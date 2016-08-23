@@ -127,7 +127,7 @@ type TxPool struct {
 	cfg           Config
 	pool          map[chainhash.Hash]*TxDesc
 	orphans       map[chainhash.Hash]*btcutil.Tx
-	orphansByPrev map[chainhash.Hash]map[chainhash.Hash]*btcutil.Tx
+	orphansByPrev map[wire.OutPoint]map[chainhash.Hash]*btcutil.Tx
 	outpoints     map[wire.OutPoint]*btcutil.Tx
 	pennyTotal    float64 // exponentially decaying total for penny spends.
 	lastPennyUnix int64   // unix time of last ``penny spend''
@@ -140,8 +140,9 @@ var _ mining.TxSource = (*TxPool)(nil)
 // RemoveOrphan.  See the comment for RemoveOrphan for more details.
 //
 // This function MUST be called with the mempool lock held (for writes).
-func (mp *TxPool) removeOrphan(txHash *chainhash.Hash) {
+func (mp *TxPool) removeOrphan(tx *btcutil.Tx, removeRedeemers bool) {
 	// Nothing to do if passed tx is not an orphan.
+	txHash := tx.Hash()
 	tx, exists := mp.orphans[*txHash]
 	if !exists {
 		return
@@ -149,14 +150,25 @@ func (mp *TxPool) removeOrphan(txHash *chainhash.Hash) {
 
 	// Remove the reference from the previous orphan index.
 	for _, txIn := range tx.MsgTx().TxIn {
-		originTxHash := txIn.PreviousOutPoint.Hash
-		if orphans, exists := mp.orphansByPrev[originTxHash]; exists {
-			delete(orphans, *tx.Hash())
+		orphans, exists := mp.orphansByPrev[txIn.PreviousOutPoint]
+		if exists {
+			delete(orphans, *txHash)
 
 			// Remove the map entry altogether if there are no
 			// longer any orphans which depend on it.
 			if len(orphans) == 0 {
-				delete(mp.orphansByPrev, originTxHash)
+				delete(mp.orphansByPrev, txIn.PreviousOutPoint)
+			}
+		}
+	}
+
+	// Remove any orphans that redeem outputs from this one if requested.
+	if removeRedeemers {
+		prevOut := wire.OutPoint{Hash: *txHash}
+		for txOutIdx := range tx.MsgTx().TxOut {
+			prevOut.Index = uint32(txOutIdx)
+			for _, orphan := range mp.orphansByPrev[prevOut] {
+				mp.removeOrphan(orphan, true)
 			}
 		}
 	}
@@ -169,9 +181,9 @@ func (mp *TxPool) removeOrphan(txHash *chainhash.Hash) {
 // previous orphan index.
 //
 // This function is safe for concurrent access.
-func (mp *TxPool) RemoveOrphan(txHash *chainhash.Hash) {
+func (mp *TxPool) RemoveOrphan(tx *btcutil.Tx) {
 	mp.mtx.Lock()
-	mp.removeOrphan(txHash)
+	mp.removeOrphan(tx, false)
 	mp.mtx.Unlock()
 }
 
@@ -190,8 +202,8 @@ func (mp *TxPool) limitNumOrphans() error {
 	// is not important here because an adversary would have to be
 	// able to pull off preimage attacks on the hashing function in
 	// order to target eviction of specific entries anyways.
-	for txHash := range mp.orphans {
-		mp.removeOrphan(&txHash)
+	for _, tx := range mp.orphans {
+		mp.removeOrphan(tx, false)
 		break
 	}
 
@@ -213,12 +225,11 @@ func (mp *TxPool) addOrphan(tx *btcutil.Tx) {
 
 	mp.orphans[*tx.Hash()] = tx
 	for _, txIn := range tx.MsgTx().TxIn {
-		originTxHash := txIn.PreviousOutPoint.Hash
-		if _, exists := mp.orphansByPrev[originTxHash]; !exists {
-			mp.orphansByPrev[originTxHash] =
+		if _, exists := mp.orphansByPrev[txIn.PreviousOutPoint]; !exists {
+			mp.orphansByPrev[txIn.PreviousOutPoint] =
 				make(map[chainhash.Hash]*btcutil.Tx)
 		}
-		mp.orphansByPrev[originTxHash][*tx.Hash()] = tx
+		mp.orphansByPrev[txIn.PreviousOutPoint][*tx.Hash()] = tx
 	}
 
 	log.Debugf("Stored orphan transaction %v (total: %d)", tx.Hash(),
@@ -251,6 +262,22 @@ func (mp *TxPool) maybeAddOrphan(tx *btcutil.Tx) error {
 	mp.addOrphan(tx)
 
 	return nil
+}
+
+// removeOrphanDoubleSpends removes all orphans which spend outputs spent by the
+// passed transaction from the orphan pool.  Removing those orphans then leads
+// to removing all orphans which rely on them, recursively.  This is necessary
+// when a transaction is added to the main pool because it may spend outputs
+// that orphans also spend.
+//
+// This function MUST be called with the mempool lock held (for writes).
+func (mp *TxPool) removeOrphanDoubleSpends(tx *btcutil.Tx) {
+	msgTx := tx.MsgTx()
+	for _, txIn := range msgTx.TxIn {
+		for _, orphan := range mp.orphansByPrev[txIn.PreviousOutPoint] {
+			mp.removeOrphan(orphan, true)
+		}
+	}
 }
 
 // isTransactionInPool returns whether or not the passed transaction already
@@ -333,8 +360,8 @@ func (mp *TxPool) removeTransaction(tx *btcutil.Tx, removeRedeemers bool) {
 	if removeRedeemers {
 		// Remove any transactions which rely on this one.
 		for i := uint32(0); i < uint32(len(tx.MsgTx().TxOut)); i++ {
-			outpoint := wire.NewOutPoint(txHash, i)
-			if txRedeemer, exists := mp.outpoints[*outpoint]; exists {
+			prevOut := wire.OutPoint{Hash: *txHash, Index: i}
+			if txRedeemer, exists := mp.outpoints[prevOut]; exists {
 				mp.removeTransaction(txRedeemer, true)
 			}
 		}
@@ -486,19 +513,22 @@ func (mp *TxPool) FetchTransaction(txHash *chainhash.Hash) (*btcutil.Tx, error) 
 // more details.
 //
 // This function MUST be called with the mempool lock held (for writes).
-func (mp *TxPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit bool) ([]*chainhash.Hash, error) {
+func (mp *TxPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit, rejectDupOrphans bool) ([]*chainhash.Hash, error) {
 	txHash := tx.Hash()
 
 	// Don't accept the transaction if it already exists in the pool.  This
-	// applies to orphan transactions as well.  This check is intended to
-	// be a quick check to weed out duplicates.
-	if mp.haveTransaction(txHash) {
+	// applies to orphan transactions as well when the reject duplicate
+	// orphans flag is set.  This check is intended to be a quick check to
+	// weed out duplicates.
+	if mp.isTransactionInPool(txHash) || (rejectDupOrphans &&
+		mp.isOrphanInPool(txHash)) {
+
 		str := fmt.Sprintf("already have transaction %v", txHash)
 		return nil, txRuleError(wire.RejectDuplicate, str)
 	}
 
 	// Perform preliminary sanity checks on the transaction.  This makes
-	// use of btcchain which contains the invariant rules for what
+	// use of blockchain which contains the invariant rules for what
 	// transactions are allowed into blocks.
 	err := blockchain.CheckTransactionSanity(tx)
 	if err != nil {
@@ -605,7 +635,7 @@ func (mp *TxPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit bool) 
 	}
 
 	// Perform several checks on the transaction inputs using the invariant
-	// rules in btcchain for what transactions are allowed into blocks.
+	// rules in blockchain for what transactions are allowed into blocks.
 	// Also returns the fees associated with the transaction which will be
 	// used later.
 	txFee, err := blockchain.CheckTransactionInputs(tx, nextBlockHeight,
@@ -752,7 +782,7 @@ func (mp *TxPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit bool) 
 func (mp *TxPool) MaybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit bool) ([]*chainhash.Hash, error) {
 	// Protect concurrent access.
 	mp.mtx.Lock()
-	hashes, err := mp.maybeAcceptTransaction(tx, isNew, rateLimit)
+	hashes, err := mp.maybeAcceptTransaction(tx, isNew, rateLimit, true)
 	mp.mtx.Unlock()
 
 	return hashes, err
@@ -762,82 +792,80 @@ func (mp *TxPool) MaybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit bool) 
 // ProcessOrphans.  See the comment for ProcessOrphans for more details.
 //
 // This function MUST be called with the mempool lock held (for writes).
-func (mp *TxPool) processOrphans(hash *chainhash.Hash) []*btcutil.Tx {
+func (mp *TxPool) processOrphans(acceptedTx *btcutil.Tx) []*btcutil.Tx {
 	var acceptedTxns []*btcutil.Tx
 
-	// Start with processing at least the passed hash.
-	processHashes := list.New()
-	processHashes.PushBack(hash)
-	for processHashes.Len() > 0 {
-		// Pop the first hash to process.
-		firstElement := processHashes.Remove(processHashes.Front())
-		processHash := firstElement.(*chainhash.Hash)
+	// Start with processing at least the passed transaction.
+	processList := list.New()
+	processList.PushBack(acceptedTx)
+	for processList.Len() > 0 {
+		// Pop the transaction to process from the front of the list.
+		firstElement := processList.Remove(processList.Front())
+		processItem := firstElement.(*btcutil.Tx)
 
-		// Look up all orphans that are referenced by the transaction we
-		// just accepted.  This will typically only be one, but it could
-		// be multiple if the referenced transaction contains multiple
-		// outputs.  Skip to the next item on the list of hashes to
-		// process if there are none.
-		orphans, exists := mp.orphansByPrev[*processHash]
-		if !exists || orphans == nil {
-			continue
-		}
-
-		for _, tx := range orphans {
-			// Remove the orphan from the orphan pool.  Current
-			// behavior requires that all saved orphans with
-			// a newly accepted parent are removed from the orphan
-			// pool and potentially added to the memory pool, but
-			// transactions which cannot be added to memory pool
-			// (including due to still being orphans) are expunged
-			// from the orphan pool.
+		prevOut := wire.OutPoint{Hash: *processItem.Hash()}
+		for txOutIdx := range processItem.MsgTx().TxOut {
+			// Look up all orphans that redeem the output that is
+			// now available.  This will typically only be one, but
+			// it could be multiple if the orphan pool contains
+			// double spends.  While it may seem odd that the orphan
+			// pool would allow this since there can only possibly
+			// ultimately be a single redeemer, it's important to
+			// track it this way to prevent malicious actors from
+			// being able to purposely constructing orphans that
+			// would otherwise make outputs unspendable.
 			//
-			// TODO(jrick): The above described behavior sounds
-			// like a bug, and I think we should investigate
-			// potentially moving orphans to the memory pool, but
-			// leaving them in the orphan pool if not all parent
-			// transactions are known yet.
-			orphanHash := tx.Hash()
-			mp.removeOrphan(orphanHash)
-
-			// Potentially accept the transaction into the
-			// transaction pool.
-			missingParents, err := mp.maybeAcceptTransaction(tx,
-				true, true)
-			if err != nil {
-				// TODO: Remove orphans that depend on this
-				// failed transaction.
-				log.Debugf("Unable to move orphan transaction "+
-					"%v to mempool: %v", tx.Hash(), err)
+			// Skip to the next available output if there are none.
+			prevOut.Index = uint32(txOutIdx)
+			orphans, exists := mp.orphansByPrev[prevOut]
+			if !exists {
 				continue
 			}
 
-			if len(missingParents) > 0 {
-				// Transaction is still an orphan, so add it
-				// back.
-				mp.addOrphan(tx)
-				continue
+			// Potentially accept an orphan into the tx pool.
+			for _, tx := range orphans {
+				missing, err := mp.maybeAcceptTransaction(
+					tx, true, true, false)
+				if err != nil {
+					// The orphan is now invalid, so there
+					// is no way any other orphans which
+					// redeem any of its outputs can be
+					// accepted.  Remove them.
+					mp.removeOrphan(tx, true)
+					break
+				}
+
+				// Transaction is still an orphan.  Try the next
+				// orphan which redeems this output.
+				if len(missing) > 0 {
+					continue
+				}
+
+				// Transaction was accepted into the main pool.
+				//
+				// Add it to the list of accepted transactions
+				// that are no longer orphans, remove it from
+				// the orphan pool, and add it to the list of
+				// transactions to process so any orphans that
+				// depend on it are handled too.
+				acceptedTxns = append(acceptedTxns, tx)
+				mp.removeOrphan(tx, false)
+				processList.PushBack(tx)
+
+				// Only one transaction for this outpoint can be
+				// accepted, so the rest are now double spends
+				// and are removed later.
+				break
 			}
-
-			// Add this transaction to the list of transactions
-			// that are no longer orphans.
-			acceptedTxns = append(acceptedTxns, tx)
-
-			// Add this transaction to the list of transactions to
-			// process so any orphans that depend on this one are
-			// handled too.
-			//
-			// TODO(jrick): In the case that this is still an orphan,
-			// we know that any other transactions in the orphan
-			// pool with this orphan as their parent are still
-			// orphans as well, and should be removed.  While
-			// recursively calling removeOrphan and
-			// maybeAcceptTransaction on these transactions is not
-			// wrong per se, it is overkill if all we care about is
-			// recursively removing child transactions of this
-			// orphan.
-			processHashes.PushBack(orphanHash)
 		}
+	}
+
+	// Recursively remove any orphans that also redeem any outputs redeemed
+	// by the accepted transactions since those are now definitive double
+	// spends.
+	mp.removeOrphanDoubleSpends(acceptedTx)
+	for _, tx := range acceptedTxns {
+		mp.removeOrphanDoubleSpends(tx)
 	}
 
 	return acceptedTxns
@@ -853,9 +881,9 @@ func (mp *TxPool) processOrphans(hash *chainhash.Hash) []*btcutil.Tx {
 // no transactions were moved from the orphan pool to the mempool.
 //
 // This function is safe for concurrent access.
-func (mp *TxPool) ProcessOrphans(hash *chainhash.Hash) []*btcutil.Tx {
+func (mp *TxPool) ProcessOrphans(acceptedTx *btcutil.Tx) []*btcutil.Tx {
 	mp.mtx.Lock()
-	acceptedTxns := mp.processOrphans(hash)
+	acceptedTxns := mp.processOrphans(acceptedTx)
 	mp.mtx.Unlock()
 
 	return acceptedTxns
@@ -880,7 +908,8 @@ func (mp *TxPool) ProcessTransaction(tx *btcutil.Tx, allowOrphan, rateLimit bool
 	defer mp.mtx.Unlock()
 
 	// Potentially accept the transaction to the memory pool.
-	missingParents, err := mp.maybeAcceptTransaction(tx, true, rateLimit)
+	missingParents, err := mp.maybeAcceptTransaction(tx, true, rateLimit,
+		true)
 	if err != nil {
 		return nil, err
 	}
@@ -890,7 +919,7 @@ func (mp *TxPool) ProcessTransaction(tx *btcutil.Tx, allowOrphan, rateLimit bool
 		// transaction (they may no longer be orphans if all inputs
 		// are now available) and repeat for those accepted
 		// transactions until there are no more.
-		newTxs := mp.processOrphans(tx.Hash())
+		newTxs := mp.processOrphans(tx)
 		acceptedTxs := make([]*btcutil.Tx, len(newTxs)+1)
 
 		// Add the parent transaction first so remote nodes
@@ -1055,7 +1084,7 @@ func New(cfg *Config) *TxPool {
 		cfg:           *cfg,
 		pool:          make(map[chainhash.Hash]*TxDesc),
 		orphans:       make(map[chainhash.Hash]*btcutil.Tx),
-		orphansByPrev: make(map[chainhash.Hash]map[chainhash.Hash]*btcutil.Tx),
+		orphansByPrev: make(map[wire.OutPoint]map[chainhash.Hash]*btcutil.Tx),
 		outpoints:     make(map[wire.OutPoint]*btcutil.Tx),
 	}
 }

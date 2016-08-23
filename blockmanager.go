@@ -1207,8 +1207,8 @@ func (b *blockManager) handleNotifyMsg(notification *blockchain.Notification) {
 		for _, tx := range block.Transactions()[1:] {
 			b.server.txMemPool.RemoveTransaction(tx, false)
 			b.server.txMemPool.RemoveDoubleSpends(tx)
-			b.server.txMemPool.RemoveOrphan(tx.Hash())
-			acceptedTxs := b.server.txMemPool.ProcessOrphans(tx.Hash())
+			b.server.txMemPool.RemoveOrphan(tx)
+			acceptedTxs := b.server.txMemPool.ProcessOrphans(tx)
 			b.server.AnnounceNewTransactions(acceptedTxs)
 		}
 

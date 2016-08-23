@@ -552,3 +552,231 @@ func TestOrphanEviction(t *testing.T) {
 		testPoolMembership(tc, tx, false, false)
 	}
 }
+
+// TestBasicOrphanRemoval ensure that orphan removal works as expected when an
+// orphan that doesn't exist is removed  both when there is another orphan that
+// redeems it and when there is not.
+func TestBasicOrphanRemoval(t *testing.T) {
+	t.Parallel()
+
+	const maxOrphans = 4
+	harness, spendableOuts, err := newPoolHarness(&chaincfg.MainNetParams)
+	if err != nil {
+		t.Fatalf("unable to create test pool: %v", err)
+	}
+	harness.txPool.cfg.Policy.MaxOrphanTxs = maxOrphans
+	tc := &testContext{t, harness}
+
+	// Create a chain of transactions rooted with the first spendable output
+	// provided by the harness.
+	chainedTxns, err := harness.CreateTxChain(spendableOuts[0], maxOrphans+1)
+	if err != nil {
+		t.Fatalf("unable to create transaction chain: %v", err)
+	}
+
+	// Ensure the orphans are accepted (only up to the maximum allowed so
+	// none are evicted).
+	for _, tx := range chainedTxns[1 : maxOrphans+1] {
+		acceptedTxns, err := harness.txPool.ProcessTransaction(tx, true,
+			false)
+		if err != nil {
+			t.Fatalf("ProcessTransaction: failed to accept valid "+
+				"orphan %v", err)
+		}
+
+		// Ensure no transactions were reported as accepted.
+		if len(acceptedTxns) != 0 {
+			t.Fatalf("ProcessTransaction: reported %d accepted "+
+				"transactions from what should be an orphan",
+				len(acceptedTxns))
+		}
+
+		// Ensure the transaction is in the orphan pool, not in the
+		// transaction pool, and reported as available.
+		testPoolMembership(tc, tx, true, false)
+	}
+
+	// Attempt to remove an orphan that has no redeemers and is not present,
+	// and ensure the state of all other orphans are unaffected.
+	nonChainedOrphanTx, err := harness.CreateSignedTx([]spendableOutput{{
+		amount:   btcutil.Amount(5000000000),
+		outPoint: wire.OutPoint{Hash: chainhash.Hash{}, Index: 0},
+	}}, 1)
+	if err != nil {
+		t.Fatalf("unable to create signed tx: %v", err)
+	}
+
+	harness.txPool.RemoveOrphan(nonChainedOrphanTx)
+	testPoolMembership(tc, nonChainedOrphanTx, false, false)
+	for _, tx := range chainedTxns[1 : maxOrphans+1] {
+		testPoolMembership(tc, tx, true, false)
+	}
+
+	// Attempt to remove an orphan that has a existing redeemer but itself
+	// is not present and ensure the state of all other orphans (including
+	// the one that redeems it) are unaffected.
+	harness.txPool.RemoveOrphan(chainedTxns[0])
+	testPoolMembership(tc, chainedTxns[0], false, false)
+	for _, tx := range chainedTxns[1 : maxOrphans+1] {
+		testPoolMembership(tc, tx, true, false)
+	}
+
+	// Remove each orphan one-by-one and ensure they are removed as
+	// expected.
+	for _, tx := range chainedTxns[1 : maxOrphans+1] {
+		harness.txPool.RemoveOrphan(tx)
+		testPoolMembership(tc, tx, false, false)
+	}
+}
+
+// TestOrphanChainRemoval ensure that orphan chains (orphans that spend outputs
+// from other orphans) are removed as expected.
+func TestOrphanChainRemoval(t *testing.T) {
+	t.Parallel()
+
+	const maxOrphans = 10
+	harness, spendableOuts, err := newPoolHarness(&chaincfg.MainNetParams)
+	if err != nil {
+		t.Fatalf("unable to create test pool: %v", err)
+	}
+	harness.txPool.cfg.Policy.MaxOrphanTxs = maxOrphans
+	tc := &testContext{t, harness}
+
+	// Create a chain of transactions rooted with the first spendable output
+	// provided by the harness.
+	chainedTxns, err := harness.CreateTxChain(spendableOuts[0], maxOrphans+1)
+	if err != nil {
+		t.Fatalf("unable to create transaction chain: %v", err)
+	}
+
+	// Ensure the orphans are accepted (only up to the maximum allowed so
+	// none are evicted).
+	for _, tx := range chainedTxns[1 : maxOrphans+1] {
+		acceptedTxns, err := harness.txPool.ProcessTransaction(tx, true,
+			false)
+		if err != nil {
+			t.Fatalf("ProcessTransaction: failed to accept valid "+
+				"orphan %v", err)
+		}
+
+		// Ensure no transactions were reported as accepted.
+		if len(acceptedTxns) != 0 {
+			t.Fatalf("ProcessTransaction: reported %d accepted "+
+				"transactions from what should be an orphan",
+				len(acceptedTxns))
+		}
+
+		// Ensure the transaction is in the orphan pool, not in the
+		// transaction pool, and reported as available.
+		testPoolMembership(tc, tx, true, false)
+	}
+
+	// Remove the first orphan that starts the orphan chain without the
+	// remove redeemer flag set and ensure that only the first orphan was
+	// removed.
+	harness.txPool.mtx.Lock()
+	harness.txPool.removeOrphan(chainedTxns[1], false)
+	harness.txPool.mtx.Unlock()
+	testPoolMembership(tc, chainedTxns[1], false, false)
+	for _, tx := range chainedTxns[2 : maxOrphans+1] {
+		testPoolMembership(tc, tx, true, false)
+	}
+
+	// Remove the first remaining orphan that starts the orphan chain with
+	// the remove redeemer flag set and ensure they are all removed.
+	harness.txPool.mtx.Lock()
+	harness.txPool.removeOrphan(chainedTxns[2], true)
+	harness.txPool.mtx.Unlock()
+	for _, tx := range chainedTxns[2 : maxOrphans+1] {
+		testPoolMembership(tc, tx, false, false)
+	}
+}
+
+// TestMultiInputOrphanDoubleSpend ensures that orphans that spend from an
+// output that is spend by another transaction entering the pool are removed.
+func TestMultiInputOrphanDoubleSpend(t *testing.T) {
+	t.Parallel()
+
+	const maxOrphans = 4
+	harness, outputs, err := newPoolHarness(&chaincfg.MainNetParams)
+	if err != nil {
+		t.Fatalf("unable to create test pool: %v", err)
+	}
+	harness.txPool.cfg.Policy.MaxOrphanTxs = maxOrphans
+	tc := &testContext{t, harness}
+
+	// Create a chain of transactions rooted with the first spendable output
+	// provided by the harness.
+	chainedTxns, err := harness.CreateTxChain(outputs[0], maxOrphans+1)
+	if err != nil {
+		t.Fatalf("unable to create transaction chain: %v", err)
+	}
+
+	// Start by adding the orphan transactions from the generated chain
+	// except the final one.
+	for _, tx := range chainedTxns[1:maxOrphans] {
+		acceptedTxns, err := harness.txPool.ProcessTransaction(tx, true,
+			false)
+		if err != nil {
+			t.Fatalf("ProcessTransaction: failed to accept valid "+
+				"orphan %v", err)
+		}
+		if len(acceptedTxns) != 0 {
+			t.Fatalf("ProcessTransaction: reported %d accepted transactions "+
+				"from what should be an orphan", len(acceptedTxns))
+		}
+		testPoolMembership(tc, tx, true, false)
+	}
+
+	// Ensure a transaction that contains a double spend of the same output
+	// as the second orphan that was just added as well as a valid spend
+	// from that last orphan in the chain generated above (and is not in the
+	// orphan pool) is accepted to the orphan pool.  This must be allowed
+	// since it would otherwise be possible for a malicious actor to disrupt
+	// tx chains.
+	doubleSpendTx, err := harness.CreateSignedTx([]spendableOutput{
+		txOutToSpendableOut(chainedTxns[1], 0),
+		txOutToSpendableOut(chainedTxns[maxOrphans], 0),
+	}, 1)
+	if err != nil {
+		t.Fatalf("unable to create signed tx: %v", err)
+	}
+	acceptedTxns, err := harness.txPool.ProcessTransaction(doubleSpendTx,
+		true, false)
+	if err != nil {
+		t.Fatalf("ProcessTransaction: failed to accept valid orphan %v",
+			err)
+	}
+	if len(acceptedTxns) != 0 {
+		t.Fatalf("ProcessTransaction: reported %d accepted transactions "+
+			"from what should be an orphan", len(acceptedTxns))
+	}
+	testPoolMembership(tc, doubleSpendTx, true, false)
+
+	// Add the transaction which completes the orphan chain and ensure the
+	// chain gets accepted.  Notice the accept orphans flag is also false
+	// here to ensure it has no bearing on whether or not already existing
+	// orphans in the pool are linked.
+	//
+	// This will cause the shared output to become a concrete spend which
+	// will in turn must cause the double spending orphan to be removed.
+	acceptedTxns, err = harness.txPool.ProcessTransaction(chainedTxns[0],
+		false, false)
+	if err != nil {
+		t.Fatalf("ProcessTransaction: failed to accept valid tx %v", err)
+	}
+	if len(acceptedTxns) != maxOrphans {
+		t.Fatalf("ProcessTransaction: reported accepted transactions "+
+			"length does not match expected -- got %d, want %d",
+			len(acceptedTxns), maxOrphans)
+	}
+	for _, tx := range acceptedTxns {
+		// Ensure the transaction is no longer in the orphan pool, is
+		// in the transaction pool, and is reported as available.
+		testPoolMembership(tc, tx, false, true)
+	}
+
+	// Ensure the double spending orphan is no longer in the orphan pool and
+	// was not moved to the transaction pool.
+	testPoolMembership(tc, doubleSpendTx, false, false)
+}
