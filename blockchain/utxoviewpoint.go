@@ -153,6 +153,29 @@ func (entry *UtxoEntry) PkScriptByIndex(outputIndex uint32) []byte {
 	return output.pkScript
 }
 
+// Clone returns a deep copy of the utxo entry.
+func (entry *UtxoEntry) Clone() *UtxoEntry {
+	if entry == nil {
+		return nil
+	}
+
+	newEntry := &UtxoEntry{
+		version:       entry.version,
+		isCoinBase:    entry.isCoinBase,
+		blockHeight:   entry.blockHeight,
+		sparseOutputs: make(map[uint32]*utxoOutput),
+	}
+	for outputIndex, output := range entry.sparseOutputs {
+		newEntry.sparseOutputs[outputIndex] = &utxoOutput{
+			spent:      output.spent,
+			compressed: output.compressed,
+			amount:     output.amount,
+			pkScript:   output.pkScript,
+		}
+	}
+	return newEntry
+}
+
 // newUtxoEntry returns a new unspent transaction output entry with the provided
 // coinbase flag and block height ready to have unspent outputs added.
 func newUtxoEntry(version int32, isCoinBase bool, blockHeight int32) *UtxoEntry {
