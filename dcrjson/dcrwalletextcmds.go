@@ -81,11 +81,12 @@ func NewAddTicketCmd(ticketHex string) *AddTicketCmd {
 type ConsolidateCmd struct {
 	Inputs  int `json:"inputs"`
 	Account *string
+	Address *string
 }
 
 // NewConsolidateCmd creates a new ConsolidateCmd.
-func NewConsolidateCmd(inputs int, acct *string) *ConsolidateCmd {
-	return &ConsolidateCmd{Inputs: inputs, Account: acct}
+func NewConsolidateCmd(inputs int, acct *string, addr *string) *ConsolidateCmd {
+	return &ConsolidateCmd{Inputs: inputs, Account: acct, Address: addr}
 }
 
 // SStxInput represents the inputs to an SStx transaction. Specifically a
