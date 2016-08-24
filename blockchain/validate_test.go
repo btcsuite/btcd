@@ -17,6 +17,53 @@ import (
 	"github.com/btcsuite/btcutil"
 )
 
+// TestSequenceLocksActive tests the SequenceLockActive function to ensure it
+// works as expected in all possible combinations/scenarios.
+func TestSequenceLocksActive(t *testing.T) {
+	seqLock := func(h int32, s int64) *blockchain.SequenceLock {
+		return &blockchain.SequenceLock{
+			Seconds:     s,
+			BlockHeight: h,
+		}
+	}
+
+	tests := []struct {
+		seqLock     *blockchain.SequenceLock
+		blockHeight int32
+		mtp         time.Time
+
+		want bool
+	}{
+		// Block based sequence lock with equal block height.
+		{seqLock: seqLock(1000, -1), blockHeight: 1001, mtp: time.Unix(9, 0), want: true},
+
+		// Time based sequence lock with mtp past the absolute time.
+		{seqLock: seqLock(-1, 30), blockHeight: 2, mtp: time.Unix(31, 0), want: true},
+
+		// Block based sequence lock with current height below seq lock block height.
+		{seqLock: seqLock(1000, -1), blockHeight: 90, mtp: time.Unix(9, 0), want: false},
+
+		// Time based sequence lock with current time before lock time.
+		{seqLock: seqLock(-1, 30), blockHeight: 2, mtp: time.Unix(29, 0), want: false},
+
+		// Block based sequence lock at the same height, so shouldn't yet be active.
+		{seqLock: seqLock(1000, -1), blockHeight: 1000, mtp: time.Unix(9, 0), want: false},
+
+		// Time based sequence lock with current time equal to lock time, so shouldn't yet be active.
+		{seqLock: seqLock(-1, 30), blockHeight: 2, mtp: time.Unix(30, 0), want: false},
+	}
+
+	t.Logf("Running %d sequence locks tests", len(tests))
+	for i, test := range tests {
+		got := blockchain.SequenceLockActive(test.seqLock,
+			test.blockHeight, test.mtp)
+		if got != test.want {
+			t.Fatalf("SequenceLockActive #%d got %v want %v", i,
+				got, test.want)
+		}
+	}
+}
+
 // TestCheckConnectBlock tests the CheckConnectBlock function to ensure it
 // fails.
 func TestCheckConnectBlock(t *testing.T) {
