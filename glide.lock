@@ -1,10 +1,10 @@
-hash: b4b0fa8d8b8327f8095fa627d53599343c6827f1ec43fbb2bf0d4b5f6939dc73
-updated: 2016-07-15T14:38:09.1172375-05:00
+hash: 4648b5e89ce577ac30492bc77edc33a1176f4cbbb021495b1cb522c2588a5e90
+updated: 2016-08-24T09:44:38.019002376-05:00
 imports:
 - name: github.com/btcsuite/btclog
-  version: f96df2375f37300305f329b8e5258764b4f19a7f
+  version: 73889fb79bd687870312b6e40effcecffbd57d30
 - name: github.com/btcsuite/fastsha256
-  version: 302ad4db268b46f9ebda3078f6f7397f96047735
+  version: 637e656429416087660c84436a2a035d69d54e2e
 - name: github.com/btcsuite/go-flags
   version: 6c288d648c1cc1befcb90cb5511dcacf64ae8e61
 - name: github.com/btcsuite/go-socks
@@ -45,7 +45,7 @@ imports:
   - registry
   - winapi
 - name: github.com/davecgh/go-spew
-  version: 5215b55f46b2b919f50a1df0eaa5886afe4e3b3d
+  version: 6cf5744a041a0022271cefed95ba843f6d87fd51
   subpackages:
   - spew
 - name: github.com/decred/bitset
@@ -53,9 +53,9 @@ imports:
 - name: github.com/decred/blake256
   version: a840e32d7c31fe2e0218607334cb120a683951a4
 - name: github.com/decred/dcrrpcclient
-  version: f3c620d63cb02aec0c1152a72d3c8669b92a2fb5
+  version: 103ed11be3a7035554d3925fbfaa67742641510f
 - name: github.com/decred/dcrutil
-  version: 4a3bdb1cb08b49811674750998363b8b8ccfd66e
+  version: 4fc91a08eea88e74539d42d6301fd298b9bd8230
   subpackages:
   - bloom
   - base58
@@ -64,7 +64,15 @@ imports:
   subpackages:
   - edwards25519
 - name: golang.org/x/crypto
-  version: 10c26747e67d76ad4fafe6087c6f4073c3b22942
+  version: b35ccbc95a0eaae49fb65c5d627cb7149ed8d1ab
   subpackages:
   - ssh/terminal
-devImports: []
+testImports:
+- name: github.com/pmezard/go-difflib
+  version: 792786c7400a136282c1664665ae0a8db921c6c2
+  subpackages:
+  - difflib
+- name: github.com/stretchr/testify
+  version: d77da356e56a7428ad25149ca77381849a6a5232
+  subpackages:
+  - assert

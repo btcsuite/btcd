@@ -32,9 +32,7 @@ import:
 - package: github.com/decred/bitset
 - package: github.com/decred/blake256
 - package: github.com/decred/dcrrpcclient
-  version: v0.1.6
 - package: github.com/decred/dcrutil
-  version: v0.1.6
   subpackages:
   - bloom
 - package: github.com/decred/ed25519
