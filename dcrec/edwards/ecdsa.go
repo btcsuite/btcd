@@ -7,6 +7,7 @@ package edwards
 import (
 	"bytes"
 	"crypto/hmac"
+	"crypto/sha256"
 	"fmt"
 	"hash"
 	"io"
@@ -14,7 +15,6 @@ import (
 
 	"crypto/sha512"
 
-	"github.com/btcsuite/fastsha256"
 	"github.com/decred/ed25519"
 	"github.com/decred/ed25519/edwards25519"
 )
@@ -102,7 +102,7 @@ func NonceRFC6979(curve *TwistedEdwardsCurve, privkey *big.Int, hash []byte,
 	extra []byte, version []byte) *big.Int {
 	q := curve.Params().N
 	x := privkey
-	alg := fastsha256.New
+	alg := sha256.New
 
 	qlen := q.BitLen()
 	holen := alg().Size()

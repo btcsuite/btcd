@@ -10,12 +10,11 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/hmac"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"hash"
 	"math/big"
-
-	"github.com/btcsuite/fastsha256"
 )
 
 // Errors returned by canonicalPadding.
@@ -455,7 +454,7 @@ func NonceRFC6979(privkey *big.Int, hash []byte, extra []byte,
 	curve := S256()
 	q := curve.Params().N
 	x := privkey
-	alg := fastsha256.New
+	alg := sha256.New
 
 	qlen := q.BitLen()
 	holen := alg().Size()

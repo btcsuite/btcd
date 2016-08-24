@@ -11,7 +11,7 @@ import (
 
 // HashFunc calculates the hash of the supplied bytes.
 // TODO(jcv) Should modify blake256 so it has the same interface as blake2
-// and fastsha256 so these function can look more like btcsuite.  Then should
+// and sha256 so these function can look more like btcsuite.  Then should
 // try to get it to the upstream blake256 repo
 func HashFunc(data []byte) [blake256.Size]byte {
 	var outB [blake256.Size]byte

@@ -1,10 +1,8 @@
-hash: 4648b5e89ce577ac30492bc77edc33a1176f4cbbb021495b1cb522c2588a5e90
-updated: 2016-08-24T09:44:38.019002376-05:00
+hash: 26b232a0701585082422dc9f718ad82932d29309789896663ce3c4a5925cb84b
+updated: 2016-08-24T12:05:43.171730574-04:00
 imports:
 - name: github.com/btcsuite/btclog
   version: 73889fb79bd687870312b6e40effcecffbd57d30
-- name: github.com/btcsuite/fastsha256
-  version: 637e656429416087660c84436a2a035d69d54e2e
 - name: github.com/btcsuite/go-flags
   version: 6c288d648c1cc1befcb90cb5511dcacf64ae8e61
 - name: github.com/btcsuite/go-socks
@@ -19,17 +17,17 @@ imports:
   version: 7834afc9e8cd15233b6c3d97e12674a31ca24602
   subpackages:
   - leveldb
+  - leveldb/cache
   - leveldb/comparer
   - leveldb/errors
   - leveldb/filter
   - leveldb/iterator
-  - leveldb/opt
-  - leveldb/util
-  - leveldb/cache
   - leveldb/journal
   - leveldb/memdb
+  - leveldb/opt
   - leveldb/storage
   - leveldb/table
+  - leveldb/util
 - name: github.com/btcsuite/seelog
   version: ae8891d029dd3c269dcfd6f261ad23e761acd99f
 - name: github.com/btcsuite/snappy-go
@@ -41,8 +39,8 @@ imports:
   subpackages:
   - eventlog
   - mgr
-  - svc
   - registry
+  - svc
   - winapi
 - name: github.com/davecgh/go-spew
   version: 6cf5744a041a0022271cefed95ba843f6d87fd51
@@ -57,14 +55,14 @@ imports:
 - name: github.com/decred/dcrutil
   version: 4fc91a08eea88e74539d42d6301fd298b9bd8230
   subpackages:
-  - bloom
   - base58
+  - bloom
 - name: github.com/decred/ed25519
   version: b0909d3f798b97a03c9e77023f97a5301a2a7900
   subpackages:
   - edwards25519
 - name: golang.org/x/crypto
-  version: b35ccbc95a0eaae49fb65c5d627cb7149ed8d1ab
+  version: 986d3313588aa5c68f1df95eac956f79cf3b2c01
   subpackages:
   - ssh/terminal
 testImports:

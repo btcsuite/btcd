@@ -7,6 +7,7 @@ package main
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"crypto/subtle"
 	"crypto/tls"
 	"encoding/base64"
@@ -30,7 +31,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/btcsuite/fastsha256"
 	"github.com/btcsuite/websocket"
 
 	"github.com/decred/bitset"
@@ -5723,8 +5723,8 @@ type rpcServer struct {
 	policy       *mining.Policy
 	server       *server
 	chain        *blockchain.BlockChain
-	authsha      [fastsha256.Size]byte
-	limitauthsha [fastsha256.Size]byte
+	authsha      [sha256.Size]byte
+	limitauthsha [sha256.Size]byte
 	ntfnMgr      *wsNotificationManager
 	numClients   int32
 	statusLines  map[int]string
@@ -5881,7 +5881,7 @@ func (s *rpcServer) checkAuth(r *http.Request, require bool) (bool, bool, error)
 		return false, false, nil
 	}
 
-	authsha := fastsha256.Sum256([]byte(authhdr[0]))
+	authsha := sha256.Sum256([]byte(authhdr[0]))
 
 	// Check for limited auth first as in environments with limited users, those
 	// are probably expected to have a higher volume of calls
@@ -6218,12 +6218,12 @@ func newRPCServer(listenAddrs []string, policy *mining.Policy, s *server) (*rpcS
 	if cfg.RPCUser != "" && cfg.RPCPass != "" {
 		login := cfg.RPCUser + ":" + cfg.RPCPass
 		auth := "Basic " + base64.StdEncoding.EncodeToString([]byte(login))
-		rpc.authsha = fastsha256.Sum256([]byte(auth))
+		rpc.authsha = sha256.Sum256([]byte(auth))
 	}
 	if cfg.RPCLimitUser != "" && cfg.RPCLimitPass != "" {
 		login := cfg.RPCLimitUser + ":" + cfg.RPCLimitPass
 		auth := "Basic " + base64.StdEncoding.EncodeToString([]byte(login))
-		rpc.limitauthsha = fastsha256.Sum256([]byte(auth))
+		rpc.limitauthsha = sha256.Sum256([]byte(auth))
 	}
 	rpc.ntfnMgr = newWsNotificationManager(&rpc)
 

@@ -8,6 +8,7 @@ package main
 import (
 	"bytes"
 	"container/list"
+	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/base64"
 	"encoding/hex"
@@ -20,7 +21,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/btcsuite/fastsha256"
 	"github.com/btcsuite/golangcrypto/ripemd160"
 	"github.com/btcsuite/websocket"
 
@@ -1325,7 +1325,7 @@ func (c *wsClient) handleMessage(msg []byte) {
 		// Check credentials.
 		login := authCmd.Username + ":" + authCmd.Passphrase
 		auth := "Basic " + base64.StdEncoding.EncodeToString([]byte(login))
-		authSha := fastsha256.Sum256([]byte(auth))
+		authSha := sha256.Sum256([]byte(auth))
 		cmp := subtle.ConstantTimeCompare(authSha[:], c.server.authsha[:])
 		limitcmp := subtle.ConstantTimeCompare(authSha[:], c.server.limitauthsha[:])
 		if cmp != 1 && limitcmp != 1 {

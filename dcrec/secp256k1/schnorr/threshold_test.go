@@ -6,11 +6,11 @@ package schnorr
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/hex"
 	"math/rand"
 	"testing"
 
-	"github.com/btcsuite/fastsha256"
 	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/dcrec/secp256k1"
 	"github.com/stretchr/testify/assert"
@@ -26,7 +26,7 @@ type signerHex struct {
 // Sha256. The internal tests from secp256k1 are kind of screwy and for
 // partial signatures call this hash function instead of testSchnorrHash.
 func testSchnorrSha256Hash(msg []byte) []byte {
-	sha := fastsha256.Sum256(msg)
+	sha := sha256.Sum256(msg)
 	return sha[:]
 }
 
