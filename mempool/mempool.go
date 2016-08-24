@@ -37,6 +37,15 @@ const (
 	// mempoolHeight is the height used for the "block" height field of the
 	// contextual transaction information provided in a transaction view.
 	mempoolHeight = 0x7fffffff
+
+	// orphanTTL is the maximum amount of time an orphan is allowed to
+	// stay in the orphan pool before it expires and is evicted during the
+	// next scan.
+	orphanTTL = time.Minute * 15
+
+	// orphanExpireScanInterval is the minimum amount of time in between
+	// scans of the orphan pool to evict expired transactions.
+	orphanExpireScanInterval = time.Minute * 5
 )
 
 // Config is a descriptor containing the memory pool configuration.
@@ -116,6 +125,14 @@ type TxDesc struct {
 	StartingPriority float64
 }
 
+// orphanTx is normal transaction that references an ancestor transaction
+// that is not yet available.  It also contains additional information related
+// to it such as an expiration time to help prevent caching the orphan forever.
+type orphanTx struct {
+	tx         *btcutil.Tx
+	expiration time.Time
+}
+
 // TxPool is used as a source of transactions that need to be mined into blocks
 // and relayed to other peers.  It is safe for concurrent access from multiple
 // peers.
@@ -126,11 +143,17 @@ type TxPool struct {
 	mtx           sync.RWMutex
 	cfg           Config
 	pool          map[chainhash.Hash]*TxDesc
-	orphans       map[chainhash.Hash]*btcutil.Tx
+	orphans       map[chainhash.Hash]*orphanTx
 	orphansByPrev map[wire.OutPoint]map[chainhash.Hash]*btcutil.Tx
 	outpoints     map[wire.OutPoint]*btcutil.Tx
 	pennyTotal    float64 // exponentially decaying total for penny spends.
 	lastPennyUnix int64   // unix time of last ``penny spend''
+
+	// nextExpireScan is the time after which the orphan pool will be
+	// scanned in order to evict orphans.  This is NOT a hard deadline as
+	// the scan will only run when an orphan is added to the pool as opposed
+	// to on an unconditional timer.
+	nextExpireScan time.Time
 }
 
 // Ensure the TxPool type implements the mining.TxSource interface.
@@ -143,13 +166,13 @@ var _ mining.TxSource = (*TxPool)(nil)
 func (mp *TxPool) removeOrphan(tx *btcutil.Tx, removeRedeemers bool) {
 	// Nothing to do if passed tx is not an orphan.
 	txHash := tx.Hash()
-	tx, exists := mp.orphans[*txHash]
+	otx, exists := mp.orphans[*txHash]
 	if !exists {
 		return
 	}
 
 	// Remove the reference from the previous orphan index.
-	for _, txIn := range tx.MsgTx().TxIn {
+	for _, txIn := range otx.tx.MsgTx().TxIn {
 		orphans, exists := mp.orphansByPrev[txIn.PreviousOutPoint]
 		if exists {
 			delete(orphans, *txHash)
@@ -192,6 +215,34 @@ func (mp *TxPool) RemoveOrphan(tx *btcutil.Tx) {
 //
 // This function MUST be called with the mempool lock held (for writes).
 func (mp *TxPool) limitNumOrphans() error {
+	// Scan through the orphan pool and remove any expired orphans when it's
+	// time.  This is done for efficiency so the scan only happens
+	// periodically instead of on every orphan added to the pool.
+	if now := time.Now(); now.After(mp.nextExpireScan) {
+		origNumOrphans := len(mp.orphans)
+		for _, otx := range mp.orphans {
+			if now.After(otx.expiration) {
+				// Remove redeemers too because the missing
+				// parents are very unlikely to ever materialize
+				// since the orphan has already been around more
+				// than long enough for them to be delivered.
+				mp.removeOrphan(otx.tx, true)
+			}
+		}
+
+		// Set next expiration scan to occur after the scan interval.
+		mp.nextExpireScan = now.Add(orphanExpireScanInterval)
+
+		numOrphans := len(mp.orphans)
+		if numExpired := origNumOrphans - numOrphans; numExpired > 0 {
+			log.Debugf("Expired %d %s (remaining: %d)", numExpired,
+				pickNoun(numExpired, "orphan", "orphans"),
+				numOrphans)
+		}
+	}
+
+	// Nothing to do if adding another orphan will not cause the pool to
+	// exceed the limit.
 	if len(mp.orphans)+1 <= mp.cfg.Policy.MaxOrphanTxs {
 		return nil
 	}
@@ -202,8 +253,10 @@ func (mp *TxPool) limitNumOrphans() error {
 	// is not important here because an adversary would have to be
 	// able to pull off preimage attacks on the hashing function in
 	// order to target eviction of specific entries anyways.
-	for _, tx := range mp.orphans {
-		mp.removeOrphan(tx, false)
+	for _, otx := range mp.orphans {
+		// Don't remove redeemers in the case of a random eviction since
+		// it is quite possible it might be needed again shortly.
+		mp.removeOrphan(otx.tx, false)
 		break
 	}
 
@@ -219,11 +272,15 @@ func (mp *TxPool) addOrphan(tx *btcutil.Tx) {
 		return
 	}
 
-	// Limit the number orphan transactions to prevent memory exhaustion.  A
-	// random orphan is evicted to make room if needed.
+	// Limit the number orphan transactions to prevent memory exhaustion.
+	// This will periodically remove any expired orphans and evict a random
+	// orphan if space is still needed.
 	mp.limitNumOrphans()
 
-	mp.orphans[*tx.Hash()] = tx
+	mp.orphans[*tx.Hash()] = &orphanTx{
+		tx:         tx,
+		expiration: time.Now().Add(orphanTTL),
+	}
 	for _, txIn := range tx.MsgTx().TxIn {
 		if _, exists := mp.orphansByPrev[txIn.PreviousOutPoint]; !exists {
 			mp.orphansByPrev[txIn.PreviousOutPoint] =
@@ -1081,10 +1138,11 @@ func (mp *TxPool) LastUpdated() time.Time {
 // transactions until they are mined into a block.
 func New(cfg *Config) *TxPool {
 	return &TxPool{
-		cfg:           *cfg,
-		pool:          make(map[chainhash.Hash]*TxDesc),
-		orphans:       make(map[chainhash.Hash]*btcutil.Tx),
-		orphansByPrev: make(map[wire.OutPoint]map[chainhash.Hash]*btcutil.Tx),
-		outpoints:     make(map[wire.OutPoint]*btcutil.Tx),
+		cfg:            *cfg,
+		pool:           make(map[chainhash.Hash]*TxDesc),
+		orphans:        make(map[chainhash.Hash]*orphanTx),
+		orphansByPrev:  make(map[wire.OutPoint]map[chainhash.Hash]*btcutil.Tx),
+		nextExpireScan: time.Now().Add(orphanExpireScanInterval),
+		outpoints:      make(map[wire.OutPoint]*btcutil.Tx),
 	}
 }
