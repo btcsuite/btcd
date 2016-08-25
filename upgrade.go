@@ -17,13 +17,12 @@ var oldTicketDBName = "ticketdb_old.gob"
 // from before ffldb was introduced and renames it in preparation for resyncing
 // the blockchain.
 func checkForAndMoveOldTicketDb() error {
-	ffldbPath := filepath.Join(cfg.DcrdHomeDir, defaultDataDirname,
-		activeNetParams.Name, blockDbNamePrefix+"_"+defaultDbType)
+	ffldbPath := filepath.Join(cfg.DataDir,
+		blockDbNamePrefix+"_"+defaultDbType)
 
 	if _, err := os.Stat(ffldbPath); os.IsNotExist(err) {
 		// Rename the old ticket database.
-		ticketDBPath := filepath.Join(cfg.DcrdHomeDir, defaultDataDirname,
-			activeNetParams.Name, ticketDBName)
+		ticketDBPath := filepath.Join(cfg.DataDir, ticketDBName)
 		if _, err := os.Stat(ticketDBPath); !os.IsNotExist(err) && err != nil {
 			return err
 		}
@@ -32,8 +31,7 @@ func checkForAndMoveOldTicketDb() error {
 			oldTicketDBName + ". It can be safely removed if you " +
 			"no longer wish to roll back to an old version of the " +
 			"software.")
-		oldTicketDBPath := filepath.Join(cfg.DcrdHomeDir, defaultDataDirname,
-			activeNetParams.Name, oldTicketDBName)
+		oldTicketDBPath := filepath.Join(cfg.DataDir, oldTicketDBName)
 		err = os.Rename(ticketDBPath, oldTicketDBPath)
 		if err != nil {
 			return err
