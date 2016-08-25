@@ -27,7 +27,7 @@ import (
 
 const (
 	// MaxProtocolVersion is the max protocol version the peer supports.
-	MaxProtocolVersion = wire.SendHeadersVersion
+	MaxProtocolVersion = wire.FeeFilterVersion
 
 	// outputBufferSize is the number of elements the output channels use.
 	outputBufferSize = 50
@@ -139,6 +139,9 @@ type MessageListeners struct {
 	// OnGetHeaders is invoked when a peer receives a getheaders bitcoin
 	// message.
 	OnGetHeaders func(p *Peer, msg *wire.MsgGetHeaders)
+
+	// OnFeeFilter is invoked when a peer receives a feefilter bitcoin message.
+	OnFeeFilter func(p *Peer, msg *wire.MsgFeeFilter)
 
 	// OnFilterAdd is invoked when a peer receives a filteradd bitcoin message.
 	OnFilterAdd func(p *Peer, msg *wire.MsgFilterAdd)
@@ -1498,6 +1501,11 @@ out:
 		case *wire.MsgGetHeaders:
 			if p.cfg.Listeners.OnGetHeaders != nil {
 				p.cfg.Listeners.OnGetHeaders(p, msg)
+			}
+
+		case *wire.MsgFeeFilter:
+			if p.cfg.Listeners.OnFeeFilter != nil {
+				p.cfg.Listeners.OnFeeFilter(p, msg)
 			}
 
 		case *wire.MsgFilterAdd:
