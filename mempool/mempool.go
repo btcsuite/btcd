@@ -84,6 +84,11 @@ type Config struct {
 // Policy houses the policy (configuration parameters) which is used to
 // control the mempool.
 type Policy struct {
+	// MaxTxVersion is the transaction version that the mempool should
+	// accept.  All transactions above this version are rejected as
+	// non-standard.
+	MaxTxVersion int32
+
 	// DisableRelayPriority defines whether to relay free or low-fee
 	// transactions that do not have enough priority to be relayed.
 	DisableRelayPriority bool
@@ -625,7 +630,8 @@ func (mp *TxPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit, rejec
 	// forbid their acceptance.
 	if !mp.cfg.Policy.AcceptNonStd {
 		err = checkTransactionStandard(tx, nextBlockHeight,
-			medianTimePast, mp.cfg.Policy.MinRelayTxFee)
+			medianTimePast, mp.cfg.Policy.MinRelayTxFee,
+			mp.cfg.Policy.MaxTxVersion)
 		if err != nil {
 			// Attempt to extract a reject code from the error so
 			// it can be retained.  When not possible, fall back to
