@@ -67,6 +67,11 @@ type Config struct {
 	// chain tip within the best chain.
 	MedianTimePast func() time.Time
 
+	// CalcSequenceLock defines the function to use in order to generate
+	// the current sequence lock for the given transaction using the passed
+	// utxo view.
+	CalcSequenceLock func(*btcutil.Tx, *blockchain.UtxoViewpoint) (*blockchain.SequenceLock, error)
+
 	// SigCache defines a signature cache to use.
 	SigCache *txscript.SigCache
 
