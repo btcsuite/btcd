@@ -5,7 +5,7 @@
 // This file is ignored during the regular tests due to the following build tag.
 // +build rpctest
 
-package main
+package integration
 
 import (
 	"bytes"
