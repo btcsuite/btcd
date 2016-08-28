@@ -20,7 +20,7 @@ func genesisBlockNode(params *chaincfg.Params) *blockNode {
 	genesisBlock := dcrutil.NewBlock(params.GenesisBlock)
 	header := &genesisBlock.MsgBlock().Header
 	node := newBlockNode(header, genesisBlock.Hash(), 0, []chainhash.Hash{},
-		[]chainhash.Hash{}, []uint32{})
+		[]chainhash.Hash{}, []uint32{}, []uint16{})
 	node.inMainChain = true
 
 	return node
@@ -102,6 +102,7 @@ func TestCalcWantHeight(t *testing.T) {
 	}
 }
 
+// newFakeNode creates a fake blockNode and sets pertinent internals.
 func newFakeNode(blockVersion int32, height int64, currentNode *blockNode) *blockNode {
 	// Make up a header.
 	header := &wire.BlockHeader{
@@ -111,7 +112,7 @@ func newFakeNode(blockVersion int32, height int64, currentNode *blockNode) *bloc
 	}
 	node := newBlockNode(header, &chainhash.Hash{}, 0,
 		[]chainhash.Hash{}, []chainhash.Hash{},
-		[]uint32{})
+		[]uint32{}, []uint16{})
 	node.height = height
 	node.parent = currentNode
 
@@ -423,7 +424,7 @@ func TestCalcStakeVersionByNode(t *testing.T) {
 			}
 			node := newBlockNode(header, &chainhash.Hash{}, 0,
 				[]chainhash.Hash{}, []chainhash.Hash{},
-				[]uint32{})
+				[]uint32{}, []uint16{})
 			node.height = i
 			node.parent = currentNode
 
@@ -790,7 +791,7 @@ func TestIsStakeMajorityVersion(t *testing.T) {
 			}
 			node := newBlockNode(header, &chainhash.Hash{}, 0,
 				[]chainhash.Hash{}, []chainhash.Hash{},
-				[]uint32{})
+				[]uint32{}, []uint16{})
 			node.height = i
 			node.parent = currentNode
 
