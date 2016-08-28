@@ -363,9 +363,9 @@ func testGenerateAndSubmitBlock(r *Harness, t *testing.T) {
 			"expected %v, got %v", numTxns+1, numBlocksTxns)
 	}
 	blockVersion := block.MsgBlock().Header.Version
-	if blockVersion != wire.BlockVersion {
+	if blockVersion != BlockVersion {
 		t.Fatalf("block version is not default: expected %v, got %v",
-			wire.BlockVersion, blockVersion)
+			BlockVersion, blockVersion)
 	}
 
 	// Next generate a block with a "non-standard" block version along with
