@@ -6,6 +6,7 @@ package chaincfg
 
 import (
 	"errors"
+	"math"
 	"math/big"
 	"time"
 
@@ -59,6 +60,37 @@ type DNSSeed struct {
 	// by service flags (wire.ServiceFlag).
 	HasFiltering bool
 }
+
+// ConsensusDeployment defines details related to a specific consensus rule
+// change that is voted in.  This is part of BIP0009.
+type ConsensusDeployment struct {
+	// BitNumber defines the specific bit number within the block version
+	// this particular soft-fork deployment refers to.
+	BitNumber uint8
+
+	// StartTime is the median block time after which voting on the
+	// deployment starts.
+	StartTime uint64
+
+	// ExpireTime is the median block time after which the attempted
+	// deployment expires.
+	ExpireTime uint64
+}
+
+// Constants that define the deployment offset in the deployments field of the
+// parameters for each deployment.  This is useful to be able to get the details
+// of a specific deployment by name.
+const (
+	// DeploymentTestDummy defines the rule change deployment ID for testing
+	// purposes.
+	DeploymentTestDummy = iota
+
+	// NOTE: DefinedDeployments must always come last since it is used to
+	// determine how many defined deployments there currently are.
+
+	// DefinedDeployments is the number of currently defined deployments.
+	DefinedDeployments
+)
 
 // Params defines a Bitcoin network by its parameters.  These parameters may be
 // used by Bitcoin applications to differentiate networks as well as addresses
@@ -143,6 +175,23 @@ type Params struct {
 	// The number of nodes to check.  This is part of BIP0034.
 	BlockUpgradeNumToCheck uint64
 
+	// These fields are related to voting on consensus rule changes as
+	// defined by BIP0009.
+	//
+	// RuleChangeActivationThreshold is the number of blocks in a threshold
+	// state retarget window for which a positive vote for a rule change
+	// must be cast in order to lock in a rule change. It should typically
+	// be 95% for the main network and 75% for test networks.
+	//
+	// MinerConfirmationWindow is the number of blocks in each threshold
+	// state retarget window.
+	//
+	// Deployments define the specific consensus rule changes to be voted
+	// on.
+	RuleChangeActivationThreshold uint32
+	MinerConfirmationWindow       uint32
+	Deployments                   [DefinedDeployments]ConsensusDeployment
+
 	// Mempool parameters
 	RelayNonStdTxs bool
 
@@ -221,6 +270,20 @@ var MainNetParams = Params{
 	BlockRejectNumRequired:  950,
 	BlockUpgradeNumToCheck:  1000,
 
+	// Consensus rule change deployments.
+	//
+	// The miner confirmation window is defined as:
+	//   target proof of work timespan / target proof of work spacing
+	RuleChangeActivationThreshold: 1916, // 95% of MinerConfirmationWindow
+	MinerConfirmationWindow:       2016, //
+	Deployments: [DefinedDeployments]ConsensusDeployment{
+		DeploymentTestDummy: {
+			BitNumber:  28,
+			StartTime:  1199145601, // January 1, 2008 UTC
+			ExpireTime: 1230767999, // December 31, 2008 UTC
+		},
+	},
+
 	// Mempool parameters
 	RelayNonStdTxs: false,
 
@@ -273,6 +336,20 @@ var RegressionNetParams = Params{
 	BlockEnforceNumRequired: 750,
 	BlockRejectNumRequired:  950,
 	BlockUpgradeNumToCheck:  1000,
+
+	// Consensus rule change deployments.
+	//
+	// The miner confirmation window is defined as:
+	//   target proof of work timespan / target proof of work spacing
+	RuleChangeActivationThreshold: 108, // 75%  of MinerConfirmationWindow
+	MinerConfirmationWindow:       144,
+	Deployments: [DefinedDeployments]ConsensusDeployment{
+		DeploymentTestDummy: {
+			BitNumber:  28,
+			StartTime:  0,             // Always available for vote
+			ExpireTime: math.MaxInt64, // Never expires
+		},
+	},
 
 	// Mempool parameters
 	RelayNonStdTxs: true,
@@ -334,6 +411,20 @@ var TestNet3Params = Params{
 	BlockRejectNumRequired:  75,
 	BlockUpgradeNumToCheck:  100,
 
+	// Consensus rule change deployments.
+	//
+	// The miner confirmation window is defined as:
+	//   target proof of work timespan / target proof of work spacing
+	RuleChangeActivationThreshold: 1512, // 75% of MinerConfirmationWindow
+	MinerConfirmationWindow:       2016,
+	Deployments: [DefinedDeployments]ConsensusDeployment{
+		DeploymentTestDummy: {
+			BitNumber:  28,
+			StartTime:  1199145601, // January 1, 2008 UTC
+			ExpireTime: 1230767999, // December 31, 2008 UTC
+		},
+	},
+
 	// Mempool parameters
 	RelayNonStdTxs: true,
 
@@ -390,6 +481,20 @@ var SimNetParams = Params{
 	BlockEnforceNumRequired: 51,
 	BlockRejectNumRequired:  75,
 	BlockUpgradeNumToCheck:  100,
+
+	// Consensus rule change deployments.
+	//
+	// The miner confirmation window is defined as:
+	//   target proof of work timespan / target proof of work spacing
+	RuleChangeActivationThreshold: 75, // 75% of MinerConfirmationWindow
+	MinerConfirmationWindow:       100,
+	Deployments: [DefinedDeployments]ConsensusDeployment{
+		DeploymentTestDummy: {
+			BitNumber:  28,
+			StartTime:  0,             // Always available for vote
+			ExpireTime: math.MaxInt64, // Never expires
+		},
+	},
 
 	// Mempool parameters
 	RelayNonStdTxs: true,

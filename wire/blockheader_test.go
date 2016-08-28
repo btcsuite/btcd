@@ -24,7 +24,7 @@ func TestBlockHeader(t *testing.T) {
 	hash := mainNetGenesisHash
 	merkleHash := mainNetGenesisMerkleRoot
 	bits := uint32(0x1d00ffff)
-	bh := NewBlockHeader(&hash, &merkleHash, bits, nonce)
+	bh := NewBlockHeader(1, &hash, &merkleHash, bits, nonce)
 
 	// Ensure we get the same data back out.
 	if !bh.PrevBlock.IsEqual(&hash) {

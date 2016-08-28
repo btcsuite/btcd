@@ -22,14 +22,6 @@ const (
 	// transaction to be considered high priority.
 	MinHighPriority = btcutil.SatoshiPerBitcoin * 144.0 / 250
 
-	// generatedBlockVersion is the version of the block being generated.
-	// It is defined as a constant here rather than using the
-	// wire.BlockVersion constant since a change in the block version
-	// will require changes to the generated block.  Using the wire constant
-	// for generated block version could allow creation of invalid blocks
-	// for the updated version.
-	generatedBlockVersion = 4
-
 	// blockHeaderOverhead is the max number of bytes it takes to serialize
 	// a block header and max possible transaction count.
 	blockHeaderOverhead = wire.MaxBlockHeaderPayload + wire.MaxVarIntPayload
@@ -766,11 +758,18 @@ mempoolLoop:
 		return nil, err
 	}
 
+	// Calculate the next expected block version based on the state of the
+	// rule change deployments.
+	nextBlockVersion, err := g.chain.CalcNextBlockVersion()
+	if err != nil {
+		return nil, err
+	}
+
 	// Create a new block ready to be solved.
 	merkles := blockchain.BuildMerkleTreeStore(blockTxns)
 	var msgBlock wire.MsgBlock
 	msgBlock.Header = wire.BlockHeader{
-		Version:    generatedBlockVersion,
+		Version:    nextBlockVersion,
 		PrevBlock:  *prevHash,
 		MerkleRoot: *merkles[len(merkles)-1],
 		Timestamp:  ts,

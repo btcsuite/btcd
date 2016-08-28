@@ -12,9 +12,6 @@ import (
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 )
 
-// BlockVersion is the current latest supported block version.
-const BlockVersion = 4
-
 // MaxBlockHeaderPayload is the maximum number of bytes a block header can be.
 // Version 4 bytes + Timestamp 4 bytes + Bits 4 bytes + Nonce 4 bytes +
 // PrevBlock and MerkleRoot hashes.
@@ -95,16 +92,16 @@ func (h *BlockHeader) Serialize(w io.Writer) error {
 	return writeBlockHeader(w, 0, h)
 }
 
-// NewBlockHeader returns a new BlockHeader using the provided previous block
-// hash, merkle root hash, difficulty bits, and nonce used to generate the
+// NewBlockHeader returns a new BlockHeader using the provided version, previous
+// block hash, merkle root hash, difficulty bits, and nonce used to generate the
 // block with defaults for the remaining fields.
-func NewBlockHeader(prevHash *chainhash.Hash, merkleRootHash *chainhash.Hash,
+func NewBlockHeader(version int32, prevHash, merkleRootHash *chainhash.Hash,
 	bits uint32, nonce uint32) *BlockHeader {
 
 	// Limit the timestamp to one second precision since the protocol
 	// doesn't support better.
 	return &BlockHeader{
-		Version:    BlockVersion,
+		Version:    version,
 		PrevBlock:  *prevHash,
 		MerkleRoot: *merkleRootHash,
 		Timestamp:  time.Unix(time.Now().Unix(), 0),

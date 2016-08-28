@@ -223,6 +223,34 @@ type BlockChain struct {
 	// chain state can be quickly reconstructed on load.
 	stateLock     sync.RWMutex
 	stateSnapshot *BestState
+
+	// The following caches are used to efficiently keep track of the
+	// current deployment threshold state of each rule change deployment.
+	//
+	// This information is stored in the database so it can be quickly
+	// reconstructed on load.
+	//
+	// warningCaches caches the current deployment threshold state for blocks
+	// in each of the **possible** deployments.  This is used in order to
+	// detect when new unrecognized rule changes are being voted on and/or
+	// have been activated such as will be the case when older versions of
+	// the software are being used
+	//
+	// deploymentCaches caches the current deployment threshold state for
+	// blocks in each of the actively defined deployments.
+	warningCaches    []thresholdStateCache
+	deploymentCaches []thresholdStateCache
+
+	// The following fields are used to determine if certain warnings have
+	// already been shown.
+	//
+	// unknownRulesWarned refers to warnings due to unknown rules being
+	// activated.
+	//
+	// unknownVersionsWarned refers to warnings due to unknown versions
+	// being mined.
+	unknownRulesWarned    bool
+	unknownVersionsWarned bool
 }
 
 // DisableVerify provides a mechanism to disable transaction script validation
@@ -551,6 +579,38 @@ func (b *BlockChain) relativeNode(anchor *blockNode, distance uint32) (*blockNod
 	})
 	if err != nil {
 		return nil, err
+	}
+
+	return iterNode, nil
+}
+
+// ancestorNode returns the ancestor block node at the provided height by
+// following the chain backwards from the given node while dynamically loading
+// any pruned nodes from the database and updating the memory block chain as
+// needed.  The returned block will be nil when a height is requested that is
+// after the height of the passed node or is less than zero.
+//
+// This function MUST be called with the chain state lock held (for writes).
+func (b *BlockChain) ancestorNode(node *blockNode, height int32) (*blockNode, error) {
+	// Nothing to do if the requested height is outside of the valid range.
+	if height > node.height || height < 0 {
+		return nil, nil
+	}
+
+	// Iterate backwards until the requested height is reached.
+	iterNode := node
+	for iterNode != nil && iterNode.height > height {
+		// Get the previous block node.  This function is used over
+		// simply accessing iterNode.parent directly as it will
+		// dynamically create previous block nodes as needed.  This
+		// helps allow only the pieces of the chain that are needed
+		// to remain in memory.
+		var err error
+		iterNode, err = b.getPrevNodeFromNode(iterNode)
+		if err != nil {
+			log.Errorf("getPrevNodeFromNode: %v", err)
+			return nil, err
+		}
 	}
 
 	return iterNode, nil
@@ -934,6 +994,22 @@ func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block, view *U
 			"spent transaction out information")
 	}
 
+	// No warnings about unknown rules or versions until the chain is
+	// current.
+	if b.isCurrent() {
+		// Warn if any unknown new rules are either about to activate or
+		// have already been activated.
+		if err := b.warnUnknownRuleActivations(node); err != nil {
+			return err
+		}
+
+		// Warn if a high enough percentage of the last blocks have
+		// unexpected versions.
+		if err := b.warnUnknownVersions(node); err != nil {
+			return err
+		}
+	}
+
 	// Calculate the median time for the block.
 	medianTime, err := b.calcPastMedianTime(node)
 	if err != nil {
@@ -996,11 +1072,16 @@ func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block, view *U
 			}
 		}
 
-		return nil
+		// Update the cached threshold states in the database as needed.
+		return b.putThresholdCaches(dbTx)
 	})
 	if err != nil {
 		return err
 	}
+
+	// Mark all modified entries in the threshold caches as flushed now that
+	// they have been committed to the database.
+	b.markThresholdCachesFlushed()
 
 	// Prune fully spent entries and mark all entries in the view unmodified
 	// now that the modifications have been committed to the database.
@@ -1507,17 +1588,14 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, fla
 	return true, nil
 }
 
-// IsCurrent returns whether or not the chain believes it is current.  Several
+// isCurrent returns whether or not the chain believes it is current.  Several
 // factors are used to guess, but the key factors that allow the chain to
 // believe it is current are:
 //  - Latest block height is after the latest checkpoint (if enabled)
 //  - Latest block has a timestamp newer than 24 hours ago
 //
-// This function is safe for concurrent access.
-func (b *BlockChain) IsCurrent() bool {
-	b.chainLock.RLock()
-	defer b.chainLock.RUnlock()
-
+// This function MUST be called with the chain state lock held (for reads).
+func (b *BlockChain) isCurrent() bool {
 	// Not current if the latest main (best) chain height is before the
 	// latest known good checkpoint (when checkpoints are enabled).
 	checkpoint := b.latestCheckpoint()
@@ -1532,6 +1610,20 @@ func (b *BlockChain) IsCurrent() bool {
 	// otherwise.
 	minus24Hours := b.timeSource.AdjustedTime().Add(-24 * time.Hour)
 	return !b.bestNode.timestamp.Before(minus24Hours)
+}
+
+// IsCurrent returns whether or not the chain believes it is current.  Several
+// factors are used to guess, but the key factors that allow the chain to
+// believe it is current are:
+//  - Latest block height is after the latest checkpoint (if enabled)
+//  - Latest block has a timestamp newer than 24 hours ago
+//
+// This function is safe for concurrent access.
+func (b *BlockChain) IsCurrent() bool {
+	b.chainLock.RLock()
+	defer b.chainLock.RUnlock()
+
+	return b.isCurrent()
 }
 
 // BestSnapshot returns information about the current best chain block and
@@ -1653,6 +1745,8 @@ func New(config *Config) (*BlockChain, error) {
 		orphans:             make(map[chainhash.Hash]*orphanBlock),
 		prevOrphans:         make(map[chainhash.Hash][]*orphanBlock),
 		blockCache:          make(map[chainhash.Hash]*btcutil.Block),
+		warningCaches:       newThresholdCaches(vbNumBits),
+		deploymentCaches:    newThresholdCaches(chaincfg.DefinedDeployments),
 	}
 
 	// Initialize the chain state from the passed database.  When the db
@@ -1668,6 +1762,14 @@ func New(config *Config) (*BlockChain, error) {
 		if err := config.IndexManager.Init(&b); err != nil {
 			return nil, err
 		}
+	}
+
+	// Initialize rule change threshold state caches from the passed
+	// database.  When the db does not yet contains any cached information
+	// for a given threshold cache, the threshold states will be calculated
+	// using the chain state.
+	if err := b.initThresholdCaches(); err != nil {
+		return nil, err
 	}
 
 	log.Infof("Chain state (height %d, hash %v, totaltx %d, work %v)",
