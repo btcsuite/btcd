@@ -2201,7 +2201,7 @@ out:
 	bmgrLog.Trace("Block handler done")
 }
 
-// handleNotifyMsg handles notifications from blockhain.  It does things such
+// handleNotifyMsg handles notifications from blockchain.  It does things such
 // as request orphan block parents and relay accepted blocks to connected peers.
 func (b *blockManager) handleNotifyMsg(notification *blockchain.Notification) {
 	switch notification.Type {
@@ -2445,6 +2445,10 @@ func (b *blockManager) handleNotifyMsg(notification *blockchain.Notification) {
 		if r := b.server.rpcServer; r != nil {
 			r.ntfnMgr.NotifyReorganization(rd)
 		}
+
+		// Drop the associated mining template from the old chain, since it
+		// will be no longer valid.
+		b.cachedCurrentTemplate = nil
 	}
 }
 
