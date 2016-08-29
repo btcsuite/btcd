@@ -1,13 +1,11 @@
 language: go
 go:
-  - 1.5.3
-  - 1.6
+  - 1.6.3
+  - 1.7
 sudo: false
-before_install:
-  - gotools=golang.org/x/tools
 install:
   - go get -d -t -v ./...
-  - go get -v $gotools/cmd/cover
+  - go get -v golang.org/x/tools/cmd/cover
   - go get -v github.com/bradfitz/goimports
   - go get -v github.com/golang/lint/golint
 script:
