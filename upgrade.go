@@ -20,6 +20,13 @@ func checkForAndMoveOldTicketDb() error {
 	ffldbPath := filepath.Join(cfg.DataDir,
 		blockDbNamePrefix+"_"+defaultDbType)
 
+	// No data path exists, break because this is a fresh start and
+	// the database must be constructed.
+	if _, err := os.Stat(cfg.DataDir); os.IsNotExist(err) {
+		return nil
+	}
+
+	// An old version of the chain exists, update it.
 	if _, err := os.Stat(ffldbPath); os.IsNotExist(err) {
 		// Rename the old ticket database.
 		ticketDBPath := filepath.Join(cfg.DataDir, ticketDBName)
