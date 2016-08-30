@@ -5,6 +5,7 @@
 package mempool
 
 import (
+	"bytes"
 	"math/rand"
 	"testing"
 
@@ -362,5 +363,62 @@ func TestEstimateFeeRollback(t *testing.T) {
 		// Erase history.
 		txHistory = txHistory[0 : len(txHistory)-stepsBack]
 		estimateHistory = estimateHistory[0 : len(estimateHistory)-stepsBack]
+	}
+}
+
+func (eft *estimateFeeTester) checkSaveAndRestore(
+	previousEstimates [estimateFeeDepth]BtcPerKilobyte) {
+
+	// Get the save state.
+	save := eft.ef.Save()
+
+	// Save and restore database.
+	var err error
+	eft.ef, err = RestoreFeeEstimator(save)
+	if err != nil {
+		eft.t.Fatalf("Could not restore database: %s", err)
+	}
+
+	// Save again and check that it matches the previous one.
+	redo := eft.ef.Save()
+	if !bytes.Equal(save, redo) {
+		eft.t.Fatalf("Restored states do not match: %v %v", save, redo)
+	}
+
+	// Check that the results match.
+	newEstimates := eft.estimates()
+
+	for i, prev := range previousEstimates {
+		if prev != newEstimates[i] {
+			eft.t.Error("Mismatch in estimate ", i, " after restore; got ", newEstimates[i], " but expected ", prev)
+		}
+	}
+}
+
+// TestSave tests saving and restoring to a []byte.
+func TestDatabase(t *testing.T) {
+
+	txPerRound := uint32(7)
+	txPerBlock := uint32(5)
+	binSize := uint32(6)
+	maxReplacements := uint32(4)
+	rounds := 8
+
+	eft := estimateFeeTester{ef: newTestFeeEstimator(binSize, maxReplacements, uint32(rounds)+1), t: t}
+	var txHistory [][]*TxDesc
+	estimateHistory := [][estimateFeeDepth]BtcPerKilobyte{eft.estimates()}
+
+	for round := 0; round < rounds; round++ {
+		eft.checkSaveAndRestore(estimateHistory[len(estimateHistory)-1])
+
+		// Go forward one step.
+		txHistory, estimateHistory =
+			eft.round(txHistory, estimateHistory, txPerRound, txPerBlock)
+	}
+
+	// Reverse the process and try again.
+	for round := 1; round <= rounds; round++ {
+		eft.rollback()
+		eft.checkSaveAndRestore(estimateHistory[len(estimateHistory)-round-1])
 	}
 }
