@@ -873,7 +873,7 @@ func handleEstimateFee(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 	}
 
 	// Convert to satoshis per kb.
-	return float64(feeRate.ToSatoshiPerKb()), nil
+	return float64(feeRate), nil
 }
 
 // handleGenerate handles generate commands.

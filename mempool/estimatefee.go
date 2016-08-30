@@ -5,11 +5,15 @@
 package mempool
 
 import (
+	"bytes"
+	"encoding/binary"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"math/rand"
 	"sort"
+	"strings"
 	"sync"
 
 	"github.com/roasbeef/btcd/chaincfg/chainhash"
@@ -19,8 +23,6 @@ import (
 
 // TODO incorporate Alex Morcos' modifications to Gavin's initial model
 // https://lists.linuxfoundation.org/pipermail/bitcoin-dev/2014-October/006824.html
-
-// TODO store and restore the FeeEstimator state in the database.
 
 const (
 	// estimateFeeDepth is the maximum number of blocks before a transaction
@@ -46,6 +48,12 @@ const (
 	bytePerKb = 1024
 
 	btcPerSatoshi = 1E-8
+)
+
+var (
+	// EstimateFeeDatabaseKey is the key that we use to
+	// store the fee estimator in the database.
+	EstimateFeeDatabaseKey = []byte("estimatefee")
 )
 
 // SatoshiPerByte is number with units of satoshis per byte.
@@ -99,6 +107,29 @@ type observedTransaction struct {
 	mined int32
 }
 
+func (o *observedTransaction) Serialize(w io.Writer) {
+	binary.Write(w, binary.BigEndian, o.hash)
+	binary.Write(w, binary.BigEndian, o.feeRate)
+	binary.Write(w, binary.BigEndian, o.observed)
+	binary.Write(w, binary.BigEndian, o.mined)
+}
+
+func deserializeObservedTransaction(r io.Reader) (*observedTransaction, error) {
+	ot := observedTransaction{}
+
+	// The first 32 bytes should be a hash.
+	binary.Read(r, binary.BigEndian, &ot.hash)
+
+	// The next 8 are SatoshiPerByte
+	binary.Read(r, binary.BigEndian, &ot.feeRate)
+
+	// And next there are two uint32's.
+	binary.Read(r, binary.BigEndian, &ot.observed)
+	binary.Read(r, binary.BigEndian, &ot.mined)
+
+	return &ot, nil
+}
+
 // registeredBlock has the hash of a block and the list of transactions
 // it mined which had been previously observed by the FeeEstimator. It
 // is used if Rollback is called to reverse the effect of registering
@@ -106,6 +137,15 @@ type observedTransaction struct {
 type registeredBlock struct {
 	hash         chainhash.Hash
 	transactions []*observedTransaction
+}
+
+func (rb *registeredBlock) serialize(w io.Writer, txs map[*observedTransaction]uint32) {
+	binary.Write(w, binary.BigEndian, rb.hash)
+
+	binary.Write(w, binary.BigEndian, uint32(len(rb.transactions)))
+	for _, o := range rb.transactions {
+		binary.Write(w, binary.BigEndian, txs[o])
+	}
 }
 
 // FeeEstimator manages the data necessary to create
@@ -532,4 +572,178 @@ func (ef *FeeEstimator) EstimateFee(numBlocks uint32) (BtcPerKilobyte, error) {
 	}
 
 	return ef.cached[int(numBlocks)-1].ToBtcPerKb(), nil
+}
+
+// In case the format for the serialized version of the FeeEstimator changes,
+// we use a version number. If the version number changes, it does not make
+// sense to try to upgrade a previous version to a new version. Instead, just
+// start fee estimation over.
+const estimateFeeSaveVersion = 1
+
+func deserializeRegisteredBlock(r io.Reader, txs map[uint32]*observedTransaction) (*registeredBlock, error) {
+	var lenTransactions uint32
+
+	rb := &registeredBlock{}
+	binary.Read(r, binary.BigEndian, &rb.hash)
+	binary.Read(r, binary.BigEndian, &lenTransactions)
+
+	rb.transactions = make([]*observedTransaction, lenTransactions)
+
+	for i := uint32(0); i < lenTransactions; i++ {
+		var index uint32
+		binary.Read(r, binary.BigEndian, &index)
+		rb.transactions[i] = txs[index]
+	}
+
+	return rb, nil
+}
+
+// FeeEstimatorState represents a saved FeeEstimator that can be
+// restored with data from an earlier session of the program.
+type FeeEstimatorState []byte
+
+// observedTxSet is a set of txs that can that is sorted
+// by hash. It exists for serialization purposes so that
+// a serialized state always comes out the same.
+type observedTxSet []*observedTransaction
+
+func (q observedTxSet) Len() int { return len(q) }
+
+func (q observedTxSet) Less(i, j int) bool {
+	return strings.Compare(q[i].hash.String(), q[j].hash.String()) < 0
+}
+
+func (q observedTxSet) Swap(i, j int) {
+	q[i], q[j] = q[j], q[i]
+}
+
+// Save records the current state of the FeeEstimator to a []byte that
+// can be restored later.
+func (ef *FeeEstimator) Save() FeeEstimatorState {
+	ef.mtx.Lock()
+	defer ef.mtx.Unlock()
+
+	// TODO figure out what the capacity should be.
+	w := bytes.NewBuffer(make([]byte, 0))
+
+	binary.Write(w, binary.BigEndian, uint32(estimateFeeSaveVersion))
+
+	// Insert basic parameters.
+	binary.Write(w, binary.BigEndian, &ef.maxRollback)
+	binary.Write(w, binary.BigEndian, &ef.binSize)
+	binary.Write(w, binary.BigEndian, &ef.maxReplacements)
+	binary.Write(w, binary.BigEndian, &ef.minRegisteredBlocks)
+	binary.Write(w, binary.BigEndian, &ef.lastKnownHeight)
+	binary.Write(w, binary.BigEndian, &ef.numBlocksRegistered)
+
+	// Put all the observed transactions in a sorted list.
+	var txCount uint32
+	ots := make([]*observedTransaction, len(ef.observed))
+	for hash := range ef.observed {
+		ots[txCount] = ef.observed[hash]
+		txCount++
+	}
+
+	sort.Sort(observedTxSet(ots))
+
+	txCount = 0
+	observed := make(map[*observedTransaction]uint32)
+	binary.Write(w, binary.BigEndian, uint32(len(ef.observed)))
+	for _, ot := range ots {
+		ot.Serialize(w)
+		observed[ot] = txCount
+		txCount++
+	}
+
+	// Save all the right bins.
+	for _, list := range ef.bin {
+
+		binary.Write(w, binary.BigEndian, uint32(len(list)))
+
+		for _, o := range list {
+			binary.Write(w, binary.BigEndian, observed[o])
+		}
+	}
+
+	// Dropped transactions.
+	binary.Write(w, binary.BigEndian, uint32(len(ef.dropped)))
+	for _, registered := range ef.dropped {
+		registered.serialize(w, observed)
+	}
+
+	// Commit the tx and return.
+	return FeeEstimatorState(w.Bytes())
+}
+
+// RestoreFeeEstimator takes a FeeEstimatorState that was previously
+// returned by Save and restores it to a FeeEstimator
+func RestoreFeeEstimator(data FeeEstimatorState) (*FeeEstimator, error) {
+	r := bytes.NewReader([]byte(data))
+
+	// Check version
+	var version uint32
+	err := binary.Read(r, binary.BigEndian, &version)
+	if err != nil {
+		return nil, err
+	}
+	if version != estimateFeeSaveVersion {
+		return nil, fmt.Errorf("Incorrect version: expected %d found %d", estimateFeeSaveVersion, version)
+	}
+
+	ef := &FeeEstimator{
+		observed: make(map[chainhash.Hash]*observedTransaction),
+	}
+
+	// Read basic parameters.
+	binary.Read(r, binary.BigEndian, &ef.maxRollback)
+	binary.Read(r, binary.BigEndian, &ef.binSize)
+	binary.Read(r, binary.BigEndian, &ef.maxReplacements)
+	binary.Read(r, binary.BigEndian, &ef.minRegisteredBlocks)
+	binary.Read(r, binary.BigEndian, &ef.lastKnownHeight)
+	binary.Read(r, binary.BigEndian, &ef.numBlocksRegistered)
+
+	// Read transactions.
+	var numObserved uint32
+	observed := make(map[uint32]*observedTransaction)
+	binary.Read(r, binary.BigEndian, &numObserved)
+	for i := uint32(0); i < numObserved; i++ {
+		ot, err := deserializeObservedTransaction(r)
+		if err != nil {
+			return nil, err
+		}
+		observed[i] = ot
+		ef.observed[ot.hash] = ot
+	}
+
+	// Read bins.
+	for i := 0; i < estimateFeeDepth; i++ {
+		var numTransactions uint32
+		binary.Read(r, binary.BigEndian, &numTransactions)
+		bin := make([]*observedTransaction, numTransactions)
+		for j := uint32(0); j < numTransactions; j++ {
+			var index uint32
+			binary.Read(r, binary.BigEndian, &index)
+
+			var exists bool
+			bin[j], exists = observed[index]
+			if !exists {
+				return nil, fmt.Errorf("Invalid transaction reference %d", index)
+			}
+		}
+		ef.bin[i] = bin
+	}
+
+	// Read dropped transactions.
+	var numDropped uint32
+	binary.Read(r, binary.BigEndian, &numDropped)
+	ef.dropped = make([]*registeredBlock, numDropped)
+	for i := uint32(0); i < numDropped; i++ {
+		var err error
+		ef.dropped[int(i)], err = deserializeRegisteredBlock(r, observed)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return ef, nil
 }
