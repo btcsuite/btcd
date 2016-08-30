@@ -1121,6 +1121,9 @@ func (*wsNotificationManager) addAddrRequests(
 	wsc *wsClient, addrs []string) {
 
 	for _, addr := range addrs {
+		rpcsLog.Tracef("Adding address %v for address notifications (client "+
+			"session %v)", addr, wsc.sessionID)
+
 		// Track the request in the client as well so it can be quickly be
 		// removed on disconnect.
 		wsc.addrRequests[addr] = struct{}{}
@@ -2602,7 +2605,6 @@ func handleRescan(wsc *wsClient, icmd interface{}) (interface{}, error) {
 	// lastBlock tracks the previously-rescanned block.
 	// It equals nil when no previous blocks have been rescanned.
 	var lastBlock *dcrutil.Block
-	var lastBlockHash *chainhash.Hash
 
 	// Instead of fetching all block hashes at once, fetch in smaller chunks
 	// to ensure large rescans consume a limited amount of memory.
@@ -2630,7 +2632,7 @@ fetchRange:
 			// The rescan is finished if no blocks hashes for this
 			// range were successfully fetched and a stop block
 			// was provided.
-			if maxBlock != math.MaxInt32 {
+			if maxBlock != math.MaxInt64 {
 				break
 			}
 
@@ -2651,7 +2653,7 @@ fetchRange:
 			best := blockManager.chain.BestSnapshot()
 			curHash := best.Hash
 			again := true
-			if lastBlockHash == nil || *lastBlockHash == *curHash {
+			if lastBlock == nil || *lastBlock.Sha() == *curHash {
 				again = false
 				n := wsc.server.ntfnMgr
 				n.RegisterSpentRequests(wsc, lookups.unspentSlice())
@@ -2819,7 +2821,7 @@ fetchRange:
 	// received before the rescan RPC returns.  Therefore, another method
 	// is needed to safely inform clients that all rescan notifications have
 	// been sent.
-	lastBlockHash = lastBlock.Sha()
+	lastBlockHash := lastBlock.Sha()
 	n := dcrjson.NewRescanFinishedNtfn(lastBlockHash.String(),
 		lastBlock.Height(),
 		lastBlock.MsgBlock().Header.Timestamp.Unix())

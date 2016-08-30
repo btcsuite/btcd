@@ -2327,7 +2327,8 @@ func (b *blockManager) handleNotifyMsg(notification *blockchain.Notification) {
 			b.server.txMemPool.RemoveTransaction(stx, false)
 			b.server.txMemPool.RemoveDoubleSpends(stx)
 			b.server.txMemPool.RemoveOrphan(stx.Sha())
-			b.server.txMemPool.ProcessOrphans(stx.Sha())
+			acceptedTxs := b.server.txMemPool.ProcessOrphans(stx.Sha())
+			b.server.AnnounceNewTransactions(acceptedTxs)
 		}
 
 		if r := b.server.rpcServer; r != nil {
