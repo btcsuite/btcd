@@ -155,6 +155,9 @@ type config struct {
 	DropAddrIndex       bool          `long:"dropaddrindex" description:"Deletes the address-based transaction index from the database on start up and then exits."`
 	NoExistsAddrIndex   bool          `long:"noexistsaddrindex" description:"Disable the exists address index, which tracks whether or not an address has even been used."`
 	DropExistsAddrIndex bool          `long:"dropexistsaddrindex" description:"Deletes the exists address index from the database on start up and then exits."`
+	PipeRx              uint          `long:"piperx" description:"File descriptor of read end pipe to enable parent -> child process communication"`
+	PipeTx              uint          `long:"pipetx" description:"File descriptor of write end pipe to enable parent <- child process communication"`
+	LifetimeEvents      bool          `long:"lifetimeevents" description:"Send lifetime notifications over the TX pipe"`
 	onionlookup         func(string) ([]net.IP, error)
 	lookup              func(string) ([]net.IP, error)
 	oniondial           func(string, string) (net.Conn, error)

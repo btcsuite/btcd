@@ -17,13 +17,11 @@ import (
 	"time"
 
 	"github.com/decred/dcrd/blockchain/indexers"
+	"github.com/decred/dcrd/blockchain/stake"
 	"github.com/decred/dcrd/limits"
 )
 
-var (
-	cfg             *config
-	shutdownChannel = make(chan struct{})
-)
+var cfg *config
 
 // winServiceMain is only invoked on Windows.  It detects when dcrd is running
 // as a service and reacts accordingly.
@@ -43,6 +41,9 @@ func dcrdMain(serverChan chan<- *server) error {
 	}
 	cfg = tcfg
 	defer backendLog.Flush()
+
+	interrupted := interruptListener()
+	defer dcrdLog.Info("Shutdown complete")
 
 	// Show version at startup.
 	dcrdLog.Infof("Version %s", version())
@@ -92,38 +93,50 @@ func dcrdMain(serverChan chan<- *server) error {
 		}()
 	}
 
+	var lifetimeNotifier lifetimeEventServer
+	if cfg.LifetimeEvents {
+		lifetimeNotifier = newLifetimeEventServer(outgoingPipeMessages)
+	}
+
+	if cfg.PipeRx != 0 {
+		go serviceControlPipeRx(uintptr(cfg.PipeRx))
+	}
+	if cfg.PipeTx != 0 {
+		go serviceControlPipeTx(uintptr(cfg.PipeTx))
+	} else {
+		go drainOutgoingPipeMessages()
+	}
+
+	if interruptRequested(interrupted) {
+		return nil
+	}
+
 	// Perform upgrades to dcrd as new versions require it.
 	if err := doUpgrades(); err != nil {
 		dcrdLog.Errorf("%v", err)
 		return err
 	}
 
+	if interruptRequested(interrupted) {
+		return nil
+	}
+
 	// Load the block database.
+	lifetimeNotifier.notifyStartupEvent(lifetimeEventDBOpen)
 	db, err := loadBlockDB()
 	if err != nil {
 		dcrdLog.Errorf("%v", err)
 		return err
 	}
-	defer db.Close()
-
-	tmdb, err := loadTicketDB(db, activeNetParams.Params)
-	if err != nil {
-		dcrdLog.Errorf("%v", err)
-		return err
-	}
 	defer func() {
-		err := tmdb.Store(cfg.DataDir, "ticketdb.gob")
-		if err != nil {
-			dcrdLog.Errorf("Failed to store ticket database: %v", err.Error())
-		}
-	}()
-	defer tmdb.Close()
-
-	// Ensure the databases are sync'd and closed on Ctrl+C.
-	addInterruptHandler(func() {
+		lifetimeNotifier.notifyShutdownEvent(lifetimeEventDBOpen)
 		dcrdLog.Infof("Gracefully shutting down the database...")
 		db.Close()
-	})
+	}()
+
+	if interruptRequested(interrupted) {
+		return nil
+	}
 
 	// Drop indexes and exit if requested.
 	//
@@ -154,7 +167,41 @@ func dcrdMain(serverChan chan<- *server) error {
 		return nil
 	}
 
+	// The ticket "DB" takes ages to load and serialize back out to a file.
+	// Load it asynchronously and if the process is interrupted during the
+	// load, discard the result since no cleanup is necessary.
+	lifetimeNotifier.notifyStartupEvent(lifetimeEventTicketDB)
+	type ticketDBResult struct {
+		ticketDB *stake.TicketDB
+		err      error
+	}
+	ticketDBResultChan := make(chan ticketDBResult)
+	go func() {
+		tmdb, err := loadTicketDB(db, activeNetParams.Params)
+		ticketDBResultChan <- ticketDBResult{tmdb, err}
+	}()
+	var tmdb *stake.TicketDB
+	select {
+	case <-interrupted:
+		return nil
+	case r := <-ticketDBResultChan:
+		if r.err != nil {
+			dcrdLog.Errorf("%v", err)
+			return err
+		}
+		tmdb = r.ticketDB
+	}
+	defer func() {
+		lifetimeNotifier.notifyShutdownEvent(lifetimeEventTicketDB)
+		tmdb.Close()
+		err := tmdb.Store(cfg.DataDir, "ticketdb.gob")
+		if err != nil {
+			dcrdLog.Errorf("Failed to store ticket database: %v", err.Error())
+		}
+	}()
+
 	// Create server and start it.
+	lifetimeNotifier.notifyStartupEvent(lifetimeEventP2PServer)
 	server, err := newServer(cfg.Listeners, db, tmdb, activeNetParams.Params)
 	if err != nil {
 		// TODO(oga) this logging could do with some beautifying.
@@ -162,32 +209,28 @@ func dcrdMain(serverChan chan<- *server) error {
 			cfg.Listeners, err)
 		return err
 	}
-	addInterruptHandler(func() {
+	defer func() {
+		lifetimeNotifier.notifyShutdownEvent(lifetimeEventP2PServer)
 		dcrdLog.Infof("Gracefully shutting down the server...")
 		server.Stop()
 		server.WaitForShutdown()
-	})
+		srvrLog.Infof("Server shutdown complete")
+	}()
+
 	server.Start()
 	if serverChan != nil {
 		serverChan <- server
 	}
 
-	// Monitor for graceful server shutdown and signal the main goroutine
-	// when done.  This is done in a separate goroutine rather than waiting
-	// directly so the main goroutine can be signaled for shutdown by either
-	// a graceful shutdown or from the main interrupt handler.  This is
-	// necessary since the main goroutine must be kept running long enough
-	// for the interrupt handler goroutine to finish.
-	go func() {
-		server.WaitForShutdown()
-		srvrLog.Infof("Server shutdown complete")
-		shutdownChannel <- struct{}{}
-	}()
+	if interruptRequested(interrupted) {
+		return nil
+	}
 
-	// Wait for shutdown signal from either a graceful server stop or from
-	// the interrupt handler.
-	<-shutdownChannel
-	dcrdLog.Info("Shutdown complete")
+	lifetimeNotifier.notifyStartupComplete()
+
+	// Wait until the interrupt signal is received from an OS signal or
+	// shutdown is requested through the RPC server.
+	<-interrupted
 	return nil
 }
 

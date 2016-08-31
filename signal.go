@@ -10,79 +10,45 @@ import (
 	"os/signal"
 )
 
-// interruptChannel is used to receive SIGINT (Ctrl+C) signals.
-var interruptChannel chan os.Signal
+// shutdownRequestChannel is used to initiate shutdown from one of the
+// subsystems using the same code paths as when an interrupt signal is received.
+var shutdownRequestChannel = make(chan struct{})
 
-// addHandlerChannel is used to add an interrupt handler to the list of handlers
-// to be invoked on SIGINT (Ctrl+C) signals.
-var addHandlerChannel = make(chan func())
+// interruptSignals defines the default signals to catch in order to do a proper
+// shutdown.  This may be modified during init depending on the platform.
+var interruptSignals = []os.Signal{os.Interrupt}
 
-// signals defines the default signals to catch in order to do a proper
-// shutdown.
-var signals = []os.Signal{os.Interrupt}
+// interruptListener listens for SIGINT (Ctrl+C) signals and shutdown requests
+// from shutdownRequestChannel.  It returns a channel that is closed when either
+// signal is received.
+func interruptListener() <-chan struct{} {
+	c := make(chan struct{})
 
-// mainInterruptHandler listens for SIGINT (Ctrl+C) signals on the
-// interruptChannel and invokes the registered interruptCallbacks accordingly.
-// It also listens for callback registration.  It must be run as a goroutine.
-func mainInterruptHandler() {
-	// interruptCallbacks is a list of callbacks to invoke when a
-	// SIGINT (Ctrl+C) is received.
-	var interruptCallbacks []func()
+	go func() {
+		interruptChannel := make(chan os.Signal, 1)
+		signal.Notify(interruptChannel, interruptSignals...)
 
-	// isShutdown is a flag which is used to indicate whether or not
-	// the shutdown signal has already been received and hence any future
-	// attempts to add a new interrupt handler should invoke them
-	// immediately.
-	var isShutdown bool
-
-	for {
 		select {
 		case sig := <-interruptChannel:
-			// Ignore more than one shutdown signal.
-			if isShutdown {
-				dcrdLog.Infof("Received signal (%s).  "+
-					"Already shutting down...", sig)
-				continue
-			}
-
-			isShutdown = true
-			dcrdLog.Infof("Received signal (%s).  Shutting down...",
-				sig)
-
-			// Run handlers in LIFO order.
-			for i := range interruptCallbacks {
-				idx := len(interruptCallbacks) - 1 - i
-				callback := interruptCallbacks[idx]
-				callback()
-			}
-
-			// Signal the main goroutine to shutdown.
-			go func() {
-				shutdownChannel <- struct{}{}
-			}()
-
-		case handler := <-addHandlerChannel:
-			// The shutdown signal has already been received, so
-			// just invoke and new handlers immediately.
-			if isShutdown {
-				handler()
-			}
-
-			interruptCallbacks = append(interruptCallbacks, handler)
+			dcrdLog.Infof("Received signal (%s).  Shutting down...", sig)
+		case <-shutdownRequestChannel:
+			dcrdLog.Infof("Shutdown requested.  Shutting down...")
 		}
-	}
+
+		close(c)
+	}()
+
+	return c
 }
 
-// addInterruptHandler adds a handler to call when a SIGINT (Ctrl+C) is
-// received.
-func addInterruptHandler(handler func()) {
-	// Create the channel and start the main interrupt handler which invokes
-	// all other callbacks and exits if not already done.
-	if interruptChannel == nil {
-		interruptChannel = make(chan os.Signal, 1)
-		signal.Notify(interruptChannel, signals...)
-		go mainInterruptHandler()
+// interruptRequested returns true when the channel returned by
+// interruptListener was closed.  This simplifies early shutdown slightly since
+// the caller can just use an if statement instead of a select.
+func interruptRequested(interrupted <-chan struct{}) bool {
+	select {
+	case <-interrupted:
+		return true
+	default:
+		return false
 	}
-
-	addHandlerChannel <- handler
 }

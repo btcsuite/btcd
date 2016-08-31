@@ -86,17 +86,11 @@ loop:
 				// more commands while pending.
 				changes <- svc.Status{State: svc.StopPending}
 
-				// Stop the main server gracefully when it is
-				// already setup or just break out and allow
-				// the service to exit immediately if it's not
-				// setup yet.  Note that calling Stop will cause
-				// dcrdMain to exit in the goroutine above which
-				// will in turn send a signal (and a potential
-				// error) to doneChan.
-				if mainServer != nil {
-					mainServer.Stop()
-				} else {
-					break loop
+				// Signal the main function to exit if shutdown
+				// was not already requested.
+				select {
+				case shutdownRequestChannel <- struct{}{}:
+				default:
 				}
 
 			default:
