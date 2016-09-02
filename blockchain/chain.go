@@ -1727,11 +1727,39 @@ func (b *BlockChain) forceHeadReorganization(formerBest chainhash.Hash,
 	}
 
 	newBestBlock, err := b.getBlockFromHash(&newBest)
+	if err != nil {
+		return err
+	}
 
 	// Check to make sure our forced-in node validates correctly.
 	view := NewUtxoViewpoint()
 	view.SetBestHash(&b.bestNode.header.PrevBlock)
 	view.SetStakeViewpoint(ViewpointPrevValidInitial)
+
+	formerBestBlock, err := b.getBlockFromHash(&formerBest)
+	if err != nil {
+		return err
+	}
+	commonParentBlock, err := b.getBlockFromHash(formerBestNode.parent.hash)
+	if err != nil {
+		return err
+	}
+	var stxos []spentTxOut
+	err = b.db.View(func(dbTx database.Tx) error {
+		stxos, err = dbFetchSpendJournalEntry(dbTx, formerBestBlock,
+			commonParentBlock, view)
+		return err
+	})
+	if err != nil {
+		return err
+	}
+
+	err = b.disconnectTransactions(view, formerBestBlock, commonParentBlock,
+		stxos)
+	if err != nil {
+		return err
+	}
+
 	err = checkBlockSanity(newBestBlock,
 		timeSource,
 		BFNone,
