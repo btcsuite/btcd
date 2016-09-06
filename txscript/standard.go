@@ -358,15 +358,12 @@ func NullDataScript(data []byte) ([]byte, error) {
 		return nil, ErrStackLongScript
 	}
 
-	return unparseScript([]parsedOpcode{
-		parsedOpcode{
-			opcode: &opcodeArray[OP_RETURN],
-		},
-		parsedOpcode{
-			opcode: &opcodeArray[OP_PUSHDATA1],
-			data:   data,
-		},
-	})
+	script := make([]byte, 3+len(data))
+	script[0] = OP_RETURN
+	script[1] = OP_PUSHDATA1
+	script[2] = byte(len(data))
+	copy(script[3:3+len(data)], data)
+	return script, nil
 }
 
 // MultiSigScript returns a valid script for a multisignature redemption where
