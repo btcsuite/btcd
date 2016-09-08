@@ -286,11 +286,12 @@ func createDefaultConfigFile(destinationPath string) error {
 		return err
 	}
 
-	// Read dcrd.conf from its default path.
+	// Read dcrd.conf from its default path.  If no dcrd.conf then just give
+	// up but do not error (since it is not an error to not have a dcrd.conf).
 	dcrdConfigPath := filepath.Join(dcrdHomeDir, "dcrd.conf")
 	dcrdConfigFile, err := os.Open(dcrdConfigPath)
 	if err != nil {
-		return err
+		return nil
 	}
 	defer dcrdConfigFile.Close()
 	content, err := ioutil.ReadAll(dcrdConfigFile)
