@@ -404,8 +404,8 @@ func loadConfig() (*config, []string, error) {
 		if _, err := os.Stat(preCfg.ConfigFile); os.IsNotExist(err) {
 			err := createDefaultConfigFile(preCfg.ConfigFile)
 			if err != nil {
-				fmt.Fprintln(os.Stderr, "Error creating a "+
-					"default config file: %v", err)
+				fmt.Fprintf(os.Stderr, "Error creating a "+
+					"default config file: %v\n", err)
 			}
 		}
 
