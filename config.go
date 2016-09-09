@@ -404,7 +404,8 @@ func loadConfig() (*config, []string, error) {
 		if _, err := os.Stat(preCfg.ConfigFile); os.IsNotExist(err) {
 			err := createDefaultConfigFile(preCfg.ConfigFile)
 			if err != nil {
-				btcdLog.Warnf("Error creating a default config file: %v", err)
+				fmt.Fprintln(os.Stderr, "Error creating a "+
+					"default config file: %v", err)
 			}
 		}
 
