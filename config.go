@@ -404,7 +404,8 @@ func loadConfig() (*config, []string, error) {
 		if _, err := os.Stat(preCfg.ConfigFile); os.IsNotExist(err) {
 			err := createDefaultConfigFile(preCfg.ConfigFile)
 			if err != nil {
-				btcdLog.Warnf("Error creating a default config file: %v", err)
+				fmt.Fprintf(os.Stderr, "Error creating a "+
+					"default config file: %v\n", err)
 			}
 		}
 
@@ -833,8 +834,8 @@ func loadConfig() (*config, []string, error) {
 
 		if cfg.TorIsolation &&
 			(cfg.ProxyUser != "" || cfg.ProxyPass != "") {
-			btcdLog.Warn("Tor isolation set -- overriding " +
-				"specified proxy user credentials")
+			fmt.Fprintln(os.Stderr, "Tor isolation set -- "+
+				"overriding specified proxy user credentials")
 		}
 
 		proxy := &socks.Proxy{
@@ -871,8 +872,9 @@ func loadConfig() (*config, []string, error) {
 
 		if cfg.TorIsolation &&
 			(cfg.OnionProxyUser != "" || cfg.OnionProxyPass != "") {
-			btcdLog.Warn("Tor isolation set -- overriding " +
-				"specified onionproxy user credentials ")
+			fmt.Fprintln(os.Stderr, "Tor isolation set -- "+
+				"overriding specified onionproxy user "+
+				"credentials ")
 		}
 
 		cfg.oniondial = func(a, b string) (net.Conn, error) {
