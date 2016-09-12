@@ -111,7 +111,7 @@ func upgradeDBPaths() error {
 func upgradeDataPaths() error {
 	// No need to migrate if the old and new home paths are the same.
 	oldHomePath := oldBtcdHomeDir()
-	newHomePath := btcdHomeDir
+	newHomePath := defaultHomeDir
 	if oldHomePath == newHomePath {
 		return nil
 	}

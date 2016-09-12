@@ -175,20 +175,13 @@ func loadConfig() (*config, []string, error) {
 		RPCCert:    defaultRPCCertFile,
 	}
 
-	// Create the home directory if it doesn't already exist.
-	err := os.MkdirAll(btcdHomeDir, 0700)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "%v\n", err)
-		os.Exit(-1)
-	}
-
 	// Pre-parse the command line options to see if an alternative config
 	// file, the version flag, or the list commands flag was specified.  Any
 	// errors aside from the help message error can be ignored here since
 	// they will be caught by the final parse below.
 	preCfg := cfg
 	preParser := flags.NewParser(&preCfg, flags.HelpFlag)
-	_, err = preParser.Parse()
+	_, err := preParser.Parse()
 	if err != nil {
 		if e, ok := err.(*flags.Error); ok && e.Type == flags.ErrHelp {
 			fmt.Fprintln(os.Stderr, err)
@@ -282,9 +275,6 @@ func loadConfig() (*config, []string, error) {
 // For this it tries to read the btcd config file at its default path, and extract
 // the RPC user and password from it.
 func createDefaultConfigFile(destinationPath string) error {
-	// Create the destination directory if it does not exists
-	os.MkdirAll(filepath.Dir(destinationPath), 0700)
-
 	// Read btcd.conf from its default path
 	btcdConfigPath := filepath.Join(btcdHomeDir, "btcd.conf")
 	btcdConfigFile, err := os.Open(btcdConfigPath)
@@ -319,14 +309,22 @@ func createDefaultConfigFile(destinationPath string) error {
 		return nil
 	}
 
+	// Create the destination directory if it does not exists
+	err = os.MkdirAll(filepath.Dir(destinationPath), 0700)
+	if err != nil {
+		return err
+	}
+
 	// Create the destination file and write the rpcuser and rpcpass to it
-	dest, err := os.OpenFile(destinationPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0700)
+	dest, err := os.OpenFile(destinationPath,
+		os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
 		return err
 	}
 	defer dest.Close()
 
-	dest.WriteString(fmt.Sprintf("rpcuser=%s\nrpcpass=%s", string(userSubmatches[1]), string(passSubmatches[1])))
+	dest.WriteString(fmt.Sprintf("rpcuser=%s\nrpcpass=%s",
+		string(userSubmatches[1]), string(passSubmatches[1])))
 
 	return nil
 }
