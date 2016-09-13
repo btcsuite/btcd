@@ -117,6 +117,13 @@ func TestMain(m *testing.M) {
 	// purposes.
 	if err := primaryHarness.SetUp(true, 25); err != nil {
 		fmt.Println("unable to setup test chain: ", err)
+
+		// Even though the harness was not fully setup, it still needs
+		// to be torn down to ensure all resources such as temp
+		// directories are cleaned up.  The error is intentionally
+		// ignored since this is already an error path and nothing else
+		// could be done about it anyways.
+		_ = primaryHarness.TearDown()
 		os.Exit(1)
 	}
 
