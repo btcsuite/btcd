@@ -30,18 +30,20 @@ func checkForAndMoveOldTicketDb() error {
 	if _, err := os.Stat(ffldbPath); os.IsNotExist(err) {
 		// Rename the old ticket database.
 		ticketDBPath := filepath.Join(cfg.DataDir, ticketDBName)
-		if _, err := os.Stat(ticketDBPath); !os.IsNotExist(err) && err != nil {
+		if _, err := os.Stat(ticketDBPath); !os.IsNotExist(err) {
 			return err
 		}
 
-		dcrdLog.Warnf("The old ticket database file has been named " +
-			oldTicketDBName + ". It can be safely removed if you " +
-			"no longer wish to roll back to an old version of the " +
-			"software.")
 		oldTicketDBPath := filepath.Join(cfg.DataDir, oldTicketDBName)
 		err = os.Rename(ticketDBPath, oldTicketDBPath)
-		if err != nil {
+		if !os.IsNotExist(err) {
 			return err
+		}
+		if err == nil {
+			dcrdLog.Warnf("The old ticket database file has been "+
+				"renamed %v. It can be safely removed if you "+
+				"no longer wish to roll back to an old "+
+				"version of the software.", oldTicketDBName)
 		}
 	}
 
