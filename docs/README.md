@@ -29,19 +29,19 @@ licensed under the [copyfree](http://www.copyfree.org) ISC License.
 This project is currently under active development and is in a Beta state.  It
 is extremely stable and has been in production use since October 2013.
 
-It currently properly downloads, validates, and serves the block chain using the
-exact rules (including bugs) for block acceptance as the reference
-implementation, [bitcoind](https://github.com/bitcoin/bitcoin).  We have taken
-great care to avoid btcd causing a fork to the block chain. It passes all of
-the '[official](https://github.com/TheBlueMatt/test-scripts/)' block acceptance
-tests.
+It properly downloads, validates, and serves the block chain using the exact
+rules (including consensus bugs) for block acceptance as Bitcoin Core.  We have
+taken great care to avoid btcd causing a fork to the block chain.  It includes a
+full block validation testing framework which contains all of the 'official'
+block acceptance tests (and some additional ones) that is run on every pull
+request to help ensure it properly follows consensus.  Also, it passes all of
+the JSON test data in the Bitcoin Core code.
 
 It also properly relays newly mined blocks, maintains a transaction pool, and
-relays individual transactions that have not yet made it into a block. It
+relays individual transactions that have not yet made it into a block.  It
 ensures all individual transactions admitted to the pool follow the rules
-required into the block chain and also includes the vast majority of the more
-strict checks which filter transactions based on miner requirements ("standard"
-transactions).
+required by the block chain and also includes more strict checks which filter
+transactions based on miner requirements ("standard" transactions).
 
 One key difference between btcd and Bitcoin Core is that btcd does *NOT* include
 wallet functionality and this was a very intentional design decision.  See the

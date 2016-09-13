@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/btcsuite/btcd/blockchain"
+	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
 )
@@ -46,7 +47,7 @@ func TestReorganization(t *testing.T) {
 	t.Logf("Number of blocks: %v\n", len(blocks))
 
 	// Create a new database and chain instance to run tests against.
-	chain, teardownFunc, err := chainSetup("reorg")
+	chain, teardownFunc, err := chainSetup("reorg", &chaincfg.MainNetParams)
 	if err != nil {
 		t.Errorf("Failed to setup chain instance: %v", err)
 		return

@@ -36,7 +36,8 @@ func TestHaveBlock(t *testing.T) {
 	}
 
 	// Create a new database and chain instance to run tests against.
-	chain, teardownFunc, err := chainSetup("haveblock")
+	chain, teardownFunc, err := chainSetup("haveblock",
+		&chaincfg.MainNetParams)
 	if err != nil {
 		t.Errorf("Failed to setup chain instance: %v", err)
 		return

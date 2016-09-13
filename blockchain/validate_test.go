@@ -21,7 +21,8 @@ import (
 // fails.
 func TestCheckConnectBlock(t *testing.T) {
 	// Create a new database and chain instance to run tests against.
-	chain, teardownFunc, err := chainSetup("checkconnectblock")
+	chain, teardownFunc, err := chainSetup("checkconnectblock",
+		&chaincfg.MainNetParams)
 	if err != nil {
 		t.Errorf("Failed to setup chain instance: %v", err)
 		return
