@@ -102,7 +102,7 @@ Launch btcd from your Start menu.
 
 ```bash
 $ ./btcd
-````
+```
 
 ## IRC
 
