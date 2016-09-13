@@ -496,8 +496,6 @@ func (b *BlockChain) disconnectTransactions(view *UtxoViewpoint,
 	// Loop backwards through all transactions so everything is unspent in
 	// reverse order.  This is necessary since transactions later in a block
 	// can spend from previous ones.
-	// debug TODO remove
-	//stxoIdxParent, stxoIdxCurrent := countSpentOutputsPerTree(block, parent)
 	regularTxTreeValid := dcrutil.IsFlagSet16(block.MsgBlock().Header.VoteBits,
 		dcrutil.BlockValid)
 	thisNodeStakeViewpoint := ViewpointPrevInvalidStake
@@ -904,27 +902,6 @@ func (view *UtxoViewpoint) fetchInputUtxos(db database.DB,
 	block, parent *dcrutil.Block) error {
 	viewpoint := view.StakeViewpoint()
 
-	// If we need the previous block, grab it.
-	/*
-		var parent *dcrutil.Block
-		if viewpoint == ViewpointPrevValidInitial ||
-			viewpoint == ViewpointPrevValidStake {
-			prevBlock := block.MsgBlock().Header.PrevBlock
-			err := db.View(func(dbTx database.Tx) error {
-				var err error
-				parent, err = dbFetchBlockByHash(dbTx, &prevBlock)
-				if err != nil {
-					return err
-				}
-
-				return nil
-			})
-			if err != nil {
-				return err
-			}
-		}
-	*/
-
 	// Build a map of in-flight transactions because some of the inputs in
 	// this block could be referencing other transactions earlier in this
 	// block which are not yet in the chain.
@@ -992,8 +969,8 @@ func (view *UtxoViewpoint) fetchInputUtxos(db database.DB,
 		// in-flight in relation to the regular tx tree or to other tx in
 		// the stake tx tree, so don't do any of those expensive checks and
 		// just append it to the tx slice.
-		stransactions := block.STransactions()
-		for _, tx := range stransactions {
+		sTransactions := block.STransactions()
+		for _, tx := range sTransactions {
 			isSSGen, _ := stake.IsSSGen(tx)
 
 			for i, txIn := range tx.MsgTx().TxIn {

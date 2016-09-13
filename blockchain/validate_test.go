@@ -1968,6 +1968,67 @@ func TestBlockValidationRules(t *testing.T) {
 	}
 }
 
+// TestBlockchainSpendJournal tests for whether or not the spend journal is being
+// written to disk correctly on a live blockchain.
+func TestBlockchainSpendJournal(t *testing.T) {
+	// Create a new database and chain instance to run tests against.
+	chain, teardownFunc, err := chainSetup("reorgunittest",
+		simNetParams)
+	if err != nil {
+		t.Errorf("Failed to setup chain instance: %v", err)
+		return
+	}
+	defer teardownFunc()
+
+	// The genesis block should fail to connect since it's already
+	// inserted.
+	genesisBlock := simNetParams.GenesisBlock
+	err = chain.CheckConnectBlock(dcrutil.NewBlock(genesisBlock))
+	if err == nil {
+		t.Errorf("CheckConnectBlock: Did not receive expected error")
+	}
+
+	// Load up the rest of the blocks up to HEAD.
+	filename := filepath.Join("testdata/", "reorgto179.bz2")
+	fi, err := os.Open(filename)
+	bcStream := bzip2.NewReader(fi)
+	defer fi.Close()
+
+	// Create a buffer of the read file
+	bcBuf := new(bytes.Buffer)
+	bcBuf.ReadFrom(bcStream)
+
+	// Create decoder from the buffer and a map to store the data
+	bcDecoder := gob.NewDecoder(bcBuf)
+	blockChain := make(map[int64][]byte)
+
+	// Decode the blockchain into the map
+	if err := bcDecoder.Decode(&blockChain); err != nil {
+		t.Errorf("error decoding test blockchain: %v", err.Error())
+	}
+
+	// Load up the short chain
+	timeSource := blockchain.NewMedianTime()
+	finalIdx1 := 179
+	for i := 1; i < finalIdx1+1; i++ {
+		bl, err := dcrutil.NewBlockFromBytes(blockChain[int64(i)])
+		if err != nil {
+			t.Fatalf("NewBlockFromBytes error: %v", err.Error())
+		}
+		bl.SetHeight(int64(i))
+
+		_, _, err = chain.ProcessBlock(bl, timeSource, blockchain.BFNone)
+		if err != nil {
+			t.Fatalf("ProcessBlock error at height %v: %v", i, err.Error())
+		}
+	}
+
+	err = chain.DoStxoTest()
+	if err != nil {
+		t.Errorf(err.Error())
+	}
+}
+
 // simNetPowLimit is the highest proof of work value a Decred block
 // can have for the simulation test network.  It is the value 2^255 - 1.
 var simNetPowLimit = new(big.Int).Sub(new(big.Int).Lsh(bigOne, 255), bigOne)

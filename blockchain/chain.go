@@ -1205,12 +1205,6 @@ func (b *BlockChain) connectBlock(node *blockNode, block *dcrutil.Block,
 		// the block that contains all txos spent by it.
 		err = dbPutSpendJournalEntry(dbTx, block.Sha(), stxos)
 		if err != nil {
-			// Attempt to restore TicketDb if this fails.
-			_, _, _, errRemove := b.tmdb.RemoveBlockToHeight(node.height - 1)
-			if errRemove != nil {
-				return errRemove
-			}
-
 			return err
 		}
 
@@ -1535,11 +1529,19 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List,
 		// journal.
 		var stxos []spentTxOut
 		err = b.db.View(func(dbTx database.Tx) error {
-			stxos, err = dbFetchSpendJournalEntry(dbTx, block, parent, view)
+			stxos, err = dbFetchSpendJournalEntry(dbTx, block, parent)
 			return err
 		})
 		if err != nil {
 			return err
+		}
+
+		// Quick sanity test.
+		if len(stxos) != countSpentOutputs(block, parent) {
+			return AssertError(fmt.Sprintf("retrieved %v stxos when trying to "+
+				"disconnect block %v (height %v), yet counted %v "+
+				"many spent utxos", len(stxos), block.Sha(), block.Height(),
+				countSpentOutputs(block, parent)))
 		}
 
 		// Store the loaded block and spend journal entry for later.
@@ -1747,11 +1749,20 @@ func (b *BlockChain) forceHeadReorganization(formerBest chainhash.Hash,
 	var stxos []spentTxOut
 	err = b.db.View(func(dbTx database.Tx) error {
 		stxos, err = dbFetchSpendJournalEntry(dbTx, formerBestBlock,
-			commonParentBlock, view)
+			commonParentBlock)
 		return err
 	})
 	if err != nil {
 		return err
+	}
+
+	// Quick sanity test.
+	if len(stxos) != countSpentOutputs(formerBestBlock, commonParentBlock) {
+		return AssertError(fmt.Sprintf("retrieved %v stxos when trying to "+
+			"disconnect block %v (height %v), yet counted %v "+
+			"many spent utxos when trying to force head reorg", len(stxos),
+			formerBestBlock.Sha(), formerBestBlock.Height(),
+			countSpentOutputs(formerBestBlock, commonParentBlock)))
 	}
 
 	err = b.disconnectTransactions(view, formerBestBlock, commonParentBlock,

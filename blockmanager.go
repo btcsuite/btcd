@@ -1220,7 +1220,6 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 	// handling, etc.
 	onMainChain, isOrphan, err := b.chain.ProcessBlock(bmsg.block,
 		b.server.timeSource, behaviorFlags)
-
 	if err != nil {
 		// When the error is a rule error, it means the block was simply
 		// rejected as opposed to something actually going wrong, so log
@@ -1235,7 +1234,7 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 		}
 		if dbErr, ok := err.(database.Error); ok && dbErr.ErrorCode ==
 			database.ErrCorruption {
-			panic(dbErr)
+			bmgrLog.Errorf("Critical failure: %v", dbErr.Error())
 		}
 
 		// Convert the error into an appropriate reject message and

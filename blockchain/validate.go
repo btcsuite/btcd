@@ -2446,7 +2446,7 @@ func (b *BlockChain) CheckConnectBlock(block *dcrutil.Block) error {
 	view := NewUtxoViewpoint()
 	view.SetBestHash(b.bestNode.hash)
 	view.SetStakeViewpoint(ViewpointPrevValidInitial)
-
+	var stxos []spentTxOut
 	for e := detachNodes.Front(); e != nil; e = e.Next() {
 		n := e.Value.(*blockNode)
 		block, err := b.getBlockFromHash(n.hash)
@@ -2461,9 +2461,8 @@ func (b *BlockChain) CheckConnectBlock(block *dcrutil.Block) error {
 
 		// Load all of the spent txos for the block from the spend
 		// journal.
-		var stxos []spentTxOut
 		err = b.db.View(func(dbTx database.Tx) error {
-			stxos, err = dbFetchSpendJournalEntry(dbTx, block, parent, view)
+			stxos, err = dbFetchSpendJournalEntry(dbTx, block, parent)
 			return err
 		})
 		if err != nil {
@@ -2503,7 +2502,6 @@ func (b *BlockChain) CheckConnectBlock(block *dcrutil.Block) error {
 			return err
 		}
 
-		var stxos []spentTxOut
 		err = b.connectTransactions(view, block, parent, &stxos)
 		if err != nil {
 			return err
@@ -2511,5 +2509,5 @@ func (b *BlockChain) CheckConnectBlock(block *dcrutil.Block) error {
 	}
 
 	view.SetBestHash(&parentHash)
-	return b.checkConnectBlock(newNode, block, view, nil)
+	return b.checkConnectBlock(newNode, block, view, &stxos)
 }

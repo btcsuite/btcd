@@ -621,12 +621,21 @@ func (b *BlockChain) fetchTicketStore(node *blockNode) (TicketStore, error) {
 		// journal.
 		var stxos []spentTxOut
 		err = b.db.View(func(dbTx database.Tx) error {
-			stxos, err = dbFetchSpendJournalEntry(dbTx, block, parent, view)
+			stxos, err = dbFetchSpendJournalEntry(dbTx, block, parent)
 			return err
 		})
 		if err != nil {
 			return nil, err
 		}
+
+		// Quick sanity test.
+		if len(stxos) != countSpentOutputs(block, parent) {
+			return nil, AssertError(fmt.Sprintf("retrieved %v stxos when "+
+				"trying to disconnect block %v (height %v), yet counted %v "+
+				"many spent utxos when fetching ticket store", len(stxos),
+				block.Sha(), block.Height(), countSpentOutputs(block, parent)))
+		}
+
 		err = b.disconnectTransactions(view, block, parent, stxos)
 		if err != nil {
 			return nil, err

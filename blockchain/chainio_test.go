@@ -464,7 +464,7 @@ func TestSpendJournalSerialization(t *testing.T) {
 
 		// Deserialize to a spend journal entry.
 		gotEntry, err := deserializeSpendJournalEntry(test.serialized,
-			test.blockTxns, test.utxoView)
+			test.blockTxns)
 		if err != nil {
 			t.Errorf("deserializeSpendJournalEntry #%d (%s) "+
 				"unexpected error: %v", i, test.name, err)
@@ -492,7 +492,6 @@ func TestSpendJournalErrors(t *testing.T) {
 	tests := []struct {
 		name       string
 		blockTxns  []*wire.MsgTx
-		utxoView   *UtxoViewpoint
 		serialized []byte
 		errType    error
 	}{
@@ -511,7 +510,6 @@ func TestSpendJournalErrors(t *testing.T) {
 				}},
 				LockTime: 0,
 			}},
-			utxoView:   NewUtxoViewpoint(),
 			serialized: hexToBytes(""),
 			errType:    AssertError(""),
 		},
@@ -529,7 +527,6 @@ func TestSpendJournalErrors(t *testing.T) {
 				}},
 				LockTime: 0,
 			}},
-			utxoView:   NewUtxoViewpoint(),
 			serialized: hexToBytes("1301320511db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a"),
 			errType:    errDeserialize(""),
 		},
@@ -539,7 +536,7 @@ func TestSpendJournalErrors(t *testing.T) {
 		// Ensure the expected error type is returned and the returned
 		// slice is nil.
 		stxos, err := deserializeSpendJournalEntry(test.serialized,
-			test.blockTxns, test.utxoView)
+			test.blockTxns)
 		if reflect.TypeOf(err) != reflect.TypeOf(test.errType) {
 			t.Errorf("deserializeSpendJournalEntry (%s): expected "+
 				"error type does not match - got %T, want %T",

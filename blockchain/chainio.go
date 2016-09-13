@@ -388,8 +388,7 @@ func decodeSpentTxOut(serialized []byte, stxo *spentTxOut, amount int64,
 // format comments, this function also requires the transactions that spend the
 // txouts and a utxo view that contains any remaining existing utxos in the
 // transactions referenced by the inputs to the passed transasctions.
-func deserializeSpendJournalEntry(serialized []byte, txns []*wire.MsgTx,
-	view *UtxoViewpoint) ([]spentTxOut, error) {
+func deserializeSpendJournalEntry(serialized []byte, txns []*wire.MsgTx) ([]spentTxOut, error) {
 	// Calculate the total number of stxos.
 	var numStxos int
 	for _, tx := range txns {
@@ -479,7 +478,6 @@ func serializeSpendJournalEntry(stxos []spentTxOut) ([]byte, error) {
 	var size int
 	var sizes []int
 	for i := range stxos {
-		// size += spentTxOutSerializeSize(&stxos[i])
 		sz := spentTxOutSerializeSize(&stxos[i])
 		sizes = append(sizes, sz)
 		size += sz
@@ -509,18 +507,24 @@ func serializeSpendJournalEntry(stxos []spentTxOut) ([]byte, error) {
 // the passed block since that information is required to reconstruct the spent
 // txouts.
 func dbFetchSpendJournalEntry(dbTx database.Tx, block *dcrutil.Block,
-	parent *dcrutil.Block, view *UtxoViewpoint) ([]spentTxOut, error) {
+	parent *dcrutil.Block) ([]spentTxOut, error) {
 	// Exclude the coinbase transaction since it can't spend anything.
 	spendBucket := dbTx.Metadata().Bucket(dbnamespace.SpendJournalBucketName)
 	serialized := spendBucket.Get(block.Sha()[:])
-	blockTxns := append(parent.MsgBlock().Transactions[1:],
-		block.MsgBlock().STransactions...)
+
+	var blockTxns []*wire.MsgTx
+	regularTxTreeValid := dcrutil.IsFlagSet16(block.MsgBlock().Header.VoteBits,
+		dcrutil.BlockValid)
+	if regularTxTreeValid {
+		blockTxns = append(blockTxns, parent.MsgBlock().Transactions[1:]...)
+	}
+	blockTxns = append(blockTxns, block.MsgBlock().STransactions...)
 
 	if len(blockTxns) > 0 && len(serialized) == 0 {
 		return nil, AssertError("missing spend journal data")
 	}
 
-	stxos, err := deserializeSpendJournalEntry(serialized, blockTxns, view)
+	stxos, err := deserializeSpendJournalEntry(serialized, blockTxns)
 	if err != nil {
 		// Ensure any deserialization errors are returned as database
 		// corruption errors.
