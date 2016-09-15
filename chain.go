@@ -12,7 +12,6 @@ import (
 	"github.com/btcsuite/btcd/btcjson"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil"
 )
 
 // FutureGetBestBlockHashResult is a future promise to deliver the result of a
@@ -58,7 +57,7 @@ type FutureGetBlockResult chan *response
 
 // Receive waits for the response promised by the future and returns the raw
 // block requested from the server given its hash.
-func (r FutureGetBlockResult) Receive() (*btcutil.Block, error) {
+func (r FutureGetBlockResult) Receive() (*wire.MsgBlock, error) {
 	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, err
@@ -83,7 +82,7 @@ func (r FutureGetBlockResult) Receive() (*btcutil.Block, error) {
 	if err != nil {
 		return nil, err
 	}
-	return btcutil.NewBlock(&msgBlock), nil
+	return &msgBlock, nil
 }
 
 // GetBlockAsync returns an instance of a type that can be used to get the
@@ -105,7 +104,7 @@ func (c *Client) GetBlockAsync(blockHash *chainhash.Hash) FutureGetBlockResult {
 //
 // See GetBlockVerbose to retrieve a data structure with information about the
 // block instead.
-func (c *Client) GetBlock(blockHash *chainhash.Hash) (*btcutil.Block, error) {
+func (c *Client) GetBlock(blockHash *chainhash.Hash) (*wire.MsgBlock, error) {
 	return c.GetBlockAsync(blockHash).Receive()
 }
 
