@@ -48,7 +48,7 @@ implement and the API is not stable yet.
 ## Installation
 
 ```bash
-$ go get github.com/btcsuite/btcrpcclient
+$ go get -u github.com/btcsuite/btcrpcclient
 ```
 
 ## License
