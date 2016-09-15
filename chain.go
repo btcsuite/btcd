@@ -134,22 +134,47 @@ func (r FutureGetBlockVerboseResult) Receive() (*btcjson.GetBlockVerboseResult, 
 // the returned instance.
 //
 // See GetBlockVerbose for the blocking version and more details.
-func (c *Client) GetBlockVerboseAsync(blockHash *chainhash.Hash, verboseTx bool) FutureGetBlockVerboseResult {
+func (c *Client) GetBlockVerboseAsync(blockHash *chainhash.Hash) FutureGetBlockVerboseResult {
 	hash := ""
 	if blockHash != nil {
 		hash = blockHash.String()
 	}
 
-	cmd := btcjson.NewGetBlockCmd(hash, btcjson.Bool(true), &verboseTx)
+	cmd := btcjson.NewGetBlockCmd(hash, btcjson.Bool(true), nil)
 	return c.sendCmd(cmd)
 }
 
 // GetBlockVerbose returns a data structure from the server with information
 // about a block given its hash.
 //
+// See GetBlockVerboseTx to retrieve transaction data structures as well.
 // See GetBlock to retrieve a raw block instead.
-func (c *Client) GetBlockVerbose(blockHash *chainhash.Hash, verboseTx bool) (*btcjson.GetBlockVerboseResult, error) {
-	return c.GetBlockVerboseAsync(blockHash, verboseTx).Receive()
+func (c *Client) GetBlockVerbose(blockHash *chainhash.Hash) (*btcjson.GetBlockVerboseResult, error) {
+	return c.GetBlockVerboseAsync(blockHash).Receive()
+}
+
+// GetBlockVerboseTxAsync returns an instance of a type that can be used to get
+// the result of the RPC at some future time by invoking the Receive function on
+// the returned instance.
+//
+// See GetBlockVerboseTx or the blocking version and more details.
+func (c *Client) GetBlockVerboseTxAsync(blockHash *chainhash.Hash) FutureGetBlockVerboseResult {
+	hash := ""
+	if blockHash != nil {
+		hash = blockHash.String()
+	}
+
+	cmd := btcjson.NewGetBlockCmd(hash, btcjson.Bool(true), btcjson.Bool(true))
+	return c.sendCmd(cmd)
+}
+
+// GetBlockVerboseTx returns a data structure from the server with information
+// about a block and its transactions given its hash.
+//
+// See GetBlockVerbose if only transaction hashes are preferred.
+// See GetBlock to retrieve a raw block instead.
+func (c *Client) GetBlockVerboseTx(blockHash *chainhash.Hash) (*btcjson.GetBlockVerboseResult, error) {
+	return c.GetBlockVerboseTxAsync(blockHash).Receive()
 }
 
 // FutureGetBlockCountResult is a future promise to deliver the result of a
