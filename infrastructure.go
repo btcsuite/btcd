@@ -705,15 +705,15 @@ func (c *Client) handleSendPostMessage(details *sendPostDetails) {
 		return
 	}
 
-	// Handle unsuccessful HTTP responses
-	if httpResponse.StatusCode < 200 || httpResponse.StatusCode >= 300 {
-		jReq.responseChan <- &response{err: errors.New(string(respBytes))}
-		return
-	}
-
+	// Try to unmarshal the response as a regular JSON-RPC response.
 	var resp rawResponse
 	err = json.Unmarshal(respBytes, &resp)
 	if err != nil {
+		// When the response itself isn't a valid JSON-RPC response
+		// return an error which includes the HTTP status code and raw
+		// response bytes.
+		err = fmt.Errorf("status code: %d, response: %q",
+			httpResponse.StatusCode, string(respBytes))
 		jReq.responseChan <- &response{err: err}
 		return
 	}
