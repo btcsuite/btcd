@@ -27,6 +27,11 @@ func TestCheckBlockScripts(t *testing.T) {
 	}
 	if len(blocks) > 1 {
 		t.Errorf("The test block file must only have one block in it")
+		return
+	}
+	if len(blocks) == 0 {
+		t.Errorf("The test block file may not be empty")
+		return
 	}
 
 	storeDataFile := fmt.Sprintf("%d.utxostore.bz2", testBlockNum)
