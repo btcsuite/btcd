@@ -5,9 +5,7 @@
 package rpctest
 
 import (
-	"net"
 	"reflect"
-	"strconv"
 	"time"
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
@@ -110,18 +108,13 @@ retry:
 // therefore in the case of disconnects, "from" will attempt to reestablish a
 // connection to the "to" harness.
 func ConnectNode(from *Harness, to *Harness) error {
-	// Calculate the target p2p addr+port for the node to be connected to.
-	// p2p ports uses within the package are always even, so we multiply
-	// the node number by two before offsetting from the defaultP2pPort.
-	targetPort := defaultP2pPort + (2 * to.nodeNum)
-	targetAddr := net.JoinHostPort("127.0.0.1", strconv.Itoa(targetPort))
-
 	peerInfo, err := from.Node.GetPeerInfo()
 	if err != nil {
 		return err
 	}
 	numPeers := len(peerInfo)
 
+	targetAddr := to.node.config.listen
 	if err := from.Node.AddNode(targetAddr, btcrpcclient.ANAdd); err != nil {
 		return err
 	}

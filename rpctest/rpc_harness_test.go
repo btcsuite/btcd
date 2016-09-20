@@ -5,9 +5,7 @@ package rpctest
 
 import (
 	"fmt"
-	"net"
 	"os"
-	"strconv"
 	"testing"
 	"time"
 
@@ -82,14 +80,12 @@ func testSendOutputs(r *Harness, t *testing.T) {
 }
 
 func assertConnectedTo(t *testing.T, nodeA *Harness, nodeB *Harness) {
-	nodePort := defaultP2pPort + (2 * nodeB.nodeNum)
-	nodeAddr := net.JoinHostPort("127.0.0.1", strconv.Itoa(nodePort))
-
 	nodeAPeers, err := nodeA.Node.GetPeerInfo()
 	if err != nil {
 		t.Fatalf("unable to get nodeA's peer info")
 	}
 
+	nodeAddr := nodeB.node.config.listen
 	addrFound := false
 	for _, peerInfo := range nodeAPeers {
 		if peerInfo.Addr == nodeAddr {
