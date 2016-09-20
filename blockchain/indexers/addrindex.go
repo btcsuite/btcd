@@ -720,6 +720,7 @@ func (idx *AddrIndex) indexPkScript(data writeIndexData, scriptVersion uint16, p
 func (idx *AddrIndex) indexBlock(data writeIndexData, block, parent *dcrutil.Block, view *blockchain.UtxoViewpoint) {
 	regularTxTreeValid := dcrutil.IsFlagSet16(block.MsgBlock().Header.VoteBits,
 		dcrutil.BlockValid)
+	var stakeStartIdx int
 	if regularTxTreeValid {
 		for txIdx, tx := range parent.Transactions() {
 			// Coinbases do not reference any inputs.  Since the block is
@@ -753,9 +754,10 @@ func (idx *AddrIndex) indexBlock(data writeIndexData, block, parent *dcrutil.Blo
 					false)
 			}
 		}
+
+		stakeStartIdx = len(parent.Transactions())
 	}
 
-	stakeStartIdx := len(parent.Transactions())
 	for txIdx, tx := range block.STransactions() {
 		thisTxOffset := txIdx + stakeStartIdx
 
