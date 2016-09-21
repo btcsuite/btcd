@@ -44,15 +44,15 @@ func testSendOutputs(r *Harness, t *testing.T) {
 			t.Fatalf("unable to get block: %v", err)
 		}
 
-		numBlockTxns := len(block.Transactions())
+		numBlockTxns := len(block.Transactions)
 		if numBlockTxns < 2 {
 			t.Fatalf("crafted transaction wasn't mined, block should have "+
 				"at least %v transactions instead has %v", 2, numBlockTxns)
 		}
 
-		minedTx := block.Transactions()[1]
-		txHash := minedTx.Hash()
-		if *txHash != *txid {
+		minedTx := block.Transactions[1]
+		txHash := minedTx.TxHash()
+		if txHash != *txid {
 			t.Fatalf("txid's don't match, %v vs %v", txHash, txid)
 		}
 	}

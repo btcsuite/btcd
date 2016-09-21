@@ -371,10 +371,11 @@ func (h *Harness) GenerateAndSubmitBlock(txns []*btcutil.Tx, blockVersion int32,
 	if err != nil {
 		return nil, err
 	}
-	prevBlock, err := h.Node.GetBlock(prevBlockHash)
+	mBlock, err := h.Node.GetBlock(prevBlockHash)
 	if err != nil {
 		return nil, err
 	}
+	prevBlock := btcutil.NewBlock(mBlock)
 	prevBlock.SetHeight(prevBlockHeight)
 
 	// Create a new block including the specified transactions

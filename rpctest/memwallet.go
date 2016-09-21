@@ -224,11 +224,10 @@ func (m *memWallet) chainSyncer() {
 		undo := &undoEntry{
 			utxosDestroyed: make(map[wire.OutPoint]*utxo),
 		}
-		for _, tx := range block.Transactions() {
-			mtx := tx.MsgTx()
+		for _, mtx := range block.Transactions {
 			isCoinbase := blockchain.IsCoinBaseTx(mtx)
-
-			m.evalOutputs(mtx.TxOut, tx.Hash(), isCoinbase, undo)
+			txHash := mtx.TxHash()
+			m.evalOutputs(mtx.TxOut, &txHash, isCoinbase, undo)
 			m.evalInputs(mtx.TxIn, undo)
 		}
 
