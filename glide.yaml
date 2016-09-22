@@ -18,7 +18,6 @@ import:
   - leveldb/opt
   - leveldb/util
 - package: github.com/btcsuite/seelog
-  version: v2.1
 - package: github.com/btcsuite/websocket
 - package: github.com/btcsuite/winsvc
   subpackages:
@@ -40,3 +39,7 @@ import:
 - package: golang.org/x/crypto
   subpackages:
   - ssh/terminal
+testImport:
+- package: github.com/stretchr/testify
+  subpackages:
+  - assert
