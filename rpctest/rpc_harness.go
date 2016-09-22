@@ -44,7 +44,7 @@ var (
 	// It should be noted however that there is still some small probability
 	// that there will be port collisions either due to other processes
 	// running or simply due to the stars aligning on the process IDs.
-	processID = os.Getppid()
+	processID = os.Getpid()
 
 	// testInstances is a private package-level slice used to keep track of
 	// all active test harnesses. This global can be used to perform
