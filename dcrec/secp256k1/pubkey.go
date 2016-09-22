@@ -168,6 +168,14 @@ func (p PublicKey) SerializeHybrid() []byte {
 	return paddedAppend(32, b, p.Y.Bytes())
 }
 
+// IsEqual compares this PublicKey instance to the one passed, returning true if
+// both PublicKeys are equivalent. A PublicKey is equivalent to another, if they
+// both have the same X and Y coordinate.
+func (p *PublicKey) IsEqual(otherPubKey *PublicKey) bool {
+	return p.X.Cmp(otherPubKey.X) == 0 &&
+		p.Y.Cmp(otherPubKey.Y) == 0
+}
+
 // paddedAppend appends the src byte slice to dst, returning the new slice.
 // If the length of the source is smaller than the passed size, leading zero
 // bytes are appended to the dst slice before appending src.

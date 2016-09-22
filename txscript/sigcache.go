@@ -7,19 +7,21 @@ package txscript
 
 import (
 	"bytes"
-	"crypto/rand"
 	"sync"
 
 	"github.com/decred/dcrd/chaincfg/chainec"
 	"github.com/decred/dcrd/chaincfg/chainhash"
 )
 
-// sigInfo represents an entry in the SigCache. Entries in the sigcache are a
-// 3-tuple: (sigHash, sig, pubKey).
-type sigInfo struct {
-	sigHash chainhash.Hash
-	sig     string
-	pubKey  string
+// sigCacheEntry represents an entry in the SigCache. Entries within the
+// SigCache are keyed according to the sigHash of the signature. In the
+// scenario of a cache-hit (according to the sigHash), an additional comparison
+// of the signature, and public key will be executed in order to ensure a complete
+// match. In the occasion that two sigHashes collide, the newer sigHash will
+// simply overwrite the existing entry.
+type sigCacheEntry struct {
+	sig    chainec.Signature
+	pubKey chainec.PublicKey
 }
 
 // SigCache implements an ECDSA signature verification cache with a randomized
@@ -34,7 +36,7 @@ type sigInfo struct {
 // if they've already been seen and verified within the mempool.
 type SigCache struct {
 	sync.RWMutex
-	validSigs  map[sigInfo]struct{}
+	validSigs  map[chainhash.Hash]sigCacheEntry
 	maxEntries uint
 }
 
@@ -44,7 +46,10 @@ type SigCache struct {
 // to make room for new entries that would cause the number of entries in the
 // cache to exceed the max.
 func NewSigCache(maxEntries uint) *SigCache {
-	return &SigCache{validSigs: make(map[sigInfo]struct{}), maxEntries: maxEntries}
+	return &SigCache{
+		validSigs:  make(map[chainhash.Hash]sigCacheEntry, maxEntries),
+		maxEntries: maxEntries,
+	}
 }
 
 // Exists returns true if an existing entry of 'sig' over 'sigHash' for public
@@ -53,13 +58,17 @@ func NewSigCache(maxEntries uint) *SigCache {
 // NOTE: This function is safe for concurrent access. Readers won't be blocked
 // unless there exists a writer, adding an entry to the SigCache.
 func (s *SigCache) Exists(sigHash chainhash.Hash, sig chainec.Signature, pubKey chainec.PublicKey) bool {
-	info := sigInfo{sigHash, string(sig.Serialize()),
-		string(pubKey.SerializeCompressed())}
-
 	s.RLock()
-	_, ok := s.validSigs[info]
-	s.RUnlock()
-	return ok
+	defer s.RUnlock()
+
+	if entry, ok := s.validSigs[sigHash]; ok {
+		pkEqual := bytes.Equal(entry.pubKey.SerializeCompressed(),
+			pubKey.SerializeCompressed())
+		sigEqual := bytes.Equal(entry.sig.Serialize(), sig.Serialize())
+		return pkEqual && sigEqual
+	}
+
+	return false
 }
 
 // Add adds an entry for a signature over 'sigHash' under public key 'pubKey'
@@ -80,35 +89,19 @@ func (s *SigCache) Add(sigHash chainhash.Hash, sig chainec.Signature, pubKey cha
 	// If adding this new entry will put us over the max number of allowed
 	// entries, then evict an entry.
 	if uint(len(s.validSigs)+1) > s.maxEntries {
-		// Generate a cryptographically random hash.
-		randHashBytes := make([]byte, chainhash.HashSize)
-		_, err := rand.Read(randHashBytes)
-		if err != nil {
-			// Failure to read a random hash results in the proposed
-			// entry not being added to the cache since we are
-			// unable to evict any existing entries.
-			return
-		}
-
-		// Try to find the first entry that is greater than the random
-		// hash. Use the first entry (which is already pseudo random due
-		// to Go's range statement over maps) as a fall back if none of
-		// the hashes in the rejected transactions pool are larger than
-		// the random hash.
-		var foundEntry sigInfo
+		// Remove a random entry from the map relaying on the random
+		// starting point of Go's map iteration. It's worth noting that
+		// the random iteration starting point is not 100% guaranteed
+		// by the spec, however most Go compilers support it.
+		// Ultimately, the iteration order isn't important here because
+		// in order to manipulate which items are evicted, an adversary
+		// would need to be able to execute preimage attacks on the
+		// hashing function in order to start eviction at a specific
+		// entry.
 		for sigEntry := range s.validSigs {
-			if foundEntry.sig == "" {
-				foundEntry = sigEntry
-			}
-			if bytes.Compare(sigEntry.sigHash.Bytes(), randHashBytes) > 0 {
-				foundEntry = sigEntry
-				break
-			}
+			delete(s.validSigs, sigEntry)
+			break
 		}
-		delete(s.validSigs, foundEntry)
 	}
-
-	info := sigInfo{sigHash, string(sig.Serialize()),
-		string(pubKey.SerializeCompressed())}
-	s.validSigs[info] = struct{}{}
+	s.validSigs[sigHash] = sigCacheEntry{sig, pubKey}
 }

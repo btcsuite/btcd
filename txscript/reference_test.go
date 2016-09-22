@@ -199,6 +199,7 @@ func TestScriptInvalidTests(t *testing.T) {
 		return
 	}
 	sigCache := NewSigCache(10)
+
 	sigCacheToggle := []bool{true, false}
 	for _, useSigCache := range sigCacheToggle {
 		for i, test := range tests {
@@ -265,7 +266,9 @@ func TestScriptValidTests(t *testing.T) {
 			err)
 		return
 	}
+
 	sigCache := NewSigCache(10)
+
 	sigCacheToggle := []bool{true, false}
 	for _, useSigCache := range sigCacheToggle {
 		for i, test := range tests {

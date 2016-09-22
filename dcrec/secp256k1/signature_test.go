@@ -589,3 +589,24 @@ func TestRFC6979(t *testing.T) {
 		}
 	}
 }
+
+func TestSignatureIsEqual(t *testing.T) {
+	sig1 := &secp256k1.Signature{
+		R: fromHex("0082235e21a2300022738dabb8e1bbd9d19cfb1e7ab8c30a23b0afbb8d178abcf3"),
+		S: fromHex("24bf68e256c534ddfaf966bf908deb944305596f7bdcc38d69acad7f9c868724"),
+	}
+	sig2 := &secp256k1.Signature{
+		R: fromHex("4e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd41"),
+		S: fromHex("181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d09"),
+	}
+
+	if !sig1.IsEqual(sig1) {
+		t.Fatalf("value of IsEqual is incorrect, %v is "+
+			"equal to %v", sig1, sig1)
+	}
+
+	if sig1.IsEqual(sig2) {
+		t.Fatalf("value of IsEqual is incorrect, %v is not "+
+			"equal to %v", sig1, sig2)
+	}
+}
