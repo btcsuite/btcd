@@ -20,8 +20,6 @@ import (
 )
 
 const (
-	maxUint32 = 1<<32 - 1
-
 	// upgradeStartedBit if the bit flag for whether or not a database
 	// upgrade is in progress. It is used to determine if the database
 	// is in an inconsistent state from the update.
