@@ -11,57 +11,144 @@ import (
 	"testing"
 
 	"github.com/decred/dcrd/blockchain/stake"
+	"github.com/decred/dcrutil"
 )
 
 // TestTxFeePrioHeap ensures the priority queue for transaction fees and
-// priorities works as expected.
+// priorities works as expected. It doesn't set anything for the stake
+// priority, so this test only tests sorting by fee and then priority.
 func TestTxFeePrioHeap(t *testing.T) {
-	// Create priority items with random fees and priorites.
-	const numItems = 1000
-	prioItems := make([]*txPrioItem, numItems)
-	highestFeePerKB := float64(0)
-	highestPrio := float64(0)
+	// Create some fake priority items that exercise the expected sort
+	// edge conditions.
+	testItems := []*txPrioItem{
+		{feePerKB: 5678, priority: 1},
+		{feePerKB: 5678, priority: 1}, // Duplicate fee and prio
+		{feePerKB: 5678, priority: 5},
+		{feePerKB: 5678, priority: 2},
+		{feePerKB: 1234, priority: 3},
+		{feePerKB: 1234, priority: 1},
+		{feePerKB: 1234, priority: 5},
+		{feePerKB: 1234, priority: 5}, // Duplicate fee and prio
+		{feePerKB: 1234, priority: 2},
+		{feePerKB: 10000, priority: 0}, // Higher fee, smaller prio
+		{feePerKB: 0, priority: 10000}, // Higher prio, lower fee
+	}
+	numItems := len(testItems)
+
+	// Add random data in addition to the edge conditions already manually
+	// specified.
+	randSeed := rand.Int63()
+	defer func() {
+		if t.Failed() {
+			t.Logf("Random numbers using seed: %v", randSeed)
+		}
+	}()
+	prng := rand.New(rand.NewSource(randSeed))
 	for i := 0; i < 1000; i++ {
-		randPrio := rand.Float64() * 100
-		if randPrio > highestPrio {
-			highestPrio = randPrio
-		}
-		randFeePerKB := rand.Float64() * 1e8
-		if randFeePerKB > highestFeePerKB {
-			highestFeePerKB = randFeePerKB
-		}
-		prioItems[i] = &txPrioItem{
-			tx:       nil,
-			priority: randPrio,
-			feePerKB: randFeePerKB,
-		}
+		testItems = append(testItems, &txPrioItem{
+			feePerKB: prng.Float64() * dcrutil.AtomsPerCoin,
+			priority: prng.Float64() * 100,
+		})
 	}
 
-	// Test sorting by fee per KB.
-	priorityQueue := newTxPriorityQueue(numItems, txPQByFee)
-	for i := 0; i < numItems; i++ {
-		heap.Push(priorityQueue, prioItems[i])
+	// Test sorting by fee per KB then priority.
+	var highest *txPrioItem
+	priorityQueue := newTxPriorityQueue(len(testItems), txPQByFee)
+	for i := 0; i < len(testItems); i++ {
+		prioItem := testItems[i]
+		if highest == nil {
+			highest = prioItem
+		}
+		if prioItem.feePerKB >= highest.feePerKB {
+			highest = prioItem
+
+			if prioItem.feePerKB == highest.feePerKB {
+				if prioItem.priority >= highest.priority {
+					highest = prioItem
+				}
+			}
+		}
+		heap.Push(priorityQueue, prioItem)
 	}
-	for i := 0; i < numItems; i++ {
+
+	for i := 0; i < len(testItems); i++ {
 		prioItem := heap.Pop(priorityQueue).(*txPrioItem)
-		if prioItem.feePerKB > highestFeePerKB {
-			t.Fatalf("bad pop: %v fee per KB was more than last of %v",
-				prioItem.feePerKB, highestFeePerKB)
+		feesEqual := false
+		switch {
+		case prioItem.feePerKB > highest.feePerKB:
+			t.Fatalf("priority sort: item (fee per KB: %v, "+
+				"priority: %v) higher than than prev "+
+				"(fee per KB: %v, priority %v)",
+				prioItem.feePerKB, prioItem.priority,
+				highest.feePerKB, highest.priority)
+		case prioItem.feePerKB == highest.feePerKB:
+			feesEqual = true
+		default:
 		}
-		highestFeePerKB = prioItem.feePerKB
+		if feesEqual {
+			switch {
+			case prioItem.priority > highest.priority:
+				t.Fatalf("priority sort: item (fee per KB: %v, "+
+					"priority: %v) higher than than prev "+
+					"(fee per KB: %v, priority %v)",
+					prioItem.feePerKB, prioItem.priority,
+					highest.feePerKB, highest.priority)
+			case prioItem.priority == highest.priority:
+			default:
+			}
+		}
+
+		highest = prioItem
 	}
 
-	// Test sorting by priority.
+	// Test sorting by priority then fee per KB.
+	highest = nil
 	priorityQueue = newTxPriorityQueue(numItems, txPQByPriority)
-	for i := 0; i < numItems; i++ {
-		heap.Push(priorityQueue, prioItems[i])
-	}
-	for i := 0; i < numItems; i++ {
-		prioItem := heap.Pop(priorityQueue).(*txPrioItem)
-		if prioItem.priority > highestPrio {
-			t.Fatalf("bad pop: %v priority was more than last of %v",
-				prioItem.priority, highestPrio)
+	for i := 0; i < len(testItems); i++ {
+		prioItem := testItems[i]
+		if highest == nil {
+			highest = prioItem
 		}
+		if prioItem.priority >= highest.priority {
+			highest = prioItem
+
+			if prioItem.priority == highest.priority {
+				if prioItem.feePerKB >= highest.feePerKB {
+					highest = prioItem
+				}
+			}
+		}
+		heap.Push(priorityQueue, prioItem)
+	}
+
+	for i := 0; i < len(testItems); i++ {
+		prioItem := heap.Pop(priorityQueue).(*txPrioItem)
+		prioEqual := false
+		switch {
+		case prioItem.priority > highest.priority:
+			t.Fatalf("priority sort: item (fee per KB: %v, "+
+				"priority: %v) higher than than prev "+
+				"(fee per KB: %v, priority %v)",
+				prioItem.feePerKB, prioItem.priority,
+				highest.feePerKB, highest.priority)
+		case prioItem.priority == highest.priority:
+			prioEqual = true
+		default:
+		}
+		if prioEqual {
+			switch {
+			case prioItem.feePerKB > highest.feePerKB:
+				t.Fatalf("priority sort: item (fee per KB: %v, "+
+					"priority: %v) higher than than prev "+
+					"(fee per KB: %v, priority %v)",
+					prioItem.feePerKB, prioItem.priority,
+					highest.feePerKB, highest.priority)
+			case prioItem.priority == highest.priority:
+			default:
+			}
+		}
+
+		highest = prioItem
 	}
 }
 
@@ -104,8 +191,6 @@ func TestStakeTxFeePrioHeap(t *testing.T) {
 					txpi.feePerKB, last.feePerKB, txpi.txType, last.txType)
 			}
 			last = txpi
-		} else {
-			t.Fatalf("casting failure")
 		}
 	}
 
@@ -141,8 +226,6 @@ func TestStakeTxFeePrioHeap(t *testing.T) {
 					txpi.feePerKB, last.feePerKB, txpi.txType, last.txType)
 			}
 			last = txpi
-		} else {
-			t.Fatalf("casting failure")
 		}
 	}
 
@@ -192,8 +275,6 @@ func TestStakeTxFeePrioHeap(t *testing.T) {
 				}
 			}
 			last = txpi
-		} else {
-			t.Fatalf("casting failure")
 		}
 	}
 }
