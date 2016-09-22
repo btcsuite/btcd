@@ -38,7 +38,7 @@ func TestSetLogWriter(t *testing.T) {
 			name:     "use off level",
 			w:        os.Stdout,
 			level:    "off",
-			expected: errors.New("Min level can't be greater than max. Got min: 6, max: 5"),
+			expected: errors.New("min level can't be greater than max. Got min: 6, max: 5"),
 		},
 		{
 			name:     "pass",

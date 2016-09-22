@@ -13,3 +13,4 @@ install:
   - go get -v github.com/davecgh/go-spew/spew
 script:
   - export PATH=$PATH:$HOME/gopath/bin
+  - ./goclean.sh
