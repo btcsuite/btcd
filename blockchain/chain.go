@@ -193,7 +193,6 @@ type BlockChain struct {
 
 	// These fields are related to the memory block index.  They are
 	// protected by the chain lock.
-	root     *blockNode
 	bestNode *blockNode
 	index    map[chainhash.Hash]*blockNode
 	depNodes map[chainhash.Hash][]*blockNode
@@ -615,7 +614,6 @@ func (b *BlockChain) loadBlockNode(dbTx database.Tx,
 		for _, childNode := range childNodes {
 			childNode.parent = node
 			node.children = append(node.children, childNode)
-			b.root = node
 		}
 	} else {
 		// Case 3 -- The node doesn't have a parent and is not the
@@ -913,9 +911,6 @@ func (b *BlockChain) pruneBlockNodes() error {
 			return err
 		}
 	}
-
-	// Set the new root node.
-	b.root = newRootNode
 
 	return nil
 }
@@ -2120,7 +2115,6 @@ func New(config *Config) (*BlockChain, error) {
 		notifications:           config.Notifications,
 		sigCache:                config.SigCache,
 		indexManager:            config.IndexManager,
-		root:                    nil,
 		bestNode:                nil,
 		index:                   make(map[chainhash.Hash]*blockNode),
 		depNodes:                make(map[chainhash.Hash][]*blockNode),
