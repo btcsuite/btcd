@@ -573,14 +573,15 @@ func (msg *MsgTx) decodePrefix(r io.Reader, pver uint32) error {
 	}
 
 	// TxIns.
+	txIns := make([]TxIn, count)
 	msg.TxIn = make([]*TxIn, count)
 	for i := uint64(0); i < count; i++ {
-		ti := TxIn{}
-		err = readTxInPrefix(r, pver, msg.Version, &ti)
+		ti := &txIns[i]
+		err = readTxInPrefix(r, pver, msg.Version, ti)
 		if err != nil {
 			return err
 		}
-		msg.TxIn[i] = &ti
+		msg.TxIn[i] = ti
 	}
 
 	count, err = ReadVarInt(r, pver)
@@ -599,14 +600,15 @@ func (msg *MsgTx) decodePrefix(r io.Reader, pver uint32) error {
 	}
 
 	// TxOuts.
+	txOuts := make([]TxOut, count)
 	msg.TxOut = make([]*TxOut, count)
 	for i := uint64(0); i < count; i++ {
-		to := TxOut{}
-		err = readTxOut(r, pver, msg.Version, &to)
+		to := &txOuts[i]
+		err = readTxOut(r, pver, msg.Version, to)
 		if err != nil {
 			return err
 		}
-		msg.TxOut[i] = &to
+		msg.TxOut[i] = to
 	}
 
 	// Locktime and expiry.
@@ -642,14 +644,15 @@ func (msg *MsgTx) decodeWitness(r io.Reader, pver uint32, isFull bool) error {
 			return messageError("MsgTx.decodeWitness", str)
 		}
 
+		txIns := make([]TxIn, count)
 		msg.TxIn = make([]*TxIn, count)
 		for i := uint64(0); i < count; i++ {
-			ti := TxIn{}
-			err = readTxInWitness(r, pver, msg.Version, &ti)
+			ti := &txIns[i]
+			err = readTxInWitness(r, pver, msg.Version, ti)
 			if err != nil {
 				return err
 			}
-			msg.TxIn[i] = &ti
+			msg.TxIn[i] = ti
 		}
 		msg.TxOut = make([]*TxOut, 0)
 	} else {
@@ -683,9 +686,10 @@ func (msg *MsgTx) decodeWitness(r io.Reader, pver uint32, isFull bool) error {
 
 		// Read in the witnesses, and copy them into the already generated
 		// by decodePrefix TxIns.
+		txIns := make([]TxIn, count)
 		for i := uint64(0); i < count; i++ {
-			ti := TxIn{}
-			err = readTxInWitness(r, pver, msg.Version, &ti)
+			ti := &txIns[i]
+			err = readTxInWitness(r, pver, msg.Version, ti)
 			if err != nil {
 				return err
 			}
@@ -719,14 +723,15 @@ func (msg *MsgTx) decodeWitnessSigning(r io.Reader, pver uint32) error {
 		return messageError("MsgTx.decodeWitness", str)
 	}
 
+	txIns := make([]TxIn, count)
 	msg.TxIn = make([]*TxIn, count)
 	for i := uint64(0); i < count; i++ {
-		ti := TxIn{}
-		err = readTxInWitnessSigning(r, pver, msg.Version, &ti)
+		ti := &txIns[i]
+		err = readTxInWitnessSigning(r, pver, msg.Version, ti)
 		if err != nil {
 			return err
 		}
-		msg.TxIn[i] = &ti
+		msg.TxIn[i] = ti
 	}
 	msg.TxOut = make([]*TxOut, 0)
 
@@ -752,14 +757,15 @@ func (msg *MsgTx) decodeWitnessValueSigning(r io.Reader, pver uint32) error {
 		return messageError("MsgTx.decodeWitness", str)
 	}
 
+	txIns := make([]TxIn, count)
 	msg.TxIn = make([]*TxIn, count)
 	for i := uint64(0); i < count; i++ {
-		ti := TxIn{}
-		err = readTxInWitnessValueSigning(r, pver, msg.Version, &ti)
+		ti := &txIns[i]
+		err = readTxInWitnessValueSigning(r, pver, msg.Version, ti)
 		if err != nil {
 			return err
 		}
-		msg.TxIn[i] = &ti
+		msg.TxIn[i] = ti
 	}
 	msg.TxOut = make([]*TxOut, 0)
 
@@ -843,14 +849,16 @@ func (msg *MsgTx) LegacyBtcDecode(r io.Reader, pver uint32) error {
 		return messageError("MsgTx.BtcDecode", str)
 	}
 
+	// Deserialize the inputs.
+	txIns := make([]TxIn, count)
 	msg.TxIn = make([]*TxIn, count)
 	for i := uint64(0); i < count; i++ {
-		ti := TxIn{}
-		err = legacyReadTxIn(r, pver, msg.Version, &ti)
+		ti := &txIns[i]
+		err = legacyReadTxIn(r, pver, msg.Version, ti)
 		if err != nil {
 			return err
 		}
-		msg.TxIn[i] = &ti
+		msg.TxIn[i] = ti
 	}
 
 	count, err = ReadVarInt(r, pver)
@@ -868,14 +876,16 @@ func (msg *MsgTx) LegacyBtcDecode(r io.Reader, pver uint32) error {
 		return messageError("MsgTx.BtcDecode", str)
 	}
 
+	// Deserialize the outputs.
+	txOuts := make([]TxOut, count)
 	msg.TxOut = make([]*TxOut, count)
 	for i := uint64(0); i < count; i++ {
-		to := TxOut{}
-		err = legacyReadTxOut(r, pver, msg.Version, &to)
+		to := &txOuts[i]
+		err = legacyReadTxOut(r, pver, msg.Version, to)
 		if err != nil {
 			return err
 		}
-		msg.TxOut[i] = &to
+		msg.TxOut[i] = to
 	}
 
 	msg.LockTime, err = binarySerializer.Uint32(r, littleEndian)

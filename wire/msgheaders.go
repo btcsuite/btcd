@@ -50,10 +50,13 @@ func (msg *MsgHeaders) BtcDecode(r io.Reader, pver uint32) error {
 		return messageError("MsgHeaders.BtcDecode", str)
 	}
 
+	// Create a contiguous slice of headers to deserialize into in order to
+	// reduce the number of allocations.
+	headers := make([]BlockHeader, count)
 	msg.Headers = make([]*BlockHeader, 0, count)
 	for i := uint64(0); i < count; i++ {
-		bh := BlockHeader{}
-		err := readBlockHeader(r, pver, &bh)
+		bh := &headers[i]
+		err := readBlockHeader(r, pver, bh)
 		if err != nil {
 			return err
 		}
@@ -69,7 +72,7 @@ func (msg *MsgHeaders) BtcDecode(r io.Reader, pver uint32) error {
 				"transactions [count %v]", txCount)
 			return messageError("MsgHeaders.BtcDecode", str)
 		}
-		msg.AddBlockHeader(&bh)
+		msg.AddBlockHeader(bh)
 	}
 
 	return nil

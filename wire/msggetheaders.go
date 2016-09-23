@@ -65,14 +65,17 @@ func (msg *MsgGetHeaders) BtcDecode(r io.Reader, pver uint32) error {
 		return messageError("MsgGetHeaders.BtcDecode", str)
 	}
 
+	// Create a contiguous slice of hashes to deserialize into in order to
+	// reduce the number of allocations.
+	locatorHashes := make([]chainhash.Hash, count)
 	msg.BlockLocatorHashes = make([]*chainhash.Hash, 0, count)
 	for i := uint64(0); i < count; i++ {
-		sha := chainhash.Hash{}
-		err := readElement(r, &sha)
+		hash := &locatorHashes[i]
+		err := readElement(r, hash)
 		if err != nil {
 			return err
 		}
-		msg.AddBlockLocatorHash(&sha)
+		msg.AddBlockLocatorHash(hash)
 	}
 
 	err = readElement(r, &msg.HashStop)
