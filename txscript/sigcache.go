@@ -1,4 +1,4 @@
-// Copyright (c) 2015 The btcsuite developers
+// Copyright (c) 2015-2016 The btcsuite developers
 // Copyright (c) 2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
@@ -89,7 +89,7 @@ func (s *SigCache) Add(sigHash chainhash.Hash, sig chainec.Signature, pubKey cha
 	// If adding this new entry will put us over the max number of allowed
 	// entries, then evict an entry.
 	if uint(len(s.validSigs)+1) > s.maxEntries {
-		// Remove a random entry from the map relaying on the random
+		// Remove a random entry from the map. Relying on the random
 		// starting point of Go's map iteration. It's worth noting that
 		// the random iteration starting point is not 100% guaranteed
 		// by the spec, however most Go compilers support it.
