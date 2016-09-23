@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"time"
 
 	"github.com/decred/dcrd/chaincfg/chainhash"
 )
@@ -176,6 +177,16 @@ var binarySerializer binaryFreeList = make(chan []byte, binaryFreeListMaxItems)
 var errNonCanonicalVarInt = "non-canonical varint %x - discriminant %x must " +
 	"encode a value greater than %x"
 
+// uint32Time represents a unix timestamp encoded with a uint32.  It is used as
+// a way to signal the readElement function how to decode a timestamp into a Go
+// time.Time since it is otherwise ambiguous.
+type uint32Time time.Time
+
+// int64Time represents a unix timestamp encoded with an int64.  It is used as
+// a way to signal the readElement function how to decode a timestamp into a Go
+// time.Time since it is otherwise ambiguous.
+type int64Time time.Time
+
 // readElement reads the next sequence of bytes from r using little endian
 // depending on the concrete type of element pointed to.
 func readElement(r io.Reader, element interface{}) error {
@@ -224,6 +235,24 @@ func readElement(r io.Reader, element interface{}) error {
 		} else {
 			*e = true
 		}
+		return nil
+
+	// Unix timestamp encoded as a uint32.
+	case *uint32Time:
+		rv, err := binarySerializer.Uint32(r, binary.LittleEndian)
+		if err != nil {
+			return err
+		}
+		*e = uint32Time(time.Unix(int64(rv), 0))
+		return nil
+
+	// Unix timestamp encoded as an int64.
+	case *int64Time:
+		rv, err := binarySerializer.Uint64(r, binary.LittleEndian)
+		if err != nil {
+			return err
+		}
+		*e = int64Time(time.Unix(int64(rv), 0))
 		return nil
 
 	// Message header checksum.

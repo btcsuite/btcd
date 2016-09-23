@@ -85,12 +85,11 @@ func (msg *MsgVersion) BtcDecode(r io.Reader, pver uint32) error {
 			"*bytes.Buffer")
 	}
 
-	var sec int64
-	err := readElements(buf, &msg.ProtocolVersion, &msg.Services, &sec)
+	err := readElements(buf, &msg.ProtocolVersion, &msg.Services,
+		(*int64Time)(&msg.Timestamp))
 	if err != nil {
 		return err
 	}
-	msg.Timestamp = time.Unix(sec, 0)
 
 	err = readNetAddress(buf, pver, &msg.AddrYou, false)
 	if err != nil {

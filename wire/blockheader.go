@@ -188,7 +188,6 @@ func NewBlockHeader(version int32, prevHash *chainhash.Hash,
 // decoding block headers stored to disk, such as in a database, as opposed to
 // decoding from the wire.
 func readBlockHeader(r io.Reader, pver uint32, bh *BlockHeader) error {
-	var sec uint32
 	err := readElements(
 		r,
 		&bh.Version,
@@ -205,13 +204,12 @@ func readBlockHeader(r io.Reader, pver uint32, bh *BlockHeader) error {
 		&bh.SBits,
 		&bh.Height,
 		&bh.Size,
-		&sec,
+		(*uint32Time)(&bh.Timestamp),
 		&bh.Nonce,
 		&bh.ExtraData)
 	if err != nil {
 		return err
 	}
-	bh.Timestamp = time.Unix(int64(sec), 0)
 
 	return nil
 }

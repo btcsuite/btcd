@@ -103,7 +103,6 @@ func NewNetAddress(addr net.Addr, services ServiceFlag) (*NetAddress, error) {
 // version and whether or not the timestamp is included per ts.  Some messages
 // like version do not include the timestamp.
 func readNetAddress(r io.Reader, pver uint32, na *NetAddress, ts bool) error {
-	var timestamp time.Time
 	var services ServiceFlag
 	var ip [16]byte
 
@@ -111,12 +110,10 @@ func readNetAddress(r io.Reader, pver uint32, na *NetAddress, ts bool) error {
 	// stop working somewhere around 2106.  Also timestamp wasn't added until
 	// protocol version >= NetAddressTimeVersion
 	if ts {
-		var stamp uint32
-		err := readElement(r, &stamp)
+		err := readElement(r, (*uint32Time)(&na.Timestamp))
 		if err != nil {
 			return err
 		}
-		timestamp = time.Unix(int64(stamp), 0)
 	}
 
 	err := readElements(r, &services, &ip)
@@ -129,7 +126,6 @@ func readNetAddress(r io.Reader, pver uint32, na *NetAddress, ts bool) error {
 		return err
 	}
 
-	na.Timestamp = timestamp
 	na.Services = services
 	na.SetAddress(net.IP(ip[:]), port)
 	return nil
