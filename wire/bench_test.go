@@ -153,8 +153,10 @@ func BenchmarkWriteVarInt9(b *testing.B) {
 // a single byte variable length integer.
 func BenchmarkReadVarInt1(b *testing.B) {
 	buf := []byte{0x01}
+	r := bytes.NewReader(buf)
 	for i := 0; i < b.N; i++ {
-		ReadVarInt(bytes.NewReader(buf), 0)
+		r.Seek(0, 0)
+		ReadVarInt(r, 0)
 	}
 }
 
@@ -162,8 +164,10 @@ func BenchmarkReadVarInt1(b *testing.B) {
 // a three byte variable length integer.
 func BenchmarkReadVarInt3(b *testing.B) {
 	buf := []byte{0x0fd, 0xff, 0xff}
+	r := bytes.NewReader(buf)
 	for i := 0; i < b.N; i++ {
-		ReadVarInt(bytes.NewReader(buf), 0)
+		r.Seek(0, 0)
+		ReadVarInt(r, 0)
 	}
 }
 
@@ -171,8 +175,10 @@ func BenchmarkReadVarInt3(b *testing.B) {
 // a five byte variable length integer.
 func BenchmarkReadVarInt5(b *testing.B) {
 	buf := []byte{0xfe, 0xff, 0xff, 0xff, 0xff}
+	r := bytes.NewReader(buf)
 	for i := 0; i < b.N; i++ {
-		ReadVarInt(bytes.NewReader(buf), 0)
+		r.Seek(0, 0)
+		ReadVarInt(r, 0)
 	}
 }
 
@@ -180,8 +186,10 @@ func BenchmarkReadVarInt5(b *testing.B) {
 // a nine byte variable length integer.
 func BenchmarkReadVarInt9(b *testing.B) {
 	buf := []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff}
+	r := bytes.NewReader(buf)
 	for i := 0; i < b.N; i++ {
-		ReadVarInt(bytes.NewReader(buf), 0)
+		r.Seek(0, 0)
+		ReadVarInt(r, 0)
 	}
 }
 
@@ -189,8 +197,10 @@ func BenchmarkReadVarInt9(b *testing.B) {
 // four byte variable length string.
 func BenchmarkReadVarStr4(b *testing.B) {
 	buf := []byte{0x04, 't', 'e', 's', 't'}
+	r := bytes.NewReader(buf)
 	for i := 0; i < b.N; i++ {
-		ReadVarString(bytes.NewReader(buf), 0)
+		r.Seek(0, 0)
+		ReadVarString(r, 0)
 	}
 }
 
@@ -198,8 +208,10 @@ func BenchmarkReadVarStr4(b *testing.B) {
 // ten byte variable length string.
 func BenchmarkReadVarStr10(b *testing.B) {
 	buf := []byte{0x0a, 't', 'e', 's', 't', '0', '1', '2', '3', '4', '5'}
+	r := bytes.NewReader(buf)
 	for i := 0; i < b.N; i++ {
-		ReadVarString(bytes.NewReader(buf), 0)
+		r.Seek(0, 0)
+		ReadVarString(r, 0)
 	}
 }
 
@@ -229,9 +241,11 @@ func BenchmarkReadOutPoint(b *testing.B) {
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // Previous output hash
 		0xff, 0xff, 0xff, 0xff, // Previous output index
 	}
+	r := bytes.NewReader(buf)
 	var op OutPoint
 	for i := 0; i < b.N; i++ {
-		ReadOutPoint(bytes.NewReader(buf), 0, 0, &op)
+		r.Seek(0, 0)
+		ReadOutPoint(r, 0, 0, &op)
 	}
 }
 
@@ -265,9 +279,11 @@ func BenchmarkReadTxOut(b *testing.B) {
 		0xee, // 65-byte signature
 		0xac, // OP_CHECKSIG
 	}
+	r := bytes.NewReader(buf)
 	var txOut TxOut
 	for i := 0; i < b.N; i++ {
-		readTxOut(bytes.NewReader(buf), 0, 0, &txOut)
+		r.Seek(0, 0)
+		readTxOut(r, 0, 0, &txOut)
 	}
 }
 
@@ -293,9 +309,11 @@ func BenchmarkReadTxIn(b *testing.B) {
 		0x04, 0xff, 0xff, 0x00, 0x1d, 0x01, 0x04, // Signature script
 		0xff, 0xff, 0xff, 0xff, // Sequence
 	}
+	r := bytes.NewReader(buf)
 	var txIn TxIn
 	for i := 0; i < b.N; i++ {
-		readTxInPrefix(bytes.NewReader(buf), 0, 0, &txIn)
+		r.Seek(0, 0)
+		readTxInPrefix(r, 0, 0, &txIn)
 	}
 }
 
@@ -338,9 +356,12 @@ func BenchmarkDeserializeTxSmall(b *testing.B) {
 		0xac,                   // OP_CHECKSIG
 		0x00, 0x00, 0x00, 0x00, // Lock time
 	}
+
+	r := bytes.NewReader(buf)
 	var tx MsgTx
 	for i := 0; i < b.N; i++ {
-		tx.Deserialize(bytes.NewReader(buf))
+		r.Seek(0, 0)
+		tx.Deserialize(r)
 	}
 }
 
@@ -368,9 +389,11 @@ func BenchmarkDeserializeTxLarge(b *testing.B) {
 		b.Fatalf("%v", err.Error())
 	}
 
+	r := bytes.NewReader(bigTxB)
 	var tx MsgTx
 	for i := 0; i < b.N; i++ {
-		tx.Deserialize(bytes.NewReader(bigTxB))
+		r.Seek(0, 0)
+		tx.Deserialize(r)
 	}
 }
 
@@ -402,9 +425,11 @@ func BenchmarkReadBlockHeader(b *testing.B) {
 		0xf3, 0xe0, 0x01, 0x00, // Nonce
 		0x00, // TxnCount Varint
 	}
+	r := bytes.NewReader(buf)
 	var header BlockHeader
 	for i := 0; i < b.N; i++ {
-		readBlockHeader(bytes.NewReader(buf), 0, &header)
+		r.Seek(0, 0)
+		readBlockHeader(r, 0, &header)
 	}
 }
 
