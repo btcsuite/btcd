@@ -309,8 +309,8 @@ func BenchmarkWriteTxIn(b *testing.B) {
 }
 
 // BenchmarkDeserializeTx performs a benchmark on how long it takes to
-// deserialize a transaction.
-func BenchmarkDeserializeTx(b *testing.B) {
+// deserialize a small transaction.
+func BenchmarkDeserializeTxSmall(b *testing.B) {
 	buf := []byte{
 		0x01, 0x00, 0x00, 0x00, // Version
 		0x01, // Varint for number of input transactions
@@ -341,7 +341,36 @@ func BenchmarkDeserializeTx(b *testing.B) {
 	var tx MsgTx
 	for i := 0; i < b.N; i++ {
 		tx.Deserialize(bytes.NewReader(buf))
+	}
+}
 
+// BenchmarkDeserializeTxLarge performs a benchmark on how long it takes to
+// deserialize a very large transaction.
+func BenchmarkDeserializeTxLarge(b *testing.B) {
+	bigTx := new(MsgTx)
+	bigTx.Version = DefaultMsgTxVersion()
+	inputsLen := 1000
+	outputsLen := 2000
+	bigTx.TxIn = make([]*TxIn, inputsLen)
+	bigTx.TxOut = make([]*TxOut, outputsLen)
+	for i := 0; i < inputsLen; i++ {
+		bigTx.TxIn[i] = &TxIn{
+			SignatureScript: bytes.Repeat([]byte{0x12}, 120),
+		}
+	}
+	for i := 0; i < outputsLen; i++ {
+		bigTx.TxOut[i] = &TxOut{
+			PkScript: bytes.Repeat([]byte{0x34}, 30),
+		}
+	}
+	bigTxB, err := bigTx.Bytes()
+	if err != nil {
+		b.Fatalf("%v", err.Error())
+	}
+
+	var tx MsgTx
+	for i := 0; i < b.N; i++ {
+		tx.Deserialize(bytes.NewReader(bigTxB))
 	}
 }
 
