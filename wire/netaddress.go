@@ -106,7 +106,6 @@ func readNetAddress(r io.Reader, pver uint32, na *NetAddress, ts bool) error {
 	var timestamp time.Time
 	var services ServiceFlag
 	var ip [16]byte
-	var port uint16
 
 	// NOTE: The decred protocol uses a uint32 for the timestamp so it will
 	// stop working somewhere around 2106.  Also timestamp wasn't added until
@@ -125,7 +124,7 @@ func readNetAddress(r io.Reader, pver uint32, na *NetAddress, ts bool) error {
 		return err
 	}
 	// Sigh.  Decred protocol mixes little and big endian.
-	err = binary.Read(r, binary.BigEndian, &port)
+	port, err := binarySerializer.Uint16(r, bigEndian)
 	if err != nil {
 		return err
 	}
@@ -161,7 +160,7 @@ func writeNetAddress(w io.Writer, pver uint32, na *NetAddress, ts bool) error {
 	}
 
 	// Sigh.  Decred protocol mixes little and big endian.
-	err = binary.Write(w, binary.BigEndian, na.Port)
+	err = binary.Write(w, bigEndian, na.Port)
 	if err != nil {
 		return err
 	}

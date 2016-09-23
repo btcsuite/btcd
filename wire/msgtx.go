@@ -363,7 +363,10 @@ func (msg *MsgTx) TxSha() chainhash.Hash {
 	mtxCopy := msg.shallowCopyForSerializing(NoWitnessMsgTxVersion())
 
 	buf := bytes.NewBuffer(make([]byte, 0, mtxCopy.SerializeSize()))
-	_ = mtxCopy.Serialize(buf)
+	err := mtxCopy.Serialize(buf)
+	if err != nil {
+		panic("MsgTx failed serializing for TxSha")
+	}
 
 	return chainhash.HashFuncH(buf.Bytes())
 }
@@ -400,7 +403,10 @@ func (msg *MsgTx) TxShaWitness() chainhash.Hash {
 	mtxCopy := msg.shallowCopyForSerializing(WitnessOnlyMsgTxVersion())
 
 	buf := bytes.NewBuffer(make([]byte, 0, mtxCopy.SerializeSize()))
-	_ = mtxCopy.Serialize(buf)
+	err := mtxCopy.Serialize(buf)
+	if err != nil {
+		panic("MsgTx failed serializing for TxShaWitness")
+	}
 
 	return chainhash.HashFuncH(buf.Bytes())
 }
@@ -418,7 +424,10 @@ func (msg *MsgTx) TxShaWitnessSigning() chainhash.Hash {
 	mtxCopy := msg.shallowCopyForSerializing(WitnessSigningMsgTxVersion())
 
 	buf := bytes.NewBuffer(make([]byte, 0, mtxCopy.SerializeSize()))
-	_ = mtxCopy.Serialize(buf)
+	err := mtxCopy.Serialize(buf)
+	if err != nil {
+		panic("MsgTx failed serializing for TxShaWitnessSigning")
+	}
 
 	return chainhash.HashFuncH(buf.Bytes())
 }
@@ -436,7 +445,10 @@ func (msg *MsgTx) TxShaWitnessValueSigning() chainhash.Hash {
 	mtxCopy := msg.shallowCopyForSerializing(WitnessValueSigningMsgTxVersion())
 
 	buf := bytes.NewBuffer(make([]byte, 0, mtxCopy.SerializeSize()))
-	_ = mtxCopy.Serialize(buf)
+	err := mtxCopy.Serialize(buf)
+	if err != nil {
+		panic("MsgTx failed serializing for TxShaWitnessValueSigning")
+	}
 
 	return chainhash.HashFuncH(buf.Bytes())
 }
@@ -466,7 +478,11 @@ func (msg *MsgTx) TxShaLegacy() chainhash.Hash {
 	// is being out of memory or due to nil pointers, both of which would
 	// cause a run-time panic.
 	buf := bytes.NewBuffer(make([]byte, 0, msg.SerializeSize()))
-	_ = msg.LegacySerialize(buf)
+	err := msg.LegacySerialize(buf)
+	if err != nil {
+		panic("MsgTx failed serializing for TxShaLegacy")
+	}
+
 	return chainhash.HashFuncH(buf.Bytes())
 }
 
@@ -594,17 +610,15 @@ func (msg *MsgTx) decodePrefix(r io.Reader, pver uint32) error {
 	}
 
 	// Locktime and expiry.
-	var buf [4]byte
-	_, err = io.ReadFull(r, buf[:])
+	msg.LockTime, err = binarySerializer.Uint32(r, littleEndian)
 	if err != nil {
 		return err
 	}
-	msg.LockTime = binary.LittleEndian.Uint32(buf[:])
-	_, err = io.ReadFull(r, buf[:])
+
+	msg.Expiry, err = binarySerializer.Uint32(r, littleEndian)
 	if err != nil {
 		return err
 	}
-	msg.Expiry = binary.LittleEndian.Uint32(buf[:])
 
 	return nil
 }
@@ -757,12 +771,11 @@ func (msg *MsgTx) decodeWitnessValueSigning(r io.Reader, pver uint32) error {
 // See Deserialize for decoding transactions stored to disk, such as in a
 // database, as opposed to decoding transactions from the wire.
 func (msg *MsgTx) BtcDecode(r io.Reader, pver uint32) error {
-	var buf [4]byte
-	_, err := io.ReadFull(r, buf[:])
+	version, err := binarySerializer.Uint32(r, littleEndian)
 	if err != nil {
 		return err
 	}
-	msg.Version = int32(binary.LittleEndian.Uint32(buf[:]))
+	msg.Version = int32(version)
 	_, mType := msgTxVersionToVars(msg.Version)
 
 	switch {
@@ -809,12 +822,11 @@ func (msg *MsgTx) BtcDecode(r io.Reader, pver uint32) error {
 // LegacyBtcDecode decodes r using the decred protocol encoding into the
 // receiver. This is used for the decoding of legacy serialized transactions.
 func (msg *MsgTx) LegacyBtcDecode(r io.Reader, pver uint32) error {
-	var buf [4]byte
-	_, err := io.ReadFull(r, buf[:])
+	version, err := binarySerializer.Uint32(r, littleEndian)
 	if err != nil {
 		return err
 	}
-	msg.Version = int32(binary.LittleEndian.Uint32(buf[:]))
+	msg.Version = int32(version)
 
 	count, err := ReadVarInt(r, pver)
 	if err != nil {
@@ -866,11 +878,10 @@ func (msg *MsgTx) LegacyBtcDecode(r io.Reader, pver uint32) error {
 		msg.TxOut[i] = &to
 	}
 
-	_, err = io.ReadFull(r, buf[:])
+	msg.LockTime, err = binarySerializer.Uint32(r, littleEndian)
 	if err != nil {
 		return err
 	}
-	msg.LockTime = binary.LittleEndian.Uint32(buf[:])
 
 	return nil
 }
@@ -909,7 +920,6 @@ func (msg *MsgTx) FromBytes(b []byte) error {
 
 // encodePrefix encodes a transaction prefix into a writer.
 func (msg *MsgTx) encodePrefix(w io.Writer, pver uint32) error {
-	var buf [4]byte
 	count := uint64(len(msg.TxIn))
 	err := WriteVarInt(w, pver, count)
 	if err != nil {
@@ -936,14 +946,12 @@ func (msg *MsgTx) encodePrefix(w io.Writer, pver uint32) error {
 		}
 	}
 
-	binary.LittleEndian.PutUint32(buf[:], msg.LockTime)
-	_, err = w.Write(buf[:])
+	err = binarySerializer.PutUint32(w, littleEndian, msg.LockTime)
 	if err != nil {
 		return err
 	}
 
-	binary.LittleEndian.PutUint32(buf[:], msg.Expiry)
-	_, err = w.Write(buf[:])
+	err = binarySerializer.PutUint32(w, littleEndian, msg.Expiry)
 	if err != nil {
 		return err
 	}
@@ -1011,14 +1019,11 @@ func (msg *MsgTx) encodeWitnessValueSigning(w io.Writer, pver uint32) error {
 // See Serialize for encoding transactions to be stored to disk, such as in a
 // database, as opposed to encoding transactions for the wire.
 func (msg *MsgTx) BtcEncode(w io.Writer, pver uint32) error {
-	var buf [4]byte
-	binary.LittleEndian.PutUint32(buf[:], uint32(msg.Version))
-	_, mType := msgTxVersionToVars(msg.Version)
-
-	_, err := w.Write(buf[:])
+	err := binarySerializer.PutUint32(w, littleEndian, uint32(msg.Version))
 	if err != nil {
 		return err
 	}
+	_, mType := msgTxVersionToVars(msg.Version)
 
 	switch {
 	case mType == TxSerializeNoWitness:
@@ -1065,9 +1070,7 @@ func (msg *MsgTx) BtcEncode(w io.Writer, pver uint32) error {
 // LegacyBtcEncode encodes the receiver to w using the Decred protocol encoding.
 // This is for transactions encoded in the legacy encoding, for compatibility.
 func (msg *MsgTx) LegacyBtcEncode(w io.Writer, pver uint32) error {
-	var buf [4]byte
-	binary.LittleEndian.PutUint32(buf[:], uint32(msg.Version))
-	_, err := w.Write(buf[:])
+	err := binarySerializer.PutUint32(w, littleEndian, uint32(msg.Version))
 	if err != nil {
 		return err
 	}
@@ -1098,14 +1101,7 @@ func (msg *MsgTx) LegacyBtcEncode(w io.Writer, pver uint32) error {
 		}
 	}
 
-	binary.LittleEndian.PutUint32(buf[:], msg.LockTime)
-	_, err = w.Write(buf[:])
-	if err != nil {
-		return err
-	}
-
-	binary.LittleEndian.PutUint32(buf[:], msg.Expiry)
-	_, err = w.Write(buf[:])
+	err = binarySerializer.PutUint32(w, littleEndian, msg.LockTime)
 	if err != nil {
 		return err
 	}
@@ -1374,19 +1370,16 @@ func ReadOutPoint(r io.Reader, pver uint32, version int32, op *OutPoint) error {
 		return err
 	}
 
-	var buf [4]byte
-	_, err = io.ReadFull(r, buf[:])
+	op.Index, err = binarySerializer.Uint32(r, littleEndian)
 	if err != nil {
 		return err
 	}
-	op.Index = binary.LittleEndian.Uint32(buf[:])
 
-	var bufTree [1]byte
-	_, err = io.ReadFull(r, bufTree[:])
+	tree, err := binarySerializer.Uint8(r)
 	if err != nil {
 		return err
 	}
-	op.Tree = int8(bufTree[0])
+	op.Tree = int8(tree)
 
 	return nil
 }
@@ -1399,16 +1392,12 @@ func WriteOutPoint(w io.Writer, pver uint32, version int32, op *OutPoint) error 
 		return err
 	}
 
-	var buf [4]byte
-	binary.LittleEndian.PutUint32(buf[:], op.Index)
-	_, err = w.Write(buf[:])
+	err = binarySerializer.PutUint32(w, littleEndian, op.Index)
 	if err != nil {
 		return err
 	}
 
-	var bufTree [1]byte
-	bufTree[0] = byte(op.Tree)
-	_, err = w.Write(bufTree[:])
+	err = binarySerializer.PutUint8(w, uint8(op.Tree))
 	if err != nil {
 		return err
 	}
@@ -1425,12 +1414,10 @@ func legacyReadOutPoint(r io.Reader, pver uint32, version int32,
 		return err
 	}
 
-	var buf [4]byte
-	_, err = io.ReadFull(r, buf[:])
+	op.Index, err = binarySerializer.Uint32(r, littleEndian)
 	if err != nil {
 		return err
 	}
-	op.Index = binary.LittleEndian.Uint32(buf[:])
 
 	return nil
 }
@@ -1444,9 +1431,7 @@ func legacyWriteOutPoint(w io.Writer, pver uint32, version int32,
 		return err
 	}
 
-	var buf [4]byte
-	binary.LittleEndian.PutUint32(buf[:], op.Index)
-	_, err = w.Write(buf[:])
+	err = binarySerializer.PutUint32(w, littleEndian, op.Index)
 	if err != nil {
 		return err
 	}
@@ -1471,12 +1456,10 @@ func readTxInPrefix(r io.Reader, pver uint32, version int32, ti *TxIn) error {
 	ti.PreviousOutPoint = op
 
 	// Sequence.
-	var buf4 [4]byte
-	_, err = io.ReadFull(r, buf4[:])
+	ti.Sequence, err = binarySerializer.Uint32(r, littleEndian)
 	if err != nil {
 		return err
 	}
-	ti.Sequence = binary.LittleEndian.Uint32(buf4[:])
 
 	return nil
 }
@@ -1484,30 +1467,24 @@ func readTxInPrefix(r io.Reader, pver uint32, version int32, ti *TxIn) error {
 // readTxInWitness reads the next sequence of bytes from r as a transaction input
 // (TxIn) in the transaction witness.
 func readTxInWitness(r io.Reader, pver uint32, version int32, ti *TxIn) error {
-	var err error
-
 	// ValueIn.
-	var buf8 [8]byte
-	_, err = io.ReadFull(r, buf8[:])
+	valueIn, err := binarySerializer.Uint64(r, littleEndian)
 	if err != nil {
 		return err
 	}
-	ti.ValueIn = int64(binary.LittleEndian.Uint64(buf8[:]))
+	ti.ValueIn = int64(valueIn)
 
 	// BlockHeight.
-	var buf4 [4]byte
-	_, err = io.ReadFull(r, buf4[:])
+	ti.BlockHeight, err = binarySerializer.Uint32(r, littleEndian)
 	if err != nil {
 		return err
 	}
-	ti.BlockHeight = binary.LittleEndian.Uint32(buf4[:])
 
 	// BlockIndex.
-	_, err = io.ReadFull(r, buf4[:])
+	ti.BlockIndex, err = binarySerializer.Uint32(r, littleEndian)
 	if err != nil {
 		return err
 	}
-	ti.BlockIndex = binary.LittleEndian.Uint32(buf4[:])
 
 	// Signature script.
 	ti.SignatureScript, err = ReadVarBytes(r, pver, MaxMessagePayload,
@@ -1538,15 +1515,12 @@ func readTxInWitnessSigning(r io.Reader, pver uint32, version int32,
 // included.
 func readTxInWitnessValueSigning(r io.Reader, pver uint32, version int32,
 	ti *TxIn) error {
-	var err error
-
 	// ValueIn.
-	var buf8 [8]byte
-	_, err = io.ReadFull(r, buf8[:])
+	valueIn, err := binarySerializer.Uint64(r, littleEndian)
 	if err != nil {
 		return err
 	}
-	ti.ValueIn = int64(binary.LittleEndian.Uint64(buf8[:]))
+	ti.ValueIn = int64(valueIn)
 
 	// Signature script.
 	ti.SignatureScript, err = ReadVarBytes(r, pver, MaxMessagePayload,
@@ -1574,12 +1548,10 @@ func legacyReadTxIn(r io.Reader, pver uint32, version int32, ti *TxIn) error {
 		return err
 	}
 
-	var buf [4]byte
-	_, err = io.ReadFull(r, buf[:])
+	ti.Sequence, err = binarySerializer.Uint32(r, littleEndian)
 	if err != nil {
 		return err
 	}
-	ti.Sequence = binary.LittleEndian.Uint32(buf[:])
 
 	return nil
 }
@@ -1597,9 +1569,7 @@ func legacyWriteTxIn(w io.Writer, pver uint32, version int32, ti *TxIn) error {
 		return err
 	}
 
-	var buf [4]byte
-	binary.LittleEndian.PutUint32(buf[:], ti.Sequence)
-	_, err = w.Write(buf[:])
+	err = binarySerializer.PutUint32(w, littleEndian, ti.Sequence)
 	if err != nil {
 		return err
 	}
@@ -1615,9 +1585,7 @@ func writeTxInPrefix(w io.Writer, pver uint32, version int32, ti *TxIn) error {
 		return err
 	}
 
-	var buf [4]byte
-	binary.LittleEndian.PutUint32(buf[:], ti.Sequence)
-	_, err = w.Write(buf[:])
+	err = binarySerializer.PutUint32(w, littleEndian, ti.Sequence)
 	if err != nil {
 		return err
 	}
@@ -1629,24 +1597,19 @@ func writeTxInPrefix(w io.Writer, pver uint32, version int32, ti *TxIn) error {
 // input (TxIn) witness to w.
 func writeTxInWitness(w io.Writer, pver uint32, version int32, ti *TxIn) error {
 	// ValueIn.
-	var buf8 [8]byte
-	binary.LittleEndian.PutUint64(buf8[:], uint64(ti.ValueIn))
-	_, err := w.Write(buf8[:])
+	err := binarySerializer.PutUint64(w, littleEndian, uint64(ti.ValueIn))
 	if err != nil {
 		return err
 	}
 
 	// BlockHeight.
-	var buf4 [4]byte
-	binary.LittleEndian.PutUint32(buf4[:], ti.BlockHeight)
-	_, err = w.Write(buf4[:])
+	err = binarySerializer.PutUint32(w, littleEndian, ti.BlockHeight)
 	if err != nil {
 		return err
 	}
 
 	// BlockIndex.
-	binary.LittleEndian.PutUint32(buf4[:], ti.BlockIndex)
-	_, err = w.Write(buf4[:])
+	binarySerializer.PutUint32(w, littleEndian, ti.BlockIndex)
 	if err != nil {
 		return err
 	}
@@ -1682,9 +1645,7 @@ func writeTxInWitnessValueSigning(w io.Writer, pver uint32, version int32,
 	var err error
 
 	// ValueIn.
-	var buf8 [8]byte
-	binary.LittleEndian.PutUint64(buf8[:], uint64(ti.ValueIn))
-	_, err = w.Write(buf8[:])
+	err = binarySerializer.PutUint64(w, littleEndian, uint64(ti.ValueIn))
 	if err != nil {
 		return err
 	}
@@ -1701,19 +1662,16 @@ func writeTxInWitnessValueSigning(w io.Writer, pver uint32, version int32,
 // readTxOut reads the next sequence of bytes from r as a transaction output
 // (TxOut).
 func readTxOut(r io.Reader, pver uint32, version int32, to *TxOut) error {
-	var buf8 [8]byte
-	_, err := io.ReadFull(r, buf8[:])
+	value, err := binarySerializer.Uint64(r, littleEndian)
 	if err != nil {
 		return err
 	}
-	to.Value = int64(binary.LittleEndian.Uint64(buf8[:]))
+	to.Value = int64(value)
 
-	var buf2 [2]byte
-	_, err = io.ReadFull(r, buf2[:])
+	to.Version, err = binarySerializer.Uint16(r, littleEndian)
 	if err != nil {
 		return err
 	}
-	to.Version = binary.LittleEndian.Uint16(buf2[:])
 
 	to.PkScript, err = ReadVarBytes(r, pver, MaxMessagePayload,
 		"transaction output public key script")
@@ -1727,16 +1685,12 @@ func readTxOut(r io.Reader, pver uint32, version int32, to *TxOut) error {
 // writeTxOut encodes to into the decred protocol encoding for a transaction
 // output (TxOut) to w.
 func writeTxOut(w io.Writer, pver uint32, version int32, to *TxOut) error {
-	var buf8 [8]byte
-	binary.LittleEndian.PutUint64(buf8[:], uint64(to.Value))
-	_, err := w.Write(buf8[:])
+	err := binarySerializer.PutUint64(w, littleEndian, uint64(to.Value))
 	if err != nil {
 		return err
 	}
 
-	var buf2 [2]byte
-	binary.LittleEndian.PutUint16(buf2[:], to.Version)
-	_, err = w.Write(buf2[:])
+	err = binarySerializer.PutUint16(w, littleEndian, to.Version)
 	if err != nil {
 		return err
 	}
@@ -1751,12 +1705,11 @@ func writeTxOut(w io.Writer, pver uint32, version int32, to *TxOut) error {
 // legacyReadTxOut reads the next sequence of bytes from r as a transaction output
 // (TxOut) in legacy Decred format (for tests).
 func legacyReadTxOut(r io.Reader, pver uint32, version int32, to *TxOut) error {
-	var buf [8]byte
-	_, err := io.ReadFull(r, buf[:])
+	value, err := binarySerializer.Uint64(r, littleEndian)
 	if err != nil {
 		return err
 	}
-	to.Value = int64(binary.LittleEndian.Uint64(buf[:]))
+	to.Value = int64(value)
 
 	to.PkScript, err = ReadVarBytes(r, pver, MaxMessagePayload,
 		"transaction output public key script")
@@ -1770,9 +1723,7 @@ func legacyReadTxOut(r io.Reader, pver uint32, version int32, to *TxOut) error {
 // legacyWriteTxOut encodes to into the decred protocol encoding for a transaction
 // output (TxOut) to w in legacy Decred format (for tests).
 func legacyWriteTxOut(w io.Writer, pver uint32, version int32, to *TxOut) error {
-	var buf [8]byte
-	binary.LittleEndian.PutUint64(buf[:], uint64(to.Value))
-	_, err := w.Write(buf[:])
+	err := binarySerializer.PutUint64(w, littleEndian, uint64(to.Value))
 	if err != nil {
 		return err
 	}
