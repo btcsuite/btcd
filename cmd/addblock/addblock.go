@@ -12,6 +12,7 @@ import (
 
 	"github.com/btcsuite/btclog"
 	"github.com/decred/dcrd/blockchain"
+	"github.com/decred/dcrd/blockchain/indexers"
 	"github.com/decred/dcrd/database"
 	"github.com/decred/dcrd/limits"
 )
@@ -74,6 +75,7 @@ func realMain() error {
 	log = btclog.NewSubsystemLogger(backendLogger, "")
 	database.UseLogger(btclog.NewSubsystemLogger(backendLogger, "BCDB: "))
 	blockchain.UseLogger(btclog.NewSubsystemLogger(backendLogger, "CHAN: "))
+	indexers.UseLogger(btclog.NewSubsystemLogger(backendLogger, "INDX: "))
 
 	// Load the block database.
 	db, err := loadBlockDB()

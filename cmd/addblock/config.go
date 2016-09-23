@@ -35,12 +35,15 @@ var (
 //
 // See loadConfig for details on the configuration load process.
 type config struct {
-	DataDir  string `short:"b" long:"datadir" description:"Location of the dcrd data directory"`
-	DbType   string `long:"dbtype" description:"Database backend to use for the Block Chain"`
-	TestNet  bool   `long:"testnet" description:"Use the test network"`
-	SimNet   bool   `long:"simnet" description:"Use the simulation test network"`
-	InFile   string `short:"i" long:"infile" description:"File containing the block(s)"`
-	Progress int    `short:"p" long:"progress" description:"Show a progress message each time this number of seconds have passed -- Use 0 to disable progress announcements"`
+	DataDir           string `short:"b" long:"datadir" description:"Location of the dcrd data directory"`
+	DbType            string `long:"dbtype" description:"Database backend to use for the Block Chain"`
+	TestNet           bool   `long:"testnet" description:"Use the test network"`
+	SimNet            bool   `long:"simnet" description:"Use the simulation test network"`
+	InFile            string `short:"i" long:"infile" description:"File containing the block(s)"`
+	NoExistsAddrIndex bool   `long:"noexistsaddrindex" description:"Do not build a full index of which addresses were ever seen on the blockchain"`
+	TxIndex           bool   `long:"txindex" description:"Build a full hash-based transaction index which makes all transactions available via the getrawtransaction RPC"`
+	AddrIndex         bool   `long:"addrindex" description:"Build a full address-based transaction index which makes the searchrawtransactions RPC available"`
+	Progress          int    `short:"p" long:"progress" description:"Show a progress message each time this number of seconds have passed -- Use 0 to disable progress announcements"`
 }
 
 // filesExists reports whether the named file or directory exists.
