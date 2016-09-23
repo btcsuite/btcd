@@ -286,6 +286,7 @@ func BenchmarkReadTxOut(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		r.Seek(0, 0)
 		readTxOut(r, 0, 0, &txOut)
+		scriptPool.Return(txOut.PkScript)
 	}
 }
 
@@ -316,6 +317,7 @@ func BenchmarkReadTxIn(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		r.Seek(0, 0)
 		readTxInPrefix(r, 0, 0, &txIn)
+		scriptPool.Return(txIn.SignatureScript)
 	}
 }
 
