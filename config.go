@@ -62,13 +62,13 @@ const (
 )
 
 var (
-	dcrdHomeDir        = dcrutil.AppDataDir("dcrd", false)
-	defaultConfigFile  = filepath.Join(dcrdHomeDir, defaultConfigFilename)
-	defaultDataDir     = filepath.Join(dcrdHomeDir, defaultDataDirname)
+	defaultHomeDir     = dcrutil.AppDataDir("dcrd", false)
+	defaultConfigFile  = filepath.Join(defaultHomeDir, defaultConfigFilename)
+	defaultDataDir     = filepath.Join(defaultHomeDir, defaultDataDirname)
 	knownDbTypes       = database.SupportedDrivers()
-	defaultRPCKeyFile  = filepath.Join(dcrdHomeDir, "rpc.key")
-	defaultRPCCertFile = filepath.Join(dcrdHomeDir, "rpc.cert")
-	defaultLogDir      = filepath.Join(dcrdHomeDir, defaultLogDirname)
+	defaultRPCKeyFile  = filepath.Join(defaultHomeDir, "rpc.key")
+	defaultRPCCertFile = filepath.Join(defaultHomeDir, "rpc.cert")
+	defaultLogDir      = filepath.Join(defaultHomeDir, defaultLogDirname)
 )
 
 // runServiceCommand is only set to a real function on Windows.  It is used
@@ -88,7 +88,7 @@ func minUint32(a, b uint32) uint32 {
 //
 // See loadConfig for details on the configuration load process.
 type config struct {
-	DcrdHomeDir         string        `short:"A" long:"appdata" description:"Path to dcrd home directory"`
+	HomeDir             string        `short:"A" long:"appdata" description:"Path to application home directory"`
 	ShowVersion         bool          `short:"V" long:"version" description:"Display version information and exit"`
 	ConfigFile          string        `short:"C" long:"configfile" description:"Path to configuration file"`
 	DataDir             string        `short:"b" long:"datadir" description:"Directory to store data"`
@@ -177,7 +177,7 @@ type serviceOptions struct {
 func cleanAndExpandPath(path string) string {
 	// Expand initial ~ to OS specific home directory.
 	if strings.HasPrefix(path, "~") {
-		homeDir := filepath.Dir(dcrdHomeDir)
+		homeDir := filepath.Dir(defaultHomeDir)
 		path = strings.Replace(path, "~", homeDir, 1)
 	}
 
@@ -343,13 +343,13 @@ func newConfigParser(cfg *config, so *serviceOptions, options flags.Options) *fl
 // 	3) Load configuration file overwriting defaults with any specified options
 // 	4) Parse CLI options and overwrite/add any specified options
 //
-// The above results in daemon functioning properly without any config settings
+// The above results in dcrd functioning properly without any config settings
 // while still allowing the user to override settings with config files and
 // command line options.  Command line options always take precedence.
 func loadConfig() (*config, []string, error) {
 	// Default config.
 	cfg := config{
-		DcrdHomeDir:       dcrdHomeDir,
+		HomeDir:           defaultHomeDir,
 		ConfigFile:        defaultConfigFile,
 		DebugLevel:        defaultLogLevel,
 		MaxPeers:          defaultMaxPeers,
@@ -390,10 +390,8 @@ func loadConfig() (*config, []string, error) {
 	if err != nil {
 		if e, ok := err.(*flags.Error); ok && e.Type == flags.ErrHelp {
 			fmt.Fprintln(os.Stderr, err)
-		} else {
-			fmt.Printf("Could not load configuration: %v\n", err.Error())
+			return nil, nil, err
 		}
-		return nil, nil, err
 	}
 
 	// Show the version and exit if the version flag was specified.
@@ -419,36 +417,58 @@ func loadConfig() (*config, []string, error) {
 	// Update the home directory for dcrd if specified. Since the home
 	// directory is updated, other variables need to be updated to
 	// reflect the new changes.
-	if len(preCfg.DcrdHomeDir) > 0 {
-		cfg.DcrdHomeDir, _ = filepath.Abs(preCfg.DcrdHomeDir)
-		cfg.ConfigFile = filepath.Join(cfg.DcrdHomeDir, defaultConfigFilename)
-		cfg.DataDir = filepath.Join(cfg.DcrdHomeDir, defaultDataDirname)
-		cfg.RPCKey = filepath.Join(cfg.DcrdHomeDir, "rpc.key")
-		cfg.RPCCert = filepath.Join(cfg.DcrdHomeDir, "rpc.cert")
-		cfg.LogDir = filepath.Join(cfg.DcrdHomeDir, defaultLogDirname)
+	if preCfg.HomeDir != "" {
+		cfg.HomeDir, _ = filepath.Abs(preCfg.HomeDir)
+
+		if preCfg.ConfigFile == defaultConfigFile {
+			cfg.ConfigFile = filepath.Join(cfg.HomeDir, defaultConfigFilename)
+		} else {
+			cfg.ConfigFile = preCfg.ConfigFile
+		}
+		if preCfg.DataDir == defaultDataDir {
+			cfg.DataDir = filepath.Join(cfg.HomeDir, defaultDataDirname)
+		} else {
+			cfg.DataDir = preCfg.DataDir
+		}
+		if preCfg.RPCKey == defaultRPCKeyFile {
+			cfg.RPCKey = filepath.Join(cfg.HomeDir, "rpc.key")
+		} else {
+			cfg.RPCKey = preCfg.RPCKey
+		}
+		if preCfg.RPCCert == defaultRPCCertFile {
+			cfg.RPCCert = filepath.Join(cfg.HomeDir, "rpc.cert")
+		} else {
+			cfg.RPCCert = preCfg.RPCCert
+		}
+		if preCfg.LogDir == defaultLogDir {
+			cfg.LogDir = filepath.Join(cfg.HomeDir, defaultLogDirname)
+		} else {
+			cfg.LogDir = preCfg.LogDir
+		}
 	}
 
 	// Load additional config from file.
+	var configFileError error
 	parser := newConfigParser(&cfg, &serviceOpts, flags.Default)
-	if !(preCfg.SimNet) || preCfg.ConfigFile !=
-		defaultConfigFile {
+	if !(preCfg.SimNet) || cfg.ConfigFile != defaultConfigFile {
 
-		if _, err := os.Stat(preCfg.ConfigFile); os.IsNotExist(err) {
-			err := createDefaultConfigFile()
+		if _, err := os.Stat(cfg.ConfigFile); os.IsNotExist(err) {
+			err := createDefaultConfigFile(cfg.ConfigFile)
 			if err != nil {
-				dcrdLog.Warnf("Error creating a default config file: %v", err)
+				fmt.Fprintf(os.Stderr, "Error creating a "+
+					"default config file: %v\n", err)
 			}
 		}
 
-		err := flags.NewIniParser(parser).ParseFile(preCfg.ConfigFile)
+		err := flags.NewIniParser(parser).ParseFile(cfg.ConfigFile)
 		if err != nil {
-			_, ok := err.(*os.PathError)
-			if !ok || preCfg.ConfigFile != defaultConfigFile {
-				fmt.Fprintf(os.Stderr, "Error parsing config file: %v\n",
-					err)
+			if _, ok := err.(*os.PathError); !ok {
+				fmt.Fprintf(os.Stderr, "Error parsing config "+
+					"file: %v\n", err)
 				fmt.Fprintln(os.Stderr, usageMessage)
 				return nil, nil, err
 			}
+			configFileError = err
 		}
 	}
 
@@ -463,7 +483,7 @@ func loadConfig() (*config, []string, error) {
 
 	// Create the home directory if it doesn't already exist.
 	funcName := "loadConfig"
-	err = os.MkdirAll(dcrdHomeDir, 0700)
+	err = os.MkdirAll(cfg.HomeDir, 0700)
 	if err != nil {
 		// Show a nicer error message if it's because a symlink is
 		// linked to a directory that does not exist (probably because
@@ -846,8 +866,8 @@ func loadConfig() (*config, []string, error) {
 
 		if cfg.TorIsolation &&
 			(cfg.ProxyUser != "" || cfg.ProxyPass != "") {
-			dcrdLog.Warn("Tor isolation set -- overriding " +
-				"specified proxy user credentials")
+			fmt.Fprintln(os.Stderr, "Tor isolation set -- "+
+				"overriding specified proxy user credentials")
 		}
 
 		proxy := &socks.Proxy{
@@ -884,8 +904,9 @@ func loadConfig() (*config, []string, error) {
 
 		if cfg.TorIsolation &&
 			(cfg.OnionProxyUser != "" || cfg.OnionProxyPass != "") {
-			dcrdLog.Warn("Tor isolation set -- overriding " +
-				"specified onionproxy user credentials ")
+			fmt.Fprintln(os.Stderr, "Tor isolation set -- "+
+				"overriding specified onionproxy user "+
+				"credentials ")
 		}
 
 		cfg.oniondial = func(a, b string) (net.Conn, error) {
@@ -916,42 +937,33 @@ func loadConfig() (*config, []string, error) {
 		}
 	}
 
+	// Warn about missing config file only after all other configuration is
+	// done.  This prevents the warning on help messages and invalid
+	// options.  Note this should go directly before the return.
+	if configFileError != nil {
+		dcrdLog.Warnf("%v", configFileError)
+	}
+
 	return &cfg, remainingArgs, nil
 }
 
-// findSampleConfigPathWindows looks in %PROGRAMFILES% for the sample
-// configuration file. If it finds it, it returns it. Otherwise, an error
-// is returned.
-func findSampleConfigPathWindows() (string, error) {
-	winProgramFiles := os.Getenv("PROGRAMFILES")
-	winPFConfig := filepath.Join(winProgramFiles, "Decred", "Dcrd",
-		sampleConfigFilename)
-	_, err := os.Stat(winPFConfig)
-	if err == nil {
-		return winPFConfig, nil
-	}
-	if !os.IsNotExist(err) {
-		return "", err
-	}
-
-	return "", errors.New("could not find sample configuration to make new " +
-		"automated configuration file from")
-}
-
-// createDefaultConfigFile copies the file sample-dcrd.conf to the given
-// destination path, and populates it with some randomly generated RPC username
-// and password. It will only do this if the operating system is Windows.
-func createDefaultConfigFile() error {
-	if runtime.GOOS != "windows" {
-		return nil
-	}
-
-	sampleConfigPath, err := findSampleConfigPathWindows()
+// createDefaultConfig copies the file sample-dcrd.conf to the given destination path,
+// and populates it with some randomly generated RPC username and password.
+func createDefaultConfigFile(destinationPath string) error {
+	// Create the destination directory if it does not exists
+	err := os.MkdirAll(filepath.Dir(destinationPath), 0700)
 	if err != nil {
 		return err
 	}
 
-	// We generate a random user and password.
+	// We assume sample config file path is same as binary
+	path, err := filepath.Abs(filepath.Dir(os.Args[0]))
+	if err != nil {
+		return err
+	}
+	sampleConfigPath := filepath.Join(path, sampleConfigFilename)
+
+	// We generate a random user and password
 	randomBytes := make([]byte, 20)
 	_, err = rand.Read(randomBytes)
 	if err != nil {
@@ -971,20 +983,15 @@ func createDefaultConfigFile() error {
 	}
 	defer src.Close()
 
-	destinationPath := filepath.Join(dcrdHomeDir, defaultConfigFilename)
-	err = os.MkdirAll(dcrdHomeDir, 0700)
-	if err != nil {
-		return err
-	}
-	dest, err := os.OpenFile(destinationPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC,
-		0644)
+	dest, err := os.OpenFile(destinationPath,
+		os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
 		return err
 	}
 	defer dest.Close()
 
 	// We copy every line from the sample config file to the destination,
-	// only replacing the two lines for rpcuser and rpcpass.
+	// only replacing the two lines for rpcuser and rpcpass
 	reader := bufio.NewReader(src)
 	for err != io.EOF {
 		var line string
