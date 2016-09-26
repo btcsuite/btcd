@@ -643,19 +643,19 @@ func (a *AddrManager) NeedMoreAddresses() bool {
 func (a *AddrManager) AddressCache() []*wire.NetAddress {
 	a.mtx.Lock()
 	defer a.mtx.Unlock()
-	if a.nNew+a.nTried == 0 {
+
+	addrIndexLen := len(a.addrIndex)
+	if addrIndexLen == 0 {
 		return nil
 	}
 
-	allAddr := make([]*wire.NetAddress, a.nNew+a.nTried)
-	i := 0
+	allAddr := make([]*wire.NetAddress, 0, addrIndexLen)
 	// Iteration order is undefined here, but we randomise it anyway.
 	for _, v := range a.addrIndex {
-		allAddr[i] = v.na
-		i++
+		allAddr = append(allAddr, v.na)
 	}
 
-	numAddresses := len(allAddr) * getAddrPercent / 100
+	numAddresses := addrIndexLen * getAddrPercent / 100
 	if numAddresses > getAddrMax {
 		numAddresses = getAddrMax
 	}
@@ -664,12 +664,12 @@ func (a *AddrManager) AddressCache() []*wire.NetAddress {
 	// `numAddresses' since we are throwing the rest.
 	for i := 0; i < numAddresses; i++ {
 		// pick a number between current index and the end
-		j := rand.Intn(len(allAddr)-i) + i
+		j := rand.Intn(addrIndexLen-i) + i
 		allAddr[i], allAddr[j] = allAddr[j], allAddr[i]
 	}
 
 	// slice off the limit we are willing to share.
-	return allAddr[:numAddresses]
+	return allAddr[0:numAddresses]
 }
 
 // reset resets the address manager by reinitialising the random source
