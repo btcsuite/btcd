@@ -2799,7 +2799,7 @@ func (r FutureAccountAddressIndexResult) Receive() (int, error) {
 		return 0, err
 	}
 
-	// Unmarshal result as a getinfo result object.
+	// Unmarshal result as a accountaddressindex result object.
 	var index int
 	err = json.Unmarshal(res, &index)
 	if err != nil {
@@ -3033,7 +3033,7 @@ func (r FutureGetTicketsResult) Receive() ([]*chainhash.Hash, error) {
 		return nil, err
 	}
 
-	// Unmarshal result as a ticketsforaddress result object.
+	// Unmarshal result as a gettickets result object.
 	var tixRes dcrjson.GetTicketsResult
 	err = json.Unmarshal(res, &tixRes)
 	if err != nil {
@@ -3082,7 +3082,7 @@ func (r FutureGetTicketVoteBitsResult) Receive() (*dcrjson.GetTicketVoteBitsResu
 		return nil, err
 	}
 
-	// Unmarshal result as a ticketsforaddress result object.
+	// Unmarshal result as a getticketvotebits result object.
 	var infoRes dcrjson.GetTicketVoteBitsResult
 	err = json.Unmarshal(res, &infoRes)
 	if err != nil {
@@ -3122,7 +3122,7 @@ func (r FutureGetTicketsVoteBitsResult) Receive() (*dcrjson.GetTicketsVoteBitsRe
 		return nil, err
 	}
 
-	// Unmarshal result as a ticketsforaddress result object.
+	// Unmarshal result as a getticketsvotebits result object.
 	var infoRes dcrjson.GetTicketsVoteBitsResult
 	err = json.Unmarshal(res, &infoRes)
 	if err != nil {
@@ -3147,12 +3147,42 @@ func (c *Client) GetTicketsVoteBitsAsync(hashes []*chainhash.Hash) FutureGetTick
 	return c.sendCmd(cmd)
 }
 
-// GetTicketsVoteBits returns a the currently set voteBits for a given ticket.
-// If the daemon server is queried, it returns a search of tickets in the
-// live ticket pool. If the wallet server is queried, it searches all tickets
-// owned by the wallet.
+// GetTicketsVoteBits returns the currently set voteBits for a given ticket. If
+// the daemon server is queried, it returns a search of tickets in the live
+// ticket pool. If the wallet server is queried, it searches all tickets owned
+// by the wallet.
 func (c *Client) GetTicketsVoteBits(hashes []*chainhash.Hash) (*dcrjson.GetTicketsVoteBitsResult, error) {
 	return c.GetTicketsVoteBitsAsync(hashes).Receive()
+}
+
+// FutureSetTicketMaxPriceResult is a future promise to deliver the result of a
+// SetTicketMaxPriceAsync RPC invocation (or an applicable error).
+type FutureSetTicketMaxPriceResult chan *response
+
+// Receive waits for the response promised by the future and returns the info
+// provided by the server.
+func (r FutureSetTicketMaxPriceResult) Receive() error {
+	_, err := receiveFuture(r)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// SetTicketMaxPriceAsync returns an instance of a type that can be used to get
+// the result of the RPC at some future time by invoking the Receive function on
+// the returned instance.
+//
+// See SetTicketMaxPrice for the blocking version and more details.
+func (c *Client) SetTicketMaxPriceAsync(maxPrice float64) FutureSetTicketMaxPriceResult {
+	cmd := dcrjson.NewSetTicketMaxPriceCmd(maxPrice)
+	return c.sendCmd(cmd)
+}
+
+// SetTicketMaxPrice sets the maximum ticket price.
+func (c *Client) SetTicketMaxPrice(maxPrice float64) error {
+	return c.SetTicketMaxPriceAsync(maxPrice).Receive()
 }
 
 // FutureListScriptsResult is a future promise to deliver the result of a
