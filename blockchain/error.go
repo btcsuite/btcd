@@ -341,9 +341,6 @@ const (
 	// outputs tagged with stake tags, e.g. OP_SSTX.
 	ErrRegTxSpendStakeOut
 
-	// ErrBIP0030 indicates that a block failed to pass BIP0030.
-	ErrBIP0030
-
 	// ErrInvalidFinalState indicates that the final state of the PRNG included
 	// in the the block differed from the calculated final state.
 	ErrInvalidFinalState
