@@ -209,20 +209,18 @@ func (b *BlockChain) ProcessBlock(block *dcrutil.Block,
 
 	// Handle orphan blocks.
 	prevHash := &blockHeader.PrevBlock
-	if !prevHash.IsEqual(zeroHash) {
-		prevHashExists, err := b.blockExists(prevHash)
-		if err != nil {
-			return false, false, err
+	prevHashExists, err := b.blockExists(prevHash)
+	if err != nil {
+		return false, false, err
+	}
+	if !prevHashExists {
+		if !dryRun {
+			log.Infof("Adding orphan block %v with parent %v",
+				blockHash, prevHash)
+			b.addOrphanBlock(block)
 		}
-		if !prevHashExists {
-			if !dryRun {
-				log.Infof("Adding orphan block %v with parent %v",
-					blockHash, prevHash)
-				b.addOrphanBlock(block)
-			}
 
-			return false, true, err
-		}
+		return false, true, err
 	}
 
 	// The block has passed all context independent checks and appears sane
