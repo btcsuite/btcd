@@ -167,8 +167,8 @@ func (b *BlockChain) fetchStakeNode(node *blockNode) (*stake.Node, error) {
 		var errLocal error
 		if current.parent.stakeNode == nil {
 			current.parent.stakeNode, errLocal =
-				current.stakeNode.DisconnectNode(current.header,
-					current.stakeUndoData, current.newTickets, dbTx)
+				current.stakeNode.DisconnectNode(current.parent.header,
+					current.parent.stakeUndoData, current.parent.newTickets, dbTx)
 		}
 		if errLocal != nil {
 			return errLocal
