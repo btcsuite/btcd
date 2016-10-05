@@ -210,6 +210,13 @@ func NewTxFeeInfoCmd(blocks *uint32, start *uint32, end *uint32) *TxFeeInfoCmd {
 	}
 }
 
+// VersionCmd defines the version JSON-RPC command.
+type VersionCmd struct{}
+
+// NewVersionCmd returns a new instance which can be used to issue a JSON-RPC
+// version command.
+func NewVersionCmd() *VersionCmd { return new(VersionCmd) }
+
 func init() {
 	// No special flags for commands in this file.
 	flags := UsageFlag(0)
@@ -231,4 +238,5 @@ func init() {
 	MustRegisterCmd("ticketsforaddress", (*TicketsForAddressCmd)(nil), flags)
 	MustRegisterCmd("ticketvwap", (*TicketVWAPCmd)(nil), flags)
 	MustRegisterCmd("txfeeinfo", (*TxFeeInfoCmd)(nil), flags)
+	MustRegisterCmd("version", (*VersionCmd)(nil), flags)
 }

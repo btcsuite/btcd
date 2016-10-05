@@ -806,6 +806,12 @@ var helpDescsEnUS = map[string]string{
 	"feeinforange-mean":   "Mean of transaction fees in the window",
 	"feeinforange-median": "Median of transaction fees in the window",
 	"feeinforange-stddev": "Standard deviation of transaction fees in the window",
+
+	// Version help
+	"version--synopsis":       "Returns the JSON-RPC API version (semver)",
+	"version--result0--desc":  "Version objects keyed by the program or API name",
+	"version--result0--key":   "Program or API name",
+	"version--result0--value": "Object containing the semantic version",
 }
 
 // rpcResultTypes specifies the result types that each RPC command can return.
@@ -873,6 +879,7 @@ var rpcResultTypes = map[string][]interface{}{
 	"validateaddress":       {(*dcrjson.ValidateAddressChainResult)(nil)},
 	"verifychain":           {(*bool)(nil)},
 	"verifymessage":         {(*bool)(nil)},
+	"version":               {(*map[string]dcrjson.VersionResult)(nil)},
 
 	// Websocket commands.
 	"session":                     {(*dcrjson.SessionResult)(nil)},

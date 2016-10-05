@@ -49,6 +49,14 @@ import (
 	"github.com/decred/dcrutil"
 )
 
+// API version constants
+const (
+	jsonrpcSemverString = "1.0.0"
+	jsonrpcSemverMajor  = 1
+	jsonrpcSemverMinor  = 0
+	jsonrpcSemverPatch  = 0
+)
+
 const (
 	// rpcAuthTimeoutSeconds is the number of seconds a connection to the
 	// RPC server is allowed to stay open without authenticating before it
@@ -227,6 +235,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"validateaddress":       handleValidateAddress,
 	"verifychain":           handleVerifyChain,
 	"verifymessage":         handleVerifyMessage,
+	"version":               handleVersion,
 }
 
 // list of commands that we recognize, but for which dcrd has no support because
@@ -331,6 +340,7 @@ var rpcLimited = map[string]struct{}{
 	"submitblock":           {},
 	"validateaddress":       {},
 	"verifymessage":         {},
+	"version":               {},
 }
 
 // builderScript is a convenience function which is used for hard-coded scripts
@@ -5703,6 +5713,19 @@ func handleVerifyMessage(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 
 	// Return boolean if addresses match.
 	return address.EncodeAddress() == c.Address, nil
+}
+
+// handleVersion implements the version command.
+func handleVersion(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	result := map[string]dcrjson.VersionResult{
+		"dcrdjsonrpcapi": {
+			VersionString: jsonrpcSemverString,
+			Major:         jsonrpcSemverMajor,
+			Minor:         jsonrpcSemverMinor,
+			Patch:         jsonrpcSemverPatch,
+		},
+	}
+	return result, nil
 }
 
 // rpcServer holds the items the rpc server may need to access (config,
