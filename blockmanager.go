@@ -1257,7 +1257,7 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 			}
 
 			// Retrieve the current block header.
-			curBlockHeader := b.chain.GetCurrentBlockHeader()
+			curBlockHeader := b.chain.BestBlockHeader()
 
 			nextStakeDiff, errSDiff :=
 				b.chain.CalcNextRequiredStakeDifficulty()
@@ -1864,7 +1864,10 @@ out:
 							": %v", err)
 					}
 
-					curBlockHeader := b.chain.GetCurrentBlockHeader()
+					// The blockchain should be updated, so fetch the
+					// latest snapshot.
+					best = b.chain.BestSnapshot()
+					curBlockHeader := b.chain.BestBlockHeader()
 
 					b.updateChainState(best.Hash,
 						best.Height,
@@ -1996,7 +1999,7 @@ out:
 						bmgrLog.Warnf("Failed to get missing tickets for "+
 							"incoming block %v: %v", best.Hash, err)
 					}
-					curBlockHeader := b.chain.GetCurrentBlockHeader()
+					curBlockHeader := b.chain.BestBlockHeader()
 
 					winningTickets, poolSize, finalState, err :=
 						b.chain.LotteryDataForBlock(msg.block.Sha())
@@ -2779,7 +2782,7 @@ func newBlockManager(s *server, indexManager blockchain.IndexManager) (*blockMan
 	}
 
 	// Retrieve the current block header and next stake difficulty.
-	curBlockHeader := bm.chain.GetCurrentBlockHeader()
+	curBlockHeader := bm.chain.BestBlockHeader()
 	nextStakeDiff, err := bm.chain.CalcNextRequiredStakeDifficulty()
 	if err != nil {
 		return nil, err
