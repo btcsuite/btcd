@@ -175,16 +175,6 @@ func CheckTransactionSanity(tx *dcrutil.Tx, params *chaincfg.Params) error {
 		}
 	}
 
-	// Check for duplicate transaction inputs.
-	existingTxOut := make(map[wire.OutPoint]struct{})
-	for _, txIn := range msgTx.TxIn {
-		if _, exists := existingTxOut[txIn.PreviousOutPoint]; exists {
-			return ruleError(ErrDuplicateTxInputs, "transaction "+
-				"contains duplicate inputs")
-		}
-		existingTxOut[txIn.PreviousOutPoint] = struct{}{}
-	}
-
 	isSSGen, _ := stake.IsSSGen(tx)
 
 	// Coinbase script length must be between min and max length.
@@ -250,6 +240,16 @@ func CheckTransactionSanity(tx *dcrutil.Tx, params *chaincfg.Params) error {
 					"is null")
 			}
 		}
+	}
+
+	// Check for duplicate transaction inputs.
+	existingTxOut := make(map[wire.OutPoint]struct{})
+	for _, txIn := range msgTx.TxIn {
+		if _, exists := existingTxOut[txIn.PreviousOutPoint]; exists {
+			return ruleError(ErrDuplicateTxInputs, "transaction "+
+				"contains duplicate inputs")
+		}
+		existingTxOut[txIn.PreviousOutPoint] = struct{}{}
 	}
 
 	return nil
@@ -473,14 +473,15 @@ func checkBlockSanity(block *dcrutil.Block, timeSource MedianTimeSource,
 	totalVotes := 0
 	totalRevocations := 0
 	for _, stx := range block.STransactions() {
+		err := CheckTransactionSanity(stx, chainParams)
+		if err != nil {
+			return err
+		}
+
 		txType := stake.DetermineTxType(stx)
 		if txType == stake.TxTypeRegular {
 			errStr := fmt.Sprintf("found regular tx in stake tx tree")
 			return ruleError(ErrRegTxInStakeTree, errStr)
-		}
-		err := CheckTransactionSanity(stx, chainParams)
-		if err != nil {
-			return err
 		}
 
 		switch txType {
