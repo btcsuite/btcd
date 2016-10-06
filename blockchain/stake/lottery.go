@@ -16,15 +16,21 @@ import (
 	"github.com/decred/dcrd/chaincfg/chainhash"
 )
 
+var (
+	// seedConst is a constant derived from the hex representation of pi. It
+	// is used alonwith a caller-provided seed when initializing
+	// the deterministic lottery prng.
+	seedConst = [8]byte{0x24, 0x3F, 0x6A, 0x88, 0x85, 0xA3, 0x08, 0xD3}
+)
+
 // Hash256PRNG is a determinstic pseudorandom number generator that uses a
 // 256-bit secure hashing function to generate random uint32s starting from
 // an initial seed.
 type Hash256PRNG struct {
-	seed      []byte         // The seed used to initialize
-	hashIdx   int            // Position in the cached hash
-	idx       uint64         // Position in the hash iterator
-	seedState chainhash.Hash // Hash iterator root hash
-	lastHash  chainhash.Hash // Cached last hash used
+	seed     chainhash.Hash // The seed used to initialize
+	hashIdx  int            // Position in the cached hash
+	idx      uint64         // Position in the hash iterator
+	lastHash chainhash.Hash // Cached last hash used
 }
 
 // NewHash256PRNG creates a pointer to a newly created hash256PRNG.
@@ -37,16 +43,9 @@ func NewHash256PRNG(seed []byte) *Hash256PRNG {
 	// has to hash < 64 byte messages.  The constant is
 	// derived from the hexadecimal representation of
 	// pi.
-	cst := []byte{0x24, 0x3F, 0x6A, 0x88,
-		0x85, 0xA3, 0x08, 0xD3}
 	hp := new(Hash256PRNG)
-	hp.seed = chainhash.HashFuncB(append(seed, cst...))
-	initLH, err := chainhash.NewHash(hp.seed)
-	if err != nil {
-		return nil
-	}
-	hp.seedState = *initLH
-	hp.lastHash = *initLH
+	hp.seed = chainhash.HashFuncH(append(seed, seedConst[:]...))
+	hp.lastHash = hp.seed
 	hp.idx = 0
 	return hp
 }
@@ -75,7 +74,7 @@ func (hp *Hash256PRNG) Hash256Rand() uint32 {
 	if hp.hashIdx > 7 {
 		idxB := make([]byte, 4, 4)
 		binary.BigEndian.PutUint32(idxB, uint32(hp.idx))
-		hp.lastHash = chainhash.HashFuncH(append(hp.seed, idxB...))
+		hp.lastHash = chainhash.HashFuncH(append(hp.seed[:], idxB...))
 		hp.idx++
 		hp.hashIdx = 0
 	}
@@ -83,8 +82,8 @@ func (hp *Hash256PRNG) Hash256Rand() uint32 {
 	// 'roll over' the PRNG by re-hashing the seed when
 	// we overflow idx.
 	if hp.idx > 0xFFFFFFFF {
-		hp.seedState = chainhash.HashFuncH(hp.seedState[:])
-		hp.lastHash = hp.seedState
+		hp.seed = chainhash.HashFuncH(hp.seed[:])
+		hp.lastHash = hp.seed
 		hp.idx = 0
 	}
 
