@@ -2002,6 +2002,9 @@ func Generate() (tests [][]TestInstance, err error) {
 	// The second instance is an expectBlockTip test instance for provided
 	// values.
 	//
+	// orphaned creates and appends a single acceptBlock test instance for
+	// the current tip which expects the block to be accepted as an orphan.
+	//
 	// orphanedOrRejected creates and appends a single orphanOrRejectBlock
 	// test instance for the current tip.
 	//
@@ -2016,6 +2019,11 @@ func Generate() (tests [][]TestInstance, err error) {
 		tests = append(tests, []TestInstance{
 			acceptBlock(g.tipName, g.tip, false, false),
 			expectTipBlock(tipName, g.blocksByName[tipName]),
+		})
+	}
+	orphaned := func() {
+		tests = append(tests, []TestInstance{
+			acceptBlock(g.tipName, g.tip, false, true),
 		})
 	}
 	orphanedOrRejected := func() {
@@ -2205,6 +2213,12 @@ func Generate() (tests [][]TestInstance, err error) {
 
 	g.nextBlock("b2", outs[1], ticketOuts[1])
 	accepted()
+
+	// Ensure duplicate blocks are rejected.
+	//
+	//   ... -> b1(0) -> b2(1)
+	//               \-> b2(1)
+	rejected(blockchain.ErrDuplicateBlock)
 
 	// Create a fork from b1.  There should not be a reorg since b2 was seen
 	// first.
@@ -2493,6 +2507,32 @@ func Generate() (tests [][]TestInstance, err error) {
 	// outright rejected due to an invalid parent.
 	g.nextBlock("b31", outs[8], ticketOuts[8])
 	orphanedOrRejected()
+
+	// ---------------------------------------------------------------------
+	// Orphan tests.
+	// ---------------------------------------------------------------------
+
+	// Create valid orphan block with zero prev hash.
+	//
+	//   No previous block
+	//                    \-> borphan0(7)
+	g.setTip("b21")
+	g.nextBlock("borphan0", outs[7], ticketOuts[7], func(b *wire.MsgBlock) {
+		b.Header.PrevBlock = chainhash.Hash{}
+	})
+	orphaned()
+
+	// Create valid orphan block.
+	//
+	//   ... -> b21(6)
+	//                \-> borphanbase(7) -> borphan1(8)
+	g.setTip("b21")
+	g.nextBlock("borphanbase", outs[7], ticketOuts[7])
+	g.nextBlock("borphan1", outs[8], ticketOuts[8])
+	orphaned()
+
+	// Ensure duplicate orphan blocks are rejected.
+	rejected(blockchain.ErrDuplicateBlock)
 
 	// ---------------------------------------------------------------------
 	// Coinbase script length limits tests.
