@@ -3081,6 +3081,53 @@ func Generate() (tests [][]TestInstance, err error) {
 	rejected(blockchain.ErrMissingTx)
 
 	// ---------------------------------------------------------------------
+	// Malformed coinbase tests
+	// ---------------------------------------------------------------------
+
+	// Create block with no proof-of-work subsidy output in the coinbase.
+	//
+	//   ... -> b61(14)
+	//                 \-> b63(15)
+	g.setTip("b61")
+	g.nextBlock("b63", outs[15], ticketOuts[15], func(b *wire.MsgBlock) {
+		b.Transactions[0].TxOut = b.Transactions[0].TxOut[0:1]
+	})
+	rejected(blockchain.ErrFirstTxNotCoinbase)
+
+	// Create block with an invalid script type in the coinbase block
+	// commitment output.
+	//
+	//   ... -> b61(14)
+	//                 \-> b64(15)
+	g.setTip("b61")
+	g.nextBlock("b64", outs[15], ticketOuts[15], func(b *wire.MsgBlock) {
+		b.Transactions[0].TxOut[1].PkScript = nil
+	})
+	rejected(blockchain.ErrFirstTxNotCoinbase)
+
+	// Create block with too few bytes for the coinbase height commitment.
+	//
+	//   ... -> b61(14)
+	//                 \-> b65(15)
+	g.setTip("b61")
+	g.nextBlock("b65", outs[15], ticketOuts[15], func(b *wire.MsgBlock) {
+		script := opReturnScript(repeatOpcode(0x00, 3))
+		b.Transactions[0].TxOut[1].PkScript = script
+	})
+	rejected(blockchain.ErrFirstTxNotCoinbase)
+
+	// Create block with invalid block height in the coinbase commitment.
+	//
+	//   ... -> b61(14)
+	//                 \-> b66(15)
+	g.setTip("b61")
+	g.nextBlock("b66", outs[15], ticketOuts[15], func(b *wire.MsgBlock) {
+		script := standardCoinbaseOpReturnScript(b.Header.Height - 1)
+		b.Transactions[0].TxOut[1].PkScript = script
+	})
+	rejected(blockchain.ErrCoinbaseHeight)
+
+	// ---------------------------------------------------------------------
 	// More signature operation counting tests.
 	// ---------------------------------------------------------------------
 
@@ -3102,14 +3149,14 @@ func Generate() (tests [][]TestInstance, err error) {
 	//  [7054]     : OP_CHECKSIG (goes over the limit)
 	//
 	//   ... -> b61(14)
-	//                 \-> b63(15)
+	//                 \-> b67(15)
 	g.setTip("b61")
 	scriptSize := maxBlockSigOps + 5 + (maxScriptElementSize + 1) + 1
 	tooManySigOps = repeatOpcode(txscript.OP_CHECKSIG, scriptSize)
 	tooManySigOps[maxBlockSigOps] = txscript.OP_PUSHDATA4
 	binary.LittleEndian.PutUint32(tooManySigOps[maxBlockSigOps+1:],
 		maxScriptElementSize+1)
-	g.nextBlock("b63", outs[15], ticketOuts[15], replaceSpendScript(tooManySigOps))
+	g.nextBlock("b67", outs[15], ticketOuts[15], replaceSpendScript(tooManySigOps))
 	g.assertTipBlockSigOpsCount(maxBlockSigOps + 1)
 	rejected(blockchain.ErrTooManySigOps)
 
