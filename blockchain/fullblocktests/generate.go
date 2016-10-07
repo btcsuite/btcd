@@ -17,6 +17,7 @@ import (
 
 	"github.com/decred/dcrd/blockchain"
 	"github.com/decred/dcrd/chaincfg"
+	"github.com/decred/dcrd/chaincfg/chainec"
 	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/txscript"
 	"github.com/decred/dcrd/wire"
@@ -2114,11 +2115,31 @@ func Generate() (tests [][]TestInstance, err error) {
 	// continuing to purchase tickets using the coinbases matured above and
 	// allowing the immature tickets to mature and thus become live.
 	//
+	// While doing so, also generate blocks that have the required early
+	// vote unset to ensure they are properly rejected.
+	//
 	//   ... -> bse# -> bsv0 -> bsv1 -> ... -> bsv#
+	//             \       \       \        \-> bevbad#
+	//              |       |       \-> bevbad2
+	//              |       \-> bevbad1
+	//              \-> bevbad0
 	// ---------------------------------------------------------------------
 
 	testInstances = nil
 	for i := int64(0); int64(g.tip.Header.Height) < stakeValidationHeight; i++ {
+		// Until stake validation height is reached, test that any
+		// blocks without the early vote bits set are rejected.
+		if int64(g.tip.Header.Height) < stakeValidationHeight-1 {
+			prevTip := g.tipName
+			blockName := fmt.Sprintf("bevbad%d", i)
+			g.nextBlock(blockName, nil, nil, func(b *wire.MsgBlock) {
+				b.Header.VoteBits = 0
+			})
+			testInstances = append(testInstances, rejectBlock(g.tipName,
+				g.tip, blockchain.ErrInvalidEarlyVoteBits))
+			g.setTip(prevTip)
+		}
+
 		outs := g.oldestCoinbaseOuts()
 		blockName := fmt.Sprintf("bsv%d", i)
 		g.nextBlock(blockName, nil, outs[1:])
@@ -2272,6 +2293,50 @@ func Generate() (tests [][]TestInstance, err error) {
 		rejectBlock("b12", b12, blockchain.ErrBadCoinbaseValue),
 		expectTipBlock("b13", b13),
 	})
+
+	// ---------------------------------------------------------------------
+	// Bad dev org output tests.
+	// ---------------------------------------------------------------------
+
+	// Create a block that does not generate a payment to the dev-org P2SH
+	// address.  Test this by trying to pay to a secp256k1 P2PKH address
+	// using the same HASH160.
+	//
+	//   ... -> b5(2) -> b12(3) -> b13(4)
+	//   \                               \-> bbadtaxscript(5)
+	//    \-> b3(1) -> b4(2)
+	g.setTip("b13")
+	g.nextBlock("bbadtaxscript", outs[5], ticketOuts[5], func(b *wire.MsgBlock) {
+		taxOutput := b.Transactions[0].TxOut[0]
+		_, addrs, _, _ := txscript.ExtractPkScriptAddrs(
+			g.params.OrganizationPkScriptVersion, taxOutput.PkScript,
+			g.params)
+		p2shTaxAddr := addrs[0].(*dcrutil.AddressScriptHash)
+		p2pkhTaxAddr, err := dcrutil.NewAddressPubKeyHash(
+			p2shTaxAddr.Hash160()[:], g.params,
+			chainec.ECTypeSecp256k1)
+		if err != nil {
+			panic(err)
+		}
+		p2pkhScript, err := txscript.PayToAddrScript(p2pkhTaxAddr)
+		if err != nil {
+			panic(err)
+		}
+		taxOutput.PkScript = p2pkhScript
+	})
+	rejected(blockchain.ErrNoTax)
+
+	// Create a block that uses a newer output script version than is
+	// supported for the dev-org tax output.
+	//
+	//   ... -> b5(2) -> b12(3) -> b13(4)
+	//   \                               \-> bbadtaxscriptversion(5)
+	//    \-> b3(1) -> b4(2)
+	g.setTip("b13")
+	g.nextBlock("bbadtaxscriptversion", outs[5], ticketOuts[5], func(b *wire.MsgBlock) {
+		b.Transactions[0].TxOut[0].Version = 1
+	})
+	rejected(blockchain.ErrNoTax)
 
 	// ---------------------------------------------------------------------
 	// Too much dev-org coinbase tests.
