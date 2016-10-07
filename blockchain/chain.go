@@ -706,8 +706,6 @@ func (b *BlockChain) fetchBlockFromHash(hash *chainhash.Hash) (*dcrutil.Block,
 // fetchBlockFromHash.  It is safe for concurrent access.
 func (b *BlockChain) FetchBlockFromHash(hash *chainhash.Hash) (*dcrutil.Block,
 	error) {
-	b.chainLock.RLock()
-	defer b.chainLock.RUnlock()
 	return b.fetchBlockFromHash(hash)
 }
 
@@ -1466,13 +1464,15 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List,
 
 	// Ensure all of the needed side chain blocks are in the cache.
 	for e := attachNodes.Front(); e != nil; e = e.Next() {
-		b.blockCacheLock.RLock()
 		n := e.Value.(*blockNode)
-		if _, exists := b.blockCache[n.hash]; !exists {
+
+		b.blockCacheLock.RLock()
+		_, exists := b.blockCache[n.hash]
+		b.blockCacheLock.RUnlock()
+		if !exists {
 			return AssertError(fmt.Sprintf("block %v is missing "+
 				"from the side chain block cache", n.hash))
 		}
-		b.blockCacheLock.RUnlock()
 	}
 
 	// All of the blocks to detach and related spend journal entries needed

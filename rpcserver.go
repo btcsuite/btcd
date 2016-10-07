@@ -2060,12 +2060,7 @@ func handleGetBlock(s *rpcServer, cmd interface{},
 	if err != nil {
 		return nil, rpcDecodeHexError(c.Hash)
 	}
-	var blkBytes []byte
-	err = s.server.db.View(func(dbTx database.Tx) error {
-		var err error
-		blkBytes, err = dbTx.FetchBlock(hash)
-		return err
-	})
+	blk, err := s.server.blockManager.chain.FetchBlockFromHash(hash)
 	if err != nil {
 		return nil, &dcrjson.RPCError{
 			Code:    dcrjson.ErrRPCBlockNotFound,
@@ -2073,24 +2068,22 @@ func handleGetBlock(s *rpcServer, cmd interface{},
 		}
 	}
 
-	// DECRED TODO CJ how to check if block in main chain??
-	blockInMainChain, _ := s.chain.MainChainHasBlock(hash)
-
 	// When the verbose flag isn't set, simply return the network-serialized
 	// block as a hex-encoded string.
 	if c.Verbose != nil && !*c.Verbose {
+		blkBytes, err := blk.Bytes()
+		if err != nil {
+			return nil, &dcrjson.RPCError{
+				Code:    dcrjson.ErrRPCDeserialization,
+				Message: "Block failed to serialize",
+			}
+		}
+
 		return hex.EncodeToString(blkBytes), nil
 	}
 
 	// The verbose flag is set, so generate the JSON object and return it.
-
-	// Deserialize the block.
-	blk, err := dcrutil.NewBlockFromBytes(blkBytes)
-	if err != nil {
-		context := "Failed to deserialize block"
-		return nil, internalRPCError(err.Error(), context)
-	}
-
+	blockInMainChain, _ := s.chain.MainChainHasBlock(hash)
 	var idx int64
 	if !blockInMainChain {
 		idx = -1
@@ -2135,7 +2128,7 @@ func handleGetBlock(s *rpcServer, cmd interface{},
 		Time:          blockHeader.Timestamp.Unix(),
 		Confirmations: uint64(1 + bestState.Height - height),
 		Height:        height,
-		Size:          int32(len(blkBytes)),
+		Size:          int32(blk.MsgBlock().Header.Size),
 		Bits:          strconv.FormatInt(int64(blockHeader.Bits), 16),
 		SBits:         sbitsFloat,
 		Difficulty:    getDifficultyRatio(blockHeader.Bits),
