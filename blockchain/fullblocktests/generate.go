@@ -2634,6 +2634,70 @@ func Generate() (tests [][]TestInstance, err error) {
 	rejected(blockchain.ErrFreshStakeMismatch)
 
 	// ---------------------------------------------------------------------
+	// Stake ticket difficulty tests.
+	// ---------------------------------------------------------------------
+
+	// Create block with ticket purchase below required ticket price.
+	//
+	//   ... -> b36(8)
+	//                \-> bsd0(9)
+	g.setTip("b36")
+	g.nextBlock("bsd0", outs[9], ticketOuts[9], func(b *wire.MsgBlock) {
+		b.STransactions[5].TxOut[0].Value -= 1
+	})
+	rejected(blockchain.ErrNotEnoughStake)
+
+	// Create block with stake transaction below pos limit.
+	//
+	//   ... -> b36(8)
+	//                \-> bsd1(9)
+	g.setTip("b36")
+	g.nextBlock("bsd1", outs[9], ticketOuts[9], func(b *wire.MsgBlock) {
+		minStakeDiff := g.params.MinimumStakeDiff
+		b.Header.SBits = minStakeDiff - 2
+		// TODO: This should not be necessary.  The code is checking
+		// the ticket commit value against sbits before checking if
+		// sbits is under the minimum.  It should be reversed.
+		b.STransactions[5].TxOut[0].Value = minStakeDiff - 1
+	})
+	rejected(blockchain.ErrStakeBelowMinimum)
+
+	// ---------------------------------------------------------------------
+	// Stakebase script tests.
+	// ---------------------------------------------------------------------
+
+	// Create block that has a stakebase script that is smaller than the
+	// minimum allowed length.
+	//
+	//   ... -> b36(8)
+	//                \-> bss0(9)
+	g.setTip("b36")
+	tooSmallCbScript = repeatOpcode(0x00, minCoinbaseScriptLen-1)
+	g.nextBlock("bss0", outs[9], ticketOuts[9], replaceStakeSigScript(tooSmallCbScript))
+	rejected(blockchain.ErrBadStakebaseScriptLen)
+
+	// Create block that has a stakebase script that is larger than the
+	// maximum allowed length.
+	//
+	//   ... -> b36(8)
+	//                \-> bss1(9)
+	g.setTip("b36")
+	tooLargeCbScript = repeatOpcode(0x00, maxCoinbaseScriptLen+1)
+	g.nextBlock("bss1", outs[9], ticketOuts[9], replaceStakeSigScript(tooLargeCbScript))
+	rejected(blockchain.ErrBadStakebaseScriptLen)
+
+	// Add a block with a stake transaction with a signature script that is
+	// not the required script, but is otherwise
+	// script.
+	//
+	//   ... -> b36(8)
+	//                \-> bss2(9)
+	g.setTip("b36")
+	badScript := append(g.params.StakeBaseSigScript, 0x00)
+	g.nextBlock("bss2", outs[9], ticketOuts[9], replaceStakeSigScript(badScript))
+	rejected(blockchain.ErrBadStakevaseScrVal)
+
+	// ---------------------------------------------------------------------
 	// Multisig[Verify]/ChecksigVerifiy signature operation count tests.
 	// ---------------------------------------------------------------------
 
@@ -2832,6 +2896,16 @@ func Generate() (tests [][]TestInstance, err error) {
 	})
 	g.assertTipBlockNumTxns(3)
 	rejected(blockchain.ErrDuplicateTx)
+
+	// Create block with state tx in regular tx tree.
+	//
+	//   ... -> b41(11)
+	//                 \-> bmf0(12)
+	g.setTip("b41")
+	g.nextBlock("bmf0", outs[12], ticketOuts[12], func(b *wire.MsgBlock) {
+		b.AddTransaction(b.STransactions[1])
+	})
+	rejected(blockchain.ErrStakeTxInRegularTree)
 
 	// ---------------------------------------------------------------------
 	// Block header median time tests.
