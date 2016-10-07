@@ -2539,6 +2539,61 @@ func Generate() (tests [][]TestInstance, err error) {
 	accepted()
 
 	// ---------------------------------------------------------------------
+	// Vote tests.
+	// ---------------------------------------------------------------------
+
+	// Attempt to add block where ssgen has a null ticket reference hash.
+	//
+	//   ... -> b36(8)
+	//                \-> bv1(9)
+	g.setTip("b36")
+	g.nextBlock("bv1", outs[9], ticketOuts[9], func(b *wire.MsgBlock) {
+		b.STransactions[0].TxIn[1].PreviousOutPoint = wire.OutPoint{
+			Hash:  chainhash.Hash{},
+			Index: math.MaxUint32,
+			Tree:  dcrutil.TxTreeRegular,
+		}
+	})
+	rejected(blockchain.ErrBadTxInput)
+
+	// Attempt to add block with a regular tx in the stake tree.
+	//
+	//   ... -> b36(8)
+	//                \-> bv2(9)
+	g.setTip("b36")
+	g.nextBlock("bv2", outs[9], ticketOuts[9], func(b *wire.MsgBlock) {
+		b.STransactions[0] = b.Transactions[0]
+	})
+	rejected(blockchain.ErrRegTxInStakeTree)
+
+	// Attempt to add block with too many votes.
+	//
+	//   ... -> b36(8)
+	//                \-> bv3(9)
+	g.setTip("b36")
+	g.nextBlock("bv3", outs[9], ticketOuts[9], g.replaceWithNVotes(ticketsPerBlock+1))
+	rejected(blockchain.ErrTooManyVotes)
+
+	// Attempt to add block with too few votes.
+	//
+	//   ... -> b36(8)
+	//                \-> bv4(9)
+	g.setTip("b36")
+	g.nextBlock("bv4", outs[9], ticketOuts[9], g.replaceWithNVotes(ticketsPerBlock-3))
+	rejected(blockchain.ErrNotEnoughVotes)
+
+	// Attempt to add block with different number of votes in stake tree and
+	// header.
+	//
+	//   ... -> b36(8)
+	//                \-> bv5(9)
+	g.setTip("b36")
+	g.nextBlock("bv5", outs[9], ticketOuts[9], func(b *wire.MsgBlock) {
+		b.Header.FreshStake = 4
+	})
+	rejected(blockchain.ErrFreshStakeMismatch)
+
+	// ---------------------------------------------------------------------
 	// Multisig[Verify]/ChecksigVerifiy signature operation count tests.
 	// ---------------------------------------------------------------------
 
