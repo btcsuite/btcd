@@ -515,20 +515,12 @@ func createCoinbaseTx(subsidyCache *blockchain.SubsidyCache,
 		nextBlockHeight,
 		voters,
 		activeNetParams.Params)
-	addrOrg, err := dcrutil.DecodeAddress(params.OrganizationAddress, params)
-	if err != nil {
-		return nil, err
-	}
-	pksOrg, err := txscript.PayToAddrScript(addrOrg)
-	if err != nil {
-		return nil, err
-	}
 
 	// Tax output.
 	if params.BlockTaxProportion > 0 {
 		tx.AddTxOut(&wire.TxOut{
 			Value:    tax,
-			PkScript: pksOrg,
+			PkScript: params.OrganizationPkScript,
 		})
 	} else {
 		// Tax disabled.

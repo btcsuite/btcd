@@ -300,48 +300,24 @@ func CoinbasePaysTax(subsidyCache *SubsidyCache, tx *dcrutil.Tx, height uint32,
 		return ruleError(ErrNoTxOutputs, errStr)
 	}
 
-	// Coinbase output 0 must be the subsidy to the dev organization.
-	taxPkVersion := tx.MsgTx().TxOut[0].Version
-	taxPkScript := tx.MsgTx().TxOut[0].PkScript
-	class, addrs, _, err :=
-		txscript.ExtractPkScriptAddrs(taxPkVersion, taxPkScript, params)
-	// The script can't be a weird class.
-	if !(class == txscript.ScriptHashTy ||
-		class == txscript.PubKeyHashTy ||
-		class == txscript.PubKeyTy) {
-		errStr := fmt.Sprintf("wrong script class for tax output")
-		return ruleError(ErrNoTax, errStr)
+	taxOutput := tx.MsgTx().TxOut[0]
+	if taxOutput.Version != params.OrganizationPkScriptVersion {
+		return ruleError(ErrNoTax,
+			"coinbase tax output uses incorrect script version")
 	}
-
-	// There should only be one address.
-	if len(addrs) != 1 {
-		errStr := fmt.Sprintf("no or too many addresses in output")
-		return ruleError(ErrNoTax, errStr)
-	}
-
-	// Decode the organization address.
-	addrOrg, err := dcrutil.DecodeAddress(params.OrganizationAddress, params)
-	if err != nil {
-		return err
-	}
-
-	if !bytes.Equal(addrs[0].ScriptAddress(), addrOrg.ScriptAddress()) {
-		errStr := fmt.Sprintf("address in output 0 has non matching org "+
-			"address; got %v (hash160 %x), want %v (hash160 %x)",
-			addrs[0].EncodeAddress(),
-			addrs[0].ScriptAddress(),
-			addrOrg.EncodeAddress(),
-			addrOrg.ScriptAddress())
-		return ruleError(ErrNoTax, errStr)
+	if !bytes.Equal(taxOutput.PkScript, params.OrganizationPkScript) {
+		return ruleError(ErrNoTax,
+			"coinbase tax output script does not match the "+
+				"required script")
 	}
 
 	// Get the amount of subsidy that should have been paid out to
 	// the organization, then check it.
 	orgSubsidy := CalcBlockTaxSubsidy(subsidyCache, int64(height), voters, params)
-	amountFound := tx.MsgTx().TxOut[0].Value
-	if orgSubsidy != amountFound {
+	if orgSubsidy != taxOutput.Value {
 		errStr := fmt.Sprintf("amount in output 0 has non matching org "+
-			"calculated amount; got %v, want %v", amountFound, orgSubsidy)
+			"calculated amount; got %v, want %v", taxOutput.Value,
+			orgSubsidy)
 		return ruleError(ErrNoTax, errStr)
 	}
 

@@ -6,6 +6,7 @@
 package chaincfg
 
 import (
+	"encoding/hex"
 	"errors"
 	"math/big"
 	"time"
@@ -263,10 +264,13 @@ type Params struct {
 	// it to be this value miners/daemons could freely change it.
 	StakeBaseSigScript []byte
 
-	// OrganizationAddress is the static address for block taxes to be
-	// distributed to in every block's coinbase. It should ideally be
-	// a P2SH multisignature address.
-	OrganizationAddress string
+	// OrganizationPkScript is the output script for block taxes to be
+	// distributed to in every block's coinbase. It should ideally be a P2SH
+	// multisignature address.  OrganizationPkScriptVersion is the version
+	// of the output script.  Until PoS hardforking is implemented, this
+	// version must always match for a block to validate.
+	OrganizationPkScript        []byte
+	OrganizationPkScriptVersion uint16
 
 	// BlockOneLedger specifies the list of payouts in the coinbase of
 	// block height 1. If there are no payouts to be given, set this
@@ -360,8 +364,10 @@ var MainNetParams = Params{
 	StakeBaseSigScript:    []byte{0x00, 0x00},
 
 	// Decred organization related parameters
-	OrganizationAddress: "Dcur2mcGjmENx4DhNqDctW5wJCVyT3Qeqkx",
-	BlockOneLedger:      BlockOneLedgerMainNet,
+	// Organization address is Dcur2mcGjmENx4DhNqDctW5wJCVyT3Qeqkx
+	OrganizationPkScript:        hexDecode("a914f5916158e3e2c4551c1796708db8367207ed13bb87"),
+	OrganizationPkScriptVersion: 0,
+	BlockOneLedger:              BlockOneLedgerMainNet,
 }
 
 // TestNetParams defines the network parameters for the test currency network.
@@ -452,9 +458,11 @@ var TestNetParams = Params{
 	StakeValidationHeight: 768,     // Arbitrary
 	StakeBaseSigScript:    []byte{0xDE, 0xAD, 0xBE, 0xEF},
 
-	// Decred organization related parameters
-	OrganizationAddress: "TcemyEtyHSg9L7jww7uihv9BJfKL6YGiZYn",
-	BlockOneLedger:      BlockOneLedgerTestNet,
+	// Decred organization related parameters.
+	// Organization address is TcemyEtyHSg9L7jww7uihv9BJfKL6YGiZYn
+	OrganizationPkScript:        hexDecode("a9144fa6cbd0dbe5ec407fe4c8ad374e667771fa0d4487"),
+	OrganizationPkScriptVersion: 0,
+	BlockOneLedger:              BlockOneLedgerTestNet,
 }
 
 // SimNetParams defines the network parameters for the simulation test Decred
@@ -565,8 +573,10 @@ var SimNetParams = Params{
 	//   SkQn8ervNvAUEX5Ua3Lwjc6BAuTXRznDoDzsyxgjYqX58znY7w9e4
 	//   SkQkfkHZeBbMW8129tZ3KspEh1XBFC1btbkgzs6cjSyPbrgxzsKqk
 	//
-	OrganizationAddress: "ScuQxvveKGfpG1ypt6u27F99Anf7EW3cqhq",
-	BlockOneLedger:      BlockOneLedgerSimNet,
+	// Organization address is ScuQxvveKGfpG1ypt6u27F99Anf7EW3cqhq
+	OrganizationPkScript:        hexDecode("a914cbb08d6ca783b533b2c7d24a51fbca92d937bf9987"),
+	OrganizationPkScriptVersion: 0,
+	BlockOneLedger:              BlockOneLedgerSimNet,
 }
 
 var (
@@ -698,6 +708,14 @@ func newHashFromStr(hexStr string) *chainhash.Hash {
 		panic(err)
 	}
 	return sha
+}
+
+func hexDecode(hexStr string) []byte {
+	b, err := hex.DecodeString(hexStr)
+	if err != nil {
+		panic(err)
+	}
+	return b
 }
 
 // BlockOneSubsidy returns the total subsidy of block height 1 for the

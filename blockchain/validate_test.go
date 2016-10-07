@@ -1838,7 +1838,7 @@ func TestBlockValidationRules(t *testing.T) {
 	sstxCBIn.SignatureScript = []byte{0x51, 0x51}
 	sstxToUse166.AddTxIn(sstxCBIn)
 
-	orgAddr, _ := dcrutil.DecodeAddress(simNetParams.OrganizationAddress,
+	orgAddr, _ := dcrutil.DecodeAddress("ScuQxvveKGfpG1ypt6u27F99Anf7EW3cqhq",
 		simNetParams)
 	pkScript, _ := txscript.GenerateSStxAddrPush(orgAddr,
 		dcrutil.Amount(29702992297), 0x0000)
@@ -2138,8 +2138,9 @@ var simNetParams = &chaincfg.Params{
 	//   SkQn8ervNvAUEX5Ua3Lwjc6BAuTXRznDoDzsyxgjYqX58znY7w9e4
 	//   SkQkfkHZeBbMW8129tZ3KspEh1XBFC1btbkgzs6cjSyPbrgxzsKqk
 	//
-	OrganizationAddress: "ScuQxvveKGfpG1ypt6u27F99Anf7EW3cqhq",
-	BlockOneLedger:      BlockOneLedgerSimNet,
+	OrganizationPkScript:        chaincfg.SimNetParams.OrganizationPkScript,
+	OrganizationPkScriptVersion: chaincfg.SimNetParams.OrganizationPkScriptVersion,
+	BlockOneLedger:              BlockOneLedgerSimNet,
 }
 
 // BlockOneLedgerSimNet is the block one output ledger for the simulation
