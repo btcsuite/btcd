@@ -245,6 +245,11 @@ type BlockChain struct {
 	// chain state can be quickly reconstructed on load.
 	stateLock     sync.RWMutex
 	stateSnapshot *BestState
+
+	// pruner is the automatic pruner for block nodes and stake nodes,
+	// so that the memory may be restored by the garbage collector if
+	// it is unlikely to be referenced in the future.
+	pruner *chainPruner
 }
 
 // DisableVerify provides a mechanism to disable transaction script validation
@@ -847,6 +852,27 @@ func (b *BlockChain) pruneStakeNodes() error {
 			node.ticketsSpent = nil
 			node.ticketsRevoked = nil
 		}
+	}
+
+	return nil
+}
+
+// pruneNodes tranverses the blockchain and prunes nodes and stake data from
+// memory so that the memory can be recovered by the garbage collector.  This
+// allows the caller of the blockchain to manually handle GC related to the
+// blockchain.
+//
+// This function is NOT safe for concurrent access and must be called with
+// the chain lock held for writes.
+func (b *BlockChain) pruneNodes() error {
+	err := b.pruneStakeNodes()
+	if err != nil {
+		return err
+	}
+
+	err = b.pruneBlockNodes()
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -2130,6 +2156,7 @@ func New(config *Config) (*BlockChain, error) {
 	}
 
 	b.subsidyCache = NewSubsidyCache(b.bestNode.height, b.chainParams)
+	b.pruner = newChainPruner(&b)
 
 	log.Infof("Blockchain database version %v loaded",
 		b.dbInfo.version)
