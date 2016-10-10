@@ -114,8 +114,9 @@ func realMain() error {
 	}
 
 	log.Infof("Processed a total of %d blocks (%d imported, %d already "+
-		"known)", results.blocksProcessed, results.blocksImported,
-		results.blocksProcessed-results.blocksImported)
+		"known) in %v", results.blocksProcessed, results.blocksImported,
+		results.blocksProcessed-results.blocksImported, results.duration)
+
 	return nil
 }
 

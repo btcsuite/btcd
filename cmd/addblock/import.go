@@ -26,6 +26,7 @@ var zeroHash = chainhash.Hash{}
 type importResults struct {
 	blocksProcessed int64
 	blocksImported  int64
+	duration        time.Duration
 	err             error
 }
 
@@ -48,6 +49,7 @@ type blockImporter struct {
 	lastHeight        int64
 	lastBlockTime     time.Time
 	lastLogTime       time.Time
+	startTime         time.Time
 }
 
 // readBlock reads the next block from the input file.
@@ -257,6 +259,7 @@ func (bi *blockImporter) statusHandler(resultsChan chan *importResults) {
 		resultsChan <- &importResults{
 			blocksProcessed: bi.blocksProcessed,
 			blocksImported:  bi.blocksImported,
+			duration:        time.Now().Sub(bi.startTime),
 			err:             err,
 		}
 		close(bi.quit)
@@ -266,6 +269,7 @@ func (bi *blockImporter) statusHandler(resultsChan chan *importResults) {
 		resultsChan <- &importResults{
 			blocksProcessed: bi.blocksProcessed,
 			blocksImported:  bi.blocksImported,
+			duration:        time.Now().Sub(bi.startTime),
 			err:             nil,
 		}
 	}
@@ -352,5 +356,6 @@ func newBlockImporter(db database.DB, r io.ReadSeeker) (*blockImporter, error) {
 		chain:        chain,
 		medianTime:   blockchain.NewMedianTime(),
 		lastLogTime:  time.Now(),
+		startTime:    time.Now(),
 	}, nil
 }

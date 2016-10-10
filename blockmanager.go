@@ -6,11 +6,9 @@
 package main
 
 import (
-	"bytes"
 	"container/list"
-	"encoding/gob"
+	"encoding/binary"
 	"fmt"
-	"io/ioutil"
 	"math/rand"
 	"os"
 	"path/filepath"
@@ -2762,11 +2760,12 @@ func newBlockManager(s *server, indexManager blockchain.IndexManager) (*blockMan
 
 	// Dump the blockchain here if asked for it, and quit.
 	if cfg.DumpBlockchain != "" {
-		err = dumpBlockChain(best.Height, s.db)
+		err = dumpBlockChain(bm.chain, best.Height)
 		if err != nil {
 			return nil, err
 		}
-		return nil, fmt.Errorf("Block database dump to map completed, closing.")
+
+		return nil, fmt.Errorf("closing after dumping blockchain")
 	}
 
 	// Query the DB for the current winning ticket data.
@@ -2896,24 +2895,60 @@ func loadBlockDB() (database.DB, error) {
 }
 
 // dumpBlockChain dumps a map of the blockchain blocks as serialized bytes.
-func dumpBlockChain(height int64, db database.DB) error {
-	blockchain, err := blockchain.DumpBlockChain(db, height)
+func dumpBlockChain(b *blockchain.BlockChain, height int64) error {
+	bmgrLog.Infof("Writing the blockchain to disk as a flat file, " +
+		"please wait...")
+
+	progressLogger := newBlockProgressLogger("Written", bmgrLog)
+
+	file, err := os.Create(cfg.DumpBlockchain)
 	if err != nil {
 		return err
 	}
+	defer file.Close()
 
-	// Serialize the map into a buffer
-	w := new(bytes.Buffer)
-	encoder := gob.NewEncoder(w)
-	if err := encoder.Encode(blockchain); err != nil {
-		return err
+	// Store the network ID in an array for later writing.
+	var net [4]byte
+	binary.LittleEndian.PutUint32(net[:], uint32(activeNetParams.Net))
+
+	// Write the blocks sequentially, excluding the genesis block.
+	var sz [4]byte
+	for i := int64(1); i <= height; i++ {
+		bl, err := b.BlockByHeight(i)
+		if err != nil {
+			return err
+		}
+
+		// Serialize the block for writing.
+		blB, err := bl.Bytes()
+		if err != nil {
+			return err
+		}
+
+		// Write the network ID first.
+		_, err = file.Write(net[:])
+		if err != nil {
+			return err
+		}
+
+		// Write the size of the block as a little endian uint32,
+		// then write the block itself serialized.
+		binary.LittleEndian.PutUint32(sz[:], uint32(len(blB)))
+		_, err = file.Write(sz[:])
+		if err != nil {
+			return err
+		}
+
+		_, err = file.Write(blB)
+		if err != nil {
+			return err
+		}
+
+		progressLogger.logBlockHeight(bl)
 	}
 
-	// Write the buffer to disk
-	err = ioutil.WriteFile(cfg.DumpBlockchain, w.Bytes(), 0664)
-	if err != nil {
-		return err
-	}
+	bmgrLog.Infof("Successfully dumped the blockchain (%v blocks) to %v.",
+		height, cfg.DumpBlockchain)
 
 	return nil
 }

@@ -2266,11 +2266,13 @@ func (s *server) Stop() error {
 		}
 	}
 
-	// Stop the CPU miner if needed
-	s.cpuMiner.Stop()
+	// Stop the CPU miner if needed.
+	if cfg.Generate && s.cpuMiner != nil {
+		s.cpuMiner.Stop()
+	}
 
 	// Shutdown the RPC server if it's not disabled.
-	if !cfg.DisableRPC {
+	if !cfg.DisableRPC && s.rpcServer != nil {
 		s.rpcServer.Stop()
 	}
 
