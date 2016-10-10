@@ -476,7 +476,7 @@ func indexNeedsInputs(index Indexer) bool {
 
 // dbFetchTx looks up the passed transaction hash in the transaction index and
 // loads it from the database.
-func dbFetchTx(dbTx database.Tx, hash *chainhash.Hash) (*wire.MsgTx, error) {
+func dbFetchTx(dbTx database.Tx, hash chainhash.Hash) (*wire.MsgTx, error) {
 	// Look up the location of the transaction.
 	blockRegion, err := dbFetchTxIndexEntry(dbTx, hash)
 	if err != nil {
@@ -530,7 +530,7 @@ func makeUtxoView(dbTx database.Tx, block, parent *dcrutil.Block) (*blockchain.U
 					continue
 				}
 
-				originTx, err := dbFetchTx(dbTx, &originOut.Hash)
+				originTx, err := dbFetchTx(dbTx, originOut.Hash)
 				if err != nil {
 					return nil, err
 				}
@@ -557,7 +557,7 @@ func makeUtxoView(dbTx database.Tx, block, parent *dcrutil.Block) (*blockchain.U
 				continue
 			}
 
-			originTx, err := dbFetchTx(dbTx, &originOut.Hash)
+			originTx, err := dbFetchTx(dbTx, originOut.Hash)
 			if err != nil {
 				return nil, err
 			}

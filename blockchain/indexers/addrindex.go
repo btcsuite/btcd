@@ -143,7 +143,7 @@ var (
 
 // fetchBlockHashFunc defines a callback function to use in order to convert a
 // serialized block ID to an associated block hash.
-type fetchBlockHashFunc func(serializedID []byte) (*chainhash.Hash, error)
+type fetchBlockHashFunc func(serializedID []byte) (chainhash.Hash, error)
 
 // serializeAddrIndexEntry serializes the provided block id and transaction
 // location according to the format described in detail above.
@@ -170,7 +170,7 @@ func deserializeAddrIndexEntry(serialized []byte, region *database.BlockRegion, 
 	if err != nil {
 		return err
 	}
-	region.Hash = hash
+	region.Hash = &hash
 	region.Offset = byteOrder.Uint32(serialized[4:8])
 	region.Len = byteOrder.Uint32(serialized[8:12])
 	return nil
@@ -816,7 +816,8 @@ func (idx *AddrIndex) ConnectBlock(dbTx database.Tx, block, parent *dcrutil.Bloc
 			return err
 		}
 
-		parentBlockID, err = dbFetchBlockIDByHash(dbTx, parent.Sha())
+		parentSha := parent.Sha()
+		parentBlockID, err = dbFetchBlockIDByHash(dbTx, *parentSha)
 		if err != nil {
 			return err
 		}
@@ -835,7 +836,8 @@ func (idx *AddrIndex) ConnectBlock(dbTx database.Tx, block, parent *dcrutil.Bloc
 	}
 
 	// Get the internal block ID associated with the block.
-	blockID, err := dbFetchBlockIDByHash(dbTx, block.Sha())
+	blockSha := block.Sha()
+	blockID, err := dbFetchBlockIDByHash(dbTx, *blockSha)
 	if err != nil {
 		return err
 	}
@@ -913,7 +915,7 @@ func (idx *AddrIndex) TxRegionsForAddress(dbTx database.Tx, addr dcrutil.Address
 	err = idx.db.View(func(dbTx database.Tx) error {
 		// Create closure to lookup the block hash given the ID using
 		// the database transaction.
-		fetchBlockHash := func(id []byte) (*chainhash.Hash, error) {
+		fetchBlockHash := func(id []byte) (chainhash.Hash, error) {
 			// Deserialize and populate the result.
 			return dbFetchBlockHashBySerializedID(dbTx, id)
 		}
