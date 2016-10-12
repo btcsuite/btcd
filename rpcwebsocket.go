@@ -2097,7 +2097,7 @@ func rescanBlock(wsc *wsClient, lookups *rescanKeys, blk *dcrutil.Block,
 		recvNotified := false
 
 		// Get the stake tx type.
-		txType := stake.DetermineTxType(tx)
+		txType := stake.DetermineTxType(tx.MsgTx())
 
 		for i, txin := range tx.MsgTx().TxIn {
 			// Skip stakebase.

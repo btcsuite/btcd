@@ -114,21 +114,20 @@ func IsCoinBase(tx *dcrutil.Tx) bool {
 
 // CheckTransactionSanity performs some preliminary checks on a transaction to
 // ensure it is sane.  These checks are context free.
-func CheckTransactionSanity(tx *dcrutil.Tx, params *chaincfg.Params) error {
+func CheckTransactionSanity(tx *wire.MsgTx, params *chaincfg.Params) error {
 	// A transaction must have at least one input.
-	msgTx := tx.MsgTx()
-	if len(msgTx.TxIn) == 0 {
+	if len(tx.TxIn) == 0 {
 		return ruleError(ErrNoTxInputs, "transaction has no inputs")
 	}
 
 	// A transaction must have at least one output.
-	if len(msgTx.TxOut) == 0 {
+	if len(tx.TxOut) == 0 {
 		return ruleError(ErrNoTxOutputs, "transaction has no outputs")
 	}
 
 	// A transaction must not exceed the maximum allowed block payload when
 	// serialized.
-	serializedTxSize := tx.MsgTx().SerializeSize()
+	serializedTxSize := tx.SerializeSize()
 	if serializedTxSize > params.MaximumBlockSize {
 		str := fmt.Sprintf("serialized transaction is too big - got "+
 			"%d, max %d", serializedTxSize, params.MaximumBlockSize)
@@ -142,7 +141,7 @@ func CheckTransactionSanity(tx *dcrutil.Tx, params *chaincfg.Params) error {
 	// as a atom.  One decred is a quantity of atoms as defined by the
 	// AtomsPerCoin constant.
 	var totalAtom int64
-	for _, txOut := range msgTx.TxOut {
+	for _, txOut := range tx.TxOut {
 		atom := txOut.Value
 		if atom < 0 {
 			str := fmt.Sprintf("transaction output has negative "+
@@ -178,22 +177,22 @@ func CheckTransactionSanity(tx *dcrutil.Tx, params *chaincfg.Params) error {
 	isSSGen, _ := stake.IsSSGen(tx)
 
 	// Coinbase script length must be between min and max length.
-	if IsCoinBase(tx) {
+	if IsCoinBaseTx(tx) {
 		// The referenced outpoint should be null.
-		if !isNullOutpoint(&msgTx.TxIn[0].PreviousOutPoint) {
+		if !isNullOutpoint(&tx.TxIn[0].PreviousOutPoint) {
 			str := fmt.Sprintf("coinbase transaction did not use a " +
 				"null outpoint")
 			return ruleError(ErrBadCoinbaseOutpoint, str)
 		}
 
 		// The fraud proof should also be null.
-		if !isNullFraudProof(msgTx.TxIn[0]) {
+		if !isNullFraudProof(tx.TxIn[0]) {
 			str := fmt.Sprintf("coinbase transaction fraud proof was " +
 				"non-null")
 			return ruleError(ErrBadCoinbaseFraudProof, str)
 		}
 
-		slen := len(msgTx.TxIn[0].SignatureScript)
+		slen := len(tx.TxIn[0].SignatureScript)
 		if slen < MinCoinbaseScriptLen || slen > MaxCoinbaseScriptLen {
 			str := fmt.Sprintf("coinbase transaction script length "+
 				"of %d is out of range (min: %d, max: %d)",
@@ -202,7 +201,7 @@ func CheckTransactionSanity(tx *dcrutil.Tx, params *chaincfg.Params) error {
 		}
 	} else if isSSGen {
 		// Check script length of stake base signature.
-		slen := len(msgTx.TxIn[0].SignatureScript)
+		slen := len(tx.TxIn[0].SignatureScript)
 		if slen < MinCoinbaseScriptLen || slen > MaxCoinbaseScriptLen {
 			str := fmt.Sprintf("stakebase transaction script length "+
 				"of %d is out of range (min: %d, max: %d)",
@@ -212,17 +211,17 @@ func CheckTransactionSanity(tx *dcrutil.Tx, params *chaincfg.Params) error {
 
 		// The script must be set to the one specified by the network.
 		// Check script length of stake base signature.
-		if !bytes.Equal(msgTx.TxIn[0].SignatureScript,
+		if !bytes.Equal(tx.TxIn[0].SignatureScript,
 			params.StakeBaseSigScript) {
 			str := fmt.Sprintf("stakebase transaction signature script "+
 				"was set to disallowed value (got %x, want %x)",
-				msgTx.TxIn[0].SignatureScript,
+				tx.TxIn[0].SignatureScript,
 				params.StakeBaseSigScript)
 			return ruleError(ErrBadStakevaseScrVal, str)
 		}
 
 		// The ticket reference hash in an SSGen tx must not be null.
-		ticketHash := &msgTx.TxIn[1].PreviousOutPoint
+		ticketHash := &tx.TxIn[1].PreviousOutPoint
 		if isNullOutpoint(ticketHash) {
 			return ruleError(ErrBadTxInput, "ssgen tx "+
 				"ticket input refers to previous output that "+
@@ -232,7 +231,7 @@ func CheckTransactionSanity(tx *dcrutil.Tx, params *chaincfg.Params) error {
 		// Previous transaction outputs referenced by the inputs to this
 		// transaction must not be null except in the case of stake bases
 		// for SSGen tx.
-		for _, txIn := range msgTx.TxIn {
+		for _, txIn := range tx.TxIn {
 			prevOut := &txIn.PreviousOutPoint
 			if isNullOutpoint(prevOut) {
 				return ruleError(ErrBadTxInput, "transaction "+
@@ -244,7 +243,7 @@ func CheckTransactionSanity(tx *dcrutil.Tx, params *chaincfg.Params) error {
 
 	// Check for duplicate transaction inputs.
 	existingTxOut := make(map[wire.OutPoint]struct{})
-	for _, txIn := range msgTx.TxIn {
+	for _, txIn := range tx.TxIn {
 		if _, exists := existingTxOut[txIn.PreviousOutPoint]; exists {
 			return ruleError(ErrDuplicateTxInputs, "transaction "+
 				"contains duplicate inputs")
@@ -260,8 +259,9 @@ func CheckTransactionSanity(tx *dcrutil.Tx, params *chaincfg.Params) error {
 func checkProofOfStake(block *dcrutil.Block, posLimit int64) error {
 	msgBlock := block.MsgBlock()
 	for _, staketx := range block.STransactions() {
-		if is, _ := stake.IsSStx(staketx); is {
-			commitValue := staketx.MsgTx().TxOut[0].Value
+		msgTx := staketx.MsgTx()
+		if is, _ := stake.IsSStx(msgTx); is {
+			commitValue := msgTx.TxOut[0].Value
 
 			// Check for underflow block sbits.
 			if commitValue < msgBlock.Header.SBits {
@@ -441,14 +441,14 @@ func checkBlockSanity(block *dcrutil.Block, timeSource MedianTimeSource,
 
 	// The first transaction in a block's txtreeregular must be a coinbase.
 	transactions := block.Transactions()
-	if !IsCoinBase(transactions[0]) {
+	if !IsCoinBaseTx(transactions[0].MsgTx()) {
 		return ruleError(ErrFirstTxNotCoinbase, "first transaction in "+
 			"block is not a coinbase")
 	}
 
 	// A block must not have more than one coinbase.
 	for i, tx := range transactions[1:] {
-		if IsCoinBase(tx) {
+		if IsCoinBaseTx(tx.MsgTx()) {
 			str := fmt.Sprintf("block contains second coinbase at "+
 				"index %d", i+1)
 			return ruleError(ErrMultipleCoinbases, str)
@@ -458,12 +458,13 @@ func checkBlockSanity(block *dcrutil.Block, timeSource MedianTimeSource,
 	// Do some preliminary checks on each transaction to ensure they are
 	// sane before continuing.
 	for _, tx := range transactions {
-		txType := stake.DetermineTxType(tx)
+		msgTx := tx.MsgTx()
+		txType := stake.DetermineTxType(msgTx)
 		if txType != stake.TxTypeRegular {
 			errStr := fmt.Sprintf("found stake tx in regular tx tree")
 			return ruleError(ErrStakeTxInRegularTree, errStr)
 		}
-		err := CheckTransactionSanity(tx, chainParams)
+		err := CheckTransactionSanity(msgTx, chainParams)
 		if err != nil {
 			return err
 		}
@@ -472,7 +473,7 @@ func checkBlockSanity(block *dcrutil.Block, timeSource MedianTimeSource,
 	totalTickets := 0
 	totalVotes := 0
 	totalRevocations := 0
-	for _, stx := range block.STransactions() {
+	for _, stx := range block.MsgBlock().STransactions {
 		err := CheckTransactionSanity(stx, chainParams)
 		if err != nil {
 			return err
@@ -577,12 +578,13 @@ func checkBlockSanity(block *dcrutil.Block, timeSource MedianTimeSource,
 	// allowed per block.
 	totalSigOps := 0
 	for _, tx := range allTransactions {
+		msgTx := tx.MsgTx()
 		// We could potentially overflow the accumulator so check for
 		// overflow.
 		lastSigOps := totalSigOps
 
-		isSSGen, _ := stake.IsSSGen(tx)
-		isCoinBase := IsCoinBase(tx)
+		isSSGen, _ := stake.IsSSGen(msgTx)
+		isCoinBase := IsCoinBaseTx(msgTx)
 
 		totalSigOps += CountSigOps(tx, isCoinBase, isSSGen)
 		if totalSigOps < lastSigOps || totalSigOps > MaxSigOpsPerBlock {
@@ -790,8 +792,9 @@ func (b *BlockChain) CheckBlockStakeSanity(stakeValidationHeight int64, node *bl
 	ssGens := 0 // Votes
 	ssRtxs := 0 // Revocations
 	for i, tx := range stakeTransactions {
-		isSSGen, _ := stake.IsSSGen(tx)
-		isSSRtx, _ := stake.IsSSRtx(tx)
+		msgTx := tx.MsgTx()
+		isSSGen, _ := stake.IsSSGen(msgTx)
+		isSSRtx, _ := stake.IsSSRtx(msgTx)
 
 		if isSSGen {
 			ssGens++
@@ -853,12 +856,13 @@ func (b *BlockChain) CheckBlockStakeSanity(stakeValidationHeight int64, node *bl
 	numSStxTx := 0
 
 	for _, staketx := range stakeTransactions {
-		if is, _ := stake.IsSStx(staketx); is {
+		msgTx := staketx.MsgTx()
+		if is, _ := stake.IsSStx(msgTx); is {
 			numSStxTx++
 
 			// 1. Make sure that we're committing enough coins. Checked already
 			// when we check stake difficulty, so may not be needed.
-			if staketx.MsgTx().TxOut[0].Value < sbits {
+			if msgTx.TxOut[0].Value < sbits {
 				txSha := staketx.Sha()
 				errStr := fmt.Sprintf("Error in stake consensus: the amount "+
 					"committed in SStx %v was less than the sBits value %v",
@@ -966,11 +970,12 @@ func (b *BlockChain) CheckBlockStakeSanity(stakeValidationHeight int64, node *bl
 	}
 
 	for _, staketx := range stakeTransactions {
-		if is, _ := stake.IsSSGen(staketx); is {
+		msgTx := staketx.MsgTx()
+		if is, _ := stake.IsSSGen(msgTx); is {
 			numSSGenTx++
 
 			// Check and store the vote for TxTreeRegular.
-			ssGenVoteBits := stake.SSGenVoteBits(staketx)
+			ssGenVoteBits := stake.SSGenVoteBits(msgTx)
 			if dcrutil.IsFlagSet16(ssGenVoteBits, dcrutil.BlockValid) {
 				voteYea++
 			} else {
@@ -978,7 +983,6 @@ func (b *BlockChain) CheckBlockStakeSanity(stakeValidationHeight int64, node *bl
 			}
 
 			// Grab the input SStx hash from the inputs of the transaction.
-			msgTx := staketx.MsgTx()
 			sstxIn := msgTx.TxIn[1] // sstx input
 			sstxHash := sstxIn.PreviousOutPoint.Hash
 
@@ -994,7 +998,7 @@ func (b *BlockChain) CheckBlockStakeSanity(stakeValidationHeight int64, node *bl
 
 			// 3. Check to make sure that the SSGen tx votes on the parent block of
 			// the block in which it is included.
-			votedOnSha, votedOnHeight, err := stake.SSGenBlockVotedOn(staketx)
+			votedOnSha, votedOnHeight, err := stake.SSGenBlockVotedOn(msgTx)
 			if err != nil {
 				errStr := fmt.Sprintf("unexpected vote tx decode error: %v",
 					err.Error())
@@ -1055,11 +1059,11 @@ func (b *BlockChain) CheckBlockStakeSanity(stakeValidationHeight int64, node *bl
 	// 4. Check for revocation overflows.
 	numSSRtxTx := 0
 	for _, staketx := range stakeTransactions {
-		if is, _ := stake.IsSSRtx(staketx); is {
+		msgTx := staketx.MsgTx()
+		if is, _ := stake.IsSSRtx(msgTx); is {
 			numSSRtxTx++
 
 			// Grab the input SStx hash from the inputs of the transaction.
-			msgTx := staketx.MsgTx()
 			sstxIn := msgTx.TxIn[0] // sstx input
 			sstxHash := sstxIn.PreviousOutPoint.Hash
 
@@ -1135,9 +1139,11 @@ func CheckTransactionInputs(subsidyCache *SubsidyCache, tx *dcrutil.Tx,
 	txHeight int64, utxoView *UtxoViewpoint, checkFraudProof bool,
 	chainParams *chaincfg.Params) (int64, error) {
 
+	msgTx := tx.MsgTx()
+
 	// Expired transactions are not allowed.
-	if tx.MsgTx().Expiry != wire.NoExpiryValue {
-		if txHeight >= int64(tx.MsgTx().Expiry) {
+	if msgTx.Expiry != wire.NoExpiryValue {
+		if txHeight >= int64(msgTx.Expiry) {
 			errStr := fmt.Sprintf("Transaction indicated an expiry of %v"+
 				" while the current height is %v", tx.MsgTx().Expiry, txHeight)
 			return 0, ruleError(ErrExpiredTx, errStr)
@@ -1150,7 +1156,7 @@ func CheckTransactionInputs(subsidyCache *SubsidyCache, tx *dcrutil.Tx,
 	var totalAtomIn int64
 
 	// Coinbase transactions have no inputs.
-	if IsCoinBase(tx) {
+	if IsCoinBaseTx(msgTx) {
 		return 0, nil
 	}
 
@@ -1164,10 +1170,8 @@ func CheckTransactionInputs(subsidyCache *SubsidyCache, tx *dcrutil.Tx,
 
 	// 1. Check and make sure that the output amounts in the commitments to the
 	// ticket are correctly calculated.
-	isSStx, _ := stake.IsSStx(tx)
+	isSStx, _ := stake.IsSStx(msgTx)
 	if isSStx {
-		msgTx := tx.MsgTx()
-
 		sstxInAmts := make([]int64, len(msgTx.TxIn))
 
 		for idx, txIn := range msgTx.TxIn {
@@ -1210,7 +1214,7 @@ func CheckTransactionInputs(subsidyCache *SubsidyCache, tx *dcrutil.Tx,
 			sstxInAmts[idx] = utxoEntry.AmountByIndex(originTxIndex)
 		}
 
-		_, _, sstxOutAmts, sstxChangeAmts, _, _ := stake.TxSStxStakeOutputInfo(tx)
+		_, _, sstxOutAmts, sstxChangeAmts, _, _ := stake.TxSStxStakeOutputInfo(msgTx)
 		_, sstxOutAmtsCalc, err := stake.SStxNullOutputAmounts(sstxInAmts,
 			sstxChangeAmts,
 			msgTx.TxOut[0].Value)
@@ -1239,7 +1243,7 @@ func CheckTransactionInputs(subsidyCache *SubsidyCache, tx *dcrutil.Tx,
 	// Save whether or not this is an SSGen tx; if it is, we need to skip the
 	//     input check of the stakebase later, and another input check for OP_SSTX
 	//     tagged output uses.
-	isSSGen, _ := stake.IsSSGen(tx)
+	isSSGen, _ := stake.IsSSGen(msgTx)
 	if isSSGen {
 		// Cursory check to see if we've even reached stake-enabled height.
 		if txHeight < stakeEnabledHeight {
@@ -1249,7 +1253,6 @@ func CheckTransactionInputs(subsidyCache *SubsidyCache, tx *dcrutil.Tx,
 		}
 
 		// Grab the input SStx hash from the inputs of the transaction.
-		msgTx := tx.MsgTx()
 		nullIn := msgTx.TxIn[0]
 		sstxIn := msgTx.TxIn[1] // sstx input
 		sstxHash := sstxIn.PreviousOutPoint.Hash
@@ -1257,7 +1260,7 @@ func CheckTransactionInputs(subsidyCache *SubsidyCache, tx *dcrutil.Tx,
 		// Calculate the theoretical stake vote subsidy by extracting the vote
 		// height.  Should be impossible because IsSSGen requires this byte string
 		// to be a certain number of bytes.
-		_, heightVotingOn, err := stake.SSGenBlockVotedOn(tx)
+		_, heightVotingOn, err := stake.SSGenBlockVotedOn(msgTx)
 		if err != nil {
 			errStr := fmt.Sprintf("Could not parse SSGen block vote information "+
 				"from SSGen %v; Error returned %v",
@@ -1312,7 +1315,7 @@ func CheckTransactionInputs(subsidyCache *SubsidyCache, tx *dcrutil.Tx,
 			stake.SStxStakeOutputInfo(minOutsSStx)
 
 		ssgenPayTypes, ssgenPkhs, ssgenAmts, err :=
-			stake.TxSSGenStakeOutputInfo(tx, chainParams)
+			stake.TxSSGenStakeOutputInfo(msgTx, chainParams)
 		if err != nil {
 			errStr := fmt.Sprintf("Could not decode outputs for SSgen %v: %v",
 				txHash, err.Error())
@@ -1389,7 +1392,7 @@ func CheckTransactionInputs(subsidyCache *SubsidyCache, tx *dcrutil.Tx,
 
 	// Save whether or not this is an SSRtx tx; if it is, we need to know this
 	// later input check for OP_SSTX outs.
-	isSSRtx, _ := stake.IsSSRtx(tx)
+	isSSRtx, _ := stake.IsSSRtx(msgTx)
 
 	if isSSRtx {
 		// Cursory check to see if we've even reach stake-enabled height.
@@ -1402,7 +1405,6 @@ func CheckTransactionInputs(subsidyCache *SubsidyCache, tx *dcrutil.Tx,
 		}
 
 		// Grab the input SStx hash from the inputs of the transaction.
-		msgTx := tx.MsgTx()
 		sstxIn := msgTx.TxIn[0] // sstx input
 		sstxHash := sstxIn.PreviousOutPoint.Hash
 
@@ -1434,7 +1436,7 @@ func CheckTransactionInputs(subsidyCache *SubsidyCache, tx *dcrutil.Tx,
 		// size restrictions for components of SSRtxs already checked
 		// for in IsSSRtx.
 		ssrtxPayTypes, ssrtxPkhs, ssrtxAmts, err :=
-			stake.TxSSRtxStakeOutputInfo(tx, chainParams)
+			stake.TxSSRtxStakeOutputInfo(msgTx, chainParams)
 		if err != nil {
 			errStr := fmt.Sprintf("Could not decode outputs for SSRtx %v: %v",
 				txHash, err.Error())
@@ -1506,11 +1508,11 @@ func CheckTransactionInputs(subsidyCache *SubsidyCache, tx *dcrutil.Tx,
 	// ----------------------------------------------------------------------------
 	// Decred general transaction testing (and a few stake exceptions).
 	// ----------------------------------------------------------------------------
-	for idx, txIn := range tx.MsgTx().TxIn {
+	for idx, txIn := range msgTx.TxIn {
 		// Inputs won't exist for stakebase tx, so ignore them.
 		if isSSGen && idx == 0 {
 			// However, do add the reward amount.
-			_, heightVotingOn, _ := stake.SSGenBlockVotedOn(tx)
+			_, heightVotingOn, _ := stake.SSGenBlockVotedOn(msgTx)
 			stakeVoteSubsidy := CalcStakeVoteSubsidy(subsidyCache,
 				int64(heightVotingOn), chainParams)
 			totalAtomIn += stakeVoteSubsidy
@@ -1626,8 +1628,8 @@ func CheckTransactionInputs(subsidyCache *SubsidyCache, tx *dcrutil.Tx,
 				utxoEntry.ScriptVersionByIndex(originTxIndex),
 				utxoEntry.PkScriptByIndex(originTxIndex)) ==
 				txscript.StakeSubmissionTy {
-				_, errIsSSGen := stake.IsSSGen(tx)
-				_, errIsSSRtx := stake.IsSSRtx(tx)
+				_, errIsSSGen := stake.IsSSGen(msgTx)
+				_, errIsSSRtx := stake.IsSSRtx(msgTx)
 				errStr := fmt.Sprintf("Tx %v attempted to spend an OP_SSTX "+
 					"tagged output, however it was not an SSGen or SSRtx tx"+
 					"; IsSSGen err: %v, isSSRtx err: %v",
@@ -1868,7 +1870,8 @@ func CountP2SHSigOps(tx *dcrutil.Tx, isCoinBaseTx bool, isStakeBaseTx bool,
 // TxTree true == Regular, false == Stake
 func checkNumSigOps(tx *dcrutil.Tx, utxoView *UtxoViewpoint, index int,
 	txTree bool, cumulativeSigOps int) (int, error) {
-	isSSGen, _ := stake.IsSSGen(tx)
+	msgTx := tx.MsgTx()
+	isSSGen, _ := stake.IsSSGen(msgTx)
 	numsigOps := CountSigOps(tx, (index == 0) && txTree, isSSGen)
 
 	// Since the first (and only the first) transaction has
@@ -1907,9 +1910,10 @@ func checkNumSigOps(tx *dcrutil.Tx, utxoView *UtxoViewpoint, index int,
 func checkStakeBaseAmounts(subsidyCache *SubsidyCache, height int64,
 	params *chaincfg.Params, txs []*dcrutil.Tx, utxoView *UtxoViewpoint) error {
 	for _, tx := range txs {
-		if is, _ := stake.IsSSGen(tx); is {
+		msgTx := tx.MsgTx()
+		if is, _ := stake.IsSSGen(msgTx); is {
 			// Ensure the input is available.
-			txInHash := &tx.MsgTx().TxIn[1].PreviousOutPoint.Hash
+			txInHash := &msgTx.TxIn[1].PreviousOutPoint.Hash
 			utxoEntry, exists := utxoView.entries[*txInHash]
 			if !exists || utxoEntry == nil {
 				str := fmt.Sprintf("couldn't find input tx %v for stakebase "+
@@ -1917,12 +1921,12 @@ func checkStakeBaseAmounts(subsidyCache *SubsidyCache, height int64,
 				return ruleError(ErrTicketUnavailable, str)
 			}
 
-			originTxIndex := tx.MsgTx().TxIn[1].PreviousOutPoint.Index
+			originTxIndex := msgTx.TxIn[1].PreviousOutPoint.Index
 			originTxAtom := utxoEntry.AmountByIndex(originTxIndex)
 
 			totalOutputs := int64(0)
 			// Sum up the outputs.
-			for _, out := range tx.MsgTx().TxOut {
+			for _, out := range msgTx.TxOut {
 				totalOutputs += out.Value
 			}
 
@@ -1951,9 +1955,10 @@ func getStakeBaseAmounts(txs []*dcrutil.Tx, utxoView *UtxoViewpoint) (int64, err
 	totalInputs := int64(0)
 	totalOutputs := int64(0)
 	for _, tx := range txs {
-		if is, _ := stake.IsSSGen(tx); is {
+		msgTx := tx.MsgTx()
+		if is, _ := stake.IsSSGen(msgTx); is {
 			// Ensure the input is available.
-			txInHash := &tx.MsgTx().TxIn[1].PreviousOutPoint.Hash
+			txInHash := &msgTx.TxIn[1].PreviousOutPoint.Hash
 			utxoEntry, exists := utxoView.entries[*txInHash]
 			if !exists || utxoEntry == nil {
 				str := fmt.Sprintf("couldn't find input tx %v for stakebase "+
@@ -1962,13 +1967,13 @@ func getStakeBaseAmounts(txs []*dcrutil.Tx, utxoView *UtxoViewpoint) (int64, err
 				return 0, ruleError(ErrTicketUnavailable, str)
 			}
 
-			originTxIndex := tx.MsgTx().TxIn[1].PreviousOutPoint.Index
+			originTxIndex := msgTx.TxIn[1].PreviousOutPoint.Index
 			originTxAtom := utxoEntry.AmountByIndex(originTxIndex)
 
 			totalInputs += originTxAtom
 
 			// Sum up the outputs.
-			for _, out := range tx.MsgTx().TxOut {
+			for _, out := range msgTx.TxOut {
 				totalOutputs += out.Value
 			}
 		}
@@ -1985,9 +1990,10 @@ func getStakeTreeFees(subsidyCache *SubsidyCache, height int64,
 	totalInputs := int64(0)
 	totalOutputs := int64(0)
 	for _, tx := range txs {
-		isSSGen, _ := stake.IsSSGen(tx)
+		msgTx := tx.MsgTx()
+		isSSGen, _ := stake.IsSSGen(msgTx)
 
-		for i, in := range tx.MsgTx().TxIn {
+		for i, in := range msgTx.TxIn {
 			// Ignore stakebases.
 			if isSSGen && i == 0 {
 				continue
@@ -2007,7 +2013,7 @@ func getStakeTreeFees(subsidyCache *SubsidyCache, height int64,
 			totalInputs += originTxAtom
 		}
 
-		for _, out := range tx.MsgTx().TxOut {
+		for _, out := range msgTx.TxOut {
 			totalOutputs += out.Value
 		}
 

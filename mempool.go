@@ -187,12 +187,12 @@ func (mp *txMemPool) insertVote(ssgen *dcrutil.Tx) error {
 	ticketHash := &msgTx.TxIn[1].PreviousOutPoint.Hash
 
 	// Get the block it is voting on; here we're agnostic of height.
-	blockHash, blockHeight, err := stake.SSGenBlockVotedOn(ssgen)
+	blockHash, blockHeight, err := stake.SSGenBlockVotedOn(msgTx)
 	if err != nil {
 		return err
 	}
 
-	voteBits := stake.SSGenVoteBits(ssgen)
+	voteBits := stake.SSGenVoteBits(msgTx)
 	vote := dcrutil.IsFlagSet16(voteBits, dcrutil.BlockValid)
 
 	voteTx := &VoteTx{*voteHash, *ticketHash, vote}
@@ -649,16 +649,17 @@ func (mp *txMemPool) HaveTransactions(hashes []*chainhash.Hash) []bool {
 func (mp *txMemPool) removeTransaction(tx *dcrutil.Tx, removeRedeemers bool) {
 	txmpLog.Tracef("Removing transaction %v", tx.Sha())
 
+	msgTx := tx.MsgTx()
 	txHash := tx.Sha()
 	var txType stake.TxType
 	if removeRedeemers {
 		// Remove any transactions which rely on this one.
-		txType = stake.DetermineTxType(tx)
+		txType = stake.DetermineTxType(msgTx)
 		tree := dcrutil.TxTreeRegular
 		if txType != stake.TxTypeRegular {
 			tree = dcrutil.TxTreeStake
 		}
-		for i := uint32(0); i < uint32(len(tx.MsgTx().TxOut)); i++ {
+		for i := uint32(0); i < uint32(len(msgTx.TxOut)); i++ {
 			outpoint := wire.NewOutPoint(txHash, i, tree)
 			if txRedeemer, exists := mp.outpoints[*outpoint]; exists {
 				mp.removeTransaction(txRedeemer, true)
@@ -726,6 +727,7 @@ func (mp *txMemPool) RemoveDoubleSpends(tx *dcrutil.Tx) {
 // This function MUST be called with the mempool lock held (for writes).
 func (mp *txMemPool) addTransaction(utxoView *blockchain.UtxoViewpoint,
 	tx *dcrutil.Tx, txType stake.TxType, height int64, fee int64) {
+	msgTx := tx.MsgTx()
 	// Add the transaction to the pool and mark the referenced outpoints
 	// as spent by the pool.
 	mp.pool[*tx.Sha()] = &mempoolTxDesc{
@@ -736,9 +738,9 @@ func (mp *txMemPool) addTransaction(utxoView *blockchain.UtxoViewpoint,
 			Height: height,
 			Fee:    fee,
 		},
-		StartingPriority: calcPriority(tx.MsgTx(), utxoView, height),
+		StartingPriority: calcPriority(msgTx, utxoView, height),
 	}
-	for _, txIn := range tx.MsgTx().TxIn {
+	for _, txIn := range msgTx.TxIn {
 		mp.outpoints[txIn.PreviousOutPoint] = tx
 	}
 	atomic.StoreInt64(&mp.lastUpdated, time.Now().Unix())
@@ -749,7 +751,7 @@ func (mp *txMemPool) addTransaction(utxoView *blockchain.UtxoViewpoint,
 		mp.cfg.AddrIndex.AddUnconfirmedTx(tx, utxoView)
 	}
 	if mp.cfg.ExistsAddrIndex != nil {
-		mp.cfg.ExistsAddrIndex.AddUnconfirmedTx(tx)
+		mp.cfg.ExistsAddrIndex.AddUnconfirmedTx(msgTx)
 	}
 }
 
@@ -901,6 +903,7 @@ func (mp *txMemPool) FetchTransaction(txHash *chainhash.Hash, includeRecentBlock
 // It should also set the dcrutil tree type for the tx as well.
 func (mp *txMemPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew,
 	rateLimit, allowHighFees bool) ([]*chainhash.Hash, error) {
+	msgTx := tx.MsgTx()
 	txHash := tx.Sha()
 	// Don't accept the transaction if it already exists in the pool.  This
 	// applies to orphan transactions as well.  This check is intended to
@@ -913,7 +916,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew,
 	// Perform preliminary sanity checks on the transaction.  This makes
 	// use of chain which contains the invariant rules for what
 	// transactions are allowed into blocks.
-	err := blockchain.CheckTransactionSanity(tx, mp.cfg.ChainParams)
+	err := blockchain.CheckTransactionSanity(msgTx, mp.cfg.ChainParams)
 	if err != nil {
 		if cerr, ok := err.(blockchain.RuleError); ok {
 			return nil, chainRuleError(cerr)
@@ -932,7 +935,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew,
 	// value for now.  This is an artifact of older bitcoind clients which
 	// treated this field as an int32 and would treat anything larger
 	// incorrectly (as negative).
-	if tx.MsgTx().LockTime > math.MaxInt32 {
+	if msgTx.LockTime > math.MaxInt32 {
 		str := fmt.Sprintf("transaction %v has a lock time after "+
 			"2038 which is not accepted yet", txHash)
 		return nil, txRuleError(wire.RejectNonstandard, str)
@@ -947,7 +950,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew,
 	// Determine what type of transaction we're dealing with (regular or stake).
 	// Then, be sure to set the tx tree correctly as it's possible a use submitted
 	// it to the network with TxTreeUnknown.
-	txType := stake.DetermineTxType(tx)
+	txType := stake.DetermineTxType(msgTx)
 	if txType == stake.TxTypeRegular {
 		tx.SetTree(dcrutil.TxTreeRegular)
 	} else {
@@ -983,10 +986,10 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew,
 			return nil, err
 		}
 
-		if tx.MsgTx().TxOut[0].Value < sDiff {
+		if msgTx.TxOut[0].Value < sDiff {
 			str := fmt.Sprintf("transaction %v has not enough funds "+
 				"to meet stake difficuly (ticket diff %v < next diff %v)",
-				txHash, tx.MsgTx().TxOut[0].Value, sDiff)
+				txHash, msgTx.TxOut[0].Value, sDiff)
 			return nil, txRuleError(wire.RejectInsufficientFee, str)
 		}
 	}
@@ -998,14 +1001,14 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew,
 			for _, mpTx := range mp.pool {
 				if mpTx.Type == stake.TxTypeSSGen {
 					if mpTx.Tx.MsgTx().TxIn[1].PreviousOutPoint ==
-						tx.MsgTx().TxIn[1].PreviousOutPoint {
+						msgTx.TxIn[1].PreviousOutPoint {
 						ssGenAlreadyFound++
 					}
 				}
 				if ssGenAlreadyFound > maxSSGensDoubleSpends {
 					str := fmt.Sprintf("transaction %v in the pool "+
 						"with more than %v ssgens",
-						tx.MsgTx().TxIn[1].PreviousOutPoint,
+						msgTx.TxIn[1].PreviousOutPoint,
 						maxSSGensDoubleSpends)
 					return nil, txRuleError(wire.RejectDuplicate, str)
 				}
@@ -1016,10 +1019,10 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew,
 			for _, mpTx := range mp.pool {
 				if mpTx.Type == stake.TxTypeSSRtx {
 					if mpTx.Tx.MsgTx().TxIn[0].PreviousOutPoint ==
-						tx.MsgTx().TxIn[0].PreviousOutPoint {
+						msgTx.TxIn[0].PreviousOutPoint {
 						str := fmt.Sprintf("transaction %v in the pool "+
 							" as a ssrtx. Only one ssrtx allowed.",
-							tx.MsgTx().TxIn[0].PreviousOutPoint)
+							msgTx.TxIn[0].PreviousOutPoint)
 						return nil, txRuleError(wire.RejectDuplicate, str)
 					}
 				}
@@ -1042,7 +1045,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew,
 
 	// Votes that are on too old of blocks are rejected.
 	if txType == stake.TxTypeSSGen {
-		_, voteHeight, err := stake.SSGenBlockVotedOn(tx)
+		_, voteHeight, err := stake.SSGenBlockVotedOn(msgTx)
 		if err != nil {
 			return nil, err
 		}
@@ -1080,7 +1083,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew,
 
 	// Transaction is an orphan if any of the inputs don't exist.
 	var missingParents []*chainhash.Hash
-	for i, txIn := range tx.MsgTx().TxIn {
+	for i, txIn := range msgTx.TxIn {
 		if i == 0 && txType == stake.TxTypeSSGen {
 			continue
 		}
@@ -1186,7 +1189,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew,
 	// transaction does not exceeed 1000 less than the reserved space for
 	// high-priority transactions, don't require a fee for it.
 	// This applies to non-stake transactions only.
-	serializedSize := int64(tx.MsgTx().SerializeSize())
+	serializedSize := int64(msgTx.SerializeSize())
 	minFee := calcMinRequiredTxRelayFee(serializedSize,
 		mp.cfg.Policy.MinRelayTxFee)
 	if txType == stake.TxTypeRegular { // Non-stake only
@@ -1207,7 +1210,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew,
 	if isNew && !mp.cfg.Policy.DisableRelayPriority && txFee < minFee &&
 		txType == stake.TxTypeRegular {
 
-		currentPriority := calcPriority(tx.MsgTx(), utxoView,
+		currentPriority := calcPriority(msgTx, utxoView,
 			nextBlockHeight)
 		if currentPriority <= minHighPriority {
 			str := fmt.Sprintf("transaction %v has insufficient "+
@@ -1417,7 +1420,7 @@ func (mp *txMemPool) PruneStakeTx(requiredStakeDifficulty, height int64) {
 
 func (mp *txMemPool) pruneStakeTx(requiredStakeDifficulty, height int64) {
 	for _, tx := range mp.pool {
-		txType := stake.DetermineTxType(tx.Tx)
+		txType := stake.DetermineTxType(tx.Tx.MsgTx())
 		if txType == stake.TxTypeSStx &&
 			tx.Height+int64(heightDiffToPruneTicket) < height {
 			mp.removeTransaction(tx.Tx, true)

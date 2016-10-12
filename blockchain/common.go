@@ -154,7 +154,7 @@ func DebugBlockString(block *dcrutil.Block) string {
 
 	for i, stx := range block.STransactions() {
 		txTypeStr := ""
-		txType := stake.DetermineTxType(stx)
+		txType := stake.DetermineTxType(stx.MsgTx())
 		switch txType {
 		case stake.TxTypeSStx:
 			txTypeStr = "SStx"
@@ -177,9 +177,8 @@ func DebugBlockString(block *dcrutil.Block) string {
 // DebugMsgTxString dumps a verbose message containing information about the
 // contents of a transaction.
 func DebugMsgTxString(msgTx *wire.MsgTx) string {
-	tx := dcrutil.NewTx(msgTx)
-	isSStx, _ := stake.IsSStx(tx)
-	isSSGen, _ := stake.IsSSGen(tx)
+	isSStx, _ := stake.IsSStx(msgTx)
+	isSSGen, _ := stake.IsSSGen(msgTx)
 	var sstxType []bool
 	var sstxPkhs [][]byte
 	var sstxAmts []int64
@@ -188,7 +187,7 @@ func DebugMsgTxString(msgTx *wire.MsgTx) string {
 
 	if isSStx {
 		sstxType, sstxPkhs, sstxAmts, _, sstxRules, sstxLimits =
-			stake.TxSStxStakeOutputInfo(tx)
+			stake.TxSStxStakeOutputInfo(msgTx)
 	}
 
 	var buffer bytes.Buffer
@@ -295,14 +294,14 @@ func DebugMsgTxString(msgTx *wire.MsgTx) string {
 
 		// SSGen block/block height OP_RETURN.
 		if isSSGen && i == 0 {
-			blkHash, blkHeight, _ := stake.SSGenBlockVotedOn(tx)
+			blkHash, blkHeight, _ := stake.SSGenBlockVotedOn(msgTx)
 			str = fmt.Sprintf("SSGen block hash voted on: %v, height: %v\n",
 				blkHash, blkHeight)
 			buffer.WriteString(str)
 		}
 
 		if isSSGen && i == 1 {
-			vb := stake.SSGenVoteBits(tx)
+			vb := stake.SSGenVoteBits(msgTx)
 			str = fmt.Sprintf("SSGen vote bits: %v\n", vb)
 			buffer.WriteString(str)
 		}

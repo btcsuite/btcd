@@ -759,10 +759,11 @@ func (idx *AddrIndex) indexBlock(data writeIndexData, block, parent *dcrutil.Blo
 	}
 
 	for txIdx, tx := range block.STransactions() {
+		msgTx := tx.MsgTx()
 		thisTxOffset := txIdx + stakeStartIdx
 
-		isSSGen, _ := stake.IsSSGen(tx)
-		for i, txIn := range tx.MsgTx().TxIn {
+		isSSGen, _ := stake.IsSSGen(msgTx)
+		for i, txIn := range msgTx.TxIn {
 			// Skip stakebases.
 			if isSSGen && i == 0 {
 				continue
@@ -787,8 +788,8 @@ func (idx *AddrIndex) indexBlock(data writeIndexData, block, parent *dcrutil.Blo
 				txType == stake.TxTypeSStx)
 		}
 
-		isSStx, _ := stake.IsSStx(tx)
-		for _, txOut := range tx.MsgTx().TxOut {
+		isSStx, _ := stake.IsSStx(msgTx)
+		for _, txOut := range msgTx.TxOut {
 			idx.indexPkScript(data, txOut.Version, txOut.PkScript,
 				thisTxOffset, isSStx)
 		}
@@ -995,8 +996,9 @@ func (idx *AddrIndex) AddUnconfirmedTx(tx *dcrutil.Tx, utxoView *blockchain.Utxo
 	// The existence checks are elided since this is only called after the
 	// transaction has already been validated and thus all inputs are
 	// already known to exist.
-	isSSGen, _ := stake.IsSSGen(tx)
-	for i, txIn := range tx.MsgTx().TxIn {
+	msgTx := tx.MsgTx()
+	isSSGen, _ := stake.IsSSGen(msgTx)
+	for i, txIn := range msgTx.TxIn {
 		// Skip stakebase.
 		if i == 0 && isSSGen {
 			continue
@@ -1017,8 +1019,8 @@ func (idx *AddrIndex) AddUnconfirmedTx(tx *dcrutil.Tx, utxoView *blockchain.Utxo
 	}
 
 	// Index addresses of all created outputs.
-	isSStx, _ := stake.IsSStx(tx)
-	for _, txOut := range tx.MsgTx().TxOut {
+	isSStx, _ := stake.IsSStx(msgTx)
+	for _, txOut := range msgTx.TxOut {
 		idx.indexUnconfirmedAddresses(txOut.Version, txOut.PkScript, tx,
 			isSStx)
 	}

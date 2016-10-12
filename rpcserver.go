@@ -949,7 +949,7 @@ func handleCreateRawSStx(s *rpcServer,
 	}
 
 	// Make sure we generated a valid SStx.
-	if _, err := stake.IsSStx(dcrutil.NewTx(mtx)); err != nil {
+	if _, err := stake.IsSStx(mtx); err != nil {
 		return nil, err
 	}
 
@@ -1133,8 +1133,7 @@ func handleCreateRawSSGenTx(s *rpcServer,
 	}
 
 	// Check to make sure our SSGen was created correctly.
-	ssgenTx := dcrutil.NewTx(mtx)
-	_, err = stake.IsSSGen(ssgenTx)
+	_, err = stake.IsSSGen(mtx)
 	if err != nil {
 		return nil, err
 	}
@@ -1296,8 +1295,7 @@ func handleCreateRawSSRtx(s *rpcServer,
 	}
 
 	// Check to make sure our SSGen was created correctly.
-	ssrtxTx := dcrutil.NewTx(mtx)
-	_, err = stake.IsSSRtx(ssrtxTx)
+	_, err = stake.IsSSRtx(mtx)
 	if err != nil {
 		return nil, err
 	}
@@ -1385,7 +1383,7 @@ func stringInSlice(a string, list []string) bool {
 func createVoutList(mtx *wire.MsgTx, chainParams *chaincfg.Params,
 	filterAddrMap map[string]struct{}) []dcrjson.Vout {
 
-	txType := stake.DetermineTxType(dcrutil.NewTx(mtx))
+	txType := stake.DetermineTxType(mtx)
 	voutList := make([]dcrjson.Vout, 0, len(mtx.TxOut))
 	for i, v := range mtx.TxOut {
 		// The disassembled string will contain [error] inline if the
@@ -2666,8 +2664,7 @@ func (state *gbtWorkState) blockTemplateResult(bm *blockManager,
 		}
 
 		var txTypeStr string
-		tempTx := dcrutil.NewTx(tx)
-		txType := stake.DetermineTxType(tempTx)
+		txType := stake.DetermineTxType(tx)
 		switch txType {
 		case stake.TxTypeRegular:
 			txTypeStr = "regular"
@@ -2770,8 +2767,7 @@ func (state *gbtWorkState) blockTemplateResult(bm *blockManager,
 		}
 
 		var txTypeStr string
-		tempStx := dcrutil.NewTx(stx)
-		txType := stake.DetermineTxType(tempStx)
+		txType := stake.DetermineTxType(stx)
 		switch txType {
 		case stake.TxTypeRegular:
 			txTypeStr = "error"
@@ -5244,7 +5240,7 @@ func ticketFeeInfoForBlock(s *rpcServer, height int64, txType stake.TxType) (*dc
 		}
 	} else {
 		for _, stx := range bl.STransactions() {
-			thisTxType := stake.DetermineTxType(stx)
+			thisTxType := stake.DetermineTxType(stx.MsgTx())
 			if thisTxType == txType {
 				txFees[itr] = calcFeePerKb(stx)
 				itr++
@@ -5289,7 +5285,7 @@ func ticketFeeInfoForRange(s *rpcServer, start int64, end int64, txType stake.Tx
 			}
 		} else {
 			for _, stx := range bl.STransactions() {
-				thisTxType := stake.DetermineTxType(stx)
+				thisTxType := stake.DetermineTxType(stx.MsgTx())
 				if thisTxType == txType {
 					txFees = append(txFees, calcFeePerKb(stx))
 				}

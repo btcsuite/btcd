@@ -659,8 +659,9 @@ func maybeInsertStakeTx(bm *blockManager, stx *dcrutil.Tx, treeValid bool) bool 
 			"stx %s: %v", stx.Sha(), err)
 		return false
 	}
-	isSSGen, _ := stake.IsSSGen(stx)
-	for i, txIn := range stx.MsgTx().TxIn {
+	mstx := stx.MsgTx()
+	isSSGen, _ := stake.IsSSGen(mstx)
+	for i, txIn := range mstx.TxIn {
 		// Evaluate if this is a stakebase input or not. If it
 		// is, continue without evaluation of the input.
 		// if isStakeBase
@@ -1288,7 +1289,8 @@ mempoolLoop:
 		// A block can't have more than one coinbase or contain
 		// non-finalized transactions.
 		tx := txDesc.Tx
-		if blockchain.IsCoinBase(tx) {
+		msgTx := tx.MsgTx()
+		if blockchain.IsCoinBaseTx(msgTx) {
 			minrLog.Tracef("Skipping coinbase tx %s", tx.Sha())
 			continue
 		}
@@ -1303,7 +1305,7 @@ mempoolLoop:
 		// the ticket number.
 		isSSGen := txDesc.Type == stake.TxTypeSSGen
 		if isSSGen {
-			blockHash, blockHeight, err := stake.SSGenBlockVotedOn(tx)
+			blockHash, blockHeight, err := stake.SSGenBlockVotedOn(msgTx)
 			if err != nil { // Should theoretically never fail.
 				minrLog.Tracef("Skipping ssgen tx %s because of failure "+
 					"to extract block voting data", tx.Sha())
@@ -1665,14 +1667,15 @@ mempoolLoop:
 	var voteBitsVoters []uint16
 
 	for _, tx := range blockTxns {
+		msgTx := tx.MsgTx()
 		if nextBlockHeight < stakeValidationHeight {
 			break // No SSGen should be present before this height.
 		}
 
-		if isSSGen, _ := stake.IsSSGen(tx); isSSGen {
-			txCopy := dcrutil.NewTxDeepTxIns(tx.MsgTx())
+		if isSSGen, _ := stake.IsSSGen(msgTx); isSSGen {
+			txCopy := dcrutil.NewTxDeepTxIns(msgTx)
 			if maybeInsertStakeTx(blockManager, txCopy, treeValid) {
-				vb := stake.SSGenVoteBits(txCopy)
+				vb := stake.SSGenVoteBits(txCopy.MsgTx())
 				voteBitsVoters = append(voteBitsVoters, vb)
 				blockTxnsStake = append(blockTxnsStake, txCopy)
 				voters++
@@ -1766,7 +1769,8 @@ mempoolLoop:
 	// Get the newly purchased tickets (SStx tx) and store them and their number.
 	freshStake := 0
 	for _, tx := range blockTxns {
-		isSStx, _ := stake.IsSStx(tx)
+		msgTx := tx.MsgTx()
+		isSStx, _ := stake.IsSStx(msgTx)
 		if tx.Tree() == dcrutil.TxTreeStake && isSStx {
 			// A ticket can not spend an input from TxTreeRegular, since it
 			// has not yet been validated.
@@ -1775,8 +1779,8 @@ mempoolLoop:
 			}
 
 			// Quick check for difficulty here.
-			if tx.MsgTx().TxOut[0].Value >= reqStakeDifficulty {
-				txCopy := dcrutil.NewTxDeepTxIns(tx.MsgTx())
+			if msgTx.TxOut[0].Value >= reqStakeDifficulty {
+				txCopy := dcrutil.NewTxDeepTxIns(msgTx)
 				if maybeInsertStakeTx(blockManager, txCopy, treeValid) {
 					blockTxnsStake = append(blockTxnsStake, txCopy)
 					freshStake++
@@ -1797,9 +1801,10 @@ mempoolLoop:
 			break // No SSRtx should be present before this height.
 		}
 
-		isSSRtx, _ := stake.IsSSRtx(tx)
+		msgTx := tx.MsgTx()
+		isSSRtx, _ := stake.IsSSRtx(msgTx)
 		if tx.Tree() == dcrutil.TxTreeStake && isSSRtx {
-			txCopy := dcrutil.NewTxDeepTxIns(tx.MsgTx())
+			txCopy := dcrutil.NewTxDeepTxIns(msgTx)
 			if maybeInsertStakeTx(blockManager, txCopy, treeValid) {
 				blockTxnsStake = append(blockTxnsStake, txCopy)
 				revocations++

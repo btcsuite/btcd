@@ -298,13 +298,14 @@ func (view *UtxoViewpoint) LookupEntry(txHash *chainhash.Hash) *UtxoEntry {
 // existing entries since it's possible it has changed during a reorg.
 func (view *UtxoViewpoint) AddTxOuts(tx *dcrutil.Tx, blockHeight int64,
 	blockIndex uint32) {
+	msgTx := tx.MsgTx()
 	// When there are not already any utxos associated with the transaction,
 	// add a new entry for it to the view.
 	entry := view.LookupEntry(tx.Sha())
 	if entry == nil {
-		txType := stake.DetermineTxType(tx)
-		entry = newUtxoEntry(tx.MsgTx().Version, uint32(blockHeight),
-			blockIndex, IsCoinBase(tx), tx.MsgTx().Expiry != 0, txType)
+		txType := stake.DetermineTxType(msgTx)
+		entry = newUtxoEntry(msgTx.Version, uint32(blockHeight),
+			blockIndex, IsCoinBaseTx(msgTx), msgTx.Expiry != 0, txType)
 		if txType == stake.TxTypeSStx {
 			stakeExtra := make([]byte, serializeSizeForMinimalOutputs(tx))
 			putTxToMinimalOutputs(stakeExtra, tx)
@@ -358,8 +359,9 @@ func (view *UtxoViewpoint) AddTxOuts(tx *dcrutil.Tx, blockHeight int64,
 // view does not contain the required utxos.
 func (view *UtxoViewpoint) connectTransaction(tx *dcrutil.Tx, blockHeight int64,
 	blockIndex uint32, stxos *[]spentTxOut) error {
+	msgTx := tx.MsgTx()
 	// Coinbase transactions don't have any inputs to spend.
-	if IsCoinBase(tx) {
+	if IsCoinBaseTx(msgTx) {
 		// Add the transaction's outputs as available utxos.
 		view.AddTxOuts(tx, blockHeight, blockIndex)
 		return nil
@@ -368,8 +370,8 @@ func (view *UtxoViewpoint) connectTransaction(tx *dcrutil.Tx, blockHeight int64,
 	// Spend the referenced utxos by marking them spent in the view and,
 	// if a slice was provided for the spent txout details, append an entry
 	// to it.
-	txType := stake.DetermineTxType(tx)
-	for i, txIn := range tx.MsgTx().TxIn {
+	txType := stake.DetermineTxType(msgTx)
+	for i, txIn := range msgTx.TxIn {
 		if i == 0 && (txType == stake.TxTypeSSGen) {
 			continue
 		}
@@ -511,7 +513,8 @@ func (b *BlockChain) disconnectTransactions(view *UtxoViewpoint,
 	transactions := block.STransactions()
 	for txIdx := len(transactions) - 1; txIdx > -1; txIdx-- {
 		tx := transactions[txIdx]
-		tt := stake.DetermineTxType(tx)
+		msgTx := tx.MsgTx()
+		tt := stake.DetermineTxType(msgTx)
 
 		// Clear this transaction from the view if it already exists or
 		// create a new empty entry for when it does not.  This is done
@@ -519,8 +522,8 @@ func (b *BlockChain) disconnectTransactions(view *UtxoViewpoint,
 		// to signal modifications have happened.
 		entry := view.entries[*tx.Sha()]
 		if entry == nil {
-			entry = newUtxoEntry(tx.MsgTx().Version, uint32(block.Height()),
-				uint32(txIdx), IsCoinBase(tx), tx.MsgTx().Expiry != 0, tt)
+			entry = newUtxoEntry(msgTx.Version, uint32(block.Height()),
+				uint32(txIdx), IsCoinBaseTx(msgTx), msgTx.Expiry != 0, tt)
 			if tt == stake.TxTypeSStx {
 				stakeExtra := make([]byte, serializeSizeForMinimalOutputs(tx))
 				putTxToMinimalOutputs(stakeExtra, tx)
@@ -712,7 +715,8 @@ func (view *UtxoViewpoint) disconnectTransactionSlice(transactions []*dcrutil.Tx
 	}
 	for txIdx := len(transactions) - 1; txIdx > -1; txIdx-- {
 		tx := transactions[txIdx]
-		txType := stake.DetermineTxType(tx)
+		msgTx := tx.MsgTx()
+		txType := stake.DetermineTxType(msgTx)
 
 		// Clear this transaction from the view if it already exists or
 		// create a new empty entry for when it does not.  This is done
@@ -721,8 +725,8 @@ func (view *UtxoViewpoint) disconnectTransactionSlice(transactions []*dcrutil.Tx
 		isCoinbase := txIdx == 0
 		entry := view.entries[*tx.Sha()]
 		if entry == nil {
-			entry = newUtxoEntry(tx.MsgTx().Version, uint32(height),
-				uint32(txIdx), IsCoinBase(tx), tx.MsgTx().Expiry != 0, txType)
+			entry = newUtxoEntry(msgTx.Version, uint32(height),
+				uint32(txIdx), IsCoinBaseTx(msgTx), msgTx.Expiry != 0, txType)
 			if txType == stake.TxTypeSStx {
 				stakeExtra := make([]byte, serializeSizeForMinimalOutputs(tx))
 				putTxToMinimalOutputs(stakeExtra, tx)
@@ -740,7 +744,7 @@ func (view *UtxoViewpoint) disconnectTransactionSlice(transactions []*dcrutil.Tx
 		if isCoinbase {
 			continue
 		}
-		for txInIdx := len(tx.MsgTx().TxIn) - 1; txInIdx > -1; txInIdx-- {
+		for txInIdx := len(msgTx.TxIn) - 1; txInIdx > -1; txInIdx-- {
 			// Ensure the spent txout index is decremented to stay
 			// in sync with the transaction input.
 			stxo := &stxos[stxoIdx]
@@ -749,7 +753,7 @@ func (view *UtxoViewpoint) disconnectTransactionSlice(transactions []*dcrutil.Tx
 			// When there is not already an entry for the referenced
 			// transaction in the view, it means it was fully spent,
 			// so create a new utxo entry in order to resurrect it.
-			txIn := tx.MsgTx().TxIn[txInIdx]
+			txIn := msgTx.TxIn[txInIdx]
 			originHash := &txIn.PreviousOutPoint.Hash
 			originInIndex := txIn.PreviousOutPoint.Index
 			//originHeight := txIn.BlockHeight
@@ -969,11 +973,10 @@ func (view *UtxoViewpoint) fetchInputUtxos(db database.DB,
 		// in-flight in relation to the regular tx tree or to other tx in
 		// the stake tx tree, so don't do any of those expensive checks and
 		// just append it to the tx slice.
-		sTransactions := block.STransactions()
-		for _, tx := range sTransactions {
+		for _, tx := range block.MsgBlock().STransactions {
 			isSSGen, _ := stake.IsSSGen(tx)
 
-			for i, txIn := range tx.MsgTx().TxIn {
+			for i, txIn := range tx.TxIn {
 				// Ignore stakebases.
 				if isSSGen && i == 0 {
 					continue
@@ -1109,9 +1112,10 @@ func (b *BlockChain) FetchUtxoView(tx *dcrutil.Tx, treeValid bool) (*UtxoViewpoi
 	// fully spent.
 	txNeededSet := make(map[chainhash.Hash]struct{})
 	txNeededSet[*tx.Sha()] = struct{}{}
-	isSSGen, _ := stake.IsSSGen(tx)
-	if !IsCoinBase(tx) {
-		for i, txIn := range tx.MsgTx().TxIn {
+	msgTx := tx.MsgTx()
+	isSSGen, _ := stake.IsSSGen(msgTx)
+	if !IsCoinBaseTx(msgTx) {
+		for i, txIn := range msgTx.TxIn {
 			if isSSGen && i == 0 {
 				continue
 			}

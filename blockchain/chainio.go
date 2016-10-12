@@ -390,7 +390,7 @@ func deserializeSpendJournalEntry(serialized []byte, txns []*wire.MsgTx) ([]spen
 	// Calculate the total number of stxos.
 	var numStxos int
 	for _, tx := range txns {
-		txType := stake.DetermineTxType(dcrutil.NewTx(tx))
+		txType := stake.DetermineTxType(tx)
 
 		if txType == stake.TxTypeSSGen {
 			numStxos++
@@ -420,7 +420,7 @@ func deserializeSpendJournalEntry(serialized []byte, txns []*wire.MsgTx) ([]spen
 	stxos := make([]spentTxOut, numStxos)
 	for txIdx := len(txns) - 1; txIdx > -1; txIdx-- {
 		tx := txns[txIdx]
-		txType := stake.DetermineTxType(dcrutil.NewTx(tx))
+		txType := stake.DetermineTxType(tx)
 
 		// Loop backwards through all of the transaction inputs and read
 		// the associated stxo.

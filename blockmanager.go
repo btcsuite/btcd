@@ -893,7 +893,7 @@ func (b *blockManager) current() bool {
 func (b *blockManager) checkBlockForHiddenVotes(block *dcrutil.Block) {
 	var votesFromBlock []*dcrutil.Tx
 	for _, stx := range block.STransactions() {
-		isSSGen, _ := stake.IsSSGen(stx)
+		isSSGen, _ := stake.IsSSGen(stx.MsgTx())
 		if isSSGen {
 			votesFromBlock = append(votesFromBlock, stx)
 		}
@@ -949,9 +949,10 @@ func (b *blockManager) checkBlockForHiddenVotes(block *dcrutil.Block) {
 		// Add all the votes found in our template. Keep their
 		// hashes in a map for easy lookup in the next loop.
 		for _, stx := range templateBlock.STransactions() {
-			txType := stake.DetermineTxType(stx)
+			mstx := stx.MsgTx()
+			txType := stake.DetermineTxType(mstx)
 			if txType == stake.TxTypeSSGen {
-				ticketH := stx.MsgTx().TxIn[1].PreviousOutPoint.Hash
+				ticketH := mstx.TxIn[1].PreviousOutPoint.Hash
 				oldVoteMap[ticketH] = struct{}{}
 				newVotes = append(newVotes, stx)
 			}

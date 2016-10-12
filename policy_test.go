@@ -479,7 +479,7 @@ func TestCheckTransactionStandard(t *testing.T) {
 	for _, test := range tests {
 		// Ensure standardness is as expected.
 		tx := dcrutil.NewTx(&test.tx)
-		err := checkTransactionStandard(tx, stake.DetermineTxType(tx),
+		err := checkTransactionStandard(tx, stake.DetermineTxType(&test.tx),
 			test.height, timeSource, defaultMinRelayTxFee)
 		if err == nil && test.isStandard {
 			// Test passes since function returned standard for a

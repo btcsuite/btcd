@@ -12,6 +12,7 @@ import (
 	"github.com/decred/dcrd/chaincfg"
 	"github.com/decred/dcrd/database"
 	"github.com/decred/dcrd/txscript"
+	"github.com/decred/dcrd/wire"
 	"github.com/decred/dcrutil"
 )
 
@@ -225,8 +226,9 @@ func (idx *ExistsAddrIndex) ConnectBlock(dbTx database.Tx, block, parent *dcruti
 	usedAddrs := make(map[[addrKeySize]byte]struct{})
 
 	for _, tx := range allTxns {
-		isSStx, _ := stake.IsSStx(tx)
-		for _, txIn := range tx.MsgTx().TxIn {
+		msgTx := tx.MsgTx()
+		isSStx, _ := stake.IsSStx(msgTx)
+		for _, txIn := range msgTx.TxIn {
 			if txscript.IsMultisigSigScript(txIn.SignatureScript) {
 				rs, err :=
 					txscript.MultisigRedeemScriptFromScriptSig(
@@ -330,9 +332,9 @@ func (idx *ExistsAddrIndex) DisconnectBlock(dbTx database.Tx, block, parent *dcr
 
 // addUnconfirmedTx adds all addresses related to the transaction to the
 // unconfirmed (memory-only) exists address index.
-func (idx *ExistsAddrIndex) addUnconfirmedTx(tx *dcrutil.Tx) {
+func (idx *ExistsAddrIndex) addUnconfirmedTx(tx *wire.MsgTx) {
 	isSStx, _ := stake.IsSStx(tx)
-	for _, txIn := range tx.MsgTx().TxIn {
+	for _, txIn := range tx.TxIn {
 		if txscript.IsMultisigSigScript(txIn.SignatureScript) {
 			rs, err :=
 				txscript.MultisigRedeemScriptFromScriptSig(
@@ -365,7 +367,7 @@ func (idx *ExistsAddrIndex) addUnconfirmedTx(tx *dcrutil.Tx) {
 		}
 	}
 
-	for _, txOut := range tx.MsgTx().TxOut {
+	for _, txOut := range tx.TxOut {
 		class, addrs, _, err := txscript.ExtractPkScriptAddrs(txOut.Version,
 			txOut.PkScript, idx.chainParams)
 		if err != nil {
@@ -401,7 +403,7 @@ func (idx *ExistsAddrIndex) addUnconfirmedTx(tx *dcrutil.Tx) {
 // AddUnconfirmedTx is the exported form of addUnconfirmedTx.
 //
 // This function is safe for concurrent access.
-func (idx *ExistsAddrIndex) AddUnconfirmedTx(tx *dcrutil.Tx) {
+func (idx *ExistsAddrIndex) AddUnconfirmedTx(tx *wire.MsgTx) {
 	idx.unconfirmedLock.Lock()
 	defer idx.unconfirmedLock.Unlock()
 

@@ -48,10 +48,10 @@ func (b *BlockChain) upgradeToVersion2() error {
 				if errLocal != nil {
 					return errLocal
 				}
-				for _, stx := range matureBlock.STransactions() {
+				for _, stx := range matureBlock.MsgBlock().STransactions {
 					if is, _ := stake.IsSStx(stx); is {
-						h := stx.Sha()
-						newTickets = append(newTickets, *h)
+						h := stx.TxSha()
+						newTickets = append(newTickets, h)
 					}
 				}
 			}

@@ -542,11 +542,12 @@ func makeUtxoView(dbTx database.Tx, block, parent *dcrutil.Block) (*blockchain.U
 	}
 
 	for _, tx := range block.STransactions() {
-		isSSGen, _ := stake.IsSSGen(tx)
+		msgTx := tx.MsgTx()
+		isSSGen, _ := stake.IsSSGen(msgTx)
 
 		// Use the transaction index to load all of the referenced
 		// inputs and add their outputs to the view.
-		for i, txIn := range tx.MsgTx().TxIn {
+		for i, txIn := range msgTx.TxIn {
 			// Skip stakebases.
 			if isSSGen && i == 0 {
 				continue
