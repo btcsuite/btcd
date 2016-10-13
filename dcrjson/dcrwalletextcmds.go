@@ -569,6 +569,22 @@ func NewSetTicketVoteBitsCmd(txHash string, voteBits uint16, voteBitsExt *string
 	}
 }
 
+// SetTicketsVoteBitsCmd is a type handling custom marshaling and
+// unmarshaling of setticketsvotebits JSON RPC commands.
+type SetTicketsVoteBitsCmd struct {
+	TxHashes      string
+	VoteBitsBytes string
+}
+
+// NewSetTicketsVoteBitsCmd creates a new instance of the setticketsvotebits
+// command.
+func NewSetTicketsVoteBitsCmd(txHashes string, voteBitsBytes string) *SetTicketsVoteBitsCmd {
+	return &SetTicketsVoteBitsCmd{
+		TxHashes:      txHashes,
+		VoteBitsBytes: voteBitsBytes,
+	}
+}
+
 // SignRawTransactionsCmd defines the signrawtransactions JSON-RPC command.
 type SignRawTransactionsCmd struct {
 	RawTxs []string
@@ -651,6 +667,7 @@ func init() {
 	MustRegisterCmd("setticketfee", (*SetTicketFeeCmd)(nil), flags)
 	MustRegisterCmd("setticketmaxprice", (*SetTicketMaxPriceCmd)(nil), flags)
 	MustRegisterCmd("setticketvotebits", (*SetTicketVoteBitsCmd)(nil), flags)
+	MustRegisterCmd("setticketsvotebits", (*SetTicketsVoteBitsCmd)(nil), flags)
 	MustRegisterCmd("signrawtransactions", (*SignRawTransactionsCmd)(nil), flags)
 	MustRegisterCmd("stakepooluserinfo", (*StakePoolUserInfoCmd)(nil), flags)
 	MustRegisterCmd("walletinfo", (*WalletInfoCmd)(nil), flags)

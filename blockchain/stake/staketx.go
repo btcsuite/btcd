@@ -176,6 +176,13 @@ var (
 	rangeLimitMax = uint16(63)
 )
 
+// VoteBits is a field representing the mandatory 2-byte field of voteBits along
+// with the optional 73-byte extended field for votes.
+type VoteBits struct {
+	Bits         uint16
+	ExtendedBits []byte
+}
+
 // --------------------------------------------------------------------------------
 // Accessory Stake Functions
 // --------------------------------------------------------------------------------
