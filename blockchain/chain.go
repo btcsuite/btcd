@@ -1205,7 +1205,9 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List, flags 
 // proof of work.  In the typical case, the new block simply extends the main
 // chain.  However, it may also be extending (or creating) a side chain (fork)
 // which may or may not end up becoming the main chain depending on which fork
-// cumulatively has the most proof of work.
+// cumulatively has the most proof of work.  It returns whether or not the block
+// ended up on the main chain (either due to extending the main chain or causing
+// a reorganization to become the main chain).
 //
 // The flags modify the behavior of this function as follows:
 //  - BFFastAdd: Avoids several expensive transaction validation operations.
@@ -1215,7 +1217,7 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List, flags 
 //    modifying the state are avoided.
 //
 // This function MUST be called with the chain state lock held (for writes).
-func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, flags BehaviorFlags) error {
+func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, flags BehaviorFlags) (bool, error) {
 	fastAdd := flags&BFFastAdd == BFFastAdd
 	dryRun := flags&BFDryRun == BFDryRun
 
@@ -1231,13 +1233,13 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, fla
 		if !fastAdd {
 			err := b.checkConnectBlock(node, block, view, &stxos)
 			if err != nil {
-				return err
+				return false, err
 			}
 		}
 
 		// Don't connect the block if performing a dry run.
 		if dryRun {
-			return nil
+			return true, nil
 		}
 
 		// In the fast add case the code to check the block connection
@@ -1247,18 +1249,18 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, fla
 		if fastAdd {
 			err := view.fetchInputUtxos(b.db, block)
 			if err != nil {
-				return err
+				return false, err
 			}
 			err = view.connectTransactions(block, &stxos)
 			if err != nil {
-				return err
+				return false, err
 			}
 		}
 
 		// Connect the block to the main chain.
 		err := b.connectBlock(node, block, view, stxos)
 		if err != nil {
-			return err
+			return false, err
 		}
 
 		// Connect the parent node to this node.
@@ -1266,7 +1268,7 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, fla
 			node.parent.children = append(node.parent.children, node)
 		}
 
-		return nil
+		return true, nil
 	}
 	if fastAdd {
 		log.Warnf("fastAdd set in the side chain case? %v\n",
@@ -1305,7 +1307,7 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, fla
 	if node.workSum.Cmp(b.bestNode.workSum) <= 0 {
 		// Skip Logging info when the dry run flag is set.
 		if dryRun {
-			return nil
+			return false, nil
 		}
 
 		// Find the fork point.
@@ -1327,7 +1329,7 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, fla
 				node.hash, fork.height, fork.hash)
 		}
 
-		return nil
+		return false, nil
 	}
 
 	// We're extending (or creating) a side chain and the cumulative work
@@ -1346,10 +1348,10 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, fla
 	}
 	err := b.reorganizeChain(detachNodes, attachNodes, flags)
 	if err != nil {
-		return err
+		return false, err
 	}
 
-	return nil
+	return true, nil
 }
 
 // IsCurrent returns whether or not the chain believes it is current.  Several

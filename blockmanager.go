@@ -566,7 +566,7 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 
 	// Process the block to include validation, best chain selection, orphan
 	// handling, etc.
-	isOrphan, err := b.chain.ProcessBlock(bmsg.block, behaviorFlags)
+	_, isOrphan, err := b.chain.ProcessBlock(bmsg.block, behaviorFlags)
 	if err != nil {
 		// When the error is a rule error, it means the block was simply
 		// rejected as opposed to something actually going wrong, so log
@@ -1121,8 +1121,8 @@ out:
 				msg.reply <- b.syncPeer
 
 			case processBlockMsg:
-				isOrphan, err := b.chain.ProcessBlock(msg.block,
-					msg.flags)
+				_, isOrphan, err := b.chain.ProcessBlock(
+					msg.block, msg.flags)
 				if err != nil {
 					msg.reply <- processBlockResponse{
 						isOrphan: false,

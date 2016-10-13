@@ -60,7 +60,7 @@ func TestReorganization(t *testing.T) {
 
 	expectedOrphans := map[int]struct{}{5: {}, 6: {}}
 	for i := 1; i < len(blocks); i++ {
-		isOrphan, err := chain.ProcessBlock(blocks[i], blockchain.BFNone)
+		_, isOrphan, err := chain.ProcessBlock(blocks[i], blockchain.BFNone)
 		if err != nil {
 			t.Errorf("ProcessBlock fail on block %v: %v\n", i, err)
 			return
