@@ -13,6 +13,7 @@ import (
 	"github.com/decred/dcrd/blockchain/stake"
 	"github.com/decred/dcrd/chaincfg"
 	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/decred/dcrd/txscript"
 	"github.com/decred/dcrd/wire"
 	"github.com/decred/dcrutil"
 )
@@ -875,7 +876,32 @@ func TestGetSSGenVoteBits(t *testing.T) {
 
 	if correctvbs != votebits {
 		t.Errorf("Error thrown on TestGetSSGenVoteBits: Looking for "+
-			"amount % x, got amount % x", correctvbs, votebits)
+			"vbs % x, got vbs % x", correctvbs, votebits)
+	}
+}
+
+func TestGetSSGenVersion(t *testing.T) {
+	var ssgen = ssgenMsgTx.Copy()
+
+	missingVersion := uint32(stake.VoteConsensusVersionAbsent)
+	version := stake.SSGenVersion(ssgen)
+	if version != missingVersion {
+		t.Errorf("Error thrown on TestGetSSGenVersion: Looking for "+
+			"version % x, got version % x", missingVersion, version)
+	}
+
+	vbBytes := []byte{0x01, 0x00, 0x01, 0xef, 0xcd, 0xab}
+	expectedVersion := uint32(0xabcdef01)
+	pkScript, err := txscript.GenerateProvablyPruneableOut(vbBytes)
+	if err != nil {
+		t.Errorf("GenerateProvablyPruneableOut error %v", err)
+	}
+	ssgen.TxOut[1].PkScript = pkScript
+	version = stake.SSGenVersion(ssgen)
+
+	if version != expectedVersion {
+		t.Errorf("Error thrown on TestGetSSGenVersion: Looking for "+
+			"version % x, got version % x", expectedVersion, version)
 	}
 }
 

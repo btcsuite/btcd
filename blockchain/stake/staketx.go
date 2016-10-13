@@ -115,9 +115,9 @@ const (
 	// 01000000 00000000 = Apply fees rule
 	SStxRevFractionFlag = 0x4000
 
-	// fractioningAmount is the amount to divide by after multiplying
-	// to obtain the limit for the output's amount.
-	fractioningAmount = 64
+	// VoteConsensusVersionAbsent is the value of the consensus version
+	// for a short read of the voteBits.
+	VoteConsensusVersionAbsent = 0
 )
 
 var (
@@ -414,6 +414,9 @@ func TxSSGenStakeOutputInfo(tx *wire.MsgTx, params *chaincfg.Params) ([]bool,
 
 // SSGenBlockVotedOn takes an SSGen tx and returns the block voted on in the
 // first OP_RETURN by hash and height.
+//
+// This function is only safe to be called on a transaction that
+// has passed IsSSGen.
 func SSGenBlockVotedOn(tx *wire.MsgTx) (chainhash.Hash, uint32, error) {
 	// Get the block header hash.
 	blockSha, err := chainhash.NewHash(tx.TxOut[0].PkScript[2:34])
@@ -429,10 +432,25 @@ func SSGenBlockVotedOn(tx *wire.MsgTx) (chainhash.Hash, uint32, error) {
 
 // SSGenVoteBits takes an SSGen tx as input and scans through its
 // outputs, returning the VoteBits of the index 1 output.
+//
+// This function is only safe to be called on a transaction that
+// has passed IsSSGen.
 func SSGenVoteBits(tx *wire.MsgTx) uint16 {
-	votebits := binary.LittleEndian.Uint16(tx.TxOut[1].PkScript[2:4])
+	return binary.LittleEndian.Uint16(tx.TxOut[1].PkScript[2:4])
+}
 
-	return votebits
+// SSGenVersion takes an SSGen tx as input and returns the network
+// consensus version from the VoteBits output.  If there is a short
+// read, the network consensus version is considered 0 or "unset".
+//
+// This function is only safe to be called on a transaction that
+// has passed IsSSGen.
+func SSGenVersion(tx *wire.MsgTx) uint32 {
+	if len(tx.TxOut[1].PkScript) < 8 {
+		return VoteConsensusVersionAbsent
+	}
+
+	return binary.LittleEndian.Uint32(tx.TxOut[1].PkScript[4:8])
 }
 
 // TxSSRtxStakeOutputInfo takes an SSRtx tx as input and scans through its
