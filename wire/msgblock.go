@@ -23,7 +23,8 @@ const defaultTransactionAlloc = 2048
 const MaxBlocksPerMsg = 500
 
 // MaxBlockPayload is the maximum bytes a block message can be in bytes.
-const MaxBlockPayload = 1000000 // Not actually 1MB which would be 1024 * 1024
+// After Segregated Witness, the max block payload has been raised to 4MB.
+const MaxBlockPayload = 4000000
 
 // maxTxPerBlock is the maximum number of transactions that could
 // possibly fit into a block.
@@ -114,7 +115,7 @@ func (msg *MsgBlock) Deserialize(r io.Reader) error {
 	return msg.BtcDecode(r, 0, WitnessEncoding)
 }
 
-// DeserializeWitness decodes a block from r into the receiver similar to
+// DeserializeNoWitness decodes a block from r into the receiver similar to
 // Deserialize, however DeserializeWitness strips all (if any) witness data
 // from the transactions within the block before encoding them.
 func (msg *MsgBlock) DeserializeNoWitness(r io.Reader) error {
@@ -213,8 +214,8 @@ func (msg *MsgBlock) Serialize(w io.Writer) error {
 	return msg.BtcEncode(w, 0, WitnessEncoding)
 }
 
-// SerializeWitness encodes a block to w using an identical format to Serialize,
-// with all (if any) witness data stripped from all transactions.
+// SerializeNoWitness encodes a block to w using an identical format to
+// Serialize, with all (if any) witness data stripped from all transactions.
 // This method is provided in additon to the regular Serialize, in order to
 // allow one to selectively encode transaction witness data to non-upgraded
 // peers which are unaware of the new encoding.
@@ -223,7 +224,7 @@ func (msg *MsgBlock) SerializeNoWitness(w io.Writer) error {
 }
 
 // SerializeSize returns the number of bytes it would take to serialize the
-// the block.
+// block, factoring in any witness data within transaction.
 func (msg *MsgBlock) SerializeSize() int {
 	// Block header bytes + Serialized varint size for the number of
 	// transactions.
@@ -231,6 +232,20 @@ func (msg *MsgBlock) SerializeSize() int {
 
 	for _, tx := range msg.Transactions {
 		n += tx.SerializeSize()
+	}
+
+	return n
+}
+
+// SerializeSizeStripped returns the number of bytes it would take to serialize
+// the block, excluding any witness data (if any).
+func (msg *MsgBlock) SerializeSizeStripped() int {
+	// Block header bytes + Serialized varint size for the number of
+	// transactions.
+	n := blockHeaderLen + VarIntSerializeSize(uint64(len(msg.Transactions)))
+
+	for _, tx := range msg.Transactions {
+		n += tx.SerializeSizeStripped()
 	}
 
 	return n
