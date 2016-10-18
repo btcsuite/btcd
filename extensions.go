@@ -508,6 +508,49 @@ func (c *Client) GetCurrentNet() (wire.CurrencyNet, error) {
 	return c.GetCurrentNetAsync().Receive()
 }
 
+// FutureGetHeadersResult is a future promise to delivere the result of a
+// getheaders RPC invocation (or an applicable error).
+type FutureGetHeadersResult chan *response
+
+// Receive waits for the response promised by the future and returns the
+// getheaders result.
+func (r FutureGetHeadersResult) Receive() (*dcrjson.GetHeadersResult, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarsal result as a getheaders result object.
+	var vr dcrjson.GetHeadersResult
+	err = json.Unmarshal(res, &vr)
+	if err != nil {
+		return nil, err
+	}
+
+	return &vr, nil
+}
+
+// GetHeadersAsync returns an instance of a type that can be used to get the result
+// of the RPC at some future time by invoking the Receive function on the returned instance.
+//
+// See GetHeaders for the blocking version and more details.
+func (c *Client) GetHeadersAsync(blockLocators []chainhash.Hash, hashStop *chainhash.Hash) FutureGetHeadersResult {
+	concatenatedLocators := make([]byte, chainhash.HashSize*len(blockLocators))
+	for i := range blockLocators {
+		copy(concatenatedLocators[i*chainhash.HashSize:], blockLocators[i][:])
+	}
+	cmd := dcrjson.NewGetHeadersCmd(hex.EncodeToString(concatenatedLocators),
+		hashStop.String())
+	return c.sendCmd(cmd)
+}
+
+// GetHeaders mimics the wire protocol getheaders and headers messages by
+// returning all headers on the main chain after the first known block in the
+// locators, up until a block hash matches hashStop.
+func (c *Client) GetHeaders(blockLocators []chainhash.Hash, hashStop *chainhash.Hash) (*dcrjson.GetHeadersResult, error) {
+	return c.GetHeadersAsync(blockLocators, hashStop).Receive()
+}
+
 // FutureGetStakeDifficultyResult is a future promise to deliver the result of a
 // GetStakeDifficultyAsync RPC invocation (or an applicable error).
 type FutureGetStakeDifficultyResult chan *response
@@ -940,4 +983,40 @@ func (c *Client) TxFeeInfoAsync(blocks *uint32, start *uint32, end *uint32) Futu
 // NOTE: This is a decred extension.
 func (c *Client) TxFeeInfo(blocks *uint32, start *uint32, end *uint32) (*dcrjson.TxFeeInfoResult, error) {
 	return c.TxFeeInfoAsync(blocks, start, end).Receive()
+}
+
+// FutureVersionResult is a future promise to delivere the result of a version
+// RPC invocation (or an applicable error).
+type FutureVersionResult chan *response
+
+// Receive waits for the response promised by the future and returns the version
+// result.
+func (r FutureVersionResult) Receive() (*dcrjson.VersionResult, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarsal result as a version result object.
+	var vr dcrjson.VersionResult
+	err = json.Unmarshal(res, &vr)
+	if err != nil {
+		return nil, err
+	}
+
+	return &vr, nil
+}
+
+// VersionAsync returns an instance of a type that can be used to get the result
+// of the RPC at some future time by invoking the Receive function on the returned instance.
+//
+// See Version for the blocking version and more details.
+func (c *Client) VersionAsync() FutureVersionResult {
+	cmd := dcrjson.NewVersionCmd()
+	return c.sendCmd(cmd)
+}
+
+// Version returns information about the server's JSON-RPC API versions.
+func (c *Client) Version() (*dcrjson.VersionResult, error) {
+	return c.VersionAsync().Receive()
 }
