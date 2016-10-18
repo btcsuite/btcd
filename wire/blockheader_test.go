@@ -79,10 +79,11 @@ func TestBlockHeaderWire(t *testing.T) {
 	}
 
 	tests := []struct {
-		in   *BlockHeader // Data to encode
-		out  *BlockHeader // Expected decoded data
-		buf  []byte       // Wire encoding
-		pver uint32       // Protocol version for wire encoding
+		in   *BlockHeader    // Data to encode
+		out  *BlockHeader    // Expected decoded data
+		buf  []byte          // Wire encoding
+		pver uint32          // Protocol version for wire encoding
+		enc  MessageEncoding // Message encoding variant to use
 	}{
 		// Latest protocol version.
 		{
@@ -90,6 +91,7 @@ func TestBlockHeaderWire(t *testing.T) {
 			baseBlockHdr,
 			baseBlockHdrEncoded,
 			ProtocolVersion,
+			BaseEncoding,
 		},
 
 		// Protocol version BIP0035Version.
@@ -98,6 +100,7 @@ func TestBlockHeaderWire(t *testing.T) {
 			baseBlockHdr,
 			baseBlockHdrEncoded,
 			BIP0035Version,
+			BaseEncoding,
 		},
 
 		// Protocol version BIP0031Version.
@@ -106,6 +109,7 @@ func TestBlockHeaderWire(t *testing.T) {
 			baseBlockHdr,
 			baseBlockHdrEncoded,
 			BIP0031Version,
+			BaseEncoding,
 		},
 
 		// Protocol version NetAddressTimeVersion.
@@ -114,6 +118,7 @@ func TestBlockHeaderWire(t *testing.T) {
 			baseBlockHdr,
 			baseBlockHdrEncoded,
 			NetAddressTimeVersion,
+			BaseEncoding,
 		},
 
 		// Protocol version MultipleAddressVersion.
@@ -122,6 +127,7 @@ func TestBlockHeaderWire(t *testing.T) {
 			baseBlockHdr,
 			baseBlockHdrEncoded,
 			MultipleAddressVersion,
+			BaseEncoding,
 		},
 	}
 
@@ -141,7 +147,7 @@ func TestBlockHeaderWire(t *testing.T) {
 		}
 
 		buf.Reset()
-		err = test.in.BtcEncode(&buf, pver)
+		err = test.in.BtcEncode(&buf, pver, 0)
 		if err != nil {
 			t.Errorf("BtcEncode #%d error %v", i, err)
 			continue
@@ -167,7 +173,7 @@ func TestBlockHeaderWire(t *testing.T) {
 		}
 
 		rbuf = bytes.NewReader(test.buf)
-		err = bh.BtcDecode(rbuf, pver)
+		err = bh.BtcDecode(rbuf, pver, test.enc)
 		if err != nil {
 			t.Errorf("BtcDecode #%d error %v", i, err)
 			continue
