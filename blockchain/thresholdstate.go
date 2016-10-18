@@ -316,6 +316,21 @@ func (b *BlockChain) ThresholdState(deploymentID uint32) (ThresholdState, error)
 	return state, err
 }
 
+// IsDeploymentActive returns true if the target deploymentID is active, and
+// false otherwise.
+//
+// This function is safe for concurrent access.
+func (b *BlockChain) IsDeploymentActive(deploymentID uint32) (bool, error) {
+	b.chainLock.Lock()
+	state, err := b.deploymentState(b.bestNode, deploymentID)
+	b.chainLock.Unlock()
+	if err != nil {
+		return false, err
+	}
+
+	return state == ThresholdActive, nil
+}
+
 // deploymentState returns the current rule change threshold for a given
 // deploymentID. The threshold is evaluated from the point of view of the block
 // node passed in as the first argument to this method.
