@@ -808,57 +808,34 @@ func (sp *serverPeer) OnGetBlocks(p *peer.Peer, msg *wire.MsgGetBlocks) {
 	}
 }
 
-// OnGetHeaders is invoked when a peer receives a getheaders wire message.
-func (sp *serverPeer) OnGetHeaders(p *peer.Peer, msg *wire.MsgGetHeaders) {
-	// Ignore getheaders requests if not in sync.
-	if !sp.server.blockManager.IsCurrent() {
-		return
-	}
-
+// locateBlocks returns the hashes of the blocks after the first known block in
+// locators, until hashStop is reached, or up to a max of
+// wire.MaxBlockHeadersPerMsg block hashes.  This implements the search
+// algorithm used by getheaders.
+//
+// TODO: For efficiency this should take a []Hash, not []*Hash.  This requires
+// changing the representation of the wire.MsgGetHeaders to use a []Hash slice
+// for the block locators.
+func (s *server) locateBlocks(locators []*chainhash.Hash, hashStop *chainhash.Hash) ([]chainhash.Hash, error) {
 	// Attempt to look up the height of the provided stop hash.
-	chain := sp.server.blockManager.chain
+	chain := s.blockManager.chain
 	endIdx := int64(math.MaxInt64)
-	height, err := chain.BlockHeightByHash(&msg.HashStop)
+	height, err := chain.BlockHeightByHash(hashStop)
 	if err == nil {
 		endIdx = height + 1
 	}
 
 	// There are no block locators so a specific header is being requested
 	// as identified by the stop hash.
-	if len(msg.BlockLocatorHashes) == 0 {
+	if len(locators) == 0 {
 		// No blocks with the stop hash were found so there is nothing
 		// to do.  Just return.  This behavior mirrors the reference
 		// implementation.
 		if endIdx == math.MaxInt64 {
-			return
+			return nil, nil
 		}
 
-		// Fetch the raw block header bytes from the database.
-		var headerBytes []byte
-		err := sp.server.db.View(func(dbTx database.Tx) error {
-			var err error
-			headerBytes, err = dbTx.FetchBlockHeader(&msg.HashStop)
-			return err
-		})
-		if err != nil {
-			peerLog.Warnf("Lookup of known block hash failed: %v",
-				err)
-			return
-		}
-
-		// Deserialize the block header.
-		var header wire.BlockHeader
-		err = header.Deserialize(bytes.NewReader(headerBytes))
-		if err != nil {
-			peerLog.Warnf("Block header deserialize failed: %v",
-				err)
-			return
-		}
-
-		headersMsg := wire.NewMsgHeaders()
-		headersMsg.AddBlockHeader(&header)
-		p.QueueMessage(headersMsg, nil)
-		return
+		return []chainhash.Hash{*hashStop}, nil
 	}
 
 	// Find the most recent known block based on the block locator.
@@ -867,8 +844,8 @@ func (sp *serverPeer) OnGetHeaders(p *peer.Peer, msg *wire.MsgGetHeaders) {
 	// over with the genesis block if unknown block locators are provided.
 	// This mirrors the behavior in the reference implementation.
 	startIdx := int64(1)
-	for _, hash := range msg.BlockLocatorHashes {
-		height, err := chain.BlockHeightByHash(hash)
+	for _, loc := range locators {
+		height, err := chain.BlockHeightByHash(loc)
 		if err == nil {
 			// Start with the next hash since we know this one.
 			startIdx = height + 1
@@ -876,43 +853,65 @@ func (sp *serverPeer) OnGetHeaders(p *peer.Peer, msg *wire.MsgGetHeaders) {
 		}
 	}
 
-	// Don't attempt to fetch more than we can put into a single message.
+	// Don't attempt to fetch more than we can put into a single wire
+	// message.
 	if endIdx-startIdx > wire.MaxBlockHeadersPerMsg {
 		endIdx = startIdx + wire.MaxBlockHeadersPerMsg
 	}
 
 	// Fetch the inventory from the block database.
-	hashList, err := chain.HeightRange(startIdx, endIdx)
-	if err != nil {
-		peerLog.Warnf("Header lookup failed: %v", err)
-		return
-	}
+	return chain.HeightRange(startIdx, endIdx)
+}
 
-	// Generate headers message and send it.
-	headersMsg := wire.NewMsgHeaders()
-	err = sp.server.db.View(func(dbTx database.Tx) error {
-		for i := range hashList {
-			headerBytes, err := dbTx.FetchBlockHeader(&hashList[i])
-			if err != nil {
-				return err
-			}
-
-			var header wire.BlockHeader
-			err = header.Deserialize(bytes.NewReader(headerBytes))
-			if err != nil {
-				return err
-			}
-			headersMsg.AddBlockHeader(&header)
+// fetchHeaders fetches and decodes headers from the db for each hash in
+// blockHashes.
+func fetchHeaders(db database.DB, blockHashes []chainhash.Hash) ([]*wire.BlockHeader, error) {
+	headers := make([]*wire.BlockHeader, 0, len(blockHashes))
+	err := db.View(func(dbTx database.Tx) error {
+		rawHeaders, err := dbTx.FetchBlockHeaders(blockHashes)
+		if err != nil {
+			return err
 		}
-
+		for _, headerBytes := range rawHeaders {
+			h := new(wire.BlockHeader)
+			err = h.Deserialize(bytes.NewReader(headerBytes))
+			if err != nil {
+				return err
+			}
+			headers = append(headers, h)
+		}
 		return nil
 	})
-	if err != nil {
-		peerLog.Warnf("Failed to build headers: %v", err)
+	return headers, err
+}
+
+// OnGetHeaders is invoked when a peer receives a getheaders wire message.
+func (sp *serverPeer) OnGetHeaders(p *peer.Peer, msg *wire.MsgGetHeaders) {
+	// Ignore getheaders requests if not in sync.
+	if !sp.server.blockManager.IsCurrent() {
 		return
 	}
 
-	p.QueueMessage(headersMsg, nil)
+	blockHashes, err := sp.server.locateBlocks(msg.BlockLocatorHashes,
+		&msg.HashStop)
+	if err != nil {
+		peerLog.Errorf("OnGetHeaders: failed to fetch hashes: %v", err)
+		return
+	}
+	blockHeaders, err := fetchHeaders(sp.server.db, blockHashes)
+	if err != nil {
+		peerLog.Errorf("OnGetHeaders: failed to fetch block headers: "+
+			"%v", err)
+	}
+
+	if len(blockHeaders) > wire.MaxBlockHeadersPerMsg {
+		peerLog.Warnf("OnGetHeaders: fetched more block headers than " +
+			"allowed per message")
+		// Can still recover from this error, just slice off the extra
+		// headers and continue queing the message.
+		blockHeaders = blockHeaders[:wire.MaxBlockHeaderPayload]
+	}
+	p.QueueMessage(&wire.MsgHeaders{Headers: blockHeaders}, nil)
 }
 
 // OnFilterAdd is invoked when a peer receives a filteradd wire message and is

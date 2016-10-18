@@ -439,6 +439,12 @@ var helpDescsEnUS = map[string]string{
 	"infowalletresult-relayfee":        "The minimum relay fee for non-free transactions in DCR/KB",
 	"infowalletresult-errors":          "Any current errors",
 
+	// GetHeadersCmd help.
+	"getheaders--synopsis":     "Returns block headers starting with the first known block hash from the request",
+	"getheaders-blocklocators": "Concatenated hashes of blocks.  Headers are returned starting from the first known hash in this list",
+	"getheaders-hashstop":      "Optional block hash to stop including block headers for",
+	"getheadersresult-headers": "Serialized block headers of all located blocks, limited to some arbitrary maximum number of hashes (currently 2000, which matches the wire protocol headers message, but this is not guaranteed)",
+
 	// GetInfoCmd help.
 	"getinfo--synopsis": "Returns a JSON object containing various state info.",
 
@@ -848,6 +854,7 @@ var rpcResultTypes = map[string][]interface{}{
 	"getstakedifficulty":    {(*dcrjson.GetStakeDifficultyResult)(nil)},
 	"getgenerate":           {(*bool)(nil)},
 	"gethashespersec":       {(*float64)(nil)},
+	"getheaders":            {(*dcrjson.GetHeadersResult)(nil)},
 	"getinfo":               {(*dcrjson.InfoChainResult)(nil)},
 	"getmempoolinfo":        {(*dcrjson.GetMempoolInfoResult)(nil)},
 	"getmininginfo":         {(*dcrjson.GetMiningInfoResult)(nil)},

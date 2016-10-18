@@ -348,6 +348,21 @@ func NewGetInfoCmd() *GetInfoCmd {
 	return &GetInfoCmd{}
 }
 
+// GetHeadersCmd defines the getheaders JSON-RPC command.
+type GetHeadersCmd struct {
+	BlockLocators string `json:"blocklocators"`
+	HashStop      string `json:"hashstop"`
+}
+
+// NewGetHeadersCmd returns a new instance which can be used to issue a
+// getheaders JSON-RPC command.
+func NewGetHeadersCmd(blockLocators string, hashStop string) *GetHeadersCmd {
+	return &GetHeadersCmd{
+		BlockLocators: blockLocators,
+		HashStop:      hashStop,
+	}
+}
+
 // GetMempoolInfoCmd defines the getmempoolinfo JSON-RPC command.
 type GetMempoolInfoCmd struct{}
 
@@ -766,6 +781,7 @@ func init() {
 	MustRegisterCmd("getdifficulty", (*GetDifficultyCmd)(nil), flags)
 	MustRegisterCmd("getgenerate", (*GetGenerateCmd)(nil), flags)
 	MustRegisterCmd("gethashespersec", (*GetHashesPerSecCmd)(nil), flags)
+	MustRegisterCmd("getheaders", (*GetHeadersCmd)(nil), flags)
 	MustRegisterCmd("getinfo", (*GetInfoCmd)(nil), flags)
 	MustRegisterCmd("getmempoolinfo", (*GetMempoolInfoCmd)(nil), flags)
 	MustRegisterCmd("getmininginfo", (*GetMiningInfoCmd)(nil), flags)

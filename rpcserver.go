@@ -51,9 +51,9 @@ import (
 
 // API version constants
 const (
-	jsonrpcSemverString = "1.0.0"
+	jsonrpcSemverString = "1.1.0"
 	jsonrpcSemverMajor  = 1
-	jsonrpcSemverMinor  = 0
+	jsonrpcSemverMinor  = 1
 	jsonrpcSemverPatch  = 0
 )
 
@@ -204,6 +204,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"getdifficulty":         handleGetDifficulty,
 	"getgenerate":           handleGetGenerate,
 	"gethashespersec":       handleGetHashesPerSec,
+	"getheaders":            handleGetHeaders,
 	"getinfo":               handleGetInfo,
 	"getmempoolinfo":        handleGetMempoolInfo,
 	"getmininginfo":         handleGetMiningInfo,
@@ -3296,6 +3297,63 @@ func handleGetGenerate(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 // handleGetHashesPerSec implements the gethashespersec command.
 func handleGetHashesPerSec(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	return int64(s.server.cpuMiner.HashesPerSecond()), nil
+}
+
+// handleGetHeaders implements the getheaders command.
+func handleGetHeaders(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	c := cmd.(*dcrjson.GetHeadersCmd)
+	blockLocators, err := dcrjson.DecodeConcatenatedHashes(c.BlockLocators)
+	if err != nil {
+		// Already a *dcrjson.RPCError
+		return nil, err
+	}
+	var hashStop chainhash.Hash
+	if c.HashStop != "" {
+		err := chainhash.Decode(&hashStop, c.HashStop)
+		if err != nil {
+			return nil, &dcrjson.RPCError{
+				Code:    dcrjson.ErrRPCInvalidParameter,
+				Message: "Failed to decode hashstop: " + err.Error(),
+			}
+		}
+	}
+	// Until wire.MsgGetHeaders uses []Hash instead of the []*Hash, this
+	// conversion is necessary.  The wire protocol getheaders is (probably)
+	// called much more often than this RPC, so server.locateBlocks is
+	// optimized for that and this is given the performance penality.
+	pBlockLocators := make([]*chainhash.Hash, len(blockLocators))
+	for i := range blockLocators {
+		pBlockLocators[i] = &blockLocators[i]
+	}
+	blockHashes, err := s.server.locateBlocks(pBlockLocators, &hashStop)
+	if err != nil {
+		return nil, &dcrjson.RPCError{
+			Code: dcrjson.ErrRPCDatabase,
+			Message: "Failed to fetch hashes of block " +
+				"headers: " + err.Error(),
+		}
+	}
+	blockHeaders, err := fetchHeaders(s.server.db, blockHashes)
+	if err != nil {
+		return nil, &dcrjson.RPCError{
+			Code: dcrjson.ErrRPCDatabase,
+			Message: "Failed to fetch headers of located blocks: " +
+				err.Error(),
+		}
+	}
+
+	hexBlockHeaders := make([]string, len(blockHeaders))
+	var buf bytes.Buffer
+	for i, h := range blockHeaders {
+		err := h.Serialize(&buf)
+		if err != nil {
+			return nil, internalRPCError(err.Error(),
+				"Failed to serialize block header")
+		}
+		hexBlockHeaders[i] = hex.EncodeToString(buf.Bytes())
+		buf.Reset()
+	}
+	return &dcrjson.GetHeadersResult{Headers: hexBlockHeaders}, nil
 }
 
 // handleGetInfo implements the getinfo command. We only return the fields

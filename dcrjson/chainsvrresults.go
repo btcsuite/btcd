@@ -487,3 +487,9 @@ type ValidateAddressChainResult struct {
 	IsValid bool   `json:"isvalid"`
 	Address string `json:"address,omitempty"`
 }
+
+// GetHeadersResult models the data returned by the chain server getheaders
+// command.
+type GetHeadersResult struct {
+	Headers []string `json:"headers"`
+}
