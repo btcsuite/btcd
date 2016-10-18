@@ -53,7 +53,7 @@ const (
 	CmdFeeFilter   = "feefilter"
 )
 
-// WireEncoding represents the wire message encoding format to be used.
+// MessageEncoding represents the wire message encoding format to be used.
 type MessageEncoding uint32
 
 const (
