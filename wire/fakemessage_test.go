@@ -15,15 +15,16 @@ type fakeMessage struct {
 	forceLenErr    bool
 }
 
-// BtcDecode doesn't do anything.  It just satisfies the Message interface.
-func (msg *fakeMessage) BtcDecode(r io.Reader, pver uint32) error {
+// BtcDecode doesn't do anything.  It just satisfies the wire.Message
+// interface.
+func (msg *fakeMessage) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) error {
 	return nil
 }
 
 // BtcEncode writes the payload field of the fake message or forces an error
 // if the forceEncodeErr flag of the fake message is set.  It also satisfies the
-// Message interface.
-func (msg *fakeMessage) BtcEncode(w io.Writer, pver uint32) error {
+// wire.Message interface.
+func (msg *fakeMessage) BtcEncode(w io.Writer, pver uint32, enc MessageEncoding) error {
 	if msg.forceEncodeErr {
 		err := &MessageError{
 			Func:        "fakeMessage.BtcEncode",
