@@ -645,15 +645,19 @@ func NewEngine(scriptPubKey []byte, tx *wire.MsgTx, txIdx int, flags ScriptFlags
 	}
 
 	// The clean stack flag (ScriptVerifyCleanStack) is not allowed without
-	// the pay-to-script-hash (P2SH) evaluation (ScriptBip16) flag.
+	// either the the pay-to-script-hash (P2SH) evaluation (ScriptBip16)
+	// flag or the Segregated Witness (ScriptVerifyWitness) flag.
 	//
 	// Recall that evaluating a P2SH script without the flag set results in
-	// non-P2SH evaluation which leaves the P2SH inputs on the stack.  Thus,
-	// allowing the clean stack flag without the P2SH flag would make it
-	// possible to have a situation where P2SH would not be a soft fork when
-	// it should be.
-	vm := Engine{flags: flags, sigCache: sigCache}
-	if vm.hasFlag(ScriptVerifyCleanStack) && !vm.hasFlag(ScriptBip16) {
+	// non-P2SH evaluation which leaves the P2SH inputs on the stack.
+	// Thus, allowing the clean stack flag without the P2SH flag would make
+	// it possible to have a situation where P2SH would not be a soft fork
+	// when it should be. The same goes for segwit which will pull in
+	// additional scripts for execution from the witness stack.
+	vm := Engine{flags: flags, sigCache: sigCache, hashCache: hashCache,
+		inputAmount: inputAmount}
+	if vm.hasFlag(ScriptVerifyCleanStack) && (!vm.hasFlag(ScriptBip16) &&
+		!vm.hasFlag(ScriptVerifyWitness)) {
 		return nil, scriptError(ErrInvalidFlags,
 			"invalid flags combination")
 	}
@@ -731,14 +735,17 @@ func NewEngine(scriptPubKey []byte, tx *wire.MsgTx, txIdx int, flags ScriptFlags
 
 			witProgram = scriptPubKey
 		case len(tx.TxIn[txIdx].Witness) != 0 && vm.bip16:
+			pops, err := parseScript(scriptSig)
+			if err != nil {
+				return nil, err
+			}
+
 			// The sigScript MUST be *exactly* a single canonical
 			// data push of the witness program, otherwise we
 			// reintroduce malleability.
-			dataPush := vm.scripts[0][0]
-			if len(vm.scripts[0]) == 1 && canonicalPush(dataPush) &&
-				IsWitnessProgram(dataPush.data) {
-
-				witProgram = dataPush.data
+			if len(pops) == 1 && canonicalPush(pops[0]) &&
+				IsWitnessProgram(pops[0].data) {
+				witProgram = pops[0].data
 			} else {
 				errStr := "signature script for witness " +
 					"nested p2sh is not canonical"
@@ -752,7 +759,6 @@ func NewEngine(scriptPubKey []byte, tx *wire.MsgTx, txIdx int, flags ScriptFlags
 			if err != nil {
 				return nil, err
 			}
-			vm.witness = true
 		} else {
 			// If we didn't find a witness program in either the
 			// pkScript or as a datapush within the sigScript, then
