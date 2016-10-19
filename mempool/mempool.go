@@ -73,8 +73,17 @@ type Config struct {
 	// utxo view.
 	CalcSequenceLock func(*btcutil.Tx, *blockchain.UtxoViewpoint) (*blockchain.SequenceLock, error)
 
+	// IsDeploymentActive returns true if the target deploymentID is
+	// active, and false otherwise. The mempool uses this function to gauge
+	// if transactions using new to be soft-forked rules should be allowed
+	// into the mempool or not.
+	IsDeploymentActive func(deploymentID uint32) (bool, error)
+
 	// SigCache defines a signature cache to use.
 	SigCache *txscript.SigCache
+
+	// HashCache defines the transaction hash mid-state cache to use.
+	HashCache *txscript.HashCache
 
 	// AddrIndex defines the optional address index instance to use for
 	// indexing the unconfirmed transactions in the memory pool.
@@ -112,10 +121,10 @@ type Policy struct {
 	// of big orphans.
 	MaxOrphanTxSize int
 
-	// MaxSigOpsPerTx is the maximum number of signature operations
-	// in a single transaction we will relay or mine.  It is a fraction
-	// of the max signature operations for a block.
-	MaxSigOpsPerTx int
+	// MaxSigOpCostPerTx is the cumulative maximum cost of all the signature
+	// operations in a single transaction we will relay or mine.  It is a
+	// fraction of the max signature operations for a block.
+	MaxSigOpCostPerTx int
 
 	// MinRelayTxFee defines the minimum transaction fee in BTC/kB to be
 	// considered a non-zero fee.
@@ -604,6 +613,22 @@ func (mp *TxPool) FetchTransaction(txHash *chainhash.Hash) (*btcutil.Tx, error) 
 func (mp *TxPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit, rejectDupOrphans bool) ([]*chainhash.Hash, *TxDesc, error) {
 	txHash := tx.Hash()
 
+	// If a transaction has iwtness data, and segwit isn't active yet, If
+	// segwit isn't active yet, then we won't accept it into the mempool as
+	// it can't be mined yet.
+	if tx.MsgTx().HasWitness() {
+		segwitActive, err := mp.cfg.IsDeploymentActive(chaincfg.DeploymentSegwit)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		if !segwitActive {
+			str := fmt.Sprintf("transaction %v has witness data, "+
+				"but segwit isn't active yet", txHash)
+			return nil, nil, txRuleError(wire.RejectNonstandard, str)
+		}
+	}
+
 	// Don't accept the transaction if it already exists in the pool.  This
 	// applies to orphan transactions as well when the reject duplicate
 	// orphans flag is set.  This check is intended to be a quick check to
@@ -780,17 +805,17 @@ func (mp *TxPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit, rejec
 	// the coinbase address itself can contain signature operations, the
 	// maximum allowed signature operations per transaction is less than
 	// the maximum allowed signature operations per block.
-	numSigOps, err := blockchain.CountP2SHSigOps(tx, false, utxoView)
+	// TODO(roasbeef): last bool should be conditional on segwit activation
+	sigOpCost, err := blockchain.GetSigOpCost(tx, false, utxoView, true, true)
 	if err != nil {
 		if cerr, ok := err.(blockchain.RuleError); ok {
 			return nil, nil, chainRuleError(cerr)
 		}
 		return nil, nil, err
 	}
-	numSigOps += blockchain.CountSigOps(tx)
-	if numSigOps > mp.cfg.Policy.MaxSigOpsPerTx {
-		str := fmt.Sprintf("transaction %v has too many sigops: %d > %d",
-			txHash, numSigOps, mp.cfg.Policy.MaxSigOpsPerTx)
+	if sigOpCost > mp.cfg.Policy.MaxSigOpCostPerTx {
+		str := fmt.Sprintf("transaction %v sigop cost is too high: %d > %d",
+			txHash, sigOpCost, mp.cfg.Policy.MaxSigOpCostPerTx)
 		return nil, nil, txRuleError(wire.RejectNonstandard, str)
 	}
 
@@ -857,7 +882,8 @@ func (mp *TxPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit, rejec
 	// Verify crypto signatures for each input and reject the transaction if
 	// any don't verify.
 	err = blockchain.ValidateTransactionScripts(tx, utxoView,
-		txscript.StandardVerifyFlags, mp.cfg.SigCache)
+		txscript.StandardVerifyFlags, mp.cfg.SigCache,
+		mp.cfg.HashCache)
 	if err != nil {
 		if cerr, ok := err.(blockchain.RuleError); ok {
 			return nil, nil, chainRuleError(cerr)
