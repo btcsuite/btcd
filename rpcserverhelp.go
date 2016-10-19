@@ -106,7 +106,7 @@ var helpDescsEnUS = map[string]string{
 	"decodescriptresult-reqSigs":   "The number of required signatures",
 	"decodescriptresult-type":      "The type of the script (e.g. 'pubkeyhash')",
 	"decodescriptresult-addresses": "The bitcoin addresses associated with this script",
-	"decodescriptresult-p2sh":      "The script hash for use in pay-to-script-hash transactions",
+	"decodescriptresult-p2sh":      "The script hash for use in pay-to-script-hash transactions (only present if the provided redeem script is not already a pay-to-script-hash script)",
 
 	// DecodeScriptCmd help.
 	"decodescript--synopsis": "Returns a JSON object with information about the provided hex-encoded script.",
