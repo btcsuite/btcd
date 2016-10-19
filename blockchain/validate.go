@@ -979,11 +979,18 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block, vi
 	// spent.  See the documentation for checkBIP0030 for more details.
 	//
 	// There are two blocks in the chain which violate this rule, so the
-	// check must be skipped for those blocks. The isBIP0030Node function is
-	// used to determine if this block is one of the two blocks that must be
-	// skipped.
-	enforceBIP0030 := !isBIP0030Node(node)
-	if enforceBIP0030 {
+	// check must be skipped for those blocks.  The isBIP0030Node function
+	// is used to determine if this block is one of the two blocks that must
+	// be skipped.
+	//
+	// In addition, as of BIP0034, duplicate coinbases are no longer
+	// possible due to its requirement for including the block height in the
+	// coinbase and thus it is no longer possible to create transactions
+	// that 'overwrite' older ones.  Therefore, only enforce the rule if
+	// BIP0034 is not yet active.  This is a useful optimization because the
+	// BIP0030 check is expensive since it involves a ton of cache misses in
+	// the utxoset.
+	if !isBIP0030Node(node) && (node.height < b.chainParams.BIP0034Height) {
 		err := b.checkBIP0030(node, block, view)
 		if err != nil {
 			return err
