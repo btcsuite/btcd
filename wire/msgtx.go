@@ -314,6 +314,21 @@ func (msg *MsgTx) TxHash() chainhash.Hash {
 	return chainhash.DoubleHashH(buf.Bytes())
 }
 
+// WitnessHash generates the hash of the transaction serialized according to
+// the new witness serialization defined in BIP0141 and BIP0144. The final
+// output is used within the Segregated Witness commitment of all the witnesses
+// within a block. If a transaction has no witness data, then the witness hash,
+// is the same as its txid.
+func (msg *MsgTx) WitnessHash() chainhash.Hash {
+	if msg.HasWitness() {
+		buf := bytes.NewBuffer(make([]byte, 0, msg.SerializeSize()))
+		_ = msg.Serialize(buf)
+		return chainhash.DoubleHashH(buf.Bytes())
+	}
+
+	return msg.TxHash()
+}
+
 // Copy creates a deep copy of a transaction so that the original does not get
 // modified when the copy is manipulated.
 func (msg *MsgTx) Copy() *MsgTx {
