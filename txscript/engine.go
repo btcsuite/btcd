@@ -288,6 +288,7 @@ func (vm *Engine) Step() (done bool, err error) {
 		return true, err
 	}
 	opcode := &vm.scripts[vm.scriptIdx][vm.scriptOff]
+	vm.scriptOff++
 
 	// Execute the opcode while taking into account several things such as
 	// disabled opcodes, illegal opcodes, maximum allowed operations per
@@ -307,7 +308,6 @@ func (vm *Engine) Step() (done bool, err error) {
 	}
 
 	// Prepare for next instruction.
-	vm.scriptOff++
 	if vm.scriptOff >= len(vm.scripts[vm.scriptIdx]) {
 		// Illegal to have an `if' that straddles two scripts.
 		if err == nil && len(vm.condStack) != 0 {
