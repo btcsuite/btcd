@@ -230,6 +230,9 @@ var rpcUnimplemented = map[string]struct{}{
 	"getblockchaininfo": {},
 	"getchaintips":      {},
 	"getnetworkinfo":    {},
+	"invalidateblock":   {},
+	"preciousblock":     {},
+	"reconsiderblock":   {},
 }
 
 // Commands that are available to a limited user

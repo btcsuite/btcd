@@ -682,6 +682,19 @@ func TestChainSvrCmds(t *testing.T) {
 			unmarshalled: &btcjson.PingCmd{},
 		},
 		{
+			name: "preciousblock",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("preciousblock", "0123")
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewPreciousBlockCmd("0123")
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"preciousblock","params":["0123"],"id":1}`,
+			unmarshalled: &btcjson.PreciousBlockCmd{
+				BlockHash: "0123",
+			},
+		},
+		{
 			name: "reconsiderblock",
 			newCmd: func() (interface{}, error) {
 				return btcjson.NewCmd("reconsiderblock", "123")
