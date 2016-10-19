@@ -236,7 +236,7 @@ func BenchmarkReadTxOut(b *testing.B) {
 func BenchmarkWriteTxOut(b *testing.B) {
 	txOut := blockOne.Transactions[0].TxOut[0]
 	for i := 0; i < b.N; i++ {
-		writeTxOut(ioutil.Discard, 0, 0, txOut)
+		WriteTxOut(ioutil.Discard, 0, 0, txOut)
 	}
 }
 

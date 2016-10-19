@@ -14,6 +14,61 @@ import (
 	"github.com/btcsuite/btcutil"
 )
 
+// RawTxInWitnessSignature returns the serialized ECDA signature for the input
+// idx of the given transaction, with the hashType appended to it. This
+// function is identical to RawTxInSignature, however the signature generated
+// signs a new sighash digest defined in BIP0143.
+func RawTxInWitnessSignature(tx *wire.MsgTx, sigHashes *TxSigHashes, idx int,
+	amt int64, subScript []byte, hashType SigHashType,
+	key *btcec.PrivateKey) ([]byte, error) {
+
+	parsedScript, err := parseScript(subScript)
+	if err != nil {
+		return nil, fmt.Errorf("cannot parse output script: %v", err)
+	}
+
+	hash, err := calcWitnessSignatureHash(parsedScript, sigHashes, hashType, tx,
+		idx, amt)
+	if err != nil {
+		return nil, err
+	}
+
+	signature, err := key.Sign(hash)
+	if err != nil {
+		return nil, fmt.Errorf("cannot sign tx input: %s", err)
+	}
+
+	return append(signature.Serialize(), byte(hashType)), nil
+}
+
+// WitnessSignature creates an input witness stack for tx to spend BTC sent
+// from a previous output to the owner of privKey using the p2wkh script
+// template. The passed transaction must contain all the inputs and outputs as
+// dictated by the passed hashType. The signature generated observes the new
+// transaction digest algorithm defined within BIP0143.
+func WitnessSignature(tx *wire.MsgTx, sigHashes *TxSigHashes, idx int, amt int64,
+	subscript []byte, hashType SigHashType, privKey *btcec.PrivateKey,
+	compress bool) (wire.TxWitness, error) {
+
+	sig, err := RawTxInWitnessSignature(tx, sigHashes, idx, amt, subscript,
+		hashType, privKey)
+	if err != nil {
+		return nil, err
+	}
+
+	pk := (*btcec.PublicKey)(&privKey.PublicKey)
+	var pkData []byte
+	if compress {
+		pkData = pk.SerializeCompressed()
+	} else {
+		pkData = pk.SerializeUncompressed()
+	}
+
+	// A witness script is actually a stack, so we return an array of byte
+	// slices here, rather than a single byte slice.
+	return wire.TxWitness{sig, pkData}, nil
+}
+
 // RawTxInSignature returns the serialized ECDSA signature for the input idx of
 // the given transaction, with hashType appended to it.
 func RawTxInSignature(tx *wire.MsgTx, idx int, subScript []byte,
