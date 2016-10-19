@@ -42,25 +42,29 @@ type orphanBlock struct {
 // However, the returned snapshot must be treated as immutable since it is
 // shared by all callers.
 type BestState struct {
-	Hash       chainhash.Hash // The hash of the block.
-	Height     int32          // The height of the block.
-	Bits       uint32         // The difficulty bits of the block.
-	BlockSize  uint64         // The size of the block.
-	NumTxns    uint64         // The number of txns in the block.
-	TotalTxns  uint64         // The total number of txns in the chain.
-	MedianTime time.Time      // Median time as per CalcPastMedianTime.
+	Hash        chainhash.Hash // The hash of the block.
+	Height      int32          // The height of the block.
+	Bits        uint32         // The difficulty bits of the block.
+	BlockSize   uint64         // The size of the block.
+	BlockWeight uint64         // The weight of the block.
+	NumTxns     uint64         // The number of txns in the block.
+	TotalTxns   uint64         // The total number of txns in the chain.
+	MedianTime  time.Time      // Median time as per CalcPastMedianTime.
 }
 
 // newBestState returns a new best stats instance for the given parameters.
-func newBestState(node *blockNode, blockSize, numTxns, totalTxns uint64, medianTime time.Time) *BestState {
+func newBestState(node *blockNode, blockSize, blockWeight, numTxns,
+	totalTxns uint64, medianTime time.Time) *BestState {
+
 	return &BestState{
-		Hash:       node.hash,
-		Height:     node.height,
-		Bits:       node.bits,
-		BlockSize:  blockSize,
-		NumTxns:    numTxns,
-		TotalTxns:  totalTxns,
-		MedianTime: medianTime,
+		Hash:        node.hash,
+		Height:      node.height,
+		Bits:        node.bits,
+		BlockSize:   blockSize,
+		BlockWeight: blockWeight,
+		NumTxns:     numTxns,
+		TotalTxns:   totalTxns,
+		MedianTime:  medianTime,
 	}
 }
 
@@ -80,6 +84,7 @@ type BlockChain struct {
 	notifications       NotificationCallback
 	sigCache            *txscript.SigCache
 	indexManager        IndexManager
+	hashCache           *txscript.HashCache
 
 	// The following fields are calculated based upon the provided chain
 	// parameters.  They are also set when the instance is created and
@@ -616,8 +621,9 @@ func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block, view *U
 	b.stateLock.RUnlock()
 	numTxns := uint64(len(block.MsgBlock().Transactions))
 	blockSize := uint64(block.MsgBlock().SerializeSize())
-	state := newBestState(node, blockSize, numTxns, curTotalTxns+numTxns,
-		medianTime)
+	blockWeight := uint64(GetBlockWeight(block))
+	state := newBestState(node, blockSize, blockWeight, numTxns,
+		curTotalTxns+numTxns, medianTime)
 
 	// Atomically insert info into the database.
 	err = b.db.Update(func(dbTx database.Tx) error {
@@ -744,9 +750,10 @@ func (b *BlockChain) disconnectBlock(node *blockNode, block *btcutil.Block, view
 	b.stateLock.RUnlock()
 	numTxns := uint64(len(prevBlock.MsgBlock().Transactions))
 	blockSize := uint64(prevBlock.MsgBlock().SerializeSize())
+	blockWeight := uint64(GetBlockWeight(prevBlock))
 	newTotalTxns := curTotalTxns - uint64(len(block.MsgBlock().Transactions))
-	state := newBestState(prevNode, blockSize, numTxns, newTotalTxns,
-		medianTime)
+	state := newBestState(prevNode, blockSize, blockWeight, numTxns,
+		newTotalTxns, medianTime)
 
 	err = b.db.Update(func(dbTx database.Tx) error {
 		// Update best block state.
@@ -1328,6 +1335,16 @@ type Config struct {
 	// This field can be nil if the caller does not wish to make use of an
 	// index manager.
 	IndexManager IndexManager
+
+	// HashCache defines a transaction hash mid-state cache to use when
+	// validating transactions. This cache has the potential to greatly
+	// speed up transaction validation as re-using the pre-calculated
+	// mid-state eliminates the O(N^2) validation complexity due to the
+	// SigHashAll flag.
+	//
+	// This field can be nil if the caller is not interested in using a
+	// signature cache.
+	HashCache *txscript.HashCache
 }
 
 // New returns a BlockChain instance using the provided configuration details.
@@ -1378,6 +1395,7 @@ func New(config *Config) (*BlockChain, error) {
 		maxRetargetTimespan: targetTimespan * adjustmentFactor,
 		blocksPerRetarget:   int32(targetTimespan / targetTimePerBlock),
 		index:               newBlockIndex(config.DB, params),
+		hashCache:           config.HashCache,
 		orphans:             make(map[chainhash.Hash]*orphanBlock),
 		prevOrphans:         make(map[chainhash.Hash][]*orphanBlock),
 		warningCaches:       newThresholdCaches(vbNumBits),
