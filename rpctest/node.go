@@ -12,10 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"time"
-
-	"github.com/btcsuite/btcd/wire"
 
 	rpc "github.com/btcsuite/btcrpcclient"
 	"github.com/btcsuite/btcutil"
@@ -90,8 +87,6 @@ func (n *nodeConfig) setDefaults() error {
 // process.
 func (n *nodeConfig) arguments() []string {
 	args := []string{}
-	// --simnet
-	args = append(args, fmt.Sprintf("--%s", strings.ToLower(wire.SimNet.String())))
 	if n.rpcUser != "" {
 		// --rpcuser
 		args = append(args, fmt.Sprintf("--rpcuser=%s", n.rpcUser))
