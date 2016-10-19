@@ -227,6 +227,34 @@ const (
 	// reached.
 	ErrUnsatisfiedLockTime
 
+	// ErrWitnessProgramEmpty is returned if ScriptVerifyWitness is set and
+	// the witness stack itself is empty.
+	ErrWitnessProgramEmpty
+
+	// ErrWitnessScriptMismatch is returned if ScriptVerifyWitness is set
+	// and the witness itself for a p2wkh witness program isn't *exactly* 2
+	// items.
+	ErrWitnessScriptMismatch
+
+	// ErrWitnessProgramWrongLength is returned if ScriptVerifyWitness is
+	// set and the length of the witness program violates the length as
+	// dictated by the current witness version.
+	ErrWitnessProgramWrongLength
+
+	// ErrWitnessMalleated is returned if ScriptVerifyWitness is set and a
+	// native p2wsh program is encountered which has a non-empty sigScript.
+	ErrWitnessMalleated
+
+	// ErrWitnessMalleatedP2SH is returned if ScriptVerifyWitness if set
+	// and the validation logic for nested p2sh encounters a sigScript
+	// which isn't *exactyl* a datapush of the witness program.
+	ErrWitnessMalleatedP2SH
+
+	// ErrWitnessUnexpected is returned if ScriptVerifyWitness is set and a
+	// transaction includes witness data but doesn't spend an which is a
+	// witness program (nested or native).
+	ErrWitnessUnexpected
+
 	// numErrorCodes is the maximum error code number used in tests.  This
 	// entry MUST be the last entry in the enum.
 	numErrorCodes
