@@ -1473,6 +1473,7 @@ func newBlockManager(s *server, indexManager blockchain.IndexManager) (*blockMan
 		Notifications: bm.handleNotifyMsg,
 		SigCache:      s.sigCache,
 		IndexManager:  indexManager,
+		HashCache:     s.hashCache,
 	})
 	if err != nil {
 		return nil, err
