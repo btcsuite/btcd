@@ -21,12 +21,20 @@ const (
 // the generation of block templates.  See the documentation for
 // NewBlockTemplate for more details on each of these parameters are used.
 type Policy struct {
-	// BlockMinSize is the minimum block size in bytes to be used when
+	// BlockMinWeight is the minimum block weight to be used when
 	// generating a block template.
+	BlockMinWeight uint32
+
+	// BlockMaxWeight is the maximum block weight to be used when
+	// generating a block template.
+	BlockMaxWeight uint32
+
+	// BlockMinWeight is the minimum block size to be used when generating
+	// a block template.
 	BlockMinSize uint32
 
-	// BlockMaxSize is the maximum block size in bytes to be used when
-	// generating a block template.
+	// BlockMaxSize is the maximum block size to be used when generating a
+	// block template.
 	BlockMaxSize uint32
 
 	// BlockPrioritySize is the size in bytes for high-priority / low-fee
