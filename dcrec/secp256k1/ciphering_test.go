@@ -1,38 +1,35 @@
-// Copyright (c) 2015 The btcsuite developers
-// Copyright (c) 2015-2016 The Decred developers
+// Copyright (c) 2015-2016 The btcsuite developers
+// Copyright (c) 2015-2017 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package secp256k1_test
+package secp256k1
 
 import (
 	"bytes"
 	"encoding/hex"
 	"testing"
-
-	"github.com/decred/dcrd/dcrec/secp256k1"
 )
 
 func TestGenerateSharedSecret(t *testing.T) {
-	c := secp256k1.S256()
-	privKey1, err := secp256k1.GeneratePrivateKey(secp256k1.S256())
+	c := S256()
+	privKey1, err := GeneratePrivateKey(c)
 	if err != nil {
 		t.Errorf("private key generation error: %s", err)
 		return
 	}
-	privKey2, err := secp256k1.GeneratePrivateKey(secp256k1.S256())
+	privKey2, err := GeneratePrivateKey(c)
 	if err != nil {
 		t.Errorf("private key generation error: %s", err)
 		return
 	}
 
 	pk1x, pk1y := privKey1.Public()
-	pk1 := secp256k1.NewPublicKey(c, pk1x, pk1y)
+	pk1 := NewPublicKey(c, pk1x, pk1y)
 	pk2x, pk2y := privKey2.Public()
-	pk2 := secp256k1.NewPublicKey(c, pk2x, pk2y)
-	secret1 := secp256k1.GenerateSharedSecret(privKey1, pk2)
-	secret2 := secp256k1.GenerateSharedSecret(privKey2, pk1)
-
+	pk2 := NewPublicKey(c, pk2x, pk2y)
+	secret1 := GenerateSharedSecret(privKey1, pk2)
+	secret2 := GenerateSharedSecret(privKey2, pk1)
 	if !bytes.Equal(secret1, secret2) {
 		t.Errorf("ECDH failed, secrets mismatch - first: %x, second: %x",
 			secret1, secret2)
@@ -41,8 +38,8 @@ func TestGenerateSharedSecret(t *testing.T) {
 
 // Test 1: Encryption and decryption
 func TestCipheringBasic(t *testing.T) {
-	c := secp256k1.S256()
-	privkey, err := secp256k1.GeneratePrivateKey(secp256k1.S256())
+	c := S256()
+	privkey, err := GeneratePrivateKey(c)
 	if err != nil {
 		t.Fatal("failed to generate private key")
 	}
@@ -50,13 +47,13 @@ func TestCipheringBasic(t *testing.T) {
 	in := []byte("Hey there dude. How are you doing? This is a test.")
 
 	pk1x, pk1y := privkey.Public()
-	pk1 := secp256k1.NewPublicKey(c, pk1x, pk1y)
-	out, err := secp256k1.Encrypt(pk1, in)
+	pk1 := NewPublicKey(c, pk1x, pk1y)
+	out, err := Encrypt(pk1, in)
 	if err != nil {
 		t.Fatal("failed to encrypt:", err)
 	}
 
-	dec, err := secp256k1.Decrypt(privkey, out)
+	dec, err := Decrypt(privkey, out)
 	if err != nil {
 		t.Fatal("failed to decrypt:", err)
 	}
@@ -70,7 +67,7 @@ func TestCipheringBasic(t *testing.T) {
 func TestCiphering(t *testing.T) {
 	pb, _ := hex.DecodeString("fe38240982f313ae5afb3e904fb8215fb11af1200592b" +
 		"fca26c96c4738e4bf8f")
-	privkey, _ := secp256k1.PrivKeyFromBytes(secp256k1.S256(), pb)
+	privkey, _ := PrivKeyFromBytes(S256(), pb)
 
 	in := []byte("This is just a test.")
 	out, _ := hex.DecodeString("b0d66e5adaa5ed4e2f0ca68e17b8f2fc02ca002009e3" +
@@ -79,7 +76,7 @@ func TestCiphering(t *testing.T) {
 		"9b0ba77cf14348fcff80fee10e11981f1b4be372d93923e9178972f69937ec850ed" +
 		"6c3f11ff572ddd5b2bedf9f9c0b327c54da02a28fcdce1f8369ffec")
 
-	dec, err := secp256k1.Decrypt(privkey, out)
+	dec, err := Decrypt(privkey, out)
 	if err != nil {
 		t.Fatal("failed to decrypt:", err)
 	}
@@ -90,7 +87,7 @@ func TestCiphering(t *testing.T) {
 }
 
 func TestCipheringErrors(t *testing.T) {
-	privkey, err := secp256k1.GeneratePrivateKey(secp256k1.S256())
+	privkey, err := GeneratePrivateKey(S256())
 	if err != nil {
 		t.Fatal("failed to generate private key")
 	}
@@ -163,7 +160,7 @@ func TestCipheringErrors(t *testing.T) {
 	}
 
 	for i, test := range tests1 {
-		_, err = secp256k1.Decrypt(privkey, test.ciphertext)
+		_, err = Decrypt(privkey, test.ciphertext)
 		if err == nil {
 			t.Errorf("Decrypt #%d did not get error", i)
 		}
@@ -177,7 +174,7 @@ func TestCipheringErrors(t *testing.T) {
 		{bytes.Repeat([]byte{0x07}, 15)},
 	}
 	for i, test := range tests2 {
-		_, err = secp256k1.TstRemovePKCSPadding(test.in)
+		_, err = removePKCSPadding(test.in)
 		if err == nil {
 			t.Errorf("removePKCSPadding #%d did not get error", i)
 		}

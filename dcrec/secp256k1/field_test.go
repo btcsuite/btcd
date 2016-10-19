@@ -1,16 +1,14 @@
-// Copyright (c) 2013-2014 The btcsuite developers
-// Copyright (c) 2015-2016 The Decred developers
-// Copyright (c) 2013-2014 Dave Collins
+// Copyright (c) 2013-2016 The btcsuite developers
+// Copyright (c) 2015-2017 The Decred developers
+// Copyright (c) 2013-2017 Dave Collins
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package secp256k1_test
+package secp256k1
 
 import (
 	"reflect"
 	"testing"
-
-	"github.com/decred/dcrd/dcrec/secp256k1"
 )
 
 // TestSetInt ensures that setting a field value to various native integers
@@ -31,11 +29,10 @@ func TestSetInt(t *testing.T) {
 
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
-		f := secp256k1.NewFieldVal().SetInt(test.in)
-		result := f.TstRawInts()
-		if !reflect.DeepEqual(result, test.raw) {
+		f := new(FieldVal).SetInt(test.in)
+		if !reflect.DeepEqual(f.n, test.raw) {
 			t.Errorf("fieldVal.Set #%d wrong result\ngot: %v\n"+
-				"want: %v", i, result, test.raw)
+				"want: %v", i, f.n, test.raw)
 			continue
 		}
 	}
@@ -43,9 +40,9 @@ func TestSetInt(t *testing.T) {
 
 // TestZero ensures that zeroing a field value zero works as expected.
 func TestZero(t *testing.T) {
-	f := secp256k1.NewFieldVal().SetInt(2)
+	f := new(FieldVal).SetInt(2)
 	f.Zero()
-	for idx, rawInt := range f.TstRawInts() {
+	for idx, rawInt := range f.n {
 		if rawInt != 0 {
 			t.Errorf("internal field integer at index #%d is not "+
 				"zero - got %d", idx, rawInt)
@@ -55,22 +52,22 @@ func TestZero(t *testing.T) {
 
 // TestIsZero ensures that checking if a field IsZero works as expected.
 func TestIsZero(t *testing.T) {
-	f := secp256k1.NewFieldVal()
+	f := new(FieldVal)
 	if !f.IsZero() {
 		t.Errorf("new field value is not zero - got %v (rawints %x)", f,
-			f.TstRawInts())
+			f.n)
 	}
 
 	f.SetInt(1)
 	if f.IsZero() {
 		t.Errorf("field claims it's zero when it's not - got %v "+
-			"(raw rawints %x)", f, f.TstRawInts())
+			"(raw rawints %x)", f, f.n)
 	}
 
 	f.Zero()
 	if !f.IsZero() {
 		t.Errorf("field claims it's not zero when it is - got %v "+
-			"(raw rawints %x)", f, f.TstRawInts())
+			"(raw rawints %x)", f, f.n)
 	}
 }
 
@@ -148,7 +145,7 @@ func TestStringer(t *testing.T) {
 
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
-		f := secp256k1.NewFieldVal().SetHex(test.in)
+		f := new(FieldVal).SetHex(test.in)
 		result := f.String()
 		if result != test.expected {
 			t.Errorf("fieldVal.String #%d wrong result\ngot: %v\n"+
@@ -243,11 +240,14 @@ func TestNormalize(t *testing.T) {
 
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
-		f := secp256k1.NewFieldVal().TstSetRawInts(test.raw).Normalize()
-		result := f.TstRawInts()
-		if !reflect.DeepEqual(result, test.normalized) {
+		f := new(FieldVal)
+		for rawIntIdx := 0; rawIntIdx < len(test.raw); rawIntIdx++ {
+			f.n[rawIntIdx] = test.raw[rawIntIdx]
+		}
+		f.Normalize()
+		if !reflect.DeepEqual(f.n, test.normalized) {
 			t.Errorf("fieldVal.Set #%d wrong normalized result\n"+
-				"got: %x\nwant: %x", i, result, test.normalized)
+				"got: %x\nwant: %x", i, f.n, test.normalized)
 			continue
 		}
 	}
@@ -272,7 +272,7 @@ func TestIsOdd(t *testing.T) {
 
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
-		f := secp256k1.NewFieldVal().SetHex(test.in)
+		f := new(FieldVal).SetHex(test.in)
 		result := f.IsOdd()
 		if result != test.expected {
 			t.Errorf("fieldVal.IsOdd #%d wrong result\n"+
@@ -305,8 +305,8 @@ func TestEquals(t *testing.T) {
 
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
-		f := secp256k1.NewFieldVal().SetHex(test.in1).Normalize()
-		f2 := secp256k1.NewFieldVal().SetHex(test.in2).Normalize()
+		f := new(FieldVal).SetHex(test.in1).Normalize()
+		f2 := new(FieldVal).SetHex(test.in2).Normalize()
 		result := f.Equals(f2)
 		if result != test.expected {
 			t.Errorf("fieldVal.Equals #%d wrong result\n"+
@@ -353,8 +353,8 @@ func TestNegate(t *testing.T) {
 
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
-		f := secp256k1.NewFieldVal().SetHex(test.in).Normalize()
-		expected := secp256k1.NewFieldVal().SetHex(test.expected).Normalize()
+		f := new(FieldVal).SetHex(test.in).Normalize()
+		expected := new(FieldVal).SetHex(test.expected).Normalize()
 		result := f.Negate(1).Normalize()
 		if !result.Equals(expected) {
 			t.Errorf("fieldVal.Negate #%d wrong result\n"+
@@ -404,8 +404,8 @@ func TestAddInt(t *testing.T) {
 
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
-		f := secp256k1.NewFieldVal().SetHex(test.in1).Normalize()
-		expected := secp256k1.NewFieldVal().SetHex(test.expected).Normalize()
+		f := new(FieldVal).SetHex(test.in1).Normalize()
+		expected := new(FieldVal).SetHex(test.expected).Normalize()
 		result := f.AddInt(test.in2).Normalize()
 		if !result.Equals(expected) {
 			t.Errorf("fieldVal.AddInt #%d wrong result\n"+
@@ -455,9 +455,9 @@ func TestAdd(t *testing.T) {
 
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
-		f := secp256k1.NewFieldVal().SetHex(test.in1).Normalize()
-		f2 := secp256k1.NewFieldVal().SetHex(test.in2).Normalize()
-		expected := secp256k1.NewFieldVal().SetHex(test.expected).Normalize()
+		f := new(FieldVal).SetHex(test.in1).Normalize()
+		f2 := new(FieldVal).SetHex(test.in2).Normalize()
+		expected := new(FieldVal).SetHex(test.expected).Normalize()
 		result := f.Add(f2).Normalize()
 		if !result.Equals(expected) {
 			t.Errorf("fieldVal.Add #%d wrong result\n"+
@@ -507,9 +507,9 @@ func TestAdd2(t *testing.T) {
 
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
-		f := secp256k1.NewFieldVal().SetHex(test.in1).Normalize()
-		f2 := secp256k1.NewFieldVal().SetHex(test.in2).Normalize()
-		expected := secp256k1.NewFieldVal().SetHex(test.expected).Normalize()
+		f := new(FieldVal).SetHex(test.in1).Normalize()
+		f2 := new(FieldVal).SetHex(test.in2).Normalize()
+		expected := new(FieldVal).SetHex(test.expected).Normalize()
 		result := f.Add2(f, f2).Normalize()
 		if !result.Equals(expected) {
 			t.Errorf("fieldVal.Add2 #%d wrong result\n"+
@@ -572,8 +572,8 @@ func TestMulInt(t *testing.T) {
 
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
-		f := secp256k1.NewFieldVal().SetHex(test.in1).Normalize()
-		expected := secp256k1.NewFieldVal().SetHex(test.expected).Normalize()
+		f := new(FieldVal).SetHex(test.in1).Normalize()
+		expected := new(FieldVal).SetHex(test.expected).Normalize()
 		result := f.MulInt(test.in2).Normalize()
 		if !result.Equals(expected) {
 			t.Errorf("fieldVal.MulInt #%d wrong result\n"+
@@ -633,9 +633,9 @@ func TestMul(t *testing.T) {
 
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
-		f := secp256k1.NewFieldVal().SetHex(test.in1).Normalize()
-		f2 := secp256k1.NewFieldVal().SetHex(test.in2).Normalize()
-		expected := secp256k1.NewFieldVal().SetHex(test.expected).Normalize()
+		f := new(FieldVal).SetHex(test.in1).Normalize()
+		f2 := new(FieldVal).SetHex(test.in2).Normalize()
+		expected := new(FieldVal).SetHex(test.expected).Normalize()
 		result := f.Mul(f2).Normalize()
 		if !result.Equals(expected) {
 			t.Errorf("fieldVal.Mul #%d wrong result\n"+
@@ -680,8 +680,8 @@ func TestSquare(t *testing.T) {
 
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
-		f := secp256k1.NewFieldVal().SetHex(test.in).Normalize()
-		expected := secp256k1.NewFieldVal().SetHex(test.expected).Normalize()
+		f := new(FieldVal).SetHex(test.in).Normalize()
+		expected := new(FieldVal).SetHex(test.expected).Normalize()
 		result := f.Square().Normalize()
 		if !result.Equals(expected) {
 			t.Errorf("fieldVal.Square #%d wrong result\n"+
@@ -733,8 +733,8 @@ func TestInverse(t *testing.T) {
 
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
-		f := secp256k1.NewFieldVal().SetHex(test.in).Normalize()
-		expected := secp256k1.NewFieldVal().SetHex(test.expected).Normalize()
+		f := new(FieldVal).SetHex(test.in).Normalize()
+		expected := new(FieldVal).SetHex(test.expected).Normalize()
 		result := f.Inverse().Normalize()
 		if !result.Equals(expected) {
 			t.Errorf("fieldVal.Inverse #%d wrong result\n"+

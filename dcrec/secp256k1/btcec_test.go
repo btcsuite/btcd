@@ -1,11 +1,11 @@
 // Copyright 2011 The Go Authors. All rights reserved.
-// Copyright (c) 2015-2016 The Decred developers
+// Copyright (c) 2015-2017 The Decred developers
 // Copyright 2011 ThePiachu. All rights reserved.
-// Copyright 2013-2014 The btcsuite developers
+// Copyright 2013-2016 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package secp256k1_test
+package secp256k1
 
 import (
 	"crypto/rand"
@@ -14,9 +14,24 @@ import (
 	"fmt"
 	"math/big"
 	"testing"
-
-	"github.com/decred/dcrd/dcrec/secp256k1"
 )
+
+// isJacobianOnS256Curve returns boolean if the point (x,y,z) is on the
+// secp256k1 curve.
+func isJacobianOnS256Curve(x, y, z *FieldVal) bool {
+	// Elliptic curve equation for secp256k1 is: y^2 = x^3 + 7
+	// In Jacobian coordinates, Y = y/z^3 and X = x/z^2
+	// Thus:
+	// (y/z^3)^2 = (x/z^2)^3 + 7
+	// y^2/z^6 = x^3/z^6 + 7
+	// y^2 = x^3 + 7*z^6
+	var y2, z2, x3, result FieldVal
+	y2.SquareVal(y).Normalize()
+	z2.SquareVal(z)
+	x3.SquareVal(x).Mul(x)
+	result.SquareVal(&z2).Mul(&z2).MulInt(7).Add(&x3).Normalize()
+	return y2.Equals(&result)
+}
 
 // TestAddJacobian tests addition of points projected in Jacobian coordinates.
 func TestAddJacobian(t *testing.T) {
@@ -212,37 +227,37 @@ func TestAddJacobian(t *testing.T) {
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
 		// Convert hex to field values.
-		x1 := secp256k1.NewFieldVal().SetHex(test.x1)
-		y1 := secp256k1.NewFieldVal().SetHex(test.y1)
-		z1 := secp256k1.NewFieldVal().SetHex(test.z1)
-		x2 := secp256k1.NewFieldVal().SetHex(test.x2)
-		y2 := secp256k1.NewFieldVal().SetHex(test.y2)
-		z2 := secp256k1.NewFieldVal().SetHex(test.z2)
-		x3 := secp256k1.NewFieldVal().SetHex(test.x3)
-		y3 := secp256k1.NewFieldVal().SetHex(test.y3)
-		z3 := secp256k1.NewFieldVal().SetHex(test.z3)
+		x1 := new(FieldVal).SetHex(test.x1)
+		y1 := new(FieldVal).SetHex(test.y1)
+		z1 := new(FieldVal).SetHex(test.z1)
+		x2 := new(FieldVal).SetHex(test.x2)
+		y2 := new(FieldVal).SetHex(test.y2)
+		z2 := new(FieldVal).SetHex(test.z2)
+		x3 := new(FieldVal).SetHex(test.x3)
+		y3 := new(FieldVal).SetHex(test.y3)
+		z3 := new(FieldVal).SetHex(test.z3)
 
 		// Ensure the test data is using points that are actually on
 		// the curve (or the point at infinity).
-		if !z1.IsZero() && !secp256k1.S256().TstIsJacobianOnCurve(x1, y1, z1) {
+		if !z1.IsZero() && !isJacobianOnS256Curve(x1, y1, z1) {
 			t.Errorf("#%d first point is not on the curve -- "+
 				"invalid test data", i)
 			continue
 		}
-		if !z2.IsZero() && !secp256k1.S256().TstIsJacobianOnCurve(x2, y2, z2) {
+		if !z2.IsZero() && !isJacobianOnS256Curve(x2, y2, z2) {
 			t.Errorf("#%d second point is not on the curve -- "+
 				"invalid test data", i)
 			continue
 		}
-		if !z3.IsZero() && !secp256k1.S256().TstIsJacobianOnCurve(x3, y3, z3) {
+		if !z3.IsZero() && !isJacobianOnS256Curve(x3, y3, z3) {
 			t.Errorf("#%d expected point is not on the curve -- "+
 				"invalid test data", i)
 			continue
 		}
 
 		// Add the two points.
-		rx, ry, rz := secp256k1.NewFieldVal(), secp256k1.NewFieldVal(), secp256k1.NewFieldVal()
-		secp256k1.S256().TstAddJacobian(x1, y1, z1, x2, y2, z2, rx, ry, rz)
+		rx, ry, rz := new(FieldVal), new(FieldVal), new(FieldVal)
+		S256().AddJacobian(x1, y1, z1, x2, y2, z2, rx, ry, rz)
 
 		// Ensure result matches expected.
 		if !rx.Equals(x3) || !ry.Equals(y3) || !rz.Equals(z3) {
@@ -321,24 +336,24 @@ func TestAddAffine(t *testing.T) {
 
 		// Ensure the test data is using points that are actually on
 		// the curve (or the point at infinity).
-		if !(x1.Sign() == 0 && y1.Sign() == 0) && !secp256k1.S256().IsOnCurve(x1, y1) {
+		if !(x1.Sign() == 0 && y1.Sign() == 0) && !S256().IsOnCurve(x1, y1) {
 			t.Errorf("#%d first point is not on the curve -- "+
 				"invalid test data", i)
 			continue
 		}
-		if !(x2.Sign() == 0 && y2.Sign() == 0) && !secp256k1.S256().IsOnCurve(x2, y2) {
+		if !(x2.Sign() == 0 && y2.Sign() == 0) && !S256().IsOnCurve(x2, y2) {
 			t.Errorf("#%d second point is not on the curve -- "+
 				"invalid test data", i)
 			continue
 		}
-		if !(x3.Sign() == 0 && y3.Sign() == 0) && !secp256k1.S256().IsOnCurve(x3, y3) {
+		if !(x3.Sign() == 0 && y3.Sign() == 0) && !S256().IsOnCurve(x3, y3) {
 			t.Errorf("#%d expected point is not on the curve -- "+
 				"invalid test data", i)
 			continue
 		}
 
 		// Add the two points.
-		rx, ry := secp256k1.S256().Add(x1, y1, x2, y2)
+		rx, ry := S256().Add(x1, y1, x2, y2)
 
 		// Ensure result matches expected.
 		if rx.Cmp(x3) != 00 || ry.Cmp(y3) != 0 {
@@ -388,29 +403,29 @@ func TestDoubleJacobian(t *testing.T) {
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
 		// Convert hex to field values.
-		x1 := secp256k1.NewFieldVal().SetHex(test.x1)
-		y1 := secp256k1.NewFieldVal().SetHex(test.y1)
-		z1 := secp256k1.NewFieldVal().SetHex(test.z1)
-		x3 := secp256k1.NewFieldVal().SetHex(test.x3)
-		y3 := secp256k1.NewFieldVal().SetHex(test.y3)
-		z3 := secp256k1.NewFieldVal().SetHex(test.z3)
+		x1 := new(FieldVal).SetHex(test.x1)
+		y1 := new(FieldVal).SetHex(test.y1)
+		z1 := new(FieldVal).SetHex(test.z1)
+		x3 := new(FieldVal).SetHex(test.x3)
+		y3 := new(FieldVal).SetHex(test.y3)
+		z3 := new(FieldVal).SetHex(test.z3)
 
 		// Ensure the test data is using points that are actually on
 		// the curve (or the point at infinity).
-		if !z1.IsZero() && !secp256k1.S256().TstIsJacobianOnCurve(x1, y1, z1) {
+		if !z1.IsZero() && !isJacobianOnS256Curve(x1, y1, z1) {
 			t.Errorf("#%d first point is not on the curve -- "+
 				"invalid test data", i)
 			continue
 		}
-		if !z3.IsZero() && !secp256k1.S256().TstIsJacobianOnCurve(x3, y3, z3) {
+		if !z3.IsZero() && !isJacobianOnS256Curve(x3, y3, z3) {
 			t.Errorf("#%d expected point is not on the curve -- "+
 				"invalid test data", i)
 			continue
 		}
 
 		// Double the point.
-		rx, ry, rz := secp256k1.NewFieldVal(), secp256k1.NewFieldVal(), secp256k1.NewFieldVal()
-		secp256k1.S256().TstDoubleJacobian(x1, y1, z1, rx, ry, rz)
+		rx, ry, rz := new(FieldVal), new(FieldVal), new(FieldVal)
+		S256().doubleJacobian(x1, y1, z1, rx, ry, rz)
 
 		// Ensure result matches expected.
 		if !rx.Equals(x3) || !ry.Equals(y3) || !rz.Equals(z3) {
@@ -472,19 +487,19 @@ func TestDoubleAffine(t *testing.T) {
 
 		// Ensure the test data is using points that are actually on
 		// the curve (or the point at infinity).
-		if !(x1.Sign() == 0 && y1.Sign() == 0) && !secp256k1.S256().IsOnCurve(x1, y1) {
+		if !(x1.Sign() == 0 && y1.Sign() == 0) && !S256().IsOnCurve(x1, y1) {
 			t.Errorf("#%d first point is not on the curve -- "+
 				"invalid test data", i)
 			continue
 		}
-		if !(x3.Sign() == 0 && y3.Sign() == 0) && !secp256k1.S256().IsOnCurve(x3, y3) {
+		if !(x3.Sign() == 0 && y3.Sign() == 0) && !S256().IsOnCurve(x3, y3) {
 			t.Errorf("#%d expected point is not on the curve -- "+
 				"invalid test data", i)
 			continue
 		}
 
 		// Double the point.
-		rx, ry := secp256k1.S256().Double(x1, y1)
+		rx, ry := S256().Double(x1, y1)
 
 		// Ensure result matches expected.
 		if rx.Cmp(x3) != 00 || ry.Cmp(y3) != 0 {
@@ -496,7 +511,7 @@ func TestDoubleAffine(t *testing.T) {
 }
 
 func TestOnCurve(t *testing.T) {
-	s256 := secp256k1.S256()
+	s256 := S256()
 	if !s256.IsOnCurve(s256.Params().Gx, s256.Params().Gy) {
 		t.Errorf("FAIL S256")
 	}
@@ -538,7 +553,7 @@ var s256BaseMultTests = []baseMultTest{
 
 //TODO: test different curves as well?
 func TestBaseMult(t *testing.T) {
-	s256 := secp256k1.S256()
+	s256 := S256()
 	for i, e := range s256BaseMultTests {
 		k, ok := new(big.Int).SetString(e.k, 16)
 		if !ok {
@@ -555,7 +570,7 @@ func TestBaseMult(t *testing.T) {
 }
 
 func TestBaseMultVerify(t *testing.T) {
-	s256 := secp256k1.S256()
+	s256 := S256()
 	for bytes := 1; bytes < 40; bytes++ {
 		for i := 0; i < 30; i++ {
 			data := make([]byte, bytes)
@@ -583,7 +598,7 @@ func TestScalarMult(t *testing.T) {
 	// Use another random exponent on the new point.
 	// We use BaseMult to verify by multiplying the previous exponent
 	// and the new random exponent together (mod N)
-	s256 := secp256k1.S256()
+	s256 := S256()
 	x, y := s256.Gx, s256.Gy
 	exponent := big.NewInt(1)
 	for i := 0; i < 1024; i++ {
@@ -604,8 +619,8 @@ func TestScalarMult(t *testing.T) {
 }
 
 // Test this curve's usage with the ecdsa package.
-func testKeyGeneration(t *testing.T, c *secp256k1.KoblitzCurve, tag string) {
-	priv, err := secp256k1.GeneratePrivateKey(c)
+func testKeyGeneration(t *testing.T, c *KoblitzCurve, tag string) {
+	priv, err := GeneratePrivateKey(c)
 	if err != nil {
 		t.Errorf("%s: error: %s", tag, err)
 		return
@@ -616,13 +631,13 @@ func testKeyGeneration(t *testing.T, c *secp256k1.KoblitzCurve, tag string) {
 }
 
 func TestKeyGeneration(t *testing.T) {
-	testKeyGeneration(t, secp256k1.S256(), "S256")
+	testKeyGeneration(t, S256(), "S256")
 }
 
-func testSignAndVerify(t *testing.T, c *secp256k1.KoblitzCurve, tag string) {
-	priv, _ := secp256k1.GeneratePrivateKey(c)
+func testSignAndVerify(t *testing.T, c *KoblitzCurve, tag string) {
+	priv, _ := GeneratePrivateKey(c)
 	pubx, puby := priv.Public()
-	pub := secp256k1.NewPublicKey(c, pubx, puby)
+	pub := NewPublicKey(c, pubx, puby)
 
 	hashed := []byte("testing")
 	sig, err := priv.Sign(hashed)
@@ -642,7 +657,7 @@ func testSignAndVerify(t *testing.T, c *secp256k1.KoblitzCurve, tag string) {
 }
 
 func TestSignAndVerify(t *testing.T) {
-	testSignAndVerify(t, secp256k1.S256(), "S256")
+	testSignAndVerify(t, S256(), "S256")
 }
 
 func TestNAF(t *testing.T) {
@@ -656,7 +671,7 @@ func TestNAF(t *testing.T) {
 			t.Fatalf("failed to read random data at %d", i)
 			break
 		}
-		nafPos, nafNeg := secp256k1.NAF(data)
+		nafPos, nafNeg := NAF(data)
 		want := new(big.Int).SetBytes(data)
 		got := big.NewInt(0)
 		// Check that the NAF representation comes up with the right number
@@ -678,14 +693,6 @@ func TestNAF(t *testing.T) {
 			t.Errorf("%d: Failed NAF got %X want %X", i, got, want)
 		}
 	}
-}
-
-func fromHex(s string) *big.Int {
-	r, ok := new(big.Int).SetString(s, 16)
-	if !ok {
-		panic("bad hex")
-	}
-	return r
 }
 
 // These test vectors were taken from
@@ -828,8 +835,8 @@ func TestVectors(t *testing.T) {
 	sha := sha1.New()
 
 	for i, test := range testVectors {
-		pub := secp256k1.PublicKey{
-			Curve: secp256k1.S256(),
+		pub := PublicKey{
+			Curve: S256(),
 			X:     fromHex(test.Qx),
 			Y:     fromHex(test.Qy),
 		}
@@ -837,10 +844,9 @@ func TestVectors(t *testing.T) {
 		sha.Reset()
 		sha.Write(msg)
 		hashed := sha.Sum(nil)
-		sig := secp256k1.Signature{R: fromHex(test.r), S: fromHex(test.s)}
-		if fuck := sig.Verify(hashed, &pub); fuck != test.ok {
-			//t.Errorf("%d: bad result %v %v", i, pub, hashed)
-			t.Errorf("%d: bad result %v instead of %v", i, fuck,
+		sig := Signature{R: fromHex(test.r), S: fromHex(test.s)}
+		if verified := sig.Verify(hashed, &pub); verified != test.ok {
+			t.Errorf("%d: bad result %v instead of %v", i, verified,
 				test.ok)
 		}
 		if testing.Short() {

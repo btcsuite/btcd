@@ -1,15 +1,13 @@
-// Copyright (c) 2013-2014 The btcsuite developers
-// Copyright (c) 2015-2016 The Decred developers
+// Copyright (c) 2013-2016 The btcsuite developers
+// Copyright (c) 2015-2017 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package secp256k1_test
+package secp256k1
 
 import (
 	"bytes"
 	"testing"
-
-	"github.com/decred/dcrd/dcrec/secp256k1"
 )
 
 func TestPrivKeys(t *testing.T) {
@@ -29,10 +27,9 @@ func TestPrivKeys(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		priv, pub := secp256k1.PrivKeyFromBytes(secp256k1.S256(), test.key)
+		priv, pub := PrivKeyFromBytes(S256(), test.key)
 
-		_, err := secp256k1.ParsePubKey(
-			pub.SerializeUncompressed(), secp256k1.S256())
+		_, err := ParsePubKey(pub.SerializeUncompressed(), S256())
 		if err != nil {
 			t.Errorf("%s privkey: %v", test.name, err)
 			continue

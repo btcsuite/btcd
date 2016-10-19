@@ -1,9 +1,9 @@
-// Copyright (c) 2013-2014 The btcsuite developers
-// Copyright (c) 2015-2016 The Decred developers
+// Copyright (c) 2013-2016 The btcsuite developers
+// Copyright (c) 2015-2017 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package secp256k1_test
+package secp256k1
 
 import (
 	"bytes"
@@ -13,8 +13,6 @@ import (
 	"fmt"
 	"math/big"
 	"testing"
-
-	"github.com/decred/dcrd/dcrec/secp256k1"
 )
 
 type signatureTest struct {
@@ -333,9 +331,9 @@ func TestSignatures(t *testing.T) {
 	for _, test := range signatureTests {
 		var err error
 		if test.der {
-			_, err = secp256k1.ParseDERSignature(test.sig, secp256k1.S256())
+			_, err = ParseDERSignature(test.sig, S256())
 		} else {
-			_, err = secp256k1.ParseSignature(test.sig, secp256k1.S256())
+			_, err = ParseSignature(test.sig, S256())
 		}
 		if err != nil {
 			if test.isValid {
@@ -357,14 +355,14 @@ func TestSignatures(t *testing.T) {
 func TestSignatureSerialize(t *testing.T) {
 	tests := []struct {
 		name     string
-		ecsig    *secp256k1.Signature
+		ecsig    *Signature
 		expected []byte
 	}{
 		// signature from decred blockchain tx
 		// 0437cd7f8525ceed2324359c2d0ba26006d92d85
 		{
 			"valid 1 - r and s most significant bits are zero",
-			&secp256k1.Signature{
+			&Signature{
 				R: fromHex("4e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd41"),
 				S: fromHex("181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d09"),
 			},
@@ -384,7 +382,7 @@ func TestSignatureSerialize(t *testing.T) {
 		// cb00f8a0573b18faa8c4f467b049f5d202bf1101d9ef2633bc611be70376a4b4
 		{
 			"valid 2 - r most significant bit is one",
-			&secp256k1.Signature{
+			&Signature{
 				R: fromHex("0082235e21a2300022738dabb8e1bbd9d19cfb1e7ab8c30a23b0afbb8d178abcf3"),
 				S: fromHex("24bf68e256c534ddfaf966bf908deb944305596f7bdcc38d69acad7f9c868724"),
 			},
@@ -404,9 +402,9 @@ func TestSignatureSerialize(t *testing.T) {
 		// fda204502a3345e08afd6af27377c052e77f1fefeaeb31bdd45f1e1237ca5470
 		{
 			"valid 3 - s most significant bit is one",
-			&secp256k1.Signature{
+			&Signature{
 				R: fromHex("1cadddc2838598fee7dc35a12b340c6bde8b389f7bfd19a1252a17c4b5ed2d71"),
-				S: new(big.Int).Add(fromHex("00c1a251bbecb14b058a8bd77f65de87e51c47e95904f4c0e9d52eddc21c1415ac"), secp256k1.S256().N),
+				S: new(big.Int).Add(fromHex("00c1a251bbecb14b058a8bd77f65de87e51c47e95904f4c0e9d52eddc21c1415ac"), S256().N),
 			},
 			[]byte{
 				0x30, 0x45, 0x02, 0x20, 0x1c, 0xad, 0xdd, 0xc2,
@@ -422,7 +420,7 @@ func TestSignatureSerialize(t *testing.T) {
 		},
 		{
 			"zero signature",
-			&secp256k1.Signature{
+			&Signature{
 				R: big.NewInt(0),
 				S: big.NewInt(0),
 			},
@@ -440,19 +438,19 @@ func TestSignatureSerialize(t *testing.T) {
 	}
 }
 
-func testSignCompact(t *testing.T, tag string, curve *secp256k1.KoblitzCurve,
+func testSignCompact(t *testing.T, tag string, curve *KoblitzCurve,
 	data []byte, isCompressed bool) {
-	tmp, _ := secp256k1.GeneratePrivateKey(curve)
-	priv := (*secp256k1.PrivateKey)(tmp)
+	tmp, _ := GeneratePrivateKey(curve)
+	priv := (*PrivateKey)(tmp)
 
 	hashed := []byte("testing")
-	sig, err := secp256k1.SignCompact(curve, priv, hashed, isCompressed)
+	sig, err := SignCompact(curve, priv, hashed, isCompressed)
 	if err != nil {
 		t.Errorf("%s: error signing: %s", tag, err)
 		return
 	}
 
-	pk, wasCompressed, err := secp256k1.RecoverCompact(curve, sig, hashed)
+	pk, wasCompressed, err := RecoverCompact(curve, sig, hashed)
 	if err != nil {
 		t.Errorf("%s: error recovering: %s", tag, err)
 		return
@@ -476,7 +474,7 @@ func testSignCompact(t *testing.T, tag string, curve *secp256k1.KoblitzCurve,
 		sig[0] += 4
 	}
 
-	pk, wasCompressed, err = secp256k1.RecoverCompact(curve, sig, hashed)
+	pk, wasCompressed, err = RecoverCompact(curve, sig, hashed)
 	if err != nil {
 		t.Errorf("%s: error recovering (2): %s", tag, err)
 		return
@@ -504,7 +502,7 @@ func TestSignCompact(t *testing.T) {
 			continue
 		}
 		compressed := i%2 != 0
-		testSignCompact(t, name, secp256k1.S256(), data, compressed)
+		testSignCompact(t, name, S256(), data, compressed)
 	}
 }
 
@@ -559,11 +557,11 @@ func TestRFC6979(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		privKey, _ := secp256k1.PrivKeyFromBytes(secp256k1.S256(), decodeHex(test.key))
+		privKey, _ := PrivKeyFromBytes(S256(), decodeHex(test.key))
 		hash := sha256.Sum256([]byte(test.msg))
 
 		// Ensure deterministically generated nonce is the expected value.
-		gotNonce := secp256k1.TstNonceRFC6979(privKey.D, hash[:]).Bytes()
+		gotNonce := NonceRFC6979(privKey.D, hash[:], nil, nil).Bytes()
 		wantNonce := decodeHex(test.nonce)
 		if !bytes.Equal(gotNonce, wantNonce) {
 			t.Errorf("NonceRFC6979 #%d (%s): Nonce is incorrect: "+
@@ -591,11 +589,11 @@ func TestRFC6979(t *testing.T) {
 }
 
 func TestSignatureIsEqual(t *testing.T) {
-	sig1 := &secp256k1.Signature{
+	sig1 := &Signature{
 		R: fromHex("0082235e21a2300022738dabb8e1bbd9d19cfb1e7ab8c30a23b0afbb8d178abcf3"),
 		S: fromHex("24bf68e256c534ddfaf966bf908deb944305596f7bdcc38d69acad7f9c868724"),
 	}
-	sig2 := &secp256k1.Signature{
+	sig2 := &Signature{
 		R: fromHex("4e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd41"),
 		S: fromHex("181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d09"),
 	}
