@@ -8,6 +8,8 @@ import (
 	"bytes"
 	"reflect"
 	"testing"
+
+	"github.com/btcsuite/btcd/wire"
 )
 
 // TestParseOpcode tests for opcode parsing with bad data templates.
@@ -3839,6 +3841,94 @@ func TestGetPreciseSigOps(t *testing.T) {
 		if count != test.nSigOps {
 			t.Errorf("%s: expected count of %d, got %d", test.name,
 				test.nSigOps, count)
+
+		}
+	}
+}
+
+// TestGetWitnessSigOpCount tests that the sig op counting for p2wkh, p2wsh,
+// nested p2sh, and invalid variants are counted properly.
+func TestGetWitnessSigOpCount(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+
+		sigScript []byte
+		pkScript  []byte
+		witness   wire.TxWitness
+
+		numSigOps int
+	}{
+		// A regualr p2wkh witness program. The output being spent
+		// should only have a single sig-op counted.
+		{
+			name: "p2wkh",
+			pkScript: mustParseShortForm("OP_0 DATA_20 " +
+				"0x365ab47888e150ff46f8d51bce36dcd680f1283f"),
+			witness: wire.TxWitness{
+				hexToBytes("3045022100ee9fe8f9487afa977" +
+					"6647ebcf0883ce0cd37454d7ce19889d34ba2c9" +
+					"9ce5a9f402200341cb469d0efd3955acb9e46" +
+					"f568d7e2cc10f9084aaff94ced6dc50a59134ad01"),
+				hexToBytes("03f0000d0639a22bfaf217e4c9428" +
+					"9c2b0cc7fa1036f7fd5d9f61a9d6ec153100e"),
+			},
+			numSigOps: 1,
+		},
+		// A p2wkh witness program nested within a p2sh output script.
+		// The pattern should be recognized properly and attribute only
+		// a single sig op.
+		{
+			name: "nested p2sh",
+			sigScript: hexToBytes("160014ad0ffa2e387f07" +
+				"e7ead14dc56d5a97dbd6ff5a23"),
+			pkScript: mustParseShortForm("HASH160 DATA_20 " +
+				"0xb3a84b564602a9d68b4c9f19c2ea61458ff7826c EQUAL"),
+			witness: wire.TxWitness{
+				hexToBytes("3045022100cb1c2ac1ff1d57d" +
+					"db98f7bdead905f8bf5bcc8641b029ce8eef25" +
+					"c75a9e22a4702203be621b5c86b771288706be5" +
+					"a7eee1db4fceabf9afb7583c1cc6ee3f8297b21201"),
+				hexToBytes("03f0000d0639a22bfaf217e4c9" +
+					"4289c2b0cc7fa1036f7fd5d9f61a9d6ec153100e"),
+			},
+			numSigOps: 1,
+		},
+		// A p2sh script that spends a 2-of-2 multi-sig output.
+		{
+			name:      "p2wsh multi-sig spend",
+			numSigOps: 2,
+			pkScript: hexToBytes("0020e112b88a0cd87ba387f" +
+				"449d443ee2596eb353beb1f0351ab2cba8909d875db23"),
+			witness: wire.TxWitness{
+				hexToBytes("522103b05faca7ceda92b493" +
+					"3f7acdf874a93de0dc7edc461832031cd69cbb1d1e" +
+					"6fae2102e39092e031c1621c902e3704424e8d8" +
+					"3ca481d4d4eeae1b7970f51c78231207e52ae"),
+			},
+		},
+		// A p2wsh witness program. However, the witness script fails
+		// to parse after the valid portion of the script. As a result,
+		// the valid portion of the script should still be counted.
+		{
+			name:      "witness script doesn't parse",
+			numSigOps: 1,
+			pkScript: hexToBytes("0020e112b88a0cd87ba387f44" +
+				"9d443ee2596eb353beb1f0351ab2cba8909d875db23"),
+			witness: wire.TxWitness{
+				mustParseShortForm("DUP HASH160 " +
+					"'17VZNX1SN5NtKa8UQFxwQbFeFc3iqRYhem'" +
+					" EQUALVERIFY CHECKSIG DATA_20 0x91"),
+			},
+		},
+	}
+
+	for _, test := range tests {
+		count := GetWitnessSigOpCount(test.sigScript, test.pkScript,
+			test.witness)
+		if count != test.numSigOps {
+			t.Errorf("%s: expected count of %d, got %d", test.name,
+				test.numSigOps, count)
 
 		}
 	}
