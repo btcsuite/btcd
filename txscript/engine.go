@@ -704,6 +704,68 @@ func NewEngine(scriptPubKey []byte, tx *wire.MsgTx, txIdx int, flags ScriptFlags
 		vm.astack.verifyMinimalData = true
 	}
 
+	// Check to see if we should execute in witness verification mode
+	// according to the set flags. We check both the pkScript, and sigScript
+	// here since in the case of nested p2sh, the scriptSig will be a valid
+	// witness program. For nested p2sh, all the bytes after the first data
+	// push should *exactly* match the witness program template.
+	if vm.hasFlag(ScriptVerifyWitness) {
+		// If witness evaluation is enabled, then P2SH MUST also be
+		// active.
+		if !vm.hasFlag(ScriptBip16) {
+			errStr := "P2SH must be enabled to do witness verification"
+			return nil, scriptError(ErrInvalidFlags, errStr)
+		}
+
+		var witProgram []byte
+
+		switch {
+		case isWitnessProgram(vm.scripts[1]):
+			// The scriptSig must be *empty* for all native witness
+			// programs, otherwise we introduce malleability.
+			if len(scriptSig) != 0 {
+				errStr := "native witness program cannot " +
+					"also have a signature script"
+				return nil, scriptError(ErrWitnessMalleated, errStr)
+			}
+
+			witProgram = scriptPubKey
+		case len(tx.TxIn[txIdx].Witness) != 0 && vm.bip16:
+			// The sigScript MUST be *exactly* a single canonical
+			// data push of the witness program, otherwise we
+			// reintroduce malleability.
+			dataPush := vm.scripts[0][0]
+			if len(vm.scripts[0]) == 1 && canonicalPush(dataPush) &&
+				IsWitnessProgram(dataPush.data) {
+
+				witProgram = dataPush.data
+			} else {
+				errStr := "signature script for witness " +
+					"nested p2sh is not canonical"
+				return nil, scriptError(ErrWitnessMalleatedP2SH, errStr)
+			}
+		}
+
+		if witProgram != nil {
+			var err error
+			vm.witnessVersion, vm.witnessProgram, err = ExtractWitnessProgramInfo(witProgram)
+			if err != nil {
+				return nil, err
+			}
+			vm.witness = true
+		} else {
+			// If we didn't find a witness program in either the
+			// pkScript or as a datapush within the sigScript, then
+			// there MUST NOT be any witness data associated with
+			// the input being validated.
+			if !vm.witness && len(tx.TxIn[txIdx].Witness) != 0 {
+				errStr := "non-witness inputs cannot have a witness"
+				return nil, scriptError(ErrWitnessUnexpected, errStr)
+			}
+		}
+
+	}
+
 	vm.tx = *tx
 	vm.txIdx = txIdx
 
