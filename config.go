@@ -53,7 +53,7 @@ const (
 	blockMaxSizeMax              = wire.MaxBlockPayload - 1000
 	defaultGenerate              = false
 	defaultMaxOrphanTransactions = 100
-	defaultMaxOrphanTxSize       = mempool.MaxStandardTxSize
+	defaultMaxOrphanTxSize       = 100000
 	defaultSigCacheMaxSize       = 100000
 	sampleConfigFilename         = "sample-btcd.conf"
 	defaultTxIndex               = false
