@@ -1,4 +1,4 @@
-// Copyright 2013-2014 The btcsuite developers
+// Copyright 2013-2016 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -20,7 +20,7 @@ func BenchmarkAddJacobian(b *testing.B) {
 	curve := S256()
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		curve.TstAddJacobian(x1, y1, z1, x2, y2, z2, x3, y3, z3)
+		curve.addJacobian(x1, y1, z1, x2, y2, z2, x3, y3, z3)
 	}
 }
 
@@ -39,7 +39,7 @@ func BenchmarkAddJacobianNotZOne(b *testing.B) {
 	curve := S256()
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		curve.TstAddJacobian(x1, y1, z1, x2, y2, z2, x3, y3, z3)
+		curve.addJacobian(x1, y1, z1, x2, y2, z2, x3, y3, z3)
 	}
 }
 

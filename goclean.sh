@@ -10,7 +10,7 @@ set -ex
 
 # Automatic checks
 test -z "$(go fmt $(glide novendor) | tee /dev/stderr)"
-test -z "$(for package in $(glide novendor); do golint $package; done | grep -v 'ALL_CAPS\|OP_\|NewFieldVal' | tee /dev/stderr)"
+test -z "$(for package in $(glide novendor); do golint $package; done | grep -v 'ALL_CAPS\|OP_' | tee /dev/stderr)"
 test -z "$(go vet $(glide novendor) 2>&1 | tee /dev/stderr)"
 env GORACE="halt_on_error=1" go test -v -race -tags rpctest $(glide novendor)
 

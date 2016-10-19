@@ -1,31 +1,29 @@
-// Copyright (c) 2015 The btcsuite developers
+// Copyright (c) 2015-2016 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package btcec_test
+package btcec
 
 import (
 	"bytes"
 	"encoding/hex"
 	"testing"
-
-	"github.com/btcsuite/btcd/btcec"
 )
 
 func TestGenerateSharedSecret(t *testing.T) {
-	privKey1, err := btcec.NewPrivateKey(btcec.S256())
+	privKey1, err := NewPrivateKey(S256())
 	if err != nil {
 		t.Errorf("private key generation error: %s", err)
 		return
 	}
-	privKey2, err := btcec.NewPrivateKey(btcec.S256())
+	privKey2, err := NewPrivateKey(S256())
 	if err != nil {
 		t.Errorf("private key generation error: %s", err)
 		return
 	}
 
-	secret1 := btcec.GenerateSharedSecret(privKey1, privKey2.PubKey())
-	secret2 := btcec.GenerateSharedSecret(privKey2, privKey1.PubKey())
+	secret1 := GenerateSharedSecret(privKey1, privKey2.PubKey())
+	secret2 := GenerateSharedSecret(privKey2, privKey1.PubKey())
 
 	if !bytes.Equal(secret1, secret2) {
 		t.Errorf("ECDH failed, secrets mismatch - first: %x, second: %x",
@@ -35,19 +33,19 @@ func TestGenerateSharedSecret(t *testing.T) {
 
 // Test 1: Encryption and decryption
 func TestCipheringBasic(t *testing.T) {
-	privkey, err := btcec.NewPrivateKey(btcec.S256())
+	privkey, err := NewPrivateKey(S256())
 	if err != nil {
 		t.Fatal("failed to generate private key")
 	}
 
 	in := []byte("Hey there dude. How are you doing? This is a test.")
 
-	out, err := btcec.Encrypt(privkey.PubKey(), in)
+	out, err := Encrypt(privkey.PubKey(), in)
 	if err != nil {
 		t.Fatal("failed to encrypt:", err)
 	}
 
-	dec, err := btcec.Decrypt(privkey, out)
+	dec, err := Decrypt(privkey, out)
 	if err != nil {
 		t.Fatal("failed to decrypt:", err)
 	}
@@ -61,7 +59,7 @@ func TestCipheringBasic(t *testing.T) {
 func TestCiphering(t *testing.T) {
 	pb, _ := hex.DecodeString("fe38240982f313ae5afb3e904fb8215fb11af1200592b" +
 		"fca26c96c4738e4bf8f")
-	privkey, _ := btcec.PrivKeyFromBytes(btcec.S256(), pb)
+	privkey, _ := PrivKeyFromBytes(S256(), pb)
 
 	in := []byte("This is just a test.")
 	out, _ := hex.DecodeString("b0d66e5adaa5ed4e2f0ca68e17b8f2fc02ca002009e3" +
@@ -70,7 +68,7 @@ func TestCiphering(t *testing.T) {
 		"9b0ba77cf14348fcff80fee10e11981f1b4be372d93923e9178972f69937ec850ed" +
 		"6c3f11ff572ddd5b2bedf9f9c0b327c54da02a28fcdce1f8369ffec")
 
-	dec, err := btcec.Decrypt(privkey, out)
+	dec, err := Decrypt(privkey, out)
 	if err != nil {
 		t.Fatal("failed to decrypt:", err)
 	}
@@ -81,7 +79,7 @@ func TestCiphering(t *testing.T) {
 }
 
 func TestCipheringErrors(t *testing.T) {
-	privkey, err := btcec.NewPrivateKey(btcec.S256())
+	privkey, err := NewPrivateKey(S256())
 	if err != nil {
 		t.Fatal("failed to generate private key")
 	}
@@ -154,7 +152,7 @@ func TestCipheringErrors(t *testing.T) {
 	}
 
 	for i, test := range tests1 {
-		_, err = btcec.Decrypt(privkey, test.ciphertext)
+		_, err = Decrypt(privkey, test.ciphertext)
 		if err == nil {
 			t.Errorf("Decrypt #%d did not get error", i)
 		}
@@ -168,7 +166,7 @@ func TestCipheringErrors(t *testing.T) {
 		{bytes.Repeat([]byte{0x07}, 15)},
 	}
 	for i, test := range tests2 {
-		_, err = btcec.TstRemovePKCSPadding(test.in)
+		_, err = removePKCSPadding(test.in)
 		if err == nil {
 			t.Errorf("removePKCSPadding #%d did not get error", i)
 		}

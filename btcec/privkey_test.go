@@ -1,14 +1,12 @@
-// Copyright (c) 2013-2014 The btcsuite developers
+// Copyright (c) 2013-2016 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package btcec_test
+package btcec
 
 import (
 	"bytes"
 	"testing"
-
-	"github.com/btcsuite/btcd/btcec"
 )
 
 func TestPrivKeys(t *testing.T) {
@@ -28,10 +26,9 @@ func TestPrivKeys(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		priv, pub := btcec.PrivKeyFromBytes(btcec.S256(), test.key)
+		priv, pub := PrivKeyFromBytes(S256(), test.key)
 
-		_, err := btcec.ParsePubKey(
-			pub.SerializeUncompressed(), btcec.S256())
+		_, err := ParsePubKey(pub.SerializeUncompressed(), S256())
 		if err != nil {
 			t.Errorf("%s privkey: %v", test.name, err)
 			continue
