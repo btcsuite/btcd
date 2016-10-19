@@ -70,6 +70,98 @@ func IsPayToScriptHash(script []byte) bool {
 	return isScriptHash(pops)
 }
 
+// isWitnessScriptHash returns true if the passed script is a
+// pay-to-witness-script-hash transaction, false otherwise.
+func isWitnessScriptHash(pops []parsedOpcode) bool {
+	return len(pops) == 2 &&
+		pops[0].opcode.value == OP_0 &&
+		pops[1].opcode.value == OP_DATA_32
+}
+
+// IsPayToWitnessScriptHash returns true if the is in the standard
+// pay-to-witness-script-hash (P2WSH) format, false otherwise.
+func IsPayToWitnessScriptHash(script []byte) bool {
+	pops, err := parseScript(script)
+	if err != nil {
+		return false
+	}
+	return isWitnessScriptHash(pops)
+}
+
+// IsPayToWitnessPubKeyHash returns true if the is in the standard
+// pay-to-witness-pubkey-hash (P2WKH) format, false otherwise.
+func IsPayToWitnessPubKeyHash(script []byte) bool {
+	pops, err := parseScript(script)
+	if err != nil {
+		return false
+	}
+	return isWitnessPubKeyHash(pops)
+}
+
+// isWitnessPubKeyHash returns true if the passed script is a
+// pay-to-witness-pubkey-hash, and false otherwise.
+func isWitnessPubKeyHash(pops []parsedOpcode) bool {
+	return len(pops) == 2 &&
+		pops[0].opcode.value == OP_0 &&
+		pops[1].opcode.value == OP_DATA_20
+}
+
+// IsWitnessProgram returns true if the passed script is a valid witness
+// program which is encoded according to the passed witness program version. A
+// witness program must be a small integer (from 0-16), followed by 2-40 bytes
+// of pushed data.
+func IsWitnessProgram(script []byte) bool {
+	// The length of the script must be between 4 and 42 bytes. The
+	// smallest program is the witness version, followed by a data push of
+	// 2 bytes.  The largest allowed witness program has a data push of
+	// 40-bytes.
+	if len(script) < 4 || len(script) > 42 {
+		return false
+	}
+
+	pops, err := parseScript(script)
+	if err != nil {
+		return false
+	}
+
+	return isWitnessProgram(pops)
+}
+
+// isWitnessProgram returns true if the passed script is a witness program, and
+// false otherwise. A witness program MUST adhere to the following constraints:
+// there must be excatly two pops (program version and the program itself), the
+// first opcode MUST be a small integer (0-16), the push data MUST be
+// cannonical, and finally the size of the push data must be between 2 and 40
+// bytes.
+func isWitnessProgram(pops []parsedOpcode) bool {
+	return len(pops) == 2 &&
+		isSmallInt(pops[0].opcode) &&
+		canonicalPush(pops[1]) &&
+		(len(pops[1].data) >= 2 && len(pops[1].data) <= 40)
+}
+
+// ExtractWitnessProgramInfo attempts to extract the witness program version,
+// as well as the witness program itself from the passed script.
+func ExtractWitnessProgramInfo(script []byte) (int, []byte, error) {
+	pops, err := parseScript(script)
+	if err != nil {
+		return 0, nil, err
+	}
+
+	// If at this point, the scripts doesn't resemble a witness program,
+	// then we'll exit early as there isn't a valid version or program to
+	// extract.
+	if !isWitnessProgram(pops) {
+		return 0, nil, fmt.Errorf("script is not a witness program, " +
+			"unable to extract version or witness program")
+	}
+
+	witnessVersion := asSmallInt(pops[0].opcode)
+	witnessProgram := pops[1].data
+
+	return witnessVersion, witnessProgram, nil
+}
+
 // isPushOnly returns true if the script only pushes data, false otherwise.
 func isPushOnly(pops []parsedOpcode) bool {
 	// NOTE: This function does NOT verify opcodes directly since it is
