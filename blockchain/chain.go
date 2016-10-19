@@ -654,35 +654,6 @@ func (b *BlockChain) removeBlockNode(node *blockNode) error {
 	return nil
 }
 
-// isMajorityVersion determines if a previous number of blocks in the chain
-// starting with startNode are at least the minimum passed version.
-//
-// This function MUST be called with the chain state lock held (for writes).
-func (b *BlockChain) isMajorityVersion(minVer int32, startNode *blockNode, numRequired uint64) bool {
-	numFound := uint64(0)
-	iterNode := startNode
-	for i := uint64(0); i < b.chainParams.BlockUpgradeNumToCheck &&
-		numFound < numRequired && iterNode != nil; i++ {
-		// This node has a version that is at least the minimum version.
-		if iterNode.version >= minVer {
-			numFound++
-		}
-
-		// Get the previous block node.  This function is used over
-		// simply accessing iterNode.parent directly as it will
-		// dynamically create previous block nodes as needed.  This
-		// helps allow only the pieces of the chain that are needed
-		// to remain in memory.
-		var err error
-		iterNode, err = b.getPrevNodeFromNode(iterNode)
-		if err != nil {
-			break
-		}
-	}
-
-	return numFound >= numRequired
-}
-
 // calcPastMedianTime calculates the median time of the previous few blocks
 // prior to, and including, the passed block node.  It is primarily used to
 // validate new blocks have sane timestamps.
