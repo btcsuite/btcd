@@ -1031,25 +1031,86 @@ func TestStringifyClass(t *testing.T) {
 
 // TestNullDataScript tests whether NullDataScript returns a valid script.
 func TestNullDataScript(t *testing.T) {
-	data := []byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
-		17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33,
-		34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50,
-		51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67,
-		68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79}
+	tiny := hexToBytes("01")
+	short := hexToBytes("0102030405060708090a0b0c0d0e0f1" +
+		"01112131415161718")
+	shortExp := hexToBytes("6a180102030405060708090a0b0c0d0e0f1" +
+		"01112131415161718")
+	justRight := hexToBytes("000102030405060708090a0b0c0d0e0f" +
+		"101112131415161718191a1b1c1d1e1f20212223242526272829" +
+		"2a2b2c2d2e2f303132333435363738393a3b3c3d3e3f40414243" +
+		"4445464748494a4b4c4d4e4f")
+	tooLong := hexToBytes("000102030405060708090a0b0c0d0e0f" +
+		"101112131415161718191a1b1c1d1e1f20212223242526272829" +
+		"2a2b2c2d2e2f303132333435363738393a3b3c3d3e3f40414243" +
+		"4445464748494a4b4c4d4e4f50")
 
-	tooLong := append(data, byte(80))
-
-	script, err := txscript.NullDataScript(data)
-	if err != nil {
-		t.Error("Error returned creating script: ", err)
+	tests := []struct {
+		name     string
+		data     []byte
+		valid    bool
+		expected []byte
+	}{
+		{
+			name:     "small data",
+			data:     tiny,
+			valid:    true,
+			expected: []byte{0x6a, 0x51},
+		},
+		{
+			name:     "data of size before OP_PUSHDATA1 is needed",
+			data:     short,
+			valid:    true,
+			expected: shortExp,
+		},
+		{
+			name:  "just right",
+			data:  justRight,
+			valid: true,
+			expected: append([]byte{
+				OP_RETURN, OP_PUSHDATA1, 80},
+				justRight...),
+		},
+		{
+			name:     "too big",
+			data:     tooLong,
+			valid:    false,
+			expected: nil,
+		},
 	}
-	scriptType := txscript.GetScriptClass(script)
-	if scriptType != txscript.NullDataTy {
-		t.Error("Expected a NullDataTy, got ", scriptType)
-	}
 
-	_, tooLongErr := txscript.NullDataScript(tooLong)
-	if tooLongErr == nil || tooLongErr != txscript.ErrStackLongScript {
-		t.Error("Expected ErrStackLongScript, got ", tooLongErr)
+	for _, test := range tests {
+		script, err := NullDataScript(test.data)
+
+		if !test.valid {
+			if err == nil {
+				t.Errorf("NullDataScript test %v: expected error but none was returned. ",
+					test.name)
+			}
+
+			continue
+		}
+
+		if err != nil {
+			t.Errorf("NullDataScript test %v: Unexpected error returned %v ",
+				test.name, err)
+
+			continue
+		}
+
+		// Check that the expected result was returned.
+		if !bytes.Equal(script, test.expected) {
+			t.Errorf("NullDataScript test %v: Expected %x, got %x",
+				test.name, test.expected, script)
+
+			continue
+		}
+
+		// Check that the script has the correct type.
+		scriptType := GetScriptClass(script)
+		if scriptType != NullDataTy {
+			t.Errorf("NullDataScript test %v: Expected NullDataTy, got %v",
+				test.name, scriptType)
+		}
 	}
 }
