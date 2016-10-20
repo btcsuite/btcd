@@ -576,6 +576,18 @@ func ExtractCoinbaseHeight(coinbaseTx *btcutil.Tx) (int32, error) {
 		return 0, ruleError(ErrMissingCoinbaseHeight, str)
 	}
 
+	// Detect the case when the block height is a small integer encoded with
+	// as single byte.
+	opcode := int(sigScript[0])
+	if opcode == txscript.OP_0 {
+		return 0, nil
+	}
+	if opcode >= txscript.OP_1 && opcode <= txscript.OP_16 {
+		return int32(opcode - (txscript.OP_1 - 1)), nil
+	}
+
+	// Otherwise, the opcode is the length of the following bytes which
+	// encode in the block height.
 	serializedLen := int(sigScript[0])
 	if len(sigScript[1:]) < serializedLen {
 		str := "the coinbase signature script for blocks of " +
