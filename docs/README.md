@@ -238,26 +238,28 @@ information.
 <a name="GoPackages" />
 * The btcsuite Bitcoin-related Go Packages:
     * [btcrpcclient](https://github.com/btcsuite/btcrpcclient) - Implements a
-	  robust and easy to use Websocket-enabled Bitcoin JSON-RPC client
+      robust and easy to use Websocket-enabled Bitcoin JSON-RPC client
     * [btcjson](https://github.com/btcsuite/btcjson) - Provides an extensive API
-	  for the underlying JSON-RPC command and return values
+      for the underlying JSON-RPC command and return values
     * [wire](https://github.com/btcsuite/btcd/tree/master/wire) - Implements the
-	  Bitcoin wire protocol
+      Bitcoin wire protocol
     * [peer](https://github.com/btcsuite/btcd/tree/master/peer) -
-	  Provides a common base for creating and managing Bitcoin network peers.
+      Provides a common base for creating and managing Bitcoin network peers.
     * [blockchain](https://github.com/btcsuite/btcd/tree/master/blockchain) -
-	  Implements Bitcoin block handling and chain selection rules
+      Implements Bitcoin block handling and chain selection rules
+    * [blockchain/fullblocktests](https://github.com/btcsuite/btcd/tree/master/blockchain/fullblocktests) -
+      Provides a set of block tests for testing the consensus validation rules
     * [txscript](https://github.com/btcsuite/btcd/tree/master/txscript) -
-	  Implements the Bitcoin transaction scripting language
+      Implements the Bitcoin transaction scripting language
     * [btcec](https://github.com/btcsuite/btcd/tree/master/btcec) - Implements
-	  support for the elliptic curve cryptographic functions needed for the
-	  Bitcoin scripts
+      support for the elliptic curve cryptographic functions needed for the
+      Bitcoin scripts
     * [database](https://github.com/btcsuite/btcd/tree/master/database) -
-	  Provides a database interface for the Bitcoin block chain
+      Provides a database interface for the Bitcoin block chain
     * [btcutil](https://github.com/btcsuite/btcutil) - Provides Bitcoin-specific
-	  convenience functions and types
+      convenience functions and types
     * [chainhash](https://github.com/btcsuite/btcd/tree/master/chaincfg/chainhash) -
-          Provides a generic hash type and associated functions that allows the
-          specific hash algorithm to be abstracted.
+      Provides a generic hash type and associated functions that allows the
+      specific hash algorithm to be abstracted.
     * [connmgr](https://github.com/btcsuite/btcd/tree/master/connmgr) -
-          Package connmgr implements a generic Bitcoin network connection manager.
+      Package connmgr implements a generic Bitcoin network connection manager.
