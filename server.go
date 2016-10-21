@@ -1624,7 +1624,7 @@ func (s *server) listenHandler(listener net.Listener) {
 		sp := newServerPeer(s, false)
 		sp.Peer = peer.NewInboundPeer(newPeerConfig(sp))
 		go s.peerDoneHandler(sp)
-		sp.Connect(conn)
+		sp.AssociateConnection(conn)
 	}
 	s.wg.Done()
 	srvrLog.Tracef("Listener handler done for %s", listener.Addr())
@@ -1720,7 +1720,7 @@ func (s *server) establishConn(sp *serverPeer) error {
 	if err != nil {
 		return err
 	}
-	sp.Connect(conn)
+	sp.AssociateConnection(conn)
 	s.addrManager.Attempt(sp.NA())
 	return nil
 }
