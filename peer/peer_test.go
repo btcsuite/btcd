@@ -251,13 +251,13 @@ func TestPeerConnection(t *testing.T) {
 					&conn{raddr: "10.0.0.2:8333"},
 				)
 				inPeer := peer.NewInboundPeer(peerCfg)
-				inPeer.Connect(inConn)
+				inPeer.AssociateConnection(inConn)
 
 				outPeer, err := peer.NewOutboundPeer(peerCfg, "10.0.0.2:8333")
 				if err != nil {
 					return nil, nil, err
 				}
-				outPeer.Connect(outConn)
+				outPeer.AssociateConnection(outConn)
 
 				for i := 0; i < 4; i++ {
 					select {
@@ -277,13 +277,13 @@ func TestPeerConnection(t *testing.T) {
 					&conn{raddr: "10.0.0.2:8333"},
 				)
 				inPeer := peer.NewInboundPeer(peerCfg)
-				inPeer.Connect(inConn)
+				inPeer.AssociateConnection(inConn)
 
 				outPeer, err := peer.NewOutboundPeer(peerCfg, "10.0.0.2:8333")
 				if err != nil {
 					return nil, nil, err
 				}
-				outPeer.Connect(outConn)
+				outPeer.AssociateConnection(outConn)
 
 				for i := 0; i < 4; i++ {
 					select {
@@ -396,7 +396,7 @@ func TestPeerListeners(t *testing.T) {
 		&conn{raddr: "10.0.0.2:8333"},
 	)
 	inPeer := peer.NewInboundPeer(peerCfg)
-	inPeer.Connect(inConn)
+	inPeer.AssociateConnection(inConn)
 
 	peerCfg.Listeners = peer.MessageListeners{
 		OnVerAck: func(p *peer.Peer, msg *wire.MsgVerAck) {
@@ -408,7 +408,7 @@ func TestPeerListeners(t *testing.T) {
 		t.Errorf("NewOutboundPeer: unexpected err %v\n", err)
 		return
 	}
-	outPeer.Connect(outConn)
+	outPeer.AssociateConnection(outConn)
 
 	for i := 0; i < 2; i++ {
 		select {
@@ -550,8 +550,8 @@ func TestOutboundPeer(t *testing.T) {
 	}
 
 	// Test trying to connect twice.
-	p.Connect(c)
-	p.Connect(c)
+	p.AssociateConnection(c)
+	p.AssociateConnection(c)
 
 	disconnected := make(chan struct{})
 	go func() {
@@ -604,7 +604,7 @@ func TestOutboundPeer(t *testing.T) {
 		t.Errorf("NewOutboundPeer: unexpected err - %v\n", err)
 		return
 	}
-	p1.Connect(c1)
+	p1.AssociateConnection(c1)
 
 	// Test update latest block
 	latestBlockHash, err := chainhash.NewHashFromStr("1a63f9cdff1752e6375c8c76e543a71d239e1a2e5c6db1aa679")
@@ -634,7 +634,7 @@ func TestOutboundPeer(t *testing.T) {
 		t.Errorf("NewOutboundPeer: unexpected err - %v\n", err)
 		return
 	}
-	p2.Connect(c2)
+	p2.AssociateConnection(c2)
 
 	// Test PushXXX
 	var addrs []*wire.NetAddress
