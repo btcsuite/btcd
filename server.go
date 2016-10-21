@@ -353,15 +353,6 @@ func (sp *serverPeer) OnVersion(p *peer.Peer, msg *wire.MsgVersion) {
 
 			// Mark the address as a known good address.
 			addrManager.Good(p.NA())
-		} else {
-			// A peer might not be advertising the same address that it
-			// actually connected from.  One example of why this can happen
-			// is with NAT.  Only add the address to the address manager if
-			// the addresses agree.
-			if addrmgr.NetAddressKey(&msg.AddrMe) == addrmgr.NetAddressKey(p.NA()) {
-				addrManager.AddAddress(p.NA(), p.NA())
-				addrManager.Good(p.NA())
-			}
 		}
 	}
 
