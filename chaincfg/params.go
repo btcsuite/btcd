@@ -50,6 +50,16 @@ type Checkpoint struct {
 	Hash   *chainhash.Hash
 }
 
+// DNSSeed identifies a DNS seed.
+type DNSSeed struct {
+	// Host defines the hostname of the seed.
+	Host string
+
+	// HasFiltering defines whether the seed supports filtering
+	// by service flags (wire.ServiceFlag).
+	HasFiltering bool
+}
+
 // Params defines a Bitcoin network by its parameters.  These parameters may be
 // used by Bitcoin applications to differentiate networks as well as addresses
 // and keys for one network from those intended for use on another network.
@@ -65,7 +75,7 @@ type Params struct {
 
 	// DNSSeeds defines a list of DNS seeds for the network that are used
 	// as one method to discover peers.
-	DNSSeeds []string
+	DNSSeeds []DNSSeed
 
 	// GenesisBlock defines the first block of the chain.
 	GenesisBlock *wire.MsgBlock
@@ -155,14 +165,14 @@ var MainNetParams = Params{
 	Name:        "mainnet",
 	Net:         wire.MainNet,
 	DefaultPort: "8333",
-	DNSSeeds: []string{
-		"seed.bitcoin.sipa.be",
-		"dnsseed.bluematt.me",
-		"dnsseed.bitcoin.dashjr.org",
-		"seed.bitcoinstats.com",
-		"seed.bitnodes.io",
-		"bitseed.xf2.org",
-		"seed.bitcoin.jonasschnelli.ch",
+	DNSSeeds: []DNSSeed{
+		{"seed.bitcoin.sipa.be", true},
+		{"dnsseed.bluematt.me", true},
+		{"dnsseed.bitcoin.dashjr.org", false},
+		{"seed.bitcoinstats.com", true},
+		{"seed.bitnodes.io", false},
+		{"bitseed.xf2.org", false},
+		{"seed.bitcoin.jonasschnelli.ch", true},
 	},
 
 	// Chain parameters
@@ -235,7 +245,7 @@ var RegressionNetParams = Params{
 	Name:        "regtest",
 	Net:         wire.TestNet,
 	DefaultPort: "18444",
-	DNSSeeds:    []string{},
+	DNSSeeds:    []DNSSeed{},
 
 	// Chain parameters
 	GenesisBlock:             &regTestGenesisBlock,
@@ -288,10 +298,11 @@ var TestNet3Params = Params{
 	Name:        "testnet3",
 	Net:         wire.TestNet3,
 	DefaultPort: "18333",
-	DNSSeeds: []string{
-		"testnet-seed.bitcoin.schildbach.de",
-		"testnet-seed.bitcoin.petertodd.org",
-		"testnet-seed.bluematt.me",
+	DNSSeeds: []DNSSeed{
+		{"testnet-seed.bitcoin.jonasschnelli.ch", true},
+		{"testnet-seed.bitcoin.schildbach.de", false},
+		{"seed.tbtc.petertodd.org", true},
+		{"testnet-seed.bluematt.me", false},
 	},
 
 	// Chain parameters
@@ -351,7 +362,7 @@ var SimNetParams = Params{
 	Name:        "simnet",
 	Net:         wire.SimNet,
 	DefaultPort: "18555",
-	DNSSeeds:    []string{}, // NOTE: There must NOT be any seeds.
+	DNSSeeds:    []DNSSeed{}, // NOTE: There must NOT be any seeds.
 
 	// Chain parameters
 	GenesisBlock:             &simNetGenesisBlock,
@@ -415,6 +426,11 @@ var (
 	scriptHashAddrIDs = make(map[byte]struct{})
 	hdPrivToPubKeyIDs = make(map[[4]byte][]byte)
 )
+
+// String returns the hostname of the DNS seed in human-readable form.
+func (d DNSSeed) String() string {
+	return d.Host
+}
 
 // Register registers the network parameters for a Bitcoin network.  This may
 // error with ErrDuplicateNet if the network is already registered (either
