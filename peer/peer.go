@@ -784,11 +784,17 @@ func (p *Peer) localVersionMsg() (*wire.MsgVersion, error) {
 		}
 	}
 
-	// TODO(tuxcanfly): In case BestLocalAddress is nil, ourNA defaults to
-	// remote NA, which is wrong. Need to fix this.
-	ourNA := p.na
-	if p.cfg.BestLocalAddress != nil {
-		ourNA = p.cfg.BestLocalAddress(p.na)
+	// Create a wire.NetAddress with only the services set to use as the
+	// "addrme" in the version message.
+	//
+	// Older nodes previously added the IP and port information to the
+	// address manager which proved to be unreliable as an inbound
+	// connection from a peer didn't necessarily mean the peer itself
+	// accepted inbound connections.
+	//
+	// Also, the timestamp is unused in the version message.
+	ourNA := &wire.NetAddress{
+		Services: p.cfg.Services,
 	}
 
 	// Generate a unique nonce for this peer so self connections can be
