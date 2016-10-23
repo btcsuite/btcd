@@ -196,9 +196,6 @@ type Config struct {
 	// reported.
 	NewestBlock HashFunc
 
-	// BestLocalAddress returns the best local address for a given address.
-	BestLocalAddress AddrFunc
-
 	// HostToNetAddress returns the netaddress for the given host. This can be
 	// nil in  which case the host will be parsed as an IP address.
 	HostToNetAddress HostToNetAddrFunc
