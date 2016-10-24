@@ -44,6 +44,7 @@ type GetStakeInfoResult struct {
 	Missed           uint32  `json:"missed"`
 	ProportionMissed float64 `json:"proportionmissed"`
 	Revoked          uint32  `json:"revoked"`
+	Expired          uint32  `json:"expired"`
 }
 
 // GetTicketsResult models the data returned from the gettickets

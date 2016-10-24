@@ -51,9 +51,9 @@ import (
 
 // API version constants
 const (
-	jsonrpcSemverString = "1.1.0"
+	jsonrpcSemverString = "1.2.0"
 	jsonrpcSemverMajor  = 1
-	jsonrpcSemverMinor  = 1
+	jsonrpcSemverMinor  = 2
 	jsonrpcSemverPatch  = 0
 )
 
@@ -186,6 +186,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"estimatestakediff":     handleEstimateStakeDiff,
 	"existsaddress":         handleExistsAddress,
 	"existsaddresses":       handleExistsAddresses,
+	"existsexpiredtickets":  handleExistsExpiredTickets,
 	"existsliveticket":      handleExistsLiveTicket,
 	"existslivetickets":     handleExistsLiveTickets,
 	"existsmempooltxs":      handleExistsMempoolTxs,
@@ -1745,6 +1746,36 @@ func handleExistsAddresses(s *rpcServer, cmd interface{},
 
 	// Convert the slice of bools into a compacted set of bit flags.
 	set := bitset.NewBytes(len(c.Addresses))
+	for i := range exists {
+		if exists[i] {
+			set.Set(i)
+		}
+	}
+
+	return hex.EncodeToString([]byte(set)), nil
+}
+
+// handleExistsExpiredTickets implements the existsexpiredtickets command.
+func handleExistsExpiredTickets(s *rpcServer, cmd interface{},
+	closeChan <-chan struct{}) (interface{}, error) {
+	c := cmd.(*dcrjson.ExistsExpiredTicketsCmd)
+
+	hashes, err := dcrjson.DecodeConcatenatedHashes(c.TxHashBlob)
+	if err != nil {
+		return nil, err
+	}
+
+	exists := s.server.blockManager.chain.CheckExpiredTickets(hashes)
+	if len(exists) != len(hashes) {
+		return nil, &dcrjson.RPCError{
+			Code: dcrjson.ErrRPCDatabase,
+			Message: fmt.Sprintf("output of ExistsExpiredTickets wrong size "+
+				"(want %v, got %v)", len(hashes), len(exists)),
+		}
+	}
+
+	// Convert the slice of bools into a compacted set of bit flags.
+	set := bitset.NewBytes(len(hashes))
 	for i := range exists {
 		if exists[i] {
 			set.Set(i)

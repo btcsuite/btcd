@@ -171,6 +171,11 @@ var helpDescsEnUS = map[string]string{
 	"existsaddresses-addresses": "The addresses to check",
 	"existsaddresses--result0":  "Bitset of bools showing if addresses exist or not",
 
+	// ExistsExpiredTicketsCmd help.
+	"existsexpiredtickets--synopsis":  "Test for the existance of the provided tickets in the expired ticket map",
+	"existsexpiredtickets-txhashblob": "Blob containing the hashes to check",
+	"existsexpiredtickets--result0":   "Bool blob showing if ticket exists in the expired ticket database or not",
+
 	// ExistsLiveTicketCmd help.
 	"existsliveticket--synopsis": "Test for the existance of the provided ticket",
 	"existsliveticket-txhash":    "The ticket hash to check",
@@ -836,6 +841,7 @@ var rpcResultTypes = map[string][]interface{}{
 	"estimatestakediff":     {(*dcrjson.EstimateStakeDiffResult)(nil)},
 	"existsaddress":         {(*bool)(nil)},
 	"existsaddresses":       {(*string)(nil)},
+	"existsexpiredtickets":  {(*string)(nil)},
 	"existsliveticket":      {(*bool)(nil)},
 	"existslivetickets":     {(*string)(nil)},
 	"existsmempooltxs":      {(*string)(nil)},
