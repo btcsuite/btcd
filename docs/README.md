@@ -256,6 +256,9 @@ information.
       Bitcoin scripts
     * [database](https://github.com/btcsuite/btcd/tree/master/database) -
       Provides a database interface for the Bitcoin block chain
+    * [mempool](https://github.com/btcsuite/btcd/tree/master/mempool) -
+      Package mempool provides a policy-enforced pool of unmined bitcoin
+      transactions.
     * [btcutil](https://github.com/btcsuite/btcutil) - Provides Bitcoin-specific
       convenience functions and types
     * [chainhash](https://github.com/btcsuite/btcd/tree/master/chaincfg/chainhash) -
