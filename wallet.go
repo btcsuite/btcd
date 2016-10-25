@@ -3185,6 +3185,36 @@ func (c *Client) SetTicketMaxPrice(maxPrice float64) error {
 	return c.SetTicketMaxPriceAsync(maxPrice).Receive()
 }
 
+// FutureSetBalanceToMaintainResult is a future promise to deliver the result of
+// a SetBalanceToMaintainAsync RPC invocation (or an applicable error).
+type FutureSetBalanceToMaintainResult chan *response
+
+// Receive waits for the response promised by the future and returns the info
+// provided by the server.
+func (r FutureSetBalanceToMaintainResult) Receive() error {
+	_, err := receiveFuture(r)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// SetBalanceToMaintainAsync returns an instance of a type that can be used to
+// get the result of the RPC at some future time by invoking the Receive
+// function on the returned instance.
+//
+// See SetBalanceToMaintain for the blocking version and more details.
+func (c *Client) SetBalanceToMaintainAsync(maxPrice float64) FutureSetBalanceToMaintainResult {
+	cmd := dcrjson.NewSetBalanceToMaintainCmd(maxPrice)
+	return c.sendCmd(cmd)
+}
+
+// SetBalanceToMaintain sets the balance to maintain.
+func (c *Client) SetBalanceToMaintain(balanceToMaintain float64) error {
+	return c.SetBalanceToMaintainAsync(balanceToMaintain).Receive()
+}
+
 // FutureListScriptsResult is a future promise to deliver the result of a
 // ListScriptsAsync RPC invocation (or an applicable error).
 type FutureListScriptsResult chan *response
