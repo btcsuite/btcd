@@ -41,13 +41,13 @@ func TestCalcMinRequiredTxRelayFee(t *testing.T) {
 		},
 		{
 			"max standard tx size with default minimum relay fee",
-			maxStandardTxSize,
+			MaxStandardTxSize,
 			DefaultMinRelayTxFee,
 			100000,
 		},
 		{
 			"max standard tx size with max satoshi relay fee",
-			maxStandardTxSize,
+			MaxStandardTxSize,
 			btcutil.MaxSatoshi,
 			btcutil.MaxSatoshi,
 		},
@@ -360,7 +360,7 @@ func TestCheckTransactionStandard(t *testing.T) {
 				TxOut: []*wire.TxOut{{
 					Value: 0,
 					PkScript: bytes.Repeat([]byte{0x00},
-						maxStandardTxSize+1),
+						MaxStandardTxSize+1),
 				}},
 				LockTime: 0,
 			},

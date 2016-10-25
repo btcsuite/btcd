@@ -19,10 +19,10 @@ const (
 	// that are considered standard in a pay-to-script-hash script.
 	maxStandardP2SHSigOps = 15
 
-	// maxStandardTxSize is the maximum size allowed for transactions that
+	// MaxStandardTxSize is the maximum size allowed for transactions that
 	// are considered standard and will therefore be relayed and considered
 	// for mining.
-	maxStandardTxSize = 100000
+	MaxStandardTxSize = 100000
 
 	// maxStandardSigScriptSize is the maximum size allowed for a
 	// transaction input signature script to be considered standard.  This
@@ -276,9 +276,9 @@ func checkTransactionStandard(tx *btcutil.Tx, height int32,
 	// size of a transaction.  This also helps mitigate CPU exhaustion
 	// attacks.
 	serializedLen := msgTx.SerializeSize()
-	if serializedLen > maxStandardTxSize {
+	if serializedLen > MaxStandardTxSize {
 		str := fmt.Sprintf("transaction size of %v is larger than max "+
-			"allowed size of %v", serializedLen, maxStandardTxSize)
+			"allowed size of %v", serializedLen, MaxStandardTxSize)
 		return txRuleError(wire.RejectNonstandard, str)
 	}
 

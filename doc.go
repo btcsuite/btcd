@@ -94,7 +94,7 @@ Application Options:
       --norelaypriority     Do not require free or low-fee transactions to have
                             high priority for relaying
       --maxorphantx=        Max number of orphan transactions to keep in memory
-                            (1000)
+                            (100)
       --generate            Generate (mine) bitcoins using the CPU
       --miningaddr=         Add the specified payment address to the list of
                             addresses to use for generated blocks -- At least
