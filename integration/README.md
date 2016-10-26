@@ -6,8 +6,8 @@ integration
 (http://img.shields.io/badge/license-ISC-blue.svg)](http://copyfree.org)
 
 This contains integration tests which make use of the
-[rpctest](https://github.com/btcsuite/btcd/tree/master/rpctest) package to
-programmatically drive nodes via RPC.
+[rpctest](https://github.com/btcsuite/btcd/tree/master/integration/rpctest)
+package to programmatically drive nodes via RPC.
 
 ## License
 
