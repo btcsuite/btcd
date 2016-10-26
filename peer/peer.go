@@ -829,7 +829,7 @@ func (p *Peer) localVersionMsg() (*wire.MsgVersion, error) {
 	msg.Services = p.cfg.Services
 
 	// Advertise our max supported protocol version.
-	msg.ProtocolVersion = int32(p.ProtocolVersion())
+	msg.ProtocolVersion = int32(p.cfg.ProtocolVersion)
 
 	// Advertise if inv messages for transactions are desired.
 	msg.DisableRelayTx = p.cfg.DisableRelayTx
@@ -2040,12 +2040,12 @@ func (p *Peer) negotiateOutboundProtocol() error {
 // newPeerBase returns a new base bitcoin peer based on the inbound flag.  This
 // is used by the NewInboundPeer and NewOutboundPeer functions to perform base
 // setup needed by both types of peers.
-func newPeerBase(cfg *Config, inbound bool) *Peer {
-	// Default to the max supported protocol version.  Override to the
-	// version specified by the caller if configured.
-	protocolVersion := uint32(MaxProtocolVersion)
-	if cfg.ProtocolVersion != 0 {
-		protocolVersion = cfg.ProtocolVersion
+func newPeerBase(origCfg *Config, inbound bool) *Peer {
+	// Default to the max supported protocol version if not specified by the
+	// caller.
+	cfg := *origCfg // Copy to avoid mutating caller.
+	if cfg.ProtocolVersion == 0 {
+		cfg.ProtocolVersion = uint32(MaxProtocolVersion)
 	}
 
 	// Set the chain parameters to testnet if the caller did not specify any.
@@ -2065,9 +2065,9 @@ func newPeerBase(cfg *Config, inbound bool) *Peer {
 		queueQuit:       make(chan struct{}),
 		outQuit:         make(chan struct{}),
 		quit:            make(chan struct{}),
-		cfg:             *cfg, // Copy so caller can't mutate.
+		cfg:             cfg, // Copy so caller can't mutate.
 		services:        cfg.Services,
-		protocolVersion: protocolVersion,
+		protocolVersion: cfg.ProtocolVersion,
 	}
 	return &p
 }
