@@ -34,6 +34,7 @@ import (
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcd/mempool"
+	"github.com/btcsuite/btcd/mining"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
@@ -98,7 +99,8 @@ var (
 	// data.
 	gbtCoinbaseAux = &btcjson.GetBlockTemplateResultAux{
 		Flags: hex.EncodeToString(builderScript(txscript.
-			NewScriptBuilder().AddData([]byte(coinbaseFlags)))),
+			NewScriptBuilder().
+			AddData([]byte(mining.CoinbaseFlags)))),
 	}
 
 	// gbtCapabilities describes additional capabilities returned with a
@@ -349,7 +351,7 @@ type gbtWorkState struct {
 	lastGenerated time.Time
 	prevHash      *chainhash.Hash
 	minTimestamp  time.Time
-	template      *BlockTemplate
+	template      *mining.BlockTemplate
 	notifyMap     map[chainhash.Hash]map[int64]chan struct{}
 	timeSource    blockchain.MedianTimeSource
 }
@@ -1398,11 +1400,11 @@ func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bo
 		targetDifficulty = fmt.Sprintf("%064x",
 			blockchain.CompactToBig(msgBlock.Header.Bits))
 
-		// Find the minimum allowed timestamp for the block based on the
+		// Get the minimum allowed timestamp for the block based on the
 		// median timestamp of the last several blocks per the chain
 		// consensus rules.
 		best := s.server.blockManager.chain.BestSnapshot()
-		minTimestamp := minimumMedianTime(best)
+		minTimestamp := mining.MinimumMedianTime(best)
 
 		// Update work state to ensure another block template isn't
 		// generated until needed.
@@ -3654,7 +3656,7 @@ func handleVerifyMessage(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 type rpcServer struct {
 	started                int32
 	shutdown               int32
-	generator              *BlkTmplGenerator
+	generator              *mining.BlkTmplGenerator
 	server                 *server
 	chain                  *blockchain.BlockChain
 	authsha                [fastsha256.Size]byte
@@ -4160,7 +4162,7 @@ func genCertPair(certFile, keyFile string) error {
 }
 
 // newRPCServer returns a new instance of the rpcServer struct.
-func newRPCServer(listenAddrs []string, generator *BlkTmplGenerator, s *server) (*rpcServer, error) {
+func newRPCServer(listenAddrs []string, generator *mining.BlkTmplGenerator, s *server) (*rpcServer, error) {
 	rpc := rpcServer{
 		server:                 s,
 		generator:              generator,

@@ -14,6 +14,7 @@ import (
 	"github.com/btcsuite/btcd/connmgr"
 	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcd/mempool"
+	"github.com/btcsuite/btcd/mining"
 	"github.com/btcsuite/btcd/peer"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btclog"
@@ -127,6 +128,7 @@ func useLogger(subsystemID string, logger btclog.Logger) {
 
 	case "MINR":
 		minrLog = logger
+		mining.UseLogger(logger)
 
 	case "PEER":
 		peerLog = logger
