@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcd/blockchain"
+	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
@@ -45,6 +46,42 @@ var (
 	defaultNumWorkers = uint32(runtime.NumCPU())
 )
 
+// cpuminerConfig is a descriptor containing the cpu miner configuration.
+type cpuminerConfig struct {
+	// ChainParams identifies which chain parameters the cpu miner is
+	// associated with.
+	ChainParams *chaincfg.Params
+
+	// BlockTemplateGenerator identifies the instance to use in order to
+	// generate block templates that the miner will attempt to solve.
+	BlockTemplateGenerator *BlkTmplGenerator
+
+	// MiningAddrs is a list of payment addresses to use for the generated
+	// blocks.  Each generated block will randomly choose one of them.
+	MiningAddrs []btcutil.Address
+
+	// ProcessBlock defines the function to call with any solved blocks.
+	// It typically must run the provided block through the same set of
+	// rules and handling as any other block coming from the network.
+	ProcessBlock func(*btcutil.Block, blockchain.BehaviorFlags) (bool, error)
+
+	// ConnectedCount defines the function to use to obtain how many other
+	// peers the server is connected to.  This is used by the automatic
+	// persistent mining routine to determine whether or it should attempt
+	// mining.  This is useful because there is no point in mining when not
+	// connected to any peers since there would no be anyone to send any
+	// found blocks to.
+	ConnectedCount func() int32
+
+	// IsCurrent defines the function to use to obtain whether or not the
+	// block chain is current.  This is used by the automatic persistent
+	// mining routine to determine whether or it should attempt mining.
+	// This is useful because there is no point in mining if the chain is
+	// not current since any solved blocks would be on a side chain and and
+	// up orphaned anyways.
+	IsCurrent func() bool
+}
+
 // CPUMiner provides facilities for solving blocks (mining) using the CPU in
 // a concurrency-safe manner.  It consists of two main goroutines -- a speed
 // monitor and a controller for worker goroutines which generate and solve
@@ -54,7 +91,7 @@ var (
 type CPUMiner struct {
 	sync.Mutex
 	g                 *BlkTmplGenerator
-	server            *server
+	cfg               cpuminerConfig
 	numWorkers        uint32
 	started           bool
 	discreteMining    bool
@@ -279,7 +316,7 @@ out:
 		// Wait until there is a connection to at least one other peer
 		// since there is no way to relay a found block or receive
 		// transactions to work on when there are no connected peers.
-		if m.server.ConnectedCount() == 0 {
+		if m.cfg.ConnectedCount() == 0 {
 			time.Sleep(time.Second)
 			continue
 		}
@@ -299,7 +336,7 @@ out:
 
 		// Choose a payment address at random.
 		rand.Seed(time.Now().UnixNano())
-		payToAddr := cfg.miningAddrs[rand.Intn(len(cfg.miningAddrs))]
+		payToAddr := m.cfg.MiningAddrs[rand.Intn(len(m.cfg.MiningAddrs))]
 
 		// Create a new block template using the available transactions
 		// in the memory pool as a source of transactions to potentially
@@ -511,10 +548,10 @@ func (m *CPUMiner) GenerateNBlocks(n uint32) ([]*chainhash.Hash, error) {
 	m.Lock()
 
 	// Respond with an error if there's virtually 0 chance of CPU-mining a block.
-	if !m.server.chainParams.GenerateSupported {
+	if !m.cfg.ChainParams.GenerateSupported {
 		m.Unlock()
 		return nil, errors.New("No support for `generate` on the current " +
-			"network, " + m.server.chainParams.Net.String() +
+			"network, " + m.cfg.ChainParams.Net.String() +
 			", as it's unlikely to be possible to CPU-mine a block.")
 	}
 
@@ -561,7 +598,7 @@ func (m *CPUMiner) GenerateNBlocks(n uint32) ([]*chainhash.Hash, error) {
 
 		// Choose a payment address at random.
 		rand.Seed(time.Now().UnixNano())
-		payToAddr := cfg.miningAddrs[rand.Intn(len(cfg.miningAddrs))]
+		payToAddr := m.cfg.MiningAddrs[rand.Intn(len(m.cfg.MiningAddrs))]
 
 		// Create a new block template using the available transactions
 		// in the memory pool as a source of transactions to potentially
@@ -601,10 +638,10 @@ func (m *CPUMiner) GenerateNBlocks(n uint32) ([]*chainhash.Hash, error) {
 // newCPUMiner returns a new instance of a CPU miner for the provided server.
 // Use Start to begin the mining process.  See the documentation for CPUMiner
 // type for more details.
-func newCPUMiner(generator *BlkTmplGenerator, s *server) *CPUMiner {
+func newCPUMiner(cfg *cpuminerConfig) *CPUMiner {
 	return &CPUMiner{
-		g:                 generator,
-		server:            s,
+		g:                 cfg.BlockTemplateGenerator,
+		cfg:               *cfg,
 		numWorkers:        defaultNumWorkers,
 		updateNumWorkers:  make(chan struct{}),
 		queryHashesPerSec: make(chan float64),
