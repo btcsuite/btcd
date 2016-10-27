@@ -282,7 +282,7 @@ func (g *testGenerator) createCoinbaseTx(blockHeight int32) *wire.MsgTx {
 		panic(err)
 	}
 
-	tx := wire.NewMsgTx()
+	tx := wire.NewMsgTx(1)
 	tx.AddTxIn(&wire.TxIn{
 		// Coinbase transactions have no inputs, so previous outpoint is
 		// zero hash and max index.
@@ -436,7 +436,7 @@ func additionalTx(tx *wire.MsgTx) func(*wire.MsgBlock) {
 // script which avoids the need to track addresses and signature scripts in the
 // tests.
 func createSpendTx(spend *spendableOut, fee btcutil.Amount) *wire.MsgTx {
-	spendTx := wire.NewMsgTx()
+	spendTx := wire.NewMsgTx(1)
 	spendTx.AddTxIn(&wire.TxIn{
 		PreviousOutPoint: spend.prevOut,
 		Sequence:         wire.MaxTxInSequenceNum,

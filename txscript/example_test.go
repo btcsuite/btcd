@@ -101,7 +101,7 @@ func ExampleSignTxOutput() {
 	// For this example, create a fake transaction that represents what
 	// would ordinarily be the real transaction that is being spent.  It
 	// contains a single output that pays to address in the amount of 1 BTC.
-	originTx := wire.NewMsgTx()
+	originTx := wire.NewMsgTx(wire.TxVersion)
 	prevOut := wire.NewOutPoint(&chainhash.Hash{}, ^uint32(0))
 	txIn := wire.NewTxIn(prevOut, []byte{txscript.OP_0, txscript.OP_0})
 	originTx.AddTxIn(txIn)
@@ -115,7 +115,7 @@ func ExampleSignTxOutput() {
 	originTxHash := originTx.TxHash()
 
 	// Create the transaction to redeem the fake transaction.
-	redeemTx := wire.NewMsgTx()
+	redeemTx := wire.NewMsgTx(wire.TxVersion)
 
 	// Add the input(s) the redeeming transaction will spend.  There is no
 	// signature script at this point since it hasn't been created or signed

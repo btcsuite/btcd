@@ -164,7 +164,7 @@ func parseScriptFlags(flagStr string) (ScriptFlags, error) {
 // createSpendTx generates a basic spending transaction given the passed
 // signature and public key scripts.
 func createSpendingTx(sigScript, pkScript []byte) *wire.MsgTx {
-	coinbaseTx := wire.NewMsgTx()
+	coinbaseTx := wire.NewMsgTx(wire.TxVersion)
 
 	outPoint := wire.NewOutPoint(&chainhash.Hash{}, ^uint32(0))
 	txIn := wire.NewTxIn(outPoint, []byte{OP_0, OP_0})
@@ -172,7 +172,7 @@ func createSpendingTx(sigScript, pkScript []byte) *wire.MsgTx {
 	coinbaseTx.AddTxIn(txIn)
 	coinbaseTx.AddTxOut(txOut)
 
-	spendingTx := wire.NewMsgTx()
+	spendingTx := wire.NewMsgTx(wire.TxVersion)
 	coinbaseTxHash := coinbaseTx.TxHash()
 	outPoint = wire.NewOutPoint(&coinbaseTxHash, 0)
 	txIn = wire.NewTxIn(outPoint, sigScript)
@@ -642,7 +642,7 @@ func TestCalcSignatureHash(t *testing.T) {
 			t.Fatalf("TestCalcSignatureHash: Test #%d has "+
 				"wrong length.", i)
 		}
-		tx := wire.NewMsgTx()
+		var tx wire.MsgTx
 		rawTx, _ := hex.DecodeString(test[0].(string))
 		err := tx.Deserialize(bytes.NewReader(rawTx))
 		if err != nil {
@@ -660,7 +660,7 @@ func TestCalcSignatureHash(t *testing.T) {
 		}
 
 		hashType := SigHashType(testVecF64ToUint32(test[3].(float64)))
-		hash := calcSignatureHash(parsedScript, hashType, tx,
+		hash := calcSignatureHash(parsedScript, hashType, &tx,
 			int(test[2].(float64)))
 
 		expectedHash, _ := chainhash.NewHashFromStr(test[4].(string))

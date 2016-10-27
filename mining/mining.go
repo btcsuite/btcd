@@ -268,7 +268,7 @@ func createCoinbaseTx(params *chaincfg.Params, coinbaseScript []byte, nextBlockH
 		}
 	}
 
-	tx := wire.NewMsgTx()
+	tx := wire.NewMsgTx(wire.TxVersion)
 	tx.AddTxIn(&wire.TxIn{
 		// Coinbase transactions have no inputs, so previous outpoint is
 		// zero hash and max index.

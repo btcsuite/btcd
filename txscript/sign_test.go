@@ -1629,7 +1629,7 @@ func TestSignatureScript(t *testing.T) {
 
 nexttest:
 	for i := range sigScriptTests {
-		tx := wire.NewMsgTx()
+		tx := wire.NewMsgTx(wire.TxVersion)
 
 		output := wire.NewTxOut(500, []byte{OP_RETURN})
 		tx.AddTxOut(output)

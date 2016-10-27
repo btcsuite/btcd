@@ -538,7 +538,7 @@ func handleCreateRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan 
 
 	// Add all transaction inputs to a new transaction after performing
 	// some validity checks.
-	mtx := wire.NewMsgTx()
+	mtx := wire.NewMsgTx(wire.TxVersion)
 	for _, input := range c.Inputs {
 		txHash, err := chainhash.NewHashFromStr(input.Txid)
 		if err != nil {
@@ -3402,8 +3402,8 @@ func handleSendRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan st
 	if err != nil {
 		return nil, rpcDecodeHexError(hexStr)
 	}
-	msgtx := wire.NewMsgTx()
-	err = msgtx.Deserialize(bytes.NewReader(serializedTx))
+	var msgTx wire.MsgTx
+	err = msgTx.Deserialize(bytes.NewReader(serializedTx))
 	if err != nil {
 		return nil, &btcjson.RPCError{
 			Code:    btcjson.ErrRPCDeserialization,
@@ -3411,7 +3411,7 @@ func handleSendRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan st
 		}
 	}
 
-	tx := btcutil.NewTx(msgtx)
+	tx := btcutil.NewTx(&msgTx)
 	acceptedTxs, err := s.server.txMemPool.ProcessTransaction(tx, false, false)
 	if err != nil {
 		// When the error is a rule error, it means the transaction was

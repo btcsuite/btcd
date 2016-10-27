@@ -28,7 +28,7 @@ func TestTx(t *testing.T) {
 
 	// Ensure the command is expected value.
 	wantCmd := "tx"
-	msg := NewMsgTx()
+	msg := NewMsgTx(1)
 	if cmd := msg.Command(); cmd != wantCmd {
 		t.Errorf("NewMsgAddr: wrong command - got %v want %v",
 			cmd, wantCmd)
@@ -139,7 +139,7 @@ func TestTxHash(t *testing.T) {
 	}
 
 	// First transaction from block 113875.
-	msgTx := NewMsgTx()
+	msgTx := NewMsgTx(1)
 	txIn := TxIn{
 		PreviousOutPoint: OutPoint{
 			Hash:  chainhash.Hash{},
@@ -180,7 +180,7 @@ func TestTxHash(t *testing.T) {
 // of transaction inputs and outputs and protocol versions.
 func TestTxWire(t *testing.T) {
 	// Empty tx message.
-	noTx := NewMsgTx()
+	noTx := NewMsgTx(1)
 	noTx.Version = 1
 	noTxEncoded := []byte{
 		0x01, 0x00, 0x00, 0x00, // Version
@@ -374,7 +374,7 @@ func TestTxWireErrors(t *testing.T) {
 
 // TestTxSerialize tests MsgTx serialize and deserialize.
 func TestTxSerialize(t *testing.T) {
-	noTx := NewMsgTx()
+	noTx := NewMsgTx(1)
 	noTx.Version = 1
 	noTxEncoded := []byte{
 		0x01, 0x00, 0x00, 0x00, // Version
@@ -615,7 +615,7 @@ func TestTxOverflowErrors(t *testing.T) {
 // transactions is accurate.
 func TestTxSerializeSize(t *testing.T) {
 	// Empty tx message.
-	noTx := NewMsgTx()
+	noTx := NewMsgTx(1)
 	noTx.Version = 1
 
 	tests := []struct {

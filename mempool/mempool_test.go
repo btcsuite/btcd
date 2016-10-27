@@ -152,7 +152,7 @@ func (p *poolHarness) CreateCoinbaseTx(blockHeight int32, numOutputs uint32) (*b
 		return nil, err
 	}
 
-	tx := wire.NewMsgTx()
+	tx := wire.NewMsgTx(wire.TxVersion)
 	tx.AddTxIn(&wire.TxIn{
 		// Coinbase transactions have no inputs, so previous outpoint is
 		// zero hash and max index.
@@ -194,7 +194,7 @@ func (p *poolHarness) CreateSignedTx(inputs []spendableOutput, numOutputs uint32
 	amountPerOutput := int64(totalInput) / int64(numOutputs)
 	remainder := int64(totalInput) - amountPerOutput*int64(numOutputs)
 
-	tx := wire.NewMsgTx()
+	tx := wire.NewMsgTx(wire.TxVersion)
 	for _, input := range inputs {
 		tx.AddTxIn(&wire.TxIn{
 			PreviousOutPoint: input.outPoint,
@@ -240,7 +240,7 @@ func (p *poolHarness) CreateTxChain(firstOutput spendableOutput, numTxns uint32)
 		// Create the transaction using the previous transaction output
 		// and paying the full amount to the payment address associated
 		// with the harness.
-		tx := wire.NewMsgTx()
+		tx := wire.NewMsgTx(wire.TxVersion)
 		tx.AddTxIn(&wire.TxIn{
 			PreviousOutPoint: prevOutPoint,
 			SignatureScript:  nil,
