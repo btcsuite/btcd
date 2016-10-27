@@ -209,7 +209,7 @@ func standardCoinbaseScript(nextBlockHeight int32, extraNonce uint64) ([]byte, e
 //
 // See the comment for NewBlockTemplate for more information about why the nil
 // address handling is useful.
-func createCoinbaseTx(coinbaseScript []byte, nextBlockHeight int32, addr btcutil.Address) (*btcutil.Tx, error) {
+func createCoinbaseTx(params *chaincfg.Params, coinbaseScript []byte, nextBlockHeight int32, addr btcutil.Address) (*btcutil.Tx, error) {
 	// Create the script to pay to the provided payment address if one was
 	// specified.  Otherwise create a script that allows the coinbase to be
 	// redeemable by anyone.
@@ -239,8 +239,7 @@ func createCoinbaseTx(coinbaseScript []byte, nextBlockHeight int32, addr btcutil
 		Sequence:        wire.MaxTxInSequenceNum,
 	})
 	tx.AddTxOut(&wire.TxOut{
-		Value: blockchain.CalcBlockSubsidy(nextBlockHeight,
-			activeNetParams.Params),
+		Value:    blockchain.CalcBlockSubsidy(nextBlockHeight, params),
 		PkScript: pkScript,
 	})
 	return btcutil.NewTx(tx), nil
@@ -403,11 +402,6 @@ func newBlkTmplGenerator(policy *mining.Policy, params *chaincfg.Params,
 //  |  <= policy.BlockMinSize)          |   |
 //   -----------------------------------  --
 func (g *BlkTmplGenerator) NewBlockTemplate(payToAddress btcutil.Address) (*BlockTemplate, error) {
-	// Locals for faster access.
-	policy := g.policy
-	timeSource := g.timeSource
-	sigCache := g.sigCache
-
 	// Extend the most recently known best block.
 	best := g.chain.BestSnapshot()
 	prevHash := best.Hash
@@ -426,8 +420,8 @@ func (g *BlkTmplGenerator) NewBlockTemplate(payToAddress btcutil.Address) (*Bloc
 	if err != nil {
 		return nil, err
 	}
-	coinbaseTx, err := createCoinbaseTx(coinbaseScript, nextBlockHeight,
-		payToAddress)
+	coinbaseTx, err := createCoinbaseTx(g.chainParams, coinbaseScript,
+		nextBlockHeight, payToAddress)
 	if err != nil {
 		return nil, err
 	}
@@ -440,7 +434,7 @@ func (g *BlkTmplGenerator) NewBlockTemplate(payToAddress btcutil.Address) (*Bloc
 	// choose the initial sort order for the priority queue based on whether
 	// or not there is an area allocated for high-priority transactions.
 	sourceTxns := g.txSource.MiningDescs()
-	sortedByFee := policy.BlockPrioritySize == 0
+	sortedByFee := g.policy.BlockPrioritySize == 0
 	priorityQueue := newTxPriorityQueue(len(sourceTxns), sortedByFee)
 
 	// Create a slice to hold the transactions to be included in the
@@ -482,7 +476,7 @@ mempoolLoop:
 			continue
 		}
 		if !blockchain.IsFinalizedTransaction(tx, nextBlockHeight,
-			timeSource.AdjustedTime()) {
+			g.timeSource.AdjustedTime()) {
 			minrLog.Tracef("Skipping non-finalized tx %s", tx.Hash())
 			continue
 		}
@@ -583,7 +577,9 @@ mempoolLoop:
 		// Enforce maximum block size.  Also check for overflow.
 		txSize := uint32(tx.MsgTx().SerializeSize())
 		blockPlusTxSize := blockSize + txSize
-		if blockPlusTxSize < blockSize || blockPlusTxSize >= policy.BlockMaxSize {
+		if blockPlusTxSize < blockSize ||
+			blockPlusTxSize >= g.policy.BlockMaxSize {
+
 			minrLog.Tracef("Skipping tx %s because it would exceed "+
 				"the max block size", tx.Hash())
 			logSkippedDeps(tx, deps)
@@ -621,14 +617,14 @@ mempoolLoop:
 		// Skip free transactions once the block is larger than the
 		// minimum block size.
 		if sortedByFee &&
-			prioItem.feePerKB < int64(policy.TxMinFreeFee) &&
-			blockPlusTxSize >= policy.BlockMinSize {
+			prioItem.feePerKB < int64(g.policy.TxMinFreeFee) &&
+			blockPlusTxSize >= g.policy.BlockMinSize {
 
 			minrLog.Tracef("Skipping tx %s with feePerKB %d "+
 				"< TxMinFreeFee %d and block size %d >= "+
 				"minBlockSize %d", tx.Hash(), prioItem.feePerKB,
-				policy.TxMinFreeFee, blockPlusTxSize,
-				policy.BlockMinSize)
+				g.policy.TxMinFreeFee, blockPlusTxSize,
+				g.policy.BlockMinSize)
 			logSkippedDeps(tx, deps)
 			continue
 		}
@@ -636,13 +632,13 @@ mempoolLoop:
 		// Prioritize by fee per kilobyte once the block is larger than
 		// the priority size or there are no more high-priority
 		// transactions.
-		if !sortedByFee && (blockPlusTxSize >= policy.BlockPrioritySize ||
+		if !sortedByFee && (blockPlusTxSize >= g.policy.BlockPrioritySize ||
 			prioItem.priority <= mining.MinHighPriority) {
 
 			minrLog.Tracef("Switching to sort by fees per "+
 				"kilobyte blockSize %d >= BlockPrioritySize "+
 				"%d || priority %.2f <= minHighPriority %.2f",
-				blockPlusTxSize, policy.BlockPrioritySize,
+				blockPlusTxSize, g.policy.BlockPrioritySize,
 				prioItem.priority, mining.MinHighPriority)
 
 			sortedByFee = true
@@ -654,7 +650,7 @@ mempoolLoop:
 			// too low.  Otherwise this transaction will be the
 			// final one in the high-priority section, so just fall
 			// though to the code below so it is added now.
-			if blockPlusTxSize > policy.BlockPrioritySize ||
+			if blockPlusTxSize > g.policy.BlockPrioritySize ||
 				prioItem.priority < mining.MinHighPriority {
 
 				heap.Push(priorityQueue, prioItem)
@@ -665,7 +661,7 @@ mempoolLoop:
 		// Ensure the transaction inputs pass all of the necessary
 		// preconditions before allowing it to be added to the block.
 		_, err = blockchain.CheckTransactionInputs(tx, nextBlockHeight,
-			blockUtxos, activeNetParams.Params)
+			blockUtxos, g.chainParams)
 		if err != nil {
 			minrLog.Tracef("Skipping tx %s due to error in "+
 				"CheckTransactionInputs: %v", tx.Hash(), err)
@@ -673,7 +669,7 @@ mempoolLoop:
 			continue
 		}
 		err = blockchain.ValidateTransactionScripts(tx, blockUtxos,
-			txscript.StandardVerifyFlags, sigCache)
+			txscript.StandardVerifyFlags, g.sigCache)
 		if err != nil {
 			minrLog.Tracef("Skipping tx %s due to error in "+
 				"ValidateTransactionScripts: %v", tx.Hash(), err)
@@ -724,7 +720,7 @@ mempoolLoop:
 	// Calculate the required difficulty for the block.  The timestamp
 	// is potentially adjusted to ensure it comes after the median time of
 	// the last several blocks per the chain consensus rules.
-	ts := medianAdjustedTime(best, timeSource)
+	ts := medianAdjustedTime(best, g.timeSource)
 	reqDifficulty, err := g.chain.CalcNextRequiredDifficulty(ts)
 	if err != nil {
 		return nil, err
@@ -784,7 +780,7 @@ func (g *BlkTmplGenerator) UpdateBlockTime(msgBlock *wire.MsgBlock) error {
 
 	// If running on a network that requires recalculating the difficulty,
 	// do so now.
-	if activeNetParams.ReduceMinDifficulty {
+	if g.chainParams.ReduceMinDifficulty {
 		difficulty, err := g.chain.CalcNextRequiredDifficulty(newTime)
 		if err != nil {
 			return err
