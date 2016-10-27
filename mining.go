@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcd/blockchain"
+	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/mempool"
 	"github.com/btcsuite/btcd/mining"
@@ -311,11 +312,12 @@ func medianAdjustedTime(chainState *blockchain.BestState, timeSource blockchain.
 // See the NewBlockTemplate method for a detailed description of how the block
 // template is generated.
 type BlkTmplGenerator struct {
-	policy       *mining.Policy
-	txSource     mining.TxSource
-	sigCache     *txscript.SigCache
-	blockManager *blockManager
-	timeSource   blockchain.MedianTimeSource
+	policy      *mining.Policy
+	chainParams *chaincfg.Params
+	txSource    mining.TxSource
+	chain       *blockchain.BlockChain
+	timeSource  blockchain.MedianTimeSource
+	sigCache    *txscript.SigCache
 }
 
 // newBlkTmplGenerator returns a new block template generator for the given
@@ -324,16 +326,18 @@ type BlkTmplGenerator struct {
 // The additional state-related fields are required in order to ensure the
 // templates are built on top of the current best chain and adhere to the
 // consensus rules.
-func newBlkTmplGenerator(policy *mining.Policy, txSource mining.TxSource,
-	timeSource blockchain.MedianTimeSource, sigCache *txscript.SigCache,
-	blockManager *blockManager) *BlkTmplGenerator {
+func newBlkTmplGenerator(policy *mining.Policy, params *chaincfg.Params,
+	txSource mining.TxSource, chain *blockchain.BlockChain,
+	timeSource blockchain.MedianTimeSource,
+	sigCache *txscript.SigCache) *BlkTmplGenerator {
 
 	return &BlkTmplGenerator{
-		policy:       policy,
-		txSource:     txSource,
-		sigCache:     sigCache,
-		blockManager: blockManager,
-		timeSource:   timeSource,
+		policy:      policy,
+		chainParams: params,
+		txSource:    txSource,
+		chain:       chain,
+		timeSource:  timeSource,
+		sigCache:    sigCache,
 	}
 }
 
@@ -402,12 +406,11 @@ func newBlkTmplGenerator(policy *mining.Policy, txSource mining.TxSource,
 func (g *BlkTmplGenerator) NewBlockTemplate(payToAddress btcutil.Address) (*BlockTemplate, error) {
 	// Locals for faster access.
 	policy := g.policy
-	blockManager := g.blockManager
 	timeSource := g.timeSource
 	sigCache := g.sigCache
 
 	// Extend the most recently known best block.
-	best := blockManager.chain.BestSnapshot()
+	best := g.chain.BestSnapshot()
 	prevHash := best.Hash
 	nextBlockHeight := best.Height + 1
 
@@ -490,7 +493,7 @@ mempoolLoop:
 		// mempool since a transaction which depends on other
 		// transactions in the mempool must come after those
 		// dependencies in the final generated block.
-		utxos, err := blockManager.chain.FetchUtxoView(tx)
+		utxos, err := g.chain.FetchUtxoView(tx)
 		if err != nil {
 			minrLog.Warnf("Unable to fetch utxo view for tx %s: "+
 				"%v", tx.Hash(), err)
@@ -723,7 +726,7 @@ mempoolLoop:
 	// is potentially adjusted to ensure it comes after the median time of
 	// the last several blocks per the chain consensus rules.
 	ts := medianAdjustedTime(best, timeSource)
-	reqDifficulty, err := blockManager.chain.CalcNextRequiredDifficulty(ts)
+	reqDifficulty, err := g.chain.CalcNextRequiredDifficulty(ts)
 	if err != nil {
 		return nil, err
 	}
@@ -749,7 +752,7 @@ mempoolLoop:
 	// chain with no issues.
 	block := btcutil.NewBlock(&msgBlock)
 	block.SetHeight(nextBlockHeight)
-	if err := blockManager.chain.CheckConnectBlock(block); err != nil {
+	if err := g.chain.CheckConnectBlock(block); err != nil {
 		return nil, err
 	}
 
@@ -777,15 +780,13 @@ func (g *BlkTmplGenerator) UpdateBlockTime(msgBlock *wire.MsgBlock) error {
 	// The new timestamp is potentially adjusted to ensure it comes after
 	// the median time of the last several blocks per the chain consensus
 	// rules.
-	best := g.blockManager.chain.BestSnapshot()
-	newTimestamp := medianAdjustedTime(best, g.timeSource)
-	msgBlock.Header.Timestamp = newTimestamp
+	newTime := medianAdjustedTime(g.chain.BestSnapshot(), g.timeSource)
+	msgBlock.Header.Timestamp = newTime
 
 	// If running on a network that requires recalculating the difficulty,
 	// do so now.
 	if activeNetParams.ReduceMinDifficulty {
-		chain := g.blockManager.chain
-		difficulty, err := chain.CalcNextRequiredDifficulty(newTimestamp)
+		difficulty, err := g.chain.CalcNextRequiredDifficulty(newTime)
 		if err != nil {
 			return err
 		}
@@ -821,4 +822,21 @@ func (g *BlkTmplGenerator) UpdateExtraNonce(msgBlock *wire.MsgBlock, blockHeight
 	merkles := blockchain.BuildMerkleTreeStore(block.Transactions())
 	msgBlock.Header.MerkleRoot = *merkles[len(merkles)-1]
 	return nil
+}
+
+// BestSnapshot returns information about the current best chain block and
+// related state as of the current point in time using the chain instance
+// associated with the block template generator.  The returned state must be
+// treated as immutable since it is shared by all callers.
+//
+// This function is safe for concurrent access.
+func (g *BlkTmplGenerator) BestSnapshot() *blockchain.BestState {
+	return g.chain.BestSnapshot()
+}
+
+// TxSource returns the associated transaction source.
+//
+// This function is safe for concurrent access.
+func (g *BlkTmplGenerator) TxSource() mining.TxSource {
+	return g.txSource
 }
