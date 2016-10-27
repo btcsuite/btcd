@@ -30,10 +30,6 @@ const (
 	// inclusion when generating block templates.
 	DefaultBlockPrioritySize = 50000
 
-	// MinHighPriority is the minimum priority value that allows a
-	// transaction to be considered high priority.
-	MinHighPriority = btcutil.SatoshiPerBitcoin * 144.0 / 250
-
 	// orphanTTL is the maximum amount of time an orphan is allowed to
 	// stay in the orphan pool before it expires and is evicted during the
 	// next scan.
@@ -797,10 +793,10 @@ func (mp *TxPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit, rejec
 	if isNew && !mp.cfg.Policy.DisableRelayPriority && txFee < minFee {
 		currentPriority := mining.CalcPriority(tx.MsgTx(), utxoView,
 			nextBlockHeight)
-		if currentPriority <= MinHighPriority {
+		if currentPriority <= mining.MinHighPriority {
 			str := fmt.Sprintf("transaction %v has insufficient "+
 				"priority (%g <= %g)", txHash,
-				currentPriority, MinHighPriority)
+				currentPriority, mining.MinHighPriority)
 			return nil, txRuleError(wire.RejectInsufficientFee, str)
 		}
 	}

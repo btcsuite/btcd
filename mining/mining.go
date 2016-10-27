@@ -11,6 +11,12 @@ import (
 	"github.com/btcsuite/btcutil"
 )
 
+const (
+	// MinHighPriority is the minimum priority value that allows a
+	// transaction to be considered high priority.
+	MinHighPriority = btcutil.SatoshiPerBitcoin * 144.0 / 250
+)
+
 // TxDesc is a descriptor about a transaction in a transaction source along with
 // additional metadata.
 type TxDesc struct {

@@ -12,7 +12,6 @@ import (
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/mempool"
 	"github.com/btcsuite/btcd/mining"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
@@ -638,13 +637,13 @@ mempoolLoop:
 		// the priority size or there are no more high-priority
 		// transactions.
 		if !sortedByFee && (blockPlusTxSize >= policy.BlockPrioritySize ||
-			prioItem.priority <= mempool.MinHighPriority) {
+			prioItem.priority <= mining.MinHighPriority) {
 
 			minrLog.Tracef("Switching to sort by fees per "+
 				"kilobyte blockSize %d >= BlockPrioritySize "+
 				"%d || priority %.2f <= minHighPriority %.2f",
 				blockPlusTxSize, policy.BlockPrioritySize,
-				prioItem.priority, mempool.MinHighPriority)
+				prioItem.priority, mining.MinHighPriority)
 
 			sortedByFee = true
 			priorityQueue.SetLessFunc(txPQByFee)
@@ -656,7 +655,7 @@ mempoolLoop:
 			// final one in the high-priority section, so just fall
 			// though to the code below so it is added now.
 			if blockPlusTxSize > policy.BlockPrioritySize ||
-				prioItem.priority < mempool.MinHighPriority {
+				prioItem.priority < mining.MinHighPriority {
 
 				heap.Push(priorityQueue, prioItem)
 				continue
