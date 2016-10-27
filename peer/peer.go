@@ -417,8 +417,9 @@ type Peer struct {
 	userAgent            string
 	services             wire.ServiceFlag
 	versionKnown         bool
-	protocolVersion      uint32
-	sendHeadersPreferred bool // peer sent a sendheaders message
+	advertisedProtoVer   uint32 // protocol version advertised by remote
+	protocolVersion      uint32 // negotiated protocol version
+	sendHeadersPreferred bool   // peer sent a sendheaders message
 	versionSent          bool
 	verAckReceived       bool
 
@@ -504,7 +505,7 @@ func (p *Peer) StatsSnapshot() *StatsSnap {
 	addr := p.addr
 	userAgent := p.userAgent
 	services := p.services
-	protocolVersion := p.protocolVersion
+	protocolVersion := p.advertisedProtoVer
 	p.flagsMtx.Unlock()
 
 	// Get a copy of all relevant flags and stats.
@@ -647,7 +648,7 @@ func (p *Peer) VerAckReceived() bool {
 	return p.verAckReceived
 }
 
-// ProtocolVersion returns the peer protocol version.
+// ProtocolVersion returns the negotiated peer protocol version.
 //
 // This function is safe for concurrent access.
 func (p *Peer) ProtocolVersion() uint32 {
@@ -1022,7 +1023,8 @@ func (p *Peer) handleRemoteVersionMsg(msg *wire.MsgVersion) error {
 
 	// Negotiate the protocol version.
 	p.flagsMtx.Lock()
-	p.protocolVersion = minUint32(p.protocolVersion, uint32(msg.ProtocolVersion))
+	p.advertisedProtoVer = uint32(msg.ProtocolVersion)
+	p.protocolVersion = minUint32(p.protocolVersion, p.advertisedProtoVer)
 	p.versionKnown = true
 	log.Debugf("Negotiated protocol version %d for peer %s",
 		p.protocolVersion, p)
