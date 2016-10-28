@@ -413,7 +413,7 @@ func (b *blockManager) handleTxMsg(tmsg *txMsg) {
 	// memory pool, orphan handling, etc.
 	allowOrphans := cfg.MaxOrphanTxs > 0
 	acceptedTxs, err := b.server.txMemPool.ProcessTransaction(tmsg.tx,
-		allowOrphans, true)
+		allowOrphans, true, mempool.Tag(tmsg.peer.ID()))
 
 	// Remove transaction from request maps. Either the mempool/chain
 	// already knows about it and as such we shouldn't have any more
