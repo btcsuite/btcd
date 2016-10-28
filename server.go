@@ -155,7 +155,6 @@ type server struct {
 	newPeers             chan *serverPeer
 	donePeers            chan *serverPeer
 	banPeers             chan *serverPeer
-	wakeup               chan struct{}
 	query                chan interface{}
 	relayInv             chan relayMsg
 	broadcast            chan broadcastMsg
@@ -1658,9 +1657,6 @@ func (s *server) peerHandler() {
 	}
 	go s.connManager.Start()
 
-	// if nothing else happens, wake us up soon.
-	time.AfterFunc(10*time.Second, func() { s.wakeup <- struct{}{} })
-
 out:
 	for {
 		select {
@@ -1689,10 +1685,6 @@ out:
 		case bmsg := <-s.broadcast:
 			s.handleBroadcastMsg(state, &bmsg)
 
-		// Used by timers below to wake us back up.
-		case <-s.wakeup:
-			// this page left intentionally blank
-
 		case qmsg := <-s.query:
 			s.handleQuery(state, qmsg)
 
@@ -1720,7 +1712,6 @@ cleanup:
 		case <-s.peerHeightsUpdate:
 		case <-s.relayInv:
 		case <-s.broadcast:
-		case <-s.wakeup:
 		case <-s.query:
 		default:
 			break cleanup
@@ -2311,7 +2302,6 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 		newPeers:             make(chan *serverPeer, cfg.MaxPeers),
 		donePeers:            make(chan *serverPeer, cfg.MaxPeers),
 		banPeers:             make(chan *serverPeer, cfg.MaxPeers),
-		wakeup:               make(chan struct{}),
 		query:                make(chan interface{}),
 		relayInv:             make(chan relayMsg, cfg.MaxPeers),
 		broadcast:            make(chan broadcastMsg, cfg.MaxPeers),
