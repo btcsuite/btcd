@@ -972,18 +972,18 @@ func (s *server) RemoveRebroadcastInventory(iv *wire.InvVect) {
 // both websocket and getblocktemplate long poll clients of the passed
 // transactions.  This function should be called whenever new transactions
 // are added to the mempool.
-func (s *server) AnnounceNewTransactions(newTxs []*btcutil.Tx) {
+func (s *server) AnnounceNewTransactions(newTxs []*mempool.TxDesc) {
 	// Generate and relay inventory vectors for all newly accepted
 	// transactions into the memory pool due to the original being
 	// accepted.
-	for _, tx := range newTxs {
+	for _, txD := range newTxs {
 		// Generate the inventory vector and relay it.
-		iv := wire.NewInvVect(wire.InvTypeTx, tx.Hash())
-		s.RelayInventory(iv, tx)
+		iv := wire.NewInvVect(wire.InvTypeTx, txD.Tx.Hash())
+		s.RelayInventory(iv, txD)
 
 		if s.rpcServer != nil {
 			// Notify websocket clients about mempool transactions.
-			s.rpcServer.ntfnMgr.NotifyMempoolTx(tx, true)
+			s.rpcServer.ntfnMgr.NotifyMempoolTx(txD.Tx, true)
 
 			// Potentially notify any getblocktemplate long poll clients
 			// about stale block templates due to the new transaction.
@@ -1319,14 +1319,14 @@ func (s *server) handleRelayInvMsg(state *peerState, msg relayMsg) {
 			// Don't relay the transaction if there is a bloom
 			// filter loaded and the transaction doesn't match it.
 			if sp.filter.IsLoaded() {
-				tx, ok := msg.data.(*btcutil.Tx)
+				txD, ok := msg.data.(*mempool.TxDesc)
 				if !ok {
 					peerLog.Warnf("Underlying data for tx" +
-						" inv relay is not a transaction")
+						" inv relay is not a *mempool.TxDesc")
 					return
 				}
 
-				if !sp.filter.MatchTxAndUpdate(tx) {
+				if !sp.filter.MatchTxAndUpdate(txD.Tx) {
 					return
 				}
 			}

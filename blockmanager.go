@@ -1185,7 +1185,7 @@ func (b *blockManager) handleNotifyMsg(notification *blockchain.Notification) {
 		// Reinsert all of the transactions (except the coinbase) into
 		// the transaction pool.
 		for _, tx := range block.Transactions()[1:] {
-			_, err := b.server.txMemPool.MaybeAcceptTransaction(tx,
+			_, _, err := b.server.txMemPool.MaybeAcceptTransaction(tx,
 				false, false)
 			if err != nil {
 				// Remove the transaction and all transactions

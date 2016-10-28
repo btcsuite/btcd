@@ -442,10 +442,10 @@ func TestSimpleOrphanChain(t *testing.T) {
 			"length does not match expected -- got %d, want %d",
 			len(acceptedTxns), len(chainedTxns))
 	}
-	for _, tx := range acceptedTxns {
+	for _, txD := range acceptedTxns {
 		// Ensure the transaction is no longer in the orphan pool, is
 		// now in the transaction pool, and is reported as available.
-		testPoolMembership(tc, tx, false, true)
+		testPoolMembership(tc, txD.Tx, false, true)
 	}
 }
 
@@ -784,10 +784,10 @@ func TestMultiInputOrphanDoubleSpend(t *testing.T) {
 			"length does not match expected -- got %d, want %d",
 			len(acceptedTxns), maxOrphans)
 	}
-	for _, tx := range acceptedTxns {
+	for _, txD := range acceptedTxns {
 		// Ensure the transaction is no longer in the orphan pool, is
 		// in the transaction pool, and is reported as available.
-		testPoolMembership(tc, tx, false, true)
+		testPoolMembership(tc, txD.Tx, false, true)
 	}
 
 	// Ensure the double spending orphan is no longer in the orphan pool and
