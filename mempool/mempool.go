@@ -218,6 +218,23 @@ func (mp *TxPool) RemoveOrphan(tx *btcutil.Tx) {
 	mp.mtx.Unlock()
 }
 
+// RemoveOrphansByTag removes all orphan transactions tagged with the provided
+// identifier.
+//
+// This function is safe for concurrent access.
+func (mp *TxPool) RemoveOrphansByTag(tag Tag) uint64 {
+	var numEvicted uint64
+	mp.mtx.Lock()
+	for _, otx := range mp.orphans {
+		if otx.tag == tag {
+			mp.removeOrphan(otx.tx, true)
+			numEvicted++
+		}
+	}
+	mp.mtx.Unlock()
+	return numEvicted
+}
+
 // limitNumOrphans limits the number of orphan transactions by evicting a random
 // orphan if adding a new one would cause it to overflow the max allowed.
 //
