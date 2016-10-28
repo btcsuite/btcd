@@ -510,10 +510,11 @@ func (mp *TxPool) addTransaction(utxoView *blockchain.UtxoViewpoint, tx *btcutil
 	// as spent by the pool.
 	txD := &TxDesc{
 		TxDesc: mining.TxDesc{
-			Tx:     tx,
-			Added:  time.Now(),
-			Height: height,
-			Fee:    fee,
+			Tx:       tx,
+			Added:    time.Now(),
+			Height:   height,
+			Fee:      fee,
+			FeePerKB: fee * 1000 / int64(tx.MsgTx().SerializeSize()),
 		},
 		StartingPriority: mining.CalcPriority(tx.MsgTx(), utxoView, height),
 	}
