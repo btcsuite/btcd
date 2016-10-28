@@ -28,6 +28,7 @@ import (
 	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcd/mempool"
 	"github.com/btcsuite/btcd/mining"
+	"github.com/btcsuite/btcd/mining/cpuminer"
 	"github.com/btcsuite/btcd/peer"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
@@ -153,7 +154,7 @@ type server struct {
 	rpcServer            *rpcServer
 	blockManager         *blockManager
 	txMemPool            *mempool.TxPool
-	cpuMiner             *CPUMiner
+	cpuMiner             *cpuminer.CPUMiner
 	modifyRebroadcastInv chan interface{}
 	newPeers             chan *serverPeer
 	donePeers            chan *serverPeer
@@ -2378,7 +2379,7 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 	blockTemplateGenerator := mining.NewBlkTmplGenerator(&policy,
 		s.chainParams, s.txMemPool, s.blockManager.chain, s.timeSource,
 		s.sigCache)
-	s.cpuMiner = newCPUMiner(&cpuminerConfig{
+	s.cpuMiner = cpuminer.New(&cpuminer.Config{
 		ChainParams:            chainParams,
 		BlockTemplateGenerator: blockTemplateGenerator,
 		MiningAddrs:            cfg.miningAddrs,
