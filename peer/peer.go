@@ -1851,7 +1851,7 @@ func (p *Peer) QueueInventory(invVect *wire.InvVect) {
 	p.outputInvChan <- invVect
 }
 
-// AssociateConnection associates the given conn to the peer. Calling this
+// AssociateConnection associates the given conn to the peer.   Calling this
 // function when the peer is already connected will have no effect.
 func (p *Peer) AssociateConnection(conn net.Conn) {
 	// Already connected?
@@ -1879,7 +1879,7 @@ func (p *Peer) AssociateConnection(conn net.Conn) {
 
 	go func() {
 		if err := p.start(); err != nil {
-			log.Warnf("Cannot start peer %v: %v", p, err)
+			log.Debugf("Cannot start peer %v: %v", p, err)
 			p.Disconnect()
 		}
 	}()
