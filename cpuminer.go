@@ -548,14 +548,6 @@ func (m *CPUMiner) NumWorkers() int32 {
 func (m *CPUMiner) GenerateNBlocks(n uint32) ([]*chainhash.Hash, error) {
 	m.Lock()
 
-	// Respond with an error if there's virtually 0 chance of CPU-mining a block.
-	if !m.cfg.ChainParams.GenerateSupported {
-		m.Unlock()
-		return nil, errors.New("No support for `generate` on the current " +
-			"network, " + m.cfg.ChainParams.Net.String() +
-			", as it's unlikely to be possible to CPU-mine a block.")
-	}
-
 	// Respond with an error if server is already mining.
 	if m.started || m.discreteMining {
 		m.Unlock()
