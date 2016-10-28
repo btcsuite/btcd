@@ -46,10 +46,10 @@ func BenchmarkAddJacobianNotZOne(b *testing.B) {
 // BenchmarkScalarBaseMult benchmarks the secp256k1 curve ScalarBaseMult
 // function.
 func BenchmarkScalarBaseMult(b *testing.B) {
-	k := fromHex("d74bf844b0862475103d96a611cf2d898447e288d34b360bc885cb8ce7c00575")
+	k := new(nfieldVal).SetHex("d74bf844b0862475103d96a611cf2d898447e288d34b360bc885cb8ce7c00575")
 	curve := S256()
 	for i := 0; i < b.N; i++ {
-		curve.ScalarBaseMult(k.Bytes())
+		curve.ScalarBaseMult(k.Bytes()[:])
 	}
 }
 
@@ -97,8 +97,8 @@ func BenchmarkSigVerify(b *testing.B) {
 	// Double sha256 of []byte{0x01, 0x02, 0x03, 0x04}
 	msgHash := fromHex("8de472e2399610baaa7f84840547cd409434e31f5d3bd71e4d947f283874f9c0")
 	sig := Signature{
-		R: fromHex("fef45d2892953aa5bbcdb057b5e98b208f1617a7498af7eb765574e29b5d9c2c"),
-		S: fromHex("d47563f52aac6b04b55de236b7c515eb9311757db01e02cff079c3ca6efb063f"),
+		R: new(nfieldVal).SetHex("fef45d2892953aa5bbcdb057b5e98b208f1617a7498af7eb765574e29b5d9c2c"),
+		S: new(nfieldVal).SetHex("d47563f52aac6b04b55de236b7c515eb9311757db01e02cff079c3ca6efb063f"),
 	}
 
 	if !sig.Verify(msgHash.Bytes(), &pubKey) {

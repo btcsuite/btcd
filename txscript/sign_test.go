@@ -64,8 +64,8 @@ func checkScripts(msg string, tx *wire.MsgTx, idx int, sigScript, pkScript []byt
 
 	err = vm.Execute()
 	if err != nil {
-		return fmt.Errorf("invalid script signature for %s: %v", msg,
-			err)
+		return fmt.Errorf("invalid script signature for %s: %v %v", msg,
+			err, vm)
 	}
 
 	return nil
@@ -85,8 +85,6 @@ func signAndCheck(msg string, tx *wire.MsgTx, idx int, pkScript []byte,
 }
 
 func TestSignTxOutput(t *testing.T) {
-	t.Parallel()
-
 	// make key
 	// make script based on key.
 	// sign with magic pixie dust.
@@ -1623,8 +1621,6 @@ var sigScriptTests = []tstSigScript{
 // created for the MsgTxs in txTests, since they come from the blockchain
 // and we don't have the private keys.
 func TestSignatureScript(t *testing.T) {
-	t.Parallel()
-
 	privKey, _ := btcec.PrivKeyFromBytes(btcec.S256(), privKeyD)
 
 nexttest:

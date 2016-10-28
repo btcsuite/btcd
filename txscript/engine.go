@@ -581,6 +581,10 @@ func (vm *Engine) SetAltStack(data [][]byte) {
 	setStack(&vm.astack, data)
 }
 
+func (vm *Engine) String() string {
+	return fmt.Sprintf("%v", vm.scripts)
+}
+
 // NewEngine returns a new script engine for the provided public key script,
 // transaction, and input index.  The flags modify the behavior of the script
 // engine according to the description provided by each flag.
