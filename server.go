@@ -1265,7 +1265,7 @@ func (s *server) handleDonePeerMsg(state *peerState, sp *serverPeer) {
 		if !sp.Inbound() && sp.VersionKnown() {
 			state.outboundGroups[addrmgr.GroupKey(sp.NA())]--
 		}
-		if sp.persistent && sp.connReq != nil {
+		if !sp.Inbound() && sp.connReq != nil {
 			s.connManager.Disconnect(sp.connReq.ID())
 		}
 		delete(list, sp.ID())
@@ -1584,25 +1584,30 @@ func (s *server) listenHandler(listener net.Listener) {
 		}
 		sp := newServerPeer(s, false)
 		sp.Peer = peer.NewInboundPeer(newPeerConfig(sp))
-		go s.peerDoneHandler(sp)
 		sp.AssociateConnection(conn)
+		go s.peerDoneHandler(sp)
 	}
 	s.wg.Done()
 	srvrLog.Tracef("Listener handler done for %s", listener.Addr())
 }
 
-// newOutboundPeer initializes a new outbound peer and setups the message
-// listeners.
-func (s *server) newOutboundPeer(addr string, persistent bool) *serverPeer {
-	sp := newServerPeer(s, persistent)
-	p, err := peer.NewOutboundPeer(newPeerConfig(sp), addr)
+// outboundPeerConnected is invoked by the connection manager when a new
+// outbound connection is established.  It initializes a new outbound server
+// peer instance, associates it with the relevant state such as the connection
+// request instance and the connection itself, and finally notifies the address
+// manager of the attempt.
+func (s *server) outboundPeerConnected(c *connmgr.ConnReq, conn net.Conn) {
+	sp := newServerPeer(s, c.Permanent)
+	p, err := peer.NewOutboundPeer(newPeerConfig(sp), c.Addr)
 	if err != nil {
-		srvrLog.Errorf("Cannot create outbound peer %s: %v", addr, err)
-		return nil
+		srvrLog.Debugf("Cannot create outbound peer %s: %v", c.Addr, err)
+		s.connManager.Disconnect(c.ID())
 	}
 	sp.Peer = p
+	sp.connReq = c
+	sp.AssociateConnection(conn)
 	go s.peerDoneHandler(sp)
-	return sp
+	s.addrManager.Attempt(sp.NA())
 }
 
 // peerDoneHandler handles peer disconnects by notifiying the server that it's
@@ -2451,14 +2456,7 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 		RetryDuration: connectionRetryInterval,
 		MaxOutbound:   defaultMaxOutbound,
 		Dial:          dcrdDial,
-		OnConnection: func(c *connmgr.ConnReq, conn net.Conn) {
-			sp := s.newOutboundPeer(c.Addr, c.Permanent)
-			if sp != nil {
-				sp.AssociateConnection(conn)
-				sp.connReq = c
-				s.addrManager.Attempt(sp.NA())
-			}
-		},
+		OnConnection:  s.outboundPeerConnected,
 		GetNewAddress: newAddressFunc,
 	})
 	if err != nil {
