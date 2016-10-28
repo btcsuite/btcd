@@ -18,7 +18,7 @@ type addrIndexBucket struct {
 	levels map[[levelKeySize]byte][]byte
 }
 
-// Clone returns a deep copy of the mock adress index bucket.
+// Clone returns a deep copy of the mock address index bucket.
 func (b *addrIndexBucket) Clone() *addrIndexBucket {
 	levels := make(map[[levelKeySize]byte][]byte)
 	for k, v := range b.levels {
@@ -164,7 +164,8 @@ func (b *addrIndexBucket) sanityCheck(addrKey [addrKeySize]byte, expectedTotal i
 }
 
 // TestAddrIndexLevels ensures that adding and deleting entries to the address
-// index creates multiple levels as decribed by the address index documentation.
+// index creates multiple levels as described by the address index
+// documentation.
 func TestAddrIndexLevels(t *testing.T) {
 	t.Parallel()
 

@@ -223,7 +223,7 @@ func (sp *serverPeer) newestBlock() (*chainhash.Hash, int32, error) {
 	return best.Hash, best.Height, nil
 }
 
-// addKnownAddresses adds the given addresses to the set of known addreses to
+// addKnownAddresses adds the given addresses to the set of known addresses to
 // the peer to prevent sending duplicate addresses.
 func (sp *serverPeer) addKnownAddresses(addresses []*wire.NetAddress) {
 	for _, na := range addresses {
@@ -2137,7 +2137,7 @@ out:
 	if err := s.nat.DeletePortMapping("tcp", int(lport), int(lport)); err != nil {
 		srvrLog.Warnf("unable to remove UPnP port mapping: %v", err)
 	} else {
-		srvrLog.Debugf("succesfully disestablished UPnP port mapping")
+		srvrLog.Debugf("successfully disestablished UPnP port mapping")
 	}
 
 	s.wg.Done()

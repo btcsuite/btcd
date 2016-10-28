@@ -373,7 +373,7 @@ func dbRemoveAddrIndexEntries(bucket internalBucket, addrKey [addrKeySize]byte, 
 		return nil
 	}
 
-	// Loop fowards through the levels while removing entries until the
+	// Loop forwards through the levels while removing entries until the
 	// specified number has been removed.  This will potentially result in
 	// entirely empty lower levels which will be backfilled below.
 	var highestLoadedLevel uint8

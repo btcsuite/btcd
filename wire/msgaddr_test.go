@@ -103,7 +103,7 @@ func TestAddr(t *testing.T) {
 }
 
 // TestAddrWire tests the MsgAddr wire encode and decode for various numbers
-// of addreses and protocol versions.
+// of addresses and protocol versions.
 func TestAddrWire(t *testing.T) {
 	// A couple of NetAddresses to use for testing.
 	na := &NetAddress{

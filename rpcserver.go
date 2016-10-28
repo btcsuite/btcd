@@ -2450,7 +2450,7 @@ func handleGetTxOut(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 		if c.Vout > uint32(len(mtx.TxOut)-1) {
 			return nil, &btcjson.RPCError{
 				Code: btcjson.ErrRPCInvalidTxVout,
-				Message: "Ouput index number (vout) does not " +
+				Message: "Output index number (vout) does not " +
 					"exist for transaction.",
 			}
 		}
@@ -2994,7 +2994,7 @@ func createVinListPrevOut(s *rpcServer, mtx *wire.MsgTx, chainParams *chaincfg.P
 		return vinList, nil
 	}
 
-	// Use a dynamically sized list to accomodate the address filter.
+	// Use a dynamically sized list to accommodate the address filter.
 	vinList := make([]btcjson.VinPrevOut, 0, len(mtx.TxIn))
 
 	// Lookup all of the referenced transaction outputs needed to populate

@@ -294,7 +294,7 @@ sigLoop:
 		hash := calcSignatureHash(pkPops, hashType, tx, idx)
 
 		for _, addr := range addresses {
-			// All multisig addresses should be pubkey addreses
+			// All multisig addresses should be pubkey addresses
 			// it is an error to call this internal function with
 			// bad input.
 			pkaddr := addr.(*btcutil.AddressPubKey)
