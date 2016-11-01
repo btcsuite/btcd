@@ -13,6 +13,18 @@ import (
 	"github.com/decred/dcrd/chaincfg/chainhash"
 )
 
+// EncodeConcatenatedHashes serializes a slice of chainhash.Hash values into a
+// string of hex-encoded bytes.
+func EncodeConcatenatedHashes(hashSlice []chainhash.Hash) string {
+	length := len(hashSlice) * chainhash.HashSize
+	hashBytes := make([]byte, 0, length)
+	for i := range hashSlice {
+		hashBytes = append(hashBytes, hashSlice[i][:]...)
+	}
+
+	return hex.EncodeToString(hashBytes)
+}
+
 // DecodeConcatenatedHashes return a slice of contiguous chainhash.Hash objects
 // created by decoding a single string of concatenated hex-encoded hashes.
 //
