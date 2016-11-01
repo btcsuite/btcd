@@ -64,15 +64,15 @@ type DynamicBanScore struct {
 	lastUnix   int64
 	transient  float64
 	persistent uint32
-	sync.Mutex
+	mtx        sync.Mutex
 }
 
 // String returns the ban score as a human-readable string.
 func (s *DynamicBanScore) String() string {
-	s.Lock()
+	s.mtx.Lock()
 	r := fmt.Sprintf("persistent %v + transient %v at %v = %v as of now",
 		s.persistent, s.transient, s.lastUnix, s.Int())
-	s.Unlock()
+	s.mtx.Unlock()
 	return r
 }
 
@@ -81,9 +81,9 @@ func (s *DynamicBanScore) String() string {
 //
 // This function is safe for concurrent access.
 func (s *DynamicBanScore) Int() uint32 {
-	s.Lock()
+	s.mtx.Lock()
 	r := s.int(time.Now())
-	s.Unlock()
+	s.mtx.Unlock()
 	return r
 }
 
@@ -92,9 +92,9 @@ func (s *DynamicBanScore) Int() uint32 {
 //
 // This function is safe for concurrent access.
 func (s *DynamicBanScore) Increase(persistent, transient uint32) uint32 {
-	s.Lock()
+	s.mtx.Lock()
 	r := s.increase(persistent, transient, time.Now())
-	s.Unlock()
+	s.mtx.Unlock()
 	return r
 }
 
@@ -102,11 +102,11 @@ func (s *DynamicBanScore) Increase(persistent, transient uint32) uint32 {
 //
 // This function is safe for concurrent access.
 func (s *DynamicBanScore) Reset() {
-	s.Lock()
+	s.mtx.Lock()
 	s.persistent = 0
 	s.transient = 0
 	s.lastUnix = 0
-	s.Unlock()
+	s.mtx.Unlock()
 }
 
 // int returns the ban score, the sum of the persistent and decaying scores at a
