@@ -3233,6 +3233,48 @@ func Generate() (tests [][]TestInstance, err error) {
 	})
 	rejected(blockchain.ErrDuplicateTxInputs)
 
+	// Create block with nanosecond precision timestamp.
+	//
+	//   ... -> b61(14)
+	//                 \-> b77(15)
+	g.setTip("b61")
+	g.nextBlock("b77", outs[15], ticketOuts[15], func(b *wire.MsgBlock) {
+		b.Header.Timestamp = b.Header.Timestamp.Add(1 * time.Nanosecond)
+	})
+	rejected(blockchain.ErrInvalidTime)
+
+	// Create block with target difficulty that is too low (0 or below).
+	//
+	//   ... -> b61(14)
+	//                 \-> b78(15)
+	g.setTip("b61")
+	b78 := g.nextBlock("b78", outs[15], ticketOuts[15])
+	{
+		// This can't be done inside a munge function passed to nextBlock
+		// because the block is solved after the function returns and this test
+		// involves an unsolvable block.
+		b78Hash := b78.BlockSha()
+		b78.Header.Bits = 0x01810000 // -1 in compact form.
+		g.updateBlockState("b78", b78Hash, "b78", b78)
+	}
+	rejected(blockchain.ErrUnexpectedDifficulty)
+
+	// Create block with target difficulty that is greater than max allowed.
+	//
+	//   ... -> b61(14)
+	//                 \-> b79(15)
+	g.setTip("b61")
+	b79 := g.nextBlock("b79", outs[15], ticketOuts[15])
+	{
+		// This can't be done inside a munge function passed to nextBlock
+		// because the block is solved after the function returns and this test
+		// involves an improperly solved block.
+		b79Hash := b79.BlockSha()
+		b79.Header.Bits = g.params.PowLimitBits + 1
+		g.updateBlockState("b79", b79Hash, "b79", b79)
+	}
+	rejected(blockchain.ErrUnexpectedDifficulty)
+
 	// ---------------------------------------------------------------------
 	// More signature operation counting tests.
 	// ---------------------------------------------------------------------
@@ -3255,14 +3297,14 @@ func Generate() (tests [][]TestInstance, err error) {
 	//  [7054]     : OP_CHECKSIG (goes over the limit)
 	//
 	//   ... -> b61(14)
-	//                 \-> b77(15)
+	//                 \-> b80(15)
 	g.setTip("b61")
 	scriptSize := maxBlockSigOps + 5 + (maxScriptElementSize + 1) + 1
 	tooManySigOps = repeatOpcode(txscript.OP_CHECKSIG, scriptSize)
 	tooManySigOps[maxBlockSigOps] = txscript.OP_PUSHDATA4
 	binary.LittleEndian.PutUint32(tooManySigOps[maxBlockSigOps+1:],
 		maxScriptElementSize+1)
-	g.nextBlock("b77", outs[15], ticketOuts[15], replaceSpendScript(tooManySigOps))
+	g.nextBlock("b80", outs[15], ticketOuts[15], replaceSpendScript(tooManySigOps))
 	g.assertTipBlockSigOpsCount(maxBlockSigOps + 1)
 	rejected(blockchain.ErrTooManySigOps)
 
