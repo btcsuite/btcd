@@ -3127,6 +3127,112 @@ func Generate() (tests [][]TestInstance, err error) {
 	})
 	rejected(blockchain.ErrCoinbaseHeight)
 
+	// Create block with a fraudulent transaction (invalid index).
+	//
+	//   ... -> b61(14)
+	//                 \-> b67(15)
+	g.setTip("b61")
+	g.nextBlock("b67", outs[15], ticketOuts[15], func(b *wire.MsgBlock) {
+		b.Transactions[0].TxIn[0].BlockIndex = wire.NullBlockIndex - 1
+	})
+	rejected(blockchain.ErrBadCoinbaseFraudProof)
+
+	// Create block containing a transaction with no inputs.
+	//
+	//   ... -> b61(14)
+	//                 \-> b68(15)
+	g.setTip("b61")
+	g.nextBlock("b68", outs[15], ticketOuts[15], func(b *wire.MsgBlock) {
+		b.Transactions[1].TxIn = nil
+	})
+	rejected(blockchain.ErrNoTxInputs)
+
+	// Create block containing a transaction with no outputs.
+	//
+	//   ... -> b61(14)
+	//                 \-> b69(15)
+	g.setTip("b61")
+	g.nextBlock("b69", outs[15], ticketOuts[15], func(b *wire.MsgBlock) {
+		b.Transactions[1].TxOut = nil
+	})
+	rejected(blockchain.ErrNoTxOutputs)
+
+	// Create block containing a transaction output with negative value.
+	//
+	//   ... -> b61(14)
+	//                 \-> b70(15)
+	g.setTip("b61")
+	g.nextBlock("b70", outs[15], ticketOuts[15], func(b *wire.MsgBlock) {
+		b.Transactions[1].TxOut[0].Value = -1
+	})
+	rejected(blockchain.ErrBadTxOutValue)
+
+	// Create block containing a transaction output with an exceedingly
+	// large (and therefore invalid) value.
+	//
+	//   ... -> b61(14)
+	//                 \-> b71(15)
+	g.setTip("b61")
+	g.nextBlock("b71", outs[15], ticketOuts[15], func(b *wire.MsgBlock) {
+		b.Transactions[1].TxOut[0].Value = dcrutil.MaxAmount + 1
+	})
+	rejected(blockchain.ErrBadTxOutValue)
+
+	// Create block containing a transaction whose outputs have an
+	// exceedingly large (and therefore invalid) total value.
+	//
+	//   ... -> b61(14)
+	//                 \-> b72(15)
+	g.setTip("b61")
+	g.nextBlock("b72", outs[15], ticketOuts[15], func(b *wire.MsgBlock) {
+		b.Transactions[1].TxOut[0].Value = dcrutil.MaxAmount
+		b.Transactions[1].TxOut[1].Value = 1
+	})
+	rejected(blockchain.ErrBadTxOutValue)
+
+	// Create block containing a stakebase tx with a small signature script.
+	//
+	//   ... -> b61(14)
+	//                 \-> b73(15)
+	g.setTip("b61")
+	tooSmallSbScript := repeatOpcode(0x00, minCoinbaseScriptLen-1)
+	g.nextBlock("b73", outs[15], ticketOuts[15], replaceStakeSigScript(tooSmallSbScript))
+	rejected(blockchain.ErrBadStakebaseScriptLen)
+
+	// Create block containing a base stake tx with a large signature script.
+	//
+	//   ... -> b61(14)
+	//                 \-> b74(15)
+	g.setTip("b61")
+	tooLargeSbScript := repeatOpcode(0x00, maxCoinbaseScriptLen+1)
+	g.nextBlock("b74", outs[15], ticketOuts[15], replaceStakeSigScript(tooLargeSbScript))
+	rejected(blockchain.ErrBadStakebaseScriptLen)
+
+	// Create block containing an input transaction with a null outpoint.
+	//
+	//   ... -> b61(14)
+	//                 \-> b75(15)
+	g.setTip("b61")
+	g.nextBlock("b75", outs[15], ticketOuts[15], func(b *wire.MsgBlock) {
+		tx := b.Transactions[1]
+		tx.AddTxIn(&wire.TxIn{
+			PreviousOutPoint: *wire.NewOutPoint(&chainhash.Hash{},
+				wire.MaxPrevOutIndex, dcrutil.TxTreeRegular)})
+	})
+	rejected(blockchain.ErrBadTxInput)
+
+	// Create block containing duplicate tx inputs.
+	//
+	//   ... -> b61(14)
+	//                 \-> b76(15)
+	g.setTip("b61")
+	g.nextBlock("b76", outs[15], ticketOuts[15], func(b *wire.MsgBlock) {
+		tx := b.Transactions[1]
+		tx.AddTxIn(&wire.TxIn{
+			PreviousOutPoint: b.Transactions[1].TxIn[0].PreviousOutPoint})
+	})
+	rejected(blockchain.ErrDuplicateTxInputs)
+
 	// ---------------------------------------------------------------------
 	// More signature operation counting tests.
 	// ---------------------------------------------------------------------
@@ -3149,14 +3255,14 @@ func Generate() (tests [][]TestInstance, err error) {
 	//  [7054]     : OP_CHECKSIG (goes over the limit)
 	//
 	//   ... -> b61(14)
-	//                 \-> b67(15)
+	//                 \-> b77(15)
 	g.setTip("b61")
 	scriptSize := maxBlockSigOps + 5 + (maxScriptElementSize + 1) + 1
 	tooManySigOps = repeatOpcode(txscript.OP_CHECKSIG, scriptSize)
 	tooManySigOps[maxBlockSigOps] = txscript.OP_PUSHDATA4
 	binary.LittleEndian.PutUint32(tooManySigOps[maxBlockSigOps+1:],
 		maxScriptElementSize+1)
-	g.nextBlock("b67", outs[15], ticketOuts[15], replaceSpendScript(tooManySigOps))
+	g.nextBlock("b77", outs[15], ticketOuts[15], replaceSpendScript(tooManySigOps))
 	g.assertTipBlockSigOpsCount(maxBlockSigOps + 1)
 	rejected(blockchain.ErrTooManySigOps)
 
