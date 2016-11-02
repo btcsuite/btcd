@@ -172,11 +172,11 @@ type ConnManager struct {
 // retry duration. Otherwise, if required, it makes a new connection request.
 // After maxFailedConnectionAttempts new connections will be retried after the
 // configured retry duration.
-func (cm *ConnManager) handleFailedConn(c *ConnReq, retry bool) {
+func (cm *ConnManager) handleFailedConn(c *ConnReq) {
 	if atomic.LoadInt32(&cm.stop) != 0 {
 		return
 	}
-	if retry && c.Permanent {
+	if c.Permanent {
 		c.retryCount++
 		d := time.Duration(c.retryCount) * cm.cfg.RetryDuration
 		if d > maxRetryDuration {
@@ -241,7 +241,9 @@ out:
 						go cm.cfg.OnDisconnection(connReq)
 					}
 
-					cm.handleFailedConn(connReq, msg.retry)
+					if uint32(len(conns)) < cm.cfg.TargetOutbound && msg.retry {
+						cm.handleFailedConn(connReq)
+					}
 				} else {
 					log.Errorf("Unknown connection: %d", msg.id)
 				}
@@ -250,7 +252,7 @@ out:
 				connReq := msg.c
 				connReq.updateState(ConnFailed)
 				log.Debugf("Failed to connect to %v: %v", connReq, msg.err)
-				cm.handleFailedConn(connReq, true)
+				cm.handleFailedConn(connReq)
 			}
 
 		case <-cm.quit:
