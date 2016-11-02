@@ -5,13 +5,18 @@
 # 3. go vet        (http://golang.org/cmd/vet)
 # 4. race detector (http://blog.golang.org/race-detector)
 # 5. test coverage (http://blog.golang.org/cover)
+#
+# gometaling (github.com/alecthomas/gometalinter) is used to run each each
+# static checker.
 
 set -ex
 
 # Automatic checks
-test -z "$(go fmt $(glide novendor) | tee /dev/stderr)"
-test -z "$(for package in $(glide novendor); do golint $package; done | grep -v 'ALL_CAPS\|OP_' | tee /dev/stderr)"
-test -z "$(go vet $(glide novendor) 2>&1 | tee /dev/stderr)"
+test -z "$(gometalinter --disable-all \
+--enable=gofmt \
+--enable=golint \
+--enable=vet \
+--vendor --deadline=20s ./... | grep -v 'ALL_CAPS\|OP_' 2>&1 | tee /dev/stderr)"
 env GORACE="halt_on_error=1" go test -v -race -tags rpctest $(glide novendor)
 
 # Run test coverage on each subdirectories and merge the coverage profile.
