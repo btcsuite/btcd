@@ -41,8 +41,13 @@ const (
 	// the server.
 	defaultServices = wire.SFNodeNetwork | wire.SFNodeBloom
 
-	// defaultMaxOutbound is the default number of max outbound peers.
-	defaultMaxOutbound = 8
+	// defaultRequiredServices describes the default services that are
+	// required to be supported by outbound peers.
+	defaultRequiredServices = wire.SFNodeNetwork
+
+	// defaultTargetOutbound is the default number of outbound peers to
+	// target.
+	defaultTargetOutbound = 8
 
 	// connectionRetryInterval is the base amount of time to wait in between
 	// retries when connecting to persistent peers.  It is adjusted by the
@@ -97,12 +102,11 @@ type updatePeerHeightsMsg struct {
 // peerState maintains state of inbound, persistent, outbound peers as well
 // as banned peers and outbound groups.
 type peerState struct {
-	inboundPeers     map[int32]*serverPeer
-	outboundPeers    map[int32]*serverPeer
-	persistentPeers  map[int32]*serverPeer
-	banned           map[string]time.Time
-	outboundGroups   map[string]int
-	maxOutboundPeers int
+	inboundPeers    map[int32]*serverPeer
+	outboundPeers   map[int32]*serverPeer
+	persistentPeers map[int32]*serverPeer
+	banned          map[string]time.Time
+	outboundGroups  map[string]int
 }
 
 // Count returns the count of all known peers.
@@ -1638,15 +1642,11 @@ func (s *server) peerHandler() {
 	srvrLog.Tracef("Starting peer handler")
 
 	state := &peerState{
-		inboundPeers:     make(map[int32]*serverPeer),
-		persistentPeers:  make(map[int32]*serverPeer),
-		outboundPeers:    make(map[int32]*serverPeer),
-		banned:           make(map[string]time.Time),
-		maxOutboundPeers: defaultMaxOutbound,
-		outboundGroups:   make(map[string]int),
-	}
-	if cfg.MaxPeers < state.maxOutboundPeers {
-		state.maxOutboundPeers = cfg.MaxPeers
+		inboundPeers:    make(map[int32]*serverPeer),
+		persistentPeers: make(map[int32]*serverPeer),
+		outboundPeers:   make(map[int32]*serverPeer),
+		banned:          make(map[string]time.Time),
+		outboundGroups:  make(map[string]int),
 	}
 
 	if !cfg.DisableDNSSeed {
@@ -2452,16 +2452,16 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 	}
 
 	// Create a connection manager.
-	maxOutbound := defaultMaxOutbound
-	if cfg.MaxPeers < maxOutbound {
-		maxOutbound = cfg.MaxPeers
+	targetOutbound := defaultTargetOutbound
+	if cfg.MaxPeers < targetOutbound {
+		targetOutbound = cfg.MaxPeers
 	}
 	cmgr, err := connmgr.New(&connmgr.Config{
-		RetryDuration: connectionRetryInterval,
-		MaxOutbound:   uint32(maxOutbound),
-		Dial:          dcrdDial,
-		OnConnection:  s.outboundPeerConnected,
-		GetNewAddress: newAddressFunc,
+		RetryDuration:  connectionRetryInterval,
+		TargetOutbound: uint32(targetOutbound),
+		Dial:           dcrdDial,
+		OnConnection:   s.outboundPeerConnected,
+		GetNewAddress:  newAddressFunc,
 	})
 	if err != nil {
 		return nil, err

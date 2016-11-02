@@ -100,9 +100,9 @@ func TestStartStop(t *testing.T) {
 	connected := make(chan *ConnReq)
 	disconnected := make(chan *ConnReq)
 	cmgr, err := New(&Config{
-		MaxOutbound:   1,
-		GetNewAddress: func() (string, error) { return "127.0.0.1:18555", nil },
-		Dial:          mockDialer,
+		TargetOutbound: 1,
+		GetNewAddress:  func() (string, error) { return "127.0.0.1:18555", nil },
+		Dial:           mockDialer,
 		OnConnection: func(c *ConnReq, conn net.Conn) {
 			connected <- c
 		},
@@ -141,8 +141,8 @@ func TestStartStop(t *testing.T) {
 func TestConnectMode(t *testing.T) {
 	connected := make(chan *ConnReq)
 	cmgr, err := New(&Config{
-		MaxOutbound: 2,
-		Dial:        mockDialer,
+		TargetOutbound: 2,
+		Dial:           mockDialer,
 		OnConnection: func(c *ConnReq, conn net.Conn) {
 			connected <- c
 		},
@@ -173,17 +173,17 @@ func TestConnectMode(t *testing.T) {
 	cmgr.Stop()
 }
 
-// TestMaxOutbound tests the maximum number of outbound connections.
+// TestTargetOutbound tests the target number of outbound connections.
 //
 // We wait until all connections are established, then test they there are the
 // only connections made.
-func TestMaxOutbound(t *testing.T) {
-	maxOutbound := uint32(10)
+func TestTargetOutbound(t *testing.T) {
+	targetOutbound := uint32(10)
 	connected := make(chan *ConnReq)
 	cmgr, err := New(&Config{
-		MaxOutbound:   maxOutbound,
-		Dial:          mockDialer,
-		GetNewAddress: func() (string, error) { return "127.0.0.1:18555", nil },
+		TargetOutbound: targetOutbound,
+		Dial:           mockDialer,
+		GetNewAddress:  func() (string, error) { return "127.0.0.1:18555", nil },
 		OnConnection: func(c *ConnReq, conn net.Conn) {
 			connected <- c
 		},
@@ -192,13 +192,13 @@ func TestMaxOutbound(t *testing.T) {
 		t.Fatalf("New error: %v", err)
 	}
 	cmgr.Start()
-	for i := uint32(0); i < maxOutbound; i++ {
+	for i := uint32(0); i < targetOutbound; i++ {
 		<-connected
 	}
 
 	select {
 	case c := <-connected:
-		t.Fatalf("max outbound: got unexpected connection - %v", c.Addr)
+		t.Fatalf("target outbound: got unexpected connection - %v", c.Addr)
 	case <-time.After(time.Millisecond):
 		break
 	}
@@ -213,9 +213,9 @@ func TestRetryPermanent(t *testing.T) {
 	connected := make(chan *ConnReq)
 	disconnected := make(chan *ConnReq)
 	cmgr, err := New(&Config{
-		RetryDuration: time.Millisecond,
-		MaxOutbound:   1,
-		Dial:          mockDialer,
+		RetryDuration:  time.Millisecond,
+		TargetOutbound: 1,
+		Dial:           mockDialer,
 		OnConnection: func(c *ConnReq, conn net.Conn) {
 			connected <- c
 		},
@@ -302,9 +302,9 @@ func TestMaxRetryDuration(t *testing.T) {
 
 	connected := make(chan *ConnReq)
 	cmgr, err := New(&Config{
-		RetryDuration: time.Millisecond,
-		MaxOutbound:   1,
-		Dial:          timedDialer,
+		RetryDuration:  time.Millisecond,
+		TargetOutbound: 1,
+		Dial:           timedDialer,
 		OnConnection: func(c *ConnReq, conn net.Conn) {
 			connected <- c
 		},
@@ -335,10 +335,10 @@ func TestNetworkFailure(t *testing.T) {
 		return nil, errors.New("network down")
 	}
 	cmgr, err := New(&Config{
-		MaxOutbound:   5,
-		RetryDuration: 5 * time.Millisecond,
-		Dial:          errDialer,
-		GetNewAddress: func() (string, error) { return "127.0.0.1:18555", nil },
+		TargetOutbound: 5,
+		RetryDuration:  5 * time.Millisecond,
+		Dial:           errDialer,
+		GetNewAddress:  func() (string, error) { return "127.0.0.1:18555", nil },
 		OnConnection: func(c *ConnReq, conn net.Conn) {
 			t.Fatalf("network failure: got unexpected connection - %v", c.Addr)
 		},
