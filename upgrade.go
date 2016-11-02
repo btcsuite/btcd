@@ -13,6 +13,9 @@ import (
 // dirEmpty returns whether or not the specified directory path is empty.
 func dirEmpty(dirPath string) (bool, error) {
 	f, err := os.Open(dirPath)
+	if err != nil {
+		return false, err
+	}
 	defer f.Close()
 
 	// Read the names of a max of one entry from the directory.  When the

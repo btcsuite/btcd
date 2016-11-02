@@ -61,7 +61,7 @@ func TestIsBad(t *testing.T) {
 	secondsOld := time.Now().Add(-2 * time.Second)
 	minutesOld := time.Now().Add(-27 * time.Minute)
 	hoursOld := time.Now().Add(-5 * time.Hour)
-	zeroTime, _ := time.Parse("Jan 1, 1970 at 0:00am (GMT)", "Jan 1, 1970 at 0:00am (GMT)")
+	zeroTime := time.Time{}
 
 	futureNa := &wire.NetAddress{Timestamp: future}
 	minutesOldNa := &wire.NetAddress{Timestamp: minutesOld}
