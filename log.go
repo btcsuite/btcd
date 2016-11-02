@@ -22,12 +22,6 @@ import (
 	"github.com/btcsuite/seelog"
 )
 
-const (
-	// maxRejectReasonLen is the maximum length of a sanitized reject reason
-	// that will be logged.
-	maxRejectReasonLen = 250
-)
-
 // Loggers per subsystem.  Note that backendLog is a seelog logger that all of
 // the subsystem loggers route their messages to.  When adding new subsystems,
 // add a reference here, to the subsystemLoggers map, and the useLogger
@@ -68,22 +62,6 @@ var subsystemLoggers = map[string]btclog.Logger{
 	"SCRP": scrpLog,
 	"SRVR": srvrLog,
 	"TXMP": txmpLog,
-}
-
-// logClosure is used to provide a closure over expensive logging operations
-// so don't have to be performed when the logging level doesn't warrant it.
-type logClosure func() string
-
-// String invokes the underlying function and returns the result.
-func (c logClosure) String() string {
-	return c()
-}
-
-// newLogClosure returns a new closure over a function that returns a string
-// which itself provides a Stringer interface so that it can be used with the
-// logging system.
-func newLogClosure(c func() string) logClosure {
-	return logClosure(c)
 }
 
 // useLogger updates the logger references for subsystemID to logger.  Invalid

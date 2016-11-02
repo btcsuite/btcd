@@ -42,7 +42,6 @@ const (
 	defaultMaxRPCClients         = 10
 	defaultMaxRPCWebsockets      = 25
 	defaultMaxRPCConcurrentReqs  = 20
-	defaultVerifyEnabled         = false
 	defaultDbType                = "ffldb"
 	defaultFreeTxRelayLimit      = 15.0
 	defaultBlockMinSize          = 0

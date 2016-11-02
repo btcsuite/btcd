@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2014 The btcsuite developers
+// Copyright (c) 2013-2016 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -95,8 +95,6 @@ const (
 	// needAddressThreshold is the number of addresses under which the
 	// address manager will claim to need more addresses.
 	needAddressThreshold = 1000
-
-	newAddressBufferSize = 50
 
 	// dumpAddressInterval is the interval used to dump the address
 	// cache to disk for future use.
