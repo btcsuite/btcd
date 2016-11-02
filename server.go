@@ -1254,7 +1254,7 @@ func (s *server) handleDonePeerMsg(state *peerState, sp *serverPeer) {
 	}
 
 	if sp.connReq != nil {
-		s.connManager.Remove(sp.connReq.ID())
+		s.connManager.Disconnect(sp.connReq.ID())
 	}
 
 	// Update the address' last seen time if the peer has acknowledged
