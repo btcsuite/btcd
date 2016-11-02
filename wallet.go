@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"strconv"
 
+	"github.com/decred/dcrd/blockchain/stake"
 	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/dcrjson"
 	"github.com/decred/dcrd/wire"
@@ -3325,6 +3326,42 @@ func (c *Client) SetTicketVoteBitsAsync(hash *chainhash.Hash, voteBits uint16) F
 // bits are used in the future for a vote.
 func (c *Client) SetTicketVoteBits(hash *chainhash.Hash, voteBits uint16) error {
 	return c.SetTicketVoteBitsAsync(hash, voteBits).Receive()
+}
+
+// FutureSetTicketsVoteBitsResult is a future promise to deliver the result of a
+// SetTicketsVoteBitsAsync RPC invocation (or an applicable error).
+type FutureSetTicketsVoteBitsResult chan *response
+
+// Receive waits for the response promised by the future and returns the info
+// provided by the server.
+func (r FutureSetTicketsVoteBitsResult) Receive() error {
+	_, err := receiveFuture(r)
+	return err
+}
+
+// SetTicketsVoteBitsAsync returns an instance of a type that can be used to
+// get the result of the RPC at some future time by invoking the Receive
+// function on the returned instance.
+//
+// See SetTicketsVoteBits for the blocking version and more details.
+func (c *Client) SetTicketsVoteBitsAsync(hashes []*chainhash.Hash, votesBits []stake.VoteBits) FutureSetTicketsVoteBitsResult {
+	vbs, err := dcrjson.EncodeConcatenatedVoteBits(votesBits)
+	if err != nil {
+		return newFutureError(err)
+	}
+	var hashSlice []chainhash.Hash
+	for i := range hashes {
+		hashSlice = append(hashSlice, *hashes[i])
+	}
+	hashesConcat := dcrjson.EncodeConcatenatedHashes(hashSlice)
+	cmd := dcrjson.NewSetTicketsVoteBitsCmd(hashesConcat, vbs)
+	return c.sendCmd(cmd)
+}
+
+// SetTicketsVoteBits sets the voteBits fields in each tickets in the given
+// slice, so that these bits are used in the future for a vote.
+func (c *Client) SetTicketsVoteBits(hashes []*chainhash.Hash, votesBits []stake.VoteBits) error {
+	return c.SetTicketsVoteBitsAsync(hashes, votesBits).Receive()
 }
 
 // FutureSetTxFeeResult is a future promise to deliver the result of a
