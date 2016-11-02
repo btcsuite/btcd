@@ -1438,6 +1438,11 @@ func (s *server) handleQuery(state *peerState, querymsg interface{}) {
 
 	case connectNodeMsg:
 		// XXX(oga) duplicate oneshots?
+		// Limit max number of total peers.
+		if state.Count() >= cfg.MaxPeers {
+			msg.reply <- errors.New("max peers reached")
+			return
+		}
 		for _, peer := range state.persistentPeers {
 			if peer.Addr() == msg.addr {
 				if msg.permanent {
