@@ -32,9 +32,9 @@ var (
 	// persistent connections.
 	defaultRetryDuration = time.Second * 5
 
-	// defaultMaxOutbound is the default number of maximum outbound connections
-	// to maintain.
-	defaultMaxOutbound = uint32(8)
+	// defaultTargetOutbound is the default number of outbound connections to
+	// maintain.
+	defaultTargetOutbound = uint32(8)
 )
 
 // DialFunc defines a function that dials a connection.
@@ -110,9 +110,9 @@ func (c *ConnReq) String() string {
 
 // Config holds the configuration options related to the connection manager.
 type Config struct {
-	// MaxOutbound is the maximum number of outbound network connections to
+	// TargetOutbound is the number of outbound network connections to
 	// maintain. Defaults to 8.
-	MaxOutbound uint32
+	TargetOutbound uint32
 
 	// RetryDuration is the duration to wait before retrying connection
 	// requests. Defaults to 5s.
@@ -207,7 +207,7 @@ func (cm *ConnManager) handleFailedConn(c *ConnReq, retry bool) {
 // connections so that we remain connected to the network.  Connection requests
 // are processed and mapped by their assigned ids.
 func (cm *ConnManager) connHandler() {
-	conns := make(map[uint64]*ConnReq, cm.cfg.MaxOutbound)
+	conns := make(map[uint64]*ConnReq, cm.cfg.TargetOutbound)
 out:
 	for {
 		select {
@@ -329,7 +329,7 @@ func (cm *ConnManager) Start() {
 	cm.wg.Add(1)
 	go cm.connHandler()
 
-	for i := atomic.LoadUint64(&cm.connReqCount); i < uint64(cm.cfg.MaxOutbound); i++ {
+	for i := atomic.LoadUint64(&cm.connReqCount); i < uint64(cm.cfg.TargetOutbound); i++ {
 		go cm.NewConnReq()
 	}
 }
@@ -359,8 +359,8 @@ func New(cfg *Config) (*ConnManager, error) {
 	if cfg.RetryDuration <= 0 {
 		cfg.RetryDuration = defaultRetryDuration
 	}
-	if cfg.MaxOutbound == 0 {
-		cfg.MaxOutbound = defaultMaxOutbound
+	if cfg.TargetOutbound == 0 {
+		cfg.TargetOutbound = defaultTargetOutbound
 	}
 	cm := ConnManager{
 		cfg:      *cfg, // Copy so caller can't mutate
