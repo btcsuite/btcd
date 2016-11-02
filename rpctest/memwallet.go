@@ -448,7 +448,7 @@ func (m *memWallet) CreateTransaction(outputs []*wire.TxOut, feeRate btcutil.Amo
 	}
 
 	// Attempt to fund the transaction with spendable utxos.
-	if err := m.fundTx(tx, outputAmt, btcutil.Amount(feeRate)); err != nil {
+	if err := m.fundTx(tx, outputAmt, feeRate); err != nil {
 		return nil, err
 	}
 

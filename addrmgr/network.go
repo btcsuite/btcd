@@ -246,12 +246,12 @@ func GroupKey(na *wire.NetAddress) string {
 	}
 	if IsRFC6145(na) || IsRFC6052(na) {
 		// last four bytes are the ip address
-		ip := net.IP(na.IP[12:16])
+		ip := na.IP[12:16]
 		return ip.Mask(net.CIDRMask(16, 32)).String()
 	}
 
 	if IsRFC3964(na) {
-		ip := net.IP(na.IP[2:6])
+		ip := na.IP[2:6]
 		return ip.Mask(net.CIDRMask(16, 32)).String()
 
 	}

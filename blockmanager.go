@@ -572,7 +572,7 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 			} else {
 				bmgrLog.Debugf("Extracted height of %v from "+
 					"orphan block", cbHeight)
-				heightUpdate = int32(cbHeight)
+				heightUpdate = cbHeight
 				blkHashUpdate = blockHash
 			}
 		}
@@ -615,7 +615,7 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 	if blkHashUpdate != nil && heightUpdate != 0 {
 		bmsg.peer.UpdateLastBlockHeight(heightUpdate)
 		if isOrphan || b.current() {
-			go b.server.UpdatePeerHeights(blkHashUpdate, int32(heightUpdate), bmsg.peer)
+			go b.server.UpdatePeerHeights(blkHashUpdate, heightUpdate, bmsg.peer)
 		}
 	}
 
@@ -882,7 +882,7 @@ func (b *blockManager) handleInvMsg(imsg *invMsg) {
 	if lastBlock != -1 && b.current() {
 		blkHeight, err := b.chain.BlockHeightByHash(&invVects[lastBlock].Hash)
 		if err == nil {
-			imsg.peer.UpdateLastBlockHeight(int32(blkHeight))
+			imsg.peer.UpdateLastBlockHeight(blkHeight)
 		}
 	}
 

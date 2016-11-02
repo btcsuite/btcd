@@ -420,8 +420,8 @@ func (*wsNotificationManager) notifyBlockConnected(clients map[chan struct{}]*ws
 	block *btcutil.Block) {
 
 	// Notify interested websocket clients about the connected block.
-	ntfn := btcjson.NewBlockConnectedNtfn(block.Hash().String(),
-		int32(block.Height()), block.MsgBlock().Header.Timestamp.Unix())
+	ntfn := btcjson.NewBlockConnectedNtfn(block.Hash().String(), block.Height(),
+		block.MsgBlock().Header.Timestamp.Unix())
 	marshalledJSON, err := btcjson.MarshalCmd(nil, ntfn)
 	if err != nil {
 		rpcsLog.Error("Failed to marshal block connected notification: "+
@@ -445,7 +445,7 @@ func (*wsNotificationManager) notifyBlockDisconnected(clients map[chan struct{}]
 
 	// Notify interested websocket clients about the disconnected block.
 	ntfn := btcjson.NewBlockDisconnectedNtfn(block.Hash().String(),
-		int32(block.Height()), block.MsgBlock().Header.Timestamp.Unix())
+		block.Height(), block.MsgBlock().Header.Timestamp.Unix())
 	marshalledJSON, err := btcjson.MarshalCmd(nil, ntfn)
 	if err != nil {
 		rpcsLog.Error("Failed to marshal block disconnected "+
@@ -602,7 +602,7 @@ func blockDetails(block *btcutil.Block, txIndex int) *btcjson.BlockDetails {
 		return nil
 	}
 	return &btcjson.BlockDetails{
-		Height: int32(block.Height()),
+		Height: block.Height(),
 		Hash:   block.Hash().String(),
 		Index:  txIndex,
 		Time:   block.MsgBlock().Header.Timestamp.Unix(),
@@ -2026,8 +2026,7 @@ fetchRange:
 			}
 
 			n := btcjson.NewRescanProgressNtfn(hashList[i].String(),
-				int32(blk.Height()),
-				blk.MsgBlock().Header.Timestamp.Unix())
+				blk.Height(), blk.MsgBlock().Header.Timestamp.Unix())
 			mn, err := btcjson.MarshalCmd(nil, n)
 			if err != nil {
 				rpcsLog.Errorf("Failed to marshal rescan "+

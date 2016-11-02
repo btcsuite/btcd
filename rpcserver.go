@@ -545,7 +545,7 @@ func handleCreateRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan 
 			return nil, rpcDecodeHexError(input.Txid)
 		}
 
-		prevOut := wire.NewOutPoint(txHash, uint32(input.Vout))
+		prevOut := wire.NewOutPoint(txHash, input.Vout)
 		txIn := wire.NewTxIn(prevOut, []byte{})
 		if c.LockTime != nil && *c.LockTime != 0 {
 			txIn.Sequence = wire.MaxTxInSequenceNum - 1
@@ -1200,7 +1200,7 @@ func handleGetBlockHeader(s *rpcServer, cmd interface{}, closeChan <-chan struct
 	blockHeaderReply := btcjson.GetBlockHeaderVerboseResult{
 		Hash:          c.Hash,
 		Confirmations: uint64(1 + best.Height - blockHeight),
-		Height:        int32(blockHeight),
+		Height:        blockHeight,
 		Version:       blockHeader.Version,
 		MerkleRoot:    blockHeader.MerkleRoot.String(),
 		NextHash:      nextHashString,
@@ -3647,12 +3647,11 @@ func handleVerifyMessage(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 	}
 
 	// Reconstruct the pubkey hash.
-	btcPK := (*btcec.PublicKey)(pk)
 	var serializedPK []byte
 	if wasCompressed {
-		serializedPK = btcPK.SerializeCompressed()
+		serializedPK = pk.SerializeCompressed()
 	} else {
-		serializedPK = btcPK.SerializeUncompressed()
+		serializedPK = pk.SerializeUncompressed()
 	}
 	address, err := btcutil.NewAddressPubKey(serializedPK,
 		activeNetParams.Params)

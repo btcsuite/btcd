@@ -454,7 +454,7 @@ func (p *Peer) UpdateLastBlockHeight(newHeight int32) {
 	p.statsMtx.Lock()
 	log.Tracef("Updating last block height of peer %v from %v to %v",
 		p.addr, p.lastBlock, newHeight)
-	p.lastBlock = int32(newHeight)
+	p.lastBlock = newHeight
 	p.statsMtx.Unlock()
 }
 
@@ -805,7 +805,7 @@ func (p *Peer) localVersionMsg() (*wire.MsgVersion, error) {
 	sentNonces.Add(nonce)
 
 	// Version message.
-	msg := wire.NewMsgVersion(ourNA, theirNA, nonce, int32(blockNum))
+	msg := wire.NewMsgVersion(ourNA, theirNA, nonce, blockNum)
 	msg.AddUserAgent(p.cfg.UserAgentName, p.cfg.UserAgentVersion)
 
 	// XXX: bitcoind appears to always enable the full node services flag
@@ -2054,7 +2054,7 @@ func newPeerBase(origCfg *Config, inbound bool) *Peer {
 	// caller.
 	cfg := *origCfg // Copy to avoid mutating caller.
 	if cfg.ProtocolVersion == 0 {
-		cfg.ProtocolVersion = uint32(MaxProtocolVersion)
+		cfg.ProtocolVersion = MaxProtocolVersion
 	}
 
 	// Set the chain parameters to testnet if the caller did not specify any.

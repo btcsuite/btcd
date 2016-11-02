@@ -165,7 +165,7 @@ func (alert *Alert) Serialize(w io.Writer, pver uint32) error {
 	if err != nil {
 		return err
 	}
-	for i := 0; i < int(count); i++ {
+	for i := 0; i < count; i++ {
 		err = writeElement(w, alert.SetCancel[i])
 		if err != nil {
 			return err
@@ -187,7 +187,7 @@ func (alert *Alert) Serialize(w io.Writer, pver uint32) error {
 	if err != nil {
 		return err
 	}
-	for i := 0; i < int(count); i++ {
+	for i := 0; i < count; i++ {
 		err = WriteVarString(w, pver, alert.SetSubVer[i])
 		if err != nil {
 			return err

@@ -115,7 +115,7 @@ func New(activeNet *chaincfg.Params, handlers *btcrpcclient.NotificationHandlers
 			"of the supported chain networks")
 	}
 
-	harnessID := strconv.Itoa(int(numTestInstances))
+	harnessID := strconv.Itoa(numTestInstances)
 	nodeTestData, err := ioutil.TempDir("", "rpctest-"+harnessID)
 	if err != nil {
 		return nil, err
