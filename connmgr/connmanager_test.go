@@ -9,7 +9,6 @@ import (
 	"errors"
 	"io"
 	"net"
-	"strconv"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -40,7 +39,7 @@ type mockConn struct {
 	lnet, laddr string
 
 	// remote network, address for the connection.
-	rnet, raddr string
+	rAddr net.Addr
 }
 
 // LocalAddr returns the local address for the connection.
@@ -50,7 +49,7 @@ func (c mockConn) LocalAddr() net.Addr {
 
 // RemoteAddr returns the remote address for the connection.
 func (c mockConn) RemoteAddr() net.Addr {
-	return &mockAddr{c.rnet, c.raddr}
+	return &mockAddr{c.rAddr.Network(), c.rAddr.String()}
 }
 
 // Close handles closing the connection.
@@ -64,9 +63,9 @@ func (c mockConn) SetWriteDeadline(t time.Time) error { return nil }
 
 // mockDialer mocks the net.Dial interface by returning a mock connection to
 // the given address.
-func mockDialer(network, address string) (net.Conn, error) {
+func mockDialer(addr net.Addr) (net.Conn, error) {
 	r, w := io.Pipe()
-	c := &mockConn{raddr: address}
+	c := &mockConn{rAddr: addr}
 	c.Reader = r
 	c.Writer = w
 	return c, nil
@@ -102,8 +101,13 @@ func TestStartStop(t *testing.T) {
 	disconnected := make(chan *ConnReq)
 	cmgr, err := New(&Config{
 		TargetOutbound: 1,
-		GetNewAddress:  func() (string, error) { return "127.0.0.1:18555", nil },
-		Dial:           mockDialer,
+		GetNewAddress: func() (net.Addr, error) {
+			return &net.TCPAddr{
+				IP:   net.ParseIP("127.0.0.1"),
+				Port: 18555,
+			}, nil
+		},
+		Dial: mockDialer,
 		OnConnection: func(c *ConnReq, conn net.Conn) {
 			connected <- c
 		},
@@ -120,7 +124,13 @@ func TestStartStop(t *testing.T) {
 	// already stopped
 	cmgr.Stop()
 	// ignored
-	cr := &ConnReq{Addr: "127.0.0.1:18555", Permanent: true}
+	cr := &ConnReq{
+		Addr: &net.TCPAddr{
+			IP:   net.ParseIP("127.0.0.1"),
+			Port: 18555,
+		},
+		Permanent: true,
+	}
 	cmgr.Connect(cr)
 	if cr.ID() != 0 {
 		t.Fatalf("start/stop: got id: %v, want: 0", cr.ID())
@@ -151,7 +161,13 @@ func TestConnectMode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New error: %v", err)
 	}
-	cr := &ConnReq{Addr: "127.0.0.1:18555", Permanent: true}
+	cr := &ConnReq{
+		Addr: &net.TCPAddr{
+			IP:   net.ParseIP("127.0.0.1"),
+			Port: 18555,
+		},
+		Permanent: true,
+	}
 	cmgr.Start()
 	cmgr.Connect(cr)
 	gotConnReq := <-connected
@@ -184,7 +200,12 @@ func TestTargetOutbound(t *testing.T) {
 	cmgr, err := New(&Config{
 		TargetOutbound: targetOutbound,
 		Dial:           mockDialer,
-		GetNewAddress:  func() (string, error) { return "127.0.0.1:18555", nil },
+		GetNewAddress: func() (net.Addr, error) {
+			return &net.TCPAddr{
+				IP:   net.ParseIP("127.0.0.1"),
+				Port: 18555,
+			}, nil
+		},
 		OnConnection: func(c *ConnReq, conn net.Conn) {
 			connected <- c
 		},
@@ -228,7 +249,13 @@ func TestRetryPermanent(t *testing.T) {
 		t.Fatalf("New error: %v", err)
 	}
 
-	cr := &ConnReq{Addr: "127.0.0.1:18555", Permanent: true}
+	cr := &ConnReq{
+		Addr: &net.TCPAddr{
+			IP:   net.ParseIP("127.0.0.1"),
+			Port: 18555,
+		},
+		Permanent: true,
+	}
 	go cmgr.Connect(cr)
 	cmgr.Start()
 	gotConnReq := <-connected
@@ -292,10 +319,10 @@ func TestMaxRetryDuration(t *testing.T) {
 	time.AfterFunc(5*time.Millisecond, func() {
 		close(networkUp)
 	})
-	timedDialer := func(network, address string) (net.Conn, error) {
+	timedDialer := func(addr net.Addr) (net.Conn, error) {
 		select {
 		case <-networkUp:
-			return mockDialer(network, address)
+			return mockDialer(addr)
 		default:
 			return nil, errors.New("network down")
 		}
@@ -314,7 +341,13 @@ func TestMaxRetryDuration(t *testing.T) {
 		t.Fatalf("New error: %v", err)
 	}
 
-	cr := &ConnReq{Addr: "127.0.0.1:18555", Permanent: true}
+	cr := &ConnReq{
+		Addr: &net.TCPAddr{
+			IP:   net.ParseIP("127.0.0.1"),
+			Port: 18555,
+		},
+		Permanent: true,
+	}
 	go cmgr.Connect(cr)
 	cmgr.Start()
 	// retry in 1ms
@@ -331,7 +364,7 @@ func TestMaxRetryDuration(t *testing.T) {
 // failure gracefully.
 func TestNetworkFailure(t *testing.T) {
 	var dials uint32
-	errDialer := func(network, address string) (net.Conn, error) {
+	errDialer := func(net net.Addr) (net.Conn, error) {
 		atomic.AddUint32(&dials, 1)
 		return nil, errors.New("network down")
 	}
@@ -339,7 +372,12 @@ func TestNetworkFailure(t *testing.T) {
 		TargetOutbound: 5,
 		RetryDuration:  5 * time.Millisecond,
 		Dial:           errDialer,
-		GetNewAddress:  func() (string, error) { return "127.0.0.1:18555", nil },
+		GetNewAddress: func() (net.Addr, error) {
+			return &net.TCPAddr{
+				IP:   net.ParseIP("127.0.0.1"),
+				Port: 18555,
+			}, nil
+		},
 		OnConnection: func(c *ConnReq, conn net.Conn) {
 			t.Fatalf("network failure: got unexpected connection - %v", c.Addr)
 		},
@@ -365,7 +403,7 @@ func TestNetworkFailure(t *testing.T) {
 // the failure.
 func TestStopFailed(t *testing.T) {
 	done := make(chan struct{}, 1)
-	waitDialer := func(network, address string) (net.Conn, error) {
+	waitDialer := func(addr net.Addr) (net.Conn, error) {
 		done <- struct{}{}
 		time.Sleep(time.Millisecond)
 		return nil, errors.New("network down")
@@ -384,7 +422,13 @@ func TestStopFailed(t *testing.T) {
 		atomic.StoreInt32(&cmgr.stop, 0)
 		cmgr.Stop()
 	}()
-	cr := &ConnReq{Addr: "127.0.0.1:18555", Permanent: true}
+	cr := &ConnReq{
+		Addr: &net.TCPAddr{
+			IP:   net.ParseIP("127.0.0.1"),
+			Port: 18555,
+		},
+		Permanent: true,
+	}
 	go cmgr.Connect(cr)
 	cmgr.Wait()
 }
@@ -428,12 +472,14 @@ func (m *mockListener) Addr() net.Addr {
 // address.  It will cause the Accept function to return a mock connection
 // configured with the provided remote address and the local address for the
 // mock listener.
-func (m *mockListener) Connect(remoteAddr string) {
+func (m *mockListener) Connect(ip string, port int) {
 	m.provideConn <- &mockConn{
 		laddr: m.localAddr,
 		lnet:  "tcp",
-		raddr: remoteAddr,
-		rnet:  "tcp",
+		rAddr: &net.TCPAddr{
+			IP:   net.ParseIP(ip),
+			Port: port,
+		},
 	}
 }
 
@@ -471,8 +517,8 @@ func TestListeners(t *testing.T) {
 	go func() {
 		for i, listener := range listeners {
 			l := listener.(*mockListener)
-			l.Connect("127.0.0.1:" + strconv.Itoa(10000+i*2))
-			l.Connect("127.0.0.1:" + strconv.Itoa(10000+i*2+1))
+			l.Connect("127.0.0.1", 10000+i*2)
+			l.Connect("127.0.0.1", 10000+i*2+1)
 		}
 	}()
 
