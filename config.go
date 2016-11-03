@@ -388,9 +388,12 @@ func loadConfig() (*config, []string, error) {
 	preParser := newConfigParser(&preCfg, &serviceOpts, flags.HelpFlag)
 	_, err := preParser.Parse()
 	if err != nil {
-		if e, ok := err.(*flags.Error); ok && e.Type == flags.ErrHelp {
+		if e, ok := err.(*flags.Error); ok && e.Type != flags.ErrHelp {
 			fmt.Fprintln(os.Stderr, err)
-			return nil, nil, err
+			os.Exit(1)
+		} else if ok && e.Type == flags.ErrHelp {
+			fmt.Fprintln(os.Stdout, err)
+			os.Exit(0)
 		}
 	}
 
