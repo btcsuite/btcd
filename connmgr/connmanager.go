@@ -57,7 +57,7 @@ type ConnReq struct {
 	// The following variables must only be used atomically.
 	id uint64
 
-	Addr      string
+	Addr      net.Addr
 	Permanent bool
 
 	conn       net.Conn
@@ -88,7 +88,7 @@ func (c *ConnReq) State() ConnState {
 
 // String returns a human-readable string for the connection request.
 func (c *ConnReq) String() string {
-	if c.Addr == "" {
+	if c.Addr.String() == "" {
 		return fmt.Sprintf("reqid %d", atomic.LoadUint64(&c.id))
 	}
 	return fmt.Sprintf("%s (reqid %d)", c.Addr, atomic.LoadUint64(&c.id))
@@ -137,10 +137,10 @@ type Config struct {
 
 	// GetNewAddress is a way to get an address to make a network connection
 	// to.  If nil, no new connections will be made automatically.
-	GetNewAddress func() (string, error)
+	GetNewAddress func() (net.Addr, error)
 
 	// Dial connects to the address on the named network. It cannot be nil.
-	Dial func(string, string) (net.Conn, error)
+	Dial func(net.Addr) (net.Conn, error)
 }
 
 // handleConnected is used to queue a successful connection.
@@ -281,14 +281,18 @@ func (cm *ConnManager) NewConnReq() {
 	if cm.cfg.GetNewAddress == nil {
 		return
 	}
+
 	c := &ConnReq{}
 	atomic.StoreUint64(&c.id, atomic.AddUint64(&cm.connReqCount, 1))
+
 	addr, err := cm.cfg.GetNewAddress()
 	if err != nil {
 		cm.requests <- handleFailed{c, err}
 		return
 	}
+
 	c.Addr = addr
+
 	cm.Connect(c)
 }
 
@@ -302,7 +306,7 @@ func (cm *ConnManager) Connect(c *ConnReq) {
 		atomic.StoreUint64(&c.id, atomic.AddUint64(&cm.connReqCount, 1))
 	}
 	log.Debugf("Attempting to connect to %v", c)
-	conn, err := cm.cfg.Dial("tcp", c.Addr)
+	conn, err := cm.cfg.Dial(c.Addr)
 	if err != nil {
 		cm.requests <- handleFailed{c, err}
 	} else {

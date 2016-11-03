@@ -1456,9 +1456,15 @@ func (s *server) handleQuery(state *peerState, querymsg interface{}) {
 			}
 		}
 
+		netAddr, err := addrStringToNetAddr(msg.addr)
+		if err != nil {
+			msg.reply <- err
+			return
+		}
+
 		// TODO(oga) if too many, nuke a non-perm peer.
 		go s.connManager.Connect(&connmgr.ConnReq{
-			Addr:      msg.addr,
+			Addr:      netAddr,
 			Permanent: msg.permanent,
 		})
 		msg.reply <- nil
@@ -1603,7 +1609,7 @@ func (s *server) inboundPeerConnected(conn net.Conn) {
 // manager of the attempt.
 func (s *server) outboundPeerConnected(c *connmgr.ConnReq, conn net.Conn) {
 	sp := newServerPeer(s, c.Permanent)
-	p, err := peer.NewOutboundPeer(newPeerConfig(sp), c.Addr)
+	p, err := peer.NewOutboundPeer(newPeerConfig(sp), c.Addr.String())
 	if err != nil {
 		srvrLog.Debugf("Cannot create outbound peer %s: %v", c.Addr, err)
 		s.connManager.Disconnect(c.ID())
@@ -2401,9 +2407,9 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 	// specified peers and actively avoid advertising and connecting to
 	// discovered peers in order to prevent it from becoming a public test
 	// network.
-	var newAddressFunc func() (string, error)
+	var newAddressFunc func() (net.Addr, error)
 	if !cfg.SimNet && len(cfg.ConnectPeers) == 0 {
-		newAddressFunc = func() (string, error) {
+		newAddressFunc = func() (net.Addr, error) {
 			for tries := 0; tries < 100; tries++ {
 				addr := s.addrManager.GetAddress("any")
 				if addr == nil {
@@ -2432,9 +2438,12 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 					activeNetParams.DefaultPort && tries < 50 {
 					continue
 				}
-				return addrmgr.NetAddressKey(addr.NetAddress()), nil
+
+				addrString := addrmgr.NetAddressKey(addr.NetAddress())
+				return addrStringToNetAddr(addrString)
 			}
-			return "", errors.New("no valid connect address")
+
+			return nil, errors.New("no valid connect address")
 		}
 	}
 
@@ -2463,7 +2472,15 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 		permanentPeers = cfg.AddPeers
 	}
 	for _, addr := range permanentPeers {
-		go s.connManager.Connect(&connmgr.ConnReq{Addr: addr, Permanent: true})
+		tcpAddr, err := addrStringToNetAddr(addr)
+		if err != nil {
+			return nil, err
+		}
+
+		go s.connManager.Connect(&connmgr.ConnReq{
+			Addr:      tcpAddr,
+			Permanent: true,
+		})
 	}
 
 	if !cfg.DisableRPC {
@@ -2481,6 +2498,34 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 	}
 
 	return &s, nil
+}
+
+// addrStringToNetAddr takes an address in the form of 'host:port' and returns
+// a net.Addr which maps to the original address with any host names resolved
+// to IP addresses.
+func addrStringToNetAddr(addr string) (net.Addr, error) {
+	host, strPort, err := net.SplitHostPort(addr)
+	if err != nil {
+		return nil, err
+	}
+
+	// Attempt to look up an IP address associated with the parsed host.
+	// The btcdLookup function will transparently handle performing the
+	// lookup over Tor if necessary.
+	ips, err := btcdLookup(host)
+	if err != nil {
+		return nil, err
+	}
+
+	port, err := strconv.Atoi(strPort)
+	if err != nil {
+		return nil, err
+	}
+
+	return &net.TCPAddr{
+		IP:   ips[0],
+		Port: port,
+	}, nil
 }
 
 // dynamicTickDuration is a convenience function used to dynamically choose a

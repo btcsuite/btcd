@@ -1001,11 +1001,11 @@ func createDefaultConfigFile(destinationPath string) error {
 // example, .onion addresses will be dialed using the onion specific proxy if
 // one was specified, but will otherwise use the normal dial function (which
 // could itself use a proxy or not).
-func btcdDial(network, address string) (net.Conn, error) {
-	if strings.Contains(address, ".onion:") {
-		return cfg.oniondial(network, address)
+func btcdDial(addr net.Addr) (net.Conn, error) {
+	if strings.Contains(addr.String(), ".onion:") {
+		return cfg.oniondial(addr.Network(), addr.String())
 	}
-	return cfg.dial(network, address)
+	return cfg.dial(addr.Network(), addr.String())
 }
 
 // btcdLookup returns the correct DNS lookup function to use depending on the
