@@ -17,6 +17,7 @@ test -z "$(gometalinter --disable-all \
 --enable=golint \
 --enable=vet \
 --enable=gosimple \
+--enable=unconvert \
 --deadline=20s $(glide novendor) | grep -v 'ALL_CAPS\|OP_' 2>&1 | tee /dev/stderr)"
 env GORACE="halt_on_error=1" go test -v -race -tags rpctest $(glide novendor)
 
