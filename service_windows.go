@@ -156,12 +156,7 @@ func installService() error {
 	// messges instead of needing to create our own message catalog.
 	eventlog.Remove(svcName)
 	eventsSupported := uint32(eventlog.Error | eventlog.Warning | eventlog.Info)
-	err = eventlog.InstallAsEventCreate(svcName, eventsSupported)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return eventlog.InstallAsEventCreate(svcName, eventsSupported)
 }
 
 // removeService attempts to uninstall the btcd service.  Typically this should
@@ -184,12 +179,7 @@ func removeService() error {
 	defer service.Close()
 
 	// Remove the service.
-	err = service.Delete()
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return service.Delete()
 }
 
 // startService attempts to start the btcd service.

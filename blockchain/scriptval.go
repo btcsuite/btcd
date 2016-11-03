@@ -213,11 +213,7 @@ func ValidateTransactionScripts(tx *btcutil.Tx, utxoView *UtxoViewpoint, flags t
 
 	// Validate all of the inputs.
 	validator := newTxValidator(utxoView, flags, sigCache)
-	if err := validator.Validate(txValItems); err != nil {
-		return err
-	}
-
-	return nil
+	return validator.Validate(txValItems)
 }
 
 // checkBlockScripts executes and validates the scripts for all transactions in
@@ -248,9 +244,5 @@ func checkBlockScripts(block *btcutil.Block, utxoView *UtxoViewpoint, scriptFlag
 
 	// Validate all of the inputs.
 	validator := newTxValidator(utxoView, scriptFlags, sigCache)
-	if err := validator.Validate(txValItems); err != nil {
-		return err
-	}
-
-	return nil
+	return validator.Validate(txValItems)
 }

@@ -2424,7 +2424,7 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 
 				// only allow recent nodes (10mins) after we failed 30
 				// times
-				if tries < 30 && time.Now().Sub(addr.LastAttempt()) < 10*time.Minute {
+				if tries < 30 && time.Since(addr.LastAttempt()) < 10*time.Minute {
 					continue
 				}
 

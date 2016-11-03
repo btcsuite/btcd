@@ -151,7 +151,7 @@ func sanitizeString(str string, maxLength uint) string {
 
 	// Strip any characters not in the safeChars string removed.
 	str = strings.Map(func(r rune) rune {
-		if strings.IndexRune(safeChars, r) >= 0 {
+		if strings.ContainsRune(safeChars, r) {
 			return r
 		}
 		return -1

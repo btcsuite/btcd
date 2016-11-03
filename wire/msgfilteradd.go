@@ -37,11 +37,7 @@ func (msg *MsgFilterAdd) BtcDecode(r io.Reader, pver uint32) error {
 	var err error
 	msg.Data, err = ReadVarBytes(r, pver, MaxFilterAddDataSize,
 		"filteradd data")
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // BtcEncode encodes the receiver to w using the bitcoin protocol encoding.
@@ -60,12 +56,7 @@ func (msg *MsgFilterAdd) BtcEncode(w io.Writer, pver uint32) error {
 		return messageError("MsgFilterAdd.BtcEncode", str)
 	}
 
-	err := WriteVarBytes(w, pver, msg.Data)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return WriteVarBytes(w, pver, msg.Data)
 }
 
 // Command returns the protocol command string for the message.  This is part

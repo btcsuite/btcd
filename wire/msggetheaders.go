@@ -77,12 +77,7 @@ func (msg *MsgGetHeaders) BtcDecode(r io.Reader, pver uint32) error {
 		msg.AddBlockLocatorHash(hash)
 	}
 
-	err = readElement(r, &msg.HashStop)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return readElement(r, &msg.HashStop)
 }
 
 // BtcEncode encodes the receiver to w using the bitcoin protocol encoding.
@@ -113,12 +108,7 @@ func (msg *MsgGetHeaders) BtcEncode(w io.Writer, pver uint32) error {
 		}
 	}
 
-	err = writeElement(w, &msg.HashStop)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return writeElement(w, &msg.HashStop)
 }
 
 // Command returns the protocol command string for the message.  This is part

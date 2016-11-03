@@ -39,9 +39,7 @@ func TestReorganization(t *testing.T) {
 		if err != nil {
 			t.Errorf("Error loading file: %v\n", err)
 		}
-		for _, block := range blockTmp {
-			blocks = append(blocks, block)
-		}
+		blocks = append(blocks, blockTmp...)
 	}
 
 	t.Logf("Number of blocks: %v\n", len(blocks))

@@ -378,7 +378,7 @@ func writeElement(w io.Writer, element interface{}) error {
 
 	case bool:
 		var err error
-		if e == true {
+		if e {
 			err = binarySerializer.PutUint8(w, 0x01)
 		} else {
 			err = binarySerializer.PutUint8(w, 0x00)
@@ -624,10 +624,7 @@ func WriteVarString(w io.Writer, pver uint32, str string) error {
 		return err
 	}
 	_, err = w.Write([]byte(str))
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 // ReadVarBytes reads a variable length byte array.  A byte array is encoded
@@ -672,10 +669,7 @@ func WriteVarBytes(w io.Writer, pver uint32, bytes []byte) error {
 	}
 
 	_, err = w.Write(bytes)
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 // randomUint64 returns a cryptographically random uint64 value.  This

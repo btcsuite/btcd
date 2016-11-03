@@ -106,12 +106,7 @@ func (msg *MsgFilterLoad) BtcEncode(w io.Writer, pver uint32) error {
 		return err
 	}
 
-	err = writeElements(w, msg.HashFuncs, msg.Tweak, msg.Flags)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return writeElements(w, msg.HashFuncs, msg.Tweak, msg.Flags)
 }
 
 // Command returns the protocol command string for the message.  This is part

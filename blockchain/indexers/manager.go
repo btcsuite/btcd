@@ -271,10 +271,7 @@ func (m *Manager) Init(chain *blockchain.BlockChain) error {
 		err := m.db.View(func(dbTx database.Tx) error {
 			idxKey := indexer.Key()
 			hash, height, err = dbFetchIndexerTip(dbTx, idxKey)
-			if err != nil {
-				return err
-			}
-			return nil
+			return err
 		})
 		if err != nil {
 			return err

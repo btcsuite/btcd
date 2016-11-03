@@ -241,7 +241,7 @@ func (vm *Engine) CheckErrorCondition(finalScript bool) error {
 	if err != nil {
 		return err
 	}
-	if v == false {
+	if !v {
 		// Log interesting data.
 		log.Tracef("%v", newLogClosure(func() string {
 			dis0, _ := vm.DisasmScript(0)
@@ -337,7 +337,7 @@ func (vm *Engine) Step() (done bool, err error) {
 // for successful validation or an error if one occurred.
 func (vm *Engine) Execute() (err error) {
 	done := false
-	for done != true {
+	for !done {
 		log.Tracef("%v", newLogClosure(func() string {
 			dis, err := vm.DisasmPC()
 			if err != nil {

@@ -537,12 +537,7 @@ func (msg *MsgTx) BtcEncode(w io.Writer, pver uint32) error {
 		}
 	}
 
-	err = binarySerializer.PutUint32(w, littleEndian, msg.LockTime)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return binarySerializer.PutUint32(w, littleEndian, msg.LockTime)
 }
 
 // Serialize encodes the transaction to w using a format that suitable for
@@ -652,11 +647,7 @@ func readOutPoint(r io.Reader, pver uint32, version int32, op *OutPoint) error {
 	}
 
 	op.Index, err = binarySerializer.Uint32(r, littleEndian)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // writeOutPoint encodes op to the bitcoin protocol encoding for an OutPoint
@@ -667,11 +658,7 @@ func writeOutPoint(w io.Writer, pver uint32, version int32, op *OutPoint) error 
 		return err
 	}
 
-	err = binarySerializer.PutUint32(w, littleEndian, op.Index)
-	if err != nil {
-		return err
-	}
-	return nil
+	return binarySerializer.PutUint32(w, littleEndian, op.Index)
 }
 
 // readScript reads a variable length byte array that represents a transaction
@@ -719,12 +706,7 @@ func readTxIn(r io.Reader, pver uint32, version int32, ti *TxIn) error {
 		return err
 	}
 
-	err = readElement(r, &ti.Sequence)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return readElement(r, &ti.Sequence)
 }
 
 // writeTxIn encodes ti to the bitcoin protocol encoding for a transaction
@@ -740,12 +722,7 @@ func writeTxIn(w io.Writer, pver uint32, version int32, ti *TxIn) error {
 		return err
 	}
 
-	err = binarySerializer.PutUint32(w, littleEndian, ti.Sequence)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return binarySerializer.PutUint32(w, littleEndian, ti.Sequence)
 }
 
 // readTxOut reads the next sequence of bytes from r as a transaction output
@@ -758,11 +735,7 @@ func readTxOut(r io.Reader, pver uint32, version int32, to *TxOut) error {
 
 	to.PkScript, err = readScript(r, pver, MaxMessagePayload,
 		"transaction output public key script")
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // writeTxOut encodes to into the bitcoin protocol encoding for a transaction
@@ -773,9 +746,5 @@ func writeTxOut(w io.Writer, pver uint32, version int32, to *TxOut) error {
 		return err
 	}
 
-	err = WriteVarBytes(w, pver, to.PkScript)
-	if err != nil {
-		return err
-	}
-	return nil
+	return WriteVarBytes(w, pver, to.PkScript)
 }

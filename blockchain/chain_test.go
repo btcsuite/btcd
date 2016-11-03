@@ -31,9 +31,7 @@ func TestHaveBlock(t *testing.T) {
 			t.Errorf("Error loading file: %v\n", err)
 			return
 		}
-		for _, block := range blockTmp {
-			blocks = append(blocks, block)
-		}
+		blocks = append(blocks, blockTmp...)
 	}
 
 	// Create a new database and chain instance to run tests against.
@@ -119,14 +117,10 @@ func TestHaveBlock(t *testing.T) {
 // the returned SequenceLocks are correct for each test instance.
 func TestCalcSequenceLock(t *testing.T) {
 	fileName := "blk_0_to_4.dat.bz2"
-	blockTmp, err := loadBlocks(fileName)
+	blocks, err := loadBlocks(fileName)
 	if err != nil {
 		t.Errorf("Error loading file: %v\n", err)
 		return
-	}
-	var blocks []*btcutil.Block
-	for _, block := range blockTmp {
-		blocks = append(blocks, block)
 	}
 
 	// Create a new database and chain instance to run tests against.

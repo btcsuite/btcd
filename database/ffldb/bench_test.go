@@ -29,10 +29,7 @@ func BenchmarkBlockHeader(b *testing.B) {
 	defer db.Close()
 	err = db.Update(func(tx database.Tx) error {
 		block := btcutil.NewBlock(chaincfg.MainNetParams.GenesisBlock)
-		if err := tx.StoreBlock(block); err != nil {
-			return err
-		}
-		return nil
+		return tx.StoreBlock(block)
 	})
 	if err != nil {
 		b.Fatal(err)
@@ -73,10 +70,7 @@ func BenchmarkBlock(b *testing.B) {
 	defer db.Close()
 	err = db.Update(func(tx database.Tx) error {
 		block := btcutil.NewBlock(chaincfg.MainNetParams.GenesisBlock)
-		if err := tx.StoreBlock(block); err != nil {
-			return err
-		}
-		return nil
+		return tx.StoreBlock(block)
 	})
 	if err != nil {
 		b.Fatal(err)

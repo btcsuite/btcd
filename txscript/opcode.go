@@ -998,7 +998,7 @@ func opcodeVerify(op *parsedOpcode, vm *Engine) error {
 		return err
 	}
 
-	if verified != true {
+	if !verified {
 		return ErrStackVerifyFailed
 	}
 	return nil
@@ -1169,14 +1169,8 @@ func opcodeCheckSequenceVerify(op *parsedOpcode, vm *Engine) error {
 	// Mask off non-consensus bits before doing comparisons.
 	lockTimeMask := int64(wire.SequenceLockTimeIsSeconds |
 		wire.SequenceLockTimeMask)
-	err = verifyLockTime(txSequence&lockTimeMask,
-		wire.SequenceLockTimeIsSeconds,
-		sequence&lockTimeMask)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return verifyLockTime(txSequence&lockTimeMask,
+		wire.SequenceLockTimeIsSeconds, sequence&lockTimeMask)
 }
 
 // opcodeToAltStack removes the top item from the main data stack and pushes it

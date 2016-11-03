@@ -101,12 +101,7 @@ func upgradeDBPaths() error {
 	upgradeDBPathNet(filepath.Join(oldDbRoot, "btcd_regtest.db"), "regtest")
 
 	// Remove the old db directory.
-	err := os.RemoveAll(oldDbRoot)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return os.RemoveAll(oldDbRoot)
 }
 
 // upgradeDataPaths moves the application data from its location prior to btcd

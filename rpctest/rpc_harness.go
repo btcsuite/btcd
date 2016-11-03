@@ -240,16 +240,13 @@ func (h *Harness) SetUp(createTestChain bool, numMatureOutputs uint32) error {
 		return err
 	}
 	ticker := time.NewTicker(time.Millisecond * 100)
-out:
-	for {
-		select {
-		case <-ticker.C:
-			walletHeight := h.wallet.SyncedHeight()
-			if walletHeight == height {
-				break out
-			}
+	for range ticker.C {
+		walletHeight := h.wallet.SyncedHeight()
+		if walletHeight == height {
+			break
 		}
 	}
+	ticker.Stop()
 
 	return nil
 }

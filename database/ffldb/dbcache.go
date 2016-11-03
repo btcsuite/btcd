@@ -533,7 +533,7 @@ func (c *dbCache) flush() error {
 func (c *dbCache) needsFlush(tx *transaction) bool {
 	// A flush is needed when more time has elapsed than the configured
 	// flush interval.
-	if time.Now().Sub(c.lastFlush) > c.flushInterval {
+	if time.Since(c.lastFlush) > c.flushInterval {
 		return true
 	}
 
@@ -545,11 +545,7 @@ func (c *dbCache) needsFlush(tx *transaction) bool {
 	snap := tx.snapshot
 	totalSize := snap.pendingKeys.Size() + snap.pendingRemove.Size()
 	totalSize = uint64(float64(totalSize) * 1.5)
-	if totalSize > c.maxSize {
-		return true
-	}
-
-	return false
+	return totalSize > c.maxSize
 }
 
 // commitTx atomically adds all of the pending keys to add and remove into the

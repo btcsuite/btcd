@@ -122,9 +122,7 @@ func resultStructHelp(xT descLookupFunc, rt reflect.Type, indentLevel int) []str
 			result := fmt.Sprintf("%s\"%s\": %s\t(%s)\t%s", indent,
 				fieldName, brace, fieldType, xT(fieldDescKey))
 			results = append(results, result)
-			for _, example := range fieldExamples {
-				results = append(results, example)
-			}
+			results = append(results, fieldExamples...)
 		} else {
 			result := fmt.Sprintf("%s\"%s\": %s,\t(%s)\t%s", indent,
 				fieldName, fieldExamples[0], fieldType,

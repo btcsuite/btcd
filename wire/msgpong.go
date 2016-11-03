@@ -31,12 +31,7 @@ func (msg *MsgPong) BtcDecode(r io.Reader, pver uint32) error {
 		return messageError("MsgPong.BtcDecode", str)
 	}
 
-	err := readElement(r, &msg.Nonce)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return readElement(r, &msg.Nonce)
 }
 
 // BtcEncode encodes the receiver to w using the bitcoin protocol encoding.
@@ -50,12 +45,7 @@ func (msg *MsgPong) BtcEncode(w io.Writer, pver uint32) error {
 		return messageError("MsgPong.BtcEncode", str)
 	}
 
-	err := writeElement(w, msg.Nonce)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return writeElement(w, msg.Nonce)
 }
 
 // Command returns the protocol command string for the message.  This is part

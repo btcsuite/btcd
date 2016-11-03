@@ -1527,14 +1527,11 @@ func (b *BlockChain) IsCurrent() bool {
 
 	// Not current if the latest best block has a timestamp before 24 hours
 	// ago.
-	minus24Hours := b.timeSource.AdjustedTime().Add(-24 * time.Hour)
-	if b.bestNode.timestamp.Before(minus24Hours) {
-		return false
-	}
-
-	// The chain appears to be current if the above checks did not report
+	//
+	// The chain appears to be current if none of the checks reported
 	// otherwise.
-	return true
+	minus24Hours := b.timeSource.AdjustedTime().Add(-24 * time.Hour)
+	return !b.bestNode.timestamp.Before(minus24Hours)
 }
 
 // BestSnapshot returns information about the current best chain block and

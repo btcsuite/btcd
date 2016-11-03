@@ -67,18 +67,10 @@ func NewInvVect(typ InvType, hash *chainhash.Hash) *InvVect {
 // readInvVect reads an encoded InvVect from r depending on the protocol
 // version.
 func readInvVect(r io.Reader, pver uint32, iv *InvVect) error {
-	err := readElements(r, &iv.Type, &iv.Hash)
-	if err != nil {
-		return err
-	}
-	return nil
+	return readElements(r, &iv.Type, &iv.Hash)
 }
 
 // writeInvVect serializes an InvVect to w depending on the protocol version.
 func writeInvVect(w io.Writer, pver uint32, iv *InvVect) error {
-	err := writeElements(w, iv.Type, &iv.Hash)
-	if err != nil {
-		return err
-	}
-	return nil
+	return writeElements(w, iv.Type, &iv.Hash)
 }

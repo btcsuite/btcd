@@ -85,11 +85,7 @@ func (msg *MsgMerkleBlock) BtcDecode(r io.Reader, pver uint32) error {
 
 	msg.Flags, err = ReadVarBytes(r, pver, maxFlagsPerMerkleBlock,
 		"merkle block flags size")
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // BtcEncode encodes the receiver to w using the bitcoin protocol encoding.
@@ -136,12 +132,7 @@ func (msg *MsgMerkleBlock) BtcEncode(w io.Writer, pver uint32) error {
 		}
 	}
 
-	err = WriteVarBytes(w, pver, msg.Flags)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return WriteVarBytes(w, pver, msg.Flags)
 }
 
 // Command returns the protocol command string for the message.  This is part

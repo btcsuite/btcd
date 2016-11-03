@@ -395,11 +395,7 @@ func testNestedBucket(tc *testContext, testBucket database.Bucket) bool {
 	defer func() {
 		tc.bucketDepth--
 	}()
-	if !testBucketInterface(tc, testBucket) {
-		return false
-	}
-
-	return true
+	return testBucketInterface(tc, testBucket)
 }
 
 // testBucketInterface ensures the bucket interface is working properly by
@@ -1504,11 +1500,7 @@ func testFetchBlockIO(tc *testContext, tx database.Tx) bool {
 	}
 	wantErrCode = database.ErrBlockRegionInvalid
 	_, err = tx.FetchBlockRegions(badBlockRegions)
-	if !checkDbError(tc.t, testName, err, wantErrCode) {
-		return false
-	}
-
-	return true
+	return checkDbError(tc.t, testName, err, wantErrCode)
 }
 
 // testBlockIOTxInterface ensures that the block IO interface works as expected
@@ -1942,11 +1934,7 @@ func testClosedTxInterface(tc *testContext, tx database.Tx) bool {
 		return false
 	}
 	err = tx.Commit()
-	if !checkDbError(tc.t, "closed tx commit", err, wantErrCode) {
-		return false
-	}
-
-	return true
+	return checkDbError(tc.t, "closed tx commit", err, wantErrCode)
 }
 
 // testTxClosed ensures that both the metadata and block IO API functions behave
@@ -2016,16 +2004,13 @@ func testConcurrecy(tc *testContext) bool {
 	startTime := time.Now()
 	err := tc.db.View(func(tx database.Tx) error {
 		_, err := tx.FetchBlock(tc.blocks[0].Hash())
-		if err != nil {
-			return err
-		}
-		return nil
+		return err
 	})
 	if err != nil {
 		tc.t.Errorf("Unexpected error in view: %v", err)
 		return false
 	}
-	elapsed := time.Now().Sub(startTime)
+	elapsed := time.Since(startTime)
 	if sleepTime < elapsed {
 		sleepTime = elapsed
 	}
@@ -2041,10 +2026,7 @@ func testConcurrecy(tc *testContext) bool {
 		err := tc.db.View(func(tx database.Tx) error {
 			time.Sleep(sleepTime)
 			_, err := tx.FetchBlock(tc.blocks[blockNum].Hash())
-			if err != nil {
-				return err
-			}
-			return nil
+			return err
 		})
 		if err != nil {
 			tc.t.Errorf("Unexpected error in concurrent view: %v",
@@ -2065,7 +2047,7 @@ func testConcurrecy(tc *testContext) bool {
 			return false
 		}
 	}
-	elapsed = time.Now().Sub(startTime)
+	elapsed = time.Since(startTime)
 	tc.t.Logf("%d concurrent reads of same block elapsed: %v", numReaders,
 		elapsed)
 
@@ -2088,7 +2070,7 @@ func testConcurrecy(tc *testContext) bool {
 			return false
 		}
 	}
-	elapsed = time.Now().Sub(startTime)
+	elapsed = time.Since(startTime)
 	tc.t.Logf("%d concurrent reads of different blocks elapsed: %v",
 		numReaders, elapsed)
 
@@ -2142,11 +2124,7 @@ func testConcurrecy(tc *testContext) bool {
 	// Set some data the readers are expecting to not find and signal the
 	// readers the write is done by closing the writeComplete channel.
 	err = tc.db.Update(func(tx database.Tx) error {
-		err := tx.Metadata().Put(concurrentKey, concurrentVal)
-		if err != nil {
-			return err
-		}
-		return nil
+		return tx.Metadata().Put(concurrentKey, concurrentVal)
 	})
 	if err != nil {
 		tc.t.Errorf("Unexpected error in update: %v", err)
@@ -2187,7 +2165,7 @@ func testConcurrecy(tc *testContext) bool {
 			return false
 		}
 	}
-	elapsed = time.Now().Sub(startTime)
+	elapsed = time.Since(startTime)
 	tc.t.Logf("%d concurrent writers elapsed using sleep time %v: %v",
 		numWriters, writeSleepTime, elapsed)
 

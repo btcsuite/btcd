@@ -50,7 +50,7 @@ func (cmd *fetchBlockCmd) Execute(args []string) error {
 		if err != nil {
 			return err
 		}
-		log.Infof("Loaded block in %v", time.Now().Sub(startTime))
+		log.Infof("Loaded block in %v", time.Since(startTime))
 		log.Infof("Block Hex: %s", hex.EncodeToString(blockBytes))
 		return nil
 	})

@@ -2232,7 +2232,7 @@ func handleGetPeerInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 			SyncNode:       p == syncPeer,
 		}
 		if p.LastPingNonce() != 0 {
-			wait := float64(time.Now().Sub(statsSnap.LastPingTime).Nanoseconds())
+			wait := float64(time.Since(statsSnap.LastPingTime).Nanoseconds())
 			// We actually want microseconds.
 			info.PingWait = wait / 1000
 		}
@@ -3740,11 +3740,7 @@ func (s *rpcServer) writeHTTPResponseHeaders(req *http.Request, headers http.Hea
 	}
 
 	_, err = io.WriteString(w, "\r\n")
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // Stop is used by server.go to stop the rpc listener.
@@ -3945,10 +3941,9 @@ func (s *rpcServer) jsonRPCRead(w http.ResponseWriter, r *http.Request, isAdmin 
 	body, err := ioutil.ReadAll(r.Body)
 	r.Body.Close()
 	if err != nil {
-		errMsg := fmt.Sprintf("error reading JSON message: %v", err)
 		errCode := http.StatusBadRequest
-		http.Error(w, strconv.FormatInt(int64(errCode), 10)+" "+errMsg,
-			errCode)
+		http.Error(w, fmt.Sprintf("%d error reading JSON message: %v",
+			errCode, err), errCode)
 		return
 	}
 
@@ -3963,16 +3958,14 @@ func (s *rpcServer) jsonRPCRead(w http.ResponseWriter, r *http.Request, isAdmin 
 		errMsg := "webserver doesn't support hijacking"
 		rpcsLog.Warnf(errMsg)
 		errCode := http.StatusInternalServerError
-		http.Error(w, strconv.FormatInt(int64(errCode), 10)+" "+errMsg,
-			errCode)
+		http.Error(w, strconv.Itoa(errCode)+" "+errMsg, errCode)
 		return
 	}
 	conn, buf, err := hj.Hijack()
 	if err != nil {
 		rpcsLog.Warnf("Failed to hijack HTTP connection: %v", err)
 		errCode := http.StatusInternalServerError
-		http.Error(w, strconv.FormatInt(int64(errCode), 10)+" "+
-			err.Error(), errCode)
+		http.Error(w, strconv.Itoa(errCode)+" "+err.Error(), errCode)
 		return
 	}
 	defer conn.Close()
