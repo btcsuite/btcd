@@ -156,6 +156,32 @@ var helpDescsEnUS = map[string]string{
 	"getblock--condition1": "verbose=true",
 	"getblock--result0":    "Hex-encoded bytes of the serialized block",
 
+	// GetBlockChainInfoCmd help.
+	"getblockchaininfo--synopsis": "Returns information about the current blockchain state and the status of any active soft-fork deployments.",
+
+	// GetBlockChainInfoResult help.
+	"getblockchaininforesult-chain":                 "The name of the chain the daemon is on (testnet, mainnet, etc)",
+	"getblockchaininforesult-blocks":                "The number of blocks in the best known chain",
+	"getblockchaininforesult-headers":               "The number of headers that we've gathered for in the best known chain",
+	"getblockchaininforesult-bestblockhash":         "The block hash for the latest block in the main chain",
+	"getblockchaininforesult-difficulty":            "The current chain difficulty",
+	"getblockchaininforesult-mediantime":            "The median time from the PoV of the best block in the chain",
+	"getblockchaininforesult-verificationprogress":  "An estimate for how much of the best chain we've verified",
+	"getblockchaininforesult-pruned":                "A bool that indicates if the node is pruned or not",
+	"getblockchaininforesult-pruneheight":           "The lowest block retained in the current pruned chain",
+	"getblockchaininforesult-chainwork":             "The total cumulative work in the best chain",
+	"getblockchaininforesult-softforks":             "The status of the super-majority soft-forks",
+	"getblockchaininforesult-bip9_softforks":        "JSON object describing active BIP0009 deployments",
+	"getblockchaininforesult-bip9_softforks--key":   "bip9_softforks",
+	"getblockchaininforesult-bip9_softforks--value": "An object describing a particular BIP009 deployment",
+	"getblockchaininforesult-bip9_softforks--desc":  "The status of any defined BIP0009 soft-fork deployments",
+
+	// SoftForkDescription help.
+	"softforkdescription-reject":  "The current activation status of the softfork",
+	"softforkdescription-version": "The block version that signals enforcement of this softfork",
+	"softforkdescription-id":      "The string identifier for the soft fork",
+	"-status":                     "A bool which indicates if the soft fork is active",
+
 	// TxRawResult help.
 	"txrawresult-hex":           "Hex-encoded transaction",
 	"txrawresult-txid":          "The hash of the transaction",
@@ -599,6 +625,7 @@ var rpcResultTypes = map[string][]interface{}{
 	"getblockhash":          {(*string)(nil)},
 	"getblockheader":        {(*string)(nil), (*btcjson.GetBlockHeaderVerboseResult)(nil)},
 	"getblocktemplate":      {(*btcjson.GetBlockTemplateResult)(nil), (*string)(nil), nil},
+	"getblockchaininfo":     {(*btcjson.GetBlockChainInfoResult)(nil)},
 	"getconnectioncount":    {(*int32)(nil)},
 	"getcurrentnet":         {(*uint32)(nil)},
 	"getdifficulty":         {(*float64)(nil)},

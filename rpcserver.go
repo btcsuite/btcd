@@ -144,6 +144,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"getbestblock":          handleGetBestBlock,
 	"getbestblockhash":      handleGetBestBlockHash,
 	"getblock":              handleGetBlock,
+	"getblockchaininfo":     handleGetBlockChainInfo,
 	"getblockcount":         handleGetBlockCount,
 	"getblockhash":          handleGetBlockHash,
 	"getblockheader":        handleGetBlockHeader,
@@ -226,14 +227,13 @@ var rpcAskWallet = map[string]struct{}{
 
 // Commands that are currently unimplemented, but should ultimately be.
 var rpcUnimplemented = map[string]struct{}{
-	"estimatefee":       {},
-	"estimatepriority":  {},
-	"getblockchaininfo": {},
-	"getchaintips":      {},
-	"getnetworkinfo":    {},
-	"invalidateblock":   {},
-	"preciousblock":     {},
-	"reconsiderblock":   {},
+	"estimatefee":      {},
+	"estimatepriority": {},
+	"getchaintips":     {},
+	"getnetworkinfo":   {},
+	"invalidateblock":  {},
+	"preciousblock":    {},
+	"reconsiderblock":  {},
 }
 
 // Commands that are available to a limited user
@@ -1119,6 +1119,127 @@ func handleGetBlock(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 	}
 
 	return blockReply, nil
+}
+
+// softForkStatus converts a ThresholdState state into a human readable string
+// corresponding to the particular state.
+func softForkStatus(state blockchain.ThresholdState) (string, error) {
+	switch state {
+	case blockchain.ThresholdDefined:
+		return "defined", nil
+	case blockchain.ThresholdStarted:
+		return "started", nil
+	case blockchain.ThresholdLockedIn:
+		return "lockedin", nil
+	case blockchain.ThresholdActive:
+		return "active", nil
+	case blockchain.ThresholdFailed:
+		return "failed", nil
+	default:
+		return "", fmt.Errorf("unknown deployment state: %v", state)
+	}
+}
+
+// handleGetBlockChainInfo implements the getblockchaininfo command.
+func handleGetBlockChainInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+
+	// Obtain a snapshot of the current best known blockchain state. We'll
+	// populate the response to this call primarily from this snapshot.
+	chainSnapshot := s.chain.BestSnapshot()
+
+	chainInfo := &btcjson.GetBlockChainInfoResult{
+		Chain:         activeNetParams.Name,
+		Blocks:        chainSnapshot.Height,
+		Headers:       chainSnapshot.Height,
+		BestBlockHash: chainSnapshot.Hash.String(),
+		Difficulty:    getDifficultyRatio(chainSnapshot.Bits),
+		MedianTime:    chainSnapshot.MedianTime.Unix(),
+		Pruned:        false,
+		Bip9SoftForks: make(map[string]*btcjson.Bip9SoftForkDescription),
+	}
+
+	// Next, populate the response with information describing the current
+	// status of soft-forks deployed via the super-majority block
+	// signalling mechanism.
+	height := chainSnapshot.Height
+	chainInfo.SoftForks = []*btcjson.SoftForkDescription{
+		{
+			ID:      "bip34",
+			Version: 2,
+			Reject: struct {
+				Status bool `json:"status"`
+			}{
+				Status: height >= activeNetParams.BIP0034Height,
+			},
+		},
+		{
+			ID:      "bip66",
+			Version: 3,
+			Reject: struct {
+				Status bool `json:"status"`
+			}{
+				Status: height >= activeNetParams.BIP0066Height,
+			},
+		},
+		{
+			ID:      "bip65",
+			Version: 4,
+			Reject: struct {
+				Status bool `json:"status"`
+			}{
+				Status: height >= activeNetParams.BIP0065Height,
+			},
+		},
+	}
+
+	// Finally, query the BIP0009 version bits state for all currently
+	// defined BIP0009 soft-fork deployments.
+	for deployment, deploymentDetails := range activeNetParams.Deployments {
+		// Map the integer deployment ID into a human readable
+		// fork-name.
+		var forkName string
+		switch deployment {
+		case chaincfg.DeploymentTestDummy:
+			forkName = "dummy"
+		default:
+			return nil, &btcjson.RPCError{
+				Code: btcjson.ErrRPCInternal.Code,
+				Message: fmt.Sprintf("Unknown deployment %v "+
+					"detected", deployment),
+			}
+		}
+
+		// Query the chain for the current status of the deployment as
+		// identified by its deployment ID.
+		deploymentStatus, err := s.chain.ThresholdState(uint32(deployment))
+		if err != nil {
+			context := "Failed to obtain deployment status"
+			return nil, internalRPCError(err.Error(), context)
+		}
+
+		// Attempt to convert the current deployment status into a
+		// human readable string. If the status is unrecognized, then a
+		// non-nil error is returned.
+		statusString, err := softForkStatus(deploymentStatus)
+		if err != nil {
+			return nil, &btcjson.RPCError{
+				Code: btcjson.ErrRPCInternal.Code,
+				Message: fmt.Sprintf("unknown deployment status: %v",
+					deploymentStatus),
+			}
+		}
+
+		// Finally, populate the soft-fork description with all the
+		// information gathered above.
+		chainInfo.Bip9SoftForks[forkName] = &btcjson.Bip9SoftForkDescription{
+			Status:    strings.ToLower(statusString),
+			Bit:       deploymentDetails.BitNumber,
+			StartTime: int64(deploymentDetails.StartTime),
+			Timeout:   int64(deploymentDetails.ExpireTime),
+		}
+	}
+
+	return chainInfo, nil
 }
 
 // handleGetBlockCount implements the getblockcount command.
