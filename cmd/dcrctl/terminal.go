@@ -182,9 +182,10 @@ func startTerminal(c *config) {
 		return
 	}
 	n := terminal.NewTerminal(os.Stdin, "> ")
+	n.SetSize(int(^uint(0)>>1), 0)
+
+	var ln string
 	for {
-		var ln string
-		var err error
 		if !protected {
 			ln, err = n.ReadLine()
 		} else {
@@ -209,6 +210,7 @@ func startTerminal(c *config) {
 				break
 			}
 			n = terminal.NewTerminal(os.Stdin, "> ")
+			n.SetSize(int(^uint(0)>>1), 0)
 			clear = false
 		} else {
 			termState, err = terminal.MakeRaw(int(os.Stdin.Fd()))
