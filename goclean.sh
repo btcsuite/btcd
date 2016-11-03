@@ -12,8 +12,8 @@
 set -e
 
 # Automatic checks
-test -z "$(gofmt -l -w .     | tee /dev/stderr)"
 test -z "$(gometalinter --disable-all \
+--enable=gofmt \
 --enable=golint \
 --enable=vet \
 --enable=goimports \

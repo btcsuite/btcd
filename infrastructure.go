@@ -555,7 +555,7 @@ func (c *Client) reregisterNtfns() error {
 // ignoreResends is a set of all methods for requests that are "long running"
 // are not be reissued by the client on reconnect.
 var ignoreResends = map[string]struct{}{
-	"rescan": struct{}{},
+	"rescan": {},
 }
 
 // resendRequests resends any requests that had not completed when the client
