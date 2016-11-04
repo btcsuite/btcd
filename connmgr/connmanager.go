@@ -97,6 +97,29 @@ func (c *ConnReq) String() string {
 
 // Config holds the configuration options related to the connection manager.
 type Config struct {
+	// Listeners defines a slice of listeners for which the connection
+	// manager will take ownership of and accept connections.  When a
+	// connection is accepted, the OnAccept handler will be invoked with the
+	// connection.  Since the connection manager takes ownership of these
+	// listeners, they will be closed when the connection manager is
+	// stopped.
+	//
+	// This field will not have any effect if the OnAccept field is not
+	// also specified.  It may be nil if the caller does not wish to listen
+	// for incoming connections.
+	Listeners []net.Listener
+
+	// OnAccept is a callback that is fired when an inbound connection is
+	// accepted.  It is the caller's responsibility to close the connection.
+	// Failure to close the connection will result in the connection manager
+	// believing the connection is still active and thus have undesirable
+	// side effects such as still counting toward maximum connection limits.
+	//
+	// This field will not have any effect if the Listeners field is not
+	// also specified since there couldn't possibly be any accepted
+	// connections in that case.
+	OnAccept func(net.Conn)
+
 	// TargetOutbound is the number of outbound network connections to
 	// maintain. Defaults to 8.
 	TargetOutbound uint32
@@ -307,6 +330,26 @@ func (cm *ConnManager) Remove(id uint64) {
 	cm.requests <- handleDisconnected{id, false}
 }
 
+// listenHandler accepts incoming connections on a given listener.  It must be
+// run as a goroutine.
+func (cm *ConnManager) listenHandler(listener net.Listener) {
+	log.Infof("Server listening on %s", listener.Addr())
+	for atomic.LoadInt32(&cm.stop) == 0 {
+		conn, err := listener.Accept()
+		if err != nil {
+			// Only log the error if not forcibly shutting down.
+			if atomic.LoadInt32(&cm.stop) == 0 {
+				log.Errorf("Can't accept connection: %v", err)
+			}
+			continue
+		}
+		go cm.cfg.OnAccept(conn)
+	}
+
+	cm.wg.Done()
+	log.Tracef("Listener handler done for %s", listener.Addr())
+}
+
 // Start launches the connection manager and begins connecting to the network.
 func (cm *ConnManager) Start() {
 	// Already started?
@@ -317,6 +360,15 @@ func (cm *ConnManager) Start() {
 	log.Trace("Connection manager started")
 	cm.wg.Add(1)
 	go cm.connHandler()
+
+	// Start all the listeners so long as the caller requested them and
+	// provided a callback to be invoked when connections are accepted.
+	if cm.cfg.OnAccept != nil {
+		for _, listner := range cm.cfg.Listeners {
+			cm.wg.Add(1)
+			go cm.listenHandler(listner)
+		}
+	}
 
 	for i := atomic.LoadUint64(&cm.connReqCount); i < uint64(cm.cfg.TargetOutbound); i++ {
 		go cm.NewConnReq()
@@ -334,6 +386,15 @@ func (cm *ConnManager) Stop() {
 		log.Warnf("Connection manager already stopped")
 		return
 	}
+
+	// Stop all the listeners.  There will not be any listeners if
+	// listening is disabled.
+	for _, listener := range cm.cfg.Listeners {
+		// Ignore the error since this is shutdown and there is no way
+		// to recover anyways.
+		_ = listener.Close()
+	}
+
 	close(cm.quit)
 	log.Trace("Connection manager stopped")
 }
