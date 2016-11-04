@@ -8,7 +8,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"net"
 	"strings"
 	"time"
 )
@@ -237,27 +236,6 @@ func NewMsgVersion(me *NetAddress, you *NetAddress, nonce uint64,
 		LastBlock:       lastBlock,
 		DisableRelayTx:  false,
 	}
-}
-
-// NewMsgVersionFromConn is a convenience function that extracts the remote
-// and local address from conn and returns a new bitcoin version message that
-// conforms to the Message interface.  See NewMsgVersion.
-func NewMsgVersionFromConn(conn net.Conn, nonce uint64,
-	lastBlock int32) (*MsgVersion, error) {
-
-	// Don't assume any services until we know otherwise.
-	lna, err := NewNetAddress(conn.LocalAddr(), 0)
-	if err != nil {
-		return nil, err
-	}
-
-	// Don't assume any services until we know otherwise.
-	rna, err := NewNetAddress(conn.RemoteAddr(), 0)
-	if err != nil {
-		return nil, err
-	}
-
-	return NewMsgVersion(lna, rna, nonce, lastBlock), nil
 }
 
 // validateUserAgent checks userAgent length against MaxUserAgentLen

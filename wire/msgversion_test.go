@@ -131,45 +131,6 @@ func TestVersion(t *testing.T) {
 		t.Errorf("HasService: SFNodeNetwork service not set")
 	}
 
-	// Use a fake connection.
-	conn := &fakeConn{localAddr: tcpAddrMe, remoteAddr: tcpAddrYou}
-	msg, err = NewMsgVersionFromConn(conn, nonce, lastBlock)
-	if err != nil {
-		t.Errorf("NewMsgVersionFromConn: %v", err)
-	}
-
-	// Ensure we get the correct connection data back out.
-	if !msg.AddrMe.IP.Equal(tcpAddrMe.IP) {
-		t.Errorf("NewMsgVersionFromConn: wrong me ip - got %v, want %v",
-			msg.AddrMe.IP, tcpAddrMe.IP)
-	}
-	if !msg.AddrYou.IP.Equal(tcpAddrYou.IP) {
-		t.Errorf("NewMsgVersionFromConn: wrong you ip - got %v, want %v",
-			msg.AddrYou.IP, tcpAddrYou.IP)
-	}
-
-	// Use a fake connection with local UDP addresses to force a failure.
-	conn = &fakeConn{
-		localAddr:  &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 8333},
-		remoteAddr: tcpAddrYou,
-	}
-	msg, err = NewMsgVersionFromConn(conn, nonce, lastBlock)
-	if err != ErrInvalidNetAddr {
-		t.Errorf("NewMsgVersionFromConn: expected error not received "+
-			"- got %v, want %v", err, ErrInvalidNetAddr)
-	}
-
-	// Use a fake connection with remote UDP addresses to force a failure.
-	conn = &fakeConn{
-		localAddr:  tcpAddrMe,
-		remoteAddr: &net.UDPAddr{IP: net.ParseIP("192.168.0.1"), Port: 8333},
-	}
-	msg, err = NewMsgVersionFromConn(conn, nonce, lastBlock)
-	if err != ErrInvalidNetAddr {
-		t.Errorf("NewMsgVersionFromConn: expected error not received "+
-			"- got %v, want %v", err, ErrInvalidNetAddr)
-	}
-
 	return
 }
 
