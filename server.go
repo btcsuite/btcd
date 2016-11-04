@@ -145,7 +145,6 @@ type server struct {
 	shutdown      int32
 	shutdownSched int32
 
-	listeners            []net.Listener
 	chainParams          *chaincfg.Params
 	addrManager          *addrmgr.AddrManager
 	connManager          *connmgr.ConnManager
@@ -1582,26 +1581,15 @@ func newPeerConfig(sp *serverPeer) *peer.Config {
 	}
 }
 
-// listenHandler is the main listener which accepts incoming connections for the
-// server.  It must be run as a goroutine.
-func (s *server) listenHandler(listener net.Listener) {
-	srvrLog.Infof("Server listening on %s", listener.Addr())
-	for atomic.LoadInt32(&s.shutdown) == 0 {
-		conn, err := listener.Accept()
-		if err != nil {
-			// Only log the error if we're not forcibly shutting down.
-			if atomic.LoadInt32(&s.shutdown) == 0 {
-				srvrLog.Errorf("Can't accept connection: %v", err)
-			}
-			continue
-		}
-		sp := newServerPeer(s, false)
-		sp.Peer = peer.NewInboundPeer(newPeerConfig(sp))
-		sp.AssociateConnection(conn)
-		go s.peerDoneHandler(sp)
-	}
-	s.wg.Done()
-	srvrLog.Tracef("Listener handler done for %s", listener.Addr())
+// inboundPeerConnected is invoked by the connection manager when a new inbound
+// connection is established.  It initializes a new inbound server peer
+// instance, associates it with the connection, and starts a goroutine to wait
+// for disconnection.
+func (s *server) inboundPeerConnected(conn net.Conn) {
+	sp := newServerPeer(s, false)
+	sp.Peer = peer.NewInboundPeer(newPeerConfig(sp))
+	sp.AssociateConnection(conn)
+	go s.peerDoneHandler(sp)
 }
 
 // outboundPeerConnected is invoked by the connection manager when a new
@@ -1966,13 +1954,6 @@ func (s *server) Start() {
 
 	srvrLog.Trace("Starting server")
 
-	// Start all the listeners.  There will not be any if listening is
-	// disabled.
-	for _, listener := range s.listeners {
-		s.wg.Add(1)
-		go s.listenHandler(listener)
-	}
-
 	// Start the peer handler which in turn starts the address and block
 	// managers.
 	s.wg.Add(1)
@@ -2009,15 +1990,6 @@ func (s *server) Stop() error {
 	}
 
 	srvrLog.Warnf("Server shutting down")
-
-	// Stop all the listeners.  There will not be any listeners if
-	// listening is disabled.
-	for _, listener := range s.listeners {
-		err := listener.Close()
-		if err != nil {
-			return err
-		}
-	}
 
 	// Stop the CPU miner if needed
 	s.cpuMiner.Stop()
@@ -2317,7 +2289,6 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 	}
 
 	s := server{
-		listeners:            listeners,
 		chainParams:          chainParams,
 		addrManager:          amgr,
 		newPeers:             make(chan *serverPeer, cfg.MaxPeers),
@@ -2469,6 +2440,8 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 		targetOutbound = cfg.MaxPeers
 	}
 	cmgr, err := connmgr.New(&connmgr.Config{
+		Listeners:      listeners,
+		OnAccept:       s.inboundPeerConnected,
 		RetryDuration:  connectionRetryInterval,
 		TargetOutbound: uint32(targetOutbound),
 		Dial:           btcdDial,
