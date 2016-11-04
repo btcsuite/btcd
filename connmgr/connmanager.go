@@ -38,12 +38,6 @@ var (
 	defaultTargetOutbound = uint32(8)
 )
 
-// DialFunc defines a function that dials a connection.
-type DialFunc func(string, string) (net.Conn, error)
-
-// AddressFunc defines a function that returns a network address to connect to.
-type AddressFunc func() (string, error)
-
 // ConnState represents the state of the requested connection.
 type ConnState uint8
 
@@ -57,14 +51,6 @@ const (
 	ConnDisconnected
 	ConnFailed
 )
-
-// OnConnectionFunc is the signature of the callback function which is used to
-// subscribe to new connections.
-type OnConnectionFunc func(*ConnReq, net.Conn)
-
-// OnDisconnectionFunc is the signature of the callback function which is used to
-// notify disconnections.
-type OnDisconnectionFunc func(*ConnReq)
 
 // ConnReq is the connection request to a network address. If permanent, the
 // connection will be retried on disconnection.
@@ -119,20 +105,20 @@ type Config struct {
 	// requests. Defaults to 5s.
 	RetryDuration time.Duration
 
-	// OnConnection is a callback that is fired when a new connection is
-	// established.
-	OnConnection OnConnectionFunc
+	// OnConnection is a callback that is fired when a new outbound
+	// connection is established.
+	OnConnection func(*ConnReq, net.Conn)
 
-	// OnDisconnection is a callback that is fired when a connection is
-	// disconnected.
-	OnDisconnection OnDisconnectionFunc
+	// OnDisconnection is a callback that is fired when an outbound
+	// connection is disconnected.
+	OnDisconnection func(*ConnReq)
 
 	// GetNewAddress is a way to get an address to make a network connection
 	// to.  If nil, no new connections will be made automatically.
-	GetNewAddress AddressFunc
+	GetNewAddress func() (string, error)
 
 	// Dial connects to the address on the named network. It cannot be nil.
-	Dial DialFunc
+	Dial func(string, string) (net.Conn, error)
 }
 
 // handleConnected is used to queue a successful connection.
