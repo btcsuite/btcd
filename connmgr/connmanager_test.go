@@ -9,6 +9,7 @@ import (
 	"errors"
 	"io"
 	"net"
+	"strconv"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -385,5 +386,116 @@ func TestStopFailed(t *testing.T) {
 	}()
 	cr := &ConnReq{Addr: "127.0.0.1:18555", Permanent: true}
 	go cmgr.Connect(cr)
+	cmgr.Wait()
+}
+
+// mockListener implements the net.Listener interface and is used to test
+// code that deals with net.Listeners without having to actually make any real
+// connections.
+type mockListener struct {
+	localAddr   string
+	provideConn chan net.Conn
+}
+
+// Accept returns a mock connection when it receives a signal via the Connect
+// function.
+//
+// This is part of the net.Listener interface.
+func (m *mockListener) Accept() (net.Conn, error) {
+	for conn := range m.provideConn {
+		return conn, nil
+	}
+	return nil, errors.New("network connection closed")
+}
+
+// Close closes the mock listener which will cause any blocked Accept
+// operations to be unblocked and return errors.
+//
+// This is part of the net.Listener interface.
+func (m *mockListener) Close() error {
+	close(m.provideConn)
+	return nil
+}
+
+// Addr returns the address the mock listener was configured with.
+//
+// This is part of the net.Listener interface.
+func (m *mockListener) Addr() net.Addr {
+	return &mockAddr{"tcp", m.localAddr}
+}
+
+// Connect fakes a connection to the mock listener from the provided remote
+// address.  It will cause the Accept function to return a mock connection
+// configured with the provided remote address and the local address for the
+// mock listener.
+func (m *mockListener) Connect(remoteAddr string) {
+	m.provideConn <- &mockConn{
+		laddr: m.localAddr,
+		lnet:  "tcp",
+		raddr: remoteAddr,
+		rnet:  "tcp",
+	}
+}
+
+// newMockListener returns a new mock listener for the provided local address
+// and port.  No ports are actually opened.
+func newMockListener(localAddr string) *mockListener {
+	return &mockListener{
+		localAddr:   localAddr,
+		provideConn: make(chan net.Conn),
+	}
+}
+
+// TestListeners ensures providing listeners to the connection manager along
+// with an accept callback works properly.
+func TestListeners(t *testing.T) {
+	// Setup a connection manager with a couple of mock listeners that
+	// notify a channel when they receive mock connections.
+	receivedConns := make(chan net.Conn)
+	listener1 := newMockListener("127.0.0.1:8333")
+	listener2 := newMockListener("127.0.0.1:9333")
+	listeners := []net.Listener{listener1, listener2}
+	cmgr, err := New(&Config{
+		Listeners: listeners,
+		OnAccept: func(conn net.Conn) {
+			receivedConns <- conn
+		},
+		Dial: mockDialer,
+	})
+	if err != nil {
+		t.Fatalf("New error: %v", err)
+	}
+	cmgr.Start()
+
+	// Fake a couple of mock connections to each of the listeners.
+	go func() {
+		for i, listener := range listeners {
+			l := listener.(*mockListener)
+			l.Connect("127.0.0.1:" + strconv.Itoa(10000+i*2))
+			l.Connect("127.0.0.1:" + strconv.Itoa(10000+i*2+1))
+		}
+	}()
+
+	// Tally the receive connections to ensure the expected number are
+	// received.  Also, fail the test after a timeout so it will not hang
+	// forever should the test not work.
+	expectedNumConns := len(listeners) * 2
+	var numConns int
+out:
+	for {
+		select {
+		case <-receivedConns:
+			numConns++
+			if numConns == expectedNumConns {
+				break out
+			}
+
+		case <-time.After(time.Millisecond * 50):
+			t.Fatalf("Timeout waiting for %d expected connections",
+				expectedNumConns)
+		}
+	}
+
+	cmgr.Stop()
 	cmgr.Wait()
 }
