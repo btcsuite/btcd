@@ -1,5 +1,5 @@
 hash: f31381b9d7836c3acfccda809b8b279691b38d97517933b4f10e97f8ec468d2b
-updated: 2016-10-05T20:46:59.837714578Z
+updated: 2016-11-03T11:14:54.38201947-05:00
 imports:
 - name: github.com/btcsuite/btclog
   version: 73889fb79bd687870312b6e40effcecffbd57d30
@@ -39,11 +39,11 @@ imports:
   subpackages:
   - eventlog
   - mgr
-  - registry
   - svc
+  - registry
   - winapi
 - name: github.com/davecgh/go-spew
-  version: 6cf5744a041a0022271cefed95ba843f6d87fd51
+  version: 346938d642f2ec3594ed81d874461961cd0faa76
   subpackages:
   - spew
 - name: github.com/decred/bitset
@@ -51,26 +51,30 @@ imports:
 - name: github.com/decred/blake256
   version: a840e32d7c31fe2e0218607334cb120a683951a4
 - name: github.com/decred/dcrrpcclient
-  version: 0f562bb540de12dfd5248aee87063eaa4792705f
+  version: 6ef6822ab0e5c8f85cbf9e39261a221330c5d373
 - name: github.com/decred/dcrutil
   version: 0484582bf5503574d824f110e836a8c48aa60c8c
   subpackages:
-  - base58
   - bloom
+  - base58
 - name: github.com/decred/ed25519
   version: b0909d3f798b97a03c9e77023f97a5301a2a7900
   subpackages:
   - edwards25519
 - name: golang.org/x/crypto
-  version: 8e06e8ddd9629eb88639aba897641bff8031f1d3
+  version: 9477e0b78b9ac3d0b03822fd95422e2fe07627cd
   subpackages:
   - ssh/terminal
+- name: golang.org/x/sys
+  version: c200b10b5d5e122be351b67af224adc6128af5bf
+  subpackages:
+  - unix
 testImports:
 - name: github.com/pmezard/go-difflib
   version: d8ed2627bdf02c080bf22230dbb337003b7aba2d
   subpackages:
   - difflib
 - name: github.com/stretchr/testify
-  version: d77da356e56a7428ad25149ca77381849a6a5232
+  version: 976c720a22c8eb4eb6a0b4348ad85ad12491a506
   subpackages:
   - assert
