@@ -41,16 +41,10 @@ func TestMessage(t *testing.T) {
 
 	// MsgVersion.
 	addrYou := &net.TCPAddr{IP: net.ParseIP("192.168.0.1"), Port: 8333}
-	you, err := NewNetAddress(addrYou, SFNodeNetwork)
-	if err != nil {
-		t.Errorf("NewNetAddress: %v", err)
-	}
+	you := NewNetAddress(addrYou, SFNodeNetwork)
 	you.Timestamp = time.Time{} // Version message has zero value timestamp.
 	addrMe := &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 8333}
-	me, err := NewNetAddress(addrMe, SFNodeNetwork)
-	if err != nil {
-		t.Errorf("NewNetAddress: %v", err)
-	}
+	me := NewNetAddress(addrMe, SFNodeNetwork)
 	me.Timestamp = time.Time{} // Version message has zero value timestamp.
 	msgVersion := NewMsgVersion(me, you, 123123, 0)
 

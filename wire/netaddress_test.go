@@ -21,14 +21,7 @@ func TestNetAddress(t *testing.T) {
 	port := 8333
 
 	// Test NewNetAddress.
-	tcpAddr := &net.TCPAddr{
-		IP:   ip,
-		Port: port,
-	}
-	na, err := NewNetAddress(tcpAddr, 0)
-	if err != nil {
-		t.Errorf("NewNetAddress: %v", err)
-	}
+	na := NewNetAddress(&net.TCPAddr{IP: ip, Port: port}, 0)
 
 	// Ensure we get the same ip, port, and services back out.
 	if !na.IP.Equal(ip) {
@@ -75,14 +68,6 @@ func TestNetAddress(t *testing.T) {
 		t.Errorf("maxNetAddressPayload: wrong max payload length for "+
 			"protocol version %d - got %v, want %v", pver,
 			maxPayload, wantPayload)
-	}
-
-	// Check for expected failure on wrong address type.
-	udpAddr := &net.UDPAddr{}
-	_, err = NewNetAddress(udpAddr, 0)
-	if err != ErrInvalidNetAddr {
-		t.Errorf("NewNetAddress: expected error not received - "+
-			"got %v, want %v", err, ErrInvalidNetAddr)
 	}
 }
 

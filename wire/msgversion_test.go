@@ -23,15 +23,9 @@ func TestVersion(t *testing.T) {
 	// Create version message data.
 	lastBlock := int32(234234)
 	tcpAddrMe := &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 8333}
-	me, err := NewNetAddress(tcpAddrMe, SFNodeNetwork)
-	if err != nil {
-		t.Errorf("NewNetAddress: %v", err)
-	}
+	me := NewNetAddress(tcpAddrMe, SFNodeNetwork)
 	tcpAddrYou := &net.TCPAddr{IP: net.ParseIP("192.168.0.1"), Port: 8333}
-	you, err := NewNetAddress(tcpAddrYou, SFNodeNetwork)
-	if err != nil {
-		t.Errorf("NewNetAddress: %v", err)
-	}
+	you := NewNetAddress(tcpAddrYou, SFNodeNetwork)
 	nonce, err := RandomUint64()
 	if err != nil {
 		t.Errorf("RandomUint64: error generating nonce: %v", err)

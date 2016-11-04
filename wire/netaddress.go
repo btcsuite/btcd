@@ -6,15 +6,10 @@ package wire
 
 import (
 	"encoding/binary"
-	"errors"
 	"io"
 	"net"
 	"time"
 )
-
-// ErrInvalidNetAddr describes an error that indicates the caller didn't specify
-// a TCP address as required.
-var ErrInvalidNetAddr = errors.New("provided net.Addr is not a net.TCPAddr")
 
 // maxNetAddressPayload returns the max payload size for a bitcoin NetAddress
 // based on the protocol version.
@@ -85,17 +80,8 @@ func NewNetAddressIPPort(ip net.IP, port uint16, services ServiceFlag) *NetAddre
 
 // NewNetAddress returns a new NetAddress using the provided TCP address and
 // supported services with defaults for the remaining fields.
-//
-// Note that addr must be a net.TCPAddr.  An ErrInvalidNetAddr is returned
-// if it is not.
-func NewNetAddress(addr net.Addr, services ServiceFlag) (*NetAddress, error) {
-	tcpAddr, ok := addr.(*net.TCPAddr)
-	if !ok {
-		return nil, ErrInvalidNetAddr
-	}
-
-	na := NewNetAddressIPPort(tcpAddr.IP, uint16(tcpAddr.Port), services)
-	return na, nil
+func NewNetAddress(addr *net.TCPAddr, services ServiceFlag) *NetAddress {
+	return NewNetAddressIPPort(addr.IP, uint16(addr.Port), services)
 }
 
 // readNetAddress reads an encoded NetAddress from r depending on the protocol
