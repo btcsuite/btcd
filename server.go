@@ -2426,7 +2426,7 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 	// specified peers and actively avoid advertising and connecting to
 	// discovered peers in order to prevent it from becoming a public test
 	// network.
-	var newAddressFunc connmgr.AddressFunc
+	var newAddressFunc func() (string, error)
 	if !cfg.SimNet && len(cfg.ConnectPeers) == 0 {
 		newAddressFunc = func() (string, error) {
 			for tries := 0; tries < 100; tries++ {
