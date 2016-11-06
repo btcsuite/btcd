@@ -7,7 +7,6 @@ package cpuminer
 import (
 	"errors"
 	"fmt"
-	"math/rand"
 	"runtime"
 	"sync"
 	"time"
@@ -57,9 +56,9 @@ type Config struct {
 	// generate block templates that the miner will attempt to solve.
 	BlockTemplateGenerator *mining.BlkTmplGenerator
 
-	// MiningAddrs is a list of payment addresses to use for the generated
-	// blocks.  Each generated block will randomly choose one of them.
-	MiningAddrs []btcutil.Address
+	// GetMiningAddr is a function which when called yields an address to
+	// to use as the payment address for generated blocks.
+	GetMiningAddr func() btcutil.Address
 
 	// ProcessBlock defines the function to call with any solved blocks.
 	// It typically must run the provided block through the same set of
@@ -334,9 +333,9 @@ out:
 			continue
 		}
 
-		// Choose a payment address at random.
-		rand.Seed(time.Now().UnixNano())
-		payToAddr := m.cfg.MiningAddrs[rand.Intn(len(m.cfg.MiningAddrs))]
+		// Obtain a new payment address selected according to the logic
+		// of the current mining address generation function.
+		payToAddr := m.cfg.GetMiningAddr()
 
 		// Create a new block template using the available transactions
 		// in the memory pool as a source of transactions to potentially
@@ -588,9 +587,9 @@ func (m *CPUMiner) GenerateNBlocks(n uint32) ([]*chainhash.Hash, error) {
 		m.submitBlockLock.Lock()
 		curHeight := m.g.BestSnapshot().Height
 
-		// Choose a payment address at random.
-		rand.Seed(time.Now().UnixNano())
-		payToAddr := m.cfg.MiningAddrs[rand.Intn(len(m.cfg.MiningAddrs))]
+		// Obtain a new payment address selected according to the logic
+		// of the current mining address generation function.
+		payToAddr := m.cfg.GetMiningAddr()
 
 		// Create a new block template using the available transactions
 		// in the memory pool as a source of transactions to potentially

@@ -6,6 +6,7 @@ package main
 
 import (
 	"fmt"
+	prand "math/rand"
 	"net"
 	"net/http"
 	_ "net/http/pprof"
@@ -14,6 +15,7 @@ import (
 	"runtime"
 	"runtime/debug"
 	"runtime/pprof"
+	"time"
 
 	"github.com/btcsuite/btcd/blockchain/indexers"
 	"github.com/btcsuite/btcd/database"
@@ -330,4 +332,9 @@ func main() {
 	if err := btcdMain(nil); err != nil {
 		os.Exit(1)
 	}
+}
+
+func init() {
+	prand.Seed(time.Now().UnixNano())
+
 }
