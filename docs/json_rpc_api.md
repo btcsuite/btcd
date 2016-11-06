@@ -581,6 +581,9 @@ The following is an overview of the RPC methods which are implemented by btcd, b
 |6|[generate](#generate)|N|When in simnet or regtest mode, generate a set number of blocks. |None|
 |7|[version](#version)|Y|Returns the JSON-RPC API version.|
 |8|[getheaders](#getheaders)|Y|Returns block headers starting with the first known block hash from the request.|
+|9|[addminingaddr](#addminingaddr)|N|Add a new address to the list of generation (coinbase payout) addresses. |None|
+|10|[delminingaddr](#delminingaddr)|N|Delete an address from the list of generation (coinbase payout) addresses. |None|
+|11|[listminingaddrs](#listminingaddrs)|N|List all the active generation (coinbase payout) addresses. |None|
 
 
 <a name="ExtMethodDetails" />
@@ -672,7 +675,6 @@ The following is an overview of the RPC methods which are implemented by btcd, b
 |Description|Returns the version of the JSON-RPC API built into this release of btcd.|
 |Returns|`{ (json object)`<br />&nbsp;&nbsp;`"btcdjsonrpcapi": {`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"versionstring": "x.y.z",  (string) the version of the JSON-RPC API`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"major": x,  (numeric) the major version of the JSON-RPC API`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"minor": y,  (numeric) the minor version of the JSON-RPC API`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"patch": z,  (numeric) the patch version of the JSON-RPC API`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"prerelease": "",  (string) prerelease info for the JSON-RPC API`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"buildmetadata": ""  (string) metadata about the server build`<br />&nbsp;&nbsp;`}`<br />`}`|
 |Example Return|`{`<br />&nbsp;&nbsp;`"btcdjsonrpcapi": {`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"versionstring": "1.0.0",`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"major": 1,  `<br />&nbsp;&nbsp;&nbsp;&nbsp;`"minor": 0,`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"patch": 0,`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"prerelease": "",`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"buildmetadata": ""`<br />&nbsp;&nbsp;`}`<br />`}`|
-[Return to Overview](#MethodOverview)<br />
 
 ***
 
@@ -685,6 +687,43 @@ The following is an overview of the RPC methods which are implemented by btcd, b
 |Description|Returns block headers starting with the first known block hash from the request.|
 |Returns|`[ (json array of strings)`<br />&nbsp;&nbsp;`"blockheader",`<br />&nbsp;&nbsp;`...`<br />`]`|
 |Example Return|`[`<br />&nbsp;&nbsp;`"0000002099417930b2ae09feda10e38b58c0f6bb44b4d60fa33f0e000000000000000000d53...",`<br />&nbsp;&nbsp;`"000000203ba25a173bfd24d09e0c76002a910b685ca297bd09a17b020000000000000000702..."`<br />`]`|
+
+***
+
+<a name="addminingaddr"/>
+
+|   |   |
+|---|---|
+|Method|addminingaddr|
+|Parameters|1. address (string, required) - The address to add to the list of generation addresses|
+|Description|Attempts to add the specified address to the list of mining generation addresses. Attempting to add a duplicated address results in an error. All generation addresses must be unique.|
+|Returns|Nothing|
+[Return to Overview](#MethodOverview)<br />
+
+***
+
+<a name="delminingaddr"/>
+
+|   |   |
+|---|---|
+|Method|delminingaddr|
+|Parameters|1. address (string, required) - The address to delete from the list of mining addresses|
+|Description|Attempts to remove the passed address from the list of mining addresses. Attempting to delete a non-existent address results in an error.|
+|Returns|Nothing|
+[Return to Overview](#MethodOverview)<br />
+
+***
+
+***
+
+<a name="listminingaddrs"/>
+
+|   |   |
+|---|---|
+|Method|listminingaddrs|
+|Parameters|None|
+|Description|Returns a list of all the currently active generation (coinbase payout) addresses.|
+|Returns|Nothing|
 [Return to Overview](#MethodOverview)<br />
 
 ***
