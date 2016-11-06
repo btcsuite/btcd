@@ -187,6 +187,43 @@ func TestBtcdExtCmds(t *testing.T) {
 			marshalled:   `{"jsonrpc":"1.0","method":"version","params":[],"id":1}`,
 			unmarshalled: &btcjson.VersionCmd{},
 		},
+		{
+			name: "addminingaddr",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("addminingaddr", "1Address")
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewAddMiningAddrCmd("1Address")
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"addminingaddr","params":["1Address"],"id":1}`,
+			unmarshalled: &btcjson.AddMiningAddrCmd{
+				Address: "1Address",
+			},
+		},
+		{
+			name: "delminingaddr",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("delminingaddr", "1Address")
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewDelMiningAddrCmd("1Address")
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"delminingaddr","params":["1Address"],"id":1}`,
+			unmarshalled: &btcjson.DelMiningAddrCmd{
+				Address: "1Address",
+			},
+		},
+		{
+			name: "listminingaddrs",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("listminingaddrs")
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewListMiningAddrsCmd()
+			},
+			marshalled:   `{"jsonrpc":"1.0","method":"listminingaddrs","params":[],"id":1}`,
+			unmarshalled: &btcjson.ListMiningAddrsCmd{},
+		},
 	}
 
 	t.Logf("Running %d tests", len(tests))

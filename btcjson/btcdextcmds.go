@@ -124,6 +124,41 @@ type VersionCmd struct{}
 // github.com/decred/dcrd/dcrjson.
 func NewVersionCmd() *VersionCmd { return new(VersionCmd) }
 
+// AddMiningAddrCmd defines the addminingaddr JSON-RPC command.
+type AddMiningAddrCmd struct {
+	Address string `json:"address"`
+}
+
+// NewAddMiningAddrCmd returns a new instance which can be used to issue a
+// addminingaddr JSON-RPC command.
+func NewAddMiningAddrCmd(addr string) *AddMiningAddrCmd {
+	return &AddMiningAddrCmd{
+		Address: addr,
+	}
+}
+
+// DelMiningAddrCmd defines the delminingaddr JSON-RPC command.
+type DelMiningAddrCmd struct {
+	Address string `json:"address"`
+}
+
+// NewDelMiningAddrCmd returns a new instance which can be used to issue a
+// delminingaddr JSON-RPC command.
+func NewDelMiningAddrCmd(addr string) *DelMiningAddrCmd {
+	return &DelMiningAddrCmd{
+		Address: addr,
+	}
+}
+
+// ListMiningAddrsCmd defines the listminingaddrs JSON-RPC command.
+type ListMiningAddrsCmd struct{}
+
+// NewListMiningAddrsCmd returns a new instance which can be used to issue a
+// listminingaddrs JSON-RPC command.
+func NewListMiningAddrsCmd() *ListMiningAddrsCmd {
+	return &ListMiningAddrsCmd{}
+}
+
 func init() {
 	// No special flags for commands in this file.
 	flags := UsageFlag(0)
@@ -135,4 +170,7 @@ func init() {
 	MustRegisterCmd("getcurrentnet", (*GetCurrentNetCmd)(nil), flags)
 	MustRegisterCmd("getheaders", (*GetHeadersCmd)(nil), flags)
 	MustRegisterCmd("version", (*VersionCmd)(nil), flags)
+	MustRegisterCmd("addminingaddr", (*AddMiningAddrCmd)(nil), flags)
+	MustRegisterCmd("delminingaddr", (*DelMiningAddrCmd)(nil), flags)
+	MustRegisterCmd("listminingaddrs", (*ListMiningAddrsCmd)(nil), flags)
 }
