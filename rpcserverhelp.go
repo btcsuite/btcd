@@ -29,6 +29,10 @@ var helpDescsEnUS = map[string]string{
 	"debuglevel--result0":    "The string 'Done.'",
 	"debuglevel--result1":    "The list of subsystems",
 
+	// AddMiningAddrCmd help.
+	"addminingaddr--synopsis": "Adds an additional available mining address to the set of mining addresses for the daemon",
+	"addminingaddr-address":   "The address to append to the set of mining addresses",
+
 	// AddNodeCmd help.
 	"addnode--synopsis": "Attempts to add or remove a persistent peer.",
 	"addnode-addr":      "IP address and port of the peer to operate on",
@@ -123,6 +127,9 @@ var helpDescsEnUS = map[string]string{
 		"generated before the transaction is mined.",
 	"estimatefee--result0": "Estimated fee per kilobyte in satoshis for a block to " +
 		"be mined in the next NumBlocks blocks.",
+	// DelMiningAddrCmd help.
+	"delminingaddr--synopsis": "Attempts to delete the target address from the set of mining addresses",
+	"delminingaddr-address":   "The address to delete from the set of mining addresses",
 
 	// GenerateCmd help
 	"generate--synopsis": "Generates a set number of blocks (simnet or regtest only) and returns a JSON\n" +
@@ -514,6 +521,10 @@ var helpDescsEnUS = map[string]string{
 	"help--result0":    "List of commands",
 	"help--result1":    "Help for specified command",
 
+	// ListMiningAddrsCmd help.
+	"listminingaddrs--synopsis": "Returns a list of the current active mining addresses",
+	"listminingaddrs--result0":  "List of current active mining addresses",
+
 	// PingCmd help.
 	"ping--synopsis": "Queues a ping to be sent to each connected peer.\n" +
 		"Ping times are provided by getpeerinfo via the pingtime and pingwait fields.",
@@ -675,11 +686,13 @@ var helpDescsEnUS = map[string]string{
 // pointer to the type (or nil to indicate no return value).
 var rpcResultTypes = map[string][]interface{}{
 	"addnode":               nil,
+	"addminingaddr":         nil,
 	"createrawtransaction":  {(*string)(nil)},
 	"debuglevel":            {(*string)(nil), (*string)(nil)},
 	"decoderawtransaction":  {(*btcjson.TxRawDecodeResult)(nil)},
 	"decodescript":          {(*btcjson.DecodeScriptResult)(nil)},
 	"estimatefee":           {(*float64)(nil)},
+	"delminingaddr":         nil,
 	"generate":              {(*[]string)(nil)},
 	"getaddednodeinfo":      {(*[]string)(nil), (*[]btcjson.GetAddedNodeInfoResult)(nil)},
 	"getbestblock":          {(*btcjson.GetBestBlockResult)(nil)},
@@ -707,6 +720,7 @@ var rpcResultTypes = map[string][]interface{}{
 	"getrawmempool":         {(*[]string)(nil), (*btcjson.GetRawMempoolVerboseResult)(nil)},
 	"getrawtransaction":     {(*string)(nil), (*btcjson.TxRawResult)(nil)},
 	"gettxout":              {(*btcjson.GetTxOutResult)(nil)},
+	"listminingaddrs":       {(*[]string)(nil)},
 	"node":                  nil,
 	"help":                  {(*string)(nil), (*string)(nil)},
 	"ping":                  nil,

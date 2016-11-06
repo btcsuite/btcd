@@ -127,12 +127,13 @@ type commandHandler func(*rpcServer, interface{}, <-chan struct{}) (interface{},
 // a dependency loop.
 var rpcHandlers map[string]commandHandler
 var rpcHandlersBeforeInit = map[string]commandHandler{
+	"addminingaddr":         handleAddMiningAddr,
 	"addnode":               handleAddNode,
 	"createrawtransaction":  handleCreateRawTransaction,
 	"debuglevel":            handleDebugLevel,
 	"decoderawtransaction":  handleDecodeRawTransaction,
 	"decodescript":          handleDecodeScript,
-	"estimatefee":           handleEstimateFee,
+	"delminingaddr":         handleDelMiningAddr,
 	"generate":              handleGenerate,
 	"getaddednodeinfo":      handleGetAddedNodeInfo,
 	"getbestblock":          handleGetBestBlock,
@@ -161,6 +162,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"getrawtransaction":     handleGetRawTransaction,
 	"gettxout":              handleGetTxOut,
 	"help":                  handleHelp,
+	"listminingaddrs":       handleListMiningAddrs,
 	"node":                  handleNode,
 	"ping":                  handlePing,
 	"searchrawtransactions": handleSearchRawTransactions,
@@ -357,6 +359,42 @@ func handleUnimplemented(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 // These commands will be implemented in btcwallet.
 func handleAskWallet(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	return nil, ErrRPCNoWallet
+}
+
+// handleAddMiningAddr implements the addminingaddr command.
+func handleAddMiningAddr(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	c := cmd.(*btcjson.AddMiningAddrCmd)
+
+	// Decode the addresses encoded as a string into an in-memory object.
+	addr, err := btcutil.DecodeAddress(c.Address, activeNetParams.Params)
+	if err != nil {
+		return nil, &btcjson.RPCError{
+			Code:    btcjson.ErrRPCInvalidAddressOrKey,
+			Message: "Invalid address or key: " + err.Error(),
+		}
+	}
+
+	// Ensure the passed address belongs to the same network that btcd
+	// is currently on. Otherwise, this could lead to generating invalid
+	// block templates.
+	if !addr.IsForNet(activeNetParams.Params) {
+		return nil, &btcjson.RPCError{
+			Code: btcjson.ErrRPCInvalidAddressOrKey,
+			Message: fmt.Sprintf("Mining address %v is on the "+
+				"wrong network: ", activeNetParams.Params),
+		}
+	}
+
+	// Attempt to add the address to the set of mining addresses, if a
+	// duplicate is detected, then a non-nil error will be returned.
+	if err := s.server.miningAddrs.AddAddr(addr); err != nil {
+		return nil, &btcjson.RPCError{
+			Code:    btcjson.ErrRPCInternal.Code,
+			Message: "Duplicate mining address detected",
+		}
+	}
+
+	return nil, nil
 }
 
 // handleAddNode handles addnode commands.
@@ -876,11 +914,47 @@ func handleEstimateFee(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 	return float64(feeRate), nil
 }
 
+// handleDelMiningAddr implements the delminingaddr command.
+func handleDelMiningAddr(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	c := cmd.(*btcjson.DelMiningAddrCmd)
+
+	// Decode the addresses encoded as a string into an in-memory object.
+	addr, err := btcutil.DecodeAddress(c.Address, activeNetParams.Params)
+	if err != nil {
+		return nil, &btcjson.RPCError{
+			Code:    btcjson.ErrRPCInvalidAddressOrKey,
+			Message: "Invalid address or key: " + err.Error(),
+		}
+	}
+
+	// Ensure the the passed address belongs to the same network that btcd
+	// is currently on.
+	if !addr.IsForNet(activeNetParams.Params) {
+		return nil, &btcjson.RPCError{
+			Code: btcjson.ErrRPCInvalidAddressOrKey,
+			Message: fmt.Sprintf("Mining address %v is on the "+
+				"wrong network: ", activeNetParams.Params),
+		}
+	}
+
+	// Attempt to remove the passed address from the set of mining
+	// addresses, if the address can't be located, then a non-nil error
+	// will be returned.
+	if err := s.server.miningAddrs.RemoveAddr(addr); err != nil {
+		return nil, &btcjson.RPCError{
+			Code:    btcjson.ErrRPCInvalidAddressOrKey,
+			Message: fmt.Sprintf("Mining address %v not found", addr),
+		}
+	}
+
+	return nil, nil
+}
+
 // handleGenerate handles generate commands.
 func handleGenerate(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	// Respond with an error if there are no addresses to pay the
 	// created blocks to.
-	if len(cfg.miningAddrs) == 0 {
+	if s.server.miningAddrs.NumAddrs() == 0 {
 		return nil, &btcjson.RPCError{
 			Code: btcjson.ErrRPCInternal.Code,
 			Message: "No payment addresses specified " +
@@ -948,7 +1022,7 @@ func handleGetAddedNodeInfo(s *rpcServer, cmd interface{}, closeChan <-chan stru
 		}
 		if !found {
 			return nil, &btcjson.RPCError{
-				Code:    btcjson.ErrRPCClientNodeNotAdded,
+				Code:    -24, // TODO: ErrRPCClientNodeNotAdded
 				Message: "Node has not been added",
 			}
 		}
@@ -1562,7 +1636,7 @@ func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bo
 		// to create their own coinbase.
 		var payAddr btcutil.Address
 		if !useCoinbaseValue {
-			payAddr = cfg.miningAddrs[rand.Intn(len(cfg.miningAddrs))]
+			payAddr = s.server.miningAddrs.RandomAddr()
 		}
 
 		// Create a new block template that has a coinbase which anyone
@@ -1617,7 +1691,7 @@ func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bo
 		// returned if none have been specified.
 		if !useCoinbaseValue && !template.ValidPayAddress {
 			// Choose a payment address at random.
-			payToAddr := cfg.miningAddrs[rand.Intn(len(cfg.miningAddrs))]
+			payToAddr := s.server.miningAddrs.RandomAddr()
 
 			// Update the block coinbase output of the template to
 			// pay to the randomly selected payment address.
@@ -1925,7 +1999,7 @@ func handleGetBlockTemplateRequest(s *rpcServer, request *btcjson.TemplateReques
 
 	// When a coinbase transaction has been requested, respond with an error
 	// if there are no addresses to pay the created block template to.
-	if !useCoinbaseValue && len(cfg.miningAddrs) == 0 {
+	if !useCoinbaseValue && s.server.miningAddrs.NumAddrs() == 0 {
 		return nil, &btcjson.RPCError{
 			Code: btcjson.ErrRPCInternal.Code,
 			Message: "A coinbase transaction has been requested, " +
@@ -2798,6 +2872,11 @@ func handleHelp(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (inter
 	return help, nil
 }
 
+// handleListMiningAddrs implements the listminingaddrs command.
+func handleListMiningAddrs(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	return s.server.miningAddrs.ListEncodedAddrs(), nil
+}
+
 // handlePing implements the ping command.
 func handlePing(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	// Ask server to ping \o_
@@ -3419,7 +3498,7 @@ func handleSetGenerate(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 	} else {
 		// Respond with an error if there are no addresses to pay the
 		// created blocks to.
-		if len(cfg.miningAddrs) == 0 {
+		if s.server.miningAddrs.NumAddrs() == 0 {
 			return nil, &btcjson.RPCError{
 				Code: btcjson.ErrRPCInternal.Code,
 				Message: "No payment addresses specified " +

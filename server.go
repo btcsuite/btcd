@@ -215,6 +215,7 @@ type server struct {
 	chain                *blockchain.BlockChain
 	txMemPool            *mempool.TxPool
 	cpuMiner             *cpuminer.CPUMiner
+	miningAddrs          *miningAddrStore
 	modifyRebroadcastInv chan interface{}
 	newPeers             chan *serverPeer
 	donePeers            chan *serverPeer
@@ -2549,6 +2550,116 @@ func setupRPCListeners() ([]net.Listener, error) {
 	return listeners, nil
 }
 
+// miningAddrStore encapsulates a set of coinbase generation addresses in a
+// concurrent safe interface. All addresses stored MUST be unique, any
+// duplicates are rejected.
+type miningAddrStore struct {
+	miningAddrs []btcutil.Address
+	sync.RWMutex
+}
+
+// newMiningAddrStore creates a new instance of the miningAddrStore with
+// sufficient capacity to store numAddrs number of addresses.
+func newMiningAddrStore(numAddrs int) *miningAddrStore {
+	return &miningAddrStore{
+		miningAddrs: make([]btcutil.Address, 0, numAddrs),
+	}
+}
+
+// AddAddr adds a new generation address to the set of available generation
+// addresses. If the passed address is already within the set of generation
+// addresses, then a non-nil error is returned.
+//
+// NOTE: This function is safe for concurrent access.
+func (m *miningAddrStore) AddAddr(addr btcutil.Address) error {
+	m.Lock()
+	defer m.Unlock()
+
+	// Scan the current list of mining addresses to ensure that we don't
+	// add any duplicates.
+	for _, miningAddr := range m.miningAddrs {
+		if miningAddr.EncodeAddress() == addr.EncodeAddress() {
+			return fmt.Errorf("duplicate address detected")
+		}
+	}
+
+	// If adding this new address will not introduce any duplicate mining
+	// addresses, then append it to the list of available mining addresses.
+	m.miningAddrs = append(m.miningAddrs, addr)
+
+	return nil
+}
+
+// RemoveAddr attempts to remove the passed address from the set of available
+// generation addresses. If the passed address isn't a member of the set of
+// generation addresses, then a non-nil error is returned.
+//
+// NOTE: This function is safe for concurrent access.
+func (m *miningAddrStore) RemoveAddr(addr btcutil.Address) error {
+	m.Lock()
+	defer m.Unlock()
+
+	for i := range m.miningAddrs {
+		if m.miningAddrs[i].String() == addr.String() {
+			// Delete the element in-place from the slice of mining
+			// addresses by sliding elements to the right of the
+			// index over one.
+			copy(m.miningAddrs[i:], m.miningAddrs[i+1:])
+
+			// Then we set the final element to a nil value in
+			// order to avoid of GC leak, then re-slice the slice
+			// to reduce its length by one (cutting off the newly
+			// added nil element).
+			m.miningAddrs[len(m.miningAddrs)-1] = nil
+			m.miningAddrs = m.miningAddrs[:len(m.miningAddrs)-1]
+
+			return nil
+		}
+	}
+
+	// If we've reached this point, then the targeted mining address wasn't
+	// found so we return an error indicating so.
+	return fmt.Errorf("mining address not found")
+}
+
+// ListEncodedAddrs returns a slice of the string encoding of all the current
+// generation addresses.
+//
+// NOTE: This function is safe for concurrent access.
+func (m *miningAddrStore) ListEncodedAddrs() []string {
+	m.RLock()
+	defer m.RUnlock()
+
+	miningAddrs := make([]string, len(m.miningAddrs))
+	for i, miningAddr := range m.miningAddrs {
+		miningAddrs[i] = miningAddr.String()
+	}
+
+	return miningAddrs
+}
+
+// RandomAddr selects an address from the set of generation addresses using
+// a psuedo-random selection algorithm.
+//
+// NOTE: This function is safe for concurrent access.
+func (m *miningAddrStore) RandomAddr() btcutil.Address {
+	m.RLock()
+	defer m.RUnlock()
+
+	return m.miningAddrs[prand.Intn(len(m.miningAddrs))]
+}
+
+// NumAddrs returns the number of addresses within the current set of active
+// mining addresses.
+//
+// NOTE: This function is safe for concurrent access.
+func (m *miningAddrStore) NumAddrs() int {
+	m.RLock()
+	defer m.RUnlock()
+
+	return len(m.miningAddrs)
+}
+
 // newServer returns a new btcd server configured to listen on addr for the
 // bitcoin network type specified by chainParams.  Use start to begin accepting
 // connections from peers.
@@ -2607,6 +2718,15 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 		cfCheckptCaches:      make(map[wire.FilterType][]cfHeaderKV),
 		agentBlacklist:       agentBlacklist,
 		agentWhitelist:       agentWhitelist,
+		miningAddrs:          newMiningAddrStore(len(cfg.miningAddrs)),
+	}
+
+	// Load all the configured mining addresses into the mining addr store.
+	// Any duplicate addresses will be rejected.
+	for _, miningAddr := range cfg.miningAddrs {
+		if err := s.miningAddrs.AddAddr(miningAddr); err != nil {
+			return nil, err
+		}
 	}
 
 	// Create the transaction and address indexes if needed.
@@ -2758,10 +2878,12 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 	s.cpuMiner = cpuminer.New(&cpuminer.Config{
 		ChainParams:            chainParams,
 		BlockTemplateGenerator: blockTemplateGenerator,
-		MiningAddrs:            cfg.miningAddrs,
 		ProcessBlock:           s.syncManager.ProcessBlock,
 		ConnectedCount:         s.ConnectedCount,
 		IsCurrent:              s.syncManager.IsCurrent,
+		GetMiningAddr: func() btcutil.Address {
+			return s.miningAddrs.RandomAddr()
+		},
 	})
 
 	// Only setup a function to return new addresses to connect to when
