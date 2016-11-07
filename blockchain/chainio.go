@@ -1271,7 +1271,7 @@ func (b *BlockChain) createChainState() error {
 	genesisBlock := dcrutil.NewBlock(b.chainParams.GenesisBlock)
 	header := &genesisBlock.MsgBlock().Header
 	node := newBlockNode(header, genesisBlock.Sha(), 0, []chainhash.Hash{},
-		[]chainhash.Hash{})
+		[]chainhash.Hash{}, []uint32{})
 	node.inMainChain = true
 	b.bestNode = node
 
@@ -1431,10 +1431,11 @@ func (b *BlockChain) initChainState() error {
 
 		// Create a new node and set it as the best node.  The preceding
 		// nodes will be loaded on demand as needed.
+		blk := dcrutil.NewBlock(&block)
 		header := &block.Header
 		node := newBlockNode(header, &state.hash, int64(state.height),
-			ticketsSpentInBlock(dcrutil.NewBlock(&block)),
-			ticketsRevokedInBlock(dcrutil.NewBlock(&block)))
+			ticketsSpentInBlock(blk), ticketsRevokedInBlock(blk),
+			voteVersionsInBlock(blk, b.chainParams))
 		node.inMainChain = true
 		node.workSum = state.workSum
 

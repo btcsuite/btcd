@@ -37,7 +37,8 @@ func TestBlockHeader(t *testing.T) {
 	sbits := int64(0x0000000000000000)
 	blockHeight := uint32(0)
 	blockSize := uint32(0)
-	extraData := [36]byte{}
+	stakeVersion := uint32(0xb0a710ad)
+	extraData := [32]byte{}
 
 	bh := wire.NewBlockHeader(
 		1, // verision
@@ -56,6 +57,7 @@ func TestBlockHeader(t *testing.T) {
 		blockSize,
 		nonce,
 		extraData,
+		stakeVersion,
 	)
 
 	// Ensure we get the same data back out.
@@ -107,6 +109,10 @@ func TestBlockHeader(t *testing.T) {
 		t.Errorf("NewBlockHeader: wrong nonce - got %v, want %v",
 			bh.Nonce, nonce)
 	}
+	if bh.StakeVersion != stakeVersion {
+		t.Errorf("NewBlockHeader: wrong stakeVersion - got %v, want %v",
+			bh.StakeVersion, stakeVersion)
+	}
 }
 
 // TestBlockHeaderWire tests the BlockHeader wire encode and decode for various
@@ -134,22 +140,23 @@ func TestBlockHeaderWire(t *testing.T) {
 	// baseBlockHdr is used in the various tests as a baseline BlockHeader.
 	bits := uint32(0x1d00ffff)
 	baseBlockHdr := &wire.BlockHeader{
-		Version:     1,
-		PrevBlock:   mainNetGenesisHash,
-		MerkleRoot:  mainNetGenesisMerkleRoot,
-		StakeRoot:   mainNetGenesisMerkleRoot,
-		VoteBits:    uint16(0x0000),
-		FinalState:  [6]byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
-		Voters:      uint16(0x0000),
-		FreshStake:  uint8(0x00),
-		Revocations: uint8(0x00),
-		PoolSize:    uint32(0x00000000),
-		Timestamp:   time.Unix(0x495fab29, 0), // 2009-01-03 12:15:05 -0600 CST
-		Bits:        bits,
-		SBits:       int64(0x0000000000000000),
-		Nonce:       nonce,
-		Height:      uint32(0),
-		Size:        uint32(0),
+		Version:      1,
+		PrevBlock:    mainNetGenesisHash,
+		MerkleRoot:   mainNetGenesisMerkleRoot,
+		StakeRoot:    mainNetGenesisMerkleRoot,
+		VoteBits:     uint16(0x0000),
+		FinalState:   [6]byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+		Voters:       uint16(0x0000),
+		FreshStake:   uint8(0x00),
+		Revocations:  uint8(0x00),
+		PoolSize:     uint32(0x00000000),
+		Timestamp:    time.Unix(0x495fab29, 0), // 2009-01-03 12:15:05 -0600 CST
+		Bits:         bits,
+		SBits:        int64(0x0000000000000000),
+		Nonce:        nonce,
+		StakeVersion: uint32(0x0ddba110),
+		Height:       uint32(0),
+		Size:         uint32(0),
 	}
 
 	// baseBlockHdrEncoded is the wire encoded bytes of baseBlockHdr.
@@ -183,7 +190,7 @@ func TestBlockHeaderWire(t *testing.T) {
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00,
+		0x10, 0xa1, 0xdb, 0x0d, // StakeVersion
 	}
 
 	tests := []struct {
@@ -264,21 +271,22 @@ func TestBlockHeaderSerialize(t *testing.T) {
 	// baseBlockHdr is used in the various tests as a baseline BlockHeader.
 	bits := uint32(0x1d00ffff)
 	baseBlockHdr := &wire.BlockHeader{
-		Version:     1,
-		PrevBlock:   mainNetGenesisHash,
-		MerkleRoot:  mainNetGenesisMerkleRoot,
-		StakeRoot:   mainNetGenesisMerkleRoot,
-		VoteBits:    uint16(0x0000),
-		FinalState:  [6]byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
-		Voters:      uint16(0x0000),
-		FreshStake:  uint8(0x00),
-		Revocations: uint8(0x00),
-		Timestamp:   time.Unix(0x495fab29, 0), // 2009-01-03 12:15:05 -0600 CST
-		Bits:        bits,
-		SBits:       int64(0x0000000000000000),
-		Nonce:       nonce,
-		Height:      uint32(0),
-		Size:        uint32(0),
+		Version:      1,
+		PrevBlock:    mainNetGenesisHash,
+		MerkleRoot:   mainNetGenesisMerkleRoot,
+		StakeRoot:    mainNetGenesisMerkleRoot,
+		VoteBits:     uint16(0x0000),
+		FinalState:   [6]byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+		Voters:       uint16(0x0000),
+		FreshStake:   uint8(0x00),
+		Revocations:  uint8(0x00),
+		Timestamp:    time.Unix(0x495fab29, 0), // 2009-01-03 12:15:05 -0600 CST
+		Bits:         bits,
+		SBits:        int64(0x0000000000000000),
+		Nonce:        nonce,
+		StakeVersion: uint32(0x0ddba110),
+		Height:       uint32(0),
+		Size:         uint32(0),
 	}
 
 	// baseBlockHdrEncoded is the wire encoded bytes of baseBlockHdr.
@@ -312,7 +320,7 @@ func TestBlockHeaderSerialize(t *testing.T) {
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00,
+		0x10, 0xa1, 0xdb, 0x0d, // StakeVersion
 	}
 
 	tests := []struct {

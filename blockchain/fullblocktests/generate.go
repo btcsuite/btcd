@@ -1645,23 +1645,24 @@ func (g *testGenerator) nextBlock(blockName string, spend *spendableOut, ticketS
 	// Create the unsolved block.
 	block := wire.MsgBlock{
 		Header: wire.BlockHeader{
-			Version:     1,
-			PrevBlock:   g.tip.BlockSha(),
-			MerkleRoot:  calcMerkleRoot(regularTxns),
-			StakeRoot:   calcMerkleRoot(stakeTxns),
-			VoteBits:    1,
-			FinalState:  finalState,
-			Voters:      numVotes,
-			FreshStake:  numTicketPurchases,
-			Revocations: numTicketRevocations,
-			PoolSize:    uint32(len(liveTickets)),
-			Bits:        g.calcNextRequiredDifficulty(),
-			SBits:       int64(ticketPrice),
-			Height:      nextHeight,
-			Size:        0, // Filled in below.
-			Timestamp:   ts,
-			Nonce:       0, // To be solved.
-			ExtraData:   [36]byte{},
+			Version:      1,
+			PrevBlock:    g.tip.BlockSha(),
+			MerkleRoot:   calcMerkleRoot(regularTxns),
+			StakeRoot:    calcMerkleRoot(stakeTxns),
+			VoteBits:     1,
+			FinalState:   finalState,
+			Voters:       numVotes,
+			FreshStake:   numTicketPurchases,
+			Revocations:  numTicketRevocations,
+			PoolSize:     uint32(len(liveTickets)),
+			Bits:         g.calcNextRequiredDifficulty(),
+			SBits:        int64(ticketPrice),
+			Height:       nextHeight,
+			Size:         0, // Filled in below.
+			Timestamp:    ts,
+			Nonce:        0, // To be solved.
+			ExtraData:    [32]byte{},
+			StakeVersion: 0,
 		},
 		Transactions:  regularTxns,
 		STransactions: stakeTxns,

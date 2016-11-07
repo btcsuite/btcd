@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/decred/dcrd/blockchain/stake"
+	"github.com/decred/dcrd/chaincfg"
 	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/txscript"
 	"github.com/decred/dcrutil"
@@ -199,6 +200,19 @@ func ticketsRevokedInBlock(bl *dcrutil.Block) []chainhash.Hash {
 	return tickets
 }
 
+// voteVersionsInBlock returns all versions in a block.
+func voteVersionsInBlock(bl *dcrutil.Block, params *chaincfg.Params) []uint32 {
+	versions := make([]uint32, 0, params.TicketsPerBlock)
+	for _, stx := range bl.MsgBlock().STransactions {
+		if is, _ := stake.IsSSGen(stx); !is {
+			continue
+		}
+		versions = append(versions, stake.SSGenVersion(stx))
+	}
+
+	return versions
+}
+
 // maybeAcceptBlock potentially accepts a block into the memory block chain.
 // It performs several validation checks which depend on its position within
 // the block chain before adding it.  The block is expected to have already gone
@@ -248,7 +262,9 @@ func (b *BlockChain) maybeAcceptBlock(block *dcrutil.Block,
 	// Create a new block node for the block and add it to the in-memory
 	// block chain (could be either a side chain or the main chain).
 	blockHeader := &block.MsgBlock().Header
-	newNode := newBlockNode(blockHeader, block.Sha(), blockHeight, ticketsSpentInBlock(block), ticketsRevokedInBlock(block))
+	newNode := newBlockNode(blockHeader, block.Sha(), blockHeight,
+		ticketsSpentInBlock(block), ticketsRevokedInBlock(block),
+		voteVersionsInBlock(block, b.chainParams))
 	if prevNode != nil {
 		newNode.parent = prevNode
 		newNode.height = blockHeight

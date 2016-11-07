@@ -71,14 +71,15 @@ var genesisMerkleRoot = genesisCoinbaseTx.TxShaFull()
 // it are validated for correctness.
 var genesisBlock = wire.MsgBlock{
 	Header: wire.BlockHeader{
-		Version:    1,
-		PrevBlock:  chainhash.Hash{},
-		MerkleRoot: genesisMerkleRoot,
-		StakeRoot:  chainhash.Hash{},
-		Timestamp:  time.Unix(1454954400, 0), // Mon, 08 Feb 2016 18:00:00 GMT
-		Bits:       0x1b01ffff,               // Difficulty 32767
-		SBits:      2 * 1e8,                  // 2 Coin
-		Nonce:      0x00000000,
+		Version:      1,
+		PrevBlock:    chainhash.Hash{},
+		MerkleRoot:   genesisMerkleRoot,
+		StakeRoot:    chainhash.Hash{},
+		Timestamp:    time.Unix(1454954400, 0), // Mon, 08 Feb 2016 18:00:00 GMT
+		Bits:         0x1b01ffff,               // Difficulty 32767
+		SBits:        2 * 1e8,                  // 2 Coin
+		Nonce:        0x00000000,
+		StakeVersion: 0,
 	},
 	Transactions: []*wire.MsgTx{&genesisCoinbaseTx},
 }
@@ -142,13 +143,14 @@ var testNetGenesisMerkleRoot = genesisCoinbaseTxLegacy.TxSha()
 // serves as the public transaction ledger for the test network (version 3).
 var testNetGenesisBlock = wire.MsgBlock{
 	Header: wire.BlockHeader{
-		Version:    1,
-		PrevBlock:  chainhash.Hash{},
-		MerkleRoot: testNetGenesisMerkleRoot,
-		Timestamp:  time.Unix(1453908222, 0), // 2016-01-27 TestNet9
-		Bits:       0x1e00ffff,
-		SBits:      20000000,
-		Nonce:      0x18aea41a,
+		Version:      1,
+		PrevBlock:    chainhash.Hash{},
+		MerkleRoot:   testNetGenesisMerkleRoot,
+		Timestamp:    time.Unix(1453908222, 0), // 2016-01-27 TestNet9
+		Bits:         0x1e00ffff,
+		SBits:        20000000,
+		Nonce:        0x18aea41a,
+		StakeVersion: 0,
 	},
 	Transactions: []*wire.MsgTx{&genesisCoinbaseTxLegacy},
 }
@@ -225,17 +227,18 @@ var simNetGenesisBlock = wire.MsgBlock{
 			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 		}),
-		VoteBits:    uint16(0x0000),
-		FinalState:  [6]byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
-		Voters:      uint16(0x0000),
-		FreshStake:  uint8(0x00),
-		Revocations: uint8(0x00),
-		Timestamp:   time.Unix(1401292357, 0), // 2009-01-08 20:54:25 -0600 CST
-		PoolSize:    uint32(0),
-		Bits:        0x207fffff, // 545259519
-		SBits:       int64(0x0000000000000000),
-		Nonce:       0x00000000,
-		Height:      uint32(0),
+		VoteBits:     0,
+		FinalState:   [6]byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+		Voters:       0,
+		FreshStake:   0,
+		Revocations:  0,
+		Timestamp:    time.Unix(1401292357, 0), // 2009-01-08 20:54:25 -0600 CST
+		PoolSize:     0,
+		Bits:         0x207fffff, // 545259519
+		SBits:        0,
+		Nonce:        0,
+		StakeVersion: 0,
+		Height:       0,
 	},
 	Transactions:  []*wire.MsgTx{&regTestGenesisCoinbaseTx},
 	STransactions: []*wire.MsgTx{},

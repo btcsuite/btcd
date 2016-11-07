@@ -29,6 +29,7 @@ type GetBlockHeaderVerboseResult struct {
 	Size          uint32  `json:"size"`
 	Time          int64   `json:"time"`
 	Nonce         uint32  `json:"nonce"`
+	StakeVersion  uint32  `json:"stakeversion"`
 	Difficulty    float64 `json:"difficulty"`
 	NextHash      string  `json:"nextblockhash,omitempty"`
 }
@@ -60,6 +61,7 @@ type GetBlockVerboseResult struct {
 	SBits         float64       `json:"sbits"`
 	Difficulty    float64       `json:"difficulty"`
 	ExtraData     string        `json:"extradata"`
+	StakeVersion  uint32        `json:"stakeversion"`
 	PreviousHash  string        `json:"previousblockhash"`
 	NextHash      string        `json:"nextblockhash,omitempty"`
 }

@@ -76,7 +76,10 @@ type BlockHeader struct {
 
 	// ExtraData is used to encode the nonce or any other extra data
 	// that might be used later on in consensus.
-	ExtraData [36]byte
+	ExtraData [32]byte
+
+	// StakeVersion used for voting.
+	StakeVersion uint32
 }
 
 // blockHeaderLen is a constant that represents the number of bytes for a block
@@ -159,28 +162,29 @@ func NewBlockHeader(version int32, prevHash *chainhash.Hash,
 	merkleRootHash *chainhash.Hash, stakeRoot *chainhash.Hash, voteBits uint16,
 	finalState [6]byte, voters uint16, freshStake uint8, revocations uint8,
 	poolsize uint32, bits uint32, sbits int64, height uint32, size uint32,
-	nonce uint32, extraData [36]byte) *BlockHeader {
+	nonce uint32, extraData [32]byte, stakeVersion uint32) *BlockHeader {
 
 	// Limit the timestamp to one second precision since the protocol
 	// doesn't support better.
 	return &BlockHeader{
-		Version:     version,
-		PrevBlock:   *prevHash,
-		MerkleRoot:  *merkleRootHash,
-		StakeRoot:   *stakeRoot,
-		VoteBits:    voteBits,
-		FinalState:  finalState,
-		Voters:      voters,
-		FreshStake:  freshStake,
-		Revocations: revocations,
-		PoolSize:    poolsize,
-		Bits:        bits,
-		SBits:       sbits,
-		Height:      height,
-		Size:        size,
-		Timestamp:   time.Unix(time.Now().Unix(), 0),
-		Nonce:       nonce,
-		ExtraData:   extraData,
+		Version:      version,
+		PrevBlock:    *prevHash,
+		MerkleRoot:   *merkleRootHash,
+		StakeRoot:    *stakeRoot,
+		VoteBits:     voteBits,
+		FinalState:   finalState,
+		Voters:       voters,
+		FreshStake:   freshStake,
+		Revocations:  revocations,
+		PoolSize:     poolsize,
+		Bits:         bits,
+		SBits:        sbits,
+		Height:       height,
+		Size:         size,
+		Timestamp:    time.Unix(time.Now().Unix(), 0),
+		Nonce:        nonce,
+		ExtraData:    extraData,
+		StakeVersion: stakeVersion,
 	}
 }
 
@@ -206,7 +210,8 @@ func readBlockHeader(r io.Reader, pver uint32, bh *BlockHeader) error {
 		&bh.Size,
 		(*uint32Time)(&bh.Timestamp),
 		&bh.Nonce,
-		&bh.ExtraData)
+		&bh.ExtraData,
+		&bh.StakeVersion)
 	if err != nil {
 		return err
 	}
@@ -238,7 +243,8 @@ func writeBlockHeader(w io.Writer, pver uint32, bh *BlockHeader) error {
 		bh.Size,
 		sec,
 		bh.Nonce,
-		bh.ExtraData)
+		bh.ExtraData,
+		bh.StakeVersion)
 	if err != nil {
 		return err
 	}

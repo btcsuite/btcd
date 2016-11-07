@@ -2281,6 +2281,7 @@ func handleGetBlockHeader(s *rpcServer, cmd interface{}, closeChan <-chan struct
 		Size:          blockHeader.Size,
 		Time:          blockHeader.Timestamp.Unix(),
 		Nonce:         blockHeader.Nonce,
+		StakeVersion:  blockHeader.StakeVersion,
 		Difficulty:    getDifficultyRatio(blockHeader.Bits),
 		NextHash:      nextHashString,
 	}

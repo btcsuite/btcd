@@ -40,7 +40,8 @@ func TestMerkleBlock(t *testing.T) {
 		uint32(1),                                   // Height
 		uint32(0),                                   // Size
 		testBlock.Header.Nonce,                      // Nonce
-		[36]byte{},                                  // ExtraData
+		[32]byte{},                                  // ExtraData
+		uint32(0x7e1eca57),                          // StakeVersion
 	)
 
 	// Ensure the command is expected value.
@@ -431,15 +432,17 @@ var testMerkleBlock = wire.MsgMerkleBlock{
 			0x7b, 0xa1, 0xa3, 0xc3, 0x54, 0x0b, 0xf7, 0xb1,
 			0xcd, 0xb6, 0x06, 0xe8, 0x57, 0x23, 0x3e, 0x0e,
 		}),
-		VoteBits:    uint16(0x0000),
-		FinalState:  [6]byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
-		Voters:      uint16(0x0000),
-		FreshStake:  uint8(0x00),
-		Revocations: uint8(0x00),
-		Timestamp:   time.Unix(0x4966bc61, 0), // 2009-01-08 20:54:25 -0600 CST
-		Bits:        0x1d00ffff,               // 486604799
-		SBits:       int64(0x0000000000000000),
-		Nonce:       0x9962e301, // 2573394689
+		VoteBits:     uint16(0x0000),
+		FinalState:   [6]byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+		Voters:       uint16(0x0000),
+		FreshStake:   uint8(0x00),
+		Revocations:  uint8(0x00),
+		Timestamp:    time.Unix(0x4966bc61, 0), // 2009-01-08 20:54:25 -0600 CST
+		Bits:         0x1d00ffff,               // 486604799
+		SBits:        int64(0x0000000000000000),
+		Nonce:        0x9962e301, // 2573394689
+		ExtraData:    [32]byte{},
+		StakeVersion: uint32(0x7e1eca57),
 	},
 	Transactions: 1,
 	Hashes: []*chainhash.Hash{
@@ -493,7 +496,7 @@ var testMerkleBlockBytes = []byte{
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00,
+	0x57, 0xca, 0x1e, 0x7e, // StakeVersion
 	0x01, 0x00, 0x00, 0x00, // TxnCount (regular) [180]
 	0x01, // Num hashes (regular) [184]
 	0x98, 0x20, 0x51, 0xfd, 0x1e, 0x4b, 0xa7, 0x44,

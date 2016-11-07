@@ -6,6 +6,7 @@
 package peer_test
 
 import (
+	"encoding/binary"
 	"errors"
 	"io"
 	"net"
@@ -458,7 +459,8 @@ func TestPeerListeners(t *testing.T) {
 			"OnBlock",
 			wire.NewMsgBlock(wire.NewBlockHeader(0, &chainhash.Hash{},
 				&chainhash.Hash{}, &chainhash.Hash{}, 1, [6]byte{},
-				1, 1, 1, 1, 1, 1, 1, 1, 1, [36]byte{})),
+				1, 1, 1, 1, 1, 1, 1, 1, 1, [32]byte{},
+				binary.LittleEndian.Uint32([]byte{0xb0, 0x1d, 0xfa, 0xce}))),
 		},
 		{
 			"OnInv",
@@ -500,8 +502,9 @@ func TestPeerListeners(t *testing.T) {
 			"OnMerkleBlock",
 			wire.NewMsgMerkleBlock(wire.NewBlockHeader(0,
 				&chainhash.Hash{}, &chainhash.Hash{},
-				&chainhash.Hash{}, 1, [6]byte{}, 1, 1, 1, 1, 1,
-				1, 1, 1, 1, [36]byte{})),
+				&chainhash.Hash{}, 1, [6]byte{},
+				1, 1, 1, 1, 1, 1, 1, 1, 1, [32]byte{},
+				binary.LittleEndian.Uint32([]byte{0xb0, 0x1d, 0xfa, 0xce}))),
 		},
 		// only one version message is allowed
 		// only one verack message is allowed

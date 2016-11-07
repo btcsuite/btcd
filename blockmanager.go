@@ -376,6 +376,7 @@ type chainState struct {
 	curBlockHeader      wire.BlockHeader
 	pastMedianTime      time.Time
 	pastMedianTimeErr   error
+	stakeVersion        uint32
 }
 
 // Best returns the block hash and height known for the tip of the best known
@@ -2796,7 +2797,6 @@ func newBlockManager(s *server, indexManager blockchain.IndexManager) (*blockMan
 		wt,
 		missedTickets,
 		*curBlockHeader)
-
 	bm.lotteryDataBroadcast = make(map[chainhash.Hash]struct{})
 
 	return &bm, nil

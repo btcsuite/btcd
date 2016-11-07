@@ -107,6 +107,9 @@ func DebugBlockHeaderString(chainParams *chaincfg.Params,
 	str = fmt.Sprintf("Nonce: %v \n", bh.Nonce)
 	buffer.WriteString(str)
 
+	str = fmt.Sprintf("StakeVersion: %v \n", bh.StakeVersion)
+	buffer.WriteString(str)
+
 	str = fmt.Sprintf("Height: %v \n", bh.Height)
 	buffer.WriteString(str)
 

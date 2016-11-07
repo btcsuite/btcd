@@ -92,13 +92,16 @@ type blockNode struct {
 	stakeUndoData  stake.UndoTicketDataSlice
 	ticketsSpent   []chainhash.Hash
 	ticketsRevoked []chainhash.Hash
+
+	// Keep track of all voter versions in this block.
+	voterVersions []uint32
 }
 
 // newBlockNode returns a new block node for the given block header.  It is
 // completely disconnected from the chain and the workSum value is just the work
 // for the passed block.  The work sum is updated accordingly when the node is
 // inserted into a chain.
-func newBlockNode(blockHeader *wire.BlockHeader, blockSha *chainhash.Hash, height int64, ticketsSpent []chainhash.Hash, ticketsRevoked []chainhash.Hash) *blockNode {
+func newBlockNode(blockHeader *wire.BlockHeader, blockSha *chainhash.Hash, height int64, ticketsSpent []chainhash.Hash, ticketsRevoked []chainhash.Hash, voterVersions []uint32) *blockNode {
 	// Make a copy of the hash so the node doesn't keep a reference to part
 	// of the full block/block header preventing it from being garbage
 	// collected.
@@ -109,6 +112,7 @@ func newBlockNode(blockHeader *wire.BlockHeader, blockSha *chainhash.Hash, heigh
 		header:         *blockHeader,
 		ticketsSpent:   ticketsSpent,
 		ticketsRevoked: ticketsRevoked,
+		voterVersions:  voterVersions,
 	}
 	return &node
 }
@@ -490,7 +494,8 @@ func (b *BlockChain) loadBlockNode(dbTx database.Tx,
 
 	blockHeader := block.MsgBlock().Header
 	node := newBlockNode(&blockHeader, hash, int64(blockHeader.Height),
-		ticketsSpentInBlock(block), ticketsRevokedInBlock(block))
+		ticketsSpentInBlock(block), ticketsRevokedInBlock(block),
+		voteVersionsInBlock(block, b.chainParams))
 	node.inMainChain = true
 	prevHash := &blockHeader.PrevBlock
 
@@ -899,6 +904,7 @@ func (b *BlockChain) BestBlockHeader() *wire.BlockHeader {
 		b.bestNode.header.Size,
 		b.bestNode.header.Nonce,
 		b.bestNode.header.ExtraData,
+		b.bestNode.header.StakeVersion,
 	)
 }
 

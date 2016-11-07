@@ -264,6 +264,10 @@ type Params struct {
 	// it to be this value miners/daemons could freely change it.
 	StakeBaseSigScript []byte
 
+	// StakeVersion is the current stake version.  Miners should use this
+	// value when creating new blocks.
+	StakeVersion uint32
+
 	// OrganizationPkScript is the output script for block taxes to be
 	// distributed to in every block's coinbase. It should ideally be a P2SH
 	// multisignature address.  OrganizationPkScriptVersion is the version
@@ -293,7 +297,7 @@ var MainNetParams = Params{
 	// Chain parameters
 	GenesisBlock:             &genesisBlock,
 	GenesisHash:              &genesisHash,
-	CurrentBlockVersion:      1,
+	CurrentBlockVersion:      2,
 	PowLimit:                 mainPowLimit,
 	PowLimitBits:             0x1d00ffff,
 	ResetMinDifficulty:       false,
@@ -362,6 +366,7 @@ var MainNetParams = Params{
 	StakeEnabledHeight:    256 + 256, // CoinbaseMaturity + TicketMaturity
 	StakeValidationHeight: 4096,      // ~14 days
 	StakeBaseSigScript:    []byte{0x00, 0x00},
+	StakeVersion:          2,
 
 	// Decred organization related parameters
 	// Organization address is Dcur2mcGjmENx4DhNqDctW5wJCVyT3Qeqkx
@@ -386,7 +391,7 @@ var TestNetParams = Params{
 	// Chain parameters
 	GenesisBlock:             &testNetGenesisBlock,
 	GenesisHash:              &testNetGenesisHash,
-	CurrentBlockVersion:      0,
+	CurrentBlockVersion:      2,
 	PowLimit:                 testNetPowLimit,
 	PowLimitBits:             0x1e00ffff,
 	ResetMinDifficulty:       false,
@@ -457,6 +462,7 @@ var TestNetParams = Params{
 	StakeEnabledHeight:    16 + 16, // CoinbaseMaturity + TicketMaturity
 	StakeValidationHeight: 768,     // Arbitrary
 	StakeBaseSigScript:    []byte{0xDE, 0xAD, 0xBE, 0xEF},
+	StakeVersion:          2,
 
 	// Decred organization related parameters.
 	// Organization address is TcemyEtyHSg9L7jww7uihv9BJfKL6YGiZYn
@@ -481,7 +487,7 @@ var SimNetParams = Params{
 	// Chain parameters
 	GenesisBlock:             &simNetGenesisBlock,
 	GenesisHash:              &simNetGenesisHash,
-	CurrentBlockVersion:      0,
+	CurrentBlockVersion:      2,
 	PowLimit:                 simNetPowLimit,
 	PowLimitBits:             0x207fffff,
 	ResetMinDifficulty:       false,
@@ -543,6 +549,7 @@ var SimNetParams = Params{
 	StakeEnabledHeight:    16 + 16,       // CoinbaseMaturity + TicketMaturity
 	StakeValidationHeight: 16 + (64 * 2), // CoinbaseMaturity + TicketPoolSize*2
 	StakeBaseSigScript:    []byte{0xDE, 0xAD, 0xBE, 0xEF},
+	StakeVersion:          2,
 
 	// Decred organization related parameters
 	//

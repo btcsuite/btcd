@@ -40,7 +40,8 @@ func TestBlock(t *testing.T) {
 		uint32(1),                                   // Height
 		uint32(1),                                   // Size
 		testBlock.Header.Nonce,                      // Nonce
-		[36]byte{},                                  // ExtraData
+		[32]byte{},                                  // ExtraData
+		uint32(0x5ca1ab1e),                          // StakeVersion
 	)
 
 	// Ensure the command is expected value.
@@ -143,7 +144,7 @@ func TestBlockSTxShas(t *testing.T) {
 // TestBlockSha tests the ability to generate the hash of a block accurately.
 func TestBlockSha(t *testing.T) {
 	// Block 1 hash.
-	hashStr := "152437dada95368c42b19febc1702939fa9c1ccdb6fd7284e5b7a19d8fe6df7a"
+	hashStr := "6b73b6f6faebbfd6a541f38820593e43c50ce1abf64602ab8ac7d5502991c37f"
 	wantHash, err := chainhash.NewHashFromStr(hashStr)
 	if err != nil {
 		t.Errorf("NewShaHashFromStr: %v", err)
@@ -486,8 +487,8 @@ func TestBlockOverflowErrors(t *testing.T) {
 				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-				0x00, 0x00, 0x00, 0x00,
 				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+				0x5c, 0xa1, 0xab, 0x1e, //StakeVersion
 				0xff, // TxnCount
 			}, pver, &wire.MessageError{},
 		},
@@ -575,19 +576,20 @@ var testBlock = wire.MsgBlock{
 			0x7b, 0xa1, 0xa3, 0xc3, 0x54, 0x0b, 0xf7, 0xb1,
 			0xcd, 0xb6, 0x06, 0xe8, 0x57, 0x23, 0x3e, 0x0e,
 		}),
-		VoteBits:    uint16(0x0000),
-		FinalState:  [6]byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
-		Voters:      uint16(0x0000),
-		FreshStake:  uint8(0x00),
-		Revocations: uint8(0x00),
-		PoolSize:    uint32(0x00000000), // Poolsize
-		Bits:        0x1d00ffff,         // 486604799
-		SBits:       int64(0x0000000000000000),
-		Height:      uint32(1),
-		Size:        uint32(1),
-		Timestamp:   time.Unix(0x4966bc61, 0), // 2009-01-08 20:54:25 -0600 CST
-		Nonce:       0x9962e301,               // 2573394689
-		ExtraData:   [36]byte{},
+		VoteBits:     uint16(0x0000),
+		FinalState:   [6]byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+		Voters:       uint16(0x0000),
+		FreshStake:   uint8(0x00),
+		Revocations:  uint8(0x00),
+		PoolSize:     uint32(0x00000000), // Poolsize
+		Bits:         0x1d00ffff,         // 486604799
+		SBits:        int64(0x0000000000000000),
+		Height:       uint32(1),
+		Size:         uint32(1),
+		Timestamp:    time.Unix(0x4966bc61, 0), // 2009-01-08 20:54:25 -0600 CST
+		Nonce:        0x9962e301,               // 2573394689
+		ExtraData:    [32]byte{},
+		StakeVersion: uint32(0x5ca1ab1e),
 	},
 	Transactions: []*wire.MsgTx{
 		{
@@ -707,7 +709,7 @@ var testBlockBytes = []byte{
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00,
+	0x1e, 0xab, 0xa1, 0x5c, // StakeVersion
 	// Announce number of txs
 	0x01, // TxnCount [180]
 	// Begin bogus normal txs
