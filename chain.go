@@ -250,6 +250,42 @@ func (c *Client) GetDifficulty() (float64, error) {
 	return c.GetDifficultyAsync().Receive()
 }
 
+// FutureGetBlockChainInfoResult is a promised to deliver the result of a
+// GetBlockChainInfoAsync RPC invocation (or an applicable error).
+type FutureGetBlockChainInfoResult chan *response
+
+// Receive waits for the response promised by the future and returns chain info
+// result provided by the server.
+func (r FutureGetBlockChainInfoResult) Receive() (*btcjson.GetBlockChainInfoResult, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	var chainInfo btcjson.GetBlockChainInfoResult
+	if err := json.Unmarshal(res, &chainInfo); err != nil {
+		return nil, err
+	}
+	return &chainInfo, nil
+}
+
+// GetBlockChainInfoAsync returns an instance of a type that can be used to get
+// the result of the RPC at some future time by invoking the Receive function
+// on the returned instance.
+//
+// See GetBlockChainInfo for the blocking version and more details.
+func (c *Client) GetBlockChainInfoAsync() FutureGetBlockChainInfoResult {
+	cmd := btcjson.NewGetBlockChainInfoCmd()
+	return c.sendCmd(cmd)
+}
+
+// GetBlockChainInfo returns information related to the processing staate of
+// various chain-specific details such as the current difficulty from the tip
+// of the main-chain.
+func (c *Client) GetBlockChainInfo() (*btcjson.GetBlockChainInfoResult, error) {
+	return c.GetBlockChainInfoAsync().Receive()
+}
+
 // FutureGetBlockHashResult is a future promise to deliver the result of a
 // GetBlockHashAsync RPC invocation (or an applicable error).
 type FutureGetBlockHashResult chan *response
