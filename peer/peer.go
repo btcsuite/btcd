@@ -1422,7 +1422,9 @@ out:
 			// remote peer has not disconnected.
 			if p.shouldHandleReadError(err) {
 				errMsg := fmt.Sprintf("Can't read message from %s: %v", p, err)
-				log.Errorf(errMsg)
+				if err != io.ErrUnexpectedEOF {
+					log.Errorf(errMsg)
+				}
 
 				// Push a reject message for the malformed message and wait for
 				// the message to be sent before disconnecting.
