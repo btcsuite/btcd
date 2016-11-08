@@ -496,3 +496,46 @@ func (c *Client) GetTxOutAsync(txHash *chainhash.Hash, index uint32, mempool boo
 func (c *Client) GetTxOut(txHash *chainhash.Hash, index uint32, mempool bool) (*dcrjson.GetTxOutResult, error) {
 	return c.GetTxOutAsync(txHash, index, mempool).Receive()
 }
+
+// FutureRescanResult is a future promise to deliver the result of a
+// RescanAsynnc RPC invocation (or an applicable error).
+type FutureRescanResult chan *response
+
+// Receive waits for the response promised by the future and returns the
+// discovered rescan data.
+func (r FutureRescanResult) Receive() (*dcrjson.RescanResult, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	var rescanResult *dcrjson.RescanResult
+	err = json.Unmarshal(res, &rescanResult)
+	if err != nil {
+		return nil, err
+	}
+
+	return rescanResult, nil
+}
+
+// RescanAsync returns an instance of a type that can be used to get the result
+// of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+//
+// See Rescan for the blocking version and more details.
+func (c *Client) RescanAsync(blockHashes []chainhash.Hash) FutureRescanResult {
+	concatenatedBlockHashes := make([]byte, chainhash.HashSize*len(blockHashes))
+	for i := range blockHashes {
+		copy(concatenatedBlockHashes[i*chainhash.HashSize:], blockHashes[i][:])
+	}
+
+	cmd := dcrjson.NewRescanCmd(hex.EncodeToString(concatenatedBlockHashes))
+	return c.sendCmd(cmd)
+}
+
+// Rescan rescans the blocks identified by blockHashes, in order, using the
+// client's loaded transaction filter.  The blocks do not need to be on the main
+// chain, but they do need to be adjacent to each other.
+func (c *Client) Rescan(blockHashes []chainhash.Hash) (*dcrjson.RescanResult, error) {
+	return c.RescanAsync(blockHashes).Receive()
+}

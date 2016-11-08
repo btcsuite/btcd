@@ -1,10 +1,12 @@
 language: go
 go:
   - 1.6.3
-  - 1.7
+  - 1.7.3
 sudo: false
 install:
-  - go get -d -t -v ./...
+  - go get github.com/Masterminds/glide
+  - glide install
+  - go install
   - go get -v golang.org/x/tools/cmd/cover
   - go get -v github.com/bradfitz/goimports
   - go get -v github.com/golang/lint/golint

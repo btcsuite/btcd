@@ -6,7 +6,6 @@
 package dcrrpcclient
 
 import (
-	"bytes"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -40,8 +39,6 @@ type notificationState struct {
 	notifyStakeDifficulty       bool
 	notifyNewTx                 bool
 	notifyNewTxVerbose          bool
-	notifyReceived              map[string]struct{}
-	notifySpent                 map[dcrjson.OutPoint]struct{}
 }
 
 // Copy returns a deep copy of the receiver.
@@ -50,24 +47,13 @@ func (s *notificationState) Copy() *notificationState {
 	stateCopy.notifyBlocks = s.notifyBlocks
 	stateCopy.notifyNewTx = s.notifyNewTx
 	stateCopy.notifyNewTxVerbose = s.notifyNewTxVerbose
-	stateCopy.notifyReceived = make(map[string]struct{})
-	for addr := range s.notifyReceived {
-		stateCopy.notifyReceived[addr] = struct{}{}
-	}
-	stateCopy.notifySpent = make(map[dcrjson.OutPoint]struct{})
-	for op := range s.notifySpent {
-		stateCopy.notifySpent[op] = struct{}{}
-	}
 
 	return &stateCopy
 }
 
 // newNotificationState returns a new notification state ready to be populated.
 func newNotificationState() *notificationState {
-	return &notificationState{
-		notifyReceived: make(map[string]struct{}),
-		notifySpent:    make(map[dcrjson.OutPoint]struct{}),
-	}
+	return &notificationState{}
 }
 
 // newNilFutureResult returns a new future result channel that already has the
@@ -99,15 +85,17 @@ type NotificationHandlers struct {
 	// (best) chain.  It will only be invoked if a preceding call to
 	// NotifyBlocks has been made to register for the notification and the
 	// function is non-nil.
-	OnBlockConnected func(hash *chainhash.Hash, height int32, t time.Time,
-		vb uint16)
+	OnBlockConnected func(blockHeader []byte, transactions [][]byte)
 
 	// OnBlockDisconnected is invoked when a block is disconnected from the
 	// longest (best) chain.  It will only be invoked if a preceding call to
 	// NotifyBlocks has been made to register for the notification and the
 	// function is non-nil.
-	OnBlockDisconnected func(hash *chainhash.Hash, height int32, t time.Time,
-		vb uint16)
+	OnBlockDisconnected func(blockHeader []byte)
+
+	// OnRelevantTxAccepted is invoked when an unmined transaction passes
+	// the client's transaction filter.
+	OnRelevantTxAccepted func(transaction []byte)
 
 	// OnReorganization is invoked when the blockchain begins reorganizing.
 	// It will only be invoked if a preceding call to NotifyBlocks has been
@@ -148,37 +136,6 @@ type NotificationHandlers struct {
 	OnStakeDifficulty func(hash *chainhash.Hash,
 		height int64,
 		stakeDiff int64)
-
-	// OnRecvTx is invoked when a transaction that receives funds to a
-	// registered address is received into the memory pool and also
-	// connected to the longest (best) chain.  It will only be invoked if a
-	// preceding call to NotifyReceived, Rescan, or RescanEndHeight has been
-	// made to register for the notification and the function is non-nil.
-	OnRecvTx func(transaction *dcrutil.Tx, details *dcrjson.BlockDetails)
-
-	// OnRedeemingTx is invoked when a transaction that spends a registered
-	// outpoint is received into the memory pool and also connected to the
-	// longest (best) chain.  It will only be invoked if a preceding call to
-	// NotifySpent, Rescan, or RescanEndHeight has been made to register for
-	// the notification and the function is non-nil.
-	//
-	// NOTE: The NotifyReceived will automatically register notifications
-	// for the outpoints that are now "owned" as a result of receiving
-	// funds to the registered addresses.  This means it is possible for
-	// this to invoked indirectly as the result of a NotifyReceived call.
-	OnRedeemingTx func(transaction *dcrutil.Tx, details *dcrjson.BlockDetails)
-
-	// OnRescanFinished is invoked after a rescan finishes due to a previous
-	// call to Rescan or RescanEndHeight.  Finished rescans should be
-	// signaled on this notification, rather than relying on the return
-	// result of a rescan request, due to how dcrd may send various rescan
-	// notifications after the rescan request has already returned.
-	OnRescanFinished func(hash *chainhash.Hash, height int32, blkTime time.Time)
-
-	// OnRescanProgress is invoked periodically when a rescan is underway.
-	// It will only be invoked if a preceding call to Rescan or
-	// RescanEndHeight has been made and the function is non-nil.
-	OnRescanProgress func(hash *chainhash.Hash, height int32, blkTime time.Time)
 
 	// OnTxAccepted is invoked when a transaction is accepted into the
 	// memory pool.  It will only be invoked if a preceding call to
@@ -262,16 +219,14 @@ func (c *Client) handleNotification(ntfn *rawNotification) {
 			return
 		}
 
-		blockSha, blockHeight, blockTime, voteBits, err :=
-			parseChainNtfnParams(ntfn.Params)
+		blockHeader, transactions, err := parseBlockConnectedParams(ntfn.Params)
 		if err != nil {
-			log.Warnf("Received invalid block connected "+
+			log.Warnf("Received invalid blockconnected "+
 				"notification: %v", err)
 			return
 		}
 
-		c.ntfnHandlers.OnBlockConnected(blockSha, blockHeight, blockTime,
-			voteBits)
+		c.ntfnHandlers.OnBlockConnected(blockHeader, transactions)
 
 	// OnBlockDisconnected
 	case dcrjson.BlockDisconnectedNtfnMethod:
@@ -281,16 +236,30 @@ func (c *Client) handleNotification(ntfn *rawNotification) {
 			return
 		}
 
-		blockSha, blockHeight, blockTime, voteBits, err :=
-			parseChainNtfnParams(ntfn.Params)
+		blockHeader, err := parseBlockDisconnectedParams(ntfn.Params)
 		if err != nil {
-			log.Warnf("Received invalid block connected "+
+			log.Warnf("Received invalid blockdisconnected "+
 				"notification: %v", err)
 			return
 		}
 
-		c.ntfnHandlers.OnBlockDisconnected(blockSha, blockHeight, blockTime,
-			voteBits)
+		c.ntfnHandlers.OnBlockDisconnected(blockHeader)
+
+	case dcrjson.RelevantTxAcceptedNtfnMethod:
+		// Ignore the notification if the client is not interested in
+		// it.
+		if c.ntfnHandlers.OnRelevantTxAccepted == nil {
+			return
+		}
+
+		transaction, err := parseRelevantTxAcceptedParams(ntfn.Params)
+		if err != nil {
+			log.Warnf("Received invalid relevanttxaccepted "+
+				"notification: %v", err)
+			return
+		}
+
+		c.ntfnHandlers.OnRelevantTxAccepted(transaction)
 
 	case dcrjson.ReorganizationNtfnMethod:
 		// Ignore the notification if the client is not interested in
@@ -390,74 +359,6 @@ func (c *Client) handleNotification(ntfn *rawNotification) {
 		c.ntfnHandlers.OnStakeDifficulty(blockSha,
 			blockHeight,
 			stakeDiff)
-
-	// OnRecvTx
-	case dcrjson.RecvTxNtfnMethod:
-		// Ignore the notification if the client is not interested in
-		// it.
-		if c.ntfnHandlers.OnRecvTx == nil {
-			return
-		}
-
-		tx, block, err := parseChainTxNtfnParams(ntfn.Params)
-		if err != nil {
-			log.Warnf("Received invalid recvtx notification: %v",
-				err)
-			return
-		}
-
-		c.ntfnHandlers.OnRecvTx(tx, block)
-
-	// OnRedeemingTx
-	case dcrjson.RedeemingTxNtfnMethod:
-		// Ignore the notification if the client is not interested in
-		// it.
-		if c.ntfnHandlers.OnRedeemingTx == nil {
-			return
-		}
-
-		tx, block, err := parseChainTxNtfnParams(ntfn.Params)
-		if err != nil {
-			log.Warnf("Received invalid redeemingtx "+
-				"notification: %v", err)
-			return
-		}
-
-		c.ntfnHandlers.OnRedeemingTx(tx, block)
-
-	// OnRescanFinished
-	case dcrjson.RescanFinishedNtfnMethod:
-		// Ignore the notification if the client is not interested in
-		// it.
-		if c.ntfnHandlers.OnRescanFinished == nil {
-			return
-		}
-
-		hash, height, blkTime, err := parseRescanProgressParams(ntfn.Params)
-		if err != nil {
-			log.Warnf("Received invalid rescanfinished "+
-				"notification: %v", err)
-			return
-		}
-
-		c.ntfnHandlers.OnRescanFinished(hash, height, blkTime)
-
-	// OnRescanProgress
-	case dcrjson.RescanProgressNtfnMethod:
-		// Ignore the notification if the client is not interested in
-		// it.
-		if c.ntfnHandlers.OnRescanProgress == nil {
-			return
-		}
-
-		hash, height, blkTime, err := parseRescanProgressParams(ntfn.Params)
-		if err != nil {
-			log.Warnf("Received invalid rescanprogress "+
-				"notification: %v", err)
-			return
-		}
-
-		c.ntfnHandlers.OnRescanProgress(hash, height, blkTime)
 
 	// OnTxAccepted
 	case dcrjson.TxAcceptedNtfnMethod:
@@ -619,53 +520,61 @@ func (e wrongNumParams) Error() string {
 	return fmt.Sprintf("wrong number of parameters (%d)", e)
 }
 
-// parseChainNtfnParams parses out the block hash and height from the parameters
-// of blockconnected and blockdisconnected notifications.
-func parseChainNtfnParams(params []json.RawMessage) (*chainhash.Hash,
-	int32, time.Time, uint16, error) {
-
-	if len(params) != 4 {
-		return nil, 0, time.Time{}, 0, wrongNumParams(len(params))
-	}
-
-	// Unmarshal first parameter as a string.
-	var blockHashStr string
-	err := json.Unmarshal(params[0], &blockHashStr)
+func parseHexParam(param json.RawMessage) ([]byte, error) {
+	var s string
+	err := json.Unmarshal(param, &s)
 	if err != nil {
-		return nil, 0, time.Time{}, 0, err
+		return nil, err
+	}
+	return hex.DecodeString(s)
+}
+
+// parseBlockConnectedParams parses out the parameters included in a
+// blockconnected notification.
+func parseBlockConnectedParams(params []json.RawMessage) (blockHeader []byte, transactions [][]byte, err error) {
+	if len(params) != 2 {
+		return nil, nil, wrongNumParams(len(params))
 	}
 
-	// Unmarshal second parameter as an integer.
-	var blockHeight int32
-	err = json.Unmarshal(params[1], &blockHeight)
+	blockHeader, err = parseHexParam(params[0])
 	if err != nil {
-		return nil, 0, time.Time{}, 0, err
+		return nil, nil, err
 	}
 
-	// Unmarshal third parameter as unix time.
-	var blockTimeUnix int64
-	err = json.Unmarshal(params[2], &blockTimeUnix)
+	var hexTransactions []string
+	err = json.Unmarshal(params[1], &hexTransactions)
 	if err != nil {
-		return nil, 0, time.Time{}, 0, err
+		return nil, nil, err
+	}
+	transactions = make([][]byte, len(hexTransactions))
+	for i, hexTx := range hexTransactions {
+		transactions[i], err = hex.DecodeString(hexTx)
+		if err != nil {
+			return nil, nil, err
+		}
 	}
 
-	// Unmarshal fourth parameter as votebits (uint16).
-	var voteBits uint16
-	err = json.Unmarshal(params[3], &voteBits)
-	if err != nil {
-		return nil, 0, time.Time{}, 0, err
+	return blockHeader, transactions, nil
+}
+
+// parseBlockDisconnectedParams parses out the parameters included in a
+// blockdisconnected notification.
+func parseBlockDisconnectedParams(params []json.RawMessage) (blockHeader []byte, err error) {
+	if len(params) != 1 {
+		return nil, wrongNumParams(len(params))
 	}
 
-	// Create hash from block hash string.
-	blockHash, err := chainhash.NewHashFromStr(blockHashStr)
-	if err != nil {
-		return nil, 0, time.Time{}, 0, err
+	return parseHexParam(params[0])
+}
+
+// parseRelevantTxAcceptedParams parses out the parameter included in a
+// relevanttxaccepted notification.
+func parseRelevantTxAcceptedParams(params []json.RawMessage) (transaction []byte, err error) {
+	if len(params) != 1 {
+		return nil, wrongNumParams(len(params))
 	}
 
-	// Create time.Time from unix time.
-	blockTime := time.Unix(blockTimeUnix, 0)
-
-	return blockHash, blockHeight, blockTime, voteBits, nil
+	return parseHexParam(params[0])
 }
 
 func parseReorganizationNtfnParams(params []json.RawMessage) (*chainhash.Hash,
@@ -956,50 +865,6 @@ func parseStakeDifficultyNtfnParams(params []json.RawMessage) (
 	}
 
 	return bHash, bHeight, stakeDiff, nil
-}
-
-// parseChainTxNtfnParams parses out the transaction and optional details about
-// the block it's mined in from the parameters of recvtx and redeemingtx
-// notifications.
-func parseChainTxNtfnParams(params []json.RawMessage) (*dcrutil.Tx,
-	*dcrjson.BlockDetails, error) {
-
-	if len(params) == 0 || len(params) > 2 {
-		return nil, nil, wrongNumParams(len(params))
-	}
-
-	// Unmarshal first parameter as a string.
-	var txHex string
-	err := json.Unmarshal(params[0], &txHex)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// If present, unmarshal second optional parameter as the block details
-	// JSON object.
-	var block *dcrjson.BlockDetails
-	if len(params) > 1 {
-		err = json.Unmarshal(params[1], &block)
-		if err != nil {
-			return nil, nil, err
-		}
-	}
-
-	// Hex decode and deserialize the transaction.
-	serializedTx, err := hex.DecodeString(txHex)
-	if err != nil {
-		return nil, nil, err
-	}
-	var msgTx wire.MsgTx
-	err = msgTx.Deserialize(bytes.NewReader(serializedTx))
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// TODO: Change recvtx and redeemingtx callback signatures to use
-	// nicer types for details about the block (block sha as a
-	// dcrwire.ShaHash, block time as a time.Time, etc.).
-	return dcrutil.NewTx(&msgTx), block, nil
 }
 
 // parseRescanProgressParams parses out the height of the last rescanned block
@@ -1572,91 +1437,6 @@ func (c *Client) NotifyStakeDifficulty() error {
 	return c.NotifyStakeDifficultyAsync().Receive()
 }
 
-// FutureNotifySpentResult is a future promise to deliver the result of a
-// NotifySpentAsync RPC invocation (or an applicable error).
-type FutureNotifySpentResult chan *response
-
-// Receive waits for the response promised by the future and returns an error
-// if the registration was not successful.
-func (r FutureNotifySpentResult) Receive() error {
-	_, err := receiveFuture(r)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// notifySpentInternal is the same as notifySpentAsync except it accepts
-// the converted outpoints as a parameter so the client can more efficiently
-// recreate the previous notification state on reconnect.
-func (c *Client) notifySpentInternal(outpoints []dcrjson.OutPoint) FutureNotifySpentResult {
-	// Not supported in HTTP POST mode.
-	if c.config.HTTPPostMode {
-		return newFutureError(ErrWebsocketsRequired)
-	}
-
-	// Ignore the notification if the client is not interested in
-	// notifications.
-	if c.ntfnHandlers == nil {
-		return newNilFutureResult()
-	}
-
-	cmd := dcrjson.NewNotifySpentCmd(outpoints)
-	return c.sendCmd(cmd)
-}
-
-// newOutPointFromWire constructs the btcjson representation of a transaction
-// outpoint from the wire type.
-func newOutPointFromWire(op *wire.OutPoint) dcrjson.OutPoint {
-	return dcrjson.OutPoint{
-		Hash:  op.Hash.String(),
-		Index: op.Index,
-		Tree:  op.Tree,
-	}
-}
-
-// NotifySpentAsync returns an instance of a type that can be used to get the
-// result of the RPC at some future time by invoking the Receive function on
-// the returned instance.
-//
-// See NotifySpent for the blocking version and more details.
-//
-// NOTE: This is a dcrd extension and requires a websocket connection.
-func (c *Client) NotifySpentAsync(outpoints []*wire.OutPoint) FutureNotifySpentResult {
-	// Not supported in HTTP POST mode.
-	if c.config.HTTPPostMode {
-		return newFutureError(ErrWebsocketsRequired)
-	}
-
-	// Ignore the notification if the client is not interested in
-	// notifications.
-	if c.ntfnHandlers == nil {
-		return newNilFutureResult()
-	}
-
-	ops := make([]dcrjson.OutPoint, 0, len(outpoints))
-	for _, outpoint := range outpoints {
-		ops = append(ops, newOutPointFromWire(outpoint))
-	}
-	cmd := dcrjson.NewNotifySpentCmd(ops)
-	return c.sendCmd(cmd)
-}
-
-// NotifySpent registers the client to receive notifications when the passed
-// transaction outputs are spent.  The notifications are delivered to the
-// notification handlers associated with the client.  Calling this function has
-// no effect if there are no notification handlers and will result in an error
-// if the client is configured to run in HTTP POST mode.
-//
-// The notifications delivered as a result of this call will be via
-// OnRedeemingTx.
-//
-// NOTE: This is a dcrd extension and requires a websocket connection.
-func (c *Client) NotifySpent(outpoints []*wire.OutPoint) error {
-	return c.NotifySpentAsync(outpoints).Receive()
-}
-
 // FutureNotifyNewTransactionsResult is a future promise to deliver the result
 // of a NotifyNewTransactionsAsync RPC invocation (or an applicable error).
 type FutureNotifyNewTransactionsResult chan *response
@@ -1710,260 +1490,49 @@ func (c *Client) NotifyNewTransactions(verbose bool) error {
 	return c.NotifyNewTransactionsAsync(verbose).Receive()
 }
 
-// FutureNotifyReceivedResult is a future promise to deliver the result of a
-// NotifyReceivedAsync RPC invocation (or an applicable error).
-type FutureNotifyReceivedResult chan *response
+// FutureLoadTxFilterResult is a future promise to deliver the result
+// of a LoadTxFilterAsync RPC invocation (or an applicable error).
+type FutureLoadTxFilterResult chan *response
 
 // Receive waits for the response promised by the future and returns an error
 // if the registration was not successful.
-func (r FutureNotifyReceivedResult) Receive() error {
+func (r FutureLoadTxFilterResult) Receive() error {
 	_, err := receiveFuture(r)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
-// notifyReceivedInternal is the same as notifyReceivedAsync except it accepts
-// the converted addresses as a parameter so the client can more efficiently
-// recreate the previous notification state on reconnect.
-func (c *Client) notifyReceivedInternal(addresses []string) FutureNotifyReceivedResult {
-	// Not supported in HTTP POST mode.
-	if c.config.HTTPPostMode {
-		return newFutureError(ErrWebsocketsRequired)
+// LoadTxFilterAsync returns an instance of a type that can be used to
+// get the result of the RPC at some future time by invoking the Receive
+// function on the returned instance.
+//
+// See LoadTxFilter for the blocking version and more details.
+//
+// NOTE: This is a dcrd extension and requires a websocket connection.
+func (c *Client) LoadTxFilterAsync(reload bool, addresses []dcrutil.Address,
+	outPoints []wire.OutPoint) FutureLoadTxFilterResult {
+
+	addrStrs := make([]string, len(addresses))
+	for i, a := range addresses {
+		addrStrs[i] = a.EncodeAddress()
+	}
+	outPointObjects := make([]dcrjson.OutPoint, len(outPoints))
+	for i := range outPoints {
+		outPointObjects[i] = dcrjson.OutPoint{
+			Hash:  outPoints[i].Hash.String(),
+			Index: outPoints[i].Index,
+			Tree:  outPoints[i].Tree,
+		}
 	}
 
-	// Ignore the notification if the client is not interested in
-	// notifications.
-	if c.ntfnHandlers == nil {
-		return newNilFutureResult()
-	}
-
-	// Convert addresses to strings.
-	cmd := dcrjson.NewNotifyReceivedCmd(addresses)
+	cmd := dcrjson.NewLoadTxFilterCmd(reload, addrStrs, outPointObjects)
 	return c.sendCmd(cmd)
 }
 
-// NotifyReceivedAsync returns an instance of a type that can be used to get the
-// result of the RPC at some future time by invoking the Receive function on
-// the returned instance.
-//
-// See NotifyReceived for the blocking version and more details.
+// LoadTxFilter loads, reloads, or adds data to a websocket client's transaction
+// filter.  The filter is consistently updated based on inspected transactions
+// during mempool acceptence, block acceptence, and for all rescanned blocks.
 //
 // NOTE: This is a dcrd extension and requires a websocket connection.
-func (c *Client) NotifyReceivedAsync(addresses []dcrutil.Address) FutureNotifyReceivedResult {
-	// Not supported in HTTP POST mode.
-	if c.config.HTTPPostMode {
-		return newFutureError(ErrWebsocketsRequired)
-	}
-
-	// Ignore the notification if the client is not interested in
-	// notifications.
-	if c.ntfnHandlers == nil {
-		return newNilFutureResult()
-	}
-
-	// Convert addresses to strings.
-	addrs := make([]string, 0, len(addresses))
-	for _, addr := range addresses {
-		addrs = append(addrs, addr.String())
-	}
-
-	cmd := dcrjson.NewNotifyReceivedCmd(addrs)
-	return c.sendCmd(cmd)
-}
-
-// NotifyReceived registers the client to receive notifications every time a
-// new transaction which pays to one of the passed addresses is accepted to
-// memory pool or in a block connected to the block chain.  In addition, when
-// one of these transactions is detected, the client is also automatically
-// registered for notifications when the new transaction outpoints the address
-// now has available are spent (See NotifySpent).  The notifications are
-// delivered to the notification handlers associated with the client.  Calling
-// this function has no effect if there are no notification handlers and will
-// result in an error if the client is configured to run in HTTP POST mode.
-//
-// The notifications delivered as a result of this call will be via one of
-// *OnRecvTx (for transactions that receive funds to one of the passed
-// addresses) or OnRedeemingTx (for transactions which spend from one
-// of the outpoints which are automatically registered upon receipt of funds to
-// the address).
-//
-// NOTE: This is a dcrd extension and requires a websocket connection.
-func (c *Client) NotifyReceived(addresses []dcrutil.Address) error {
-	return c.NotifyReceivedAsync(addresses).Receive()
-}
-
-// FutureRescanResult is a future promise to deliver the result of a RescanAsync
-// or RescanEndHeightAsync RPC invocation (or an applicable error).
-type FutureRescanResult chan *response
-
-// Receive waits for the response promised by the future and returns an error
-// if the rescan was not successful.
-func (r FutureRescanResult) Receive() error {
-	_, err := receiveFuture(r)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// RescanAsync returns an instance of a type that can be used to get the result
-// of the RPC at some future time by invoking the Receive function on the
-// returned instance.
-//
-// See Rescan for the blocking version and more details.
-//
-// NOTE: Rescan requests are not issued on client reconnect and must be
-// performed manually (ideally with a new start height based on the last
-// rescan progress notification).  See the OnClientConnected notification
-// callback for a good callsite to reissue rescan requests on connect and
-// reconnect.
-//
-// NOTE: This is a dcrd extension and requires a websocket connection.
-func (c *Client) RescanAsync(startBlock *chainhash.Hash,
-	addresses []dcrutil.Address,
-	outpoints []*wire.OutPoint) FutureRescanResult {
-
-	// Not supported in HTTP POST mode.
-	if c.config.HTTPPostMode {
-		return newFutureError(ErrWebsocketsRequired)
-	}
-
-	// Ignore the notification if the client is not interested in
-	// notifications.
-	if c.ntfnHandlers == nil {
-		return newNilFutureResult()
-	}
-
-	// Convert block hashes to strings.
-	var startBlockHashStr string
-	if startBlock != nil {
-		startBlockHashStr = startBlock.String()
-	}
-
-	// Convert addresses to strings.
-	addrs := make([]string, 0, len(addresses))
-	for _, addr := range addresses {
-		addrs = append(addrs, addr.String())
-	}
-
-	// Convert outpoints.
-	ops := make([]dcrjson.OutPoint, 0, len(outpoints))
-	for _, op := range outpoints {
-		ops = append(ops, newOutPointFromWire(op))
-	}
-
-	cmd := dcrjson.NewRescanCmd(startBlockHashStr, addrs, ops, nil)
-	return c.sendCmd(cmd)
-}
-
-// Rescan rescans the block chain starting from the provided starting block to
-// the end of the longest chain for transactions that pay to the passed
-// addresses and transactions which spend the passed outpoints.
-//
-// The notifications of found transactions are delivered to the notification
-// handlers associated with client and this call will not return until the
-// rescan has completed.  Calling this function has no effect if there are no
-// notification handlers and will result in an error if the client is configured
-// to run in HTTP POST mode.
-//
-// The notifications delivered as a result of this call will be via one of
-// OnRedeemingTx (for transactions which spend from the one of the
-// passed outpoints), OnRecvTx (for transactions that receive funds
-// to one of the passed addresses), and OnRescanProgress (for rescan progress
-// updates).
-//
-// See RescanEndBlock to also specify an ending block to finish the rescan
-// without continuing through the best block on the main chain.
-//
-// NOTE: Rescan requests are not issued on client reconnect and must be
-// performed manually (ideally with a new start height based on the last
-// rescan progress notification).  See the OnClientConnected notification
-// callback for a good callsite to reissue rescan requests on connect and
-// reconnect.
-//
-// NOTE: This is a dcrd extension and requires a websocket connection.
-func (c *Client) Rescan(startBlock *chainhash.Hash,
-	addresses []dcrutil.Address,
-	outpoints []*wire.OutPoint) error {
-
-	return c.RescanAsync(startBlock, addresses, outpoints).Receive()
-}
-
-// RescanEndBlockAsync returns an instance of a type that can be used to get
-// the result of the RPC at some future time by invoking the Receive function on
-// the returned instance.
-//
-// See RescanEndBlock for the blocking version and more details.
-//
-// NOTE: This is a dcrd extension and requires a websocket connection.
-func (c *Client) RescanEndBlockAsync(startBlock *chainhash.Hash,
-	addresses []dcrutil.Address, outpoints []*wire.OutPoint,
-	endBlock *chainhash.Hash) FutureRescanResult {
-
-	// Not supported in HTTP POST mode.
-	if c.config.HTTPPostMode {
-		return newFutureError(ErrWebsocketsRequired)
-	}
-
-	// Ignore the notification if the client is not interested in
-	// notifications.
-	if c.ntfnHandlers == nil {
-		return newNilFutureResult()
-	}
-
-	// Convert block hashes to strings.
-	var startBlockHashStr, endBlockHashStr string
-	if startBlock != nil {
-		startBlockHashStr = startBlock.String()
-	}
-	if endBlock != nil {
-		endBlockHashStr = endBlock.String()
-	}
-
-	// Convert addresses to strings.
-	addrs := make([]string, 0, len(addresses))
-	for _, addr := range addresses {
-		addrs = append(addrs, addr.String())
-	}
-
-	// Convert outpoints.
-	ops := make([]dcrjson.OutPoint, 0, len(outpoints))
-	for _, op := range outpoints {
-		ops = append(ops, newOutPointFromWire(op))
-	}
-
-	cmd := dcrjson.NewRescanCmd(startBlockHashStr, addrs, ops,
-		&endBlockHashStr)
-	return c.sendCmd(cmd)
-}
-
-// RescanEndHeight rescans the block chain starting from the provided starting
-// block up to the provided ending block for transactions that pay to the
-// passed addresses and transactions which spend the passed outpoints.
-//
-// The notifications of found transactions are delivered to the notification
-// handlers associated with client and this call will not return until the
-// rescan has completed.  Calling this function has no effect if there are no
-// notification handlers and will result in an error if the client is configured
-// to run in HTTP POST mode.
-//
-// The notifications delivered as a result of this call will be via one of
-// OnRedeemingTx (for transactions which spend from the one of the
-// passed outpoints), OnRecvTx (for transactions that receive funds
-// to one of the passed addresses), and OnRescanProgress (for rescan progress
-// updates).
-//
-// See Rescan to also perform a rescan through current end of the longest chain.
-//
-// NOTE: This is a dcrd extension and requires a websocket connection.
-func (c *Client) RescanEndHeight(startBlock *chainhash.Hash,
-	addresses []dcrutil.Address, outpoints []*wire.OutPoint,
-	endBlock *chainhash.Hash) error {
-
-	return c.RescanEndBlockAsync(startBlock, addresses, outpoints,
-		endBlock).Receive()
+func (c *Client) LoadTxFilter(reload bool, addresses []dcrutil.Address, outPoints []wire.OutPoint) error {
+	return c.LoadTxFilterAsync(reload, addresses, outPoints).Receive()
 }
