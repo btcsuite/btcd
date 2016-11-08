@@ -1,5 +1,5 @@
 hash: f31381b9d7836c3acfccda809b8b279691b38d97517933b4f10e97f8ec468d2b
-updated: 2016-11-03T11:14:54.38201947-05:00
+updated: 2016-11-08T16:16:20.70957-05:00
 imports:
 - name: github.com/btcsuite/btclog
   version: 73889fb79bd687870312b6e40effcecffbd57d30
@@ -39,11 +39,11 @@ imports:
   subpackages:
   - eventlog
   - mgr
-  - svc
   - registry
+  - svc
   - winapi
 - name: github.com/davecgh/go-spew
-  version: 346938d642f2ec3594ed81d874461961cd0faa76
+  version: 6d212800a42e8ab5c146b8ace3490ee17e5225f9
   subpackages:
   - spew
 - name: github.com/decred/bitset
@@ -55,8 +55,8 @@ imports:
 - name: github.com/decred/dcrutil
   version: 0484582bf5503574d824f110e836a8c48aa60c8c
   subpackages:
-  - bloom
   - base58
+  - bloom
 - name: github.com/decred/ed25519
   version: b0909d3f798b97a03c9e77023f97a5301a2a7900
   subpackages:
@@ -66,7 +66,7 @@ imports:
   subpackages:
   - ssh/terminal
 - name: golang.org/x/sys
-  version: c200b10b5d5e122be351b67af224adc6128af5bf
+  version: 9a2e24c3733eddc63871eda99f253e2db29bd3b9
   subpackages:
   - unix
 testImports:

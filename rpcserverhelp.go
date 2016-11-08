@@ -690,37 +690,20 @@ var helpDescsEnUS = map[string]string{
 	// StopNotifyNewTransactionsCmd help.
 	"stopnotifynewtransactions--synopsis": "Stop sending either a txaccepted or a txacceptedverbose notification when a new transaction is accepted into the mempool.",
 
-	// NotifyReceivedCmd help.
-	"notifyreceived--synopsis": "Send a recvtx notification when a transaction added to mempool or appears in a newly-attached block contains a txout pkScript sending to any of the passed addresses.\n" +
-		"Matching outpoints are automatically registered for redeemingtx notifications.",
-	"notifyreceived-addresses": "List of address to receive notifications about",
-
-	// StopNotifyReceivedCmd help.
-	"stopnotifyreceived--synopsis": "Cancel registered receive notifications for each passed address.",
-	"stopnotifyreceived-addresses": "List of address to cancel receive notifications for",
-
 	// OutPoint help.
 	"outpoint-hash":  "The hex-encoded bytes of the outpoint hash",
 	"outpoint-index": "The index of the outpoint",
 	"outpoint-tree":  "The tree of the outpoint",
 
-	// NotifySpentCmd help.
-	"notifyspent--synopsis": "Send a redeemingtx notification when a transaction spending an outpoint appears in mempool (if relayed to this dcrd instance) and when such a transaction first appears in a newly-attached block.",
-	"notifyspent-outpoints": "List of transaction outpoints to monitor.",
-
-	// StopNotifySpentCmd help.
-	"stopnotifyspent--synopsis": "Cancel registered spending notifications for each passed outpoint.",
-	"stopnotifyspent-outpoints": "List of transaction outpoints to stop monitoring.",
+	// LoadTxFilterCmd help.
+	"loadtxfilter--synopsis": "Load, add to, or reload a websocket client's transaction filter for mempool transactions, new blocks and rescans.",
+	"loadtxfilter-reload":    "Load a new filter instead of adding data to an existing one",
+	"loadtxfilter-addresses": "Array of addresses to add to the transaction filter",
+	"loadtxfilter-outpoints": "Array of outpoints to add to the transaction filter",
 
 	// Rescan help.
-	"rescan--synopsis": "Rescan block chain for transactions to addresses.\n" +
-		"When the endblock parameter is omitted, the rescan continues through the best block in the main chain.\n" +
-		"Rescan results are sent as recvtx and redeemingtx notifications.\n" +
-		"This call returns once the rescan completes.",
-	"rescan-beginblock": "Hash of the first block to begin rescanning",
-	"rescan-addresses":  "List of addresses to include in the rescan",
-	"rescan-outpoints":  "List of transaction outpoints to include in the rescan",
-	"rescan-endblock":   "Hash of final block to rescan",
+	"rescan--synopsis":   "Rescan blocks for transactions matching the loaded transaction filter.",
+	"rescan-blockhashes": "Concatenated block hashes to rescan.  Each next block must be a child of the previous.",
 
 	// -------- Decred-specific help --------
 
@@ -897,6 +880,7 @@ var rpcResultTypes = map[string][]interface{}{
 	"version":               {(*map[string]dcrjson.VersionResult)(nil)},
 
 	// Websocket commands.
+	"loadtxfilter":                nil,
 	"session":                     {(*dcrjson.SessionResult)(nil)},
 	"notifywinningtickets":        nil,
 	"notifyspentandmissedtickets": nil,

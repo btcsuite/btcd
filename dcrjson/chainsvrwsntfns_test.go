@@ -32,119 +32,41 @@ func TestChainSvrWsNtfns(t *testing.T) {
 		{
 			name: "blockconnected",
 			newNtfn: func() (interface{}, error) {
-				return dcrjson.NewCmd("blockconnected", "123", 100000, 123456789, 0)
+				return dcrjson.NewCmd("blockconnected", "header", []string{"tx0", "tx1"})
 			},
 			staticNtfn: func() interface{} {
-				return dcrjson.NewBlockConnectedNtfn("123", 100000, 123456789, 0)
+				return dcrjson.NewBlockConnectedNtfn("header", []string{"tx0", "tx1"})
 			},
-			marshalled: `{"jsonrpc":"1.0","method":"blockconnected","params":["123",100000,123456789,0],"id":null}`,
+			marshalled: `{"jsonrpc":"1.0","method":"blockconnected","params":["header",["tx0","tx1"]],"id":null}`,
 			unmarshalled: &dcrjson.BlockConnectedNtfn{
-				Hash:     "123",
-				Height:   100000,
-				Time:     123456789,
-				VoteBits: 0,
+				Header:        "header",
+				SubscribedTxs: []string{"tx0", "tx1"},
 			},
 		},
 		{
 			name: "blockdisconnected",
 			newNtfn: func() (interface{}, error) {
-				return dcrjson.NewCmd("blockdisconnected", "123", 100000, 123456789, 0)
+				return dcrjson.NewCmd("blockdisconnected", "header")
 			},
 			staticNtfn: func() interface{} {
-				return dcrjson.NewBlockDisconnectedNtfn("123", 100000, 123456789, 0)
+				return dcrjson.NewBlockDisconnectedNtfn("header")
 			},
-			marshalled: `{"jsonrpc":"1.0","method":"blockdisconnected","params":["123",100000,123456789,0],"id":null}`,
+			marshalled: `{"jsonrpc":"1.0","method":"blockdisconnected","params":["header"],"id":null}`,
 			unmarshalled: &dcrjson.BlockDisconnectedNtfn{
-				Hash:     "123",
-				Height:   100000,
-				Time:     123456789,
-				VoteBits: 0,
+				Header: "header",
 			},
 		},
 		{
-			name: "recvtx",
+			name: "relevanttxaccepted",
 			newNtfn: func() (interface{}, error) {
-				return dcrjson.NewCmd("recvtx", "001122", `{"height":100000,"tree":0,"hash":"123","index":0,"time":12345678,"votebits":0}`)
+				return dcrjson.NewCmd("relevanttxaccepted", "001122")
 			},
 			staticNtfn: func() interface{} {
-				blockDetails := dcrjson.BlockDetails{
-					Height:   100000,
-					Tree:     0,
-					Hash:     "123",
-					Index:    0,
-					Time:     12345678,
-					VoteBits: 0,
-				}
-				return dcrjson.NewRecvTxNtfn("001122", &blockDetails)
+				return dcrjson.NewRelevantTxAcceptedNtfn("001122")
 			},
-			marshalled: `{"jsonrpc":"1.0","method":"recvtx","params":["001122",{"height":100000,"tree":0,"hash":"123","index":0,"time":12345678,"votebits":0}],"id":null}`,
-			unmarshalled: &dcrjson.RecvTxNtfn{
-				HexTx: "001122",
-				Block: &dcrjson.BlockDetails{
-					Height:   100000,
-					Tree:     0,
-					Hash:     "123",
-					Index:    0,
-					Time:     12345678,
-					VoteBits: 0,
-				},
-			},
-		},
-		{
-			name: "redeemingtx",
-			newNtfn: func() (interface{}, error) {
-				return dcrjson.NewCmd("redeemingtx", "001122", `{"height":100000,"tree":0,"hash":"123","index":0,"time":12345678,"votebits":0}`)
-			},
-			staticNtfn: func() interface{} {
-				blockDetails := dcrjson.BlockDetails{
-					Height:   100000,
-					Hash:     "123",
-					Index:    0,
-					Time:     12345678,
-					VoteBits: 0,
-				}
-				return dcrjson.NewRedeemingTxNtfn("001122", &blockDetails)
-			},
-			marshalled: `{"jsonrpc":"1.0","method":"redeemingtx","params":["001122",{"height":100000,"tree":0,"hash":"123","index":0,"time":12345678,"votebits":0}],"id":null}`,
-			unmarshalled: &dcrjson.RedeemingTxNtfn{
-				HexTx: "001122",
-				Block: &dcrjson.BlockDetails{
-					Height:   100000,
-					Hash:     "123",
-					Index:    0,
-					Time:     12345678,
-					VoteBits: 0,
-				},
-			},
-		},
-		{
-			name: "rescanfinished",
-			newNtfn: func() (interface{}, error) {
-				return dcrjson.NewCmd("rescanfinished", "123", 100000, 12345678)
-			},
-			staticNtfn: func() interface{} {
-				return dcrjson.NewRescanFinishedNtfn("123", 100000, 12345678)
-			},
-			marshalled: `{"jsonrpc":"1.0","method":"rescanfinished","params":["123",100000,12345678],"id":null}`,
-			unmarshalled: &dcrjson.RescanFinishedNtfn{
-				Hash:   "123",
-				Height: 100000,
-				Time:   12345678,
-			},
-		},
-		{
-			name: "rescanprogress",
-			newNtfn: func() (interface{}, error) {
-				return dcrjson.NewCmd("rescanprogress", "123", 100000, 12345678)
-			},
-			staticNtfn: func() interface{} {
-				return dcrjson.NewRescanProgressNtfn("123", 100000, 12345678)
-			},
-			marshalled: `{"jsonrpc":"1.0","method":"rescanprogress","params":["123",100000,12345678],"id":null}`,
-			unmarshalled: &dcrjson.RescanProgressNtfn{
-				Hash:   "123",
-				Height: 100000,
-				Time:   12345678,
+			marshalled: `{"jsonrpc":"1.0","method":"relevanttxaccepted","params":["001122"],"id":null}`,
+			unmarshalled: &dcrjson.RelevantTxAcceptedNtfn{
+				Transaction: "001122",
 			},
 		},
 		{

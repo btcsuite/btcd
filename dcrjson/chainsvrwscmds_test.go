@@ -101,96 +101,16 @@ func TestChainSvrWsCmds(t *testing.T) {
 			unmarshalled: &dcrjson.StopNotifyNewTransactionsCmd{},
 		},
 		{
-			name: "notifyreceived",
-			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("notifyreceived", []string{"1Address"})
-			},
-			staticCmd: func() interface{} {
-				return dcrjson.NewNotifyReceivedCmd([]string{"1Address"})
-			},
-			marshalled: `{"jsonrpc":"1.0","method":"notifyreceived","params":[["1Address"]],"id":1}`,
-			unmarshalled: &dcrjson.NotifyReceivedCmd{
-				Addresses: []string{"1Address"},
-			},
-		},
-		{
-			name: "stopnotifyreceived",
-			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("stopnotifyreceived", []string{"1Address"})
-			},
-			staticCmd: func() interface{} {
-				return dcrjson.NewStopNotifyReceivedCmd([]string{"1Address"})
-			},
-			marshalled: `{"jsonrpc":"1.0","method":"stopnotifyreceived","params":[["1Address"]],"id":1}`,
-			unmarshalled: &dcrjson.StopNotifyReceivedCmd{
-				Addresses: []string{"1Address"},
-			},
-		},
-		{
-			name: "notifyspent",
-			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("notifyspent", `[{"hash":"123","index":0}]`)
-			},
-			staticCmd: func() interface{} {
-				ops := []dcrjson.OutPoint{{Hash: "123", Index: 0}}
-				return dcrjson.NewNotifySpentCmd(ops)
-			},
-			marshalled: `{"jsonrpc":"1.0","method":"notifyspent","params":[[{"hash":"123","tree":0,"index":0}]],"id":1}`,
-			unmarshalled: &dcrjson.NotifySpentCmd{
-				OutPoints: []dcrjson.OutPoint{{Hash: "123", Index: 0}},
-			},
-		},
-		{
-			name: "stopnotifyspent",
-			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("stopnotifyspent", `[{"hash":"123","index":0}]`)
-			},
-			staticCmd: func() interface{} {
-				ops := []dcrjson.OutPoint{{Hash: "123", Index: 0}}
-				return dcrjson.NewStopNotifySpentCmd(ops)
-			},
-			marshalled: `{"jsonrpc":"1.0","method":"stopnotifyspent","params":[[{"hash":"123","tree":0,"index":0}]],"id":1}`,
-			unmarshalled: &dcrjson.StopNotifySpentCmd{
-				OutPoints: []dcrjson.OutPoint{{Hash: "123", Index: 0}},
-			},
-		},
-		{
 			name: "rescan",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("rescan", "123", `["1Address"]`, `[{"hash":"0000000000000000000000000000000000000000000000000000000000000123","tree":0,"index":0}]`)
+				return dcrjson.NewCmd("rescan", "0000000000000000000000000000000000000000000000000000000000000123")
 			},
 			staticCmd: func() interface{} {
-				addrs := []string{"1Address"}
-				ops := []dcrjson.OutPoint{{
-					Hash:  "0000000000000000000000000000000000000000000000000000000000000123",
-					Index: 0,
-				}}
-				return dcrjson.NewRescanCmd("123", addrs, ops, nil)
+				return dcrjson.NewRescanCmd("0000000000000000000000000000000000000000000000000000000000000123")
 			},
-			marshalled: `{"jsonrpc":"1.0","method":"rescan","params":["123",["1Address"],[{"hash":"0000000000000000000000000000000000000000000000000000000000000123","tree":0,"index":0}]],"id":1}`,
+			marshalled: `{"jsonrpc":"1.0","method":"rescan","params":["0000000000000000000000000000000000000000000000000000000000000123"],"id":1}`,
 			unmarshalled: &dcrjson.RescanCmd{
-				BeginBlock: "123",
-				Addresses:  []string{"1Address"},
-				OutPoints:  []dcrjson.OutPoint{{Hash: "0000000000000000000000000000000000000000000000000000000000000123", Index: 0}},
-				EndBlock:   nil,
-			},
-		},
-		{
-			name: "rescan optional",
-			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("rescan", "123", `["1Address"]`, `[{"hash":"123","tree":0,"index":0}]`, "456")
-			},
-			staticCmd: func() interface{} {
-				addrs := []string{"1Address"}
-				ops := []dcrjson.OutPoint{{Hash: "123", Index: 0}}
-				return dcrjson.NewRescanCmd("123", addrs, ops, dcrjson.String("456"))
-			},
-			marshalled: `{"jsonrpc":"1.0","method":"rescan","params":["123",["1Address"],[{"hash":"123","tree":0,"index":0}],"456"],"id":1}`,
-			unmarshalled: &dcrjson.RescanCmd{
-				BeginBlock: "123",
-				Addresses:  []string{"1Address"},
-				OutPoints:  []dcrjson.OutPoint{{Hash: "123", Index: 0}},
-				EndBlock:   dcrjson.String("456"),
+				BlockHashes: "0000000000000000000000000000000000000000000000000000000000000123",
 			},
 		},
 	}

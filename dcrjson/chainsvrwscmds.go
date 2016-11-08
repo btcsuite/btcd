@@ -23,6 +23,32 @@ func NewAuthenticateCmd(username, passphrase string) *AuthenticateCmd {
 	}
 }
 
+// OutPoint describes a transaction outpoint that will be marshalled to and
+// from JSON.  Contains Decred addition.
+type OutPoint struct {
+	Hash  string `json:"hash"`
+	Tree  int8   `json:"tree"`
+	Index uint32 `json:"index"`
+}
+
+// LoadTxFilterCmd defines the loadtxfilter request parameters to load or
+// reload a transaction filter.
+type LoadTxFilterCmd struct {
+	Reload    bool
+	Addresses []string
+	OutPoints []OutPoint
+}
+
+// NewLoadTxFilterCmd returns a new instance which can be used to issue a
+// loadtxfilter JSON-RPC command.
+func NewLoadTxFilterCmd(reload bool, addresses []string, outPoints []OutPoint) *LoadTxFilterCmd {
+	return &LoadTxFilterCmd{
+		Reload:    reload,
+		Addresses: addresses,
+		OutPoints: outPoints,
+	}
+}
+
 // NotifyBlocksCmd defines the notifyblocks JSON-RPC command.
 type NotifyBlocksCmd struct{}
 
@@ -78,86 +104,17 @@ func NewStopNotifyNewTransactionsCmd() *StopNotifyNewTransactionsCmd {
 	return &StopNotifyNewTransactionsCmd{}
 }
 
-// NotifyReceivedCmd defines the notifyreceived JSON-RPC command.
-type NotifyReceivedCmd struct {
-	Addresses []string
-}
-
-// NewNotifyReceivedCmd returns a new instance which can be used to issue a
-// notifyreceived JSON-RPC command.
-func NewNotifyReceivedCmd(addresses []string) *NotifyReceivedCmd {
-	return &NotifyReceivedCmd{
-		Addresses: addresses,
-	}
-}
-
-// OutPoint describes a transaction outpoint that will be marshalled to and
-// from JSON.  Contains Decred addition.
-type OutPoint struct {
-	Hash  string `json:"hash"`
-	Tree  int8   `json:"tree"`
-	Index uint32 `json:"index"`
-}
-
-// NotifySpentCmd defines the notifyspent JSON-RPC command.
-type NotifySpentCmd struct {
-	OutPoints []OutPoint
-}
-
-// NewNotifySpentCmd returns a new instance which can be used to issue a
-// notifyspent JSON-RPC command.
-func NewNotifySpentCmd(outPoints []OutPoint) *NotifySpentCmd {
-	return &NotifySpentCmd{
-		OutPoints: outPoints,
-	}
-}
-
-// StopNotifyReceivedCmd defines the stopnotifyreceived JSON-RPC command.
-type StopNotifyReceivedCmd struct {
-	Addresses []string
-}
-
-// NewStopNotifyReceivedCmd returns a new instance which can be used to issue a
-// stopnotifyreceived JSON-RPC command.
-func NewStopNotifyReceivedCmd(addresses []string) *StopNotifyReceivedCmd {
-	return &StopNotifyReceivedCmd{
-		Addresses: addresses,
-	}
-}
-
-// StopNotifySpentCmd defines the stopnotifyspent JSON-RPC command.
-type StopNotifySpentCmd struct {
-	OutPoints []OutPoint
-}
-
-// NewStopNotifySpentCmd returns a new instance which can be used to issue a
-// stopnotifyspent JSON-RPC command.
-func NewStopNotifySpentCmd(outPoints []OutPoint) *StopNotifySpentCmd {
-	return &StopNotifySpentCmd{
-		OutPoints: outPoints,
-	}
-}
-
 // RescanCmd defines the rescan JSON-RPC command.
 type RescanCmd struct {
-	BeginBlock string
-	Addresses  []string
-	OutPoints  []OutPoint
-	EndBlock   *string
+	// Concatinated block hashes in non-byte-reversed hex encoding.  Must
+	// have length evenly divisible by 2*chainhash.HashSize.
+	BlockHashes string
 }
 
 // NewRescanCmd returns a new instance which can be used to issue a rescan
 // JSON-RPC command.
-//
-// The parameters which are pointers indicate they are optional.  Passing nil
-// for optional parameters will use the default value.
-func NewRescanCmd(beginBlock string, addresses []string, outPoints []OutPoint, endBlock *string) *RescanCmd {
-	return &RescanCmd{
-		BeginBlock: beginBlock,
-		Addresses:  addresses,
-		OutPoints:  outPoints,
-		EndBlock:   endBlock,
-	}
+func NewRescanCmd(blockHashes string) *RescanCmd {
+	return &RescanCmd{BlockHashes: blockHashes}
 }
 
 func init() {
@@ -165,14 +122,11 @@ func init() {
 	flags := UFWebsocketOnly
 
 	MustRegisterCmd("authenticate", (*AuthenticateCmd)(nil), flags)
+	MustRegisterCmd("loadtxfilter", (*LoadTxFilterCmd)(nil), flags)
 	MustRegisterCmd("notifyblocks", (*NotifyBlocksCmd)(nil), flags)
 	MustRegisterCmd("notifynewtransactions", (*NotifyNewTransactionsCmd)(nil), flags)
-	MustRegisterCmd("notifyreceived", (*NotifyReceivedCmd)(nil), flags)
-	MustRegisterCmd("notifyspent", (*NotifySpentCmd)(nil), flags)
 	MustRegisterCmd("session", (*SessionCmd)(nil), flags)
 	MustRegisterCmd("stopnotifyblocks", (*StopNotifyBlocksCmd)(nil), flags)
 	MustRegisterCmd("stopnotifynewtransactions", (*StopNotifyNewTransactionsCmd)(nil), flags)
-	MustRegisterCmd("stopnotifyspent", (*StopNotifySpentCmd)(nil), flags)
-	MustRegisterCmd("stopnotifyreceived", (*StopNotifyReceivedCmd)(nil), flags)
 	MustRegisterCmd("rescan", (*RescanCmd)(nil), flags)
 }
