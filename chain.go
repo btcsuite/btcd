@@ -250,7 +250,7 @@ func (c *Client) GetDifficulty() (float64, error) {
 	return c.GetDifficultyAsync().Receive()
 }
 
-// FutureGetBlockChainInfoResult is a promised to deliver the result of a
+// FutureGetBlockChainInfoResult is a promise to deliver the result of a
 // GetBlockChainInfoAsync RPC invocation (or an applicable error).
 type FutureGetBlockChainInfoResult chan *response
 
@@ -279,9 +279,9 @@ func (c *Client) GetBlockChainInfoAsync() FutureGetBlockChainInfoResult {
 	return c.sendCmd(cmd)
 }
 
-// GetBlockChainInfo returns information related to the processing staate of
+// GetBlockChainInfo returns information related to the processing state of
 // various chain-specific details such as the current difficulty from the tip
-// of the main-chain.
+// of the main chain.
 func (c *Client) GetBlockChainInfo() (*btcjson.GetBlockChainInfoResult, error) {
 	return c.GetBlockChainInfoAsync().Receive()
 }
