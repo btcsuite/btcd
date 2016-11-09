@@ -750,30 +750,13 @@ func (m *wsNotificationManager) notifyBlockConnected(clients map[chan struct{}]*
 	block *dcrutil.Block) {
 
 	// Create the common portion of the notification that is the same for
-	// every client.  Stake transactions are always included for every
-	// client regardless of what outpoints and addresses they watch.
+	// every client.
 	headerBytes, err := block.MsgBlock().Header.Bytes()
 	if err != nil {
 		// This should never error.  The header is written to an
 		// in-memory expandable buffer, and given that the block was
 		// just accepted, there should be no issues serializing it.
 		panic(err)
-	}
-	stakeTransactions := block.STransactions()
-	hexStakeTransactions := make([]string, 0, len(stakeTransactions))
-	buf := new(bytes.Buffer)
-	for _, tx := range stakeTransactions {
-		err := tx.MsgTx().Serialize(buf)
-		if err != nil {
-			// This should never error.  The transaction is written
-			// to an in-memory expandable buffer, and given that the
-			// block was just accepted, there should be no issues
-			// serializing it.
-			panic(err)
-		}
-		stakeTxHex := hex.EncodeToString(buf.Bytes())
-		buf.Reset()
-		hexStakeTransactions = append(hexStakeTransactions, stakeTxHex)
 	}
 	ntfn := dcrjson.BlockConnectedNtfn{
 		Header:        hex.EncodeToString(headerBytes),
@@ -783,6 +766,15 @@ func (m *wsNotificationManager) notifyBlockConnected(clients map[chan struct{}]*
 	// Search for relevant transactions for each client and save them
 	// serialized in hex encoding for the notification.
 	subscribedTxs := make(map[chan struct{}][]string)
+	for _, tx := range block.STransactions() {
+		var txHex string
+		for quitChan := range m.subscribedClients(tx, clients) {
+			if txHex == "" {
+				txHex = txHexString(tx.MsgTx())
+			}
+			subscribedTxs[quitChan] = append(subscribedTxs[quitChan], txHex)
+		}
+	}
 	for _, tx := range block.Transactions() {
 		var txHex string
 		for quitChan := range m.subscribedClients(tx, clients) {
@@ -794,9 +786,9 @@ func (m *wsNotificationManager) notifyBlockConnected(clients map[chan struct{}]*
 	}
 
 	for quitChan, client := range clients {
-		// Add all stake transactions and the previously discovered
-		// relevant transactions for this client, if any.
-		ntfn.SubscribedTxs = append(hexStakeTransactions, subscribedTxs[quitChan]...)
+		// Add all previously discovered relevant transactions for this client,
+		// if any.
+		ntfn.SubscribedTxs = subscribedTxs[quitChan]
 
 		// Marshal and queue notification.
 		marshalledJSON, err := dcrjson.MarshalCmd(nil, &ntfn)
