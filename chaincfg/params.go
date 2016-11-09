@@ -328,6 +328,7 @@ var MainNetParams = Params{
 		{54770, newHashFromStr("00000000000009293d067b1126b7de07fc9b2b94ee50dfe0d48c239a7adb072c")},
 		{60720, newHashFromStr("0000000000000a64475d68ffb9ad89a3d147c0f5138db26b40da9d19d0004117")},
 		{65270, newHashFromStr("0000000000000021f107601962789b201f0a0cbb98ac5f8c12b93d94e795b441")},
+		{75380, newHashFromStr("0000000000000e7d13cfc85806aa720fe3670980f5b7d33253e4f41985558372")},
 	},
 
 	// Mempool parameters
@@ -424,6 +425,7 @@ var TestNetParams = Params{
 		{146740, newHashFromStr("00000000003300fa29af1b0066c688513f4f188f95edcff55dcdeb4e8f2c3b5e")},
 		{162230, newHashFromStr("0000000006741ab11e44af3cebc1c52905f873b4e059a1013da63bc076a3edbb")},
 		{173750, newHashFromStr("0000000000fe0a2f55589d8b75502f8adc26be95971a16d12d7ea65da5a0a507")},
+		{197920, newHashFromStr("000000000174a97eed678549df66b4025a8ff4b5034e7b0fdc63d1112d4716ab")},
 	},
 
 	// Mempool parameters
