@@ -208,9 +208,9 @@ const (
 	// for a stakebase transaction is not within the valid range.
 	ErrBadStakebaseScriptLen
 
-	// ErrBadStakevaseScrVal indicates the signature script for a stakebase
+	// ErrBadStakebaseScrVal indicates the signature script for a stakebase
 	// transaction was not set to the network consensus value.
-	ErrBadStakevaseScrVal
+	ErrBadStakebaseScrVal
 
 	// ErrScriptMalformed indicates a transaction script is malformed in
 	// some way.  For example, it might be longer than the maximum allowed
@@ -464,7 +464,7 @@ var errorCodeStrings = map[ErrorCode]string{
 	ErrBadCoinbaseAmountIn:    "ErrBadCoinbaseAmountIn",
 	ErrBadStakebaseAmountIn:   "ErrBadStakebaseAmountIn",
 	ErrBadStakebaseScriptLen:  "ErrBadStakebaseScriptLen",
-	ErrBadStakevaseScrVal:     "ErrBadStakevaseScrVal",
+	ErrBadStakebaseScrVal:     "ErrBadStakebaseScrVal",
 	ErrScriptMalformed:        "ErrScriptMalformed",
 	ErrScriptValidation:       "ErrScriptValidation",
 	ErrNotEnoughStake:         "ErrNotEnoughStake",

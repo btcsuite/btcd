@@ -217,7 +217,7 @@ func CheckTransactionSanity(tx *wire.MsgTx, params *chaincfg.Params) error {
 				"was set to disallowed value (got %x, want %x)",
 				tx.TxIn[0].SignatureScript,
 				params.StakeBaseSigScript)
-			return ruleError(ErrBadStakevaseScrVal, str)
+			return ruleError(ErrBadStakebaseScrVal, str)
 		}
 
 		// The ticket reference hash in an SSGen tx must not be null.

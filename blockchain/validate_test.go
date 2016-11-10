@@ -576,7 +576,7 @@ func TestBlockValidationRules(t *testing.T) {
 	}
 
 	// ----------------------------------------------------------------------------
-	// ErrBadStakevaseScrVal
+	// ErrBadStakebaseScrVal
 	badStakebaseScr153 := new(wire.MsgBlock)
 	badStakebaseScr153.FromBytes(block153Bytes)
 	badStakebaseScr153.STransactions[0].TxIn[0].SignatureScript[0] ^= 0x01
@@ -586,7 +586,7 @@ func TestBlockValidationRules(t *testing.T) {
 
 	err = blockchain.CheckWorklessBlockSanity(b153test, timeSource, simNetParams)
 	if err == nil || err.(blockchain.RuleError).GetCode() !=
-		blockchain.ErrBadStakevaseScrVal {
+		blockchain.ErrBadStakebaseScrVal {
 		t.Errorf("Failed to get error or correct error for bad stakebase "+
 			"script test (err: %v)", err)
 	}

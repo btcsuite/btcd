@@ -2696,7 +2696,7 @@ func Generate() (tests [][]TestInstance, err error) {
 	g.setTip("b36")
 	badScript := append(g.params.StakeBaseSigScript, 0x00)
 	g.nextBlock("bss2", outs[9], ticketOuts[9], replaceStakeSigScript(badScript))
-	rejected(blockchain.ErrBadStakevaseScrVal)
+	rejected(blockchain.ErrBadStakebaseScrVal)
 
 	// ---------------------------------------------------------------------
 	// Multisig[Verify]/ChecksigVerifiy signature operation count tests.
