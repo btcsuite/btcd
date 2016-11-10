@@ -1034,20 +1034,20 @@ type FutureVersionResult chan *response
 
 // Receive waits for the response promised by the future and returns the version
 // result.
-func (r FutureVersionResult) Receive() (*dcrjson.VersionResult, error) {
+func (r FutureVersionResult) Receive() (map[string]dcrjson.VersionResult, error) {
 	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, err
 	}
 
 	// Unmarsal result as a version result object.
-	var vr dcrjson.VersionResult
+	var vr map[string]dcrjson.VersionResult
 	err = json.Unmarshal(res, &vr)
 	if err != nil {
 		return nil, err
 	}
 
-	return &vr, nil
+	return vr, nil
 }
 
 // VersionAsync returns an instance of a type that can be used to get the result
@@ -1060,6 +1060,6 @@ func (c *Client) VersionAsync() FutureVersionResult {
 }
 
 // Version returns information about the server's JSON-RPC API versions.
-func (c *Client) Version() (*dcrjson.VersionResult, error) {
+func (c *Client) Version() (map[string]dcrjson.VersionResult, error) {
 	return c.VersionAsync().Receive()
 }
