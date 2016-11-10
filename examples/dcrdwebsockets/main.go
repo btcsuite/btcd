@@ -11,7 +11,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrrpcclient"
 	"github.com/decred/dcrutil"
 )
@@ -22,11 +21,11 @@ func main() {
 	// for notifications.  See the documentation of the dcrrpcclient
 	// NotificationHandlers type for more details about each handler.
 	ntfnHandlers := dcrrpcclient.NotificationHandlers{
-		OnBlockConnected: func(hash *chainhash.Hash, height int32, time time.Time, vb uint16) {
-			log.Printf("Block connected: %v (%d) %v %v", hash, height, time, vb)
+		OnBlockConnected: func(blockHeader []byte, transactions [][]byte) {
+			log.Printf("Block connected: %v %v", blockHeader, transactions)
 		},
-		OnBlockDisconnected: func(hash *chainhash.Hash, height int32, time time.Time, vb uint16) {
-			log.Printf("Block disconnected: %v (%d) %v %v", hash, height, time, vb)
+		OnBlockDisconnected: func(blockHeader []byte) {
+			log.Printf("Block disconnected: %v", blockHeader)
 		},
 	}
 
