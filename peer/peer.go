@@ -399,10 +399,12 @@ type HostToNetAddrFunc func(host string, port uint16,
 // provided as a convenience.
 type Peer struct {
 	// The following variables must only be used atomically.
-	connected     int32
-	disconnect    int32
 	bytesReceived uint64
 	bytesSent     uint64
+	lastRecv      int64
+	lastSend      int64
+	connected     int32
+	disconnect    int32
 
 	conn net.Conn
 
@@ -436,8 +438,6 @@ type Peer struct {
 	statsMtx           sync.RWMutex
 	timeOffset         int64
 	timeConnected      time.Time
-	lastSend           time.Time
-	lastRecv           time.Time
 	startingHeight     int64
 	lastBlock          int64
 	lastAnnouncedBlock *chainhash.Hash
@@ -516,10 +516,10 @@ func (p *Peer) StatsSnapshot() *StatsSnap {
 		Addr:           addr,
 		UserAgent:      userAgent,
 		Services:       services,
-		LastSend:       p.lastSend,
-		LastRecv:       p.lastRecv,
-		BytesSent:      atomic.LoadUint64(&p.bytesSent),
-		BytesRecv:      atomic.LoadUint64(&p.bytesReceived),
+		LastSend:       p.LastSend(),
+		LastRecv:       p.LastRecv(),
+		BytesSent:      p.BytesSent(),
+		BytesRecv:      p.BytesReceived(),
 		ConnTime:       p.timeConnected,
 		TimeOffset:     p.timeOffset,
 		Version:        protocolVersion,
@@ -674,20 +674,14 @@ func (p *Peer) LastBlock() int64 {
 //
 // This function is safe for concurrent access.
 func (p *Peer) LastSend() time.Time {
-	p.statsMtx.RLock()
-	defer p.statsMtx.RUnlock()
-
-	return p.lastSend
+	return time.Unix(atomic.LoadInt64(&p.lastSend), 0)
 }
 
 // LastRecv returns the last recv time of the peer.
 //
 // This function is safe for concurrent access.
 func (p *Peer) LastRecv() time.Time {
-	p.statsMtx.RLock()
-	defer p.statsMtx.RUnlock()
-
-	return p.lastRecv
+	return time.Unix(atomic.LoadInt64(&p.lastRecv), 0)
 }
 
 // BytesSent returns the total number of bytes sent by the peer.
@@ -1460,9 +1454,7 @@ out:
 			}
 			break out
 		}
-		p.statsMtx.Lock()
-		p.lastRecv = time.Now()
-		p.statsMtx.Unlock()
+		atomic.StoreInt64(&p.lastRecv, time.Now().Unix())
 		p.stallControl <- stallControlMsg{sccReceiveMessage, rmsg}
 
 		// Ensure version message comes first.
@@ -1853,9 +1845,7 @@ out:
 			// message that it has been sent (if requested), and
 			// signal the send queue to the deliver the next queued
 			// message.
-			p.statsMtx.Lock()
-			p.lastSend = time.Now()
-			p.statsMtx.Unlock()
+			atomic.StoreInt64(&p.lastSend, time.Now().Unix())
 			if msg.doneChan != nil {
 				msg.doneChan <- struct{}{}
 			}
