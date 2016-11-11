@@ -22,11 +22,6 @@ import (
 // that the coinbase contains the height encoding to make coinbase hash collisions
 // impossible.
 func checkCoinbaseUniqueHeight(blockHeight int64, block *dcrutil.Block) error {
-	if !(len(block.MsgBlock().Transactions) > 0) {
-		str := fmt.Sprintf("block %v has no coinbase", block.Sha())
-		return ruleError(ErrNoTransactions, str)
-	}
-
 	// Coinbase TxOut[0] is always tax, TxOut[1] is always
 	// height + extranonce, so at least two outputs must
 	// exist.
