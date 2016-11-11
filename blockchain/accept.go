@@ -25,7 +25,7 @@ func checkCoinbaseUniqueHeight(blockHeight int64, block *dcrutil.Block) error {
 	// Coinbase TxOut[0] is always tax, TxOut[1] is always
 	// height + extranonce, so at least two outputs must
 	// exist.
-	if !(len(block.MsgBlock().Transactions[0].TxOut) > 1) {
+	if len(block.MsgBlock().Transactions[0].TxOut) < 2 {
 		str := fmt.Sprintf("block %v is missing necessary coinbase "+
 			"outputs", block.Sha())
 		return ruleError(ErrFirstTxNotCoinbase, str)
