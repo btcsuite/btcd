@@ -821,7 +821,7 @@ func (b *BlockChain) pruneBlockNodes() error {
 // them by assigning nil and allowing the memory to be recovered by GC.
 //
 // This function MUST be called with the chain state lock held (for writes).
-func (b *BlockChain) pruneStakeNodes() error {
+func (b *BlockChain) pruneStakeNodes() {
 	// Find the height to prune to.
 	pruneToNode := b.bestNode
 	for i := int64(0); i < minMemoryStakeNodes-1 && pruneToNode != nil; i++ {
@@ -830,7 +830,7 @@ func (b *BlockChain) pruneStakeNodes() error {
 
 	// Nothing to do if there are not enough nodes.
 	if pruneToNode == nil || pruneToNode.parent == nil {
-		return nil
+		return
 	}
 
 	// Push the nodes to delete on a list in reverse order since it's easier
@@ -858,8 +858,6 @@ func (b *BlockChain) pruneStakeNodes() error {
 			node.ticketsRevoked = nil
 		}
 	}
-
-	return nil
 }
 
 // pruneNodes tranverses the blockchain and prunes nodes and stake data from
@@ -870,17 +868,9 @@ func (b *BlockChain) pruneStakeNodes() error {
 // This function is NOT safe for concurrent access and must be called with
 // the chain lock held for writes.
 func (b *BlockChain) pruneNodes() error {
-	err := b.pruneStakeNodes()
-	if err != nil {
-		return err
-	}
+	b.pruneStakeNodes()
 
-	err = b.pruneBlockNodes()
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return b.pruneBlockNodes()
 }
 
 // BestBlockHeader returns a copy of the block header of the block at HEAD.
