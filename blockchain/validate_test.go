@@ -118,7 +118,7 @@ func TestBlockValidationRules(t *testing.T) {
 	}
 
 	err = chain.CheckConnectBlock(b1test)
-	if err == nil || err.(blockchain.RuleError).GetCode() !=
+	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrBlockOneOutputs {
 		t.Errorf("Got no error or unexpected error for ErrBlockOneOutputs "+
 			"test 2: %v", err)
@@ -141,7 +141,7 @@ func TestBlockValidationRules(t *testing.T) {
 	}
 
 	err = chain.CheckConnectBlock(b1test)
-	if err == nil || err.(blockchain.RuleError).GetCode() !=
+	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrBlockOneOutputs {
 		t.Errorf("Got no error or unexpected error for ErrBlockOneOutputs "+
 			"test 3: %v", err)
@@ -164,7 +164,7 @@ func TestBlockValidationRules(t *testing.T) {
 	}
 
 	err = chain.CheckConnectBlock(b1test)
-	if err == nil || err.(blockchain.RuleError).GetCode() !=
+	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrBlockOneOutputs {
 		t.Errorf("Got no error or unexpected error for ErrBlockOneOutputs "+
 			"test 4: %v", err)
@@ -218,7 +218,7 @@ func TestBlockValidationRules(t *testing.T) {
 
 	// Hits error here.
 	err = chain.CheckConnectBlock(b142test)
-	if err == nil || err.(blockchain.RuleError).GetCode() !=
+	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrInvalidEarlyStakeTx {
 		t.Errorf("Got unexpected no error or wrong error for "+
 			"ErrInvalidEarlyStakeTx test: %v", err)
@@ -233,7 +233,7 @@ func TestBlockValidationRules(t *testing.T) {
 	b142test.SetHeight(int64(stakeEarlyTest))
 
 	err = blockchain.CheckWorklessBlockSanity(b142test, timeSource, simNetParams)
-	if err == nil || err.(blockchain.RuleError).GetCode() !=
+	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrInvalidEarlyVoteBits {
 		t.Errorf("Got unexpected no error or wrong error for "+
 			"ErrInvalidEarlyVoteBits test: %v", err)
@@ -286,7 +286,7 @@ func TestBlockValidationRules(t *testing.T) {
 	b153test.SetHeight(int64(testsIdx1))
 
 	err = blockchain.CheckWorklessBlockSanity(b153test, timeSource, simNetParams)
-	if err == nil || err.(blockchain.RuleError).GetCode() !=
+	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrBadMerkleRoot {
 		t.Errorf("Failed to get error or correct error for ErrBadMerkleRoot 1"+
 			"test (err: %v)", err)
@@ -309,7 +309,7 @@ func TestBlockValidationRules(t *testing.T) {
 	b153test.SetHeight(int64(testsIdx1))
 
 	err = blockchain.CheckWorklessBlockSanity(b153test, timeSource, simNetParams)
-	if err == nil || err.(blockchain.RuleError).GetCode() !=
+	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrBadMerkleRoot {
 		t.Errorf("Failed to get error or correct error for ErrBadMerkleRoot 2"+
 			"test (err: %v)", err)
@@ -331,7 +331,7 @@ func TestBlockValidationRules(t *testing.T) {
 	b153test.SetHeight(int64(testsIdx1))
 
 	_, _, err = chain.ProcessBlock(b153test, timeSource, blockchain.BFNone)
-	if err == nil || err.(blockchain.RuleError).GetCode() !=
+	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrUnexpectedDifficulty {
 		t.Errorf("Failed to get error or correct error for "+
 			"ErrUnexpectedDifficulty test (err: %v)", err)
@@ -346,7 +346,7 @@ func TestBlockValidationRules(t *testing.T) {
 	b153test.SetHeight(int64(testsIdx1))
 
 	_, _, err = chain.ProcessBlock(b153test, timeSource, blockchain.BFNoPoWCheck)
-	if err == nil || err.(blockchain.RuleError).GetCode() !=
+	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrWrongBlockSize {
 		t.Errorf("Failed to get error or correct error for "+
 			"ErrWrongBlockSize test (err: %v)", err)
@@ -361,7 +361,7 @@ func TestBlockValidationRules(t *testing.T) {
 	b153test.SetHeight(int64(testsIdx1))
 
 	_, _, err = chain.ProcessBlock(b153test, timeSource, blockchain.BFNone)
-	if err == nil || err.(blockchain.RuleError).GetCode() !=
+	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrHighHash {
 		t.Errorf("Failed to get error or correct error for "+
 			"ErrHighHash test (err: %v)", err)
@@ -382,7 +382,7 @@ func TestBlockValidationRules(t *testing.T) {
 	}
 
 	err = chain.CheckConnectBlock(b153test)
-	if err == nil || err.(blockchain.RuleError).GetCode() !=
+	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrMissingParent {
 		t.Errorf("Got no or unexpected error for ErrMissingParent test %v", err)
 	}
@@ -403,7 +403,7 @@ func TestBlockValidationRules(t *testing.T) {
 	}
 
 	err = chain.CheckConnectBlock(b153test)
-	if err == nil || err.(blockchain.RuleError).GetCode() !=
+	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrBadCoinbaseValue {
 		t.Errorf("Got no or unexpected error for ErrBadCoinbaseValue test %v",
 			err)
@@ -420,7 +420,7 @@ func TestBlockValidationRules(t *testing.T) {
 	b153test.SetHeight(int64(testsIdx1))
 
 	err = blockchain.CheckWorklessBlockSanity(b153test, timeSource, simNetParams)
-	if err == nil || err.(blockchain.RuleError).GetCode() !=
+	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrFirstTxNotCoinbase {
 		t.Errorf("Got no or unexpected sanity error for "+
 			"ErrBadCoinbaseOutpoint test: %v", err)
@@ -441,7 +441,7 @@ func TestBlockValidationRules(t *testing.T) {
 	b153test.SetHeight(int64(testsIdx1))
 
 	err = blockchain.CheckWorklessBlockSanity(b153test, timeSource, simNetParams)
-	if err == nil || err.(blockchain.RuleError).GetCode() !=
+	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrBadCoinbaseFraudProof {
 		t.Errorf("Got no or unexpected sanity error for "+
 			"ErrBadCoinbaseFraudProof test: %v", err)
@@ -469,7 +469,7 @@ func TestBlockValidationRules(t *testing.T) {
 	}
 
 	err = chain.CheckConnectBlock(b153test)
-	if err == nil || err.(blockchain.RuleError).GetCode() !=
+	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrBadCoinbaseAmountIn {
 		t.Errorf("Got no or unexpected sanity error for "+
 			"ErrBadCoinbaseAmountIn test: %v", err)
@@ -491,7 +491,7 @@ func TestBlockValidationRules(t *testing.T) {
 	}
 
 	err = chain.CheckConnectBlock(b153test)
-	if err == nil || err.(blockchain.RuleError).GetCode() !=
+	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrBadStakebaseAmountIn {
 		t.Errorf("Got no or unexpected sanity error for "+
 			"ErrBadCoinbaseAmountIn test: %v", err)
@@ -512,7 +512,7 @@ func TestBlockValidationRules(t *testing.T) {
 	b153test.SetHeight(int64(testsIdx1))
 
 	err = blockchain.CheckWorklessBlockSanity(b153test, timeSource, simNetParams)
-	if err == nil || err.(blockchain.RuleError).GetCode() !=
+	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrRegTxInStakeTree {
 		t.Errorf("Failed to get error or correct error for ErrRegTxInStakeTree "+
 			"test (err: %v)", err)
@@ -538,7 +538,7 @@ func TestBlockValidationRules(t *testing.T) {
 	b153test.SetHeight(int64(testsIdx1))
 
 	err = blockchain.CheckWorklessBlockSanity(b153test, timeSource, simNetParams)
-	if err == nil || err.(blockchain.RuleError).GetCode() !=
+	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrStakeTxInRegularTree {
 		t.Errorf("Failed to get error or correct error for ErrRegTxInStakeTree "+
 			"test (err: %v)", err)
@@ -562,7 +562,7 @@ func TestBlockValidationRules(t *testing.T) {
 	b153test.SetHeight(int64(testsIdx1))
 
 	err = blockchain.CheckWorklessBlockSanity(b153test, timeSource, simNetParams)
-	if err == nil || err.(blockchain.RuleError).GetCode() !=
+	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrBadStakebaseScriptLen {
 		t.Errorf("Failed to get error or correct error for bad stakebase "+
 			"script len test (err: %v)", err)
@@ -585,7 +585,7 @@ func TestBlockValidationRules(t *testing.T) {
 	b153test.SetHeight(int64(testsIdx1))
 
 	err = blockchain.CheckWorklessBlockSanity(b153test, timeSource, simNetParams)
-	if err == nil || err.(blockchain.RuleError).GetCode() !=
+	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrBadStakebaseScrVal {
 		t.Errorf("Failed to get error or correct error for bad stakebase "+
 			"script test (err: %v)", err)
@@ -608,7 +608,7 @@ func TestBlockValidationRules(t *testing.T) {
 	b153test.SetHeight(int64(testsIdx1))
 
 	err = blockchain.CheckWorklessBlockSanity(b153test, timeSource, simNetParams)
-	if err == nil || err.(blockchain.RuleError).GetCode() !=
+	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrRevocationsMismatch {
 		t.Errorf("got unexpected no error or other error for "+
 			"ErrInvalidRevocations sanity check: %v", err)
@@ -642,7 +642,7 @@ func TestBlockValidationRules(t *testing.T) {
 
 	// Fails and hits ErrSSRtxPayeesMismatch.
 	err = chain.CheckConnectBlock(b153test)
-	if err == nil || err.(blockchain.RuleError).GetCode() !=
+	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrSSRtxPayeesMismatch {
 		t.Errorf("Unexpected no or wrong error for ErrSSRtxPayeesMismatch "+
 			"test: %v", err)
@@ -667,7 +667,7 @@ func TestBlockValidationRules(t *testing.T) {
 
 	// Fails and hits ErrSSRtxPayees.
 	err = chain.CheckConnectBlock(b153test)
-	if err == nil || err.(blockchain.RuleError).GetCode() !=
+	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrSSRtxPayees {
 		t.Errorf("Unexpected no or wrong error for ErrSSRtxPayees "+
 			"test 1: %v", err)
@@ -694,7 +694,7 @@ func TestBlockValidationRules(t *testing.T) {
 
 	// Fails and hits ErrSSRtxPayees.
 	err = chain.CheckConnectBlock(b153test)
-	if err == nil || err.(blockchain.RuleError).GetCode() !=
+	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrSSRtxPayees {
 		t.Errorf("Unexpected no or wrong error for ErrSSRtxPayees "+
 			"test 2: %v", err)
@@ -729,7 +729,7 @@ func TestBlockValidationRules(t *testing.T) {
 
 	// Fails and hits ErrInvalidSSRtx.
 	err = chain.CheckConnectBlock(b153test)
-	if err == nil || err.(blockchain.RuleError).GetCode() !=
+	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrInvalidSSRtx {
 		t.Errorf("Unexpected no or wrong error for ErrInvalidSSRtx test: %v",
 			err)
@@ -774,7 +774,7 @@ func TestBlockValidationRules(t *testing.T) {
 
 	// This fails both checks.
 	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, simNetParams)
-	if err == nil || err.(blockchain.RuleError).GetCode() !=
+	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrNotEnoughStake {
 		t.Errorf("Failed to get error or correct error for low stake amt "+
 			"test (err: %v)", err)
@@ -797,7 +797,7 @@ func TestBlockValidationRules(t *testing.T) {
 
 	// Throws an error in stake consensus.
 	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, simNetParams)
-	if err == nil || err.(blockchain.RuleError).GetCode() !=
+	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrFreshStakeMismatch {
 		t.Errorf("Unexpected no or wrong error for ErrFreshStakeMismatch "+
 			"sanity check test: %v", err.Error())
@@ -826,7 +826,7 @@ func TestBlockValidationRules(t *testing.T) {
 
 	// Fails and hits ErrNotEnoughVotes.
 	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, simNetParams)
-	if err == nil || err.(blockchain.RuleError).GetCode() !=
+	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrNotEnoughVotes {
 		t.Errorf("Got no or unexpected block sanity err for "+
 			"not enough votes (err: %v)", err)
@@ -882,7 +882,7 @@ func TestBlockValidationRules(t *testing.T) {
 
 	// Fails and hits ErrTooManyVotes.
 	err = chain.CheckConnectBlock(b154test)
-	if err == nil || err.(blockchain.RuleError).GetCode() !=
+	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrTicketUnavailable {
 		t.Errorf("Unexpected no or wrong error for ErrTicketUnavailable test: %v",
 			err)
@@ -908,7 +908,7 @@ func TestBlockValidationRules(t *testing.T) {
 
 	// Fails and hits ErrTooManyVotes.
 	err = chain.CheckConnectBlock(b154test)
-	if err == nil || err.(blockchain.RuleError).GetCode() !=
+	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrVotesOnWrongBlock {
 		t.Errorf("Unexpected no or wrong error for ErrVotesOnWrongBlock test: %v",
 			err)
@@ -928,7 +928,7 @@ func TestBlockValidationRules(t *testing.T) {
 
 	// Fails and hits ErrVotesMismatch.
 	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, simNetParams)
-	if err == nil || err.(blockchain.RuleError).GetCode() !=
+	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrVotesMismatch {
 		t.Errorf("got unexpected no or wrong error for ErrVotesMismatch "+
 			"sanity check: %v", err)
@@ -951,7 +951,7 @@ func TestBlockValidationRules(t *testing.T) {
 
 	// Fails and hits ErrIncongruentVotebit.
 	err = chain.CheckConnectBlock(b154test)
-	if err == nil || err.(blockchain.RuleError).GetCode() !=
+	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrIncongruentVotebit {
 		t.Errorf("Unexpected no or wrong error for ErrIncongruentVotebit "+
 			"test 1: %v", err)
@@ -981,7 +981,7 @@ func TestBlockValidationRules(t *testing.T) {
 
 	// Fails and hits ErrIncongruentVotebit.
 	err = chain.CheckConnectBlock(b154test)
-	if err == nil || err.(blockchain.RuleError).GetCode() !=
+	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrIncongruentVotebit {
 		t.Errorf("Unexpected no or wrong error for ErrIncongruentVotebit "+
 			"test 2: %v", err)
@@ -1011,7 +1011,7 @@ func TestBlockValidationRules(t *testing.T) {
 
 	// Fails and hits ErrIncongruentVotebit.
 	err = chain.CheckConnectBlock(b154test)
-	if err == nil || err.(blockchain.RuleError).GetCode() !=
+	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrIncongruentVotebit {
 		t.Errorf("Unexpected no or wrong error for ErrIncongruentVotebit "+
 			"test 3: %v", err)
@@ -1041,7 +1041,7 @@ func TestBlockValidationRules(t *testing.T) {
 
 	// Fails and hits ErrIncongruentVotebit.
 	err = chain.CheckConnectBlock(b154test)
-	if err == nil || err.(blockchain.RuleError).GetCode() !=
+	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrIncongruentVotebit {
 		t.Errorf("Unexpected no or wrong error for ErrIncongruentVotebit "+
 			"test 4: %v", err)
@@ -1076,7 +1076,7 @@ func TestBlockValidationRules(t *testing.T) {
 
 	// Fails and hits ErrIncongruentVotebit.
 	err = chain.CheckConnectBlock(b154test)
-	if err == nil || err.(blockchain.RuleError).GetCode() !=
+	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrIncongruentVotebit {
 		t.Errorf("Unexpected no or wrong error for ErrIncongruentVotebit "+
 			"test 5: %v", err)
@@ -1111,7 +1111,7 @@ func TestBlockValidationRules(t *testing.T) {
 
 	// Fails and hits ErrIncongruentVotebit.
 	err = chain.CheckConnectBlock(b154test)
-	if err == nil || err.(blockchain.RuleError).GetCode() !=
+	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrIncongruentVotebit {
 		t.Errorf("Unexpected no or wrong error for ErrIncongruentVotebit "+
 			"test 6: %v", err)
@@ -1146,7 +1146,7 @@ func TestBlockValidationRules(t *testing.T) {
 
 	// Fails and hits ErrIncongruentVotebit.
 	err = chain.CheckConnectBlock(b154test)
-	if err == nil || err.(blockchain.RuleError).GetCode() !=
+	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrIncongruentVotebit {
 		t.Errorf("Unexpected no or wrong error for ErrIncongruentVotebit "+
 			"test 7: %v", err)
@@ -1173,7 +1173,7 @@ func TestBlockValidationRules(t *testing.T) {
 
 	// Fails and hits ErrSStxCommitment.
 	err = chain.CheckConnectBlock(b154test)
-	if err == nil || err.(blockchain.RuleError).GetCode() !=
+	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrSStxCommitment {
 		t.Errorf("Unexpected no or wrong error for ErrSStxCommitment test: %v",
 			err)
@@ -1207,7 +1207,7 @@ func TestBlockValidationRules(t *testing.T) {
 
 	// Fails and hits ErrSSGenPayeeOuts.
 	err = chain.CheckConnectBlock(b154test)
-	if err == nil || err.(blockchain.RuleError).GetCode() !=
+	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrSSGenPayeeOuts {
 		t.Errorf("Unexpected no or wrong error for ErrSSGenPayeeOuts "+
 			"test: %v", err)
@@ -1232,7 +1232,7 @@ func TestBlockValidationRules(t *testing.T) {
 
 	// Fails and hits ErrSSGenPayeeOuts.
 	err = chain.CheckConnectBlock(b154test)
-	if err == nil || err.(blockchain.RuleError).GetCode() !=
+	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrSSGenPayeeOuts {
 		t.Errorf("Unexpected no or wrong error for ErrSSGenPayeeOuts "+
 			"test 2: %v", err)
@@ -1294,7 +1294,7 @@ func TestBlockValidationRules(t *testing.T) {
 
 	// Fails and hits ErrTxSStxOutSpend.
 	err = chain.CheckConnectBlock(b154test)
-	if err == nil || err.(blockchain.RuleError).GetCode() !=
+	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrTxSStxOutSpend {
 		t.Errorf("Unexpected no or wrong error for ErrTxSStxOutSpend test: %v",
 			err)
@@ -1323,7 +1323,7 @@ func TestBlockValidationRules(t *testing.T) {
 
 	// Fails and hits ErrRegTxSpendStakeOut.
 	err = chain.CheckConnectBlock(b154test)
-	if err == nil || err.(blockchain.RuleError).GetCode() !=
+	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrRegTxSpendStakeOut {
 		t.Errorf("Unexpected no or wrong error for ErrRegTxSpendStakeOut test: %v",
 			err)
@@ -1345,7 +1345,7 @@ func TestBlockValidationRules(t *testing.T) {
 
 	// Fails and hits ErrInvalidFinalState.
 	err = chain.CheckConnectBlock(b154test)
-	if err == nil || err.(blockchain.RuleError).GetCode() !=
+	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrInvalidFinalState {
 		t.Errorf("Unexpected no or wrong error for ErrInvalidFinalState test: %v",
 			err)
@@ -1367,7 +1367,7 @@ func TestBlockValidationRules(t *testing.T) {
 
 	// Fails and hits ErrPoolSize.
 	err = chain.CheckConnectBlock(b154test)
-	if err == nil || err.(blockchain.RuleError).GetCode() !=
+	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrPoolSize {
 		t.Errorf("Unexpected no or wrong error for ErrPoolSize test: %v",
 			err)
@@ -1399,7 +1399,7 @@ func TestBlockValidationRules(t *testing.T) {
 
 	// Fails and hits ErrDiscordantTxTree.
 	err = chain.CheckConnectBlock(b154test)
-	if err == nil || err.(blockchain.RuleError).GetCode() !=
+	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrDiscordantTxTree {
 		t.Errorf("Unexpected no or wrong error for ErrDiscordantTxTree test: %v",
 			err)
@@ -1421,7 +1421,7 @@ func TestBlockValidationRules(t *testing.T) {
 
 	// Throws ProcessBlock error through checkBlockContext.
 	_, _, err = chain.ProcessBlock(b154test, timeSource, blockchain.BFNoPoWCheck)
-	if err == nil || err.(blockchain.RuleError).GetCode() !=
+	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrBadBlockHeight {
 		t.Errorf("ProcessBlock ErrBadBlockHeight test no or unexpected "+
 			"error: %v", err)
@@ -1445,7 +1445,7 @@ func TestBlockValidationRules(t *testing.T) {
 	}
 
 	err = chain.CheckConnectBlock(b154test)
-	if err == nil || err.(blockchain.RuleError).GetCode() !=
+	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrNoTax {
 		t.Errorf("Got no error or unexpected error for ErrNoTax "+
 			"test 1: %v", err)
@@ -1467,7 +1467,7 @@ func TestBlockValidationRules(t *testing.T) {
 	}
 
 	err = chain.CheckConnectBlock(b154test)
-	if err == nil || err.(blockchain.RuleError).GetCode() !=
+	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrNoTax {
 		t.Errorf("Got no error or unexpected error for ErrNoTax "+
 			"test 2: %v", err)
@@ -1489,7 +1489,7 @@ func TestBlockValidationRules(t *testing.T) {
 	}
 
 	err = chain.CheckConnectBlock(b154test)
-	if err == nil || err.(blockchain.RuleError).GetCode() !=
+	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrNoTax {
 		t.Errorf("Got no error or unexpected error for ErrNoTax "+
 			"test 3: %v", err)
@@ -1516,7 +1516,7 @@ func TestBlockValidationRules(t *testing.T) {
 
 	// Fails and hits ErrExpiredTx.
 	err = chain.CheckConnectBlock(b154test)
-	if err == nil || err.(blockchain.RuleError).GetCode() !=
+	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrExpiredTx {
 		t.Errorf("Unexpected no or wrong error for ErrExpiredTx test: %v",
 			err)
@@ -1543,7 +1543,7 @@ func TestBlockValidationRules(t *testing.T) {
 
 	// Fails and hits ErrFraudAmountIn.
 	err = chain.CheckConnectBlock(b154test)
-	if err == nil || err.(blockchain.RuleError).GetCode() !=
+	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrFraudAmountIn {
 		t.Errorf("Unexpected no or wrong error for ErrFraudAmountIn test: %v",
 			err)
@@ -1570,7 +1570,7 @@ func TestBlockValidationRules(t *testing.T) {
 
 	// Fails and hits ErrFraudBlockHeight.
 	err = chain.CheckConnectBlock(b154test)
-	if err == nil || err.(blockchain.RuleError).GetCode() !=
+	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrFraudBlockHeight {
 		t.Errorf("Unexpected no or wrong error for ErrFraudBlockHeight test: %v",
 			err)
@@ -1597,7 +1597,7 @@ func TestBlockValidationRules(t *testing.T) {
 
 	// Fails and hits ErrFraudBlockIndex.
 	err = chain.CheckConnectBlock(b154test)
-	if err == nil || err.(blockchain.RuleError).GetCode() !=
+	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrFraudBlockIndex {
 		t.Errorf("Unexpected no or wrong error for ErrFraudBlockIndex test: %v",
 			err)
@@ -1624,7 +1624,7 @@ func TestBlockValidationRules(t *testing.T) {
 
 	// Fails and hits ErrScriptValidation.
 	err = chain.CheckConnectBlock(b154test)
-	if err == nil || err.(blockchain.RuleError).GetCode() !=
+	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrScriptValidation {
 		t.Errorf("Unexpected no or wrong error for ErrScriptValidation test: %v",
 			err)
@@ -1647,7 +1647,7 @@ func TestBlockValidationRules(t *testing.T) {
 
 	// Fails and hits ErrScriptValidation.
 	err = chain.CheckConnectBlock(b154test)
-	if err == nil || err.(blockchain.RuleError).GetCode() !=
+	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrScriptValidation {
 		t.Errorf("Unexpected no or wrong error for ErrScriptValidation test: %v",
 			err)
@@ -1677,7 +1677,7 @@ func TestBlockValidationRules(t *testing.T) {
 
 	// Fails and hits ErrMissingTx.
 	err = chain.CheckConnectBlock(b154test)
-	if err == nil || err.(blockchain.RuleError).GetCode() !=
+	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrMissingTx {
 		t.Errorf("Unexpected no or wrong error for invalMissingInsS154 test: %v",
 			err)
@@ -1704,7 +1704,7 @@ func TestBlockValidationRules(t *testing.T) {
 
 	// Fails and hits ErrScriptMalformed.
 	err = chain.CheckConnectBlock(b154test)
-	if err == nil || err.(blockchain.RuleError).GetCode() !=
+	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrScriptMalformed {
 		t.Errorf("Unexpected no or wrong error for ErrScriptMalformed test: %v",
 			err)
@@ -1745,7 +1745,7 @@ func TestBlockValidationRules(t *testing.T) {
 
 	// Fails and hits ErrZeroValueOutputSpend.
 	err = chain.CheckConnectBlock(b154test)
-	if err == nil || err.(blockchain.RuleError).GetCode() !=
+	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrMissingTx {
 		t.Errorf("Unexpected no or wrong error for "+
 			"ErrMissingTx test: %v", err)
@@ -1812,7 +1812,7 @@ func TestBlockValidationRules(t *testing.T) {
 
 	// Fails and hits ErrMissingTx.
 	err = chain.CheckConnectBlock(b166test)
-	if err == nil || err.(blockchain.RuleError).GetCode() !=
+	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrMissingTx {
 		t.Errorf("Unexpected no or wrong error for "+
 			"ErrMissingTx test 1: %v", err)
@@ -1860,7 +1860,7 @@ func TestBlockValidationRules(t *testing.T) {
 
 	// Fails and hits ErrMissingTx.
 	err = chain.CheckConnectBlock(b166test)
-	if err == nil || err.(blockchain.RuleError).GetCode() !=
+	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrMissingTx {
 		t.Errorf("Unexpected no or wrong error for "+
 			"ErrMissingTx test 2: %v", err)
@@ -1909,7 +1909,7 @@ func TestBlockValidationRules(t *testing.T) {
 	// and instead just writes the transaction hash as being missing.
 	// This output doesn't become legal to spend until the next block.
 	err = chain.CheckConnectBlock(b166test)
-	if err == nil || err.(blockchain.RuleError).GetCode() !=
+	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrImmatureSpend {
 		t.Errorf("Unexpected no or wrong error for "+
 			"ErrImmatureSpend test: %v", err)
@@ -1935,7 +1935,7 @@ func TestBlockValidationRules(t *testing.T) {
 
 	// Fails and hits ErrMissingTx.
 	err = chain.CheckConnectBlock(b166test)
-	if err == nil || err.(blockchain.RuleError).GetCode() !=
+	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrMissingTx {
 		t.Errorf("Unexpected no or wrong error for "+
 			"double spend test 1: %v", err)
@@ -1961,7 +1961,7 @@ func TestBlockValidationRules(t *testing.T) {
 
 	// Fails and hits ErrMissingTx.
 	err = chain.CheckConnectBlock(b166test)
-	if err == nil || err.(blockchain.RuleError).GetCode() !=
+	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrMissingTx {
 		t.Errorf("Unexpected no or wrong error for "+
 			"double spend test 2: %v", err)

@@ -537,11 +537,6 @@ func (e RuleError) Error() string {
 	return e.Description
 }
 
-// GetCode satisfies the error interface and prints human-readable errors.
-func (e RuleError) GetCode() ErrorCode {
-	return e.ErrorCode
-}
-
 // ruleError creates an RuleError given a set of arguments.
 func ruleError(c ErrorCode, desc string) RuleError {
 	return RuleError{ErrorCode: c, Description: desc}
