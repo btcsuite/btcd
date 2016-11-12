@@ -309,6 +309,13 @@ func createDefaultConfigFile(destinationPath string) error {
 		return nil
 	}
 
+	// Extract the notls
+	noTLSRegexp, err := regexp.Compile(`(?m)^\s*notls=(0|1)(?:\s|$)`)
+	if err != nil {
+		return err
+	}
+	noTLSSubmatches := noTLSRegexp.FindSubmatch(content)
+
 	// Create the destination directory if it does not exists
 	err = os.MkdirAll(filepath.Dir(destinationPath), 0700)
 	if err != nil {
@@ -323,8 +330,13 @@ func createDefaultConfigFile(destinationPath string) error {
 	}
 	defer dest.Close()
 
-	dest.WriteString(fmt.Sprintf("rpcuser=%s\nrpcpass=%s",
-		string(userSubmatches[1]), string(passSubmatches[1])))
+	destString := fmt.Sprintf("rpcuser=%s\nrpcpass=%s\n",
+		string(userSubmatches[1]), string(passSubmatches[1]))
+	if noTLSSubmatches != nil {
+		destString += fmt.Sprintf("notls=%s\n", noTLSSubmatches[1])
+	}
+
+	dest.WriteString(destString)
 
 	return nil
 }
