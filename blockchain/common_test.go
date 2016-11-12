@@ -112,6 +112,7 @@ func chainSetup(dbName string, params *chaincfg.Params) (*blockchain.BlockChain,
 	chain, err := blockchain.New(&blockchain.Config{
 		DB:          db,
 		ChainParams: params,
+		TimeSource:  blockchain.NewMedianTime(),
 	})
 
 	if err != nil {

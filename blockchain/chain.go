@@ -193,6 +193,7 @@ type BlockChain struct {
 	db                  database.DB
 	dbInfo              *databaseInfo
 	chainParams         *chaincfg.Params
+	timeSource          MedianTimeSource
 	notifications       NotificationCallback
 	sigCache            *txscript.SigCache
 	indexManager        IndexManager
@@ -1703,8 +1704,7 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List,
 // forceReorganizationToBlock forces a reorganization of the block chain to the
 // block hash requested, so long as it matches up with the current organization
 // of the best chain.
-func (b *BlockChain) forceHeadReorganization(formerBest chainhash.Hash,
-	newBest chainhash.Hash, timeSource MedianTimeSource) error {
+func (b *BlockChain) forceHeadReorganization(formerBest chainhash.Hash, newBest chainhash.Hash) error {
 	if formerBest.IsEqual(&newBest) {
 		return fmt.Errorf("can't reorganize to the same block")
 	}
@@ -1773,10 +1773,10 @@ func (b *BlockChain) forceHeadReorganization(formerBest chainhash.Hash,
 		return err
 	}
 
-	err = checkBlockSanity(newBestBlock,
-		timeSource,
-		BFNone,
-		b.chainParams)
+	err = checkBlockSanity(newBestBlock, b.timeSource, BFNone, b.chainParams)
+	if err != nil {
+		return err
+	}
 
 	err = b.checkConnectBlock(newBestNode, newBestBlock, view, nil)
 	if err != nil {
@@ -1792,11 +1792,10 @@ func (b *BlockChain) forceHeadReorganization(formerBest chainhash.Hash,
 }
 
 // ForceHeadReorganization is the exported version of forceHeadReorganization.
-func (b *BlockChain) ForceHeadReorganization(formerBest chainhash.Hash,
-	newBest chainhash.Hash, timeSource MedianTimeSource) error {
+func (b *BlockChain) ForceHeadReorganization(formerBest chainhash.Hash, newBest chainhash.Hash) error {
 	b.chainLock.Lock()
 	defer b.chainLock.Unlock()
-	return b.forceHeadReorganization(formerBest, newBest, timeSource)
+	return b.forceHeadReorganization(formerBest, newBest)
 }
 
 // connectBestChain handles connecting the passed block to the chain while
@@ -2001,7 +2000,7 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *dcrutil.Block,
 //  - Latest block has a timestamp newer than 24 hours ago
 //
 // This function is safe for concurrent access.
-func (b *BlockChain) IsCurrent(timeSource MedianTimeSource) bool {
+func (b *BlockChain) IsCurrent() bool {
 	b.chainLock.RLock()
 	defer b.chainLock.RUnlock()
 
@@ -2014,7 +2013,7 @@ func (b *BlockChain) IsCurrent(timeSource MedianTimeSource) bool {
 
 	// Not current if the latest best block has a timestamp before 24 hours
 	// ago.
-	minus24Hours := timeSource.AdjustedTime().Add(-24 * time.Hour)
+	minus24Hours := b.timeSource.AdjustedTime().Add(-24 * time.Hour)
 	if b.bestNode.header.Timestamp.Before(minus24Hours) {
 		return false
 	}
@@ -2067,6 +2066,14 @@ type Config struct {
 	// This field is required.
 	ChainParams *chaincfg.Params
 
+	// TimeSource defines the median time source to use for things such as
+	// block processing and determining whether or not the chain is current.
+	//
+	// The caller is expected to keep a reference to the time source as well
+	// and add time samples from other peers on the network so the local
+	// time is adjusted to be in agreement with other peers.
+	TimeSource MedianTimeSource
+
 	// Notifications defines a callback to which notifications will be sent
 	// when various events take place.  See the documentation for
 	// Notification and NotificationType for details on the types and
@@ -2118,6 +2125,7 @@ func New(config *Config) (*BlockChain, error) {
 		checkpointsByHeight:     checkpointsByHeight,
 		db:                      config.DB,
 		chainParams:             params,
+		timeSource:              config.TimeSource,
 		notifications:           config.Notifications,
 		sigCache:                config.SigCache,
 		indexManager:            config.IndexManager,

@@ -35,7 +35,6 @@ type importResults struct {
 type blockImporter struct {
 	db                database.DB
 	chain             *blockchain.BlockChain
-	medianTime        blockchain.MedianTimeSource
 	r                 io.ReadSeeker
 	processQueue      chan []byte
 	doneChan          chan bool
@@ -133,8 +132,7 @@ func (bi *blockImporter) processBlock(serializedBlock []byte) (bool, error) {
 
 	// Ensure the blocks follows all of the chain rules and match up to the
 	// known checkpoints.
-	_, isOrphan, err := bi.chain.ProcessBlock(block, bi.medianTime,
-		blockchain.BFFastAdd)
+	_, isOrphan, err := bi.chain.ProcessBlock(block, blockchain.BFFastAdd)
 	if err != nil {
 		return false, err
 	}
@@ -340,6 +338,7 @@ func newBlockImporter(db database.DB, r io.ReadSeeker) (*blockImporter, error) {
 	chain, err := blockchain.New(&blockchain.Config{
 		DB:           db,
 		ChainParams:  activeNetParams,
+		TimeSource:   blockchain.NewMedianTime(),
 		IndexManager: indexManager,
 	})
 	if err != nil {
@@ -354,7 +353,6 @@ func newBlockImporter(db database.DB, r io.ReadSeeker) (*blockImporter, error) {
 		errChan:      make(chan error),
 		quit:         make(chan struct{}),
 		chain:        chain,
-		medianTime:   blockchain.NewMedianTime(),
 		lastLogTime:  time.Now(),
 		startTime:    time.Now(),
 	}, nil

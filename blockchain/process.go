@@ -126,8 +126,7 @@ func (b *BlockChain) processOrphans(hash *chainhash.Hash, flags BehaviorFlags) e
 // or on a side chain. True means it's on the main chain.
 //
 // This function is safe for concurrent access.
-func (b *BlockChain) ProcessBlock(block *dcrutil.Block,
-	timeSource MedianTimeSource, flags BehaviorFlags) (bool, bool, error) {
+func (b *BlockChain) ProcessBlock(block *dcrutil.Block, flags BehaviorFlags) (bool, bool, error) {
 	b.chainLock.Lock()
 	defer b.chainLock.Unlock()
 
@@ -160,7 +159,7 @@ func (b *BlockChain) ProcessBlock(block *dcrutil.Block,
 	}
 
 	// Perform preliminary sanity checks on the block and its transactions.
-	err = checkBlockSanity(block, timeSource, flags, b.chainParams)
+	err = checkBlockSanity(block, b.timeSource, flags, b.chainParams)
 	if err != nil {
 		return false, false, err
 	}

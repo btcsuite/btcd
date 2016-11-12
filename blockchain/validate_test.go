@@ -180,7 +180,7 @@ func TestBlockValidationRules(t *testing.T) {
 		}
 		bl.SetHeight(int64(i))
 
-		_, _, err = chain.ProcessBlock(bl, timeSource, blockchain.BFNone)
+		_, _, err = chain.ProcessBlock(bl, blockchain.BFNone)
 		if err != nil {
 			t.Fatalf("ProcessBlock error at height %v: %v", i, err.Error())
 		}
@@ -257,7 +257,7 @@ func TestBlockValidationRules(t *testing.T) {
 		}
 		bl.SetHeight(int64(i))
 
-		_, _, err = chain.ProcessBlock(bl, timeSource, blockchain.BFNone)
+		_, _, err = chain.ProcessBlock(bl, blockchain.BFNone)
 		if err != nil {
 			t.Errorf("ProcessBlock error at height %v: %v", i,
 				err.Error())
@@ -330,7 +330,7 @@ func TestBlockValidationRules(t *testing.T) {
 	b153test = dcrutil.NewBlock(badDifficulty153)
 	b153test.SetHeight(int64(testsIdx1))
 
-	_, _, err = chain.ProcessBlock(b153test, timeSource, blockchain.BFNone)
+	_, _, err = chain.ProcessBlock(b153test, blockchain.BFNone)
 	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrUnexpectedDifficulty {
 		t.Errorf("Failed to get error or correct error for "+
@@ -345,7 +345,7 @@ func TestBlockValidationRules(t *testing.T) {
 	b153test = dcrutil.NewBlock(badBlockSize153)
 	b153test.SetHeight(int64(testsIdx1))
 
-	_, _, err = chain.ProcessBlock(b153test, timeSource, blockchain.BFNoPoWCheck)
+	_, _, err = chain.ProcessBlock(b153test, blockchain.BFNoPoWCheck)
 	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrWrongBlockSize {
 		t.Errorf("Failed to get error or correct error for "+
@@ -360,7 +360,7 @@ func TestBlockValidationRules(t *testing.T) {
 	b153test = dcrutil.NewBlock(badHash153)
 	b153test.SetHeight(int64(testsIdx1))
 
-	_, _, err = chain.ProcessBlock(b153test, timeSource, blockchain.BFNone)
+	_, _, err = chain.ProcessBlock(b153test, blockchain.BFNone)
 	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrHighHash {
 		t.Errorf("Failed to get error or correct error for "+
@@ -741,7 +741,7 @@ func TestBlockValidationRules(t *testing.T) {
 	block153MsgBlock.FromBytes(block153Bytes)
 	b153test = dcrutil.NewBlock(block153MsgBlock)
 	b153test.SetHeight(int64(testsIdx1))
-	_, _, err = chain.ProcessBlock(b153test, timeSource, blockchain.BFNone)
+	_, _, err = chain.ProcessBlock(b153test, blockchain.BFNone)
 	if err != nil {
 		t.Errorf("Got unexpected error processing block 153 %v", err)
 	}
@@ -1420,7 +1420,7 @@ func TestBlockValidationRules(t *testing.T) {
 	b154test.SetHeight(int64(testsIdx2))
 
 	// Throws ProcessBlock error through checkBlockContext.
-	_, _, err = chain.ProcessBlock(b154test, timeSource, blockchain.BFNoPoWCheck)
+	_, _, err = chain.ProcessBlock(b154test, blockchain.BFNoPoWCheck)
 	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrBadBlockHeight {
 		t.Errorf("ProcessBlock ErrBadBlockHeight test no or unexpected "+
@@ -1780,7 +1780,7 @@ func TestBlockValidationRules(t *testing.T) {
 			}
 		}
 
-		_, _, err = chain.ProcessBlock(bl, timeSource, blockchain.BFNone)
+		_, _, err = chain.ProcessBlock(bl, blockchain.BFNone)
 		if err != nil {
 			t.Errorf("ProcessBlock error: %v", err.Error())
 		}
@@ -2008,7 +2008,6 @@ func TestBlockchainSpendJournal(t *testing.T) {
 	}
 
 	// Load up the short chain
-	timeSource := blockchain.NewMedianTime()
 	finalIdx1 := 179
 	for i := 1; i < finalIdx1+1; i++ {
 		bl, err := dcrutil.NewBlockFromBytes(blockChain[int64(i)])
@@ -2017,7 +2016,7 @@ func TestBlockchainSpendJournal(t *testing.T) {
 		}
 		bl.SetHeight(int64(i))
 
-		_, _, err = chain.ProcessBlock(bl, timeSource, blockchain.BFNone)
+		_, _, err = chain.ProcessBlock(bl, blockchain.BFNone)
 		if err != nil {
 			t.Fatalf("ProcessBlock error at height %v: %v", i, err.Error())
 		}

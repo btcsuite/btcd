@@ -32,7 +32,6 @@ func TestFullBlocks(t *testing.T) {
 	// testAcceptedBlock attempts to process the block in the provided test
 	// instance and ensures that it was accepted according to the flags
 	// specified in the test.
-	timeSource := blockchain.NewMedianTime()
 	testAcceptedBlock := func(item fullblocktests.AcceptedBlock) {
 		blockHeight := item.Block.Header.Height
 		block := dcrutil.NewBlock(item.Block)
@@ -40,7 +39,7 @@ func TestFullBlocks(t *testing.T) {
 			item.Name, block.Sha(), blockHeight)
 
 		isMainChain, isOrphan, err := chain.ProcessBlock(block,
-			timeSource, blockchain.BFNone)
+			blockchain.BFNone)
 		if err != nil {
 			t.Fatalf("block %q (hash %s, height %d) should "+
 				"have been accepted: %v", item.Name,
@@ -72,8 +71,7 @@ func TestFullBlocks(t *testing.T) {
 		t.Logf("Testing block %s (hash %s, height %d)",
 			item.Name, block.Sha(), blockHeight)
 
-		_, _, err := chain.ProcessBlock(block, timeSource,
-			blockchain.BFNone)
+		_, _, err := chain.ProcessBlock(block, blockchain.BFNone)
 		if err == nil {
 			t.Fatalf("block %q (hash %s, height %d) should not "+
 				"have been accepted", item.Name, block.Sha(),
@@ -106,8 +104,7 @@ func TestFullBlocks(t *testing.T) {
 		t.Logf("Testing block %s (hash %s, height %d)",
 			item.Name, block.Sha(), blockHeight)
 
-		_, isOrphan, err := chain.ProcessBlock(block, timeSource,
-			blockchain.BFNone)
+		_, isOrphan, err := chain.ProcessBlock(block, blockchain.BFNone)
 		if err != nil {
 			// Ensure the error code is of the expected type.
 			if _, ok := err.(blockchain.RuleError); !ok {

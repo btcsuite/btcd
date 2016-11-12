@@ -56,7 +56,6 @@ func TestBlockchainFunctions(t *testing.T) {
 	}
 
 	// Insert blocks 1 to 168 and perform various tests.
-	timeSource := blockchain.NewMedianTime()
 	for i := 1; i <= 168; i++ {
 		bl, err := dcrutil.NewBlockFromBytes(blockChain[int64(i)])
 		if err != nil {
@@ -64,7 +63,7 @@ func TestBlockchainFunctions(t *testing.T) {
 		}
 		bl.SetHeight(int64(i))
 
-		_, _, err = chain.ProcessBlock(bl, timeSource, blockchain.BFNone)
+		_, _, err = chain.ProcessBlock(bl, blockchain.BFNone)
 		if err != nil {
 			t.Fatalf("ProcessBlock error at height %v: %v", i, err.Error())
 		}

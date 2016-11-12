@@ -57,7 +57,6 @@ func reorgTestLong(t *testing.T) {
 	}
 
 	// Load up the short chain
-	timeSource := blockchain.NewMedianTime()
 	finalIdx1 := 179
 	for i := 1; i < finalIdx1+1; i++ {
 		bl, err := dcrutil.NewBlockFromBytes(blockChain[int64(i)])
@@ -66,7 +65,7 @@ func reorgTestLong(t *testing.T) {
 		}
 		bl.SetHeight(int64(i))
 
-		_, _, err = chain.ProcessBlock(bl, timeSource, blockchain.BFNone)
+		_, _, err = chain.ProcessBlock(bl, blockchain.BFNone)
 		if err != nil {
 			t.Fatalf("ProcessBlock error at height %v: %v", i, err.Error())
 		}
@@ -102,7 +101,7 @@ func reorgTestLong(t *testing.T) {
 		}
 		bl.SetHeight(int64(i))
 
-		_, _, err = chain.ProcessBlock(bl, timeSource, blockchain.BFNone)
+		_, _, err = chain.ProcessBlock(bl, blockchain.BFNone)
 		if err != nil {
 			t.Fatalf("ProcessBlock error: %v", err.Error())
 		}
@@ -168,8 +167,6 @@ func reorgTestShort(t *testing.T) {
 		t.Errorf("error decoding test blockchain: %v", err.Error())
 	}
 
-	timeSource := blockchain.NewMedianTime()
-
 	// Load the long chain and begin loading blocks from that too,
 	// forcing a reorganization
 	// Load up the rest of the blocks up to HEAD.
@@ -201,7 +198,7 @@ func reorgTestShort(t *testing.T) {
 		}
 		bl.SetHeight(int64(i))
 
-		_, _, err = chain.ProcessBlock(bl, timeSource, blockchain.BFNone)
+		_, _, err = chain.ProcessBlock(bl, blockchain.BFNone)
 		if err != nil {
 			t.Fatalf("ProcessBlock error at height %v: %v", i, err.Error())
 		}
@@ -218,7 +215,7 @@ func reorgTestShort(t *testing.T) {
 			}
 			bl.SetHeight(int64(i + j))
 
-			_, _, err = chain.ProcessBlock(bl, timeSource, blockchain.BFNone)
+			_, _, err = chain.ProcessBlock(bl, blockchain.BFNone)
 			if err != nil {
 				t.Fatalf("ProcessBlock error: %v", err.Error())
 			}
@@ -287,7 +284,6 @@ func reorgTestForced(t *testing.T) {
 	}
 
 	// Load up the short chain
-	timeSource := blockchain.NewMedianTime()
 	finalIdx1 := 131
 	var oldBestHash *chainhash.Hash
 	for i := 1; i < finalIdx1+1; i++ {
@@ -300,7 +296,7 @@ func reorgTestForced(t *testing.T) {
 			oldBestHash = bl.Sha()
 		}
 
-		_, _, err = chain.ProcessBlock(bl, timeSource, blockchain.BFNone)
+		_, _, err = chain.ProcessBlock(bl, blockchain.BFNone)
 		if err != nil {
 			t.Fatalf("ProcessBlock error at height %v: %v", i, err.Error())
 		}
@@ -334,13 +330,13 @@ func reorgTestForced(t *testing.T) {
 	}
 	forkBl.SetHeight(forkPoint)
 
-	_, _, err = chain.ProcessBlock(forkBl, timeSource, blockchain.BFNone)
+	_, _, err = chain.ProcessBlock(forkBl, blockchain.BFNone)
 	if err != nil {
 		t.Fatalf("ProcessBlock error: %v", err.Error())
 	}
 	newBestHash := forkBl.Sha()
 
-	err = chain.ForceHeadReorganization(*oldBestHash, *newBestHash, timeSource)
+	err = chain.ForceHeadReorganization(*oldBestHash, *newBestHash)
 	if err != nil {
 		t.Fatalf("failed forced reorganization: %v", err.Error())
 	}
