@@ -2504,6 +2504,9 @@ func addrStringToNetAddr(addr string) (net.Addr, error) {
 	if err != nil {
 		return nil, err
 	}
+	if len(ips) == 0 {
+		return nil, fmt.Errorf("no addresses found for %s", host)
+	}
 
 	port, err := strconv.Atoi(strPort)
 	if err != nil {
