@@ -421,7 +421,7 @@ func (h *Harness) GenerateAndSubmitBlock(txns []*btcutil.Tx, blockVersion int32,
 	prevBlock.SetHeight(prevBlockHeight)
 
 	// Create a new block including the specified transactions
-	newBlock, err := createBlock(prevBlock, txns, blockVersion,
+	newBlock, err := CreateBlock(prevBlock, txns, blockVersion,
 		blockTime, h.wallet.coinbaseAddr, h.ActiveNet)
 	if err != nil {
 		return nil, err

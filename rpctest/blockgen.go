@@ -112,13 +112,32 @@ func createCoinbaseTx(coinbaseScript []byte, nextBlockHeight int32,
 	return btcutil.NewTx(tx), nil
 }
 
-// createBlock creates a new block building from the previous block.
-func createBlock(prevBlock *btcutil.Block, inclusionTxs []*btcutil.Tx,
+// CreateBlock creates a new block building from the previous block with a
+// specified blockversion and timestamp. If the timestamp passed is zero (not
+// initialized), then the timestamp of the previous block will be used plus 1
+// second is used. Passing nil for the previous block results in a block that
+// builds off of the genesis block for the specified chain.
+func CreateBlock(prevBlock *btcutil.Block, inclusionTxs []*btcutil.Tx,
 	blockVersion int32, blockTime time.Time,
 	miningAddr btcutil.Address, net *chaincfg.Params) (*btcutil.Block, error) {
 
-	prevHash := prevBlock.Hash()
-	blockHeight := prevBlock.Height() + 1
+	var (
+		prevHash      *chainhash.Hash
+		blockHeight   int32
+		prevBlockTime time.Time
+	)
+
+	// If the previous block isn't specified, then we'll construct a block
+	// that builds off of the genesis block for the chain.
+	if prevBlock == nil {
+		prevHash = net.GenesisHash
+		blockHeight = 1
+		prevBlockTime = net.GenesisBlock.Header.Timestamp.Add(time.Minute)
+	} else {
+		prevHash = prevBlock.Hash()
+		blockHeight = prevBlock.Height() + 1
+		prevBlockTime = prevBlock.MsgBlock().Header.Timestamp
+	}
 
 	// If a target block time was specified, then use that as the header's
 	// timestamp. Otherwise, add one second to the previous block unless
@@ -128,7 +147,7 @@ func createBlock(prevBlock *btcutil.Block, inclusionTxs []*btcutil.Tx,
 	case !blockTime.IsZero():
 		ts = blockTime
 	default:
-		ts = prevBlock.MsgBlock().Header.Timestamp.Add(time.Second)
+		ts = prevBlockTime.Add(time.Second)
 	}
 
 	extraNonce := uint64(0)
