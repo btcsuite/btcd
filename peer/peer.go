@@ -686,7 +686,7 @@ func (p *Peer) LastRecv() time.Time {
 // This function is safe fo concurrent access.
 func (p *Peer) LocalAddr() net.Addr {
 	var localAddr net.Addr
-	if p.Connected() {
+	if atomic.LoadInt32(&p.connected) != 0 {
 		localAddr = p.conn.LocalAddr()
 	}
 	return localAddr
