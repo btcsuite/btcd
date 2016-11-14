@@ -917,7 +917,7 @@ func handleGetAddedNodeInfo(s *rpcServer, cmd interface{}, closeChan <-chan stru
 		}
 		if !found {
 			return nil, &btcjson.RPCError{
-				Code:    -24, // TODO: ErrRPCClientNodeNotAdded
+				Code:    btcjson.ErrRPCClientNodeNotAdded,
 				Message: "Node has not been added",
 			}
 		}
@@ -1946,7 +1946,7 @@ func handleGetBlockTemplateProposal(s *rpcServer, request *btcjson.TemplateReque
 			err := rpcsLog.Errorf("Failed to process block "+
 				"proposal: %v", err)
 			return nil, &btcjson.RPCError{
-				Code:    -25, // TODO: ErrRpcVerify
+				Code:    btcjson.ErrRPCVerify,
 				Message: err.Error(),
 			}
 		}
