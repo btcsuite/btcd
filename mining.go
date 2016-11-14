@@ -468,7 +468,7 @@ func createCoinbaseTx(subsidyCache *blockchain.SubsidyCache,
 		// Coinbase transactions have no inputs, so previous outpoint is
 		// zero hash and max index.
 		PreviousOutPoint: *wire.NewOutPoint(&chainhash.Hash{},
-			wire.MaxPrevOutIndex, dcrutil.TxTreeRegular),
+			wire.MaxPrevOutIndex, wire.TxTreeRegular),
 		Sequence:        wire.MaxTxInSequenceNum,
 		BlockHeight:     wire.NullBlockHeight,
 		BlockIndex:      wire.NullBlockIndex,
@@ -1502,7 +1502,7 @@ mempoolLoop:
 		// minimum block size, except for stake transactions.
 		if sortedByFee &&
 			(prioItem.feePerKB < float64(policy.TxMinFreeFee)) &&
-			(tx.Tree() != dcrutil.TxTreeStake) &&
+			(tx.Tree() != wire.TxTreeStake) &&
 			(blockPlusTxSize >= policy.BlockMinSize) {
 
 			minrLog.Tracef("Skipping tx %s with feePerKB %.2f "+
@@ -1699,7 +1699,7 @@ mempoolLoop:
 
 			tempBlockTxns := make([]*dcrutil.Tx, 0, len(sourceTxns))
 			for _, tx := range blockTxns {
-				if tx.Tree() == dcrutil.TxTreeRegular {
+				if tx.Tree() == wire.TxTreeRegular {
 					// Go through all the inputs and check to see if this mempool
 					// tx uses outputs from the parent block. This loop is
 					// probably very expensive.
@@ -1733,7 +1733,7 @@ mempoolLoop:
 	for _, tx := range blockTxns {
 		msgTx := tx.MsgTx()
 		isSStx, _ := stake.IsSStx(msgTx)
-		if tx.Tree() == dcrutil.TxTreeStake && isSStx {
+		if tx.Tree() == wire.TxTreeStake && isSStx {
 			// A ticket can not spend an input from TxTreeRegular, since it
 			// has not yet been validated.
 			if containsTxIns(blockTxns, tx) {
@@ -1765,7 +1765,7 @@ mempoolLoop:
 
 		msgTx := tx.MsgTx()
 		isSSRtx, _ := stake.IsSSRtx(msgTx)
-		if tx.Tree() == dcrutil.TxTreeStake && isSSRtx {
+		if tx.Tree() == wire.TxTreeStake && isSSRtx {
 			txCopy := dcrutil.NewTxDeepTxIns(msgTx)
 			if maybeInsertStakeTx(blockManager, txCopy, treeValid) {
 				blockTxnsStake = append(blockTxnsStake, txCopy)
@@ -1815,7 +1815,7 @@ mempoolLoop:
 		return nil, err
 	}
 
-	coinbaseTx.SetTree(dcrutil.TxTreeRegular) // Coinbase only in regular tx tree
+	coinbaseTx.SetTree(wire.TxTreeRegular) // Coinbase only in regular tx tree
 	if err != nil {
 		return nil, err
 	}
@@ -1833,9 +1833,9 @@ mempoolLoop:
 
 	// Assemble the two transaction trees.
 	for _, tx := range blockTxns {
-		if tx.Tree() == dcrutil.TxTreeRegular {
+		if tx.Tree() == wire.TxTreeRegular {
 			blockTxnsRegular = append(blockTxnsRegular, tx)
-		} else if tx.Tree() == dcrutil.TxTreeStake {
+		} else if tx.Tree() == wire.TxTreeStake {
 			continue
 		} else {
 			minrLog.Tracef("Error adding tx %s to block; invalid tree", tx.Sha())

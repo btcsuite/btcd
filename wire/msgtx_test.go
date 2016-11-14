@@ -16,7 +16,6 @@ import (
 
 	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/wire"
-	"github.com/decred/dcrutil"
 )
 
 // TestTx tests the MsgTx API.
@@ -52,7 +51,7 @@ func TestTx(t *testing.T) {
 	// NOTE: This is a block hash and made up index, but we're only
 	// testing package functionality.
 	prevOutIndex := uint32(1)
-	prevOut := wire.NewOutPoint(hash, prevOutIndex, dcrutil.TxTreeRegular)
+	prevOut := wire.NewOutPoint(hash, prevOutIndex, wire.TxTreeRegular)
 	if !prevOut.Hash.IsEqual(hash) {
 		t.Errorf("NewOutPoint: wrong hash - got %v, want %v",
 			spew.Sprint(&prevOut.Hash), spew.Sprint(hash))
@@ -147,7 +146,7 @@ func TestTxSha(t *testing.T) {
 		PreviousOutPoint: wire.OutPoint{
 			Hash:  chainhash.Hash{},
 			Index: 0xffffffff,
-			Tree:  dcrutil.TxTreeRegular,
+			Tree:  wire.TxTreeRegular,
 		},
 		Sequence:        0xffffffff,
 		ValueIn:         5000000000,

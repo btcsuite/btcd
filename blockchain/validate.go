@@ -57,7 +57,7 @@ var (
 // is set.
 func isNullOutpoint(outpoint *wire.OutPoint) bool {
 	if outpoint.Index == math.MaxUint32 && outpoint.Hash.IsEqual(zeroHash) &&
-		outpoint.Tree == dcrutil.TxTreeRegular {
+		outpoint.Tree == wire.TxTreeRegular {
 		return true
 	}
 	return false
@@ -1604,9 +1604,9 @@ func CheckTransactionInputs(subsidyCache *SubsidyCache, tx *dcrutil.Tx,
 		// Ensure that the outpoint's tx tree makes sense.
 		originTxOPTree := txIn.PreviousOutPoint.Tree
 		originTxType := utxoEntry.TransactionType()
-		indicatedTree := dcrutil.TxTreeRegular
+		indicatedTree := wire.TxTreeRegular
 		if originTxType != stake.TxTypeRegular {
-			indicatedTree = dcrutil.TxTreeStake
+			indicatedTree = wire.TxTreeStake
 		}
 		if indicatedTree != originTxOPTree {
 			errStr := fmt.Sprintf("tx %v attempted to spend from a %v "+

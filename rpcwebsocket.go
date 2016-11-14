@@ -1990,7 +1990,7 @@ func rescanBlock(filter *wsClientFilter, block *dcrutil.Block) []string {
 		added := false
 
 		inputs := tx.TxIn
-		if tree == dcrutil.TxTreeRegular {
+		if tree == wire.TxTreeRegular {
 			// Skip previous output checks for coinbase inputs.  These do
 			// not reference a previous output.
 			if blockchain.IsCoinBaseTx(tx) {
@@ -2044,10 +2044,10 @@ func rescanBlock(filter *wsClientFilter, block *dcrutil.Block) []string {
 	msgBlock := block.MsgBlock()
 	filter.mu.Lock()
 	for _, tx := range msgBlock.STransactions {
-		checkTransaction(tx, dcrutil.TxTreeStake)
+		checkTransaction(tx, wire.TxTreeStake)
 	}
 	for _, tx := range msgBlock.Transactions {
-		checkTransaction(tx, dcrutil.TxTreeRegular)
+		checkTransaction(tx, wire.TxTreeRegular)
 	}
 	filter.mu.Unlock()
 

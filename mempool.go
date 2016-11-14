@@ -655,9 +655,9 @@ func (mp *txMemPool) removeTransaction(tx *dcrutil.Tx, removeRedeemers bool) {
 	if removeRedeemers {
 		// Remove any transactions which rely on this one.
 		txType = stake.DetermineTxType(msgTx)
-		tree := dcrutil.TxTreeRegular
+		tree := wire.TxTreeRegular
 		if txType != stake.TxTypeRegular {
-			tree = dcrutil.TxTreeStake
+			tree = wire.TxTreeStake
 		}
 		for i := uint32(0); i < uint32(len(msgTx.TxOut)); i++ {
 			outpoint := wire.NewOutPoint(txHash, i, tree)
@@ -952,9 +952,9 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew,
 	// it to the network with TxTreeUnknown.
 	txType := stake.DetermineTxType(msgTx)
 	if txType == stake.TxTypeRegular {
-		tx.SetTree(dcrutil.TxTreeRegular)
+		tx.SetTree(wire.TxTreeRegular)
 	} else {
-		tx.SetTree(dcrutil.TxTreeStake)
+		tx.SetTree(wire.TxTreeStake)
 	}
 
 	// Don't allow non-standard transactions if the network parameters

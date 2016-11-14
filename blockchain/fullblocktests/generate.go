@@ -156,7 +156,7 @@ func makeSpendableOutForTx(tx *wire.MsgTx, blockHeight, txIndex, txOutIndex uint
 		prevOut: wire.OutPoint{
 			Hash:  tx.TxSha(),
 			Index: txOutIndex,
-			Tree:  dcrutil.TxTreeRegular,
+			Tree:  wire.TxTreeRegular,
 		},
 		blockHeight: blockHeight,
 		blockIndex:  txIndex,

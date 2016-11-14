@@ -614,8 +614,8 @@ func handleCreateRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan 
 			return nil, rpcDecodeHexError(input.Txid)
 		}
 
-		if !(int8(input.Tree) == dcrutil.TxTreeRegular ||
-			int8(input.Tree) == dcrutil.TxTreeStake) {
+		if !(int8(input.Tree) == wire.TxTreeRegular ||
+			int8(input.Tree) == wire.TxTreeStake) {
 			return nil, dcrjson.RPCError{
 				Code:    dcrjson.ErrRPCInvalidParams.Code,
 				Message: "Invalid parameter, tx tree must be regular or stake",
@@ -744,8 +744,8 @@ func handleCreateRawSStx(s *rpcServer,
 			}
 		}
 
-		if !(int8(input.Tree) == dcrutil.TxTreeRegular ||
-			int8(input.Tree) == dcrutil.TxTreeStake) {
+		if !(int8(input.Tree) == wire.TxTreeRegular ||
+			int8(input.Tree) == wire.TxTreeStake) {
 			return nil, dcrjson.RPCError{
 				Code:    dcrjson.ErrRPCInvalidParameter,
 				Message: "Invalid parameter, tx tree must be regular or stake",
@@ -1049,7 +1049,7 @@ func handleCreateRawSSGenTx(s *rpcServer,
 			}
 		}
 
-		if !(int8(input.Tree) == dcrutil.TxTreeStake) {
+		if !(int8(input.Tree) == wire.TxTreeStake) {
 			return nil, dcrjson.RPCError{
 				Code:    dcrjson.ErrRPCInvalidParameter,
 				Message: "Invalid parameter, tx tree of sstx input must be stake",
@@ -1229,7 +1229,7 @@ func handleCreateRawSSRtx(s *rpcServer,
 			}
 		}
 
-		if !(int8(input.Tree) == dcrutil.TxTreeStake) {
+		if !(int8(input.Tree) == wire.TxTreeStake) {
 			return nil, dcrjson.RPCError{
 				Code:    dcrjson.ErrRPCInvalidParameter,
 				Message: "Invalid parameter, tx tree of sstx input must be stake",

@@ -192,7 +192,7 @@ type VoteBits struct {
 func isNullOutpoint(tx *wire.MsgTx) bool {
 	nullInOP := tx.TxIn[0].PreviousOutPoint
 	if nullInOP.Index == math.MaxUint32 && nullInOP.Hash.IsEqual(zeroHash) &&
-		nullInOP.Tree == dcrutil.TxTreeRegular {
+		nullInOP.Tree == wire.TxTreeRegular {
 		return true
 	}
 	return false
@@ -950,7 +950,7 @@ func IsSSGen(tx *wire.MsgTx) (bool, error) {
 			return false, stakeRuleError(ErrSSGenWrongIndex, errStr)
 		}
 
-		if txin.PreviousOutPoint.Tree != dcrutil.TxTreeStake {
+		if txin.PreviousOutPoint.Tree != wire.TxTreeStake {
 			return false, stakeRuleError(ErrSSGenWrongTxTree, "SSGen used "+
 				"a non-stake input")
 		}
@@ -1109,7 +1109,7 @@ func IsSSRtx(tx *wire.MsgTx) (bool, error) {
 
 	// Check to make sure that the output used as input came from TxTreeStake.
 	for _, txin := range tx.TxIn {
-		if txin.PreviousOutPoint.Tree != dcrutil.TxTreeStake {
+		if txin.PreviousOutPoint.Tree != wire.TxTreeStake {
 			return false, stakeRuleError(ErrSSRtxWrongTxTree, "SSRtx used "+
 				"a non-stake input")
 		}
@@ -1170,9 +1170,9 @@ func DetermineTxType(tx *wire.MsgTx) TxType {
 func SetTxTree(tx *dcrutil.Tx) {
 	txType := DetermineTxType(tx.MsgTx())
 
-	indicatedTree := dcrutil.TxTreeRegular
+	indicatedTree := wire.TxTreeRegular
 	if txType != TxTypeRegular {
-		indicatedTree = dcrutil.TxTreeStake
+		indicatedTree = wire.TxTreeStake
 	}
 
 	tx.SetTree(indicatedTree)

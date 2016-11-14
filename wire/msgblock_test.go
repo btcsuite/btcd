@@ -16,7 +16,6 @@ import (
 
 	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/wire"
-	"github.com/decred/dcrutil"
 )
 
 // TestBlock tests the MsgBlock API.
@@ -599,7 +598,7 @@ var testBlock = wire.MsgBlock{
 					PreviousOutPoint: wire.OutPoint{
 						Hash:  chainhash.Hash{},
 						Index: 0xffffffff,
-						Tree:  dcrutil.TxTreeRegular,
+						Tree:  wire.TxTreeRegular,
 					},
 					Sequence:    0xffffffff,
 					ValueIn:     0x1616161616161616,
@@ -641,7 +640,7 @@ var testBlock = wire.MsgBlock{
 					PreviousOutPoint: wire.OutPoint{
 						Hash:  chainhash.Hash{},
 						Index: 0xffffffff,
-						Tree:  dcrutil.TxTreeStake,
+						Tree:  wire.TxTreeStake,
 					},
 					Sequence:    0xffffffff,
 					ValueIn:     0x1313131313131313,

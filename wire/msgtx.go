@@ -45,6 +45,19 @@ const (
 	// DefaultPkScriptVersion is the default pkScript version, referring to
 	// extended Decred script.
 	DefaultPkScriptVersion uint16 = 0x0000
+
+	// TxTreeUnknown is the value returned for a transaction tree that is
+	// unknown.  This is typically because the transaction has not been
+	// inserted into a block yet.
+	TxTreeUnknown int8 = -1
+
+	// TxTreeRegular is the value for a normal transcation tree for a
+	// transaction's location in a block.
+	TxTreeRegular int8 = 0
+
+	// TxTreeStake is the value for a stake transcation tree for a
+	// transaction's location in a block.
+	TxTreeStake int8 = 1
 )
 
 const (
