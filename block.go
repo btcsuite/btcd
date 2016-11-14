@@ -142,7 +142,7 @@ func (b *Block) Tx(txNum int) (*Tx, error) {
 	// Generate and cache the wrapped transaction and return it.
 	newTx := NewTx(b.msgBlock.Transactions[txNum])
 	newTx.SetIndex(txNum)
-	newTx.SetTree(TxTreeRegular)
+	newTx.SetTree(wire.TxTreeRegular)
 	b.transactions[txNum] = newTx
 	return newTx, nil
 }
@@ -171,7 +171,7 @@ func (b *Block) STx(txNum int) (*Tx, error) {
 	// Generate and cache the wrapped transaction and return it.
 	newTx := NewTx(b.msgBlock.STransactions[txNum])
 	newTx.SetIndex(txNum)
-	newTx.SetTree(TxTreeStake)
+	newTx.SetTree(wire.TxTreeStake)
 	b.sTransactions[txNum] = newTx
 	return newTx, nil
 }
@@ -199,7 +199,7 @@ func (b *Block) Transactions() []*Tx {
 		if tx == nil {
 			newTx := NewTx(b.msgBlock.Transactions[i])
 			newTx.SetIndex(i)
-			newTx.SetTree(TxTreeRegular)
+			newTx.SetTree(wire.TxTreeRegular)
 			b.transactions[i] = newTx
 		}
 	}
@@ -231,7 +231,7 @@ func (b *Block) STransactions() []*Tx {
 		if tx == nil {
 			newTx := NewTx(b.msgBlock.STransactions[i])
 			newTx.SetIndex(i)
-			newTx.SetTree(TxTreeStake)
+			newTx.SetTree(wire.TxTreeStake)
 			b.sTransactions[i] = newTx
 		}
 	}

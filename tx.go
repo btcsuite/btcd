@@ -18,19 +18,6 @@ import (
 // mutated.
 var assertTransactionImmutability = false
 
-// TxTreeUnknown is the value returned for a transaction tree that is unknown.
-// This is typically because the transaction has not been inserted into a block
-// yet.
-const TxTreeUnknown = int8(-1)
-
-// TxTreeRegular is the value for a normal transcation tree for a transaction's
-// location in a block.
-const TxTreeRegular = int8(0)
-
-// TxTreeStake is the value for a stake transcation tree for a transaction's
-// location in a block.
-const TxTreeStake = int8(1)
-
 // TxIndexUnknown is the value returned for a transaction index that is unknown.
 // This is typically because the transaction has not been inserted into a block
 // yet.
@@ -98,7 +85,7 @@ func NewTx(msgTx *wire.MsgTx) *Tx {
 	return &Tx{
 		hash:    msgTx.TxSha(),
 		msgTx:   msgTx,
-		txTree:  TxTreeUnknown,
+		txTree:  wire.TxTreeUnknown,
 		txIndex: TxIndexUnknown,
 	}
 }
@@ -154,7 +141,7 @@ func NewTxDeep(msgTx *wire.MsgTx) *Tx {
 	return &Tx{
 		hash:    mtx.TxSha(),
 		msgTx:   mtx,
-		txTree:  TxTreeUnknown,
+		txTree:  wire.TxTreeUnknown,
 		txIndex: TxIndexUnknown,
 	}
 }
@@ -203,7 +190,7 @@ func NewTxDeepTxIns(msgTx *wire.MsgTx) *Tx {
 	return &Tx{
 		hash:    msgTx.TxSha(),
 		msgTx:   msgTx,
-		txTree:  TxTreeUnknown,
+		txTree:  wire.TxTreeUnknown,
 		txIndex: TxIndexUnknown,
 	}
 }
@@ -228,7 +215,7 @@ func NewTxFromReaderLegacy(r io.Reader) (*Tx, error) {
 	t := Tx{
 		hash:    msgTx.TxSha(),
 		msgTx:   &msgTx,
-		txTree:  TxTreeUnknown,
+		txTree:  wire.TxTreeUnknown,
 		txIndex: TxIndexUnknown,
 	}
 
@@ -255,7 +242,7 @@ func NewTxFromReader(r io.Reader) (*Tx, error) {
 	t := Tx{
 		hash:    msgTx.TxSha(),
 		msgTx:   &msgTx,
-		txTree:  TxTreeUnknown,
+		txTree:  wire.TxTreeUnknown,
 		txIndex: TxIndexUnknown,
 	}
 
