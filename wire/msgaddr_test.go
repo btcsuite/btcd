@@ -1,9 +1,9 @@
-// Copyright (c) 2013-2015 The btcsuite developers
+// Copyright (c) 2013-2016 The btcsuite developers
 // Copyright (c) 2015-2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package wire_test
+package wire
 
 import (
 	"bytes"
@@ -14,16 +14,15 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/decred/dcrd/wire"
 )
 
 // TestAddr tests the MsgAddr API.
 func TestAddr(t *testing.T) {
-	pver := wire.ProtocolVersion
+	pver := ProtocolVersion
 
 	// Ensure the command is expected value.
 	wantCmd := "addr"
-	msg := wire.NewMsgAddr()
+	msg := NewMsgAddr()
 	if cmd := msg.Command(); cmd != wantCmd {
 		t.Errorf("NewMsgAddr: wrong command - got %v want %v",
 			cmd, wantCmd)
@@ -41,7 +40,7 @@ func TestAddr(t *testing.T) {
 
 	// Ensure NetAddresses are added properly.
 	tcpAddr := &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 8333}
-	na, err := wire.NewNetAddress(tcpAddr, wire.SFNodeNetwork)
+	na, err := NewNetAddress(tcpAddr, SFNodeNetwork)
 	if err != nil {
 		t.Errorf("NewNetAddress: %v", err)
 	}
@@ -64,7 +63,7 @@ func TestAddr(t *testing.T) {
 
 	// Ensure adding more than the max allowed addresses per message returns
 	// error.
-	for i := 0; i < wire.MaxAddrPerMsg+1; i++ {
+	for i := 0; i < MaxAddrPerMsg+1; i++ {
 		err = msg.AddAddress(na)
 	}
 	if err == nil {
@@ -84,27 +83,27 @@ func TestAddr(t *testing.T) {
 // of addreses and protocol versions.
 func TestAddrWire(t *testing.T) {
 	// A couple of NetAddresses to use for testing.
-	na := &wire.NetAddress{
+	na := &NetAddress{
 		Timestamp: time.Unix(0x495fab29, 0), // 2009-01-03 12:15:05 -0600 CST
-		Services:  wire.SFNodeNetwork,
+		Services:  SFNodeNetwork,
 		IP:        net.ParseIP("127.0.0.1"),
 		Port:      8333,
 	}
-	na2 := &wire.NetAddress{
+	na2 := &NetAddress{
 		Timestamp: time.Unix(0x495fab29, 0), // 2009-01-03 12:15:05 -0600 CST
-		Services:  wire.SFNodeNetwork,
+		Services:  SFNodeNetwork,
 		IP:        net.ParseIP("192.168.0.1"),
 		Port:      8334,
 	}
 
 	// Empty address message.
-	noAddr := wire.NewMsgAddr()
+	noAddr := NewMsgAddr()
 	noAddrEncoded := []byte{
 		0x00, // Varint for number of addresses
 	}
 
 	// Address message with multiple addresses.
-	multiAddr := wire.NewMsgAddr()
+	multiAddr := NewMsgAddr()
 	multiAddr.AddAddresses(na, na2)
 	multiAddrEncoded := []byte{
 		0x02,                   // Varint for number of addresses
@@ -122,17 +121,17 @@ func TestAddrWire(t *testing.T) {
 	}
 
 	tests := []struct {
-		in   *wire.MsgAddr // Message to encode
-		out  *wire.MsgAddr // Expected decoded message
-		buf  []byte        // Wire encoding
-		pver uint32        // Protocol version for wire encoding
+		in   *MsgAddr // Message to encode
+		out  *MsgAddr // Expected decoded message
+		buf  []byte   // Wire encoding
+		pver uint32   // Protocol version for wire encoding
 	}{
 		// Latest protocol version with no addresses.
 		{
 			noAddr,
 			noAddr,
 			noAddrEncoded,
-			wire.ProtocolVersion,
+			ProtocolVersion,
 		},
 
 		// Latest protocol version with multiple addresses.
@@ -140,7 +139,7 @@ func TestAddrWire(t *testing.T) {
 			multiAddr,
 			multiAddr,
 			multiAddrEncoded,
-			wire.ProtocolVersion,
+			ProtocolVersion,
 		},
 	}
 
@@ -160,7 +159,7 @@ func TestAddrWire(t *testing.T) {
 		}
 
 		// Decode the message from wire format.
-		var msg wire.MsgAddr
+		var msg MsgAddr
 		rbuf := bytes.NewReader(test.buf)
 		err = msg.BtcDecode(rbuf, test.pver)
 		if err != nil {
@@ -178,25 +177,25 @@ func TestAddrWire(t *testing.T) {
 // TestAddrWireErrors performs negative tests against wire encode and decode
 // of MsgAddr to confirm error paths work correctly.
 func TestAddrWireErrors(t *testing.T) {
-	pver := wire.ProtocolVersion
-	wireErr := &wire.MessageError{}
+	pver := ProtocolVersion
+	wireErr := &MessageError{}
 
 	// A couple of NetAddresses to use for testing.
-	na := &wire.NetAddress{
+	na := &NetAddress{
 		Timestamp: time.Unix(0x495fab29, 0), // 2009-01-03 12:15:05 -0600 CST
-		Services:  wire.SFNodeNetwork,
+		Services:  SFNodeNetwork,
 		IP:        net.ParseIP("127.0.0.1"),
 		Port:      8333,
 	}
-	na2 := &wire.NetAddress{
+	na2 := &NetAddress{
 		Timestamp: time.Unix(0x495fab29, 0), // 2009-01-03 12:15:05 -0600 CST
-		Services:  wire.SFNodeNetwork,
+		Services:  SFNodeNetwork,
 		IP:        net.ParseIP("192.168.0.1"),
 		Port:      8334,
 	}
 
 	// Address message with multiple addresses.
-	baseAddr := wire.NewMsgAddr()
+	baseAddr := NewMsgAddr()
 	baseAddr.AddAddresses(na, na2)
 	baseAddrEncoded := []byte{
 		0x02,                   // Varint for number of addresses
@@ -215,8 +214,8 @@ func TestAddrWireErrors(t *testing.T) {
 
 	// Message that forces an error by having more than the max allowed
 	// addresses.
-	maxAddr := wire.NewMsgAddr()
-	for i := 0; i < wire.MaxAddrPerMsg; i++ {
+	maxAddr := NewMsgAddr()
+	for i := 0; i < MaxAddrPerMsg; i++ {
 		maxAddr.AddAddress(na)
 	}
 	maxAddr.AddrList = append(maxAddr.AddrList, na)
@@ -225,12 +224,12 @@ func TestAddrWireErrors(t *testing.T) {
 	}
 
 	tests := []struct {
-		in       *wire.MsgAddr // Value to encode
-		buf      []byte        // Wire encoding
-		pver     uint32        // Protocol version for wire encoding
-		max      int           // Max size of fixed buffer to induce errors
-		writeErr error         // Expected write error
-		readErr  error         // Expected read error
+		in       *MsgAddr // Value to encode
+		buf      []byte   // Wire encoding
+		pver     uint32   // Protocol version for wire encoding
+		max      int      // Max size of fixed buffer to induce errors
+		writeErr error    // Expected write error
+		readErr  error    // Expected read error
 	}{
 		// Latest protocol version with intentional read/write errors.
 		// Force error in addresses count
@@ -252,9 +251,9 @@ func TestAddrWireErrors(t *testing.T) {
 			continue
 		}
 
-		// For errors which are not of type wire.MessageError, check
-		// them for equality.
-		if _, ok := err.(*wire.MessageError); !ok {
+		// For errors which are not of type MessageError, check them for
+		// equality.
+		if _, ok := err.(*MessageError); !ok {
 			if err != test.writeErr {
 				t.Errorf("BtcEncode #%d wrong error got: %v, "+
 					"want: %v", i, err, test.writeErr)
@@ -263,7 +262,7 @@ func TestAddrWireErrors(t *testing.T) {
 		}
 
 		// Decode from wire format.
-		var msg wire.MsgAddr
+		var msg MsgAddr
 		r := newFixedReader(test.max, test.buf)
 		err = msg.BtcDecode(r, test.pver)
 		if reflect.TypeOf(err) != reflect.TypeOf(test.readErr) {
@@ -272,9 +271,9 @@ func TestAddrWireErrors(t *testing.T) {
 			continue
 		}
 
-		// For errors which are not of type wire.MessageError, check
-		// them for equality.
-		if _, ok := err.(*wire.MessageError); !ok {
+		// For errors which are not of type MessageError, check them for
+		// equality.
+		if _, ok := err.(*MessageError); !ok {
 			if err != test.readErr {
 				t.Errorf("BtcDecode #%d wrong error got: %v, "+
 					"want: %v", i, err, test.readErr)

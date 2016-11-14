@@ -1,9 +1,9 @@
-// Copyright (c) 2013-2015 The btcsuite developers
+// Copyright (c) 2013-2016 The btcsuite developers
 // Copyright (c) 2015-2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package wire_test
+package wire
 
 import (
 	"bytes"
@@ -15,15 +15,14 @@ import (
 	"github.com/davecgh/go-spew/spew"
 
 	"github.com/decred/dcrd/chaincfg/chainhash"
-	"github.com/decred/dcrd/wire"
 )
 
 // TestBlock tests the MsgBlock API.
 func TestBlock(t *testing.T) {
-	pver := wire.ProtocolVersion
+	pver := ProtocolVersion
 
 	// Test block header.
-	bh := wire.NewBlockHeader(
+	bh := NewBlockHeader(
 		int32(pver),                                 // Version
 		&testBlock.Header.PrevBlock,                 // PrevHash
 		&testBlock.Header.MerkleRoot,                // MerkleRoot
@@ -45,7 +44,7 @@ func TestBlock(t *testing.T) {
 
 	// Ensure the command is expected value.
 	wantCmd := "block"
-	msg := wire.NewMsgBlock(bh)
+	msg := NewMsgBlock(bh)
 	if cmd := msg.Command(); cmd != wantCmd {
 		t.Errorf("NewMsgBlock: wrong command - got %v want %v",
 			cmd, wantCmd)
@@ -161,12 +160,12 @@ func TestBlockSha(t *testing.T) {
 // of transaction inputs and outputs and protocol versions.
 func TestBlockWire(t *testing.T) {
 	tests := []struct {
-		in      *wire.MsgBlock // Message to encode
-		out     *wire.MsgBlock // Expected decoded message
-		buf     []byte         // Wire encoding
-		txLocs  []wire.TxLoc   // Expected transaction locations
-		sTxLocs []wire.TxLoc   // Expected stake transaction locations
-		pver    uint32         // Protocol version for wire encoding
+		in      *MsgBlock // Message to encode
+		out     *MsgBlock // Expected decoded message
+		buf     []byte    // Wire encoding
+		txLocs  []TxLoc   // Expected transaction locations
+		sTxLocs []TxLoc   // Expected stake transaction locations
+		pver    uint32    // Protocol version for wire encoding
 	}{
 		// Latest protocol version.
 		{
@@ -175,7 +174,7 @@ func TestBlockWire(t *testing.T) {
 			testBlockBytes,
 			testBlockTxLocs,
 			testBlockSTxLocs,
-			wire.ProtocolVersion,
+			ProtocolVersion,
 		},
 	}
 
@@ -195,7 +194,7 @@ func TestBlockWire(t *testing.T) {
 		}
 
 		// Decode the message from wire format.
-		var msg wire.MsgBlock
+		var msg MsgBlock
 		rbuf := bytes.NewReader(test.buf)
 		err = msg.BtcDecode(rbuf, test.pver)
 		if err != nil {
@@ -219,12 +218,12 @@ func TestBlockWireErrors(t *testing.T) {
 	pver := uint32(60002)
 
 	tests := []struct {
-		in       *wire.MsgBlock // Value to encode
-		buf      []byte         // Wire encoding
-		pver     uint32         // Protocol version for wire encoding
-		max      int            // Max size of fixed buffer to induce errors
-		writeErr error          // Expected write error
-		readErr  error          // Expected read error
+		in       *MsgBlock // Value to encode
+		buf      []byte    // Wire encoding
+		pver     uint32    // Protocol version for wire encoding
+		max      int       // Max size of fixed buffer to induce errors
+		writeErr error     // Expected write error
+		readErr  error     // Expected read error
 	}{ // Force error in version.
 		{&testBlock, testBlockBytes, pver, 0, io.ErrShortWrite, io.EOF}, // 0
 		// Force error in prev block hash.
@@ -275,7 +274,7 @@ func TestBlockWireErrors(t *testing.T) {
 		}
 
 		// Decode from wire format.
-		var msg wire.MsgBlock
+		var msg MsgBlock
 		r := newFixedReader(test.max, test.buf)
 		err = msg.BtcDecode(r, test.pver)
 		if err != test.readErr {
@@ -289,11 +288,11 @@ func TestBlockWireErrors(t *testing.T) {
 // TestBlockSerialize tests MsgBlock serialize and deserialize.
 func TestBlockSerialize(t *testing.T) {
 	tests := []struct {
-		in      *wire.MsgBlock // Message to encode
-		out     *wire.MsgBlock // Expected decoded message
-		buf     []byte         // Serialized data
-		txLocs  []wire.TxLoc   // Expected transaction locations
-		sTxLocs []wire.TxLoc   // Expected stake transaction locations
+		in      *MsgBlock // Message to encode
+		out     *MsgBlock // Expected decoded message
+		buf     []byte    // Serialized data
+		txLocs  []TxLoc   // Expected transaction locations
+		sTxLocs []TxLoc   // Expected stake transaction locations
 	}{
 		{
 			&testBlock,
@@ -320,7 +319,7 @@ func TestBlockSerialize(t *testing.T) {
 		}
 
 		// Deserialize the block.
-		var block wire.MsgBlock
+		var block MsgBlock
 		rbuf := bytes.NewReader(test.buf)
 		err = block.Deserialize(rbuf)
 		if err != nil {
@@ -335,7 +334,7 @@ func TestBlockSerialize(t *testing.T) {
 
 		// Deserialize the block while gathering transaction location
 		// information.
-		var txLocBlock wire.MsgBlock
+		var txLocBlock MsgBlock
 		br := bytes.NewBuffer(test.buf)
 		txLocs, sTxLocs, err := txLocBlock.DeserializeTxLoc(br)
 		if err != nil {
@@ -364,11 +363,11 @@ func TestBlockSerialize(t *testing.T) {
 // decode of MsgBlock to confirm error paths work correctly.
 func TestBlockSerializeErrors(t *testing.T) {
 	tests := []struct {
-		in       *wire.MsgBlock // Value to encode
-		buf      []byte         // Serialized data
-		max      int            // Max size of fixed buffer to induce errors
-		writeErr error          // Expected write error
-		readErr  error          // Expected read error
+		in       *MsgBlock // Value to encode
+		buf      []byte    // Serialized data
+		max      int       // Max size of fixed buffer to induce errors
+		writeErr error     // Expected write error
+		readErr  error     // Expected read error
 	}{
 		{&testBlock, testBlockBytes, 0, io.ErrShortWrite, io.EOF}, // 0
 		// Force error in prev block hash.
@@ -419,7 +418,7 @@ func TestBlockSerializeErrors(t *testing.T) {
 		}
 
 		// Deserialize the block.
-		var block wire.MsgBlock
+		var block MsgBlock
 		r := newFixedReader(test.max, test.buf)
 		err = block.Deserialize(r)
 		if err != test.readErr {
@@ -428,7 +427,7 @@ func TestBlockSerializeErrors(t *testing.T) {
 			continue
 		}
 
-		var txLocBlock wire.MsgBlock
+		var txLocBlock MsgBlock
 		br := bytes.NewBuffer(test.buf[0:test.max])
 		_, _, err = txLocBlock.DeserializeTxLoc(br)
 		if err != test.readErr {
@@ -489,14 +488,14 @@ func TestBlockOverflowErrors(t *testing.T) {
 				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 				0x5c, 0xa1, 0xab, 0x1e, //StakeVersion
 				0xff, // TxnCount
-			}, pver, &wire.MessageError{},
+			}, pver, &MessageError{},
 		},
 	}
 
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
 		// Decode from wire format.
-		var msg wire.MsgBlock
+		var msg MsgBlock
 		r := bytes.NewReader(test.buf)
 		err := msg.BtcDecode(r, test.pver)
 		if reflect.TypeOf(err) != reflect.TypeOf(test.err) {
@@ -529,11 +528,11 @@ func TestBlockOverflowErrors(t *testing.T) {
 // various blocks is accurate.
 func TestBlockSerializeSize(t *testing.T) {
 	// Block with no transactions.
-	noTxBlock := wire.NewMsgBlock(&testBlock.Header)
+	noTxBlock := NewMsgBlock(&testBlock.Header)
 
 	tests := []struct {
-		in   *wire.MsgBlock // Block to encode
-		size int            // Expected serialized size
+		in   *MsgBlock // Block to encode
+		size int       // Expected serialized size
 	}{
 		// Block with no transactions (header + 2x numtx)
 		{noTxBlock, 182},
@@ -554,8 +553,8 @@ func TestBlockSerializeSize(t *testing.T) {
 }
 
 // testBlock is a basic normative block that is used throughout tests.
-var testBlock = wire.MsgBlock{
-	Header: wire.BlockHeader{
+var testBlock = MsgBlock{
+	Header: BlockHeader{
 		Version: 1,
 		PrevBlock: chainhash.Hash([chainhash.HashSize]byte{ // Make go vet happy.
 			0x6f, 0xe2, 0x8c, 0x0a, 0xb6, 0xf1, 0xb3, 0x72,
@@ -590,15 +589,15 @@ var testBlock = wire.MsgBlock{
 		ExtraData:    [32]byte{},
 		StakeVersion: uint32(0x5ca1ab1e),
 	},
-	Transactions: []*wire.MsgTx{
+	Transactions: []*MsgTx{
 		{
 			Version: 1,
-			TxIn: []*wire.TxIn{
+			TxIn: []*TxIn{
 				{
-					PreviousOutPoint: wire.OutPoint{
+					PreviousOutPoint: OutPoint{
 						Hash:  chainhash.Hash{},
 						Index: 0xffffffff,
-						Tree:  wire.TxTreeRegular,
+						Tree:  TxTreeRegular,
 					},
 					Sequence:    0xffffffff,
 					ValueIn:     0x1616161616161616,
@@ -609,7 +608,7 @@ var testBlock = wire.MsgBlock{
 					},
 				},
 			},
-			TxOut: []*wire.TxOut{
+			TxOut: []*TxOut{
 				{
 					Value:   0x3333333333333333,
 					Version: 0x9898,
@@ -632,15 +631,15 @@ var testBlock = wire.MsgBlock{
 			Expiry:   0x22222222,
 		},
 	},
-	STransactions: []*wire.MsgTx{
+	STransactions: []*MsgTx{
 		{
 			Version: 1,
-			TxIn: []*wire.TxIn{
+			TxIn: []*TxIn{
 				{
-					PreviousOutPoint: wire.OutPoint{
+					PreviousOutPoint: OutPoint{
 						Hash:  chainhash.Hash{},
 						Index: 0xffffffff,
-						Tree:  wire.TxTreeStake,
+						Tree:  TxTreeStake,
 					},
 					Sequence:    0xffffffff,
 					ValueIn:     0x1313131313131313,
@@ -651,7 +650,7 @@ var testBlock = wire.MsgBlock{
 					},
 				},
 			},
-			TxOut: []*wire.TxOut{
+			TxOut: []*TxOut{
 				{
 					Value:   0x3333333333333333,
 					Version: 0x1212,
@@ -782,11 +781,11 @@ var testBlockBytes = []byte{
 }
 
 // Transaction location information for the test block transactions.
-var testBlockTxLocs = []wire.TxLoc{
+var testBlockTxLocs = []TxLoc{
 	{TxStart: 181, TxLen: 158},
 }
 
 // Transaction location information for the test block stake transactions.
-var testBlockSTxLocs = []wire.TxLoc{
+var testBlockSTxLocs = []TxLoc{
 	{TxStart: 340, TxLen: 158},
 }

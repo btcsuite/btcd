@@ -1,9 +1,9 @@
-// Copyright (c) 2013-2015 The btcsuite developers
+// Copyright (c) 2013-2016 The btcsuite developers
 // Copyright (c) 2015-2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package wire_test
+package wire
 
 import (
 	"bytes"
@@ -12,19 +12,18 @@ import (
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/decred/dcrd/wire"
 )
 
 // TestPing tests the MsgPing API against the latest protocol version.
 func TestPing(t *testing.T) {
-	pver := wire.ProtocolVersion
+	pver := ProtocolVersion
 
 	// Ensure we get the same nonce back out.
-	nonce, err := wire.RandomUint64()
+	nonce, err := RandomUint64()
 	if err != nil {
 		t.Errorf("RandomUint64: Error generating nonce: %v", err)
 	}
-	msg := wire.NewMsgPing(nonce)
+	msg := NewMsgPing(nonce)
 	if msg.Nonce != nonce {
 		t.Errorf("NewMsgPing: wrong nonce - got %v, want %v",
 			msg.Nonce, nonce)
@@ -53,17 +52,17 @@ func TestPing(t *testing.T) {
 // versions.
 func TestPingWire(t *testing.T) {
 	tests := []struct {
-		in   wire.MsgPing // Message to encode
-		out  wire.MsgPing // Expected decoded message
-		buf  []byte       // Wire encoding
-		pver uint32       // Protocol version for wire encoding
+		in   MsgPing // Message to encode
+		out  MsgPing // Expected decoded message
+		buf  []byte  // Wire encoding
+		pver uint32  // Protocol version for wire encoding
 	}{
 		// Latest protocol version.
 		{
-			wire.MsgPing{Nonce: 123123}, // 0x1e0f3
-			wire.MsgPing{Nonce: 123123}, // 0x1e0f3
+			MsgPing{Nonce: 123123}, // 0x1e0f3
+			MsgPing{Nonce: 123123}, // 0x1e0f3
 			[]byte{0xf3, 0xe0, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00},
-			wire.ProtocolVersion,
+			ProtocolVersion,
 		},
 	}
 
@@ -83,7 +82,7 @@ func TestPingWire(t *testing.T) {
 		}
 
 		// Decode the message from wire format.
-		var msg wire.MsgPing
+		var msg MsgPing
 		rbuf := bytes.NewReader(test.buf)
 		err = msg.BtcDecode(rbuf, test.pver)
 		if err != nil {
@@ -101,19 +100,19 @@ func TestPingWire(t *testing.T) {
 // TestPingWireErrors performs negative tests against wire encode and decode
 // of MsgPing to confirm error paths work correctly.
 func TestPingWireErrors(t *testing.T) {
-	pver := wire.ProtocolVersion
+	pver := ProtocolVersion
 
 	tests := []struct {
-		in       *wire.MsgPing // Value to encode
-		buf      []byte        // Wire encoding
-		pver     uint32        // Protocol version for wire encoding
-		max      int           // Max size of fixed buffer to induce errors
-		writeErr error         // Expected write error
-		readErr  error         // Expected read error
+		in       *MsgPing // Value to encode
+		buf      []byte   // Wire encoding
+		pver     uint32   // Protocol version for wire encoding
+		max      int      // Max size of fixed buffer to induce errors
+		writeErr error    // Expected write error
+		readErr  error    // Expected read error
 	}{
 		// Latest protocol version with intentional read/write errors.
 		{
-			&wire.MsgPing{Nonce: 123123}, // 0x1e0f3
+			&MsgPing{Nonce: 123123}, // 0x1e0f3
 			[]byte{0xf3, 0xe0, 0x01, 0x00},
 			pver,
 			2,
@@ -134,7 +133,7 @@ func TestPingWireErrors(t *testing.T) {
 		}
 
 		// Decode from wire format.
-		var msg wire.MsgPing
+		var msg MsgPing
 		r := newFixedReader(test.max, test.buf)
 		err = msg.BtcDecode(r, test.pver)
 		if err != test.readErr {

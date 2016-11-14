@@ -1,23 +1,21 @@
-// Copyright (c) 2013-2015 The btcsuite developers
+// Copyright (c) 2013-2016 The btcsuite developers
 // Copyright (c) 2015-2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package wire_test
+package wire
 
 import (
 	"bytes"
 	"testing"
-
-	"github.com/decred/dcrd/wire"
 )
 
 func TestMemPool(t *testing.T) {
-	pver := wire.ProtocolVersion
+	pver := ProtocolVersion
 
 	// Ensure the command is expected value.
 	wantCmd := "mempool"
-	msg := wire.NewMsgMemPool()
+	msg := NewMsgMemPool()
 	if cmd := msg.Command(); cmd != wantCmd {
 		t.Errorf("NewMsgMemPool: wrong command - got %v want %v",
 			cmd, wantCmd)
@@ -40,7 +38,7 @@ func TestMemPool(t *testing.T) {
 	}
 
 	// Test decode with latest protocol version.
-	readmsg := wire.NewMsgMemPool()
+	readmsg := NewMsgMemPool()
 	err = readmsg.BtcDecode(&buf, pver)
 	if err != nil {
 		t.Errorf("decode of MsgMemPool failed [%v] err <%v>", buf, err)

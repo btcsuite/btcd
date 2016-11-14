@@ -1,9 +1,9 @@
-// Copyright (c) 2014-2015 The btcsuite developers
+// Copyright (c) 2014-2016 The btcsuite developers
 // Copyright (c) 2015-2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package wire_test
+package wire
 
 import (
 	"bytes"
@@ -11,15 +11,14 @@ import (
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/decred/dcrd/wire"
 )
 
 // TestFilterCLearLatest tests the MsgFilterClear API against the latest
 // protocol version.
 func TestFilterClearLatest(t *testing.T) {
-	pver := wire.ProtocolVersion
+	pver := ProtocolVersion
 
-	msg := wire.NewMsgFilterClear()
+	msg := NewMsgFilterClear()
 
 	// Ensure the command is expected value.
 	wantCmd := "filterclear"
@@ -43,21 +42,21 @@ func TestFilterClearLatest(t *testing.T) {
 // TestFilterClearWire tests the MsgFilterClear wire encode and decode for
 // various protocol versions.
 func TestFilterClearWire(t *testing.T) {
-	msgFilterClear := wire.NewMsgFilterClear()
+	msgFilterClear := NewMsgFilterClear()
 	msgFilterClearEncoded := []byte{}
 
 	tests := []struct {
-		in   *wire.MsgFilterClear // Message to encode
-		out  *wire.MsgFilterClear // Expected decoded message
-		buf  []byte               // Wire encoding
-		pver uint32               // Protocol version for wire encoding
+		in   *MsgFilterClear // Message to encode
+		out  *MsgFilterClear // Expected decoded message
+		buf  []byte          // Wire encoding
+		pver uint32          // Protocol version for wire encoding
 	}{
 		// Latest protocol version.
 		{
 			msgFilterClear,
 			msgFilterClear,
 			msgFilterClearEncoded,
-			wire.ProtocolVersion,
+			ProtocolVersion,
 		},
 	}
 
@@ -77,7 +76,7 @@ func TestFilterClearWire(t *testing.T) {
 		}
 
 		// Decode the message from wire format.
-		var msg wire.MsgFilterClear
+		var msg MsgFilterClear
 		rbuf := bytes.NewReader(test.buf)
 		err = msg.BtcDecode(rbuf, test.pver)
 		if err != nil {

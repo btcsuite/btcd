@@ -1,5 +1,5 @@
 // msgminingstate_test.go
-package wire_test
+package wire
 
 import (
 	"bytes"
@@ -9,14 +9,13 @@ import (
 	"github.com/davecgh/go-spew/spew"
 
 	"github.com/decred/dcrd/chaincfg/chainhash"
-	"github.com/decred/dcrd/wire"
 )
 
 // TestMiningStateWire tests the MsgMiningState wire encode and decode for a sample
 // message containing a fake block header and some fake vote hashes.
 func TestMiningStateWire(t *testing.T) {
 	// Empty tx message.
-	sampleMSMsg := wire.NewMsgMiningState()
+	sampleMSMsg := NewMsgMiningState()
 	sampleMSMsg.Version = 1
 	sampleMSMsg.Height = 123456
 
@@ -70,17 +69,17 @@ func TestMiningStateWire(t *testing.T) {
 	}
 
 	tests := []struct {
-		in   *wire.MsgMiningState // Message to encode
-		out  *wire.MsgMiningState // Expected decoded message
-		buf  []byte               // Wire encoding
-		pver uint32               // Protocol version for wire encoding
+		in   *MsgMiningState // Message to encode
+		out  *MsgMiningState // Expected decoded message
+		buf  []byte          // Wire encoding
+		pver uint32          // Protocol version for wire encoding
 	}{
 		// Version 1 sample message with the latest protocol version.
 		{
 			sampleMSMsg,
 			sampleMSMsg,
 			sampleMSMsgEncoded,
-			wire.ProtocolVersion,
+			ProtocolVersion,
 		},
 	}
 
@@ -100,7 +99,7 @@ func TestMiningStateWire(t *testing.T) {
 		}
 
 		// Decode the message from wire format.
-		var msg wire.MsgMiningState
+		var msg MsgMiningState
 		rbuf := bytes.NewReader(test.buf)
 		err = msg.BtcDecode(rbuf, test.pver)
 		if err != nil {

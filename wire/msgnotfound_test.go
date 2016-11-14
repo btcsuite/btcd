@@ -1,9 +1,9 @@
-// Copyright (c) 2013-2015 The btcsuite developers
+// Copyright (c) 2013-2016 The btcsuite developers
 // Copyright (c) 2015-2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package wire_test
+package wire
 
 import (
 	"bytes"
@@ -14,16 +14,15 @@ import (
 	"github.com/davecgh/go-spew/spew"
 
 	"github.com/decred/dcrd/chaincfg/chainhash"
-	"github.com/decred/dcrd/wire"
 )
 
 // TestNotFound tests the MsgNotFound API.
 func TestNotFound(t *testing.T) {
-	pver := wire.ProtocolVersion
+	pver := ProtocolVersion
 
 	// Ensure the command is expected value.
 	wantCmd := "notfound"
-	msg := wire.NewMsgNotFound()
+	msg := NewMsgNotFound()
 	if cmd := msg.Command(); cmd != wantCmd {
 		t.Errorf("NewMsgNotFound: wrong command - got %v want %v",
 			cmd, wantCmd)
@@ -41,7 +40,7 @@ func TestNotFound(t *testing.T) {
 
 	// Ensure inventory vectors are added properly.
 	hash := chainhash.Hash{}
-	iv := wire.NewInvVect(wire.InvTypeBlock, &hash)
+	iv := NewInvVect(InvTypeBlock, &hash)
 	err := msg.AddInvVect(iv)
 	if err != nil {
 		t.Errorf("AddInvVect: %v", err)
@@ -53,7 +52,7 @@ func TestNotFound(t *testing.T) {
 
 	// Ensure adding more than the max allowed inventory vectors per
 	// message returns an error.
-	for i := 0; i < wire.MaxInvPerMsg; i++ {
+	for i := 0; i < MaxInvPerMsg; i++ {
 		err = msg.AddInvVect(iv)
 	}
 	if err == nil {
@@ -81,17 +80,17 @@ func TestNotFoundWire(t *testing.T) {
 		t.Errorf("NewShaHashFromStr: %v", err)
 	}
 
-	iv := wire.NewInvVect(wire.InvTypeBlock, blockHash)
-	iv2 := wire.NewInvVect(wire.InvTypeTx, txHash)
+	iv := NewInvVect(InvTypeBlock, blockHash)
+	iv2 := NewInvVect(InvTypeTx, txHash)
 
 	// Empty notfound message.
-	NoInv := wire.NewMsgNotFound()
+	NoInv := NewMsgNotFound()
 	NoInvEncoded := []byte{
 		0x00, // Varint for number of inventory vectors
 	}
 
 	// NotFound message with multiple inventory vectors.
-	MultiInv := wire.NewMsgNotFound()
+	MultiInv := NewMsgNotFound()
 	MultiInv.AddInvVect(iv)
 	MultiInv.AddInvVect(iv2)
 	MultiInvEncoded := []byte{
@@ -109,17 +108,17 @@ func TestNotFoundWire(t *testing.T) {
 	}
 
 	tests := []struct {
-		in   *wire.MsgNotFound // Message to encode
-		out  *wire.MsgNotFound // Expected decoded message
-		buf  []byte            // Wire encoding
-		pver uint32            // Protocol version for wire encoding
+		in   *MsgNotFound // Message to encode
+		out  *MsgNotFound // Expected decoded message
+		buf  []byte       // Wire encoding
+		pver uint32       // Protocol version for wire encoding
 	}{
 		// Latest protocol version with no inv vectors.
 		{
 			NoInv,
 			NoInv,
 			NoInvEncoded,
-			wire.ProtocolVersion,
+			ProtocolVersion,
 		},
 
 		// Latest protocol version with multiple inv vectors.
@@ -127,7 +126,7 @@ func TestNotFoundWire(t *testing.T) {
 			MultiInv,
 			MultiInv,
 			MultiInvEncoded,
-			wire.ProtocolVersion,
+			ProtocolVersion,
 		},
 	}
 
@@ -147,7 +146,7 @@ func TestNotFoundWire(t *testing.T) {
 		}
 
 		// Decode the message from wire format.
-		var msg wire.MsgNotFound
+		var msg MsgNotFound
 		rbuf := bytes.NewReader(test.buf)
 		err = msg.BtcDecode(rbuf, test.pver)
 		if err != nil {
@@ -165,8 +164,8 @@ func TestNotFoundWire(t *testing.T) {
 // TestNotFoundWireErrors performs negative tests against wire encode and decode
 // of MsgNotFound to confirm error paths work correctly.
 func TestNotFoundWireErrors(t *testing.T) {
-	pver := wire.ProtocolVersion
-	wireErr := &wire.MessageError{}
+	pver := ProtocolVersion
+	wireErr := &MessageError{}
 
 	// Block 203707 hash.
 	hashStr := "3264bc2ac36a60840790ba1d475d01367e7c723da941069e9dc"
@@ -175,10 +174,10 @@ func TestNotFoundWireErrors(t *testing.T) {
 		t.Errorf("NewShaHashFromStr: %v", err)
 	}
 
-	iv := wire.NewInvVect(wire.InvTypeBlock, blockHash)
+	iv := NewInvVect(InvTypeBlock, blockHash)
 
 	// Base message used to induce errors.
-	baseNotFound := wire.NewMsgNotFound()
+	baseNotFound := NewMsgNotFound()
 	baseNotFound.AddInvVect(iv)
 	baseNotFoundEncoded := []byte{
 		0x02,                   // Varint for number of inv vectors
@@ -191,8 +190,8 @@ func TestNotFoundWireErrors(t *testing.T) {
 
 	// Message that forces an error by having more than the max allowed inv
 	// vectors.
-	maxNotFound := wire.NewMsgNotFound()
-	for i := 0; i < wire.MaxInvPerMsg; i++ {
+	maxNotFound := NewMsgNotFound()
+	for i := 0; i < MaxInvPerMsg; i++ {
 		maxNotFound.AddInvVect(iv)
 	}
 	maxNotFound.InvList = append(maxNotFound.InvList, iv)
@@ -201,12 +200,12 @@ func TestNotFoundWireErrors(t *testing.T) {
 	}
 
 	tests := []struct {
-		in       *wire.MsgNotFound // Value to encode
-		buf      []byte            // Wire encoding
-		pver     uint32            // Protocol version for wire encoding
-		max      int               // Max size of fixed buffer to induce errors
-		writeErr error             // Expected write error
-		readErr  error             // Expected read error
+		in       *MsgNotFound // Value to encode
+		buf      []byte       // Wire encoding
+		pver     uint32       // Protocol version for wire encoding
+		max      int          // Max size of fixed buffer to induce errors
+		writeErr error        // Expected write error
+		readErr  error        // Expected read error
 	}{
 		// Force error in inventory vector count
 		{baseNotFound, baseNotFoundEncoded, pver, 0, io.ErrShortWrite, io.EOF},
@@ -227,9 +226,9 @@ func TestNotFoundWireErrors(t *testing.T) {
 			continue
 		}
 
-		// For errors which are not of type wire.MessageError, check
-		// them for equality.
-		if _, ok := err.(*wire.MessageError); !ok {
+		// For errors which are not of type MessageError, check them for
+		// equality.
+		if _, ok := err.(*MessageError); !ok {
 			if err != test.writeErr {
 				t.Errorf("BtcEncode #%d wrong error got: %v, "+
 					"want: %v", i, err, test.writeErr)
@@ -238,7 +237,7 @@ func TestNotFoundWireErrors(t *testing.T) {
 		}
 
 		// Decode from wire format.
-		var msg wire.MsgNotFound
+		var msg MsgNotFound
 		r := newFixedReader(test.max, test.buf)
 		err = msg.BtcDecode(r, test.pver)
 		if reflect.TypeOf(err) != reflect.TypeOf(test.readErr) {
@@ -247,9 +246,9 @@ func TestNotFoundWireErrors(t *testing.T) {
 			continue
 		}
 
-		// For errors which are not of type wire.MessageError, check
-		// them for equality.
-		if _, ok := err.(*wire.MessageError); !ok {
+		// For errors which are not of type MessageError, check them for
+		// equality.
+		if _, ok := err.(*MessageError); !ok {
 			if err != test.readErr {
 				t.Errorf("BtcDecode #%d wrong error got: %v, "+
 					"want: %v", i, err, test.readErr)

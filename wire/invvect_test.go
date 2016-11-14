@@ -1,9 +1,9 @@
-// Copyright (c) 2013-2015 The btcsuite developers
+// Copyright (c) 2013-2016 The btcsuite developers
 // Copyright (c) 2015-2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package wire_test
+package wire
 
 import (
 	"bytes"
@@ -13,18 +13,17 @@ import (
 	"github.com/davecgh/go-spew/spew"
 
 	"github.com/decred/dcrd/chaincfg/chainhash"
-	"github.com/decred/dcrd/wire"
 )
 
 // TestInvVectStringer tests the stringized output for inventory vector types.
 func TestInvTypeStringer(t *testing.T) {
 	tests := []struct {
-		in   wire.InvType
+		in   InvType
 		want string
 	}{
-		{wire.InvTypeError, "ERROR"},
-		{wire.InvTypeTx, "MSG_TX"},
-		{wire.InvTypeBlock, "MSG_BLOCK"},
+		{InvTypeError, "ERROR"},
+		{InvTypeTx, "MSG_TX"},
+		{InvTypeBlock, "MSG_BLOCK"},
 		{0xffffffff, "Unknown InvType (4294967295)"},
 	}
 
@@ -42,11 +41,11 @@ func TestInvTypeStringer(t *testing.T) {
 
 // TestInvVect tests the InvVect API.
 func TestInvVect(t *testing.T) {
-	ivType := wire.InvTypeBlock
+	ivType := InvTypeBlock
 	hash := chainhash.Hash{}
 
 	// Ensure we get the same payload and signature back out.
-	iv := wire.NewInvVect(ivType, &hash)
+	iv := NewInvVect(ivType, &hash)
 	if iv.Type != ivType {
 		t.Errorf("NewInvVect: wrong type - got %v, want %v",
 			iv.Type, ivType)
@@ -69,8 +68,8 @@ func TestInvVectWire(t *testing.T) {
 	}
 
 	// errInvVect is an inventory vector with an error.
-	errInvVect := wire.InvVect{
-		Type: wire.InvTypeError,
+	errInvVect := InvVect{
+		Type: InvTypeError,
 		Hash: chainhash.Hash{},
 	}
 
@@ -84,8 +83,8 @@ func TestInvVectWire(t *testing.T) {
 	}
 
 	// txInvVect is an inventory vector representing a transaction.
-	txInvVect := wire.InvVect{
-		Type: wire.InvTypeTx,
+	txInvVect := InvVect{
+		Type: InvTypeTx,
 		Hash: *baseHash,
 	}
 
@@ -99,8 +98,8 @@ func TestInvVectWire(t *testing.T) {
 	}
 
 	// blockInvVect is an inventory vector representing a block.
-	blockInvVect := wire.InvVect{
-		Type: wire.InvTypeBlock,
+	blockInvVect := InvVect{
+		Type: InvTypeBlock,
 		Hash: *baseHash,
 	}
 
@@ -114,17 +113,17 @@ func TestInvVectWire(t *testing.T) {
 	}
 
 	tests := []struct {
-		in   wire.InvVect // NetAddress to encode
-		out  wire.InvVect // Expected decoded NetAddress
-		buf  []byte       // Wire encoding
-		pver uint32       // Protocol version for wire encoding
+		in   InvVect // NetAddress to encode
+		out  InvVect // Expected decoded NetAddress
+		buf  []byte  // Wire encoding
+		pver uint32  // Protocol version for wire encoding
 	}{
 		// Latest protocol version error inventory vector.
 		{
 			errInvVect,
 			errInvVect,
 			errInvVectEncoded,
-			wire.ProtocolVersion,
+			ProtocolVersion,
 		},
 
 		// Latest protocol version tx inventory vector.
@@ -132,7 +131,7 @@ func TestInvVectWire(t *testing.T) {
 			txInvVect,
 			txInvVect,
 			txInvVectEncoded,
-			wire.ProtocolVersion,
+			ProtocolVersion,
 		},
 
 		// Latest protocol version block inventory vector.
@@ -140,7 +139,7 @@ func TestInvVectWire(t *testing.T) {
 			blockInvVect,
 			blockInvVect,
 			blockInvVectEncoded,
-			wire.ProtocolVersion,
+			ProtocolVersion,
 		},
 	}
 
@@ -148,7 +147,7 @@ func TestInvVectWire(t *testing.T) {
 	for i, test := range tests {
 		// Encode to wire format.
 		var buf bytes.Buffer
-		err := wire.TstWriteInvVect(&buf, test.pver, &test.in)
+		err := writeInvVect(&buf, test.pver, &test.in)
 		if err != nil {
 			t.Errorf("writeInvVect #%d error %v", i, err)
 			continue
@@ -160,9 +159,9 @@ func TestInvVectWire(t *testing.T) {
 		}
 
 		// Decode the message from wire format.
-		var iv wire.InvVect
+		var iv InvVect
 		rbuf := bytes.NewReader(test.buf)
-		err = wire.TstReadInvVect(rbuf, test.pver, &iv)
+		err = readInvVect(rbuf, test.pver, &iv)
 		if err != nil {
 			t.Errorf("readInvVect #%d error %v", i, err)
 			continue

@@ -1,9 +1,9 @@
-// Copyright (c) 2013-2015 The btcsuite developers
+// Copyright (c) 2013-2016 The btcsuite developers
 // Copyright (c) 2015-2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package wire_test
+package wire
 
 import (
 	"bytes"
@@ -14,12 +14,11 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/decred/dcrd/chaincfg/chainhash"
-	"github.com/decred/dcrd/wire"
 )
 
 // TestBlockHeader tests the BlockHeader API.
 func TestBlockHeader(t *testing.T) {
-	nonce64, err := wire.RandomUint64()
+	nonce64, err := RandomUint64()
 	if err != nil {
 		t.Errorf("RandomUint64: Error generating nonce: %v", err)
 	}
@@ -40,7 +39,7 @@ func TestBlockHeader(t *testing.T) {
 	stakeVersion := uint32(0xb0a710ad)
 	extraData := [32]byte{}
 
-	bh := wire.NewBlockHeader(
+	bh := NewBlockHeader(
 		1, // verision
 		&hash,
 		&merkleHash,
@@ -121,25 +120,9 @@ func TestBlockHeaderWire(t *testing.T) {
 	nonce := uint32(123123) // 0x1e0f3
 	pver := uint32(70001)
 
-	/*bh := dcrwire.NewBlockHeader(
-	&hash,
-	&merkleHash,
-	&merkleHash, // stakeRoot
-	votebits,
-	winner,
-	overflow,
-	voters,
-	freshstake,
-	revocations,
-	bits,
-	sbits,
-	nonce,
-	height,
-	size)*/
-
 	// baseBlockHdr is used in the various tests as a baseline BlockHeader.
 	bits := uint32(0x1d00ffff)
-	baseBlockHdr := &wire.BlockHeader{
+	baseBlockHdr := &BlockHeader{
 		Version:      1,
 		PrevBlock:    mainNetGenesisHash,
 		MerkleRoot:   mainNetGenesisMerkleRoot,
@@ -194,17 +177,17 @@ func TestBlockHeaderWire(t *testing.T) {
 	}
 
 	tests := []struct {
-		in   *wire.BlockHeader // Data to encode
-		out  *wire.BlockHeader // Expected decoded data
-		buf  []byte            // Wire encoding
-		pver uint32            // Protocol version for wire encoding
+		in   *BlockHeader // Data to encode
+		out  *BlockHeader // Expected decoded data
+		buf  []byte       // Wire encoding
+		pver uint32       // Protocol version for wire encoding
 	}{
 		// Latest protocol version.
 		{
 			baseBlockHdr,
 			baseBlockHdr,
 			baseBlockHdrEncoded,
-			wire.ProtocolVersion,
+			ProtocolVersion,
 		},
 	}
 
@@ -213,7 +196,7 @@ func TestBlockHeaderWire(t *testing.T) {
 		// Encode to wire format.
 		// Former test (doesn't work because of capacity error)
 		var buf bytes.Buffer
-		err := wire.TstWriteBlockHeader(&buf, test.pver, test.in)
+		err := writeBlockHeader(&buf, test.pver, test.in)
 		if err != nil {
 			t.Errorf("writeBlockHeader #%d error %v", i, err)
 			continue
@@ -237,9 +220,9 @@ func TestBlockHeaderWire(t *testing.T) {
 		}
 
 		// Decode the block header from wire format.
-		var bh wire.BlockHeader
+		var bh BlockHeader
 		rbuf := bytes.NewReader(test.buf)
-		err = wire.TstReadBlockHeader(rbuf, test.pver, &bh)
+		err = readBlockHeader(rbuf, test.pver, &bh)
 		if err != nil {
 			t.Errorf("readBlockHeader #%d error %v", i, err)
 			continue
@@ -270,7 +253,7 @@ func TestBlockHeaderSerialize(t *testing.T) {
 
 	// baseBlockHdr is used in the various tests as a baseline BlockHeader.
 	bits := uint32(0x1d00ffff)
-	baseBlockHdr := &wire.BlockHeader{
+	baseBlockHdr := &BlockHeader{
 		Version:      1,
 		PrevBlock:    mainNetGenesisHash,
 		MerkleRoot:   mainNetGenesisMerkleRoot,
@@ -324,9 +307,9 @@ func TestBlockHeaderSerialize(t *testing.T) {
 	}
 
 	tests := []struct {
-		in  *wire.BlockHeader // Data to encode
-		out *wire.BlockHeader // Expected decoded data
-		buf []byte            // Serialized data
+		in  *BlockHeader // Data to encode
+		out *BlockHeader // Expected decoded data
+		buf []byte       // Serialized data
 	}{
 		{
 			baseBlockHdr,
@@ -351,7 +334,7 @@ func TestBlockHeaderSerialize(t *testing.T) {
 		}
 
 		// Deserialize the block header.
-		var bh wire.BlockHeader
+		var bh BlockHeader
 		rbuf := bytes.NewReader(test.buf)
 		err = bh.Deserialize(rbuf)
 		if err != nil {
@@ -380,7 +363,7 @@ func TestBlockHeaderHashing(t *testing.T) {
 
 	vecH, _ := hex.DecodeString(dummyHeader)
 	r := bytes.NewReader(vecH)
-	var bh wire.BlockHeader
+	var bh BlockHeader
 	bh.Deserialize(r)
 	hash2 := bh.BlockSha()
 

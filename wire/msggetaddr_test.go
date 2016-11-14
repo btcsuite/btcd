@@ -1,9 +1,9 @@
-// Copyright (c) 2013-2015 The btcsuite developers
+// Copyright (c) 2013-2016 The btcsuite developers
 // Copyright (c) 2015-2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package wire_test
+package wire
 
 import (
 	"bytes"
@@ -11,16 +11,15 @@ import (
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/decred/dcrd/wire"
 )
 
 // TestGetAddr tests the MsgGetAddr API.
 func TestGetAddr(t *testing.T) {
-	pver := wire.ProtocolVersion
+	pver := ProtocolVersion
 
 	// Ensure the command is expected value.
 	wantCmd := "getaddr"
-	msg := wire.NewMsgGetAddr()
+	msg := NewMsgGetAddr()
 	if cmd := msg.Command(); cmd != wantCmd {
 		t.Errorf("NewMsgGetAddr: wrong command - got %v want %v",
 			cmd, wantCmd)
@@ -42,21 +41,21 @@ func TestGetAddr(t *testing.T) {
 // TestGetAddrWire tests the MsgGetAddr wire encode and decode for various
 // protocol versions.
 func TestGetAddrWire(t *testing.T) {
-	msgGetAddr := wire.NewMsgGetAddr()
+	msgGetAddr := NewMsgGetAddr()
 	msgGetAddrEncoded := []byte{}
 
 	tests := []struct {
-		in   *wire.MsgGetAddr // Message to encode
-		out  *wire.MsgGetAddr // Expected decoded message
-		buf  []byte           // Wire encoding
-		pver uint32           // Protocol version for wire encoding
+		in   *MsgGetAddr // Message to encode
+		out  *MsgGetAddr // Expected decoded message
+		buf  []byte      // Wire encoding
+		pver uint32      // Protocol version for wire encoding
 	}{
 		// Latest protocol version.
 		{
 			msgGetAddr,
 			msgGetAddr,
 			msgGetAddrEncoded,
-			wire.ProtocolVersion,
+			ProtocolVersion,
 		},
 	}
 
@@ -76,7 +75,7 @@ func TestGetAddrWire(t *testing.T) {
 		}
 
 		// Decode the message from wire format.
-		var msg wire.MsgGetAddr
+		var msg MsgGetAddr
 		rbuf := bytes.NewReader(test.buf)
 		err = msg.BtcDecode(rbuf, test.pver)
 		if err != nil {

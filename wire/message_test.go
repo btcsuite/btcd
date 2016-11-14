@@ -1,9 +1,9 @@
-// Copyright (c) 2013-2015 The btcsuite developers
+// Copyright (c) 2013-2016 The btcsuite developers
 // Copyright (c) 2015-2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package wire_test
+package wire
 
 import (
 	"bytes"
@@ -16,12 +16,11 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/decred/dcrd/chaincfg/chainhash"
-	"github.com/decred/dcrd/wire"
 )
 
 // makeHeader is a convenience function to make a message header in the form of
 // a byte slice.  It is used to force errors when reading messages.
-func makeHeader(dcrnet wire.CurrencyNet, command string,
+func makeHeader(dcrnet CurrencyNet, command string,
 	payloadLen uint32, checksum uint32) []byte {
 
 	// The length of a decred message header is 24 bytes.
@@ -37,44 +36,44 @@ func makeHeader(dcrnet wire.CurrencyNet, command string,
 
 // TestMessage tests the Read/WriteMessage and Read/WriteMessageN API.
 func TestMessage(t *testing.T) {
-	pver := wire.ProtocolVersion
+	pver := ProtocolVersion
 
 	// Create the various types of messages to test.
 
 	// MsgVersion.
 	addrYou := &net.TCPAddr{IP: net.ParseIP("192.168.0.1"), Port: 8333}
-	you, err := wire.NewNetAddress(addrYou, wire.SFNodeNetwork)
+	you, err := NewNetAddress(addrYou, SFNodeNetwork)
 	if err != nil {
 		t.Errorf("NewNetAddress: %v", err)
 	}
 	you.Timestamp = time.Time{} // Version message has zero value timestamp.
 	addrMe := &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 8333}
-	me, err := wire.NewNetAddress(addrMe, wire.SFNodeNetwork)
+	me, err := NewNetAddress(addrMe, SFNodeNetwork)
 	if err != nil {
 		t.Errorf("NewNetAddress: %v", err)
 	}
 	me.Timestamp = time.Time{} // Version message has zero value timestamp.
-	msgVersion := wire.NewMsgVersion(me, you, 123123, 0)
+	msgVersion := NewMsgVersion(me, you, 123123, 0)
 
-	msgVerack := wire.NewMsgVerAck()
-	msgGetAddr := wire.NewMsgGetAddr()
-	msgAddr := wire.NewMsgAddr()
-	msgGetBlocks := wire.NewMsgGetBlocks(&chainhash.Hash{})
+	msgVerack := NewMsgVerAck()
+	msgGetAddr := NewMsgGetAddr()
+	msgAddr := NewMsgAddr()
+	msgGetBlocks := NewMsgGetBlocks(&chainhash.Hash{})
 	msgBlock := &testBlock
-	msgInv := wire.NewMsgInv()
-	msgGetData := wire.NewMsgGetData()
-	msgNotFound := wire.NewMsgNotFound()
-	msgTx := wire.NewMsgTx()
-	msgPing := wire.NewMsgPing(123123)
-	msgPong := wire.NewMsgPong(123123)
-	msgGetHeaders := wire.NewMsgGetHeaders()
-	msgHeaders := wire.NewMsgHeaders()
-	msgAlert := wire.NewMsgAlert([]byte("payload"), []byte("signature"))
-	msgMemPool := wire.NewMsgMemPool()
-	msgFilterAdd := wire.NewMsgFilterAdd([]byte{0x01})
-	msgFilterClear := wire.NewMsgFilterClear()
-	msgFilterLoad := wire.NewMsgFilterLoad([]byte{0x01}, 10, 0, wire.BloomUpdateNone)
-	bh := wire.NewBlockHeader(
+	msgInv := NewMsgInv()
+	msgGetData := NewMsgGetData()
+	msgNotFound := NewMsgNotFound()
+	msgTx := NewMsgTx()
+	msgPing := NewMsgPing(123123)
+	msgPong := NewMsgPong(123123)
+	msgGetHeaders := NewMsgGetHeaders()
+	msgHeaders := NewMsgHeaders()
+	msgAlert := NewMsgAlert([]byte("payload"), []byte("signature"))
+	msgMemPool := NewMsgMemPool()
+	msgFilterAdd := NewMsgFilterAdd([]byte{0x01})
+	msgFilterClear := NewMsgFilterClear()
+	msgFilterLoad := NewMsgFilterLoad([]byte{0x01}, 10, 0, BloomUpdateNone)
+	bh := NewBlockHeader(
 		int32(0),                                    // Version
 		&chainhash.Hash{},                           // PrevHash
 		&chainhash.Hash{},                           // MerkleRoot
@@ -93,44 +92,44 @@ func TestMessage(t *testing.T) {
 		[32]byte{},                                  // ExtraData
 		uint32(0xcab005e0),                          // StakeVersion
 	)
-	msgMerkleBlock := wire.NewMsgMerkleBlock(bh)
-	msgReject := wire.NewMsgReject("block", wire.RejectDuplicate, "duplicate block")
+	msgMerkleBlock := NewMsgMerkleBlock(bh)
+	msgReject := NewMsgReject("block", RejectDuplicate, "duplicate block")
 
 	tests := []struct {
-		in     wire.Message     // Value to encode
-		out    wire.Message     // Expected decoded value
-		pver   uint32           // Protocol version for wire encoding
-		dcrnet wire.CurrencyNet // Network to use for wire encoding
-		bytes  int              // Expected num bytes read/written
+		in     Message     // Value to encode
+		out    Message     // Expected decoded value
+		pver   uint32      // Protocol version for wire encoding
+		dcrnet CurrencyNet // Network to use for wire encoding
+		bytes  int         // Expected num bytes read/written
 	}{
-		{msgVersion, msgVersion, pver, wire.MainNet, 125},         // [0]
-		{msgVerack, msgVerack, pver, wire.MainNet, 24},            // [1]
-		{msgGetAddr, msgGetAddr, pver, wire.MainNet, 24},          // [2]
-		{msgAddr, msgAddr, pver, wire.MainNet, 25},                // [3]
-		{msgGetBlocks, msgGetBlocks, pver, wire.MainNet, 61},      // [4]
-		{msgBlock, msgBlock, pver, wire.MainNet, 522},             // [5]
-		{msgInv, msgInv, pver, wire.MainNet, 25},                  // [6]
-		{msgGetData, msgGetData, pver, wire.MainNet, 25},          // [7]
-		{msgNotFound, msgNotFound, pver, wire.MainNet, 25},        // [8]
-		{msgTx, msgTx, pver, wire.MainNet, 39},                    // [9]
-		{msgPing, msgPing, pver, wire.MainNet, 32},                // [10]
-		{msgPong, msgPong, pver, wire.MainNet, 32},                // [11]
-		{msgGetHeaders, msgGetHeaders, pver, wire.MainNet, 61},    // [12]
-		{msgHeaders, msgHeaders, pver, wire.MainNet, 25},          // [13]
-		{msgAlert, msgAlert, pver, wire.MainNet, 42},              // [14]
-		{msgMemPool, msgMemPool, pver, wire.MainNet, 24},          // [15]
-		{msgFilterAdd, msgFilterAdd, pver, wire.MainNet, 26},      // [16]
-		{msgFilterClear, msgFilterClear, pver, wire.MainNet, 24},  // [17]
-		{msgFilterLoad, msgFilterLoad, pver, wire.MainNet, 35},    // [18]
-		{msgMerkleBlock, msgMerkleBlock, pver, wire.MainNet, 215}, // [19]
-		{msgReject, msgReject, pver, wire.MainNet, 79},            // [20]
+		{msgVersion, msgVersion, pver, MainNet, 125},         // [0]
+		{msgVerack, msgVerack, pver, MainNet, 24},            // [1]
+		{msgGetAddr, msgGetAddr, pver, MainNet, 24},          // [2]
+		{msgAddr, msgAddr, pver, MainNet, 25},                // [3]
+		{msgGetBlocks, msgGetBlocks, pver, MainNet, 61},      // [4]
+		{msgBlock, msgBlock, pver, MainNet, 522},             // [5]
+		{msgInv, msgInv, pver, MainNet, 25},                  // [6]
+		{msgGetData, msgGetData, pver, MainNet, 25},          // [7]
+		{msgNotFound, msgNotFound, pver, MainNet, 25},        // [8]
+		{msgTx, msgTx, pver, MainNet, 39},                    // [9]
+		{msgPing, msgPing, pver, MainNet, 32},                // [10]
+		{msgPong, msgPong, pver, MainNet, 32},                // [11]
+		{msgGetHeaders, msgGetHeaders, pver, MainNet, 61},    // [12]
+		{msgHeaders, msgHeaders, pver, MainNet, 25},          // [13]
+		{msgAlert, msgAlert, pver, MainNet, 42},              // [14]
+		{msgMemPool, msgMemPool, pver, MainNet, 24},          // [15]
+		{msgFilterAdd, msgFilterAdd, pver, MainNet, 26},      // [16]
+		{msgFilterClear, msgFilterClear, pver, MainNet, 24},  // [17]
+		{msgFilterLoad, msgFilterLoad, pver, MainNet, 35},    // [18]
+		{msgMerkleBlock, msgMerkleBlock, pver, MainNet, 215}, // [19]
+		{msgReject, msgReject, pver, MainNet, 79},            // [20]
 	}
 
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
 		// Encode to wire format.
 		var buf bytes.Buffer
-		nw, err := wire.WriteMessageN(&buf, test.in, test.pver, test.dcrnet)
+		nw, err := WriteMessageN(&buf, test.in, test.pver, test.dcrnet)
 		if err != nil {
 			t.Errorf("WriteMessage #%d error %v", i, err)
 			continue
@@ -144,7 +143,7 @@ func TestMessage(t *testing.T) {
 
 		// Decode from wire format.
 		rbuf := bytes.NewReader(buf.Bytes())
-		nr, msg, _, err := wire.ReadMessageN(rbuf, test.pver, test.dcrnet)
+		nr, msg, _, err := ReadMessageN(rbuf, test.pver, test.dcrnet)
 		if err != nil {
 			t.Errorf("ReadMessage #%d error %v, msg %v", i, err,
 				spew.Sdump(msg))
@@ -169,7 +168,7 @@ func TestMessage(t *testing.T) {
 	for i, test := range tests {
 		// Encode to wire format.
 		var buf bytes.Buffer
-		err := wire.WriteMessage(&buf, test.in, test.pver, test.dcrnet)
+		err := WriteMessage(&buf, test.in, test.pver, test.dcrnet)
 		if err != nil {
 			t.Errorf("WriteMessage #%d error %v", i, err)
 			continue
@@ -177,7 +176,7 @@ func TestMessage(t *testing.T) {
 
 		// Decode from wire format.
 		rbuf := bytes.NewReader(buf.Bytes())
-		msg, _, err := wire.ReadMessage(rbuf, test.pver, test.dcrnet)
+		msg, _, err := ReadMessage(rbuf, test.pver, test.dcrnet)
 		if err != nil {
 			t.Errorf("ReadMessage #%d error %v, msg %v", i, err,
 				spew.Sdump(msg))
@@ -194,12 +193,12 @@ func TestMessage(t *testing.T) {
 // TestReadMessageWireErrors performs negative tests against wire decoding into
 // concrete messages to confirm error paths work correctly.
 func TestReadMessageWireErrors(t *testing.T) {
-	pver := wire.ProtocolVersion
-	dcrnet := wire.MainNet
+	pver := ProtocolVersion
+	dcrnet := MainNet
 
 	// Ensure message errors are as expected with no function specified.
 	wantErr := "something bad happened"
-	testErr := wire.MessageError{Description: wantErr}
+	testErr := MessageError{Description: wantErr}
 	if testErr.Error() != wantErr {
 		t.Errorf("MessageError: wrong error - got %v, want %v",
 			testErr.Error(), wantErr)
@@ -207,18 +206,18 @@ func TestReadMessageWireErrors(t *testing.T) {
 
 	// Ensure message errors are as expected with a function specified.
 	wantFunc := "foo"
-	testErr = wire.MessageError{Func: wantFunc, Description: wantErr}
+	testErr = MessageError{Func: wantFunc, Description: wantErr}
 	if testErr.Error() != wantFunc+": "+wantErr {
 		t.Errorf("MessageError: wrong error - got %v, want %v",
 			testErr.Error(), wantErr)
 	}
 
 	// Wire encoded bytes for main and testnet networks magic identifiers.
-	testNet3Bytes := makeHeader(wire.TestNet, "", 0, 0)
+	testNet3Bytes := makeHeader(TestNet, "", 0, 0)
 
 	// Wire encoded bytes for a message that exceeds max overall message
 	// length.
-	mpl := uint32(wire.MaxMessagePayload)
+	mpl := uint32(MaxMessagePayload)
 	exceedMaxPayloadBytes := makeHeader(dcrnet, "getaddr", mpl+1, 0)
 
 	// Wire encoded bytes for a command which is invalid utf-8.
@@ -253,12 +252,12 @@ func TestReadMessageWireErrors(t *testing.T) {
 	discardBytes := makeHeader(dcrnet, "bogus", 15*1024, 0)
 
 	tests := []struct {
-		buf     []byte           // Wire encoding
-		pver    uint32           // Protocol version for wire encoding
-		dcrnet  wire.CurrencyNet // Decred network for wire encoding
-		max     int              // Max size of fixed buffer to induce errors
-		readErr error            // Expected read error
-		bytes   int              // Expected num bytes read
+		buf     []byte      // Wire encoding
+		pver    uint32      // Protocol version for wire encoding
+		dcrnet  CurrencyNet // Decred network for wire encoding
+		max     int         // Max size of fixed buffer to induce errors
+		readErr error       // Expected read error
+		bytes   int         // Expected num bytes read
 	}{
 		// Latest protocol version with intentional read errors.
 
@@ -278,7 +277,7 @@ func TestReadMessageWireErrors(t *testing.T) {
 			pver,
 			dcrnet,
 			len(testNet3Bytes),
-			&wire.MessageError{},
+			&MessageError{},
 			24,
 		},
 
@@ -288,7 +287,7 @@ func TestReadMessageWireErrors(t *testing.T) {
 			pver,
 			dcrnet,
 			len(exceedMaxPayloadBytes),
-			&wire.MessageError{},
+			&MessageError{},
 			24,
 		},
 
@@ -298,7 +297,7 @@ func TestReadMessageWireErrors(t *testing.T) {
 			pver,
 			dcrnet,
 			len(badCommandBytes),
-			&wire.MessageError{},
+			&MessageError{},
 			24,
 		},
 
@@ -308,7 +307,7 @@ func TestReadMessageWireErrors(t *testing.T) {
 			pver,
 			dcrnet,
 			len(unsupportedCommandBytes),
-			&wire.MessageError{},
+			&MessageError{},
 			24,
 		},
 
@@ -318,7 +317,7 @@ func TestReadMessageWireErrors(t *testing.T) {
 			pver,
 			dcrnet,
 			len(exceedTypePayloadBytes),
-			&wire.MessageError{},
+			&MessageError{},
 			24,
 		},
 
@@ -338,7 +337,7 @@ func TestReadMessageWireErrors(t *testing.T) {
 			pver,
 			dcrnet,
 			len(badChecksumBytes),
-			&wire.MessageError{},
+			&MessageError{},
 			26,
 		},
 
@@ -348,7 +347,7 @@ func TestReadMessageWireErrors(t *testing.T) {
 			pver,
 			dcrnet,
 			len(badMessageBytes),
-			&wire.MessageError{},
+			&MessageError{},
 			25,
 		},
 
@@ -358,7 +357,7 @@ func TestReadMessageWireErrors(t *testing.T) {
 			pver,
 			dcrnet,
 			len(discardBytes),
-			&wire.MessageError{},
+			&MessageError{},
 			24,
 		},
 	}
@@ -367,7 +366,7 @@ func TestReadMessageWireErrors(t *testing.T) {
 	for i, test := range tests {
 		// Decode from wire format.
 		r := newFixedReader(test.max, test.buf)
-		nr, _, _, err := wire.ReadMessageN(r, test.pver, test.dcrnet)
+		nr, _, _, err := ReadMessageN(r, test.pver, test.dcrnet)
 		if reflect.TypeOf(err) != reflect.TypeOf(test.readErr) {
 			t.Errorf("ReadMessage #%d wrong error got: %v <%T>, "+
 				"want: %T", i, err, err, test.readErr)
@@ -380,9 +379,9 @@ func TestReadMessageWireErrors(t *testing.T) {
 				"got %d, want %d", i, nr, test.bytes)
 		}
 
-		// For errors which are not of type wire.MessageError, check
-		// them for equality.
-		if _, ok := err.(*wire.MessageError); !ok {
+		// For errors which are not of type MessageError, check them for
+		// equality.
+		if _, ok := err.(*MessageError); !ok {
 			if err != test.readErr {
 				t.Errorf("ReadMessage #%d wrong error got: %v <%T>, "+
 					"want: %v <%T>", i, err, err,
@@ -396,9 +395,9 @@ func TestReadMessageWireErrors(t *testing.T) {
 // TestWriteMessageWireErrors performs negative tests against wire encoding from
 // concrete messages to confirm error paths work correctly.
 func TestWriteMessageWireErrors(t *testing.T) {
-	pver := wire.ProtocolVersion
-	dcrnet := wire.MainNet
-	wireErr := &wire.MessageError{}
+	pver := ProtocolVersion
+	dcrnet := MainNet
+	wireErr := &MessageError{}
 
 	// Fake message with a command that is too long.
 	badCommandMsg := &fakeMessage{command: "somethingtoolong"}
@@ -407,7 +406,7 @@ func TestWriteMessageWireErrors(t *testing.T) {
 	encodeErrMsg := &fakeMessage{forceEncodeErr: true}
 
 	// Fake message that has payload which exceeds max overall message size.
-	exceedOverallPayload := make([]byte, wire.MaxMessagePayload+1)
+	exceedOverallPayload := make([]byte, MaxMessagePayload+1)
 	exceedOverallPayloadErrMsg := &fakeMessage{payload: exceedOverallPayload}
 
 	// Fake message that has payload which exceeds max allowed per message.
@@ -420,12 +419,12 @@ func TestWriteMessageWireErrors(t *testing.T) {
 	bogusMsg := &fakeMessage{command: "bogus", payload: bogusPayload}
 
 	tests := []struct {
-		msg    wire.Message     // Message to encode
-		pver   uint32           // Protocol version for wire encoding
-		dcrnet wire.CurrencyNet // Decred network for wire encoding
-		max    int              // Max size of fixed buffer to induce errors
-		err    error            // Expected error
-		bytes  int              // Expected num bytes written
+		msg    Message     // Message to encode
+		pver   uint32      // Protocol version for wire encoding
+		dcrnet CurrencyNet // Decred network for wire encoding
+		max    int         // Max size of fixed buffer to induce errors
+		err    error       // Expected error
+		bytes  int         // Expected num bytes written
 	}{
 		// Command too long.
 		{badCommandMsg, pver, dcrnet, 0, wireErr, 0},
@@ -445,7 +444,7 @@ func TestWriteMessageWireErrors(t *testing.T) {
 	for i, test := range tests {
 		// Encode wire format.
 		w := newFixedWriter(test.max)
-		nw, err := wire.WriteMessageN(w, test.msg, test.pver, test.dcrnet)
+		nw, err := WriteMessageN(w, test.msg, test.pver, test.dcrnet)
 		if reflect.TypeOf(err) != reflect.TypeOf(test.err) {
 			t.Errorf("WriteMessage #%d wrong error got: %v <%T>, "+
 				"want: %T", i, err, err, test.err)
@@ -458,9 +457,9 @@ func TestWriteMessageWireErrors(t *testing.T) {
 				"written - got %d, want %d", i, nw, test.bytes)
 		}
 
-		// For errors which are not of type wire.MessageError, check
-		// them for equality.
-		if _, ok := err.(*wire.MessageError); !ok {
+		// For errors which are not of type MessageError, check them for
+		// equality.
+		if _, ok := err.(*MessageError); !ok {
 			if err != test.err {
 				t.Errorf("ReadMessage #%d wrong error got: %v <%T>, "+
 					"want: %v <%T>", i, err, err,

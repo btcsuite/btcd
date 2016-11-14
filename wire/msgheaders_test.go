@@ -1,9 +1,9 @@
-// Copyright (c) 2013-2015 The btcsuite developers
+// Copyright (c) 2013-2016 The btcsuite developers
 // Copyright (c) 2015-2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package wire_test
+package wire
 
 import (
 	"bytes"
@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/decred/dcrd/wire"
 )
 
 // TestHeaders tests the MsgHeaders API.
@@ -22,7 +21,7 @@ func TestHeaders(t *testing.T) {
 
 	// Ensure the command is expected value.
 	wantCmd := "headers"
-	msg := wire.NewMsgHeaders()
+	msg := NewMsgHeaders()
 	if cmd := msg.Command(); cmd != wantCmd {
 		t.Errorf("NewMsgHeaders: wrong command - got %v want %v",
 			cmd, wantCmd)
@@ -51,10 +50,10 @@ func TestHeaders(t *testing.T) {
 	// Ensure adding more than the max allowed headers per message returns
 	// error.
 	var err error
-	for i := 0; i < wire.MaxBlockHeadersPerMsg+1; i++ {
+	for i := 0; i < MaxBlockHeadersPerMsg+1; i++ {
 		err = msg.AddBlockHeader(bh)
 	}
-	if reflect.TypeOf(err) != reflect.TypeOf(&wire.MessageError{}) {
+	if reflect.TypeOf(err) != reflect.TypeOf(&MessageError{}) {
 		t.Errorf("AddBlockHeader: expected error on too many headers " +
 			"not received")
 	}
@@ -65,7 +64,7 @@ func TestHeaders(t *testing.T) {
 // TestHeadersWire tests the MsgHeaders wire encode and decode for various
 // numbers of headers and protocol versions.
 func TestHeadersWire(t *testing.T) {
-	bh := wire.NewBlockHeader(
+	bh := NewBlockHeader(
 		testBlock.Header.Version,                    // Version
 		&mainNetGenesisHash,                         // PrevHash
 		&testBlock.Header.MerkleRoot,                // MerkleRootHash
@@ -87,13 +86,13 @@ func TestHeadersWire(t *testing.T) {
 	bh.Timestamp = time.Unix(0x4966bc61, 0)
 
 	// Empty headers message.
-	noHeaders := wire.NewMsgHeaders()
+	noHeaders := NewMsgHeaders()
 	noHeadersEncoded := []byte{
 		0x00, // Varint for number of headers
 	}
 
 	// Headers message with one header.
-	oneHeader := wire.NewMsgHeaders()
+	oneHeader := NewMsgHeaders()
 	oneHeader.AddBlockHeader(bh)
 	oneHeaderEncoded := []byte{
 		0x01,                   // VarInt for number of headers.
@@ -131,17 +130,17 @@ func TestHeadersWire(t *testing.T) {
 	}
 
 	tests := []struct {
-		in   *wire.MsgHeaders // Message to encode
-		out  *wire.MsgHeaders // Expected decoded message
-		buf  []byte           // Wire encoding
-		pver uint32           // Protocol version for wire encoding
+		in   *MsgHeaders // Message to encode
+		out  *MsgHeaders // Expected decoded message
+		buf  []byte      // Wire encoding
+		pver uint32      // Protocol version for wire encoding
 	}{
 		// Latest protocol version with no headers.
 		{
 			noHeaders,
 			noHeaders,
 			noHeadersEncoded,
-			wire.ProtocolVersion,
+			ProtocolVersion,
 		},
 
 		// Latest protocol version with one header.
@@ -149,7 +148,7 @@ func TestHeadersWire(t *testing.T) {
 			oneHeader,
 			oneHeader,
 			oneHeaderEncoded,
-			wire.ProtocolVersion,
+			ProtocolVersion,
 		},
 	}
 
@@ -169,7 +168,7 @@ func TestHeadersWire(t *testing.T) {
 		}
 
 		// Decode the message from wire format.
-		var msg wire.MsgHeaders
+		var msg MsgHeaders
 		rbuf := bytes.NewReader(test.buf)
 		err = msg.BtcDecode(rbuf, test.pver)
 		if err != nil {
@@ -187,14 +186,14 @@ func TestHeadersWire(t *testing.T) {
 // TestHeadersWireErrors performs negative tests against wire encode and decode
 // of MsgHeaders to confirm error paths work correctly.
 func TestHeadersWireErrors(t *testing.T) {
-	pver := wire.ProtocolVersion
-	wireErr := &wire.MessageError{}
+	pver := ProtocolVersion
+	wireErr := &MessageError{}
 
 	hash := mainNetGenesisHash
 	merkleHash := testBlock.Header.MerkleRoot
 	bits := uint32(0x1d00ffff)
 	nonce := uint32(0x9962e301)
-	bh := wire.NewBlockHeader(
+	bh := NewBlockHeader(
 		int32(pver),                                 // Verision
 		&hash,                                       // PrevHash
 		&merkleHash,                                 // MerkleRootHash
@@ -218,7 +217,7 @@ func TestHeadersWireErrors(t *testing.T) {
 	bh.Timestamp = testBlock.Header.Timestamp
 
 	// Headers message with one header.
-	oneHeader := wire.NewMsgHeaders()
+	oneHeader := NewMsgHeaders()
 	oneHeader.AddBlockHeader(bh)
 	oneHeaderEncoded := []byte{
 		0x01,                   // VarInt for number of headers.
@@ -255,8 +254,8 @@ func TestHeadersWireErrors(t *testing.T) {
 
 	// Message that forces an error by having more than the max allowed
 	// headers.
-	maxHeaders := wire.NewMsgHeaders()
-	for i := 0; i < wire.MaxBlockHeadersPerMsg; i++ {
+	maxHeaders := NewMsgHeaders()
+	for i := 0; i < MaxBlockHeadersPerMsg; i++ {
 		maxHeaders.AddBlockHeader(bh)
 	}
 	maxHeaders.Headers = append(maxHeaders.Headers, bh)
@@ -266,7 +265,7 @@ func TestHeadersWireErrors(t *testing.T) {
 
 	// Intentionally invalid block header that has a transaction count used
 	// to force errors.
-	bhTrans := wire.NewBlockHeader(
+	bhTrans := NewBlockHeader(
 		int32(0),                                    // Verision
 		&hash,                                       // PrevHash
 		&merkleHash,                                 // MerkleRootHash
@@ -288,7 +287,7 @@ func TestHeadersWireErrors(t *testing.T) {
 	bhTrans.Version = testBlock.Header.Version
 	bhTrans.Timestamp = testBlock.Header.Timestamp
 
-	transHeader := wire.NewMsgHeaders()
+	transHeader := NewMsgHeaders()
 	transHeader.AddBlockHeader(bhTrans)
 	transHeaderEncoded := []byte{
 		0x01,                   // VarInt for number of headers.
@@ -324,12 +323,12 @@ func TestHeadersWireErrors(t *testing.T) {
 	}
 
 	tests := []struct {
-		in       *wire.MsgHeaders // Value to encode
-		buf      []byte           // Wire encoding
-		pver     uint32           // Protocol version for wire encoding
-		max      int              // Max size of fixed buffer to induce errors
-		writeErr error            // Expected write error
-		readErr  error            // Expected read error
+		in       *MsgHeaders // Value to encode
+		buf      []byte      // Wire encoding
+		pver     uint32      // Protocol version for wire encoding
+		max      int         // Max size of fixed buffer to induce errors
+		writeErr error       // Expected write error
+		readErr  error       // Expected read error
 	}{
 		// Latest protocol version with intentional read/write errors.
 		// Force error in header count.
@@ -355,9 +354,9 @@ func TestHeadersWireErrors(t *testing.T) {
 			continue
 		}
 
-		// For errors which are not of type wire.MessageError, check
-		// them for equality.
-		if _, ok := err.(*wire.MessageError); !ok {
+		// For errors which are not of type MessageError, check them for
+		// equality.
+		if _, ok := err.(*MessageError); !ok {
 			if err != test.writeErr {
 				t.Errorf("BtcEncode #%d wrong error got: %v, "+
 					"want: %v", i, err, test.writeErr)
@@ -366,7 +365,7 @@ func TestHeadersWireErrors(t *testing.T) {
 		}
 
 		// Decode from wire format.
-		var msg wire.MsgHeaders
+		var msg MsgHeaders
 		r := newFixedReader(test.max, test.buf)
 		err = msg.BtcDecode(r, test.pver)
 		if reflect.TypeOf(err) != reflect.TypeOf(test.readErr) {
@@ -376,9 +375,9 @@ func TestHeadersWireErrors(t *testing.T) {
 			continue
 		}
 
-		// For errors which are not of type wire.MessageError, check
-		// them for equality.
-		if _, ok := err.(*wire.MessageError); !ok {
+		// For errors which are not of type MessageError, check them for
+		// equality.
+		if _, ok := err.(*MessageError); !ok {
 			if err != test.readErr {
 				t.Errorf("BtcDecode #%d wrong error got: %v, "+
 					"want: %v", i, err, test.readErr)
