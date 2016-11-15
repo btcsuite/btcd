@@ -38,7 +38,7 @@ func ExampleNewFilter() {
 	filter.AddShaHash(txHash)
 
 	// Show that the filter matches.
-	matches := filter.Matches(txHash.Bytes())
+	matches := filter.Matches(txHash[:])
 	fmt.Println("Filter Matches?:", matches)
 
 	// Output:
