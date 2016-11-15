@@ -25,7 +25,7 @@ func isOdd(a *big.Int) bool {
 // decompressPoint decompresses a point on the given curve given the X point and
 // the solution to use.
 func decompressPoint(curve *KoblitzCurve, x *big.Int, ybit bool) (*big.Int, error) {
-	// TODO(oga) This will probably only work for secp256k1 due to
+	// TODO: This will probably only work for secp256k1 due to
 	// optimizations.
 
 	// Y = +-sqrt(x^3 + B)

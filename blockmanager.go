@@ -364,7 +364,7 @@ func (b *blockManager) handleDonePeerMsg(peers *list.List, sp *serverPeer) {
 
 	// Remove requested blocks from the global map so that they will be
 	// fetched from elsewhere next time we get an inv.
-	// TODO(oga) we could possibly here check which peers have these blocks
+	// TODO: we could possibly here check which peers have these blocks
 	// and request them now to speed things up a little.
 	for k := range sp.requestedBlocks {
 		delete(b.requestedBlocks, k)

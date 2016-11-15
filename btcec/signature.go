@@ -329,7 +329,7 @@ func recoverKeyFromSignature(curve *KoblitzCurve, sig *Signature, msg []byte,
 	e.Mod(e, curve.Params().N)
 	minuseGx, minuseGy := curve.ScalarBaseMult(e.Bytes())
 
-	// TODO(oga) this would be faster if we did a mult and add in one
+	// TODO: this would be faster if we did a mult and add in one
 	// step to prevent the jacobian conversion back and forth.
 	Qx, Qy := curve.Add(sRx, sRy, minuseGx, minuseGy)
 

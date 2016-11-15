@@ -4221,7 +4221,7 @@ func newRPCServer(listenAddrs []string, generator *mining.BlkTmplGenerator, s *s
 		}
 	}
 
-	// TODO(oga) this code is similar to that in server, should be
+	// TODO: this code is similar to that in server, should be
 	// factored into something shared.
 	ipv4ListenAddrs, ipv6ListenAddrs, _, err := parseListeners(listenAddrs)
 	if err != nil {
