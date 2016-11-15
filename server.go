@@ -1227,7 +1227,7 @@ func (s *server) handleAddPeerMsg(state *peerState, sp *serverPeer) bool {
 		srvrLog.Infof("Max peers reached [%d] - disconnecting peer %s",
 			cfg.MaxPeers, sp)
 		sp.Disconnect()
-		// TODO(oga) how to handle permanent peers here?
+		// TODO: how to handle permanent peers here?
 		// they should be rescheduled.
 		return false
 	}
@@ -1439,7 +1439,7 @@ func (s *server) handleQuery(state *peerState, querymsg interface{}) {
 		msg.reply <- peers
 
 	case connectNodeMsg:
-		// XXX(oga) duplicate oneshots?
+		// TODO: duplicate oneshots?
 		// Limit max number of total peers.
 		if state.Count() >= cfg.MaxPeers {
 			msg.reply <- errors.New("max peers reached")
@@ -1462,7 +1462,7 @@ func (s *server) handleQuery(state *peerState, querymsg interface{}) {
 			return
 		}
 
-		// TODO(oga) if too many, nuke a non-perm peer.
+		// TODO: if too many, nuke a non-perm peer.
 		go s.connManager.Connect(&connmgr.ConnReq{
 			Addr:      netAddr,
 			Permanent: msg.permanent,
@@ -2119,9 +2119,9 @@ out:
 	for {
 		select {
 		case <-timer.C:
-			// TODO(oga) pick external port  more cleverly
-			// TODO(oga) know which ports we are listening to on an external net.
-			// TODO(oga) if specific listen port doesn't work then ask for wildcard
+			// TODO: pick external port  more cleverly
+			// TODO: know which ports we are listening to on an external net.
+			// TODO: if specific listen port doesn't work then ask for wildcard
 			// listen port?
 			// XXX this assumes timeout is in seconds.
 			listenPort, err := s.nat.AddPortMapping("tcp", int(lport), int(lport),
@@ -2130,7 +2130,7 @@ out:
 				srvrLog.Warnf("can't add UPnP port mapping: %v", err)
 			}
 			if first && err == nil {
-				// TODO(oga): look this up periodically to see if upnp domain changed
+				// TODO: look this up periodically to see if upnp domain changed
 				// and so did ip.
 				externalip, err := s.nat.GetExternalAddress()
 				if err != nil {
@@ -2229,7 +2229,7 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 			// nil nat here is fine, just means no upnp on network.
 		}
 
-		// TODO(oga) nonstandard port...
+		// TODO: nonstandard port...
 		if wildcard {
 			port, err :=
 				strconv.ParseUint(activeNetParams.DefaultPort,
