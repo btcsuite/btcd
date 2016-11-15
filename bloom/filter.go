@@ -1,5 +1,5 @@
-// Copyright (c) 2014 The btcsuite developers
-// Copyright (c) 2015 The Decred developers
+// Copyright (c) 2014-2016 The btcsuite developers
+// Copyright (c) 2015-2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -49,7 +49,7 @@ func NewFilter(elements, tweak uint32, fprate float64, flags wire.BloomUpdateTyp
 	if fprate > 1.0 {
 		fprate = 1.0
 	}
-	if fprate < 0 {
+	if fprate < 1e-9 {
 		fprate = 1e-9
 	}
 
