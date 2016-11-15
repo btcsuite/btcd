@@ -59,7 +59,7 @@ type addrIndexer struct {
 // newAddrIndexer creates a new block address indexer.
 // Use Start to begin processing incoming index jobs.
 func newAddrIndexer(s *server) (*addrIndexer, error) {
-	_, chainHeight, err := s.db.NewestSha()
+	_, chainHeight, err := s.db.NewestHash()
 	if err != nil {
 		return nil, err
 	}
@@ -135,29 +135,29 @@ func (a *addrIndexer) initialize() error {
 		for lastBlockIdxHeight <= a.chainTip {
 			// Skip the genesis block.
 			if !(lastBlockIdxHeight == 0) {
-				targetSha, err := a.server.db.FetchBlockShaByHeight(
+				targetHash, err := a.server.db.FetchBlockHashByHeight(
 					lastBlockIdxHeight)
 				if err != nil {
-					return fmt.Errorf("Unable to look up the sha of the "+
+					return fmt.Errorf("Unable to look up the hash of the "+
 						"next target block (height %v): %v",
 						lastBlockIdxHeight, err)
 				}
-				targetBlock, err := a.server.db.FetchBlockBySha(targetSha)
+				targetBlock, err := a.server.db.FetchBlockByHash(targetHash)
 				if err != nil {
-					// Unable to locate a target block by sha, this
+					// Unable to locate a target block by hash, this
 					// is a critical error, we may have an
 					// inconsistency in the DB.
 					return fmt.Errorf("Unable to look up the next "+
-						"target block (sha %v): %v", targetSha, err)
+						"target block (hash %v): %v", targetHash, err)
 				}
-				targetParent, err := a.server.db.FetchBlockBySha(
+				targetParent, err := a.server.db.FetchBlockByHash(
 					&targetBlock.MsgBlock().Header.PrevBlock)
 				if err != nil {
-					// Unable to locate a target block by sha, this
+					// Unable to locate a target block by hash, this
 					// is a critical error, we may have an
 					// inconsistency in the DB.
 					return fmt.Errorf("Unable to look up the next "+
-						"target block parent (sha %v): %v",
+						"target block parent (hash %v): %v",
 						targetBlock.MsgBlock().Header.PrevBlock, err)
 				}
 
@@ -166,7 +166,7 @@ func (a *addrIndexer) initialize() error {
 					return fmt.Errorf("Unable to index transactions of"+
 						" block: %v", err)
 				}
-				err = a.server.db.UpdateAddrIndexForBlock(targetSha,
+				err = a.server.db.UpdateAddrIndexForBlock(targetHash,
 					lastBlockIdxHeight,
 					addrIndex)
 				if err != nil {
@@ -295,17 +295,17 @@ func (a *addrIndexer) lookupTransaction(txHash chainhash.Hash, blk *dcrutil.Bloc
 	// tx tree regular was validated.
 	if txTreeRegularValid {
 		for _, stx := range parent.STransactions() {
-			if stx.Sha().IsEqual(&txHash) {
+			if stx.Hash().IsEqual(&txHash) {
 				return stx.MsgTx(), nil
 			}
 		}
 		for _, tx := range parent.Transactions() {
-			if tx.Sha().IsEqual(&txHash) {
+			if tx.Hash().IsEqual(&txHash) {
 				return tx.MsgTx(), nil
 			}
 		}
 		for _, tx := range blk.Transactions() {
-			if tx.Sha().IsEqual(&txHash) {
+			if tx.Hash().IsEqual(&txHash) {
 				return tx.MsgTx(), nil
 			}
 		}
@@ -313,19 +313,19 @@ func (a *addrIndexer) lookupTransaction(txHash chainhash.Hash, blk *dcrutil.Bloc
 		// Just search this block's regular tx tree and the previous
 		// block's stake tx tree.
 		for _, stx := range parent.STransactions() {
-			if stx.Sha().IsEqual(&txHash) {
+			if stx.Hash().IsEqual(&txHash) {
 				return stx.MsgTx(), nil
 			}
 		}
 		for _, tx := range blk.Transactions() {
-			if tx.Sha().IsEqual(&txHash) {
+			if tx.Hash().IsEqual(&txHash) {
 				return tx.MsgTx(), nil
 			}
 		}
 	}
 
 	// Lookup and fetch the referenced output's tx in the database.
-	txList, err := a.server.db.FetchTxBySha(&txHash)
+	txList, err := a.server.db.FetchTxByHash(&txHash)
 	if err != nil {
 		adxrLog.Errorf("Error fetching tx %v: %v",
 			txHash, err)
@@ -391,7 +391,7 @@ func (a *addrIndexer) indexBlockAddrs(blk *dcrutil.Block,
 					parent.Height(), locInBlock, stake.TxTypeRegular)
 				if err != nil {
 					adxrLog.Tracef("Error converting tx txout %v: %v",
-						tx.MsgTx().TxSha(), err)
+						tx.MsgTx().TxHash(), err)
 					continue
 				}
 				addrIndex = append(addrIndex, toAppend...)
@@ -437,7 +437,7 @@ func (a *addrIndexer) indexBlockAddrs(blk *dcrutil.Block,
 				blk.Height(), locInBlock, txType)
 			if err != nil {
 				adxrLog.Tracef("Error converting stx txout %v: %v",
-					stx.MsgTx().TxSha(), err)
+					stx.MsgTx().TxHash(), err)
 				continue
 			}
 			addrIndex = append(addrIndex, toAppend...)
@@ -455,7 +455,7 @@ func (a *addrIndexer) InsertBlock(block *dcrutil.Block, parent *dcrutil.Block) e
 		return fmt.Errorf("Unable to index transactions of"+
 			" block: %v", err)
 	}
-	err = a.server.db.UpdateAddrIndexForBlock(block.Sha(),
+	err = a.server.db.UpdateAddrIndexForBlock(block.Hash(),
 		block.Height(),
 		addrIndex)
 	if err != nil {
@@ -474,7 +474,7 @@ func (a *addrIndexer) RemoveBlock(block *dcrutil.Block,
 		return fmt.Errorf("Unable to index transactions of"+
 			" block: %v", err)
 	}
-	err = a.server.db.DropAddrIndexForBlock(block.Sha(),
+	err = a.server.db.DropAddrIndexForBlock(block.Hash(),
 		block.Height(),
 		addrIndex)
 	if err != nil {

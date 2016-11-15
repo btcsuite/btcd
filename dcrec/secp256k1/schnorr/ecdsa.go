@@ -164,7 +164,7 @@ func Sign(curve *secp256k1.KoblitzCurve, priv *secp256k1.PrivateKey,
 
 	for {
 		sig, err := schnorrSign(curve, hash, pA[:], kB, nil, nil,
-			chainhash.HashFuncB)
+			chainhash.HashB)
 		if err == nil {
 			r = sig.GetR()
 			s = sig.GetS()
@@ -284,7 +284,7 @@ func Verify(curve *secp256k1.KoblitzCurve, pubkey *secp256k1.PublicKey,
 	msg []byte, r *big.Int, s *big.Int) bool {
 	sig := NewSignature(r, s)
 	ok, _ := schnorrVerify(curve, sig.Serialize(), pubkey, msg,
-		chainhash.HashFuncB)
+		chainhash.HashB)
 
 	return ok
 }
@@ -401,5 +401,5 @@ func schnorrRecover(curve *secp256k1.KoblitzCurve, sig, msg []byte,
 func RecoverPubkey(curve *secp256k1.KoblitzCurve, sig,
 	msg []byte) (*secp256k1.PublicKey, bool, error) {
 
-	return schnorrRecover(curve, sig, msg, chainhash.HashFuncB)
+	return schnorrRecover(curve, sig, msg, chainhash.HashB)
 }

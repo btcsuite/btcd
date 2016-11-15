@@ -47,7 +47,7 @@ const (
 )
 
 var (
-	// zeroHash is the zero value for a wire.ShaHash and is defined as
+	// zeroHash is the zero value for a chainhash.Hash and is defined as
 	// a package level variable to avoid the need to create a new instance
 	// every time a check is needed.
 	zeroHash = &chainhash.Hash{}
@@ -268,7 +268,7 @@ func checkProofOfStake(block *dcrutil.Block, posLimit int64) error {
 				errStr := fmt.Sprintf("Stake tx %v has a commitment value "+
 					"less than the minimum stake difficulty specified in "+
 					"the block (%v)",
-					staketx.Sha(), msgBlock.Header.SBits)
+					staketx.Hash(), msgBlock.Header.SBits)
 				return ruleError(ErrNotEnoughStake, errStr)
 			}
 
@@ -277,7 +277,7 @@ func checkProofOfStake(block *dcrutil.Block, posLimit int64) error {
 				errStr := fmt.Sprintf("Stake tx %v has a commitment value "+
 					"less than the minimum stake difficulty for the "+
 					"network (%v)",
-					staketx.Sha(), posLimit)
+					staketx.Hash(), posLimit)
 				return ruleError(ErrStakeBelowMinimum, errStr)
 			}
 		}
@@ -319,8 +319,8 @@ func checkProofOfWork(header *wire.BlockHeader, powLimit *big.Int,
 	// to avoid proof of work checks is set.
 	if flags&BFNoPoWCheck != BFNoPoWCheck {
 		// The block hash must be less than the claimed target.
-		hash := header.BlockSha()
-		hashNum := ShaHashToBig(&hash)
+		hash := header.BlockHash()
+		hashNum := HashToBig(&hash)
 		if hashNum.Cmp(target) > 0 {
 			str := fmt.Sprintf("block hash of %064x is higher than "+
 				"expected max of %064x", hashNum, target)
@@ -513,7 +513,7 @@ func checkBlockSanity(block *dcrutil.Block, timeSource MedianTimeSource,
 	if totalVotes > int(chainParams.TicketsPerBlock) {
 		errStr := fmt.Sprintf("the number of SSGen tx in block %v was %v, "+
 			"overflowing the maximum allowed (%v)",
-			block.Sha(), totalVotes, int(chainParams.TicketsPerBlock))
+			block.Hash(), totalVotes, int(chainParams.TicketsPerBlock))
 		return ruleError(ErrTooManyVotes, errStr)
 	}
 
@@ -565,7 +565,7 @@ func checkBlockSanity(block *dcrutil.Block, timeSource MedianTimeSource,
 	allTransactions := append(transactions, stakeTransactions...)
 
 	for _, tx := range allTransactions {
-		hash := tx.Sha()
+		hash := tx.Hash()
 		if _, exists := existingTxHashes[*hash]; exists {
 			str := fmt.Sprintf("block contains duplicate "+
 				"transaction %v", hash)
@@ -601,7 +601,7 @@ func checkBlockSanity(block *dcrutil.Block, timeSource MedianTimeSource,
 		if header.VoteBits != earlyVoteBitsValue {
 			str := fmt.Sprintf("pre stake validation height block %v "+
 				"contained an invalid votebits value (expected %v, "+
-				"got %v)", block.Sha(), earlyVoteBitsValue,
+				"got %v)", block.Hash(), earlyVoteBitsValue,
 				header.VoteBits)
 			return ruleError(ErrInvalidEarlyVoteBits, str)
 		}
@@ -675,7 +675,7 @@ func (b *BlockChain) checkBlockHeaderContext(header *wire.BlockHeader, prevNode 
 	blockHeight := prevNode.height + 1
 
 	// Ensure chain matches up to predetermined checkpoints.
-	blockHash := header.BlockSha()
+	blockHash := header.BlockHash()
 	if !b.verifyCheckpoint(blockHeight, &blockHash) {
 		str := fmt.Sprintf("block at height %d does not match "+
 			"checkpoint hash", blockHeight)
@@ -735,7 +735,7 @@ func (b *BlockChain) checkDupTxs(txSet []*dcrutil.Tx,
 	// Typically, there will not be any utxos for any of the transactions.
 	fetchSet := make(map[chainhash.Hash]struct{})
 	for _, tx := range txSet {
-		fetchSet[*tx.Sha()] = struct{}{}
+		fetchSet[*tx.Hash()] = struct{}{}
 	}
 	err := view.fetchUtxos(b.db, fetchSet)
 	if err != nil {
@@ -745,11 +745,11 @@ func (b *BlockChain) checkDupTxs(txSet []*dcrutil.Tx,
 	// Duplicate transactions are only allowed if the previous transaction
 	// is fully spent.
 	for _, tx := range txSet {
-		txEntry := view.LookupEntry(tx.Sha())
+		txEntry := view.LookupEntry(tx.Hash())
 		if txEntry != nil && !txEntry.IsFullySpent() {
 			str := fmt.Sprintf("tried to overwrite transaction %v "+
 				"at block height %d that is not fully spent",
-				tx.Sha(), txEntry.BlockHeight())
+				tx.Hash(), txEntry.BlockHeight())
 			return ruleError(ErrOverwriteTx, str)
 		}
 	}
@@ -770,7 +770,7 @@ func (b *BlockChain) CheckBlockStakeSanity(stakeValidationHeight int64, node *bl
 	stakeTransactions := block.STransactions()
 	msgBlock := block.MsgBlock()
 	sbits := msgBlock.Header.SBits
-	blockSha := block.Sha()
+	blockHash := block.Hash()
 	prevBlockHash := &msgBlock.Header.PrevBlock
 	poolSize := int(msgBlock.Header.PoolSize)
 	finalState := node.header.FinalState
@@ -863,10 +863,10 @@ func (b *BlockChain) CheckBlockStakeSanity(stakeValidationHeight int64, node *bl
 			// 1. Make sure that we're committing enough coins. Checked already
 			// when we check stake difficulty, so may not be needed.
 			if msgTx.TxOut[0].Value < sbits {
-				txSha := staketx.Sha()
+				txHash := staketx.Hash()
 				errStr := fmt.Sprintf("Error in stake consensus: the amount "+
 					"committed in SStx %v was less than the sBits value %v",
-					txSha, sbits)
+					txHash, sbits)
 				return ruleError(ErrNotEnoughStake, errStr)
 			}
 		}
@@ -879,7 +879,7 @@ func (b *BlockChain) CheckBlockStakeSanity(stakeValidationHeight int64, node *bl
 	// need this check, as the above one should fail if you overflow uint8.
 	if numSStxTx > int(chainParams.MaxFreshStakePerBlock) {
 		errStr := fmt.Sprintf("Error in stake consensus: the number of SStx tx "+
-			"in block %v was %v, overflowing the maximum allowed (255)", blockSha,
+			"in block %v was %v, overflowing the maximum allowed (255)", blockHash,
 			numSStxTx)
 		return ruleError(ErrTooManySStxs, errStr)
 	}
@@ -892,7 +892,7 @@ func (b *BlockChain) CheckBlockStakeSanity(stakeValidationHeight int64, node *bl
 		if stakeTxSum != len(stakeTransactions) {
 			errStr := fmt.Sprintf("Error in stake consensus: the number of "+
 				"stake tx in block %v was %v, however we expected %v",
-				block.Sha(), stakeTxSum, len(stakeTransactions))
+				block.Hash(), stakeTxSum, len(stakeTransactions))
 			return ruleError(ErrInvalidEarlyStakeTx, errStr)
 		}
 
@@ -917,7 +917,7 @@ func (b *BlockChain) CheckBlockStakeSanity(stakeValidationHeight int64, node *bl
 	// 1. Check to make sure we have a majority of the potential voters voting.
 	if msgBlock.Header.Voters == 0 {
 		errStr := fmt.Sprintf("Error: no voters in block %v",
-			blockSha)
+			blockHash)
 		return ruleError(ErrNotEnoughVotes, errStr)
 	}
 
@@ -925,7 +925,7 @@ func (b *BlockChain) CheckBlockStakeSanity(stakeValidationHeight int64, node *bl
 	if msgBlock.Header.Voters < majority {
 		errStr := fmt.Sprintf("Error in stake consensus: the number of voters is "+
 			"not in the majority as compared to potential votes for block %v",
-			blockSha)
+			blockHash)
 		return ruleError(ErrNotEnoughVotes, errStr)
 	}
 
@@ -992,25 +992,25 @@ func (b *BlockChain) CheckBlockStakeSanity(stakeValidationHeight int64, node *bl
 			if !ticketAvailable {
 				errStr := fmt.Sprintf("Error in stake consensus: Ticket %v was "+
 					"not found to be available in the stake patch or database, "+
-					"yet block %v spends it!", sstxHash, blockSha)
+					"yet block %v spends it!", sstxHash, blockHash)
 				return ruleError(ErrTicketUnavailable, errStr)
 			}
 
 			// 3. Check to make sure that the SSGen tx votes on the parent block of
 			// the block in which it is included.
-			votedOnSha, votedOnHeight, err := stake.SSGenBlockVotedOn(msgTx)
+			votedOnHash, votedOnHeight, err := stake.SSGenBlockVotedOn(msgTx)
 			if err != nil {
 				errStr := fmt.Sprintf("unexpected vote tx decode error: %v",
 					err.Error())
 				return ruleError(ErrUnparseableSSGen, errStr)
 			}
 
-			if !(votedOnSha.IsEqual(prevBlockHash)) ||
+			if !(votedOnHash.IsEqual(prevBlockHash)) ||
 				(votedOnHeight != uint32(block.Height())-1) {
-				txSha := msgTx.TxSha()
+				txHash := msgTx.TxHash()
 				errStr := fmt.Sprintf("Error in stake consensus: SSGen %v voted "+
 					"on block %v at height %v, however it was found inside "+
-					"block %v at height %v!", txSha, votedOnSha,
+					"block %v at height %v!", txHash, votedOnHash,
 					votedOnHeight, prevBlockHash, block.Height()-1)
 				return ruleError(ErrVotesOnWrongBlock, errStr)
 			}
@@ -1027,13 +1027,13 @@ func (b *BlockChain) CheckBlockStakeSanity(stakeValidationHeight int64, node *bl
 	if (voteYea <= voteNay) && txTreeRegularValid {
 		errStr := fmt.Sprintf("Error in stake consensus: the voters voted "+
 			"against parent TxTreeRegular inclusion in block %v, but the "+
-			"block header indicates it was voted for", blockSha)
+			"block header indicates it was voted for", blockHash)
 		return ruleError(ErrIncongruentVotebit, errStr)
 	}
 	if (voteYea > voteNay) && !txTreeRegularValid {
 		errStr := fmt.Sprintf("Error in stake consensus: the voters voted "+
 			"for parent TxTreeRegular inclusion in block %v, but the "+
-			"block header indicates it was voted against", blockSha)
+			"block header indicates it was voted against", blockHash)
 		return ruleError(ErrIncongruentVotebit, errStr)
 	}
 
@@ -1076,7 +1076,7 @@ func (b *BlockChain) CheckBlockStakeSanity(stakeValidationHeight int64, node *bl
 			if !ticketMissed {
 				errStr := fmt.Sprintf("Error in stake consensus: Ticket %v was "+
 					"not found to be missed in the stake patch or database, "+
-					"yet block %v spends it!", sstxHash, blockSha)
+					"yet block %v spends it!", sstxHash, blockHash)
 				return ruleError(ErrInvalidSSRtx, errStr)
 			}
 		}
@@ -1089,7 +1089,7 @@ func (b *BlockChain) CheckBlockStakeSanity(stakeValidationHeight int64, node *bl
 	// check, but check anyway.
 	if numSSRtxTx > math.MaxUint8 {
 		errStr := fmt.Sprintf("Error in stake consensus: the number of SSRtx tx "+
-			"in block %v was %v, overflowing the maximum allowed (255)", blockSha,
+			"in block %v was %v, overflowing the maximum allowed (255)", blockHash,
 			numSSRtxTx)
 		return ruleError(ErrTooManyRevocations, errStr)
 	}
@@ -1109,7 +1109,7 @@ func (b *BlockChain) CheckBlockStakeSanity(stakeValidationHeight int64, node *bl
 
 	if stakeTxSum != len(stakeTransactions) {
 		errStr := fmt.Sprintf("Error in stake consensus: the number of stake tx "+
-			"in block %v was %v, however we expected %v", block.Sha(), stakeTxSum,
+			"in block %v was %v, however we expected %v", block.Hash(), stakeTxSum,
 			len(stakeTransactions))
 		return ruleError(ErrNonstandardStakeTx, errStr)
 	}
@@ -1152,7 +1152,7 @@ func CheckTransactionInputs(subsidyCache *SubsidyCache, tx *dcrutil.Tx,
 
 	ticketMaturity := int64(chainParams.TicketMaturity)
 	stakeEnabledHeight := chainParams.StakeEnabledHeight
-	txHash := tx.Sha()
+	txHash := tx.Hash()
 	var totalAtomIn int64
 
 	// Coinbase transactions have no inputs.
@@ -1824,7 +1824,7 @@ func CountP2SHSigOps(tx *dcrutil.Tx, isCoinBaseTx bool, isStakeBaseTx bool,
 			str := fmt.Sprintf("unable to find unspent transaction "+
 				"%v referenced from transaction %s:%d during "+
 				"CountP2SHSigOps: output missing",
-				txIn.PreviousOutPoint.Hash, tx.Sha(), txInIndex)
+				txIn.PreviousOutPoint.Hash, tx.Hash(), txInIndex)
 			return 0, ruleError(ErrMissingTx, str)
 		}
 
@@ -1832,7 +1832,7 @@ func CountP2SHSigOps(tx *dcrutil.Tx, isCoinBaseTx bool, isStakeBaseTx bool,
 			str := fmt.Sprintf("unable to find unspent output "+
 				"%v referenced from transaction %s:%d during "+
 				"CountP2SHSigOps: output spent",
-				txIn.PreviousOutPoint, tx.Sha(), txInIndex)
+				txIn.PreviousOutPoint, tx.Hash(), txInIndex)
 			return 0, ruleError(ErrMissingTx, str)
 		}
 
@@ -1938,7 +1938,7 @@ func checkStakeBaseAmounts(subsidyCache *SubsidyCache, height int64,
 
 			if difference > calcSubsidy {
 				str := fmt.Sprintf("ssgen tx %v spent more than allowed "+
-					"(spent %v, allowed %v)", tx.Sha(), difference, calcSubsidy)
+					"(spent %v, allowed %v)", tx.Hash(), difference, calcSubsidy)
 				return ruleError(ErrSSGenSubsidy, str)
 			}
 		}
@@ -2405,7 +2405,7 @@ func (b *BlockChain) CheckConnectBlock(block *dcrutil.Block) error {
 		return ruleError(ErrMissingParent, err.Error())
 	}
 
-	newNode := newBlockNode(&block.MsgBlock().Header, block.Sha(),
+	newNode := newBlockNode(&block.MsgBlock().Header, block.Hash(),
 		block.Height(), ticketsSpentInBlock(block),
 		ticketsRevokedInBlock(block),
 		voteVersionsInBlock(block, b.chainParams))

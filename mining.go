@@ -270,7 +270,7 @@ func newTxPriorityQueue(reserve int, lessFunc func(*txPriorityQueue, int,
 func containsTxIns(txs []*dcrutil.Tx, tx *dcrutil.Tx) bool {
 	for _, txToCheck := range txs {
 		for _, txIn := range tx.MsgTx().TxIn {
-			if txIn.PreviousOutPoint.Hash.IsEqual(txToCheck.Sha()) {
+			if txIn.PreviousOutPoint.Hash.IsEqual(txToCheck.Hash()) {
 				return true
 			}
 		}
@@ -338,7 +338,7 @@ func hashInSlice(h chainhash.Hash, list []chainhash.Hash) bool {
 // can not be found.
 func txIndexFromTxList(hash chainhash.Hash, list []*dcrutil.Tx) int {
 	for i, tx := range list {
-		h := tx.Sha()
+		h := tx.Hash()
 		if hash == *h {
 			return i
 		}
@@ -598,7 +598,7 @@ func logSkippedDeps(tx *dcrutil.Tx, deps *list.List) {
 	for e := deps.Front(); e != nil; e = e.Next() {
 		item := e.Value.(*txPrioItem)
 		minrLog.Tracef("Skipping tx %s since it depends on %s\n",
-			item.tx.Sha(), tx.Sha())
+			item.tx.Hash(), tx.Hash())
 	}
 }
 
@@ -656,7 +656,7 @@ func maybeInsertStakeTx(bm *blockManager, stx *dcrutil.Tx, treeValid bool) bool 
 	view, err := bm.chain.FetchUtxoView(stx, treeValid)
 	if err != nil {
 		minrLog.Warnf("Unable to fetch transaction store for "+
-			"stx %s: %v", stx.Sha(), err)
+			"stx %s: %v", stx.Hash(), err)
 		return false
 	}
 	mstx := stx.MsgTx()
@@ -1253,13 +1253,13 @@ mempoolLoop:
 		tx := txDesc.Tx
 		msgTx := tx.MsgTx()
 		if blockchain.IsCoinBaseTx(msgTx) {
-			minrLog.Tracef("Skipping coinbase tx %s", tx.Sha())
+			minrLog.Tracef("Skipping coinbase tx %s", tx.Hash())
 			continue
 		}
 		if !blockchain.IsFinalizedTransaction(tx, nextBlockHeight,
 			timeSource.AdjustedTime()) {
 
-			minrLog.Tracef("Skipping non-finalized tx %s", tx.Sha())
+			minrLog.Tracef("Skipping non-finalized tx %s", tx.Hash())
 			continue
 		}
 
@@ -1270,14 +1270,14 @@ mempoolLoop:
 			blockHash, blockHeight, err := stake.SSGenBlockVotedOn(msgTx)
 			if err != nil { // Should theoretically never fail.
 				minrLog.Tracef("Skipping ssgen tx %s because of failure "+
-					"to extract block voting data", tx.Sha())
+					"to extract block voting data", tx.Hash())
 				continue
 			}
 
 			if !((blockHash == *prevHash) &&
 				(int64(blockHeight) == nextBlockHeight-1)) {
 				minrLog.Tracef("Skipping ssgen tx %s because it does "+
-					"not vote on the correct block", tx.Sha())
+					"not vote on the correct block", tx.Hash())
 				continue
 			}
 		}
@@ -1289,7 +1289,7 @@ mempoolLoop:
 		utxos, err := blockManager.chain.FetchUtxoView(tx, treeValid)
 		if err != nil {
 			minrLog.Warnf("Unable to fetch utxo view for tx %s: "+
-				"%v", tx.Sha(), err)
+				"%v", tx.Hash(), err)
 			continue
 		}
 
@@ -1313,7 +1313,7 @@ mempoolLoop:
 					minrLog.Tracef("Skipping tx %s because "+
 						"it references unspent output "+
 						"%s which is not available",
-						tx.Sha(), txIn.PreviousOutPoint)
+						tx.Hash(), txIn.PreviousOutPoint)
 					continue mempoolLoop
 				}
 
@@ -1410,14 +1410,14 @@ mempoolLoop:
 		// any) and remove the entry for this transaction as it will
 		// either be included or skipped, but in either case the deps
 		// are no longer needed.
-		deps := dependers[*tx.Sha()]
-		delete(dependers, *tx.Sha())
+		deps := dependers[*tx.Hash()]
+		delete(dependers, *tx.Hash())
 
 		// Skip if we already have too many SStx.
 		if isSStx && (numSStx >=
 			int(server.chainParams.MaxFreshStakePerBlock)) {
 			minrLog.Tracef("Skipping sstx %s because it would exceed "+
-				"the max number of sstx allowed in a block", tx.Sha())
+				"the max number of sstx allowed in a block", tx.Hash())
 			logSkippedDeps(tx, deps)
 			continue
 		}
@@ -1441,9 +1441,10 @@ mempoolLoop:
 		txSize := uint32(tx.MsgTx().SerializeSize())
 		blockPlusTxSize := blockSize + txSize
 		if blockPlusTxSize < blockSize || blockPlusTxSize >= policy.BlockMaxSize {
-			minrLog.Tracef("Skipping tx %s (size %v) because it would exceed "+
-				"the max block size; cur block size %v, cur num tx %v", tx.Sha(),
-				txSize, blockSize, len(blockTxns))
+			minrLog.Tracef("Skipping tx %s (size %v) because it "+
+				"would exceed the max block size; cur block "+
+				"size %v, cur num tx %v", tx.Hash(), txSize,
+				blockSize, len(blockTxns))
 			logSkippedDeps(tx, deps)
 			continue
 		}
@@ -1454,7 +1455,7 @@ mempoolLoop:
 		if blockSigOps+numSigOps < blockSigOps ||
 			blockSigOps+numSigOps > blockchain.MaxSigOpsPerBlock {
 			minrLog.Tracef("Skipping tx %s because it would "+
-				"exceed the maximum sigops per block", tx.Sha())
+				"exceed the maximum sigops per block", tx.Hash())
 			logSkippedDeps(tx, deps)
 			continue
 		}
@@ -1465,7 +1466,7 @@ mempoolLoop:
 			isSSGen, blockUtxos)
 		if err != nil {
 			minrLog.Tracef("Skipping tx %s due to error in "+
-				"CountP2SHSigOps: %v", tx.Sha(), err)
+				"CountP2SHSigOps: %v", tx.Hash(), err)
 			logSkippedDeps(tx, deps)
 			continue
 		}
@@ -1474,7 +1475,7 @@ mempoolLoop:
 			blockSigOps+numSigOps > blockchain.MaxSigOpsPerBlock {
 			minrLog.Tracef("Skipping tx %s because it would "+
 				"exceed the maximum sigops per block (p2sh)",
-				tx.Sha())
+				tx.Hash())
 			logSkippedDeps(tx, deps)
 			continue
 		}
@@ -1507,7 +1508,7 @@ mempoolLoop:
 
 			minrLog.Tracef("Skipping tx %s with feePerKB %.2f "+
 				"< TxMinFreeFee %d and block size %d >= "+
-				"minBlockSize %d", tx.Sha(), prioItem.feePerKB,
+				"minBlockSize %d", tx.Hash(), prioItem.feePerKB,
 				policy.TxMinFreeFee, blockPlusTxSize,
 				policy.BlockMinSize)
 			logSkippedDeps(tx, deps)
@@ -1553,7 +1554,7 @@ mempoolLoop:
 			server.chainParams)
 		if err != nil {
 			minrLog.Tracef("Skipping tx %s due to error in "+
-				"CheckTransactionInputs: %v", tx.Sha(), err)
+				"CheckTransactionInputs: %v", tx.Hash(), err)
 			logSkippedDeps(tx, deps)
 			continue
 		}
@@ -1561,7 +1562,7 @@ mempoolLoop:
 			txscript.StandardVerifyFlags, server.sigCache)
 		if err != nil {
 			minrLog.Tracef("Skipping tx %s due to error in "+
-				"ValidateTransactionScripts: %v", tx.Sha(), err)
+				"ValidateTransactionScripts: %v", tx.Hash(), err)
 			logSkippedDeps(tx, deps)
 			continue
 		}
@@ -1574,7 +1575,7 @@ mempoolLoop:
 		if err != nil {
 			minrLog.Warnf("Unable to spend transaction %v in the preliminary "+
 				"UTXO view for the block template: %v",
-				tx.Sha(), err)
+				tx.Hash(), err)
 		}
 
 		// Add the transaction to the block, increment counters, and
@@ -1593,11 +1594,11 @@ mempoolLoop:
 			foundWinningTickets[tx.MsgTx().TxIn[1].PreviousOutPoint.Hash] = true
 		}
 
-		txFeesMap[*tx.Sha()] = prioItem.fee
-		txSigOpCountsMap[*tx.Sha()] = numSigOps
+		txFeesMap[*tx.Hash()] = prioItem.fee
+		txSigOpCountsMap[*tx.Hash()] = numSigOps
 
 		minrLog.Tracef("Adding tx %s (priority %.2f, feePerKB %.2f)",
-			prioItem.tx.Sha(), prioItem.priority, prioItem.feePerKB)
+			prioItem.tx.Hash(), prioItem.priority, prioItem.feePerKB)
 
 		// Add transactions which depend on this one (and also do not
 		// have any other unsatisified dependencies) to the priority
@@ -1608,7 +1609,7 @@ mempoolLoop:
 				// there are no more dependencies after this
 				// one.
 				item := e.Value.(*txPrioItem)
-				delete(item.dependsOn, *tx.Sha())
+				delete(item.dependsOn, *tx.Hash())
 				if len(item.dependsOn) == 0 {
 					heap.Push(priorityQueue, item)
 				}
@@ -1707,7 +1708,7 @@ mempoolLoop:
 					for _, txIn := range tx.MsgTx().TxIn {
 						for _, parentTx := range topBlockRegTx {
 							if txIn.PreviousOutPoint.Hash.IsEqual(
-								parentTx.Sha()) {
+								parentTx.Hash()) {
 								isValid = false
 							}
 						}
@@ -1822,8 +1823,8 @@ mempoolLoop:
 	numCoinbaseSigOps := int64(blockchain.CountSigOps(coinbaseTx, true, false))
 	blockSize += uint32(coinbaseTx.MsgTx().SerializeSize())
 	blockSigOps += numCoinbaseSigOps
-	txFeesMap[*coinbaseTx.Sha()] = 0
-	txSigOpCountsMap[*coinbaseTx.Sha()] = numCoinbaseSigOps
+	txFeesMap[*coinbaseTx.Hash()] = 0
+	txSigOpCountsMap[*coinbaseTx.Hash()] = numCoinbaseSigOps
 
 	// Build tx lists for regular tx.
 	blockTxnsRegular := make([]*dcrutil.Tx, 0, len(blockTxns)+1)
@@ -1838,41 +1839,41 @@ mempoolLoop:
 		} else if tx.Tree() == wire.TxTreeStake {
 			continue
 		} else {
-			minrLog.Tracef("Error adding tx %s to block; invalid tree", tx.Sha())
+			minrLog.Tracef("Error adding tx %s to block; invalid tree", tx.Hash())
 			continue
 		}
 	}
 
 	for _, tx := range blockTxnsRegular {
-		fee, ok := txFeesMap[*tx.Sha()]
+		fee, ok := txFeesMap[*tx.Hash()]
 		if !ok {
 			return nil, fmt.Errorf("couldn't find fee for tx %v",
-				*tx.Sha())
+				*tx.Hash())
 		}
 		totalFees += fee
 		txFees = append(txFees, fee)
 
-		tsos, ok := txSigOpCountsMap[*tx.Sha()]
+		tsos, ok := txSigOpCountsMap[*tx.Hash()]
 		if !ok {
 			return nil, fmt.Errorf("couldn't find sig ops count for tx %v",
-				*tx.Sha())
+				*tx.Hash())
 		}
 		txSigOpCounts = append(txSigOpCounts, tsos)
 	}
 
 	for _, tx := range blockTxnsStake {
-		fee, ok := txFeesMap[*tx.Sha()]
+		fee, ok := txFeesMap[*tx.Hash()]
 		if !ok {
 			return nil, fmt.Errorf("couldn't find fee for stx %v",
-				*tx.Sha())
+				*tx.Hash())
 		}
 		totalFees += fee
 		txFees = append(txFees, fee)
 
-		tsos, ok := txSigOpCountsMap[*tx.Sha()]
+		tsos, ok := txSigOpCountsMap[*tx.Hash()]
 		if !ok {
 			return nil, fmt.Errorf("couldn't find sig ops count for stx %v",
-				*tx.Sha())
+				*tx.Hash())
 		}
 		txSigOpCounts = append(txSigOpCounts, tsos)
 	}
@@ -1934,7 +1935,7 @@ mempoolLoop:
 		utxs, err := blockManager.chain.FetchUtxoView(tx, treeValid)
 		if err != nil {
 			str := fmt.Sprintf("failed to fetch input utxs for tx %v: %s",
-				tx.Sha(), err.Error())
+				tx.Hash(), err.Error())
 			return nil, miningRuleError(ErrFetchTxStore, str)
 		}
 

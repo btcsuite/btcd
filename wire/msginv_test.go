@@ -12,7 +12,6 @@ import (
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
-
 	"github.com/decred/dcrd/chaincfg/chainhash"
 )
 
@@ -79,14 +78,14 @@ func TestInvWire(t *testing.T) {
 	hashStr := "3264bc2ac36a60840790ba1d475d01367e7c723da941069e9dc"
 	blockHash, err := chainhash.NewHashFromStr(hashStr)
 	if err != nil {
-		t.Errorf("NewShaHashFromStr: %v", err)
+		t.Errorf("NewHashFromStr: %v", err)
 	}
 
 	// Transation 1 of Block 203707 hash.
 	hashStr = "d28a3dc7392bf00a9855ee93dd9a81eff82a2c4fe57fbd42cfe71b487accfaf0"
 	txHash, err := chainhash.NewHashFromStr(hashStr)
 	if err != nil {
-		t.Errorf("NewShaHashFromStr: %v", err)
+		t.Errorf("NewHashFromStr: %v", err)
 	}
 
 	iv := NewInvVect(InvTypeBlock, blockHash)
@@ -180,7 +179,7 @@ func TestInvWireErrors(t *testing.T) {
 	hashStr := "3264bc2ac36a60840790ba1d475d01367e7c723da941069e9dc"
 	blockHash, err := chainhash.NewHashFromStr(hashStr)
 	if err != nil {
-		t.Errorf("NewShaHashFromStr: %v", err)
+		t.Errorf("NewHashFromStr: %v", err)
 	}
 
 	iv := NewInvVect(InvTypeBlock, blockHash)

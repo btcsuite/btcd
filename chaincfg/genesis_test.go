@@ -1,4 +1,4 @@
-// Copyright (c) 2014 The btcsuite developers
+// Copyright (c) 2014-2016 The btcsuite developers
 // Copyright (c) 2015-2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
@@ -43,7 +43,7 @@ func TestGenesisBlock(t *testing.T) {
 	}
 
 	// Check hash of the block against expected hash.
-	hash := MainNetParams.GenesisBlock.BlockSha()
+	hash := MainNetParams.GenesisBlock.BlockHash()
 	if !MainNetParams.GenesisHash.IsEqual(&hash) {
 		t.Fatalf("TestGenesisBlock: Genesis block hash does not "+
 			"appear valid - got %v, want %v", spew.Sdump(hash),
@@ -85,7 +85,7 @@ func TestTestNetGenesisBlock(t *testing.T) {
 	}
 
 	// Check hash of the block against expected hash.
-	hash := TestNetParams.GenesisBlock.BlockSha()
+	hash := TestNetParams.GenesisBlock.BlockHash()
 	if !TestNetParams.GenesisHash.IsEqual(&hash) {
 		t.Fatalf("TestTestNetGenesisBlock: Genesis block hash does "+
 			"not appear valid - got %v, want %v", spew.Sdump(hash),
@@ -127,7 +127,7 @@ func TestSimNetGenesisBlock(t *testing.T) {
 	}
 
 	// Check hash of the block against expected hash.
-	hash := SimNetParams.GenesisBlock.BlockSha()
+	hash := SimNetParams.GenesisBlock.BlockHash()
 	if !SimNetParams.GenesisHash.IsEqual(&hash) {
 		t.Fatalf("TestSimNetGenesisBlock: Genesis block hash does "+
 			"not appear valid - got %v, want %v", spew.Sdump(hash),

@@ -210,7 +210,7 @@ type Config struct {
 	// peer will report a block height of 0, however it is good practice for
 	// peers to specify this so their currently best known is accurately
 	// reported.
-	NewestBlock ShaFunc
+	NewestBlock HashFunc
 
 	// BestLocalAddress returns the best local address for a given address.
 	BestLocalAddress AddrFunc
@@ -359,9 +359,9 @@ type StatsSnap struct {
 	LastPingMicros int64
 }
 
-// ShaFunc is a function which returns a block sha, height and error
+// HashFunc is a function which returns a block hash, height and error
 // It is used as a callback to get newest block details.
-type ShaFunc func() (sha *chainhash.Hash, height int64, err error)
+type HashFunc func() (hash *chainhash.Hash, height int64, err error)
 
 // AddrFunc is a func which takes an address and returns a related address.
 type AddrFunc func(remoteAddr *wire.NetAddress) *wire.NetAddress
@@ -475,15 +475,15 @@ func (p *Peer) UpdateLastBlockHeight(newHeight int64) {
 	p.statsMtx.Unlock()
 }
 
-// UpdateLastAnnouncedBlock updates meta-data about the last block sha this
+// UpdateLastAnnouncedBlock updates meta-data about the last block hash this
 // peer is known to have announced.
 //
 // This function is safe for concurrent access.
-func (p *Peer) UpdateLastAnnouncedBlock(blkSha *chainhash.Hash) {
-	log.Tracef("Updating last blk for peer %v, %v", p.addr, blkSha)
+func (p *Peer) UpdateLastAnnouncedBlock(blkHash *chainhash.Hash) {
+	log.Tracef("Updating last blk for peer %v, %v", p.addr, blkHash)
 
 	p.statsMtx.Lock()
-	p.lastAnnouncedBlock = blkSha
+	p.lastAnnouncedBlock = blkHash
 	p.statsMtx.Unlock()
 }
 

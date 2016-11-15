@@ -44,7 +44,7 @@ func NewHash256PRNG(seed []byte) *Hash256PRNG {
 	// derived from the hexadecimal representation of
 	// pi.
 	hp := new(Hash256PRNG)
-	hp.seed = chainhash.HashFuncH(append(seed, seedConst[:]...))
+	hp.seed = chainhash.HashH(append(seed, seedConst[:]...))
 	hp.lastHash = hp.seed
 	hp.idx = 0
 	return hp
@@ -61,7 +61,7 @@ func (hp *Hash256PRNG) StateHash() chainhash.Hash {
 	binary.BigEndian.PutUint32(finalState[len(fHash):], uint32(fIdx))
 	finalState[len(fHash)+4] = byte(fHashIdx)
 
-	return chainhash.HashFuncH(finalState)
+	return chainhash.HashH(finalState)
 }
 
 // Hash256Rand returns a uint32 random number using the pseudorandom number
@@ -74,7 +74,7 @@ func (hp *Hash256PRNG) Hash256Rand() uint32 {
 	if hp.hashIdx > 7 {
 		idxB := make([]byte, 4, 4)
 		binary.BigEndian.PutUint32(idxB, uint32(hp.idx))
-		hp.lastHash = chainhash.HashFuncH(append(hp.seed[:], idxB...))
+		hp.lastHash = chainhash.HashH(append(hp.seed[:], idxB...))
 		hp.idx++
 		hp.hashIdx = 0
 	}
@@ -82,7 +82,7 @@ func (hp *Hash256PRNG) Hash256Rand() uint32 {
 	// 'roll over' the PRNG by re-hashing the seed when
 	// we overflow idx.
 	if hp.idx > 0xFFFFFFFF {
-		hp.seed = chainhash.HashFuncH(hp.seed[:])
+		hp.seed = chainhash.HashH(hp.seed[:])
 		hp.lastHash = hp.seed
 		hp.idx = 0
 	}

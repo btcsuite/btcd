@@ -166,7 +166,7 @@ var (
 	// 0x?? 0x?? (VoteBits) ... 0x??
 	validSSGenVoteOutMinPrefix = []byte{0x6a, 0x02}
 
-	// zeroHash is the zero value for a wire.ShaHash and is defined as
+	// zeroHash is the zero value for a chainhash.Hash and is defined as
 	// a package level variable to avoid the need to create a new instance
 	// every time a check is needed.
 	zeroHash = &chainhash.Hash{}
@@ -426,7 +426,7 @@ func TxSSGenStakeOutputInfo(tx *wire.MsgTx, params *chaincfg.Params) ([]bool,
 // has passed IsSSGen.
 func SSGenBlockVotedOn(tx *wire.MsgTx) (chainhash.Hash, uint32, error) {
 	// Get the block header hash.
-	blockSha, err := chainhash.NewHash(tx.TxOut[0].PkScript[2:34])
+	blockHash, err := chainhash.NewHash(tx.TxOut[0].PkScript[2:34])
 	if err != nil {
 		return chainhash.Hash{}, 0, err
 	}
@@ -434,7 +434,7 @@ func SSGenBlockVotedOn(tx *wire.MsgTx) (chainhash.Hash, uint32, error) {
 	// Get the block height.
 	height := binary.LittleEndian.Uint32(tx.TxOut[0].PkScript[34:38])
 
-	return *blockSha, height, nil
+	return *blockHash, height, nil
 }
 
 // SSGenVoteBits takes an SSGen tx as input and scans through its

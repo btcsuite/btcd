@@ -302,7 +302,7 @@ func (a *AddrManager) getNewBucket(netAddr, srcAddr *wire.NetAddress) int {
 	data1 = append(data1, a.key[:]...)
 	data1 = append(data1, []byte(GroupKey(netAddr))...)
 	data1 = append(data1, []byte(GroupKey(srcAddr))...)
-	hash1 := chainhash.HashFuncB(data1)
+	hash1 := chainhash.HashB(data1)
 	hash64 := binary.LittleEndian.Uint64(hash1)
 	hash64 %= newBucketsPerGroup
 	var hashbuf [8]byte
@@ -312,7 +312,7 @@ func (a *AddrManager) getNewBucket(netAddr, srcAddr *wire.NetAddress) int {
 	data2 = append(data2, GroupKey(srcAddr)...)
 	data2 = append(data2, hashbuf[:]...)
 
-	hash2 := chainhash.HashFuncB(data2)
+	hash2 := chainhash.HashB(data2)
 	return int(binary.LittleEndian.Uint64(hash2) % newBucketCount)
 }
 
@@ -323,7 +323,7 @@ func (a *AddrManager) getTriedBucket(netAddr *wire.NetAddress) int {
 	data1 := []byte{}
 	data1 = append(data1, a.key[:]...)
 	data1 = append(data1, []byte(NetAddressKey(netAddr))...)
-	hash1 := chainhash.HashFuncB(data1)
+	hash1 := chainhash.HashB(data1)
 	hash64 := binary.LittleEndian.Uint64(hash1)
 	hash64 %= triedBucketsPerGroup
 	var hashbuf [8]byte
@@ -333,7 +333,7 @@ func (a *AddrManager) getTriedBucket(netAddr *wire.NetAddress) int {
 	data2 = append(data2, GroupKey(netAddr)...)
 	data2 = append(data2, hashbuf[:]...)
 
-	hash2 := chainhash.HashFuncB(data2)
+	hash2 := chainhash.HashB(data2)
 	return int(binary.LittleEndian.Uint64(hash2) % triedBucketCount)
 }
 

@@ -121,7 +121,7 @@ func (bi *blockImporter) processBlock(serializedBlock []byte) (bool, error) {
 	// Skip blocks that already exist.
 	var exists bool
 	err = bi.db.View(func(tx database.Tx) error {
-		exists, err = tx.HasBlock(block.Sha())
+		exists, err = tx.HasBlock(block.Hash())
 		if err != nil {
 			return err
 		}

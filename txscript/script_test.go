@@ -515,7 +515,7 @@ func TestCalcSignatureHash(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		txIn := new(wire.TxIn)
 		txIn.Sequence = 0xFFFFFFFF
-		txIn.PreviousOutPoint.Hash = chainhash.HashFuncH([]byte{byte(i)})
+		txIn.PreviousOutPoint.Hash = chainhash.HashH([]byte{byte(i)})
 		txIn.PreviousOutPoint.Index = uint32(i)
 		txIn.PreviousOutPoint.Tree = int8(0)
 		tx.AddTxIn(txIn)
@@ -537,7 +537,7 @@ func TestCalcSignatureHash(t *testing.T) {
 		t.Fatalf("unexpected error %v", err.Error())
 	}
 
-	prefixHash := tx.TxSha()
+	prefixHash := tx.TxHash()
 	msg2, err := txscript.CalcSignatureHash(pops, txscript.SigHashAll, tx, 0,
 		&prefixHash)
 	if err != nil {

@@ -101,12 +101,12 @@ type blockNode struct {
 // completely disconnected from the chain and the workSum value is just the work
 // for the passed block.  The work sum is updated accordingly when the node is
 // inserted into a chain.
-func newBlockNode(blockHeader *wire.BlockHeader, blockSha *chainhash.Hash, height int64, ticketsSpent []chainhash.Hash, ticketsRevoked []chainhash.Hash, voterVersions []uint32) *blockNode {
+func newBlockNode(blockHeader *wire.BlockHeader, blockHash *chainhash.Hash, height int64, ticketsSpent []chainhash.Hash, ticketsRevoked []chainhash.Hash, voterVersions []uint32) *blockNode {
 	// Make a copy of the hash so the node doesn't keep a reference to part
 	// of the full block/block header preventing it from being garbage
 	// collected.
 	node := blockNode{
-		hash:           *blockSha,
+		hash:           *blockHash,
 		workSum:        CalcWork(blockHeader.Bits),
 		height:         height,
 		header:         *blockHeader,
@@ -361,7 +361,7 @@ func (b *BlockChain) removeOrphanBlock(orphan *orphanBlock) {
 	defer b.orphanLock.Unlock()
 
 	// Remove the orphan block from the orphan pool.
-	orphanHash := orphan.block.Sha()
+	orphanHash := orphan.block.Hash()
 	delete(b.orphans, *orphanHash)
 
 	// Remove the reference from the previous orphan index too.  An indexing
@@ -371,7 +371,7 @@ func (b *BlockChain) removeOrphanBlock(orphan *orphanBlock) {
 	prevHash := &orphan.block.MsgBlock().Header.PrevBlock
 	orphans := b.prevOrphans[*prevHash]
 	for i := 0; i < len(orphans); i++ {
-		hash := orphans[i].block.Sha()
+		hash := orphans[i].block.Hash()
 		if hash.IsEqual(orphanHash) {
 			copy(orphans[i:], orphans[i+1:])
 			orphans[len(orphans)-1] = nil
@@ -430,7 +430,7 @@ func (b *BlockChain) addOrphanBlock(block *dcrutil.Block) {
 		block:      block,
 		expiration: expiration,
 	}
-	b.orphans[*block.Sha()] = oBlock
+	b.orphans[*block.Hash()] = oBlock
 
 	// Add to previous hash lookup index for faster dependency lookups.
 	prevHash := &block.MsgBlock().Header.PrevBlock
@@ -486,8 +486,7 @@ func (b *BlockChain) GetGeneration(hash chainhash.Hash) ([]chainhash.Hash, error
 //
 // This function MUST be called with the chain state lock held (for writes).
 // The database transaction may be read-only.
-func (b *BlockChain) loadBlockNode(dbTx database.Tx,
-	hash *chainhash.Hash) (*blockNode, error) {
+func (b *BlockChain) loadBlockNode(dbTx database.Tx, hash *chainhash.Hash) (*blockNode, error) {
 	block, err := dbFetchBlockByHash(dbTx, hash)
 	if err != nil {
 		return nil, err
@@ -1057,7 +1056,7 @@ func (b *BlockChain) getReorganizeNodes(node *blockNode) (*list.List, *list.List
 // and removes any old blocks from the cache that might be present.
 func (b *BlockChain) pushMainChainBlockCache(block *dcrutil.Block) {
 	curHeight := block.Height()
-	curHash := block.Sha()
+	curHash := block.Hash()
 	b.mainchainBlockCacheLock.Lock()
 	b.mainchainBlockCache[*curHash] = block
 	for hash, bl := range b.mainchainBlockCache {
@@ -1071,7 +1070,7 @@ func (b *BlockChain) pushMainChainBlockCache(block *dcrutil.Block) {
 // dbMaybeStoreBlock stores the provided block in the database if it's not
 // already there.
 func dbMaybeStoreBlock(dbTx database.Tx, block *dcrutil.Block) error {
-	hasBlock, err := dbTx.HasBlock(block.Sha())
+	hasBlock, err := dbTx.HasBlock(block.Hash())
 	if err != nil {
 		return err
 	}
@@ -1149,7 +1148,7 @@ func (b *BlockChain) connectBlock(node *blockNode, block *dcrutil.Block,
 
 		// Add the block hash and height to the block index which tracks
 		// the main chain.
-		err = dbPutBlockIndex(dbTx, block.Sha(), node.height)
+		err = dbPutBlockIndex(dbTx, block.Hash(), node.height)
 		if err != nil {
 			return err
 		}
@@ -1164,7 +1163,7 @@ func (b *BlockChain) connectBlock(node *blockNode, block *dcrutil.Block,
 
 		// Update the transaction spend journal by adding a record for
 		// the block that contains all txos spent by it.
-		err = dbPutSpendJournalEntry(dbTx, block.Sha(), stxos)
+		err = dbPutSpendJournalEntry(dbTx, block.Hash(), stxos)
 		if err != nil {
 			return err
 		}
@@ -1275,7 +1274,7 @@ func (b *BlockChain) connectBlock(node *blockNode, block *dcrutil.Block,
 
 // dropMainChainBlockCache drops a block from the main chain block cache.
 func (b *BlockChain) dropMainChainBlockCache(block *dcrutil.Block) {
-	curHash := block.Sha()
+	curHash := block.Hash()
 	b.mainchainBlockCacheLock.Lock()
 	delete(b.mainchainBlockCache, *curHash)
 	b.mainchainBlockCacheLock.Unlock()
@@ -1348,7 +1347,7 @@ func (b *BlockChain) disconnectBlock(node *blockNode, block *dcrutil.Block,
 
 		// Remove the block hash and height from the block index which
 		// tracks the main chain.
-		err = dbRemoveBlockIndex(dbTx, block.Sha(), node.height)
+		err = dbRemoveBlockIndex(dbTx, block.Hash(), node.height)
 		if err != nil {
 			return err
 		}
@@ -1363,7 +1362,7 @@ func (b *BlockChain) disconnectBlock(node *blockNode, block *dcrutil.Block,
 
 		// Update the transaction spend journal by removing the record
 		// that contains all txos spent by the block .
-		err = dbRemoveSpendJournalEntry(dbTx, block.Sha())
+		err = dbRemoveSpendJournalEntry(dbTx, block.Hash())
 		if err != nil {
 			return err
 		}
@@ -1543,7 +1542,7 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List,
 		if len(stxos) != countSpentOutputs(block, parent) {
 			return AssertError(fmt.Sprintf("retrieved %v stxos when trying to "+
 				"disconnect block %v (height %v), yet counted %v "+
-				"many spent utxos", len(stxos), block.Sha(), block.Height(),
+				"many spent utxos", len(stxos), block.Hash(), block.Height(),
 				countSpentOutputs(block, parent)))
 		}
 
@@ -1763,7 +1762,7 @@ func (b *BlockChain) forceHeadReorganization(formerBest chainhash.Hash, newBest 
 		return AssertError(fmt.Sprintf("retrieved %v stxos when trying to "+
 			"disconnect block %v (height %v), yet counted %v "+
 			"many spent utxos when trying to force head reorg", len(stxos),
-			formerBestBlock.Sha(), formerBestBlock.Height(),
+			formerBestBlock.Hash(), formerBestBlock.Height(),
 			countSpentOutputs(formerBestBlock, commonParentBlock)))
 	}
 
@@ -1892,7 +1891,7 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *dcrutil.Block,
 	}
 	if fastAdd {
 		log.Warnf("fastAdd set in the side chain case? %v\n",
-			block.Sha())
+			block.Hash())
 	}
 
 	// We're extending (or creating) a side chain which may or may not

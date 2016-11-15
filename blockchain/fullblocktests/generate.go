@@ -154,7 +154,7 @@ type spendableOut struct {
 func makeSpendableOutForTx(tx *wire.MsgTx, blockHeight, txIndex, txOutIndex uint32) spendableOut {
 	return spendableOut{
 		prevOut: wire.OutPoint{
-			Hash:  tx.TxSha(),
+			Hash:  tx.TxHash(),
 			Index: txOutIndex,
 			Tree:  wire.TxTreeRegular,
 		},
@@ -194,8 +194,8 @@ func (t stakeTicketSorter) Swap(i, j int) { t[i], t[j] = t[j], t[i] }
 // Less returns whether the stake ticket with index i should sort before the
 // stake ticket with index j.  It is part of the sort.Interface implementation.
 func (t stakeTicketSorter) Less(i, j int) bool {
-	iHash := t[i].tx.CachedTxSha()[:]
-	jHash := t[j].tx.CachedTxSha()[:]
+	iHash := t[i].tx.CachedTxHash()[:]
+	jHash := t[j].tx.CachedTxHash()[:]
 	return bytes.Compare(iHash, jHash) < 0
 }
 
@@ -234,7 +234,7 @@ func makeTestGenerator(params *chaincfg.Params) (testGenerator, error) {
 	}
 
 	genesis := params.GenesisBlock
-	genesisHash := genesis.BlockSha()
+	genesisHash := genesis.BlockHash()
 	return testGenerator{
 		params:           params,
 		tip:              genesis,
@@ -413,7 +413,7 @@ func (g *testGenerator) createCoinbaseTx(blockHeight uint32, numVotes uint16) *w
 		// Coinbase transactions have no inputs, so previous outpoint is
 		// zero hash and max index.
 		PreviousOutPoint: *wire.NewOutPoint(&chainhash.Hash{},
-			wire.MaxPrevOutIndex, dcrutil.TxTreeRegular),
+			wire.MaxPrevOutIndex, wire.TxTreeRegular),
 		Sequence:        wire.MaxTxInSequenceNum,
 		ValueIn:         int64(devSubsidy + powSubsidy),
 		BlockHeight:     wire.NullBlockHeight,
@@ -563,7 +563,7 @@ func isRevocationTx(tx *wire.MsgTx) bool {
 // suitable for use in a vote tx (ssgen) given the block to vote on.
 func voteBlockScript(parentBlock *wire.MsgBlock) []byte {
 	var data [36]byte
-	parentHash := parentBlock.BlockSha()
+	parentHash := parentBlock.BlockHash()
 	copy(data[:], parentHash[:])
 	binary.LittleEndian.PutUint32(data[32:], parentBlock.Header.Height)
 	script, err := txscript.NewScriptBuilder().AddOp(txscript.OP_RETURN).
@@ -628,11 +628,11 @@ func (g *testGenerator) createVoteTx(parentBlock *wire.MsgBlock, ticket *stakeTi
 	// Generate and return the transaction with the proof-of-stake subsidy
 	// coinbase and spending from the provided ticket along with the
 	// previously described outputs.
-	ticketHash := ticket.tx.TxSha()
+	ticketHash := ticket.tx.TxHash()
 	tx := wire.NewMsgTx()
 	tx.AddTxIn(&wire.TxIn{
 		PreviousOutPoint: *wire.NewOutPoint(&chainhash.Hash{},
-			wire.MaxPrevOutIndex, dcrutil.TxTreeRegular),
+			wire.MaxPrevOutIndex, wire.TxTreeRegular),
 		Sequence:        wire.MaxTxInSequenceNum,
 		ValueIn:         int64(voteSubsidy),
 		BlockHeight:     wire.NullBlockHeight,
@@ -641,7 +641,7 @@ func (g *testGenerator) createVoteTx(parentBlock *wire.MsgBlock, ticket *stakeTi
 	})
 	tx.AddTxIn(&wire.TxIn{
 		PreviousOutPoint: *wire.NewOutPoint(&ticketHash, 0,
-			dcrutil.TxTreeStake),
+			wire.TxTreeStake),
 		Sequence:        wire.MaxTxInSequenceNum,
 		ValueIn:         int64(ticketPrice),
 		BlockHeight:     ticket.blockHeight,
@@ -1050,7 +1050,7 @@ func (hp *hash256prng) State() chainhash.Hash {
 	binary.BigEndian.PutUint32(finalState[offset:], uint32(hp.idx))
 	offset += 4
 	finalState[offset] = byte(hp.hashOffset)
-	return chainhash.HashFuncH(finalState)
+	return chainhash.HashH(finalState)
 }
 
 // Hash256Rand returns a uint32 random number using the pseudorandom number
@@ -1068,7 +1068,7 @@ func (hp *hash256prng) Hash256Rand() uint32 {
 		data := make([]byte, len(hp.seed)+4)
 		copy(data, hp.seed[:])
 		binary.BigEndian.PutUint32(data[len(hp.seed):], uint32(hp.idx))
-		hp.cachedHash = chainhash.HashFuncH(data)
+		hp.cachedHash = chainhash.HashH(data)
 		hp.idx++
 		hp.hashOffset = 0
 	}
@@ -1076,7 +1076,7 @@ func (hp *hash256prng) Hash256Rand() uint32 {
 	// Roll over the entire PRNG by re-hashing the seed when the hash
 	// iterator index overlows a uint32.
 	if hp.idx > math.MaxUint32 {
-		hp.seed = chainhash.HashFuncH(hp.seed[:])
+		hp.seed = chainhash.HashH(hp.seed[:])
 		hp.cachedHash = hp.seed
 		hp.idx = 0
 	}
@@ -1200,7 +1200,7 @@ func (g *testGenerator) sortedLiveTickets(block *wire.MsgBlock) []*stakeTicket {
 			panic(err)
 		}
 		for _, winner := range winners {
-			delete(allTickets, winner.tx.TxSha())
+			delete(allTickets, winner.tx.TxHash())
 		}
 	}
 
@@ -1222,7 +1222,7 @@ func (g *testGenerator) sortedLiveTickets(block *wire.MsgBlock) []*stakeTicket {
 			if isTicketPurchaseTx(tx) {
 				ticket := &stakeTicket{tx, block.Header.Height,
 					uint32(txIdx)}
-				allTickets[tx.TxSha()] = ticket
+				allTickets[tx.TxHash()] = ticket
 			}
 		}
 	}
@@ -1239,11 +1239,11 @@ func (g *testGenerator) sortedLiveTickets(block *wire.MsgBlock) []*stakeTicket {
 func calcFinalLotteryState(winners []*stakeTicket, prngStateHash chainhash.Hash) [6]byte {
 	data := make([]byte, (len(winners)+1)*chainhash.HashSize)
 	for i := 0; i < len(winners); i++ {
-		h := winners[i].tx.TxSha()
+		h := winners[i].tx.TxHash()
 		copy(data[chainhash.HashSize*i:], h[:])
 	}
 	copy(data[chainhash.HashSize*len(winners):], prngStateHash[:])
-	dataHash := chainhash.HashFuncH(data)
+	dataHash := chainhash.HashH(data)
 
 	var finalState [6]byte
 	copy(finalState[:], dataHash[0:6])
@@ -1290,8 +1290,8 @@ func solveBlock(header *wire.BlockHeader) bool {
 				return
 			default:
 				hdr.Nonce = i
-				hash := hdr.BlockSha()
-				if blockchain.ShaHashToBig(&hash).Cmp(
+				hash := hdr.BlockHash()
+				if blockchain.HashToBig(&hash).Cmp(
 					targetDifficulty) <= 0 {
 
 					results <- sbResult{true, i}
@@ -1646,7 +1646,7 @@ func (g *testGenerator) nextBlock(blockName string, spend *spendableOut, ticketS
 	block := wire.MsgBlock{
 		Header: wire.BlockHeader{
 			Version:      1,
-			PrevBlock:    g.tip.BlockSha(),
+			PrevBlock:    g.tip.BlockHash(),
 			MerkleRoot:   calcMerkleRoot(regularTxns),
 			StakeRoot:    calcMerkleRoot(stakeTxns),
 			VoteBits:     1,
@@ -1697,7 +1697,7 @@ func (g *testGenerator) nextBlock(blockName string, spend *spendableOut, ticketS
 	}
 
 	// Update generator state and return the block.
-	blockHash := block.BlockSha()
+	blockHash := block.BlockHash()
 	g.blocks[blockHash] = &block
 	g.blocksByName[blockName] = &block
 	g.tip = &block
@@ -1713,7 +1713,7 @@ func (g *testGenerator) createPremineBlock(blockName string, additionalAmount dc
 	coinbaseTx := wire.NewMsgTx()
 	coinbaseTx.AddTxIn(&wire.TxIn{
 		PreviousOutPoint: *wire.NewOutPoint(&chainhash.Hash{},
-			wire.MaxPrevOutIndex, dcrutil.TxTreeRegular),
+			wire.MaxPrevOutIndex, wire.TxTreeRegular),
 		Sequence:        wire.MaxTxInSequenceNum,
 		ValueIn:         0, // Updated below.
 		BlockHeight:     wire.NullBlockHeight,
@@ -1759,7 +1759,7 @@ func (g *testGenerator) updateBlockState(oldBlockName string, oldBlockHash chain
 	delete(g.blocksByName, oldBlockName)
 
 	// Add new entries.
-	newBlockHash := newBlock.BlockSha()
+	newBlockHash := newBlock.BlockHash()
 	g.blocks[newBlockHash] = newBlock
 	g.blocksByName[newBlockName] = newBlock
 }
@@ -1794,7 +1794,7 @@ func (g *testGenerator) saveTipCoinbaseOuts() {
 		makeSpendableOut(g.tip, 0, 6),
 		makeSpendableOut(g.tip, 0, 7),
 	})
-	g.prevCollectedHash = g.tip.BlockSha()
+	g.prevCollectedHash = g.tip.BlockHash()
 }
 
 // saveSpendableCoinbaseOuts adds all proof-of-work coinbase outputs starting
@@ -1813,7 +1813,7 @@ func (g *testGenerator) saveSpendableCoinbaseOuts() {
 	// collected.
 	var collectBlocks []*wire.MsgBlock
 	for b := g.tip; b != nil; b = g.blocks[b.Header.PrevBlock] {
-		if b.BlockSha() == g.prevCollectedHash {
+		if b.BlockHash() == g.prevCollectedHash {
 			break
 		}
 		collectBlocks = append(collectBlocks, b)
@@ -1907,7 +1907,7 @@ func (g *testGenerator) assertTipBlockNumTxns(expected int) {
 // assertTipBlockHash panics if the current tip block associated with the
 // generator does not match the specified hash.
 func (g *testGenerator) assertTipBlockHash(expected chainhash.Hash) {
-	hash := g.tip.BlockSha()
+	hash := g.tip.BlockHash()
 	if hash != expected {
 		panic(fmt.Sprintf("block hash of block %q (height %d) is %v "+
 			"instead of expected %v", g.tipName,
@@ -2592,7 +2592,7 @@ func Generate() (tests [][]TestInstance, err error) {
 		b.STransactions[0].TxIn[1].PreviousOutPoint = wire.OutPoint{
 			Hash:  chainhash.Hash{},
 			Index: math.MaxUint32,
-			Tree:  dcrutil.TxTreeRegular,
+			Tree:  wire.TxTreeRegular,
 		}
 	})
 	rejected(blockchain.ErrBadTxInput)
@@ -2826,13 +2826,13 @@ func Generate() (tests [][]TestInstance, err error) {
 	// because the block is solved after the function returns and this test
 	// requires an unsolved block.
 	{
-		origHash := b46.BlockSha()
+		origHash := b46.BlockHash()
 		for {
 			// Keep incrementing the nonce until the hash treated as
 			// a uint256 is higher than the limit.
 			b46.Header.Nonce += 1
-			hash := b46.BlockSha()
-			hashNum := blockchain.ShaHashToBig(&hash)
+			hash := b46.BlockHash()
+			hashNum := blockchain.HashToBig(&hash)
 			if hashNum.Cmp(g.params.PowLimit) >= 0 {
 				break
 			}
@@ -3218,7 +3218,7 @@ func Generate() (tests [][]TestInstance, err error) {
 		tx := b.Transactions[1]
 		tx.AddTxIn(&wire.TxIn{
 			PreviousOutPoint: *wire.NewOutPoint(&chainhash.Hash{},
-				wire.MaxPrevOutIndex, dcrutil.TxTreeRegular)})
+				wire.MaxPrevOutIndex, wire.TxTreeRegular)})
 	})
 	rejected(blockchain.ErrBadTxInput)
 
@@ -3254,7 +3254,7 @@ func Generate() (tests [][]TestInstance, err error) {
 		// This can't be done inside a munge function passed to nextBlock
 		// because the block is solved after the function returns and this test
 		// involves an unsolvable block.
-		b78Hash := b78.BlockSha()
+		b78Hash := b78.BlockHash()
 		b78.Header.Bits = 0x01810000 // -1 in compact form.
 		g.updateBlockState("b78", b78Hash, "b78", b78)
 	}
@@ -3270,7 +3270,7 @@ func Generate() (tests [][]TestInstance, err error) {
 		// This can't be done inside a munge function passed to nextBlock
 		// because the block is solved after the function returns and this test
 		// involves an improperly solved block.
-		b79Hash := b79.BlockSha()
+		b79Hash := b79.BlockHash()
 		b79.Header.Bits = g.params.PowLimitBits + 1
 		g.updateBlockState("b79", b79Hash, "b79", b79)
 	}

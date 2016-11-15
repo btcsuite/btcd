@@ -1014,11 +1014,10 @@ func GenerateSSGenBlockRef(blockHash chainhash.Hash, height uint32) ([]byte,
 	}
 
 	// Serialize the block hash and height
-	blockHashBytes := blockHash.Bytes()
 	blockHeightBytes := make([]byte, 4)
 	binary.LittleEndian.PutUint32(blockHeightBytes, height)
 
-	blockData := append(blockHashBytes, blockHeightBytes...)
+	blockData := append(blockHash[:], blockHeightBytes...)
 
 	// Concatenate the prefix and block data
 	blockDataOut := append(dataPushes, blockData...)

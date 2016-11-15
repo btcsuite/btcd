@@ -248,7 +248,7 @@ func WriteMessageN(w io.Writer, msg Message, pver uint32, dcrnet CurrencyNet) (i
 	hdr.magic = dcrnet
 	hdr.command = cmd
 	hdr.length = uint32(lenp)
-	copy(hdr.checksum[:], chainhash.HashFuncB(payload)[0:4])
+	copy(hdr.checksum[:], chainhash.HashB(payload)[0:4])
 
 	// Encode the header for the message.  This is done to a buffer
 	// rather than directly to the writer since writeElements doesn't
@@ -349,7 +349,7 @@ func ReadMessageN(r io.Reader, pver uint32, dcrnet CurrencyNet) (int, Message, [
 	}
 
 	// Test checksum.
-	checksum := chainhash.HashFuncB(payload)[0:4]
+	checksum := chainhash.HashB(payload)[0:4]
 	if !bytes.Equal(checksum[:], hdr.checksum[:]) {
 		str := fmt.Sprintf("payload checksum failed - header "+
 			"indicates %v, but actual checksum is %v.",

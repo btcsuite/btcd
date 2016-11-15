@@ -50,7 +50,7 @@ func (b *BlockChain) upgradeToVersion2() error {
 				}
 				for _, stx := range matureBlock.MsgBlock().STransactions {
 					if is, _ := stake.IsSStx(stx); is {
-						h := stx.TxSha()
+						h := stx.TxHash()
 						newTickets = append(newTickets, h)
 					}
 				}

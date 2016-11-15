@@ -85,8 +85,8 @@ type mempoolConfig struct {
 	// associated with.
 	ChainParams *chaincfg.Params
 
-	// NewestSha defines the function to retrieve the newest sha.
-	NewestSha func() (*chainhash.Hash, int64, error)
+	// NewestHash defines the function to retrieve the newest sha.
+	NewestHash func() (*chainhash.Hash, int64, error)
 
 	// NextStakeDifficulty defines the function to retrieve the stake
 	// difficulty for the block after the current best block.
@@ -182,7 +182,7 @@ type txMemPool struct {
 // insertVote inserts a vote into the map of block votes.
 // This function is safe for concurrent access.
 func (mp *txMemPool) insertVote(ssgen *dcrutil.Tx) error {
-	voteHash := ssgen.Sha()
+	voteHash := ssgen.Hash()
 	msgTx := ssgen.MsgTx()
 	ticketHash := &msgTx.TxIn[1].PreviousOutPoint.Hash
 
@@ -437,7 +437,7 @@ func (mp *txMemPool) removeOrphan(txHash *chainhash.Hash) {
 	for _, txIn := range tx.MsgTx().TxIn {
 		originTxHash := txIn.PreviousOutPoint.Hash
 		if orphans, exists := mp.orphansByPrev[originTxHash]; exists {
-			delete(orphans, *tx.Sha())
+			delete(orphans, *tx.Hash())
 
 			// Remove the map entry altogether if there are no
 			// longer any orphans which depend on it.
@@ -487,7 +487,7 @@ func (mp *txMemPool) limitNumOrphans() error {
 			if foundHash == nil {
 				foundHash = &txHash
 			}
-			txHashNum := blockchain.ShaHashToBig(&txHash)
+			txHashNum := blockchain.HashToBig(&txHash)
 			if txHashNum.Cmp(randHashNum) > 0 {
 				foundHash = &txHash
 				break
@@ -508,17 +508,17 @@ func (mp *txMemPool) addOrphan(tx *dcrutil.Tx) {
 	// random orphan is evicted to make room if needed.
 	mp.limitNumOrphans()
 
-	mp.orphans[*tx.Sha()] = tx
+	mp.orphans[*tx.Hash()] = tx
 	for _, txIn := range tx.MsgTx().TxIn {
 		originTxHash := txIn.PreviousOutPoint.Hash
 		if _, exists := mp.orphansByPrev[originTxHash]; !exists {
 			mp.orphansByPrev[originTxHash] =
 				make(map[chainhash.Hash]*dcrutil.Tx)
 		}
-		mp.orphansByPrev[originTxHash][*tx.Sha()] = tx
+		mp.orphansByPrev[originTxHash][*tx.Hash()] = tx
 	}
 
-	txmpLog.Debugf("Stored orphan transaction %v (total: %d)", tx.Sha(),
+	txmpLog.Debugf("Stored orphan transaction %v (total: %d)", tx.Hash(),
 		len(mp.orphans))
 }
 
@@ -647,10 +647,10 @@ func (mp *txMemPool) HaveTransactions(hashes []*chainhash.Hash) []bool {
 //
 // This function MUST be called with the mempool lock held (for writes).
 func (mp *txMemPool) removeTransaction(tx *dcrutil.Tx, removeRedeemers bool) {
-	txmpLog.Tracef("Removing transaction %v", tx.Sha())
+	txmpLog.Tracef("Removing transaction %v", tx.Hash())
 
 	msgTx := tx.MsgTx()
-	txHash := tx.Sha()
+	txHash := tx.Hash()
 	var txType stake.TxType
 	if removeRedeemers {
 		// Remove any transactions which rely on this one.
@@ -713,7 +713,7 @@ func (mp *txMemPool) RemoveDoubleSpends(tx *dcrutil.Tx) {
 
 	for _, txIn := range tx.MsgTx().TxIn {
 		if txRedeemer, ok := mp.outpoints[txIn.PreviousOutPoint]; ok {
-			if !txRedeemer.Sha().IsEqual(tx.Sha()) {
+			if !txRedeemer.Hash().IsEqual(tx.Hash()) {
 				mp.removeTransaction(txRedeemer, true)
 			}
 		}
@@ -730,7 +730,7 @@ func (mp *txMemPool) addTransaction(utxoView *blockchain.UtxoViewpoint,
 	msgTx := tx.MsgTx()
 	// Add the transaction to the pool and mark the referenced outpoints
 	// as spent by the pool.
-	mp.pool[*tx.Sha()] = &mempoolTxDesc{
+	mp.pool[*tx.Hash()] = &mempoolTxDesc{
 		TxDesc: mining.TxDesc{
 			Tx:     tx,
 			Type:   txType,
@@ -773,7 +773,7 @@ func (mp *txMemPool) checkPoolDoubleSpend(tx *dcrutil.Tx,
 
 		if txR, exists := mp.outpoints[txIn.PreviousOutPoint]; exists {
 			str := fmt.Sprintf("transaction %v in the pool "+
-				"already spends the same coins", txR.Sha())
+				"already spends the same coins", txR.Hash())
 			return txRuleError(wire.RejectDuplicate, str)
 		}
 	}
@@ -882,7 +882,7 @@ func (mp *txMemPool) FetchTransaction(txHash *chainhash.Hash, includeRecentBlock
 		}
 
 		for _, tx := range bl.Transactions() {
-			if tx.Sha().IsEqual(txHash) {
+			if tx.Hash().IsEqual(txHash) {
 				return tx, nil
 			}
 		}
@@ -904,7 +904,7 @@ func (mp *txMemPool) FetchTransaction(txHash *chainhash.Hash, includeRecentBlock
 func (mp *txMemPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew,
 	rateLimit, allowHighFees bool) ([]*chainhash.Hash, error) {
 	msgTx := tx.MsgTx()
-	txHash := tx.Sha()
+	txHash := tx.Hash()
 	// Don't accept the transaction if it already exists in the pool.  This
 	// applies to orphan transactions as well.  This check is intended to
 	// be a quick check to weed out duplicates.
@@ -1055,7 +1055,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew,
 			str := fmt.Sprintf("transaction %v votes on old "+
 				"block height of %v which is before the "+
 				"current cutoff height of %v",
-				tx.Sha(), voteHeight, nextBlockHeight-maximumVoteAgeDelta)
+				tx.Hash(), voteHeight, nextBlockHeight-maximumVoteAgeDelta)
 			return nil, txRuleError(wire.RejectNonstandard, str)
 		}
 	}
@@ -1357,7 +1357,7 @@ func (mp *txMemPool) processOrphans(hash *chainhash.Hash) []*dcrutil.Tx {
 			// potentially moving orphans to the memory pool, but
 			// leaving them in the orphan pool if not all parent
 			// transactions are known yet.
-			orphanHash := tx.Sha()
+			orphanHash := tx.Hash()
 			mp.removeOrphan(orphanHash)
 
 			// Potentially accept the transaction into the
@@ -1369,7 +1369,7 @@ func (mp *txMemPool) processOrphans(hash *chainhash.Hash) []*dcrutil.Tx {
 				// failed transaction.
 				txmpLog.Debugf("Unable to move "+
 					"orphan transaction %v to mempool: %v",
-					tx.Sha(), err)
+					tx.Hash(), err)
 				continue
 			}
 
@@ -1451,7 +1451,7 @@ func (mp *txMemPool) pruneExpiredTx(height int64) {
 		if tx.Tx.MsgTx().Expiry != 0 {
 			if height >= int64(tx.Tx.MsgTx().Expiry) {
 				txmpLog.Debugf("Pruning expired transaction %v from the "+
-					"mempool", tx.Tx.Sha())
+					"mempool", tx.Tx.Hash())
 				mp.removeTransaction(tx.Tx, true)
 			}
 		}
@@ -1496,11 +1496,11 @@ func (mp *txMemPool) ProcessTransaction(tx *dcrutil.Tx, allowOrphan,
 	defer func() {
 		if err != nil {
 			txmpLog.Tracef("Failed to process transaction %v: %s",
-				tx.Sha(), err.Error())
+				tx.Hash(), err.Error())
 		}
 	}()
 
-	txmpLog.Tracef("Processing transaction %v", tx.Sha())
+	txmpLog.Tracef("Processing transaction %v", tx.Hash())
 
 	// Potentially accept the transaction to the memory pool.
 	var missingParents []*chainhash.Hash
@@ -1516,7 +1516,7 @@ func (mp *txMemPool) ProcessTransaction(tx *dcrutil.Tx, allowOrphan,
 		// transaction (they are no longer orphans if all inputs are
 		// now available) and repeat for those accepted transactions
 		// until there are no more.
-		newTxs := mp.processOrphans(tx.Sha())
+		newTxs := mp.processOrphans(tx.Hash())
 		acceptedTxs := make([]*dcrutil.Tx, len(newTxs)+1)
 
 		// Add the parent transaction first so remote nodes
@@ -1541,7 +1541,7 @@ func (mp *txMemPool) ProcessTransaction(tx *dcrutil.Tx, allowOrphan,
 		// which is not really always the case.
 		str := fmt.Sprintf("orphan transaction %v references "+
 			"outputs of unknown or fully-spent "+
-			"transaction %v", tx.Sha(), missingParents[0])
+			"transaction %v", tx.Hash(), missingParents[0])
 		return nil, txRuleError(wire.RejectDuplicate, str)
 	}
 
@@ -1565,11 +1565,11 @@ func (mp *txMemPool) Count() int {
 	return len(mp.pool)
 }
 
-// TxShas returns a slice of hashes for all of the transactions in the memory
+// TxHashes returns a slice of hashes for all of the transactions in the memory
 // pool.
 //
 // This function is safe for concurrent access.
-func (mp *txMemPool) TxShas() []*chainhash.Hash {
+func (mp *txMemPool) TxHashes() []*chainhash.Hash {
 	mp.RLock()
 	defer mp.RUnlock()
 

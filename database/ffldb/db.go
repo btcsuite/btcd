@@ -1160,7 +1160,7 @@ func (tx *transaction) StoreBlock(block *dcrutil.Block) error {
 	}
 
 	// Reject the block if it already exists.
-	blockHash := block.Sha()
+	blockHash := block.Hash()
 	if tx.hasBlock(blockHash) {
 		str := fmt.Sprintf("block %s already exists", blockHash)
 		return makeDbErr(database.ErrBlockExists, str, nil)

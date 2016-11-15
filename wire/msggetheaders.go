@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2015 The btcsuite developers
+// Copyright (c) 2013-2016 The btcsuite developers
 // Copyright (c) 2015-2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
@@ -107,8 +107,8 @@ func (msg *MsgGetHeaders) BtcEncode(w io.Writer, pver uint32) error {
 		return err
 	}
 
-	for _, sha := range msg.BlockLocatorHashes {
-		err := writeElement(w, sha)
+	for _, hash := range msg.BlockLocatorHashes {
+		err := writeElement(w, hash)
 		if err != nil {
 			return err
 		}
@@ -133,13 +133,15 @@ func (msg *MsgGetHeaders) Command() string {
 func (msg *MsgGetHeaders) MaxPayloadLength(pver uint32) uint32 {
 	// Version 4 bytes + num block locator hashes (varInt) + max allowed block
 	// locators + hash stop.
-	return 4 + MaxVarIntPayload + (MaxBlockLocatorsPerMsg * chainhash.HashSize) + chainhash.HashSize
+	return 4 + MaxVarIntPayload + (MaxBlockLocatorsPerMsg *
+		chainhash.HashSize) + chainhash.HashSize
 }
 
 // NewMsgGetHeaders returns a new decred getheaders message that conforms to
 // the Message interface.  See MsgGetHeaders for details.
 func NewMsgGetHeaders() *MsgGetHeaders {
 	return &MsgGetHeaders{
-		BlockLocatorHashes: make([]*chainhash.Hash, 0, MaxBlockLocatorsPerMsg),
+		BlockLocatorHashes: make([]*chainhash.Hash, 0,
+			MaxBlockLocatorsPerMsg),
 	}
 }

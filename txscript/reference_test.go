@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2015 The btcsuite developers
+// Copyright (c) 2013-2016 The btcsuite developers
 // Copyright (c) 2015-2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
@@ -159,16 +159,15 @@ func createSpendingTx(sigScript, pkScript []byte) *wire.MsgTx {
 	coinbaseTx := wire.NewMsgTx()
 
 	outPoint := wire.NewOutPoint(&chainhash.Hash{}, ^uint32(0),
-		dcrutil.TxTreeRegular)
+		wire.TxTreeRegular)
 	txIn := wire.NewTxIn(outPoint, []byte{OP_0, OP_0})
 	txOut := wire.NewTxOut(0, pkScript)
 	coinbaseTx.AddTxIn(txIn)
 	coinbaseTx.AddTxOut(txOut)
 
 	spendingTx := wire.NewMsgTx()
-	coinbaseTxSha := coinbaseTx.TxSha()
-	outPoint = wire.NewOutPoint(&coinbaseTxSha, 0,
-		dcrutil.TxTreeRegular)
+	coinbaseTxHash := coinbaseTx.TxHash()
+	outPoint = wire.NewOutPoint(&coinbaseTxHash, 0, wire.TxTreeRegular)
 	txIn = wire.NewTxIn(outPoint, sigScript)
 	txOut = wire.NewTxOut(0, nil)
 
@@ -414,14 +413,14 @@ testloop:
 
 			previoustx, ok := input[0].(string)
 			if !ok {
-				t.Errorf("bad test (%dth input sha not string)"+
+				t.Errorf("bad test (%dth input hash not string)"+
 					"%d: %v", j, i, test)
 				continue testloop
 			}
 
 			prevhash, err := chainhash.NewHashFromStr(previoustx)
 			if err != nil {
-				t.Errorf("bad test (%dth input sha not sha %v)"+
+				t.Errorf("bad test (%dth input hash not hash %v)"+
 					"%d: %v", j, err, i, test)
 				continue testloop
 			}
@@ -448,7 +447,7 @@ testloop:
 				continue testloop
 			}
 
-			prevOuts[*wire.NewOutPoint(prevhash, idx, dcrutil.TxTreeRegular)] = script
+			prevOuts[*wire.NewOutPoint(prevhash, idx, wire.TxTreeRegular)] = script
 		}
 
 		for k, txin := range tx.MsgTx().TxIn {
@@ -557,14 +556,14 @@ testloop:
 
 			previoustx, ok := input[0].(string)
 			if !ok {
-				t.Errorf("bad test (%dth input sha not string)"+
+				t.Errorf("bad test (%dth input hash not string)"+
 					"%d: %v", j, i, test)
 				continue
 			}
 
 			prevhash, err := chainhash.NewHashFromStr(previoustx)
 			if err != nil {
-				t.Errorf("bad test (%dth input sha not sha %v)"+
+				t.Errorf("bad test (%dth input hash not hash %v)"+
 					"%d: %v", j, err, i, test)
 				continue
 			}
@@ -591,7 +590,7 @@ testloop:
 				continue
 			}
 
-			prevOuts[*wire.NewOutPoint(prevhash, idx, dcrutil.TxTreeRegular)] = script
+			prevOuts[*wire.NewOutPoint(prevhash, idx, wire.TxTreeRegular)] = script
 		}
 
 		for k, txin := range tx.MsgTx().TxIn {

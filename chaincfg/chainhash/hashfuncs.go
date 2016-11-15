@@ -1,5 +1,5 @@
-// Copyright (c) 2015-2016 The Decred Developers
 // Copyright (c) 2015-2016 The Decred developers
+// Copyright (c) 2016 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -25,16 +25,16 @@ func HashFunc(data []byte) [blake256.Size]byte {
 	return outB
 }
 
-// HashFuncB calculates hash(b) and returns the resulting bytes.
-func HashFuncB(b []byte) []byte {
+// HashB calculates hash(b) and returns the resulting bytes.
+func HashB(b []byte) []byte {
 	a := blake256.New()
 	a.Write(b)
 	out := a.Sum(nil)
 	return out
 }
 
-// HashFuncH calculates hash(b) and returns the resulting bytes as a Hash.
-func HashFuncH(b []byte) Hash {
+// HashH calculates hash(b) and returns the resulting bytes as a Hash.
+func HashH(b []byte) Hash {
 	var outB [blake256.Size]byte
 	a := blake256.New()
 	a.Write(b)

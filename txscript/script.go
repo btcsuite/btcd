@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2015 The btcsuite developers
+// Copyright (c) 2013-2016 The btcsuite developers
 // Copyright (c) 2015-2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
@@ -401,7 +401,7 @@ func calcSignatureHash(script []parsedOpcode, hashType SigHashType,
 		chaincfg.SigHashOptimization {
 		prefixHash = *cachedPrefix
 	} else {
-		prefixHash = txCopy.TxSha()
+		prefixHash = txCopy.TxHash()
 	}
 
 	// If the ValueIn is to be included in what we're signing, sign
@@ -409,13 +409,13 @@ func calcSignatureHash(script []parsedOpcode, hashType SigHashType,
 	// prefix and signature scripts.
 	var witnessHash chainhash.Hash
 	if hashType&sigHashMask != SigHashAllValue {
-		witnessHash = txCopy.TxShaWitnessSigning()
+		witnessHash = txCopy.TxHashWitnessSigning()
 	} else {
-		witnessHash = txCopy.TxShaWitnessValueSigning()
+		witnessHash = txCopy.TxHashWitnessValueSigning()
 	}
-	wbuf.Write(prefixHash.Bytes())
-	wbuf.Write(witnessHash.Bytes())
-	return chainhash.HashFuncB(wbuf.Bytes()), nil
+	wbuf.Write(prefixHash[:])
+	wbuf.Write(witnessHash[:])
+	return chainhash.HashB(wbuf.Bytes()), nil
 }
 
 // asSmallInt returns the passed opcode, which must be true according to

@@ -737,7 +737,7 @@ func (idx *AddrIndex) indexBlock(data writeIndexData, block, parent *dcrutil.Blo
 					if entry == nil {
 						log.Warnf("Missing input %v for tx %v while "+
 							"indexing block %v (height %v)\n", origin.Hash,
-							tx.Sha(), block.Sha(), block.Height())
+							tx.Hash(), block.Hash(), block.Height())
 						continue
 					}
 
@@ -777,7 +777,7 @@ func (idx *AddrIndex) indexBlock(data writeIndexData, block, parent *dcrutil.Blo
 			if entry == nil {
 				log.Warnf("Missing input %v for tx %v while "+
 					"indexing block %v (height %v)\n", origin.Hash,
-					tx.Sha(), block.Sha(), block.Height())
+					tx.Hash(), block.Hash(), block.Height())
 				continue
 			}
 
@@ -817,8 +817,8 @@ func (idx *AddrIndex) ConnectBlock(dbTx database.Tx, block, parent *dcrutil.Bloc
 			return err
 		}
 
-		parentSha := parent.Sha()
-		parentBlockID, err = dbFetchBlockIDByHash(dbTx, *parentSha)
+		parentHash := parent.Hash()
+		parentBlockID, err = dbFetchBlockIDByHash(dbTx, *parentHash)
 		if err != nil {
 			return err
 		}
@@ -837,8 +837,8 @@ func (idx *AddrIndex) ConnectBlock(dbTx database.Tx, block, parent *dcrutil.Bloc
 	}
 
 	// Get the internal block ID associated with the block.
-	blockSha := block.Sha()
-	blockID, err := dbFetchBlockIDByHash(dbTx, *blockSha)
+	blockHash := block.Hash()
+	blockID, err := dbFetchBlockIDByHash(dbTx, *blockHash)
 	if err != nil {
 		return err
 	}
@@ -968,13 +968,13 @@ func (idx *AddrIndex) indexUnconfirmedAddresses(scriptVersion uint16, pkScript [
 			addrIndexEntry = make(map[chainhash.Hash]*dcrutil.Tx)
 			idx.txnsByAddr[addrKey] = addrIndexEntry
 		}
-		addrIndexEntry[*tx.Sha()] = tx
+		addrIndexEntry[*tx.Hash()] = tx
 
 		// Add a mapping from the transaction to the address.
-		addrsByTxEntry := idx.addrsByTx[*tx.Sha()]
+		addrsByTxEntry := idx.addrsByTx[*tx.Hash()]
 		if addrsByTxEntry == nil {
 			addrsByTxEntry = make(map[[addrKeySize]byte]struct{})
-			idx.addrsByTx[*tx.Sha()] = addrsByTxEntry
+			idx.addrsByTx[*tx.Hash()] = addrsByTxEntry
 		}
 		addrsByTxEntry[addrKey] = struct{}{}
 		idx.unconfirmedLock.Unlock()

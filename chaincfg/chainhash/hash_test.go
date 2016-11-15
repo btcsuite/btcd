@@ -64,7 +64,7 @@ func TestHash(t *testing.T) {
 	}
 
 	// Set hash from byte slice and ensure contents match.
-	err = hash.SetBytes(blockHash.Bytes())
+	err = hash.SetBytes(blockHash.CloneBytes())
 	if err != nil {
 		t.Errorf("SetBytes: %v", err)
 	}

@@ -33,9 +33,9 @@ var (
 //
 //   [<block hash><block height>],...
 //
-//   Field           Type           Size
+//   Field           Type             Size
 //   block hash      chainhash.Hash   chainhash.HashSize
-//   block height    uint32         4 bytes
+//   block height    uint32           4 bytes
 // -----------------------------------------------------------------------------
 
 // dbPutIndexerTip uses an existing database transaction to update or add the
@@ -84,7 +84,7 @@ func dbIndexConnectBlock(dbTx database.Tx, indexer Indexer, block, parent *dcrut
 		return AssertError(fmt.Sprintf("dbIndexConnectBlock must be "+
 			"called with a block that extends the current index "+
 			"tip (%s, tip %s, block %s)", indexer.Name(),
-			curTipHash, block.Sha()))
+			curTipHash, block.Hash()))
 	}
 
 	// Notify the indexer with the connected block so it can index it.
@@ -93,7 +93,7 @@ func dbIndexConnectBlock(dbTx database.Tx, indexer Indexer, block, parent *dcrut
 	}
 
 	// Update the current index tip.
-	return dbPutIndexerTip(dbTx, idxKey, block.Sha(), uint32(block.Height()))
+	return dbPutIndexerTip(dbTx, idxKey, block.Hash(), uint32(block.Height()))
 }
 
 // dbIndexDisconnectBlock removes all of the index entries associated with the
@@ -108,11 +108,11 @@ func dbIndexDisconnectBlock(dbTx database.Tx, indexer Indexer, block, parent *dc
 	if err != nil {
 		return err
 	}
-	if !curTipHash.IsEqual(block.Sha()) {
+	if !curTipHash.IsEqual(block.Hash()) {
 		return AssertError(fmt.Sprintf("dbIndexDisconnectBlock must "+
 			"be called with the block at the current index tip "+
 			"(%s, tip %s, block %s)", indexer.Name(),
-			curTipHash, block.Sha()))
+			curTipHash, block.Hash()))
 	}
 
 	// Notify the indexer with the disconnected block so it can remove all
@@ -213,7 +213,7 @@ func (m *Manager) maybeCreateIndexes(dbTx database.Tx) error {
 
 		// Set the tip for the index to values which represent an
 		// uninitialized index (the genesis block hack and height).
-		genesisBlockHash := m.params.GenesisBlock.BlockSha()
+		genesisBlockHash := m.params.GenesisBlock.BlockHash()
 		err := dbPutIndexerTip(dbTx, idxKey, &genesisBlockHash, 0)
 		if err != nil {
 			return err

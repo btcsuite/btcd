@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2015 The btcsuite developers
+// Copyright (c) 2013-2016 The btcsuite developers
 // Copyright (c) 2015-2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
@@ -2265,7 +2265,7 @@ func opcodeSha256(op *parsedOpcode, vm *Engine) error {
 		return err
 	}
 
-	hash := chainhash.HashFuncB(buf)
+	hash := chainhash.HashB(buf)
 	vm.dstack.PushByteArray(hash[:])
 	return nil
 }
@@ -2280,7 +2280,7 @@ func opcodeHash160(op *parsedOpcode, vm *Engine) error {
 		return err
 	}
 
-	hash := chainhash.HashFuncB(buf)
+	hash := chainhash.HashB(buf)
 	vm.dstack.PushByteArray(calcHash(hash[:], ripemd160.New()))
 	return nil
 }
@@ -2295,7 +2295,7 @@ func opcodeHash256(op *parsedOpcode, vm *Engine) error {
 		return err
 	}
 
-	vm.dstack.PushByteArray(chainhash.HashFuncB(chainhash.HashFuncB(buf)))
+	vm.dstack.PushByteArray(chainhash.HashB(chainhash.HashB(buf)))
 	return nil
 }
 
@@ -2377,7 +2377,7 @@ func opcodeCheckSig(op *parsedOpcode, vm *Engine) error {
 	var prefixHash *chainhash.Hash
 	if hashType&sigHashMask == SigHashAll {
 		if optimizeSigVerification {
-			ph := vm.tx.CachedTxSha()
+			ph := vm.tx.CachedTxHash()
 			prefixHash = ph
 		}
 	}
@@ -2599,7 +2599,7 @@ func opcodeCheckMultiSig(op *parsedOpcode, vm *Engine) error {
 		var prefixHash *chainhash.Hash
 		if hashType&sigHashMask == SigHashAll {
 			if optimizeSigVerification {
-				ph := vm.tx.CachedTxSha()
+				ph := vm.tx.CachedTxHash()
 				prefixHash = ph
 			}
 		}
@@ -2762,7 +2762,7 @@ func opcodeCheckSigAlt(op *parsedOpcode, vm *Engine) error {
 	var prefixHash *chainhash.Hash
 	if hashType&sigHashMask == SigHashAll {
 		if optimizeSigVerification {
-			ph := vm.tx.CachedTxSha()
+			ph := vm.tx.CachedTxHash()
 			prefixHash = ph
 		}
 	}

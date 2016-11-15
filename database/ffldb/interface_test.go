@@ -1100,7 +1100,7 @@ func testFetchBlockIOMissing(tc *testContext, tx database.Tx) bool {
 	allBlockHashes := make([]chainhash.Hash, len(tc.blocks))
 	allBlockRegions := make([]database.BlockRegion, len(tc.blocks))
 	for i, block := range tc.blocks {
-		blockHash := block.Sha()
+		blockHash := block.Hash()
 		allBlockHashes[i] = *blockHash
 
 		txLocs, _, err := block.TxLoc()
@@ -1207,7 +1207,7 @@ func testFetchBlockIO(tc *testContext, tx database.Tx) bool {
 	allBlockTxLocs := make([][]wire.TxLoc, len(tc.blocks))
 	allBlockRegions := make([]database.BlockRegion, len(tc.blocks))
 	for i, block := range tc.blocks {
-		blockHash := block.Sha()
+		blockHash := block.Hash()
 		allBlockHashes[i] = *blockHash
 
 		blockBytes, err := block.Bytes()
@@ -1823,7 +1823,7 @@ func testClosedTxInterface(tc *testContext, tx database.Tx) bool {
 	allBlockHashes := make([]chainhash.Hash, len(tc.blocks))
 	allBlockRegions := make([]database.BlockRegion, len(tc.blocks))
 	for i, block := range tc.blocks {
-		blockHash := block.Sha()
+		blockHash := block.Hash()
 		allBlockHashes[i] = *blockHash
 
 		txLocs, _, err := block.TxLoc()
@@ -1991,7 +1991,7 @@ func testConcurrecy(tc *testContext) bool {
 	// test failures on slower systems.
 	startTime := time.Now()
 	err := tc.db.View(func(tx database.Tx) error {
-		_, err := tx.FetchBlock(tc.blocks[0].Sha())
+		_, err := tx.FetchBlock(tc.blocks[0].Hash())
 		if err != nil {
 			return err
 		}
@@ -2016,7 +2016,7 @@ func testConcurrecy(tc *testContext) bool {
 	reader := func(blockNum int) {
 		err := tc.db.View(func(tx database.Tx) error {
 			time.Sleep(sleepTime)
-			_, err := tx.FetchBlock(tc.blocks[blockNum].Sha())
+			_, err := tx.FetchBlock(tc.blocks[blockNum].Hash())
 			if err != nil {
 				return err
 			}

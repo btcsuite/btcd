@@ -1,4 +1,7 @@
-// chainio_test.go
+// Copyright (c) 2016 The Decred developers
+// Use of this source code is governed by an ISC
+// license that can be found in the LICENSE file.
+
 package ticketdb
 
 import (
@@ -33,8 +36,8 @@ func hexToBytes(s string) []byte {
 	return b
 }
 
-// newShaHashFromStr converts a 64 character hex string to a chainhash.Hash.
-func newShaHashFromStr(s string) *chainhash.Hash {
+// newHashFromStr converts a 64 character hex string to a chainhash.Hash.
+func newHashFromStr(s string) *chainhash.Hash {
 	h, _ := chainhash.NewHashFromStr(s)
 
 	return h
@@ -138,11 +141,11 @@ func TestDbInfoDeserializeErrors(t *testing.T) {
 func TestBestChainStateSerialization(t *testing.T) {
 	t.Parallel()
 
-	hash1 := chainhash.HashFuncH([]byte{0x00})
-	hash2 := chainhash.HashFuncH([]byte{0x01})
-	hash3 := chainhash.HashFuncH([]byte{0x02})
-	hash4 := chainhash.HashFuncH([]byte{0x03})
-	hash5 := chainhash.HashFuncH([]byte{0x04})
+	hash1 := chainhash.HashH([]byte{0x00})
+	hash2 := chainhash.HashH([]byte{0x01})
+	hash3 := chainhash.HashH([]byte{0x02})
+	hash4 := chainhash.HashH([]byte{0x03})
+	hash5 := chainhash.HashH([]byte{0x04})
 
 	tests := []struct {
 		name       string
@@ -152,7 +155,7 @@ func TestBestChainStateSerialization(t *testing.T) {
 		{
 			name: "generic block",
 			state: BestChainState{
-				Hash:        *newShaHashFromStr("000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f"),
+				Hash:        *newHashFromStr("000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f"),
 				Height:      12323,
 				Live:        29399,
 				Missed:      293929392,
@@ -241,7 +244,7 @@ func TestBlockUndoDataSerializing(t *testing.T) {
 			name: "two ticket datas",
 			utds: []UndoTicketData{
 				UndoTicketData{
-					TicketHash:   chainhash.HashFuncH([]byte{0x00}),
+					TicketHash:   chainhash.HashH([]byte{0x00}),
 					TicketHeight: 123456,
 					Missed:       true,
 					Revoked:      false,
@@ -249,7 +252,7 @@ func TestBlockUndoDataSerializing(t *testing.T) {
 					Expired:      true,
 				},
 				UndoTicketData{
-					TicketHash:   chainhash.HashFuncH([]byte{0x01}),
+					TicketHash:   chainhash.HashH([]byte{0x01}),
 					TicketHeight: 122222,
 					Missed:       false,
 					Revoked:      true,
@@ -333,8 +336,8 @@ func TestBlockUndoDataDeserializingErrors(t *testing.T) {
 // ticket hashes works as expected.
 func TestTicketHashesSerializing(t *testing.T) {
 	t.Parallel()
-	hash1 := chainhash.HashFuncH([]byte{0x00})
-	hash2 := chainhash.HashFuncH([]byte{0x01})
+	hash1 := chainhash.HashH([]byte{0x00})
+	hash2 := chainhash.HashH([]byte{0x01})
 
 	tests := []struct {
 		name       string
@@ -464,7 +467,7 @@ func TestLiveDatabase(t *testing.T) {
 	ticketMap := make(map[tickettreap.Key]*tickettreap.Value)
 	tickets := make([]chainhash.Hash, 5)
 	for i := 0; i < 4; i++ {
-		h := chainhash.HashFuncH(bytes.Repeat([]byte{0x01}, i))
+		h := chainhash.HashH(bytes.Repeat([]byte{0x01}, i))
 		ticketMap[tickettreap.Key(h)] = &tickettreap.Value{
 			Height:  12345 + uint32(i),
 			Missed:  i%2 == 0,

@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2015 The btcsuite developers
+// Copyright (c) 2013-2016 The btcsuite developers
 // Copyright (c) 2015-2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
@@ -113,7 +113,7 @@ func signBadAndCheck(msg string, tx *wire.MsgTx, idx int, pkScript []byte,
 	hashType txscript.SigHashType, kdb txscript.KeyDB, sdb txscript.ScriptDB,
 	previousScript []byte, suite int) error {
 	// Setup a PRNG.
-	randScriptHash := chainhash.HashFuncB(pkScript)
+	randScriptHash := chainhash.HashB(pkScript)
 	tRand := mrand.New(mrand.NewSource(int64(randScriptHash[0])))
 
 	// Test SigHashAllValue by corrupting the transaction's ValueIn so that

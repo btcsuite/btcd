@@ -81,12 +81,12 @@ func (msg *MsgMiningState) BtcDecode(r io.Reader, pver uint32) error {
 
 	msg.BlockHashes = make([]*chainhash.Hash, 0, count)
 	for i := uint64(0); i < count; i++ {
-		sha := chainhash.Hash{}
-		err := readElement(r, &sha)
+		hash := chainhash.Hash{}
+		err := readElement(r, &hash)
 		if err != nil {
 			return err
 		}
-		msg.AddBlockHash(&sha)
+		msg.AddBlockHash(&hash)
 	}
 
 	// Read num vote hashes and limit to max.
@@ -102,12 +102,12 @@ func (msg *MsgMiningState) BtcDecode(r io.Reader, pver uint32) error {
 
 	msg.VoteHashes = make([]*chainhash.Hash, 0, count)
 	for i := uint64(0); i < count; i++ {
-		sha := chainhash.Hash{}
-		err := readElement(r, &sha)
+		hash := chainhash.Hash{}
+		err := readElement(r, &hash)
 		if err != nil {
 			return err
 		}
-		msg.AddVoteHash(&sha)
+		msg.AddVoteHash(&hash)
 	}
 
 	return nil

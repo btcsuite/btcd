@@ -17,7 +17,7 @@ import (
 )
 
 func TestBasicPRNG(t *testing.T) {
-	seed := chainhash.HashFuncB([]byte{0x01})
+	seed := chainhash.HashB([]byte{0x01})
 	prng := NewHash256PRNG(seed)
 	for i := 0; i < 100000; i++ {
 		prng.Hash256Rand()
@@ -79,7 +79,7 @@ func (tds TicketDataSlice) Len() int { return len(tds) }
 
 func TestLotteryNumSelection(t *testing.T) {
 	// Test finding ticket indexes.
-	seed := chainhash.HashFuncB([]byte{0x01})
+	seed := chainhash.HashB([]byte{0x01})
 	prng := NewHash256PRNG(seed)
 	ticketsInPool := int64(56789)
 	tooFewTickets := int64(4)
@@ -123,7 +123,7 @@ func TestLotteryNumSelection(t *testing.T) {
 }
 
 func TestLotteryNumErrors(t *testing.T) {
-	seed := chainhash.HashFuncB([]byte{0x01})
+	seed := chainhash.HashB([]byte{0x01})
 	prng := NewHash256PRNG(seed)
 
 	// Too big pool.
@@ -136,7 +136,7 @@ func TestLotteryNumErrors(t *testing.T) {
 func TestFetchWinnersErrors(t *testing.T) {
 	treap := new(tickettreap.Immutable)
 	for i := 0; i < 0xff; i++ {
-		h := chainhash.HashFuncH([]byte{byte(i)})
+		h := chainhash.HashH([]byte{byte(i)})
 		v := &tickettreap.Value{
 			Height:  uint32(i),
 			Missed:  i%2 == 0,
@@ -192,7 +192,7 @@ func TestTicketSorting(t *testing.T) {
 		rint64 := randomGen.Int63n(1 << 62)
 		randBytes := make([]byte, 8, 8)
 		binary.LittleEndian.PutUint64(randBytes, uint64(rint64))
-		h := chainhash.HashFuncH(randBytes)
+		h := chainhash.HashH(randBytes)
 		td.SStxHash = h
 
 		prefix := byte(h[0])
@@ -237,7 +237,7 @@ func TestTicketSorting(t *testing.T) {
 }
 
 func BenchmarkHashPRNG(b *testing.B) {
-	seed := chainhash.HashFuncB([]byte{0x01})
+	seed := chainhash.HashB([]byte{0x01})
 	prng := NewHash256PRNG(seed)
 
 	for n := 0; n < b.N; n++ {

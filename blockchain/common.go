@@ -1,3 +1,7 @@
+// Copyright (c) 2015-2016 The Decred developers
+// Use of this source code is governed by an ISC
+// license that can be found in the LICENSE file.
+
 package blockchain
 
 import (
@@ -128,7 +132,7 @@ func DebugBlockString(block *dcrutil.Block) string {
 
 	var buffer bytes.Buffer
 
-	hash := block.Sha()
+	hash := block.Hash()
 
 	str := fmt.Sprintf("Block Header: %v Height: %v \n",
 		hash, block.Height())
@@ -144,7 +148,7 @@ func DebugBlockString(block *dcrutil.Block) string {
 	buffer.WriteString(str)
 
 	for i, tx := range block.Transactions() {
-		str = fmt.Sprintf("Index: %v, Hash: %v \n", i, tx.Sha())
+		str = fmt.Sprintf("Index: %v, Hash: %v \n", i, tx.Hash())
 		buffer.WriteString(str)
 	}
 
@@ -170,7 +174,7 @@ func DebugBlockString(block *dcrutil.Block) string {
 		}
 
 		str = fmt.Sprintf("Index: %v, Type: %v, Hash: %v \n",
-			i, txTypeStr, stx.Sha())
+			i, txTypeStr, stx.Hash())
 		buffer.WriteString(str)
 	}
 
@@ -195,7 +199,7 @@ func DebugMsgTxString(msgTx *wire.MsgTx) string {
 
 	var buffer bytes.Buffer
 
-	hash := msgTx.TxSha()
+	hash := msgTx.TxHash()
 	str := fmt.Sprintf("Transaction hash: %v, Version %v, Locktime: %v, "+
 		"Expiry %v\n\n", hash, msgTx.Version, msgTx.LockTime, msgTx.Expiry)
 	buffer.WriteString(str)

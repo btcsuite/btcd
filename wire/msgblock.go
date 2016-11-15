@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2015 The btcsuite developers
+// Copyright (c) 2013-2016 The btcsuite developers
 // Copyright (c) 2015-2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
@@ -333,31 +333,28 @@ func (msg *MsgBlock) MaxPayloadLength(pver uint32) uint32 {
 	return MaxBlockPayload
 }
 
-// BlockSha computes the block identifier hash for this block.
-func (msg *MsgBlock) BlockSha() chainhash.Hash {
-	return msg.Header.BlockSha()
+// BlockHash computes the block identifier hash for this block.
+func (msg *MsgBlock) BlockHash() chainhash.Hash {
+	return msg.Header.BlockHash()
 }
 
-// TxShas returns a slice of hashes of all of transactions in this block.
-func (msg *MsgBlock) TxShas() []chainhash.Hash {
-	shaList := make([]chainhash.Hash, 0, len(msg.Transactions))
+// TxHashes returns a slice of hashes of all of transactions in this block.
+func (msg *MsgBlock) TxHashes() []chainhash.Hash {
+	hashList := make([]chainhash.Hash, 0, len(msg.Transactions))
 	for _, tx := range msg.Transactions {
-		txSha := tx.TxSha()
-		shaList = append(shaList, txSha)
+		hashList = append(hashList, tx.TxHash())
 	}
-	return shaList
+	return hashList
 }
 
-// STxShas returns a slice of hashes of all of stake transactions in this block.
-func (msg *MsgBlock) STxShas() []chainhash.Hash {
-	shaList := make([]chainhash.Hash, 0, len(msg.STransactions))
+// STxHashes returns a slice of hashes of all of stake transactions in this
+// block.
+func (msg *MsgBlock) STxHashes() []chainhash.Hash {
+	hashList := make([]chainhash.Hash, 0, len(msg.STransactions))
 	for _, tx := range msg.STransactions {
-		// Ignore error here since TxSha can't fail in the current
-		// implementation except due to run-time panics.
-		sha := tx.TxSha()
-		shaList = append(shaList, sha)
+		hashList = append(hashList, tx.TxHash())
 	}
-	return shaList
+	return hashList
 }
 
 // NewMsgBlock returns a new decred block message that conforms to the

@@ -1382,7 +1382,7 @@ func TestBlockValidationRules(t *testing.T) {
 	// ErrDiscordantTxTree
 	mtxFromB = new(wire.MsgTx)
 	mtxFromB.FromBytes(regularTx154)
-	mtxFromB.TxIn[0].PreviousOutPoint.Tree = dcrutil.TxTreeStake
+	mtxFromB.TxIn[0].PreviousOutPoint.Tree = wire.TxTreeStake
 
 	errTxTreeIn154 := new(wire.MsgBlock)
 	errTxTreeIn154.FromBytes(block154Bytes)
@@ -1769,11 +1769,11 @@ func TestBlockValidationRules(t *testing.T) {
 			for _, stx := range bl.MsgBlock().STransactions {
 				for j, sTxIn := range stx.TxIn {
 					for _, tx := range bl.MsgBlock().Transactions {
-						h := tx.TxSha()
+						h := tx.TxHash()
 						if h == sTxIn.PreviousOutPoint.Hash {
 							t.Errorf("Illegal cross tree reference ("+
 								"stx %v references tx %v in input %v)",
-								stx.TxSha(), h, j)
+								stx.TxHash(), h, j)
 						}
 					}
 				}
@@ -1826,7 +1826,7 @@ func TestBlockValidationRules(t *testing.T) {
 	sstxToUse166 := sstxSpendInvalid166.STransactions[5]
 
 	// Craft an otherwise valid sstx.
-	coinbaseHash := spendInvalid166.Transactions[0].TxSha()
+	coinbaseHash := spendInvalid166.Transactions[0].TxHash()
 	sstxCBIn := new(wire.TxIn)
 	sstxCBIn.ValueIn = 29702992297
 	sstxCBIn.PreviousOutPoint.Hash = coinbaseHash
@@ -1872,7 +1872,7 @@ func TestBlockValidationRules(t *testing.T) {
 	sstxSpend2Invalid166 := new(wire.MsgBlock)
 	sstxSpend2Invalid166.FromBytes(block166Bytes)
 	sstxToUse166 = sstxSpend2Invalid166.STransactions[6]
-	sstxChangeHash := spendInvalid166.STransactions[5].TxSha()
+	sstxChangeHash := spendInvalid166.STransactions[5].TxHash()
 	sstxChangeIn := new(wire.TxIn)
 	sstxChangeIn.ValueIn = 2345438298
 	sstxChangeIn.PreviousOutPoint.Hash = sstxChangeHash
@@ -2155,7 +2155,7 @@ var bigOne = new(big.Int).SetInt64(1)
 
 // simNetGenesisHash is the hash of the first block in the block chain for the
 // simulation test network.
-var simNetGenesisHash = simNetGenesisBlock.BlockSha()
+var simNetGenesisHash = simNetGenesisBlock.BlockHash()
 
 // simNetGenesisMerkleRoot is the hash of the first transaction in the genesis
 // block for the simulation test network.  It is the same as the merkle root for
@@ -2209,7 +2209,7 @@ var genesisCoinbaseTxLegacy = wire.MsgTx{
 
 // genesisMerkleRoot is the hash of the first transaction in the genesis block
 // for the main network.
-var genesisMerkleRoot = genesisCoinbaseTxLegacy.TxSha()
+var genesisMerkleRoot = genesisCoinbaseTxLegacy.TxHash()
 
 var regTestGenesisCoinbaseTx = wire.MsgTx{
 	Version: 1,

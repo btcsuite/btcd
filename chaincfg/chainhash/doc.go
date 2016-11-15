@@ -1,6 +1,5 @@
-// Package chainhash defines the hash functions used.
+// Package chainhash provides abstracted hash functionality.
 //
-// This package provides a wrapper around the hash function used.  This is
-// designed to isolate the code that needs to be changed to support coins
-// with different hash functions (i.e, bitcoin vs decred).
+// This package provides a generic hash type and associated functions that
+// allows the specific hash algorithm to be abstracted.
 package chainhash

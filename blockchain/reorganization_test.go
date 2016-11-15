@@ -109,7 +109,7 @@ func reorgTestLong(t *testing.T) {
 
 	// Ensure our blockchain is at the correct best tip
 	topBlock, _ := chain.GetTopBlock()
-	tipHash := topBlock.Sha()
+	tipHash := topBlock.Hash()
 	expected, _ := chainhash.NewHashFromStr("5ab969d0afd8295b6cd1506f2a310d" +
 		"259322015c8bd5633f283a163ce0e50594")
 	if *tipHash != *expected {
@@ -226,7 +226,7 @@ func reorgTestShort(t *testing.T) {
 
 	// Ensure our blockchain is at the correct best tip
 	topBlock, _ := chain.GetTopBlock()
-	tipHash := topBlock.Sha()
+	tipHash := topBlock.Hash()
 	expected, _ := chainhash.NewHashFromStr("5ab969d0afd8295b6cd1506f2a310d" +
 		"259322015c8bd5633f283a163ce0e50594")
 	if *tipHash != *expected {
@@ -293,7 +293,7 @@ func reorgTestForced(t *testing.T) {
 		}
 		bl.SetHeight(int64(i))
 		if i == finalIdx1 {
-			oldBestHash = bl.Sha()
+			oldBestHash = bl.Hash()
 		}
 
 		_, _, err = chain.ProcessBlock(bl, blockchain.BFNone)
@@ -334,7 +334,7 @@ func reorgTestForced(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ProcessBlock error: %v", err.Error())
 	}
-	newBestHash := forkBl.Sha()
+	newBestHash := forkBl.Hash()
 
 	err = chain.ForceHeadReorganization(*oldBestHash, *newBestHash)
 	if err != nil {
@@ -344,7 +344,7 @@ func reorgTestForced(t *testing.T) {
 	// Ensure our blockchain is at the correct best tip for our forced
 	// reorganization
 	topBlock, _ := chain.GetTopBlock()
-	tipHash := topBlock.Sha()
+	tipHash := topBlock.Hash()
 	expected, _ := chainhash.NewHashFromStr("0df603f434be1dca22d706c7c47be16a8" +
 		"edcef2f151bcf08b51138aa1cda26e2")
 	if *tipHash != *expected {

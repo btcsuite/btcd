@@ -334,7 +334,7 @@ func TestSchnorrThreshold(t *testing.T) {
 
 			sig, err := schnorrPartialSign(curve, msg, keysToUse[j].Serialize(),
 				privNoncesToUse[j].Serialize(), publicNonceSum,
-				chainhash.HashFuncB)
+				chainhash.HashB)
 			assert.NoError(t, err)
 
 			partialSignatures[j] = sig
@@ -354,7 +354,7 @@ func TestSchnorrThreshold(t *testing.T) {
 
 		// Verify the combined signature and public keys.
 		ok, err := schnorrVerify(curve, combinedSignature.Serialize(),
-			allPksSum, msg, chainhash.HashFuncB)
+			allPksSum, msg, chainhash.HashB)
 		assert.NoError(t, err)
 		assert.Equal(t, true, ok)
 
@@ -411,7 +411,7 @@ func TestSchnorrThreshold(t *testing.T) {
 
 			sig, _ := schnorrPartialSign(curve, msg, keysToUse[j].Serialize(),
 				privNoncesToUse[j].Serialize(), publicNonceSum,
-				chainhash.HashFuncB)
+				chainhash.HashB)
 
 			partialSignatures[j] = sig
 		}
@@ -430,7 +430,7 @@ func TestSchnorrThreshold(t *testing.T) {
 		// Nothing that makes it here should be valid.
 		if allPksSum != nil && combinedSignature != nil {
 			ok, _ = schnorrVerify(curve, combinedSignature.Serialize(),
-				allPksSum, msg, chainhash.HashFuncB)
+				allPksSum, msg, chainhash.HashB)
 			assert.Equal(t, false, ok)
 		}
 	}

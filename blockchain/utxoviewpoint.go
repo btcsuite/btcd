@@ -301,7 +301,7 @@ func (view *UtxoViewpoint) AddTxOuts(tx *dcrutil.Tx, blockHeight int64,
 	msgTx := tx.MsgTx()
 	// When there are not already any utxos associated with the transaction,
 	// add a new entry for it to the view.
-	entry := view.LookupEntry(tx.Sha())
+	entry := view.LookupEntry(tx.Hash())
 	if entry == nil {
 		txType := stake.DetermineTxType(msgTx)
 		entry = newUtxoEntry(msgTx.Version, uint32(blockHeight),
@@ -311,7 +311,7 @@ func (view *UtxoViewpoint) AddTxOuts(tx *dcrutil.Tx, blockHeight int64,
 			putTxToMinimalOutputs(stakeExtra, tx)
 			entry.stakeExtra = stakeExtra
 		}
-		view.entries[*tx.Sha()] = entry
+		view.entries[*tx.Hash()] = entry
 	} else {
 		entry.height = uint32(blockHeight)
 		entry.index = uint32(blockIndex)
@@ -474,7 +474,7 @@ func (b *BlockChain) connectTransactions(view *UtxoViewpoint, block *dcrutil.Blo
 
 	// Update the best hash for view to include this block since all of its
 	// transactions have been connected.
-	view.SetBestHash(block.Sha())
+	view.SetBestHash(block.Hash())
 	return nil
 }
 
@@ -520,7 +520,7 @@ func (b *BlockChain) disconnectTransactions(view *UtxoViewpoint,
 		// create a new empty entry for when it does not.  This is done
 		// because the code relies on its existence in the view in order
 		// to signal modifications have happened.
-		entry := view.entries[*tx.Sha()]
+		entry := view.entries[*tx.Hash()]
 		if entry == nil {
 			entry = newUtxoEntry(msgTx.Version, uint32(block.Height()),
 				uint32(txIdx), IsCoinBaseTx(msgTx), msgTx.Expiry != 0, tt)
@@ -529,7 +529,7 @@ func (b *BlockChain) disconnectTransactions(view *UtxoViewpoint,
 				putTxToMinimalOutputs(stakeExtra, tx)
 				entry.stakeExtra = stakeExtra
 			}
-			view.entries[*tx.Sha()] = entry
+			view.entries[*tx.Hash()] = entry
 		}
 		entry.modified = true
 		entry.sparseOutputs = make(map[uint32]*utxoOutput)
@@ -619,12 +619,12 @@ func (b *BlockChain) disconnectTransactions(view *UtxoViewpoint,
 				// because the code relies on its existence in the view in order
 				// to signal modifications have happened.
 				isCoinbase := txIdx == 0
-				entry := view.entries[*tx.Sha()]
+				entry := view.entries[*tx.Hash()]
 				if entry == nil {
 					entry = newUtxoEntry(tx.MsgTx().Version,
 						uint32(parent.Height()), uint32(txIdx), isCoinbase,
 						tx.MsgTx().Expiry != 0, stake.TxTypeRegular)
-					view.entries[*tx.Sha()] = entry
+					view.entries[*tx.Hash()] = entry
 				}
 				entry.modified = true
 				entry.sparseOutputs = make(map[uint32]*utxoOutput)
@@ -694,7 +694,7 @@ func (b *BlockChain) disconnectTransactions(view *UtxoViewpoint,
 
 	// Update the best hash for view to the previous block since all of the
 	// transactions for the current block have been disconnected.
-	view.SetBestHash(parent.Sha())
+	view.SetBestHash(parent.Hash())
 	return nil
 }
 
@@ -723,7 +723,7 @@ func (view *UtxoViewpoint) disconnectTransactionSlice(transactions []*dcrutil.Tx
 		// because the code relies on its existence in the view in order
 		// to signal modifications have happened.
 		isCoinbase := txIdx == 0
-		entry := view.entries[*tx.Sha()]
+		entry := view.entries[*tx.Hash()]
 		if entry == nil {
 			entry = newUtxoEntry(msgTx.Version, uint32(height),
 				uint32(txIdx), IsCoinBaseTx(msgTx), msgTx.Expiry != 0, txType)
@@ -732,7 +732,7 @@ func (view *UtxoViewpoint) disconnectTransactionSlice(transactions []*dcrutil.Tx
 				putTxToMinimalOutputs(stakeExtra, tx)
 				entry.stakeExtra = stakeExtra
 			}
-			view.entries[*tx.Sha()] = entry
+			view.entries[*tx.Hash()] = entry
 		}
 		entry.modified = true
 		entry.sparseOutputs = make(map[uint32]*utxoOutput)
@@ -827,8 +827,7 @@ func (view *UtxoViewpoint) commit() {
 // Upon completion of this function, the view will contain an entry for each
 // requested transaction.  Fully spent transactions, or those which otherwise
 // don't exist, will result in a nil entry in the view.
-func (view *UtxoViewpoint) fetchUtxosMain(db database.DB,
-	txSet map[chainhash.Hash]struct{}) error {
+func (view *UtxoViewpoint) fetchUtxosMain(db database.DB, txSet map[chainhash.Hash]struct{}) error {
 	// Nothing to do if there are no requested hashes.
 	if len(txSet) == 0 {
 		return nil
@@ -869,8 +868,7 @@ func (view *UtxoViewpoint) fetchUtxosMain(db database.DB,
 // fetchUtxos loads utxo details about provided set of transaction hashes into
 // the view from the database as needed unless they already exist in the view in
 // which case they are ignored.
-func (view *UtxoViewpoint) fetchUtxos(db database.DB,
-	txSet map[chainhash.Hash]struct{}) error {
+func (view *UtxoViewpoint) fetchUtxos(db database.DB, txSet map[chainhash.Hash]struct{}) error {
 	// Nothing to do if there are no requested hashes.
 	if len(txSet) == 0 {
 		return nil
@@ -918,7 +916,7 @@ func (view *UtxoViewpoint) fetchInputUtxos(db database.DB,
 	if viewpoint == ViewpointPrevValidInitial {
 		transactions := parent.Transactions()
 		for i, tx := range transactions {
-			txInFlight[*tx.Sha()] = i
+			txInFlight[*tx.Hash()] = i
 		}
 
 		// Loop through all of the transaction inputs (except for the coinbase
@@ -1014,7 +1012,7 @@ func (view *UtxoViewpoint) fetchInputUtxos(db database.DB,
 		viewpoint == ViewpointPrevInvalidRegular {
 		transactions := block.Transactions()
 		for i, tx := range transactions {
-			txInFlight[*tx.Sha()] = i
+			txInFlight[*tx.Hash()] = i
 		}
 
 		// Loop through all of the transaction inputs (except for the coinbase
@@ -1111,7 +1109,7 @@ func (b *BlockChain) FetchUtxoView(tx *dcrutil.Tx, treeValid bool) (*UtxoViewpoi
 	// itself as a way for the caller to detect duplicates that are not
 	// fully spent.
 	txNeededSet := make(map[chainhash.Hash]struct{})
-	txNeededSet[*tx.Sha()] = struct{}{}
+	txNeededSet[*tx.Hash()] = struct{}{}
 	msgTx := tx.MsgTx()
 	isSSGen, _ := stake.IsSSGen(msgTx)
 	if !IsCoinBaseTx(msgTx) {

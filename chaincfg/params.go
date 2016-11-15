@@ -1,4 +1,4 @@
-// Copyright (c) 2014 The btcsuite developers
+// Copyright (c) 2014-2016 The btcsuite developers
 // Copyright (c) 2015-2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
@@ -701,11 +701,11 @@ func HDPrivateKeyToPublicKeyID(id []byte) ([]byte, error) {
 }
 
 // newHashFromStr converts the passed big-endian hex string into a
-// wire.Hash.  It only differs from the one available in wire in that
+// chainhash.Hash.  It only differs from the one available in chainhash in that
 // it panics on an error since it will only (and must only) be called with
 // hard-coded, and therefore known good, hashes.
 func newHashFromStr(hexStr string) *chainhash.Hash {
-	sha, err := chainhash.NewHashFromStr(hexStr)
+	hash, err := chainhash.NewHashFromStr(hexStr)
 	if err != nil {
 		// Ordinarily I don't like panics in library code since it
 		// can take applications down without them having a chance to
@@ -716,7 +716,7 @@ func newHashFromStr(hexStr string) *chainhash.Hash {
 		// 100% predictable.
 		panic(err)
 	}
-	return sha
+	return hash
 }
 
 func hexDecode(hexStr string) []byte {

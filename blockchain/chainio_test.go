@@ -259,7 +259,7 @@ func TestSpendJournalSerialization(t *testing.T) {
 				Version: 1,
 				TxIn: []*wire.TxIn{{
 					PreviousOutPoint: wire.OutPoint{
-						Hash:  *newShaHashFromStr("0437cd7f8525ceed2324359c2d0ba26006d92d856a9c20fa0241106ee5a597c9"),
+						Hash:  *newHashFromStr("0437cd7f8525ceed2324359c2d0ba26006d92d856a9c20fa0241106ee5a597c9"),
 						Index: 0,
 						Tree:  0,
 					},
@@ -311,7 +311,7 @@ func TestSpendJournalSerialization(t *testing.T) {
 				Version: 1,
 				TxIn: []*wire.TxIn{{
 					PreviousOutPoint: wire.OutPoint{
-						Hash:  *newShaHashFromStr("c0ed017828e59ad5ed3cf70ee7c6fb0f426433047462477dc7a5d470f987a537"),
+						Hash:  *newHashFromStr("c0ed017828e59ad5ed3cf70ee7c6fb0f426433047462477dc7a5d470f987a537"),
 						Index: 1,
 						Tree:  0,
 					},
@@ -336,7 +336,7 @@ func TestSpendJournalSerialization(t *testing.T) {
 				Version: 1,
 				TxIn: []*wire.TxIn{{
 					PreviousOutPoint: wire.OutPoint{
-						Hash:  *newShaHashFromStr("92fbe1d4be82f765dfabc9559d4620864b05cc897c4db0e29adac92d294e52b7"),
+						Hash:  *newHashFromStr("92fbe1d4be82f765dfabc9559d4620864b05cc897c4db0e29adac92d294e52b7"),
 						Index: 0,
 						Tree:  0,
 					},
@@ -359,7 +359,7 @@ func TestSpendJournalSerialization(t *testing.T) {
 				Expiry:   0,
 			}},
 			utxoView: &UtxoViewpoint{entries: map[chainhash.Hash]*UtxoEntry{
-				*newShaHashFromStr("c0ed017828e59ad5ed3cf70ee7c6fb0f426433047462477dc7a5d470f987a537"): {
+				*newHashFromStr("c0ed017828e59ad5ed3cf70ee7c6fb0f426433047462477dc7a5d470f987a537"): {
 					txVersion:  1,
 					isCoinBase: false,
 					hasExpiry:  false,
@@ -398,7 +398,7 @@ func TestSpendJournalSerialization(t *testing.T) {
 				Version: 1,
 				TxIn: []*wire.TxIn{{
 					PreviousOutPoint: wire.OutPoint{
-						Hash:  *newShaHashFromStr("c0ed017828e59ad5ed3cf70ee7c6fb0f426433047462477dc7a5d470f987a537"),
+						Hash:  *newHashFromStr("c0ed017828e59ad5ed3cf70ee7c6fb0f426433047462477dc7a5d470f987a537"),
 						Index: 1,
 					},
 					SignatureScript: hexToBytes(""),
@@ -408,7 +408,7 @@ func TestSpendJournalSerialization(t *testing.T) {
 					ValueIn:         159747816,
 				}, {
 					PreviousOutPoint: wire.OutPoint{
-						Hash:  *newShaHashFromStr("c0ed017828e59ad5ed3cf70ee7c6fb0f426433047462477dc7a5d470f987a537"),
+						Hash:  *newHashFromStr("c0ed017828e59ad5ed3cf70ee7c6fb0f426433047462477dc7a5d470f987a537"),
 						Index: 2,
 					},
 					SignatureScript: hexToBytes(""),
@@ -430,7 +430,7 @@ func TestSpendJournalSerialization(t *testing.T) {
 				Expiry:   0,
 			}},
 			utxoView: &UtxoViewpoint{entries: map[chainhash.Hash]*UtxoEntry{
-				*newShaHashFromStr("c0ed017828e59ad5ed3cf70ee7c6fb0f426433047462477dc7a5d470f987a537"): {
+				*newHashFromStr("c0ed017828e59ad5ed3cf70ee7c6fb0f426433047462477dc7a5d470f987a537"): {
 					txVersion:  1,
 					isCoinBase: false,
 					hasExpiry:  false,
@@ -502,7 +502,7 @@ func TestSpendJournalErrors(t *testing.T) {
 				Version: 1,
 				TxIn: []*wire.TxIn{{
 					PreviousOutPoint: wire.OutPoint{
-						Hash:  *newShaHashFromStr("0437cd7f8525ceed2324359c2d0ba26006d92d856a9c20fa0241106ee5a597c9"),
+						Hash:  *newHashFromStr("0437cd7f8525ceed2324359c2d0ba26006d92d856a9c20fa0241106ee5a597c9"),
 						Index: 0,
 					},
 					SignatureScript: hexToBytes("47304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901"),
@@ -519,7 +519,7 @@ func TestSpendJournalErrors(t *testing.T) {
 				Version: 1,
 				TxIn: []*wire.TxIn{{
 					PreviousOutPoint: wire.OutPoint{
-						Hash:  *newShaHashFromStr("0437cd7f8525ceed2324359c2d0ba26006d92d856a9c20fa0241106ee5a597c9"),
+						Hash:  *newHashFromStr("0437cd7f8525ceed2324359c2d0ba26006d92d856a9c20fa0241106ee5a597c9"),
 						Index: 0,
 					},
 					SignatureScript: hexToBytes("47304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901"),
@@ -1090,7 +1090,7 @@ func TestBestChainStateSerialization(t *testing.T) {
 		{
 			name: "genesis",
 			state: bestChainState{
-				hash:         *newShaHashFromStr("000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f"),
+				hash:         *newHashFromStr("000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f"),
 				height:       0,
 				totalTxns:    1,
 				totalSubsidy: 0,
@@ -1104,7 +1104,7 @@ func TestBestChainStateSerialization(t *testing.T) {
 		{
 			name: "block 1",
 			state: bestChainState{
-				hash:         *newShaHashFromStr("00000000839a8e6886ab5951d76f411475428afc90947ee320161bbf18eb6048"),
+				hash:         *newHashFromStr("00000000839a8e6886ab5951d76f411475428afc90947ee320161bbf18eb6048"),
 				height:       1,
 				totalTxns:    2,
 				totalSubsidy: 123456789,

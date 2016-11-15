@@ -13,7 +13,6 @@ import (
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
-
 	"github.com/decred/dcrd/chaincfg/chainhash"
 )
 
@@ -25,7 +24,7 @@ func TestTx(t *testing.T) {
 	hashStr := "3ba27aa200b1cecaad478d2b00432346c3f1f3986da1afd33e506"
 	hash, err := chainhash.NewHashFromStr(hashStr)
 	if err != nil {
-		t.Errorf("NewShaHashFromStr: %v", err)
+		t.Errorf("NewHashFromStr: %v", err)
 	}
 
 	// Ensure the command is expected value.
@@ -130,13 +129,13 @@ func TestTx(t *testing.T) {
 	return
 }
 
-// TestTxSha tests the ability to generate the hash of a transaction accurately.
-func TestTxSha(t *testing.T) {
+// TestTxHash tests the ability to generate the hash of a transaction accurately.
+func TestTxHash(t *testing.T) {
 	// Hash of first transaction from block 113875.
 	hashStr := "4538fc1618badd058ee88fd020984451024858796be0a1ed111877f887e1bd53"
 	wantHash, err := chainhash.NewHashFromStr(hashStr)
 	if err != nil {
-		t.Errorf("NewShaHashFromStr: %v", err)
+		t.Errorf("NewHashFromStr: %v", err)
 		return
 	}
 
@@ -176,9 +175,9 @@ func TestTxSha(t *testing.T) {
 	msgTx.Expiry = 0
 
 	// Ensure the hash produced is expected.
-	txHash := msgTx.TxSha()
+	txHash := msgTx.TxHash()
 	if !txHash.IsEqual(wantHash) {
-		t.Errorf("TxSha: wrong hash - got %v, want %v",
+		t.Errorf("TxHash: wrong hash - got %v, want %v",
 			spew.Sprint(txHash), spew.Sprint(wantHash))
 	}
 }

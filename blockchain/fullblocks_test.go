@@ -36,14 +36,14 @@ func TestFullBlocks(t *testing.T) {
 		blockHeight := item.Block.Header.Height
 		block := dcrutil.NewBlock(item.Block)
 		t.Logf("Testing block %s (hash %s, height %d)",
-			item.Name, block.Sha(), blockHeight)
+			item.Name, block.Hash(), blockHeight)
 
 		isMainChain, isOrphan, err := chain.ProcessBlock(block,
 			blockchain.BFNone)
 		if err != nil {
 			t.Fatalf("block %q (hash %s, height %d) should "+
 				"have been accepted: %v", item.Name,
-				block.Sha(), blockHeight, err)
+				block.Hash(), blockHeight, err)
 		}
 
 		// Ensure the main chain and orphan flags match the values
@@ -51,13 +51,13 @@ func TestFullBlocks(t *testing.T) {
 		if isMainChain != item.IsMainChain {
 			t.Fatalf("block %q (hash %s, height %d) unexpected main "+
 				"chain flag -- got %v, want %v", item.Name,
-				block.Sha(), blockHeight, isMainChain,
+				block.Hash(), blockHeight, isMainChain,
 				item.IsMainChain)
 		}
 		if isOrphan != item.IsOrphan {
 			t.Fatalf("block %q (hash %s, height %d) unexpected "+
 				"orphan flag -- got %v, want %v", item.Name,
-				block.Sha(), blockHeight, isOrphan,
+				block.Hash(), blockHeight, isOrphan,
 				item.IsOrphan)
 		}
 	}
@@ -69,12 +69,12 @@ func TestFullBlocks(t *testing.T) {
 		blockHeight := item.Block.Header.Height
 		block := dcrutil.NewBlock(item.Block)
 		t.Logf("Testing block %s (hash %s, height %d)",
-			item.Name, block.Sha(), blockHeight)
+			item.Name, block.Hash(), blockHeight)
 
 		_, _, err := chain.ProcessBlock(block, blockchain.BFNone)
 		if err == nil {
 			t.Fatalf("block %q (hash %s, height %d) should not "+
-				"have been accepted", item.Name, block.Sha(),
+				"have been accepted", item.Name, block.Hash(),
 				blockHeight)
 		}
 
@@ -84,13 +84,13 @@ func TestFullBlocks(t *testing.T) {
 		if !ok {
 			t.Fatalf("block %q (hash %s, height %d) returned "+
 				"unexpected error type -- got %T, want "+
-				"blockchain.RuleError", item.Name, block.Sha(),
+				"blockchain.RuleError", item.Name, block.Hash(),
 				blockHeight, err)
 		}
 		if rerr.ErrorCode != item.RejectCode {
 			t.Fatalf("block %q (hash %s, height %d) does not have "+
 				"expected reject code -- got %v, want %v",
-				item.Name, block.Sha(), blockHeight,
+				item.Name, block.Hash(), blockHeight,
 				rerr.ErrorCode, item.RejectCode)
 		}
 	}
@@ -102,7 +102,7 @@ func TestFullBlocks(t *testing.T) {
 		blockHeight := item.Block.Header.Height
 		block := dcrutil.NewBlock(item.Block)
 		t.Logf("Testing block %s (hash %s, height %d)",
-			item.Name, block.Sha(), blockHeight)
+			item.Name, block.Hash(), blockHeight)
 
 		_, isOrphan, err := chain.ProcessBlock(block, blockchain.BFNone)
 		if err != nil {
@@ -111,7 +111,7 @@ func TestFullBlocks(t *testing.T) {
 				t.Fatalf("block %q (hash %s, height %d) "+
 					"returned unexpected error type -- "+
 					"got %T, want blockchain.RuleError",
-					item.Name, block.Sha(), blockHeight,
+					item.Name, block.Hash(), blockHeight,
 					err)
 			}
 		}
@@ -119,7 +119,7 @@ func TestFullBlocks(t *testing.T) {
 		if !isOrphan {
 			t.Fatalf("block %q (hash %s, height %d) was accepted, "+
 				"but is not considered an orphan", item.Name,
-				block.Sha(), blockHeight)
+				block.Hash(), blockHeight)
 		}
 	}
 
@@ -129,16 +129,16 @@ func TestFullBlocks(t *testing.T) {
 		blockHeight := item.Block.Header.Height
 		block := dcrutil.NewBlock(item.Block)
 		t.Logf("Testing tip for block %s (hash %s, height %d)",
-			item.Name, block.Sha(), blockHeight)
+			item.Name, block.Hash(), blockHeight)
 
 		// Ensure hash and height match.
 		best := chain.BestSnapshot()
-		if *best.Hash != item.Block.BlockSha() ||
+		if *best.Hash != item.Block.BlockHash() ||
 			best.Height != int64(item.Block.Header.Height) {
 
 			t.Fatalf("block %q (hash %s, height %d) should be "+
 				"the current tip -- got (hash %s, height %d)",
-				item.Name, block.Sha(), blockHeight, best.Hash,
+				item.Name, block.Hash(), blockHeight, best.Hash,
 				best.Height)
 		}
 	}

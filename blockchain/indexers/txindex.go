@@ -64,17 +64,17 @@ var (
 // The serialized format for keys and values in the block hash to ID bucket is:
 //   <hash> = <ID>
 //
-//   Field           Type            Size
+//   Field           Type              Size
 //   hash            chainhash.Hash    32 bytes
-//   ID              uint32          4 bytes
+//   ID              uint32            4 bytes
 //   -----
 //   Total: 36 bytes
 //
 // The serialized format for keys and values in the ID to block hash bucket is:
 //   <ID> = <hash>
 //
-//   Field           Type            Size
-//   ID              uint32          4 bytes
+//   Field           Type              Size
+//   ID              uint32            4 bytes
 //   hash            chainhash.Hash    32 bytes
 //   -----
 //   Total: 36 bytes
@@ -83,11 +83,11 @@ var (
 //
 //   <txhash> = <block id><start offset><tx length>
 //
-//   Field           Type            Size
+//   Field           Type              Size
 //   txhash          chainhash.Hash    32 bytes
-//   block id        uint32          4 bytes
-//   start offset    uint32          4 bytes
-//   tx length       uint32          4 bytes
+//   block id        uint32            4 bytes
+//   start offset    uint32            4 bytes
+//   tx length       uint32            4 bytes
 //   -----
 //   Total: 44 bytes
 // -----------------------------------------------------------------------------
@@ -243,8 +243,8 @@ func dbAddTxIndexEntries(dbTx database.Tx, block, parent *dcrutil.Block, blockID
 			return err
 		}
 
-		parentSha := parent.Sha()
-		parentBlockID, err = dbFetchBlockIDByHash(dbTx, *parentSha)
+		parentHash := parent.Hash()
+		parentBlockID, err = dbFetchBlockIDByHash(dbTx, *parentHash)
 		if err != nil {
 			return err
 		}
@@ -275,8 +275,8 @@ func dbAddTxIndexEntries(dbTx database.Tx, block, parent *dcrutil.Block, blockID
 
 		putTxIndexEntry(serializedValues[offset:], blockIDToUse, allTxsLocs[i])
 		endOffset := offset + txEntrySize
-		txSha := tx.Sha()
-		err := dbPutTxIndexEntry(dbTx, *txSha,
+		txHash := tx.Hash()
+		err := dbPutTxIndexEntry(dbTx, *txHash,
 			serializedValues[offset:endOffset:endOffset])
 		if err != nil {
 			return err
@@ -307,16 +307,16 @@ func dbRemoveTxIndexEntries(dbTx database.Tx, block, parent *dcrutil.Block) erro
 		dcrutil.BlockValid)
 	if regularTxTreeValid {
 		for _, tx := range parent.Transactions() {
-			txSha := tx.Sha()
-			err := dbRemoveTxIndexEntry(dbTx, *txSha)
+			txHash := tx.Hash()
+			err := dbRemoveTxIndexEntry(dbTx, *txHash)
 			if err != nil {
 				return err
 			}
 		}
 	}
 	for _, tx := range block.STransactions() {
-		txSha := tx.Sha()
-		err := dbRemoveTxIndexEntry(dbTx, *txSha)
+		txHash := tx.Hash()
+		err := dbRemoveTxIndexEntry(dbTx, *txHash)
 		if err != nil {
 			return err
 		}
@@ -444,8 +444,8 @@ func (idx *TxIndex) ConnectBlock(dbTx database.Tx, block, parent *dcrutil.Block,
 
 	// Add the new block ID index entry for the block being connected and
 	// update the current internal block ID accordingly.
-	blockSha := block.Sha()
-	err := dbPutBlockIDIndexEntry(dbTx, *blockSha, newBlockID)
+	blockHash := block.Hash()
+	err := dbPutBlockIDIndexEntry(dbTx, *blockHash, newBlockID)
 	if err != nil {
 		return err
 	}
@@ -466,8 +466,8 @@ func (idx *TxIndex) DisconnectBlock(dbTx database.Tx, block, parent *dcrutil.Blo
 
 	// Remove the block ID index entry for the block being disconnected and
 	// decrement the current internal block ID to account for it.
-	blockSha := block.Sha()
-	if err := dbRemoveBlockIDIndexEntry(dbTx, *blockSha); err != nil {
+	blockHash := block.Hash()
+	if err := dbRemoveBlockIDIndexEntry(dbTx, *blockHash); err != nil {
 		return err
 	}
 	idx.curBlockID--

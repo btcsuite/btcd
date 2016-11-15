@@ -278,7 +278,7 @@ func TestSignaturesAndRecovery(t *testing.T) {
 
 		// Make sure we can verify the original signature.
 		_, err := schnorrVerify(curve, sig.Serialize(), pubkey, tv.msg,
-			chainhash.HashFuncB)
+			chainhash.HashB)
 		assert.NoError(t, err)
 
 		ok := Verify(curve, pubkey, tv.msg, sig.R, sig.S)
@@ -287,7 +287,7 @@ func TestSignaturesAndRecovery(t *testing.T) {
 		// See if we can recover the public keys OK.
 		var pkRecover *secp256k1.PublicKey
 		pkRecover, _, err = schnorrRecover(curve, sig.Serialize(), tv.msg,
-			chainhash.HashFuncB)
+			chainhash.HashB)
 		assert.NoError(t, err)
 		if err == nil {
 			assert.Equal(t, pubkey.Serialize(), pkRecover.Serialize())
@@ -304,7 +304,7 @@ func TestSignaturesAndRecovery(t *testing.T) {
 			sigBad[pos] ^= 1 << uint8(bitPos)
 		}
 		_, err = schnorrVerify(curve, sigBad, pubkey, tv.msg,
-			chainhash.HashFuncB)
+			chainhash.HashB)
 		assert.Error(t, err)
 
 		// Make sure it breaks pubkey recovery too.

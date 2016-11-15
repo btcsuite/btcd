@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
-
 	"github.com/decred/dcrd/chaincfg/chainhash"
 )
 
@@ -101,57 +100,57 @@ func TestBlock(t *testing.T) {
 	return
 }
 
-// TestBlockTxShas tests the ability to generate a slice of all transaction
+// TestBlockTxHashes tests the ability to generate a slice of all transaction
 // hashes from a block accurately.
-func TestBlockTxShas(t *testing.T) {
+func TestBlockTxHashes(t *testing.T) {
 	// Block 1, transaction 1 hash.
 	hashStr := "55a25248c04dd8b6599ca2a708413c00d79ae90ce075c54e8a967a647d7e4bea"
 	wantHash, err := chainhash.NewHashFromStr(hashStr)
 	if err != nil {
-		t.Errorf("NewShaHashFromStr: %v", err)
+		t.Errorf("NewHashFromStr: %v", err)
 		return
 	}
 
-	wantShas := []chainhash.Hash{*wantHash}
-	shas := testBlock.TxShas()
-	if !reflect.DeepEqual(shas, wantShas) {
-		t.Errorf("TxShas: wrong transaction hashes - got %v, want %v",
-			spew.Sdump(shas), spew.Sdump(wantShas))
+	wantHashes := []chainhash.Hash{*wantHash}
+	hashes := testBlock.TxHashes()
+	if !reflect.DeepEqual(hashes, wantHashes) {
+		t.Errorf("TxHashes: wrong transaction hashes - got %v, want %v",
+			spew.Sdump(hashes), spew.Sdump(wantHashes))
 	}
 }
 
-// TestBlockSTxShas tests the ability to generate a slice of all stake transaction
-// hashes from a block accurately.
-func TestBlockSTxShas(t *testing.T) {
+// TestBlockSTxHashes tests the ability to generate a slice of all stake
+// transaction hashes from a block accurately.
+func TestBlockSTxHashes(t *testing.T) {
 	// Block 1, transaction 1 hash.
 	hashStr := "ae208a69f3ee088d0328126e3d9bef7652b108d1904f27b166c5999233a801d4"
 	wantHash, err := chainhash.NewHashFromStr(hashStr)
 	if err != nil {
-		t.Errorf("NewShaHashFromStr: %v", err)
+		t.Errorf("NewHashFromStr: %v", err)
 		return
 	}
 
-	wantShas := []chainhash.Hash{*wantHash}
-	shas := testBlock.STxShas()
-	if !reflect.DeepEqual(shas, wantShas) {
-		t.Errorf("STxShas: wrong transaction hashes - got %v, want %v",
-			spew.Sdump(shas), spew.Sdump(wantShas))
+	wantHashes := []chainhash.Hash{*wantHash}
+	hashes := testBlock.STxHashes()
+	if !reflect.DeepEqual(hashes, wantHashes) {
+		t.Errorf("STxHashes: wrong transaction hashes - got %v, want %v",
+			spew.Sdump(hashes), spew.Sdump(wantHashes))
 	}
 }
 
-// TestBlockSha tests the ability to generate the hash of a block accurately.
-func TestBlockSha(t *testing.T) {
+// TestBlockHash tests the ability to generate the hash of a block accurately.
+func TestBlockHash(t *testing.T) {
 	// Block 1 hash.
 	hashStr := "6b73b6f6faebbfd6a541f38820593e43c50ce1abf64602ab8ac7d5502991c37f"
 	wantHash, err := chainhash.NewHashFromStr(hashStr)
 	if err != nil {
-		t.Errorf("NewShaHashFromStr: %v", err)
+		t.Errorf("NewHashFromStr: %v", err)
 	}
 
 	// Ensure the hash produced is expected.
-	blockHash := testBlock.BlockSha()
+	blockHash := testBlock.BlockHash()
 	if !blockHash.IsEqual(wantHash) {
-		t.Errorf("BlockSha: wrong hash - got %v, want %v",
+		t.Errorf("BlockHash: wrong hash - got %v, want %v",
 			spew.Sprint(blockHash), spew.Sprint(wantHash))
 	}
 }

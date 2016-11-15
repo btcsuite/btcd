@@ -1,4 +1,4 @@
-// Copyright (c) 2014 The btcsuite developers
+// Copyright (c) 2014-2016 The btcsuite developers
 // Copyright (c) 2015-2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
@@ -178,9 +178,7 @@ func (m *CPUMiner) submitBlock(block *dcrutil.Block) bool {
 		coinbaseTxGenerated += out.Value
 	}
 	minrLog.Infof("Block submitted via CPU miner accepted (hash %s, "+
-		"height %v, amount %v)",
-		block.Sha(),
-		block.Height(),
+		"height %v, amount %v)", block.Hash(), block.Height(),
 		dcrutil.Amount(coinbaseTxGenerated))
 	return true
 }
@@ -271,12 +269,12 @@ func (m *CPUMiner) solveBlock(msgBlock *wire.MsgBlock, ticker *time.Ticker,
 
 			// Update the nonce and hash the block header.
 			header.Nonce = i
-			hash := header.BlockSha()
+			hash := header.BlockHash()
 			hashesCompleted++
 
 			// The block is solved when the new block hash is less
 			// than the target difficulty.  Yay!
-			if blockchain.ShaHashToBig(&hash).Cmp(targetDifficulty) <= 0 {
+			if blockchain.HashToBig(&hash).Cmp(targetDifficulty) <= 0 {
 				m.updateHashes <- hashesCompleted
 				return true
 			}
@@ -641,7 +639,7 @@ func (m *CPUMiner) GenerateNBlocks(n uint32) ([]*chainhash.Hash, error) {
 		if m.solveBlock(template.Block, ticker, nil) {
 			block := dcrutil.NewBlock(template.Block)
 			m.submitBlock(block)
-			blockHashes[i] = block.Sha()
+			blockHashes[i] = block.Hash()
 			i++
 			if i == n {
 				minrLog.Tracef("Generated %d blocks", i)

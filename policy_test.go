@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2015 The btcsuite developers
+// Copyright (c) 2013-2016 The btcsuite developers
 // Copyright (c) 2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
@@ -278,7 +278,7 @@ func TestCheckTransactionStandard(t *testing.T) {
 	// Create some dummy, but otherwise standard, data for transactions.
 	prevOutHash, err := chainhash.NewHashFromStr("01")
 	if err != nil {
-		t.Fatalf("NewShaHashFromStr: unexpected error: %v", err)
+		t.Fatalf("NewHashFromStr: unexpected error: %v", err)
 	}
 	dummyPrevOut := wire.OutPoint{Hash: *prevOutHash, Index: 1, Tree: 0}
 	dummySigScript := bytes.Repeat([]byte{0x00}, 65)

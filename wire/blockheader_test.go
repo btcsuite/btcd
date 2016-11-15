@@ -365,11 +365,10 @@ func TestBlockHeaderHashing(t *testing.T) {
 	r := bytes.NewReader(vecH)
 	var bh BlockHeader
 	bh.Deserialize(r)
-	hash2 := bh.BlockSha()
+	hash2 := bh.BlockHash()
 
 	if !hash2.IsEqual(hash) {
-		t.Errorf("wrong block sha returned (want %v, got %v)",
-			hash,
+		t.Errorf("wrong block hash returned (want %v, got %v)", hash,
 			hash2)
 	}
 }

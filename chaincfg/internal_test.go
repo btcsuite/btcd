@@ -10,7 +10,7 @@ import (
 	"github.com/decred/dcrd/chaincfg/chainhash"
 )
 
-func TestInvalidShaStr(t *testing.T) {
+func TestInvalidHashStr(t *testing.T) {
 	_, err := chainhash.NewHashFromStr("banana")
 	if err == nil {
 		t.Error("Invalid string should fail.")

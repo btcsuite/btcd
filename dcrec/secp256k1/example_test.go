@@ -27,7 +27,7 @@ func Example_signMessage() {
 
 	// Sign a message using the private key.
 	message := "test message"
-	messageHash := chainhash.HashFuncB([]byte(message))
+	messageHash := chainhash.HashB([]byte(message))
 	signature, err := privKey.Sign(messageHash)
 	if err != nil {
 		fmt.Println(err)
@@ -80,7 +80,7 @@ func Example_verifySignature() {
 
 	// Verify the signature for the message using the public key.
 	message := "test message"
-	messageHash := chainhash.HashFuncB([]byte(message))
+	messageHash := chainhash.HashB([]byte(message))
 	verified := signature.Verify(messageHash, pubKey)
 	fmt.Println("Signature Verified?", verified)
 

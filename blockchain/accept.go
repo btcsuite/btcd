@@ -27,7 +27,7 @@ func checkCoinbaseUniqueHeight(blockHeight int64, block *dcrutil.Block) error {
 	// exist.
 	if len(block.MsgBlock().Transactions[0].TxOut) < 2 {
 		str := fmt.Sprintf("block %v is missing necessary coinbase "+
-			"outputs", block.Sha())
+			"outputs", block.Hash())
 		return ruleError(ErrFirstTxNotCoinbase, str)
 	}
 
@@ -39,13 +39,13 @@ func checkCoinbaseUniqueHeight(blockHeight int64, block *dcrutil.Block) error {
 		block.MsgBlock().Transactions[0].TxOut[1].PkScript)
 	if err != nil {
 		str := fmt.Sprintf("block %v txOut 1 has wrong pkScript "+
-			"type", block.Sha())
+			"type", block.Hash())
 		return ruleError(ErrFirstTxNotCoinbase, str)
 	}
 
 	if len(nullData) < 4 {
 		str := fmt.Sprintf("block %v txOut 1 has too short nullData "+
-			"push to contain height", block.Sha())
+			"push to contain height", block.Hash())
 		return ruleError(ErrFirstTxNotCoinbase, str)
 	}
 
@@ -55,7 +55,7 @@ func checkCoinbaseUniqueHeight(blockHeight int64, block *dcrutil.Block) error {
 		prevBlock := block.MsgBlock().Header.PrevBlock
 		str := fmt.Sprintf("block %v txOut 1 has wrong height in "+
 			"coinbase; want %v, got %v; prevBlock %v, header height %v",
-			block.Sha(), blockHeight, cbHeight, prevBlock,
+			block.Hash(), blockHeight, cbHeight, prevBlock,
 			block.MsgBlock().Header.Height)
 		return ruleError(ErrCoinbaseHeight, str)
 	}
@@ -134,7 +134,7 @@ func (b *BlockChain) checkBlockContext(block *dcrutil.Block, prevNode *blockNode
 				header.Timestamp) {
 
 				str := fmt.Sprintf("block contains unfinalized regular "+
-					"transaction %v", tx.Sha())
+					"transaction %v", tx.Hash())
 				return ruleError(ErrUnfinalizedTx, str)
 			}
 		}
@@ -143,7 +143,7 @@ func (b *BlockChain) checkBlockContext(block *dcrutil.Block, prevNode *blockNode
 				header.Timestamp) {
 
 				str := fmt.Sprintf("block contains unfinalized stake "+
-					"transaction %v", stx.Sha())
+					"transaction %v", stx.Hash())
 				return ruleError(ErrUnfinalizedTx, str)
 			}
 		}
@@ -257,7 +257,7 @@ func (b *BlockChain) maybeAcceptBlock(block *dcrutil.Block,
 	// Create a new block node for the block and add it to the in-memory
 	// block chain (could be either a side chain or the main chain).
 	blockHeader := &block.MsgBlock().Header
-	newNode := newBlockNode(blockHeader, block.Sha(), blockHeight,
+	newNode := newBlockNode(blockHeader, block.Hash(), blockHeight,
 		ticketsSpentInBlock(block), ticketsRevokedInBlock(block),
 		voteVersionsInBlock(block, b.chainParams))
 	if prevNode != nil {

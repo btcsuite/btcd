@@ -1,4 +1,5 @@
 // Copyright (c) 2015-2016 The btcsuite developers
+// Copyright (c) 2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -508,7 +509,7 @@ func dbFetchSpendJournalEntry(dbTx database.Tx, block *dcrutil.Block,
 	parent *dcrutil.Block) ([]spentTxOut, error) {
 	// Exclude the coinbase transaction since it can't spend anything.
 	spendBucket := dbTx.Metadata().Bucket(dbnamespace.SpendJournalBucketName)
-	serialized := spendBucket.Get(block.Sha()[:])
+	serialized := spendBucket.Get(block.Hash()[:])
 
 	var blockTxns []*wire.MsgTx
 	regularTxTreeValid := dcrutil.IsFlagSet16(block.MsgBlock().Header.VoteBits,
@@ -530,7 +531,7 @@ func dbFetchSpendJournalEntry(dbTx database.Tx, block *dcrutil.Block,
 			return nil, database.Error{
 				ErrorCode: database.ErrCorruption,
 				Description: fmt.Sprintf("corrupt spend "+
-					"information for %v: %v", block.Sha(),
+					"information for %v: %v", block.Hash(),
 					err),
 			}
 		}
@@ -545,8 +546,7 @@ func dbFetchSpendJournalEntry(dbTx database.Tx, block *dcrutil.Block,
 // spend journal entry for the given block hash using the provided slice of
 // spent txouts.   The spent txouts slice must contain an entry for every txout
 // the transactions in the block spend in the order they are spent.
-func dbPutSpendJournalEntry(dbTx database.Tx, blockHash *chainhash.Hash,
-	stxos []spentTxOut) error {
+func dbPutSpendJournalEntry(dbTx database.Tx, blockHash *chainhash.Hash, stxos []spentTxOut) error {
 	spendBucket := dbTx.Metadata().Bucket(dbnamespace.SpendJournalBucketName)
 	serialized, err := serializeSpendJournalEntry(stxos)
 	if err != nil {
@@ -973,7 +973,7 @@ func dbPutUtxoView(dbTx database.Tx, view *UtxoViewpoint) error {
 //   <hash>
 //
 //   Field      Type             Size
-//   hash       chainhash.Hash   chainhash.Hash
+//   hash       chainhash.Hash   chainhash.HashSize
 // -----------------------------------------------------------------------------
 
 // dbPutBlockIndex uses an existing database transaction to update or add the
@@ -999,8 +999,7 @@ func dbPutBlockIndex(dbTx database.Tx, hash *chainhash.Hash, height int64) error
 // dbRemoveBlockIndex uses an existing database transaction remove block index
 // entries from the hash to height and height to hash mappings for the provided
 // values.
-func dbRemoveBlockIndex(dbTx database.Tx, hash *chainhash.Hash,
-	height int64) error {
+func dbRemoveBlockIndex(dbTx database.Tx, hash *chainhash.Hash, height int64) error {
 	// Remove the block hash to height mapping.
 	meta := dbTx.Metadata()
 	hashIndex := meta.Bucket(dbnamespace.HashIndexBucketName)
@@ -1270,7 +1269,7 @@ func (b *BlockChain) createChainState() error {
 	// Create a new node from the genesis block and set it as the best node.
 	genesisBlock := dcrutil.NewBlock(b.chainParams.GenesisBlock)
 	header := &genesisBlock.MsgBlock().Header
-	node := newBlockNode(header, genesisBlock.Sha(), 0, []chainhash.Hash{},
+	node := newBlockNode(header, genesisBlock.Hash(), 0, []chainhash.Hash{},
 		[]chainhash.Hash{}, []uint32{})
 	node.inMainChain = true
 	b.bestNode = node
@@ -1484,8 +1483,7 @@ func (b *BlockChain) initChainState() error {
 
 // dbFetchHeaderByHash uses an existing database transaction to retrieve the
 // block header for the provided hash.
-func dbFetchHeaderByHash(dbTx database.Tx,
-	hash *chainhash.Hash) (*wire.BlockHeader, error) {
+func dbFetchHeaderByHash(dbTx database.Tx, hash *chainhash.Hash) (*wire.BlockHeader, error) {
 	headerBytes, err := dbTx.FetchBlockHeader(hash)
 	if err != nil {
 		return nil, err
@@ -1537,8 +1535,7 @@ func (b *BlockChain) HeaderByHeight(height int64) (*wire.BlockHeader, error) {
 // dbFetchBlockByHash uses an existing database transaction to retrieve the raw
 // block for the provided hash, deserialize it, retrieve the appropriate height
 // from the index, and return a dcrutil.Block with the height set.
-func dbFetchBlockByHash(dbTx database.Tx, hash *chainhash.Hash) (*dcrutil.Block,
-	error) {
+func dbFetchBlockByHash(dbTx database.Tx, hash *chainhash.Hash) (*dcrutil.Block, error) {
 	// First find the height associated with the provided hash in the index.
 	blockHeight, err := dbFetchHeightByHash(dbTx, hash)
 	if err != nil {
@@ -1635,8 +1632,7 @@ func (b *BlockChain) BlockHeightByHash(hash *chainhash.Hash) (int64, error) {
 // main chain.
 //
 // This function is safe for concurrent access.
-func (b *BlockChain) BlockHashByHeight(blockHeight int64) (*chainhash.Hash,
-	error) {
+func (b *BlockChain) BlockHashByHeight(blockHeight int64) (*chainhash.Hash, error) {
 	var hash *chainhash.Hash
 	err := b.db.View(func(dbTx database.Tx) error {
 		var err error
@@ -1675,8 +1671,7 @@ func (b *BlockChain) BlockByHash(hash *chainhash.Hash) (*dcrutil.Block, error) {
 // height.  The end height will be limited to the current main chain height.
 //
 // This function is safe for concurrent access.
-func (b *BlockChain) HeightRange(startHeight, endHeight int64) ([]chainhash.Hash,
-	error) {
+func (b *BlockChain) HeightRange(startHeight, endHeight int64) ([]chainhash.Hash, error) {
 	// Ensure requested heights are sane.
 	if startHeight < 0 {
 		return nil, fmt.Errorf("start height of fetch range must not "+

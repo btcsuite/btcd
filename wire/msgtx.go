@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2015 The btcsuite developers
+// Copyright (c) 2013-2016 The btcsuite developers
 // Copyright (c) 2015-2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
@@ -468,138 +468,114 @@ func (msg *MsgTx) shallowCopyForSerializing(version int32) *MsgTx {
 	}
 }
 
-// TxSha generates the Hash name for the transaction prefix.
-func (msg *MsgTx) TxSha() chainhash.Hash {
-	// Encode the transaction and calculate double sha256 on the result.
-	// Ignore the error returns since the only way the encode could fail
-	// is being out of memory or due to nil pointers, both of which would
-	// cause a run-time panic.
-
-	// TxSha should always calculate a non-witnessed hash.
+// TxHash generates the Hash name for the transaction prefix.
+func (msg *MsgTx) TxHash() chainhash.Hash {
+	// TxHash should always calculate a non-witnessed hash.
 	mtxCopy := msg.shallowCopyForSerializing(NoWitnessMsgTxVersion())
 
 	buf := bytes.NewBuffer(make([]byte, 0, mtxCopy.SerializeSize()))
 	err := mtxCopy.Serialize(buf)
 	if err != nil {
-		panic("MsgTx failed serializing for TxSha")
+		panic("MsgTx failed serializing for TxHash")
 	}
 
-	return chainhash.HashFuncH(buf.Bytes())
+	return chainhash.HashH(buf.Bytes())
 }
 
-// CachedTxSha generates the Hash name for the transaction prefix and stores
+// CachedTxHash generates the Hash name for the transaction prefix and stores
 // it if it does not exist. The cached hash is then returned. It can be
-// recalculated later with RecacheTxSha.
-func (msg *MsgTx) CachedTxSha() *chainhash.Hash {
+// recalculated later with RecacheTxHash.
+func (msg *MsgTx) CachedTxHash() *chainhash.Hash {
 	if msg.CachedHash == nil {
-		h := msg.TxSha()
+		h := msg.TxHash()
 		msg.CachedHash = &h
 	}
 
 	return msg.CachedHash
 }
 
-// RecacheTxSha generates the Hash name for the transaction prefix and stores
+// RecacheTxHash generates the Hash name for the transaction prefix and stores
 // it. The cached hash is then returned.
-func (msg *MsgTx) RecacheTxSha() *chainhash.Hash {
-	h := msg.TxSha()
+func (msg *MsgTx) RecacheTxHash() *chainhash.Hash {
+	h := msg.TxHash()
 	msg.CachedHash = &h
 
 	return msg.CachedHash
 }
 
-// TxShaWitness generates the Hash name for the transaction witness.
-func (msg *MsgTx) TxShaWitness() chainhash.Hash {
-	// Encode the transaction and calculate double sha256 on the result.
-	// Ignore the error returns since the only way the encode could fail
-	// is being out of memory or due to nil pointers, both of which would
-	// cause a run-time panic.
-
-	// TxShaWitness should always calculate a witnessed hash.
+// TxHashWitness generates the Hash name for the transaction witness.
+func (msg *MsgTx) TxHashWitness() chainhash.Hash {
+	// TxHashWitness should always calculate a witnessed hash.
 	mtxCopy := msg.shallowCopyForSerializing(WitnessOnlyMsgTxVersion())
 
 	buf := bytes.NewBuffer(make([]byte, 0, mtxCopy.SerializeSize()))
 	err := mtxCopy.Serialize(buf)
 	if err != nil {
-		panic("MsgTx failed serializing for TxShaWitness")
+		panic("MsgTx failed serializing for TxHashWitness")
 	}
 
-	return chainhash.HashFuncH(buf.Bytes())
+	return chainhash.HashH(buf.Bytes())
 }
 
-// TxShaWitnessSigning generates the Hash name for the transaction witness with
+// TxHashWitnessSigning generates the Hash name for the transaction witness with
 // the malleable portions (AmountIn, BlockHeight, BlockIndex) removed. These are
 // verified and set by the miner instead.
-func (msg *MsgTx) TxShaWitnessSigning() chainhash.Hash {
-	// Encode the transaction and calculate double sha256 on the result.
-	// Ignore the error returns since the only way the encode could fail
-	// is being out of memory or due to nil pointers, both of which would
-	// cause a run-time panic.
-
-	// TxShaWitness should always calculate a witnessed hash.
+func (msg *MsgTx) TxHashWitnessSigning() chainhash.Hash {
+	// TxHashWitness should always calculate a witnessed hash.
 	mtxCopy := msg.shallowCopyForSerializing(WitnessSigningMsgTxVersion())
 
 	buf := bytes.NewBuffer(make([]byte, 0, mtxCopy.SerializeSize()))
 	err := mtxCopy.Serialize(buf)
 	if err != nil {
-		panic("MsgTx failed serializing for TxShaWitnessSigning")
+		panic("MsgTx failed serializing for TxHashWitnessSigning")
 	}
 
-	return chainhash.HashFuncH(buf.Bytes())
+	return chainhash.HashH(buf.Bytes())
 }
 
-// TxShaWitnessValueSigning generates the Hash name for the transaction witness
+// TxHashWitnessValueSigning generates the Hash name for the transaction witness
 // with BlockHeight and BlockIndex removed, allowing the signer to specify the
 // ValueIn.
-func (msg *MsgTx) TxShaWitnessValueSigning() chainhash.Hash {
-	// Encode the transaction and calculate double sha256 on the result.
-	// Ignore the error returns since the only way the encode could fail
-	// is being out of memory or due to nil pointers, both of which would
-	// cause a run-time panic.
-
-	// TxShaWitness should always calculate a witnessed hash.
+func (msg *MsgTx) TxHashWitnessValueSigning() chainhash.Hash {
+	// TxHashWitness should always calculate a witnessed hash.
 	mtxCopy := msg.shallowCopyForSerializing(WitnessValueSigningMsgTxVersion())
 
 	buf := bytes.NewBuffer(make([]byte, 0, mtxCopy.SerializeSize()))
 	err := mtxCopy.Serialize(buf)
 	if err != nil {
-		panic("MsgTx failed serializing for TxShaWitnessValueSigning")
+		panic("MsgTx failed serializing for TxHashWitnessValueSigning")
 	}
 
-	return chainhash.HashFuncH(buf.Bytes())
+	return chainhash.HashH(buf.Bytes())
 }
 
-// TxShaFull generates the Hash name for the transaction prefix || witness. It
+// TxHashFull generates the Hash name for the transaction prefix || witness. It
 // first obtains the hashes for both the transaction prefix and witness, then
 // concatenates them and hashes these 64 bytes.
 // Note that the inputs to the hashes, serialized prefix and serialized witnesses,
 // have different uint32 versions because version is now actually two uint16s,
 // with the last 16 bits referring to the serialization type. The first 16 bits
 // refer to the actual version, and these must be the same in both serializations.
-func (msg *MsgTx) TxShaFull() chainhash.Hash {
+func (msg *MsgTx) TxHashFull() chainhash.Hash {
 	concat := make([]byte, 64, 64)
-	prefixHash := msg.TxSha()
-	witnessHash := msg.TxShaWitness()
+	prefixHash := msg.TxHash()
+	witnessHash := msg.TxHashWitness()
 	copy(concat[0:32], prefixHash[:])
 	copy(concat[32:64], witnessHash[:])
 
-	return chainhash.HashFuncH(concat)
+	return chainhash.HashH(concat)
 }
 
-// TxShaLegacy generates the legacy transaction hash, for software
+// TxHashLegacy generates the legacy transaction hash, for software
 // compatibility.
-func (msg *MsgTx) TxShaLegacy() chainhash.Hash {
-	// Encode the transaction and calculate double sha256 on the result.
-	// Ignore the error returns since the only way the encode could fail
-	// is being out of memory or due to nil pointers, both of which would
-	// cause a run-time panic.
+func (msg *MsgTx) TxHashLegacy() chainhash.Hash {
 	buf := bytes.NewBuffer(make([]byte, 0, msg.SerializeSize()))
 	err := msg.LegacySerialize(buf)
 	if err != nil {
-		panic("MsgTx failed serializing for TxShaLegacy")
+		panic("MsgTx failed serializing for TxHashLegacy")
 	}
 
-	return chainhash.HashFuncH(buf.Bytes())
+	return chainhash.HashH(buf.Bytes())
 }
 
 // Copy creates a deep copy of a transaction so that the original does not get

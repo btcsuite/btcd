@@ -11,7 +11,6 @@ import (
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
-
 	"github.com/decred/dcrd/chaincfg/chainhash"
 )
 
@@ -64,7 +63,7 @@ func TestInvVectWire(t *testing.T) {
 	hashStr := "3264bc2ac36a60840790ba1d475d01367e7c723da941069e9dc"
 	baseHash, err := chainhash.NewHashFromStr(hashStr)
 	if err != nil {
-		t.Errorf("NewShaHashFromStr: %v", err)
+		t.Errorf("NewHashFromStr: %v", err)
 	}
 
 	// errInvVect is an inventory vector with an error.

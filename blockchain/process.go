@@ -98,7 +98,7 @@ func (b *BlockChain) processOrphans(hash *chainhash.Hash, flags BehaviorFlags) e
 			}
 
 			// Remove the orphan from the orphan pool.
-			orphanHash := orphan.block.Sha()
+			orphanHash := orphan.block.Hash()
 			b.removeOrphanBlock(orphan)
 			i--
 
@@ -133,7 +133,7 @@ func (b *BlockChain) ProcessBlock(block *dcrutil.Block, flags BehaviorFlags) (bo
 	fastAdd := flags&BFFastAdd == BFFastAdd
 	dryRun := flags&BFDryRun == BFDryRun
 
-	blockHash := block.Sha()
+	blockHash := block.Hash()
 	log.Tracef("Processing block %v", blockHash)
 	currentTime := time.Now()
 	defer func() {

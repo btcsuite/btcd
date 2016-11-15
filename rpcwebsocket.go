@@ -729,7 +729,7 @@ func (m *wsNotificationManager) subscribedClients(tx *dcrutil.Tx,
 				if f.existsAddress(a) {
 					subscribed[q] = struct{}{}
 					op := wire.OutPoint{
-						Hash:  *tx.Sha(),
+						Hash:  *tx.Hash(),
 						Index: uint32(i),
 						Tree:  tx.Tree(),
 					}
@@ -884,8 +884,7 @@ func (*wsNotificationManager) notifyWinningTickets(
 
 	// Notify interested websocket clients about the connected block.
 	ntfn := dcrjson.NewWinningTicketsNtfn(wtnd.BlockHash.String(),
-		int32(wtnd.BlockHeight),
-		ticketMap)
+		int32(wtnd.BlockHeight), ticketMap)
 
 	marshalledJSON, err := dcrjson.MarshalCmd(nil, ntfn)
 	if err != nil {
@@ -1008,7 +1007,6 @@ func (*wsNotificationManager) notifyStakeDifficulty(
 			"%v", err)
 		return
 	}
-
 	for _, wsc := range clients {
 		wsc.QueueNotification(marshalledJSON)
 	}
@@ -1029,7 +1027,7 @@ func (m *wsNotificationManager) UnregisterNewMempoolTxsUpdates(wsc *wsClient) {
 // notifyForNewTx notifies websocket clients that have registered for updates
 // when a new transaction is added to the memory pool.
 func (m *wsNotificationManager) notifyForNewTx(clients map[chan struct{}]*wsClient, tx *dcrutil.Tx) {
-	txShaStr := tx.Sha().String()
+	txHashStr := tx.Hash().String()
 	mtx := tx.MsgTx()
 
 	var amount int64
@@ -1037,7 +1035,7 @@ func (m *wsNotificationManager) notifyForNewTx(clients map[chan struct{}]*wsClie
 		amount += txOut.Value
 	}
 
-	ntfn := dcrjson.NewTxAcceptedNtfn(txShaStr, dcrutil.Amount(amount).ToCoin())
+	ntfn := dcrjson.NewTxAcceptedNtfn(txHashStr, dcrutil.Amount(amount).ToCoin())
 	marshalledJSON, err := dcrjson.MarshalCmd(nil, ntfn)
 	if err != nil {
 		rpcsLog.Errorf("Failed to marshal tx notification: %s", err.Error())
@@ -1054,7 +1052,7 @@ func (m *wsNotificationManager) notifyForNewTx(clients map[chan struct{}]*wsClie
 			}
 
 			net := m.server.server.chainParams
-			rawTx, err := createTxRawResult(net, mtx, txShaStr,
+			rawTx, err := createTxRawResult(net, mtx, txHashStr,
 				wire.NullBlockIndex, nil, "", 0, 0)
 			if err != nil {
 				return
@@ -1127,7 +1125,7 @@ func (m *wsNotificationManager) notifyRelevantTxAccepted(tx *dcrutil.Tx,
 					clientsToNotify[q] = c
 
 					op := wire.OutPoint{
-						Hash:  *tx.Sha(),
+						Hash:  *tx.Hash(),
 						Index: uint32(i),
 						Tree:  tx.Tree(),
 					}
@@ -1297,9 +1295,9 @@ func (c *wsClient) handleMessage(msg []byte) {
 		// Check credentials.
 		login := authCmd.Username + ":" + authCmd.Passphrase
 		auth := "Basic " + base64.StdEncoding.EncodeToString([]byte(login))
-		authSha := sha256.Sum256([]byte(auth))
-		cmp := subtle.ConstantTimeCompare(authSha[:], c.server.authsha[:])
-		limitcmp := subtle.ConstantTimeCompare(authSha[:], c.server.limitauthsha[:])
+		authHash := sha256.Sum256([]byte(auth))
+		cmp := subtle.ConstantTimeCompare(authHash[:], c.server.authsha[:])
+		limitcmp := subtle.ConstantTimeCompare(authHash[:], c.server.limitauthsha[:])
 		if cmp != 1 && limitcmp != 1 {
 			rpcsLog.Warnf("Auth failure.")
 			c.Disconnect()
@@ -2027,7 +2025,7 @@ func rescanBlock(filter *wsClientFilter, block *dcrutil.Block) []string {
 				}
 
 				op := wire.OutPoint{
-					Hash:  tx.TxSha(),
+					Hash:  tx.TxHash(),
 					Index: uint32(i),
 					Tree:  tree,
 				}

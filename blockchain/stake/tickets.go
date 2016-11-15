@@ -344,7 +344,7 @@ func LoadBestNode(dbTx database.Tx, height uint32, blockHash chainhash.Hash, hea
 		}
 		lastHash := prng.StateHash()
 		stateBuffer = append(stateBuffer, lastHash[:]...)
-		copy(node.finalState[:], chainhash.HashFuncB(stateBuffer)[0:6])
+		copy(node.finalState[:], chainhash.HashB(stateBuffer)[0:6])
 	}
 
 	log.Infof("Stake database version %v loaded", info.Version)
@@ -628,7 +628,7 @@ func connectNode(node *Node, header wire.BlockHeader, ticketsSpentInBlock, revok
 		}
 		lastHash := prng.StateHash()
 		stateBuffer = append(stateBuffer, lastHash[:]...)
-		copy(connectedNode.finalState[:], chainhash.HashFuncB(stateBuffer)[0:6])
+		copy(connectedNode.finalState[:], chainhash.HashB(stateBuffer)[0:6])
 	}
 
 	return connectedNode, nil
@@ -791,7 +791,7 @@ func disconnectNode(node *Node, parentHeader wire.BlockHeader, parentUtds UndoTi
 		}
 		lastHash := prng.StateHash()
 		stateBuffer = append(stateBuffer, lastHash[:]...)
-		copy(restoredNode.finalState[:], chainhash.HashFuncB(stateBuffer)[0:6])
+		copy(restoredNode.finalState[:], chainhash.HashB(stateBuffer)[0:6])
 	}
 
 	return restoredNode, nil

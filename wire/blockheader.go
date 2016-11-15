@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2015 The btcsuite developers
+// Copyright (c) 2013-2016 The btcsuite developers
 // Copyright (c) 2015-2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
@@ -86,8 +86,8 @@ type BlockHeader struct {
 // header.
 const blockHeaderLen = 180
 
-// BlockSha computes the block identifier hash for the given block header.
-func (h *BlockHeader) BlockSha() chainhash.Hash {
+// BlockHash computes the block identifier hash for the given block header.
+func (h *BlockHeader) BlockHash() chainhash.Hash {
 	// Encode the header and hash256 everything prior to the number of
 	// transactions.  Ignore the error returns since there is no way the
 	// encode could fail except being out of memory which would cause a
@@ -95,7 +95,7 @@ func (h *BlockHeader) BlockSha() chainhash.Hash {
 	var buf bytes.Buffer
 	_ = writeBlockHeader(&buf, 0, h)
 
-	return chainhash.HashFuncH(buf.Bytes())
+	return chainhash.HashH(buf.Bytes())
 }
 
 // BtcDecode decodes r using the bitcoin protocol encoding into the receiver.

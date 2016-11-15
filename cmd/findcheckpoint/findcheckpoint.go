@@ -103,7 +103,7 @@ func findCandidates(chain *blockchain.BlockChain, latestHash *chainhash.Hash) ([
 		if isCandidate {
 			checkpoint := chaincfg.Checkpoint{
 				Height: block.Height(),
-				Hash:   block.Sha(),
+				Hash:   block.Hash(),
 			}
 			candidates = append(candidates, &checkpoint)
 		}

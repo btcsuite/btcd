@@ -101,7 +101,7 @@ type relayMsg struct {
 // updates, peer heights will be kept up to date, allowing for fresh data when
 // selecting sync peer candidacy.
 type updatePeerHeightsMsg struct {
-	newSha     *chainhash.Hash
+	newHash    *chainhash.Hash
 	newHeight  int64
 	originPeer *serverPeer
 }
@@ -428,7 +428,7 @@ func (sp *serverPeer) OnMemPool(p *peer.Peer, msg *wire.MsgMemPool) {
 	for i, txDesc := range txDescs {
 		// Another thread might have removed the transaction from the
 		// pool since the initial query.
-		hash := txDesc.Tx.Sha()
+		hash := txDesc.Tx.Hash()
 		if !txMemPool.IsTransactionInPool(hash) {
 			continue
 		}
@@ -534,9 +534,8 @@ func (sp *serverPeer) OnGetMiningState(p *peer.Peer, msg *wire.MsgGetMiningState
 		if i >= wire.MaxMSBlocksAtHeadPerMsg {
 			break
 		}
-		hP := new(chainhash.Hash)
-		hP.SetBytes(h.Bytes())
-		blockHashes[i] = hP
+		hashCopy := h
+		blockHashes[i] = &hashCopy
 	}
 
 	// Construct the set of votes to send.
@@ -551,9 +550,8 @@ func (sp *serverPeer) OnGetMiningState(p *peer.Peer, msg *wire.MsgGetMiningState
 			return
 		}
 		for _, vh := range vhsForBlock {
-			vhP := new(chainhash.Hash)
-			vhP.SetBytes(vh.Bytes())
-			voteHashes = append(voteHashes, vhP)
+			hashCopy := vh
+			voteHashes = append(voteHashes, &hashCopy)
 		}
 	}
 
@@ -582,7 +580,7 @@ func (sp *serverPeer) OnMiningState(p *peer.Peer, msg *wire.MsgMiningState) {
 func (sp *serverPeer) OnTx(p *peer.Peer, msg *wire.MsgTx) {
 	if cfg.BlocksOnly {
 		peerLog.Tracef("Ignoring tx %v from %v - blocksonly enabled",
-			msg.TxSha(), p)
+			msg.TxHash(), p)
 		return
 	}
 
@@ -590,7 +588,7 @@ func (sp *serverPeer) OnTx(p *peer.Peer, msg *wire.MsgTx) {
 	// Convert the raw MsgTx to a dcrutil.Tx which provides some convenience
 	// methods and things such as hash caching.
 	tx := dcrutil.NewTx(msg)
-	iv := wire.NewInvVect(wire.InvTypeTx, tx.Sha())
+	iv := wire.NewInvVect(wire.InvTypeTx, tx.Hash())
 	p.AddKnownInventory(iv)
 
 	// Queue the transaction up to be handled by the block manager and
@@ -610,7 +608,7 @@ func (sp *serverPeer) OnBlock(p *peer.Peer, msg *wire.MsgBlock, buf []byte) {
 	block := dcrutil.NewBlockFromBlockAndBytes(msg, buf)
 
 	// Add the block to the known inventory for the peer.
-	iv := wire.NewInvVect(wire.InvTypeBlock, block.Sha())
+	iv := wire.NewInvVect(wire.InvTypeBlock, block.Hash())
 	p.AddKnownInventory(iv)
 
 	// Queue the block up to be handled by the block manager and
@@ -1084,7 +1082,7 @@ func (s *server) AnnounceNewTransactions(newTxs []*dcrutil.Tx) {
 	// accepted.
 	for _, tx := range newTxs {
 		// Generate the inventory vector and relay it.
-		iv := wire.NewInvVect(wire.InvTypeTx, tx.Sha())
+		iv := wire.NewInvVect(wire.InvTypeTx, tx.Hash())
 		s.RelayInventory(iv, tx)
 
 		if s.rpcServer != nil {
@@ -1101,17 +1099,17 @@ func (s *server) AnnounceNewTransactions(newTxs []*dcrutil.Tx) {
 
 // pushTxMsg sends a tx message for the provided transaction hash to the
 // connected peer.  An error is returned if the transaction hash is not known.
-func (s *server) pushTxMsg(sp *serverPeer, sha *chainhash.Hash, doneChan chan<- struct{}, waitChan <-chan struct{}) error {
+func (s *server) pushTxMsg(sp *serverPeer, hash *chainhash.Hash, doneChan chan<- struct{}, waitChan <-chan struct{}) error {
 	// Attempt to fetch the requested transaction from the pool.  A
 	// call could be made to check for existence first, but simply trying
 	// to fetch a missing transaction results in the same behavior.
 	// Do not allow peers to request transactions already in a block
 	// but are unconfirmed, as they may be expensive. Restrict that
 	// to the authenticated RPC only.
-	tx, err := s.txMemPool.FetchTransaction(sha, false)
+	tx, err := s.txMemPool.FetchTransaction(hash, false)
 	if err != nil {
 		peerLog.Tracef("Unable to fetch tx %v from transaction "+
-			"pool: %v", sha, err)
+			"pool: %v", hash, err)
 
 		if doneChan != nil {
 			doneChan <- struct{}{}
@@ -1243,17 +1241,17 @@ func (s *server) handleUpdatePeerHeights(state *peerState, umsg updatePeerHeight
 
 		// This is a pointer to the underlying memory which doesn't
 		// change.
-		latestBlkSha := sp.LastAnnouncedBlock()
+		latestBlkHash := sp.LastAnnouncedBlock()
 
 		// Skip this peer if it hasn't recently announced any new blocks.
-		if latestBlkSha == nil {
+		if latestBlkHash == nil {
 			return
 		}
 
 		// If the peer has recently announced a block, and this block
 		// matches our newly accepted block, then update their block
 		// height.
-		if *latestBlkSha == *umsg.newSha {
+		if *latestBlkHash == *umsg.newHash {
 			sp.UpdateLastBlockHeight(int64(umsg.newHeight))
 			sp.UpdateLastAnnouncedBlock(nil)
 		}
@@ -2129,9 +2127,9 @@ func (s *server) NetTotals() (uint64, uint64) {
 // the latest connected main chain block, or a recognized orphan. These height
 // updates allow us to dynamically refresh peer heights, ensuring sync peer
 // selection has access to the latest block heights for each peer.
-func (s *server) UpdatePeerHeights(latestBlkSha *chainhash.Hash, latestHeight int64, updateSource *serverPeer) {
+func (s *server) UpdatePeerHeights(latestBlkHash *chainhash.Hash, latestHeight int64, updateSource *serverPeer) {
 	s.peerHeightsUpdate <- updatePeerHeightsMsg{
-		newSha:     latestBlkSha,
+		newHash:    latestBlkHash,
 		newHeight:  latestHeight,
 		originPeer: updateSource,
 	}
@@ -2625,7 +2623,7 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 	txC := mempoolConfig{
 		ChainParams: chainParams,
 		// EnableAddrIndex: !cfg.NoAddrIndex, TODO
-		NewestSha: func() (*chainhash.Hash, int64, error) {
+		NewestHash: func() (*chainhash.Hash, int64, error) {
 			bm.chainState.Lock()
 			hash := bm.chainState.newestHash
 			height := bm.chainState.newestHeight

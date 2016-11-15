@@ -77,7 +77,7 @@ func ticketsInBlock(bl *dcrutil.Block) []chainhash.Hash {
 	tickets := make([]chainhash.Hash, 0)
 	for _, stx := range bl.STransactions() {
 		if DetermineTxType(stx.MsgTx()) == TxTypeSStx {
-			h := stx.Sha()
+			h := stx.Hash()
 			tickets = append(tickets, *h)
 		}
 	}
@@ -102,7 +102,7 @@ func votesInBlock(bl *dcrutil.Block) []chainhash.Hash {
 	votes := make([]chainhash.Hash, 0)
 	for _, stx := range bl.STransactions() {
 		if DetermineTxType(stx.MsgTx()) == TxTypeSSGen {
-			h := stx.Sha()
+			h := stx.Hash()
 			votes = append(votes, *h)
 		}
 	}
@@ -443,15 +443,15 @@ func TestTicketDBLongChain(t *testing.T) {
 
 				// Write the new node to db.
 				nodesForward[i] = bestNode
-				blockSha := block.Sha()
-				err := WriteConnectedBestNode(dbTx, bestNode, *blockSha)
+				blockHash := block.Hash()
+				err := WriteConnectedBestNode(dbTx, bestNode, *blockHash)
 				if err != nil {
 					return fmt.Errorf("failure writing the best node: %v",
 						err.Error())
 				}
 
 				// Reload the node from DB and make sure it's the same.
-				blockHash := block.Sha()
+				blockHash := block.Hash()
 				loadedNode, err := LoadBestNode(dbTx, bestNode.Height(),
 					*blockHash, header, simNetParams)
 				if err != nil {
@@ -523,9 +523,9 @@ func TestTicketDBLongChain(t *testing.T) {
 			nodesBackward[i-1] = bestNode
 			err = testDb.Update(func(dbTx database.Tx) error {
 				nodesForward[i] = bestNode
-				parentBlockSha := parentBlock.Sha()
+				parentBlockHash := parentBlock.Hash()
 				err := WriteDisconnectedBestNode(dbTx, bestNode,
-					*parentBlockSha, formerBestNode.UndoData())
+					*parentBlockHash, formerBestNode.UndoData())
 				if err != nil {
 					return fmt.Errorf("failure writing the best node: %v",
 						err.Error())
@@ -540,7 +540,7 @@ func TestTicketDBLongChain(t *testing.T) {
 			// Check the best node against the loaded best node from
 			// the database after.
 			err = testDb.View(func(dbTx database.Tx) error {
-				parentBlockHash := parentBlock.Sha()
+				parentBlockHash := parentBlock.Hash()
 				loadedNode, err := LoadBestNode(dbTx, bestNode.Height(),
 					*parentBlockHash, header, simNetParams)
 				if err != nil {
@@ -660,15 +660,15 @@ func TestTicketDBGeneral(t *testing.T) {
 
 			// Write the new node to db.
 			nodesForward[i] = bestNode
-			blockSha := block.Sha()
-			err := WriteConnectedBestNode(dbTx, bestNode, *blockSha)
+			blockHash := block.Hash()
+			err := WriteConnectedBestNode(dbTx, bestNode, *blockHash)
 			if err != nil {
 				return fmt.Errorf("failure writing the best node: %v",
 					err.Error())
 			}
 
 			// Reload the node from DB and make sure it's the same.
-			blockHash := block.Sha()
+			blockHash = block.Hash()
 			loadedNode, err := LoadBestNode(dbTx, bestNode.Height(),
 				*blockHash, header, simNetParams)
 			if err != nil {
@@ -748,9 +748,9 @@ func TestTicketDBGeneral(t *testing.T) {
 		nodesBackward[i-1] = bestNode
 		err = testDb.Update(func(dbTx database.Tx) error {
 			nodesForward[i] = bestNode
-			parentBlockSha := parentBlock.Sha()
+			parentBlockHash := parentBlock.Hash()
 			err := WriteDisconnectedBestNode(dbTx, bestNode,
-				*parentBlockSha, formerBestNode.UndoData())
+				*parentBlockHash, formerBestNode.UndoData())
 			if err != nil {
 				return fmt.Errorf("failure writing the best node: %v",
 					err.Error())
@@ -765,7 +765,7 @@ func TestTicketDBGeneral(t *testing.T) {
 		// Check the best node against the loaded best node from
 		// the database after.
 		err = testDb.View(func(dbTx database.Tx) error {
-			parentBlockHash := parentBlock.Sha()
+			parentBlockHash := parentBlock.Hash()
 			loadedNode, err := LoadBestNode(dbTx, bestNode.Height(),
 				*parentBlockHash, header, simNetParams)
 			if err != nil {
@@ -829,7 +829,7 @@ func TestTicketDBGeneral(t *testing.T) {
 	}
 
 	// Test for corrupted spentInBlock.
-	someHash := chainhash.HashFuncH([]byte{0x00})
+	someHash := chainhash.HashH([]byte{0x00})
 	spentInBlock = n162Test.SpentByBlock()
 	spentInBlock[4] = someHash
 	_, err = nodesForward[161].ConnectNode(b162.MsgBlock().Header,
@@ -1056,7 +1056,7 @@ var bigOne = new(big.Int).SetInt64(1)
 
 // simNetGenesisHash is the hash of the first block in the block chain for the
 // simulation test network.
-var simNetGenesisHash = simNetGenesisBlock.BlockSha()
+var simNetGenesisHash = simNetGenesisBlock.BlockHash()
 
 // simNetGenesisMerkleRoot is the hash of the first transaction in the genesis
 // block for the simulation test network.  It is the same as the merkle root for
@@ -1110,7 +1110,7 @@ var genesisCoinbaseTxLegacy = wire.MsgTx{
 
 // genesisMerkleRoot is the hash of the first transaction in the genesis block
 // for the main network.
-var genesisMerkleRoot = genesisCoinbaseTxLegacy.TxSha()
+var genesisMerkleRoot = genesisCoinbaseTxLegacy.TxHash()
 
 var regTestGenesisCoinbaseTx = wire.MsgTx{
 	Version: 1,

@@ -178,7 +178,7 @@ func PartialSign(curve *secp256k1.KoblitzCurve, msg []byte,
 	defer zeroSlice(privNonceBytes)
 
 	return schnorrPartialSign(curve, msg, privBytes, privNonceBytes, pubSum,
-		chainhash.HashFuncB)
+		chainhash.HashB)
 }
 
 // schnorrCombineSigs combines a list of partial Schnorr signatures s values

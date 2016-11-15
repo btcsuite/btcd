@@ -22,7 +22,7 @@ import (
 
 func TestIsSStx(t *testing.T) {
 	var sstx = dcrutil.NewTx(sstxMsgTx)
-	sstx.SetTree(dcrutil.TxTreeStake)
+	sstx.SetTree(wire.TxTreeStake)
 	sstx.SetIndex(0)
 
 	test, err := stake.IsSStx(sstx.MsgTx())
@@ -49,7 +49,7 @@ func TestIsSStx(t *testing.T) {
 
 	sstx = dcrutil.NewTxDeep(sstxMsgTx)
 	sstx.MsgTx().TxOut[1].PkScript = biggestPush
-	sstx.SetTree(dcrutil.TxTreeStake)
+	sstx.SetTree(wire.TxTreeStake)
 	sstx.SetIndex(0)
 
 	test, err = stake.IsSStx(sstx.MsgTx())
@@ -72,7 +72,7 @@ func TestIsSSTxErrors(t *testing.T) {
 	// Test too many inputs with sstxMsgTxExtraInputs
 
 	var sstxExtraInputs = dcrutil.NewTx(sstxMsgTxExtraInput)
-	sstxExtraInputs.SetTree(dcrutil.TxTreeStake)
+	sstxExtraInputs.SetTree(wire.TxTreeStake)
 	sstxExtraInputs.SetIndex(0)
 
 	test, err := stake.IsSStx(sstxExtraInputs.MsgTx())
@@ -86,7 +86,7 @@ func TestIsSSTxErrors(t *testing.T) {
 	// Test too many outputs with sstxMsgTxExtraOutputs
 
 	var sstxExtraOutputs = dcrutil.NewTx(sstxMsgTxExtraOutputs)
-	sstxExtraOutputs.SetTree(dcrutil.TxTreeStake)
+	sstxExtraOutputs.SetTree(wire.TxTreeStake)
 	sstxExtraOutputs.SetIndex(0)
 
 	test, err = stake.IsSStx(sstxExtraOutputs.MsgTx())
@@ -115,7 +115,7 @@ func TestIsSSTxErrors(t *testing.T) {
 	}
 
 	var sstxUntaggedOut = dcrutil.NewTx(&tx)
-	sstxUntaggedOut.SetTree(dcrutil.TxTreeStake)
+	sstxUntaggedOut.SetTree(wire.TxTreeStake)
 	sstxUntaggedOut.SetIndex(0)
 
 	test, err = stake.IsSStx(sstxUntaggedOut.MsgTx())
@@ -129,7 +129,7 @@ func TestIsSSTxErrors(t *testing.T) {
 	// Test for mismatched number of inputs versus number of outputs
 
 	var sstxInsOutsMismatched = dcrutil.NewTx(sstxMismatchedInsOuts)
-	sstxInsOutsMismatched.SetTree(dcrutil.TxTreeStake)
+	sstxInsOutsMismatched.SetTree(wire.TxTreeStake)
 	sstxInsOutsMismatched.SetIndex(0)
 
 	test, err = stake.IsSStx(sstxInsOutsMismatched.MsgTx())
@@ -142,7 +142,7 @@ func TestIsSSTxErrors(t *testing.T) {
 	// ---------------------------------------------------------------------------
 	// Test for bad version of output.
 	var sstxBadVerOut = dcrutil.NewTx(sstxBadVersionOut)
-	sstxBadVerOut.SetTree(dcrutil.TxTreeStake)
+	sstxBadVerOut.SetTree(wire.TxTreeStake)
 	sstxBadVerOut.SetIndex(0)
 
 	test, err = stake.IsSStx(sstxBadVerOut.MsgTx())
@@ -156,7 +156,7 @@ func TestIsSSTxErrors(t *testing.T) {
 	// Test for second or more output not being OP_RETURN push
 
 	var sstxNoNullData = dcrutil.NewTx(sstxNullDataMissing)
-	sstxNoNullData.SetTree(dcrutil.TxTreeStake)
+	sstxNoNullData.SetTree(wire.TxTreeStake)
 	sstxNoNullData.SetIndex(0)
 
 	test, err = stake.IsSStx(sstxNoNullData.MsgTx())
@@ -170,7 +170,7 @@ func TestIsSSTxErrors(t *testing.T) {
 	// Test for change output being in the wrong place
 
 	var sstxNullDataMis = dcrutil.NewTx(sstxNullDataMisplaced)
-	sstxNullDataMis.SetTree(dcrutil.TxTreeStake)
+	sstxNullDataMis.SetTree(wire.TxTreeStake)
 	sstxNullDataMis.SetIndex(0)
 
 	test, err = stake.IsSStx(sstxNullDataMis.MsgTx())
@@ -204,7 +204,7 @@ func TestIsSSTxErrors(t *testing.T) {
 	}
 
 	var sstxWrongPKHLength = dcrutil.NewTx(&tx)
-	sstxWrongPKHLength.SetTree(dcrutil.TxTreeStake)
+	sstxWrongPKHLength.SetTree(wire.TxTreeStake)
 	sstxWrongPKHLength.SetIndex(0)
 
 	test, err = stake.IsSStx(sstxWrongPKHLength.MsgTx())
@@ -239,7 +239,7 @@ func TestIsSSTxErrors(t *testing.T) {
 	tx.TxOut[1].PkScript = tooBigPush
 
 	var sstxWrongPrefix = dcrutil.NewTx(&tx)
-	sstxWrongPrefix.SetTree(dcrutil.TxTreeStake)
+	sstxWrongPrefix.SetTree(wire.TxTreeStake)
 	sstxWrongPrefix.SetIndex(0)
 
 	test, err = stake.IsSStx(sstxWrongPrefix.MsgTx())
@@ -254,7 +254,7 @@ func TestIsSSTxErrors(t *testing.T) {
 
 func TestIsSSGen(t *testing.T) {
 	var ssgen = dcrutil.NewTx(ssgenMsgTx)
-	ssgen.SetTree(dcrutil.TxTreeStake)
+	ssgen.SetTree(wire.TxTreeStake)
 	ssgen.SetIndex(0)
 
 	test, err := stake.IsSSGen(ssgen.MsgTx())
@@ -279,7 +279,7 @@ func TestIsSSGen(t *testing.T) {
 	}
 
 	ssgen = dcrutil.NewTxDeep(ssgenMsgTx)
-	ssgen.SetTree(dcrutil.TxTreeStake)
+	ssgen.SetTree(wire.TxTreeStake)
 	ssgen.SetIndex(0)
 	ssgen.MsgTx().TxOut[1].PkScript = biggestPush
 
@@ -304,7 +304,7 @@ func TestIsSSGenErrors(t *testing.T) {
 	// Test too many inputs with ssgenMsgTxExtraInputs
 
 	var ssgenExtraInputs = dcrutil.NewTx(ssgenMsgTxExtraInput)
-	ssgenExtraInputs.SetTree(dcrutil.TxTreeStake)
+	ssgenExtraInputs.SetTree(wire.TxTreeStake)
 	ssgenExtraInputs.SetIndex(0)
 
 	test, err := stake.IsSSGen(ssgenExtraInputs.MsgTx())
@@ -318,7 +318,7 @@ func TestIsSSGenErrors(t *testing.T) {
 	// Test too many outputs with sstxMsgTxExtraOutputs
 
 	var ssgenExtraOutputs = dcrutil.NewTx(ssgenMsgTxExtraOutputs)
-	ssgenExtraOutputs.SetTree(dcrutil.TxTreeStake)
+	ssgenExtraOutputs.SetTree(wire.TxTreeStake)
 	ssgenExtraOutputs.SetIndex(0)
 
 	test, err = stake.IsSSGen(ssgenExtraOutputs.MsgTx())
@@ -332,7 +332,7 @@ func TestIsSSGenErrors(t *testing.T) {
 	// Test 0th input not being stakebase error
 
 	var ssgenStakeBaseWrong = dcrutil.NewTx(ssgenMsgTxStakeBaseWrong)
-	ssgenStakeBaseWrong.SetTree(dcrutil.TxTreeStake)
+	ssgenStakeBaseWrong.SetTree(wire.TxTreeStake)
 	ssgenStakeBaseWrong.SetIndex(0)
 
 	test, err = stake.IsSSGen(ssgenStakeBaseWrong.MsgTx())
@@ -362,7 +362,7 @@ func TestIsSSGenErrors(t *testing.T) {
 	}
 
 	var ssgenWrongTreeIns = dcrutil.NewTx(&tx)
-	ssgenWrongTreeIns.SetTree(dcrutil.TxTreeStake)
+	ssgenWrongTreeIns.SetTree(wire.TxTreeStake)
 	ssgenWrongTreeIns.SetIndex(0)
 
 	test, err = stake.IsSSGen(ssgenWrongTreeIns.MsgTx())
@@ -375,7 +375,7 @@ func TestIsSSGenErrors(t *testing.T) {
 	// ---------------------------------------------------------------------------
 	// Test for bad version of output.
 	var ssgenTxBadVerOut = dcrutil.NewTx(ssgenMsgTxBadVerOut)
-	ssgenTxBadVerOut.SetTree(dcrutil.TxTreeStake)
+	ssgenTxBadVerOut.SetTree(wire.TxTreeStake)
 	ssgenTxBadVerOut.SetIndex(0)
 
 	test, err = stake.IsSSGen(ssgenTxBadVerOut.MsgTx())
@@ -389,7 +389,7 @@ func TestIsSSGenErrors(t *testing.T) {
 	// Test 0th output not being OP_RETURN push
 
 	var ssgenWrongZeroethOut = dcrutil.NewTx(ssgenMsgTxWrongZeroethOut)
-	ssgenWrongZeroethOut.SetTree(dcrutil.TxTreeStake)
+	ssgenWrongZeroethOut.SetTree(wire.TxTreeStake)
 	ssgenWrongZeroethOut.SetIndex(0)
 
 	test, err = stake.IsSSGen(ssgenWrongZeroethOut.MsgTx())
@@ -428,7 +428,7 @@ func TestIsSSGenErrors(t *testing.T) {
 	}
 
 	var ssgenWrongDataPush0Length = dcrutil.NewTx(&tx)
-	ssgenWrongDataPush0Length.SetTree(dcrutil.TxTreeStake)
+	ssgenWrongDataPush0Length.SetTree(wire.TxTreeStake)
 	ssgenWrongDataPush0Length.SetIndex(0)
 
 	test, err = stake.IsSSGen(ssgenWrongDataPush0Length.MsgTx())
@@ -468,7 +468,7 @@ func TestIsSSGenErrors(t *testing.T) {
 	}
 
 	var ssgenWrongNullData0Prefix = dcrutil.NewTx(&tx)
-	ssgenWrongNullData0Prefix.SetTree(dcrutil.TxTreeStake)
+	ssgenWrongNullData0Prefix.SetTree(wire.TxTreeStake)
 	ssgenWrongNullData0Prefix.SetIndex(0)
 
 	test, err = stake.IsSSGen(ssgenWrongNullData0Prefix.MsgTx())
@@ -482,7 +482,7 @@ func TestIsSSGenErrors(t *testing.T) {
 	// Test 1st output not being OP_RETURN push
 
 	var ssgenWrongFirstOut = dcrutil.NewTx(ssgenMsgTxWrongFirstOut)
-	ssgenWrongFirstOut.SetTree(dcrutil.TxTreeStake)
+	ssgenWrongFirstOut.SetTree(wire.TxTreeStake)
 	ssgenWrongFirstOut.SetIndex(0)
 
 	test, err = stake.IsSSGen(ssgenWrongFirstOut.MsgTx())
@@ -510,7 +510,7 @@ func TestIsSSGenErrors(t *testing.T) {
 	}
 
 	var ssgenWrongDataPush1Length = dcrutil.NewTx(&tx)
-	ssgenWrongDataPush1Length.SetTree(dcrutil.TxTreeStake)
+	ssgenWrongDataPush1Length.SetTree(wire.TxTreeStake)
 	ssgenWrongDataPush1Length.SetIndex(0)
 
 	test, err = stake.IsSSGen(ssgenWrongDataPush1Length.MsgTx())
@@ -539,7 +539,7 @@ func TestIsSSGenErrors(t *testing.T) {
 	}
 
 	var ssgenLongDataPush1Length = dcrutil.NewTx(&tx)
-	ssgenLongDataPush1Length.SetTree(dcrutil.TxTreeStake)
+	ssgenLongDataPush1Length.SetTree(wire.TxTreeStake)
 	ssgenLongDataPush1Length.SetIndex(0)
 
 	test, err = stake.IsSSGen(ssgenLongDataPush1Length.MsgTx())
@@ -568,7 +568,7 @@ func TestIsSSGenErrors(t *testing.T) {
 	}
 
 	var ssgenWrongNullData1Prefix = dcrutil.NewTx(&tx)
-	ssgenWrongNullData1Prefix.SetTree(dcrutil.TxTreeStake)
+	ssgenWrongNullData1Prefix.SetTree(wire.TxTreeStake)
 	ssgenWrongNullData1Prefix.SetIndex(0)
 
 	test, err = stake.IsSSGen(ssgenWrongNullData1Prefix.MsgTx())
@@ -598,7 +598,7 @@ func TestIsSSGenErrors(t *testing.T) {
 	}
 
 	var ssgentestGenOutputUntagged = dcrutil.NewTx(&tx)
-	ssgentestGenOutputUntagged.SetTree(dcrutil.TxTreeStake)
+	ssgentestGenOutputUntagged.SetTree(wire.TxTreeStake)
 	ssgentestGenOutputUntagged.SetIndex(0)
 
 	test, err = stake.IsSSGen(ssgentestGenOutputUntagged.MsgTx())
@@ -613,7 +613,7 @@ func TestIsSSGenErrors(t *testing.T) {
 
 func TestIsSSRtx(t *testing.T) {
 	var ssrtx = dcrutil.NewTx(ssrtxMsgTx)
-	ssrtx.SetTree(dcrutil.TxTreeStake)
+	ssrtx.SetTree(wire.TxTreeStake)
 	ssrtx.SetIndex(0)
 
 	test, err := stake.IsSSRtx(ssrtx.MsgTx())
@@ -636,7 +636,7 @@ func TestIsSSRtxErrors(t *testing.T) {
 	// Test too many inputs with ssrtxMsgTxTooManyInputs
 
 	var ssrtxTooManyInputs = dcrutil.NewTx(ssrtxMsgTxTooManyInputs)
-	ssrtxTooManyInputs.SetTree(dcrutil.TxTreeStake)
+	ssrtxTooManyInputs.SetTree(wire.TxTreeStake)
 	ssrtxTooManyInputs.SetIndex(0)
 
 	test, err := stake.IsSSRtx(ssrtxTooManyInputs.MsgTx())
@@ -650,7 +650,7 @@ func TestIsSSRtxErrors(t *testing.T) {
 	// Test too many outputs with ssrtxMsgTxTooManyOutputs
 
 	var ssrtxTooManyOutputs = dcrutil.NewTx(ssrtxMsgTxTooManyOutputs)
-	ssrtxTooManyOutputs.SetTree(dcrutil.TxTreeStake)
+	ssrtxTooManyOutputs.SetTree(wire.TxTreeStake)
 	ssrtxTooManyOutputs.SetIndex(0)
 
 	test, err = stake.IsSSRtx(ssrtxTooManyOutputs.MsgTx())
@@ -663,7 +663,7 @@ func TestIsSSRtxErrors(t *testing.T) {
 	// ---------------------------------------------------------------------------
 	// Test for bad version of output.
 	var ssrtxTxBadVerOut = dcrutil.NewTx(ssrtxMsgTxBadVerOut)
-	ssrtxTxBadVerOut.SetTree(dcrutil.TxTreeStake)
+	ssrtxTxBadVerOut.SetTree(wire.TxTreeStake)
 	ssrtxTxBadVerOut.SetIndex(0)
 
 	test, err = stake.IsSSRtx(ssrtxTxBadVerOut.MsgTx())
@@ -693,7 +693,7 @@ func TestIsSSRtxErrors(t *testing.T) {
 	}
 
 	var ssrtxTestRevocOutputUntagged = dcrutil.NewTx(&tx)
-	ssrtxTestRevocOutputUntagged.SetTree(dcrutil.TxTreeStake)
+	ssrtxTestRevocOutputUntagged.SetTree(wire.TxTreeStake)
 	ssrtxTestRevocOutputUntagged.SetIndex(0)
 
 	test, err = stake.IsSSRtx(ssrtxTestRevocOutputUntagged.MsgTx())
@@ -722,7 +722,7 @@ func TestIsSSRtxErrors(t *testing.T) {
 	}
 
 	var ssrtxWrongTreeIns = dcrutil.NewTx(&tx)
-	ssrtxWrongTreeIns.SetTree(dcrutil.TxTreeStake)
+	ssrtxWrongTreeIns.SetTree(wire.TxTreeStake)
 	ssrtxWrongTreeIns.SetIndex(0)
 
 	test, err = stake.IsSSRtx(ssrtxWrongTreeIns.MsgTx())
@@ -737,12 +737,12 @@ func TestIsSSRtxErrors(t *testing.T) {
 // Minor function testing
 func TestGetSSGenBlockVotedOn(t *testing.T) {
 	var ssgen = dcrutil.NewTx(ssgenMsgTx)
-	ssgen.SetTree(dcrutil.TxTreeStake)
+	ssgen.SetTree(wire.TxTreeStake)
 	ssgen.SetIndex(0)
 
-	blocksha, height, err := stake.SSGenBlockVotedOn(ssgen.MsgTx())
+	blockHash, height, err := stake.SSGenBlockVotedOn(ssgen.MsgTx())
 
-	correctblocksha, _ := chainhash.NewHash(
+	correctBlockHash, _ := chainhash.NewHash(
 		[]byte{
 			0x94, 0x8c, 0x76, 0x5a, // 32 byte hash
 			0x69, 0x14, 0xd4, 0x3f,
@@ -760,9 +760,9 @@ func TestGetSSGenBlockVotedOn(t *testing.T) {
 		t.Errorf("Error thrown on TestGetSSGenBlockVotedOn: %v", err)
 	}
 
-	if !reflect.DeepEqual(blocksha, *correctblocksha) {
+	if !reflect.DeepEqual(blockHash, *correctBlockHash) {
 		t.Errorf("Error thrown on TestGetSSGenBlockVotedOn: Looking for "+
-			"hash %v, got hash %v: %v", *correctblocksha, blocksha, err)
+			"hash %v, got hash %v: %v", *correctBlockHash, blockHash, err)
 	}
 
 	if height != correctheight {
@@ -773,7 +773,7 @@ func TestGetSSGenBlockVotedOn(t *testing.T) {
 
 func TestGetSStxStakeOutputInfo(t *testing.T) {
 	var sstx = dcrutil.NewTx(sstxMsgTx)
-	sstx.SetTree(dcrutil.TxTreeStake)
+	sstx.SetTree(wire.TxTreeStake)
 	sstx.SetIndex(0)
 
 	correctTyp := true
@@ -829,7 +829,7 @@ func TestGetSStxStakeOutputInfo(t *testing.T) {
 
 func TestGetSSGenStakeOutputInfo(t *testing.T) {
 	var ssgen = dcrutil.NewTx(ssgenMsgTx)
-	ssgen.SetTree(dcrutil.TxTreeStake)
+	ssgen.SetTree(wire.TxTreeStake)
 	ssgen.SetIndex(0)
 
 	correctTyp := false
@@ -867,7 +867,7 @@ func TestGetSSGenStakeOutputInfo(t *testing.T) {
 
 func TestGetSSGenVoteBits(t *testing.T) {
 	var ssgen = dcrutil.NewTx(ssgenMsgTx)
-	ssgen.SetTree(dcrutil.TxTreeStake)
+	ssgen.SetTree(wire.TxTreeStake)
 	ssgen.SetIndex(0)
 
 	correctvbs := uint16(0x8c94)
@@ -907,7 +907,7 @@ func TestGetSSGenVersion(t *testing.T) {
 
 func TestGetSSRtxStakeOutputInfo(t *testing.T) {
 	var ssrtx = dcrutil.NewTx(ssrtxMsgTx)
-	ssrtx.SetTree(dcrutil.TxTreeStake)
+	ssrtx.SetTree(wire.TxTreeStake)
 	ssrtx.SetIndex(0)
 
 	correctTyp := false
@@ -1489,7 +1489,7 @@ var sstxTxIn = wire.TxIn{
 			0x79, 0xac, 0x88, 0xfd, 0xf3, 0x57, 0xa1, 0x87,
 		}), // 87a157f3fd88ac7907c05fc55e271dc4acdc5605d187d646604ca8c0e9382e03
 		Index: 0,
-		Tree:  dcrutil.TxTreeRegular,
+		Tree:  wire.TxTreeRegular,
 	},
 	SignatureScript: []byte{
 		0x49, // OP_DATA_73
@@ -1785,7 +1785,7 @@ var ssgenTxIn0 = wire.TxIn{
 	PreviousOutPoint: wire.OutPoint{
 		Hash:  chainhash.Hash{},
 		Index: 0xffffffff,
-		Tree:  dcrutil.TxTreeRegular,
+		Tree:  wire.TxTreeRegular,
 	},
 	SignatureScript: []byte{
 		0x04, 0xff, 0xff, 0x00, 0x1d, 0x01, 0x04,
@@ -1806,7 +1806,7 @@ var ssgenTxIn1 = wire.TxIn{
 			0x79, 0xac, 0x88, 0xfd, 0xf3, 0x57, 0xa1, 0x87,
 		}), // 87a157f3fd88ac7907c05fc55e271dc4acdc5605d187d646604ca8c0e9382e03
 		Index: 0,
-		Tree:  dcrutil.TxTreeStake,
+		Tree:  wire.TxTreeStake,
 	},
 	SignatureScript: []byte{
 		0x49, // OP_DATA_73
@@ -2066,7 +2066,7 @@ var ssrtxTxIn = wire.TxIn{
 			0x79, 0xac, 0x88, 0xfd, 0xf3, 0x57, 0xa1, 0x87,
 		}), // 87a157f3fd88ac7907c05fc55e271dc4acdc5605d187d646604ca8c0e9382e03
 		Index: 0,
-		Tree:  dcrutil.TxTreeStake,
+		Tree:  wire.TxTreeStake,
 	},
 	SignatureScript: []byte{
 		0x49, // OP_DATA_73

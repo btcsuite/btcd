@@ -1,4 +1,4 @@
-// Copyright (c) 2015 The btcsuite developers
+// Copyright (c) 2015-2016 The btcsuite developers
 // Copyright (c) 2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
@@ -197,12 +197,12 @@ func messageSummary(msg wire.Message) string {
 
 	case *wire.MsgTx:
 		return fmt.Sprintf("hash %s, %d inputs, %d outputs, lock %s",
-			msg.TxSha(), len(msg.TxIn), len(msg.TxOut),
+			msg.TxHash(), len(msg.TxIn), len(msg.TxOut),
 			formatLockTime(msg.LockTime))
 
 	case *wire.MsgBlock:
 		header := &msg.Header
-		return fmt.Sprintf("hash %s, ver %d, %d tx, %s", msg.BlockSha(),
+		return fmt.Sprintf("hash %s, ver %d, %d tx, %s", msg.BlockHash(),
 			header.Version, len(msg.Transactions), header.Timestamp)
 
 	case *wire.MsgInv:

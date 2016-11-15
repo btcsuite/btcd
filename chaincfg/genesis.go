@@ -1,4 +1,4 @@
-// Copyright (c) 2014 The btcsuite developers
+// Copyright (c) 2014-2016 The btcsuite developers
 // Copyright (c) 2015-2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
@@ -53,7 +53,7 @@ var genesisCoinbaseTx = wire.MsgTx{
 
 // genesisMerkleRoot is the hash of the first transaction in the genesis block
 // for the main network.
-var genesisMerkleRoot = genesisCoinbaseTx.TxShaFull()
+var genesisMerkleRoot = genesisCoinbaseTx.TxHashFull()
 
 // genesisBlock defines the genesis block of the block chain which serves as the
 // public transaction ledger for the main network.
@@ -86,7 +86,7 @@ var genesisBlock = wire.MsgBlock{
 
 // genesisHash is the hash of the first block in the block chain for the main
 // network (genesis block).
-var genesisHash = genesisBlock.BlockSha()
+var genesisHash = genesisBlock.BlockHash()
 
 // TestNet ------------------------------------------------------------------------
 
@@ -137,7 +137,7 @@ var genesisCoinbaseTxLegacy = wire.MsgTx{
 
 // testNetGenesisMerkleRoot is the hash of the first transaction in the genesis block
 // for the test network.
-var testNetGenesisMerkleRoot = genesisCoinbaseTxLegacy.TxSha()
+var testNetGenesisMerkleRoot = genesisCoinbaseTxLegacy.TxHash()
 
 // testNetGenesisBlock defines the genesis block of the block chain which
 // serves as the public transaction ledger for the test network (version 3).
@@ -157,7 +157,7 @@ var testNetGenesisBlock = wire.MsgBlock{
 
 // testNetGenesisHash is the hash of the first block in the block chain for the
 // test network.
-var testNetGenesisHash = testNetGenesisBlock.BlockSha()
+var testNetGenesisHash = testNetGenesisBlock.BlockHash()
 
 // SimNet -------------------------------------------------------------------------
 
@@ -246,4 +246,4 @@ var simNetGenesisBlock = wire.MsgBlock{
 
 // simNetGenesisHash is the hash of the first block in the block chain for the
 // simulation test network.
-var simNetGenesisHash = simNetGenesisBlock.BlockSha()
+var simNetGenesisHash = simNetGenesisBlock.BlockHash()

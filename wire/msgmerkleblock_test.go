@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
-
 	"github.com/decred/dcrd/chaincfg/chainhash"
 )
 
@@ -67,7 +66,7 @@ func TestMerkleBlock(t *testing.T) {
 		rand.Read(data)
 		hash, err := chainhash.NewHash(data)
 		if err != nil {
-			t.Errorf("NewShaHash failed: %v\n", err)
+			t.Errorf("NewHash failed: %v\n", err)
 			return
 		}
 
@@ -85,7 +84,7 @@ func TestMerkleBlock(t *testing.T) {
 	rand.Read(data)
 	hash, err := chainhash.NewHash(data)
 	if err != nil {
-		t.Errorf("NewShaHash failed: %v\n", err)
+		t.Errorf("NewHash failed: %v\n", err)
 		return
 	}
 
@@ -98,7 +97,7 @@ func TestMerkleBlock(t *testing.T) {
 	rand.Read(data)
 	hash, err = chainhash.NewHash(data)
 	if err != nil {
-		t.Errorf("NewShaHash failed: %v\n", err)
+		t.Errorf("NewHash failed: %v\n", err)
 		return
 	}
 

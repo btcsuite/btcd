@@ -19,13 +19,13 @@ import (
 // best block chain that a good checkpoint candidate must be.
 const CheckpointConfirmations = 4096
 
-// newShaHashFromStr converts the passed big-endian hex string into a
-// wire.ShaHash.  It only differs from the one available in wire in that
+// newHashFromStr converts the passed big-endian hex string into a
+// chainhash.Hash.  It only differs from the one available in chainhash in that
 // it ignores the error since it will only (and must only) be called with
 // hard-coded, and therefore known good, hashes.
-func newShaHashFromStr(hexStr string) *chainhash.Hash {
-	sha, _ := chainhash.NewHashFromStr(hexStr)
-	return sha
+func newHashFromStr(hexStr string) *chainhash.Hash {
+	hash, _ := chainhash.NewHashFromStr(hexStr)
+	return hash
 }
 
 // DisableCheckpoints provides a mechanism to disable validation against
@@ -270,7 +270,7 @@ func (b *BlockChain) IsCheckpointCandidate(block *dcrutil.Block) (bool, error) {
 	var isCandidate bool
 	err := b.db.View(func(dbTx database.Tx) error {
 		// A checkpoint must be in the main chain.
-		blockHeight, err := dbFetchHeightByHash(dbTx, block.Sha())
+		blockHeight, err := dbFetchHeightByHash(dbTx, block.Hash())
 		if err != nil {
 			// Only return an error if it's not due to the block not
 			// being in the main chain.
