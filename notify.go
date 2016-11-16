@@ -551,7 +551,7 @@ func parseTxAcceptedNtfnParams(params []json.RawMessage) (*chainhash.Hash,
 		return nil, 0, err
 	}
 
-	return txHash, btcutil.Amount(amt), nil
+	return txHash, amt, nil
 }
 
 // parseTxAcceptedVerboseNtfnParams parses out details about a raw transaction
@@ -628,7 +628,7 @@ func parseAccountBalanceNtfnParams(params []json.RawMessage) (account string,
 		return "", 0, false, err
 	}
 
-	return account, btcutil.Amount(bal), confirmed, nil
+	return account, bal, confirmed, nil
 }
 
 // parseWalletLockStateNtfnParams parses out the account name and locked
