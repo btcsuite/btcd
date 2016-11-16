@@ -663,11 +663,7 @@ type FutureNotifyBlocksResult chan *response
 // if the registration was not successful.
 func (r FutureNotifyBlocksResult) Receive() error {
 	_, err := receiveFuture(r)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // NotifyBlocksAsync returns an instance of a type that can be used to get the
@@ -715,11 +711,7 @@ type FutureNotifySpentResult chan *response
 // if the registration was not successful.
 func (r FutureNotifySpentResult) Receive() error {
 	_, err := receiveFuture(r)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // notifySpentInternal is the same as notifySpentAsync except it accepts
@@ -799,11 +791,7 @@ type FutureNotifyNewTransactionsResult chan *response
 // if the registration was not successful.
 func (r FutureNotifyNewTransactionsResult) Receive() error {
 	_, err := receiveFuture(r)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // NotifyNewTransactionsAsync returns an instance of a type that can be used to
@@ -852,11 +840,7 @@ type FutureNotifyReceivedResult chan *response
 // if the registration was not successful.
 func (r FutureNotifyReceivedResult) Receive() error {
 	_, err := receiveFuture(r)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // notifyReceivedInternal is the same as notifyReceivedAsync except it accepts
@@ -936,11 +920,7 @@ type FutureRescanResult chan *response
 // if the rescan was not successful.
 func (r FutureRescanResult) Receive() error {
 	_, err := receiveFuture(r)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // RescanAsync returns an instance of a type that can be used to get the result
