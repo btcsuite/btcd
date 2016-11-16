@@ -5,14 +5,19 @@
 # 3. golint        (https://github.com/golang/lint)
 # 4. go vet        (http://golang.org/cmd/vet)
 # 5. test coverage (http://blog.golang.org/cover)
+#
+# gometalinter (github.com/alecthomas/gometalinter) is used to run each each
+# static checker.
 
 set -e
 
 # Automatic checks
 test -z "$(gofmt -l -w .     | tee /dev/stderr)"
-test -z "$(goimports -l -w . | tee /dev/stderr)"
-test -z "$(golint .          | tee /dev/stderr)"
-go vet ./...
+test -z "$(gometalinter --disable-all \
+--enable=golint \
+--enable=vet \
+--enable=goimports \
+--deadline=20s ./... | tee /dev/stderr)"
 env GORACE="halt_on_error=1" go test -v -race ./...
 
 # Run test coverage on each subdirectories and merge the coverage profile.
