@@ -1,5 +1,5 @@
-// Copyright (c) 2013, 2014 The btcsuite developers
-// Copyright (c) 2015 The Decred developers
+// Copyright (c) 2013-2016 The btcsuite developers
+// Copyright (c) 2015-2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -84,7 +84,7 @@ func DecodeWIF(wif string) (*WIF, error) {
 	// Checksum is first four bytes of hash of the identifier byte
 	// and privKey.  Verify this matches the final 4 bytes of the decoded
 	// private key.
-	cksum := chainhash.HashFuncB(decoded[:decodedLen-4])
+	cksum := chainhash.HashB(decoded[:decodedLen-4])
 	if !bytes.Equal(cksum[:4], decoded[decodedLen-4:]) {
 		return nil, ErrChecksumMismatch
 	}
@@ -125,7 +125,7 @@ func (w *WIF) String() string {
 	a = append(a, byte(w.ecType))
 	a = append(a, w.PrivKey.Serialize()...)
 
-	cksum := chainhash.HashFuncB(a)
+	cksum := chainhash.HashB(a)
 	a = append(a, cksum[:4]...)
 	return base58.Encode(a)
 }

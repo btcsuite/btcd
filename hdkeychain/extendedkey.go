@@ -1,4 +1,4 @@
-// Copyright (c) 2014 The btcsuite developers
+// Copyright (c) 2014-2016 The btcsuite developers
 // Copyright (c) 2015-2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
@@ -397,7 +397,7 @@ func (k *ExtendedKey) String() (string, error) {
 		serializedBytes = append(serializedBytes, k.pubKeyBytes()...)
 	}
 
-	checkSum := chainhash.HashFuncB(chainhash.HashFuncB(serializedBytes))[:4]
+	checkSum := chainhash.HashB(chainhash.HashB(serializedBytes))[:4]
 	serializedBytes = append(serializedBytes, checkSum...)
 	return base58.Encode(serializedBytes), nil
 }
@@ -499,7 +499,7 @@ func NewKeyFromString(key string) (*ExtendedKey, error) {
 	// Split the payload and checksum up and ensure the checksum matches.
 	payload := decoded[:len(decoded)-4]
 	checkSum := decoded[len(decoded)-4:]
-	expectedCheckSum := chainhash.HashFuncB(chainhash.HashFuncB(payload))[:4]
+	expectedCheckSum := chainhash.HashB(chainhash.HashB(payload))[:4]
 	if !bytes.Equal(checkSum, expectedCheckSum) {
 		return nil, ErrBadChecksum
 	}

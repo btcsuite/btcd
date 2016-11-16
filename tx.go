@@ -1,5 +1,5 @@
-// Copyright (c) 2013-2014 The btcsuite developers
-// Copyright (c) 2015 The Decred developers
+// Copyright (c) 2013-2016 The btcsuite developers
+// Copyright (c) 2015-2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -28,10 +28,10 @@ const TxIndexUnknown = -1
 // first access so subsequent accesses don't have to repeat the relatively
 // expensive hashing operations.
 type Tx struct {
-	hash    chainhash.Hash
-	msgTx   *wire.MsgTx // Underlying MsgTx
-	txTree  int8        // Indicates which tx tree the tx is found in
-	txIndex int         // Position within a block or TxIndexUnknown
+	hash    chainhash.Hash // Cached transaction hash
+	msgTx   *wire.MsgTx    // Underlying MsgTx
+	txTree  int8           // Indicates which tx tree the tx is found in
+	txIndex int            // Position within a block or TxIndexUnknown
 }
 
 // MsgTx returns the underlying wire.MsgTx for the transaction.
@@ -40,12 +40,12 @@ func (t *Tx) MsgTx() *wire.MsgTx {
 	return t.msgTx
 }
 
-// Sha returns the hash of the transaction.  This is equivalent to
-// calling TxSha on the underlying wire.MsgTx, however it caches the
+// Hash returns the hash of the transaction.  This is equivalent to
+// calling TxHash on the underlying wire.MsgTx, however it caches the
 // result so subsequent calls are more efficient.
-func (t *Tx) Sha() *chainhash.Hash {
+func (t *Tx) Hash() *chainhash.Hash {
 	if assertTransactionImmutability {
-		hash := t.msgTx.TxSha()
+		hash := t.msgTx.TxHash()
 		if !hash.IsEqual(&t.hash) {
 			str := fmt.Sprintf("ASSERT: mutated util.tx detected, old hash %v, "+
 				"new hash %v",
@@ -83,7 +83,7 @@ func (t *Tx) SetTree(tree int8) {
 // wire.MsgTx.  See Tx.
 func NewTx(msgTx *wire.MsgTx) *Tx {
 	return &Tx{
-		hash:    msgTx.TxSha(),
+		hash:    msgTx.TxHash(),
 		msgTx:   msgTx,
 		txTree:  wire.TxTreeUnknown,
 		txIndex: TxIndexUnknown,
@@ -139,7 +139,7 @@ func NewTxDeep(msgTx *wire.MsgTx) *Tx {
 	}
 
 	return &Tx{
-		hash:    mtx.TxSha(),
+		hash:    mtx.TxHash(),
 		msgTx:   mtx,
 		txTree:  wire.TxTreeUnknown,
 		txIndex: TxIndexUnknown,
@@ -188,7 +188,7 @@ func NewTxDeepTxIns(msgTx *wire.MsgTx) *Tx {
 	}
 
 	return &Tx{
-		hash:    msgTx.TxSha(),
+		hash:    msgTx.TxHash(),
 		msgTx:   msgTx,
 		txTree:  wire.TxTreeUnknown,
 		txIndex: TxIndexUnknown,
@@ -213,7 +213,7 @@ func NewTxFromReaderLegacy(r io.Reader) (*Tx, error) {
 	}
 
 	t := Tx{
-		hash:    msgTx.TxSha(),
+		hash:    msgTx.TxHash(),
 		msgTx:   &msgTx,
 		txTree:  wire.TxTreeUnknown,
 		txIndex: TxIndexUnknown,
@@ -240,7 +240,7 @@ func NewTxFromReader(r io.Reader) (*Tx, error) {
 	}
 
 	t := Tx{
-		hash:    msgTx.TxSha(),
+		hash:    msgTx.TxHash(),
 		msgTx:   &msgTx,
 		txTree:  wire.TxTreeUnknown,
 		txIndex: TxIndexUnknown,

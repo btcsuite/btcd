@@ -1,5 +1,5 @@
-// Copyright (c) 2013, 2014 The btcsuite developers
-// Copyright (c) 2015 The Decred developers
+// Copyright (c) 2013-2016 The btcsuite developers
+// Copyright (c) 2015-2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -97,7 +97,7 @@ func NewMerkleBlock(block *dcrutil.Block, filter *Filter) (*wire.MsgMerkleBlock,
 		} else {
 			mBlock.matchedBits = append(mBlock.matchedBits, 0x00)
 		}
-		mBlock.allHashes = append(mBlock.allHashes, tx.Sha())
+		mBlock.allHashes = append(mBlock.allHashes, tx.Hash())
 	}
 
 	// Calculate the number of merkle branches (height) in the tree.
@@ -116,8 +116,8 @@ func NewMerkleBlock(block *dcrutil.Block, filter *Filter) (*wire.MsgMerkleBlock,
 		Hashes:       make([]*chainhash.Hash, 0, len(mBlock.finalHashes)),
 		Flags:        make([]byte, (len(mBlock.bits)+7)/8),
 	}
-	for _, sha := range mBlock.finalHashes {
-		msgMerkleBlock.AddTxHash(sha)
+	for _, hash := range mBlock.finalHashes {
+		msgMerkleBlock.AddTxHash(hash)
 	}
 	for i := uint32(0); i < uint32(len(mBlock.bits)); i++ {
 		msgMerkleBlock.Flags[i/8] |= mBlock.bits[i] << (i % 8)

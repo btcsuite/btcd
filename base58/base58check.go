@@ -20,8 +20,8 @@ var ErrInvalidFormat = errors.New("invalid format: version and/or checksum bytes
 
 // checksum: first four bytes of hash^2
 func checksum(input []byte) (cksum [4]byte) {
-	h := chainhash.HashFuncB(input)
-	h2 := chainhash.HashFuncB(h[:])
+	h := chainhash.HashB(input)
+	h2 := chainhash.HashB(h[:])
 	copy(cksum[:], h2[:4])
 	return
 }

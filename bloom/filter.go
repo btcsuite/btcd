@@ -216,10 +216,10 @@ func (bf *Filter) Add(data []byte) {
 	bf.mtx.Unlock()
 }
 
-// AddShaHash adds the passed chainhash.Hash to the Filter.
+// AddHash adds the passed chainhash.Hash to the Filter.
 //
 // This function is safe for concurrent access.
-func (bf *Filter) AddShaHash(hash *chainhash.Hash) {
+func (bf *Filter) AddHash(hash *chainhash.Hash) {
 	bf.mtx.Lock()
 	bf.add(hash[:])
 	bf.mtx.Unlock()
@@ -251,8 +251,7 @@ func (bf *Filter) AddOutPoint(outpoint *wire.OutPoint) {
 // script.
 //
 // This function MUST be called with the filter lock held.
-func (bf *Filter) maybeAddOutpoint(pkScrVer uint16, pkScript []byte,
-	outHash *chainhash.Hash, outIdx uint32, outTree int8) {
+func (bf *Filter) maybeAddOutpoint(pkScrVer uint16, pkScript []byte, outHash *chainhash.Hash, outIdx uint32, outTree int8) {
 	switch bf.msgFilterLoad.Flags {
 	case wire.BloomUpdateAll:
 		outpoint := wire.NewOutPoint(outHash, outIdx, outTree)
@@ -275,7 +274,7 @@ func (bf *Filter) maybeAddOutpoint(pkScrVer uint16, pkScript []byte,
 func (bf *Filter) matchTxAndUpdate(tx *dcrutil.Tx) bool {
 	// Check if the filter matches the hash of the transaction.
 	// This is useful for finding transactions when they appear in a block.
-	matched := bf.matches(tx.Sha()[:])
+	matched := bf.matches(tx.Hash()[:])
 
 	// Check if the filter matches any data elements in the public key
 	// scripts of any of the outputs.  When it does, add the outpoint that
@@ -297,8 +296,8 @@ func (bf *Filter) matchTxAndUpdate(tx *dcrutil.Tx) bool {
 			}
 
 			matched = true
-			bf.maybeAddOutpoint(txOut.Version, txOut.PkScript, tx.Sha(),
-				uint32(i), tx.Tree())
+			bf.maybeAddOutpoint(txOut.Version, txOut.PkScript,
+				tx.Hash(), uint32(i), tx.Tree())
 			break
 		}
 	}

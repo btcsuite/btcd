@@ -1,5 +1,5 @@
-// Copyright (c) 2013-2014 The btcsuite developers
-// Copyright (c) 2015 The Decred developers
+// Copyright (c) 2013-2016 The btcsuite developers
+// Copyright (c) 2015-2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -37,23 +37,23 @@ func TestBlock(t *testing.T) {
 	}
 
 	// Hash for block 100,000.
-	wantShaStr := "85457e2420d265386a84fc48aaee4f6dc98bac015dcc8d536ead20e2faf66a9d"
-	wantSha, err := chainhash.NewHashFromStr(wantShaStr)
+	wantHashStr := "85457e2420d265386a84fc48aaee4f6dc98bac015dcc8d536ead20e2faf66a9d"
+	wantHash, err := chainhash.NewHashFromStr(wantHashStr)
 	if err != nil {
-		t.Errorf("NewShaHashFromStr: %v", err)
+		t.Errorf("NewHashFromStr: %v", err)
 	}
 
-	// Request the sha multiple times to test generation and caching.
+	// Request the hash multiple times to test generation and caching.
 	for i := 0; i < 2; i++ {
-		sha := b.Sha()
-		if !sha.IsEqual(wantSha) {
-			t.Errorf("Sha #%d mismatched sha - got %v, want %v", i,
-				sha, wantSha)
+		hash := b.Hash()
+		if !hash.IsEqual(wantHash) {
+			t.Errorf("Hash #%d mismatched hash - got %v, want %v",
+				i, hash, wantHash)
 		}
 	}
 
-	// Shas for the transactions in Block100000.
-	wantTxShas := []string{
+	// Hashes for the transactions in Block100000.
+	wantTxHashes := []string{
 		"1cbd9fe1a143a265cc819ff9d8132a7cbc4ca48eb68c0de39cfdf7ecf42cbbd1",
 		"f3f9bc9473b6fe18d66e3ac2a1a95b6317b280f4e6687a074075b56aebf1eb53",
 		"ba2ed6210a561a4dab34ec8668ad61ec97f126826dae893719dff7383b9d6928",
@@ -63,14 +63,15 @@ func TestBlock(t *testing.T) {
 	// Create a new block to nuke all cached data.
 	b = dcrutil.NewBlock(&Block100000)
 
-	// Request sha for all transactions one at a time via Tx.
-	for i, txSha := range wantTxShas {
-		wantSha, err := chainhash.NewHashFromStr(txSha)
+	// Request hash for all transactions one at a time via Tx.
+	for i, txHash := range wantTxHashes {
+		wantHash, err := chainhash.NewHashFromStr(txHash)
 		if err != nil {
-			t.Errorf("NewShaHashFromStr: %v", err)
+			t.Errorf("NewHashFromStr: %v", err)
 		}
 
-		// Request the sha multiple times to test generation and caching.
+		// Request the hash multiple times to test generation and
+		// caching.
 		for j := 0; j < 2; j++ {
 			tx, err := b.Tx(i)
 			if err != nil {
@@ -78,10 +79,10 @@ func TestBlock(t *testing.T) {
 				continue
 			}
 
-			sha := tx.Sha()
-			if !sha.IsEqual(wantSha) {
-				t.Errorf("Sha #%d mismatched sha - got %v, "+
-					"want %v", j, sha, wantSha)
+			hash := tx.Hash()
+			if !hash.IsEqual(wantHash) {
+				t.Errorf("Hash #%d mismatched hash - got %v, "+
+					"want %v", j, hash, wantHash)
 				continue
 			}
 		}
@@ -96,24 +97,24 @@ func TestBlock(t *testing.T) {
 		transactions := b.Transactions()
 
 		// Ensure we get the expected number of transactions.
-		if len(transactions) != len(wantTxShas) {
+		if len(transactions) != len(wantTxHashes) {
 			t.Errorf("Transactions #%d mismatched number of "+
 				"transactions - got %d, want %d", i,
-				len(transactions), len(wantTxShas))
+				len(transactions), len(wantTxHashes))
 			continue
 		}
 
-		// Ensure all of the shas match.
+		// Ensure all of the hashes match.
 		for j, tx := range transactions {
-			wantSha, err := chainhash.NewHashFromStr(wantTxShas[j])
+			wantHash, err := chainhash.NewHashFromStr(wantTxHashes[j])
 			if err != nil {
-				t.Errorf("NewShaHashFromStr: %v", err)
+				t.Errorf("NewHashFromStr: %v", err)
 			}
 
-			sha := tx.Sha()
-			if !sha.IsEqual(wantSha) {
-				t.Errorf("Transactions #%d mismatched shas - "+
-					"got %v, want %v", j, sha, wantSha)
+			hash := tx.Hash()
+			if !hash.IsEqual(wantHash) {
+				t.Errorf("Transactions #%d mismatched hashes "+
+					"- got %v, want %v", j, hash, wantHash)
 				continue
 			}
 		}
@@ -264,15 +265,15 @@ func TestBlockErrors(t *testing.T) {
 			"got %v, want %v", err, io.EOF)
 	}
 
-	// Ensure TxSha returns expected error on invalid indices.
-	_, err = b.TxSha(-1)
+	// Ensure TxHash returns expected error on invalid indices.
+	_, err = b.TxHash(-1)
 	if _, ok := err.(dcrutil.OutOfRangeError); !ok {
-		t.Errorf("TxSha: wrong error - got: %v <%T>, "+
+		t.Errorf("TxHash: wrong error - got: %v <%T>, "+
 			"want: <%T>", err, err, dcrutil.OutOfRangeError(""))
 	}
-	_, err = b.TxSha(len(Block100000.Transactions) + 1)
+	_, err = b.TxHash(len(Block100000.Transactions) + 1)
 	if _, ok := err.(dcrutil.OutOfRangeError); !ok {
-		t.Errorf("TxSha: wrong error - got: %v <%T>, "+
+		t.Errorf("TxHash: wrong error - got: %v <%T>, "+
 			"want: <%T>", err, err, dcrutil.OutOfRangeError(""))
 	}
 

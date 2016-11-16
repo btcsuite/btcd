@@ -1,5 +1,5 @@
-// Copyright (c) 2013-2014 The btcsuite developers
-// Copyright (c) 2015 The Decred developers
+// Copyright (c) 2013-2016 The btcsuite developers
+// Copyright (c) 2015-2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -96,17 +96,15 @@ func (b *Block) BlockHeaderBytes() ([]byte, error) {
 	return serializedBlockHeader, nil
 }
 
-// Sha returns the block identifier hash for the Block.  This is equivalent to
-// calling BlockSha on the underlying wire.MsgBlock, however it caches the
+// Hash returns the block identifier hash for the Block.  This is equivalent to
+// calling BlockHash on the underlying wire.MsgBlock, however it caches the
 // result so subsequent calls are more efficient.
-func (b *Block) Sha() *chainhash.Hash {
+func (b *Block) Hash() *chainhash.Hash {
 	if assertBlockImmutability {
-		hash := b.msgBlock.BlockSha()
+		hash := b.msgBlock.BlockHash()
 		if !hash.IsEqual(&b.hash) {
 			str := fmt.Sprintf("ASSERT: mutated util.block detected, old hash "+
-				"%v, new hash %v",
-				b.hash,
-				hash)
+				"%v, new hash %v", b.hash, hash)
 			panic(str)
 		}
 	}
@@ -240,12 +238,12 @@ func (b *Block) STransactions() []*Tx {
 	return b.sTransactions
 }
 
-// TxSha returns the hash for the requested transaction number in the Block.
+// TxHash returns the hash for the requested transaction number in the Block.
 // The supplied index is 0 based.  That is to say, the first transaction in the
-// block is txNum 0.  This is equivalent to calling TxSha on the underlying
+// block is txNum 0.  This is equivalent to calling TxHash on the underlying
 // wire.MsgTx, however it caches the result so subsequent calls are more
 // efficient.
-func (b *Block) TxSha(txNum int) (*chainhash.Hash, error) {
+func (b *Block) TxHash(txNum int) (*chainhash.Hash, error) {
 	// Attempt to get a wrapped transaction for the specified index.  It
 	// will be created lazily if needed or simply return the cached version
 	// if it has already been generated.
@@ -256,15 +254,15 @@ func (b *Block) TxSha(txNum int) (*chainhash.Hash, error) {
 
 	// Defer to the wrapped transaction which will return the cached hash if
 	// it has already been generated.
-	return tx.Sha(), nil
+	return tx.Hash(), nil
 }
 
-// STxSha returns the hash for the requested stake transaction number in the Block.
-// The supplied index is 0 based.  That is to say, the first transaction in the
-// block is txNum 0.  This is equivalent to calling TxSha on the underlying
-// wire.MsgTx, however it caches the result so subsequent calls are more
-// efficient.
-func (b *Block) STxSha(txNum int) (*chainhash.Hash, error) {
+// STxHash returns the hash for the requested stake transaction number in the
+// Block.  The supplied index is 0 based.  That is to say, the first transaction
+// in the block is txNum 0.  This is equivalent to calling TxHash on the
+// underlying wire.MsgTx, however it caches the result so subsequent calls are
+// more efficient.
+func (b *Block) STxHash(txNum int) (*chainhash.Hash, error) {
 	// Attempt to get a wrapped transaction for the specified index.  It
 	// will be created lazily if needed or simply return the cached version
 	// if it has already been generated.
@@ -275,7 +273,7 @@ func (b *Block) STxSha(txNum int) (*chainhash.Hash, error) {
 
 	// Defer to the wrapped transaction which will return the cached hash if
 	// it has already been generated.
-	return tx.Sha(), nil
+	return tx.Hash(), nil
 }
 
 // TxLoc returns the offsets and lengths of each transaction in a raw block.
@@ -311,7 +309,7 @@ func (b *Block) SetHeight(height int64) {
 // wire.MsgBlock.  See Block.
 func NewBlock(msgBlock *wire.MsgBlock) *Block {
 	return &Block{
-		hash:        msgBlock.BlockSha(),
+		hash:        msgBlock.BlockHash(),
 		msgBlock:    msgBlock,
 		blockHeight: int64(msgBlock.Header.Height),
 	}
@@ -346,7 +344,7 @@ func NewBlockDeepCopyCoinbase(msgBlock *wire.MsgBlock) *Block {
 		blockHeight: int64(msgBlockCopy.Header.Height),
 		msgBlock:    msgBlockCopy,
 	}
-	bl.hash = msgBlock.BlockSha()
+	bl.hash = msgBlock.BlockHash()
 
 	return bl
 }
@@ -376,7 +374,7 @@ func NewBlockDeepCopy(msgBlock *wire.MsgBlock) *Block {
 		blockHeight: int64(msgBlockCopy.Header.Height),
 		msgBlock:    msgBlockCopy,
 	}
-	bl.hash = msgBlock.BlockSha()
+	bl.hash = msgBlock.BlockHash()
 
 	return bl
 }
@@ -405,7 +403,7 @@ func NewBlockFromReader(r io.Reader) (*Block, error) {
 	}
 
 	b := Block{
-		hash:        msgBlock.BlockSha(),
+		hash:        msgBlock.BlockHash(),
 		msgBlock:    &msgBlock,
 		blockHeight: int64(msgBlock.Header.Height),
 	}
@@ -416,7 +414,7 @@ func NewBlockFromReader(r io.Reader) (*Block, error) {
 // an underlying wire.MsgBlock and the serialized bytes for it.  See Block.
 func NewBlockFromBlockAndBytes(msgBlock *wire.MsgBlock, serializedBlock []byte) *Block {
 	return &Block{
-		hash:            msgBlock.BlockSha(),
+		hash:            msgBlock.BlockHash(),
 		msgBlock:        msgBlock,
 		serializedBlock: serializedBlock,
 		blockHeight:     int64(msgBlock.Header.Height),

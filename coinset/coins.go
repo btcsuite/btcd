@@ -1,5 +1,5 @@
-// Copyright (c) 2014-2015 The btcsuite developers
-// Copyright (c) 2015 The Decred developers
+// Copyright (c) 2014-2016 The btcsuite developers
+// Copyright (c) 2015-2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -361,7 +361,7 @@ var _ Coin = &SimpleCoin{}
 
 // Hash returns the hash value of the transaction on which the Coin is an output
 func (c *SimpleCoin) Hash() *chainhash.Hash {
-	return c.Tx.Sha()
+	return c.Tx.Hash()
 }
 
 // Index returns the index of the output on the transaction which the Coin represents

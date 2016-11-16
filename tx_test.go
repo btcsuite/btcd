@@ -1,5 +1,5 @@
-// Copyright (c) 2013-2014 The btcsuite developers
-// Copyright (c) 2015 The Decred developers
+// Copyright (c) 2013-2016 The btcsuite developers
+// Copyright (c) 2015-2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -60,18 +60,18 @@ func TestTx(t *testing.T) {
 	}
 
 	// Hash for block 100,000 transaction 0.
-	wantShaStr := "1cbd9fe1a143a265cc819ff9d8132a7cbc4ca48eb68c0de39cfdf7ecf42cbbd1"
-	wantSha, err := chainhash.NewHashFromStr(wantShaStr)
+	wantHashStr := "1cbd9fe1a143a265cc819ff9d8132a7cbc4ca48eb68c0de39cfdf7ecf42cbbd1"
+	wantHash, err := chainhash.NewHashFromStr(wantHashStr)
 	if err != nil {
-		t.Errorf("NewShaHashFromStr: %v", err)
+		t.Errorf("NewHashFromStr: %v", err)
 	}
 
-	// Request the sha multiple times to test generation and caching.
+	// Request the hash multiple times to test generation and caching.
 	for i := 0; i < 2; i++ {
-		sha := tx.Sha()
-		if !sha.IsEqual(wantSha) {
-			t.Errorf("Sha #%d mismatched sha - got %v, want %v", i,
-				sha, wantSha)
+		hash := tx.Hash()
+		if !hash.IsEqual(wantHash) {
+			t.Errorf("Hash #%d mismatched hash - got %v, want %v", i,
+				hash, wantHash)
 		}
 	}
 }
