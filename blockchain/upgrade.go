@@ -81,7 +81,7 @@ func (b *BlockChain) upgradeToVersion2() error {
 				b.bestNode.ticketsRevoked = ticketsRevokedInBlock(block)
 			}
 
-			progressLogger.LogBlockHeight(block, parent)
+			progressLogger.LogBlockHeight(block.MsgBlock(), parent.MsgBlock())
 			parent = block
 		}
 

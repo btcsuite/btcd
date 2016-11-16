@@ -457,7 +457,7 @@ func (m *Manager) Init(chain *blockchain.BlockChain) error {
 		if err != nil {
 			return err
 		}
-		progressLogger.LogBlockHeight(block, parent)
+		progressLogger.LogBlockHeight(block.MsgBlock(), parent.MsgBlock())
 	}
 
 	log.Infof("Indexes caught up to height %d", bestHeight)

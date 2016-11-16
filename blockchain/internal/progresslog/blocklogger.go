@@ -11,6 +11,7 @@ import (
 
 	"github.com/btcsuite/btclog"
 
+	"github.com/decred/dcrd/wire"
 	"github.com/decred/dcrutil"
 )
 
@@ -42,16 +43,16 @@ func NewBlockProgressLogger(progressMessage string, logger btclog.Logger) *Block
 // LogBlockHeight logs a new block height as an information message to show
 // progress to the user. In order to prevent spam, it limits logging to one
 // message every 10 seconds with duration and totals included.
-func (b *BlockProgressLogger) LogBlockHeight(block, parent *dcrutil.Block) {
+func (b *BlockProgressLogger) LogBlockHeight(block, parent *wire.MsgBlock) {
 	b.Lock()
 	defer b.Unlock()
 	b.receivedLogBlocks++
-	regularTxTreeValid := dcrutil.IsFlagSet16(block.MsgBlock().Header.VoteBits,
+	regularTxTreeValid := dcrutil.IsFlagSet16(block.Header.VoteBits,
 		dcrutil.BlockValid)
 	if regularTxTreeValid {
-		b.receivedLogTx += int64(len(parent.MsgBlock().Transactions))
+		b.receivedLogTx += int64(len(parent.Transactions))
 	}
-	b.receivedLogTx += int64(len(block.MsgBlock().STransactions))
+	b.receivedLogTx += int64(len(block.STransactions))
 
 	now := time.Now()
 	duration := now.Sub(b.lastBlockLogTime)
@@ -74,8 +75,8 @@ func (b *BlockProgressLogger) LogBlockHeight(block, parent *dcrutil.Block) {
 	}
 	b.subsystemLogger.Infof("%s %d %s in the last %s (%d %s, height %d, %s)",
 		b.progressAction, b.receivedLogBlocks, blockStr, tDuration,
-		b.receivedLogTx, txStr, block.Height(),
-		block.MsgBlock().Header.Timestamp)
+		b.receivedLogTx, txStr, block.Header.Height,
+		block.Header.Timestamp)
 
 	b.receivedLogBlocks = 0
 	b.receivedLogTx = 0
