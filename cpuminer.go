@@ -151,12 +151,12 @@ func (m *CPUMiner) submitBlock(block *dcrutil.Block) bool {
 			return false
 		}
 		// Occasionally errors are given out for timing errors with
-		// ResetMinDifficulty and high block works that is above
+		// ReduceMinDifficulty and high block works that is above
 		// the target. Feed these to debug.
-		if m.server.chainParams.ResetMinDifficulty &&
+		if m.server.chainParams.ReduceMinDifficulty &&
 			rErr.ErrorCode == blockchain.ErrHighHash {
 			minrLog.Debugf("Block submitted via CPU miner rejected "+
-				"because of ResetMinDifficulty time sync failure: %v",
+				"because of ReduceMinDifficulty time sync failure: %v",
 				err)
 			return false
 		}

@@ -23,11 +23,11 @@ func TestBlockSubsidy(t *testing.T) {
 			continue
 		}
 
-		if i%mainnet.ReductionInterval == 0 {
-			numBlocks := mainnet.ReductionInterval
+		if i%mainnet.SubsidyReductionInterval == 0 {
+			numBlocks := mainnet.SubsidyReductionInterval
 			// First reduction internal, which is reduction interval - 2
 			// to skip the genesis block and block one.
-			if i == mainnet.ReductionInterval {
+			if i == mainnet.SubsidyReductionInterval {
 				numBlocks -= 2
 			}
 			height := i - numBlocks
@@ -45,7 +45,7 @@ func TestBlockSubsidy(t *testing.T) {
 
 			// First reduction internal, subtract the stake subsidy for
 			// blocks before the staking system is enabled.
-			if i == mainnet.ReductionInterval {
+			if i == mainnet.SubsidyReductionInterval {
 				totalSubsidy -= stake * (mainnet.StakeValidationHeight - 2)
 			}
 		}

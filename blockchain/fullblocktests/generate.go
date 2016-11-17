@@ -277,7 +277,7 @@ func uniqueOpReturnScript() []byte {
 // good tests which exercise that code, so it wouldn't make sense to use the
 // same code to generate them.
 func (g *testGenerator) calcFullSubsidy(blockHeight uint32) dcrutil.Amount {
-	iterations := int64(blockHeight) / g.params.ReductionInterval
+	iterations := int64(blockHeight) / g.params.SubsidyReductionInterval
 	subsidy := g.params.BaseSubsidy
 	for i := int64(0); i < iterations; i++ {
 		subsidy *= g.params.MulSubsidy

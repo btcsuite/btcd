@@ -80,33 +80,48 @@ type TokenPayout struct {
 // used by Decred applications to differentiate networks as well as addresses
 // and keys for one network from those intended for use on another network.
 type Params struct {
-	Name        string
-	Net         wire.CurrencyNet
-	DefaultPort string
-	DNSSeeds    []string
+	// Name defines a human-readable identifier for the network.
+	Name string
 
-	// Starting block for the network (block 0).
+	// Net defines the magic bytes used to identify the network.
+	Net wire.CurrencyNet
+
+	// DefaultPort defines the default peer-to-peer port for the network.
+	DefaultPort string
+
+	// DNSSeeds defines a list of DNS seeds for the network that are used
+	// as one method to discover peers.
+	DNSSeeds []string
+
+	// GenesisBlock defines the first block of the chain.
 	GenesisBlock *wire.MsgBlock
 
-	// Starting block hash.
+	// GenesisHash is the starting block hash.
 	GenesisHash *chainhash.Hash
 
-	// The version of the block that the majority of the network is currently
-	// on.
+	// CurrentBlockVersion is the version of the block that the majority of
+	// the network is currently on.
 	CurrentBlockVersion int32
 
-	// Maximum value for nbits (minimum Proof of Work) as a uint256.
+	// PowLimit defines the highest allowed proof of work value for a block
+	// as a uint256.
 	PowLimit *big.Int
 
-	// Maximum value for nbits (minimum Proof of Work) in compact form.
+	// PowLimitBits defines the highest allowed proof of work value for a
+	// block in compact form.
 	PowLimitBits uint32
 
-	// Testnet difficulty reset flag.
-	ResetMinDifficulty bool
+	// ReduceMinDifficulty defines whether the network should reduce the
+	// minimum required difficulty after a long enough period of time has
+	// passed without finding a block.  This is really only useful for test
+	// networks and should not be set on a main network.
+	ReduceMinDifficulty bool
 
-	// MinDiffResetTimeFactor is the amount to multiply TimePerBlock by to
-	// reset the difficulty to the minimum network factor.
-	MinDiffResetTimeFactor time.Duration
+	// MinDiffReductionTime is the amount of time after which the minimum
+	// required difficulty should be reduced when a block hasn't been found.
+	//
+	// NOTE: This only applies if ReduceMinDifficulty is true.
+	MinDiffReductionTime time.Duration
 
 	// GenerateSupported specifies whether or not CPU mining is allowed.
 	GenerateSupported bool
@@ -115,9 +130,9 @@ type Params struct {
 	// on the network.
 	MaximumBlockSize int
 
-	// TimePerBlock is the desired amount of time to generate each block in
-	// minutes.
-	TimePerBlock time.Duration
+	// TargetTimePerBlock is the desired amount of time to generate each
+	// block.
+	TargetTimePerBlock time.Duration
 
 	// WorkDiffAlpha is the stake difficulty EMA calculation alpha (smoothing)
 	// value. It is different from a normal EMA alpha. Closer to 1 --> smoother.
@@ -131,10 +146,10 @@ type Params struct {
 	// of the exponentially weighted average.
 	WorkDiffWindows int64
 
-	// targetTimespan is the desired amount of time that should elapse
-	// before block difficulty requirement is examined to determine how
+	// TargetTimespan is the desired amount of time that should elapse
+	// before the block difficulty requirement is examined to determine how
 	// it should be changed in order to maintain the desired block
-	// generation rate. This value should correspond to the product of
+	// generation rate.  This value should correspond to the product of
 	// WorkDiffWindowSize and TimePerBlock above.
 	TargetTimespan time.Duration
 
@@ -146,7 +161,7 @@ type Params struct {
 	// Subsidy parameters.
 	//
 	// Subsidy calculation for exponential reductions:
-	// 0 for i in range (0, height / ReductionInterval):
+	// 0 for i in range (0, height / SubsidyReductionInterval):
 	// 1     subsidy *= MulSubsidy
 	// 2     subsidy /= DivSubsidy
 	//
@@ -161,8 +176,8 @@ type Params struct {
 	// Subsidy reduction divisor.
 	DivSubsidy int64
 
-	// Reduction interval in blocks.
-	ReductionInterval int64
+	// SubsidyReductionInterval is the reduction interval in blocks.
+	SubsidyReductionInterval int64
 
 	// WorkRewardProportion is the comparative amount of the subsidy given for
 	// creating a block.
@@ -223,7 +238,8 @@ type Params struct {
 	// be >= (StakeEnabledHeight + StakeValidationHeight).
 	TicketExpiry uint32
 
-	// Maturity for spending coinbase tx.
+	// CoinbaseMaturity is the number of blocks required before newly mined
+	// coins (coinbase transactions) can be spent.
 	CoinbaseMaturity uint16
 
 	// Maturity for spending SStx change outputs.
@@ -300,11 +316,11 @@ var MainNetParams = Params{
 	CurrentBlockVersion:      2,
 	PowLimit:                 mainPowLimit,
 	PowLimitBits:             0x1d00ffff,
-	ResetMinDifficulty:       false,
-	MinDiffResetTimeFactor:   0x7FFFFFFF,
+	ReduceMinDifficulty:      false,
+	MinDiffReductionTime:     0, // Does not apply since ReduceMinDifficulty false
 	GenerateSupported:        false,
 	MaximumBlockSize:         393216,
-	TimePerBlock:             time.Minute * 5,
+	TargetTimePerBlock:       time.Minute * 5,
 	WorkDiffAlpha:            1,
 	WorkDiffWindowSize:       144,
 	WorkDiffWindows:          20,
@@ -312,13 +328,13 @@ var MainNetParams = Params{
 	RetargetAdjustmentFactor: 4,
 
 	// Subsidy parameters.
-	BaseSubsidy:           3119582664, // 21m
-	MulSubsidy:            100,
-	DivSubsidy:            101,
-	ReductionInterval:     6144,
-	WorkRewardProportion:  6,
-	StakeRewardProportion: 3,
-	BlockTaxProportion:    1,
+	BaseSubsidy:              3119582664, // 21m
+	MulSubsidy:               100,
+	DivSubsidy:               101,
+	SubsidyReductionInterval: 6144,
+	WorkRewardProportion:     6,
+	StakeRewardProportion:    3,
+	BlockTaxProportion:       1,
 
 	// Checkpoints ordered from oldest to newest.
 	Checkpoints: []Checkpoint{
@@ -395,11 +411,11 @@ var TestNetParams = Params{
 	CurrentBlockVersion:      2,
 	PowLimit:                 testNetPowLimit,
 	PowLimitBits:             0x1e00ffff,
-	ResetMinDifficulty:       false,
-	MinDiffResetTimeFactor:   0x7FFFFFFF,
+	ReduceMinDifficulty:      false,
+	MinDiffReductionTime:     0, // Does not apply since ReduceMinDifficulty false
 	GenerateSupported:        true,
 	MaximumBlockSize:         1000000,
-	TimePerBlock:             time.Minute * 2,
+	TargetTimePerBlock:       time.Minute * 2,
 	WorkDiffAlpha:            1,
 	WorkDiffWindowSize:       144,
 	WorkDiffWindows:          20,
@@ -407,13 +423,13 @@ var TestNetParams = Params{
 	RetargetAdjustmentFactor: 4,
 
 	// Subsidy parameters.
-	BaseSubsidy:           2500000000, // 25 Coin
-	MulSubsidy:            100,
-	DivSubsidy:            101,
-	ReductionInterval:     2048,
-	WorkRewardProportion:  6,
-	StakeRewardProportion: 3,
-	BlockTaxProportion:    1,
+	BaseSubsidy:              2500000000, // 25 Coin
+	MulSubsidy:               100,
+	DivSubsidy:               101,
+	SubsidyReductionInterval: 2048,
+	WorkRewardProportion:     6,
+	StakeRewardProportion:    3,
+	BlockTaxProportion:       1,
 
 	// Checkpoints ordered from oldest to newest.
 	Checkpoints: []Checkpoint{
@@ -492,25 +508,25 @@ var SimNetParams = Params{
 	CurrentBlockVersion:      2,
 	PowLimit:                 simNetPowLimit,
 	PowLimitBits:             0x207fffff,
-	ResetMinDifficulty:       false,
-	MinDiffResetTimeFactor:   0x7FFFFFFF,
+	ReduceMinDifficulty:      false,
+	MinDiffReductionTime:     0, // Does not apply since ReduceMinDifficulty false
 	GenerateSupported:        true,
 	MaximumBlockSize:         1000000,
-	TimePerBlock:             time.Second * 1,
+	TargetTimePerBlock:       time.Second,
 	WorkDiffAlpha:            1,
 	WorkDiffWindowSize:       8,
 	WorkDiffWindows:          4,
-	TargetTimespan:           time.Second * 1 * 8, // TimePerBlock * WindowSize
+	TargetTimespan:           time.Second * 8, // TimePerBlock * WindowSize
 	RetargetAdjustmentFactor: 4,
 
 	// Subsidy parameters.
-	BaseSubsidy:           50000000000,
-	MulSubsidy:            100,
-	DivSubsidy:            101,
-	ReductionInterval:     128,
-	WorkRewardProportion:  6,
-	StakeRewardProportion: 3,
-	BlockTaxProportion:    1,
+	BaseSubsidy:              50000000000,
+	MulSubsidy:               100,
+	DivSubsidy:               101,
+	SubsidyReductionInterval: 128,
+	WorkRewardProportion:     6,
+	StakeRewardProportion:    3,
+	BlockTaxProportion:       1,
 
 	// Checkpoints ordered from oldest to newest.
 	Checkpoints: nil,

@@ -1120,13 +1120,10 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew,
 	// Perform several checks on the transaction inputs using the invariant
 	// rules in chain for what transactions are allowed into blocks.
 	// Also returns the fees associated with the transaction which will be
-	// used later.
+	// used later.  The fraud proof is not checked because it will be
+	// filled in by the miner.
 	txFee, err := blockchain.CheckTransactionInputs(mp.subsidyCache,
-		tx,
-		nextBlockHeight,
-		utxoView,
-		false, // Don't check fraud proof; filled in by miner
-		mp.cfg.ChainParams)
+		tx, nextBlockHeight, utxoView, false, mp.cfg.ChainParams)
 	if err != nil {
 		if cerr, ok := err.(blockchain.RuleError); ok {
 			return nil, chainRuleError(cerr)

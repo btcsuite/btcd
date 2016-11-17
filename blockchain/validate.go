@@ -1135,6 +1135,9 @@ func (b *BlockChain) CheckBlockStakeSanity(stakeValidationHeight int64, node *bl
 // amount, and verifying the signatures to prove the spender was the owner of
 // the decred and therefore allowed to spend them.  As it checks the inputs,
 // it also calculates the total fees for the transaction and returns that value.
+//
+// NOTE: The transaction MUST have already been sanity checked with the
+// CheckTransactionSanity function prior to calling this function.
 func CheckTransactionInputs(subsidyCache *SubsidyCache, tx *dcrutil.Tx,
 	txHeight int64, utxoView *UtxoViewpoint, checkFraudProof bool,
 	chainParams *chaincfg.Params) (int64, error) {

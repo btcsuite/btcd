@@ -108,10 +108,14 @@ func chainSetup(dbName string, params *chaincfg.Params) (*blockchain.BlockChain,
 		}
 	}
 
+	// Copy the chain params to ensure any modifications the tests do to
+	// the chain parameters do not affect the global instance.
+	paramsCopy := *params
+
 	// Create the main chain instance.
 	chain, err := blockchain.New(&blockchain.Config{
 		DB:          db,
-		ChainParams: params,
+		ChainParams: &paramsCopy,
 		TimeSource:  blockchain.NewMedianTime(),
 	})
 

@@ -114,10 +114,10 @@ var simNetParams = &chaincfg.Params{
 	CurrentBlockVersion:      0,
 	PowLimit:                 simNetPowLimit,
 	PowLimitBits:             0x207fffff,
-	ResetMinDifficulty:       false,
+	ReduceMinDifficulty:      false,
 	GenerateSupported:        true,
 	MaximumBlockSize:         1000000,
-	TimePerBlock:             time.Second * 1,
+	TargetTimePerBlock:       time.Second * 1,
 	WorkDiffAlpha:            1,
 	WorkDiffWindowSize:       8,
 	WorkDiffWindows:          4,
@@ -125,13 +125,13 @@ var simNetParams = &chaincfg.Params{
 	RetargetAdjustmentFactor: 4,
 
 	// Subsidy parameters.
-	BaseSubsidy:           50000000000,
-	MulSubsidy:            100,
-	DivSubsidy:            101,
-	ReductionInterval:     128,
-	WorkRewardProportion:  6,
-	StakeRewardProportion: 3,
-	BlockTaxProportion:    1,
+	BaseSubsidy:              50000000000,
+	MulSubsidy:               100,
+	DivSubsidy:               101,
+	SubsidyReductionInterval: 128,
+	WorkRewardProportion:     6,
+	StakeRewardProportion:    3,
+	BlockTaxProportion:       1,
 
 	// Checkpoints ordered from oldest to newest.
 	Checkpoints: nil,

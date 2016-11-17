@@ -175,11 +175,10 @@ func (b *BlockChain) calcEasiestDifficulty(bits uint32,
 	maxRetargetTimespan := int64(b.chainParams.TargetTimespan) *
 		b.chainParams.RetargetAdjustmentFactor
 
-	// The test network rules allow minimum difficulty blocks after more
-	// than twice the desired amount of time needed to generate a block has
-	// elapsed.
-	if b.chainParams.ResetMinDifficulty {
-		if durationVal > int64(b.chainParams.TimePerBlock)*2 {
+	// The test network rules allow minimum difficulty blocks once too much
+	// time has elapsed without mining a block.
+	if b.chainParams.ReduceMinDifficulty {
+		if durationVal > int64(b.chainParams.MinDiffReductionTime) {
 			return b.chainParams.PowLimitBits
 		}
 	}
@@ -206,8 +205,7 @@ func (b *BlockChain) calcEasiestDifficulty(bits uint32,
 // did not have the special testnet minimum difficulty rule applied.
 //
 // This function MUST be called with the chain state lock held (for writes).
-func (b *BlockChain) findPrevTestNetDifficulty(startNode *blockNode) (uint32,
-	error) {
+func (b *BlockChain) findPrevTestNetDifficulty(startNode *blockNode) (uint32, error) {
 	// Search backwards through the chain for the last block without
 	// the special rule applied.
 	blocksPerRetarget := b.chainParams.WorkDiffWindowSize *
@@ -259,23 +257,21 @@ func (b *BlockChain) calcNextRequiredDifficulty(curNode *blockNode,
 
 	// We're not at a retarget point, return the oldDiff.
 	if (curNode.height+1)%b.chainParams.WorkDiffWindowSize != 0 {
-		// The test network rules allow minimum difficulty blocks after
-		// more than twice the desired amount of time needed to generate
-		// a block has elapsed.
-		if b.chainParams.ResetMinDifficulty {
-			// Return minimum difficulty when more than twice the
-			// desired amount of time needed to generate a block has
-			// elapsed.
-			allowMinTime := curNode.header.Timestamp.Add(
-				b.chainParams.TimePerBlock * b.chainParams.MinDiffResetTimeFactor)
+		// For networks that support it, allow special reduction of the
+		// required difficulty once too much time has elapsed without
+		// mining a block.
+		if b.chainParams.ReduceMinDifficulty {
+			// Return minimum difficulty when more than the desired
+			// amount of time has elapsed without mining a block.
+			reductionTime := b.chainParams.MinDiffReductionTime
+			allowMinTime := curNode.header.Timestamp.Add(reductionTime)
 
 			// For every extra target timespan that passes, we halve the
 			// difficulty.
 			if newBlockTime.After(allowMinTime) {
 				timePassed := newBlockTime.Sub(curNode.header.Timestamp)
-				timePassed -= (b.chainParams.TimePerBlock *
-					b.chainParams.MinDiffResetTimeFactor)
-				shifts := uint((timePassed / b.chainParams.TimePerBlock) + 1)
+				timePassed -= b.chainParams.MinDiffReductionTime
+				shifts := uint((timePassed / b.chainParams.TargetTimePerBlock) + 1)
 
 				// Scale the difficulty with time passed.
 				oldTarget := CompactToBig(curNode.header.Bits)
@@ -371,7 +367,11 @@ func (b *BlockChain) calcNextRequiredDifficulty(curNode *blockNode,
 			break // Exit for loop when we hit the end.
 		}
 
-		// Get the previous block node.
+		// Get the previous block node.  This function is used over
+		// simply accessing firstNode.parent directly as it will
+		// dynamically create previous block nodes as needed.  This
+		// helps allow only the pieces of the chain that are needed
+		// to remain in memory.
 		var err error
 		tempNode := oldNode
 		oldNode, err = b.getPrevNodeFromNode(oldNode)
@@ -490,8 +490,7 @@ func mergeDifficulty(oldDiff int64, newDiff1 int64, newDiff2 int64) int64 {
 // and then uses it to determine the next stake difficulty.
 // TODO: You can combine the first and second for loops below for a speed up
 // if you'd like, I'm not sure how much it matters.
-func (b *BlockChain) calcNextRequiredStakeDifficulty(curNode *blockNode) (int64,
-	error) {
+func (b *BlockChain) calcNextRequiredStakeDifficulty(curNode *blockNode) (int64, error) {
 	alpha := b.chainParams.StakeDiffAlpha
 	stakeDiffStartHeight := int64(b.chainParams.CoinbaseMaturity) +
 		1

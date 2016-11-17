@@ -792,7 +792,7 @@ func handleTooFewVoters(subsidyCache *blockchain.SubsidyCache,
 
 				// If we're on testnet, the time since this last block
 				// listed as the parent must be taken into consideration.
-				if bm.server.chainParams.ResetMinDifficulty {
+				if bm.server.chainParams.ReduceMinDifficulty {
 					parentHash := cptCopy.Block.Header.PrevBlock
 
 					requiredDifficulty, err :=
@@ -895,7 +895,7 @@ func handleTooFewVoters(subsidyCache *blockchain.SubsidyCache,
 
 				// If we're on testnet, the time since this last block
 				// listed as the parent must be taken into consideration.
-				if bm.server.chainParams.ResetMinDifficulty {
+				if bm.server.chainParams.ReduceMinDifficulty {
 					parentHash := topBlock.MsgBlock().Header.PrevBlock
 
 					requiredDifficulty, err :=
@@ -1546,12 +1546,10 @@ mempoolLoop:
 
 		// Ensure the transaction inputs pass all of the necessary
 		// preconditions before allowing it to be added to the block.
-		_, err = blockchain.CheckTransactionInputs(subsidyCache,
-			tx,
-			nextBlockHeight,
-			blockUtxos,
-			false, // Don't check fraud proofs; missing ones are filled out below
-			server.chainParams)
+		// The fraud proof is not checked because it will be filled in
+		// by the miner.
+		_, err = blockchain.CheckTransactionInputs(subsidyCache, tx,
+			nextBlockHeight, blockUtxos, false, server.chainParams)
 		if err != nil {
 			minrLog.Tracef("Skipping tx %s due to error in "+
 				"CheckTransactionInputs: %v", tx.Hash(), err)
@@ -2094,7 +2092,7 @@ func UpdateBlockTime(msgBlock *wire.MsgBlock, bManager *blockManager) error {
 
 	// If running on a network that requires recalculating the difficulty,
 	// do so now.
-	if activeNetParams.ResetMinDifficulty {
+	if activeNetParams.ReduceMinDifficulty {
 		difficulty, err := bManager.chain.CalcNextRequiredDifficulty(
 			newTimestamp)
 		if err != nil {

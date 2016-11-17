@@ -41,13 +41,13 @@ func NewSubsidyCache(height int64, params *chaincfg.Params) *SubsidyCache {
 		params:       params,
 	}
 
-	iteration := uint64(height / params.ReductionInterval)
+	iteration := uint64(height / params.SubsidyReductionInterval)
 	if iteration < subsidyCacheInitWidth {
 		return &sc
 	}
 
 	for i := iteration - 4; i <= iteration; i++ {
-		sc.CalcBlockSubsidy(int64(iteration) * params.ReductionInterval)
+		sc.CalcBlockSubsidy(int64(iteration) * params.SubsidyReductionInterval)
 	}
 
 	return &sc
@@ -59,7 +59,7 @@ func NewSubsidyCache(height int64, params *chaincfg.Params) *SubsidyCache {
 // has the expected value.
 //
 // Subsidy calculation for exponential reductions:
-// 0 for i in range (0, height / ReductionInterval):
+// 0 for i in range (0, height / SubsidyReductionInterval):
 // 1     subsidy *= MulSubsidy
 // 2     subsidy /= DivSubsidy
 //
@@ -71,7 +71,7 @@ func (s *SubsidyCache) CalcBlockSubsidy(height int64) int64 {
 		return s.params.BlockOneSubsidy()
 	}
 
-	iteration := uint64(height / s.params.ReductionInterval)
+	iteration := uint64(height / s.params.SubsidyReductionInterval)
 
 	if iteration == 0 {
 		return s.params.BaseSubsidy
