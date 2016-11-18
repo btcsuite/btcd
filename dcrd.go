@@ -41,12 +41,14 @@ func dcrdMain(serverChan chan<- *server) error {
 	cfg = tcfg
 	defer backendLog.Flush()
 
-	interrupted := interruptListener()
+	// Get a channel that will be closed when a shutdown signal has been
+	// triggered either from an OS signal such as SIGINT (Ctrl+C) or from
+	// another subsystem such as the RPC server.
+	interruptedChan := interruptListener()
 	defer dcrdLog.Info("Shutdown complete")
 
-	// Show version at startup.
+	// Show version and home dir at startup.
 	dcrdLog.Infof("Version %s", version())
-	// Show dcrd home dir location
 	dcrdLog.Infof("Home dir: %s", cfg.HomeDir)
 
 	// Enable http profiling server if requested.
@@ -106,11 +108,8 @@ func dcrdMain(serverChan chan<- *server) error {
 		go drainOutgoingPipeMessages()
 	}
 
-	if interruptRequested(interrupted) {
-		return nil
-	}
-
-	if interruptRequested(interrupted) {
+	// Return now if an interrupt signal was triggered.
+	if interruptRequested(interruptedChan) {
 		return nil
 	}
 
@@ -122,12 +121,14 @@ func dcrdMain(serverChan chan<- *server) error {
 		return err
 	}
 	defer func() {
+		// Ensure the database is sync'd and closed on shutdown.
 		lifetimeNotifier.notifyShutdownEvent(lifetimeEventDBOpen)
 		dcrdLog.Infof("Gracefully shutting down the database...")
 		db.Close()
 	}()
 
-	if interruptRequested(interrupted) {
+	// Return now if an interrupt signal was triggered.
+	if interruptRequested(interruptedChan) {
 		return nil
 	}
 
@@ -182,15 +183,16 @@ func dcrdMain(serverChan chan<- *server) error {
 		serverChan <- server
 	}
 
-	if interruptRequested(interrupted) {
+	if interruptRequested(interruptedChan) {
 		return nil
 	}
 
 	lifetimeNotifier.notifyStartupComplete()
 
 	// Wait until the interrupt signal is received from an OS signal or
-	// shutdown is requested through the RPC server.
-	<-interrupted
+	// shutdown is requested through one of the subsystems such as the RPC
+	// server.
+	<-interruptedChan
 	return nil
 }
 

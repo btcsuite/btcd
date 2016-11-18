@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2014 The btcsuite developers
+// Copyright (c) 2013-2016 The btcsuite developers
 // Copyright (c) 2015-2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
@@ -86,12 +86,8 @@ loop:
 				// more commands while pending.
 				changes <- svc.Status{State: svc.StopPending}
 
-				// Signal the main function to exit if shutdown
-				// was not already requested.
-				select {
-				case shutdownRequestChannel <- struct{}{}:
-				default:
-				}
+				// Signal the main function to exit.
+				shutdownRequestChannel <- struct{}{}
 
 			default:
 				elog.Error(1, fmt.Sprintf("Unexpected control "+
