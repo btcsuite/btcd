@@ -19,11 +19,15 @@ Note: To send or receive funds and join Proof-of-Stake mining, you will also nee
 This project is currently under active development and is in a Beta state.  It
 is extremely stable and has been in production use since February 2016.  
 
-It is forked from [btcd](https://github.com/btcsuite/btcd) which is a bitcoin full 
-node implementation written in Go.  btcd is a ongoing project under active 
+It is forked from [btcd](https://github.com/btcsuite/btcd) which is a bitcoin
+full node implementation written in Go.  btcd is a ongoing project under active 
 development.  Because dcrd is constantly synced with btcd codebase, it will 
 get the benefit of btcd's ongoing upgrades to peer and connection handling, 
 database optimization and other blockchain related technology improvements.
+
+## Requirements
+
+[Go](http://golang.org) 1.6 or newer.
 
 ## Getting Started
 
