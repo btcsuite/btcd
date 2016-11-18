@@ -204,6 +204,11 @@ const (
 	// single element.
 	ErrCleanStack
 
+	// ErrNullFail is returned when the ScriptVerifyNullFail flag is
+	// set and signatures are not empty on failed checksig or checkmultisig
+	// operations.
+	ErrNullFail
+
 	// -------------------------------
 	// Failures related to soft forks.
 	// -------------------------------
@@ -266,6 +271,7 @@ var errorCodeStrings = map[ErrorCode]string{
 	ErrSigNullDummy:             "ErrSigNullDummy",
 	ErrPubKeyType:               "ErrPubKeyType",
 	ErrCleanStack:               "ErrCleanStack",
+	ErrNullFail:                 "ErrNullFail",
 	ErrDiscourageUpgradableNOPs: "ErrDiscourageUpgradableNOPs",
 	ErrNegativeLockTime:         "ErrNegativeLockTime",
 	ErrUnsatisfiedLockTime:      "ErrUnsatisfiedLockTime",

@@ -2084,6 +2084,11 @@ func opcodeCheckSig(op *parsedOpcode, vm *Engine) error {
 		valid = signature.Verify(hash, pubKey)
 	}
 
+	if !valid && vm.hasFlag(ScriptVerifyNullFail) && len(sigBytes) > 0 {
+		str := "signature not empty on failed checksig"
+		return scriptError(ErrNullFail, str)
+	}
+
 	vm.dstack.PushBool(valid)
 	return nil
 }
@@ -2315,6 +2320,15 @@ func opcodeCheckMultiSig(op *parsedOpcode, vm *Engine) error {
 			// PubKey verified, move on to the next signature.
 			signatureIdx++
 			numSignatures--
+		}
+	}
+
+	if !success && vm.hasFlag(ScriptVerifyNullFail) {
+		for _, sig := range signatures {
+			if len(sig.signature) > 0 {
+				str := "not all signatures empty on failed checkmultisig"
+				return scriptError(ErrNullFail, str)
+			}
 		}
 	}
 

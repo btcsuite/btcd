@@ -62,6 +62,10 @@ const (
 	// push operator. This is both rules 3 and 4 of BIP0062.
 	ScriptVerifyMinimalData
 
+	// ScriptVerifyNullFail defines that signatures must be empty if
+	// a CHECKSIG or CHECKMULTISIG operation fails.
+	ScriptVerifyNullFail
+
 	// ScriptVerifySigPushOnly defines that signature scripts must contain
 	// only pushed data.  This is rule 2 of BIP0062.
 	ScriptVerifySigPushOnly

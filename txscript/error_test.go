@@ -53,6 +53,7 @@ func TestErrorCodeStringer(t *testing.T) {
 		{ErrSigNullDummy, "ErrSigNullDummy"},
 		{ErrPubKeyType, "ErrPubKeyType"},
 		{ErrCleanStack, "ErrCleanStack"},
+		{ErrNullFail, "ErrNullFail"},
 		{ErrDiscourageUpgradableNOPs, "ErrDiscourageUpgradableNOPs"},
 		{ErrNegativeLockTime, "ErrNegativeLockTime"},
 		{ErrUnsatisfiedLockTime, "ErrUnsatisfiedLockTime"},
