@@ -169,8 +169,8 @@ type txMemPool struct {
 	outpoints     map[wire.OutPoint]*dcrutil.Tx
 
 	// Votes on blocks.
-	votes    map[chainhash.Hash][]*VoteTx
 	votesMtx sync.Mutex
+	votes    map[chainhash.Hash][]*VoteTx
 
 	// A declared subsidy cache as passed from the blockchain.
 	subsidyCache *blockchain.SubsidyCache
@@ -180,7 +180,8 @@ type txMemPool struct {
 }
 
 // insertVote inserts a vote into the map of block votes.
-// This function is safe for concurrent access.
+//
+// This function MUST be called with the vote mutex locked (for writes).
 func (mp *txMemPool) insertVote(ssgen *dcrutil.Tx) error {
 	voteHash := ssgen.Hash()
 	msgTx := ssgen.MsgTx()
@@ -192,47 +193,25 @@ func (mp *txMemPool) insertVote(ssgen *dcrutil.Tx) error {
 		return err
 	}
 
-	voteBits := stake.SSGenVoteBits(msgTx)
-	vote := dcrutil.IsFlagSet16(voteBits, dcrutil.BlockValid)
-
-	voteTx := &VoteTx{*voteHash, *ticketHash, vote}
-	vts, exists := mp.votes[blockHash]
-
 	// If there are currently no votes for this block,
 	// start a new buffered slice and store it.
+	vts, exists := mp.votes[blockHash]
 	if !exists {
-		minrLog.Debugf("Accepted vote %v for block hash %v (height %v), "+
-			"voting %v on the transaction tree",
-			voteHash, blockHash, blockHeight, vote)
-
-		slice := make([]*VoteTx, int(mp.cfg.ChainParams.TicketsPerBlock),
-			int(mp.cfg.ChainParams.TicketsPerBlock))
-		slice[0] = voteTx
-		mp.votes[blockHash] = slice
-		return nil
+		vts = make([]*VoteTx, 0, mp.cfg.ChainParams.TicketsPerBlock)
+		mp.votes[blockHash] = vts
 	}
 
-	// We already have a vote for this ticket; break.
+	// Nothing to do if a vote for the ticket is already known.
 	for _, vt := range vts {
-		// At the end.
-		if vt == nil {
-			break
-		}
-
 		if vt.SstxHash.IsEqual(ticketHash) {
 			return nil
 		}
 	}
 
-	// Add the new vote in. Find where the first empty
-	// slot is and insert it.
-	for i, vt := range vts {
-		// At the end.
-		if vt == nil {
-			mp.votes[blockHash][i] = voteTx
-			break
-		}
-	}
+	// Append the new vote.
+	voteBits := stake.SSGenVoteBits(msgTx)
+	vote := dcrutil.IsFlagSet16(voteBits, dcrutil.BlockValid)
+	mp.votes[blockHash] = append(vts, &VoteTx{*voteHash, *ticketHash, vote})
 
 	minrLog.Debugf("Accepted vote %v for block hash %v (height %v), "+
 		"voting %v on the transaction tree",
@@ -241,21 +220,19 @@ func (mp *txMemPool) insertVote(ssgen *dcrutil.Tx) error {
 	return nil
 }
 
-// InsertVote calls insertVote, but makes it safe for concurrent access.
+// InsertVote inserts a vote into the map of block votes.
+//
+// This function is safe for concurrent access.
 func (mp *txMemPool) InsertVote(ssgen *dcrutil.Tx) error {
 	mp.votesMtx.Lock()
 	defer mp.votesMtx.Unlock()
 
-	err := mp.insertVote(ssgen)
-
-	return err
+	return mp.insertVote(ssgen)
 }
 
 // getVoteHashesForBlock gets the transaction hashes of all the known votes for
 // some block on the blockchain.
-func (mp *txMemPool) getVoteHashesForBlock(block chainhash.Hash) ([]chainhash.Hash,
-	error) {
-	var hashes []chainhash.Hash
+func (mp *txMemPool) getVoteHashesForBlock(block chainhash.Hash) ([]chainhash.Hash, error) {
 	vts, exists := mp.votes[block]
 	if !exists {
 		return nil, fmt.Errorf("couldn't find block requested in mp.votes")
@@ -266,11 +243,8 @@ func (mp *txMemPool) getVoteHashesForBlock(block chainhash.Hash) ([]chainhash.Ha
 	}
 
 	zeroHash := &chainhash.Hash{}
+	var hashes []chainhash.Hash
 	for _, vt := range vts {
-		if vt == nil {
-			break
-		}
-
 		if vt.SsgenHash.IsEqual(zeroHash) {
 			return nil, fmt.Errorf("unset vote hash in vote info")
 		}
@@ -282,30 +256,14 @@ func (mp *txMemPool) getVoteHashesForBlock(block chainhash.Hash) ([]chainhash.Ha
 
 // GetVoteHashesForBlock calls getVoteHashesForBlock, but makes it safe for
 // concurrent access.
-func (mp *txMemPool) GetVoteHashesForBlock(block chainhash.Hash) ([]chainhash.Hash,
-	error) {
+func (mp *txMemPool) GetVoteHashesForBlock(block chainhash.Hash) ([]chainhash.Hash, error) {
 	mp.votesMtx.Lock()
 	defer mp.votesMtx.Unlock()
 
-	hashes, err := mp.getVoteHashesForBlock(block)
-
-	return hashes, err
+	return mp.getVoteHashesForBlock(block)
 }
 
 // TODO Pruning of the votes map DECRED
-
-func getNumberOfVotesOnBlock(blockVoteTxs []*VoteTx) int {
-	numVotes := 0
-	for _, vt := range blockVoteTxs {
-		if vt == nil {
-			break
-		}
-
-		numVotes++
-	}
-
-	return numVotes
-}
 
 // blockWithLenVotes is a block with the number of votes currently present
 // for that block. Just used for sorting.
@@ -333,23 +291,12 @@ func (mp *txMemPool) sortParentsByVotes(currentTopBlock chainhash.Hash,
 		return nil, fmt.Errorf("no blocks to sort")
 	}
 
-	bwlvs := make([]*blockWithLenVotes, lenBlocks, lenBlocks)
-
-	for i, blockHash := range blocks {
-		votes, exists := mp.votes[blockHash]
-		if exists {
-			bwlv := &blockWithLenVotes{
-				blockHash,
-				uint16(getNumberOfVotesOnBlock(votes)),
-			}
-			bwlvs[i] = bwlv
-		} else {
-			bwlv := &blockWithLenVotes{
-				blockHash,
-				uint16(0),
-			}
-			bwlvs[i] = bwlv
-		}
+	bwlvs := make([]*blockWithLenVotes, 0, lenBlocks)
+	for _, blockHash := range blocks {
+		bwlvs = append(bwlvs, &blockWithLenVotes{
+			blockHash,
+			uint16(len(mp.votes[blockHash])),
+		})
 	}
 
 	// Blocks with the most votes appear at the top of the list.
@@ -372,12 +319,8 @@ func (mp *txMemPool) sortParentsByVotes(currentTopBlock chainhash.Hash,
 	// the same amount of votes as the current leader after the sort. After this
 	// point, all blocks listed in sortedUsefulBlocks definitely also have the
 	// minimum number of votes required.
-	topBlockVotes, exists := mp.votes[currentTopBlock]
-	topBlockVotesLen := 0
-	if exists {
-		topBlockVotesLen = getNumberOfVotesOnBlock(topBlockVotes)
-	}
-	if bwlvs[0].Votes == uint16(topBlockVotesLen) {
+	topBlockVotes := mp.votes[currentTopBlock]
+	if bwlvs[0].Votes == uint16(len(topBlockVotes)) {
 		if !bwlvs[0].Block.IsEqual(&currentTopBlock) {
 			// Find our block in the list.
 			pos := 0
@@ -407,14 +350,11 @@ func (mp *txMemPool) sortParentsByVotes(currentTopBlock chainhash.Hash,
 
 // SortParentsByVotes is the concurrency safe exported version of
 // sortParentsByVotes.
-func (mp *txMemPool) SortParentsByVotes(currentTopBlock chainhash.Hash,
-	blocks []chainhash.Hash) ([]chainhash.Hash, error) {
+func (mp *txMemPool) SortParentsByVotes(currentTopBlock chainhash.Hash, blocks []chainhash.Hash) ([]chainhash.Hash, error) {
 	mp.votesMtx.Lock()
 	defer mp.votesMtx.Unlock()
 
-	sortedBlocks, err := mp.sortParentsByVotes(currentTopBlock, blocks)
-
-	return sortedBlocks, err
+	return mp.sortParentsByVotes(currentTopBlock, blocks)
 }
 
 // Ensure the txMemPool type implements the mining.TxSource interface.
@@ -785,38 +725,29 @@ func (mp *txMemPool) checkPoolDoubleSpend(tx *dcrutil.Tx,
 // tree regular for the block at HEAD is valid.
 func (mp *txMemPool) isTxTreeValid(newestHash *chainhash.Hash) bool {
 	// There are no votes on the block currently; assume it's valid.
-	if mp.votes[*newestHash] == nil {
+	vts := mp.votes[*newestHash]
+	if len(vts) == 0 {
 		return true
 	}
 
 	// There are not possibly enough votes to tell if the txTree is valid;
 	// assume it's valid.
-	if len(mp.votes[*newestHash]) <=
-		int(mp.cfg.ChainParams.TicketsPerBlock/2) {
+	if len(vts) <= int(mp.cfg.ChainParams.TicketsPerBlock/2) {
 		return true
 	}
 
 	// Otherwise, tally the votes and determine if it's valid or not.
 	yea := 0
 	nay := 0
-
-	for _, vote := range mp.votes[*newestHash] {
-		// End of list, break.
-		if vote == nil {
-			break
-		}
-
-		if vote.Vote == true {
+	for _, vote := range vts {
+		if vote.Vote {
 			yea++
 		} else {
 			nay++
 		}
 	}
 
-	if yea > nay {
-		return true
-	}
-	return false
+	return yea > nay
 }
 
 // IsTxTreeValid calls isTxTreeValid, but makes it safe for concurrent access.
