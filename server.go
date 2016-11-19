@@ -394,6 +394,15 @@ func (sp *serverPeer) OnVersion(_ *peer.Peer, msg *wire.MsgVersion) {
 // pool up to the maximum inventory allowed per message.  When the peer has a
 // bloom filter loaded, the contents are filtered accordingly.
 func (sp *serverPeer) OnMemPool(_ *peer.Peer, msg *wire.MsgMemPool) {
+	// Only allow mempool requests if the server has bloom filtering
+	// enabled.
+	if sp.server.services&wire.SFNodeBloom != wire.SFNodeBloom {
+		peerLog.Debugf("peer %v sent mempool request with bloom "+
+			"filtering disabled -- disconnecting", sp)
+		sp.Disconnect()
+		return
+	}
+
 	// A decaying ban score increase is applied to prevent flooding.
 	// The ban score accumulates and passes the ban threshold if a burst of
 	// mempool messages comes from a peer. The score decays each minute to
