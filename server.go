@@ -213,6 +213,7 @@ type serverPeer struct {
 	continueHash    *chainhash.Hash
 	relayMtx        sync.Mutex
 	disableRelayTx  bool
+	sentAddrs       bool
 	requestQueue    []*wire.InvVect
 	requestedTxns   map[chainhash.Hash]struct{}
 	requestedBlocks map[chainhash.Hash]struct{}
@@ -892,8 +893,19 @@ func (sp *serverPeer) OnGetAddr(_ *peer.Peer, msg *wire.MsgGetAddr) {
 	// Do not accept getaddr requests from outbound peers.  This reduces
 	// fingerprinting attacks.
 	if !sp.Inbound() {
+		peerLog.Debugf("Ignoring getaddr request from outbound peer ",
+			"%v", sp)
 		return
 	}
+
+	// Only allow one getaddr request per connection to discourage
+	// address stamping of inv announcements.
+	if sp.sentAddrs {
+		peerLog.Debugf("Ignoring repeated getaddr request from peer ",
+			"%v", sp)
+		return
+	}
+	sp.sentAddrs = true
 
 	// Get the current known addresses from the address manager.
 	addrCache := sp.server.addrManager.AddressCache()
