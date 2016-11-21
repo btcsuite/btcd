@@ -2411,7 +2411,7 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 	if !cfg.SimNet && len(cfg.ConnectPeers) == 0 {
 		newAddressFunc = func() (net.Addr, error) {
 			for tries := 0; tries < 100; tries++ {
-				addr := s.addrManager.GetAddress("any")
+				addr := s.addrManager.GetAddress()
 				if addr == nil {
 					break
 				}
