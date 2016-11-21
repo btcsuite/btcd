@@ -3,11 +3,13 @@
 # 1. gofmt         (http://golang.org/cmd/gofmt/)
 # 2. golint        (https://github.com/golang/lint)
 # 3. go vet        (http://golang.org/cmd/vet)
-# 4. race detector (http://blog.golang.org/race-detector)
-# 5. test coverage (http://blog.golang.org/cover)
+# 4. gosimple      (https://github.com/dominikh/go-simple)
+# 5. unconvert     (https://github.com/mdempsky/unconvert)
+# 6. race detector (http://blog.golang.org/race-detector)
+# 7. test coverage (http://blog.golang.org/cover)
 #
-# gometaling (github.com/alecthomas/gometalinter) is used to run each each
-# static checker.
+# gometalinter (github.com/alecthomas/gometalinter) is used to run each static
+# checker.
 
 set -ex
 
@@ -18,7 +20,7 @@ test -z "$(gometalinter --disable-all \
 --enable=vet \
 --enable=gosimple \
 --enable=unconvert \
---deadline=20s $(glide novendor) | grep -v 'ALL_CAPS\|OP_' 2>&1 | tee /dev/stderr)"
+--deadline=4m $(glide novendor) | grep -v 'ALL_CAPS\|OP_' 2>&1 | tee /dev/stderr)"
 env GORACE="halt_on_error=1" go test -v -race -tags rpctest $(glide novendor)
 
 # Run test coverage on each subdirectories and merge the coverage profile.
