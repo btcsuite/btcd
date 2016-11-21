@@ -242,24 +242,21 @@ func TestBlockUndoDataSerializing(t *testing.T) {
 	}{
 		{
 			name: "two ticket datas",
-			utds: []UndoTicketData{
-				UndoTicketData{
-					TicketHash:   chainhash.HashH([]byte{0x00}),
-					TicketHeight: 123456,
-					Missed:       true,
-					Revoked:      false,
-					Spent:        false,
-					Expired:      true,
-				},
-				UndoTicketData{
-					TicketHash:   chainhash.HashH([]byte{0x01}),
-					TicketHeight: 122222,
-					Missed:       false,
-					Revoked:      true,
-					Spent:        true,
-					Expired:      false,
-				},
-			},
+			utds: []UndoTicketData{{
+				TicketHash:   chainhash.HashH([]byte{0x00}),
+				TicketHeight: 123456,
+				Missed:       true,
+				Revoked:      false,
+				Spent:        false,
+				Expired:      true,
+			}, {
+				TicketHash:   chainhash.HashH([]byte{0x01}),
+				TicketHeight: 122222,
+				Missed:       false,
+				Revoked:      true,
+				Spent:        true,
+				Expired:      false,
+			}},
 			serialized: hexToBytes("0ce8d4ef4dd7cd8d62dfded9d4edb0a774ae6a41929a74da23109e8f11139c8740e20100094a6c419a1e25c85327115c4ace586decddfe2990ed8f3d4d801871158338501d6edd010006"),
 		},
 	}

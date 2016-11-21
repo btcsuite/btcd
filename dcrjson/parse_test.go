@@ -86,10 +86,10 @@ func TestDecodeConcatenatedHashes(t *testing.T) {
 
 func TestEncodeConcatenatedVoteBits(t *testing.T) {
 	testVbs := []stake.VoteBits{
-		stake.VoteBits{Bits: 0, ExtendedBits: []byte{}},
-		stake.VoteBits{Bits: 0, ExtendedBits: []byte{0x00}},
-		stake.VoteBits{Bits: 0x1223, ExtendedBits: []byte{0x01, 0x02, 0x03, 0x04}},
-		stake.VoteBits{Bits: 0xaaaa, ExtendedBits: []byte{0x01, 0x02, 0x03, 0x04, 0x05}},
+		{Bits: 0, ExtendedBits: []byte{}},
+		{Bits: 0, ExtendedBits: []byte{0x00}},
+		{Bits: 0x1223, ExtendedBits: []byte{0x01, 0x02, 0x03, 0x04}},
+		{Bits: 0xaaaa, ExtendedBits: []byte{0x01, 0x02, 0x03, 0x04, 0x05}},
 	}
 	encodedResults, err := dcrjson.EncodeConcatenatedVoteBits(testVbs)
 	if err != nil {
@@ -113,7 +113,7 @@ func TestEncodeConcatenatedVoteBits(t *testing.T) {
 
 	// Test too long voteBits extended.
 	testVbs = []stake.VoteBits{
-		stake.VoteBits{Bits: 0, ExtendedBits: bytes.Repeat([]byte{0x00}, 74)},
+		{Bits: 0, ExtendedBits: bytes.Repeat([]byte{0x00}, 74)},
 	}
 	_, err = dcrjson.EncodeConcatenatedVoteBits(testVbs)
 	if err == nil {
@@ -132,9 +132,9 @@ func TestDecodeConcatenatedVoteBits(t *testing.T) {
 	encodedBytesStr := hex.EncodeToString(encodedBytes)
 
 	expectedVbs := []stake.VoteBits{
-		stake.VoteBits{Bits: 0, ExtendedBits: []byte{0x00}},
-		stake.VoteBits{Bits: 0x1223, ExtendedBits: []byte{0x01, 0x02, 0x03, 0x04}},
-		stake.VoteBits{Bits: 0xaaaa, ExtendedBits: []byte{0x01, 0x02, 0x03, 0x04, 0x05}},
+		{Bits: 0, ExtendedBits: []byte{0x00}},
+		{Bits: 0x1223, ExtendedBits: []byte{0x01, 0x02, 0x03, 0x04}},
+		{Bits: 0xaaaa, ExtendedBits: []byte{0x01, 0x02, 0x03, 0x04, 0x05}},
 	}
 
 	decodedSlice, err :=
