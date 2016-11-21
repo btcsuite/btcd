@@ -11,6 +11,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math"
+	"sort"
 	"time"
 
 	"github.com/decred/dcrd/blockchain"
@@ -277,6 +278,109 @@ func containsTxIns(txs []*dcrutil.Tx, tx *dcrutil.Tx) bool {
 	}
 
 	return false
+}
+
+// blockWithNumVotes is a block with the number of votes currently present
+// for that block. Just used for sorting.
+type blockWithNumVotes struct {
+	Hash     chainhash.Hash
+	NumVotes uint16
+}
+
+// byNumberOfVotes implements sort.Interface to sort a slice of blocks by their
+// number of votes.
+type byNumberOfVotes []*blockWithNumVotes
+
+// Len returns the number of elements in the slice.  It is part of the
+// sort.Interface implementation.
+func (b byNumberOfVotes) Len() int {
+	return len(b)
+}
+
+// Swap swaps the elements at the passed indices.  It is part of the
+// sort.Interface implementation.
+func (b byNumberOfVotes) Swap(i, j int) {
+	b[i], b[j] = b[j], b[i]
+}
+
+// Less returns whether the block with index i should sort before the block with
+// index j.  It is part of the sort.Interface implementation.
+func (b byNumberOfVotes) Less(i, j int) bool {
+	return b[i].NumVotes < b[j].NumVotes
+}
+
+// SortParentsByVotes takes a list of block header hashes and sorts them
+// by the number of votes currently available for them in the votes map of
+// mempool.  It then returns all blocks that are eligible to be used (have
+// at least a majority number of votes) sorted by number of votes, descending.
+//
+// This function is safe for concurrent access.
+func SortParentsByVotes(mp *txMemPool, currentTopBlock chainhash.Hash, blocks []chainhash.Hash, params *chaincfg.Params) []chainhash.Hash {
+	// Return now when no blocks were provided.
+	lenBlocks := len(blocks)
+	if lenBlocks == 0 {
+		return nil
+	}
+
+	// Fetch the vote metadata for the provided block hashes from the
+	// mempool and filter out any blocks that do not have the minimum
+	// required number of votes.
+	minVotesRequired := (params.TicketsPerBlock / 2) + 1
+	voteMetadata := mp.VotesForBlocks(blocks)
+	filtered := make([]*blockWithNumVotes, 0, lenBlocks)
+	for i := range blocks {
+		numVotes := uint16(len(voteMetadata[i]))
+		if numVotes >= minVotesRequired {
+			filtered = append(filtered, &blockWithNumVotes{
+				Hash:     blocks[i],
+				NumVotes: numVotes,
+			})
+		}
+	}
+
+	// Return now if there are no blocks with enough votes to be eligible to
+	// build on top of.
+	if len(filtered) == 0 {
+		return nil
+	}
+
+	// Blocks with the most votes appear at the top of the list.
+	sort.Sort(sort.Reverse(byNumberOfVotes(filtered)))
+	sortedUsefulBlocks := make([]chainhash.Hash, 0, len(filtered))
+	for _, bwnv := range filtered {
+		sortedUsefulBlocks = append(sortedUsefulBlocks, bwnv.Hash)
+	}
+
+	// Make sure we don't reorganize the chain needlessly if the top block has
+	// the same amount of votes as the current leader after the sort. After this
+	// point, all blocks listed in sortedUsefulBlocks definitely also have the
+	// minimum number of votes required.
+	numTopBlockVotes := uint16(len(mp.votes[currentTopBlock]))
+	if filtered[0].NumVotes == numTopBlockVotes && filtered[0].Hash !=
+		currentTopBlock {
+
+		// Attempt to find the position of the current block being built
+		// from in the list.
+		pos := 0
+		for i, bwnv := range filtered {
+			if bwnv.Hash == currentTopBlock {
+				pos = i
+				break
+			}
+		}
+
+		// Swap the top block into the first position. We directly access
+		// sortedUsefulBlocks useful blocks here with the assumption that
+		// since the values were accumulated from filtered, they should be
+		// in the same positions and we shouldn't be able to access anything
+		// out of bounds.
+		if pos != 0 {
+			sortedUsefulBlocks[0], sortedUsefulBlocks[pos] =
+				sortedUsefulBlocks[pos], sortedUsefulBlocks[0]
+		}
+	}
+
+	return sortedUsefulBlocks
 }
 
 // BlockTemplate houses a block that has yet to be solved along with additional
@@ -1158,17 +1262,13 @@ func NewBlockTemplate(policy *mining.Policy, server *server,
 		// Get the list of blocks that we can actually build on top of. If we're
 		// not currently on the block that has the most votes, switch to that
 		// block.
-		eligibleParents, err := mempool.SortParentsByVotes(*prevHash, children)
-		if err != nil {
-			if err.(MiningRuleError).GetCode() == ErrNotEnoughVoters {
-				minrLog.Debugf("Too few voters found on any HEAD block, " +
-					"recycling a parent block to mine on")
-				return handleTooFewVoters(subsidyCache, nextBlockHeight,
-					payToAddress, server.blockManager)
-			}
-			minrLog.Errorf("unexpected error while sorting eligible "+
-				"parents: %v", err.Error())
-			return nil, err
+		eligibleParents := SortParentsByVotes(mempool, *prevHash, children,
+			blockManager.server.chainParams)
+		if len(eligibleParents) == 0 {
+			minrLog.Debugf("Too few voters found on any HEAD block, " +
+				"recycling a parent block to mine on")
+			return handleTooFewVoters(subsidyCache, nextBlockHeight,
+				payToAddress, server.blockManager)
 		}
 
 		minrLog.Debugf("Found eligible parent %v with enough votes to build "+
@@ -1177,7 +1277,7 @@ func NewBlockTemplate(policy *mining.Policy, server *server,
 
 		// Force a reorganization to the parent with the most votes if we need
 		// to.
-		if !eligibleParents[0].IsEqual(prevHash) {
+		if eligibleParents[0] != *prevHash {
 			for _, newHead := range eligibleParents {
 				err := blockManager.ForceReorganization(*prevHash, newHead)
 				if err != nil {

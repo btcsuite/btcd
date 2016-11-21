@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"math"
 	"math/big"
-	"sort"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -243,99 +242,25 @@ func (mp *txMemPool) VoteHashesForBlock(blockHash chainhash.Hash) []chainhash.Ha
 	return hashes
 }
 
-// TODO Pruning of the votes map DECRED
-
-// blockWithLenVotes is a block with the number of votes currently present
-// for that block. Just used for sorting.
-type blockWithLenVotes struct {
-	Block chainhash.Hash
-	Votes uint16
-}
-
-// ByNumberOfVotes defines the methods needed to satisify sort.Interface to
-// sort a slice of Blocks by their number of votes.
-type ByNumberOfVotes []*blockWithLenVotes
-
-func (b ByNumberOfVotes) Len() int           { return len(b) }
-func (b ByNumberOfVotes) Less(i, j int) bool { return b[i].Votes < b[j].Votes }
-func (b ByNumberOfVotes) Swap(i, j int)      { b[i], b[j] = b[j], b[i] }
-
-// sortParentsByVotes takes a list of block header hashes and sorts them
-// by the number of votes currently available for them in the votes map of
-// mempool. It then returns all blocks that are eligible to be used (have
-// at least a majority number of votes) sorted by number of votes, descending.
-func (mp *txMemPool) sortParentsByVotes(currentTopBlock chainhash.Hash,
-	blocks []chainhash.Hash) ([]chainhash.Hash, error) {
-	lenBlocks := len(blocks)
-	if lenBlocks == 0 {
-		return nil, fmt.Errorf("no blocks to sort")
-	}
-
-	bwlvs := make([]*blockWithLenVotes, 0, lenBlocks)
-	for _, blockHash := range blocks {
-		bwlvs = append(bwlvs, &blockWithLenVotes{
-			blockHash,
-			uint16(len(mp.votes[blockHash])),
-		})
-	}
-
-	// Blocks with the most votes appear at the top of the list.
-	sort.Sort(sort.Reverse(ByNumberOfVotes(bwlvs)))
-
-	var sortedUsefulBlocks []chainhash.Hash
-	minimumVotesRequired := uint16((mp.cfg.ChainParams.TicketsPerBlock / 2) + 1)
-	for _, bwlv := range bwlvs {
-		if bwlv.Votes >= minimumVotesRequired {
-			sortedUsefulBlocks = append(sortedUsefulBlocks, bwlv.Block)
-		}
-	}
-
-	if sortedUsefulBlocks == nil {
-		return nil, miningRuleError(ErrNotEnoughVoters,
-			"no block had enough votes to build on top of")
-	}
-
-	// Make sure we don't reorganize the chain needlessly if the top block has
-	// the same amount of votes as the current leader after the sort. After this
-	// point, all blocks listed in sortedUsefulBlocks definitely also have the
-	// minimum number of votes required.
-	topBlockVotes := mp.votes[currentTopBlock]
-	if bwlvs[0].Votes == uint16(len(topBlockVotes)) {
-		if !bwlvs[0].Block.IsEqual(&currentTopBlock) {
-			// Find our block in the list.
-			pos := 0
-			for i, bwlv := range bwlvs {
-				if bwlv.Block.IsEqual(&currentTopBlock) {
-					pos = i
-					break
-				}
-			}
-
-			if pos == 0 { // Should never happen...
-				return nil, fmt.Errorf("couldn't find top block in list")
-			}
-
-			// Swap the top block into the first position. We directly access
-			// sortedUsefulBlocks useful blocks here with the assumption that
-			// since the values were accumulated from blvs, they should be
-			// in the same positions and we shouldn't be able to access anything
-			// out of bounds.
-			sortedUsefulBlocks[0], sortedUsefulBlocks[pos] =
-				sortedUsefulBlocks[pos], sortedUsefulBlocks[0]
-		}
-	}
-
-	return sortedUsefulBlocks, nil
-}
-
-// SortParentsByVotes is the concurrency safe exported version of
-// sortParentsByVotes.
-func (mp *txMemPool) SortParentsByVotes(currentTopBlock chainhash.Hash, blocks []chainhash.Hash) ([]chainhash.Hash, error) {
+// VotesForBlocks returns the vote metadata for all votes on the provided
+// block hashes that are currently available in the mempool.
+//
+// This function is safe for concurrent access.
+func (mp *txMemPool) VotesForBlocks(hashes []chainhash.Hash) [][]*VoteTx {
+	result := make([][]*VoteTx, 0, len(hashes))
 	mp.votesMtx.Lock()
-	defer mp.votesMtx.Unlock()
+	for _, hash := range hashes {
+		votes := mp.votes[hash]
+		votesCopy := make([]*VoteTx, len(votes))
+		copy(votesCopy, votes)
+		result = append(result, votesCopy)
+	}
+	mp.votesMtx.Unlock()
 
-	return mp.sortParentsByVotes(currentTopBlock, blocks)
+	return result
 }
+
+// TODO Pruning of the votes map DECRED
 
 // Ensure the txMemPool type implements the mining.TxSource interface.
 var _ mining.TxSource = (*txMemPool)(nil)

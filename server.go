@@ -502,25 +502,17 @@ func (sp *serverPeer) OnGetMiningState(p *peer.Peer, msg *wire.MsgGetMiningState
 		return
 	}
 
-	// Get the list of blocks that we can actually build on top of.
-	blockHashes, err := mp.SortParentsByVotes(*newest, children)
-	if err != nil {
-		// We couldn't find enough voters for any block, so just return now.
-		if err.(MiningRuleError).GetCode() == ErrNotEnoughVoters {
-			return
-		}
-		peerLog.Warnf("unexpected mempool error while sorting eligible "+
-			"parents for mining state request: %v", err.Error())
+	// Get the list of blocks of blocks that are eligible to built on and
+	// limit the list to the maximum number of allowed eligible block hashes
+	// per mining state message.  There is nothing to send when there are no
+	// eligible blocks.
+	blockHashes := SortParentsByVotes(mp, *newest, children,
+		bm.server.chainParams)
+	numBlocks := len(blockHashes)
+	if numBlocks == 0 {
 		return
 	}
-
-	// Nothing to send, abort.
-	if len(blockHashes) == 0 {
-		return
-	}
-
-	// Construct the set of block hashes to send.
-	if len(blockHashes) > wire.MaxMSBlocksAtHeadPerMsg {
+	if numBlocks > wire.MaxMSBlocksAtHeadPerMsg {
 		blockHashes = blockHashes[:wire.MaxMSBlocksAtHeadPerMsg]
 	}
 
