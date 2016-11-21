@@ -744,7 +744,7 @@ func NetAddressKey(na *wire.NetAddress) string {
 // random one from the possible addresses with preference given to ones that
 // have not been used recently and should not pick 'close' addresses
 // consecutively.
-func (a *AddrManager) GetAddress(class string) *KnownAddress {
+func (a *AddrManager) GetAddress() *KnownAddress {
 	// Protect concurrent access.
 	a.mtx.Lock()
 	defer a.mtx.Unlock()
