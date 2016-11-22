@@ -220,16 +220,6 @@ func (mp *txMemPool) insertVote(ssgen *dcrutil.Tx) error {
 	return nil
 }
 
-// InsertVote inserts a vote into the map of block votes.
-//
-// This function is safe for concurrent access.
-func (mp *txMemPool) InsertVote(ssgen *dcrutil.Tx) error {
-	mp.votesMtx.Lock()
-	defer mp.votesMtx.Unlock()
-
-	return mp.insertVote(ssgen)
-}
-
 // getVoteHashesForBlock gets the transaction hashes of all the known votes for
 // some block on the blockchain.
 func (mp *txMemPool) getVoteHashesForBlock(block chainhash.Hash) ([]chainhash.Hash, error) {
@@ -1218,7 +1208,9 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew,
 	// If it's an SSGen (vote), insert it into the list of
 	// votes.
 	if txType == stake.TxTypeSSGen {
-		err := mp.InsertVote(tx)
+		mp.votesMtx.Lock()
+		err := mp.insertVote(tx)
+		mp.votesMtx.Unlock()
 		if err != nil {
 			return nil, err
 		}
