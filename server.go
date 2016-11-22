@@ -446,7 +446,7 @@ func (sp *serverPeer) OnMemPool(p *peer.Peer, msg *wire.MsgMemPool) {
 
 // pushMiningStateMsg pushes a mining state message to the queue for a
 // requesting peer.
-func (sp *serverPeer) pushMiningStateMsg(height uint32, blockHashes []*chainhash.Hash, voteHashes []*chainhash.Hash) error {
+func (sp *serverPeer) pushMiningStateMsg(height uint32, blockHashes []chainhash.Hash, voteHashes []chainhash.Hash) error {
 	// Nothing to send, abort.
 	if len(blockHashes) == 0 {
 		return nil
@@ -455,14 +455,14 @@ func (sp *serverPeer) pushMiningStateMsg(height uint32, blockHashes []*chainhash
 	// Construct the mining state request and queue it to be sent.
 	msg := wire.NewMsgMiningState()
 	msg.Height = height
-	for _, hash := range blockHashes {
-		err := msg.AddBlockHash(hash)
+	for i := range blockHashes {
+		err := msg.AddBlockHash(&blockHashes[i])
 		if err != nil {
 			return err
 		}
 	}
-	for _, hash := range voteHashes {
-		err := msg.AddVoteHash(hash)
+	for i := range voteHashes {
+		err := msg.AddVoteHash(&voteHashes[i])
 		if err != nil {
 			return err
 		}
@@ -501,7 +501,7 @@ func (sp *serverPeer) OnGetMiningState(p *peer.Peer, msg *wire.MsgGetMiningState
 	}
 
 	// Get the list of blocks that we can actually build on top of.
-	eligibleParents, err := mp.SortParentsByVotes(*newest, children)
+	blockHashes, err := mp.SortParentsByVotes(*newest, children)
 	if err != nil {
 		// We couldn't find enough voters for any block, so just return now.
 		if err.(MiningRuleError).GetCode() == ErrNotEnoughVoters {
@@ -513,29 +513,20 @@ func (sp *serverPeer) OnGetMiningState(p *peer.Peer, msg *wire.MsgGetMiningState
 	}
 
 	// Nothing to send, abort.
-	if len(eligibleParents) == 0 {
+	if len(blockHashes) == 0 {
 		return
 	}
 
 	// Construct the set of block hashes to send.
-	numBlocks := len(eligibleParents)
-	if numBlocks > wire.MaxMSBlocksAtHeadPerMsg {
-		numBlocks = wire.MaxMSBlocksAtHeadPerMsg
-	}
-	blockHashes := make([]*chainhash.Hash, numBlocks, numBlocks)
-	for i, h := range eligibleParents {
-		if i >= wire.MaxMSBlocksAtHeadPerMsg {
-			break
-		}
-		hashCopy := h
-		blockHashes[i] = &hashCopy
+	if len(blockHashes) > wire.MaxMSBlocksAtHeadPerMsg {
+		blockHashes = blockHashes[:wire.MaxMSBlocksAtHeadPerMsg]
 	}
 
 	// Construct the set of votes to send.
-	voteHashes := make([]*chainhash.Hash, 0, wire.MaxMSVotesAtHeadPerMsg)
+	voteHashes := make([]chainhash.Hash, 0, wire.MaxMSVotesAtHeadPerMsg)
 	for _, bh := range blockHashes {
 		// Fetch the vote hashes themselves and append them.
-		vhsForBlock, err := mp.GetVoteHashesForBlock(*bh)
+		vhsForBlock, err := mp.GetVoteHashesForBlock(bh)
 		if err != nil {
 			peerLog.Warnf("unexpected error while fetching vote hashes "+
 				"for block %v for a mining state request: %v",
@@ -543,8 +534,7 @@ func (sp *serverPeer) OnGetMiningState(p *peer.Peer, msg *wire.MsgGetMiningState
 			return
 		}
 		for _, vh := range vhsForBlock {
-			hashCopy := vh
-			voteHashes = append(voteHashes, &hashCopy)
+			voteHashes = append(voteHashes, vh)
 		}
 	}
 
