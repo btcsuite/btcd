@@ -220,37 +220,27 @@ func (mp *txMemPool) insertVote(ssgen *dcrutil.Tx) error {
 	return nil
 }
 
-// getVoteHashesForBlock gets the transaction hashes of all the known votes for
-// some block on the blockchain.
-func (mp *txMemPool) getVoteHashesForBlock(block chainhash.Hash) ([]chainhash.Hash, error) {
-	vts, exists := mp.votes[block]
-	if !exists {
-		return nil, fmt.Errorf("couldn't find block requested in mp.votes")
-	}
-
-	if len(vts) == 0 {
-		return nil, fmt.Errorf("block found in mp.votes, but contains no votes")
-	}
-
-	zeroHash := &chainhash.Hash{}
-	var hashes []chainhash.Hash
-	for _, vt := range vts {
-		if vt.SsgenHash.IsEqual(zeroHash) {
-			return nil, fmt.Errorf("unset vote hash in vote info")
-		}
-		hashes = append(hashes, vt.SsgenHash)
-	}
-
-	return hashes, nil
-}
-
-// GetVoteHashesForBlock calls getVoteHashesForBlock, but makes it safe for
-// concurrent access.
-func (mp *txMemPool) GetVoteHashesForBlock(block chainhash.Hash) ([]chainhash.Hash, error) {
+// VoteHashesForBlock returns the hashes for all votes on the provided block
+// hash that are currently available in the mempool.
+//
+// This function is safe for concurrent access.
+func (mp *txMemPool) VoteHashesForBlock(blockHash chainhash.Hash) []chainhash.Hash {
 	mp.votesMtx.Lock()
 	defer mp.votesMtx.Unlock()
 
-	return mp.getVoteHashesForBlock(block)
+	// Lookup the vote metadata for the block.
+	vts, exists := mp.votes[blockHash]
+	if !exists || len(vts) == 0 {
+		return nil
+	}
+
+	// Copy the vote hashes from the vote metadata.
+	hashes := make([]chainhash.Hash, 0, len(vts))
+	for _, vt := range vts {
+		hashes = append(hashes, vt.SsgenHash)
+	}
+
+	return hashes
 }
 
 // TODO Pruning of the votes map DECRED
@@ -822,8 +812,7 @@ func (mp *txMemPool) FetchTransaction(txHash *chainhash.Hash, includeRecentBlock
 // so that we can easily pick different stake tx types from the mempool later.
 // This should probably be done at the bottom using "IsSStx" etc functions.
 // It should also set the dcrutil tree type for the tx as well.
-func (mp *txMemPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew,
-	rateLimit, allowHighFees bool) ([]*chainhash.Hash, error) {
+func (mp *txMemPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew, rateLimit, allowHighFees bool) ([]*chainhash.Hash, error) {
 	msgTx := tx.MsgTx()
 	txHash := tx.Hash()
 	// Don't accept the transaction if it already exists in the pool.  This

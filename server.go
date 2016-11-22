@@ -493,6 +493,8 @@ func (sp *serverPeer) OnGetMiningState(p *peer.Peer, msg *wire.MsgGetMiningState
 		return
 	}
 
+	// Obtain the entire generation of blocks stemming from the parent of
+	// the current tip.
 	children, err := bm.GetGeneration(*newest)
 	if err != nil {
 		peerLog.Warnf("failed to access block manager to get the generation "+
@@ -526,11 +528,11 @@ func (sp *serverPeer) OnGetMiningState(p *peer.Peer, msg *wire.MsgGetMiningState
 	voteHashes := make([]chainhash.Hash, 0, wire.MaxMSVotesAtHeadPerMsg)
 	for _, bh := range blockHashes {
 		// Fetch the vote hashes themselves and append them.
-		vhsForBlock, err := mp.GetVoteHashesForBlock(bh)
-		if err != nil {
+		vhsForBlock := mp.VoteHashesForBlock(bh)
+		if len(vhsForBlock) == 0 {
 			peerLog.Warnf("unexpected error while fetching vote hashes "+
-				"for block %v for a mining state request: %v",
-				bh, err.Error())
+				"for block %v for a mining state request: no vote "+
+				"metadata for block", bh)
 			return
 		}
 		for _, vh := range vhsForBlock {

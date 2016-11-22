@@ -1187,9 +1187,10 @@ func NewBlockTemplate(policy *mining.Policy, server *server,
 
 				// Check to make sure we actually have the transactions
 				// (votes) we need in the mempool.
-				voteHashes, err := mempool.GetVoteHashesForBlock(newHead)
-				if err != nil {
-					return nil, err
+				voteHashes := mempool.VoteHashesForBlock(newHead)
+				if len(voteHashes) == 0 {
+					return nil, fmt.Errorf("no vote metadata for block %v",
+						newHead)
 				}
 
 				if exist := mempool.CheckIfTxsExist(voteHashes); !exist {
