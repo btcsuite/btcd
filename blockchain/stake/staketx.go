@@ -29,10 +29,10 @@ type TxType int
 // Possible TxTypes.  Statically declare these so that they might be used in
 // consensus code.
 const (
-	TxTypeRegular = 0
-	TxTypeSStx    = 1
-	TxTypeSSGen   = 2
-	TxTypeSSRtx   = 3
+	TxTypeRegular TxType = iota
+	TxTypeSStx
+	TxTypeSSGen
+	TxTypeSSRtx
 )
 
 const (
