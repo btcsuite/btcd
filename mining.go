@@ -29,6 +29,14 @@ const (
 	// transaction to be considered high priority.
 	minHighPriority = dcrutil.AtomsPerCoin * 144.0 / 250
 
+	// generatedBlockVersion is the version of the block being generated.
+	// It is defined as a constant here rather than using the
+	// wire.BlockVersion constant since a change in the block version
+	// will require changes to the generated block.  Using the wire constant
+	// for generated block version could allow creation of invalid blocks
+	// for the updated version.
+	generatedBlockVersion = 2
+
 	// blockHeaderOverhead is the max number of bytes it takes to serialize
 	// a block header and max possible transaction count.
 	blockHeaderOverhead = wire.MaxBlockHeaderPayload + wire.MaxVarIntPayload
@@ -2101,7 +2109,7 @@ mempoolLoop:
 
 	var msgBlock wire.MsgBlock
 	msgBlock.Header = wire.BlockHeader{
-		Version:      server.chainParams.CurrentBlockVersion,
+		Version:      generatedBlockVersion,
 		PrevBlock:    *prevHash,
 		MerkleRoot:   *merkles[len(merkles)-1],
 		StakeRoot:    *merklesStake[len(merklesStake)-1],

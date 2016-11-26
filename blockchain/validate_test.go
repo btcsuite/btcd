@@ -2047,7 +2047,6 @@ var simNetParams = &chaincfg.Params{
 	// Chain parameters
 	GenesisBlock:             &simNetGenesisBlock,
 	GenesisHash:              &simNetGenesisHash,
-	CurrentBlockVersion:      0,
 	PowLimit:                 simNetPowLimit,
 	PowLimitBits:             0x207fffff,
 	ReduceMinDifficulty:      false,
@@ -2071,6 +2070,16 @@ var simNetParams = &chaincfg.Params{
 
 	// Checkpoints ordered from oldest to newest.
 	Checkpoints: nil,
+
+	// Enforce current block version once majority of the network has
+	// upgraded.
+	// 51% (51 / 100)
+	// Reject previous block versions once a majority of the network has
+	// upgraded.
+	// 75% (75 / 100)
+	BlockEnforceNumRequired: 51,
+	BlockRejectNumRequired:  75,
+	BlockUpgradeNumToCheck:  100,
 
 	// Mempool parameters
 	RelayNonStdTxs: true,

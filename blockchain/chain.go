@@ -902,12 +902,11 @@ func (b *BlockChain) BestBlockHeader() *wire.BlockHeader {
 // starting with startNode are at least the minimum passed version.
 //
 // This function MUST be called with the chain state lock held (for writes).
-func (b *BlockChain) isMajorityVersion(minVer int32, startNode *blockNode,
-	numRequired int32) bool {
-	numFound := int32(0)
+func (b *BlockChain) isMajorityVersion(minVer int32, startNode *blockNode, numRequired uint64) bool {
+	numFound := uint64(0)
 	iterNode := startNode
-	for i := int32(0); i < b.chainParams.CurrentBlockVersion &&
-		numFound < int32(numRequired) && iterNode != nil; i++ {
+	for i := uint64(0); i < b.chainParams.BlockUpgradeNumToCheck &&
+		numFound < numRequired && iterNode != nil; i++ {
 		// This node has a version that is at least the minimum version.
 		if iterNode.header.Version >= minVer {
 			numFound++

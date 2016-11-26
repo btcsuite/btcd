@@ -698,13 +698,11 @@ func (b *BlockChain) checkBlockHeaderContext(header *wire.BlockHeader, prevNode 
 	}
 
 	if !fastAdd {
-		// Reject old version blocks once a majority of the network has
+		// Reject version 1 blocks once a majority of the network has
 		// upgraded.
-		mv := b.chainParams.CurrentBlockVersion
-		if header.Version < mv &&
-			b.isMajorityVersion(mv,
-				prevNode,
-				b.chainParams.CurrentBlockVersion) {
+		if header.Version < 2 && b.isMajorityVersion(2, prevNode,
+			b.chainParams.BlockRejectNumRequired) {
+
 			str := "new blocks with version %d are no longer valid"
 			str = fmt.Sprintf(str, header.Version)
 			return ruleError(ErrBlockVersionTooOld, str)

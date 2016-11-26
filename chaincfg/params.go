@@ -99,10 +99,6 @@ type Params struct {
 	// GenesisHash is the starting block hash.
 	GenesisHash *chainhash.Hash
 
-	// CurrentBlockVersion is the version of the block that the majority of
-	// the network is currently on.
-	CurrentBlockVersion int32
-
 	// PowLimit defines the highest allowed proof of work value for a block
 	// as a uint256.
 	PowLimit *big.Int
@@ -195,6 +191,15 @@ type Params struct {
 
 	// Checkpoints ordered from oldest to newest.
 	Checkpoints []Checkpoint
+
+	// Enforce current block version once network has upgraded.
+	BlockEnforceNumRequired uint64
+
+	// Reject previous block versions once network has upgraded.
+	BlockRejectNumRequired uint64
+
+	// The number of nodes to check.
+	BlockUpgradeNumToCheck uint64
 
 	// Mempool parameters
 	RelayNonStdTxs bool
@@ -313,7 +318,6 @@ var MainNetParams = Params{
 	// Chain parameters
 	GenesisBlock:             &genesisBlock,
 	GenesisHash:              &genesisHash,
-	CurrentBlockVersion:      2,
 	PowLimit:                 mainPowLimit,
 	PowLimitBits:             0x1d00ffff,
 	ReduceMinDifficulty:      false,
@@ -346,6 +350,16 @@ var MainNetParams = Params{
 		{65270, newHashFromStr("0000000000000021f107601962789b201f0a0cbb98ac5f8c12b93d94e795b441")},
 		{75380, newHashFromStr("0000000000000e7d13cfc85806aa720fe3670980f5b7d33253e4f41985558372")},
 	},
+
+	// Enforce current block version once majority of the network has
+	// upgraded.
+	// 75% (750 / 1000)
+	// Reject previous block versions once a majority of the network has
+	// upgraded.
+	// 95% (950 / 1000)
+	BlockEnforceNumRequired: 750,
+	BlockRejectNumRequired:  950,
+	BlockUpgradeNumToCheck:  1000,
 
 	// Mempool parameters
 	RelayNonStdTxs: false,
@@ -408,7 +422,6 @@ var TestNetParams = Params{
 	// Chain parameters
 	GenesisBlock:             &testNetGenesisBlock,
 	GenesisHash:              &testNetGenesisHash,
-	CurrentBlockVersion:      2,
 	PowLimit:                 testNetPowLimit,
 	PowLimitBits:             0x1e00ffff,
 	ReduceMinDifficulty:      false,
@@ -443,6 +456,16 @@ var TestNetParams = Params{
 		{173750, newHashFromStr("0000000000fe0a2f55589d8b75502f8adc26be95971a16d12d7ea65da5a0a507")},
 		{197920, newHashFromStr("000000000174a97eed678549df66b4025a8ff4b5034e7b0fdc63d1112d4716ab")},
 	},
+
+	// Enforce current block version once majority of the network has
+	// upgraded.
+	// 51% (51 / 100)
+	// Reject previous block versions once a majority of the network has
+	// upgraded.
+	// 75% (75 / 100)
+	BlockEnforceNumRequired: 51,
+	BlockRejectNumRequired:  75,
+	BlockUpgradeNumToCheck:  100,
 
 	// Mempool parameters
 	RelayNonStdTxs: true,
@@ -505,7 +528,6 @@ var SimNetParams = Params{
 	// Chain parameters
 	GenesisBlock:             &simNetGenesisBlock,
 	GenesisHash:              &simNetGenesisHash,
-	CurrentBlockVersion:      2,
 	PowLimit:                 simNetPowLimit,
 	PowLimitBits:             0x207fffff,
 	ReduceMinDifficulty:      false,
@@ -530,6 +552,16 @@ var SimNetParams = Params{
 
 	// Checkpoints ordered from oldest to newest.
 	Checkpoints: nil,
+
+	// Enforce current block version once majority of the network has
+	// upgraded.
+	// 51% (51 / 100)
+	// Reject previous block versions once a majority of the network has
+	// upgraded.
+	// 75% (75 / 100)
+	BlockEnforceNumRequired: 51,
+	BlockRejectNumRequired:  75,
+	BlockUpgradeNumToCheck:  100,
 
 	// Mempool parameters
 	RelayNonStdTxs: true,
