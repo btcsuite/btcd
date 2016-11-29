@@ -18,6 +18,7 @@ import (
 	"github.com/decred/dcrd/blockchain/stake"
 	"github.com/decred/dcrd/chaincfg"
 	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/decred/dcrd/mempool"
 	"github.com/decred/dcrd/mining"
 	"github.com/decred/dcrd/txscript"
 	"github.com/decred/dcrd/wire"
@@ -323,7 +324,7 @@ func (b byNumberOfVotes) Less(i, j int) bool {
 // at least a majority number of votes) sorted by number of votes, descending.
 //
 // This function is safe for concurrent access.
-func SortParentsByVotes(mp *txMemPool, currentTopBlock chainhash.Hash, blocks []chainhash.Hash, params *chaincfg.Params) []chainhash.Hash {
+func SortParentsByVotes(mp *mempool.TxPool, currentTopBlock chainhash.Hash, blocks []chainhash.Hash, params *chaincfg.Params) []chainhash.Hash {
 	// Return now when no blocks were provided.
 	lenBlocks := len(blocks)
 	if lenBlocks == 0 {
@@ -363,7 +364,8 @@ func SortParentsByVotes(mp *txMemPool, currentTopBlock chainhash.Hash, blocks []
 	// the same amount of votes as the current leader after the sort. After this
 	// point, all blocks listed in sortedUsefulBlocks definitely also have the
 	// minimum number of votes required.
-	numTopBlockVotes := uint16(len(mp.votes[currentTopBlock]))
+	curVoteMetadata := mp.VotesForBlocks([]chainhash.Hash{currentTopBlock})
+	numTopBlockVotes := uint16(len(curVoteMetadata))
 	if filtered[0].NumVotes == numTopBlockVotes && filtered[0].Hash !=
 		currentTopBlock {
 
@@ -1202,7 +1204,7 @@ func NewBlockTemplate(policy *mining.Policy, server *server,
 
 	// TODO: The mempool should be completely separated via the TxSource
 	// interface so this function is fully decoupled.
-	mempool := server.txMemPool
+	mp := server.txMemPool
 
 	var txSource mining.TxSource = server.txMemPool
 	blockManager := server.blockManager
@@ -1270,7 +1272,7 @@ func NewBlockTemplate(policy *mining.Policy, server *server,
 		// Get the list of blocks that we can actually build on top of. If we're
 		// not currently on the block that has the most votes, switch to that
 		// block.
-		eligibleParents := SortParentsByVotes(mempool, *prevHash, children,
+		eligibleParents := SortParentsByVotes(mp, *prevHash, children,
 			blockManager.server.chainParams)
 		if len(eligibleParents) == 0 {
 			minrLog.Debugf("Too few voters found on any HEAD block, " +
@@ -1295,13 +1297,13 @@ func NewBlockTemplate(policy *mining.Policy, server *server,
 
 				// Check to make sure we actually have the transactions
 				// (votes) we need in the mempool.
-				voteHashes := mempool.VoteHashesForBlock(newHead)
+				voteHashes := mp.VoteHashesForBlock(newHead)
 				if len(voteHashes) == 0 {
 					return nil, fmt.Errorf("no vote metadata for block %v",
 						newHead)
 				}
 
-				if exist := mempool.CheckIfTxsExist(voteHashes); !exist {
+				if exist := mp.CheckIfTxsExist(voteHashes); !exist {
 					continue
 				} else {
 					prevHash = &newHead
@@ -1353,7 +1355,7 @@ func NewBlockTemplate(policy *mining.Policy, server *server,
 
 	minrLog.Debugf("Considering %d transactions for inclusion to new block",
 		len(sourceTxns))
-	treeValid := mempool.IsTxTreeValid(prevHash)
+	treeValid := mp.IsTxTreeValid(prevHash)
 
 mempoolLoop:
 	for _, txDesc := range sourceTxns {
@@ -1450,7 +1452,7 @@ mempoolLoop:
 		// Calculate the final transaction priority using the input
 		// value age sum as well as the adjusted transaction size.  The
 		// formula is: sum(inputValue * inputAge) / adjustedTxSize
-		prioItem.priority = calcPriority(tx.MsgTx(), utxos,
+		prioItem.priority = mempool.CalcPriority(tx.MsgTx(), utxos,
 			nextBlockHeight)
 
 		// Calculate the fee in Atoms/KB.
@@ -1628,13 +1630,13 @@ mempoolLoop:
 		// the priority size or there are no more high-priority
 		// transactions.
 		if !sortedByFee && (blockPlusTxSize >= policy.BlockPrioritySize ||
-			prioItem.priority <= minHighPriority) {
+			prioItem.priority <= mempool.MinHighPriority) {
 
 			minrLog.Tracef("Switching to sort by fees per "+
 				"kilobyte blockSize %d >= BlockPrioritySize "+
 				"%d || priority %.2f <= minHighPriority %.2f",
 				blockPlusTxSize, policy.BlockPrioritySize,
-				prioItem.priority, minHighPriority)
+				prioItem.priority, mempool.MinHighPriority)
 
 			sortedByFee = true
 			priorityQueue.SetLessFunc(txPQByStakeAndFee)
@@ -1646,7 +1648,7 @@ mempoolLoop:
 			// final one in the high-priority section, so just fall
 			// though to the code below so it is added now.
 			if blockPlusTxSize > policy.BlockPrioritySize ||
-				prioItem.priority < minHighPriority {
+				prioItem.priority < mempool.MinHighPriority {
 
 				heap.Push(priorityQueue, prioItem)
 				continue

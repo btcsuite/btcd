@@ -1,9 +1,9 @@
-// Copyright (c) 2014 The btcsuite developers
+// Copyright (c) 2014-2016 The btcsuite developers
 // Copyright (c) 2015-2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package main
+package mempool
 
 import (
 	"github.com/decred/dcrd/blockchain"
@@ -110,9 +110,9 @@ func extractRejectCode(err error) (wire.RejectCode, bool) {
 	return wire.RejectInvalid, false
 }
 
-// errToRejectErr examines the underlying type of the error and returns a reject
+// ErrToRejectErr examines the underlying type of the error and returns a reject
 // code and string appropriate to be sent in a wire.MsgReject message.
-func errToRejectErr(err error) (wire.RejectCode, string) {
+func ErrToRejectErr(err error) (wire.RejectCode, string) {
 	// Return the reject code along with the error text if it can be
 	// extracted from the error.
 	rejectCode, found := extractRejectCode(err)

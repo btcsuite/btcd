@@ -17,6 +17,7 @@ import (
 	"github.com/decred/dcrd/blockchain/indexers"
 	"github.com/decred/dcrd/blockchain/stake"
 	"github.com/decred/dcrd/database"
+	"github.com/decred/dcrd/mempool"
 	"github.com/decred/dcrd/peer"
 	"github.com/decred/dcrd/txscript"
 )
@@ -145,6 +146,7 @@ func useLogger(subsystemID string, logger btclog.Logger) {
 
 	case "TXMP":
 		txmpLog = logger
+		mempool.UseLogger(logger)
 	}
 }
 

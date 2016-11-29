@@ -25,6 +25,7 @@ import (
 	"github.com/btcsuite/go-socks/socks"
 	"github.com/decred/dcrd/database"
 	_ "github.com/decred/dcrd/database/ffldb"
+	"github.com/decred/dcrd/mempool"
 	"github.com/decred/dcrd/wire"
 	"github.com/decred/dcrutil"
 )
@@ -47,7 +48,6 @@ const (
 	defaultBlockMaxSize          = 375000
 	blockMaxSizeMin              = 1000
 	blockMaxSizeMax              = wire.MaxBlockPayload - 1000
-	defaultBlockPrioritySize     = 20000
 	defaultAddrIndex             = false
 	defaultGenerate              = false
 	defaultNonAggressive         = false
@@ -362,11 +362,11 @@ func loadConfig() (*config, []string, error) {
 		DbType:            defaultDbType,
 		RPCKey:            defaultRPCKeyFile,
 		RPCCert:           defaultRPCCertFile,
-		MinRelayTxFee:     defaultMinRelayTxFee.ToCoin(),
+		MinRelayTxFee:     mempool.DefaultMinRelayTxFee.ToCoin(),
 		FreeTxRelayLimit:  defaultFreeTxRelayLimit,
 		BlockMinSize:      defaultBlockMinSize,
 		BlockMaxSize:      defaultBlockMaxSize,
-		BlockPrioritySize: defaultBlockPrioritySize,
+		BlockPrioritySize: mempool.DefaultBlockPrioritySize,
 		MaxOrphanTxs:      defaultMaxOrphanTransactions,
 		SigCacheMaxSize:   defaultSigCacheMaxSize,
 		Generate:          defaultGenerate,

@@ -3,7 +3,7 @@
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package main
+package mempool
 
 import (
 	"bytes"
@@ -39,17 +39,17 @@ func TestCalcMinRequiredTxRelayFee(t *testing.T) {
 		{
 			"1000 bytes with default minimum relay fee",
 			1000,
-			defaultMinRelayTxFee,
+			DefaultMinRelayTxFee,
 			1000000,
 		},
 		{
 			"max standard tx size with default minimum relay fee",
 			maxStandardTxSize,
-			defaultMinRelayTxFee,
+			DefaultMinRelayTxFee,
 			100000000,
 		},
 		{
-			"max standard tx size with max satoshi relay fee",
+			"max standard tx size with max relay fee",
 			maxStandardTxSize,
 			dcrutil.MaxAmount,
 			dcrutil.MaxAmount,
@@ -242,7 +242,7 @@ func TestDust(t *testing.T) {
 		},
 		{
 			// Maximum allowed value is never dust.
-			"max satoshi amount is never dust",
+			"max amount is never dust",
 			wire.TxOut{Value: dcrutil.MaxAmount, Version: 0, PkScript: pkScript},
 			dcrutil.MaxAmount,
 			false,
@@ -480,7 +480,7 @@ func TestCheckTransactionStandard(t *testing.T) {
 		// Ensure standardness is as expected.
 		tx := dcrutil.NewTx(&test.tx)
 		err := checkTransactionStandard(tx, stake.DetermineTxType(&test.tx),
-			test.height, timeSource, defaultMinRelayTxFee)
+			test.height, timeSource, DefaultMinRelayTxFee)
 		if err == nil && test.isStandard {
 			// Test passes since function returned standard for a
 			// transaction which is intended to be standard.

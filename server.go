@@ -27,6 +27,7 @@ import (
 	"github.com/decred/dcrd/chaincfg"
 	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/database"
+	"github.com/decred/dcrd/mempool"
 	"github.com/decred/dcrd/mining"
 	"github.com/decred/dcrd/peer"
 	"github.com/decred/dcrd/txscript"
@@ -185,7 +186,7 @@ type server struct {
 	sigCache             *txscript.SigCache
 	rpcServer            *rpcServer
 	blockManager         *blockManager
-	txMemPool            *txMemPool
+	txMemPool            *mempool.TxPool
 	cpuMiner             *CPUMiner
 	modifyRebroadcastInv chan interface{}
 	pendingPeers         chan *serverPeer
@@ -2597,7 +2598,16 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 	}
 	s.blockManager = bm
 
-	txC := mempoolConfig{
+	txC := mempool.Config{
+		Policy: mempool.Policy{
+			DisableRelayPriority: cfg.NoRelayPriority,
+			FreeTxRelayLimit:     cfg.FreeTxRelayLimit,
+			MaxOrphanTxs:         cfg.MaxOrphanTxs,
+			MaxOrphanTxSize:      defaultMaxOrphanTxSize,
+			MaxSigOpsPerTx:       blockchain.MaxSigOpsPerBlock / 5,
+			MinRelayTxFee:        cfg.minRelayTxFee,
+			AllowOldVotes:        cfg.AllowOldVotes,
+		},
 		ChainParams: chainParams,
 		// EnableAddrIndex: !cfg.NoAddrIndex, TODO
 		NewestHash: func() (*chainhash.Hash, int64, error) {
@@ -2613,15 +2623,6 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 			bm.chainState.Unlock()
 			return sDiff, nil
 		},
-
-		Policy: mempoolPolicy{
-			DisableRelayPriority: cfg.NoRelayPriority,
-			FreeTxRelayLimit:     cfg.FreeTxRelayLimit,
-			MaxOrphanTxs:         cfg.MaxOrphanTxs,
-			MaxOrphanTxSize:      defaultMaxOrphanTxSize,
-			MaxSigOpsPerTx:       blockchain.MaxSigOpsPerBlock / 5,
-			MinRelayTxFee:        cfg.minRelayTxFee,
-		},
 		FetchUtxoView:   s.blockManager.chain.FetchUtxoView,
 		Chain:           s.blockManager.chain,
 		SigCache:        s.sigCache,
@@ -2629,7 +2630,7 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 		AddrIndex:       s.addrIndex,
 		ExistsAddrIndex: s.existsAddrIndex,
 	}
-	s.txMemPool = newTxMemPool(&txC)
+	s.txMemPool = mempool.New(&txC)
 
 	// Create the mining policy based on the configuration options.
 	// NOTE: The CPU miner relies on the mempool, so the mempool has to be

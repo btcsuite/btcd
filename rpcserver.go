@@ -34,7 +34,6 @@ import (
 	"github.com/btcsuite/websocket"
 
 	"github.com/decred/bitset"
-
 	"github.com/decred/dcrd/blockchain"
 	"github.com/decred/dcrd/blockchain/stake"
 	"github.com/decred/dcrd/chaincfg"
@@ -42,10 +41,10 @@ import (
 	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/database"
 	"github.com/decred/dcrd/dcrjson"
+	"github.com/decred/dcrd/mempool"
 	"github.com/decred/dcrd/mining"
 	"github.com/decred/dcrd/txscript"
 	"github.com/decred/dcrd/wire"
-
 	"github.com/decred/dcrutil"
 )
 
@@ -3626,85 +3625,47 @@ func handleGetPeerInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 // handleGetRawMempool implements the getrawmempool command.
 func handleGetRawMempool(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	c := cmd.(*dcrjson.GetRawMempoolCmd)
-	mp := s.server.txMemPool
-	descs := mp.TxDescs()
-	var txType stake.TxType
 
+	// Choose the type to filter the results by based on the provided param.
+	// A filter type of nil means no filtering.
+	var filterType *stake.TxType
 	if c.TxType != nil {
-		switch *c.TxType {
-		case string(dcrjson.GRMRegular):
-			txType = stake.TxTypeRegular
-		case string(dcrjson.GRMTickets):
-			txType = stake.TxTypeSStx
-		case string(dcrjson.GRMVotes):
-			txType = stake.TxTypeSSGen
-		case string(dcrjson.GRMRevocations):
-			txType = stake.TxTypeSSRtx
-		case string(dcrjson.GRMAll):
+		switch dcrjson.GetRawMempoolTxTypeCmd(*c.TxType) {
+		case dcrjson.GRMRegular:
+			filterType = new(stake.TxType)
+			*filterType = stake.TxTypeRegular
+		case dcrjson.GRMTickets:
+			filterType = new(stake.TxType)
+			*filterType = stake.TxTypeSStx
+		case dcrjson.GRMVotes:
+			filterType = new(stake.TxType)
+			*filterType = stake.TxTypeSSGen
+		case dcrjson.GRMRevocations:
+			filterType = new(stake.TxType)
+			*filterType = stake.TxTypeSSRtx
+		case dcrjson.GRMAll:
+			// Nothing to do
 		default:
 			return nil, fmt.Errorf("Invalid transaction type")
 		}
 	}
+
+	// Return verbose results if requested.
+	mp := s.server.txMemPool
 	if c.Verbose != nil && *c.Verbose {
-		result := make(map[string]*dcrjson.GetRawMempoolVerboseResult,
-			len(descs))
-
-		best := s.chain.BestSnapshot()
-
-		mp.RLock()
-		defer mp.RUnlock()
-		for _, desc := range descs {
-			if desc.Type != txType && c.TxType != nil &&
-				*c.TxType != string(dcrjson.GRMAll) {
-				continue
-			}
-
-			// Calculate the current priority based on the inputs to
-			// the transaction.  Use zero if one or more of the
-			// input transactions can't be found for some reason.
-			tx := desc.Tx
-			var currentPriority float64
-			utxos, err := mp.fetchInputUtxos(tx)
-			if err == nil {
-				currentPriority = calcPriority(tx.MsgTx(),
-					utxos, best.Height+1)
-			}
-
-			mpd := &dcrjson.GetRawMempoolVerboseResult{
-				Size:             int32(tx.MsgTx().SerializeSize()),
-				Fee:              dcrutil.Amount(desc.Fee).ToCoin(),
-				Time:             desc.Added.Unix(),
-				Height:           desc.Height,
-				StartingPriority: desc.StartingPriority,
-				CurrentPriority:  currentPriority,
-				Depends:          make([]string, 0),
-			}
-			for _, txIn := range tx.MsgTx().TxIn {
-				hash := &txIn.PreviousOutPoint.Hash
-				if s.server.txMemPool.haveTransaction(hash) {
-					mpd.Depends = append(mpd.Depends,
-						hash.String())
-				}
-			}
-
-			result[tx.Hash().String()] = mpd
-		}
-
-		return result, nil
+		return mp.RawMempoolVerbose(filterType), nil
 	}
 
 	// The response is simply an array of the transaction hashes if the
 	// verbose flag is not set.
-	descsLen := len(descs)
-	hashStrings := make([]string, 0, descsLen)
-	for i := 0; i < descsLen; i++ {
-		if descs[i].Type != txType && c.TxType != nil &&
-			*c.TxType != string(dcrjson.GRMAll) {
+	descs := mp.TxDescs()
+	hashStrings := make([]string, 0, len(descs))
+	for i := range descs {
+		if filterType != nil && descs[i].Type != *filterType {
 			continue
 		}
 		hashStrings = append(hashStrings, descs[i].Tx.Hash().String())
 	}
-
 	return hashStrings, nil
 }
 
@@ -5050,7 +5011,7 @@ func handleSendRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan st
 		// so log it as an actual error.  In both cases, a JSON-RPC
 		// error is returned to the client with the deserialization
 		// error code (to match bitcoind behavior).
-		if _, ok := err.(RuleError); ok {
+		if _, ok := err.(mempool.RuleError); ok {
 			rpcsLog.Debugf("Rejected transaction %v: %v", tx.Hash(),
 				err)
 		} else {

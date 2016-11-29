@@ -21,6 +21,7 @@ import (
 	"github.com/decred/dcrd/chaincfg"
 	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/database"
+	"github.com/decred/dcrd/mempool"
 	"github.com/decred/dcrd/wire"
 	"github.com/decred/dcrutil"
 )
@@ -839,7 +840,7 @@ func (b *blockManager) handleTxMsg(tmsg *txMsg) {
 		// simply rejected as opposed to something actually going wrong,
 		// so log it as such.  Otherwise, something really did go wrong,
 		// so log it as an actual error.
-		if _, ok := err.(RuleError); ok {
+		if _, ok := err.(mempool.RuleError); ok {
 			bmgrLog.Debugf("Rejected transaction %v from %s: %v",
 				txHash, tmsg.peer, err)
 		} else {
@@ -849,7 +850,7 @@ func (b *blockManager) handleTxMsg(tmsg *txMsg) {
 
 		// Convert the error into an appropriate reject message and
 		// send it.
-		code, reason := errToRejectErr(err)
+		code, reason := mempool.ErrToRejectErr(err)
 		tmsg.peer.PushRejectMsg(wire.CmdTx, code, reason, txHash,
 			false)
 		return
@@ -1140,7 +1141,7 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 
 		// Convert the error into an appropriate reject message and
 		// send it.
-		code, reason := errToRejectErr(err)
+		code, reason := mempool.ErrToRejectErr(err)
 		bmsg.peer.PushRejectMsg(wire.CmdBlock, code, reason,
 			blockHash, false)
 		return
@@ -1205,7 +1206,7 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 				b.server.chainParams.StakeValidationHeight-1 {
 				bmgrLog.Errorf("Failed to get next winning tickets: %v", err)
 
-				code, reason := errToRejectErr(err)
+				code, reason := mempool.ErrToRejectErr(err)
 				bmsg.peer.PushRejectMsg(wire.CmdBlock, code, reason,
 					blockHash, false)
 				return

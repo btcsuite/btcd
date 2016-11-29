@@ -2,7 +2,7 @@
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package main
+package mempool
 
 import (
 	"fmt"
@@ -39,12 +39,12 @@ const (
 	// (1 + 15*74 + 3) + (15*34 + 3) + 23 = 1650
 	maxStandardSigScriptSize = 1650
 
-	// defaultMinRelayTxFee is the minimum fee in satoshi that is required
-	// for a transaction to be treated as free for relay and mining
-	// purposes.  It is also used to help determine if a transaction is
-	// considered dust and as a base for calculating minimum required fees
-	// for larger transactions.  This value is in Satoshi/1000 bytes.
-	defaultMinRelayTxFee = dcrutil.Amount(1e6)
+	// DefaultMinRelayTxFee is the minimum fee in atoms that is required for
+	// a transaction to be treated as free for relay and mining purposes.
+	// It is also used to help determine if a transaction is considered dust
+	// and as a base for calculating minimum required fees for larger
+	// transactions.  This value is in Atoms/1000 bytes.
+	DefaultMinRelayTxFee = dcrutil.Amount(1e6)
 
 	// maxStandardMultiSigKeys is the maximum number of public keys allowed
 	// in a multi-signature transaction output script for it to be
@@ -76,11 +76,11 @@ func calcMinRequiredTxRelayFee(serializedSize int64, minRelayTxFee dcrutil.Amoun
 	return minFee
 }
 
-// calcPriority returns a transaction priority given a transaction and the sum
+// CalcPriority returns a transaction priority given a transaction and the sum
 // of each of its input values multiplied by their age (# of confirmations).
 // Thus, the final formula for the priority is:
 // sum(inputValue * inputAge) / adjustedTxSize
-func calcPriority(tx *wire.MsgTx, utxoView *blockchain.UtxoViewpoint, nextBlockHeight int64) float64 {
+func CalcPriority(tx *wire.MsgTx, utxoView *blockchain.UtxoViewpoint, nextBlockHeight int64) float64 {
 	// In order to encourage spending multiple old unspent transaction
 	// outputs thereby reducing the total set, don't count the constant
 	// overhead for each input as well as enough bytes of the signature
