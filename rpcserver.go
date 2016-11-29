@@ -2711,17 +2711,16 @@ func (state *gbtWorkState) blockTemplateResult(bm *blockManager,
 			numSigOps, err := blockchain.CountP2SHSigOps(txU, false, isSSGen,
 				view)
 			if err != nil {
-				if cerr, ok := err.(blockchain.RuleError); ok {
-					return nil, chainRuleError(cerr)
-				}
-				return nil, err
+				context := "Failed to count signature operations"
+				return nil, internalRPCError(err.Error(), context)
 			}
 
 			numSigOps += blockchain.CountSigOps(txU, false, isSSGen)
 			if numSigOps > maxSigOpsPerTx {
-				str := fmt.Sprintf("transaction %v has too many sigops: %d > %d",
-					txHash, numSigOps, maxSigOpsPerTx)
-				return nil, txRuleError(wire.RejectNonstandard, str)
+				errStr := fmt.Sprintf("transaction %v has too "+
+					"many sigops: %d > %d", txHash,
+					numSigOps, maxSigOpsPerTx)
+				return nil, internalRPCError(errStr, "")
 			}
 			sigOps = int64(numSigOps)
 		}
@@ -2827,17 +2826,16 @@ func (state *gbtWorkState) blockTemplateResult(bm *blockManager,
 			numSigOps, err := blockchain.CountP2SHSigOps(txU, false, isSSGen,
 				view)
 			if err != nil {
-				if cerr, ok := err.(blockchain.RuleError); ok {
-					return nil, chainRuleError(cerr)
-				}
-				return nil, err
+				context := "Failed to count signature operations"
+				return nil, internalRPCError(err.Error(), context)
 			}
 
 			numSigOps += blockchain.CountSigOps(txU, false, isSSGen)
 			if numSigOps > maxSigOpsPerTx {
-				str := fmt.Sprintf("transaction %v has too many sigops: %d > %d",
-					stxHash, numSigOps, maxSigOpsPerTx)
-				return nil, txRuleError(wire.RejectNonstandard, str)
+				errStr := fmt.Sprintf("transaction %v has too "+
+					"many sigops: %d > %d", stxHash,
+					numSigOps, maxSigOpsPerTx)
+				return nil, internalRPCError(errStr, "")
 			}
 			sigOps = int64(numSigOps)
 		}
