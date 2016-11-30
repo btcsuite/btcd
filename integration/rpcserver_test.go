@@ -16,6 +16,7 @@ import (
 
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/integration/rpctest"
+	"github.com/btcsuite/btcutil"
 )
 
 func testGetBestBlock(r *rpctest.Harness, t *testing.T) {
@@ -94,10 +95,80 @@ func testGetBlockHash(r *rpctest.Harness, t *testing.T) {
 	}
 }
 
+func testMiningAddrCalls(r *rpctest.Harness, t *testing.T) {
+	var err error
+	const numAddrs = 5
+
+	// First generate a few fresh addresses from the harness.
+	addrs := make([]btcutil.Address, numAddrs)
+	for i := 0; i < numAddrs; i++ {
+		addrs[i], err = r.NewAddress()
+		if err != nil {
+			t.Fatalf("unable to generate new address: %v", err)
+		}
+	}
+
+	// Next, we use the addminingaddr call to add the above generated
+	// addresses to btcd's set of mining addresses.
+	for _, addr := range addrs {
+		if err := r.Node.AddMiningAddr(addr); err != nil {
+			t.Fatalf("unable to add mining address: %v", err)
+		}
+	}
+
+	// Attempting to add the same address twice should be rejected due to
+	// duplicates.
+	if err := r.Node.AddMiningAddr(addrs[0]); err == nil {
+		t.Fatalf("duplicate mining address wasn't rejected")
+	}
+
+	// Next, try to delete a single address, then immediately try to delete
+	// the same address. The second call should result in an error as the
+	// address is no longer within the set of mining addresses.
+	if err := r.Node.DelMiningAddr(addrs[2]); err != nil {
+		t.Fatalf("unable to delete mining address: %v", err)
+	}
+	if err := r.Node.DelMiningAddr(addrs[2]); err == nil {
+		t.Fatalf("deletion of non-existent address should fail")
+	}
+
+	// Query for the list of mining addresses, there should be exactly 5
+	// addresses: one from the harness' initialization, and four of the
+	// remaining addresses we added.
+	miningAddrs, err := r.Node.ListMiningAddrs()
+	if err != nil {
+		t.Fatalf("unable to list mining addrs: %v", err)
+	}
+	if len(miningAddrs) != 5 {
+		t.Fatalf("expected %v mining addrs after deletion got %v", 5,
+			len(miningAddrs))
+	}
+
+	// Next, remove all the remaining address we generated from btcd's set
+	// of mining addresses.
+	for _, addr := range append(addrs[:2], addrs[3:]...) {
+		if err := r.Node.DelMiningAddr(addr); err != nil {
+			t.Fatalf("unable to delete mining addr: %v", err)
+		}
+	}
+
+	// Only a single address should remain at this point: the harness'
+	// original mining address.
+	miningAddrs, err = r.Node.ListMiningAddrs()
+	if err != nil {
+		t.Fatalf("unable to list mining addrs: %v", err)
+	}
+	if len(miningAddrs) != 1 {
+		t.Fatalf("expected %v mining addrs after deletion got %v", 1,
+			len(miningAddrs))
+	}
+}
+
 var rpcTestCases = []rpctest.HarnessTestCase{
 	testGetBestBlock,
 	testGetBlockCount,
 	testGetBlockHash,
+	testMiningAddrCalls,
 }
 
 var primaryHarness *rpctest.Harness
