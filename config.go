@@ -892,7 +892,7 @@ func loadConfig() (*config, []string, error) {
 
 	// Ensure there is at least one mining address when the generate flag is
 	// set.
-	if cfg.Generate && len(cfg.MiningAddrs) == 0 {
+	if cfg.Generate && len(cfg.miningAddrs) == 0 {
 		str := "%s: the generate flag is set, but there are no mining " +
 			"addresses specified "
 		err := fmt.Errorf(str, funcName)
