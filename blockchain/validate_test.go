@@ -18,6 +18,7 @@ import (
 	"github.com/decred/dcrd/blockchain"
 	"github.com/decred/dcrd/chaincfg"
 	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/decred/dcrd/database"
 	"github.com/decred/dcrd/txscript"
 	"github.com/decred/dcrd/wire"
 	"github.com/decred/dcrutil"
@@ -2028,6 +2029,61 @@ func TestBlockchainSpendJournal(t *testing.T) {
 	}
 }
 
+// TestCheckBlockSanity tests the context free block sanity checks with blocks
+// not on a chain.
+func TestCheckBlockSanity(t *testing.T) {
+	timeSource := blockchain.NewMedianTime()
+	block := dcrutil.NewBlock(&badBlock)
+	err := blockchain.CheckBlockSanity(block, timeSource, simNetParams)
+	if err == nil {
+		t.Fatalf("block should fail.\n")
+	}
+}
+
+// TestCheckWorklessBlockSanity tests the context free workless block sanity
+// checks with blocks not on a chain.
+func TestCheckWorklessBlockSanity(t *testing.T) {
+	timeSource := blockchain.NewMedianTime()
+	block := dcrutil.NewBlock(&badBlock)
+	err := blockchain.CheckWorklessBlockSanity(block, timeSource, simNetParams)
+	if err == nil {
+		t.Fatalf("block should fail.\n")
+	}
+}
+
+// TestCheckBlockHeaderContext tests that genesis block passes context headers
+// because it's previousNode is nil.
+func TestCheckBlockHeaderContext(t *testing.T) {
+	// Create a new database for the blocks.
+	dbPath := filepath.Join(os.TempDir(), "examplecheckheadercontext")
+	_ = os.RemoveAll(dbPath)
+	db, err := database.Create("ffldb", dbPath, simNetParams.Net)
+	if err != nil {
+		t.Fatalf("Failed to create database: %v\n", err)
+		return
+	}
+	defer os.RemoveAll(dbPath)
+	defer db.Close()
+
+	// Create a new BlockChain instance using the underlying database for
+	// the simnet network.
+	chain, err := blockchain.New(&blockchain.Config{
+		DB:          db,
+		ChainParams: simNetParams,
+		TimeSource:  blockchain.NewMedianTime(),
+	})
+	if err != nil {
+		t.Fatalf("Failed to create chain instance: %v\n", err)
+		return
+	}
+
+	err = chain.TstCheckBlockHeaderContext(&simNetGenesisBlock.Header, nil, blockchain.BFNone)
+	if err != nil {
+		t.Fatalf("genesisblock should pass just by definition: %v\n", err)
+		return
+	}
+}
+
 // simNetPowLimit is the highest proof of work value a Decred block
 // can have for the simulation test network.  It is the value 2^255 - 1.
 var simNetPowLimit = new(big.Int).Sub(new(big.Int).Lsh(bigOne, 255), bigOne)
@@ -2296,5 +2352,28 @@ var simNetGenesisBlock = wire.MsgBlock{
 		Height:       uint32(0),
 	},
 	Transactions:  []*wire.MsgTx{&regTestGenesisCoinbaseTx},
+	STransactions: []*wire.MsgTx{},
+}
+
+// badBlock is an intentionally bad block that should fail the context-less
+// sanity checks.
+var badBlock = wire.MsgBlock{
+	Header: wire.BlockHeader{
+		Version:      1,
+		MerkleRoot:   simNetGenesisMerkleRoot,
+		VoteBits:     uint16(0x0000),
+		FinalState:   [6]byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+		Voters:       uint16(0x0000),
+		FreshStake:   uint8(0x00),
+		Revocations:  uint8(0x00),
+		Timestamp:    time.Unix(1401292357, 0), // 2009-01-08 20:54:25 -0600 CST
+		PoolSize:     uint32(0),
+		Bits:         0x207fffff, // 545259519
+		SBits:        int64(0x0000000000000000),
+		Nonce:        0x37580963,
+		StakeVersion: uint32(0),
+		Height:       uint32(0),
+	},
+	Transactions:  []*wire.MsgTx{},
 	STransactions: []*wire.MsgTx{},
 }

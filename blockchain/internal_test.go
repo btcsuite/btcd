@@ -16,6 +16,8 @@ package blockchain
 import (
 	"sort"
 	"time"
+
+	"github.com/decred/dcrd/wire"
 )
 
 // TstTimeSorter makes the internal timeSorter type available to the test
@@ -37,3 +39,9 @@ var TstCheckBlockScripts = checkBlockScripts
 // TstDeserializeUtxoEntry makes the internal deserializeUtxoEntry function
 // available to the test package.
 var TstDeserializeUtxoEntry = deserializeUtxoEntry
+
+// TstCheckBlockHeaderContext makes the internal checkBlockHeaderContext
+// function available to the test package.
+func (b *BlockChain) TstCheckBlockHeaderContext(header *wire.BlockHeader, prevNode *blockNode, flags BehaviorFlags) error {
+	return b.checkBlockHeaderContext(header, prevNode, flags)
+}
