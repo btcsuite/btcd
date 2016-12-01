@@ -116,6 +116,7 @@ func chainSetup(dbName string, params *chaincfg.Params) (*blockchain.BlockChain,
 	chain, err := blockchain.New(&blockchain.Config{
 		DB:          db,
 		ChainParams: &paramsCopy,
+		Checkpoints: nil,
 		TimeSource:  blockchain.NewMedianTime(),
 		SigCache:    txscript.NewSigCache(1000),
 	})

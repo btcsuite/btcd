@@ -9,6 +9,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"sort"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -182,7 +183,7 @@ func (b *blockManager) findNextHeaderCheckpoint(height int32) *chaincfg.Checkpoi
 	if cfg.DisableCheckpoints {
 		return nil
 	}
-	checkpoints := b.server.chainParams.Checkpoints
+	checkpoints := b.chain.Checkpoints()
 	if len(checkpoints) == 0 {
 		return nil
 	}
@@ -1324,6 +1325,57 @@ func (b *blockManager) Pause() chan<- struct{} {
 	return c
 }
 
+// checkpointSorter implements sort.Interface to allow a slice of checkpoints to
+// be sorted.
+type checkpointSorter []chaincfg.Checkpoint
+
+// Len returns the number of checkpoints in the slice.  It is part of the
+// sort.Interface implementation.
+func (s checkpointSorter) Len() int {
+	return len(s)
+}
+
+// Swap swaps the checkpoints at the passed indices.  It is part of the
+// sort.Interface implementation.
+func (s checkpointSorter) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
+}
+
+// Less returns whether the checkpoint with index i should sort before the
+// checkpoint with index j.  It is part of the sort.Interface implementation.
+func (s checkpointSorter) Less(i, j int) bool {
+	return s[i].Height < s[j].Height
+}
+
+// mergeCheckpoints returns two slices of checkpoints merged into one slice
+// such that the checkpoints are sorted by height.  In the case the additional
+// checkpoints contain a checkpoint with the same height as a checkpoint in the
+// default checkpoints, the additional checkpoint will take precedence and
+// overwrite the default one.
+func mergeCheckpoints(defaultCheckpoints, additional []chaincfg.Checkpoint) []chaincfg.Checkpoint {
+	// Create a map of the additional checkpoint heights to detect
+	// duplicates.
+	additionalHeights := make(map[int32]struct{})
+	for _, checkpoint := range additional {
+		additionalHeights[checkpoint.Height] = struct{}{}
+	}
+
+	// Add all default checkpoints that do not have an override in the
+	// additional checkpoints.
+	numDefault := len(defaultCheckpoints)
+	checkpoints := make([]chaincfg.Checkpoint, 0, numDefault+len(additional))
+	for _, checkpoint := range defaultCheckpoints {
+		if _, exists := additionalHeights[checkpoint.Height]; !exists {
+			checkpoints = append(checkpoints, checkpoint)
+		}
+	}
+
+	// Append the additional checkpoints and return the sorted results.
+	checkpoints = append(checkpoints, additional...)
+	sort.Sort(checkpointSorter(checkpoints))
+	return checkpoints
+}
+
 // newBlockManager returns a new bitcoin block manager.
 // Use Start to begin processing asynchronous block and inv updates.
 func newBlockManager(s *server, indexManager blockchain.IndexManager) (*blockManager, error) {
@@ -1338,11 +1390,18 @@ func newBlockManager(s *server, indexManager blockchain.IndexManager) (*blockMan
 		quit:            make(chan struct{}),
 	}
 
+	// Merge given checkpoints with the default ones unless they are disabled.
+	var checkpoints []chaincfg.Checkpoint
+	if !cfg.DisableCheckpoints {
+		checkpoints = mergeCheckpoints(s.chainParams.Checkpoints, cfg.addCheckpoints)
+	}
+
 	// Create a new block chain instance with the appropriate configuration.
 	var err error
 	bm.chain, err = blockchain.New(&blockchain.Config{
 		DB:            s.db,
 		ChainParams:   s.chainParams,
+		Checkpoints:   checkpoints,
 		TimeSource:    s.timeSource,
 		Notifications: bm.handleNotifyMsg,
 		SigCache:      s.sigCache,
@@ -1352,7 +1411,6 @@ func newBlockManager(s *server, indexManager blockchain.IndexManager) (*blockMan
 		return nil, err
 	}
 	best := bm.chain.BestSnapshot()
-	bm.chain.DisableCheckpoints(cfg.DisableCheckpoints)
 	if !cfg.DisableCheckpoints {
 		// Initialize the next checkpoint based on the current height.
 		bm.nextCheckpoint = bm.findNextHeaderCheckpoint(best.Height)

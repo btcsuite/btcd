@@ -27,66 +27,39 @@ func newHashFromStr(hexStr string) *chainhash.Hash {
 	return hash
 }
 
-// DisableCheckpoints provides a mechanism to disable validation against
-// checkpoints which you DO NOT want to do in production.  It is provided only
-// for debug purposes.
-//
-// This function is safe for concurrent access.
-func (b *BlockChain) DisableCheckpoints(disable bool) {
-	b.chainLock.Lock()
-	b.noCheckpoints = disable
-	b.chainLock.Unlock()
-}
-
 // Checkpoints returns a slice of checkpoints (regardless of whether they are
-// already known).  When checkpoints are disabled or there are no checkpoints
-// for the active network, it will return nil.
+// already known).
+// When there are no checkpoints for the chain, it will return nil.
 //
 // This function is safe for concurrent access.
 func (b *BlockChain) Checkpoints() []chaincfg.Checkpoint {
-	b.chainLock.RLock()
-	defer b.chainLock.RUnlock()
-
-	if b.noCheckpoints || len(b.chainParams.Checkpoints) == 0 {
-		return nil
-	}
-
-	return b.chainParams.Checkpoints
+	return b.checkpoints
 }
 
-// latestCheckpoint returns the most recent checkpoint (regardless of whether it
-// is already known).  When checkpoints are disabled or there are no checkpoints
-// for the active network, it will return nil.
+// HasCheckpoints returns whether this BlockChain has checkpoints defined.
 //
-// This function MUST be called with the chain state lock held (for reads).
-func (b *BlockChain) latestCheckpoint() *chaincfg.Checkpoint {
-	if b.noCheckpoints || len(b.chainParams.Checkpoints) == 0 {
-		return nil
-	}
-
-	checkpoints := b.chainParams.Checkpoints
-	return &checkpoints[len(checkpoints)-1]
+// This function is safe for concurrent access.
+func (b *BlockChain) HasCheckpoints() bool {
+	return len(b.checkpoints) > 0
 }
 
-// LatestCheckpoint returns the most recent checkpoint (regardless of whether it
-// is already known).  When checkpoints are disabled or there are no checkpoints
-// for the active network, it will return nil.
+// LatestCheckpoint returns the most recent checkpoint (regardless of whether they
+// are already known). When there are no defined checkpoints for the active chain
+// instance, it will return nil.
 //
 // This function is safe for concurrent access.
 func (b *BlockChain) LatestCheckpoint() *chaincfg.Checkpoint {
-	b.chainLock.RLock()
-	checkpoint := b.latestCheckpoint()
-	b.chainLock.RUnlock()
-	return checkpoint
+	if !b.HasCheckpoints() {
+		return nil
+	}
+	return &b.checkpoints[len(b.checkpoints)-1]
 }
 
 // verifyCheckpoint returns whether the passed block height and hash combination
-// match the hard-coded checkpoint data.  It also returns true if there is no
-// checkpoint data for the passed block height.
-//
-// This function MUST be called with the chain lock held (for reads).
+// match the checkpoint data. It also returns true if there is no checkpoint
+// data for the passed block height.
 func (b *BlockChain) verifyCheckpoint(height int32, hash *chainhash.Hash) bool {
-	if b.noCheckpoints || len(b.chainParams.Checkpoints) == 0 {
+	if !b.HasCheckpoints() {
 		return true
 	}
 
@@ -112,14 +85,14 @@ func (b *BlockChain) verifyCheckpoint(height int32, hash *chainhash.Hash) bool {
 //
 // This function MUST be called with the chain lock held (for reads).
 func (b *BlockChain) findPreviousCheckpoint() (*btcutil.Block, error) {
-	if b.noCheckpoints || len(b.chainParams.Checkpoints) == 0 {
+	if !b.HasCheckpoints() {
 		return nil, nil
 	}
 
-	// No checkpoints.
-	checkpoints := b.chainParams.Checkpoints
+	checkpoints := b.checkpoints
 	numCheckpoints := len(checkpoints)
 	if numCheckpoints == 0 {
+		// No checkpoints.
 		return nil, nil
 	}
 
@@ -260,11 +233,6 @@ func isNonstandardTransaction(tx *btcutil.Tx) bool {
 func (b *BlockChain) IsCheckpointCandidate(block *btcutil.Block) (bool, error) {
 	b.chainLock.RLock()
 	defer b.chainLock.RUnlock()
-
-	// Checkpoints must be enabled.
-	if b.noCheckpoints {
-		return false, fmt.Errorf("checkpoints are disabled")
-	}
 
 	var isCandidate bool
 	err := b.db.View(func(dbTx database.Tx) error {

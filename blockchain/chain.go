@@ -158,6 +158,7 @@ type BlockChain struct {
 	// The following fields are set when the instance is created and can't
 	// be changed afterwards, so there is no need to protect them with a
 	// separate mutex.
+	checkpoints         []chaincfg.Checkpoint
 	checkpointsByHeight map[int32]*chaincfg.Checkpoint
 	db                  database.DB
 	chainParams         *chaincfg.Params
@@ -188,8 +189,7 @@ type BlockChain struct {
 
 	// These fields are configuration parameters that can be toggled at
 	// runtime.  They are protected by the chain lock.
-	noVerify      bool
-	noCheckpoints bool
+	noVerify bool
 
 	// These fields are related to the memory block index.  They are
 	// protected by the chain lock.
@@ -1569,7 +1569,7 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, fla
 func (b *BlockChain) isCurrent() bool {
 	// Not current if the latest main (best) chain height is before the
 	// latest known good checkpoint (when checkpoints are enabled).
-	checkpoint := b.latestCheckpoint()
+	checkpoint := b.LatestCheckpoint()
 	if checkpoint != nil && b.bestNode.height < checkpoint.Height {
 		return false
 	}
@@ -1640,6 +1640,12 @@ type Config struct {
 	// This field is required.
 	ChainParams *chaincfg.Params
 
+	// Checkpoints hold caller-defined checkpoints that should be added to the
+	// default checkpoints in ChainParams. Checkpoints must be sorted by height.
+	//
+	// This field can be nil if the caller did not specify any checkpoints.
+	Checkpoints []chaincfg.Checkpoint
+
 	// TimeSource defines the median time source to use for things such as
 	// block processing and determining whether or not the chain is current.
 	//
@@ -1688,20 +1694,21 @@ func New(config *Config) (*BlockChain, error) {
 	}
 
 	// Generate a checkpoint by height map from the provided checkpoints.
-	params := config.ChainParams
 	var checkpointsByHeight map[int32]*chaincfg.Checkpoint
-	if len(params.Checkpoints) > 0 {
+	if len(config.Checkpoints) > 0 {
 		checkpointsByHeight = make(map[int32]*chaincfg.Checkpoint)
-		for i := range params.Checkpoints {
-			checkpoint := &params.Checkpoints[i]
+		for i := range config.Checkpoints {
+			checkpoint := &config.Checkpoints[i]
 			checkpointsByHeight[checkpoint.Height] = checkpoint
 		}
 	}
 
+	params := config.ChainParams
 	targetTimespan := int64(params.TargetTimespan)
 	targetTimePerBlock := int64(params.TargetTimePerBlock)
 	adjustmentFactor := params.RetargetAdjustmentFactor
 	b := BlockChain{
+		checkpoints:         config.Checkpoints,
 		checkpointsByHeight: checkpointsByHeight,
 		db:                  config.DB,
 		chainParams:         params,
