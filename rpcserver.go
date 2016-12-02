@@ -1082,6 +1082,7 @@ func handleGetBlock(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 	blockReply := btcjson.GetBlockVerboseResult{
 		Hash:          c.Hash,
 		Version:       blockHeader.Version,
+		VersionHex:    fmt.Sprintf("%08x", blockHeader.Version),
 		MerkleRoot:    blockHeader.MerkleRoot.String(),
 		PreviousHash:  blockHeader.PrevBlock.String(),
 		Nonce:         blockHeader.Nonce,
@@ -1202,6 +1203,7 @@ func handleGetBlockHeader(s *rpcServer, cmd interface{}, closeChan <-chan struct
 		Confirmations: uint64(1 + best.Height - blockHeight),
 		Height:        blockHeight,
 		Version:       blockHeader.Version,
+		VersionHex:    fmt.Sprintf("%08x", blockHeader.Version),
 		MerkleRoot:    blockHeader.MerkleRoot.String(),
 		NextHash:      nextHashString,
 		PreviousHash:  blockHeader.PrevBlock.String(),
