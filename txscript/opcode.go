@@ -1117,11 +1117,6 @@ func opcodeCheckSequenceVerify(op *parsedOpcode, vm *Engine) error {
 		return nil
 	}
 
-	if vm.tx.Version < 2 {
-		return fmt.Errorf("invalid transaction version: %d",
-			vm.tx.Version)
-	}
-
 	// The current transaction sequence is a uint32 resulting in a maximum
 	// sequence of 2^32-1.  However, scriptNums are signed and therefore a
 	// standard 4-byte scriptNum would only support up to a maximum of
@@ -1154,6 +1149,13 @@ func opcodeCheckSequenceVerify(op *parsedOpcode, vm *Engine) error {
 	// CHECKSEQUENCEVERIFY behaves as a NOP.
 	if sequence&int64(wire.SequenceLockTimeDisabled) != 0 {
 		return nil
+	}
+
+	// Transaction version numbers not high enough to trigger CSV rules must
+	// fail.
+	if vm.tx.Version < 2 {
+		return fmt.Errorf("invalid transaction version: %d",
+			vm.tx.Version)
 	}
 
 	// Sequence numbers with their most significant bit set are not
