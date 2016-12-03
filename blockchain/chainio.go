@@ -1905,6 +1905,15 @@ func (b *BlockChain) initThresholdCaches() error {
 			"change.  This might take a while...")
 	}
 
+	// Get the previous block node.  This function is used over simply
+	// accessing b.bestNode.parent directly as it will dynamically create
+	// previous block nodes as needed.  This helps allow only the pieces of
+	// the chain that are needed to remain in memory.
+	prevNode, err := b.getPrevNodeFromNode(b.bestNode)
+	if err != nil {
+		return err
+	}
+
 	// Initialize the warning and deployment caches by calculating the
 	// threshold state for each of them.  This will ensure the caches are
 	// populated and any states that needed to be recalculated due to
@@ -1912,7 +1921,7 @@ func (b *BlockChain) initThresholdCaches() error {
 	for bit := uint32(0); bit < vbNumBits; bit++ {
 		checker := bitConditionChecker{bit: bit, chain: b}
 		cache := &b.warningCaches[bit]
-		_, err := b.thresholdState(b.bestNode, checker, cache)
+		_, err := b.thresholdState(prevNode, checker, cache)
 		if err != nil {
 			return err
 		}
@@ -1921,7 +1930,7 @@ func (b *BlockChain) initThresholdCaches() error {
 		deployment := &b.chainParams.Deployments[id]
 		cache := &b.deploymentCaches[id]
 		checker := deploymentChecker{deployment: deployment, chain: b}
-		_, err := b.thresholdState(b.bestNode, checker, cache)
+		_, err := b.thresholdState(prevNode, checker, cache)
 		if err != nil {
 			return err
 		}

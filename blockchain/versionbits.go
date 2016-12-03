@@ -244,12 +244,21 @@ func (b *BlockChain) CalcNextBlockVersion() (int32, error) {
 //
 // This function MUST be called with the chain state lock held (for writes)
 func (b *BlockChain) warnUnknownRuleActivations(node *blockNode) error {
+	// Get the previous block node.  This function is used over simply
+	// accessing node.parent directly as it will dynamically create previous
+	// block nodes as needed.  This helps allow only the pieces of the chain
+	// that are needed to remain in memory.
+	prevNode, err := b.getPrevNodeFromNode(node)
+	if err != nil {
+		return err
+	}
+
 	// Warn if any unknown new rules are either about to activate or have
 	// already been activated.
 	for bit := uint32(0); bit < vbNumBits; bit++ {
 		checker := bitConditionChecker{bit: bit, chain: b}
 		cache := &b.warningCaches[bit]
-		state, err := b.thresholdState(node, checker, cache)
+		state, err := b.thresholdState(prevNode, checker, cache)
 		if err != nil {
 			return err
 		}

@@ -141,9 +141,9 @@ func newThresholdCaches(numCaches uint32) []thresholdStateCache {
 	return caches
 }
 
-// thresholdState returns the current rule change threshold state for the given
-// node and deployment ID.  The cache is used to ensure the threshold states for
-// previous windows are only calculated once.
+// thresholdState returns the current rule change threshold state for the block
+// AFTER the given node and deployment ID.  The cache is used to ensure the
+// threshold states for previous windows are only calculated once.
 //
 // This function MUST be called with the chain state lock held (for writes).
 func (b *BlockChain) thresholdState(prevNode *blockNode, checker thresholdConditionChecker, cache *thresholdStateCache) (ThresholdState, error) {
@@ -305,7 +305,7 @@ func (b *BlockChain) thresholdState(prevNode *blockNode, checker thresholdCondit
 }
 
 // ThresholdState returns the current rule change threshold state of the given
-// deployment ID for the end of the current best chain.
+// deployment ID for the block AFTER then end of the current best chain.
 //
 // This function is safe for concurrent access.
 func (b *BlockChain) ThresholdState(deploymentID uint32) (ThresholdState, error) {
