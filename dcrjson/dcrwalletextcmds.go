@@ -416,6 +416,11 @@ func NewRedeemMultiSigOutsCmd(from string, to *string,
 	}
 }
 
+// RescanWalletCmd describes the rescanwallet JSON-RPC request and parameters.
+type RescanWalletCmd struct {
+	BeginHeight *int `jsonrpcdefault:"0"`
+}
+
 // SendToMultiSigCmd is a type handling custom marshaling and
 // unmarshaling of sendtomultisig JSON RPC commands.
 type SendToMultiSigCmd struct {
@@ -659,6 +664,7 @@ func init() {
 	MustRegisterCmd("purchaseticket", (*PurchaseTicketCmd)(nil), flags)
 	MustRegisterCmd("redeemmultisigout", (*RedeemMultiSigOutCmd)(nil), flags)
 	MustRegisterCmd("redeemmultisigouts", (*RedeemMultiSigOutsCmd)(nil), flags)
+	MustRegisterCmd("rescanwallet", (*RescanWalletCmd)(nil), flags)
 	MustRegisterCmd("sendtomultisig", (*SendToMultiSigCmd)(nil), flags)
 	MustRegisterCmd("sendtosstx", (*SendToSStxCmd)(nil), flags)
 	MustRegisterCmd("sendtossgen", (*SendToSSGenCmd)(nil), flags)
