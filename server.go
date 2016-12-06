@@ -65,6 +65,28 @@ var (
 	userAgentVersion = fmt.Sprintf("%d.%d.%d", appMajor, appMinor, appPatch)
 )
 
+// onionAddr implements the net.Addr interface and represents a tor address.
+type onionAddr struct {
+	addr string
+}
+
+// String returns the onion address.
+//
+// This is part of the net.Addr interface.
+func (oa *onionAddr) String() string {
+	return oa.addr
+}
+
+// Network returns "onion".
+//
+// This is part of the net.Addr interface.
+func (oa *onionAddr) Network() string {
+	return "onion"
+}
+
+// Ensure onionAddr implements the net.Addr interface.
+var _ net.Addr = (*onionAddr)(nil)
+
 // broadcastMsg provides the ability to house a bitcoin message to be broadcast
 // to all connected peers except specified excluded peers.
 type broadcastMsg struct {
@@ -2469,13 +2491,13 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 		permanentPeers = cfg.AddPeers
 	}
 	for _, addr := range permanentPeers {
-		tcpAddr, err := addrStringToNetAddr(addr)
+		netAddr, err := addrStringToNetAddr(addr)
 		if err != nil {
 			return nil, err
 		}
 
 		go s.connManager.Connect(&connmgr.ConnReq{
-			Addr:      tcpAddr,
+			Addr:      netAddr,
 			Permanent: true,
 		})
 	}
@@ -2499,27 +2521,44 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 
 // addrStringToNetAddr takes an address in the form of 'host:port' and returns
 // a net.Addr which maps to the original address with any host names resolved
-// to IP addresses.
+// to IP addresses.  It also handles tor addresses properly by returning a
+// net.Addr that encapsulates the address.
 func addrStringToNetAddr(addr string) (net.Addr, error) {
 	host, strPort, err := net.SplitHostPort(addr)
 	if err != nil {
 		return nil, err
 	}
 
+	port, err := strconv.Atoi(strPort)
+	if err != nil {
+		return nil, err
+	}
+
+	// Skip if host is already an IP address.
+	if ip := net.ParseIP(host); ip != nil {
+		return &net.TCPAddr{
+			IP:   ip,
+			Port: port,
+		}, nil
+	}
+
+	// Tor addresses cannot be resolved to an IP, so just return an onion
+	// address instead.
+	if strings.HasSuffix(host, ".onion") {
+		if cfg.NoOnion {
+			return nil, errors.New("tor has been disabled")
+		}
+
+		return &onionAddr{addr: addr}, nil
+	}
+
 	// Attempt to look up an IP address associated with the parsed host.
-	// The btcdLookup function will transparently handle performing the
-	// lookup over Tor if necessary.
 	ips, err := btcdLookup(host)
 	if err != nil {
 		return nil, err
 	}
 	if len(ips) == 0 {
 		return nil, fmt.Errorf("no addresses found for %s", host)
-	}
-
-	port, err := strconv.Atoi(strPort)
-	if err != nil {
-		return nil, err
 	}
 
 	return &net.TCPAddr{

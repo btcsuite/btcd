@@ -919,18 +919,24 @@ func handleGetAddedNodeInfo(s *rpcServer, cmd interface{}, closeChan <-chan stru
 			host = peer.Addr()
 		}
 
-		// Do a DNS lookup for the address.  If the lookup fails, just
-		// use the host.
 		var ipList []string
-		ips, err := btcdLookup(host)
-		if err == nil {
+		switch {
+		case net.ParseIP(host) != nil, strings.HasSuffix(host, ".onion"):
+			ipList = make([]string, 1)
+			ipList[0] = host
+		default:
+			// Do a DNS lookup for the address.  If the lookup fails, just
+			// use the host.
+			ips, err := btcdLookup(host)
+			if err != nil {
+				ipList = make([]string, 1)
+				ipList[0] = host
+				break
+			}
 			ipList = make([]string, 0, len(ips))
 			for _, ip := range ips {
 				ipList = append(ipList, ip.String())
 			}
-		} else {
-			ipList = make([]string, 1)
-			ipList[0] = host
 		}
 
 		// Add the addresses and connection info to the result.
