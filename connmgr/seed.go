@@ -50,14 +50,13 @@ func SeedFromDNS(chainParams *chaincfg.Params, lookupFn LookupFunc, seedFn OnSee
 			// if this errors then we have *real* problems
 			intPort, _ := strconv.Atoi(chainParams.DefaultPort)
 			for i, peer := range seedpeers {
-				addresses[i] = new(wire.NetAddress)
-				addresses[i].SetAddress(peer, uint16(intPort))
-				// bitcoind seeds with addresses from
-				// a time randomly selected between 3
-				// and 7 days ago.
-				addresses[i].Timestamp = time.Now().Add(-1 *
-					time.Second * time.Duration(secondsIn3Days+
-					randSource.Int31n(secondsIn4Days)))
+				addresses[i] = wire.NewNetAddressTimestamp(
+					// bitcoind seeds with addresses from
+					// a time randomly selected between 3
+					// and 7 days ago.
+					time.Now().Add(-1*time.Second*time.Duration(secondsIn3Days+
+						randSource.Int31n(secondsIn4Days))),
+					0, peer, uint16(intPort))
 			}
 
 			seedFn(addresses)

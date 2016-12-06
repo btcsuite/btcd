@@ -60,20 +60,21 @@ func (na *NetAddress) AddService(service ServiceFlag) {
 	na.Services |= service
 }
 
-// SetAddress is a convenience function to set the IP address and port in one
-// call.
-func (na *NetAddress) SetAddress(ip net.IP, port uint16) {
-	na.IP = ip
-	na.Port = port
-}
-
 // NewNetAddressIPPort returns a new NetAddress using the provided IP, port, and
 // supported services with defaults for the remaining fields.
 func NewNetAddressIPPort(ip net.IP, port uint16, services ServiceFlag) *NetAddress {
+	return NewNetAddressTimestamp(time.Now(), services, ip, port)
+}
+
+// NewNetAddressTimestamp returns a new NetAddress using the provided
+// timestamp, IP, port, and supported services. The timestamp is rounded to
+// single second precision.
+func NewNetAddressTimestamp(
+	timestamp time.Time, services ServiceFlag, ip net.IP, port uint16) *NetAddress {
 	// Limit the timestamp to one second precision since the protocol
 	// doesn't support better.
 	na := NetAddress{
-		Timestamp: time.Unix(time.Now().Unix(), 0),
+		Timestamp: time.Unix(timestamp.Unix(), 0),
 		Services:  services,
 		IP:        ip,
 		Port:      port,
@@ -100,7 +101,6 @@ func NewNetAddress(addr net.Addr, services ServiceFlag) (*NetAddress, error) {
 // version and whether or not the timestamp is included per ts.  Some messages
 // like version do not include the timestamp.
 func readNetAddress(r io.Reader, pver uint32, na *NetAddress, ts bool) error {
-	var services ServiceFlag
 	var ip [16]byte
 
 	// NOTE: The decred protocol uses a uint32 for the timestamp so it will
@@ -113,7 +113,7 @@ func readNetAddress(r io.Reader, pver uint32, na *NetAddress, ts bool) error {
 		}
 	}
 
-	err := readElements(r, &services, &ip)
+	err := readElements(r, &na.Services, &ip)
 	if err != nil {
 		return err
 	}
@@ -123,8 +123,12 @@ func readNetAddress(r io.Reader, pver uint32, na *NetAddress, ts bool) error {
 		return err
 	}
 
-	na.Services = services
-	na.SetAddress(net.IP(ip[:]), port)
+	*na = NetAddress{
+		Timestamp: na.Timestamp,
+		Services:  na.Services,
+		IP:        net.IP(ip[:]),
+		Port:      port,
+	}
 	return nil
 }
 

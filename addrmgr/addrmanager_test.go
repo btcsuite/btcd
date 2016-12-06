@@ -94,12 +94,7 @@ func addNaTests() {
 
 func addNaTest(ip string, port uint16, want string) {
 	nip := net.ParseIP(ip)
-	na := wire.NetAddress{
-		Timestamp: time.Now(),
-		Services:  wire.SFNodeNetwork,
-		IP:        nip,
-		Port:      port,
-	}
+	na := *wire.NewNetAddressIPPort(nip, port, wire.SFNodeNetwork)
 	test := naTest{na, want}
 	naTests = append(naTests, test)
 }
@@ -246,7 +241,8 @@ func TestConnected(t *testing.T) {
 	}
 	ka := n.GetAddress()
 	na := ka.NetAddress()
-	na.Timestamp = time.Now().Add(time.Hour * -1) // make it an hour ago
+	// make it an hour ago
+	na.Timestamp = time.Unix(time.Now().Add(time.Hour*-1).Unix(), 0)
 
 	n.Connected(na)
 
@@ -263,7 +259,6 @@ func TestNeedMoreAddresses(t *testing.T) {
 		t.Errorf("Expected that we need more addresses")
 	}
 	addrs := make([]*wire.NetAddress, addrsToAdd)
-	now := time.Now()
 
 	var err error
 	for i := 0; i < addrsToAdd; i++ {
@@ -274,12 +269,7 @@ func TestNeedMoreAddresses(t *testing.T) {
 		}
 	}
 
-	srcAddr := &wire.NetAddress{
-		Timestamp: now,
-		Services:  0,
-		IP:        net.IPv4(173, 144, 173, 111),
-		Port:      8333,
-	}
+	srcAddr := wire.NewNetAddressIPPort(net.IPv4(173, 144, 173, 111), 8333, 0)
 
 	n.AddAddresses(addrs, srcAddr)
 	numAddrs := n.NumAddresses()
@@ -297,7 +287,6 @@ func TestGood(t *testing.T) {
 	n := addrmgr.New("testgood", lookupFunc)
 	addrsToAdd := 64 * 64
 	addrs := make([]*wire.NetAddress, addrsToAdd)
-	now := time.Now()
 
 	var err error
 	for i := 0; i < addrsToAdd; i++ {
@@ -308,12 +297,7 @@ func TestGood(t *testing.T) {
 		}
 	}
 
-	srcAddr := &wire.NetAddress{
-		Timestamp: now,
-		Services:  0,
-		IP:        net.IPv4(173, 144, 173, 111),
-		Port:      8333,
-	}
+	srcAddr := wire.NewNetAddressIPPort(net.IPv4(173, 144, 173, 111), 8333, 0)
 
 	n.AddAddresses(addrs, srcAddr)
 	for _, addr := range addrs {

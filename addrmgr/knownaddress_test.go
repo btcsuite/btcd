@@ -15,33 +15,34 @@ import (
 )
 
 func TestChance(t *testing.T) {
+	now := time.Unix(time.Now().Unix(), 0)
 	var tests = []struct {
 		addr     *addrmgr.KnownAddress
 		expected float64
 	}{
 		{
 			//Test normal case
-			addrmgr.TstNewKnownAddress(&wire.NetAddress{Timestamp: time.Now().Add(-35 * time.Second)},
+			addrmgr.TstNewKnownAddress(&wire.NetAddress{Timestamp: now.Add(-35 * time.Second)},
 				0, time.Now().Add(-30*time.Minute), time.Now(), false, 0),
 			1.0,
 		}, {
 			//Test case in which lastseen < 0
-			addrmgr.TstNewKnownAddress(&wire.NetAddress{Timestamp: time.Now().Add(20 * time.Second)},
+			addrmgr.TstNewKnownAddress(&wire.NetAddress{Timestamp: now.Add(20 * time.Second)},
 				0, time.Now().Add(-30*time.Minute), time.Now(), false, 0),
 			1.0,
 		}, {
 			//Test case in which lastattempt < 0
-			addrmgr.TstNewKnownAddress(&wire.NetAddress{Timestamp: time.Now().Add(-35 * time.Second)},
+			addrmgr.TstNewKnownAddress(&wire.NetAddress{Timestamp: now.Add(-35 * time.Second)},
 				0, time.Now().Add(30*time.Minute), time.Now(), false, 0),
 			1.0 * .01,
 		}, {
 			//Test case in which lastattempt < ten minutes
-			addrmgr.TstNewKnownAddress(&wire.NetAddress{Timestamp: time.Now().Add(-35 * time.Second)},
+			addrmgr.TstNewKnownAddress(&wire.NetAddress{Timestamp: now.Add(-35 * time.Second)},
 				0, time.Now().Add(-5*time.Minute), time.Now(), false, 0),
 			1.0 * .01,
 		}, {
 			//Test case with several failed attempts.
-			addrmgr.TstNewKnownAddress(&wire.NetAddress{Timestamp: time.Now().Add(-35 * time.Second)},
+			addrmgr.TstNewKnownAddress(&wire.NetAddress{Timestamp: now.Add(-35 * time.Second)},
 				2, time.Now().Add(-30*time.Minute), time.Now(), false, 0),
 			1 / 1.5 / 1.5,
 		},
@@ -57,12 +58,13 @@ func TestChance(t *testing.T) {
 }
 
 func TestIsBad(t *testing.T) {
-	future := time.Now().Add(35 * time.Minute)
-	monthOld := time.Now().Add(-43 * time.Hour * 24)
-	secondsOld := time.Now().Add(-2 * time.Second)
-	minutesOld := time.Now().Add(-27 * time.Minute)
-	hoursOld := time.Now().Add(-5 * time.Hour)
-	zeroTime, _ := time.Parse("Jan 1, 1970 at 0:00am (GMT)", "Jan 1, 1970 at 0:00am (GMT)")
+	now := time.Unix(time.Now().Unix(), 0)
+	future := now.Add(35 * time.Minute)
+	monthOld := now.Add(-43 * time.Hour * 24)
+	secondsOld := now.Add(-2 * time.Second)
+	minutesOld := now.Add(-27 * time.Minute)
+	hoursOld := now.Add(-5 * time.Hour)
+	zeroTime := time.Time{}
 
 	futureNa := &wire.NetAddress{Timestamp: future}
 	minutesOldNa := &wire.NetAddress{Timestamp: minutesOld}
