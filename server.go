@@ -2434,8 +2434,8 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 				}
 
 				// allow nondefault ports after 50 failed tries.
-				if fmt.Sprintf("%d", addr.NetAddress().Port) !=
-					activeNetParams.DefaultPort && tries < 50 {
+				if tries < 50 && fmt.Sprintf("%d", addr.NetAddress().Port) !=
+					activeNetParams.DefaultPort {
 					continue
 				}
 
