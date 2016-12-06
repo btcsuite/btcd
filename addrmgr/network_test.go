@@ -7,7 +7,6 @@ package addrmgr_test
 import (
 	"net"
 	"testing"
-	"time"
 
 	"github.com/btcsuite/btcd/addrmgr"
 	"github.com/btcsuite/btcd/wire"
@@ -40,12 +39,7 @@ func TestIPTypes(t *testing.T) {
 		rfc4193, rfc4380, rfc4843, rfc4862, rfc5737, rfc6052, rfc6145, rfc6598,
 		local, valid, routable bool) ipTest {
 		nip := net.ParseIP(ip)
-		na := wire.NetAddress{
-			Timestamp: time.Now(),
-			Services:  wire.SFNodeNetwork,
-			IP:        nip,
-			Port:      8333,
-		}
+		na := *wire.NewNetAddressIPPort(nip, 8333, wire.SFNodeNetwork)
 		test := ipTest{na, rfc1918, rfc2544, rfc3849, rfc3927, rfc3964, rfc4193, rfc4380,
 			rfc4843, rfc4862, rfc5737, rfc6052, rfc6145, rfc6598, local, valid, routable}
 		return test
@@ -198,12 +192,7 @@ func TestGroupKey(t *testing.T) {
 
 	for i, test := range tests {
 		nip := net.ParseIP(test.ip)
-		na := wire.NetAddress{
-			Timestamp: time.Now(),
-			Services:  wire.SFNodeNetwork,
-			IP:        nip,
-			Port:      8333,
-		}
+		na := *wire.NewNetAddressIPPort(nip, 8333, wire.SFNodeNetwork)
 		if key := addrmgr.GroupKey(&na); key != test.expected {
 			t.Errorf("TestGroupKey #%d (%s): unexpected group key "+
 				"- got '%s', want '%s'", i, test.name,

@@ -596,18 +596,16 @@ func (a *AddrManager) AddAddressByIP(addrIP string) error {
 		return err
 	}
 	// Put it in wire.Netaddress
-	var na wire.NetAddress
-	na.Timestamp = time.Now()
-	na.IP = net.ParseIP(addr)
-	if na.IP == nil {
+	ip := net.ParseIP(addr)
+	if ip == nil {
 		return fmt.Errorf("invalid ip address %s", addr)
 	}
 	port, err := strconv.ParseUint(portStr, 10, 0)
 	if err != nil {
 		return fmt.Errorf("invalid port %s: %v", portStr, err)
 	}
-	na.Port = uint16(port)
-	a.AddAddress(&na, &na) // XXX use correct src address
+	na := wire.NewNetAddressIPPort(ip, uint16(port), 0)
+	a.AddAddress(na, na) // XXX use correct src address
 	return nil
 }
 
@@ -1069,16 +1067,13 @@ func (a *AddrManager) GetBestLocalAddress(remoteAddr *wire.NetAddress) *wire.Net
 			remoteAddr.Port)
 
 		// Send something unroutable if nothing suitable.
-		bestAddress = &wire.NetAddress{
-			Timestamp: time.Now(),
-			Services:  wire.SFNodeNetwork,
-			Port:      0,
-		}
+		var ip net.IP
 		if !IsIPv4(remoteAddr) && !IsOnionCatTor(remoteAddr) {
-			bestAddress.IP = net.IPv6zero
+			ip = net.IPv6zero
 		} else {
-			bestAddress.IP = net.IPv4zero
+			ip = net.IPv4zero
 		}
+		bestAddress = wire.NewNetAddressIPPort(ip, 0, wire.SFNodeNetwork)
 	}
 
 	return bestAddress
