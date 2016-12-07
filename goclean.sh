@@ -22,7 +22,7 @@ test -z "$(gometalinter --disable-all \
 --enable=unconvert \
 --enable=goimports \
 --deadline=45s ./... | tee /dev/stderr)"
-env GORACE="halt_on_error=1" go test -v -race ./...
+env GORACE="halt_on_error=1" go test -race ./...
 
 # Run test coverage on each subdirectories and merge the coverage profile.
 
