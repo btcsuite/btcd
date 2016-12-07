@@ -22,17 +22,16 @@ import (
 	"time"
 )
 
-// NewTLSCertPair returns a new PEM-encoded x.509 certificate pair
-// based on a 384-bit ECDSA private key.  The machine's local interface
-// addresses and all variants of IPv4 and IPv6 localhost are included as
-// valid IP addresses.
-func NewTLSCertPair(organization string, validUntil time.Time, extraHosts []string) (cert, key []byte, err error) {
+// NewTLSCertPair returns a new PEM-encoded x.509 certificate pair.  The
+// machine's local interface addresses and all variants of IPv4 and IPv6
+// localhost are included as valid IP addresses.
+func NewTLSCertPair(curve elliptic.Curve, organization string, validUntil time.Time, extraHosts []string) (cert, key []byte, err error) {
 	now := time.Now()
 	if validUntil.Before(now) {
 		return nil, nil, errors.New("validUntil would create an already-expired certificate")
 	}
 
-	priv, err := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
+	priv, err := ecdsa.GenerateKey(curve, rand.Reader)
 	if err != nil {
 		return nil, nil, err
 	}
