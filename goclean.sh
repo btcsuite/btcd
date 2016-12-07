@@ -11,7 +11,7 @@ set -ex
 # Automatic checks
 test -z "$(go fmt $(glide novendor) | tee /dev/stderr)"
 test -z "$(go vet $(glide novendor) 2>&1 | tee /dev/stderr)"
-env GORACE="halt_on_error=1" go test -v -race $(glide novendor)
+env GORACE="halt_on_error=1" go test -race $(glide novendor)
 
 # Run test coverage on each subdirectories and merge the coverage profile.
 
