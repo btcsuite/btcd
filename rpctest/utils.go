@@ -140,7 +140,7 @@ func TearDownAll() error {
 	defer harnessStateMtx.Unlock()
 
 	for _, harness := range testInstances {
-		if err := harness.TearDown(); err != nil {
+		if err := harness.tearDown(); err != nil {
 			return err
 		}
 	}

@@ -255,12 +255,11 @@ func (h *Harness) SetUp(createTestChain bool, numMatureOutputs uint32) error {
 	return nil
 }
 
-// TearDown stops the running rpc test instance. All created processes are
+// tearDown stops the running rpc test instance.  All created processes are
 // killed, and temporary directories removed.
 //
-// NOTE: This method and SetUp should always be called from the same goroutine
-// as they are not concurrent safe.
-func (h *Harness) TearDown() error {
+// This function MUST be called with the harness state mutex held (for writes).
+func (h *Harness) tearDown() error {
 	if h.Node != nil {
 		h.Node.Shutdown()
 	}
@@ -276,6 +275,18 @@ func (h *Harness) TearDown() error {
 	delete(testInstances, h.testNodeDir)
 
 	return nil
+}
+
+// TearDown stops the running rpc test instance. All created processes are
+// killed, and temporary directories removed.
+//
+// NOTE: This method and SetUp should always be called from the same goroutine
+// as they are not concurrent safe.
+func (h *Harness) TearDown() error {
+	harnessStateMtx.Lock()
+	defer harnessStateMtx.Unlock()
+
+	return h.tearDown()
 }
 
 // connectRPCClient attempts to establish an RPC connection to the created btcd
