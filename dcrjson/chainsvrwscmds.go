@@ -106,7 +106,7 @@ func NewStopNotifyNewTransactionsCmd() *StopNotifyNewTransactionsCmd {
 
 // RescanCmd defines the rescan JSON-RPC command.
 type RescanCmd struct {
-	// Concatinated block hashes in non-byte-reversed hex encoding.  Must
+	// Concatenated block hashes in non-byte-reversed hex encoding.  Must
 	// have length evenly divisible by 2*chainhash.HashSize.
 	BlockHashes string
 }
