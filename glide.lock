@@ -1,5 +1,5 @@
 hash: f31381b9d7836c3acfccda809b8b279691b38d97517933b4f10e97f8ec468d2b
-updated: 2016-11-16T12:37:17.0883016-06:00
+updated: 2016-12-07T14:45:59.225417-05:00
 imports:
 - name: github.com/btcsuite/btclog
   version: 73889fb79bd687870312b6e40effcecffbd57d30
@@ -53,7 +53,7 @@ imports:
 - name: github.com/decred/dcrrpcclient
   version: fc4826bb281f5b68af4cf95c20d8664419b4cc08
 - name: github.com/decred/dcrutil
-  version: 883bcecb86cda037f14a22ef923a5ea79f751512
+  version: b107d74547385caeaba836a213b9b6ffbd3d8096
   subpackages:
   - base58
   - bloom
