@@ -21,7 +21,7 @@ test -z "$(gometalinter --disable-all \
 --enable=gosimple \
 --enable=unconvert \
 --deadline=4m $(glide novendor) | grep -v 'ALL_CAPS\|OP_' 2>&1 | tee /dev/stderr)"
-env GORACE="halt_on_error=1" go test -v -race -tags rpctest $(glide novendor)
+env GORACE="halt_on_error=1" go test -race -tags rpctest $(glide novendor)
 
 # Run test coverage on each subdirectories and merge the coverage profile.
 
