@@ -15,7 +15,7 @@ import (
 
 	"github.com/btcsuite/btcd/btcjson"
 	"github.com/btcsuite/btcutil"
-	flags "github.com/btcsuite/go-flags"
+	flags "github.com/jessevdk/go-flags"
 )
 
 const (
