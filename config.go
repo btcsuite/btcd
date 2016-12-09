@@ -26,8 +26,8 @@ import (
 	"github.com/btcsuite/btcd/mempool"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
-	flags "github.com/btcsuite/go-flags"
 	"github.com/btcsuite/go-socks/socks"
+	flags "github.com/jessevdk/go-flags"
 )
 
 const (

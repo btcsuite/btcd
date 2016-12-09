@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcutil"
-	flags "github.com/btcsuite/go-flags"
+	flags "github.com/jessevdk/go-flags"
 )
 
 type config struct {

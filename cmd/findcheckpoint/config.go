@@ -14,7 +14,7 @@ import (
 	_ "github.com/btcsuite/btcd/database/ffldb"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
-	flags "github.com/btcsuite/go-flags"
+	flags "github.com/jessevdk/go-flags"
 )
 
 const (
