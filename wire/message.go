@@ -51,6 +51,7 @@ const (
 	CmdReject      = "reject"
 	CmdSendHeaders = "sendheaders"
 	CmdFeeFilter   = "feefilter"
+	CmdGetCBFilter = "getcbfilter"
 )
 
 // MessageEncoding represents the wire message encoding format to be used.
@@ -155,6 +156,9 @@ func makeEmptyMessage(command string) (Message, error) {
 
 	case CmdFeeFilter:
 		msg = &MsgFeeFilter{}
+
+	case CmdGetCBFilter:
+		msg = &MsgGetCBFilter{}
 
 	default:
 		return nil, fmt.Errorf("unhandled command [%s]", command)
