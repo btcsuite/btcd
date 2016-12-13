@@ -308,7 +308,7 @@ func rpcDecodeHexError(gotHex string) *btcjson.RPCError {
 }
 
 // rpcNoTxInfoError is a convenience function for returning a nicely formatted
-// RPC error which indiactes there is no information available for the provided
+// RPC error which indicates there is no information available for the provided
 // transaction hash.
 func rpcNoTxInfoError(txHash *chainhash.Hash) *btcjson.RPCError {
 	return btcjson.NewRPCError(btcjson.ErrRPCNoTxInfo,
