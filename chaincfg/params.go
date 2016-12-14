@@ -349,6 +349,7 @@ var MainNetParams = Params{
 		{60720, newHashFromStr("0000000000000a64475d68ffb9ad89a3d147c0f5138db26b40da9d19d0004117")},
 		{65270, newHashFromStr("0000000000000021f107601962789b201f0a0cbb98ac5f8c12b93d94e795b441")},
 		{75380, newHashFromStr("0000000000000e7d13cfc85806aa720fe3670980f5b7d33253e4f41985558372")},
+		{85410, newHashFromStr("00000000000013ec928074bea6eac9754aa614c7acb20edf300f18b0cd122692")},
 	},
 
 	// Enforce current block version once majority of the network has
@@ -455,6 +456,7 @@ var TestNetParams = Params{
 		{162230, newHashFromStr("0000000006741ab11e44af3cebc1c52905f873b4e059a1013da63bc076a3edbb")},
 		{173750, newHashFromStr("0000000000fe0a2f55589d8b75502f8adc26be95971a16d12d7ea65da5a0a507")},
 		{197920, newHashFromStr("000000000174a97eed678549df66b4025a8ff4b5034e7b0fdc63d1112d4716ab")},
+		{223050, newHashFromStr("00000000065827e0fd67067f2268f14890a1b7e863b1fa7dee627a3d4b7d33b5")},
 	},
 
 	// Enforce current block version once majority of the network has
