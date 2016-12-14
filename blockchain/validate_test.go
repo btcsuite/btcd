@@ -2090,7 +2090,7 @@ func TestCheckBlockHeaderContext(t *testing.T) {
 		block.Height(), nil, nil, nil)
 	err = chain.TstCheckBlockHeaderContext(&block.MsgBlock().Header, newNode, blockchain.BFNone)
 	if err == nil {
-		t.Fatalf("Should fail due to bad diff in newNode%v\n", err)
+		t.Fatalf("Should fail due to bad diff in newNode\n")
 		return
 	}
 }
