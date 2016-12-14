@@ -2082,6 +2082,17 @@ func TestCheckBlockHeaderContext(t *testing.T) {
 		t.Fatalf("genesisblock should pass just by definition: %v\n", err)
 		return
 	}
+
+	// Test failing checkBlockHeaderContext when calcNextRequiredDifficulty
+	// fails.
+	block := dcrutil.NewBlock(&badBlock)
+	newNode := blockchain.TstNewBlockNode(&block.MsgBlock().Header, block.Hash(),
+		block.Height(), nil, nil, nil)
+	err = chain.TstCheckBlockHeaderContext(&block.MsgBlock().Header, newNode, blockchain.BFNone)
+	if err == nil {
+		t.Fatalf("Should fail due to bad diff in newNode%v\n", err)
+		return
+	}
 }
 
 // simNetPowLimit is the highest proof of work value a Decred block

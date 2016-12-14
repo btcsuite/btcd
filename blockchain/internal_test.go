@@ -17,6 +17,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/wire"
 )
 
@@ -44,4 +45,10 @@ var TstDeserializeUtxoEntry = deserializeUtxoEntry
 // function available to the test package.
 func (b *BlockChain) TstCheckBlockHeaderContext(header *wire.BlockHeader, prevNode *blockNode, flags BehaviorFlags) error {
 	return b.checkBlockHeaderContext(header, prevNode, flags)
+}
+
+// TstNewBlockNode makes the internal newBlockNode function available to the
+// test package.
+func TstNewBlockNode(blockHeader *wire.BlockHeader, blockHash *chainhash.Hash, height int64, ticketsSpent []chainhash.Hash, ticketsRevoked []chainhash.Hash, voterVersions []uint32) *blockNode {
+	return newBlockNode(blockHeader, blockHash, height, ticketsSpent, ticketsRevoked, voterVersions)
 }
