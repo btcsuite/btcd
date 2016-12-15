@@ -1,4 +1,5 @@
-// Copyright (c) 2014 The btcsuite developers
+// Copyright (c) 2014-2016 The btcsuite developers
+// Copyright (c) 2015-2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -134,6 +135,17 @@ func TestBtcdExtCmds(t *testing.T) {
 			},
 			marshalled:   `{"jsonrpc":"1.0","method":"getcurrentnet","params":[],"id":1}`,
 			unmarshalled: &btcjson.GetCurrentNetCmd{},
+		},
+		{
+			name: "version",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("version")
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewVersionCmd()
+			},
+			marshalled:   `{"jsonrpc":"1.0","method":"version","params":[],"id":1}`,
+			unmarshalled: &btcjson.VersionCmd{},
 		},
 	}
 

@@ -1,4 +1,5 @@
-// Copyright (c) 2015 The btcsuite developers
+// Copyright (c) 2015-2016 The btcsuite developers
+// Copyright (c) 2015-2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -605,6 +606,20 @@ var helpDescsEnUS = map[string]string{
 	"rescan-addresses":  "List of addresses to include in the rescan",
 	"rescan-outpoints":  "List of transaction outpoints to include in the rescan",
 	"rescan-endblock":   "Hash of final block to rescan",
+
+	// Version help.
+	"version--synopsis":       "Returns the JSON-RPC API version (semver)",
+	"version--result0--desc":  "Version objects keyed by the program or API name",
+	"version--result0--key":   "Program or API name",
+	"version--result0--value": "Object containing the semantic version",
+
+	// VersionResult help.
+	"versionresult-versionstring": "The JSON-RPC API version (semver)",
+	"versionresult-major":         "The major component of the JSON-RPC API version",
+	"versionresult-minor":         "The minor component of the JSON-RPC API version",
+	"versionresult-patch":         "The patch component of the JSON-RPC API version",
+	"versionresult-prerelease":    "Prerelease info about the current build",
+	"versionresult-buildmetadata": "Metadata about the current build",
 }
 
 // rpcResultTypes specifies the result types that each RPC command can return.
@@ -652,6 +667,7 @@ var rpcResultTypes = map[string][]interface{}{
 	"validateaddress":       {(*btcjson.ValidateAddressChainResult)(nil)},
 	"verifychain":           {(*bool)(nil)},
 	"verifymessage":         {(*bool)(nil)},
+	"version":               {(*map[string]btcjson.VersionResult)(nil)},
 
 	// Websocket commands.
 	"session":                   {(*btcjson.SessionResult)(nil)},

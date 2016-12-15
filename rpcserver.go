@@ -1,4 +1,5 @@
 // Copyright (c) 2013-2016 The btcsuite developers
+// Copyright (c) 2015-2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -40,6 +41,14 @@ import (
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/fastsha256"
 	"github.com/btcsuite/websocket"
+)
+
+// API version constants
+const (
+	jsonrpcSemverString = "1.0.0"
+	jsonrpcSemverMajor  = 1
+	jsonrpcSemverMinor  = 0
+	jsonrpcSemverPatch  = 0
 )
 
 const (
@@ -175,6 +184,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"validateaddress":       handleValidateAddress,
 	"verifychain":           handleVerifyChain,
 	"verifymessage":         handleVerifyMessage,
+	"version":               handleVersion,
 }
 
 // list of commands that we recognize, but for which btcd has no support because
@@ -271,6 +281,7 @@ var rpcLimited = map[string]struct{}{
 	"submitblock":           {},
 	"validateaddress":       {},
 	"verifymessage":         {},
+	"version":               {},
 }
 
 // builderScript is a convenience function which is used for hard-coded scripts
@@ -3787,6 +3798,22 @@ func handleVerifyMessage(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 
 	// Return boolean if addresses match.
 	return address.EncodeAddress() == c.Address, nil
+}
+
+// handleVersion implements the version command.
+//
+// NOTE: This is a btcsuite extension ported from
+// github.com/decred/dcrd.
+func handleVersion(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	result := map[string]btcjson.VersionResult{
+		"btcdjsonrpcapi": {
+			VersionString: jsonrpcSemverString,
+			Major:         jsonrpcSemverMajor,
+			Minor:         jsonrpcSemverMinor,
+			Patch:         jsonrpcSemverPatch,
+		},
+	}
+	return result, nil
 }
 
 // rpcServer holds the items the rpc server may need to access (config,

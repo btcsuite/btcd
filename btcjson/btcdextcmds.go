@@ -1,4 +1,5 @@
-// Copyright (c) 2014 The btcsuite developers
+// Copyright (c) 2014-2016 The btcsuite developers
+// Copyright (c) 2015-2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -89,6 +90,19 @@ func NewGetCurrentNetCmd() *GetCurrentNetCmd {
 	return &GetCurrentNetCmd{}
 }
 
+// VersionCmd defines the version JSON-RPC command.
+//
+// NOTE: This is a btcsuite extension ported from
+// github.com/decred/dcrd/dcrjson.
+type VersionCmd struct{}
+
+// NewVersionCmd returns a new instance which can be used to issue a JSON-RPC
+// version command.
+//
+// NOTE: This is a btcsuite extension ported from
+// github.com/decred/dcrd/dcrjson.
+func NewVersionCmd() *VersionCmd { return new(VersionCmd) }
+
 func init() {
 	// No special flags for commands in this file.
 	flags := UsageFlag(0)
@@ -98,4 +112,5 @@ func init() {
 	MustRegisterCmd("generate", (*GenerateCmd)(nil), flags)
 	MustRegisterCmd("getbestblock", (*GetBestBlockCmd)(nil), flags)
 	MustRegisterCmd("getcurrentnet", (*GetCurrentNetCmd)(nil), flags)
+	MustRegisterCmd("version", (*VersionCmd)(nil), flags)
 }
