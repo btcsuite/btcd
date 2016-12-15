@@ -1,4 +1,5 @@
-// Copyright (c) 2014-2015 The btcsuite developers
+// Copyright (c) 2014-2016 The btcsuite developers
+// Copyright (c) 2015-2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -347,4 +348,54 @@ func (c *Client) SessionAsync() FutureSessionResult {
 // NOTE: This is a btcsuite extension.
 func (c *Client) Session() (*btcjson.SessionResult, error) {
 	return c.SessionAsync().Receive()
+}
+
+// FutureVersionResult is a future promise to delivere the result of a version
+// RPC invocation (or an applicable error).
+//
+// NOTE: This is a btcsuite extension ported from
+// github.com/decred/dcrrpcclient.
+type FutureVersionResult chan *response
+
+// Receive waits for the response promised by the future and returns the version
+// result.
+//
+// NOTE: This is a btcsuite extension ported from
+// github.com/decred/dcrrpcclient.
+func (r FutureVersionResult) Receive() (map[string]btcjson.VersionResult,
+	error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal result as a version result object.
+	var vr map[string]btcjson.VersionResult
+	err = json.Unmarshal(res, &vr)
+	if err != nil {
+		return nil, err
+	}
+
+	return vr, nil
+}
+
+// VersionAsync returns an instance of a type that can be used to get the result
+// of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+//
+// See Version for the blocking version and more details.
+//
+// NOTE: This is a btcsuite extension ported from
+// github.com/decred/dcrrpcclient.
+func (c *Client) VersionAsync() FutureVersionResult {
+	cmd := btcjson.NewVersionCmd()
+	return c.sendCmd(cmd)
+}
+
+// Version returns information about the server's JSON-RPC API versions.
+//
+// NOTE: This is a btcsuite extension ported from
+// github.com/decred/dcrrpcclient.
+func (c *Client) Version() (map[string]btcjson.VersionResult, error) {
+	return c.VersionAsync().Receive()
 }
