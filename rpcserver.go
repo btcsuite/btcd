@@ -1,5 +1,5 @@
-// Copyright (c) 2013-2016 The btcsuite developers
-// Copyright (c) 2015-2016 The Decred developers
+// Copyright (c) 2013-2017 The btcsuite developers
+// Copyright (c) 2015-2017 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -45,9 +45,9 @@ import (
 
 // API version constants
 const (
-	jsonrpcSemverString = "1.0.0"
+	jsonrpcSemverString = "1.1.0"
 	jsonrpcSemverMajor  = 1
-	jsonrpcSemverMinor  = 0
+	jsonrpcSemverMinor  = 1
 	jsonrpcSemverPatch  = 0
 )
 
@@ -163,6 +163,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"getdifficulty":         handleGetDifficulty,
 	"getgenerate":           handleGetGenerate,
 	"gethashespersec":       handleGetHashesPerSec,
+	"getheaders":            handleGetHeaders,
 	"getinfo":               handleGetInfo,
 	"getmempoolinfo":        handleGetMempoolInfo,
 	"getmininginfo":         handleGetMiningInfo,
@@ -270,6 +271,7 @@ var rpcLimited = map[string]struct{}{
 	"getblockhash":          {},
 	"getcurrentnet":         {},
 	"getdifficulty":         {},
+	"getheaders":            {},
 	"getinfo":               {},
 	"getnettotals":          {},
 	"getnetworkhashps":      {},
@@ -2146,6 +2148,65 @@ func handleGetGenerate(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 // handleGetHashesPerSec implements the gethashespersec command.
 func handleGetHashesPerSec(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	return int64(s.server.cpuMiner.HashesPerSecond()), nil
+}
+
+// handleGetHeaders implements the getheaders command.
+//
+// NOTE: This is a btcsuite extension ported from
+// github.com/decred/dcrd.
+func handleGetHeaders(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	c := cmd.(*btcjson.GetHeadersCmd)
+	blockLocators := make([]*chainhash.Hash, len(c.BlockLocators))
+	for i := range c.BlockLocators {
+		blockLocator, err := chainhash.NewHashFromStr(c.BlockLocators[i])
+		if err != nil {
+			return nil, &btcjson.RPCError{
+				Code: btcjson.ErrRPCInvalidParameter,
+				Message: "Failed to decode block locator: " +
+					err.Error(),
+			}
+		}
+		blockLocators[i] = blockLocator
+	}
+	var hashStop chainhash.Hash
+	if c.HashStop != "" {
+		err := chainhash.Decode(&hashStop, c.HashStop)
+		if err != nil {
+			return nil, &btcjson.RPCError{
+				Code:    btcjson.ErrRPCInvalidParameter,
+				Message: "Failed to decode hashstop: " + err.Error(),
+			}
+		}
+	}
+	blockHashes, err := s.server.locateBlocks(blockLocators, &hashStop)
+	if err != nil {
+		return nil, &btcjson.RPCError{
+			Code: btcjson.ErrRPCDatabase,
+			Message: "Failed to fetch hashes of block " +
+				"headers: " + err.Error(),
+		}
+	}
+	blockHeaders, err := fetchHeaders(s.server.db, blockHashes)
+	if err != nil {
+		return nil, &btcjson.RPCError{
+			Code: btcjson.ErrRPCDatabase,
+			Message: "Failed to fetch headers of located blocks: " +
+				err.Error(),
+		}
+	}
+
+	hexBlockHeaders := make([]string, len(blockHeaders))
+	var buf bytes.Buffer
+	for i, h := range blockHeaders {
+		err := h.Serialize(&buf)
+		if err != nil {
+			return nil, internalRPCError(err.Error(),
+				"Failed to serialize block header")
+		}
+		hexBlockHeaders[i] = hex.EncodeToString(buf.Bytes())
+		buf.Reset()
+	}
+	return hexBlockHeaders, nil
 }
 
 // handleGetInfo implements the getinfo command. We only return the fields

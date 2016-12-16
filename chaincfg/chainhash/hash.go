@@ -84,35 +84,45 @@ func NewHash(newHash []byte) (*Hash, error) {
 // the hexadecimal string of a byte-reversed hash, but any missing characters
 // result in zero padding at the end of the Hash.
 func NewHashFromStr(hash string) (*Hash, error) {
-	// Return error if hash string is too long.
-	if len(hash) > MaxHashStringSize {
-		return nil, ErrHashStrSize
-	}
-
-	// Hex decoder expects the hash to be a multiple of two.
-	if len(hash)%2 != 0 {
-		hash = "0" + hash
-	}
-
-	// Convert string hash to bytes.
-	buf, err := hex.DecodeString(hash)
+	ret := new(Hash)
+	err := Decode(ret, hash)
 	if err != nil {
 		return nil, err
 	}
+	return ret, nil
+}
 
-	// Un-reverse the decoded bytes, copying into in leading bytes of a
-	// Hash.  There is no need to explicitly pad the result as any
-	// missing (when len(buf) < HashSize) bytes from the decoded hex string
-	// will remain zeros at the end of the Hash.
-	var ret Hash
-	blen := len(buf)
-	mid := blen / 2
-	if blen%2 != 0 {
-		mid++
+// Decode decodes the byte-reversed hexadecimal string encoding of a Hash to a
+// destination.
+func Decode(dst *Hash, src string) error {
+	// Return error if hash string is too long.
+	if len(src) > MaxHashStringSize {
+		return ErrHashStrSize
 	}
-	blen--
-	for i, b := range buf[:mid] {
-		ret[i], ret[blen-i] = buf[blen-i], b
+
+	// Hex decoder expects the hash to be a multiple of two.  When not, pad
+	// with a leading zero.
+	var srcBytes []byte
+	if len(src)%2 == 0 {
+		srcBytes = []byte(src)
+	} else {
+		srcBytes = make([]byte, 1+len(src))
+		srcBytes[0] = '0'
+		copy(srcBytes[1:], src)
 	}
-	return &ret, nil
+
+	// Hex decode the source bytes to a temporary destination.
+	var reversedHash Hash
+	_, err := hex.Decode(reversedHash[HashSize-hex.DecodedLen(len(srcBytes)):], srcBytes)
+	if err != nil {
+		return err
+	}
+
+	// Reverse copy from the temporary hash to destination.  Because the
+	// temporary was zeroed, the written result will be correctly padded.
+	for i, b := range reversedHash[:HashSize/2] {
+		dst[i], dst[HashSize-1-i] = reversedHash[HashSize-1-i], b
+	}
+
+	return nil
 }

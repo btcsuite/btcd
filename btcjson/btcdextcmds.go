@@ -90,6 +90,27 @@ func NewGetCurrentNetCmd() *GetCurrentNetCmd {
 	return &GetCurrentNetCmd{}
 }
 
+// GetHeadersCmd defines the getheaders JSON-RPC command.
+//
+// NOTE: This is a btcsuite extension ported from
+// github.com/decred/dcrd/dcrjson.
+type GetHeadersCmd struct {
+	BlockLocators []string `json:"blocklocators"`
+	HashStop      string   `json:"hashstop"`
+}
+
+// NewGetHeadersCmd returns a new instance which can be used to issue a
+// getheaders JSON-RPC command.
+//
+// NOTE: This is a btcsuite extension ported from
+// github.com/decred/dcrd/dcrjson.
+func NewGetHeadersCmd(blockLocators []string, hashStop string) *GetHeadersCmd {
+	return &GetHeadersCmd{
+		BlockLocators: blockLocators,
+		HashStop:      hashStop,
+	}
+}
+
 // VersionCmd defines the version JSON-RPC command.
 //
 // NOTE: This is a btcsuite extension ported from
@@ -112,5 +133,6 @@ func init() {
 	MustRegisterCmd("generate", (*GenerateCmd)(nil), flags)
 	MustRegisterCmd("getbestblock", (*GetBestBlockCmd)(nil), flags)
 	MustRegisterCmd("getcurrentnet", (*GetCurrentNetCmd)(nil), flags)
+	MustRegisterCmd("getheaders", (*GetHeadersCmd)(nil), flags)
 	MustRegisterCmd("version", (*VersionCmd)(nil), flags)
 }

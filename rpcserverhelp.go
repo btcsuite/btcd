@@ -1,5 +1,5 @@
-// Copyright (c) 2015-2016 The btcsuite developers
-// Copyright (c) 2015-2016 The Decred developers
+// Copyright (c) 2015-2017 The btcsuite developers
+// Copyright (c) 2015-2017 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -360,6 +360,12 @@ var helpDescsEnUS = map[string]string{
 	"infowalletresult-relayfee":        "The minimum relay fee for non-free transactions in BTC/KB",
 	"infowalletresult-errors":          "Any current errors",
 
+	// GetHeadersCmd help.
+	"getheaders--synopsis":     "Returns block headers starting with the first known block hash from the request",
+	"getheaders-blocklocators": "JSON array of hex-encoded hashes of blocks.  Headers are returned starting from the first known hash in this list",
+	"getheaders-hashstop":      "Block hash to stop including block headers for; if not found, all headers to the latest known block are returned.",
+	"getheaders--result0":      "Serialized block headers of all located blocks, limited to some arbitrary maximum number of hashes (currently 2000, which matches the wire protocol headers message, but this is not guaranteed)",
+
 	// GetInfoCmd help.
 	"getinfo--synopsis": "Returns a JSON object containing various state info.",
 
@@ -646,6 +652,7 @@ var rpcResultTypes = map[string][]interface{}{
 	"getdifficulty":         {(*float64)(nil)},
 	"getgenerate":           {(*bool)(nil)},
 	"gethashespersec":       {(*float64)(nil)},
+	"getheaders":            {(*[]string)(nil)},
 	"getinfo":               {(*btcjson.InfoChainResult)(nil)},
 	"getmempoolinfo":        {(*btcjson.GetMempoolInfoResult)(nil)},
 	"getmininginfo":         {(*btcjson.GetMiningInfoResult)(nil)},

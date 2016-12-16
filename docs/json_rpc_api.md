@@ -584,6 +584,7 @@ The following is an overview of the RPC methods which are implemented by btcd, b
 |5|[node](#node)|N|Attempts to add or remove a peer. |None|
 |6|[generate](#generate)|N|When in simnet or regtest mode, generate a set number of blocks. |None|
 |7|[version](#version)|Y|Returns the JSON-RPC API version.|
+|8|[getheaders](#getheaders)|Y|Returns block headers starting with the first known block hash from the request.|
 
 
 <a name="ExtMethodDetails" />
@@ -674,6 +675,19 @@ The following is an overview of the RPC methods which are implemented by btcd, b
 |Description|Returns the version of the JSON-RPC API built into this release of btcd.|
 |Returns|`{ (json object)`<br />&nbsp;&nbsp;`"btcdjsonrpcapi": {`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"versionstring": "x.y.z",  (string) the version of the JSON-RPC API`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"major": x,  (numeric) the major version of the JSON-RPC API`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"minor": y,  (numeric) the minor version of the JSON-RPC API`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"patch": z,  (numeric) the patch version of the JSON-RPC API`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"prerelease": "",  (string) prerelease info for the JSON-RPC API`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"buildmetadata": ""  (string) metadata about the server build`<br />&nbsp;&nbsp;`}`<br />`}`|
 |Example Return|`{`<br />&nbsp;&nbsp;`"btcdjsonrpcapi": {`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"versionstring": "1.0.0",`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"major": 1,  `<br />&nbsp;&nbsp;&nbsp;&nbsp;`"minor": 0,`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"patch": 0,`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"prerelease": "",`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"buildmetadata": ""`<br />&nbsp;&nbsp;`}`<br />`}`|
+[Return to Overview](#MethodOverview)<br />
+
+***
+
+<a name="getheaders"/>
+
+|   |   |
+|---|---|
+|Method|getheaders|
+|Parameters|1. Block Locators (JSON array, required)<br />&nbsp;`[ (json array of strings)`<br />&nbsp;&nbsp;`"blocklocator", (string) the known block hash`<br />&nbsp;&nbsp;`...`<br />&nbsp;`]`<br />2. hashstop (string) - last desired block's hash|
+|Description|Returns block headers starting with the first known block hash from the request.|
+|Returns|`[ (json array of strings)`<br />&nbsp;&nbsp;`"blockheader",`<br />&nbsp;&nbsp;`...`<br />`]`|
+|Example Return|`[`<br />&nbsp;&nbsp;`"0000002099417930b2ae09feda10e38b58c0f6bb44b4d60fa33f0e000000000000000000d53...",`<br />&nbsp;&nbsp;`"000000203ba25a173bfd24d09e0c76002a910b685ca297bd09a17b020000000000000000702..."`<br />`]`|
 [Return to Overview](#MethodOverview)<br />
 
 ***
