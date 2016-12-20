@@ -2110,6 +2110,7 @@ var simNetParams = &chaincfg.Params{
 	Name:        "simnet",
 	Net:         wire.SimNet,
 	DefaultPort: "18555",
+	DNSSeeds:    nil, // NOTE: There must NOT be any seeds.
 
 	// Chain parameters
 	GenesisBlock:             &simNetGenesisBlock,
@@ -2117,13 +2118,14 @@ var simNetParams = &chaincfg.Params{
 	PowLimit:                 simNetPowLimit,
 	PowLimitBits:             0x207fffff,
 	ReduceMinDifficulty:      false,
+	MinDiffReductionTime:     0, // Does not apply since ReduceMinDifficulty false
 	GenerateSupported:        true,
 	MaximumBlockSize:         1000000,
-	TargetTimePerBlock:       time.Second * 1,
+	TargetTimePerBlock:       time.Second,
 	WorkDiffAlpha:            1,
 	WorkDiffWindowSize:       8,
 	WorkDiffWindows:          4,
-	TargetTimespan:           time.Second * 1 * 8, // TimePerBlock * WindowSize
+	TargetTimespan:           time.Second * 8, // TimePerBlock * WindowSize
 	RetargetAdjustmentFactor: 4,
 
 	// Subsidy parameters.
@@ -2152,12 +2154,13 @@ var simNetParams = &chaincfg.Params{
 	RelayNonStdTxs: true,
 
 	// Address encoding magics
-	PubKeyAddrID:     [2]byte{0x27, 0x6f}, // starts with Sk
-	PubKeyHashAddrID: [2]byte{0x0e, 0x91}, // starts with Ss
-	PKHEdwardsAddrID: [2]byte{0x0e, 0x71}, // starts with Se
-	PKHSchnorrAddrID: [2]byte{0x0e, 0x53}, // starts with SS
-	ScriptHashAddrID: [2]byte{0x0e, 0x6c}, // starts with Sc
-	PrivateKeyID:     [2]byte{0x23, 0x07}, // starts with Ps
+	NetworkAddressPrefix: "S",
+	PubKeyAddrID:         [2]byte{0x27, 0x6f}, // starts with Sk
+	PubKeyHashAddrID:     [2]byte{0x0e, 0x91}, // starts with Ss
+	PKHEdwardsAddrID:     [2]byte{0x0e, 0x71}, // starts with Se
+	PKHSchnorrAddrID:     [2]byte{0x0e, 0x53}, // starts with SS
+	ScriptHashAddrID:     [2]byte{0x0e, 0x6c}, // starts with Sc
+	PrivateKeyID:         [2]byte{0x23, 0x07}, // starts with Ps
 
 	// BIP32 hierarchical deterministic extended key magics
 	HDPrivateKeyID: [4]byte{0x04, 0x20, 0xb9, 0x03}, // starts with sprv
@@ -2172,59 +2175,26 @@ var simNetParams = &chaincfg.Params{
 	TicketPoolSize:        64,
 	TicketsPerBlock:       5,
 	TicketMaturity:        16,
-	TicketExpiry:          256, // 4*TicketPoolSize
+	TicketExpiry:          384, // 6*TicketPoolSize
 	CoinbaseMaturity:      16,
 	SStxChangeMaturity:    1,
 	TicketPoolSizeWeight:  4,
 	StakeDiffAlpha:        1,
 	StakeDiffWindowSize:   8,
 	StakeDiffWindows:      8,
-	MaxFreshStakePerBlock: 40,            // 8*TicketsPerBlock
+	MaxFreshStakePerBlock: 20,            // 4*TicketsPerBlock
 	StakeEnabledHeight:    16 + 16,       // CoinbaseMaturity + TicketMaturity
 	StakeValidationHeight: 16 + (64 * 2), // CoinbaseMaturity + TicketPoolSize*2
-	StakeBaseSigScript:    []byte{0xDE, 0xAD, 0xBE, 0xEF},
+	StakeBaseSigScript:    []byte{0xde, 0xad, 0xbe, 0xef},
 
 	// Decred organization related parameters
-	//
-	// "Dev org" address is a 3-of-3 P2SH going to wallet:
-	// aardvark adroitness aardvark adroitness
-	// aardvark adroitness aardvark adroitness
-	// aardvark adroitness aardvark adroitness
-	// aardvark adroitness aardvark adroitness
-	// aardvark adroitness aardvark adroitness
-	// aardvark adroitness aardvark adroitness
-	// aardvark adroitness aardvark adroitness
-	// aardvark adroitness aardvark adroitness
-	// briefcase
-	// (seed 0x00000000000000000000000000000000000000000000000000000000000000)
-	//
-	// This same wallet owns the three ledger outputs for simnet.
-	//
-	// P2SH details for simnet dev org is below.
-	//
-	// address: Scc4ZC844nzuZCXsCFXUBXTLks2mD6psWom
-	// redeemScript: 532103e8c60c7336744c8dcc7b85c27789950fc52aa4e48f895ebbfb
-	// ac383ab893fc4c2103ff9afc246e0921e37d12e17d8296ca06a8f92a07fbe7857ed1d4
-	// f0f5d94e988f21033ed09c7fa8b83ed53e6f2c57c5fa99ed2230c0d38edf53c0340d0f
-	// c2e79c725a53ae
-	//   (3-of-3 multisig)
-	// Pubkeys used:
-	//   SkQmxbeuEFDByPoTj41TtXat8tWySVuYUQpd4fuNNyUx51tF1csSs
-	//   SkQn8ervNvAUEX5Ua3Lwjc6BAuTXRznDoDzsyxgjYqX58znY7w9e4
-	//   SkQkfkHZeBbMW8129tZ3KspEh1XBFC1btbkgzs6cjSyPbrgxzsKqk
-	//
 	OrganizationPkScript:        chaincfg.SimNetParams.OrganizationPkScript,
 	OrganizationPkScriptVersion: chaincfg.SimNetParams.OrganizationPkScriptVersion,
-	BlockOneLedger:              BlockOneLedgerSimNet,
-}
-
-// BlockOneLedgerSimNet is the block one output ledger for the simulation
-// network. See below under "Decred organization related parameters" for
-// information on how to spend these outputs.
-var BlockOneLedgerSimNet = []*chaincfg.TokenPayout{
-	{Address: "Sshw6S86G2bV6W32cbc7EhtFy8f93rU6pae", Amount: 100000 * 1e8},
-	{Address: "SsjXRK6Xz6CFuBt6PugBvrkdAa4xGbcZ18w", Amount: 100000 * 1e8},
-	{Address: "SsfXiYkYkCoo31CuVQw428N6wWKus2ZEw5X", Amount: 100000 * 1e8},
+	BlockOneLedger: []*chaincfg.TokenPayout{
+		{Address: "Sshw6S86G2bV6W32cbc7EhtFy8f93rU6pae", Amount: 100000 * 1e8},
+		{Address: "SsjXRK6Xz6CFuBt6PugBvrkdAa4xGbcZ18w", Amount: 100000 * 1e8},
+		{Address: "SsfXiYkYkCoo31CuVQw428N6wWKus2ZEw5X", Amount: 100000 * 1e8},
+	},
 }
 
 var bigOne = new(big.Int).SetInt64(1)

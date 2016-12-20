@@ -107,6 +107,7 @@ var simNetParams = &chaincfg.Params{
 	Name:        "simnet",
 	Net:         wire.SimNet,
 	DefaultPort: "18555",
+	DNSSeeds:    nil, // NOTE: There must NOT be any seeds.
 
 	// Chain parameters
 	GenesisBlock:             &simNetGenesisBlock,
@@ -114,13 +115,14 @@ var simNetParams = &chaincfg.Params{
 	PowLimit:                 simNetPowLimit,
 	PowLimitBits:             0x207fffff,
 	ReduceMinDifficulty:      false,
+	MinDiffReductionTime:     0, // Does not apply since ReduceMinDifficulty false
 	GenerateSupported:        true,
 	MaximumBlockSize:         1000000,
-	TargetTimePerBlock:       time.Second * 1,
+	TargetTimePerBlock:       time.Second,
 	WorkDiffAlpha:            1,
 	WorkDiffWindowSize:       8,
 	WorkDiffWindows:          4,
-	TargetTimespan:           time.Second * 1 * 8, // TimePerBlock * WindowSize
+	TargetTimespan:           time.Second * 8, // TimePerBlock * WindowSize
 	RetargetAdjustmentFactor: 4,
 
 	// Subsidy parameters.
@@ -149,12 +151,13 @@ var simNetParams = &chaincfg.Params{
 	RelayNonStdTxs: true,
 
 	// Address encoding magics
-	PubKeyAddrID:     [2]byte{0x27, 0x6f}, // starts with Sk
-	PubKeyHashAddrID: [2]byte{0x0e, 0x91}, // starts with Ss
-	PKHEdwardsAddrID: [2]byte{0x0e, 0x71}, // starts with Se
-	PKHSchnorrAddrID: [2]byte{0x0e, 0x53}, // starts with SS
-	ScriptHashAddrID: [2]byte{0x0e, 0x6c}, // starts with Sc
-	PrivateKeyID:     [2]byte{0x23, 0x07}, // starts with Ps
+	NetworkAddressPrefix: "S",
+	PubKeyAddrID:         [2]byte{0x27, 0x6f}, // starts with Sk
+	PubKeyHashAddrID:     [2]byte{0x0e, 0x91}, // starts with Ss
+	PKHEdwardsAddrID:     [2]byte{0x0e, 0x71}, // starts with Se
+	PKHSchnorrAddrID:     [2]byte{0x0e, 0x53}, // starts with SS
+	ScriptHashAddrID:     [2]byte{0x0e, 0x6c}, // starts with Sc
+	PrivateKeyID:         [2]byte{0x23, 0x07}, // starts with Ps
 
 	// BIP32 hierarchical deterministic extended key magics
 	HDPrivateKeyID: [4]byte{0x04, 0x20, 0xb9, 0x03}, // starts with sprv
@@ -169,14 +172,14 @@ var simNetParams = &chaincfg.Params{
 	TicketPoolSize:        64,
 	TicketsPerBlock:       5,
 	TicketMaturity:        16,
-	TicketExpiry:          256, // 4*TicketPoolSize
+	TicketExpiry:          384, // 6*TicketPoolSize
 	CoinbaseMaturity:      16,
 	SStxChangeMaturity:    1,
 	TicketPoolSizeWeight:  4,
 	StakeDiffAlpha:        1,
 	StakeDiffWindowSize:   8,
 	StakeDiffWindows:      8,
-	MaxFreshStakePerBlock: 40,            // 8*TicketsPerBlock
+	MaxFreshStakePerBlock: 20,            // 4*TicketsPerBlock
 	StakeEnabledHeight:    16 + 16,       // CoinbaseMaturity + TicketMaturity
 	StakeValidationHeight: 16 + (64 * 2), // CoinbaseMaturity + TicketPoolSize*2
 	StakeBaseSigScript:    []byte{0xde, 0xad, 0xbe, 0xef},
