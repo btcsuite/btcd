@@ -307,18 +307,19 @@ func (g *testGenerator) calcPoWSubsidy(fullSubsidy dcrutil.Amount, blockHeight u
 	return (powSubsidy * dcrutil.Amount(numVotes)) / ticketsPerBlock
 }
 
-// calcPoSSubsidy returns the proof-of-stake subsidy portion from a given full
-// subsidy and block height.
+// calcPoSSubsidy returns the proof-of-stake subsidy portion for a given block
+// height being voted on.
 //
 // NOTE: This and the other subsidy calculation funcs intentionally are not
 // using the blockchain code since the intent is to be able to generate known
 // good tests which exercise that code, so it wouldn't make sense to use the
 // same code to generate them.
-func (g *testGenerator) calcPoSSubsidy(fullSubsidy dcrutil.Amount, blockHeight uint32) dcrutil.Amount {
-	if int64(blockHeight) < g.params.StakeValidationHeight {
+func (g *testGenerator) calcPoSSubsidy(heightVotedOn uint32) dcrutil.Amount {
+	if int64(heightVotedOn+1) < g.params.StakeValidationHeight {
 		return 0
 	}
 
+	fullSubsidy := g.calcFullSubsidy(heightVotedOn)
 	posProportion := dcrutil.Amount(g.params.StakeRewardProportion)
 	totalProportions := dcrutil.Amount(g.params.TotalSubsidyProportions())
 	return (fullSubsidy * posProportion) / totalProportions
@@ -605,9 +606,7 @@ func voteBitsScript(voteYes bool) []byte {
 func (g *testGenerator) createVoteTx(parentBlock *wire.MsgBlock, ticket *stakeTicket) *wire.MsgTx {
 	// Calculate the proof-of-stake subsidy proportion based on the block
 	// height.
-	blockHeight := parentBlock.Header.Height + 1
-	fullSubsidy := g.calcFullSubsidy(blockHeight)
-	posSubsidy := g.calcPoSSubsidy(fullSubsidy, blockHeight)
+	posSubsidy := g.calcPoSSubsidy(parentBlock.Header.Height)
 	voteSubsidy := posSubsidy / dcrutil.Amount(g.params.TicketsPerBlock)
 	ticketPrice := dcrutil.Amount(ticket.tx.TxOut[0].Value)
 
