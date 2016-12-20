@@ -2097,10 +2097,13 @@ func Generate() (tests [][]TestInstance, err error) {
 	// ---------------------------------------------------------------------
 
 	testInstances = nil
+	var ticketsPurchased int
 	for i := int64(0); int64(g.tip.Header.Height) < stakeEnabledHeight; i++ {
 		outs := g.oldestCoinbaseOuts()
+		ticketOuts := outs[1:]
+		ticketsPurchased += len(ticketOuts)
 		blockName := fmt.Sprintf("bse%d", i)
-		g.nextBlock(blockName, nil, outs[1:])
+		g.nextBlock(blockName, nil, ticketOuts)
 		g.saveTipCoinbaseOuts()
 		testInstances = append(testInstances, acceptBlock(g.tipName,
 			g.tip, true, false))
@@ -2135,6 +2138,7 @@ func Generate() (tests [][]TestInstance, err error) {
 	// ---------------------------------------------------------------------
 
 	testInstances = nil
+	targetPoolSize := g.params.TicketPoolSize * g.params.TicketsPerBlock
 	for i := int64(0); int64(g.tip.Header.Height) < stakeValidationHeight; i++ {
 		// Until stake validation height is reached, test that any
 		// blocks without the early vote bits set are rejected.
@@ -2149,9 +2153,21 @@ func Generate() (tests [][]TestInstance, err error) {
 			g.setTip(prevTip)
 		}
 
+		// Only purchase tickets until the target ticket pool size is
+		// reached.
 		outs := g.oldestCoinbaseOuts()
+		ticketOuts := outs[1:]
+		if ticketsPurchased+len(ticketOuts) > int(targetPoolSize) {
+			ticketsNeeded := int(targetPoolSize) - ticketsPurchased
+			if ticketsNeeded > 0 {
+				ticketOuts = ticketOuts[1 : ticketsNeeded+1]
+			} else {
+				ticketOuts = nil
+			}
+		}
+		ticketsPurchased += len(ticketOuts)
 		blockName := fmt.Sprintf("bsv%d", i)
-		g.nextBlock(blockName, nil, outs[1:])
+		g.nextBlock(blockName, nil, ticketOuts)
 		g.saveTipCoinbaseOuts()
 		testInstances = append(testInstances, acceptBlock(g.tipName,
 			g.tip, true, false))
