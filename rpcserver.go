@@ -215,6 +215,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"getrawmempool":         handleGetRawMempool,
 	"getrawtransaction":     handleGetRawTransaction,
 	"getstakedifficulty":    handleGetStakeDifficulty,
+	"getstakeversions":      handleGetStakeVersions,
 	"getticketpoolvalue":    handleGetTicketPoolValue,
 	"gettxout":              handleGetTxOut,
 	"getwork":               handleGetWork,
@@ -3829,6 +3830,43 @@ func handleGetStakeDifficulty(s *rpcServer, cmd interface{}, closeChan <-chan st
 	}
 
 	return sDiffResult, nil
+}
+
+// handleGetStakeVersions implements the getstakeversions command.
+func handleGetStakeVersions(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	c, ok := cmd.(*dcrjson.GetStakeVersionsCmd)
+	if !ok {
+		return nil, internalRPCError("Invalid command",
+			"handleGetStakeVersions")
+	}
+	hash, err := chainhash.NewHashFromStr(c.Hash)
+	if err != nil {
+		return nil, err
+	}
+
+	sv, err := s.chain.GetStakeVersions(hash, c.Count)
+	if err != nil {
+		return nil, err
+	}
+
+	result := dcrjson.GetStakeVersionsResult{
+		StakeVersions: make([]dcrjson.StakeVersions, 0, len(sv)),
+	}
+	for _, v := range sv {
+		nsv := dcrjson.StakeVersions{
+			Hash:          v.Hash.String(),
+			Height:        v.Height,
+			StakeVersion:  v.StakeVersion,
+			VoterVersions: make([]uint32, 0, len(v.StakeVersions)),
+		}
+		for _, version := range v.StakeVersions {
+			nsv.VoterVersions = append(nsv.VoterVersions, version)
+		}
+
+		result.StakeVersions = append(result.StakeVersions, nsv)
+	}
+
+	return result, nil
 }
 
 // handleGetTicketPoolValue implements the getticketpoolvalue command.

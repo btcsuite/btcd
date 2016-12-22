@@ -56,7 +56,7 @@ func (b *BlockChain) lotteryDataForBlock(hash *chainhash.Hash) ([]chainhash.Hash
 	if n, exists := b.index[*hash]; exists {
 		node = n
 	} else {
-		node, _ = b.findNode(hash)
+		node, _ = b.findNode(hash, maxSearchDepth)
 	}
 
 	if node == nil {

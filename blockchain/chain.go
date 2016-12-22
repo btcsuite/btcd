@@ -44,11 +44,11 @@ const (
 	// keep in memory, by height from the tip of the mainchain.
 	mainchainBlockCacheSize = 12
 
-	// searchDepth is the distance in block nodes to search down the
+	// maxSearchDepth is the distance in block nodes to search down the
 	// blockchain to find some parent, loading block nodes from the
-	// database if necessary.  Reorganizations longer than this disance
-	// may fail.
-	searchDepth = 2880
+	// database if necessary.  Reorganizations longer than this disance may
+	// fail.
+	maxSearchDepth = 2880
 )
 
 // blockNode represents a block within the block chain and is primarily used to
@@ -257,6 +257,56 @@ type BlockChain struct {
 	pruner *chainPruner
 }
 
+// StakeVersions is a condensed form of a dcrutil.Block that is used to prevent
+// using gigabytes of memory.
+type StakeVersions struct {
+	Hash          chainhash.Hash
+	Height        int64
+	StakeVersion  uint32
+	StakeVersions []uint32
+}
+
+// GetStakeVersions returns a cooked array of StakeVersions.  We do this in
+// order to not bloat memory by returning raw blocks.
+func (b *BlockChain) GetStakeVersions(hash *chainhash.Hash, count int32) ([]StakeVersions, error) {
+	b.chainLock.Lock()
+	defer b.chainLock.Unlock()
+
+	startNode, err := b.findNode(hash, 0)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]StakeVersions, 0, count)
+	prevNode := startNode
+	for i := int32(0); i < count; i++ {
+		sv := StakeVersions{
+			Hash:         prevNode.hash,
+			Height:       prevNode.height,
+			StakeVersion: prevNode.header.StakeVersion,
+			StakeVersions: make([]uint32, 0,
+				len(prevNode.voterVersions)),
+		}
+
+		for _, version := range prevNode.voterVersions {
+			sv.StakeVersions = append(sv.StakeVersions, version)
+		}
+
+		result = append(result, sv)
+
+		prevNode, err = b.getPrevNodeFromNode(prevNode)
+		if err != nil {
+			return nil, err
+		}
+		if prevNode == nil {
+			// Just return what we did find.
+			break
+		}
+	}
+
+	return result, nil
+}
+
 // DisableVerify provides a mechanism to disable transaction script validation
 // which you DO NOT want to do in production as it could allow double spends
 // and other undesirable things.  It is provided only for debug purposes since
@@ -445,7 +495,7 @@ func (b *BlockChain) addOrphanBlock(block *dcrutil.Block) {
 // used by the mempool downstream to locate all potential block template
 // parents.
 func (b *BlockChain) getGeneration(h chainhash.Hash) ([]chainhash.Hash, error) {
-	node, err := b.findNode(&h)
+	node, err := b.findNode(&h, maxSearchDepth)
 
 	// This typically happens because the main chain has recently
 	// reorganized and the block the miner is looking at is on
@@ -532,7 +582,7 @@ func (b *BlockChain) loadBlockNode(dbTx database.Tx, hash *chainhash.Hash) (*blo
 		// further down the line in the blockchain to which the block
 		// could be attached, for example if the node had been pruned from
 		// the index.
-		foundParent, err := b.findNode(&node.header.PrevBlock)
+		foundParent, err := b.findNode(&node.header.PrevBlock, maxSearchDepth)
 		if err == nil {
 			node.workSum = node.workSum.Add(foundParent.workSum, node.workSum)
 			foundParent.children = append(foundParent.children, node)
@@ -551,10 +601,10 @@ func (b *BlockChain) loadBlockNode(dbTx database.Tx, hash *chainhash.Hash) (*blo
 }
 
 // findNode finds the node scaling backwards from best chain or return an
-// error.
+// error.  If searchDepth equal zero there is no searchDepth.
 //
 // This function MUST be called with the chain state lock held (for writes).
-func (b *BlockChain) findNode(nodeHash *chainhash.Hash) (*blockNode, error) {
+func (b *BlockChain) findNode(nodeHash *chainhash.Hash, searchDepth int) (*blockNode, error) {
 	var node *blockNode
 	err := b.db.View(func(dbTx database.Tx) error {
 		// Most common case; we're checking a block that wants to be connected
@@ -568,7 +618,7 @@ func (b *BlockChain) findNode(nodeHash *chainhash.Hash) (*blockNode, error) {
 			foundPrev := b.bestNode
 			notFound := true
 			for !foundPrev.hash.IsEqual(b.chainParams.GenesisHash) {
-				if distance >= searchDepth {
+				if searchDepth != 0 && distance >= searchDepth {
 					break
 				}
 
@@ -1035,7 +1085,7 @@ func (b *BlockChain) getReorganizeNodes(node *blockNode) (*list.List, *list.List
 	for n := b.bestNode; n != nil; n = n.parent {
 		if n.parent == nil {
 			var err error
-			n.parent, err = b.findNode(&n.header.PrevBlock)
+			n.parent, err = b.findNode(&n.header.PrevBlock, maxSearchDepth)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -2163,9 +2213,10 @@ func New(config *Config) (*BlockChain, error) {
 	log.Infof("Blockchain database version %v loaded",
 		b.dbInfo.version)
 
-	log.Infof("Chain state: height %d, hash %v, total transactions %d, work %v",
-		b.bestNode.height, b.bestNode.hash, b.stateSnapshot.TotalTxns,
-		b.bestNode.workSum)
+	log.Infof("Chain state: height %d, hash %v, total transactions %d, "+
+		"work %v, stake version %v", b.bestNode.height, b.bestNode.hash,
+		b.stateSnapshot.TotalTxns, b.bestNode.workSum,
+		0)
 
 	return &b, nil
 }

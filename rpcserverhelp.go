@@ -408,6 +408,16 @@ var helpDescsEnUS = map[string]string{
 	"getstakedifficultyresult-current": "The current top block's stake difficulty",
 	"getstakedifficultyresult-next":    "The calculated stake difficulty of the next block",
 
+	// GetStakeDifficultyCmd help.
+	"getstakeversions--synopsis":           "Returns the stake versions statistics.",
+	"getstakeversions-hash":                "The start block hash.",
+	"getstakeversions-count":               "The number of blocks that will be returned.",
+	"getstakeversionsresult-stakeversions": "Array of stake versions per block.",
+	"stakeversions-hash":                   "Hash of the block.",
+	"stakeversions-height":                 "Height of the block.",
+	"stakeversions-stakeversion":           "The stake version of the block",
+	"stakeversions-voterversions":          "The version of each vote in the block",
+
 	// GetGenerateCmd help.
 	"getgenerate--synopsis": "Returns if the server is set to generate coins (mine) or not.",
 	"getgenerate--result0":  "True if mining, false if not",
@@ -843,6 +853,7 @@ var rpcResultTypes = map[string][]interface{}{
 	"getcurrentnet":         {(*uint32)(nil)},
 	"getdifficulty":         {(*float64)(nil)},
 	"getstakedifficulty":    {(*dcrjson.GetStakeDifficultyResult)(nil)},
+	"getstakeversions":      {(*dcrjson.GetStakeVersionsResult)(nil)},
 	"getgenerate":           {(*bool)(nil)},
 	"gethashespersec":       {(*float64)(nil)},
 	"getheaders":            {(*dcrjson.GetHeadersResult)(nil)},

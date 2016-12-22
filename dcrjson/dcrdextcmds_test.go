@@ -42,6 +42,20 @@ func TestDcrdExtCmds(t *testing.T) {
 				LevelSpec: "trace",
 			},
 		},
+		{
+			name: "getstakeversions",
+			newCmd: func() (interface{}, error) {
+				return dcrjson.NewCmd("getstakeversions", "deadbeef", 1)
+			},
+			staticCmd: func() interface{} {
+				return dcrjson.NewGetStakeVersionsCmd("deadbeef", 1)
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"getstakeversions","params":["deadbeef",1],"id":1}`,
+			unmarshalled: &dcrjson.GetStakeVersionsCmd{
+				Hash:  "deadbeef",
+				Count: 1,
+			},
+		},
 	}
 
 	t.Logf("Running %d tests", len(tests))

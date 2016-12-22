@@ -12,6 +12,20 @@ type GetStakeDifficultyResult struct {
 	NextStakeDifficulty    float64 `json:"next"`
 }
 
+// StakeVersions models the data for GetStakeVersionsResult.
+type StakeVersions struct {
+	Hash          string   `json:"hash"`
+	Height        int64    `json:"height"`
+	StakeVersion  uint32   `json:"stakeversion"`
+	VoterVersions []uint32 `json:"voterversions"`
+}
+
+// GetStakeVersionsResult models the data returned from the getstakeversions
+// command.
+type GetStakeVersionsResult struct {
+	StakeVersions []StakeVersions `json:"stakeversions"`
+}
+
 // EstimateStakeDiffResult models the data returned from the estimatestakediff
 // command.
 type EstimateStakeDiffResult struct {

@@ -439,7 +439,7 @@ func (b *BlockChain) calcNextRequiredDifficulty(curNode *blockNode,
 func (b *BlockChain) CalcNextRequiredDiffFromNode(hash *chainhash.Hash,
 	timestamp time.Time) (uint32, error) {
 	// Fetch the block to get the difficulty for.
-	node, err := b.findNode(hash)
+	node, err := b.findNode(hash, maxSearchDepth)
 	if err != nil {
 		return 0, err
 	}

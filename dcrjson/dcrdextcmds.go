@@ -116,6 +116,22 @@ func NewGetStakeDifficultyCmd() *GetStakeDifficultyCmd {
 	return &GetStakeDifficultyCmd{}
 }
 
+// GetStakeVersionsCmd returns stake version for a range of blocks.
+// Count indicates how many blocks are walked backwards.
+type GetStakeVersionsCmd struct {
+	Hash  string
+	Count int32
+}
+
+// NewGetStakeVersionsCmd returns a new instance which can be used to
+// issue a JSON-RPC getstakeversions command.
+func NewGetStakeVersionsCmd(hash string, count int32) *GetStakeVersionsCmd {
+	return &GetStakeVersionsCmd{
+		Hash:  hash,
+		Count: count,
+	}
+}
+
 // GetTicketPoolValueCmd defines the getticketpoolvalue JSON-RPC command.
 type GetTicketPoolValueCmd struct{}
 
@@ -243,6 +259,7 @@ func init() {
 	MustRegisterCmd("existsmempooltxs", (*ExistsMempoolTxsCmd)(nil), flags)
 	MustRegisterCmd("getcoinsupply", (*GetCoinSupplyCmd)(nil), flags)
 	MustRegisterCmd("getstakedifficulty", (*GetStakeDifficultyCmd)(nil), flags)
+	MustRegisterCmd("getstakeversions", (*GetStakeVersionsCmd)(nil), flags)
 	MustRegisterCmd("getticketpoolvalue", (*GetTicketPoolValueCmd)(nil), flags)
 	MustRegisterCmd("livetickets", (*LiveTicketsCmd)(nil), flags)
 	MustRegisterCmd("missedtickets", (*MissedTicketsCmd)(nil), flags)

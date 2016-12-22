@@ -2401,7 +2401,7 @@ func (b *BlockChain) CheckConnectBlock(block *dcrutil.Block) error {
 	defer b.chainLock.Unlock()
 
 	parentHash := block.MsgBlock().Header.PrevBlock
-	prevNode, err := b.findNode(&parentHash)
+	prevNode, err := b.findNode(&parentHash, maxSearchDepth)
 	if err != nil {
 		return ruleError(ErrMissingParent, err.Error())
 	}
