@@ -267,6 +267,10 @@ type Params struct {
 	// of the exponentially weighted average.
 	StakeDiffWindows int64
 
+	// StakeVersionInterval determines the interval where the stake version
+	// is calculated.
+	StakeVersionInterval int64
+
 	// MaxFreshStakePerBlock is the maximum number of new tickets that may be
 	// submitted per block.
 	MaxFreshStakePerBlock uint8
@@ -285,9 +289,11 @@ type Params struct {
 	// it to be this value miners/daemons could freely change it.
 	StakeBaseSigScript []byte
 
-	// StakeVersion is the current stake version.  Miners should use this
-	// value when creating new blocks.
-	StakeVersion uint32
+	// StakeMajorityMultiplier and StakeMajorityDivisor are used
+	// to calculate the super majority of stake votes using integer math as
+	// such: X*StakeMajorityMultiplier/StakeMajorityDivisor
+	StakeMajorityMultiplier int32
+	StakeMajorityDivisor    int32
 
 	// OrganizationPkScript is the output script for block taxes to be
 	// distributed to in every block's coinbase. It should ideally be a P2SH
@@ -383,22 +389,24 @@ var MainNetParams = Params{
 	HDCoinType: 20,
 
 	// Decred PoS parameters
-	MinimumStakeDiff:      2 * 1e8, // 2 Coin
-	TicketPoolSize:        8192,
-	TicketsPerBlock:       5,
-	TicketMaturity:        256,
-	TicketExpiry:          40960, // 5*TicketPoolSize
-	CoinbaseMaturity:      256,
-	SStxChangeMaturity:    1,
-	TicketPoolSizeWeight:  4,
-	StakeDiffAlpha:        1, // Minimal
-	StakeDiffWindowSize:   144,
-	StakeDiffWindows:      20,
-	MaxFreshStakePerBlock: 20,        // 4*TicketsPerBlock
-	StakeEnabledHeight:    256 + 256, // CoinbaseMaturity + TicketMaturity
-	StakeValidationHeight: 4096,      // ~14 days
-	StakeBaseSigScript:    []byte{0x00, 0x00},
-	StakeVersion:          2,
+	MinimumStakeDiff:        2 * 1e8, // 2 Coin
+	TicketPoolSize:          8192,
+	TicketsPerBlock:         5,
+	TicketMaturity:          256,
+	TicketExpiry:            40960, // 5*TicketPoolSize
+	CoinbaseMaturity:        256,
+	SStxChangeMaturity:      1,
+	TicketPoolSizeWeight:    4,
+	StakeDiffAlpha:          1, // Minimal
+	StakeDiffWindowSize:     144,
+	StakeDiffWindows:        20,
+	StakeVersionInterval:    144 * 2 * 7, // ~1 week
+	MaxFreshStakePerBlock:   20,          // 4*TicketsPerBlock
+	StakeEnabledHeight:      256 + 256,   // CoinbaseMaturity + TicketMaturity
+	StakeValidationHeight:   4096,        // ~14 days
+	StakeBaseSigScript:      []byte{0x00, 0x00},
+	StakeMajorityMultiplier: 3,
+	StakeMajorityDivisor:    4,
 
 	// Decred organization related parameters
 	// Organization address is Dcur2mcGjmENx4DhNqDctW5wJCVyT3Qeqkx
@@ -490,22 +498,24 @@ var TestNetParams = Params{
 	HDCoinType: 11,
 
 	// Decred PoS parameters
-	MinimumStakeDiff:      20000000, // 0.2 Coin
-	TicketPoolSize:        1024,
-	TicketsPerBlock:       5,
-	TicketMaturity:        16,
-	TicketExpiry:          6144, // 6*TicketPoolSize
-	CoinbaseMaturity:      16,
-	SStxChangeMaturity:    1,
-	TicketPoolSizeWeight:  4,
-	StakeDiffAlpha:        1,
-	StakeDiffWindowSize:   144,
-	StakeDiffWindows:      20,
-	MaxFreshStakePerBlock: 20,      // 4*TicketsPerBlock
-	StakeEnabledHeight:    16 + 16, // CoinbaseMaturity + TicketMaturity
-	StakeValidationHeight: 768,     // Arbitrary
-	StakeBaseSigScript:    []byte{0xDE, 0xAD, 0xBE, 0xEF},
-	StakeVersion:          2,
+	MinimumStakeDiff:        20000000, // 0.2 Coin
+	TicketPoolSize:          1024,
+	TicketsPerBlock:         5,
+	TicketMaturity:          16,
+	TicketExpiry:            6144, // 6*TicketPoolSize
+	CoinbaseMaturity:        16,
+	SStxChangeMaturity:      1,
+	TicketPoolSizeWeight:    4,
+	StakeDiffAlpha:          1,
+	StakeDiffWindowSize:     144,
+	StakeDiffWindows:        20,
+	StakeVersionInterval:    144 * 2 * 7, // ~1 week
+	MaxFreshStakePerBlock:   20,          // 4*TicketsPerBlock
+	StakeEnabledHeight:      16 + 16,     // CoinbaseMaturity + TicketMaturity
+	StakeValidationHeight:   768,         // Arbitrary
+	StakeBaseSigScript:      []byte{0xDE, 0xAD, 0xBE, 0xEF},
+	StakeMajorityMultiplier: 3,
+	StakeMajorityDivisor:    4,
 
 	// Decred organization related parameters.
 	// Organization address is TcemyEtyHSg9L7jww7uihv9BJfKL6YGiZYn
@@ -586,22 +596,24 @@ var SimNetParams = Params{
 	HDCoinType: 115, // ASCII for s
 
 	// Decred PoS parameters
-	MinimumStakeDiff:      20000,
-	TicketPoolSize:        64,
-	TicketsPerBlock:       5,
-	TicketMaturity:        16,
-	TicketExpiry:          384, // 6*TicketPoolSize
-	CoinbaseMaturity:      16,
-	SStxChangeMaturity:    1,
-	TicketPoolSizeWeight:  4,
-	StakeDiffAlpha:        1,
-	StakeDiffWindowSize:   8,
-	StakeDiffWindows:      8,
-	MaxFreshStakePerBlock: 20,            // 4*TicketsPerBlock
-	StakeEnabledHeight:    16 + 16,       // CoinbaseMaturity + TicketMaturity
-	StakeValidationHeight: 16 + (64 * 2), // CoinbaseMaturity + TicketPoolSize*2
-	StakeBaseSigScript:    []byte{0xDE, 0xAD, 0xBE, 0xEF},
-	StakeVersion:          2,
+	MinimumStakeDiff:        20000,
+	TicketPoolSize:          64,
+	TicketsPerBlock:         5,
+	TicketMaturity:          16,
+	TicketExpiry:            384, // 6*TicketPoolSize
+	CoinbaseMaturity:        16,
+	SStxChangeMaturity:      1,
+	TicketPoolSizeWeight:    4,
+	StakeDiffAlpha:          1,
+	StakeDiffWindowSize:     8,
+	StakeDiffWindows:        8,
+	StakeVersionInterval:    8 * 2 * 7,
+	MaxFreshStakePerBlock:   20,            // 4*TicketsPerBlock
+	StakeEnabledHeight:      16 + 16,       // CoinbaseMaturity + TicketMaturity
+	StakeValidationHeight:   16 + (64 * 2), // CoinbaseMaturity + TicketPoolSize*2
+	StakeBaseSigScript:      []byte{0xDE, 0xAD, 0xBE, 0xEF},
+	StakeMajorityMultiplier: 3,
+	StakeMajorityDivisor:    4,
 
 	// Decred organization related parameters
 	//

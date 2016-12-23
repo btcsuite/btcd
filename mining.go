@@ -36,7 +36,7 @@ const (
 	// will require changes to the generated block.  Using the wire constant
 	// for generated block version could allow creation of invalid blocks
 	// for the updated version.
-	generatedBlockVersion = 2
+	generatedBlockVersion = 3
 
 	// blockHeaderOverhead is the max number of bytes it takes to serialize
 	// a block header and max possible transaction count.
@@ -2105,6 +2105,12 @@ mempoolLoop:
 		}
 	}
 
+	// Figure out stake version.
+	generatedStakeVersion, err := blockManager.chain.CalcStakeVersionByHash(prevHash)
+	if err != nil {
+		return nil, err
+	}
+
 	// Create a new block ready to be solved.
 	merkles := blockchain.BuildMerkleTreeStore(blockTxnsRegular)
 	merklesStake := blockchain.BuildMerkleTreeStore(blockTxnsStake)
@@ -2124,7 +2130,7 @@ mempoolLoop:
 		Timestamp:    ts,
 		SBits:        reqStakeDifficulty,
 		Bits:         reqDifficulty,
-		StakeVersion: server.chainParams.StakeVersion,
+		StakeVersion: generatedStakeVersion,
 		Height:       uint32(nextBlockHeight),
 		// Size declared below
 	}

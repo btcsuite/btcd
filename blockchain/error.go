@@ -44,6 +44,11 @@ const (
 	// to a newer version.
 	ErrBlockVersionTooOld
 
+	// ErrBadStakeVersionindicates the block version is too old and is no
+	// longer accepted since the majority of the network has upgraded to a
+	// newer version.
+	ErrBadStakeVersion
+
 	// ErrInvalidTime indicates the time in the passed block has a precision
 	// that is more than one second.  The chain consensus rules require
 	// timestamps to have a maximum precision of one second.
@@ -426,6 +431,7 @@ var errorCodeStrings = map[ErrorCode]string{
 	ErrBlockTooBig:            "ErrBlockTooBig",
 	ErrWrongBlockSize:         "ErrWrongBlockSize",
 	ErrBlockVersionTooOld:     "ErrBlockVersionTooOld",
+	ErrBadStakeVersion:        "ErrBlockStakeVersion",
 	ErrInvalidTime:            "ErrInvalidTime",
 	ErrTimeTooOld:             "ErrTimeTooOld",
 	ErrTimeTooNew:             "ErrTimeTooNew",

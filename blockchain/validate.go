@@ -698,6 +698,16 @@ func (b *BlockChain) checkBlockHeaderContext(header *wire.BlockHeader, prevNode 
 	}
 
 	if !fastAdd {
+		// Reject version 2 blocks once a majority of the network has
+		// upgraded.
+		if header.Version < 3 && b.isMajorityVersion(3, prevNode,
+			b.chainParams.BlockRejectNumRequired) {
+
+			str := "new blocks with version %d are no longer valid"
+			str = fmt.Sprintf(str, header.Version)
+			return ruleError(ErrBlockVersionTooOld, str)
+		}
+
 		// Reject version 1 blocks once a majority of the network has
 		// upgraded.
 		if header.Version < 2 && b.isMajorityVersion(2, prevNode,
@@ -706,6 +716,20 @@ func (b *BlockChain) checkBlockHeaderContext(header *wire.BlockHeader, prevNode 
 			str := "new blocks with version %d are no longer valid"
 			str = fmt.Sprintf(str, header.Version)
 			return ruleError(ErrBlockVersionTooOld, str)
+		}
+
+		// Enforce the stake version in the header once a majority of
+		// the network has upgraded to version 3 blocks.
+		if header.Version >= 3 && b.isMajorityVersion(3, prevNode,
+			b.chainParams.BlockEnforceNumRequired) {
+
+			expectedStakeVer := b.calcStakeVersion(prevNode)
+			if header.StakeVersion != expectedStakeVer {
+				str := fmt.Sprintf("block stake version of %d "+
+					"is not the expected version of %d",
+					header.StakeVersion, expectedStakeVer)
+				return ruleError(ErrBadStakeVersion, str)
+			}
 		}
 	}
 
