@@ -11,7 +11,7 @@ set -ex
 # Automatic checks
 test -z "$(go fmt $(glide novendor) | tee /dev/stderr)"
 test -z "$(go vet $(glide novendor) 2>&1 | tee /dev/stderr)"
-env GORACE="halt_on_error=1" go test -race $(glide novendor)
+env GORACE="halt_on_error=1" go test -short -race $(glide novendor)
 
 # Run test coverage on each subdirectories and merge the coverage profile.
 
@@ -24,7 +24,7 @@ for dir in $(find . -maxdepth 10 -not -path '.' -not -path './.git*' \
     -not -path './vendor*' -type d)
 do
 if ls $dir/*.go &> /dev/null; then
-  go test -covermode=count -coverprofile=$dir/profile.tmp $dir
+  go test -short -covermode=count -coverprofile=$dir/profile.tmp $dir
   if [ -f $dir/profile.tmp ]; then
     cat $dir/profile.tmp | tail -n +2 >> profile.cov
     rm $dir/profile.tmp
