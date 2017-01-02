@@ -2095,6 +2095,37 @@ func TestCheckBlockHeaderContext(t *testing.T) {
 	}
 }
 
+// TestTxValidationErrors ensures certain malformed freestanding transactions
+// are rejected as as expected.
+func TestTxValidationErrors(t *testing.T) {
+	// Create a transaction that is too large
+	tx := wire.NewMsgTx()
+	prevOut := wire.NewOutPoint(&chainhash.Hash{0x01}, 0, wire.TxTreeRegular)
+	tx.AddTxIn(wire.NewTxIn(prevOut, nil))
+	pkScript := bytes.Repeat([]byte{0x00}, wire.MaxBlockPayload)
+	tx.AddTxOut(wire.NewTxOut(0, pkScript))
+
+	// Assert the transaction is larger than the max allowed size.
+	txSize := tx.SerializeSize()
+	if txSize <= wire.MaxBlockPayload {
+		t.Fatalf("generated transaction is not large enough -- got "+
+			"%d, want > %d", txSize, wire.MaxBlockPayload)
+	}
+
+	// Ensure transaction is rejected due to being too large.
+	err := blockchain.CheckTransactionSanity(tx, &chaincfg.MainNetParams)
+	rerr, ok := err.(blockchain.RuleError)
+	if !ok {
+		t.Fatalf("CheckTransactionSanity: unexpected error type for "+
+			"transaction that is too large -- got %T", err)
+	}
+	if rerr.ErrorCode != blockchain.ErrTxTooBig {
+		t.Fatalf("CheckTransactionSanity: unexpected error code for "+
+			"transaction that is too large -- got %v, want %v",
+			rerr.ErrorCode, blockchain.ErrTxTooBig)
+	}
+}
+
 // simNetPowLimit is the highest proof of work value a Decred block
 // can have for the simulation test network.  It is the value 2^255 - 1.
 var simNetPowLimit = new(big.Int).Sub(new(big.Int).Lsh(bigOne, 255), bigOne)
