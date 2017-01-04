@@ -537,17 +537,6 @@ func checkBlockSanity(block *btcutil.Block, powLimit *big.Int, timeSource Median
 		return ruleError(ErrBadMerkleRoot, str)
 	}
 
-	// Next, validate the witness commitment (if any) within the block.
-	// This involves asserting that if the coinbase contains the special
-	// commitment output, then this merkle root matches a computed merkle
-	// root of all the wtxid's of the transactions within the block. In
-	// addition, various other checks against the coinbase's witness stack.
-	// TODO(roasbeef): only perform this check if we expect block to have a
-	// witness commitment
-	if err := ValidateWitnessCommitment(block); err != nil {
-		return err
-	}
-
 	// Check for duplicate transactions.  This check will be fairly quick
 	// since the transaction hashes are already cached due to building the
 	// merkle tree above.
@@ -1076,8 +1065,15 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block, vi
 	// after the timestamp defined by txscript.Bip16Activation.  See
 	// https://en.bitcoin.it/wiki/BIP_0016 for more details.
 	enforceBIP0016 := node.timestamp >= txscript.Bip16Activation.Unix()
-	// TODO(roasbeef): should check flag, consult bip 9 log etc
-	enforceSegWit := true
+
+	// Query for the Version Bits state for the segwit soft-fork
+	// deployment. If segwit is active, we'll switch over to enforcing all
+	// the new rules.
+	segwitState, err := b.deploymentState(node.parent, chaincfg.DeploymentSegwit)
+	if err != nil {
+		return err
+	}
+	enforceSegWit := segwitState == ThresholdActive
 
 	// The number of signature operations must be less than the maximum
 	// allowed per block.  Note that the preliminary sanity checks on a
@@ -1105,7 +1101,6 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block, vi
 		lastSigOpCost := totalSigOpCost
 		totalSigOpCost += sigOpCost
 		if totalSigOpCost < lastSigOpCost || totalSigOpCost > MaxBlockSigOpsCost {
-			// TODO(roasbeef): modify error
 			str := fmt.Sprintf("block contains too many "+
 				"signature operations - got %v, max %v",
 				totalSigOpCost, MaxBlockSigOpsCost)
@@ -1239,9 +1234,12 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block, vi
 		}
 	}
 
-	// TODO(roasbeef): check bip9 for segwit here, others also
-	scriptFlags |= txscript.ScriptVerifyWitness
-	scriptFlags |= txscript.ScriptStrictMultiSig
+	// Enforce the segwit soft-fork package once the soft-fork has shifted
+	// into the "active" version bits state.
+	if enforceSegWit {
+		scriptFlags |= txscript.ScriptVerifyWitness
+		scriptFlags |= txscript.ScriptStrictMultiSig
+	}
 
 	// Now that the inexpensive checks are done and have passed, verify the
 	// transactions are actually allowed to spend the coins by running the

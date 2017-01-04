@@ -249,6 +249,10 @@ func checkBlockScripts(block *btcutil.Block, utxoView *UtxoViewpoint,
 	scriptFlags txscript.ScriptFlags, sigCache *txscript.SigCache,
 	hashCache *txscript.HashCache) error {
 
+	// First determine if segwit is active according to the scriptFlags. If
+	// it isn't then we don't need to interact with the HashCache.
+	segwitActive := scriptFlags&txscript.ScriptVerifyWitness == txscript.ScriptVerifyWitness
+
 	// Collect all of the transaction inputs and required information for
 	// validation for all transactions in the block into a single slice.
 	numInputs := 0
@@ -308,7 +312,7 @@ func checkBlockScripts(block *btcutil.Block, utxoView *UtxoViewpoint,
 	// If the HashCache is present, once we have validated the block, we no
 	// longer need the cached hashes for these transactions, so we purge
 	// them from the cache.
-	if hashCache != nil {
+	if segwitActive && hashCache != nil {
 		for _, tx := range block.Transactions() {
 			hashCache.PurgeSigHashes(tx.Hash())
 		}
