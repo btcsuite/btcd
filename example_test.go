@@ -18,9 +18,9 @@ func ExampleAmount() {
 	a = dcrutil.Amount(1e5)
 	fmt.Println("100,000 Atoms:", a)
 	// Output:
-	// Zero Atom: 0 Coin
-	// 100,000,000 Atoms: 1 Coin
-	// 100,000 Atoms: 0.001 Coin
+	// Zero Atom: 0 DCR
+	// 100,000,000 Atoms: 1 DCR
+	// 100,000 Atoms: 0.001 DCR
 }
 
 func ExampleNewAmount() {
@@ -52,9 +52,9 @@ func ExampleNewAmount() {
 	}
 	fmt.Println(amountNaN) //Output 4
 
-	// Output: 1 Coin
-	// 0.01234567 Coin
-	// 0 Coin
+	// Output: 1 DCR
+	// 0.01234567 DCR
+	// 0 DCR
 	// invalid coin amount
 }
 
@@ -68,9 +68,9 @@ func ExampleAmount_unitConversions() {
 	fmt.Println("Atom to Atom:", amount.Format(dcrutil.AmountAtom))
 
 	// Output:
-	// Atom to kCoin: 444.333222111 kCoin
-	// Atom to Coin: 444333.222111 Coin
-	// Atom to MilliCoin: 444333222.111 mCoin
-	// Atom to MicroCoin: 444333222111 μCoin
+	// Atom to kCoin: 444.333222111 kDCR
+	// Atom to Coin: 444333.222111 DCR
+	// Atom to MilliCoin: 444333222.111 mDCR
+	// Atom to MicroCoin: 444333222111 μDCR
 	// Atom to Atom: 44433322211100 Atom
 }
