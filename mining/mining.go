@@ -5,6 +5,7 @@
 package mining
 
 import (
+	"bytes"
 	"container/heap"
 	"fmt"
 	"time"
@@ -460,7 +461,6 @@ func (g *BlkTmplGenerator) NewBlockTemplate(payToAddress btcutil.Address) (*Bloc
 	if err != nil {
 		return nil, err
 	}
-	// TODO(roasbeef): add witnesss commitment output
 	coinbaseTx, err := createCoinbaseTx(g.chainParams, coinbaseScript,
 		nextBlockHeight, payToAddress)
 	if err != nil {
@@ -580,7 +580,6 @@ mempoolLoop:
 			nextBlockHeight)
 
 		// Calculate the fee in Satoshi/kB.
-		// TODO(roasbeef): cost accounting by weight
 		prioItem.feePerKB = txDesc.FeePerKB
 		prioItem.fee = txDesc.Fee
 
@@ -602,13 +601,22 @@ mempoolLoop:
 	// The starting block size is the size of the block header plus the max
 	// possible transaction count size, plus the size of the coinbase
 	// transaction.
-	blockWeight := uint32((blockHeaderOverhead * (blockchain.WitnessScaleFactor - 1)) + blockchain.GetTransactionWeight(coinbaseTx))
+	blockWeight := uint32((blockHeaderOverhead * blockchain.WitnessScaleFactor) +
+		blockchain.GetTransactionWeight(coinbaseTx))
 	blockSigOpCost := coinbaseSigOpCost
 	totalFees := int64(0)
 
-	// TODO(roasbeef): should be guarded by version bits state check
-	var witnessIncluded bool
-	includeWitness := true
+	// Query the version bits state to see if segwit has been activated, if
+	// so then this means that we'll include any transactions with witness
+	// data in the mempool, and also add the witness commitment as an
+	// OP_RETURN output in the coinbase transaction.
+	segwitState, err := g.chain.ThresholdState(chaincfg.DeploymentSegwit)
+	if err != nil {
+		return nil, err
+	}
+	segwitActive := segwitState == blockchain.ThresholdActive
+
+	witnessIncluded := false
 
 	// Choose which transactions make it into the block.
 	for priorityQueue.Len() > 0 {
@@ -620,37 +628,38 @@ mempoolLoop:
 		switch {
 		// If segregated witness has not been activated yet, then we
 		// shouldn't include any witness transactions in the block.
-		case tx.HasWitness() && !segwitActive:
+		case !segwitActive && tx.HasWitness():
 			continue
 
 		// Otherwise, Keep track of if we've included a transaction
 		// with witness data or not. If so, then we'll need to include
 		// the witness commitment as the last output in the coinbase
 		// transaction.
-		case tx.HasWitness() && segwitActive:
+		case segwitActive && !witnessIncluded && tx.HasWitness():
 			// If we're about to include a transaction bearing
 			// witness data, then we'll also need to include a
 			// witness commitment in the coinbase transaction.
 			// Therefore, we account for the additional weight
-			// within the block.
-			if !witnessIncluded {
-				// First we account for the additional witness
-				// data in the witness nonce of the coinbaes
-				// transaction: 32-bytes of zeroes.
-				blockWeight += 2 + 32
-
-				// Next we account for the additional flag and
-				// marker bytes in the transaction
-				// serialization.
-				blockWeight += (1 + 1) * blockchain.WitnessScaleFactor
-
-				// Finally we account for the weight of the
-				// additional OP_RETURN output: 8-bytes (value)
-				// + 1-byte (var-int) + 38-bytes (pkScript),
-				// scaling up the weight as it's non-witness
-				// data.
-				blockWeight += (8 + 1 + 38) * blockchain.WitnessScaleFactor
+			// within the block with a model coinbase tx with a
+			// witness commitment.
+			coinbaseCopy := btcutil.NewTx(coinbaseTx.MsgTx().Copy())
+			coinbaseCopy.MsgTx().TxIn[0].Witness = [][]byte{
+				bytes.Repeat([]byte("a"),
+					blockchain.CoinbaseWitnessDataLen),
 			}
+			coinbaseCopy.MsgTx().AddTxOut(&wire.TxOut{
+				PkScript: bytes.Repeat([]byte("a"),
+					blockchain.CoinbaseWitnessPkScriptLength),
+			})
+
+			// In order to accurately account for the weight
+			// addition due to this coinbase transaction, we'll add
+			// the difference of the transaction before and after
+			// the addition of the commitment to the block weight.
+			weightDiff := blockchain.GetTransactionWeight(coinbaseCopy) -
+				blockchain.GetTransactionWeight(coinbaseTx)
+
+			blockWeight += uint32(weightDiff)
 
 			witnessIncluded = true
 		}
@@ -660,7 +669,7 @@ mempoolLoop:
 
 		// Enforce maximum block size.  Also check for overflow.
 		txWeight := uint32(blockchain.GetTransactionWeight(tx))
-		blockPlusTxWeight := uint32(blockWeight + txWeight)
+		blockPlusTxWeight := blockWeight + txWeight
 		if blockPlusTxWeight < blockWeight ||
 			blockPlusTxWeight >= g.policy.BlockMaxWeight {
 
@@ -673,7 +682,7 @@ mempoolLoop:
 		// Enforce maximum signature operation cost per block.  Also
 		// check for overflow.
 		sigOpCost, err := blockchain.GetSigOpCost(tx, false,
-			blockUtxos, true, includeWitness)
+			blockUtxos, true, segwitActive)
 		if err != nil {
 			log.Tracef("Skipping tx %s due to error in "+
 				"GetSigOpCost: %v", tx.Hash(), err)
@@ -789,12 +798,49 @@ mempoolLoop:
 	// the total fees accordingly.
 	blockWeight -= wire.MaxVarIntPayload -
 		(uint32(wire.VarIntSerializeSize(uint64(len(blockTxns)))) *
-			(blockchain.WitnessScaleFactor - 1))
+			blockchain.WitnessScaleFactor)
 	coinbaseTx.MsgTx().TxOut[0].Value += totalFees
 	txFees[0] = -totalFees
 
-	// TODO(roasbeef): add witness commitment
+	// If segwit is active and we included transactions with witness data,
+	// then we'll need to include a commitment to the witness data in an
+	// OP_RETURN output within the coinbase transaction.
+	var witnessCommitment []byte
 	if witnessIncluded {
+		// The witness of the coinbase transaction MUST be exactly 32-bytes
+		// of all zeroes.
+		var witnessNonce [blockchain.CoinbaseWitnessDataLen]byte
+		coinbaseTx.MsgTx().TxIn[0].Witness = wire.TxWitness{witnessNonce[:]}
+
+		// Next, obtain the merkle root of a tree which consists of the
+		// wtxid of all transactions in the block. The coinbase
+		// transaction will have a special wtxid of all zeroes.
+		witnessMerkleTree := blockchain.BuildMerkleTreeStore(blockTxns,
+			true)
+		witnessMerkleRoot := witnessMerkleTree[len(witnessMerkleTree)-1]
+
+		// The preimage to the witness commitment is:
+		// witnessRoot || coinbaseWitness
+		var witnessPreimage [64]byte
+		copy(witnessPreimage[:32], witnessMerkleRoot[:])
+		copy(witnessPreimage[32:], witnessNonce[:])
+
+		// The witness commitment itself is the double-sha256 of the
+		// witness preimage generated above. With the commitment
+		// generated, the witness script for the output is: OP_RETURN
+		// OP_DATA_36 {0xaa21a9ed || witnessCommitment}. The leading
+		// prefix is refered to as the "witness magic bytes".
+		witnessCommitment = chainhash.DoubleHashB(witnessPreimage[:])
+		witnessScript := append(blockchain.WitnessMagicBytes, witnessCommitment...)
+
+		// Finally, create the OP_RETURN carrying witness commitment
+		// output as an additional output within the coinbase.
+		commitmentOutput := &wire.TxOut{
+			Value:    0,
+			PkScript: witnessScript,
+		}
+		coinbaseTx.MsgTx().TxOut = append(coinbaseTx.MsgTx().TxOut,
+			commitmentOutput)
 	}
 
 	// Calculate the required difficulty for the block.  The timestamp
@@ -844,11 +890,12 @@ mempoolLoop:
 		blockWeight, blockchain.CompactToBig(msgBlock.Header.Bits))
 
 	return &BlockTemplate{
-		Block:           &msgBlock,
-		Fees:            txFees,
-		SigOpCosts:      txSigOpCosts,
-		Height:          nextBlockHeight,
-		ValidPayAddress: payToAddress != nil,
+		Block:             &msgBlock,
+		Fees:              txFees,
+		SigOpCosts:        txSigOpCosts,
+		Height:            nextBlockHeight,
+		ValidPayAddress:   payToAddress != nil,
+		WitnessCommitment: witnessCommitment,
 	}, nil
 }
 
