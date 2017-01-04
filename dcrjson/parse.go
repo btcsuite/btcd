@@ -73,10 +73,10 @@ func DecodeConcatenatedHashes(hashes string) ([]chainhash.Hash, error) {
 func EncodeConcatenatedVoteBits(voteBitsSlice []stake.VoteBits) (string, error) {
 	length := 0
 	for i := range voteBitsSlice {
-		if len(voteBitsSlice[i].ExtendedBits) > stake.MaxSingleBytePushLength-2 {
+		if len(voteBitsSlice[i].ExtendedBits) > stake.SSGenVoteBitsExtendedMaxSize {
 			return "", fmt.Errorf("extended votebits too long (got %v, want "+
 				"%v max", len(voteBitsSlice[i].ExtendedBits),
-				stake.MaxSingleBytePushLength-2)
+				stake.SSGenVoteBitsExtendedMaxSize)
 		}
 
 		length += 1 + 2 + len(voteBitsSlice[i].ExtendedBits)

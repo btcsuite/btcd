@@ -89,6 +89,16 @@ const (
 	// SStx commitment or VoteBits push.
 	MaxSingleBytePushLength = 75
 
+	// SSGenVoteBitsExtendedMaxSize is the maximum size for a VoteBitsExtended
+	// push in an SSGen.
+	//
+	// The final vote transaction includes a single data push for all vote
+	// bits concatenated.  The non-extended vote bits occupy the first 2
+	// bytes, thus the max number of extended vote bits is the maximum
+	// allow length for a single byte data push minus the 2 bytes required
+	// by the non-extended vote bits.
+	SSGenVoteBitsExtendedMaxSize = MaxSingleBytePushLength - 2
+
 	// SStxVoteReturnFractionMask extracts the return fraction from a
 	// commitment output version.
 	// If after applying this mask &0x003f is given, the entire amount of
