@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2015 The btcsuite developers
+// Copyright (c) 2013-2017 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -32,8 +32,11 @@ what conditions must be met in order to spend bitcoins.
 
 Errors
 
-Errors returned by this package are of the form txscript.ErrStackX where X
-indicates the specific error.  See Variables in the package documentation for a
-full list.
+Errors returned by this package are of type txscript.Error.  This allows the
+caller to programmatically determine the specific error by examining the
+ErrorCode field of the type asserted txscript.Error while still providing rich
+error messages with contextual information.  A convenience function named
+IsErrorCode is also provided to allow callers to easily check for a specific
+error code.  See ErrorCode in the package documentation for a full list.
 */
 package txscript

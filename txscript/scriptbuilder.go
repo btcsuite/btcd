@@ -62,9 +62,9 @@ func (b *ScriptBuilder) AddOp(opcode byte) *ScriptBuilder {
 
 	// Pushes that would cause the script to exceed the largest allowed
 	// script size would result in a non-canonical script.
-	if len(b.script)+1 > maxScriptSize {
+	if len(b.script)+1 > MaxScriptSize {
 		str := fmt.Sprintf("adding an opcode would exceed the maximum "+
-			"allowed canonical script length of %d", maxScriptSize)
+			"allowed canonical script length of %d", MaxScriptSize)
 		b.err = ErrScriptNotCanonical(str)
 		return b
 	}
@@ -83,9 +83,9 @@ func (b *ScriptBuilder) AddOps(opcodes []byte) *ScriptBuilder {
 
 	// Pushes that would cause the script to exceed the largest allowed
 	// script size would result in a non-canonical script.
-	if len(b.script)+len(opcodes) > maxScriptSize {
+	if len(b.script)+len(opcodes) > MaxScriptSize {
 		str := fmt.Sprintf("adding opcodes would exceed the maximum "+
-			"allowed canonical script length of %d", maxScriptSize)
+			"allowed canonical script length of %d", MaxScriptSize)
 		b.err = ErrScriptNotCanonical(str)
 		return b
 	}
@@ -198,10 +198,10 @@ func (b *ScriptBuilder) AddData(data []byte) *ScriptBuilder {
 	// Pushes that would cause the script to exceed the largest allowed
 	// script size would result in a non-canonical script.
 	dataSize := canonicalDataSize(data)
-	if len(b.script)+dataSize > maxScriptSize {
+	if len(b.script)+dataSize > MaxScriptSize {
 		str := fmt.Sprintf("adding %d bytes of data would exceed the "+
 			"maximum allowed canonical script length of %d",
-			dataSize, maxScriptSize)
+			dataSize, MaxScriptSize)
 		b.err = ErrScriptNotCanonical(str)
 		return b
 	}
@@ -212,7 +212,7 @@ func (b *ScriptBuilder) AddData(data []byte) *ScriptBuilder {
 	if dataLen > MaxScriptElementSize {
 		str := fmt.Sprintf("adding a data element of %d bytes would "+
 			"exceed the maximum allowed script element size of %d",
-			dataLen, maxScriptSize)
+			dataLen, MaxScriptElementSize)
 		b.err = ErrScriptNotCanonical(str)
 		return b
 	}
@@ -230,10 +230,10 @@ func (b *ScriptBuilder) AddInt64(val int64) *ScriptBuilder {
 
 	// Pushes that would cause the script to exceed the largest allowed
 	// script size would result in a non-canonical script.
-	if len(b.script)+1 > maxScriptSize {
+	if len(b.script)+1 > MaxScriptSize {
 		str := fmt.Sprintf("adding an integer would exceed the "+
 			"maximum allow canonical script length of %d",
-			maxScriptSize)
+			MaxScriptSize)
 		b.err = ErrScriptNotCanonical(str)
 		return b
 	}

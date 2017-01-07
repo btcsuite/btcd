@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2016 The btcsuite developers
+// Copyright (c) 2013-2017 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -24,10 +24,11 @@ func TestOpcodeDisabled(t *testing.T) {
 	}
 	for _, opcodeVal := range tests {
 		pop := parsedOpcode{opcode: &opcodeArray[opcodeVal], data: nil}
-		if err := opcodeDisabled(&pop, nil); err != ErrStackOpDisabled {
+		err := opcodeDisabled(&pop, nil)
+		if !IsErrorCode(err, ErrDisabledOpcode) {
 			t.Errorf("opcodeDisabled: unexpected error - got %v, "+
-				"want %v", err, ErrStackOpDisabled)
-			return
+				"want %v", err, ErrDisabledOpcode)
+			continue
 		}
 	}
 }

@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2016 The btcsuite developers
+// Copyright (c) 2013-2017 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -392,7 +392,7 @@ func TestCalcScriptInfo(t *testing.T) {
 			pkScript: "HASH160 DATA_20 0xfe441065b6532231de2fac56" +
 				"3152205ec4f59c",
 			bip16:         true,
-			scriptInfoErr: ErrStackShortScript,
+			scriptInfoErr: scriptError(ErrMalformedPush, ""),
 		},
 		{
 			name: "sigScript doesn't parse",
@@ -402,7 +402,7 @@ func TestCalcScriptInfo(t *testing.T) {
 			pkScript: "HASH160 DATA_20 0xfe441065b6532231de2fac56" +
 				"3152205ec4f59c74 EQUAL",
 			bip16:         true,
-			scriptInfoErr: ErrStackShortScript,
+			scriptInfoErr: scriptError(ErrMalformedPush, ""),
 		},
 		{
 			// Invented scripts, the hashes do not match
@@ -461,25 +461,19 @@ func TestCalcScriptInfo(t *testing.T) {
 	for _, test := range tests {
 		sigScript := mustParseShortForm(test.sigScript)
 		pkScript := mustParseShortForm(test.pkScript)
-		si, err := CalcScriptInfo(sigScript, pkScript,
-			test.bip16)
+		si, err := CalcScriptInfo(sigScript, pkScript, test.bip16)
+		if e := tstCheckScriptError(err, test.scriptInfoErr); e != nil {
+			t.Errorf("scriptinfo test %q: %v", test.name, e)
+			continue
+		}
 		if err != nil {
-			if err != test.scriptInfoErr {
-				t.Errorf("scriptinfo test \"%s\": got \"%v\""+
-					"expected \"%v\"", test.name, err,
-					test.scriptInfoErr)
-			}
 			continue
 		}
-		if test.scriptInfoErr != nil {
-			t.Errorf("%s: succeeded when expecting \"%v\"",
-				test.name, test.scriptInfoErr)
-			continue
-		}
+
 		if *si != test.scriptInfo {
 			t.Errorf("%s: scriptinfo doesn't match expected. "+
-				"got: \"%v\" expected \"%v\"", test.name,
-				*si, test.scriptInfo)
+				"got: %q expected %q", test.name, *si,
+				test.scriptInfo)
 			continue
 		}
 	}
@@ -521,8 +515,7 @@ func TestPayToAddrScript(t *testing.T) {
 	p2pkhMain, err := btcutil.NewAddressPubKeyHash(hexToBytes("e34cce70c86"+
 		"373273efcc54ce7d2a491bb4a0e84"), &chaincfg.MainNetParams)
 	if err != nil {
-		t.Errorf("Unable to create public key hash address: %v", err)
-		return
+		t.Fatalf("Unable to create public key hash address: %v", err)
 	}
 
 	// Taken from transaction:
@@ -530,8 +523,7 @@ func TestPayToAddrScript(t *testing.T) {
 	p2shMain, _ := btcutil.NewAddressScriptHashFromHash(hexToBytes("e8c300"+
 		"c87986efa84c37c0519929019ef86eb5b4"), &chaincfg.MainNetParams)
 	if err != nil {
-		t.Errorf("Unable to create script hash address: %v", err)
-		return
+		t.Fatalf("Unable to create script hash address: %v", err)
 	}
 
 	//  mainnet p2pk 13CG6SJ3yHUXo4Cr2RY4THLLJrNFuG3gUg
@@ -539,17 +531,15 @@ func TestPayToAddrScript(t *testing.T) {
 		"74d0cb94344c9569c2e77901573d8d7903c3ebec3a957724895dca52c6b4"),
 		&chaincfg.MainNetParams)
 	if err != nil {
-		t.Errorf("Unable to create pubkey address (compressed): %v",
+		t.Fatalf("Unable to create pubkey address (compressed): %v",
 			err)
-		return
 	}
 	p2pkCompressed2Main, err := btcutil.NewAddressPubKey(hexToBytes("03b0b"+
 		"d634234abbb1ba1e986e884185c61cf43e001f9137f23c2c409273eb16e65"),
 		&chaincfg.MainNetParams)
 	if err != nil {
-		t.Errorf("Unable to create pubkey address (compressed 2): %v",
+		t.Fatalf("Unable to create pubkey address (compressed 2): %v",
 			err)
-		return
 	}
 
 	p2pkUncompressedMain, err := btcutil.NewAddressPubKey(hexToBytes("0411"+
@@ -557,10 +547,13 @@ func TestPayToAddrScript(t *testing.T) {
 		"cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b4"+
 		"12a3"), &chaincfg.MainNetParams)
 	if err != nil {
-		t.Errorf("Unable to create pubkey address (uncompressed): %v",
+		t.Fatalf("Unable to create pubkey address (uncompressed): %v",
 			err)
-		return
 	}
+
+	// Errors used in the tests below defined here for convenience and to
+	// keep the horizontal test size shorter.
+	errUnsupportedAddress := scriptError(ErrUnsupportedAddress, "")
 
 	tests := []struct {
 		in       btcutil.Address
@@ -606,18 +599,18 @@ func TestPayToAddrScript(t *testing.T) {
 		},
 
 		// Supported address types with nil pointers.
-		{(*btcutil.AddressPubKeyHash)(nil), "", ErrUnsupportedAddress},
-		{(*btcutil.AddressScriptHash)(nil), "", ErrUnsupportedAddress},
-		{(*btcutil.AddressPubKey)(nil), "", ErrUnsupportedAddress},
+		{(*btcutil.AddressPubKeyHash)(nil), "", errUnsupportedAddress},
+		{(*btcutil.AddressScriptHash)(nil), "", errUnsupportedAddress},
+		{(*btcutil.AddressPubKey)(nil), "", errUnsupportedAddress},
 
 		// Unsupported address type.
-		{&bogusAddress{}, "", ErrUnsupportedAddress},
+		{&bogusAddress{}, "", errUnsupportedAddress},
 	}
 
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
 		pkScript, err := PayToAddrScript(test.in)
-		if err != test.err {
+		if e := tstCheckScriptError(err, test.err); e != nil {
 			t.Errorf("PayToAddrScript #%d unexpected error - "+
 				"got %v, want %v", i, err, test.err)
 			continue
@@ -642,17 +635,15 @@ func TestMultiSigScript(t *testing.T) {
 		"74d0cb94344c9569c2e77901573d8d7903c3ebec3a957724895dca52c6b4"),
 		&chaincfg.MainNetParams)
 	if err != nil {
-		t.Errorf("Unable to create pubkey address (compressed): %v",
+		t.Fatalf("Unable to create pubkey address (compressed): %v",
 			err)
-		return
 	}
 	p2pkCompressed2Main, err := btcutil.NewAddressPubKey(hexToBytes("03b0b"+
 		"d634234abbb1ba1e986e884185c61cf43e001f9137f23c2c409273eb16e65"),
 		&chaincfg.MainNetParams)
 	if err != nil {
-		t.Errorf("Unable to create pubkey address (compressed 2): %v",
+		t.Fatalf("Unable to create pubkey address (compressed 2): %v",
 			err)
-		return
 	}
 
 	p2pkUncompressedMain, err := btcutil.NewAddressPubKey(hexToBytes("0411"+
@@ -660,9 +651,8 @@ func TestMultiSigScript(t *testing.T) {
 		"cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b4"+
 		"12a3"), &chaincfg.MainNetParams)
 	if err != nil {
-		t.Errorf("Unable to create pubkey address (uncompressed): %v",
+		t.Fatalf("Unable to create pubkey address (uncompressed): %v",
 			err)
-		return
 	}
 
 	tests := []struct {
@@ -702,7 +692,7 @@ func TestMultiSigScript(t *testing.T) {
 			},
 			3,
 			"",
-			ErrBadNumRequired,
+			scriptError(ErrTooManyRequiredSigs, ""),
 		},
 		{
 			[]*btcutil.AddressPubKey{
@@ -721,16 +711,15 @@ func TestMultiSigScript(t *testing.T) {
 			},
 			2,
 			"",
-			ErrBadNumRequired,
+			scriptError(ErrTooManyRequiredSigs, ""),
 		},
 	}
 
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
 		script, err := MultiSigScript(test.keys, test.nrequired)
-		if err != test.err {
-			t.Errorf("MultiSigScript #%d unexpected error - "+
-				"got %v, want %v", i, err, test.err)
+		if e := tstCheckScriptError(err, test.err); e != nil {
+			t.Errorf("MultiSigScript #%d: %v", i, e)
 			continue
 		}
 
@@ -757,14 +746,14 @@ func TestCalcMultiSigStats(t *testing.T) {
 			name: "short script",
 			script: "0x046708afdb0fe5548271967f1a67130b7105cd6a828" +
 				"e03909a67962e0ea1f61d",
-			err: ErrStackShortScript,
+			err: scriptError(ErrMalformedPush, ""),
 		},
 		{
 			name: "stack underflow",
 			script: "RETURN DATA_41 0x046708afdb0fe5548271967f1a" +
 				"67130b7105cd6a828e03909a67962e0ea1f61deb649f6" +
 				"bc3f4cef308",
-			err: ErrStackUnderflow,
+			err: scriptError(ErrNotMultisigScript, ""),
 		},
 		{
 			name: "multisig script",
@@ -780,10 +769,11 @@ func TestCalcMultiSigStats(t *testing.T) {
 
 	for i, test := range tests {
 		script := mustParseShortForm(test.script)
-		if _, _, err := CalcMultiSigStats(script); err != test.err {
-			t.Errorf("CalcMultiSigStats #%d (%s) unexpected "+
-				"error\ngot: %v\nwant: %v", i, test.name, err,
-				test.err)
+		_, _, err := CalcMultiSigStats(script)
+		if e := tstCheckScriptError(err, test.err); e != nil {
+			t.Errorf("CalcMultiSigStats #%d (%s): %v", i, test.name,
+				e)
+			continue
 		}
 	}
 }
@@ -968,7 +958,7 @@ func TestScriptClass(t *testing.T) {
 		if class != test.class {
 			t.Errorf("%s: expected %s got %s (script %x)", test.name,
 				test.class, class, script)
-			return
+			continue
 		}
 	}
 }
@@ -1082,17 +1072,18 @@ func TestNullDataScript(t *testing.T) {
 				"728292a2b2c2d2e2f303132333435363738393a3b3c3" +
 				"d3e3f404142434445464748494a4b4c4d4e4f50"),
 			expected: nil,
-			err:      ErrStackLongScript,
+			err:      scriptError(ErrTooMuchNullData, ""),
 			class:    NonStandardTy,
 		},
 	}
 
 	for i, test := range tests {
 		script, err := NullDataScript(test.data)
-		if err != test.err {
-			t.Errorf("NullDataScript: #%d (%s) unexpected error: "+
-				"got %v, want %v", i, test.name, err, test.err)
+		if e := tstCheckScriptError(err, test.err); e != nil {
+			t.Errorf("NullDataScript: #%d (%s): %v", i, test.name,
+				e)
 			continue
+
 		}
 
 		// Check that the expected result was returned.
