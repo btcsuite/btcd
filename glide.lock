@@ -1,5 +1,5 @@
-hash: f31381b9d7836c3acfccda809b8b279691b38d97517933b4f10e97f8ec468d2b
-updated: 2016-12-07T14:45:59.225417-05:00
+hash: 07e0c3b630a43e1398956ecc13ffc56ab6f53590a2f04d7bec19634ba7b77f96
+updated: 2017-01-09T11:29:35.671928757-06:00
 imports:
 - name: github.com/btcsuite/btclog
   version: 73889fb79bd687870312b6e40effcecffbd57d30
@@ -53,7 +53,7 @@ imports:
 - name: github.com/decred/dcrrpcclient
   version: fc4826bb281f5b68af4cf95c20d8664419b4cc08
 - name: github.com/decred/dcrutil
-  version: b107d74547385caeaba836a213b9b6ffbd3d8096
+  version: ba0a5f399a43abc0e1a0a0442509c36f35321bce
   subpackages:
   - base58
   - bloom
@@ -62,11 +62,11 @@ imports:
   subpackages:
   - edwards25519
 - name: golang.org/x/crypto
-  version: 9477e0b78b9ac3d0b03822fd95422e2fe07627cd
+  version: c3b1d0d6d8690eaebe3064711b026770cc37efa3
   subpackages:
   - ssh/terminal
 - name: golang.org/x/sys
-  version: b699b7032584f0953262cb2788a0ca19bb494703
+  version: d75a52659825e75fff6158388dddc6a5b04f9ba5
   subpackages:
   - unix
 testImports:
@@ -75,6 +75,6 @@ testImports:
   subpackages:
   - difflib
 - name: github.com/stretchr/testify
-  version: 976c720a22c8eb4eb6a0b4348ad85ad12491a506
+  version: 69483b4bd14f5845b5a1e55bca19e954e827f1d0
   subpackages:
   - assert
