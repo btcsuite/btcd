@@ -38,6 +38,7 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcutil/bloom"
+	"github.com/btcsuite/btcutil/gcs"
 )
 
 const (
@@ -745,8 +746,45 @@ func (sp *serverPeer) OnGetCBFilter(_ *peer.Peer, msg *wire.MsgGetCBFilter) {
 		return
 	}
 
+	chain := sp.server.blockManager.chain
+	block, err := chain.BlockByHash(&msg.BlockHash)
+	if err != nil {
+		peerLog.Warnf("failed to get block %v: %v", msg.BlockHash, err)
+		return
+	}
+
+	txSlice := block.Transactions() // XXX can this fail?
+	txHashes := make([][]byte, len(txSlice))
+
+	for i := 0; i < len(txSlice); i++ {
+		txHash, err := block.TxHash(i)
+		if err != nil {
+			peerLog.Warnf("failed to get hash of tx %v of block %v",
+			    i, msg.BlockHash)
+			return
+		}
+		txHashes = append(txHashes, txHash.CloneBytes())
+		peerLog.Warnf("got hash %v", txHash)
+	}
+
+	var key [gcs.KeySize]byte
+	P := uint8(20) // collision probability
+
+	for i := 0; i < gcs.KeySize; i += 4 {
+		binary.BigEndian.PutUint32(key[i:],
+		    randomUint32Number(math.MaxUint32))
+	}
+
+	filter, err := gcs.BuildGCSFilter(P, key, txHashes)
+	if err != nil {
+		peerLog.Warnf("failed to generate filter for block %v",
+		    msg.BlockHash)
+		return
+	}
+
 	// XXX pedro: work in progress
-	peerLog.Warnf("received OnGetCBFilter")
+	peerLog.Warnf("received OnGetCBFilter: %v", block)
+	peerLog.Warnf("received OnGetCBFilter: %v", filter)
 }
 
 // enforceNodeBloomFlag disconnects the peer if the server is not configured to
@@ -967,6 +1005,24 @@ func randomUint16Number(max uint16) uint16 {
 	// modulus.
 	var randomNumber uint16
 	var limitRange = (math.MaxUint16 / max) * max
+	for {
+		binary.Read(rand.Reader, binary.LittleEndian, &randomNumber)
+		if randomNumber < limitRange {
+			return (randomNumber % max)
+		}
+	}
+}
+
+// randomUint32Number returns a random uint32 in a specified input range.  Note
+// that the range is in zeroth ordering; if you pass it 1800, you will get
+// values from 0 to 1800.
+func randomUint32Number(max uint32) uint32 {
+	// In order to avoid modulo bias and ensure every possible outcome in
+	// [0, max) has equal probability, the random number must be sampled
+	// from a random source that has a range limited to a multiple of the
+	// modulus.
+	var randomNumber uint32
+	var limitRange = (math.MaxUint32 / max) * max
 	for {
 		binary.Read(rand.Reader, binary.LittleEndian, &randomNumber)
 		if randomNumber < limitRange {
