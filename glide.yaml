@@ -8,7 +8,6 @@ import:
   - base58
   - hdkeychain
 - package: github.com/btcsuite/btcrpcclient
-- package: github.com/btcsuite/fastsha256
 - package: github.com/btcsuite/go-socks
   subpackages:
   - socks

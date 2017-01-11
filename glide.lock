@@ -1,21 +1,19 @@
-hash: ebeea81fdd8ab49cce0e295ae834f8fbb0fb6e1b8e618a5059aceff477ef6596
-updated: 2016-12-09T12:53:49.172263045-05:00
+hash: 3483e97fe9cd4e2c998f05ca648ce21767e1a4b955919aeffbc6bfe87d9b0648
+updated: 2017-01-11T09:52:36.894361964-05:00
 imports:
 - name: github.com/btcsuite/btclog
   version: 73889fb79bd687870312b6e40effcecffbd57d30
 - name: github.com/btcsuite/btcrpcclient
-  version: 7903290fd9956021ed7b65463f8667df345b365e
+  version: 5ce0ed600997eafaed25ad4936c1d84ec6ad2b5a
 - name: github.com/btcsuite/btcutil
-  version: 96e858f48ed95f9245e765d98be0ee01176409c7
+  version: bca6409ade96981b0e77a2a7d358be53b340a1a7
   subpackages:
   - .
   - base58
   - bloom
   - hdkeychain
-- name: github.com/btcsuite/fastsha256
-  version: 637e656429416087660c84436a2a035d69d54e2e
 - name: github.com/btcsuite/go-socks
-  version: cfe8b59e565c1a5bd4e2005d77cd9aa8b2e14524
+  version: 4720035b7bfd2a9bb130b1c184f8bbe41b6f0d0f
   subpackages:
   - socks
 - name: github.com/btcsuite/golangcrypto

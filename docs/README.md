@@ -155,9 +155,8 @@ For a list of available options, run: `$ btcctl --help`
 
 <a name="Mining" />
 **2.4 Mining**<br />
-btcd supports both the `getwork` and `getblocktemplate` RPCs although the
-`getwork` RPC is deprecated and will likely be removed in a future release.
-The limited user cannot access these RPCs.<br />
+btcd supports the `getblocktemplate` RPC.
+The limited user cannot access this RPC.<br />
 
 **1. Add the payment addresses with the `miningaddr` option.**<br />
 

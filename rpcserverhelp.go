@@ -470,19 +470,6 @@ var helpDescsEnUS = map[string]string{
 	"gettxout-vout":           "The index of the output",
 	"gettxout-includemempool": "Include the mempool when true",
 
-	// GetWorkResult help.
-	"getworkresult-data":     "Hex-encoded block data",
-	"getworkresult-hash1":    "(DEPRECATED) Hex-encoded formatted hash buffer",
-	"getworkresult-midstate": "(DEPRECATED) Hex-encoded precomputed hash state after hashing first half of the data",
-	"getworkresult-target":   "Hex-encoded little-endian hash target",
-
-	// GetWorkCmd help.
-	"getwork--synopsis":   "(DEPRECATED - Use getblocktemplate instead) Returns formatted hash data to work on or checks and submits solved data.",
-	"getwork-data":        "Hex-encoded data to check",
-	"getwork--condition0": "no data provided",
-	"getwork--condition1": "data provided",
-	"getwork--result1":    "Whether or not the solved data is valid and was added to the chain",
-
 	// HelpCmd help.
 	"help--synopsis":   "Returns a list of all commands or help for a specified command.",
 	"help-command":     "The command to retrieve help for",
@@ -662,7 +649,6 @@ var rpcResultTypes = map[string][]interface{}{
 	"getrawmempool":         {(*[]string)(nil), (*btcjson.GetRawMempoolVerboseResult)(nil)},
 	"getrawtransaction":     {(*string)(nil), (*btcjson.TxRawResult)(nil)},
 	"gettxout":              {(*btcjson.GetTxOutResult)(nil)},
-	"getwork":               {(*btcjson.GetWorkResult)(nil), (*bool)(nil)},
 	"node":                  nil,
 	"help":                  {(*string)(nil), (*string)(nil)},
 	"ping":                  nil,

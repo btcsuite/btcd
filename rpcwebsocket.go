@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2016 The btcsuite developers
+// Copyright (c) 2013-2017 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -7,6 +7,7 @@ package main
 import (
 	"bytes"
 	"container/list"
+	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/base64"
 	"encoding/hex"
@@ -25,7 +26,6 @@ import (
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
-	"github.com/btcsuite/fastsha256"
 	"github.com/btcsuite/golangcrypto/ripemd160"
 	"github.com/btcsuite/websocket"
 )
@@ -1010,7 +1010,7 @@ out:
 			// Check credentials.
 			login := authCmd.Username + ":" + authCmd.Passphrase
 			auth := "Basic " + base64.StdEncoding.EncodeToString([]byte(login))
-			authSha := fastsha256.Sum256([]byte(auth))
+			authSha := sha256.Sum256([]byte(auth))
 			cmp := subtle.ConstantTimeCompare(authSha[:], c.server.authsha[:])
 			limitcmp := subtle.ConstantTimeCompare(authSha[:], c.server.limitauthsha[:])
 			if cmp != 1 && limitcmp != 1 {

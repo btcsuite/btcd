@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2014 The btcsuite developers
+// Copyright (c) 2013-2017 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -9,12 +9,11 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/hmac"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"hash"
 	"math/big"
-
-	"github.com/btcsuite/fastsha256"
 )
 
 // Errors returned by canonicalPadding.
@@ -455,7 +454,7 @@ func nonceRFC6979(privkey *big.Int, hash []byte) *big.Int {
 	curve := S256()
 	q := curve.Params().N
 	x := privkey
-	alg := fastsha256.New
+	alg := sha256.New
 
 	qlen := q.BitLen()
 	holen := alg().Size()

@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2016 The btcsuite developers
+// Copyright (c) 2013-2017 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -106,7 +106,6 @@ Application Options:
                             a block (750000)
       --blockprioritysize=  Size in bytes for high-priority/low-fee transactions
                             when creating a block (50000)
-      --getworkkey=         DEPRECATED -- Use the --miningaddr option instead
       --nopeerbloomfilters  Disable bloom filtering support.
       --sigcachemaxsize=    The maximum number of entries in the signature
                             verification cache.

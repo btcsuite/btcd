@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2016 The btcsuite developers
+// Copyright (c) 2013-2017 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -7,12 +7,11 @@ package btcec
 import (
 	"bytes"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"math/big"
 	"testing"
-
-	"github.com/btcsuite/fastsha256"
 )
 
 type signatureTest struct {
@@ -558,7 +557,7 @@ func TestRFC6979(t *testing.T) {
 
 	for i, test := range tests {
 		privKey, _ := PrivKeyFromBytes(S256(), decodeHex(test.key))
-		hash := fastsha256.Sum256([]byte(test.msg))
+		hash := sha256.Sum256([]byte(test.msg))
 
 		// Ensure deterministically generated nonce is the expected value.
 		gotNonce := nonceRFC6979(privKey.D, hash[:]).Bytes()
