@@ -5,11 +5,13 @@
 package indexers
 
 import (
+	"encoding/binary"
 	"errors"
 
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcutil"
+	"github.com/btcsuite/btcutil/gcs"
 )
 
 const (
@@ -82,6 +84,29 @@ func (idx *CBFIndex) Create(dbTx database.Tx) error {
 //
 // This is part of the Indexer interface.
 func (idx *CBFIndex) ConnectBlock(dbTx database.Tx, block *btcutil.Block, view *blockchain.UtxoViewpoint) error {
+	txSlice := block.Transactions() // XXX can this fail?
+	txHashes := make([][]byte, len(txSlice))
+
+	for i := 0; i < len(txSlice); i++ {
+		txHash, err := block.TxHash(i)
+		if err != nil {
+			return err
+		}
+		txHashes = append(txHashes, txHash.CloneBytes())
+	}
+
+	var key [gcs.KeySize]byte
+	P := uint8(20) // collision probability
+
+	for i := 0; i < gcs.KeySize; i += 4 {
+		binary.BigEndian.PutUint32(key[i:], uint32(0xcafebabe))
+	}
+
+	_, err := gcs.BuildGCSFilter(P, key, txHashes)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 

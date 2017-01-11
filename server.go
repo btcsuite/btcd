@@ -38,7 +38,6 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcutil/bloom"
-	"github.com/btcsuite/btcutil/gcs"
 )
 
 const (
@@ -746,44 +745,8 @@ func (sp *serverPeer) OnGetCBFilter(_ *peer.Peer, msg *wire.MsgGetCBFilter) {
 		return
 	}
 
-	chain := sp.server.blockManager.chain
-	block, err := chain.BlockByHash(&msg.BlockHash)
-	if err != nil {
-		peerLog.Warnf("failed to get block %v: %v", msg.BlockHash, err)
-		return
-	}
-
-	txSlice := block.Transactions() // XXX can this fail?
-	txHashes := make([][]byte, len(txSlice))
-
-	for i := 0; i < len(txSlice); i++ {
-		txHash, err := block.TxHash(i)
-		if err != nil {
-			peerLog.Warnf("failed to get hash of tx %v of block %v",
-			    i, msg.BlockHash)
-			return
-		}
-		txHashes = append(txHashes, txHash.CloneBytes())
-		peerLog.Warnf("got hash %v", txHash)
-	}
-
-	var key [gcs.KeySize]byte
-	P := uint8(20) // collision probability
-
-	for i := 0; i < gcs.KeySize; i += 4 {
-		binary.BigEndian.PutUint32(key[i:], uint32(0xcafebabe))
-	}
-
-	filter, err := gcs.BuildGCSFilter(P, key, txHashes)
-	if err != nil {
-		peerLog.Warnf("failed to generate filter for block %v",
-		    msg.BlockHash)
-		return
-	}
-
-	// XXX pedro: work in progress
-	peerLog.Warnf("received OnGetCBFilter: %v", block)
-	peerLog.Warnf("received OnGetCBFilter: %v", filter)
+	// XXX work in progress
+	peerLog.Warnf("received OnGetCBFilter: not yet")
 }
 
 // enforceNodeBloomFlag disconnects the peer if the server is not configured to
