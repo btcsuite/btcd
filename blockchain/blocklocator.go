@@ -28,7 +28,7 @@ import (
 type BlockLocator []*chainhash.Hash
 
 // blockLocatorFromHash returns a block locator for the passed block hash.
-// See BlockLocator for details on the algotirhm used to create a block locator.
+// See BlockLocator for details on the algorithm used to create a block locator.
 //
 // In addition to the general algorithm referenced above, there are a couple of
 // special cases which are handled:
