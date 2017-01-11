@@ -39,6 +39,7 @@ const (
 	defaultMaxPeers              = 125
 	defaultBanDuration           = time.Hour * 24
 	defaultBanThreshold          = 100
+	defaultConnectTimeout        = time.Second * 30
 	defaultMaxRPCClients         = 10
 	defaultMaxRPCWebsockets      = 25
 	defaultMaxRPCConcurrentReqs  = 20
@@ -148,8 +149,8 @@ type config struct {
 	RejectNonStd         bool          `long:"rejectnonstd" description:"Reject non-standard transactions regardless of the default settings for the active network."`
 	onionlookup          func(string) ([]net.IP, error)
 	lookup               func(string) ([]net.IP, error)
-	oniondial            func(string, string) (net.Conn, error)
-	dial                 func(string, string) (net.Conn, error)
+	oniondial            func(string, string, time.Duration) (net.Conn, error)
+	dial                 func(string, string, time.Duration) (net.Conn, error)
 	miningAddrs          []btcutil.Address
 	minRelayTxFee        btcutil.Amount
 }
@@ -806,12 +807,12 @@ func loadConfig() (*config, []string, error) {
 	}
 
 	// Setup dial and DNS resolution (lookup) functions depending on the
-	// specified options.  The default is to use the standard net.Dial
-	// function as well as the system DNS resolver.  When a proxy is
-	// specified, the dial function is set to the proxy specific dial
-	// function and the lookup is set to use tor (unless --noonion is
+	// specified options.  The default is to use the standard
+	// net.DialTimeout function as well as the system DNS resolver.  When a
+	// proxy is specified, the dial function is set to the proxy specific
+	// dial function and the lookup is set to use tor (unless --noonion is
 	// specified in which case the system DNS resolver is used).
-	cfg.dial = net.Dial
+	cfg.dial = net.DialTimeout
 	cfg.lookup = net.LookupIP
 	if cfg.Proxy != "" {
 		_, _, err := net.SplitHostPort(cfg.Proxy)
@@ -835,7 +836,7 @@ func loadConfig() (*config, []string, error) {
 			Password:     cfg.ProxyPass,
 			TorIsolation: cfg.TorIsolation,
 		}
-		cfg.dial = proxy.Dial
+		cfg.dial = proxy.DialTimeout
 		if !cfg.NoOnion {
 			cfg.lookup = func(host string) ([]net.IP, error) {
 				return connmgr.TorLookupIP(host, cfg.Proxy)
@@ -868,14 +869,14 @@ func loadConfig() (*config, []string, error) {
 				"credentials ")
 		}
 
-		cfg.oniondial = func(a, b string) (net.Conn, error) {
+		cfg.oniondial = func(a, b string, t time.Duration) (net.Conn, error) {
 			proxy := &socks.Proxy{
 				Addr:         cfg.OnionProxy,
 				Username:     cfg.OnionProxyUser,
 				Password:     cfg.OnionProxyPass,
 				TorIsolation: cfg.TorIsolation,
 			}
-			return proxy.Dial(a, b)
+			return proxy.DialTimeout(a, b, t)
 		}
 		cfg.onionlookup = func(host string) ([]net.IP, error) {
 			return connmgr.TorLookupIP(host, cfg.OnionProxy)
@@ -888,7 +889,7 @@ func loadConfig() (*config, []string, error) {
 	// Specifying --noonion means the onion address dial and DNS resolution
 	// (lookup) functions result in an error.
 	if cfg.NoOnion {
-		cfg.oniondial = func(a, b string) (net.Conn, error) {
+		cfg.oniondial = func(a, b string, t time.Duration) (net.Conn, error) {
 			return nil, errors.New("tor has been disabled")
 		}
 		cfg.onionlookup = func(a string) ([]net.IP, error) {
@@ -980,9 +981,10 @@ func createDefaultConfigFile(destinationPath string) error {
 // could itself use a proxy or not).
 func btcdDial(addr net.Addr) (net.Conn, error) {
 	if strings.Contains(addr.String(), ".onion:") {
-		return cfg.oniondial(addr.Network(), addr.String())
+		return cfg.oniondial(addr.Network(), addr.String(),
+			defaultConnectTimeout)
 	}
-	return cfg.dial(addr.Network(), addr.String())
+	return cfg.dial(addr.Network(), addr.String(), defaultConnectTimeout)
 }
 
 // btcdLookup returns the correct DNS lookup function to use depending on the
