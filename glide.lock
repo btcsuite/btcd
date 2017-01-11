@@ -1,14 +1,13 @@
-hash: 3483e97fe9cd4e2c998f05ca648ce21767e1a4b955919aeffbc6bfe87d9b0648
-updated: 2017-01-11T09:52:36.894361964-05:00
+hash: ea6e6ffa31517aacb35de06b097975229096253bf658d302f2d6652fde91b3f1
+updated: 2017-01-11T15:54:00.925235328-05:00
 imports:
 - name: github.com/btcsuite/btclog
   version: 73889fb79bd687870312b6e40effcecffbd57d30
 - name: github.com/btcsuite/btcrpcclient
   version: 5ce0ed600997eafaed25ad4936c1d84ec6ad2b5a
 - name: github.com/btcsuite/btcutil
-  version: bca6409ade96981b0e77a2a7d358be53b340a1a7
+  version: 86346b5a958c0cf94186b87855469ae991be501c
   subpackages:
-  - .
   - base58
   - bloom
   - hdkeychain

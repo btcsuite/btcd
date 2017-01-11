@@ -1,13 +1,12 @@
 language: go
 go:
-  - 1.6.3
-  - 1.7.3
+  - 1.6.x
+  - 1.7.x
 sudo: false
 install:
   - go get -v github.com/Masterminds/glide
   - glide install
   - go install . ./cmd/...
-  - go get -v golang.org/x/tools/cmd/cover
   - go get -v github.com/alecthomas/gometalinter
   - gometalinter --install
 script:

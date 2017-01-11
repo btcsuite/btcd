@@ -1,13 +1,11 @@
 package: github.com/btcsuite/btcd
 import:
 - package: github.com/btcsuite/btclog
+- package: github.com/btcsuite/btcrpcclient
 - package: github.com/btcsuite/btcutil
   subpackages:
-  - .
   - bloom
-  - base58
   - hdkeychain
-- package: github.com/btcsuite/btcrpcclient
 - package: github.com/btcsuite/go-socks
   subpackages:
   - socks
