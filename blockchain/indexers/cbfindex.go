@@ -102,7 +102,14 @@ func (idx *CBFIndex) ConnectBlock(dbTx database.Tx, block *btcutil.Block, view *
 		binary.BigEndian.PutUint32(key[i:], uint32(0xcafebabe))
 	}
 
-	_, err := gcs.BuildGCSFilter(P, key, txHashes)
+	filter, err := gcs.BuildGCSFilter(P, key, txHashes)
+	if err != nil {
+		return err
+	}
+
+	meta := dbTx.Metadata()
+	hashIndex := meta.Bucket(cbfIndexKey)
+	err = hashIndex.Put(block.Hash().CloneBytes(), filter.Bytes())
 	if err != nil {
 		return err
 	}
