@@ -156,6 +156,17 @@ func (idx *CBFIndex) DisconnectBlock(dbTx database.Tx, block *btcutil.Block, vie
 	return nil
 }
 
+func (idx *CBFIndex) GetFilterByBlockHash(hash *chainhash.Hash) ([]byte,
+    error) {
+	var filterBytes []byte
+	err := idx.db.View(func(dbTx database.Tx) error {
+		var err error
+		filterBytes, err = dbFetchCBFIndexEntry(dbTx, hash)
+		return err
+	})
+	return filterBytes, err
+}
+
 // NewCBFIndex returns a new instance of an indexer that is used to create a
 // mapping of the hashes of all blocks in the blockchain to their respective
 // committed bloom filters.

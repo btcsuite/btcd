@@ -746,8 +746,14 @@ func (sp *serverPeer) OnGetCBFilter(_ *peer.Peer, msg *wire.MsgGetCBFilter) {
 		return
 	}
 
-	// XXX work in progress
-	peerLog.Warnf("received OnGetCBFilter: not yet")
+	filterBytes, err := sp.server.cbfIndex.GetFilterByBlockHash(&msg.BlockHash)
+
+	if len(filterBytes) > 0 {
+		peerLog.Infof("Obtained CB filter for %v", msg.BlockHash)
+	} else {
+		peerLog.Infof("Could not obtain CB filter for %v: %v",
+		    msg.BlockHash, err)
+	}
 }
 
 // enforceNodeBloomFlag disconnects the peer if the server is not configured to
