@@ -10,6 +10,7 @@ import (
 	"fmt"
 
 	"github.com/btcsuite/btcd/blockchain"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcutil/gcs"
@@ -31,6 +32,18 @@ var (
 	// not exist in the CBF index.
 	errCBFEntry = errors.New("no entry in the block ID index")
 )
+
+func dbFetchCBFIndexEntry(dbTx database.Tx, blockHash *chainhash.Hash) ([]byte,
+    error) {
+	// Load the record from the database and return now if it doesn't exist.
+	index := dbTx.Metadata().Bucket(cbfIndexKey)
+	serializedFilter := index.Get(blockHash.CloneBytes())
+	if len(serializedFilter) == 0 {
+		return nil, nil
+	}
+
+	return serializedFilter, nil
+}
 
 // The serialized format for keys and values in the block hash to CBF bucket is:
 //   <hash> = <CBF>
