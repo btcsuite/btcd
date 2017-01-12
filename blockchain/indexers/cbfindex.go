@@ -78,19 +78,14 @@ func (idx *CBFIndex) Create(dbTx database.Tx) error {
 	return err
 }
 
-// ConnectBlock is invoked by the index manager when a new block has been
-// connected to the main chain.  This indexer adds a hash-to-CBF mapping for
-// every passed block.
-//
-// This is part of the Indexer interface.
-func (idx *CBFIndex) ConnectBlock(dbTx database.Tx, block *btcutil.Block, view *blockchain.UtxoViewpoint) error {
+func generateFilterForBlock(block *btcutil.Block) ([]byte, error) {
 	txSlice := block.Transactions() // XXX can this fail?
 	txHashes := make([][]byte, len(txSlice))
 
 	for i := 0; i < len(txSlice); i++ {
 		txHash, err := block.TxHash(i)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		txHashes = append(txHashes, txHash.CloneBytes())
 	}
@@ -104,12 +99,27 @@ func (idx *CBFIndex) ConnectBlock(dbTx database.Tx, block *btcutil.Block, view *
 
 	filter, err := gcs.BuildGCSFilter(P, key, txHashes)
 	if err != nil {
+		return nil, err
+	}
+
+	return filter.Bytes(), nil
+}
+
+// ConnectBlock is invoked by the index manager when a new block has been
+// connected to the main chain.  This indexer adds a hash-to-CBF mapping for
+// every passed block.
+//
+// This is part of the Indexer interface.
+func (idx *CBFIndex) ConnectBlock(dbTx database.Tx, block *btcutil.Block,
+    view *blockchain.UtxoViewpoint) error {
+	filterBytes, err := generateFilterForBlock(block)
+	if err != nil {
 		return err
 	}
 
 	meta := dbTx.Metadata()
 	index := meta.Bucket(cbfIndexKey)
-	err = index.Put(block.Hash().CloneBytes(), filter.Bytes())
+	err = index.Put(block.Hash().CloneBytes(), filterBytes)
 	if err != nil {
 		return err
 	}
