@@ -229,6 +229,7 @@ type server struct {
 	// do not need to be protected for concurrent access.
 	txIndex   *indexers.TxIndex
 	addrIndex *indexers.AddrIndex
+	cbfIndex  *indexers.CBFIndex
 }
 
 // serverPeer extends the peer to maintain state shared by the server and
@@ -2235,6 +2236,11 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 		indxLog.Info("Address index is enabled")
 		s.addrIndex = indexers.NewAddrIndex(db, chainParams)
 		indexes = append(indexes, s.addrIndex)
+	}
+	if !cfg.NoCBFilters {
+		indxLog.Info("CBF index is enabled")
+		s.cbfIndex = indexers.NewCBFIndex(db)
+		indexes = append(indexes, s.cbfIndex)
 	}
 
 	// Create an index manager if any of the optional indexes are enabled.
