@@ -7,11 +7,14 @@ package indexers
 import (
 	"encoding/binary"
 	"errors"
+	"fmt"
 
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcutil/gcs"
+
+	"os"
 )
 
 const (
@@ -102,6 +105,8 @@ func generateFilterForBlock(block *btcutil.Block) ([]byte, error) {
 		return nil, err
 	}
 
+	fmt.Fprintf(os.Stderr, "Generated CBF for block %v", block.Hash())
+
 	return filter.Bytes(), nil
 }
 
@@ -123,6 +128,8 @@ func (idx *CBFIndex) ConnectBlock(dbTx database.Tx, block *btcutil.Block,
 	if err != nil {
 		return err
 	}
+
+	fmt.Fprintf(os.Stderr, "Stored CBF for block %v", block.Hash())
 
 	return nil
 }
