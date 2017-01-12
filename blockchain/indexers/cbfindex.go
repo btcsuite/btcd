@@ -108,8 +108,8 @@ func (idx *CBFIndex) ConnectBlock(dbTx database.Tx, block *btcutil.Block, view *
 	}
 
 	meta := dbTx.Metadata()
-	hashIndex := meta.Bucket(cbfIndexKey)
-	err = hashIndex.Put(block.Hash().CloneBytes(), filter.Bytes())
+	index := meta.Bucket(cbfIndexKey)
+	err = index.Put(block.Hash().CloneBytes(), filter.Bytes())
 	if err != nil {
 		return err
 	}
