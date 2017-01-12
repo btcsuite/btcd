@@ -153,6 +153,7 @@ func main() {
 	chain, err := blockchain.New(&blockchain.Config{
 		DB:          db,
 		ChainParams: activeNetParams,
+		TimeSource:  blockchain.NewMedianTime(),
 	})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to initialize chain: %v\n", err)

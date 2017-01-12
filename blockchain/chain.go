@@ -1683,6 +1683,9 @@ func New(config *Config) (*BlockChain, error) {
 	if config.ChainParams == nil {
 		return nil, AssertError("blockchain.New chain parameters nil")
 	}
+	if config.TimeSource == nil {
+		return nil, AssertError("blockchain.New timesource is nil")
+	}
 
 	// Generate a checkpoint by height map from the provided checkpoints.
 	params := config.ChainParams
