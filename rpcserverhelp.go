@@ -323,6 +323,11 @@ var helpDescsEnUS = map[string]string{
 	"getblocktemplate--condition2": "mode=proposal, accepted",
 	"getblocktemplate--result1":    "An error string which represents why the proposal was rejected or nothing if accepted",
 
+	// GetCBFilterCmd help.
+	"getcbfilter--synopsis":   "Returns a block's committed bloom filter  given its hash.",
+	"getcbfilter-hash":        "The hash of the block",
+	"getcbfilter--result0":    "The block's committed bloom filter",
+
 	// GetConnectionCountCmd help.
 	"getconnectioncount--synopsis": "Returns the number of active connections to other peers.",
 	"getconnectioncount--result0":  "The number of connections",
@@ -668,6 +673,7 @@ var rpcResultTypes = map[string][]interface{}{
 	"getblockheader":        {(*string)(nil), (*btcjson.GetBlockHeaderVerboseResult)(nil)},
 	"getblocktemplate":      {(*btcjson.GetBlockTemplateResult)(nil), (*string)(nil), nil},
 	"getblockchaininfo":     {(*btcjson.GetBlockChainInfoResult)(nil)},
+	"getcbfilter":           {(*[]byte)(nil)},
 	"getconnectioncount":    {(*int32)(nil)},
 	"getcurrentnet":         {(*uint32)(nil)},
 	"getdifficulty":         {(*float64)(nil)},
