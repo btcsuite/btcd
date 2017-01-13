@@ -142,6 +142,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"getblockhash":          handleGetBlockHash,
 	"getblockheader":        handleGetBlockHeader,
 	"getblocktemplate":      handleGetBlockTemplate,
+	"getcbfilter":           handleGetCBFilter,
 	"getconnectioncount":    handleGetConnectionCount,
 	"getcurrentnet":         handleGetCurrentNet,
 	"getdifficulty":         handleGetDifficulty,
@@ -258,6 +259,7 @@ var rpcLimited = map[string]struct{}{
 	"getblockcount":         {},
 	"getblockhash":          {},
 	"getblockheader":        {},
+	"getcbfilter":           {},
 	"getcurrentnet":         {},
 	"getdifficulty":         {},
 	"getheaders":            {},
@@ -2142,6 +2144,11 @@ func handleGetBlockTemplate(s *rpcServer, cmd interface{}, closeChan <-chan stru
 		Code:    btcjson.ErrRPCInvalidParameter,
 		Message: "Invalid mode",
 	}
+}
+
+// handleGetCBFilter implements the getcbfilter command.
+func handleGetCBFilter(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	return nil, nil
 }
 
 // handleGetConnectionCount implements the getconnectioncount command.

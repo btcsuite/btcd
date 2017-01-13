@@ -278,6 +278,18 @@ func NewGetBlockTemplateCmd(request *TemplateRequest) *GetBlockTemplateCmd {
 		Request: request,
 	}
 }
+// GetCBFilterCmd defines the getcbfilter JSON-RPC command.
+type GetCBFilterCmd struct {
+	Hash string
+}
+
+// NewGetCBFilterCmd returns a new instance which can be used to issue a
+// getcbfilter JSON-RPC command.
+func NewGetCBFilterCmd(hash string) *GetCBFilterCmd {
+	return &GetCBFilterCmd{
+		Hash: hash,
+	}
+}
 
 // GetChainTipsCmd defines the getchaintips JSON-RPC command.
 type GetChainTipsCmd struct{}
@@ -756,6 +768,7 @@ func init() {
 	MustRegisterCmd("getblockhash", (*GetBlockHashCmd)(nil), flags)
 	MustRegisterCmd("getblockheader", (*GetBlockHeaderCmd)(nil), flags)
 	MustRegisterCmd("getblocktemplate", (*GetBlockTemplateCmd)(nil), flags)
+	MustRegisterCmd("getcbfilter", (*GetCBFilterCmd)(nil), flags)
 	MustRegisterCmd("getchaintips", (*GetChainTipsCmd)(nil), flags)
 	MustRegisterCmd("getconnectioncount", (*GetConnectionCountCmd)(nil), flags)
 	MustRegisterCmd("getdifficulty", (*GetDifficultyCmd)(nil), flags)
