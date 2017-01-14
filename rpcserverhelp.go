@@ -673,7 +673,7 @@ var rpcResultTypes = map[string][]interface{}{
 	"getblockheader":        {(*string)(nil), (*btcjson.GetBlockHeaderVerboseResult)(nil)},
 	"getblocktemplate":      {(*btcjson.GetBlockTemplateResult)(nil), (*string)(nil), nil},
 	"getblockchaininfo":     {(*btcjson.GetBlockChainInfoResult)(nil)},
-	"getcbfilter":           {(*[]byte)(nil)},
+	"getcbfilter":           {(*string)(nil)},
 	"getconnectioncount":    {(*int32)(nil)},
 	"getcurrentnet":         {(*uint32)(nil)},
 	"getdifficulty":         {(*float64)(nil)},
