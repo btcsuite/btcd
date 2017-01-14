@@ -2148,6 +2148,23 @@ func handleGetBlockTemplate(s *rpcServer, cmd interface{}, closeChan <-chan stru
 
 // handleGetCBFilter implements the getcbfilter command.
 func handleGetCBFilter(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	c := cmd.(*btcjson.GetCBFilterCmd)
+	hash, err := chainhash.NewHashFromStr(c.Hash)
+	if err != nil {
+		return nil, rpcDecodeHexError(c.Hash)
+	}
+
+	filterBytes, err := s.server.cbfIndex.GetFilterByBlockHash(hash)
+	if len(filterBytes) > 0 {
+		rpcsLog.Debugf("Found CB filter for %v", hash)
+	} else {
+		rpcsLog.Debugf("Could not find CB filter for %v: %v", hash, err)
+		return nil, &btcjson.RPCError{
+			Code:    btcjson.ErrRPCBlockNotFound,
+			Message: "Block not found",
+		}
+	}
+
 	return nil, nil
 }
 
