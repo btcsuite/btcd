@@ -6,30 +6,40 @@
 # 4. go vet        (http://golang.org/cmd/vet)
 # 5. gosimple      (https://github.com/dominikh/go-simple)
 # 6. unconvert     (https://github.com/mdempsky/unconvert)
-# 7. test coverage (http://blog.golang.org/cover)
+# 7. race detector (http://blog.golang.org/race-detector)
+# 8. test coverage (http://blog.golang.org/cover)
 #
-# gometalinter (github.com/alecthomas/gometalinter) is used to run each each
-# static checker.
+# gometalinter (github.com/alecthomas/gometalinter) is used to run each static
+# checker.
 
-set -e
+set -ex
+
+# Make sure gometalinter is installed and $GOPATH/bin is in your path.
+# $ go get -v github.com/alecthomas/gometalinter"
+# $ gometalinter --install"
+if [ ! -x "$(type -p gometalinter)" ]; then
+  exit 1
+fi
 
 # Automatic checks
 test -z "$(gometalinter --disable-all \
 --enable=gofmt \
+--enable=goimports \
 --enable=golint \
 --enable=vet \
 --enable=gosimple \
 --enable=unconvert \
---enable=goimports \
 --deadline=45s ./... | tee /dev/stderr)"
 env GORACE="halt_on_error=1" go test -race ./...
 
 # Run test coverage on each subdirectories and merge the coverage profile.
 
+set +x
 echo "mode: count" > profile.cov
 
 # Standard go tooling behavior is to ignore dirs with leading underscores.
-for dir in $(find . -maxdepth 10 -not -path './.git*' -not -path '*/_*' -type d);
+for dir in $(find . -maxdepth 10 -not -path '.' -not -path './.git*' \
+    -not -path '*/_*' -type d);
 do
 if ls $dir/*.go &> /dev/null; then
   go test -covermode=count -coverprofile=$dir/profile.tmp $dir
