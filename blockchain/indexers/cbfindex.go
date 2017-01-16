@@ -152,8 +152,15 @@ func (idx *CBFIndex) ConnectBlock(dbTx database.Tx, block *btcutil.Block,
 // mapping for every passed block.
 //
 // This is part of the Indexer interface.
-func (idx *CBFIndex) DisconnectBlock(dbTx database.Tx, block *btcutil.Block, view *blockchain.UtxoViewpoint) error {
-	return nil
+func (idx *CBFIndex) DisconnectBlock(dbTx database.Tx, block *btcutil.Block,
+    view *blockchain.UtxoViewpoint) error {
+	index := dbTx.Metadata().Bucket(cbfIndexKey)
+	filterBytes := index.Get(block.Hash().CloneBytes())
+	if len(filterBytes) == 0 {
+		return fmt.Errorf("can't remove non-existent filter %s from " +
+		    "the cbfilter index", block.Hash())
+	}
+	return index.Delete(block.Hash().CloneBytes())
 }
 
 func (idx *CBFIndex) GetFilterByBlockHash(hash *chainhash.Hash) ([]byte,
