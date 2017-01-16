@@ -3251,12 +3251,28 @@ func handleSendRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan st
 		}
 	}
 
+	// When the transaction was accepted it should be the first item in the
+	// returned array of accepted transactions.  The only way this will not
+	// be true is if the API for ProcessTransaction changes and this code is
+	// not properly updated, but ensure the condition holds as a safeguard.
+	//
+	// Also, since an error is being returned to the caller, ensure the
+	// transaction is removed from the memory pool.
+	if len(acceptedTxs) == 0 || !acceptedTxs[0].Tx.Hash().IsEqual(tx.Hash()) {
+		s.server.txMemPool.RemoveTransaction(tx, true)
+
+		errStr := fmt.Sprintf("transaction %v is not in accepted list",
+			tx.Hash())
+		return nil, internalRPCError(errStr, "")
+	}
+
 	s.server.AnnounceNewTransactions(acceptedTxs)
 
 	// Keep track of all the sendrawtransaction request txns so that they
 	// can be rebroadcast if they don't make their way into a block.
-	iv := wire.NewInvVect(wire.InvTypeTx, tx.Hash())
-	s.server.AddRebroadcastInventory(iv, tx)
+	txD := acceptedTxs[0]
+	iv := wire.NewInvVect(wire.InvTypeTx, txD.Tx.Hash())
+	s.server.AddRebroadcastInventory(iv, txD)
 
 	return tx.Hash().String(), nil
 }

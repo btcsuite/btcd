@@ -1367,8 +1367,9 @@ func (s *server) handleRelayInvMsg(state *peerState, msg relayMsg) {
 
 			txD, ok := msg.data.(*mempool.TxDesc)
 			if !ok {
-				peerLog.Warnf("Underlying data for tx" +
-					" inv relay is not a *mempool.TxDesc")
+				peerLog.Warnf("Underlying data for tx inv "+
+					"relay is not a *mempool.TxDesc: %T",
+					msg.data)
 				return
 			}
 
