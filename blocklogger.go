@@ -64,7 +64,7 @@ func (b *blockProgressLogger) logBlockHeight(block *dcrutil.Block) {
 		txStr = "transaction"
 	}
 	stxStr := "stake transactions"
-	if b.receivedLogTx == 1 {
+	if b.receivedLogSTx == 1 {
 		stxStr = "stake transaction"
 	}
 	b.subsystemLogger.Infof("%s %d %s in the last %s (%d %s, %d %s, height "+
