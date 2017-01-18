@@ -746,7 +746,7 @@ func (sp *serverPeer) OnGetCBFilter(_ *peer.Peer, msg *wire.MsgGetCBFilter) {
 		return
 	}
 
-	filterBytes, err := sp.server.cbfIndex.GetFilterByBlockHash(&msg.BlockHash)
+	filterBytes, err := sp.server.cbfIndex.FilterByBlockHash(&msg.BlockHash)
 
 	if len(filterBytes) > 0 {
 		peerLog.Infof("Obtained CB filter for %v", msg.BlockHash)
