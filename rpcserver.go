@@ -142,7 +142,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"getblockhash":          handleGetBlockHash,
 	"getblockheader":        handleGetBlockHeader,
 	"getblocktemplate":      handleGetBlockTemplate,
-	"getcbfilter":           handleGetCBFilter,
+	"getcfilter":            handleGetCFilter,
 	"getconnectioncount":    handleGetConnectionCount,
 	"getcurrentnet":         handleGetCurrentNet,
 	"getdifficulty":         handleGetDifficulty,
@@ -259,7 +259,7 @@ var rpcLimited = map[string]struct{}{
 	"getblockcount":         {},
 	"getblockhash":          {},
 	"getblockheader":        {},
-	"getcbfilter":           {},
+	"getcfilter":            {},
 	"getcurrentnet":         {},
 	"getdifficulty":         {},
 	"getheaders":            {},
@@ -2146,19 +2146,20 @@ func handleGetBlockTemplate(s *rpcServer, cmd interface{}, closeChan <-chan stru
 	}
 }
 
-// handleGetCBFilter implements the getcbfilter command.
-func handleGetCBFilter(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
-	c := cmd.(*btcjson.GetCBFilterCmd)
+// handleGetCFilter implements the getcfilter command.
+func handleGetCFilter(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	c := cmd.(*btcjson.GetCFilterCmd)
 	hash, err := chainhash.NewHashFromStr(c.Hash)
 	if err != nil {
 		return nil, rpcDecodeHexError(c.Hash)
 	}
 
-	filterBytes, err := s.server.cbfIndex.FilterByBlockHash(hash)
+	filterBytes, err := s.server.cfIndex.FilterByBlockHash(hash)
 	if len(filterBytes) > 0 {
-		rpcsLog.Debugf("Found CB filter for %v", hash)
+		rpcsLog.Debugf("Found committed filter for %v", hash)
 	} else {
-		rpcsLog.Debugf("Could not find CB filter for %v: %v", hash, err)
+		rpcsLog.Debugf("Could not find committed filter for %v: %v",
+		    hash, err)
 		return nil, &btcjson.RPCError{
 			Code:    btcjson.ErrRPCBlockNotFound,
 			Message: "Block not found",

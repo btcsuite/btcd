@@ -19,24 +19,24 @@ import (
 )
 
 const (
-	// cbfIndexName is the human-readable name for the index.
-	cbfIndexName = "committed bloom filter index"
+	// cfIndexName is the human-readable name for the index.
+	cfIndexName = "committed bloom filter index"
 )
 
 var (
-	// cbfIndexKey is the name of the db bucket used to house the
-	// block hash -> CBF index.
-	cbfIndexKey = []byte("cbfbyhashidx")
+	// cfIndexKey is the name of the db bucket used to house the
+	// block hash -> CF index.
+	cfIndexKey = []byte("cfbyhashidx")
 
-	// errNoCBFEntry is an error that indicates a requested entry does
-	// not exist in the CBF index.
-	errCBFEntry = errors.New("no entry in the block ID index")
+	// errNoCFEntry is an error that indicates a requested entry does
+	// not exist in the CF index.
+	errCFEntry = errors.New("no entry in the block ID index")
 )
 
-func dbFetchCBFIndexEntry(dbTx database.Tx, blockHash *chainhash.Hash) ([]byte,
+func dbFetchCFIndexEntry(dbTx database.Tx, blockHash *chainhash.Hash) ([]byte,
     error) {
 	// Load the record from the database and return now if it doesn't exist.
-	index := dbTx.Metadata().Bucket(cbfIndexKey)
+	index := dbTx.Metadata().Bucket(cfIndexKey)
 	serializedFilter := index.Get(blockHash[:])
 	if len(serializedFilter) == 0 {
 		return nil, nil
@@ -45,52 +45,52 @@ func dbFetchCBFIndexEntry(dbTx database.Tx, blockHash *chainhash.Hash) ([]byte,
 	return serializedFilter, nil
 }
 
-// The serialized format for keys and values in the block hash to CBF bucket is:
-//   <hash> = <CBF>
+// The serialized format for keys and values in the block hash to CF bucket is:
+//   <hash> = <CF>
 //
 //   Field           Type              Size
 //   hash            chainhash.Hash    32 bytes
-//   CBF             []byte            variable
+//   CF              []byte            variable
 //   -----
 //   Total: > 32 bytes
 
-// CBFIndex implements a CBF by hash index.
-type CBFIndex struct {
+// CFIndex implements a CF by hash index.
+type CFIndex struct {
 	db database.DB
 }
 
-// Ensure the CBFIndex type implements the Indexer interface.
-var _ Indexer = (*CBFIndex)(nil)
+// Ensure the CFIndex type implements the Indexer interface.
+var _ Indexer = (*CFIndex)(nil)
 
-// Init initializes the hash-based CBF index.
+// Init initializes the hash-based CF index.
 //
 // This is part of the Indexer interface.
-func (idx *CBFIndex) Init() error {
+func (idx *CFIndex) Init() error {
 	return nil
 }
 
 // Key returns the database key to use for the index as a byte slice.
 //
 // This is part of the Indexer interface.
-func (idx *CBFIndex) Key() []byte {
-	return cbfIndexKey
+func (idx *CFIndex) Key() []byte {
+	return cfIndexKey
 }
 
 // Name returns the human-readable name of the index.
 //
 // This is part of the Indexer interface.
-func (idx *CBFIndex) Name() string {
-	return cbfIndexName
+func (idx *CFIndex) Name() string {
+	return cfIndexName
 }
 
 // Create is invoked when the indexer manager determines the index needs
 // to be created for the first time.  It creates the buckets for the hash-based
-// CBF index.
+// CF index.
 //
 // This is part of the Indexer interface.
-func (idx *CBFIndex) Create(dbTx database.Tx) error {
+func (idx *CFIndex) Create(dbTx database.Tx) error {
 	meta := dbTx.Metadata()
-	_, err := meta.CreateBucket(cbfIndexKey)
+	_, err := meta.CreateBucket(cfIndexKey)
 	return err
 }
 
@@ -118,17 +118,17 @@ func generateFilterForBlock(block *btcutil.Block) ([]byte, error) {
 		return nil, err
 	}
 
-	fmt.Fprintf(os.Stderr, "Generated CBF for block %v", block.Hash())
+	fmt.Fprintf(os.Stderr, "Generated CF for block %v", block.Hash())
 
 	return filter.Bytes(), nil
 }
 
 // ConnectBlock is invoked by the index manager when a new block has been
-// connected to the main chain.  This indexer adds a hash-to-CBF mapping for
+// connected to the main chain.  This indexer adds a hash-to-CF mapping for
 // every passed block.
 //
 // This is part of the Indexer interface.
-func (idx *CBFIndex) ConnectBlock(dbTx database.Tx, block *btcutil.Block,
+func (idx *CFIndex) ConnectBlock(dbTx database.Tx, block *btcutil.Block,
     view *blockchain.UtxoViewpoint) error {
 	filterBytes, err := generateFilterForBlock(block)
 	if err != nil {
@@ -136,55 +136,55 @@ func (idx *CBFIndex) ConnectBlock(dbTx database.Tx, block *btcutil.Block,
 	}
 
 	meta := dbTx.Metadata()
-	index := meta.Bucket(cbfIndexKey)
+	index := meta.Bucket(cfIndexKey)
 	err = index.Put(block.Hash()[:], filterBytes)
 	if err != nil {
 		return err
 	}
 
-	fmt.Fprintf(os.Stderr, "Stored CBF for block %v", block.Hash())
+	fmt.Fprintf(os.Stderr, "Stored CF for block %v", block.Hash())
 
 	return nil
 }
 
 // DisconnectBlock is invoked by the index manager when a block has been
-// disconnected from the main chain.  This indexer removes the hash-to-CBF
+// disconnected from the main chain.  This indexer removes the hash-to-CF
 // mapping for every passed block.
 //
 // This is part of the Indexer interface.
-func (idx *CBFIndex) DisconnectBlock(dbTx database.Tx, block *btcutil.Block,
+func (idx *CFIndex) DisconnectBlock(dbTx database.Tx, block *btcutil.Block,
     view *blockchain.UtxoViewpoint) error {
-	index := dbTx.Metadata().Bucket(cbfIndexKey)
+	index := dbTx.Metadata().Bucket(cfIndexKey)
 	filterBytes := index.Get(block.Hash()[:])
 	if len(filterBytes) == 0 {
 		return fmt.Errorf("can't remove non-existent filter %s from " +
-		    "the cbfilter index", block.Hash())
+		    "the cfilter index", block.Hash())
 	}
 	return index.Delete(block.Hash()[:])
 }
 
-func (idx *CBFIndex) FilterByBlockHash(hash *chainhash.Hash) ([]byte, error) {
+func (idx *CFIndex) FilterByBlockHash(hash *chainhash.Hash) ([]byte, error) {
 	var filterBytes []byte
 	err := idx.db.View(func(dbTx database.Tx) error {
 		var err error
-		filterBytes, err = dbFetchCBFIndexEntry(dbTx, hash)
+		filterBytes, err = dbFetchCFIndexEntry(dbTx, hash)
 		return err
 	})
 	return filterBytes, err
 }
 
-// NewCBFIndex returns a new instance of an indexer that is used to create a
+// NewCFIndex returns a new instance of an indexer that is used to create a
 // mapping of the hashes of all blocks in the blockchain to their respective
 // committed bloom filters.
 //
 // It implements the Indexer interface which plugs into the IndexManager that in
 // turn is used by the blockchain package.  This allows the index to be
 // seamlessly maintained along with the chain.
-func NewCBFIndex(db database.DB) *CBFIndex {
-	return &CBFIndex{db: db}
+func NewCFIndex(db database.DB) *CFIndex {
+	return &CFIndex{db: db}
 }
 
-// DropCBFIndex drops the CBF index from the provided database if exists.
-func DropCBFIndex(db database.DB) error {
-	return dropIndex(db, cbfIndexKey, cbfIndexName)
+// DropCFIndex drops the CF index from the provided database if exists.
+func DropCFIndex(db database.DB) error {
+	return dropIndex(db, cfIndexKey, cfIndexName)
 }

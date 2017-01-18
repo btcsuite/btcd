@@ -10,39 +10,39 @@ import (
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 )
 
-type MsgGetCBFilter struct {
+type MsgGetCFilter struct {
 	ProtocolVersion    uint32
 	BlockHash          chainhash.Hash
 }
 
-func (msg *MsgGetCBFilter) BtcDecode(r io.Reader, pver uint32) error {
+func (msg *MsgGetCFilter) BtcDecode(r io.Reader, pver uint32) error {
 	return readElement(r, &msg.BlockHash)
 }
 
 // BtcEncode encodes the receiver to w using the bitcoin protocol encoding.
 // This is part of the Message interface implementation.
-func (msg *MsgGetCBFilter) BtcEncode(w io.Writer, pver uint32) error {
+func (msg *MsgGetCFilter) BtcEncode(w io.Writer, pver uint32) error {
 	return writeElement(w, &msg.BlockHash)
 }
 
 // Command returns the protocol command string for the message.  This is part
 // of the Message interface implementation.
-func (msg *MsgGetCBFilter) Command() string {
-	return CmdGetCBFilter
+func (msg *MsgGetCFilter) Command() string {
+	return CmdGetCFilter
 }
 
 // MaxPayloadLength returns the maximum length the payload can be for the
 // receiver.  This is part of the Message interface implementation.
-func (msg *MsgGetCBFilter) MaxPayloadLength(pver uint32) uint32 {
+func (msg *MsgGetCFilter) MaxPayloadLength(pver uint32) uint32 {
 	// Protocol version 4 bytes + block hash.
 	return 4 + chainhash.HashSize
 }
 
-// NewMsgGetCBFilter returns a new bitcoin getblocks message that conforms to
+// NewMsgGetCFilter returns a new bitcoin getblocks message that conforms to
 // the Message interface using the passed parameters and defaults for the
 // remaining fields.
-func NewMsgGetCBFilter(blockHash *chainhash.Hash) *MsgGetCBFilter {
-	return &MsgGetCBFilter{
+func NewMsgGetCFilter(blockHash *chainhash.Hash) *MsgGetCFilter {
+	return &MsgGetCFilter{
 		ProtocolVersion:    ProtocolVersion,
 		BlockHash:          *blockHash,
 	}
