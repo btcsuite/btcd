@@ -163,8 +163,7 @@ func (idx *CBFIndex) DisconnectBlock(dbTx database.Tx, block *btcutil.Block,
 	return index.Delete(block.Hash()[:])
 }
 
-func (idx *CBFIndex) GetFilterByBlockHash(hash *chainhash.Hash) ([]byte,
-    error) {
+func (idx *CBFIndex) FilterByBlockHash(hash *chainhash.Hash) ([]byte, error) {
 	var filterBytes []byte
 	err := idx.db.View(func(dbTx database.Tx) error {
 		var err error

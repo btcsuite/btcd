@@ -2154,7 +2154,7 @@ func handleGetCBFilter(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 		return nil, rpcDecodeHexError(c.Hash)
 	}
 
-	filterBytes, err := s.server.cbfIndex.GetFilterByBlockHash(hash)
+	filterBytes, err := s.server.cbfIndex.FilterByBlockHash(hash)
 	if len(filterBytes) > 0 {
 		rpcsLog.Debugf("Found CB filter for %v", hash)
 	} else {
