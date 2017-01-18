@@ -229,7 +229,7 @@ type server struct {
 	// do not need to be protected for concurrent access.
 	txIndex   *indexers.TxIndex
 	addrIndex *indexers.AddrIndex
-	cbfIndex  *indexers.CBFIndex
+	cfIndex   *indexers.CFIndex
 }
 
 // serverPeer extends the peer to maintain state shared by the server and
@@ -739,20 +739,20 @@ func (sp *serverPeer) OnGetHeaders(_ *peer.Peer, msg *wire.MsgGetHeaders) {
 	sp.QueueMessage(&wire.MsgHeaders{Headers: blockHeaders}, nil)
 }
 
-// OnGetCBFilter is invoked when a peer receives a getcbfilter bitcoin message.
-func (sp *serverPeer) OnGetCBFilter(_ *peer.Peer, msg *wire.MsgGetCBFilter) {
-	// Ignore getcbfilter requests if not in sync.
+// OnGetCFilter is invoked when a peer receives a getcfilter bitcoin message.
+func (sp *serverPeer) OnGetCFilter(_ *peer.Peer, msg *wire.MsgGetCFilter) {
+	// Ignore getcfilter requests if not in sync.
 	if !sp.server.blockManager.IsCurrent() {
 		return
 	}
 
-	filterBytes, err := sp.server.cbfIndex.FilterByBlockHash(&msg.BlockHash)
+	filterBytes, err := sp.server.cfIndex.FilterByBlockHash(&msg.BlockHash)
 
 	if len(filterBytes) > 0 {
 		peerLog.Infof("Obtained CB filter for %v", msg.BlockHash)
 	} else {
 		peerLog.Infof("Could not obtain CB filter for %v: %v",
-		    msg.BlockHash, err)
+			msg.BlockHash, err)
 	}
 }
 
@@ -1603,7 +1603,7 @@ func newPeerConfig(sp *serverPeer) *peer.Config {
 			OnGetData:     sp.OnGetData,
 			OnGetBlocks:   sp.OnGetBlocks,
 			OnGetHeaders:  sp.OnGetHeaders,
-			OnGetCBFilter: sp.OnGetCBFilter,
+			OnGetCFilter:  sp.OnGetCFilter,
 			OnFeeFilter:   sp.OnFeeFilter,
 			OnFilterAdd:   sp.OnFilterAdd,
 			OnFilterClear: sp.OnFilterClear,
@@ -2178,8 +2178,8 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 	if cfg.NoPeerBloomFilters {
 		services &^= wire.SFNodeBloom
 	}
-	if cfg.NoCBFilters {
-		services &^= wire.SFNodeCBF
+	if cfg.NoCFilters {
+		services &^= wire.SFNodeCF
 	}
 
 	amgr := addrmgr.New(cfg.DataDir, btcdLookup)
@@ -2243,10 +2243,10 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 		s.addrIndex = indexers.NewAddrIndex(db, chainParams)
 		indexes = append(indexes, s.addrIndex)
 	}
-	if !cfg.NoCBFilters {
-		indxLog.Info("CBF index is enabled")
-		s.cbfIndex = indexers.NewCBFIndex(db)
-		indexes = append(indexes, s.cbfIndex)
+	if !cfg.NoCFilters {
+		indxLog.Info("CF index is enabled")
+		s.cfIndex = indexers.NewCFIndex(db)
+		indexes = append(indexes, s.cfIndex)
 	}
 
 	// Create an index manager if any of the optional indexes are enabled.

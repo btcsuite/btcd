@@ -72,9 +72,9 @@ const (
 	// and transactions including witness data (BIP0144).
 	SFNodeWitness
 
-	// SFNNodeCBF is a flag used to indicate a peer supports committed
-	// bloom filters (CBFs).
-	SFNodeCBF
+	// SFNodeCF is a flag used to indicate a peer supports committed
+	// filters (CFs).
+	SFNodeCF
 )
 
 // Map of service flags back to their constant names for pretty printing.
@@ -83,7 +83,7 @@ var sfStrings = map[ServiceFlag]string{
 	SFNodeGetUTXO: "SFNodeGetUTXO",
 	SFNodeBloom:   "SFNodeBloom",
 	SFNodeWitness: "SFNodeWitness",
-	SFNodeCBF:     "SFNodeCBF",
+	SFNodeCF:      "SFNodeCF",
 }
 
 // orderedSFStrings is an ordered list of service flags from highest to
@@ -93,7 +93,7 @@ var orderedSFStrings = []ServiceFlag{
 	SFNodeGetUTXO,
 	SFNodeBloom,
 	SFNodeWitness,
-	SFNodeCBF,
+	SFNodeCF,
 }
 
 // String returns the ServiceFlag in human-readable form.

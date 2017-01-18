@@ -144,9 +144,9 @@ type MessageListeners struct {
 	// message.
 	OnGetHeaders func(p *Peer, msg *wire.MsgGetHeaders)
 
-	// OnGetCBFilter is invoked when a peer receives a getcbfilter bitcoin
+	// OnGetCFilter is invoked when a peer receives a getcfilter bitcoin
 	// message.
-	OnGetCBFilter func(p *Peer, msg *wire.MsgGetCBFilter)
+	OnGetCFilter func(p *Peer, msg *wire.MsgGetCFilter)
 
 	// OnFeeFilter is invoked when a peer receives a feefilter bitcoin message.
 	OnFeeFilter func(p *Peer, msg *wire.MsgFeeFilter)
@@ -1285,7 +1285,7 @@ func (p *Peer) maybeAddDeadline(pendingResponses map[string]time.Time, msgCmd st
 		deadline = time.Now().Add(stallResponseTimeout * 3)
 		pendingResponses[wire.CmdHeaders] = deadline
 
-	// XXX pedro: we may need to handle OnCBFilter here depending on the
+	// XXX pedro: we may need to handle OnCFilter here depending on the
 	// protocol behaviour defined.
 	}
 }
@@ -1586,9 +1586,9 @@ out:
 				p.cfg.Listeners.OnGetHeaders(p, msg)
 			}
 
-		case *wire.MsgGetCBFilter:
-			if p.cfg.Listeners.OnGetCBFilter != nil {
-				p.cfg.Listeners.OnGetCBFilter(p, msg)
+		case *wire.MsgGetCFilter:
+			if p.cfg.Listeners.OnGetCFilter != nil {
+				p.cfg.Listeners.OnGetCFilter(p, msg)
 			}
 
 		case *wire.MsgFeeFilter:
