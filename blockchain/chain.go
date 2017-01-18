@@ -1640,10 +1640,12 @@ type Config struct {
 	// This field is required.
 	ChainParams *chaincfg.Params
 
-	// Checkpoints hold caller-defined checkpoints that should be added to the
-	// default checkpoints in ChainParams. Checkpoints must be sorted by height.
+	// Checkpoints hold caller-defined checkpoints that should be added to
+	// the default checkpoints in ChainParams.  Checkpoints must be sorted
+	// by height.
 	//
-	// This field can be nil if the caller did not specify any checkpoints.
+	// This field can be nil if the caller does not wish to specify any
+	// checkpoints.
 	Checkpoints []chaincfg.Checkpoint
 
 	// TimeSource defines the median time source to use for things such as
@@ -1693,13 +1695,21 @@ func New(config *Config) (*BlockChain, error) {
 		return nil, AssertError("blockchain.New timesource is nil")
 	}
 
-	// Generate a checkpoint by height map from the provided checkpoints.
+	// Generate a checkpoint by height map from the provided checkpoints
+	// and assert the provided checkpoints are sorted by height as required.
 	var checkpointsByHeight map[int32]*chaincfg.Checkpoint
+	var prevCheckpointHeight int32
 	if len(config.Checkpoints) > 0 {
 		checkpointsByHeight = make(map[int32]*chaincfg.Checkpoint)
 		for i := range config.Checkpoints {
 			checkpoint := &config.Checkpoints[i]
+			if checkpoint.Height <= prevCheckpointHeight {
+				return nil, AssertError("blockchain.New " +
+					"checkpoints are not sorted by height")
+			}
+
 			checkpointsByHeight[checkpoint.Height] = checkpoint
+			prevCheckpointHeight = checkpoint.Height
 		}
 	}
 

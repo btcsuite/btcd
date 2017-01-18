@@ -28,8 +28,8 @@ func newHashFromStr(hexStr string) *chainhash.Hash {
 }
 
 // Checkpoints returns a slice of checkpoints (regardless of whether they are
-// already known).
-// When there are no checkpoints for the chain, it will return nil.
+// already known).  When there are no checkpoints for the chain, it will return
+// nil.
 //
 // This function is safe for concurrent access.
 func (b *BlockChain) Checkpoints() []chaincfg.Checkpoint {
@@ -43,8 +43,8 @@ func (b *BlockChain) HasCheckpoints() bool {
 	return len(b.checkpoints) > 0
 }
 
-// LatestCheckpoint returns the most recent checkpoint (regardless of whether they
-// are already known). When there are no defined checkpoints for the active chain
+// LatestCheckpoint returns the most recent checkpoint (regardless of whether it
+// is already known). When there are no defined checkpoints for the active chain
 // instance, it will return nil.
 //
 // This function is safe for concurrent access.
@@ -56,7 +56,7 @@ func (b *BlockChain) LatestCheckpoint() *chaincfg.Checkpoint {
 }
 
 // verifyCheckpoint returns whether the passed block height and hash combination
-// match the checkpoint data. It also returns true if there is no checkpoint
+// match the checkpoint data.  It also returns true if there is no checkpoint
 // data for the passed block height.
 func (b *BlockChain) verifyCheckpoint(height int32, hash *chainhash.Hash) bool {
 	if !b.HasCheckpoints() {

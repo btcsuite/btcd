@@ -74,8 +74,7 @@ Application Options:
       --testnet             Use the test network
       --regtest             Use the regression test network
       --simnet              Use the simulation test network
-      --addcheckpoint=      Add ad additional checkpoint.
-                            Format: '<height>:<hash>'
+      --addcheckpoint=      Add a custom checkpoint.  Format: '<height>:<hash>'
       --nocheckpoints       Disable built-in checkpoints.  Don't do this unless
                             you know what you're doing.
       --dbtype=             Database backend to use for the Block Chain (ffldb)

@@ -1353,25 +1353,27 @@ func (s checkpointSorter) Less(i, j int) bool {
 // default checkpoints, the additional checkpoint will take precedence and
 // overwrite the default one.
 func mergeCheckpoints(defaultCheckpoints, additional []chaincfg.Checkpoint) []chaincfg.Checkpoint {
-	// Create a map of the additional checkpoint heights to detect
-	// duplicates.
-	additionalHeights := make(map[int32]struct{})
+	// Create a map of the additional checkpoints to remove duplicates while
+	// leaving the most recently-specified checkpoint.
+	extra := make(map[int32]chaincfg.Checkpoint)
 	for _, checkpoint := range additional {
-		additionalHeights[checkpoint.Height] = struct{}{}
+		extra[checkpoint.Height] = checkpoint
 	}
 
 	// Add all default checkpoints that do not have an override in the
 	// additional checkpoints.
 	numDefault := len(defaultCheckpoints)
-	checkpoints := make([]chaincfg.Checkpoint, 0, numDefault+len(additional))
+	checkpoints := make([]chaincfg.Checkpoint, 0, numDefault+len(extra))
 	for _, checkpoint := range defaultCheckpoints {
-		if _, exists := additionalHeights[checkpoint.Height]; !exists {
+		if _, exists := extra[checkpoint.Height]; !exists {
 			checkpoints = append(checkpoints, checkpoint)
 		}
 	}
 
 	// Append the additional checkpoints and return the sorted results.
-	checkpoints = append(checkpoints, additional...)
+	for _, checkpoint := range extra {
+		checkpoints = append(checkpoints, checkpoint)
+	}
 	sort.Sort(checkpointSorter(checkpoints))
 	return checkpoints
 }

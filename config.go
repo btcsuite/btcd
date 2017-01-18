@@ -125,7 +125,7 @@ type config struct {
 	TestNet3             bool          `long:"testnet" description:"Use the test network"`
 	RegressionTest       bool          `long:"regtest" description:"Use the regression test network"`
 	SimNet               bool          `long:"simnet" description:"Use the simulation test network"`
-	AddCheckpoints       []string      `long:"addcheckpoint" description:"Add a custom checkpoint. Format: '<height>:<hash>'"`
+	AddCheckpoints       []string      `long:"addcheckpoint" description:"Add a custom checkpoint.  Format: '<height>:<hash>'"`
 	DisableCheckpoints   bool          `long:"nocheckpoints" description:"Disable built-in checkpoints.  Don't do this unless you know what you're doing."`
 	DbType               string        `long:"dbtype" description:"Database backend to use for the Block Chain"`
 	Profile              string        `long:"profile" description:"Enable HTTP profiling on given port -- NOTE port must be between 1024 and 65536"`
@@ -311,20 +311,25 @@ func normalizeAddresses(addrs []string, defaultPort string) []string {
 func newCheckpointFromStr(checkpoint string) (chaincfg.Checkpoint, error) {
 	parts := strings.Split(checkpoint, ":")
 	if len(parts) != 2 {
-		return chaincfg.Checkpoint{}, errors.New("checkpoints must use the " +
-			"syntax '<height>:<hash>'")
+		return chaincfg.Checkpoint{}, fmt.Errorf("unable to parse "+
+			"checkpoint %q -- use the syntax <height>:<hash>",
+			checkpoint)
 	}
 
 	height, err := strconv.ParseInt(parts[0], 10, 32)
 	if err != nil {
-		return chaincfg.Checkpoint{}, fmt.Errorf("unable to parse checkpoint "+
-			"due to malformed height: %s", parts[0])
+		return chaincfg.Checkpoint{}, fmt.Errorf("unable to parse "+
+			"checkpoint %q due to malformed height", checkpoint)
 	}
 
+	if len(parts[1]) == 0 {
+		return chaincfg.Checkpoint{}, fmt.Errorf("unable to parse "+
+			"checkpoint %q due to missing hash", checkpoint)
+	}
 	hash, err := chainhash.NewHashFromStr(parts[1])
 	if err != nil {
-		return chaincfg.Checkpoint{}, fmt.Errorf("unable to parse checkpoint "+
-			"due to malformed hash: %s", parts[1])
+		return chaincfg.Checkpoint{}, fmt.Errorf("unable to parse "+
+			"checkpoint %q due to malformed hash", checkpoint)
 	}
 
 	return chaincfg.Checkpoint{
