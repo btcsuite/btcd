@@ -6,7 +6,6 @@ package indexers
 
 import (
 	"encoding/binary"
-	"errors"
 	"fmt"
 
 	"github.com/btcsuite/btcd/blockchain"
@@ -27,10 +26,6 @@ var (
 	// cfIndexKey is the name of the db bucket used to house the
 	// block hash -> CF index.
 	cfIndexKey = []byte("cfbyhashidx")
-
-	// errNoCFEntry is an error that indicates a requested entry does
-	// not exist in the CF index.
-	errCFEntry = errors.New("no entry in the block ID index")
 )
 
 func dbFetchCFIndexEntry(dbTx database.Tx, blockHash *chainhash.Hash) ([]byte,
