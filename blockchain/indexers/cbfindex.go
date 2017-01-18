@@ -37,7 +37,7 @@ func dbFetchCBFIndexEntry(dbTx database.Tx, blockHash *chainhash.Hash) ([]byte,
     error) {
 	// Load the record from the database and return now if it doesn't exist.
 	index := dbTx.Metadata().Bucket(cbfIndexKey)
-	serializedFilter := index.Get(blockHash.CloneBytes())
+	serializedFilter := index.Get(blockHash[:])
 	if len(serializedFilter) == 0 {
 		return nil, nil
 	}
@@ -103,7 +103,7 @@ func generateFilterForBlock(block *btcutil.Block) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		txHashes = append(txHashes, txHash.CloneBytes())
+		txHashes = append(txHashes, txHash[:])
 	}
 
 	var key [gcs.KeySize]byte
@@ -137,7 +137,7 @@ func (idx *CBFIndex) ConnectBlock(dbTx database.Tx, block *btcutil.Block,
 
 	meta := dbTx.Metadata()
 	index := meta.Bucket(cbfIndexKey)
-	err = index.Put(block.Hash().CloneBytes(), filterBytes)
+	err = index.Put(block.Hash()[:], filterBytes)
 	if err != nil {
 		return err
 	}
@@ -155,12 +155,12 @@ func (idx *CBFIndex) ConnectBlock(dbTx database.Tx, block *btcutil.Block,
 func (idx *CBFIndex) DisconnectBlock(dbTx database.Tx, block *btcutil.Block,
     view *blockchain.UtxoViewpoint) error {
 	index := dbTx.Metadata().Bucket(cbfIndexKey)
-	filterBytes := index.Get(block.Hash().CloneBytes())
+	filterBytes := index.Get(block.Hash()[:])
 	if len(filterBytes) == 0 {
 		return fmt.Errorf("can't remove non-existent filter %s from " +
 		    "the cbfilter index", block.Hash())
 	}
-	return index.Delete(block.Hash().CloneBytes())
+	return index.Delete(block.Hash()[:])
 }
 
 func (idx *CBFIndex) GetFilterByBlockHash(hash *chainhash.Hash) ([]byte,
