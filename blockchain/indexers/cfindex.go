@@ -5,14 +5,13 @@
 package indexers
 
 import (
-	"encoding/binary"
 	"fmt"
 
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcutil"
-	"github.com/btcsuite/btcutil/gcs"
+	"github.com/btcsuite/btcutil/gcs/builder"
 
 	"os"
 )
@@ -90,32 +89,21 @@ func (idx *CFIndex) Create(dbTx database.Tx) error {
 }
 
 func generateFilterForBlock(block *btcutil.Block) ([]byte, error) {
-	txSlice := block.Transactions() // XXX can this fail?
-	txHashes := make([][]byte, len(txSlice))
-
-	for i := 0; i < len(txSlice); i++ {
-		txHash, err := block.TxHash(i)
-		if err != nil {
-			return nil, err
-		}
-		txHashes = append(txHashes, txHash[:])
-	}
-
-	var key [gcs.KeySize]byte
-	P := uint8(20) // collision probability
-
-	for i := 0; i < gcs.KeySize; i += 4 {
-		binary.BigEndian.PutUint32(key[i:], uint32(0xcafebabe))
-	}
-
-	filter, err := gcs.BuildGCSFilter(P, key, txHashes)
+	b := builder.WithKeyHash(block.Hash())
+	_, err := b.Key()
 	if err != nil {
 		return nil, err
 	}
-
-	fmt.Fprintf(os.Stderr, "Generated CF for block %v", block.Hash())
-
-	return filter.Bytes(), nil
+	for _, tx := range block.Transactions() {
+		for _, txIn := range tx.MsgTx().TxIn {
+			b.AddOutPoint(txIn.PreviousOutPoint)
+		}
+	}
+	f, err := b.Build()
+	if err != nil {
+		return nil, err
+	}
+	return f.Bytes(), nil
 }
 
 // ConnectBlock is invoked by the index manager when a new block has been
