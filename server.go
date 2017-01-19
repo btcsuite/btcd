@@ -229,7 +229,7 @@ type server struct {
 	// do not need to be protected for concurrent access.
 	txIndex   *indexers.TxIndex
 	addrIndex *indexers.AddrIndex
-	cfIndex   *indexers.CFIndex
+	cfIndex   *indexers.CfIndex
 }
 
 // serverPeer extends the peer to maintain state shared by the server and
@@ -2244,8 +2244,8 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 		indexes = append(indexes, s.addrIndex)
 	}
 	if !cfg.NoCFilters {
-		indxLog.Info("CF index is enabled")
-		s.cfIndex = indexers.NewCFIndex(db)
+		indxLog.Info("cf index is enabled")
+		s.cfIndex = indexers.NewCfIndex(db)
 		indexes = append(indexes, s.cfIndex)
 	}
 
