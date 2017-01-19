@@ -5,6 +5,23 @@
 
 package dcrjson
 
+// GetAccountBalanceResult models the account data from the getbalance command.
+type GetAccountBalanceResult struct {
+	AccountName             string  `json:"accountname"`
+	ImmatureCoinbaseRewards float64 `json:"immaturecoinbaserewards"`
+	ImmatureStakeGeneration float64 `json:"immaturestakegeneration"`
+	LockedByTickets         float64 `json:"lockedbytickets"`
+	Spendable               float64 `json:"spendable"`
+	Total                   float64 `json:"total"`
+	VotingAuthority         float64 `json:"votingauthority"`
+}
+
+// GetBalanceResult models the data from the getbalance command.
+type GetBalanceResult struct {
+	Balances  []GetAccountBalanceResult `json:"balances"`
+	BlockHash string                    `json:"blockhash"`
+}
+
 // GetTransactionDetailsResult models the details data from the gettransaction command.
 //
 // This models the "short" version of the ListTransactionsResult type, which
