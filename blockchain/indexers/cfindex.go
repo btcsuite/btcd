@@ -118,6 +118,9 @@ func makeBasicFilterForBlock(block *btcutil.Block) ([]byte, error) {
 		for _, txIn := range tx.MsgTx().TxIn {
 			b.AddOutPoint(txIn.PreviousOutPoint)
 		}
+		for _, txOut := range tx.MsgTx().TxOut {
+			b.AddScript(txOut.PkScript)
+		}
 	}
 	f, err := b.Build()
 	if err != nil {
