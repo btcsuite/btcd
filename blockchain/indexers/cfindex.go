@@ -18,19 +18,22 @@ import (
 
 const (
 	// cfIndexName is the human-readable name for the index.
-	cfIndexName = "committed bloom filter index"
+	cfIndexName = "committed filter index"
 )
 
 var (
-	// cfIndexKey is the name of the db bucket used to house the
-	// block hash -> CF index.
-	cfIndexKey = []byte("cfbyhashidx")
+	// cfBasicIndexKey is the name of the db bucket used to house the
+	// block hash -> Basic CF index (CF #0).
+	cfBasicIndexKey = []byte("cf0byhashidx")
+	// cfExtendedIndexKey is the name of the db bucket used to house the
+	// block hash -> Extended CF index (CF #1).
+	cfExtendedIndexKey = []byte("cf1byhashidx")
 )
 
 func dbFetchCFIndexEntry(dbTx database.Tx, blockHash *chainhash.Hash) ([]byte,
     error) {
 	// Load the record from the database and return now if it doesn't exist.
-	index := dbTx.Metadata().Bucket(cfIndexKey)
+	index := dbTx.Metadata().Bucket(cfBasicIndexKey)
 	serializedFilter := index.Get(blockHash[:])
 	if len(serializedFilter) == 0 {
 		return nil, nil
@@ -64,10 +67,8 @@ func (idx *CFIndex) Init() error {
 }
 
 // Key returns the database key to use for the index as a byte slice.
-//
-// This is part of the Indexer interface.
 func (idx *CFIndex) Key() []byte {
-	return cfIndexKey
+	return cfBasicIndexKey
 }
 
 // Name returns the human-readable name of the index.
@@ -77,14 +78,16 @@ func (idx *CFIndex) Name() string {
 	return cfIndexName
 }
 
-// Create is invoked when the indexer manager determines the index needs
-// to be created for the first time.  It creates the buckets for the hash-based
-// CF index.
-//
-// This is part of the Indexer interface.
+// Create is invoked when the indexer manager determines the index needs to be
+// created for the first time. It creates buckets for the two hash-based CF
+// indexes (simple, extended).
 func (idx *CFIndex) Create(dbTx database.Tx) error {
 	meta := dbTx.Metadata()
-	_, err := meta.CreateBucket(cfIndexKey)
+	_, err := meta.CreateBucket(cfBasicIndexKey)
+	if err != nil {
+		return err
+	}
+	_, err = meta.CreateBucket(cfExtendedIndexKey)
 	return err
 }
 
@@ -119,7 +122,7 @@ func (idx *CFIndex) ConnectBlock(dbTx database.Tx, block *btcutil.Block,
 	}
 
 	meta := dbTx.Metadata()
-	index := meta.Bucket(cfIndexKey)
+	index := meta.Bucket(cfBasicIndexKey)
 	err = index.Put(block.Hash()[:], filterBytes)
 	if err != nil {
 		return err
@@ -137,7 +140,7 @@ func (idx *CFIndex) ConnectBlock(dbTx database.Tx, block *btcutil.Block,
 // This is part of the Indexer interface.
 func (idx *CFIndex) DisconnectBlock(dbTx database.Tx, block *btcutil.Block,
     view *blockchain.UtxoViewpoint) error {
-	index := dbTx.Metadata().Bucket(cfIndexKey)
+	index := dbTx.Metadata().Bucket(cfBasicIndexKey)
 	filterBytes := index.Get(block.Hash()[:])
 	if len(filterBytes) == 0 {
 		return fmt.Errorf("can't remove non-existent filter %s from " +
@@ -169,5 +172,5 @@ func NewCFIndex(db database.DB) *CFIndex {
 
 // DropCFIndex drops the CF index from the provided database if exists.
 func DropCFIndex(db database.DB) error {
-	return dropIndex(db, cfIndexKey, cfIndexName)
+	return dropIndex(db, cfBasicIndexKey, cfIndexName)
 }
