@@ -755,6 +755,9 @@ func (sp *serverPeer) OnGetCFilter(_ *peer.Peer, msg *wire.MsgGetCFilter) {
 		peerLog.Infof("Could not obtain CB filter for %v: %v",
 			msg.BlockHash, err)
 	}
+
+	filterMsg := wire.NewMsgCFilter(filterBytes)
+	sp.QueueMessage(filterMsg, nil)
 }
 
 // enforceNodeBloomFlag disconnects the peer if the server is not configured to
