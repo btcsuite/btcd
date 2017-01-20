@@ -2154,7 +2154,7 @@ func handleGetCFilter(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) 
 		return nil, rpcDecodeHexError(c.Hash)
 	}
 
-	filterBytes, err := s.server.cfIndex.FilterByBlockHash(hash)
+	filterBytes, err := s.server.cfIndex.FilterByBlockHash(hash, c.Extended)
 	if len(filterBytes) > 0 {
 		rpcsLog.Debugf("Found committed filter for %v", hash)
 	} else {

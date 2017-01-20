@@ -320,12 +320,12 @@ func TestChainSvrCmds(t *testing.T) {
 		{
 			name: "getcfilter",
 			newCmd: func() (interface{}, error) {
-				return btcjson.NewCmd("getcfilter", "123")
+				return btcjson.NewCmd("getcfilter", "123", false)
 			},
 			staticCmd: func() interface{} {
-				return btcjson.NewGetCFilterCmd("123")
+				return btcjson.NewGetCFilterCmd("123", false)
 			},
-			marshalled: `{"jsonrpc":"1.0","method":"getcfilter","params":["123"],"id":1}`,
+			marshalled: `{"jsonrpc":"1.0","method":"getcfilter","params":["123",false],"id":1}`,
 			unmarshalled: &btcjson.GetCFilterCmd{
 				Hash:    "123",
 			},
