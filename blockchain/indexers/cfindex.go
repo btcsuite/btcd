@@ -107,7 +107,8 @@ func (idx *CfIndex) Create(dbTx database.Tx) error {
 }
 
 // makeBasicFilter() builds a block's basic filter, which consists of all
-// outpoints referenced by transactions within the block.
+// outpoints and pkscript data pushes referenced by transactions within the
+// block.
 func makeBasicFilterForBlock(block *btcutil.Block) ([]byte, error) {
 	b := builder.WithKeyHash(block.Hash())
 	_, err := b.Key()
@@ -120,6 +121,27 @@ func makeBasicFilterForBlock(block *btcutil.Block) ([]byte, error) {
 		}
 		for _, txOut := range tx.MsgTx().TxOut {
 			b.AddScript(txOut.PkScript)
+		}
+	}
+	f, err := b.Build()
+	if err != nil {
+		return nil, err
+	}
+	return f.Bytes(), nil
+}
+
+// makeExtendedFilter() builds a block's extended filter, which consists of
+// all tx hashes and sigscript data pushes contained in the block.
+func makeExtendedFilterForBlock(block *btcutil.Block) ([]byte, error) {
+	b := builder.WithKeyHash(block.Hash())
+	_, err := b.Key()
+	if err != nil {
+		return nil, err
+	}
+	for _, tx := range block.Transactions() {
+		b.AddHash(tx.Hash())
+		for _, txIn := range tx.MsgTx().TxIn {
+			b.AddScript(txIn.SignatureScript)
 		}
 	}
 	f, err := b.Build()
