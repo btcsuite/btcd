@@ -280,14 +280,16 @@ func NewGetBlockTemplateCmd(request *TemplateRequest) *GetBlockTemplateCmd {
 }
 // GetCFilterCmd defines the getcfilter JSON-RPC command.
 type GetCFilterCmd struct {
-	Hash string
+	Hash     string
+	Extended bool
 }
 
 // NewGetCFilterCmd returns a new instance which can be used to issue a
 // getcfilter JSON-RPC command.
-func NewGetCFilterCmd(hash string) *GetCFilterCmd {
+func NewGetCFilterCmd(hash string, extended bool) *GetCFilterCmd {
 	return &GetCFilterCmd{
-		Hash: hash,
+		Hash:     hash,
+		Extended: extended,
 	}
 }
 

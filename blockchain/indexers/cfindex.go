@@ -171,11 +171,15 @@ func (idx *CfIndex) DisconnectBlock(dbTx database.Tx, block *btcutil.Block,
 	return dbDeleteBasicEntry(dbTx, block.Hash())
 }
 
-func (idx *CfIndex) FilterByBlockHash(hash *chainhash.Hash) ([]byte, error) {
+func (idx *CfIndex) FilterByBlockHash(hash *chainhash.Hash, extended bool) ([]byte, error) {
 	var filterBytes []byte
 	err := idx.db.View(func(dbTx database.Tx) error {
 		var err error
-		filterBytes, err = dbFetchBasicEntry(dbTx, hash)
+		if extended {
+			filterBytes, err = dbFetchExtendedEntry(dbTx, hash)
+		} else {
+			filterBytes, err = dbFetchBasicEntry(dbTx, hash)
+		}
 		return err
 	})
 	return filterBytes, err

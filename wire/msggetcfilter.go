@@ -13,16 +13,25 @@ import (
 type MsgGetCFilter struct {
 	ProtocolVersion    uint32
 	BlockHash          chainhash.Hash
+	Extended           bool
 }
 
 func (msg *MsgGetCFilter) BtcDecode(r io.Reader, pver uint32) error {
-	return readElement(r, &msg.BlockHash)
+	err := readElement(r, &msg.BlockHash)
+	if err != nil {
+		return err
+	}
+	return readElement(r, &msg.Extended)
 }
 
 // BtcEncode encodes the receiver to w using the bitcoin protocol encoding.
 // This is part of the Message interface implementation.
 func (msg *MsgGetCFilter) BtcEncode(w io.Writer, pver uint32) error {
-	return writeElement(w, &msg.BlockHash)
+	err := writeElement(w, &msg.BlockHash)
+	if err != nil {
+		return err
+	}
+	return writeElement(w, &msg.Extended)
 }
 
 // Command returns the protocol command string for the message.  This is part
@@ -34,16 +43,17 @@ func (msg *MsgGetCFilter) Command() string {
 // MaxPayloadLength returns the maximum length the payload can be for the
 // receiver.  This is part of the Message interface implementation.
 func (msg *MsgGetCFilter) MaxPayloadLength(pver uint32) uint32 {
-	// Protocol version 4 bytes + block hash.
-	return 4 + chainhash.HashSize
+	// Protocol version 4 bytes + block hash + Extended flag.
+	return 4 + chainhash.HashSize + 1
 }
 
 // NewMsgGetCFilter returns a new bitcoin getblocks message that conforms to
 // the Message interface using the passed parameters and defaults for the
 // remaining fields.
-func NewMsgGetCFilter(blockHash *chainhash.Hash) *MsgGetCFilter {
+func NewMsgGetCFilter(blockHash *chainhash.Hash, extended bool) *MsgGetCFilter {
 	return &MsgGetCFilter{
-		ProtocolVersion:    ProtocolVersion,
+		ProtocolVersion:     ProtocolVersion,
 		BlockHash:          *blockHash,
+		Extended:            extended,
 	}
 }
