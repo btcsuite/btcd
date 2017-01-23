@@ -384,6 +384,19 @@ func TestChainSvrCmds(t *testing.T) {
 			unmarshalled: &btcjson.GetInfoCmd{},
 		},
 		{
+			name: "getmempoolentry",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("getmempoolentry", "txhash")
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewGetMempoolEntryCmd("txhash")
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"getmempoolentry","params":["txhash"],"id":1}`,
+			unmarshalled: &btcjson.GetMempoolEntryCmd{
+				TxID: "txhash",
+			},
+		},
+		{
 			name: "getmempoolinfo",
 			newCmd: func() (interface{}, error) {
 				return btcjson.NewCmd("getmempoolinfo")
