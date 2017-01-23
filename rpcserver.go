@@ -222,6 +222,7 @@ var rpcUnimplemented = map[string]struct{}{
 	"estimatefee":      {},
 	"estimatepriority": {},
 	"getchaintips":     {},
+	"getmempoolentry":  {},
 	"getnetworkinfo":   {},
 	"getwork":          {},
 	"invalidateblock":  {},

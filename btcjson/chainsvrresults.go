@@ -1,4 +1,4 @@
-// Copyright (c) 2014 The btcsuite developers
+// Copyright (c) 2014-2017 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -164,6 +164,25 @@ type GetBlockTemplateResult struct {
 	// Block proposal from BIP 0023.
 	Capabilities  []string `json:"capabilities,omitempty"`
 	RejectReasion string   `json:"reject-reason,omitempty"`
+}
+
+// GetMempoolEntryResult models the data returned from the getmempoolentry
+// command.
+type GetMempoolEntryResult struct {
+	Size             int32    `json:"size"`
+	Fee              float64  `json:"fee"`
+	ModifiedFee      float64  `json:"modifiedfee"`
+	Time             int64    `json:"time"`
+	Height           int64    `json:"height"`
+	StartingPriority float64  `json:"startingpriority"`
+	CurrentPriority  float64  `json:"currentpriority"`
+	DescendantCount  int64    `json:"descendantcount"`
+	DescendantSize   int64    `json:"descendantsize"`
+	DescendantFees   float64  `json:"descendantfees"`
+	AncestorCount    int64    `json:"ancestorcount"`
+	AncestorSize     int64    `json:"ancestorsize"`
+	AncestorFees     float64  `json:"ancestorfees"`
+	Depends          []string `json:"depends"`
 }
 
 // GetMempoolInfoResult models the data returned from the getmempoolinfo
