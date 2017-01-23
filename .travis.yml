@@ -4,7 +4,10 @@ go:
   - 1.7.x
 sudo: false
 install:
-  - go get -v github.com/Masterminds/glide
+  - GLIDE_TAG=v0.12.3
+  - GLIDE_DOWNLOAD="https://github.com/Masterminds/glide/releases/download/$GLIDE_TAG/glide-$GLIDE_TAG-linux-amd64.tar.gz"
+  - curl -L $GLIDE_DOWNLOAD | tar -xvz
+  - export PATH=$PATH:$PWD/linux-amd64/
   - glide install
   - go install . ./cmd/...
   - go get -v github.com/alecthomas/gometalinter
