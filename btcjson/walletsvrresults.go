@@ -58,9 +58,11 @@ type InfoWalletResult struct {
 
 // ListTransactionsResult models the data from the listtransactions command.
 type ListTransactionsResult struct {
+	Abandoned         bool     `json:"abandoned"`
 	Account           string   `json:"account"`
 	Address           string   `json:"address,omitempty"`
 	Amount            float64  `json:"amount"`
+	BIP125Replaceable string   `json:"bip125-replaceable,omitempty"`
 	BlockHash         string   `json:"blockhash,omitempty"`
 	BlockIndex        *int64   `json:"blockindex,omitempty"`
 	BlockTime         int64    `json:"blocktime,omitempty"`
@@ -71,6 +73,7 @@ type ListTransactionsResult struct {
 	InvolvesWatchOnly bool     `json:"involveswatchonly,omitempty"`
 	Time              int64    `json:"time"`
 	TimeReceived      int64    `json:"timereceived"`
+	Trusted           bool     `json:"trusted"`
 	TxID              string   `json:"txid"`
 	Vout              uint32   `json:"vout"`
 	WalletConflicts   []string `json:"walletconflicts"`
