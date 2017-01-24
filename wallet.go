@@ -8,7 +8,6 @@ package dcrrpcclient
 import (
 	"encoding/hex"
 	"encoding/json"
-	"strconv"
 
 	"github.com/decred/dcrd/blockchain/stake"
 	"github.com/decred/dcrd/chaincfg/chainhash"
@@ -1826,58 +1825,20 @@ type FutureGetBalanceResult chan *response
 
 // Receive waits for the response promised by the future and returns the
 // available balance from the server for the specified account.
-func (r FutureGetBalanceResult) Receive() (dcrutil.Amount, error) {
+func (r FutureGetBalanceResult) Receive() (*dcrjson.GetBalanceResult, error) {
 	res, err := receiveFuture(r)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	// Unmarshal result as a floating point number.
-	var balance float64
+	var balance dcrjson.GetBalanceResult
 	err = json.Unmarshal(res, &balance)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
-	amount, err := dcrutil.NewAmount(balance)
-	if err != nil {
-		return 0, err
-	}
-
-	return amount, nil
-}
-
-// FutureGetBalanceParseResult is same as FutureGetBalanceResult except
-// that the result is expected to be a string which is then parsed into
-// a float64 value
-// This is required for compatiblity with servers like blockchain.info
-type FutureGetBalanceParseResult chan *response
-
-// Receive waits for the response promised by the future and returns the
-// available balance from the server for the specified account.
-func (r FutureGetBalanceParseResult) Receive() (dcrutil.Amount, error) {
-	res, err := receiveFuture(r)
-	if err != nil {
-		return 0, err
-	}
-
-	// Unmarshal result as a string
-	var balanceString string
-	err = json.Unmarshal(res, &balanceString)
-	if err != nil {
-		return 0, err
-	}
-
-	balance, err := strconv.ParseFloat(balanceString, 64)
-	if err != nil {
-		return 0, err
-	}
-	amount, err := dcrutil.NewAmount(balance)
-	if err != nil {
-		return 0, err
-	}
-
-	return amount, nil
+	return &balance, nil
 }
 
 // GetBalanceAsync returns an instance of a type that can be used to get the
@@ -1886,7 +1847,7 @@ func (r FutureGetBalanceParseResult) Receive() (dcrutil.Amount, error) {
 //
 // See GetBalance for the blocking version and more details.
 func (c *Client) GetBalanceAsync(account string) FutureGetBalanceResult {
-	cmd := dcrjson.NewGetBalanceCmd(&account, nil, nil)
+	cmd := dcrjson.NewGetBalanceCmd(&account, nil)
 	return c.sendCmd(cmd)
 }
 
@@ -1895,7 +1856,7 @@ func (c *Client) GetBalanceAsync(account string) FutureGetBalanceResult {
 // be "*" for all accounts.
 //
 // See GetBalanceMinConf to override the minimum number of confirmations.
-func (c *Client) GetBalance(account string) (dcrutil.Amount, error) {
+func (c *Client) GetBalance(account string) (*dcrjson.GetBalanceResult, error) {
 	return c.GetBalanceAsync(account).Receive()
 }
 
@@ -1905,7 +1866,7 @@ func (c *Client) GetBalance(account string) (dcrutil.Amount, error) {
 //
 // See GetBalanceMinConf for the blocking version and more details.
 func (c *Client) GetBalanceMinConfAsync(account string, minConfirms int) FutureGetBalanceResult {
-	cmd := dcrjson.NewGetBalanceCmd(&account, &minConfirms, nil)
+	cmd := dcrjson.NewGetBalanceCmd(&account, &minConfirms)
 	return c.sendCmd(cmd)
 }
 
@@ -1914,35 +1875,8 @@ func (c *Client) GetBalanceMinConfAsync(account string, minConfirms int) FutureG
 // account may be "*" for all accounts.
 //
 // See GetBalance to use the default minimum number of confirmations.
-func (c *Client) GetBalanceMinConf(account string, minConfirms int) (dcrutil.Amount, error) {
-	if c.config.EnableBCInfoHacks {
-		response := c.GetBalanceMinConfAsync(account, minConfirms)
-		return FutureGetBalanceParseResult(response).Receive()
-	}
+func (c *Client) GetBalanceMinConf(account string, minConfirms int) (*dcrjson.GetBalanceResult, error) {
 	return c.GetBalanceMinConfAsync(account, minConfirms).Receive()
-}
-
-// GetBalanceMinConfTypeAsync returns an instance of a type that can be used to get
-// the result of the RPC at some future time by invoking the Receive function on
-// the returned instance.
-//
-// See GetBalanceMinConfType for the blocking version and more details.
-func (c *Client) GetBalanceMinConfTypeAsync(account string, minConfirms int, balanceType string) FutureGetBalanceResult {
-	cmd := dcrjson.NewGetBalanceCmd(&account, &minConfirms, &balanceType)
-	return c.sendCmd(cmd)
-}
-
-// GetBalanceMinConfType returns the available balance from the server for the
-// specified account using the specified number of minimum confirmations and
-// balance type.  The account may be "*" for all accounts.
-//
-// See GetBalanceMinConf to use the default balance type.
-func (c *Client) GetBalanceMinConfType(account string, minConfirms int, balanceType string) (dcrutil.Amount, error) {
-	if c.config.EnableBCInfoHacks {
-		response := c.GetBalanceMinConfAsync(account, minConfirms)
-		return FutureGetBalanceParseResult(response).Receive()
-	}
-	return c.GetBalanceMinConfTypeAsync(account, minConfirms, balanceType).Receive()
 }
 
 // FutureGetReceivedByAccountResult is a future promise to deliver the result of

@@ -10,6 +10,7 @@ import:
   - spew
 - package: github.com/decred/dcrd
   subpackages:
+  - blockchain/stake
   - chaincfg/chainhash
   - dcrjson
   - wire
