@@ -1,4 +1,5 @@
-// Copyright (c) 2014 The btcsuite developers
+// Copyright (c) 2014-2017 The btcsuite developers
+// Copyright (c) 2015-2017 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -190,6 +191,26 @@ func TestChainSvrWsCmds(t *testing.T) {
 				Addresses:  []string{"1Address"},
 				OutPoints:  []btcjson.OutPoint{{Hash: "123", Index: 0}},
 				EndBlock:   btcjson.String("456"),
+			},
+		},
+		{
+			name: "loadtxfilter",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("loadtxfilter", false, `["1Address"]`, `[{"hash":"0000000000000000000000000000000000000000000000000000000000000123","index":0}]`)
+			},
+			staticCmd: func() interface{} {
+				addrs := []string{"1Address"}
+				ops := []btcjson.OutPoint{{
+					Hash:  "0000000000000000000000000000000000000000000000000000000000000123",
+					Index: 0,
+				}}
+				return btcjson.NewLoadTxFilterCmd(false, addrs, ops)
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"loadtxfilter","params":[false,["1Address"],[{"hash":"0000000000000000000000000000000000000000000000000000000000000123","index":0}]],"id":1}`,
+			unmarshalled: &btcjson.LoadTxFilterCmd{
+				Reload:    false,
+				Addresses: []string{"1Address"},
+				OutPoints: []btcjson.OutPoint{{Hash: "0000000000000000000000000000000000000000000000000000000000000123", Index: 0}},
 			},
 		},
 	}

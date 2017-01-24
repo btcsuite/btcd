@@ -1,4 +1,5 @@
-// Copyright (c) 2014-2015 The btcsuite developers
+// Copyright (c) 2014-2017 The btcsuite developers
+// Copyright (c) 2015-2017 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -78,12 +79,16 @@ func NewStopNotifyNewTransactionsCmd() *StopNotifyNewTransactionsCmd {
 }
 
 // NotifyReceivedCmd defines the notifyreceived JSON-RPC command.
+//
+// NOTE: Deprecated. Use LoadTxFilterCmd instead.
 type NotifyReceivedCmd struct {
 	Addresses []string
 }
 
 // NewNotifyReceivedCmd returns a new instance which can be used to issue a
 // notifyreceived JSON-RPC command.
+//
+// NOTE: Deprecated. Use NewLoadTxFilterCmd instead.
 func NewNotifyReceivedCmd(addresses []string) *NotifyReceivedCmd {
 	return &NotifyReceivedCmd{
 		Addresses: addresses,
@@ -97,13 +102,41 @@ type OutPoint struct {
 	Index uint32 `json:"index"`
 }
 
+// LoadTxFilterCmd defines the loadtxfilter request parameters to load or
+// reload a transaction filter.
+//
+// NOTE: This is a btcd extension ported from github.com/decred/dcrd/dcrjson
+// and requires a websocket connection.
+type LoadTxFilterCmd struct {
+	Reload    bool
+	Addresses []string
+	OutPoints []OutPoint
+}
+
+// NewLoadTxFilterCmd returns a new instance which can be used to issue a
+// loadtxfilter JSON-RPC command.
+//
+// NOTE: This is a btcd extension ported from github.com/decred/dcrd/dcrjson
+// and requires a websocket connection.
+func NewLoadTxFilterCmd(reload bool, addresses []string, outPoints []OutPoint) *LoadTxFilterCmd {
+	return &LoadTxFilterCmd{
+		Reload:    reload,
+		Addresses: addresses,
+		OutPoints: outPoints,
+	}
+}
+
 // NotifySpentCmd defines the notifyspent JSON-RPC command.
+//
+// NOTE: Deprecated. Use LoadTxFilterCmd instead.
 type NotifySpentCmd struct {
 	OutPoints []OutPoint
 }
 
 // NewNotifySpentCmd returns a new instance which can be used to issue a
 // notifyspent JSON-RPC command.
+//
+// NOTE: Deprecated. Use NewLoadTxFilterCmd instead.
 func NewNotifySpentCmd(outPoints []OutPoint) *NotifySpentCmd {
 	return &NotifySpentCmd{
 		OutPoints: outPoints,
@@ -111,12 +144,16 @@ func NewNotifySpentCmd(outPoints []OutPoint) *NotifySpentCmd {
 }
 
 // StopNotifyReceivedCmd defines the stopnotifyreceived JSON-RPC command.
+//
+// NOTE: Deprecated. Use LoadTxFilterCmd instead.
 type StopNotifyReceivedCmd struct {
 	Addresses []string
 }
 
 // NewStopNotifyReceivedCmd returns a new instance which can be used to issue a
 // stopnotifyreceived JSON-RPC command.
+//
+// NOTE: Deprecated. Use NewLoadTxFilterCmd instead.
 func NewStopNotifyReceivedCmd(addresses []string) *StopNotifyReceivedCmd {
 	return &StopNotifyReceivedCmd{
 		Addresses: addresses,
@@ -124,12 +161,16 @@ func NewStopNotifyReceivedCmd(addresses []string) *StopNotifyReceivedCmd {
 }
 
 // StopNotifySpentCmd defines the stopnotifyspent JSON-RPC command.
+//
+// NOTE: Deprecated. Use LoadTxFilterCmd instead.
 type StopNotifySpentCmd struct {
 	OutPoints []OutPoint
 }
 
 // NewStopNotifySpentCmd returns a new instance which can be used to issue a
 // stopnotifyspent JSON-RPC command.
+//
+// NOTE: Deprecated. Use NewLoadTxFilterCmd instead.
 func NewStopNotifySpentCmd(outPoints []OutPoint) *StopNotifySpentCmd {
 	return &StopNotifySpentCmd{
 		OutPoints: outPoints,
@@ -163,6 +204,7 @@ func init() {
 	flags := UFWebsocketOnly
 
 	MustRegisterCmd("authenticate", (*AuthenticateCmd)(nil), flags)
+	MustRegisterCmd("loadtxfilter", (*LoadTxFilterCmd)(nil), flags)
 	MustRegisterCmd("notifyblocks", (*NotifyBlocksCmd)(nil), flags)
 	MustRegisterCmd("notifynewtransactions", (*NotifyNewTransactionsCmd)(nil), flags)
 	MustRegisterCmd("notifyreceived", (*NotifyReceivedCmd)(nil), flags)
