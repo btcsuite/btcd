@@ -123,9 +123,8 @@ func NewGetAddressesByAccountCmd(account string) *GetAddressesByAccountCmd {
 
 // GetBalanceCmd defines the getbalance JSON-RPC command.
 type GetBalanceCmd struct {
-	Account     *string
-	MinConf     *int `jsonrpcdefault:"1"`
-	BalanceType *string
+	Account *string
+	MinConf *int `jsonrpcdefault:"1"`
 }
 
 // NewGetBalanceCmd returns a new instance which can be used to issue a
@@ -133,12 +132,10 @@ type GetBalanceCmd struct {
 //
 // The parameters which are pointers indicate they are optional.  Passing nil
 // for optional parameters will use the default value.
-func NewGetBalanceCmd(account *string, minConf *int, balType *string) *GetBalanceCmd {
-
+func NewGetBalanceCmd(account *string, minConf *int) *GetBalanceCmd {
 	return &GetBalanceCmd{
-		Account:     account,
-		MinConf:     minConf,
-		BalanceType: balType,
+		Account: account,
+		MinConf: minConf,
 	}
 }
 

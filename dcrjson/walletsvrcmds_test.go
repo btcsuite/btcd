@@ -174,7 +174,7 @@ func TestWalletSvrCmds(t *testing.T) {
 				return dcrjson.NewCmd("getbalance")
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewGetBalanceCmd(nil, nil, nil)
+				return dcrjson.NewGetBalanceCmd(nil, nil)
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"getbalance","params":[],"id":1}`,
 			unmarshalled: &dcrjson.GetBalanceCmd{
@@ -188,7 +188,7 @@ func TestWalletSvrCmds(t *testing.T) {
 				return dcrjson.NewCmd("getbalance", "acct")
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewGetBalanceCmd(dcrjson.String("acct"), nil, nil)
+				return dcrjson.NewGetBalanceCmd(dcrjson.String("acct"), nil)
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"getbalance","params":["acct"],"id":1}`,
 			unmarshalled: &dcrjson.GetBalanceCmd{
@@ -202,7 +202,7 @@ func TestWalletSvrCmds(t *testing.T) {
 				return dcrjson.NewCmd("getbalance", "acct", 6)
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewGetBalanceCmd(dcrjson.String("acct"), dcrjson.Int(6), nil)
+				return dcrjson.NewGetBalanceCmd(dcrjson.String("acct"), dcrjson.Int(6))
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"getbalance","params":["acct",6],"id":1}`,
 			unmarshalled: &dcrjson.GetBalanceCmd{
