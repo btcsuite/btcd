@@ -213,6 +213,20 @@ func TestChainSvrWsCmds(t *testing.T) {
 				OutPoints: []btcjson.OutPoint{{Hash: "0000000000000000000000000000000000000000000000000000000000000123", Index: 0}},
 			},
 		},
+		{
+			name: "rescanblocks",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("rescanblocks", `["0000000000000000000000000000000000000000000000000000000000000123"]`)
+			},
+			staticCmd: func() interface{} {
+				blockhashes := []string{"0000000000000000000000000000000000000000000000000000000000000123"}
+				return btcjson.NewRescanBlocksCmd(blockhashes)
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"rescanblocks","params":[["0000000000000000000000000000000000000000000000000000000000000123"]],"id":1}`,
+			unmarshalled: &btcjson.RescanBlocksCmd{
+				BlockHashes: []string{"0000000000000000000000000000000000000000000000000000000000000123"},
+			},
+		},
 	}
 
 	t.Logf("Running %d tests", len(tests))

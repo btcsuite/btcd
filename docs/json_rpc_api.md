@@ -694,11 +694,12 @@ user.  Click the method name for further details such as parameter and return in
 |5|[stopnotifyreceived](#stopnotifyreceived)|*DEPRECATED, for similar functionality see [loadtxfilter](#loadtxfilter)*<br />Cancel registered notifications for when a txout spends to any of the passed addresses.|None|
 |6|[notifyspent](#notifyspent)|*DEPRECATED, for similar functionality see [loadtxfilter](#loadtxfilter)*<br />Send notification when a txout is spent.|[redeemingtx](#redeemingtx)|
 |7|[stopnotifyspent](#stopnotifyspent)|*DEPRECATED, for similar functionality see [loadtxfilter](#loadtxfilter)*<br />Cancel registered spending notifications for each passed outpoint.|None|
-|8|[rescan](#rescan)|Rescan block chain for transactions to addresses and spent transaction outpoints.|[recvtx](#recvtx), [redeemingtx](#redeemingtx), [rescanprogress](#rescanprogress), and [rescanfinished](#rescanfinished) |
+|8|[rescan](#rescan)|*DEPRECATED, for similar functionality see [rescanblocks](#rescanblocks)*<br />Rescan block chain for transactions to addresses and spent transaction outpoints.|[recvtx](#recvtx), [redeemingtx](#redeemingtx), [rescanprogress](#rescanprogress), and [rescanfinished](#rescanfinished) |
 |9|[notifynewtransactions](#notifynewtransactions)|Send notifications for all new transactions as they are accepted into the mempool.|[txaccepted](#txaccepted) or [txacceptedverbose](#txacceptedverbose)|
 |10|[stopnotifynewtransactions](#stopnotifynewtransactions)|Stop sending either a txaccepted or a txacceptedverbose notification when a new transaction is accepted into the mempool.|None|
 |11|[session](#session)|Return details regarding a websocket client's current connection.|None|
 |12|[loadtxfilter](#loadtxfilter)|Load, add to, or reload a websocket client's transaction filter for mempool transactions, new blocks and rescanblocks.|[relevanttxaccepted](#relevanttxaccepted)|
+|13|[rescanblocks](#rescanblocks)|Rescan blocks for transactions matching the loaded transaction filter.|None|
 
 <a name="WSExtMethodDetails" />
 **7.2 Method Details**<br />
@@ -799,7 +800,7 @@ user.  Click the method name for further details such as parameter and return in
 |Method|rescan|
 |Notifications|[recvtx](#recvtx), [redeemingtx](#redeemingtx), [rescanprogress](#rescanprogress), and [rescanfinished](#rescanfinished)|
 |Parameters|1. BeginBlock (string, required) block hash to begin rescanning from<br />2. Addresses (JSON array, required)<br />&nbsp;`[ (json array of strings)`<br />&nbsp;&nbsp;`"bitcoinaddress", (string) the bitcoin address`<br />&nbsp;&nbsp;`...` <br />&nbsp;`]`<br />3. Outpoints (JSON array, required)<br />&nbsp;`[ (JSON array)`<br />&nbsp;&nbsp;`{ (JSON object)`<br />&nbsp;&nbsp;&nbsp;`"hash":"data", (string) the hex-encoded bytes of the outpoint hash`<br />&nbsp;&nbsp;&nbsp;`"index":n (numeric) the txout index of the outpoint`<br />&nbsp;&nbsp;`},`<br />&nbsp;&nbsp;`...`<br />&nbsp;`]`<br />4. EndBlock (string, optional) hash of final block to rescan|
-|Description|Rescan block chain for transactions to addresses, starting at block BeginBlock and ending at EndBlock.  The current known UTXO set for all passed addresses at height BeginBlock should included in the Outpoints argument.  If EndBlock is omitted, the rescan continues through the best block in the main chain.  Additionally, if no EndBlock is provided, the client is automatically registered for transaction notifications for all rescanned addresses and the final UTXO set.  Rescan results are sent as recvtx and redeemingtx notifications.  This call returns once the rescan completes.|
+|Description|*DEPRECATED, for similar functionality see [rescanblocks](#rescanblocks)*<br />Rescan block chain for transactions to addresses, starting at block BeginBlock and ending at EndBlock.  The current known UTXO set for all passed addresses at height BeginBlock should included in the Outpoints argument.  If EndBlock is omitted, the rescan continues through the best block in the main chain.  Additionally, if no EndBlock is provided, the client is automatically registered for transaction notifications for all rescanned addresses and the final UTXO set.  Rescan results are sent as recvtx and redeemingtx notifications.  This call returns once the rescan completes.|
 |Returns|Nothing|
 [Return to Overview](#WSExtMethodOverview)<br />
 
@@ -856,6 +857,19 @@ user.  Click the method name for further details such as parameter and return in
 |Returns|Nothing|
 [Return to Overview](#WSExtMethodOverview)<br />
 
+***
+
+<a name="rescanblocks"/>
+
+|   |   |
+|---|---|
+|Method|rescanblocks|
+|Notifications|None|
+|Parameters|1. Blockhashes (JSON array, required) - List of hashes to rescan.  Each next block must be a child of the previous.|
+|Description|Rescan blocks for transactions matching the loaded transaction filter.|
+|Returns|`[ (JSON array)`<br />&nbsp;&nbsp;`{ (JSON object)`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"hash": "data", (string) Hash of the matching block.`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"transactions": [ (JSON array) List of matching transactions, serialized and hex-encoded.`<br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`"serializedtx" (string) Serialized and hex-encoded transaction.`<br />&nbsp;&nbsp;&nbsp;&nbsp;`]`<br />&nbsp;&nbsp;`}`<br />`]`|
+|Example Return|`[`<br />&nbsp;&nbsp;`{`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"hash": "0000002099417930b2ae09feda10e38b58c0f6bb44b4d60fa33f0e000000000000000000d53...",`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"transactions": [`<br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`"493046022100cb42f8df44eca83dd0a727988dcde9384953e830b1f8004d57485e2ede1b9c8..."`<br />&nbsp;&nbsp;&nbsp;&nbsp;`]`<br />&nbsp;&nbsp;`}`<br />`]`|
+
 
 <a name="Notifications" />
 ### 8. Notifications (Websocket-specific)
@@ -875,8 +889,8 @@ The following is an overview of the JSON-RPC notifications used for Websocket co
 |4|[redeemingtx](#redeemingtx)|*DEPRECATED, for similar functionality see [relevanttxaccepted](#relevanttxaccepted) and [filteredblockconnected](#filteredblockconnected)*<br />Processed a transaction that spends a registered outpoint.|[notifyspent](#notifyspent) and [rescan](#rescan)|
 |5|[txaccepted](#txaccepted)|Received a new transaction after requesting simple notifications of all new transactions accepted into the mempool.|[notifynewtransactions](#notifynewtransactions)|
 |6|[txacceptedverbose](#txacceptedverbose)|Received a new transaction after requesting verbose notifications of all new transactions accepted into the mempool.|[notifynewtransactions](#notifynewtransactions)|
-|7|[rescanprogress](#rescanprogress)|A rescan operation that is underway has made progress.|[rescan](#rescan)|
-|8|[rescanfinished](#rescanfinished)|A rescan operation has completed.|[rescan](#rescan)|
+|7|[rescanprogress](#rescanprogress)|*DEPRECATED, notifications not used by [rescanblocks](#rescanblocks)*<br />A rescan operation that is underway has made progress.|[rescan](#rescan)|
+|8|[rescanfinished](#rescanfinished)|*DEPRECATED, notifications not used by [rescanblocks](#rescanblocks)*<br />A rescan operation has completed.|[rescan](#rescan)|
 |9|[relevanttxaccepted](#relevanttxaccepted)|A transaction matching the tx filter has been accepted into the mempool.|[loadtxfilter](#loadtxfilter)|
 |10|[filteredblockconnected](#filteredblockconnected)|Block connected to the main chain; contains any transactions that match the client's tx filter.|[notifyblocks](#notifyblocks), [loadtxfilter](#loadtxfilter)|
 |11|[filteredblockdisconnected](#filteredblockdisconnected)|Block disconnected from the main chain.|[notifyblocks](#notifyblocks), [loadtxfilter](#loadtxfilter)|
@@ -969,7 +983,7 @@ The following is an overview of the JSON-RPC notifications used for Websocket co
 |Method|rescanprogress|
 |Request|[rescan](#rescan)|
 |Parameters|1. Hash (string) hash of the last processed block<br />2. Height (numeric) height of the last processed block<br />3. Time (numeric) UNIX time of the last processed block|
-|Description|Notifies a client with the current progress at periodic intervals when a long-running [rescan](#rescan) is underway.|
+|Description|*DEPRECATED, notifications not used by [rescanblocks](#rescanblocks)*<br />Notifies a client with the current progress at periodic intervals when a long-running [rescan](#rescan) is underway.|
 |Example|`{`<br />&nbsp;`"jsonrpc": "1.0",`<br />&nbsp;`"method": "rescanprogress",`<br />&nbsp;`"params":`<br />&nbsp;&nbsp;`[`<br />&nbsp;&nbsp;&nbsp;`"0000000000000ea86b49e11843b2ad937ac89ae74a963c7edd36e0147079b89d",`<br />&nbsp;&nbsp;&nbsp;`127213,`<br />&nbsp;&nbsp;&nbsp;`1306533807`<br />&nbsp;&nbsp;`],`<br />&nbsp;`"id": null`<br />`}`|
 [Return to Overview](#NotificationOverview)<br />
 
@@ -982,7 +996,7 @@ The following is an overview of the JSON-RPC notifications used for Websocket co
 |Method|rescanfinished|
 |Request|[rescan](#rescan)|
 |Parameters|1. Hash (string) hash of the last rescanned block<br />2. Height (numeric) height of the last rescanned block<br />3. Time (numeric) UNIX time of the last rescanned block |
-|Description|Notifies a client that the [rescan](#rescan) has completed and no further notifications will be sent.|
+|Description|*DEPRECATED, notifications not used by [rescanblocks](#rescanblocks)*<br />Notifies a client that the [rescan](#rescan) has completed and no further notifications will be sent.|
 |Example|`{`<br />&nbsp;`"jsonrpc": "1.0",`<br />&nbsp;`"method": "rescanfinished",`<br />&nbsp;`"params":`<br />&nbsp;&nbsp;`[`<br />&nbsp;&nbsp;&nbsp;`"0000000000000ea86b49e11843b2ad937ac89ae74a963c7edd36e0147079b89d",`<br />&nbsp;&nbsp;&nbsp;`127213,`<br />&nbsp;&nbsp;&nbsp;`1306533807`<br />&nbsp;&nbsp;`],`<br />&nbsp;`"id": null`<br />`}`|
 [Return to Overview](#NotificationOverview)<br />
 
