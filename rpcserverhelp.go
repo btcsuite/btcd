@@ -590,6 +590,12 @@ var helpDescsEnUS = map[string]string{
 	"stopnotifyspent--synopsis": "Cancel registered spending notifications for each passed outpoint.",
 	"stopnotifyspent-outpoints": "List of transaction outpoints to stop monitoring.",
 
+	// LoadTxFilterCmd help.
+	"loadtxfilter--synopsis": "Load, add to, or reload a websocket client's transaction filter for mempool transactions, new blocks and rescanblocks.",
+	"loadtxfilter-reload":    "Load a new filter instead of adding data to an existing one",
+	"loadtxfilter-addresses": "Array of addresses to add to the transaction filter",
+	"loadtxfilter-outpoints": "Array of outpoints to add to the transaction filter",
+
 	// Rescan help.
 	"rescan--synopsis": "Rescan block chain for transactions to addresses.\n" +
 		"When the endblock parameter is omitted, the rescan continues through the best block in the main chain.\n" +
@@ -663,6 +669,7 @@ var rpcResultTypes = map[string][]interface{}{
 	"version":               {(*map[string]btcjson.VersionResult)(nil)},
 
 	// Websocket commands.
+	"loadtxfilter":              nil,
 	"session":                   {(*btcjson.SessionResult)(nil)},
 	"notifyblocks":              nil,
 	"stopnotifyblocks":          nil,
