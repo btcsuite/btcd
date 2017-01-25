@@ -44,9 +44,9 @@ import (
 
 // API version constants
 const (
-	jsonrpcSemverString = "1.2.0"
+	jsonrpcSemverString = "1.3.0"
 	jsonrpcSemverMajor  = 1
-	jsonrpcSemverMinor  = 2
+	jsonrpcSemverMinor  = 3
 	jsonrpcSemverPatch  = 0
 )
 
@@ -238,6 +238,7 @@ var rpcLimited = map[string]struct{}{
 	"notifyreceived":        {},
 	"notifyspent":           {},
 	"rescan":                {},
+	"rescanblocks":          {},
 	"session":               {},
 
 	// Websockets AND HTTP/S commands

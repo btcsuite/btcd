@@ -74,6 +74,7 @@ var wsHandlersBeforeInit = map[string]wsCommandHandler{
 	"stopnotifyspent":           handleStopNotifySpent,
 	"stopnotifyreceived":        handleStopNotifyReceived,
 	"rescan":                    handleRescan,
+	"rescanblocks":              handleRescanBlocks,
 }
 
 // WebsocketHandler handles a new websocket client by creating a new wsClient,
@@ -245,8 +246,7 @@ func (m *wsNotificationManager) NotifyMempoolTx(tx *btcutil.Tx, isNew bool) {
 }
 
 // wsClientFilter tracks relevant addresses for each websocket client for
-// the future `rescanblocks` extension. It is modified by the `loadtxfilter`
-// command.
+// the `rescanblocks` extension. It is modified by the `loadtxfilter` command.
 //
 // NOTE: This extension was ported from github.com/decred/dcrd
 type wsClientFilter struct {
@@ -759,7 +759,6 @@ func (m *wsNotificationManager) notifyFilteredBlockConnected(clients map[chan st
 		}
 	}
 	for quitChan, wsc := range clients {
-
 		// Add all discovered transactions for this client. For clients
 		// that have no new-style filter, add the empty string slice.
 		ntfn.SubscribedTxs = subscribedTxs[quitChan]
@@ -1273,7 +1272,7 @@ type wsClient struct {
 
 	// filterData is the new generation transaction filter backported from
 	// github.com/decred/dcrd for the new backported `loadtxfilter` and
-	// future `rescanblocks` methods.
+	// `rescanblocks` methods.
 	filterData *wsClientFilter
 
 	// Networking infrastructure.
@@ -2117,6 +2116,136 @@ func rescanBlock(wsc *wsClient, lookups *rescanKeys, blk *btcutil.Block) {
 			}
 		}
 	}
+}
+
+// rescanBlockFilter rescans a block for any relevant transactions for the
+// passed lookup keys. Any discovered transactions are returned hex encoded as
+// a string slice.
+//
+// NOTE: This extension is ported from github.com/decred/dcrd
+func rescanBlockFilter(filter *wsClientFilter, block *btcutil.Block) []string {
+	var transactions []string
+
+	filter.mu.Lock()
+	for _, tx := range block.Transactions() {
+		msgTx := tx.MsgTx()
+
+		// Keep track of whether the transaction has already been added
+		// to the result.  It shouldn't be added twice.
+		added := false
+
+		// Scan inputs if not a coinbase transaction.
+		if !blockchain.IsCoinBaseTx(msgTx) {
+			for _, input := range msgTx.TxIn {
+				if !filter.existsUnspentOutPoint(&input.PreviousOutPoint) {
+					continue
+				}
+				if !added {
+					transactions = append(
+						transactions,
+						txHexString(msgTx))
+					added = true
+				}
+			}
+		}
+
+		// Scan outputs.
+		for i, output := range msgTx.TxOut {
+			_, addrs, _, err := txscript.ExtractPkScriptAddrs(
+				output.PkScript,
+				activeNetParams.Params)
+			if err != nil {
+				continue
+			}
+			for _, a := range addrs {
+				if !filter.existsAddress(a) {
+					continue
+				}
+
+				op := wire.OutPoint{
+					Hash:  *tx.Hash(),
+					Index: uint32(i),
+				}
+				filter.addUnspentOutPoint(&op)
+
+				if !added {
+					transactions = append(
+						transactions,
+						txHexString(msgTx))
+					added = true
+				}
+			}
+		}
+	}
+	filter.mu.Unlock()
+
+	return transactions
+}
+
+// handleRescanBlocks implements the rescanblocks command extension for
+// websocket connections.
+//
+// NOTE: This extension is ported from github.com/decred/dcrd
+func handleRescanBlocks(wsc *wsClient, icmd interface{}) (interface{}, error) {
+	cmd, ok := icmd.(*btcjson.RescanBlocksCmd)
+	if !ok {
+		return nil, btcjson.ErrRPCInternal
+	}
+
+	// Load client's transaction filter.  Must exist in order to continue.
+	wsc.Lock()
+	filter := wsc.filterData
+	wsc.Unlock()
+	if filter == nil {
+		return nil, &btcjson.RPCError{
+			Code:    btcjson.ErrRPCMisc,
+			Message: "Transaction filter must be loaded before rescanning",
+		}
+	}
+
+	blockHashes := make([]*chainhash.Hash, len(cmd.BlockHashes))
+
+	for i := range cmd.BlockHashes {
+		hash, err := chainhash.NewHashFromStr(cmd.BlockHashes[i])
+		if err != nil {
+			return nil, err
+		}
+		blockHashes[i] = hash
+	}
+
+	discoveredData := make([]btcjson.RescannedBlock, 0, len(blockHashes))
+
+	// Iterate over each block in the request and rescan.  When a block
+	// contains relevant transactions, add it to the response.
+	bc := wsc.server.server.blockManager.chain
+	var lastBlockHash *chainhash.Hash
+	for i := range blockHashes {
+		block, err := bc.BlockByHash(blockHashes[i])
+		if err != nil {
+			return nil, &btcjson.RPCError{
+				Code:    btcjson.ErrRPCBlockNotFound,
+				Message: "Failed to fetch block: " + err.Error(),
+			}
+		}
+		if lastBlockHash != nil && block.MsgBlock().Header.PrevBlock != *lastBlockHash {
+			return nil, &btcjson.RPCError{
+				Code: btcjson.ErrRPCInvalidParameter,
+				Message: fmt.Sprintf("Block %v is not a child of %v",
+					blockHashes[i], lastBlockHash),
+			}
+		}
+		lastBlockHash = blockHashes[i]
+
+		transactions := rescanBlockFilter(filter, block)
+		if len(transactions) != 0 {
+			discoveredData = append(discoveredData, btcjson.RescannedBlock{
+				Hash:         cmd.BlockHashes[i],
+				Transactions: transactions,
+			})
+		}
+	}
+
+	return &discoveredData, nil
 }
 
 // recoverFromReorg attempts to recover from a detected reorganize during a

@@ -606,6 +606,15 @@ var helpDescsEnUS = map[string]string{
 	"rescan-outpoints":  "List of transaction outpoints to include in the rescan",
 	"rescan-endblock":   "Hash of final block to rescan",
 
+	// RescanBlocks help.
+	"rescanblocks--synopsis":   "Rescan blocks for transactions matching the loaded transaction filter.",
+	"rescanblocks-blockhashes": "List of hashes to rescan.  Each next block must be a child of the previous.",
+	"rescanblocks--result0":    "List of matching blocks.",
+
+	// RescannedBlock help.
+	"rescannedblock-hash":         "Hash of the matching block.",
+	"rescannedblock-transactions": "List of matching transactions, serialized and hex-encoded.",
+
 	// Version help.
 	"version--synopsis":       "Returns the JSON-RPC API version (semver)",
 	"version--result0--desc":  "Version objects keyed by the program or API name",
@@ -680,6 +689,7 @@ var rpcResultTypes = map[string][]interface{}{
 	"notifyspent":               nil,
 	"stopnotifyspent":           nil,
 	"rescan":                    nil,
+	"rescanblocks":              {(*[]btcjson.RescannedBlock)(nil)},
 }
 
 // helpCacher provides a concurrent safe type that provides help and usage for
