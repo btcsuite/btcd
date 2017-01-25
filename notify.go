@@ -156,11 +156,15 @@ type NotificationHandlers struct {
 	// signaled on this notification, rather than relying on the return
 	// result of a rescan request, due to how btcd may send various rescan
 	// notifications after the rescan request has already returned.
+	//
+	// NOTE: Deprecated. Not used with RescanBlocks.
 	OnRescanFinished func(hash *chainhash.Hash, height int32, blkTime time.Time)
 
 	// OnRescanProgress is invoked periodically when a rescan is underway.
 	// It will only be invoked if a preceding call to Rescan or
 	// RescanEndHeight has been made and the function is non-nil.
+	//
+	// NOTE: Deprecated. Not used with RescanBlocks.
 	OnRescanProgress func(hash *chainhash.Hash, height int32, blkTime time.Time)
 
 	// OnTxAccepted is invoked when a transaction is accepted into the
@@ -1121,6 +1125,8 @@ func (c *Client) NotifyReceived(addresses []btcutil.Address) error {
 
 // FutureRescanResult is a future promise to deliver the result of a RescanAsync
 // or RescanEndHeightAsync RPC invocation (or an applicable error).
+//
+// NOTE: Deprecated. Use FutureRescanBlocksResult instead.
 type FutureRescanResult chan *response
 
 // Receive waits for the response promised by the future and returns an error
@@ -1143,6 +1149,8 @@ func (r FutureRescanResult) Receive() error {
 // reconnect.
 //
 // NOTE: This is a btcd extension and requires a websocket connection.
+//
+// NOTE: Deprecated. Use RescanBlocksAsync instead.
 func (c *Client) RescanAsync(startBlock *chainhash.Hash,
 	addresses []btcutil.Address,
 	outpoints []*wire.OutPoint) FutureRescanResult {
@@ -1206,6 +1214,8 @@ func (c *Client) RescanAsync(startBlock *chainhash.Hash,
 // reconnect.
 //
 // NOTE: This is a btcd extension and requires a websocket connection.
+//
+// NOTE: Deprecated. Use RescanBlocks instead.
 func (c *Client) Rescan(startBlock *chainhash.Hash,
 	addresses []btcutil.Address,
 	outpoints []*wire.OutPoint) error {
@@ -1220,6 +1230,8 @@ func (c *Client) Rescan(startBlock *chainhash.Hash,
 // See RescanEndBlock for the blocking version and more details.
 //
 // NOTE: This is a btcd extension and requires a websocket connection.
+//
+// NOTE: Deprecated. Use RescanBlocksAsync instead.
 func (c *Client) RescanEndBlockAsync(startBlock *chainhash.Hash,
 	addresses []btcutil.Address, outpoints []*wire.OutPoint,
 	endBlock *chainhash.Hash) FutureRescanResult {
@@ -1280,6 +1292,8 @@ func (c *Client) RescanEndBlockAsync(startBlock *chainhash.Hash,
 // See Rescan to also perform a rescan through current end of the longest chain.
 //
 // NOTE: This is a btcd extension and requires a websocket connection.
+//
+// NOTE: Deprecated. Use RescanBlocks instead.
 func (c *Client) RescanEndHeight(startBlock *chainhash.Hash,
 	addresses []btcutil.Address, outpoints []*wire.OutPoint,
 	endBlock *chainhash.Hash) error {
