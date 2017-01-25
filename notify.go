@@ -1,4 +1,5 @@
-// Copyright (c) 2014-2016 The btcsuite developers
+// Copyright (c) 2014-2017 The btcsuite developers
+// Copyright (c) 2015-2017 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -93,19 +94,40 @@ type NotificationHandlers struct {
 	// (best) chain.  It will only be invoked if a preceding call to
 	// NotifyBlocks has been made to register for the notification and the
 	// function is non-nil.
+	//
+	// NOTE: Deprecated. Use OnFilteredBlockConnected instead.
 	OnBlockConnected func(hash *chainhash.Hash, height int32, t time.Time)
+
+	// OnFilteredBlockConnected is invoked when a block is connected to the
+	// longest (best) chain.  It will only be invoked if a preceding call to
+	// NotifyBlocks has been made to register for the notification and the
+	// function is non-nil.  Its parameters differ from OnBlockConnected: it
+	// receives the block's height, header, and relevant transactions.
+	OnFilteredBlockConnected func(height int32, header *wire.BlockHeader,
+		txs []*btcutil.Tx)
 
 	// OnBlockDisconnected is invoked when a block is disconnected from the
 	// longest (best) chain.  It will only be invoked if a preceding call to
 	// NotifyBlocks has been made to register for the notification and the
 	// function is non-nil.
+	//
+	// NOTE: Deprecated. Use OnFilteredBlockDisconnected instead.
 	OnBlockDisconnected func(hash *chainhash.Hash, height int32, t time.Time)
+
+	// OnFilteredBlockDisconnected is invoked when a block is disconnected
+	// from the longest (best) chain.  It will only be invoked if a
+	// preceding NotifyBlocks has been made to register for the notification
+	// and the call to function is non-nil.  Its parameters differ from
+	// OnBlockDisconnected: it receives the block's height and header.
+	OnFilteredBlockDisconnected func(height int32, header *wire.BlockHeader)
 
 	// OnRecvTx is invoked when a transaction that receives funds to a
 	// registered address is received into the memory pool and also
 	// connected to the longest (best) chain.  It will only be invoked if a
 	// preceding call to NotifyReceived, Rescan, or RescanEndHeight has been
 	// made to register for the notification and the function is non-nil.
+	//
+	// NOTE: Deprecated. Use OnRelevantTxAccepted instead.
 	OnRecvTx func(transaction *btcutil.Tx, details *btcjson.BlockDetails)
 
 	// OnRedeemingTx is invoked when a transaction that spends a registered
@@ -118,7 +140,16 @@ type NotificationHandlers struct {
 	// for the outpoints that are now "owned" as a result of receiving
 	// funds to the registered addresses.  This means it is possible for
 	// this to invoked indirectly as the result of a NotifyReceived call.
+	//
+	// NOTE: Deprecated. Use OnRelevantTxAccepted instead.
 	OnRedeemingTx func(transaction *btcutil.Tx, details *btcjson.BlockDetails)
+
+	// OnRelevantTxAccepted is invoked when an unmined transaction passes
+	// the client's transaction filter.
+	//
+	// NOTE: This is a btcsuite extension ported from
+	// github.com/decred/dcrrpcclient.
+	OnRelevantTxAccepted func(transaction []byte)
 
 	// OnRescanFinished is invoked after a rescan finishes due to a previous
 	// call to Rescan or RescanEndHeight.  Finished rescans should be
@@ -200,6 +231,25 @@ func (c *Client) handleNotification(ntfn *rawNotification) {
 
 		c.ntfnHandlers.OnBlockConnected(blockHash, blockHeight, blockTime)
 
+	// OnFilteredBlockConnected
+	case btcjson.FilteredBlockConnectedNtfnMethod:
+		// Ignore the notification if the client is not interested in
+		// it.
+		if c.ntfnHandlers.OnFilteredBlockConnected == nil {
+			return
+		}
+
+		blockHeight, blockHeader, transactions, err :=
+			parseFilteredBlockConnectedParams(ntfn.Params)
+		if err != nil {
+			log.Warnf("Received invalid filtered block "+
+				"connected notification: %v", err)
+			return
+		}
+
+		c.ntfnHandlers.OnFilteredBlockConnected(blockHeight,
+			blockHeader, transactions)
+
 	// OnBlockDisconnected
 	case btcjson.BlockDisconnectedNtfnMethod:
 		// Ignore the notification if the client is not interested in
@@ -216,6 +266,25 @@ func (c *Client) handleNotification(ntfn *rawNotification) {
 		}
 
 		c.ntfnHandlers.OnBlockDisconnected(blockHash, blockHeight, blockTime)
+
+	// OnFilteredBlockDisconnected
+	case btcjson.FilteredBlockDisconnectedNtfnMethod:
+		// Ignore the notification if the client is not interested in
+		// it.
+		if c.ntfnHandlers.OnFilteredBlockDisconnected == nil {
+			return
+		}
+
+		blockHeight, blockHeader, err :=
+			parseFilteredBlockDisconnectedParams(ntfn.Params)
+		if err != nil {
+			log.Warnf("Received invalid filtered block "+
+				"disconnected notification: %v", err)
+			return
+		}
+
+		c.ntfnHandlers.OnFilteredBlockDisconnected(blockHeight,
+			blockHeader)
 
 	// OnRecvTx
 	case btcjson.RecvTxNtfnMethod:
@@ -250,6 +319,23 @@ func (c *Client) handleNotification(ntfn *rawNotification) {
 		}
 
 		c.ntfnHandlers.OnRedeemingTx(tx, block)
+
+	// OnRelevantTxAccepted
+	case btcjson.RelevantTxAcceptedNtfnMethod:
+		// Ignore the notification if the client is not interested in
+		// it.
+		if c.ntfnHandlers.OnRelevantTxAccepted == nil {
+			return
+		}
+
+		transaction, err := parseRelevantTxAcceptedParams(ntfn.Params)
+		if err != nil {
+			log.Warnf("Received invalid relevanttxaccepted "+
+				"notification: %v", err)
+			return
+		}
+
+		c.ntfnHandlers.OnRelevantTxAccepted(transaction)
 
 	// OnRescanFinished
 	case btcjson.RescanFinishedNtfnMethod:
@@ -433,6 +519,115 @@ func parseChainNtfnParams(params []json.RawMessage) (*chainhash.Hash,
 	blockTime := time.Unix(blockTimeUnix, 0)
 
 	return blockHash, blockHeight, blockTime, nil
+}
+
+// parseFilteredBlockConnectedParams parses out the parameters included in a
+// filteredblockconnected notification.
+//
+// NOTE: This is a btcd extension ported from github.com/decred/dcrrpcclient
+// and requires a websocket connection.
+func parseFilteredBlockConnectedParams(params []json.RawMessage) (int32,
+	*wire.BlockHeader, []*btcutil.Tx, error) {
+
+	if len(params) < 3 {
+		return 0, nil, nil, wrongNumParams(len(params))
+	}
+
+	// Unmarshal first parameter as an integer.
+	var blockHeight int32
+	err := json.Unmarshal(params[0], &blockHeight)
+	if err != nil {
+		return 0, nil, nil, err
+	}
+
+	// Unmarshal second parameter as a slice of bytes.
+	blockHeaderBytes, err := parseHexParam(params[1])
+	if err != nil {
+		return 0, nil, nil, err
+	}
+
+	// Deserialize block header from slice of bytes.
+	var blockHeader wire.BlockHeader
+	err = blockHeader.Deserialize(bytes.NewReader(blockHeaderBytes))
+	if err != nil {
+		return 0, nil, nil, err
+	}
+
+	// Unmarshal third parameter as a slice of hex-encoded strings.
+	var hexTransactions []string
+	err = json.Unmarshal(params[2], &hexTransactions)
+	if err != nil {
+		return 0, nil, nil, err
+	}
+
+	// Create slice of transactions from slice of strings by hex-decoding.
+	transactions := make([]*btcutil.Tx, len(hexTransactions))
+	for i, hexTx := range hexTransactions {
+		transaction, err := hex.DecodeString(hexTx)
+		if err != nil {
+			return 0, nil, nil, err
+		}
+
+		transactions[i], err = btcutil.NewTxFromBytes(transaction)
+		if err != nil {
+			return 0, nil, nil, err
+		}
+	}
+
+	return blockHeight, &blockHeader, transactions, nil
+}
+
+// parseFilteredBlockDisconnectedParams parses out the parameters included in a
+// filteredblockdisconnected notification.
+//
+// NOTE: This is a btcd extension ported from github.com/decred/dcrrpcclient
+// and requires a websocket connection.
+func parseFilteredBlockDisconnectedParams(params []json.RawMessage) (int32,
+	*wire.BlockHeader, error) {
+	if len(params) < 2 {
+		return 0, nil, wrongNumParams(len(params))
+	}
+
+	// Unmarshal first parameter as an integer.
+	var blockHeight int32
+	err := json.Unmarshal(params[0], &blockHeight)
+	if err != nil {
+		return 0, nil, err
+	}
+
+	// Unmarshal second parmeter as a slice of bytes.
+	blockHeaderBytes, err := parseHexParam(params[1])
+	if err != nil {
+		return 0, nil, err
+	}
+
+	// Deserialize block header from slice of bytes.
+	var blockHeader wire.BlockHeader
+	err = blockHeader.Deserialize(bytes.NewReader(blockHeaderBytes))
+	if err != nil {
+		return 0, nil, err
+	}
+
+	return blockHeight, &blockHeader, nil
+}
+
+func parseHexParam(param json.RawMessage) ([]byte, error) {
+	var s string
+	err := json.Unmarshal(param, &s)
+	if err != nil {
+		return nil, err
+	}
+	return hex.DecodeString(s)
+}
+
+// parseRelevantTxAcceptedParams parses out the parameter included in a
+// relevanttxaccepted notification.
+func parseRelevantTxAcceptedParams(params []json.RawMessage) (transaction []byte, err error) {
+	if len(params) < 1 {
+		return nil, wrongNumParams(len(params))
+	}
+
+	return parseHexParam(params[0])
 }
 
 // parseChainTxNtfnParams parses out the transaction and optional details about
@@ -705,6 +900,8 @@ func (c *Client) NotifyBlocks() error {
 
 // FutureNotifySpentResult is a future promise to deliver the result of a
 // NotifySpentAsync RPC invocation (or an applicable error).
+//
+// NOTE: Deprecated. Use FutureLoadTxFilterResult instead.
 type FutureNotifySpentResult chan *response
 
 // Receive waits for the response promised by the future and returns an error
@@ -749,6 +946,8 @@ func newOutPointFromWire(op *wire.OutPoint) btcjson.OutPoint {
 // See NotifySpent for the blocking version and more details.
 //
 // NOTE: This is a btcd extension and requires a websocket connection.
+//
+// NOTE: Deprecated. Use LoadTxFilterAsync instead.
 func (c *Client) NotifySpentAsync(outpoints []*wire.OutPoint) FutureNotifySpentResult {
 	// Not supported in HTTP POST mode.
 	if c.config.HTTPPostMode {
@@ -779,6 +978,8 @@ func (c *Client) NotifySpentAsync(outpoints []*wire.OutPoint) FutureNotifySpentR
 // OnRedeemingTx.
 //
 // NOTE: This is a btcd extension and requires a websocket connection.
+//
+// NOTE: Deprecated. Use LoadTxFilter instead.
 func (c *Client) NotifySpent(outpoints []*wire.OutPoint) error {
 	return c.NotifySpentAsync(outpoints).Receive()
 }
@@ -834,6 +1035,8 @@ func (c *Client) NotifyNewTransactions(verbose bool) error {
 
 // FutureNotifyReceivedResult is a future promise to deliver the result of a
 // NotifyReceivedAsync RPC invocation (or an applicable error).
+//
+// NOTE: Deprecated. Use FutureLoadTxFilterResult instead.
 type FutureNotifyReceivedResult chan *response
 
 // Receive waits for the response promised by the future and returns an error
@@ -870,6 +1073,8 @@ func (c *Client) notifyReceivedInternal(addresses []string) FutureNotifyReceived
 // See NotifyReceived for the blocking version and more details.
 //
 // NOTE: This is a btcd extension and requires a websocket connection.
+//
+// NOTE: Deprecated. Use LoadTxFilterAsync instead.
 func (c *Client) NotifyReceivedAsync(addresses []btcutil.Address) FutureNotifyReceivedResult {
 	// Not supported in HTTP POST mode.
 	if c.config.HTTPPostMode {
@@ -908,6 +1113,8 @@ func (c *Client) NotifyReceivedAsync(addresses []btcutil.Address) FutureNotifyRe
 // the address).
 //
 // NOTE: This is a btcd extension and requires a websocket connection.
+//
+// NOTE: Deprecated. Use LoadTxFilter instead.
 func (c *Client) NotifyReceived(addresses []btcutil.Address) error {
 	return c.NotifyReceivedAsync(addresses).Receive()
 }
@@ -1079,4 +1286,58 @@ func (c *Client) RescanEndHeight(startBlock *chainhash.Hash,
 
 	return c.RescanEndBlockAsync(startBlock, addresses, outpoints,
 		endBlock).Receive()
+}
+
+// FutureLoadTxFilterResult is a future promise to deliver the result
+// of a LoadTxFilterAsync RPC invocation (or an applicable error).
+//
+// NOTE: This is a btcd extension ported from github.com/decred/dcrrpcclient
+// and requires a websocket connection.
+type FutureLoadTxFilterResult chan *response
+
+// Receive waits for the response promised by the future and returns an error
+// if the registration was not successful.
+//
+// NOTE: This is a btcd extension ported from github.com/decred/dcrrpcclient
+// and requires a websocket connection.
+func (r FutureLoadTxFilterResult) Receive() error {
+	_, err := receiveFuture(r)
+	return err
+}
+
+// LoadTxFilterAsync returns an instance of a type that can be used to
+// get the result of the RPC at some future time by invoking the Receive
+// function on the returned instance.
+//
+// See LoadTxFilter for the blocking version and more details.
+//
+// NOTE: This is a btcd extension ported from github.com/decred/dcrrpcclient
+// and requires a websocket connection.
+func (c *Client) LoadTxFilterAsync(reload bool, addresses []btcutil.Address,
+	outPoints []wire.OutPoint) FutureLoadTxFilterResult {
+
+	addrStrs := make([]string, len(addresses))
+	for i, a := range addresses {
+		addrStrs[i] = a.EncodeAddress()
+	}
+	outPointObjects := make([]btcjson.OutPoint, len(outPoints))
+	for i := range outPoints {
+		outPointObjects[i] = btcjson.OutPoint{
+			Hash:  outPoints[i].Hash.String(),
+			Index: outPoints[i].Index,
+		}
+	}
+
+	cmd := btcjson.NewLoadTxFilterCmd(reload, addrStrs, outPointObjects)
+	return c.sendCmd(cmd)
+}
+
+// LoadTxFilter loads, reloads, or adds data to a websocket client's transaction
+// filter.  The filter is consistently updated based on inspected transactions
+// during mempool acceptance, block acceptance, and for all rescanned blocks.
+//
+// NOTE: This is a btcd extension ported from github.com/decred/dcrrpcclient
+// and requires a websocket connection.
+func (c *Client) LoadTxFilter(reload bool, addresses []btcutil.Address, outPoints []wire.OutPoint) error {
+	return c.LoadTxFilterAsync(reload, addresses, outPoints).Receive()
 }
