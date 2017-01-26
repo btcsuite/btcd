@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2015 The btcsuite developers
+// Copyright (c) 2014-2017 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcrpcclient"
 	"github.com/btcsuite/btcutil"
 )
@@ -21,11 +21,13 @@ func main() {
 	// for notifications.  See the documentation of the btcrpcclient
 	// NotificationHandlers type for more details about each handler.
 	ntfnHandlers := btcrpcclient.NotificationHandlers{
-		OnBlockConnected: func(hash *chainhash.Hash, height int32, time time.Time) {
-			log.Printf("Block connected: %v (%d) %v", hash, height, time)
+		OnFilteredBlockConnected: func(height int32, header *wire.BlockHeader, txns []*btcutil.Tx) {
+			log.Printf("Block connected: %v (%d) %v",
+				header.BlockHash(), height, header.Timestamp)
 		},
-		OnBlockDisconnected: func(hash *chainhash.Hash, height int32, time time.Time) {
-			log.Printf("Block disconnected: %v (%d) %v", hash, height, time)
+		OnFilteredBlockDisconnected: func(height int32, header *wire.BlockHeader) {
+			log.Printf("Block disconnected: %v (%d) %v",
+				header.BlockHash(), height, header.Timestamp)
 		},
 	}
 
