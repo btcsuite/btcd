@@ -1,10 +1,10 @@
 hash: ea6e6ffa31517aacb35de06b097975229096253bf658d302f2d6652fde91b3f1
-updated: 2017-01-11T15:54:00.925235328-05:00
+updated: 2017-01-27T20:06:58.5779336-06:00
 imports:
 - name: github.com/btcsuite/btclog
   version: 73889fb79bd687870312b6e40effcecffbd57d30
 - name: github.com/btcsuite/btcrpcclient
-  version: 5ce0ed600997eafaed25ad4936c1d84ec6ad2b5a
+  version: abcdfb702a7ca67e4a32c10be380c63216bd69fe
 - name: github.com/btcsuite/btcutil
   version: 86346b5a958c0cf94186b87855469ae991be501c
   subpackages:

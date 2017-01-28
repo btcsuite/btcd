@@ -1,4 +1,4 @@
-// Copyright (c) 2016 The btcsuite developers
+// Copyright (c) 2016-2017 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -160,28 +160,28 @@ func New(activeNet *chaincfg.Params, handlers *btcrpcclient.NotificationHandlers
 		handlers = &btcrpcclient.NotificationHandlers{}
 	}
 
-	// If a handler for the OnBlockConnected/OnBlockDisconnected callback
-	// has already been set, then we create a wrapper callback which
-	// executes both the currently registered callback, and the mem
-	// wallet's callback.
-	if handlers.OnBlockConnected != nil {
-		obc := handlers.OnBlockConnected
-		handlers.OnBlockConnected = func(hash *chainhash.Hash, height int32, t time.Time) {
-			wallet.IngestBlock(hash, height, t)
-			obc(hash, height, t)
+	// If a handler for the OnFilteredBlock{Connected,Disconnected} callback
+	// callback has already been set, then create a wrapper callback which
+	// executes both the currently registered callback and the mem wallet's
+	// callback.
+	if handlers.OnFilteredBlockConnected != nil {
+		obc := handlers.OnFilteredBlockConnected
+		handlers.OnFilteredBlockConnected = func(height int32, header *wire.BlockHeader, filteredTxns []*btcutil.Tx) {
+			wallet.IngestBlock(height, header, filteredTxns)
+			obc(height, header, filteredTxns)
 		}
 	} else {
 		// Otherwise, we can claim the callback ourselves.
-		handlers.OnBlockConnected = wallet.IngestBlock
+		handlers.OnFilteredBlockConnected = wallet.IngestBlock
 	}
-	if handlers.OnBlockDisconnected != nil {
-		obd := handlers.OnBlockConnected
-		handlers.OnBlockDisconnected = func(hash *chainhash.Hash, height int32, t time.Time) {
-			wallet.UnwindBlock(hash, height, t)
-			obd(hash, height, t)
+	if handlers.OnFilteredBlockDisconnected != nil {
+		obd := handlers.OnFilteredBlockDisconnected
+		handlers.OnFilteredBlockDisconnected = func(height int32, header *wire.BlockHeader) {
+			wallet.UnwindBlock(height, header)
+			obd(height, header)
 		}
 	} else {
-		handlers.OnBlockDisconnected = wallet.UnwindBlock
+		handlers.OnFilteredBlockDisconnected = wallet.UnwindBlock
 	}
 
 	h := &Harness{
@@ -220,8 +220,15 @@ func (h *Harness) SetUp(createTestChain bool, numMatureOutputs uint32) error {
 
 	h.wallet.Start()
 
-	// Ensure the btcd properly dispatches our registered call-back for
-	// each new block. Otherwise, the memWallet won't function properly.
+	// Filter transactions that pay to the coinbase associated with the
+	// wallet.
+	filterAddrs := []btcutil.Address{h.wallet.coinbaseAddr}
+	if err := h.Node.LoadTxFilter(true, filterAddrs, nil); err != nil {
+		return err
+	}
+
+	// Ensure btcd properly dispatches our registered call-back for each new
+	// block. Otherwise, the memWallet won't function properly.
 	if err := h.Node.NotifyBlocks(); err != nil {
 		return err
 	}

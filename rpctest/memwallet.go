@@ -1,4 +1,4 @@
-// Copyright (c) 2016 The btcsuite developers
+// Copyright (c) 2016-2017 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -9,7 +9,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"sync"
-	"time"
 
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/btcec"
@@ -55,8 +54,8 @@ func (u *utxo) isMature(height int32) bool {
 // used to sync up the memWallet each time a new block is connected to the main
 // chain.
 type chainUpdate struct {
-	blockHash   *chainhash.Hash
-	blockHeight int32
+	blockHeight  int32
+	filteredTxns []*btcutil.Tx
 }
 
 // undoEntry is functionally the opposite of a chainUpdate. An undoEntry is
@@ -179,11 +178,11 @@ func (m *memWallet) SetRPCClient(rpcClient *btcrpcclient.Client) {
 // IngestBlock is a call-back which is to be triggered each time a new block is
 // connected to the main chain. Ingesting a block updates the wallet's internal
 // utxo state based on the outputs created and destroyed within each block.
-func (m *memWallet) IngestBlock(blockHash *chainhash.Hash, height int32, t time.Time) {
+func (m *memWallet) IngestBlock(height int32, header *wire.BlockHeader, filteredTxns []*btcutil.Tx) {
 	// Append this new chain update to the end of the queue of new chain
 	// updates.
 	m.chainMtx.Lock()
-	m.chainUpdates = append(m.chainUpdates, &chainUpdate{blockHash, height})
+	m.chainUpdates = append(m.chainUpdates, &chainUpdate{height, filteredTxns})
 	m.chainMtx.Unlock()
 
 	// Launch a goroutine to signal the chainSyncer that a new update is
@@ -210,21 +209,16 @@ func (m *memWallet) chainSyncer() {
 		m.chainUpdates = m.chainUpdates[1:]
 		m.chainMtx.Unlock()
 
-		// Fetch the new block so we can process it shortly below.
-		block, err := m.rpc.GetBlock(update.blockHash)
-		if err != nil {
-			return
-		}
-
-		// Update the latest synced height, then process each
-		// transaction in the block creating and destroying utxos
-		// within the wallet as a result.
+		// Update the latest synced height, then process each filtered
+		// transaction in the block creating and destroying utxos within
+		// the wallet as a result.
 		m.Lock()
 		m.currentHeight = update.blockHeight
 		undo := &undoEntry{
 			utxosDestroyed: make(map[wire.OutPoint]*utxo),
 		}
-		for _, mtx := range block.Transactions {
+		for _, tx := range update.filteredTxns {
+			mtx := tx.MsgTx()
 			isCoinbase := blockchain.IsCoinBaseTx(mtx)
 			txHash := mtx.TxHash()
 			m.evalOutputs(mtx.TxOut, &txHash, isCoinbase, undo)
@@ -293,7 +287,7 @@ func (m *memWallet) evalInputs(inputs []*wire.TxIn, undo *undoEntry) {
 // UnwindBlock is a call-back which is to be executed each time a block is
 // disconnected from the main chain. Unwinding a block undoes the effect that a
 // particular block had on the wallet's internal utxo state.
-func (m *memWallet) UnwindBlock(hash *chainhash.Hash, height int32, t time.Time) {
+func (m *memWallet) UnwindBlock(height int32, header *wire.BlockHeader) {
 	m.Lock()
 	defer m.Unlock()
 
@@ -310,7 +304,9 @@ func (m *memWallet) UnwindBlock(hash *chainhash.Hash, height int32, t time.Time)
 	delete(m.reorgJournal, height)
 }
 
-// newAddress returns a new address from the wallet's hd key chain.
+// newAddress returns a new address from the wallet's hd key chain.  It also
+// loads the address into the RPC client's transaction filter to ensure any
+// transactions that involve it are delivered via the notifications.
 func (m *memWallet) newAddress() (btcutil.Address, error) {
 	index := m.hdIndex
 
@@ -324,6 +320,11 @@ func (m *memWallet) newAddress() (btcutil.Address, error) {
 	}
 
 	addr, err := keyToAddr(privKey, m.net)
+	if err != nil {
+		return nil, err
+	}
+
+	err = m.rpc.LoadTxFilter(false, []btcutil.Address{addr}, nil)
 	if err != nil {
 		return nil, err
 	}
