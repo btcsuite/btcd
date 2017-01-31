@@ -160,7 +160,15 @@ func (idx *CfIndex) ConnectBlock(dbTx database.Tx, block *btcutil.Block,
 	if err != nil {
 		return err
 	}
-	return dbStoreBasicEntry(dbTx, block.Hash(), f)
+	err = dbStoreBasicEntry(dbTx, block.Hash(), f)
+	if err != nil {
+		return err
+	}
+	f, err = makeExtendedFilterForBlock(block)
+	if err != nil {
+		return err
+	}
+	return dbStoreExtendedEntry(dbTx, block.Hash(), f)
 }
 
 // DisconnectBlock is invoked by the index manager when a block has been
