@@ -176,7 +176,11 @@ func (idx *CfIndex) ConnectBlock(dbTx database.Tx, block *btcutil.Block,
 // mapping for every passed block. This is part of the Indexer interface.
 func (idx *CfIndex) DisconnectBlock(dbTx database.Tx, block *btcutil.Block,
     view *blockchain.UtxoViewpoint) error {
-	return dbDeleteBasicEntry(dbTx, block.Hash())
+	err := dbDeleteBasicEntry(dbTx, block.Hash())
+	if err != nil {
+		return err
+	}
+	return dbDeleteExtendedEntry(dbTx, block.Hash())
 }
 
 func (idx *CfIndex) FilterByBlockHash(hash *chainhash.Hash, extended bool) ([]byte, error) {
