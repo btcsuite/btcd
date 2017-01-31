@@ -59,10 +59,15 @@ type blockNode struct {
 	// ancestor when switching chains.
 	inMainChain bool
 
-	// Some fields from block headers to aid in best chain selection.
-	version   int32
-	bits      uint32
-	timestamp int64
+	// Some fields from block headers to aid in best chain selection and
+	// reconstructing headers from memory.  These must be treated as
+	// immutable and are intentionally ordered to avoid padding on 64-bit
+	// platforms.
+	version    int32
+	bits       uint32
+	nonce      uint32
+	timestamp  int64
+	merkleRoot chainhash.Hash
 }
 
 // newBlockNode returns a new block node for the given block header.  It is
@@ -81,9 +86,26 @@ func newBlockNode(blockHeader *wire.BlockHeader, blockHash *chainhash.Hash, heig
 		height:     height,
 		version:    blockHeader.Version,
 		bits:       blockHeader.Bits,
+		nonce:      blockHeader.Nonce,
 		timestamp:  blockHeader.Timestamp.Unix(),
+		merkleRoot: blockHeader.MerkleRoot,
 	}
 	return &node
+}
+
+// Header constructs a block header from the node and returns it.
+//
+// This function is safe for concurrent access.
+func (node *blockNode) Header() wire.BlockHeader {
+	// No lock is needed because all accessed fields are immutable.
+	return wire.BlockHeader{
+		Version:    node.version,
+		PrevBlock:  *node.parentHash,
+		MerkleRoot: node.merkleRoot,
+		Timestamp:  time.Unix(node.timestamp, 0),
+		Bits:       node.bits,
+		Nonce:      node.nonce,
+	}
 }
 
 // orphanBlock represents a block that we don't yet have the parent for.  It
@@ -1559,6 +1581,30 @@ func (b *BlockChain) BestSnapshot() *BestState {
 	snapshot := b.stateSnapshot
 	b.stateLock.RUnlock()
 	return snapshot
+}
+
+// FetchHeader returns the block header identified by the given hash or an error
+// if it doesn't exist.
+func (b *BlockChain) FetchHeader(hash *chainhash.Hash) (wire.BlockHeader, error) {
+	// Reconstruct the header from the block index if possible.
+	b.chainLock.RLock()
+	node, ok := b.index[*hash]
+	b.chainLock.RUnlock()
+	if ok {
+		return node.Header(), nil
+	}
+
+	// Fall back to loading it from the database.
+	var header *wire.BlockHeader
+	err := b.db.View(func(dbTx database.Tx) error {
+		var err error
+		header, err = dbFetchHeaderByHash(dbTx, hash)
+		return err
+	})
+	if err != nil {
+		return wire.BlockHeader{}, err
+	}
+	return *header, nil
 }
 
 // IndexManager provides a generic interface that the is called when blocks are

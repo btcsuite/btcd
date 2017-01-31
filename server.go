@@ -726,24 +726,17 @@ func (s *server) locateBlocks(locators []*chainhash.Hash, hashStop *chainhash.Ha
 
 // fetchHeaders fetches and decodes headers from the db for each hash in
 // blockHashes.
-func fetchHeaders(db database.DB, blockHashes []chainhash.Hash) ([]*wire.BlockHeader, error) {
-	headers := make([]*wire.BlockHeader, 0, len(blockHashes))
-	err := db.View(func(dbTx database.Tx) error {
-		rawHeaders, err := dbTx.FetchBlockHeaders(blockHashes)
+func fetchHeaders(chain *blockchain.BlockChain, blockHashes []chainhash.Hash) ([]wire.BlockHeader, error) {
+	headers := make([]wire.BlockHeader, 0, len(blockHashes))
+	for i := range blockHashes {
+		header, err := chain.FetchHeader(&blockHashes[i])
 		if err != nil {
-			return err
+			return nil, err
 		}
-		for _, headerBytes := range rawHeaders {
-			h := new(wire.BlockHeader)
-			err = h.Deserialize(bytes.NewReader(headerBytes))
-			if err != nil {
-				return err
-			}
-			headers = append(headers, h)
-		}
-		return nil
-	})
-	return headers, err
+		headers = append(headers, header)
+	}
+
+	return headers, nil
 }
 
 // OnGetHeaders is invoked when a peer receives a getheaders bitcoin
@@ -760,11 +753,15 @@ func (sp *serverPeer) OnGetHeaders(_ *peer.Peer, msg *wire.MsgGetHeaders) {
 		peerLog.Errorf("OnGetHeaders: failed to fetch hashes: %v", err)
 		return
 	}
-	blockHeaders, err := fetchHeaders(sp.server.db, blockHashes)
+	headers, err := fetchHeaders(sp.server.blockManager.chain, blockHashes)
 	if err != nil {
 		peerLog.Errorf("OnGetHeaders: failed to fetch block headers: "+
 			"%v", err)
 		return
+	}
+	blockHeaders := make([]*wire.BlockHeader, len(headers))
+	for i := range headers {
+		blockHeaders[i] = &headers[i]
 	}
 
 	if len(blockHeaders) > wire.MaxBlockHeadersPerMsg {

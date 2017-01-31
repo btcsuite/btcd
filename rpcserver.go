@@ -1243,17 +1243,12 @@ func handleGetBlockHash(s *rpcServer, cmd interface{}, closeChan <-chan struct{}
 func handleGetBlockHeader(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	c := cmd.(*btcjson.GetBlockHeaderCmd)
 
-	// Load the raw header bytes from the database.
+	// Fetch the header from chain.
 	hash, err := chainhash.NewHashFromStr(c.Hash)
 	if err != nil {
 		return nil, rpcDecodeHexError(c.Hash)
 	}
-	var headerBytes []byte
-	err = s.server.db.View(func(dbTx database.Tx) error {
-		var err error
-		headerBytes, err = dbTx.FetchBlockHeader(hash)
-		return err
-	})
+	blockHeader, err := s.chain.FetchHeader(hash)
 	if err != nil {
 		return nil, &btcjson.RPCError{
 			Code:    btcjson.ErrRPCBlockNotFound,
@@ -1264,18 +1259,16 @@ func handleGetBlockHeader(s *rpcServer, cmd interface{}, closeChan <-chan struct
 	// When the verbose flag isn't set, simply return the serialized block
 	// header as a hex-encoded string.
 	if c.Verbose != nil && !*c.Verbose {
-		return hex.EncodeToString(headerBytes), nil
+		var headerBuf bytes.Buffer
+		err := blockHeader.Serialize(&headerBuf)
+		if err != nil {
+			context := "Failed to serialize block header"
+			return nil, internalRPCError(err.Error(), context)
+		}
+		return hex.EncodeToString(headerBuf.Bytes()), nil
 	}
 
 	// The verbose flag is set, so generate the JSON object and return it.
-
-	// Deserialize the header.
-	var blockHeader wire.BlockHeader
-	err = blockHeader.Deserialize(bytes.NewReader(headerBytes))
-	if err != nil {
-		context := "Failed to deserialize block header"
-		return nil, internalRPCError(err.Error(), context)
-	}
 
 	// Get the block height from chain.
 	blockHeight, err := s.chain.BlockHeightByHash(hash)
@@ -2150,7 +2143,7 @@ func handleGetHeaders(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) 
 				"headers: " + err.Error(),
 		}
 	}
-	blockHeaders, err := fetchHeaders(s.server.db, blockHashes)
+	blockHeaders, err := fetchHeaders(s.chain, blockHashes)
 	if err != nil {
 		return nil, &btcjson.RPCError{
 			Code: btcjson.ErrRPCDatabase,
@@ -2315,23 +2308,10 @@ func handleGetNetworkHashPS(s *rpcServer, cmd interface{}, closeChan <-chan stru
 			return nil, internalRPCError(err.Error(), context)
 		}
 
-		// Load the raw header bytes.
-		var headerBytes []byte
-		err = s.server.db.View(func(dbTx database.Tx) error {
-			var err error
-			headerBytes, err = dbTx.FetchBlockHeader(hash)
-			return err
-		})
+		// Fetch the header from chain.
+		header, err := s.chain.FetchHeader(hash)
 		if err != nil {
 			context := "Failed to fetch block header"
-			return nil, internalRPCError(err.Error(), context)
-		}
-
-		// Deserialize the header.
-		var header wire.BlockHeader
-		err = header.Deserialize(bytes.NewReader(headerBytes))
-		if err != nil {
-			context := "Failed to deserialize block header"
 			return nil, internalRPCError(err.Error(), context)
 		}
 
@@ -2521,23 +2501,10 @@ func handleGetRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan str
 	var blkHashStr string
 	var chainHeight int32
 	if blkHash != nil {
-		// Load the raw header bytes.
-		var headerBytes []byte
-		err := s.server.db.View(func(dbTx database.Tx) error {
-			var err error
-			headerBytes, err = dbTx.FetchBlockHeader(blkHash)
-			return err
-		})
+		// Fetch the header from chain.
+		header, err := s.chain.FetchHeader(blkHash)
 		if err != nil {
 			context := "Failed to fetch block header"
-			return nil, internalRPCError(err.Error(), context)
-		}
-
-		// Deserialize the header.
-		var header wire.BlockHeader
-		err = header.Deserialize(bytes.NewReader(headerBytes))
-		if err != nil {
-			context := "Failed to deserialize block header"
 			return nil, internalRPCError(err.Error(), context)
 		}
 
@@ -3161,26 +3128,13 @@ func handleSearchRawTransactions(s *rpcServer, cmd interface{}, closeChan <-chan
 		var blkHashStr string
 		var blkHeight int32
 		if blkHash := rtx.blkHash; blkHash != nil {
-			// Load the raw header bytes from the database.
-			var headerBytes []byte
-			err := s.server.db.View(func(dbTx database.Tx) error {
-				var err error
-				headerBytes, err = dbTx.FetchBlockHeader(blkHash)
-				return err
-			})
+			// Fetch the header from chain.
+			header, err := s.chain.FetchHeader(blkHash)
 			if err != nil {
 				return nil, &btcjson.RPCError{
 					Code:    btcjson.ErrRPCBlockNotFound,
 					Message: "Block not found",
 				}
-			}
-
-			// Deserialize the block header.
-			var header wire.BlockHeader
-			err = header.Deserialize(bytes.NewReader(headerBytes))
-			if err != nil {
-				context := "Failed to deserialize block header"
-				return nil, internalRPCError(err.Error(), context)
 			}
 
 			// Get the block height from chain.
