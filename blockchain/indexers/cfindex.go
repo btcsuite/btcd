@@ -22,11 +22,17 @@ const (
 // Besides holding different content, they also live in different buckets.
 var (
 	// cfBasicIndexKey is the name of the db bucket used to house the
-	// block hash -> Basic cf index (cf#0).
+	// block hash -> basic cf index (cf#0).
 	cfBasicIndexKey = []byte("cf0byhashidx")
+	// cfBasicHeaderKey is the name of the db bucket used to house the
+	// block hash -> basic cf header index (cf#0).
+	cfBasicHeaderKey = []byte("cf0headerbyhashidx")
 	// cfExtendedIndexKey is the name of the db bucket used to house the
-	// block hash -> Extended cf index (cf#1).
+	// block hash -> extended cf index (cf#1).
 	cfExtendedIndexKey = []byte("cf1byhashidx")
+	// cfExtendedHeaderKey is the name of the db bucket used to house the
+	// block hash -> extended cf header index (cf#1).
+	cfExtendedHeaderKey = []byte("cf1headerbyhashidx")
 )
 
 // dbFetchBasicEntry() retrieves a block's basic filter. An entry's absence is
@@ -102,7 +108,15 @@ func (idx *CfIndex) Create(dbTx database.Tx) error {
 	if err != nil {
 		return err
 	}
+	_, err = meta.CreateBucket(cfBasicHeaderKey)
+	if err != nil {
+		return err
+	}
 	_, err = meta.CreateBucket(cfExtendedIndexKey)
+	if err != nil {
+		return err
+	}
+	_, err = meta.CreateBucket(cfExtendedHeaderKey)
 	return err
 }
 
