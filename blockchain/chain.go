@@ -708,18 +708,6 @@ func (b *BlockChain) calcPastMedianTime(startNode *blockNode) (time.Time, error)
 	return time.Unix(medianTimestamp, 0), nil
 }
 
-// CalcPastMedianTime calculates the median time of the previous few blocks
-// prior to, and including, the end of the current best chain.  It is primarily
-// used to ensure new blocks have sane timestamps.
-//
-// This function is safe for concurrent access.
-func (b *BlockChain) CalcPastMedianTime() (time.Time, error) {
-	b.chainLock.Lock()
-	defer b.chainLock.Unlock()
-
-	return b.calcPastMedianTime(b.bestNode)
-}
-
 // SequenceLock represents the converted relative lock-time in seconds, and
 // absolute block-height for a transaction input's relative lock-times.
 // According to SequenceLock, after the referenced input has been confirmed
