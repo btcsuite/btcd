@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2016 The btcsuite developers
+// Copyright (c) 2013-2017 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -62,7 +62,7 @@ type blockNode struct {
 	// Some fields from block headers to aid in best chain selection.
 	version   int32
 	bits      uint32
-	timestamp time.Time
+	timestamp int64
 }
 
 // newBlockNode returns a new block node for the given block header.  It is
@@ -81,7 +81,7 @@ func newBlockNode(blockHeader *wire.BlockHeader, blockHash *chainhash.Hash, heig
 		height:     height,
 		version:    blockHeader.Version,
 		bits:       blockHeader.Bits,
-		timestamp:  blockHeader.Timestamp,
+		timestamp:  blockHeader.Timestamp.Unix(),
 	}
 	return &node
 }
@@ -666,7 +666,7 @@ func (b *BlockChain) calcPastMedianTime(startNode *blockNode) (time.Time, error)
 
 	// Create a slice of the previous few block timestamps used to calculate
 	// the median per the number defined by the constant medianTimeBlocks.
-	timestamps := make([]time.Time, medianTimeBlocks)
+	timestamps := make([]int64, medianTimeBlocks)
 	numNodes := 0
 	iterNode := startNode
 	for i := 0; i < medianTimeBlocks && iterNode != nil; i++ {
@@ -705,7 +705,7 @@ func (b *BlockChain) calcPastMedianTime(startNode *blockNode) (time.Time, error)
 	// however, be aware that should the medianTimeBlocks constant ever be
 	// changed to an even number, this code will be wrong.
 	medianTimestamp := timestamps[numNodes/2]
-	return medianTimestamp, nil
+	return time.Unix(medianTimestamp, 0), nil
 }
 
 // CalcPastMedianTime calculates the median time of the previous few blocks
@@ -1581,8 +1581,8 @@ func (b *BlockChain) isCurrent() bool {
 	//
 	// The chain appears to be current if none of the checks reported
 	// otherwise.
-	minus24Hours := b.timeSource.AdjustedTime().Add(-24 * time.Hour)
-	return !b.bestNode.timestamp.Before(minus24Hours)
+	minus24Hours := b.timeSource.AdjustedTime().Add(-24 * time.Hour).Unix()
+	return b.bestNode.timestamp >= minus24Hours
 }
 
 // IsCurrent returns whether or not the chain believes it is current.  Several
@@ -1716,8 +1716,8 @@ func New(config *Config) (*BlockChain, error) {
 	}
 
 	params := config.ChainParams
-	targetTimespan := int64(params.TargetTimespan)
-	targetTimePerBlock := int64(params.TargetTimePerBlock)
+	targetTimespan := int64(params.TargetTimespan / time.Second)
+	targetTimePerBlock := int64(params.TargetTimePerBlock / time.Second)
 	adjustmentFactor := params.RetargetAdjustmentFactor
 	b := BlockChain{
 		checkpoints:         config.Checkpoints,

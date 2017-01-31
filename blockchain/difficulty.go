@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2016 The btcsuite developers
+// Copyright (c) 2013-2017 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -158,14 +158,16 @@ func CalcWork(bits uint32) *big.Int {
 // known good checkpoint.
 func (b *BlockChain) calcEasiestDifficulty(bits uint32, duration time.Duration) uint32 {
 	// Convert types used in the calculations below.
-	durationVal := int64(duration)
+	durationVal := int64(duration / time.Second)
 	adjustmentFactor := big.NewInt(b.chainParams.RetargetAdjustmentFactor)
 
 	// The test network rules allow minimum difficulty blocks after more
 	// than twice the desired amount of time needed to generate a block has
 	// elapsed.
 	if b.chainParams.ReduceMinDifficulty {
-		if durationVal > int64(b.chainParams.MinDiffReductionTime) {
+		reductionTime := int64(b.chainParams.MinDiffReductionTime /
+			time.Second)
+		if durationVal > reductionTime {
 			return b.chainParams.PowLimitBits
 		}
 	}
@@ -243,9 +245,10 @@ func (b *BlockChain) calcNextRequiredDifficulty(lastNode *blockNode, newBlockTim
 		if b.chainParams.ReduceMinDifficulty {
 			// Return minimum difficulty when more than the desired
 			// amount of time has elapsed without mining a block.
-			reductionTime := b.chainParams.MinDiffReductionTime
-			allowMinTime := lastNode.timestamp.Add(reductionTime)
-			if newBlockTime.After(allowMinTime) {
+			reductionTime := int64(b.chainParams.MinDiffReductionTime /
+				time.Second)
+			allowMinTime := lastNode.timestamp + reductionTime
+			if newBlockTime.Unix() > allowMinTime {
 				return b.chainParams.PowLimitBits, nil
 			}
 
@@ -286,7 +289,7 @@ func (b *BlockChain) calcNextRequiredDifficulty(lastNode *blockNode, newBlockTim
 
 	// Limit the amount of adjustment that can occur to the previous
 	// difficulty.
-	actualTimespan := lastNode.timestamp.UnixNano() - firstNode.timestamp.UnixNano()
+	actualTimespan := lastNode.timestamp - firstNode.timestamp
 	adjustedTimespan := actualTimespan
 	if actualTimespan < b.minRetargetTimespan {
 		adjustedTimespan = b.minRetargetTimespan
@@ -301,7 +304,8 @@ func (b *BlockChain) calcNextRequiredDifficulty(lastNode *blockNode, newBlockTim
 	// result.
 	oldTarget := CompactToBig(lastNode.bits)
 	newTarget := new(big.Int).Mul(oldTarget, big.NewInt(adjustedTimespan))
-	newTarget.Div(newTarget, big.NewInt(int64(b.chainParams.TargetTimespan)))
+	targetTimeSpan := int64(b.chainParams.TargetTimespan / time.Second)
+	newTarget.Div(newTarget, big.NewInt(targetTimeSpan))
 
 	// Limit new value to the proof of work limit.
 	if newTarget.Cmp(b.chainParams.PowLimit) > 0 {
@@ -317,7 +321,8 @@ func (b *BlockChain) calcNextRequiredDifficulty(lastNode *blockNode, newBlockTim
 	log.Debugf("Old target %08x (%064x)", lastNode.bits, oldTarget)
 	log.Debugf("New target %08x (%064x)", newTargetBits, CompactToBig(newTargetBits))
 	log.Debugf("Actual timespan %v, adjusted timespan %v, target timespan %v",
-		time.Duration(actualTimespan), time.Duration(adjustedTimespan),
+		time.Duration(actualTimespan)*time.Second,
+		time.Duration(adjustedTimespan)*time.Second,
 		b.chainParams.TargetTimespan)
 
 	return newTargetBits, nil
