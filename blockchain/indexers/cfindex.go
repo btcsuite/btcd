@@ -244,18 +244,36 @@ func (idx *CfIndex) DisconnectBlock(dbTx database.Tx, block *btcutil.Block,
 	return dbDeleteFilter(dbTx, cfExtendedIndexKey, block.Hash())
 }
 
-func (idx *CfIndex) FilterByBlockHash(hash *chainhash.Hash, extended bool) ([]byte, error) {
-	var filterBytes []byte
+// FilterByBlockHash() returns the serialized contents of a block's basic or
+// extended committed filter.
+func (idx *CfIndex) FilterByBlockHash(h *chainhash.Hash, extended bool) ([]byte, error) {
+	var f []byte
 	err := idx.db.View(func(dbTx database.Tx) error {
 		var err error
 		key := cfBasicIndexKey
 		if extended {
 			key = cfExtendedIndexKey
 		}
-		filterBytes, err = dbFetchFilter(dbTx, key, hash)
+		f, err = dbFetchFilter(dbTx, key, h)
 		return err
 	})
-	return filterBytes, err
+	return f, err
+}
+
+// FilterHeaderByBlockHash() returns the serialized contents of a block's basic
+// or extended committed filter header.
+func (idx *CfIndex) FilterHeaderByBlockHash(h *chainhash.Hash, extended bool) ([]byte, error) {
+	var fh []byte
+	err := idx.db.View(func(dbTx database.Tx) error {
+		var err error
+		key := cfBasicHeaderKey
+		if extended {
+			key = cfExtendedHeaderKey
+		}
+		fh, err = dbFetchFilterHeader(dbTx, key, h)
+		return err
+	})
+	return fh, err
 }
 
 // NewCfIndex returns a new instance of an indexer that is used to create a
