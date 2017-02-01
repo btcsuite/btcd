@@ -615,44 +615,6 @@ func (b *BlockChain) ancestorNode(node *blockNode, height int32) (*blockNode, er
 	return iterNode, nil
 }
 
-// removeBlockNode removes the passed block node from the memory chain by
-// unlinking all of its children and removing it from the the node and
-// dependency indices.
-//
-// This function MUST be called with the chain state lock held (for writes).
-func (b *BlockChain) removeBlockNode(node *blockNode) error {
-	if node.parent != nil {
-		return AssertError(fmt.Sprintf("removeBlockNode must be "+
-			"called with a node at the front of the chain - node %v",
-			node.hash))
-	}
-
-	// Remove the node from the node index.
-	delete(b.index, *node.hash)
-
-	// Unlink all of the node's children.
-	for _, child := range node.children {
-		child.parent = nil
-	}
-	node.children = nil
-
-	// Remove the reference from the dependency index.
-	prevHash := node.parentHash
-	if children, ok := b.depNodes[*prevHash]; ok {
-		// Find the node amongst the children of the
-		// dependencies for the parent hash and remove it.
-		b.depNodes[*prevHash] = removeChildNode(children, node)
-
-		// Remove the map entry altogether if there are no
-		// longer any nodes which depend on the parent hash.
-		if len(b.depNodes[*prevHash]) == 0 {
-			delete(b.depNodes, *prevHash)
-		}
-	}
-
-	return nil
-}
-
 // calcPastMedianTime calculates the median time of the previous few blocks
 // prior to, and including, the passed block node.  It is primarily used to
 // validate new blocks have sane timestamps.
