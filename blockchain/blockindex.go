@@ -31,13 +31,13 @@ type blockNode struct {
 	children []*blockNode
 
 	// hash is the double sha 256 of the block.
-	hash *chainhash.Hash
+	hash chainhash.Hash
 
 	// parentHash is the double sha 256 of the parent block.  This is kept
 	// here over simply relying on parent.hash directly since block nodes
 	// are sparse and the parent node might not be in memory when its hash
 	// is needed.
-	parentHash *chainhash.Hash
+	parentHash chainhash.Hash
 
 	// height is the position in the block chain.
 	height int32
@@ -67,13 +67,9 @@ type blockNode struct {
 // for the passed block.  The work sum is updated accordingly when the node is
 // inserted into a chain.
 func newBlockNode(blockHeader *wire.BlockHeader, blockHash *chainhash.Hash, height int32) *blockNode {
-	// Make a copy of the hash so the node doesn't keep a reference to part
-	// of the full block/block header preventing it from being garbage
-	// collected.
-	prevHash := blockHeader.PrevBlock
 	node := blockNode{
-		hash:       blockHash,
-		parentHash: &prevHash,
+		hash:       *blockHash,
+		parentHash: blockHeader.PrevBlock,
 		workSum:    CalcWork(blockHeader.Bits),
 		height:     height,
 		version:    blockHeader.Version,
@@ -92,7 +88,7 @@ func (node *blockNode) Header() wire.BlockHeader {
 	// No lock is needed because all accessed fields are immutable.
 	return wire.BlockHeader{
 		Version:    node.version,
-		PrevBlock:  *node.parentHash,
+		PrevBlock:  node.parentHash,
 		MerkleRoot: node.merkleRoot,
 		Timestamp:  time.Unix(node.timestamp, 0),
 		Bits:       node.bits,
@@ -115,7 +111,7 @@ func removeChildNode(children []*blockNode, node *blockNode) []*blockNode {
 	// does not reevaluate the slice on each iteration nor does it adjust
 	// the index for the modified slice.
 	for i := 0; i < len(children); i++ {
-		if children[i].hash.IsEqual(node.hash) {
+		if children[i].hash.IsEqual(&node.hash) {
 			copy(children[i:], children[i+1:])
 			children[len(children)-1] = nil
 			return children[:len(children)-1]
@@ -286,7 +282,7 @@ func (bi *blockIndex) prevNodeFromNode(node *blockNode) (*blockNode, error) {
 	var prevBlockNode *blockNode
 	err := bi.db.View(func(dbTx database.Tx) error {
 		var err error
-		prevBlockNode, err = bi.loadBlockNode(dbTx, node.parentHash)
+		prevBlockNode, err = bi.loadBlockNode(dbTx, &node.parentHash)
 		return err
 	})
 	return prevBlockNode, err
@@ -339,7 +335,7 @@ func (bi *blockIndex) RelativeNode(anchor *blockNode, distance uint32) (*blockNo
 			// pulling it into the memory cache in the processes.
 			default:
 				iterNode, err = bi.loadBlockNode(dbTx,
-					iterNode.parentHash)
+					&iterNode.parentHash)
 				if err != nil {
 					return err
 				}
@@ -389,8 +385,8 @@ func (bi *blockIndex) AncestorNode(node *blockNode, height int32) (*blockNode, e
 // This function is safe for concurrent access.
 func (bi *blockIndex) AddNode(node *blockNode) {
 	bi.Lock()
-	bi.index[*node.hash] = node
-	if prevHash := node.parentHash; prevHash != nil && *prevHash != *zeroHash {
+	bi.index[node.hash] = node
+	if prevHash := &node.parentHash; *prevHash != *zeroHash {
 		bi.depNodes[*prevHash] = append(bi.depNodes[*prevHash], node)
 	}
 	bi.Unlock()

@@ -42,13 +42,13 @@ type orphanBlock struct {
 // However, the returned snapshot must be treated as immutable since it is
 // shared by all callers.
 type BestState struct {
-	Hash       *chainhash.Hash // The hash of the block.
-	Height     int32           // The height of the block.
-	Bits       uint32          // The difficulty bits of the block.
-	BlockSize  uint64          // The size of the block.
-	NumTxns    uint64          // The number of txns in the block.
-	TotalTxns  uint64          // The total number of txns in the chain.
-	MedianTime time.Time       // Median time as per CalcPastMedianTime.
+	Hash       chainhash.Hash // The hash of the block.
+	Height     int32          // The height of the block.
+	Bits       uint32         // The difficulty bits of the block.
+	BlockSize  uint64         // The size of the block.
+	NumTxns    uint64         // The number of txns in the block.
+	TotalTxns  uint64         // The total number of txns in the chain.
+	MedianTime time.Time      // Median time as per CalcPastMedianTime.
 }
 
 // newBestState returns a new best stats instance for the given parameters.
@@ -522,7 +522,7 @@ func (b *BlockChain) getReorganizeNodes(node *blockNode) (*list.List, *list.List
 	// common ancestor adding each block to the list of nodes to detach from
 	// the main chain.
 	for n := b.bestNode; n != nil && n.parent != nil; n = n.parent {
-		if n.hash.IsEqual(ancestor.hash) {
+		if n.hash.IsEqual(&ancestor.hash) {
 			break
 		}
 		detachNodes.PushBack(n)
@@ -559,7 +559,7 @@ func dbMaybeStoreBlock(dbTx database.Tx, block *btcutil.Block) error {
 func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block, view *UtxoViewpoint, stxos []spentTxOut) error {
 	// Make sure it's extending the end of the best chain.
 	prevHash := &block.MsgBlock().Header.PrevBlock
-	if !prevHash.IsEqual(b.bestNode.hash) {
+	if !prevHash.IsEqual(&b.bestNode.hash) {
 		return AssertError("connectBlock must be called with a block " +
 			"that extends the main chain")
 	}
@@ -689,7 +689,7 @@ func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block, view *U
 // This function MUST be called with the chain state lock held (for writes).
 func (b *BlockChain) disconnectBlock(node *blockNode, block *btcutil.Block, view *UtxoViewpoint) error {
 	// Make sure the node being disconnected is the end of the best chain.
-	if !node.hash.IsEqual(b.bestNode.hash) {
+	if !node.hash.IsEqual(&b.bestNode.hash) {
 		return AssertError("disconnectBlock must be called with the " +
 			"block at the end of the main chain")
 	}
@@ -713,7 +713,7 @@ func (b *BlockChain) disconnectBlock(node *blockNode, block *btcutil.Block, view
 	var prevBlock *btcutil.Block
 	err = b.db.View(func(dbTx database.Tx) error {
 		var err error
-		prevBlock, err = dbFetchBlockByHash(dbTx, prevNode.hash)
+		prevBlock, err = dbFetchBlockByHash(dbTx, &prevNode.hash)
 		return err
 	})
 	if err != nil {
@@ -843,13 +843,13 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List, flags 
 	// database and using that information to unspend all of the spent txos
 	// and remove the utxos created by the blocks.
 	view := NewUtxoViewpoint()
-	view.SetBestHash(b.bestNode.hash)
+	view.SetBestHash(&b.bestNode.hash)
 	for e := detachNodes.Front(); e != nil; e = e.Next() {
 		n := e.Value.(*blockNode)
 		var block *btcutil.Block
 		err := b.db.View(func(dbTx database.Tx) error {
 			var err error
-			block, err = dbFetchBlockByHash(dbTx, n.hash)
+			block, err = dbFetchBlockByHash(dbTx, &n.hash)
 			return err
 		})
 		if err != nil {
@@ -903,7 +903,7 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List, flags 
 			// NOTE: This block is not in the main chain, so the
 			// block has to be loaded directly from the database
 			// instead of using the dbFetchBlockByHash function.
-			blockBytes, err := dbTx.FetchBlock(n.hash)
+			blockBytes, err := dbTx.FetchBlock(&n.hash)
 			if err != nil {
 				return err
 			}
@@ -944,7 +944,7 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List, flags 
 	// view to be valid from the viewpoint of each block being connected or
 	// disconnected.
 	view = NewUtxoViewpoint()
-	view.SetBestHash(b.bestNode.hash)
+	view.SetBestHash(&b.bestNode.hash)
 
 	// Disconnect blocks from the main chain.
 	for i, e := 0, detachNodes.Front(); e != nil; i, e = i+1, e.Next() {
@@ -1040,12 +1040,12 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, fla
 
 	// We are extending the main (best) chain with a new block.  This is the
 	// most common case.
-	if node.parentHash.IsEqual(b.bestNode.hash) {
+	if node.parentHash.IsEqual(&b.bestNode.hash) {
 		// Perform several checks to verify the block can be connected
 		// to the main chain without violating any rules and without
 		// actually connecting the block.
 		view := NewUtxoViewpoint()
-		view.SetBestHash(node.parentHash)
+		view.SetBestHash(&node.parentHash)
 		stxos := make([]spentTxOut, 0, countSpentOutputs(block))
 		if !fastAdd {
 			err := b.checkConnectBlock(node, block, view, &stxos)
@@ -1096,7 +1096,7 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, fla
 	// become the main chain, but in either case the entry is needed in the
 	// index for future processing.
 	b.index.Lock()
-	b.index.index[*node.hash] = node
+	b.index.index[node.hash] = node
 	b.index.Unlock()
 
 	// Connect the parent node to this node.
@@ -1112,7 +1112,7 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, fla
 			node.parent.children = children
 
 			b.index.Lock()
-			delete(b.index.index, *node.hash)
+			delete(b.index.index, node.hash)
 			b.index.Unlock()
 		}()
 	}
@@ -1134,7 +1134,7 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, fla
 		}
 
 		// Log information about how the block is forking the chain.
-		if fork.hash.IsEqual(node.parent.hash) {
+		if fork.hash.IsEqual(&node.parent.hash) {
 			log.Infof("FORK: Block %v forks the chain at height %d"+
 				"/block %v, but does not cause a reorganize",
 				node.hash, fork.height, fork.hash)

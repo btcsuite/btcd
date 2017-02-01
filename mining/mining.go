@@ -435,7 +435,7 @@ func NewBlkTmplGenerator(policy *Policy, params *chaincfg.Params,
 func (g *BlkTmplGenerator) NewBlockTemplate(payToAddress btcutil.Address) (*BlockTemplate, error) {
 	// Extend the most recently known best block.
 	best := g.chain.BestSnapshot()
-	prevHash := best.Hash
+	prevHash := &best.Hash
 	nextBlockHeight := best.Height + 1
 
 	// Create a standard coinbase transaction paying to the provided

@@ -103,20 +103,20 @@ type thresholdStateCache struct {
 
 // Lookup returns the threshold state associated with the given hash along with
 // a boolean that indicates whether or not it is valid.
-func (c *thresholdStateCache) Lookup(hash chainhash.Hash) (ThresholdState, bool) {
-	state, ok := c.entries[hash]
+func (c *thresholdStateCache) Lookup(hash *chainhash.Hash) (ThresholdState, bool) {
+	state, ok := c.entries[*hash]
 	return state, ok
 }
 
 // Update updates the cache to contain the provided hash to threshold state
 // mapping while properly tracking needed updates flush changes to the database.
-func (c *thresholdStateCache) Update(hash chainhash.Hash, state ThresholdState) {
-	if existing, ok := c.entries[hash]; ok && existing == state {
+func (c *thresholdStateCache) Update(hash *chainhash.Hash, state ThresholdState) {
+	if existing, ok := c.entries[*hash]; ok && existing == state {
 		return
 	}
 
-	c.dbUpdates[hash] = state
-	c.entries[hash] = state
+	c.dbUpdates[*hash] = state
+	c.entries[*hash] = state
 }
 
 // MarkFlushed marks all of the current udpates as flushed to the database.
@@ -170,7 +170,7 @@ func (b *BlockChain) thresholdState(prevNode *blockNode, checker thresholdCondit
 	for prevNode != nil {
 		// Nothing more to do if the state of the block is already
 		// cached.
-		if _, ok := cache.Lookup(*prevNode.hash); ok {
+		if _, ok := cache.Lookup(&prevNode.hash); ok {
 			break
 		}
 
@@ -184,7 +184,7 @@ func (b *BlockChain) thresholdState(prevNode *blockNode, checker thresholdCondit
 		// The state is simply defined if the start time hasn't been
 		// been reached yet.
 		if uint64(medianTime.Unix()) < checker.BeginTime() {
-			cache.Update(*prevNode.hash, ThresholdDefined)
+			cache.Update(&prevNode.hash, ThresholdDefined)
 			break
 		}
 
@@ -206,7 +206,7 @@ func (b *BlockChain) thresholdState(prevNode *blockNode, checker thresholdCondit
 	state := ThresholdDefined
 	if prevNode != nil {
 		var ok bool
-		state, ok = cache.Lookup(*prevNode.hash)
+		state, ok = cache.Lookup(&prevNode.hash)
 		if !ok {
 			return ThresholdFailed, AssertError(fmt.Sprintf(
 				"thresholdState: cache lookup failed for %v",
@@ -298,7 +298,7 @@ func (b *BlockChain) thresholdState(prevNode *blockNode, checker thresholdCondit
 
 		// Update the cache to avoid recalculating the state in the
 		// future.
-		cache.Update(*prevNode.hash, state)
+		cache.Update(&prevNode.hash, state)
 	}
 
 	return state, nil

@@ -246,7 +246,7 @@ func newServerPeer(s *server, isPersistent bool) *serverPeer {
 // required by the configuration for the peer package.
 func (sp *serverPeer) newestBlock() (*chainhash.Hash, int32, error) {
 	best := sp.server.blockManager.chain.BestSnapshot()
-	return best.Hash, best.Height, nil
+	return &best.Hash, best.Height, nil
 }
 
 // addKnownAddresses adds the given addresses to the set of known addresses to
@@ -1130,7 +1130,7 @@ func (s *server) pushBlockMsg(sp *serverPeer, hash *chainhash.Hash, doneChan cha
 	if sendInv {
 		best := sp.server.blockManager.chain.BestSnapshot()
 		invMsg := wire.NewMsgInvSizeHint(1)
-		iv := wire.NewInvVect(wire.InvTypeBlock, best.Hash)
+		iv := wire.NewInvVect(wire.InvTypeBlock, &best.Hash)
 		invMsg.AddInvVect(iv)
 		sp.QueueMessage(invMsg, doneChan)
 		sp.continueHash = nil

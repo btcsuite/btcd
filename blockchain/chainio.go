@@ -1064,7 +1064,7 @@ func deserializeBestChainState(serializedData []byte) (bestChainState, error) {
 func dbPutBestState(dbTx database.Tx, snapshot *BestState, workSum *big.Int) error {
 	// Serialize the current best chain state.
 	serializedData := serializeBestChainState(bestChainState{
-		hash:      *snapshot.Hash,
+		hash:      snapshot.Hash,
 		height:    uint32(snapshot.Height),
 		totalTxns: snapshot.TotalTxns,
 		workSum:   workSum,
@@ -1129,7 +1129,7 @@ func (b *BlockChain) createChainState() error {
 
 		// Add the genesis block hash to height and height to hash
 		// mappings to the index.
-		err = dbPutBlockIndex(dbTx, b.bestNode.hash, b.bestNode.height)
+		err = dbPutBlockIndex(dbTx, &b.bestNode.hash, b.bestNode.height)
 		if err != nil {
 			return err
 		}

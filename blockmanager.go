@@ -378,7 +378,7 @@ func (b *blockManager) handleDonePeerMsg(peers *list.List, sp *serverPeer) {
 		b.syncPeer = nil
 		if b.headersFirstMode {
 			best := b.chain.BestSnapshot()
-			b.resetHeaderState(best.Hash, best.Height)
+			b.resetHeaderState(&best.Hash, best.Height)
 		}
 		b.startSync(peers)
 	}
@@ -595,7 +595,7 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 		// potential sync node candidacy.
 		best := b.chain.BestSnapshot()
 		heightUpdate = best.Height
-		blkHashUpdate = best.Hash
+		blkHashUpdate = &best.Hash
 
 		// Clear the rejected transactions.
 		b.rejectedTxns = make(map[chainhash.Hash]struct{})
@@ -1417,7 +1417,7 @@ func newBlockManager(s *server, indexManager blockchain.IndexManager) (*blockMan
 		// Initialize the next checkpoint based on the current height.
 		bm.nextCheckpoint = bm.findNextHeaderCheckpoint(best.Height)
 		if bm.nextCheckpoint != nil {
-			bm.resetHeaderState(best.Hash, best.Height)
+			bm.resetHeaderState(&best.Hash, best.Height)
 		}
 	} else {
 		bmgrLog.Info("Checkpoints are disabled")

@@ -69,7 +69,7 @@ nextTest:
 			hash[0] = uint8(i + 1)
 
 			// Ensure the hash isn't available in the cache already.
-			_, ok := cache.Lookup(hash)
+			_, ok := cache.Lookup(&hash)
 			if ok {
 				t.Errorf("Lookup (%s): has entry for hash %v",
 					test.name, hash)
@@ -78,8 +78,8 @@ nextTest:
 
 			// Ensure hash that was added to the cache reports it's
 			// available and the state is the expected value.
-			cache.Update(hash, test.state)
-			state, ok := cache.Lookup(hash)
+			cache.Update(&hash, test.state)
+			state, ok := cache.Lookup(&hash)
 			if !ok {
 				t.Errorf("Lookup (%s): missing entry for hash "+
 					"%v", test.name, hash)
@@ -118,7 +118,7 @@ nextTest:
 
 			// Ensure hash is still available in the cache and the
 			// state is the expected value.
-			state, ok = cache.Lookup(hash)
+			state, ok = cache.Lookup(&hash)
 			if !ok {
 				t.Errorf("Lookup (%s): missing entry after "+
 					"flush for hash %v", test.name, hash)
@@ -134,8 +134,8 @@ nextTest:
 			// Ensure adding an existing hash with the same state
 			// doesn't break the existing entry and it is NOT added
 			// to the database updates map.
-			cache.Update(hash, test.state)
-			state, ok = cache.Lookup(hash)
+			cache.Update(&hash, test.state)
+			state, ok = cache.Lookup(&hash)
 			if !ok {
 				t.Errorf("Lookup (%s): missing entry after "+
 					"second add for hash %v", test.name,
@@ -160,8 +160,8 @@ nextTest:
 			if newState == test.state {
 				newState = ThresholdStarted
 			}
-			cache.Update(hash, newState)
-			state, ok = cache.Lookup(hash)
+			cache.Update(&hash, newState)
+			state, ok = cache.Lookup(&hash)
 			if !ok {
 				t.Errorf("Lookup (%s): missing entry after "+
 					"state change for hash %v", test.name,

@@ -1470,7 +1470,7 @@ func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bo
 	// generated.
 	var msgBlock *wire.MsgBlock
 	var targetDifficulty string
-	latestHash := s.server.blockManager.chain.BestSnapshot().Hash
+	latestHash := &s.server.blockManager.chain.BestSnapshot().Hash
 	template := state.template
 	if template == nil || state.prevHash == nil ||
 		!state.prevHash.IsEqual(latestHash) ||
@@ -2026,9 +2026,9 @@ func handleGetBlockTemplateProposal(s *rpcServer, request *btcjson.TemplateReque
 	block := btcutil.NewBlock(&msgBlock)
 
 	// Ensure the block is building from the expected previous block.
-	expectedPrevHash := s.server.blockManager.chain.BestSnapshot().Hash
+	expectedPrevHash := &s.server.blockManager.chain.BestSnapshot().Hash
 	prevHash := &block.MsgBlock().Header.PrevBlock
-	if expectedPrevHash == nil || !expectedPrevHash.IsEqual(prevHash) {
+	if !expectedPrevHash.IsEqual(prevHash) {
 		return "bad-prevblk", nil
 	}
 

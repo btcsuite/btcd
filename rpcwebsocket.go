@@ -2471,7 +2471,7 @@ fetchRange:
 			blockManager := wsc.server.server.blockManager
 			pauseGuard := blockManager.Pause()
 			best := blockManager.chain.BestSnapshot()
-			curHash := best.Hash
+			curHash := &best.Hash
 			again := true
 			if lastBlockHash == nil || *lastBlockHash == *curHash {
 				again = false
