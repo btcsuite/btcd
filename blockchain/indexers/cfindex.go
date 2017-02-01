@@ -49,6 +49,20 @@ func dbFetchExtendedEntry(dbTx database.Tx, h *chainhash.Hash) ([]byte, error) {
 	return idx.Get(h[:]), nil
 }
 
+// dbFetchBasicHeader() retrieves a block's basic filter header. A filter's
+// absence is not considered an error.
+func dbFetchBasicHeader(dbTx database.Tx, h *chainhash.Hash) ([]byte, error) {
+	idx := dbTx.Metadata().Bucket(cfBasicHeaderKey)
+	return idx.Get(h[:]), nil
+}
+
+// dbFetchExtendedHeader() retrieves a block's extended filter header.
+// A filter's absence is not considered an error.
+func dbFetchExtendedHeader(dbTx database.Tx, h*chainhash.Hash) ([]byte, error) {
+	idx := dbTx.Metadata().Bucket(cfExtendedHeaderKey)
+	return idx.Get(h[:]), nil
+}
+
 // dbStoreBasicEntry() stores a block's basic filter.
 func dbStoreBasicEntry(dbTx database.Tx, h *chainhash.Hash, f []byte) error {
 	idx := dbTx.Metadata().Bucket(cfBasicIndexKey)
