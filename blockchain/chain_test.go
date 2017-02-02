@@ -200,25 +200,30 @@ func TestCalcSequenceLock(t *testing.T) {
 	}
 	utxoView.SetBestHash(blocksWithMTP[len(blocksWithMTP)-1].block.Hash())
 
-	// The median time calculated from the PoV of the best block in our
-	// test chain. For unconfirmed inputs, this value will be used since
-	// the MTP will be calculated from the PoV of the yet-to-be-mined
-	// block.
-	nextMedianTime := int64(1401292712)
-
 	// We'll refer to this utxo within each input in the transactions
-	// created below. This utxo has an age of 4 blocks and was mined within
-	// block 297
-	targetTx := blocksWithMTP[len(blocksWithMTP)-4].block.Transactions()[0]
+	// created below. This utxo has an age of 4 blocks.  Note that the
+	// sequence lock heights are always calculated from the same point of
+	// view that they were originally calculated from for a given utxo.
+	// That is to say, the height prior to it.
+	targetBlock := blocksWithMTP[len(blocksWithMTP)-4].block
+	targetTx := targetBlock.Transactions()[0]
 	utxo := wire.OutPoint{
 		Hash:  *targetTx.Hash(),
 		Index: 0,
 	}
+	prevUtxoHeight := targetBlock.Height() - 1
 
 	// Obtain the median time past from the PoV of the input created above.
 	// The MTP for the input is the MTP from the PoV of the block *prior*
 	// to the one that included it.
 	medianTime := blocksWithMTP[len(blocksWithMTP)-5].mtp.Unix()
+
+	// The median time calculated from the PoV of the best block in our
+	// test chain.  For unconfirmed inputs, this value will be used since
+	// the MTP will be calculated from the PoV of the yet-to-be-mined
+	// block.
+	nextMedianTime := blocksWithMTP[len(blocksWithMTP)-1].mtp.Unix() + 1
+	nextBlockHeight := blocksWithMTP[len(blocksWithMTP)-1].block.Height() + 1
 
 	// Add an additional transaction which will serve as our unconfirmed
 	// output.
@@ -241,8 +246,8 @@ func TestCalcSequenceLock(t *testing.T) {
 	tests := []struct {
 		tx      *btcutil.Tx
 		view    *blockchain.UtxoViewpoint
-		want    *blockchain.SequenceLock
 		mempool bool
+		want    *blockchain.SequenceLock
 	}{
 		// A transaction of version one should disable sequence locks
 		// as the new sequence number semantics only apply to
@@ -261,9 +266,9 @@ func TestCalcSequenceLock(t *testing.T) {
 				BlockHeight: -1,
 			},
 		},
-		// A transaction with a single input, that a max int sequence
-		// number. This sequence number has the high bit set, so
-		// sequence locks should be disabled.
+		// A transaction with a single input with max sequence number.
+		// This sequence number has the high bit set, so sequence locks
+		// should be disabled.
 		{
 			tx: btcutil.NewTx(&wire.MsgTx{
 				Version: 2,
@@ -279,9 +284,9 @@ func TestCalcSequenceLock(t *testing.T) {
 			},
 		},
 		// A transaction with a single input whose lock time is
-		// expressed in seconds. However, the specified lock time is
+		// expressed in seconds.  However, the specified lock time is
 		// below the required floor for time based lock times since
-		// they have time granularity of 512 seconds. As a result, the
+		// they have time granularity of 512 seconds.  As a result, the
 		// seconds lock-time should be just before the median time of
 		// the targeted block.
 		{
@@ -299,7 +304,7 @@ func TestCalcSequenceLock(t *testing.T) {
 			},
 		},
 		// A transaction with a single input whose lock time is
-		// expressed in seconds. The number of seconds should be 1023
+		// expressed in seconds.  The number of seconds should be 1023
 		// seconds after the median past time of the last block in the
 		// chain.
 		{
@@ -316,12 +321,12 @@ func TestCalcSequenceLock(t *testing.T) {
 				BlockHeight: -1,
 			},
 		},
-		// A transaction with multiple inputs. The first input has a
-		// sequence lock in blocks with a value of 4. The last input
+		// A transaction with multiple inputs.  The first input has a
+		// lock time expressed in seconds.  The second input has a
+		// sequence lock in blocks with a value of 4.  The last input
 		// has a sequence number with a value of 5, but has the disable
-		// bit set. So the first lock should be selected as it's the
-		// target lock as its the furthest in the future lock that
-		// isn't disabled.
+		// bit set.  So the first lock should be selected as it's the
+		// latest lock that isn't disabled.
 		{
 			tx: btcutil.NewTx(&wire.MsgTx{
 				Version: 2,
@@ -330,24 +335,23 @@ func TestCalcSequenceLock(t *testing.T) {
 					Sequence:         blockchain.LockTimeToSequence(true, 2560),
 				}, {
 					PreviousOutPoint: utxo,
-					Sequence: blockchain.LockTimeToSequence(false, 5) |
-						wire.SequenceLockTimeDisabled,
+					Sequence:         blockchain.LockTimeToSequence(false, 4),
 				}, {
 					PreviousOutPoint: utxo,
-					Sequence:         blockchain.LockTimeToSequence(false, 4),
+					Sequence: blockchain.LockTimeToSequence(false, 5) |
+						wire.SequenceLockTimeDisabled,
 				}},
 			}),
 			view: utxoView,
 			want: &blockchain.SequenceLock{
 				Seconds:     medianTime + (5 << wire.SequenceLockTimeGranularity) - 1,
-				BlockHeight: 299,
+				BlockHeight: prevUtxoHeight + 3,
 			},
 		},
-		// Transaction has a single input spending the genesis block
-		// transaction. The input's sequence number is encodes a
-		// relative lock-time in blocks (3 blocks). The sequence lock
-		// should have a value of -1 for seconds, but a block height of
-		// 298 meaning it can be included at height 299.
+		// Transaction with a single input.  The input's sequence number
+		// encodes a relative lock-time in blocks (3 blocks).  The
+		// sequence lock should  have a value of -1 for seconds, but a
+		// height of 2 meaning it can be included at height 3.
 		{
 			tx: btcutil.NewTx(&wire.MsgTx{
 				Version: 2,
@@ -359,11 +363,11 @@ func TestCalcSequenceLock(t *testing.T) {
 			view: utxoView,
 			want: &blockchain.SequenceLock{
 				Seconds:     -1,
-				BlockHeight: 298,
+				BlockHeight: prevUtxoHeight + 2,
 			},
 		},
 		// A transaction with two inputs with lock times expressed in
-		// seconds. The selected sequence lock value for seconds should
+		// seconds.  The selected sequence lock value for seconds should
 		// be the time further in the future.
 		{
 			tx: btcutil.NewTx(&wire.MsgTx{
@@ -383,10 +387,9 @@ func TestCalcSequenceLock(t *testing.T) {
 			},
 		},
 		// A transaction with two inputs with lock times expressed in
-		// seconds. The selected sequence lock value for blocks should
-		// be the height further in the future. The converted absolute
-		// block height should be 302, meaning it can be included in
-		// block 303.
+		// blocks.  The selected sequence lock value for blocks should
+		// be the height further in the future, so a height of 10
+		// indicating it can be included at height 11.
 		{
 			tx: btcutil.NewTx(&wire.MsgTx{
 				Version: 2,
@@ -395,19 +398,18 @@ func TestCalcSequenceLock(t *testing.T) {
 					Sequence:         blockchain.LockTimeToSequence(false, 1),
 				}, {
 					PreviousOutPoint: utxo,
-					Sequence:         blockchain.LockTimeToSequence(false, 7),
+					Sequence:         blockchain.LockTimeToSequence(false, 11),
 				}},
 			}),
 			view: utxoView,
 			want: &blockchain.SequenceLock{
 				Seconds:     -1,
-				BlockHeight: 302,
+				BlockHeight: prevUtxoHeight + 10,
 			},
 		},
-		// A transaction with multiple inputs. Two inputs are time
-		// based, and the other two are input maturity based. The lock
-		// lying further into the future for both inputs should be
-		// chosen.
+		// A transaction with multiple inputs.  Two inputs are time
+		// based, and the other two are block based. The lock lying
+		// further into the future for both inputs should be chosen.
 		{
 			tx: btcutil.NewTx(&wire.MsgTx{
 				Version: 2,
@@ -428,15 +430,15 @@ func TestCalcSequenceLock(t *testing.T) {
 			view: utxoView,
 			want: &blockchain.SequenceLock{
 				Seconds:     medianTime + (13 << wire.SequenceLockTimeGranularity) - 1,
-				BlockHeight: 304,
+				BlockHeight: prevUtxoHeight + 8,
 			},
 		},
-		// A transaction with a single unconfirmed input. As the input
+		// A transaction with a single unconfirmed input.  As the input
 		// is confirmed, the height of the input should be interpreted
-		// as the height of the *next* block. The current block height
-		// is 300, so the lock time should be calculated using height
-		// 301 as a base. A 2 block relative lock means the transaction
-		// can be included after block 302, so in 303.
+		// as the height of the *next* block.  So, a 2 block relative
+		// lock means the sequence lock should be for 1 block after the
+		// *next* block height, indicating it can be included 2 blocks
+		// after that.
 		{
 			tx: btcutil.NewTx(&wire.MsgTx{
 				Version: 2,
@@ -445,13 +447,14 @@ func TestCalcSequenceLock(t *testing.T) {
 					Sequence:         blockchain.LockTimeToSequence(false, 2),
 				}},
 			}),
-			view: utxoView,
+			view:    utxoView,
+			mempool: true,
 			want: &blockchain.SequenceLock{
 				Seconds:     -1,
-				BlockHeight: 302,
+				BlockHeight: nextBlockHeight + 1,
 			},
 		},
-		// A transaction with a single unconfirmed input. The input has
+		// A transaction with a single unconfirmed input.  The input has
 		// a time based lock, so the lock time should be based off the
 		// MTP of the *next* block.
 		{
@@ -462,7 +465,8 @@ func TestCalcSequenceLock(t *testing.T) {
 					Sequence:         blockchain.LockTimeToSequence(true, 1024),
 				}},
 			}),
-			view: utxoView,
+			view:    utxoView,
+			mempool: true,
 			want: &blockchain.SequenceLock{
 				Seconds:     nextMedianTime + 1023,
 				BlockHeight: -1,
