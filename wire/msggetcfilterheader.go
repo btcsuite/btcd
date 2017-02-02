@@ -10,13 +10,13 @@ import (
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 )
 
-type MsgGetCFilter struct {
+type MsgGetCFilterHeader struct {
 	ProtocolVersion    uint32
 	BlockHash          chainhash.Hash
 	Extended           bool
 }
 
-func (msg *MsgGetCFilter) BtcDecode(r io.Reader, pver uint32) error {
+func (msg *MsgGetCFilterHeader) BtcDecode(r io.Reader, pver uint32) error {
 	err := readElement(r, &msg.BlockHash)
 	if err != nil {
 		return err
@@ -26,7 +26,7 @@ func (msg *MsgGetCFilter) BtcDecode(r io.Reader, pver uint32) error {
 
 // BtcEncode encodes the receiver to w using the bitcoin protocol encoding.
 // This is part of the Message interface implementation.
-func (msg *MsgGetCFilter) BtcEncode(w io.Writer, pver uint32) error {
+func (msg *MsgGetCFilterHeader) BtcEncode(w io.Writer, pver uint32) error {
 	err := writeElement(w, &msg.BlockHash)
 	if err != nil {
 		return err
@@ -36,22 +36,22 @@ func (msg *MsgGetCFilter) BtcEncode(w io.Writer, pver uint32) error {
 
 // Command returns the protocol command string for the message.  This is part
 // of the Message interface implementation.
-func (msg *MsgGetCFilter) Command() string {
-	return CmdGetCFilter
+func (msg *MsgGetCFilterHeader) Command() string {
+	return CmdGetCFilterHeader
 }
 
 // MaxPayloadLength returns the maximum length the payload can be for the
 // receiver.  This is part of the Message interface implementation.
-func (msg *MsgGetCFilter) MaxPayloadLength(pver uint32) uint32 {
+func (msg *MsgGetCFilterHeader) MaxPayloadLength(pver uint32) uint32 {
 	// Protocol version 4 bytes + block hash + Extended flag.
 	return 4 + chainhash.HashSize + 1
 }
 
-// NewMsgGetCFilter returns a new bitcoin getcfilter message that conforms to
-// the Message interface using the passed parameters and defaults for the
-// remaining fields.
-func NewMsgGetCFilter(blockHash *chainhash.Hash, extended bool) *MsgGetCFilter {
-	return &MsgGetCFilter{
+// NewMsgGetCFilterHeader returns a new bitcoin getcfilterheader message that
+// conforms to the Message interface using the passed parameters and defaults
+// for the remaining fields.
+func NewMsgGetCFilterHeader(blockHash *chainhash.Hash, extended bool) *MsgGetCFilterHeader {
+	return &MsgGetCFilterHeader{
 		ProtocolVersion:     ProtocolVersion,
 		BlockHash:          *blockHash,
 		Extended:            extended,
