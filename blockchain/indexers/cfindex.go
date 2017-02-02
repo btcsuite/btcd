@@ -160,9 +160,12 @@ func makeBasicFilterForBlock(block *btcutil.Block) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	for _, tx := range block.Transactions() {
-		for _, txIn := range tx.MsgTx().TxIn {
-			b.AddOutPoint(txIn.PreviousOutPoint)
+	for i, tx := range block.Transactions() {
+		// Skip the inputs for the coinbase transaction
+		if i != 0 {
+			for _, txIn := range tx.MsgTx().TxIn {
+				b.AddOutPoint(txIn.PreviousOutPoint)
+			}
 		}
 		for _, txOut := range tx.MsgTx().TxOut {
 			b.AddScript(txOut.PkScript)
@@ -183,10 +186,13 @@ func makeExtendedFilterForBlock(block *btcutil.Block) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	for _, tx := range block.Transactions() {
+	for i, tx := range block.Transactions() {
 		b.AddHash(tx.Hash())
-		for _, txIn := range tx.MsgTx().TxIn {
-			b.AddScript(txIn.SignatureScript)
+		// Skip the inputs for the coinbase transaction
+		if i != 0 {
+			for _, txIn := range tx.MsgTx().TxIn {
+				b.AddScript(txIn.SignatureScript)
+			}
 		}
 	}
 	f, err := b.Build()
