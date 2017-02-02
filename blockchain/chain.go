@@ -637,16 +637,11 @@ func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block, view *U
 			}
 		}
 
-		// Update the cached threshold states in the database as needed.
-		return b.putThresholdCaches(dbTx)
+		return nil
 	})
 	if err != nil {
 		return err
 	}
-
-	// Mark all modified entries in the threshold caches as flushed now that
-	// they have been committed to the database.
-	b.markThresholdCachesFlushed()
 
 	// Prune fully spent entries and mark all entries in the view unmodified
 	// now that the modifications have been committed to the database.
@@ -1352,10 +1347,7 @@ func New(config *Config) (*BlockChain, error) {
 		}
 	}
 
-	// Initialize rule change threshold state caches from the passed
-	// database.  When the db does not yet contains any cached information
-	// for a given threshold cache, the threshold states will be calculated
-	// using the chain state.
+	// Initialize rule change threshold state caches.
 	if err := b.initThresholdCaches(); err != nil {
 		return nil, err
 	}

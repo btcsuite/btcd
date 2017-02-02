@@ -15,37 +15,34 @@ import (
 type ThresholdState byte
 
 // These constants are used to identify specific threshold states.
-//
-// NOTE: This section specifically does not use iota for the individual states
-// since these values are serialized and must be stable for long-term storage.
 const (
 	// ThresholdDefined is the first state for each deployment and is the
 	// state for the genesis block has by definition for all deployments.
-	ThresholdDefined ThresholdState = 0
+	ThresholdDefined ThresholdState = iota
 
 	// ThresholdStarted is the state for a deployment once its start time
 	// has been reached.
-	ThresholdStarted ThresholdState = 1
+	ThresholdStarted
 
 	// ThresholdLockedIn is the state for a deployment during the retarget
 	// period which is after the ThresholdStarted state period and the
 	// number of blocks that have voted for the deployment equal or exceed
 	// the required number of votes for the deployment.
-	ThresholdLockedIn ThresholdState = 2
+	ThresholdLockedIn
 
 	// ThresholdActive is the state for a deployment for all blocks after a
 	// retarget period in which the deployment was in the ThresholdLockedIn
 	// state.
-	ThresholdActive ThresholdState = 3
+	ThresholdActive
 
 	// ThresholdFailed is the state for a deployment once its expiration
 	// time has been reached and it did not reach the ThresholdLockedIn
 	// state.
-	ThresholdFailed ThresholdState = 4
+	ThresholdFailed
 
 	// numThresholdsStates is the maximum number of threshold states used in
 	// tests.
-	numThresholdsStates = iota
+	numThresholdsStates
 )
 
 // thresholdStateStrings is a map of ThresholdState values back to their
@@ -94,11 +91,9 @@ type thresholdConditionChecker interface {
 }
 
 // thresholdStateCache provides a type to cache the threshold states of each
-// threshold window for a set of IDs.  It also keeps track of which entries have
-// been modified and therefore need to be written to the database.
+// threshold window for a set of IDs.
 type thresholdStateCache struct {
-	dbUpdates map[chainhash.Hash]ThresholdState
-	entries   map[chainhash.Hash]ThresholdState
+	entries map[chainhash.Hash]ThresholdState
 }
 
 // Lookup returns the threshold state associated with the given hash along with
@@ -109,23 +104,9 @@ func (c *thresholdStateCache) Lookup(hash *chainhash.Hash) (ThresholdState, bool
 }
 
 // Update updates the cache to contain the provided hash to threshold state
-// mapping while properly tracking needed updates flush changes to the database.
+// mapping.
 func (c *thresholdStateCache) Update(hash *chainhash.Hash, state ThresholdState) {
-	if existing, ok := c.entries[*hash]; ok && existing == state {
-		return
-	}
-
-	c.dbUpdates[*hash] = state
 	c.entries[*hash] = state
-}
-
-// MarkFlushed marks all of the current udpates as flushed to the database.
-// This is useful so the caller can ensure the needed database updates are not
-// lost until they have successfully been written to the database.
-func (c *thresholdStateCache) MarkFlushed() {
-	for hash := range c.dbUpdates {
-		delete(c.dbUpdates, hash)
-	}
 }
 
 // newThresholdCaches returns a new array of caches to be used when calculating
@@ -134,8 +115,7 @@ func newThresholdCaches(numCaches uint32) []thresholdStateCache {
 	caches := make([]thresholdStateCache, numCaches)
 	for i := 0; i < len(caches); i++ {
 		caches[i] = thresholdStateCache{
-			entries:   make(map[chainhash.Hash]ThresholdState),
-			dbUpdates: make(map[chainhash.Hash]ThresholdState),
+			entries: make(map[chainhash.Hash]ThresholdState),
 		}
 	}
 	return caches
@@ -326,4 +306,50 @@ func (b *BlockChain) deploymentState(prevNode *blockNode, deploymentID uint32) (
 	cache := &b.deploymentCaches[deploymentID]
 
 	return b.thresholdState(prevNode, checker, cache)
+}
+
+// initThresholdCaches initializes the threshold state caches for each warning
+// bit and defined deployment and provides warnings if the chain is current per
+// the warnUnknownVersions and warnUnknownRuleActivations functions.
+func (b *BlockChain) initThresholdCaches() error {
+	// Initialize the warning and deployment caches by calculating the
+	// threshold state for each of them.  This will ensure the caches are
+	// populated and any states that needed to be recalculated due to
+	// definition changes is done now.
+	prevNode := b.bestNode.parent
+	for bit := uint32(0); bit < vbNumBits; bit++ {
+		checker := bitConditionChecker{bit: bit, chain: b}
+		cache := &b.warningCaches[bit]
+		_, err := b.thresholdState(prevNode, checker, cache)
+		if err != nil {
+			return err
+		}
+	}
+	for id := 0; id < len(b.chainParams.Deployments); id++ {
+		deployment := &b.chainParams.Deployments[id]
+		cache := &b.deploymentCaches[id]
+		checker := deploymentChecker{deployment: deployment, chain: b}
+		_, err := b.thresholdState(prevNode, checker, cache)
+		if err != nil {
+			return err
+		}
+	}
+
+	// No warnings about unknown rules or versions until the chain is
+	// current.
+	if b.isCurrent() {
+		// Warn if a high enough percentage of the last blocks have
+		// unexpected versions.
+		if err := b.warnUnknownVersions(b.bestNode); err != nil {
+			return err
+		}
+
+		// Warn if any unknown new rules are either about to activate or
+		// have already been activated.
+		if err := b.warnUnknownRuleActivations(b.bestNode); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

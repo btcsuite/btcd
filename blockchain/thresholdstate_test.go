@@ -92,48 +92,8 @@ nextTest:
 				continue nextTest
 			}
 
-			// Ensure the update is also added to the internal
-			// database updates map and its state matches.
-			state, ok = cache.dbUpdates[hash]
-			if !ok {
-				t.Errorf("dbUpdates (%s): missing entry for "+
-					"hash %v", test.name, hash)
-				continue nextTest
-			}
-			if state != test.state {
-				t.Errorf("dbUpdates (%s): state mismatch - "+
-					"got %v, want %v", test.name, state,
-					test.state)
-				continue nextTest
-			}
-
-			// Ensure flushing the cache removes all entries from
-			// the internal database updates map.
-			cache.MarkFlushed()
-			if len(cache.dbUpdates) != 0 {
-				t.Errorf("dbUpdates (%s): unflushed entries",
-					test.name)
-				continue nextTest
-			}
-
-			// Ensure hash is still available in the cache and the
-			// state is the expected value.
-			state, ok = cache.Lookup(&hash)
-			if !ok {
-				t.Errorf("Lookup (%s): missing entry after "+
-					"flush for hash %v", test.name, hash)
-				continue nextTest
-			}
-			if state != test.state {
-				t.Errorf("Lookup (%s): state mismatch after "+
-					"flush - got %v, want %v", test.name,
-					state, test.state)
-				continue nextTest
-			}
-
 			// Ensure adding an existing hash with the same state
-			// doesn't break the existing entry and it is NOT added
-			// to the database updates map.
+			// doesn't break the existing entry.
 			cache.Update(&hash, test.state)
 			state, ok = cache.Lookup(&hash)
 			if !ok {
@@ -146,11 +106,6 @@ nextTest:
 				t.Errorf("Lookup (%s): state mismatch after "+
 					"second add - got %v, want %v",
 					test.name, state, test.state)
-				continue nextTest
-			}
-			if len(cache.dbUpdates) != 0 {
-				t.Errorf("dbUpdates (%s): unflushed entries "+
-					"after duplicate add", test.name)
 				continue nextTest
 			}
 
@@ -171,22 +126,6 @@ nextTest:
 			if state != newState {
 				t.Errorf("Lookup (%s): state mismatch after "+
 					"state change - got %v, want %v",
-					test.name, state, newState)
-				continue nextTest
-			}
-
-			// Ensure the update is also added to the internal
-			// database updates map and its state matches.
-			state, ok = cache.dbUpdates[hash]
-			if !ok {
-				t.Errorf("dbUpdates (%s): missing entry after "+
-					"state change for hash %v", test.name,
-					hash)
-				continue nextTest
-			}
-			if state != newState {
-				t.Errorf("dbUpdates (%s): state mismatch "+
-					"after state change - got %v, want %v",
 					test.name, state, newState)
 				continue nextTest
 			}
