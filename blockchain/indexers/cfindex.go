@@ -6,7 +6,9 @@ package indexers
 
 import (
 	"errors"
+
 	"github.com/btcsuite/btcd/blockchain"
+	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcutil"
@@ -37,14 +39,14 @@ var (
 	cfExtendedHeaderKey = []byte("cf1headerbyhashidx")
 )
 
-// dbFetchFilter() retrieves a block's basic or extended filter. A filter's
+// dbFetchFilter retrieves a block's basic or extended filter. A filter's
 // absence is not considered an error.
 func dbFetchFilter(dbTx database.Tx, key []byte, h *chainhash.Hash) ([]byte, error) {
 	idx := dbTx.Metadata().Bucket(key)
 	return idx.Get(h[:]), nil
 }
 
-// dbFetchFilterHeader() retrieves a block's basic or extended filter header.
+// dbFetchFilterHeader retrieves a block's basic or extended filter header.
 // A filter's absence is not considered an error.
 func dbFetchFilterHeader(dbTx database.Tx, key []byte, h *chainhash.Hash) ([]byte, error) {
 	idx := dbTx.Metadata().Bucket(key)
@@ -55,13 +57,13 @@ func dbFetchFilterHeader(dbTx database.Tx, key []byte, h *chainhash.Hash) ([]byt
 	return fh, nil
 }
 
-// dbStoreFilter() stores a block's basic or extended filter.
+// dbStoreFilter stores a block's basic or extended filter.
 func dbStoreFilter(dbTx database.Tx, key []byte, h *chainhash.Hash, f []byte) error {
 	idx := dbTx.Metadata().Bucket(key)
 	return idx.Put(h[:], f)
 }
 
-// dbStoreFilterHeader() stores a block's basic or extended filter header.
+// dbStoreFilterHeader stores a block's basic or extended filter header.
 func dbStoreFilterHeader(dbTx database.Tx, key []byte, h *chainhash.Hash, fh []byte) error {
 	if len(fh) != fastsha256.Size {
 		return errors.New("invalid filter header length")
@@ -70,13 +72,13 @@ func dbStoreFilterHeader(dbTx database.Tx, key []byte, h *chainhash.Hash, fh []b
 	return idx.Put(h[:], fh)
 }
 
-// dbDeleteFilter() deletes a filter's basic or extended filter.
+// dbDeleteFilter deletes a filter's basic or extended filter.
 func dbDeleteFilter(dbTx database.Tx, key []byte, h *chainhash.Hash) error {
 	idx := dbTx.Metadata().Bucket(key)
 	return idx.Delete(h[:])
 }
 
-// dbDeleteFilterHeader() deletes a filter's basic or extended filter header.
+// dbDeleteFilterHeader deletes a filter's basic or extended filter header.
 func dbDeleteFilterHeader(dbTx database.Tx, key []byte, h *chainhash.Hash) error {
 	idx := dbTx.Metadata().Bucket(key)
 	return idx.Delete(h[:])
@@ -84,7 +86,8 @@ func dbDeleteFilterHeader(dbTx database.Tx, key []byte, h *chainhash.Hash) error
 
 // CfIndex implements a committed filter (cf) by hash index.
 type CfIndex struct {
-	db database.DB
+	db          database.DB
+	chainParams *chaincfg.Params
 }
 
 // Ensure the CfIndex type implements the Indexer interface.
@@ -108,7 +111,7 @@ func (idx *CfIndex) Name() string {
 	return cfIndexName
 }
 
-// Create() is invoked when the indexer manager determines the index needs to
+// Create is invoked when the indexer manager determines the index needs to
 // be created for the first time. It creates buckets for the two hash-based cf
 // indexes (simple, extended).
 func (idx *CfIndex) Create(dbTx database.Tx) error {
@@ -126,10 +129,29 @@ func (idx *CfIndex) Create(dbTx database.Tx) error {
 		return err
 	}
 	_, err = meta.CreateBucket(cfExtendedHeaderKey)
+	if err != nil {
+		return err
+	}
+	firstHeader := make([]byte, chainhash.HashSize)
+	err = dbStoreFilterHeader(
+		dbTx,
+		cfBasicHeaderKey,
+		&idx.chainParams.GenesisBlock.Header.PrevBlock,
+		firstHeader,
+	)
+	if err != nil {
+		return err
+	}
+	err = dbStoreFilterHeader(
+		dbTx,
+		cfExtendedHeaderKey,
+		&idx.chainParams.GenesisBlock.Header.PrevBlock,
+		firstHeader,
+	)
 	return err
 }
 
-// makeBasicFilterForBlock() builds a block's basic filter, which consists of
+// makeBasicFilterForBlock builds a block's basic filter, which consists of
 // all outpoints and pkscript data pushes referenced by transactions within the
 // block.
 func makeBasicFilterForBlock(block *btcutil.Block) ([]byte, error) {
@@ -153,7 +175,7 @@ func makeBasicFilterForBlock(block *btcutil.Block) ([]byte, error) {
 	return f.Bytes(), nil
 }
 
-// makeExtendedFilterForBlock() builds a block's extended filter, which consists
+// makeExtendedFilterForBlock builds a block's extended filter, which consists
 // of all tx hashes and sigscript data pushes contained in the block.
 func makeExtendedFilterForBlock(block *btcutil.Block) ([]byte, error) {
 	b := builder.WithKeyHash(block.Hash())
@@ -174,7 +196,7 @@ func makeExtendedFilterForBlock(block *btcutil.Block) ([]byte, error) {
 	return f.Bytes(), nil
 }
 
-// makeHeaderForFilter() implements the chaining logic between filters, where
+// makeHeaderForFilter implements the chaining logic between filters, where
 // a filter's header is defined as sha256(sha256(filter) + previousFilterHeader).
 func makeHeaderForFilter(f, pfh []byte) []byte {
 	fhash := fastsha256.Sum256(f)
@@ -185,7 +207,7 @@ func makeHeaderForFilter(f, pfh []byte) []byte {
 	return fh[:]
 }
 
-// storeFilter() stores a given filter, and performs the steps needed to
+// storeFilter stores a given filter, and performs the steps needed to
 // generate the filter's header.
 func storeFilter(dbTx database.Tx, block *btcutil.Block, f []byte, extended bool) error {
 	// Figure out which buckets to use.
@@ -209,14 +231,14 @@ func storeFilter(dbTx database.Tx, block *btcutil.Block, f []byte, extended bool
 	}
 	// Construct the new block's filter header, and store it.
 	fh := makeHeaderForFilter(f, pfh)
-	return dbStoreFilterHeader(dbTx, cfBasicHeaderKey, h, fh)
+	return dbStoreFilterHeader(dbTx, hkey, h, fh)
 }
 
-// ConnectBlock() is invoked by the index manager when a new block has been
+// ConnectBlock is invoked by the index manager when a new block has been
 // connected to the main chain. This indexer adds a hash-to-cf mapping for
 // every passed block. This is part of the Indexer interface.
 func (idx *CfIndex) ConnectBlock(dbTx database.Tx, block *btcutil.Block,
-    view *blockchain.UtxoViewpoint) error {
+	view *blockchain.UtxoViewpoint) error {
 	f, err := makeBasicFilterForBlock(block)
 	if err != nil {
 		return err
@@ -232,11 +254,11 @@ func (idx *CfIndex) ConnectBlock(dbTx database.Tx, block *btcutil.Block,
 	return storeFilter(dbTx, block, f, true)
 }
 
-// DisconnectBlock() is invoked by the index manager when a block has been
+// DisconnectBlock is invoked by the index manager when a block has been
 // disconnected from the main chain.  This indexer removes the hash-to-cf
 // mapping for every passed block. This is part of the Indexer interface.
 func (idx *CfIndex) DisconnectBlock(dbTx database.Tx, block *btcutil.Block,
-    view *blockchain.UtxoViewpoint) error {
+	view *blockchain.UtxoViewpoint) error {
 	err := dbDeleteFilter(dbTx, cfBasicIndexKey, block.Hash())
 	if err != nil {
 		return err
@@ -244,7 +266,7 @@ func (idx *CfIndex) DisconnectBlock(dbTx database.Tx, block *btcutil.Block,
 	return dbDeleteFilter(dbTx, cfExtendedIndexKey, block.Hash())
 }
 
-// FilterByBlockHash() returns the serialized contents of a block's basic or
+// FilterByBlockHash returns the serialized contents of a block's basic or
 // extended committed filter.
 func (idx *CfIndex) FilterByBlockHash(h *chainhash.Hash, extended bool) ([]byte, error) {
 	var f []byte
@@ -260,7 +282,7 @@ func (idx *CfIndex) FilterByBlockHash(h *chainhash.Hash, extended bool) ([]byte,
 	return f, err
 }
 
-// FilterHeaderByBlockHash() returns the serialized contents of a block's basic
+// FilterHeaderByBlockHash returns the serialized contents of a block's basic
 // or extended committed filter header.
 func (idx *CfIndex) FilterHeaderByBlockHash(h *chainhash.Hash, extended bool) ([]byte, error) {
 	var fh []byte
@@ -283,11 +305,24 @@ func (idx *CfIndex) FilterHeaderByBlockHash(h *chainhash.Hash, extended bool) ([
 // It implements the Indexer interface which plugs into the IndexManager that in
 // turn is used by the blockchain package. This allows the index to be
 // seamlessly maintained along with the chain.
-func NewCfIndex(db database.DB) *CfIndex {
-	return &CfIndex{db: db}
+func NewCfIndex(db database.DB, chainParams *chaincfg.Params) *CfIndex {
+	return &CfIndex{db: db, chainParams: chainParams}
 }
 
 // DropCfIndex drops the CF index from the provided database if exists.
 func DropCfIndex(db database.DB) error {
-	return dropIndex(db, cfBasicIndexKey, cfIndexName)
+	err := dropIndex(db, cfBasicIndexKey, cfIndexName)
+	if err != nil {
+		return err
+	}
+	err = dropIndex(db, cfBasicHeaderKey, cfIndexName)
+	if err != nil {
+		return err
+	}
+	err = dropIndex(db, cfExtendedIndexKey, cfIndexName)
+	if err != nil {
+		return err
+	}
+	err = dropIndex(db, cfExtendedHeaderKey, cfIndexName)
+	return err
 }
