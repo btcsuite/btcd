@@ -750,14 +750,36 @@ func (sp *serverPeer) OnGetCFilter(_ *peer.Peer, msg *wire.MsgGetCFilter) {
 		msg.Extended)
 
 	if len(filterBytes) > 0 {
-		peerLog.Infof("Obtained CB filter for %v", msg.BlockHash)
+		peerLog.Infof("Obtained CF for %v", msg.BlockHash)
 	} else {
-		peerLog.Infof("Could not obtain CB filter for %v: %v",
-			msg.BlockHash, err)
+		peerLog.Infof("Could not obtain CF for %v: %v", msg.BlockHash,
+			err)
 	}
 
 	filterMsg := wire.NewMsgCFilter(filterBytes)
 	sp.QueueMessage(filterMsg, nil)
+}
+
+// OnGetCFilterHeader is invoked when a peer receives a getcfilterheader bitcoin
+// message.
+func (sp *serverPeer) OnGetCFilterHeader(_ *peer.Peer, msg *wire.MsgGetCFilterHeader) {
+	// Ignore getcfilterheader requests if not in sync.
+	if !sp.server.blockManager.IsCurrent() {
+		return
+	}
+
+	headerBytes, err := sp.server.cfIndex.FilterHeaderByBlockHash(
+		&msg.BlockHash, msg.Extended)
+
+	if len(headerBytes) > 0 {
+		peerLog.Infof("Obtained CF header for %v", msg.BlockHash)
+	} else {
+		peerLog.Infof("Could not obtain CF header for %v: %v",
+			msg.BlockHash, err)
+	}
+
+	headerMsg := wire.NewMsgCFilterHeader(headerBytes)
+	sp.QueueMessage(headerMsg, nil)
 }
 
 // enforceNodeBloomFlag disconnects the peer if the server is not configured to
@@ -1598,24 +1620,25 @@ func disconnectPeer(peerList map[int32]*serverPeer, compareFunc func(*serverPeer
 func newPeerConfig(sp *serverPeer) *peer.Config {
 	return &peer.Config{
 		Listeners: peer.MessageListeners{
-			OnVersion:     sp.OnVersion,
-			OnMemPool:     sp.OnMemPool,
-			OnTx:          sp.OnTx,
-			OnBlock:       sp.OnBlock,
-			OnInv:         sp.OnInv,
-			OnHeaders:     sp.OnHeaders,
-			OnGetData:     sp.OnGetData,
-			OnGetBlocks:   sp.OnGetBlocks,
-			OnGetHeaders:  sp.OnGetHeaders,
-			OnGetCFilter:  sp.OnGetCFilter,
-			OnFeeFilter:   sp.OnFeeFilter,
-			OnFilterAdd:   sp.OnFilterAdd,
-			OnFilterClear: sp.OnFilterClear,
-			OnFilterLoad:  sp.OnFilterLoad,
-			OnGetAddr:     sp.OnGetAddr,
-			OnAddr:        sp.OnAddr,
-			OnRead:        sp.OnRead,
-			OnWrite:       sp.OnWrite,
+			OnVersion:           sp.OnVersion,
+			OnMemPool:           sp.OnMemPool,
+			OnTx:                sp.OnTx,
+			OnBlock:             sp.OnBlock,
+			OnInv:               sp.OnInv,
+			OnHeaders:           sp.OnHeaders,
+			OnGetData:           sp.OnGetData,
+			OnGetBlocks:         sp.OnGetBlocks,
+			OnGetHeaders:        sp.OnGetHeaders,
+			OnGetCFilter:        sp.OnGetCFilter,
+			OnGetCFilterHeader:  sp.OnGetCFilterHeader,
+			OnFeeFilter:         sp.OnFeeFilter,
+			OnFilterAdd:         sp.OnFilterAdd,
+			OnFilterClear:       sp.OnFilterClear,
+			OnFilterLoad:        sp.OnFilterLoad,
+			OnGetAddr:           sp.OnGetAddr,
+			OnAddr:              sp.OnAddr,
+			OnRead:              sp.OnRead,
+			OnWrite:             sp.OnWrite,
 
 			// Note: The reference client currently bans peers that send alerts
 			// not signed with its key.  We could verify against their key, but
