@@ -193,3 +193,49 @@ func TestDecodeConcatenatedVoteBits(t *testing.T) {
 		t.Fatalf("expected corruption error")
 	}
 }
+
+func TestInvalidDecodeConcatenatedHashes(t *testing.T) {
+	testStrings := []struct {
+		str string
+		err dcrjson.RPCError
+	}{
+		{
+			// length of 1
+			"0",
+			dcrjson.RPCError{
+				Code: dcrjson.ErrRPCInvalidParameter,
+			},
+		}, {
+			// not hex
+			"ffffgfffffffffffffffffffffffffff" +
+				"ffffffffffffffffffffffffffffffff",
+			dcrjson.RPCError{
+				Code: dcrjson.ErrRPCDecodeHexString,
+			},
+		}, {
+			// invalid length
+			"298e5cc3d985bfe811edd4396b86d2de66b0cef4" +
+				"2b21d980096b86d2de96b86d2",
+			dcrjson.RPCError{
+				Code: dcrjson.ErrRPCInvalidParameter,
+			},
+		},
+	}
+	for _, str := range testStrings {
+		_, err := dcrjson.DecodeConcatenatedHashes(str.str)
+		if err == nil {
+			t.Fatalf("DecodeConcatenatedHashes passed on '%s' "+
+				"when it should have failed", str)
+		}
+		rpcError, ok := err.(*dcrjson.RPCError)
+		if !ok {
+			t.Fatalf("DecodeConcatenatedHashes error is not "+
+				"expected type *dcrjson.RPCError: %T", err)
+		}
+		if rpcError.Code != str.err.Code {
+			t.Fatalf("DecodeConcatenatedHashes returned "+
+				"unexpected error code: want %v, got %v",
+				str.err.Code, rpcError.Code)
+		}
+	}
+}
