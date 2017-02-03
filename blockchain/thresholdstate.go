@@ -157,12 +157,8 @@ func (b *BlockChain) thresholdState(prevNode *blockNode, checker thresholdCondit
 	// Get the ancestor that is the last block of the previous confirmation
 	// window in order to get its threshold state.  This can be done because
 	// the state is the same for all blocks within a given window.
-	var err error
-	prevNode, err = b.index.AncestorNode(prevNode, prevNode.height-
+	prevNode = prevNode.Ancestor(prevNode.height -
 		(prevNode.height+1)%confirmationWindow)
-	if err != nil {
-		return ThresholdFailed, err
-	}
 
 	// Iterate backwards through each of the previous confirmation windows
 	// to find the most recently cached threshold state.
@@ -176,10 +172,7 @@ func (b *BlockChain) thresholdState(prevNode *blockNode, checker thresholdCondit
 
 		// The start and expiration times are based on the median block
 		// time, so calculate it now.
-		medianTime, err := b.index.CalcPastMedianTime(prevNode)
-		if err != nil {
-			return ThresholdFailed, err
-		}
+		medianTime := prevNode.CalcPastMedianTime()
 
 		// The state is simply defined if the start time hasn't been
 		// been reached yet.
@@ -194,11 +187,7 @@ func (b *BlockChain) thresholdState(prevNode *blockNode, checker thresholdCondit
 
 		// Get the ancestor that is the last block of the previous
 		// confirmation window.
-		prevNode, err = b.index.AncestorNode(prevNode, prevNode.height-
-			confirmationWindow)
-		if err != nil {
-			return ThresholdFailed, err
-		}
+		prevNode = prevNode.RelativeAncestor(confirmationWindow)
 	}
 
 	// Start with the threshold state for the most recent confirmation
@@ -223,10 +212,7 @@ func (b *BlockChain) thresholdState(prevNode *blockNode, checker thresholdCondit
 		case ThresholdDefined:
 			// The deployment of the rule change fails if it expires
 			// before it is accepted and locked in.
-			medianTime, err := b.index.CalcPastMedianTime(prevNode)
-			if err != nil {
-				return ThresholdFailed, err
-			}
+			medianTime := prevNode.CalcPastMedianTime()
 			medianTimeUnix := uint64(medianTime.Unix())
 			if medianTimeUnix >= checker.EndTime() {
 				state = ThresholdFailed
@@ -243,10 +229,7 @@ func (b *BlockChain) thresholdState(prevNode *blockNode, checker thresholdCondit
 		case ThresholdStarted:
 			// The deployment of the rule change fails if it expires
 			// before it is accepted and locked in.
-			medianTime, err := b.index.CalcPastMedianTime(prevNode)
-			if err != nil {
-				return ThresholdFailed, err
-			}
+			medianTime := prevNode.CalcPastMedianTime()
 			if uint64(medianTime.Unix()) >= checker.EndTime() {
 				state = ThresholdFailed
 				break
@@ -266,16 +249,8 @@ func (b *BlockChain) thresholdState(prevNode *blockNode, checker thresholdCondit
 					count++
 				}
 
-				// Get the previous block node.  This function
-				// is used over simply accessing countNode.parent
-				// directly as it will dynamically create
-				// previous block nodes as needed.  This helps
-				// allow only the pieces of the chain that are
-				// needed to remain in memory.
-				countNode, err = b.index.PrevNodeFromNode(countNode)
-				if err != nil {
-					return ThresholdFailed, err
-				}
+				// Get the previous block node.
+				countNode = countNode.parent
 			}
 
 			// The state is locked in if the number of blocks in the
@@ -341,8 +316,7 @@ func (b *BlockChain) IsDeploymentActive(deploymentID uint32) (bool, error) {
 // AFTER the passed node.
 //
 // This function MUST be called with the chain state lock held (for writes).
-func (b *BlockChain) deploymentState(prevNode *blockNode,
-	deploymentID uint32) (ThresholdState, error) {
+func (b *BlockChain) deploymentState(prevNode *blockNode, deploymentID uint32) (ThresholdState, error) {
 	if deploymentID > uint32(len(b.chainParams.Deployments)) {
 		return ThresholdFailed, DeploymentError(deploymentID)
 	}

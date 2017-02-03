@@ -26,17 +26,10 @@ import (
 func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, flags BehaviorFlags) (bool, error) {
 	dryRun := flags&BFDryRun == BFDryRun
 
-	// Get a block node for the block previous to this one.  Will be nil
-	// if this is the genesis block.
-	prevNode, err := b.index.PrevNodeFromBlock(block)
-	if err != nil {
-		log.Errorf("PrevNodeFromBlock: %v", err)
-		return false, err
-	}
-
 	// The height of this block is one more than the referenced previous
 	// block.
 	blockHeight := int32(0)
+	prevNode := b.index.LookupNode(&block.MsgBlock().Header.PrevBlock)
 	if prevNode != nil {
 		blockHeight = prevNode.height + 1
 	}
@@ -44,7 +37,7 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, flags BehaviorFlags)
 
 	// The block must pass all of the validation rules which depend on the
 	// position of the block within the block chain.
-	err = b.checkBlockContext(block, prevNode, flags)
+	err := b.checkBlockContext(block, prevNode, flags)
 	if err != nil {
 		return false, err
 	}
@@ -68,7 +61,7 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, flags BehaviorFlags)
 	// Create a new block node for the block and add it to the in-memory
 	// block chain (could be either a side chain or the main chain).
 	blockHeader := &block.MsgBlock().Header
-	newNode := newBlockNode(blockHeader, block.Hash(), blockHeight)
+	newNode := newBlockNode(blockHeader, blockHeight)
 	if prevNode != nil {
 		newNode.parent = prevNode
 		newNode.height = blockHeight

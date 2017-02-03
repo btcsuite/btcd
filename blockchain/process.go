@@ -40,7 +40,7 @@ const (
 // blockExists determines whether a block with the given hash exists either in
 // the main chain or any side chains.
 //
-// This function MUST be called with the chain state lock held (for reads).
+// This function is safe for concurrent access.
 func (b *BlockChain) blockExists(hash *chainhash.Hash) (bool, error) {
 	// Check block index first (could be main chain or side chain blocks).
 	if b.index.HaveBlock(hash) {

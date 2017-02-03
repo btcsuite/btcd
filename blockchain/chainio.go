@@ -1081,7 +1081,7 @@ func (b *BlockChain) createChainState() error {
 	// Create a new node from the genesis block and set it as the best node.
 	genesisBlock := btcutil.NewBlock(b.chainParams.GenesisBlock)
 	header := &genesisBlock.MsgBlock().Header
-	node := newBlockNode(header, genesisBlock.Hash(), 0)
+	node := newBlockNode(header, 0)
 	node.inMainChain = true
 	b.bestNode = node
 
@@ -1168,6 +1168,44 @@ func (b *BlockChain) initChainState() error {
 			return err
 		}
 
+		// Load all of the headers from the data for the known best
+		// chain and construct the block index accordingly.  Since the
+		// number of nodes are already known, perform a single alloc
+		// for them versus a whole bunch of little ones to reduce
+		// pressure on the GC.
+		log.Infof("Loading block index.  This might take a while...")
+		bestHeight := int32(state.height)
+		blockNodes := make([]blockNode, bestHeight+1)
+		for height := int32(0); height <= bestHeight; height++ {
+			header, err := dbFetchHeaderByHeight(dbTx, height)
+			if err != nil {
+				return err
+			}
+
+			// Initialize the block node for the block, connect it,
+			// and add it to the block index.
+			node := &blockNodes[height]
+			initBlockNode(node, header, height)
+			if parent := b.bestNode; parent != nil {
+				node.parent = parent
+				node.workSum = node.workSum.Add(parent.workSum,
+					node.workSum)
+			}
+			node.inMainChain = true
+			b.index.AddNode(node)
+
+			// This node is now the end of the best chain.
+			b.bestNode = node
+		}
+
+		// Ensure the resulting best node matches the stored best state
+		// hash.
+		if b.bestNode.hash != state.hash {
+			return AssertError(fmt.Sprintf("initChainState: block "+
+				"index chain tip %s does not match stored "+
+				"best state %s", b.bestNode.hash, state.hash))
+		}
+
 		// Load the raw block bytes for the best block.
 		blockBytes, err := dbTx.FetchBlock(&state.hash)
 		if err != nil {
@@ -1179,29 +1217,12 @@ func (b *BlockChain) initChainState() error {
 			return err
 		}
 
-		// Create a new node and set it as the best node.  The preceding
-		// nodes will be loaded on demand as needed.
-		header := &block.Header
-		node := newBlockNode(header, &state.hash, int32(state.height))
-		node.inMainChain = true
-		node.workSum = state.workSum
-		b.bestNode = node
-
-		// Add the new node to the block index.
-		b.index.AddNode(node)
-
-		// Calculate the median time for the block.
-		medianTime, err := b.index.CalcPastMedianTime(node)
-		if err != nil {
-			return err
-		}
-
 		// Initialize the state related to the best block.
 		blockSize := uint64(len(blockBytes))
 		blockWeight := uint64(GetBlockWeight(btcutil.NewBlock(&block)))
 		numTxns := uint64(len(block.Transactions))
 		b.stateSnapshot = newBestState(b.bestNode, blockSize, blockWeight,
-			numTxns, state.totalTxns, medianTime)
+			numTxns, state.totalTxns, b.bestNode.CalcPastMedianTime())
 		isStateInitialized = true
 
 		return nil
@@ -1906,19 +1927,11 @@ func (b *BlockChain) initThresholdCaches() error {
 			"change.  This might take a while...")
 	}
 
-	// Get the previous block node.  This function is used over simply
-	// accessing b.bestNode.parent directly as it will dynamically create
-	// previous block nodes as needed.  This helps allow only the pieces of
-	// the chain that are needed to remain in memory.
-	prevNode, err := b.index.PrevNodeFromNode(b.bestNode)
-	if err != nil {
-		return err
-	}
-
 	// Initialize the warning and deployment caches by calculating the
 	// threshold state for each of them.  This will ensure the caches are
 	// populated and any states that needed to be recalculated due to
 	// definition changes is done now.
+	prevNode := b.bestNode.parent
 	for bit := uint32(0); bit < vbNumBits; bit++ {
 		checker := bitConditionChecker{bit: bit, chain: b}
 		cache := &b.warningCaches[bit]

@@ -668,11 +668,7 @@ func (b *BlockChain) checkBlockHeaderContext(header *wire.BlockHeader, prevNode 
 
 		// Ensure the timestamp for the block header is after the
 		// median time of the last several blocks (medianTimeBlocks).
-		medianTime, err := b.index.CalcPastMedianTime(prevNode)
-		if err != nil {
-			log.Errorf("CalcPastMedianTime: %v", err)
-			return err
-		}
+		medianTime := prevNode.CalcPastMedianTime()
 		if !header.Timestamp.After(medianTime) {
 			str := "block timestamp of %v is not after expected %v"
 			str = fmt.Sprintf(str, header.Timestamp, medianTime)
@@ -762,12 +758,7 @@ func (b *BlockChain) checkBlockContext(block *btcutil.Block, prevNode *blockNode
 		// timestamps for all lock-time based checks.
 		blockTime := header.Timestamp
 		if csvState == ThresholdActive {
-			medianTime, err := b.index.CalcPastMedianTime(prevNode)
-			if err != nil {
-				return err
-			}
-
-			blockTime = medianTime
+			blockTime = prevNode.CalcPastMedianTime()
 		}
 
 		// The height of this block is one more than the referenced
@@ -1015,10 +1006,11 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block, vi
 	}
 
 	// Ensure the view is for the node being checked.
-	if !view.BestHash().IsEqual(&node.parentHash) {
+	parentHash := &block.MsgBlock().Header.PrevBlock
+	if !view.BestHash().IsEqual(parentHash) {
 		return AssertError(fmt.Sprintf("inconsistent view when "+
 			"checking block connection: best hash is %v instead "+
-			"of expected %v", view.BestHash(), node.hash))
+			"of expected %v", view.BestHash(), parentHash))
 	}
 
 	// BIP0030 added a rule to prevent blocks which contain duplicate
@@ -1200,10 +1192,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block, vi
 
 		// We obtain the MTP of the *previous* block in order to
 		// determine if transactions in the current block are final.
-		medianTime, err := b.index.CalcPastMedianTime(node.parent)
-		if err != nil {
-			return err
-		}
+		medianTime := node.parent.CalcPastMedianTime()
 
 		// Additionally, if the CSV soft-fork package is now active,
 		// then we also enforce the relative sequence number based
@@ -1268,8 +1257,7 @@ func (b *BlockChain) CheckConnectBlock(block *btcutil.Block) error {
 	defer b.chainLock.Unlock()
 
 	prevNode := b.bestNode
-	newNode := newBlockNode(&block.MsgBlock().Header, block.Hash(),
-		prevNode.height+1)
+	newNode := newBlockNode(&block.MsgBlock().Header, prevNode.height+1)
 	newNode.parent = prevNode
 	newNode.workSum.Add(prevNode.workSum, newNode.workSum)
 

@@ -194,24 +194,14 @@ func (b *BlockChain) calcEasiestDifficulty(bits uint32, duration time.Duration) 
 // did not have the special testnet minimum difficulty rule applied.
 //
 // This function MUST be called with the chain state lock held (for writes).
-func (b *BlockChain) findPrevTestNetDifficulty(startNode *blockNode) (uint32, error) {
+func (b *BlockChain) findPrevTestNetDifficulty(startNode *blockNode) uint32 {
 	// Search backwards through the chain for the last block without
 	// the special rule applied.
 	iterNode := startNode
 	for iterNode != nil && iterNode.height%b.blocksPerRetarget != 0 &&
 		iterNode.bits == b.chainParams.PowLimitBits {
 
-		// Get the previous block node.  This function is used over
-		// simply accessing iterNode.parent directly as it will
-		// dynamically create previous block nodes as needed.  This
-		// helps allow only the pieces of the chain that are needed
-		// to remain in memory.
-		var err error
-		iterNode, err = b.index.PrevNodeFromNode(iterNode)
-		if err != nil {
-			log.Errorf("PrevNodeFromNode: %v", err)
-			return 0, err
-		}
+		iterNode = iterNode.parent
 	}
 
 	// Return the found difficulty or the minimum difficulty if no
@@ -220,7 +210,7 @@ func (b *BlockChain) findPrevTestNetDifficulty(startNode *blockNode) (uint32, er
 	if iterNode != nil {
 		lastBits = iterNode.bits
 	}
-	return lastBits, nil
+	return lastBits
 }
 
 // calcNextRequiredDifficulty calculates the required difficulty for the block
@@ -228,8 +218,6 @@ func (b *BlockChain) findPrevTestNetDifficulty(startNode *blockNode) (uint32, er
 // This function differs from the exported CalcNextRequiredDifficulty in that
 // the exported version uses the current best chain as the previous block node
 // while this function accepts any block node.
-//
-// This function MUST be called with the chain state lock held (for writes).
 func (b *BlockChain) calcNextRequiredDifficulty(lastNode *blockNode, newBlockTime time.Time) (uint32, error) {
 	// Genesis block.
 	if lastNode == nil {
@@ -255,11 +243,7 @@ func (b *BlockChain) calcNextRequiredDifficulty(lastNode *blockNode, newBlockTim
 			// The block was mined within the desired timeframe, so
 			// return the difficulty for the last block which did
 			// not have the special minimum difficulty rule applied.
-			prevBits, err := b.findPrevTestNetDifficulty(lastNode)
-			if err != nil {
-				return 0, err
-			}
-			return prevBits, nil
+			return b.findPrevTestNetDifficulty(lastNode), nil
 		}
 
 		// For the main network (or any unrecognized networks), simply
@@ -269,20 +253,7 @@ func (b *BlockChain) calcNextRequiredDifficulty(lastNode *blockNode, newBlockTim
 
 	// Get the block node at the previous retarget (targetTimespan days
 	// worth of blocks).
-	firstNode := lastNode
-	for i := int32(0); i < b.blocksPerRetarget-1 && firstNode != nil; i++ {
-		// Get the previous block node.  This function is used over
-		// simply accessing firstNode.parent directly as it will
-		// dynamically create previous block nodes as needed.  This
-		// helps allow only the pieces of the chain that are needed
-		// to remain in memory.
-		var err error
-		firstNode, err = b.index.PrevNodeFromNode(firstNode)
-		if err != nil {
-			return 0, err
-		}
-	}
-
+	firstNode := lastNode.RelativeAncestor(b.blocksPerRetarget - 1)
 	if firstNode == nil {
 		return 0, AssertError("unable to obtain previous retarget block")
 	}

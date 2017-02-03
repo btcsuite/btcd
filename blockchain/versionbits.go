@@ -113,15 +113,7 @@ func (c bitConditionChecker) Condition(node *blockNode) (bool, error) {
 		return false, nil
 	}
 
-	// Get the previous block node.  This function is used over simply
-	// accessing node.parent directly as it will dynamically create previous
-	// block nodes as needed.  This helps allow only the pieces of the chain
-	// that are needed to remain in memory.
-	prevNode, err := c.chain.index.PrevNodeFromNode(node)
-	if err != nil {
-		return false, err
-	}
-	expectedVersion, err := c.chain.calcNextBlockVersion(prevNode)
+	expectedVersion, err := c.chain.calcNextBlockVersion(node.parent)
 	if err != nil {
 		return false, err
 	}
@@ -244,21 +236,12 @@ func (b *BlockChain) CalcNextBlockVersion() (int32, error) {
 //
 // This function MUST be called with the chain state lock held (for writes)
 func (b *BlockChain) warnUnknownRuleActivations(node *blockNode) error {
-	// Get the previous block node.  This function is used over simply
-	// accessing node.parent directly as it will dynamically create previous
-	// block nodes as needed.  This helps allow only the pieces of the chain
-	// that are needed to remain in memory.
-	prevNode, err := b.index.PrevNodeFromNode(node)
-	if err != nil {
-		return err
-	}
-
 	// Warn if any unknown new rules are either about to activate or have
 	// already been activated.
 	for bit := uint32(0); bit < vbNumBits; bit++ {
 		checker := bitConditionChecker{bit: bit, chain: b}
 		cache := &b.warningCaches[bit]
-		state, err := b.thresholdState(prevNode, checker, cache)
+		state, err := b.thresholdState(node.parent, checker, cache)
 		if err != nil {
 			return err
 		}
@@ -305,14 +288,7 @@ func (b *BlockChain) warnUnknownVersions(node *blockNode) error {
 			numUpgraded++
 		}
 
-		// Get the previous block node.  This function is used over
-		// simply accessing node.parent directly as it will dynamically
-		// create previous block nodes as needed.  This helps allow only
-		// the pieces of the chain that are needed to remain in memory.
-		node, err = b.index.PrevNodeFromNode(node)
-		if err != nil {
-			return err
-		}
+		node = node.parent
 	}
 	if numUpgraded > unknownVerWarnNum {
 		log.Warn("Unknown block versions are being mined, so new " +

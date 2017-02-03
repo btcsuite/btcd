@@ -193,10 +193,7 @@ func (b *BlockChain) DisableVerify(disable bool) {
 //
 // This function is safe for concurrent access.
 func (b *BlockChain) HaveBlock(hash *chainhash.Hash) (bool, error) {
-	b.chainLock.RLock()
 	exists, err := b.blockExists(hash)
-	b.chainLock.RUnlock()
-
 	if err != nil {
 		return false, err
 	}
@@ -378,15 +375,10 @@ func (b *BlockChain) calcSequenceLock(node *blockNode, tx *btcutil.Tx, utxoView 
 	// If we're performing block validation, then we need to query the BIP9
 	// state.
 	if !csvSoftforkActive {
-		prevNode, err := b.index.PrevNodeFromNode(node)
-		if err != nil {
-			return nil, err
-		}
-
 		// Obtain the latest BIP9 version bits state for the
 		// CSV-package soft-fork deployment. The adherence of sequence
 		// locks depends on the current soft-fork state.
-		csvState, err := b.deploymentState(prevNode, chaincfg.DeploymentCSV)
+		csvState, err := b.deploymentState(node.parent, chaincfg.DeploymentCSV)
 		if err != nil {
 			return nil, err
 		}
@@ -439,26 +431,17 @@ func (b *BlockChain) calcSequenceLock(node *blockNode, tx *btcutil.Tx, utxoView 
 			continue
 		case sequenceNum&wire.SequenceLockTimeIsSeconds == wire.SequenceLockTimeIsSeconds:
 			// This input requires a relative time lock expressed
-			// in seconds before it can be spent. Therefore, we
+			// in seconds before it can be spent.  Therefore, we
 			// need to query for the block prior to the one in
 			// which this input was included within so we can
 			// compute the past median time for the block prior to
 			// the one which included this referenced output.
-			// TODO: caching should be added to keep this speedy
-			inputDepth := uint32(node.height-inputHeight) + 1
-			blockNode, err := b.index.RelativeNode(node, inputDepth)
-			if err != nil {
-				return sequenceLock, err
+			prevInputHeight := inputHeight - 1
+			if prevInputHeight < 0 {
+				prevInputHeight = 0
 			}
-
-			// With all the necessary block headers loaded into
-			// memory, we can now finally calculate the MTP of the
-			// block prior to the one which included the output
-			// being spent.
-			medianTime, err := b.index.CalcPastMedianTime(blockNode)
-			if err != nil {
-				return sequenceLock, err
-			}
+			blockNode := node.Ancestor(prevInputHeight)
+			medianTime := blockNode.CalcPastMedianTime()
 
 			// Time based relative time-locks as defined by BIP 68
 			// have a time granularity of RelativeLockSeconds, so
@@ -535,12 +518,6 @@ func (b *BlockChain) getReorganizeNodes(node *blockNode) (*list.List, *list.List
 		attachNodes.PushFront(ancestor)
 	}
 
-	// TODO(davec): Use prevNodeFromNode function in case the requested
-	// node is further back than the what is in memory.  This shouldn't
-	// happen in the normal course of operation, but the ability to fetch
-	// input transactions of arbitrary blocks will likely to be exposed at
-	// some point and that could lead to an issue here.
-
 	// Start from the end of the main chain and work backwards until the
 	// common ancestor adding each block to the list of nodes to detach from
 	// the main chain.
@@ -609,12 +586,6 @@ func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block, view *U
 		}
 	}
 
-	// Calculate the median time for the block.
-	medianTime, err := b.index.CalcPastMedianTime(node)
-	if err != nil {
-		return err
-	}
-
 	// Generate a new best state snapshot that will be used to update the
 	// database and later memory if all database updates are successful.
 	b.stateLock.RLock()
@@ -624,10 +595,10 @@ func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block, view *U
 	blockSize := uint64(block.MsgBlock().SerializeSize())
 	blockWeight := uint64(GetBlockWeight(block))
 	state := newBestState(node, blockSize, blockWeight, numTxns,
-		curTotalTxns+numTxns, medianTime)
+		curTotalTxns+numTxns, node.CalcPastMedianTime())
 
 	// Atomically insert info into the database.
-	err = b.db.Update(func(dbTx database.Tx) error {
+	err := b.db.Update(func(dbTx database.Tx) error {
 		// Update best block state.
 		err := dbPutBestState(dbTx, state, node.workSum)
 		if err != nil {
@@ -718,24 +689,10 @@ func (b *BlockChain) disconnectBlock(node *blockNode, block *btcutil.Block, view
 			"block at the end of the main chain")
 	}
 
-	// Get the previous block node.  This function is used over simply
-	// accessing node.parent directly as it will dynamically create previous
-	// block nodes as needed.  This helps allow only the pieces of the chain
-	// that are needed to remain in memory.
-	prevNode, err := b.index.PrevNodeFromNode(node)
-	if err != nil {
-		return err
-	}
-
-	// Calculate the median time for the previous block.
-	medianTime, err := b.index.CalcPastMedianTime(prevNode)
-	if err != nil {
-		return err
-	}
-
 	// Load the previous block since some details for it are needed below.
+	prevNode := node.parent
 	var prevBlock *btcutil.Block
-	err = b.db.View(func(dbTx database.Tx) error {
+	err := b.db.View(func(dbTx database.Tx) error {
 		var err error
 		prevBlock, err = dbFetchBlockByHash(dbTx, &prevNode.hash)
 		return err
@@ -754,7 +711,7 @@ func (b *BlockChain) disconnectBlock(node *blockNode, block *btcutil.Block, view
 	blockWeight := uint64(GetBlockWeight(prevBlock))
 	newTotalTxns := curTotalTxns - uint64(len(block.MsgBlock().Transactions))
 	state := newBestState(prevNode, blockSize, blockWeight, numTxns,
-		newTotalTxns, medianTime)
+		newTotalTxns, prevNode.CalcPastMedianTime())
 
 	err = b.db.Update(func(dbTx database.Tx) error {
 		// Update best block state.
@@ -1026,16 +983,12 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List, flags 
 		}
 	}
 
-	// Log the point where the chain forked.
+	// Log the point where the chain forked and old and new best chain
+	// heads.
 	firstAttachNode := attachNodes.Front().Value.(*blockNode)
-	forkNode, err := b.index.PrevNodeFromNode(firstAttachNode)
-	if err == nil {
-		log.Infof("REORGANIZE: Chain forks at %v", forkNode.hash)
-	}
-
-	// Log the old and new best chain heads.
 	firstDetachNode := detachNodes.Front().Value.(*blockNode)
 	lastAttachNode := attachNodes.Back().Value.(*blockNode)
+	log.Infof("REORGANIZE: Chain forks at %v", firstAttachNode.parent.hash)
 	log.Infof("REORGANIZE: Old best chain head was %v", firstDetachNode.hash)
 	log.Infof("REORGANIZE: New best chain head is %v", lastAttachNode.hash)
 
@@ -1065,12 +1018,13 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, fla
 
 	// We are extending the main (best) chain with a new block.  This is the
 	// most common case.
-	if node.parentHash.IsEqual(&b.bestNode.hash) {
+	parentHash := &block.MsgBlock().Header.PrevBlock
+	if parentHash.IsEqual(&b.bestNode.hash) {
 		// Perform several checks to verify the block can be connected
 		// to the main chain without violating any rules and without
 		// actually connecting the block.
 		view := NewUtxoViewpoint()
-		view.SetBestHash(&node.parentHash)
+		view.SetBestHash(parentHash)
 		stxos := make([]spentTxOut, 0, countSpentOutputs(block))
 		if !fastAdd {
 			err := b.checkConnectBlock(node, block, view, &stxos)
@@ -1105,11 +1059,6 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, fla
 			return false, err
 		}
 
-		// Connect the parent node to this node.
-		if node.parent != nil {
-			node.parent.children = append(node.parent.children, node)
-		}
-
 		return true, nil
 	}
 	if fastAdd {
@@ -1124,18 +1073,13 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, fla
 	b.index.index[node.hash] = node
 	b.index.Unlock()
 
-	// Connect the parent node to this node.
+	// Mark node as in a side chain.
 	node.inMainChain = false
-	node.parent.children = append(node.parent.children, node)
 
 	// Disconnect it from the parent node when the function returns when
 	// running in dry run mode.
 	if dryRun {
 		defer func() {
-			children := node.parent.children
-			children = removeChildNode(children, node)
-			node.parent.children = children
-
 			b.index.Lock()
 			delete(b.index.index, node.hash)
 			b.index.Unlock()
@@ -1159,7 +1103,7 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, fla
 		}
 
 		// Log information about how the block is forking the chain.
-		if fork.hash.IsEqual(&node.parent.hash) {
+		if fork.hash.IsEqual(parentHash) {
 			log.Infof("FORK: Block %v forks the chain at height %d"+
 				"/block %v, but does not cause a reorganize",
 				node.hash, fork.height, fork.hash)
