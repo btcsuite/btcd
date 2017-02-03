@@ -426,6 +426,45 @@ func (c *Client) GetBlockHeaderVerbose(blockHash *chainhash.Hash) (*btcjson.GetB
 	return c.GetBlockHeaderVerboseAsync(blockHash).Receive()
 }
 
+// FutureGetMempoolEntryResult is a future promise to deliver the result of a
+// GetMempoolEntryAsync RPC invocation (or an applicable error).
+type FutureGetMempoolEntryResult chan *response
+
+// Receive waits for the response promised by the future and returns a data
+// structure with information about the transaction in the memory pool given
+// its hash.
+func (r FutureGetMempoolEntryResult) Receive() (*btcjson.GetMempoolEntryResult, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal the result as an array of strings.
+	var mempoolEntryResult btcjson.GetMempoolEntryResult
+	err = json.Unmarshal(res, &mempoolEntryResult)
+	if err != nil {
+		return nil, err
+	}
+
+	return &mempoolEntryResult, nil
+}
+
+// GetMempoolEntryAsync returns an instance of a type that can be used to get the
+// result of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+//
+// See GetMempoolEntry for the blocking version and more details.
+func (c *Client) GetMempoolEntryAsync(txHash string) FutureGetMempoolEntryResult {
+	cmd := btcjson.NewGetMempoolEntryCmd(txHash)
+	return c.sendCmd(cmd)
+}
+
+// GetMempoolEntry returns a data structure with information about the
+// transaction in the memory pool given its hash.
+func (c *Client) GetMempoolEntry(txHash string) (*btcjson.GetMempoolEntryResult, error) {
+	return c.GetMempoolEntryAsync(txHash).Receive()
+}
+
 // FutureGetRawMempoolResult is a future promise to deliver the result of a
 // GetRawMempoolAsync RPC invocation (or an applicable error).
 type FutureGetRawMempoolResult chan *response
