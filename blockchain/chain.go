@@ -123,8 +123,8 @@ type BlockChain struct {
 
 	// These fields are related to checkpoint handling.  They are protected
 	// by the chain lock.
-	nextCheckpoint  *chaincfg.Checkpoint
-	checkpointBlock *btcutil.Block
+	nextCheckpoint *chaincfg.Checkpoint
+	checkpointNode *blockNode
 
 	// The state is used as a fairly efficient way to cache information
 	// about the current best chain state that is returned to callers when
