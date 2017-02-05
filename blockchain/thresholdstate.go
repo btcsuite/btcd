@@ -101,10 +101,13 @@ type thresholdConditionChecker interface {
 	// state retarget window.
 	MinerConfirmationWindow() uint32
 
-	// Condition returns whether or not the rule change activation condition
-	// has been met.  This typically involves checking whether or not the
-	// bit assocaited with the condition is set, but can be more complex as
-	// needed.
+	// Condition returns an array of thresholdConditionTally that contains
+	// all votes.  By convention isIgnore and isNo can not be true at the
+	// same time.  The array is always returned in the same order so that
+	// the consumer can repeatedly call this function without having to
+	// care about said order.  Only 1 isNo vote is allowed.  By convention
+	// the zero value of the vote as determined by the mask is an isIgnore
+	// vote.
 	Condition(*blockNode) ([]thresholdConditionTally, error)
 }
 
