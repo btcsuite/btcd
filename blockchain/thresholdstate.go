@@ -350,11 +350,12 @@ func (b *BlockChain) thresholdState(prevNode *blockNode, checker thresholdCondit
 //
 // This function is safe for concurrent access.
 func (b *BlockChain) ThresholdState(version uint32, deploymentID string) (ThresholdState, error) {
-	for k, d := range b.chainParams.Deployments[version] {
-		if d.Vote.Id == deploymentID {
+	for k := range b.chainParams.Deployments[version] {
+		if b.chainParams.Deployments[version][k].Vote.Id == deploymentID {
 			checker := deploymentChecker{
 				deployment: &b.chainParams.Deployments[version][k],
-				chain:      b}
+				chain:      b,
+			}
 			cache := &b.deploymentCaches[version][k]
 			b.chainLock.Lock()
 			defer b.chainLock.Unlock()
