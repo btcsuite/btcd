@@ -5,11 +5,7 @@
 
 package blockchain
 
-import (
-	"fmt"
-
-	"github.com/decred/dcrd/chaincfg"
-)
+import "github.com/decred/dcrd/chaincfg"
 
 // deploymentChecker provides a thresholdConditionChecker which can be used to
 // test a specific deployment rule.  This is required for properly detecting
@@ -75,7 +71,7 @@ func (c deploymentChecker) MinerConfirmationWindow() uint32 {
 // This is part of the thresholdConditionChecker interface implementation.
 func (c deploymentChecker) Condition(node *blockNode) ([]thresholdConditionTally, error) {
 	if c.deployment.Vote.Mask == 0 {
-		return []thresholdConditionTally{}, fmt.Errorf("invalid mask")
+		return []thresholdConditionTally{}, AssertError("invalid mask")
 	}
 
 	// Calculate shift in order to make a zero based index later.
