@@ -19,8 +19,7 @@ func genesisBlockNode(params *chaincfg.Params) *blockNode {
 	// Create a new node from the genesis block.
 	genesisBlock := dcrutil.NewBlock(params.GenesisBlock)
 	header := &genesisBlock.MsgBlock().Header
-	node := newBlockNode(header, genesisBlock.Hash(), 0, []chainhash.Hash{},
-		[]chainhash.Hash{}, []uint32{}, []uint16{})
+	node := newBlockNode(header, genesisBlock.Hash(), 0, nil, nil, nil, nil)
 	node.inMainChain = true
 
 	return node
