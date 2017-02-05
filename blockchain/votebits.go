@@ -85,9 +85,9 @@ func (c deploymentChecker) Condition(node *blockNode) ([]thresholdConditionTally
 		mask >>= 1
 	}
 
-	// Setup tally array.
+	// Setup tally array and iterate over Choices to assemble the vote
+	// information into the thresholdConditionTally array.
 	tally := make([]thresholdConditionTally, len(c.deployment.Vote.Choices))
-
 	for _, v := range node.voteBits {
 		// Make sure only valid bits are set.
 		x := c.deployment.Vote.Mask & v
