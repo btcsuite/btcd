@@ -2240,7 +2240,7 @@ func New(config *Config) (*BlockChain, error) {
 		blockCache:              make(map[chainhash.Hash]*dcrutil.Block),
 		mainchainBlockCache:     make(map[chainhash.Hash]*dcrutil.Block),
 		mainchainBlockCacheSize: mainchainBlockCacheSize,
-		deploymentCaches:        newThresholdCaches(0, 1, 2, 3), // XXX fake entries
+		deploymentCaches:        newThresholdCaches(),
 	}
 
 	// Initialize the chain state from the passed database.  When the db
