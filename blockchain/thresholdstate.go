@@ -8,6 +8,7 @@ package blockchain
 import (
 	"fmt"
 
+	"github.com/decred/dcrd/chaincfg"
 	"github.com/decred/dcrd/chaincfg/chainhash"
 )
 
@@ -148,14 +149,16 @@ func (c *thresholdStateCache) MarkFlushed() {
 
 // newThresholdCaches returns a new array of caches to be used when calculating
 // threshold states.
-func newThresholdCaches(versions ...uint32) map[uint32][]thresholdStateCache {
+func newThresholdCaches(params *chaincfg.Params) map[uint32][]thresholdStateCache {
 	caches := make(map[uint32][]thresholdStateCache)
-	for _, i := range versions {
-		caches[i] = []thresholdStateCache{
-			{
-				entries:   make(map[chainhash.Hash]ThresholdState),
-				dbUpdates: make(map[chainhash.Hash]ThresholdState),
-			},
+	for version := range params.Deployments {
+		for i := uint32(0); i < uint32(len(params.Deployments[version])); i++ {
+			caches[i] = []thresholdStateCache{
+				{
+					entries:   make(map[chainhash.Hash]ThresholdState),
+					dbUpdates: make(map[chainhash.Hash]ThresholdState),
+				},
+			}
 		}
 	}
 	return caches
