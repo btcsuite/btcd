@@ -93,8 +93,8 @@ func (t thresholdStateTuple) String() string {
 	return fmt.Sprintf("Unknown ThresholdState (%v):%v", t.state, t.choice)
 }
 
-// newThresholdStateTuple returns an initialized thresholdStateTuple.
-func newThresholdStateTuple(state ThresholdState, choice uint32) thresholdStateTuple {
+// newThresholdState returns an initialized thresholdStateTuple.
+func newThresholdState(state ThresholdState, choice uint32) thresholdStateTuple {
 	return thresholdStateTuple{state: state, choice: choice}
 }
 
@@ -203,8 +203,7 @@ func (b *BlockChain) thresholdState(prevNode *blockNode, checker thresholdCondit
 	// defined by definition.
 	confirmationWindow := int64(checker.MinerConfirmationWindow())
 	if prevNode == nil || (prevNode.height+1) < confirmationWindow {
-		return newThresholdStateTuple(ThresholdDefined, invalidChoice),
-			nil
+		return newThresholdState(ThresholdDefined, invalidChoice), nil
 	}
 
 	// Get the ancestor that is the last block of the previous confirmation
@@ -214,8 +213,7 @@ func (b *BlockChain) thresholdState(prevNode *blockNode, checker thresholdCondit
 	prevNode, err = b.ancestorNode(prevNode, prevNode.height-
 		(prevNode.height+1)%confirmationWindow)
 	if err != nil {
-		return newThresholdStateTuple(ThresholdFailed, invalidChoice),
-			err
+		return newThresholdState(ThresholdFailed, invalidChoice), err
 	}
 
 	// Iterate backwards through each of the previous confirmation windows
@@ -232,7 +230,7 @@ func (b *BlockChain) thresholdState(prevNode *blockNode, checker thresholdCondit
 		// time, so calculate it now.
 		medianTime, err := b.calcPastMedianTime(prevNode)
 		if err != nil {
-			return newThresholdStateTuple(ThresholdFailed,
+			return newThresholdState(ThresholdFailed,
 				invalidChoice), err
 		}
 
@@ -255,19 +253,19 @@ func (b *BlockChain) thresholdState(prevNode *blockNode, checker thresholdCondit
 		prevNode, err = b.ancestorNode(prevNode, prevNode.height-
 			confirmationWindow)
 		if err != nil {
-			return newThresholdStateTuple(ThresholdFailed,
+			return newThresholdState(ThresholdFailed,
 				invalidChoice), err
 		}
 	}
 
 	// Start with the threshold state for the most recent confirmation
 	// window that has a cached state.
-	stateTuple := newThresholdStateTuple(ThresholdDefined, invalidChoice)
+	stateTuple := newThresholdState(ThresholdDefined, invalidChoice)
 	if prevNode != nil {
 		var ok bool
 		stateTuple, ok = cache.Lookup(prevNode.hash)
 		if !ok {
-			return newThresholdStateTuple(ThresholdFailed,
+			return newThresholdState(ThresholdFailed,
 					invalidChoice), AssertError(fmt.Sprintf(
 					"thresholdState: cache lookup failed "+
 						"for %v", prevNode.hash))
@@ -285,7 +283,7 @@ func (b *BlockChain) thresholdState(prevNode *blockNode, checker thresholdCondit
 			// before it is accepted and locked in.
 			medianTime, err := b.calcPastMedianTime(prevNode)
 			if err != nil {
-				return newThresholdStateTuple(ThresholdFailed,
+				return newThresholdState(ThresholdFailed,
 					invalidChoice), err
 			}
 			medianTimeUnix := uint64(medianTime.Unix())
@@ -306,7 +304,7 @@ func (b *BlockChain) thresholdState(prevNode *blockNode, checker thresholdCondit
 			// before it is accepted and locked in.
 			medianTime, err := b.calcPastMedianTime(prevNode)
 			if err != nil {
-				return newThresholdStateTuple(ThresholdFailed,
+				return newThresholdState(ThresholdFailed,
 					invalidChoice), err
 			}
 			if uint64(medianTime.Unix()) >= checker.EndTime() {
@@ -322,7 +320,7 @@ func (b *BlockChain) thresholdState(prevNode *blockNode, checker thresholdCondit
 			for i := int64(0); i < confirmationWindow; i++ {
 				c, err := checker.Condition(countNode)
 				if err != nil {
-					return newThresholdStateTuple(
+					return newThresholdState(
 						ThresholdFailed, invalidChoice), err
 				}
 
@@ -346,7 +344,7 @@ func (b *BlockChain) thresholdState(prevNode *blockNode, checker thresholdCondit
 				// needed to remain in memory.
 				countNode, err = b.getPrevNodeFromNode(countNode)
 				if err != nil {
-					return newThresholdStateTuple(
+					return newThresholdState(
 						ThresholdFailed, invalidChoice), err
 				}
 			}
