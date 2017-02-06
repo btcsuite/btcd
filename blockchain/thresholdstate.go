@@ -45,7 +45,7 @@ const (
 	ThresholdFailed ThresholdState = 4
 
 	// ThresholdInvalid is a deployment that does not exist.
-	ThresholdInvalid = iota
+	ThresholdInvalid ThresholdState = 5
 )
 
 // thresholdStateStrings is a map of ThresholdState values back to their
