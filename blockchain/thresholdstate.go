@@ -68,14 +68,32 @@ func (t _ThresholdState) String() string {
 }
 
 const (
+	// invalidChoice indicates an invalid choice in the
+	// thresholdStateTuple.
 	invalidChoice = uint32(0xffffffff)
 )
 
+// thresholdStateTuple contains the current state and the activated choice,
+// when valid.
 type thresholdStateTuple struct {
-	state  _ThresholdState
+	// state contains the current ThresholdState.
+	state _ThresholdState
+
+	// coice is set to invalidChoice unless state is: ThresholdLockedIn,
+	// ThresholdFailed & ThresholdActive.  choice should always be
+	// crosschecked with invalidChoice.
 	choice uint32
 }
 
+// String returns the thresholdStateTuple as a human-readable tuple.
+func (t thresholdStateTuple) String() string {
+	if s := thresholdStateStrings[t.state]; s != "" {
+		return fmt.Sprintf("%v:%v", s, t.choice)
+	}
+	return fmt.Sprintf("Unknown ThresholdState (%v):%v", t.state, t.choice)
+}
+
+// newThresholdStateTuple returns an initialized thresholdStateTuple.
 func newThresholdStateTuple(state _ThresholdState, choice uint32) thresholdStateTuple {
 	return thresholdStateTuple{state: state, choice: choice}
 }
