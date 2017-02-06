@@ -14,7 +14,7 @@ import (
 
 // ThresholdState define the various threshold states used when voting on
 // consensus changes.
-type _ThresholdState byte
+type ThresholdState byte
 
 // These constants are used to identify specific threshold states.
 //
@@ -23,35 +23,35 @@ type _ThresholdState byte
 const (
 	// ThresholdDefined is the first state for each deployment and is the
 	// state for the genesis block has by defintion for all deployments.
-	ThresholdDefined _ThresholdState = 0
+	ThresholdDefined ThresholdState = 0
 
 	// ThresholdStarted is the state for a deployment once its start time
 	// has been reached.
-	ThresholdStarted _ThresholdState = 1
+	ThresholdStarted ThresholdState = 1
 
 	// ThresholdLockedIn is the state for a deployment during the retarget
 	// period which is after the ThresholdStarted state period and the
 	// number of blocks that have voted for the deployment equal or exceed
 	// the required number of votes for the deployment.
-	ThresholdLockedIn _ThresholdState = 2
+	ThresholdLockedIn ThresholdState = 2
 
 	// ThresholdActive is the state for a deployment for all blocks after a
 	// retarget period in which the deployment was in the ThresholdLockedIn
 	// state.
-	ThresholdActive _ThresholdState = 3
+	ThresholdActive ThresholdState = 3
 
 	// ThresholdFailed is the state for a deployment once its expiration
 	// time has been reached and it did not reach the ThresholdLockedIn
 	// state.
-	ThresholdFailed _ThresholdState = 4
+	ThresholdFailed ThresholdState = 4
 
 	// ThresholdInvalid is a deployment that does not exist.
-	ThresholdInvalid _ThresholdState = 5
+	ThresholdInvalid ThresholdState = 5
 )
 
 // thresholdStateStrings is a map of ThresholdState values back to their
 // constant names for pretty printing.
-var thresholdStateStrings = map[_ThresholdState]string{
+var thresholdStateStrings = map[ThresholdState]string{
 	ThresholdDefined:  "ThresholdDefined",
 	ThresholdStarted:  "ThresholdStarted",
 	ThresholdLockedIn: "ThresholdLockedIn",
@@ -60,7 +60,7 @@ var thresholdStateStrings = map[_ThresholdState]string{
 }
 
 // String returns the ThresholdState as a human-readable name.
-func (t _ThresholdState) String() string {
+func (t ThresholdState) String() string {
 	if s := thresholdStateStrings[t]; s != "" {
 		return s
 	}
@@ -77,7 +77,7 @@ const (
 // when valid.
 type thresholdStateTuple struct {
 	// state contains the current ThresholdState.
-	state _ThresholdState
+	state ThresholdState
 
 	// coice is set to invalidChoice unless state is: ThresholdLockedIn,
 	// ThresholdFailed & ThresholdActive.  choice should always be
@@ -94,7 +94,7 @@ func (t thresholdStateTuple) String() string {
 }
 
 // newThresholdStateTuple returns an initialized thresholdStateTuple.
-func newThresholdStateTuple(state _ThresholdState, choice uint32) thresholdStateTuple {
+func newThresholdStateTuple(state ThresholdState, choice uint32) thresholdStateTuple {
 	return thresholdStateTuple{state: state, choice: choice}
 }
 

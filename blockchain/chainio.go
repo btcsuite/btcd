@@ -2094,7 +2094,7 @@ func dbFetchThresholdCaches(dbTx database.Tx, caches map[uint32][]thresholdState
 				var hash chainhash.Hash
 				copy(hash[:], k)
 				caches[version][i].entries[hash] =
-					newThresholdStateTuple(_ThresholdState(v[0]),
+					newThresholdStateTuple(ThresholdState(v[0]),
 						byteOrder.Uint32(v[1:]))
 				return nil
 			})
