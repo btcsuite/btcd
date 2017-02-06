@@ -151,7 +151,7 @@ func TestVoting(t *testing.T) {
 		// We have to reset the cache for every test.
 		bc := &BlockChain{
 			chainParams:      params,
-			deploymentCaches: newThresholdCaches(ourVersion),
+			deploymentCaches: newThresholdCaches(params),
 		}
 		genesisNode := genesisBlockNode(params)
 		genesisNode.header.StakeVersion = test.startStakeVersion
