@@ -2002,10 +2002,11 @@ func thresholdCacheBucket(prefix []byte, id uint32) []byte {
 
 // dbPutThresholdState uses an existing database transaction to update or add
 // the rule change threshold state for the provided block hash.
-func dbPutThresholdState(bucket database.Bucket, hash chainhash.Hash, state ThresholdState) error {
+func dbPutThresholdState(bucket database.Bucket, hash chainhash.Hash, state thresholdStateTuple) error {
 	// Add the block hash to threshold state mapping.
-	var serializedState [1]byte
-	serializedState[0] = byte(state)
+	var serializedState [1 + 4]byte
+	serializedState[0] = byte(state.state)
+	byteOrder.PutUint32(serializedState[1:], state.choice)
 	return bucket.Put(hash[:], serializedState[:])
 }
 
@@ -2092,7 +2093,9 @@ func dbFetchThresholdCaches(dbTx database.Tx, caches map[uint32][]thresholdState
 
 				var hash chainhash.Hash
 				copy(hash[:], k)
-				caches[version][i].entries[hash] = ThresholdState(v[0])
+				caches[version][i].entries[hash] =
+					newThresholdStateTuple(_ThresholdState(v[0]),
+						byteOrder.Uint32(v[1:]))
 				return nil
 			})
 			if err != nil {

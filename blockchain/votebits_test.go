@@ -116,7 +116,7 @@ func TestVoting(t *testing.T) {
 		blockVersion      int32
 		startStakeVersion uint32
 		voteBits          uint16
-		expectedState     []ThresholdState
+		expectedState     []thresholdStateTuple
 	}{
 		{
 			name:              "pedro 100% yes",
@@ -125,7 +125,7 @@ func TestVoting(t *testing.T) {
 			blockVersion:      3,
 			startStakeVersion: ourVersion,
 			voteBits:          0x2,
-			expectedState:     []ThresholdState{ThresholdActive},
+			expectedState:     []thresholdStateTuple{{ThresholdActive, 1}},
 		},
 		{
 			name:              "pedro 100% no",
@@ -134,7 +134,7 @@ func TestVoting(t *testing.T) {
 			blockVersion:      3,
 			startStakeVersion: ourVersion,
 			voteBits:          0x4,
-			expectedState:     []ThresholdState{ThresholdFailed},
+			expectedState:     []thresholdStateTuple{{ThresholdFailed, 2}},
 		},
 		{
 			name:              "pedro 100% abstain",
@@ -143,7 +143,7 @@ func TestVoting(t *testing.T) {
 			blockVersion:      3,
 			startStakeVersion: ourVersion,
 			voteBits:          0x0,
-			expectedState:     []ThresholdState{ThresholdStarted},
+			expectedState:     []thresholdStateTuple{{ThresholdStarted, invalidChoice}},
 		},
 	}
 
