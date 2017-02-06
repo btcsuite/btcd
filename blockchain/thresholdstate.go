@@ -152,13 +152,11 @@ func (c *thresholdStateCache) MarkFlushed() {
 func newThresholdCaches(params *chaincfg.Params) map[uint32][]thresholdStateCache {
 	caches := make(map[uint32][]thresholdStateCache)
 	for version := range params.Deployments {
-		for i := uint32(0); i < uint32(len(params.Deployments[version])); i++ {
-			caches[i] = []thresholdStateCache{
-				{
-					entries:   make(map[chainhash.Hash]ThresholdState),
-					dbUpdates: make(map[chainhash.Hash]ThresholdState),
-				},
-			}
+		caches[version] = make([]thresholdStateCache,
+			len(params.Deployments[version]))
+		for k := range caches[version] {
+			caches[version][k].entries = make(map[chainhash.Hash]ThresholdState)
+			caches[version][k].dbUpdates = make(map[chainhash.Hash]ThresholdState)
 		}
 	}
 	return caches
