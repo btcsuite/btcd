@@ -147,7 +147,6 @@ func (v *Vote) IsIgnore(vote uint16) (bool, error) {
 		return false, fmt.Errorf("invalid vote bits set")
 	}
 
-	// XXX should we hard code vote == 0 and return true here?
 	for k := range v.Choices {
 		if vote == v.Choices[k].Bits {
 			return v.Choices[k].IsIgnore, nil
@@ -165,7 +164,6 @@ func (v *Vote) IsNo(vote uint16) (bool, error) {
 		return false, fmt.Errorf("invalid vote bits set")
 	}
 
-	// XXX should we hard code vote == 0 and return true here?
 	for k := range v.Choices {
 		if vote == v.Choices[k].Bits {
 			return v.Choices[k].IsNo, nil
