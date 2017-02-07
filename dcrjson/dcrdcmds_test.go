@@ -14,11 +14,11 @@ import (
 	"github.com/decred/dcrd/dcrjson"
 )
 
-// TestBtcdExtCmds tests all of the btcd extended commands marshal and unmarshal
+// TestBtcdCmds tests all of the btcd extended commands marshal and unmarshal
 // into valid results include handling of optional fields being omitted in the
 // marshalled command, while optional fields with defaults have the default
 // assigned on unmarshalled commands.
-func TestDcrdExtCmds(t *testing.T) {
+func TestDcrdCmds(t *testing.T) {
 	t.Parallel()
 
 	testID := int(1)
@@ -52,6 +52,20 @@ func TestDcrdExtCmds(t *testing.T) {
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"getstakeversions","params":["deadbeef",1],"id":1}`,
 			unmarshalled: &dcrjson.GetStakeVersionsCmd{
+				Hash:  "deadbeef",
+				Count: 1,
+			},
+		},
+		{
+			name: "getvoteinfo",
+			newCmd: func() (interface{}, error) {
+				return dcrjson.NewCmd("getvoteinfo", "deadbeef", 1)
+			},
+			staticCmd: func() interface{} {
+				return dcrjson.NewGetVoteInfoCmd("deadbeef", 1)
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"getvoteinfo","params":["deadbeef",1],"id":1}`,
+			unmarshalled: &dcrjson.GetVoteInfoCmd{
 				Hash:  "deadbeef",
 				Count: 1,
 			},

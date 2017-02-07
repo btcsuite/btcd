@@ -26,6 +26,14 @@ type GetStakeVersionsResult struct {
 	StakeVersions []StakeVersions `json:"stakeversions"`
 }
 
+// GetVoteInfoResult models the data returned from the getvoteinfo command.
+type GetVoteInfoResult struct {
+	Hash         string `json:"hash"`
+	Height       int64  `json:"height"`
+	StakeVersion uint32 `json:"stakeversion"`
+	//StakeVersions []StakeVersions `json:"stakeversions"`
+}
+
 // EstimateStakeDiffResult models the data returned from the estimatestakediff
 // command.
 type EstimateStakeDiffResult struct {

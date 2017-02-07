@@ -141,6 +141,22 @@ func NewGetTicketPoolValueCmd() *GetTicketPoolValueCmd {
 	return &GetTicketPoolValueCmd{}
 }
 
+// GetVoteInfoCmd returns voting results over a range of blocks.  Count
+// indicates how many blocks are walked backwards.
+type GetVoteInfoCmd struct {
+	Hash  string
+	Count int32
+}
+
+// NewGetVoteInfoCmd returns a new instance which can be used to
+// issue a JSON-RPC getvoteinfo command.
+func NewGetVoteInfoCmd(hash string, count int32) *GetVoteInfoCmd {
+	return &GetVoteInfoCmd{
+		Hash:  hash,
+		Count: count,
+	}
+}
+
 // LiveTicketsCmd is a type handling custom marshaling and
 // unmarshaling of livetickets JSON RPC commands.
 type LiveTicketsCmd struct{}
@@ -261,6 +277,7 @@ func init() {
 	MustRegisterCmd("getstakedifficulty", (*GetStakeDifficultyCmd)(nil), flags)
 	MustRegisterCmd("getstakeversions", (*GetStakeVersionsCmd)(nil), flags)
 	MustRegisterCmd("getticketpoolvalue", (*GetTicketPoolValueCmd)(nil), flags)
+	MustRegisterCmd("getvoteinfo", (*GetVoteInfoCmd)(nil), flags)
 	MustRegisterCmd("livetickets", (*LiveTicketsCmd)(nil), flags)
 	MustRegisterCmd("missedtickets", (*MissedTicketsCmd)(nil), flags)
 	MustRegisterCmd("rebroadcastmissed", (*RebroadcastMissedCmd)(nil), flags)

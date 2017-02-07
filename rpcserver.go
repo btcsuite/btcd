@@ -217,6 +217,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"getstakedifficulty":    handleGetStakeDifficulty,
 	"getstakeversions":      handleGetStakeVersions,
 	"getticketpoolvalue":    handleGetTicketPoolValue,
+	"getvoteinfo":           handleGetVoteInfo,
 	"gettxout":              handleGetTxOut,
 	"getwork":               handleGetWork,
 	"help":                  handleHelp,
@@ -3878,6 +3879,11 @@ func handleGetTicketPoolValue(s *rpcServer, cmd interface{}, closeChan <-chan st
 	}
 
 	return amt.ToCoin(), nil
+}
+
+// handleGetVoteInfo implements the getvoteinfo command.
+func handleGetVoteInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	return nil, fmt.Errorf("not yet")
 }
 
 // bigToLEUint256 returns the passed big integer as an unsigned 256-bit integer
