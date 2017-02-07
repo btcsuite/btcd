@@ -316,19 +316,19 @@ type Params struct {
 	// These fields are related to voting on consensus rule changes as
 	// defined by BIP0009.
 	//
-	// RuleChangeActivationThreshold is the number of blocks in a threshold
-	// state retarget window for which a positive vote for a rule change
-	// must be cast in order to lock in a rule change. It should typically
-	// be 95% for the main network and 75% for test networks.
+	// RuleChangeActivationQurom is the number of votes required for a vote
+	// to take effect.
 	//
 	// MinerConfirmationWindow is the number of blocks in each threshold
 	// state retarget window.
 	//
 	// Deployments define the specific consensus rule changes to be voted
 	// on for the stake version (the map key).
-	RuleChangeActivationThreshold uint32
-	MinerConfirmationWindow       uint32
-	Deployments                   map[uint32][]ConsensusDeployment
+	RuleChangeActivationQuorum     uint32
+	RuleChangeActivationMultiplier uint32
+	RuleChangeActivationDivisor    uint32
+	MinerConfirmationWindow        uint32
+	Deployments                    map[uint32][]ConsensusDeployment
 
 	// Enforce current block version once network has upgraded.
 	BlockEnforceNumRequired uint64
@@ -497,13 +497,12 @@ var MainNetParams = Params{
 		{99880, newHashFromStr("0000000000000cb2a9a9ded647b9f78aae51ace32dd8913701d420ead272913c")},
 	},
 
-	// XXX make sure we like these values
-	// Consensus rule change deployments.
-	//
 	// The miner confirmation window is defined as:
 	//   target proof of work timespan / target proof of work spacing
-	RuleChangeActivationThreshold: 1916, // 95% of MinerConfirmationWindow
-	MinerConfirmationWindow:       2016, //
+	RuleChangeActivationQuorum:     4032, // 10 % of MinerConfirmationWindow * TicketsPerBlock
+	RuleChangeActivationMultiplier: 3,    // 75%
+	RuleChangeActivationDivisor:    4,
+	MinerConfirmationWindow:        2016 * 4, // 4 weeks
 
 	// Enforce current block version once majority of the network has
 	// upgraded.
@@ -615,13 +614,14 @@ var TestNetParams = Params{
 		{257350, newHashFromStr("000000000265019c4f9412977efcaf4811462992e6d424e251e7a91424c454ba")},
 	},
 
-	// XXX make sure we like these values
 	// Consensus rule change deployments.
 	//
 	// The miner confirmation window is defined as:
 	//   target proof of work timespan / target proof of work spacing
-	RuleChangeActivationThreshold: 1512, // 75% of MinerConfirmationWindow
-	MinerConfirmationWindow:       2016,
+	RuleChangeActivationQuorum:     2520, // 10 % of MinerConfirmationWindow * TicketsPerBlock
+	RuleChangeActivationMultiplier: 3,    // 75%
+	RuleChangeActivationDivisor:    4,
+	MinerConfirmationWindow:        5040, // 1 week
 
 	// Enforce current block version once majority of the network has
 	// upgraded.
@@ -721,13 +721,14 @@ var SimNetParams = Params{
 	// Checkpoints ordered from oldest to newest.
 	Checkpoints: nil,
 
-	// XXX make sure we like these values
 	// Consensus rule change deployments.
 	//
 	// The miner confirmation window is defined as:
 	//   target proof of work timespan / target proof of work spacing
-	RuleChangeActivationThreshold: 75, // 75% of MinerConfirmationWindow
-	MinerConfirmationWindow:       100,
+	RuleChangeActivationQuorum:     160, // 10 % of MinerConfirmationWindow * TicketsPerBlock
+	RuleChangeActivationMultiplier: 3,   // 75%
+	RuleChangeActivationDivisor:    4,
+	MinerConfirmationWindow:        320, // 320 seconds
 
 	// Enforce current block version once majority of the network has
 	// upgraded.
