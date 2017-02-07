@@ -1307,6 +1307,7 @@ func (c *Client) Connect(tries int) error {
 		var wsConn *websocket.Conn
 		wsConn, err = dial(c.config)
 		if err != nil {
+			log.Errorf("Connection attempt failed: %v", err)
 			backoff = connectionRetryInterval * time.Duration(i+1)
 			if backoff > time.Minute {
 				backoff = time.Minute
