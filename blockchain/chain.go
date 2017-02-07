@@ -321,6 +321,23 @@ func (b *BlockChain) GetStakeVersions(hash *chainhash.Hash, count int32) ([]Stak
 	return result, nil
 }
 
+type VoteStatus struct {
+	Count uint32
+}
+
+type VoteInfo struct {
+	Agendas      []chaincfg.Vote
+	AgendaStatus [][]VoteStatus
+}
+
+// GetVoteInfo returns
+func (b *BlockChain) GetVoteInfo(hash *chainhash.Hash, count int32) ([]VoteInfo, error) {
+	b.chainLock.Lock()
+	defer b.chainLock.Unlock()
+
+	return nil, fmt.Errorf("not yet")
+}
+
 // DisableVerify provides a mechanism to disable transaction script validation
 // which you DO NOT want to do in production as it could allow double spends
 // and other undesirable things.  It is provided only for debug purposes since
