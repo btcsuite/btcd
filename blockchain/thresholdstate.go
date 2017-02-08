@@ -127,7 +127,7 @@ type thresholdConditionChecker interface {
 
 	// RuleChangeActivationThreshold is the number of blocks for which the
 	// condition must be true in order to lock in a rule change.
-	RuleChangeActivationThreshold() uint32
+	RuleChangeActivationThreshold(uint32) uint32
 
 	// MinerConfirmationWindow is the number of blocks in each threshold
 	// state retarget window.
@@ -315,7 +315,11 @@ func (b *BlockChain) thresholdState(prevNode *blockNode, checker thresholdCondit
 			// At this point, the rule change is still being voted
 			// on by the miners, so iterate backwards through the
 			// confirmation window to count all of the votes in it.
-			var counts []thresholdConditionTally
+			var (
+				counts      []thresholdConditionTally
+				totalVotes  uint32
+				ignoreVotes uint32
+			)
 			countNode := prevNode
 			for i := int64(0); i < confirmationWindow; i++ {
 				c, err := checker.Condition(countNode)
@@ -334,6 +338,11 @@ func (b *BlockChain) thresholdState(prevNode *blockNode, checker thresholdCondit
 					counts[k].count += c[k].count
 					counts[k].isIgnore = c[k].isIgnore
 					counts[k].isNo = c[k].isNo
+					if c[k].isIgnore {
+						ignoreVotes += c[k].count
+					} else {
+						totalVotes += c[k].count
+					}
 				}
 
 				// Get the previous block node.  This function
@@ -353,7 +362,11 @@ func (b *BlockChain) thresholdState(prevNode *blockNode, checker thresholdCondit
 			// period that voted for the rule change meets the
 			// activation threshold.
 			for k, v := range counts {
-				if counts[k].count >= checker.RuleChangeActivationThreshold() {
+				// We require at least 10% quorum on all votes.
+				if v.count < b.chainParams.RuleChangeActivationQuorum {
+					continue
+				}
+				if v.count >= checker.RuleChangeActivationThreshold(totalVotes) {
 					// Something went over the threshold
 					switch {
 					case !v.isIgnore && !v.isNo:

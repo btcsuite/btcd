@@ -50,8 +50,11 @@ func (c deploymentChecker) EndTime() uint64 {
 // is associated with.
 //
 // This is part of the thresholdConditionChecker interface implementation.
-func (c deploymentChecker) RuleChangeActivationThreshold() uint32 {
-	return c.chain.chainParams.RuleChangeActivationThreshold
+func (c deploymentChecker) RuleChangeActivationThreshold(totalVotes uint32) uint32 {
+	// XXX we probably should drop RuleChangeActivationThreshold since this
+	// does not require context.
+	return totalVotes * c.chain.chainParams.RuleChangeActivationMultiplier /
+		c.chain.chainParams.RuleChangeActivationDivisor
 }
 
 // MinerConfirmationWindow is the number of blocks in each threshold state
