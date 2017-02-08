@@ -52,7 +52,7 @@ func defaultParams() *chaincfg.Params {
 	params.Deployments[ourVersion] = []chaincfg.ConsensusDeployment{
 		{
 			Vote:       pedro,
-			StartTime:  uint64(time.Now().Unix()),                       // we need to futz with this
+			StartTime:  uint64(time.Now().Add(5 * time.Second).Unix()),  // we need to futz with this
 			ExpireTime: uint64(time.Now().Add(10 * time.Second).Unix()), // we need to futz with this
 		},
 	}
@@ -157,7 +157,7 @@ func TestVoting(t *testing.T) {
 				},
 				{
 					state:  ThresholdActive,
-					choice: invalidChoice,
+					choice: 0x02,
 				},
 			},
 		},
