@@ -213,7 +213,7 @@ func TestVoting(t *testing.T) {
 					Height:       currentHeight,
 					Nonce:        uint32(0),
 					StakeVersion: test.startStakeVersion,
-					Timestamp:    currentTimestamp.Add(time.Second),
+					Timestamp:    currentTimestamp,
 				}
 				node := newBlockNode(header, &chainhash.Hash{}, 0,
 					[]chainhash.Hash{}, []chainhash.Hash{},
@@ -232,6 +232,7 @@ func TestVoting(t *testing.T) {
 				currentNode = node
 				bc.bestNode = currentNode
 				currentHeight++
+				currentTimestamp = currentTimestamp.Add(time.Second)
 			}
 			ts, err := bc.ThresholdState(ourVersion, pedro.Id)
 			if err != nil {
