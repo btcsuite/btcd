@@ -140,13 +140,8 @@ type Choice struct {
 }
 
 // IsIgnore compares vote to Choice.Bits and determines if it is the no vote.
-// This function will return an error if the vote bits are invalid or not
-// found.
+// This function will return an error if the vote bits are not found.
 func (v *Vote) IsIgnore(vote uint16) (bool, error) {
-	if vote&v.Mask != vote {
-		return false, fmt.Errorf("invalid vote bits set")
-	}
-
 	for k := range v.Choices {
 		if vote == v.Choices[k].Bits {
 			return v.Choices[k].IsIgnore, nil
@@ -157,13 +152,8 @@ func (v *Vote) IsIgnore(vote uint16) (bool, error) {
 }
 
 // IsNo comares vote to Choice.Bits and determines if it is the abstain vote.
-// This function will return an error if the vote bits are invalid or not
-// found.
+// This function will return an error if the vote bits are or not found.
 func (v *Vote) IsNo(vote uint16) (bool, error) {
-	if vote&v.Mask != vote {
-		return false, fmt.Errorf("invalid vote bits set")
-	}
-
 	for k := range v.Choices {
 		if vote == v.Choices[k].Bits {
 			return v.Choices[k].IsNo, nil
