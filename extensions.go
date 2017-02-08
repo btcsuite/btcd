@@ -635,6 +635,47 @@ func (c *Client) GetStakeDifficulty() (*dcrjson.GetStakeDifficultyResult, error)
 	return c.GetStakeDifficultyAsync().Receive()
 }
 
+// FutureGetStakeVersionsResult is a future promise to deliver the result of a
+// GetStakeVersionsAsync RPC invocation (or an applicable error).
+type FutureGetStakeVersionsResult chan *response
+
+// Receive waits for the response promised by the future and returns the network
+// the server is running on.
+func (r FutureGetStakeVersionsResult) Receive() (*dcrjson.GetStakeVersionsResult, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal result as a dcrjson.GetStakeVersionsResult.
+	var gsvr dcrjson.GetStakeVersionsResult
+	err = json.Unmarshal(res, &gsvr)
+	if err != nil {
+		return nil, err
+	}
+
+	return &gsvr, nil
+}
+
+// GetStakeVersionsAsync returns an instance of a type that can be used to
+// get the result of the RPC at some future time by invoking the Receive
+// function on the returned instance.
+//
+// See GetStakeVersions for the blocking version and more details.
+//
+// NOTE: This is a dcrd extension.
+func (c *Client) GetStakeVersionsAsync(hash string, count int32) FutureGetStakeVersionsResult {
+	cmd := dcrjson.NewGetStakeVersionsCmd(hash, count)
+	return c.sendCmd(cmd)
+}
+
+// GetStakeVersions returns the current and next stake difficulty.
+//
+// NOTE: This is a dcrd extension.
+func (c *Client) GetStakeVersions(hash string, count int32) (*dcrjson.GetStakeVersionsResult, error) {
+	return c.GetStakeVersionsAsync(hash, count).Receive()
+}
+
 // FutureGetTicketPoolValueResult is a future promise to deliver the result of a
 // GetTicketPoolValueAsync RPC invocation (or an applicable error).
 type FutureGetTicketPoolValueResult chan *response
