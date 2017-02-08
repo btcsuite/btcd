@@ -52,8 +52,8 @@ func defaultParams() *chaincfg.Params {
 	params.Deployments[ourVersion] = []chaincfg.ConsensusDeployment{
 		{
 			Vote:       pedro,
-			StartTime:  uint64(time.Now().Add(5 * time.Second).Unix()),  // we need to futz with this
-			ExpireTime: uint64(time.Now().Add(10 * time.Second).Unix()), // we need to futz with this
+			StartTime:  uint64(time.Now().Add(5 * time.Second).Unix()),
+			ExpireTime: uint64(time.Now().Add(24 * time.Hour).Unix()),
 		},
 	}
 
@@ -203,6 +203,7 @@ func TestVoting(t *testing.T) {
 
 		var currentNode *blockNode
 		currentNode = genesisNode
+		currentNode.header.Timestamp = time.Now()
 		currentHeight := uint32(1)
 		for k := range test.expectedState {
 			for i := uint32(0); i < test.voteBitsCounts[k].count; i++ {
@@ -212,7 +213,7 @@ func TestVoting(t *testing.T) {
 					Height:       currentHeight,
 					Nonce:        uint32(0),
 					StakeVersion: test.startStakeVersion,
-					Timestamp:    time.Now(),
+					Timestamp:    currentNode.header.Timestamp.Add(time.Second),
 				}
 				node := newBlockNode(header, &chainhash.Hash{}, 0,
 					[]chainhash.Hash{}, []chainhash.Hash{},
