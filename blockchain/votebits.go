@@ -102,12 +102,12 @@ func (c deploymentChecker) Condition(node *blockNode) ([]thresholdConditionTally
 	for _, v := range node.voteBits {
 		// Make sure only valid bits are set.
 		x := c.deployment.Vote.Mask & v
-		isIgnore, err := c.deployment.Vote.IsIgnore(v)
+		isIgnore, err := c.deployment.Vote.IsIgnore(x)
 		if err != nil {
 			// Ignore invalid vote; others may be ok.
 			continue
 		}
-		isNo, err := c.deployment.Vote.IsNo(v)
+		isNo, err := c.deployment.Vote.IsNo(x)
 		if err != nil {
 			// Ignore invalid vote; others may be ok.
 			continue

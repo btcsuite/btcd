@@ -52,7 +52,7 @@ func defaultParams() *chaincfg.Params {
 	params.Deployments[ourVersion] = []chaincfg.ConsensusDeployment{
 		{
 			Vote:       pedro,
-			StartTime:  uint64(time.Now().Add(5 * time.Second).Unix()),
+			StartTime:  uint64(time.Now().Add(321 * time.Second).Unix()),
 			ExpireTime: uint64(time.Now().Add(24 * time.Hour).Unix()),
 		},
 	}
@@ -130,7 +130,7 @@ func TestVoting(t *testing.T) {
 			voteBitsCounts: []voteBitsCount{
 				{
 					voteBits: 0x01,
-					count:    params.MinerConfirmationWindow,
+					count:    params.MinerConfirmationWindow - 1,
 				}, {
 					voteBits: 0x03,
 					count:    params.MinerConfirmationWindow,
@@ -149,15 +149,15 @@ func TestVoting(t *testing.T) {
 				},
 				{
 					state:  ThresholdStarted,
-					choice: 0x02,
+					choice: invalidChoice,
 				},
 				{
 					state:  ThresholdLockedIn,
-					choice: 0x02,
+					choice: 0x01,
 				},
 				{
 					state:  ThresholdActive,
-					choice: 0x02,
+					choice: 0x01,
 				},
 			},
 		},
@@ -215,7 +215,8 @@ func TestVoting(t *testing.T) {
 					StakeVersion: test.startStakeVersion,
 					Timestamp:    currentTimestamp,
 				}
-				node := newBlockNode(header, &chainhash.Hash{}, 0,
+				hash := header.BlockHash()
+				node := newBlockNode(header, &hash, 0,
 					[]chainhash.Hash{}, []chainhash.Hash{},
 					[]uint32{}, []uint16{})
 				node.height = int64(currentHeight)
