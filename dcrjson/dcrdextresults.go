@@ -16,6 +16,7 @@ type GetStakeDifficultyResult struct {
 type StakeVersions struct {
 	Hash          string   `json:"hash"`
 	Height        int64    `json:"height"`
+	BlockVersion  int32    `json:"blockversion"`
 	StakeVersion  uint32   `json:"stakeversion"`
 	VoterVersions []uint32 `json:"voterversions"`
 }

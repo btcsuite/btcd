@@ -262,6 +262,7 @@ type BlockChain struct {
 type StakeVersions struct {
 	Hash          chainhash.Hash
 	Height        int64
+	BlockVersion  int32
 	StakeVersion  uint32
 	StakeVersions []uint32
 }
@@ -283,6 +284,7 @@ func (b *BlockChain) GetStakeVersions(hash *chainhash.Hash, count int32) ([]Stak
 		sv := StakeVersions{
 			Hash:         prevNode.hash,
 			Height:       prevNode.height,
+			BlockVersion: prevNode.header.Version,
 			StakeVersion: prevNode.header.StakeVersion,
 			StakeVersions: make([]uint32, 0,
 				len(prevNode.voterVersions)),

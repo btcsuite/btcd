@@ -3857,6 +3857,7 @@ func handleGetStakeVersions(s *rpcServer, cmd interface{}, closeChan <-chan stru
 		nsv := dcrjson.StakeVersions{
 			Hash:          v.Hash.String(),
 			Height:        v.Height,
+			BlockVersion:  v.BlockVersion,
 			StakeVersion:  v.StakeVersion,
 			VoterVersions: make([]uint32, 0, len(v.StakeVersions)),
 		}

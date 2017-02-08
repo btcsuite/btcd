@@ -415,6 +415,7 @@ var helpDescsEnUS = map[string]string{
 	"getstakeversionsresult-stakeversions": "Array of stake versions per block.",
 	"stakeversions-hash":                   "Hash of the block.",
 	"stakeversions-height":                 "Height of the block.",
+	"stakeversions-blockversion":           "The block version",
 	"stakeversions-stakeversion":           "The stake version of the block",
 	"stakeversions-voterversions":          "The version of each vote in the block",
 
