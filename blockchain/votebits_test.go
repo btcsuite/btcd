@@ -203,7 +203,7 @@ func TestVoting(t *testing.T) {
 
 		var currentNode *blockNode
 		currentNode = genesisNode
-		currentNode.header.Timestamp = time.Now()
+		currentTimestamp := time.Now()
 		currentHeight := uint32(1)
 		for k := range test.expectedState {
 			for i := uint32(0); i < test.voteBitsCounts[k].count; i++ {
@@ -213,7 +213,7 @@ func TestVoting(t *testing.T) {
 					Height:       currentHeight,
 					Nonce:        uint32(0),
 					StakeVersion: test.startStakeVersion,
-					Timestamp:    currentNode.header.Timestamp.Add(time.Second),
+					Timestamp:    currentTimestamp.Add(time.Second),
 				}
 				node := newBlockNode(header, &chainhash.Hash{}, 0,
 					[]chainhash.Hash{}, []chainhash.Hash{},
