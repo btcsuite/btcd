@@ -135,6 +135,9 @@ func TestVoting(t *testing.T) {
 					voteBits: 0x03,
 					count:    params.MinerConfirmationWindow,
 				}, {
+					voteBits: 0x03,
+					count:    params.MinerConfirmationWindow,
+				}, {
 					voteBits: 0x01,
 					count:    params.MinerConfirmationWindow,
 				},
