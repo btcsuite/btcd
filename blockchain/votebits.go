@@ -43,16 +43,24 @@ func (c deploymentChecker) EndTime() uint64 {
 	return c.deployment.ExpireTime
 }
 
-// RuleChangeActivationThreshold is the number of blocks for which the condition
-// must be true in order to lock in a rule change.
+// RuleChangeActivationQuorum is the minimum votes required to reach quorum.
+//
+// This implementation returns the value defined by the chain params the checker
+// is associated with.
+//
+// This is part of the thresholdConditionChecker interface implementation.
+func (c deploymentChecker) RuleChangeActivationQuorum() uint32 {
+	return c.chain.chainParams.RuleChangeActivationQuorum
+}
+
+// RuleChangeActivationThreshold is the number of votes required to reach the
+// threshold as defined by chain params.
 //
 // This implementation returns the value defined by the chain params the checker
 // is associated with.
 //
 // This is part of the thresholdConditionChecker interface implementation.
 func (c deploymentChecker) RuleChangeActivationThreshold(totalVotes uint32) uint32 {
-	// XXX we probably should drop RuleChangeActivationThreshold since this
-	// does not require context.
 	return totalVotes * c.chain.chainParams.RuleChangeActivationMultiplier /
 		c.chain.chainParams.RuleChangeActivationDivisor
 }
@@ -94,10 +102,6 @@ func (c deploymentChecker) Condition(node *blockNode) ([]thresholdConditionTally
 	for _, v := range node.voteBits {
 		// Make sure only valid bits are set.
 		x := c.deployment.Vote.Mask & v
-		if x != v {
-			// Ignore invalid vote; others may be ok.
-			continue
-		}
 		isIgnore, err := c.deployment.Vote.IsIgnore(v)
 		if err != nil {
 			// Ignore invalid vote; others may be ok.

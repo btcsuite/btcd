@@ -125,8 +125,13 @@ type thresholdConditionChecker interface {
 	// locked in or activated.
 	EndTime() uint64
 
-	// RuleChangeActivationThreshold is the number of blocks for which the
-	// condition must be true in order to lock in a rule change.
+	// RuleChangeActivationQuorum is the minimum number of votes required
+	// in a voting period for before we check
+	// RuleChangeActivationThreshold.
+	RuleChangeActivationQuorum() uint32
+
+	// RuleChangeActivationThreshold is the number of votes required in
+	// order to lock in a rule change.
 	RuleChangeActivationThreshold(uint32) uint32
 
 	// MinerConfirmationWindow is the number of blocks in each threshold
