@@ -109,42 +109,80 @@ func TestSerializeDeserialize(t *testing.T) {
 func TestVoting(t *testing.T) {
 	params := defaultParams()
 
+	type voteBitsCount struct {
+		voteBits uint16
+		count    uint32
+	}
+
 	tests := []struct {
 		name              string
 		numNodes          uint32
 		vote              chaincfg.Vote
 		blockVersion      int32
 		startStakeVersion uint32
-		voteBits          uint16
+		voteBitsCounts    []voteBitsCount
 		expectedState     []thresholdStateTuple
 	}{
 		{
 			name:              "pedro 100% yes",
-			numNodes:          params.MinerConfirmationWindow * 4,
+			numNodes:          params.MinerConfirmationWindow,
 			vote:              pedro,
 			blockVersion:      3,
 			startStakeVersion: ourVersion,
-			voteBits:          0x2,
-			expectedState:     []thresholdStateTuple{{ThresholdActive, 1}},
+			voteBitsCounts: []voteBitsCount{
+				{
+					voteBits: 0x01,
+					count:    params.MinerConfirmationWindow,
+				}, {
+					voteBits: 0x03,
+					count:    params.MinerConfirmationWindow,
+				}, {
+					voteBits: 0x01,
+					count:    params.MinerConfirmationWindow,
+				},
+			},
+			expectedState: []thresholdStateTuple{
+				{
+					state:  ThresholdStarted,
+					choice: invalidChoice,
+				},
+				{
+					state:  ThresholdLockedIn,
+					choice: 0x02,
+				},
+				{
+					state:  ThresholdActive,
+					choice: invalidChoice,
+				},
+			},
 		},
-		{
-			name:              "pedro 100% no",
-			numNodes:          params.MinerConfirmationWindow * 4,
-			vote:              pedro,
-			blockVersion:      3,
-			startStakeVersion: ourVersion,
-			voteBits:          0x4,
-			expectedState:     []thresholdStateTuple{{ThresholdFailed, 2}},
-		},
-		{
-			name:              "pedro 100% abstain",
-			numNodes:          params.MinerConfirmationWindow * 4,
-			vote:              pedro,
-			blockVersion:      3,
-			startStakeVersion: ourVersion,
-			voteBits:          0x0,
-			expectedState:     []thresholdStateTuple{{ThresholdStarted, invalidChoice}},
-		},
+		//{
+		//	name:              "pedro 100% no",
+		//	numNodes:          params.MinerConfirmationWindow,
+		//	vote:              pedro,
+		//	blockVersion:      3,
+		//	startStakeVersion: ourVersion,
+		//	voteBits:          0x4,
+		//	expectedState:     []thresholdStateTuple{{ThresholdFailed, 2}},
+		//},
+		//{
+		//	name:              "pedro 100% abstain",
+		//	numNodes:          params.MinerConfirmationWindow,
+		//	vote:              pedro,
+		//	blockVersion:      3,
+		//	startStakeVersion: ourVersion,
+		//	voteBits:          0x0,
+		//	expectedState:     []thresholdStateTuple{{ThresholdStarted, invalidChoice}},
+		//},
+		//{
+		//	name:              "less than quorum",
+		//	numNodes:          params.MinerConfirmationWindow,
+		//	vote:              pedro,
+		//	blockVersion:      3,
+		//	startStakeVersion: ourVersion,
+		//	voteBitsCounts:    []voteBitsCount{{voteBits: 0x02, count: 100}},
+		//	expectedState:     thresholdStateTuple{ThresholdStarted, invalidChoice},
+		//},
 	}
 
 	for _, test := range tests {
@@ -160,12 +198,13 @@ func TestVoting(t *testing.T) {
 
 		var currentNode *blockNode
 		currentNode = genesisNode
+		currentHeight := uint32(1)
 		for k := range test.expectedState {
-			for i := uint32(1); i <= test.numNodes; i++ {
+			for i := uint32(0); i < test.numNodes; i++ {
 				// Make up a header.
 				header := &wire.BlockHeader{
 					Version:      test.blockVersion,
-					Height:       uint32(i),
+					Height:       currentHeight,
 					Nonce:        uint32(0),
 					StakeVersion: test.startStakeVersion,
 					Timestamp:    time.Now(),
@@ -173,17 +212,18 @@ func TestVoting(t *testing.T) {
 				node := newBlockNode(header, &chainhash.Hash{}, 0,
 					[]chainhash.Hash{}, []chainhash.Hash{},
 					[]uint32{}, []uint16{})
-				node.height = int64(i)
+				node.height = int64(currentHeight)
 				node.parent = currentNode
 
 				// set stake versions and vote bits
 				for x := 0; x < int(params.TicketsPerBlock); x++ {
 					node.voterVersions = append(node.voterVersions, test.startStakeVersion)
-					node.voteBits = append(node.voteBits, test.voteBits)
+					node.voteBits = append(node.voteBits, test.voteBitsCounts[k].voteBits)
 				}
 
 				currentNode = node
 				bc.bestNode = currentNode
+				currentHeight++
 			}
 			ts, err := bc.ThresholdState(ourVersion, pedro.Id)
 			if err != nil {
