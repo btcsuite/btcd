@@ -363,7 +363,7 @@ func (b *BlockChain) thresholdState(prevNode *blockNode, checker thresholdCondit
 			// activation threshold.
 			for k, v := range counts {
 				// We require at least 10% quorum on all votes.
-				if v.count < b.chainParams.RuleChangeActivationQuorum {
+				if v.count < checker.RuleChangeActivationQuorum() {
 					continue
 				}
 				if v.count >= checker.RuleChangeActivationThreshold(totalVotes) {
