@@ -51,8 +51,9 @@ func defaultParams() *chaincfg.Params {
 	params.Deployments = make(map[uint32][]chaincfg.ConsensusDeployment)
 	params.Deployments[ourVersion] = []chaincfg.ConsensusDeployment{
 		{
-			Vote:       pedro,
-			StartTime:  uint64(time.Now().Add(321 * time.Second).Unix()),
+			Vote: pedro,
+			StartTime: uint64(time.Now().Add(time.Duration(params.MinerConfirmationWindow) *
+				time.Second).Unix()),
 			ExpireTime: uint64(time.Now().Add(24 * time.Hour).Unix()),
 		},
 	}
@@ -161,24 +162,84 @@ func TestVoting(t *testing.T) {
 				},
 			},
 		},
-		//{
-		//	name:              "pedro 100% no",
-		//	numNodes:          params.MinerConfirmationWindow,
-		//	vote:              pedro,
-		//	blockVersion:      3,
-		//	startStakeVersion: ourVersion,
-		//	voteBits:          0x4,
-		//	expectedState:     []thresholdStateTuple{{ThresholdFailed, 2}},
-		//},
-		//{
-		//	name:              "pedro 100% abstain",
-		//	numNodes:          params.MinerConfirmationWindow,
-		//	vote:              pedro,
-		//	blockVersion:      3,
-		//	startStakeVersion: ourVersion,
-		//	voteBits:          0x0,
-		//	expectedState:     []thresholdStateTuple{{ThresholdStarted, invalidChoice}},
-		//},
+		{
+			name:              "pedro 100% no",
+			vote:              pedro,
+			blockVersion:      3,
+			startStakeVersion: ourVersion,
+			voteBitsCounts: []voteBitsCount{
+				{
+					voteBits: 0x01,
+					count:    params.MinerConfirmationWindow - 1,
+				}, {
+					voteBits: 0x05,
+					count:    params.MinerConfirmationWindow,
+				}, {
+					voteBits: 0x05,
+					count:    params.MinerConfirmationWindow,
+				}, {
+					voteBits: 0x01,
+					count:    params.MinerConfirmationWindow,
+				},
+			},
+			expectedState: []thresholdStateTuple{
+				{
+					state:  ThresholdDefined,
+					choice: invalidChoice,
+				},
+				{
+					state:  ThresholdStarted,
+					choice: invalidChoice,
+				},
+				{
+					state:  ThresholdFailed,
+					choice: 0x02,
+				},
+				{
+					state:  ThresholdFailed,
+					choice: 0x02,
+				},
+			},
+		},
+		{
+			name:              "pedro 100% abstain",
+			vote:              pedro,
+			blockVersion:      3,
+			startStakeVersion: ourVersion,
+			voteBitsCounts: []voteBitsCount{
+				{
+					voteBits: 0x01,
+					count:    params.MinerConfirmationWindow - 1,
+				}, {
+					voteBits: 0x01,
+					count:    params.MinerConfirmationWindow,
+				}, {
+					voteBits: 0x01,
+					count:    params.MinerConfirmationWindow,
+				}, {
+					voteBits: 0x01,
+					count:    params.MinerConfirmationWindow,
+				},
+			},
+			expectedState: []thresholdStateTuple{
+				{
+					state:  ThresholdDefined,
+					choice: invalidChoice,
+				},
+				{
+					state:  ThresholdStarted,
+					choice: invalidChoice,
+				},
+				{
+					state:  ThresholdStarted,
+					choice: invalidChoice,
+				},
+				{
+					state:  ThresholdStarted,
+					choice: invalidChoice,
+				},
+			},
+		},
 		//{
 		//	name:              "less than quorum",
 		//	numNodes:          params.MinerConfirmationWindow,
