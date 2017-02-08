@@ -116,7 +116,6 @@ func TestVoting(t *testing.T) {
 
 	tests := []struct {
 		name              string
-		numNodes          uint32
 		vote              chaincfg.Vote
 		blockVersion      int32
 		startStakeVersion uint32
@@ -125,7 +124,6 @@ func TestVoting(t *testing.T) {
 	}{
 		{
 			name:              "pedro 100% yes",
-			numNodes:          params.MinerConfirmationWindow,
 			vote:              pedro,
 			blockVersion:      3,
 			startStakeVersion: ourVersion,
@@ -143,8 +141,12 @@ func TestVoting(t *testing.T) {
 			},
 			expectedState: []thresholdStateTuple{
 				{
-					state:  ThresholdStarted,
+					state:  ThresholdDefined,
 					choice: invalidChoice,
+				},
+				{
+					state:  ThresholdStarted,
+					choice: 0x02,
 				},
 				{
 					state:  ThresholdLockedIn,
@@ -194,13 +196,13 @@ func TestVoting(t *testing.T) {
 		genesisNode := genesisBlockNode(params)
 		genesisNode.header.StakeVersion = test.startStakeVersion
 
-		t.Logf("running: %v\n", test.name)
+		t.Logf("running: %v", test.name)
 
 		var currentNode *blockNode
 		currentNode = genesisNode
 		currentHeight := uint32(1)
 		for k := range test.expectedState {
-			for i := uint32(0); i < test.numNodes; i++ {
+			for i := uint32(0); i < test.voteBitsCounts[k].count; i++ {
 				// Make up a header.
 				header := &wire.BlockHeader{
 					Version:      test.blockVersion,
@@ -217,8 +219,10 @@ func TestVoting(t *testing.T) {
 
 				// set stake versions and vote bits
 				for x := 0; x < int(params.TicketsPerBlock); x++ {
-					node.voterVersions = append(node.voterVersions, test.startStakeVersion)
-					node.voteBits = append(node.voteBits, test.voteBitsCounts[k].voteBits)
+					node.voterVersions = append(node.voterVersions,
+						test.startStakeVersion)
+					node.voteBits = append(node.voteBits,
+						test.voteBitsCounts[k].voteBits)
 				}
 
 				currentNode = node
@@ -227,11 +231,11 @@ func TestVoting(t *testing.T) {
 			}
 			ts, err := bc.ThresholdState(ourVersion, pedro.Id)
 			if err != nil {
-				t.Fatalf("ThresholdState: %v", err)
+				t.Fatalf("ThresholdState(%v): %v", k, err)
 			}
 			if ts != test.expectedState[k] {
-				t.Fatalf("%v got state %v wanted %v", test.name, ts,
-					test.expectedState[k])
+				t.Fatalf("%v (%v) got state %v wanted %v",
+					test.name, k, ts, test.expectedState[k])
 			}
 		}
 	}
