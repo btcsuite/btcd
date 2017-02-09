@@ -449,19 +449,17 @@ func (b *BlockChain) thresholdState(version uint32, prevNode *blockNode, checker
 	return stateTuple, nil
 }
 
-// ThresholdState returns the current rule change threshold state of the given
-// deployment ID for the block AFTER then end of the current best chain.
+// deploymentState returns the current rule change threshold for a given stake
+// version and deploymentID.  The threshold is evaluated from the point of view
+// of the block node passed in as the first argument to this method.
 //
-// This function is safe for concurrent access.
-func (b *BlockChain) ThresholdState(hash *chainhash.Hash, version uint32, deploymentID string) (ThresholdStateTuple, error) {
-	b.chainLock.Lock()
-	node, ok := b.index[*hash]
-	b.chainLock.Unlock()
-	if !ok {
-		return ThresholdStateTuple{State: ThresholdInvalid,
-			Choice: invalidChoice}, HashError(hash.String())
-	}
-
+// It is important to note that, as the variable name indicates, this function
+// expects the block node prior to the block for which the deployment state is
+// desired.  In other words, the returned deployment state is for the block
+// AFTER the passed node.
+//
+// This function MUST be called with the chain state lock held (for writes).
+func (b *BlockChain) deploymentState(prevNode *blockNode, version uint32, deploymentID string) (ThresholdStateTuple, error) {
 	for k := range b.chainParams.Deployments[version] {
 		if b.chainParams.Deployments[version][k].Vote.Id == deploymentID {
 			checker := deploymentChecker{
@@ -469,13 +467,37 @@ func (b *BlockChain) ThresholdState(hash *chainhash.Hash, version uint32, deploy
 				chain:      b,
 			}
 			cache := &b.deploymentCaches[version][k]
-			b.chainLock.Lock()
-			defer b.chainLock.Unlock()
-			return b.thresholdState(version, node, checker, cache)
+			return b.thresholdState(version, prevNode, checker, cache)
 		}
 	}
-	return ThresholdStateTuple{State: ThresholdInvalid,
-		Choice: invalidChoice}, DeploymentError(deploymentID)
+
+	invalidState := ThresholdStateTuple{
+		State:  ThresholdInvalid,
+		Choice: invalidChoice,
+	}
+	return invalidState, DeploymentError(deploymentID)
+}
+
+// ThresholdState returns the current rule change threshold state of the given
+// deployment ID for the block AFTER the provided block hash.
+//
+// This function is safe for concurrent access.
+func (b *BlockChain) ThresholdState(hash *chainhash.Hash, version uint32, deploymentID string) (ThresholdStateTuple, error) {
+	b.chainLock.Lock()
+	node, ok := b.index[*hash]
+	b.chainLock.Unlock()
+	if !ok {
+		invalidState := ThresholdStateTuple{
+			State:  ThresholdInvalid,
+			Choice: invalidChoice,
+		}
+		return invalidState, HashError(hash.String())
+	}
+
+	b.chainLock.Lock()
+	state, err := b.deploymentState(node, version, deploymentID)
+	b.chainLock.Unlock()
+	return state, err
 }
 
 type VoteCounts struct {

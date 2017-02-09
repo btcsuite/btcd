@@ -17,7 +17,7 @@ const (
 	InitialProcotolVersion uint32 = 1
 
 	// ProtocolVersion is the latest protocol version this package supports.
-	ProtocolVersion uint32 = 3
+	ProtocolVersion uint32 = 4
 
 	// BIP0111Version is the protocol version which added the SFNodeBloom
 	// service flag.

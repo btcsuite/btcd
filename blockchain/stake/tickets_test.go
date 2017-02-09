@@ -1,4 +1,4 @@
-// Copyright (c) 2015-2016 The Decred developers
+// Copyright (c) 2015-2017 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -9,6 +9,7 @@ import (
 	"compress/bzip2"
 	"encoding/gob"
 	"fmt"
+	"math"
 	"math/big"
 	"os"
 	"path/filepath"
@@ -954,7 +955,8 @@ var simNetParams = &chaincfg.Params{
 	ReduceMinDifficulty:      false,
 	MinDiffReductionTime:     0, // Does not apply since ReduceMinDifficulty false
 	GenerateSupported:        true,
-	MaximumBlockSize:         1000000,
+	MaximumBlockSizes:        []int{1000000, 1310720},
+	MaxTxSize:                1000000,
 	TargetTimePerBlock:       time.Second,
 	WorkDiffAlpha:            1,
 	WorkDiffWindowSize:       8,
@@ -982,6 +984,36 @@ var simNetParams = &chaincfg.Params{
 	RuleChangeActivationMultiplier: 3,   // 75%
 	RuleChangeActivationDivisor:    4,
 	RuleChangeActivationInterval:   320, // 320 seconds
+	Deployments: map[uint32][]chaincfg.ConsensusDeployment{
+		4: {{
+			Vote: chaincfg.Vote{
+				Id:          chaincfg.VoteIDMaxBlockSize,
+				Description: "Change maximum allowed block size from 1MiB to 1.25MB",
+				Mask:        0x0006, // Bits 1 and 2
+				Choices: []chaincfg.Choice{{
+					Id:          "abstain",
+					Description: "abstain voting for change",
+					Bits:        0x0000,
+					IsIgnore:    true,
+					IsNo:        false,
+				}, {
+					Id:          "no",
+					Description: "reject changing max allowed block size",
+					Bits:        0x0002, // Bit 1
+					IsIgnore:    false,
+					IsNo:        true,
+				}, {
+					Id:          "yes",
+					Description: "accept changing max allowed block size",
+					Bits:        0x0004, // Bit 2
+					IsIgnore:    false,
+					IsNo:        false,
+				}},
+			},
+			StartTime:  0,             // Always available for vote
+			ExpireTime: math.MaxInt64, // Never expires
+		}},
+	},
 
 	// Enforce current block version once majority of the network has
 	// upgraded.

@@ -13,10 +13,13 @@ import (
 )
 
 // maxFlagsPerMerkleBlock is the maximum number of flag bytes that could
-// possibly fit into a merkle block.  Since each transaction is represented by
-// a single bit, this is the max number of transactions per block divided by
-// 8 bits per byte.  Then an extra one to cover partials.
-const maxFlagsPerMerkleBlock = MaxTxPerTxTree / 8
+// possibly fit into a merkle block of the given protocol version.
+func maxFlagsPerMerkleBlock(pver uint32) uint32 {
+	// Each transaction is represented by a single bit, so the result is the
+	// max number of transactions per block divided by 8 bits per byte.
+	// Then an extra one to cover partials.
+	return uint32(MaxTxPerTxTree(ProtocolVersion)/8) + 1
+}
 
 // MsgMerkleBlock implements the Message interface and represents a decred
 // merkleblock message which is used to reset a Bloom filter.
@@ -33,9 +36,10 @@ type MsgMerkleBlock struct {
 
 // AddTxHash adds a new transaction hash to the message.
 func (msg *MsgMerkleBlock) AddTxHash(hash *chainhash.Hash) error {
-	if len(msg.Hashes)+1 > MaxTxPerTxTree {
+	maxTxPerTree := MaxTxPerTxTree(ProtocolVersion)
+	if uint64(len(msg.Hashes)+1) > maxTxPerTree {
 		str := fmt.Sprintf("too many tx hashes for message [max %v]",
-			MaxTxPerTxTree)
+			maxTxPerTree)
 		return messageError("MsgMerkleBlock.AddTxHash", str)
 	}
 
@@ -45,9 +49,10 @@ func (msg *MsgMerkleBlock) AddTxHash(hash *chainhash.Hash) error {
 
 // AddSTxHash adds a new stake transaction hash to the message.
 func (msg *MsgMerkleBlock) AddSTxHash(hash *chainhash.Hash) error {
-	if len(msg.SHashes)+1 > MaxTxPerTxTree {
+	maxTxPerTree := MaxTxPerTxTree(ProtocolVersion)
+	if uint64(len(msg.SHashes)+1) > maxTxPerTree {
 		str := fmt.Sprintf("too many tx hashes for message [max %v]",
-			MaxTxPerTxTree)
+			maxTxPerTree)
 		return messageError("MsgMerkleBlock.AddSTxHash", str)
 	}
 
@@ -73,9 +78,10 @@ func (msg *MsgMerkleBlock) BtcDecode(r io.Reader, pver uint32) error {
 	if err != nil {
 		return err
 	}
-	if count > MaxTxPerTxTree {
+	maxTxPerTree := MaxTxPerTxTree(pver)
+	if count > maxTxPerTree {
 		str := fmt.Sprintf("too many transaction hashes for message "+
-			"[count %v, max %v]", count, MaxTxPerTxTree)
+			"[count %v, max %v]", count, maxTxPerTree)
 		return messageError("MsgMerkleBlock.BtcDecode", str)
 	}
 
@@ -102,9 +108,9 @@ func (msg *MsgMerkleBlock) BtcDecode(r io.Reader, pver uint32) error {
 	if err != nil {
 		return err
 	}
-	if scount > MaxTxPerTxTree {
+	if scount > maxTxPerTree {
 		str := fmt.Sprintf("too many stransaction hashes for message "+
-			"[count %v, max %v]", scount, MaxTxPerTxTree)
+			"[count %v, max %v]", scount, maxTxPerTree)
 		return messageError("MsgMerkleBlock.BtcDecode", str)
 	}
 
@@ -119,7 +125,7 @@ func (msg *MsgMerkleBlock) BtcDecode(r io.Reader, pver uint32) error {
 		msg.AddSTxHash(hash)
 	}
 
-	msg.Flags, err = ReadVarBytes(r, pver, maxFlagsPerMerkleBlock,
+	msg.Flags, err = ReadVarBytes(r, pver, maxFlagsPerMerkleBlock(pver),
 		"merkle block flags size")
 	if err != nil {
 		return err
@@ -132,24 +138,26 @@ func (msg *MsgMerkleBlock) BtcDecode(r io.Reader, pver uint32) error {
 // This is part of the Message interface implementation.
 func (msg *MsgMerkleBlock) BtcEncode(w io.Writer, pver uint32) error {
 	// Read num transaction hashes and limit to max.
-	numHashes := len(msg.Hashes)
-	if numHashes > MaxTxPerTxTree {
+	numHashes := uint64(len(msg.Hashes))
+	maxTxPerTree := MaxTxPerTxTree(pver)
+	if numHashes > maxTxPerTree {
 		str := fmt.Sprintf("too many transaction hashes for message "+
-			"[count %v, max %v]", numHashes, MaxTxPerTxTree)
+			"[count %v, max %v]", numHashes, maxTxPerTree)
 		return messageError("MsgMerkleBlock.BtcDecode", str)
 	}
 	// Read num stake transaction hashes and limit to max.
-	numSHashes := len(msg.SHashes)
-	if numSHashes > MaxTxPerTxTree {
+	numSHashes := uint64(len(msg.SHashes))
+	if numSHashes > maxTxPerTree {
 		str := fmt.Sprintf("too many stake transaction hashes for message "+
-			"[count %v, max %v]", numHashes, MaxTxPerTxTree)
+			"[count %v, max %v]", numHashes, maxTxPerTree)
 		return messageError("MsgMerkleBlock.BtcDecode", str)
 	}
 
-	numFlagBytes := len(msg.Flags)
-	if numFlagBytes > maxFlagsPerMerkleBlock {
+	numFlagBytes := uint32(len(msg.Flags))
+	maxFlags := maxFlagsPerMerkleBlock(pver)
+	if numFlagBytes > maxFlags {
 		str := fmt.Sprintf("too many flag bytes for message [count %v, "+
-			"max %v]", numFlagBytes, maxFlagsPerMerkleBlock)
+			"max %v]", numFlagBytes, maxFlags)
 		return messageError("MsgMerkleBlock.BtcDecode", str)
 	}
 
@@ -207,6 +215,11 @@ func (msg *MsgMerkleBlock) Command() string {
 // MaxPayloadLength returns the maximum length the payload can be for the
 // receiver.  This is part of the Message interface implementation.
 func (msg *MsgMerkleBlock) MaxPayloadLength(pver uint32) uint32 {
+	// Protocol version 3 and lower have a different max block payload.
+	if pver <= 3 {
+		return MaxBlockPayloadV3
+	}
+
 	return MaxBlockPayload
 }
 

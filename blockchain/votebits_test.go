@@ -50,14 +50,13 @@ var (
 func defaultParams() chaincfg.Params {
 	params := chaincfg.SimNetParams
 	params.Deployments = make(map[uint32][]chaincfg.ConsensusDeployment)
-	params.Deployments[posVersion] = []chaincfg.ConsensusDeployment{
-		{
-			Vote: pedro,
-			StartTime: uint64(time.Now().Add(time.Duration(params.RuleChangeActivationInterval) *
-				time.Second).Unix()),
-			ExpireTime: uint64(time.Now().Add(24 * time.Hour).Unix()),
-		},
-	}
+	params.Deployments[posVersion] = []chaincfg.ConsensusDeployment{{
+		Vote: pedro,
+		StartTime: uint64(time.Now().Add(time.Duration(
+			params.RuleChangeActivationInterval) *
+			time.Second).Unix()),
+		ExpireTime: uint64(time.Now().Add(24 * time.Hour).Unix()),
+	}}
 
 	return params
 }

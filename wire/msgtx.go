@@ -1538,6 +1538,11 @@ func (msg *MsgTx) Command() string {
 // MaxPayloadLength returns the maximum length the payload can be for the
 // receiver.  This is part of the Message interface implementation.
 func (msg *MsgTx) MaxPayloadLength(pver uint32) uint32 {
+	// Protocol version 3 and lower have a different max block payload.
+	if pver <= 3 {
+		return MaxBlockPayloadV3
+	}
+
 	return MaxBlockPayload
 }
 

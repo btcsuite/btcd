@@ -1,4 +1,4 @@
-// Copyright (c) 2016 The Decred developers
+// Copyright (c) 2016-2017 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -349,7 +349,7 @@ func Generate() (tests [][]TestInstance, err error) {
 	coinbaseMaturity := g.Params().CoinbaseMaturity
 	stakeEnabledHeight := g.Params().StakeEnabledHeight
 	stakeValidationHeight := g.Params().StakeValidationHeight
-	maxBlockSize := g.Params().MaximumBlockSize
+	maxBlockSize := g.Params().MaximumBlockSizes[0]
 	ticketsPerBlock := g.Params().TicketsPerBlock
 
 	// ---------------------------------------------------------------------

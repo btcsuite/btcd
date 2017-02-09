@@ -1,5 +1,5 @@
 // Copyright (c) 2013-2016 The btcsuite developers
-// Copyright (c) 2015-2016 The Decred developers
+// Copyright (c) 2015-2017 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -23,12 +23,22 @@ const defaultTransactionAlloc = 2048
 // MaxBlocksPerMsg is the maximum number of blocks allowed per message.
 const MaxBlocksPerMsg = 500
 
-// MaxBlockPayload is the maximum bytes a block message can be in bytes.
-const MaxBlockPayload = 1000000 // Not actually 1MB which would be 1024 * 1024
+// MaxBlockPayloadV3 is the maximum bytes a block message can be in bytes as of
+// version 3 of the protocol.
+const MaxBlockPayloadV3 = 1000000 // Not actually 1MB which would be 1024 * 1024
 
-// MaxTxPerTxTree is the maximum number of transactions that could
-// possibly fit into a block per each merkle root.
-const MaxTxPerTxTree = ((MaxBlockPayload / minTxPayload) / 2) + 1
+// MaxBlockPayload is the maximum bytes a block message can be in bytes.
+const MaxBlockPayload = 1310720 // 1.25MB
+
+// MaxTxPerTxTree returns the maximum number of transactions that could possibly
+// fit into a block per each merkle root for the given protocol version.
+func MaxTxPerTxTree(pver uint32) uint64 {
+	if pver <= 3 {
+		return ((MaxBlockPayloadV3 / minTxPayload) / 2) + 1
+	}
+
+	return ((MaxBlockPayload / minTxPayload) / 2) + 1
+}
 
 // TxLoc holds locator data for the offset and length of where a transaction is
 // located within a MsgBlock data buffer.
@@ -88,9 +98,10 @@ func (msg *MsgBlock) BtcDecode(r io.Reader, pver uint32) error {
 	// tx tree.
 	// It would be possible to cause memory exhaustion and panics without
 	// a sane upper bound on this count.
-	if txCount > MaxTxPerTxTree {
+	maxTxPerTree := MaxTxPerTxTree(pver)
+	if txCount > maxTxPerTree {
 		str := fmt.Sprintf("too many transactions to fit into a block "+
-			"[count %d, max %d]", txCount, MaxTxPerTxTree)
+			"[count %d, max %d]", txCount, maxTxPerTree)
 		return messageError("MsgBlock.BtcDecode", str)
 	}
 
@@ -112,9 +123,9 @@ func (msg *MsgBlock) BtcDecode(r io.Reader, pver uint32) error {
 	if err != nil {
 		return err
 	}
-	if stakeTxCount > MaxTxPerTxTree {
+	if stakeTxCount > maxTxPerTree {
 		str := fmt.Sprintf("too many stransactions to fit into a block "+
-			"[count %d, max %d]", stakeTxCount, MaxTxPerTxTree)
+			"[count %d, max %d]", stakeTxCount, maxTxPerTree)
 		return messageError("MsgBlock.BtcDecode", str)
 	}
 
@@ -173,12 +184,15 @@ func (msg *MsgBlock) DeserializeTxLoc(r *bytes.Buffer) ([]TxLoc, []TxLoc, error)
 		return nil, nil, err
 	}
 	// Prevent more transactions than could possibly fit into a normal tx
-	// tree.
-	// It would be possible to cause memory exhaustion and panics without
-	// a sane upper bound on this count.
-	if txCount > MaxTxPerTxTree {
+	// tree.  It would be possible to cause memory exhaustion and panics
+	// without a sane upper bound on this count.
+	//
+	// NOTE: This is using the constant for the latest protocol version
+	// since it is in terms of the largest possible block size.
+	maxTxPerTree := MaxTxPerTxTree(ProtocolVersion)
+	if txCount > maxTxPerTree {
 		str := fmt.Sprintf("too many transactions to fit into a block "+
-			"[count %d, max %d]", txCount, MaxTxPerTxTree)
+			"[count %d, max %d]", txCount, maxTxPerTree)
 		return nil, nil, messageError("MsgBlock.DeserializeTxLoc", str)
 	}
 
@@ -203,12 +217,14 @@ func (msg *MsgBlock) DeserializeTxLoc(r *bytes.Buffer) ([]TxLoc, []TxLoc, error)
 	}
 
 	// Prevent more transactions than could possibly fit into a stake tx
-	// tree.
-	// It would be possible to cause memory exhaustion and panics without
-	// a sane upper bound on this count.
-	if stakeTxCount > MaxTxPerTxTree {
+	// tree.  It would be possible to cause memory exhaustion and panics
+	// without a sane upper bound on this count.
+	//
+	// NOTE: This is using the constant for the latest protocol version
+	// since it is in terms of the largest possible block size.
+	if stakeTxCount > maxTxPerTree {
 		str := fmt.Sprintf("too many transactions to fit into a stake tx tree "+
-			"[count %d, max %d]", stakeTxCount, MaxTxPerTxTree)
+			"[count %d, max %d]", stakeTxCount, maxTxPerTree)
 		return nil, nil, messageError("MsgBlock.DeserializeTxLoc", str)
 	}
 
@@ -327,6 +343,11 @@ func (msg *MsgBlock) Command() string {
 // MaxPayloadLength returns the maximum length the payload can be for the
 // receiver.  This is part of the Message interface implementation.
 func (msg *MsgBlock) MaxPayloadLength(pver uint32) uint32 {
+	// Protocol version 3 and lower have a different max block payload.
+	if pver <= 3 {
+		return MaxBlockPayloadV3
+	}
+
 	// Block header at 80 bytes + transaction count + max transactions
 	// which can vary up to the MaxBlockPayload (including the block header
 	// and transaction count).

@@ -1,5 +1,5 @@
 // Copyright (c) 2013-2016 The btcsuite developers
-// Copyright (c) 2015-2016 The Decred developers
+// Copyright (c) 2015-2017 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -23,8 +23,13 @@ import (
 
 const (
 	// MaxSigOpsPerBlock is the maximum number of signature operations
-	// allowed for a block.  It is a fraction of the max block payload size.
-	MaxSigOpsPerBlock = wire.MaxBlockPayload / 200
+	// allowed for a block.  This really should be based upon the max
+	// allowed block size for a network and any votes that might change it,
+	// however, since it was not updated to be based upon it before release,
+	// it will require a hard fork and associated vote agenda to change it.
+	// The original max block size for the protocol was 1MiB, so that is
+	// what this is based on.
+	MaxSigOpsPerBlock = 1000000 / 200
 
 	// MaxTimeOffsetSeconds is the maximum number of seconds a block time
 	// is allowed to be ahead of the current time.  This is currently 2
@@ -125,12 +130,12 @@ func CheckTransactionSanity(tx *wire.MsgTx, params *chaincfg.Params) error {
 		return ruleError(ErrNoTxOutputs, "transaction has no outputs")
 	}
 
-	// A transaction must not exceed the maximum allowed block payload when
+	// A transaction must not exceed the maximum allowed size when
 	// serialized.
 	serializedTxSize := tx.SerializeSize()
-	if serializedTxSize > params.MaximumBlockSize {
+	if serializedTxSize > params.MaxTxSize {
 		str := fmt.Sprintf("serialized transaction is too big - got "+
-			"%d, max %d", serializedTxSize, params.MaximumBlockSize)
+			"%d, max %d", serializedTxSize, params.MaxTxSize)
 		return ruleError(ErrTxTooBig, str)
 	}
 
@@ -411,10 +416,18 @@ func checkBlockSanity(block *dcrutil.Block, timeSource MedianTimeSource,
 
 	// A block must not exceed the maximum allowed block payload when
 	// serialized.
+	//
+	// This is a quick and context-free sanity check of the maximum block
+	// size according to the wire protocol.  Even though the wire protocol
+	// already prevents blocks bigger than this limit, there are other
+	// methods of receiving a block that might not have been checked
+	// already.  A separate block size is enforced later that takes into
+	// account the network-specific block size and the results of block size
+	// votes.  Typically that block size is more restrictive than this one.
 	serializedSize := msgBlock.SerializeSize()
-	if serializedSize > chainParams.MaximumBlockSize {
+	if serializedSize > wire.MaxBlockPayload {
 		str := fmt.Sprintf("serialized block is too big - got %d, "+
-			"max %d", serializedSize, chainParams.MaximumBlockSize)
+			"max %d", serializedSize, wire.MaxBlockPayload)
 		return ruleError(ErrBlockTooBig, str)
 	}
 	if msgBlock.Header.Size != uint32(serializedSize) {
@@ -683,6 +696,17 @@ func (b *BlockChain) checkBlockHeaderContext(header *wire.BlockHeader, prevNode 
 	}
 
 	if !fastAdd {
+		// Reject version 3 blocks for networks other than the main
+		// network once a majority of the network has upgraded.
+		if b.chainParams.Net != wire.MainNet && header.Version < 4 &&
+			b.isMajorityVersion(4, prevNode,
+				b.chainParams.BlockRejectNumRequired) {
+
+			str := "new blocks with version %d are no longer valid"
+			str = fmt.Sprintf(str, header.Version)
+			return ruleError(ErrBlockVersionTooOld, str)
+		}
+
 		// Reject version 2 blocks once a majority of the network has
 		// upgraded.
 		if header.Version < 3 && b.isMajorityVersion(3, prevNode,
