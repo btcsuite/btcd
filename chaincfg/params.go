@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"math"
 	"math/big"
 	"time"
 
@@ -88,15 +89,15 @@ type Checkpoint struct {
 //			IsNo:        false,
 //		},
 //		{
-//			Id:          "yes",
-//			Description: "accept changing block height to uint64",
+//			Id:          "no",
+//			Description: "reject changing block height to uint64",
 //			Bits:        0x0002,
 //			IsIgnore:    false,
 //			IsNo:        false,
 //		},
 //		{
-//			Id:          "no",
-//			Description: "reject changing block height to uint64",
+//			Id:          "yes",
+//			Description: "accept changing block height to uint64",
 //			Bits:        0x0004,
 //			IsIgnore:    false,
 //			IsNo:        true,
@@ -164,6 +165,12 @@ func (v *Vote) IsNo(vote uint16) (bool, error) {
 
 	return false, fmt.Errorf("vote bits not found")
 }
+
+const (
+	// VoteIDMaxBlockSize is the vote ID for the the maximum block size
+	// increase agenda used for the hard fork demo.
+	VoteIDMaxBlockSize = "maxblocksize"
+)
 
 // ConsensusDeployment defines details related to a specific consensus rule
 // change that is voted in.  This is part of BIP0009.
@@ -235,9 +242,17 @@ type Params struct {
 	// GenerateSupported specifies whether or not CPU mining is allowed.
 	GenerateSupported bool
 
-	// MaximumBlockSize is the maximum size of a block that can be generated
-	// on the network.
-	MaximumBlockSize int
+	// MaximumBlockSizes are the maximum sizes of a block that can be
+	// generated on the network.  It is an array because the max block size
+	// can be different values depending on the results of a voting agenda.
+	// The first entry is the initial block size for the network, while the
+	// other entries are potential block size changes which take effect when
+	// the vote for the associated agenda succeeds.
+	MaximumBlockSizes []int
+
+	// MaxTxSize is the maximum number of bytes a serialized transaction can
+	// be in order to be considered valid by consensus.
+	MaxTxSize int
 
 	// TargetTimePerBlock is the desired amount of time to generate each
 	// block.
@@ -459,7 +474,8 @@ var MainNetParams = Params{
 	ReduceMinDifficulty:      false,
 	MinDiffReductionTime:     0, // Does not apply since ReduceMinDifficulty false
 	GenerateSupported:        false,
-	MaximumBlockSize:         393216,
+	MaximumBlockSizes:        []int{393216},
+	MaxTxSize:                393216,
 	TargetTimePerBlock:       time.Minute * 5,
 	WorkDiffAlpha:            1,
 	WorkDiffWindowSize:       144,
@@ -574,7 +590,8 @@ var TestNetParams = Params{
 	ReduceMinDifficulty:      false,
 	MinDiffReductionTime:     0, // Does not apply since ReduceMinDifficulty false
 	GenerateSupported:        true,
-	MaximumBlockSize:         1000000,
+	MaximumBlockSizes:        []int{1000000, 1310720},
+	MaxTxSize:                1000000,
 	TargetTimePerBlock:       time.Minute * 2,
 	WorkDiffAlpha:            1,
 	WorkDiffWindowSize:       144,
@@ -614,6 +631,36 @@ var TestNetParams = Params{
 	RuleChangeActivationMultiplier: 3,    // 75%
 	RuleChangeActivationDivisor:    4,
 	MinerConfirmationWindow:        5040, // 1 week
+	Deployments: map[uint32][]ConsensusDeployment{
+		4: {{
+			Vote: Vote{
+				Id:          VoteIDMaxBlockSize,
+				Description: "Change maximum allowed block size from 1MiB to 1.25MB",
+				Mask:        0x0006, // Bits 1 and 2
+				Choices: []Choice{{
+					Id:          "abstain",
+					Description: "abstain voting for change",
+					Bits:        0x0000,
+					IsIgnore:    true,
+					IsNo:        false,
+				}, {
+					Id:          "no",
+					Description: "reject changing max allowed block size",
+					Bits:        0x0002, // Bit 1
+					IsIgnore:    false,
+					IsNo:        false,
+				}, {
+					Id:          "yes",
+					Description: "accept changing max allowed block size",
+					Bits:        0x0004, // Bit 2
+					IsIgnore:    false,
+					IsNo:        true,
+				}},
+			},
+			StartTime:  1486598400, // Feb 9th, 2017
+			ExpireTime: 1496966400, // Jun 9th, 2017
+		}},
+	},
 
 	// Enforce current block version once majority of the network has
 	// upgraded.
@@ -693,7 +740,8 @@ var SimNetParams = Params{
 	ReduceMinDifficulty:      false,
 	MinDiffReductionTime:     0, // Does not apply since ReduceMinDifficulty false
 	GenerateSupported:        true,
-	MaximumBlockSize:         1000000,
+	MaximumBlockSizes:        []int{1000000, 1310720},
+	MaxTxSize:                1000000,
 	TargetTimePerBlock:       time.Second,
 	WorkDiffAlpha:            1,
 	WorkDiffWindowSize:       8,
@@ -721,6 +769,36 @@ var SimNetParams = Params{
 	RuleChangeActivationMultiplier: 3,   // 75%
 	RuleChangeActivationDivisor:    4,
 	MinerConfirmationWindow:        320, // 320 seconds
+	Deployments: map[uint32][]ConsensusDeployment{
+		4: {{
+			Vote: Vote{
+				Id:          VoteIDMaxBlockSize,
+				Description: "Change maximum allowed block size from 1MiB to 1.25MB",
+				Mask:        0x0006, // Bits 1 and 2
+				Choices: []Choice{{
+					Id:          "abstain",
+					Description: "abstain voting for change",
+					Bits:        0x0000,
+					IsIgnore:    true,
+					IsNo:        false,
+				}, {
+					Id:          "no",
+					Description: "reject changing max allowed block size",
+					Bits:        0x0002, // Bit 1
+					IsIgnore:    false,
+					IsNo:        false,
+				}, {
+					Id:          "yes",
+					Description: "accept changing max allowed block size",
+					Bits:        0x0004, // Bit 2
+					IsIgnore:    false,
+					IsNo:        true,
+				}},
+			},
+			StartTime:  0,             // Always available for vote
+			ExpireTime: math.MaxInt64, // Never expires
+		}},
+	},
 
 	// Enforce current block version once majority of the network has
 	// upgraded.

@@ -1,5 +1,5 @@
 // Copyright (c) 2013-2016 The btcsuite developers
-// Copyright (c) 2015-2016 The Decred developers
+// Copyright (c) 2015-2017 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -24,7 +24,7 @@ const defaultTransactionAlloc = 2048
 const MaxBlocksPerMsg = 500
 
 // MaxBlockPayload is the maximum bytes a block message can be in bytes.
-const MaxBlockPayload = 1000000 // Not actually 1MB which would be 1024 * 1024
+const MaxBlockPayload = 1310720 // 1.25MB
 
 // MaxTxPerTxTree is the maximum number of transactions that could
 // possibly fit into a block per each merkle root.

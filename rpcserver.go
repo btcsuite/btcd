@@ -1,5 +1,5 @@
 // Copyright (c) 2013-2016 The btcsuite developers
-// Copyright (c) 2015-2016 The Decred developers
+// Copyright (c) 2015-2017 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -2860,6 +2860,15 @@ func (state *gbtWorkState) blockTemplateResult(bm *blockManager,
 		return nil, err
 	}
 
+	// Choose the correct maximum block size as defined by the  network
+	// parameters and the current status of any hard fork votes to change it
+	// when serialized.
+	maxBlockSize, err := bm.chain.MaxBlockSize()
+	if err != nil {
+		context := "Failed to obtain threshold state"
+		return nil, internalRPCError(err.Error(), context)
+	}
+
 	// Generate the block template reply.  Note that following mutations are
 	// implied by the included or omission of fields:
 	//  Including MinTime -> time/decrement
@@ -2869,7 +2878,7 @@ func (state *gbtWorkState) blockTemplateResult(bm *blockManager,
 	reply := dcrjson.GetBlockTemplateResult{
 		Header:        hex.EncodeToString(headerBytes),
 		SigOpLimit:    blockchain.MaxSigOpsPerBlock,
-		SizeLimit:     int64(bm.server.chainParams.MaximumBlockSize),
+		SizeLimit:     maxBlockSize,
 		Transactions:  transactions,
 		STransactions: stransactions,
 		LongPollID:    templateID,

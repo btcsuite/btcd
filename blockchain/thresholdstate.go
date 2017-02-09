@@ -408,11 +408,17 @@ func (b *BlockChain) thresholdState(prevNode *blockNode, checker thresholdCondit
 	return stateTuple, nil
 }
 
-// ThresholdState returns the current rule change threshold state of the given
-// deployment ID for the block AFTER then end of the current best chain.
+// deploymentState returns the current rule change threshold for a given stake
+// version and deploymentID.  The threshold is evaluated from the point of view
+// of the block node passed in as the first argument to this method.
 //
-// This function is safe for concurrent access.
-func (b *BlockChain) ThresholdState(version uint32, deploymentID string) (thresholdStateTuple, error) {
+// It is important to note that, as the variable name indicates, this function
+// expects the block node prior to the block for which the deployment state is
+// desired.  In other words, the returned deployment state is for the block
+// AFTER the passed node.
+//
+// This function MUST be called with the chain state lock held (for writes).
+func (b *BlockChain) deploymentState(prevNode *blockNode, version uint32, deploymentID string) (thresholdStateTuple, error) {
 	for k := range b.chainParams.Deployments[version] {
 		if b.chainParams.Deployments[version][k].Vote.Id == deploymentID {
 			checker := deploymentChecker{
@@ -420,13 +426,24 @@ func (b *BlockChain) ThresholdState(version uint32, deploymentID string) (thresh
 				chain:      b,
 			}
 			cache := &b.deploymentCaches[version][k]
-			b.chainLock.Lock()
-			defer b.chainLock.Unlock()
-			return b.thresholdState(b.bestNode, checker,
-				cache)
+			return b.thresholdState(prevNode, checker, cache)
 		}
 	}
-	return thresholdStateTuple{state: ThresholdInvalid,
-			choice: invalidChoice},
-		fmt.Errorf("deployment not found: %v", deploymentID)
+
+	invalidState := thresholdStateTuple{
+		state:  ThresholdInvalid,
+		choice: invalidChoice,
+	}
+	return invalidState, fmt.Errorf("deployment not found: %v", deploymentID)
+}
+
+// ThresholdState returns the current rule change threshold state of the given
+// deployment ID for the block AFTER then end of the current best chain.
+//
+// This function is safe for concurrent access.
+func (b *BlockChain) ThresholdState(version uint32, deploymentID string) (thresholdStateTuple, error) {
+	b.chainLock.Lock()
+	state, err := b.deploymentState(b.bestNode, version, deploymentID)
+	b.chainLock.Unlock()
+	return state, err
 }

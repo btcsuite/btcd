@@ -1,5 +1,5 @@
 // Copyright (c) 2013-2016 The btcsuite developers
-// Copyright (c) 2015-2016 The Decred developers
+// Copyright (c) 2015-2017 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 package blockchain_test
@@ -2151,7 +2151,8 @@ var simNetParams = &chaincfg.Params{
 	ReduceMinDifficulty:      false,
 	MinDiffReductionTime:     0, // Does not apply since ReduceMinDifficulty false
 	GenerateSupported:        true,
-	MaximumBlockSize:         1000000,
+	MaximumBlockSizes:        []int{1000000, 1310720},
+	MaxTxSize:                1000000,
 	TargetTimePerBlock:       time.Second,
 	WorkDiffAlpha:            1,
 	WorkDiffWindowSize:       8,

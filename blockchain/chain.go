@@ -1,5 +1,5 @@
 // Copyright (c) 2013-2016 The btcsuite developers
-// Copyright (c) 2015-2016 The Decred developers
+// Copyright (c) 2015-2017 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -2153,6 +2153,46 @@ func (b *BlockChain) BestSnapshot() *BestState {
 	snapshot := b.stateSnapshot
 	b.stateLock.RUnlock()
 	return snapshot
+}
+
+// MaximumBlockSize returns the maximum permitted block size for the block
+// AFTER the given node.
+//
+// This function MUST be called with the chain state lock held (for reads).
+func (b *BlockChain) maxBlockSize(prevNode *blockNode) (int64, error) {
+	// Hard fork voting on block size is not enabled on mainnet.
+	if b.chainParams.Net == wire.MainNet {
+		return int64(b.chainParams.MaximumBlockSizes[0]), nil
+	}
+
+	// Return the larger block size if the version 4 stake vote for the max
+	// block size increase agenda is active.
+	//
+	// NOTE: The choice field of the return threshold state is not examined
+	// here because there is only one possible choice that can be active
+	// for the agenda, which is yes, so there is no need to check it.
+	maxSize := int64(b.chainParams.MaximumBlockSizes[0])
+	state, err := b.deploymentState(prevNode, 4, chaincfg.VoteIDMaxBlockSize)
+	if err != nil {
+		return maxSize, err
+	}
+	if state.state == ThresholdActive {
+		return int64(b.chainParams.MaximumBlockSizes[1]), nil
+	}
+
+	// The max block size is not changed in any other cases.
+	return maxSize, nil
+}
+
+// MaximumBlockSize returns the maximum permitted block size for the block AFTER
+// the end of the current best chain.
+//
+// This function is safe for concurrent access.
+func (b *BlockChain) MaxBlockSize() (int64, error) {
+	b.chainLock.Lock()
+	maxSize, err := b.maxBlockSize(b.bestNode)
+	b.chainLock.Unlock()
+	return maxSize, err
 }
 
 // IndexManager provides a generic interface that the is called when blocks are
