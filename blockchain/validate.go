@@ -409,21 +409,6 @@ func checkBlockSanity(block *dcrutil.Block, timeSource MedianTimeSource,
 			"any transactions")
 	}
 
-	// A block must not have more transactions than the max block payload.
-	if numTx > chainParams.MaximumBlockSize {
-		str := fmt.Sprintf("block contains too many transactions - "+
-			"got %d, max %d", numTx, chainParams.MaximumBlockSize)
-		return ruleError(ErrTooManyTransactions, str)
-	}
-
-	// A block must not have more stake transactions than the max block payload.
-	numStakeTx := len(msgBlock.STransactions)
-	if numStakeTx > chainParams.MaximumBlockSize {
-		str := fmt.Sprintf("block contains too many stake transactions - "+
-			"got %d, max %d", numStakeTx, chainParams.MaximumBlockSize)
-		return ruleError(ErrTooManyTransactions, str)
-	}
-
 	// A block must not exceed the maximum allowed block payload when
 	// serialized.
 	serializedSize := msgBlock.SerializeSize()
