@@ -1,13 +1,12 @@
-// Copyright (c) 2016 The Decred developers
+// Copyright (c) 2016-2017 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package stakeversiontests
+package chaingen
 
 import (
 	"bytes"
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"math"
 	"math/big"
@@ -45,63 +44,40 @@ var (
 	coinbaseSigScript = []byte{txscript.OP_0, txscript.OP_0}
 )
 
-// TestInstance is an interface that describes a specific test instance returned
-// by the tests generated in this package.  It should be type asserted to one
-// of the concrete test instance types in order to test accordingly.
-type TestInstance interface {
-	FullBlockTestInstance()
-}
-
-// AcceptedBlock defines a test instance that expects a block to be accepted to
-// the blockchain either by extending the main chain, on a side chain, or as an
-// orphan.
-type AcceptedBlock struct {
-	Name        string
-	Block       *wire.MsgBlock
-	IsMainChain bool
-	IsOrphan    bool
-}
-
-// Ensure AcceptedBlock implements the TestInstance interface.
-var _ TestInstance = AcceptedBlock{}
-
-// FullBlockTestInstance only exists to allow the AcceptedBlock to be treated
-// as a TestInstance.
-//
-// This implements the TestInstance interface.
-func (b AcceptedBlock) FullBlockTestInstance() {}
-
-// RejectedBlock defines a test instance that expects a block to be rejected by
-// the blockchain consensus rules.
-type RejectedBlock struct {
-	Name       string
-	Block      *wire.MsgBlock
-	RejectCode blockchain.ErrorCode
-}
-
-// Ensure RejectedBlock implements the TestInstance interface.
-var _ TestInstance = RejectedBlock{}
-
-// FullBlockTestInstance only exists to allow the RejectedBlock to be treated
-// as a TestInstance.
-//
-// This implements the TestInstance interface.
-func (b RejectedBlock) FullBlockTestInstance() {}
-
-// spendableOut represents a transaction output that is spendable along with
+// SpendableOut represents a transaction output that is spendable along with
 // additional metadata such as the block its in and how much it pays.
-type spendableOut struct {
+type SpendableOut struct {
 	prevOut     wire.OutPoint
 	blockHeight uint32
 	blockIndex  uint32
 	amount      dcrutil.Amount
 }
 
-// makeSpendableOutForTx returns a spendable output for the given transaction
+// PrevOut returns the outpoint associated with the spendable output.
+func (s *SpendableOut) PrevOut() wire.OutPoint {
+	return s.prevOut
+}
+
+// BlockHeight returns the block height of the block the spendable output is in.
+func (s *SpendableOut) BlockHeight() uint32 {
+	return s.blockHeight
+}
+
+// BlockIndex returns the offset into the block the spendable output is in.
+func (s *SpendableOut) BlockIndex() uint32 {
+	return s.blockIndex
+}
+
+// Amount returns the amount associated with the spendable output.
+func (s *SpendableOut) Amount() dcrutil.Amount {
+	return s.amount
+}
+
+// MakeSpendableOutForTx returns a spendable output for the given transaction
 // block height, transaction index within the block, and transaction output
 // index within the transaction.
-func makeSpendableOutForTx(tx *wire.MsgTx, blockHeight, txIndex, txOutIndex uint32) spendableOut {
-	return spendableOut{
+func MakeSpendableOutForTx(tx *wire.MsgTx, blockHeight, txIndex, txOutIndex uint32) SpendableOut {
+	return SpendableOut{
 		prevOut: wire.OutPoint{
 			Hash:  tx.TxHash(),
 			Index: txOutIndex,
@@ -113,11 +89,11 @@ func makeSpendableOutForTx(tx *wire.MsgTx, blockHeight, txIndex, txOutIndex uint
 	}
 }
 
-// makeSpendableOut returns a spendable output for the given block, transaction
+// MakeSpendableOut returns a spendable output for the given block, transaction
 // index within the block, and transaction output index within the transaction.
-func makeSpendableOut(block *wire.MsgBlock, txIndex, txOutIndex uint32) spendableOut {
+func MakeSpendableOut(block *wire.MsgBlock, txIndex, txOutIndex uint32) SpendableOut {
 	tx := block.Transactions[txIndex]
-	return makeSpendableOutForTx(tx, block.Header.Height, txIndex, txOutIndex)
+	return MakeSpendableOutForTx(tx, block.Header.Height, txIndex, txOutIndex)
 }
 
 // stakeTicket represents a transaction that is an sstx along with the height of
@@ -148,11 +124,11 @@ func (t stakeTicketSorter) Less(i, j int) bool {
 	return bytes.Compare(iHash, jHash) < 0
 }
 
-// testGenerator houses state used to easy the process of generating test blocks
+// Generator houses state used to ease the process of generating test blocks
 // that build from one another along with housing other useful things such as
 // available spendable outputs and generic payment scripts used throughout the
 // tests.
-type testGenerator struct {
+type Generator struct {
 	params           *chaincfg.Params
 	tip              *wire.MsgBlock
 	tipName          string
@@ -162,29 +138,28 @@ type testGenerator struct {
 	p2shOpTrueScript []byte
 
 	// Used for tracking spendable coinbase outputs.
-	spendableOuts     [][]spendableOut
+	spendableOuts     [][]SpendableOut
 	prevCollectedHash chainhash.Hash
 }
 
-// makeTestGenerator returns a test generator instance initialized with the
-// genesis block as the tip as well as a cached generic pay-to-script-script for
-// OP_TRUE.
-func makeTestGenerator(params *chaincfg.Params) (testGenerator, error) {
+// MakeGenerator returns a generator instance initialized with the genesis block
+// as the tip as well as a cached generic pay-to-script-hash script for OP_TRUE.
+func MakeGenerator(params *chaincfg.Params) (Generator, error) {
 	// Generate a generic pay-to-script-hash script that is a simple
 	// OP_TRUE.  This allows the tests to avoid needing to generate and
 	// track actual public keys and signatures.
 	p2shOpTrueAddr, err := dcrutil.NewAddressScriptHash(opTrueScript, params)
 	if err != nil {
-		return testGenerator{}, err
+		return Generator{}, err
 	}
 	p2shOpTrueScript, err := txscript.PayToAddrScript(p2shOpTrueAddr)
 	if err != nil {
-		return testGenerator{}, err
+		return Generator{}, err
 	}
 
 	genesis := params.GenesisBlock
 	genesisHash := genesis.BlockHash()
-	return testGenerator{
+	return Generator{
 		params:           params,
 		tip:              genesis,
 		tipName:          "genesis",
@@ -195,32 +170,50 @@ func makeTestGenerator(params *chaincfg.Params) (testGenerator, error) {
 	}, nil
 }
 
-// replaceVoteVersions returns a function that itself takes a block and
-// modifies it by replacing the voter version of the stake transaction.
-func replaceVoteVersions(newVersion uint32) func(*wire.MsgBlock) {
-	return func(b *wire.MsgBlock) {
-		for _, stx := range b.STransactions {
-			if isVoteTx(stx) {
-				stx.TxOut[1].PkScript = voteBitsScript(true, newVersion)
-			}
-		}
-	}
+// Params returns the chain params associated with the generator instance.
+func (g *Generator) Params() *chaincfg.Params {
+	return g.params
 }
 
-// replaceStakeVersion returns a function that itself takes a block and
-// modifies it by replacing the stake version of the header.
-func replaceStakeVersion(newVersion uint32) func(*wire.MsgBlock) {
-	return func(b *wire.MsgBlock) {
-		b.Header.StakeVersion = newVersion
-	}
+// Tip returns the current tip block of the generator instance.
+func (g *Generator) Tip() *wire.MsgBlock {
+	return g.tip
 }
 
-// replaceBlockVersion returns a function that itself takes a block and
-// modifies it by replacing the stake version of the header.
-func replaceBlockVersion(newVersion int32) func(*wire.MsgBlock) {
-	return func(b *wire.MsgBlock) {
-		b.Header.Version = newVersion
+// SetTip changes the tip of the instance to the block with the provided name.
+// This is useful since the tip is used for things such as generating subsequent
+// blocks.
+func (g *Generator) SetTip(blockName string) {
+	g.tip = g.blocksByName[blockName]
+	if g.tip == nil {
+		panic(fmt.Sprintf("tip block name %s does not exist", blockName))
 	}
+	g.tipName = blockName
+}
+
+// TipName returns the name of the current tip block of the generator instance.
+func (g *Generator) TipName() string {
+	return g.tipName
+}
+
+// BlockByName returns the block associated with the provided block name.  It
+// will panic if the specified block name does not exist.
+func (g *Generator) BlockByName(blockName string) *wire.MsgBlock {
+	block, ok := g.blocksByName[blockName]
+	if !ok {
+		panic(fmt.Sprintf("block name %s does not exist", blockName))
+	}
+	return block
+}
+
+// BlockByHash returns the block associated with the provided block hash.  It
+// will panic if the specified block hash does not exist.
+func (g *Generator) BlockByHash(hash *chainhash.Hash) *wire.MsgBlock {
+	block, ok := g.blocks[*hash]
+	if !ok {
+		panic(fmt.Sprintf("block with hash %s does not exist", hash))
+	}
+	return block
 }
 
 // opReturnScript returns a provably-pruneable OP_RETURN script with the
@@ -253,7 +246,7 @@ func uniqueOpReturnScript() []byte {
 // using the blockchain code since the intent is to be able to generate known
 // good tests which exercise that code, so it wouldn't make sense to use the
 // same code to generate them.
-func (g *testGenerator) calcFullSubsidy(blockHeight uint32) dcrutil.Amount {
+func (g *Generator) calcFullSubsidy(blockHeight uint32) dcrutil.Amount {
 	iterations := int64(blockHeight) / g.params.SubsidyReductionInterval
 	subsidy := g.params.BaseSubsidy
 	for i := int64(0); i < iterations; i++ {
@@ -271,7 +264,7 @@ func (g *testGenerator) calcFullSubsidy(blockHeight uint32) dcrutil.Amount {
 // using the blockchain code since the intent is to be able to generate known
 // good tests which exercise that code, so it wouldn't make sense to use the
 // same code to generate them.
-func (g *testGenerator) calcPoWSubsidy(fullSubsidy dcrutil.Amount, blockHeight uint32, numVotes uint16) dcrutil.Amount {
+func (g *Generator) calcPoWSubsidy(fullSubsidy dcrutil.Amount, blockHeight uint32, numVotes uint16) dcrutil.Amount {
 	powProportion := dcrutil.Amount(g.params.WorkRewardProportion)
 	totalProportions := dcrutil.Amount(g.params.TotalSubsidyProportions())
 	powSubsidy := (fullSubsidy * powProportion) / totalProportions
@@ -291,7 +284,7 @@ func (g *testGenerator) calcPoWSubsidy(fullSubsidy dcrutil.Amount, blockHeight u
 // using the blockchain code since the intent is to be able to generate known
 // good tests which exercise that code, so it wouldn't make sense to use the
 // same code to generate them.
-func (g *testGenerator) calcPoSSubsidy(heightVotedOn uint32) dcrutil.Amount {
+func (g *Generator) calcPoSSubsidy(heightVotedOn uint32) dcrutil.Amount {
 	if int64(heightVotedOn+1) < g.params.StakeValidationHeight {
 		return 0
 	}
@@ -308,7 +301,7 @@ func (g *testGenerator) calcPoSSubsidy(heightVotedOn uint32) dcrutil.Amount {
 // using the blockchain code since the intent is to be able to generate known
 // good tests which exercise that code, so it wouldn't make sense to use the
 // same code to generate them.
-func (g *testGenerator) calcDevSubsidy(fullSubsidy dcrutil.Amount, blockHeight uint32, numVotes uint16) dcrutil.Amount {
+func (g *Generator) calcDevSubsidy(fullSubsidy dcrutil.Amount, blockHeight uint32, numVotes uint16) dcrutil.Amount {
 	devProportion := dcrutil.Amount(g.params.BlockTaxProportion)
 	totalProportions := dcrutil.Amount(g.params.TotalSubsidyProportions())
 	devSubsidy := (fullSubsidy * devProportion) / totalProportions
@@ -347,7 +340,7 @@ func standardCoinbaseOpReturnScript(blockHeight uint32) []byte {
 // - Second output is a standard provably prunable data-only coinbase output
 // - Third and subsequent outputs pay the pow subsidy portion to the generic
 //   OP_TRUE p2sh script hash
-func (g *testGenerator) addCoinbaseTxOutputs(tx *wire.MsgTx, blockHeight uint32, devSubsidy, powSubsidy dcrutil.Amount) {
+func (g *Generator) addCoinbaseTxOutputs(tx *wire.MsgTx, blockHeight uint32, devSubsidy, powSubsidy dcrutil.Amount) {
 	// First output is the developer subsidy.
 	tx.AddTxOut(&wire.TxOut{
 		Value:    int64(devSubsidy),
@@ -373,13 +366,13 @@ func (g *testGenerator) addCoinbaseTxOutputs(tx *wire.MsgTx, blockHeight uint32,
 	}
 }
 
-// createCoinbaseTx returns a coinbase transaction paying an appropriate
+// CreateCoinbaseTx returns a coinbase transaction paying an appropriate
 // subsidy based on the passed block height and number of votes to the dev org
 // and proof-of-work miner.
 //
 // See the createCoinbaseTxOutputs documentation for a breakdown of the outputs
 // the transaction contains.
-func (g *testGenerator) createCoinbaseTx(blockHeight uint32, numVotes uint16) *wire.MsgTx {
+func (g *Generator) CreateCoinbaseTx(blockHeight uint32, numVotes uint16) *wire.MsgTx {
 	// Calculate the subsidy proportions based on the block height and the
 	// number of votes the block will include.
 	fullSubsidy := g.calcFullSubsidy(blockHeight)
@@ -448,7 +441,7 @@ func purchaseCommitmentScript(addr dcrutil.Address, amount, voteFeeLimit, revoca
 // - First output is an OP_SSTX followed by the OP_TRUE p2sh script hash
 // - Second output is an OP_RETURN followed by the commitment script
 // - Third output is an OP_SSTXCHANGE followed by the OP_TRUE p2sh script hash
-func (g *testGenerator) createTicketPurchaseTx(spend *spendableOut, ticketPrice, fee dcrutil.Amount) *wire.MsgTx {
+func (g *Generator) createTicketPurchaseTx(spend *SpendableOut, ticketPrice, fee dcrutil.Amount) *wire.MsgTx {
 	// The first output is the voting rights address.  This impl uses the
 	// standard pay-to-script-hash to an OP_TRUE.
 	pkScript, err := txscript.PayToSStx(g.p2shOpTrueAddr)
@@ -554,16 +547,19 @@ func voteBlockScript(parentBlock *wire.MsgBlock) []byte {
 
 // voteBitsScript returns a standard provably-pruneable OP_RETURN script
 // suitable for use in a vote tx (ssgen) with the appropriate vote bits set
-// depending on the provided param.
+// depending on the provided params.
 func voteBitsScript(voteYes bool, voteVersion uint32) []byte {
 	bits := uint16(0)
 	if voteYes {
 		bits = 1
 	}
 
-	data := make([]byte, 2+4)
+	data := make([]byte, 6)
 	binary.LittleEndian.PutUint16(data[:], bits)
 	binary.LittleEndian.PutUint32(data[2:], voteVersion)
+	if voteVersion == 0 {
+		data = data[:2]
+	}
 	script, err := txscript.NewScriptBuilder().AddOp(txscript.OP_RETURN).
 		AddData(data[:]).Script()
 	if err != nil {
@@ -581,7 +577,7 @@ func voteBitsScript(voteYes bool, voteVersion uint32) []byte {
 // - Second output is an OP_RETURN followed by the vote bits
 // - Third and subsequent outputs are the payouts according to the ticket
 //   commitments and the appropriate proportion of the vote subsidy.
-func (g *testGenerator) createVoteTx(parentBlock *wire.MsgBlock, ticket *stakeTicket) *wire.MsgTx {
+func (g *Generator) createVoteTx(parentBlock *wire.MsgBlock, ticket *stakeTicket) *wire.MsgTx {
 	// Calculate the proof-of-stake subsidy proportion based on the block
 	// height.
 	posSubsidy := g.calcPoSSubsidy(parentBlock.Header.Height)
@@ -592,9 +588,7 @@ func (g *testGenerator) createVoteTx(parentBlock *wire.MsgBlock, ticket *stakeTi
 	blockScript := voteBlockScript(parentBlock)
 
 	// The second output is the vote bits.
-	voteScript := voteBitsScript(true, 3) // XXX find voterversion
-	//fmt.Printf("voteScript: %x\n", voteScript)
-	//spew.Dump(ticket)
+	voteScript := voteBitsScript(true, 0)
 
 	// The third and subsequent outputs pay the original commitment amounts
 	// along with the appropriate portion of the vote subsidy.  This impl
@@ -638,7 +632,7 @@ func (g *testGenerator) createVoteTx(parentBlock *wire.MsgBlock, ticket *stakeTi
 // when a height is requested that is after the height of the passed block.
 // Also, a callback can optionally be provided that is invoked with each block
 // as it traverses.
-func (g *testGenerator) ancestorBlock(block *wire.MsgBlock, height uint32, f func(*wire.MsgBlock)) *wire.MsgBlock {
+func (g *Generator) ancestorBlock(block *wire.MsgBlock, height uint32, f func(*wire.MsgBlock)) *wire.MsgBlock {
 	// Nothing to do if the requested height is outside of the valid
 	// range.
 	if block == nil || height > block.Header.Height {
@@ -685,7 +679,7 @@ func mergeDifficulty(oldDiff int64, newDiff1 int64, newDiff2 int64) int64 {
 // limitRetarget clamps the passed new difficulty to the old one adjusted by the
 // factor specified in the chain parameters.  This ensures the difficulty can
 // only move up or down by a limited amount.
-func (g *testGenerator) limitRetarget(oldDiff, newDiff int64) int64 {
+func (g *Generator) limitRetarget(oldDiff, newDiff int64) int64 {
 	maxRetarget := g.params.RetargetAdjustmentFactor
 	switch {
 	case newDiff == 0:
@@ -713,7 +707,7 @@ func (g *testGenerator) limitRetarget(oldDiff, newDiff int64) int64 {
 //    weight
 // 4) Calculate the final retarget difficulty based on the exponential weighted
 //    average and ensure it is limited to the max retarget adjustment factor
-func (g *testGenerator) calcNextRequiredDifficulty() uint32 {
+func (g *Generator) calcNextRequiredDifficulty() uint32 {
 	// Target difficulty before the first retarget interval is the pow
 	// limit.
 	nextHeight := g.tip.Header.Height + 1
@@ -830,7 +824,14 @@ func (g *testGenerator) calcNextRequiredDifficulty() uint32 {
 //    difficulty from #5 and the tickets per window retarget difficulty from #7
 //    using scaled multiplication and ensure it is limited to the max retarget
 //    adjustment factor
-func (g *testGenerator) calcNextRequiredStakeDifficulty() int64 {
+//
+// NOTE: In order to simplify the test code, this implementation does not use
+// big integers so it will NOT match the actual consensus code for really big
+// numbers.  However, the parameters on simnet and the pool sizes used in these
+// tests are low enough that this is not an issue for the tests.  Anyone looking
+// at this code should NOT use it for mainnet calculations as is since it will
+// not always yield the correct results.
+func (g *Generator) calcNextRequiredStakeDifficulty() int64 {
 	// Stake difficulty before any tickets could possibly be purchased is
 	// the minimum value.
 	nextHeight := g.tip.Header.Height + 1
@@ -913,18 +914,7 @@ func (g *testGenerator) calcNextRequiredStakeDifficulty() int64 {
 	// limit it to the maximum allowed retarget adjustment factor.
 	//
 	// This is the first metric used in the final calculated difficulty.
-	// nextPoolSizeDiff := (weightedPoolSizeSum/weightSum * curDiff) >> 32
-	nextPoolSizeDiffBig := new(big.Int)
-	weightedPoolSizeSumBig := new(big.Int).SetUint64(weightedPoolSizeSum)
-	weightSumBig := new(big.Int).SetUint64(weightSum)
-	curDiffBig := new(big.Int).SetInt64(curDiff)
-	nextPoolSizeDiffBig.Div(weightedPoolSizeSumBig, weightSumBig)
-	nextPoolSizeDiffBig.Mul(nextPoolSizeDiffBig, curDiffBig)
-	nextPoolSizeDiffBig.Rsh(nextPoolSizeDiffBig, 32)
-	nextPoolSizeDiff := nextPoolSizeDiffBig.Int64()
-	if nextPoolSizeDiff < 0 {
-		panic(fmt.Sprintf("nextPoolSizeDiff overflow %v", nextPoolSizeDiff))
-	}
+	nextPoolSizeDiff := (int64(weightedPoolSizeSum/weightSum) * curDiff) >> 32
 	nextPoolSizeDiff = g.limitRetarget(curDiff, nextPoolSizeDiff)
 
 	// -----------------------------------------
@@ -980,16 +970,7 @@ func (g *testGenerator) calcNextRequiredStakeDifficulty() int64 {
 	// factor.
 	//
 	// This is the second metric used in the final calculated difficulty.
-	// nextNewTixDiff := (weightedTicketsSum/weightSum * curDiff) >> 32
-	nextNewTixDiffBig := new(big.Int)
-	weightedTicketsSumBig := new(big.Int).SetUint64(weightedTicketsSum)
-	nextNewTixDiffBig.Div(weightedTicketsSumBig, weightSumBig)
-	nextNewTixDiffBig.Mul(nextNewTixDiffBig, curDiffBig)
-	nextNewTixDiffBig.Rsh(nextNewTixDiffBig, 32)
-	nextNewTixDiff := nextNewTixDiffBig.Int64()
-	if nextNewTixDiff < 0 {
-		panic(fmt.Sprintf("nextNewTixDiff overflow %v", nextNewTixDiff))
-	}
+	nextNewTixDiff := (int64(weightedTicketsSum/weightSum) * curDiff) >> 32
 	nextNewTixDiff = g.limitRetarget(curDiff, nextNewTixDiff)
 
 	// Average the previous two metrics using scaled multiplication and
@@ -1143,7 +1124,7 @@ func winningTickets(voteBlock *wire.MsgBlock, liveTickets []*stakeTicket, numVot
 // tickets.  However, this is desirable for testing purposes because it means
 // the caller does not have to be burdened with keeping track of and updating
 // the state of the ticket pool when reorganizing.
-func (g *testGenerator) sortedLiveTickets(block *wire.MsgBlock) []*stakeTicket {
+func (g *Generator) sortedLiveTickets(block *wire.MsgBlock) []*stakeTicket {
 	// No possible live tickets before the coinbase maturity height + ticket
 	// maturity height.
 	tipHeight := block.Header.Height
@@ -1259,7 +1240,7 @@ func calcMerkleRoot(txns []*wire.MsgTx) chainhash.Hash {
 // with the solution.  False is returned if no solution exists.
 //
 // NOTE: This function will never solve blocks with a nonce of 0.  This is done
-// so the 'nextBlock' function can properly detect when a nonce was modified by
+// so the 'NextBlock' function can properly detect when a nonce was modified by
 // a munge function.
 func solveBlock(header *wire.BlockHeader) bool {
 	// sbResult is used by the solver goroutines to send results.
@@ -1318,12 +1299,90 @@ func solveBlock(header *wire.BlockHeader) bool {
 	return false
 }
 
-// createSpendTx creates a transaction that spends from the provided spendable
+// ReplaceWithNVotes returns a function that itself takes a block and modifies
+// it by replacing the votes in the stake tree with specified number of votes.
+func (g *Generator) ReplaceWithNVotes(numVotes uint16) func(*wire.MsgBlock) {
+	return func(b *wire.MsgBlock) {
+		// Generate the sorted live ticket pool for the parent block.
+		parentBlock := g.blocks[b.Header.PrevBlock]
+		liveTickets := g.sortedLiveTickets(parentBlock)
+
+		// Get the winning tickets for the specified number of votes.
+		winners, _, err := winningTickets(parentBlock, liveTickets,
+			numVotes)
+		if err != nil {
+			panic(err)
+		}
+
+		// Generate vote transactions for the winning tickets.
+		defaultNumVotes := int(g.params.TicketsPerBlock)
+		numExisting := len(b.STransactions) - defaultNumVotes
+		stakeTxns := make([]*wire.MsgTx, 0, numExisting+int(numVotes))
+		for _, ticket := range winners {
+			voteTx := g.createVoteTx(parentBlock, ticket)
+			stakeTxns = append(stakeTxns, voteTx)
+		}
+
+		// Add back the original stake transactions other than the
+		// original stake votes that have been replaced.
+		for _, stakeTx := range b.STransactions[defaultNumVotes:] {
+			stakeTxns = append(stakeTxns, stakeTx)
+		}
+
+		// Update the block with the new stake transactions and the
+		// header with the new number of votes.
+		b.STransactions = stakeTxns
+		b.Header.Voters = numVotes
+
+		// Recalculate the coinbase amount based on the number of new
+		// votes and update the coinbase so that the adjustment in
+		// subsidy is accounted for.
+		height := b.Header.Height
+		fullSubsidy := g.calcFullSubsidy(height)
+		devSubsidy := g.calcDevSubsidy(fullSubsidy, height, numVotes)
+		powSubsidy := g.calcPoWSubsidy(fullSubsidy, height, numVotes)
+		cbTx := b.Transactions[0]
+		cbTx.TxIn[0].ValueIn = int64(devSubsidy + powSubsidy)
+		cbTx.TxOut = nil
+		g.addCoinbaseTxOutputs(cbTx, height, devSubsidy, powSubsidy)
+	}
+}
+
+// ReplaceBlockVersion returns a function that itself takes a block and modifies
+// it by replacing the stake version of the header.
+func ReplaceBlockVersion(newVersion int32) func(*wire.MsgBlock) {
+	return func(b *wire.MsgBlock) {
+		b.Header.Version = newVersion
+	}
+}
+
+// ReplaceStakeVersion returns a function that itself takes a block and modifies
+// it by replacing the stake version of the header.
+func ReplaceStakeVersion(newVersion uint32) func(*wire.MsgBlock) {
+	return func(b *wire.MsgBlock) {
+		b.Header.StakeVersion = newVersion
+	}
+}
+
+// ReplaceVoteVersions returns a function that itself takes a block and modifies
+// it by replacing the voter version of the stake transaction.
+func ReplaceVoteVersions(newVersion uint32) func(*wire.MsgBlock) {
+	return func(b *wire.MsgBlock) {
+		for _, stx := range b.STransactions {
+			if isVoteTx(stx) {
+				stx.TxOut[1].PkScript = voteBitsScript(true,
+					newVersion)
+			}
+		}
+	}
+}
+
+// CreateSpendTx creates a transaction that spends from the provided spendable
 // output and includes an additional unique OP_RETURN output to ensure the
 // transaction ends up with a unique hash.  The public key script is a simple
 // OP_TRUE p2sh script which avoids the need to track addresses and signature
-// scripts in the tests.  This signature script the opTrueRedeemScript.
-func (g *testGenerator) createSpendTx(spend *spendableOut, fee dcrutil.Amount) *wire.MsgTx {
+// scripts in the tests.  The signature script is the opTrueRedeemScript.
+func (g *Generator) CreateSpendTx(spend *SpendableOut, fee dcrutil.Amount) *wire.MsgTx {
 	spendTx := wire.NewMsgTx()
 	spendTx.AddTxIn(&wire.TxIn{
 		PreviousOutPoint: spend.prevOut,
@@ -1339,7 +1398,18 @@ func (g *testGenerator) createSpendTx(spend *spendableOut, fee dcrutil.Amount) *
 	return spendTx
 }
 
-// nextBlock builds a new block that extends the current tip associated with the
+// CreateSpendTxForTx creates a transaction that spends from the first output of
+// the provided transaction and includes an additional unique OP_RETURN output
+// to ensure the transaction ends up with a unique hash.  The public key script
+// is a simple OP_TRUE p2sh script which avoids the need to track addresses and
+// signature scripts in the tests.  This signature script the
+// opTrueRedeemScript.
+func (g *Generator) CreateSpendTxForTx(tx *wire.MsgTx, blockHeight, txIndex uint32, fee dcrutil.Amount) *wire.MsgTx {
+	spend := MakeSpendableOutForTx(tx, blockHeight, txIndex, 0)
+	return g.CreateSpendTx(&spend, fee)
+}
+
+// NextBlock builds a new block that extends the current tip associated with the
 // generator and updates the generator's tip to the newly generated block.
 //
 // The block will include the following:
@@ -1375,7 +1445,7 @@ func (g *testGenerator) createSpendTx(spend *spendableOut, fee dcrutil.Amount) *
 // - The stake root will be recalculated unless it was manually changed
 // - The size of the block will be recalculated unless it was manually changed
 // - The block will be solved unless the nonce was changed
-func (g *testGenerator) nextBlock(blockName string, spend *spendableOut, ticketSpends []spendableOut, mungers ...func(*wire.MsgBlock)) *wire.MsgBlock {
+func (g *Generator) NextBlock(blockName string, spend *SpendableOut, ticketSpends []SpendableOut, mungers ...func(*wire.MsgBlock)) *wire.MsgBlock {
 	// Generate the sorted live ticket pool for the current tip.
 	liveTickets := g.sortedLiveTickets(g.tip)
 	nextHeight := g.tip.Header.Height + 1
@@ -1454,7 +1524,7 @@ func (g *testGenerator) nextBlock(blockName string, spend *spendableOut, ticketS
 	{
 		// Create coinbase transaction for the block with no additional
 		// dev or pow subsidy.
-		coinbaseTx := g.createCoinbaseTx(nextHeight, numVotes)
+		coinbaseTx := g.CreateCoinbaseTx(nextHeight, numVotes)
 		regularTxns = []*wire.MsgTx{coinbaseTx}
 
 		// Increase the PoW subsidy to account for any fees in the stake
@@ -1476,21 +1546,28 @@ func (g *testGenerator) nextBlock(blockName string, spend *spendableOut, ticketS
 			// a simple OP_TRUE p2sh script in order to avoid the
 			// need to track addresses and signature scripts in the
 			// tests.
-			spendTx := g.createSpendTx(spend, fee)
+			spendTx := g.CreateSpendTx(spend, fee)
 			regularTxns = append(regularTxns, spendTx)
 		}
 	}
 
 	// Use a timestamp that is 7/8 of target timespan after the previous
 	// block unless this is the first block in which case the current time
-	// is used.  This helps maintain the retarget difficulty low.  Also,
-	// ensure the timestamp is limited to one second precision.
+	// is used or the proof-of-work difficulty parameters have been adjusted
+	// such that it's greater than the max 2 hours worth of blocks that can
+	// be tested in which case one second is used.  This helps maintain the
+	// retarget difficulty low as needed.  Also, ensure the timestamp is
+	// limited to one second precision.
 	var ts time.Time
 	if nextHeight == 1 {
 		ts = time.Now()
 	} else {
-
-		ts = g.tip.Header.Timestamp.Add(g.params.TargetTimespan * 7 / 8)
+		if g.params.WorkDiffWindowSize > 7200 {
+			ts = g.tip.Header.Timestamp.Add(time.Second)
+		} else {
+			addDuration := g.params.TargetTimespan * 7 / 8
+			ts = g.tip.Header.Timestamp.Add(addDuration)
+		}
 	}
 	ts = time.Unix(ts.Unix(), 0)
 
@@ -1557,11 +1634,11 @@ func (g *testGenerator) nextBlock(blockName string, spend *spendableOut, ticketS
 	return &block
 }
 
-// createPremineBlock generates the first block of the chain with the required
+// CreatePremineBlock generates the first block of the chain with the required
 // premine payouts.  The additional amount parameter can be used to create a
 // block that is otherwise a completely valid premine block except it adds the
 // extra amount to each payout and thus create a block that violates consensus.
-func (g *testGenerator) createPremineBlock(blockName string, additionalAmount dcrutil.Amount) *wire.MsgBlock {
+func (g *Generator) CreatePremineBlock(blockName string, additionalAmount dcrutil.Amount) *wire.MsgBlock {
 	coinbaseTx := wire.NewMsgTx()
 	coinbaseTx.AddTxIn(&wire.TxIn{
 		PreviousOutPoint: *wire.NewOutPoint(&chainhash.Hash{},
@@ -1596,47 +1673,78 @@ func (g *testGenerator) createPremineBlock(blockName string, additionalAmount dc
 	coinbaseTx.TxIn[0].ValueIn = int64(totalSubsidy)
 
 	// Generate the block with the specially created regular transactions.
-	return g.nextBlock(blockName, nil, nil, func(b *wire.MsgBlock) {
+	return g.NextBlock(blockName, nil, nil, func(b *wire.MsgBlock) {
 		b.Transactions = []*wire.MsgTx{coinbaseTx}
 	})
 }
 
-// setTip changes the tip of the instance to the block with the provided name.
-// This is useful since the tip is used for things such as generating subsequent
-// blocks.
-func (g *testGenerator) setTip(blockName string) {
-	g.tip = g.blocksByName[blockName]
-	if g.tip == nil {
-		panic(fmt.Sprintf("tip block name %s does not exist", blockName))
-	}
-	g.tipName = blockName
+// UpdateBlockState manually updates the generator state to remove all internal
+// map references to a block via its old hash and insert new ones for the new
+// block hash.  This is useful if the test code has to manually change a block
+// after 'NextBlock' has returned.
+func (g *Generator) UpdateBlockState(oldBlockName string, oldBlockHash chainhash.Hash, newBlockName string, newBlock *wire.MsgBlock) {
+	// Remove existing entries.
+	delete(g.blocks, oldBlockHash)
+	delete(g.blocksByName, oldBlockName)
+
+	// Add new entries.
+	newBlockHash := newBlock.BlockHash()
+	g.blocks[newBlockHash] = newBlock
+	g.blocksByName[newBlockName] = newBlock
 }
 
-// oldestCoinbaseOuts removes the oldest set of coinbase proof-of-work outputs
+// OldestCoinbaseOuts removes the oldest set of coinbase proof-of-work outputs
 // that was previously saved to the generator and returns the set as a slice.
-func (g *testGenerator) oldestCoinbaseOuts() []spendableOut {
+func (g *Generator) OldestCoinbaseOuts() []SpendableOut {
 	outs := g.spendableOuts[0]
 	g.spendableOuts = g.spendableOuts[1:]
 	return outs
 }
 
-// saveTipCoinbaseOuts adds the proof-of-work outputs of the coinbase tx in the
+// SaveTipCoinbaseOuts adds the proof-of-work outputs of the coinbase tx in the
 // current tip block to the list of spendable outputs.
-func (g *testGenerator) saveTipCoinbaseOuts() {
-	g.spendableOuts = append(g.spendableOuts, []spendableOut{
-		makeSpendableOut(g.tip, 0, 2),
-		makeSpendableOut(g.tip, 0, 3),
-		makeSpendableOut(g.tip, 0, 4),
-		makeSpendableOut(g.tip, 0, 5),
-		makeSpendableOut(g.tip, 0, 6),
-		makeSpendableOut(g.tip, 0, 7),
+func (g *Generator) SaveTipCoinbaseOuts() {
+	g.spendableOuts = append(g.spendableOuts, []SpendableOut{
+		MakeSpendableOut(g.tip, 0, 2),
+		MakeSpendableOut(g.tip, 0, 3),
+		MakeSpendableOut(g.tip, 0, 4),
+		MakeSpendableOut(g.tip, 0, 5),
+		MakeSpendableOut(g.tip, 0, 6),
+		MakeSpendableOut(g.tip, 0, 7),
 	})
 	g.prevCollectedHash = g.tip.BlockHash()
 }
 
-// assertTipHeight panics if the current tip block associated with the generator
+// SaveSpendableCoinbaseOuts adds all proof-of-work coinbase outputs starting
+// from the block after the last block that had its coinbase outputs collected
+// and ending at the current tip.  This is useful to batch the collection of the
+// outputs once the tests reach a stable point so they don't have to manually
+// add them for the right tests which will ultimately end up being the best
+// chain.
+func (g *Generator) SaveSpendableCoinbaseOuts() {
+	// Ensure tip is reset to the current one when done.
+	curTipName := g.tipName
+	defer g.SetTip(curTipName)
+
+	// Loop through the ancestors of the current tip until the
+	// reaching the block that has already had the coinbase outputs
+	// collected.
+	var collectBlocks []*wire.MsgBlock
+	for b := g.tip; b != nil; b = g.blocks[b.Header.PrevBlock] {
+		if b.BlockHash() == g.prevCollectedHash {
+			break
+		}
+		collectBlocks = append(collectBlocks, b)
+	}
+	for i := range collectBlocks {
+		g.tip = collectBlocks[len(collectBlocks)-1-i]
+		g.SaveTipCoinbaseOuts()
+	}
+}
+
+// AssertTipHeight panics if the current tip block associated with the generator
 // does not have the specified height.
-func (g *testGenerator) assertTipHeight(expected uint32) {
+func (g *Generator) AssertTipHeight(expected uint32) {
 	height := g.tip.Header.Height
 	if height != expected {
 		panic(fmt.Sprintf("height for block %q is %d instead of "+
@@ -1644,9 +1752,82 @@ func (g *testGenerator) assertTipHeight(expected uint32) {
 	}
 }
 
-// assertStakeVersion panics if the current tip block associated with the
+// countBlockSigOps returns the number of legacy signature operations in the
+// scripts in the passed block.
+func countBlockSigOps(block *wire.MsgBlock) int {
+	totalSigOps := 0
+	for _, tx := range block.Transactions {
+		for _, txIn := range tx.TxIn {
+			numSigOps := txscript.GetSigOpCount(txIn.SignatureScript)
+			totalSigOps += numSigOps
+		}
+		for _, txOut := range tx.TxOut {
+			numSigOps := txscript.GetSigOpCount(txOut.PkScript)
+			totalSigOps += numSigOps
+		}
+	}
+
+	return totalSigOps
+}
+
+// AssertTipBlockSigOpsCount panics if the current tip block associated with the
+// generator does not have the specified number of signature operations.
+func (g *Generator) AssertTipBlockSigOpsCount(expected int) {
+	numSigOps := countBlockSigOps(g.tip)
+	if numSigOps != expected {
+		panic(fmt.Sprintf("generated number of sigops for block %q "+
+			"(height %d) is %d instead of expected %d", g.tipName,
+			g.tip.Header.Height, numSigOps, expected))
+	}
+}
+
+// AssertTipBlockSize panics if the if the current tip block associated with the
+// generator does not have the specified size when serialized.
+func (g *Generator) AssertTipBlockSize(expected int) {
+	serializeSize := g.tip.SerializeSize()
+	if serializeSize != expected {
+		panic(fmt.Sprintf("block size of block %q (height %d) is %d "+
+			"instead of expected %d", g.tipName,
+			g.tip.Header.Height, serializeSize, expected))
+	}
+}
+
+// AssertTipBlockNumTxns panics if the number of transactions in the current tip
+// block associated with the generator does not match the specified value.
+func (g *Generator) AssertTipBlockNumTxns(expected int) {
+	numTxns := len(g.tip.Transactions)
+	if numTxns != expected {
+		panic(fmt.Sprintf("number of txns in block %q (height %d) is "+
+			"%d instead of expected %d", g.tipName,
+			g.tip.Header.Height, numTxns, expected))
+	}
+}
+
+// AssertTipBlockHash panics if the current tip block associated with the
+// generator does not match the specified hash.
+func (g *Generator) AssertTipBlockHash(expected chainhash.Hash) {
+	hash := g.tip.BlockHash()
+	if hash != expected {
+		panic(fmt.Sprintf("block hash of block %q (height %d) is %v "+
+			"instead of expected %v", g.tipName,
+			g.tip.Header.Height, hash, expected))
+	}
+}
+
+// AssertTipBlockMerkleRoot panics if the merkle root in header of the current
+// tip block associated with the generator does not match the specified hash.
+func (g *Generator) AssertTipBlockMerkleRoot(expected chainhash.Hash) {
+	hash := g.tip.Header.MerkleRoot
+	if hash != expected {
+		panic(fmt.Sprintf("merkle root of block %q (height %d) is %v "+
+			"instead of expected %v", g.tipName,
+			g.tip.Header.Height, hash, expected))
+	}
+}
+
+// AssertStakeVersion panics if the current tip block associated with the
 // generator does not have the specified stake version in the header.
-func (g *testGenerator) assertStakeVersion(expected uint32) {
+func (g *Generator) AssertStakeVersion(expected uint32) {
 	stakeVersion := g.tip.Header.StakeVersion
 	if stakeVersion != expected {
 		panic(fmt.Sprintf("stake version for block %q is %d instead of "+
@@ -1654,522 +1835,12 @@ func (g *testGenerator) assertStakeVersion(expected uint32) {
 	}
 }
 
-// assertBlockVersion panics if the current tip block associated with the
+// AssertBlockVersion panics if the current tip block associated with the
 // generator does not have the specified version.
-func (g *testGenerator) assertBlockVersion(expected int32) {
+func (g *Generator) AssertBlockVersion(expected int32) {
 	blockVersion := g.tip.Header.Version
 	if blockVersion != expected {
 		panic(fmt.Sprintf("block version for block %q is %d instead of "+
 			"expected %d", g.tipName, blockVersion, expected))
 	}
-}
-
-// Generate returns a slice of tests that can be used to exercise the consensus
-// validation rules.  The tests are intended to be flexible enough to allow both
-// unit-style tests directly against the blockchain code as well as
-// integration-style tests over the peer-to-peer network.  To achieve that goal,
-// each test contains additional information about the expected result, however
-// that information can be ignored when doing comparison tests between to
-// independent versions over the peer-to-peer network.
-func Generate() (tests []TestInstance, err error) {
-	// In order to simplify the generation code which really should never
-	// fail unless the test code itself is broken, panics are used
-	// internally.  This deferred func ensures any panics don't escape the
-	// generator by replacing the named error return with the underlying
-	// panic error.
-	defer func() {
-		if r := recover(); r != nil {
-			tests = nil
-
-			switch rt := r.(type) {
-			case string:
-				err = errors.New(rt)
-			case error:
-				err = rt
-			default:
-				err = errors.New("Unknown panic")
-			}
-		}
-	}()
-
-	// Create a test generator instance initialized with the genesis block
-	// as the tip as well as some cached payment scripts to be used
-	// throughout the tests.
-	g, err := makeTestGenerator(simNetParams)
-	if err != nil {
-		return nil, err
-	}
-
-	// Define some convenience helper functions to return an individual test
-	// instance that has the described characteristics.
-	//
-	// acceptBlock creates a test instance that expects the provided block
-	// to be accepted by the consensus rules.
-	//
-	// rejectBlock creates a test instance that expects the provided block
-	// to be rejected by the consensus rules.
-	acceptBlock := func(blockName string, block *wire.MsgBlock, isMainChain, isOrphan bool) TestInstance {
-		return AcceptedBlock{blockName, block, isMainChain, isOrphan}
-	}
-	rejectBlock := func(blockName string, block *wire.MsgBlock, code blockchain.ErrorCode) TestInstance {
-		return RejectedBlock{blockName, block, code}
-	}
-
-	// Define some convenience helper functions to populate the tests slice
-	// with test instances that have the described characteristics.
-	//
-	// accepted creates and appends a single acceptBlock test instance for
-	// the current tip which expects the block to be accepted to the main
-	// chain.
-	//
-	// rejected creates and appends a single rejectBlock test instance for
-	// the current tip.
-	accepted := func() {
-		tests = append(tests, acceptBlock(g.tipName, g.tip, true, false))
-	}
-	rejected := func(code blockchain.ErrorCode) {
-		tests = append(tests, rejectBlock(g.tipName, g.tip, code))
-	}
-
-	// Shorter versions of useful params for convenience.
-	ticketsPerBlock := g.params.TicketsPerBlock
-	coinbaseMaturity := g.params.CoinbaseMaturity
-	stakeEnabledHeight := g.params.StakeEnabledHeight
-	stakeValidationHeight := g.params.StakeValidationHeight
-	stakeVerInterval := g.params.StakeVersionInterval
-	stakeMajorityMul := int64(g.params.StakeMajorityMultiplier)
-	stakeMajorityDiv := int64(g.params.StakeMajorityDivisor)
-
-	// ---------------------------------------------------------------------
-	// Premine tests.
-	// ---------------------------------------------------------------------
-
-	// Add the required premine block.
-	//
-	//   genesis -> bp
-	g.createPremineBlock("bp", 0)
-	g.assertTipHeight(1)
-	accepted()
-
-	// ---------------------------------------------------------------------
-	// Generate enough blocks to have mature coinbase outputs to work with.
-	//
-	//   genesis -> bp -> bm0 -> bm1 -> ... -> bm#
-	// ---------------------------------------------------------------------
-
-	for i := uint16(0); i < coinbaseMaturity; i++ {
-		blockName := fmt.Sprintf("bm%d", i)
-		g.nextBlock(blockName, nil, nil)
-		g.saveTipCoinbaseOuts()
-		accepted()
-	}
-	g.assertTipHeight(uint32(coinbaseMaturity) + 1)
-
-	// ---------------------------------------------------------------------
-	// Generate enough blocks to reach the stake enabled height while
-	// creating ticket purchases that spend from the coinbases matured
-	// above.  This will also populate the pool of immature tickets.
-	//
-	//   ... -> bm# ... -> bse0 -> bse1 -> ... -> bse#
-	// ---------------------------------------------------------------------
-
-	var ticketsPurchased int
-	for i := int64(0); int64(g.tip.Header.Height) < stakeEnabledHeight; i++ {
-		outs := g.oldestCoinbaseOuts()
-		ticketOuts := outs[1:]
-		ticketsPurchased += len(ticketOuts)
-		blockName := fmt.Sprintf("bse%d", i)
-		g.nextBlock(blockName, nil, ticketOuts)
-		g.saveTipCoinbaseOuts()
-		accepted()
-	}
-	g.assertTipHeight(uint32(stakeEnabledHeight))
-
-	// ---------------------------------------------------------------------
-	// Generate enough blocks to reach the stake validation height while
-	// continuing to purchase tickets using the coinbases matured above and
-	// allowing the immature tickets to mature and thus become live.
-	// ---------------------------------------------------------------------
-
-	targetPoolSize := g.params.TicketPoolSize * ticketsPerBlock
-	for i := int64(0); int64(g.tip.Header.Height) < stakeValidationHeight; i++ {
-		// Only purchase tickets until the target ticket pool size is
-		// reached.
-		outs := g.oldestCoinbaseOuts()
-		ticketOuts := outs[1:]
-		if ticketsPurchased+len(ticketOuts) > int(targetPoolSize) {
-			ticketsNeeded := int(targetPoolSize) - ticketsPurchased
-			if ticketsNeeded > 0 {
-				ticketOuts = ticketOuts[1 : ticketsNeeded+1]
-			} else {
-				ticketOuts = nil
-			}
-		}
-		ticketsPurchased += len(ticketOuts)
-
-		blockName := fmt.Sprintf("bsv%d", i)
-		g.nextBlock(blockName, nil, ticketOuts)
-		g.saveTipCoinbaseOuts()
-		accepted()
-	}
-	g.assertTipHeight(uint32(stakeValidationHeight))
-
-	// ---------------------------------------------------------------------
-	// Generate enough blocks to reach one block before the next stake
-	// version interval with block version 2, stake version 0, and vote
-	// version 3.
-	//
-	// This will result in a majority of blocks with a version prior to
-	// version 3 where stake version enforcement begins and thus it must not
-	// be enforced.
-	// ---------------------------------------------------------------------
-
-	for i := int64(0); i < stakeVerInterval-1; i++ {
-		outs := g.oldestCoinbaseOuts()
-		blockName := fmt.Sprintf("bsvtA%d", i)
-		g.nextBlock(blockName, nil, outs[1:],
-			replaceBlockVersion(2),
-			replaceStakeVersion(0),
-			replaceVoteVersions(3))
-		g.saveTipCoinbaseOuts()
-		accepted()
-	}
-	g.assertTipHeight(uint32(stakeValidationHeight + stakeVerInterval - 1))
-	g.assertBlockVersion(2)
-	g.assertStakeVersion(0)
-
-	// ---------------------------------------------------------------------
-	// Generate a single block with block version 3, stake version 42, and
-	// vote version 41.
-	//
-	// This block must be accepted because even though it is a version 3
-	// block with an invalid stake version, there have not yet been a
-	// majority of version 3 blocks which is required to trigger stake
-	// version enforcement.
-	// ---------------------------------------------------------------------
-
-	outs := g.oldestCoinbaseOuts()
-	g.nextBlock("bsvtB0", nil, outs[1:],
-		replaceBlockVersion(3),
-		replaceStakeVersion(42),
-		replaceVoteVersions(41))
-	g.saveTipCoinbaseOuts()
-	accepted()
-	g.assertTipHeight(uint32(stakeValidationHeight + stakeVerInterval))
-	g.assertBlockVersion(3)
-	g.assertStakeVersion(42) // expected bogus
-
-	// ---------------------------------------------------------------------
-	// Generate enough blocks to reach one block before the next stake
-	// version interval with block version 3, stake version 0, and vote
-	// version 2.
-	//
-	// This will result in a majority of version 3 blocks which will trigger
-	// enforcement of the stake version.  It also results in a majority of
-	// version 2 votes, however, since enforcement is not yet active in this
-	// interval, they will not actually count toward establishing a
-	// majority.
-	// ---------------------------------------------------------------------
-
-	for i := int64(0); i < stakeVerInterval-1; i++ {
-		outs := g.oldestCoinbaseOuts()
-		blockName := fmt.Sprintf("bsvtB%d", i+1)
-		g.nextBlock(blockName, nil, outs[1:],
-			replaceBlockVersion(3),
-			replaceStakeVersion(0),
-			replaceVoteVersions(2))
-		g.saveTipCoinbaseOuts()
-		accepted()
-	}
-	g.assertTipHeight(uint32(stakeValidationHeight + 2*stakeVerInterval - 1))
-	g.assertBlockVersion(3)
-	g.assertStakeVersion(0)
-
-	// ---------------------------------------------------------------------
-	// Generate a single block with block version 3, stake version 2, and
-	// vote version 3.
-	//
-	// This block must be rejected because even though the majority stake
-	// version per voters was 2 in the previous period, stake version
-	// enforcement had not yet been achieved and thus the required stake
-	// version is still 0.
-	// ---------------------------------------------------------------------
-
-	g.nextBlock("bsvtCbad0", nil, nil,
-		replaceBlockVersion(3),
-		replaceStakeVersion(2),
-		replaceVoteVersions(3))
-	g.assertTipHeight(uint32(stakeValidationHeight + 2*stakeVerInterval))
-	g.assertBlockVersion(3)
-	g.assertStakeVersion(2)
-	rejected(blockchain.ErrBadStakeVersion)
-
-	// ---------------------------------------------------------------------
-	// Generate a single block with block version 3, stake version 1, and
-	// vote version 3.
-	//
-	// This block must be rejected because even though the majority stake
-	// version per voters was 2 in the previous period, stake version
-	// enforcement had not yet been achieved and thus the required stake
-	// version is still 0.
-	// ---------------------------------------------------------------------
-
-	g.setTip(fmt.Sprintf("bsvtB%d", stakeVerInterval-1))
-	g.nextBlock("bsvtCbad1", nil, nil,
-		replaceBlockVersion(3),
-		replaceStakeVersion(1),
-		replaceVoteVersions(3))
-	g.assertTipHeight(uint32(stakeValidationHeight + 2*stakeVerInterval))
-	g.assertBlockVersion(3)
-	g.assertStakeVersion(1)
-	rejected(blockchain.ErrBadStakeVersion)
-
-	// ---------------------------------------------------------------------
-	// Generate enough blocks to reach one block before the next stake
-	// version interval with block version 3, stake version 0, and vote
-	// version 3.
-	//
-	// This will result in a majority of version 3 votes which will trigger
-	// enforcement of a bump in the stake version to 3.
-	// ---------------------------------------------------------------------
-
-	g.setTip(fmt.Sprintf("bsvtB%d", stakeVerInterval-1))
-	for i := int64(0); i < stakeVerInterval; i++ {
-		outs := g.oldestCoinbaseOuts()
-		blockName := fmt.Sprintf("bsvtC%d", i)
-		g.nextBlock(blockName, nil, outs[1:],
-			replaceBlockVersion(3),
-			replaceStakeVersion(0),
-			replaceVoteVersions(3))
-		g.saveTipCoinbaseOuts()
-		accepted()
-	}
-	g.assertTipHeight(uint32(stakeValidationHeight + 3*stakeVerInterval - 1))
-	g.assertBlockVersion(3)
-	g.assertStakeVersion(0)
-
-	// ---------------------------------------------------------------------
-	// Generate a single block with block version 3, stake version 2, and
-	// vote version 2.
-	//
-	// This block must be rejected because the majority stake version per
-	// voters is now 3 and stake version enforcement has been achieved.
-	// ---------------------------------------------------------------------
-
-	g.nextBlock("bsvtDbad0", nil, nil,
-		replaceBlockVersion(3),
-		replaceStakeVersion(2),
-		replaceVoteVersions(2))
-	g.assertTipHeight(uint32(stakeValidationHeight + 3*stakeVerInterval))
-	g.assertBlockVersion(3)
-	g.assertStakeVersion(2)
-	rejected(blockchain.ErrBadStakeVersion)
-
-	// ---------------------------------------------------------------------
-	// Generate a single block with block version 3, stake version 4, and
-	// vote version 2.
-	//
-	// This block must be rejected because the majority stake version per
-	// voters is now 3 and stake version enforcement has been achieved.
-	// ---------------------------------------------------------------------
-
-	g.setTip(fmt.Sprintf("bsvtC%d", stakeVerInterval-1))
-	g.nextBlock("bsvtDbad1", nil, nil,
-		replaceBlockVersion(3),
-		replaceStakeVersion(4),
-		replaceVoteVersions(2))
-	g.assertTipHeight(uint32(stakeValidationHeight + 3*stakeVerInterval))
-	g.assertBlockVersion(3)
-	g.assertStakeVersion(4)
-	rejected(blockchain.ErrBadStakeVersion)
-
-	// ---------------------------------------------------------------------
-	// Generate enough blocks to reach one block before the next stake
-	// version interval with block version 3, stake version 3, and vote
-	// version 2.
-	//
-	// This will result in a majority of version 2 votes, but since version
-	// 3 has already been achieved, the stake version must not regress.
-	// ---------------------------------------------------------------------
-
-	g.setTip(fmt.Sprintf("bsvtC%d", stakeVerInterval-1))
-	for i := int64(0); i < stakeVerInterval; i++ {
-		outs := g.oldestCoinbaseOuts()
-		blockName := fmt.Sprintf("bsvtD%d", i)
-		g.nextBlock(blockName, nil, outs[1:],
-			replaceBlockVersion(3),
-			replaceStakeVersion(3),
-			replaceVoteVersions(2))
-		g.saveTipCoinbaseOuts()
-		accepted()
-	}
-	g.assertTipHeight(uint32(stakeValidationHeight + 4*stakeVerInterval - 1))
-	g.assertBlockVersion(3)
-	g.assertStakeVersion(3)
-
-	// ---------------------------------------------------------------------
-	// Generate a single block with block version 3, stake version 2, and
-	// vote version 2.
-	//
-	// This block must be rejected because even though the majority stake
-	// version per voters in the previous interval was 2, the majority stake
-	// version is not allowed to regress.
-	// ---------------------------------------------------------------------
-
-	g.nextBlock("bsvtEbad0", nil, nil,
-		replaceBlockVersion(3),
-		replaceStakeVersion(2),
-		replaceVoteVersions(2))
-	g.assertTipHeight(uint32(stakeValidationHeight + 4*stakeVerInterval))
-	g.assertBlockVersion(3)
-	g.assertStakeVersion(2)
-	rejected(blockchain.ErrBadStakeVersion)
-
-	// ---------------------------------------------------------------------
-	// Generate a single block with block version 3, stake version 4, and
-	// vote version 3.
-	//
-	// This block must be rejected because the majority stake version is
-	// still 3.
-	// ---------------------------------------------------------------------
-
-	g.setTip(fmt.Sprintf("bsvtD%d", stakeVerInterval-1))
-	g.nextBlock("bsvtEbad1", nil, nil,
-		replaceBlockVersion(3),
-		replaceStakeVersion(4),
-		replaceVoteVersions(3))
-	g.assertTipHeight(uint32(stakeValidationHeight + 4*stakeVerInterval))
-	g.assertBlockVersion(3)
-	g.assertStakeVersion(4)
-	rejected(blockchain.ErrBadStakeVersion)
-
-	// ---------------------------------------------------------------------
-	// Generate enough blocks to reach one block before the next stake
-	// version interval with block version 3, stake version 3, and a mix of
-	// 3 and 4 for the vote version such that a super majority is *NOT*
-	// achieved.
-	//
-	// This will result in an unchanged required stake version.
-	// ---------------------------------------------------------------------
-
-	g.setTip(fmt.Sprintf("bsvtD%d", stakeVerInterval-1))
-	votesPerInterval := stakeVerInterval * int64(ticketsPerBlock)
-	targetVotes := (votesPerInterval * stakeMajorityMul) / stakeMajorityDiv
-	targetBlocks := targetVotes / int64(ticketsPerBlock)
-	for i := int64(0); i < targetBlocks-1; i++ {
-		outs := g.oldestCoinbaseOuts()
-		blockName := fmt.Sprintf("bsvtE%da", i)
-		g.nextBlock(blockName, nil, outs[1:],
-			replaceBlockVersion(3),
-			replaceStakeVersion(3),
-			replaceVoteVersions(4))
-		g.saveTipCoinbaseOuts()
-		g.assertBlockVersion(3)
-		g.assertStakeVersion(3)
-		accepted()
-	}
-	for i := int64(0); i < stakeVerInterval-(targetBlocks-1); i++ {
-		outs := g.oldestCoinbaseOuts()
-		blockName := fmt.Sprintf("bsvtE%db", targetBlocks-1+i)
-		g.nextBlock(blockName, nil, outs[1:],
-			replaceBlockVersion(3),
-			replaceStakeVersion(3),
-			replaceVoteVersions(3))
-		g.saveTipCoinbaseOuts()
-		g.assertBlockVersion(3)
-		g.assertStakeVersion(3)
-		accepted()
-	}
-	g.assertTipHeight(uint32(stakeValidationHeight + 5*stakeVerInterval - 1))
-
-	// ---------------------------------------------------------------------
-	// Generate a single block with block version 3, stake version 4, and
-	// vote version 3.
-	//
-	// This block must be rejected because the majority stake version is
-	// still 3 due to failing to achieve enough votes in the previous
-	// period.
-	// ---------------------------------------------------------------------
-
-	g.nextBlock("bsvtFbad0", nil, nil,
-		replaceBlockVersion(3),
-		replaceStakeVersion(4),
-		replaceVoteVersions(3))
-	g.assertTipHeight(uint32(stakeValidationHeight + 5*stakeVerInterval))
-	g.assertBlockVersion(3)
-	g.assertStakeVersion(4)
-	rejected(blockchain.ErrBadStakeVersion)
-
-	// ---------------------------------------------------------------------
-	// Generate enough blocks to reach one block before the next stake
-	// version interval with block version 3, stake version 3, and a mix of
-	// 3 and 4 for the vote version such that a super majority of version 4
-	// is achieved.
-	//
-	// This will result in a majority stake version of 4.
-	// ---------------------------------------------------------------------
-
-	g.setTip(fmt.Sprintf("bsvtE%db", stakeVerInterval-1))
-	for i := int64(0); i < targetBlocks; i++ {
-		outs := g.oldestCoinbaseOuts()
-		blockName := fmt.Sprintf("bsvtF%da", i)
-		g.nextBlock(blockName, nil, outs[1:],
-			replaceBlockVersion(3),
-			replaceStakeVersion(3),
-			replaceVoteVersions(4))
-		g.saveTipCoinbaseOuts()
-		g.assertBlockVersion(3)
-		g.assertStakeVersion(3)
-		accepted()
-	}
-	for i := int64(0); i < stakeVerInterval-targetBlocks; i++ {
-		outs := g.oldestCoinbaseOuts()
-		blockName := fmt.Sprintf("bsvtF%db", targetBlocks+i)
-		g.nextBlock(blockName, nil, outs[1:],
-			replaceBlockVersion(3),
-			replaceStakeVersion(3),
-			replaceVoteVersions(3))
-		g.saveTipCoinbaseOuts()
-		g.assertBlockVersion(3)
-		g.assertStakeVersion(3)
-		accepted()
-	}
-	g.assertTipHeight(uint32(stakeValidationHeight + 6*stakeVerInterval - 1))
-
-	// ---------------------------------------------------------------------
-	// Generate a single block with block version 3, stake version 3, and
-	// vote version 3.
-	//
-	// This block must be rejected because the majority stake version is
-	// now 4 due to achieving a majority of votes in the previous period.
-	// ---------------------------------------------------------------------
-
-	g.nextBlock("bsvtGbad0", nil, nil,
-		replaceBlockVersion(3),
-		replaceStakeVersion(3),
-		replaceVoteVersions(3))
-	g.assertTipHeight(uint32(stakeValidationHeight + 6*stakeVerInterval))
-	g.assertBlockVersion(3)
-	g.assertStakeVersion(3)
-	rejected(blockchain.ErrBadStakeVersion)
-
-	// ---------------------------------------------------------------------
-	// Generate a single block with block version 3, stake version 4, and
-	// vote version 3.
-	//
-	// This block must be accepted because the majority stake version is
-	// now 4 due to achieving a majority of votes in the previous period.
-	// ---------------------------------------------------------------------
-
-	g.setTip(fmt.Sprintf("bsvtF%db", stakeVerInterval-1))
-	g.nextBlock("bsvtG0", nil, nil,
-		replaceBlockVersion(3),
-		replaceStakeVersion(4),
-		replaceVoteVersions(3))
-	g.assertTipHeight(uint32(stakeValidationHeight + 6*stakeVerInterval))
-	g.assertBlockVersion(3)
-	g.assertStakeVersion(4)
-	accepted()
-
-	return tests, nil
 }
