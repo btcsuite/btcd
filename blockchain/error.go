@@ -9,6 +9,36 @@ import (
 	"fmt"
 )
 
+// VoteVersionError identifies an error that indicates a vote version was
+// specified that does not exist.
+type VoteVersionError uint32
+
+// Error returns the assertion error as a human-readable string and satisfies
+// the error interface.
+func (e VoteVersionError) Error() string {
+	return fmt.Sprintf("stake version %v does not exist", uint32(e))
+}
+
+// HashError identifies an error that indicates a hash was specified that does
+// not exist.
+type HashError string
+
+// Error returns the assertion error as a human-readable string and satisfies
+// the error interface.
+func (e HashError) Error() string {
+	return fmt.Sprintf("hash %v does not exist", string(e))
+}
+
+// DeploymentError identifies an error that indicates a deployment ID was
+// specified that does not exist.
+type DeploymentError string
+
+// Error returns the assertion error as a human-readable string and satisfies
+// the error interface.
+func (e DeploymentError) Error() string {
+	return fmt.Sprintf("deployment ID %v does not exist", string(e))
+}
+
 // AssertError identifies an error that indicates an internal code consistency
 // issue and should be treated as a critical and unrecoverable error.
 type AssertError string

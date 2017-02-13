@@ -1,5 +1,5 @@
 // Copyright (c) 2014-2016 The btcsuite developers
-// Copyright (c) 2015-2016 The Decred developers
+// Copyright (c) 2015-2017 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -8,6 +8,7 @@ package chaincfg
 import (
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"math/big"
 	"time"
 
@@ -33,6 +34,8 @@ var (
 	// simNetPowLimit is the highest proof of work value a Decred block
 	// can have for the simulation test network.  It is the value 2^255 - 1.
 	simNetPowLimit = new(big.Int).Sub(new(big.Int).Lsh(bigOne, 255), bigOne)
+
+	VoteBitsNotFound = fmt.Errorf("vote bits not found")
 )
 
 // SigHashOptimization is an optimization for verification of transactions that
@@ -67,6 +70,131 @@ var CPUMinerThreads = 1
 type Checkpoint struct {
 	Height int64
 	Hash   *chainhash.Hash
+}
+
+// Vote describes a voting instance.  It is self-describing so that the UI can
+// be directly implemented using the fields.  Mask determines which bits can be
+// used.  Bits are enumerated.
+//
+// For example, change block height from int64 to uint64.
+// Vote {
+//	Id:          "blockheight",
+//	Description: "Change block height from int64 to uint64"
+//	Mask:        0x0006,
+//	Choices:     []Choice{
+//		{
+//			Id:          "abstain",
+//			Description: "abstain voting for change",
+//			Bits:        0x0000,
+//			IsIgnore:    true,
+//			IsNo:        false,
+//		},
+//		{
+//			Id:          "yes",
+//			Description: "accept changing block height to uint64",
+//			Bits:        0x0002,
+//			IsIgnore:    false,
+//			IsNo:        false,
+//		},
+//		{
+//			Id:          "no",
+//			Description: "reject changing block height to uint64",
+//			Bits:        0x0004,
+//			IsIgnore:    false,
+//			IsNo:        true,
+//		},
+//	},
+// }
+//
+type Vote struct {
+	// Single unique word identifying the vote.
+	Id string
+
+	// Longer description of what the vote is about.
+	Description string
+
+	// Usable bits for this vote.
+	Mask uint16
+
+	Choices []Choice
+}
+
+// Choice is an defins one of the possible Choices that make up a vote. The 0
+// value in Bits indicates the default choice.  Care should be taken not to
+// bias a vote with the default choice.
+type Choice struct {
+	// Single unique word identifying vote (e.g. yes)
+	Id string
+
+	// Longer description of the vote.
+	Description string
+
+	// Bits used for this vote.
+	Bits uint16
+
+	// Ignore this choice.  By convention this must be the 0 vote (abstain)
+	// and exist only once in the Vote.Choices array.
+	IsIgnore bool
+
+	// This coince indicates a hard No Vote.  By convention this must exist
+	// only once in the Vote.Choices array.
+	IsNo bool
+}
+
+// VoteIndex compares vote to Choice.Bits and returns the index into the
+// Choices array.  If the vote is invalid it returns -1.
+func (v *Vote) VoteIndex(vote uint16) int {
+	vote &= v.Mask
+	for k := range v.Choices {
+		if vote == v.Choices[k].Bits {
+			return k
+		}
+	}
+
+	return -1
+}
+
+// IsIgnore compares vote to Choice.Bits and determines if it is the no vote.
+// This function will return an error if the vote bits are not found.
+func (v *Vote) IsIgnore(vote uint16) (bool, error) {
+	vote &= v.Mask
+	for k := range v.Choices {
+		if vote == v.Choices[k].Bits {
+			return v.Choices[k].IsIgnore, nil
+		}
+	}
+
+	return false, VoteBitsNotFound
+}
+
+// IsNo comares vote to Choice.Bits and determines if it is the abstain vote.
+// This function will return an error if the vote bits are or not found.
+func (v *Vote) IsNo(vote uint16) (bool, error) {
+	vote &= v.Mask
+	for k := range v.Choices {
+		if vote == v.Choices[k].Bits {
+			return v.Choices[k].IsNo, nil
+		}
+	}
+
+	return false, VoteBitsNotFound
+}
+
+// ConsensusDeployment defines details related to a specific consensus rule
+// change that is voted in.  This is part of BIP0009.
+type ConsensusDeployment struct {
+	// Vote describes the what is being voted on and what the choices are.
+	// This is sitting in a struct in order to make merging between btcd
+	// easier.
+	Vote Vote
+
+	// StartTime is the median block time after which voting on the
+	// deployment starts.
+	StartTime uint64
+
+	// ExpireTime is the median block time after which the attempted
+	// deployment expires.
+	ExpireTime uint64
 }
 
 // TokenPayout is a payout for block 1 which specifies an address and an amount
@@ -191,6 +319,23 @@ type Params struct {
 
 	// Checkpoints ordered from oldest to newest.
 	Checkpoints []Checkpoint
+
+	// These fields are related to voting on consensus rule changes as
+	// defined by BIP0009.
+	//
+	// RuleChangeActivationQurom is the number of votes required for a vote
+	// to take effect.
+	//
+	// RuleChangeActivationInterval is the number of blocks in each threshold
+	// state retarget window.
+	//
+	// Deployments define the specific consensus rule changes to be voted
+	// on for the stake version (the map key).
+	RuleChangeActivationQuorum     uint32
+	RuleChangeActivationMultiplier uint32
+	RuleChangeActivationDivisor    uint32
+	RuleChangeActivationInterval   uint32
+	Deployments                    map[uint32][]ConsensusDeployment
 
 	// Enforce current block version once network has upgraded.
 	BlockEnforceNumRequired uint64
@@ -359,6 +504,13 @@ var MainNetParams = Params{
 		{99880, newHashFromStr("0000000000000cb2a9a9ded647b9f78aae51ace32dd8913701d420ead272913c")},
 	},
 
+	// The miner confirmation window is defined as:
+	//   target proof of work timespan / target proof of work spacing
+	RuleChangeActivationQuorum:     4032, // 10 % of RuleChangeActivationInterval * TicketsPerBlock
+	RuleChangeActivationMultiplier: 3,    // 75%
+	RuleChangeActivationDivisor:    4,
+	RuleChangeActivationInterval:   2016 * 4, // 4 weeks
+
 	// Enforce current block version once majority of the network has
 	// upgraded.
 	// 75% (750 / 1000)
@@ -469,6 +621,15 @@ var TestNetParams = Params{
 		{257350, newHashFromStr("000000000265019c4f9412977efcaf4811462992e6d424e251e7a91424c454ba")},
 	},
 
+	// Consensus rule change deployments.
+	//
+	// The miner confirmation window is defined as:
+	//   target proof of work timespan / target proof of work spacing
+	RuleChangeActivationQuorum:     2520, // 10 % of RuleChangeActivationInterval * TicketsPerBlock
+	RuleChangeActivationMultiplier: 3,    // 75%
+	RuleChangeActivationDivisor:    4,
+	RuleChangeActivationInterval:   5040, // 1 week
+
 	// Enforce current block version once majority of the network has
 	// upgraded.
 	// 51% (51 / 100)
@@ -566,6 +727,15 @@ var SimNetParams = Params{
 
 	// Checkpoints ordered from oldest to newest.
 	Checkpoints: nil,
+
+	// Consensus rule change deployments.
+	//
+	// The miner confirmation window is defined as:
+	//   target proof of work timespan / target proof of work spacing
+	RuleChangeActivationQuorum:     160, // 10 % of RuleChangeActivationInterval * TicketsPerBlock
+	RuleChangeActivationMultiplier: 3,   // 75%
+	RuleChangeActivationDivisor:    4,
+	RuleChangeActivationInterval:   320, // 320 seconds
 
 	// Enforce current block version once majority of the network has
 	// upgraded.

@@ -33,6 +33,13 @@ func calcWantHeight(stakeValidationHeight, interval, height int64) int64 {
 		intervalOffset
 }
 
+// CalcWantHeight calculates the height of the final block of the previous
+// interval given a block height.
+func (b *BlockChain) CalcWantHeight(interval, height int64) int64 {
+	return calcWantHeight(b.chainParams.StakeValidationHeight, interval,
+		height)
+}
+
 // findStakeVersionPriorNode walks the chain backwards from prevNode until it
 // reaches the final block of the previous stake version interval and returns
 // that node.  The returned node will be nil when the provided prevNode is too

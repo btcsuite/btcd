@@ -208,6 +208,19 @@ func voteVersionsInBlock(bl *dcrutil.Block, params *chaincfg.Params) []uint32 {
 	return versions
 }
 
+// voteBitsInBlock returns a list of vote bits for the voters in this block.
+func voteBitsInBlock(bl *dcrutil.Block) []uint16 {
+	var voteBits []uint16
+	for _, stx := range bl.MsgBlock().STransactions {
+		if is, _ := stake.IsSSGen(stx); !is {
+			continue
+		}
+		voteBits = append(voteBits, stake.SSGenVoteBits(stx))
+	}
+
+	return voteBits
+}
+
 // maybeAcceptBlock potentially accepts a block into the memory block chain.
 // It performs several validation checks which depend on its position within
 // the block chain before adding it.  The block is expected to have already gone
@@ -259,7 +272,8 @@ func (b *BlockChain) maybeAcceptBlock(block *dcrutil.Block,
 	blockHeader := &block.MsgBlock().Header
 	newNode := newBlockNode(blockHeader, block.Hash(), blockHeight,
 		ticketsSpentInBlock(block), ticketsRevokedInBlock(block),
-		voteVersionsInBlock(block, b.chainParams))
+		voteVersionsInBlock(block, b.chainParams),
+		voteBitsInBlock(block))
 	if prevNode != nil {
 		newNode.parent = prevNode
 		newNode.height = blockHeight

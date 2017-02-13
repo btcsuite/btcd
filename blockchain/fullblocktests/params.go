@@ -137,6 +137,15 @@ var simNetParams = &chaincfg.Params{
 	// Checkpoints ordered from oldest to newest.
 	Checkpoints: nil,
 
+	// BIP0009 consensus rule change deployments.
+	//
+	// The miner confirmation window is defined as:
+	//   target proof of work timespan / target proof of work spacing
+	RuleChangeActivationQuorum:     160, // 10 % of RuleChangeActivationInterval * TicketsPerBlock
+	RuleChangeActivationMultiplier: 3,   // 75%
+	RuleChangeActivationDivisor:    4,
+	RuleChangeActivationInterval:   320, // 320 seconds
+
 	// Enforce current block version once majority of the network has
 	// upgraded.
 	// 51% (51 / 100)

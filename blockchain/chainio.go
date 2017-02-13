@@ -7,17 +7,62 @@ package blockchain
 
 import (
 	"bytes"
+	"encoding/binary"
 	"fmt"
 	"math/big"
+	"reflect"
 	"sort"
 	"time"
 
 	"github.com/decred/dcrd/blockchain/internal/dbnamespace"
 	"github.com/decred/dcrd/blockchain/stake"
+	"github.com/decred/dcrd/chaincfg"
 	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/database"
 	"github.com/decred/dcrd/wire"
 	"github.com/decred/dcrutil"
+)
+
+var (
+	// hashIndexBucketName is the name of the db bucket used to house to the
+	// block hash -> block height index.
+	hashIndexBucketName = []byte("hashidx")
+
+	// heightIndexBucketName is the name of the db bucket used to house to
+	// the block height -> block hash index.
+	heightIndexBucketName = []byte("heightidx")
+
+	// chainStateKeyName is the name of the db key used to store the best
+	// chain state.
+	chainStateKeyName = []byte("chainstate")
+
+	// spendJournalBucketName is the name of the db bucket used to house
+	// transactions outputs that are spent in each block.
+	spendJournalBucketName = []byte("spendjournal")
+
+	// utxoSetBucketName is the name of the db bucket used to house the
+	// unspent transaction output set.
+	utxoSetBucketName = []byte("utxoset")
+
+	// thresholdBucketName is the name of the db bucket used to house cached
+	// threshold states.
+	thresholdBucketName = []byte("thresholdstate")
+
+	// numDeploymentsKeyName is the name of the db key used to store the
+	// number of saved deployment caches.
+	numDeploymentsKeyName = []byte("numdeployments")
+
+	// deploymentBucketName is the name of the db bucket used to house the
+	// cached threshold states for the actively defined rule deployments.
+	deploymentBucketName = []byte("deploymentcache")
+	// deploymentStateKeyName is the name of the db key used to store the
+	// deployment state associated with the threshold cache for a given rule
+	// deployment.
+	deploymentStateKeyName = []byte("deploymentstate")
+
+	// byteOrder is the preferred byte order used for serializing numeric
+	// fields for storage in the database.
+	byteOrder = binary.LittleEndian
 )
 
 const (
@@ -61,6 +106,13 @@ func (e errDeserialize) Error() string {
 func isDeserializeErr(err error) bool {
 	_, ok := err.(errDeserialize)
 	return ok
+}
+
+// isDbBucketNotFoundErr returns whether or not the passed error is a
+// database.Error with an error code of database.ErrBucketNotFound.
+func isDbBucketNotFoundErr(err error) bool {
+	dbErr, ok := err.(database.Error)
+	return ok && dbErr.ErrorCode == database.ErrBucketNotFound
 }
 
 // -----------------------------------------------------------------------------
@@ -1270,7 +1322,7 @@ func (b *BlockChain) createChainState() error {
 	genesisBlock := dcrutil.NewBlock(b.chainParams.GenesisBlock)
 	header := &genesisBlock.MsgBlock().Header
 	node := newBlockNode(header, genesisBlock.Hash(), 0, []chainhash.Hash{},
-		[]chainhash.Hash{}, []uint32{})
+		[]chainhash.Hash{}, []uint32{}, []uint16{})
 	node.inMainChain = true
 	b.bestNode = node
 
@@ -1434,7 +1486,8 @@ func (b *BlockChain) initChainState() error {
 		header := &block.Header
 		node := newBlockNode(header, &state.hash, int64(state.height),
 			ticketsSpentInBlock(blk), ticketsRevokedInBlock(blk),
-			voteVersionsInBlock(blk, b.chainParams))
+			voteVersionsInBlock(blk, b.chainParams),
+			voteBitsInBlock(blk))
 		node.inMainChain = true
 		node.workSum = state.workSum
 
@@ -1760,4 +1813,507 @@ func DumpBlockChain(db database.DB, height int64) (map[int64][]byte, error) {
 	}
 
 	return blockchain, err
+}
+
+// -----------------------------------------------------------------------------
+// The threshold state consists of individual threshold cache buckets for each
+// cache id under one main threshold state bucket.  Each threshold cache bucket
+// contains entries keyed by the block hash for the final block in each window
+// and their associated threshold states as well as the associated deployment
+// parameters.
+//
+// The serialized value format is for each cache entry keyed by hash is:
+//
+//   <thresholdstate>
+//
+//   Field             Type      Size
+//   threshold state   uint8     1 byte
+//
+//
+// In addition, the threshold cache buckets for deployments contain the specific
+// deployment parameters they were created with.  This allows the cache
+// invalidation when there any changes to their definitions.
+//
+// The serialized value format for the deployment parameters is:
+//
+//   <bit number><start time><expire time>
+//
+//   Field            Type      Size
+//   mask             uint16    2 bytes
+//   start time       uint64    8 bytes
+//   expire time      uint64    8 bytes
+//   num choices      uint16    2 bytes
+//   choice[0..N]     uint32    4 bytes
+//
+// The serialized value format for the choice array is:
+//
+//   <bits><isIgnore><isNo>
+//
+//   Field            Type      Size
+//   bits             uint16    2 bytes
+//   isIgnore         uint8     1 byte (bool)
+//   isNo             uint8     1 byte (bool)
+//
+// Finally, the main threshold bucket also contains the number of stored
+// deployment buckets as described above.
+//
+// The serialized value format for the number of stored deployment buckets is:
+//
+//   <num deployments>
+//
+//   Field             Type      Size
+//   num deployments   uint32    4 bytes
+// -----------------------------------------------------------------------------
+
+// serializeDeploymentCacheParams serializes the parameters for the passed
+// deployment into a single byte slice according to the format described in
+// detail above.
+func serializeDeploymentCacheParams(deployment *chaincfg.ConsensusDeployment) []byte {
+	serialized := make([]byte, 2+8+8+2+len(deployment.Vote.Choices)*4)
+	byteOrder.PutUint16(serialized[0:], deployment.Vote.Mask)
+	byteOrder.PutUint64(serialized[2:], deployment.StartTime)
+	byteOrder.PutUint64(serialized[10:], deployment.ExpireTime)
+	byteOrder.PutUint16(serialized[18:],
+		uint16(len(deployment.Vote.Choices)))
+	for i := 0; i < len(deployment.Vote.Choices); i++ {
+		byteOrder.PutUint16(serialized[20+i*4:],
+			deployment.Vote.Choices[i].Bits)
+		if deployment.Vote.Choices[i].IsIgnore {
+			serialized[20+i*4+2] = 1
+		}
+		if deployment.Vote.Choices[i].IsNo {
+			serialized[20+i*4+3] = 1
+		}
+	}
+	return serialized
+}
+
+// deserializeDeploymentCacheParams deserializes the passed serialized
+// deployment cache parameters into a deployment struct.
+func deserializeDeploymentCacheParams(serialized []byte) (chaincfg.ConsensusDeployment, error) {
+	// Ensure the serialized data has enough bytes to properly deserialize
+	// the bit number, start time, and expire time.
+	if len(serialized) < 2+8+8+2 {
+		return chaincfg.ConsensusDeployment{}, database.Error{
+			ErrorCode:   database.ErrCorruption,
+			Description: "corrupt deployment cache state",
+		}
+	}
+
+	var deployment chaincfg.ConsensusDeployment
+	deployment.Vote.Mask = byteOrder.Uint16(serialized[0:])
+	deployment.StartTime = byteOrder.Uint64(serialized[2:])
+	deployment.ExpireTime = byteOrder.Uint64(serialized[10:])
+	choicesLen := byteOrder.Uint16(serialized[18:])
+
+	// make sure we have enough bytes
+	if len(serialized) != 2+8+8+2+int(choicesLen)*4 {
+		return chaincfg.ConsensusDeployment{}, database.Error{
+			ErrorCode:   database.ErrCorruption,
+			Description: "corrupt deployment choices cache state",
+		}
+	}
+
+	// Recreate array.
+	deployment.Vote.Choices = make([]chaincfg.Choice, choicesLen,
+		choicesLen)
+	for i := 0; i < int(choicesLen); i++ {
+		deployment.Vote.Choices[i].Bits =
+			byteOrder.Uint16(serialized[20+i*4:])
+		if serialized[20+i*4+2] != 0 {
+			deployment.Vote.Choices[i].IsIgnore = true
+		}
+		if serialized[20+i*4+3] != 0 {
+			deployment.Vote.Choices[i].IsNo = true
+		}
+	}
+
+	return deployment, nil
+}
+
+// dbPutDeploymentCacheParams uses an existing database transaction to update
+// the deployment cache params with the given values.
+func dbPutDeploymentCacheParams(bucket database.Bucket, deployment *chaincfg.ConsensusDeployment) error {
+	serialized := serializeDeploymentCacheParams(deployment)
+	return bucket.Put(deploymentStateKeyName, serialized)
+}
+
+// dbFetchDeploymentCacheParams uses an existing database transaction to
+// retrieve the deployment parameters from the given bucket, deserialize them,
+// and returns the resulting deployment struct.
+func dbFetchDeploymentCacheParams(bucket database.Bucket) (chaincfg.ConsensusDeployment, error) {
+	serialized := bucket.Get(deploymentStateKeyName)
+	return deserializeDeploymentCacheParams(serialized)
+}
+
+// serializeNumDeployments serializes the parameters for the passed number of
+// deployments into a single byte slice according to the format described in
+// detail above.
+func serializeNumDeployments(numDeployments uint32) []byte {
+	serialized := make([]byte, 4)
+	byteOrder.PutUint32(serialized, numDeployments)
+	return serialized
+}
+
+// deserializeDeploymentCacheParams deserializes the passed serialized
+// number of deployments.
+func deserializeNumDeployments(serialized []byte) (uint32, error) {
+	if len(serialized) != 4 {
+		return 0, database.Error{
+			ErrorCode:   database.ErrCorruption,
+			Description: "corrupt stored number of deployments",
+		}
+	}
+	return byteOrder.Uint32(serialized), nil
+}
+
+func appendVersion(blob []byte, version uint32) []byte {
+	v := []byte(fmt.Sprintf("%v", version))
+
+	return append(blob, v[:]...)
+}
+
+// dbPutNumDeployments uses an existing database transaction to update the
+// number of deployments for the given version to the given value.
+func dbPutNumDeployments(bucket database.Bucket, version, numDeployments uint32) error {
+	serialized := serializeNumDeployments(numDeployments)
+	return bucket.Put(appendVersion(numDeploymentsKeyName, version),
+		serialized)
+}
+
+// dbFetchNumDeployments uses an existing database transaction to retrieve the
+// the number of deployments for the provided version, deserialize it, and
+// returns the result.
+func dbFetchNumDeployments(bucket database.Bucket, version uint32) (uint32, error) {
+	// Ensure the serialized data has enough bytes to properly deserialize
+	// the number of stored deployments.
+	serialized := bucket.Get(appendVersion(numDeploymentsKeyName, version))
+	return deserializeNumDeployments(serialized)
+}
+
+// thresholdCacheBucket returns the serialized bucket name to use for a
+// threshold cache given a prefix and an ID.
+func thresholdCacheBucket(prefix []byte, id uint32) []byte {
+	bucketName := make([]byte, len(prefix)+4)
+	copy(bucketName, prefix)
+	byteOrder.PutUint32(bucketName[len(bucketName)-4:], id)
+	return bucketName
+}
+
+// dbPutThresholdState uses an existing database transaction to update or add
+// the rule change threshold state for the provided block hash.
+func dbPutThresholdState(bucket database.Bucket, hash chainhash.Hash, state ThresholdStateTuple) error {
+	// Add the block hash to threshold state mapping.
+	var serializedState [1 + 4]byte
+	serializedState[0] = byte(state.State)
+	byteOrder.PutUint32(serializedState[1:], state.Choice)
+	return bucket.Put(hash[:], serializedState[:])
+}
+
+// dbPutThresholdCaches uses an existing database transaction to update the
+// provided threshold state caches using the given bucket prefix.
+func dbPutThresholdCaches(dbTx database.Tx, caches map[uint32][]thresholdStateCache, bucketPrefix []byte) error {
+	// Loop through each of the defined cache IDs in the provided cache and
+	// populate the associated bucket with all of the block hash to
+	// threshold state mappings for it.
+	for version := range caches {
+		cachesBucket := dbTx.Metadata().Bucket(thresholdBucketName)
+		for i := uint32(0); i < uint32(len(caches)); i++ {
+			cache := &caches[version][i]
+			if len(cache.dbUpdates) == 0 {
+				continue
+			}
+
+			cacheIDBucketName := thresholdCacheBucket(bucketPrefix, i)
+			bucket := cachesBucket.Bucket(cacheIDBucketName)
+			for blockHash, state := range cache.dbUpdates {
+				err := dbPutThresholdState(bucket, blockHash, state)
+				if err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+// putThresholdCaches uses an existing database transaction to update the
+// threshold state caches.
+func (b *BlockChain) putThresholdCaches(dbTx database.Tx) error {
+	return dbPutThresholdCaches(dbTx, b.deploymentCaches,
+		deploymentBucketName)
+}
+
+// markThresholdCachesFlushed clears any pending updates to be written from
+// threshold state caches.  Callers are intended to call this after the pending
+// updates have been successfully written to the database via the
+// putThresholdCaches function and its associated database transation is closed.
+// This approach is taken to ensure the memory state is not updated until after
+// the atomic database update was successful.
+func (b *BlockChain) markThresholdCachesFlushed() {
+	for k := range b.deploymentCaches {
+		for i := 0; i < len(b.deploymentCaches[k]); i++ {
+			b.deploymentCaches[k][i].MarkFlushed()
+		}
+	}
+}
+
+// dbFetchThresholdCaches uses an existing database transaction to retrieve
+// the threshold state caches from the provided bucket prefix into the given
+// cache parameter.  When the db does not contain any information for a specific
+// id within that cache, that entry will simply be empty.
+func dbFetchThresholdCaches(dbTx database.Tx, caches map[uint32][]thresholdStateCache, bucketPrefix []byte) error {
+	// Nothing to load if the main threshold state caches bucket
+	// doesn't exist.
+	cachesBucket := dbTx.Metadata().Bucket(thresholdBucketName)
+	if cachesBucket == nil {
+		return nil
+	}
+
+	// Loop through each of the cache IDs and load any saved threshold
+	// states.
+	for version := range caches {
+		for i := 0; i < len(caches); i++ {
+			// Nothing to do for this cache ID if there is no bucket for it.
+			cacheIDBucketName := thresholdCacheBucket(bucketPrefix,
+				uint32(i))
+			cacheIDBucket := cachesBucket.Bucket(cacheIDBucketName[:])
+			if cacheIDBucket == nil {
+				continue
+			}
+
+			// Load all of the cached block hash to threshold state
+			// mappings from the bucket.
+			err := cacheIDBucket.ForEach(func(k, v []byte) error {
+				// Skip non-hash entries.
+				if len(k) != chainhash.HashSize {
+					return nil
+				}
+
+				var hash chainhash.Hash
+				copy(hash[:], k)
+				caches[version][i].entries[hash] =
+					newThresholdState(ThresholdState(v[0]),
+						byteOrder.Uint32(v[1:]))
+				return nil
+			})
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+// invalidateThresholdCaches removes any threshold state caches that are no
+// longer valid.  This can happen if a deployment ID is changed such as when it
+// is reused, or if it is reordered in the parameter definitions.  It is also
+// necessary for specific bits in the warning cache when deployment definitions
+// are added and removed since it could change the expected block versions and
+// hence potentially change the result of the warning states for that bit.
+func (b *BlockChain) invalidateThresholdCaches(cachesBucket database.Bucket) error {
+	for version := range b.chainParams.Deployments {
+		deployments := b.chainParams.Deployments[version][:]
+
+		// Remove any stored deployments that are no longer defined along with
+		// the warning cache associated with their bits.
+		numStoredDeployments, err := dbFetchNumDeployments(cachesBucket, version)
+		if err != nil {
+			return err
+		}
+		definedDeployments := uint32(len(deployments))
+		for i := definedDeployments; i < numStoredDeployments; i++ {
+			// Nothing to do when nothing is stored for the deployment.
+			deployBucketKey := thresholdCacheBucket(deploymentBucketName, i)
+			deployBucket := cachesBucket.Bucket(deployBucketKey)
+			if deployBucket == nil {
+				continue
+			}
+
+			// Remove deployment state and cache.
+			err = cachesBucket.DeleteBucket(deployBucketKey)
+			if err != nil && !isDbBucketNotFoundErr(err) {
+				return err
+			}
+			log.Debugf("Removed threshold state caches for deployment %d", i)
+		}
+
+		// Remove any deployment caches that no longer match the associated
+		// deployment definition.
+		for i := uint32(0); i < uint32(len(deployments)); i++ {
+			// Remove the warning cache for the bit associated with the new
+			// deployment definition if nothing is already stored for the
+			// deployment.
+			deployBucketKey := thresholdCacheBucket(deploymentBucketName, i)
+			deployBucket := cachesBucket.Bucket(deployBucketKey)
+			if deployBucket == nil {
+				continue
+			}
+
+			// Load the deployment details the cache was created for from
+			// the database, compare them against the currently defined
+			// deployment, and invalidate the relevant caches if they don't
+			// match.
+			stored, err := dbFetchDeploymentCacheParams(deployBucket)
+			if err != nil {
+				return err
+			}
+			if !reflect.DeepEqual(stored, deployments[i]) {
+				// Remove deployment state and cache.
+				err := cachesBucket.DeleteBucket(deployBucketKey)
+				if err != nil && !isDbBucketNotFoundErr(err) {
+					return err
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+// initThresholdCacheBuckets creates any missing buckets needed for the defined
+// threshold caches and populates them with state-related details so they can
+// be invalidated as needed.
+func (b *BlockChain) initThresholdCacheBuckets(meta database.Bucket) error {
+	// Create overall bucket that houses all of the threshold caches and
+	// their related state as needed.
+	cachesBucket, err := meta.CreateBucketIfNotExists(thresholdBucketName)
+	if err != nil {
+		return err
+	}
+
+	for version := range b.deploymentCaches {
+		// Update the number of stored deployment as needed.
+		definedDeployments := uint32(len(b.deploymentCaches[version]))
+		storedDeployments, err := dbFetchNumDeployments(cachesBucket,
+			version)
+		if err != nil || storedDeployments != definedDeployments {
+			err := dbPutNumDeployments(cachesBucket, version,
+				definedDeployments)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	// Create buckets for each of the deployment caches as needed, and
+	// populate the created buckets with the specific deployment details so
+	// that the cache(s) can be invalidated properly with future updates.
+	for k := range b.chainParams.Deployments {
+		for i := range b.chainParams.Deployments[k] {
+			name := thresholdCacheBucket(deploymentBucketName,
+				uint32(i))
+			if bucket := cachesBucket.Bucket(name); bucket != nil {
+				continue
+			}
+
+			deployBucket, err := cachesBucket.CreateBucket(name)
+			if err != nil {
+				return err
+			}
+
+			deployment := &b.chainParams.Deployments[k][i]
+			err = dbPutDeploymentCacheParams(deployBucket,
+				deployment)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+// initThresholdCaches initializes the threshold state caches from the database.
+// When the db does not yet contain any information for a specific threshold
+// cache or a given id within that cache, it will simply be empty which will
+// lead to it being calculated as needed.
+func (b *BlockChain) initThresholdCaches() error {
+	// Create and initialize missing threshold state cache buckets and
+	// remove any that are no longer valid.
+	err := b.db.Update(func(dbTx database.Tx) error {
+		meta := dbTx.Metadata()
+		cachesBucket := meta.Bucket(thresholdBucketName)
+		if cachesBucket != nil {
+			err := b.invalidateThresholdCaches(cachesBucket)
+			if err != nil {
+				return err
+			}
+		}
+
+		// Create all cache buckets as needed.
+		return b.initThresholdCacheBuckets(meta)
+	})
+	if err != nil {
+		return err
+	}
+
+	// Load the deployment caches.
+	err = b.db.View(func(dbTx database.Tx) error {
+		// Load the deployment threshold states.
+		return dbFetchThresholdCaches(dbTx, b.deploymentCaches,
+			deploymentBucketName)
+	})
+	if err != nil {
+		return err
+	}
+
+	// Inform the user the states might take a while to recalculate if any
+	// of the threshold state caches aren't populated.
+	var showMsg bool
+	for k := range b.deploymentCaches {
+		for i := range b.deploymentCaches[k] {
+			if len(b.deploymentCaches[k][i].entries) == 0 {
+				showMsg = true
+				break
+			}
+		}
+	}
+	if showMsg {
+		log.Info("Recalculating threshold states due to definition " +
+			"change.  This might take a while...")
+	}
+
+	// Get the previous block node.  This function is used over simply
+	// accessing b.bestNode.parent directly as it will dynamically create
+	// previous block nodes as needed.  This helps allow only the pieces of
+	// the chain that are needed to remain in memory.
+	prevNode, err := b.getPrevNodeFromNode(b.bestNode)
+	if err != nil {
+		return err
+	}
+
+	// Initialize the deployment caches by calculating the threshold state
+	// for each of them.  This will ensure the caches are populated and any
+	// states that needed to be recalculated due to definition changes is
+	// done now.
+	for version := range b.deploymentCaches {
+		for id := 0; id < len(b.chainParams.Deployments[version]); id++ {
+			deployment := &b.chainParams.Deployments[version][id]
+			cache := &b.deploymentCaches[version][id]
+			checker := deploymentChecker{deployment: deployment,
+				chain: b}
+			_, err := b.thresholdState(version, prevNode, checker,
+				cache)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	// Update the cached threshold states in the database as needed.
+	err = b.db.Update(func(dbTx database.Tx) error {
+		return b.putThresholdCaches(dbTx)
+	})
+	if err != nil {
+		return err
+	}
+
+	// Mark all modified entries in the threshold caches as flushed now that
+	// they have been committed to the database.
+	b.markThresholdCachesFlushed()
+
+	return nil
 }

@@ -27,6 +27,40 @@ type GetStakeVersionsResult struct {
 	StakeVersions []StakeVersions `json:"stakeversions"`
 }
 
+type Choice struct {
+	Id          string  `json:"id"`
+	Description string  `json:"description"`
+	Bits        uint16  `json:"bits"`
+	IsIgnore    bool    `json:"isignore"`
+	IsNo        bool    `json:"isno"`
+	Count       uint32  `json:"count"`
+	Percentage  float64 `json:"percentage"`
+}
+
+// Agenda
+type Agenda struct {
+	Id               string   `json:"id"`
+	Description      string   `json:"description"`
+	Mask             uint16   `json:"mask"`
+	StartTime        uint64   `json:"starttime"`
+	ExpireTime       uint64   `json:"expiretime"`
+	TotalVotes       uint32   `json:"totalvotes"`
+	Status           string   `json:"status"`
+	QuorumPercentage float64  `json:"quorumpercentage"`
+	Choices          []Choice `json:"choices"`
+}
+
+// GetVoteInfoResult models the data returned from the getvoteinfo command.
+type GetVoteInfoResult struct {
+	CurrentHeight int64    `json:"currentheight"`
+	StartHeight   int64    `json:"startheight"`
+	EndHeight     int64    `json:"endheight"`
+	Hash          string   `json:"hash"`
+	StakeVersion  uint32   `json:"stakeversion"`
+	Quorum        uint32   `json:"quorum"`
+	Agendas       []Agenda `json:"agendas"`
+}
+
 // EstimateStakeDiffResult models the data returned from the estimatestakediff
 // command.
 type EstimateStakeDiffResult struct {

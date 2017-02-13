@@ -217,6 +217,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"getstakedifficulty":    handleGetStakeDifficulty,
 	"getstakeversions":      handleGetStakeVersions,
 	"getticketpoolvalue":    handleGetTicketPoolValue,
+	"getvoteinfo":           handleGetVoteInfo,
 	"gettxout":              handleGetTxOut,
 	"getwork":               handleGetWork,
 	"help":                  handleHelp,
@@ -3879,6 +3880,87 @@ func handleGetTicketPoolValue(s *rpcServer, cmd interface{}, closeChan <-chan st
 	}
 
 	return amt.ToCoin(), nil
+}
+
+// handleGetVoteInfo implements the getvoteinfo command.
+func handleGetVoteInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	c, ok := cmd.(*dcrjson.GetVoteInfoCmd)
+	if !ok {
+		return nil, internalRPCError("Invalid command",
+			"handleGetVoteInfo")
+	}
+
+	snapshot := s.chain.BestSnapshot()
+	vi, err := s.chain.GetVoteInfo(snapshot.Hash, c.Version)
+	if err != nil {
+		return nil, err
+	}
+
+	interval := int64(s.server.chainParams.RuleChangeActivationInterval)
+	quorum := s.server.chainParams.RuleChangeActivationQuorum
+	// Assemble JSON result.
+	result := dcrjson.GetVoteInfoResult{
+		CurrentHeight: snapshot.Height,
+		StartHeight: s.chain.CalcWantHeight(interval,
+			snapshot.Height) + 1,
+		EndHeight: s.chain.CalcWantHeight(interval,
+			snapshot.Height) + interval,
+		Hash:         snapshot.Hash.String(),
+		StakeVersion: c.Version,
+		Quorum:       quorum,
+		Agendas:      make([]dcrjson.Agenda, 0, len(vi.Agendas)),
+	}
+	for _, agenda := range vi.Agendas {
+		// Obtain status of agenda.
+		state, err := s.chain.ThresholdState(snapshot.Hash, c.Version,
+			agenda.Vote.Id)
+		if err != nil {
+			return nil, err
+		}
+
+		counts, err := s.chain.GetVoteCounts(c.Version, agenda.Vote.Id)
+		if err != nil {
+			return nil, err
+		}
+
+		qmin := quorum
+		totalNonIgnore := counts.Total - counts.TotalIgnore
+		if totalNonIgnore < quorum {
+			qmin = totalNonIgnore
+		}
+		a := dcrjson.Agenda{
+			Id:          agenda.Vote.Id,
+			Description: agenda.Vote.Description,
+			Mask:        agenda.Vote.Mask,
+			Choices: make([]dcrjson.Choice, 0,
+				len(agenda.Vote.Choices)),
+			StartTime:        agenda.StartTime,
+			ExpireTime:       agenda.ExpireTime,
+			TotalVotes:       counts.Total,
+			Status:           state.String(),
+			QuorumPercentage: float64(qmin) / float64(quorum),
+		}
+
+		// Handle choices.
+		for k, choice := range agenda.Vote.Choices {
+			c := dcrjson.Choice{
+				Id:          choice.Id,
+				Description: choice.Description,
+				Bits:        choice.Bits,
+				IsIgnore:    choice.IsIgnore,
+				IsNo:        choice.IsNo,
+				Count:       counts.VoteChoices[k],
+				Percentage: float64(counts.VoteChoices[k]) /
+					float64(counts.Total),
+			}
+			a.Choices = append(a.Choices, c)
+		}
+
+		// Append transformed agenda.
+		result.Agendas = append(result.Agendas, a)
+	}
+
+	return result, nil
 }
 
 // bigToLEUint256 returns the passed big integer as an unsigned 256-bit integer

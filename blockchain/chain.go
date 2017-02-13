@@ -95,13 +95,16 @@ type blockNode struct {
 
 	// Keep track of all voter versions in this block.
 	voterVersions []uint32
+
+	// Keep track of all vote bits in this block.
+	voteBits []uint16
 }
 
 // newBlockNode returns a new block node for the given block header.  It is
 // completely disconnected from the chain and the workSum value is just the work
 // for the passed block.  The work sum is updated accordingly when the node is
 // inserted into a chain.
-func newBlockNode(blockHeader *wire.BlockHeader, blockHash *chainhash.Hash, height int64, ticketsSpent []chainhash.Hash, ticketsRevoked []chainhash.Hash, voterVersions []uint32) *blockNode {
+func newBlockNode(blockHeader *wire.BlockHeader, blockHash *chainhash.Hash, height int64, ticketsSpent []chainhash.Hash, ticketsRevoked []chainhash.Hash, voterVersions []uint32, voteBits []uint16) *blockNode {
 	// Make a copy of the hash so the node doesn't keep a reference to part
 	// of the full block/block header preventing it from being garbage
 	// collected.
@@ -113,6 +116,7 @@ func newBlockNode(blockHeader *wire.BlockHeader, blockHash *chainhash.Hash, heig
 		ticketsSpent:   ticketsSpent,
 		ticketsRevoked: ticketsRevoked,
 		voterVersions:  voterVersions,
+		voteBits:       voteBits,
 	}
 	return &node
 }
@@ -251,6 +255,16 @@ type BlockChain struct {
 	stateLock     sync.RWMutex
 	stateSnapshot *BestState
 
+	// The following caches are used to efficiently keep track of the
+	// current deployment threshold state of each rule change deployment.
+	//
+	// This information is stored in the database so it can be quickly
+	// reconstructed on load.
+	//
+	// deploymentCaches caches the current deployment threshold state for
+	// blocks in each of the actively defined deployments.
+	deploymentCaches map[uint32][]thresholdStateCache
+
 	// pruner is the automatic pruner for block nodes and stake nodes,
 	// so that the memory may be restored by the garbage collector if
 	// it is unlikely to be referenced in the future.
@@ -307,6 +321,39 @@ func (b *BlockChain) GetStakeVersions(hash *chainhash.Hash, count int32) ([]Stak
 	}
 
 	return result, nil
+}
+
+type VoteInfo struct {
+	Agendas      []chaincfg.ConsensusDeployment
+	AgendaStatus []ThresholdStateTuple
+}
+
+// GetVoteInfo returns
+func (b *BlockChain) GetVoteInfo(hash *chainhash.Hash, version uint32) (*VoteInfo, error) {
+	deployments, ok := b.chainParams.Deployments[version]
+	if !ok {
+		return nil, VoteVersionError(version)
+	}
+
+	if !ok {
+		return nil, HashError(hash.String())
+	}
+
+	vi := VoteInfo{
+		Agendas: make([]chaincfg.ConsensusDeployment,
+			0, len(deployments)),
+		AgendaStatus: make([]ThresholdStateTuple, 0, len(deployments)),
+	}
+	for _, deployment := range deployments {
+		vi.Agendas = append(vi.Agendas, deployment)
+		status, err := b.ThresholdState(hash, version, deployment.Vote.Id)
+		if err != nil {
+			return nil, err
+		}
+		vi.AgendaStatus = append(vi.AgendaStatus, status)
+	}
+
+	return &vi, nil
 }
 
 // DisableVerify provides a mechanism to disable transaction script validation
@@ -547,7 +594,8 @@ func (b *BlockChain) loadBlockNode(dbTx database.Tx, hash *chainhash.Hash) (*blo
 	blockHeader := block.MsgBlock().Header
 	node := newBlockNode(&blockHeader, hash, int64(blockHeader.Height),
 		ticketsSpentInBlock(block), ticketsRevokedInBlock(block),
-		voteVersionsInBlock(block, b.chainParams))
+		voteVersionsInBlock(block, b.chainParams),
+		voteBitsInBlock(block))
 	node.inMainChain = true
 	prevHash := &blockHeader.PrevBlock
 
@@ -717,6 +765,38 @@ func (b *BlockChain) getPrevNodeFromNode(node *blockNode) (*blockNode, error) {
 		return err
 	})
 	return prevBlockNode, err
+}
+
+// ancestorNode returns the ancestor block node at the provided height by
+// following the chain backwards from the given node while dynamically loading
+// any pruned nodes from the database and updating the memory block chain as
+// needed.  The returned block will be nil when a height is requested that is
+// after the height of the passed node or is less than zero.
+//
+// This function MUST be called with the chain state lock held (for writes).
+func (b *BlockChain) ancestorNode(node *blockNode, height int64) (*blockNode, error) {
+	// Nothing to do if the requested height is outside of the valid range.
+	if height > node.height || height < 0 {
+		return nil, nil
+	}
+
+	// Iterate backwards until the requested height is reached.
+	iterNode := node
+	for iterNode != nil && iterNode.height > height {
+		// Get the previous block node.  This function is used over
+		// simply accessing iterNode.parent directly as it will
+		// dynamically create previous block nodes as needed.  This
+		// helps allow only the pieces of the chain that are needed
+		// to remain in memory.
+		var err error
+		iterNode, err = b.getPrevNodeFromNode(iterNode)
+		if err != nil {
+			log.Errorf("getPrevNodeFromNode: %v", err)
+			return nil, err
+		}
+	}
+
+	return iterNode, nil
 }
 
 // fetchBlockFromHash searches the internal chain block stores and the database in
@@ -2043,6 +2123,30 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *dcrutil.Block,
 	return true, nil
 }
 
+// isCurrent returns whether or not the chain believes it is current.  Several
+// factors are used to guess, but the key factors that allow the chain to
+// believe it is current are:
+//  - Latest block height is after the latest checkpoint (if enabled)
+//  - Latest block has a timestamp newer than 24 hours ago
+//
+// This function MUST be called with the chain state lock held (for reads).
+func (b *BlockChain) isCurrent() bool {
+	// Not current if the latest main (best) chain height is before the
+	// latest known good checkpoint (when checkpoints are enabled).
+	checkpoint := b.latestCheckpoint()
+	if checkpoint != nil && b.bestNode.height < checkpoint.Height {
+		return false
+	}
+
+	// Not current if the latest best block has a timestamp before 24 hours
+	// ago.
+	//
+	// The chain appears to be current if none of the checks reported
+	// otherwise.
+	minus24Hours := b.timeSource.AdjustedTime().Add(-24 * time.Hour)
+	return !b.bestNode.header.Timestamp.Before(minus24Hours)
+}
+
 // IsCurrent returns whether or not the chain believes it is current.  Several
 // factors are used to guess, but the key factors that allow the chain to
 // believe it is current are:
@@ -2054,23 +2158,7 @@ func (b *BlockChain) IsCurrent() bool {
 	b.chainLock.RLock()
 	defer b.chainLock.RUnlock()
 
-	// Not current if the latest main (best) chain height is before the
-	// latest known good checkpoint (when checkpoints are enabled).
-	checkpoint := b.latestCheckpoint()
-	if checkpoint != nil && b.bestNode.height < checkpoint.Height {
-		return false
-	}
-
-	// Not current if the latest best block has a timestamp before 24 hours
-	// ago.
-	minus24Hours := b.timeSource.AdjustedTime().Add(-24 * time.Hour)
-	if b.bestNode.header.Timestamp.Before(minus24Hours) {
-		return false
-	}
-
-	// The chain appears to be current if the above checks did not report
-	// otherwise.
-	return true
+	return b.isCurrent()
 }
 
 // BestSnapshot returns information about the current best chain block and
@@ -2187,6 +2275,7 @@ func New(config *Config) (*BlockChain, error) {
 		blockCache:              make(map[chainhash.Hash]*dcrutil.Block),
 		mainchainBlockCache:     make(map[chainhash.Hash]*dcrutil.Block),
 		mainchainBlockCacheSize: mainchainBlockCacheSize,
+		deploymentCaches:        newThresholdCaches(params),
 	}
 
 	// Initialize the chain state from the passed database.  When the db

@@ -2087,7 +2087,7 @@ func TestCheckBlockHeaderContext(t *testing.T) {
 	// fails.
 	block := dcrutil.NewBlock(&badBlock)
 	newNode := blockchain.TstNewBlockNode(&block.MsgBlock().Header, block.Hash(),
-		block.Height(), nil, nil, nil)
+		block.Height(), nil, nil, nil, nil)
 	err = chain.TstCheckBlockHeaderContext(&block.MsgBlock().Header, newNode, blockchain.BFNone)
 	if err == nil {
 		t.Fatalf("Should fail due to bad diff in newNode\n")
@@ -2170,6 +2170,15 @@ var simNetParams = &chaincfg.Params{
 
 	// Checkpoints ordered from oldest to newest.
 	Checkpoints: nil,
+
+	// BIP0009 consensus rule change deployments.
+	//
+	// The miner confirmation window is defined as:
+	//   target proof of work timespan / target proof of work spacing
+	RuleChangeActivationQuorum:     160, // 10 % of RuleChangeActivationInterval * TicketsPerBlock
+	RuleChangeActivationMultiplier: 3,   // 75%
+	RuleChangeActivationDivisor:    4,
+	RuleChangeActivationInterval:   320, // 320 seconds
 
 	// Enforce current block version once majority of the network has
 	// upgraded.

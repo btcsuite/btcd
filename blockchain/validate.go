@@ -2418,7 +2418,8 @@ func (b *BlockChain) CheckConnectBlock(block *dcrutil.Block) error {
 	newNode := newBlockNode(&block.MsgBlock().Header, block.Hash(),
 		block.Height(), ticketsSpentInBlock(block),
 		ticketsRevokedInBlock(block),
-		voteVersionsInBlock(block, b.chainParams))
+		voteVersionsInBlock(block, b.chainParams),
+		voteBitsInBlock(block))
 	newNode.parent = prevNode
 	newNode.workSum.Add(prevNode.workSum, newNode.workSum)
 	if prevNode != nil {
