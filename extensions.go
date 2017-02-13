@@ -723,6 +723,47 @@ func (c *Client) GetTicketPoolValue() (dcrutil.Amount, error) {
 	return c.GetTicketPoolValueAsync().Receive()
 }
 
+// FutureGetVoteInfoResult is a future promise to deliver the result of a
+// GetVoteInfoAsync RPC invocation (or an applicable error).
+type FutureGetVoteInfoResult chan *response
+
+// Receive waits for the response promised by the future and returns the network
+// the server is running on.
+func (r FutureGetVoteInfoResult) Receive() (*dcrjson.GetVoteInfoResult, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal result as a dcrjson.GetVoteInfoResult.
+	var gsvr dcrjson.GetVoteInfoResult
+	err = json.Unmarshal(res, &gsvr)
+	if err != nil {
+		return nil, err
+	}
+
+	return &gsvr, nil
+}
+
+// GetVoteInfoAsync returns an instance of a type that can be used to
+// get the result of the RPC at some future time by invoking the Receive
+// function on the returned instance.
+//
+// See GetVoteInfo for the blocking version and more details.
+//
+// NOTE: This is a dcrd extension.
+func (c *Client) GetVoteInfoAsync(version uint32) FutureGetVoteInfoResult {
+	cmd := dcrjson.NewGetVoteInfoCmd(version)
+	return c.sendCmd(cmd)
+}
+
+// GetVoteInfo returns the current and next stake difficulty.
+//
+// NOTE: This is a dcrd extension.
+func (c *Client) GetVoteInfo(version uint32) (*dcrjson.GetVoteInfoResult, error) {
+	return c.GetVoteInfoAsync(version).Receive()
+}
+
 // FutureListAddressTransactionsResult is a future promise to deliver the result
 // of a ListAddressTransactionsAsync RPC invocation (or an applicable error).
 type FutureListAddressTransactionsResult chan *response
