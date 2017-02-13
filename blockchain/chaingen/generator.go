@@ -44,6 +44,12 @@ var (
 	coinbaseSigScript = []byte{txscript.OP_0, txscript.OP_0}
 )
 
+const (
+	// voteBitYes is the specific bit that is set in the vote bits to
+	// indicate that the previous block is valid.
+	voteBitYes = 0x01
+)
+
 // SpendableOut represents a transaction output that is spendable along with
 // additional metadata such as the block its in and how much it pays.
 type SpendableOut struct {
@@ -548,12 +554,7 @@ func voteBlockScript(parentBlock *wire.MsgBlock) []byte {
 // voteBitsScript returns a standard provably-pruneable OP_RETURN script
 // suitable for use in a vote tx (ssgen) with the appropriate vote bits set
 // depending on the provided params.
-func voteBitsScript(voteYes bool, voteVersion uint32) []byte {
-	bits := uint16(0)
-	if voteYes {
-		bits = 1
-	}
-
+func voteBitsScript(bits uint16, voteVersion uint32) []byte {
 	data := make([]byte, 6)
 	binary.LittleEndian.PutUint16(data[:], bits)
 	binary.LittleEndian.PutUint32(data[2:], voteVersion)
@@ -588,7 +589,7 @@ func (g *Generator) createVoteTx(parentBlock *wire.MsgBlock, ticket *stakeTicket
 	blockScript := voteBlockScript(parentBlock)
 
 	// The second output is the vote bits.
-	voteScript := voteBitsScript(true, 0)
+	voteScript := voteBitsScript(voteBitYes, 0)
 
 	// The third and subsequent outputs pay the original commitment amounts
 	// along with the appropriate portion of the vote subsidy.  This impl
@@ -1365,12 +1366,25 @@ func ReplaceStakeVersion(newVersion uint32) func(*wire.MsgBlock) {
 }
 
 // ReplaceVoteVersions returns a function that itself takes a block and modifies
-// it by replacing the voter version of the stake transaction.
+// it by replacing the voter version of the stake transactions.
 func ReplaceVoteVersions(newVersion uint32) func(*wire.MsgBlock) {
 	return func(b *wire.MsgBlock) {
 		for _, stx := range b.STransactions {
 			if isVoteTx(stx) {
-				stx.TxOut[1].PkScript = voteBitsScript(true,
+				stx.TxOut[1].PkScript = voteBitsScript(
+					voteBitYes, newVersion)
+			}
+		}
+	}
+}
+
+// ReplaceVotes returns a function that itself takes a block and modifies it by
+// replacing the voter version and bits of the stake transactions.
+func ReplaceVotes(voteBits uint16, newVersion uint32) func(*wire.MsgBlock) {
+	return func(b *wire.MsgBlock) {
+		for _, stx := range b.STransactions {
+			if isVoteTx(stx) {
+				stx.TxOut[1].PkScript = voteBitsScript(voteBits,
 					newVersion)
 			}
 		}
