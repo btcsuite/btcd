@@ -650,7 +650,7 @@ var TestNetParams = Params{
 		4: {{
 			Vote: Vote{
 				Id:          VoteIDMaxBlockSize,
-				Description: "Change maximum allowed block size from 1MiB to 1.25MB",
+				Description: "Change maximum allowed block size from 1MB to 1.25MiB",
 				Mask:        0x0006, // Bits 1 and 2
 				Choices: []Choice{{
 					Id:          "abstain",
