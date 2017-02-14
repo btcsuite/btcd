@@ -91,7 +91,7 @@ func (c deploymentChecker) StakeValidationHeight() int64 {
 // associated with the checker is set.
 //
 // This is part of the thresholdConditionChecker interface implementation.
-func (c deploymentChecker) Condition(node *blockNode) ([]thresholdConditionTally, error) {
+func (c deploymentChecker) Condition(node *blockNode, version uint32) ([]thresholdConditionTally, error) {
 	if c.deployment.Vote.Mask == 0 {
 		return []thresholdConditionTally{}, AssertError("invalid mask")
 	}
@@ -110,24 +110,18 @@ func (c deploymentChecker) Condition(node *blockNode) ([]thresholdConditionTally
 	// Setup tally array and iterate over Choices to assemble the vote
 	// information into the thresholdConditionTally array.
 	tally := make([]thresholdConditionTally, len(c.deployment.Vote.Choices))
-	for _, v := range node.voteBits {
-		// Make sure only valid bits are set.
-		x := c.deployment.Vote.Mask & v
-		isIgnore, err := c.deployment.Vote.IsIgnore(x)
-		if err != nil {
-			// Ignore invalid vote; others may be ok.
-			continue
-		}
-		isNo, err := c.deployment.Vote.IsNo(x)
-		if err != nil {
-			// Ignore invalid vote; others may be ok.
+	for t, choice := range c.deployment.Vote.Choices {
+		tally[t].isIgnore = choice.IsIgnore
+		tally[t].isNo = choice.IsNo
+	}
+
+	for _, vote := range node.votes {
+		if version != vote.version {
+			// Wrong version, ignore.
 			continue
 		}
 
-		idx := int(x >> shift)
-		tally[idx].count += 1
-		tally[idx].isIgnore = isIgnore
-		tally[idx].isNo = isNo
+		tally[c.deployment.Vote.Mask&vote.bits>>shift].count += 1
 	}
 
 	return tally, nil

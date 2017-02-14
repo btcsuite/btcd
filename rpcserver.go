@@ -3900,10 +3900,6 @@ func handleGetVoteInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 	}
 
 	snapshot := s.chain.BestSnapshot()
-	vi, err := s.chain.GetVoteInfo(snapshot.Hash, c.Version)
-	if err != nil {
-		return nil, err
-	}
 
 	interval := int64(s.server.chainParams.RuleChangeActivationInterval)
 	quorum := s.server.chainParams.RuleChangeActivationQuorum
@@ -3914,11 +3910,24 @@ func handleGetVoteInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 			snapshot.Height) + 1,
 		EndHeight: s.chain.CalcWantHeight(interval,
 			snapshot.Height) + interval,
-		Hash:         snapshot.Hash.String(),
-		StakeVersion: c.Version,
-		Quorum:       quorum,
-		Agendas:      make([]dcrjson.Agenda, 0, len(vi.Agendas)),
+		Hash:        snapshot.Hash.String(),
+		VoteVersion: c.Version,
+		Quorum:      quorum,
 	}
+
+	// We don't fail, we try to return the totals for this version.
+	var err error
+	result.TotalVotes, err = s.chain.CountVoteVersion(c.Version)
+	if err != nil {
+		return nil, err
+	}
+
+	vi, err := s.chain.GetVoteInfo(snapshot.Hash, c.Version)
+	if err != nil {
+		return result, nil
+	}
+
+	result.Agendas = make([]dcrjson.Agenda, 0, len(vi.Agendas))
 	for _, agenda := range vi.Agendas {
 		// Obtain status of agenda.
 		state, err := s.chain.ThresholdState(snapshot.Hash, c.Version,
@@ -3943,11 +3952,10 @@ func handleGetVoteInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 			Mask:        agenda.Vote.Mask,
 			Choices: make([]dcrjson.Choice, 0,
 				len(agenda.Vote.Choices)),
-			StartTime:        agenda.StartTime,
-			ExpireTime:       agenda.ExpireTime,
-			TotalVotes:       counts.Total,
-			Status:           state.String(),
-			QuorumPercentage: float64(qmin) / float64(quorum),
+			StartTime:      agenda.StartTime,
+			ExpireTime:     agenda.ExpireTime,
+			Status:         state.String(),
+			QuorumProgress: float64(qmin) / float64(quorum),
 		}
 
 		// Handle choices.
@@ -3959,7 +3967,7 @@ func handleGetVoteInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 				IsIgnore:    choice.IsIgnore,
 				IsNo:        choice.IsNo,
 				Count:       counts.VoteChoices[k],
-				Percentage: float64(counts.VoteChoices[k]) /
+				Progress: float64(counts.VoteChoices[k]) /
 					float64(counts.Total),
 			}
 			a.Choices = append(a.Choices, c)

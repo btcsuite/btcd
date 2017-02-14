@@ -159,7 +159,7 @@ type thresholdConditionChecker interface {
 	// care about said order.  Only 1 isNo vote is allowed.  By convention
 	// the zero value of the vote as determined by the mask is an isIgnore
 	// vote.
-	Condition(*blockNode) ([]thresholdConditionTally, error)
+	Condition(*blockNode, uint32) ([]thresholdConditionTally, error)
 }
 
 // thresholdStateCache provides a type to cache the threshold states of each
@@ -230,7 +230,8 @@ func (b *BlockChain) thresholdState(version uint32, prevNode *blockNode, checker
 	// window in order to get its threshold state.  This can be done because
 	// the state is the same for all blocks within a given window.
 	wantHeight := calcWantHeight(svh,
-		int64(checker.RuleChangeActivationInterval()), prevNode.height)
+		int64(checker.RuleChangeActivationInterval()),
+		prevNode.height+1)
 	var err error
 	prevNode, err = b.ancestorNode(prevNode, wantHeight)
 	if err != nil {
@@ -359,7 +360,7 @@ func (b *BlockChain) thresholdState(version uint32, prevNode *blockNode, checker
 			)
 			countNode := prevNode
 			for i := int64(0); i < confirmationWindow; i++ {
-				c, err := checker.Condition(countNode)
+				c, err := checker.Condition(countNode, version)
 				if err != nil {
 					return newThresholdState(
 						ThresholdFailed, invalidChoice), err
@@ -395,39 +396,50 @@ func (b *BlockChain) thresholdState(version uint32, prevNode *blockNode, checker
 				}
 			}
 
+			// Determine if we have reached quorum.
+			totalNonIgnoreVotes := uint32(0)
+			for _, v := range counts {
+				if v.isIgnore && !v.isNo {
+					continue
+				}
+				totalNonIgnoreVotes += v.count
+			}
+			if totalNonIgnoreVotes < checker.RuleChangeActivationQuorum() {
+				break
+			}
+
 			// The state is locked in if the number of blocks in the
 			// period that voted for the rule change meets the
 			// activation threshold.
 			for k, v := range counts {
 				// We require at least 10% quorum on all votes.
-				if v.count < checker.RuleChangeActivationQuorum() {
+				if v.count < checker.RuleChangeActivationThreshold(totalVotes) {
 					continue
 				}
-				if v.count >= checker.RuleChangeActivationThreshold(totalVotes) {
-					// Something went over the threshold
-					switch {
-					case !v.isIgnore && !v.isNo:
-						// One of the choices has
-						// reached majority.
-						stateTuple.State = ThresholdLockedIn
-						stateTuple.Choice = uint32(k)
-					case !v.isIgnore && v.isNo:
-						// No choice.  Only 1 No per
-						// vote is allowed.  A No vote
-						// is required though.
-						stateTuple.State = ThresholdFailed
-						stateTuple.Choice = uint32(k)
-					case v.isIgnore && !v.isNo:
-						// This is the ignore case.
-						// The statemachine is not
-						// supposed to change.
-					case v.isIgnore && v.isNo:
-						// Invalid choice.
-						stateTuple.State = ThresholdFailed
-						stateTuple.Choice = uint32(k)
-					}
-					break
+				// Something went over the threshold
+				switch {
+				case !v.isIgnore && !v.isNo:
+					// One of the choices has
+					// reached majority.
+					stateTuple.State = ThresholdLockedIn
+					stateTuple.Choice = uint32(k)
+				case !v.isIgnore && v.isNo:
+					// No choice.  Only 1 No per
+					// vote is allowed.  A No vote
+					// is required though.
+					stateTuple.State = ThresholdFailed
+					stateTuple.Choice = uint32(k)
+				case v.isIgnore && !v.isNo:
+					// This is the ignore case.
+					// The statemachine is not
+					// supposed to change.
+					continue
+				case v.isIgnore && v.isNo:
+					// Invalid choice.
+					stateTuple.State = ThresholdFailed
+					stateTuple.Choice = uint32(k)
 				}
+				break
 			}
 
 		case ThresholdLockedIn:
@@ -500,13 +512,18 @@ func (b *BlockChain) ThresholdState(hash *chainhash.Hash, version uint32, deploy
 	return state, err
 }
 
+// VoteCounts is a compacted struct that is used to message vote counts.
 type VoteCounts struct {
 	Total       uint32
 	TotalIgnore uint32
 	VoteChoices []uint32
 }
 
-func (b *BlockChain) getVoteCounts(node *blockNode, d chaincfg.ConsensusDeployment) (VoteCounts, error) {
+// getVoteCounts returns the vote counts for the specified version for the
+// current interval.
+//
+// This function MUST be called with the chain state lock held (for writes).
+func (b *BlockChain) getVoteCounts(node *blockNode, version uint32, d chaincfg.ConsensusDeployment) (VoteCounts, error) {
 	height := calcWantHeight(b.chainParams.StakeValidationHeight,
 		int64(b.chainParams.RuleChangeActivationInterval), node.height)
 
@@ -516,10 +533,16 @@ func (b *BlockChain) getVoteCounts(node *blockNode, d chaincfg.ConsensusDeployme
 	}
 	countNode := node
 	for countNode.height > height {
-		result.Total += uint32(len(countNode.voteBits))
+		for _, vote := range countNode.votes {
+			// Wrong versions do not count.
+			if vote.version != version {
+				continue
+			}
 
-		for _, voteBits := range countNode.voteBits {
-			index := d.Vote.VoteIndex(voteBits)
+			// Increase total votes.
+			result.Total++
+
+			index := d.Vote.VoteIndex(vote.bits)
 			if index == -1 {
 				result.TotalIgnore++
 				continue
@@ -545,14 +568,59 @@ func (b *BlockChain) getVoteCounts(node *blockNode, d chaincfg.ConsensusDeployme
 	return result, nil
 }
 
+// GetVoteCounts returns the vote counts for the specified version and
+// deployment identifier for the current interval.
+//
+// This function is safe for concurrent access.
 func (b *BlockChain) GetVoteCounts(version uint32, deploymentID string) (VoteCounts, error) {
 	for k := range b.chainParams.Deployments[version] {
 		if b.chainParams.Deployments[version][k].Vote.Id == deploymentID {
 			b.chainLock.Lock()
 			defer b.chainLock.Unlock()
-			return b.getVoteCounts(b.bestNode,
+			return b.getVoteCounts(b.bestNode, version,
 				b.chainParams.Deployments[version][k])
 		}
 	}
 	return VoteCounts{}, DeploymentError(deploymentID)
+}
+
+// CountVoteVersion returns the total number of version votes for the current
+// interval.
+//
+// This function is safe for concurrent access.
+func (b *BlockChain) CountVoteVersion(version uint32) (uint32, error) {
+	b.chainLock.Lock()
+	defer b.chainLock.Unlock()
+	countNode := b.bestNode
+
+	height := calcWantHeight(b.chainParams.StakeValidationHeight,
+		int64(b.chainParams.RuleChangeActivationInterval),
+		countNode.height)
+
+	var err error
+	total := uint32(0)
+	for countNode.height > height {
+		for _, vote := range countNode.votes {
+			// Wrong versions do not count.
+			if vote.version != version {
+				continue
+			}
+
+			// Increase total votes.
+			total++
+		}
+
+		// Get the previous block node.  This function
+		// is used over simply accessing countNode.parent
+		// directly as it will dynamically create
+		// previous block nodes as needed.  This helps
+		// allow only the pieces of the chain that are
+		// needed to remain in memory.
+		countNode, err = b.getPrevNodeFromNode(countNode)
+		if err != nil {
+			return 0, err
+		}
+	}
+
+	return total, nil
 }

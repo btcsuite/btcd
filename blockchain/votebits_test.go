@@ -106,12 +106,596 @@ func TestSerializeDeserialize(t *testing.T) {
 	}
 }
 
+func TestNoQuorum(t *testing.T) {
+	params := defaultParams()
+	bc := &BlockChain{
+		chainParams:      &params,
+		deploymentCaches: newThresholdCaches(&params),
+		index:            make(map[chainhash.Hash]*blockNode),
+	}
+	genesisNode := genesisBlockNode(&params)
+	genesisNode.header.StakeVersion = posVersion
+
+	var currentNode *blockNode
+	currentNode = genesisNode
+	currentTimestamp := time.Now()
+	currentHeight := uint32(1)
+
+	// get to svi
+	for i := uint32(0); i < uint32(params.StakeValidationHeight); i++ {
+		// Make up a header.
+		header := &wire.BlockHeader{
+			Version:      powVersion,
+			Height:       currentHeight,
+			Nonce:        uint32(0),
+			StakeVersion: posVersion,
+			Timestamp:    currentTimestamp,
+		}
+		hash := header.BlockHash()
+		node := newBlockNode(header, &hash, 0,
+			[]chainhash.Hash{}, []chainhash.Hash{},
+			[]uint32{}, []voteVersionTuple{})
+		node.height = int64(currentHeight)
+		node.parent = currentNode
+
+		currentNode = node
+		bc.bestNode = currentNode
+
+		// fake index
+		bc.index[hash] = node
+
+		currentHeight++
+		currentTimestamp = currentTimestamp.Add(time.Second)
+	}
+	t.Logf("Height %v", currentNode.height)
+	ts, err := bc.ThresholdState(&currentNode.hash, posVersion, pedro.Id)
+	if err != nil {
+		t.Fatalf("ThresholdState(SVI): %v", err)
+	}
+	tse := ThresholdStateTuple{
+		State:  ThresholdDefined,
+		Choice: invalidChoice,
+	}
+	if ts != tse {
+		t.Fatalf("expected %v got %v", ts.Choice, tse.Choice)
+	}
+
+	// get to started
+	for i := uint32(0); i < uint32(params.RuleChangeActivationInterval-1); i++ {
+		// Make up a header.
+		header := &wire.BlockHeader{
+			Version:      powVersion,
+			Height:       currentHeight,
+			Nonce:        uint32(0),
+			StakeVersion: posVersion,
+			Timestamp:    currentTimestamp,
+		}
+		hash := header.BlockHash()
+		node := newBlockNode(header, &hash, 0,
+			[]chainhash.Hash{}, []chainhash.Hash{},
+			[]uint32{}, []voteVersionTuple{})
+		node.height = int64(currentHeight)
+		node.parent = currentNode
+
+		// set stake versions and vote bits
+		for x := 0; x < int(params.TicketsPerBlock); x++ {
+			node.voterVersions = append(node.voterVersions,
+				posVersion)
+			node.votes = append(node.votes, voteVersionTuple{
+				version: posVersion,
+				bits:    0x01})
+		}
+
+		currentNode = node
+		bc.bestNode = currentNode
+
+		// fake index
+		bc.index[hash] = node
+
+		currentHeight++
+		currentTimestamp = currentTimestamp.Add(time.Second)
+	}
+
+	t.Logf("Height %v", currentNode.height)
+	ts, err = bc.ThresholdState(&currentNode.hash, posVersion, pedro.Id)
+	if err != nil {
+		t.Fatalf("ThresholdState(started): %v", err)
+	}
+	tse = ThresholdStateTuple{
+		State:  ThresholdStarted,
+		Choice: invalidChoice,
+	}
+	if ts != tse {
+		t.Fatalf("expected %v got %v", ts.Choice, tse.Choice)
+	}
+
+	// get to quorum - 1
+	voteCount := uint32(0)
+	for i := uint32(0); i < uint32(params.RuleChangeActivationInterval); i++ {
+		// Make up a header.
+		header := &wire.BlockHeader{
+			Version:      powVersion,
+			Height:       currentHeight,
+			Nonce:        uint32(0),
+			StakeVersion: posVersion,
+			Timestamp:    currentTimestamp,
+		}
+		hash := header.BlockHash()
+		node := newBlockNode(header, &hash, 0,
+			[]chainhash.Hash{}, []chainhash.Hash{},
+			[]uint32{}, []voteVersionTuple{})
+		node.height = int64(currentHeight)
+		node.parent = currentNode
+
+		// set stake versions and vote bits
+		for x := 0; x < int(params.TicketsPerBlock); x++ {
+			node.voterVersions = append(node.voterVersions,
+				posVersion)
+			v := voteVersionTuple{
+				version: posVersion,
+				bits:    0x01,
+			}
+			if voteCount < params.RuleChangeActivationQuorum-1 {
+				v.bits = 0x05 // vote no
+			}
+			node.votes = append(node.votes, v)
+			voteCount++
+		}
+
+		currentNode = node
+		bc.bestNode = currentNode
+
+		// fake index
+		bc.index[hash] = node
+
+		currentHeight++
+		currentTimestamp = currentTimestamp.Add(time.Second)
+	}
+
+	t.Logf("Height %v", currentNode.height)
+	ts, err = bc.ThresholdState(&currentNode.hash, posVersion, pedro.Id)
+	if err != nil {
+		t.Fatalf("ThresholdState(quorum-1): %v", err)
+	}
+	tse = ThresholdStateTuple{
+		State:  ThresholdStarted,
+		Choice: invalidChoice,
+	}
+	if ts != tse {
+		t.Fatalf("expected %v got %v", ts.Choice, tse.Choice)
+	}
+
+	// get to exact quorum but with 75%-1 yes votes
+	voteCount = uint32(0)
+	for i := uint32(0); i < uint32(params.RuleChangeActivationInterval); i++ {
+		// Make up a header.
+		header := &wire.BlockHeader{
+			Version:      powVersion,
+			Height:       currentHeight,
+			Nonce:        uint32(0),
+			StakeVersion: posVersion,
+			Timestamp:    currentTimestamp,
+		}
+		hash := header.BlockHash()
+		node := newBlockNode(header, &hash, 0,
+			[]chainhash.Hash{}, []chainhash.Hash{},
+			[]uint32{}, []voteVersionTuple{})
+		node.height = int64(currentHeight)
+		node.parent = currentNode
+
+		// set stake versions and vote bits
+		for x := 0; x < int(params.TicketsPerBlock); x++ {
+			node.voterVersions = append(node.voterVersions,
+				posVersion)
+			v := voteVersionTuple{
+				version: posVersion,
+				bits:    0x01,
+			}
+			// 119 yes, 41 no -> 120 == 75% and 120 reaches quorum
+			quorum := params.RuleChangeActivationQuorum*
+				params.RuleChangeActivationMultiplier/
+				params.RuleChangeActivationDivisor - 1
+			if voteCount < quorum {
+				v.bits = 0x05 // vote no
+			} else {
+				if voteCount < params.RuleChangeActivationQuorum {
+					v.bits = 0x03 // vote yes
+				} else {
+					v.bits = 0x01 // ignore
+				}
+			}
+			node.votes = append(node.votes, v)
+			voteCount++
+		}
+
+		currentNode = node
+		bc.bestNode = currentNode
+
+		// fake index
+		bc.index[hash] = node
+
+		currentHeight++
+		currentTimestamp = currentTimestamp.Add(time.Second)
+	}
+
+	t.Logf("Height %v", currentNode.height)
+	ts, err = bc.ThresholdState(&currentNode.hash, posVersion, pedro.Id)
+	if err != nil {
+		t.Fatalf("ThresholdState(quorum 75%%-1): %v", err)
+	}
+	tse = ThresholdStateTuple{
+		State:  ThresholdStarted,
+		Choice: invalidChoice,
+	}
+	if ts != tse {
+		t.Fatalf("expected %v got %v", ts.Choice, tse.Choice)
+	}
+
+	// get to exact quorum with exactly 75% of votes
+	voteCount = uint32(0)
+	for i := uint32(0); i < uint32(params.RuleChangeActivationInterval); i++ {
+		// Make up a header.
+		header := &wire.BlockHeader{
+			Version:      powVersion,
+			Height:       currentHeight,
+			Nonce:        uint32(0),
+			StakeVersion: posVersion,
+			Timestamp:    currentTimestamp,
+		}
+		hash := header.BlockHash()
+		node := newBlockNode(header, &hash, 0,
+			[]chainhash.Hash{}, []chainhash.Hash{},
+			[]uint32{}, []voteVersionTuple{})
+		node.height = int64(currentHeight)
+		node.parent = currentNode
+
+		// set stake versions and vote bits
+		for x := 0; x < int(params.TicketsPerBlock); x++ {
+			node.voterVersions = append(node.voterVersions,
+				posVersion)
+			v := voteVersionTuple{
+				version: posVersion,
+				bits:    0x01,
+			}
+			// 120 yes, 40 no -> 120 == 75% and 120 reaches quorum
+			quorum := params.RuleChangeActivationQuorum *
+				params.RuleChangeActivationMultiplier /
+				params.RuleChangeActivationDivisor
+			if voteCount < quorum {
+				v.bits = 0x05 // vote no
+			} else {
+				if voteCount < params.RuleChangeActivationQuorum {
+					v.bits = 0x03 // vote yes
+				} else {
+					v.bits = 0x01 // ignore
+				}
+			}
+			node.votes = append(node.votes, v)
+			voteCount++
+		}
+
+		currentNode = node
+		bc.bestNode = currentNode
+
+		// fake index
+		bc.index[hash] = node
+
+		currentHeight++
+		currentTimestamp = currentTimestamp.Add(time.Second)
+	}
+
+	t.Logf("Height %v", currentNode.height)
+	ts, err = bc.ThresholdState(&currentNode.hash, posVersion, pedro.Id)
+	if err != nil {
+		t.Fatalf("ThresholdState(quorum 75%%): %v", err)
+	}
+	tse = ThresholdStateTuple{
+		State:  ThresholdFailed,
+		Choice: 0x02,
+	}
+	if ts != tse {
+		t.Fatalf("expected %v got %v", ts.Choice, tse.Choice)
+	}
+}
+
+func TestYesQuorum(t *testing.T) {
+	params := defaultParams()
+	bc := &BlockChain{
+		chainParams:      &params,
+		deploymentCaches: newThresholdCaches(&params),
+		index:            make(map[chainhash.Hash]*blockNode),
+	}
+	genesisNode := genesisBlockNode(&params)
+	genesisNode.header.StakeVersion = posVersion
+
+	var currentNode *blockNode
+	currentNode = genesisNode
+	currentTimestamp := time.Now()
+	currentHeight := uint32(1)
+
+	// get to svi
+	for i := uint32(0); i < uint32(params.StakeValidationHeight); i++ {
+		// Make up a header.
+		header := &wire.BlockHeader{
+			Version:      powVersion,
+			Height:       currentHeight,
+			Nonce:        uint32(0),
+			StakeVersion: posVersion,
+			Timestamp:    currentTimestamp,
+		}
+		hash := header.BlockHash()
+		node := newBlockNode(header, &hash, 0,
+			[]chainhash.Hash{}, []chainhash.Hash{},
+			[]uint32{}, []voteVersionTuple{})
+		node.height = int64(currentHeight)
+		node.parent = currentNode
+
+		currentNode = node
+		bc.bestNode = currentNode
+
+		// fake index
+		bc.index[hash] = node
+
+		currentHeight++
+		currentTimestamp = currentTimestamp.Add(time.Second)
+	}
+	t.Logf("Height %v", currentNode.height)
+	ts, err := bc.ThresholdState(&currentNode.hash, posVersion, pedro.Id)
+	if err != nil {
+		t.Fatalf("ThresholdState(SVI): %v", err)
+	}
+	tse := ThresholdStateTuple{
+		State:  ThresholdDefined,
+		Choice: invalidChoice,
+	}
+	if ts != tse {
+		t.Fatalf("expected %v got %v", ts.Choice, tse.Choice)
+	}
+
+	// get to started
+	for i := uint32(0); i < uint32(params.RuleChangeActivationInterval-1); i++ {
+		// Make up a header.
+		header := &wire.BlockHeader{
+			Version:      powVersion,
+			Height:       currentHeight,
+			Nonce:        uint32(0),
+			StakeVersion: posVersion,
+			Timestamp:    currentTimestamp,
+		}
+		hash := header.BlockHash()
+		node := newBlockNode(header, &hash, 0,
+			[]chainhash.Hash{}, []chainhash.Hash{},
+			[]uint32{}, []voteVersionTuple{})
+		node.height = int64(currentHeight)
+		node.parent = currentNode
+
+		// set stake versions and vote bits
+		for x := 0; x < int(params.TicketsPerBlock); x++ {
+			node.voterVersions = append(node.voterVersions,
+				posVersion)
+			node.votes = append(node.votes, voteVersionTuple{
+				version: posVersion,
+				bits:    0x01})
+		}
+
+		currentNode = node
+		bc.bestNode = currentNode
+
+		// fake index
+		bc.index[hash] = node
+
+		currentHeight++
+		currentTimestamp = currentTimestamp.Add(time.Second)
+	}
+
+	t.Logf("Height %v", currentNode.height)
+	ts, err = bc.ThresholdState(&currentNode.hash, posVersion, pedro.Id)
+	if err != nil {
+		t.Fatalf("ThresholdState(started): %v", err)
+	}
+	tse = ThresholdStateTuple{
+		State:  ThresholdStarted,
+		Choice: invalidChoice,
+	}
+	if ts != tse {
+		t.Fatalf("expected %v got %v", ts.Choice, tse.Choice)
+	}
+
+	// get to quorum - 1
+	voteCount := uint32(0)
+	for i := uint32(0); i < uint32(params.RuleChangeActivationInterval); i++ {
+		// Make up a header.
+		header := &wire.BlockHeader{
+			Version:      powVersion,
+			Height:       currentHeight,
+			Nonce:        uint32(0),
+			StakeVersion: posVersion,
+			Timestamp:    currentTimestamp,
+		}
+		hash := header.BlockHash()
+		node := newBlockNode(header, &hash, 0,
+			[]chainhash.Hash{}, []chainhash.Hash{},
+			[]uint32{}, []voteVersionTuple{})
+		node.height = int64(currentHeight)
+		node.parent = currentNode
+
+		// set stake versions and vote bits
+		for x := 0; x < int(params.TicketsPerBlock); x++ {
+			node.voterVersions = append(node.voterVersions,
+				posVersion)
+			v := voteVersionTuple{
+				version: posVersion,
+				bits:    0x01,
+			}
+			if voteCount < params.RuleChangeActivationQuorum-1 {
+				v.bits = 0x03 // vote yes
+			}
+			node.votes = append(node.votes, v)
+			voteCount++
+		}
+
+		currentNode = node
+		bc.bestNode = currentNode
+
+		// fake index
+		bc.index[hash] = node
+
+		currentHeight++
+		currentTimestamp = currentTimestamp.Add(time.Second)
+	}
+
+	t.Logf("Height %v", currentNode.height)
+	ts, err = bc.ThresholdState(&currentNode.hash, posVersion, pedro.Id)
+	if err != nil {
+		t.Fatalf("ThresholdState(quorum-1): %v", err)
+	}
+	tse = ThresholdStateTuple{
+		State:  ThresholdStarted,
+		Choice: invalidChoice,
+	}
+	if ts != tse {
+		t.Fatalf("expected %v got %v", ts.Choice, tse.Choice)
+	}
+
+	// get to exact quorum but with 75%-1 yes votes
+	voteCount = uint32(0)
+	for i := uint32(0); i < uint32(params.RuleChangeActivationInterval); i++ {
+		// Make up a header.
+		header := &wire.BlockHeader{
+			Version:      powVersion,
+			Height:       currentHeight,
+			Nonce:        uint32(0),
+			StakeVersion: posVersion,
+			Timestamp:    currentTimestamp,
+		}
+		hash := header.BlockHash()
+		node := newBlockNode(header, &hash, 0,
+			[]chainhash.Hash{}, []chainhash.Hash{},
+			[]uint32{}, []voteVersionTuple{})
+		node.height = int64(currentHeight)
+		node.parent = currentNode
+
+		// set stake versions and vote bits
+		for x := 0; x < int(params.TicketsPerBlock); x++ {
+			node.voterVersions = append(node.voterVersions,
+				posVersion)
+			v := voteVersionTuple{
+				version: posVersion,
+				bits:    0x01,
+			}
+			// 119 yes, 41 no -> 120 == 75% and 120 reaches quorum
+			quorum := params.RuleChangeActivationQuorum*
+				params.RuleChangeActivationMultiplier/
+				params.RuleChangeActivationDivisor - 1
+			if voteCount < quorum {
+				v.bits = 0x03 // vote yes
+			} else {
+				if voteCount < params.RuleChangeActivationQuorum {
+					v.bits = 0x05 // vote no
+				} else {
+					v.bits = 0x01 // ignore
+				}
+			}
+			node.votes = append(node.votes, v)
+			voteCount++
+		}
+
+		currentNode = node
+		bc.bestNode = currentNode
+
+		// fake index
+		bc.index[hash] = node
+
+		currentHeight++
+		currentTimestamp = currentTimestamp.Add(time.Second)
+	}
+
+	t.Logf("Height %v", currentNode.height)
+	ts, err = bc.ThresholdState(&currentNode.hash, posVersion, pedro.Id)
+	if err != nil {
+		t.Fatalf("ThresholdState(quorum 75%%-1): %v", err)
+	}
+	tse = ThresholdStateTuple{
+		State:  ThresholdStarted,
+		Choice: invalidChoice,
+	}
+	if ts != tse {
+		t.Fatalf("expected %v got %v", ts.Choice, tse.Choice)
+	}
+
+	// get to exact quorum with exactly 75% of votes
+	voteCount = uint32(0)
+	for i := uint32(0); i < uint32(params.RuleChangeActivationInterval); i++ {
+		// Make up a header.
+		header := &wire.BlockHeader{
+			Version:      powVersion,
+			Height:       currentHeight,
+			Nonce:        uint32(0),
+			StakeVersion: posVersion,
+			Timestamp:    currentTimestamp,
+		}
+		hash := header.BlockHash()
+		node := newBlockNode(header, &hash, 0,
+			[]chainhash.Hash{}, []chainhash.Hash{},
+			[]uint32{}, []voteVersionTuple{})
+		node.height = int64(currentHeight)
+		node.parent = currentNode
+
+		// set stake versions and vote bits
+		for x := 0; x < int(params.TicketsPerBlock); x++ {
+			node.voterVersions = append(node.voterVersions,
+				posVersion)
+			v := voteVersionTuple{
+				version: posVersion,
+				bits:    0x01,
+			}
+			// 120 yes, 40 no -> 120 == 75% and 120 reaches quorum
+			quorum := params.RuleChangeActivationQuorum *
+				params.RuleChangeActivationMultiplier /
+				params.RuleChangeActivationDivisor
+			if voteCount < quorum {
+				v.bits = 0x03 // vote yes
+			} else {
+				if voteCount < params.RuleChangeActivationQuorum {
+					v.bits = 0x05 // vote no
+				} else {
+					v.bits = 0x01 // ignore
+				}
+			}
+			node.votes = append(node.votes, v)
+			voteCount++
+		}
+
+		currentNode = node
+		bc.bestNode = currentNode
+
+		// fake index
+		bc.index[hash] = node
+
+		currentHeight++
+		currentTimestamp = currentTimestamp.Add(time.Second)
+	}
+
+	t.Logf("Height %v", currentNode.height)
+	ts, err = bc.ThresholdState(&currentNode.hash, posVersion, pedro.Id)
+	if err != nil {
+		t.Fatalf("ThresholdState(quorum 75%%): %v", err)
+	}
+	tse = ThresholdStateTuple{
+		State:  ThresholdLockedIn,
+		Choice: 0x01,
+	}
+	if ts != tse {
+		t.Fatalf("expected %v got %v", ts.Choice, tse.Choice)
+	}
+}
+
 func TestVoting(t *testing.T) {
 	params := defaultParams()
 
-	type voteBitsCount struct {
-		voteBits uint16
-		count    uint32
+	type voteCount struct {
+		vote  voteVersionTuple
+		count uint32
 	}
 
 	tests := []struct {
@@ -119,7 +703,7 @@ func TestVoting(t *testing.T) {
 		vote              chaincfg.Vote
 		blockVersion      int32
 		startStakeVersion uint32
-		voteBitsCounts    []voteBitsCount
+		voteBitsCounts    []voteCount
 		expectedState     []ThresholdStateTuple
 	}{
 		{
@@ -127,10 +711,12 @@ func TestVoting(t *testing.T) {
 			vote:              pedro,
 			blockVersion:      powVersion,
 			startStakeVersion: posVersion,
-			voteBitsCounts: []voteBitsCount{
+			voteBitsCounts: []voteCount{
 				{
-					voteBits: 0x01,
-					count:    uint32(params.StakeValidationHeight) - 1,
+					vote: voteVersionTuple{
+						version: posVersion,
+						bits:    0x01},
+					count: uint32(params.StakeValidationHeight) - 1,
 				},
 			},
 			expectedState: []ThresholdStateTuple{
@@ -145,18 +731,24 @@ func TestVoting(t *testing.T) {
 			vote:              pedro,
 			blockVersion:      powVersion,
 			startStakeVersion: posVersion - 1,
-			voteBitsCounts: []voteBitsCount{
+			voteBitsCounts: []voteCount{
 				{
-					voteBits: 0x01,
-					count:    uint32(params.StakeValidationHeight),
+					vote: voteVersionTuple{
+						version: posVersion,
+						bits:    0x01},
+					count: uint32(params.StakeValidationHeight),
 				},
 				{
-					voteBits: 0x01,
-					count:    params.RuleChangeActivationInterval - 1,
+					vote: voteVersionTuple{
+						version: posVersion,
+						bits:    0x01},
+					count: params.RuleChangeActivationInterval - 1,
 				},
 				{
-					voteBits: 0x03,
-					count:    params.RuleChangeActivationInterval,
+					vote: voteVersionTuple{
+						version: posVersion,
+						bits:    0x03},
+					count: params.RuleChangeActivationInterval,
 				},
 			},
 			expectedState: []ThresholdStateTuple{
@@ -179,18 +771,30 @@ func TestVoting(t *testing.T) {
 			vote:              pedro,
 			blockVersion:      powVersion,
 			startStakeVersion: posVersion + 1,
-			voteBitsCounts: []voteBitsCount{
+			voteBitsCounts: []voteCount{
 				{
-					voteBits: 0x01,
-					count:    uint32(params.StakeValidationHeight),
+					vote: voteVersionTuple{
+						version: posVersion,
+						bits:    0x01},
+					count: uint32(params.StakeValidationHeight),
 				},
 				{
-					voteBits: 0x01,
-					count:    params.RuleChangeActivationInterval - 1,
+					vote: voteVersionTuple{
+						version: posVersion,
+						bits:    0x01},
+					count: params.RuleChangeActivationInterval - 1,
 				},
 				{
-					voteBits: 0x03,
-					count:    params.RuleChangeActivationInterval,
+					vote: voteVersionTuple{
+						version: posVersion,
+						bits:    0x03},
+					count: params.RuleChangeActivationInterval,
+				},
+				{
+					vote: voteVersionTuple{
+						version: posVersion,
+						bits:    0x03},
+					count: params.RuleChangeActivationInterval,
 				},
 			},
 			expectedState: []ThresholdStateTuple{
@@ -199,12 +803,16 @@ func TestVoting(t *testing.T) {
 					Choice: invalidChoice,
 				},
 				{
-					State:  ThresholdDefined,
+					State:  ThresholdStarted,
 					Choice: invalidChoice,
 				},
 				{
-					State:  ThresholdStarted,
-					Choice: invalidChoice,
+					State:  ThresholdLockedIn,
+					Choice: 0x01,
+				},
+				{
+					State:  ThresholdActive,
+					Choice: 0x01,
 				},
 			},
 		},
@@ -213,18 +821,24 @@ func TestVoting(t *testing.T) {
 			vote:              pedro,
 			blockVersion:      powVersion - 1,
 			startStakeVersion: posVersion,
-			voteBitsCounts: []voteBitsCount{
+			voteBitsCounts: []voteCount{
 				{
-					voteBits: 0x01,
-					count:    uint32(params.StakeValidationHeight),
+					vote: voteVersionTuple{
+						version: posVersion,
+						bits:    0x01},
+					count: uint32(params.StakeValidationHeight),
 				},
 				{
-					voteBits: 0x01,
-					count:    params.RuleChangeActivationInterval - 1,
+					vote: voteVersionTuple{
+						version: posVersion,
+						bits:    0x01},
+					count: params.RuleChangeActivationInterval - 1,
 				},
 				{
-					voteBits: 0x03,
-					count:    params.RuleChangeActivationInterval,
+					vote: voteVersionTuple{
+						version: posVersion,
+						bits:    0x03},
+					count: params.RuleChangeActivationInterval,
 				},
 			},
 			expectedState: []ThresholdStateTuple{
@@ -247,64 +861,33 @@ func TestVoting(t *testing.T) {
 			vote:              pedro,
 			blockVersion:      powVersion + 1,
 			startStakeVersion: posVersion,
-			voteBitsCounts: []voteBitsCount{
+			voteBitsCounts: []voteCount{
 				{
-					voteBits: 0x01,
-					count:    uint32(params.StakeValidationHeight),
+					vote: voteVersionTuple{
+						version: posVersion,
+						bits:    0x01},
+					count: uint32(params.StakeValidationHeight),
 				},
 				{
-					voteBits: 0x01,
-					count:    params.RuleChangeActivationInterval - 1,
+					vote: voteVersionTuple{
+						version: posVersion,
+						bits:    0x01},
+					count: params.RuleChangeActivationInterval - 1,
 				},
 				{
-					voteBits: 0x03,
-					count:    params.RuleChangeActivationInterval,
-				},
-			},
-			expectedState: []ThresholdStateTuple{
-				{
-					State:  ThresholdDefined,
-					Choice: invalidChoice,
+					vote: voteVersionTuple{
+						version: posVersion,
+						bits:    0x03},
+					count: params.RuleChangeActivationInterval,
 				},
 				{
-					State:  ThresholdDefined,
-					Choice: invalidChoice,
-				},
-				{
-					State:  ThresholdStarted,
-					Choice: invalidChoice,
-				},
-			},
-		},
-		{
-			name:              "pedro 100% yes",
-			vote:              pedro,
-			blockVersion:      powVersion,
-			startStakeVersion: posVersion,
-			voteBitsCounts: []voteBitsCount{
-				{
-					voteBits: 0x01,
-					count:    uint32(params.StakeValidationHeight),
-				},
-				{
-					voteBits: 0x01,
-					count:    params.RuleChangeActivationInterval - 1,
-				}, {
-					voteBits: 0x03,
-					count:    params.RuleChangeActivationInterval,
-				}, {
-					voteBits: 0x03,
-					count:    params.RuleChangeActivationInterval,
-				}, {
-					voteBits: 0x01,
-					count:    params.RuleChangeActivationInterval,
+					vote: voteVersionTuple{
+						version: posVersion,
+						bits:    0x03},
+					count: params.RuleChangeActivationInterval,
 				},
 			},
 			expectedState: []ThresholdStateTuple{
-				{
-					State:  ThresholdDefined,
-					Choice: invalidChoice,
-				},
 				{
 					State:  ThresholdDefined,
 					Choice: invalidChoice,
@@ -324,27 +907,47 @@ func TestVoting(t *testing.T) {
 			},
 		},
 		{
-			name:              "pedro 100% no",
+			name:              "pedro 100% yes, wrong version",
 			vote:              pedro,
 			blockVersion:      powVersion,
 			startStakeVersion: posVersion,
-			voteBitsCounts: []voteBitsCount{
+			voteBitsCounts: []voteCount{
 				{
-					voteBits: 0x01,
-					count:    uint32(params.StakeValidationHeight),
+					vote: voteVersionTuple{
+						version: posVersion + 1,
+						bits:    0x01},
+					count: uint32(params.StakeValidationHeight),
 				},
 				{
-					voteBits: 0x01,
-					count:    params.RuleChangeActivationInterval - 1,
+					vote: voteVersionTuple{
+						version: posVersion + 1,
+						bits:    0x01},
+					count: params.RuleChangeActivationInterval - 1,
 				}, {
-					voteBits: 0x05,
-					count:    params.RuleChangeActivationInterval,
+					vote: voteVersionTuple{
+						version: posVersion + 1,
+						bits:    0x03},
+					count: params.RuleChangeActivationInterval,
 				}, {
-					voteBits: 0x05,
-					count:    params.RuleChangeActivationInterval,
+					vote: voteVersionTuple{
+						version: posVersion + 1,
+						bits:    0x03},
+					count: params.RuleChangeActivationInterval,
 				}, {
-					voteBits: 0x01,
-					count:    params.RuleChangeActivationInterval,
+					vote: voteVersionTuple{
+						version: posVersion,
+						bits:    0x03},
+					count: params.RuleChangeActivationInterval,
+				}, {
+					vote: voteVersionTuple{
+						version: posVersion,
+						bits:    0x03},
+					count: params.RuleChangeActivationInterval,
+				}, {
+					vote: voteVersionTuple{
+						version: posVersion + 1,
+						bits:    0x01},
+					count: params.RuleChangeActivationInterval,
 				},
 			},
 			expectedState: []ThresholdStateTuple{
@@ -352,6 +955,124 @@ func TestVoting(t *testing.T) {
 					State:  ThresholdDefined,
 					Choice: invalidChoice,
 				},
+				{
+					State:  ThresholdStarted,
+					Choice: invalidChoice,
+				},
+				{
+					State:  ThresholdStarted,
+					Choice: invalidChoice,
+				},
+				{
+					State:  ThresholdStarted,
+					Choice: invalidChoice,
+				},
+				{
+					State:  ThresholdLockedIn,
+					Choice: 0x01,
+				},
+				{
+					State:  ThresholdActive,
+					Choice: 0x01,
+				},
+				{
+					State:  ThresholdActive,
+					Choice: 0x01,
+				},
+			},
+		},
+		{
+			name:              "pedro 100% yes",
+			vote:              pedro,
+			blockVersion:      powVersion,
+			startStakeVersion: posVersion,
+			voteBitsCounts: []voteCount{
+				{
+					vote: voteVersionTuple{
+						version: posVersion,
+						bits:    0x01},
+					count: uint32(params.StakeValidationHeight),
+				},
+				{
+					vote: voteVersionTuple{
+						version: posVersion,
+						bits:    0x01},
+					count: params.RuleChangeActivationInterval - 1,
+				}, {
+					vote: voteVersionTuple{
+						version: posVersion,
+						bits:    0x03},
+					count: params.RuleChangeActivationInterval,
+				}, {
+					vote: voteVersionTuple{
+						version: posVersion,
+						bits:    0x03},
+					count: params.RuleChangeActivationInterval,
+				}, {
+					vote: voteVersionTuple{
+						version: posVersion,
+						bits:    0x01},
+					count: params.RuleChangeActivationInterval,
+				},
+			},
+			expectedState: []ThresholdStateTuple{
+				{
+					State:  ThresholdDefined,
+					Choice: invalidChoice,
+				},
+				{
+					State:  ThresholdStarted,
+					Choice: invalidChoice,
+				},
+				{
+					State:  ThresholdLockedIn,
+					Choice: 0x01,
+				},
+				{
+					State:  ThresholdActive,
+					Choice: 0x01,
+				},
+				{
+					State:  ThresholdActive,
+					Choice: 0x01,
+				},
+			},
+		},
+		{
+			name:              "pedro 100% no",
+			vote:              pedro,
+			blockVersion:      powVersion,
+			startStakeVersion: posVersion,
+			voteBitsCounts: []voteCount{
+				{
+					vote: voteVersionTuple{
+						version: posVersion,
+						bits:    0x01},
+					count: uint32(params.StakeValidationHeight),
+				},
+				{
+					vote: voteVersionTuple{
+						version: posVersion,
+						bits:    0x01},
+					count: params.RuleChangeActivationInterval - 1,
+				}, {
+					vote: voteVersionTuple{
+						version: posVersion,
+						bits:    0x05},
+					count: params.RuleChangeActivationInterval,
+				}, {
+					vote: voteVersionTuple{
+						version: posVersion,
+						bits:    0x05},
+					count: params.RuleChangeActivationInterval,
+				}, {
+					vote: voteVersionTuple{
+						version: posVersion,
+						bits:    0x01},
+					count: params.RuleChangeActivationInterval,
+				},
+			},
+			expectedState: []ThresholdStateTuple{
 				{
 					State:  ThresholdDefined,
 					Choice: invalidChoice,
@@ -368,6 +1089,10 @@ func TestVoting(t *testing.T) {
 					State:  ThresholdFailed,
 					Choice: 0x02,
 				},
+				{
+					State:  ThresholdFailed,
+					Choice: 0x02,
+				},
 			},
 		},
 		{
@@ -375,23 +1100,33 @@ func TestVoting(t *testing.T) {
 			vote:              pedro,
 			blockVersion:      powVersion,
 			startStakeVersion: posVersion,
-			voteBitsCounts: []voteBitsCount{
+			voteBitsCounts: []voteCount{
 				{
-					voteBits: 0x01,
-					count:    uint32(params.StakeValidationHeight),
+					vote: voteVersionTuple{
+						version: posVersion,
+						bits:    0x01},
+					count: uint32(params.StakeValidationHeight),
 				},
 				{
-					voteBits: 0x01,
-					count:    params.RuleChangeActivationInterval - 1,
+					vote: voteVersionTuple{
+						version: posVersion,
+						bits:    0x01},
+					count: params.RuleChangeActivationInterval - 1,
 				}, {
-					voteBits: 0x01,
-					count:    params.RuleChangeActivationInterval,
+					vote: voteVersionTuple{
+						version: posVersion,
+						bits:    0x01},
+					count: params.RuleChangeActivationInterval,
 				}, {
-					voteBits: 0x01,
-					count:    params.RuleChangeActivationInterval,
+					vote: voteVersionTuple{
+						version: posVersion,
+						bits:    0x01},
+					count: params.RuleChangeActivationInterval,
 				}, {
-					voteBits: 0x01,
-					count:    params.RuleChangeActivationInterval,
+					vote: voteVersionTuple{
+						version: posVersion,
+						bits:    0x01},
+					count: params.RuleChangeActivationInterval,
 				},
 			},
 			expectedState: []ThresholdStateTuple{
@@ -400,7 +1135,7 @@ func TestVoting(t *testing.T) {
 					Choice: invalidChoice,
 				},
 				{
-					State:  ThresholdDefined,
+					State:  ThresholdStarted,
 					Choice: invalidChoice,
 				},
 				{
@@ -423,7 +1158,7 @@ func TestVoting(t *testing.T) {
 		//	vote:              pedro,
 		//	blockVersion: powVersion,
 		//	startStakeVersion: posVersion,
-		//	voteBitsCounts:    []voteBitsCount{{voteBits: 0x02, count: 100}},
+		//	voteBitsCounts:    []voteCount{{vote: 0x02, count: 100}},
 		//	expectedState:     ThresholdStateTuple{ThresholdStarted, invalidChoice},
 		//},
 	}
@@ -459,7 +1194,7 @@ func TestVoting(t *testing.T) {
 				hash := header.BlockHash()
 				node := newBlockNode(header, &hash, 0,
 					[]chainhash.Hash{}, []chainhash.Hash{},
-					[]uint32{}, []uint16{})
+					[]uint32{}, []voteVersionTuple{})
 				node.height = int64(currentHeight)
 				node.parent = currentNode
 
@@ -467,8 +1202,8 @@ func TestVoting(t *testing.T) {
 				for x := 0; x < int(params.TicketsPerBlock); x++ {
 					node.voterVersions = append(node.voterVersions,
 						test.startStakeVersion)
-					node.voteBits = append(node.voteBits,
-						test.voteBitsCounts[k].voteBits)
+					node.votes = append(node.votes,
+						test.voteBitsCounts[k].vote)
 				}
 
 				currentNode = node
@@ -480,14 +1215,18 @@ func TestVoting(t *testing.T) {
 				currentHeight++
 				currentTimestamp = currentTimestamp.Add(time.Second)
 			}
+			t.Logf("Height %v", currentNode.height)
 			ts, err := bc.ThresholdState(&currentNode.hash,
 				posVersion, pedro.Id)
 			if err != nil {
 				t.Fatalf("ThresholdState(%v): %v", k, err)
 			}
 			if ts != test.expectedState[k] {
-				t.Fatalf("%v (%v) got state %v wanted %v",
-					test.name, k, ts, test.expectedState[k])
+				t.Fatalf("%v.%v (%v) got state %v wanted state"+
+					" %v got choice %v wanted choice %v",
+					test.name, test.vote.Id, k, ts,
+					test.expectedState[k], ts.Choice,
+					test.expectedState[k].Choice)
 			}
 		}
 	}
@@ -582,9 +1321,9 @@ func defaultParallelParams() chaincfg.Params {
 func TestVotingParallel(t *testing.T) {
 	params := defaultParallelParams()
 
-	type voteBitsCount struct {
-		voteBits uint16
-		count    uint32
+	type voteCount struct {
+		vote  voteVersionTuple
+		count uint32
 	}
 
 	tests := []struct {
@@ -592,7 +1331,7 @@ func TestVotingParallel(t *testing.T) {
 		vote              []chaincfg.Vote
 		blockVersion      int32
 		startStakeVersion uint32
-		voteBitsCounts    []voteBitsCount
+		voteBitsCounts    []voteCount
 		expectedState     [][]ThresholdStateTuple
 	}{
 		{
@@ -600,23 +1339,38 @@ func TestVotingParallel(t *testing.T) {
 			vote:              []chaincfg.Vote{testDummy1, testDummy2},
 			blockVersion:      powVersion,
 			startStakeVersion: posVersion,
-			voteBitsCounts: []voteBitsCount{
+			voteBitsCounts: []voteCount{
 				{
-					voteBits: 0x01,
-					count:    uint32(params.StakeValidationHeight),
+					vote: voteVersionTuple{
+						version: posVersion,
+						bits:    0x01},
+					count: uint32(params.StakeValidationHeight),
 				},
 				{
-					voteBits: 0x01,
-					count:    params.RuleChangeActivationInterval - 1,
+					vote: voteVersionTuple{
+						version: posVersion,
+						bits:    0x01},
+					count: params.RuleChangeActivationInterval - 1,
 				}, {
-					voteBits: vbTestDummy1Yes | vbTestDummy2No,
-					count:    params.RuleChangeActivationInterval,
+					vote: voteVersionTuple{
+						version: posVersion - 1,
+						bits:    vbTestDummy1Yes | vbTestDummy2No},
+					count: params.RuleChangeActivationInterval,
 				}, {
-					voteBits: vbTestDummy1Yes | vbTestDummy2No,
-					count:    params.RuleChangeActivationInterval,
+					vote: voteVersionTuple{
+						version: posVersion,
+						bits:    vbTestDummy1Yes | vbTestDummy2No},
+					count: params.RuleChangeActivationInterval,
 				}, {
-					voteBits: 0x01,
-					count:    params.RuleChangeActivationInterval,
+					vote: voteVersionTuple{
+						version: posVersion,
+						bits:    0x01},
+					count: params.RuleChangeActivationInterval,
+				}, {
+					vote: voteVersionTuple{
+						version: posVersion,
+						bits:    0x01},
+					count: params.RuleChangeActivationInterval,
 				},
 			},
 			expectedState: [][]ThresholdStateTuple{
@@ -627,7 +1381,7 @@ func TestVotingParallel(t *testing.T) {
 						Choice: invalidChoice,
 					},
 					{
-						State:  ThresholdDefined,
+						State:  ThresholdStarted,
 						Choice: invalidChoice,
 					},
 					{
@@ -642,6 +1396,10 @@ func TestVotingParallel(t *testing.T) {
 						State:  ThresholdActive,
 						Choice: 0x02,
 					},
+					{
+						State:  ThresholdActive,
+						Choice: 0x02,
+					},
 				},
 				// 1
 				{
@@ -650,12 +1408,16 @@ func TestVotingParallel(t *testing.T) {
 						Choice: invalidChoice,
 					},
 					{
-						State:  ThresholdDefined,
+						State:  ThresholdStarted,
 						Choice: invalidChoice,
 					},
 					{
 						State:  ThresholdStarted,
 						Choice: invalidChoice,
+					},
+					{
+						State:  ThresholdFailed,
+						Choice: 0x01,
 					},
 					{
 						State:  ThresholdFailed,
@@ -701,7 +1463,7 @@ func TestVotingParallel(t *testing.T) {
 				hash := header.BlockHash()
 				node := newBlockNode(header, &hash, 0,
 					[]chainhash.Hash{}, []chainhash.Hash{},
-					[]uint32{}, []uint16{})
+					[]uint32{}, []voteVersionTuple{})
 				node.height = int64(currentHeight)
 				node.parent = currentNode
 
@@ -709,8 +1471,8 @@ func TestVotingParallel(t *testing.T) {
 				for x := 0; x < int(params.TicketsPerBlock); x++ {
 					node.voterVersions = append(node.voterVersions,
 						test.startStakeVersion)
-					node.voteBits = append(node.voteBits,
-						test.voteBitsCounts[k].voteBits)
+					node.votes = append(node.votes,
+						test.voteBitsCounts[k].vote)
 				}
 
 				currentNode = node
@@ -722,6 +1484,7 @@ func TestVotingParallel(t *testing.T) {
 				currentHeight++
 				currentTimestamp = currentTimestamp.Add(time.Second)
 			}
+			t.Logf("Height %v", currentNode.height)
 			for i := range test.vote {
 				ts, err := bc.ThresholdState(&currentNode.hash,
 					posVersion, test.vote[i].Id)

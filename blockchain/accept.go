@@ -223,13 +223,17 @@ func voteVersionsInBlock(bl *dcrutil.Block, params *chaincfg.Params) []uint32 {
 }
 
 // voteBitsInBlock returns a list of vote bits for the voters in this block.
-func voteBitsInBlock(bl *dcrutil.Block) []uint16 {
-	var voteBits []uint16
+func voteBitsInBlock(bl *dcrutil.Block) []voteVersionTuple {
+	var voteBits []voteVersionTuple
 	for _, stx := range bl.MsgBlock().STransactions {
 		if is, _ := stake.IsSSGen(stx); !is {
 			continue
 		}
-		voteBits = append(voteBits, stake.SSGenVoteBits(stx))
+
+		voteBits = append(voteBits, voteVersionTuple{
+			version: stake.SSGenVersion(stx),
+			bits:    stake.SSGenVoteBits(stx),
+		})
 	}
 
 	return voteBits

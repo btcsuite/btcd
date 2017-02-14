@@ -34,20 +34,19 @@ type Choice struct {
 	IsIgnore    bool    `json:"isignore"`
 	IsNo        bool    `json:"isno"`
 	Count       uint32  `json:"count"`
-	Percentage  float64 `json:"percentage"`
+	Progress    float64 `json:"progress"`
 }
 
 // Agenda
 type Agenda struct {
-	Id               string   `json:"id"`
-	Description      string   `json:"description"`
-	Mask             uint16   `json:"mask"`
-	StartTime        uint64   `json:"starttime"`
-	ExpireTime       uint64   `json:"expiretime"`
-	TotalVotes       uint32   `json:"totalvotes"`
-	Status           string   `json:"status"`
-	QuorumPercentage float64  `json:"quorumpercentage"`
-	Choices          []Choice `json:"choices"`
+	Id             string   `json:"id"`
+	Description    string   `json:"description"`
+	Mask           uint16   `json:"mask"`
+	StartTime      uint64   `json:"starttime"`
+	ExpireTime     uint64   `json:"expiretime"`
+	Status         string   `json:"status"`
+	QuorumProgress float64  `json:"quorumprogress"`
+	Choices        []Choice `json:"choices"`
 }
 
 // GetVoteInfoResult models the data returned from the getvoteinfo command.
@@ -56,9 +55,10 @@ type GetVoteInfoResult struct {
 	StartHeight   int64    `json:"startheight"`
 	EndHeight     int64    `json:"endheight"`
 	Hash          string   `json:"hash"`
-	StakeVersion  uint32   `json:"stakeversion"`
+	VoteVersion   uint32   `json:"voteversion"`
 	Quorum        uint32   `json:"quorum"`
-	Agendas       []Agenda `json:"agendas"`
+	TotalVotes    uint32   `json:"totalvotes"`
+	Agendas       []Agenda `json:"agendas,omitempty"`
 }
 
 // EstimateStakeDiffResult models the data returned from the estimatestakediff

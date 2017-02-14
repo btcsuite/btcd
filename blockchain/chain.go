@@ -51,6 +51,13 @@ const (
 	maxSearchDepth = 2880
 )
 
+// voteVersionTuple contains the extracted vote bits and version from votes
+// (SSGen).
+type voteVersionTuple struct {
+	version uint32
+	bits    uint16
+}
+
 // blockNode represents a block within the block chain and is primarily used to
 // aid in selecting the best chain to be the main chain.  The main chain is
 // stored into the block database.
@@ -97,14 +104,14 @@ type blockNode struct {
 	voterVersions []uint32
 
 	// Keep track of all vote bits in this block.
-	voteBits []uint16
+	votes []voteVersionTuple
 }
 
 // newBlockNode returns a new block node for the given block header.  It is
 // completely disconnected from the chain and the workSum value is just the work
 // for the passed block.  The work sum is updated accordingly when the node is
 // inserted into a chain.
-func newBlockNode(blockHeader *wire.BlockHeader, blockHash *chainhash.Hash, height int64, ticketsSpent []chainhash.Hash, ticketsRevoked []chainhash.Hash, voterVersions []uint32, voteBits []uint16) *blockNode {
+func newBlockNode(blockHeader *wire.BlockHeader, blockHash *chainhash.Hash, height int64, ticketsSpent []chainhash.Hash, ticketsRevoked []chainhash.Hash, voterVersions []uint32, votes []voteVersionTuple) *blockNode {
 	// Make a copy of the hash so the node doesn't keep a reference to part
 	// of the full block/block header preventing it from being garbage
 	// collected.
@@ -116,7 +123,7 @@ func newBlockNode(blockHeader *wire.BlockHeader, blockHash *chainhash.Hash, heig
 		ticketsSpent:   ticketsSpent,
 		ticketsRevoked: ticketsRevoked,
 		voterVersions:  voterVersions,
-		voteBits:       voteBits,
+		votes:          votes,
 	}
 	return &node
 }
