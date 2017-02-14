@@ -115,9 +115,9 @@ var (
 	}
 )
 
-// TestTresholdState ensures that the threshold state function progresses
+// TestThresholdState ensures that the threshold state function progresses
 // through the states correctly.
-func TestTresholdState(t *testing.T) {
+func TestThresholdState(t *testing.T) {
 	// Skip tests when running with -short
 	if testing.Short() {
 		t.Skip("Skipping full block threshold state tests in short mode")
@@ -222,13 +222,16 @@ func TestTresholdState(t *testing.T) {
 	}
 
 	// Shorter versions of useful params for convenience.
-	ticketsPerBlock := params.TicketsPerBlock
+	ticketsPerBlock := int64(params.TicketsPerBlock)
 	coinbaseMaturity := params.CoinbaseMaturity
 	stakeEnabledHeight := params.StakeEnabledHeight
 	stakeValidationHeight := params.StakeValidationHeight
 	stakeVerInterval := params.StakeVersionInterval
 	ruleChangeInterval := int64(params.RuleChangeActivationInterval)
 	powNumToCheck := int64(params.BlockUpgradeNumToCheck)
+	ruleChangeQuorum := int64(params.RuleChangeActivationQuorum)
+	ruleChangeMult := int64(params.RuleChangeActivationMultiplier)
+	ruleChangeDiv := int64(params.RuleChangeActivationDivisor)
 
 	// ---------------------------------------------------------------------
 	// Premine.
@@ -290,7 +293,7 @@ func TestTresholdState(t *testing.T) {
 	// enforcement is reached.
 	// ---------------------------------------------------------------------
 
-	targetPoolSize := g.Params().TicketPoolSize * ticketsPerBlock
+	targetPoolSize := int64(g.Params().TicketPoolSize) * ticketsPerBlock
 	for i := int64(0); int64(g.Tip().Header.Height) < stakeValidationHeight; i++ {
 		// Only purchase tickets until the target ticket pool size is
 		// reached.
@@ -355,7 +358,7 @@ func TestTresholdState(t *testing.T) {
 	// started.
 	// ---------------------------------------------------------------------
 
-	blocksNeeded = stakeValidationHeight + ruleChangeInterval - 1 -
+	blocksNeeded = stakeValidationHeight + ruleChangeInterval - 2 -
 		int64(g.Tip().Header.Height)
 	for i := int64(0); i < blocksNeeded; i++ {
 		outs := g.OldestCoinbaseOuts()
@@ -367,7 +370,7 @@ func TestTresholdState(t *testing.T) {
 		g.SaveTipCoinbaseOuts()
 		accepted()
 	}
-	g.AssertTipHeight(uint32(stakeValidationHeight + ruleChangeInterval - 1))
+	g.AssertTipHeight(uint32(stakeValidationHeight + ruleChangeInterval - 2))
 	g.AssertBlockVersion(3)
 	g.AssertStakeVersion(3)
 	testThresholdState(testDummy1ID, blockchain.ThresholdDefined, invalidChoice)
@@ -386,8 +389,8 @@ func TestTresholdState(t *testing.T) {
 	// started.
 	// ---------------------------------------------------------------------
 
-	blocksNeeded = stakeVerInterval + int64(g.Tip().Header.Height+1)%
-		stakeVerInterval
+	blocksNeeded = stakeValidationHeight + stakeVerInterval*4 - 1 -
+		int64(g.Tip().Header.Height)
 	for i := int64(0); i < blocksNeeded; i++ {
 		outs := g.OldestCoinbaseOuts()
 		blockName := fmt.Sprintf("bsvtC%d", i)
@@ -415,7 +418,7 @@ func TestTresholdState(t *testing.T) {
 	// moving to started.
 	// ---------------------------------------------------------------------
 
-	blocksNeeded = stakeValidationHeight + ruleChangeInterval*2 -
+	blocksNeeded = stakeValidationHeight + ruleChangeInterval*2 - 1 -
 		int64(g.Tip().Header.Height)
 	for i := int64(0); i < blocksNeeded; i++ {
 		outs := g.OldestCoinbaseOuts()
@@ -431,7 +434,7 @@ func TestTresholdState(t *testing.T) {
 		g.SaveTipCoinbaseOuts()
 		accepted()
 	}
-	g.AssertTipHeight(uint32(stakeValidationHeight + ruleChangeInterval*2))
+	g.AssertTipHeight(uint32(stakeValidationHeight + ruleChangeInterval*2 - 1))
 	g.AssertBlockVersion(4)
 	g.AssertStakeVersion(4)
 	testThresholdState(testDummy1ID, blockchain.ThresholdDefined, invalidChoice)
@@ -464,8 +467,8 @@ func TestTresholdState(t *testing.T) {
 		g.SaveTipCoinbaseOuts()
 		accepted()
 	}
-	g.AssertTipHeight(uint32(stakeValidationHeight + ruleChangeInterval*2 +
-		powNumToCheck))
+	g.AssertTipHeight(uint32(stakeValidationHeight + ruleChangeInterval*2 -
+		1 + powNumToCheck))
 	g.AssertBlockVersion(4)
 	g.AssertStakeVersion(4)
 	testThresholdState(testDummy1ID, blockchain.ThresholdDefined, invalidChoice)
@@ -484,7 +487,7 @@ func TestTresholdState(t *testing.T) {
 	// respectively.
 	// ---------------------------------------------------------------------
 
-	blocksNeeded = stakeValidationHeight + ruleChangeInterval*3 -
+	blocksNeeded = stakeValidationHeight + ruleChangeInterval*3 - 1 -
 		int64(g.Tip().Header.Height)
 	for i := int64(0); i < blocksNeeded; i++ {
 		outs := g.OldestCoinbaseOuts()
@@ -497,7 +500,117 @@ func TestTresholdState(t *testing.T) {
 		g.SaveTipCoinbaseOuts()
 		accepted()
 	}
-	g.AssertTipHeight(uint32(stakeValidationHeight + ruleChangeInterval*3))
+	g.AssertTipHeight(uint32(stakeValidationHeight + ruleChangeInterval*3 - 1))
+	g.AssertBlockVersion(4)
+	g.AssertStakeVersion(4)
+	testThresholdState(testDummy1ID, blockchain.ThresholdStarted, invalidChoice)
+	testThresholdState(testDummy2ID, blockchain.ThresholdStarted, invalidChoice)
+
+	// ---------------------------------------------------------------------
+	// Generate enough blocks to reach the next rule change interval with
+	// block version 4, stake version 4, and vote version 3.  Also, set the
+	// vote bits to include yes votes for the first test dummy agenda and
+	// no for the second test dummy agenda to ensure they aren't counted.
+	//
+	// The treshold state for the dummy deployments must remain in started
+	// because the votes are an old version and thus have a different
+	// definition and don't apply to version 4.
+	// ---------------------------------------------------------------------
+
+	blocksNeeded = stakeValidationHeight + ruleChangeInterval*4 - 1 -
+		int64(g.Tip().Header.Height)
+	for i := int64(0); i < blocksNeeded; i++ {
+		outs := g.OldestCoinbaseOuts()
+		blockName := fmt.Sprintf("bsvtG%d", i)
+		g.NextBlock(blockName, nil, outs[1:],
+			chaingen.ReplaceBlockVersion(4),
+			chaingen.ReplaceStakeVersion(4),
+			chaingen.ReplaceVotes(vbPrevBlockValid|vbTestDummy1Yes|
+				vbTestDummy2No, 3))
+		g.SaveTipCoinbaseOuts()
+		accepted()
+	}
+	g.AssertTipHeight(uint32(stakeValidationHeight + ruleChangeInterval*4 - 1))
+	g.AssertBlockVersion(4)
+	g.AssertStakeVersion(4)
+	testThresholdState(testDummy1ID, blockchain.ThresholdStarted, invalidChoice)
+	testThresholdState(testDummy2ID, blockchain.ThresholdStarted, invalidChoice)
+
+	// ---------------------------------------------------------------------
+	// Generate enough blocks to reach the next rule change interval with
+	// block version 4, stake version 4, and vote version 4.  Set the vote
+	// bits such that quorum is not reached, but there is a majority yes
+	// votes for the first test dummy agenda and a majority no for the
+	// second test dummy agenda.
+	//
+	// The treshold state for the dummy deployments must remain in started
+	// because quorum was not reached.
+	// ---------------------------------------------------------------------
+
+	var totalVotes int64
+	blocksNeeded = stakeValidationHeight + ruleChangeInterval*5 - 1 -
+		int64(g.Tip().Header.Height)
+	for i := int64(0); i < blocksNeeded; i++ {
+		outs := g.OldestCoinbaseOuts()
+		blockName := fmt.Sprintf("bsvtH%d", i)
+		voteBits := uint16(vbPrevBlockValid) // Abstain both test dummy
+		if totalVotes+ticketsPerBlock < ruleChangeQuorum {
+			voteBits = vbPrevBlockValid | vbTestDummy1Yes |
+				vbTestDummy2No
+		}
+		g.NextBlock(blockName, nil, outs[1:],
+			chaingen.ReplaceBlockVersion(4),
+			chaingen.ReplaceStakeVersion(4),
+			chaingen.ReplaceVotes(voteBits, 4))
+		totalVotes += ticketsPerBlock
+		g.SaveTipCoinbaseOuts()
+		accepted()
+	}
+	g.AssertTipHeight(uint32(stakeValidationHeight + ruleChangeInterval*5 - 1))
+	g.AssertBlockVersion(4)
+	g.AssertStakeVersion(4)
+	testThresholdState(testDummy1ID, blockchain.ThresholdStarted, invalidChoice)
+	testThresholdState(testDummy2ID, blockchain.ThresholdStarted, invalidChoice)
+
+	// ---------------------------------------------------------------------
+	// Generate enough blocks to reach the next rule change interval with
+	// block version 4, stake version 4, and vote version 4.  Set the vote
+	// bits such that quorum is reached, but there are a few votes shy of a
+	// majority yes for the first test dummy agenda and a few votes shy of a
+	// majority no for the second test dummy agenda.
+	//
+	// The treshold state for the dummy deployments must remain in started
+	// because even though quorum was reached, a required majority was not.
+	// ---------------------------------------------------------------------
+
+	blocksNeeded = stakeValidationHeight + ruleChangeInterval*6 - 1 -
+		int64(g.Tip().Header.Height)
+	totalVotes = 0
+	numActiveNeeded := ruleChangeQuorum * 2
+	numMinorityNeeded := numActiveNeeded*ruleChangeMult/ruleChangeDiv - 1
+	if numActiveNeeded > ticketsPerBlock*blocksNeeded {
+		numActiveNeeded = ticketsPerBlock * blocksNeeded
+	}
+	for i := int64(0); i < blocksNeeded; i++ {
+		outs := g.OldestCoinbaseOuts()
+		blockName := fmt.Sprintf("bsvtI%d", i)
+		voteBits := uint16(vbPrevBlockValid) // Abstain both test dummy
+		if totalVotes+ticketsPerBlock < numMinorityNeeded {
+			voteBits = vbPrevBlockValid | vbTestDummy1Yes |
+				vbTestDummy2No
+		} else if totalVotes+ticketsPerBlock <= numActiveNeeded {
+			voteBits = vbPrevBlockValid | vbTestDummy1No |
+				vbTestDummy2Yes
+		}
+		g.NextBlock(blockName, nil, outs[1:],
+			chaingen.ReplaceBlockVersion(4),
+			chaingen.ReplaceStakeVersion(4),
+			chaingen.ReplaceVotes(voteBits, 4))
+		totalVotes += int64(ticketsPerBlock)
+		g.SaveTipCoinbaseOuts()
+		accepted()
+	}
+	g.AssertTipHeight(uint32(stakeValidationHeight + ruleChangeInterval*6 - 1))
 	g.AssertBlockVersion(4)
 	g.AssertStakeVersion(4)
 	testThresholdState(testDummy1ID, blockchain.ThresholdStarted, invalidChoice)
@@ -515,11 +628,11 @@ func TestTresholdState(t *testing.T) {
 	// achieved.
 	// ---------------------------------------------------------------------
 
-	blocksNeeded = stakeValidationHeight + ruleChangeInterval*4 -
+	blocksNeeded = stakeValidationHeight + ruleChangeInterval*7 - 1 -
 		int64(g.Tip().Header.Height)
 	for i := int64(0); i < blocksNeeded; i++ {
 		outs := g.OldestCoinbaseOuts()
-		blockName := fmt.Sprintf("bsvtG%d", i)
+		blockName := fmt.Sprintf("bsvtJ%d", i)
 		g.NextBlock(blockName, nil, outs[1:],
 			chaingen.ReplaceBlockVersion(4),
 			chaingen.ReplaceStakeVersion(4),
@@ -528,7 +641,7 @@ func TestTresholdState(t *testing.T) {
 		g.SaveTipCoinbaseOuts()
 		accepted()
 	}
-	g.AssertTipHeight(uint32(stakeValidationHeight + ruleChangeInterval*4))
+	g.AssertTipHeight(uint32(stakeValidationHeight + ruleChangeInterval*7 - 1))
 	g.AssertBlockVersion(4)
 	g.AssertStakeVersion(4)
 	testThresholdState(testDummy1ID, blockchain.ThresholdLockedIn, testDummy1YesIndex)
@@ -548,11 +661,11 @@ func TestTresholdState(t *testing.T) {
 	// undone.
 	// ---------------------------------------------------------------------
 
-	blocksNeeded = stakeValidationHeight + ruleChangeInterval*5 -
+	blocksNeeded = stakeValidationHeight + ruleChangeInterval*8 - 1 -
 		int64(g.Tip().Header.Height)
 	for i := int64(0); i < blocksNeeded; i++ {
 		outs := g.OldestCoinbaseOuts()
-		blockName := fmt.Sprintf("bsvtH%d", i)
+		blockName := fmt.Sprintf("bsvtK%d", i)
 		g.NextBlock(blockName, nil, outs[1:],
 			chaingen.ReplaceBlockVersion(4),
 			chaingen.ReplaceStakeVersion(4),
@@ -561,7 +674,7 @@ func TestTresholdState(t *testing.T) {
 		g.SaveTipCoinbaseOuts()
 		accepted()
 	}
-	g.AssertTipHeight(uint32(stakeValidationHeight + ruleChangeInterval*5))
+	g.AssertTipHeight(uint32(stakeValidationHeight + ruleChangeInterval*8 - 1))
 	g.AssertBlockVersion(4)
 	g.AssertStakeVersion(4)
 	testThresholdState(testDummy1ID, blockchain.ThresholdActive, testDummy1YesIndex)
