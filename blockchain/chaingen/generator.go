@@ -85,7 +85,7 @@ func (s *SpendableOut) Amount() dcrutil.Amount {
 func MakeSpendableOutForTx(tx *wire.MsgTx, blockHeight, txIndex, txOutIndex uint32) SpendableOut {
 	return SpendableOut{
 		prevOut: wire.OutPoint{
-			Hash:  tx.TxHash(),
+			Hash:  *tx.CachedTxHash(),
 			Index: txOutIndex,
 			Tree:  wire.TxTreeRegular,
 		},
@@ -146,6 +146,13 @@ type Generator struct {
 	// Used for tracking spendable coinbase outputs.
 	spendableOuts     [][]SpendableOut
 	prevCollectedHash chainhash.Hash
+
+	// Used for tracking the live ticket pool.
+	originalParents map[chainhash.Hash]chainhash.Hash
+	immatureTickets []*stakeTicket
+	liveTickets     []*stakeTicket
+	wonTickets      map[chainhash.Hash][]*stakeTicket
+	expiredTickets  []*stakeTicket
 }
 
 // MakeGenerator returns a generator instance initialized with the genesis block
@@ -173,6 +180,8 @@ func MakeGenerator(params *chaincfg.Params) (Generator, error) {
 		blocksByName:     map[string]*wire.MsgBlock{"genesis": genesis},
 		p2shOpTrueAddr:   p2shOpTrueAddr,
 		p2shOpTrueScript: p2shOpTrueScript,
+		originalParents:  make(map[chainhash.Hash]chainhash.Hash),
+		wonTickets:       make(map[chainhash.Hash][]*stakeTicket),
 	}, nil
 }
 
@@ -184,17 +193,6 @@ func (g *Generator) Params() *chaincfg.Params {
 // Tip returns the current tip block of the generator instance.
 func (g *Generator) Tip() *wire.MsgBlock {
 	return g.tip
-}
-
-// SetTip changes the tip of the instance to the block with the provided name.
-// This is useful since the tip is used for things such as generating subsequent
-// blocks.
-func (g *Generator) SetTip(blockName string) {
-	g.tip = g.blocksByName[blockName]
-	if g.tip == nil {
-		panic(fmt.Sprintf("tip block name %s does not exist", blockName))
-	}
-	g.tipName = blockName
 }
 
 // TipName returns the name of the current tip block of the generator instance.
@@ -602,7 +600,7 @@ func (g *Generator) createVoteTx(parentBlock *wire.MsgBlock, ticket *stakeTicket
 	// Generate and return the transaction with the proof-of-stake subsidy
 	// coinbase and spending from the provided ticket along with the
 	// previously described outputs.
-	ticketHash := ticket.tx.TxHash()
+	ticketHash := ticket.tx.CachedTxHash()
 	tx := wire.NewMsgTx()
 	tx.AddTxIn(&wire.TxIn{
 		PreviousOutPoint: *wire.NewOutPoint(&chainhash.Hash{},
@@ -614,7 +612,7 @@ func (g *Generator) createVoteTx(parentBlock *wire.MsgBlock, ticket *stakeTicket
 		SignatureScript: g.params.StakeBaseSigScript,
 	})
 	tx.AddTxIn(&wire.TxIn{
-		PreviousOutPoint: *wire.NewOutPoint(&ticketHash, 0,
+		PreviousOutPoint: *wire.NewOutPoint(ticketHash, 0,
 			wire.TxTreeStake),
 		Sequence:        wire.MaxTxInSequenceNum,
 		ValueIn:         int64(ticketPrice),
@@ -1118,94 +1116,6 @@ func winningTickets(voteBlock *wire.MsgBlock, liveTickets []*stakeTicket, numVot
 	return winners, prng.State(), nil
 }
 
-// sortedLiveTickets generates a list of sorted live tickets for the provided
-// block.  This is a much less efficient approach than is possible because
-// it follows the chain all the back to the first possible ticket height and
-// generates the entire live ticket map versus using some type of cached live
-// tickets.  However, this is desirable for testing purposes because it means
-// the caller does not have to be burdened with keeping track of and updating
-// the state of the ticket pool when reorganizing.
-func (g *Generator) sortedLiveTickets(block *wire.MsgBlock) []*stakeTicket {
-	// No possible live tickets before the coinbase maturity height + ticket
-	// maturity height.
-	tipHeight := block.Header.Height
-	coinbaseMaturity := uint32(g.params.CoinbaseMaturity)
-	ticketMaturity := uint32(g.params.TicketMaturity)
-	if tipHeight <= coinbaseMaturity+ticketMaturity {
-		return nil
-	}
-
-	// Collect all of the blocks since the first block that could have
-	// ticket purchases.
-	numToProcess := tipHeight - coinbaseMaturity
-	blocksToProcess := make([]*wire.MsgBlock, 0, numToProcess)
-	numProcessed := uint32(0)
-	for block != nil && numProcessed < numToProcess {
-		blocksToProcess = append(blocksToProcess, block)
-		block = g.blocks[block.Header.PrevBlock]
-		numProcessed++
-	}
-
-	// Helper closure to generate and return the live tickets from the map
-	// of all tickets by including only the tickets that are mature and
-	// have not expired.
-	ticketExpiry := uint32(g.params.TicketExpiry)
-	allTickets := make(map[chainhash.Hash]*stakeTicket)
-	genSortedLiveTickets := func(tipHeight uint32) []*stakeTicket {
-		liveTickets := make([]*stakeTicket, 0, len(allTickets))
-		for _, ticket := range allTickets {
-			liveHeight := ticket.blockHeight + ticketMaturity
-			expireHeight := liveHeight + ticketExpiry
-			if tipHeight >= liveHeight && tipHeight < expireHeight {
-				liveTickets = append(liveTickets, ticket)
-			}
-		}
-		sort.Sort(stakeTicketSorter(liveTickets))
-		return liveTickets
-	}
-
-	// Helper closure to remove the expected votes for a given parent block
-	// from the map of all tickets.
-	removeExpectedVotes := func(parentBlock *wire.MsgBlock) {
-		liveTickets := genSortedLiveTickets(parentBlock.Header.Height)
-		winners, _, err := winningTickets(parentBlock, liveTickets,
-			g.params.TicketsPerBlock)
-		if err != nil {
-			panic(err)
-		}
-		for _, winner := range winners {
-			delete(allTickets, winner.tx.TxHash())
-		}
-	}
-
-	// Process blocks from the oldest to newest while collecting all stake
-	// ticket purchases that have not already been selected to vote.
-	for i := range blocksToProcess {
-		block := blocksToProcess[len(blocksToProcess)-1-i]
-
-		// Remove expected votes once the stake validation height has
-		// been reached since even if the tests didn't actually cast the
-		// votes, they are still no longer live.
-		if int64(block.Header.Height) >= g.params.StakeValidationHeight {
-			parentBlock := g.blocks[block.Header.PrevBlock]
-			removeExpectedVotes(parentBlock)
-		}
-
-		// Add stake ticket purchases to all tickets map.
-		for txIdx, tx := range block.STransactions {
-			if isTicketPurchaseTx(tx) {
-				ticket := &stakeTicket{tx, block.Header.Height,
-					uint32(txIdx)}
-				allTickets[tx.TxHash()] = ticket
-			}
-		}
-	}
-
-	// Finally, generate and return the live tickets by including only the
-	// tickets that are mature and have not expired.
-	return genSortedLiveTickets(tipHeight)
-}
-
 // calcFinalLotteryState calculates the final lottery state for a set of winning
 // tickets and the associated deterministic prng state hash after selecting the
 // winners.  It is the first 6 bytes of:
@@ -1213,7 +1123,7 @@ func (g *Generator) sortedLiveTickets(block *wire.MsgBlock) []*stakeTicket {
 func calcFinalLotteryState(winners []*stakeTicket, prngStateHash chainhash.Hash) [6]byte {
 	data := make([]byte, (len(winners)+1)*chainhash.HashSize)
 	for i := 0; i < len(winners); i++ {
-		h := winners[i].tx.TxHash()
+		h := winners[i].tx.CachedTxHash()
 		copy(data[chainhash.HashSize*i:], h[:])
 	}
 	copy(data[chainhash.HashSize*len(winners):], prngStateHash[:])
@@ -1302,14 +1212,25 @@ func solveBlock(header *wire.BlockHeader) bool {
 
 // ReplaceWithNVotes returns a function that itself takes a block and modifies
 // it by replacing the votes in the stake tree with specified number of votes.
+//
+// NOTE: This must only be used as a munger to the 'NextBlock' function or it
+// will lead to an invalid live ticket pool.  To help safeguard against improper
+// usage, it will panic if called with a block that does not connect to the
+// current tip block.
 func (g *Generator) ReplaceWithNVotes(numVotes uint16) func(*wire.MsgBlock) {
 	return func(b *wire.MsgBlock) {
-		// Generate the sorted live ticket pool for the parent block.
-		parentBlock := g.blocks[b.Header.PrevBlock]
-		liveTickets := g.sortedLiveTickets(parentBlock)
+		// Attempt to prevent misuse of this function by ensuring the
+		// provided block connects to the current tip.
+		if b.Header.PrevBlock != g.tip.BlockHash() {
+			panic(fmt.Sprintf("attempt to replace number of votes "+
+				"for block %s with parent %s that is not the "+
+				"current tip %s", b.BlockHash(),
+				b.Header.PrevBlock, g.tip.BlockHash()))
+		}
 
 		// Get the winning tickets for the specified number of votes.
-		winners, _, err := winningTickets(parentBlock, liveTickets,
+		parentBlock := g.tip
+		winners, _, err := winningTickets(parentBlock, g.liveTickets,
 			numVotes)
 		if err != nil {
 			panic(err)
@@ -1367,6 +1288,9 @@ func ReplaceStakeVersion(newVersion uint32) func(*wire.MsgBlock) {
 
 // ReplaceVoteVersions returns a function that itself takes a block and modifies
 // it by replacing the voter version of the stake transactions.
+//
+// NOTE: This must only be used as a munger to the 'NextBlock' function or it
+// will lead to an invalid live ticket pool.
 func ReplaceVoteVersions(newVersion uint32) func(*wire.MsgBlock) {
 	return func(b *wire.MsgBlock) {
 		for _, stx := range b.STransactions {
@@ -1380,6 +1304,9 @@ func ReplaceVoteVersions(newVersion uint32) func(*wire.MsgBlock) {
 
 // ReplaceVotes returns a function that itself takes a block and modifies it by
 // replacing the voter version and bits of the stake transactions.
+//
+// NOTE: This must only be used as a munger to the 'NextBlock' function or it
+// will lead to an invalid live ticket pool.
 func ReplaceVotes(voteBits uint16, newVersion uint32) func(*wire.MsgBlock) {
 	return func(b *wire.MsgBlock) {
 		for _, stx := range b.STransactions {
@@ -1423,6 +1350,264 @@ func (g *Generator) CreateSpendTxForTx(tx *wire.MsgTx, blockHeight, txIndex uint
 	return g.CreateSpendTx(&spend, fee)
 }
 
+// removeTicket removes the passed index from the provided slice of tickets and
+// returns the resulting slice.  This is an in-place modification.
+func removeTicket(tickets []*stakeTicket, index int) []*stakeTicket {
+	copy(tickets[index:], tickets[index+1:])
+	tickets[len(tickets)-1] = nil // Prevent memory leak
+	tickets = tickets[:len(tickets)-1]
+	return tickets
+}
+
+// connectLiveTickets updates the live ticket pool for a new tip block by
+// removing tickets that are now expired from it, removing the passed winners
+// from it, adding any immature tickets which are now mature to it, and
+// resorting it.
+func (g *Generator) connectLiveTickets(blockHash *chainhash.Hash, height uint32, winners, purchases []*stakeTicket) {
+	// Move expired tickets from the live ticket pool to the expired ticket
+	// pool.
+	ticketMaturity := uint32(g.params.TicketMaturity)
+	ticketExpiry := g.params.TicketExpiry
+	for i := 0; i < len(g.liveTickets); i++ {
+		ticket := g.liveTickets[i]
+		liveHeight := ticket.blockHeight + ticketMaturity
+		expireHeight := liveHeight + ticketExpiry
+		if height >= expireHeight {
+			g.liveTickets = removeTicket(g.liveTickets, i)
+			g.expiredTickets = append(g.expiredTickets, ticket)
+
+			// This is required because the ticket at the current
+			// offset was just removed from the slice that is being
+			// iterated, so adjust the offset down one accordingly.
+			i--
+		}
+	}
+
+	// Move winning tickets from the live ticket pool to won tickets pool.
+	for i := 0; i < len(g.liveTickets); i++ {
+		ticket := g.liveTickets[i]
+		for _, winner := range winners {
+			if ticket.tx.CachedTxHash() == winner.tx.CachedTxHash() {
+				g.liveTickets = removeTicket(g.liveTickets, i)
+
+				// This is required because the ticket at the
+				// current offset was just removed from the
+				// slice that is being iterated, so adjust the
+				// offset down one accordingly.
+				i--
+				break
+			}
+		}
+	}
+	g.wonTickets[*blockHash] = winners
+
+	// Move immature tickets which are now mature to the live ticket pool.
+	for i := 0; i < len(g.immatureTickets); i++ {
+		ticket := g.immatureTickets[i]
+		liveHeight := ticket.blockHeight + ticketMaturity
+		if height >= liveHeight {
+			g.immatureTickets = removeTicket(g.immatureTickets, i)
+			g.liveTickets = append(g.liveTickets, ticket)
+
+			// This is required because the ticket at the current
+			// offset was just removed from the slice that is being
+			// iterated, so adjust the offset down one accordingly.
+			i--
+		}
+	}
+
+	// Resort the ticket pool now that all live ticket pool manipulations
+	// are done.
+	sort.Sort(stakeTicketSorter(g.liveTickets))
+
+	// Add new ticket purchases to the immature ticket pool.
+	g.immatureTickets = append(g.immatureTickets, purchases...)
+}
+
+// connectBlockTickets updates the live ticket pool and associated data structs
+// by for the passed block.  It will panic if the specified block does not
+// connect to the current tip block.
+func (g Generator) connectBlockTickets(b *wire.MsgBlock) {
+	// Attempt to prevent misuse of this function by ensuring the provided
+	// block connects to the current tip.
+	if b.Header.PrevBlock != g.tip.BlockHash() {
+		panic(fmt.Sprintf("attempt to connect block %s with parent %s "+
+			"that is not the current tip %s", b.BlockHash(),
+			b.Header.PrevBlock, g.tip.BlockHash()))
+	}
+
+	// Get all of the winning tickets for the block.
+	numVotes := g.params.TicketsPerBlock
+	winners, _, err := winningTickets(g.tip, g.liveTickets, numVotes)
+	if err != nil {
+		panic(err)
+	}
+
+	// Extract the ticket purchases (sstx) from the block.
+	height := b.Header.Height
+	var purchases []*stakeTicket
+	for txIdx, tx := range b.STransactions {
+		if isTicketPurchaseTx(tx) {
+			ticket := &stakeTicket{tx, height, uint32(txIdx)}
+			purchases = append(purchases, ticket)
+		}
+	}
+
+	// Update the live ticket pool and associated data structures.
+	blockHash := b.BlockHash()
+	g.connectLiveTickets(&blockHash, height, winners, purchases)
+}
+
+// disconnectBlockTickets updates the live ticket pool and associated data
+// structs by unwinding the passed block, which must be the current tip block.
+// It will panic if the specified block is not the current tip block.
+func (g *Generator) disconnectBlockTickets(b *wire.MsgBlock) {
+	// Attempt to prevent misuse of this function by ensuring the provided
+	// block is the current tip.
+	if b != g.tip {
+		panic(fmt.Sprintf("attempt to disconnect block %s that is not "+
+			"the current tip %s", b.BlockHash(), g.tip.BlockHash()))
+	}
+
+	// Remove tickets created in the block from the immature ticket pool.
+	blockHeight := b.Header.Height
+	for i := 0; i < len(g.immatureTickets); i++ {
+		ticket := g.immatureTickets[i]
+		if ticket.blockHeight == blockHeight {
+			g.immatureTickets = removeTicket(g.immatureTickets, i)
+
+			// This is required because the ticket at the current
+			// offset was just removed from the slice that is being
+			// iterated, so adjust the offset down one accordingly.
+			i--
+		}
+	}
+
+	// Move tickets that are no longer mature from the live ticket pool to
+	// the immature ticket pool.
+	prevBlockHeight := blockHeight - 1
+	ticketMaturity := uint32(g.params.TicketMaturity)
+	for i := 0; i < len(g.liveTickets); i++ {
+		ticket := g.liveTickets[i]
+		liveHeight := ticket.blockHeight + ticketMaturity
+		if prevBlockHeight < liveHeight {
+			g.liveTickets = removeTicket(g.liveTickets, i)
+			g.immatureTickets = append(g.immatureTickets, ticket)
+
+			// This is required because the ticket at the current
+			// offset was just removed from the slice that is being
+			// iterated, so adjust the offset down one accordingly.
+			i--
+		}
+	}
+
+	// Move tickets that are no longer expired from the expired ticket pool
+	// to the live ticket pool.
+	ticketExpiry := g.params.TicketExpiry
+	for i := 0; i < len(g.expiredTickets); i++ {
+		ticket := g.expiredTickets[i]
+		liveHeight := ticket.blockHeight + ticketMaturity
+		expireHeight := liveHeight + ticketExpiry
+		if prevBlockHeight < expireHeight {
+			g.expiredTickets = removeTicket(g.expiredTickets, i)
+			g.liveTickets = append(g.liveTickets, ticket)
+
+			// This is required because the ticket at the current
+			// offset was just removed from the slice that is being
+			// iterated, so adjust the offset down one accordingly.
+			i--
+		}
+	}
+
+	// Add the winning tickets consumed by the block back to the live ticket
+	// pool.
+	blockHash := b.BlockHash()
+	g.liveTickets = append(g.liveTickets, g.wonTickets[blockHash]...)
+	delete(g.wonTickets, blockHash)
+
+	// Resort the ticket pool now that all live ticket pool manipulations
+	// are done.
+	sort.Sort(stakeTicketSorter(g.liveTickets))
+}
+
+// originalParent returns the original block the passed block was built from.
+// This is necessary because callers might change the previous block hash in a
+// munger which would cause the like ticket pool to be reconstructed improperly.
+func (g *Generator) originalParent(b *wire.MsgBlock) *wire.MsgBlock {
+	parentHash, ok := g.originalParents[b.BlockHash()]
+	if !ok {
+		parentHash = b.Header.PrevBlock
+	}
+	return g.BlockByHash(&parentHash)
+}
+
+// SetTip changes the tip of the instance to the block with the provided name.
+// This is useful since the tip is used for things such as generating subsequent
+// blocks.
+func (g *Generator) SetTip(blockName string) {
+	// Nothing to do if already the tip.
+	if blockName == g.tipName {
+		return
+	}
+
+	newTip := g.blocksByName[blockName]
+	if newTip == nil {
+		panic(fmt.Sprintf("tip block name %s does not exist", blockName))
+	}
+
+	// Create a list of blocks to disconnect and blocks to connect in order
+	// to switch to the new tip.
+	var connect, disconnect []*wire.MsgBlock
+	oldBranch, newBranch := g.tip, newTip
+	for oldBranch != newBranch {
+		// As long as the two branches are not at the same height, add
+		// the tip of the longest one to the appropriate connect or
+		// disconnect list and move its tip back to its previous block.
+		if oldBranch.Header.Height > newBranch.Header.Height {
+			disconnect = append(disconnect, oldBranch)
+			oldBranch = g.originalParent(oldBranch)
+			continue
+		} else if newBranch.Header.Height > oldBranch.Header.Height {
+			connect = append(connect, newBranch)
+			newBranch = g.originalParent(newBranch)
+			continue
+		}
+
+		// At this point the two branches have the same height, so add
+		// each tip to the appropriate connect or disconnect list and
+		// the tips to their previous block.
+		disconnect = append(disconnect, oldBranch)
+		oldBranch = g.originalParent(oldBranch)
+		connect = append(connect, newBranch)
+		newBranch = g.originalParent(newBranch)
+	}
+
+	// Update the live ticket pool and associated data structs by
+	// disconnecting all blocks back to the fork point.
+	for _, block := range disconnect {
+		g.disconnectBlockTickets(block)
+		g.tip = g.originalParent(block)
+	}
+
+	// Update the live ticket pool and associated data structs by connecting
+	// all blocks after the fork point up to the new tip.  The list of
+	// blocks to connect is iterated in reverse order, because it was
+	// constructed in reverse, and the blocks need to be connected in the
+	// order in which they build the chain.
+	for i := len(connect) - 1; i >= 0; i-- {
+		block := connect[i]
+		g.connectBlockTickets(block)
+		g.tip = block
+	}
+
+	// Ensure the tip is the expected new tip and set the associated name.
+	if g.tip != newTip {
+		panic(fmt.Sprintf("tip %s is not expected new tip %s",
+			g.tip.BlockHash(), newTip.BlockHash()))
+	}
+	g.tipName = blockName
+}
+
 // NextBlock builds a new block that extends the current tip associated with the
 // generator and updates the generator's tip to the newly generated block.
 //
@@ -1460,17 +1645,15 @@ func (g *Generator) CreateSpendTxForTx(tx *wire.MsgTx, blockHeight, txIndex uint
 // - The size of the block will be recalculated unless it was manually changed
 // - The block will be solved unless the nonce was changed
 func (g *Generator) NextBlock(blockName string, spend *SpendableOut, ticketSpends []SpendableOut, mungers ...func(*wire.MsgBlock)) *wire.MsgBlock {
-	// Generate the sorted live ticket pool for the current tip.
-	liveTickets := g.sortedLiveTickets(g.tip)
-	nextHeight := g.tip.Header.Height + 1
-
 	// Calculate the next required stake difficulty (aka ticket price).
 	ticketPrice := dcrutil.Amount(g.calcNextRequiredStakeDifficulty())
 
 	// Generate the appropriate votes and ticket purchases based on the
 	// current tip block and provided ticket spendable outputs.
+	var ticketWinners []*stakeTicket
 	var stakeTxns []*wire.MsgTx
 	var finalState [6]byte
+	nextHeight := g.tip.Header.Height + 1
 	if nextHeight > uint32(g.params.CoinbaseMaturity) {
 		// Generate votes once the stake validation height has been
 		// reached.
@@ -1479,10 +1662,11 @@ func (g *Generator) NextBlock(blockName string, spend *SpendableOut, ticketSpend
 			// winning tickets to the stake tree.
 			numVotes := g.params.TicketsPerBlock
 			winners, stateHash, err := winningTickets(g.tip,
-				liveTickets, numVotes)
+				g.liveTickets, numVotes)
 			if err != nil {
 				panic(err)
 			}
+			ticketWinners = winners
 			for _, ticket := range winners {
 				voteTx := g.createVoteTx(g.tip, ticket)
 				stakeTxns = append(stakeTxns, voteTx)
@@ -1506,18 +1690,20 @@ func (g *Generator) NextBlock(blockName string, spend *SpendableOut, ticketSpend
 		}
 	}
 
-	// Count the number of ticket purchases (sstx), votes (ssgen), and
-	// ticket revocations (ssrtx) and calculate the total PoW fees generated
-	// by the stake transactions.
+	// Create stake tickets for the ticket purchases (sstx), count the
+	// votes (ssgen) and ticket revocations (ssrtx),  and calculate the
+	// total PoW fees generated by the stake transactions.
 	var numVotes uint16
-	var numTicketPurchases, numTicketRevocations uint8
+	var numTicketRevocations uint8
+	var ticketPurchases []*stakeTicket
 	var stakeTreeFees dcrutil.Amount
-	for _, tx := range stakeTxns {
+	for txIdx, tx := range stakeTxns {
 		switch {
 		case isVoteTx(tx):
 			numVotes++
 		case isTicketPurchaseTx(tx):
-			numTicketPurchases++
+			ticket := &stakeTicket{tx, nextHeight, uint32(txIdx)}
+			ticketPurchases = append(ticketPurchases, ticket)
 		case isRevocationTx(tx):
 			numTicketRevocations++
 		}
@@ -1586,18 +1772,19 @@ func (g *Generator) NextBlock(blockName string, spend *SpendableOut, ticketSpend
 	ts = time.Unix(ts.Unix(), 0)
 
 	// Create the unsolved block.
+	prevHash := g.tip.BlockHash()
 	block := wire.MsgBlock{
 		Header: wire.BlockHeader{
 			Version:      1,
-			PrevBlock:    g.tip.BlockHash(),
+			PrevBlock:    prevHash,
 			MerkleRoot:   calcMerkleRoot(regularTxns),
 			StakeRoot:    calcMerkleRoot(stakeTxns),
 			VoteBits:     1,
 			FinalState:   finalState,
 			Voters:       numVotes,
-			FreshStake:   numTicketPurchases,
+			FreshStake:   uint8(len(ticketPurchases)),
 			Revocations:  numTicketRevocations,
-			PoolSize:     uint32(len(liveTickets)),
+			PoolSize:     uint32(len(g.liveTickets)),
 			Bits:         g.calcNextRequiredDifficulty(),
 			SBits:        int64(ticketPrice),
 			Height:       nextHeight,
@@ -1641,6 +1828,15 @@ func (g *Generator) NextBlock(blockName string, spend *SpendableOut, ticketSpend
 
 	// Update generator state and return the block.
 	blockHash := block.BlockHash()
+	if block.Header.PrevBlock != prevHash {
+		// Save the orignal block this one was built from if it was
+		// manually changed in a munger so the code which deals with
+		// updating the live tickets when changing the tip has access to
+		// it.
+		g.originalParents[blockHash] = prevHash
+	}
+	g.connectLiveTickets(&blockHash, nextHeight, ticketWinners,
+		ticketPurchases)
 	g.blocks[blockHash] = &block
 	g.blocksByName[blockName] = &block
 	g.tip = &block
@@ -1698,13 +1894,16 @@ func (g *Generator) CreatePremineBlock(blockName string, additionalAmount dcruti
 // after 'NextBlock' has returned.
 func (g *Generator) UpdateBlockState(oldBlockName string, oldBlockHash chainhash.Hash, newBlockName string, newBlock *wire.MsgBlock) {
 	// Remove existing entries.
+	wonTickets := g.wonTickets[oldBlockHash]
 	delete(g.blocks, oldBlockHash)
 	delete(g.blocksByName, oldBlockName)
+	delete(g.wonTickets, oldBlockHash)
 
 	// Add new entries.
 	newBlockHash := newBlock.BlockHash()
 	g.blocks[newBlockHash] = newBlock
 	g.blocksByName[newBlockName] = newBlock
+	g.wonTickets[newBlockHash] = wonTickets
 }
 
 // OldestCoinbaseOuts removes the oldest set of coinbase proof-of-work outputs
@@ -1715,18 +1914,24 @@ func (g *Generator) OldestCoinbaseOuts() []SpendableOut {
 	return outs
 }
 
+// saveCoinbaseOuts adds the proof-of-work outputs of the coinbase tx in the
+// passed block to the list of spendable outputs.
+func (g *Generator) saveCoinbaseOuts(b *wire.MsgBlock) {
+	g.spendableOuts = append(g.spendableOuts, []SpendableOut{
+		MakeSpendableOut(b, 0, 2),
+		MakeSpendableOut(b, 0, 3),
+		MakeSpendableOut(b, 0, 4),
+		MakeSpendableOut(b, 0, 5),
+		MakeSpendableOut(b, 0, 6),
+		MakeSpendableOut(b, 0, 7),
+	})
+	g.prevCollectedHash = b.BlockHash()
+}
+
 // SaveTipCoinbaseOuts adds the proof-of-work outputs of the coinbase tx in the
 // current tip block to the list of spendable outputs.
 func (g *Generator) SaveTipCoinbaseOuts() {
-	g.spendableOuts = append(g.spendableOuts, []SpendableOut{
-		MakeSpendableOut(g.tip, 0, 2),
-		MakeSpendableOut(g.tip, 0, 3),
-		MakeSpendableOut(g.tip, 0, 4),
-		MakeSpendableOut(g.tip, 0, 5),
-		MakeSpendableOut(g.tip, 0, 6),
-		MakeSpendableOut(g.tip, 0, 7),
-	})
-	g.prevCollectedHash = g.tip.BlockHash()
+	g.saveCoinbaseOuts(g.tip)
 }
 
 // SaveSpendableCoinbaseOuts adds all proof-of-work coinbase outputs starting
@@ -1736,10 +1941,6 @@ func (g *Generator) SaveTipCoinbaseOuts() {
 // add them for the right tests which will ultimately end up being the best
 // chain.
 func (g *Generator) SaveSpendableCoinbaseOuts() {
-	// Ensure tip is reset to the current one when done.
-	curTipName := g.tipName
-	defer g.SetTip(curTipName)
-
 	// Loop through the ancestors of the current tip until the
 	// reaching the block that has already had the coinbase outputs
 	// collected.
@@ -1751,8 +1952,7 @@ func (g *Generator) SaveSpendableCoinbaseOuts() {
 		collectBlocks = append(collectBlocks, b)
 	}
 	for i := range collectBlocks {
-		g.tip = collectBlocks[len(collectBlocks)-1-i]
-		g.SaveTipCoinbaseOuts()
+		g.saveCoinbaseOuts(collectBlocks[len(collectBlocks)-1-i])
 	}
 }
 
