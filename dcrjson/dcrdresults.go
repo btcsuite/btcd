@@ -12,7 +12,7 @@ type GetStakeDifficultyResult struct {
 	NextStakeDifficulty    float64 `json:"next"`
 }
 
-// VersionCount models a generic version:count tupple.
+// VersionCount models a generic version:count tuple.
 type VersionCount struct {
 	Version uint32 `json:"version"`
 	Count   uint32 `json:"count"`
@@ -60,7 +60,7 @@ type Choice struct {
 	Progress    float64 `json:"progress"`
 }
 
-// Agenda models an individual agenda including it's choices.
+// Agenda models an individual agenda including its choices.
 type Agenda struct {
 	Id             string   `json:"id"`
 	Description    string   `json:"description"`

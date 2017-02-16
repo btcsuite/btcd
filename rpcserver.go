@@ -3864,7 +3864,7 @@ func convertVersionMap(m map[int]int) []dcrjson.VersionCount {
 
 // handleGetStakeVersionInfo implements the getstakeversioninfo command.
 func handleGetStakeVersionInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
-	count := int32(0)
+	count := int32(1)
 	c, ok := cmd.(*dcrjson.GetStakeVersionInfoCmd)
 	if !ok {
 		return nil, internalRPCError("Invalid command",
@@ -3872,9 +3872,10 @@ func handleGetStakeVersionInfo(s *rpcServer, cmd interface{}, closeChan <-chan s
 	}
 	if c.Count != nil {
 		count = *c.Count
-	}
-	if count == 0 {
-		count = 1
+		if count <= 0 {
+			return nil, internalRPCError("Invalid count",
+				"handleGetStakeVersionInfo")
+		}
 	}
 
 	snapshot := s.chain.BestSnapshot()
@@ -3891,17 +3892,17 @@ func handleGetStakeVersionInfo(s *rpcServer, cmd interface{}, closeChan <-chan s
 	endHeight := s.chain.CalcWantHeight(interval,
 		snapshot.Height) + 1
 	hash := snapshot.Hash
-	adjust := int32(1) // we are off by one on the initial iteration.
+	adjust := int32(1) // We are off by one on the initial iteration.
 	for i := int32(0); i < count; i++ {
 		numBlocks := int32(startHeight - endHeight)
 		if numBlocks <= 0 {
 			// Just return what we got.
-			return result, nil
+			break
 		}
 		sv, err := s.chain.GetStakeVersions(hash, numBlocks+adjust)
 		if err != nil {
-			// Just return what we got.
-			return result, nil
+			return nil, internalRPCError(err.Error(),
+				"handleGetStakeVersionInfo")
 		}
 
 		posVersions := make(map[int]int)
@@ -3928,8 +3929,8 @@ func handleGetStakeVersionInfo(s *rpcServer, cmd interface{}, closeChan <-chan s
 		// Get prior block hash.
 		hash, err = s.chain.BlockHashByHeight(startHeight - 1)
 		if err != nil {
-			// Just return what we got.
-			return result, nil
+			return nil, internalRPCError(err.Error(),
+				"handleGetStakeVersionInfo")
 		}
 	}
 

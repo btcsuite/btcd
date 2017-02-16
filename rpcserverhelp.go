@@ -409,7 +409,7 @@ var helpDescsEnUS = map[string]string{
 	"getstakedifficultyresult-next":    "The calculated stake difficulty of the next block",
 
 	// GetStakeVersionInfoCmd help.
-	"getstakeversioninfo--synopsis":           "Returns the stake versions statistics.",
+	"getstakeversioninfo--synopsis":           "Returns stake version statistics for one or more stake version intervals.",
 	"getstakeversioninfo-count":               "Number of intervals to return.",
 	"getstakeversioninforesult-currentheight": "Top of the chain height.",
 	"getstakeversioninforesult-hash":          "Top of the chain hash.",
