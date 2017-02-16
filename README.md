@@ -27,7 +27,7 @@ database optimization and other blockchain related technology improvements.
 
 ## Requirements
 
-[Go](http://golang.org) 1.6 or newer.
+[Go](http://golang.org) 1.7 or newer.
 
 ## Getting Started
 

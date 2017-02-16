@@ -388,8 +388,8 @@ func TestNewCmdErrors(t *testing.T) {
 	for i, test := range tests {
 		_, err := dcrjson.NewCmd(test.method, test.args...)
 		if reflect.TypeOf(err) != reflect.TypeOf(test.err) {
-			t.Errorf("Test #%d (%s) wrong error - got %T (%[2]v), "+
-				"want %T", i, test.name, err, test.err)
+			t.Errorf("Test #%d (%s) wrong error type - got `%T` (%v), want `%T`",
+				i, test.name, err, err, test.err)
 			continue
 		}
 		gotErrorCode := err.(dcrjson.Error).Code
@@ -436,8 +436,8 @@ func TestMarshalCmdErrors(t *testing.T) {
 	for i, test := range tests {
 		_, err := dcrjson.MarshalCmd(test.id, test.cmd)
 		if reflect.TypeOf(err) != reflect.TypeOf(test.err) {
-			t.Errorf("Test #%d (%s) wrong error - got %T (%[2]v), "+
-				"want %T", i, test.name, err, test.err)
+			t.Errorf("Test #%d (%s) wrong error type - got `%T` (%v), want `%T`",
+				i, test.name, err, err, test.err)
 			continue
 		}
 		gotErrorCode := err.(dcrjson.Error).Code
@@ -505,8 +505,8 @@ func TestUnmarshalCmdErrors(t *testing.T) {
 	for i, test := range tests {
 		_, err := dcrjson.UnmarshalCmd(&test.request)
 		if reflect.TypeOf(err) != reflect.TypeOf(test.err) {
-			t.Errorf("Test #%d (%s) wrong error - got %T (%[2]v), "+
-				"want %T", i, test.name, err, test.err)
+			t.Errorf("Test #%d (%s) wrong error type - got `%T` (%v), want `%T`",
+				i, test.name, err, err, test.err)
 			continue
 		}
 		gotErrorCode := err.(dcrjson.Error).Code
