@@ -657,6 +657,47 @@ func (r FutureGetStakeVersionsResult) Receive() (*dcrjson.GetStakeVersionsResult
 	return &gsvr, nil
 }
 
+// GetStakeVersionInfoAsync returns an instance of a type that can be used to
+// get the result of the RPC at some future time by invoking the Receive
+// function on the returned instance.
+//
+// See GetStakeVersionInfo for the blocking version and more details.
+//
+// NOTE: This is a dcrd extension.
+func (c *Client) GetStakeVersionInfoAsync(count int32) FutureGetStakeVersionInfoResult {
+	cmd := dcrjson.NewGetStakeVersionInfoCmd(count)
+	return c.sendCmd(cmd)
+}
+
+// GetStakeVersionInfo returns the stake versions results for past requested intervals (count).
+//
+// NOTE: This is a dcrd extension.
+func (c *Client) GetStakeVersionInfo(count int32) (*dcrjson.GetStakeVersionInfoResult, error) {
+	return c.GetStakeVersionInfoAsync(count).Receive()
+}
+
+// FutureGetStakeVersionInfoResult is a future promise to deliver the result of a
+// GetStakeVersionInfoAsync RPC invocation (or an applicable error).
+type FutureGetStakeVersionInfoResult chan *response
+
+// Receive waits for the response promised by the future and returns the network
+// the server is running on.
+func (r FutureGetStakeVersionInfoResult) Receive() (*dcrjson.GetStakeVersionInfoResult, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal result as a dcrjson.GetStakeVersionInfoResult.
+	var gsvr dcrjson.GetStakeVersionInfoResult
+	err = json.Unmarshal(res, &gsvr)
+	if err != nil {
+		return nil, err
+	}
+
+	return &gsvr, nil
+}
+
 // GetStakeVersionsAsync returns an instance of a type that can be used to
 // get the result of the RPC at some future time by invoking the Receive
 // function on the returned instance.
@@ -669,7 +710,7 @@ func (c *Client) GetStakeVersionsAsync(hash string, count int32) FutureGetStakeV
 	return c.sendCmd(cmd)
 }
 
-// GetStakeVersions returns the current and next stake difficulty.
+// GetStakeVersions returns the stake versions and vote versions of past requested blocks.
 //
 // NOTE: This is a dcrd extension.
 func (c *Client) GetStakeVersions(hash string, count int32) (*dcrjson.GetStakeVersionsResult, error) {
