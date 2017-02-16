@@ -134,7 +134,7 @@ func TestNoQuorum(t *testing.T) {
 		hash := header.BlockHash()
 		node := newBlockNode(header, &hash, 0,
 			[]chainhash.Hash{}, []chainhash.Hash{},
-			[]uint32{}, []voteVersionTuple{})
+			[]voteVersionTuple{})
 		node.height = int64(currentHeight)
 		node.parent = currentNode
 
@@ -173,14 +173,12 @@ func TestNoQuorum(t *testing.T) {
 		hash := header.BlockHash()
 		node := newBlockNode(header, &hash, 0,
 			[]chainhash.Hash{}, []chainhash.Hash{},
-			[]uint32{}, []voteVersionTuple{})
+			[]voteVersionTuple{})
 		node.height = int64(currentHeight)
 		node.parent = currentNode
 
 		// set stake versions and vote bits
 		for x := 0; x < int(params.TicketsPerBlock); x++ {
-			node.voterVersions = append(node.voterVersions,
-				posVersion)
 			node.votes = append(node.votes, voteVersionTuple{
 				version: posVersion,
 				bits:    0x01})
@@ -223,14 +221,12 @@ func TestNoQuorum(t *testing.T) {
 		hash := header.BlockHash()
 		node := newBlockNode(header, &hash, 0,
 			[]chainhash.Hash{}, []chainhash.Hash{},
-			[]uint32{}, []voteVersionTuple{})
+			[]voteVersionTuple{})
 		node.height = int64(currentHeight)
 		node.parent = currentNode
 
 		// set stake versions and vote bits
 		for x := 0; x < int(params.TicketsPerBlock); x++ {
-			node.voterVersions = append(node.voterVersions,
-				posVersion)
 			v := voteVersionTuple{
 				version: posVersion,
 				bits:    0x01,
@@ -279,14 +275,12 @@ func TestNoQuorum(t *testing.T) {
 		hash := header.BlockHash()
 		node := newBlockNode(header, &hash, 0,
 			[]chainhash.Hash{}, []chainhash.Hash{},
-			[]uint32{}, []voteVersionTuple{})
+			[]voteVersionTuple{})
 		node.height = int64(currentHeight)
 		node.parent = currentNode
 
 		// set stake versions and vote bits
 		for x := 0; x < int(params.TicketsPerBlock); x++ {
-			node.voterVersions = append(node.voterVersions,
-				posVersion)
 			v := voteVersionTuple{
 				version: posVersion,
 				bits:    0x01,
@@ -345,14 +339,12 @@ func TestNoQuorum(t *testing.T) {
 		hash := header.BlockHash()
 		node := newBlockNode(header, &hash, 0,
 			[]chainhash.Hash{}, []chainhash.Hash{},
-			[]uint32{}, []voteVersionTuple{})
+			[]voteVersionTuple{})
 		node.height = int64(currentHeight)
 		node.parent = currentNode
 
 		// set stake versions and vote bits
 		for x := 0; x < int(params.TicketsPerBlock); x++ {
-			node.voterVersions = append(node.voterVersions,
-				posVersion)
 			v := voteVersionTuple{
 				version: posVersion,
 				bits:    0x01,
@@ -426,7 +418,7 @@ func TestYesQuorum(t *testing.T) {
 		hash := header.BlockHash()
 		node := newBlockNode(header, &hash, 0,
 			[]chainhash.Hash{}, []chainhash.Hash{},
-			[]uint32{}, []voteVersionTuple{})
+			[]voteVersionTuple{})
 		node.height = int64(currentHeight)
 		node.parent = currentNode
 
@@ -465,14 +457,12 @@ func TestYesQuorum(t *testing.T) {
 		hash := header.BlockHash()
 		node := newBlockNode(header, &hash, 0,
 			[]chainhash.Hash{}, []chainhash.Hash{},
-			[]uint32{}, []voteVersionTuple{})
+			[]voteVersionTuple{})
 		node.height = int64(currentHeight)
 		node.parent = currentNode
 
 		// set stake versions and vote bits
 		for x := 0; x < int(params.TicketsPerBlock); x++ {
-			node.voterVersions = append(node.voterVersions,
-				posVersion)
 			node.votes = append(node.votes, voteVersionTuple{
 				version: posVersion,
 				bits:    0x01})
@@ -515,14 +505,12 @@ func TestYesQuorum(t *testing.T) {
 		hash := header.BlockHash()
 		node := newBlockNode(header, &hash, 0,
 			[]chainhash.Hash{}, []chainhash.Hash{},
-			[]uint32{}, []voteVersionTuple{})
+			[]voteVersionTuple{})
 		node.height = int64(currentHeight)
 		node.parent = currentNode
 
 		// set stake versions and vote bits
 		for x := 0; x < int(params.TicketsPerBlock); x++ {
-			node.voterVersions = append(node.voterVersions,
-				posVersion)
 			v := voteVersionTuple{
 				version: posVersion,
 				bits:    0x01,
@@ -571,14 +559,12 @@ func TestYesQuorum(t *testing.T) {
 		hash := header.BlockHash()
 		node := newBlockNode(header, &hash, 0,
 			[]chainhash.Hash{}, []chainhash.Hash{},
-			[]uint32{}, []voteVersionTuple{})
+			[]voteVersionTuple{})
 		node.height = int64(currentHeight)
 		node.parent = currentNode
 
 		// set stake versions and vote bits
 		for x := 0; x < int(params.TicketsPerBlock); x++ {
-			node.voterVersions = append(node.voterVersions,
-				posVersion)
 			v := voteVersionTuple{
 				version: posVersion,
 				bits:    0x01,
@@ -637,14 +623,12 @@ func TestYesQuorum(t *testing.T) {
 		hash := header.BlockHash()
 		node := newBlockNode(header, &hash, 0,
 			[]chainhash.Hash{}, []chainhash.Hash{},
-			[]uint32{}, []voteVersionTuple{})
+			[]voteVersionTuple{})
 		node.height = int64(currentHeight)
 		node.parent = currentNode
 
 		// set stake versions and vote bits
 		for x := 0; x < int(params.TicketsPerBlock); x++ {
-			node.voterVersions = append(node.voterVersions,
-				posVersion)
 			v := voteVersionTuple{
 				version: posVersion,
 				bits:    0x01,
@@ -1194,14 +1178,12 @@ func TestVoting(t *testing.T) {
 				hash := header.BlockHash()
 				node := newBlockNode(header, &hash, 0,
 					[]chainhash.Hash{}, []chainhash.Hash{},
-					[]uint32{}, []voteVersionTuple{})
+					[]voteVersionTuple{})
 				node.height = int64(currentHeight)
 				node.parent = currentNode
 
 				// set stake versions and vote bits
 				for x := 0; x < int(params.TicketsPerBlock); x++ {
-					node.voterVersions = append(node.voterVersions,
-						test.startStakeVersion)
 					node.votes = append(node.votes,
 						test.voteBitsCounts[k].vote)
 				}
@@ -1463,14 +1445,12 @@ func TestVotingParallel(t *testing.T) {
 				hash := header.BlockHash()
 				node := newBlockNode(header, &hash, 0,
 					[]chainhash.Hash{}, []chainhash.Hash{},
-					[]uint32{}, []voteVersionTuple{})
+					[]voteVersionTuple{})
 				node.height = int64(currentHeight)
 				node.parent = currentNode
 
 				// set stake versions and vote bits
 				for x := 0; x < int(params.TicketsPerBlock); x++ {
-					node.voterVersions = append(node.voterVersions,
-						test.startStakeVersion)
 					node.votes = append(node.votes,
 						test.voteBitsCounts[k].vote)
 				}

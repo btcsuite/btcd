@@ -100,10 +100,7 @@ type blockNode struct {
 	ticketsSpent   []chainhash.Hash
 	ticketsRevoked []chainhash.Hash
 
-	// Keep track of all voter versions in this block.
-	voterVersions []uint32
-
-	// Keep track of all vote bits in this block.
+	// Keep track of all vote version and bits in this block.
 	votes []voteVersionTuple
 }
 
@@ -111,7 +108,7 @@ type blockNode struct {
 // completely disconnected from the chain and the workSum value is just the work
 // for the passed block.  The work sum is updated accordingly when the node is
 // inserted into a chain.
-func newBlockNode(blockHeader *wire.BlockHeader, blockHash *chainhash.Hash, height int64, ticketsSpent []chainhash.Hash, ticketsRevoked []chainhash.Hash, voterVersions []uint32, votes []voteVersionTuple) *blockNode {
+func newBlockNode(blockHeader *wire.BlockHeader, blockHash *chainhash.Hash, height int64, ticketsSpent []chainhash.Hash, ticketsRevoked []chainhash.Hash, votes []voteVersionTuple) *blockNode {
 	// Make a copy of the hash so the node doesn't keep a reference to part
 	// of the full block/block header preventing it from being garbage
 	// collected.
@@ -122,7 +119,6 @@ func newBlockNode(blockHeader *wire.BlockHeader, blockHash *chainhash.Hash, heig
 		header:         *blockHeader,
 		ticketsSpent:   ticketsSpent,
 		ticketsRevoked: ticketsRevoked,
-		voterVersions:  voterVersions,
 		votes:          votes,
 	}
 	return &node
@@ -308,11 +304,11 @@ func (b *BlockChain) GetStakeVersions(hash *chainhash.Hash, count int32) ([]Stak
 			BlockVersion: prevNode.header.Version,
 			StakeVersion: prevNode.header.StakeVersion,
 			StakeVersions: make([]uint32, 0,
-				len(prevNode.voterVersions)),
+				len(prevNode.votes)),
 		}
 
-		for _, version := range prevNode.voterVersions {
-			sv.StakeVersions = append(sv.StakeVersions, version)
+		for _, v := range prevNode.votes {
+			sv.StakeVersions = append(sv.StakeVersions, v.version)
 		}
 
 		result = append(result, sv)
@@ -601,7 +597,6 @@ func (b *BlockChain) loadBlockNode(dbTx database.Tx, hash *chainhash.Hash) (*blo
 	blockHeader := block.MsgBlock().Header
 	node := newBlockNode(&blockHeader, hash, int64(blockHeader.Height),
 		ticketsSpentInBlock(block), ticketsRevokedInBlock(block),
-		voteVersionsInBlock(block, b.chainParams),
 		voteBitsInBlock(block))
 	node.inMainChain = true
 	prevHash := &blockHeader.PrevBlock

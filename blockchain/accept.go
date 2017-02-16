@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/decred/dcrd/blockchain/stake"
-	"github.com/decred/dcrd/chaincfg"
 	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/txscript"
 	"github.com/decred/dcrutil"
@@ -209,19 +208,6 @@ func ticketsRevokedInBlock(bl *dcrutil.Block) []chainhash.Hash {
 	return tickets
 }
 
-// voteVersionsInBlock returns all versions in a block.
-func voteVersionsInBlock(bl *dcrutil.Block, params *chaincfg.Params) []uint32 {
-	versions := make([]uint32, 0, params.TicketsPerBlock)
-	for _, stx := range bl.MsgBlock().STransactions {
-		if is, _ := stake.IsSSGen(stx); !is {
-			continue
-		}
-		versions = append(versions, stake.SSGenVersion(stx))
-	}
-
-	return versions
-}
-
 // voteBitsInBlock returns a list of vote bits for the voters in this block.
 func voteBitsInBlock(bl *dcrutil.Block) []voteVersionTuple {
 	var voteBits []voteVersionTuple
@@ -290,7 +276,6 @@ func (b *BlockChain) maybeAcceptBlock(block *dcrutil.Block,
 	blockHeader := &block.MsgBlock().Header
 	newNode := newBlockNode(blockHeader, block.Hash(), blockHeight,
 		ticketsSpentInBlock(block), ticketsRevokedInBlock(block),
-		voteVersionsInBlock(block, b.chainParams),
 		voteBitsInBlock(block))
 	if prevNode != nil {
 		newNode.parent = prevNode
