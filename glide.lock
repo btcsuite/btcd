@@ -1,12 +1,12 @@
 hash: 07e0c3b630a43e1398956ecc13ffc56ab6f53590a2f04d7bec19634ba7b77f96
-updated: 2017-02-13T19:53:18.424106937Z
+updated: 2017-02-16T14:43:25.458626654Z
 imports:
 - name: github.com/btcsuite/btclog
   version: 73889fb79bd687870312b6e40effcecffbd57d30
 - name: github.com/btcsuite/go-flags
   version: 6c288d648c1cc1befcb90cb5511dcacf64ae8e61
 - name: github.com/btcsuite/go-socks
-  version: cfe8b59e565c1a5bd4e2005d77cd9aa8b2e14524
+  version: 4720035b7bfd2a9bb130b1c184f8bbe41b6f0d0f
   subpackages:
   - socks
 - name: github.com/btcsuite/golangcrypto
@@ -62,11 +62,11 @@ imports:
   subpackages:
   - edwards25519
 - name: golang.org/x/crypto
-  version: c3b1d0d6d8690eaebe3064711b026770cc37efa3
+  version: 453249f01cfeb54c3d549ddb75ff152ca243f9d8
   subpackages:
   - ssh/terminal
 - name: golang.org/x/sys
-  version: d75a52659825e75fff6158388dddc6a5b04f9ba5
+  version: e24f485414aeafb646f6fca458b0bf869c0880a1
   subpackages:
   - unix
 testImports:
