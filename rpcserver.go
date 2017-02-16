@@ -254,6 +254,7 @@ var rpcLimited = map[string]struct{}{
 	"getblock":              {},
 	"getblockcount":         {},
 	"getblockhash":          {},
+	"getblockheader":        {},
 	"getcurrentnet":         {},
 	"getdifficulty":         {},
 	"getheaders":            {},
