@@ -12,6 +12,28 @@ type GetStakeDifficultyResult struct {
 	NextStakeDifficulty    float64 `json:"next"`
 }
 
+// VersionCount models a generic version:count tupple.
+type VersionCount struct {
+	Version uint32 `json:"version"`
+	Count   uint32 `json:"count"`
+}
+
+// VersionInterval models a cooked version count for an interval.
+type VersionInterval struct {
+	StartHeight  int64          `json:"startheight"`
+	EndHeight    int64          `json:"endheight"`
+	PoSVersions  []VersionCount `json:"posversions"`
+	VoteVersions []VersionCount `json:"voteversions"`
+}
+
+// GetStakeVersionInfoResult models the resulting data for getstakeversioninfo
+// command.
+type GetStakeVersionInfoResult struct {
+	CurrentHeight int64             `json:"currentheight"`
+	Hash          string            `json:"hash"`
+	Intervals     []VersionInterval `json:"intervals"`
+}
+
 // StakeVersions models the data for GetStakeVersionsResult.
 type StakeVersions struct {
 	Hash          string   `json:"hash"`
@@ -27,6 +49,7 @@ type GetStakeVersionsResult struct {
 	StakeVersions []StakeVersions `json:"stakeversions"`
 }
 
+// Choice models an individual choice inside an Agenda.
 type Choice struct {
 	Id          string  `json:"id"`
 	Description string  `json:"description"`
@@ -37,7 +60,7 @@ type Choice struct {
 	Progress    float64 `json:"progress"`
 }
 
-// Agenda
+// Agenda models an individual agenda including it's choices.
 type Agenda struct {
 	Id             string   `json:"id"`
 	Description    string   `json:"description"`

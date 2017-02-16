@@ -215,6 +215,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"getrawmempool":         handleGetRawMempool,
 	"getrawtransaction":     handleGetRawTransaction,
 	"getstakedifficulty":    handleGetStakeDifficulty,
+	"getstakeversioninfo":   handleGetStakeVersionInfo,
 	"getstakeversions":      handleGetStakeVersions,
 	"getticketpoolvalue":    handleGetTicketPoolValue,
 	"getvoteinfo":           handleGetVoteInfo,
@@ -3841,6 +3842,98 @@ func handleGetStakeDifficulty(s *rpcServer, cmd interface{}, closeChan <-chan st
 	}
 
 	return sDiffResult, nil
+}
+
+// convertVersionMap translates a map[int]int into a sorted array of
+// VersionCount that contains the same information.
+func convertVersionMap(m map[int]int) []dcrjson.VersionCount {
+	sorted := make([]dcrjson.VersionCount, 0, len(m))
+	order := make([]int, 0, len(m))
+	for k := range m {
+		order = append(order, k)
+	}
+	sort.Ints(order)
+
+	for _, v := range order {
+		sorted = append(sorted, dcrjson.VersionCount{Version: uint32(v),
+			Count: uint32(m[v])})
+	}
+
+	return sorted
+}
+
+// handleGetStakeVersionInfo implements the getstakeversioninfo command.
+func handleGetStakeVersionInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	count := int32(0)
+	c, ok := cmd.(*dcrjson.GetStakeVersionInfoCmd)
+	if !ok {
+		return nil, internalRPCError("Invalid command",
+			"handleGetStakeVersionInfo")
+	}
+	if c.Count != nil {
+		count = *c.Count
+	}
+	if count == 0 {
+		count = 1
+	}
+
+	snapshot := s.chain.BestSnapshot()
+
+	interval := int64(s.server.chainParams.StakeVersionInterval)
+	// Assemble JSON result.
+	result := dcrjson.GetStakeVersionInfoResult{
+		CurrentHeight: snapshot.Height,
+		Hash:          snapshot.Hash.String(),
+		Intervals:     make([]dcrjson.VersionInterval, 0, count),
+	}
+
+	startHeight := snapshot.Height
+	endHeight := s.chain.CalcWantHeight(interval,
+		snapshot.Height) + 1
+	hash := snapshot.Hash
+	adjust := int32(1) // we are off by one on the initial iteration.
+	for i := int32(0); i < count; i++ {
+		numBlocks := int32(startHeight - endHeight)
+		if numBlocks <= 0 {
+			// Just return what we got.
+			return result, nil
+		}
+		sv, err := s.chain.GetStakeVersions(hash, numBlocks+adjust)
+		if err != nil {
+			// Just return what we got.
+			return result, nil
+		}
+
+		posVersions := make(map[int]int)
+		voteVersions := make(map[int]int)
+		for _, v := range sv {
+			posVersions[int(v.StakeVersion)]++
+			for _, version := range v.StakeVersions {
+				voteVersions[int(version)]++
+			}
+		}
+		versionInterval := dcrjson.VersionInterval{
+			StartHeight:  endHeight,
+			EndHeight:    startHeight,
+			PoSVersions:  convertVersionMap(posVersions),
+			VoteVersions: convertVersionMap(voteVersions),
+		}
+		result.Intervals = append(result.Intervals, versionInterval)
+
+		// Adjust interval.
+		endHeight -= interval
+		startHeight = endHeight + interval
+		adjust = 0
+
+		// Get prior block hash.
+		hash, err = s.chain.BlockHashByHeight(startHeight - 1)
+		if err != nil {
+			// Just return what we got.
+			return result, nil
+		}
+	}
+
+	return result, nil
 }
 
 // handleGetStakeVersions implements the getstakeversions command.

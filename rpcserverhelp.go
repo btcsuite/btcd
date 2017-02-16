@@ -408,6 +408,19 @@ var helpDescsEnUS = map[string]string{
 	"getstakedifficultyresult-current": "The current top block's stake difficulty",
 	"getstakedifficultyresult-next":    "The calculated stake difficulty of the next block",
 
+	// GetStakeVersionInfoCmd help.
+	"getstakeversioninfo--synopsis":           "Returns the stake versions statistics.",
+	"getstakeversioninfo-count":               "Number of intervals to return.",
+	"getstakeversioninforesult-currentheight": "Top of the chain height.",
+	"getstakeversioninforesult-hash":          "Top of the chain hash.",
+	"getstakeversioninforesult-intervals":     "Array of total stake and vote counts.",
+	"versioncount-count":                      "Number of votes.",
+	"versioncount-version":                    "Version of the vote.",
+	"versioninterval-startheight":             "Start of the interval.",
+	"versioninterval-endheight":               "End of the interval.",
+	"versioninterval-voteversions":            "Tally of all vote versions.",
+	"versioninterval-posversions":             "Tally of the stake versions.",
+
 	// GetStakeDifficultyCmd help.
 	"getstakeversions--synopsis":           "Returns the stake versions statistics.",
 	"getstakeversions-hash":                "The start block hash.",
@@ -881,6 +894,7 @@ var rpcResultTypes = map[string][]interface{}{
 	"getcurrentnet":         {(*uint32)(nil)},
 	"getdifficulty":         {(*float64)(nil)},
 	"getstakedifficulty":    {(*dcrjson.GetStakeDifficultyResult)(nil)},
+	"getstakeversioninfo":   {(*dcrjson.GetStakeVersionInfoResult)(nil)},
 	"getstakeversions":      {(*dcrjson.GetStakeVersionsResult)(nil)},
 	"getgenerate":           {(*bool)(nil)},
 	"gethashespersec":       {(*float64)(nil)},
