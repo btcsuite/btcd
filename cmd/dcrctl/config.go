@@ -109,7 +109,6 @@ type config struct {
 	SimNet        bool   `long:"simnet" description:"Connect to the simulation test network"`
 	TLSSkipVerify bool   `long:"skipverify" description:"Do not verify tls certificates (not recommended!)"`
 	Wallet        bool   `long:"wallet" description:"Connect to wallet"`
-	Terminal      bool   `long:"terminal" description:"Allow interactive use in a terminal"`
 }
 
 // normalizeAddress returns addr with the passed default port appended if

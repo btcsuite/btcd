@@ -51,10 +51,6 @@ func main() {
 	if err != nil {
 		os.Exit(1)
 	}
-	if cfg.Terminal {
-		startTerminal(cfg)
-		os.Exit(1)
-	}
 
 	if len(args) < 1 {
 		usage("No command specified")

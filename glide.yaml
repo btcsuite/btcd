@@ -36,9 +36,6 @@ import:
 - package: github.com/decred/ed25519
   subpackages:
   - edwards25519
-- package: golang.org/x/crypto
-  subpackages:
-  - ssh/terminal
 testImport:
 - package: github.com/stretchr/testify
   version: ^1.1.0
