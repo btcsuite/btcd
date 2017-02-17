@@ -4023,6 +4023,28 @@ func handleGetVoteInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 
 	result.Agendas = make([]dcrjson.Agenda, 0, len(vi.Agendas))
 	for _, agenda := range vi.Agendas {
+		a := dcrjson.Agenda{
+			Id:          agenda.Vote.Id,
+			Description: agenda.Vote.Description,
+			Mask:        agenda.Vote.Mask,
+			Choices: make([]dcrjson.Choice, 0,
+				len(agenda.Vote.Choices)),
+			StartTime:  agenda.StartTime,
+			ExpireTime: agenda.ExpireTime,
+		}
+
+		// Handle choices.
+		for _, choice := range agenda.Vote.Choices {
+			c := dcrjson.Choice{
+				Id:          choice.Id,
+				Description: choice.Description,
+				Bits:        choice.Bits,
+				IsIgnore:    choice.IsIgnore,
+				IsNo:        choice.IsNo,
+			}
+			a.Choices = append(a.Choices, c)
+		}
+
 		// Obtain status of agenda.
 		state, err := s.chain.ThresholdState(snapshot.Hash, c.Version,
 			agenda.Vote.Id)
@@ -4030,41 +4052,33 @@ func handleGetVoteInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 			return nil, err
 		}
 
+		// Save off status.
+		a.Status = state.String()
+
+		if state.State != blockchain.ThresholdStarted {
+			// Append transformed agenda without progress.
+			result.Agendas = append(result.Agendas, a)
+			continue
+		}
+
 		counts, err := s.chain.GetVoteCounts(c.Version, agenda.Vote.Id)
 		if err != nil {
 			return nil, err
 		}
 
+		// Calculate quorum.
 		qmin := quorum
 		totalNonIgnore := counts.Total - counts.TotalIgnore
 		if totalNonIgnore < quorum {
 			qmin = totalNonIgnore
 		}
-		a := dcrjson.Agenda{
-			Id:          agenda.Vote.Id,
-			Description: agenda.Vote.Description,
-			Mask:        agenda.Vote.Mask,
-			Choices: make([]dcrjson.Choice, 0,
-				len(agenda.Vote.Choices)),
-			StartTime:      agenda.StartTime,
-			ExpireTime:     agenda.ExpireTime,
-			Status:         state.String(),
-			QuorumProgress: float64(qmin) / float64(quorum),
-		}
+		a.QuorumProgress = float64(qmin) / float64(quorum)
 
-		// Handle choices.
-		for k, choice := range agenda.Vote.Choices {
-			c := dcrjson.Choice{
-				Id:          choice.Id,
-				Description: choice.Description,
-				Bits:        choice.Bits,
-				IsIgnore:    choice.IsIgnore,
-				IsNo:        choice.IsNo,
-				Count:       counts.VoteChoices[k],
-				Progress: float64(counts.VoteChoices[k]) /
-					float64(counts.Total),
-			}
-			a.Choices = append(a.Choices, c)
+		// Calcualte choice progress.
+		for k := range a.Choices {
+			a.Choices[k].Count = counts.VoteChoices[k]
+			a.Choices[k].Progress = float64(counts.VoteChoices[k]) /
+				float64(counts.Total)
 		}
 
 		// Append transformed agenda.
