@@ -27,9 +27,9 @@ const (
 )
 
 // appBuild is defined as a variable so it can be overridden during the build
-// process with '-ldflags "-X main.appBuild foo' if needed.  It MUST only
+// process with '-ldflags "-X main.appBuild=foo' if needed.  It MUST only
 // contain characters from semanticAlphabet per the semantic versioning spec.
-var appBuild string
+var appBuild = "dev"
 
 // version returns the application version as a properly formed string per the
 // semantic versioning 2.0.0 spec (http://semver.org/).
