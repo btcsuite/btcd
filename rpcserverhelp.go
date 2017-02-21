@@ -430,7 +430,9 @@ var helpDescsEnUS = map[string]string{
 	"stakeversions-height":                 "Height of the block.",
 	"stakeversions-blockversion":           "The block version",
 	"stakeversions-stakeversion":           "The stake version of the block",
-	"stakeversions-voterversions":          "The version of each vote in the block",
+	"stakeversions-votes":                  "The version and bits of each vote in the block",
+	"versionbits-version":                  "The version of the vote.",
+	"versionbits-bits":                     "The bits assigned by the vote.",
 
 	// GetVoteInfo
 	"getvoteinfo--synopsis":           "Returns the vote info statistics.",

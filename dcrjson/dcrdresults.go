@@ -34,13 +34,19 @@ type GetStakeVersionInfoResult struct {
 	Intervals     []VersionInterval `json:"intervals"`
 }
 
+// VersionBits models a generic version:bits tuple.
+type VersionBits struct {
+	Version uint32 `json:"version"`
+	Bits    uint16 `json:"bits"`
+}
+
 // StakeVersions models the data for GetStakeVersionsResult.
 type StakeVersions struct {
-	Hash          string   `json:"hash"`
-	Height        int64    `json:"height"`
-	BlockVersion  int32    `json:"blockversion"`
-	StakeVersion  uint32   `json:"stakeversion"`
-	VoterVersions []uint32 `json:"voterversions"`
+	Hash         string        `json:"hash"`
+	Height       int64         `json:"height"`
+	BlockVersion int32         `json:"blockversion"`
+	StakeVersion uint32        `json:"stakeversion"`
+	Votes        []VersionBits `json:"votes"`
 }
 
 // GetStakeVersionsResult models the data returned from the getstakeversions

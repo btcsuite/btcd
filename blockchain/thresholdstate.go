@@ -535,14 +535,14 @@ func (b *BlockChain) getVoteCounts(node *blockNode, version uint32, d chaincfg.C
 	for countNode.height > height {
 		for _, vote := range countNode.votes {
 			// Wrong versions do not count.
-			if vote.version != version {
+			if vote.Version != version {
 				continue
 			}
 
 			// Increase total votes.
 			result.Total++
 
-			index := d.Vote.VoteIndex(vote.bits)
+			index := d.Vote.VoteIndex(vote.Bits)
 			if index == -1 {
 				result.TotalIgnore++
 				continue
@@ -602,7 +602,7 @@ func (b *BlockChain) CountVoteVersion(version uint32) (uint32, error) {
 	for countNode.height > height {
 		for _, vote := range countNode.votes {
 			// Wrong versions do not count.
-			if vote.version != version {
+			if vote.Version != version {
 				continue
 			}
 

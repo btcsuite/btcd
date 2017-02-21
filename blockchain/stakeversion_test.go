@@ -110,7 +110,7 @@ func newFakeNode(blockVersion int32, height int64, currentNode *blockNode) *bloc
 		Nonce:   0,
 	}
 	node := newBlockNode(header, &chainhash.Hash{}, 0, []chainhash.Hash{},
-		[]chainhash.Hash{}, []voteVersionTuple{})
+		[]chainhash.Hash{}, []VoteVersionTuple{})
 	node.height = height
 	node.parent = currentNode
 
@@ -151,7 +151,7 @@ func TestCalcStakeVersionCorners(t *testing.T) {
 		// Set stake versions.
 		for x := uint16(0); x < params.TicketsPerBlock; x++ {
 			node.votes = append(node.votes,
-				voteVersionTuple{version: 2})
+				VoteVersionTuple{Version: 2})
 		}
 
 		sv, err := bc.calcStakeVersionByNode(currentNode)
@@ -184,7 +184,7 @@ func TestCalcStakeVersionCorners(t *testing.T) {
 		// Set stake versions.
 		for x := uint16(0); x < params.TicketsPerBlock; x++ {
 			node.votes = append(node.votes,
-				voteVersionTuple{version: 4})
+				VoteVersionTuple{Version: 4})
 		}
 
 		sv, err := bc.calcStakeVersionByNode(currentNode)
@@ -219,7 +219,7 @@ func TestCalcStakeVersionCorners(t *testing.T) {
 		// Set stake versions.
 		for x := uint16(0); x < params.TicketsPerBlock; x++ {
 			node.votes = append(node.votes,
-				voteVersionTuple{version: 2})
+				VoteVersionTuple{Version: 2})
 		}
 
 		sv, err := bc.calcStakeVersionByNode(currentNode)
@@ -255,7 +255,7 @@ func TestCalcStakeVersionCorners(t *testing.T) {
 		// Set stake versions.
 		for x := uint16(0); x < params.TicketsPerBlock; x++ {
 			node.votes = append(node.votes,
-				voteVersionTuple{version: 5})
+				VoteVersionTuple{Version: 5})
 		}
 
 		sv, err := bc.calcStakeVersionByNode(currentNode)
@@ -294,7 +294,7 @@ func TestCalcStakeVersionCorners(t *testing.T) {
 		// Set stake versions.
 		for x := uint16(0); x < params.TicketsPerBlock; x++ {
 			node.votes = append(node.votes,
-				voteVersionTuple{version: 4})
+				VoteVersionTuple{Version: 4})
 		}
 
 		sv, err := bc.calcStakeVersionByNode(currentNode)
@@ -333,7 +333,7 @@ func TestCalcStakeVersionCorners(t *testing.T) {
 		// Set stake versions.
 		for x := uint16(0); x < params.TicketsPerBlock; x++ {
 			node.votes = append(node.votes,
-				voteVersionTuple{version: 4})
+				VoteVersionTuple{Version: 4})
 		}
 
 		sv, err := bc.calcStakeVersionByNode(currentNode)
@@ -383,7 +383,7 @@ func TestCalcStakeVersionByNode(t *testing.T) {
 					// set voter versions
 					for x := 0; x < int(params.TicketsPerBlock); x++ {
 						b.votes = append(b.votes,
-							voteVersionTuple{version: 3})
+							VoteVersionTuple{Version: 3})
 					}
 
 					// set header stake version
@@ -402,7 +402,7 @@ func TestCalcStakeVersionByNode(t *testing.T) {
 					// set voter versions
 					for x := 0; x < int(params.TicketsPerBlock); x++ {
 						b.votes = append(b.votes,
-							voteVersionTuple{version: 2})
+							VoteVersionTuple{Version: 2})
 					}
 
 					// set header stake version
@@ -430,7 +430,7 @@ func TestCalcStakeVersionByNode(t *testing.T) {
 			}
 			node := newBlockNode(header, &chainhash.Hash{}, 0,
 				[]chainhash.Hash{}, []chainhash.Hash{},
-				[]voteVersionTuple{})
+				[]VoteVersionTuple{})
 			node.height = i
 			node.parent = currentNode
 
@@ -505,7 +505,7 @@ func TestIsStakeMajorityVersion(t *testing.T) {
 				if int64(b.header.Height) > params.StakeValidationHeight {
 					for x := 0; x < int(params.TicketsPerBlock); x++ {
 						b.votes = append(b.votes,
-							voteVersionTuple{version: 2})
+							VoteVersionTuple{Version: 2})
 					}
 				}
 			},
@@ -525,7 +525,7 @@ func TestIsStakeMajorityVersion(t *testing.T) {
 				if int64(b.header.Height) < params.StakeValidationHeight+params.StakeVersionInterval {
 					for x := 0; x < int(params.TicketsPerBlock); x++ {
 						b.votes = append(b.votes,
-							voteVersionTuple{version: 1})
+							VoteVersionTuple{Version: 1})
 					}
 					return
 				}
@@ -538,7 +538,7 @@ func TestIsStakeMajorityVersion(t *testing.T) {
 						v = 2
 					}
 					b.votes = append(b.votes,
-						voteVersionTuple{version: v})
+						VoteVersionTuple{Version: v})
 					ticketCount++
 				}
 			},
@@ -558,7 +558,7 @@ func TestIsStakeMajorityVersion(t *testing.T) {
 				if int64(b.header.Height) < params.StakeValidationHeight+params.StakeVersionInterval {
 					for x := 0; x < int(params.TicketsPerBlock); x++ {
 						b.votes = append(b.votes,
-							voteVersionTuple{version: 1})
+							VoteVersionTuple{Version: 1})
 					}
 					return
 				}
@@ -571,7 +571,7 @@ func TestIsStakeMajorityVersion(t *testing.T) {
 						v = 2
 					}
 					b.votes = append(b.votes,
-						voteVersionTuple{version: v})
+						VoteVersionTuple{Version: v})
 					ticketCount++
 				}
 			},
@@ -591,7 +591,7 @@ func TestIsStakeMajorityVersion(t *testing.T) {
 				if int64(b.header.Height) < params.StakeValidationHeight+params.StakeVersionInterval {
 					for x := 0; x < int(params.TicketsPerBlock); x++ {
 						b.votes = append(b.votes,
-							voteVersionTuple{version: 1})
+							VoteVersionTuple{Version: 1})
 					}
 					return
 				}
@@ -604,7 +604,7 @@ func TestIsStakeMajorityVersion(t *testing.T) {
 						v = 2
 					}
 					b.votes = append(b.votes,
-						voteVersionTuple{version: v})
+						VoteVersionTuple{Version: v})
 					ticketCount++
 				}
 			},
@@ -624,14 +624,14 @@ func TestIsStakeMajorityVersion(t *testing.T) {
 				if int64(b.header.Height) < params.StakeValidationHeight+params.StakeVersionInterval {
 					for x := 0; x < int(params.TicketsPerBlock); x++ {
 						b.votes = append(b.votes,
-							voteVersionTuple{version: 1})
+							VoteVersionTuple{Version: 1})
 					}
 					return
 				}
 
 				for x := 0; x < int(params.TicketsPerBlock); x++ {
 					b.votes = append(b.votes,
-						voteVersionTuple{version: uint32(x) % 5})
+						VoteVersionTuple{Version: uint32(x) % 5})
 				}
 			},
 			startStakeVersion:    1,
@@ -649,7 +649,7 @@ func TestIsStakeMajorityVersion(t *testing.T) {
 
 				for x := 0; x < int(params.TicketsPerBlock); x++ {
 					b.votes = append(b.votes,
-						voteVersionTuple{version: uint32(x) % 5})
+						VoteVersionTuple{Version: uint32(x) % 5})
 				}
 			},
 			startStakeVersion:    1,
@@ -668,7 +668,7 @@ func TestIsStakeMajorityVersion(t *testing.T) {
 				if int64(b.header.Height) < params.StakeValidationHeight+params.StakeVersionInterval {
 					for x := 0; x < int(params.TicketsPerBlock-2); x++ {
 						b.votes = append(b.votes,
-							voteVersionTuple{version: 1})
+							VoteVersionTuple{Version: 1})
 					}
 					return
 				}
@@ -681,7 +681,7 @@ func TestIsStakeMajorityVersion(t *testing.T) {
 						v = 2
 					}
 					b.votes = append(b.votes,
-						voteVersionTuple{version: v})
+						VoteVersionTuple{Version: v})
 					ticketCount++
 				}
 			},
@@ -701,7 +701,7 @@ func TestIsStakeMajorityVersion(t *testing.T) {
 				if int64(b.header.Height) < params.StakeValidationHeight+params.StakeVersionInterval {
 					for x := 0; x < int(params.TicketsPerBlock-2); x++ {
 						b.votes = append(b.votes,
-							voteVersionTuple{version: 1})
+							VoteVersionTuple{Version: 1})
 					}
 					return
 				}
@@ -714,7 +714,7 @@ func TestIsStakeMajorityVersion(t *testing.T) {
 						v = 2
 					}
 					b.votes = append(b.votes,
-						voteVersionTuple{version: v})
+						VoteVersionTuple{Version: v})
 					ticketCount++
 				}
 			},
@@ -734,7 +734,7 @@ func TestIsStakeMajorityVersion(t *testing.T) {
 				if int64(b.header.Height) < params.StakeValidationHeight+params.StakeVersionInterval {
 					for x := 0; x < int(params.TicketsPerBlock-2); x++ {
 						b.votes = append(b.votes,
-							voteVersionTuple{version: 1})
+							VoteVersionTuple{Version: 1})
 					}
 					return
 				}
@@ -747,7 +747,7 @@ func TestIsStakeMajorityVersion(t *testing.T) {
 						v = 2
 					}
 					b.votes = append(b.votes,
-						voteVersionTuple{version: v})
+						VoteVersionTuple{Version: v})
 					ticketCount++
 				}
 			},
@@ -768,7 +768,7 @@ func TestIsStakeMajorityVersion(t *testing.T) {
 				if int64(b.header.Height) < params.StakeValidationHeight+params.StakeVersionInterval {
 					for x := 0; x < int(params.TicketsPerBlock-2); x++ {
 						b.votes = append(b.votes,
-							voteVersionTuple{version: 1})
+							VoteVersionTuple{Version: 1})
 					}
 					return
 				}
@@ -781,7 +781,7 @@ func TestIsStakeMajorityVersion(t *testing.T) {
 						v = 2
 					}
 					b.votes = append(b.votes,
-						voteVersionTuple{version: v})
+						VoteVersionTuple{Version: v})
 					ticketCount++
 				}
 			},
@@ -815,7 +815,7 @@ func TestIsStakeMajorityVersion(t *testing.T) {
 			}
 			node := newBlockNode(header, &chainhash.Hash{}, 0,
 				[]chainhash.Hash{}, []chainhash.Hash{},
-				[]voteVersionTuple{})
+				[]VoteVersionTuple{})
 			node.height = i
 			node.parent = currentNode
 
@@ -825,7 +825,7 @@ func TestIsStakeMajorityVersion(t *testing.T) {
 			} else {
 				for x := 0; x < int(params.TicketsPerBlock); x++ {
 					node.votes = append(node.votes,
-						voteVersionTuple{version: test.startStakeVersion})
+						VoteVersionTuple{Version: test.startStakeVersion})
 				}
 			}
 

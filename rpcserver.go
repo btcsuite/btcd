@@ -3909,8 +3909,8 @@ func handleGetStakeVersionInfo(s *rpcServer, cmd interface{}, closeChan <-chan s
 		voteVersions := make(map[int]int)
 		for _, v := range sv {
 			posVersions[int(v.StakeVersion)]++
-			for _, version := range v.StakeVersions {
-				voteVersions[int(version)]++
+			for _, vote := range v.Votes {
+				voteVersions[int(vote.Version)]++
 			}
 		}
 		versionInterval := dcrjson.VersionInterval{
@@ -3959,14 +3959,17 @@ func handleGetStakeVersions(s *rpcServer, cmd interface{}, closeChan <-chan stru
 	}
 	for _, v := range sv {
 		nsv := dcrjson.StakeVersions{
-			Hash:          v.Hash.String(),
-			Height:        v.Height,
-			BlockVersion:  v.BlockVersion,
-			StakeVersion:  v.StakeVersion,
-			VoterVersions: make([]uint32, 0, len(v.StakeVersions)),
+			Hash:         v.Hash.String(),
+			Height:       v.Height,
+			BlockVersion: v.BlockVersion,
+			StakeVersion: v.StakeVersion,
+			Votes: make([]dcrjson.VersionBits, 0,
+				len(v.Votes)),
 		}
-		for _, version := range v.StakeVersions {
-			nsv.VoterVersions = append(nsv.VoterVersions, version)
+		for _, vote := range v.Votes {
+			nsv.Votes = append(nsv.Votes,
+				dcrjson.VersionBits{Version: vote.Version,
+					Bits: vote.Bits})
 		}
 
 		result.StakeVersions = append(result.StakeVersions, nsv)

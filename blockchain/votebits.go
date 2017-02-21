@@ -116,12 +116,12 @@ func (c deploymentChecker) Condition(node *blockNode, version uint32) ([]thresho
 	}
 
 	for _, vote := range node.votes {
-		if version != vote.version {
+		if version != vote.Version {
 			// Wrong version, ignore.
 			continue
 		}
 
-		tally[c.deployment.Vote.Mask&vote.bits>>shift].count += 1
+		tally[c.deployment.Vote.Mask&vote.Bits>>shift].count += 1
 	}
 
 	return tally, nil

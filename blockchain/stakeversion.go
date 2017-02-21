@@ -100,7 +100,7 @@ func (b *BlockChain) isVoterMajorityVersion(minVer uint32, prevNode *blockNode) 
 	for i := int64(0); i < b.chainParams.StakeVersionInterval && iterNode != nil; i++ {
 		totalVotesFound += int32(len(iterNode.votes))
 		for _, v := range iterNode.votes {
-			if v.version >= minVer {
+			if v.Version >= minVer {
 				versionCount += 1
 			}
 		}
@@ -225,7 +225,7 @@ func (b *BlockChain) calcVoterVersionInterval(prevNode *blockNode) (uint32, erro
 	for i := int64(0); i < b.chainParams.StakeVersionInterval && iterNode != nil; i++ {
 		totalVotesFound += int32(len(iterNode.votes))
 		for _, v := range iterNode.votes {
-			versions[v.version]++
+			versions[v.Version]++
 		}
 
 		iterNode, err = b.getPrevNodeFromNode(iterNode)

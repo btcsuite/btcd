@@ -209,16 +209,16 @@ func ticketsRevokedInBlock(bl *dcrutil.Block) []chainhash.Hash {
 }
 
 // voteBitsInBlock returns a list of vote bits for the voters in this block.
-func voteBitsInBlock(bl *dcrutil.Block) []voteVersionTuple {
-	var voteBits []voteVersionTuple
+func voteBitsInBlock(bl *dcrutil.Block) []VoteVersionTuple {
+	var voteBits []VoteVersionTuple
 	for _, stx := range bl.MsgBlock().STransactions {
 		if is, _ := stake.IsSSGen(stx); !is {
 			continue
 		}
 
-		voteBits = append(voteBits, voteVersionTuple{
-			version: stake.SSGenVersion(stx),
-			bits:    stake.SSGenVoteBits(stx),
+		voteBits = append(voteBits, VoteVersionTuple{
+			Version: stake.SSGenVersion(stx),
+			Bits:    stake.SSGenVoteBits(stx),
 		})
 	}
 

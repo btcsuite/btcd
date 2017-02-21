@@ -1322,7 +1322,7 @@ func (b *BlockChain) createChainState() error {
 	genesisBlock := dcrutil.NewBlock(b.chainParams.GenesisBlock)
 	header := &genesisBlock.MsgBlock().Header
 	node := newBlockNode(header, genesisBlock.Hash(), 0, []chainhash.Hash{},
-		[]chainhash.Hash{}, []voteVersionTuple{})
+		[]chainhash.Hash{}, []VoteVersionTuple{})
 	node.inMainChain = true
 	b.bestNode = node
 

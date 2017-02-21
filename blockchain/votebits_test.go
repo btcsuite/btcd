@@ -134,7 +134,7 @@ func TestNoQuorum(t *testing.T) {
 		hash := header.BlockHash()
 		node := newBlockNode(header, &hash, 0,
 			[]chainhash.Hash{}, []chainhash.Hash{},
-			[]voteVersionTuple{})
+			[]VoteVersionTuple{})
 		node.height = int64(currentHeight)
 		node.parent = currentNode
 
@@ -173,15 +173,15 @@ func TestNoQuorum(t *testing.T) {
 		hash := header.BlockHash()
 		node := newBlockNode(header, &hash, 0,
 			[]chainhash.Hash{}, []chainhash.Hash{},
-			[]voteVersionTuple{})
+			[]VoteVersionTuple{})
 		node.height = int64(currentHeight)
 		node.parent = currentNode
 
 		// set stake versions and vote bits
 		for x := 0; x < int(params.TicketsPerBlock); x++ {
-			node.votes = append(node.votes, voteVersionTuple{
-				version: posVersion,
-				bits:    0x01})
+			node.votes = append(node.votes, VoteVersionTuple{
+				Version: posVersion,
+				Bits:    0x01})
 		}
 
 		currentNode = node
@@ -221,18 +221,18 @@ func TestNoQuorum(t *testing.T) {
 		hash := header.BlockHash()
 		node := newBlockNode(header, &hash, 0,
 			[]chainhash.Hash{}, []chainhash.Hash{},
-			[]voteVersionTuple{})
+			[]VoteVersionTuple{})
 		node.height = int64(currentHeight)
 		node.parent = currentNode
 
 		// set stake versions and vote bits
 		for x := 0; x < int(params.TicketsPerBlock); x++ {
-			v := voteVersionTuple{
-				version: posVersion,
-				bits:    0x01,
+			v := VoteVersionTuple{
+				Version: posVersion,
+				Bits:    0x01,
 			}
 			if voteCount < params.RuleChangeActivationQuorum-1 {
-				v.bits = 0x05 // vote no
+				v.Bits = 0x05 // vote no
 			}
 			node.votes = append(node.votes, v)
 			voteCount++
@@ -275,27 +275,27 @@ func TestNoQuorum(t *testing.T) {
 		hash := header.BlockHash()
 		node := newBlockNode(header, &hash, 0,
 			[]chainhash.Hash{}, []chainhash.Hash{},
-			[]voteVersionTuple{})
+			[]VoteVersionTuple{})
 		node.height = int64(currentHeight)
 		node.parent = currentNode
 
 		// set stake versions and vote bits
 		for x := 0; x < int(params.TicketsPerBlock); x++ {
-			v := voteVersionTuple{
-				version: posVersion,
-				bits:    0x01,
+			v := VoteVersionTuple{
+				Version: posVersion,
+				Bits:    0x01,
 			}
 			// 119 yes, 41 no -> 120 == 75% and 120 reaches quorum
 			quorum := params.RuleChangeActivationQuorum*
 				params.RuleChangeActivationMultiplier/
 				params.RuleChangeActivationDivisor - 1
 			if voteCount < quorum {
-				v.bits = 0x05 // vote no
+				v.Bits = 0x05 // vote no
 			} else {
 				if voteCount < params.RuleChangeActivationQuorum {
-					v.bits = 0x03 // vote yes
+					v.Bits = 0x03 // vote yes
 				} else {
-					v.bits = 0x01 // ignore
+					v.Bits = 0x01 // ignore
 				}
 			}
 			node.votes = append(node.votes, v)
@@ -339,27 +339,27 @@ func TestNoQuorum(t *testing.T) {
 		hash := header.BlockHash()
 		node := newBlockNode(header, &hash, 0,
 			[]chainhash.Hash{}, []chainhash.Hash{},
-			[]voteVersionTuple{})
+			[]VoteVersionTuple{})
 		node.height = int64(currentHeight)
 		node.parent = currentNode
 
 		// set stake versions and vote bits
 		for x := 0; x < int(params.TicketsPerBlock); x++ {
-			v := voteVersionTuple{
-				version: posVersion,
-				bits:    0x01,
+			v := VoteVersionTuple{
+				Version: posVersion,
+				Bits:    0x01,
 			}
 			// 120 yes, 40 no -> 120 == 75% and 120 reaches quorum
 			quorum := params.RuleChangeActivationQuorum *
 				params.RuleChangeActivationMultiplier /
 				params.RuleChangeActivationDivisor
 			if voteCount < quorum {
-				v.bits = 0x05 // vote no
+				v.Bits = 0x05 // vote no
 			} else {
 				if voteCount < params.RuleChangeActivationQuorum {
-					v.bits = 0x03 // vote yes
+					v.Bits = 0x03 // vote yes
 				} else {
-					v.bits = 0x01 // ignore
+					v.Bits = 0x01 // ignore
 				}
 			}
 			node.votes = append(node.votes, v)
@@ -418,7 +418,7 @@ func TestYesQuorum(t *testing.T) {
 		hash := header.BlockHash()
 		node := newBlockNode(header, &hash, 0,
 			[]chainhash.Hash{}, []chainhash.Hash{},
-			[]voteVersionTuple{})
+			[]VoteVersionTuple{})
 		node.height = int64(currentHeight)
 		node.parent = currentNode
 
@@ -457,15 +457,15 @@ func TestYesQuorum(t *testing.T) {
 		hash := header.BlockHash()
 		node := newBlockNode(header, &hash, 0,
 			[]chainhash.Hash{}, []chainhash.Hash{},
-			[]voteVersionTuple{})
+			[]VoteVersionTuple{})
 		node.height = int64(currentHeight)
 		node.parent = currentNode
 
 		// set stake versions and vote bits
 		for x := 0; x < int(params.TicketsPerBlock); x++ {
-			node.votes = append(node.votes, voteVersionTuple{
-				version: posVersion,
-				bits:    0x01})
+			node.votes = append(node.votes, VoteVersionTuple{
+				Version: posVersion,
+				Bits:    0x01})
 		}
 
 		currentNode = node
@@ -505,18 +505,18 @@ func TestYesQuorum(t *testing.T) {
 		hash := header.BlockHash()
 		node := newBlockNode(header, &hash, 0,
 			[]chainhash.Hash{}, []chainhash.Hash{},
-			[]voteVersionTuple{})
+			[]VoteVersionTuple{})
 		node.height = int64(currentHeight)
 		node.parent = currentNode
 
 		// set stake versions and vote bits
 		for x := 0; x < int(params.TicketsPerBlock); x++ {
-			v := voteVersionTuple{
-				version: posVersion,
-				bits:    0x01,
+			v := VoteVersionTuple{
+				Version: posVersion,
+				Bits:    0x01,
 			}
 			if voteCount < params.RuleChangeActivationQuorum-1 {
-				v.bits = 0x03 // vote yes
+				v.Bits = 0x03 // vote yes
 			}
 			node.votes = append(node.votes, v)
 			voteCount++
@@ -559,27 +559,27 @@ func TestYesQuorum(t *testing.T) {
 		hash := header.BlockHash()
 		node := newBlockNode(header, &hash, 0,
 			[]chainhash.Hash{}, []chainhash.Hash{},
-			[]voteVersionTuple{})
+			[]VoteVersionTuple{})
 		node.height = int64(currentHeight)
 		node.parent = currentNode
 
 		// set stake versions and vote bits
 		for x := 0; x < int(params.TicketsPerBlock); x++ {
-			v := voteVersionTuple{
-				version: posVersion,
-				bits:    0x01,
+			v := VoteVersionTuple{
+				Version: posVersion,
+				Bits:    0x01,
 			}
 			// 119 yes, 41 no -> 120 == 75% and 120 reaches quorum
 			quorum := params.RuleChangeActivationQuorum*
 				params.RuleChangeActivationMultiplier/
 				params.RuleChangeActivationDivisor - 1
 			if voteCount < quorum {
-				v.bits = 0x03 // vote yes
+				v.Bits = 0x03 // vote yes
 			} else {
 				if voteCount < params.RuleChangeActivationQuorum {
-					v.bits = 0x05 // vote no
+					v.Bits = 0x05 // vote no
 				} else {
-					v.bits = 0x01 // ignore
+					v.Bits = 0x01 // ignore
 				}
 			}
 			node.votes = append(node.votes, v)
@@ -623,27 +623,27 @@ func TestYesQuorum(t *testing.T) {
 		hash := header.BlockHash()
 		node := newBlockNode(header, &hash, 0,
 			[]chainhash.Hash{}, []chainhash.Hash{},
-			[]voteVersionTuple{})
+			[]VoteVersionTuple{})
 		node.height = int64(currentHeight)
 		node.parent = currentNode
 
 		// set stake versions and vote bits
 		for x := 0; x < int(params.TicketsPerBlock); x++ {
-			v := voteVersionTuple{
-				version: posVersion,
-				bits:    0x01,
+			v := VoteVersionTuple{
+				Version: posVersion,
+				Bits:    0x01,
 			}
 			// 120 yes, 40 no -> 120 == 75% and 120 reaches quorum
 			quorum := params.RuleChangeActivationQuorum *
 				params.RuleChangeActivationMultiplier /
 				params.RuleChangeActivationDivisor
 			if voteCount < quorum {
-				v.bits = 0x03 // vote yes
+				v.Bits = 0x03 // vote yes
 			} else {
 				if voteCount < params.RuleChangeActivationQuorum {
-					v.bits = 0x05 // vote no
+					v.Bits = 0x05 // vote no
 				} else {
-					v.bits = 0x01 // ignore
+					v.Bits = 0x01 // ignore
 				}
 			}
 			node.votes = append(node.votes, v)
@@ -678,7 +678,7 @@ func TestVoting(t *testing.T) {
 	params := defaultParams()
 
 	type voteCount struct {
-		vote  voteVersionTuple
+		vote  VoteVersionTuple
 		count uint32
 	}
 
@@ -697,9 +697,9 @@ func TestVoting(t *testing.T) {
 			startStakeVersion: posVersion,
 			voteBitsCounts: []voteCount{
 				{
-					vote: voteVersionTuple{
-						version: posVersion,
-						bits:    0x01},
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x01},
 					count: uint32(params.StakeValidationHeight) - 1,
 				},
 			},
@@ -717,21 +717,21 @@ func TestVoting(t *testing.T) {
 			startStakeVersion: posVersion - 1,
 			voteBitsCounts: []voteCount{
 				{
-					vote: voteVersionTuple{
-						version: posVersion,
-						bits:    0x01},
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x01},
 					count: uint32(params.StakeValidationHeight),
 				},
 				{
-					vote: voteVersionTuple{
-						version: posVersion,
-						bits:    0x01},
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x01},
 					count: params.RuleChangeActivationInterval - 1,
 				},
 				{
-					vote: voteVersionTuple{
-						version: posVersion,
-						bits:    0x03},
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x03},
 					count: params.RuleChangeActivationInterval,
 				},
 			},
@@ -757,27 +757,27 @@ func TestVoting(t *testing.T) {
 			startStakeVersion: posVersion + 1,
 			voteBitsCounts: []voteCount{
 				{
-					vote: voteVersionTuple{
-						version: posVersion,
-						bits:    0x01},
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x01},
 					count: uint32(params.StakeValidationHeight),
 				},
 				{
-					vote: voteVersionTuple{
-						version: posVersion,
-						bits:    0x01},
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x01},
 					count: params.RuleChangeActivationInterval - 1,
 				},
 				{
-					vote: voteVersionTuple{
-						version: posVersion,
-						bits:    0x03},
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x03},
 					count: params.RuleChangeActivationInterval,
 				},
 				{
-					vote: voteVersionTuple{
-						version: posVersion,
-						bits:    0x03},
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x03},
 					count: params.RuleChangeActivationInterval,
 				},
 			},
@@ -807,21 +807,21 @@ func TestVoting(t *testing.T) {
 			startStakeVersion: posVersion,
 			voteBitsCounts: []voteCount{
 				{
-					vote: voteVersionTuple{
-						version: posVersion,
-						bits:    0x01},
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x01},
 					count: uint32(params.StakeValidationHeight),
 				},
 				{
-					vote: voteVersionTuple{
-						version: posVersion,
-						bits:    0x01},
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x01},
 					count: params.RuleChangeActivationInterval - 1,
 				},
 				{
-					vote: voteVersionTuple{
-						version: posVersion,
-						bits:    0x03},
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x03},
 					count: params.RuleChangeActivationInterval,
 				},
 			},
@@ -847,27 +847,27 @@ func TestVoting(t *testing.T) {
 			startStakeVersion: posVersion,
 			voteBitsCounts: []voteCount{
 				{
-					vote: voteVersionTuple{
-						version: posVersion,
-						bits:    0x01},
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x01},
 					count: uint32(params.StakeValidationHeight),
 				},
 				{
-					vote: voteVersionTuple{
-						version: posVersion,
-						bits:    0x01},
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x01},
 					count: params.RuleChangeActivationInterval - 1,
 				},
 				{
-					vote: voteVersionTuple{
-						version: posVersion,
-						bits:    0x03},
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x03},
 					count: params.RuleChangeActivationInterval,
 				},
 				{
-					vote: voteVersionTuple{
-						version: posVersion,
-						bits:    0x03},
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x03},
 					count: params.RuleChangeActivationInterval,
 				},
 			},
@@ -897,40 +897,40 @@ func TestVoting(t *testing.T) {
 			startStakeVersion: posVersion,
 			voteBitsCounts: []voteCount{
 				{
-					vote: voteVersionTuple{
-						version: posVersion + 1,
-						bits:    0x01},
+					vote: VoteVersionTuple{
+						Version: posVersion + 1,
+						Bits:    0x01},
 					count: uint32(params.StakeValidationHeight),
 				},
 				{
-					vote: voteVersionTuple{
-						version: posVersion + 1,
-						bits:    0x01},
+					vote: VoteVersionTuple{
+						Version: posVersion + 1,
+						Bits:    0x01},
 					count: params.RuleChangeActivationInterval - 1,
 				}, {
-					vote: voteVersionTuple{
-						version: posVersion + 1,
-						bits:    0x03},
+					vote: VoteVersionTuple{
+						Version: posVersion + 1,
+						Bits:    0x03},
 					count: params.RuleChangeActivationInterval,
 				}, {
-					vote: voteVersionTuple{
-						version: posVersion + 1,
-						bits:    0x03},
+					vote: VoteVersionTuple{
+						Version: posVersion + 1,
+						Bits:    0x03},
 					count: params.RuleChangeActivationInterval,
 				}, {
-					vote: voteVersionTuple{
-						version: posVersion,
-						bits:    0x03},
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x03},
 					count: params.RuleChangeActivationInterval,
 				}, {
-					vote: voteVersionTuple{
-						version: posVersion,
-						bits:    0x03},
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x03},
 					count: params.RuleChangeActivationInterval,
 				}, {
-					vote: voteVersionTuple{
-						version: posVersion + 1,
-						bits:    0x01},
+					vote: VoteVersionTuple{
+						Version: posVersion + 1,
+						Bits:    0x01},
 					count: params.RuleChangeActivationInterval,
 				},
 			},
@@ -972,30 +972,30 @@ func TestVoting(t *testing.T) {
 			startStakeVersion: posVersion,
 			voteBitsCounts: []voteCount{
 				{
-					vote: voteVersionTuple{
-						version: posVersion,
-						bits:    0x01},
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x01},
 					count: uint32(params.StakeValidationHeight),
 				},
 				{
-					vote: voteVersionTuple{
-						version: posVersion,
-						bits:    0x01},
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x01},
 					count: params.RuleChangeActivationInterval - 1,
 				}, {
-					vote: voteVersionTuple{
-						version: posVersion,
-						bits:    0x03},
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x03},
 					count: params.RuleChangeActivationInterval,
 				}, {
-					vote: voteVersionTuple{
-						version: posVersion,
-						bits:    0x03},
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x03},
 					count: params.RuleChangeActivationInterval,
 				}, {
-					vote: voteVersionTuple{
-						version: posVersion,
-						bits:    0x01},
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x01},
 					count: params.RuleChangeActivationInterval,
 				},
 			},
@@ -1029,30 +1029,30 @@ func TestVoting(t *testing.T) {
 			startStakeVersion: posVersion,
 			voteBitsCounts: []voteCount{
 				{
-					vote: voteVersionTuple{
-						version: posVersion,
-						bits:    0x01},
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x01},
 					count: uint32(params.StakeValidationHeight),
 				},
 				{
-					vote: voteVersionTuple{
-						version: posVersion,
-						bits:    0x01},
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x01},
 					count: params.RuleChangeActivationInterval - 1,
 				}, {
-					vote: voteVersionTuple{
-						version: posVersion,
-						bits:    0x05},
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x05},
 					count: params.RuleChangeActivationInterval,
 				}, {
-					vote: voteVersionTuple{
-						version: posVersion,
-						bits:    0x05},
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x05},
 					count: params.RuleChangeActivationInterval,
 				}, {
-					vote: voteVersionTuple{
-						version: posVersion,
-						bits:    0x01},
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x01},
 					count: params.RuleChangeActivationInterval,
 				},
 			},
@@ -1086,30 +1086,30 @@ func TestVoting(t *testing.T) {
 			startStakeVersion: posVersion,
 			voteBitsCounts: []voteCount{
 				{
-					vote: voteVersionTuple{
-						version: posVersion,
-						bits:    0x01},
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x01},
 					count: uint32(params.StakeValidationHeight),
 				},
 				{
-					vote: voteVersionTuple{
-						version: posVersion,
-						bits:    0x01},
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x01},
 					count: params.RuleChangeActivationInterval - 1,
 				}, {
-					vote: voteVersionTuple{
-						version: posVersion,
-						bits:    0x01},
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x01},
 					count: params.RuleChangeActivationInterval,
 				}, {
-					vote: voteVersionTuple{
-						version: posVersion,
-						bits:    0x01},
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x01},
 					count: params.RuleChangeActivationInterval,
 				}, {
-					vote: voteVersionTuple{
-						version: posVersion,
-						bits:    0x01},
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x01},
 					count: params.RuleChangeActivationInterval,
 				},
 			},
@@ -1178,7 +1178,7 @@ func TestVoting(t *testing.T) {
 				hash := header.BlockHash()
 				node := newBlockNode(header, &hash, 0,
 					[]chainhash.Hash{}, []chainhash.Hash{},
-					[]voteVersionTuple{})
+					[]VoteVersionTuple{})
 				node.height = int64(currentHeight)
 				node.parent = currentNode
 
@@ -1304,7 +1304,7 @@ func TestVotingParallel(t *testing.T) {
 	params := defaultParallelParams()
 
 	type voteCount struct {
-		vote  voteVersionTuple
+		vote  VoteVersionTuple
 		count uint32
 	}
 
@@ -1323,35 +1323,35 @@ func TestVotingParallel(t *testing.T) {
 			startStakeVersion: posVersion,
 			voteBitsCounts: []voteCount{
 				{
-					vote: voteVersionTuple{
-						version: posVersion,
-						bits:    0x01},
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x01},
 					count: uint32(params.StakeValidationHeight),
 				},
 				{
-					vote: voteVersionTuple{
-						version: posVersion,
-						bits:    0x01},
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x01},
 					count: params.RuleChangeActivationInterval - 1,
 				}, {
-					vote: voteVersionTuple{
-						version: posVersion - 1,
-						bits:    vbTestDummy1Yes | vbTestDummy2No},
+					vote: VoteVersionTuple{
+						Version: posVersion - 1,
+						Bits:    vbTestDummy1Yes | vbTestDummy2No},
 					count: params.RuleChangeActivationInterval,
 				}, {
-					vote: voteVersionTuple{
-						version: posVersion,
-						bits:    vbTestDummy1Yes | vbTestDummy2No},
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    vbTestDummy1Yes | vbTestDummy2No},
 					count: params.RuleChangeActivationInterval,
 				}, {
-					vote: voteVersionTuple{
-						version: posVersion,
-						bits:    0x01},
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x01},
 					count: params.RuleChangeActivationInterval,
 				}, {
-					vote: voteVersionTuple{
-						version: posVersion,
-						bits:    0x01},
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x01},
 					count: params.RuleChangeActivationInterval,
 				},
 			},
@@ -1445,7 +1445,7 @@ func TestVotingParallel(t *testing.T) {
 				hash := header.BlockHash()
 				node := newBlockNode(header, &hash, 0,
 					[]chainhash.Hash{}, []chainhash.Hash{},
-					[]voteVersionTuple{})
+					[]VoteVersionTuple{})
 				node.height = int64(currentHeight)
 				node.parent = currentNode
 

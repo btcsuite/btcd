@@ -51,11 +51,11 @@ const (
 	maxSearchDepth = 2880
 )
 
-// voteVersionTuple contains the extracted vote bits and version from votes
+// VoteVersionTuple contains the extracted vote bits and version from votes
 // (SSGen).
-type voteVersionTuple struct {
-	version uint32
-	bits    uint16
+type VoteVersionTuple struct {
+	Version uint32
+	Bits    uint16
 }
 
 // blockNode represents a block within the block chain and is primarily used to
@@ -101,14 +101,14 @@ type blockNode struct {
 	ticketsRevoked []chainhash.Hash
 
 	// Keep track of all vote version and bits in this block.
-	votes []voteVersionTuple
+	votes []VoteVersionTuple
 }
 
 // newBlockNode returns a new block node for the given block header.  It is
 // completely disconnected from the chain and the workSum value is just the work
 // for the passed block.  The work sum is updated accordingly when the node is
 // inserted into a chain.
-func newBlockNode(blockHeader *wire.BlockHeader, blockHash *chainhash.Hash, height int64, ticketsSpent []chainhash.Hash, ticketsRevoked []chainhash.Hash, votes []voteVersionTuple) *blockNode {
+func newBlockNode(blockHeader *wire.BlockHeader, blockHash *chainhash.Hash, height int64, ticketsSpent []chainhash.Hash, ticketsRevoked []chainhash.Hash, votes []VoteVersionTuple) *blockNode {
 	// Make a copy of the hash so the node doesn't keep a reference to part
 	// of the full block/block header preventing it from being garbage
 	// collected.
@@ -277,11 +277,11 @@ type BlockChain struct {
 // StakeVersions is a condensed form of a dcrutil.Block that is used to prevent
 // using gigabytes of memory.
 type StakeVersions struct {
-	Hash          chainhash.Hash
-	Height        int64
-	BlockVersion  int32
-	StakeVersion  uint32
-	StakeVersions []uint32
+	Hash         chainhash.Hash
+	Height       int64
+	BlockVersion int32
+	StakeVersion uint32
+	Votes        []VoteVersionTuple
 }
 
 // GetStakeVersions returns a cooked array of StakeVersions.  We do this in
@@ -303,12 +303,7 @@ func (b *BlockChain) GetStakeVersions(hash *chainhash.Hash, count int32) ([]Stak
 			Height:       prevNode.height,
 			BlockVersion: prevNode.header.Version,
 			StakeVersion: prevNode.header.StakeVersion,
-			StakeVersions: make([]uint32, 0,
-				len(prevNode.votes)),
-		}
-
-		for _, v := range prevNode.votes {
-			sv.StakeVersions = append(sv.StakeVersions, v.version)
+			Votes:        prevNode.votes,
 		}
 
 		result = append(result, sv)
