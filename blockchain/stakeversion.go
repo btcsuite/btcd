@@ -5,6 +5,7 @@
 package blockchain
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
 
@@ -17,6 +18,16 @@ var (
 	errStakeVersionMajorityNotFound = errors.New("stake version majority " +
 		"not found")
 )
+
+// stakeMajorityCacheVersionKey creates a map key that is comprised of a stake
+// version and a hash.  This is used for caches that require a version in
+// addition to a simple hash.
+func stakeMajorityCacheVersionKey(version uint32, hash *chainhash.Hash) [stakeMajorityCacheKeySize]byte {
+	key := [stakeMajorityCacheKeySize]byte{}
+	binary.LittleEndian.PutUint32(key[0:], version)
+	copy(key[4:], hash[:])
+	return key
+}
 
 // calcWantHeight calculates the height of the final block of the previous
 // interval given a stake validation height, stake validation interval, and
@@ -91,6 +102,12 @@ func (b *BlockChain) isVoterMajorityVersion(minVer uint32, prevNode *blockNode) 
 		return 0 >= minVer
 	}
 
+	// Generate map key and look up cached result.
+	key := stakeMajorityCacheVersionKey(minVer, &node.hash)
+	if result, ok := b.isVoterMajorityVersionCache[key]; ok {
+		return result
+	}
+
 	// Tally both the total number of votes in the previous stake version validation
 	// interval and how many of those votes are at least the requested minimum
 	// version.
@@ -116,7 +133,11 @@ func (b *BlockChain) isVoterMajorityVersion(minVer uint32, prevNode *blockNode) 
 	numRequired := totalVotesFound * b.chainParams.StakeMajorityMultiplier /
 		b.chainParams.StakeMajorityDivisor
 
-	return versionCount >= numRequired
+	// Cache value.
+	result := versionCount >= numRequired
+	b.isVoterMajorityVersionCache[key] = result
+
+	return result
 }
 
 // isStakeMajorityVersion determines if minVer requirement is met based on
@@ -137,6 +158,12 @@ func (b *BlockChain) isStakeMajorityVersion(minVer uint32, prevNode *blockNode) 
 		return 0 >= minVer
 	}
 
+	// Generate map key and look up cached result.
+	key := stakeMajorityCacheVersionKey(minVer, &node.hash)
+	if result, ok := b.isStakeMajorityVersionCache[key]; ok {
+		return result
+	}
+
 	// Tally how many of the block headers in the previous stake version validation
 	// interval have their stake version set to at least the requested minimum
 	// version.
@@ -150,6 +177,7 @@ func (b *BlockChain) isStakeMajorityVersion(minVer uint32, prevNode *blockNode) 
 		var err error
 		iterNode, err = b.getPrevNodeFromNode(iterNode)
 		if err != nil {
+			b.isStakeMajorityVersionCache[key] = false
 			return false
 		}
 	}
@@ -159,7 +187,11 @@ func (b *BlockChain) isStakeMajorityVersion(minVer uint32, prevNode *blockNode) 
 		b.chainParams.StakeMajorityMultiplier /
 		b.chainParams.StakeMajorityDivisor
 
-	return versionCount >= numRequired
+	// Cache result.
+	result := versionCount >= numRequired
+	b.isStakeMajorityVersionCache[key] = result
+
+	return result
 }
 
 // calcPriorStakeVersion calculates the header stake version of the prior
@@ -175,6 +207,11 @@ func (b *BlockChain) calcPriorStakeVersion(prevNode *blockNode) (uint32, error) 
 	}
 	if node == nil {
 		return 0, nil
+	}
+
+	// Check cache.
+	if result, ok := b.calcPriorStakeVersionCache[node.hash]; ok {
+		return result, nil
 	}
 
 	// Tally how many of each stake version the block headers in the previous stake
@@ -198,6 +235,7 @@ func (b *BlockChain) calcPriorStakeVersion(prevNode *blockNode) (uint32, error) 
 
 	for version, count := range versions {
 		if count >= numRequired {
+			b.calcPriorStakeVersionCache[node.hash] = version
 			return version, nil
 		}
 	}
@@ -217,6 +255,13 @@ func (b *BlockChain) calcVoterVersionInterval(prevNode *blockNode) (uint32, erro
 	// Note that we are NOT checking if we are on interval!
 	var err error
 
+	// See if we have cached results.  Note that we assume that we are on
+	// an interval.  If we are not we are going to keep way too many cache
+	// entries!
+	if result, ok := b.calcVoterVersionIntervalCache[prevNode.hash]; ok {
+		return result, nil
+	}
+
 	// Tally both the total number of votes in the previous stake version validation
 	// interval and how many of each version those votes have.
 	versions := make(map[uint32]int32) // [version][count]
@@ -234,7 +279,7 @@ func (b *BlockChain) calcVoterVersionInterval(prevNode *blockNode) (uint32, erro
 		}
 	}
 
-	// Assert wthat we have enough votes in case this function is called at
+	// Assert that we have enough votes in case this function is called at
 	// an invalid interval.
 	if int64(totalVotesFound) < b.chainParams.StakeVersionInterval*
 		(int64(b.chainParams.TicketsPerBlock/2)+1) {
@@ -250,6 +295,7 @@ func (b *BlockChain) calcVoterVersionInterval(prevNode *blockNode) (uint32, erro
 
 	for version, count := range versions {
 		if count >= numRequired {
+			b.calcVoterVersionIntervalCache[prevNode.hash] = version
 			return version, nil
 		}
 	}
@@ -311,6 +357,11 @@ func (b *BlockChain) calcStakeVersion(prevNode *blockNode) uint32 {
 		return 0
 	}
 
+	// Check cache.
+	if result, ok := b.calcStakeVersionCache[node.hash]; ok {
+		return result
+	}
+
 	// Walk chain backwards to start of node interval (start of current
 	// period) Note that calcWantHeight returns the LAST height of the
 	// prior interval; hence the + 1.
@@ -321,6 +372,7 @@ func (b *BlockChain) calcStakeVersion(prevNode *blockNode) uint32 {
 		var err error
 		iterNode, err = b.getPrevNodeFromNode(iterNode)
 		if err != nil || iterNode == nil {
+			b.calcStakeVersionCache[node.hash] = 0
 			return 0
 		}
 	}
@@ -329,19 +381,21 @@ func (b *BlockChain) calcStakeVersion(prevNode *blockNode) uint32 {
 	// wasn't enforced and therefore irrelevant.
 	if !b.isMajorityVersion(3, iterNode,
 		b.chainParams.BlockRejectNumRequired) {
+		b.calcStakeVersionCache[node.hash] = 0
 		return 0
 	}
 
+	ourVersion := version
 	if b.isStakeMajorityVersion(version, node) {
 		priorVersion, _ := b.calcPriorStakeVersion(node)
-		if version > priorVersion {
-			return version
-		} else {
-			return priorVersion
+		if version <= priorVersion {
+			ourVersion = priorVersion
 		}
 	}
 
-	return version
+	b.calcStakeVersionCache[node.hash] = ourVersion
+
+	return ourVersion
 }
 
 // calcStakeVersionByHash calculates the last prior valid majority stake

@@ -5,13 +5,27 @@
 package blockchain
 
 import (
+	"fmt"
 	"testing"
+	"time"
 
 	"github.com/decred/dcrd/chaincfg"
 	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/wire"
 	"github.com/decred/dcrutil"
 )
+
+// newFakeChain returns a chain that is usable for syntetic tests.
+func newFakeChain(params *chaincfg.Params) *BlockChain {
+	return &BlockChain{
+		chainParams:                   params,
+		isVoterMajorityVersionCache:   make(map[[stakeMajorityCacheKeySize]byte]bool),
+		isStakeMajorityVersionCache:   make(map[[stakeMajorityCacheKeySize]byte]bool),
+		calcPriorStakeVersionCache:    make(map[[chainhash.HashSize]byte]uint32),
+		calcVoterVersionIntervalCache: make(map[[chainhash.HashSize]byte]uint32),
+		calcStakeVersionCache:         make(map[[chainhash.HashSize]byte]uint32),
+	}
+}
 
 // genesisBlockNode creates a fake chain of blockNodes.  It is used for testing
 // the mechanical properties of the version code.
@@ -109,7 +123,8 @@ func newFakeNode(blockVersion int32, height int64, currentNode *blockNode) *bloc
 		Height:  uint32(height),
 		Nonce:   0,
 	}
-	node := newBlockNode(header, &chainhash.Hash{}, 0, []chainhash.Hash{},
+	hash := header.BlockHash()
+	node := newBlockNode(header, &hash, 0, []chainhash.Hash{},
 		[]chainhash.Hash{}, []VoteVersionTuple{})
 	node.height = height
 	node.parent = currentNode
@@ -121,9 +136,7 @@ func TestCalcStakeVersionCorners(t *testing.T) {
 	params := &chaincfg.SimNetParams
 	currentNode := genesisBlockNode(params)
 
-	bc := &BlockChain{
-		chainParams: params,
-	}
+	bc := newFakeChain(params)
 
 	svh := params.StakeValidationHeight
 	interval := params.StakeVersionInterval
@@ -414,10 +427,8 @@ func TestCalcStakeVersionByNode(t *testing.T) {
 		},
 	}
 
-	bc := &BlockChain{
-		chainParams: params,
-	}
 	for _, test := range tests {
+		bc := newFakeChain(params)
 		currentNode := genesisBlockNode(params)
 
 		t.Logf("running: \"%v\"\n", test.name)
@@ -428,7 +439,8 @@ func TestCalcStakeVersionByNode(t *testing.T) {
 				Height:  uint32(i),
 				Nonce:   uint32(0),
 			}
-			node := newBlockNode(header, &chainhash.Hash{}, 0,
+			hash := header.BlockHash()
+			node := newBlockNode(header, &hash, 0,
 				[]chainhash.Hash{}, []chainhash.Hash{},
 				[]VoteVersionTuple{})
 			node.height = i
@@ -793,10 +805,10 @@ func TestIsStakeMajorityVersion(t *testing.T) {
 		},
 	}
 
-	bc := &BlockChain{
-		chainParams: params,
-	}
 	for _, test := range tests {
+		// Create new BlockChain in order to blow away cache.
+		bc := newFakeChain(params)
+
 		ticketCount = 0
 
 		genesisNode := genesisBlockNode(params)
@@ -813,7 +825,8 @@ func TestIsStakeMajorityVersion(t *testing.T) {
 				Nonce:        uint32(0),
 				StakeVersion: test.startStakeVersion,
 			}
-			node := newBlockNode(header, &chainhash.Hash{}, 0,
+			hash := header.BlockHash()
+			node := newBlockNode(header, &hash, 0,
 				[]chainhash.Hash{}, []chainhash.Hash{},
 				[]VoteVersionTuple{})
 			node.height = i
@@ -846,6 +859,114 @@ func TestIsStakeMajorityVersion(t *testing.T) {
 		if version != test.expectedCalcVersion {
 			t.Fatalf("%v calcStakeVersionByNode got %v expected %v",
 				test.name, version, test.expectedCalcVersion)
+		}
+	}
+}
+
+func TestLarge(t *testing.T) {
+	params := &chaincfg.MainNetParams
+
+	numRuns := 5
+	numBlocks := params.StakeVersionInterval * 100
+	numBlocksShallow := params.StakeVersionInterval * 10
+	tests := []struct {
+		name                 string
+		numNodes             int64
+		set                  func(*blockNode)
+		blockVersion         int32
+		startStakeVersion    uint32
+		expectedStakeVersion uint32
+		expectedCalcVersion  uint32
+		result               bool
+	}{
+		{
+			name:                 "shallow cache",
+			numNodes:             numBlocksShallow,
+			startStakeVersion:    1,
+			expectedStakeVersion: 1,
+			expectedCalcVersion:  0,
+			result:               true,
+		},
+		{
+			name:                 "deep cache",
+			numNodes:             numBlocks,
+			startStakeVersion:    1,
+			expectedStakeVersion: 1,
+			expectedCalcVersion:  0,
+			result:               true,
+		},
+	}
+
+	for _, test := range tests {
+		// Create new BlockChain in order to blow away cache.
+		bc := newFakeChain(params)
+
+		genesisNode := genesisBlockNode(params)
+		genesisNode.header.StakeVersion = test.startStakeVersion
+
+		t.Logf("running: %v with %v nodes\n", test.name, test.numNodes)
+		var currentNode *blockNode
+		currentNode = genesisNode
+		for i := int64(1); i <= test.numNodes; i++ {
+			// Make up a header.
+			header := &wire.BlockHeader{
+				Version:      test.blockVersion,
+				Height:       uint32(i),
+				Nonce:        uint32(0),
+				StakeVersion: test.startStakeVersion,
+			}
+			hash := header.BlockHash()
+			node := newBlockNode(header, &hash, 0,
+				[]chainhash.Hash{}, []chainhash.Hash{},
+				[]VoteVersionTuple{})
+			node.height = i
+			node.parent = currentNode
+
+			// Override version.
+			for x := 0; x < int(params.TicketsPerBlock); x++ {
+				node.votes = append(node.votes,
+					VoteVersionTuple{Version: test.startStakeVersion})
+			}
+
+			currentNode = node
+			bc.bestNode = currentNode
+		}
+
+		for x := 0; x < numRuns; x++ {
+			start := time.Now()
+			res := bc.isVoterMajorityVersion(test.expectedStakeVersion, currentNode)
+			if res != test.result {
+				t.Fatalf("%v isVoterMajorityVersion got %v expected %v", test.name, res, test.result)
+			}
+
+			// validate calcStakeVersion
+			version, err := bc.calcStakeVersionByNode(currentNode)
+			if err != nil {
+				t.Fatalf("calcStakeVersionByNode: unexpected error: %v", err)
+			}
+			if version != test.expectedCalcVersion {
+				t.Fatalf("%v calcStakeVersionByNode got %v expected %v",
+					test.name, version, test.expectedCalcVersion)
+			}
+			end := time.Now()
+
+			setup := "setup 0"
+			if x != 0 {
+				setup = fmt.Sprintf("run %v", x)
+			}
+
+			vkey := stakeMajorityCacheKeySize + 8 // bool on x86_64
+			key := chainhash.HashSize + 4         // size of uint32
+
+			cost := len(bc.isVoterMajorityVersionCache) * vkey
+			cost += len(bc.isStakeMajorityVersionCache) * vkey
+			cost += len(bc.calcPriorStakeVersionCache) * key
+			cost += len(bc.calcVoterVersionIntervalCache) * key
+			cost += len(bc.calcStakeVersionCache) * key
+			memoryCost := fmt.Sprintf("memory cost: %v", cost)
+
+			t.Logf("run time (%v) %v %v", setup, end.Sub(start),
+				memoryCost)
 		}
 	}
 }

@@ -272,7 +272,25 @@ type BlockChain struct {
 	// so that the memory may be restored by the garbage collector if
 	// it is unlikely to be referenced in the future.
 	pruner *chainPruner
+
+	// The following maps are various caches for the stake version/voting
+	// system.  The goal of these is to reduce disk access to load blocks
+	// from disk.  Measurements indicate that it is slightly more expensive
+	// so setup the cache (<10%) vs doing a straight chain walk.  Every
+	// other subsequent call is >10x faster.
+	isVoterMajorityVersionCache   map[[stakeMajorityCacheKeySize]byte]bool
+	isStakeMajorityVersionCache   map[[stakeMajorityCacheKeySize]byte]bool
+	calcPriorStakeVersionCache    map[[chainhash.HashSize]byte]uint32
+	calcVoterVersionIntervalCache map[[chainhash.HashSize]byte]uint32
+	calcStakeVersionCache         map[[chainhash.HashSize]byte]uint32
 }
+
+const (
+	// stakeMajorityCacheKeySize is comprised of the stake version and the
+	// hash size.  The stake version is a little endian uint32, hence we
+	// add 4 to the overall size.
+	stakeMajorityCacheKeySize = 4 + chainhash.HashSize
+)
 
 // StakeVersions is a condensed form of a dcrutil.Block that is used to prevent
 // using gigabytes of memory.
@@ -2297,22 +2315,27 @@ func New(config *Config) (*BlockChain, error) {
 	}
 
 	b := BlockChain{
-		checkpointsByHeight:     checkpointsByHeight,
-		db:                      config.DB,
-		chainParams:             params,
-		timeSource:              config.TimeSource,
-		notifications:           config.Notifications,
-		sigCache:                config.SigCache,
-		indexManager:            config.IndexManager,
-		bestNode:                nil,
-		index:                   make(map[chainhash.Hash]*blockNode),
-		depNodes:                make(map[chainhash.Hash][]*blockNode),
-		orphans:                 make(map[chainhash.Hash]*orphanBlock),
-		prevOrphans:             make(map[chainhash.Hash][]*orphanBlock),
-		blockCache:              make(map[chainhash.Hash]*dcrutil.Block),
-		mainchainBlockCache:     make(map[chainhash.Hash]*dcrutil.Block),
-		mainchainBlockCacheSize: mainchainBlockCacheSize,
-		deploymentCaches:        newThresholdCaches(params),
+		checkpointsByHeight:           checkpointsByHeight,
+		db:                            config.DB,
+		chainParams:                   params,
+		timeSource:                    config.TimeSource,
+		notifications:                 config.Notifications,
+		sigCache:                      config.SigCache,
+		indexManager:                  config.IndexManager,
+		bestNode:                      nil,
+		index:                         make(map[chainhash.Hash]*blockNode),
+		depNodes:                      make(map[chainhash.Hash][]*blockNode),
+		orphans:                       make(map[chainhash.Hash]*orphanBlock),
+		prevOrphans:                   make(map[chainhash.Hash][]*orphanBlock),
+		blockCache:                    make(map[chainhash.Hash]*dcrutil.Block),
+		mainchainBlockCache:           make(map[chainhash.Hash]*dcrutil.Block),
+		mainchainBlockCacheSize:       mainchainBlockCacheSize,
+		deploymentCaches:              newThresholdCaches(params),
+		isVoterMajorityVersionCache:   make(map[[stakeMajorityCacheKeySize]byte]bool),
+		isStakeMajorityVersionCache:   make(map[[stakeMajorityCacheKeySize]byte]bool),
+		calcPriorStakeVersionCache:    make(map[[chainhash.HashSize]byte]uint32),
+		calcVoterVersionIntervalCache: make(map[[chainhash.HashSize]byte]uint32),
+		calcStakeVersionCache:         make(map[[chainhash.HashSize]byte]uint32),
 	}
 
 	// Initialize the chain state from the passed database.  When the db
