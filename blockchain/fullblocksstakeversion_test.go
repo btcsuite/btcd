@@ -17,11 +17,6 @@ import (
 // TestStakeVersion ensures that the stake version field in the block header is
 // enforced properly.
 func TestStakeVersion(t *testing.T) {
-	// Skip tests when running with -short
-	if testing.Short() {
-		t.Skip("Skipping stake/voter full block tests in short mode")
-	}
-
 	// Create a test generator instance initialized with the genesis block
 	// as the tip as well as some cached payment scripts to be used
 	// throughout the tests.

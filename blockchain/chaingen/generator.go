@@ -1171,6 +1171,7 @@ func solveBlock(header *wire.BlockHeader) bool {
 		for i := startNonce; i >= startNonce && i <= stopNonce; i++ {
 			select {
 			case <-quit:
+				results <- sbResult{false, 0}
 				return
 			default:
 				hdr.Nonce = i
@@ -1198,16 +1199,17 @@ func solveBlock(header *wire.BlockHeader) bool {
 		}
 		go solver(*header, rangeStart, rangeStop)
 	}
+	var foundResult bool
 	for i := uint32(0); i < numCores; i++ {
 		result := <-results
-		if result.found {
+		if !foundResult && result.found {
 			close(quit)
 			header.Nonce = result.nonce
-			return true
+			foundResult = true
 		}
 	}
 
-	return false
+	return foundResult
 }
 
 // ReplaceWithNVotes returns a function that itself takes a block and modifies

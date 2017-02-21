@@ -118,11 +118,6 @@ var (
 // TestThresholdState ensures that the threshold state function progresses
 // through the states correctly.
 func TestThresholdState(t *testing.T) {
-	// Skip tests when running with -short
-	if testing.Short() {
-		t.Skip("Skipping full block threshold state tests in short mode")
-	}
-
 	// Create chain params based on simnet params, but add a specific test
 	// dummy deployment and set the proof-of-work difficulty readjustment
 	// size to a really large number so that the test chain can be generated
