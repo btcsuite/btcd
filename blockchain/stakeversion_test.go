@@ -124,8 +124,7 @@ func newFakeNode(blockVersion int32, height int64, currentNode *blockNode) *bloc
 		Nonce:   0,
 	}
 	hash := header.BlockHash()
-	node := newBlockNode(header, &hash, 0, []chainhash.Hash{},
-		[]chainhash.Hash{}, []VoteVersionTuple{})
+	node := newBlockNode(header, &hash, 0, nil, nil, nil)
 	node.height = height
 	node.parent = currentNode
 
@@ -440,9 +439,7 @@ func TestCalcStakeVersionByNode(t *testing.T) {
 				Nonce:   uint32(0),
 			}
 			hash := header.BlockHash()
-			node := newBlockNode(header, &hash, 0,
-				[]chainhash.Hash{}, []chainhash.Hash{},
-				[]VoteVersionTuple{})
+			node := newBlockNode(header, &hash, 0, nil, nil, nil)
 			node.height = i
 			node.parent = currentNode
 
@@ -826,9 +823,7 @@ func TestIsStakeMajorityVersion(t *testing.T) {
 				StakeVersion: test.startStakeVersion,
 			}
 			hash := header.BlockHash()
-			node := newBlockNode(header, &hash, 0,
-				[]chainhash.Hash{}, []chainhash.Hash{},
-				[]VoteVersionTuple{})
+			node := newBlockNode(header, &hash, 0, nil, nil, nil)
 			node.height = i
 			node.parent = currentNode
 

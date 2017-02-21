@@ -132,9 +132,7 @@ func TestNoQuorum(t *testing.T) {
 			Timestamp:    currentTimestamp,
 		}
 		hash := header.BlockHash()
-		node := newBlockNode(header, &hash, 0,
-			[]chainhash.Hash{}, []chainhash.Hash{},
-			[]VoteVersionTuple{})
+		node := newBlockNode(header, &hash, 0, nil, nil, nil)
 		node.height = int64(currentHeight)
 		node.parent = currentNode
 
@@ -171,9 +169,7 @@ func TestNoQuorum(t *testing.T) {
 			Timestamp:    currentTimestamp,
 		}
 		hash := header.BlockHash()
-		node := newBlockNode(header, &hash, 0,
-			[]chainhash.Hash{}, []chainhash.Hash{},
-			[]VoteVersionTuple{})
+		node := newBlockNode(header, &hash, 0, nil, nil, nil)
 		node.height = int64(currentHeight)
 		node.parent = currentNode
 
@@ -219,9 +215,7 @@ func TestNoQuorum(t *testing.T) {
 			Timestamp:    currentTimestamp,
 		}
 		hash := header.BlockHash()
-		node := newBlockNode(header, &hash, 0,
-			[]chainhash.Hash{}, []chainhash.Hash{},
-			[]VoteVersionTuple{})
+		node := newBlockNode(header, &hash, 0, nil, nil, nil)
 		node.height = int64(currentHeight)
 		node.parent = currentNode
 
@@ -273,9 +267,7 @@ func TestNoQuorum(t *testing.T) {
 			Timestamp:    currentTimestamp,
 		}
 		hash := header.BlockHash()
-		node := newBlockNode(header, &hash, 0,
-			[]chainhash.Hash{}, []chainhash.Hash{},
-			[]VoteVersionTuple{})
+		node := newBlockNode(header, &hash, 0, nil, nil, nil)
 		node.height = int64(currentHeight)
 		node.parent = currentNode
 
@@ -337,9 +329,7 @@ func TestNoQuorum(t *testing.T) {
 			Timestamp:    currentTimestamp,
 		}
 		hash := header.BlockHash()
-		node := newBlockNode(header, &hash, 0,
-			[]chainhash.Hash{}, []chainhash.Hash{},
-			[]VoteVersionTuple{})
+		node := newBlockNode(header, &hash, 0, nil, nil, nil)
 		node.height = int64(currentHeight)
 		node.parent = currentNode
 
@@ -416,9 +406,7 @@ func TestYesQuorum(t *testing.T) {
 			Timestamp:    currentTimestamp,
 		}
 		hash := header.BlockHash()
-		node := newBlockNode(header, &hash, 0,
-			[]chainhash.Hash{}, []chainhash.Hash{},
-			[]VoteVersionTuple{})
+		node := newBlockNode(header, &hash, 0, nil, nil, nil)
 		node.height = int64(currentHeight)
 		node.parent = currentNode
 
@@ -455,9 +443,7 @@ func TestYesQuorum(t *testing.T) {
 			Timestamp:    currentTimestamp,
 		}
 		hash := header.BlockHash()
-		node := newBlockNode(header, &hash, 0,
-			[]chainhash.Hash{}, []chainhash.Hash{},
-			[]VoteVersionTuple{})
+		node := newBlockNode(header, &hash, 0, nil, nil, nil)
 		node.height = int64(currentHeight)
 		node.parent = currentNode
 
@@ -503,9 +489,7 @@ func TestYesQuorum(t *testing.T) {
 			Timestamp:    currentTimestamp,
 		}
 		hash := header.BlockHash()
-		node := newBlockNode(header, &hash, 0,
-			[]chainhash.Hash{}, []chainhash.Hash{},
-			[]VoteVersionTuple{})
+		node := newBlockNode(header, &hash, 0, nil, nil, nil)
 		node.height = int64(currentHeight)
 		node.parent = currentNode
 
@@ -557,9 +541,7 @@ func TestYesQuorum(t *testing.T) {
 			Timestamp:    currentTimestamp,
 		}
 		hash := header.BlockHash()
-		node := newBlockNode(header, &hash, 0,
-			[]chainhash.Hash{}, []chainhash.Hash{},
-			[]VoteVersionTuple{})
+		node := newBlockNode(header, &hash, 0, nil, nil, nil)
 		node.height = int64(currentHeight)
 		node.parent = currentNode
 
@@ -621,9 +603,7 @@ func TestYesQuorum(t *testing.T) {
 			Timestamp:    currentTimestamp,
 		}
 		hash := header.BlockHash()
-		node := newBlockNode(header, &hash, 0,
-			[]chainhash.Hash{}, []chainhash.Hash{},
-			[]VoteVersionTuple{})
+		node := newBlockNode(header, &hash, 0, nil, nil, nil)
 		node.height = int64(currentHeight)
 		node.parent = currentNode
 
@@ -1176,9 +1156,8 @@ func TestVoting(t *testing.T) {
 					Timestamp:    currentTimestamp,
 				}
 				hash := header.BlockHash()
-				node := newBlockNode(header, &hash, 0,
-					[]chainhash.Hash{}, []chainhash.Hash{},
-					[]VoteVersionTuple{})
+				node := newBlockNode(header, &hash, 0, nil, nil,
+					nil)
 				node.height = int64(currentHeight)
 				node.parent = currentNode
 
@@ -1443,9 +1422,8 @@ func TestVotingParallel(t *testing.T) {
 					Timestamp:    currentTimestamp,
 				}
 				hash := header.BlockHash()
-				node := newBlockNode(header, &hash, 0,
-					[]chainhash.Hash{}, []chainhash.Hash{},
-					[]VoteVersionTuple{})
+				node := newBlockNode(header, &hash, 0, nil, nil,
+					nil)
 				node.height = int64(currentHeight)
 				node.parent = currentNode
 
