@@ -175,7 +175,7 @@ func makeBasicFilterForBlock(block *btcutil.Block) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return f.Bytes(), nil
+	return f.NBytes(), nil
 }
 
 // makeExtendedFilterForBlock builds a block's extended filter, which consists
@@ -199,7 +199,7 @@ func makeExtendedFilterForBlock(block *btcutil.Block) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return f.Bytes(), nil
+	return f.NBytes(), nil
 }
 
 // makeHeaderForFilter implements the chaining logic between filters, where
