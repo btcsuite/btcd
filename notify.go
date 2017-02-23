@@ -45,6 +45,10 @@ type notificationState struct {
 func (s *notificationState) Copy() *notificationState {
 	var stateCopy notificationState
 	stateCopy.notifyBlocks = s.notifyBlocks
+	stateCopy.notifyWinningTickets = s.notifyWinningTickets
+	stateCopy.notifySpentAndMissedTickets = s.notifySpentAndMissedTickets
+	stateCopy.notifyNewTickets = s.notifyNewTickets
+	stateCopy.notifyStakeDifficulty = s.notifyStakeDifficulty
 	stateCopy.notifyNewTx = s.notifyNewTx
 	stateCopy.notifyNewTxVerbose = s.notifyNewTxVerbose
 
