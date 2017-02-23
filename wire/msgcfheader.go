@@ -6,36 +6,38 @@ package wire
 
 import (
 	"fmt"
-	"github.com/btcsuite/fastsha256"
 	"io"
+
+	"github.com/btcsuite/fastsha256"
 )
 
 const (
-	// MaxCFilterHeaderDataSize is the maximum byte size of a committed
+	// MaxCFHeaderDataSize is the maximum byte size of a committed
 	// filter header.
-	MaxCFilterHeaderDataSize = fastsha256.Size
+	MaxCFHeaderDataSize = fastsha256.Size
 )
-type MsgCFilterHeader struct {
+
+type MsgCFHeader struct {
 	Data []byte
 }
 
 // BtcDecode decodes r using the bitcoin protocol encoding into the receiver.
 // This is part of the Message interface implementation.
-func (msg *MsgCFilterHeader) BtcDecode(r io.Reader, pver uint32) error {
+func (msg *MsgCFHeader) BtcDecode(r io.Reader, pver uint32) error {
 	var err error
-	msg.Data, err = ReadVarBytes(r, pver, MaxCFilterHeaderDataSize,
+	msg.Data, err = ReadVarBytes(r, pver, MaxCFHeaderDataSize,
 		"cf header data")
 	return err
 }
 
 // BtcEncode encodes the receiver to w using the bitcoin protocol encoding.
 // This is part of the Message interface implementation.
-func (msg *MsgCFilterHeader) BtcEncode(w io.Writer, pver uint32) error {
+func (msg *MsgCFHeader) BtcEncode(w io.Writer, pver uint32) error {
 	size := len(msg.Data)
-	if size > MaxCFilterHeaderDataSize {
-		str := fmt.Sprintf("cf header size too large for message " +
-			"[size %v, max %v]", size, MaxCFilterHeaderDataSize)
-		return messageError("MsgCFilterHeader.BtcEncode", str)
+	if size > MaxCFHeaderDataSize {
+		str := fmt.Sprintf("cf header size too large for message "+
+			"[size %v, max %v]", size, MaxCFHeaderDataSize)
+		return messageError("MsgCFHeader.BtcEncode", str)
 	}
 
 	return WriteVarBytes(w, pver, msg.Data)
@@ -50,7 +52,7 @@ func (msg *MsgCFilterHeader) BtcEncode(w io.Writer, pver uint32) error {
 // this comment was written, the encoded filter header is the same in both
 // instances, but there is a distinct difference and separating the two allows
 // the API to be flexible enough to deal with changes.
-func (msg *MsgCFilterHeader) Deserialize(r io.Reader) error {
+func (msg *MsgCFHeader) Deserialize(r io.Reader) error {
 	// At the current time, there is no difference between the wire encoding
 	// and the stable long-term storage format.  As a result, make use of
 	// BtcDecode.
@@ -59,21 +61,21 @@ func (msg *MsgCFilterHeader) Deserialize(r io.Reader) error {
 
 // Command returns the protocol command string for the message.  This is part
 // of the Message interface implementation.
-func (msg *MsgCFilterHeader) Command() string {
-	return CmdCFilterHeader
+func (msg *MsgCFHeader) Command() string {
+	return CmdCFHeader
 }
 
 // MaxPayloadLength returns the maximum length the payload can be for the
 // receiver.  This is part of the Message interface implementation.
-func (msg *MsgCFilterHeader) MaxPayloadLength(pver uint32) uint32 {
-	return uint32(VarIntSerializeSize(MaxCFilterHeaderDataSize)) +
-		MaxCFilterHeaderDataSize
+func (msg *MsgCFHeader) MaxPayloadLength(pver uint32) uint32 {
+	return uint32(VarIntSerializeSize(MaxCFHeaderDataSize)) +
+		MaxCFHeaderDataSize
 }
 
-// NewMsgFilterAdd returns a new bitcoin cfilterheader message that conforms to
-// the Message interface. See MsgCFilterHeader for details.
-func NewMsgCFilterHeader(data []byte) *MsgCFilterHeader {
-	return &MsgCFilterHeader{
+// NewMsgCFHeader returns a new bitcoin cfheader message that conforms to
+// the Message interface. See MsgCFHeader for details.
+func NewMsgCFHeader(data []byte) *MsgCFHeader {
+	return &MsgCFHeader{
 		Data: data,
 	}
 }

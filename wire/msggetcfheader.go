@@ -10,12 +10,12 @@ import (
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 )
 
-type MsgGetCFilter struct {
+type MsgGetCFHeader struct {
 	BlockHash chainhash.Hash
 	Extended  bool
 }
 
-func (msg *MsgGetCFilter) BtcDecode(r io.Reader, pver uint32) error {
+func (msg *MsgGetCFHeader) BtcDecode(r io.Reader, pver uint32) error {
 	err := readElement(r, &msg.BlockHash)
 	if err != nil {
 		return err
@@ -25,7 +25,7 @@ func (msg *MsgGetCFilter) BtcDecode(r io.Reader, pver uint32) error {
 
 // BtcEncode encodes the receiver to w using the bitcoin protocol encoding.
 // This is part of the Message interface implementation.
-func (msg *MsgGetCFilter) BtcEncode(w io.Writer, pver uint32) error {
+func (msg *MsgGetCFHeader) BtcEncode(w io.Writer, pver uint32) error {
 	err := writeElement(w, &msg.BlockHash)
 	if err != nil {
 		return err
@@ -35,22 +35,22 @@ func (msg *MsgGetCFilter) BtcEncode(w io.Writer, pver uint32) error {
 
 // Command returns the protocol command string for the message.  This is part
 // of the Message interface implementation.
-func (msg *MsgGetCFilter) Command() string {
-	return CmdGetCFilter
+func (msg *MsgGetCFHeader) Command() string {
+	return CmdGetCFHeader
 }
 
 // MaxPayloadLength returns the maximum length the payload can be for the
 // receiver.  This is part of the Message interface implementation.
-func (msg *MsgGetCFilter) MaxPayloadLength(pver uint32) uint32 {
+func (msg *MsgGetCFHeader) MaxPayloadLength(pver uint32) uint32 {
 	// Block hash + Extended flag.
 	return chainhash.HashSize + 1
 }
 
-// NewMsgGetCFilter returns a new bitcoin getcfilter message that conforms to
+// NewMsgGetCFHeader returns a new bitcoin getcfheader message that conforms to
 // the Message interface using the passed parameters and defaults for the
 // remaining fields.
-func NewMsgGetCFilter(blockHash *chainhash.Hash, extended bool) *MsgGetCFilter {
-	return &MsgGetCFilter{
+func NewMsgGetCFHeader(blockHash *chainhash.Hash, extended bool) *MsgGetCFHeader {
+	return &MsgGetCFHeader{
 		BlockHash: *blockHash,
 		Extended:  extended,
 	}
