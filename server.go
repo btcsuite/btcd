@@ -760,9 +760,8 @@ func (sp *serverPeer) OnGetCFilter(_ *peer.Peer, msg *wire.MsgGetCFilter) {
 	sp.QueueMessage(filterMsg, nil)
 }
 
-// OnGetCFilterHeader is invoked when a peer receives a getcfilterheader bitcoin
-// message.
-func (sp *serverPeer) OnGetCFilterHeader(_ *peer.Peer, msg *wire.MsgGetCFilterHeader) {
+// OnGetCFHeader is invoked when a peer receives a getcfheader bitcoin message.
+func (sp *serverPeer) OnGetCFHeader(_ *peer.Peer, msg *wire.MsgGetCFHeader) {
 	// Ignore getcfilterheader requests if not in sync.
 	if !sp.server.blockManager.IsCurrent() {
 		return
@@ -778,7 +777,7 @@ func (sp *serverPeer) OnGetCFilterHeader(_ *peer.Peer, msg *wire.MsgGetCFilterHe
 			msg.BlockHash, err)
 	}
 
-	headerMsg := wire.NewMsgCFilterHeader(headerBytes)
+	headerMsg := wire.NewMsgCFHeader(headerBytes)
 	sp.QueueMessage(headerMsg, nil)
 }
 
@@ -1620,25 +1619,25 @@ func disconnectPeer(peerList map[int32]*serverPeer, compareFunc func(*serverPeer
 func newPeerConfig(sp *serverPeer) *peer.Config {
 	return &peer.Config{
 		Listeners: peer.MessageListeners{
-			OnVersion:           sp.OnVersion,
-			OnMemPool:           sp.OnMemPool,
-			OnTx:                sp.OnTx,
-			OnBlock:             sp.OnBlock,
-			OnInv:               sp.OnInv,
-			OnHeaders:           sp.OnHeaders,
-			OnGetData:           sp.OnGetData,
-			OnGetBlocks:         sp.OnGetBlocks,
-			OnGetHeaders:        sp.OnGetHeaders,
-			OnGetCFilter:        sp.OnGetCFilter,
-			OnGetCFilterHeader:  sp.OnGetCFilterHeader,
-			OnFeeFilter:         sp.OnFeeFilter,
-			OnFilterAdd:         sp.OnFilterAdd,
-			OnFilterClear:       sp.OnFilterClear,
-			OnFilterLoad:        sp.OnFilterLoad,
-			OnGetAddr:           sp.OnGetAddr,
-			OnAddr:              sp.OnAddr,
-			OnRead:              sp.OnRead,
-			OnWrite:             sp.OnWrite,
+			OnVersion:     sp.OnVersion,
+			OnMemPool:     sp.OnMemPool,
+			OnTx:          sp.OnTx,
+			OnBlock:       sp.OnBlock,
+			OnInv:         sp.OnInv,
+			OnHeaders:     sp.OnHeaders,
+			OnGetData:     sp.OnGetData,
+			OnGetBlocks:   sp.OnGetBlocks,
+			OnGetHeaders:  sp.OnGetHeaders,
+			OnGetCFilter:  sp.OnGetCFilter,
+			OnGetCFHeader: sp.OnGetCFHeader,
+			OnFeeFilter:   sp.OnFeeFilter,
+			OnFilterAdd:   sp.OnFilterAdd,
+			OnFilterClear: sp.OnFilterClear,
+			OnFilterLoad:  sp.OnFilterLoad,
+			OnGetAddr:     sp.OnGetAddr,
+			OnAddr:        sp.OnAddr,
+			OnRead:        sp.OnRead,
+			OnWrite:       sp.OnWrite,
 
 			// Note: The reference client currently bans peers that send alerts
 			// not signed with its key.  We could verify against their key, but
