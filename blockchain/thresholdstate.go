@@ -301,9 +301,8 @@ func (b *BlockChain) thresholdState(version uint32, prevNode *blockNode, checker
 
 		switch stateTuple.State {
 		case ThresholdDefined:
-			// Make sure we are on the correct stake version.
-			if prevNode.height < svh ||
-				prevNode.header.StakeVersion < version {
+			// Ensure we are at the minimal require height.
+			if prevNode.height < svh {
 				stateTuple.State = ThresholdDefined
 				break
 			}
@@ -318,6 +317,12 @@ func (b *BlockChain) thresholdState(version uint32, prevNode *blockNode, checker
 			medianTimeUnix := uint64(medianTime.Unix())
 			if medianTimeUnix >= checker.EndTime() {
 				stateTuple.State = ThresholdFailed
+				break
+			}
+
+			// Make sure we are on the correct stake version.
+			if b.calcStakeVersion(prevNode) < version {
+				stateTuple.State = ThresholdDefined
 				break
 			}
 

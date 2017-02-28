@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/decred/dcrd/chaincfg"
-	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/wire"
 )
 
@@ -108,11 +107,7 @@ func TestSerializeDeserialize(t *testing.T) {
 
 func TestNoQuorum(t *testing.T) {
 	params := defaultParams()
-	bc := &BlockChain{
-		chainParams:      &params,
-		deploymentCaches: newThresholdCaches(&params),
-		index:            make(map[chainhash.Hash]*blockNode),
-	}
+	bc := newFakeChain(&params)
 	genesisNode := genesisBlockNode(&params)
 	genesisNode.header.StakeVersion = posVersion
 
@@ -382,11 +377,7 @@ func TestNoQuorum(t *testing.T) {
 
 func TestYesQuorum(t *testing.T) {
 	params := defaultParams()
-	bc := &BlockChain{
-		chainParams:      &params,
-		deploymentCaches: newThresholdCaches(&params),
-		index:            make(map[chainhash.Hash]*blockNode),
-	}
+	bc := newFakeChain(&params)
 	genesisNode := genesisBlockNode(&params)
 	genesisNode.header.StakeVersion = posVersion
 
@@ -706,7 +697,14 @@ func TestVoting(t *testing.T) {
 					vote: VoteVersionTuple{
 						Version: posVersion,
 						Bits:    0x01},
-					count: params.RuleChangeActivationInterval - 1,
+					count: uint32(params.StakeVersionInterval) - 1,
+				},
+				{
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x01},
+					count: params.RuleChangeActivationInterval -
+						uint32(params.StakeVersionInterval),
 				},
 				{
 					vote: VoteVersionTuple{
@@ -725,8 +723,64 @@ func TestVoting(t *testing.T) {
 					Choice: invalidChoice,
 				},
 				{
+					State:  ThresholdStarted,
+					Choice: invalidChoice,
+				},
+				{
+					State:  ThresholdLockedIn,
+					Choice: 1,
+				},
+			},
+		},
+		{
+			name:              "pedro greater PoS version calcStakeVersion",
+			vote:              pedro,
+			blockVersion:      powVersion,
+			startStakeVersion: posVersion - 1,
+			voteBitsCounts: []voteCount{
+				{
+					vote: VoteVersionTuple{
+						Version: posVersion - 1,
+						Bits:    0x01},
+					count: uint32(params.StakeValidationHeight) +
+						uint32(2*params.StakeVersionInterval) - 1,
+				},
+				{
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x01},
+					count: params.RuleChangeActivationInterval %
+						uint32(params.StakeVersionInterval),
+				},
+				{
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x01},
+					count: params.RuleChangeActivationInterval,
+				},
+				{
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x03},
+					count: params.RuleChangeActivationInterval,
+				},
+			},
+			expectedState: []ThresholdStateTuple{
+				{
 					State:  ThresholdDefined,
 					Choice: invalidChoice,
+				},
+				{
+					State:  ThresholdDefined,
+					Choice: invalidChoice,
+				},
+				{
+					State:  ThresholdStarted,
+					Choice: invalidChoice,
+				},
+				{
+					State:  ThresholdLockedIn,
+					Choice: 1,
 				},
 			},
 		},
@@ -1116,26 +1170,84 @@ func TestVoting(t *testing.T) {
 				},
 			},
 		},
-		//{
-		//	name:              "less than quorum",
-		//	numNodes:          params.RuleChangeActivationInterval,
-		//	vote:              pedro,
-		//	blockVersion: powVersion,
-		//	startStakeVersion: posVersion,
-		//	voteBitsCounts:    []voteCount{{vote: 0x02, count: 100}},
-		//	expectedState:     ThresholdStateTuple{ThresholdStarted, invalidChoice},
-		//},
+		{
+			name:              "pedro overlap",
+			vote:              pedro,
+			blockVersion:      powVersion,
+			startStakeVersion: posVersion - 1,
+			voteBitsCounts: []voteCount{
+				{
+					vote: VoteVersionTuple{
+						Version: posVersion - 1,
+						Bits:    0x01},
+					count: uint32(params.StakeValidationHeight) +
+						uint32(19*params.StakeVersionInterval) - 1,
+				},
+				{
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x01},
+					count: uint32(params.StakeVersionInterval) - 1,
+				},
+				{
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x01},
+					count: 1,
+				},
+				{
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x03},
+					count: uint32(params.RuleChangeActivationInterval) - 1,
+				},
+				{
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x03},
+					count: 1,
+				},
+				{
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x01},
+					count: uint32(params.RuleChangeActivationInterval),
+				},
+			},
+			expectedState: []ThresholdStateTuple{
+				{
+					State:  ThresholdDefined,
+					Choice: invalidChoice,
+				},
+				{
+					State:  ThresholdDefined,
+					Choice: invalidChoice,
+				},
+				{
+					State:  ThresholdStarted,
+					Choice: invalidChoice,
+				},
+				{
+					State:  ThresholdStarted,
+					Choice: invalidChoice,
+				},
+				{
+					State:  ThresholdLockedIn,
+					Choice: 1,
+				},
+				{
+					State:  ThresholdActive,
+					Choice: 1,
+				},
+			},
+		},
 	}
 
 	for _, test := range tests {
 		// Reset params.
 		params = defaultParams()
 		// We have to reset the cache for every test.
-		bc := &BlockChain{
-			chainParams:      &params,
-			deploymentCaches: newThresholdCaches(&params),
-			index:            make(map[chainhash.Hash]*blockNode),
-		}
+		bc := newFakeChain(&params)
 		genesisNode := genesisBlockNode(&params)
 		genesisNode.header.StakeVersion = test.startStakeVersion
 
@@ -1279,7 +1391,7 @@ func defaultParallelParams() chaincfg.Params {
 	return params
 }
 
-func TestVotingParallel(t *testing.T) {
+func TestParallelVoting(t *testing.T) {
 	params := defaultParallelParams()
 
 	type voteCount struct {
@@ -1397,11 +1509,7 @@ func TestVotingParallel(t *testing.T) {
 		// Reset params.
 		params = defaultParallelParams()
 		// We have to reset the cache for every test.
-		bc := &BlockChain{
-			chainParams:      &params,
-			deploymentCaches: newThresholdCaches(&params),
-			index:            make(map[chainhash.Hash]*blockNode),
-		}
+		bc := newFakeChain(&params)
 		genesisNode := genesisBlockNode(&params)
 		genesisNode.header.StakeVersion = test.startStakeVersion
 

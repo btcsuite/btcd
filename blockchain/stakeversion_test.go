@@ -18,7 +18,9 @@ import (
 // newFakeChain returns a chain that is usable for syntetic tests.
 func newFakeChain(params *chaincfg.Params) *BlockChain {
 	return &BlockChain{
-		chainParams:                   params,
+		chainParams:      params,
+		deploymentCaches: newThresholdCaches(params),
+		index:            make(map[chainhash.Hash]*blockNode),
 		isVoterMajorityVersionCache:   make(map[[stakeMajorityCacheKeySize]byte]bool),
 		isStakeMajorityVersionCache:   make(map[[stakeMajorityCacheKeySize]byte]bool),
 		calcPriorStakeVersionCache:    make(map[[chainhash.HashSize]byte]uint32),
