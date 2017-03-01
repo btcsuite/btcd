@@ -7,11 +7,11 @@ package coinset_test
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"testing"
 
-	"github.com/btcsuite/fastsha256"
 	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrutil"
 	"github.com/decred/dcrutil/coinset"
@@ -32,7 +32,7 @@ func (c *TestCoin) NumConfs() int64       { return c.TxNumConfs }
 func (c *TestCoin) ValueAge() int64       { return int64(c.TxValue) * c.TxNumConfs }
 
 func NewCoin(index int64, value dcrutil.Amount, numConfs int64) coinset.Coin {
-	h := fastsha256.New()
+	h := sha256.New()
 	h.Write([]byte(fmt.Sprintf("%d", index)))
 	hash, _ := chainhash.NewHash(h.Sum(nil))
 	c := &TestCoin{
