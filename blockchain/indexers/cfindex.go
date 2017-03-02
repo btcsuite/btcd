@@ -25,6 +25,9 @@ const (
 // generated and dropped in pairs, and both are indexed by a block's hash.
 // Besides holding different content, they also live in different buckets.
 var (
+	// cfIndexParentBucketKey is the name of the parent bucket used to house
+	// the index. The rest of the buckets live below this bucket.
+	cfIndexParentBucketKey = []byte("cfindexparentbucket")
 	// cfBasicIndexKey is the name of the db bucket used to house the
 	// block hash -> basic cf index (cf#0).
 	cfBasicIndexKey = []byte("cf0byhashidx")
@@ -42,14 +45,14 @@ var (
 // dbFetchFilter retrieves a block's basic or extended filter. A filter's
 // absence is not considered an error.
 func dbFetchFilter(dbTx database.Tx, key []byte, h *chainhash.Hash) ([]byte, error) {
-	idx := dbTx.Metadata().Bucket(key)
+	idx := dbTx.Metadata().Bucket(cfIndexParentBucketKey).Bucket(key)
 	return idx.Get(h[:]), nil
 }
 
 // dbFetchFilterHeader retrieves a block's basic or extended filter header.
 // A filter's absence is not considered an error.
 func dbFetchFilterHeader(dbTx database.Tx, key []byte, h *chainhash.Hash) ([]byte, error) {
-	idx := dbTx.Metadata().Bucket(key)
+	idx := dbTx.Metadata().Bucket(cfIndexParentBucketKey).Bucket(key)
 	fh := idx.Get(h[:])
 	if len(fh) != fastsha256.Size {
 		return nil, errors.New("invalid filter header length")
@@ -59,7 +62,7 @@ func dbFetchFilterHeader(dbTx database.Tx, key []byte, h *chainhash.Hash) ([]byt
 
 // dbStoreFilter stores a block's basic or extended filter.
 func dbStoreFilter(dbTx database.Tx, key []byte, h *chainhash.Hash, f []byte) error {
-	idx := dbTx.Metadata().Bucket(key)
+	idx := dbTx.Metadata().Bucket(cfIndexParentBucketKey).Bucket(key)
 	return idx.Put(h[:], f)
 }
 
@@ -68,19 +71,19 @@ func dbStoreFilterHeader(dbTx database.Tx, key []byte, h *chainhash.Hash, fh []b
 	if len(fh) != fastsha256.Size {
 		return errors.New("invalid filter header length")
 	}
-	idx := dbTx.Metadata().Bucket(key)
+	idx := dbTx.Metadata().Bucket(cfIndexParentBucketKey).Bucket(key)
 	return idx.Put(h[:], fh)
 }
 
 // dbDeleteFilter deletes a filter's basic or extended filter.
 func dbDeleteFilter(dbTx database.Tx, key []byte, h *chainhash.Hash) error {
-	idx := dbTx.Metadata().Bucket(key)
+	idx := dbTx.Metadata().Bucket(cfIndexParentBucketKey).Bucket(key)
 	return idx.Delete(h[:])
 }
 
 // dbDeleteFilterHeader deletes a filter's basic or extended filter header.
 func dbDeleteFilterHeader(dbTx database.Tx, key []byte, h *chainhash.Hash) error {
-	idx := dbTx.Metadata().Bucket(key)
+	idx := dbTx.Metadata().Bucket(cfIndexParentBucketKey).Bucket(key)
 	return idx.Delete(h[:])
 }
 
@@ -102,7 +105,7 @@ func (idx *CfIndex) Init() error {
 // Key returns the database key to use for the index as a byte slice. This is
 // part of the Indexer interface.
 func (idx *CfIndex) Key() []byte {
-	return cfBasicIndexKey
+	return cfIndexParentBucketKey
 }
 
 // Name returns the human-readable name of the index. This is part of the
@@ -116,19 +119,23 @@ func (idx *CfIndex) Name() string {
 // indexes (simple, extended).
 func (idx *CfIndex) Create(dbTx database.Tx) error {
 	meta := dbTx.Metadata()
-	_, err := meta.CreateBucket(cfBasicIndexKey)
+	cfIndexParentBucket, err := meta.CreateBucket(cfIndexParentBucketKey)
 	if err != nil {
 		return err
 	}
-	_, err = meta.CreateBucket(cfBasicHeaderKey)
+	_, err = cfIndexParentBucket.CreateBucket(cfBasicIndexKey)
 	if err != nil {
 		return err
 	}
-	_, err = meta.CreateBucket(cfExtendedIndexKey)
+	_, err = cfIndexParentBucket.CreateBucket(cfBasicHeaderKey)
 	if err != nil {
 		return err
 	}
-	_, err = meta.CreateBucket(cfExtendedHeaderKey)
+	_, err = cfIndexParentBucket.CreateBucket(cfExtendedIndexKey)
+	if err != nil {
+		return err
+	}
+	_, err = cfIndexParentBucket.CreateBucket(cfExtendedHeaderKey)
 	if err != nil {
 		return err
 	}
@@ -317,18 +324,5 @@ func NewCfIndex(db database.DB, chainParams *chaincfg.Params) *CfIndex {
 
 // DropCfIndex drops the CF index from the provided database if exists.
 func DropCfIndex(db database.DB) error {
-	err := dropIndex(db, cfBasicIndexKey, cfIndexName)
-	if err != nil {
-		return err
-	}
-	err = dropIndex(db, cfBasicHeaderKey, cfIndexName)
-	if err != nil {
-		return err
-	}
-	err = dropIndex(db, cfExtendedIndexKey, cfIndexName)
-	if err != nil {
-		return err
-	}
-	err = dropIndex(db, cfExtendedHeaderKey, cfIndexName)
-	return err
+	return dropIndex(db, cfIndexParentBucketKey, cfIndexName)
 }
