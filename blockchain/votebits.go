@@ -5,7 +5,9 @@
 
 package blockchain
 
-import "github.com/decred/dcrd/chaincfg"
+import (
+	"github.com/decred/dcrd/chaincfg"
+)
 
 // deploymentChecker provides a thresholdConditionChecker which can be used to
 // test a specific deployment rule.  This is required for properly detecting
@@ -120,8 +122,12 @@ func (c deploymentChecker) Condition(node *blockNode, version uint32) ([]thresho
 			// Wrong version, ignore.
 			continue
 		}
-
-		tally[c.deployment.Vote.Mask&vote.Bits>>shift].count += 1
+		idx := c.deployment.Vote.Mask & vote.Bits >> shift
+		if int(idx) > len(c.deployment.Vote.Choices)-1 {
+			// Invalid choice.
+			continue
+		}
+		tally[idx].count += 1
 	}
 
 	return tally, nil

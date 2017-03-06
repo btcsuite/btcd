@@ -44,13 +44,63 @@ var (
 			},
 		},
 	}
+
+	multipleChoice = chaincfg.Vote{
+		Id:          "multiplechoice",
+		Description: "Pick one",
+		Mask:        0x70, // 0b0111 0000
+		Choices: []chaincfg.Choice{
+			{
+				Id:          "Abstain",
+				Description: "Abstain multiple choice",
+				Bits:        0x0, // 0b0000 0000
+				IsIgnore:    true,
+				IsNo:        false,
+			},
+			{
+				Id:          "one",
+				Description: "Choice 1",
+				Bits:        0x10, // 0b0001 0000
+				IsIgnore:    false,
+				IsNo:        false,
+			},
+			{
+				Id:          "Vote against",
+				Description: "Vote against all multiple ",
+				Bits:        0x20, // 0b0010 0000
+				IsIgnore:    false,
+				IsNo:        true,
+			},
+			{
+				Id:          "two",
+				Description: "Choice 2",
+				Bits:        0x30, // 0b0011 0000
+				IsIgnore:    false,
+				IsNo:        false,
+			},
+			{
+				Id:          "three",
+				Description: "Choice 3",
+				Bits:        0x40, // 0b0100 0000
+				IsIgnore:    false,
+				IsNo:        false,
+			},
+			{
+				Id:          "four",
+				Description: "Choice 4",
+				Bits:        0x50, // 0b0101 0000
+				IsIgnore:    false,
+				IsNo:        false,
+			},
+		},
+	}
 )
 
-func defaultParams() chaincfg.Params {
+func defaultParams(vote chaincfg.Vote) chaincfg.Params {
 	params := chaincfg.SimNetParams
 	params.Deployments = make(map[uint32][]chaincfg.ConsensusDeployment)
 	params.Deployments[posVersion] = []chaincfg.ConsensusDeployment{{
-		Vote: pedro,
+		Vote: vote,
 		StartTime: uint64(time.Now().Add(time.Duration(
 			params.RuleChangeActivationInterval) *
 			time.Second).Unix()),
@@ -61,7 +111,7 @@ func defaultParams() chaincfg.Params {
 }
 
 func TestSerializeDeserialize(t *testing.T) {
-	params := defaultParams()
+	params := defaultParams(pedro)
 	ourDeployment := &params.Deployments[posVersion][0]
 	blob := serializeDeploymentCacheParams(ourDeployment)
 
@@ -106,7 +156,7 @@ func TestSerializeDeserialize(t *testing.T) {
 }
 
 func TestNoQuorum(t *testing.T) {
-	params := defaultParams()
+	params := defaultParams(pedro)
 	bc := newFakeChain(&params)
 	genesisNode := genesisBlockNode(&params)
 	genesisNode.header.StakeVersion = posVersion
@@ -376,7 +426,7 @@ func TestNoQuorum(t *testing.T) {
 }
 
 func TestYesQuorum(t *testing.T) {
-	params := defaultParams()
+	params := defaultParams(pedro)
 	bc := newFakeChain(&params)
 	genesisNode := genesisBlockNode(&params)
 	genesisNode.header.StakeVersion = posVersion
@@ -646,7 +696,10 @@ func TestYesQuorum(t *testing.T) {
 }
 
 func TestVoting(t *testing.T) {
-	params := defaultParams()
+	params := defaultParams(chaincfg.Vote{})
+	rci := params.RuleChangeActivationInterval
+	svh := uint32(params.StakeValidationHeight)
+	svi := uint32(params.StakeVersionInterval)
 
 	type voteCount struct {
 		vote  VoteVersionTuple
@@ -658,6 +711,7 @@ func TestVoting(t *testing.T) {
 		vote              chaincfg.Vote
 		blockVersion      int32
 		startStakeVersion uint32
+		end               func(time.Time) uint64
 		voteBitsCounts    []voteCount
 		expectedState     []ThresholdStateTuple
 	}{
@@ -671,7 +725,7 @@ func TestVoting(t *testing.T) {
 					vote: VoteVersionTuple{
 						Version: posVersion,
 						Bits:    0x01},
-					count: uint32(params.StakeValidationHeight) - 1,
+					count: svh - 1,
 				},
 			},
 			expectedState: []ThresholdStateTuple{
@@ -691,26 +745,25 @@ func TestVoting(t *testing.T) {
 					vote: VoteVersionTuple{
 						Version: posVersion,
 						Bits:    0x01},
-					count: uint32(params.StakeValidationHeight),
+					count: svh,
 				},
 				{
 					vote: VoteVersionTuple{
 						Version: posVersion,
 						Bits:    0x01},
-					count: uint32(params.StakeVersionInterval) - 1,
+					count: svi - 1,
 				},
 				{
 					vote: VoteVersionTuple{
 						Version: posVersion,
 						Bits:    0x01},
-					count: params.RuleChangeActivationInterval -
-						uint32(params.StakeVersionInterval),
+					count: rci - svi,
 				},
 				{
 					vote: VoteVersionTuple{
 						Version: posVersion,
 						Bits:    0x03},
-					count: params.RuleChangeActivationInterval,
+					count: rci,
 				},
 			},
 			expectedState: []ThresholdStateTuple{
@@ -742,27 +795,25 @@ func TestVoting(t *testing.T) {
 					vote: VoteVersionTuple{
 						Version: posVersion - 1,
 						Bits:    0x01},
-					count: uint32(params.StakeValidationHeight) +
-						uint32(2*params.StakeVersionInterval) - 1,
+					count: svh + 2*svi - 1,
 				},
 				{
 					vote: VoteVersionTuple{
 						Version: posVersion,
 						Bits:    0x01},
-					count: params.RuleChangeActivationInterval %
-						uint32(params.StakeVersionInterval),
+					count: rci % svi,
 				},
 				{
 					vote: VoteVersionTuple{
 						Version: posVersion,
 						Bits:    0x01},
-					count: params.RuleChangeActivationInterval,
+					count: rci,
 				},
 				{
 					vote: VoteVersionTuple{
 						Version: posVersion,
 						Bits:    0x03},
-					count: params.RuleChangeActivationInterval,
+					count: rci,
 				},
 			},
 			expectedState: []ThresholdStateTuple{
@@ -794,25 +845,25 @@ func TestVoting(t *testing.T) {
 					vote: VoteVersionTuple{
 						Version: posVersion,
 						Bits:    0x01},
-					count: uint32(params.StakeValidationHeight),
+					count: svh,
 				},
 				{
 					vote: VoteVersionTuple{
 						Version: posVersion,
 						Bits:    0x01},
-					count: params.RuleChangeActivationInterval - 1,
+					count: rci - 1,
 				},
 				{
 					vote: VoteVersionTuple{
 						Version: posVersion,
 						Bits:    0x03},
-					count: params.RuleChangeActivationInterval,
+					count: rci,
 				},
 				{
 					vote: VoteVersionTuple{
 						Version: posVersion,
 						Bits:    0x03},
-					count: params.RuleChangeActivationInterval,
+					count: rci,
 				},
 			},
 			expectedState: []ThresholdStateTuple{
@@ -844,19 +895,19 @@ func TestVoting(t *testing.T) {
 					vote: VoteVersionTuple{
 						Version: posVersion,
 						Bits:    0x01},
-					count: uint32(params.StakeValidationHeight),
+					count: svh,
 				},
 				{
 					vote: VoteVersionTuple{
 						Version: posVersion,
 						Bits:    0x01},
-					count: params.RuleChangeActivationInterval - 1,
+					count: rci - 1,
 				},
 				{
 					vote: VoteVersionTuple{
 						Version: posVersion,
 						Bits:    0x03},
-					count: params.RuleChangeActivationInterval,
+					count: rci,
 				},
 			},
 			expectedState: []ThresholdStateTuple{
@@ -884,25 +935,25 @@ func TestVoting(t *testing.T) {
 					vote: VoteVersionTuple{
 						Version: posVersion,
 						Bits:    0x01},
-					count: uint32(params.StakeValidationHeight),
+					count: svh,
 				},
 				{
 					vote: VoteVersionTuple{
 						Version: posVersion,
 						Bits:    0x01},
-					count: params.RuleChangeActivationInterval - 1,
+					count: rci - 1,
 				},
 				{
 					vote: VoteVersionTuple{
 						Version: posVersion,
 						Bits:    0x03},
-					count: params.RuleChangeActivationInterval,
+					count: rci,
 				},
 				{
 					vote: VoteVersionTuple{
 						Version: posVersion,
 						Bits:    0x03},
-					count: params.RuleChangeActivationInterval,
+					count: rci,
 				},
 			},
 			expectedState: []ThresholdStateTuple{
@@ -934,38 +985,38 @@ func TestVoting(t *testing.T) {
 					vote: VoteVersionTuple{
 						Version: posVersion + 1,
 						Bits:    0x01},
-					count: uint32(params.StakeValidationHeight),
+					count: svh,
 				},
 				{
 					vote: VoteVersionTuple{
 						Version: posVersion + 1,
 						Bits:    0x01},
-					count: params.RuleChangeActivationInterval - 1,
+					count: rci - 1,
 				}, {
 					vote: VoteVersionTuple{
 						Version: posVersion + 1,
 						Bits:    0x03},
-					count: params.RuleChangeActivationInterval,
+					count: rci,
 				}, {
 					vote: VoteVersionTuple{
 						Version: posVersion + 1,
 						Bits:    0x03},
-					count: params.RuleChangeActivationInterval,
+					count: rci,
 				}, {
 					vote: VoteVersionTuple{
 						Version: posVersion,
 						Bits:    0x03},
-					count: params.RuleChangeActivationInterval,
+					count: rci,
 				}, {
 					vote: VoteVersionTuple{
 						Version: posVersion,
 						Bits:    0x03},
-					count: params.RuleChangeActivationInterval,
+					count: rci,
 				}, {
 					vote: VoteVersionTuple{
 						Version: posVersion + 1,
 						Bits:    0x01},
-					count: params.RuleChangeActivationInterval,
+					count: rci,
 				},
 			},
 			expectedState: []ThresholdStateTuple{
@@ -1009,28 +1060,28 @@ func TestVoting(t *testing.T) {
 					vote: VoteVersionTuple{
 						Version: posVersion,
 						Bits:    0x01},
-					count: uint32(params.StakeValidationHeight),
+					count: svh,
 				},
 				{
 					vote: VoteVersionTuple{
 						Version: posVersion,
 						Bits:    0x01},
-					count: params.RuleChangeActivationInterval - 1,
+					count: rci - 1,
 				}, {
 					vote: VoteVersionTuple{
 						Version: posVersion,
 						Bits:    0x03},
-					count: params.RuleChangeActivationInterval,
+					count: rci,
 				}, {
 					vote: VoteVersionTuple{
 						Version: posVersion,
 						Bits:    0x03},
-					count: params.RuleChangeActivationInterval,
+					count: rci,
 				}, {
 					vote: VoteVersionTuple{
 						Version: posVersion,
 						Bits:    0x01},
-					count: params.RuleChangeActivationInterval,
+					count: rci,
 				},
 			},
 			expectedState: []ThresholdStateTuple{
@@ -1066,28 +1117,28 @@ func TestVoting(t *testing.T) {
 					vote: VoteVersionTuple{
 						Version: posVersion,
 						Bits:    0x01},
-					count: uint32(params.StakeValidationHeight),
+					count: svh,
 				},
 				{
 					vote: VoteVersionTuple{
 						Version: posVersion,
 						Bits:    0x01},
-					count: params.RuleChangeActivationInterval - 1,
+					count: rci - 1,
 				}, {
 					vote: VoteVersionTuple{
 						Version: posVersion,
 						Bits:    0x05},
-					count: params.RuleChangeActivationInterval,
+					count: rci,
 				}, {
 					vote: VoteVersionTuple{
 						Version: posVersion,
 						Bits:    0x05},
-					count: params.RuleChangeActivationInterval,
+					count: rci,
 				}, {
 					vote: VoteVersionTuple{
 						Version: posVersion,
 						Bits:    0x01},
-					count: params.RuleChangeActivationInterval,
+					count: rci,
 				},
 			},
 			expectedState: []ThresholdStateTuple{
@@ -1114,6 +1165,72 @@ func TestVoting(t *testing.T) {
 			},
 		},
 		{
+			name:              "pedro 100% invalid",
+			vote:              pedro,
+			blockVersion:      powVersion,
+			startStakeVersion: posVersion,
+			voteBitsCounts: []voteCount{
+				{
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x01},
+					count: svh,
+				},
+				{
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x01},
+					count: rci - 1,
+				}, {
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x06},
+					count: rci,
+				}, {
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x06},
+					count: rci,
+				}, {
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x03},
+					count: rci,
+				}, {
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x01},
+					count: rci,
+				},
+			},
+			expectedState: []ThresholdStateTuple{
+				{
+					State:  ThresholdDefined,
+					Choice: invalidChoice,
+				},
+				{
+					State:  ThresholdStarted,
+					Choice: invalidChoice,
+				},
+				{
+					State:  ThresholdStarted,
+					Choice: invalidChoice,
+				},
+				{
+					State:  ThresholdStarted,
+					Choice: invalidChoice,
+				},
+				{
+					State:  ThresholdLockedIn,
+					Choice: 0x01,
+				},
+				{
+					State:  ThresholdActive,
+					Choice: 0x01,
+				},
+			},
+		},
+		{
 			name:              "pedro 100% abstain",
 			vote:              pedro,
 			blockVersion:      powVersion,
@@ -1123,28 +1240,28 @@ func TestVoting(t *testing.T) {
 					vote: VoteVersionTuple{
 						Version: posVersion,
 						Bits:    0x01},
-					count: uint32(params.StakeValidationHeight),
+					count: svh,
 				},
 				{
 					vote: VoteVersionTuple{
 						Version: posVersion,
 						Bits:    0x01},
-					count: params.RuleChangeActivationInterval - 1,
+					count: rci - 1,
 				}, {
 					vote: VoteVersionTuple{
 						Version: posVersion,
 						Bits:    0x01},
-					count: params.RuleChangeActivationInterval,
+					count: rci,
 				}, {
 					vote: VoteVersionTuple{
 						Version: posVersion,
 						Bits:    0x01},
-					count: params.RuleChangeActivationInterval,
+					count: rci,
 				}, {
 					vote: VoteVersionTuple{
 						Version: posVersion,
 						Bits:    0x01},
-					count: params.RuleChangeActivationInterval,
+					count: rci,
 				},
 			},
 			expectedState: []ThresholdStateTuple{
@@ -1166,6 +1283,94 @@ func TestVoting(t *testing.T) {
 				},
 				{
 					State:  ThresholdStarted,
+					Choice: invalidChoice,
+				},
+			},
+		},
+		{
+			name:              "pedro expire before started",
+			vote:              pedro,
+			blockVersion:      powVersion,
+			startStakeVersion: posVersion - 1,
+			end: func(t time.Time) uint64 {
+				return uint64(t.Add(time.Second *
+					time.Duration(int64(svh)+int64(rci+rci/2))).Unix())
+			},
+			voteBitsCounts: []voteCount{
+				{
+					vote: VoteVersionTuple{
+						Version: posVersion - 1,
+						Bits:    0x01},
+					count: svh,
+				},
+				{
+					vote: VoteVersionTuple{
+						Version: posVersion - 1,
+						Bits:    0x05},
+					count: rci - 1,
+				},
+				{
+					vote: VoteVersionTuple{
+						Version: posVersion - 1,
+						Bits:    0x05},
+					count: rci,
+				},
+			},
+			expectedState: []ThresholdStateTuple{
+				{
+					State:  ThresholdDefined,
+					Choice: invalidChoice,
+				},
+				{
+					State:  ThresholdDefined,
+					Choice: invalidChoice,
+				},
+				{
+					State:  ThresholdFailed,
+					Choice: invalidChoice,
+				},
+			},
+		},
+		{
+			name:              "pedro expire after started",
+			vote:              pedro,
+			blockVersion:      powVersion,
+			startStakeVersion: posVersion,
+			end: func(t time.Time) uint64 {
+				return uint64(t.Add(time.Second *
+					time.Duration(int64(svh)+int64(rci+rci/2))).Unix())
+			},
+			voteBitsCounts: []voteCount{
+				{
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x01},
+					count: svh,
+				},
+				{
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x05},
+					count: rci - 1,
+				},
+				{
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x05},
+					count: rci,
+				},
+			},
+			expectedState: []ThresholdStateTuple{
+				{
+					State:  ThresholdDefined,
+					Choice: invalidChoice,
+				},
+				{
+					State:  ThresholdStarted,
+					Choice: invalidChoice,
+				},
+				{
+					State:  ThresholdFailed,
 					Choice: invalidChoice,
 				},
 			},
@@ -1180,14 +1385,13 @@ func TestVoting(t *testing.T) {
 					vote: VoteVersionTuple{
 						Version: posVersion - 1,
 						Bits:    0x01},
-					count: uint32(params.StakeValidationHeight) +
-						uint32(19*params.StakeVersionInterval) - 1,
+					count: svh + 19*svi - 1,
 				},
 				{
 					vote: VoteVersionTuple{
 						Version: posVersion,
 						Bits:    0x01},
-					count: uint32(params.StakeVersionInterval) - 1,
+					count: svi - 1,
 				},
 				{
 					vote: VoteVersionTuple{
@@ -1199,7 +1403,7 @@ func TestVoting(t *testing.T) {
 					vote: VoteVersionTuple{
 						Version: posVersion,
 						Bits:    0x03},
-					count: uint32(params.RuleChangeActivationInterval) - 1,
+					count: uint32(rci) - 1,
 				},
 				{
 					vote: VoteVersionTuple{
@@ -1211,7 +1415,7 @@ func TestVoting(t *testing.T) {
 					vote: VoteVersionTuple{
 						Version: posVersion,
 						Bits:    0x01},
-					count: uint32(params.RuleChangeActivationInterval),
+					count: uint32(rci),
 				},
 			},
 			expectedState: []ThresholdStateTuple{
@@ -1241,11 +1445,374 @@ func TestVoting(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:              "multiple choice 100% abstain",
+			vote:              multipleChoice,
+			blockVersion:      powVersion,
+			startStakeVersion: posVersion,
+			voteBitsCounts: []voteCount{
+				{
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x01},
+					count: svh,
+				},
+				{
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x01},
+					count: rci - 1,
+				}, {
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x01},
+					count: rci,
+				},
+			},
+			expectedState: []ThresholdStateTuple{
+				{
+					State:  ThresholdDefined,
+					Choice: invalidChoice,
+				},
+				{
+					State:  ThresholdStarted,
+					Choice: invalidChoice,
+				},
+				{
+					State:  ThresholdStarted,
+					Choice: invalidChoice,
+				},
+			},
+		},
+		{
+			name:              "multiple choice 100% no",
+			vote:              multipleChoice,
+			blockVersion:      powVersion,
+			startStakeVersion: posVersion,
+			voteBitsCounts: []voteCount{
+				{
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x01},
+					count: svh,
+				},
+				{
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x01},
+					count: rci - 1,
+				}, {
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x21},
+					count: rci,
+				},
+			},
+			expectedState: []ThresholdStateTuple{
+				{
+					State:  ThresholdDefined,
+					Choice: invalidChoice,
+				},
+				{
+					State:  ThresholdStarted,
+					Choice: invalidChoice,
+				},
+				{
+					State:  ThresholdFailed,
+					Choice: 2,
+				},
+			},
+		},
+		{
+			name:              "multiple choice 100% choice 1",
+			vote:              multipleChoice,
+			blockVersion:      powVersion,
+			startStakeVersion: posVersion,
+			voteBitsCounts: []voteCount{
+				{
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x01},
+					count: svh,
+				},
+				{
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x01},
+					count: rci - 1,
+				}, {
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x11},
+					count: rci,
+				}, {
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x11},
+					count: rci,
+				}, {
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x01},
+					count: rci,
+				},
+			},
+			expectedState: []ThresholdStateTuple{
+				{
+					State:  ThresholdDefined,
+					Choice: invalidChoice,
+				},
+				{
+					State:  ThresholdStarted,
+					Choice: invalidChoice,
+				},
+				{
+					State:  ThresholdLockedIn,
+					Choice: 1,
+				},
+				{
+					State:  ThresholdActive,
+					Choice: 1,
+				},
+				{
+					State:  ThresholdActive,
+					Choice: 1,
+				},
+			},
+		},
+		{
+			name:              "multiple choice 100% choice 2",
+			vote:              multipleChoice,
+			blockVersion:      powVersion,
+			startStakeVersion: posVersion,
+			voteBitsCounts: []voteCount{
+				{
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x01},
+					count: svh,
+				},
+				{
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x01},
+					count: rci - 1,
+				}, {
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x31},
+					count: rci,
+				}, {
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x31},
+					count: rci,
+				}, {
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x01},
+					count: rci,
+				},
+			},
+			expectedState: []ThresholdStateTuple{
+				{
+					State:  ThresholdDefined,
+					Choice: invalidChoice,
+				},
+				{
+					State:  ThresholdStarted,
+					Choice: invalidChoice,
+				},
+				{
+					State:  ThresholdLockedIn,
+					Choice: 3,
+				},
+				{
+					State:  ThresholdActive,
+					Choice: 3,
+				},
+				{
+					State:  ThresholdActive,
+					Choice: 3,
+				},
+			},
+		},
+		{
+			name:              "multiple choice 100% choice 3",
+			vote:              multipleChoice,
+			blockVersion:      powVersion,
+			startStakeVersion: posVersion,
+			voteBitsCounts: []voteCount{
+				{
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x01},
+					count: svh,
+				},
+				{
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x01},
+					count: rci - 1,
+				}, {
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x41},
+					count: rci,
+				}, {
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x41},
+					count: rci,
+				}, {
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x01},
+					count: rci,
+				},
+			},
+			expectedState: []ThresholdStateTuple{
+				{
+					State:  ThresholdDefined,
+					Choice: invalidChoice,
+				},
+				{
+					State:  ThresholdStarted,
+					Choice: invalidChoice,
+				},
+				{
+					State:  ThresholdLockedIn,
+					Choice: 4,
+				},
+				{
+					State:  ThresholdActive,
+					Choice: 4,
+				},
+				{
+					State:  ThresholdActive,
+					Choice: 4,
+				},
+			},
+		},
+		{
+			name:              "multiple choice 100% choice 4",
+			vote:              multipleChoice,
+			blockVersion:      powVersion,
+			startStakeVersion: posVersion,
+			voteBitsCounts: []voteCount{
+				{
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x01},
+					count: svh,
+				},
+				{
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x01},
+					count: rci - 1,
+				}, {
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x51},
+					count: rci,
+				}, {
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x51},
+					count: rci,
+				}, {
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x01},
+					count: rci,
+				},
+			},
+			expectedState: []ThresholdStateTuple{
+				{
+					State:  ThresholdDefined,
+					Choice: invalidChoice,
+				},
+				{
+					State:  ThresholdStarted,
+					Choice: invalidChoice,
+				},
+				{
+					State:  ThresholdLockedIn,
+					Choice: 5,
+				},
+				{
+					State:  ThresholdActive,
+					Choice: 5,
+				},
+				{
+					State:  ThresholdActive,
+					Choice: 5,
+				},
+			},
+		},
+		{
+			name:              "multiple choice 100% choice 5 (invalid)",
+			vote:              multipleChoice,
+			blockVersion:      powVersion,
+			startStakeVersion: posVersion,
+			voteBitsCounts: []voteCount{
+				{
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x01},
+					count: svh,
+				},
+				{
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x01},
+					count: rci - 1,
+				}, {
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x61},
+					count: rci,
+				}, {
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x61},
+					count: rci,
+				}, {
+					vote: VoteVersionTuple{
+						Version: posVersion,
+						Bits:    0x01},
+					count: rci,
+				},
+			},
+			expectedState: []ThresholdStateTuple{
+				{
+					State:  ThresholdDefined,
+					Choice: invalidChoice,
+				},
+				{
+					State:  ThresholdStarted,
+					Choice: invalidChoice,
+				},
+				{
+					State:  ThresholdStarted,
+					Choice: invalidChoice,
+				},
+				{
+					State:  ThresholdStarted,
+					Choice: invalidChoice,
+				},
+				{
+					State:  ThresholdStarted,
+					Choice: invalidChoice,
+				},
+			},
+		},
 	}
 
 	for _, test := range tests {
 		// Reset params.
-		params = defaultParams()
+		params = defaultParams(test.vote)
 		// We have to reset the cache for every test.
 		bc := newFakeChain(&params)
 		genesisNode := genesisBlockNode(&params)
@@ -1255,7 +1822,21 @@ func TestVoting(t *testing.T) {
 
 		var currentNode *blockNode
 		currentNode = genesisNode
+
+		// Override start time.
 		currentTimestamp := time.Now()
+
+		// Override expiration time.
+		if test.end != nil {
+			params.Deployments[posVersion][0].ExpireTime =
+				test.end(currentTimestamp)
+		}
+
+		t.Logf("currentTimestamp %v start %v expiration %v",
+			uint64(currentTimestamp.Unix()),
+			params.Deployments[posVersion][0].StartTime,
+			params.Deployments[posVersion][0].ExpireTime)
+
 		currentHeight := uint32(1)
 		for k := range test.expectedState {
 			for i := uint32(0); i < test.voteBitsCounts[k].count; i++ {
@@ -1288,9 +1869,13 @@ func TestVoting(t *testing.T) {
 				currentHeight++
 				currentTimestamp = currentTimestamp.Add(time.Second)
 			}
-			t.Logf("Height %v", currentNode.height)
+			t.Logf("Height %v, Start time %v, curTime %v, delta %v",
+				currentNode.height, params.Deployments[4][0].StartTime,
+				currentNode.header.Timestamp.Unix(),
+				currentNode.header.Timestamp.Unix()-
+					int64(params.Deployments[4][0].StartTime))
 			ts, err := bc.ThresholdState(&currentNode.hash,
-				posVersion, pedro.Id)
+				posVersion, test.vote.Id)
 			if err != nil {
 				t.Fatalf("ThresholdState(%v): %v", k, err)
 			}
