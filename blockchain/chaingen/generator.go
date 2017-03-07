@@ -1092,7 +1092,7 @@ func winningTickets(voteBlock *wire.MsgBlock, liveTickets []*stakeTicket, numVot
 	if numLiveTickets > math.MaxUint32 {
 		return nil, chainhash.Hash{}, fmt.Errorf("live ticket pool "+
 			"has %d tickets which is more than the max allowed of "+
-			"%d", len(liveTickets), math.MaxUint32)
+			"%d", len(liveTickets), uint32(math.MaxUint32))
 	}
 	if uint32(numVotes) > numLiveTickets {
 		return nil, chainhash.Hash{}, fmt.Errorf("live ticket pool "+
