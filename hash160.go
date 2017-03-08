@@ -8,7 +8,8 @@ package dcrutil
 import (
 	"hash"
 
-	"github.com/btcsuite/golangcrypto/ripemd160"
+	"golang.org/x/crypto/ripemd160"
+
 	"github.com/decred/dcrd/chaincfg/chainhash"
 )
 

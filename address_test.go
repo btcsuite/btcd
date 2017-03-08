@@ -17,7 +17,7 @@ import (
 	"github.com/decred/dcrd/wire"
 	"github.com/decred/dcrutil"
 
-	"github.com/btcsuite/golangcrypto/ripemd160"
+	"golang.org/x/crypto/ripemd160"
 )
 
 // invalidNet is an invalid network.
