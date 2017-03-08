@@ -166,7 +166,7 @@ func (alert *Alert) Serialize(w io.Writer, pver uint32) error {
 	if err != nil {
 		return err
 	}
-	for i := 0; i < int(count); i++ {
+	for i := 0; i < count; i++ {
 		err = writeElement(w, alert.SetCancel[i])
 		if err != nil {
 			return err
@@ -188,7 +188,7 @@ func (alert *Alert) Serialize(w io.Writer, pver uint32) error {
 	if err != nil {
 		return err
 	}
-	for i := 0; i < int(count); i++ {
+	for i := 0; i < count; i++ {
 		err = WriteVarString(w, pver, alert.SetSubVer[i])
 		if err != nil {
 			return err
@@ -207,11 +207,7 @@ func (alert *Alert) Serialize(w io.Writer, pver uint32) error {
 	if err != nil {
 		return err
 	}
-	err = WriteVarString(w, pver, alert.Reserved)
-	if err != nil {
-		return err
-	}
-	return nil
+	return WriteVarString(w, pver, alert.Reserved)
 }
 
 // Deserialize decodes from r into the receiver using the alert protocol
@@ -280,10 +276,7 @@ func (alert *Alert) Deserialize(r io.Reader, pver uint32) error {
 		return err
 	}
 	alert.Reserved, err = ReadVarString(r, pver)
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 // NewAlert returns an new Alert with values provided.
@@ -357,11 +350,7 @@ func (msg *MsgAlert) BtcDecode(r io.Reader, pver uint32) error {
 
 	msg.Signature, err = ReadVarBytes(r, pver, MaxMessagePayload,
 		"alert signature")
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // BtcEncode encodes the receiver to w using the decred protocol encoding.
@@ -391,11 +380,7 @@ func (msg *MsgAlert) BtcEncode(w io.Writer, pver uint32) error {
 	if err != nil {
 		return err
 	}
-	err = WriteVarBytes(w, pver, msg.Signature)
-	if err != nil {
-		return err
-	}
-	return nil
+	return WriteVarBytes(w, pver, msg.Signature)
 }
 
 // Command returns the protocol command string for the message.  This is part

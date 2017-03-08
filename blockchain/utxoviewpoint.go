@@ -314,7 +314,7 @@ func (view *UtxoViewpoint) AddTxOuts(tx *dcrutil.Tx, blockHeight int64,
 		view.entries[*tx.Hash()] = entry
 	} else {
 		entry.height = uint32(blockHeight)
-		entry.index = uint32(blockIndex)
+		entry.index = blockIndex
 	}
 	entry.modified = true
 
@@ -841,7 +841,7 @@ func (view *UtxoViewpoint) fetchUtxosMain(db database.DB, txSet map[chainhash.Ha
 	// since other code uses the presence of an entry in the store as a way
 	// to optimize spend and unspend updates to apply only to the specific
 	// utxos that the caller needs access to.
-	err := db.View(func(dbTx database.Tx) error {
+	return db.View(func(dbTx database.Tx) error {
 		for hash := range txSet {
 			hashCopy := hash
 			// If the UTX already exists in the view, skip adding it.
@@ -858,11 +858,6 @@ func (view *UtxoViewpoint) fetchUtxosMain(db database.DB, txSet map[chainhash.Ha
 
 		return nil
 	})
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 // fetchUtxos loads utxo details about provided set of transaction hashes into
@@ -886,14 +881,7 @@ func (view *UtxoViewpoint) fetchUtxos(db database.DB, txSet map[chainhash.Hash]s
 	}
 
 	// Request the input utxos from the database.
-	err := view.fetchUtxosMain(db, txNeededSet)
-	if err != nil {
-		return err
-	}
-
-	// Connect up to the stake viewpoint that was requested
-	// if the flag to do so is given.
-	return nil
+	return view.fetchUtxosMain(db, txNeededSet)
 }
 
 // fetchInputUtxos loads utxo details about the input transactions referenced

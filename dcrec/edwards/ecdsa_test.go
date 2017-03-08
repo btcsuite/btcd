@@ -392,7 +392,7 @@ func benchmarkVerification(b *testing.B) {
 			sigList[randIndex].msg,
 			sigList[randIndex].sig.R,
 			sigList[randIndex].sig.S)
-		if ver != true {
+		if !ver {
 			panic("made invalid sig")
 		}
 	}

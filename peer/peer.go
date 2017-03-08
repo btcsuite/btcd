@@ -1077,7 +1077,7 @@ func (p *Peer) handlePongMsg(msg *wire.MsgPong) {
 	// without large usage of the ping rpc call since we ping infrequently
 	// enough that if they overlap we would have timed out the peer.
 	if p.lastPingNonce != 0 && msg.Nonce == p.lastPingNonce {
-		p.lastPingMicros = time.Now().Sub(p.lastPingTime).Nanoseconds()
+		p.lastPingMicros = time.Since(p.lastPingTime).Nanoseconds()
 		p.lastPingMicros /= 1000 // convert to usec.
 		p.lastPingNonce = 0
 	}
@@ -1300,7 +1300,7 @@ out:
 
 				// Extend active deadlines by the time it took
 				// to execute the callback.
-				duration := time.Now().Sub(handlersStartTime)
+				duration := time.Since(handlersStartTime)
 				deadlineOffset += duration
 				handlerActive = false
 
@@ -2022,7 +2022,7 @@ func (p *Peer) negotiateOutboundProtocol() error {
 func newPeerBase(cfg *Config, inbound bool) *Peer {
 	// Default to the max supported protocol version.  Override to the
 	// version specified by the caller if configured.
-	protocolVersion := uint32(MaxProtocolVersion)
+	protocolVersion := MaxProtocolVersion
 	if cfg.ProtocolVersion != 0 {
 		protocolVersion = cfg.ProtocolVersion
 	}

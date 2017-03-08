@@ -215,12 +215,7 @@ func ValidateTransactionScripts(tx *dcrutil.Tx, utxoView *UtxoViewpoint, flags t
 	}
 
 	// Validate all of the inputs.
-	validator := newTxValidator(utxoView, flags, sigCache)
-	if err := validator.Validate(txValItems); err != nil {
-		return err
-	}
-
-	return nil
+	return newTxValidator(utxoView, flags, sigCache).Validate(txValItems)
 
 }
 
@@ -263,10 +258,5 @@ func checkBlockScripts(block *dcrutil.Block, utxoView *UtxoViewpoint, txTree boo
 	}
 
 	// Validate all of the inputs.
-	validator := newTxValidator(utxoView, scriptFlags, sigCache)
-	if err := validator.Validate(txValItems); err != nil {
-		return err
-	}
-
-	return nil
+	return newTxValidator(utxoView, scriptFlags, sigCache).Validate(txValItems)
 }

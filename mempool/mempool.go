@@ -1395,11 +1395,7 @@ func (mp *TxPool) ProcessTransaction(tx *dcrutil.Tx, allowOrphan, rateLimit, all
 
 	// Potentially add the orphan transaction to the orphan pool.
 	err = mp.maybeAddOrphan(tx)
-	if err != nil {
-		return nil, err
-	}
-
-	return nil, nil
+	return nil, err
 }
 
 // Count returns the number of transactions in the main pool.  It does not
@@ -1504,7 +1500,7 @@ func (mp *TxPool) RawMempoolVerbose(filterType *stake.TxType) map[string]*dcrjso
 			Size:             int32(tx.MsgTx().SerializeSize()),
 			Fee:              dcrutil.Amount(desc.Fee).ToCoin(),
 			Time:             desc.Added.Unix(),
-			Height:           int64(desc.Height),
+			Height:           desc.Height,
 			StartingPriority: desc.StartingPriority,
 			CurrentPriority:  currentPriority,
 			Depends:          make([]string, 0),

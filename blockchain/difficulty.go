@@ -494,7 +494,7 @@ func (b *BlockChain) calcNextRequiredStakeDifficulty(curNode *blockNode) (int64,
 	alpha := b.chainParams.StakeDiffAlpha
 	stakeDiffStartHeight := int64(b.chainParams.CoinbaseMaturity) +
 		1
-	maxRetarget := int64(b.chainParams.RetargetAdjustmentFactor)
+	maxRetarget := b.chainParams.RetargetAdjustmentFactor
 	TicketPoolWeight := int64(b.chainParams.TicketPoolSizeWeight)
 
 	// Number of nodes to traverse while calculating difficulty.
@@ -759,7 +759,7 @@ func (b *BlockChain) estimateNextStakeDifficulty(curNode *blockNode,
 	alpha := b.chainParams.StakeDiffAlpha
 	stakeDiffStartHeight := int64(b.chainParams.CoinbaseMaturity) +
 		1
-	maxRetarget := int64(b.chainParams.RetargetAdjustmentFactor)
+	maxRetarget := b.chainParams.RetargetAdjustmentFactor
 	TicketPoolWeight := int64(b.chainParams.TicketPoolSizeWeight)
 
 	// Number of nodes to traverse while calculating difficulty.

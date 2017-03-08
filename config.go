@@ -583,7 +583,7 @@ func loadConfig() (*config, []string, error) {
 	}
 
 	// Don't allow ban durations that are too short.
-	if cfg.BanDuration < time.Duration(time.Second) {
+	if cfg.BanDuration < time.Second {
 		str := "%s: The banduration option may not be less than 1s -- parsed [%v]"
 		err := fmt.Errorf(str, funcName, cfg.BanDuration)
 		fmt.Fprintln(os.Stderr, err)
@@ -1004,9 +1004,9 @@ func createDefaultConfigFile(destinationPath string) error {
 		}
 
 		if strings.Contains(line, "rpcuser=") {
-			line = "rpcuser=" + string(generatedRPCUser) + "\n"
+			line = "rpcuser=" + generatedRPCUser + "\n"
 		} else if strings.Contains(line, "rpcpass=") {
-			line = "rpcpass=" + string(generatedRPCPass) + "\n"
+			line = "rpcpass=" + generatedRPCPass + "\n"
 		}
 
 		if _, err := dest.WriteString(line); err != nil {

@@ -42,7 +42,7 @@ func (cmd *headersCmd) Execute(args []string) error {
 	// the database would keep a metadata index of its own.
 	blockIdxName := []byte("ffldb-blockidx")
 	if !headersCfg.Bulk {
-		err = db.View(func(tx database.Tx) error {
+		return db.View(func(tx database.Tx) error {
 			totalHdrs := 0
 			blockIdxBucket := tx.Metadata().Bucket(blockIdxName)
 			blockIdxBucket.ForEach(func(k, v []byte) error {
@@ -63,18 +63,13 @@ func (cmd *headersCmd) Execute(args []string) error {
 				return nil
 			})
 			log.Infof("Loaded %d headers in %v", numLoaded,
-				time.Now().Sub(startTime))
+				time.Since(startTime))
 			return nil
 		})
-		if err != nil {
-			return err
-		}
-
-		return nil
 	}
 
 	// Bulk load headers.
-	err = db.View(func(tx database.Tx) error {
+	return db.View(func(tx database.Tx) error {
 		blockIdxBucket := tx.Metadata().Bucket(blockIdxName)
 		hashes := make([]chainhash.Hash, 0, 500000)
 		blockIdxBucket.ForEach(func(k, v []byte) error {
@@ -91,12 +86,7 @@ func (cmd *headersCmd) Execute(args []string) error {
 			return err
 		}
 		log.Infof("Loaded %d headers in %v", len(hdrs),
-			time.Now().Sub(startTime))
+			time.Since(startTime))
 		return nil
 	})
-	if err != nil {
-		return err
-	}
-
-	return nil
 }

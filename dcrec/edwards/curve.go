@@ -194,11 +194,8 @@ func (curve *TwistedEdwardsCurve) IsOnCurve(x *big.Int, y *big.Int) bool {
 	// Check if we're in the cofactor of the curve (8).
 	modEight := new(big.Int)
 	modEight.Mod(enumBig, eight)
-	if modEight.Cmp(zero) != 0 {
-		return false
-	}
 
-	return true
+	return modEight.Cmp(zero) == 0
 }
 
 // cachedGroupElement is a cached extended group element derived from

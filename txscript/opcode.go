@@ -1010,7 +1010,7 @@ func opcodeVerify(op *parsedOpcode, vm *Engine) error {
 		return err
 	}
 
-	if verified != true {
+	if !verified {
 		return ErrStackVerifyFailed
 	}
 	return nil

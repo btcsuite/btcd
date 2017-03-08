@@ -248,7 +248,7 @@ func (curve *TwistedEdwardsCurve) EncodedBytesToBigIntPoint(s *[32]byte) (*big.I
 
 	xIsNegBytes := sCopy[31]>>7 == 1
 	p := new(edwards25519.ExtendedGroupElement)
-	if p.FromBytes(sCopy) == false {
+	if !p.FromBytes(sCopy) {
 		return nil, nil, fmt.Errorf("point not on curve")
 	}
 

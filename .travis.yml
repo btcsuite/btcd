@@ -7,10 +7,8 @@ install:
   - go get -v github.com/Masterminds/glide
   - glide install
   - go install -v . ./cmd/...
-  - go get -v golang.org/x/tools/cmd/cover
-  - go get -v github.com/bradfitz/goimports
-  - go get -v github.com/golang/lint/golint
-  - go get -v github.com/davecgh/go-spew/spew
+  - go get -v github.com/alecthomas/gometalinter
+  - gometalinter --install
 script:
   - export PATH=$PATH:$HOME/gopath/bin
   - ./goclean.sh

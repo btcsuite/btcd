@@ -21,7 +21,7 @@ import (
 // DoStxoTest does a test on a simulated blockchain to ensure that the data
 // stored in the STXO buckets is not corrupt.
 func (b *BlockChain) DoStxoTest() error {
-	err := b.db.View(func(dbTx database.Tx) error {
+	return b.db.View(func(dbTx database.Tx) error {
 		for i := int64(2); i <= b.bestNode.height; i++ {
 			block, err := dbFetchBlockByHeight(dbTx, i)
 			if err != nil {
@@ -39,20 +39,15 @@ func (b *BlockChain) DoStxoTest() error {
 				return err
 			}
 
-			if int(ntx) != len(stxos) {
+			if ntx != len(stxos) {
 				return fmt.Errorf("bad number of stxos calculated at "+
 					"height %v, got %v expected %v",
-					i, len(stxos), int(ntx))
+					i, len(stxos), ntx)
 			}
 		}
 
 		return nil
 	})
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 // DebugBlockHeaderString dumps a verbose message containing information about

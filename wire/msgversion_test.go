@@ -64,7 +64,7 @@ func TestVersion(t *testing.T) {
 		t.Errorf("NewMsgVersion: wrong last block - got %v, want %v",
 			msg.LastBlock, lastBlock)
 	}
-	if msg.DisableRelayTx != false {
+	if msg.DisableRelayTx {
 		t.Errorf("NewMsgVersion: disable relay tx is not false by "+
 			"default - got %v, want %v", msg.DisableRelayTx, false)
 	}

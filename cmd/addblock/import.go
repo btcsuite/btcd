@@ -257,7 +257,7 @@ func (bi *blockImporter) statusHandler(resultsChan chan *importResults) {
 		resultsChan <- &importResults{
 			blocksProcessed: bi.blocksProcessed,
 			blocksImported:  bi.blocksImported,
-			duration:        time.Now().Sub(bi.startTime),
+			duration:        time.Since(bi.startTime),
 			err:             err,
 		}
 		close(bi.quit)
@@ -267,7 +267,7 @@ func (bi *blockImporter) statusHandler(resultsChan chan *importResults) {
 		resultsChan <- &importResults{
 			blocksProcessed: bi.blocksProcessed,
 			blocksImported:  bi.blocksImported,
-			duration:        time.Now().Sub(bi.startTime),
+			duration:        time.Since(bi.startTime),
 			err:             nil,
 		}
 	}

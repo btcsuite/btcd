@@ -833,12 +833,8 @@ func deepCopyBlockTemplate(blockTemplate *BlockTemplate) *BlockTemplate {
 		}
 	}
 
-	sTransactionsCopy := make([]*wire.MsgTx,
-		len(blockTemplate.Block.STransactions),
-		len(blockTemplate.Block.STransactions))
-	for i, mtx := range blockTemplate.Block.STransactions {
-		sTransactionsCopy[i] = mtx
-	}
+	sTransactionsCopy := make([]*wire.MsgTx, len(blockTemplate.Block.STransactions))
+	copy(sTransactionsCopy, blockTemplate.Block.STransactions)
 
 	msgBlockCopy := &wire.MsgBlock{
 		Header:        headerCopy,
@@ -846,16 +842,11 @@ func deepCopyBlockTemplate(blockTemplate *BlockTemplate) *BlockTemplate {
 		STransactions: sTransactionsCopy,
 	}
 
-	fees := make([]int64, len(blockTemplate.Fees), len(blockTemplate.Fees))
-	for i, f := range blockTemplate.Fees {
-		fees[i] = f
-	}
+	fees := make([]int64, len(blockTemplate.Fees))
+	copy(fees, blockTemplate.Fees)
 
-	sigOps := make([]int64, len(blockTemplate.SigOpCounts),
-		len(blockTemplate.SigOpCounts))
-	for i, s := range blockTemplate.SigOpCounts {
-		sigOps[i] = s
-	}
+	sigOps := make([]int64, len(blockTemplate.SigOpCounts))
+	copy(sigOps, blockTemplate.SigOpCounts)
 
 	return &BlockTemplate{
 		Block:           msgBlockCopy,
@@ -1243,16 +1234,10 @@ func NewBlockTemplate(policy *mining.Policy, server *server,
 	poolSize := chainState.nextPoolSize
 	reqStakeDifficulty := chainState.nextStakeDifficulty
 	finalState := chainState.nextFinalState
-	winningTickets := make([]chainhash.Hash, len(chainState.winningTickets),
-		len(chainState.winningTickets))
-	for i, h := range chainState.winningTickets {
-		winningTickets[i] = h
-	}
-	missedTickets := make([]chainhash.Hash, len(chainState.missedTickets),
-		len(chainState.missedTickets))
-	for i := range chainState.missedTickets {
-		missedTickets[i] = chainState.missedTickets[i]
-	}
+	winningTickets := make([]chainhash.Hash, len(chainState.winningTickets))
+	copy(winningTickets, chainState.winningTickets)
+	missedTickets := make([]chainhash.Hash, len(chainState.missedTickets))
+	copy(missedTickets, chainState.missedTickets)
 	chainState.Unlock()
 
 	chainBest := blockManager.chain.BestSnapshot()

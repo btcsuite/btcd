@@ -51,10 +51,7 @@ type NetAddress struct {
 
 // HasService returns whether the specified service is supported by the address.
 func (na *NetAddress) HasService(service ServiceFlag) bool {
-	if na.Services&service == service {
-		return true
-	}
-	return false
+	return na.Services&service == service
 }
 
 // AddService adds service as a supported service by the peer generating the
@@ -156,10 +153,5 @@ func writeNetAddress(w io.Writer, pver uint32, na *NetAddress, ts bool) error {
 	}
 
 	// Sigh.  Decred protocol mixes little and big endian.
-	err = binary.Write(w, bigEndian, na.Port)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return binary.Write(w, bigEndian, na.Port)
 }

@@ -764,7 +764,7 @@ func newBlockStore(basePath string, network wire.CurrencyNet) *blockStore {
 		writeCursor: &writeCursor{
 			curFile:    &lockableFile{},
 			curFileNum: uint32(fileNum),
-			curOffset:  uint32(fileOff),
+			curOffset:  fileOff,
 		},
 	}
 	store.openFileFunc = store.openFile

@@ -427,7 +427,7 @@ func purchaseCommitmentScript(addr dcrutil.Address, amount, voteFeeLimit, revoca
 	copy(data[:], addr.ScriptAddress())
 	binary.LittleEndian.PutUint64(data[20:], uint64(amount))
 	data[27] |= 1 << 7
-	binary.LittleEndian.PutUint16(data[28:], uint16(limits))
+	binary.LittleEndian.PutUint16(data[28:], limits)
 	script, err := txscript.NewScriptBuilder().AddOp(txscript.OP_RETURN).
 		AddData(data[:]).Script()
 	if err != nil {
@@ -1066,7 +1066,7 @@ func (hp *hash256prng) uniformRandom(upperBound uint32) uint32 {
 	// (2^32 - (x*2)) % x == 2^32 % x when x <= 2^31
 	min := ((math.MaxUint32 - (upperBound * 2)) + 1) % upperBound
 	if upperBound > 0x80000000 {
-		min = uint32(1 + ^upperBound)
+		min = 1 + ^upperBound
 	}
 
 	r := hp.Hash256Rand()
@@ -1249,9 +1249,7 @@ func (g *Generator) ReplaceWithNVotes(numVotes uint16) func(*wire.MsgBlock) {
 
 		// Add back the original stake transactions other than the
 		// original stake votes that have been replaced.
-		for _, stakeTx := range b.STransactions[defaultNumVotes:] {
-			stakeTxns = append(stakeTxns, stakeTx)
-		}
+		stakeTxns = append(stakeTxns, b.STransactions[defaultNumVotes:]...)
 
 		// Update the block with the new stake transactions and the
 		// header with the new number of votes.

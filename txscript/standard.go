@@ -171,15 +171,11 @@ func isAnyKindOfScriptHash(pops []parsedOpcode) bool {
 		return true
 	}
 
-	stakeP2SH := len(pops) == 4 &&
+	return len(pops) == 4 &&
 		(pops[0].opcode.value >= 186 && pops[0].opcode.value <= 189) &&
 		pops[1].opcode.value == OP_HASH160 &&
 		pops[2].opcode.value == OP_DATA_20 &&
 		pops[3].opcode.value == OP_EQUAL
-	if stakeP2SH {
-		return true
-	}
-	return false
 }
 
 // isMultiSig returns true if the passed script is a multisig transaction, false

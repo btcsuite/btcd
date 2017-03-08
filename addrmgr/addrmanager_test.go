@@ -259,7 +259,7 @@ func TestNeedMoreAddresses(t *testing.T) {
 	n := addrmgr.New("testneedmoreaddresses", lookupFunc)
 	addrsToAdd := 1500
 	b := n.NeedMoreAddresses()
-	if b == false {
+	if !b {
 		t.Errorf("Expected that we need more addresses")
 	}
 	addrs := make([]*wire.NetAddress, addrsToAdd)
@@ -288,7 +288,7 @@ func TestNeedMoreAddresses(t *testing.T) {
 	}
 
 	b = n.NeedMoreAddresses()
-	if b == true {
+	if b {
 		t.Errorf("Expected that we don't need more addresses")
 	}
 }

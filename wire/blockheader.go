@@ -192,7 +192,7 @@ func NewBlockHeader(version int32, prevHash *chainhash.Hash,
 // decoding block headers stored to disk, such as in a database, as opposed to
 // decoding from the wire.
 func readBlockHeader(r io.Reader, pver uint32, bh *BlockHeader) error {
-	err := readElements(
+	return readElements(
 		r,
 		&bh.Version,
 		&bh.PrevBlock,
@@ -212,11 +212,6 @@ func readBlockHeader(r io.Reader, pver uint32, bh *BlockHeader) error {
 		&bh.Nonce,
 		&bh.ExtraData,
 		&bh.StakeVersion)
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 // writeBlockHeader writes a decred block header to w.  See Serialize for
@@ -225,7 +220,7 @@ func readBlockHeader(r io.Reader, pver uint32, bh *BlockHeader) error {
 // TODO: make sure serializing/writing is actually correct w/r/t dereferencing
 func writeBlockHeader(w io.Writer, pver uint32, bh *BlockHeader) error {
 	sec := uint32(bh.Timestamp.Unix())
-	err := writeElements(
+	return writeElements(
 		w,
 		bh.Version,
 		&bh.PrevBlock,
@@ -245,9 +240,4 @@ func writeBlockHeader(w io.Writer, pver uint32, bh *BlockHeader) error {
 		bh.Nonce,
 		bh.ExtraData,
 		bh.StakeVersion)
-	if err != nil {
-		return err
-	}
-
-	return nil
 }

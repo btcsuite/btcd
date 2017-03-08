@@ -104,7 +104,7 @@ func Discover() (nat NAT, err error) {
 			// return
 		}
 		answer := string(answerBytes[0:n])
-		if strings.Index(answer, "\r\n"+st) < 0 {
+		if !strings.Contains(answer, "\r\n"+st) {
 			continue
 		}
 		// HTTP header field names are case-insensitive.

@@ -528,9 +528,7 @@ func (sp *serverPeer) OnGetMiningState(p *peer.Peer, msg *wire.MsgGetMiningState
 				"metadata for block", bh)
 			return
 		}
-		for _, vh := range vhsForBlock {
-			voteHashes = append(voteHashes, vh)
-		}
+		voteHashes = append(voteHashes, vhsForBlock...)
 	}
 
 	err = sp.pushMiningStateMsg(uint32(height), blockHashes, voteHashes)
@@ -1230,7 +1228,7 @@ func (s *server) handleUpdatePeerHeights(state *peerState, umsg updatePeerHeight
 		// matches our newly accepted block, then update their block
 		// height.
 		if *latestBlkHash == *umsg.newHash {
-			sp.UpdateLastBlockHeight(int64(umsg.newHeight))
+			sp.UpdateLastBlockHeight(umsg.newHeight)
 			sp.UpdateLastAnnouncedBlock(nil)
 		}
 	})
@@ -1919,7 +1917,7 @@ out:
 
 			// only allow recent nodes (10mins) after we failed 30
 			// times
-			if tries < 30 && time.Now().Sub(addr.LastAttempt()) < 10*time.Minute {
+			if tries < 30 && time.Since(addr.LastAttempt()) < 10*time.Minute {
 				continue
 			}
 

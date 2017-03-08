@@ -188,12 +188,7 @@ func (msg *MsgVersion) BtcEncode(w io.Writer, pver uint32) error {
 		return err
 	}
 
-	err = writeElement(w, !msg.DisableRelayTx)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return writeElement(w, !msg.DisableRelayTx)
 }
 
 // Command returns the protocol command string for the message.  This is part

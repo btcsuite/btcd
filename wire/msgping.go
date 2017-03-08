@@ -30,22 +30,14 @@ type MsgPing struct {
 // This is part of the Message interface implementation.
 func (msg *MsgPing) BtcDecode(r io.Reader, pver uint32) error {
 	err := readElement(r, &msg.Nonce)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // BtcEncode encodes the receiver to w using the decred protocol encoding.
 // This is part of the Message interface implementation.
 func (msg *MsgPing) BtcEncode(w io.Writer, pver uint32) error {
 	err := writeElement(w, msg.Nonce)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // Command returns the protocol command string for the message.  This is part

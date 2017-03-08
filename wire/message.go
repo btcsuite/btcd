@@ -266,11 +266,7 @@ func WriteMessageN(w io.Writer, msg Message, pver uint32, dcrnet CurrencyNet) (i
 	// Write payload.
 	n, err = w.Write(payload)
 	totalBytes += n
-	if err != nil {
-		return totalBytes, err
-	}
-
-	return totalBytes, nil
+	return totalBytes, err
 }
 
 // WriteMessage writes a decred Message to w including the necessary header

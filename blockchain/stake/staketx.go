@@ -873,10 +873,10 @@ func IsSStx(tx *wire.MsgTx) (bool, error) {
 		outputScriptBuffer := bytes.NewBuffer(rawScript)
 		outputScriptPrefix := outputScriptBuffer.Next(2)
 
-		minPush := uint8(validSStxAddressOutMinPrefix[1])
-		maxPush := uint8(validSStxAddressOutMinPrefix[1]) +
+		minPush := validSStxAddressOutMinPrefix[1]
+		maxPush := validSStxAddressOutMinPrefix[1] +
 			(MaxSingleBytePushLength - minPush)
-		pushLen := uint8(outputScriptPrefix[1])
+		pushLen := outputScriptPrefix[1]
 		pushLengthValid := (pushLen >= minPush) && (pushLen <= maxPush)
 		// The first byte should be OP_RETURN, while the second byte should be a
 		// valid push length.
@@ -1034,10 +1034,10 @@ func IsSSGen(tx *wire.MsgTx) (bool, error) {
 	firstOutputScriptBuffer := bytes.NewBuffer(firstOutputScript)
 	firstOutputScriptPrefix := firstOutputScriptBuffer.Next(2)
 
-	minPush := uint8(validSSGenVoteOutMinPrefix[1])
-	maxPush := uint8(validSSGenVoteOutMinPrefix[1]) +
+	minPush := validSSGenVoteOutMinPrefix[1]
+	maxPush := validSSGenVoteOutMinPrefix[1] +
 		(MaxSingleBytePushLength - minPush)
-	pushLen := uint8(firstOutputScriptPrefix[1])
+	pushLen := firstOutputScriptPrefix[1]
 	pushLengthValid := (pushLen >= minPush) && (pushLen <= maxPush)
 	// The first byte should be OP_RETURN, while the second byte should be a
 	// valid push length.

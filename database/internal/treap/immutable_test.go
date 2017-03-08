@@ -30,7 +30,7 @@ func TestImmutableEmpty(t *testing.T) {
 
 	// Ensure there are no errors with requesting keys from an empty treap.
 	key := serializeUint32(0)
-	if gotVal := testTreap.Has(key); gotVal != false {
+	if gotVal := testTreap.Has(key); gotVal {
 		t.Fatalf("Has: unexpected result - got %v, want false", gotVal)
 	}
 	if gotVal := testTreap.Get(key); gotVal != nil {
@@ -349,7 +349,7 @@ func TestImmutableDuplicatePut(t *testing.T) {
 		testTreap = testTreap.Put(key, expectedVal)
 
 		// Ensure the key still exists and is the new value.
-		if gotVal := testTreap.Has(key); gotVal != true {
+		if gotVal := testTreap.Has(key); !gotVal {
 			t.Fatalf("Has: unexpected result - got %v, want false",
 				gotVal)
 		}
@@ -380,7 +380,7 @@ func TestImmutableNilValue(t *testing.T) {
 	testTreap = testTreap.Put(key, nil)
 
 	// Ensure the key exists and is an empty byte slice.
-	if gotVal := testTreap.Has(key); gotVal != true {
+	if gotVal := testTreap.Has(key); !gotVal {
 		t.Fatalf("Has: unexpected result - got %v, want false", gotVal)
 	}
 	if gotVal := testTreap.Get(key); gotVal == nil {
@@ -409,10 +409,7 @@ func TestImmutableForEachStopIterator(t *testing.T) {
 	var numIterated int
 	testTreap.ForEach(func(k, v []byte) bool {
 		numIterated++
-		if numIterated == numItems/2 {
-			return false
-		}
-		return true
+		return numIterated != numItems/2
 	})
 	if numIterated != numItems/2 {
 		t.Fatalf("ForEach: unexpected iterate count - got %d, want %d",

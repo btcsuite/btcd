@@ -87,12 +87,7 @@ func (b *BlockChain) upgradeToVersion2() error {
 
 		// Write the new database version.
 		b.dbInfo.version = 2
-		errLocal = dbPutDatabaseInfo(dbTx, b.dbInfo)
-		if errLocal != nil {
-			return errLocal
-		}
-
-		return nil
+		return dbPutDatabaseInfo(dbTx, b.dbInfo)
 	})
 	if err != nil {
 		return err

@@ -72,11 +72,9 @@ func TestSchnorrThreshold(t *testing.T) {
 		}
 
 		// Combine pubkeys.
-		allPubkeys := make([]*PublicKey, numKeysForTest,
-			numKeysForTest)
-		for j, pubkey := range pubKeysToUse {
-			allPubkeys[j] = pubkey
-		}
+		allPubkeys := make([]*PublicKey, numKeysForTest)
+		copy(allPubkeys, pubKeysToUse)
+
 		allPksSum := CombinePubkeys(curve, allPubkeys)
 
 		privNoncesToUse := make([]*PrivateKey, numKeysForTest,

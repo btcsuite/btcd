@@ -617,11 +617,7 @@ func TestTicketDBGeneral(t *testing.T) {
 	err = testDb.Update(func(dbTx database.Tx) error {
 		var errLocal error
 		bestNode, errLocal = InitDatabaseState(dbTx, simNetParams)
-		if errLocal != nil {
-			return errLocal
-		}
-
-		return nil
+		return errLocal
 	})
 	if err != nil {
 		t.Fatalf(err.Error())
@@ -729,11 +725,7 @@ func TestTicketDBGeneral(t *testing.T) {
 
 			bestNodeUsingDB, err = formerBestNode.DisconnectNode(header, nil,
 				nil, dbTx)
-			if err != nil {
-				return err
-			}
-
-			return nil
+			return err
 		})
 		if err != nil {
 			t.Errorf("couldn't disconnect using the database: %v",

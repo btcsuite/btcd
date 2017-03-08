@@ -659,12 +659,7 @@ func (b *blockManager) startSync(peers *list.List) {
 // syncing from.
 func (b *blockManager) isSyncCandidate(sp *serverPeer) bool {
 	// The peer is not a candidate for sync if it's not a full node.
-	if sp.Services()&wire.SFNodeNetwork != wire.SFNodeNetwork {
-		return false
-	}
-
-	// Candidate if all checks passed.
-	return true
+	return sp.Services()&wire.SFNodeNetwork == wire.SFNodeNetwork
 }
 
 // syncMiningStateAfterSync polls the blockMananger for the current sync
@@ -672,19 +667,15 @@ func (b *blockManager) isSyncCandidate(sp *serverPeer) bool {
 // sync the mining state to the network.
 func (b *blockManager) syncMiningStateAfterSync(sp *serverPeer) {
 	go func() {
-		ticker := time.NewTicker(time.Second * 3)
-		defer ticker.Stop()
 		for {
-			select {
-			case <-ticker.C:
-				if !sp.Connected() {
-					return
-				}
-				if b.IsCurrent() {
-					msg := wire.NewMsgGetMiningState()
-					sp.QueueMessage(msg, nil)
-					return
-				}
+			time.Sleep(3 * time.Second)
+			if !sp.Connected() {
+				return
+			}
+			if b.IsCurrent() {
+				msg := wire.NewMsgGetMiningState()
+				sp.QueueMessage(msg, nil)
+				return
 			}
 		}
 	}()
@@ -1312,7 +1303,7 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 	if blkHashUpdate != nil && heightUpdate != 0 {
 		bmsg.peer.UpdateLastBlockHeight(heightUpdate)
 		if isOrphan || b.current() {
-			go b.server.UpdatePeerHeights(blkHashUpdate, int64(heightUpdate),
+			go b.server.UpdatePeerHeights(blkHashUpdate, heightUpdate,
 				bmsg.peer)
 		}
 	}
@@ -1587,7 +1578,7 @@ func (b *blockManager) handleInvMsg(imsg *invMsg) {
 		blkHeight, err := b.chain.BlockHeightByHash(&invVects[lastBlock].Hash)
 		if err == nil {
 
-			imsg.peer.UpdateLastBlockHeight(int64(blkHeight))
+			imsg.peer.UpdateLastBlockHeight(blkHeight)
 		}
 	}
 

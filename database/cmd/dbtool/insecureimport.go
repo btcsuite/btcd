@@ -122,10 +122,7 @@ func (bi *blockImporter) processBlock(serializedBlock []byte) (bool, error) {
 	var exists bool
 	err = bi.db.View(func(tx database.Tx) error {
 		exists, err = tx.HasBlock(block.Hash())
-		if err != nil {
-			return err
-		}
-		return nil
+		return err
 	})
 	if err != nil {
 		return false, err
@@ -140,10 +137,7 @@ func (bi *blockImporter) processBlock(serializedBlock []byte) (bool, error) {
 		var exists bool
 		err := bi.db.View(func(tx database.Tx) error {
 			exists, err = tx.HasBlock(prevHash)
-			if err != nil {
-				return err
-			}
-			return nil
+			return err
 		})
 		if err != nil {
 			return false, err

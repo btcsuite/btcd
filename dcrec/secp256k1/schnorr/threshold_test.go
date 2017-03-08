@@ -345,11 +345,9 @@ func TestSchnorrThreshold(t *testing.T) {
 		assert.NoError(t, err)
 
 		// Combine pubkeys.
-		allPubkeys := make([]*secp256k1.PublicKey, numKeysForTest,
-			numKeysForTest)
-		for j, pubkey := range pubKeysToUse {
-			allPubkeys[j] = pubkey
-		}
+		allPubkeys := make([]*secp256k1.PublicKey, numKeysForTest)
+		copy(allPubkeys, pubKeysToUse)
+
 		allPksSum := CombinePubkeys(curve, allPubkeys)
 
 		// Verify the combined signature and public keys.
@@ -420,11 +418,9 @@ func TestSchnorrThreshold(t *testing.T) {
 		combinedSignature, _ = CombineSigs(curve, partialSignatures)
 
 		// Combine pubkeys.
-		allPubkeys = make([]*secp256k1.PublicKey, numKeysForTest,
-			numKeysForTest)
-		for j, pubkey := range pubKeysToUse {
-			allPubkeys[j] = pubkey
-		}
+		allPubkeys = make([]*secp256k1.PublicKey, numKeysForTest)
+		copy(allPubkeys, pubKeysToUse)
+
 		allPksSum = CombinePubkeys(curve, allPubkeys)
 
 		// Nothing that makes it here should be valid.

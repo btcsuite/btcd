@@ -136,7 +136,7 @@ func (b *ScriptBuilder) addData(data []byte) *ScriptBuilder {
 		b.script = append(b.script, OP_0)
 		return b
 	} else if dataLen == 1 && data[0] <= 16 {
-		b.script = append(b.script, byte((OP_1-1)+data[0]))
+		b.script = append(b.script, OP_1-1+data[0])
 		return b
 	} else if dataLen == 1 && data[0] == 0x81 {
 		b.script = append(b.script, byte(OP_1NEGATE))

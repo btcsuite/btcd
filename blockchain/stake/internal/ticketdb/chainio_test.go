@@ -446,11 +446,7 @@ func TestLiveDatabase(t *testing.T) {
 	var dbi *DatabaseInfo
 	err = testDb.View(func(dbTx database.Tx) error {
 		dbi, err = DbFetchDatabaseInfo(dbTx)
-		if err != nil {
-			return err
-		}
-
-		return nil
+		return err
 	})
 	if err != nil {
 		t.Fatalf("%v", err.Error())
@@ -495,11 +491,7 @@ func TestLiveDatabase(t *testing.T) {
 	ticketMap2 := make(map[tickettreap.Key]*tickettreap.Value)
 	err = testDb.View(func(dbTx database.Tx) error {
 		treap, err = DbLoadAllTickets(dbTx, dbnamespace.LiveTicketsBucketName)
-		if err != nil {
-			return err
-		}
-
-		return nil
+		return err
 	})
 	if err != nil {
 		t.Fatalf("%v", err.Error())
