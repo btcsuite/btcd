@@ -5,9 +5,6 @@ import:
 - package: github.com/btcsuite/go-socks
   subpackages:
   - socks
-- package: github.com/btcsuite/golangcrypto
-  subpackages:
-  - ripemd160
 - package: github.com/btcsuite/goleveldb
   subpackages:
   - leveldb
@@ -36,6 +33,9 @@ import:
 - package: github.com/decred/ed25519
   subpackages:
   - edwards25519
+- package: golang.org/x/crypto
+  subpackages:
+  - ripemd160
 testImport:
 - package: github.com/stretchr/testify
   version: ^1.1.0

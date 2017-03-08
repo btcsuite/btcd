@@ -1,5 +1,5 @@
-hash: 89ed7e73f1c55de07eaf8c44717dd9919291b8ea2ab16bf76674324057ea583a
-updated: 2017-02-16T20:42:39.426024619Z
+hash: 807209320ff3d80af89663d3407f7d3fef4cfa67e52750c4ffa58bae790f8a16
+updated: 2017-03-08T11:08:04.404189759-05:00
 imports:
 - name: github.com/btcsuite/btclog
   version: 73889fb79bd687870312b6e40effcecffbd57d30
@@ -9,10 +9,6 @@ imports:
   version: 4720035b7bfd2a9bb130b1c184f8bbe41b6f0d0f
   subpackages:
   - socks
-- name: github.com/btcsuite/golangcrypto
-  version: 53f62d9b43e87a6c56975cf862af7edf33a8d0df
-  subpackages:
-  - ripemd160
 - name: github.com/btcsuite/goleveldb
   version: 7834afc9e8cd15233b6c3d97e12674a31ca24602
   subpackages:
@@ -53,7 +49,7 @@ imports:
 - name: github.com/decred/dcrrpcclient
   version: 0a9e95ce9a20a0fbf535fdc2c79169b30d613378
 - name: github.com/decred/dcrutil
-  version: ba0a5f399a43abc0e1a0a0442509c36f35321bce
+  version: 2646ed56075e905782d7342ccaefbb8243ffcdc4
   subpackages:
   - base58
   - bloom
@@ -61,6 +57,10 @@ imports:
   version: b0909d3f798b97a03c9e77023f97a5301a2a7900
   subpackages:
   - edwards25519
+- name: golang.org/x/crypto
+  version: 728b753d0135da6801d45a38e6f43ff55779c5c2
+  subpackages:
+  - ripemd160
 testImports:
 - name: github.com/pmezard/go-difflib
   version: d8ed2627bdf02c080bf22230dbb337003b7aba2d

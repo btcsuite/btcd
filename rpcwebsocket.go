@@ -20,8 +20,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/btcsuite/golangcrypto/ripemd160"
 	"github.com/btcsuite/websocket"
+	"golang.org/x/crypto/ripemd160"
 
 	"github.com/decred/dcrd/blockchain"
 	"github.com/decred/dcrd/blockchain/stake"
