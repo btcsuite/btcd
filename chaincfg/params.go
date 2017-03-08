@@ -75,7 +75,8 @@ type Checkpoint struct {
 
 // Vote describes a voting instance.  It is self-describing so that the UI can
 // be directly implemented using the fields.  Mask determines which bits can be
-// used.  Bits are enumerated.
+// used.  Bits are enumerated and must be consecutive.  Each vote requires one
+// and only one abstain (bits = 0) and reject vote (IsNo = true).
 //
 // For example, change block height from int64 to uint64.
 // Vote {
@@ -120,9 +121,9 @@ type Vote struct {
 	Choices []Choice
 }
 
-// Choice is an defins one of the possible Choices that make up a vote. The 0
-// value in Bits indicates the default choice.  Care should be taken not to
-// bias a vote with the default choice.
+// Choice defines one of the possible Choices that make up a vote. The 0 value
+// in Bits indicates the default choice.  Care should be taken not to bias a
+// vote with the default choice.
 type Choice struct {
 	// Single unique word identifying vote (e.g. yes)
 	Id string
