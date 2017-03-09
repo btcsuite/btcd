@@ -60,9 +60,9 @@ func (msg *MsgCFHeaders) BtcDecode(r io.Reader, pver uint32) error {
 
 	// Create a contiguous slice of headers to deserialize into in order to
 	// reduce the number of allocations.
-	var cfh chainhash.Hash
 	msg.HeaderHashes = make([]*chainhash.Hash, 0, count)
 	for i := uint64(0); i < count; i++ {
+		var cfh chainhash.Hash
 		err := readElement(r, &cfh)
 		if err != nil {
 			return err
