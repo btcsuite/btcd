@@ -206,18 +206,27 @@ func ValidateTransactionScripts(tx *btcutil.Tx, utxoView *UtxoViewpoint,
 	flags txscript.ScriptFlags, sigCache *txscript.SigCache,
 	hashCache *txscript.HashCache) error {
 
+	// First determine if segwit is active according to the scriptFlags. If
+	// it isn't then we don't need to interact with the HashCache.
+	segwitActive := flags&txscript.ScriptVerifyWitness == txscript.ScriptVerifyWitness
+
 	// If the hashcache doesn't yet has the sighash midstate for this
 	// transaction, then we'll compute them now so we can re-use them
 	// amongst all worker validation goroutines.
-	if !hashCache.ContainsHashes(tx.Hash()) {
+	if segwitActive && tx.MsgTx().HasWitness() &&
+		!hashCache.ContainsHashes(tx.Hash()) {
 		hashCache.AddSigHashes(tx.MsgTx())
 	}
 
-	// The same pointer to the transaction's sighash midstate will be
-	// re-used amongst all validation goroutines. By pre-computing the
-	// sighash here instead of during validation, we ensure the sighashes
-	// are only computed once.
-	cachedHashes, _ := hashCache.GetSigHashes(tx.Hash())
+	var cachedHashes *txscript.TxSigHashes
+	if segwitActive && tx.MsgTx().HasWitness() {
+		// The same pointer to the transaction's sighash midstate will
+		// be re-used amongst all validation goroutines. By
+		// pre-computing the sighash here instead of during validation,
+		// we ensure the sighashes
+		// are only computed once.
+		cachedHashes, _ = hashCache.GetSigHashes(tx.Hash())
+	}
 
 	// Collect all of the transaction inputs and required information for
 	// validation.
@@ -268,14 +277,14 @@ func checkBlockScripts(block *btcutil.Block, utxoView *UtxoViewpoint,
 		// sighashes for the transaction. This allows us to take
 		// advantage of the potential speed savings due to the new
 		// digest algorithm (BIP0143).
-		if segwitActive && tx.MsgTx().HasWitness() && hashCache != nil &&
+		if segwitActive && tx.HasWitness() && hashCache != nil &&
 			!hashCache.ContainsHashes(hash) {
 
 			hashCache.AddSigHashes(tx.MsgTx())
 		}
 
 		var cachedHashes *txscript.TxSigHashes
-		if segwitActive && tx.MsgTx().HasWitness() {
+		if segwitActive && tx.HasWitness() {
 			if hashCache != nil {
 				cachedHashes, _ = hashCache.GetSigHashes(hash)
 			} else {
@@ -314,7 +323,9 @@ func checkBlockScripts(block *btcutil.Block, utxoView *UtxoViewpoint,
 	// them from the cache.
 	if segwitActive && hashCache != nil {
 		for _, tx := range block.Transactions() {
-			hashCache.PurgeSigHashes(tx.Hash())
+			if tx.MsgTx().HasWitness() {
+				hashCache.PurgeSigHashes(tx.Hash())
+			}
 		}
 	}
 
