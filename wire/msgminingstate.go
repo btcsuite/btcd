@@ -107,7 +107,10 @@ func (msg *MsgMiningState) BtcDecode(r io.Reader, pver uint32) error {
 		if err != nil {
 			return err
 		}
-		msg.AddVoteHash(&hash)
+		err = msg.AddVoteHash(&hash)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil

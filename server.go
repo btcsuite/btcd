@@ -467,6 +467,9 @@ func (sp *serverPeer) pushMiningStateMsg(height uint32, blockHashes []chainhash.
 		if err != nil {
 			return err
 		}
+		if i+1 >= wire.MaxMSBlocksAtHeadPerMsg {
+			break
+		}
 	}
 
 	sp.QueueMessage(msg, nil)
