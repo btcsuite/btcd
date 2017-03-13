@@ -1477,11 +1477,7 @@ func createVoutList(mtx *wire.MsgTx, chainParams *chaincfg.Params,
 
 // createTxRawResult converts the passed transaction and associated parameters
 // to a raw transaction JSON object.
-func createTxRawResult(chainParams *chaincfg.Params, mtx *wire.MsgTx,
-	txHash string, blkIdx uint32, blkHeader *wire.BlockHeader,
-	blkHash string, blkHeight int64,
-	chainHeight int64) (*dcrjson.TxRawResult, error) {
-
+func createTxRawResult(chainParams *chaincfg.Params, mtx *wire.MsgTx, txHash string, blkIdx uint32, blkHeader *wire.BlockHeader, blkHash string, blkHeight int64, confirmations int64) (*dcrjson.TxRawResult, error) {
 	mtxHex, err := messageToHex(mtx)
 	if err != nil {
 		return nil, err
@@ -1508,7 +1504,7 @@ func createTxRawResult(chainParams *chaincfg.Params, mtx *wire.MsgTx,
 		txReply.Time = blkHeader.Timestamp.Unix()
 		txReply.Blocktime = blkHeader.Timestamp.Unix()
 		txReply.BlockHash = blkHash
-		txReply.Confirmations = uint64(1 + chainHeight - blkHeight)
+		txReply.Confirmations = confirmations
 	}
 
 	return txReply, nil
@@ -2088,33 +2084,26 @@ func handleGetBlock(s *rpcServer, cmd interface{},
 		return hex.EncodeToString(blkBytes), nil
 	}
 
-	// The verbose flag is set, so generate the JSON object and return it.
-	blockInMainChain, _ := s.chain.MainChainHasBlock(hash)
-	var idx int64
-	if !blockInMainChain {
-		idx = -1
-	}
+	best := s.chain.BestSnapshot()
+
+	// See if this block is an orphan and adjust Confirmations accordingly.
+	onMainChain, _ := s.chain.MainChainHasBlock(hash)
 
 	// Get next block hash unless there are none.
-	blockHeader := &blk.MsgBlock().Header
 	var nextHashString string
-	bestState := s.chain.BestSnapshot()
-	height := int64(blockHeader.Height)
-	if height < bestState.Height {
-		nextHash, err := s.chain.BlockHashByHeight(height + 1)
-		if err != nil {
-			context := "No next block hash"
-			return nil, internalRPCError(err.Error(), context)
-		}
-
-		nextHeader, err := s.chain.HeaderByHeight(height + 1)
-		if err != nil {
-			context := "No next block header"
-			return nil, internalRPCError(err.Error(), context)
-		}
-		if nextHeader.PrevBlock == *hash {
+	blockHeader := &blk.MsgBlock().Header
+	confirmations := int64(-1)
+	if onMainChain {
+		if int64(blockHeader.Height) < best.Height {
+			nextHash, err := s.chain.BlockHashByHeight(int64(blockHeader.Height + 1))
+			if err != nil {
+				context := "No next block"
+				return nil, internalRPCError(err.Error(),
+					context)
+			}
 			nextHashString = nextHash.String()
 		}
+		confirmations = 1 + best.Height - int64(blockHeader.Height)
 	}
 
 	sbitsFloat := float64(blockHeader.SBits) / dcrutil.AtomsPerCoin
@@ -2133,8 +2122,8 @@ func handleGetBlock(s *rpcServer, cmd interface{},
 		PoolSize:      blockHeader.PoolSize,
 		Time:          blockHeader.Timestamp.Unix(),
 		StakeVersion:  blockHeader.StakeVersion,
-		Confirmations: uint64(1 + bestState.Height - height),
-		Height:        height,
+		Confirmations: confirmations,
+		Height:        int64(blockHeader.Height),
 		Size:          int32(blk.MsgBlock().Header.Size),
 		Bits:          strconv.FormatInt(int64(blockHeader.Bits), 16),
 		SBits:         sbitsFloat,
@@ -2165,8 +2154,8 @@ func handleGetBlock(s *rpcServer, cmd interface{},
 		for i, tx := range txns {
 			rawTxn, err := createTxRawResult(s.server.chainParams,
 				tx.MsgTx(), tx.Hash().String(), uint32(i),
-				blockHeader, blk.Hash().String(), idx,
-				bestState.Height)
+				blockHeader, blk.Hash().String(),
+				int64(blockHeader.Height), confirmations)
 			if err != nil {
 				return nil, err
 			}
@@ -2179,7 +2168,8 @@ func handleGetBlock(s *rpcServer, cmd interface{},
 		for i, tx := range stxns {
 			rawSTxn, err := createTxRawResult(s.server.chainParams,
 				tx.MsgTx(), tx.Hash().String(), uint32(i),
-				blockHeader, blk.Hash().String(), idx, bestState.Height)
+				blockHeader, blk.Hash().String(),
+				int64(blockHeader.Height), confirmations)
 			if err != nil {
 				return nil, err
 			}
@@ -2249,28 +2239,31 @@ func handleGetBlockHeader(s *rpcServer, cmd interface{}, closeChan <-chan struct
 		return nil, internalRPCError(err.Error(), context)
 	}
 
-	// Get the block height from chain.
-	blockHeight, err := s.chain.BlockHeightByHash(hash)
-	if err != nil {
-		context := "Failed to obtain block height"
-		return nil, internalRPCError(err.Error(), context)
-	}
 	best := s.chain.BestSnapshot()
+
+	// See if this block is an orphan and adjust Confirmations accordingly.
+	onMainChain, _ := s.chain.MainChainHasBlock(hash)
 
 	// Get next block hash unless there are none.
 	var nextHashString string
-	if blockHeight < best.Height {
-		nextHash, err := s.chain.BlockHashByHeight(blockHeight + 1)
-		if err != nil {
-			context := "No next block"
-			return nil, internalRPCError(err.Error(), context)
+	confirmations := int64(-1)
+	height := int64(blockHeader.Height)
+	if onMainChain {
+		if height < best.Height {
+			nextHash, err := s.chain.BlockHashByHeight(height + 1)
+			if err != nil {
+				context := "No next block"
+				return nil, internalRPCError(err.Error(),
+					context)
+			}
+			nextHashString = nextHash.String()
 		}
-		nextHashString = nextHash.String()
+		confirmations = 1 + best.Height - height
 	}
 
 	blockHeaderReply := dcrjson.GetBlockHeaderVerboseResult{
 		Hash:          c.Hash,
-		Confirmations: uint64(1 + best.Height - blockHeight),
+		Confirmations: confirmations,
 		Version:       blockHeader.Version,
 		PreviousHash:  blockHeader.PrevBlock.String(),
 		MerkleRoot:    blockHeader.MerkleRoot.String(),
@@ -2283,7 +2276,7 @@ func handleGetBlockHeader(s *rpcServer, cmd interface{}, closeChan <-chan struct
 		PoolSize:      blockHeader.PoolSize,
 		Bits:          strconv.FormatInt(int64(blockHeader.Bits), 16),
 		SBits:         dcrutil.Amount(blockHeader.SBits).ToCoin(),
-		Height:        blockHeader.Height,
+		Height:        uint32(height),
 		Size:          blockHeader.Size,
 		Time:          blockHeader.Timestamp.Unix(),
 		Nonce:         blockHeader.Nonce,
@@ -2291,6 +2284,7 @@ func handleGetBlockHeader(s *rpcServer, cmd interface{}, closeChan <-chan struct
 		Difficulty:    getDifficultyRatio(blockHeader.Bits),
 		NextHash:      nextHashString,
 	}
+
 	return blockHeaderReply, nil
 
 }
@@ -3780,9 +3774,11 @@ func handleGetRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan str
 	}
 
 	// The verbose flag is set, so generate the JSON object and return it.
-	var blkHeader *wire.BlockHeader
-	var blkHashStr string
-	var chainHeight int64
+	var (
+		blkHeader     *wire.BlockHeader
+		blkHashStr    string
+		confirmations int64
+	)
 	if blkHash != nil {
 		// Load the raw header bytes.
 		var headerBytes []byte
@@ -3806,11 +3802,12 @@ func handleGetRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan str
 
 		blkHeader = &header
 		blkHashStr = blkHash.String()
-		chainHeight = s.chain.BestSnapshot().Height
+		confirmations = 1 + s.chain.BestSnapshot().Height - blkHeight
 	}
 
 	rawTxn, err := createTxRawResult(s.server.chainParams, mtx,
-		txHash.String(), 0, blkHeader, blkHashStr, blkHeight, chainHeight)
+		txHash.String(), 0, blkHeader, blkHashStr, blkHeight,
+		confirmations)
 	if err != nil {
 		return nil, err
 	}

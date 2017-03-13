@@ -1035,10 +1035,12 @@ func (m *wsNotificationManager) notifyForNewTx(clients map[chan struct{}]*wsClie
 		amount += txOut.Value
 	}
 
-	ntfn := dcrjson.NewTxAcceptedNtfn(txHashStr, dcrutil.Amount(amount).ToCoin())
+	ntfn := dcrjson.NewTxAcceptedNtfn(txHashStr,
+		dcrutil.Amount(amount).ToCoin())
 	marshalledJSON, err := dcrjson.MarshalCmd(nil, ntfn)
 	if err != nil {
-		rpcsLog.Errorf("Failed to marshal tx notification: %s", err.Error())
+		rpcsLog.Errorf("Failed to marshal tx notification: %s",
+			err.Error())
 		return
 	}
 

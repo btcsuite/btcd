@@ -12,7 +12,7 @@ import "encoding/json"
 // returns a hex-encoded string.
 type GetBlockHeaderVerboseResult struct {
 	Hash          string  `json:"hash"`
-	Confirmations uint64  `json:"confirmations"`
+	Confirmations int64   `json:"confirmations"`
 	Version       int32   `json:"version"`
 	PreviousHash  string  `json:"previousblockhash,omitempty"`
 	MerkleRoot    string  `json:"merkleroot"`
@@ -39,7 +39,7 @@ type GetBlockHeaderVerboseResult struct {
 // hex-encoded string.  Contains Decred additions.
 type GetBlockVerboseResult struct {
 	Hash          string        `json:"hash"`
-	Confirmations uint64        `json:"confirmations"`
+	Confirmations int64         `json:"confirmations"`
 	Size          int32         `json:"size"`
 	Height        int64         `json:"height"`
 	Version       int32         `json:"version"`
@@ -453,7 +453,7 @@ type TxRawResult struct {
 	BlockHash     string `json:"blockhash,omitempty"`
 	BlockHeight   int64  `json:"blockheight"`
 	BlockIndex    uint32 `json:"blockindex,omitempty"`
-	Confirmations uint64 `json:"confirmations,omitempty"`
+	Confirmations int64  `json:"confirmations,omitempty"`
 	Time          int64  `json:"time,omitempty"`
 	Blocktime     int64  `json:"blocktime,omitempty"`
 }
