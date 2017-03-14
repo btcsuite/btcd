@@ -48,7 +48,7 @@ func dcrdMain(serverChan chan<- *server) error {
 	defer dcrdLog.Info("Shutdown complete")
 
 	// Show version and home dir at startup.
-	dcrdLog.Infof("Version %s", version())
+	dcrdLog.Infof("Version %s (Go version %s)", version(), runtime.Version())
 	dcrdLog.Infof("Home dir: %s", cfg.HomeDir)
 
 	// Enable http profiling server if requested.
