@@ -33,10 +33,16 @@ var mainNetParams = params{
 }
 
 // testNetParams contains parameters specific to the test network (version 0)
-// (wire.TestNet).  NOTE: The RPC port is intentionally different than the
-// reference implementation - see the mainNetParams comment for details.
+// (wire.TestNet).
 var testNetParams = params{
 	Params:  &chaincfg.TestNetParams,
+	rpcPort: "19109",
+}
+
+// testNetParams contains parameters specific to the test network (version 2)
+// (wire.TestNet2).
+var testNet2Params = params{
+	Params:  &chaincfg.TestNet2Params,
 	rpcPort: "19109",
 }
 
