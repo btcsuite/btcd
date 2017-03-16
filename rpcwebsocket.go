@@ -1794,7 +1794,7 @@ func handleWebsocketHelp(wsc *wsClient, icmd interface{}) (interface{}, error) {
 		usage, err := wsc.server.helpCacher.rpcUsage(true)
 		if err != nil {
 			context := "Failed to generate RPC usage"
-			return nil, internalRPCError(err.Error(), context)
+			return nil, rpcInternalError(err.Error(), context)
 		}
 		return usage, nil
 	}
@@ -1819,7 +1819,7 @@ func handleWebsocketHelp(wsc *wsClient, icmd interface{}) (interface{}, error) {
 	help, err := wsc.server.helpCacher.rpcMethodHelp(command)
 	if err != nil {
 		context := "Failed to generate help"
-		return nil, internalRPCError(err.Error(), context)
+		return nil, rpcInternalError(err.Error(), context)
 	}
 	return help, nil
 }
