@@ -2029,7 +2029,7 @@ func newPeerBase(cfg *Config, inbound bool) *Peer {
 
 	// Set the chain parameters to testnet if the caller did not specify any.
 	if cfg.ChainParams == nil {
-		cfg.ChainParams = &chaincfg.TestNetParams
+		cfg.ChainParams = &chaincfg.TestNet2Params
 	}
 
 	p := Peer{

@@ -540,9 +540,9 @@ func (b *bogusAddress) DSA(chainParams *chaincfg.Params) int {
 	return -1
 }
 
-// Net returns &chaincfg.TestNetParams.
+// Net returns &chaincfg.TestNet2Params.
 func (b *bogusAddress) Net() *chaincfg.Params {
-	return &chaincfg.TestNetParams
+	return &chaincfg.TestNet2Params
 }
 
 // TestPayToAddrScript ensures the PayToAddrScript function generates the

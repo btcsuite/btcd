@@ -1359,7 +1359,7 @@ func TestVerifyRealTxs(t *testing.T) {
 	ssrtxTx := dcrutil.NewTx(ssrtxMtx)
 
 	ssrtxTypes, ssrtxAddrs, ssrtxAmts, err :=
-		stake.TxSSRtxStakeOutputInfo(ssrtxTx.MsgTx(), &chaincfg.TestNetParams)
+		stake.TxSSRtxStakeOutputInfo(ssrtxTx.MsgTx(), &chaincfg.TestNet2Params)
 	if err != nil {
 		t.Errorf("Unexpected GetSSRtxStakeOutputInfo error: %v", err.Error())
 	}
@@ -1394,7 +1394,7 @@ func TestVerifyRealTxs(t *testing.T) {
 	sstxTypes, sstxAddrs, sstxAmts, _, sstxRules, sstxLimits =
 		stake.TxSStxStakeOutputInfo(sstxTx.MsgTx())
 	ssrtxTypes, ssrtxAddrs, ssrtxAmts, err =
-		stake.TxSSRtxStakeOutputInfo(ssrtxTx.MsgTx(), &chaincfg.TestNetParams)
+		stake.TxSSRtxStakeOutputInfo(ssrtxTx.MsgTx(), &chaincfg.TestNet2Params)
 	if err != nil {
 		t.Errorf("Unexpected GetSSRtxStakeOutputInfo error: %v", err.Error())
 	}
@@ -1420,7 +1420,7 @@ func TestVerifyRealTxs(t *testing.T) {
 	sstxTypes, sstxAddrs, sstxAmts, _, sstxRules, sstxLimits =
 		stake.TxSStxStakeOutputInfo(sstxTx.MsgTx())
 	ssrtxTypes, ssrtxAddrs, ssrtxAmts, err =
-		stake.TxSSRtxStakeOutputInfo(ssrtxTx.MsgTx(), &chaincfg.TestNetParams)
+		stake.TxSSRtxStakeOutputInfo(ssrtxTx.MsgTx(), &chaincfg.TestNet2Params)
 	if err != nil {
 		t.Errorf("Unexpected GetSSRtxStakeOutputInfo error: %v", err.Error())
 	}
@@ -1451,7 +1451,7 @@ func TestVerifyRealTxs(t *testing.T) {
 	sstxTypes, sstxAddrs, sstxAmts, _, sstxRules, sstxLimits =
 		stake.TxSStxStakeOutputInfo(sstxTx.MsgTx())
 	ssrtxTypes, ssrtxAddrs, ssrtxAmts, err =
-		stake.TxSSRtxStakeOutputInfo(ssrtxTx.MsgTx(), &chaincfg.TestNetParams)
+		stake.TxSSRtxStakeOutputInfo(ssrtxTx.MsgTx(), &chaincfg.TestNet2Params)
 	if err != nil {
 		t.Errorf("Unexpected GetSSRtxStakeOutputInfo error: %v", err.Error())
 	}

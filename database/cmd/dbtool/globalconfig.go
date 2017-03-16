@@ -68,7 +68,7 @@ func setupGlobalConfig() error {
 	numNets := 0
 	if cfg.TestNet {
 		numNets++
-		activeNetParams = &chaincfg.TestNetParams
+		activeNetParams = &chaincfg.TestNet2Params
 	}
 	if cfg.SimNet {
 		numNets++

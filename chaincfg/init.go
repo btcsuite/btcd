@@ -151,7 +151,7 @@ func validateAgendas() {
 		case 0:
 			params = MainNetParams
 		case 1:
-			params = TestNetParams
+			params = TestNet2Params
 		case 2:
 			params = SimNetParams
 		default:

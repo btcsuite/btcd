@@ -2195,7 +2195,7 @@ func (b *BlockChain) BestSnapshot() *BestState {
 func (b *BlockChain) maxBlockSize(prevNode *blockNode) (int64, error) {
 	// Hard fork voting on block size is only enabled on testnet v1 and
 	// simnet.
-	if b.chainParams.Net != wire.TestNet && b.chainParams.Net != wire.SimNet {
+	if b.chainParams.Net != wire.SimNet {
 		return int64(b.chainParams.MaximumBlockSizes[0]), nil
 	}
 

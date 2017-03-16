@@ -32,14 +32,7 @@ var mainNetParams = params{
 	rpcPort: "9109",
 }
 
-// testNetParams contains parameters specific to the test network (version 0)
-// (wire.TestNet).
-var testNetParams = params{
-	Params:  &chaincfg.TestNetParams,
-	rpcPort: "19109",
-}
-
-// testNetParams contains parameters specific to the test network (version 2)
+// testNet2Params contains parameters specific to the test network (version 2)
 // (wire.TestNet2).
 var testNet2Params = params{
 	Params:  &chaincfg.TestNet2Params,
@@ -57,15 +50,15 @@ var simNetParams = params{
 // time of writing, dcrd currently places blocks for testnet version 0 in the
 // data and log directory "testnet", which does not match the Name field of the
 // chaincfg parameters.  This function can be used to override this directory name
-// as "testnet" when the passed active network matches wire.TestNet.
+// as "testnet2" when the passed active network matches wire.TestNet2.
 //
 // A proper upgrade to move the data and log directories for this network to
 // "testnet" is planned for the future, at which point this function can be
 // removed and the network parameter's name used instead.
 func netName(chainParams *params) string {
 	switch chainParams.Net {
-	case wire.TestNet:
-		return "testnet"
+	case wire.TestNet2:
+		return "testnet2"
 	default:
 		return chainParams.Name
 	}

@@ -292,7 +292,7 @@ func TestCheckTransactionStandard(t *testing.T) {
 	}
 	addrHash := [20]byte{0x01}
 	addr, err := dcrutil.NewAddressPubKeyHash(addrHash[:],
-		&chaincfg.TestNetParams, chainec.ECTypeSecp256k1)
+		&chaincfg.TestNet2Params, chainec.ECTypeSecp256k1)
 	if err != nil {
 		t.Fatalf("NewAddressPubKeyHash: unexpected error: %v", err)
 	}
