@@ -709,7 +709,7 @@ var TestNetParams = Params{
 	BlockOneLedger:              BlockOneLedgerTestNet,
 }
 
-// Test2NetParams defines the network parameters for the test currency network.
+// TestNet2Params defines the network parameters for the test currency network.
 // This network is sometimes simply called "testnet".
 // This is the second public iteration of testnet.
 var TestNet2Params = Params{
@@ -807,7 +807,7 @@ var TestNet2Params = Params{
 	MaxFreshStakePerBlock:   20,          // 4*TicketsPerBlock
 	StakeEnabledHeight:      16 + 16,     // CoinbaseMaturity + TicketMaturity
 	StakeValidationHeight:   768,         // Arbitrary
-	StakeBaseSigScript:      []byte{0xDE, 0xAD, 0xBE, 0xEF},
+	StakeBaseSigScript:      []byte{0x00, 0x00},
 	StakeMajorityMultiplier: 3,
 	StakeMajorityDivisor:    4,
 
