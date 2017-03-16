@@ -772,7 +772,7 @@ var TestNet2Params = Params{
 	BlockUpgradeNumToCheck:  100,
 
 	// Mempool parameters
-	RelayNonStdTxs: false,
+	RelayNonStdTxs: true,
 
 	// Address encoding magics
 	NetworkAddressPrefix: "T",
