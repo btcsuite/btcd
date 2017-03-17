@@ -4470,8 +4470,7 @@ func handleGetWorkSubmission(s *rpcServer, hexData string) (interface{}, error) 
 	msgBlock := tempBlock.MsgBlock()
 	msgBlock.Header = submittedHeader
 	if msgBlock.Header.Height > 1 {
-		pkScriptCopy := make([]byte, len(blockInfo.pkScript),
-			len(blockInfo.pkScript))
+		pkScriptCopy := make([]byte, len(blockInfo.pkScript))
 		copy(pkScriptCopy, blockInfo.pkScript)
 		msgBlock.Transactions[0].TxOut[1].PkScript = blockInfo.pkScript
 		merkles := blockchain.BuildMerkleTreeStore(tempBlock.Transactions())
@@ -4622,7 +4621,7 @@ func handleLiveTickets(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 		return nil, err
 	}
 
-	ltString := make([]string, len(lt), len(lt))
+	ltString := make([]string, len(lt))
 	for i := range lt {
 		ltString[i] = lt[i].String()
 	}
@@ -4637,7 +4636,7 @@ func handleMissedTickets(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 		return nil, err
 	}
 
-	mtString := make([]string, len(mt), len(mt))
+	mtString := make([]string, len(mt))
 	for i, hash := range mt {
 		mtString[i] = hash.String()
 	}
@@ -5655,7 +5654,7 @@ func handleTicketsForAddress(s *rpcServer, cmd interface{}, closeChan <-chan str
 		return nil, err
 	}
 
-	ticketStrings := make([]string, len(tickets), len(tickets))
+	ticketStrings := make([]string, len(tickets))
 	itr := 0
 	for _, ticket := range tickets {
 		ticketStrings[itr] = ticket.String()

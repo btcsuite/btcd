@@ -473,7 +473,7 @@ func standardCoinbaseOpReturn(height uint32, extraNonces []uint64) ([]byte,
 		return nil, fmt.Errorf("extranonces has wrong num uint64s")
 	}
 
-	enData := make([]byte, 36, 36)
+	enData := make([]byte, 36)
 	binary.LittleEndian.PutUint32(enData[0:4], height)
 	binary.LittleEndian.PutUint64(enData[4:12], extraNonces[0])
 	binary.LittleEndian.PutUint64(enData[12:20], extraNonces[1])
@@ -498,7 +498,7 @@ func (bt *BlockTemplate) getCoinbaseExtranonces() []uint64 {
 		return []uint64{0, 0, 0, 0}
 	}
 
-	ens := make([]uint64, 4, 4) // 32-bytes
+	ens := make([]uint64, 4) // 32-bytes
 	ens[0] = binary.LittleEndian.Uint64(
 		bt.Block.Transactions[0].TxOut[1].PkScript[6:14])
 	ens[1] = binary.LittleEndian.Uint64(
@@ -522,7 +522,7 @@ func getCoinbaseExtranonces(msgBlock *wire.MsgBlock) []uint64 {
 		return []uint64{0, 0, 0, 0}
 	}
 
-	ens := make([]uint64, 4, 4) // 32-bytes
+	ens := make([]uint64, 4) // 32-bytes
 	ens[0] = binary.LittleEndian.Uint64(
 		msgBlock.Transactions[0].TxOut[1].PkScript[6:14])
 	ens[1] = binary.LittleEndian.Uint64(
@@ -596,9 +596,7 @@ func createCoinbaseTx(subsidyCache *blockchain.SubsidyCache,
 	// Block one is a special block that might pay out tokens to a ledger.
 	if nextBlockHeight == 1 && len(params.BlockOneLedger) != 0 {
 		// Convert the addresses in the ledger into useable format.
-		addrs := make([]dcrutil.Address,
-			len(params.BlockOneLedger),
-			len(params.BlockOneLedger))
+		addrs := make([]dcrutil.Address, len(params.BlockOneLedger))
 		for i, payout := range params.BlockOneLedger {
 			addr, err := dcrutil.DecodeAddress(payout.Address, params)
 			if err != nil {
@@ -821,8 +819,7 @@ func deepCopyBlockTemplate(blockTemplate *BlockTemplate) *BlockTemplate {
 	// Copy transactions pointers. Duplicate the coinbase
 	// transaction, because it might update it by modifying
 	// the extra nonce.
-	transactionsCopy := make([]*wire.MsgTx, len(blockTemplate.Block.Transactions),
-		len(blockTemplate.Block.Transactions))
+	transactionsCopy := make([]*wire.MsgTx, len(blockTemplate.Block.Transactions))
 	coinbaseCopy :=
 		dcrutil.NewTxDeep(blockTemplate.Block.Transactions[0])
 	for i, mtx := range blockTemplate.Block.Transactions {
