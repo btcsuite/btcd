@@ -305,8 +305,22 @@ type StakeVersions struct {
 // GetStakeVersions returns a cooked array of StakeVersions.  We do this in
 // order to not bloat memory by returning raw blocks.
 func (b *BlockChain) GetStakeVersions(hash *chainhash.Hash, count int32) ([]StakeVersions, error) {
+	// Nothing to do if no count requested.
+	if count == 0 {
+		return nil, nil
+	}
+
+	if count < 0 {
+		return nil, fmt.Errorf("count must not be less than zero - "+
+			"got %d", count)
+	}
+
 	b.chainLock.Lock()
 	defer b.chainLock.Unlock()
+
+	if count > int32(b.bestNode.height) {
+		count = int32(b.bestNode.height)
+	}
 
 	startNode, err := b.findNode(hash, 0)
 	if err != nil {
@@ -315,7 +329,7 @@ func (b *BlockChain) GetStakeVersions(hash *chainhash.Hash, count int32) ([]Stak
 
 	result := make([]StakeVersions, 0, count)
 	prevNode := startNode
-	for i := int32(0); i < count; i++ {
+	for i := int32(0); prevNode != nil && i < count; i++ {
 		sv := StakeVersions{
 			Hash:         prevNode.hash,
 			Height:       prevNode.height,
@@ -329,10 +343,6 @@ func (b *BlockChain) GetStakeVersions(hash *chainhash.Hash, count int32) ([]Stak
 		prevNode, err = b.getPrevNodeFromNode(prevNode)
 		if err != nil {
 			return nil, err
-		}
-		if prevNode == nil {
-			// Just return what we did find.
-			break
 		}
 	}
 

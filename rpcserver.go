@@ -3936,14 +3936,17 @@ func handleGetStakeVersionInfo(s *rpcServer, cmd interface{}, closeChan <-chan s
 
 // handleGetStakeVersions implements the getstakeversions command.
 func handleGetStakeVersions(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
-	c, ok := cmd.(*dcrjson.GetStakeVersionsCmd)
-	if !ok {
-		return nil, internalRPCError("Invalid command",
-			"handleGetStakeVersions")
-	}
+	c := cmd.(*dcrjson.GetStakeVersionsCmd)
+
 	hash, err := chainhash.NewHashFromStr(c.Hash)
 	if err != nil {
-		return nil, err
+		return nil, rpcDecodeHexError(c.Hash)
+	}
+	if c.Count <= 0 {
+		return nil, &dcrjson.RPCError{
+			Code:    dcrjson.ErrRPCInvalidParameter,
+			Message: "Invalid parameter, count must be > 0",
+		}
 	}
 
 	sv, err := s.chain.GetStakeVersions(hash, c.Count)
