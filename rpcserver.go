@@ -713,9 +713,7 @@ func handleCreateRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan 
 }
 
 // handleCreateRawSStx handles createrawsstx commands.
-func handleCreateRawSStx(s *rpcServer,
-	cmd interface{},
-	closeChan <-chan struct{}) (interface{}, error) {
+func handleCreateRawSStx(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	c := cmd.(*dcrjson.CreateRawSStxCmd)
 
 	// Basic sanity checks for the information coming from the cmd.
@@ -968,9 +966,7 @@ func handleCreateRawSStx(s *rpcServer,
 }
 
 // handleCreateRawSSGenTx handles createrawssgentx commands.
-func handleCreateRawSSGenTx(s *rpcServer,
-	cmd interface{},
-	closeChan <-chan struct{}) (interface{}, error) {
+func handleCreateRawSSGenTx(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	c := cmd.(*dcrjson.CreateRawSSGenTxCmd)
 
 	// Only a single SStx should be given
@@ -1153,9 +1149,7 @@ func handleCreateRawSSGenTx(s *rpcServer,
 }
 
 // handleCreateRawSSRtx handles createrawssrtx commands.
-func handleCreateRawSSRtx(s *rpcServer,
-	cmd interface{},
-	closeChan <-chan struct{}) (interface{}, error) {
+func handleCreateRawSSRtx(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	c := cmd.(*dcrjson.CreateRawSSRtxCmd)
 
 	// Only a single SStx should be given
@@ -1386,8 +1380,7 @@ func stringInSlice(a string, list []string) bool {
 
 // createVoutList returns a slice of JSON objects for the outputs of the passed
 // transaction.
-func createVoutList(mtx *wire.MsgTx, chainParams *chaincfg.Params,
-	filterAddrMap map[string]struct{}) []dcrjson.Vout {
+func createVoutList(mtx *wire.MsgTx, chainParams *chaincfg.Params, filterAddrMap map[string]struct{}) []dcrjson.Vout {
 
 	txType := stake.DetermineTxType(mtx)
 	voutList := make([]dcrjson.Vout, 0, len(mtx.TxOut))
@@ -1594,15 +1587,12 @@ func handleDecodeScript(s *rpcServer, cmd interface{}, closeChan <-chan struct{}
 // handleEstimateFee implenents the estimatefee command.
 // TODO this is a very basic implementation.  It should be
 // modified to match the bitcoin-core one.
-func handleEstimateFee(s *rpcServer, cmd interface{},
-	closeChan <-chan struct{}) (interface{}, error) {
-
+func handleEstimateFee(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	return 0.01, nil
 }
 
 // handleEstimateStakeDiff implements the estimatestakediff command.
-func handleEstimateStakeDiff(s *rpcServer, cmd interface{},
-	closeChan <-chan struct{}) (interface{}, error) {
+func handleEstimateStakeDiff(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	c := cmd.(*dcrjson.EstimateStakeDiffCmd)
 
 	// Minimum possible stake difficulty.
@@ -1681,8 +1671,7 @@ func handleEstimateStakeDiff(s *rpcServer, cmd interface{},
 }
 
 // handleExistsAddress implements the existsaddress command.
-func handleExistsAddress(s *rpcServer, cmd interface{},
-	closeChan <-chan struct{}) (interface{}, error) {
+func handleExistsAddress(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	existsAddrIndex := s.server.existsAddrIndex
 	if existsAddrIndex == nil {
 		return nil, &dcrjson.RPCError{
@@ -1713,8 +1702,7 @@ func handleExistsAddress(s *rpcServer, cmd interface{},
 }
 
 // handleExistsAddresses implements the existsaddresses command.
-func handleExistsAddresses(s *rpcServer, cmd interface{},
-	closeChan <-chan struct{}) (interface{}, error) {
+func handleExistsAddresses(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	existsAddrIndex := s.server.existsAddrIndex
 	if existsAddrIndex == nil {
 		return nil, &dcrjson.RPCError{
@@ -1756,8 +1744,7 @@ func handleExistsAddresses(s *rpcServer, cmd interface{},
 }
 
 // handleExistsExpiredTickets implements the existsexpiredtickets command.
-func handleExistsExpiredTickets(s *rpcServer, cmd interface{},
-	closeChan <-chan struct{}) (interface{}, error) {
+func handleExistsExpiredTickets(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	c := cmd.(*dcrjson.ExistsExpiredTicketsCmd)
 
 	hashes, err := dcrjson.DecodeConcatenatedHashes(c.TxHashBlob)
@@ -1786,8 +1773,7 @@ func handleExistsExpiredTickets(s *rpcServer, cmd interface{},
 }
 
 // handleExistsLiveTicket implements the existsliveticket command.
-func handleExistsLiveTicket(s *rpcServer, cmd interface{},
-	closeChan <-chan struct{}) (interface{}, error) {
+func handleExistsLiveTicket(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	c := cmd.(*dcrjson.ExistsLiveTicketCmd)
 
 	hash, err := chainhash.NewHashFromStr(c.TxHash)
@@ -1802,8 +1788,7 @@ func handleExistsLiveTicket(s *rpcServer, cmd interface{},
 }
 
 // handleExistsLiveTickets implements the existslivetickets command.
-func handleExistsLiveTickets(s *rpcServer, cmd interface{},
-	closeChan <-chan struct{}) (interface{}, error) {
+func handleExistsLiveTickets(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	c := cmd.(*dcrjson.ExistsLiveTicketsCmd)
 
 	hashes, err := dcrjson.DecodeConcatenatedHashes(c.TxHashBlob)
@@ -1832,8 +1817,7 @@ func handleExistsLiveTickets(s *rpcServer, cmd interface{},
 }
 
 // handleExistsMempoolTxs implements the existsmempooltxs command.
-func handleExistsMempoolTxs(s *rpcServer, cmd interface{},
-	closeChan <-chan struct{}) (interface{}, error) {
+func handleExistsMempoolTxs(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	c := cmd.(*dcrjson.ExistsMempoolTxsCmd)
 
 	txHashBlob, err := hex.DecodeString(c.TxHashBlob)
@@ -2581,9 +2565,7 @@ func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bo
 // and returned to the caller.
 //
 // This function MUST be called with the state locked.
-func (state *gbtWorkState) blockTemplateResult(bm *blockManager,
-	useCoinbaseValue bool, submitOld *bool) (*dcrjson.GetBlockTemplateResult,
-	error) {
+func (state *gbtWorkState) blockTemplateResult(bm *blockManager, useCoinbaseValue bool, submitOld *bool) (*dcrjson.GetBlockTemplateResult, error) {
 	// Ensure the timestamps are still in valid range for the template.
 	// This should really only ever happen if the local clock is changed
 	// after the template is generated, but it's important to avoid serving
