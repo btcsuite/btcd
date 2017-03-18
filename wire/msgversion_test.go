@@ -114,7 +114,7 @@ func TestVersion(t *testing.T) {
 	// remote and local net addresses + nonce 8 bytes + length of user agent
 	// (varInt) + max allowed user agent length + last block 4 bytes +
 	// relay transactions flag 1 byte.
-	wantPayload := uint32(2102)
+	wantPayload := uint32(358)
 	maxPayload := msg.MaxPayloadLength(pver)
 	if maxPayload != wantPayload {
 		t.Errorf("MaxPayloadLength: wrong max payload length for "+

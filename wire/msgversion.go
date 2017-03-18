@@ -16,10 +16,10 @@ import (
 
 // MaxUserAgentLen is the maximum allowed length for the user agent field in a
 // version message (MsgVersion).
-const MaxUserAgentLen = 2000
+const MaxUserAgentLen = 256
 
 // DefaultUserAgent for wire in the stack
-const DefaultUserAgent = "/dcrwire:0.2.0/"
+const DefaultUserAgent = "/dcrwire:0.2.1/"
 
 // MsgVersion implements the Message interface and represents a decred version
 // message.  It is used for a peer to advertise itself as soon as an outbound
