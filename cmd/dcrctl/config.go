@@ -157,6 +157,16 @@ func cleanAndExpandPath(path string) string {
 	return filepath.Clean(os.ExpandEnv(path))
 }
 
+// filesExists reports whether the named file or directory exists.
+func fileExists(name string) bool {
+	if _, err := os.Stat(name); err != nil {
+		if os.IsNotExist(err) {
+			return false
+		}
+	}
+	return true
+}
+
 // loadConfig initializes and parses the config using a config file and command
 // line options.
 //
@@ -218,7 +228,7 @@ func loadConfig() (*config, []string, error) {
 		os.Exit(0)
 	}
 
-	if _, err := os.Stat(preCfg.ConfigFile); os.IsNotExist(err) {
+	if !fileExists(preCfg.ConfigFile) {
 		err := createDefaultConfigFile(preCfg.ConfigFile)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error creating a default config file: %v\n", err)
@@ -283,8 +293,14 @@ func loadConfig() (*config, []string, error) {
 // For this it tries to read the dcrd config file at its default path, and extract
 // the RPC user and password from it.
 func createDefaultConfigFile(destinationPath string) error {
-	// Read dcrd.conf from its default path
+	// Nothing to do when there is no existing dcrd conf file at the default
+	// path to extract the details from.
 	dcrdConfigPath := filepath.Join(dcrdHomeDir, "dcrd.conf")
+	if !fileExists(dcrdConfigPath) {
+		return nil
+	}
+
+	// Read dcrd.conf from its default path
 	dcrdConfigFile, err := os.Open(dcrdConfigPath)
 	if err != nil {
 		return err
