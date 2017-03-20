@@ -62,6 +62,7 @@ func TestIsSStx(t *testing.T) {
 func TestIsSSTxErrors(t *testing.T) {
 	// Initialize the buffer for later manipulation
 	var buf bytes.Buffer
+	buf.Grow(sstxMsgTx.SerializeSize())
 	err := sstxMsgTx.Serialize(&buf)
 	if err != nil {
 		t.Errorf("Error serializing the reference sstx: %v", err)
@@ -294,6 +295,7 @@ func TestIsSSGen(t *testing.T) {
 func TestIsSSGenErrors(t *testing.T) {
 	// Initialize the buffer for later manipulation
 	var buf bytes.Buffer
+	buf.Grow(ssgenMsgTx.SerializeSize())
 	err := ssgenMsgTx.Serialize(&buf)
 	if err != nil {
 		t.Errorf("Error serializing the reference sstx: %v", err)
@@ -626,6 +628,7 @@ func TestIsSSRtx(t *testing.T) {
 func TestIsSSRtxErrors(t *testing.T) {
 	// Initialize the buffer for later manipulation
 	var buf bytes.Buffer
+	buf.Grow(ssrtxMsgTx.SerializeSize())
 	err := ssrtxMsgTx.Serialize(&buf)
 	if err != nil {
 		t.Errorf("Error serializing the reference sstx: %v", err)

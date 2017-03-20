@@ -93,6 +93,7 @@ func (h *BlockHeader) BlockHash() chainhash.Hash {
 	// encode could fail except being out of memory which would cause a
 	// run-time panic.
 	var buf bytes.Buffer
+	buf.Grow(MaxBlockHeaderPayload)
 	_ = writeBlockHeader(&buf, 0, h)
 
 	return chainhash.HashH(buf.Bytes())
@@ -145,6 +146,7 @@ func (h *BlockHeader) Serialize(w io.Writer) error {
 func (h *BlockHeader) Bytes() ([]byte, error) {
 	// Serialize the MsgBlock.
 	var w bytes.Buffer
+	w.Grow(MaxBlockHeaderPayload)
 	err := h.Serialize(&w)
 	if err != nil {
 		return nil, err

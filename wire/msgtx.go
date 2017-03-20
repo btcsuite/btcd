@@ -1397,6 +1397,7 @@ func (msg *MsgTx) LegacySerialize(w io.Writer) error {
 func (msg *MsgTx) Bytes() ([]byte, error) {
 	// Serialize the MsgTx.
 	var w bytes.Buffer
+	w.Grow(msg.SerializeSize())
 	err := msg.Serialize(&w)
 	if err != nil {
 		return nil, err
@@ -1409,6 +1410,7 @@ func (msg *MsgTx) BytesPrefix() ([]byte, error) {
 	mtxCopy := msg.shallowCopyForSerializing(NoWitnessMsgTxVersion())
 
 	var w bytes.Buffer
+	w.Grow(msg.SerializeSize())
 	err := mtxCopy.Serialize(&w)
 	if err != nil {
 		return nil, err
@@ -1421,6 +1423,7 @@ func (msg *MsgTx) BytesWitness() ([]byte, error) {
 	mtxCopy := msg.shallowCopyForSerializing(WitnessOnlyMsgTxVersion())
 
 	var w bytes.Buffer
+	w.Grow(msg.SerializeSize())
 	err := mtxCopy.Serialize(&w)
 	if err != nil {
 		return nil, err

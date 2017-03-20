@@ -3364,6 +3364,7 @@ func handleGetHeaders(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) 
 
 	hexBlockHeaders := make([]string, len(blockHeaders))
 	var buf bytes.Buffer
+	buf.Grow(wire.MaxBlockHeaderPayload)
 	for i, h := range blockHeaders {
 		err := h.Serialize(&buf)
 		if err != nil {

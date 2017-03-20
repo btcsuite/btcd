@@ -315,6 +315,7 @@ func TestBlockSerialize(t *testing.T) {
 	for i, test := range tests {
 		// Serialize the block.
 		var buf bytes.Buffer
+		buf.Grow(test.in.SerializeSize())
 		err := test.in.Serialize(&buf)
 		if err != nil {
 			t.Errorf("Serialize #%d error %v", i, err)

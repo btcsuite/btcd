@@ -303,6 +303,7 @@ func (msg *MsgBlock) Serialize(w io.Writer) error {
 func (msg *MsgBlock) Bytes() ([]byte, error) {
 	// Serialize the MsgTx.
 	var w bytes.Buffer
+	w.Grow(msg.SerializeSize())
 	err := msg.Serialize(&w)
 	if err != nil {
 		return nil, err

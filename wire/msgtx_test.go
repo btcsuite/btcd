@@ -379,6 +379,7 @@ func TestTxSerialize(t *testing.T) {
 	for i, test := range tests {
 		// Serialize the transaction.
 		var buf bytes.Buffer
+		buf.Grow(test.in.SerializeSize())
 		err := test.in.Serialize(&buf)
 		if err != nil {
 			t.Errorf("Serialize #%d error %v", i, err)
@@ -472,6 +473,7 @@ func TestTxSerializePrefix(t *testing.T) {
 	for i, test := range tests {
 		// Serialize the transaction.
 		var buf bytes.Buffer
+		buf.Grow(test.in.SerializeSize())
 		err := test.in.Serialize(&buf)
 		if err != nil {
 			t.Errorf("Serialize #%d error %v", i, err)
@@ -562,6 +564,7 @@ func TestTxSerializeWitness(t *testing.T) {
 	for i, test := range tests {
 		// Serialize the transaction.
 		var buf bytes.Buffer
+		buf.Grow(test.in.SerializeSize())
 		err := test.in.Serialize(&buf)
 		if err != nil {
 			t.Errorf("Serialize #%d error %v", i, err)
@@ -652,6 +655,7 @@ func TestTxSerializeWitnessSigning(t *testing.T) {
 	for i, test := range tests {
 		// Serialize the transaction.
 		var buf bytes.Buffer
+		buf.Grow(test.in.SerializeSize())
 		err := test.in.Serialize(&buf)
 		if err != nil {
 			t.Errorf("Serialize #%d error %v", i, err)
@@ -742,6 +746,7 @@ func TestTxSerializeWitnessValueSigning(t *testing.T) {
 	for i, test := range tests {
 		// Serialize the transaction.
 		var buf bytes.Buffer
+		buf.Grow(test.in.SerializeSize())
 		err := test.in.Serialize(&buf)
 		if err != nil {
 			t.Errorf("Serialize #%d error %v", i, err)

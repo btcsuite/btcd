@@ -196,6 +196,7 @@ func TestBlockHeaderWire(t *testing.T) {
 		// Encode to wire format.
 		// Former test (doesn't work because of capacity error)
 		var buf bytes.Buffer
+		buf.Grow(MaxBlockHeaderPayload)
 		err := writeBlockHeader(&buf, test.pver, test.in)
 		if err != nil {
 			t.Errorf("writeBlockHeader #%d error %v", i, err)
@@ -319,9 +320,13 @@ func TestBlockHeaderSerialize(t *testing.T) {
 	}
 
 	t.Logf("Running %d tests", len(tests))
+	var buf bytes.Buffer
+	buf.Grow(MaxBlockHeaderPayload)
 	for i, test := range tests {
+		// Clear existing contents.
+		buf.Reset()
+
 		// Serialize the block header.
-		var buf bytes.Buffer
 		err := test.in.Serialize(&buf)
 		if err != nil {
 			t.Errorf("Serialize #%d error %v", i, err)

@@ -1083,6 +1083,7 @@ func winningTickets(voteBlock *wire.MsgBlock, liveTickets []*stakeTicket, numVot
 	// Serialize the parent block header used as the seed to the
 	// deterministic pseudo random number generator for vote selection.
 	var buf bytes.Buffer
+	buf.Grow(wire.MaxBlockHeaderPayload)
 	if err := voteBlock.Header.Serialize(&buf); err != nil {
 		return nil, chainhash.Hash{}, err
 	}
