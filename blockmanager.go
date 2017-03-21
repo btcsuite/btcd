@@ -716,7 +716,8 @@ func (b *blockManager) fetchHeaderBlocks() {
 	}
 }
 
-// handleHeadersMsghandles headers messages from all peers.
+// handleHeadersMsg handles block header messages from all peers.  Headers are
+// requested when performing a headers-first sync.
 func (b *blockManager) handleHeadersMsg(hmsg *headersMsg) {
 	// The remote peer is misbehaving if we didn't request headers.
 	msg := hmsg.headers
