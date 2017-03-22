@@ -1,0 +1,35 @@
+<?xml version='1.0'?>
+<!DOCTYPE service_bundle SYSTEM '/usr/share/lib/xml/dtd/service_bundle.dtd.1'>
+<service_bundle type='manifest' name='export'>
+  <service name='application/dcrd' type='service' version='0'>
+    <create_default_instance enabled='true'/>
+    <single_instance/>
+
+    <dependency name='network' grouping='require_all' restart_on='error' type='service'>
+      <service_fmri value='svc:/milestone/network:default'/>
+    </dependency>
+    <dependency name='filesystem' grouping='require_all' restart_on='error' type='service'>
+      <service_fmri value='svc:/system/filesystem/local'/>
+    </dependency>
+
+    <method_context>
+      <method_credential group='dcrd' user='dcrd'/>
+    </method_context>
+
+    <exec_method name='start' type='method' exec='/opt/decred/bin/dcrd --appdata /var/dcrd' timeout_seconds='60'/>
+    <exec_method name='stop' type='method' exec=':kill' timeout_seconds='60'/>
+
+    <property_group name='startd' type='framework'>
+      <propval name='duration' type='astring' value='child'/>
+      <propval name='ignore_error' type='astring' value='core,signal'/>
+    </property_group>
+
+    <stability value='Evolving'/>
+
+    <template>
+      <common_name>
+        <loctext xml:lang='C'>dcrd</loctext>
+      </common_name>
+    </template>
+  </service>
+</service_bundle>

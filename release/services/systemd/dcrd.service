@@ -1,0 +1,13 @@
+[Unit]
+Description=Decred Full Node
+
+[Service]
+Type=simple
+User=dcrd
+Group=dcrd
+WorkingDirectory=/var/dcrd
+ExecStart=/opt/decred/bin/dcrd --appdata=/var/dcrd
+Restart=on-abnormal
+
+[Install]
+WantedBy=multi-user.target
