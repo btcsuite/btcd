@@ -267,7 +267,7 @@ func uniqueOpReturnScript() []byte {
 		panic(err)
 	}
 
-	data := make([]byte, 8, 8)
+	data := make([]byte, 8)
 	binary.LittleEndian.PutUint64(data[0:8], rand)
 	return opReturnScript(data)
 }

@@ -62,7 +62,7 @@ func (sig *Signature) Serialize() []byte {
 	// total length of returned signature is 1 byte for each magic and
 	// length (6 total), plus lengths of r and s
 	length := 6 + len(rb) + len(sb)
-	b := make([]byte, length, length)
+	b := make([]byte, length)
 
 	b[0] = 0x30
 	b[1] = byte(length - 2)

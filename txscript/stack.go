@@ -155,7 +155,7 @@ func (s *stack) nipN(idx int32) ([]byte, error) {
 	if idx == 0 {
 		s.stk = s.stk[:sz-1]
 	} else if idx == sz-1 {
-		s1 := make([][]byte, sz-1, sz-1)
+		s1 := make([][]byte, sz-1)
 		copy(s1, s.stk[1:])
 		s.stk = s1
 	} else {

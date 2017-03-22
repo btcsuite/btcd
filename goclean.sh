@@ -30,13 +30,13 @@ fi
 linter_targets=$(glide novendor)
 
 # Automatic checks
-test -z "$(gometalinter --disable-all \
+test -z "$(gometalinter -j 4 --disable-all \
 --enable=gofmt \
 --enable=golint \
 --enable=vet \
 --enable=gosimple \
 --enable=unconvert \
---deadline=4m $linter_targets 2>&1 | grep -v 'ALL_CAPS\|OP_' 2>&1 | tee /dev/stderr)"
+--deadline=10m $linter_targets 2>&1 | grep -v 'ALL_CAPS\|OP_' 2>&1 | tee /dev/stderr)"
 env GORACE="halt_on_error=1" go test -race -tags rpctest $linter_targets
 
 # Run test coverage on each subdirectories and merge the coverage profile.
