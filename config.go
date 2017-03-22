@@ -535,7 +535,12 @@ func loadConfig() (*config, []string, error) {
 	// All data is specific to a network, so namespacing the data directory
 	// means each individual piece of serialized data does not have to
 	// worry about changing names per network and such.
+	//
+	// Make list of old versions of testnet directories here since the
+	// network specific DataDir will be used after this.
 	cfg.DataDir = cleanAndExpandPath(cfg.DataDir)
+	var oldTestNets []string
+	oldTestNets = append(oldTestNets, filepath.Join(cfg.DataDir, "testnet"))
 	cfg.DataDir = filepath.Join(cfg.DataDir, netName(activeNetParams))
 
 	// Append the network type to the log directory so it is "namespaced"
@@ -938,6 +943,15 @@ func loadConfig() (*config, []string, error) {
 		}
 		cfg.onionlookup = func(a string) ([]net.IP, error) {
 			return nil, errors.New("tor has been disabled")
+		}
+	}
+
+	// Warn if old testnet directory is present.
+	for _, oldDir := range oldTestNets {
+		if fileExists(oldDir) {
+			dcrdLog.Warnf("Block chain data from previous testnet"+
+				" found (%v) and can probably be removed.",
+				oldDir)
 		}
 	}
 
