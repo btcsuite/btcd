@@ -6,8 +6,6 @@
 package blockchain
 
 import (
-	"fmt"
-
 	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/database"
 	"github.com/decred/dcrd/txscript"
@@ -56,11 +54,11 @@ func (b *BlockChain) lotteryDataForBlock(hash *chainhash.Hash) ([]chainhash.Hash
 	if n, exists := b.index[*hash]; exists {
 		node = n
 	} else {
-		node, _ = b.findNode(hash, maxSearchDepth)
-	}
-
-	if node == nil {
-		return nil, 0, [6]byte{}, fmt.Errorf("node doesn't exist")
+		var err error
+		node, err = b.findNode(hash, maxSearchDepth)
+		if err != nil {
+			return nil, 0, [6]byte{}, err
+		}
 	}
 
 	winningTickets, poolSize, finalState, err := b.lotteryDataForNode(node)
@@ -121,7 +119,6 @@ func (b *BlockChain) TicketsWithAddress(address dcrutil.Address) ([]chainhash.Ha
 
 	var ticketsWithAddr []chainhash.Hash
 	err := b.db.View(func(dbTx database.Tx) error {
-		var err error
 		for _, hash := range tickets {
 			utxo, err := dbFetchUtxoEntry(dbTx, &hash)
 			if err != nil {
@@ -131,11 +128,14 @@ func (b *BlockChain) TicketsWithAddress(address dcrutil.Address) ([]chainhash.Ha
 			_, addrs, _, err :=
 				txscript.ExtractPkScriptAddrs(txscript.DefaultScriptVersion,
 					utxo.PkScriptByIndex(0), b.chainParams)
+			if err != nil {
+				return err
+			}
 			if addrs[0].EncodeAddress() == address.EncodeAddress() {
 				ticketsWithAddr = append(ticketsWithAddr, hash)
 			}
 		}
-		return err
+		return nil
 	})
 	if err != nil {
 		return nil, err
@@ -214,7 +214,6 @@ func (b *BlockChain) TicketPoolValue() (dcrutil.Amount, error) {
 
 	var amt int64
 	err := b.db.View(func(dbTx database.Tx) error {
-		var err error
 		for _, hash := range sn.LiveTickets() {
 			utxo, err := dbFetchUtxoEntry(dbTx, &hash)
 			if err != nil {
@@ -223,7 +222,7 @@ func (b *BlockChain) TicketPoolValue() (dcrutil.Amount, error) {
 
 			amt += utxo.sparseOutputs[0].amount
 		}
-		return err
+		return nil
 	})
 	if err != nil {
 		return 0, err

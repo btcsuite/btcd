@@ -143,14 +143,14 @@ func (b *BlockChain) fetchStakeNode(node *blockNode) (*stake.Node, error) {
 	err = b.db.View(func(dbTx database.Tx) error {
 		for e := detachNodes.Front(); e != nil; e = e.Next() {
 			n := e.Value.(*blockNode)
-			var errLocal error
 			if n.stakeNode == nil {
+				var errLocal error
 				n.stakeNode, errLocal =
 					current.stakeNode.DisconnectNode(n.header,
 						n.stakeUndoData, n.newTickets, dbTx)
-			}
-			if errLocal != nil {
-				return errLocal
+				if errLocal != nil {
+					return errLocal
+				}
 			}
 			current = n
 		}
@@ -164,16 +164,15 @@ func (b *BlockChain) fetchStakeNode(node *blockNode) (*stake.Node, error) {
 	// Detach the final block and get the filled in node for the fork
 	// point.
 	err = b.db.View(func(dbTx database.Tx) error {
-		var errLocal error
 		if current.parent.stakeNode == nil {
+			var errLocal error
 			current.parent.stakeNode, errLocal =
 				current.stakeNode.DisconnectNode(current.parent.header,
 					current.parent.stakeUndoData, current.parent.newTickets, dbTx)
+			if errLocal != nil {
+				return errLocal
+			}
 		}
-		if errLocal != nil {
-			return errLocal
-		}
-
 		current = current.parent
 		return nil
 	})
