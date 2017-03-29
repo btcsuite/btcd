@@ -6,8 +6,10 @@ package connmgr
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"net"
+	"runtime"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -419,6 +421,52 @@ func TestStopFailed(t *testing.T) {
 	}
 	go cmgr.Connect(cr)
 	cmgr.Wait()
+}
+
+// TestRemovePendingConnection tests that it's possible to cancel a pending
+// connection, removing its internal state from the ConnMgr.
+func TestRemovePendingConnection(t *testing.T) {
+	// Create a ConnMgr instance with an instance of a dialer that'll never
+	// succeed.
+	wait := make(chan struct{})
+	indefiniteDialer := func(addr net.Addr) (net.Conn, error) {
+		<-wait
+		return nil, fmt.Errorf("error")
+	}
+	cmgr, err := New(&Config{
+		Dial: indefiniteDialer,
+	})
+	if err != nil {
+		t.Fatalf("New error: %v", err)
+	}
+	cmgr.Start()
+
+	// Establish a connection request to a random IP we've chosen.
+	cr := &ConnReq{
+		Addr: &net.TCPAddr{
+			IP:   net.ParseIP("127.0.0.1"),
+			Port: 18555,
+		},
+		Permanent: true,
+	}
+	go cmgr.Connect(cr)
+
+	runtime.Gosched()
+
+	// The request launched above will actually never be able to establish
+	// a connection. So we'll cancel it _before_ it's able to be completed.
+	cmgr.Remove(cr.ID())
+
+	runtime.Gosched()
+
+	// Now examine the status of the connection request, it should read a
+	// status of failed.
+	if cr.State() != ConnFailed {
+		t.Fatalf("request wasn't cancelled, status is: %v", cr.State())
+	}
+
+	close(wait)
+	cmgr.Stop()
 }
 
 // mockListener implements the net.Listener interface and is used to test
