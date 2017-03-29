@@ -143,6 +143,15 @@ type Config struct {
 	Dial func(net.Addr) (net.Conn, error)
 }
 
+// registerPending is used to register a pending connection attempt. By
+// registering pending connection attempts we allow callers to cancel pending
+// connection attempts before their successful or in the case they're not
+// longer wanted.
+type registerPending struct {
+	c    *ConnReq
+	done chan struct{}
+}
+
 // handleConnected is used to queue a successful connection.
 type handleConnected struct {
 	c    *ConnReq
@@ -217,11 +226,16 @@ func (cm *ConnManager) handleFailedConn(c *ConnReq) {
 // are processed and mapped by their assigned ids.
 func (cm *ConnManager) connHandler() {
 	conns := make(map[uint64]*ConnReq, cm.cfg.TargetOutbound)
+	pendingConns := make(map[uint64]*ConnReq)
 out:
 	for {
 		select {
 		case req := <-cm.requests:
 			switch msg := req.(type) {
+
+			case registerPending:
+				pendingConns[msg.c.id] = msg.c
+				close(msg.done)
 
 			case handleConnected:
 				connReq := msg.c
@@ -232,12 +246,26 @@ out:
 				connReq.retryCount = 0
 				cm.failedAttempts = 0
 
+				delete(pendingConns, connReq.id)
+
 				if cm.cfg.OnConnection != nil {
 					go cm.cfg.OnConnection(connReq, msg.conn)
 				}
 
 			case handleDisconnected:
-				if connReq, ok := conns[msg.id]; ok {
+				connReq, ok := conns[msg.id]
+				if !ok {
+					connReq, ok = pendingConns[msg.id]
+					if ok && !msg.retry {
+						connReq.updateState(ConnFailed)
+
+						log.Debugf("Cancelling: %v", connReq)
+						delete(pendingConns, msg.id)
+						return
+					}
+				}
+
+				if connReq != nil {
 					connReq.updateState(ConnDisconnected)
 					if connReq.conn != nil {
 						connReq.conn.Close()
@@ -304,8 +332,18 @@ func (cm *ConnManager) Connect(c *ConnReq) {
 	}
 	if atomic.LoadUint64(&c.id) == 0 {
 		atomic.StoreUint64(&c.id, atomic.AddUint64(&cm.connReqCount, 1))
+
+		// Submit a request of a pending connection attempt to the
+		// connection manager. By registering the id before the
+		// connection is even established, we'll be able to later
+		// cancel the connection via the Remove method.
+		done := make(chan struct{})
+		cm.requests <- registerPending{c, done}
+		<-done
 	}
+
 	log.Debugf("Attempting to connect to %v", c)
+
 	conn, err := cm.cfg.Dial(c.Addr)
 	if err != nil {
 		cm.requests <- handleFailed{c, err}
@@ -324,8 +362,11 @@ func (cm *ConnManager) Disconnect(id uint64) {
 	cm.requests <- handleDisconnected{id, true}
 }
 
-// Remove removes the connection corresponding to the given connection
-// id from known connections.
+// Remove removes the connection corresponding to the given connection id from
+// known connections.
+//
+// NOTE: This method can also be used to cancel a lingering connection attempt
+// that hasn't yet succeeded.
 func (cm *ConnManager) Remove(id uint64) {
 	if atomic.LoadInt32(&cm.stop) != 0 {
 		return
