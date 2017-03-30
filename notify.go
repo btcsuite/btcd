@@ -943,7 +943,7 @@ func parseTxAcceptedNtfnParams(params []json.RawMessage) (*chainhash.Hash,
 		return nil, 0, err
 	}
 
-	return txHash, dcrutil.Amount(amt), nil
+	return txHash, amt, nil
 }
 
 // parseTxAcceptedVerboseNtfnParams parses out details about a raw transaction
@@ -1020,7 +1020,7 @@ func parseAccountBalanceNtfnParams(params []json.RawMessage) (account string,
 		return "", 0, false, err
 	}
 
-	return account, dcrutil.Amount(bal), confirmed, nil
+	return account, bal, confirmed, nil
 }
 
 // parseTicketPurchasedNtfnParams parses out the ticket hash and amount

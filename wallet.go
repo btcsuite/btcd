@@ -1024,8 +1024,8 @@ func (c *Client) SendToSSGenAsync(fromAccount string,
 	height int64,
 	votebits uint16) FutureSendToSSGenResult {
 
-	ticketHashString := hex.EncodeToString([]byte(tickethash[:]))
-	blockHashString := hex.EncodeToString([]byte(blockhash[:]))
+	ticketHashString := hex.EncodeToString(tickethash[:])
+	blockHashString := hex.EncodeToString(blockhash[:])
 
 	cmd := dcrjson.NewSendToSSGenCmd(fromAccount, ticketHashString,
 		blockHashString, height, votebits, nil)
@@ -1062,8 +1062,8 @@ func (c *Client) SendToSSGenCommentAsync(fromAccount string,
 	votebits uint16,
 	comment string) FutureSendToSSGenResult {
 
-	ticketHashString := hex.EncodeToString([]byte(tickethash[:]))
-	blockHashString := hex.EncodeToString([]byte(blockhash[:]))
+	ticketHashString := hex.EncodeToString(tickethash[:])
+	blockHashString := hex.EncodeToString(blockhash[:])
 
 	cmd := dcrjson.NewSendToSSGenCmd(fromAccount, ticketHashString,
 		blockHashString, height, votebits, &comment)
@@ -1128,7 +1128,7 @@ func (r FutureSendToSSRtxResult) Receive() (*chainhash.Hash, error) {
 func (c *Client) SendToSSRtxAsync(fromAccount string,
 	tickethash chainhash.Hash) FutureSendToSSRtxResult {
 
-	ticketHashString := hex.EncodeToString([]byte(tickethash[:]))
+	ticketHashString := hex.EncodeToString(tickethash[:])
 
 	cmd := dcrjson.NewSendToSSRtxCmd(fromAccount, ticketHashString, nil)
 
@@ -1157,7 +1157,7 @@ func (c *Client) SendToSSRtxCommentAsync(fromAccount string,
 	tickethash chainhash.Hash,
 	comment string) FutureSendToSSRtxResult {
 
-	ticketHashString := hex.EncodeToString([]byte(tickethash[:]))
+	ticketHashString := hex.EncodeToString(tickethash[:])
 
 	cmd := dcrjson.NewSendToSSRtxCmd(fromAccount, ticketHashString, &comment)
 
