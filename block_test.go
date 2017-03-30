@@ -122,6 +122,7 @@ func TestBlock(t *testing.T) {
 
 	// Serialize the test block.
 	var block100000Buf bytes.Buffer
+	block100000Buf.Grow(Block100000.SerializeSize())
 	err = Block100000.Serialize(&block100000Buf)
 	if err != nil {
 		t.Errorf("Serialize: %v", err)
@@ -169,6 +170,7 @@ func TestBlock(t *testing.T) {
 func TestNewBlockFromBytes(t *testing.T) {
 	// Serialize the test block.
 	var block100000Buf bytes.Buffer
+	block100000Buf.Grow(Block100000.SerializeSize())
 	err := Block100000.Serialize(&block100000Buf)
 	if err != nil {
 		t.Errorf("Serialize: %v", err)
@@ -206,6 +208,7 @@ func TestNewBlockFromBytes(t *testing.T) {
 func TestNewBlockFromBlockAndBytes(t *testing.T) {
 	// Serialize the test block.
 	var block100000Buf bytes.Buffer
+	block100000Buf.Grow(Block100000.SerializeSize())
 	err := Block100000.Serialize(&block100000Buf)
 	if err != nil {
 		t.Errorf("Serialize: %v", err)
@@ -244,6 +247,7 @@ func TestBlockErrors(t *testing.T) {
 
 	// Serialize the test block.
 	var block100000Buf bytes.Buffer
+	block100000Buf.Grow(Block100000.SerializeSize())
 	err := Block100000.Serialize(&block100000Buf)
 	if err != nil {
 		t.Errorf("Serialize: %v", err)

@@ -40,7 +40,7 @@ func Decode(b string) []byte {
 		}
 	}
 	flen := numZeros + len(tmpval)
-	val := make([]byte, flen, flen)
+	val := make([]byte, flen)
 	copy(val[numZeros:], tmpval)
 
 	return val

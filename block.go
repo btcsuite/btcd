@@ -64,6 +64,7 @@ func (b *Block) Bytes() ([]byte, error) {
 
 	// Serialize the MsgBlock.
 	var w bytes.Buffer
+	w.Grow(b.msgBlock.SerializeSize())
 	err := b.msgBlock.Serialize(&w)
 	if err != nil {
 		return nil, err
@@ -86,6 +87,7 @@ func (b *Block) BlockHeaderBytes() ([]byte, error) {
 
 	// Serialize the MsgBlock.
 	var w bytes.Buffer
+	w.Grow(wire.MaxBlockHeaderPayload)
 	err := b.msgBlock.Header.Serialize(&w)
 	if err != nil {
 		return nil, err

@@ -81,6 +81,7 @@ func TestNewTxFromBytes(t *testing.T) {
 	// Serialize the test transaction.
 	testTx := Block100000.Transactions[0]
 	var testTxBuf bytes.Buffer
+	testTxBuf.Grow(testTx.SerializeSize())
 	err := testTx.Serialize(&testTxBuf)
 	if err != nil {
 		t.Errorf("Serialize: %v", err)
@@ -106,6 +107,7 @@ func TestTxErrors(t *testing.T) {
 	// Serialize the test transaction.
 	testTx := Block100000.Transactions[0]
 	var testTxBuf bytes.Buffer
+	testTxBuf.Grow(testTx.SerializeSize())
 	err := testTx.Serialize(&testTxBuf)
 	if err != nil {
 		t.Errorf("Serialize: %v", err)
