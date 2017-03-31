@@ -1,5 +1,5 @@
-hash: 807209320ff3d80af89663d3407f7d3fef4cfa67e52750c4ffa58bae790f8a16
-updated: 2017-03-16T14:14:43.875458414-04:00
+hash: 2b8970779e0f073a5720aa6d6558bfbf1919f12ef2e19b3921955f156edd93e3
+updated: 2017-03-31T14:22:09.68867139-04:00
 imports:
 - name: github.com/btcsuite/btclog
   version: 73889fb79bd687870312b6e40effcecffbd57d30
@@ -47,9 +47,9 @@ imports:
 - name: github.com/decred/blake256
   version: a840e32d7c31fe2e0218607334cb120a683951a4
 - name: github.com/decred/dcrrpcclient
-  version: 0476421c0f19f8540fb0f584000b04f82b906610
+  version: a24e0b968f2379a5882781f11494354ca2af4453
 - name: github.com/decred/dcrutil
-  version: ee6d002bf0de123fe47a8d2b8489f75145ce746e
+  version: ebd2e98736e819ac043d54439969b30144b92ced
   subpackages:
   - base58
   - bloom
@@ -58,9 +58,14 @@ imports:
   subpackages:
   - edwards25519
 - name: golang.org/x/crypto
-  version: 728b753d0135da6801d45a38e6f43ff55779c5c2
+  version: 3cb07270c9455e8ad27956a70891c962d121a228
   subpackages:
   - ripemd160
+  - ssh/terminal
+- name: golang.org/x/sys
+  version: 9a7256cb28ed514b4e1e5f68959914c4c28a92e0
+  subpackages:
+  - unix
 testImports:
 - name: github.com/pmezard/go-difflib
   version: d8ed2627bdf02c080bf22230dbb337003b7aba2d
