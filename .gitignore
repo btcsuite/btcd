@@ -1,5 +1,6 @@
-cmd/dcrd/dcrd
-cmd/dcrd/dcrctl
+dcrd
+cmd/dcrctl/dcrctl
+cmd/promptsecret/promptsecret
 *~
 *.pyc
 vendor/
