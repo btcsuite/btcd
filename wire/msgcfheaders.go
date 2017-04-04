@@ -27,6 +27,7 @@ const (
 // of committed filter headers per message is currently 2000. See
 // MsgGetCFHeaders for details on requesting the headers.
 type MsgCFHeaders struct {
+	StopHash     chainhash.Hash
 	HeaderHashes []*chainhash.Hash
 }
 
@@ -45,6 +46,12 @@ func (msg *MsgCFHeaders) AddCFHeader(headerHash *chainhash.Hash) error {
 // BtcDecode decodes r using the bitcoin protocol encoding into the receiver.
 // This is part of the Message interface implementation.
 func (msg *MsgCFHeaders) BtcDecode(r io.Reader, pver uint32) error {
+	// Read stop hash
+	err := readElement(r, &msg.StopHash)
+	if err != nil {
+		return err
+	}
+
 	count, err := ReadVarInt(r, pver)
 	if err != nil {
 		return err
@@ -76,6 +83,12 @@ func (msg *MsgCFHeaders) BtcDecode(r io.Reader, pver uint32) error {
 // BtcEncode encodes the receiver to w using the bitcoin protocol encoding.
 // This is part of the Message interface implementation.
 func (msg *MsgCFHeaders) BtcEncode(w io.Writer, pver uint32) error {
+	// Write stop hash
+	err := writeElement(w, msg.StopHash)
+	if err != nil {
+		return err
+	}
+
 	// Limit to max committed headers per message.
 	count := len(msg.HeaderHashes)
 	if count > MaxCFHeadersPerMsg {
@@ -85,7 +98,7 @@ func (msg *MsgCFHeaders) BtcEncode(w io.Writer, pver uint32) error {
 		return messageError("MsgCFHeaders.BtcEncode", str)
 	}
 
-	err := WriteVarInt(w, pver, uint64(count))
+	err = WriteVarInt(w, pver, uint64(count))
 	if err != nil {
 		return err
 	}
@@ -125,8 +138,9 @@ func (msg *MsgCFHeaders) Command() string {
 // MaxPayloadLength returns the maximum length the payload can be for the
 // receiver.  This is part of the Message interface implementation.
 func (msg *MsgCFHeaders) MaxPayloadLength(pver uint32) uint32 {
-	// Num headers (varInt) + (header size * max allowed headers).
-	return MaxVarIntPayload + (MaxCFHeaderPayload * MaxBlockHeadersPerMsg)
+	// Hash size + num headers (varInt) + (header size * max headers).
+	return chainhash.HashSize + MaxVarIntPayload +
+		(MaxCFHeaderPayload * MaxCFHeadersPerMsg)
 }
 
 // NewMsgCFHeaders returns a new bitcoin cfheaders message that conforms to
