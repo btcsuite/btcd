@@ -756,7 +756,8 @@ func (sp *serverPeer) OnGetCFilter(_ *peer.Peer, msg *wire.MsgGetCFilter) {
 			err)
 	}
 
-	filterMsg := wire.NewMsgCFilter(&msg.BlockHash, filterBytes)
+	filterMsg := wire.NewMsgCFilter(&msg.BlockHash, msg.Extended,
+		filterBytes)
 	sp.QueueMessage(filterMsg, nil)
 }
 
@@ -807,6 +808,7 @@ func (sp *serverPeer) OnGetCFHeaders(_ *peer.Peer, msg *wire.MsgGetCFHeaders) {
 		headersMsg := wire.NewMsgCFHeaders()
 		headersMsg.AddCFHeader(&header)
 		headersMsg.StopHash = msg.HashStop
+		headersMsg.Extended = msg.Extended
 		sp.QueueMessage(headersMsg, nil)
 		return
 	}
@@ -863,6 +865,7 @@ func (sp *serverPeer) OnGetCFHeaders(_ *peer.Peer, msg *wire.MsgGetCFHeaders) {
 		headersMsg.AddCFHeader(&header)
 	}
 
+	headersMsg.Extended = msg.Extended
 	headersMsg.StopHash = hashList[len(hashList)-1]
 	sp.QueueMessage(headersMsg, nil)
 }

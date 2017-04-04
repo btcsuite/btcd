@@ -28,6 +28,7 @@ const (
 // MsgGetCFHeaders for details on requesting the headers.
 type MsgCFHeaders struct {
 	StopHash     chainhash.Hash
+	Extended     bool
 	HeaderHashes []*chainhash.Hash
 }
 
@@ -52,6 +53,13 @@ func (msg *MsgCFHeaders) BtcDecode(r io.Reader, pver uint32) error {
 		return err
 	}
 
+	// Read extended flag
+	err = readElement(r, &msg.Extended)
+	if err != nil {
+		return err
+	}
+
+	// Read number of filter headers
 	count, err := ReadVarInt(r, pver)
 	if err != nil {
 		return err
@@ -85,6 +93,12 @@ func (msg *MsgCFHeaders) BtcDecode(r io.Reader, pver uint32) error {
 func (msg *MsgCFHeaders) BtcEncode(w io.Writer, pver uint32) error {
 	// Write stop hash
 	err := writeElement(w, msg.StopHash)
+	if err != nil {
+		return err
+	}
+
+	// Write extended flag
+	err = writeElement(w, msg.Extended)
 	if err != nil {
 		return err
 	}
@@ -139,7 +153,7 @@ func (msg *MsgCFHeaders) Command() string {
 // receiver.  This is part of the Message interface implementation.
 func (msg *MsgCFHeaders) MaxPayloadLength(pver uint32) uint32 {
 	// Hash size + num headers (varInt) + (header size * max headers).
-	return chainhash.HashSize + MaxVarIntPayload +
+	return chainhash.HashSize + 1 + MaxVarIntPayload +
 		(MaxCFHeaderPayload * MaxCFHeadersPerMsg)
 }
 
