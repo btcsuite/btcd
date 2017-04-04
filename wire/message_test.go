@@ -71,7 +71,7 @@ func TestMessage(t *testing.T) {
 	msgReject := NewMsgReject("block", RejectDuplicate, "duplicate block")
 	msgGetCFilter := NewMsgGetCFilter(&chainhash.Hash{}, false)
 	msgGetCFHeaders := NewMsgGetCFHeaders()
-	msgCFilter := NewMsgCFilter([]byte("payload"))
+	msgCFilter := NewMsgCFilter(&chainhash.Hash{}, []byte("payload"))
 	msgCFHeaders := NewMsgCFHeaders()
 
 	tests := []struct {
@@ -104,8 +104,8 @@ func TestMessage(t *testing.T) {
 		{msgReject, msgReject, pver, MainNet, 79},
 		{msgGetCFilter, msgGetCFilter, pver, MainNet, 57},
 		{msgGetCFHeaders, msgGetCFHeaders, pver, MainNet, 62},
-		{msgCFilter, msgCFilter, pver, MainNet, 32},
-		{msgCFHeaders, msgCFHeaders, pver, MainNet, 25},
+		{msgCFilter, msgCFilter, pver, MainNet, 64},
+		{msgCFHeaders, msgCFHeaders, pver, MainNet, 57},
 	}
 
 	t.Logf("Running %d tests", len(tests))

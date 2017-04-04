@@ -544,7 +544,7 @@ func TestPeerListeners(t *testing.T) {
 		},
 		{
 			"OnCFilter",
-			wire.NewMsgCFilter([]byte("payload")),
+			wire.NewMsgCFilter(&chainhash.Hash{}, []byte("payload")),
 		},
 		{
 			"OnCFHeaders",

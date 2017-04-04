@@ -7,22 +7,27 @@ package wire
 import (
 	"fmt"
 	"io"
+
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 )
 
 const (
 	// MaxCFilterDataSize is the maximum byte size of a committed filter.
-	MaxCFilterDataSize = 65536
+	MaxCFilterDataSize = 262144
 )
+
 type MsgCFilter struct {
-	Data []byte
+	BlockHash chainhash.Hash
+	Data      []byte
 }
 
 // BtcDecode decodes r using the bitcoin protocol encoding into the receiver.
 // This is part of the Message interface implementation.
 func (msg *MsgCFilter) BtcDecode(r io.Reader, pver uint32) error {
 	var err error
+	err = readElement(r, &msg.BlockHash)
 	msg.Data, err = ReadVarBytes(r, pver, MaxCFilterDataSize,
-	    "cfilter data")
+		"cfilter data")
 	return err
 }
 
@@ -34,6 +39,11 @@ func (msg *MsgCFilter) BtcEncode(w io.Writer, pver uint32) error {
 		str := fmt.Sprintf("cfilter size too large for message "+
 			"[size %v, max %v]", size, MaxCFilterDataSize)
 		return messageError("MsgCFilter.BtcEncode", str)
+	}
+
+	err := writeElement(w, msg.BlockHash)
+	if err != nil {
+		return err
 	}
 
 	return WriteVarBytes(w, pver, msg.Data)
@@ -65,13 +75,14 @@ func (msg *MsgCFilter) Command() string {
 // receiver.  This is part of the Message interface implementation.
 func (msg *MsgCFilter) MaxPayloadLength(pver uint32) uint32 {
 	return uint32(VarIntSerializeSize(MaxCFilterDataSize)) +
-	    MaxCFilterDataSize
+		MaxCFilterDataSize
 }
 
-// NewMsgFilterAdd returns a new bitcoin filteradd message that conforms to the
+// NewMsgCFilter returns a new bitcoin cfilter message that conforms to the
 // Message interface. See MsgCFilter for details.
-func NewMsgCFilter(data []byte) *MsgCFilter {
+func NewMsgCFilter(blockHash *chainhash.Hash, data []byte) *MsgCFilter {
 	return &MsgCFilter{
-		Data: data,
+		BlockHash: *blockHash,
+		Data:      data,
 	}
 }
