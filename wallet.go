@@ -2876,6 +2876,43 @@ func (c *Client) AddTicket(ticket *dcrutil.Tx) error {
 	return c.AddTicketAsync(hex.EncodeToString(ticketB)).Receive()
 }
 
+// FutureGenerateVoteResult is a future promise to deliver the result of a
+// GenerateVoteAsync RPC invocation (or an applicable error).
+type FutureGenerateVoteResult chan *response
+
+// Receive waits for the response promised by the future and returns the info
+// provided by the server.
+func (r FutureGenerateVoteResult) Receive() (*dcrjson.GenerateVoteResult, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal result as a getinfo result object.
+	var infoRes dcrjson.GenerateVoteResult
+	err = json.Unmarshal(res, &infoRes)
+	if err != nil {
+		return nil, err
+	}
+
+	return &infoRes, nil
+}
+
+// GenerateVoteAsync returns an instance of a type that can be used to get the result
+// of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+//
+// See GenerateVote for the blocking version and more details.
+func (c *Client) GenerateVoteAsync(blockHash *chainhash.Hash, height int64, sstxHash *chainhash.Hash, voteBits uint16, voteBitsExt string) FutureGenerateVoteResult {
+	cmd := dcrjson.NewGenerateVoteCmd(blockHash.String(), height, sstxHash.String(), voteBits, voteBitsExt)
+	return c.sendCmd(cmd)
+}
+
+// GenerateVote returns hex of an SSGen.
+func (c *Client) GenerateVote(blockHash *chainhash.Hash, height int64, sstxHash *chainhash.Hash, voteBits uint16, voteBitsExt string) (*dcrjson.GenerateVoteResult, error) {
+	return c.GenerateVoteAsync(blockHash, height, sstxHash, voteBits, voteBitsExt).Receive()
+}
+
 // NOTE: While getinfo is implemented here (in wallet.go), a dcrd chain server
 // will respond to getinfo requests as well, excluding any wallet information.
 
@@ -3088,66 +3125,6 @@ func (c *Client) GetTicketsVoteBitsAsync(hashes []*chainhash.Hash) FutureGetTick
 // by the wallet.
 func (c *Client) GetTicketsVoteBits(hashes []*chainhash.Hash) (*dcrjson.GetTicketsVoteBitsResult, error) {
 	return c.GetTicketsVoteBitsAsync(hashes).Receive()
-}
-
-// FutureSetTicketMaxPriceResult is a future promise to deliver the result of a
-// SetTicketMaxPriceAsync RPC invocation (or an applicable error).
-type FutureSetTicketMaxPriceResult chan *response
-
-// Receive waits for the response promised by the future and returns the info
-// provided by the server.
-func (r FutureSetTicketMaxPriceResult) Receive() error {
-	_, err := receiveFuture(r)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// SetTicketMaxPriceAsync returns an instance of a type that can be used to get
-// the result of the RPC at some future time by invoking the Receive function on
-// the returned instance.
-//
-// See SetTicketMaxPrice for the blocking version and more details.
-func (c *Client) SetTicketMaxPriceAsync(maxPrice float64) FutureSetTicketMaxPriceResult {
-	cmd := dcrjson.NewSetTicketMaxPriceCmd(maxPrice)
-	return c.sendCmd(cmd)
-}
-
-// SetTicketMaxPrice sets the maximum ticket price.
-func (c *Client) SetTicketMaxPrice(maxPrice float64) error {
-	return c.SetTicketMaxPriceAsync(maxPrice).Receive()
-}
-
-// FutureSetBalanceToMaintainResult is a future promise to deliver the result of
-// a SetBalanceToMaintainAsync RPC invocation (or an applicable error).
-type FutureSetBalanceToMaintainResult chan *response
-
-// Receive waits for the response promised by the future and returns the info
-// provided by the server.
-func (r FutureSetBalanceToMaintainResult) Receive() error {
-	_, err := receiveFuture(r)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// SetBalanceToMaintainAsync returns an instance of a type that can be used to
-// get the result of the RPC at some future time by invoking the Receive
-// function on the returned instance.
-//
-// See SetBalanceToMaintain for the blocking version and more details.
-func (c *Client) SetBalanceToMaintainAsync(maxPrice float64) FutureSetBalanceToMaintainResult {
-	cmd := dcrjson.NewSetBalanceToMaintainCmd(maxPrice)
-	return c.sendCmd(cmd)
-}
-
-// SetBalanceToMaintain sets the balance to maintain.
-func (c *Client) SetBalanceToMaintain(balanceToMaintain float64) error {
-	return c.SetBalanceToMaintainAsync(balanceToMaintain).Receive()
 }
 
 // FutureListScriptsResult is a future promise to deliver the result of a
