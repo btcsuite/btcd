@@ -156,15 +156,25 @@ func NewCreateRawSSRtxCmd(inputs []TransactionInput, fee *float64) *CreateRawSSR
 	}
 }
 
-// GetBalanceToMaintainCmd is a type handling custom marshaling and
-// unmarshaling of getbalancetomaintain JSON wallet extension
-// commands.
-type GetBalanceToMaintainCmd struct {
+// GenerateVoteCmd is a type handling custom marshaling and
+// unmarshaling of generatevote JSON wallet extension commands.
+type GenerateVoteCmd struct {
+	BlockHash   string
+	Height      int64
+	TicketHash  string
+	VoteBits    uint16
+	VoteBitsExt string
 }
 
-// NewGetBalanceToMaintainCmd creates a new GetBalanceToMaintainCmd.
-func NewGetBalanceToMaintainCmd() *GetBalanceToMaintainCmd {
-	return &GetBalanceToMaintainCmd{}
+// NewGenerateVoteCmd creates a new GenerateVoteCmd.
+func NewGenerateVoteCmd(blockhash string, height int64, tickethash string, votebits uint16, voteBitsExt string) *GenerateVoteCmd {
+	return &GenerateVoteCmd{
+		BlockHash:   blockhash,
+		Height:      height,
+		TicketHash:  tickethash,
+		VoteBits:    votebits,
+		VoteBitsExt: voteBitsExt,
+	}
 }
 
 // GetMultisigOutInfoCmd is a type handling custom marshaling and
@@ -221,17 +231,6 @@ type GetTicketFeeCmd struct {
 // NewGetTicketFeeCmd creates a new GetTicketFeeCmd.
 func NewGetTicketFeeCmd() *GetTicketFeeCmd {
 	return &GetTicketFeeCmd{}
-}
-
-// GetTicketMaxPriceCmd is a type handling custom marshaling and
-// unmarshaling of getticketmaxprice JSON wallet extension
-// commands.
-type GetTicketMaxPriceCmd struct {
-}
-
-// NewGetTicketMaxPriceCmd creates a new GetTicketMaxPriceCmd.
-func NewGetTicketMaxPriceCmd() *GetTicketMaxPriceCmd {
-	return &GetTicketMaxPriceCmd{}
 }
 
 // GetTicketsCmd is a type handling custom marshaling and
@@ -642,13 +641,12 @@ func init() {
 	MustRegisterCmd("createrawsstx", (*CreateRawSStxCmd)(nil), flags)
 	MustRegisterCmd("createrawssgentx", (*CreateRawSSGenTxCmd)(nil), flags)
 	MustRegisterCmd("createrawssrtx", (*CreateRawSSRtxCmd)(nil), flags)
-	MustRegisterCmd("getbalancetomaintain", (*GetBalanceToMaintainCmd)(nil), flags)
+	MustRegisterCmd("generatevote", (*GenerateVoteCmd)(nil), flags)
 	MustRegisterCmd("getmultisigoutinfo", (*GetMultisigOutInfoCmd)(nil), flags)
 	MustRegisterCmd("getmasterpubkey", (*GetMasterPubkeyCmd)(nil), flags)
 	MustRegisterCmd("getseed", (*GetSeedCmd)(nil), flags)
 	MustRegisterCmd("getstakeinfo", (*GetStakeInfoCmd)(nil), flags)
 	MustRegisterCmd("getticketfee", (*GetTicketFeeCmd)(nil), flags)
-	MustRegisterCmd("getticketmaxprice", (*GetTicketMaxPriceCmd)(nil), flags)
 	MustRegisterCmd("gettickets", (*GetTicketsCmd)(nil), flags)
 	MustRegisterCmd("getticketvotebits", (*GetTicketVoteBitsCmd)(nil), flags)
 	MustRegisterCmd("getticketsvotebits", (*GetTicketsVoteBitsCmd)(nil), flags)
