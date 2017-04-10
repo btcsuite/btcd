@@ -25,21 +25,21 @@ var (
 				Id:          "Abstain",
 				Description: "Abstain voting for Pedro",
 				Bits:        0x0, // 0b0000
-				IsIgnore:    true,
+				IsAbstain:   true,
 				IsNo:        false,
 			},
 			{
 				Id:          "Yes",
 				Description: "Vote for Pedro",
 				Bits:        0x2, // 0b0010
-				IsIgnore:    false,
+				IsAbstain:   false,
 				IsNo:        false,
 			},
 			{
 				Id:          "No",
 				Description: "Dont vote for Pedro",
 				Bits:        0x4, // 0b0100
-				IsIgnore:    false,
+				IsAbstain:   false,
 				IsNo:        true,
 			},
 		},
@@ -54,42 +54,42 @@ var (
 				Id:          "Abstain",
 				Description: "Abstain multiple choice",
 				Bits:        0x0, // 0b0000 0000
-				IsIgnore:    true,
+				IsAbstain:   true,
 				IsNo:        false,
 			},
 			{
 				Id:          "one",
 				Description: "Choice 1",
 				Bits:        0x10, // 0b0001 0000
-				IsIgnore:    false,
+				IsAbstain:   false,
 				IsNo:        false,
 			},
 			{
 				Id:          "Vote against",
 				Description: "Vote against all multiple ",
 				Bits:        0x20, // 0b0010 0000
-				IsIgnore:    false,
+				IsAbstain:   false,
 				IsNo:        true,
 			},
 			{
 				Id:          "two",
 				Description: "Choice 2",
 				Bits:        0x30, // 0b0011 0000
-				IsIgnore:    false,
+				IsAbstain:   false,
 				IsNo:        false,
 			},
 			{
 				Id:          "three",
 				Description: "Choice 3",
 				Bits:        0x40, // 0b0100 0000
-				IsIgnore:    false,
+				IsAbstain:   false,
 				IsNo:        false,
 			},
 			{
 				Id:          "four",
 				Description: "Choice 4",
 				Bits:        0x50, // 0b0101 0000
-				IsIgnore:    false,
+				IsAbstain:   false,
 				IsNo:        false,
 			},
 		},
@@ -140,11 +140,11 @@ func TestSerializeDeserialize(t *testing.T) {
 				deserialized.Vote.Choices[i].Bits,
 				ourDeployment.Vote.Choices[i].Bits)
 		}
-		if deserialized.Vote.Choices[i].IsIgnore !=
-			ourDeployment.Vote.Choices[i].IsIgnore {
-			t.Fatalf("invalid IsIgnore %v got %v expected %v", i,
-				deserialized.Vote.Choices[i].IsIgnore,
-				ourDeployment.Vote.Choices[i].IsIgnore)
+		if deserialized.Vote.Choices[i].IsAbstain !=
+			ourDeployment.Vote.Choices[i].IsAbstain {
+			t.Fatalf("invalid IsAbstain %v got %v expected %v", i,
+				deserialized.Vote.Choices[i].IsAbstain,
+				ourDeployment.Vote.Choices[i].IsAbstain)
 		}
 		if deserialized.Vote.Choices[i].IsNo !=
 			ourDeployment.Vote.Choices[i].IsNo {
@@ -1911,19 +1911,19 @@ var (
 			Id:          "abstain",
 			Description: "abstain voting for change",
 			Bits:        0x0000,
-			IsIgnore:    true,
+			IsAbstain:   true,
 			IsNo:        false,
 		}, {
 			Id:          "no",
 			Description: "vote no",
 			Bits:        0x0002, // Bit 1
-			IsIgnore:    false,
+			IsAbstain:   false,
 			IsNo:        true,
 		}, {
 			Id:          "yes",
 			Description: "vote yes",
 			Bits:        0x0004, // Bit 2
-			IsIgnore:    false,
+			IsAbstain:   false,
 			IsNo:        false,
 		}},
 	}
@@ -1937,19 +1937,19 @@ var (
 			Id:          "abstain",
 			Description: "abstain voting for change",
 			Bits:        0x0000,
-			IsIgnore:    true,
+			IsAbstain:   true,
 			IsNo:        false,
 		}, {
 			Id:          "no",
 			Description: "vote no",
 			Bits:        0x0008, // Bit 3
-			IsIgnore:    false,
+			IsAbstain:   false,
 			IsNo:        true,
 		}, {
 			Id:          "yes",
 			Description: "vote yes",
 			Bits:        0x0010, // Bit 4
-			IsIgnore:    false,
+			IsAbstain:   false,
 			IsNo:        false,
 		}},
 	}

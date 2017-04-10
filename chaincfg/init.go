@@ -11,16 +11,16 @@ import (
 )
 
 var (
-	ErrDuplicateVoteId = errors.New("duplicate vote id")
-	ErrInvalidMask     = errors.New("invalid mask")
-	ErrNotConsecutive  = errors.New("choices not consecutive")
-	ErrTooManyChoices  = errors.New("too many choices")
-	ErrInvalidIgnore   = errors.New("invalid ignore bits")
-	ErrInvalidBits     = errors.New("invalid vote bits")
-	ErrInvalidIsIgnore = errors.New("one and only one IsIgnore rule " +
+	ErrDuplicateVoteId  = errors.New("duplicate vote id")
+	ErrInvalidMask      = errors.New("invalid mask")
+	ErrNotConsecutive   = errors.New("choices not consecutive")
+	ErrTooManyChoices   = errors.New("too many choices")
+	ErrInvalidAbstain   = errors.New("invalid abstain bits")
+	ErrInvalidBits      = errors.New("invalid vote bits")
+	ErrInvalidIsAbstain = errors.New("one and only one IsAbstain rule " +
 		"violation")
 	ErrInvalidIsNo      = errors.New("one and only one IsNo rule violation")
-	ErrInvalidBothFlags = errors.New("IsNo and IsIgnore may not be both " +
+	ErrInvalidBothFlags = errors.New("IsNo and IsAbstain may not be both " +
 		"set to true")
 	ErrDuplicateChoiceId = errors.New("duplicate choice ID")
 )
@@ -60,7 +60,7 @@ func shift(mask uint16) uint {
 
 func validateChoices(mask uint16, choices []Choice) error {
 	var (
-		isIgnore, isNo int
+		numAbstain, numNo int
 	)
 
 	// Check that mask is consecutive.
@@ -76,9 +76,9 @@ func validateChoices(mask uint16, choices []Choice) error {
 	dups := make(map[string]struct{})
 	s := shift(mask)
 	for index, choice := range choices {
-		// Check that choice 0 is the ignore vote.
-		if mask&choice.Bits == 0 && !choice.IsIgnore {
-			return ErrInvalidIgnore
+		// Check that choice 0 is the abstain vote.
+		if mask&choice.Bits == 0 && !choice.IsAbstain {
+			return ErrInvalidAbstain
 		}
 
 		// Check mask bits.
@@ -93,16 +93,16 @@ func validateChoices(mask uint16, choices []Choice) error {
 		}
 
 		// Check that both flags aren't set to true.
-		if choice.IsIgnore && choice.IsNo {
+		if choice.IsAbstain && choice.IsNo {
 			return ErrInvalidBothFlags
 		}
 
 		// Count flags.
-		if choice.IsIgnore {
-			isIgnore++
+		if choice.IsAbstain {
+			numAbstain++
 		}
 		if choice.IsNo {
-			isNo++
+			numNo++
 		}
 
 		// Check for duplicates.
@@ -114,11 +114,11 @@ func validateChoices(mask uint16, choices []Choice) error {
 		dups[id] = struct{}{}
 	}
 
-	// Check that there is only one IsNo and IsIgnore flag set to true.
-	if isIgnore != 1 {
-		return ErrInvalidIsIgnore
+	// Check that there is only one IsNo and IsAbstain flag set to true.
+	if numAbstain != 1 {
+		return ErrInvalidIsAbstain
 	}
-	if isNo != 1 {
+	if numNo != 1 {
 		return ErrInvalidIsNo
 	}
 

@@ -456,7 +456,7 @@ var helpDescsEnUS = map[string]string{
 	"choice-id":                       "Unique identifier of this choice.",
 	"choice-description":              "Description of this choice.",
 	"choice-bits":                     "Bits that dentify this choice.",
-	"choice-isignore":                 "Should this vote be ignored.",
+	"choice-isabstain":                "This choice is to abstain from change.",
 	"choice-isno":                     "Hard no choice (1 and only 1 per agenda).",
 	"choice-count":                    "How many votes received.",
 	"choice-progress":                 "Progress of the overall count.",

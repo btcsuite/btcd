@@ -51,8 +51,8 @@ import (
 
 // API version constants
 const (
-	jsonrpcSemverString = "2.0.0"
-	jsonrpcSemverMajor  = 2
+	jsonrpcSemverString = "3.0.0"
+	jsonrpcSemverMajor  = 3
 	jsonrpcSemverMinor  = 0
 	jsonrpcSemverPatch  = 0
 )
@@ -3840,7 +3840,7 @@ func handleGetVoteInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 				Id:          choice.Id,
 				Description: choice.Description,
 				Bits:        choice.Bits,
-				IsIgnore:    choice.IsIgnore,
+				IsAbstain:   choice.IsAbstain,
 				IsNo:        choice.IsNo,
 			}
 			a.Choices = append(a.Choices, c)
@@ -3870,9 +3870,9 @@ func handleGetVoteInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 
 		// Calculate quorum.
 		qmin := quorum
-		totalNonIgnore := counts.Total - counts.TotalIgnore
-		if totalNonIgnore < quorum {
-			qmin = totalNonIgnore
+		totalNonAbstain := counts.Total - counts.TotalAbstain
+		if totalNonAbstain < quorum {
+			qmin = totalNonAbstain
 		}
 		a.QuorumProgress = float64(qmin) / float64(quorum)
 

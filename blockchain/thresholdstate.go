@@ -109,15 +109,15 @@ func newThresholdState(state ThresholdState, choice uint32) ThresholdStateTuple 
 }
 
 // thresholdConditionTally is returned by thresholdConditionChecker.Condition
-// to indicate how many votes an option received.  The isIgnore and isNo flags
-// are accordingly set.  Note isIgnore and isNo can NOT be both true at the
+// to indicate how many votes an option received.  The isAbstain and isNo flags
+// are accordingly set.  Note isAbstain and isNo can NOT be both true at the
 // same time.
 type thresholdConditionTally struct {
 	// Vote count
 	count uint32
 
-	// isIgnore is the abstain (or zero vote).
-	isIgnore bool
+	// isAbstain is the abstain (or zero vote).
+	isAbstain bool
 
 	// isNo is the hard no vote.
 	isNo bool
@@ -153,11 +153,11 @@ type thresholdConditionChecker interface {
 	StakeValidationHeight() int64
 
 	// Condition returns an array of thresholdConditionTally that contains
-	// all votes.  By convention isIgnore and isNo can not be true at the
+	// all votes.  By convention isAbstain and isNo can not be true at the
 	// same time.  The array is always returned in the same order so that
 	// the consumer can repeatedly call this function without having to
 	// care about said order.  Only 1 isNo vote is allowed.  By convention
-	// the zero value of the vote as determined by the mask is an isIgnore
+	// the zero value of the vote as determined by the mask is an isAbstain
 	// vote.
 	Condition(*blockNode, uint32) ([]thresholdConditionTally, error)
 }
@@ -359,9 +359,9 @@ func (b *BlockChain) thresholdState(version uint32, prevNode *blockNode, checker
 			// on by the miners, so iterate backwards through the
 			// confirmation window to count all of the votes in it.
 			var (
-				counts      []thresholdConditionTally
-				totalVotes  uint32
-				ignoreVotes uint32
+				counts       []thresholdConditionTally
+				totalVotes   uint32
+				abstainVotes uint32
 			)
 			countNode := prevNode
 			for i := int64(0); i < confirmationWindow; i++ {
@@ -379,10 +379,10 @@ func (b *BlockChain) thresholdState(version uint32, prevNode *blockNode, checker
 				// Tally votes.
 				for k := range c {
 					counts[k].count += c[k].count
-					counts[k].isIgnore = c[k].isIgnore
+					counts[k].isAbstain = c[k].isAbstain
 					counts[k].isNo = c[k].isNo
-					if c[k].isIgnore {
-						ignoreVotes += c[k].count
+					if c[k].isAbstain {
+						abstainVotes += c[k].count
 					} else {
 						totalVotes += c[k].count
 					}
@@ -402,14 +402,14 @@ func (b *BlockChain) thresholdState(version uint32, prevNode *blockNode, checker
 			}
 
 			// Determine if we have reached quorum.
-			totalNonIgnoreVotes := uint32(0)
+			totalNonAbstainVotes := uint32(0)
 			for _, v := range counts {
-				if v.isIgnore && !v.isNo {
+				if v.isAbstain && !v.isNo {
 					continue
 				}
-				totalNonIgnoreVotes += v.count
+				totalNonAbstainVotes += v.count
 			}
-			if totalNonIgnoreVotes < checker.RuleChangeActivationQuorum() {
+			if totalNonAbstainVotes < checker.RuleChangeActivationQuorum() {
 				break
 			}
 
@@ -423,23 +423,23 @@ func (b *BlockChain) thresholdState(version uint32, prevNode *blockNode, checker
 				}
 				// Something went over the threshold
 				switch {
-				case !v.isIgnore && !v.isNo:
+				case !v.isAbstain && !v.isNo:
 					// One of the choices has
 					// reached majority.
 					stateTuple.State = ThresholdLockedIn
 					stateTuple.Choice = uint32(k)
-				case !v.isIgnore && v.isNo:
+				case !v.isAbstain && v.isNo:
 					// No choice.  Only 1 No per
 					// vote is allowed.  A No vote
 					// is required though.
 					stateTuple.State = ThresholdFailed
 					stateTuple.Choice = uint32(k)
-				case v.isIgnore && !v.isNo:
-					// This is the ignore case.
+				case v.isAbstain && !v.isNo:
+					// This is the abstain case.
 					// The statemachine is not
 					// supposed to change.
 					continue
-				case v.isIgnore && v.isNo:
+				case v.isAbstain && v.isNo:
 					// Invalid choice.
 					stateTuple.State = ThresholdFailed
 					stateTuple.Choice = uint32(k)
@@ -519,9 +519,9 @@ func (b *BlockChain) ThresholdState(hash *chainhash.Hash, version uint32, deploy
 
 // VoteCounts is a compacted struct that is used to message vote counts.
 type VoteCounts struct {
-	Total       uint32
-	TotalIgnore uint32
-	VoteChoices []uint32
+	Total        uint32
+	TotalAbstain uint32
+	VoteChoices  []uint32
 }
 
 // getVoteCounts returns the vote counts for the specified version for the
@@ -549,11 +549,11 @@ func (b *BlockChain) getVoteCounts(node *blockNode, version uint32, d chaincfg.C
 
 			index := d.Vote.VoteIndex(vote.Bits)
 			if index == -1 {
-				result.TotalIgnore++
+				// Invalid votes are treated as abstain.
+				result.TotalAbstain++
 				continue
-			} else if d.Vote.Choices[index].IsIgnore {
-				// IsIgnore votes are also counted against ignored.
-				result.TotalIgnore++
+			} else if d.Vote.Choices[index].IsAbstain {
+				result.TotalAbstain++
 			}
 			result.VoteChoices[index]++
 		}

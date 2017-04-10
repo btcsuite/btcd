@@ -88,21 +88,21 @@ type Checkpoint struct {
 //			Id:          "abstain",
 //			Description: "abstain voting for change",
 //			Bits:        0x0000,
-//			IsIgnore:    true,
+//			IsAbstain:   true,
 //			IsNo:        false,
 //		},
 //		{
 //			Id:          "no",
 //			Description: "reject changing block height to uint64",
 //			Bits:        0x0002,
-//			IsIgnore:    false,
+//			IsAbstain:   false,
 //			IsNo:        false,
 //		},
 //		{
 //			Id:          "yes",
 //			Description: "accept changing block height to uint64",
 //			Bits:        0x0004,
-//			IsIgnore:    false,
+//			IsAbstain:   false,
 //			IsNo:        true,
 //		},
 //	},
@@ -134,9 +134,9 @@ type Choice struct {
 	// Bits used for this vote.
 	Bits uint16
 
-	// Ignore this choice.  By convention this must be the 0 vote (abstain)
-	// and exist only once in the Vote.Choices array.
-	IsIgnore bool
+	// This is the abstain choice.  By convention this must be the 0 vote
+	// (abstain) and exist only once in the Vote.Choices array.
+	IsAbstain bool
 
 	// This coince indicates a hard No Vote.  By convention this must exist
 	// only once in the Vote.Choices array.
@@ -732,19 +732,19 @@ var SimNetParams = Params{
 					Id:          "abstain",
 					Description: "abstain voting for change",
 					Bits:        0x0000,
-					IsIgnore:    true,
+					IsAbstain:   true,
 					IsNo:        false,
 				}, {
 					Id:          "no",
 					Description: "reject changing max allowed block size",
 					Bits:        0x0002, // Bit 1
-					IsIgnore:    false,
+					IsAbstain:   false,
 					IsNo:        true,
 				}, {
 					Id:          "yes",
 					Description: "accept changing max allowed block size",
 					Bits:        0x0004, // Bit 2
-					IsIgnore:    false,
+					IsAbstain:   false,
 					IsNo:        false,
 				}},
 			},

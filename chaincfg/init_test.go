@@ -18,21 +18,21 @@ var (
 				Id:          "Abstain",
 				Description: "Abstain voting for Pedro",
 				Bits:        0x0, // 0b0000
-				IsIgnore:    true,
+				IsAbstain:   true,
 				IsNo:        false,
 			},
 			{
 				Id:          "Yes",
 				Description: "Vote for Pedro",
 				Bits:        0x2, // 0b0010
-				IsIgnore:    false,
+				IsAbstain:   false,
 				IsNo:        false,
 			},
 			{
 				Id:          "No",
 				Description: "Dont vote for Pedro",
 				Bits:        0x4, // 0b0100
-				IsIgnore:    false,
+				IsAbstain:   false,
 				IsNo:        true,
 			},
 		},
@@ -47,28 +47,28 @@ var (
 				Id:          "Abstain",
 				Description: "Abstain voting for Pedro",
 				Bits:        0x0, // 0b0000
-				IsIgnore:    true,
+				IsAbstain:   true,
 				IsNo:        false,
 			},
 			{
 				Id:          "Yes",
 				Description: "Vote for Pedro",
 				Bits:        0x2, // 0b0010
-				IsIgnore:    false,
+				IsAbstain:   false,
 				IsNo:        false,
 			},
 			{
 				Id:          "No",
 				Description: "Dont vote for Pedro",
 				Bits:        0x4, // 0b0100
-				IsIgnore:    false,
+				IsAbstain:   false,
 				IsNo:        true,
 			},
 			{
 				Id:          "Maybe",
 				Description: "Vote for Pedro",
 				Bits:        0x6, // 0b0110
-				IsIgnore:    false,
+				IsAbstain:   false,
 				IsNo:        false,
 			},
 			// XXX here we go out of mask bounds
@@ -76,7 +76,7 @@ var (
 				Id:          "Hmmmm",
 				Description: "Vote for Pedro",
 				Bits:        0x6, // 0b0110 XXX invalid bits too
-				IsIgnore:    false,
+				IsAbstain:   false,
 				IsNo:        false,
 			},
 		},
@@ -91,14 +91,14 @@ var (
 				Id:          "Abstain",
 				Description: "Abstain voting for Pedro",
 				Bits:        0x0, // 0b0000
-				IsIgnore:    true,
+				IsAbstain:   true,
 				IsNo:        false,
 			},
 			{
 				Id:          "Yes",
 				Description: "Vote for Pedro",
 				Bits:        0x2, // 0b0010
-				IsIgnore:    false,
+				IsAbstain:   false,
 				IsNo:        false,
 			},
 			// XXX not consecutive
@@ -106,13 +106,13 @@ var (
 				Id:          "Maybe",
 				Description: "Vote for Pedro",
 				Bits:        0x6, // 0b0110
-				IsIgnore:    false,
+				IsAbstain:   false,
 				IsNo:        false,
 			},
 		},
 	}
 
-	invalidIgnore = Vote{
+	invalidAbstain = Vote{
 		Id:          "voteforpedro",
 		Description: "You should always vote for Pedro",
 		Mask:        0x6, // 0b0110
@@ -121,21 +121,21 @@ var (
 				Id:          "Abstain",
 				Description: "Abstain voting for Pedro",
 				Bits:        0x0,   // 0b0000
-				IsIgnore:    false, // XXX this is the invalid bit
+				IsAbstain:   false, // XXX this is the invalid bit
 				IsNo:        false,
 			},
 			{
 				Id:          "Yes",
 				Description: "Vote for Pedro",
 				Bits:        0x2, // 0b0010
-				IsIgnore:    false,
+				IsAbstain:   false,
 				IsNo:        false,
 			},
 			{
 				Id:          "No",
 				Description: "Dont vote for Pedro",
 				Bits:        0x4, // 0b0100
-				IsIgnore:    false,
+				IsAbstain:   false,
 				IsNo:        true,
 			},
 		},
@@ -150,27 +150,27 @@ var (
 				Id:          "Abstain",
 				Description: "Abstain voting for Pedro",
 				Bits:        0x0, // 0b0000
-				IsIgnore:    true,
+				IsAbstain:   true,
 				IsNo:        false,
 			},
 			{
 				Id:          "Yes",
 				Description: "Vote for Pedro",
 				Bits:        0x2, // 0b0010
-				IsIgnore:    false,
+				IsAbstain:   false,
 				IsNo:        false,
 			},
 			{
 				Id:          "No",
 				Description: "Dont vote for Pedro",
 				Bits:        0xc, // 0b1100 XXX invalid bits
-				IsIgnore:    false,
+				IsAbstain:   false,
 				IsNo:        true,
 			},
 		},
 	}
 
-	twoIsIgnore = Vote{
+	twoIsAbstain = Vote{
 		Id:          "voteforpedro",
 		Description: "You should always vote for Pedro",
 		Mask:        0x6, // 0b0110
@@ -179,21 +179,21 @@ var (
 				Id:          "Abstain",
 				Description: "Abstain voting for Pedro",
 				Bits:        0x0, // 0b0000
-				IsIgnore:    true,
+				IsAbstain:   true,
 				IsNo:        false,
 			},
 			{
 				Id:          "Yes",
 				Description: "Vote for Pedro",
 				Bits:        0x2,  // 0b0010
-				IsIgnore:    true, // XXX this is the invalid choice
+				IsAbstain:   true, // XXX this is the invalid choice
 				IsNo:        false,
 			},
 			{
 				Id:          "No",
 				Description: "Dont vote for Pedro",
 				Bits:        0x4, // 0b0100
-				IsIgnore:    false,
+				IsAbstain:   false,
 				IsNo:        true,
 			},
 		},
@@ -208,21 +208,21 @@ var (
 				Id:          "Abstain",
 				Description: "Abstain voting for Pedro",
 				Bits:        0x0, // 0b0000
-				IsIgnore:    true,
+				IsAbstain:   true,
 				IsNo:        false,
 			},
 			{
 				Id:          "Yes",
 				Description: "Vote for Pedro",
 				Bits:        0x2, // 0b0010
-				IsIgnore:    false,
+				IsAbstain:   false,
 				IsNo:        true, // XXX this is the invalid choice
 			},
 			{
 				Id:          "No",
 				Description: "Dont vote for Pedro",
 				Bits:        0x4, // 0b0100
-				IsIgnore:    false,
+				IsAbstain:   false,
 				IsNo:        true,
 			},
 		},
@@ -237,21 +237,21 @@ var (
 				Id:          "Abstain",
 				Description: "Abstain voting for Pedro",
 				Bits:        0x0, // 0b0000
-				IsIgnore:    true,
+				IsAbstain:   true,
 				IsNo:        false,
 			},
 			{
 				Id:          "Yes",
 				Description: "Vote for Pedro",
 				Bits:        0x2,  // 0b0010
-				IsIgnore:    true, // XXX this is the invalid choice
+				IsAbstain:   true, // XXX this is the invalid choice
 				IsNo:        true, // XXX this is the invalid choice
 			},
 			{
 				Id:          "No",
 				Description: "Dont vote for Pedro",
 				Bits:        0x4, // 0b0100
-				IsIgnore:    false,
+				IsAbstain:   false,
 				IsNo:        true,
 			},
 		},
@@ -266,21 +266,21 @@ var (
 				Id:          "Abstain",
 				Description: "Abstain voting for Pedro",
 				Bits:        0x0, // 0b0000
-				IsIgnore:    true,
+				IsAbstain:   true,
 				IsNo:        false,
 			},
 			{
 				Id:          "Yes",
 				Description: "Vote for Pedro",
 				Bits:        0x2, // 0b0010
-				IsIgnore:    false,
+				IsAbstain:   false,
 				IsNo:        false,
 			},
 			{
 				Id:          "Yes", // XXX this is the invalid ID
 				Description: "Dont vote for Pedro",
 				Bits:        0x4, // 0b0100
-				IsIgnore:    false,
+				IsAbstain:   false,
 				IsNo:        true,
 			},
 		},
@@ -310,8 +310,8 @@ func TestChoices(t *testing.T) {
 		},
 		{
 			name:     "invalid ignore",
-			vote:     invalidIgnore,
-			expected: ErrInvalidIgnore,
+			vote:     invalidAbstain,
+			expected: ErrInvalidAbstain,
 		},
 		{
 			name:     "invalid vote bits",
@@ -319,9 +319,9 @@ func TestChoices(t *testing.T) {
 			expected: ErrInvalidBits,
 		},
 		{
-			name:     "2 IsIgnore",
-			vote:     twoIsIgnore,
-			expected: ErrInvalidIsIgnore,
+			name:     "2 IsAbstain",
+			vote:     twoIsAbstain,
+			expected: ErrInvalidIsAbstain,
 		},
 		{
 			name:     "2 IsNo",
@@ -329,7 +329,7 @@ func TestChoices(t *testing.T) {
 			expected: ErrInvalidIsNo,
 		},
 		{
-			name:     "both IsIgnore IsNo",
+			name:     "both IsAbstain IsNo",
 			vote:     bothFlags,
 			expected: ErrInvalidBothFlags,
 		},

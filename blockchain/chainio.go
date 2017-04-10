@@ -1845,11 +1845,11 @@ func DumpBlockChain(db database.DB, height int64) (map[int64][]byte, error) {
 //
 // The serialized value format for the choice array is:
 //
-//   <bits><isIgnore><isNo>
+//   <bits><isAbstain><isNo>
 //
 //   Field            Type      Size
 //   bits             uint16    2 bytes
-//   isIgnore         uint8     1 byte (bool)
+//   isAbstain        uint8     1 byte (bool)
 //   isNo             uint8     1 byte (bool)
 //
 // Finally, the main threshold bucket also contains the number of stored
@@ -1876,7 +1876,7 @@ func serializeDeploymentCacheParams(deployment *chaincfg.ConsensusDeployment) []
 	for i := 0; i < len(deployment.Vote.Choices); i++ {
 		byteOrder.PutUint16(serialized[20+i*4:],
 			deployment.Vote.Choices[i].Bits)
-		if deployment.Vote.Choices[i].IsIgnore {
+		if deployment.Vote.Choices[i].IsAbstain {
 			serialized[20+i*4+2] = 1
 		}
 		if deployment.Vote.Choices[i].IsNo {
@@ -1919,7 +1919,7 @@ func deserializeDeploymentCacheParams(serialized []byte) (chaincfg.ConsensusDepl
 		deployment.Vote.Choices[i].Bits =
 			byteOrder.Uint16(serialized[20+i*4:])
 		if serialized[20+i*4+2] != 0 {
-			deployment.Vote.Choices[i].IsIgnore = true
+			deployment.Vote.Choices[i].IsAbstain = true
 		}
 		if serialized[20+i*4+3] != 0 {
 			deployment.Vote.Choices[i].IsNo = true

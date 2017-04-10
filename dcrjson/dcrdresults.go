@@ -60,7 +60,7 @@ type Choice struct {
 	Id          string  `json:"id"`
 	Description string  `json:"description"`
 	Bits        uint16  `json:"bits"`
-	IsIgnore    bool    `json:"isignore"`
+	IsAbstain   bool    `json:"isabstain"`
 	IsNo        bool    `json:"isno"`
 	Count       uint32  `json:"count"`
 	Progress    float64 `json:"progress"`

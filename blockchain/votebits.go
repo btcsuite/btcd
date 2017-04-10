@@ -113,7 +113,7 @@ func (c deploymentChecker) Condition(node *blockNode, version uint32) ([]thresho
 	// information into the thresholdConditionTally array.
 	tally := make([]thresholdConditionTally, len(c.deployment.Vote.Choices))
 	for t, choice := range c.deployment.Vote.Choices {
-		tally[t].isIgnore = choice.IsIgnore
+		tally[t].isAbstain = choice.IsAbstain
 		tally[t].isNo = choice.IsNo
 	}
 
