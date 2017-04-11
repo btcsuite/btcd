@@ -246,26 +246,15 @@ func NewGetTicketsCmd(includeImmature bool) *GetTicketsCmd {
 	return &GetTicketsCmd{includeImmature}
 }
 
-// GetTicketVoteBitsCmd defines the getticketvotebits JSON-RPC command.
-type GetTicketVoteBitsCmd struct {
-	TxHash string
+// GetVoteChoicesCmd returns a new instance which can be used to issue a
+// getvotechoices JSON-RPC command.
+type GetVoteChoicesCmd struct {
 }
 
-// NewGetTicketVoteBitsCmd returns a new instance which can be used to issue
-// a getticketvotebits JSON-RPC command.
-func NewGetTicketVoteBitsCmd(txHash string) *GetTicketVoteBitsCmd {
-	return &GetTicketVoteBitsCmd{TxHash: txHash}
-}
-
-// GetTicketsVoteBitsCmd defines the getticketsvotebits JSON-RPC command.
-type GetTicketsVoteBitsCmd struct {
-	TxHashes []string
-}
-
-// NewGetTicketsVoteBitsCmd returns a new instance which can be used to issue
-// a getticketsvotebits JSON-RPC command.
-func NewGetTicketsVoteBitsCmd(txHashes []string) *GetTicketsVoteBitsCmd {
-	return &GetTicketsVoteBitsCmd{TxHashes: txHashes}
+// NewGetVoteChoicesCmd returns a new instance which can be used to
+// issue a JSON-RPC getvotechoices command.
+func NewGetVoteChoicesCmd() *GetVoteChoicesCmd {
+	return &GetVoteChoicesCmd{}
 }
 
 // GetWalletFeeCmd defines the getwalletfee JSON-RPC command.
@@ -555,38 +544,16 @@ func NewSetTicketMaxPriceCmd(max float64) *SetTicketMaxPriceCmd {
 	}
 }
 
-// SetTicketVoteBitsCmd is a type handling custom marshaling and
-// unmarshaling of setticketvotebits JSON RPC commands.
-type SetTicketVoteBitsCmd struct {
-	TxHash      string
-	VoteBits    uint16
-	VoteBitsExt *string
+// SetVoteChoiceCmd defines the parameters to the setvotechoice method.
+type SetVoteChoiceCmd struct {
+	AgendaID string
+	ChoiceID string
 }
 
-// NewSetTicketVoteBitsCmd creates a new instance of the setticketvotebits
-// command.
-func NewSetTicketVoteBitsCmd(txHash string, voteBits uint16, voteBitsExt *string) *SetTicketVoteBitsCmd {
-	return &SetTicketVoteBitsCmd{
-		TxHash:      txHash,
-		VoteBits:    voteBits,
-		VoteBitsExt: voteBitsExt,
-	}
-}
-
-// SetTicketsVoteBitsCmd is a type handling custom marshaling and
-// unmarshaling of setticketsvotebits JSON RPC commands.
-type SetTicketsVoteBitsCmd struct {
-	TxHashes      string
-	VoteBitsBytes string
-}
-
-// NewSetTicketsVoteBitsCmd creates a new instance of the setticketsvotebits
-// command.
-func NewSetTicketsVoteBitsCmd(txHashes string, voteBitsBytes string) *SetTicketsVoteBitsCmd {
-	return &SetTicketsVoteBitsCmd{
-		TxHashes:      txHashes,
-		VoteBitsBytes: voteBitsBytes,
-	}
+// NewSetVoteChoiceCmd returns a new instance which can be used to issue a
+// setvotechoice JSON-RPC command.
+func NewSetVoteChoiceCmd(agendaID, choiceID string) *SetVoteChoiceCmd {
+	return &SetVoteChoiceCmd{AgendaID: agendaID, ChoiceID: choiceID}
 }
 
 // SignRawTransactionsCmd defines the signrawtransactions JSON-RPC command.
@@ -648,8 +615,7 @@ func init() {
 	MustRegisterCmd("getstakeinfo", (*GetStakeInfoCmd)(nil), flags)
 	MustRegisterCmd("getticketfee", (*GetTicketFeeCmd)(nil), flags)
 	MustRegisterCmd("gettickets", (*GetTicketsCmd)(nil), flags)
-	MustRegisterCmd("getticketvotebits", (*GetTicketVoteBitsCmd)(nil), flags)
-	MustRegisterCmd("getticketsvotebits", (*GetTicketsVoteBitsCmd)(nil), flags)
+	MustRegisterCmd("getvotechoices", (*GetVoteChoicesCmd)(nil), flags)
 	MustRegisterCmd("importscript", (*ImportScriptCmd)(nil), flags)
 	MustRegisterCmd("listscripts", (*ListScriptsCmd)(nil), flags)
 	MustRegisterCmd("notifynewtickets", (*NotifyNewTicketsCmd)(nil), flags)
@@ -670,8 +636,7 @@ func init() {
 	MustRegisterCmd("setbalancetomaintain", (*SetBalanceToMaintainCmd)(nil), flags)
 	MustRegisterCmd("setticketfee", (*SetTicketFeeCmd)(nil), flags)
 	MustRegisterCmd("setticketmaxprice", (*SetTicketMaxPriceCmd)(nil), flags)
-	MustRegisterCmd("setticketvotebits", (*SetTicketVoteBitsCmd)(nil), flags)
-	MustRegisterCmd("setticketsvotebits", (*SetTicketsVoteBitsCmd)(nil), flags)
+	MustRegisterCmd("setvotechoice", (*SetVoteChoiceCmd)(nil), flags)
 	MustRegisterCmd("signrawtransactions", (*SignRawTransactionsCmd)(nil), flags)
 	MustRegisterCmd("stakepooluserinfo", (*StakePoolUserInfoCmd)(nil), flags)
 	MustRegisterCmd("walletinfo", (*WalletInfoCmd)(nil), flags)

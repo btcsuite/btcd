@@ -1,5 +1,5 @@
 hash: 2b8970779e0f073a5720aa6d6558bfbf1919f12ef2e19b3921955f156edd93e3
-updated: 2017-03-31T14:22:09.68867139-04:00
+updated: 2017-04-11T12:03:34.2949457-04:00
 imports:
 - name: github.com/btcsuite/btclog
   version: 73889fb79bd687870312b6e40effcecffbd57d30
@@ -47,7 +47,7 @@ imports:
 - name: github.com/decred/blake256
   version: a840e32d7c31fe2e0218607334cb120a683951a4
 - name: github.com/decred/dcrrpcclient
-  version: a24e0b968f2379a5882781f11494354ca2af4453
+  version: e5a52611671993ad821dab68f6e7d8fb57510381
 - name: github.com/decred/dcrutil
   version: ebd2e98736e819ac043d54439969b30144b92ced
   subpackages:

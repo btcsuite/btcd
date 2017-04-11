@@ -53,22 +53,18 @@ type GetTicketsResult struct {
 	Hashes []string `json:"hashes"`
 }
 
-// VoteBitsData models the data stored for any given voteBits for a ticket.
-type VoteBitsData struct {
-	VoteBits    uint16 `json:"votebits"`
-	VoteBitsExt string `json:"votebitsext"`
+// VoteChoice models the data for a vote choice in the getvotechoices result.
+type VoteChoice struct {
+	AgendaID          string `json:"agendaid"`
+	AgendaDescription string `json:"agendadescription"`
+	ChoiceID          string `json:"choiceid"`
+	ChoiceDescription string `json:"choicedescription"`
 }
 
-// GetTicketVoteBitsResult models the data returned from the getticketvotebits
-// command.
-type GetTicketVoteBitsResult struct {
-	VoteBitsData
-}
-
-// GetTicketsVoteBitsResult models the data returned from the getticketsvotebits
-// command.
-type GetTicketsVoteBitsResult struct {
-	VoteBitsList []VoteBitsData `json:"votebitslist"`
+// GetVoteChoicesResult models the data returned by the getvotechoices command.
+type GetVoteChoicesResult struct {
+	Version uint32       `json:"version"`
+	Choices []VoteChoice `json:"choices"`
 }
 
 // ScriptInfo is the structure representing a redeem script, its hash,
