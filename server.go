@@ -1617,15 +1617,16 @@ func newPeerConfig(sp *serverPeer) *peer.Config {
 			// other implementations' alert messages, we will not relay theirs.
 			OnAlert: nil,
 		},
-		NewestBlock:      sp.newestBlock,
-		HostToNetAddress: sp.server.addrManager.HostToNetAddress,
-		Proxy:            cfg.Proxy,
-		UserAgentName:    userAgentName,
-		UserAgentVersion: userAgentVersion,
-		ChainParams:      sp.server.chainParams,
-		Services:         sp.server.services,
-		DisableRelayTx:   cfg.BlocksOnly,
-		ProtocolVersion:  wire.FeeFilterVersion,
+		NewestBlock:       sp.newestBlock,
+		HostToNetAddress:  sp.server.addrManager.HostToNetAddress,
+		Proxy:             cfg.Proxy,
+		UserAgentName:     userAgentName,
+		UserAgentVersion:  userAgentVersion,
+		UserAgentComments: cfg.UserAgentComments,
+		ChainParams:       sp.server.chainParams,
+		Services:          sp.server.services,
+		DisableRelayTx:    cfg.BlocksOnly,
+		ProtocolVersion:   wire.FeeFilterVersion,
 	}
 }
 

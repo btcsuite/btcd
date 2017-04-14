@@ -77,6 +77,8 @@ Application Options:
       --addcheckpoint=      Add a custom checkpoint.  Format: '<height>:<hash>'
       --nocheckpoints       Disable built-in checkpoints.  Don't do this unless
                             you know what you're doing.
+      --uacomment=          Comment to add to the user agent --
+                            See BIP 14 for more information.
       --dbtype=             Database backend to use for the Block Chain (ffldb)
       --profile=            Enable HTTP profiling on given port -- NOTE port
                             must be between 1024 and 65536
