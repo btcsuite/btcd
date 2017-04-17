@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"sort"
 	"strconv"
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
@@ -747,4 +748,67 @@ func writeTxOut(w io.Writer, pver uint32, version int32, to *TxOut) error {
 	}
 
 	return WriteVarBytes(w, pver, to.PkScript)
+}
+
+// Sort sorts the inputs and outputs according to BIP LI01
+func (msg *MsgTx) Sort() {
+	sortInputs(msg.TxIn)
+	sortOutputs(msg.TxOut)
+}
+
+// Transaction input and output sorting, based on BIP LI01
+// (https://github.com/kristovatlas/rfc/blob/master/bips/bip-li01.mediawiki)
+type sortableInputSlice []*TxIn
+type sortableOutputSlice []*TxOut
+
+func sortInputs(ins []*TxIn) []*TxIn {
+	sort.Sort(sortableInputSlice(ins))
+	return ins
+}
+func sortOutputs(outs []*TxOut) []*TxOut {
+	sort.Sort(sortableOutputSlice(outs))
+	return outs
+}
+
+// for SortableInputSlice and SortableOutputSlice, three functions are needed
+// to make it sortable with sort.Sort() -- Len, Less, and Swap
+// Len and Swap are trivial.  Less is BIP LI01 specific.
+func (ins sortableInputSlice) Len() int {
+	return len(ins)
+}
+func (outs sortableOutputSlice) Len() int {
+	return len(outs)
+}
+
+func (ins sortableInputSlice) Swap(i, j int) {
+	ins[i], ins[j] = ins[j], ins[i]
+}
+func (outs sortableOutputSlice) Swap(i, j int) {
+	outs[i], outs[j] = outs[j], outs[i]
+}
+
+// Input comparison function.
+// First sort based on input txid (reversed / rpc-style), then index
+func (ins sortableInputSlice) Less(i, j int) bool {
+	ihash := ins[i].PreviousOutPoint.Hash
+	jhash := ins[j].PreviousOutPoint.Hash
+	for b := 0; b < HashSize/2; b++ {
+		ihash[b], ihash[HashSize-1-b] = ihash[HashSize-1-b], ihash[b]
+		jhash[b], jhash[HashSize-1-b] = jhash[HashSize-1-b], jhash[b]
+	}
+	c := bytes.Compare(ihash[:], jhash[:])
+	if c == 0 {
+		// input txids are the same, compare index
+		return ins[i].PreviousOutPoint.Index < ins[j].PreviousOutPoint.Index
+	}
+	return c == -1.
+}
+
+// Output comparison function.
+// First sort based on amount (smallest first), then PkScript
+func (outs sortableOutputSlice) Less(i, j int) bool {
+	if outs[i].Value == outs[j].Value {
+		return bytes.Compare(outs[i].PkScript, outs[j].PkScript) < 0
+	}
+	return outs[i].Value < outs[j].Value
 }
