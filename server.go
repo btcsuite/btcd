@@ -1985,6 +1985,7 @@ out:
 cleanup:
 	for {
 		select {
+		case <-s.relayNtfnChan:
 		case <-s.modifyRebroadcastInv:
 		default:
 			break cleanup
