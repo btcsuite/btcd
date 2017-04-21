@@ -40,13 +40,13 @@ func TestCalcMinRequiredTxRelayFee(t *testing.T) {
 			"1000 bytes with default minimum relay fee",
 			1000,
 			DefaultMinRelayTxFee,
-			1000000,
+			1e5,
 		},
 		{
 			"max standard tx size with default minimum relay fee",
 			maxStandardTxSize,
 			DefaultMinRelayTxFee,
-			100000000,
+			1e7,
 		},
 		{
 			"max standard tx size with max relay fee",
