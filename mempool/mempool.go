@@ -46,9 +46,10 @@ const (
 	// a ticket to enter the mempool.
 	minTicketFee = 1e6
 
-	// maxRelayFeeMultiplier is the factor that we disallow fees / kb above
-	// the minimum tx fee.
-	maxRelayFeeMultiplier = 100
+	// maxRelayFeeMultiplier is the factor that we disallow fees / kB above the
+	// minimum tx fee.  At the current default minimum relay fee of 0.001
+	// DCR/kB, this results in a maximum allowed high fee of 1 DCR/kB.
+	maxRelayFeeMultiplier = 1000
 
 	// maxSSGensDoubleSpends is the maximum number of SSGen double spends
 	// allowed in the pool.
@@ -1106,10 +1107,9 @@ func (mp *TxPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew, rateLimit, allow
 		return nil, txRuleError(wire.RejectInsufficientFee, str)
 	}
 
-	// Check whether allowHighFees is set to false (default), if so, then make sure
-	// the current fee is sensible.  100 * above the minimum fee/kb seems to be a
-	// reasonable amount to check.  If people would like to avoid this check
-	// then they can AllowHighFees = true
+	// Check whether allowHighFees is set to false (default), if so, then make
+	// sure the current fee is sensible.  If people would like to avoid this
+	// check then they can AllowHighFees = true
 	if !allowHighFees {
 		maxFee := calcMinRequiredTxRelayFee(serializedSize*maxRelayFeeMultiplier,
 			mp.cfg.Policy.MinRelayTxFee)
