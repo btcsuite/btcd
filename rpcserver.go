@@ -1482,14 +1482,15 @@ func handleEstimateStakeDiff(s *rpcServer, cmd interface{}, closeChan <-chan str
 	c := cmd.(*dcrjson.EstimateStakeDiffCmd)
 
 	// Minimum possible stake difficulty.
-	min, err := s.server.blockManager.EstimateNextStakeDifficulty(0, false)
+	chain := s.server.blockManager.chain
+	min, err := chain.EstimateNextStakeDifficulty(0, false)
 	if err != nil {
 		return nil, rpcInternalError(err.Error(), "Could not "+
 			"estimate next minimum stake difficulty")
 	}
 
 	// Maximum possible stake difficulty.
-	max, err := s.server.blockManager.EstimateNextStakeDifficulty(0, true)
+	max, err := chain.EstimateNextStakeDifficulty(0, true)
 	if err != nil {
 		return nil, rpcInternalError(err.Error(), "Could not "+
 			"estimate next maximum stake difficulty")
@@ -1519,8 +1520,8 @@ func handleEstimateStakeDiff(s *rpcServer, cmd interface{}, closeChan <-chan str
 	remaining := float64(nextAdjustment - bestHeight - 1)
 	averagePerBlock := float64(totalTickets) / blocksSince
 	expectedTickets := int64(math.Floor(averagePerBlock * remaining))
-	expected, err := s.server.blockManager.EstimateNextStakeDifficulty(
-		expectedTickets, false)
+	expected, err := chain.EstimateNextStakeDifficulty(expectedTickets,
+		false)
 	if err != nil {
 		return nil, rpcInternalError(err.Error(), "Could not "+
 			"estimate next stake difficulty")
@@ -1529,7 +1530,7 @@ func handleEstimateStakeDiff(s *rpcServer, cmd interface{}, closeChan <-chan str
 	// User-specified stake difficulty, if they asked for one.
 	var userEstFltPtr *float64
 	if c.Tickets != nil {
-		userEst, err := s.server.blockManager.EstimateNextStakeDifficulty(int64(*c.Tickets),
+		userEst, err := chain.EstimateNextStakeDifficulty(int64(*c.Tickets),
 			false)
 		if err != nil {
 			return nil, rpcInternalError(err.Error(), "Could not "+

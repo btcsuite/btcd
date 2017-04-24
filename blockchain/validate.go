@@ -707,11 +707,21 @@ func (b *BlockChain) checkBlockHeaderContext(header *wire.BlockHeader, prevNode 
 	}
 
 	if !fastAdd {
-		// Reject version 3 blocks for networks other than the main
+		// Reject version 4 blocks for networks other than the main
 		// network once a majority of the network has upgraded.
-		if b.chainParams.Net != wire.MainNet && header.Version < 4 &&
-			b.isMajorityVersion(4, prevNode,
+		if b.chainParams.Net != wire.MainNet && header.Version < 5 &&
+			b.isMajorityVersion(5, prevNode,
 				b.chainParams.BlockRejectNumRequired) {
+
+			str := "new blocks with version %d are no longer valid"
+			str = fmt.Sprintf(str, header.Version)
+			return ruleError(ErrBlockVersionTooOld, str)
+		}
+
+		// Reject version 3 blocks once a majority of the network has
+		// upgraded.
+		if header.Version < 4 && b.isMajorityVersion(4, prevNode,
+			b.chainParams.BlockRejectNumRequired) {
 
 			str := "new blocks with version %d are no longer valid"
 			str = fmt.Sprintf(str, header.Version)
@@ -873,8 +883,7 @@ func (b *BlockChain) CheckBlockStakeSanity(stakeValidationHeight int64, node *bl
 	calcSBits, err := b.calcNextRequiredStakeDifficulty(node.parent)
 	if err != nil {
 		errStr := fmt.Sprintf("couldn't calculate stake difficulty "+
-			"for block node %v: %v",
-			node.hash, calcSBits)
+			"for block node %v: %v", node.hash, err)
 		return ruleError(ErrUnexpectedDifficulty, errStr)
 	}
 	if block.MsgBlock().Header.SBits != calcSBits {

@@ -1,5 +1,5 @@
 // Copyright (c) 2013-2016 The btcsuite developers
-// Copyright (c) 2015-2016 The Decred developers
+// Copyright (c) 2015-2017 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -10,6 +10,7 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/decred/dcrd/chaincfg"
 	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/wire"
 )
@@ -486,11 +487,15 @@ func mergeDifficulty(oldDiff int64, newDiff1 int64, newDiff2 int64) int64 {
 	return summedChange.Int64()
 }
 
-// calcNextRequiredStakeDifficulty calculates the exponentially weighted average
-// and then uses it to determine the next stake difficulty.
-// TODO: You can combine the first and second for loops below for a speed up
-// if you'd like, I'm not sure how much it matters.
-func (b *BlockChain) calcNextRequiredStakeDifficulty(curNode *blockNode) (int64, error) {
+// calcNextRequiredStakeDifficultyV1 calculates the required stake difficulty
+// for the block after the passed previous block node based on exponentially
+// weighted averages.
+//
+// NOTE: This is the original stake difficulty algorithm that was used at Decred
+// launch.
+//
+// This function MUST be called with the chain state lock held (for writes).
+func (b *BlockChain) calcNextRequiredStakeDifficultyV1(curNode *blockNode) (int64, error) {
 	alpha := b.chainParams.StakeDiffAlpha
 	stakeDiffStartHeight := int64(b.chainParams.CoinbaseMaturity) +
 		1
@@ -743,19 +748,277 @@ func (b *BlockChain) calcNextRequiredStakeDifficulty(curNode *blockNode) (int64,
 	return nextDiff, nil
 }
 
-// CalcNextRequiredStakeDifficulty is the exported version of the above function.
-// This function is NOT safe for concurrent access.
-func (b *BlockChain) CalcNextRequiredStakeDifficulty() (int64, error) {
-	return b.calcNextRequiredStakeDifficulty(b.bestNode)
+// estimateSupply returns an estimate of the coin supply for the provided block
+// height.  This is primarily used in the stake difficulty algorithm and relies
+// on an estimate to simplify the necessary calculations.  The actual total
+// coin supply as of a given block height depends on many factors such as the
+// number of votes included in every prior block (not including all votes
+// reduces the subsidy) and whether or not any of the prior blocks have been
+// invalidated by stakeholders thereby removing the PoW subsidy for them.
+//
+// This function is safe for concurrent access.
+func estimateSupply(params *chaincfg.Params, height int64) int64 {
+	if height <= 0 {
+		return 0
+	}
+
+	// Estimate the supply by calculating the full block subsidy for each
+	// reduction interval and multiplying it the number of blocks in the
+	// interval then adding the subsidy produced by number of blocks in the
+	// current interval.
+	supply := params.BlockOneSubsidy()
+	reductions := int64(height) / params.SubsidyReductionInterval
+	subsidy := params.BaseSubsidy
+	for i := int64(0); i < reductions; i++ {
+		supply += params.SubsidyReductionInterval * subsidy
+
+		subsidy *= params.MulSubsidy
+		subsidy /= params.DivSubsidy
+	}
+	supply += (1 + int64(height)%params.SubsidyReductionInterval) * subsidy
+
+	// Blocks 0 and 1 have special subsidy amounts that have already been
+	// added above, so remove what their subsidies would have normally been
+	// which were also added above.
+	supply -= params.BaseSubsidy * 2
+
+	return supply
 }
 
-// estimateNextStakeDifficulty returns a user-specified estimate for the next
-// stake difficulty, with the passed ticketsInWindow indicating the number of
-// fresh stake to pretend exists within this window. Optionally the user can
-// also override this variable with useMaxTickets, which simply plugs in the
-// maximum number of tickets the user can try.
-func (b *BlockChain) estimateNextStakeDifficulty(curNode *blockNode,
-	ticketsInWindow int64, useMaxTickets bool) (int64, error) {
+// sumPurchasedTickets returns the sum of the number of tickets purchased in the
+// most recent specified number of blocks from the point of view of the passed
+// node.
+//
+// This function MUST be called with the chain state lock held (for writes).
+func (b *BlockChain) sumPurchasedTickets(startNode *blockNode, numToSum int64) (int64, error) {
+	var numPurchased int64
+	for node, numTraversed := startNode, int64(0); node != nil &&
+		numTraversed < numToSum; numTraversed++ {
+
+		numPurchased += int64(node.header.FreshStake)
+
+		// Get the previous block node.  This function is used over
+		// simply accessing iterNode.parent directly as it will
+		// dynamically create previous block nodes as needed.  This
+		// helps allow only the pieces of the chain that are needed
+		// to remain in memory.
+		var err error
+		node, err = b.getPrevNodeFromNode(node)
+		if err != nil {
+			return 0, err
+		}
+	}
+
+	return numPurchased, nil
+}
+
+// calcNextStakeDiffV2 calculates the next stake difficulty for the given set
+// of parameters using the algorithm defined in DCP0001.
+//
+// This function contains the heart of the algorithm and thus is separated for
+// use in both the actual stake difficulty calculation as well as estimation.
+//
+// The caller must perform all of the necessary chain traversal in order to
+// get the current difficulty, previous retarget interval's pool size plus
+// its immature tickets, as well as the current pool size plus immature tickets.
+//
+// This function is safe for concurrent access.
+func calcNextStakeDiffV2(params *chaincfg.Params, nextHeight, curDiff, prevPoolSizeAll, curPoolSizeAll int64) int64 {
+	// Shorter version of various parameter for convenience.
+	votesPerBlock := int64(params.TicketsPerBlock)
+	ticketPoolSize := int64(params.TicketPoolSize)
+	ticketMaturity := int64(params.TicketMaturity)
+
+	// Calculate the difficulty by multiplying the old stake difficulty
+	// with two ratios that represent a force to counteract the relative
+	// change in the pool size (Fc) and a restorative force to push the pool
+	// size  towards the target value (Fr).
+	//
+	// Per DCP0001, the generalized equation is:
+	//
+	//   nextDiff = min(max(curDiff * Fc * Fr, Slb), Sub)
+	//
+	// The detailed form expands to:
+	//
+	//                        curPoolSizeAll      curPoolSizeAll
+	//   nextDiff = curDiff * ---------------  * -----------------
+	//                        prevPoolSizeAll    targetPoolSizeAll
+	//
+	//   Slb = b.chainParams.MinimumStakeDiff
+	//
+	//               estimatedTotalSupply
+	//   Sub = -------------------------------
+	//          targetPoolSize / votesPerBlock
+	//
+	// In order to avoid the need to perform floating point math which could
+	// be problematic across langauges due to uncertainty in floating point
+	// math libs, this is further simplified to integer math as follows:
+	//
+	//                   curDiff * curPoolSizeAll^2
+	//   nextDiff = -----------------------------------
+	//              prevPoolSizeAll * targetPoolSizeAll
+	//
+	// Further, the Sub parameter must calculate the denomitor first using
+	// integer math.
+	targetPoolSizeAll := votesPerBlock * (ticketPoolSize + ticketMaturity)
+	curPoolSizeAllBig := big.NewInt(curPoolSizeAll)
+	nextDiffBig := big.NewInt(curDiff)
+	nextDiffBig.Mul(nextDiffBig, curPoolSizeAllBig)
+	nextDiffBig.Mul(nextDiffBig, curPoolSizeAllBig)
+	nextDiffBig.Div(nextDiffBig, big.NewInt(prevPoolSizeAll))
+	nextDiffBig.Div(nextDiffBig, big.NewInt(targetPoolSizeAll))
+
+	// Limit the new stake difficulty between the minimum allowed stake
+	// difficulty and a maximum value that is relative to the total supply.
+	//
+	// NOTE: This is intentionally using integer math to prevent any
+	// potential issues due to uncertainty in floating point math libs.  The
+	// ticketPoolSize parameter already contains the result of
+	// (targetPoolSize / votesPerBlock).
+	nextDiff := nextDiffBig.Int64()
+	estimatedSupply := estimateSupply(params, nextHeight)
+	maximumStakeDiff := estimatedSupply / ticketPoolSize
+	if nextDiff > maximumStakeDiff {
+		nextDiff = maximumStakeDiff
+	}
+	if nextDiff < params.MinimumStakeDiff {
+		nextDiff = params.MinimumStakeDiff
+	}
+	return nextDiff
+}
+
+// calcNextRequiredStakeDifficultyV2 calculates the required stake difficulty
+// for the block after the passed previous block node based on the algorithm
+// defined in DCP0001.
+//
+// This function MUST be called with the chain state lock held (for writes).
+func (b *BlockChain) calcNextRequiredStakeDifficultyV2(curNode *blockNode) (int64, error) {
+	// Stake difficulty before any tickets could possibly be purchased is
+	// the minimum value.
+	nextHeight := int64(0)
+	if curNode != nil {
+		nextHeight = curNode.height + 1
+	}
+	stakeDiffStartHeight := int64(b.chainParams.CoinbaseMaturity) + 1
+	if nextHeight < stakeDiffStartHeight {
+		return b.chainParams.MinimumStakeDiff, nil
+	}
+
+	// Return the previous block's difficulty requirements if the next block
+	// is not at a difficulty retarget interval.
+	intervalSize := b.chainParams.StakeDiffWindowSize
+	curDiff := curNode.header.SBits
+	if nextHeight%intervalSize != 0 {
+		return curDiff, nil
+	}
+
+	// Get the pool size and number of tickets that were immature at the
+	// previous retarget interval.
+	//
+	// NOTE: Since the stake difficulty must be calculated based on existing
+	// blocks, it is always calculated for the block after a given block, so
+	// the information for the previous retarget interval must be retrieved
+	// relative to the block just before it to coincide with how it was
+	// originally calculated.
+	var prevPoolSize int64
+	prevRetargetHeight := nextHeight - intervalSize - 1
+	prevRetargetNode, err := b.ancestorNode(curNode, prevRetargetHeight)
+	if err != nil {
+		return 0, err
+	}
+	if prevRetargetNode != nil {
+		prevPoolSize = int64(prevRetargetNode.header.PoolSize)
+	}
+	ticketMaturity := int64(b.chainParams.TicketMaturity)
+	prevImmatureTickets, err := b.sumPurchasedTickets(prevRetargetNode,
+		ticketMaturity)
+	if err != nil {
+		return 0, err
+	}
+
+	// Return the existing ticket price for the first few intervals to avoid
+	// division by zero and encourage initial pool population.
+	prevPoolSizeAll := prevPoolSize + prevImmatureTickets
+	if prevPoolSizeAll == 0 {
+		return curDiff, nil
+	}
+
+	// Count the number of currently immature tickets.
+	immatureTickets, err := b.sumPurchasedTickets(curNode, ticketMaturity)
+	if err != nil {
+		return 0, err
+	}
+
+	// Calculate and return the final next required difficulty.
+	curPoolSizeAll := int64(curNode.header.PoolSize) + immatureTickets
+	return calcNextStakeDiffV2(b.chainParams, nextHeight, curDiff,
+		prevPoolSizeAll, curPoolSizeAll), nil
+}
+
+// sdiffAlgoDeploymentVersion returns the deployment vesion for the stake
+// difficulty algorithm change as defined in DCP0001 for the provided network.
+//
+// This function is safe for concurrent access.
+func sdiffAlgoDeploymentVersion(network wire.CurrencyNet) uint32 {
+	if network != wire.MainNet {
+		return 5
+	}
+	return 4
+}
+
+// calcNextRequiredStakeDifficulty calculates the required stake difficulty for
+// the block after the passed previous block node based on the active stake
+// difficulty retarget rules.
+//
+// This function differs from the exported CalcNextRequiredDifficulty in that
+// the exported version uses the current best chain as the previous block node
+// while this function accepts any block node.
+//
+// This function MUST be called with the chain state lock held (for writes).
+func (b *BlockChain) calcNextRequiredStakeDifficulty(curNode *blockNode) (int64, error) {
+	// Use the new stake difficulty algorithm if the stake vote for the new
+	// algorithm agenda is active.
+	//
+	// NOTE: The choice field of the return threshold state is not examined
+	// here because there is only one possible choice that can be active
+	// for the agenda, which is yes, so there is no need to check it.
+	deploymentVersion := sdiffAlgoDeploymentVersion(b.chainParams.Net)
+	state, err := b.deploymentState(curNode, deploymentVersion,
+		chaincfg.VoteIDSDiffAlgorithm)
+	if err != nil {
+		return 0, err
+	}
+	if state.State == ThresholdActive {
+		return b.calcNextRequiredStakeDifficultyV2(curNode)
+	}
+
+	// Use the old stake difficulty algorithm in any other case.
+	return b.calcNextRequiredStakeDifficultyV1(curNode)
+}
+
+// CalcNextRequiredStakeDifficulty calculates the required stake difficulty for
+// the block after the end of the current best chain based on the active stake
+// difficulty retarget rules.
+//
+// This function is safe for concurrent access.
+func (b *BlockChain) CalcNextRequiredStakeDifficulty() (int64, error) {
+	b.chainLock.Lock()
+	nextDiff, err := b.calcNextRequiredStakeDifficulty(b.bestNode)
+	b.chainLock.Unlock()
+	return nextDiff, err
+}
+
+// estimateNextStakeDifficultyV1 estimates the next stake difficulty by
+// pretending the provided number of tickets will be purchased in the remainder
+// of the interval unless the flag to use max tickets is set in which case it
+// will use the max possible number of tickets that can be purchased in the
+// remainder of the interval.
+//
+// NOTE: This uses the original stake difficulty algorithm that was used at
+// Decred launch.
+//
+// This function MUST be called with the chain state lock held (for writes).
+func (b *BlockChain) estimateNextStakeDifficultyV1(curNode *blockNode, ticketsInWindow int64, useMaxTickets bool) (int64, error) {
 	alpha := b.chainParams.StakeDiffAlpha
 	stakeDiffStartHeight := int64(b.chainParams.CoinbaseMaturity) +
 		1
@@ -1063,10 +1326,189 @@ func (b *BlockChain) estimateNextStakeDifficulty(curNode *blockNode,
 	return nextDiff, nil
 }
 
-// EstimateNextStakeDifficulty is the exported version of the above function.
-// This function is NOT safe for concurrent access.
-func (b *BlockChain) EstimateNextStakeDifficulty(ticketsInWindow int64,
-	useMaxTickets bool) (int64, error) {
-	return b.estimateNextStakeDifficulty(b.bestNode, ticketsInWindow,
+// estimateNextStakeDifficultyV2 estimates the next stake difficulty using the
+// algorithm defined in DCP0001 by pretending the provided number of tickets
+// will be purchased in the remainder of the interval unless the flag to use max
+// tickets is set in which case it will use the max possible number of tickets
+// that can be purchased in the remainder of the interval.
+//
+// This function MUST be called with the chain state lock held (for writes).
+func (b *BlockChain) estimateNextStakeDifficultyV2(curNode *blockNode, newTickets int64, useMaxTickets bool) (int64, error) {
+	// Calculate the next retarget interval height.
+	curHeight := int64(0)
+	if curNode != nil {
+		curHeight = curNode.height
+	}
+	intervalSize := b.chainParams.StakeDiffWindowSize
+	blocksUntilRetarget := intervalSize - curHeight%intervalSize
+	nextRetargetHeight := curHeight + blocksUntilRetarget
+
+	// This code really should be updated to work with retarget interval
+	// size greater than the ticket maturity, such as is the case on
+	// testnet, but since it does not currently work under that scenario,
+	// return an error rather than incorrect results.
+	ticketMaturity := int64(b.chainParams.TicketMaturity)
+	if intervalSize > ticketMaturity {
+		return 0, fmt.Errorf("stake difficulty estimation does not "+
+			"currently work when the retarget interval is larger "+
+			"than the ticket maturity (interval %d, ticket "+
+			"maturity %d)", intervalSize, ticketMaturity)
+	}
+
+	// Calculate the maximum possible number of tickets that could be sold
+	// in the remainder of the interval and potentially override the number
+	// of new tickets to include in the estimate per the user-specified
+	// flag.
+	maxTicketsPerBlock := int64(b.chainParams.MaxFreshStakePerBlock)
+	maxRemainingTickets := (blocksUntilRetarget - 1) * maxTicketsPerBlock
+	if useMaxTickets {
+		newTickets = maxRemainingTickets
+	}
+
+	// Ensure the specified number of tickets is not too high.
+	if newTickets > maxRemainingTickets {
+		return 0, fmt.Errorf("unable to create an estimated stake "+
+			"difficulty with %d tickets since it is more than "+
+			"the maximum remaining of %d", newTickets,
+			maxRemainingTickets)
+	}
+
+	// Stake difficulty before any tickets could possibly be purchased is
+	// the minimum value.
+	stakeDiffStartHeight := int64(b.chainParams.CoinbaseMaturity) + 1
+	if nextRetargetHeight < stakeDiffStartHeight {
+		return b.chainParams.MinimumStakeDiff, nil
+	}
+
+	// Get the pool size and number of tickets that were immature at the
+	// previous retarget interval
+	//
+	// NOTE: Since the stake difficulty must be calculated based on existing
+	// blocks, it is always calculated for the block after a given block, so
+	// the information for the previous retarget interval must be retrieved
+	// relative to the block just before it to coincide with how it was
+	// originally calculated.
+	var prevPoolSize int64
+	prevRetargetHeight := nextRetargetHeight - intervalSize - 1
+	prevRetargetNode, err := b.ancestorNode(curNode, prevRetargetHeight)
+	if err != nil {
+		return 0, err
+	}
+	if prevRetargetNode != nil {
+		prevPoolSize = int64(prevRetargetNode.header.PoolSize)
+	}
+	prevImmatureTickets, err := b.sumPurchasedTickets(prevRetargetNode,
+		ticketMaturity)
+	if err != nil {
+		return 0, err
+	}
+
+	// Return the existing ticket price for the first few intervals to avoid
+	// division by zero and encourage initial pool population.
+	curDiff := curNode.header.SBits
+	prevPoolSizeAll := prevPoolSize + prevImmatureTickets
+	if prevPoolSizeAll == 0 {
+		return curDiff, nil
+	}
+
+	// Calculate the number of tickets that will still be immature at the
+	// next retarget based on the known data.
+	nextMaturityFloor := nextRetargetHeight - ticketMaturity - 1
+	remainingImmatureTickets, err := b.sumPurchasedTickets(curNode,
+		curHeight-nextMaturityFloor)
+	if err != nil {
+		return 0, err
+	}
+
+	// Calculate the number of tickets that will mature in the remainder of
+	// the interval.
+	//
+	// NOTE: The pool size in the block headers does not include the tickets
+	// maturing at the height in which they mature since they are not
+	// eligible for selection until the next block, so exclude them by
+	// starting one block before the next maturity floor.
+	nextMaturityFloorNode, err := b.ancestorNode(curNode, nextMaturityFloor-1)
+	if err != nil {
+		return 0, err
+	}
+	curMaturityFloor := curHeight - ticketMaturity
+	maturingTickets, err := b.sumPurchasedTickets(nextMaturityFloorNode,
+		nextMaturityFloor-curMaturityFloor)
+	if err != nil {
+		return 0, err
+	}
+
+	// Calculate the number of votes that will occur during the remainder of
+	// the interval.
+	stakeValidationHeight := int64(b.chainParams.StakeValidationHeight)
+	var pendingVotes int64
+	if nextRetargetHeight > stakeValidationHeight {
+		votingBlocks := blocksUntilRetarget - 1
+		if curHeight < stakeValidationHeight {
+			votingBlocks = nextRetargetHeight - stakeValidationHeight
+		}
+		votesPerBlock := int64(b.chainParams.TicketsPerBlock)
+		pendingVotes = votingBlocks * votesPerBlock
+	}
+
+	// Calculate what the pool size would be as of the next interval.
+	curPoolSize := int64(curNode.header.PoolSize)
+	estimatedPoolSize := curPoolSize + maturingTickets - pendingVotes
+	estimatedImmatureTickets := remainingImmatureTickets + newTickets
+	estimatedPoolSizeAll := estimatedPoolSize + estimatedImmatureTickets
+
+	// Calculate and return the final estimated difficulty.
+	return calcNextStakeDiffV2(b.chainParams, nextRetargetHeight, curDiff,
+		prevPoolSizeAll, estimatedPoolSizeAll), nil
+}
+
+// estimateNextStakeDifficulty estimates the next stake difficulty by pretending
+// the provided number of tickets will be purchased in the remainder of the
+// interval unless the flag to use max tickets is set in which case it will use
+// the max possible number of tickets that can be purchased in the remainder of
+// the interval.
+//
+// The stake difficulty algorithm is selected based on the active rules.
+//
+// This function differs from the exported EstimateNextStakeDifficulty in that
+// the exported version uses the current best chain as the block node while this
+// function accepts any block node.
+//
+// This function MUST be called with the chain state lock held (for writes).
+func (b *BlockChain) estimateNextStakeDifficulty(curNode *blockNode, newTickets int64, useMaxTickets bool) (int64, error) {
+	// Use the new stake difficulty algorithm if the stake vote for the new
+	// algorithm agenda is active.
+	//
+	// NOTE: The choice field of the return threshold state is not examined
+	// here because there is only one possible choice that can be active
+	// for the agenda, which is yes, so there is no need to check it.
+	deploymentVersion := sdiffAlgoDeploymentVersion(b.chainParams.Net)
+	state, err := b.deploymentState(curNode, deploymentVersion,
+		chaincfg.VoteIDSDiffAlgorithm)
+	if err != nil {
+		return 0, err
+	}
+	if state.State == ThresholdActive {
+		return b.estimateNextStakeDifficultyV2(curNode, newTickets,
+			useMaxTickets)
+	}
+
+	// Use the old stake difficulty algorithm in any other case.
+	return b.estimateNextStakeDifficultyV1(curNode, newTickets,
 		useMaxTickets)
+}
+
+// EstimateNextStakeDifficulty estimates the next stake difficulty by pretending
+// the provided number of tickets will be purchased in the remainder of the
+// interval unless the flag to use max tickets is set in which case it will use
+// the max possible number of tickets that can be purchased in the remainder of
+// the interval.
+//
+// This function is safe for concurrent access.
+func (b *BlockChain) EstimateNextStakeDifficulty(newTickets int64, useMaxTickets bool) (int64, error) {
+	b.chainLock.Lock()
+	estimate, err := b.estimateNextStakeDifficulty(b.bestNode, newTickets,
+		useMaxTickets)
+	b.chainLock.Unlock()
+	return estimate, err
 }
