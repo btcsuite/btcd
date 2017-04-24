@@ -493,6 +493,7 @@ var MainNetParams = Params{
 		{75380, newHashFromStr("0000000000000e7d13cfc85806aa720fe3670980f5b7d33253e4f41985558372")},
 		{85410, newHashFromStr("00000000000013ec928074bea6eac9754aa614c7acb20edf300f18b0cd122692")},
 		{99880, newHashFromStr("0000000000000cb2a9a9ded647b9f78aae51ace32dd8913701d420ead272913c")},
+		{123080, newHashFromStr("000000000000009ea6e02d0f0424f445ed50686f9ae4aecdf3b268e981114477")},
 	},
 
 	// The miner confirmation window is defined as:
@@ -600,7 +601,10 @@ var TestNet2Params = Params{
 	BlockTaxProportion:       1,
 
 	// Checkpoints ordered from oldest to newest.
-	Checkpoints: []Checkpoint{},
+	Checkpoints: []Checkpoint{
+		{12500, newHashFromStr("000000000046db2b18647632bac76577e418a5cdd8508a2f1cd82a6b30c3e854")},
+		{25000, newHashFromStr("0000000000970b7f74178ba6bc3426cd2a65ab854c04e92f542567843f5612a2")},
+	},
 
 	// Consensus rule change deployments.
 	//
