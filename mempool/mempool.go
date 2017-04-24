@@ -42,10 +42,6 @@ const (
 	// contextual transaction information provided in a transaction view.
 	mempoolHeight = 0x7fffffff
 
-	// minTicketFee is the minimum fee per KB in atoms that is required for
-	// a ticket to enter the mempool.
-	minTicketFee = 1e6
-
 	// maxRelayFeeMultiplier is the factor that we disallow fees / kB above the
 	// minimum tx fee.  At the current default minimum relay fee of 0.001
 	// DCR/kB, this results in a maximum allowed high fee of 1 DCR/kB.
@@ -1094,17 +1090,19 @@ func (mp *TxPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew, rateLimit, allow
 			mp.cfg.Policy.FreeTxRelayLimit*10*1000)
 	}
 
-	// Set an absolute threshold for ticket rejection and obey it. Tickets
-	// are treated differently in the mempool because they have a set
-	// difficulty and generally a window in which they expire.
-	//
-	// This applies to tickets transactions only.
-	minTicketFee := calcMinRequiredTxRelayFee(serializedSize, minTicketFee)
-	if (txFee < minTicketFee) && txType == stake.TxTypeSStx {
-		str := fmt.Sprintf("transaction %v has a %v fee which "+
-			"is under the required threshold amount of %d", txHash, txFee,
-			minTicketFee)
-		return nil, txRuleError(wire.RejectInsufficientFee, str)
+	// Check that tickets also pay the minimum of the relay fee.  This fee is
+	// also performed on regular transactions above, but fees lower than the
+	// miniumum may be allowed when there is sufficient priority, and these
+	// checks aren't desired for ticket purchases.
+	if txType == stake.TxTypeSStx {
+		minTicketFee := calcMinRequiredTxRelayFee(serializedSize,
+			mp.cfg.Policy.MinRelayTxFee)
+		if txFee < minTicketFee {
+			str := fmt.Sprintf("ticket purchase transaction %v has a %v "+
+				"fee which is under the required threshold amount of %d",
+				txHash, txFee, minTicketFee)
+			return nil, txRuleError(wire.RejectInsufficientFee, str)
+		}
 	}
 
 	// Check whether allowHighFees is set to false (default), if so, then make
