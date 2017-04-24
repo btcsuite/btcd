@@ -1474,7 +1474,7 @@ func handleDecodeScript(s *rpcServer, cmd interface{}, closeChan <-chan struct{}
 // TODO this is a very basic implementation.  It should be
 // modified to match the bitcoin-core one.
 func handleEstimateFee(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
-	return 0.01, nil
+	return cfg.minRelayTxFee.ToCoin(), nil
 }
 
 // handleEstimateStakeDiff implements the estimatestakediff command.
