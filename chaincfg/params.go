@@ -164,6 +164,10 @@ const (
 	// VoteIDSDiffAlgorithm is the vote ID for the new stake difficulty
 	// algorithm (aka ticket price) agenda defined by DCP0001.
 	VoteIDSDiffAlgorithm = "sdiffalgorithm"
+
+	// VoteIDLNSupport is the vote ID for determining if the developers
+	// should work on integrating Lightning Network support.
+	VoteIDLNSupport = "lnsupport"
 )
 
 // ConsensusDeployment defines details related to a specific consensus rule
@@ -534,6 +538,33 @@ var MainNetParams = Params{
 			},
 			StartTime:  1493164800, // Apr 26th, 2017
 			ExpireTime: 1524700800, // Apr 26th, 2018
+		}, {
+			Vote: Vote{
+				Id:          VoteIDLNSupport,
+				Description: "Request developers begin work on Lightning Network (LN) integration",
+				Mask:        0x0018, // Bits 3 and 4
+				Choices: []Choice{{
+					Id:          "abstain",
+					Description: "abstain from voting",
+					Bits:        0x0000,
+					IsAbstain:   true,
+					IsNo:        false,
+				}, {
+					Id:          "no",
+					Description: "no, do not work on integrating LN support",
+					Bits:        0x0008, // Bit 3
+					IsAbstain:   false,
+					IsNo:        true,
+				}, {
+					Id:          "yes",
+					Description: "yes, begin work on integrating LN support",
+					Bits:        0x0010, // Bit 4
+					IsAbstain:   false,
+					IsNo:        false,
+				}},
+			},
+			StartTime:  1493164800, // Apr 26th, 2017
+			ExpireTime: 1508976000, // Oct 26th, 2017
 		}},
 	},
 
