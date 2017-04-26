@@ -446,12 +446,14 @@ func PayToAddrScript(addr btcutil.Address) ([]byte, error) {
 
 	case *btcutil.AddressWitnessPubKeyHash:
 		if addr == nil {
-			return nil, ErrUnsupportedAddress
+			return nil, scriptError(ErrUnsupportedAddress,
+				nilAddrErrStr)
 		}
 		return payToWitnessPubKeyHashScript(addr.ScriptAddress())
 	case *btcutil.AddressWitnessScriptHash:
 		if addr == nil {
-			return nil, ErrUnsupportedAddress
+			return nil, scriptError(ErrUnsupportedAddress,
+				nilAddrErrStr)
 		}
 		return payToWitnessScriptHashScript(addr.ScriptAddress())
 	}
