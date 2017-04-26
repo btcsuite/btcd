@@ -259,7 +259,7 @@ func (vm *Engine) verifyWitnessProgram(witness [][]byte) error {
 			if len(witness) != 2 {
 				err := fmt.Sprintf("should have exactly two "+
 					"items in witness, instead have %v", len(witness))
-				return scriptError(ErrWitnessScriptMismatch, err)
+				return scriptError(ErrWitnessProgramMismatch, err)
 			}
 
 			// Now we'll resume execution as if it were a regular
@@ -280,7 +280,6 @@ func (vm *Engine) verifyWitnessProgram(witness [][]byte) error {
 			vm.SetStack(witness)
 
 		case payToWitnessScriptHashDataSize: // P2WSH
-
 			// Additionally, The witness stack MUST NOT be empty at
 			// this point.
 			if len(witness) == 0 {
@@ -303,7 +302,7 @@ func (vm *Engine) verifyWitnessProgram(witness [][]byte) error {
 			// the witness stack matches the witness program.
 			witnessHash := sha256.Sum256(witnessScript)
 			if !bytes.Equal(witnessHash[:], vm.witnessProgram) {
-				return scriptError(ErrWitnessScriptMismatch,
+				return scriptError(ErrWitnessProgramMismatch,
 					"witness program hash mismatch")
 			}
 
@@ -330,8 +329,9 @@ func (vm *Engine) verifyWitnessProgram(witness [][]byte) error {
 			return scriptError(ErrWitnessProgramWrongLength, errStr)
 		}
 	} else if vm.hasFlag(ScriptVerifyDiscourageUpgradeableWitnessProgram) {
-		return fmt.Errorf("new witness program versions invalid: %v",
-			vm.witnessVersion)
+		errStr := fmt.Sprintf("new witness program versions "+
+			"invalid: %v", vm.witnessProgram)
+		return scriptError(ErrDiscourageUpgradableWitnessProgram, errStr)
 	} else {
 		// If we encounter an unknown witness program version and we
 		// aren't discouraging future unknown witness based soft-forks,

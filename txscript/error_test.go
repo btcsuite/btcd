@@ -57,6 +57,15 @@ func TestErrorCodeStringer(t *testing.T) {
 		{ErrDiscourageUpgradableNOPs, "ErrDiscourageUpgradableNOPs"},
 		{ErrNegativeLockTime, "ErrNegativeLockTime"},
 		{ErrUnsatisfiedLockTime, "ErrUnsatisfiedLockTime"},
+		{ErrWitnessProgramEmpty, "ErrWitnessProgramEmpty"},
+		{ErrWitnessProgramMismatch, "ErrWitnessProgramMismatch"},
+		{ErrWitnessProgramWrongLength, "ErrWitnessProgramWrongLength"},
+		{ErrWitnessMalleated, "ErrWitnessMalleated"},
+		{ErrWitnessMalleatedP2SH, "ErrWitnessMalleatedP2SH"},
+		{ErrWitnessUnexpected, "ErrWitnessUnexpected"},
+		{ErrMinimalIf, "ErrMinimalIf"},
+		{ErrWitnessPubKeyType, "ErrWitnessPubKeyType"},
+		{ErrDiscourageUpgradableWitnessProgram, "ErrDiscourageUpgradableWitnessProgram"},
 		{0xffff, "Unknown ErrorCode (65535)"},
 	}
 
