@@ -928,7 +928,7 @@ func popIfBool(vm *Engine) (bool, error) {
 	// When not in witness execution mode, not executing a v0 witness
 	// program, or the minimal if flag isn't set pop the top stack item as
 	// a normal bool.
-	if !vm.witness || !vm.hasFlag(ScriptVerifyMinimalIf) {
+	if !vm.isWitnessVersionActive(0) || !vm.hasFlag(ScriptVerifyMinimalIf) {
 		return vm.dstack.PopBool()
 	}
 
@@ -2090,7 +2090,7 @@ func opcodeCheckSig(op *parsedOpcode, vm *Engine) error {
 
 	// Generate the signature hash based on the signature hash type.
 	var hash []byte
-	if vm.witness {
+	if vm.isWitnessVersionActive(0) {
 		var sigHashes *TxSigHashes
 		if vm.hashCache != nil {
 			sigHashes = vm.hashCache
@@ -2275,9 +2275,9 @@ func opcodeCheckMultiSig(op *parsedOpcode, vm *Engine) error {
 	// Get script starting from the most recent OP_CODESEPARATOR.
 	script := vm.subScript()
 
-	// Remove the signature in pre-segwit scripts since there is no way for
-	// a signature to sign itself.
-	if !vm.witness {
+	// Remove the signature in pre version 0 segwit scripts since there is
+	// no way for a signature to sign itself.
+	if !vm.isWitnessVersionActive(0) {
 		for _, sigInfo := range signatures {
 			script = removeOpcodeByData(script, sigInfo.signature)
 		}
@@ -2363,7 +2363,7 @@ func opcodeCheckMultiSig(op *parsedOpcode, vm *Engine) error {
 
 		// Generate the signature hash based on the signature hash type.
 		var hash []byte
-		if vm.witness {
+		if vm.isWitnessVersionActive(0) {
 			var sigHashes *TxSigHashes
 			if vm.hashCache != nil {
 				sigHashes = vm.hashCache

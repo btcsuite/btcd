@@ -88,6 +88,11 @@ const (
 	// ScriptVerifyMinimalIf makes a script with an OP_IF/OP_NOTIF whose
 	// operand is anything other than empty vector or [0x01] non-standard.
 	ScriptVerifyMinimalIf
+
+	// ScriptVerifyWitnessPubKeyType makes a script within a check-sig
+	// operation whose public key isn't serialized in a compressed format
+	// non-standard.
+	ScriptVerifyWitnessPubKeyType
 )
 
 const (
@@ -127,7 +132,6 @@ type Engine struct {
 	hashCache       *TxSigHashes
 	bip16           bool     // treat execution as pay-to-script-hash
 	savedFirstStack [][]byte // stack from first script for bip16 scripts
-	witness         bool     // treat execution as a witness program
 	witnessVersion  int
 	witnessProgram  []byte
 	inputAmount     int64
@@ -237,10 +241,17 @@ func (vm *Engine) curPC() (script int, off int, err error) {
 	return vm.scriptIdx, vm.scriptOff, nil
 }
 
+// isWitnessVersionActive returns true if a witness program was extracted
+// during the initialization of the Engine, and the program's version matches
+// the specified version.
+func (vm *Engine) isWitnessVersionActive(version uint) bool {
+	return vm.witnessProgram != nil && uint(vm.witnessVersion) == version
+}
+
 // verifyWitnessProgram validates the stored witness program using the passed
 // witness as input.
 func (vm *Engine) verifyWitnessProgram(witness [][]byte) error {
-	if vm.witnessVersion == 0 {
+	if vm.isWitnessVersionActive(0) {
 		switch len(vm.witnessProgram) {
 		case payToWitnessPubKeyHashDataSize: // P2WKH
 			// The witness stack should consist of exactly two
@@ -326,10 +337,10 @@ func (vm *Engine) verifyWitnessProgram(witness [][]byte) error {
 		// aren't discouraging future unknown witness based soft-forks,
 		// then we de-activate the segwit behavior within the VM for
 		// the remainder of execution.
-		vm.witness = false
+		vm.witnessProgram = nil
 	}
 
-	if vm.witness {
+	if vm.isWitnessVersionActive(0) {
 		// All elements within the witness stack must not be greater
 		// than the maximum bytes which are allowed to be pushed onto
 		// the stack.
@@ -384,11 +395,12 @@ func (vm *Engine) CheckErrorCondition(finalScript bool) error {
 			"error check when script unfinished")
 	}
 
-	// If we're in witness execution mode, and this was the final script,
-	// then the stack MUST be clean in order to maintain compatibility with
-	// BIP16.
-	if finalScript && vm.witness && vm.dstack.Depth() != 1 {
-		return ErrStackCleanStack
+	// If we're in version zero witness execution mode, and this was the
+	// final script, then the stack MUST be clean in order to maintain
+	// compatibility with BIP16.
+	if finalScript && vm.isWitnessVersionActive(0) && vm.dstack.Depth() != 1 {
+		return scriptError(ErrEvalFalse, "witness program must "+
+			"have clean stack")
 	}
 
 	if finalScript && vm.hasFlag(ScriptVerifyCleanStack) &&
@@ -488,8 +500,9 @@ func (vm *Engine) Step() (done bool, err error) {
 			// Set stack to be the stack from first script minus the
 			// script itself
 			vm.SetStack(vm.savedFirstStack[:len(vm.savedFirstStack)-1])
-		} else if (vm.scriptIdx == 1 && vm.witness) ||
-			(vm.scriptIdx == 2 && vm.witness && vm.bip16) { // Nested P2SH.
+		} else if (vm.scriptIdx == 1 && vm.witnessProgram != nil) ||
+			(vm.scriptIdx == 2 && vm.witnessProgram != nil && vm.bip16) { // Nested P2SH.
+
 			vm.scriptIdx++
 
 			witness := vm.tx.TxIn[vm.txIdx].Witness
@@ -569,6 +582,13 @@ func (vm *Engine) checkHashTypeEncoding(hashType SigHashType) error {
 // checkPubKeyEncoding returns whether or not the passed public key adheres to
 // the strict encoding requirements if enabled.
 func (vm *Engine) checkPubKeyEncoding(pubKey []byte) error {
+	if vm.hasFlag(ScriptVerifyWitnessPubKeyType) &&
+		vm.isWitnessVersionActive(0) && !btcec.IsCompressedPubKey(pubKey) {
+
+		str := "only uncompressed keys are accepted post-segwit"
+		return scriptError(ErrWitnessPubKeyType, str)
+	}
+
 	if !vm.hasFlag(ScriptVerifyStrictEncoding) {
 		return nil
 	}
@@ -581,6 +601,7 @@ func (vm *Engine) checkPubKeyEncoding(pubKey []byte) error {
 		// Uncompressed
 		return nil
 	}
+
 	return scriptError(ErrPubKeyType, "unsupported public key type")
 }
 
@@ -916,7 +937,7 @@ func NewEngine(scriptPubKey []byte, tx *wire.MsgTx, txIdx int, flags ScriptFlags
 			// pkScript or as a datapush within the sigScript, then
 			// there MUST NOT be any witness data associated with
 			// the input being validated.
-			if !vm.witness && len(tx.TxIn[txIdx].Witness) != 0 {
+			if vm.witnessProgram == nil && len(tx.TxIn[txIdx].Witness) != 0 {
 				errStr := "non-witness inputs cannot have a witness"
 				return nil, scriptError(ErrWitnessUnexpected, errStr)
 			}
