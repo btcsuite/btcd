@@ -84,6 +84,10 @@ const (
 	// ScriptVerifyDiscourageUpgradeableWitnessProgram makes witness
 	// program with versions 2-16 non-standard.
 	ScriptVerifyDiscourageUpgradeableWitnessProgram
+
+	// ScriptVerifyMinimalIf makes a script with an OP_IF/OP_NOTIF whose
+	// operand is anything other than empty vector or [0x01] non-standard.
+	ScriptVerifyMinimalIf
 )
 
 const (
