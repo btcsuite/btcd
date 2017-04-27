@@ -12,6 +12,7 @@ import (
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcutil"
+	"github.com/btcsuite/btcutil/gcs"
 	"github.com/btcsuite/btcutil/gcs/builder"
 	"github.com/btcsuite/fastsha256"
 )
@@ -158,71 +159,10 @@ func (idx *CfIndex) Create(dbTx database.Tx) error {
 	return err
 }
 
-// makeBasicFilterForBlock builds a block's basic filter, which consists of
-// all outpoints and pkscript data pushes referenced by transactions within the
-// block.
-func makeBasicFilterForBlock(block *btcutil.Block) ([]byte, error) {
-	b := builder.WithKeyHash(block.Hash())
-	_, err := b.Key()
-	if err != nil {
-		return nil, err
-	}
-	for i, tx := range block.Transactions() {
-		// Skip the inputs for the coinbase transaction
-		if i != 0 {
-			for _, txIn := range tx.MsgTx().TxIn {
-				b.AddOutPoint(txIn.PreviousOutPoint)
-			}
-		}
-		for _, txOut := range tx.MsgTx().TxOut {
-			b.AddScript(txOut.PkScript)
-		}
-	}
-	f, err := b.Build()
-	if err != nil {
-		return nil, err
-	}
-	return f.NBytes(), nil
-}
-
-// makeExtendedFilterForBlock builds a block's extended filter, which consists
-// of all tx hashes and sigscript data pushes contained in the block.
-func makeExtendedFilterForBlock(block *btcutil.Block) ([]byte, error) {
-	b := builder.WithKeyHash(block.Hash())
-	_, err := b.Key()
-	if err != nil {
-		return nil, err
-	}
-	for i, tx := range block.Transactions() {
-		b.AddHash(tx.Hash())
-		// Skip the inputs for the coinbase transaction
-		if i != 0 {
-			for _, txIn := range tx.MsgTx().TxIn {
-				b.AddScript(txIn.SignatureScript)
-			}
-		}
-	}
-	f, err := b.Build()
-	if err != nil {
-		return nil, err
-	}
-	return f.NBytes(), nil
-}
-
-// makeHeaderForFilter implements the chaining logic between filters, where
-// a filter's header is defined as sha256(sha256(filter) + previousFilterHeader).
-func makeHeaderForFilter(f, pfh []byte) []byte {
-	fhash := fastsha256.Sum256(f)
-	chain := make([]byte, 0, 2*fastsha256.Size)
-	chain = append(chain, fhash[:]...)
-	chain = append(chain, pfh...)
-	fh := fastsha256.Sum256(chain)
-	return fh[:]
-}
-
 // storeFilter stores a given filter, and performs the steps needed to
 // generate the filter's header.
-func storeFilter(dbTx database.Tx, block *btcutil.Block, f []byte, extended bool) error {
+func storeFilter(dbTx database.Tx, block *btcutil.Block, f *gcs.Filter,
+	extended bool) error {
 	// Figure out which buckets to use.
 	fkey := cfBasicIndexKey
 	hkey := cfBasicHeaderKey
@@ -232,7 +172,7 @@ func storeFilter(dbTx database.Tx, block *btcutil.Block, f []byte, extended bool
 	}
 	// Start by storing the filter.
 	h := block.Hash()
-	err := dbStoreFilter(dbTx, fkey, h, f)
+	err := dbStoreFilter(dbTx, fkey, h, f.NBytes())
 	if err != nil {
 		return err
 	}
@@ -243,8 +183,12 @@ func storeFilter(dbTx database.Tx, block *btcutil.Block, f []byte, extended bool
 		return err
 	}
 	// Construct the new block's filter header, and store it.
-	fh := makeHeaderForFilter(f, pfh)
-	return dbStoreFilterHeader(dbTx, hkey, h, fh)
+	prevHeader, err := chainhash.NewHash(pfh)
+	if err != nil {
+		return err
+	}
+	fh := builder.MakeHeaderForFilter(f, *prevHeader)
+	return dbStoreFilterHeader(dbTx, hkey, h, fh[:])
 }
 
 // ConnectBlock is invoked by the index manager when a new block has been
@@ -252,7 +196,7 @@ func storeFilter(dbTx database.Tx, block *btcutil.Block, f []byte, extended bool
 // every passed block. This is part of the Indexer interface.
 func (idx *CfIndex) ConnectBlock(dbTx database.Tx, block *btcutil.Block,
 	view *blockchain.UtxoViewpoint) error {
-	f, err := makeBasicFilterForBlock(block)
+	f, err := builder.BuildBasicFilter(block.MsgBlock())
 	if err != nil {
 		return err
 	}
@@ -260,7 +204,7 @@ func (idx *CfIndex) ConnectBlock(dbTx database.Tx, block *btcutil.Block,
 	if err != nil {
 		return err
 	}
-	f, err = makeExtendedFilterForBlock(block)
+	f, err = builder.BuildExtFilter(block.MsgBlock())
 	if err != nil {
 		return err
 	}
