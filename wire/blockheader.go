@@ -1,5 +1,5 @@
 // Copyright (c) 2013-2016 The btcsuite developers
-// Copyright (c) 2015-2016 The Decred developers
+// Copyright (c) 2015-2017 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -13,13 +13,14 @@ import (
 	"github.com/decred/dcrd/chaincfg/chainhash"
 )
 
-// MaxBlockHeaderPayload is the max size of the header which comes from:
-// Version 4 bytes + Bits 4 bytes + PrevBlock and MerkleRoot hashes + 32 StakeRoot
-// bytes + 2 VoteBits bytes + 6 FinalState bytes + 2 Voters bytes +
-// 1 FreshStake byte + 1 Revocations byte + 8 SBits bytes + 4 PoolSize bytes +
-// 4 Height bytes + 4 Size bytes + Timestamp 4 bytes + 4 bytes nonce.
+// MaxBlockHeaderPayload is the maximum number of bytes a block header can be.
+// Version 4 bytes + PrevBlock 32 bytes + MerkleRoot 32 bytes + StakeRoot 32
+// bytes + VoteBits 2 bytes + FinalState 6 bytes + Voters 2 bytes + FreshStake 1
+// byte + Revocations 1 bytes + PoolSize 4 bytes + Bits 4 bytes + SBits 8 bytes
+// + Height 4 bytes + Size 4 bytes + Timestamp 4 bytes + Nonce 4 bytes +
+// ExtraData 32 bytes + StakeVersion 4 bytes.
 // --> Total 180 bytes.
-const MaxBlockHeaderPayload = 16 + (chainhash.HashSize * 2) + 64 + 36
+const MaxBlockHeaderPayload = 84 + (chainhash.HashSize * 3)
 
 // BlockHeader defines information about a block and is used in the decred
 // block (MsgBlock) and headers (MsgHeaders) messages.
@@ -194,52 +195,21 @@ func NewBlockHeader(version int32, prevHash *chainhash.Hash,
 // decoding block headers stored to disk, such as in a database, as opposed to
 // decoding from the wire.
 func readBlockHeader(r io.Reader, pver uint32, bh *BlockHeader) error {
-	return readElements(
-		r,
-		&bh.Version,
-		&bh.PrevBlock,
-		&bh.MerkleRoot,
-		&bh.StakeRoot,
-		&bh.VoteBits,
-		&bh.FinalState,
-		&bh.Voters,
-		&bh.FreshStake,
-		&bh.Revocations,
-		&bh.PoolSize,
-		&bh.Bits,
-		&bh.SBits,
-		&bh.Height,
-		&bh.Size,
-		(*uint32Time)(&bh.Timestamp),
-		&bh.Nonce,
-		&bh.ExtraData,
-		&bh.StakeVersion)
+	return readElements(r, &bh.Version, &bh.PrevBlock, &bh.MerkleRoot,
+		&bh.StakeRoot, &bh.VoteBits, &bh.FinalState, &bh.Voters,
+		&bh.FreshStake, &bh.Revocations, &bh.PoolSize, &bh.Bits,
+		&bh.SBits, &bh.Height, &bh.Size, (*uint32Time)(&bh.Timestamp),
+		&bh.Nonce, &bh.ExtraData, &bh.StakeVersion)
 }
 
 // writeBlockHeader writes a decred block header to w.  See Serialize for
 // encoding block headers to be stored to disk, such as in a database, as
 // opposed to encoding for the wire.
-// TODO: make sure serializing/writing is actually correct w/r/t dereferencing
 func writeBlockHeader(w io.Writer, pver uint32, bh *BlockHeader) error {
 	sec := uint32(bh.Timestamp.Unix())
-	return writeElements(
-		w,
-		bh.Version,
-		&bh.PrevBlock,
-		&bh.MerkleRoot,
-		&bh.StakeRoot,
-		bh.VoteBits,
-		bh.FinalState,
-		bh.Voters,
-		bh.FreshStake,
-		bh.Revocations,
-		bh.PoolSize,
-		bh.Bits,
-		bh.SBits,
-		bh.Height,
-		bh.Size,
-		sec,
-		bh.Nonce,
-		bh.ExtraData,
+	return writeElements(w, bh.Version, &bh.PrevBlock, &bh.MerkleRoot,
+		&bh.StakeRoot, bh.VoteBits, bh.FinalState, bh.Voters,
+		bh.FreshStake, bh.Revocations, bh.PoolSize, bh.Bits, bh.SBits,
+		bh.Height, bh.Size, sec, bh.Nonce, bh.ExtraData,
 		bh.StakeVersion)
 }
