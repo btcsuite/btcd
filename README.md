@@ -80,7 +80,7 @@ go install $(glide nv)
 ```
 
 For more information about decred and how to set up your software please go to
-our docs page at [docs.decred.org](https://docs.decred.org/getting-started/overview/).  
+our docs page at [docs.decred.org](https://docs.decred.org/getting-started/beginner-guide/).  
 
 ## Contact 
 
