@@ -202,7 +202,6 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"getblockcount":         handleGetBlockCount,
 	"getblockhash":          handleGetBlockHash,
 	"getblockheader":        handleGetBlockHeader,
-	"getblocktemplate":      handleGetBlockTemplate,
 	"getcoinsupply":         handleGetCoinSupply,
 	"getconnectioncount":    handleGetConnectionCount,
 	"getcurrentnet":         handleGetCurrentNet,
@@ -309,6 +308,7 @@ var rpcAskWallet = map[string]struct{}{
 var rpcUnimplemented = map[string]struct{}{
 	"estimatefee":       {},
 	"estimatepriority":  {},
+	"getblocktemplate":  {},
 	"getblockchaininfo": {},
 	"getchaintips":      {},
 	"getnetworkinfo":    {},
