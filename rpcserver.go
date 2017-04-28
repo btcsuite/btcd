@@ -2536,10 +2536,10 @@ func (state *gbtWorkState) blockTemplateResult(bm *blockManager, useCoinbaseValu
 			numSigOps += blockchain.CountSigOps(txU, false,
 				isSSGen)
 			if numSigOps > maxSigOpsPerTx {
-				context := fmt.Sprintf("transaction %v has "+
+				errStr := fmt.Sprintf("transaction %v has "+
 					"too many sigops: %d > %d", txHash,
 					numSigOps, maxSigOpsPerTx)
-				return nil, rpcInternalError("", context)
+				return nil, rpcInternalError(errStr, "")
 			}
 			sigOps = int64(numSigOps)
 		}
@@ -2612,9 +2612,9 @@ func (state *gbtWorkState) blockTemplateResult(bm *blockManager, useCoinbaseValu
 				len(msgBlock.STransactions)
 			if allTxCount != len(template.Fees) ||
 				allTxCount != len(template.SigOpCounts) {
-				context := "failed to build template due to " +
+				errStr := "failed to build template due to " +
 					"race"
-				return nil, rpcInternalError("", context)
+				return nil, rpcInternalError(errStr, "")
 			}
 
 			fee = template.Fees[i+len(msgBlock.Transactions)]
@@ -2655,12 +2655,10 @@ func (state *gbtWorkState) blockTemplateResult(bm *blockManager, useCoinbaseValu
 
 			numSigOps += blockchain.CountSigOps(txU, false, isSSGen)
 			if numSigOps > maxSigOpsPerTx {
-				context := "Too many sigops"
 				errStr := fmt.Sprintf("transaction %v has "+
 					"too many sigops: %d > %d", stxHash,
 					numSigOps, maxSigOpsPerTx)
-				return nil, rpcInternalError(errStr,
-					context)
+				return nil, rpcInternalError(errStr, "")
 			}
 			sigOps = int64(numSigOps)
 		}
