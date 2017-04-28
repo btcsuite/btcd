@@ -104,9 +104,6 @@ const (
 	// transaction output's pkscript type is a ticket commitment.
 	sstxCommitmentString = "sstxcommitment"
 
-	// maxProtocolVersion is the max protocol version the server supports.
-	maxProtocolVersion = 2
-
 	// maxSigOpsPerTx is the maximum number of signature operations
 	// in a single transaction we will relay or mine.  It is a fraction
 	// of the max signature operations for a block.

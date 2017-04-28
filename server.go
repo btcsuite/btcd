@@ -53,6 +53,9 @@ const (
 	// retries when connecting to persistent peers.  It is adjusted by the
 	// number of retries such that there is a retry backoff.
 	connectionRetryInterval = time.Second * 5
+
+	// maxProtocolVersion is the max protocol version the server supports.
+	maxProtocolVersion = wire.MaxBlockSizeVersion
 )
 
 var (
@@ -1579,7 +1582,7 @@ func newPeerConfig(sp *serverPeer) *peer.Config {
 		ChainParams:      sp.server.chainParams,
 		Services:         sp.server.services,
 		DisableRelayTx:   cfg.BlocksOnly,
-		ProtocolVersion:  wire.MaxBlockSizeVersion,
+		ProtocolVersion:  maxProtocolVersion,
 	}
 }
 
