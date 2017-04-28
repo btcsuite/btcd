@@ -798,7 +798,8 @@ func (c *Client) GetVoteInfoAsync(version uint32) FutureGetVoteInfoResult {
 	return c.sendCmd(cmd)
 }
 
-// GetVoteInfo returns the current and next stake difficulty.
+// GetVoteInfo returns voting information for the specified stake version. This
+// includes current voting window, quorum, total votes and agendas.
 //
 // NOTE: This is a dcrd extension.
 func (c *Client) GetVoteInfo(version uint32) (*dcrjson.GetVoteInfoResult, error) {
