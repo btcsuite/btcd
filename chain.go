@@ -264,6 +264,82 @@ func (c *Client) GetBlockHash(blockHeight int64) (*chainhash.Hash, error) {
 	return c.GetBlockHashAsync(blockHeight).Receive()
 }
 
+// FutureGetBlockHeaderResult is a future promise to deliver the result of a
+// GetBlockHeaderAsync RPC invocation (or an applicable error).
+type FutureGetBlockHeaderResult chan *response
+
+// Receive waits for the response promised by the future and returns the hex of
+// the block header at the given hash
+func (r FutureGetBlockHeaderResult) Receive() (*wire.BlockHeader, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal the result
+	var bh wire.BlockHeader
+	err = json.Unmarshal(res, &bh)
+	if err != nil {
+		return nil, err
+	}
+	return &bh, nil
+}
+
+// GetBlockHeaderAsync returns an instance of a type that can be used to get the
+// result of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+//
+// See GetBlockHeader for the blocking version and more details.
+func (c *Client) GetBlockHeaderAsync(hash *chainhash.Hash) FutureGetBlockHeaderResult {
+	cmd := dcrjson.NewGetBlockHeaderCmd(hash.String(), dcrjson.Bool(false))
+	return c.sendCmd(cmd)
+}
+
+// GetBlockHeader returns the hash of the block in the best block chain at the
+// given height.
+func (c *Client) GetBlockHeader(hash *chainhash.Hash) (*wire.BlockHeader, error) {
+	return c.GetBlockHeaderAsync(hash).Receive()
+}
+
+// FutureGetBlockHeaderVerboseResult is a future promise to deliver the result of a
+// GetBlockHeaderAsync RPC invocation (or an applicable error).
+type FutureGetBlockHeaderVerboseResult chan *response
+
+// Receive waits for the response promised by the future and returns a data
+// structure of the block header requested from the server given its hash.
+func (r FutureGetBlockHeaderVerboseResult) Receive() (*dcrjson.GetBlockHeaderVerboseResult, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal the result
+	var bh dcrjson.GetBlockHeaderVerboseResult
+	err = json.Unmarshal(res, &bh)
+	if err != nil {
+		return nil, err
+	}
+	return &bh, nil
+}
+
+// GetBlockHeaderVerboseAsync returns an instance of a type that can be used to
+// get the result of the RPC at some future time by invoking the Receive
+// function on the returned instance.
+//
+// See GetBlockHeaderVerbose for the blocking version and more details.
+func (c *Client) GetBlockHeaderVerboseAsync(hash *chainhash.Hash) FutureGetBlockHeaderVerboseResult {
+	cmd := dcrjson.NewGetBlockHeaderCmd(hash.String(), dcrjson.Bool(true))
+	return c.sendCmd(cmd)
+}
+
+// GetBlockHeaderVerbose returns a data structure of the block header from the
+// server given its hash.
+//
+// See GetBlockHeader to retrieve a raw block header instead.
+func (c *Client) GetBlockHeaderVerbose(hash *chainhash.Hash) (*dcrjson.GetBlockHeaderVerboseResult, error) {
+	return c.GetBlockHeaderVerboseAsync(hash).Receive()
+}
+
 // FutureGetRawMempoolResult is a future promise to deliver the result of a
 // GetRawMempoolAsync RPC invocation (or an applicable error).
 type FutureGetRawMempoolResult chan *response
