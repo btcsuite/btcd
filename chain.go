@@ -276,12 +276,25 @@ func (r FutureGetBlockHeaderResult) Receive() (*wire.BlockHeader, error) {
 		return nil, err
 	}
 
-	// Unmarshal the result
-	var bh wire.BlockHeader
-	err = json.Unmarshal(res, &bh)
+	// Unmarshal the result as a string.
+	var bhHex string
+	err = json.Unmarshal(res, &bhHex)
 	if err != nil {
 		return nil, err
 	}
+
+	serializedBH, err := hex.DecodeString(bhHex)
+	if err != nil {
+		return nil, err
+	}
+
+	// Deserialize the blockheader and return it.
+	var bh wire.BlockHeader
+	err = bh.Deserialize(bytes.NewReader(serializedBH))
+	if err != nil {
+		return nil, err
+	}
+
 	return &bh, nil
 }
 
