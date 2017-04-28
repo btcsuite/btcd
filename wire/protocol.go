@@ -26,6 +26,10 @@ const (
 	// SendHeadersVersion is the protocol version which added a new
 	// sendheaders message.
 	SendHeadersVersion uint32 = 3
+
+	// MaxBlockSizeVersion is the protocol version which increased the
+	// original blocksize.
+	MaxBlockSizeVersion uint32 = 4
 )
 
 // ServiceFlag identifies services supported by a decred peer.
