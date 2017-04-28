@@ -28,7 +28,7 @@ import (
 
 const (
 	// MaxProtocolVersion is the max protocol version the peer supports.
-	MaxProtocolVersion = wire.SendHeadersVersion
+	MaxProtocolVersion = wire.MaxBlockSizeVersion
 
 	// outputBufferSize is the number of elements the output channels use.
 	outputBufferSize = 5000
