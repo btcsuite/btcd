@@ -457,7 +457,7 @@ func (sp *serverPeer) OnGetMiningState(p *peer.Peer, msg *wire.MsgGetMiningState
 	children, err := bm.GetGeneration(*newest)
 	if err != nil {
 		peerLog.Warnf("failed to access block manager to get the generation "+
-			"for a mining state request (block: %v)", newest)
+			"for a mining state request (block: %v): %v", newest, err)
 		return
 	}
 
