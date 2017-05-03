@@ -1751,16 +1751,17 @@ func handleLoadTxFilter(wsc *wsClient, icmd interface{}) (interface{}, error) {
 		wsc.filterData = makeWSClientFilter(cmd.Addresses, outPoints)
 		wsc.Unlock()
 	} else {
+		filter := wsc.filterData
 		wsc.Unlock()
 
-		wsc.filterData.mu.Lock()
+		filter.mu.Lock()
 		for _, a := range cmd.Addresses {
-			wsc.filterData.addAddressStr(a)
+			filter.addAddressStr(a)
 		}
 		for _, op := range outPoints {
-			wsc.filterData.addUnspentOutPoint(op)
+			filter.addUnspentOutPoint(op)
 		}
-		wsc.filterData.mu.Unlock()
+		filter.mu.Unlock()
 	}
 
 	return nil, nil
