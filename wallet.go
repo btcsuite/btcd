@@ -2758,54 +2758,6 @@ func (c *Client) AccountAddressIndex(account string, branch uint32) (int, error)
 	return c.AccountAddressIndexAsync(account, branch).Receive()
 }
 
-// FutureAccountFetchAddressesResult is a future promise to deliver the result of
-// an AccountFetchAddressesAsync RPC invocation (or an applicable error).
-type FutureAccountFetchAddressesResult chan *response
-
-// Receive waits for the response promised by the future and returns the info
-// provided by the server.
-func (r FutureAccountFetchAddressesResult) Receive() ([]dcrutil.Address, error) {
-	res, err := receiveFuture(r)
-	if err != nil {
-		return nil, err
-	}
-
-	// Unmarshal result as a slice of strings.
-	var addrsStr []string
-	err = json.Unmarshal(res, &addrsStr)
-	if err != nil {
-		return nil, err
-	}
-
-	// Convert the strings into addresses.
-	addrs := make([]dcrutil.Address, len(addrsStr))
-	for i := range addrsStr {
-		addr, err := dcrutil.DecodeNetworkAddress(addrsStr[i])
-		if err != nil {
-			return nil, err
-		}
-		addrs[i] = addr
-	}
-
-	return addrs, nil
-}
-
-// AccountFetchAddressesAsync returns an instance of a type that can be used
-// to get the result of the RPC at some future time by invoking the Receive
-// function on the returned instance.
-//
-// See AccountFetchAddresses for the blocking version and more details.
-func (c *Client) AccountFetchAddressesAsync(account string, branch uint32, start int, end int) FutureAccountFetchAddressesResult {
-	cmd := dcrjson.NewAccountFetchAddressesCmd(account, int(branch), start, end)
-	return c.sendCmd(cmd)
-}
-
-// AccountFetchAddresses returns a list of addresses from [start,end) for a
-// given account's branch.
-func (c *Client) AccountFetchAddresses(account string, branch uint32, start int, end int) ([]dcrutil.Address, error) {
-	return c.AccountFetchAddressesAsync(account, branch, start, end).Receive()
-}
-
 // FutureAccountSyncAddressIndexResult is a future promise to deliver the
 // result of an AccountSyncAddressIndexAsync RPC invocation (or an
 // applicable error).
