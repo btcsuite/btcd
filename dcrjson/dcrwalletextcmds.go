@@ -23,27 +23,6 @@ func NewAccountAddressIndexCmd(acct string, branch int) *AccountAddressIndexCmd 
 	}
 }
 
-// AccountFetchAddressesCmd is a type handling custom marshaling and
-// unmarshaling of accountfetchaddresses JSON wallet extension
-// commands.
-type AccountFetchAddressesCmd struct {
-	Account string `json:"account"`
-	Branch  int    `json:"branch"`
-	Start   int    `json:"start"`
-	End     int    `json:"end"`
-}
-
-// NewAccountFetchAddressesCmd creates a new AccountFetchAddressesCmd.
-func NewAccountFetchAddressesCmd(acct string, branch int, start int,
-	end int) *AccountFetchAddressesCmd {
-	return &AccountFetchAddressesCmd{
-		Account: acct,
-		Branch:  branch,
-		Start:   start,
-		End:     end,
-	}
-}
-
 // AccountSyncAddressIndexCmd is a type handling custom marshaling and
 // unmarshaling of accountsyncaddressindex JSON wallet extension
 // commands.
@@ -601,7 +580,6 @@ func init() {
 	flags := UFWalletOnly
 
 	MustRegisterCmd("accountaddressindex", (*AccountAddressIndexCmd)(nil), flags)
-	MustRegisterCmd("accountfetchaddresses", (*AccountFetchAddressesCmd)(nil), flags)
 	MustRegisterCmd("accountsyncaddressindex", (*AccountSyncAddressIndexCmd)(nil), flags)
 	MustRegisterCmd("addticket", (*AddTicketCmd)(nil), flags)
 	MustRegisterCmd("consolidate", (*ConsolidateCmd)(nil), flags)

@@ -248,7 +248,6 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 // should ask a connected instance of dcrwallet.
 var rpcAskWallet = map[string]struct{}{
 	"accountaddressindex":     {},
-	"accountfetchaddresses":   {},
 	"accountsyncaddressindex": {},
 	"addmultisigaddress":      {},
 	"addticket":               {},
