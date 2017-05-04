@@ -250,6 +250,9 @@ func BlockOneCoinbasePaysTokens(tx *dcrutil.Tx,
 		// There should only be one address.
 		_, addrs, _, err :=
 			txscript.ExtractPkScriptAddrs(txout.Version, txout.PkScript, params)
+		if err != nil {
+			return ruleError(ErrBlockOneOutputs, err.Error())
+		}
 		if len(addrs) != 1 {
 			errStr := fmt.Sprintf("too many addresses in output")
 			return ruleError(ErrBlockOneOutputs, errStr)

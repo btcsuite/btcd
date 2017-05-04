@@ -1045,7 +1045,7 @@ func Generate() (tests [][]TestInstance, err error) {
 	//
 	// OP_CHECKMULTISIG counts for 20 sigops.
 	tooManySigOps = repeatOpcode(txscript.OP_CHECKMULTISIG, maxBlockSigOps/20)
-	tooManySigOps = append(manySigOps, txscript.OP_CHECKSIG)
+	tooManySigOps = append(tooManySigOps, txscript.OP_CHECKSIG)
 	g.NextBlock("b38", outs[10], ticketOuts[10], replaceSpendScript(tooManySigOps))
 	g.AssertTipBlockSigOpsCount(maxBlockSigOps + 1)
 	rejected(blockchain.ErrTooManySigOps)
@@ -1067,7 +1067,7 @@ func Generate() (tests [][]TestInstance, err error) {
 	//                \-> b40(11)
 	//
 	tooManySigOps = repeatOpcode(txscript.OP_CHECKMULTISIGVERIFY, maxBlockSigOps/20)
-	tooManySigOps = append(manySigOps, txscript.OP_CHECKSIG)
+	tooManySigOps = append(tooManySigOps, txscript.OP_CHECKSIG)
 	g.NextBlock("b40", outs[11], ticketOuts[11], replaceSpendScript(tooManySigOps))
 	g.AssertTipBlockSigOpsCount(maxBlockSigOps + 1)
 	rejected(blockchain.ErrTooManySigOps)

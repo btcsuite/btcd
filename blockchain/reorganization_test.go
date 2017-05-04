@@ -40,6 +40,9 @@ func reorgTestLong(t *testing.T) {
 	// Load up the rest of the blocks up to HEAD.
 	filename := filepath.Join("testdata/", "reorgto179.bz2")
 	fi, err := os.Open(filename)
+	if err != nil {
+		t.Errorf("Unable to open %s: %v", filename, err)
+	}
 	bcStream := bzip2.NewReader(fi)
 	defer fi.Close()
 
@@ -75,6 +78,9 @@ func reorgTestLong(t *testing.T) {
 	// Load up the rest of the blocks up to HEAD.
 	filename = filepath.Join("testdata/", "reorgto180.bz2")
 	fi, err = os.Open(filename)
+	if err != nil {
+		t.Errorf("Unable to open %s: %v", filename, err)
+	}
 	bcStream = bzip2.NewReader(fi)
 	defer fi.Close()
 
@@ -149,6 +155,9 @@ func reorgTestShort(t *testing.T) {
 	// Load up the rest of the blocks up to HEAD.
 	filename := filepath.Join("testdata/", "reorgto179.bz2")
 	fi, err := os.Open(filename)
+	if err != nil {
+		t.Errorf("Unable to open %s: %v", filename, err)
+	}
 	bcStream := bzip2.NewReader(fi)
 	defer fi.Close()
 
@@ -170,6 +179,9 @@ func reorgTestShort(t *testing.T) {
 	// Load up the rest of the blocks up to HEAD.
 	filename = filepath.Join("testdata/", "reorgto180.bz2")
 	fi, err = os.Open(filename)
+	if err != nil {
+		t.Errorf("Unable to open %s: %v", filename, err)
+	}
 	bcStream = bzip2.NewReader(fi)
 	defer fi.Close()
 

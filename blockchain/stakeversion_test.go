@@ -359,7 +359,6 @@ func TestCalcStakeVersionCorners(t *testing.T) {
 		bc.bestNode = currentNode
 
 	}
-	height += runCount
 
 	if !bc.isStakeMajorityVersion(0, currentNode) {
 		t.Fatalf("invalid StakeVersion expected 0 -> true")

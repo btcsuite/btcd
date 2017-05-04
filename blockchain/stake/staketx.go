@@ -410,6 +410,9 @@ func TxSSGenStakeOutputInfo(tx *wire.MsgTx, params *chaincfg.Params) ([]bool,
 					"ssgen tagged output in idx %v", idx)
 			}
 			subClass, err := txscript.GetStakeOutSubclass(out.PkScript)
+			if err != nil {
+				return nil, nil, nil, err
+			}
 			if !(subClass == txscript.PubKeyHashTy ||
 				subClass == txscript.ScriptHashTy) {
 				return nil, nil, nil, fmt.Errorf("bad script type")
@@ -494,6 +497,9 @@ func TxSSRtxStakeOutputInfo(tx *wire.MsgTx, params *chaincfg.Params) ([]bool,
 				"ssrtx tagged output in idx %v", idx)
 		}
 		subClass, err := txscript.GetStakeOutSubclass(out.PkScript)
+		if err != nil {
+			return nil, nil, nil, err
+		}
 		if !(subClass == txscript.PubKeyHashTy ||
 			subClass == txscript.ScriptHashTy) {
 			return nil, nil, nil, fmt.Errorf("bad script type")
