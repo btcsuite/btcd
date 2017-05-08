@@ -168,7 +168,7 @@ func initSeelogLogger(logFile string) {
 			<rollingfile type="size" filename="%s" maxsize="10485760" maxrolls="3" />
 		</outputs>
 		<formats>
-			<format id="all" format="%%Time %%Date [%%LEV] %%Msg%%n" />
+			<format id="all" format="%%Date(15:04:05.000 2006-01-02) [%%LEV] %%Msg%%n" />
 		</formats>
 	</seelog>`
 	config = fmt.Sprintf(config, logFile)
