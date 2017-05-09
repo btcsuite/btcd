@@ -1,12 +1,12 @@
-hash: ea6e6ffa31517aacb35de06b097975229096253bf658d302f2d6652fde91b3f1
-updated: 2017-01-27T20:06:58.5779336-06:00
+hash: 4a7317ba20a3d8dd1ea253b86d86231d97cf85c16ca368471a50e8c42771daf0
+updated: 2017-05-08T23:05:30.5569509-05:00
 imports:
 - name: github.com/btcsuite/btclog
   version: 73889fb79bd687870312b6e40effcecffbd57d30
 - name: github.com/btcsuite/btcrpcclient
   version: abcdfb702a7ca67e4a32c10be380c63216bd69fe
 - name: github.com/btcsuite/btcutil
-  version: 86346b5a958c0cf94186b87855469ae991be501c
+  version: dcd4997b0664bcfd6ef48e4ae9da8396e08b1cd9
   subpackages:
   - base58
   - bloom
@@ -15,10 +15,6 @@ imports:
   version: 4720035b7bfd2a9bb130b1c184f8bbe41b6f0d0f
   subpackages:
   - socks
-- name: github.com/btcsuite/golangcrypto
-  version: 53f62d9b43e87a6c56975cf862af7edf33a8d0df
-  subpackages:
-  - ripemd160
 - name: github.com/btcsuite/goleveldb
   version: 7834afc9e8cd15233b6c3d97e12674a31ca24602
   subpackages:
@@ -54,4 +50,8 @@ imports:
   - spew
 - name: github.com/jessevdk/go-flags
   version: 1679536dcc895411a9f5848d9a0250be7856448c
+- name: golang.org/x/crypto
+  version: 122d919ec1efcfb58483215da23f815853e24b81
+  subpackages:
+  - ripemd160
 testImports: []

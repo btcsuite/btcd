@@ -9,7 +9,7 @@ import:
 - package: github.com/btcsuite/go-socks
   subpackages:
   - socks
-- package: github.com/btcsuite/golangcrypto
+- package: golang.org/x/crypto
   subpackages:
   - ripemd160
 - package: github.com/btcsuite/goleveldb
