@@ -2221,7 +2221,7 @@ func (b *blockManager) handleNotifyMsg(notification *blockchain.Notification) {
 		}
 
 		if r := b.server.rpcServer; r != nil {
-			r.ntfnMgr.NotifySpentAndMissedTickets(tnd)
+			r.ntfnMgr.NotifyNewTickets(tnd)
 		}
 
 	// A block has been disconnected from the main block chain.
