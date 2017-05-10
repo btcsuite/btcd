@@ -131,7 +131,7 @@ type NotificationHandlers struct {
 	OnNewTickets func(hash *chainhash.Hash,
 		height int64,
 		stakeDiff int64,
-		tickets map[chainhash.Hash]chainhash.Hash)
+		tickets []*chainhash.Hash)
 
 	// OnStakeDifficulty is invoked when a block is connected to the longest
 	// (best) chain and a new stake difficulty is calculated.  It will only
@@ -763,11 +763,7 @@ func parseSpentAndMissedTicketsNtfnParams(params []json.RawMessage) (
 
 // parseNewTicketsNtfnParams parses out the block header hash, height,
 // winner number, overflow, and ticket map from a NewTickets notification.
-func parseNewTicketsNtfnParams(params []json.RawMessage) (*chainhash.Hash,
-	int64,
-	int64,
-	map[chainhash.Hash]chainhash.Hash,
-	error) {
+func parseNewTicketsNtfnParams(params []json.RawMessage) (*chainhash.Hash, int64, int64, []*chainhash.Hash, error) {
 
 	if len(params) != 4 {
 		return nil, 0, 0, nil, wrongNumParams(len(params))
@@ -801,28 +797,21 @@ func parseNewTicketsNtfnParams(params []json.RawMessage) (*chainhash.Hash,
 		return nil, 0, 0, nil, err
 	}
 
-	// Unmarshal fourth parameter as a map[hash]hash.
-	tickets := make(map[string]string)
+	// Unmarshal fourth parameter as a slice.
+	var tickets []string
 	err = json.Unmarshal(params[3], &tickets)
 	if err != nil {
 		return nil, 0, 0, nil, err
 	}
-	t := make(map[chainhash.Hash]chainhash.Hash)
+	t := make([]*chainhash.Hash, len(tickets))
 
-	for hashStr, ticketNH := range tickets {
-		// Create and cache ShaHash from tx hash.
-		ticketSha, err := chainhash.NewHashFromStr(hashStr)
+	for i, ticketHashStr := range tickets {
+		ticketHash, err := chainhash.NewHashFromStr(ticketHashStr)
 		if err != nil {
 			return nil, 0, 0, nil, err
 		}
 
-		// Convert the numberData to a big int.
-		numberHash, err := chainhash.NewHashFromStr(ticketNH)
-		if err != nil {
-			return nil, 0, 0, nil, err
-		}
-
-		t[*ticketSha] = *numberHash
+		t[i] = ticketHash
 	}
 
 	return sha, bh, stakeDiff, t, nil
