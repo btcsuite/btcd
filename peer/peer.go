@@ -405,7 +405,6 @@ type Peer struct {
 	advertisedProtoVer   uint32 // protocol version advertised by remote
 	protocolVersion      uint32 // negotiated protocol version
 	sendHeadersPreferred bool   // peer sent a sendheaders message
-	versionSent          bool
 	verAckReceived       bool
 
 	knownInventory     *mruInventoryMap
@@ -2017,14 +2016,7 @@ func (p *Peer) writeLocalVersionMsg() error {
 		return err
 	}
 
-	if err := p.writeMessage(localVerMsg); err != nil {
-		return err
-	}
-
-	p.flagsMtx.Lock()
-	p.versionSent = true
-	p.flagsMtx.Unlock()
-	return nil
+	return p.writeMessage(localVerMsg)
 }
 
 // negotiateInboundProtocol waits to receive a version message from the peer
