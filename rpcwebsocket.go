@@ -794,7 +794,7 @@ func (m *wsNotificationManager) notifyBlockConnected(clients map[chan struct{}]*
 		// Marshal and queue notification.
 		marshalledJSON, err := dcrjson.MarshalCmd(nil, &ntfn)
 		if err != nil {
-			rpcsLog.Error("Failed to marshal block connected "+
+			rpcsLog.Errorf("Failed to marshal block connected "+
 				"notification: %v", err)
 			continue
 		}
@@ -826,7 +826,7 @@ func (*wsNotificationManager) notifyBlockDisconnected(clients map[chan struct{}]
 	}
 	marshalledJSON, err := dcrjson.MarshalCmd(nil, &ntfn)
 	if err != nil {
-		rpcsLog.Error("Failed to marshal block disconnected "+
+		rpcsLog.Errorf("Failed to marshal block disconnected "+
 			"notification: %v", err)
 		return
 	}
@@ -851,7 +851,7 @@ func (m *wsNotificationManager) notifyReorganization(clients map[chan struct{}]*
 		int32(rd.NewHeight))
 	marshalledJSON, err := dcrjson.MarshalCmd(nil, ntfn)
 	if err != nil {
-		rpcsLog.Error("Failed to marshal reorganization "+
+		rpcsLog.Errorf("Failed to marshal reorganization "+
 			"notification: %v", err)
 		return
 	}
@@ -889,7 +889,7 @@ func (*wsNotificationManager) notifyWinningTickets(
 
 	marshalledJSON, err := dcrjson.MarshalCmd(nil, ntfn)
 	if err != nil {
-		rpcsLog.Error("Failed to marshal winning tickets notification: "+
+		rpcsLog.Errorf("Failed to marshal winning tickets notification: "+
 			"%v", err)
 		return
 	}
@@ -931,8 +931,8 @@ func (*wsNotificationManager) notifySpentAndMissedTickets(
 
 	marshalledJSON, err := dcrjson.MarshalCmd(nil, ntfn)
 	if err != nil {
-		rpcsLog.Error("Failed to marshal spent and missed tickets notification: "+
-			"%v", err)
+		rpcsLog.Errorf("Failed to marshal spent and missed tickets "+
+			"notification: %v", err)
 		return
 	}
 
@@ -982,7 +982,7 @@ func (*wsNotificationManager) notifyNewTickets(clients map[chan struct{}]*wsClie
 
 	marshalledJSON, err := dcrjson.MarshalCmd(nil, ntfn)
 	if err != nil {
-		rpcsLog.Error("Failed to marshal new tickets notification: "+
+		rpcsLog.Errorf("Failed to marshal new tickets notification: "+
 			"%v", err)
 		return
 	}
@@ -1004,7 +1004,7 @@ func (*wsNotificationManager) notifyStakeDifficulty(
 
 	marshalledJSON, err := dcrjson.MarshalCmd(nil, ntfn)
 	if err != nil {
-		rpcsLog.Error("Failed to marshal stake difficulty notification: "+
+		rpcsLog.Errorf("Failed to marshal stake difficulty notification: "+
 			"%v", err)
 		return
 	}
