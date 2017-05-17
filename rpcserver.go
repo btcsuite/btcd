@@ -187,6 +187,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"estimatestakediff":     handleEstimateStakeDiff,
 	"existsaddress":         handleExistsAddress,
 	"existsaddresses":       handleExistsAddresses,
+	"existsmissedtickets":   handleExistsMissedTickets,
 	"existsexpiredtickets":  handleExistsExpiredTickets,
 	"existsliveticket":      handleExistsLiveTicket,
 	"existslivetickets":     handleExistsLiveTickets,
@@ -1596,6 +1597,32 @@ func handleExistsAddresses(s *rpcServer, cmd interface{}, closeChan <-chan struc
 
 	// Convert the slice of bools into a compacted set of bit flags.
 	set := bitset.NewBytes(len(c.Addresses))
+	for i := range exists {
+		if exists[i] {
+			set.Set(i)
+		}
+	}
+
+	return hex.EncodeToString([]byte(set)), nil
+}
+
+// handleExistsMissedTickets implements the existsmissedtickets command.
+func handleExistsMissedTickets(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	c := cmd.(*dcrjson.ExistsMissedTicketsCmd)
+
+	hashes, err := dcrjson.DecodeConcatenatedHashes(c.TxHashBlob)
+	if err != nil {
+		return nil, err
+	}
+
+	exists := s.server.blockManager.chain.CheckMissedTickets(hashes)
+	if len(exists) != len(hashes) {
+		return nil, rpcInvalidError("Invalid missed ticket count "+
+			"got %v, want %v", len(exists), len(hashes))
+	}
+
+	// Convert the slice of bools into a compacted set of bit flags.
+	set := bitset.NewBytes(len(hashes))
 	for i := range exists {
 		if exists[i] {
 			set.Set(i)
