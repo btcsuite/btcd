@@ -1,0 +1,17 @@
+package: github.com/decred/dcrutil
+import:
+- package: github.com/decred/dcrd
+  subpackages:
+  - blockchain
+  - chaincfg
+  - chaincfg/chainec
+  - chaincfg/chainhash
+  - txscript
+  - wire
+- package: golang.org/x/crypto
+  subpackages:
+  - ripemd160
+testImport:
+- package: github.com/davecgh/go-spew
+  subpackages:
+  - spew

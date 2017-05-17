@@ -1,14 +1,19 @@
+dist: trusty
 language: go
 go:
   - 1.7.x
   - 1.8.x
 sudo: false
+before_install:
+  - GLIDE_TAG=v0.12.3
+  - GLIDE_DOWNLOAD="https://github.com/Masterminds/glide/releases/download/$GLIDE_TAG/glide-$GLIDE_TAG-linux-amd64.tar.gz"
+  - curl -L $GLIDE_DOWNLOAD | tar -xvz
+  - export PATH=$PATH:$PWD/linux-amd64/
+  - glide install
+  - go get -v github.com/alecthomas/gometalinter
+  - gometalinter --install
 install:
-  - go get -d -t -v ./...
-  - go get -v golang.org/x/tools/cmd/cover
-  - go get -v github.com/bradfitz/goimports
-  - go get -v github.com/golang/lint/golint
+  - go install $(glide nv)
 script:
   - export PATH=$PATH:$HOME/gopath/bin
-  - go install ./...
   - ./goclean.sh
