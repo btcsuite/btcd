@@ -40,7 +40,6 @@ type Block struct {
 	msgBlock        *wire.MsgBlock // Underlying MsgBlock
 	serializedBlock []byte         // Serialized bytes for the block
 	hash            chainhash.Hash // Cached block hash
-	blockHeight     int64          // Height in the main block chain
 	transactions    []*Tx          // Transactions
 	sTransactions   []*Tx          // Stake transactions
 	txnsGenerated   bool           // ALL wrapped transactions generated
@@ -296,24 +295,12 @@ func (b *Block) TxLoc() ([]wire.TxLoc, []wire.TxLoc, error) {
 	return txLocs, sTxLocs, err
 }
 
-// Height returns the saved height of the block in the block chain.  This value
-// will be BlockHeightUnknown if it hasn't already explicitly been set.
-func (b *Block) Height() int64 {
-	return b.blockHeight
-}
-
-// SetHeight sets the height of the block in the block chain.
-func (b *Block) SetHeight(height int64) {
-	b.blockHeight = height
-}
-
 // NewBlock returns a new instance of a block given an underlying
 // wire.MsgBlock.  See Block.
 func NewBlock(msgBlock *wire.MsgBlock) *Block {
 	return &Block{
-		hash:        msgBlock.BlockHash(),
-		msgBlock:    msgBlock,
-		blockHeight: int64(msgBlock.Header.Height),
+		hash:     msgBlock.BlockHash(),
+		msgBlock: msgBlock,
 	}
 }
 
@@ -343,8 +330,7 @@ func NewBlockDeepCopyCoinbase(msgBlock *wire.MsgBlock) *Block {
 		NewTxDeep(msgBlockCopy.Transactions[0]).MsgTx()
 
 	bl := &Block{
-		blockHeight: int64(msgBlockCopy.Header.Height),
-		msgBlock:    msgBlockCopy,
+		msgBlock: msgBlockCopy,
 	}
 	bl.hash = msgBlock.BlockHash()
 
@@ -373,8 +359,7 @@ func NewBlockDeepCopy(msgBlock *wire.MsgBlock) *Block {
 	msgBlockCopy.Header = msgBlock.Header
 
 	bl := &Block{
-		blockHeight: int64(msgBlockCopy.Header.Height),
-		msgBlock:    msgBlockCopy,
+		msgBlock: msgBlockCopy,
 	}
 	bl.hash = msgBlock.BlockHash()
 
@@ -390,7 +375,6 @@ func NewBlockFromBytes(serializedBlock []byte) (*Block, error) {
 		return nil, err
 	}
 	b.serializedBlock = serializedBlock
-	b.SetHeight(int64(b.msgBlock.Header.Height))
 	return b, nil
 }
 
@@ -405,9 +389,8 @@ func NewBlockFromReader(r io.Reader) (*Block, error) {
 	}
 
 	b := Block{
-		hash:        msgBlock.BlockHash(),
-		msgBlock:    &msgBlock,
-		blockHeight: int64(msgBlock.Header.Height),
+		hash:     msgBlock.BlockHash(),
+		msgBlock: &msgBlock,
 	}
 	return &b, nil
 }
@@ -419,6 +402,5 @@ func NewBlockFromBlockAndBytes(msgBlock *wire.MsgBlock, serializedBlock []byte) 
 		hash:            msgBlock.BlockHash(),
 		msgBlock:        msgBlock,
 		serializedBlock: serializedBlock,
-		blockHeight:     int64(msgBlock.Header.Height),
 	}
 }

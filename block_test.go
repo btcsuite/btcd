@@ -29,15 +29,14 @@ func TestBlock(t *testing.T) {
 	}
 
 	// Ensure block height set and get work properly.
-	wantHeight := int64(100000)
-	b.SetHeight(wantHeight)
-	if gotHeight := b.Height(); gotHeight != wantHeight {
+	wantHeight := uint32(100000)
+	if gotHeight := b.MsgBlock().Header.Height; gotHeight != wantHeight {
 		t.Errorf("Height: mismatched height - got %v, want %v",
 			gotHeight, wantHeight)
 	}
 
 	// Hash for block 100,000.
-	wantHashStr := "85457e2420d265386a84fc48aaee4f6dc98bac015dcc8d536ead20e2faf66a9d"
+	wantHashStr := "142c5f5b6f868b0e70172b78cea2cff21e6580612b3a360cf6bb2a5976e25ed1"
 	wantHash, err := chainhash.NewHashFromStr(wantHashStr)
 	if err != nil {
 		t.Errorf("NewHashFromStr: %v", err)
@@ -309,6 +308,7 @@ func TestBlockErrors(t *testing.T) {
 var Block100000 = wire.MsgBlock{
 	Header: wire.BlockHeader{
 		Version: 1,
+		Height:  100000,
 		PrevBlock: chainhash.Hash([32]byte{ // Make go vet happy.
 			0x50, 0x12, 0x01, 0x19, 0x17, 0x2a, 0x61, 0x04,
 			0x21, 0xa6, 0xc3, 0x01, 0x1d, 0xd3, 0x30, 0xd9,
