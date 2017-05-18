@@ -1,5 +1,5 @@
 hash: 2b8970779e0f073a5720aa6d6558bfbf1919f12ef2e19b3921955f156edd93e3
-updated: 2017-05-04T13:23:49.568759-04:00
+updated: 2017-05-18T11:21:32.466255698-04:00
 imports:
 - name: github.com/btcsuite/btclog
   version: 73889fb79bd687870312b6e40effcecffbd57d30
@@ -47,9 +47,9 @@ imports:
 - name: github.com/decred/blake256
   version: a840e32d7c31fe2e0218607334cb120a683951a4
 - name: github.com/decred/dcrrpcclient
-  version: 4536faefc970fe06267bf4af1bb7d10871138ea4
+  version: 7208596a68e5114e0c27d08b26c69cf38ccd1ee2
 - name: github.com/decred/dcrutil
-  version: ebd2e98736e819ac043d54439969b30144b92ced
+  version: f3e368a4178919ac884566084ece536c791cce52
   subpackages:
   - base58
   - bloom
@@ -58,12 +58,12 @@ imports:
   subpackages:
   - edwards25519
 - name: golang.org/x/crypto
-  version: 3cb07270c9455e8ad27956a70891c962d121a228
+  version: 0fe963104e9d1877082f8fb38f816fcd97eb1d10
   subpackages:
   - ripemd160
   - ssh/terminal
 - name: golang.org/x/sys
-  version: 9a7256cb28ed514b4e1e5f68959914c4c28a92e0
+  version: e62c3de784db939836898e5c19ffd41bece347da
   subpackages:
   - unix
 testImports:

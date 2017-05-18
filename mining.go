@@ -930,7 +930,6 @@ func handleTooFewVoters(subsidyCache *blockchain.SubsidyCache,
 
 				// Make sure the block validates.
 				block := dcrutil.NewBlockDeepCopyCoinbase(cptCopy.Block)
-				block.SetHeight(cptCopy.Height)
 				if err := blockchain.CheckWorklessBlockSanity(block,
 					bm.server.timeSource,
 					bm.server.chainParams); err != nil {
@@ -1037,7 +1036,6 @@ func handleTooFewVoters(subsidyCache *blockchain.SubsidyCache,
 
 				// Make sure the block validates.
 				btBlock := dcrutil.NewBlockDeepCopyCoinbase(btMsgBlock)
-				btBlock.SetHeight(bt.Height)
 				if err := blockchain.CheckWorklessBlockSanity(btBlock,
 					bm.server.timeSource,
 					bm.server.chainParams); err != nil {
@@ -2145,7 +2143,6 @@ mempoolLoop:
 	// consensus rules to ensure it properly connects to the current best
 	// chain with no issues.
 	block := dcrutil.NewBlockDeepCopyCoinbase(&msgBlock)
-	block.SetHeight(nextBlockHeight)
 
 	if err := blockchain.CheckWorklessBlockSanity(block,
 		server.timeSource,

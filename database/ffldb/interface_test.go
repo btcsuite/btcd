@@ -81,7 +81,6 @@ func loadBlocks(t *testing.T, dataFile string, network wire.CurrencyNet) ([]*dcr
 		if err != nil {
 			t.Errorf("NewBlockFromBytes error: %v", err.Error())
 		}
-		bl.SetHeight(int64(i))
 
 		blocks[i] = bl
 	}

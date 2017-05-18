@@ -918,7 +918,6 @@ func (b *blockManager) checkBlockForHiddenVotes(block *dcrutil.Block) {
 		int(b.server.chainParams.TicketsPerBlock))
 	if template != nil {
 		templateBlock := dcrutil.NewBlock(template.Block)
-		templateBlock.SetHeight(template.Height)
 
 		// Add all the votes found in our template. Keep their
 		// hashes in a map for easy lookup in the next loop.

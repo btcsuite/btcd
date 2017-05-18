@@ -61,7 +61,6 @@ func TestBlockchainFunctions(t *testing.T) {
 		if err != nil {
 			t.Errorf("NewBlockFromBytes error: %v", err.Error())
 		}
-		bl.SetHeight(int64(i))
 
 		_, _, err = chain.ProcessBlock(bl, blockchain.BFNone)
 		if err != nil {

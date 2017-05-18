@@ -63,7 +63,6 @@ func reorgTestLong(t *testing.T) {
 		if err != nil {
 			t.Fatalf("NewBlockFromBytes error: %v", err.Error())
 		}
-		bl.SetHeight(int64(i))
 
 		_, _, err = chain.ProcessBlock(bl, blockchain.BFNone)
 		if err != nil {
@@ -99,7 +98,6 @@ func reorgTestLong(t *testing.T) {
 		if err != nil {
 			t.Fatalf("NewBlockFromBytes error: %v", err.Error())
 		}
-		bl.SetHeight(int64(i))
 
 		_, _, err = chain.ProcessBlock(bl, blockchain.BFNone)
 		if err != nil {
@@ -196,7 +194,6 @@ func reorgTestShort(t *testing.T) {
 		if err != nil {
 			t.Fatalf("NewBlockFromBytes error: %v", err.Error())
 		}
-		bl.SetHeight(int64(i))
 
 		_, _, err = chain.ProcessBlock(bl, blockchain.BFNone)
 		if err != nil {
@@ -213,7 +210,6 @@ func reorgTestShort(t *testing.T) {
 			if err != nil {
 				t.Fatalf("NewBlockFromBytes error: %v", err.Error())
 			}
-			bl.SetHeight(int64(i + j))
 
 			_, _, err = chain.ProcessBlock(bl, blockchain.BFNone)
 			if err != nil {
@@ -291,7 +287,6 @@ func reorgTestForced(t *testing.T) {
 		if err != nil {
 			t.Fatalf("NewBlockFromBytes error: %v", err.Error())
 		}
-		bl.SetHeight(int64(i))
 		if i == finalIdx1 {
 			oldBestHash = bl.Hash()
 		}
@@ -328,7 +323,6 @@ func reorgTestForced(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewBlockFromBytes error: %v", err.Error())
 	}
-	forkBl.SetHeight(forkPoint)
 
 	_, _, err = chain.ProcessBlock(forkBl, blockchain.BFNone)
 	if err != nil {

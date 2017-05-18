@@ -1587,10 +1587,10 @@ func (b *BlockChain) HeaderByHeight(height int64) (*wire.BlockHeader, error) {
 // block for the provided hash, deserialize it, retrieve the appropriate height
 // from the index, and return a dcrutil.Block with the height set.
 func dbFetchBlockByHash(dbTx database.Tx, hash *chainhash.Hash) (*dcrutil.Block, error) {
-	// First find the height associated with the provided hash in the index.
-	blockHeight, err := dbFetchHeightByHash(dbTx, hash)
-	if err != nil {
-		return nil, err
+	// Check if the block is in the main chain.
+	if !dbMainChainHasBlock(dbTx, hash) {
+		str := fmt.Sprintf("block %s is not in the main chain", hash)
+		return nil, errNotInMainChain(str)
 	}
 
 	// Load the raw block bytes from the database.
@@ -1604,7 +1604,6 @@ func dbFetchBlockByHash(dbTx database.Tx, hash *chainhash.Hash) (*dcrutil.Block,
 	if err != nil {
 		return nil, err
 	}
-	block.SetHeight(blockHeight)
 
 	return block, nil
 }
@@ -1630,7 +1629,6 @@ func dbFetchBlockByHeight(dbTx database.Tx, height int64) (*dcrutil.Block, error
 	if err != nil {
 		return nil, err
 	}
-	block.SetHeight(height)
 
 	return block, nil
 }

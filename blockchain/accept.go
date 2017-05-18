@@ -247,13 +247,7 @@ func (b *BlockChain) maybeAcceptBlock(block *dcrutil.Block,
 		return false, err
 	}
 
-	// The height of this block is one more than the referenced previous
-	// block.
-	blockHeight := int64(0)
-	if prevNode != nil {
-		blockHeight = prevNode.height + 1
-	}
-	block.SetHeight(blockHeight)
+	blockHeight := block.Height()
 
 	// The block must pass all of the validation rules which depend on the
 	// position of the block within the block chain.

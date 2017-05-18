@@ -133,11 +133,6 @@ func (m *CPUMiner) submitBlock(block *dcrutil.Block) bool {
 	m.submitBlockLock.Lock()
 	defer m.submitBlockLock.Unlock()
 
-	_, latestHeight := m.server.blockManager.chainState.Best()
-
-	// Be sure to set this so ProcessBlock doesn't fail! - Decred
-	block.SetHeight(latestHeight + 1)
-
 	// Process this block using the same rules as blocks coming from other
 	// nodes. This will in turn relay it to the network like normal.
 	isOrphan, err := m.server.blockManager.ProcessBlock(block, blockchain.BFNone)
