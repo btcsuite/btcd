@@ -220,7 +220,6 @@ var MainNetParams = Params{
 		{"dnsseed.bitcoin.dashjr.org", false},
 		{"seed.bitcoinstats.com", true},
 		{"seed.bitnodes.io", false},
-		{"bitseed.xf2.org", false},
 		{"seed.bitcoin.jonasschnelli.ch", true},
 	},
 
