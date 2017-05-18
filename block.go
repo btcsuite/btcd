@@ -295,6 +295,14 @@ func (b *Block) TxLoc() ([]wire.TxLoc, []wire.TxLoc, error) {
 	return txLocs, sTxLocs, err
 }
 
+// Height returns a casted int64 height from the block header.
+//
+// This function should not be used for new code and will be
+// removed in the future.
+func (b *Block) Height() int64 {
+	return int64(b.msgBlock.Header.Height)
+}
+
 // NewBlock returns a new instance of a block given an underlying
 // wire.MsgBlock.  See Block.
 func NewBlock(msgBlock *wire.MsgBlock) *Block {
