@@ -471,8 +471,6 @@ func NewAddressSecpPubKey(serializedPubKey []byte,
 		pkFormat = PKFHybrid
 	}
 
-	pkFormat = PKFCompressed
-
 	return &AddressSecpPubKey{
 		net:          net,
 		pubKeyFormat: pkFormat,
