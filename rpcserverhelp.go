@@ -338,6 +338,17 @@ var helpDescsEnUS = map[string]string{
 	"getblockheaderverboseresult-stakeroot":         "The merkle root of the stake transaction tree",
 	"getblockheaderverboseresult-stakeversion":      "The stake version of the block",
 
+	// GetBlockSubsidyCmd help.
+	"getblocksubsidy--synopsis": "Returns information regarding subsidy amounts.",
+	"getblocksubsidy-height":    "The block height",
+	"getblocksubsidy-voters":    "The number of voters",
+
+	// GetBlockSubsidyResult help.
+	"getblocksubsidyresult-developer": "The developer subsidy",
+	"getblocksubsidyresult-pos":       "The Proof-of-Stake subsidy",
+	"getblocksubsidyresult-pow":       "The Proof-of-Work subsidy",
+	"getblocksubsidyresult-total":     "The total subsidy",
+
 	// TemplateRequest help.
 	"templaterequest-mode":         "This is 'template', 'proposal', or omitted",
 	"templaterequest-capabilities": "List of capabilities",
@@ -897,6 +908,7 @@ var rpcResultTypes = map[string][]interface{}{
 	"getblockcount":         {(*int64)(nil)},
 	"getblockhash":          {(*string)(nil)},
 	"getblockheader":        {(*string)(nil), (*dcrjson.GetBlockHeaderVerboseResult)(nil)},
+	"getblocksubsidy":       {(*dcrjson.GetBlockSubsidyResult)(nil)},
 	"getblocktemplate":      {(*dcrjson.GetBlockTemplateResult)(nil), (*string)(nil), nil},
 	"getconnectioncount":    {(*int32)(nil)},
 	"getcurrentnet":         {(*uint32)(nil)},

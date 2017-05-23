@@ -200,6 +200,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"getblockcount":         handleGetBlockCount,
 	"getblockhash":          handleGetBlockHash,
 	"getblockheader":        handleGetBlockHeader,
+	"getblocksubsidy":       handleGetBlockSubsidy,
 	"getcoinsupply":         handleGetCoinSupply,
 	"getconnectioncount":    handleGetConnectionCount,
 	"getcurrentnet":         handleGetCurrentNet,
@@ -2126,6 +2127,36 @@ func handleGetBlockHeader(s *rpcServer, cmd interface{}, closeChan <-chan struct
 
 	return blockHeaderReply, nil
 
+}
+
+// handleGetBlockSubsidy implements the getblocksubsidy command.
+func handleGetBlockSubsidy(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	c := cmd.(*dcrjson.GetBlockSubsidyCmd)
+
+	height := c.Height
+	voters := c.Voters
+
+	cache := s.chain.FetchSubsidyCache()
+	if cache == nil {
+		return nil, rpcInternalError("empty subsidy cache", "")
+	}
+
+	dev := blockchain.CalcBlockTaxSubsidy(cache, height, voters,
+		s.server.chainParams)
+	pos := blockchain.CalcStakeVoteSubsidy(cache, height,
+		s.server.chainParams) * int64(voters)
+	pow := blockchain.CalcBlockWorkSubsidy(cache, height, voters,
+		s.server.chainParams)
+	total := dev + pos + pow
+
+	rep := dcrjson.GetBlockSubsidyResult{
+		Developer: dev,
+		PoS:       pos,
+		PoW:       pow,
+		Total:     total,
+	}
+
+	return rep, nil
 }
 
 // encodeTemplateID encodes the passed details into an ID that can be used to

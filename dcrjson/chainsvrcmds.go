@@ -206,6 +206,21 @@ func NewGetBlockHeaderCmd(hash string, verbose *bool) *GetBlockHeaderCmd {
 	}
 }
 
+// GetBlockSubsidyCmd defines the getblocksubsidy JSON-RPC command.
+type GetBlockSubsidyCmd struct {
+	Height int64
+	Voters uint16
+}
+
+// NewGetBlockSubsidyCmd returns a new instance which can be used to issue a
+// getblocksubsidy JSON-RPC command.
+func NewGetBlockSubsidyCmd(height int64, voters uint16) *GetBlockSubsidyCmd {
+	return &GetBlockSubsidyCmd{
+		Height: height,
+		Voters: voters,
+	}
+}
+
 // TemplateRequest is a request object as defined in BIP22
 // (https://en.bitcoin.it/wiki/BIP_0022), it is optionally provided as an
 // pointer argument to GetBlockTemplateCmd.
@@ -775,6 +790,7 @@ func init() {
 	MustRegisterCmd("getblockcount", (*GetBlockCountCmd)(nil), flags)
 	MustRegisterCmd("getblockhash", (*GetBlockHashCmd)(nil), flags)
 	MustRegisterCmd("getblockheader", (*GetBlockHeaderCmd)(nil), flags)
+	MustRegisterCmd("getblocksubsidy", (*GetBlockSubsidyCmd)(nil), flags)
 	MustRegisterCmd("getblocktemplate", (*GetBlockTemplateCmd)(nil), flags)
 	MustRegisterCmd("getchaintips", (*GetChainTipsCmd)(nil), flags)
 	MustRegisterCmd("getconnectioncount", (*GetConnectionCountCmd)(nil), flags)

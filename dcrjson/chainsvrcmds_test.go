@@ -235,6 +235,20 @@ func TestChainSvrCmds(t *testing.T) {
 			},
 		},
 		{
+			name: "getblocksubsidy",
+			newCmd: func() (interface{}, error) {
+				return dcrjson.NewCmd("getblocksubsidy", 123, 256)
+			},
+			staticCmd: func() interface{} {
+				return dcrjson.NewGetBlockSubsidyCmd(123, 256)
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"getblocksubsidy","params":[123,256],"id":1}`,
+			unmarshalled: &dcrjson.GetBlockSubsidyCmd{
+				Height: 123,
+				Voters: 256,
+			},
+		},
+		{
 			name: "getblocktemplate",
 			newCmd: func() (interface{}, error) {
 				return dcrjson.NewCmd("getblocktemplate")
