@@ -429,8 +429,7 @@ nextTest:
 					FreshStake: ticketInfo.newTickets,
 					PoolSize:   poolSize,
 				}
-				hash := header.BlockHash()
-				node := newBlockNode(header, &hash,
+				node := newBlockNode(header,
 					int64(nextHeight), nil, nil, nil)
 				node.parent = bc.bestNode
 
@@ -733,8 +732,7 @@ nextTest:
 					FreshStake: ticketInfo.newTickets,
 					PoolSize:   poolSize,
 				}
-				hash := header.BlockHash()
-				node := newBlockNode(header, &hash,
+				node := newBlockNode(header,
 					int64(nextHeight), nil, nil, nil)
 				node.parent = bc.bestNode
 

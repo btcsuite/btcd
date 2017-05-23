@@ -2015,7 +2015,7 @@ func TestCheckBlockHeaderContext(t *testing.T) {
 	// Test failing checkBlockHeaderContext when calcNextRequiredDifficulty
 	// fails.
 	block := dcrutil.NewBlock(&badBlock)
-	newNode := blockchain.TstNewBlockNode(&block.MsgBlock().Header, block.Hash(),
+	newNode := blockchain.TstNewBlockNode(&block.MsgBlock().Header,
 		block.Height(), nil, nil, nil)
 	err = chain.TstCheckBlockHeaderContext(&block.MsgBlock().Header, newNode, blockchain.BFNone)
 	if err == nil {

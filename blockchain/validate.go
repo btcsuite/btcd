@@ -2506,7 +2506,7 @@ func (b *BlockChain) CheckConnectBlock(block *dcrutil.Block) error {
 		return ruleError(ErrMissingParent, err.Error())
 	}
 
-	newNode := newBlockNode(&block.MsgBlock().Header, block.Hash(),
+	newNode := newBlockNode(&block.MsgBlock().Header,
 		block.Height(), ticketsSpentInBlock(block),
 		ticketsRevokedInBlock(block),
 		voteBitsInBlock(block))
