@@ -2507,7 +2507,7 @@ func (b *BlockChain) CheckConnectBlock(block *dcrutil.Block) error {
 	}
 
 	newNode := newBlockNode(&block.MsgBlock().Header,
-		block.Height(), ticketsSpentInBlock(block),
+		ticketsSpentInBlock(block),
 		ticketsRevokedInBlock(block),
 		voteBitsInBlock(block))
 	newNode.parent = prevNode

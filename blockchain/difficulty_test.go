@@ -430,7 +430,7 @@ nextTest:
 					PoolSize:   poolSize,
 				}
 				node := newBlockNode(header,
-					int64(nextHeight), nil, nil, nil)
+					nil, nil, nil)
 				node.parent = bc.bestNode
 
 				// Update the pool size for the next header.
@@ -733,7 +733,7 @@ nextTest:
 					PoolSize:   poolSize,
 				}
 				node := newBlockNode(header,
-					int64(nextHeight), nil, nil, nil)
+					nil, nil, nil)
 				node.parent = bc.bestNode
 
 				// Update the pool size for the next header.

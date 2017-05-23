@@ -2016,7 +2016,7 @@ func TestCheckBlockHeaderContext(t *testing.T) {
 	// fails.
 	block := dcrutil.NewBlock(&badBlock)
 	newNode := blockchain.TstNewBlockNode(&block.MsgBlock().Header,
-		block.Height(), nil, nil, nil)
+		nil, nil, nil)
 	err = chain.TstCheckBlockHeaderContext(&block.MsgBlock().Header, newNode, blockchain.BFNone)
 	if err == nil {
 		t.Fatalf("Should fail due to bad diff in newNode\n")

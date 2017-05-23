@@ -35,7 +35,7 @@ func genesisBlockNode(params *chaincfg.Params) *blockNode {
 	// Create a new node from the genesis block.
 	genesisBlock := dcrutil.NewBlock(params.GenesisBlock)
 	header := &genesisBlock.MsgBlock().Header
-	node := newBlockNode(header, 0, nil, nil, nil)
+	node := newBlockNode(header, nil, nil, nil)
 	node.inMainChain = true
 
 	return node
@@ -125,7 +125,7 @@ func newFakeNode(blockVersion int32, height int64, currentNode *blockNode) *bloc
 		Height:  uint32(height),
 		Nonce:   0,
 	}
-	node := newBlockNode(header, 0, nil, nil, nil)
+	node := newBlockNode(header, nil, nil, nil)
 	node.height = height
 	node.parent = currentNode
 
@@ -439,7 +439,7 @@ func TestCalcStakeVersionByNode(t *testing.T) {
 				Height:  uint32(i),
 				Nonce:   uint32(0),
 			}
-			node := newBlockNode(header, 0, nil, nil, nil)
+			node := newBlockNode(header, nil, nil, nil)
 			node.height = i
 			node.parent = currentNode
 
@@ -822,7 +822,7 @@ func TestIsStakeMajorityVersion(t *testing.T) {
 				Nonce:        uint32(0),
 				StakeVersion: test.startStakeVersion,
 			}
-			node := newBlockNode(header, 0, nil, nil, nil)
+			node := newBlockNode(header, nil, nil, nil)
 			node.height = i
 			node.parent = currentNode
 
@@ -909,9 +909,7 @@ func TestLarge(t *testing.T) {
 				Nonce:        uint32(0),
 				StakeVersion: test.startStakeVersion,
 			}
-			node := newBlockNode(header, 0,
-				[]chainhash.Hash{}, []chainhash.Hash{},
-				[]VoteVersionTuple{})
+			node := newBlockNode(header, nil, nil, nil)
 			node.height = i
 			node.parent = currentNode
 
