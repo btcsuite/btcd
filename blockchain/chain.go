@@ -1029,29 +1029,14 @@ func (b *BlockChain) pruneNodes() error {
 	return b.pruneBlockNodes()
 }
 
-// BestBlockHeader returns a copy of the block header of the block at HEAD.
+// BestPrevHash returns the hash of the previous block of the block at HEAD.
 //
-// This function is NOT safe for concurrent access.
-func (b *BlockChain) BestBlockHeader() *wire.BlockHeader {
-	return wire.NewBlockHeader(
-		b.bestNode.header.Version,
-		&b.bestNode.header.PrevBlock,
-		&b.bestNode.header.MerkleRoot,
-		&b.bestNode.header.StakeRoot,
-		b.bestNode.header.VoteBits,
-		b.bestNode.header.FinalState,
-		b.bestNode.header.Voters,
-		b.bestNode.header.FreshStake,
-		b.bestNode.header.Revocations,
-		b.bestNode.header.PoolSize,
-		b.bestNode.header.Bits,
-		b.bestNode.header.SBits,
-		b.bestNode.header.Height,
-		b.bestNode.header.Size,
-		b.bestNode.header.Nonce,
-		b.bestNode.header.ExtraData,
-		b.bestNode.header.StakeVersion,
-	)
+// This function is safe for concurrent access.
+func (b *BlockChain) BestPrevHash() chainhash.Hash {
+	b.chainLock.Lock()
+	defer b.chainLock.Unlock()
+
+	return b.bestNode.header.PrevBlock
 }
 
 // isMajorityVersion determines if a previous number of blocks in the chain

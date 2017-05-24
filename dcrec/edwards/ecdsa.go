@@ -8,11 +8,11 @@ import (
 	"bytes"
 	"crypto/hmac"
 	"crypto/sha256"
+	"crypto/sha512"
 	"fmt"
 	"hash"
 	"io"
 	"math/big"
-	"crypto/sha512"
 
 	"github.com/agl/ed25519"
 	"github.com/agl/ed25519/edwards25519"

@@ -871,9 +871,9 @@ func handleTooFewVoters(subsidyCache *blockchain.SubsidyCache,
 	// Check to see if we've fallen off the chain, for example if a
 	// reorganization had recently occurred. If this is the case,
 	// nuke the templates.
-	bestHeader := chainState.GetTopBlockHeader()
+	prevBlockHash := chainState.GetTopPrevHash()
 	if curTemplate != nil {
-		if !bestHeader.PrevBlock.IsEqual(
+		if !prevBlockHash.IsEqual(
 			&curTemplate.Block.Header.PrevBlock) {
 			minrLog.Debugf("Cached mining templates are no longer current, " +
 				"resetting")

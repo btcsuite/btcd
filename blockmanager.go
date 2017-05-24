@@ -359,7 +359,7 @@ type chainState struct {
 	nextStakeDifficulty int64
 	winningTickets      []chainhash.Hash
 	missedTickets       []chainhash.Hash
-	curBlockHeader      wire.BlockHeader
+	curPrevHash         chainhash.Hash
 	pastMedianTime      time.Time
 	pastMedianTimeErr   error
 	stakeVersion        uint32
@@ -415,15 +415,14 @@ func (c *chainState) CurrentlyMissed() []chainhash.Hash {
 	return c.missedTickets
 }
 
-// CurrentlyMissed returns the eligible SStx hashes to vote on the
-// next block as inputs for SSGen.
+// GetTopPrevHash returns the current previous block hash.
 //
 // This function is safe for concurrent access.
-func (c *chainState) GetTopBlockHeader() wire.BlockHeader {
+func (c *chainState) GetTopPrevHash() chainhash.Hash {
 	c.Lock()
 	defer c.Unlock()
 
-	return c.curBlockHeader
+	return c.curPrevHash
 }
 
 // blockManager provides a concurrency safe block manager for handling all
@@ -490,7 +489,7 @@ func (b *blockManager) resetHeaderState(newestHash *chainhash.Hash, newestHeight
 func (b *blockManager) updateChainState(newestHash *chainhash.Hash,
 	newestHeight int64, finalState [6]byte, poolSize uint32,
 	nextStakeDiff int64, winningTickets []chainhash.Hash,
-	missedTickets []chainhash.Hash, curBlockHeader wire.BlockHeader) {
+	missedTickets []chainhash.Hash, curPrevHash chainhash.Hash) {
 
 	b.chainState.Lock()
 	defer b.chainState.Unlock()
@@ -509,7 +508,7 @@ func (b *blockManager) updateChainState(newestHash *chainhash.Hash,
 	b.chainState.nextStakeDifficulty = nextStakeDiff
 	b.chainState.winningTickets = winningTickets
 	b.chainState.missedTickets = missedTickets
-	b.chainState.curBlockHeader = curBlockHeader
+	b.chainState.curPrevHash = curPrevHash
 }
 
 // findNextHeaderCheckpoint returns the next checkpoint after the passed height.
@@ -1228,8 +1227,8 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 					"for best block %v: %v", best.Hash, err)
 			}
 
-			// Retrieve the current block header.
-			curBlockHeader := b.chain.BestBlockHeader()
+			// Retrieve the current previous block hash.
+			curPrevHash := b.chain.BestPrevHash()
 
 			nextStakeDiff, errSDiff :=
 				b.chain.CalcNextRequiredStakeDifficulty()
@@ -1260,7 +1259,7 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 
 			b.updateChainState(best.Hash, best.Height, finalState,
 				uint32(poolSize), nextStakeDiff, winningTickets,
-				missedTickets, *curBlockHeader)
+				missedTickets, curPrevHash)
 
 			// Update this peer's latest block height, for future
 			// potential sync node candidancy.
@@ -1829,7 +1828,7 @@ out:
 					// The blockchain should be updated, so fetch the
 					// latest snapshot.
 					best = b.chain.BestSnapshot()
-					curBlockHeader := b.chain.BestBlockHeader()
+					curPrevHash := b.chain.BestPrevHash()
 
 					b.updateChainState(best.Hash,
 						best.Height,
@@ -1838,7 +1837,7 @@ out:
 						nextStakeDiff,
 						winningTickets,
 						missedTickets,
-						*curBlockHeader)
+						curPrevHash)
 				}
 
 				msg.reply <- forceReorganizationResponse{
@@ -1961,7 +1960,7 @@ out:
 						bmgrLog.Warnf("Failed to get missing tickets for "+
 							"incoming block %v: %v", best.Hash, err)
 					}
-					curBlockHeader := b.chain.BestBlockHeader()
+					curPrevHash := b.chain.BestPrevHash()
 
 					winningTickets, poolSize, finalState, err :=
 						b.chain.LotteryDataForBlock(msg.block.Hash())
@@ -1978,7 +1977,7 @@ out:
 						nextStakeDiff,
 						winningTickets,
 						missedTickets,
-						*curBlockHeader)
+						curPrevHash)
 				}
 
 				// Allow any clients performing long polling via the
@@ -2726,8 +2725,8 @@ func newBlockManager(s *server, indexManager blockchain.IndexManager) (*blockMan
 		return nil, err
 	}
 
-	// Retrieve the current block header and next stake difficulty.
-	curBlockHeader := bm.chain.BestBlockHeader()
+	// Retrieve the current previous block hash and next stake difficulty.
+	curPrevHash := bm.chain.BestPrevHash()
 	nextStakeDiff, err := bm.chain.CalcNextRequiredStakeDifficulty()
 	if err != nil {
 		return nil, err
@@ -2740,7 +2739,7 @@ func newBlockManager(s *server, indexManager blockchain.IndexManager) (*blockMan
 		nextStakeDiff,
 		wt,
 		missedTickets,
-		*curBlockHeader)
+		curPrevHash)
 	bm.lotteryDataBroadcast = make(map[chainhash.Hash]struct{})
 
 	return &bm, nil
