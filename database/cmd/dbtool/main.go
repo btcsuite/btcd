@@ -61,11 +61,11 @@ func loadBlockDB() (database.DB, error) {
 // around the fact that deferred functions do not run when os.Exit() is called.
 func realMain() error {
 	// Setup logging.
-	backendLogger := btclog.NewDefaultBackendLogger()
-	defer backendLogger.Flush()
-	log = btclog.NewSubsystemLogger(backendLogger, "")
-	dbLog := btclog.NewSubsystemLogger(backendLogger, "BCDB: ")
-	dbLog.SetLevel(btclog.DebugLvl)
+	backendLogger := btclog.NewBackend(os.Stdout)
+	defer os.Stdout.Sync()
+	log = backendLogger.Logger("MAIN")
+	dbLog := backendLogger.Logger("BCDB")
+	dbLog.SetLevel(btclog.LevelDebug)
 	database.UseLogger(dbLog)
 
 	// Setup the parser options and commands.

@@ -676,7 +676,7 @@ func (s *blockStore) handleRollback(oldBlockFileNum, oldBlockOffset uint32) {
 	}
 	for ; wc.curFileNum > oldBlockFileNum; wc.curFileNum-- {
 		if err := s.deleteFileFunc(wc.curFileNum); err != nil {
-			_ = log.Warnf("ROLLBACK: Failed to delete block file "+
+			log.Warnf("ROLLBACK: Failed to delete block file "+
 				"number %d: %v", wc.curFileNum, err)
 			return
 		}
@@ -688,7 +688,7 @@ func (s *blockStore) handleRollback(oldBlockFileNum, oldBlockOffset uint32) {
 		obf, err := s.openWriteFileFunc(wc.curFileNum)
 		if err != nil {
 			wc.curFile.Unlock()
-			_ = log.Warnf("ROLLBACK: %v", err)
+			log.Warnf("ROLLBACK: %v", err)
 			return
 		}
 		wc.curFile.file = obf
@@ -697,7 +697,7 @@ func (s *blockStore) handleRollback(oldBlockFileNum, oldBlockOffset uint32) {
 	// Truncate the to the provided rollback offset.
 	if err := wc.curFile.file.Truncate(int64(oldBlockOffset)); err != nil {
 		wc.curFile.Unlock()
-		_ = log.Warnf("ROLLBACK: Failed to truncate file %d: %v",
+		log.Warnf("ROLLBACK: Failed to truncate file %d: %v",
 			wc.curFileNum, err)
 		return
 	}
@@ -706,7 +706,7 @@ func (s *blockStore) handleRollback(oldBlockFileNum, oldBlockOffset uint32) {
 	err := wc.curFile.file.Sync()
 	wc.curFile.Unlock()
 	if err != nil {
-		_ = log.Warnf("ROLLBACK: Failed to sync file %d: %v",
+		log.Warnf("ROLLBACK: Failed to sync file %d: %v",
 			wc.curFileNum, err)
 		return
 	}

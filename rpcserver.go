@@ -2039,11 +2039,11 @@ func handleGetBlockTemplateProposal(s *rpcServer, request *btcjson.TemplateReque
 	isOrphan, err := s.server.blockManager.ProcessBlock(block, flags)
 	if err != nil {
 		if _, ok := err.(blockchain.RuleError); !ok {
-			err := rpcsLog.Errorf("Failed to process block "+
-				"proposal: %v", err)
+			errStr := fmt.Sprintf("Failed to process block proposal: %v", err)
+			rpcsLog.Error(errStr)
 			return nil, &btcjson.RPCError{
 				Code:    btcjson.ErrRPCVerify,
-				Message: err.Error(),
+				Message: errStr,
 			}
 		}
 
