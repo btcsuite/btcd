@@ -337,8 +337,8 @@ func LoadBestNode(dbTx database.Tx, height uint32, blockHash chainhash.Hash, hea
 			return nil, err
 		}
 		prng := NewHash256PRNG(hB)
-		_, err = findTicketIdxs(int64(node.liveTickets.Len()),
-			int(node.params.TicketsPerBlock), prng)
+		_, err = findTicketIdxs(node.liveTickets.Len(),
+			node.params.TicketsPerBlock, prng)
 		if err != nil {
 			return nil, err
 		}
@@ -607,8 +607,8 @@ func connectNode(node *Node, header wire.BlockHeader, ticketsSpentInBlock, revok
 			return nil, err
 		}
 		prng := NewHash256PRNG(hB)
-		idxs, err := findTicketIdxs(int64(connectedNode.liveTickets.Len()),
-			int(connectedNode.params.TicketsPerBlock), prng)
+		idxs, err := findTicketIdxs(connectedNode.liveTickets.Len(),
+			connectedNode.params.TicketsPerBlock, prng)
 		if err != nil {
 			return nil, err
 		}
@@ -784,8 +784,8 @@ func disconnectNode(node *Node, parentHeader wire.BlockHeader, parentUtds UndoTi
 			return nil, err
 		}
 		prng := NewHash256PRNG(phB)
-		_, err = findTicketIdxs(int64(restoredNode.liveTickets.Len()),
-			int(node.params.TicketsPerBlock), prng)
+		_, err = findTicketIdxs(restoredNode.liveTickets.Len(),
+			node.params.TicketsPerBlock, prng)
 		if err != nil {
 			return nil, err
 		}

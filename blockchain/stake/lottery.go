@@ -130,9 +130,10 @@ func intInSlice(i int, sl []int) bool {
 }
 
 // findTicketIdxs finds n many unique index numbers for a list length size.
-func findTicketIdxs(size int64, n int, prng *Hash256PRNG) ([]int, error) {
-	if size < int64(n) {
-		return nil, fmt.Errorf("list size too small")
+func findTicketIdxs(size int, n uint16, prng *Hash256PRNG) ([]int, error) {
+	if size < int(n) {
+		return nil, fmt.Errorf("list size too small: %v < %v",
+			size, n)
 	}
 
 	if size > 0xFFFFFFFF {
@@ -141,7 +142,7 @@ func findTicketIdxs(size int64, n int, prng *Hash256PRNG) ([]int, error) {
 	sz := uint32(size)
 
 	var list []int
-	listLen := 0
+	var listLen uint16
 	for listLen < n {
 		r := int(prng.uniformRandom(sz))
 		if !intInSlice(r, list) {
@@ -154,7 +155,7 @@ func findTicketIdxs(size int64, n int, prng *Hash256PRNG) ([]int, error) {
 }
 
 // FindTicketIdxs is the exported version of findTicketIdxs used for testing.
-func FindTicketIdxs(size int64, n int, prng *Hash256PRNG) ([]int, error) {
+func FindTicketIdxs(size int, n uint16, prng *Hash256PRNG) ([]int, error) {
 	return findTicketIdxs(size, n, prng)
 }
 

@@ -81,10 +81,10 @@ func TestLotteryNumSelection(t *testing.T) {
 	// Test finding ticket indexes.
 	seed := chainhash.HashB([]byte{0x01})
 	prng := NewHash256PRNG(seed)
-	ticketsInPool := int64(56789)
-	tooFewTickets := int64(4)
-	justEnoughTickets := int64(5)
-	ticketsPerBlock := 5
+	ticketsInPool := 56789
+	tooFewTickets := 4
+	justEnoughTickets := 5
+	ticketsPerBlock := uint16(5)
 
 	_, err := FindTicketIdxs(tooFewTickets, ticketsPerBlock, prng)
 	if err == nil {
