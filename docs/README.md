@@ -214,6 +214,7 @@ configuration necessary, however, there is an optional method to use a
 **3.1.1 bootstrap.dat**
 
 * [Using bootstrap.dat](https://github.com/btcsuite/btcd/tree/master/docs/using_bootstrap_dat.md)
+
 <a name="NetworkConfig" />
 
 **3.1.2 Network Configuration**
