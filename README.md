@@ -1,10 +1,9 @@
 btcrpcclient
 ============
 
-[![Build Status](https://travis-ci.org/btcsuite/btcrpcclient.png?branch=master)]
-(https://travis-ci.org/btcsuite/btcrpcclient)
-[![GoDoc](https://godoc.org/github.com/btcsuite/btcrpcclient?status.png)]
-(http://godoc.org/github.com/btcsuite/btcrpcclient)
+[![Build Status](http://img.shields.io/travis/btcsuite/btcrpcclient.svg)](https://travis-ci.org/btcsuite/btcrpcclient)
+[![ISC License](http://img.shields.io/badge/license-ISC-blue.svg)](http://copyfree.org)
+[![GoDoc](https://img.shields.io/badge/godoc-reference-blue.svg)](http://godoc.org/github.com/btcsuite/btcrpcclient)
 
 btcrpcclient implements a Websocket-enabled Bitcoin JSON-RPC client package
 written in [Go](http://golang.org/).  It provides a robust and easy to use
