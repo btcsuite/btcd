@@ -1,14 +1,13 @@
+sudo: required
+
 language: go
-go:
-  - 1.7.x
-  - 1.8.x
-sudo: false
-install:
-  - go get github.com/Masterminds/glide
-  - glide install
-  - go install
-  - go get -v github.com/alecthomas/gometalinter
-  - gometalinter --install
+
+services:
+  - docker
+
+env:
+  - GOVERSION = 1.7
+  - GOVERSION = 1.8
+
 script:
-  - export PATH=$PATH:$HOME/gopath/bin
-  - ./goclean.sh
+  - ./run_tests.sh $GOVERSION

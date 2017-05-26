@@ -47,6 +47,20 @@ implement and the API is not stable yet.
 $ go get github.com/decred/dcrrpcclient
 ```
 
+## Docker
+
+All tests and linters may be run in a docker container using the script `run_tests.sh`.  This script defaults to using the current supported version of go.  You can run it with the major version of go you would like to use as the only arguement to test a previous on a previous version of go (generally decred supports the current version of go and the previous one).
+
+```
+./run_tests.sh 1.7
+```
+
+To run the tests locally without docker:
+
+```
+./run_tests.sh local
+```
+
 ## License
 
 Package dcrrpcclient is licensed under the [copyfree](http://copyfree.org) ISC
