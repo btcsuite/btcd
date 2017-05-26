@@ -1,13 +1,11 @@
 dcrutil
 =======
 
-[![Build Status](http://img.shields.io/travis/decred/dcrutil.svg)]
-(https://travis-ci.org/decred/dcrutil) [![Coverage Status]
-(http://img.shields.io/coveralls/decred/dcrutil.svg)]
-(https://coveralls.io/r/decred/dcrutil?branch=master) [![ISC License]
-(http://img.shields.io/badge/license-ISC-blue.svg)](http://copyfree.org)
-[![GoDoc](http://img.shields.io/badge/godoc-reference-blue.svg)]
-(http://godoc.org/github.com/decred/dcrutil)
+
+[![Build Status](http://img.shields.io/travis/decred/dcrutil.svg)](https://travis-ci.org/decred/dcrutil)
+[![Coverage Status](http://img.shields.io/coveralls/decred/dcrutil.svg)](https://coveralls.io/r/decred/dcrutil?branch=master)
+[![ISC License](http://img.shields.io/badge/license-ISC-blue.svg)](http://copyfree.org)
+[![GoDoc](http://img.shields.io/badge/godoc-reference-blue.svg)](http://godoc.org/github.com/decred/dcrutil)
 
 Package dcrutil provides decred-specific convenience functions and types.
 A comprehensive suite of tests is provided to ensure proper functionality.  See

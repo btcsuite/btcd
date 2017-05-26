@@ -1,11 +1,9 @@
 coinset
 =======
 
-[![Build Status](http://img.shields.io/travis/decred/dcrutil.svg)]
-(https://travis-ci.org/decred/dcrutil) [![ISC License]
-(http://img.shields.io/badge/license-ISC-blue.svg)](http://copyfree.org)
-[![GoDoc](http://img.shields.io/badge/godoc-reference-blue.svg)]
-(http://godoc.org/github.com/decred/dcrutil/coinset)
+[![Build Status](http://img.shields.io/travis/decred/dcrutil.svg)](https://travis-ci.org/decred/dcrutil)
+[![ISC License](http://img.shields.io/badge/license-ISC-blue.svg)](http://copyfree.org)
+[![GoDoc](http://img.shields.io/badge/godoc-reference-blue.svg)](http://godoc.org/github.com/decred/dcrutil/coinset)
 
 Package coinset provides decred-specific convenience functions for selecting
 from and managing sets of unspent transaction outpoints (UTXOs).

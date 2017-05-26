@@ -1,11 +1,9 @@
 hdkeychain
 ==========
 
-[![Build Status](http://img.shields.io/travis/decred/dcrutil.svg)]
-(https://travis-ci.org/decred/dcrutil) [![ISC License]
-(http://img.shields.io/badge/license-ISC-blue.svg)](http://copyfree.org)
-[![GoDoc](http://img.shields.io/badge/godoc-reference-blue.svg)]
-(http://godoc.org/github.com/decred/dcrutil/hdkeychain)
+[![Build Status](http://img.shields.io/travis/decred/dcrutil.svg)](https://travis-ci.org/decred/dcrutil)
+[![ISC License](http://img.shields.io/badge/license-ISC-blue.svg)](http://copyfree.org)
+[![GoDoc](http://img.shields.io/badge/godoc-reference-blue.svg)](http://godoc.org/github.com/decred/dcrutil/hdkeychain)
 
 Package hdkeychain provides an API for Decred hierarchical deterministic
 extended keys (based on BIP0032).
@@ -46,16 +44,13 @@ $ go get -u github.com/decred/dcrutil/hdkeychain
 
 ## Examples
 
-* [NewMaster Example]
-  (http://godoc.org/github.com/decred/dcrutil/hdkeychain#example-NewMaster)  
+* [NewMaster Example](http://godoc.org/github.com/decred/dcrutil/hdkeychain#example-NewMaster)  
   Demonstrates how to generate a cryptographically random seed then use it to
   create a new master node (extended key).
-* [Default Wallet Layout Example]
-  (http://godoc.org/github.com/decred/dcrutil/hdkeychain#example-package--DefaultWalletLayout)  
+* [Default Wallet Layout Example](http://godoc.org/github.com/decred/dcrutil/hdkeychain#example-package--DefaultWalletLayout)  
   Demonstrates the default hierarchical deterministic wallet layout as described
   in BIP0032.
-* [Audits Use Case Example]
-  (http://godoc.org/github.com/decred/dcrutil/hdkeychain#example-package--Audits)  
+* [Audits Use Case Example](http://godoc.org/github.com/decred/dcrutil/hdkeychain#example-package--Audits)  
   Demonstrates the audits use case in BIP0032.
 
 ## License
