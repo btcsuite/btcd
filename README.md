@@ -1,9 +1,9 @@
 dcrd
 ====
 
-[![Build Status](http://img.shields.io/travis/decred/dcrd.svg)]
-(https://travis-ci.org/decred/dcrd) [![ISC License]
-(http://img.shields.io/badge/license-ISC-blue.svg)](http://copyfree.org)
+[![Build Status](https://travis-ci.org/decred/dcrd.png?branch=master)](https://travis-ci.org/decred/dcrd)
+[![ISC License](http://img.shields.io/badge/license-ISC-blue.svg)](http://copyfree.org)
+[![GoDoc](https://img.shields.io/badge/godoc-reference-blue.svg)](http://godoc.org/github.com/decred/dcrd)
 
 dcrd is a Decred full node implementation written in Go (golang).
 

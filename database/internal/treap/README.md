@@ -1,8 +1,9 @@
 treap
 =====
 
-[![Build Status](https://travis-ci.org/decred/dcrd.png?branch=master)]
-(https://travis-ci.org/decred/dcrd)
+[![Build Status](http://img.shields.io/travis/decred/dcrd.svg)](https://travis-ci.org/decred/dcrd)
+[![ISC License](http://img.shields.io/badge/license-ISC-blue.svg)](http://copyfree.org)
+[![GoDoc](https://img.shields.io/badge/godoc-reference-blue.svg)](http://godoc.org/github.com/decred/dcrd/database/internal/treap)
 
 Package treap implements a treap data structure that is used to hold ordered
 key/value pairs using a combination of binary search tree and heap semantics.
@@ -31,19 +32,6 @@ Package treap is licensed under the copyfree ISC license.
 
 This package is only used internally in the database code and as such is not
 available for use outside of it.
-
-## Documentation
-
-[![GoDoc](https://godoc.org/github.com/decred/dcrd/database2/internal/treap?status.png)]
-(http://godoc.org/github.com/decred/dcrd/database/internal/treap)
-
-Full `go doc` style documentation for the project can be viewed online without
-installing this package by using the GoDoc site here:
-http://godoc.org/github.com/decred/dcrd/database2/internal/treap
-
-You can also view the documentation locally once the package is installed with
-the `godoc` tool by running `godoc -http=":6060"` and pointing your browser to
-http://localhost:6060/pkg/github.com/decred/dcrd/database2/internal/treap
 
 ## License
 

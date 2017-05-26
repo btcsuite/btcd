@@ -1,8 +1,9 @@
 indexers
 ========
 
-[![Build Status](https://travis-ci.org/btcsuite/btcd.png?branch=master)]
-(https://travis-ci.org/btcsuite/btcd)
+[![Build Status](https://travis-ci.org/decred/dcrd.png?branch=master)](https://travis-ci.org/decred/dcrd)
+[![ISC License](http://img.shields.io/badge/license-ISC-blue.svg)](http://copyfree.org)
+[![GoDoc](https://godoc.org/github.com/decred/dcrd/blockchain/indexers?status.png)](http://godoc.org/github.com/decred/dcrd/blockchain/indexers)
 
 Package indexers implements optional block chain indexes.
 
@@ -22,19 +23,6 @@ via an RPC interface.
   - Stores a key with an empty value for every address that has ever existed 
     and was seen by the client
   - Requires the transaction-by-hash index
-
-## Documentation
-
-[![GoDoc](https://godoc.org/github.com/decred/dcrd/blockchain/indexers?status.png)]
-(http://godoc.org/github.com/decred/dcrd/blockchain/indexers)
-
-Full `go doc` style documentation for the project can be viewed online without
-installing this package by using the GoDoc site here:
-http://godoc.org/github.com/btcsuite/btcd/blockchain/indexers
-
-You can also view the documentation locally once the package is installed with
-the `godoc` tool by running `godoc -http=":6060"` and pointing your browser to
-http://localhost:6060/pkg/github.com/decred/dcrd/blockchain/indexers
 
 ## Installation
 
