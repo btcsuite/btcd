@@ -1,19 +1,13 @@
-dist: trusty
+sudo: required
+
 language: go
-go:
-  - 1.7.x
-  - 1.8.x
-sudo: false
-before_install:
-  - GLIDE_TAG=v0.12.3
-  - GLIDE_DOWNLOAD="https://github.com/Masterminds/glide/releases/download/$GLIDE_TAG/glide-$GLIDE_TAG-linux-amd64.tar.gz"
-  - curl -L $GLIDE_DOWNLOAD | tar -xvz
-  - export PATH=$PATH:$PWD/linux-amd64/
-  - glide install
-  - go get -v github.com/alecthomas/gometalinter
-  - gometalinter --install
-install:
-  - go install $(glide nv)
+
+services:
+  - docker
+
+env:
+  - GOVERSION = 1.7
+  - GOVERSION = 1.8
+
 script:
-  - export PATH=$PATH:$HOME/gopath/bin
-  - ./goclean.sh
+  - ./run_tests.sh $GOVERSION
