@@ -638,7 +638,7 @@ func checkSerializedHeight(coinbaseTx *btcutil.Tx, wantHeight int32) error {
 	return nil
 }
 
-// checkBlockHeaderContext peforms several validation checks on the block header
+// checkBlockHeaderContext performs several validation checks on the block header
 // which depend on its position within the block chain.
 //
 // The flags modify the behavior of this function as follows:

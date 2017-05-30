@@ -791,7 +791,7 @@ func (sp *serverPeer) enforceNodeBloomFlag(cmd string) bool {
 		if sp.ProtocolVersion() >= wire.BIP0111Version &&
 			!cfg.DisableBanning {
 
-			// Disonnect the peer regardless of whether it was
+			// Disconnect the peer regardless of whether it was
 			// banned.
 			sp.addBanScore(100, 0, cmd)
 			sp.Disconnect()
@@ -1527,7 +1527,7 @@ func (s *server) handleQuery(state *peerState, querymsg interface{}) {
 		}
 	// Request a list of the persistent (added) peers.
 	case getAddedNodesMsg:
-		// Respond with a slice of the relavent peers.
+		// Respond with a slice of the relevant peers.
 		peers := make([]*serverPeer, 0, len(state.persistentPeers))
 		for _, sp := range state.persistentPeers {
 			peers = append(peers, sp)
@@ -1565,7 +1565,7 @@ func (s *server) handleQuery(state *peerState, querymsg interface{}) {
 	}
 }
 
-// disconnectPeer attempts to drop the connection of a tageted peer in the
+// disconnectPeer attempts to drop the connection of a targeted peer in the
 // passed peer list. Targets are identified via usage of the passed
 // `compareFunc`, which should return `true` if the passed peer is the target
 // peer. This function returns true on success and false if the peer is unable

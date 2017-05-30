@@ -441,7 +441,7 @@ func TestGetBestLocalAddress(t *testing.T) {
 		}
 	}
 	/*
-		// Add a tor generated IP address
+		// Add a Tor generated IP address
 		localAddr = wire.NetAddress{IP: net.ParseIP("fd87:d87e:eb43:25::1")}
 		amgr.AddLocalAddress(&localAddr, addrmgr.ManualPrio)
 

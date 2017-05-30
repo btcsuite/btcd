@@ -88,7 +88,7 @@ var (
 // MessageListeners defines callback function pointers to invoke with message
 // listeners for a peer. Any listener which is not set to a concrete callback
 // during peer initialization is ignored. Execution of multiple message
-// listeners occurs serially, so one callback blocks the excution of the next.
+// listeners occurs serially, so one callback blocks the execution of the next.
 //
 // NOTE: Unless otherwise documented, these listeners must NOT directly call any
 // blocking calls (such as WaitForShutdown) on the peer instance since the input
