@@ -100,14 +100,11 @@ func TorLookupIP(host, proxy string) ([]net.IP, error) {
 	}
 	if buf[1] != 0 {
 		if int(buf[1]) > len(torStatusErrors) {
-			err = ErrTorInvalidProxyResponse
-		} else {
-			err = torStatusErrors[buf[1]]
-			if err == nil {
-				err = ErrTorInvalidProxyResponse
-			}
+			return nil, ErrTorInvalidProxyResponse
+		} else if err := torStatusErrors[buf[1]]; err != nil {
+			return nil, err
 		}
-		return nil, err
+		return nil, ErrTorInvalidProxyResponse
 	}
 	if buf[3] != 1 {
 		err := torStatusErrors[torGeneralError]

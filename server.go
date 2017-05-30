@@ -2260,7 +2260,7 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 					amgrLog.Warnf("Skipping specified external IP: %v", err)
 				}
 			}
-		} else if discover && cfg.Upnp {
+		} else if cfg.Upnp {
 			nat, err = Discover()
 			if err != nil {
 				srvrLog.Warnf("Can't discover upnp: %v", err)

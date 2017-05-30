@@ -38,12 +38,8 @@ func (ka *KnownAddress) LastAttempt() time.Time {
 // attempted and how often attempts to connect to it have failed.
 func (ka *KnownAddress) chance() float64 {
 	now := time.Now()
-	lastSeen := now.Sub(ka.na.Timestamp)
 	lastAttempt := now.Sub(ka.lastattempt)
 
-	if lastSeen < 0 {
-		lastSeen = 0
-	}
 	if lastAttempt < 0 {
 		lastAttempt = 0
 	}

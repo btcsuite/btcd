@@ -362,7 +362,6 @@ func calcSignatureHash(script []parsedOpcode, hashType SigHashType, tx *wire.Msg
 	}
 	if hashType&SigHashAnyOneCanPay != 0 {
 		txCopy.TxIn = txCopy.TxIn[idx : idx+1]
-		idx = 0
 	}
 
 	// The final hash is the double sha256 of both the serialized modified
