@@ -32,31 +32,6 @@ func copyBytes(aB []byte) *[32]byte {
 	return s
 }
 
-// copyBytes64 copies a byte slice to a 64 byte array.
-func copyBytes64(aB []byte) *[64]byte {
-	if aB == nil {
-		return nil
-	}
-
-	s := new([64]byte)
-
-	// If we have a short byte string, expand
-	// it so that it's long enough.
-	aBLen := len(aB)
-	if aBLen < 64 {
-		diff := 64 - aBLen
-		for i := 0; i < diff; i++ {
-			aB = append([]byte{0x00}, aB...)
-		}
-	}
-
-	for i := 0; i < 64; i++ {
-		s[i] = aB[i]
-	}
-
-	return s
-}
-
 // BigIntToEncodedBytes converts a big integer into its corresponding
 // 32 byte little endian representation.
 func BigIntToEncodedBytes(a *big.Int) *[32]byte {

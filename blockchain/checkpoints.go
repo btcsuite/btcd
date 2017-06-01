@@ -19,15 +19,6 @@ import (
 // best block chain that a good checkpoint candidate must be.
 const CheckpointConfirmations = 4096
 
-// newHashFromStr converts the passed big-endian hex string into a
-// chainhash.Hash.  It only differs from the one available in chainhash in that
-// it ignores the error since it will only (and must only) be called with
-// hard-coded, and therefore known good, hashes.
-func newHashFromStr(hexStr string) *chainhash.Hash {
-	hash, _ := chainhash.NewHashFromStr(hexStr)
-	return hash
-}
-
 // DisableCheckpoints provides a mechanism to disable validation against
 // checkpoints which you DO NOT want to do in production.  It is provided only
 // for debug purposes.

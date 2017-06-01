@@ -44,7 +44,6 @@ const (
 	defaultMaxRPCClients         = 10
 	defaultMaxRPCWebsockets      = 25
 	defaultMaxRPCConcurrentReqs  = 20
-	defaultVerifyEnabled         = false
 	defaultDbType                = "ffldb"
 	defaultFreeTxRelayLimit      = 15.0
 	defaultBlockMinSize          = 0
@@ -53,7 +52,6 @@ const (
 	blockMaxSizeMax              = wire.MaxBlockPayload - 1000
 	defaultAddrIndex             = false
 	defaultGenerate              = false
-	defaultNonAggressive         = false
 	defaultNoMiningStateSync     = false
 	defaultAllowOldVotes         = false
 	defaultMaxOrphanTransactions = 1000

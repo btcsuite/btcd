@@ -1839,40 +1839,6 @@ func handleStopNotifyNewTransactions(wsc *wsClient, icmd interface{}) (interface
 	return nil, nil
 }
 
-// checkAddressValidity checks the validity of each address in the passed
-// string slice. It does this by attempting to decode each address using the
-// current active network parameters. If any single address fails to decode
-// properly, the function returns an error. Otherwise, nil is returned.
-func checkAddressValidity(addrs []string) error {
-	for _, addr := range addrs {
-		_, err := dcrutil.DecodeAddress(addr, activeNetParams.Params)
-		if err != nil {
-			return &dcrjson.RPCError{
-				Code: dcrjson.ErrRPCInvalidAddressOrKey,
-				Message: fmt.Sprintf("Invalid address or key: %v",
-					addr),
-			}
-		}
-	}
-	return nil
-}
-
-// deserializeOutpoints deserializes each serialized outpoint.
-func deserializeOutpoints(serializedOuts []dcrjson.OutPoint) ([]*wire.OutPoint, error) {
-	outpoints := make([]*wire.OutPoint, 0, len(serializedOuts))
-	for i := range serializedOuts {
-		blockHash, err := chainhash.NewHashFromStr(serializedOuts[i].Hash)
-		if err != nil {
-			return nil, rpcDecodeHexError(serializedOuts[i].Hash)
-		}
-		index := serializedOuts[i].Index
-		tree := serializedOuts[i].Tree
-		outpoints = append(outpoints, wire.NewOutPoint(blockHash, index, tree))
-	}
-
-	return outpoints, nil
-}
-
 // rescanBlock rescans a block for any relevant transactions for the passed
 // lookup keys.  Any discovered transactions are returned hex encoded as a
 // string slice.

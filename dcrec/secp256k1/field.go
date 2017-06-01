@@ -77,10 +77,6 @@ const (
 	// 2^(fieldBase*i) where i is the word position.
 	fieldBase = 26
 
-	// fieldOverflowBits is the minimum number of "overflow" bits for each
-	// word in the field value.
-	fieldOverflowBits = 32 - fieldBase
-
 	// fieldBaseMask is the mask for the bits in each word needed to
 	// represent the numeric base of each word (except the most significant
 	// word).
@@ -581,7 +577,7 @@ func (f *fieldVal) Add2(val *fieldVal, val2 *fieldVal) *fieldVal {
 // f.MulInt(2).Add(f2) so that f = 2 * f + f2.
 func (f *fieldVal) MulInt(val uint) *fieldVal {
 	// Since each word of the field representation can hold up to
-	// fieldOverflowBits extra bits which will be normalized out, it's safe
+	// 32 - fieldBase extra bits which will be normalized out, it's safe
 	// to multiply each word without using a larger type or carry
 	// propagation so long as the values won't overflow a uint32.  This
 	// could obviously be done in a loop, but the unrolled version is

@@ -1254,16 +1254,6 @@ func createVinList(mtx *wire.MsgTx) []dcrjson.Vin {
 	return vinList
 }
 
-// stringInSlice returns true if string a is found in array list.
-func stringInSlice(a string, list []string) bool {
-	for _, b := range list {
-		if b == a {
-			return true
-		}
-	}
-	return false
-}
-
 // createVoutList returns a slice of JSON objects for the outputs of the passed
 // transaction.
 func createVoutList(mtx *wire.MsgTx, chainParams *chaincfg.Params, filterAddrMap map[string]struct{}) []dcrjson.Vout {
@@ -3967,17 +3957,6 @@ func bigToLEUint256(n *big.Int) [uint256Size]byte {
 		buf[i], buf[uint256Size-1-i] = buf[uint256Size-1-i], buf[i]
 	}
 	return buf
-}
-
-// reverseUint32Array treats the passed bytes as a series of uint32s and
-// reverses the byte order of each uint32.  The passed byte slice must be a
-// multiple of 4 for a correct result.  The passed bytes slice is modified.
-func reverseUint32Array(b []byte) {
-	blen := len(b)
-	for i := 0; i < blen; i += 4 {
-		b[i], b[i+3] = b[i+3], b[i]
-		b[i+1], b[i+2] = b[i+2], b[i+1]
-	}
 }
 
 // handleGetTxOut handles gettxout commands.

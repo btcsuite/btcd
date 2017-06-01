@@ -210,15 +210,6 @@ func replaceStakeSigScript(sigScript []byte) func(*wire.MsgBlock) {
 	}
 }
 
-// replaceDevOrgScript returns a function that itself takes a block and modifies
-// it by replacing the public key script of the dev org payout in the coinbase
-// transaction.
-func replaceDevOrgScript(pkScript []byte) func(*wire.MsgBlock) {
-	return func(b *wire.MsgBlock) {
-		b.Transactions[0].TxOut[0].PkScript = pkScript
-	}
-}
-
 // additionalPoWTx returns a function that itself takes a block and modifies it
 // by adding the the provided transaction to the regular transaction tree.
 func additionalPoWTx(tx *wire.MsgTx) func(*wire.MsgBlock) {

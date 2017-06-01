@@ -27,8 +27,6 @@ import (
 )
 
 const (
-	chanBufferSize = 50
-
 	// minInFlightBlocks is the minimum number of blocks that should be
 	// in the request queue for headers-first mode before requesting
 	// more.
@@ -149,13 +147,6 @@ type calcNextReqDifficultyResponse struct {
 type calcNextReqDifficultyMsg struct {
 	timestamp time.Time
 	reply     chan calcNextReqDifficultyResponse
-}
-
-// calcNextReqDiffNodeResponse is a response sent to the reply channel of a
-// calcNextReqDiffNodeMsg query.
-type calcNextReqDiffNodeResponse struct {
-	difficulty uint32
-	err        error
 }
 
 // calcNextReqDiffNodeMsg is a message type to be sent across the message

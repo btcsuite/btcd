@@ -25,19 +25,6 @@ const (
 	// threshold in between database cache flushes when the cache size has
 	// not been exceeded.
 	defaultFlushSecs = 300 // 5 minutes
-
-	// ldbBatchHeaderSize is the size of a leveldb batch header which
-	// includes the sequence header and record counter.
-	//
-	// ldbRecordIKeySize is the size of the ikey used internally by leveldb
-	// when appending a record to a batch.
-	//
-	// These are used to help preallocate space needed for a batch in one
-	// allocation instead of letting leveldb itself constantly grow it.
-	// This results in far less pressure on the GC and consequently helps
-	// prevent the GC from allocating a lot of extra unneeded space.
-	ldbBatchHeaderSize = 12
-	ldbRecordIKeySize  = 8
 )
 
 // ldbCacheIter wraps a treap iterator to provide the additional functionality

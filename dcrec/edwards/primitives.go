@@ -5,7 +5,6 @@
 package edwards
 
 import (
-	"bytes"
 	"fmt"
 	"math/big"
 
@@ -83,15 +82,6 @@ func copyBytes64(aB []byte) *[64]byte {
 	}
 
 	return s
-}
-
-// zeroArray zeroes the memory of a scalar array.
-func zeroArray(a *[PrivScalarSize]byte) {
-	for i := 0; i < PrivScalarSize; i++ {
-		a[i] = 0x00
-	}
-
-	return
 }
 
 // zeroSlice zeroes the memory of a scalar byte slice.
@@ -295,15 +285,6 @@ func FieldElementToEncodedBytes(fe *edwards25519.FieldElement) *[32]byte {
 	s := new([32]byte)
 	edwards25519.FeToBytes(s, fe)
 	return s
-}
-
-// feEqual checks if two field elements equate.
-func feEqual(a, b *edwards25519.FieldElement) bool {
-	aB := new([32]byte)
-	edwards25519.FeToBytes(aB, a)
-	bB := new([32]byte)
-	edwards25519.FeToBytes(bB, b)
-	return bytes.Equal(aB[:], bB[:])
 }
 
 // invert inverts a big integer over the Ed25519 curve.

@@ -24,26 +24,6 @@ import (
 )
 
 var (
-	// hashIndexBucketName is the name of the db bucket used to house to the
-	// block hash -> block height index.
-	hashIndexBucketName = []byte("hashidx")
-
-	// heightIndexBucketName is the name of the db bucket used to house to
-	// the block height -> block hash index.
-	heightIndexBucketName = []byte("heightidx")
-
-	// chainStateKeyName is the name of the db key used to store the best
-	// chain state.
-	chainStateKeyName = []byte("chainstate")
-
-	// spendJournalBucketName is the name of the db bucket used to house
-	// transactions outputs that are spent in each block.
-	spendJournalBucketName = []byte("spendjournal")
-
-	// utxoSetBucketName is the name of the db bucket used to house the
-	// unspent transaction output set.
-	utxoSetBucketName = []byte("utxoset")
-
 	// thresholdBucketName is the name of the db bucket used to house cached
 	// threshold states.
 	thresholdBucketName = []byte("thresholdstate")

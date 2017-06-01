@@ -97,8 +97,6 @@ const (
 	// address manager will claim to need more addresses.
 	needAddressThreshold = 1000
 
-	newAddressBufferSize = 50
-
 	// dumpAddressInterval is the interval used to dump the address
 	// cache to disk for future use.
 	dumpAddressInterval = time.Minute * 10

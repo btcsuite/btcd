@@ -429,14 +429,7 @@ func (msg *MsgTx) AddTxOut(to *TxOut) {
 	msg.TxOut = append(msg.TxOut, to)
 }
 
-// msgTxVersionToBytes converts an int32 version into a 4 byte slice.
-func msgTxVersionToBytes(version int32) []byte {
-	mVerBytes := make([]byte, 4, 4)
-	binary.LittleEndian.PutUint32(mVerBytes[0:4], uint32(version))
-	return mVerBytes
-}
-
-// msgTxVersionDecode converts an int32 version into serialization types and
+// msgTxVersionToVars converts an int32 version into serialization types and
 // actual version.
 func msgTxVersionToVars(version int32) (uint16, TxSerializeType) {
 	mVerBytes := make([]byte, 4, 4)
@@ -444,16 +437,6 @@ func msgTxVersionToVars(version int32) (uint16, TxSerializeType) {
 	mVer := binary.LittleEndian.Uint16(mVerBytes[0:2])
 	mType := binary.LittleEndian.Uint16(mVerBytes[2:4])
 	return mVer, TxSerializeType(mType)
-}
-
-// msgTxVersionDecode converts a 4 byte slice into an int32 version.
-func msgTxVersionDecode(verBytes []byte) (int32, error) {
-	if len(verBytes) != 4 {
-		return 0, messageError("msgTxVersionDecode", "tx version wrong size")
-	}
-	ver := binary.LittleEndian.Uint32(verBytes)
-
-	return int32(ver), nil
 }
 
 // shallowCopyForSerializing make a shallow copy of a tx with a new

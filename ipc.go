@@ -163,7 +163,6 @@ type lifetimeAction byte
 
 const (
 	lifetimeEventDBOpen lifetimeAction = iota
-	lifetimeEventTicketDB
 	lifetimeEventP2PServer
 )
 

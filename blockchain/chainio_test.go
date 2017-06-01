@@ -18,6 +18,15 @@ import (
 	"github.com/decred/dcrd/wire"
 )
 
+// newHashFromStr converts the passed big-endian hex string into a
+// chainhash.Hash.  It only differs from the one available in chainhash in that
+// it ignores the error since it will only (and must only) be called with
+// hard-coded, and therefore known good, hashes.
+func newHashFromStr(hexStr string) *chainhash.Hash {
+	hash, _ := chainhash.NewHashFromStr(hexStr)
+	return hash
+}
+
 // DoStxoTest does a test on a simulated blockchain to ensure that the data
 // stored in the STXO buckets is not corrupt.
 func (b *BlockChain) DoStxoTest() error {

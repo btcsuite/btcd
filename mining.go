@@ -26,10 +26,6 @@ import (
 )
 
 const (
-	// minHighPriority is the minimum priority value that allows a
-	// transaction to be considered high priority.
-	minHighPriority = dcrutil.AtomsPerCoin * 144.0 / 250
-
 	// generatedBlockVersion is the version of the block being generated for
 	// the main network.  It is defined as a constant here rather than using
 	// the wire.BlockVersion constant since a change in the block version
@@ -165,49 +161,6 @@ func compareStakePriority(i, j *txPrioItem) int {
 		return -1
 	}
 	return 0
-}
-
-// txPQByPriority sorts a txPriorityQueue by transaction priority and then fees
-// per kilobyte.
-func txPQByPriority(pq *txPriorityQueue, i, j int) bool {
-	// Using > here so that pop gives the highest priority item as opposed
-	// to the lowest.  Sort by priority first, then fee.
-	if pq.items[i].priority == pq.items[j].priority {
-		return pq.items[i].feePerKB > pq.items[j].feePerKB
-	}
-	return pq.items[i].priority > pq.items[j].priority
-}
-
-// txPQByStakeAndPriority sorts a txPriorityQueue by stake priority then
-// transaction priority, and then fees per kilobyte.
-func txPQByStakeAndPriority(pq *txPriorityQueue, i, j int) bool {
-	// Sort by stake priority, continue if they're the same stake priority.
-	cmp := compareStakePriority(pq.items[i], pq.items[j])
-	if cmp == 1 {
-		return true
-	}
-	if cmp == -1 {
-		return false
-	}
-
-	// Using > here so that pop gives the highest priority item as opposed
-	// to the lowest.  Sort by priority first, then fee.
-	if pq.items[i].priority == pq.items[j].priority {
-		return pq.items[i].feePerKB > pq.items[j].feePerKB
-	}
-
-	return pq.items[i].priority > pq.items[j].priority
-}
-
-// txPQByFee sorts a txPriorityQueue by fees per kilobyte and then transaction
-// priority.
-func txPQByFee(pq *txPriorityQueue, i, j int) bool {
-	// Using > here so that pop gives the highest fee item as opposed
-	// to the lowest.  Sort by fee first, then priority.
-	if pq.items[i].feePerKB == pq.items[j].feePerKB {
-		return pq.items[i].priority > pq.items[j].priority
-	}
-	return pq.items[i].feePerKB > pq.items[j].feePerKB
 }
 
 // txPQByStakeAndFee sorts a txPriorityQueue by stake priority, followed by

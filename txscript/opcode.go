@@ -2299,16 +2299,6 @@ func opcodeHash256(op *parsedOpcode, vm *Engine) error {
 	return nil
 }
 
-// opcodeCodeSeparator stores the current script offset as the most recently
-// seen OP_CODESEPARATOR which is used during signature checking.
-//
-// This opcode does not change the contents of the data stack.
-// This opcode is disabled in Decred, as it always returns an engine error.
-func opcodeCodeSeparator(op *parsedOpcode, vm *Engine) error {
-	vm.lastCodeSep = vm.scriptOff
-	return nil
-}
-
 // opcodeCheckSig treats the top 2 items on the stack as a public key and a
 // signature and replaces them with a bool which indicates if the signature was
 // successfully verified.
@@ -2656,7 +2646,6 @@ func opcodeCheckMultiSigVerify(op *parsedOpcode, vm *Engine) error {
 // sign function to indicate the type of signature to generate.
 type sigTypes uint8
 
-var secp = sigTypes(chainec.ECTypeSecp256k1)
 var edwards = sigTypes(chainec.ECTypeEdwards)
 var secSchnorr = sigTypes(chainec.ECTypeSecSchnorr)
 
