@@ -1,6 +1,10 @@
-hash: 2b8970779e0f073a5720aa6d6558bfbf1919f12ef2e19b3921955f156edd93e3
-updated: 2017-05-18T11:21:32.466255698-04:00
+hash: 134468fdfb2f19fa76447939a94e40512c3891b8f0a8e1f1fa2b70bcbd40bdf4
+updated: 2017-05-31T22:00:42.668930312-04:00
 imports:
+- name: github.com/agl/ed25519
+  version: 278e1ec8e8a6e017cd07577924d6766039146ced
+  subpackages:
+  - edwards25519
 - name: github.com/btcsuite/btclog
   version: 73889fb79bd687870312b6e40effcecffbd57d30
 - name: github.com/btcsuite/go-flags
@@ -53,10 +57,6 @@ imports:
   subpackages:
   - base58
   - bloom
-- name: github.com/decred/ed25519
-  version: b0909d3f798b97a03c9e77023f97a5301a2a7900
-  subpackages:
-  - edwards25519
 - name: golang.org/x/crypto
   version: 0fe963104e9d1877082f8fb38f816fcd97eb1d10
   subpackages:

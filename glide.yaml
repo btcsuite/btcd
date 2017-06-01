@@ -1,5 +1,9 @@
 package: github.com/decred/dcrd
 import:
+- package: github.com/agl/ed25519
+  version: 278e1ec8e8a6e017cd07577924d6766039146ced
+  subpackages:
+  - edwards25519
 - package: github.com/btcsuite/btclog
 - package: github.com/btcsuite/go-flags
 - package: github.com/btcsuite/go-socks
@@ -30,9 +34,6 @@ import:
 - package: github.com/decred/dcrutil
   subpackages:
   - bloom
-- package: github.com/decred/ed25519
-  subpackages:
-  - edwards25519
 - package: golang.org/x/crypto
   subpackages:
   - ripemd160
