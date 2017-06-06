@@ -216,24 +216,26 @@ func TestWalletSvrCmds(t *testing.T) {
 				return dcrjson.NewCmd("getnewaddress")
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewGetNewAddressCmd(nil)
+				return dcrjson.NewGetNewAddressCmd(nil, nil)
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"getnewaddress","params":[],"id":1}`,
 			unmarshalled: &dcrjson.GetNewAddressCmd{
-				Account: nil,
+				Account:   nil,
+				GapPolicy: nil,
 			},
 		},
 		{
 			name: "getnewaddress optional",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("getnewaddress", "acct")
+				return dcrjson.NewCmd("getnewaddress", "acct", "ignore")
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewGetNewAddressCmd(dcrjson.String("acct"))
+				return dcrjson.NewGetNewAddressCmd(dcrjson.String("acct"), dcrjson.String("ignore"))
 			},
-			marshalled: `{"jsonrpc":"1.0","method":"getnewaddress","params":["acct"],"id":1}`,
+			marshalled: `{"jsonrpc":"1.0","method":"getnewaddress","params":["acct","ignore"],"id":1}`,
 			unmarshalled: &dcrjson.GetNewAddressCmd{
-				Account: dcrjson.String("acct"),
+				Account:   dcrjson.String("acct"),
+				GapPolicy: dcrjson.String("ignore"),
 			},
 		},
 		{

@@ -1,12 +1,12 @@
 hash: 134468fdfb2f19fa76447939a94e40512c3891b8f0a8e1f1fa2b70bcbd40bdf4
-updated: 2017-06-06T10:17:24.0166586-04:00
+updated: 2017-06-06T15:00:47.0712938-04:00
 imports:
 - name: github.com/agl/ed25519
   version: 278e1ec8e8a6e017cd07577924d6766039146ced
   subpackages:
   - edwards25519
 - name: github.com/btcsuite/btclog
-  version: 73889fb79bd687870312b6e40effcecffbd57d30
+  version: 1dfb68239632ee8c667290e30b31cf294bc3d6ae
 - name: github.com/btcsuite/go-flags
   version: 6c288d648c1cc1befcb90cb5511dcacf64ae8e61
 - name: github.com/btcsuite/go-socks
@@ -51,9 +51,9 @@ imports:
 - name: github.com/decred/blake256
   version: a840e32d7c31fe2e0218607334cb120a683951a4
 - name: github.com/decred/dcrrpcclient
-  version: 298b75929e994406aee5499af2ccabd894c9a4fd
+  version: 662d2409dd72666076572cb6a2944875b892e9a5
 - name: github.com/decred/dcrutil
-  version: f3e368a4178919ac884566084ece536c791cce52
+  version: a5fab53cab39b793142c8453caa4c6f83bc152d4
   subpackages:
   - base58
   - bloom
