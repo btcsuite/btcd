@@ -216,26 +216,24 @@ func TestWalletSvrCmds(t *testing.T) {
 				return dcrjson.NewCmd("getnewaddress")
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewGetNewAddressCmd(nil, nil)
+				return dcrjson.NewGetNewAddressCmd(nil)
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"getnewaddress","params":[],"id":1}`,
 			unmarshalled: &dcrjson.GetNewAddressCmd{
 				Account: nil,
-				Verbose: dcrjson.Bool(false),
 			},
 		},
 		{
 			name: "getnewaddress optional",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("getnewaddress", "acct", "true")
+				return dcrjson.NewCmd("getnewaddress", "acct")
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewGetNewAddressCmd(dcrjson.String("acct"), dcrjson.Bool(true))
+				return dcrjson.NewGetNewAddressCmd(dcrjson.String("acct"))
 			},
-			marshalled: `{"jsonrpc":"1.0","method":"getnewaddress","params":["acct",true],"id":1}`,
+			marshalled: `{"jsonrpc":"1.0","method":"getnewaddress","params":["acct"],"id":1}`,
 			unmarshalled: &dcrjson.GetNewAddressCmd{
 				Account: dcrjson.String("acct"),
-				Verbose: dcrjson.Bool(true),
 			},
 		},
 		{
@@ -244,26 +242,24 @@ func TestWalletSvrCmds(t *testing.T) {
 				return dcrjson.NewCmd("getrawchangeaddress")
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewGetRawChangeAddressCmd(nil, nil)
+				return dcrjson.NewGetRawChangeAddressCmd(nil)
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"getrawchangeaddress","params":[],"id":1}`,
 			unmarshalled: &dcrjson.GetRawChangeAddressCmd{
 				Account: nil,
-				Verbose: dcrjson.Bool(false),
 			},
 		},
 		{
 			name: "getrawchangeaddress optional",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("getrawchangeaddress", "acct", "true")
+				return dcrjson.NewCmd("getrawchangeaddress", "acct")
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewGetRawChangeAddressCmd(dcrjson.String("acct"), dcrjson.Bool(true))
+				return dcrjson.NewGetRawChangeAddressCmd(dcrjson.String("acct"))
 			},
-			marshalled: `{"jsonrpc":"1.0","method":"getrawchangeaddress","params":["acct",true],"id":1}`,
+			marshalled: `{"jsonrpc":"1.0","method":"getrawchangeaddress","params":["acct"],"id":1}`,
 			unmarshalled: &dcrjson.GetRawChangeAddressCmd{
 				Account: dcrjson.String("acct"),
-				Verbose: dcrjson.Bool(true),
 			},
 		},
 		{

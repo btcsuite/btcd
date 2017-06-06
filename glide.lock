@@ -1,5 +1,5 @@
 hash: 134468fdfb2f19fa76447939a94e40512c3891b8f0a8e1f1fa2b70bcbd40bdf4
-updated: 2017-05-31T22:00:42.668930312-04:00
+updated: 2017-06-06T10:17:24.0166586-04:00
 imports:
 - name: github.com/agl/ed25519
   version: 278e1ec8e8a6e017cd07577924d6766039146ced
@@ -51,7 +51,7 @@ imports:
 - name: github.com/decred/blake256
   version: a840e32d7c31fe2e0218607334cb120a683951a4
 - name: github.com/decred/dcrrpcclient
-  version: 7208596a68e5114e0c27d08b26c69cf38ccd1ee2
+  version: 298b75929e994406aee5499af2ccabd894c9a4fd
 - name: github.com/decred/dcrutil
   version: f3e368a4178919ac884566084ece536c791cce52
   subpackages:

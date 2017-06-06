@@ -142,7 +142,6 @@ func NewGetBalanceCmd(account *string, minConf *int) *GetBalanceCmd {
 // GetNewAddressCmd defines the getnewaddress JSON-RPC command.
 type GetNewAddressCmd struct {
 	Account *string
-	Verbose *bool `jsonrpcdefault:"false"`
 }
 
 // NewGetNewAddressCmd returns a new instance which can be used to issue a
@@ -150,17 +149,15 @@ type GetNewAddressCmd struct {
 //
 // The parameters which are pointers indicate they are optional.  Passing nil
 // for optional parameters will use the default value.
-func NewGetNewAddressCmd(account *string, verbose *bool) *GetNewAddressCmd {
+func NewGetNewAddressCmd(account *string) *GetNewAddressCmd {
 	return &GetNewAddressCmd{
 		Account: account,
-		Verbose: verbose,
 	}
 }
 
 // GetRawChangeAddressCmd defines the getrawchangeaddress JSON-RPC command.
 type GetRawChangeAddressCmd struct {
 	Account *string
-	Verbose *bool `jsonrpcdefault:"false"`
 }
 
 // NewGetRawChangeAddressCmd returns a new instance which can be used to issue a
@@ -168,11 +165,9 @@ type GetRawChangeAddressCmd struct {
 //
 // The parameters which are pointers indicate they are optional.  Passing nil
 // for optional parameters will use the default value.
-func NewGetRawChangeAddressCmd(account *string,
-	verbose *bool) *GetRawChangeAddressCmd {
+func NewGetRawChangeAddressCmd(account *string) *GetRawChangeAddressCmd {
 	return &GetRawChangeAddressCmd{
 		Account: account,
-		Verbose: verbose,
 	}
 }
 
