@@ -9,5 +9,7 @@ env:
   - GOVERSION = 1.7
   - GOVERSION = 1.8
 
+install: true
+
 script:
   - ./run_tests.sh $GOVERSION
