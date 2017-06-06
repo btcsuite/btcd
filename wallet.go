@@ -1332,8 +1332,7 @@ func (r FutureGetNewAddressResult) Receive() (dcrutil.Address, error) {
 //
 // See GetNewAddress for the blocking version and more details.
 func (c *Client) GetNewAddressAsync(account string) FutureGetNewAddressResult {
-	f := false
-	cmd := dcrjson.NewGetNewAddressCmd(&account, &f)
+	cmd := dcrjson.NewGetNewAddressCmd(&account)
 	return c.sendCmd(cmd)
 }
 
@@ -1371,8 +1370,7 @@ func (r FutureGetRawChangeAddressResult) Receive() (dcrutil.Address, error) {
 //
 // See GetRawChangeAddress for the blocking version and more details.
 func (c *Client) GetRawChangeAddressAsync(account string) FutureGetRawChangeAddressResult {
-	f := false
-	cmd := dcrjson.NewGetRawChangeAddressCmd(&account, &f)
+	cmd := dcrjson.NewGetRawChangeAddressCmd(&account)
 	return c.sendCmd(cmd)
 }
 
