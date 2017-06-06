@@ -1326,19 +1326,47 @@ func (r FutureGetNewAddressResult) Receive() (dcrutil.Address, error) {
 	return dcrutil.DecodeNetworkAddress(addr)
 }
 
+// GapPolicy defines the policy to use when the BIP0044 unused address gap limit
+// would be violated by creating a new address.
+type GapPolicy string
+
+// Gap policies that are understood by a wallet JSON-RPC server.  These are
+// defined for safety and convenience, but string literals can be used as well.
+const (
+	GapPolicyError  GapPolicy = "error"
+	GapPolicyIgnore GapPolicy = "ignore"
+	GapPolicyWrap   GapPolicy = "wrap"
+)
+
 // GetNewAddressAsync returns an instance of a type that can be used to get the
 // result of the RPC at some future time by invoking the Receive function on the
 // returned instance.
 //
 // See GetNewAddress for the blocking version and more details.
 func (c *Client) GetNewAddressAsync(account string) FutureGetNewAddressResult {
-	cmd := dcrjson.NewGetNewAddressCmd(&account)
+	cmd := dcrjson.NewGetNewAddressCmd(&account, nil)
+	return c.sendCmd(cmd)
+}
+
+// GetNewAddressGapPolicyAsync returns an instance of a type that can be used to
+// get the result of the RPC at some future time by invoking the Receive
+// function on the returned instance.
+//
+// See GetNewAddressGapPolicy for the blocking version and more details.
+func (c *Client) GetNewAddressGapPolicyAsync(account string, gapPolicy GapPolicy) FutureGetNewAddressResult {
+	cmd := dcrjson.NewGetNewAddressCmd(&account, (*string)(&gapPolicy))
 	return c.sendCmd(cmd)
 }
 
 // GetNewAddress returns a new address.
 func (c *Client) GetNewAddress(account string) (dcrutil.Address, error) {
 	return c.GetNewAddressAsync(account).Receive()
+}
+
+// GetNewAddressGapPolicy returns a new address while allowing callers to
+// control the BIP0044 unused address gap limit policy.
+func (c *Client) GetNewAddressGapPolicy(account string, gapPolicy GapPolicy) (dcrutil.Address, error) {
+	return c.GetNewAddressGapPolicyAsync(account, gapPolicy).Receive()
 }
 
 // FutureGetRawChangeAddressResult is a future promise to deliver the result of
