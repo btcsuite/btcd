@@ -190,6 +190,10 @@ type Params struct {
 	// Mempool parameters
 	RelayNonStdTxs bool
 
+	// Human-readable part for Bech32 encoded segwit addresses, as defined in
+	// BIP 173.
+	Bech32HRPSegwit string
+
 	// Address encoding magics
 	PubKeyHashAddrID byte // First byte of a P2PKH address
 	ScriptHashAddrID byte // First byte of a P2SH address
@@ -275,6 +279,10 @@ var MainNetParams = Params{
 	// Mempool parameters
 	RelayNonStdTxs: false,
 
+	// Human-readable part for Bech32 encoded segwit addresses, as defined in
+	// BIP 173.
+	Bech32HRPSegwit: "bc", // always bc for main net
+
 	// Address encoding magics
 	PubKeyHashAddrID: 0x00, // starts with 1
 	ScriptHashAddrID: 0x05, // starts with 3
@@ -334,6 +342,10 @@ var RegressionNetParams = Params{
 
 	// Mempool parameters
 	RelayNonStdTxs: true,
+
+	// Human-readable part for Bech32 encoded segwit addresses, as defined in
+	// BIP 173.
+	Bech32HRPSegwit: "tb", // always tb for test net
 
 	// Address encoding magics
 	PubKeyHashAddrID: 0x6f, // starts with m or n
@@ -412,6 +424,10 @@ var TestNet3Params = Params{
 	// Mempool parameters
 	RelayNonStdTxs: true,
 
+	// Human-readable part for Bech32 encoded segwit addresses, as defined in
+	// BIP 173.
+	Bech32HRPSegwit: "tb", // always tb for test net
+
 	// Address encoding magics
 	PubKeyHashAddrID: 0x6f, // starts with m or n
 	ScriptHashAddrID: 0xc4, // starts with 2
@@ -475,6 +491,10 @@ var SimNetParams = Params{
 
 	// Mempool parameters
 	RelayNonStdTxs: true,
+
+	// Human-readable part for Bech32 encoded segwit addresses, as defined in
+	// BIP 173.
+	Bech32HRPSegwit: "sb", // always sb for sim net
 
 	// Address encoding magics
 	PubKeyHashAddrID: 0x3f, // starts with S
