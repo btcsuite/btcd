@@ -247,17 +247,75 @@ func TestNormalize(t *testing.T) {
 			[10]uint32{0xffffffff, 0xffffffc0, 0xffffffc0, 0xffffffc0, 0xffffffc0, 0xffffffc0, 0xffffffc0, 0xffffffc0, 0xffffffc0, 0x3fffc0},
 			[10]uint32{0x000003d0, 0x00000040, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x000000},
 		},
+		// Prime with field representation such that the initial
+		// reduction does not result in a carry to bit 256.
+		//
+		// 2^256 - 4294968273 (secp256k1 prime)
+		{
+			[10]uint32{0x03fffc2f, 0x03ffffbf, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x003fffff},
+			[10]uint32{0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000},
+		},
+		// Prime larger than P that reduces to a value which is still
+		// larger than P when it has a magnitude of 1 due to its first
+		// word and does not result in a carry to bit 256.
+		//
+		// 2^256 - 4294968272 (secp256k1 prime + 1)
+		{
+			[10]uint32{0x03fffc30, 0x03ffffbf, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x003fffff},
+			[10]uint32{0x00000001, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000},
+		},
+		// Prime larger than P that reduces to a value which is still
+		// larger than P when it has a magnitude of 1 due to its second
+		// word and does not result in a carry to bit 256.
+		//
+		// 2^256 - 4227859409 (secp256k1 prime + 0x4000000)
+		{
+			[10]uint32{0x03fffc2f, 0x03ffffc0, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x003fffff},
+			[10]uint32{0x00000000, 0x00000001, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000},
+		},
+		// Prime larger than P that reduces to a value which is still
+		// larger than P when it has a magnitude of 1 due to a carry to
+		// bit 256, but would not be without the carry.  These values
+		// come from the fact that P is 2^256 - 4294968273 and 977 is
+		// the low order word in the internal field representation.
+		//
+		// 2^256 * 5 - ((4294968273 - (977+1)) * 4)
+		{
+			[10]uint32{0x03ffffff, 0x03fffeff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x0013fffff},
+			[10]uint32{0x00001314, 0x00000040, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x000000000},
+		},
+		// Prime larger than P that reduces to a value which is still
+		// larger than P when it has a magnitude of 1 due to both a
+		// carry to bit 256 and the first word.
+		{
+			[10]uint32{0x03fffc30, 0x03ffffbf, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x07ffffff, 0x003fffff},
+			[10]uint32{0x00000001, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000001},
+		},
+		// Prime larger than P that reduces to a value which is still
+		// larger than P when it has a magnitude of 1 due to both a
+		// carry to bit 256 and the second word.
+		//
+		{
+			[10]uint32{0x03fffc2f, 0x03ffffc0, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x3ffffff, 0x07ffffff, 0x003fffff},
+			[10]uint32{0x00000000, 0x00000001, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x0000000, 0x00000000, 0x00000001},
+		},
+		// Prime larger than P that reduces to a value which is still
+		// larger than P when it has a magnitude of 1 due to a carry to
+		// bit 256 and the first and second words.
+		//
+		{
+			[10]uint32{0x03fffc30, 0x03ffffc0, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x07ffffff, 0x003fffff},
+			[10]uint32{0x00000001, 0x00000001, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000001},
+		},
 	}
 
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
 		f := new(fieldVal)
-		for rawIntIdx := 0; rawIntIdx < len(test.raw); rawIntIdx++ {
-			f.n[rawIntIdx] = test.raw[rawIntIdx]
-		}
+		f.n = test.raw
 		f.Normalize()
 		if !reflect.DeepEqual(f.n, test.normalized) {
-			t.Errorf("fieldVal.Set #%d wrong normalized result\n"+
+			t.Errorf("fieldVal.Normalize #%d wrong result\n"+
 				"got: %x\nwant: %x", i, f.n, test.normalized)
 			continue
 		}
