@@ -23,9 +23,9 @@ func isOdd(a *big.Int) bool {
 	return a.Bit(0) == 1
 }
 
-// DecompressPoint decompresses a point on the given curve given the X point and
+// decompressPoint decompresses a point on the given curve given the X point and
 // the solution to use.
-func DecompressPoint(curve *KoblitzCurve, x *big.Int, ybit bool) (*big.Int, error) {
+func decompressPoint(curve *KoblitzCurve, x *big.Int, ybit bool) (*big.Int, error) {
 	// TODO(oga) This will probably only work for secp256k1 due to
 	// optimizations.
 
@@ -98,7 +98,7 @@ func ParsePubKey(pubKeyStr []byte, curve *KoblitzCurve) (key *PublicKey,
 				"pubkey string: %d", pubKeyStr[0])
 		}
 		pubkey.X = new(big.Int).SetBytes(pubKeyStr[1:33])
-		pubkey.Y, err = DecompressPoint(curve, pubkey.X, ybit)
+		pubkey.Y, err = decompressPoint(curve, pubkey.X, ybit)
 		if err != nil {
 			return nil, err
 		}

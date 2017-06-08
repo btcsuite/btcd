@@ -36,7 +36,7 @@ func decodeHex(hexStr string) []byte {
 }
 
 var signatureTests = []signatureTest{
-	// signatures from decred blockchain tx
+	// signatures from bitcoin blockchain tx
 	// 0437cd7f8525ceed2324359c2d0ba26006d92d85
 	{
 		name: "valid signature.",
@@ -358,7 +358,7 @@ func TestSignatureSerialize(t *testing.T) {
 		ecsig    *Signature
 		expected []byte
 	}{
-		// signature from decred blockchain tx
+		// signature from bitcoin blockchain tx
 		// 0437cd7f8525ceed2324359c2d0ba26006d92d85
 		{
 			"valid 1 - r and s most significant bits are zero",
@@ -378,7 +378,7 @@ func TestSignatureSerialize(t *testing.T) {
 				0x21, 0xa8, 0x76, 0x8d, 0x1d, 0x09,
 			},
 		},
-		// signature from decred blockchain tx
+		// signature from bitcoin blockchain tx
 		// cb00f8a0573b18faa8c4f467b049f5d202bf1101d9ef2633bc611be70376a4b4
 		{
 			"valid 2 - r most significant bit is one",
@@ -398,7 +398,7 @@ func TestSignatureSerialize(t *testing.T) {
 				0xac, 0xad, 0x7f, 0x9c, 0x86, 0x87, 0x24,
 			},
 		},
-		// signature from decred blockchain tx
+		// signature from bitcoin blockchain tx
 		// fda204502a3345e08afd6af27377c052e77f1fefeaeb31bdd45f1e1237ca5470
 		{
 			"valid 3 - s most significant bit is one",

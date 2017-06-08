@@ -18,14 +18,14 @@ import (
 
 // isJacobianOnS256Curve returns boolean if the point (x,y,z) is on the
 // secp256k1 curve.
-func isJacobianOnS256Curve(x, y, z *FieldVal) bool {
+func isJacobianOnS256Curve(x, y, z *fieldVal) bool {
 	// Elliptic curve equation for secp256k1 is: y^2 = x^3 + 7
 	// In Jacobian coordinates, Y = y/z^3 and X = x/z^2
 	// Thus:
 	// (y/z^3)^2 = (x/z^2)^3 + 7
 	// y^2/z^6 = x^3/z^6 + 7
 	// y^2 = x^3 + 7*z^6
-	var y2, z2, x3, result FieldVal
+	var y2, z2, x3, result fieldVal
 	y2.SquareVal(y).Normalize()
 	z2.SquareVal(z)
 	x3.SquareVal(x).Mul(x)
@@ -227,15 +227,15 @@ func TestAddJacobian(t *testing.T) {
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
 		// Convert hex to field values.
-		x1 := new(FieldVal).SetHex(test.x1)
-		y1 := new(FieldVal).SetHex(test.y1)
-		z1 := new(FieldVal).SetHex(test.z1)
-		x2 := new(FieldVal).SetHex(test.x2)
-		y2 := new(FieldVal).SetHex(test.y2)
-		z2 := new(FieldVal).SetHex(test.z2)
-		x3 := new(FieldVal).SetHex(test.x3)
-		y3 := new(FieldVal).SetHex(test.y3)
-		z3 := new(FieldVal).SetHex(test.z3)
+		x1 := new(fieldVal).SetHex(test.x1)
+		y1 := new(fieldVal).SetHex(test.y1)
+		z1 := new(fieldVal).SetHex(test.z1)
+		x2 := new(fieldVal).SetHex(test.x2)
+		y2 := new(fieldVal).SetHex(test.y2)
+		z2 := new(fieldVal).SetHex(test.z2)
+		x3 := new(fieldVal).SetHex(test.x3)
+		y3 := new(fieldVal).SetHex(test.y3)
+		z3 := new(fieldVal).SetHex(test.z3)
 
 		// Ensure the test data is using points that are actually on
 		// the curve (or the point at infinity).
@@ -256,8 +256,8 @@ func TestAddJacobian(t *testing.T) {
 		}
 
 		// Add the two points.
-		rx, ry, rz := new(FieldVal), new(FieldVal), new(FieldVal)
-		S256().AddJacobian(x1, y1, z1, x2, y2, z2, rx, ry, rz)
+		rx, ry, rz := new(fieldVal), new(fieldVal), new(fieldVal)
+		S256().addJacobian(x1, y1, z1, x2, y2, z2, rx, ry, rz)
 
 		// Ensure result matches expected.
 		if !rx.Equals(x3) || !ry.Equals(y3) || !rz.Equals(z3) {
@@ -403,12 +403,12 @@ func TestDoubleJacobian(t *testing.T) {
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
 		// Convert hex to field values.
-		x1 := new(FieldVal).SetHex(test.x1)
-		y1 := new(FieldVal).SetHex(test.y1)
-		z1 := new(FieldVal).SetHex(test.z1)
-		x3 := new(FieldVal).SetHex(test.x3)
-		y3 := new(FieldVal).SetHex(test.y3)
-		z3 := new(FieldVal).SetHex(test.z3)
+		x1 := new(fieldVal).SetHex(test.x1)
+		y1 := new(fieldVal).SetHex(test.y1)
+		z1 := new(fieldVal).SetHex(test.z1)
+		x3 := new(fieldVal).SetHex(test.x3)
+		y3 := new(fieldVal).SetHex(test.y3)
+		z3 := new(fieldVal).SetHex(test.z3)
 
 		// Ensure the test data is using points that are actually on
 		// the curve (or the point at infinity).
@@ -424,7 +424,7 @@ func TestDoubleJacobian(t *testing.T) {
 		}
 
 		// Double the point.
-		rx, ry, rz := new(FieldVal), new(FieldVal), new(FieldVal)
+		rx, ry, rz := new(fieldVal), new(fieldVal), new(fieldVal)
 		S256().doubleJacobian(x1, y1, z1, rx, ry, rz)
 
 		// Ensure result matches expected.

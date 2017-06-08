@@ -299,7 +299,7 @@ func recoverKeyFromSignature(curve *KoblitzCurve, sig *Signature, msg []byte,
 	// convert 02<Rx> to point R. (step 1.2 and 1.3). If we are on an odd
 	// iteration then 1.6 will be done with -R, so we calculate the other
 	// term when uncompressing the point.
-	Ry, err := DecompressPoint(curve, Rx, iter%2 == 1)
+	Ry, err := decompressPoint(curve, Rx, iter%2 == 1)
 	if err != nil {
 		return nil, err
 	}
