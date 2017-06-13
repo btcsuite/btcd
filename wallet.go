@@ -2816,6 +2816,37 @@ func (c *Client) AccountSyncAddressIndex(account string, branch uint32, index in
 	return c.AccountSyncAddressIndexAsync(account, branch, index).Receive()
 }
 
+// FutureRevokeTicketsResult is a future promise to deliver the result of a
+// RevokeTicketsAsync RPC invocation (or an applicable error).
+type FutureRevokeTicketsResult chan *response
+
+// Receive waits for the response promised by the future and returns the info
+// provided by the server.
+func (r FutureRevokeTicketsResult) Receive() error {
+	_, err := receiveFuture(r)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// RevokeTicketsAsync returns an instance of a type that can be used to get the result
+// of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+//
+// See RevokeTickets for the blocking version and more details.
+func (c *Client) RevokeTicketsAsync() FutureRevokeTicketsResult {
+	cmd := dcrjson.NewRevokeTicketsCmd()
+	return c.sendCmd(cmd)
+}
+
+// RevokeTickets triggers the wallet to issue revocations for any missed tickets that
+// have not yet been revoked.
+func (c *Client) RevokeTickets() error {
+	return c.RevokeTicketsAsync().Receive()
+}
+
 // FutureAddTicketResult is a future promise to deliver the result of a
 // AddTicketAsync RPC invocation (or an applicable error).
 type FutureAddTicketResult chan *response
