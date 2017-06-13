@@ -750,9 +750,9 @@ func (sp *serverPeer) OnGetCFilter(_ *peer.Peer, msg *wire.MsgGetCFilter) {
 		msg.Extended)
 
 	if len(filterBytes) > 0 {
-		peerLog.Infof("Obtained CF for %v", msg.BlockHash)
+		peerLog.Tracef("Obtained CF for %v", msg.BlockHash)
 	} else {
-		peerLog.Infof("Could not obtain CF for %v: %v", msg.BlockHash,
+		peerLog.Warnf("Could not obtain CF for %v: %v", msg.BlockHash,
 			err)
 	}
 
