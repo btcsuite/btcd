@@ -388,6 +388,15 @@ type RescanWalletCmd struct {
 	BeginHeight *int `jsonrpcdefault:"0"`
 }
 
+// RevokeTicketsCmd describes the revoketickets JSON-RPC request and parameters.
+type RevokeTicketsCmd struct {
+}
+
+// NewRevokeTicketsCmd creates a new RevokeTicketsCmd.
+func NewRevokeTicketsCmd() *RevokeTicketsCmd {
+	return &RevokeTicketsCmd{}
+}
+
 // SendToMultiSigCmd is a type handling custom marshaling and
 // unmarshaling of sendtomultisig JSON RPC commands.
 type SendToMultiSigCmd struct {
@@ -607,6 +616,7 @@ func init() {
 	MustRegisterCmd("redeemmultisigout", (*RedeemMultiSigOutCmd)(nil), flags)
 	MustRegisterCmd("redeemmultisigouts", (*RedeemMultiSigOutsCmd)(nil), flags)
 	MustRegisterCmd("rescanwallet", (*RescanWalletCmd)(nil), flags)
+	MustRegisterCmd("revoketickets", (*RevokeTicketsCmd)(nil), flags)
 	MustRegisterCmd("sendtomultisig", (*SendToMultiSigCmd)(nil), flags)
 	MustRegisterCmd("sendtosstx", (*SendToSStxCmd)(nil), flags)
 	MustRegisterCmd("sendtossgen", (*SendToSSGenCmd)(nil), flags)

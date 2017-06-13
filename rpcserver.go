@@ -287,6 +287,7 @@ var rpcAskWallet = map[string]struct{}{
 	"lockunspent":             {},
 	"move":                    {},
 	"rescanwallet":            {},
+	"revoketickets":           {},
 	"sendfrom":                {},
 	"sendmany":                {},
 	"sendtoaddress":           {},
