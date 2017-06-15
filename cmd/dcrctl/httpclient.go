@@ -76,6 +76,9 @@ func sendPostRequest(marshalledJSON []byte, cfg *config) ([]byte, error) {
 		protocol = "https"
 	}
 	url := protocol + "://" + cfg.RPCServer
+	if cfg.PrintJSON {
+		fmt.Println(string(marshalledJSON))
+	}
 	bodyReader := bytes.NewReader(marshalledJSON)
 	httpRequest, err := http.NewRequest("POST", url, bodyReader)
 	if err != nil {
@@ -117,6 +120,11 @@ func sendPostRequest(marshalledJSON []byte, cfg *config) ([]byte, error) {
 				http.StatusText(httpResponse.StatusCode))
 		}
 		return nil, fmt.Errorf("%s", respBytes)
+	}
+
+	// If requested, print raw json response.
+	if cfg.PrintJSON {
+		fmt.Println(string(respBytes))
 	}
 
 	// Unmarshal the response.
