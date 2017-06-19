@@ -374,7 +374,7 @@ func (g *Generator) addCoinbaseTxOutputs(tx *wire.MsgTx, blockHeight uint32, dev
 // subsidy based on the passed block height and number of votes to the dev org
 // and proof-of-work miner.
 //
-// See the createCoinbaseTxOutputs documentation for a breakdown of the outputs
+// See the addCoinbaseTxOutputs documentation for a breakdown of the outputs
 // the transaction contains.
 func (g *Generator) CreateCoinbaseTx(blockHeight uint32, numVotes uint16) *wire.MsgTx {
 	// Calculate the subsidy proportions based on the block height and the
