@@ -1,12 +1,12 @@
-hash: 134468fdfb2f19fa76447939a94e40512c3891b8f0a8e1f1fa2b70bcbd40bdf4
-updated: 2017-06-13T15:14:46.582022715Z
+hash: 153a3e6a1f31b2b29a113e953098f2b42a645103ee3e10040b5e03727a7b003c
+updated: 2017-06-20T10:57:34.1196597-04:00
 imports:
 - name: github.com/agl/ed25519
   version: 278e1ec8e8a6e017cd07577924d6766039146ced
   subpackages:
   - edwards25519
 - name: github.com/btcsuite/btclog
-  version: 1dfb68239632ee8c667290e30b31cf294bc3d6ae
+  version: 266a29b6e5ad061d4c055cec1c0049e4aae47092
 - name: github.com/btcsuite/go-flags
   version: 6c288d648c1cc1befcb90cb5511dcacf64ae8e61
 - name: github.com/btcsuite/go-socks
@@ -28,8 +28,6 @@ imports:
   - leveldb/storage
   - leveldb/table
   - leveldb/util
-- name: github.com/btcsuite/seelog
-  version: 313961b101eb55f65ae0f03ddd4e322731763b6c
 - name: github.com/btcsuite/snappy-go
   version: 0bdef8d067237991ddaa1bb6072a740bc40601ba
 - name: github.com/btcsuite/websocket
@@ -51,12 +49,16 @@ imports:
 - name: github.com/decred/blake256
   version: a840e32d7c31fe2e0218607334cb120a683951a4
 - name: github.com/decred/dcrrpcclient
-  version: ed6074a30f888d3a15155561f514e188ecb32702
+  version: e7732bfa71b4b098494fa0ce62d42fded970c393
 - name: github.com/decred/dcrutil
   version: a5fab53cab39b793142c8453caa4c6f83bc152d4
   subpackages:
   - base58
   - bloom
+- name: github.com/jrick/logrotate
+  version: 4ed05ed86ef17d10ff99cce77481e0fcf6f2c7b0
+  subpackages:
+  - rotator
 - name: golang.org/x/crypto
   version: 0fe963104e9d1877082f8fb38f816fcd97eb1d10
   subpackages:

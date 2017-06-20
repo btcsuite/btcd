@@ -18,7 +18,6 @@ import:
   - leveldb/iterator
   - leveldb/opt
   - leveldb/util
-- package: github.com/btcsuite/seelog
 - package: github.com/btcsuite/websocket
 - package: github.com/btcsuite/winsvc
   subpackages:
@@ -38,6 +37,9 @@ import:
   subpackages:
   - ripemd160
   - ssh/terminal
+- package: github.com/jrick/logrotate
+  subpackages:
+  - rotator
 testImport:
 - package: github.com/stretchr/testify
   version: ^1.1.0

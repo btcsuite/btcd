@@ -3111,8 +3111,9 @@ func handleGetBlockTemplateProposal(s *rpcServer, request *dcrjson.TemplateReque
 	isOrphan, err := s.server.blockManager.ProcessBlock(block, flags)
 	if err != nil {
 		if _, ok := err.(blockchain.RuleError); !ok {
-			err := rpcsLog.Errorf("Failed to process block "+
+			errStr := fmt.Sprintf("Failed to process block "+
 				"proposal: %v", err)
+			rpcsLog.Error(errStr)
 			return nil, rpcInternalError(err.Error(),
 				"Could not process block")
 		}
