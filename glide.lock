@@ -1,12 +1,12 @@
 hash: 153a3e6a1f31b2b29a113e953098f2b42a645103ee3e10040b5e03727a7b003c
-updated: 2017-06-20T10:57:34.1196597-04:00
+updated: 2017-06-28T14:40:45.6812682-04:00
 imports:
 - name: github.com/agl/ed25519
   version: 278e1ec8e8a6e017cd07577924d6766039146ced
   subpackages:
   - edwards25519
 - name: github.com/btcsuite/btclog
-  version: 266a29b6e5ad061d4c055cec1c0049e4aae47092
+  version: 84c8d2346e9fc8c7b947e243b9c24e6df9fd206a
 - name: github.com/btcsuite/go-flags
   version: 6c288d648c1cc1befcb90cb5511dcacf64ae8e61
 - name: github.com/btcsuite/go-socks
@@ -56,16 +56,16 @@ imports:
   - base58
   - bloom
 - name: github.com/jrick/logrotate
-  version: 4ed05ed86ef17d10ff99cce77481e0fcf6f2c7b0
+  version: a93b200c26cbae3bb09dd0dc2c7c7fe1468a034a
   subpackages:
   - rotator
 - name: golang.org/x/crypto
-  version: 0fe963104e9d1877082f8fb38f816fcd97eb1d10
+  version: 84f24dfdf3c414ed893ca1b318d0045ef5a1f607
   subpackages:
   - ripemd160
   - ssh/terminal
 - name: golang.org/x/sys
-  version: e62c3de784db939836898e5c19ffd41bece347da
+  version: 90796e5a05ce440b41c768bd9af257005e470461
   subpackages:
   - unix
 testImports:
