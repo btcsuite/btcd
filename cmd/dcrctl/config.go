@@ -28,13 +28,14 @@ const (
 )
 
 var (
-	dcrdHomeDir           = dcrutil.AppDataDir("dcrd", false)
-	dcrctlHomeDir         = dcrutil.AppDataDir("dcrctl", false)
-	dcrwalletHomeDir      = dcrutil.AppDataDir("dcrwallet", false)
-	defaultConfigFile     = filepath.Join(dcrctlHomeDir, "dcrctl.conf")
-	defaultRPCServer      = "localhost"
-	defaultRPCCertFile    = filepath.Join(dcrdHomeDir, "rpc.cert")
-	defaultWalletCertFile = filepath.Join(dcrwalletHomeDir, "rpc.cert")
+	dcrdHomeDir            = dcrutil.AppDataDir("dcrd", false)
+	dcrctlHomeDir          = dcrutil.AppDataDir("dcrctl", false)
+	dcrwalletHomeDir       = dcrutil.AppDataDir("dcrwallet", false)
+	defaultConfigFile      = filepath.Join(dcrctlHomeDir, "dcrctl.conf")
+	defaultRPCServer       = "localhost"
+	defaultWalletRPCServer = "localhost"
+	defaultRPCCertFile     = filepath.Join(dcrdHomeDir, "rpc.cert")
+	defaultWalletCertFile  = filepath.Join(dcrwalletHomeDir, "rpc.cert")
 )
 
 // listCommands categorizes and lists all of the usable commands along with
@@ -94,22 +95,23 @@ func listCommands() {
 //
 // See loadConfig for details on the configuration load process.
 type config struct {
-	ShowVersion   bool   `short:"V" long:"version" description:"Display version information and exit"`
-	ListCommands  bool   `short:"l" long:"listcommands" description:"List all of the supported commands and exit"`
-	ConfigFile    string `short:"C" long:"configfile" description:"Path to configuration file"`
-	RPCUser       string `short:"u" long:"rpcuser" description:"RPC username"`
-	RPCPassword   string `short:"P" long:"rpcpass" default-mask:"-" description:"RPC password"`
-	RPCServer     string `short:"s" long:"rpcserver" description:"RPC server to connect to"`
-	RPCCert       string `short:"c" long:"rpccert" description:"RPC server certificate chain for validation"`
-	PrintJSON     bool   `short:"j" long:"json" description:"Print json messages sent and received"`
-	NoTLS         bool   `long:"notls" description:"Disable TLS"`
-	Proxy         string `long:"proxy" description:"Connect via SOCKS5 proxy (eg. 127.0.0.1:9050)"`
-	ProxyUser     string `long:"proxyuser" description:"Username for proxy server"`
-	ProxyPass     string `long:"proxypass" default-mask:"-" description:"Password for proxy server"`
-	TestNet       bool   `long:"testnet" description:"Connect to testnet"`
-	SimNet        bool   `long:"simnet" description:"Connect to the simulation test network"`
-	TLSSkipVerify bool   `long:"skipverify" description:"Do not verify tls certificates (not recommended!)"`
-	Wallet        bool   `long:"wallet" description:"Connect to wallet"`
+	ShowVersion     bool   `short:"V" long:"version" description:"Display version information and exit"`
+	ListCommands    bool   `short:"l" long:"listcommands" description:"List all of the supported commands and exit"`
+	ConfigFile      string `short:"C" long:"configfile" description:"Path to configuration file"`
+	RPCUser         string `short:"u" long:"rpcuser" description:"RPC username"`
+	RPCPassword     string `short:"P" long:"rpcpass" default-mask:"-" description:"RPC password"`
+	RPCServer       string `short:"s" long:"rpcserver" description:"RPC server to connect to"`
+	WalletRPCServer string `short:"w" long:"walletrpcserver" description:"Wallet RPC server to connect to"`
+	RPCCert         string `short:"c" long:"rpccert" description:"RPC server certificate chain for validation"`
+	PrintJSON       bool   `short:"j" long:"json" description:"Print json messages sent and received"`
+	NoTLS           bool   `long:"notls" description:"Disable TLS"`
+	Proxy           string `long:"proxy" description:"Connect via SOCKS5 proxy (eg. 127.0.0.1:9050)"`
+	ProxyUser       string `long:"proxyuser" description:"Username for proxy server"`
+	ProxyPass       string `long:"proxypass" default-mask:"-" description:"Password for proxy server"`
+	TestNet         bool   `long:"testnet" description:"Connect to testnet"`
+	SimNet          bool   `long:"simnet" description:"Connect to the simulation test network"`
+	TLSSkipVerify   bool   `long:"skipverify" description:"Do not verify tls certificates (not recommended!)"`
+	Wallet          bool   `long:"wallet" description:"Connect to wallet"`
 }
 
 // normalizeAddress returns addr with the passed default port appended if
@@ -183,9 +185,10 @@ func fileExists(name string) bool {
 func loadConfig() (*config, []string, error) {
 	// Default config.
 	cfg := config{
-		ConfigFile: defaultConfigFile,
-		RPCServer:  defaultRPCServer,
-		RPCCert:    defaultRPCCertFile,
+		ConfigFile:      defaultConfigFile,
+		RPCServer:       defaultRPCServer,
+		RPCCert:         defaultRPCCertFile,
+		WalletRPCServer: defaultWalletRPCServer,
 	}
 
 	// Pre-parse the command line options to see if an alternative config
@@ -279,6 +282,11 @@ func loadConfig() (*config, []string, error) {
 		cfg.RPCCert = defaultWalletCertFile
 	}
 
+	// When the --wallet flag is specified, use the walletrpcserver port
+	// if specified.
+	if cfg.Wallet && cfg.WalletRPCServer != defaultWalletRPCServer {
+		cfg.RPCServer = cfg.WalletRPCServer
+	}
 	// Handle environment variable expansion in the RPC certificate path.
 	cfg.RPCCert = cleanAndExpandPath(cfg.RPCCert)
 
