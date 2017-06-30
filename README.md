@@ -96,19 +96,6 @@ To run the tests locally without docker:
 ./run_tests.sh local
 ```
 
-### Updating docker go versions
-
-When a new minor version of go is released, the docker images must be updated and rebuilt to support it.  For example, when go1.8.3 was released, the file `Dockerfile-1.8` was edited by changing `FROM golang:1.8.2` to `FROM golang:1.8.3`.  Then the image was rebuilt and pushed to docker hub:
-```
-GOVERSION=1.8
-DOCKER_IMAGE_TAG=decred-golang-builder-$GOVERSION
-docker build -t $DOCKER_IMAGE_TAG -f ./Dockerfile-$GOVERSION .
-docker tag $DOCKER_IMAGE_TAG decred/$DOCKER_IMAGE_TAG
-docker push decred/$DOCKER_IMAGE_TAG
-```
-
-For a new major version, a new file `Dockerfile-VERSION` must be created and then the previous steps can be followed.  That new version must be added to the travis build matrix to run the tests in travis.
-
 ## Contact
 
 If you have any further questions you can find us at:
