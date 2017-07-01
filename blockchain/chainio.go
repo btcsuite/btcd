@@ -298,7 +298,7 @@ func decodeSpentTxOut(serialized []byte, stxo *spentTxOut, txVersion int32) (int
 		// it.  This should never happen unless there is database
 		// corruption or this function is being called without the
 		// proper state.
-		if txVersion == 0 {
+		if txVersion == -1 {
 			return offset, AssertError("decodeSpentTxOut called " +
 				"without a containing tx version when the " +
 				"serialized stxo that does not encode the " +
@@ -382,7 +382,7 @@ func deserializeSpendJournalEntry(serialized []byte, txns []*wire.MsgTx, view *U
 			// to detect this case and pull the tx version from the
 			// entry that contains the version information as just
 			// described.
-			var txVersion int32
+			txVersion := int32(-1)
 			originHash := &txIn.PreviousOutPoint.Hash
 			entry := view.LookupEntry(originHash)
 			if entry != nil {
