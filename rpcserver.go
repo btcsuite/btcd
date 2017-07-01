@@ -4005,11 +4005,8 @@ func handleGetTxOut(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 	}
 	var txFromMempool *dcrutil.Tx
 	if includeMempool {
-		txFromMempool, err = s.server.txMemPool.FetchTransaction(txHash,
+		txFromMempool, _ = s.server.txMemPool.FetchTransaction(txHash,
 			true)
-		if err != nil {
-			return nil, rpcNoTxInfoError(txHash)
-		}
 	}
 	if txFromMempool != nil {
 		mtx := txFromMempool.MsgTx()
