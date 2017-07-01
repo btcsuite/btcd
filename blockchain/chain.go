@@ -321,8 +321,6 @@ func (b *BlockChain) addOrphanBlock(block *btcutil.Block) {
 	// Add to previous hash lookup index for faster dependency lookups.
 	prevHash := &block.MsgBlock().Header.PrevBlock
 	b.prevOrphans[*prevHash] = append(b.prevOrphans[*prevHash], oBlock)
-
-	return
 }
 
 // SequenceLock represents the converted relative lock-time in seconds, and

@@ -124,8 +124,6 @@ func TestTx(t *testing.T) {
 		t.Errorf("Copy: mismatched tx messages - got %v, want %v",
 			spew.Sdump(newMsg), spew.Sdump(msg))
 	}
-
-	return
 }
 
 // TestTxHash tests the ability to generate the hash of a transaction accurately.

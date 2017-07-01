@@ -49,7 +49,7 @@ func MarshalCmd(id interface{}, cmd interface{}) ([]byte, error) {
 	// The provided command must not be nil.
 	rv := reflect.ValueOf(cmd)
 	if rv.IsNil() {
-		str := fmt.Sprint("the specified command is nil")
+		str := "the specified command is nil"
 		return nil, makeError(ErrInvalidType, str)
 	}
 

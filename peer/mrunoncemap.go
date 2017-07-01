@@ -97,7 +97,6 @@ func (m *mruNonceMap) Add(nonce uint64) {
 	// The limit hasn't been reached yet, so just add the new item.
 	node := m.nonceList.PushFront(nonce)
 	m.nonceMap[nonce] = node
-	return
 }
 
 // Delete deletes the passed nonce from the map (if it exists).

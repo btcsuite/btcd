@@ -43,8 +43,6 @@ func TestPing(t *testing.T) {
 			"protocol version %d - got %v, want %v", pver,
 			maxPayload, wantPayload)
 	}
-
-	return
 }
 
 // TestPingBIP0031 tests the MsgPing API against the protocol version
@@ -91,8 +89,6 @@ func TestPingBIP0031(t *testing.T) {
 	if msg.Nonce == readmsg.Nonce {
 		t.Errorf("Should not get same nonce for protocol version %d", pver)
 	}
-
-	return
 }
 
 // TestPingCrossProtocol tests the MsgPing API when encoding with the latest

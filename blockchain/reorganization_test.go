@@ -68,8 +68,6 @@ func TestReorganization(t *testing.T) {
 				"is an orphan\n", i)
 		}
 	}
-
-	return
 }
 
 // loadBlocks reads files containing bitcoin block data (gzipped but otherwise

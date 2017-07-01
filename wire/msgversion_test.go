@@ -124,8 +124,6 @@ func TestVersion(t *testing.T) {
 	if !msg.HasService(SFNodeNetwork) {
 		t.Errorf("HasService: SFNodeNetwork service not set")
 	}
-
-	return
 }
 
 // TestVersionWire tests the MsgVersion wire encode and decode for various
