@@ -615,6 +615,10 @@ var helpDescsEnUS = map[string]string{
 	"rescannedblock-hash":         "Hash of the matching block.",
 	"rescannedblock-transactions": "List of matching transactions, serialized and hex-encoded.",
 
+	// Uptime help.
+	"uptime--synopsis": "Returns the total uptime of the server.",
+	"uptime--result0":  "The number of seconds that the server has been running",
+
 	// Version help.
 	"version--synopsis":       "Returns the JSON-RPC API version (semver)",
 	"version--result0--desc":  "Version objects keyed by the program or API name",
@@ -672,6 +676,7 @@ var rpcResultTypes = map[string][]interface{}{
 	"setgenerate":           nil,
 	"stop":                  {(*string)(nil)},
 	"submitblock":           {nil, (*string)(nil)},
+	"uptime":                {(*int64)(nil)},
 	"validateaddress":       {(*btcjson.ValidateAddressChainResult)(nil)},
 	"verifychain":           {(*bool)(nil)},
 	"verifymessage":         {(*bool)(nil)},

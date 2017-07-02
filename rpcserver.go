@@ -163,6 +163,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"setgenerate":           handleSetGenerate,
 	"stop":                  handleStop,
 	"submitblock":           handleSubmitBlock,
+	"uptime":                handleUptime,
 	"validateaddress":       handleValidateAddress,
 	"verifychain":           handleVerifyChain,
 	"verifymessage":         handleVerifyMessage,
@@ -267,6 +268,7 @@ var rpcLimited = map[string]struct{}{
 	"searchrawtransactions": {},
 	"sendrawtransaction":    {},
 	"submitblock":           {},
+	"uptime":                {},
 	"validateaddress":       {},
 	"verifymessage":         {},
 	"version":               {},
@@ -3311,6 +3313,11 @@ func handleSubmitBlock(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 
 	rpcsLog.Infof("Accepted block %s via submitblock", block.Hash())
 	return nil, nil
+}
+
+// handleUptime implements the uptime command.
+func handleUptime(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	return time.Now().Unix() - s.server.startupTime, nil
 }
 
 // handleValidateAddress implements the validateaddress command.

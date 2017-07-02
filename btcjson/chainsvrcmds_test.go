@@ -960,6 +960,17 @@ func TestChainSvrCmds(t *testing.T) {
 			},
 		},
 		{
+			name: "uptime",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("uptime")
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewUptimeCmd()
+			},
+			marshalled:   `{"jsonrpc":"1.0","method":"uptime","params":[],"id":1}`,
+			unmarshalled: &btcjson.UptimeCmd{},
+		},
+		{
 			name: "validateaddress",
 			newCmd: func() (interface{}, error) {
 				return btcjson.NewCmd("validateaddress", "1Address")

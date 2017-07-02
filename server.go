@@ -167,6 +167,7 @@ type server struct {
 	started       int32
 	shutdown      int32
 	shutdownSched int32
+	startupTime   int64
 
 	chainParams          *chaincfg.Params
 	addrManager          *addrmgr.AddrManager
@@ -2002,6 +2003,9 @@ func (s *server) Start() {
 	}
 
 	srvrLog.Trace("Starting server")
+
+	// Server startup time. Used for the uptime command for uptime calculation.
+	s.startupTime = time.Now().Unix()
 
 	// Start the peer handler which in turn starts the address and block
 	// managers.

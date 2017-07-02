@@ -671,6 +671,14 @@ func NewSubmitBlockCmd(hexBlock string, options *SubmitBlockOptions) *SubmitBloc
 	}
 }
 
+// UptimeCmd defines the uptime JSON-RPC command.
+type UptimeCmd struct{}
+
+// NewUptimeCmd returns a new instance which can be used to issue an uptime JSON-RPC command.
+func NewUptimeCmd() *UptimeCmd {
+	return &UptimeCmd{}
+}
+
 // ValidateAddressCmd defines the validateaddress JSON-RPC command.
 type ValidateAddressCmd struct {
 	Address string
@@ -777,6 +785,7 @@ func init() {
 	MustRegisterCmd("setgenerate", (*SetGenerateCmd)(nil), flags)
 	MustRegisterCmd("stop", (*StopCmd)(nil), flags)
 	MustRegisterCmd("submitblock", (*SubmitBlockCmd)(nil), flags)
+	MustRegisterCmd("uptime", (*UptimeCmd)(nil), flags)
 	MustRegisterCmd("validateaddress", (*ValidateAddressCmd)(nil), flags)
 	MustRegisterCmd("verifychain", (*VerifyChainCmd)(nil), flags)
 	MustRegisterCmd("verifymessage", (*VerifyMessageCmd)(nil), flags)
