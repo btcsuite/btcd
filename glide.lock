@@ -1,12 +1,12 @@
-hash: ea6e6ffa31517aacb35de06b097975229096253bf658d302f2d6652fde91b3f1
-updated: 2017-01-27T20:06:58.5779336-06:00
+hash: 9e111ebb6989c8b23db0ef5c0523e8dde1ccaa964fa7a42faccbb7a6a60b2860
+updated: 2017-06-19T16:45:22.5258215-04:00
 imports:
 - name: github.com/btcsuite/btclog
-  version: 73889fb79bd687870312b6e40effcecffbd57d30
+  version: 96c2a91a67da03552a5e6554fe3ccbfbc7f860be
 - name: github.com/btcsuite/btcrpcclient
-  version: abcdfb702a7ca67e4a32c10be380c63216bd69fe
+  version: 45b9cb481d2aead4e80aab32d7aa86db386430ab
 - name: github.com/btcsuite/btcutil
-  version: 86346b5a958c0cf94186b87855469ae991be501c
+  version: dcd4997b0664bcfd6ef48e4ae9da8396e08b1cd9
   subpackages:
   - base58
   - bloom
@@ -15,10 +15,6 @@ imports:
   version: 4720035b7bfd2a9bb130b1c184f8bbe41b6f0d0f
   subpackages:
   - socks
-- name: github.com/btcsuite/golangcrypto
-  version: 53f62d9b43e87a6c56975cf862af7edf33a8d0df
-  subpackages:
-  - ripemd160
 - name: github.com/btcsuite/goleveldb
   version: 7834afc9e8cd15233b6c3d97e12674a31ca24602
   subpackages:
@@ -34,8 +30,6 @@ imports:
   - leveldb/storage
   - leveldb/table
   - leveldb/util
-- name: github.com/btcsuite/seelog
-  version: 313961b101eb55f65ae0f03ddd4e322731763b6c
 - name: github.com/btcsuite/snappy-go
   version: 0bdef8d067237991ddaa1bb6072a740bc40601ba
 - name: github.com/btcsuite/websocket
@@ -54,4 +48,12 @@ imports:
   - spew
 - name: github.com/jessevdk/go-flags
   version: 1679536dcc895411a9f5848d9a0250be7856448c
+- name: github.com/jrick/logrotate
+  version: 4ed05ed86ef17d10ff99cce77481e0fcf6f2c7b0
+  subpackages:
+  - rotator
+- name: golang.org/x/crypto
+  version: 122d919ec1efcfb58483215da23f815853e24b81
+  subpackages:
+  - ripemd160
 testImports: []

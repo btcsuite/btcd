@@ -35,7 +35,7 @@ type Driver struct {
 var drivers = make(map[string]*Driver)
 
 // RegisterDriver adds a backend database driver to available interfaces.
-// ErrDbTypeRegistered will be retruned if the database type for the driver has
+// ErrDbTypeRegistered will be returned if the database type for the driver has
 // already been registered.
 func RegisterDriver(driver Driver) error {
 	if _, exists := drivers[driver.DbType]; exists {

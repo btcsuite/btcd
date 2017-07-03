@@ -6,6 +6,7 @@
 5. [How do I use bootstrap.dat with btcd?](#Importing)
 
 <a name="What" />
+
 ### 1. What is bootstrap.dat?
 
 It is a flat, binary file containing bitcoin blockchain data starting from the
@@ -20,6 +21,7 @@ block chain from other peers through the Bitcoin protocol with no extra
 configuration needed.
 
 <a name="ProsCons" />
+
 ### 2. What are the pros and cons of using bootstrap.dat?
 
 Pros:
@@ -36,6 +38,7 @@ Cons:
   well as the imported database
 
 <a name="Obtaining" />
+
 ### 3. Where do I get bootstrap.dat?
 
 The bootstrap.dat file is made available via a torrent.  See
@@ -43,6 +46,7 @@ The bootstrap.dat file is made available via a torrent.  See
 for the torrent download details.
 
 <a name="Trust" />
+
 ### 4. How do I know I can trust the bootstrap.dat I downloaded?
 
 You don't need to trust the file as the `addblock` utility verifies every block
@@ -53,6 +57,7 @@ that not only is it a valid chain, but it is the same chain that everyone else
 is using.
 
 <a name="Importing" />
+
 ### 5. How do I use bootstrap.dat with btcd?
 
 btcd comes with a separate utility named `addblock` which can be used to import

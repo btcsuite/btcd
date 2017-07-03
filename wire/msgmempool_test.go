@@ -59,6 +59,4 @@ func TestMemPool(t *testing.T) {
 		s := "decode of MsgMemPool passed for old protocol version %v err <%v>"
 		t.Errorf(s, msg, err)
 	}
-
-	return
 }

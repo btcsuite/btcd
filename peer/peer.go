@@ -88,7 +88,7 @@ var (
 // MessageListeners defines callback function pointers to invoke with message
 // listeners for a peer. Any listener which is not set to a concrete callback
 // during peer initialization is ignored. Execution of multiple message
-// listeners occurs serially, so one callback blocks the excution of the next.
+// listeners occurs serially, so one callback blocks the execution of the next.
 //
 // NOTE: Unless otherwise documented, these listeners must NOT directly call any
 // blocking calls (such as WaitForShutdown) on the peer instance since the input
@@ -213,6 +213,11 @@ type Config struct {
 	// is highly recommended to specify this value and that it follows the
 	// form "major.minor.revision" e.g. "2.6.41".
 	UserAgentVersion string
+
+	// UserAgentComments specify the user agent comments to advertise.  These
+	// values must not contain the illegal characters specified in BIP 14:
+	// '/', ':', '(', ')'.
+	UserAgentComments []string
 
 	// ChainParams identifies which chain parameters the peer is associated
 	// with.  It is highly recommended to specify this field, however it can
@@ -405,7 +410,6 @@ type Peer struct {
 	advertisedProtoVer   uint32 // protocol version advertised by remote
 	protocolVersion      uint32 // negotiated protocol version
 	sendHeadersPreferred bool   // peer sent a sendheaders message
-	versionSent          bool
 	verAckReceived       bool
 
 	knownInventory     *mruInventoryMap
@@ -795,15 +799,13 @@ func (p *Peer) localVersionMsg() (*wire.MsgVersion, error) {
 	// Generate a unique nonce for this peer so self connections can be
 	// detected.  This is accomplished by adding it to a size-limited map of
 	// recently seen nonces.
-	nonce, err := wire.RandomUint64()
-	if err != nil {
-		return nil, err
-	}
+	nonce := uint64(rand.Int63())
 	sentNonces.Add(nonce)
 
 	// Version message.
 	msg := wire.NewMsgVersion(ourNA, theirNA, nonce, blockNum)
-	msg.AddUserAgent(p.cfg.UserAgentName, p.cfg.UserAgentVersion)
+	msg.AddUserAgent(p.cfg.UserAgentName, p.cfg.UserAgentVersion,
+		p.cfg.UserAgentComments...)
 
 	// XXX: bitcoind appears to always enable the full node services flag
 	// of the remote peer netaddress field in the version message regardless
@@ -2017,14 +2019,7 @@ func (p *Peer) writeLocalVersionMsg() error {
 		return err
 	}
 
-	if err := p.writeMessage(localVerMsg); err != nil {
-		return err
-	}
-
-	p.flagsMtx.Lock()
-	p.versionSent = true
-	p.flagsMtx.Unlock()
-	return nil
+	return p.writeMessage(localVerMsg)
 }
 
 // negotiateInboundProtocol waits to receive a version message from the peer

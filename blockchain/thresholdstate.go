@@ -20,7 +20,7 @@ type ThresholdState byte
 // since these values are serialized and must be stable for long-term storage.
 const (
 	// ThresholdDefined is the first state for each deployment and is the
-	// state for the genesis block has by defintion for all deployments.
+	// state for the genesis block has by definition for all deployments.
 	ThresholdDefined ThresholdState = 0
 
 	// ThresholdStarted is the state for a deployment once its start time
@@ -309,14 +309,33 @@ func (b *BlockChain) thresholdState(prevNode *blockNode, checker thresholdCondit
 //
 // This function is safe for concurrent access.
 func (b *BlockChain) ThresholdState(deploymentID uint32) (ThresholdState, error) {
+	b.chainLock.Lock()
+	state, err := b.deploymentState(b.bestNode, deploymentID)
+	b.chainLock.Unlock()
+
+	return state, err
+}
+
+// deploymentState returns the current rule change threshold for a given
+// deploymentID. The threshold is evaluated from the point of view of the block
+// node passed in as the first argument to this method.
+//
+// It is important to note that, as the variable name indicates, this function
+// expects the block node prior to the block for which the deployment state is
+// desired.  In other words, the returned deployment state is for the block
+// AFTER the passed node.
+//
+// This function MUST be called with the chain state lock held (for writes).
+func (b *BlockChain) deploymentState(prevNode *blockNode,
+	deploymentID uint32) (ThresholdState, error) {
+
 	if deploymentID > uint32(len(b.chainParams.Deployments)) {
 		return ThresholdFailed, DeploymentError(deploymentID)
 	}
+
 	deployment := &b.chainParams.Deployments[deploymentID]
 	checker := deploymentChecker{deployment: deployment, chain: b}
 	cache := &b.deploymentCaches[deploymentID]
-	b.chainLock.Lock()
-	state, err := b.thresholdState(b.bestNode, checker, cache)
-	b.chainLock.Unlock()
-	return state, err
+
+	return b.thresholdState(prevNode, checker, cache)
 }

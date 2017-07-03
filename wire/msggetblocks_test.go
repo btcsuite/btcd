@@ -78,8 +78,6 @@ func TestGetBlocks(t *testing.T) {
 		t.Errorf("AddBlockLocatorHash: expected error on too many " +
 			"block locator hashes not received")
 	}
-
-	return
 }
 
 // TestGetBlocksWire tests the MsgGetBlocks wire encode and decode for various

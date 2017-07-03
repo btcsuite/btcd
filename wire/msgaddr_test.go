@@ -95,8 +95,6 @@ func TestAddr(t *testing.T) {
 			"protocol version %d - got %v, want %v", pver,
 			maxPayload, wantPayload)
 	}
-
-	return
 }
 
 // TestAddrWire tests the MsgAddr wire encode and decode for various numbers

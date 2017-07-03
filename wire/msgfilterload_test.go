@@ -48,8 +48,6 @@ func TestFilterLoadLatest(t *testing.T) {
 	if err != nil {
 		t.Errorf("decode of MsgFilterLoad failed [%v] err <%v>", buf, err)
 	}
-
-	return
 }
 
 // TestFilterLoadCrossProtocol tests the MsgFilterLoad API when encoding with

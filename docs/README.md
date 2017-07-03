@@ -22,7 +22,9 @@
     3. [The btcsuite Bitcoin-related Go Packages](#GoPackages)
 
 <a name="About" />
+
 ### 1. About
+
 btcd is a full node bitcoin implementation written in [Go](http://golang.org),
 licensed under the [copyfree](http://www.copyfree.org) ISC License.
 
@@ -53,22 +55,27 @@ directly with btcd.  That functionality is provided by the
 which are both under active development.
 
 <a name="GettingStarted" />
+
 ### 2. Getting Started
 
 <a name="Installation" />
-**2.1 Installation**<br />
+
+**2.1 Installation**
 
 The first step is to install btcd.  See one of the following sections for
 details on how to install on the supported operating systems.
 
 <a name="WindowsInstallation" />
+
 **2.1.1 Windows Installation**<br />
 
 * Install the MSI available at: https://github.com/btcsuite/btcd/releases
 * Launch btcd from the Start Menu
 
 <a name="PosixInstallation" />
-**2.1.2 Linux/BSD/MacOSX/POSIX Installation**<br />
+
+**2.1.2 Linux/BSD/MacOSX/POSIX Installation**
+
 
 - Install Go according to the installation instructions here:
   http://golang.org/doc/install
@@ -110,7 +117,8 @@ $ go install . ./cmd/...
 ```
 
 <a name="GentooInstallation" />
-**2.1.2.1 Gentoo Linux Installation**<br />
+
+**2.1.2.1 Gentoo Linux Installation**
 
 * Install Layman and enable the Bitcoin overlay.
   * https://gitlab.com/bitcoin/gentoo
@@ -118,13 +126,15 @@ $ go install . ./cmd/...
 * Install btcd: `$ emerge net-p2p/btcd`
 
 <a name="Configuration" />
-**2.2 Configuration**<br />
+
+**2.2 Configuration**
 
 btcd has a number of [configuration](http://godoc.org/github.com/btcsuite/btcd)
 options, which can be viewed by running: `$ btcd --help`.
 
 <a name="BtcctlConfig" />
-**2.3 Controlling and Querying btcd via btcctl**<br />
+
+**2.3 Controlling and Querying btcd via btcctl**
 
 btcctl is a command line utility that can be used to both control and query btcd
 via [RPC](http://www.wikipedia.org/wiki/Remote_procedure_call).  btcd does
@@ -154,11 +164,14 @@ rpclimitpass=Limitedp4ssw0rd
 For a list of available options, run: `$ btcctl --help`
 
 <a name="Mining" />
-**2.4 Mining**<br />
-btcd supports the `getblocktemplate` RPC.
-The limited user cannot access this RPC.<br />
 
-**1. Add the payment addresses with the `miningaddr` option.**<br />
+**2.4 Mining**
+
+btcd supports the `getblocktemplate` RPC.
+The limited user cannot access this RPC.
+
+
+**1. Add the payment addresses with the `miningaddr` option.**
 
 ```
 [Application Options]
@@ -168,73 +181,92 @@ miningaddr=12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX
 miningaddr=1M83ju3EChKYyysmM2FXtLNftbacagd8FR
 ```
 
-**2. Add btcd's RPC TLS certificate to system Certificate Authority list.**<br />
+**2. Add btcd's RPC TLS certificate to system Certificate Authority list.**
 
 `cgminer` uses [curl](http://curl.haxx.se/) to fetch data from the RPC server.
 Since curl validates the certificate by default, we must install the `btcd` RPC
 certificate into the default system Certificate Authority list.
 
-**Ubuntu**<br />
+**Ubuntu**
 
-1. Copy rpc.cert to /usr/share/ca-certificates: `# cp /home/user/.btcd/rpc.cert /usr/share/ca-certificates/btcd.crt`<br />
-2. Add btcd.crt to /etc/ca-certificates.conf: `# echo btcd.crt >> /etc/ca-certificates.conf`<br />
-3. Update the CA certificate list: `# update-ca-certificates`<br />
+1. Copy rpc.cert to /usr/share/ca-certificates: `# cp /home/user/.btcd/rpc.cert /usr/share/ca-certificates/btcd.crt`
+2. Add btcd.crt to /etc/ca-certificates.conf: `# echo btcd.crt >> /etc/ca-certificates.conf`
+3. Update the CA certificate list: `# update-ca-certificates`
 
-**3. Set your mining software url to use https.**<br />
+**3. Set your mining software url to use https.**
 
 `$ cgminer -o https://127.0.0.1:8334 -u rpcuser -p rpcpassword`
 
 <a name="Help" />
+
 ### 3. Help
 
 <a name="Startup" />
-**3.1 Startup**<br />
+
+**3.1 Startup**
 
 Typically btcd will run and start downloading the block chain with no extra
 configuration necessary, however, there is an optional method to use a
 `bootstrap.dat` file that may speed up the initial block chain download process.
 
 <a name="BootstrapDat" />
-**3.1.1 bootstrap.dat**<br />
+
+**3.1.1 bootstrap.dat**
+
 * [Using bootstrap.dat](https://github.com/btcsuite/btcd/tree/master/docs/using_bootstrap_dat.md)
 
 <a name="NetworkConfig" />
-**3.1.2 Network Configuration**<br />
+
+**3.1.2 Network Configuration**
+
 * [What Ports Are Used by Default?](https://github.com/btcsuite/btcd/tree/master/docs/default_ports.md)
 * [How To Listen on Specific Interfaces](https://github.com/btcsuite/btcd/tree/master/docs/configure_peer_server_listen_interfaces.md)
 * [How To Configure RPC Server to Listen on Specific Interfaces](https://github.com/btcsuite/btcd/tree/master/docs/configure_rpc_server_listen_interfaces.md)
 * [Configuring btcd with Tor](https://github.com/btcsuite/btcd/tree/master/docs/configuring_tor.md)
 
 <a name="Wallet" />
-**3.1 Wallet**<br />
+
+**3.1 Wallet**
 
 btcd was intentionally developed without an integrated wallet for security
 reasons.  Please see [btcwallet](https://github.com/btcsuite/btcwallet) for more
 information.
 
+
 <a name="Contact" />
+
 ### 4. Contact
 
 <a name="ContactIRC" />
-**4.1 IRC**<br />
-* [irc.freenode.net](irc://irc.freenode.net), channel #btcd
+
+**4.1 IRC**
+
+* [irc.freenode.net](irc://irc.freenode.net), channel `#btcd`
 
 <a name="MailingLists" />
-**4.2 Mailing Lists**<br />
+
+**4.2 Mailing Lists**
+
 * <a href="mailto:btcd+subscribe@opensource.conformal.com">btcd</a>: discussion
   of btcd and its packages.
 * <a href="mailto:btcd-commits+subscribe@opensource.conformal.com">btcd-commits</a>:
   readonly mail-out of source code changes.
 
 <a name="DeveloperResources" />
+
 ### 5. Developer Resources
 
 <a name="ContributionGuidelines" />
+
 * [Code Contribution Guidelines](https://github.com/btcsuite/btcd/tree/master/docs/code_contribution_guidelines.md)
+
 <a name="JSONRPCReference" />
+
 * [JSON-RPC Reference](https://github.com/btcsuite/btcd/tree/master/docs/json_rpc_api.md)
     * [RPC Examples](https://github.com/btcsuite/btcd/tree/master/docs/json_rpc_api.md#ExampleCode)
+
 <a name="GoPackages" />
+
 * The btcsuite Bitcoin-related Go Packages:
     * [btcrpcclient](https://github.com/btcsuite/btcrpcclient) - Implements a
       robust and easy to use Websocket-enabled Bitcoin JSON-RPC client

@@ -192,16 +192,39 @@ type GetMempoolInfoResult struct {
 	Bytes int64 `json:"bytes"`
 }
 
+// NetworksResult models the networks data from the getnetworkinfo command.
+type NetworksResult struct {
+	Name                      string `json:"name"`
+	Limited                   bool   `json:"limited"`
+	Reachable                 bool   `json:"reachable"`
+	Proxy                     string `json:"proxy"`
+	ProxyRandomizeCredentials bool   `json:"proxy_randomize_credentials"`
+}
+
+// LocalAddressesResult models the localaddresses data from the getnetworkinfo
+// command.
+type LocalAddressesResult struct {
+	Address string `json:"address"`
+	Port    uint16 `json:"port"`
+	Score   int32  `json:"score"`
+}
+
 // GetNetworkInfoResult models the data returned from the getnetworkinfo
 // command.
 type GetNetworkInfoResult struct {
 	Version         int32                  `json:"version"`
+	SubVersion      string                 `json:"subversion"`
 	ProtocolVersion int32                  `json:"protocolversion"`
+	LocalServices   string                 `json:"localservices"`
+	LocalRelay      bool                   `json:"localrelay"`
 	TimeOffset      int64                  `json:"timeoffset"`
 	Connections     int32                  `json:"connections"`
+	NetworkActive   bool                   `json:"networkactive"`
 	Networks        []NetworksResult       `json:"networks"`
 	RelayFee        float64                `json:"relayfee"`
+	IncrementalFee  float64                `json:"incrementalfee"`
 	LocalAddresses  []LocalAddressesResult `json:"localaddresses"`
+	Warnings        string                 `json:"warnings"`
 }
 
 // GetPeerInfoResult models the data returned from the getpeerinfo command.
@@ -413,22 +436,6 @@ type InfoChainResult struct {
 	TestNet         bool    `json:"testnet"`
 	RelayFee        float64 `json:"relayfee"`
 	Errors          string  `json:"errors"`
-}
-
-// LocalAddressesResult models the localaddresses data from the getnetworkinfo
-// command.
-type LocalAddressesResult struct {
-	Address string `json:"address"`
-	Port    uint16 `json:"port"`
-	Score   int32  `json:"score"`
-}
-
-// NetworksResult models the networks data from the getnetworkinfo command.
-type NetworksResult struct {
-	Name      string `json:"name"`
-	Limited   bool   `json:"limited"`
-	Reachable bool   `json:"reachable"`
-	Proxy     string `json:"proxy"`
 }
 
 // TxRawResult models the data from the getrawtransaction command.

@@ -34,13 +34,10 @@ obtained via the Create and Open functions which take a database type string
 that identifies the specific database driver (backend) to use as well as
 arguments specific to the specified driver.
 
-Namespaces
-
-The Namespace interface is an abstraction that provides facilities for obtaining
-transactions (the Tx interface) that are the basis of all database reads and
-writes.  Unlike some database interfaces that support reading and writing
-without transactions, this interface requires transactions even when only
-reading or writing a single key.
+The interface provides facilities for obtaining transactions (the Tx interface)
+that are the basis of all database reads and writes.  Unlike some database
+interfaces that support reading and writing without transactions, this interface
+requires transactions even when only reading or writing a single key.
 
 The Begin function provides an unmanaged transaction while the View and Update
 functions provide a managed transaction.  These are described in more detail

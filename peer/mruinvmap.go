@@ -99,7 +99,6 @@ func (m *mruInventoryMap) Add(iv *wire.InvVect) {
 	// The limit hasn't been reached yet, so just add the new item.
 	node := m.invList.PushFront(iv)
 	m.invMap[*iv] = node
-	return
 }
 
 // Delete deletes the passed inventory item from the map (if it exists).

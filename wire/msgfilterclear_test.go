@@ -34,8 +34,6 @@ func TestFilterClearLatest(t *testing.T) {
 			"protocol version %d - got %v, want %v", pver,
 			maxPayload, wantPayload)
 	}
-
-	return
 }
 
 // TestFilterClearCrossProtocol tests the MsgFilterClear API when encoding with

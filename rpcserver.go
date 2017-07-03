@@ -163,6 +163,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"setgenerate":           handleSetGenerate,
 	"stop":                  handleStop,
 	"submitblock":           handleSubmitBlock,
+	"uptime":                handleUptime,
 	"validateaddress":       handleValidateAddress,
 	"verifychain":           handleVerifyChain,
 	"verifymessage":         handleVerifyMessage,
@@ -254,6 +255,7 @@ var rpcLimited = map[string]struct{}{
 	"getblock":              {},
 	"getblockcount":         {},
 	"getblockhash":          {},
+	"getblockheader":        {},
 	"getcurrentnet":         {},
 	"getdifficulty":         {},
 	"getheaders":            {},
@@ -266,6 +268,7 @@ var rpcLimited = map[string]struct{}{
 	"searchrawtransactions": {},
 	"sendrawtransaction":    {},
 	"submitblock":           {},
+	"uptime":                {},
 	"validateaddress":       {},
 	"verifymessage":         {},
 	"version":               {},
@@ -1178,6 +1181,8 @@ func handleGetBlockChainInfo(s *rpcServer, cmd interface{}, closeChan <-chan str
 		switch deployment {
 		case chaincfg.DeploymentTestDummy:
 			forkName = "dummy"
+		case chaincfg.DeploymentCSV:
+			forkName = "csv"
 		default:
 			return nil, &btcjson.RPCError{
 				Code: btcjson.ErrRPCInternal.Code,
@@ -2036,11 +2041,11 @@ func handleGetBlockTemplateProposal(s *rpcServer, request *btcjson.TemplateReque
 	isOrphan, err := s.server.blockManager.ProcessBlock(block, flags)
 	if err != nil {
 		if _, ok := err.(blockchain.RuleError); !ok {
-			err := rpcsLog.Errorf("Failed to process block "+
-				"proposal: %v", err)
+			errStr := fmt.Sprintf("Failed to process block proposal: %v", err)
+			rpcsLog.Error(errStr)
 			return nil, &btcjson.RPCError{
 				Code:    btcjson.ErrRPCVerify,
-				Message: err.Error(),
+				Message: errStr,
 			}
 		}
 
@@ -3308,6 +3313,11 @@ func handleSubmitBlock(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 
 	rpcsLog.Infof("Accepted block %s via submitblock", block.Hash())
 	return nil, nil
+}
+
+// handleUptime implements the uptime command.
+func handleUptime(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	return time.Now().Unix() - s.server.startupTime, nil
 }
 
 // handleValidateAddress implements the validateaddress command.

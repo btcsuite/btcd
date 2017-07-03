@@ -61,8 +61,6 @@ func TestPongLatest(t *testing.T) {
 	if msg.Nonce != readmsg.Nonce {
 		t.Errorf("Should get same nonce for protocol version %d", pver)
 	}
-
-	return
 }
 
 // TestPongBIP0031 tests the MsgPong API against the protocol version
@@ -108,8 +106,6 @@ func TestPongBIP0031(t *testing.T) {
 	if msg.Nonce == readmsg.Nonce {
 		t.Errorf("Should not get same nonce for protocol version %d", pver)
 	}
-
-	return
 }
 
 // TestPongCrossProtocol tests the MsgPong API when encoding with the latest

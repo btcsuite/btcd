@@ -59,8 +59,6 @@ func TestFeeFilterLatest(t *testing.T) {
 	if msg.MinFee != readmsg.MinFee {
 		t.Errorf("Should get same minfee for protocol version %d", pver)
 	}
-
-	return
 }
 
 // TestFeeFilterWire tests the MsgFeeFilter wire encode and decode for various protocol

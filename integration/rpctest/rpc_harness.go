@@ -383,6 +383,13 @@ func (h *Harness) RPCConfig() btcrpcclient.ConnConfig {
 	return h.node.config.rpcConnConfig()
 }
 
+// P2PAddress returns the harness' P2P listening address. This allows potential
+// peers (such as SPV peers) created within tests to connect to a given test
+// harness instance.
+func (h *Harness) P2PAddress() string {
+	return h.node.config.listen
+}
+
 // GenerateAndSubmitBlock creates a block whose contents include the passed
 // transactions and submits it to the running simnet node. For generating
 // blocks with only a coinbase tx, callers can simply pass nil instead of
@@ -414,7 +421,7 @@ func (h *Harness) GenerateAndSubmitBlock(txns []*btcutil.Tx, blockVersion int32,
 	prevBlock.SetHeight(prevBlockHeight)
 
 	// Create a new block including the specified transactions
-	newBlock, err := createBlock(prevBlock, txns, blockVersion,
+	newBlock, err := CreateBlock(prevBlock, txns, blockVersion,
 		blockTime, h.wallet.coinbaseAddr, h.ActiveNet)
 	if err != nil {
 		return nil, err

@@ -65,7 +65,6 @@ func TestAddJacobian(t *testing.T) {
 			"131c670d414c4546b88ac3ff664611b1c38ceb1c21d76369d7a7a0969d61d97d",
 			"1",
 		},
-
 		// Addition with z1=z2=1 different x values.
 		{
 			"34f9460f0e4f08393d192b3c5133a6ba099aa0ad9fd54ebccfacdfa239ff49c6",
@@ -397,6 +396,15 @@ func TestDoubleJacobian(t *testing.T) {
 			"2b53702c466dcf6e984a35671756c506c67c2fcb8adb408c44dd125dc91cb988",
 			"6e3d537ae61fb1247eda4b4f523cfbaee5152c0d0d96b520376833c2e5944a11",
 		},
+		// From btcd issue #709.
+		{
+			"201e3f75715136d2f93c4f4598f91826f94ca01f4233a5bd35de9708859ca50d",
+			"bdf18566445e7562c6ada68aef02d498d7301503de5b18c6aef6e2b1722412e1",
+			"0000000000000000000000000000000000000000000000000000000000000001",
+			"4a5e0559863ebb4e9ed85f5c4fa76003d05d9a7626616e614a1f738621e3c220",
+			"00000000000000000000000000000000000000000000000000000001b1388778",
+			"7be30acc88bceac58d5b4d15de05a931ae602a07bcb6318d5dedc563e4482993",
+		},
 	}
 
 	t.Logf("Running %d tests", len(tests))
@@ -591,6 +599,46 @@ func TestBaseMultVerify(t *testing.T) {
 }
 
 func TestScalarMult(t *testing.T) {
+	tests := []struct {
+		x  string
+		y  string
+		k  string
+		rx string
+		ry string
+	}{
+		// base mult, essentially.
+		{
+			"79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+			"483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8",
+			"18e14a7b6a307f426a94f8114701e7c8e774e7f9a47e2c2035db29a206321725",
+			"50863ad64a87ae8a2fe83c1af1a8403cb53f53e486d8511dad8a04887e5b2352",
+			"2cd470243453a299fa9e77237716103abc11a1df38855ed6f2ee187e9c582ba6",
+		},
+		// From btcd issue #709.
+		{
+			"000000000000000000000000000000000000000000000000000000000000002c",
+			"420e7a99bba18a9d3952597510fd2b6728cfeafc21a4e73951091d4d8ddbe94e",
+			"a2e8ba2e8ba2e8ba2e8ba2e8ba2e8ba219b51835b55cc30ebfe2f6599bc56f58",
+			"a2112dcdfbcd10ae1133a358de7b82db68e0a3eb4b492cc8268d1e7118c98788",
+			"27fc7463b7bb3c5f98ecf2c84a6272bb1681ed553d92c69f2dfe25a9f9fd3836",
+		},
+	}
+
+	s256 := S256()
+	for i, test := range tests {
+		x, _ := new(big.Int).SetString(test.x, 16)
+		y, _ := new(big.Int).SetString(test.y, 16)
+		k, _ := new(big.Int).SetString(test.k, 16)
+		xWant, _ := new(big.Int).SetString(test.rx, 16)
+		yWant, _ := new(big.Int).SetString(test.ry, 16)
+		xGot, yGot := s256.ScalarMult(x, y, k.Bytes())
+		if xGot.Cmp(xWant) != 0 || yGot.Cmp(yWant) != 0 {
+			t.Fatalf("%d: bad output: got (%X, %X), want (%X, %X)", i, xGot, yGot, xWant, yWant)
+		}
+	}
+}
+
+func TestScalarMultRand(t *testing.T) {
 	// Strategy for this test:
 	// Get a random exponent from the generator point at first
 	// This creates a new point which is used in the next iteration
@@ -613,6 +661,118 @@ func TestScalarMult(t *testing.T) {
 		if x.Cmp(xWant) != 0 || y.Cmp(yWant) != 0 {
 			t.Fatalf("%d: bad output for %X: got (%X, %X), want (%X, %X)", i, data, x, y, xWant, yWant)
 			break
+		}
+	}
+}
+
+func TestSplitK(t *testing.T) {
+	tests := []struct {
+		k      string
+		k1, k2 string
+		s1, s2 int
+	}{
+		{
+			"6df2b5d30854069ccdec40ae022f5c948936324a4e9ebed8eb82cfd5a6b6d766",
+			"00000000000000000000000000000000b776e53fb55f6b006a270d42d64ec2b1",
+			"00000000000000000000000000000000d6cc32c857f1174b604eefc544f0c7f7",
+			-1, -1,
+		},
+		{
+			"6ca00a8f10632170accc1b3baf2a118fa5725f41473f8959f34b8f860c47d88d",
+			"0000000000000000000000000000000007b21976c1795723c1bfbfa511e95b84",
+			"00000000000000000000000000000000d8d2d5f9d20fc64fd2cf9bda09a5bf90",
+			1, -1,
+		},
+		{
+			"b2eda8ab31b259032d39cbc2a234af17fcee89c863a8917b2740b67568166289",
+			"00000000000000000000000000000000507d930fecda7414fc4a523b95ef3c8c",
+			"00000000000000000000000000000000f65ffb179df189675338c6185cb839be",
+			-1, -1,
+		},
+		{
+			"f6f00e44f179936f2befc7442721b0633f6bafdf7161c167ffc6f7751980e3a0",
+			"0000000000000000000000000000000008d0264f10bcdcd97da3faa38f85308d",
+			"0000000000000000000000000000000065fed1506eb6605a899a54e155665f79",
+			-1, -1,
+		},
+		{
+			"8679085ab081dc92cdd23091ce3ee998f6b320e419c3475fae6b5b7d3081996e",
+			"0000000000000000000000000000000089fbf24fbaa5c3c137b4f1cedc51d975",
+			"00000000000000000000000000000000d38aa615bd6754d6f4d51ccdaf529fea",
+			-1, -1,
+		},
+		{
+			"6b1247bb7931dfcae5b5603c8b5ae22ce94d670138c51872225beae6bba8cdb3",
+			"000000000000000000000000000000008acc2a521b21b17cfb002c83be62f55d",
+			"0000000000000000000000000000000035f0eff4d7430950ecb2d94193dedc79",
+			-1, -1,
+		},
+		{
+			"a2e8ba2e8ba2e8ba2e8ba2e8ba2e8ba219b51835b55cc30ebfe2f6599bc56f58",
+			"0000000000000000000000000000000045c53aa1bb56fcd68c011e2dad6758e4",
+			"00000000000000000000000000000000a2e79d200f27f2360fba57619936159b",
+			-1, -1,
+		},
+	}
+
+	s256 := S256()
+	for i, test := range tests {
+		k, ok := new(big.Int).SetString(test.k, 16)
+		if !ok {
+			t.Errorf("%d: bad value for k: %s", i, test.k)
+		}
+		k1, k2, k1Sign, k2Sign := s256.splitK(k.Bytes())
+		k1str := fmt.Sprintf("%064x", k1)
+		if test.k1 != k1str {
+			t.Errorf("%d: bad k1: got %v, want %v", i, k1str, test.k1)
+		}
+		k2str := fmt.Sprintf("%064x", k2)
+		if test.k2 != k2str {
+			t.Errorf("%d: bad k2: got %v, want %v", i, k2str, test.k2)
+		}
+		if test.s1 != k1Sign {
+			t.Errorf("%d: bad k1 sign: got %d, want %d", i, k1Sign, test.s1)
+		}
+		if test.s2 != k2Sign {
+			t.Errorf("%d: bad k2 sign: got %d, want %d", i, k2Sign, test.s2)
+		}
+		k1Int := new(big.Int).SetBytes(k1)
+		k1SignInt := new(big.Int).SetInt64(int64(k1Sign))
+		k1Int.Mul(k1Int, k1SignInt)
+		k2Int := new(big.Int).SetBytes(k2)
+		k2SignInt := new(big.Int).SetInt64(int64(k2Sign))
+		k2Int.Mul(k2Int, k2SignInt)
+		gotK := new(big.Int).Mul(k2Int, s256.lambda)
+		gotK.Add(k1Int, gotK)
+		gotK.Mod(gotK, s256.N)
+		if k.Cmp(gotK) != 0 {
+			t.Errorf("%d: bad k: got %X, want %X", i, gotK.Bytes(), k.Bytes())
+		}
+	}
+}
+
+func TestSplitKRand(t *testing.T) {
+	s256 := S256()
+	for i := 0; i < 1024; i++ {
+		bytesK := make([]byte, 32)
+		_, err := rand.Read(bytesK)
+		if err != nil {
+			t.Fatalf("failed to read random data at %d", i)
+			break
+		}
+		k := new(big.Int).SetBytes(bytesK)
+		k1, k2, k1Sign, k2Sign := s256.splitK(bytesK)
+		k1Int := new(big.Int).SetBytes(k1)
+		k1SignInt := new(big.Int).SetInt64(int64(k1Sign))
+		k1Int.Mul(k1Int, k1SignInt)
+		k2Int := new(big.Int).SetBytes(k2)
+		k2SignInt := new(big.Int).SetInt64(int64(k2Sign))
+		k2Int.Mul(k2Int, k2SignInt)
+		gotK := new(big.Int).Mul(k2Int, s256.lambda)
+		gotK.Add(k1Int, gotK)
+		gotK.Mod(gotK, s256.N)
+		if k.Cmp(gotK) != 0 {
+			t.Errorf("%d: bad k: got %X, want %X", i, gotK.Bytes(), k.Bytes())
 		}
 	}
 }
@@ -660,6 +820,42 @@ func TestSignAndVerify(t *testing.T) {
 }
 
 func TestNAF(t *testing.T) {
+	tests := []string{
+		"6df2b5d30854069ccdec40ae022f5c948936324a4e9ebed8eb82cfd5a6b6d766",
+		"b776e53fb55f6b006a270d42d64ec2b1",
+		"d6cc32c857f1174b604eefc544f0c7f7",
+		"45c53aa1bb56fcd68c011e2dad6758e4",
+		"a2e79d200f27f2360fba57619936159b",
+	}
+	negOne := big.NewInt(-1)
+	one := big.NewInt(1)
+	two := big.NewInt(2)
+	for i, test := range tests {
+		want, _ := new(big.Int).SetString(test, 16)
+		nafPos, nafNeg := NAF(want.Bytes())
+		got := big.NewInt(0)
+		// Check that the NAF representation comes up with the right number
+		for i := 0; i < len(nafPos); i++ {
+			bytePos := nafPos[i]
+			byteNeg := nafNeg[i]
+			for j := 7; j >= 0; j-- {
+				got.Mul(got, two)
+				if bytePos&0x80 == 0x80 {
+					got.Add(got, one)
+				} else if byteNeg&0x80 == 0x80 {
+					got.Add(got, negOne)
+				}
+				bytePos <<= 1
+				byteNeg <<= 1
+			}
+		}
+		if got.Cmp(want) != 0 {
+			t.Errorf("%d: Failed NAF got %X want %X", i, got, want)
+		}
+	}
+}
+
+func TestNAFRand(t *testing.T) {
 	negOne := big.NewInt(-1)
 	one := big.NewInt(1)
 	two := big.NewInt(2)

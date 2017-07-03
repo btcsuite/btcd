@@ -747,9 +747,9 @@ func NAF(k []byte) ([]byte, []byte) {
 	}
 	if carry {
 		retPos[0] = 1
+		return retPos, retNeg
 	}
-
-	return retPos, retNeg
+	return retPos[1:], retNeg[1:]
 }
 
 // ScalarMult returns k*(Bx, By) where k is a big endian integer.

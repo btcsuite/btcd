@@ -85,6 +85,11 @@ const (
 	// purposes.
 	DeploymentTestDummy = iota
 
+	// DeploymentCSV defines the rule change deployment ID for the CSV
+	// soft-fork package. The CSV package includes the depolyment of BIPS
+	// 68, 112, and 113.
+	DeploymentCSV
+
 	// NOTE: DefinedDeployments must always come last since it is used to
 	// determine how many defined deployments there currently are.
 
@@ -215,7 +220,6 @@ var MainNetParams = Params{
 		{"dnsseed.bitcoin.dashjr.org", false},
 		{"seed.bitcoinstats.com", true},
 		{"seed.bitnodes.io", false},
-		{"bitseed.xf2.org", false},
 		{"seed.bitcoin.jonasschnelli.ch", true},
 	},
 
@@ -269,6 +273,11 @@ var MainNetParams = Params{
 			BitNumber:  28,
 			StartTime:  1199145601, // January 1, 2008 UTC
 			ExpireTime: 1230767999, // December 31, 2008 UTC
+		},
+		DeploymentCSV: {
+			BitNumber:  0,
+			StartTime:  1462060800, // May 1st, 2016
+			ExpireTime: 1493596800, // May 1st, 2017
 		},
 	},
 
@@ -327,6 +336,11 @@ var RegressionNetParams = Params{
 	Deployments: [DefinedDeployments]ConsensusDeployment{
 		DeploymentTestDummy: {
 			BitNumber:  28,
+			StartTime:  0,             // Always available for vote
+			ExpireTime: math.MaxInt64, // Never expires
+		},
+		DeploymentCSV: {
+			BitNumber:  0,
 			StartTime:  0,             // Always available for vote
 			ExpireTime: math.MaxInt64, // Never expires
 		},
@@ -407,6 +421,11 @@ var TestNet3Params = Params{
 			StartTime:  1199145601, // January 1, 2008 UTC
 			ExpireTime: 1230767999, // December 31, 2008 UTC
 		},
+		DeploymentCSV: {
+			BitNumber:  0,
+			StartTime:  1456790400, // March 1st, 2016
+			ExpireTime: 1493596800, // May 1st, 2017
+		},
 	},
 
 	// Mempool parameters
@@ -468,6 +487,11 @@ var SimNetParams = Params{
 	Deployments: [DefinedDeployments]ConsensusDeployment{
 		DeploymentTestDummy: {
 			BitNumber:  28,
+			StartTime:  0,             // Always available for vote
+			ExpireTime: math.MaxInt64, // Never expires
+		},
+		DeploymentCSV: {
+			BitNumber:  0,
 			StartTime:  0,             // Always available for vote
 			ExpireTime: math.MaxInt64, // Never expires
 		},

@@ -16,7 +16,7 @@ import (
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/rpctest"
+	"github.com/btcsuite/btcd/integration/rpctest"
 )
 
 const (

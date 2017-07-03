@@ -190,7 +190,7 @@ func mergeScripts(chainParams *chaincfg.Params, tx *wire.MsgTx, idx int,
 		script := sigPops[len(sigPops)-1].data
 
 		// We already know this information somewhere up the stack.
-		class, addresses, nrequired, err :=
+		class, addresses, nrequired, _ :=
 			ExtractPkScriptAddrs(script, chainParams)
 
 		// regenerate scripts.

@@ -32,8 +32,6 @@ func TestVerAck(t *testing.T) {
 			"protocol version %d - got %v, want %v", pver,
 			maxPayload, wantPayload)
 	}
-
-	return
 }
 
 // TestVerAckWire tests the MsgVerAck wire encode and decode for various

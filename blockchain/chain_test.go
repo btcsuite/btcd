@@ -5,11 +5,15 @@
 package blockchain_test
 
 import (
+	"bytes"
 	"testing"
+	"time"
 
 	"github.com/btcsuite/btcd/blockchain"
+	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/integration/rpctest"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
 )
@@ -115,15 +119,10 @@ func TestHaveBlock(t *testing.T) {
 // combinations of inputs to the CalcSequenceLock function in order to ensure
 // the returned SequenceLocks are correct for each test instance.
 func TestCalcSequenceLock(t *testing.T) {
-	fileName := "blk_0_to_4.dat.bz2"
-	blocks, err := loadBlocks(fileName)
-	if err != nil {
-		t.Errorf("Error loading file: %v\n", err)
-		return
-	}
+	netParams := &chaincfg.SimNetParams
 
 	// Create a new database and chain instance to run tests against.
-	chain, teardownFunc, err := chainSetup("haveblock", &chaincfg.MainNetParams)
+	chain, teardownFunc, err := chainSetup("calcseqlock", netParams)
 	if err != nil {
 		t.Errorf("Failed to setup chain instance: %v", err)
 		return
@@ -134,45 +133,92 @@ func TestCalcSequenceLock(t *testing.T) {
 	// maturity to 1.
 	chain.TstSetCoinbaseMaturity(1)
 
-	// Load all the blocks into our test chain.
-	for i := 1; i < len(blocks); i++ {
-		_, isOrphan, err := chain.ProcessBlock(blocks[i], blockchain.BFNone)
-		if err != nil {
-			t.Errorf("ProcessBlock fail on block %v: %v\n", i, err)
-			return
-		}
-		if isOrphan {
-			t.Errorf("ProcessBlock incorrectly returned block %v "+
-				"is an orphan\n", i)
-			return
-		}
+	// Create a test mining address to use for the blocks we'll generate
+	// shortly below.
+	k := bytes.Repeat([]byte{1}, 32)
+	_, miningPub := btcec.PrivKeyFromBytes(btcec.S256(), k)
+	miningAddr, err := btcutil.NewAddressPubKey(miningPub.SerializeCompressed(),
+		netParams)
+	if err != nil {
+		t.Fatalf("unable to generate mining addr: %v", err)
 	}
 
-	// Create with all the utxos within the create created above.
+	// We'll keep track of the previous block for back pointers in blocks
+	// we generated, and also the generated blocks along with the MTP from
+	// their PoV to aide with our relative time lock calculations.
+	var prevBlock *btcutil.Block
+	var blocksWithMTP []struct {
+		block *btcutil.Block
+		mtp   time.Time
+	}
+
+	// We need to activate CSV in order to test the processing logic, so
+	// manually craft the block version that's used to signal the soft-fork
+	// activation.
+	csvBit := netParams.Deployments[chaincfg.DeploymentCSV].BitNumber
+	blockVersion := int32(0x20000000 | (uint32(1) << csvBit))
+
+	// Generate enough blocks to activate CSV, collecting each of the
+	// blocks into a slice for later use.
+	numBlocksToActivate := (netParams.MinerConfirmationWindow * 3)
+	for i := uint32(0); i < numBlocksToActivate; i++ {
+		block, err := rpctest.CreateBlock(prevBlock, nil, blockVersion,
+			time.Time{}, miningAddr, netParams)
+		if err != nil {
+			t.Fatalf("unable to generate block: %v", err)
+		}
+
+		mtp := chain.BestSnapshot().MedianTime
+
+		_, isOrphan, err := chain.ProcessBlock(block, blockchain.BFNone)
+		if err != nil {
+			t.Fatalf("ProcessBlock fail on block %v: %v\n", i, err)
+		}
+		if isOrphan {
+			t.Fatalf("ProcessBlock incorrectly returned block %v "+
+				"is an orphan\n", i)
+		}
+
+		blocksWithMTP = append(blocksWithMTP, struct {
+			block *btcutil.Block
+			mtp   time.Time
+		}{
+			block: block,
+			mtp:   mtp,
+		})
+
+		prevBlock = block
+	}
+
+	// Create a utxo view with all the utxos within the blocks created
+	// above.
 	utxoView := blockchain.NewUtxoViewpoint()
-	for blockHeight, block := range blocks {
-		for _, tx := range block.Transactions() {
+	for blockHeight, blockWithMTP := range blocksWithMTP {
+		for _, tx := range blockWithMTP.block.Transactions() {
 			utxoView.AddTxOuts(tx, int32(blockHeight))
 		}
 	}
-	utxoView.SetBestHash(blocks[len(blocks)-1].Hash())
+	utxoView.SetBestHash(blocksWithMTP[len(blocksWithMTP)-1].block.Hash())
 
-	// The median past time from the point of view of the second to last
-	// block in the chain.
-	medianTime := blocks[2].MsgBlock().Header.Timestamp.Unix()
-
-	// The median past time of the *next* block will be the timestamp of
-	// the 2nd block due to the way MTP is calculated in order to be
-	// compatible with Bitcoin Core.
-	nextMedianTime := blocks[2].MsgBlock().Header.Timestamp.Unix()
+	// The median time calculated from the PoV of the best block in our
+	// test chain. For unconfirmed inputs, this value will be used since
+	// the MTP will be calculated from the PoV of the yet-to-be-mined
+	// block.
+	nextMedianTime := int64(1401292712)
 
 	// We'll refer to this utxo within each input in the transactions
-	// created below. This block that includes this UTXO has a height of 4.
-	targetTx := blocks[4].Transactions()[0]
+	// created below. This utxo has an age of 4 blocks and was mined within
+	// block 297
+	targetTx := blocksWithMTP[len(blocksWithMTP)-4].block.Transactions()[0]
 	utxo := wire.OutPoint{
 		Hash:  *targetTx.Hash(),
 		Index: 0,
 	}
+
+	// Obtain the median time past from the PoV of the input created above.
+	// The MTP for the input is the MTP from the PoV of the block *prior*
+	// to the one that included it.
+	medianTime := blocksWithMTP[len(blocksWithMTP)-5].mtp.Unix()
 
 	// Add an additional transaction which will serve as our unconfirmed
 	// output.
@@ -187,6 +233,7 @@ func TestCalcSequenceLock(t *testing.T) {
 		Hash:  unConfTx.TxHash(),
 		Index: 0,
 	}
+
 	// Adding a utxo with a height of 0x7fffffff indicates that the output
 	// is currently unmined.
 	utxoView.AddTxOuts(btcutil.NewTx(unConfTx), 0x7fffffff)
@@ -283,24 +330,24 @@ func TestCalcSequenceLock(t *testing.T) {
 					Sequence:         blockchain.LockTimeToSequence(true, 2560),
 				}, {
 					PreviousOutPoint: utxo,
-					Sequence: blockchain.LockTimeToSequence(false, 3) |
+					Sequence: blockchain.LockTimeToSequence(false, 5) |
 						wire.SequenceLockTimeDisabled,
 				}, {
 					PreviousOutPoint: utxo,
-					Sequence:         blockchain.LockTimeToSequence(false, 3),
+					Sequence:         blockchain.LockTimeToSequence(false, 4),
 				}},
 			}),
 			view: utxoView,
 			want: &blockchain.SequenceLock{
 				Seconds:     medianTime + (5 << wire.SequenceLockTimeGranularity) - 1,
-				BlockHeight: 6,
+				BlockHeight: 299,
 			},
 		},
 		// Transaction has a single input spending the genesis block
 		// transaction. The input's sequence number is encodes a
 		// relative lock-time in blocks (3 blocks). The sequence lock
 		// should have a value of -1 for seconds, but a block height of
-		// 6 meaning it can be included at height 7.
+		// 298 meaning it can be included at height 299.
 		{
 			tx: btcutil.NewTx(&wire.MsgTx{
 				Version: 2,
@@ -312,7 +359,7 @@ func TestCalcSequenceLock(t *testing.T) {
 			view: utxoView,
 			want: &blockchain.SequenceLock{
 				Seconds:     -1,
-				BlockHeight: 6,
+				BlockHeight: 298,
 			},
 		},
 		// A transaction with two inputs with lock times expressed in
@@ -337,8 +384,9 @@ func TestCalcSequenceLock(t *testing.T) {
 		},
 		// A transaction with two inputs with lock times expressed in
 		// seconds. The selected sequence lock value for blocks should
-		// be the height further in the future, so a height of 10
-		// indicating in can be included at height 7.
+		// be the height further in the future. The converted absolute
+		// block height should be 302, meaning it can be included in
+		// block 303.
 		{
 			tx: btcutil.NewTx(&wire.MsgTx{
 				Version: 2,
@@ -353,7 +401,7 @@ func TestCalcSequenceLock(t *testing.T) {
 			view: utxoView,
 			want: &blockchain.SequenceLock{
 				Seconds:     -1,
-				BlockHeight: 10,
+				BlockHeight: 302,
 			},
 		},
 		// A transaction with multiple inputs. Two inputs are time
@@ -380,14 +428,15 @@ func TestCalcSequenceLock(t *testing.T) {
 			view: utxoView,
 			want: &blockchain.SequenceLock{
 				Seconds:     medianTime + (13 << wire.SequenceLockTimeGranularity) - 1,
-				BlockHeight: 12,
+				BlockHeight: 304,
 			},
 		},
 		// A transaction with a single unconfirmed input. As the input
 		// is confirmed, the height of the input should be interpreted
-		// as the height of the *next* block. So the relative block
-		// lock should be based from a height of 5 rather than a height
-		// of 4.
+		// as the height of the *next* block. The current block height
+		// is 300, so the lock time should be calculated using height
+		// 301 as a base. A 2 block relative lock means the transaction
+		// can be included after block 302, so in 303.
 		{
 			tx: btcutil.NewTx(&wire.MsgTx{
 				Version: 2,
@@ -399,7 +448,7 @@ func TestCalcSequenceLock(t *testing.T) {
 			view: utxoView,
 			want: &blockchain.SequenceLock{
 				Seconds:     -1,
-				BlockHeight: 6,
+				BlockHeight: 302,
 			},
 		},
 		// A transaction with a single unconfirmed input. The input has

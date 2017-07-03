@@ -23,6 +23,7 @@
 9.2. [node.js](#ExampleNodeJsCode)<br />
 
 <a name="Overview" />
+
 ### 1. Overview
 
 btcd provides a [JSON-RPC](http://json-rpc.org/wiki/specification) API that is
@@ -59,6 +60,7 @@ progress, incomplete, and susceptible to changes (both additions and removals).
 The original bitcoind/bitcoin-qt JSON-RPC API documentation is available at [https://en.bitcoin.it/wiki/Original_Bitcoin_client/API_Calls_list](https://en.bitcoin.it/wiki/Original_Bitcoin_client/API_Calls_list)
 
 <a name="HttpPostVsWebsockets" />
+
 ### 2. HTTP POST Versus Websockets
 
 The btcd RPC server supports both [HTTP POST](http://en.wikipedia.org/wiki/POST_%28HTTP%29)
@@ -81,9 +83,11 @@ JSON-RPC API are:
 |Scales well with large numbers of requests|No|Yes|
 
 <a name="Authentication" />
+
 ### 3. Authentication
 
 <a name="AuthenticationOverview" />
+
 **3.1 Authentication Overview**<br />
 
 The following authentication details are needed before establishing a connection
@@ -109,6 +113,7 @@ two, mutually exclusive, methods.
 - [Use the JSON-RPC "authenticate" command](#JSONAuth) - Websockets only
 
 <a name="HTTPAuth" />
+
 **3.2 HTTP Basic Access Authentication**<br />
 
 The btcd RPC server uses HTTP [basic access authentication](http://en.wikipedia.org/wiki/Basic_access_authentication) with the **rpcuser**
@@ -116,6 +121,7 @@ and **rpcpass** detailed above.  If the supplied credentials are invalid, you
 will be disconnected immediately upon making the connection.
 
 <a name="JSONAuth" />
+
 **3.3 JSON-RPC Authenticate Command (Websocket-specific)**<br />
 
 While the HTTP basic access authentication method is the preferred method, the
@@ -129,6 +135,7 @@ authenticated will cause the websocket to be closed immediately.
 
 
 <a name="CLIUtil" />
+
 ### 4. Command-line Utility
 
 btcd comes with a separate utility named `btcctl` which can be used to issue
@@ -138,9 +145,11 @@ be used to communicate with any server/daemon/service which provides a JSON-RPC
 API compatible with the original bitcoind/bitcoin-qt client.
 
 <a name="Methods" />
+
 ### 5. Standard Methods
 
 <a name="MethodOverview" />
+
 **5.1 Method Overview**<br />
 
 The following is an overview of the RPC methods and their current status.  Click
@@ -180,6 +189,7 @@ the method name for further details such as parameter and return information.
 |30|[verifychain](#verifychain)|N|Verifies the block chain database.|
 
 <a name="MethodDetails" />
+
 **5.2 Method Details**<br />
 
 <a name="addnode"/>
@@ -552,9 +562,11 @@ Example Return|`{`<br />&nbsp;&nbsp;`"bytes": 310768,`<br />&nbsp;&nbsp;`"size":
 
 
 <a name="ExtensionMethods" />
+
 ### 6. Extension Methods
 
 <a name="ExtMethodOverview" />
+
 **6.1 Method Overview**<br />
 
 The following is an overview of the RPC methods which are implemented by btcd, but not the original bitcoind client. Click the method name for further details such as parameter and return information.
@@ -572,6 +584,7 @@ The following is an overview of the RPC methods which are implemented by btcd, b
 
 
 <a name="ExtMethodDetails" />
+
 **6.2 Method Details**<br />
 
 <a name="debuglevel"/>
@@ -677,9 +690,11 @@ The following is an overview of the RPC methods which are implemented by btcd, b
 ***
 
 <a name="WSExtMethods" />
+
 ### 7. Websocket Extension Methods (Websocket-specific)
 
 <a name="WSExtMethodOverview" />
+
 **7.1 Method Overview**<br />
 
 The following is an overview of the RPC method requests available exclusively to Websocket clients.  All of these RPC methods are available to the limited
@@ -702,6 +717,7 @@ user.  Click the method name for further details such as parameter and return in
 |13|[rescanblocks](#rescanblocks)|Rescan blocks for transactions matching the loaded transaction filter.|None|
 
 <a name="WSExtMethodDetails" />
+
 **7.2 Method Details**<br />
 
 <a name="authenticate"/>
@@ -728,6 +744,7 @@ user.  Click the method name for further details such as parameter and return in
 [Return to Overview](#WSExtMethodOverview)<br />
 
 ***
+
 <a name="stopnotifyblocks"/>
 
 |   |   |
@@ -872,11 +889,13 @@ user.  Click the method name for further details such as parameter and return in
 
 
 <a name="Notifications" />
+
 ### 8. Notifications (Websocket-specific)
 
 btcd uses standard JSON-RPC notifications to notify clients of changes, rather than requiring clients to poll btcd for updates.  JSON-RPC notifications are a subset of requests, but do not contain an ID.  The notification type is categorized by the `method` field and additional details are sent as a JSON array in the `params` field.
 
 <a name="NotificationOverview" />
+
 **8.1 Notification Overview**<br />
 
 The following is an overview of the JSON-RPC notifications used for Websocket connections.  Click the method name for further details of the context(s) in which they are sent and their parameters.
@@ -896,6 +915,7 @@ The following is an overview of the JSON-RPC notifications used for Websocket co
 |11|[filteredblockdisconnected](#filteredblockdisconnected)|Block disconnected from the main chain.|[notifyblocks](#notifyblocks), [loadtxfilter](#loadtxfilter)|
 
 <a name="NotificationDetails" />
+
 **8.2 Notification Details**<br />
 
 <a name="blockconnected"/>
@@ -1040,6 +1060,7 @@ The following is an overview of the JSON-RPC notifications used for Websocket co
 
 
 <a name="ExampleCode" />
+
 ### 9. Example Code
 
 This section provides example code for interacting with the JSON-RPC API in
@@ -1049,6 +1070,7 @@ various languages.
 * [node.js](#ExampleNodeJsCode)
 
 <a name="ExampleGoApp" />
+
 **9.1 Go**
 
 This section provides examples of using the RPC interface using Go and the
@@ -1060,6 +1082,7 @@ This section provides examples of using the RPC interface using Go and the
 
 
 <a name="ExampleGetBlockCount" />
+
 **9.1.1 Using getblockcount to Retrieve the Current Block Height**<br />
 
 The following is an example Go application which uses the
@@ -1120,6 +1143,7 @@ Block count: 276978
 ```
 
 <a name="ExampleGetBlock" />
+
 **9.1.2 Using getblock to Retrieve the Genesis Block**<br />
 
 The following is an example Go application which uses the
@@ -1208,6 +1232,7 @@ Num transactions: 1
 ```
 
 <a name="ExampleNotifyBlocks" />
+
 **9.1.3 Using notifyblocks to Receive blockconnected and blockdisconnected
 Notifications (Websocket-specific)**<br />
 
@@ -1298,9 +1323,11 @@ Example output:
 ```
 
 <a name="ExampleNodeJsCode" />
+
 ### 9.2. Example node.js Code
 
 <a name="ExampleNotifyBlocks" />
+
 **9.2.1 Using notifyblocks to be Notified of Block Connects and Disconnects**<br />
 
 The following is example node.js code which uses [ws](https://github.com/einaros/ws)

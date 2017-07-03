@@ -69,12 +69,12 @@ func realMain() error {
 	cfg = tcfg
 
 	// Setup logging.
-	backendLogger := btclog.NewDefaultBackendLogger()
-	defer backendLogger.Flush()
-	log = btclog.NewSubsystemLogger(backendLogger, "")
-	database.UseLogger(btclog.NewSubsystemLogger(backendLogger, "BCDB: "))
-	blockchain.UseLogger(btclog.NewSubsystemLogger(backendLogger, "CHAN: "))
-	indexers.UseLogger(btclog.NewSubsystemLogger(backendLogger, "INDX: "))
+	backendLogger := btclog.NewBackend(os.Stdout)
+	defer os.Stdout.Sync()
+	log = backendLogger.Logger("MAIN")
+	database.UseLogger(backendLogger.Logger("BCDB"))
+	blockchain.UseLogger(backendLogger.Logger("CHAN"))
+	indexers.UseLogger(backendLogger.Logger("INDX"))
 
 	// Load the block database.
 	db, err := loadBlockDB()

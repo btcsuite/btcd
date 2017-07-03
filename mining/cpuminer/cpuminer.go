@@ -566,7 +566,7 @@ func (m *CPUMiner) GenerateNBlocks(n uint32) ([]*chainhash.Hash, error) {
 	log.Tracef("Generating %d blocks", n)
 
 	i := uint32(0)
-	blockHashes := make([]*chainhash.Hash, n, n)
+	blockHashes := make([]*chainhash.Hash, n)
 
 	// Start a ticker which is used to signal checks for stale work and
 	// updates to the speed monitor.

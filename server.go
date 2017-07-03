@@ -167,6 +167,7 @@ type server struct {
 	started       int32
 	shutdown      int32
 	shutdownSched int32
+	startupTime   int64
 
 	chainParams          *chaincfg.Params
 	addrManager          *addrmgr.AddrManager
@@ -791,7 +792,7 @@ func (sp *serverPeer) enforceNodeBloomFlag(cmd string) bool {
 		if sp.ProtocolVersion() >= wire.BIP0111Version &&
 			!cfg.DisableBanning {
 
-			// Disonnect the peer regardless of whether it was
+			// Disconnect the peer regardless of whether it was
 			// banned.
 			sp.addBanScore(100, 0, cmd)
 			sp.Disconnect()
@@ -1527,7 +1528,7 @@ func (s *server) handleQuery(state *peerState, querymsg interface{}) {
 		}
 	// Request a list of the persistent (added) peers.
 	case getAddedNodesMsg:
-		// Respond with a slice of the relavent peers.
+		// Respond with a slice of the relevant peers.
 		peers := make([]*serverPeer, 0, len(state.persistentPeers))
 		for _, sp := range state.persistentPeers {
 			peers = append(peers, sp)
@@ -1565,7 +1566,7 @@ func (s *server) handleQuery(state *peerState, querymsg interface{}) {
 	}
 }
 
-// disconnectPeer attempts to drop the connection of a tageted peer in the
+// disconnectPeer attempts to drop the connection of a targeted peer in the
 // passed peer list. Targets are identified via usage of the passed
 // `compareFunc`, which should return `true` if the passed peer is the target
 // peer. This function returns true on success and false if the peer is unable
@@ -1617,15 +1618,16 @@ func newPeerConfig(sp *serverPeer) *peer.Config {
 			// other implementations' alert messages, we will not relay theirs.
 			OnAlert: nil,
 		},
-		NewestBlock:      sp.newestBlock,
-		HostToNetAddress: sp.server.addrManager.HostToNetAddress,
-		Proxy:            cfg.Proxy,
-		UserAgentName:    userAgentName,
-		UserAgentVersion: userAgentVersion,
-		ChainParams:      sp.server.chainParams,
-		Services:         sp.server.services,
-		DisableRelayTx:   cfg.BlocksOnly,
-		ProtocolVersion:  wire.FeeFilterVersion,
+		NewestBlock:       sp.newestBlock,
+		HostToNetAddress:  sp.server.addrManager.HostToNetAddress,
+		Proxy:             cfg.Proxy,
+		UserAgentName:     userAgentName,
+		UserAgentVersion:  userAgentVersion,
+		UserAgentComments: cfg.UserAgentComments,
+		ChainParams:       sp.server.chainParams,
+		Services:          sp.server.services,
+		DisableRelayTx:    cfg.BlocksOnly,
+		ProtocolVersion:   wire.FeeFilterVersion,
 	}
 }
 
@@ -2002,6 +2004,9 @@ func (s *server) Start() {
 
 	srvrLog.Trace("Starting server")
 
+	// Server startup time. Used for the uptime command for uptime calculation.
+	s.startupTime = time.Now().Unix()
+
 	// Start the peer handler which in turn starts the address and block
 	// managers.
 	s.wg.Add(1)
@@ -2259,7 +2264,7 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 					amgrLog.Warnf("Skipping specified external IP: %v", err)
 				}
 			}
-		} else if discover && cfg.Upnp {
+		} else if cfg.Upnp {
 			nat, err = Discover()
 			if err != nil {
 				srvrLog.Warnf("Can't discover upnp: %v", err)

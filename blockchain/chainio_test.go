@@ -194,8 +194,9 @@ func TestStxoDecodeErrors(t *testing.T) {
 			bytesRead:  2,
 		},
 		{
-			name:       "no serialized tx version and passed 0",
+			name:       "no serialized tx version and passed -1",
 			stxo:       spentTxOut{},
+			txVersion:  -1,
 			serialized: hexToBytes("003205"),
 			errType:    AssertError(""),
 			bytesRead:  1,

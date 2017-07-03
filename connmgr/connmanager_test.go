@@ -5,15 +5,12 @@
 package connmgr
 
 import (
-	"bytes"
 	"errors"
 	"io"
 	"net"
 	"sync/atomic"
 	"testing"
 	"time"
-
-	"github.com/btcsuite/btclog"
 )
 
 func init() {
@@ -83,15 +80,6 @@ func TestNewConfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New unexpected error: %v", err)
 	}
-}
-
-// TestUseLogger tests that a logger can be passed to UseLogger
-func TestUseLogger(t *testing.T) {
-	l, err := btclog.NewLoggerFromWriter(bytes.NewBuffer(nil), btclog.InfoLvl)
-	if err != nil {
-		t.Fatal(err)
-	}
-	UseLogger(l)
 }
 
 // TestStartStop tests that the connection manager starts and stops as

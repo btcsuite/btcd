@@ -321,8 +321,6 @@ func (b *BlockChain) addOrphanBlock(block *btcutil.Block) {
 	// Add to previous hash lookup index for faster dependency lookups.
 	prevHash := &block.MsgBlock().Header.PrevBlock
 	b.prevOrphans[*prevHash] = append(b.prevOrphans[*prevHash], oBlock)
-
-	return
 }
 
 // SequenceLock represents the converted relative lock-time in seconds, and
@@ -351,17 +349,15 @@ func (b *BlockChain) CalcSequenceLock(tx *btcutil.Tx, utxoView *UtxoViewpoint,
 	b.chainLock.Lock()
 	defer b.chainLock.Unlock()
 
-	return b.calcSequenceLock(tx, utxoView, mempool)
+	return b.calcSequenceLock(b.bestNode, tx, utxoView, mempool)
 }
 
 // calcSequenceLock computes the relative lock-times for the passed
 // transaction. See the exported version, CalcSequenceLock for further details.
 //
 // This function MUST be called with the chain state lock held (for writes).
-func (b *BlockChain) calcSequenceLock(tx *btcutil.Tx, utxoView *UtxoViewpoint,
-	mempool bool) (*SequenceLock, error) {
-
-	mTx := tx.MsgTx()
+func (b *BlockChain) calcSequenceLock(node *blockNode, tx *btcutil.Tx,
+	utxoView *UtxoViewpoint, mempool bool) (*SequenceLock, error) {
 
 	// A value of -1 for each relative lock type represents a relative time
 	// lock value that will allow a transaction to be included in a block
@@ -370,20 +366,42 @@ func (b *BlockChain) calcSequenceLock(tx *btcutil.Tx, utxoView *UtxoViewpoint,
 	// activated.
 	sequenceLock := &SequenceLock{Seconds: -1, BlockHeight: -1}
 
+	// The sequence locks semantics are always active for transactions
+	// within the mempool.
+	csvSoftforkActive := mempool
+
+	// If we're performing block validation, then we need to query the BIP9
+	// state.
+	if !csvSoftforkActive {
+		prevNode, err := b.index.PrevNodeFromNode(node)
+		if err != nil {
+			return nil, err
+		}
+
+		// Obtain the latest BIP9 version bits state for the
+		// CSV-package soft-fork deployment. The adherence of sequence
+		// locks depends on the current soft-fork state.
+		csvState, err := b.deploymentState(prevNode, chaincfg.DeploymentCSV)
+		if err != nil {
+			return nil, err
+		}
+		csvSoftforkActive = csvState == ThresholdActive
+	}
+
 	// If the transaction's version is less than 2, and BIP 68 has not yet
 	// been activated then sequence locks are disabled. Additionally,
 	// sequence locks don't apply to coinbase transactions Therefore, we
 	// return sequence lock values of -1 indicating that this transaction
 	// can be included within a block at any given height or time.
-	// TODO(roasbeef): check version bits state or pass as param
-	// * true should be replaced with a version bits state check
-	sequenceLockActive := mTx.Version >= 2 && (mempool || true)
+	mTx := tx.MsgTx()
+	sequenceLockActive := mTx.Version >= 2 && csvSoftforkActive
 	if !sequenceLockActive || IsCoinBase(tx) {
 		return sequenceLock, nil
 	}
 
-	// Grab the next height to use for inputs present in the mempool.
-	nextHeight := b.BestSnapshot().Height + 1
+	// Grab the next height from the PoV of the passed blockNode to use for
+	// inputs present in the mempool.
+	nextHeight := node.height + 1
 
 	for txInIndex, txIn := range mTx.TxIn {
 		utxo := utxoView.LookupEntry(&txIn.PreviousOutPoint.Hash)
@@ -421,9 +439,8 @@ func (b *BlockChain) calcSequenceLock(tx *btcutil.Tx, utxoView *UtxoViewpoint,
 			// compute the past median time for the block prior to
 			// the one which included this referenced output.
 			// TODO: caching should be added to keep this speedy
-			inputDepth := uint32(b.bestNode.height-inputHeight) + 1
-			blockNode, err := b.index.RelativeNode(b.bestNode,
-				inputDepth)
+			inputDepth := uint32(node.height-inputHeight) + 1
+			blockNode, err := b.index.RelativeNode(node, inputDepth)
 			if err != nil {
 				return sequenceLock, err
 			}

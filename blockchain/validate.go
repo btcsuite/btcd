@@ -614,7 +614,7 @@ func ExtractCoinbaseHeight(coinbaseTx *btcutil.Tx) (int32, error) {
 		return 0, ruleError(ErrMissingCoinbaseHeight, str)
 	}
 
-	serializedHeightBytes := make([]byte, 8, 8)
+	serializedHeightBytes := make([]byte, 8)
 	copy(serializedHeightBytes, sigScript[1:serializedLen+1])
 	serializedHeight := binary.LittleEndian.Uint64(serializedHeightBytes)
 
@@ -638,7 +638,7 @@ func checkSerializedHeight(coinbaseTx *btcutil.Tx, wantHeight int32) error {
 	return nil
 }
 
-// checkBlockHeaderContext peforms several validation checks on the block header
+// checkBlockHeaderContext performs several validation checks on the block header
 // which depend on its position within the block chain.
 //
 // The flags modify the behavior of this function as follows:
@@ -752,6 +752,27 @@ func (b *BlockChain) checkBlockContext(block *btcutil.Block, prevNode *blockNode
 
 	fastAdd := flags&BFFastAdd == BFFastAdd
 	if !fastAdd {
+		// Obtain the latest state of the deployed CSV soft-fork in
+		// order to properly guard the new validation behavior based on
+		// the current BIP 9 version bits state.
+		csvState, err := b.deploymentState(prevNode, chaincfg.DeploymentCSV)
+		if err != nil {
+			return err
+		}
+
+		// Once the CSV soft-fork is fully active, we'll switch to
+		// using the current median time past of the past block's
+		// timestamps for all lock-time based checks.
+		blockTime := header.Timestamp
+		if csvState == ThresholdActive {
+			medianTime, err := b.index.CalcPastMedianTime(prevNode)
+			if err != nil {
+				return err
+			}
+
+			blockTime = medianTime
+		}
+
 		// The height of this block is one more than the referenced
 		// previous block.
 		blockHeight := prevNode.height + 1
@@ -759,7 +780,7 @@ func (b *BlockChain) checkBlockContext(block *btcutil.Block, prevNode *blockNode
 		// Ensure all transactions in the block are finalized.
 		for _, tx := range block.Transactions() {
 			if !IsFinalizedTransaction(tx, blockHeight,
-				header.Timestamp) {
+				blockTime) {
 
 				str := fmt.Sprintf("block contains unfinalized "+
 					"transaction %v", tx.Hash())
@@ -1131,6 +1152,48 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block, vi
 	// activation threshold has been reached.  This is part of BIP0065.
 	if blockHeader.Version >= 4 && node.height >= b.chainParams.BIP0065Height {
 		scriptFlags |= txscript.ScriptVerifyCheckLockTimeVerify
+	}
+
+	// Enforce CHECKSEQUENCEVERIFY during all block validation checks once
+	// the soft-fork deployment is fully active.
+	csvState, err := b.deploymentState(node.parent, chaincfg.DeploymentCSV)
+	if err != nil {
+		return err
+	}
+	if csvState == ThresholdActive {
+		// If the CSV soft-fork is now active, then modify the
+		// scriptFlags to ensure that the CSV op code is properly
+		// validated during the script checks bleow.
+		scriptFlags |= txscript.ScriptVerifyCheckSequenceVerify
+
+		// We obtain the MTP of the *previous* block in order to
+		// determine if transactions in the current block are final.
+		medianTime, err := b.index.CalcPastMedianTime(node.parent)
+		if err != nil {
+			return err
+		}
+
+		// Additionally, if the CSV soft-fork package is now active,
+		// then we also enforce the relative sequence number based
+		// lock-times within the inputs of all transactions in this
+		// candidate block.
+		for _, tx := range block.Transactions() {
+			// A transaction can only be included within a block
+			// once the sequence locks of *all* its inputs are
+			// active.
+			sequenceLock, err := b.calcSequenceLock(node, tx, view,
+				false)
+			if err != nil {
+				return err
+			}
+			if !SequenceLockActive(sequenceLock, node.height,
+				medianTime) {
+				str := fmt.Sprintf("block contains " +
+					"transaction whose input sequence " +
+					"locks are not met")
+				return ruleError(ErrUnfinalizedTx, str)
+			}
+		}
 	}
 
 	// Now that the inexpensive checks are done and have passed, verify the
