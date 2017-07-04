@@ -1723,7 +1723,19 @@ out:
 		case iv := <-p.outputInvChan:
 			// No handshake?  They'll find out soon enough.
 			if p.VersionKnown() {
-				invSendQueue.PushBack(iv)
+				// If this is a new block, then we'll blast it
+				// out immediately, sipping the inv trickle
+				// queue.
+				if iv.Type == wire.InvTypeBlock ||
+					iv.Type == wire.InvTypeWitnessBlock {
+
+					invMsg := wire.NewMsgInvSizeHint(1)
+					invMsg.AddInvVect(iv)
+					waiting = queuePacket(outMsg{msg: invMsg},
+						pendingMsgs, waiting)
+				} else {
+					invSendQueue.PushBack(iv)
+				}
 			}
 
 		case <-trickleTicker.C:
