@@ -3,6 +3,7 @@ package chaincfg_test
 import (
 	"bytes"
 	"reflect"
+	"strings"
 	"testing"
 
 	. "github.com/btcsuite/btcd/chaincfg"
@@ -16,6 +17,7 @@ var mockNetParams = Params{
 	Net:              1<<32 - 1,
 	PubKeyHashAddrID: 0x9f,
 	ScriptHashAddrID: 0xf9,
+	Bech32HRPSegwit:  "tc",
 	HDPrivateKeyID:   [4]byte{0x01, 0x02, 0x03, 0x04},
 	HDPublicKeyID:    [4]byte{0x05, 0x06, 0x07, 0x08},
 }
@@ -30,6 +32,10 @@ func TestRegister(t *testing.T) {
 		magic byte
 		valid bool
 	}
+	type prefixTest struct {
+		prefix string
+		valid  bool
+	}
 	type hdTest struct {
 		priv []byte
 		want []byte
@@ -37,11 +43,12 @@ func TestRegister(t *testing.T) {
 	}
 
 	tests := []struct {
-		name        string
-		register    []registerTest
-		p2pkhMagics []magicTest
-		p2shMagics  []magicTest
-		hdMagics    []hdTest
+		name           string
+		register       []registerTest
+		p2pkhMagics    []magicTest
+		p2shMagics     []magicTest
+		segwitPrefixes []prefixTest
+		hdMagics       []hdTest
 	}{
 		{
 			name: "default networks",
@@ -117,6 +124,44 @@ func TestRegister(t *testing.T) {
 				{
 					magic: 0xFF,
 					valid: false,
+				},
+			},
+			segwitPrefixes: []prefixTest{
+				{
+					prefix: MainNetParams.Bech32HRPSegwit + "1",
+					valid:  true,
+				},
+				{
+					prefix: TestNet3Params.Bech32HRPSegwit + "1",
+					valid:  true,
+				},
+				{
+					prefix: RegressionNetParams.Bech32HRPSegwit + "1",
+					valid:  true,
+				},
+				{
+					prefix: SimNetParams.Bech32HRPSegwit + "1",
+					valid:  true,
+				},
+				{
+					prefix: strings.ToUpper(MainNetParams.Bech32HRPSegwit + "1"),
+					valid:  true,
+				},
+				{
+					prefix: mockNetParams.Bech32HRPSegwit + "1",
+					valid:  false,
+				},
+				{
+					prefix: "abc1",
+					valid:  false,
+				},
+				{
+					prefix: "1",
+					valid:  false,
+				},
+				{
+					prefix: MainNetParams.Bech32HRPSegwit,
+					valid:  false,
 				},
 			},
 			hdMagics: []hdTest{
@@ -215,6 +260,44 @@ func TestRegister(t *testing.T) {
 					valid: false,
 				},
 			},
+			segwitPrefixes: []prefixTest{
+				{
+					prefix: MainNetParams.Bech32HRPSegwit + "1",
+					valid:  true,
+				},
+				{
+					prefix: TestNet3Params.Bech32HRPSegwit + "1",
+					valid:  true,
+				},
+				{
+					prefix: RegressionNetParams.Bech32HRPSegwit + "1",
+					valid:  true,
+				},
+				{
+					prefix: SimNetParams.Bech32HRPSegwit + "1",
+					valid:  true,
+				},
+				{
+					prefix: strings.ToUpper(MainNetParams.Bech32HRPSegwit + "1"),
+					valid:  true,
+				},
+				{
+					prefix: mockNetParams.Bech32HRPSegwit + "1",
+					valid:  true,
+				},
+				{
+					prefix: "abc1",
+					valid:  false,
+				},
+				{
+					prefix: "1",
+					valid:  false,
+				},
+				{
+					prefix: MainNetParams.Bech32HRPSegwit,
+					valid:  false,
+				},
+			},
 			hdMagics: []hdTest{
 				{
 					priv: mockNetParams.HDPrivateKeyID[:],
@@ -304,6 +387,44 @@ func TestRegister(t *testing.T) {
 					valid: false,
 				},
 			},
+			segwitPrefixes: []prefixTest{
+				{
+					prefix: MainNetParams.Bech32HRPSegwit + "1",
+					valid:  true,
+				},
+				{
+					prefix: TestNet3Params.Bech32HRPSegwit + "1",
+					valid:  true,
+				},
+				{
+					prefix: RegressionNetParams.Bech32HRPSegwit + "1",
+					valid:  true,
+				},
+				{
+					prefix: SimNetParams.Bech32HRPSegwit + "1",
+					valid:  true,
+				},
+				{
+					prefix: strings.ToUpper(MainNetParams.Bech32HRPSegwit + "1"),
+					valid:  true,
+				},
+				{
+					prefix: mockNetParams.Bech32HRPSegwit + "1",
+					valid:  true,
+				},
+				{
+					prefix: "abc1",
+					valid:  false,
+				},
+				{
+					prefix: "1",
+					valid:  false,
+				},
+				{
+					prefix: MainNetParams.Bech32HRPSegwit,
+					valid:  false,
+				},
+			},
 			hdMagics: []hdTest{
 				{
 					priv: MainNetParams.HDPrivateKeyID[:],
@@ -362,6 +483,13 @@ func TestRegister(t *testing.T) {
 			if valid != magTest.valid {
 				t.Errorf("%s: P2SH magic %d valid mismatch: got %v expected %v",
 					test.name, i, valid, magTest.valid)
+			}
+		}
+		for i, prxTest := range test.segwitPrefixes {
+			valid := IsBech32SegwitPrefix(prxTest.prefix)
+			if valid != prxTest.valid {
+				t.Errorf("%s: segwit prefix %s (%d) valid mismatch: got %v expected %v",
+					test.name, prxTest.prefix, i, valid, prxTest.valid)
 			}
 		}
 		for i, magTest := range test.hdMagics {

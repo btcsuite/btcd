@@ -8,6 +8,7 @@ import (
 	"errors"
 	"math"
 	"math/big"
+	"strings"
 	"time"
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
@@ -195,8 +196,8 @@ type Params struct {
 	// Mempool parameters
 	RelayNonStdTxs bool
 
-	// Human-readable part for Bech32 encoded segwit addresses, as defined in
-	// BIP 173.
+	// Human-readable part for Bech32 encoded segwit addresses, as defined
+	// in BIP 173.
 	Bech32HRPSegwit string
 
 	// Address encoding magics
@@ -547,10 +548,11 @@ var (
 )
 
 var (
-	registeredNets    = make(map[wire.BitcoinNet]struct{})
-	pubKeyHashAddrIDs = make(map[byte]struct{})
-	scriptHashAddrIDs = make(map[byte]struct{})
-	hdPrivToPubKeyIDs = make(map[[4]byte][]byte)
+	registeredNets       = make(map[wire.BitcoinNet]struct{})
+	pubKeyHashAddrIDs    = make(map[byte]struct{})
+	scriptHashAddrIDs    = make(map[byte]struct{})
+	bech32SegwitPrefixes = make(map[string]struct{})
+	hdPrivToPubKeyIDs    = make(map[[4]byte][]byte)
 )
 
 // String returns the hostname of the DNS seed in human-readable form.
@@ -575,6 +577,10 @@ func Register(params *Params) error {
 	pubKeyHashAddrIDs[params.PubKeyHashAddrID] = struct{}{}
 	scriptHashAddrIDs[params.ScriptHashAddrID] = struct{}{}
 	hdPrivToPubKeyIDs[params.HDPrivateKeyID] = params.HDPublicKeyID[:]
+
+	// A valid Bech32 encoded segwit address always has as prefix the
+	// human-readable part for the given net followed by '1'.
+	bech32SegwitPrefixes[params.Bech32HRPSegwit+"1"] = struct{}{}
 	return nil
 }
 
@@ -605,6 +611,15 @@ func IsPubKeyHashAddrID(id byte) bool {
 // undeterminable (if both return true).
 func IsScriptHashAddrID(id byte) bool {
 	_, ok := scriptHashAddrIDs[id]
+	return ok
+}
+
+// IsBech32SegwitPrefix returns whether the prefix is a known prefix for segwit
+// addresses on any default or registered network.  This is used when decoding
+// an address string into a specific address type.
+func IsBech32SegwitPrefix(prefix string) bool {
+	prefix = strings.ToLower(prefix)
+	_, ok := bech32SegwitPrefixes[prefix]
 	return ok
 }
 
