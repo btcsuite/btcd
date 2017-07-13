@@ -21,6 +21,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/btcsuite/btclog"
 	flags "github.com/btcsuite/go-flags"
 	"github.com/btcsuite/go-socks/socks"
 	"github.com/decred/dcrd/connmgr"
@@ -191,21 +192,8 @@ func cleanAndExpandPath(path string) string {
 
 // validLogLevel returns whether or not logLevel is a valid debug log level.
 func validLogLevel(logLevel string) bool {
-	switch logLevel {
-	case "trace":
-		fallthrough
-	case "debug":
-		fallthrough
-	case "info":
-		fallthrough
-	case "warn":
-		fallthrough
-	case "error":
-		fallthrough
-	case "critical":
-		return true
-	}
-	return false
+	_, ok := btclog.LevelFromString(logLevel)
+	return ok
 }
 
 // supportedSubsystems returns a sorted slice of the supported subsystems for
