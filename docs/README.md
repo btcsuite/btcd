@@ -21,6 +21,7 @@
     3. [The Decred-related Go Packages](#GoPackages)
 
 <a name="About" />
+
 ### 1. About
 dcrd is a full node decred implementation written in [Go](http://golang.org),
 licensed under the [copyfree](http://www.copyfree.org) ISC License.
@@ -36,21 +37,25 @@ strict checks which filter transactions based on miner requirements ("standard"
 transactions).
 
 <a name="GettingStarted" />
+
 ### 2. Getting Started
 
 <a name="Installation" />
+
 **2.1 Installation**<br />
 
 The first step is to install dcrd.  See one of the following sections for
 details on how to install on the supported operating systems.
 
 <a name="WindowsInstallation" />
+
 **2.1.1 Windows Installation**<br />
 
 * Install the MSI available at: https://github.com/decred/dcrd/releases
 * Launch dcrd from the Start Menu
 
 <a name="PosixInstallation" />
+
 **2.1.2 Linux/BSD/MacOSX/POSIX Installation**<br />
 
 * Install Go according to the installation instructions here: http://golang.org/doc/install
@@ -60,12 +65,14 @@ details on how to install on the supported operating systems.
 * Run dcrd: `$ dcrd`
 
 <a name="Configuration" />
+
 **2.2 Configuration**<br />
 
 dcrd has a number of [configuration](http://godoc.org/github.com/decred/dcrd)
 options, which can be viewed by running: `$ dcrd --help`.
 
 <a name="DcrctlConfig" />
+
 **2.3 Controlling and Querying dcrd via dcrctl**<br />
 
 dcrctl is a command line utility that can be used to both control and query dcrd
@@ -96,6 +103,7 @@ rpclimitpass=Limitedp4ssw0rd
 For a list of available options, run: `$ dcrctl --help`
 
 <a name="Mining" />
+
 **2.4 Mining**<br />
 dcrd supports both the `getwork` and `getblocktemplate` RPCs although the
 `getwork` RPC is deprecated and will likely be removed in a future release.
@@ -128,9 +136,11 @@ certificate into the default system Certificate Authority list.
 `$ cgminer -o https://127.0.0.1:9109 -u rpcuser -p rpcpassword`
 
 <a name="Help" />
+
 ### 3. Help
 
 <a name="Startup" />
+
 **3.1 Startup**<br />
 
 Typically dcrd will run and start downloading the block chain with no extra
@@ -138,10 +148,12 @@ configuration necessary, however, there is an optional method to use a
 `bootstrap.dat` file that may speed up the initial block chain download process.
 
 <a name="BootstrapDat" />
+
 **3.1.1 bootstrap.dat**<br />
 * [Using bootstrap.dat](https://github.com/decred/dcrd/tree/master/docs/using_bootstrap_dat.md)
 
 <a name="NetworkConfig" />
+
 **3.1.2 Network Configuration**<br />
 * [What Ports Are Used by Default?](https://github.com/decred/dcrd/tree/master/docs/default_ports.md)
 * [How To Listen on Specific Interfaces](https://github.com/decred/dcrd/tree/master/docs/configure_peer_server_listen_interfaces.md)
@@ -149,6 +161,7 @@ configuration necessary, however, there is an optional method to use a
 * [Configuring dcrd with Tor](https://github.com/decred/dcrd/tree/master/docs/configuring_tor.md)
 
 <a name="Wallet" />
+
 **3.1 Wallet**<br />
 
 dcrd was intentionally developed without an integrated wallet for security
@@ -156,13 +169,16 @@ reasons.  Please see [dcrwallet](https://github.com/decred/dcrwallet) for more
 information.
 
 <a name="Contact" />
+
 ### 4. Contact
 
 <a name="ContactIRC" />
+
 **4.1 IRC**<br />
 * [irc.freenode.net](irc://irc.freenode.net), channel #dcrd
 
 <a name="MailingLists" />
+
 **4.2 Mailing Lists**<br />
 * <a href="mailto:dcrd+subscribe@opensource.conformal.com">dcrd</a>: discussion
   of dcrd and its packages.
@@ -170,14 +186,18 @@ information.
   readonly mail-out of source code changes.
 
 <a name="DeveloperResources" />
+
 ### 5. Developer Resources
 
 <a name="ContributionGuidelines" />
+
 * [Code Contribution Guidelines](https://github.com/decred/dcrd/tree/master/docs/code_contribution_guidelines.md)
 <a name="JSONRPCReference" />
+
 * [JSON-RPC Reference](https://github.com/decred/dcrd/tree/master/docs/json_rpc_api.md)
     * [RPC Examples](https://github.com/decred/dcrd/tree/master/docs/json_rpc_api.md#ExampleCode)
 <a name="GoPackages" />
+
 * The Decred-related Go Packages:
     * [dcrrpcclient](https://github.com/decred/dcrrpcclient) - Implements a
 	  robust and easy to use Websocket-enabled Decred JSON-RPC client
