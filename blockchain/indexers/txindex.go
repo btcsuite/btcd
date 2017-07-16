@@ -308,7 +308,7 @@ func dbRemoveTxIndexEntries(dbTx database.Tx, block, parent *dcrutil.Block) erro
 	}
 
 	// Remove all of the regular transactions of the parent if voted valid.
-	if approvesParent(block) {
+	if approvesParent(block) && block.Height() > 1 {
 		if err := removeEntries(parent.Transactions()); err != nil {
 			return err
 		}

@@ -1174,6 +1174,11 @@ func (b *BlockChain) getReorganizeNodes(node *blockNode) (*list.List, *list.List
 	// common ancestor adding each block to the list of nodes to detach from
 	// the main chain.
 	for n := b.bestNode; n != nil; n = n.parent {
+		if n.hash == ancestor.hash {
+			break
+		}
+		detachNodes.PushBack(n)
+
 		if n.parent == nil {
 			var err error
 			n.parent, err = b.findNode(&n.header.PrevBlock, maxSearchDepth)
@@ -1181,12 +1186,6 @@ func (b *BlockChain) getReorganizeNodes(node *blockNode) (*list.List, *list.List
 				return nil, nil, err
 			}
 		}
-
-		if n.hash == ancestor.hash {
-			break
-		}
-
-		detachNodes.PushBack(n)
 	}
 
 	return detachNodes, attachNodes, nil

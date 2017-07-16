@@ -720,7 +720,7 @@ func (idx *AddrIndex) indexPkScript(data writeIndexData, scriptVersion uint16, p
 // transaction using the passed map.
 func (idx *AddrIndex) indexBlock(data writeIndexData, block, parent *dcrutil.Block, view *blockchain.UtxoViewpoint) {
 	var parentRegularTxs []*dcrutil.Tx
-	if approvesParent(block) {
+	if approvesParent(block) && block.Height() > 1 {
 		parentRegularTxs = parent.Transactions()
 	}
 	for txIdx, tx := range parentRegularTxs {
