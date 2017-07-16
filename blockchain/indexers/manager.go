@@ -1,5 +1,5 @@
 // Copyright (c) 2016 The btcsuite developers
-// Copyright (c) 2016 The Decred developers
+// Copyright (c) 2016-2017 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -40,10 +40,10 @@ var (
 
 // dbPutIndexerTip uses an existing database transaction to update or add the
 // current tip for the given index to the provided values.
-func dbPutIndexerTip(dbTx database.Tx, idxKey []byte, hash *chainhash.Hash, height uint32) error {
+func dbPutIndexerTip(dbTx database.Tx, idxKey []byte, hash *chainhash.Hash, height int32) error {
 	serialized := make([]byte, chainhash.HashSize+4)
 	copy(serialized, hash[:])
-	byteOrder.PutUint32(serialized[chainhash.HashSize:], height)
+	byteOrder.PutUint32(serialized[chainhash.HashSize:], uint32(height))
 
 	indexesBucket := dbTx.Metadata().Bucket(indexTipsBucketName)
 	return indexesBucket.Put(idxKey, serialized)
@@ -51,7 +51,7 @@ func dbPutIndexerTip(dbTx database.Tx, idxKey []byte, hash *chainhash.Hash, heig
 
 // dbFetchIndexerTip uses an existing database transaction to retrieve the
 // hash and height of the current tip for the provided index.
-func dbFetchIndexerTip(dbTx database.Tx, idxKey []byte) (*chainhash.Hash, uint32, error) {
+func dbFetchIndexerTip(dbTx database.Tx, idxKey []byte) (*chainhash.Hash, int32, error) {
 	indexesBucket := dbTx.Metadata().Bucket(indexTipsBucketName)
 	serialized := indexesBucket.Get(idxKey)
 	if len(serialized) < chainhash.HashSize+4 {
@@ -64,7 +64,7 @@ func dbFetchIndexerTip(dbTx database.Tx, idxKey []byte) (*chainhash.Hash, uint32
 
 	var hash chainhash.Hash
 	copy(hash[:], serialized[:chainhash.HashSize])
-	height := byteOrder.Uint32(serialized[chainhash.HashSize:])
+	height := int32(byteOrder.Uint32(serialized[chainhash.HashSize:]))
 	return &hash, height, nil
 }
 
@@ -93,7 +93,7 @@ func dbIndexConnectBlock(dbTx database.Tx, indexer Indexer, block, parent *dcrut
 	}
 
 	// Update the current index tip.
-	return dbPutIndexerTip(dbTx, idxKey, block.Hash(), uint32(block.Height()))
+	return dbPutIndexerTip(dbTx, idxKey, block.Hash(), int32(block.Height()))
 }
 
 // dbIndexDisconnectBlock removes all of the index entries associated with the
@@ -123,7 +123,7 @@ func dbIndexDisconnectBlock(dbTx database.Tx, indexer Indexer, block, parent *dc
 
 	// Update the current index tip.
 	prevHash := &block.MsgBlock().Header.PrevBlock
-	return dbPutIndexerTip(dbTx, idxKey, prevHash, uint32(block.Height())-1)
+	return dbPutIndexerTip(dbTx, idxKey, prevHash, int32(block.Height()-1))
 }
 
 // Manager defines an index manager that manages multiple optional indexes and
@@ -212,7 +212,7 @@ func (m *Manager) maybeCreateIndexes(dbTx database.Tx) error {
 		}
 
 		// Set the tip for the index to values which represent an
-		// uninitialized index (the genesis block hack and height).
+		// uninitialized index (the genesis block hash and height).
 		genesisBlockHash := m.params.GenesisBlock.BlockHash()
 		err := dbPutIndexerTip(dbTx, idxKey, &genesisBlockHash, 0)
 		if err != nil {
@@ -237,7 +237,7 @@ func (m *Manager) Init(chain *blockchain.BlockChain) error {
 		return nil
 	}
 
-	// Finish and drops that were previously interrupted.
+	// Finish any drops that were previously interrupted.
 	if err := m.maybeFinishDrops(); err != nil {
 		return err
 	}
@@ -273,7 +273,7 @@ func (m *Manager) Init(chain *blockchain.BlockChain) error {
 		indexer := m.enabledIndexes[i-1]
 
 		// Fetch the current tip for the index.
-		var height uint32
+		var height int32
 		var hash *chainhash.Hash
 		err := m.db.View(func(dbTx database.Tx) error {
 			idxKey := indexer.Key()
@@ -360,9 +360,9 @@ func (m *Manager) Init(chain *blockchain.BlockChain) error {
 	// lowest one so the catchup code only needs to start at the earliest
 	// block and is able to skip connecting the block for the indexes that
 	// don't need it.
-	bestHeight := chain.BestSnapshot().Height
+	bestHeight := int32(chain.BestSnapshot().Height)
 	lowestHeight := bestHeight
-	indexerHeights := make([]uint32, len(m.enabledIndexes))
+	indexerHeights := make([]int32, len(m.enabledIndexes))
 	err = m.db.View(func(dbTx database.Tx) error {
 		for i, indexer := range m.enabledIndexes {
 			idxKey := indexer.Key()
@@ -374,8 +374,8 @@ func (m *Manager) Init(chain *blockchain.BlockChain) error {
 			log.Debugf("Current %s tip (height %d, hash %v)",
 				indexer.Name(), height, hash)
 			indexerHeights[i] = height
-			if height < uint32(lowestHeight) {
-				lowestHeight = int64(height)
+			if height < lowestHeight {
+				lowestHeight = height
 			}
 		}
 		return nil
@@ -404,7 +404,8 @@ func (m *Manager) Init(chain *blockchain.BlockChain) error {
 		err = m.db.Update(func(dbTx database.Tx) error {
 			// Get the parent of the block, unless it's already cached.
 			if cachedParent == nil && height > 0 {
-				parent, err = blockchain.DBFetchBlockByHeight(dbTx, height-1)
+				parent, err = blockchain.DBFetchBlockByHeight(
+					dbTx, int64(height-1))
 				if err != nil {
 					return err
 				}
@@ -414,7 +415,8 @@ func (m *Manager) Init(chain *blockchain.BlockChain) error {
 
 			// Load the block for the height since it is required to index
 			// it.
-			block, err = blockchain.DBFetchBlockByHeight(dbTx, height)
+			block, err = blockchain.DBFetchBlockByHeight(dbTx,
+				int64(height))
 			if err != nil {
 				return err
 			}
@@ -425,7 +427,7 @@ func (m *Manager) Init(chain *blockchain.BlockChain) error {
 			for i, indexer := range m.enabledIndexes {
 				// Skip indexes that don't need to be updated with this
 				// block.
-				if indexerHeights[i] >= uint32(height) {
+				if indexerHeights[i] >= height {
 					continue
 				}
 
@@ -440,13 +442,13 @@ func (m *Manager) Init(chain *blockchain.BlockChain) error {
 						return errMakeView
 					}
 				}
-				errLocal := dbIndexConnectBlock(dbTx, indexer, block,
+				err = dbIndexConnectBlock(dbTx, indexer, block,
 					parent, view)
-				if errLocal != nil {
-					return errLocal
+				if err != nil {
+					return err
 				}
 
-				indexerHeights[i] = uint32(height)
+				indexerHeights[i] = height
 			}
 
 			return nil
@@ -473,7 +475,7 @@ func indexNeedsInputs(index Indexer) bool {
 
 // dbFetchTx looks up the passed transaction hash in the transaction index and
 // loads it from the database.
-func dbFetchTx(dbTx database.Tx, hash chainhash.Hash) (*wire.MsgTx, error) {
+func dbFetchTx(dbTx database.Tx, hash *chainhash.Hash) (*wire.MsgTx, error) {
 	// Look up the location of the transaction.
 	blockRegion, err := dbFetchTxIndexEntry(dbTx, hash)
 	if err != nil {
@@ -506,35 +508,36 @@ func dbFetchTx(dbTx database.Tx, hash chainhash.Hash) (*wire.MsgTx, error) {
 // associated scripts are still required to index them.
 func makeUtxoView(dbTx database.Tx, block, parent *dcrutil.Block) (*blockchain.UtxoViewpoint, error) {
 	view := blockchain.NewUtxoViewpoint()
-	regularTxTreeValid := dcrutil.IsFlagSet16(block.MsgBlock().Header.VoteBits,
-		dcrutil.BlockValid)
-	if regularTxTreeValid {
-		for txIdx, tx := range parent.Transactions() {
-			// Coinbases do not reference any inputs.  Since the block is
-			// required to have already gone through full validation, it has
-			// already been proven on the first transaction in the block is
-			// a coinbase.
-			if txIdx == 0 {
+	var parentRegularTxs []*dcrutil.Tx
+	if approvesParent(block) {
+		parentRegularTxs = parent.Transactions()
+	}
+	for txIdx, tx := range parentRegularTxs {
+		// Coinbases do not reference any inputs.  Since the block is
+		// required to have already gone through full validation, it has
+		// already been proven on the first transaction in the block is
+		// a coinbase.
+		if txIdx == 0 {
+			continue
+		}
+
+		// Use the transaction index to load all of the referenced
+		// inputs and add their outputs to the view.
+		for _, txIn := range tx.MsgTx().TxIn {
+			// Skip already fetched outputs.
+			originOut := &txIn.PreviousOutPoint
+			if view.LookupEntry(&originOut.Hash) != nil {
 				continue
 			}
 
-			// Use the transaction index to load all of the referenced
-			// inputs and add their outputs to the view.
-			for _, txIn := range tx.MsgTx().TxIn {
-				// Skip already fetched outputs.
-				originOut := &txIn.PreviousOutPoint
-				if view.LookupEntry(&originOut.Hash) != nil {
-					continue
-				}
-
-				originTx, err := dbFetchTx(dbTx, originOut.Hash)
-				if err != nil {
-					return nil, err
-				}
-
-				view.AddTxOuts(dcrutil.NewTx(originTx),
-					int64(wire.NullBlockHeight), wire.NullBlockIndex)
+			originTx, err := dbFetchTx(dbTx, &originOut.Hash)
+			if err != nil {
+				return nil, err
 			}
+
+			view.AddTxOuts(dcrutil.NewTx(originTx),
+				int64(wire.NullBlockHeight),
+				wire.NullBlockIndex)
 		}
 	}
 
@@ -555,7 +558,7 @@ func makeUtxoView(dbTx database.Tx, block, parent *dcrutil.Block) (*blockchain.U
 				continue
 			}
 
-			originTx, err := dbFetchTx(dbTx, originOut.Hash)
+			originTx, err := dbFetchTx(dbTx, &originOut.Hash)
 			if err != nil {
 				return nil, err
 			}

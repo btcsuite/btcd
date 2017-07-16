@@ -1,4 +1,4 @@
-// Copyright (c) 2016 The Decred developers
+// Copyright (c) 2016-2017 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -214,10 +214,8 @@ func (idx *ExistsAddrIndex) ExistsAddresses(addrs []dcrutil.Address) ([]bool, er
 //
 // This is part of the Indexer interface.
 func (idx *ExistsAddrIndex) ConnectBlock(dbTx database.Tx, block, parent *dcrutil.Block, view *blockchain.UtxoViewpoint) error {
-	regularTxTreeValid := dcrutil.IsFlagSet16(block.MsgBlock().Header.VoteBits,
-		dcrutil.BlockValid)
 	var parentTxs []*dcrutil.Tx
-	if regularTxTreeValid && block.Height() > 1 {
+	if approvesParent(block) && block.Height() > 1 {
 		parentTxs = parent.Transactions()
 	}
 	blockTxns := block.STransactions()

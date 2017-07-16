@@ -1,5 +1,5 @@
 // Copyright (c) 2016 The btcsuite developers
-// Copyright (c) 2016 The Decred developers
+// Copyright (c) 2016-2017 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -95,7 +95,7 @@ var (
 // dbPutBlockIDIndexEntry uses an existing database transaction to update or add
 // the index entries for the hash to id and id to hash mappings for the provided
 // values.
-func dbPutBlockIDIndexEntry(dbTx database.Tx, hash chainhash.Hash, id uint32) error {
+func dbPutBlockIDIndexEntry(dbTx database.Tx, hash *chainhash.Hash, id uint32) error {
 	// Serialize the height for use in the index entries.
 	var serializedID [4]byte
 	byteOrder.PutUint32(serializedID[:], id)
@@ -114,7 +114,7 @@ func dbPutBlockIDIndexEntry(dbTx database.Tx, hash chainhash.Hash, id uint32) er
 
 // dbRemoveBlockIDIndexEntry uses an existing database transaction remove index
 // entries from the hash to id and id to hash mappings for the provided hash.
-func dbRemoveBlockIDIndexEntry(dbTx database.Tx, hash chainhash.Hash) error {
+func dbRemoveBlockIDIndexEntry(dbTx database.Tx, hash *chainhash.Hash) error {
 	// Remove the block hash to ID mapping.
 	meta := dbTx.Metadata()
 	hashIndex := meta.Bucket(idByHashIndexBucketName)
@@ -133,7 +133,7 @@ func dbRemoveBlockIDIndexEntry(dbTx database.Tx, hash chainhash.Hash) error {
 
 // dbFetchBlockIDByHash uses an existing database transaction to retrieve the
 // block id for the provided hash from the index.
-func dbFetchBlockIDByHash(dbTx database.Tx, hash chainhash.Hash) (uint32, error) {
+func dbFetchBlockIDByHash(dbTx database.Tx, hash *chainhash.Hash) (uint32, error) {
 	hashIndex := dbTx.Metadata().Bucket(idByHashIndexBucketName)
 	serializedID := hashIndex.Get(hash[:])
 	if serializedID == nil {
@@ -145,21 +145,21 @@ func dbFetchBlockIDByHash(dbTx database.Tx, hash chainhash.Hash) (uint32, error)
 
 // dbFetchBlockHashBySerializedID uses an existing database transaction to
 // retrieve the hash for the provided serialized block id from the index.
-func dbFetchBlockHashBySerializedID(dbTx database.Tx, serializedID []byte) (chainhash.Hash, error) {
+func dbFetchBlockHashBySerializedID(dbTx database.Tx, serializedID []byte) (*chainhash.Hash, error) {
 	idIndex := dbTx.Metadata().Bucket(hashByIDIndexBucketName)
 	hashBytes := idIndex.Get(serializedID)
 	if hashBytes == nil {
-		return chainhash.Hash{}, errNoBlockIDEntry
+		return nil, errNoBlockIDEntry
 	}
 
 	var hash chainhash.Hash
 	copy(hash[:], hashBytes)
-	return hash, nil
+	return &hash, nil
 }
 
 // dbFetchBlockHashByID uses an existing database transaction to retrieve the
 // hash for the provided block id from the index.
-func dbFetchBlockHashByID(dbTx database.Tx, id uint32) (chainhash.Hash, error) {
+func dbFetchBlockHashByID(dbTx database.Tx, id uint32) (*chainhash.Hash, error) {
 	var serializedID [4]byte
 	byteOrder.PutUint32(serializedID[:], id)
 	return dbFetchBlockHashBySerializedID(dbTx, serializedID[:])
@@ -178,7 +178,7 @@ func putTxIndexEntry(target []byte, blockID uint32, txLoc wire.TxLoc) {
 // dbPutTxIndexEntry uses an existing database transaction to update the
 // transaction index given the provided serialized data that is expected to have
 // been serialized putTxIndexEntry.
-func dbPutTxIndexEntry(dbTx database.Tx, txHash chainhash.Hash, serializedData []byte) error {
+func dbPutTxIndexEntry(dbTx database.Tx, txHash *chainhash.Hash, serializedData []byte) error {
 	txIndex := dbTx.Metadata().Bucket(txIndexKey)
 	return txIndex.Put(txHash[:], serializedData)
 }
@@ -187,7 +187,7 @@ func dbPutTxIndexEntry(dbTx database.Tx, txHash chainhash.Hash, serializedData [
 // region for the provided transaction hash from the transaction index.  When
 // there is no entry for the provided hash, nil will be returned for the both
 // the region and the error.
-func dbFetchTxIndexEntry(dbTx database.Tx, txHash chainhash.Hash) (*database.BlockRegion, error) {
+func dbFetchTxIndexEntry(dbTx database.Tx, txHash *chainhash.Hash) (*database.BlockRegion, error) {
 	// Load the record from the database and return now if it doesn't exist.
 	txIndex := dbTx.Metadata().Bucket(txIndexKey)
 	serializedData := txIndex.Get(txHash[:])
@@ -224,72 +224,65 @@ func dbFetchTxIndexEntry(dbTx database.Tx, txHash chainhash.Hash) (*database.Blo
 }
 
 // dbAddTxIndexEntries uses an existing database transaction to add a
-// transaction index entry for every transaction in the passed block.
+// transaction index entry for every transaction in the parent of the passed
+// block (if they were valid) and every stake transaction in the passed block.
 func dbAddTxIndexEntries(dbTx database.Tx, block, parent *dcrutil.Block, blockID uint32) error {
-	// The offset and length of the transactions within the serialized
-	// block, for the regular transactions of the parent (if added)
-	// and the stake transactions of the current block.
-	regularTxTreeValid := dcrutil.IsFlagSet16(block.MsgBlock().Header.VoteBits,
-		dcrutil.BlockValid)
-	var parentRegularTxs []*dcrutil.Tx
-	var parentTxLocs []wire.TxLoc
-	var parentBlockID uint32
-	if regularTxTreeValid && block.Height() > 1 {
-		var err error
-		parentRegularTxs = parent.Transactions()
-
-		parentTxLocs, _, err = parent.TxLoc()
-		if err != nil {
-			return err
-		}
-
-		parentHash := parent.Hash()
-		parentBlockID, err = dbFetchBlockIDByHash(dbTx, *parentHash)
-		if err != nil {
-			return err
-		}
-	}
-	_, blockStxLocs, err := block.TxLoc()
-	if err != nil {
-		return err
-	}
-
-	allTxs := append(parentRegularTxs, block.STransactions()...)
-	allTxsLocs := append(parentTxLocs, blockStxLocs...)
-	stakeTxStartIdx := len(parentRegularTxs)
-
 	// As an optimization, allocate a single slice big enough to hold all
 	// of the serialized transaction index entries for the block and
 	// serialize them directly into the slice.  Then, pass the appropriate
 	// subslice to the database to be written.  This approach significantly
 	// cuts down on the number of required allocations.
-	offset := 0
-	serializedValues := make([]byte, len(allTxs)*txEntrySize)
-	blockIDToUse := parentBlockID
-	for i, tx := range allTxs {
-		// Switch to using the newest block ID for the stake transactions,
-		// since these are not from the parent.
-		if i == stakeTxStartIdx {
-			blockIDToUse = blockID
+	addEntries := func(txns []*dcrutil.Tx, txLocs []wire.TxLoc, blockID uint32) error {
+		offset := 0
+		serializedValues := make([]byte, len(txns)*txEntrySize)
+		for i, tx := range txns {
+			putTxIndexEntry(serializedValues[offset:], blockID,
+				txLocs[i])
+			endOffset := offset + txEntrySize
+			err := dbPutTxIndexEntry(dbTx, tx.Hash(),
+				serializedValues[offset:endOffset:endOffset])
+			if err != nil {
+				return err
+			}
+			offset += txEntrySize
 		}
+		return nil
+	}
 
-		putTxIndexEntry(serializedValues[offset:], blockIDToUse, allTxsLocs[i])
-		endOffset := offset + txEntrySize
-		txHash := tx.Hash()
-		err := dbPutTxIndexEntry(dbTx, *txHash,
-			serializedValues[offset:endOffset:endOffset])
+	// Add the regular transactions of the parent if voted valid.
+	if approvesParent(block) && block.Height() > 1 {
+		// The offset and length of the transactions within the
+		// serialized parent block.
+		txLocs, _, err := parent.TxLoc()
 		if err != nil {
 			return err
 		}
-		offset += txEntrySize
+
+		parentBlockID, err := dbFetchBlockIDByHash(dbTx, parent.Hash())
+		if err != nil {
+			return err
+		}
+
+		err = addEntries(parent.Transactions(), txLocs, parentBlockID)
+		if err != nil {
+			return err
+		}
 	}
 
-	return nil
+	// Add the stake transactions of the current block.
+	//
+	// The offset and length of the stake transactions within the serialized
+	// block.
+	_, stakeTxLocs, err := block.TxLoc()
+	if err != nil {
+		return err
+	}
+	return addEntries(block.STransactions(), stakeTxLocs, blockID)
 }
 
 // dbRemoveTxIndexEntry uses an existing database transaction to remove the most
 // recent transaction index entry for the given hash.
-func dbRemoveTxIndexEntry(dbTx database.Tx, txHash chainhash.Hash) error {
+func dbRemoveTxIndexEntry(dbTx database.Tx, txHash *chainhash.Hash) error {
 	txIndex := dbTx.Metadata().Bucket(txIndexKey)
 	serializedData := txIndex.Get(txHash[:])
 	if len(serializedData) == 0 {
@@ -301,28 +294,28 @@ func dbRemoveTxIndexEntry(dbTx database.Tx, txHash chainhash.Hash) error {
 }
 
 // dbRemoveTxIndexEntries uses an existing database transaction to remove the
-// latest transaction entry for every transaction in the passed block.
+// latest transaction entry for every transaction in the parent of the passed
+// block (if they were valid) and every stake transaction in the passed block.
 func dbRemoveTxIndexEntries(dbTx database.Tx, block, parent *dcrutil.Block) error {
-	regularTxTreeValid := dcrutil.IsFlagSet16(block.MsgBlock().Header.VoteBits,
-		dcrutil.BlockValid)
-	if regularTxTreeValid {
-		for _, tx := range parent.Transactions() {
-			txHash := tx.Hash()
-			err := dbRemoveTxIndexEntry(dbTx, *txHash)
+	removeEntries := func(txns []*dcrutil.Tx) error {
+		for _, tx := range txns {
+			err := dbRemoveTxIndexEntry(dbTx, tx.Hash())
 			if err != nil {
 				return err
 			}
 		}
+		return nil
 	}
-	for _, tx := range block.STransactions() {
-		txHash := tx.Hash()
-		err := dbRemoveTxIndexEntry(dbTx, *txHash)
-		if err != nil {
+
+	// Remove all of the regular transactions of the parent if voted valid.
+	if approvesParent(block) {
+		if err := removeEntries(parent.Transactions()); err != nil {
 			return err
 		}
 	}
 
-	return nil
+	// Remove the stake transactions of the block being disconnected.
+	return removeEntries(block.STransactions())
 }
 
 // TxIndex implements a transaction by hash index.  That is to say, it supports
@@ -444,8 +437,7 @@ func (idx *TxIndex) ConnectBlock(dbTx database.Tx, block, parent *dcrutil.Block,
 
 	// Add the new block ID index entry for the block being connected and
 	// update the current internal block ID accordingly.
-	blockHash := block.Hash()
-	err := dbPutBlockIDIndexEntry(dbTx, *blockHash, newBlockID)
+	err := dbPutBlockIDIndexEntry(dbTx, block.Hash(), newBlockID)
 	if err != nil {
 		return err
 	}
@@ -466,8 +458,7 @@ func (idx *TxIndex) DisconnectBlock(dbTx database.Tx, block, parent *dcrutil.Blo
 
 	// Remove the block ID index entry for the block being disconnected and
 	// decrement the current internal block ID to account for it.
-	blockHash := block.Hash()
-	if err := dbRemoveBlockIDIndexEntry(dbTx, *blockHash); err != nil {
+	if err := dbRemoveBlockIDIndexEntry(dbTx, block.Hash()); err != nil {
 		return err
 	}
 	idx.curBlockID--
@@ -484,7 +475,7 @@ func (idx *TxIndex) TxBlockRegion(hash chainhash.Hash) (*database.BlockRegion, e
 	var region *database.BlockRegion
 	err := idx.db.View(func(dbTx database.Tx) error {
 		var err error
-		region, err = dbFetchTxIndexEntry(dbTx, hash)
+		region, err = dbFetchTxIndexEntry(dbTx, &hash)
 		return err
 	})
 	return region, err

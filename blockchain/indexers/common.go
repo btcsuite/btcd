@@ -1,5 +1,5 @@
 // Copyright (c) 2016 The btcsuite developers
-// Copyright (c) 2016 The Decred developers
+// Copyright (c) 2016-2017 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -88,4 +88,12 @@ type internalBucket interface {
 	Get(key []byte) []byte
 	Put(key []byte, value []byte) error
 	Delete(key []byte) error
+}
+
+// approvesParent returns whether or not the vote bits in the header of the
+// passed block indicate the regular transaction tree of the parent block should
+// be considered valid.
+func approvesParent(block *dcrutil.Block) bool {
+	return dcrutil.IsFlagSet16(block.MsgBlock().Header.VoteBits,
+		dcrutil.BlockValid)
 }

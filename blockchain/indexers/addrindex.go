@@ -1,5 +1,5 @@
 // Copyright (c) 2016 The btcsuite developers
-// Copyright (c) 2016 The Decred developers
+// Copyright (c) 2016-2017 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -143,7 +143,7 @@ var (
 
 // fetchBlockHashFunc defines a callback function to use in order to convert a
 // serialized block ID to an associated block hash.
-type fetchBlockHashFunc func(serializedID []byte) (chainhash.Hash, error)
+type fetchBlockHashFunc func(serializedID []byte) (*chainhash.Hash, error)
 
 // serializeAddrIndexEntry serializes the provided block id and transaction
 // location according to the format described in detail above.
@@ -170,7 +170,7 @@ func deserializeAddrIndexEntry(serialized []byte, region *database.BlockRegion, 
 	if err != nil {
 		return err
 	}
-	region.Hash = &hash
+	region.Hash = hash
 	region.Offset = byteOrder.Uint32(serialized[4:8])
 	region.Len = byteOrder.Uint32(serialized[8:12])
 	return nil
@@ -390,7 +390,7 @@ func dbRemoveAddrIndexEntries(bucket internalBucket, addrKey [addrKeySize]byte, 
 		return nil
 	}
 
-	// Loop fowards through the levels while removing entries until the
+	// Loop forwards through the levels while removing entries until the
 	// specified number has been removed.  This will potentially result in
 	// entirely empty lower levels which will be backfilled below.
 	var highestLoadedLevel uint8
@@ -715,52 +715,50 @@ func (idx *AddrIndex) indexPkScript(data writeIndexData, scriptVersion uint16, p
 }
 
 // indexBlock extract all of the standard addresses from all of the transactions
-// in the passed block and maps each of them to the assocaited transaction using
-// the passed map.
+// in the parent of the passed block (if they were valid) and all of the stake
+// transactions in the passed block, and maps each of them to the associated
+// transaction using the passed map.
 func (idx *AddrIndex) indexBlock(data writeIndexData, block, parent *dcrutil.Block, view *blockchain.UtxoViewpoint) {
-	regularTxTreeValid := dcrutil.IsFlagSet16(block.MsgBlock().Header.VoteBits,
-		dcrutil.BlockValid)
-	var stakeStartIdx int
-	if regularTxTreeValid {
-		for txIdx, tx := range parent.Transactions() {
-			// Coinbases do not reference any inputs.  Since the block is
-			// required to have already gone through full validation, it has
-			// already been proven on the first transaction in the block is
-			// a coinbase.
-			if txIdx != 0 {
-				for _, txIn := range tx.MsgTx().TxIn {
-					// The view should always have the input since
-					// the index contract requires it, however, be
-					// safe and simply ignore any missing entries.
-					origin := &txIn.PreviousOutPoint
-					entry := view.LookupEntry(&origin.Hash)
-					if entry == nil {
-						log.Warnf("Missing input %v for tx %v while "+
-							"indexing block %v (height %v)\n", origin.Hash,
-							tx.Hash(), block.Hash(), block.Height())
-						continue
-					}
-
-					version := entry.ScriptVersionByIndex(origin.Index)
-					pkScript := entry.PkScriptByIndex(origin.Index)
-					txType := entry.TransactionType()
-					idx.indexPkScript(data, version, pkScript, txIdx,
-						txType == stake.TxTypeSStx)
+	var parentRegularTxs []*dcrutil.Tx
+	if approvesParent(block) {
+		parentRegularTxs = parent.Transactions()
+	}
+	for txIdx, tx := range parentRegularTxs {
+		// Coinbases do not reference any inputs.  Since the block is
+		// required to have already gone through full validation, it has
+		// already been proven on the first transaction in the block is
+		// a coinbase.
+		if txIdx != 0 {
+			for _, txIn := range tx.MsgTx().TxIn {
+				// The view should always have the input since
+				// the index contract requires it, however, be
+				// safe and simply ignore any missing entries.
+				origin := &txIn.PreviousOutPoint
+				entry := view.LookupEntry(&origin.Hash)
+				if entry == nil {
+					log.Warnf("Missing input %v for tx %v while "+
+						"indexing block %v (height %v)\n", origin.Hash,
+						tx.Hash(), block.Hash(), block.Height())
+					continue
 				}
-			}
 
-			for _, txOut := range tx.MsgTx().TxOut {
-				idx.indexPkScript(data, txOut.Version, txOut.PkScript, txIdx,
-					false)
+				version := entry.ScriptVersionByIndex(origin.Index)
+				pkScript := entry.PkScriptByIndex(origin.Index)
+				txType := entry.TransactionType()
+				idx.indexPkScript(data, version, pkScript, txIdx,
+					txType == stake.TxTypeSStx)
 			}
 		}
 
-		stakeStartIdx = len(parent.Transactions())
+		for _, txOut := range tx.MsgTx().TxOut {
+			idx.indexPkScript(data, txOut.Version, txOut.PkScript, txIdx,
+				false)
+		}
 	}
 
 	for txIdx, tx := range block.STransactions() {
 		msgTx := tx.MsgTx()
-		thisTxOffset := txIdx + stakeStartIdx
+		thisTxOffset := txIdx + len(parentRegularTxs)
 
 		isSSGen, _ := stake.IsSSGen(msgTx)
 		for i, txIn := range msgTx.TxIn {
@@ -801,16 +799,13 @@ func (idx *AddrIndex) indexBlock(data writeIndexData, block, parent *dcrutil.Blo
 // the transactions in the block involve.
 //
 // This is part of the Indexer interface.
-func (idx *AddrIndex) ConnectBlock(dbTx database.Tx, block, parent *dcrutil.Block,
-	view *blockchain.UtxoViewpoint) error {
+func (idx *AddrIndex) ConnectBlock(dbTx database.Tx, block, parent *dcrutil.Block, view *blockchain.UtxoViewpoint) error {
 	// The offset and length of the transactions within the serialized
 	// block for the regular transactions of the previous block, if
 	// applicable.
-	regularTxTreeValid := dcrutil.IsFlagSet16(block.MsgBlock().Header.VoteBits,
-		dcrutil.BlockValid)
 	var parentTxLocs []wire.TxLoc
 	var parentBlockID uint32
-	if regularTxTreeValid && block.Height() > 1 {
+	if approvesParent(block) && block.Height() > 1 {
 		var err error
 		parentTxLocs, _, err = parent.TxLoc()
 		if err != nil {
@@ -818,7 +813,7 @@ func (idx *AddrIndex) ConnectBlock(dbTx database.Tx, block, parent *dcrutil.Bloc
 		}
 
 		parentHash := parent.Hash()
-		parentBlockID, err = dbFetchBlockIDByHash(dbTx, *parentHash)
+		parentBlockID, err = dbFetchBlockIDByHash(dbTx, parentHash)
 		if err != nil {
 			return err
 		}
@@ -838,7 +833,7 @@ func (idx *AddrIndex) ConnectBlock(dbTx database.Tx, block, parent *dcrutil.Bloc
 
 	// Get the internal block ID associated with the block.
 	blockHash := block.Hash()
-	blockID, err := dbFetchBlockIDByHash(dbTx, *blockHash)
+	blockID, err := dbFetchBlockIDByHash(dbTx, blockHash)
 	if err != nil {
 		return err
 	}
@@ -916,7 +911,7 @@ func (idx *AddrIndex) TxRegionsForAddress(dbTx database.Tx, addr dcrutil.Address
 	err = idx.db.View(func(dbTx database.Tx) error {
 		// Create closure to lookup the block hash given the ID using
 		// the database transaction.
-		fetchBlockHash := func(id []byte) (chainhash.Hash, error) {
+		fetchBlockHash := func(id []byte) (*chainhash.Hash, error) {
 			// Deserialize and populate the result.
 			return dbFetchBlockHashBySerializedID(dbTx, id)
 		}
