@@ -115,11 +115,6 @@ func TestAddresses(t *testing.T) {
 			valid: false,
 			net:   &chaincfg.TestNet2Params,
 		},
-		{
-			name:  "p2pkh no default net",
-			addr:  "TsmWaPM77WSyA3aiQ2Q1KnwGDVWvEkhipBc",
-			valid: false,
-		},
 
 		// Positive P2SH tests.
 		{
@@ -479,7 +474,7 @@ func TestAddresses(t *testing.T) {
 
 	for _, test := range tests {
 		// Decode addr and compare error against valid.
-		decoded, err := dcrutil.DecodeAddress(test.addr, test.net)
+		decoded, err := dcrutil.DecodeAddress(test.addr)
 		if (err == nil) != test.valid {
 			t.Errorf("%v: decoding test failed: %v", test.name, err)
 			return

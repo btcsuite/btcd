@@ -125,10 +125,39 @@ type Address interface {
 	Net() *chaincfg.Params
 }
 
+// NewAddressPubKey returns a new Address. decoded must
+// be 33 bytes.
+func NewAddressPubKey(decoded []byte, net *chaincfg.Params) (Address, error) {
+	if len(decoded) == 33 {
+		// First byte is the signature suite and ybit.
+		suite := decoded[0]
+		suite &= ^uint8(1 << 7)
+		ybit := !(decoded[0]&(1<<7) == 0)
+		toAppend := uint8(0x02)
+		if ybit {
+			toAppend = 0x03
+		}
+
+		switch int(suite) {
+		case chainec.ECTypeSecp256k1:
+			return NewAddressSecpPubKey(
+				append([]byte{toAppend}, decoded[1:]...),
+				net)
+		case chainec.ECTypeEdwards:
+			return NewAddressEdwardsPubKey(decoded, net)
+		case chainec.ECTypeSecSchnorr:
+			return NewAddressSecSchnorrPubKey(
+				append([]byte{toAppend}, decoded[1:]...),
+				net)
+		}
+		return nil, ErrUnknownAddressType
+	}
+	return nil, ErrUnknownAddressType
+}
+
 // DecodeAddress decodes the string encoding of an address and returns
-// the Address if addr is a valid encoding for a known address type on
-// the network provided.
-func DecodeAddress(addr string, defaultNet *chaincfg.Params) (Address, error) {
+// the Address if addr is a valid encoding for a known address type
+func DecodeAddress(addr string) (Address, error) {
 	// Switch on decoded length to determine the type.
 	decoded, netID, err := base58.CheckDecode(addr)
 	if err != nil {
@@ -138,55 +167,27 @@ func DecodeAddress(addr string, defaultNet *chaincfg.Params) (Address, error) {
 		return nil, fmt.Errorf("decoded address is of unknown format: %v",
 			err.Error())
 	}
-	if defaultNet == nil {
-		return nil, ErrMissingDefaultNet
-	}
-	switch netID {
-	case defaultNet.PubKeyAddrID:
-		// First byte is the signature suite and ybit.
-		suite := decoded[0]
-		suite &= ^uint8(1 << 7)
-		ybit := !(decoded[0]&(1<<7) == 0)
 
-		switch int(suite) {
-		case chainec.ECTypeSecp256k1:
-			if len(decoded) == 33 {
-				toAppend := uint8(0x02)
-				if ybit {
-					toAppend = 0x03
-				}
-				return NewAddressSecpPubKey(
-					append([]byte{toAppend}, decoded[1:]...),
-					defaultNet)
-			}
-		case chainec.ECTypeEdwards:
-			if len(decoded) == 33 {
-				return NewAddressEdwardsPubKey(decoded, defaultNet)
-			}
-		case chainec.ECTypeSecSchnorr:
-			if len(decoded) == 33 {
-				toAppend := uint8(0x02)
-				if ybit {
-					toAppend = 0x03
-				}
-				return NewAddressSecSchnorrPubKey(
-					append([]byte{toAppend}, decoded[1:]...),
-					defaultNet)
-			}
-		}
+	net, err := detectNetworkForAddress(addr)
+	if err != nil {
 		return nil, ErrUnknownAddressType
+	}
 
-	case defaultNet.PubKeyHashAddrID:
-		return NewAddressPubKeyHash(decoded, defaultNet, chainec.ECTypeSecp256k1)
+	switch netID {
+	case net.PubKeyAddrID:
+		return NewAddressPubKey(decoded, net)
 
-	case defaultNet.PKHEdwardsAddrID:
-		return NewAddressPubKeyHash(decoded, defaultNet, chainec.ECTypeEdwards)
+	case net.PubKeyHashAddrID:
+		return NewAddressPubKeyHash(decoded, net, chainec.ECTypeSecp256k1)
 
-	case defaultNet.PKHSchnorrAddrID:
-		return NewAddressPubKeyHash(decoded, defaultNet, chainec.ECTypeSecSchnorr)
+	case net.PKHEdwardsAddrID:
+		return NewAddressPubKeyHash(decoded, net, chainec.ECTypeEdwards)
 
-	case defaultNet.ScriptHashAddrID:
-		return NewAddressScriptHashFromHash(decoded, defaultNet)
+	case net.PKHSchnorrAddrID:
+		return NewAddressPubKeyHash(decoded, net, chainec.ECTypeSecSchnorr)
+
+	case net.ScriptHashAddrID:
+		return NewAddressScriptHashFromHash(decoded, net)
 
 	default:
 		return nil, ErrUnknownAddressType
@@ -221,12 +222,7 @@ func detectNetworkForAddress(addr string) (*chaincfg.Params, error) {
 // When the address does not encode the network, such as in the case of a raw
 // public key, the address will be associated with the passed defaultNet.
 func DecodeNetworkAddress(addr string) (Address, error) {
-	params, err := detectNetworkForAddress(addr)
-	if err != nil {
-		return nil, err
-	}
-
-	return DecodeAddress(addr, params)
+	return DecodeAddress(addr)
 }
 
 // AddressPubKeyHash is an Address for a pay-to-pubkey-hash (P2PKH)
