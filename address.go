@@ -214,17 +214,6 @@ func detectNetworkForAddress(addr string) (*chaincfg.Params, error) {
 	return nil, fmt.Errorf("unknown network type in string encoded address")
 }
 
-// DecodeNetworkAddress decodes the string encoding of an address and returns
-// the Address if addr is a valid encoding for a known address type. The network
-// type is automatically detected.
-//
-// The network the address is associated with is extracted if possible.
-// When the address does not encode the network, such as in the case of a raw
-// public key, the address will be associated with the passed defaultNet.
-func DecodeNetworkAddress(addr string) (Address, error) {
-	return DecodeAddress(addr)
-}
-
 // AddressPubKeyHash is an Address for a pay-to-pubkey-hash (P2PKH)
 // transaction.
 type AddressPubKeyHash struct {
