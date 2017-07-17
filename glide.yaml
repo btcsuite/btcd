@@ -31,8 +31,6 @@ import:
 - package: github.com/decred/blake256
 - package: github.com/decred/dcrrpcclient
 - package: github.com/decred/dcrutil
-  version: 58e046aab848365647c44b295f4fab078fbc3392
-  repo: https://github.com/dnldd/dcrutil.git
   subpackages:
   - bloom
 - package: golang.org/x/crypto

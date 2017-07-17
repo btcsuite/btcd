@@ -81,7 +81,7 @@ func TestBlockchainFunctions(t *testing.T) {
 			"want %v, got %v", expectedVal, val)
 	}
 
-	a, _ := dcrutil.DecodeNetworkAddress("SsbKpMkPnadDcZFFZqRPY8nvdFagrktKuzB")
+	a, _ := dcrutil.DecodeAddress("SsbKpMkPnadDcZFFZqRPY8nvdFagrktKuzB")
 	hs, err := chain.TicketsWithAddress(a)
 	if err != nil {
 		t.Errorf("Failed to do TicketsWithAddress: %v", err)

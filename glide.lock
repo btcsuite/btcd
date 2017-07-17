@@ -1,5 +1,5 @@
-hash: 4b6e3c74874c418e9dd83046051037dabebbba6cb4d4d2a8dfa9d524b32b7eeb
-updated: 2017-07-17T22:58:54.586169116Z
+hash: 153a3e6a1f31b2b29a113e953098f2b42a645103ee3e10040b5e03727a7b003c
+updated: 2017-07-22T04:13:04.025701013Z
 imports:
 - name: github.com/agl/ed25519
   version: 278e1ec8e8a6e017cd07577924d6766039146ced
@@ -49,10 +49,9 @@ imports:
 - name: github.com/decred/blake256
   version: a840e32d7c31fe2e0218607334cb120a683951a4
 - name: github.com/decred/dcrrpcclient
-  version: e7732bfa71b4b098494fa0ce62d42fded970c393
+  version: 5dcd9e5b9cf04d8c624f6068f18c4195d19907d3
 - name: github.com/decred/dcrutil
   version: 58e046aab848365647c44b295f4fab078fbc3392
-  repo: https://github.com/dnldd/dcrutil.git
   subpackages:
   - base58
   - bloom
@@ -61,7 +60,7 @@ imports:
   subpackages:
   - rotator
 - name: golang.org/x/crypto
-  version: 84f24dfdf3c414ed893ca1b318d0045ef5a1f607
+  version: 6914964337150723782436d56b3f21610a74ce7b
   subpackages:
   - ripemd160
   - ssh/terminal
