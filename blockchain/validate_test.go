@@ -1773,8 +1773,7 @@ func TestBlockValidationRules(t *testing.T) {
 	sstxCBIn.SignatureScript = []byte{0x51, 0x51}
 	sstxToUse166.AddTxIn(sstxCBIn)
 
-	orgAddr, _ := dcrutil.DecodeAddress("ScuQxvveKGfpG1ypt6u27F99Anf7EW3cqhq",
-		simNetParams)
+	orgAddr, _ := dcrutil.DecodeAddress("ScuQxvveKGfpG1ypt6u27F99Anf7EW3cqhq")
 	pkScript, _ := txscript.GenerateSStxAddrPush(orgAddr,
 		dcrutil.Amount(29702992297), 0x0000)
 	txOut := wire.NewTxOut(int64(0), pkScript)

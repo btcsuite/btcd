@@ -30,7 +30,7 @@ func ExamplePayToAddrScript() {
 	// the address type.  It is also required for the upcoming call to
 	// PayToAddrScript.
 	addressStr := "DsSej1qR3Fyc8kV176DCh9n9cY9nqf9Quxk"
-	address, err := dcrutil.DecodeAddress(addressStr, &chaincfg.MainNetParams)
+	address, err := dcrutil.DecodeAddress(addressStr)
 	if err != nil {
 		fmt.Println(err)
 		return

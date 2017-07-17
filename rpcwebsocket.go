@@ -398,7 +398,7 @@ func (f *wsClientFilter) addAddress(a dcrutil.Address) {
 }
 
 func (f *wsClientFilter) addAddressStr(s string) {
-	a, err := dcrutil.DecodeAddress(s, activeNetParams.Params)
+	a, err := dcrutil.DecodeAddress(s)
 	// If address can't be decoded, no point in saving it since it should also
 	// impossible to create the address from an inspected transaction output
 	// script.
@@ -470,7 +470,7 @@ func (f *wsClientFilter) removeAddress(a dcrutil.Address) {
 }
 
 func (f *wsClientFilter) removeAddressStr(s string) {
-	a, err := dcrutil.DecodeAddress(s, activeNetParams.Params)
+	a, err := dcrutil.DecodeAddress(s)
 	if err == nil {
 		f.removeAddress(a)
 	} else {

@@ -1865,7 +1865,7 @@ func (g *Generator) CreatePremineBlock(blockName string, additionalAmount dcruti
 	// in order to set the input value appropriately.
 	var totalSubsidy dcrutil.Amount
 	for _, payout := range g.params.BlockOneLedger {
-		payoutAddr, err := dcrutil.DecodeAddress(payout.Address, g.params)
+		payoutAddr, err := dcrutil.DecodeAddress(payout.Address)
 		if err != nil {
 			panic(err)
 		}

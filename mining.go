@@ -551,7 +551,7 @@ func createCoinbaseTx(subsidyCache *blockchain.SubsidyCache,
 		// Convert the addresses in the ledger into useable format.
 		addrs := make([]dcrutil.Address, len(params.BlockOneLedger))
 		for i, payout := range params.BlockOneLedger {
-			addr, err := dcrutil.DecodeAddress(payout.Address, params)
+			addr, err := dcrutil.DecodeAddress(payout.Address)
 			if err != nil {
 				return nil, err
 			}

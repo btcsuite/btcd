@@ -258,7 +258,7 @@ func BlockOneCoinbasePaysTokens(tx *dcrutil.Tx,
 			return ruleError(ErrBlockOneOutputs, errStr)
 		}
 
-		addrLedger, err := dcrutil.DecodeAddress(ledger[i].Address, params)
+		addrLedger, err := dcrutil.DecodeAddress(ledger[i].Address)
 		if err != nil {
 			return err
 		}
