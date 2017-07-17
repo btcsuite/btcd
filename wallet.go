@@ -1205,7 +1205,7 @@ func (r FutureAddMultisigAddressResult) Receive() (dcrutil.Address, error) {
 		return nil, err
 	}
 
-	return dcrutil.DecodeNetworkAddress(addr)
+	return dcrutil.DecodeAddress(addr)
 }
 
 // AddMultisigAddressAsync returns an instance of a type that can be used to get
@@ -1323,7 +1323,7 @@ func (r FutureGetNewAddressResult) Receive() (dcrutil.Address, error) {
 		return nil, err
 	}
 
-	return dcrutil.DecodeNetworkAddress(addr)
+	return dcrutil.DecodeAddress(addr)
 }
 
 // GapPolicy defines the policy to use when the BIP0044 unused address gap limit
@@ -1389,7 +1389,7 @@ func (r FutureGetRawChangeAddressResult) Receive() (dcrutil.Address, error) {
 		return nil, err
 	}
 
-	return dcrutil.DecodeNetworkAddress(addr)
+	return dcrutil.DecodeAddress(addr)
 }
 
 // GetRawChangeAddressAsync returns an instance of a type that can be used to
@@ -1428,7 +1428,7 @@ func (r FutureGetAccountAddressResult) Receive() (dcrutil.Address, error) {
 		return nil, err
 	}
 
-	return dcrutil.DecodeNetworkAddress(addr)
+	return dcrutil.DecodeAddress(addr)
 }
 
 // GetAccountAddressAsync returns an instance of a type that can be used to get
@@ -1537,7 +1537,7 @@ func (r FutureGetAddressesByAccountResult) Receive() ([]dcrutil.Address, error) 
 
 	addrs := make([]dcrutil.Address, 0, len(addrStrings))
 	for _, addrStr := range addrStrings {
-		addr, err := dcrutil.DecodeNetworkAddress(addrStr)
+		addr, err := dcrutil.DecodeAddress(addrStr)
 		if err != nil {
 			return nil, err
 		}
