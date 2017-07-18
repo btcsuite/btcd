@@ -385,7 +385,8 @@ func checkBlockHeaderSanity(block *dcrutil.Block, timeSource MedianTimeSource, f
 	}
 
 	// Ensure the block time is not too far in the future.
-	maxTimestamp := time.Now().Add(time.Second * MaxTimeOffsetSeconds)
+	maxTimestamp := timeSource.AdjustedTime().Add(time.Second *
+		MaxTimeOffsetSeconds)
 	if header.Timestamp.After(maxTimestamp) {
 		str := fmt.Sprintf("block timestamp of %v is too far in the "+
 			"future", header.Timestamp)
