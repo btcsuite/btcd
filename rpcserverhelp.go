@@ -536,6 +536,7 @@ var helpDescsEnUS = map[string]string{
 	"getmininginforesult-currentblocksize": "Size of the latest best block",
 	"getmininginforesult-currentblocktx":   "Number of transactions in the latest best block",
 	"getmininginforesult-difficulty":       "Current target difficulty",
+	"getmininginforesult-stakedifficulty":  "Stake difficulty required for the next block",
 	"getmininginforesult-errors":           "Any current errors",
 	"getmininginforesult-generate":         "Whether or not server is set to generate coins",
 	"getmininginforesult-genproclimit":     "Number of processors to use for coin generation (-1 when disabled)",
@@ -543,7 +544,6 @@ var helpDescsEnUS = map[string]string{
 	"getmininginforesult-networkhashps":    "Estimated network hashes per second for the most recent blocks",
 	"getmininginforesult-pooledtx":         "Number of transactions in the memory pool",
 	"getmininginforesult-testnet":          "Whether or not server is using testnet",
-	"getmininginforesult-stakedifficulty":  "Current estimated stake difficulty",
 
 	// GetMiningInfoCmd help.
 	"getmininginfo--synopsis": "Returns a JSON object containing mining-related information.",
