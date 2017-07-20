@@ -172,11 +172,12 @@ type BestState struct {
 	BlockSize    uint64          // The size of the block.
 	NumTxns      uint64          // The number of txns in the block.
 	TotalTxns    uint64          // The total number of txns in the chain.
+	MedianTime   time.Time       // Median time as per CalcPastMedianTime.
 	TotalSubsidy int64           // The total subsidy for the chain.
 }
 
 // newBestState returns a new best stats instance for the given parameters.
-func newBestState(node *blockNode, blockSize, numTxns, totalTxns uint64, totalSubsidy int64) *BestState {
+func newBestState(node *blockNode, blockSize, numTxns, totalTxns uint64, medianTime time.Time, totalSubsidy int64) *BestState {
 	return &BestState{
 		Hash:         &node.hash,
 		Height:       node.height,
@@ -184,6 +185,7 @@ func newBestState(node *blockNode, blockSize, numTxns, totalTxns uint64, totalSu
 		BlockSize:    blockSize,
 		NumTxns:      numTxns,
 		TotalTxns:    totalTxns,
+		MedianTime:   medianTime,
 		TotalSubsidy: totalSubsidy,
 	}
 }
@@ -1231,8 +1233,7 @@ func dbMaybeStoreBlock(dbTx database.Tx, block *dcrutil.Block) error {
 // it would be inefficient to repeat it.
 //
 // This function MUST be called with the chain state lock held (for writes).
-func (b *BlockChain) connectBlock(node *blockNode, block *dcrutil.Block,
-	view *UtxoViewpoint, stxos []spentTxOut) error {
+func (b *BlockChain) connectBlock(node *blockNode, block *dcrutil.Block, view *UtxoViewpoint, stxos []spentTxOut) error {
 	// Make sure it's extending the end of the best chain.
 	prevHash := block.MsgBlock().Header.PrevBlock
 	if prevHash != b.bestNode.hash {
@@ -1248,6 +1249,12 @@ func (b *BlockChain) connectBlock(node *blockNode, block *dcrutil.Block,
 	if len(stxos) != countSpentOutputs(block, parent) {
 		return AssertError("connectBlock called with inconsistent " +
 			"spent transaction out information")
+	}
+
+	// Calculate the median time for the block.
+	medianTime, err := b.calcPastMedianTime(node)
+	if err != nil {
+		return err
 	}
 
 	// Generate a new best state snapshot that will be used to update the
@@ -1266,7 +1273,7 @@ func (b *BlockChain) connectBlock(node *blockNode, block *dcrutil.Block,
 
 	blockSize := uint64(block.MsgBlock().Header.Size)
 	state := newBestState(node, blockSize, numTxns, curTotalTxns+numTxns,
-		curTotalSubsidy+subsidy)
+		medianTime, curTotalSubsidy+subsidy)
 
 	// Get the stake node for this node, filling in any data that
 	// may have yet to have been filled in.  In all cases this
@@ -1423,8 +1430,7 @@ func (b *BlockChain) dropMainChainBlockCache(block *dcrutil.Block) {
 // the main (best) chain.
 //
 // This function MUST be called with the chain state lock held (for writes).
-func (b *BlockChain) disconnectBlock(node *blockNode, block *dcrutil.Block,
-	view *UtxoViewpoint) error {
+func (b *BlockChain) disconnectBlock(node *blockNode, block *dcrutil.Block, view *UtxoViewpoint) error {
 	// Make sure the node being disconnected is the end of the best chain.
 	if node.hash != b.bestNode.hash {
 		return AssertError("disconnectBlock must be called with the " +
@@ -1436,6 +1442,12 @@ func (b *BlockChain) disconnectBlock(node *blockNode, block *dcrutil.Block,
 	// block nodes as needed.  This helps allow only the pieces of the chain
 	// that are needed to remain in memory.
 	prevNode, err := b.getPrevNodeFromNode(node)
+	if err != nil {
+		return err
+	}
+
+	// Calculate the median time for the previous block.
+	medianTime, err := b.calcPastMedianTime(prevNode)
 	if err != nil {
 		return err
 	}
@@ -1464,7 +1476,7 @@ func (b *BlockChain) disconnectBlock(node *blockNode, block *dcrutil.Block,
 	newTotalSubsidy := curTotalSubsidy - subsidy
 
 	state := newBestState(prevNode, parentBlockSize, numTxns, newTotalTxns,
-		newTotalSubsidy)
+		medianTime, newTotalSubsidy)
 
 	// Prepare the information required to update the stake database
 	// contents.
