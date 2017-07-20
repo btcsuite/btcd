@@ -191,9 +191,6 @@ type TxPool struct {
 	votesMtx sync.Mutex
 	votes    map[chainhash.Hash][]*VoteTx
 
-	// A declared subsidy cache as passed from the blockchain.
-	subsidyCache *blockchain.SubsidyCache
-
 	pennyTotal    float64 // exponentially decaying total for penny spends.
 	lastPennyUnix int64   // unix time of last ``penny spend''
 }
@@ -974,7 +971,7 @@ func (mp *TxPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew, rateLimit, allow
 	// Also returns the fees associated with the transaction which will be
 	// used later.  The fraud proof is not checked because it will be
 	// filled in by the miner.
-	txFee, err := blockchain.CheckTransactionInputs(mp.subsidyCache,
+	txFee, err := blockchain.CheckTransactionInputs(mp.cfg.SubsidyCache,
 		tx, nextBlockHeight, utxoView, false, mp.cfg.ChainParams)
 	if err != nil {
 		if cerr, ok := err.(blockchain.RuleError); ok {
@@ -1555,6 +1552,5 @@ func New(cfg *Config) *TxPool {
 		orphansByPrev: make(map[chainhash.Hash]map[chainhash.Hash]*dcrutil.Tx),
 		outpoints:     make(map[wire.OutPoint]*dcrutil.Tx),
 		votes:         make(map[chainhash.Hash][]*VoteTx),
-		subsidyCache:  cfg.SubsidyCache,
 	}
 }
