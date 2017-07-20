@@ -9,6 +9,7 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"runtime/debug"
 	"testing"
 
 	"github.com/decred/dcrd/chaincfg"
@@ -110,17 +111,18 @@ func TestMain(m *testing.M) {
 	// Initialize the primary mining node with a chain of length 125,
 	// providing 25 mature coinbases to allow spending from for testing
 	// purposes.
-	if err = primaryHarness.SetUp(true, 25); err != nil {
+	if err := primaryHarness.SetUp(true, 25); err != nil {
 		fmt.Println("unable to setup test chain: ", err)
 		os.Exit(1)
 	}
 
 	exitCode := m.Run()
 
-	// Clean up the primary harness created above. This includes removing
-	// all temporary directories, and shutting down any created processes.
-	if err := primaryHarness.TearDown(); err != nil {
-		fmt.Println("unable to setup test chain: ", err)
+	// Clean up any active harnesses that are still currently running.This
+	// includes removing all temporary directories, and shutting down any
+	// created processes.
+	if err := rpctest.TearDownAll(); err != nil {
+		fmt.Println("unable to tear down all harnesses: ", err)
 		os.Exit(1)
 	}
 
@@ -128,7 +130,23 @@ func TestMain(m *testing.M) {
 }
 
 func TestRpcServer(t *testing.T) {
+	var currentTestNum int
+	defer func() {
+		// If one of the integration tests caused a panic within the main
+		// goroutine, then tear down all the harnesses in order to avoid
+		// any leaked btcd processes.
+		if r := recover(); r != nil {
+			fmt.Println("recovering from test panic: ", r)
+			if err := rpctest.TearDownAll(); err != nil {
+				fmt.Println("unable to tear down all harnesses: ", err)
+			}
+			t.Fatalf("test #%v panicked: %s", currentTestNum, debug.Stack())
+		}
+	}()
+
 	for _, testCase := range rpcTestCases {
 		testCase(primaryHarness, t)
+
+		currentTestNum++
 	}
 }
