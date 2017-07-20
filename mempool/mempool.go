@@ -179,7 +179,7 @@ type TxPool struct {
 	// The following variables must only be used atomically.
 	lastUpdated int64 // last time pool was updated.
 
-	sync.RWMutex
+	mtx           sync.RWMutex
 	cfg           Config
 	pool          map[chainhash.Hash]*TxDesc
 	orphans       map[chainhash.Hash]*dcrutil.Tx
@@ -321,9 +321,9 @@ func (mp *TxPool) removeOrphan(txHash *chainhash.Hash) {
 //
 // This function is safe for concurrent access.
 func (mp *TxPool) RemoveOrphan(txHash *chainhash.Hash) {
-	mp.Lock()
+	mp.mtx.Lock()
 	mp.removeOrphan(txHash)
-	mp.Unlock()
+	mp.mtx.Unlock()
 }
 
 // limitNumOrphans limits the number of orphan transactions by evicting a random
@@ -433,8 +433,8 @@ func (mp *TxPool) isTransactionInPool(hash *chainhash.Hash) bool {
 // This function is safe for concurrent access.
 func (mp *TxPool) IsTransactionInPool(hash *chainhash.Hash) bool {
 	// Protect concurrent access.
-	mp.RLock()
-	defer mp.RUnlock()
+	mp.mtx.RLock()
+	defer mp.mtx.RUnlock()
 
 	return mp.isTransactionInPool(hash)
 }
@@ -457,8 +457,8 @@ func (mp *TxPool) isOrphanInPool(hash *chainhash.Hash) bool {
 // This function is safe for concurrent access.
 func (mp *TxPool) IsOrphanInPool(hash *chainhash.Hash) bool {
 	// Protect concurrent access.
-	mp.RLock()
-	defer mp.RUnlock()
+	mp.mtx.RLock()
+	defer mp.mtx.RUnlock()
 
 	return mp.isOrphanInPool(hash)
 }
@@ -477,8 +477,8 @@ func (mp *TxPool) haveTransaction(hash *chainhash.Hash) bool {
 // This function is safe for concurrent access.
 func (mp *TxPool) HaveTransaction(hash *chainhash.Hash) bool {
 	// Protect concurrent access.
-	mp.RLock()
-	defer mp.RUnlock()
+	mp.mtx.RLock()
+	defer mp.mtx.RUnlock()
 
 	return mp.haveTransaction(hash)
 }
@@ -501,10 +501,10 @@ func (mp *TxPool) haveTransactions(hashes []*chainhash.Hash) []bool {
 // This function is safe for concurrent access.
 func (mp *TxPool) HaveTransactions(hashes []*chainhash.Hash) []bool {
 	// Protect concurrent access.
-	mp.RLock()
-	defer mp.RUnlock()
-
-	return mp.haveTransactions(hashes)
+	mp.mtx.RLock()
+	haveTxns := mp.haveTransactions(hashes)
+	mp.mtx.RUnlock()
+	return haveTxns
 }
 
 // removeTransaction is the internal function which implements the public
@@ -558,8 +558,8 @@ func (mp *TxPool) removeTransaction(tx *dcrutil.Tx, removeRedeemers bool) {
 // This function is safe for concurrent access.
 func (mp *TxPool) RemoveTransaction(tx *dcrutil.Tx, removeRedeemers bool) {
 	// Protect concurrent access.
-	mp.Lock()
-	defer mp.Unlock()
+	mp.mtx.Lock()
+	defer mp.mtx.Unlock()
 
 	mp.removeTransaction(tx, removeRedeemers)
 }
@@ -573,8 +573,8 @@ func (mp *TxPool) RemoveTransaction(tx *dcrutil.Tx, removeRedeemers bool) {
 // This function is safe for concurrent access.
 func (mp *TxPool) RemoveDoubleSpends(tx *dcrutil.Tx) {
 	// Protect concurrent access.
-	mp.Lock()
-	defer mp.Unlock()
+	mp.mtx.Lock()
+	defer mp.mtx.Unlock()
 
 	for _, txIn := range tx.MsgTx().TxIn {
 		if txRedeemer, ok := mp.outpoints[txIn.PreviousOutPoint]; ok {
@@ -718,8 +718,8 @@ func (mp *TxPool) fetchInputUtxos(tx *dcrutil.Tx) (*blockchain.UtxoViewpoint, er
 // This function is safe for concurrent access.
 func (mp *TxPool) FetchTransaction(txHash *chainhash.Hash, includeRecentBlock bool) (*dcrutil.Tx, error) {
 	// Protect concurrent access.
-	mp.RLock()
-	defer mp.RUnlock()
+	mp.mtx.RLock()
+	defer mp.mtx.RUnlock()
 
 	if txDesc, exists := mp.pool[*txHash]; exists {
 		return txDesc.Tx, nil
@@ -1166,8 +1166,8 @@ func (mp *TxPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew, rateLimit, allow
 // This function is safe for concurrent access.
 func (mp *TxPool) MaybeAcceptTransaction(tx *dcrutil.Tx, isNew, rateLimit bool) ([]*chainhash.Hash, error) {
 	// Protect concurrent access.
-	mp.Lock()
-	defer mp.Unlock()
+	mp.mtx.Lock()
+	defer mp.mtx.Unlock()
 
 	return mp.maybeAcceptTransaction(tx, isNew, rateLimit, true)
 }
@@ -1265,10 +1265,9 @@ func (mp *TxPool) processOrphans(hash *chainhash.Hash) []*dcrutil.Tx {
 // for SSGen and SSRtx
 func (mp *TxPool) PruneStakeTx(requiredStakeDifficulty, height int64) {
 	// Protect concurrent access.
-	mp.Lock()
-	defer mp.Unlock()
-
+	mp.mtx.Lock()
 	mp.pruneStakeTx(requiredStakeDifficulty, height)
+	mp.mtx.Unlock()
 }
 
 func (mp *TxPool) pruneStakeTx(requiredStakeDifficulty, height int64) {
@@ -1293,10 +1292,9 @@ func (mp *TxPool) pruneStakeTx(requiredStakeDifficulty, height int64) {
 // be able to be included into a block.
 func (mp *TxPool) PruneExpiredTx(height int64) {
 	// Protect concurrent access.
-	mp.Lock()
-	defer mp.Unlock()
-
+	mp.mtx.Lock()
 	mp.pruneExpiredTx(height)
+	mp.mtx.Unlock()
 }
 
 func (mp *TxPool) pruneExpiredTx(height int64) {
@@ -1322,10 +1320,9 @@ func (mp *TxPool) pruneExpiredTx(height int64) {
 //
 // This function is safe for concurrent access.
 func (mp *TxPool) ProcessOrphans(hash *chainhash.Hash) []*dcrutil.Tx {
-	mp.Lock()
+	mp.mtx.Lock()
 	acceptedTxns := mp.processOrphans(hash)
-	mp.Unlock()
-
+	mp.mtx.Unlock()
 	return acceptedTxns
 }
 
@@ -1342,8 +1339,8 @@ func (mp *TxPool) ProcessOrphans(hash *chainhash.Hash) []*dcrutil.Tx {
 // This function is safe for concurrent access.
 func (mp *TxPool) ProcessTransaction(tx *dcrutil.Tx, allowOrphan, rateLimit, allowHighFees bool) ([]*dcrutil.Tx, error) {
 	// Protect concurrent access.
-	mp.Lock()
-	defer mp.Unlock()
+	mp.mtx.Lock()
+	defer mp.mtx.Unlock()
 	var err error
 	defer func() {
 		if err != nil {
@@ -1407,8 +1404,8 @@ func (mp *TxPool) ProcessTransaction(tx *dcrutil.Tx, allowOrphan, rateLimit, all
 //
 // This function is safe for concurrent access.
 func (mp *TxPool) Count() int {
-	mp.RLock()
-	defer mp.RUnlock()
+	mp.mtx.RLock()
+	defer mp.mtx.RUnlock()
 
 	return len(mp.pool)
 }
@@ -1418,8 +1415,8 @@ func (mp *TxPool) Count() int {
 //
 // This function is safe for concurrent access.
 func (mp *TxPool) TxHashes() []*chainhash.Hash {
-	mp.RLock()
-	defer mp.RUnlock()
+	mp.mtx.RLock()
+	defer mp.mtx.RUnlock()
 
 	hashes := make([]*chainhash.Hash, len(mp.pool))
 	i := 0
@@ -1437,8 +1434,8 @@ func (mp *TxPool) TxHashes() []*chainhash.Hash {
 //
 // This function is safe for concurrent access.
 func (mp *TxPool) TxDescs() []*TxDesc {
-	mp.RLock()
-	defer mp.RUnlock()
+	mp.mtx.RLock()
+	defer mp.mtx.RUnlock()
 
 	descs := make([]*TxDesc, len(mp.pool))
 	i := 0
@@ -1456,8 +1453,8 @@ func (mp *TxPool) TxDescs() []*TxDesc {
 // This is part of the mining.TxSource interface implementation and is safe for
 // concurrent access as required by the interface contract.
 func (mp *TxPool) MiningDescs() []*mining.TxDesc {
-	mp.RLock()
-	defer mp.RUnlock()
+	mp.mtx.RLock()
+	defer mp.mtx.RUnlock()
 
 	descs := make([]*mining.TxDesc, len(mp.pool))
 	i := 0
@@ -1475,8 +1472,8 @@ func (mp *TxPool) MiningDescs() []*mining.TxDesc {
 //
 // This function is safe for concurrent access.
 func (mp *TxPool) RawMempoolVerbose(filterType *stake.TxType) map[string]*dcrjson.GetRawMempoolVerboseResult {
-	mp.RLock()
-	defer mp.RUnlock()
+	mp.mtx.RLock()
+	defer mp.mtx.RUnlock()
 
 	result := make(map[string]*dcrjson.GetRawMempoolVerboseResult,
 		len(mp.pool))
@@ -1536,9 +1533,7 @@ func (mp *TxPool) LastUpdated() time.Time {
 //
 // This function is safe for concurrent access.
 func (mp *TxPool) CheckIfTxsExist(hashes []chainhash.Hash) bool {
-	mp.RLock()
-	defer mp.RUnlock()
-
+	mp.mtx.RLock()
 	inPool := true
 	for _, h := range hashes {
 		if _, exists := mp.pool[h]; !exists {
@@ -1546,7 +1541,7 @@ func (mp *TxPool) CheckIfTxsExist(hashes []chainhash.Hash) bool {
 			break
 		}
 	}
-
+	mp.mtx.RUnlock()
 	return inPool
 }
 
