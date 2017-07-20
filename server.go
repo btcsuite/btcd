@@ -2359,22 +2359,17 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 			AllowOldVotes:        cfg.AllowOldVotes,
 		},
 		ChainParams: chainParams,
-		// EnableAddrIndex: !cfg.NoAddrIndex, TODO
-		NewestHash: func() (*chainhash.Hash, int64, error) {
-			bm.chainState.Lock()
-			hash := bm.chainState.newestHash
-			height := bm.chainState.newestHeight
-			bm.chainState.Unlock()
-			return hash, height, nil
-		},
 		NextStakeDifficulty: func() (int64, error) {
 			bm.chainState.Lock()
 			sDiff := bm.chainState.nextStakeDifficulty
 			bm.chainState.Unlock()
 			return sDiff, nil
 		},
-		FetchUtxoView:   s.blockManager.chain.FetchUtxoView,
-		Chain:           s.blockManager.chain,
+		FetchUtxoView:   bm.chain.FetchUtxoView,
+		BlockByHash:     bm.chain.BlockByHash,
+		BestHash:        func() *chainhash.Hash { return bm.chain.BestSnapshot().Hash },
+		BestHeight:      func() int64 { return bm.chain.BestSnapshot().Height },
+		SubsidyCache:    bm.chain.FetchSubsidyCache(),
 		SigCache:        s.sigCache,
 		TimeSource:      s.timeSource,
 		AddrIndex:       s.addrIndex,

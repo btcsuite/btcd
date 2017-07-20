@@ -86,9 +86,6 @@ type Config struct {
 	// associated with.
 	ChainParams *chaincfg.Params
 
-	// NewestHash defines the function to retrieve the newest sha.
-	NewestHash func() (*chainhash.Hash, int64, error)
-
 	// NextStakeDifficulty defines the function to retrieve the stake
 	// difficulty for the block after the current best block.
 	//
@@ -99,9 +96,20 @@ type Config struct {
 	// transaction output information.
 	FetchUtxoView func(*dcrutil.Tx, bool) (*blockchain.UtxoViewpoint, error)
 
-	// Chain defines the concurrent safe block chain instance which houses
+	// BlockByHash defines the function use to fetch the block identified
+	// by the given hash.
+	BlockByHash func(*chainhash.Hash) (*dcrutil.Block, error)
+
+	// BestHash defines the function to use to access the block hash of
 	// the current best chain.
-	Chain *blockchain.BlockChain
+	BestHash func() *chainhash.Hash
+
+	// BestHeight defines the function to use to access the block height of
+	// the current best chain.
+	BestHeight func() int64
+
+	// SubsidyCache defines a subsidy cache to use.
+	SubsidyCache *blockchain.SubsidyCache
 
 	// SigCache defines a signature cache to use.
 	SigCache *txscript.SigCache
@@ -682,8 +690,7 @@ func (mp *TxPool) IsTxTreeValid(best *chainhash.Hash) bool {
 //
 // This function MUST be called with the mempool lock held (for reads).
 func (mp *TxPool) fetchInputUtxos(tx *dcrutil.Tx) (*blockchain.UtxoViewpoint, error) {
-	best := mp.cfg.Chain.BestSnapshot()
-	tv := mp.IsTxTreeValid(best.Hash)
+	tv := mp.IsTxTreeValid(mp.cfg.BestHash())
 	utxoView, err := mp.cfg.FetchUtxoView(tx, tv)
 	if err != nil {
 		return nil, err
@@ -722,8 +729,7 @@ func (mp *TxPool) FetchTransaction(txHash *chainhash.Hash, includeRecentBlock bo
 	// for the regular transaction tree. Search that if the
 	// user indicates too, as well.
 	if includeRecentBlock {
-		best := mp.cfg.Chain.BestSnapshot()
-		bl, err := mp.cfg.Chain.BlockByHash(best.Hash)
+		bl, err := mp.cfg.BlockByHash(mp.cfg.BestHash())
 		if err != nil {
 			return nil, err
 		}
@@ -790,8 +796,8 @@ func (mp *TxPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew, rateLimit, allow
 	// Get the current height of the main chain.  A standalone transaction
 	// will be mined into the next block at best, so its height is at least
 	// one more than the current height.
-	best := mp.cfg.Chain.BestSnapshot()
-	nextBlockHeight := best.Height + 1
+	bestHeight := mp.cfg.BestHeight()
+	nextBlockHeight := bestHeight + 1
 
 	// Determine what type of transaction we're dealing with (regular or stake).
 	// Then, be sure to set the tx tree correctly as it's possible a use submitted
@@ -1131,7 +1137,7 @@ func (mp *TxPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew, rateLimit, allow
 	}
 
 	// Add to transaction pool.
-	mp.addTransaction(utxoView, tx, txType, best.Height, txFee)
+	mp.addTransaction(utxoView, tx, txType, bestHeight, txFee)
 
 	// If it's an SSGen (vote), insert it into the list of
 	// votes.
@@ -1474,7 +1480,7 @@ func (mp *TxPool) RawMempoolVerbose(filterType *stake.TxType) map[string]*dcrjso
 
 	result := make(map[string]*dcrjson.GetRawMempoolVerboseResult,
 		len(mp.pool))
-	best := mp.cfg.Chain.BestSnapshot()
+	bestHeight := mp.cfg.BestHeight()
 
 	for _, desc := range mp.pool {
 		// Skip entries that don't match the requested stake type if
@@ -1491,7 +1497,7 @@ func (mp *TxPool) RawMempoolVerbose(filterType *stake.TxType) map[string]*dcrjso
 		utxos, err := mp.fetchInputUtxos(tx)
 		if err == nil {
 			currentPriority = CalcPriority(tx.MsgTx(), utxos,
-				best.Height+1)
+				bestHeight+1)
 		}
 
 		mpd := &dcrjson.GetRawMempoolVerboseResult{
@@ -1554,6 +1560,6 @@ func New(cfg *Config) *TxPool {
 		orphansByPrev: make(map[chainhash.Hash]map[chainhash.Hash]*dcrutil.Tx),
 		outpoints:     make(map[wire.OutPoint]*dcrutil.Tx),
 		votes:         make(map[chainhash.Hash][]*VoteTx),
-		subsidyCache:  cfg.Chain.FetchSubsidyCache(),
+		subsidyCache:  cfg.SubsidyCache,
 	}
 }
