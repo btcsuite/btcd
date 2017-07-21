@@ -1,4 +1,5 @@
 // Copyright (c) 2013-2016 The btcsuite developers
+// Copyright (c) 2017 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -15,6 +16,10 @@ import (
 )
 
 const (
+	// maxStandardP2SHSigOps is the maximum number of signature operations
+	// that are considered standard in a pay-to-script-hash script.
+	maxStandardP2SHSigOps = 15
+
 	// maxStandardTxSize is the maximum size allowed for transactions that
 	// are considered standard and will therefore be relayed and considered
 	// for mining.
@@ -153,12 +158,15 @@ func calcInputValueAge(tx *wire.MsgTx, utxoView *blockchain.UtxoViewpoint, nextB
 }
 
 // checkInputsStandard performs a series of checks on a transaction's inputs
-// to ensure they are "standard".  A standard transaction input is one that
-// that consumes the expected number of elements from the stack and that number
-// is the same as the output script pushes.  This help prevent resource
-// exhaustion attacks by "creative" use of scripts that are super expensive to
-// process like OP_DUP OP_CHECKSIG OP_DROP repeated a large number of times
-// followed by a final OP_TRUE.
+// to ensure they are "standard".  A standard transaction input within the
+// context of this function is one whose referenced public key script is of a
+// standard form and, for pay-to-script-hash, does not have more than
+// maxStandardP2SHSigOps signature operations.  However, it should also be noted
+// that standard inputs also are those which have a clean stack after execution
+// and only contain pushed data in their signature scripts.  This function does
+// not perform those checks because the script engine already does this more
+// accurately and concisely via the txscript.ScriptVerifyCleanStack and
+// txscript.ScriptVerifySigPushOnly flags.
 func checkInputsStandard(tx *dcrutil.Tx, txType stake.TxType, utxoView *blockchain.UtxoViewpoint) error {
 	// NOTE: The reference implementation also does a coinbase check here,
 	// but coinbases have already been rejected prior to calling this
@@ -174,32 +182,23 @@ func checkInputsStandard(tx *dcrutil.Tx, txType stake.TxType, utxoView *blockcha
 		// function.
 		prevOut := txIn.PreviousOutPoint
 		entry := utxoView.LookupEntry(&prevOut.Hash)
+		originPkScriptVer := entry.ScriptVersionByIndex(prevOut.Index)
 		originPkScript := entry.PkScriptByIndex(prevOut.Index)
+		switch txscript.GetScriptClass(originPkScriptVer, originPkScript) {
+		case txscript.ScriptHashTy:
+			numSigOps := txscript.GetPreciseSigOpCount(
+				txIn.SignatureScript, originPkScript, true)
+			if numSigOps > maxStandardP2SHSigOps {
+				str := fmt.Sprintf("transaction input #%d has "+
+					"%d signature operations which is more "+
+					"than the allowed max amount of %d",
+					i, numSigOps, maxStandardP2SHSigOps)
+				return txRuleError(wire.RejectNonstandard, str)
+			}
 
-		// Calculate stats for the script pair.
-		scriptInfo, err := txscript.CalcScriptInfo(txIn.SignatureScript,
-			originPkScript, true)
-		if err != nil {
-			str := fmt.Sprintf("transaction input #%d script parse "+
-				"failure: %v", i, err)
-			return txRuleError(wire.RejectNonstandard, str)
-		}
-
-		// A negative value for expected inputs indicates the script is
-		// non-standard in some way.
-		if scriptInfo.ExpectedInputs < 0 {
-			str := fmt.Sprintf("transaction input #%d expects %d "+
-				"inputs", i, scriptInfo.ExpectedInputs)
-			return txRuleError(wire.RejectNonstandard, str)
-		}
-
-		// The script pair is non-standard if the number of available
-		// inputs does not match the number of expected inputs.
-		if scriptInfo.NumInputs != scriptInfo.ExpectedInputs {
-			str := fmt.Sprintf("transaction input #%d expects %d "+
-				"inputs, but referenced output script provides "+
-				"%d", i, scriptInfo.ExpectedInputs,
-				scriptInfo.NumInputs)
+		case txscript.NonStandardTy:
+			str := fmt.Sprintf("transaction input #%d has a "+
+				"non-standard script form", i)
 			return txRuleError(wire.RejectNonstandard, str)
 		}
 	}
