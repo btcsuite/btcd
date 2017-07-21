@@ -23,23 +23,29 @@ import (
 	"github.com/decred/dcrutil"
 )
 
+const (
+	// These constants define the minimum and maximum p2p and rpc port
+	// numbers used by a test harness.  The min port is inclusive while the
+	// max port is exclusive.
+	minPeerPort = 10000
+	maxPeerPort = 35000
+	minRPCPort  = maxPeerPort
+	maxRPCPort  = 60000
+)
+
 var (
 	// current number of active test nodes.
 	numTestInstances = 0
 
-	// defaultP2pPort is the initial p2p port which will be used by the
-	// first created rpc harnesses to listen on for incoming p2p
-	// connections.  Subsequent allocated ports for future rpc harness
-	// instances will be monotonically increasing odd numbers calculated as
-	// such: defaultP2pPort + (2 * harness.nodeNum).
-	defaultP2pPort = 19555
-
-	// defaultRPCPort is the initial rpc port which will be used by the
-	// first created rpc harnesses to listen on for incoming rpc
-	// connections. Subsequent allocated ports for future rpc harness
-	// instances will be monotonically increasing even numbers calculated
-	// as such: defaultP2pPort + (2 * harness.nodeNum).
-	defaultRPCPort = 18956
+	// processID is the process ID of the current running process.  It is
+	// used to calculate ports based upon it when launching an rpc
+	// harnesses.  The intent is to allow multiple process to run in
+	// parallel without port collisions.
+	//
+	// It should be noted however that there is still some small probability
+	// that there will be port collisions either due to other processes
+	// running or simply due to the stars aligning on the process IDs.
+	processID = os.Getpid()
 
 	// testInstances is a private package-level slice used to keep track of
 	// all active test harnesses. This global can be used to perform
@@ -357,18 +363,15 @@ func (h *Harness) RPCConfig() dcrrpcclient.ConnConfig {
 // support multiple test nodes running at once, the p2p and rpc port are
 // incremented after each initialization.
 func generateListeningAddresses() (string, string) {
-	var p2p, rpc string
 	localhost := "127.0.0.1"
 
-	if numTestInstances == 0 {
-		p2p = net.JoinHostPort(localhost, strconv.Itoa(defaultP2pPort))
-		rpc = net.JoinHostPort(localhost, strconv.Itoa(defaultRPCPort))
-	} else {
-		p2p = net.JoinHostPort(localhost,
-			strconv.Itoa(defaultP2pPort+(2*numTestInstances)))
-		rpc = net.JoinHostPort(localhost,
-			strconv.Itoa(defaultRPCPort+(2*numTestInstances)))
+	portString := func(minPort, maxPort int) string {
+		port := minPort + numTestInstances + ((20 * processID) %
+			(maxPort - minPort))
+		return strconv.Itoa(port)
 	}
 
+	p2p := net.JoinHostPort(localhost, portString(minPeerPort, maxPeerPort))
+	rpc := net.JoinHostPort(localhost, portString(minRPCPort, maxRPCPort))
 	return p2p, rpc
 }
