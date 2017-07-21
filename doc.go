@@ -1,5 +1,5 @@
 // Copyright (c) 2013-2016 The btcsuite developers
-// Copyright (c) 2015-2016 The Decred developers
+// Copyright (c) 2015-2017 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -118,6 +118,10 @@ Application Options:
       --sigcachemaxsize=    The maximum number of entries in the signature
                             verification cache.
       --blocksonly          Do not accept transactions from remote peers.
+      --relaynonstd         Relay non-standard transactions regardless of the
+                            default settings for the active network.
+      --rejectnonstd        Reject non-standard transactions regardless of the
+                            default settings for the active network.
 
 Help Options:
   -h, --help           Show this help message
