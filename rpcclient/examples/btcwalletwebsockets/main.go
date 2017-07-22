@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2015 The btcsuite developers
+// Copyright (c) 2014-2017 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/btcsuite/btcrpcclient"
+	"github.com/btcsuite/btcd/rpcclient"
 	"github.com/btcsuite/btcutil"
 	"github.com/davecgh/go-spew/spew"
 )
@@ -18,9 +18,9 @@ import (
 func main() {
 	// Only override the handlers for notifications you care about.
 	// Also note most of the handlers will only be called if you register
-	// for notifications.  See the documentation of the btcrpcclient
+	// for notifications.  See the documentation of the rpcclient
 	// NotificationHandlers type for more details about each handler.
-	ntfnHandlers := btcrpcclient.NotificationHandlers{
+	ntfnHandlers := rpcclient.NotificationHandlers{
 		OnAccountBalance: func(account string, balance btcutil.Amount, confirmed bool) {
 			log.Printf("New balance for account %s: %v", account,
 				balance)
@@ -33,14 +33,14 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	connCfg := &btcrpcclient.ConnConfig{
+	connCfg := &rpcclient.ConnConfig{
 		Host:         "localhost:18332",
 		Endpoint:     "ws",
 		User:         "yourrpcuser",
 		Pass:         "yourrpcpass",
 		Certificates: certs,
 	}
-	client, err := btcrpcclient.New(connCfg, &ntfnHandlers)
+	client, err := rpcclient.New(connCfg, &ntfnHandlers)
 	if err != nil {
 		log.Fatal(err)
 	}
