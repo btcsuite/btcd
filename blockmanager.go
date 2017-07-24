@@ -171,20 +171,6 @@ type calcNextReqStakeDifficultyMsg struct {
 	reply chan calcNextReqStakeDifficultyResponse
 }
 
-// getBlockFromHashResponse is a response sent to the reply channel of a
-// getBlockFromHashMsg query.
-type getBlockFromHashResponse struct {
-	block *dcrutil.Block
-	err   error
-}
-
-// getBlockFromHashMsg is a message type to be sent across the message
-// channel for requesting the required a given block from the block manager.
-type getBlockFromHashMsg struct {
-	hash  chainhash.Hash
-	reply chan getBlockFromHashResponse
-}
-
 // getGenerationResponse is a response sent to the reply channel of a
 // getGenerationMsg query.
 type getGenerationResponse struct {
@@ -1835,13 +1821,6 @@ out:
 					err: err,
 				}
 
-			case getBlockFromHashMsg:
-				b, err := b.chain.FetchBlockFromHash(&msg.hash)
-				msg.reply <- getBlockFromHashResponse{
-					block: b,
-					err:   err,
-				}
-
 			case getGenerationMsg:
 				g, err := b.chain.GetGeneration(msg.hash)
 				msg.reply <- getGenerationResponse{
@@ -2552,16 +2531,6 @@ func (b *blockManager) GetGeneration(h chainhash.Hash) ([]chainhash.Hash, error)
 	b.msgChan <- getGenerationMsg{hash: h, reply: reply}
 	response := <-reply
 	return response.hashes, response.err
-}
-
-// GetBlockFromHash returns a block for some hash from the block manager, so
-// long as the block exists. It is funneled through the block manager since
-// blockchain is not safe for concurrent access.
-func (b *blockManager) GetBlockFromHash(h chainhash.Hash) (*dcrutil.Block, error) {
-	reply := make(chan getBlockFromHashResponse)
-	b.msgChan <- getBlockFromHashMsg{hash: h, reply: reply}
-	response := <-reply
-	return response.block, response.err
 }
 
 // GetTopBlockFromChain obtains the current top block from HEAD of the blockchain.
