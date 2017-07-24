@@ -890,7 +890,7 @@ func handleTooFewVoters(subsidyCache *blockchain.SubsidyCache,
 						err.Error())
 				}
 
-				if err := bm.CheckConnectBlock(block); err != nil {
+				if err := bm.chain.CheckConnectBlock(block); err != nil {
 					minrLog.Errorf("failed to check template while "+
 						"duplicating a parent: %v", err.Error())
 					return nil, miningRuleError(ErrCheckConnectBlock,
@@ -999,7 +999,7 @@ func handleTooFewVoters(subsidyCache *blockchain.SubsidyCache,
 						str)
 				}
 
-				if err := bm.CheckConnectBlock(btBlock); err != nil {
+				if err := bm.chain.CheckConnectBlock(btBlock); err != nil {
 					str := fmt.Sprintf("failed to check template: %v while "+
 						"constructing a new parent", err.Error())
 					return nil, miningRuleError(ErrCheckConnectBlock,

@@ -127,14 +127,6 @@ type requestFromPeerResponse struct {
 	err error
 }
 
-// checkConnectBlockMsg is a message type to be sent across the message channel
-// for requesting chain to check if a block connects to the end of the current
-// main chain.
-type checkConnectBlockMsg struct {
-	block *dcrutil.Block
-	reply chan error
-}
-
 // calcNextReqDifficultyResponse is a response sent to the reply channel of a
 // calcNextReqDifficultyMsg query.
 type calcNextReqDifficultyResponse struct {
@@ -1738,11 +1730,6 @@ out:
 					err: err,
 				}
 
-			case checkConnectBlockMsg:
-				// fmt.Printf("%v\n", blockchain.DebugBlockString(msg.block))
-				err := b.chain.CheckConnectBlock(msg.block)
-				msg.reply <- err
-
 			case calcNextReqDiffNodeMsg:
 				difficulty, err :=
 					b.chain.CalcNextRequiredDiffFromNode(msg.hash,
@@ -2458,16 +2445,6 @@ func (b *blockManager) requestFromPeer(p *serverPeer, blocks, txs []*chainhash.H
 	}
 
 	return nil
-}
-
-// CheckConnectBlock performs several checks to confirm connecting the passed
-// block to the main chain does not violate any rules.  This function makes use
-// of CheckConnectBlock on an internal instance of a block chain.  It is funneled
-// through the block manager since blockchain is not safe for concurrent access.
-func (b *blockManager) CheckConnectBlock(block *dcrutil.Block) error {
-	reply := make(chan error)
-	b.msgChan <- checkConnectBlockMsg{block: block, reply: reply}
-	return <-reply
 }
 
 // CalcNextRequiredDifficulty calculates the required difficulty for the next
