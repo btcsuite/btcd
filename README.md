@@ -44,7 +44,7 @@ implement and the API is not stable yet.
 ## Installation
 
 ```bash
-$ go get github.com/decred/dcrrpcclient
+$ go get -u github.com/decred/dcrrpcclient
 ```
 
 ## Docker

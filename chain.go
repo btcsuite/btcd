@@ -268,8 +268,8 @@ func (c *Client) GetBlockHash(blockHeight int64) (*chainhash.Hash, error) {
 // GetBlockHeaderAsync RPC invocation (or an applicable error).
 type FutureGetBlockHeaderResult chan *response
 
-// Receive waits for the response promised by the future and returns the hex of
-// the block header at the given hash
+// Receive waits for the response promised by the future and returns the
+// blockheader requested from the server given its hash.
 func (r FutureGetBlockHeaderResult) Receive() (*wire.BlockHeader, error) {
 	res, err := receiveFuture(r)
 	if err != nil {
