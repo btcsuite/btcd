@@ -283,36 +283,34 @@ func isDust(txOut *wire.TxOut, minRelayTxFee dcrutil.Amount) bool {
 	//
 	// Pay-to-pubkey-hash bytes breakdown:
 	//
-	//  Output to hash (38 bytes):
-	//   2 script version, 8 value, 1 script len, 25 script
-	//   [1 OP_DUP, 1 OP_HASH_160, 1 OP_DATA_20, 20 hash,
-	//   1 OP_EQUALVERIFY, 1 OP_CHECKSIG]
+	//  Output to hash (36 bytes):
+	//   8 value, 2 script version, 1 script len, 25 script [1 OP_DUP,
+	//   1 OP_HASH_160, 1 OP_DATA_20, 20 hash, 1 OP_EQUALVERIFY,
+	//   1 OP_CHECKSIG]
 	//
 	//  Input with compressed pubkey (165 bytes):
-	//   37 prev outpoint, 16 fraud proof, 1 script len,
-	//   107 script [1 OP_DATA_72, 72 sig, 1 OP_DATA_33,
-	//   33 compressed pubkey], 4 sequence
+	//   37 prev outpoint, 4 sequence, 16 fraud proof, 1 script len,
+	//   107 script [1 OP_DATA_72, 72 sig, 1 OP_DATA_33, 33 compressed
+	//   pubkey]
 	//
-	//  Input with uncompressed pubkey (198 bytes):
-	//   37 prev outpoint,  16 fraud proof, 1 script len,
-	//   139 script [1 OP_DATA_72, 72 sig, 1 OP_DATA_65,
-	//   65 compressed pubkey], 4 sequence, 1 witness
-	//   append
+	//  Input with uncompressed pubkey (197 bytes):
+	//   37 prev outpoint, 4 sequence, 16 fraud proof, 1 script len,
+	//   139 script [1 OP_DATA_72, 72 sig, 1 OP_DATA_65, 65 uncompressed
+	//   pubkey]
 	//
 	// Pay-to-pubkey bytes breakdown:
 	//
 	//  Output to compressed pubkey (46 bytes):
-	//   2 script version, 8 value, 1 script len, 35 script
-	//   [1 OP_DATA_33, 33 compressed pubkey, 1 OP_CHECKSIG]
+	//   8 value, 2 script version, 1 script len, 35 script [1 OP_DATA_33,
+	//   33 compressed pubkey, 1 OP_CHECKSIG]
 	//
-	//  Output to uncompressed pubkey (76 bytes):
-	//   2 script version, 8 value, 1 script len, 67 script
-	//   [1 OP_DATA_65, 65 pubkey, 1 OP_CHECKSIG]
+	//  Output to uncompressed pubkey (78 bytes):
+	//   8 value, 2 script version, 1 script len, 67 script [1 OP_DATA_65,
+	//   65 uncompressed pubkey, 1 OP_CHECKSIG]
 	//
-	//  Input (133 bytes):
-	//   37 prev outpoint, 16 fraud proof, 1 script len, 73
-	//   script [1 OP_DATA_72, 72 sig], 4 sequence, 1 witness
-	//   append
+	//  Input (131 bytes):
+	//   37 prev outpoint, 4 sequence, 16 fraud proof, 1 script len,
+	//   73 script [1 OP_DATA_72, 72 sig]
 	//
 	// Theoretically this could examine the script type of the output script
 	// and use a different size for the typical input script size for
@@ -328,12 +326,12 @@ func isDust(txOut *wire.TxOut, minRelayTxFee dcrutil.Amount) bool {
 
 	// The output is considered dust if the cost to the network to spend the
 	// coins is more than 1/3 of the minimum free transaction relay fee.
-	// minFreeTxRelayFee is in Atom/KB, so multiply by 1000 to
-	// convert to bytes.
+	// minFreeTxRelayFee is in Atom/KB, so multiply by 1000 to convert to
+	// bytes.
 	//
 	// Using the typical values for a pay-to-pubkey-hash transaction from
 	// the breakdown above and the default minimum free transaction relay
-	// fee of 5000000, this equates to values less than 546 atoms being
+	// fee of 100000, this equates to values less than 60300 atoms being
 	// considered dust.
 	//
 	// The following is equivalent to (value/totalSize) * (1/3) * 1000

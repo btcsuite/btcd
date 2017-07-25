@@ -229,15 +229,27 @@ func TestDust(t *testing.T) {
 			true,
 		},
 		{
-			"25 byte public key script with value 602",
+			"25 byte public key script with value 602, relay fee 1e3",
 			wire.TxOut{Value: 602, Version: 0, PkScript: pkScript},
 			1000,
 			true,
 		},
 		{
-			"25 byte public key script with value 603",
+			"25 byte public key script with value 603, relay fee 1e3",
 			wire.TxOut{Value: 603, Version: 0, PkScript: pkScript},
 			1000,
+			false,
+		},
+		{
+			"25 byte public key script with value 60299, relay fee 1e5",
+			wire.TxOut{Value: 60299, Version: 0, PkScript: pkScript},
+			1e5,
+			true,
+		},
+		{
+			"25 byte public key script with value 60300, relay fee 1e5",
+			wire.TxOut{Value: 60300, Version: 0, PkScript: pkScript},
+			1e5,
 			false,
 		},
 		{
