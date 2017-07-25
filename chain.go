@@ -13,7 +13,6 @@ import (
 	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/dcrjson"
 	"github.com/decred/dcrd/wire"
-	"github.com/decred/dcrutil"
 )
 
 // FutureGetBestBlockHashResult is a future promise to deliver the result of a
@@ -59,7 +58,7 @@ type FutureGetBlockResult chan *response
 
 // Receive waits for the response promised by the future and returns the raw
 // block requested from the server given its hash.
-func (r FutureGetBlockResult) Receive() (*dcrutil.Block, error) {
+func (r FutureGetBlockResult) Receive() (*wire.MsgBlock, error) {
 	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, err
@@ -84,7 +83,7 @@ func (r FutureGetBlockResult) Receive() (*dcrutil.Block, error) {
 	if err != nil {
 		return nil, err
 	}
-	return dcrutil.NewBlock(&msgBlock), nil
+	return &msgBlock, nil
 }
 
 // GetBlockAsync returns an instance of a type that can be used to get the
@@ -106,7 +105,7 @@ func (c *Client) GetBlockAsync(blockHash *chainhash.Hash) FutureGetBlockResult {
 //
 // See GetBlockVerbose to retrieve a data structure with information about the
 // block instead.
-func (c *Client) GetBlock(blockHash *chainhash.Hash) (*dcrutil.Block, error) {
+func (c *Client) GetBlock(blockHash *chainhash.Hash) (*wire.MsgBlock, error) {
 	return c.GetBlockAsync(blockHash).Receive()
 }
 
