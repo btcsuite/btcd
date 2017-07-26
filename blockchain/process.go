@@ -122,8 +122,9 @@ func (b *BlockChain) processOrphans(hash *chainhash.Hash, flags BehaviorFlags) e
 // blocks, ensuring blocks follow all rules, orphan handling, and insertion into
 // the block chain along with best chain selection and reorganization.
 //
-// It returns a first bool specifying whether or not the block is on on a fork
-// or on a side chain. True means it's on the main chain.
+// When no errors occurred during processing, the first return value indicates
+// whether or not the block is on the main chain and the second indicates
+// whether or not the block is an orphan.
 //
 // This function is safe for concurrent access.
 func (b *BlockChain) ProcessBlock(block *dcrutil.Block, flags BehaviorFlags) (bool, bool, error) {
@@ -219,13 +220,12 @@ func (b *BlockChain) ProcessBlock(block *dcrutil.Block, flags BehaviorFlags) (bo
 			b.addOrphanBlock(block)
 		}
 
-		return false, true, err
+		return false, true, nil
 	}
 
 	// The block has passed all context independent checks and appears sane
 	// enough to potentially accept it into the block chain.
-	var onMainChain bool
-	onMainChain, err = b.maybeAcceptBlock(block, flags)
+	isMainChain, err := b.maybeAcceptBlock(block, flags)
 	if err != nil {
 		return false, false, err
 	}
@@ -243,5 +243,5 @@ func (b *BlockChain) ProcessBlock(block *dcrutil.Block, flags BehaviorFlags) (bo
 		log.Debugf("Accepted block %v", blockHash)
 	}
 
-	return onMainChain, false, err
+	return isMainChain, false, nil
 }

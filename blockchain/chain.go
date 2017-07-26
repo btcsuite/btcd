@@ -1953,9 +1953,9 @@ func (b *BlockChain) ForceHeadReorganization(formerBest chainhash.Hash, newBest 
 // proof of work.  In the typical case, the new block simply extends the main
 // chain.  However, it may also be extending (or creating) a side chain (fork)
 // which may or may not end up becoming the main chain depending on which fork
-// cumulatively has the most proof of work.
-// Returns a boolean that indicates where the block passed was on the main
-// chain or a sidechain (true = main chain).
+// cumulatively has the most proof of work.  It returns whether or not the block
+// ended up on the main chain (either due to extending the main chain or causing
+// a reorganization to become the main chain).
 //
 // The flags modify the behavior of this function as follows:
 //  - BFFastAdd: Avoids several expensive transaction validation operations.
@@ -1965,8 +1965,7 @@ func (b *BlockChain) ForceHeadReorganization(formerBest chainhash.Hash, newBest 
 //    modifying the state are avoided.
 //
 // This function MUST be called with the chain state lock held (for writes).
-func (b *BlockChain) connectBestChain(node *blockNode, block *dcrutil.Block,
-	flags BehaviorFlags) (bool, error) {
+func (b *BlockChain) connectBestChain(node *blockNode, block *dcrutil.Block, flags BehaviorFlags) (bool, error) {
 	fastAdd := flags&BFFastAdd == BFFastAdd
 	dryRun := flags&BFDryRun == BFDryRun
 
@@ -2033,9 +2032,7 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *dcrutil.Block,
 		}
 
 		log.Debugf("Block %v (height %v) connected to the main chain, "+
-			"%v the previous block",
-			node.hash,
-			node.height,
+			"%v the previous block", node.hash, node.height,
 			validateStr)
 
 		return true, nil

@@ -225,18 +225,18 @@ func voteBitsInBlock(bl *dcrutil.Block) []VoteVersionTuple {
 	return voteBits
 }
 
-// maybeAcceptBlock potentially accepts a block into the memory block chain.
-// It performs several validation checks which depend on its position within
-// the block chain before adding it.  The block is expected to have already gone
-// through ProcessBlock before calling this function with it.
+// maybeAcceptBlock potentially accepts a block into the block chain and, if
+// accepted, returns whether or not it is on the main chain.  It performs
+// several validation checks which depend on its position within the block chain
+// before adding it.  The block is expected to have already gone through
+// ProcessBlock before calling this function with it.
 //
 // The flags modify the behavior of this function as follows:
 //  - BFDryRun: The memory chain index will not be pruned and no accept
 //    notification will be sent since the block is not being accepted.
 //
 // This function MUST be called with the chain state lock held (for writes).
-func (b *BlockChain) maybeAcceptBlock(block *dcrutil.Block,
-	flags BehaviorFlags) (bool, error) {
+func (b *BlockChain) maybeAcceptBlock(block *dcrutil.Block, flags BehaviorFlags) (bool, error) {
 	dryRun := flags&BFDryRun == BFDryRun
 
 	// Get a block node for the block previous to this one.  Will be nil
@@ -289,8 +289,7 @@ func (b *BlockChain) maybeAcceptBlock(block *dcrutil.Block,
 	// Connect the passed block to the chain while respecting proper chain
 	// selection according to the chain with the most proof of work.  This
 	// also handles validation of the transaction scripts.
-	var onMainChain bool
-	onMainChain, err = b.connectBestChain(newNode, block, flags)
+	isMainChain, err := b.connectBestChain(newNode, block, flags)
 	if err != nil {
 		return false, err
 	}
@@ -301,9 +300,9 @@ func (b *BlockChain) maybeAcceptBlock(block *dcrutil.Block,
 	if !dryRun {
 		b.chainLock.Unlock()
 		b.sendNotification(NTBlockAccepted,
-			&BlockAcceptedNtfnsData{onMainChain, block})
+			&BlockAcceptedNtfnsData{isMainChain, block})
 		b.chainLock.Lock()
 	}
 
-	return onMainChain, nil
+	return isMainChain, nil
 }
