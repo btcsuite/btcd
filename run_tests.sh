@@ -26,7 +26,9 @@ TESTCMD="test -z \"\$(gometalinter --disable-all \
   --enable=unconvert \
   --vendor \
   --deadline=10m . | tee /dev/stderr)\"&& \
-  env GORACE='halt_on_error=1' go test -short -race \$(glide novendor)"
+  env GORACE='halt_on_error=1' go test -short -race \
+  -tags rpctest \
+  \$(glide novendor)"
 
 if [ $GOVERSION == "local" ]; then
     eval $TESTCMD
