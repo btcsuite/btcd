@@ -1,5 +1,5 @@
 hash: 153a3e6a1f31b2b29a113e953098f2b42a645103ee3e10040b5e03727a7b003c
-updated: 2017-07-22T04:13:04.025701013Z
+updated: 2017-07-26T12:10:25.6313172-05:00
 imports:
 - name: github.com/agl/ed25519
   version: 278e1ec8e8a6e017cd07577924d6766039146ced
@@ -41,7 +41,7 @@ imports:
   - svc
   - winapi
 - name: github.com/davecgh/go-spew
-  version: 346938d642f2ec3594ed81d874461961cd0faa76
+  version: adab96458c51a58dc1783b3335dcce5461522e75
   subpackages:
   - spew
 - name: github.com/decred/bitset
@@ -49,12 +49,13 @@ imports:
 - name: github.com/decred/blake256
   version: a840e32d7c31fe2e0218607334cb120a683951a4
 - name: github.com/decred/dcrrpcclient
-  version: 5dcd9e5b9cf04d8c624f6068f18c4195d19907d3
+  version: a634f8dff51115b4122664efbed1a9327063dcf0
 - name: github.com/decred/dcrutil
   version: 58e046aab848365647c44b295f4fab078fbc3392
   subpackages:
   - base58
   - bloom
+  - hdkeychain
 - name: github.com/jrick/logrotate
   version: a93b200c26cbae3bb09dd0dc2c7c7fe1468a034a
   subpackages:
