@@ -330,7 +330,6 @@ type chainState struct {
 	missedTickets       []chainhash.Hash
 	curPrevHash         chainhash.Hash
 	pastMedianTime      time.Time
-	pastMedianTimeErr   error
 	stakeVersion        uint32
 }
 
@@ -465,13 +464,7 @@ func (b *blockManager) updateChainState(newestHash *chainhash.Hash,
 
 	b.chainState.newestHash = newestHash
 	b.chainState.newestHeight = newestHeight
-	medianTime, err := b.chain.CalcPastMedianTime()
-	if err != nil {
-		b.chainState.pastMedianTimeErr = err
-	} else {
-		b.chainState.pastMedianTime = medianTime
-	}
-
+	b.chainState.pastMedianTime = b.chain.BestSnapshot().MedianTime
 	b.chainState.nextFinalState = finalState
 	b.chainState.nextPoolSize = poolSize
 	b.chainState.nextStakeDifficulty = nextStakeDiff

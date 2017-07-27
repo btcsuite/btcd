@@ -678,9 +678,6 @@ func logSkippedDeps(tx *dcrutil.Tx, deps *list.List) {
 func minimumMedianTime(chainState *chainState) (time.Time, error) {
 	chainState.Lock()
 	defer chainState.Unlock()
-	if chainState.pastMedianTimeErr != nil {
-		return time.Time{}, chainState.pastMedianTimeErr
-	}
 
 	return chainState.pastMedianTime.Add(time.Second), nil
 }
@@ -692,9 +689,6 @@ func medianAdjustedTime(chainState *chainState,
 	timeSource blockchain.MedianTimeSource) (time.Time, error) {
 	chainState.Lock()
 	defer chainState.Unlock()
-	if chainState.pastMedianTimeErr != nil {
-		return time.Time{}, chainState.pastMedianTimeErr
-	}
 
 	// The timestamp for the block must not be before the median timestamp
 	// of the last several blocks.  Thus, choose the maximum between the
