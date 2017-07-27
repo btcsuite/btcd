@@ -531,3 +531,78 @@ func TestOrphanReject(t *testing.T) {
 		}
 	}
 }
+
+// TestOrphanEviction ensures that exceeding the maximum number of orphans
+// evicts entries to make room for the new ones.
+func TestOrphanEviction(t *testing.T) {
+	t.Parallel()
+
+	harness, outputs, err := newPoolHarness(&chaincfg.MainNetParams)
+	if err != nil {
+		t.Fatalf("unable to create test pool: %v", err)
+	}
+
+	// Create a chain of transactions rooted with the first spendable output
+	// provided by the harness that is long enough to be able to force
+	// several orphan evictions.
+	maxOrphans := uint32(harness.txPool.cfg.Policy.MaxOrphanTxs)
+	chainedTxns, err := harness.CreateTxChain(outputs[0], maxOrphans+5)
+	if err != nil {
+		t.Fatalf("unable to create transaction chain: %v", err)
+	}
+
+	// Add enough orphans to exceed the max allowed while ensuring they are
+	// all accepted.  This will cause an eviction.
+	for _, tx := range chainedTxns[1:] {
+		acceptedTxns, err := harness.txPool.ProcessTransaction(tx, true,
+			false, true)
+		if err != nil {
+			t.Fatalf("ProcessTransaction: failed to accept valid "+
+				"orphan %v", err)
+		}
+
+		// Ensure no transactions were reported as accepted.
+		if len(acceptedTxns) != 0 {
+			t.Fatalf("ProcessTransaction: reported %d accepted "+
+				"transactions from what should be an orphan",
+				len(acceptedTxns))
+		}
+
+		// Ensure the transaction is in the orphan pool.
+		if !harness.txPool.IsOrphanInPool(tx.Hash()) {
+			t.Fatal("IsOrphanInPool: false for accepted orphan")
+		}
+
+		// Ensure the transaction is not in the transaction pool.
+		if harness.txPool.IsTransactionInPool(tx.Hash()) {
+			t.Fatal("IsTransactionInPool: true for accepted orphan")
+		}
+
+		// Ensure the transaction is reported as available.
+		if !harness.txPool.HaveTransaction(tx.Hash()) {
+			t.Fatal("HaveTransaction: false for accepted orphan")
+		}
+	}
+
+	// Figure out which transactions were evicted and make sure the number
+	// evicted matches the expected number.
+	var evictedTxns []*dcrutil.Tx
+	for _, tx := range chainedTxns[1:] {
+		if !harness.txPool.IsOrphanInPool(tx.Hash()) {
+			evictedTxns = append(evictedTxns, tx)
+		}
+	}
+	expectedEvictions := len(chainedTxns) - 1 - int(maxOrphans)
+	if len(evictedTxns) != expectedEvictions {
+		t.Fatalf("unexpected number of evictions -- got %d, want %d",
+			len(evictedTxns), expectedEvictions)
+	}
+
+	// Ensure none of the evicted transactioned ended up the transaction
+	// pool.
+	for _, tx := range evictedTxns {
+		if harness.txPool.IsTransactionInPool(tx.Hash()) {
+			t.Fatalf("IsTransactionInPool: true for evicted orphan")
+		}
+	}
+}
