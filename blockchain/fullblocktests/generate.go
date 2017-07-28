@@ -39,13 +39,13 @@ const (
 )
 
 var (
-	// lowFee is a single atom and exists to make the test code more
-	// readable.
-	lowFee = dcrutil.Amount(1)
-
 	// opTrueScript is a simple public key script that contains the OP_TRUE
 	// opcode.  It is defined here to reduce garbage creation.
 	opTrueScript = []byte{txscript.OP_TRUE}
+
+	// lowFee is a single atom and exists to make the test code more
+	// readable.
+	lowFee = dcrutil.Amount(1)
 )
 
 // TestInstance is an interface that describes a specific test instance returned

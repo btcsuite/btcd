@@ -1,5 +1,5 @@
 // Copyright (c) 2013-2016 The btcsuite developers
-// Copyright (c) 2015-2016 The Decred developers
+// Copyright (c) 2015-2017 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -19,6 +19,7 @@ import (
 	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/database"
 	_ "github.com/decred/dcrd/database/ffldb"
+	"github.com/decred/dcrd/txscript"
 	"github.com/decred/dcrd/wire"
 )
 
@@ -57,7 +58,7 @@ func isSupportedDbType(dbType string) bool {
 }
 
 // chainSetup is used to create a new db and chain instance with the genesis
-// block already inserted.  In addition to the new chain instnce, it returns
+// block already inserted.  In addition to the new chain instance, it returns
 // a teardown function the caller should invoke when done testing to clean up.
 func chainSetup(dbName string, params *chaincfg.Params) (*blockchain.BlockChain, func(), error) {
 	if !isSupportedDbType(testDbType) {
@@ -117,6 +118,7 @@ func chainSetup(dbName string, params *chaincfg.Params) (*blockchain.BlockChain,
 		DB:          db,
 		ChainParams: &paramsCopy,
 		TimeSource:  blockchain.NewMedianTime(),
+		SigCache:    txscript.NewSigCache(1000),
 	})
 
 	if err != nil {
