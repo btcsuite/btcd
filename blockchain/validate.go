@@ -1603,7 +1603,12 @@ func CheckTransactionInputs(subsidyCache *SubsidyCache, tx *dcrutil.Tx, txHeight
 		// Inputs won't exist for stakebase tx, so ignore them.
 		if isSSGen && idx == 0 {
 			// However, do add the reward amount.
-			_, heightVotingOn, _ := stake.SSGenBlockVotedOn(msgTx)
+			_, heightVotingOn, err := stake.SSGenBlockVotedOn(msgTx)
+			if err != nil {
+				errStr := fmt.Sprintf("unexpected vote tx "+
+					"decode error: %v", err)
+				return 0, ruleError(ErrUnparseableSSGen, errStr)
+			}
 			stakeVoteSubsidy := CalcStakeVoteSubsidy(subsidyCache,
 				int64(heightVotingOn), chainParams)
 			totalAtomIn += stakeVoteSubsidy
