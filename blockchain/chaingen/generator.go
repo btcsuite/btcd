@@ -231,9 +231,9 @@ func opReturnScript(data []byte) []byte {
 	return script
 }
 
-// uniqueOpReturnScript returns a standard provably-pruneable OP_RETURN script
+// UniqueOpReturnScript returns a standard provably-pruneable OP_RETURN script
 // with a random uint64 encoded as the data.
-func uniqueOpReturnScript() []byte {
+func UniqueOpReturnScript() []byte {
 	rand, err := wire.RandomUint64()
 	if err != nil {
 		panic(err)
@@ -1336,7 +1336,7 @@ func (g *Generator) CreateSpendTx(spend *SpendableOut, fee dcrutil.Amount) *wire
 	})
 	spendTx.AddTxOut(wire.NewTxOut(int64(spend.amount-fee),
 		g.p2shOpTrueScript))
-	spendTx.AddTxOut(wire.NewTxOut(0, uniqueOpReturnScript()))
+	spendTx.AddTxOut(wire.NewTxOut(0, UniqueOpReturnScript()))
 	return spendTx
 }
 
@@ -1428,7 +1428,7 @@ func (g *Generator) connectLiveTickets(blockHash *chainhash.Hash, height uint32,
 // connectBlockTickets updates the live ticket pool and associated data structs
 // by for the passed block.  It will panic if the specified block does not
 // connect to the current tip block.
-func (g Generator) connectBlockTickets(b *wire.MsgBlock) {
+func (g *Generator) connectBlockTickets(b *wire.MsgBlock) {
 	// Attempt to prevent misuse of this function by ensuring the provided
 	// block connects to the current tip.
 	if b.Header.PrevBlock != g.tip.BlockHash() {
@@ -1915,6 +1915,12 @@ func (g *Generator) OldestCoinbaseOuts() []SpendableOut {
 	return outs
 }
 
+// NumSpendableCoinbaseOuts returns the number of proof-of-work outputs that
+// were previously saved to the generated but have not yet been collected.
+func (g *Generator) NumSpendableCoinbaseOuts() int {
+	return len(g.spendableOuts)
+}
+
 // saveCoinbaseOuts adds the proof-of-work outputs of the coinbase tx in the
 // passed block to the list of spendable outputs.
 func (g *Generator) saveCoinbaseOuts(b *wire.MsgBlock) {
@@ -1964,6 +1970,18 @@ func (g *Generator) AssertTipHeight(expected uint32) {
 	if height != expected {
 		panic(fmt.Sprintf("height for block %q is %d instead of "+
 			"expected %d", g.tipName, height, expected))
+	}
+}
+
+// AssertScriptSigOpsCount panics if the provided script does not have the
+// specified number of signature operations.
+func (g *Generator) AssertScriptSigOpsCount(script []byte, expected int) {
+	numSigOps := txscript.GetSigOpCount(script)
+	if numSigOps != expected {
+		_, file, line, _ := runtime.Caller(1)
+		panic(fmt.Sprintf("assertion failed at %s:%d: generated number "+
+			"of sigops for script is %d instead of expected %d",
+			file, line, numSigOps, expected))
 	}
 }
 
@@ -2037,6 +2055,31 @@ func (g *Generator) AssertTipBlockMerkleRoot(expected chainhash.Hash) {
 		panic(fmt.Sprintf("merkle root of block %q (height %d) is %v "+
 			"instead of expected %v", g.tipName,
 			g.tip.Header.Height, hash, expected))
+	}
+}
+
+// AssertTipBlockTxOutOpReturn panics if the current tip block associated with
+// the generator does not have an OP_RETURN script for the transaction output at
+// the provided tx index and output index.
+func (g *Generator) AssertTipBlockTxOutOpReturn(txIndex, txOutIndex uint32) {
+	if txIndex >= uint32(len(g.tip.Transactions)) {
+		panic(fmt.Sprintf("Transaction index %d in block %q "+
+			"(height %d) does not exist", txIndex, g.tipName,
+			g.tip.Header.Height))
+	}
+
+	tx := g.tip.Transactions[txIndex]
+	if txOutIndex >= uint32(len(tx.TxOut)) {
+		panic(fmt.Sprintf("transaction index %d output %d in block %q "+
+			"(height %d) does not exist", txIndex, txOutIndex,
+			g.tipName, g.tip.Header.Height))
+	}
+
+	txOut := tx.TxOut[txOutIndex]
+	if txOut.PkScript[0] != txscript.OP_RETURN {
+		panic(fmt.Sprintf("transaction index %d output %d in block %q "+
+			"(height %d) is not an OP_RETURN", txIndex, txOutIndex,
+			g.tipName, g.tip.Header.Height))
 	}
 }
 

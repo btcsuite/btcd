@@ -1,3 +1,4 @@
+// Copyright (c) 2016 The btcsuite developers
 // Copyright (c) 2016-2017 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
@@ -16,6 +17,7 @@ import (
 	"github.com/decred/dcrd/blockchain/chaingen"
 	"github.com/decred/dcrd/chaincfg/chainec"
 	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/decred/dcrd/dcrec/secp256k1"
 	"github.com/decred/dcrd/txscript"
 	"github.com/decred/dcrd/wire"
 	"github.com/decred/dcrutil"
@@ -29,12 +31,21 @@ const (
 	maxCoinbaseScriptLen = 100
 	medianTimeBlocks     = 11
 	maxScriptElementSize = 2048
+
+	// numLargeReorgBlocks is the number of blocks to use in the large block
+	// reorg test (when enabled).  This is the equivalent of 2 day's worth
+	// of blocks.
+	numLargeReorgBlocks = 576
 )
 
 var (
 	// lowFee is a single atom and exists to make the test code more
 	// readable.
 	lowFee = dcrutil.Amount(1)
+
+	// opTrueScript is a simple public key script that contains the OP_TRUE
+	// opcode.  It is defined here to reduce garbage creation.
+	opTrueScript = []byte{txscript.OP_TRUE}
 )
 
 // TestInstance is an interface that describes a specific test instance returned
@@ -57,8 +68,8 @@ type AcceptedBlock struct {
 // Ensure AcceptedBlock implements the TestInstance interface.
 var _ TestInstance = AcceptedBlock{}
 
-// FullBlockTestInstance only exists to allow the AcceptedBlock to be treated
-// as a TestInstance.
+// FullBlockTestInstance only exists to allow AcceptedBlock to be treated as a
+// TestInstance.
 //
 // This implements the TestInstance interface.
 func (b AcceptedBlock) FullBlockTestInstance() {}
@@ -74,8 +85,8 @@ type RejectedBlock struct {
 // Ensure RejectedBlock implements the TestInstance interface.
 var _ TestInstance = RejectedBlock{}
 
-// FullBlockTestInstance only exists to allow the RejectedBlock to be treated
-// as a TestInstance.
+// FullBlockTestInstance only exists to allow RejectedBlock to be treated as a
+// TestInstance.
 //
 // This implements the TestInstance interface.
 func (b RejectedBlock) FullBlockTestInstance() {}
@@ -110,11 +121,52 @@ type ExpectedTip struct {
 // Ensure ExpectedTip implements the TestInstance interface.
 var _ TestInstance = ExpectedTip{}
 
-// FullBlockTestInstance only exists to allow the ExpectedTip to be treated
-// as a TestInstance.
+// FullBlockTestInstance only exists to allow ExpectedTip to be treated as a
+// TestInstance.
 //
 // This implements the TestInstance interface.
 func (b ExpectedTip) FullBlockTestInstance() {}
+
+// RejectedNonCanonicalBlock defines a test instance that expects a serialized
+// block that is not canonical and therefore should be rejected.
+type RejectedNonCanonicalBlock struct {
+	Name     string
+	RawBlock []byte
+	Height   int32
+}
+
+// FullBlockTestInstance only exists to allow RejectedNonCanonicalBlock to be
+// treated as a TestInstance.
+//
+// This implements the TestInstance interface.
+func (b RejectedNonCanonicalBlock) FullBlockTestInstance() {}
+
+// payToScriptHashScript returns a standard pay-to-script-hash for the provided
+// redeem script.
+func payToScriptHashScript(redeemScript []byte) []byte {
+	redeemScriptHash := dcrutil.Hash160(redeemScript)
+	script, err := txscript.NewScriptBuilder().
+		AddOp(txscript.OP_HASH160).AddData(redeemScriptHash).
+		AddOp(txscript.OP_EQUAL).Script()
+	if err != nil {
+		panic(err)
+	}
+	return script
+}
+
+// pushDataScript returns a script with the provided items individually pushed
+// to the stack.
+func pushDataScript(items ...[]byte) []byte {
+	builder := txscript.NewScriptBuilder()
+	for _, item := range items {
+		builder.AddData(item)
+	}
+	script, err := builder.Script()
+	if err != nil {
+		panic(err)
+	}
+	return script
+}
 
 // opReturnScript returns a provably-pruneable OP_RETURN script with the
 // provided data.
@@ -218,6 +270,60 @@ func additionalPoWTx(tx *wire.MsgTx) func(*wire.MsgBlock) {
 	}
 }
 
+// nonCanonicalVarInt return a variable-length encoded integer that is encoded
+// with 9 bytes even though it could be encoded with a minimal canonical
+// encoding.
+func nonCanonicalVarInt(val uint32) []byte {
+	var rv [9]byte
+	rv[0] = 0xff
+	binary.LittleEndian.PutUint64(rv[1:], uint64(val))
+	return rv[:]
+}
+
+// encodeNonCanonicalBlock serializes the block in a non-canonical way by
+// encoding the number of transactions using a variable-length encoded integer
+// with 9 bytes even though it should be encoded with a minimal canonical
+// encoding.
+func encodeNonCanonicalBlock(b *wire.MsgBlock) []byte {
+	var buf bytes.Buffer
+	b.Header.BtcEncode(&buf, 0)
+	buf.Write(nonCanonicalVarInt(uint32(len(b.Transactions))))
+	for _, tx := range b.Transactions {
+		tx.BtcEncode(&buf, 0)
+	}
+	wire.WriteVarInt(&buf, 0, uint64(len(b.STransactions)))
+	for _, stx := range b.STransactions {
+		stx.BtcEncode(&buf, 0)
+	}
+	return buf.Bytes()
+}
+
+// assertTipsNonCanonicalBlockSize panics if the if the current tip block
+// associated with the generator does not have the specified non-canonical size
+// when serialized.
+func assertTipNonCanonicalBlockSize(g *chaingen.Generator, expected int) {
+	tip := g.Tip()
+	serializeSize := len(encodeNonCanonicalBlock(tip))
+	if serializeSize != expected {
+		panic(fmt.Sprintf("block size of block %q (height %d) is %d "+
+			"instead of expected %d", g.TipName(), tip.Header.Height,
+			serializeSize, expected))
+	}
+}
+
+// cloneBlock returns a deep copy of the provided block.
+func cloneBlock(b *wire.MsgBlock) wire.MsgBlock {
+	var blockCopy wire.MsgBlock
+	blockCopy.Header = b.Header
+	for _, tx := range b.Transactions {
+		blockCopy.AddTransaction(tx.Copy())
+	}
+	for _, stx := range b.STransactions {
+		blockCopy.AddSTransaction(stx)
+	}
+	return blockCopy
+}
+
 // repeatOpcode returns a byte slice with the provided opcode repeated the
 // specified number of times.
 func repeatOpcode(opcode uint8, numRepeats int) []byte {
@@ -231,7 +337,7 @@ func repeatOpcode(opcode uint8, numRepeats int) []byte {
 // each test contains additional information about the expected result, however
 // that information can be ignored when doing comparison tests between to
 // independent versions over the peer-to-peer network.
-func Generate() (tests [][]TestInstance, err error) {
+func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 	// In order to simplify the generation code which really should never
 	// fail unless the test code itself is broken, panics are used
 	// internally.  This deferred func ensures any panics don't escape the
@@ -269,6 +375,10 @@ func Generate() (tests [][]TestInstance, err error) {
 	// rejectBlock creates a test instance that expects the provided block
 	// to be rejected by the consensus rules.
 	//
+	// rejectNonCanonicalBlock creates a test instance that encodes the
+	// provided block using a non-canonical encoded as described by the
+	// encodeNonCanonicalBlock function and expected it to be rejected.
+	//
 	// orphanOrRejectBlock creates a test instance that expected the
 	// provided block to either by accepted as an orphan or rejected by the
 	// consensus rules.
@@ -280,6 +390,11 @@ func Generate() (tests [][]TestInstance, err error) {
 	}
 	rejectBlock := func(blockName string, block *wire.MsgBlock, code blockchain.ErrorCode) TestInstance {
 		return RejectedBlock{blockName, block, code}
+	}
+	rejectNonCanonicalBlock := func(blockName string, block *wire.MsgBlock) TestInstance {
+		blockHeight := int32(block.Header.Height)
+		encoded := encodeNonCanonicalBlock(block)
+		return RejectedNonCanonicalBlock{blockName, encoded, blockHeight}
 	}
 	orphanOrRejectBlock := func(blockName string, block *wire.MsgBlock) TestInstance {
 		return OrphanOrRejectedBlock{blockName, block}
@@ -301,14 +416,17 @@ func Generate() (tests [][]TestInstance, err error) {
 	// The second instance is an expectBlockTip test instance for provided
 	// values.
 	//
+	// rejected creates and appends a single rejectBlock test instance for
+	// the current tip.
+	//
+	// rejectedNonCanonical creates and appends a single
+	// rejectNonCanonicalBlock test instance for the current tip.
+	//
 	// orphaned creates and appends a single acceptBlock test instance for
 	// the current tip which expects the block to be accepted as an orphan.
 	//
 	// orphanedOrRejected creates and appends a single orphanOrRejectBlock
 	// test instance for the current tip.
-	//
-	// rejected creates and appends a single rejectBlock test instance for
-	// the current tip.
 	accepted := func() {
 		tests = append(tests, []TestInstance{
 			acceptBlock(g.TipName(), g.Tip(), true, false),
@@ -320,6 +438,16 @@ func Generate() (tests [][]TestInstance, err error) {
 			expectTipBlock(tipName, g.BlockByName(tipName)),
 		})
 	}
+	rejected := func(code blockchain.ErrorCode) {
+		tests = append(tests, []TestInstance{
+			rejectBlock(g.TipName(), g.Tip(), code),
+		})
+	}
+	rejectedNonCanonical := func() {
+		tests = append(tests, []TestInstance{
+			rejectNonCanonicalBlock(g.TipName(), g.Tip()),
+		})
+	}
 	orphaned := func() {
 		tests = append(tests, []TestInstance{
 			acceptBlock(g.TipName(), g.Tip(), false, true),
@@ -328,11 +456,6 @@ func Generate() (tests [][]TestInstance, err error) {
 	orphanedOrRejected := func() {
 		tests = append(tests, []TestInstance{
 			orphanOrRejectBlock(g.TipName(), g.Tip()),
-		})
-	}
-	rejected := func(code blockchain.ErrorCode) {
-		tests = append(tests, []TestInstance{
-			rejectBlock(g.TipName(), g.Tip(), code),
 		})
 	}
 
@@ -722,7 +845,7 @@ func Generate() (tests [][]TestInstance, err error) {
 	//   ... -> b5(2) -> b12(3) -> b18(4) -> b19(5) -> b21(6)
 	//   \-> b3(1) -> b4(2)
 	g.SetTip("b19")
-	manySigOps := bytes.Repeat([]byte{txscript.OP_CHECKSIG}, maxBlockSigOps)
+	manySigOps := repeatOpcode(txscript.OP_CHECKSIG, maxBlockSigOps)
 	g.NextBlock("b21", outs[6], ticketOuts[6], replaceSpendScript(manySigOps))
 	g.AssertTipBlockSigOpsCount(maxBlockSigOps)
 	accepted()
@@ -732,7 +855,7 @@ func Generate() (tests [][]TestInstance, err error) {
 	//   ... -> b5(2) -> b12(3) -> b18(4) -> b19(5) -> b21(6)
 	//   \                                                   \-> b22(7)
 	//    \-> b3(1) -> b4(2)
-	tooManySigOps := bytes.Repeat([]byte{txscript.OP_CHECKSIG}, maxBlockSigOps+1)
+	tooManySigOps := repeatOpcode(txscript.OP_CHECKSIG, maxBlockSigOps+1)
 	g.NextBlock("b22", outs[7], ticketOuts[7], replaceSpendScript(tooManySigOps))
 	g.AssertTipBlockSigOpsCount(maxBlockSigOps + 1)
 	rejected(blockchain.ErrTooManySigOps)
@@ -840,7 +963,7 @@ func Generate() (tests [][]TestInstance, err error) {
 
 	// Create valid orphan block.
 	//
-	//   ... -> b21(6)
+	//   ... -> b21(6) -> b29(7)
 	//                \-> borphanbase(7) -> borphan1(8)
 	g.SetTip("b21")
 	g.NextBlock("borphanbase", outs[7], ticketOuts[7])
@@ -898,7 +1021,7 @@ func Generate() (tests [][]TestInstance, err error) {
 	// Vote tests.
 	// ---------------------------------------------------------------------
 
-	// Attempt to add block where ssgen has a null ticket reference hash.
+	// Attempt to add block where vote has a null ticket reference hash.
 	//
 	//   ... -> b36(8)
 	//                \-> bv1(9)
@@ -935,7 +1058,7 @@ func Generate() (tests [][]TestInstance, err error) {
 	//   ... -> b36(8)
 	//                \-> bv4(9)
 	g.SetTip("b36")
-	g.NextBlock("bv4", outs[9], ticketOuts[9], g.ReplaceWithNVotes(ticketsPerBlock-3))
+	g.NextBlock("bv4", outs[9], ticketOuts[9], g.ReplaceWithNVotes(ticketsPerBlock/2))
 	rejected(blockchain.ErrNotEnoughVotes)
 
 	// Attempt to add block with different number of votes in stake tree and
@@ -945,7 +1068,7 @@ func Generate() (tests [][]TestInstance, err error) {
 	//                \-> bv5(9)
 	g.SetTip("b36")
 	g.NextBlock("bv5", outs[9], ticketOuts[9], func(b *wire.MsgBlock) {
-		b.Header.FreshStake = 4
+		b.Header.FreshStake -= 1
 	})
 	rejected(blockchain.ErrFreshStakeMismatch)
 
@@ -1003,8 +1126,7 @@ func Generate() (tests [][]TestInstance, err error) {
 	rejected(blockchain.ErrBadStakebaseScriptLen)
 
 	// Add a block with a stake transaction with a signature script that is
-	// not the required script, but is otherwise
-	// script.
+	// not the required script, but is otherwise a valid script.
 	//
 	//   ... -> b36(8)
 	//                \-> bss2(9)
@@ -1107,61 +1229,210 @@ func Generate() (tests [][]TestInstance, err error) {
 	rejected(blockchain.ErrMissingTx)
 
 	// ---------------------------------------------------------------------
+	// Pay-to-script-hash signature operation count tests.
+	// ---------------------------------------------------------------------
+
+	// Create a private/public key pair for signing transactions.
+	privKey, err := secp256k1.GeneratePrivateKey(secp256k1.S256())
+	if err != nil {
+		panic(err)
+	}
+	pubKey := secp256k1.PublicKey(privKey.PublicKey)
+
+	// Create a pay-to-script-hash redeem script that consists of 9
+	// signature operations to be used in the next three blocks.
+	const redeemScriptSigOps = 9
+	redeemScript := pushDataScript(pubKey.SerializeCompressed())
+	redeemScript = append(redeemScript, bytes.Repeat([]byte{txscript.OP_2DUP,
+		txscript.OP_CHECKSIGVERIFY}, redeemScriptSigOps-1)...)
+	redeemScript = append(redeemScript, txscript.OP_CHECKSIG)
+	g.AssertScriptSigOpsCount(redeemScript, redeemScriptSigOps)
+
+	// Create a block that has enough pay-to-script-hash outputs such that
+	// another block can be created that consumes them all and exceeds the
+	// max allowed signature operations per block.
+	//
+	//   ... -> b41(11) -> bshso0 (12)
+	g.SetTip("b41")
+	bshso0 := g.NextBlock("bshso0", outs[12], ticketOuts[12], func(b *wire.MsgBlock) {
+		// Create a chain of transactions each spending from the
+		// previous one such that each contains an output that pays to
+		// the redeem script and the total number of signature
+		// operations in those redeem scripts will be more than the
+		// max allowed per block.
+		p2shScript := payToScriptHashScript(redeemScript)
+		txnsNeeded := (maxBlockSigOps / redeemScriptSigOps) + 1
+		prevTx := b.Transactions[1]
+		for i := 0; i < txnsNeeded; i++ {
+			prevTx = g.CreateSpendTxForTx(prevTx, b.Header.Height,
+				uint32(i)+1, lowFee)
+			prevTx.TxOut[0].Value -= 2
+			prevTx.AddTxOut(wire.NewTxOut(2, p2shScript))
+			b.AddTransaction(prevTx)
+		}
+	})
+	g.AssertTipBlockNumTxns((maxBlockSigOps / redeemScriptSigOps) + 3)
+	accepted()
+
+	// Create a block with more than max allowed signature operations where
+	// the majority of them are in pay-to-script-hash scripts.
+	//
+	//   ... -> b41(11) -> bshso0(12)
+	//                               \-> bshso1(13)
+	g.NextBlock("bshso1", outs[13], ticketOuts[13], func(b *wire.MsgBlock) {
+		txnsNeeded := (maxBlockSigOps / redeemScriptSigOps)
+		for i := 0; i < txnsNeeded; i++ {
+			// Create a signed transaction that spends from the
+			// associated p2sh output in bshso0.
+			spend := chaingen.MakeSpendableOut(bshso0, uint32(i+2), 2)
+			tx := g.CreateSpendTx(&spend, lowFee)
+			sig, err := txscript.RawTxInSignature(tx, 0,
+				redeemScript, txscript.SigHashAll, privKey)
+			if err != nil {
+				panic(err)
+			}
+			tx.TxIn[0].SignatureScript = pushDataScript(sig,
+				redeemScript)
+			b.AddTransaction(tx)
+		}
+
+		// Create a final tx that includes a non-pay-to-script-hash
+		// output with the number of signature operations needed to push
+		// the block one over the max allowed.
+		fill := maxBlockSigOps - (txnsNeeded * redeemScriptSigOps) + 1
+		finalTxIndex := uint32(len(b.Transactions)) - 1
+		finalTx := b.Transactions[finalTxIndex]
+		tx := g.CreateSpendTxForTx(finalTx, b.Header.Height,
+			finalTxIndex, lowFee)
+		tx.TxOut[0].PkScript = repeatOpcode(txscript.OP_CHECKSIG, fill)
+		b.AddTransaction(tx)
+	})
+	rejected(blockchain.ErrTooManySigOps)
+
+	// Create a block with the max allowed signature operations where the
+	// majority of them are in pay-to-script-hash scripts.
+	//
+	//   ... -> b41(11) -> bshso0(12) -> bshso2(13)
+	g.SetTip("bshso0")
+	g.NextBlock("bshso2", outs[13], ticketOuts[13], func(b *wire.MsgBlock) {
+		txnsNeeded := (maxBlockSigOps / redeemScriptSigOps)
+		for i := 0; i < txnsNeeded; i++ {
+			// Create a signed transaction that spends from the
+			// associated p2sh output in bshso0.
+			spend := chaingen.MakeSpendableOut(bshso0, uint32(i+2), 2)
+			tx := g.CreateSpendTx(&spend, lowFee)
+			sig, err := txscript.RawTxInSignature(tx, 0,
+				redeemScript, txscript.SigHashAll, privKey)
+			if err != nil {
+				panic(err)
+			}
+			tx.TxIn[0].SignatureScript = pushDataScript(sig,
+				redeemScript)
+			b.AddTransaction(tx)
+		}
+
+		// Create a final tx that includes a non-pay-to-script-hash
+		// output with the number of signature operations needed to push
+		// the block to exactly the max allowed.
+		fill := maxBlockSigOps - (txnsNeeded * redeemScriptSigOps)
+		if fill == 0 {
+			return
+		}
+		finalTxIndex := uint32(len(b.Transactions)) - 1
+		finalTx := b.Transactions[finalTxIndex]
+		tx := g.CreateSpendTxForTx(finalTx, b.Header.Height,
+			finalTxIndex, lowFee)
+		tx.TxOut[0].PkScript = repeatOpcode(txscript.OP_CHECKSIG, fill)
+		b.AddTransaction(tx)
+	})
+	accepted()
+
+	// ---------------------------------------------------------------------
+	// Reset the chain to a stable base.
+	//
+	//   ... -> b41(11) -> b44(12)    -> b45(13)    -> b46(14)
+	//                 \-> bshso0(12) -> bshso2(13)
+	// ---------------------------------------------------------------------
+
+	g.SetTip("b41")
+	g.NextBlock("b44", outs[12], ticketOuts[12])
+	acceptedToSideChainWithExpectedTip("bshso2")
+
+	g.NextBlock("b45", outs[13], ticketOuts[13])
+	acceptedToSideChainWithExpectedTip("bshso2")
+
+	g.NextBlock("b46", outs[14], ticketOuts[14])
+	accepted()
+
+	// Collect all of the spendable coinbase outputs from the previous
+	// collection point up to the current tip and add them to the slices.
+	// This is necessary since the coinbase maturity is small enough such
+	// that there are no more spendable outputs without using the ones
+	// created in the previous tests.
+	g.SaveSpendableCoinbaseOuts()
+	for g.NumSpendableCoinbaseOuts() > 0 {
+		coinbaseOuts := g.OldestCoinbaseOuts()
+		outs = append(outs, &coinbaseOuts[0])
+		ticketOuts = append(ticketOuts, coinbaseOuts[1:])
+
+	}
+
+	// ---------------------------------------------------------------------
 	// Various malformed block tests.
 	// ---------------------------------------------------------------------
 
 	// Create block with an otherwise valid transaction in place of where
 	// the coinbase must be.
 	//
-	//   ... -> b41(11)
-	//                 \-> b44(12)
-	g.NextBlock("b44", nil, ticketOuts[12], func(b *wire.MsgBlock) {
-		nonCoinbaseTx := g.CreateSpendTx(outs[12], lowFee)
+	//   ... -> b46(14)
+	//                 \-> b47(15)
+	g.NextBlock("b47", nil, ticketOuts[15], func(b *wire.MsgBlock) {
+		nonCoinbaseTx := g.CreateSpendTx(outs[15], lowFee)
 		b.Transactions[0] = nonCoinbaseTx
 	})
 	rejected(blockchain.ErrFirstTxNotCoinbase)
 
 	// Create block with no transactions.
 	//
-	//   ... -> b41(11)
-	//                 \-> b45(_)
-	g.SetTip("b41")
-	g.NextBlock("b45", nil, nil, func(b *wire.MsgBlock) {
+	//   ... -> b46(14)
+	//                 \-> b48(_)
+	g.SetTip("b46")
+	g.NextBlock("b48", nil, nil, func(b *wire.MsgBlock) {
 		b.Transactions = nil
 	})
 	rejected(blockchain.ErrNoTransactions)
 
 	// Create block with invalid proof of work.
 	//
-	//   ... -> b41(11)
-	//                 \-> b46(12)
-	g.SetTip("b41")
-	b46 := g.NextBlock("b46", outs[12], ticketOuts[12])
+	//   ... -> b46(14)
+	//                 \-> b49(15)
+	g.SetTip("b46")
+	b49 := g.NextBlock("b49", outs[15], ticketOuts[15])
 	// This can't be done inside a munge function passed to NextBlock
 	// because the block is solved after the function returns and this test
 	// requires an unsolved block.
 	{
-		origHash := b46.BlockHash()
+		origHash := b49.BlockHash()
 		for {
 			// Keep incrementing the nonce until the hash treated as
 			// a uint256 is higher than the limit.
-			b46.Header.Nonce += 1
-			hash := b46.BlockHash()
+			b49.Header.Nonce += 1
+			hash := b49.BlockHash()
 			hashNum := blockchain.HashToBig(&hash)
 			if hashNum.Cmp(g.Params().PowLimit) >= 0 {
 				break
 			}
 		}
-		g.UpdateBlockState("b46", origHash, "b46", b46)
+		g.UpdateBlockState("b49", origHash, "b49", b49)
 	}
 	rejected(blockchain.ErrHighHash)
 
 	// Create block with a timestamp too far in the future.
 	//
-	//   ... -> b41(11)
-	//                 \-> b47(12)
-	g.SetTip("b41")
-	g.NextBlock("b47", outs[12], ticketOuts[12], func(b *wire.MsgBlock) {
+	//   ... -> b46(14)
+	//                 \-> b50(15)
+	g.SetTip("b46")
+	g.NextBlock("b50", outs[15], ticketOuts[15], func(b *wire.MsgBlock) {
 		// 3 hours in the future clamped to 1 second precision.
 		nowPlus3Hours := time.Now().Add(time.Hour * 3)
 		b.Header.Timestamp = time.Unix(nowPlus3Hours.Unix(), 0)
@@ -1170,10 +1441,10 @@ func Generate() (tests [][]TestInstance, err error) {
 
 	// Create block with an invalid merkle root.
 	//
-	//   ... -> b41(11)
-	//                 \-> b48(12)
-	g.SetTip("b41")
-	g.NextBlock("b48", outs[12], ticketOuts[12], func(b *wire.MsgBlock) {
+	//   ... -> b46(14)
+	//                 \-> b51(15)
+	g.SetTip("b46")
+	g.NextBlock("b51", outs[15], ticketOuts[15], func(b *wire.MsgBlock) {
 		b.Header.MerkleRoot = chainhash.Hash{}
 	})
 	g.AssertTipBlockMerkleRoot(chainhash.Hash{})
@@ -1181,21 +1452,37 @@ func Generate() (tests [][]TestInstance, err error) {
 
 	// Create block with an invalid proof-of-work limit.
 	//
-	//   ... -> b41(11)
-	//                 \-> b49(12)
-	g.SetTip("b41")
-	g.NextBlock("b49", outs[12], ticketOuts[12], func(b *wire.MsgBlock) {
+	//   ... -> b46(14)
+	//                 \-> b52(15)
+	g.SetTip("b46")
+	g.NextBlock("b52", outs[15], ticketOuts[15], func(b *wire.MsgBlock) {
 		b.Header.Bits -= 1
 	})
 	rejected(blockchain.ErrUnexpectedDifficulty)
 
+	// Create block with an invalid negative proof-of-work limit.
+	//
+	//   ... -> b46(14)
+	//                 \-> b52a(15)
+	g.SetTip("b46")
+	b52a := g.NextBlock("b52a", outs[15], ticketOuts[15])
+	// This can't be done inside a munge function passed to nextBlock
+	// because the block is solved after the function returns and this test
+	// involves an unsolvable block.
+	{
+		origHash := b52a.BlockHash()
+		b52a.Header.Bits = 0x01810000 // -1 in compact form.
+		g.UpdateBlockState("b52a", origHash, "b52a", b52a)
+	}
+	rejected(blockchain.ErrUnexpectedDifficulty)
+
 	// Create block with two coinbase transactions.
 	//
-	//   ... -> b41(11)
-	//                 \-> b50(12)
-	g.SetTip("b41")
+	//   ... -> b46(14)
+	//                 \-> b53(15)
+	g.SetTip("b46")
 	coinbaseTx := g.CreateCoinbaseTx(g.Tip().Header.Height+1, ticketsPerBlock)
-	g.NextBlock("b50", outs[12], ticketOuts[12], additionalPoWTx(coinbaseTx))
+	g.NextBlock("b53", outs[15], ticketOuts[15], additionalPoWTx(coinbaseTx))
 	rejected(blockchain.ErrMultipleCoinbases)
 
 	// Create block with duplicate transactions in the regular transaction
@@ -1204,21 +1491,34 @@ func Generate() (tests [][]TestInstance, err error) {
 	// This test relies on the shape of the shape of the merkle tree to test
 	// the intended condition.  That is the reason for the assertion.
 	//
-	//   ... -> b41(11)
-	//                 \-> b51(12)
-	g.SetTip("b41")
-	g.NextBlock("b51", outs[12], ticketOuts[12], func(b *wire.MsgBlock) {
+	//   ... -> b46(14)
+	//                 \-> b54(15)
+	g.SetTip("b46")
+	g.NextBlock("b54", outs[15], ticketOuts[15], func(b *wire.MsgBlock) {
 		b.AddTransaction(b.Transactions[1])
 	})
 	g.AssertTipBlockNumTxns(3)
 	rejected(blockchain.ErrDuplicateTx)
 
-	// Create block with state tx in regular tx tree.
+	// Create a block that spends a transaction that does not exist.
 	//
-	//   ... -> b41(11)
-	//                 \-> bmf0(12)
-	g.SetTip("b41")
-	g.NextBlock("bmf0", outs[12], ticketOuts[12], func(b *wire.MsgBlock) {
+	//   ... -> b46(14)
+	//                 \-> b55(15)
+	g.SetTip("b46")
+	g.NextBlock("b55", outs[15], ticketOuts[15], func(b *wire.MsgBlock) {
+		hash := newHashFromStr("00000000000000000000000000000000" +
+			"00000000000000000123456789abcdef")
+		b.Transactions[1].TxIn[0].PreviousOutPoint.Hash = *hash
+		b.Transactions[1].TxIn[0].PreviousOutPoint.Index = 0
+	})
+	rejected(blockchain.ErrMissingTx)
+
+	// Create block with stake tx in regular tx tree.
+	//
+	//   ... -> b46(14)
+	//                 \-> bmf0(15)
+	g.SetTip("b46")
+	g.NextBlock("bmf0", outs[15], ticketOuts[15], func(b *wire.MsgBlock) {
 		b.AddTransaction(b.STransactions[1])
 	})
 	rejected(blockchain.ErrStakeTxInRegularTree)
@@ -1229,12 +1529,12 @@ func Generate() (tests [][]TestInstance, err error) {
 
 	// Create a block with a timestamp that is exactly the median time.
 	//
-	//   ... b21(6) -> b29(7) -> b36(8) -> b37(9) -> b39(10) -> b41(11)
-	//                                                                 \-> b52(12)
-	g.SetTip("b41")
-	g.NextBlock("b52", outs[12], ticketOuts[12], func(b *wire.MsgBlock) {
+	//   ... b37(9) -> b39(10) -> b41(11) -> b44(12) -> b45(13) -> b46(14)
+	//                                                                  \-> b56(15)
+	g.SetTip("b46")
+	g.NextBlock("b56", outs[15], ticketOuts[15], func(b *wire.MsgBlock) {
 		medianBlk := g.BlockByHash(&b.Header.PrevBlock)
-		for i := 0; i < (medianTimeBlocks / 2); i++ {
+		for i := 0; i < medianTimeBlocks/2; i++ {
 			medianBlk = g.BlockByHash(&medianBlk.Header.PrevBlock)
 		}
 		b.Header.Timestamp = medianBlk.Header.Timestamp
@@ -1244,11 +1544,11 @@ func Generate() (tests [][]TestInstance, err error) {
 	// Create a block with a timestamp that is one second after the median
 	// time.
 	//
-	//   ... b21(6) -> b29(7) -> b36(8) -> b37(9) -> b39(10) -> b41(11) -> b53(12)
-	g.SetTip("b41")
-	g.NextBlock("b53", outs[12], ticketOuts[12], func(b *wire.MsgBlock) {
+	//   ... b37(9) -> b39(10) -> b41(11) -> b44(12) -> b45(13) -> b46(14) -> b57(15)
+	g.SetTip("b46")
+	g.NextBlock("b57", outs[15], ticketOuts[15], func(b *wire.MsgBlock) {
 		medianBlk := g.BlockByHash(&b.Header.PrevBlock)
-		for i := 0; i < (medianTimeBlocks / 2); i++ {
+		for i := 0; i < medianTimeBlocks/2; i++ {
 			medianBlk = g.BlockByHash(&medianBlk.Header.PrevBlock)
 		}
 		medianBlockTime := medianBlk.Header.Timestamp
@@ -1257,29 +1557,51 @@ func Generate() (tests [][]TestInstance, err error) {
 	accepted()
 
 	// ---------------------------------------------------------------------
+	// CVE-2012-2459 (block hash collision due to merkle tree algo) tests.
+	//
+	// NOTE: This section originally came from upstream and applied to the
+	// ability to create two blocks with the same hash that were not
+	// identical through merkle tree tricks in Bitcoin, however, that attack
+	// vector is not possible in Decred since the block size is included in
+	// the header and adding an additional duplicate transaction changes the
+	// size and consequently the hash.  The tests are therefore not ported
+	// as they do not apply.
+	// ---------------------------------------------------------------------
+
+	// ---------------------------------------------------------------------
 	// Invalid transaction type tests.
 	// ---------------------------------------------------------------------
 
 	// Create block with a transaction that tries to spend from an index
 	// that is out of range from an otherwise valid and existing tx.
 	//
-	//   ... -> b53(12)
-	//                 \-> b54(13)
-	g.SetTip("b53")
-	g.NextBlock("b54", outs[13], ticketOuts[13], func(b *wire.MsgBlock) {
-		b.Transactions[1].TxIn[0].PreviousOutPoint.Index = 12345
+	//   ... -> b57(15)
+	//                 \-> b58(16)
+	g.SetTip("b57")
+	g.NextBlock("b58", outs[16], ticketOuts[16], func(b *wire.MsgBlock) {
+		b.Transactions[1].TxIn[0].PreviousOutPoint.Index = 42
 	})
 	rejected(blockchain.ErrMissingTx)
 
 	// Create block with transaction that pays more than its inputs.
 	//
-	//   ... -> b53(12)
-	//                 \-> b54(13)
-	g.SetTip("b53")
-	g.NextBlock("b54", outs[13], ticketOuts[13], func(b *wire.MsgBlock) {
-		b.Transactions[1].TxOut[0].Value = int64(outs[13].Amount() + 2)
+	//   ... -> b57(15)
+	//                 \-> b59(16)
+	g.SetTip("b57")
+	g.NextBlock("b59", outs[16], ticketOuts[16], func(b *wire.MsgBlock) {
+		b.Transactions[1].TxOut[0].Value = int64(outs[16].Amount()) + 1
 	})
 	rejected(blockchain.ErrSpendTooHigh)
+
+	// ---------------------------------------------------------------------
+	// BIP0030 tests.
+	//
+	// NOTE: This section originally came from upstream and applied to the
+	// ability to create coinbase transactions with the same hash, however,
+	// Decred enforces the coinbase includes the block height to which it
+	// applies, so that condition is not possible.  The tests are therefore
+	// not ported as they do not apply.
+	// ---------------------------------------------------------------------
 
 	// ---------------------------------------------------------------------
 	// Blocks with non-final transaction tests.
@@ -1287,10 +1609,10 @@ func Generate() (tests [][]TestInstance, err error) {
 
 	// Create block that contains a non-final non-coinbase transaction.
 	//
-	//   ... -> b53(12)
-	//                 \-> b55(13)
-	g.SetTip("b53")
-	g.NextBlock("b55", outs[13], ticketOuts[13], func(b *wire.MsgBlock) {
+	//   ... -> b57(15)
+	//                 \-> b60(16)
+	g.SetTip("b57")
+	g.NextBlock("b60", outs[16], ticketOuts[16], func(b *wire.MsgBlock) {
 		// A non-final transaction must have at least one input with a
 		// non-final sequence number in addition to a non-final lock
 		// time.
@@ -1301,10 +1623,10 @@ func Generate() (tests [][]TestInstance, err error) {
 
 	// Create block that contains a non-final coinbase transaction.
 	//
-	//   ... -> b53(12)
-	//                 \-> b56(13)
-	g.SetTip("b53")
-	g.NextBlock("b56", outs[13], ticketOuts[13], func(b *wire.MsgBlock) {
+	//   ... -> b57(15)
+	//                 \-> b61(16)
+	g.SetTip("b57")
+	g.NextBlock("b61", outs[16], ticketOuts[16], func(b *wire.MsgBlock) {
 		// A non-final transaction must have at least one input with a
 		// non-final sequence number in addition to a non-final lock
 		// time.
@@ -1314,14 +1636,52 @@ func Generate() (tests [][]TestInstance, err error) {
 	rejected(blockchain.ErrUnfinalizedTx)
 
 	// ---------------------------------------------------------------------
+	// Non-canonical variable-length integer tests.
+	// ---------------------------------------------------------------------
+
+	// Create a max size block with the variable-length integer for the
+	// number of transactions replaced with a larger non-canonical version
+	// that causes the block size to exceed the max allowed size.  Then,
+	// create another block that is identical except with the canonical
+	// encoding and ensure it is accepted.  The intent is to verify the
+	// implementation does not reject the second block, which will have the
+	// same hash, due to the first one already being rejected.
+	//
+	//   ... -> b57(15) -> b62(16)
+	//                 \-> b62a(16)
+	g.SetTip("b57")
+	b62a := g.NextBlock("b62a", outs[16], ticketOuts[16], func(b *wire.MsgBlock) {
+		curScriptLen := len(b.Transactions[1].TxOut[0].PkScript)
+		bytesToMaxSize := maxBlockSize - b.SerializeSize() +
+			(curScriptLen - 4)
+		sizePadScript := repeatOpcode(0x00, bytesToMaxSize)
+		replaceSpendScript(sizePadScript)(b)
+	})
+	assertTipNonCanonicalBlockSize(&g, maxBlockSize+8)
+	rejectedNonCanonical()
+
+	g.SetTip("b57")
+	b62 := g.NextBlock("b62", outs[16], ticketOuts[16], func(b *wire.MsgBlock) {
+		*b = cloneBlock(b62a)
+	})
+	// Since the two blocks have the same hash and the generator state now
+	// has b62a associated with the hash, manually remove b62a, replace it
+	// with b62, and then reset the tip to it.
+	g.UpdateBlockState("b62a", b62a.BlockHash(), "b62", b62)
+	g.SetTip("b62")
+	g.AssertTipBlockHash(b62a.BlockHash())
+	g.AssertTipBlockSize(maxBlockSize)
+	accepted()
+
+	// ---------------------------------------------------------------------
 	// Same block transaction spend tests.
 	// ---------------------------------------------------------------------
 
 	// Create block that spends an output created earlier in the same block.
 	//
-	//   ... -> b53(12) -> b57(13)
-	g.SetTip("b53")
-	g.NextBlock("b57", outs[13], ticketOuts[13], func(b *wire.MsgBlock) {
+	//   ... -> b62(16) -> b63(17)
+	g.SetTip("b62")
+	g.NextBlock("b63", outs[17], ticketOuts[17], func(b *wire.MsgBlock) {
 		spendTx3 := chaingen.MakeSpendableOut(b, 1, 0)
 		tx3 := g.CreateSpendTx(&spendTx3, lowFee)
 		b.AddTransaction(tx3)
@@ -1330,10 +1690,10 @@ func Generate() (tests [][]TestInstance, err error) {
 
 	// Create block that spends an output created later in the same block.
 	//
-	//   ... -> b57(13)
-	//                 \-> b58(14)
-	g.NextBlock("b58", nil, ticketOuts[14], func(b *wire.MsgBlock) {
-		tx2 := g.CreateSpendTx(outs[14], lowFee)
+	//   ... -> b63(17)
+	//                 \-> b64(18)
+	g.NextBlock("b64", nil, ticketOuts[18], func(b *wire.MsgBlock) {
+		tx2 := g.CreateSpendTx(outs[18], lowFee)
 		tx3 := g.CreateSpendTxForTx(tx2, b.Header.Height, 2, lowFee)
 		b.AddTransaction(tx3)
 		b.AddTransaction(tx2)
@@ -1343,10 +1703,10 @@ func Generate() (tests [][]TestInstance, err error) {
 	// Create block that double spends a transaction created in the same
 	// block.
 	//
-	//   ... -> b57(13)
-	//                 \-> b59(14)
-	g.SetTip("b57")
-	g.NextBlock("b59", outs[14], ticketOuts[14], func(b *wire.MsgBlock) {
+	//   ... -> b63(17)
+	//                 \-> b65(18)
+	g.SetTip("b63")
+	g.NextBlock("b65", outs[18], ticketOuts[18], func(b *wire.MsgBlock) {
 		tx2 := b.Transactions[1]
 		tx3 := g.CreateSpendTxForTx(tx2, b.Header.Height, 1, lowFee)
 		tx4 := g.CreateSpendTxForTx(tx2, b.Header.Height, 1, lowFee)
@@ -1363,49 +1723,32 @@ func Generate() (tests [][]TestInstance, err error) {
 	// Create block that pays 10 extra to the coinbase and a tx that only
 	// pays 9 fee.
 	//
-	//   ... -> b57(13)
-	//                 \-> b60(14)
-	g.SetTip("b57")
-	g.NextBlock("b60", outs[14], ticketOuts[14], additionalCoinbasePoW(10),
+	//   ... -> b63(17)
+	//                 \-> b66(18)
+	g.SetTip("b63")
+	g.NextBlock("b66", outs[18], ticketOuts[18], additionalCoinbasePoW(10),
 		additionalSpendFee(9))
 	rejected(blockchain.ErrBadCoinbaseValue)
 
 	// Create block that pays 10 extra to the coinbase and a tx that pays
 	// the extra 10 fee.
 	//
-	//   ... -> b57(13) -> b61(14)
-	g.SetTip("b57")
-	g.NextBlock("b61", outs[14], ticketOuts[14], additionalCoinbasePoW(10),
+	//   ... -> b63(17) -> b67(18)
+	g.SetTip("b63")
+	g.NextBlock("b67", outs[18], ticketOuts[18], additionalCoinbasePoW(10),
 		additionalSpendFee(10))
 	accepted()
 
 	// ---------------------------------------------------------------------
-	// Non-existent transaction spend tests.
-	// ---------------------------------------------------------------------
-
-	// Create a block that spends a transaction that does not exist.
-	//
-	//   ... -> b61(14)
-	//                 \-> b62(15)
-	g.SetTip("b61")
-	g.NextBlock("b62", outs[15], ticketOuts[15], func(b *wire.MsgBlock) {
-		hash := newHashFromStr("00000000000000000000000000000000" +
-			"00000000000000000123456789abcdef")
-		b.Transactions[1].TxIn[0].PreviousOutPoint.Hash = *hash
-		b.Transactions[1].TxIn[0].PreviousOutPoint.Index = 0
-	})
-	rejected(blockchain.ErrMissingTx)
-
-	// ---------------------------------------------------------------------
-	// Malformed coinbase tests
+	// Malformed coinbase tests.
 	// ---------------------------------------------------------------------
 
 	// Create block with no proof-of-work subsidy output in the coinbase.
 	//
-	//   ... -> b61(14)
-	//                 \-> b63(15)
-	g.SetTip("b61")
-	g.NextBlock("b63", outs[15], ticketOuts[15], func(b *wire.MsgBlock) {
+	//   ... -> b67(18)
+	//                 \-> b68(19)
+	g.SetTip("b67")
+	g.NextBlock("b68", outs[19], ticketOuts[19], func(b *wire.MsgBlock) {
 		b.Transactions[0].TxOut = b.Transactions[0].TxOut[0:1]
 	})
 	rejected(blockchain.ErrFirstTxNotCoinbase)
@@ -1413,20 +1756,20 @@ func Generate() (tests [][]TestInstance, err error) {
 	// Create block with an invalid script type in the coinbase block
 	// commitment output.
 	//
-	//   ... -> b61(14)
-	//                 \-> b64(15)
-	g.SetTip("b61")
-	g.NextBlock("b64", outs[15], ticketOuts[15], func(b *wire.MsgBlock) {
+	//   ... -> b67(18)
+	//                 \-> b69(19)
+	g.SetTip("b67")
+	g.NextBlock("b69", outs[19], ticketOuts[19], func(b *wire.MsgBlock) {
 		b.Transactions[0].TxOut[1].PkScript = nil
 	})
 	rejected(blockchain.ErrFirstTxNotCoinbase)
 
 	// Create block with too few bytes for the coinbase height commitment.
 	//
-	//   ... -> b61(14)
-	//                 \-> b65(15)
-	g.SetTip("b61")
-	g.NextBlock("b65", outs[15], ticketOuts[15], func(b *wire.MsgBlock) {
+	//   ... -> b67(18)
+	//                 \-> b70(19)
+	g.SetTip("b67")
+	g.NextBlock("b70", outs[19], ticketOuts[19], func(b *wire.MsgBlock) {
 		script := opReturnScript(repeatOpcode(0x00, 3))
 		b.Transactions[0].TxOut[1].PkScript = script
 	})
@@ -1434,10 +1777,10 @@ func Generate() (tests [][]TestInstance, err error) {
 
 	// Create block with invalid block height in the coinbase commitment.
 	//
-	//   ... -> b61(14)
-	//                 \-> b66(15)
-	g.SetTip("b61")
-	g.NextBlock("b66", outs[15], ticketOuts[15], func(b *wire.MsgBlock) {
+	//   ... -> b67(18)
+	//                 \-> b71(19)
+	g.SetTip("b67")
+	g.NextBlock("b71", outs[19], ticketOuts[19], func(b *wire.MsgBlock) {
 		script := standardCoinbaseOpReturnScript(b.Header.Height - 1)
 		b.Transactions[0].TxOut[1].PkScript = script
 	})
@@ -1445,40 +1788,40 @@ func Generate() (tests [][]TestInstance, err error) {
 
 	// Create block with a fraudulent transaction (invalid index).
 	//
-	//   ... -> b61(14)
-	//                 \-> b67(15)
-	g.SetTip("b61")
-	g.NextBlock("b67", outs[15], ticketOuts[15], func(b *wire.MsgBlock) {
+	//   ... -> b67(18)
+	//                 \-> b72(19)
+	g.SetTip("b67")
+	g.NextBlock("b72", outs[19], ticketOuts[19], func(b *wire.MsgBlock) {
 		b.Transactions[0].TxIn[0].BlockIndex = wire.NullBlockIndex - 1
 	})
 	rejected(blockchain.ErrBadCoinbaseFraudProof)
 
 	// Create block containing a transaction with no inputs.
 	//
-	//   ... -> b61(14)
-	//                 \-> b68(15)
-	g.SetTip("b61")
-	g.NextBlock("b68", outs[15], ticketOuts[15], func(b *wire.MsgBlock) {
+	//   ... -> b67(18)
+	//                 \-> b73(19)
+	g.SetTip("b67")
+	g.NextBlock("b73", outs[19], ticketOuts[19], func(b *wire.MsgBlock) {
 		b.Transactions[1].TxIn = nil
 	})
 	rejected(blockchain.ErrNoTxInputs)
 
 	// Create block containing a transaction with no outputs.
 	//
-	//   ... -> b61(14)
-	//                 \-> b69(15)
-	g.SetTip("b61")
-	g.NextBlock("b69", outs[15], ticketOuts[15], func(b *wire.MsgBlock) {
+	//   ... -> b67(18)
+	//                 \-> b74(19)
+	g.SetTip("b67")
+	g.NextBlock("b74", outs[19], ticketOuts[19], func(b *wire.MsgBlock) {
 		b.Transactions[1].TxOut = nil
 	})
 	rejected(blockchain.ErrNoTxOutputs)
 
 	// Create block containing a transaction output with negative value.
 	//
-	//   ... -> b61(14)
-	//                 \-> b70(15)
-	g.SetTip("b61")
-	g.NextBlock("b70", outs[15], ticketOuts[15], func(b *wire.MsgBlock) {
+	//   ... -> b67(18)
+	//                 \-> b75(19)
+	g.SetTip("b67")
+	g.NextBlock("b75", outs[19], ticketOuts[19], func(b *wire.MsgBlock) {
 		b.Transactions[1].TxOut[0].Value = -1
 	})
 	rejected(blockchain.ErrBadTxOutValue)
@@ -1486,10 +1829,10 @@ func Generate() (tests [][]TestInstance, err error) {
 	// Create block containing a transaction output with an exceedingly
 	// large (and therefore invalid) value.
 	//
-	//   ... -> b61(14)
-	//                 \-> b71(15)
-	g.SetTip("b61")
-	g.NextBlock("b71", outs[15], ticketOuts[15], func(b *wire.MsgBlock) {
+	//   ... -> b67(18)
+	//                 \-> b76(19)
+	g.SetTip("b67")
+	g.NextBlock("b76", outs[19], ticketOuts[19], func(b *wire.MsgBlock) {
 		b.Transactions[1].TxOut[0].Value = dcrutil.MaxAmount + 1
 	})
 	rejected(blockchain.ErrBadTxOutValue)
@@ -1497,10 +1840,10 @@ func Generate() (tests [][]TestInstance, err error) {
 	// Create block containing a transaction whose outputs have an
 	// exceedingly large (and therefore invalid) total value.
 	//
-	//   ... -> b61(14)
-	//                 \-> b72(15)
-	g.SetTip("b61")
-	g.NextBlock("b72", outs[15], ticketOuts[15], func(b *wire.MsgBlock) {
+	//   ... -> b67(18)
+	//                 \-> b77(19)
+	g.SetTip("b67")
+	g.NextBlock("b77", outs[19], ticketOuts[19], func(b *wire.MsgBlock) {
 		b.Transactions[1].TxOut[0].Value = dcrutil.MaxAmount
 		b.Transactions[1].TxOut[1].Value = 1
 	})
@@ -1508,28 +1851,28 @@ func Generate() (tests [][]TestInstance, err error) {
 
 	// Create block containing a stakebase tx with a small signature script.
 	//
-	//   ... -> b61(14)
-	//                 \-> b73(15)
-	g.SetTip("b61")
+	//   ... -> b67(18)
+	//                 \-> b78(19)
+	g.SetTip("b67")
 	tooSmallSbScript := repeatOpcode(0x00, minCoinbaseScriptLen-1)
-	g.NextBlock("b73", outs[15], ticketOuts[15], replaceStakeSigScript(tooSmallSbScript))
+	g.NextBlock("b78", outs[19], ticketOuts[19], replaceStakeSigScript(tooSmallSbScript))
 	rejected(blockchain.ErrBadStakebaseScriptLen)
 
 	// Create block containing a base stake tx with a large signature script.
 	//
-	//   ... -> b61(14)
-	//                 \-> b74(15)
-	g.SetTip("b61")
+	//   ... -> b67(18)
+	//                 \-> b79(19)
+	g.SetTip("b67")
 	tooLargeSbScript := repeatOpcode(0x00, maxCoinbaseScriptLen+1)
-	g.NextBlock("b74", outs[15], ticketOuts[15], replaceStakeSigScript(tooLargeSbScript))
+	g.NextBlock("b79", outs[19], ticketOuts[19], replaceStakeSigScript(tooLargeSbScript))
 	rejected(blockchain.ErrBadStakebaseScriptLen)
 
 	// Create block containing an input transaction with a null outpoint.
 	//
-	//   ... -> b61(14)
-	//                 \-> b75(15)
-	g.SetTip("b61")
-	g.NextBlock("b75", outs[15], ticketOuts[15], func(b *wire.MsgBlock) {
+	//   ... -> b67(18)
+	//                 \-> b80(19)
+	g.SetTip("b67")
+	g.NextBlock("b80", outs[19], ticketOuts[19], func(b *wire.MsgBlock) {
 		tx := b.Transactions[1]
 		tx.AddTxIn(&wire.TxIn{
 			PreviousOutPoint: *wire.NewOutPoint(&chainhash.Hash{},
@@ -1539,10 +1882,10 @@ func Generate() (tests [][]TestInstance, err error) {
 
 	// Create block containing duplicate tx inputs.
 	//
-	//   ... -> b61(14)
-	//                 \-> b76(15)
-	g.SetTip("b61")
-	g.NextBlock("b76", outs[15], ticketOuts[15], func(b *wire.MsgBlock) {
+	//   ... -> b67(18)
+	//                 \-> b81(19)
+	g.SetTip("b67")
+	g.NextBlock("b81", outs[19], ticketOuts[19], func(b *wire.MsgBlock) {
 		tx := b.Transactions[1]
 		tx.AddTxIn(&wire.TxIn{
 			PreviousOutPoint: b.Transactions[1].TxIn[0].PreviousOutPoint})
@@ -1551,43 +1894,43 @@ func Generate() (tests [][]TestInstance, err error) {
 
 	// Create block with nanosecond precision timestamp.
 	//
-	//   ... -> b61(14)
-	//                 \-> b77(15)
-	g.SetTip("b61")
-	g.NextBlock("b77", outs[15], ticketOuts[15], func(b *wire.MsgBlock) {
+	//   ... -> b67(18)
+	//                 \-> b82(19)
+	g.SetTip("b67")
+	g.NextBlock("b82", outs[19], ticketOuts[19], func(b *wire.MsgBlock) {
 		b.Header.Timestamp = b.Header.Timestamp.Add(1 * time.Nanosecond)
 	})
 	rejected(blockchain.ErrInvalidTime)
 
 	// Create block with target difficulty that is too low (0 or below).
 	//
-	//   ... -> b61(14)
-	//                 \-> b78(15)
-	g.SetTip("b61")
-	b78 := g.NextBlock("b78", outs[15], ticketOuts[15])
+	//   ... -> b67(18)
+	//                 \-> b83(19)
+	g.SetTip("b67")
+	b83 := g.NextBlock("b83", outs[19], ticketOuts[19])
 	{
 		// This can't be done inside a munge function passed to NextBlock
 		// because the block is solved after the function returns and this test
 		// involves an unsolvable block.
-		b78Hash := b78.BlockHash()
-		b78.Header.Bits = 0x01810000 // -1 in compact form.
-		g.UpdateBlockState("b78", b78Hash, "b78", b78)
+		b83Hash := b83.BlockHash()
+		b83.Header.Bits = 0x01810000 // -1 in compact form.
+		g.UpdateBlockState("b83", b83Hash, "b83", b83)
 	}
 	rejected(blockchain.ErrUnexpectedDifficulty)
 
 	// Create block with target difficulty that is greater than max allowed.
 	//
-	//   ... -> b61(14)
-	//                 \-> b79(15)
-	g.SetTip("b61")
-	b79 := g.NextBlock("b79", outs[15], ticketOuts[15])
+	//   ... -> b67(18)
+	//                 \-> b84(19)
+	g.SetTip("b67")
+	b84 := g.NextBlock("b84", outs[19], ticketOuts[19])
 	{
 		// This can't be done inside a munge function passed to NextBlock
 		// because the block is solved after the function returns and this test
 		// involves an improperly solved block.
-		b79Hash := b79.BlockHash()
-		b79.Header.Bits = g.Params().PowLimitBits + 1
-		g.UpdateBlockState("b79", b79Hash, "b79", b79)
+		b84Hash := b84.BlockHash()
+		b84.Header.Bits = g.Params().PowLimitBits + 1
+		g.UpdateBlockState("b84", b84Hash, "b84", b84)
 	}
 	rejected(blockchain.ErrUnexpectedDifficulty)
 
@@ -1612,17 +1955,263 @@ func Generate() (tests [][]TestInstance, err error) {
 	//  [5005-7053]: too large script element
 	//  [7054]     : OP_CHECKSIG (goes over the limit)
 	//
-	//   ... -> b61(14)
-	//                 \-> b80(15)
-	g.SetTip("b61")
+	//   ... -> b67(18)
+	//                 \-> b84(19)
+	g.SetTip("b67")
 	scriptSize := maxBlockSigOps + 5 + (maxScriptElementSize + 1) + 1
 	tooManySigOps = repeatOpcode(txscript.OP_CHECKSIG, scriptSize)
 	tooManySigOps[maxBlockSigOps] = txscript.OP_PUSHDATA4
 	binary.LittleEndian.PutUint32(tooManySigOps[maxBlockSigOps+1:],
 		maxScriptElementSize+1)
-	g.NextBlock("b80", outs[15], ticketOuts[15], replaceSpendScript(tooManySigOps))
+	g.NextBlock("b84", outs[19], ticketOuts[19], replaceSpendScript(tooManySigOps))
 	g.AssertTipBlockSigOpsCount(maxBlockSigOps + 1)
 	rejected(blockchain.ErrTooManySigOps)
+
+	// Create block with more than max allowed signature operations such
+	// that the signature operation that pushes it over the limit is before
+	// an invalid push data that claims a large amount of data even though
+	// that much data is not provided.
+	//
+	//   ... -> b67(18)
+	//                 \-> b85(19)
+	g.SetTip("b67")
+	scriptSize = maxBlockSigOps + 5 + maxScriptElementSize + 1
+	tooManySigOps = repeatOpcode(txscript.OP_CHECKSIG, scriptSize)
+	tooManySigOps[maxBlockSigOps+1] = txscript.OP_PUSHDATA4
+	binary.LittleEndian.PutUint32(tooManySigOps[maxBlockSigOps+2:], 0xffffffff)
+	g.NextBlock("b85", outs[19], ticketOuts[19], replaceSpendScript(tooManySigOps))
+	g.AssertTipBlockSigOpsCount(maxBlockSigOps + 1)
+	rejected(blockchain.ErrTooManySigOps)
+
+	// ---------------------------------------------------------------------
+	// Dead execution path tests.
+	// ---------------------------------------------------------------------
+
+	// Create block with an invalid opcode in a dead execution path.
+	//
+	//   ... -> b67(18) -> b86(19)
+	script := []byte{txscript.OP_IF, txscript.OP_INVALIDOPCODE,
+		txscript.OP_ELSE, txscript.OP_TRUE, txscript.OP_ENDIF}
+	g.SetTip("b67")
+	g.NextBlock("b86", outs[19], ticketOuts[19], replaceSpendScript(script),
+		func(b *wire.MsgBlock) {
+			spendTx2 := chaingen.MakeSpendableOut(b, 1, 0)
+			tx3 := g.CreateSpendTx(&spendTx2, lowFee)
+			tx3.TxIn[0].SignatureScript = []byte{txscript.OP_FALSE}
+			b.AddTransaction(tx3)
+		})
+	accepted()
+
+	// ---------------------------------------------------------------------
+	// Various OP_RETURN tests.
+	// ---------------------------------------------------------------------
+
+	// Create a block that has multiple transactions each with a single
+	// OP_RETURN output.
+	//
+	//   ... -> b86(19) -> b87(20)
+	g.NextBlock("b87", outs[20], ticketOuts[20], func(b *wire.MsgBlock) {
+		// Add 4 outputs to the spending transaction that are spent
+		// below.
+		const numAdditionalOutputs = 4
+		spendTx := b.Transactions[1]
+		spendTx.TxOut[0].Value -= int64(lowFee) * numAdditionalOutputs
+		for i := 0; i < numAdditionalOutputs; i++ {
+			spendTx.AddTxOut(wire.NewTxOut(int64(lowFee), opTrueScript))
+		}
+
+		// Add transactions spending from the outputs added above that
+		// each contain an OP_RETURN output.
+		//
+		// NOTE: The CreateSpendTx func adds the OP_RETURN output.
+		zeroFee := dcrutil.Amount(0)
+		for i := uint32(0); i < numAdditionalOutputs; i++ {
+			spend := chaingen.MakeSpendableOut(b, 1, i+2)
+			tx := g.CreateSpendTx(&spend, zeroFee)
+			tx.TxIn[0].SignatureScript = nil
+			b.AddTransaction(tx)
+		}
+	})
+	g.AssertTipBlockNumTxns(6)
+	g.AssertTipBlockTxOutOpReturn(5, 1)
+	b87OpReturnOut := chaingen.MakeSpendableOut(g.Tip(), 5, 1)
+	accepted()
+
+	// Reorg to a side chain that does not contain the OP_RETURNs.
+	//
+	//   ... -> b86(19) -> b87(20)
+	//                 \-> b88(20) -> b89(21)
+	g.SetTip("b86")
+	g.NextBlock("b88", outs[20], ticketOuts[20])
+	acceptedToSideChainWithExpectedTip("b87")
+
+	g.NextBlock("b89", outs[21], ticketOuts[21])
+	accepted()
+
+	// Reorg back to the original chain that contains the OP_RETURNs.
+	//
+	//   ... -> b86(19) -> b87(20) -> b90(21) -> b91(22)
+	//                 \-> b88(20) -> b89(21)
+	g.SetTip("b87")
+	g.NextBlock("b90", outs[21], ticketOuts[21])
+	acceptedToSideChainWithExpectedTip("b89")
+
+	g.NextBlock("b91", outs[22], ticketOuts[22])
+	accepted()
+
+	// Create a block that spends an OP_RETURN.
+	//
+	//   ... -> b86(19) -> b87(20) -> b90(21) -> b91(22)
+	//                 \-> b88(20) -> b89(21)           \-> b92(b87.tx[5].out[1])
+	g.NextBlock("b92", nil, ticketOuts[23], func(b *wire.MsgBlock) {
+		// An OP_RETURN output doesn't have any value so use a fee of 0.
+		zeroFee := dcrutil.Amount(0)
+		tx := g.CreateSpendTx(&b87OpReturnOut, zeroFee)
+		b.AddTransaction(tx)
+	})
+	rejected(blockchain.ErrMissingTx)
+
+	// Create a block that has a transaction with multiple OP_RETURNs.  Even
+	// though a transaction with a large number of OP_RETURNS is not
+	// considered a standard transaction, it is still valid by the consensus
+	// rules.
+	//
+	//   ... -> b91(22) -> b93(23)
+	//
+	g.SetTip("b91")
+	g.NextBlock("b93", outs[23], ticketOuts[23], func(b *wire.MsgBlock) {
+		const numAdditionalOutputs = 8
+		const zeroCoin = int64(0)
+		spendTx := b.Transactions[1]
+		for i := 0; i < numAdditionalOutputs; i++ {
+			opRetScript := chaingen.UniqueOpReturnScript()
+			spendTx.AddTxOut(wire.NewTxOut(zeroCoin, opRetScript))
+		}
+	})
+	for i := uint32(2); i < 10; i++ {
+		g.AssertTipBlockTxOutOpReturn(1, i)
+	}
+	accepted()
+
+	// ---------------------------------------------------------------------
+	// Large block re-org test.
+	// ---------------------------------------------------------------------
+
+	if !includeLargeReorg {
+		return tests, nil
+	}
+
+	// Ensure the tip the re-org test builds on is the best chain tip.
+	//
+	//   ... -> b93(23) -> ...
+	//g.AssertTipHeight()
+	g.SetTip("b93")
+	spendableOutOffset := int32(24) // Next spendable offset.
+
+	// Collect all of the spendable coinbase outputs from the previous
+	// collection point up to the current tip.
+	g.SaveSpendableCoinbaseOuts()
+	for g.NumSpendableCoinbaseOuts() > 0 {
+		coinbaseOuts := g.OldestCoinbaseOuts()
+		outs = append(outs, &coinbaseOuts[0])
+		ticketOuts = append(ticketOuts, coinbaseOuts[1:])
+	}
+
+	// Extend the main chain by a large number of max size blocks.
+	//
+	//   ... -> br0 -> br1 -> ... -> br#
+	testInstances = nil
+	reorgSpend := *outs[spendableOutOffset]
+	reorgTicketSpends := ticketOuts[spendableOutOffset]
+	reorgStartBlockName := g.TipName()
+	chain1TipName := g.TipName()
+	for i := int32(0); i < numLargeReorgBlocks; i++ {
+		chain1TipName = fmt.Sprintf("br%d", i)
+		g.NextBlock(chain1TipName, &reorgSpend, reorgTicketSpends, func(b *wire.MsgBlock) {
+			curScriptLen := len(b.Transactions[1].TxOut[0].PkScript)
+			bytesToMaxSize := maxBlockSize - b.SerializeSize() +
+				(curScriptLen - 4)
+			sizePadScript := repeatOpcode(0x00, bytesToMaxSize)
+			replaceSpendScript(sizePadScript)(b)
+		})
+		g.AssertTipBlockSize(maxBlockSize)
+		g.SaveTipCoinbaseOuts()
+		testInstances = append(testInstances, acceptBlock(g.TipName(),
+			g.Tip(), true, false))
+
+		// Use the next available spendable output.  First use up any
+		// remaining spendable outputs that were already popped into the
+		// outs slice, then just pop them from the stack.
+		if spendableOutOffset+1+i < int32(len(outs)) {
+			reorgSpend = *outs[spendableOutOffset+1+i]
+			reorgTicketSpends = ticketOuts[spendableOutOffset+1+i]
+		} else {
+			reorgOuts := g.OldestCoinbaseOuts()
+			reorgSpend = reorgOuts[0]
+			reorgTicketSpends = reorgOuts[1:]
+		}
+	}
+	tests = append(tests, testInstances)
+
+	// Ensure any remaining unused spendable outs from the main chain that
+	// are still associated with the generator are removed to avoid them
+	// from being used on the side chain build below.
+	for g.NumSpendableCoinbaseOuts() > 0 {
+		g.OldestCoinbaseOuts()
+	}
+
+	// Create a side chain that has the same length.
+	//
+	//   ... -> br0    -> ... -> br#
+	//      \-> bralt0 -> ... -> bralt#
+	g.SetTip(reorgStartBlockName)
+	testInstances = nil
+	reorgSpend = *outs[spendableOutOffset]
+	reorgTicketSpends = ticketOuts[spendableOutOffset]
+	chain2TipName := g.TipName()
+	for i := int32(0); i < numLargeReorgBlocks; i++ {
+		chain2TipName = fmt.Sprintf("bralt%d", i)
+		g.NextBlock(chain2TipName, &reorgSpend, reorgTicketSpends)
+		g.SaveTipCoinbaseOuts()
+		testInstances = append(testInstances, acceptBlock(g.TipName(),
+			g.Tip(), false, false))
+
+		// Use the next available spendable output.  First use up any
+		// remaining spendable outputs that were already popped into the
+		// outs slice, then just pop them from the stack.
+		if spendableOutOffset+1+i < int32(len(outs)) {
+			reorgSpend = *outs[spendableOutOffset+1+i]
+			reorgTicketSpends = ticketOuts[spendableOutOffset+1+i]
+		} else {
+			reorgOuts := g.OldestCoinbaseOuts()
+			reorgSpend = reorgOuts[0]
+			reorgTicketSpends = reorgOuts[1:]
+		}
+	}
+	testInstances = append(testInstances, expectTipBlock(chain1TipName,
+		g.BlockByName(chain1TipName)))
+	tests = append(tests, testInstances)
+
+	// Extend the side chain by one to force the large reorg.
+	//
+	//   ... -> bralt0 -> ... -> bralt# -> bralt#+1
+	//      \-> br0    -> ... -> br#
+	g.NextBlock(fmt.Sprintf("bralt%d", numLargeReorgBlocks), nil, nil)
+	chain2TipName = g.TipName()
+	accepted()
+
+	// Extend the first chain by two to force a large reorg back to it.
+	//
+	//   ... -> br0    -> ... -> br#    -> br#+1    -> br#+2
+	//      \-> bralt0 -> ... -> bralt# -> bralt#+1
+	g.SetTip(chain1TipName)
+	g.NextBlock(fmt.Sprintf("br%d", numLargeReorgBlocks), nil, nil)
+	chain1TipName = g.TipName()
+	acceptedToSideChainWithExpectedTip(chain2TipName)
+
+	g.NextBlock(fmt.Sprintf("br%d", numLargeReorgBlocks+1), nil, nil)
+	chain1TipName = g.TipName()
+	accepted()
 
 	return tests, nil
 }
