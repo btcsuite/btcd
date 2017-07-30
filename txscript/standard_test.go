@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/decred/dcrd/chaincfg"
+	"github.com/decred/dcrd/chaincfg/chainec"
 	"github.com/decred/dcrd/txscript"
 	"github.com/decred/dcrutil"
 )
@@ -48,7 +49,11 @@ func mustParseShortForm(script string) []byte {
 // the tests as a helper since the only way it can fail is if there is an error
 // in the test source code.
 func newAddressPubKey(serializedPubKey []byte) dcrutil.Address {
-	addr, err := dcrutil.NewAddressSecpPubKey(serializedPubKey,
+	pubkey, err := chainec.Secp256k1.ParsePubKey(serializedPubKey)
+	if err != nil {
+		panic("invalid public key in test source")
+	}
+	addr, err := dcrutil.NewAddressSecpPubKeyCompressed(pubkey,
 		&chaincfg.MainNetParams)
 	if err != nil {
 		panic("invalid public key in test source")
@@ -585,15 +590,9 @@ func TestPayToAddrScript(t *testing.T) {
 		return
 	}
 
-	p2pkUncompressedMain, err := dcrutil.NewAddressSecpPubKey(decodeHex("0411db"+
-		"93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2"+
-		"e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3"),
-		&chaincfg.MainNetParams)
-	if err != nil {
-		t.Errorf("Unable to create pubkey address (uncompressed): %v",
-			err)
-		return
-	}
+	p2pkUncompressedMain := newAddressPubKey(decodeHex("0411db" +
+		"93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2" +
+		"e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3"))
 
 	tests := []struct {
 		in       dcrutil.Address
@@ -688,15 +687,10 @@ func TestMultiSigScript(t *testing.T) {
 		return
 	}
 
-	p2pkUncompressedMain, err := dcrutil.NewAddressSecpPubKey(decodeHex("0411d"+
-		"b93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5c"+
-		"b2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b41"+
-		"2a3"), &chaincfg.MainNetParams)
-	if err != nil {
-		t.Errorf("Unable to create pubkey address (uncompressed): %v",
-			err)
-		return
-	}
+	p2pkUncompressedMain := newAddressPubKey(decodeHex("0411d" +
+		"b93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5c" +
+		"b2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b41" +
+		"2a3"))
 
 	tests := []struct {
 		keys      []*dcrutil.AddressSecpPubKey
@@ -740,7 +734,7 @@ func TestMultiSigScript(t *testing.T) {
 		{
 			// By default compressed pubkeys are used in Decred.
 			[]*dcrutil.AddressSecpPubKey{
-				p2pkUncompressedMain,
+				p2pkUncompressedMain.(*dcrutil.AddressSecpPubKey),
 			},
 			1,
 			"1 DATA_33 0x0311db93e1dcdb8a016b49840f8c53bc1eb68a3" +
@@ -749,7 +743,7 @@ func TestMultiSigScript(t *testing.T) {
 		},
 		{
 			[]*dcrutil.AddressSecpPubKey{
-				p2pkUncompressedMain,
+				p2pkUncompressedMain.(*dcrutil.AddressSecpPubKey),
 			},
 			2,
 			"",

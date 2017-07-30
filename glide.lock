@@ -1,5 +1,5 @@
 hash: 153a3e6a1f31b2b29a113e953098f2b42a645103ee3e10040b5e03727a7b003c
-updated: 2017-07-26T12:10:25.6313172-05:00
+updated: 2017-07-30T06:56:59.170962642Z
 imports:
 - name: github.com/agl/ed25519
   version: 278e1ec8e8a6e017cd07577924d6766039146ced
@@ -51,7 +51,7 @@ imports:
 - name: github.com/decred/dcrrpcclient
   version: a634f8dff51115b4122664efbed1a9327063dcf0
 - name: github.com/decred/dcrutil
-  version: 58e046aab848365647c44b295f4fab078fbc3392
+  version: c12bb391708716e0420d02cf9e7e28ba50bba062
   subpackages:
   - base58
   - bloom

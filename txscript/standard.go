@@ -1198,9 +1198,12 @@ func ExtractPkScriptAddrs(version uint16, pkScript []byte,
 		// Therefore the pubkey is the first item on the stack.
 		// Skip the pubkey if it's invalid for some reason.
 		requiredSigs = 1
-		addr, err := dcrutil.NewAddressSecpPubKey(pops[0].data, chainParams)
+		pk, err := chainec.Secp256k1.ParsePubKey(pops[0].data)
 		if err == nil {
-			addrs = append(addrs, addr)
+			addr, err := dcrutil.NewAddressSecpPubKeyCompressed(pk, chainParams)
+			if err == nil {
+				addrs = append(addrs, addr)
+			}
 		}
 
 	case PubkeyAltTy:
@@ -1291,10 +1294,13 @@ func ExtractPkScriptAddrs(version uint16, pkScript []byte,
 		// Extract the public keys while skipping any that are invalid.
 		addrs = make([]dcrutil.Address, 0, numPubKeys)
 		for i := 0; i < numPubKeys; i++ {
-			addr, err := dcrutil.NewAddressSecpPubKey(pops[i+1].data,
-				chainParams)
+			pubkey, err := chainec.Secp256k1.ParsePubKey(pops[i+1].data)
 			if err == nil {
-				addrs = append(addrs, addr)
+				addr, err := dcrutil.NewAddressSecpPubKeyCompressed(pubkey,
+					chainParams)
+				if err == nil {
+					addrs = append(addrs, addr)
+				}
 			}
 		}
 

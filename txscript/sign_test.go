@@ -670,9 +670,10 @@ func TestSignTxOutput(t *testing.T) {
 
 				keyDB, _, _, err := secp256k1.GenerateKey(rand.Reader)
 				key, pk := secp256k1.PrivKeyFromBytes(keyDB)
-				pkBytes := pk.SerializeUncompressed()
-
-				address, err := dcrutil.NewAddressSecpPubKey(pkBytes,
+				// For address generation, consensus rules require using
+				// a compressed public key. Look up ExtractPkScriptAddrs
+				// for more details
+				address, err := dcrutil.NewAddressSecpPubKeyCompressed(pk,
 					testingParams)
 				if err != nil {
 					t.Errorf("failed to make address for %s: %v",
@@ -722,8 +723,10 @@ func TestSignTxOutput(t *testing.T) {
 				case secp:
 					keyDB, _, _, _ = secp256k1.GenerateKey(rand.Reader)
 					key, pk = secp256k1.PrivKeyFromBytes(keyDB)
-					pkBytes = pk.SerializeUncompressed()
-					address, err = dcrutil.NewAddressSecpPubKey(pkBytes,
+					// For address generation, consensus rules require using
+					// a compressed public key. Look up ExtractPkScriptAddrs
+					// for more details
+					address, err = dcrutil.NewAddressSecpPubKeyCompressed(pk,
 						testingParams)
 					if err != nil {
 						t.Errorf("failed to make address for %s: %v",
@@ -813,8 +816,10 @@ func TestSignTxOutput(t *testing.T) {
 				case secp:
 					keyDB, _, _, _ = secp256k1.GenerateKey(rand.Reader)
 					key, pk = secp256k1.PrivKeyFromBytes(keyDB)
-					pkBytes = pk.SerializeCompressed()
-					address, err = dcrutil.NewAddressSecpPubKey(pkBytes,
+					// For address generation, consensus rules require using
+					// a compressed public key. Look up ExtractPkScriptAddrs
+					// for more details
+					address, err = dcrutil.NewAddressSecpPubKeyCompressed(pk,
 						testingParams)
 					if err != nil {
 						t.Errorf("failed to make address for %s: %v",
@@ -889,8 +894,7 @@ func TestSignTxOutput(t *testing.T) {
 				case secp:
 					keyDB, _, _, _ = secp256k1.GenerateKey(rand.Reader)
 					key, pk = secp256k1.PrivKeyFromBytes(keyDB)
-					pkBytes = pk.SerializeCompressed()
-					address, err = dcrutil.NewAddressSecpPubKey(pkBytes,
+					address, err = dcrutil.NewAddressSecpPubKeyCompressed(pk,
 						testingParams)
 					if err != nil {
 						t.Errorf("failed to make address for %s: %v",
@@ -1324,8 +1328,10 @@ func TestSignTxOutput(t *testing.T) {
 				case secp:
 					keyDB, _, _, _ = secp256k1.GenerateKey(rand.Reader)
 					key, pk = secp256k1.PrivKeyFromBytes(keyDB)
-					pkBytes = pk.SerializeUncompressed()
-					address, err = dcrutil.NewAddressSecpPubKey(pkBytes,
+					// For address generation, consensus rules require using
+					// a compressed public key. Look up ExtractPkScriptAddrs
+					// for more details
+					address, err = dcrutil.NewAddressSecpPubKeyCompressed(pk,
 						testingParams)
 					if err != nil {
 						t.Errorf("failed to make address for %s: %v",
@@ -1419,8 +1425,10 @@ func TestSignTxOutput(t *testing.T) {
 				case secp:
 					keyDB, _, _, _ = secp256k1.GenerateKey(rand.Reader)
 					key, pk = secp256k1.PrivKeyFromBytes(keyDB)
-					pkBytes = pk.SerializeUncompressed()
-					address, err = dcrutil.NewAddressSecpPubKey(pkBytes,
+					// For address generation, consensus rules require using
+					// a compressed public key. Look up ExtractPkScriptAddrs
+					// for more details
+					address, err = dcrutil.NewAddressSecpPubKeyCompressed(pk,
 						testingParams)
 					if err != nil {
 						t.Errorf("failed to make address for %s: %v",
@@ -1529,8 +1537,7 @@ func TestSignTxOutput(t *testing.T) {
 				case secp:
 					keyDB, _, _, _ = secp256k1.GenerateKey(rand.Reader)
 					key, pk = secp256k1.PrivKeyFromBytes(keyDB)
-					pkBytes = pk.SerializeCompressed()
-					address, err = dcrutil.NewAddressSecpPubKey(pkBytes,
+					address, err = dcrutil.NewAddressSecpPubKeyCompressed(pk,
 						testingParams)
 					if err != nil {
 						t.Errorf("failed to make address for %s: %v",
@@ -1624,8 +1631,7 @@ func TestSignTxOutput(t *testing.T) {
 				case secp:
 					keyDB, _, _, _ = secp256k1.GenerateKey(rand.Reader)
 					key, pk = secp256k1.PrivKeyFromBytes(keyDB)
-					pkBytes = pk.SerializeCompressed()
-					address, err = dcrutil.NewAddressSecpPubKey(pkBytes,
+					address, err = dcrutil.NewAddressSecpPubKeyCompressed(pk,
 						testingParams)
 					if err != nil {
 						t.Errorf("failed to make address for %s: %v",
@@ -1725,9 +1731,8 @@ func TestSignTxOutput(t *testing.T) {
 
 			keyDB1, _, _, err := secp256k1.GenerateKey(rand.Reader)
 			key1, pk1 := secp256k1.PrivKeyFromBytes(keyDB1)
-			pk1Bytes := pk1.SerializeUncompressed()
 
-			address1, err := dcrutil.NewAddressSecpPubKey(pk1Bytes,
+			address1, err := dcrutil.NewAddressSecpPubKeyCompressed(pk1,
 				testingParams)
 			if err != nil {
 				t.Errorf("failed to make address for %s: %v",
@@ -1737,9 +1742,8 @@ func TestSignTxOutput(t *testing.T) {
 
 			keyDB2, _, _, err := secp256k1.GenerateKey(rand.Reader)
 			key2, pk2 := secp256k1.PrivKeyFromBytes(keyDB2)
-			pk2Bytes := pk2.SerializeUncompressed()
 
-			address2, err := dcrutil.NewAddressSecpPubKey(pk2Bytes,
+			address2, err := dcrutil.NewAddressSecpPubKeyCompressed(pk2,
 				testingParams)
 			if err != nil {
 				t.Errorf("failed to make address 2 for %s: %v",
@@ -1802,9 +1806,8 @@ func TestSignTxOutput(t *testing.T) {
 
 			keyDB1, _, _, err := secp256k1.GenerateKey(rand.Reader)
 			key1, pk1 := secp256k1.PrivKeyFromBytes(keyDB1)
-			pk1Bytes := pk1.SerializeUncompressed()
 
-			address1, err := dcrutil.NewAddressSecpPubKey(pk1Bytes,
+			address1, err := dcrutil.NewAddressSecpPubKeyCompressed(pk1,
 				testingParams)
 			if err != nil {
 				t.Errorf("failed to make address for %s: %v",
@@ -1814,9 +1817,8 @@ func TestSignTxOutput(t *testing.T) {
 
 			keyDB2, _, _, err := secp256k1.GenerateKey(rand.Reader)
 			key2, pk2 := secp256k1.PrivKeyFromBytes(keyDB2)
-			pk2Bytes := pk2.SerializeUncompressed()
 
-			address2, err := dcrutil.NewAddressSecpPubKey(pk2Bytes,
+			address2, err := dcrutil.NewAddressSecpPubKeyCompressed(pk2,
 				testingParams)
 			if err != nil {
 				t.Errorf("failed to make address 2 for %s: %v",
@@ -1899,9 +1901,8 @@ func TestSignTxOutput(t *testing.T) {
 
 			keyDB1, _, _, err := secp256k1.GenerateKey(rand.Reader)
 			key1, pk1 := secp256k1.PrivKeyFromBytes(keyDB1)
-			pk1Bytes := pk1.SerializeUncompressed()
 
-			address1, err := dcrutil.NewAddressSecpPubKey(pk1Bytes,
+			address1, err := dcrutil.NewAddressSecpPubKeyCompressed(pk1,
 				testingParams)
 			if err != nil {
 				t.Errorf("failed to make address for %s: %v",
@@ -1911,9 +1912,7 @@ func TestSignTxOutput(t *testing.T) {
 
 			keyDB2, _, _, err := secp256k1.GenerateKey(rand.Reader)
 			key2, pk2 := secp256k1.PrivKeyFromBytes(keyDB2)
-			pk2Bytes := pk2.SerializeUncompressed()
-
-			address2, err := dcrutil.NewAddressSecpPubKey(pk2Bytes,
+			address2, err := dcrutil.NewAddressSecpPubKeyCompressed(pk2,
 				testingParams)
 			if err != nil {
 				t.Errorf("failed to make address 2 for %s: %v",
