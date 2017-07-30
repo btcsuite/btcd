@@ -456,8 +456,6 @@ func NewAddressSecpPubKey(serializedPubKey []byte,
 		pkFormat = PKFHybrid
 	}
 
-	pkFormat = PKFCompressed
-
 	return &AddressSecpPubKey{
 		net:          net,
 		pubKeyFormat: pkFormat,
@@ -564,6 +562,11 @@ func (a *AddressSecpPubKey) DSA(net *chaincfg.Params) int {
 // Net returns the network for the address.
 func (a *AddressSecpPubKey) Net() *chaincfg.Params {
 	return a.net
+}
+
+// NewAddressSecpPubKeyCompressed creates a new address using a compressed public key
+func NewAddressSecpPubKeyCompressed(pubkey chainec.PublicKey, params *chaincfg.Params) (*AddressSecpPubKey, error) {
+	return NewAddressSecpPubKey(pubkey.SerializeCompressed(), params)
 }
 
 // AddressEdwardsPubKey is an Address for an Ed25519 pay-to-pubkey transaction.
