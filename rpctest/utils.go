@@ -58,7 +58,7 @@ func syncMempools(nodes []*Harness) error {
 		// If all nodes have an identical mempool with respect to the
 		// first node, then we're done. Otherwise, drop back to the top
 		// of the loop and retry after a short wait period.
-		for _, node := range nodes[:1] {
+		for _, node := range nodes[1:] {
 			nodePool, err := node.Node.GetRawMempool(dcrjson.GRMAll)
 			if err != nil {
 				return err
