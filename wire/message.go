@@ -1,5 +1,5 @@
 // Copyright (c) 2013-2016 The btcsuite developers
-// Copyright (c) 2015-2016 The Decred developers
+// Copyright (c) 2015-2017 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -53,6 +53,7 @@ const (
 	CmdMerkleBlock    = "merkleblock"
 	CmdReject         = "reject"
 	CmdSendHeaders    = "sendheaders"
+	CmdFeeFilter      = "feefilter"
 )
 
 // Message is an interface that describes a decred message.  A type that
@@ -142,6 +143,9 @@ func makeEmptyMessage(command string) (Message, error) {
 
 	case CmdSendHeaders:
 		msg = &MsgSendHeaders{}
+
+	case CmdFeeFilter:
+		msg = &MsgFeeFilter{}
 
 	default:
 		return nil, fmt.Errorf("unhandled command [%s]", command)

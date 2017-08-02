@@ -1,5 +1,5 @@
 // Copyright (c) 2013-2016 The btcsuite developers
-// Copyright (c) 2015-2016 The Decred developers
+// Copyright (c) 2015-2017 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -17,7 +17,7 @@ const (
 	InitialProcotolVersion uint32 = 1
 
 	// ProtocolVersion is the latest protocol version this package supports.
-	ProtocolVersion uint32 = 4
+	ProtocolVersion uint32 = 5
 
 	// BIP0111Version is the protocol version which added the SFNodeBloom
 	// service flag.
@@ -30,6 +30,10 @@ const (
 	// MaxBlockSizeVersion is the protocol version which increased the
 	// original blocksize.
 	MaxBlockSizeVersion uint32 = 4
+
+	// FeeFilterVersion is the protocol version which added a new
+	// feefilter message.
+	FeeFilterVersion uint32 = 5
 )
 
 // ServiceFlag identifies services supported by a decred peer.

@@ -1,5 +1,5 @@
 // Copyright (c) 2015-2016 The btcsuite developers
-// Copyright (c) 2016 The Decred developers
+// Copyright (c) 2016-2017 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -361,6 +361,9 @@ func TestPeerListeners(t *testing.T) {
 			OnGetHeaders: func(p *peer.Peer, msg *wire.MsgGetHeaders) {
 				ok <- msg
 			},
+			OnFeeFilter: func(p *peer.Peer, msg *wire.MsgFeeFilter) {
+				ok <- msg
+			},
 			OnFilterAdd: func(p *peer.Peer, msg *wire.MsgFilterAdd) {
 				ok <- msg
 			},
@@ -481,6 +484,10 @@ func TestPeerListeners(t *testing.T) {
 		{
 			"OnGetHeaders",
 			wire.NewMsgGetHeaders(),
+		},
+		{
+			"OnFeeFilter",
+			wire.NewMsgFeeFilter(15000),
 		},
 		{
 			"OnFilterAdd",
@@ -664,6 +671,7 @@ func TestOutboundPeer(t *testing.T) {
 	p2.QueueMessage(wire.NewMsgMemPool(), nil)
 	p2.QueueMessage(wire.NewMsgGetData(), nil)
 	p2.QueueMessage(wire.NewMsgGetHeaders(), nil)
+	p2.QueueMessage(wire.NewMsgFeeFilter(20000), nil)
 
 	p2.Disconnect()
 }

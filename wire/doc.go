@@ -1,5 +1,5 @@
 // Copyright (c) 2013-2016 The btcsuite developers
-// Copyright (c) 2015-2016 The Decred developers
+// Copyright (c) 2015-2017 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -157,5 +157,6 @@ This package includes spec changes outlined by the following BIPs:
 	BIP0037 (https://github.com/bitcoin/bips/blob/master/bip-0037.mediawiki)
 	BIP0111	(https://github.com/bitcoin/bips/blob/master/bip-0111.mediawiki)
 	BIP0130 (https://github.com/bitcoin/bips/blob/master/bip-0130.mediawiki)
+	BIP0133 (https://github.com/bitcoin/bips/blob/master/bip-0133.mediawiki)
 */
 package wire

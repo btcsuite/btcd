@@ -1,5 +1,5 @@
 // Copyright (c) 2013-2016 The btcsuite developers
-// Copyright (c) 2016 The Decred developers
+// Copyright (c) 2016-2017 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -28,7 +28,7 @@ import (
 
 const (
 	// MaxProtocolVersion is the max protocol version the peer supports.
-	MaxProtocolVersion = wire.MaxBlockSizeVersion
+	MaxProtocolVersion = wire.FeeFilterVersion
 
 	// outputBufferSize is the number of elements the output channels use.
 	outputBufferSize = 5000
@@ -146,6 +146,9 @@ type MessageListeners struct {
 	// OnGetHeaders is invoked when a peer receives a getheaders wire
 	// message.
 	OnGetHeaders func(p *Peer, msg *wire.MsgGetHeaders)
+
+	// OnFeeFilter is invoked when a peer receives a feefilter wire message.
+	OnFeeFilter func(p *Peer, msg *wire.MsgFeeFilter)
 
 	// OnFilterAdd is invoked when a peer receives a filteradd wire message.
 	OnFilterAdd func(p *Peer, msg *wire.MsgFilterAdd)
@@ -1489,6 +1492,11 @@ out:
 		case *wire.MsgGetHeaders:
 			if p.cfg.Listeners.OnGetHeaders != nil {
 				p.cfg.Listeners.OnGetHeaders(p, msg)
+			}
+
+		case *wire.MsgFeeFilter:
+			if p.cfg.Listeners.OnFeeFilter != nil {
+				p.cfg.Listeners.OnFeeFilter(p, msg)
 			}
 
 		case *wire.MsgFilterAdd:
