@@ -70,16 +70,8 @@ func newConfig(prefix, certFile, keyFile string, extra []string) (*nodeConfig, e
 // temporary data, and log directories which must be cleaned up with a call to
 // cleanup().
 func (n *nodeConfig) setDefaults() error {
-	datadir, err := ioutil.TempDir("", n.prefix+"-data")
-	if err != nil {
-		return err
-	}
-	n.dataDir = datadir
-	logdir, err := ioutil.TempDir("", n.prefix+"-logs")
-	if err != nil {
-		return err
-	}
-	n.logDir = logdir
+	n.dataDir = filepath.Join(n.prefix, "data")
+	n.logDir = filepath.Join(n.prefix, "logs")
 	cert, err := ioutil.ReadFile(n.certFile)
 	if err != nil {
 		return err
@@ -165,21 +157,6 @@ func (n *nodeConfig) String() string {
 	return n.prefix
 }
 
-// cleanup removes the tmp data and log directories.
-func (n *nodeConfig) cleanup() error {
-	dirs := []string{
-		n.logDir,
-		n.dataDir,
-	}
-	var err error
-	for _, dir := range dirs {
-		if err = os.RemoveAll(dir); err != nil {
-			log.Printf("Cannot remove dir %s: %v", dir, err)
-		}
-	}
-	return err
-}
-
 // node houses the necessary state required to configure, launch, and manage a
 // dcrd process.
 type node struct {
@@ -212,8 +189,7 @@ func (n *node) start() error {
 		return err
 	}
 
-	pid, err := os.Create(filepath.Join(n.dataDir,
-		fmt.Sprintf("%s.pid", n.config)))
+	pid, err := os.Create(filepath.Join(n.config.String(), "dcrd.pid"))
 	if err != nil {
 		return err
 	}
@@ -254,10 +230,11 @@ func (n *node) cleanup() error {
 		if err := os.Remove(n.pidFile); err != nil {
 			log.Printf("unable to remove file %s: %v", n.pidFile,
 				err)
+			return err
 		}
 	}
 
-	return n.config.cleanup()
+	return nil
 }
 
 // shutdown terminates the running dcrd process, and cleans up all

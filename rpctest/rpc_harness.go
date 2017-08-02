@@ -124,7 +124,7 @@ func New(activeNet *chaincfg.Params, handlers *dcrrpcclient.NotificationHandlers
 	miningAddr := fmt.Sprintf("--miningaddr=%s", wallet.coinbaseAddr)
 	extraArgs = append(extraArgs, miningAddr)
 
-	config, err := newConfig("rpctest", certFile, keyFile, extraArgs)
+	config, err := newConfig(nodeTestData, certFile, keyFile, extraArgs)
 	if err != nil {
 		return nil, err
 	}
