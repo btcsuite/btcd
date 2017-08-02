@@ -231,6 +231,18 @@ func TestNormalize(t *testing.T) {
 			[10]uint32{0xfffffc2f, 0xffffff80, 0xffffffc0, 0xffffffc0, 0xffffffc0, 0xffffffc0, 0xffffffc0, 0xffffffc0, 0xffffffc0, 0x3fffc0},
 			[10]uint32{0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x000000},
 		},
+		// Prime larger than P where both first and second words are larger
+		// than P's first and second words
+		{
+			[10]uint32{0xfffffc30, 0xffffff86, 0xffffffc0, 0xffffffc0, 0xffffffc0, 0xffffffc0, 0xffffffc0, 0xffffffc0, 0xffffffc0, 0x3fffc0},
+			[10]uint32{0x00000001, 0x00000006, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x000000},
+		},
+		// Prime larger than P where only the second word is larger
+		// than P's second words.
+		{
+			[10]uint32{0xfffffc2a, 0xffffff87, 0xffffffc0, 0xffffffc0, 0xffffffc0, 0xffffffc0, 0xffffffc0, 0xffffffc0, 0xffffffc0, 0x3fffc0},
+			[10]uint32{0x03fffffb, 0x00000006, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x000000},
+		},
 		// 2^256 - 1
 		{
 			[10]uint32{0xffffffff, 0xffffffc0, 0xffffffc0, 0xffffffc0, 0xffffffc0, 0xffffffc0, 0xffffffc0, 0xffffffc0, 0xffffffc0, 0x3fffc0},
@@ -540,6 +552,8 @@ func TestAdd2(t *testing.T) {
 		{"fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2e", "1", "0"},
 		// secp256k1 prime + 1
 		{"fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f", "1", "1"},
+		// close but over the secp256k1 prime
+		{"fffffffffffffffffffffffffffffffffffffffffffffffffffffff000000000", "f1ffff000", "1ffff3d1"},
 		// Random samples.
 		{
 			"ad82b8d1cc136e23e9fd77fe2c7db1fe5a2ecbfcbde59ab3529758334f862d28",
@@ -652,6 +666,12 @@ func TestMul(t *testing.T) {
 		{"1", "0", "0"},
 		{"0", "1", "0"},
 		{"1", "1", "1"},
+		// slightly over prime
+		{
+			"ffffffffffffffffffffffffffffffffffffffffffffffffffffffff1ffff",
+			"1000",
+			"1ffff3d1",
+		},
 		// secp256k1 prime-1 * 2
 		{
 			"fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2e",

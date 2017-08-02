@@ -1,5 +1,5 @@
 // Copyright (c) 2013-2014 The btcsuite developers
-// Copyright (c) 2015-2016 The Decred developers
+// Copyright (c) 2015-2017 The Decred developers
 // Copyright (c) 2013-2014 Dave Collins
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
@@ -91,13 +91,11 @@ const (
 	fieldMSBMask = (1 << fieldMSBBits) - 1
 
 	// fieldPrimeWordZero is word zero of the secp256k1 prime in the
-	// internal field representation.  It is used during modular reduction
-	// and negation.
+	// internal field representation.  It is used during negation.
 	fieldPrimeWordZero = 0x3fffc2f
 
 	// fieldPrimeWordOne is word one of the secp256k1 prime in the
-	// internal field representation.  It is used during modular reduction
-	// and negation.
+	// internal field representation.  It is used during negation.
 	fieldPrimeWordOne = 0x3ffffbf
 )
 
