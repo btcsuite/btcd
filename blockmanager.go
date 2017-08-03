@@ -406,10 +406,6 @@ type blockManager struct {
 	requestedBlocks     map[chainhash.Hash]struct{}
 	requestedEverBlocks map[chainhash.Hash]uint8
 	progressLogger      *blockProgressLogger
-	receivedLogBlocks   int64
-	receivedLogTx       int64
-	lastBlockLogTime    time.Time
-	processingReqs      bool
 	syncPeer            *serverPeer
 	msgChan             chan interface{}
 	chainState          chainState
@@ -695,42 +691,6 @@ func (b *blockManager) handleDonePeerMsg(peers *list.List, sp *serverPeer) {
 		}
 		b.startSync(peers)
 	}
-}
-
-// logBlockHeight logs a new block height as an information message to show
-// progress to the user.  In order to prevent spam, it limits logging to one
-// message every 10 seconds with duration and totals included.
-func (b *blockManager) logBlockHeight(block *dcrutil.Block) {
-	b.receivedLogBlocks++
-	b.receivedLogTx += int64(len(block.MsgBlock().Transactions)) +
-		int64(len(block.MsgBlock().STransactions))
-
-	now := time.Now()
-	duration := now.Sub(b.lastBlockLogTime)
-	if duration < time.Second*10 {
-		return
-	}
-
-	// Truncate the duration to 10s of milliseconds.
-	durationMillis := int64(duration / time.Millisecond)
-	tDuration := 10 * time.Millisecond * time.Duration(durationMillis/10)
-
-	// Log information about new block height.
-	blockStr := "blocks"
-	if b.receivedLogBlocks == 1 {
-		blockStr = "block"
-	}
-	txStr := "transactions"
-	if b.receivedLogTx == 1 {
-		txStr = "transaction"
-	}
-	bmgrLog.Infof("Processed %d %s in the last %s (%d %s, height %d, %s)",
-		b.receivedLogBlocks, blockStr, tDuration, b.receivedLogTx,
-		txStr, block.Height(), block.MsgBlock().Header.Timestamp)
-
-	b.receivedLogBlocks = 0
-	b.receivedLogTx = 0
-	b.lastBlockLogTime = now
 }
 
 // handleTxMsg handles transaction messages from all peers.
@@ -2601,7 +2561,6 @@ func newBlockManager(s *server, indexManager blockchain.IndexManager) (*blockMan
 		requestedBlocks:     make(map[chainhash.Hash]struct{}),
 		requestedEverBlocks: make(map[chainhash.Hash]uint8),
 		progressLogger:      newBlockProgressLogger("Processed", bmgrLog),
-		lastBlockLogTime:    time.Now(),
 		msgChan:             make(chan interface{}, cfg.MaxPeers*3),
 		headerList:          list.New(),
 		AggressiveMining:    !cfg.NonAggressive,
