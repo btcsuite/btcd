@@ -215,7 +215,7 @@ being provided here.
 Here’s a model Git commit message:
 
 ```
-Short (50 chars or less) summary of changes
+prefix: Short summary of changes (max 50 chars)
 
 More detailed explanatory text, if necessary.  Wrap it to about 72
 characters or so.  In some contexts, the first line is treated as the
@@ -235,6 +235,18 @@ Further paragraphs come after blank lines.
   single space, with blank lines in between, but conventions vary here
 - Use a hanging indent
 ```
+
+The commit prefix is always of the form `prefix: `. It is for the sole  
+purpose of indicating which package or component was touched in a  
+commit.  
+
+Here is how the right prefix for a commit is chosen.
+- If a commit modifies a component in the main package  
+  (eg. `blocklogger`) use the component name as the commit prefix.
+- If a commit modifies a component in any of the packages besides the main  
+  package use the package name as the commit prefix (eg. `dcrjson`).
+- If a commit modifies components in multiple packages use the word `multi`  
+  as the commit prefix.
 
 Here are some of the reasons why wrapping your commit messages to 72 columns is
 a good thing.
