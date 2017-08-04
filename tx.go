@@ -1,5 +1,5 @@
 // Copyright (c) 2013-2016 The btcsuite developers
-// Copyright (c) 2015-2016 The Decred developers
+// Copyright (c) 2015-2017 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -193,33 +193,6 @@ func NewTxDeepTxIns(msgTx *wire.MsgTx) *Tx {
 		txTree:  wire.TxTreeUnknown,
 		txIndex: TxIndexUnknown,
 	}
-}
-
-// NewTxFromBytesLegacy returns a new instance of a transaction given the
-// serialized bytes in legacy Bitcoin format. Mostly for tests.  See Tx.
-func NewTxFromBytesLegacy(serializedTx []byte) (*Tx, error) {
-	br := bytes.NewReader(serializedTx)
-	return NewTxFromReaderLegacy(br)
-}
-
-// NewTxFromReaderLegacy returns a new instance of a transaction given a
-// Reader to deserialize the transaction.  See Tx.
-func NewTxFromReaderLegacy(r io.Reader) (*Tx, error) {
-	// Deserialize the bytes into a MsgTx.
-	var msgTx wire.MsgTx
-	err := msgTx.LegacyDeserialize(r)
-	if err != nil {
-		return nil, err
-	}
-
-	t := Tx{
-		hash:    msgTx.TxHash(),
-		msgTx:   &msgTx,
-		txTree:  wire.TxTreeUnknown,
-		txIndex: TxIndexUnknown,
-	}
-
-	return &t, nil
 }
 
 // NewTxFromBytes returns a new instance of a transaction given the
