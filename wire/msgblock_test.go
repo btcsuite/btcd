@@ -1,5 +1,5 @@
 // Copyright (c) 2013-2016 The btcsuite developers
-// Copyright (c) 2015-2016 The Decred developers
+// Copyright (c) 2015-2017 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -314,9 +314,8 @@ func TestBlockSerialize(t *testing.T) {
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
 		// Serialize the block.
-		var buf bytes.Buffer
-		buf.Grow(test.in.SerializeSize())
-		err := test.in.Serialize(&buf)
+		buf := bytes.NewBuffer(make([]byte, 0, test.in.SerializeSize()))
+		err := test.in.Serialize(buf)
 		if err != nil {
 			t.Errorf("Serialize #%d error %v", i, err)
 			continue
@@ -600,6 +599,7 @@ var testBlock = MsgBlock{
 	},
 	Transactions: []*MsgTx{
 		{
+			SerType: TxSerializeFull,
 			Version: 1,
 			TxIn: []*TxIn{
 				{
@@ -642,6 +642,7 @@ var testBlock = MsgBlock{
 	},
 	STransactions: []*MsgTx{
 		{
+			SerType: TxSerializeFull,
 			Version: 1,
 			TxIn: []*TxIn{
 				{

@@ -1,5 +1,5 @@
 // Copyright (c) 2015-2016 The btcsuite developers
-// Copyright (c) 2016 The Decred developers
+// Copyright (c) 2016-2017 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -264,7 +264,7 @@ type spentTxOut struct {
 	pkScript      []byte       // The public key script for the output.
 	stakeExtra    []byte       // Extra information for the staking system.
 	amount        int64        // The amount of the output.
-	txVersion     int32        // The txVersion of creating tx.
+	txVersion     uint16       // The version of creating tx.
 	height        uint32       // Height of the the block containing the tx.
 	index         uint32       // Index in the block of the transaction.
 	scriptVersion uint16       // The version of the scripting language.
@@ -393,7 +393,7 @@ func decodeSpentTxOut(serialized []byte, stxo *spentTxOut, amount int64,
 				"after version")
 		}
 
-		stxo.txVersion = int32(txVersion)
+		stxo.txVersion = uint16(txVersion)
 
 		if stxo.txType == stake.TxTypeSStx {
 			sz := readDeserializeSizeOfMinimalOutputs(serialized[offset:])
@@ -837,7 +837,7 @@ func deserializeUtxoEntry(serialized []byte) (*UtxoEntry, error) {
 
 	// Create a new utxo entry with the details deserialized above to house
 	// all of the utxos.
-	entry := newUtxoEntry(int32(version), uint32(blockHeight),
+	entry := newUtxoEntry(uint16(version), uint32(blockHeight),
 		uint32(blockIndex), isCoinBase, hasExpiry, txType)
 
 	// Add sparse output for unspent outputs 0 and 1 as needed based on the

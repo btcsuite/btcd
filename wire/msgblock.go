@@ -107,7 +107,7 @@ func (msg *MsgBlock) BtcDecode(r io.Reader, pver uint32) error {
 
 	msg.Transactions = make([]*MsgTx, 0, txCount)
 	for i := uint64(0); i < txCount; i++ {
-		tx := MsgTx{}
+		var tx MsgTx
 		err := tx.BtcDecode(r, pver)
 		if err != nil {
 			return err
@@ -131,7 +131,7 @@ func (msg *MsgBlock) BtcDecode(r io.Reader, pver uint32) error {
 
 	msg.STransactions = make([]*MsgTx, 0, stakeTxCount)
 	for i := uint64(0); i < stakeTxCount; i++ {
-		tx := MsgTx{}
+		var tx MsgTx
 		err := tx.BtcDecode(r, pver)
 		if err != nil {
 			return err
@@ -202,7 +202,7 @@ func (msg *MsgBlock) DeserializeTxLoc(r *bytes.Buffer) ([]TxLoc, []TxLoc, error)
 	txLocs := make([]TxLoc, txCount)
 	for i := uint64(0); i < txCount; i++ {
 		txLocs[i].TxStart = fullLen - r.Len()
-		tx := MsgTx{}
+		var tx MsgTx
 		err := tx.Deserialize(r)
 		if err != nil {
 			return nil, nil, err
@@ -234,7 +234,7 @@ func (msg *MsgBlock) DeserializeTxLoc(r *bytes.Buffer) ([]TxLoc, []TxLoc, error)
 	sTxLocs := make([]TxLoc, stakeTxCount)
 	for i := uint64(0); i < stakeTxCount; i++ {
 		sTxLocs[i].TxStart = fullLen - r.Len()
-		tx := MsgTx{}
+		var tx MsgTx
 		err := tx.Deserialize(r)
 		if err != nil {
 			return nil, nil, err
@@ -301,14 +301,12 @@ func (msg *MsgBlock) Serialize(w io.Writer) error {
 
 // Bytes returns the serialized form of the block in bytes.
 func (msg *MsgBlock) Bytes() ([]byte, error) {
-	// Serialize the MsgTx.
-	var w bytes.Buffer
-	w.Grow(msg.SerializeSize())
-	err := msg.Serialize(&w)
+	buf := bytes.NewBuffer(make([]byte, 0, msg.SerializeSize()))
+	err := msg.Serialize(buf)
 	if err != nil {
 		return nil, err
 	}
-	return w.Bytes(), nil
+	return buf.Bytes(), nil
 }
 
 // SerializeSize returns the number of bytes it would take to serialize the

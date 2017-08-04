@@ -1,5 +1,5 @@
 // Copyright (c) 2013-2016 The btcsuite developers
-// Copyright (c) 2016 The Decred developers
+// Copyright (c) 2016-2017 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -332,6 +332,7 @@ func TestCheckTransactionStandard(t *testing.T) {
 		{
 			name: "Typical pay-to-pubkey-hash transaction",
 			tx: wire.MsgTx{
+				SerType:  wire.TxSerializeFull,
 				Version:  1,
 				TxIn:     []*wire.TxIn{&dummyTxIn},
 				TxOut:    []*wire.TxOut{&dummyTxOut},
@@ -343,7 +344,8 @@ func TestCheckTransactionStandard(t *testing.T) {
 		{
 			name: "Transaction serialize type not full",
 			tx: wire.MsgTx{
-				Version:  int32(uint32(wire.TxSerializeNoWitness)<<16 | 1),
+				SerType:  wire.TxSerializeNoWitness,
+				Version:  1,
 				TxIn:     []*wire.TxIn{&dummyTxIn},
 				TxOut:    []*wire.TxOut{&dummyTxOut},
 				LockTime: 0,
@@ -355,6 +357,7 @@ func TestCheckTransactionStandard(t *testing.T) {
 		{
 			name: "Transaction version too high",
 			tx: wire.MsgTx{
+				SerType:  wire.TxSerializeFull,
 				Version:  maxTxVersion + 1,
 				TxIn:     []*wire.TxIn{&dummyTxIn},
 				TxOut:    []*wire.TxOut{&dummyTxOut},
@@ -367,6 +370,7 @@ func TestCheckTransactionStandard(t *testing.T) {
 		{
 			name: "Transaction is not finalized",
 			tx: wire.MsgTx{
+				SerType: wire.TxSerializeFull,
 				Version: 1,
 				TxIn: []*wire.TxIn{{
 					PreviousOutPoint: dummyPrevOut,
@@ -383,6 +387,7 @@ func TestCheckTransactionStandard(t *testing.T) {
 		{
 			name: "Transaction size is too large",
 			tx: wire.MsgTx{
+				SerType: wire.TxSerializeFull,
 				Version: 1,
 				TxIn:    []*wire.TxIn{&dummyTxIn},
 				TxOut: []*wire.TxOut{{
@@ -399,6 +404,7 @@ func TestCheckTransactionStandard(t *testing.T) {
 		{
 			name: "Signature script size is too large",
 			tx: wire.MsgTx{
+				SerType: wire.TxSerializeFull,
 				Version: 1,
 				TxIn: []*wire.TxIn{{
 					PreviousOutPoint: dummyPrevOut,
@@ -416,6 +422,7 @@ func TestCheckTransactionStandard(t *testing.T) {
 		{
 			name: "Signature script that does more than push data",
 			tx: wire.MsgTx{
+				SerType: wire.TxSerializeFull,
 				Version: 1,
 				TxIn: []*wire.TxIn{{
 					PreviousOutPoint: dummyPrevOut,
@@ -433,6 +440,7 @@ func TestCheckTransactionStandard(t *testing.T) {
 		{
 			name: "Valid but non standard public key script",
 			tx: wire.MsgTx{
+				SerType: wire.TxSerializeFull,
 				Version: 1,
 				TxIn:    []*wire.TxIn{&dummyTxIn},
 				TxOut: []*wire.TxOut{{
@@ -448,6 +456,7 @@ func TestCheckTransactionStandard(t *testing.T) {
 		{
 			name: "More than four nulldata outputs",
 			tx: wire.MsgTx{
+				SerType: wire.TxSerializeFull,
 				Version: 1,
 				TxIn:    []*wire.TxIn{&dummyTxIn},
 				TxOut: []*wire.TxOut{{
@@ -475,6 +484,7 @@ func TestCheckTransactionStandard(t *testing.T) {
 		{
 			name: "Dust output",
 			tx: wire.MsgTx{
+				SerType: wire.TxSerializeFull,
 				Version: 1,
 				TxIn:    []*wire.TxIn{&dummyTxIn},
 				TxOut: []*wire.TxOut{{
@@ -490,6 +500,7 @@ func TestCheckTransactionStandard(t *testing.T) {
 		{
 			name: "One nulldata output with 0 amount (standard)",
 			tx: wire.MsgTx{
+				SerType: wire.TxSerializeFull,
 				Version: 1,
 				TxIn:    []*wire.TxIn{&dummyTxIn},
 				TxOut: []*wire.TxOut{{

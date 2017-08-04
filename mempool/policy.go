@@ -350,21 +350,17 @@ func checkTransactionStandard(tx *dcrutil.Tx, txType stake.TxType, height int64,
 	timeSource blockchain.MedianTimeSource, minRelayTxFee dcrutil.Amount,
 	maxTxVersion uint16) error {
 
-	// The transaction must be a currently supported version.
-	//
-	// The version includes the real transaction version in the lower 16
-	// bits and the transaction serialize type as the upper 16 bits.
+	// The transaction must be a currently supported version and serialize
+	// type.
 	msgTx := tx.MsgTx()
-	serType := wire.TxSerializeType(uint32(msgTx.Version) >> 16)
-	txVersion := uint16(uint32(msgTx.Version) & 0xffff)
-	if serType != wire.TxSerializeFull {
+	if msgTx.SerType != wire.TxSerializeFull {
 		str := fmt.Sprintf("transaction is not serialized with all "+
-			"required data -- type %v", serType)
+			"required data -- type %v", msgTx.SerType)
 		return txRuleError(wire.RejectNonstandard, str)
 	}
-	if txVersion > maxTxVersion || txVersion < 1 {
+	if msgTx.Version > maxTxVersion || msgTx.Version < 1 {
 		str := fmt.Sprintf("transaction version %d is not in the "+
-			"valid range of %d-%d", txVersion, 1, maxTxVersion)
+			"valid range of %d-%d", msgTx.Version, 1, maxTxVersion)
 		return txRuleError(wire.RejectNonstandard, str)
 	}
 

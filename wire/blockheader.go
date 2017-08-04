@@ -37,7 +37,7 @@ type BlockHeader struct {
 	// Merkle tree reference to hash of all stake transactions for the block.
 	StakeRoot chainhash.Hash
 
-	// Votes on the previous merkleroot and yet undecided parameters. (TODO)
+	// Votes on the previous merkleroot and yet undecided parameters.
 	VoteBits uint16
 
 	// Final state of the PRNG used for ticket selection in the lottery.
@@ -93,9 +93,8 @@ func (h *BlockHeader) BlockHash() chainhash.Hash {
 	// transactions.  Ignore the error returns since there is no way the
 	// encode could fail except being out of memory which would cause a
 	// run-time panic.
-	var buf bytes.Buffer
-	buf.Grow(MaxBlockHeaderPayload)
-	_ = writeBlockHeader(&buf, 0, h)
+	buf := bytes.NewBuffer(make([]byte, 0, MaxBlockHeaderPayload))
+	_ = writeBlockHeader(buf, 0, h)
 
 	return chainhash.HashH(buf.Bytes())
 }
@@ -145,17 +144,12 @@ func (h *BlockHeader) Serialize(w io.Writer) error {
 // Bytes returns a byte slice containing the serialized contents of the block
 // header.
 func (h *BlockHeader) Bytes() ([]byte, error) {
-	// Serialize the MsgBlock.
-	var w bytes.Buffer
-	w.Grow(MaxBlockHeaderPayload)
-	err := h.Serialize(&w)
+	buf := bytes.NewBuffer(make([]byte, 0, MaxBlockHeaderPayload))
+	err := h.Serialize(buf)
 	if err != nil {
 		return nil, err
 	}
-	serializedBlockHeader := w.Bytes()
-
-	// Cache the serialized bytes and return them.
-	return serializedBlockHeader, nil
+	return buf.Bytes(), nil
 }
 
 // NewBlockHeader returns a new BlockHeader using the provided previous block

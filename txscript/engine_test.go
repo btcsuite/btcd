@@ -33,6 +33,7 @@ func TestBadPC(t *testing.T) {
 	}
 	// tx with almost empty scripts.
 	tx := &wire.MsgTx{
+		SerType: wire.TxSerializeFull,
 		Version: 1,
 		TxIn: []*wire.TxIn{
 			{
@@ -93,6 +94,7 @@ func TestCheckErrorCondition(t *testing.T) {
 
 	// tx with almost empty scripts.
 	tx := &wire.MsgTx{
+		SerType: wire.TxSerializeFull,
 		Version: 1,
 		TxIn: []*wire.TxIn{
 			{
@@ -185,6 +187,7 @@ func TestInvalidFlagCombinations(t *testing.T) {
 
 	// tx with almost empty scripts.
 	tx := &wire.MsgTx{
+		SerType: wire.TxSerializeFull,
 		Version: 1,
 		TxIn: []*wire.TxIn{
 			{

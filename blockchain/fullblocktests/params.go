@@ -69,6 +69,7 @@ var (
 			Height:      uint32(0),
 		},
 		Transactions: []*wire.MsgTx{{
+			SerType: wire.TxSerializeFull,
 			Version: 1,
 			TxIn: []*wire.TxIn{{
 				PreviousOutPoint: wire.OutPoint{

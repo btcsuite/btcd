@@ -512,6 +512,8 @@ func TestIsPushOnlyScript(t *testing.T) {
 // TestCalcSignatureHash does some rudimentary testing of msg hash calculation.
 func TestCalcSignatureHash(t *testing.T) {
 	tx := new(wire.MsgTx)
+	tx.SerType = wire.TxSerializeFull
+	tx.Version = 1
 	for i := 0; i < 3; i++ {
 		txIn := new(wire.TxIn)
 		txIn.Sequence = 0xFFFFFFFF

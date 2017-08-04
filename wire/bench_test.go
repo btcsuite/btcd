@@ -1,5 +1,5 @@
 // Copyright (c) 2013-2016 The btcsuite developers
-// Copyright (c) 2015-2016 The Decred developers
+// Copyright (c) 2015-2017 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -19,6 +19,7 @@ import (
 // genesisCoinbaseTx is the coinbase transaction for the genesis blocks for
 // the main network, regression test network, and test network (version 3).
 var genesisCoinbaseTx = MsgTx{
+	SerType: TxSerializeFull,
 	Version: 1,
 	TxIn: []*TxIn{
 		{
@@ -83,6 +84,7 @@ var blockOne = MsgBlock{
 	},
 	Transactions: []*MsgTx{
 		{
+			SerType: TxSerializeFull,
 			Version: 1,
 			TxIn: []*TxIn{
 				{
@@ -316,7 +318,7 @@ func BenchmarkReadTxIn(b *testing.B) {
 	var txIn TxIn
 	for i := 0; i < b.N; i++ {
 		r.Seek(0, 0)
-		readTxInPrefix(r, 0, 0, &txIn)
+		readTxInPrefix(r, 0, TxSerializeFull, 0, &txIn)
 		scriptPool.Return(txIn.SignatureScript)
 	}
 }
@@ -373,7 +375,8 @@ func BenchmarkDeserializeTxSmall(b *testing.B) {
 // deserialize a very large transaction.
 func BenchmarkDeserializeTxLarge(b *testing.B) {
 	bigTx := new(MsgTx)
-	bigTx.Version = DefaultMsgTxVersion()
+	bigTx.SerType = TxSerializeFull
+	bigTx.Version = TxVersion
 	inputsLen := 1000
 	outputsLen := 2000
 	bigTx.TxIn = make([]*TxIn, inputsLen)

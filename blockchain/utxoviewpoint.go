@@ -1,4 +1,5 @@
 // Copyright (c) 2015-2016 The btcsuite developers
+// Copyright (c) 2015-2017 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -91,7 +92,7 @@ type UtxoEntry struct {
 	sparseOutputs map[uint32]*utxoOutput // Sparse map of unspent outputs.
 	stakeExtra    []byte                 // Extra data for the staking system.
 
-	txVersion int32        // The tx version of this tx.
+	txVersion uint16       // The tx version of this tx.
 	height    uint32       // Height of block containing tx.
 	index     uint32       // Index of containing tx in block.
 	txType    stake.TxType // The stake type of the transaction.
@@ -103,7 +104,7 @@ type UtxoEntry struct {
 
 // TxVersion returns the transaction version of the transaction the
 // utxo represents.
-func (entry *UtxoEntry) TxVersion() int32 {
+func (entry *UtxoEntry) TxVersion() uint16 {
 	return entry.txVersion
 }
 
@@ -260,7 +261,7 @@ func (entry *UtxoEntry) Clone() *UtxoEntry {
 
 // newUtxoEntry returns a new unspent transaction output entry with the provided
 // coinbase flag and block height ready to have unspent outputs added.
-func newUtxoEntry(txVersion int32, height uint32, index uint32, isCoinBase bool,
+func newUtxoEntry(txVersion uint16, height uint32, index uint32, isCoinBase bool,
 	hasExpiry bool, tt stake.TxType) *UtxoEntry {
 	return &UtxoEntry{
 		sparseOutputs: make(map[uint32]*utxoOutput),

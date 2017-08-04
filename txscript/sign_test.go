@@ -169,6 +169,7 @@ func TestSignTxOutput(t *testing.T) {
 		secSchnorr,
 	}
 	tx := &wire.MsgTx{
+		SerType: wire.TxSerializeFull,
 		Version: 1,
 		TxIn: []*wire.TxIn{
 			{

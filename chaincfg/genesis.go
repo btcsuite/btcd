@@ -17,6 +17,7 @@ import (
 // genesisCoinbaseTx is the coinbase transaction for the genesis blocks for
 // the main network.
 var genesisCoinbaseTx = wire.MsgTx{
+	SerType: wire.TxSerializeFull,
 	Version: 1,
 	TxIn: []*wire.TxIn{
 		{
@@ -91,6 +92,7 @@ var genesisHash = genesisBlock.BlockHash()
 // genesisCoinbaseTxLegacy is the coinbase transaction for the genesis block for
 // the test network.
 var genesisCoinbaseTxLegacy = wire.MsgTx{
+	SerType: wire.TxSerializeFull,
 	Version: 1,
 	TxIn: []*wire.TxIn{
 		{
@@ -162,6 +164,7 @@ var testNet2GenesisHash = testNet2GenesisBlock.BlockHash()
 // SimNet -------------------------------------------------------------------------
 
 var regTestGenesisCoinbaseTx = wire.MsgTx{
+	SerType: wire.TxSerializeFull,
 	Version: 1,
 	TxIn: []*wire.TxIn{
 		{

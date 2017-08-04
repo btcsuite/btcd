@@ -299,6 +299,7 @@ func TestSpendJournalSerialization(t *testing.T) {
 				stakeExtra:    nil,
 			}},
 			blockTxns: []*wire.MsgTx{{ // Coinbase omitted.
+				SerType: wire.TxSerializeFull,
 				Version: 1,
 				TxIn: []*wire.TxIn{{
 					PreviousOutPoint: wire.OutPoint{
@@ -351,6 +352,7 @@ func TestSpendJournalSerialization(t *testing.T) {
 				stakeExtra:    nil,
 			}},
 			blockTxns: []*wire.MsgTx{{ // Coinbase omitted.
+				SerType: wire.TxSerializeFull,
 				Version: 1,
 				TxIn: []*wire.TxIn{{
 					PreviousOutPoint: wire.OutPoint{
@@ -376,6 +378,7 @@ func TestSpendJournalSerialization(t *testing.T) {
 				LockTime: 0,
 				Expiry:   0,
 			}, {
+				SerType: wire.TxSerializeFull,
 				Version: 1,
 				TxIn: []*wire.TxIn{{
 					PreviousOutPoint: wire.OutPoint{
@@ -438,6 +441,7 @@ func TestSpendJournalSerialization(t *testing.T) {
 				compressed:    true,
 			}},
 			blockTxns: []*wire.MsgTx{{ // Coinbase omitted.
+				SerType: wire.TxSerializeFull,
 				Version: 1,
 				TxIn: []*wire.TxIn{{
 					PreviousOutPoint: wire.OutPoint{
@@ -542,6 +546,7 @@ func TestSpendJournalErrors(t *testing.T) {
 		{
 			name: "Force assertion due to missing stxos",
 			blockTxns: []*wire.MsgTx{{ // Coinbase omitted.
+				SerType: wire.TxSerializeFull,
 				Version: 1,
 				TxIn: []*wire.TxIn{{
 					PreviousOutPoint: wire.OutPoint{
@@ -559,6 +564,7 @@ func TestSpendJournalErrors(t *testing.T) {
 		{
 			name: "Force deserialization error in stxos",
 			blockTxns: []*wire.MsgTx{{ // Coinbase omitted.
+				SerType: wire.TxSerializeFull,
 				Version: 1,
 				TxIn: []*wire.TxIn{{
 					PreviousOutPoint: wire.OutPoint{

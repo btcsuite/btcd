@@ -1350,7 +1350,7 @@ func createTxRawResult(chainParams *chaincfg.Params, mtx *wire.MsgTx, txHash str
 		Txid:        txHash,
 		Vin:         createVinList(mtx),
 		Vout:        createVoutList(mtx, chainParams, nil),
-		Version:     mtx.Version,
+		Version:     int32(mtx.Version),
 		LockTime:    mtx.LockTime,
 		Expiry:      mtx.Expiry,
 		BlockHeight: blkHeight,
@@ -1391,7 +1391,7 @@ func handleDecodeRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan 
 	// Create and return the result.
 	txReply := dcrjson.TxRawDecodeResult{
 		Txid:     mtx.TxHash().String(),
-		Version:  mtx.Version,
+		Version:  int32(mtx.Version),
 		Locktime: mtx.LockTime,
 		Expiry:   mtx.Expiry,
 		Vin:      createVinList(&mtx),
@@ -3961,7 +3961,7 @@ func handleGetTxOut(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 	// from there, otherwise attempt to fetch from the block database.
 	var bestBlockHash string
 	var confirmations int64
-	var txVersion int32
+	var txVersion uint16
 	var value int64
 	var scriptVersion uint16
 	var pkScript []byte
@@ -4045,7 +4045,7 @@ func handleGetTxOut(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 		BestBlock:     bestBlockHash,
 		Confirmations: confirmations,
 		Value:         dcrutil.Amount(value).ToUnit(dcrutil.AmountCoin),
-		Version:       txVersion,
+		Version:       int32(txVersion),
 		ScriptPubKey: dcrjson.ScriptPubKeyResult{
 			Asm:       disbuf,
 			Hex:       hex.EncodeToString(pkScript),
@@ -4972,7 +4972,7 @@ func handleSearchRawTransactions(s *rpcServer, cmd interface{}, closeChan <-chan
 				"Could not create vin list")
 		}
 		result.Vout = createVoutList(mtx, chainParams, filterAddrMap)
-		result.Version = mtx.Version
+		result.Version = int32(mtx.Version)
 		result.LockTime = mtx.LockTime
 
 		// Transactions grabbed from the mempool aren't yet in a block,

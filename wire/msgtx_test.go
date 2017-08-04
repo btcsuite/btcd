@@ -1,5 +1,5 @@
 // Copyright (c) 2013-2016 The btcsuite developers
-// Copyright (c) 2015-2016 The Decred developers
+// Copyright (c) 2015-2017 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -378,9 +378,8 @@ func TestTxSerialize(t *testing.T) {
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
 		// Serialize the transaction.
-		var buf bytes.Buffer
-		buf.Grow(test.in.SerializeSize())
-		err := test.in.Serialize(&buf)
+		buf := bytes.NewBuffer(make([]byte, 0, test.in.SerializeSize()))
+		err := test.in.Serialize(buf)
 		if err != nil {
 			t.Errorf("Serialize #%d error %v", i, err)
 			continue
@@ -437,7 +436,8 @@ func TestTxSerialize(t *testing.T) {
 // TestTxSerializePrefix tests MsgTx serialize and deserialize.
 func TestTxSerializePrefix(t *testing.T) {
 	noTx := NewMsgTx()
-	noTx.Version = 65537
+	noTx.SerType = TxSerializeNoWitness
+	noTx.Version = 1
 	noTxEncoded := []byte{
 		0x01, 0x00, 0x01, 0x00, // Version
 		0x00,                   // Varint for number of input transactions
@@ -472,9 +472,8 @@ func TestTxSerializePrefix(t *testing.T) {
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
 		// Serialize the transaction.
-		var buf bytes.Buffer
-		buf.Grow(test.in.SerializeSize())
-		err := test.in.Serialize(&buf)
+		buf := bytes.NewBuffer(make([]byte, 0, test.in.SerializeSize()))
+		err := test.in.Serialize(buf)
 		if err != nil {
 			t.Errorf("Serialize #%d error %v", i, err)
 			continue
@@ -531,7 +530,8 @@ func TestTxSerializePrefix(t *testing.T) {
 // TestTxSerializeWitness tests MsgTx serialize and deserialize.
 func TestTxSerializeWitness(t *testing.T) {
 	noTx := NewMsgTx()
-	noTx.Version = 131073
+	noTx.SerType = TxSerializeOnlyWitness
+	noTx.Version = 1
 	noTxEncoded := []byte{
 		0x01, 0x00, 0x02, 0x00, // Version
 		0x00, // Varint for number of input signatures
@@ -563,9 +563,8 @@ func TestTxSerializeWitness(t *testing.T) {
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
 		// Serialize the transaction.
-		var buf bytes.Buffer
-		buf.Grow(test.in.SerializeSize())
-		err := test.in.Serialize(&buf)
+		buf := bytes.NewBuffer(make([]byte, 0, test.in.SerializeSize()))
+		err := test.in.Serialize(buf)
 		if err != nil {
 			t.Errorf("Serialize #%d error %v", i, err)
 			continue
@@ -622,7 +621,8 @@ func TestTxSerializeWitness(t *testing.T) {
 // TestTxSerializeWitnessSigning tests MsgTx serialize and deserialize.
 func TestTxSerializeWitnessSigning(t *testing.T) {
 	noTx := NewMsgTx()
-	noTx.Version = 196609
+	noTx.SerType = TxSerializeWitnessSigning
+	noTx.Version = 1
 	noTxEncoded := []byte{
 		0x01, 0x00, 0x03, 0x00, // Version
 		0x00, // Varint for number of input signatures
@@ -654,9 +654,8 @@ func TestTxSerializeWitnessSigning(t *testing.T) {
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
 		// Serialize the transaction.
-		var buf bytes.Buffer
-		buf.Grow(test.in.SerializeSize())
-		err := test.in.Serialize(&buf)
+		buf := bytes.NewBuffer(make([]byte, 0, test.in.SerializeSize()))
+		err := test.in.Serialize(buf)
 		if err != nil {
 			t.Errorf("Serialize #%d error %v", i, err)
 			continue
@@ -713,7 +712,8 @@ func TestTxSerializeWitnessSigning(t *testing.T) {
 // TestTxSerializeWitnessValueSigning tests MsgTx serialize and deserialize.
 func TestTxSerializeWitnessValueSigning(t *testing.T) {
 	noTx := NewMsgTx()
-	noTx.Version = 262145
+	noTx.SerType = TxSerializeWitnessValueSigning
+	noTx.Version = 1
 	noTxEncoded := []byte{
 		0x01, 0x00, 0x04, 0x00, // Version
 		0x00, // Varint for number of input signatures
@@ -745,9 +745,8 @@ func TestTxSerializeWitnessValueSigning(t *testing.T) {
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
 		// Serialize the transaction.
-		var buf bytes.Buffer
-		buf.Grow(test.in.SerializeSize())
-		err := test.in.Serialize(&buf)
+		buf := bytes.NewBuffer(make([]byte, 0, test.in.SerializeSize()))
+		err := test.in.Serialize(buf)
 		if err != nil {
 			t.Errorf("Serialize #%d error %v", i, err)
 			continue
@@ -883,7 +882,7 @@ func TestTxOverflowErrors(t *testing.T) {
 	// here instead of the latest values because the test data is using
 	// bytes encoded with those versions.
 	pver := uint32(1)
-	txVer := DefaultMsgTxVersion()
+	txVer := int32(1)
 
 	tests := []struct {
 		buf     []byte // Wire encoding
@@ -1033,6 +1032,7 @@ func TestTxSerializeSize(t *testing.T) {
 
 // multiTx is a MsgTx with an input and output and used in various tests.
 var multiTx = &MsgTx{
+	SerType: TxSerializeFull,
 	Version: 1,
 	TxIn: []*TxIn{
 		{
@@ -1091,7 +1091,8 @@ var multiTx = &MsgTx{
 
 // multiTxPrefix is a MsgTx prefix with an input and output and used in various tests.
 var multiTxPrefix = &MsgTx{
-	Version: 65537,
+	SerType: TxSerializeNoWitness,
+	Version: 1,
 	TxIn: []*TxIn{
 		{
 			PreviousOutPoint: OutPoint{
@@ -1143,7 +1144,8 @@ var multiTxPrefix = &MsgTx{
 
 // multiTxWitness is a MsgTx witness with only input witness.
 var multiTxWitness = &MsgTx{
-	Version: 131073,
+	SerType: TxSerializeOnlyWitness,
+	Version: 1,
 	TxIn: []*TxIn{
 		{
 			ValueIn:     0x1212121212121212,
@@ -1159,7 +1161,8 @@ var multiTxWitness = &MsgTx{
 
 // multiTxWitnessSigning is a MsgTx witness with only input witness sigscripts.
 var multiTxWitnessSigning = &MsgTx{
-	Version: 196609,
+	SerType: TxSerializeWitnessSigning,
+	Version: 1,
 	TxIn: []*TxIn{
 		{
 			SignatureScript: []byte{
@@ -1173,7 +1176,8 @@ var multiTxWitnessSigning = &MsgTx{
 // multiTxWitnessValueSigning is a MsgTx witness with only input witness
 // sigscripts.
 var multiTxWitnessValueSigning = &MsgTx{
-	Version: 262145,
+	SerType: TxSerializeWitnessValueSigning,
+	Version: 1,
 	TxIn: []*TxIn{
 		{
 			ValueIn: 0x1212121212121212,

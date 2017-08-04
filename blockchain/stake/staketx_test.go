@@ -1634,6 +1634,7 @@ var sstxTxOut4VerBad = wire.TxOut{
 // sstxMsgTx is a valid SStx MsgTx with an input and outputs and is used in various
 // tests
 var sstxMsgTx = &wire.MsgTx{
+	SerType: wire.TxSerializeFull,
 	Version: 1,
 	TxIn: []*wire.TxIn{
 		&sstxTxIn,
@@ -1655,6 +1656,7 @@ var sstxMsgTx = &wire.MsgTx{
 
 // sstxMsgTxExtraInputs is an invalid SStx MsgTx with too many inputs
 var sstxMsgTxExtraInput = &wire.MsgTx{
+	SerType: wire.TxSerializeFull,
 	Version: 1,
 	TxIn: []*wire.TxIn{
 		&sstxTxIn, &sstxTxIn, &sstxTxIn, &sstxTxIn, &sstxTxIn, &sstxTxIn,
@@ -1680,6 +1682,7 @@ var sstxMsgTxExtraInput = &wire.MsgTx{
 
 // sstxMsgTxExtraOutputs is an invalid SStx MsgTx with too many outputs
 var sstxMsgTxExtraOutputs = &wire.MsgTx{
+	SerType: wire.TxSerializeFull,
 	Version: 1,
 	TxIn: []*wire.TxIn{
 		&sstxTxIn,
@@ -1721,6 +1724,7 @@ var sstxMsgTxExtraOutputs = &wire.MsgTx{
 // sstxMismatchedInsOuts is an invalid SStx MsgTx with too many outputs for the
 // number of inputs it has
 var sstxMismatchedInsOuts = &wire.MsgTx{
+	SerType: wire.TxSerializeFull,
 	Version: 1,
 	TxIn: []*wire.TxIn{
 		&sstxTxIn,
@@ -1735,6 +1739,7 @@ var sstxMismatchedInsOuts = &wire.MsgTx{
 // sstxBadVersionOut is an invalid SStx MsgTx with an output containing a bad
 // version.
 var sstxBadVersionOut = &wire.MsgTx{
+	SerType: wire.TxSerializeFull,
 	Version: 1,
 	TxIn: []*wire.TxIn{
 		&sstxTxIn,
@@ -1757,6 +1762,7 @@ var sstxBadVersionOut = &wire.MsgTx{
 // sstxNullDataMissing is an invalid SStx MsgTx with no address push in the second
 // output
 var sstxNullDataMissing = &wire.MsgTx{
+	SerType: wire.TxSerializeFull,
 	Version: 1,
 	TxIn: []*wire.TxIn{
 		&sstxTxIn,
@@ -1771,6 +1777,7 @@ var sstxNullDataMissing = &wire.MsgTx{
 // sstxNullDataMisplaced is an invalid SStx MsgTx that has the commitment and
 // change outputs swapped
 var sstxNullDataMisplaced = &wire.MsgTx{
+	SerType: wire.TxSerializeFull,
 	Version: 1,
 	TxIn: []*wire.TxIn{
 		&sstxTxIn,
@@ -1926,6 +1933,7 @@ var ssgenTxOut3BadVer = wire.TxOut{
 // ssgenMsgTx is a valid SSGen MsgTx with an input and outputs and is used in
 // various testing scenarios
 var ssgenMsgTx = &wire.MsgTx{
+	SerType: wire.TxSerializeFull,
 	Version: 1,
 	TxIn: []*wire.TxIn{
 		&ssgenTxIn0,
@@ -1943,6 +1951,7 @@ var ssgenMsgTx = &wire.MsgTx{
 
 // ssgenMsgTxExtraInput is an invalid SSGen MsgTx with too many inputs
 var ssgenMsgTxExtraInput = &wire.MsgTx{
+	SerType: wire.TxSerializeFull,
 	Version: 1,
 	TxIn: []*wire.TxIn{
 		&ssgenTxIn0,
@@ -1960,6 +1969,7 @@ var ssgenMsgTxExtraInput = &wire.MsgTx{
 
 // ssgenMsgTxExtraOutputs is an invalid SSGen MsgTx with too many outputs
 var ssgenMsgTxExtraOutputs = &wire.MsgTx{
+	SerType: wire.TxSerializeFull,
 	Version: 1,
 	TxIn: []*wire.TxIn{
 		&ssgenTxIn0,
@@ -1992,6 +2002,7 @@ var ssgenMsgTxExtraOutputs = &wire.MsgTx{
 // ssgenMsgTxStakeBaseWrong is an invalid SSGen tx with the stakebase in the wrong
 // position
 var ssgenMsgTxStakeBaseWrong = &wire.MsgTx{
+	SerType: wire.TxSerializeFull,
 	Version: 1,
 	TxIn: []*wire.TxIn{
 		&ssgenTxIn1,
@@ -2009,6 +2020,7 @@ var ssgenMsgTxStakeBaseWrong = &wire.MsgTx{
 // ssgenMsgTxBadVerOut is an invalid SSGen tx that contains an output with a bad
 // version
 var ssgenMsgTxBadVerOut = &wire.MsgTx{
+	SerType: wire.TxSerializeFull,
 	Version: 1,
 	TxIn: []*wire.TxIn{
 		&ssgenTxIn0,
@@ -2027,6 +2039,7 @@ var ssgenMsgTxBadVerOut = &wire.MsgTx{
 // ssgenMsgTxWrongZeroethOut is an invalid SSGen tx with the first output being not
 // an OP_RETURN push
 var ssgenMsgTxWrongZeroethOut = &wire.MsgTx{
+	SerType: wire.TxSerializeFull,
 	Version: 1,
 	TxIn: []*wire.TxIn{
 		&ssgenTxIn0,
@@ -2044,6 +2057,7 @@ var ssgenMsgTxWrongZeroethOut = &wire.MsgTx{
 // ssgenMsgTxWrongFirstOut is an invalid SSGen tx with the second output being not
 // an OP_RETURN push
 var ssgenMsgTxWrongFirstOut = &wire.MsgTx{
+	SerType: wire.TxSerializeFull,
 	Version: 1,
 	TxIn: []*wire.TxIn{
 		&ssgenTxIn0,
@@ -2154,6 +2168,7 @@ var ssrtxTxOut2BadVer = wire.TxOut{
 // ssrtxMsgTx is a valid SSRtx MsgTx with an input and outputs and is used in
 // various testing scenarios
 var ssrtxMsgTx = &wire.MsgTx{
+	SerType: wire.TxSerializeFull,
 	Version: 1,
 	TxIn: []*wire.TxIn{
 		&ssrtxTxIn,
@@ -2169,6 +2184,7 @@ var ssrtxMsgTx = &wire.MsgTx{
 // ssrtxMsgTx is a valid SSRtx MsgTx with an input and outputs and is used in
 // various testing scenarios
 var ssrtxMsgTxTooManyInputs = &wire.MsgTx{
+	SerType: wire.TxSerializeFull,
 	Version: 1,
 	TxIn: []*wire.TxIn{
 		&ssrtxTxIn,
@@ -2184,6 +2200,7 @@ var ssrtxMsgTxTooManyInputs = &wire.MsgTx{
 // ssrtxMsgTx is a valid SSRtx MsgTx with an input and outputs and is used in
 // various testing scenarios
 var ssrtxMsgTxTooManyOutputs = &wire.MsgTx{
+	SerType: wire.TxSerializeFull,
 	Version: 1,
 	TxIn: []*wire.TxIn{
 		&ssrtxTxIn,
@@ -2210,6 +2227,7 @@ var ssrtxMsgTxTooManyOutputs = &wire.MsgTx{
 }
 
 var ssrtxMsgTxBadVerOut = &wire.MsgTx{
+	SerType: wire.TxSerializeFull,
 	Version: 1,
 	TxIn: []*wire.TxIn{
 		&ssrtxTxIn,

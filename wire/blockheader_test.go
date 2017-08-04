@@ -1,5 +1,5 @@
 // Copyright (c) 2013-2016 The btcsuite developers
-// Copyright (c) 2015-2016 The Decred developers
+// Copyright (c) 2015-2017 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -195,9 +195,8 @@ func TestBlockHeaderWire(t *testing.T) {
 	for i, test := range tests {
 		// Encode to wire format.
 		// Former test (doesn't work because of capacity error)
-		var buf bytes.Buffer
-		buf.Grow(MaxBlockHeaderPayload)
-		err := writeBlockHeader(&buf, test.pver, test.in)
+		buf := bytes.NewBuffer(make([]byte, 0, MaxBlockHeaderPayload))
+		err := writeBlockHeader(buf, test.pver, test.in)
 		if err != nil {
 			t.Errorf("writeBlockHeader #%d error %v", i, err)
 			continue
@@ -209,7 +208,7 @@ func TestBlockHeaderWire(t *testing.T) {
 		}
 
 		buf.Reset()
-		err = test.in.BtcEncode(&buf, pver)
+		err = test.in.BtcEncode(buf, pver)
 		if err != nil {
 			t.Errorf("BtcEncode #%d error %v", i, err)
 			continue
@@ -320,14 +319,13 @@ func TestBlockHeaderSerialize(t *testing.T) {
 	}
 
 	t.Logf("Running %d tests", len(tests))
-	var buf bytes.Buffer
-	buf.Grow(MaxBlockHeaderPayload)
+	buf := bytes.NewBuffer(make([]byte, 0, MaxBlockHeaderPayload))
 	for i, test := range tests {
 		// Clear existing contents.
 		buf.Reset()
 
 		// Serialize the block header.
-		err := test.in.Serialize(&buf)
+		err := test.in.Serialize(buf)
 		if err != nil {
 			t.Errorf("Serialize #%d error %v", i, err)
 			continue

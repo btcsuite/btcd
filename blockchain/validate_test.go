@@ -2238,6 +2238,7 @@ var simNetGenesisMerkleRoot = genesisMerkleRoot
 // genesisCoinbaseTx legacy is the coinbase transaction for the genesis blocks for
 // the regression test network and test network.
 var genesisCoinbaseTxLegacy = wire.MsgTx{
+	SerType: wire.TxSerializeFull,
 	Version: 1,
 	TxIn: []*wire.TxIn{
 		{
@@ -2285,6 +2286,7 @@ var genesisCoinbaseTxLegacy = wire.MsgTx{
 var genesisMerkleRoot = genesisCoinbaseTxLegacy.TxHash()
 
 var regTestGenesisCoinbaseTx = wire.MsgTx{
+	SerType: wire.TxSerializeFull,
 	Version: 1,
 	TxIn: []*wire.TxIn{
 		{
