@@ -1,5 +1,5 @@
 // Copyright (c) 2013-2016 The btcsuite developers
-// Copyright (c) 2015-2016 The Decred developers
+// Copyright (c) 2015-2017 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -355,16 +355,6 @@ func (t *TxIn) SerializeSizeWitnessValueSigning() int {
 		len(t.SignatureScript)
 }
 
-// LegacySerializeSize returns the number of bytes it would take to serialize the
-// the transaction input.
-func (t *TxIn) LegacySerializeSize() int {
-	// Outpoint Hash 32 bytes + Outpoint Index 4 bytes + Sequence 4 bytes +
-	// serialized varint size for the length of SignatureScript +
-	// SignatureScript bytes.
-	return 41 + VarIntSerializeSize(uint64(len(t.SignatureScript))) +
-		len(t.SignatureScript)
-}
-
 // NewTxIn returns a new decred transaction input with the provided
 // previous outpoint point and signature script with a default sequence of
 // MaxTxInSequenceNum.
@@ -547,18 +537,6 @@ func (msg *MsgTx) TxHashFull() chainhash.Hash {
 	copy(concat[32:64], witnessHash[:])
 
 	return chainhash.HashH(concat)
-}
-
-// TxHashLegacy generates the legacy transaction hash, for software
-// compatibility.
-func (msg *MsgTx) TxHashLegacy() chainhash.Hash {
-	buf := bytes.NewBuffer(make([]byte, 0, msg.SerializeSize()))
-	err := msg.LegacySerialize(buf)
-	if err != nil {
-		panic("MsgTx failed serializing for TxHashLegacy")
-	}
-
-	return chainhash.HashH(buf.Bytes())
 }
 
 // Copy creates a deep copy of a transaction so that the original does not get
@@ -1034,109 +1012,6 @@ func (msg *MsgTx) BtcDecode(r io.Reader, pver uint32) error {
 	return nil
 }
 
-// LegacyBtcDecode decodes r using the decred protocol encoding into the
-// receiver. This is used for the decoding of legacy serialized transactions.
-func (msg *MsgTx) LegacyBtcDecode(r io.Reader, pver uint32) error {
-	version, err := binarySerializer.Uint32(r, littleEndian)
-	if err != nil {
-		return err
-	}
-	msg.Version = int32(version)
-
-	count, err := ReadVarInt(r, pver)
-	if err != nil {
-		return err
-	}
-
-	// Prevent more input transactions than could possibly fit into a
-	// message.  It would be possible to cause memory exhaustion and panics
-	// without a sane upper bound on this count.
-	if count > uint64(maxTxInPerMessage) {
-		str := fmt.Sprintf("too many input transactions to fit into "+
-			"max message size [count %d, max %d]", count,
-			maxTxInPerMessage)
-		return messageError("MsgTx.BtcDecode", str)
-	}
-
-	// returnScriptBuffers is a closure that returns any script buffers that
-	// were borrowed from the pool when there are any deserialization
-	// errors.  This is only valid to call before the final step which
-	// replaces the scripts with the location in a contiguous buffer and
-	// returns them.
-	returnScriptBuffers := func() {
-		for _, txIn := range msg.TxIn {
-			if txIn == nil || txIn.SignatureScript == nil {
-				continue
-			}
-			scriptPool.Return(txIn.SignatureScript)
-		}
-		for _, txOut := range msg.TxOut {
-			if txOut == nil || txOut.PkScript == nil {
-				continue
-			}
-			scriptPool.Return(txOut.PkScript)
-		}
-	}
-
-	// Deserialize the inputs.
-	var totalScriptSize uint64
-	txIns := make([]TxIn, count)
-	msg.TxIn = make([]*TxIn, count)
-	for i := uint64(0); i < count; i++ {
-		// The pointer is set now in case a script buffer is borrowed
-		// and needs to be returned to the pool on error.
-		ti := &txIns[i]
-		msg.TxIn[i] = ti
-		err = legacyReadTxIn(r, pver, msg.Version, ti)
-		if err != nil {
-			returnScriptBuffers()
-			return err
-		}
-		totalScriptSize += uint64(len(ti.SignatureScript))
-	}
-
-	count, err = ReadVarInt(r, pver)
-	if err != nil {
-		returnScriptBuffers()
-		return err
-	}
-
-	// Prevent more output transactions than could possibly fit into a
-	// message.  It would be possible to cause memory exhaustion and panics
-	// without a sane upper bound on this count.
-	if count > uint64(maxTxOutPerMessage) {
-		returnScriptBuffers()
-		str := fmt.Sprintf("too many output transactions to fit into "+
-			"max message size [count %d, max %d]", count,
-			maxTxOutPerMessage)
-		return messageError("MsgTx.BtcDecode", str)
-	}
-
-	// Deserialize the outputs.
-	txOuts := make([]TxOut, count)
-	msg.TxOut = make([]*TxOut, count)
-	for i := uint64(0); i < count; i++ {
-		// The pointer is set now in case a script buffer is borrowed
-		// and needs to be returned to the pool on error.
-		to := &txOuts[i]
-		err = legacyReadTxOut(r, pver, msg.Version, to)
-		msg.TxOut[i] = to
-		if err != nil {
-			returnScriptBuffers()
-			return err
-		}
-		totalScriptSize += uint64(len(to.PkScript))
-	}
-
-	msg.LockTime, err = binarySerializer.Uint32(r, littleEndian)
-	if err != nil {
-		returnScriptBuffers()
-		return err
-	}
-
-	return nil
-}
-
 // Deserialize decodes a transaction from r into the receiver using a format
 // that is suitable for long-term storage such as a database while respecting
 // the Version field in the transaction.  This function differs from BtcDecode
@@ -1152,15 +1027,6 @@ func (msg *MsgTx) Deserialize(r io.Reader) error {
 	// at protocol version 0 and the stable long-term storage format.  As
 	// a result, make use of BtcDecode.
 	return msg.BtcDecode(r, 0)
-}
-
-// LegacyDeserialize decodes a transaction that has been encoded in the legacy
-// Decred format.
-func (msg *MsgTx) LegacyDeserialize(r io.Reader) error {
-	// At the current time, there is no difference between the wire encoding
-	// at protocol version 0 and the stable long-term storage format.  As
-	// a result, make use of BtcDecode.
-	return msg.LegacyBtcDecode(r, 0)
 }
 
 // FromBytes deserializes a transaction byte slice.
@@ -1313,43 +1179,6 @@ func (msg *MsgTx) BtcEncode(w io.Writer, pver uint32) error {
 	return nil
 }
 
-// LegacyBtcEncode encodes the receiver to w using the Decred protocol encoding.
-// This is for transactions encoded in the legacy encoding, for compatibility.
-func (msg *MsgTx) LegacyBtcEncode(w io.Writer, pver uint32) error {
-	err := binarySerializer.PutUint32(w, littleEndian, uint32(msg.Version))
-	if err != nil {
-		return err
-	}
-
-	count := uint64(len(msg.TxIn))
-	err = WriteVarInt(w, pver, count)
-	if err != nil {
-		return err
-	}
-
-	for _, ti := range msg.TxIn {
-		err = legacyWriteTxIn(w, pver, msg.Version, ti)
-		if err != nil {
-			return err
-		}
-	}
-
-	count = uint64(len(msg.TxOut))
-	err = WriteVarInt(w, pver, count)
-	if err != nil {
-		return err
-	}
-
-	for _, to := range msg.TxOut {
-		err = legacyWriteTxOut(w, pver, msg.Version, to)
-		if err != nil {
-			return err
-		}
-	}
-
-	return binarySerializer.PutUint32(w, littleEndian, msg.LockTime)
-}
-
 // Serialize encodes the transaction to w using a format that suitable for
 // long-term storage such as a database while respecting the Version field in
 // the transaction.  This function differs from BtcEncode in that BtcEncode
@@ -1365,15 +1194,6 @@ func (msg *MsgTx) Serialize(w io.Writer) error {
 	// at protocol version 0 and the stable long-term storage format.  As
 	// a result, make use of BtcEncode.
 	return msg.BtcEncode(w, 0)
-}
-
-// LegacySerialize encodes the transaction in decred legacy format, for
-// compatibility.
-func (msg *MsgTx) LegacySerialize(w io.Writer) error {
-	// At the current time, there is no difference between the wire encoding
-	// at protocol version 0 and the stable long-term storage format.  As
-	// a result, make use of BtcEncode.
-	return msg.LegacyBtcEncode(w, 0)
 }
 
 // Bytes returns the serialized form of the transaction in bytes.
@@ -1486,25 +1306,6 @@ func (msg *MsgTx) SerializeSize() int {
 	return n
 }
 
-// LegacySerializeSize returns the number of bytes it would take to serialize
-// the transaction.
-func (msg *MsgTx) LegacySerializeSize() int {
-	// Version 4 bytes + LockTime 4 bytes + Expiry 4 bytes + Serialized
-	// varint size for the number of transaction inputs and outputs.
-	n := 12 + VarIntSerializeSize(uint64(len(msg.TxIn))) +
-		VarIntSerializeSize(uint64(len(msg.TxOut)))
-
-	for _, txIn := range msg.TxIn {
-		n += txIn.LegacySerializeSize()
-	}
-
-	for _, txOut := range msg.TxOut {
-		n += txOut.SerializeSize()
-	}
-
-	return n
-}
-
 // Command returns the protocol command string for the message.  This is part
 // of the Message interface implementation.
 func (msg *MsgTx) Command() string {
@@ -1555,43 +1356,6 @@ func (msg *MsgTx) PkScriptLocs() []int {
 		// Value 8 bytes + version 2 bytes + serialized varint size
 		// for the length of PkScript.
 		n += 8 + 2 + VarIntSerializeSize(uint64(len(txOut.PkScript)))
-		pkScriptLocs[i] = n
-		n += len(txOut.PkScript)
-	}
-
-	return pkScriptLocs
-}
-
-// LegacyPkScriptLocs returns a slice containing the start of each public key
-// script within the raw serialized transaction.  The caller can easily obtain
-// the length of each script by using len on the script available via the
-// appropriate transaction output entry. This is for legacy decred format.
-func (msg *MsgTx) LegacyPkScriptLocs() []int {
-	numTxOut := len(msg.TxOut)
-	if numTxOut == 0 {
-		return nil
-	}
-
-	// The starting offset in the serialized transaction of the first
-	// transaction output is:
-	//
-	// Version 4 bytes + serialized varint size for the number of
-	// transaction inputs and outputs + serialized size of each transaction
-	// input.
-	n := 4 + VarIntSerializeSize(uint64(len(msg.TxIn))) +
-		VarIntSerializeSize(uint64(numTxOut))
-	for _, txIn := range msg.TxIn {
-		n += txIn.LegacySerializeSize()
-	}
-
-	// Calculate and set the appropriate offset for each public key script.
-	pkScriptLocs := make([]int, numTxOut)
-	for i, txOut := range msg.TxOut {
-		// The offset of the script in the transaction output is:
-		//
-		// Value 8 bytes + serialized varint size for the length of
-		// PkScript.
-		n += 8 + VarIntSerializeSize(uint64(len(txOut.PkScript)))
 		pkScriptLocs[i] = n
 		n += len(txOut.PkScript)
 	}
