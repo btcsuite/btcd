@@ -50,8 +50,8 @@ func parseHex(tok string) ([]byte, error) {
 // parsing.  It is declared here so it only needs to be created once.
 var shortFormOps map[string]byte
 
-// parseShortForm parses a string as as used in the Bitcoin Core reference tests
-// into the script it came from.
+// parseShortForm parses a string as as used in the reference tests into the
+// script it came from.
 //
 // The format used for these tests is pretty simple if ad-hoc:
 //   - Opcodes other than the push opcodes and unknown are present as
@@ -179,21 +179,17 @@ func createSpendingTx(sigScript, pkScript []byte) *wire.MsgTx {
 
 // TestScriptInvalidTests ensures all of the tests in script_invalid.json fail
 // as expected.
-// TODO These tests need to be completely regenerated and should really be
-// dynamically created. Most of them are failing because they use Bitcoin's
-// sighash algorithm to create their signatures, and thus fail for completely
-// wrong reasons compared to what they're supposed to test.
 func TestScriptInvalidTests(t *testing.T) {
 	file, err := ioutil.ReadFile("data/script_invalid.json")
 	if err != nil {
-		t.Errorf("TestBitcoindInvalidTests: %v\n", err)
+		t.Errorf("TestScriptInvalidTests: %v\n", err)
 		return
 	}
 
 	var tests [][]string
 	err = json.Unmarshal(file, &tests)
 	if err != nil {
-		t.Errorf("TestBitcoindInvalidTests couldn't Unmarshal: %v",
+		t.Errorf("TestScriptInvalidTests couldn't Unmarshal: %v",
 			err)
 		return
 	}
@@ -208,7 +204,7 @@ func TestScriptInvalidTests(t *testing.T) {
 			}
 			name, err := testName(test)
 			if err != nil {
-				t.Errorf("TestBitcoindInvalidTests: invalid test #%d",
+				t.Errorf("TestScriptInvalidTests: invalid test #%d",
 					i)
 				continue
 			}
@@ -254,14 +250,14 @@ func TestScriptInvalidTests(t *testing.T) {
 func TestScriptValidTests(t *testing.T) {
 	file, err := ioutil.ReadFile("data/script_valid.json")
 	if err != nil {
-		t.Errorf("TestBitcoinValidTests: %v\n", err)
+		t.Errorf("TestScriptValidTests: %v\n", err)
 		return
 	}
 
 	var tests [][]string
 	err = json.Unmarshal(file, &tests)
 	if err != nil {
-		t.Errorf("TestBitcoindValidTests couldn't Unmarshal: %v",
+		t.Errorf("TestScriptValidTests: couldn't Unmarshal: %v",
 			err)
 		return
 	}
@@ -277,7 +273,7 @@ func TestScriptValidTests(t *testing.T) {
 			}
 			name, err := testName(test)
 			if err != nil {
-				t.Errorf("TestBitcoindValidTests: invalid test #%d",
+				t.Errorf("TestScriptValidTests: invalid test #%d",
 					i)
 				continue
 			}
