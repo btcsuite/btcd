@@ -44,19 +44,6 @@ func TestBtcWalletExtCmds(t *testing.T) {
 			},
 		},
 		{
-			name: "dumpwallet",
-			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("dumpwallet", "filename")
-			},
-			staticCmd: func() interface{} {
-				return dcrjson.NewDumpWalletCmd("filename")
-			},
-			marshalled: `{"jsonrpc":"1.0","method":"dumpwallet","params":["filename"],"id":1}`,
-			unmarshalled: &dcrjson.DumpWalletCmd{
-				Filename: "filename",
-			},
-		},
-		{
 			name: "importaddress",
 			newCmd: func() (interface{}, error) {
 				return dcrjson.NewCmd("importaddress", "1Address")
@@ -110,19 +97,6 @@ func TestBtcWalletExtCmds(t *testing.T) {
 			unmarshalled: &dcrjson.ImportPubKeyCmd{
 				PubKey: "031234",
 				Rescan: dcrjson.Bool(false),
-			},
-		},
-		{
-			name: "importwallet",
-			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("importwallet", "filename")
-			},
-			staticCmd: func() interface{} {
-				return dcrjson.NewImportWalletCmd("filename")
-			},
-			marshalled: `{"jsonrpc":"1.0","method":"importwallet","params":["filename"],"id":1}`,
-			unmarshalled: &dcrjson.ImportWalletCmd{
-				Filename: "filename",
 			},
 		},
 		{

@@ -521,24 +521,6 @@ func NewGetTxOutCmd(txHash string, vout uint32, includeMempool *bool) *GetTxOutC
 	}
 }
 
-// GetTxOutProofCmd defines the gettxoutproof JSON-RPC command.
-type GetTxOutProofCmd struct {
-	TxIDs     []string
-	BlockHash *string
-}
-
-// NewGetTxOutProofCmd returns a new instance which can be used to issue a
-// gettxoutproof JSON-RPC command.
-//
-// The parameters which are pointers indicate they are optional.  Passing nil
-// for optional parameters will use the default value.
-func NewGetTxOutProofCmd(txIDs []string, blockHash *string) *GetTxOutProofCmd {
-	return &GetTxOutProofCmd{
-		TxIDs:     txIDs,
-		BlockHash: blockHash,
-	}
-}
-
 // GetTxOutSetInfoCmd defines the gettxoutsetinfo JSON-RPC command.
 type GetTxOutSetInfoCmd struct{}
 
@@ -580,19 +562,6 @@ func NewHelpCmd(command *string) *HelpCmd {
 	}
 }
 
-// InvalidateBlockCmd defines the invalidateblock JSON-RPC command.
-type InvalidateBlockCmd struct {
-	BlockHash string
-}
-
-// NewInvalidateBlockCmd returns a new instance which can be used to issue a
-// invalidateblock JSON-RPC command.
-func NewInvalidateBlockCmd(blockHash string) *InvalidateBlockCmd {
-	return &InvalidateBlockCmd{
-		BlockHash: blockHash,
-	}
-}
-
 // PingCmd defines the ping JSON-RPC command.
 type PingCmd struct{}
 
@@ -600,19 +569,6 @@ type PingCmd struct{}
 // command.
 func NewPingCmd() *PingCmd {
 	return &PingCmd{}
-}
-
-// ReconsiderBlockCmd defines the reconsiderblock JSON-RPC command.
-type ReconsiderBlockCmd struct {
-	BlockHash string
-}
-
-// NewReconsiderBlockCmd returns a new instance which can be used to issue a
-// reconsiderblock JSON-RPC command.
-func NewReconsiderBlockCmd(blockHash string) *ReconsiderBlockCmd {
-	return &ReconsiderBlockCmd{
-		BlockHash: blockHash,
-	}
 }
 
 // SearchRawTransactionsCmd defines the searchrawtransactions JSON-RPC command.
@@ -761,19 +717,6 @@ func NewVerifyMessageCmd(address, signature, message string) *VerifyMessageCmd {
 	}
 }
 
-// VerifyTxOutProofCmd defines the verifytxoutproof JSON-RPC command.
-type VerifyTxOutProofCmd struct {
-	Proof string
-}
-
-// NewVerifyTxOutProofCmd returns a new instance which can be used to issue a
-// verifytxoutproof JSON-RPC command.
-func NewVerifyTxOutProofCmd(proof string) *VerifyTxOutProofCmd {
-	return &VerifyTxOutProofCmd{
-		Proof: proof,
-	}
-}
-
 func init() {
 	// No special flags for commands in this file.
 	flags := UsageFlag(0)
@@ -808,13 +751,10 @@ func init() {
 	MustRegisterCmd("getrawmempool", (*GetRawMempoolCmd)(nil), flags)
 	MustRegisterCmd("getrawtransaction", (*GetRawTransactionCmd)(nil), flags)
 	MustRegisterCmd("gettxout", (*GetTxOutCmd)(nil), flags)
-	MustRegisterCmd("gettxoutproof", (*GetTxOutProofCmd)(nil), flags)
 	MustRegisterCmd("gettxoutsetinfo", (*GetTxOutSetInfoCmd)(nil), flags)
 	MustRegisterCmd("getwork", (*GetWorkCmd)(nil), flags)
 	MustRegisterCmd("help", (*HelpCmd)(nil), flags)
-	MustRegisterCmd("invalidateblock", (*InvalidateBlockCmd)(nil), flags)
 	MustRegisterCmd("ping", (*PingCmd)(nil), flags)
-	MustRegisterCmd("reconsiderblock", (*ReconsiderBlockCmd)(nil), flags)
 	MustRegisterCmd("searchrawtransactions", (*SearchRawTransactionsCmd)(nil), flags)
 	MustRegisterCmd("sendrawtransaction", (*SendRawTransactionCmd)(nil), flags)
 	MustRegisterCmd("setgenerate", (*SetGenerateCmd)(nil), flags)
@@ -823,5 +763,4 @@ func init() {
 	MustRegisterCmd("validateaddress", (*ValidateAddressCmd)(nil), flags)
 	MustRegisterCmd("verifychain", (*VerifyChainCmd)(nil), flags)
 	MustRegisterCmd("verifymessage", (*VerifyMessageCmd)(nil), flags)
-	MustRegisterCmd("verifytxoutproof", (*VerifyTxOutProofCmd)(nil), flags)
 }

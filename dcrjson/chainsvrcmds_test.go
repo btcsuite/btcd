@@ -593,36 +593,6 @@ func TestChainSvrCmds(t *testing.T) {
 			},
 		},
 		{
-			name: "gettxoutproof",
-			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("gettxoutproof", []string{"123", "456"})
-			},
-			staticCmd: func() interface{} {
-				return dcrjson.NewGetTxOutProofCmd([]string{"123", "456"}, nil)
-			},
-			marshalled: `{"jsonrpc":"1.0","method":"gettxoutproof","params":[["123","456"]],"id":1}`,
-			unmarshalled: &dcrjson.GetTxOutProofCmd{
-				TxIDs: []string{"123", "456"},
-			},
-		},
-		{
-			name: "gettxoutproof optional",
-			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("gettxoutproof", []string{"123", "456"},
-					dcrjson.String("000000000000034a7dedef4a161fa058a2d67a173a90155f3a2fe6fc132e0ebf"))
-			},
-			staticCmd: func() interface{} {
-				return dcrjson.NewGetTxOutProofCmd([]string{"123", "456"},
-					dcrjson.String("000000000000034a7dedef4a161fa058a2d67a173a90155f3a2fe6fc132e0ebf"))
-			},
-			marshalled: `{"jsonrpc":"1.0","method":"gettxoutproof","params":[["123","456"],` +
-				`"000000000000034a7dedef4a161fa058a2d67a173a90155f3a2fe6fc132e0ebf"],"id":1}`,
-			unmarshalled: &dcrjson.GetTxOutProofCmd{
-				TxIDs:     []string{"123", "456"},
-				BlockHash: dcrjson.String("000000000000034a7dedef4a161fa058a2d67a173a90155f3a2fe6fc132e0ebf"),
-			},
-		},
-		{
 			name: "gettxoutsetinfo",
 			newCmd: func() (interface{}, error) {
 				return dcrjson.NewCmd("gettxoutsetinfo")
@@ -686,19 +656,6 @@ func TestChainSvrCmds(t *testing.T) {
 			},
 		},
 		{
-			name: "invalidateblock",
-			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("invalidateblock", "123")
-			},
-			staticCmd: func() interface{} {
-				return dcrjson.NewInvalidateBlockCmd("123")
-			},
-			marshalled: `{"jsonrpc":"1.0","method":"invalidateblock","params":["123"],"id":1}`,
-			unmarshalled: &dcrjson.InvalidateBlockCmd{
-				BlockHash: "123",
-			},
-		},
-		{
 			name: "ping",
 			newCmd: func() (interface{}, error) {
 				return dcrjson.NewCmd("ping")
@@ -708,19 +665,6 @@ func TestChainSvrCmds(t *testing.T) {
 			},
 			marshalled:   `{"jsonrpc":"1.0","method":"ping","params":[],"id":1}`,
 			unmarshalled: &dcrjson.PingCmd{},
-		},
-		{
-			name: "reconsiderblock",
-			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("reconsiderblock", "123")
-			},
-			staticCmd: func() interface{} {
-				return dcrjson.NewReconsiderBlockCmd("123")
-			},
-			marshalled: `{"jsonrpc":"1.0","method":"reconsiderblock","params":["123"],"id":1}`,
-			unmarshalled: &dcrjson.ReconsiderBlockCmd{
-				BlockHash: "123",
-			},
 		},
 		{
 			name: "searchrawtransactions",
@@ -1031,19 +975,6 @@ func TestChainSvrCmds(t *testing.T) {
 				Address:   "1Address",
 				Signature: "301234",
 				Message:   "test",
-			},
-		},
-		{
-			name: "verifytxoutproof",
-			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("verifytxoutproof", "test")
-			},
-			staticCmd: func() interface{} {
-				return dcrjson.NewVerifyTxOutProofCmd("test")
-			},
-			marshalled: `{"jsonrpc":"1.0","method":"verifytxoutproof","params":["test"],"id":1}`,
-			unmarshalled: &dcrjson.VerifyTxOutProofCmd{
-				Proof: "test",
 			},
 		},
 	}
