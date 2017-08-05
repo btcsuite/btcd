@@ -15,5 +15,3 @@ import:
   - dcrjson
   - wire
 - package: github.com/decred/dcrutil
-  version: 58e046aab848365647c44b295f4fab078fbc3392
-  repo: https://github.com/dnldd/dcrutil.git

@@ -1282,11 +1282,7 @@ type FutureCreateNewAccountResult chan *response
 // result of creating new account.
 func (r FutureCreateNewAccountResult) Receive() error {
 	_, err := receiveFuture(r)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // CreateNewAccountAsync returns an instance of a type that can be used to get the
@@ -1485,37 +1481,6 @@ func (c *Client) GetAccount(address dcrutil.Address) (string, error) {
 	return c.GetAccountAsync(address).Receive()
 }
 
-// FutureSetAccountResult is a future promise to deliver the result of a
-// SetAccountAsync RPC invocation (or an applicable error).
-type FutureSetAccountResult chan *response
-
-// Receive waits for the response promised by the future and returns the result
-// of setting the account to be associated with the passed address.
-func (r FutureSetAccountResult) Receive() error {
-	_, err := receiveFuture(r)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// SetAccountAsync returns an instance of a type that can be used to get the
-// result of the RPC at some future time by invoking the Receive function on the
-// returned instance.
-//
-// See SetAccount for the blocking version and more details.
-func (c *Client) SetAccountAsync(address dcrutil.Address, account string) FutureSetAccountResult {
-	addr := address.EncodeAddress()
-	cmd := dcrjson.NewSetAccountCmd(addr, account)
-	return c.sendCmd(cmd)
-}
-
-// SetAccount sets the account associated with the passed address.
-func (c *Client) SetAccount(address dcrutil.Address, account string) error {
-	return c.SetAccountAsync(address, account).Receive()
-}
-
 // FutureGetAddressesByAccountResult is a future promise to deliver the result
 // of a GetAddressesByAccountAsync RPC invocation (or an applicable error).
 type FutureGetAddressesByAccountResult chan *response
@@ -1584,74 +1549,6 @@ func (r FutureMoveResult) Receive() (bool, error) {
 	}
 
 	return moveResult, nil
-}
-
-// MoveAsync returns an instance of a type that can be used to get the result of
-// the RPC at some future time by invoking the Receive function on the returned
-// instance.
-//
-// See Move for the blocking version and more details.
-func (c *Client) MoveAsync(fromAccount, toAccount string, amount dcrutil.Amount) FutureMoveResult {
-	cmd := dcrjson.NewMoveCmd(fromAccount, toAccount, amount.ToCoin(), nil,
-		nil)
-	return c.sendCmd(cmd)
-}
-
-// Move moves specified amount from one account in your wallet to another.  Only
-// funds with the default number of minimum confirmations will be used.
-//
-// See MoveMinConf and MoveComment for different options.
-func (c *Client) Move(fromAccount, toAccount string, amount dcrutil.Amount) (bool, error) {
-	return c.MoveAsync(fromAccount, toAccount, amount).Receive()
-}
-
-// MoveMinConfAsync returns an instance of a type that can be used to get the
-// result of the RPC at some future time by invoking the Receive function on the
-// returned instance.
-//
-// See MoveMinConf for the blocking version and more details.
-func (c *Client) MoveMinConfAsync(fromAccount, toAccount string,
-	amount dcrutil.Amount, minConfirms int) FutureMoveResult {
-
-	cmd := dcrjson.NewMoveCmd(fromAccount, toAccount, amount.ToCoin(),
-		&minConfirms, nil)
-	return c.sendCmd(cmd)
-}
-
-// MoveMinConf moves specified amount from one account in your wallet to
-// another.  Only funds with the passed number of minimum confirmations will be
-// used.
-//
-// See Move to use the default number of minimum confirmations and MoveComment
-// for additional options.
-func (c *Client) MoveMinConf(fromAccount, toAccount string, amount dcrutil.Amount, minConf int) (bool, error) {
-	return c.MoveMinConfAsync(fromAccount, toAccount, amount, minConf).Receive()
-}
-
-// MoveCommentAsync returns an instance of a type that can be used to get the
-// result of the RPC at some future time by invoking the Receive function on the
-// returned instance.
-//
-// See MoveComment for the blocking version and more details.
-func (c *Client) MoveCommentAsync(fromAccount, toAccount string,
-	amount dcrutil.Amount, minConfirms int, comment string) FutureMoveResult {
-
-	cmd := dcrjson.NewMoveCmd(fromAccount, toAccount, amount.ToCoin(),
-		&minConfirms, &comment)
-	return c.sendCmd(cmd)
-}
-
-// MoveComment moves specified amount from one account in your wallet to
-// another and stores the provided comment in the wallet.  The comment
-// parameter is only available in the wallet.  Only funds with the passed number
-// of minimum confirmations will be used.
-//
-// See Move and MoveMinConf to use defaults.
-func (c *Client) MoveComment(fromAccount, toAccount string, amount dcrutil.Amount,
-	minConf int, comment string) (bool, error) {
-
-	return c.MoveCommentAsync(fromAccount, toAccount, amount, minConf,
-		comment).Receive()
 }
 
 // FutureRenameAccountResult is a future promise to deliver the result of a
