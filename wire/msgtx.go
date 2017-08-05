@@ -1413,31 +1413,6 @@ func WriteOutPoint(w io.Writer, pver uint32, version int32, op *OutPoint) error 
 	return binarySerializer.PutUint8(w, uint8(op.Tree))
 }
 
-// legacyReadOutPoint reads the next sequence of bytes from r as a legacy
-// Decred OutPoint.
-func legacyReadOutPoint(r io.Reader, pver uint32, version int32,
-	op *OutPoint) error {
-	_, err := io.ReadFull(r, op.Hash[:])
-	if err != nil {
-		return err
-	}
-
-	op.Index, err = binarySerializer.Uint32(r, littleEndian)
-	return err
-}
-
-// legacyWriteOutPoint encodes op to the decred protocol encoding for a legacy
-// Decred OutPoint to w.
-func legacyWriteOutPoint(w io.Writer, pver uint32, version int32,
-	op *OutPoint) error {
-	_, err := w.Write(op.Hash[:])
-	if err != nil {
-		return err
-	}
-
-	return binarySerializer.PutUint32(w, littleEndian, op.Index)
-}
-
 // readTxInPrefix reads the next sequence of bytes from r as a transaction input
 // (TxIn) in the transaction prefix.
 func readTxInPrefix(r io.Reader, pver uint32, version int32, ti *TxIn) error {
@@ -1511,40 +1486,6 @@ func readTxInWitnessValueSigning(r io.Reader, pver uint32, version int32,
 	ti.SignatureScript, err = readScript(r, pver, MaxMessagePayload,
 		"transaction input signature script")
 	return err
-}
-
-// readTxInPrefix reads the next sequence of bytes from r as a transaction input
-// (TxIn) in the transaction prefix.
-func legacyReadTxIn(r io.Reader, pver uint32, version int32, ti *TxIn) error {
-	err := legacyReadOutPoint(r, pver, version, &ti.PreviousOutPoint)
-	if err != nil {
-		return err
-	}
-
-	ti.SignatureScript, err = readScript(r, pver, MaxMessagePayload,
-		"transaction input signature script")
-	if err != nil {
-		return err
-	}
-
-	ti.Sequence, err = binarySerializer.Uint32(r, littleEndian)
-	return err
-}
-
-// legacyWriteTxIn encodes ti to the decred protocol encoding for a transaction
-// input (TxIn) to w for decred legacy format.
-func legacyWriteTxIn(w io.Writer, pver uint32, version int32, ti *TxIn) error {
-	err := legacyWriteOutPoint(w, pver, version, &ti.PreviousOutPoint)
-	if err != nil {
-		return err
-	}
-
-	err = WriteVarBytes(w, pver, ti.SignatureScript)
-	if err != nil {
-		return err
-	}
-
-	return binarySerializer.PutUint32(w, littleEndian, ti.Sequence)
 }
 
 // writeTxInPrefixs encodes ti to the decred protocol encoding for a transaction
@@ -1634,31 +1575,6 @@ func writeTxOut(w io.Writer, pver uint32, version int32, to *TxOut) error {
 	}
 
 	err = binarySerializer.PutUint16(w, littleEndian, to.Version)
-	if err != nil {
-		return err
-	}
-
-	return WriteVarBytes(w, pver, to.PkScript)
-}
-
-// legacyReadTxOut reads the next sequence of bytes from r as a transaction output
-// (TxOut) in legacy Decred format (for tests).
-func legacyReadTxOut(r io.Reader, pver uint32, version int32, to *TxOut) error {
-	value, err := binarySerializer.Uint64(r, littleEndian)
-	if err != nil {
-		return err
-	}
-	to.Value = int64(value)
-
-	to.PkScript, err = readScript(r, pver, MaxMessagePayload,
-		"transaction output public key script")
-	return err
-}
-
-// legacyWriteTxOut encodes to into the decred protocol encoding for a transaction
-// output (TxOut) to w in legacy Decred format (for tests).
-func legacyWriteTxOut(w io.Writer, pver uint32, version int32, to *TxOut) error {
-	err := binarySerializer.PutUint64(w, littleEndian, uint64(to.Value))
 	if err != nil {
 		return err
 	}
