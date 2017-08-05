@@ -327,6 +327,7 @@ var Block100000 = wire.MsgBlock{
 	},
 	Transactions: []*wire.MsgTx{
 		{
+			SerType: wire.TxSerializeFull,
 			Version: 1,
 			TxIn: []*wire.TxIn{
 				{
@@ -361,6 +362,7 @@ var Block100000 = wire.MsgBlock{
 			LockTime: 0,
 		},
 		{
+			SerType: wire.TxSerializeFull,
 			Version: 1,
 			TxIn: []*wire.TxIn{
 				{
@@ -430,6 +432,7 @@ var Block100000 = wire.MsgBlock{
 			LockTime: 0,
 		},
 		{
+			SerType: wire.TxSerializeFull,
 			Version: 1,
 			TxIn: []*wire.TxIn{
 				{
@@ -498,6 +501,7 @@ var Block100000 = wire.MsgBlock{
 			LockTime: 0,
 		},
 		{
+			SerType: wire.TxSerializeFull,
 			Version: 1,
 			TxIn: []*wire.TxIn{
 				{

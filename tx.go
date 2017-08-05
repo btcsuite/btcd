@@ -131,6 +131,7 @@ func NewTxDeep(msgTx *wire.MsgTx) *Tx {
 
 	mtx := &wire.MsgTx{
 		CachedHash: nil,
+		SerType:    msgTx.SerType,
 		Version:    msgTx.Version,
 		TxIn:       txIns,
 		TxOut:      txOuts,
