@@ -2412,6 +2412,7 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 
 	txC := mempool.Config{
 		Policy: mempool.Policy{
+			MaxTxVersion:         1,
 			DisableRelayPriority: cfg.NoRelayPriority,
 			RelayNonStd:          cfg.RelayNonStd,
 			FreeTxRelayLimit:     cfg.FreeTxRelayLimit,

@@ -1581,10 +1581,3 @@ func writeTxOut(w io.Writer, pver uint32, version int32, to *TxOut) error {
 
 	return WriteVarBytes(w, pver, to.PkScript)
 }
-
-// IsSupportedMsgTxVersion returns if a transaction version is supported or not.
-// Currently, inclusion into the memory pool (and thus blocks) only supports
-// the DefaultMsgTxVersion.
-func IsSupportedMsgTxVersion(msgTx *MsgTx) bool {
-	return msgTx.Version == DefaultMsgTxVersion()
-}
