@@ -28,52 +28,7 @@ func TestDcrWalletExtCmds(t *testing.T) {
 		staticCmd    func() interface{}
 		marshalled   string
 		unmarshalled interface{}
-	}{
-		{
-			name: "notifywinningtickets",
-			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("notifywinningtickets")
-			},
-			staticCmd: func() interface{} {
-				return dcrjson.NewNotifyWinningTicketsCmd()
-			},
-			marshalled:   `{"jsonrpc":"1.0","method":"notifywinningtickets","params":[],"id":1}`,
-			unmarshalled: &dcrjson.NotifyWinningTicketsCmd{},
-		},
-		{
-			name: "notifyspentandmissedtickets",
-			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("notifyspentandmissedtickets")
-			},
-			staticCmd: func() interface{} {
-				return dcrjson.NewNotifySpentAndMissedTicketsCmd()
-			},
-			marshalled:   `{"jsonrpc":"1.0","method":"notifyspentandmissedtickets","params":[],"id":1}`,
-			unmarshalled: &dcrjson.NotifySpentAndMissedTicketsCmd{},
-		},
-		{
-			name: "notifynewtickets",
-			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("notifynewtickets")
-			},
-			staticCmd: func() interface{} {
-				return dcrjson.NewNotifyNewTicketsCmd()
-			},
-			marshalled:   `{"jsonrpc":"1.0","method":"notifynewtickets","params":[],"id":1}`,
-			unmarshalled: &dcrjson.NotifyNewTicketsCmd{},
-		},
-		{
-			name: "notifystakedifficulty",
-			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("notifystakedifficulty")
-			},
-			staticCmd: func() interface{} {
-				return dcrjson.NewNotifyStakeDifficultyCmd()
-			},
-			marshalled:   `{"jsonrpc":"1.0","method":"notifystakedifficulty","params":[],"id":1}`,
-			unmarshalled: &dcrjson.NotifyStakeDifficultyCmd{},
-		},
-	}
+	}{}
 
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {

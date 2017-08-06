@@ -42,6 +42,50 @@ func TestChainSvrWsCmds(t *testing.T) {
 			unmarshalled: &dcrjson.AuthenticateCmd{Username: "user", Passphrase: "pass"},
 		},
 		{
+			name: "notifywinningtickets",
+			newCmd: func() (interface{}, error) {
+				return dcrjson.NewCmd("notifywinningtickets")
+			},
+			staticCmd: func() interface{} {
+				return dcrjson.NewNotifyWinningTicketsCmd()
+			},
+			marshalled:   `{"jsonrpc":"1.0","method":"notifywinningtickets","params":[],"id":1}`,
+			unmarshalled: &dcrjson.NotifyWinningTicketsCmd{},
+		},
+		{
+			name: "notifyspentandmissedtickets",
+			newCmd: func() (interface{}, error) {
+				return dcrjson.NewCmd("notifyspentandmissedtickets")
+			},
+			staticCmd: func() interface{} {
+				return dcrjson.NewNotifySpentAndMissedTicketsCmd()
+			},
+			marshalled:   `{"jsonrpc":"1.0","method":"notifyspentandmissedtickets","params":[],"id":1}`,
+			unmarshalled: &dcrjson.NotifySpentAndMissedTicketsCmd{},
+		},
+		{
+			name: "notifynewtickets",
+			newCmd: func() (interface{}, error) {
+				return dcrjson.NewCmd("notifynewtickets")
+			},
+			staticCmd: func() interface{} {
+				return dcrjson.NewNotifyNewTicketsCmd()
+			},
+			marshalled:   `{"jsonrpc":"1.0","method":"notifynewtickets","params":[],"id":1}`,
+			unmarshalled: &dcrjson.NotifyNewTicketsCmd{},
+		},
+		{
+			name: "notifystakedifficulty",
+			newCmd: func() (interface{}, error) {
+				return dcrjson.NewCmd("notifystakedifficulty")
+			},
+			staticCmd: func() interface{} {
+				return dcrjson.NewNotifyStakeDifficultyCmd()
+			},
+			marshalled:   `{"jsonrpc":"1.0","method":"notifystakedifficulty","params":[],"id":1}`,
+			unmarshalled: &dcrjson.NotifyStakeDifficultyCmd{},
+		},
+		{
 			name: "notifyblocks",
 			newCmd: func() (interface{}, error) {
 				return dcrjson.NewCmd("notifyblocks")

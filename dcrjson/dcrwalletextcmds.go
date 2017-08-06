@@ -270,50 +270,6 @@ func NewListScriptsCmd() *ListScriptsCmd {
 	return &ListScriptsCmd{}
 }
 
-// NotifyWinningTicketsCmd is a type handling custom marshaling and
-// unmarshaling of notifywinningtickets JSON websocket extension
-// commands.
-type NotifyWinningTicketsCmd struct {
-}
-
-// NewNotifyWinningTicketsCmd creates a new NotifyWinningTicketsCmd.
-func NewNotifyWinningTicketsCmd() *NotifyWinningTicketsCmd {
-	return &NotifyWinningTicketsCmd{}
-}
-
-// NotifySpentAndMissedTicketsCmd is a type handling custom marshaling and
-// unmarshaling of notifyspentandmissedtickets JSON websocket extension
-// commands.
-type NotifySpentAndMissedTicketsCmd struct {
-}
-
-// NewNotifySpentAndMissedTicketsCmd creates a new NotifySpentAndMissedTicketsCmd.
-func NewNotifySpentAndMissedTicketsCmd() *NotifySpentAndMissedTicketsCmd {
-	return &NotifySpentAndMissedTicketsCmd{}
-}
-
-// NotifyNewTicketsCmd is a type handling custom marshaling and
-// unmarshaling of notifynewtickets JSON websocket extension
-// commands.
-type NotifyNewTicketsCmd struct {
-}
-
-// NewNotifyNewTicketsCmd creates a new NotifyNewTicketsCmd.
-func NewNotifyNewTicketsCmd() *NotifyNewTicketsCmd {
-	return &NotifyNewTicketsCmd{}
-}
-
-// NotifyStakeDifficultyCmd is a type handling custom marshaling and
-// unmarshaling of notifystakedifficulty JSON websocket extension
-// commands.
-type NotifyStakeDifficultyCmd struct {
-}
-
-// NewNotifyStakeDifficultyCmd creates a new NotifyStakeDifficultyCmd.
-func NewNotifyStakeDifficultyCmd() *NotifyStakeDifficultyCmd {
-	return &NotifyStakeDifficultyCmd{}
-}
-
 // PurchaseTicketCmd is a type handling custom marshaling and
 // unmarshaling of purchaseticket JSON RPC commands.
 type PurchaseTicketCmd struct {
@@ -605,13 +561,6 @@ func init() {
 	MustRegisterCmd("getvotechoices", (*GetVoteChoicesCmd)(nil), flags)
 	MustRegisterCmd("importscript", (*ImportScriptCmd)(nil), flags)
 	MustRegisterCmd("listscripts", (*ListScriptsCmd)(nil), flags)
-	MustRegisterCmd("notifynewtickets", (*NotifyNewTicketsCmd)(nil), flags)
-	MustRegisterCmd("notifyspentandmissedtickets",
-		(*NotifySpentAndMissedTicketsCmd)(nil), flags)
-	MustRegisterCmd("notifystakedifficulty",
-		(*NotifyStakeDifficultyCmd)(nil), flags)
-	MustRegisterCmd("notifywinningtickets",
-		(*NotifyWinningTicketsCmd)(nil), flags)
 	MustRegisterCmd("purchaseticket", (*PurchaseTicketCmd)(nil), flags)
 	MustRegisterCmd("redeemmultisigout", (*RedeemMultiSigOutCmd)(nil), flags)
 	MustRegisterCmd("redeemmultisigouts", (*RedeemMultiSigOutsCmd)(nil), flags)
