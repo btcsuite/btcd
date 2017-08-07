@@ -6,15 +6,14 @@
 package main
 
 import (
-	"bufio"
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"io"
 	"net"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"sort"
 	"strconv"
@@ -327,6 +326,50 @@ func newConfigParser(cfg *config, so *serviceOptions, options flags.Options) *fl
 	return parser
 }
 
+// createDefaultConfig copies the file sample-dcrd.conf to the given destination path,
+// and populates it with some randomly generated RPC username and password.
+func createDefaultConfigFile(destPath string) error {
+	// Create the destination directory if it does not exist.
+	err := os.MkdirAll(filepath.Dir(destPath), 0700)
+	if err != nil {
+		return err
+	}
+
+	// Generate a random user and password for the RPC server credentials.
+	randomBytes := make([]byte, 20)
+	_, err = rand.Read(randomBytes)
+	if err != nil {
+		return err
+	}
+	generatedRPCUser := base64.StdEncoding.EncodeToString(randomBytes)
+	rpcUserLine := fmt.Sprintf("rpcuser=%v", generatedRPCUser)
+
+	_, err = rand.Read(randomBytes)
+	if err != nil {
+		return err
+	}
+	generatedRPCPass := base64.StdEncoding.EncodeToString(randomBytes)
+	rpcPassLine := fmt.Sprintf("rpcpass=%v", generatedRPCPass)
+
+	// Replace the rpcuser and rpcpass lines in the sample configuration
+	// file contents with their generated values.
+	rpcUserRE := regexp.MustCompile(`(?m)^;\s*rpcuser=[^\s]*$`)
+	rpcPassRE := regexp.MustCompile(`(?m)^;\s*rpcpass=[^\s]*$`)
+	s := rpcUserRE.ReplaceAllString(sampleConfigFileContents, rpcUserLine)
+	s = rpcPassRE.ReplaceAllString(s, rpcPassLine)
+
+	// Create config file at the provided path.
+	dest, err := os.OpenFile(destPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC,
+		0600)
+	if err != nil {
+		return err
+	}
+	defer dest.Close()
+
+	_, err = dest.WriteString(s)
+	return err
+}
+
 // loadConfig initializes and parses the config using a config file and command
 // line options.
 //
@@ -418,7 +461,10 @@ func loadConfig() (*config, []string, error) {
 		cfg.HomeDir, _ = filepath.Abs(preCfg.HomeDir)
 
 		if preCfg.ConfigFile == defaultConfigFile {
-			cfg.ConfigFile = filepath.Join(cfg.HomeDir, defaultConfigFilename)
+			defaultConfigFile = filepath.Join(cfg.HomeDir,
+				defaultConfigFilename)
+			preCfg.ConfigFile = defaultConfigFile
+			cfg.ConfigFile = defaultConfigFile
 		} else {
 			cfg.ConfigFile = preCfg.ConfigFile
 		}
@@ -444,20 +490,23 @@ func loadConfig() (*config, []string, error) {
 		}
 	}
 
+	// Create a default config file when one does not exist and the user did
+	// not specify an override.
+	if !preCfg.SimNet && preCfg.ConfigFile == defaultConfigFile &&
+		!fileExists(preCfg.ConfigFile) {
+
+		err := createDefaultConfigFile(preCfg.ConfigFile)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error creating a default "+
+				"config file: %v\n", err)
+		}
+	}
+
 	// Load additional config from file.
 	var configFileError error
 	parser := newConfigParser(&cfg, &serviceOpts, flags.Default)
-	if !(preCfg.SimNet) || cfg.ConfigFile != defaultConfigFile {
-
-		if _, err := os.Stat(cfg.ConfigFile); os.IsNotExist(err) {
-			err := createDefaultConfigFile(cfg.ConfigFile)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error creating a "+
-					"default config file: %v\n", err)
-			}
-		}
-
-		err := flags.NewIniParser(parser).ParseFile(cfg.ConfigFile)
+	if !cfg.SimNet || preCfg.ConfigFile != defaultConfigFile {
+		err := flags.NewIniParser(parser).ParseFile(preCfg.ConfigFile)
 		if err != nil {
 			if _, ok := err.(*os.PathError); !ok {
 				fmt.Fprintf(os.Stderr, "Error parsing config "+
@@ -1016,73 +1065,6 @@ func loadConfig() (*config, []string, error) {
 	}
 
 	return &cfg, remainingArgs, nil
-}
-
-// createDefaultConfig copies the file sample-dcrd.conf to the given destination path,
-// and populates it with some randomly generated RPC username and password.
-func createDefaultConfigFile(destinationPath string) error {
-	// Create the destination directory if it does not exists
-	err := os.MkdirAll(filepath.Dir(destinationPath), 0700)
-	if err != nil {
-		return err
-	}
-
-	// We assume sample config file path is same as binary
-	path, err := filepath.Abs(filepath.Dir(os.Args[0]))
-	if err != nil {
-		return err
-	}
-	sampleConfigPath := filepath.Join(path, sampleConfigFilename)
-
-	// We generate a random user and password
-	randomBytes := make([]byte, 20)
-	_, err = rand.Read(randomBytes)
-	if err != nil {
-		return err
-	}
-	generatedRPCUser := base64.StdEncoding.EncodeToString(randomBytes)
-
-	_, err = rand.Read(randomBytes)
-	if err != nil {
-		return err
-	}
-	generatedRPCPass := base64.StdEncoding.EncodeToString(randomBytes)
-
-	src, err := os.Open(sampleConfigPath)
-	if err != nil {
-		return err
-	}
-	defer src.Close()
-
-	dest, err := os.OpenFile(destinationPath,
-		os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
-	if err != nil {
-		return err
-	}
-	defer dest.Close()
-
-	// We copy every line from the sample config file to the destination,
-	// only replacing the two lines for rpcuser and rpcpass
-	reader := bufio.NewReader(src)
-	for err != io.EOF {
-		var line string
-		line, err = reader.ReadString('\n')
-		if err != nil && err != io.EOF {
-			return err
-		}
-
-		if strings.Contains(line, "rpcuser=") {
-			line = "rpcuser=" + generatedRPCUser + "\n"
-		} else if strings.Contains(line, "rpcpass=") {
-			line = "rpcpass=" + generatedRPCPass + "\n"
-		}
-
-		if _, err := dest.WriteString(line); err != nil {
-			return err
-		}
-	}
-
-	return nil
 }
 
 // dcrdDial connects to the address on the named network using the appropriate

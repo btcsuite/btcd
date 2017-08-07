@@ -1,4 +1,10 @@
-[Application Options]
+// Copyright (c) 2017 The Decred developers
+// Use of this source code is governed by an ISC
+// license that can be found in the LICENSE file.
+
+package main
+
+var sampleConfigFileContents = `[Application Options]
 
 ; ------------------------------------------------------------------------------
 ; Data settings
@@ -109,7 +115,7 @@
 ; Disable banning of misbehaving peers.
 ; nobanning=1
 
-; Maximum allowed ban score before disconnecting and banning misbehaving peers.`
+; Maximum allowed ban score before disconnecting and banning misbehaving peers.
 ; banthreshold=100
 
 ; How long to ban misbehaving peers. Valid time units are {s, m, h}.
@@ -330,3 +336,4 @@
 ; be disabled if this option is not specified.  The profile information can be
 ; accessed at http://localhost:<profileport>/debug/pprof once running.
 ; profile=6061
+`
