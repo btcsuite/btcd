@@ -429,8 +429,7 @@ func checkTransactionStandard(tx *dcrutil.Tx, txType stake.TxType, height int64,
 		// "dust".
 		if scriptClass == txscript.NullDataTy {
 			numNullDataOutputs++
-		} else if isDust(txOut, minRelayTxFee) &&
-			txType != stake.TxTypeSStx {
+		} else if txType == stake.TxTypeRegular && isDust(txOut, minRelayTxFee) {
 			str := fmt.Sprintf("transaction output %d: payment "+
 				"of %d is dust", i, txOut.Value)
 			return txRuleError(wire.RejectDust, str)
