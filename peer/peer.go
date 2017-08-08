@@ -849,21 +849,22 @@ func (p *Peer) localVersionMsg() (*wire.MsgVersion, error) {
 //
 // This function is safe for concurrent access.
 func (p *Peer) PushAddrMsg(addresses []*wire.NetAddress) ([]*wire.NetAddress, error) {
+	addressCount := len(addresses)
 
 	// Nothing to send.
-	if len(addresses) == 0 {
+	if addressCount == 0 {
 		return nil, nil
 	}
 
 	msg := wire.NewMsgAddr()
-	msg.AddrList = make([]*wire.NetAddress, len(addresses))
+	msg.AddrList = make([]*wire.NetAddress, addressCount)
 	copy(msg.AddrList, addresses)
 
 	// Randomize the addresses sent if there are more than the maximum allowed.
-	if len(msg.AddrList) > wire.MaxAddrPerMsg {
+	if addressCount > wire.MaxAddrPerMsg {
 		// Shuffle the address list.
-		for i := range msg.AddrList {
-			j := rand.Intn(i + 1)
+		for i := 0; i < wire.MaxAddrPerMsg; i++ {
+			j := i + rand.Intn(addressCount-i)
 			msg.AddrList[i], msg.AddrList[j] = msg.AddrList[j], msg.AddrList[i]
 		}
 
