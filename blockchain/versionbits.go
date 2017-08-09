@@ -275,7 +275,7 @@ func (b *BlockChain) warnUnknownRuleActivations(node *blockNode) error {
 			window := int32(checker.MinerConfirmationWindow())
 			activationHeight := window - (node.height % window)
 			log.Warnf("Unknown new rules are about to activate in "+
-				"%d blocks (bit %d)", bit, activationHeight)
+				"%d blocks (bit %d)", activationHeight, bit)
 		}
 	}
 
