@@ -2448,11 +2448,27 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 	if len(indexes) > 0 {
 		indexManager = indexers.NewManager(db, indexes)
 	}
-	bm, err := newBlockManager(&s, indexManager)
+
+	// Merge given checkpoints with the default ones unless they are disabled.
+	var checkpoints []chaincfg.Checkpoint
+	if !cfg.DisableCheckpoints {
+		checkpoints = mergeCheckpoints(s.chainParams.Checkpoints, cfg.addCheckpoints)
+	}
+
+	// Create a new block chain instance with the appropriate configuration.
+	chain, err := blockchain.New(&blockchain.Config{
+		DB:            s.db,
+		ChainParams:   s.chainParams,
+		Checkpoints:   checkpoints,
+		TimeSource:    s.timeSource,
+		Notifications: bm.handleNotifyMsg,
+		SigCache:      s.sigCache,
+		IndexManager:  indexManager,
+		HashCache:     s.hashCache,
+	})
 	if err != nil {
 		return nil, err
 	}
-	s.blockManager = bm
 
 	txC := mempool.Config{
 		Policy: mempool.Policy{
@@ -2466,11 +2482,11 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 			MaxTxVersion:         2,
 		},
 		ChainParams:    chainParams,
-		FetchUtxoView:  s.blockManager.chain.FetchUtxoView,
-		BestHeight:     func() int32 { return bm.chain.BestSnapshot().Height },
-		MedianTimePast: func() time.Time { return bm.chain.BestSnapshot().MedianTime },
+		FetchUtxoView:  chain.FetchUtxoView,
+		BestHeight:     func() int32 { return chain.BestSnapshot().Height },
+		MedianTimePast: func() time.Time { return chain.BestSnapshot().MedianTime },
 		CalcSequenceLock: func(tx *btcutil.Tx, view *blockchain.UtxoViewpoint) (*blockchain.SequenceLock, error) {
-			return bm.chain.CalcSequenceLock(tx, view, true)
+			return chain.CalcSequenceLock(tx, view, true)
 		},
 		IsDeploymentActive: bm.chain.IsDeploymentActive,
 		SigCache:           s.sigCache,
@@ -2478,6 +2494,11 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 		AddrIndex:          s.addrIndex,
 	}
 	s.txMemPool = mempool.New(&txC)
+
+	s.bm, err = newBlockManager(&s, indexManager, &chain, s.txMemPool)
+	if err != nil {
+		return nil, err
+	}
 
 	// Create the mining policy and block template generator based on the
 	// configuration options.
@@ -2671,4 +2692,57 @@ func dynamicTickDuration(remaining time.Duration) time.Duration {
 		return time.Minute * 15
 	}
 	return time.Hour
+}
+
+// checkpointSorter implements sort.Interface to allow a slice of checkpoints to
+// be sorted.
+type checkpointSorter []chaincfg.Checkpoint
+
+// Len returns the number of checkpoints in the slice.  It is part of the
+// sort.Interface implementation.
+func (s checkpointSorter) Len() int {
+	return len(s)
+}
+
+// Swap swaps the checkpoints at the passed indices.  It is part of the
+// sort.Interface implementation.
+func (s checkpointSorter) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
+}
+
+// Less returns whether the checkpoint with index i should sort before the
+// checkpoint with index j.  It is part of the sort.Interface implementation.
+func (s checkpointSorter) Less(i, j int) bool {
+	return s[i].Height < s[j].Height
+}
+
+// mergeCheckpoints returns two slices of checkpoints merged into one slice
+// such that the checkpoints are sorted by height.  In the case the additional
+// checkpoints contain a checkpoint with the same height as a checkpoint in the
+// default checkpoints, the additional checkpoint will take precedence and
+// overwrite the default one.
+func mergeCheckpoints(defaultCheckpoints, additional []chaincfg.Checkpoint) []chaincfg.Checkpoint {
+	// Create a map of the additional checkpoints to remove duplicates while
+	// leaving the most recently-specified checkpoint.
+	extra := make(map[int32]chaincfg.Checkpoint)
+	for _, checkpoint := range additional {
+		extra[checkpoint.Height] = checkpoint
+	}
+
+	// Add all default checkpoints that do not have an override in the
+	// additional checkpoints.
+	numDefault := len(defaultCheckpoints)
+	checkpoints := make([]chaincfg.Checkpoint, 0, numDefault+len(extra))
+	for _, checkpoint := range defaultCheckpoints {
+		if _, exists := extra[checkpoint.Height]; !exists {
+			checkpoints = append(checkpoints, checkpoint)
+		}
+	}
+
+	// Append the additional checkpoints and return the sorted results.
+	for _, checkpoint := range extra {
+		checkpoints = append(checkpoints, checkpoint)
+	}
+	sort.Sort(checkpointSorter(checkpoints))
+	return checkpoints
 }
