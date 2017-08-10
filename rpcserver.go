@@ -383,6 +383,13 @@ func rpcDeserializationError(fmtStr string, args ...interface{}) *dcrjson.RPCErr
 		fmt.Sprintf(fmtStr, args...))
 }
 
+// rpcRuleError is a convenience function to convert a
+// rule error to an RPC error with the appropriate code set.
+func rpcRuleError(fmtStr string, args ...interface{}) *dcrjson.RPCError {
+	return dcrjson.NewRPCError(dcrjson.ErrRPCMisc,
+		fmt.Sprintf(fmtStr, args...))
+}
+
 // rpcAddressKeyError is a convenience function to convert an address/key error to
 // an RPC error with the appropriate code set.  It also logs the error to the
 // RPC server subsystem since internal errors really should not occur.  The
@@ -5063,13 +5070,16 @@ func handleSendRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan st
 		// JSON-RPC error is returned to the client with the
 		// deserialization error code (to match bitcoind behavior).
 		if _, ok := err.(mempool.RuleError); ok {
-			rpcsLog.Debugf("Rejected transaction %v: %v", tx.Hash(),
+			err = fmt.Errorf("Rejected transaction %v: %v", tx.Hash(),
 				err)
-		} else {
-			rpcsLog.Errorf("Failed to process transaction %v: %v",
-				tx.Hash(), err)
+			rpcsLog.Debugf("%v", err)
+			return nil, rpcRuleError("%v", err)
 		}
-		return nil, rpcInternalError(err.Error(), "Tx rejected")
+
+		err = fmt.Errorf("failed to process transaction %v: %v",
+			tx.Hash(), err)
+		rpcsLog.Errorf("%v", err)
+		return nil, rpcDeserializationError("rejected: %v", err)
 	}
 
 	s.server.AnnounceNewTransactions(acceptedTxs)
