@@ -9,7 +9,6 @@ import (
 	"net"
 	"os"
 	"path/filepath"
-	"sort"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -623,14 +622,6 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 
 		// Clear the rejected transactions.
 		b.rejectedTxns = make(map[chainhash.Hash]struct{})
-
-		// Allow any clients performing long polling via the
-		// getblocktemplate RPC to be notified when the new block causes
-		// their old block template to become stale.
-		rpcServer := b.server.rpcServer
-		if rpcServer != nil {
-			rpcServer.gbtWorkState.NotifyBlockConnected(blockHash)
-		}
 	}
 
 	// Update the block height for this peer. But only send a message to
@@ -1143,14 +1134,6 @@ out:
 					}
 				}
 
-				// Allow any clients performing long polling via the
-				// getblocktemplate RPC to be notified when the new block causes
-				// their old block template to become stale.
-				rpcServer := b.server.rpcServer
-				if rpcServer != nil {
-					rpcServer.gbtWorkState.NotifyBlockConnected(msg.block.Hash())
-				}
-
 				msg.reply <- processBlockResponse{
 					isOrphan: isOrphan,
 					err:      nil,
@@ -1177,9 +1160,10 @@ out:
 	bmgrLog.Trace("Block handler done")
 }
 
-// handleNotifyMsg handles notifications from blockchain.  It does things such
-// as request orphan block parents and relay accepted blocks to connected peers.
-func (b *blockManager) handleNotifyMsg(notification *blockchain.Notification) {
+// handleBlockchainNotification handles notifications from blockchain.  It does
+// things such as request orphan block parents and relay accepted blocks to
+// connected peers.
+func (b *blockManager) handleBlockchainNotification(notification *blockchain.Notification) {
 	switch notification.Type {
 	// A block has been accepted into the block chain.  Relay it to other
 	// peers.
@@ -1219,21 +1203,9 @@ func (b *blockManager) handleNotifyMsg(notification *blockchain.Notification) {
 			b.txMemPool.RemoveTransaction(tx, false)
 			b.txMemPool.RemoveDoubleSpends(tx)
 			b.txMemPool.RemoveOrphan(tx)
+			b.server.TransactionConfirmed(tx)
 			acceptedTxs := b.txMemPool.ProcessOrphans(tx)
 			b.server.AnnounceNewTransactions(acceptedTxs)
-		}
-
-		if r := b.server.rpcServer; r != nil {
-			// Now that this block is in the blockchain we can mark
-			// all the transactions (except the coinbase) as no
-			// longer needing rebroadcasting.
-			for _, tx := range block.Transactions()[1:] {
-				iv := wire.NewInvVect(wire.InvTypeTx, tx.Hash())
-				b.server.RemoveRebroadcastInventory(iv)
-			}
-
-			// Notify registered websocket clients of incoming block.
-			r.ntfnMgr.NotifyBlockConnected(block)
 		}
 
 	// A block has been disconnected from the main block chain.
@@ -1255,11 +1227,6 @@ func (b *blockManager) handleNotifyMsg(notification *blockchain.Notification) {
 				// the transaction pool.
 				b.txMemPool.RemoveTransaction(tx, true)
 			}
-		}
-
-		// Notify registered websocket clients.
-		if r := b.server.rpcServer; r != nil {
-			r.ntfnMgr.NotifyBlockDisconnected(block)
 		}
 	}
 }

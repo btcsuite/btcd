@@ -4098,6 +4098,42 @@ func newRPCServer(listenAddrs []string, generator *mining.BlkTmplGenerator, s *s
 	return &rpc, nil
 }
 
+func (s *rpcServer) handleBlockchainNotification(notification *blockchain.Notification) {
+	switch notification.Type {
+	case blockchain.NTBlockAccepted:
+		block, ok := notification.Data.(*btcutil.Block)
+		if !ok {
+			rpcsLog.Warnf("Chain accepted notification is not a block.")
+			break
+		}
+
+		// Allow any clients performing long polling via the
+		// getblocktemplate RPC to be notified when the new block causes
+		// their old block template to become stale.
+		s.gbtWorkState.NotifyBlockConnected(block.Hash())
+
+	case blockchain.NTBlockConnected:
+		block, ok := notification.Data.(*btcutil.Block)
+		if !ok {
+			rpcsLog.Warnf("Chain connected notification is not a block.")
+			break
+		}
+
+		// Notify registered websocket clients of incoming block.
+		s.ntfnMgr.NotifyBlockConnected(block)
+
+	case blockchain.NTBlockDisconnected:
+		block, ok := notification.Data.(*btcutil.Block)
+		if !ok {
+			rpcsLog.Warnf("Chain disconnected notification is not a block.")
+			break
+		}
+
+		// Notify registered websocket clients.
+		s.ntfnMgr.NotifyBlockDisconnected(block)
+	}
+}
+
 func init() {
 	rpcHandlers = rpcHandlersBeforeInit
 	rand.Seed(time.Now().UnixNano())
