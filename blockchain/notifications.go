@@ -58,16 +58,25 @@ type Notification struct {
 	Data interface{}
 }
 
+// Subscribe to block chain notifications. Registers a callback to be executed
+// when various events take place. See the documentation on Notification and
+// NotificationType for details on the types and contents of notifications.
+func (b *BlockChain) Subscribe(callback NotificationCallback) {
+	b.notificationsLock.Lock()
+	b.notifications = append(b.notifications, callback)
+	b.notificationsLock.Unlock()
+}
+
 // sendNotification sends a notification with the passed type and data if the
 // caller requested notifications by providing a callback function in the call
 // to New.
 func (b *BlockChain) sendNotification(typ NotificationType, data interface{}) {
-	// Ignore it if the caller didn't request notifications.
-	if b.notifications == nil {
-		return
-	}
+	b.notificationsLock.RLock()
+	defer b.notificationsLock.RUnlock()
 
 	// Generate and send the notification.
 	n := Notification{Type: typ, Data: data}
-	b.notifications(&n)
+	for _, callback := range b.notifications {
+		callback(&n)
+	}
 }

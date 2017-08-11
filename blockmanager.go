@@ -1466,18 +1466,19 @@ func newBlockManager(s *server, indexManager blockchain.IndexManager) (*blockMan
 	// Create a new block chain instance with the appropriate configuration.
 	var err error
 	bm.chain, err = blockchain.New(&blockchain.Config{
-		DB:            s.db,
-		ChainParams:   s.chainParams,
-		Checkpoints:   checkpoints,
-		TimeSource:    s.timeSource,
-		Notifications: bm.handleNotifyMsg,
-		SigCache:      s.sigCache,
-		IndexManager:  indexManager,
-		HashCache:     s.hashCache,
+		DB:           s.db,
+		ChainParams:  s.chainParams,
+		Checkpoints:  checkpoints,
+		TimeSource:   s.timeSource,
+		SigCache:     s.sigCache,
+		IndexManager: indexManager,
+		HashCache:    s.hashCache,
 	})
 	if err != nil {
 		return nil, err
 	}
+	bm.chain.Subscribe(bm.handleNotifyMsg)
+
 	best := bm.chain.BestSnapshot()
 	if !cfg.DisableCheckpoints {
 		// Initialize the next checkpoint based on the current height.
