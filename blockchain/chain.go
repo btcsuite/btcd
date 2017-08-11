@@ -81,7 +81,6 @@ type BlockChain struct {
 	db                  database.DB
 	chainParams         *chaincfg.Params
 	timeSource          MedianTimeSource
-	notifications       NotificationCallback
 	sigCache            *txscript.SigCache
 	indexManager        IndexManager
 	hashCache           *txscript.HashCache
@@ -168,6 +167,11 @@ type BlockChain struct {
 	// being mined.
 	unknownRulesWarned    bool
 	unknownVersionsWarned bool
+
+	// The notifications field stores a slice of callbacks to be executed on
+	// certain blockchain events.
+	notificationsLock sync.RWMutex
+	notifications     []NotificationCallback
 }
 
 // DisableVerify provides a mechanism to disable transaction script validation
@@ -1308,15 +1312,6 @@ type Config struct {
 	// time is adjusted to be in agreement with other peers.
 	TimeSource MedianTimeSource
 
-	// Notifications defines a callback to which notifications will be sent
-	// when various events take place.  See the documentation for
-	// Notification and NotificationType for details on the types and
-	// contents of notifications.
-	//
-	// This field can be nil if the caller is not interested in receiving
-	// notifications.
-	Notifications NotificationCallback
-
 	// SigCache defines a signature cache to use when when validating
 	// signatures.  This is typically most useful when individual
 	// transactions are already being validated prior to their inclusion in
@@ -1385,7 +1380,7 @@ func New(config *Config) (*BlockChain, error) {
 		db:                  config.DB,
 		chainParams:         params,
 		timeSource:          config.TimeSource,
-		notifications:       config.Notifications,
+		notifications:       make([]NotificationCallback, 0),
 		sigCache:            config.SigCache,
 		indexManager:        config.IndexManager,
 		minRetargetTimespan: targetTimespan / adjustmentFactor,
