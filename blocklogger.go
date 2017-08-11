@@ -43,8 +43,7 @@ func (b *blockProgressLogger) logBlockHeight(block *dcrutil.Block) {
 	b.Lock()
 	defer b.Unlock()
 	b.receivedLogBlocks++
-	b.receivedLogTx += int64(len(block.MsgBlock().Transactions)) +
-		int64(len(block.MsgBlock().STransactions))
+	b.receivedLogTx += int64(len(block.MsgBlock().Transactions))
 	b.receivedLogVotes += int64(block.MsgBlock().Header.Voters)
 	b.receivedLogRevocations += int64(block.MsgBlock().Header.Revocations)
 	b.receivedLogTickets += int64(block.MsgBlock().Header.FreshStake)
@@ -82,8 +81,8 @@ func (b *blockProgressLogger) logBlockHeight(block *dcrutil.Block) {
 	b.subsystemLogger.Infof("%s %d %s in the last %s (%d %s, %d %s, %d %s, %d %s, height "+
 		"%d, %s)",
 		b.progressAction, b.receivedLogBlocks, blockStr, tDuration,
-		b.receivedLogTx, txStr, b.receivedLogVotes, voteStr,
-		b.receivedLogTickets, ticketStr, b.receivedLogRevocations,
+		b.receivedLogTx, txStr, b.receivedLogTickets, ticketStr,
+		b.receivedLogVotes, voteStr, b.receivedLogRevocations,
 		revocationStr, block.Height(), block.MsgBlock().Header.Timestamp)
 
 	b.receivedLogBlocks = 0
