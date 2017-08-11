@@ -27,7 +27,6 @@ import (
 	"github.com/decred/dcrd/database"
 	_ "github.com/decred/dcrd/database/ffldb"
 	"github.com/decred/dcrd/mempool"
-	"github.com/decred/dcrd/wire"
 	"github.com/decred/dcrutil"
 )
 
@@ -48,7 +47,6 @@ const (
 	defaultBlockMinSize          = 0
 	defaultBlockMaxSize          = 375000
 	blockMaxSizeMin              = 1000
-	blockMaxSizeMax              = wire.MaxBlockPayload - 1000
 	defaultAddrIndex             = false
 	defaultGenerate              = false
 	defaultNoMiningStateSync     = false
@@ -779,7 +777,9 @@ func loadConfig() (*config, []string, error) {
 		return nil, nil, err
 	}
 
-	// Limit the max block size to a sane value.
+	// Ensure the specified max block size is not larger than the network will
+	// allow.  1000 bytes is subtracted from the max to account for overhead.
+	blockMaxSizeMax := uint32(activeNetParams.MaximumBlockSizes[0]) - 1000
 	if cfg.BlockMaxSize < blockMaxSizeMin || cfg.BlockMaxSize >
 		blockMaxSizeMax {
 
