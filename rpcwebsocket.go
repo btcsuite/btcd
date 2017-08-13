@@ -24,6 +24,7 @@ import (
 
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/btcjson"
+	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcd/txscript"
@@ -272,7 +273,7 @@ type wsClientFilter struct {
 // for a websocket client.
 //
 // NOTE: This extension was ported from github.com/decred/dcrd
-func newWSClientFilter(addresses []string, unspentOutPoints []wire.OutPoint) *wsClientFilter {
+func newWSClientFilter(addresses []string, unspentOutPoints []wire.OutPoint, params *chaincfg.Params) *wsClientFilter {
 	filter := &wsClientFilter{
 		pubKeyHashes:        map[[ripemd160.Size]byte]struct{}{},
 		scriptHashes:        map[[ripemd160.Size]byte]struct{}{},
@@ -283,7 +284,7 @@ func newWSClientFilter(addresses []string, unspentOutPoints []wire.OutPoint) *ws
 	}
 
 	for _, s := range addresses {
-		filter.addAddressStr(s)
+		filter.addAddressStr(s, params)
 	}
 	for i := range unspentOutPoints {
 		filter.addUnspentOutPoint(&unspentOutPoints[i])
@@ -327,11 +328,11 @@ func (f *wsClientFilter) addAddress(a btcutil.Address) {
 // wsClientFilter using addAddress.
 //
 // NOTE: This extension was ported from github.com/decred/dcrd
-func (f *wsClientFilter) addAddressStr(s string) {
+func (f *wsClientFilter) addAddressStr(s string, params *chaincfg.Params) {
 	// If address can't be decoded, no point in saving it since it should also
 	// impossible to create the address from an inspected transaction output
 	// script.
-	a, err := btcutil.DecodeAddress(s, activeNetParams.Params)
+	a, err := btcutil.DecodeAddress(s, params)
 	if err != nil {
 		return
 	}
@@ -411,8 +412,8 @@ func (f *wsClientFilter) removeAddress(a btcutil.Address) {
 // wsClientFilter using removeAddress.
 //
 // NOTE: This extension was ported from github.com/decred/dcrd
-func (f *wsClientFilter) removeAddressStr(s string) {
-	a, err := btcutil.DecodeAddress(s, activeNetParams.Params)
+func (f *wsClientFilter) removeAddressStr(s string, params *chaincfg.Params) {
+	a, err := btcutil.DecodeAddress(s, params)
 	if err == nil {
 		f.removeAddress(a)
 	} else {
@@ -1786,16 +1787,19 @@ func handleLoadTxFilter(wsc *wsClient, icmd interface{}) (interface{}, error) {
 		}
 	}
 
+	params := wsc.server.cfg.ChainParams
+
 	wsc.Lock()
 	if cmd.Reload || wsc.filterData == nil {
-		wsc.filterData = newWSClientFilter(cmd.Addresses, outPoints)
+		wsc.filterData = newWSClientFilter(cmd.Addresses, outPoints,
+			params)
 		wsc.Unlock()
 	} else {
 		wsc.Unlock()
 
 		wsc.filterData.mu.Lock()
 		for _, a := range cmd.Addresses {
-			wsc.filterData.addAddressStr(a)
+			wsc.filterData.addAddressStr(a, params)
 		}
 		for i := range outPoints {
 			wsc.filterData.addUnspentOutPoint(&outPoints[i])
@@ -1873,7 +1877,7 @@ func handleNotifyReceived(wsc *wsClient, icmd interface{}) (interface{}, error) 
 
 	// Decode addresses to validate input, but the strings slice is used
 	// directly if these are all ok.
-	err := checkAddressValidity(cmd.Addresses)
+	err := checkAddressValidity(cmd.Addresses, wsc.server.cfg.ChainParams)
 	if err != nil {
 		return nil, err
 	}
@@ -1912,7 +1916,7 @@ func handleStopNotifyReceived(wsc *wsClient, icmd interface{}) (interface{}, err
 
 	// Decode addresses to validate input, but the strings slice is used
 	// directly if these are all ok.
-	err := checkAddressValidity(cmd.Addresses)
+	err := checkAddressValidity(cmd.Addresses, wsc.server.cfg.ChainParams)
 	if err != nil {
 		return nil, err
 	}
@@ -1928,9 +1932,9 @@ func handleStopNotifyReceived(wsc *wsClient, icmd interface{}) (interface{}, err
 // string slice. It does this by attempting to decode each address using the
 // current active network parameters. If any single address fails to decode
 // properly, the function returns an error. Otherwise, nil is returned.
-func checkAddressValidity(addrs []string) error {
+func checkAddressValidity(addrs []string, params *chaincfg.Params) error {
 	for _, addr := range addrs {
-		_, err := btcutil.DecodeAddress(addr, activeNetParams.Params)
+		_, err := btcutil.DecodeAddress(addr, params)
 		if err != nil {
 			return &btcjson.RPCError{
 				Code: btcjson.ErrRPCInvalidAddressOrKey,
@@ -2124,7 +2128,7 @@ func rescanBlock(wsc *wsClient, lookups *rescanKeys, blk *btcutil.Block) {
 // a string slice.
 //
 // NOTE: This extension is ported from github.com/decred/dcrd
-func rescanBlockFilter(filter *wsClientFilter, block *btcutil.Block) []string {
+func rescanBlockFilter(filter *wsClientFilter, block *btcutil.Block, params *chaincfg.Params) []string {
 	var transactions []string
 
 	filter.mu.Lock()
@@ -2153,8 +2157,7 @@ func rescanBlockFilter(filter *wsClientFilter, block *btcutil.Block) []string {
 		// Scan outputs.
 		for i, output := range msgTx.TxOut {
 			_, addrs, _, err := txscript.ExtractPkScriptAddrs(
-				output.PkScript,
-				activeNetParams.Params)
+				output.PkScript, params)
 			if err != nil {
 				continue
 			}
@@ -2219,6 +2222,7 @@ func handleRescanBlocks(wsc *wsClient, icmd interface{}) (interface{}, error) {
 	// Iterate over each block in the request and rescan.  When a block
 	// contains relevant transactions, add it to the response.
 	bc := wsc.server.cfg.Chain
+	params := wsc.server.cfg.ChainParams
 	var lastBlockHash *chainhash.Hash
 	for i := range blockHashes {
 		block, err := bc.BlockByHash(blockHashes[i])
@@ -2237,7 +2241,7 @@ func handleRescanBlocks(wsc *wsClient, icmd interface{}) (interface{}, error) {
 		}
 		lastBlockHash = blockHashes[i]
 
-		transactions := rescanBlockFilter(filter, block)
+		transactions := rescanBlockFilter(filter, block, params)
 		if len(transactions) != 0 {
 			discoveredData = append(discoveredData, btcjson.RescannedBlock{
 				Hash:         cmd.BlockHashes[i],
@@ -2342,8 +2346,9 @@ func handleRescan(wsc *wsClient, icmd interface{}) (interface{}, error) {
 	}
 	var compressedPubkey [33]byte
 	var uncompressedPubkey [65]byte
+	params := wsc.server.cfg.ChainParams
 	for _, addrStr := range cmd.Addresses {
-		addr, err := btcutil.DecodeAddress(addrStr, activeNetParams.Params)
+		addr, err := btcutil.DecodeAddress(addrStr, params)
 		if err != nil {
 			jsonErr := btcjson.RPCError{
 				Code: btcjson.ErrRPCInvalidAddressOrKey,
