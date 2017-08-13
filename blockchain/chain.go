@@ -307,6 +307,15 @@ type StakeVersions struct {
 // GetStakeVersions returns a cooked array of StakeVersions.  We do this in
 // order to not bloat memory by returning raw blocks.
 func (b *BlockChain) GetStakeVersions(hash *chainhash.Hash, count int32) ([]StakeVersions, error) {
+	exists, err := b.HaveBlock(hash)
+	if err != nil {
+		return nil, err
+	}
+
+	if !exists {
+		return nil, fmt.Errorf("hash '%s' not found on chain", hash.String())
+	}
+
 	// Nothing to do if no count requested.
 	if count == 0 {
 		return nil, nil
