@@ -2471,18 +2471,10 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 	// Create a new block chain instance with the appropriate configuration.
 	var err error
 	s.chain, err = blockchain.New(&blockchain.Config{
-		DB:          s.db,
-		ChainParams: s.chainParams,
-		Checkpoints: checkpoints,
-		TimeSource:  s.timeSource,
-		// TODO: Modify blockchain to be able to register multiple listeners and
-		// have the block manager and RPC server subscribe directly.
-		Notifications: func(notification *blockchain.Notification) {
-			s.blockManager.handleBlockchainNotification(notification)
-			if s.rpcServer != nil {
-				s.rpcServer.handleBlockchainNotification(notification)
-			}
-		},
+		DB:           s.db,
+		ChainParams:  s.chainParams,
+		Checkpoints:  checkpoints,
+		TimeSource:   s.timeSource,
 		SigCache:     s.sigCache,
 		IndexManager: indexManager,
 		HashCache:    s.hashCache,
@@ -2509,14 +2501,18 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 		CalcSequenceLock: func(tx *btcutil.Tx, view *blockchain.UtxoViewpoint) (*blockchain.SequenceLock, error) {
 			return s.chain.CalcSequenceLock(tx, view, true)
 		},
-		IsDeploymentActive: bm.chain.IsDeploymentActive,
+		IsDeploymentActive: s.chain.IsDeploymentActive,
 		SigCache:           s.sigCache,
 		HashCache:          s.hashCache,
 		AddrIndex:          s.addrIndex,
 	}
 	s.txMemPool = mempool.New(&txC)
 
-	s.blockManager, err = newBlockManager(&s, indexManager, s.chain, s.txMemPool)
+	s.blockManager, err = newBlockManager(&blockManagerConfig{
+		PeerNotifier: &s,
+		Chain:        s.chain,
+		TxMemPool:    s.txMemPool,
+	})
 	if err != nil {
 		return nil, err
 	}

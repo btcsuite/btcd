@@ -133,10 +133,30 @@ type headerNode struct {
 	hash   *chainhash.Hash
 }
 
+// PeerNotifier exposes methods to notify peers of status changes to
+// transactions, blocks, etc. Currently server implements this interface.
+type PeerNotifier interface {
+	AnnounceNewTransactions(newTxs []*mempool.TxDesc)
+
+	UpdatePeerHeights(latestBlkHash *chainhash.Hash, latestHeight int32, updateSource *serverPeer)
+
+	RelayInventory(invVect *wire.InvVect, data interface{})
+
+	TransactionConfirmed(tx *btcutil.Tx)
+}
+
+// blockManangerConfig is a configuration struct used to initialize a new
+// blockManager.
+type blockManagerConfig struct {
+	PeerNotifier PeerNotifier
+	Chain        *blockchain.BlockChain
+	TxMemPool    *mempool.TxPool
+}
+
 // blockManager provides a concurrency safe block manager for handling all
 // incoming blocks.
 type blockManager struct {
-	server          *server
+	peerNotifier    PeerNotifier
 	started         int32
 	shutdown        int32
 	chain           *blockchain.BlockChain
@@ -467,7 +487,7 @@ func (b *blockManager) handleTxMsg(tmsg *txMsg) {
 		return
 	}
 
-	b.server.AnnounceNewTransactions(acceptedTxs)
+	b.peerNotifier.AnnounceNewTransactions(acceptedTxs)
 }
 
 // current returns true if we believe we are synced with our peers, false if we
@@ -631,7 +651,7 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 	if blkHashUpdate != nil && heightUpdate != 0 {
 		bmsg.peer.UpdateLastBlockHeight(heightUpdate)
 		if isOrphan || b.current() {
-			go b.server.UpdatePeerHeights(blkHashUpdate, heightUpdate, bmsg.peer)
+			go b.peerNotifier.UpdatePeerHeights(blkHashUpdate, heightUpdate, bmsg.peer)
 		}
 	}
 
@@ -1182,7 +1202,7 @@ func (b *blockManager) handleBlockchainNotification(notification *blockchain.Not
 
 		// Generate the inventory vector and relay it.
 		iv := wire.NewInvVect(wire.InvTypeBlock, block.Hash())
-		b.server.RelayInventory(iv, block.MsgBlock().Header)
+		b.peerNotifier.RelayInventory(iv, block.MsgBlock().Header)
 
 	// A block has been connected to the main block chain.
 	case blockchain.NTBlockConnected:
@@ -1203,9 +1223,9 @@ func (b *blockManager) handleBlockchainNotification(notification *blockchain.Not
 			b.txMemPool.RemoveTransaction(tx, false)
 			b.txMemPool.RemoveDoubleSpends(tx)
 			b.txMemPool.RemoveOrphan(tx)
-			b.server.TransactionConfirmed(tx)
+			b.peerNotifier.TransactionConfirmed(tx)
 			acceptedTxs := b.txMemPool.ProcessOrphans(tx)
-			b.server.AnnounceNewTransactions(acceptedTxs)
+			b.peerNotifier.AnnounceNewTransactions(acceptedTxs)
 		}
 
 	// A block has been disconnected from the main block chain.
@@ -1360,14 +1380,11 @@ func (b *blockManager) Pause() chan<- struct{} {
 
 // newBlockManager returns a new bitcoin block manager.
 // Use Start to begin processing asynchronous block and inv updates.
-func newBlockManager(
-	s *server, indexManager blockchain.IndexManager,
-	chain *blockchain.BlockChain, txMemPool *mempool.TxPool,
-) (*blockManager, error) {
+func newBlockManager(config *blockManagerConfig) (*blockManager, error) {
 	bm := blockManager{
-		server:          s,
-		chain:           chain,
-		txMemPool:       txMemPool,
+		peerNotifier:    config.PeerNotifier,
+		chain:           config.Chain,
+		txMemPool:       config.TxMemPool,
 		rejectedTxns:    make(map[chainhash.Hash]struct{}),
 		requestedTxns:   make(map[chainhash.Hash]struct{}),
 		requestedBlocks: make(map[chainhash.Hash]struct{}),
@@ -1376,9 +1393,6 @@ func newBlockManager(
 		headerList:      list.New(),
 		quit:            make(chan struct{}),
 	}
-
-	// Register blockchain notification callbacks
-	bm.chain.Subscribe(bm.handleNotifyMsg)
 
 	best := bm.chain.BestSnapshot()
 	if !cfg.DisableCheckpoints {
@@ -1390,6 +1404,8 @@ func newBlockManager(
 	} else {
 		bmgrLog.Info("Checkpoints are disabled")
 	}
+
+	bm.chain.Subscribe(bm.handleBlockchainNotification)
 
 	return &bm, nil
 }

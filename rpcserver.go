@@ -4095,9 +4095,13 @@ func newRPCServer(listenAddrs []string, generator *mining.BlkTmplGenerator, s *s
 
 	rpc.listeners = listeners
 
+	s.chain.Subscribe(rpc.handleBlockchainNotification)
+
 	return &rpc, nil
 }
 
+// Callback for notifications from blockchain.  It notifies clients that are
+// long polling for changes or subscribed to websockets notifications.
 func (s *rpcServer) handleBlockchainNotification(notification *blockchain.Notification) {
 	switch notification.Type {
 	case blockchain.NTBlockAccepted:
