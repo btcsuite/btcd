@@ -348,9 +348,7 @@ type SequenceLock struct {
 // the candidate transaction to be included in a block.
 //
 // This function is safe for concurrent access.
-func (b *BlockChain) CalcSequenceLock(tx *btcutil.Tx, utxoView *UtxoViewpoint,
-	mempool bool) (*SequenceLock, error) {
-
+func (b *BlockChain) CalcSequenceLock(tx *btcutil.Tx, utxoView *UtxoViewpoint, mempool bool) (*SequenceLock, error) {
 	b.chainLock.Lock()
 	defer b.chainLock.Unlock()
 
@@ -361,9 +359,7 @@ func (b *BlockChain) CalcSequenceLock(tx *btcutil.Tx, utxoView *UtxoViewpoint,
 // transaction. See the exported version, CalcSequenceLock for further details.
 //
 // This function MUST be called with the chain state lock held (for writes).
-func (b *BlockChain) calcSequenceLock(node *blockNode, tx *btcutil.Tx,
-	utxoView *UtxoViewpoint, mempool bool) (*SequenceLock, error) {
-
+func (b *BlockChain) calcSequenceLock(node *blockNode, tx *btcutil.Tx, utxoView *UtxoViewpoint, mempool bool) (*SequenceLock, error) {
 	// A value of -1 for each relative lock type represents a relative time
 	// lock value that will allow a transaction to be included in a block
 	// at any given height or time. This value is returned as the relative
@@ -411,10 +407,11 @@ func (b *BlockChain) calcSequenceLock(node *blockNode, tx *btcutil.Tx,
 	for txInIndex, txIn := range mTx.TxIn {
 		utxo := utxoView.LookupEntry(&txIn.PreviousOutPoint.Hash)
 		if utxo == nil {
-			str := fmt.Sprintf("unable to find unspent output "+
-				"%v referenced from transaction %s:%d",
-				txIn.PreviousOutPoint, tx.Hash(), txInIndex)
-			return sequenceLock, ruleError(ErrMissingTx, str)
+			str := fmt.Sprintf("output %v referenced from "+
+				"transaction %s:%d either does not exist or "+
+				"has already been spent", txIn.PreviousOutPoint,
+				tx.Hash(), txInIndex)
+			return sequenceLock, ruleError(ErrMissingTxOut, str)
 		}
 
 		// If the input height is set to the mempool height, then we

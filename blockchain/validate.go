@@ -389,10 +389,11 @@ func CountP2SHSigOps(tx *btcutil.Tx, isCoinBaseTx bool, utxoView *UtxoViewpoint)
 		originTxIndex := txIn.PreviousOutPoint.Index
 		txEntry := utxoView.LookupEntry(originTxHash)
 		if txEntry == nil || txEntry.IsOutputSpent(originTxIndex) {
-			str := fmt.Sprintf("unable to find unspent output "+
-				"%v referenced from transaction %s:%d",
-				txIn.PreviousOutPoint, tx.Hash(), txInIndex)
-			return 0, ruleError(ErrMissingTx, str)
+			str := fmt.Sprintf("output %v referenced from "+
+				"transaction %s:%d either does not exist or "+
+				"has already been spent", txIn.PreviousOutPoint,
+				tx.Hash(), txInIndex)
+			return 0, ruleError(ErrMissingTxOut, str)
 		}
 
 		// We're only interested in pay-to-script-hash types, so skip
@@ -897,12 +898,14 @@ func CheckTransactionInputs(tx *btcutil.Tx, txHeight int32, utxoView *UtxoViewpo
 	for txInIndex, txIn := range tx.MsgTx().TxIn {
 		// Ensure the referenced input transaction is available.
 		originTxHash := &txIn.PreviousOutPoint.Hash
+		originTxIndex := txIn.PreviousOutPoint.Index
 		utxoEntry := utxoView.LookupEntry(originTxHash)
-		if utxoEntry == nil {
-			str := fmt.Sprintf("unable to find unspent output "+
-				"%v referenced from transaction %s:%d",
-				txIn.PreviousOutPoint, tx.Hash(), txInIndex)
-			return 0, ruleError(ErrMissingTx, str)
+		if utxoEntry == nil || utxoEntry.IsOutputSpent(originTxIndex) {
+			str := fmt.Sprintf("output %v referenced from "+
+				"transaction %s:%d either does not exist or "+
+				"has already been spent", txIn.PreviousOutPoint,
+				tx.Hash(), txInIndex)
+			return 0, ruleError(ErrMissingTxOut, str)
 		}
 
 		// Ensure the transaction is not spending coins which have not
@@ -920,15 +923,6 @@ func CheckTransactionInputs(tx *btcutil.Tx, txHeight int32, utxoView *UtxoViewpo
 					coinbaseMaturity)
 				return 0, ruleError(ErrImmatureSpend, str)
 			}
-		}
-
-		// Ensure the transaction is not double spending coins.
-		originTxIndex := txIn.PreviousOutPoint.Index
-		if utxoEntry.IsOutputSpent(originTxIndex) {
-			str := fmt.Sprintf("transaction %s:%d tried to double "+
-				"spend output %v", txHash, txInIndex,
-				txIn.PreviousOutPoint)
-			return 0, ruleError(ErrDoubleSpend, str)
 		}
 
 		// Ensure the transaction amounts are in range.  Each of the
@@ -1017,7 +1011,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block, vi
 	// an error now.
 	if node.hash.IsEqual(b.chainParams.GenesisHash) {
 		str := "the coinbase for the genesis block is not spendable"
-		return ruleError(ErrMissingTx, str)
+		return ruleError(ErrMissingTxOut, str)
 	}
 
 	// Ensure the view is for the node being checked.

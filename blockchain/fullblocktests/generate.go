@@ -997,7 +997,7 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 	acceptedToSideChainWithExpectedTip("b6")
 
 	g.nextBlock("b8", outs[4])
-	rejected(blockchain.ErrMissingTx)
+	rejected(blockchain.ErrMissingTxOut)
 
 	// ---------------------------------------------------------------------
 	// Too much proof-of-work coinbase tests.
@@ -1078,7 +1078,7 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 	//    \-> b3(1) -> b4(2)
 	g.setTip("b15")
 	g.nextBlock("b17", &b3Tx1Out)
-	rejected(blockchain.ErrMissingTx)
+	rejected(blockchain.ErrMissingTxOut)
 
 	// Create block that forks and spends a tx created on a third fork.
 	//
@@ -1090,7 +1090,7 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 	acceptedToSideChainWithExpectedTip("b15")
 
 	g.nextBlock("b19", outs[6])
-	rejected(blockchain.ErrMissingTx)
+	rejected(blockchain.ErrMissingTxOut)
 
 	// ---------------------------------------------------------------------
 	// Immature coinbase tests.
@@ -1278,11 +1278,11 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 	doubleSpendTx := createSpendTx(outs[11], lowFee)
 	g.nextBlock("b37", outs[11], additionalTx(doubleSpendTx))
 	b37Tx1Out := makeSpendableOut(g.tip, 1, 0)
-	rejected(blockchain.ErrDoubleSpend)
+	rejected(blockchain.ErrMissingTxOut)
 
 	g.setTip("b35")
 	g.nextBlock("b38", &b37Tx1Out)
-	rejected(blockchain.ErrMissingTx)
+	rejected(blockchain.ErrMissingTxOut)
 
 	// ---------------------------------------------------------------------
 	// Pay-to-script-hash signature operation count tests.
@@ -1536,7 +1536,7 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 		b.Transactions[1].TxIn[0].PreviousOutPoint.Hash = *hash
 		b.Transactions[1].TxIn[0].PreviousOutPoint.Index = 0
 	})
-	rejected(blockchain.ErrMissingTx)
+	rejected(blockchain.ErrMissingTxOut)
 
 	// ---------------------------------------------------------------------
 	// Block header median time tests.
@@ -1688,7 +1688,7 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 	g.nextBlock("b58", outs[17], func(b *wire.MsgBlock) {
 		b.Transactions[1].TxIn[0].PreviousOutPoint.Index = 42
 	})
-	rejected(blockchain.ErrMissingTx)
+	rejected(blockchain.ErrMissingTxOut)
 
 	// Create block with transaction that pays more than its inputs.
 	//
@@ -1816,7 +1816,7 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 		b.AddTransaction(tx3)
 		b.AddTransaction(tx2)
 	})
-	rejected(blockchain.ErrMissingTx)
+	rejected(blockchain.ErrMissingTxOut)
 
 	// Create block that double spends a transaction created in the same
 	// block.
@@ -1831,7 +1831,7 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 		b.AddTransaction(tx3)
 		b.AddTransaction(tx4)
 	})
-	rejected(blockchain.ErrDoubleSpend)
+	rejected(blockchain.ErrMissingTxOut)
 
 	// ---------------------------------------------------------------------
 	// Extra subsidy tests.
@@ -2022,7 +2022,7 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 	// to effective negate that behavior.
 	b75OpReturnOut.amount++
 	g.nextBlock("b80", &b75OpReturnOut)
-	rejected(blockchain.ErrMissingTx)
+	rejected(blockchain.ErrMissingTxOut)
 
 	// Create a block that has a transaction with multiple OP_RETURNs.  Even
 	// though it's not considered a standard transaction, it is still valid

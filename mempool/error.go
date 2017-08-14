@@ -74,8 +74,6 @@ func extractRejectCode(err error) (wire.RejectCode, bool) {
 		switch err.ErrorCode {
 		// Rejected due to duplicate.
 		case blockchain.ErrDuplicateBlock:
-			fallthrough
-		case blockchain.ErrDoubleSpend:
 			code = wire.RejectDuplicate
 
 		// Rejected due to obsolete version.

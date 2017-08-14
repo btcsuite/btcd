@@ -91,10 +91,12 @@ func GetSigOpCost(tx *btcutil.Tx, isCoinBaseTx bool, utxoView *UtxoViewpoint,
 			originTxIndex := txIn.PreviousOutPoint.Index
 			txEntry := utxoView.LookupEntry(originTxHash)
 			if txEntry == nil || txEntry.IsOutputSpent(originTxIndex) {
-				str := fmt.Sprintf("unable to find unspent output "+
-					"%v referenced from transaction %s:%d",
-					txIn.PreviousOutPoint, tx.Hash(), txInIndex)
-				return 0, ruleError(ErrMissingTx, str)
+				str := fmt.Sprintf("output %v referenced from "+
+					"transaction %s:%d either does not "+
+					"exist or has already been spent",
+					txIn.PreviousOutPoint, tx.Hash(),
+					txInIndex)
+				return 0, ruleError(ErrMissingTxOut, str)
 			}
 
 			witness := txIn.Witness
