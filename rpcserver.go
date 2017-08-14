@@ -2152,19 +2152,18 @@ func handleGetHashesPerSec(s *rpcServer, cmd interface{}, closeChan <-chan struc
 
 // handleGetHeaders implements the getheaders command.
 //
-// NOTE: This is a btcsuite extension ported from
+// NOTE: This is a btcsuite extension originally ported from
 // github.com/decred/dcrd.
 func handleGetHeaders(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	c := cmd.(*btcjson.GetHeadersCmd)
+
+	// Fetch the requested headers from chain while respecting the provided
+	// block locators and stop hash.
 	blockLocators := make([]*chainhash.Hash, len(c.BlockLocators))
 	for i := range c.BlockLocators {
 		blockLocator, err := chainhash.NewHashFromStr(c.BlockLocators[i])
 		if err != nil {
-			return nil, &btcjson.RPCError{
-				Code: btcjson.ErrRPCInvalidParameter,
-				Message: "Failed to decode block locator: " +
-					err.Error(),
-			}
+			return nil, rpcDecodeHexError(c.BlockLocators[i])
 		}
 		blockLocators[i] = blockLocator
 	}
@@ -2172,32 +2171,34 @@ func handleGetHeaders(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) 
 	if c.HashStop != "" {
 		err := chainhash.Decode(&hashStop, c.HashStop)
 		if err != nil {
-			return nil, &btcjson.RPCError{
-				Code:    btcjson.ErrRPCInvalidParameter,
-				Message: "Failed to decode hashstop: " + err.Error(),
-			}
+			return nil, rpcDecodeHexError(c.HashStop)
 		}
 	}
 	blockHashes, err := s.server.locateBlocks(blockLocators, &hashStop)
 	if err != nil {
 		return nil, &btcjson.RPCError{
 			Code: btcjson.ErrRPCDatabase,
-			Message: "Failed to fetch hashes of block " +
-				"headers: " + err.Error(),
-		}
-	}
-	blockHeaders, err := fetchHeaders(s.chain, blockHashes)
-	if err != nil {
-		return nil, &btcjson.RPCError{
-			Code: btcjson.ErrRPCDatabase,
-			Message: "Failed to fetch headers of located blocks: " +
+			Message: "Failed to fetch hashes of block headers: " +
 				err.Error(),
 		}
 	}
+	headers := make([]wire.BlockHeader, 0, len(blockHashes))
+	for i := range blockHashes {
+		header, err := s.chain.FetchHeader(&blockHashes[i])
+		if err != nil {
+			return nil, &btcjson.RPCError{
+				Code: btcjson.ErrRPCBlockNotFound,
+				Message: "Failed to fetch header of block: " +
+					err.Error(),
+			}
+		}
+		headers = append(headers, header)
+	}
 
-	hexBlockHeaders := make([]string, len(blockHeaders))
+	// Return the serialized block headers as hex-encoded strings.
+	hexBlockHeaders := make([]string, len(headers))
 	var buf bytes.Buffer
-	for i, h := range blockHeaders {
+	for i, h := range headers {
 		err := h.Serialize(&buf)
 		if err != nil {
 			return nil, internalRPCError(err.Error(),
