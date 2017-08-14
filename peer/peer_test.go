@@ -58,7 +58,10 @@ func (c conn) RemoteAddr() net.Addr {
 
 // Close handles closing the connection.
 func (c conn) Close() error {
-	return nil
+	if c.Closer == nil {
+		return nil
+	}
+	return c.Closer.Close()
 }
 
 func (c conn) SetDeadline(t time.Time) error      { return nil }
@@ -80,9 +83,11 @@ func pipe(c1, c2 *conn) (*conn, *conn) {
 	r2, w2 := io.Pipe()
 
 	c1.Writer = w1
+	c1.Closer = w1
 	c2.Reader = r1
 	c1.Reader = r2
 	c2.Writer = w2
+	c2.Closer = w2
 
 	return c1, c2
 }
@@ -671,6 +676,109 @@ func TestOutboundPeer(t *testing.T) {
 	p2.QueueMessage(wire.NewMsgFeeFilter(20000), nil)
 
 	p2.Disconnect()
+}
+
+// Tests that the node disconnects from peers with an unsupported protocol
+// version.
+func TestUnsupportedVersionPeer(t *testing.T) {
+	peerCfg := &peer.Config{
+		UserAgentName:     "peer",
+		UserAgentVersion:  "1.0",
+		UserAgentComments: []string{"comment"},
+		ChainParams:       &chaincfg.MainNetParams,
+		Services:          0,
+	}
+
+	localNA := wire.NewNetAddressIPPort(
+		net.ParseIP("10.0.0.1"),
+		uint16(8333),
+		wire.SFNodeNetwork,
+	)
+	remoteNA := wire.NewNetAddressIPPort(
+		net.ParseIP("10.0.0.2"),
+		uint16(8333),
+		wire.SFNodeNetwork,
+	)
+	localConn, remoteConn := pipe(
+		&conn{laddr: "10.0.0.1:8333", raddr: "10.0.0.2:8333"},
+		&conn{laddr: "10.0.0.2:8333", raddr: "10.0.0.1:8333"},
+	)
+
+	p, err := peer.NewOutboundPeer(peerCfg, "10.0.0.1:8333")
+	if err != nil {
+		t.Fatalf("NewOutboundPeer: unexpected err - %v\n", err)
+	}
+	p.AssociateConnection(localConn)
+
+	// Read outbound messages to peer into a channel
+	outboundMessages := make(chan wire.Message)
+	go func() {
+		for {
+			_, msg, _, err := wire.ReadMessageN(
+				remoteConn,
+				p.ProtocolVersion(),
+				peerCfg.ChainParams.Net,
+			)
+			if err == io.EOF {
+				close(outboundMessages)
+				return
+			}
+			if err != nil {
+				t.Errorf("Error reading message from local node: %v\n", err)
+				return
+			}
+
+			outboundMessages <- msg
+		}
+	}()
+
+	// Read version message sent to remote peer
+	select {
+	case msg := <-outboundMessages:
+		if _, ok := msg.(*wire.MsgVersion); !ok {
+			t.Fatalf("Expected version message, got [%s]", msg.Command())
+		}
+	case <-time.After(time.Second):
+		t.Fatal("Peer did not send version message")
+	}
+
+	// Remote peer writes version message advertising invalid protocol version 1
+	invalidVersionMsg := wire.NewMsgVersion(remoteNA, localNA, 0, 0)
+	invalidVersionMsg.ProtocolVersion = 1
+
+	_, err = wire.WriteMessageN(
+		remoteConn.Writer,
+		invalidVersionMsg,
+		uint32(invalidVersionMsg.ProtocolVersion),
+		peerCfg.ChainParams.Net,
+	)
+	if err != nil {
+		t.Fatalf("wire.WriteMessageN: unexpected err - %v\n", err)
+	}
+
+	// Expect peer to disconnect automatically
+	disconnected := make(chan struct{})
+	go func() {
+		p.WaitForDisconnect()
+		disconnected <- struct{}{}
+	}()
+
+	select {
+	case <-disconnected:
+		close(disconnected)
+	case <-time.After(time.Second):
+		t.Fatal("Peer did not automatically disconnect")
+	}
+
+	// Expect no further outbound messages from peer
+	select {
+	case msg, chanOpen := <-outboundMessages:
+		if chanOpen {
+			t.Fatalf("Expected no further messages, received [%s]", msg.Command())
+		}
+	case <-time.After(time.Second):
+		t.Fatal("Timeout waiting for remote reader to close")
+	}
 }
 
 func init() {

@@ -29,6 +29,10 @@ const (
 	// MaxProtocolVersion is the max protocol version the peer supports.
 	MaxProtocolVersion = wire.FeeFilterVersion
 
+	// minAcceptableProtocolVersion is the lowest protocol version that a
+	// connected peer may support.
+	minAcceptableProtocolVersion = wire.MultipleAddressVersion
+
 	// outputBufferSize is the number of elements the output channels use.
 	outputBufferSize = 50
 
@@ -1012,15 +1016,14 @@ func (p *Peer) handleRemoteVersionMsg(msg *wire.MsgVersion) error {
 
 	// Notify and disconnect clients that have a protocol version that is
 	// too old.
-	if msg.ProtocolVersion < int32(wire.MultipleAddressVersion) {
-		// Send a reject message indicating the protocol version is
-		// obsolete and wait for the message to be sent before
-		// disconnecting.
+	//
+	// NOTE: If minAcceptableProtocolVersion is raised to be higher than
+	// wire.RejectVersion, this should send a reject packet before
+	// disconnecting.
+	if uint32(msg.ProtocolVersion) < minAcceptableProtocolVersion {
 		reason := fmt.Sprintf("protocol version must be %d or greater",
-			wire.MultipleAddressVersion)
-		rejectMsg := wire.NewMsgReject(msg.Command(), wire.RejectObsolete,
-			reason)
-		return p.writeMessage(rejectMsg, wire.LatestEncoding)
+			minAcceptableProtocolVersion)
+		return errors.New(reason)
 	}
 
 	// Updating a bunch of stats including block based stats, and the
@@ -1412,9 +1415,8 @@ cleanup:
 // inHandler handles all incoming messages for the peer.  It must be run as a
 // goroutine.
 func (p *Peer) inHandler() {
-	// Peers must complete the initial version negotiation within a shorter
-	// timeframe than a general idle timeout.  The timer is then reset below
-	// to idleTimeout for all future messages.
+	// The timer is stopped when a new message is received and reset after it
+	// is processed.
 	idleTimer := time.AfterFunc(idleTimeout, func() {
 		log.Warnf("Peer %s no answer for %s -- disconnecting", p, idleTimeout)
 		p.Disconnect()
