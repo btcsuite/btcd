@@ -108,6 +108,7 @@ type peerStats struct {
 	wantTimeOffset      int64
 	wantBytesSent       uint64
 	wantBytesReceived   uint64
+	wantWitnessEnabled  bool
 }
 
 // testPeer tests the given peer's flags and stats
@@ -185,6 +186,12 @@ func testPeer(t *testing.T, p *peer.Peer, s peerStats) {
 		return
 	}
 
+	if p.IsWitnessEnabled() != s.wantWitnessEnabled {
+		t.Errorf("testPeer: wrong WitnessEnabled - got %v, want %v",
+			p.IsWitnessEnabled(), s.wantWitnessEnabled)
+		return
+	}
+
 	stats := p.StatsSnapshot()
 
 	if p.ID() != stats.ID {
@@ -211,7 +218,7 @@ func testPeer(t *testing.T, p *peer.Peer, s peerStats) {
 // TestPeerConnection tests connection between inbound and outbound peers.
 func TestPeerConnection(t *testing.T) {
 	verack := make(chan struct{})
-	peerCfg := &peer.Config{
+	peer1Cfg := &peer.Config{
 		Listeners: peer.MessageListeners{
 			OnVerAck: func(p *peer.Peer, msg *wire.MsgVerAck) {
 				verack <- struct{}{}
@@ -227,12 +234,22 @@ func TestPeerConnection(t *testing.T) {
 		UserAgentVersion:  "1.0",
 		UserAgentComments: []string{"comment"},
 		ChainParams:       &chaincfg.MainNetParams,
+		ProtocolVersion:   wire.RejectVersion, // Configure with older version
 		Services:          0,
 	}
-	wantStats := peerStats{
+	peer2Cfg := &peer.Config{
+		Listeners:         peer1Cfg.Listeners,
+		UserAgentName:     "peer",
+		UserAgentVersion:  "1.0",
+		UserAgentComments: []string{"comment"},
+		ChainParams:       &chaincfg.MainNetParams,
+		Services:          wire.SFNodeNetwork | wire.SFNodeWitness,
+	}
+
+	wantStats1 := peerStats{
 		wantUserAgent:       wire.DefaultUserAgent + "peer:1.0(comment)/",
 		wantServices:        0,
-		wantProtocolVersion: peer.MaxProtocolVersion,
+		wantProtocolVersion: wire.RejectVersion,
 		wantConnected:       true,
 		wantVersionKnown:    true,
 		wantVerAckReceived:  true,
@@ -242,7 +259,24 @@ func TestPeerConnection(t *testing.T) {
 		wantTimeOffset:      int64(0),
 		wantBytesSent:       167, // 143 version + 24 verack
 		wantBytesReceived:   167,
+		wantWitnessEnabled:  false,
 	}
+	wantStats2 := peerStats{
+		wantUserAgent:       wire.DefaultUserAgent + "peer:1.0(comment)/",
+		wantServices:        wire.SFNodeNetwork | wire.SFNodeWitness,
+		wantProtocolVersion: wire.RejectVersion,
+		wantConnected:       true,
+		wantVersionKnown:    true,
+		wantVerAckReceived:  true,
+		wantLastPingTime:    time.Time{},
+		wantLastPingNonce:   uint64(0),
+		wantLastPingMicros:  int64(0),
+		wantTimeOffset:      int64(0),
+		wantBytesSent:       167, // 143 version + 24 verack
+		wantBytesReceived:   167,
+		wantWitnessEnabled:  true,
+	}
+
 	tests := []struct {
 		name  string
 		setup func() (*peer.Peer, *peer.Peer, error)
@@ -254,10 +288,10 @@ func TestPeerConnection(t *testing.T) {
 					&conn{raddr: "10.0.0.1:8333"},
 					&conn{raddr: "10.0.0.2:8333"},
 				)
-				inPeer := peer.NewInboundPeer(peerCfg)
+				inPeer := peer.NewInboundPeer(peer1Cfg)
 				inPeer.AssociateConnection(inConn)
 
-				outPeer, err := peer.NewOutboundPeer(peerCfg, "10.0.0.2:8333")
+				outPeer, err := peer.NewOutboundPeer(peer2Cfg, "10.0.0.2:8333")
 				if err != nil {
 					return nil, nil, err
 				}
@@ -280,10 +314,10 @@ func TestPeerConnection(t *testing.T) {
 					&conn{raddr: "10.0.0.1:8333", proxy: true},
 					&conn{raddr: "10.0.0.2:8333"},
 				)
-				inPeer := peer.NewInboundPeer(peerCfg)
+				inPeer := peer.NewInboundPeer(peer1Cfg)
 				inPeer.AssociateConnection(inConn)
 
-				outPeer, err := peer.NewOutboundPeer(peerCfg, "10.0.0.2:8333")
+				outPeer, err := peer.NewOutboundPeer(peer2Cfg, "10.0.0.2:8333")
 				if err != nil {
 					return nil, nil, err
 				}
@@ -307,8 +341,8 @@ func TestPeerConnection(t *testing.T) {
 			t.Errorf("TestPeerConnection setup #%d: unexpected err %v", i, err)
 			return
 		}
-		testPeer(t, inPeer, wantStats)
-		testPeer(t, outPeer, wantStats)
+		testPeer(t, inPeer, wantStats2)
+		testPeer(t, outPeer, wantStats1)
 
 		inPeer.Disconnect()
 		outPeer.Disconnect()
