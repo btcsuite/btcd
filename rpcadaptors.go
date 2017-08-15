@@ -258,12 +258,13 @@ func (b *rpcSyncMgr) Pause() chan<- struct{} {
 	return b.blockMgr.Pause()
 }
 
-// SyncPeer returns the peer that is currently the peer being used to sync from.
+// SyncPeerID returns the peer that is currently the peer being used to sync
+// from.
 //
 // This function is safe for concurrent access and is part of the
 // rpcserverSyncManager interface implementation.
-func (b *rpcSyncMgr) SyncPeer() rpcserverPeer {
-	return (*rpcPeer)(b.blockMgr.SyncPeer())
+func (b *rpcSyncMgr) SyncPeerID() int32 {
+	return b.blockMgr.SyncPeerID()
 }
 
 // LocateBlocks returns the hashes of the blocks after the first known block in
