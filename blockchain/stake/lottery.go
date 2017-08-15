@@ -136,8 +136,10 @@ func findTicketIdxs(size int, n uint16, prng *Hash256PRNG) ([]int, error) {
 			size, n)
 	}
 
-	if size > 0xFFFFFFFF {
-		return nil, fmt.Errorf("list size too big")
+	max := int64(0xFFFFFFFF)
+	if int64(size) > max {
+		return nil, fmt.Errorf("list size too big: %v > %v",
+			size, max)
 	}
 	sz := uint32(size)
 
