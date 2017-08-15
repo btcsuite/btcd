@@ -18,6 +18,7 @@ type GetAccountBalanceResult struct {
 	LockedByTickets         float64 `json:"lockedbytickets"`
 	Spendable               float64 `json:"spendable"`
 	Total                   float64 `json:"total"`
+	Unconfirmed             float64 `json:"unconfirmed"`
 	VotingAuthority         float64 `json:"votingauthority"`
 }
 
