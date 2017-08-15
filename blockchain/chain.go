@@ -1380,7 +1380,6 @@ func New(config *Config) (*BlockChain, error) {
 		db:                  config.DB,
 		chainParams:         params,
 		timeSource:          config.TimeSource,
-		notifications:       make([]NotificationCallback, 0),
 		sigCache:            config.SigCache,
 		indexManager:        config.IndexManager,
 		minRetargetTimespan: targetTimespan / adjustmentFactor,

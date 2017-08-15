@@ -71,12 +71,11 @@ func (b *BlockChain) Subscribe(callback NotificationCallback) {
 // caller requested notifications by providing a callback function in the call
 // to New.
 func (b *BlockChain) sendNotification(typ NotificationType, data interface{}) {
-	b.notificationsLock.RLock()
-	defer b.notificationsLock.RUnlock()
-
 	// Generate and send the notification.
 	n := Notification{Type: typ, Data: data}
+	b.notificationsLock.RLock()
 	for _, callback := range b.notifications {
 		callback(&n)
 	}
+	b.notificationsLock.RUnlock()
 }
