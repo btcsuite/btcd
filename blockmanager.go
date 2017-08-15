@@ -59,6 +59,7 @@ type newPeerMsg struct {
 type blockMsg struct {
 	block *btcutil.Block
 	peer  *serverPeer
+	reply chan struct{}
 }
 
 // invMsg packages a bitcoin inv message and the peer it came from together
@@ -83,8 +84,9 @@ type donePeerMsg struct {
 // txMsg packages a bitcoin tx message and the peer it came from together
 // so the block handler has access to that information.
 type txMsg struct {
-	tx   *btcutil.Tx
-	peer *serverPeer
+	tx    *btcutil.Tx
+	peer  *serverPeer
+	reply chan struct{}
 }
 
 // getSyncPeerMsg is a message type to be sent across the message channel for
@@ -1126,11 +1128,11 @@ out:
 
 			case *txMsg:
 				b.handleTxMsg(msg)
-				msg.peer.txProcessed <- struct{}{}
+				msg.reply <- struct{}{}
 
 			case *blockMsg:
 				b.handleBlockMsg(msg)
-				msg.peer.blockProcessed <- struct{}{}
+				msg.reply <- struct{}{}
 
 			case *invMsg:
 				b.handleInvMsg(msg)
@@ -1261,26 +1263,29 @@ func (b *blockManager) NewPeer(sp *serverPeer) {
 }
 
 // QueueTx adds the passed transaction message and peer to the block handling
-// queue.
-func (b *blockManager) QueueTx(tx *btcutil.Tx, sp *serverPeer) {
+// queue. Responds to the done channel argument after the tx message is
+// processed.
+func (b *blockManager) QueueTx(tx *btcutil.Tx, sp *serverPeer, done chan struct{}) {
 	// Don't accept more transactions if we're shutting down.
 	if atomic.LoadInt32(&b.shutdown) != 0 {
-		sp.txProcessed <- struct{}{}
+		done <- struct{}{}
 		return
 	}
 
-	b.msgChan <- &txMsg{tx: tx, peer: sp}
+	b.msgChan <- &txMsg{tx: tx, peer: sp, reply: done}
 }
 
-// QueueBlock adds the passed block message and peer to the block handling queue.
-func (b *blockManager) QueueBlock(block *btcutil.Block, sp *serverPeer) {
+// QueueBlock adds the passed block message and peer to the block handling
+// queue. Responds to the done channel argument after the block message is
+// processed.
+func (b *blockManager) QueueBlock(block *btcutil.Block, sp *serverPeer, done chan struct{}) {
 	// Don't accept more blocks if we're shutting down.
 	if atomic.LoadInt32(&b.shutdown) != 0 {
-		sp.blockProcessed <- struct{}{}
+		done <- struct{}{}
 		return
 	}
 
-	b.msgChan <- &blockMsg{block: block, peer: sp}
+	b.msgChan <- &blockMsg{block: block, peer: sp, reply: done}
 }
 
 // QueueInv adds the passed inv message and peer to the block handling queue.

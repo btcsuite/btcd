@@ -485,7 +485,7 @@ func (sp *serverPeer) OnTx(_ *peer.Peer, msg *wire.MsgTx) {
 	// processed and known good or bad.  This helps prevent a malicious peer
 	// from queuing up a bunch of bad transactions before disconnecting (or
 	// being disconnected) and wasting memory.
-	sp.server.blockManager.QueueTx(tx, sp)
+	sp.server.blockManager.QueueTx(tx, sp, sp.txProcessed)
 	<-sp.txProcessed
 }
 
@@ -511,7 +511,7 @@ func (sp *serverPeer) OnBlock(_ *peer.Peer, msg *wire.MsgBlock, buf []byte) {
 	// reference implementation processes blocks in the same
 	// thread and therefore blocks further messages until
 	// the bitcoin block has been fully processed.
-	sp.server.blockManager.QueueBlock(block, sp)
+	sp.server.blockManager.QueueBlock(block, sp, sp.blockProcessed)
 	<-sp.blockProcessed
 }
 
