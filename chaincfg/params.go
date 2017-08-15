@@ -504,6 +504,7 @@ var MainNetParams = Params{
 		{123080, newHashFromStr("000000000000009ea6e02d0f0424f445ed50686f9ae4aecdf3b268e981114477")},
 		{135960, newHashFromStr("00000000000001d2f9bbca9177972c0ba45acb40836b72945a75d73b99079498")},
 		{139740, newHashFromStr("00000000000001397179ae1aff156fb1aea228938d06b83e43b78b1c44527b5b")},
+		{155900, newHashFromStr("000000000000008557e37fb05177fc5a54e693de20689753639135f85a2dcb2e")},
 	},
 
 	// The miner confirmation window is defined as:
@@ -674,6 +675,8 @@ var TestNet2Params = Params{
 		{37500, newHashFromStr("0000000000e5f9b3eb57259439694d3f12cd3b485cca54089fe3d4cc5c7c3e51")},
 		{50000, newHashFromStr("0000000005bcc5dd36ba08523d32a3a581f1ef7376929f5b89757d1c9ced4154")},
 		{62500, newHashFromStr("0000000003c0223971c732c49f019f449b494fdb822b67eb178fa4cf5d3b16ef")},
+		{80000, newHashFromStr("0000000004239806fb02243757c0cd04f2103ad2c20d2afbdf21fafbd114ef60")},
+		{97500, newHashFromStr("0000000003e41de65086786c253d2bf5259419cc15d1c1382b3d7bd69dcf7d45")},
 	},
 
 	// Consensus rule change deployments.
