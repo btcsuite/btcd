@@ -81,7 +81,7 @@ func setupGlobalConfig() error {
 
 	// Validate database type.
 	if !validDbType(cfg.DbType) {
-		str := "The specified database type [%v] is invalid -- " +
+		str := "the specified database type [%v] is invalid -- " +
 			"supported types %v"
 		return fmt.Errorf(str, cfg.DbType, knownDbTypes)
 	}

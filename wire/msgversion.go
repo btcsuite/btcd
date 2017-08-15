@@ -81,7 +81,7 @@ func (msg *MsgVersion) AddService(service ServiceFlag) {
 func (msg *MsgVersion) BtcDecode(r io.Reader, pver uint32) error {
 	buf, ok := r.(*bytes.Buffer)
 	if !ok {
-		return fmt.Errorf("MsgVersion.BtcDecode reader is not a " +
+		return fmt.Errorf("in method MsgVersion.BtcDecode reader is not a " +
 			"*bytes.Buffer")
 	}
 

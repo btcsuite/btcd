@@ -218,7 +218,7 @@ func parseAndSetDebugLevels(debugLevel string) error {
 	if !strings.Contains(debugLevel, ",") && !strings.Contains(debugLevel, "=") {
 		// Validate debug log level.
 		if !validLogLevel(debugLevel) {
-			str := "The specified debug level [%v] is invalid"
+			str := "the specified debug level [%v] is invalid"
 			return fmt.Errorf(str, debugLevel)
 		}
 
@@ -232,7 +232,7 @@ func parseAndSetDebugLevels(debugLevel string) error {
 	// issues and update the log levels accordingly.
 	for _, logLevelPair := range strings.Split(debugLevel, ",") {
 		if !strings.Contains(logLevelPair, "=") {
-			str := "The specified debug level contains an invalid " +
+			str := "the specified debug level contains an invalid " +
 				"subsystem/level pair [%v]"
 			return fmt.Errorf(str, logLevelPair)
 		}
@@ -243,14 +243,14 @@ func parseAndSetDebugLevels(debugLevel string) error {
 
 		// Validate subsystem.
 		if _, exists := subsystemLoggers[subsysID]; !exists {
-			str := "The specified subsystem [%v] is invalid -- " +
+			str := "the specified subsystem [%v] is invalid -- " +
 				"supported subsytems %v"
 			return fmt.Errorf(str, subsysID, supportedSubsystems())
 		}
 
 		// Validate log level.
 		if !validLogLevel(logLevel) {
-			str := "The specified debug level [%v] is invalid"
+			str := "the specified debug level [%v] is invalid"
 			return fmt.Errorf(str, logLevel)
 		}
 
@@ -539,7 +539,7 @@ func loadConfig() (*config, []string, error) {
 			}
 		}
 
-		str := "%s: Failed to create home directory: %v"
+		str := "%s: failed to create home directory: %v"
 		err := fmt.Errorf(str, funcName, err)
 		fmt.Fprintln(os.Stderr, err)
 		return nil, nil, err
@@ -561,7 +561,7 @@ func loadConfig() (*config, []string, error) {
 		cfg.DisableDNSSeed = true
 	}
 	if numNets > 1 {
-		str := "%s: The testnet and simnet params can't be " +
+		str := "%s: the testnet and simnet params can't be " +
 			"used together -- choose one of the three"
 		err := fmt.Errorf(str, funcName)
 		fmt.Fprintln(os.Stderr, err)
@@ -628,7 +628,7 @@ func loadConfig() (*config, []string, error) {
 
 	// Validate database type.
 	if !validDbType(cfg.DbType) {
-		str := "%s: The specified database type [%v] is invalid -- " +
+		str := "%s: the specified database type [%v] is invalid -- " +
 			"supported types %v"
 		err := fmt.Errorf(str, funcName, cfg.DbType, knownDbTypes)
 		fmt.Fprintln(os.Stderr, err)
@@ -650,7 +650,7 @@ func loadConfig() (*config, []string, error) {
 
 	// Don't allow ban durations that are too short.
 	if cfg.BanDuration < time.Second {
-		str := "%s: The banduration option may not be less than 1s -- parsed [%v]"
+		str := "%s: the banduration option may not be less than 1s -- parsed [%v]"
 		err := fmt.Errorf(str, funcName, cfg.BanDuration)
 		fmt.Fprintln(os.Stderr, err)
 		fmt.Fprintln(os.Stderr, usageMessage)
@@ -667,7 +667,7 @@ func loadConfig() (*config, []string, error) {
 			if err != nil {
 				ip = net.ParseIP(addr)
 				if ip == nil {
-					str := "%s: The whitelist value of '%s' is invalid"
+					str := "%s: the whitelist value of '%s' is invalid"
 					err = fmt.Errorf(str, funcName, addr)
 					fmt.Fprintln(os.Stderr, err)
 					fmt.Fprintln(os.Stderr, usageMessage)
@@ -759,7 +759,7 @@ func loadConfig() (*config, []string, error) {
 	}
 
 	if cfg.RPCMaxConcurrentReqs < 0 {
-		str := "%s: The rpcmaxwebsocketconcurrentrequests option may " +
+		str := "%s: the rpcmaxwebsocketconcurrentrequests option may " +
 			"not be less than 0 -- parsed [%d]"
 		err := fmt.Errorf(str, funcName, cfg.RPCMaxConcurrentReqs)
 		fmt.Fprintln(os.Stderr, err)
@@ -783,7 +783,7 @@ func loadConfig() (*config, []string, error) {
 	if cfg.BlockMaxSize < blockMaxSizeMin || cfg.BlockMaxSize >
 		blockMaxSizeMax {
 
-		str := "%s: The blockmaxsize option must be in between %d " +
+		str := "%s: the blockmaxsize option must be in between %d " +
 			"and %d -- parsed [%d]"
 		err := fmt.Errorf(str, funcName, blockMaxSizeMin,
 			blockMaxSizeMax, cfg.BlockMaxSize)
@@ -794,7 +794,7 @@ func loadConfig() (*config, []string, error) {
 
 	// Limit the max orphan count to a sane vlue.
 	if cfg.MaxOrphanTxs < 0 {
-		str := "%s: The maxorphantx option may not be less than 0 " +
+		str := "%s: the maxorphantx option may not be less than 0 " +
 			"-- parsed [%d]"
 		err := fmt.Errorf(str, funcName, cfg.MaxOrphanTxs)
 		fmt.Fprintln(os.Stderr, err)

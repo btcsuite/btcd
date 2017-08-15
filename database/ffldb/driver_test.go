@@ -210,7 +210,7 @@ func TestPersistence(t *testing.T) {
 	db.Close()
 	db, err = database.Open(dbType, dbPath, blockDataNet)
 	if err != nil {
-		t.Errorf("Failed to open test database (%s) %v", dbType, err)
+		t.Errorf("failed to open test database (%s) %v", dbType, err)
 		return
 	}
 	defer db.Close()
@@ -264,7 +264,7 @@ func TestInterface(t *testing.T) {
 	_ = os.RemoveAll(dbPath)
 	db, err := database.Create(dbType, dbPath, blockDataNet)
 	if err != nil {
-		t.Errorf("Failed to create test database (%s) %v", dbType, err)
+		t.Errorf("failed to create test database (%s) %v", dbType, err)
 		return
 	}
 	defer os.RemoveAll(dbPath)

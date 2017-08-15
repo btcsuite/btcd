@@ -170,7 +170,7 @@ out:
 		// notify the status handler with the error and bail.
 		serializedBlock, err := bi.readBlock()
 		if err != nil {
-			bi.errChan <- fmt.Errorf("Error reading from input "+
+			bi.errChan <- fmt.Errorf("error reading from input "+
 				"file: %v", err.Error())
 			break out
 		}
@@ -334,7 +334,7 @@ func (cmd *importCmd) Execute(args []string) error {
 
 	// Ensure the specified block file exists.
 	if !fileExists(cmd.InFile) {
-		str := "The specified block file [%v] does not exist"
+		str := "the specified block file [%v] does not exist"
 		return fmt.Errorf(str, cmd.InFile)
 	}
 
