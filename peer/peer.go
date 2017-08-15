@@ -416,6 +416,7 @@ type Peer struct {
 	protocolVersion      uint32 // negotiated protocol version
 	sendHeadersPreferred bool   // peer sent a sendheaders message
 	verAckReceived       bool
+	witnessEnabled       bool
 
 	wireEncoding wire.MessageEncoding
 
@@ -765,6 +766,18 @@ func (p *Peer) WantsHeaders() bool {
 	return sendHeadersPreferred
 }
 
+// IsWitnessEnabled returns true if the peer has signalled that it supports
+// segregated witness.
+//
+// This function is safe for concurrent access.
+func (p *Peer) IsWitnessEnabled() bool {
+	p.flagsMtx.Lock()
+	witnessEnabled := p.witnessEnabled
+	p.flagsMtx.Unlock()
+
+	return witnessEnabled
+}
+
 // localVersionMsg creates a version message that can be used to send to the
 // remote peer.
 func (p *Peer) localVersionMsg() (*wire.MsgVersion, error) {
@@ -1051,6 +1064,12 @@ func (p *Peer) handleRemoteVersionMsg(msg *wire.MsgVersion) error {
 
 	// Set the remote peer's user agent.
 	p.userAgent = msg.UserAgent
+
+	// Determine if the peer would like to receive witness data with
+	// transactions, or not.
+	if p.services&wire.SFNodeWitness == wire.SFNodeWitness {
+		p.witnessEnabled = true
+	}
 	p.flagsMtx.Unlock()
 
 	// Once the version message has been exchanged, we're able to determine

@@ -214,8 +214,6 @@ type serverPeer struct {
 
 	connReq         *connmgr.ConnReq
 	server          *server
-	witnessMtx      sync.Mutex
-	witnessEnabled  bool
 	persistent      bool
 	continueHash    *chainhash.Hash
 	relayMtx        sync.Mutex
@@ -247,17 +245,6 @@ func newServerPeer(s *server, isPersistent bool) *serverPeer {
 		txProcessed:     make(chan struct{}, 1),
 		blockProcessed:  make(chan struct{}, 1),
 	}
-}
-
-// IsWitnessEnabled returns true if the target serverPeer has signalled that it
-// supports segregated witness.
-//
-// This function is safe for concurrent access.
-func (sp *serverPeer) IsWitnessEnabled() bool {
-	sp.witnessMtx.Lock()
-	enabled := sp.witnessEnabled
-	sp.witnessMtx.Unlock()
-	return enabled
 }
 
 // newestBlock returns the current best block hash and height using the format
@@ -367,14 +354,6 @@ func (sp *serverPeer) OnVersion(_ *peer.Peer, msg *wire.MsgVersion) {
 	// Choose whether or not to relay transactions before a filter command
 	// is received.
 	sp.setDisableRelayTx(msg.DisableRelayTx)
-
-	// Determine if the peer would like to receive witness data with
-	// transactions, or not.
-	if sp.Services()&wire.SFNodeWitness == wire.SFNodeWitness {
-		sp.witnessMtx.Lock()
-		sp.witnessEnabled = true
-		sp.witnessMtx.Unlock()
-	}
 
 	// Update the address manager and request known addresses from the
 	// remote peer for outbound connections.  This is skipped when running
