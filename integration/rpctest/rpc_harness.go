@@ -17,8 +17,8 @@ import (
 
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/rpcclient"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcrpcclient"
 	"github.com/btcsuite/btcutil"
 )
 
@@ -78,9 +78,9 @@ type Harness struct {
 	// to.
 	ActiveNet *chaincfg.Params
 
-	Node     *btcrpcclient.Client
+	Node     *rpcclient.Client
 	node     *node
-	handlers *btcrpcclient.NotificationHandlers
+	handlers *rpcclient.NotificationHandlers
 
 	wallet *memWallet
 
@@ -97,7 +97,7 @@ type Harness struct {
 // used.
 //
 // NOTE: This function is safe for concurrent access.
-func New(activeNet *chaincfg.Params, handlers *btcrpcclient.NotificationHandlers,
+func New(activeNet *chaincfg.Params, handlers *rpcclient.NotificationHandlers,
 	extraArgs []string) (*Harness, error) {
 
 	harnessStateMtx.Lock()
@@ -157,7 +157,7 @@ func New(activeNet *chaincfg.Params, handlers *btcrpcclient.NotificationHandlers
 	numTestInstances++
 
 	if handlers == nil {
-		handlers = &btcrpcclient.NotificationHandlers{}
+		handlers = &rpcclient.NotificationHandlers{}
 	}
 
 	// If a handler for the OnFilteredBlock{Connected,Disconnected} callback
@@ -303,12 +303,12 @@ func (h *Harness) TearDown() error {
 // we're not able to establish a connection, this function returns with an
 // error.
 func (h *Harness) connectRPCClient() error {
-	var client *btcrpcclient.Client
+	var client *rpcclient.Client
 	var err error
 
 	rpcConf := h.node.config.rpcConnConfig()
 	for i := 0; i < h.maxConnRetries; i++ {
-		if client, err = btcrpcclient.New(&rpcConf, h.handlers); err != nil {
+		if client, err = rpcclient.New(&rpcConf, h.handlers); err != nil {
 			time.Sleep(time.Duration(i) * 50 * time.Millisecond)
 			continue
 		}
@@ -379,7 +379,7 @@ func (h *Harness) UnlockOutputs(inputs []*wire.TxIn) {
 // RPCConfig returns the harnesses current rpc configuration. This allows other
 // potential RPC clients created within tests to connect to a given test
 // harness instance.
-func (h *Harness) RPCConfig() btcrpcclient.ConnConfig {
+func (h *Harness) RPCConfig() rpcclient.ConnConfig {
 	return h.node.config.rpcConnConfig()
 }
 

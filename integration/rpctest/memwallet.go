@@ -14,9 +14,9 @@ import (
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/rpcclient"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcrpcclient"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcutil/hdkeychain"
 )
@@ -102,7 +102,7 @@ type memWallet struct {
 
 	net *chaincfg.Params
 
-	rpc *btcrpcclient.Client
+	rpc *rpcclient.Client
 
 	sync.RWMutex
 }
@@ -171,7 +171,7 @@ func (m *memWallet) SyncedHeight() int32 {
 
 // SetRPCClient saves the passed rpc connection to btcd as the wallet's
 // personal rpc connection.
-func (m *memWallet) SetRPCClient(rpcClient *btcrpcclient.Client) {
+func (m *memWallet) SetRPCClient(rpcClient *rpcclient.Client) {
 	m.rpc = rpcClient
 }
 

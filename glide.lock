@@ -1,10 +1,8 @@
-hash: 9e111ebb6989c8b23db0ef5c0523e8dde1ccaa964fa7a42faccbb7a6a60b2860
-updated: 2017-06-19T16:45:22.5258215-04:00
+hash: 976decfaf173d97d2e4572399490637aa12e217312a7d8b28813780a738e1151
+updated: 2017-08-15T20:07:19.2012575-05:00
 imports:
 - name: github.com/btcsuite/btclog
   version: 96c2a91a67da03552a5e6554fe3ccbfbc7f860be
-- name: github.com/btcsuite/btcrpcclient
-  version: 45b9cb481d2aead4e80aab32d7aa86db386430ab
 - name: github.com/btcsuite/btcutil
   version: 501929d3d046174c3d39f0ea54ece471aa17238c
   subpackages:

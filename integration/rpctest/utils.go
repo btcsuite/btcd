@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcrpcclient"
+	"github.com/btcsuite/btcd/rpcclient"
 )
 
 // JoinType is an enum representing a particular type of "node join". A node
@@ -115,7 +115,7 @@ func ConnectNode(from *Harness, to *Harness) error {
 	numPeers := len(peerInfo)
 
 	targetAddr := to.node.config.listen
-	if err := from.Node.AddNode(targetAddr, btcrpcclient.ANAdd); err != nil {
+	if err := from.Node.AddNode(targetAddr, rpcclient.ANAdd); err != nil {
 		return err
 	}
 
