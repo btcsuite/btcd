@@ -828,6 +828,13 @@ func (msg *MsgTx) SerializeSizeStripped() int {
 	return msg.baseSize()
 }
 
+// The virtual size of the the transaction
+// should be used to for the purpose of fee rates and provides a smooth migration from transaction size
+func (msg *MsgTx) VSize() int {
+	return (msg.SerializeSizeStripped() * 3 + msg.SerializeSize() + 3) / 4
+}
+
+
 // Command returns the protocol command string for the message.  This is part
 // of the Message interface implementation.
 func (msg *MsgTx) Command() string {
