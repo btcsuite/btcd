@@ -684,6 +684,7 @@ func loadConfig() (*config, []string, error) {
 	if (cfg.RPCUser == "" || cfg.RPCPass == "") &&
 		(cfg.RPCLimitUser == "" || cfg.RPCLimitPass == "") {
 		cfg.DisableRPC = true
+		btcdLog.Infof("JSON-RPC interface is disabled")
 	}
 
 	// Default RPC to listen on localhost only.
