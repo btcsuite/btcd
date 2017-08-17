@@ -2466,9 +2466,12 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 	s.txMemPool = mempool.New(&txC)
 
 	s.blockManager, err = newBlockManager(&blockManagerConfig{
-		PeerNotifier: &s,
-		Chain:        s.chain,
-		TxMemPool:    s.txMemPool,
+		PeerNotifier:       &s,
+		Chain:              s.chain,
+		TxMemPool:          s.txMemPool,
+		ChainParams:        s.chainParams,
+		DisableCheckpoints: cfg.DisableCheckpoints,
+		MaxPeers:           cfg.MaxPeers,
 	})
 	if err != nil {
 		return nil, err

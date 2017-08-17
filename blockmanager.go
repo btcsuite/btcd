@@ -7,8 +7,6 @@ package main
 import (
 	"container/list"
 	"net"
-	"os"
-	"path/filepath"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -153,6 +151,10 @@ type blockManagerConfig struct {
 	PeerNotifier PeerNotifier
 	Chain        *blockchain.BlockChain
 	TxMemPool    *mempool.TxPool
+	ChainParams  *chaincfg.Params
+
+	DisableCheckpoints bool
+	MaxPeers           int
 }
 
 // blockManager provides a concurrency safe block manager for handling all
@@ -163,6 +165,7 @@ type blockManager struct {
 	shutdown        int32
 	chain           *blockchain.BlockChain
 	txMemPool       *mempool.TxPool
+	chainParams     *chaincfg.Params
 	rejectedTxns    map[chainhash.Hash]struct{}
 	requestedTxns   map[chainhash.Hash]struct{}
 	requestedBlocks map[chainhash.Hash]struct{}
@@ -200,11 +203,6 @@ func (b *blockManager) resetHeaderState(newestHash *chainhash.Hash, newestHeight
 // later than the final checkpoint or some other reason such as disabled
 // checkpoints.
 func (b *blockManager) findNextHeaderCheckpoint(height int32) *chaincfg.Checkpoint {
-	// There is no next checkpoint if checkpoints are disabled or there are
-	// none for this current network.
-	if cfg.DisableCheckpoints {
-		return nil
-	}
 	checkpoints := b.chain.Checkpoints()
 	if len(checkpoints) == 0 {
 		return nil
@@ -311,7 +309,7 @@ func (b *blockManager) startSync(peers *list.List) {
 		// downloads when in regression test mode.
 		if b.nextCheckpoint != nil &&
 			best.Height < b.nextCheckpoint.Height &&
-			!cfg.RegressionTest && !cfg.DisableCheckpoints {
+			b.chainParams != &chaincfg.RegressionNetParams {
 
 			bestPeer.PushGetHeadersMsg(locator, b.nextCheckpoint.Hash)
 			b.headersFirstMode = true
@@ -333,7 +331,7 @@ func (b *blockManager) isSyncCandidate(sp *serverPeer) bool {
 	// Typically a peer is not a candidate for sync if it's not a full node,
 	// however regression test is special in that the regression tool is
 	// not a full node and still needs to be considered a sync candidate.
-	if cfg.RegressionTest {
+	if b.chainParams == &chaincfg.RegressionNetParams {
 		// The peer is not a candidate if it's not coming from localhost
 		// or the hostname can't be determined for some reason.
 		host, _, err := net.SplitHostPort(sp.Addr())
@@ -452,9 +450,8 @@ func (b *blockManager) handleTxMsg(tmsg *txMsg) {
 
 	// Process the transaction to include validation, insertion in the
 	// memory pool, orphan handling, etc.
-	allowOrphans := cfg.MaxOrphanTxs > 0
 	acceptedTxs, err := b.txMemPool.ProcessTransaction(tmsg.tx,
-		allowOrphans, true, mempool.Tag(tmsg.peer.ID()))
+		true, true, mempool.Tag(tmsg.peer.ID()))
 
 	// Remove transaction from request maps. Either the mempool/chain
 	// already knows about it and as such we shouldn't have any more
@@ -523,7 +520,7 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 		// the peer or ignore the block when we're in regression test
 		// mode in this case so the chain code is actually fed the
 		// duplicate blocks.
-		if !cfg.RegressionTest {
+		if b.chainParams != &chaincfg.RegressionNetParams {
 			bmgrLog.Warnf("Got unrequested block %v from %s -- "+
 				"disconnecting", blockHash, bmsg.peer.Addr())
 			bmsg.peer.Disconnect()
@@ -1390,17 +1387,18 @@ func newBlockManager(config *blockManagerConfig) (*blockManager, error) {
 		peerNotifier:    config.PeerNotifier,
 		chain:           config.Chain,
 		txMemPool:       config.TxMemPool,
+		chainParams:     config.ChainParams,
 		rejectedTxns:    make(map[chainhash.Hash]struct{}),
 		requestedTxns:   make(map[chainhash.Hash]struct{}),
 		requestedBlocks: make(map[chainhash.Hash]struct{}),
 		progressLogger:  newBlockProgressLogger("Processed", bmgrLog),
-		msgChan:         make(chan interface{}, cfg.MaxPeers*3),
+		msgChan:         make(chan interface{}, config.MaxPeers*3),
 		headerList:      list.New(),
 		quit:            make(chan struct{}),
 	}
 
 	best := bm.chain.BestSnapshot()
-	if !cfg.DisableCheckpoints {
+	if !config.DisableCheckpoints {
 		// Initialize the next checkpoint based on the current height.
 		bm.nextCheckpoint = bm.findNextHeaderCheckpoint(best.Height)
 		if bm.nextCheckpoint != nil {
@@ -1413,129 +1411,4 @@ func newBlockManager(config *blockManagerConfig) (*blockManager, error) {
 	bm.chain.Subscribe(bm.handleBlockchainNotification)
 
 	return &bm, nil
-}
-
-// removeRegressionDB removes the existing regression test database if running
-// in regression test mode and it already exists.
-func removeRegressionDB(dbPath string) error {
-	// Don't do anything if not in regression test mode.
-	if !cfg.RegressionTest {
-		return nil
-	}
-
-	// Remove the old regression test database if it already exists.
-	fi, err := os.Stat(dbPath)
-	if err == nil {
-		btcdLog.Infof("Removing regression test database from '%s'", dbPath)
-		if fi.IsDir() {
-			err := os.RemoveAll(dbPath)
-			if err != nil {
-				return err
-			}
-		} else {
-			err := os.Remove(dbPath)
-			if err != nil {
-				return err
-			}
-		}
-	}
-
-	return nil
-}
-
-// dbPath returns the path to the block database given a database type.
-func blockDbPath(dbType string) string {
-	// The database name is based on the database type.
-	dbName := blockDbNamePrefix + "_" + dbType
-	if dbType == "sqlite" {
-		dbName = dbName + ".db"
-	}
-	dbPath := filepath.Join(cfg.DataDir, dbName)
-	return dbPath
-}
-
-// warnMultipeDBs shows a warning if multiple block database types are detected.
-// This is not a situation most users want.  It is handy for development however
-// to support multiple side-by-side databases.
-func warnMultipeDBs() {
-	// This is intentionally not using the known db types which depend
-	// on the database types compiled into the binary since we want to
-	// detect legacy db types as well.
-	dbTypes := []string{"ffldb", "leveldb", "sqlite"}
-	duplicateDbPaths := make([]string, 0, len(dbTypes)-1)
-	for _, dbType := range dbTypes {
-		if dbType == cfg.DbType {
-			continue
-		}
-
-		// Store db path as a duplicate db if it exists.
-		dbPath := blockDbPath(dbType)
-		if fileExists(dbPath) {
-			duplicateDbPaths = append(duplicateDbPaths, dbPath)
-		}
-	}
-
-	// Warn if there are extra databases.
-	if len(duplicateDbPaths) > 0 {
-		selectedDbPath := blockDbPath(cfg.DbType)
-		btcdLog.Warnf("WARNING: There are multiple block chain databases "+
-			"using different database types.\nYou probably don't "+
-			"want to waste disk space by having more than one.\n"+
-			"Your current database is located at [%v].\nThe "+
-			"additional database is located at %v", selectedDbPath,
-			duplicateDbPaths)
-	}
-}
-
-// loadBlockDB loads (or creates when needed) the block database taking into
-// account the selected database backend and returns a handle to it.  It also
-// contains additional logic such warning the user if there are multiple
-// databases which consume space on the file system and ensuring the regression
-// test database is clean when in regression test mode.
-func loadBlockDB() (database.DB, error) {
-	// The memdb backend does not have a file path associated with it, so
-	// handle it uniquely.  We also don't want to worry about the multiple
-	// database type warnings when running with the memory database.
-	if cfg.DbType == "memdb" {
-		btcdLog.Infof("Creating block database in memory.")
-		db, err := database.Create(cfg.DbType)
-		if err != nil {
-			return nil, err
-		}
-		return db, nil
-	}
-
-	warnMultipeDBs()
-
-	// The database name is based on the database type.
-	dbPath := blockDbPath(cfg.DbType)
-
-	// The regression test is special in that it needs a clean database for
-	// each run, so remove it now if it already exists.
-	removeRegressionDB(dbPath)
-
-	btcdLog.Infof("Loading block database from '%s'", dbPath)
-	db, err := database.Open(cfg.DbType, dbPath, activeNetParams.Net)
-	if err != nil {
-		// Return the error if it's not because the database doesn't
-		// exist.
-		if dbErr, ok := err.(database.Error); !ok || dbErr.ErrorCode !=
-			database.ErrDbDoesNotExist {
-
-			return nil, err
-		}
-
-		// Create the db if it does not exist.
-		err = os.MkdirAll(cfg.DataDir, 0700)
-		if err != nil {
-			return nil, err
-		}
-		db, err = database.Create(cfg.DbType, dbPath, activeNetParams.Net)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	btcdLog.Info("Block database loaded")
-	return db, nil
 }
