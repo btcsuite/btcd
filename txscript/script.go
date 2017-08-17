@@ -99,11 +99,18 @@ func HasP2SHScriptSigStakeOpCodes(version uint16, scriptSig,
 		// Obtain the embedded pkScript from the scriptSig of the
 		// current transaction. Then, ensure that it does not use
 		// any stake tagging OP codes.
-		shScript, err := GetPkScriptFromP2SHSigScript(scriptSig)
+		pData, err := PushedData(scriptSig)
 		if err != nil {
-			return fmt.Errorf("unexpected error retrieving pkscript "+
-				"from p2sh transaction: %v", err.Error())
+			return fmt.Errorf("error retrieving pushed data "+
+				"from script: %v", err)
 		}
+		if len(pData) == 0 {
+			return fmt.Errorf("script has no pushed data")
+		}
+
+		// The pay-to-hash-script is the final data push of the
+		// signature script.
+		shScript := pData[len(pData)-1]
 
 		hasStakeOpCodes, err := ContainsStakeOpCodes(shScript)
 		if err != nil {

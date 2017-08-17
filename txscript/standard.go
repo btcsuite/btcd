@@ -531,19 +531,6 @@ func getStakeOutSubscript(pkScript []byte) []byte {
 	return pkScript[1:]
 }
 
-// GetPkScriptFromP2SHSigScript returns the embedded pkScript from the signature
-// script of a transaction spending a P2SH output.
-func GetPkScriptFromP2SHSigScript(sigScript []byte) ([]byte, error) {
-	sigPops, err := parseScript(sigScript)
-	if err != nil {
-		return nil, err
-	}
-
-	// The pay-to-hash-script is the final data push of the
-	// signature script.
-	return sigPops[len(sigPops)-1].data, nil
-}
-
 // ContainsStakeOpCodes returns whether or not a pkScript contains stake tagging
 // OP codes.
 func ContainsStakeOpCodes(pkScript []byte) (bool, error) {
