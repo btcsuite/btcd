@@ -7,6 +7,7 @@ package blockchain
 import (
 	"fmt"
 	"math/rand"
+	"reflect"
 	"testing"
 
 	"github.com/btcsuite/btcd/wire"
@@ -51,6 +52,27 @@ func tstTip(nodes []*blockNode) *blockNode {
 	return nodes[len(nodes)-1]
 }
 
+// locatorHashes is a convenience function that returns the hashes for all of
+// the passed indexes of the provided nodes.  It is used to construct expected
+// block locators in the tests.
+func locatorHashes(nodes []*blockNode, indexes ...int) BlockLocator {
+	hashes := make(BlockLocator, 0, len(indexes))
+	for _, idx := range indexes {
+		hashes = append(hashes, &nodes[idx].hash)
+	}
+	return hashes
+}
+
+// zipLocators is a convenience function that returns a single block locator
+// given a variable number of them and is used in the tests.
+func zipLocators(locators ...BlockLocator) BlockLocator {
+	var hashes BlockLocator
+	for _, locator := range locators {
+		hashes = append(hashes, locator...)
+	}
+	return hashes
+}
+
 // TestChainView ensures all of the exported functionality of chain views works
 // as intended with the expection of some special cases which are handled in
 // other tests.
@@ -77,6 +99,7 @@ func TestChainView(t *testing.T) {
 		noContains []*blockNode // expected nodes NOT in active view
 		equal      *chainView   // view expected equal to active view
 		unequal    *chainView   // view expected NOT equal to active
+		locator    BlockLocator // expected locator for active view tip
 	}{
 		{
 			// Create a view for branch 0 as the active chain and
@@ -92,6 +115,7 @@ func TestChainView(t *testing.T) {
 			noContains: branch1Nodes,
 			equal:      newChainView(tip(branch0Nodes)),
 			unequal:    newChainView(tip(branch1Nodes)),
+			locator:    locatorHashes(branch0Nodes, 4, 3, 2, 1, 0),
 		},
 		{
 			// Create a view for branch 1 as the active chain and
@@ -107,6 +131,10 @@ func TestChainView(t *testing.T) {
 			noContains: branch2Nodes,
 			equal:      newChainView(tip(branch1Nodes)),
 			unequal:    newChainView(tip(branch2Nodes)),
+			locator: zipLocators(
+				locatorHashes(branch1Nodes, 24, 23, 22, 21, 20,
+					19, 18, 17, 16, 15, 14, 13, 11, 7),
+				locatorHashes(branch0Nodes, 1, 0)),
 		},
 		{
 			// Create a view for branch 2 as the active chain and
@@ -122,6 +150,10 @@ func TestChainView(t *testing.T) {
 			noContains: branch0Nodes[2:],
 			equal:      newChainView(tip(branch2Nodes)),
 			unequal:    newChainView(tip(branch0Nodes)),
+			locator: zipLocators(
+				locatorHashes(branch2Nodes, 2, 1, 0),
+				locatorHashes(branch1Nodes, 0),
+				locatorHashes(branch0Nodes, 1, 0)),
 		},
 	}
 testLoop:
@@ -261,6 +293,15 @@ testLoop:
 					wantNode.height, node, wantNode)
 				continue testLoop
 			}
+		}
+
+		// Ensure the block locator for the tip of the active view
+		// consists of the expected hashes.
+		locator := test.view.BlockLocator(test.view.tip())
+		if !reflect.DeepEqual(locator, test.locator) {
+			t.Errorf("%s: unexpected locator -- got %v, want %v",
+				test.name, locator, test.locator)
+			continue
 		}
 	}
 }
@@ -429,5 +470,23 @@ func TestChainViewNil(t *testing.T) {
 	// doesn't produce a node.
 	if fork := view.FindFork(nil); fork != nil {
 		t.Fatalf("FindFork: unexpected fork -- got %v, want nil", fork)
+	}
+
+	// Ensure attempting to get a block locator for the tip doesn't produce
+	// one since the tip is nil.
+	if locator := view.BlockLocator(nil); locator != nil {
+		t.Fatalf("BlockLocator: unexpected locator -- got %v, want nil",
+			locator)
+	}
+
+	// Ensure attempting to get a block locator for a node that exists still
+	// works as intended.
+	branchNodes := chainedNodes(nil, 50)
+	wantLocator := locatorHashes(branchNodes, 49, 48, 47, 46, 45, 44, 43,
+		42, 41, 40, 39, 38, 36, 32, 24, 8, 0)
+	locator := view.BlockLocator(tstTip(branchNodes))
+	if !reflect.DeepEqual(locator, wantLocator) {
+		t.Fatalf("BlockLocator: unexpected locator -- got %v, want %v",
+			locator, wantLocator)
 	}
 }
