@@ -125,14 +125,14 @@ func TestCalcSequenceLock(t *testing.T) {
 
 	// Generate enough synthetic blocks to activate CSV.
 	chain := newFakeChain(netParams)
-	node := chain.bestNode
+	node := chain.bestChain.Tip()
 	blockTime := node.Header().Timestamp
 	numBlocksToActivate := (netParams.MinerConfirmationWindow * 3)
 	for i := uint32(0); i < numBlocksToActivate; i++ {
 		blockTime = blockTime.Add(time.Second)
 		node = newFakeNode(node, blockVersion, 0, blockTime)
 		chain.index.AddNode(node)
-		chain.bestNode = node
+		chain.bestChain.SetTip(node)
 	}
 
 	// Create a utxo view with a fake utxo for the inputs used in the

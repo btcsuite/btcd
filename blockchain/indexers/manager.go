@@ -284,15 +284,7 @@ func (m *Manager) Init(chain *blockchain.BlockChain) error {
 
 		// Loop until the tip is a block that exists in the main chain.
 		initialHeight := height
-		for {
-			exists, err := chain.MainChainHasBlock(hash)
-			if err != nil {
-				return err
-			}
-			if exists {
-				break
-			}
-
+		for !chain.MainChainHasBlock(hash) {
 			// At this point the index tip is orphaned, so load the
 			// orphaned block from the database directly and
 			// disconnect it from the index.  The block has to be

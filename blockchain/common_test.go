@@ -262,7 +262,6 @@ func newFakeChain(params *chaincfg.Params) *BlockChain {
 	// Create a genesis block node and block index index populated with it
 	// for use when creating the fake chain below.
 	node := newBlockNode(&params.GenesisBlock.Header, 0)
-	node.inMainChain = true
 	index := newBlockIndex(nil, params)
 	index.AddNode(node)
 
@@ -276,9 +275,9 @@ func newFakeChain(params *chaincfg.Params) *BlockChain {
 		maxRetargetTimespan: targetTimespan * adjustmentFactor,
 		blocksPerRetarget:   int32(targetTimespan / targetTimePerBlock),
 		index:               index,
+		bestChain:           newChainView(node),
 		warningCaches:       newThresholdCaches(vbNumBits),
 		deploymentCaches:    newThresholdCaches(chaincfg.DefinedDeployments),
-		bestNode:            node,
 	}
 }
 

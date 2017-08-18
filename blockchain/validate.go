@@ -1256,7 +1256,7 @@ func (b *BlockChain) CheckConnectBlock(block *btcutil.Block) error {
 	b.chainLock.Lock()
 	defer b.chainLock.Unlock()
 
-	prevNode := b.bestNode
+	prevNode := b.bestChain.Tip()
 	newNode := newBlockNode(&block.MsgBlock().Header, prevNode.height+1)
 	newNode.parent = prevNode
 	newNode.workSum.Add(prevNode.workSum, newNode.workSum)

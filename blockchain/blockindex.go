@@ -40,11 +40,6 @@ type blockNode struct {
 	// height is the position in the block chain.
 	height int32
 
-	// inMainChain denotes whether the block node is currently on the
-	// the main chain or not.  This is used to help find the common
-	// ancestor when switching chains.
-	inMainChain bool
-
 	// Some fields from block headers to aid in best chain selection and
 	// reconstructing headers from memory.  These must be treated as
 	// immutable and are intentionally ordered to avoid padding on 64-bit
