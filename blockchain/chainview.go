@@ -109,9 +109,15 @@ func (c *chainView) setTip(node *blockNode) {
 	// week.
 	needed := node.height + 1
 	if int32(cap(c.nodes)) < needed {
-		c.nodes = make([]*blockNode, needed, needed+approxNodesPerWeek)
+		nodes := make([]*blockNode, needed, needed+approxNodesPerWeek)
+		copy(nodes, c.nodes)
+		c.nodes = nodes
 	} else {
+		prevLen := int32(len(c.nodes))
 		c.nodes = c.nodes[0:needed]
+		for i := prevLen; i < needed; i++ {
+			c.nodes[i] = nil
+		}
 	}
 
 	for node != nil && c.nodes[node.height] != node {

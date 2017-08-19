@@ -6,10 +6,15 @@ package blockchain
 
 import (
 	"fmt"
+	"math/rand"
 	"testing"
 
 	"github.com/btcsuite/btcd/wire"
 )
+
+// testNoncePrng provides a deterministic prng for the nonce in generated fake
+// nodes.  The ensures that the node have unique hashes.
+var testNoncePrng = rand.New(rand.NewSource(0))
 
 // chainedNodes returns the specified number of nodes constructed such that each
 // subsequent node points to the previous one to create a chain.  The first node
@@ -20,7 +25,7 @@ func chainedNodes(parent *blockNode, numNodes int) []*blockNode {
 	for i := 0; i < numNodes; i++ {
 		// This is invalid, but all that is needed is enough to get the
 		// synthetic tests to work.
-		header := wire.BlockHeader{}
+		header := wire.BlockHeader{Nonce: testNoncePrng.Uint32()}
 		height := int32(0)
 		if tip != nil {
 			header.PrevBlock = tip.hash
@@ -306,52 +311,68 @@ func TestChainViewSetTip(t *testing.T) {
 
 	tip := tstTip
 	tests := []struct {
-		name string
-		view *chainView
-		tips []*blockNode
+		name     string
+		view     *chainView     // active view
+		tips     []*blockNode   // tips to set
+		contains [][]*blockNode // expected nodes in view for each tip
 	}{
 		{
 			// Create an empty view and set the tip to increasingly
 			// longer chains.
-			name: "increasing",
-			view: newChainView(nil),
-			tips: []*blockNode{tip(branch0Nodes), tip(branch1Nodes)},
+			name:     "increasing",
+			view:     newChainView(nil),
+			tips:     []*blockNode{tip(branch0Nodes), tip(branch1Nodes)},
+			contains: [][]*blockNode{branch0Nodes, branch1Nodes},
 		},
 		{
 			// Create a view with a longer chain and set the tip to
 			// increasingly shorter chains.
-			name: "decreasing",
-			view: newChainView(tip(branch1Nodes)),
-			tips: []*blockNode{tip(branch0Nodes), nil},
+			name:     "decreasing",
+			view:     newChainView(tip(branch1Nodes)),
+			tips:     []*blockNode{tip(branch0Nodes), nil},
+			contains: [][]*blockNode{branch0Nodes, nil},
 		},
 		{
 			// Create a view with a shorter chain and set the tip to
 			// a longer chain followed by setting it back to the
 			// shorter chain.
-			name: "small-large-small",
-			view: newChainView(tip(branch0Nodes)),
-			tips: []*blockNode{tip(branch1Nodes), tip(branch0Nodes)},
+			name:     "small-large-small",
+			view:     newChainView(tip(branch0Nodes)),
+			tips:     []*blockNode{tip(branch1Nodes), tip(branch0Nodes)},
+			contains: [][]*blockNode{branch1Nodes, branch0Nodes},
 		},
 		{
 			// Create a view with a longer chain and set the tip to
 			// a smaller chain followed by setting it back to the
 			// longer chain.
-			name: "large-small-large",
-			view: newChainView(tip(branch1Nodes)),
-			tips: []*blockNode{tip(branch0Nodes), tip(branch1Nodes)},
+			name:     "large-small-large",
+			view:     newChainView(tip(branch1Nodes)),
+			tips:     []*blockNode{tip(branch0Nodes), tip(branch1Nodes)},
+			contains: [][]*blockNode{branch0Nodes, branch1Nodes},
 		},
 	}
 
+testLoop:
 	for _, test := range tests {
-		for _, tip := range test.tips {
+		for i, tip := range test.tips {
 			// Ensure the view tip is the expected node.
 			test.view.SetTip(tip)
 			if test.view.Tip() != tip {
 				t.Errorf("%s: unexpected view tip -- got %v, "+
 					"want %v", test.name, test.view.Tip(),
 					tip)
-				continue
+				continue testLoop
 			}
+
+			// Ensure all expected nodes are contained in the view.
+			for _, node := range test.contains[i] {
+				if !test.view.Contains(node) {
+					t.Errorf("%s: expected %v in active view",
+						test.name, node)
+					continue testLoop
+				}
+			}
+
 		}
 	}
 }
