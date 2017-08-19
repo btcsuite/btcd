@@ -1,19 +1,16 @@
-// Copyright (c) 2013-2016 The btcsuite developers
+// Copyright (c) 2013-2017 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
 package blockchain_test
 
 import (
-	"bytes"
 	"testing"
 	"time"
 
 	"github.com/btcsuite/btcd/blockchain"
-	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/integration/rpctest"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
 )
@@ -121,116 +118,64 @@ func TestHaveBlock(t *testing.T) {
 func TestCalcSequenceLock(t *testing.T) {
 	netParams := &chaincfg.SimNetParams
 
-	// Create a new database and chain instance to run tests against.
-	chain, teardownFunc, err := chainSetup("calcseqlock", netParams)
-	if err != nil {
-		t.Errorf("Failed to setup chain instance: %v", err)
-		return
-	}
-	defer teardownFunc()
-
-	// Since we're not dealing with the real block chain, set the coinbase
-	// maturity to 1.
-	chain.TstSetCoinbaseMaturity(1)
-
-	// Create a test mining address to use for the blocks we'll generate
-	// shortly below.
-	k := bytes.Repeat([]byte{1}, 32)
-	_, miningPub := btcec.PrivKeyFromBytes(btcec.S256(), k)
-	miningAddr, err := btcutil.NewAddressPubKey(miningPub.SerializeCompressed(),
-		netParams)
-	if err != nil {
-		t.Fatalf("unable to generate mining addr: %v", err)
-	}
-
-	// We'll keep track of the previous block for back pointers in blocks
-	// we generated, and also the generated blocks along with the MTP from
-	// their PoV to aide with our relative time lock calculations.
-	var prevBlock *btcutil.Block
-	var blocksWithMTP []struct {
-		block *btcutil.Block
-		mtp   time.Time
-	}
-
 	// We need to activate CSV in order to test the processing logic, so
 	// manually craft the block version that's used to signal the soft-fork
 	// activation.
 	csvBit := netParams.Deployments[chaincfg.DeploymentCSV].BitNumber
 	blockVersion := int32(0x20000000 | (uint32(1) << csvBit))
 
-	// Generate enough blocks to activate CSV, collecting each of the
-	// blocks into a slice for later use.
+	// Generate enough synthetic blocks to activate CSV.
+	chain, node := blockchain.TstNewFakeChain(netParams)
+	blockTime := node.Header().Timestamp
 	numBlocksToActivate := (netParams.MinerConfirmationWindow * 3)
 	for i := uint32(0); i < numBlocksToActivate; i++ {
-		block, err := rpctest.CreateBlock(prevBlock, nil, blockVersion,
-			time.Time{}, miningAddr, netParams)
-		if err != nil {
-			t.Fatalf("unable to generate block: %v", err)
-		}
-
-		mtp := chain.BestSnapshot().MedianTime
-
-		_, isOrphan, err := chain.ProcessBlock(block, blockchain.BFNone)
-		if err != nil {
-			t.Fatalf("ProcessBlock fail on block %v: %v\n", i, err)
-		}
-		if isOrphan {
-			t.Fatalf("ProcessBlock incorrectly returned block %v "+
-				"is an orphan\n", i)
-		}
-
-		blocksWithMTP = append(blocksWithMTP, struct {
-			block *btcutil.Block
-			mtp   time.Time
-		}{
-			block: block,
-			mtp:   mtp,
-		})
-
-		prevBlock = block
+		blockTime = blockTime.Add(time.Second)
+		node = chain.TstNewFakeNode(node, blockVersion, 0, blockTime)
 	}
 
-	// Create a utxo view with all the utxos within the blocks created
-	// above.
+	// Create a utxo view with a fake utxo for the inputs used in the
+	// transactions created below.  This utxo is added such that it has an
+	// age of 4 blocks.
+	targetTx := btcutil.NewTx(&wire.MsgTx{
+		TxOut: []*wire.TxOut{{
+			PkScript: nil,
+			Value:    10,
+		}},
+	})
 	utxoView := blockchain.NewUtxoViewpoint()
-	for blockHeight, blockWithMTP := range blocksWithMTP {
-		for _, tx := range blockWithMTP.block.Transactions() {
-			utxoView.AddTxOuts(tx, int32(blockHeight))
-		}
-	}
-	utxoView.SetBestHash(blocksWithMTP[len(blocksWithMTP)-1].block.Hash())
+	utxoView.AddTxOuts(targetTx, int32(numBlocksToActivate)-4)
+	bestHeader := node.Header()
+	bestHash := bestHeader.BlockHash()
+	utxoView.SetBestHash(&bestHash)
 
-	// We'll refer to this utxo within each input in the transactions
-	// created below. This utxo has an age of 4 blocks.  Note that the
-	// sequence lock heights are always calculated from the same point of
-	// view that they were originally calculated from for a given utxo.
-	// That is to say, the height prior to it.
-	targetBlock := blocksWithMTP[len(blocksWithMTP)-4].block
-	targetTx := targetBlock.Transactions()[0]
+	// Create a utxo that spends the fake utxo created above for use in the
+	// transactions created in the tests.  It has an age of 4 blocks.  Note
+	// that the sequence lock heights are always calculated from the same
+	// point of view that they were originally calculated from for a given
+	// utxo.  That is to say, the height prior to it.
 	utxo := wire.OutPoint{
 		Hash:  *targetTx.Hash(),
 		Index: 0,
 	}
-	prevUtxoHeight := targetBlock.Height() - 1
+	prevUtxoHeight := int32(numBlocksToActivate) - 4
 
 	// Obtain the median time past from the PoV of the input created above.
 	// The MTP for the input is the MTP from the PoV of the block *prior*
 	// to the one that included it.
-	medianTime := blocksWithMTP[len(blocksWithMTP)-5].mtp.Unix()
+	medianTime := node.RelativeAncestor(5).CalcPastMedianTime().Unix()
 
-	// The median time calculated from the PoV of the best block in our
+	// The median time calculated from the PoV of the best block in the
 	// test chain.  For unconfirmed inputs, this value will be used since
 	// the MTP will be calculated from the PoV of the yet-to-be-mined
 	// block.
-	nextMedianTime := blocksWithMTP[len(blocksWithMTP)-1].mtp.Unix() + 1
-	nextBlockHeight := blocksWithMTP[len(blocksWithMTP)-1].block.Height() + 1
+	nextMedianTime := node.CalcPastMedianTime().Unix()
+	nextBlockHeight := int32(numBlocksToActivate) + 1
 
 	// Add an additional transaction which will serve as our unconfirmed
 	// output.
-	var fakeScript []byte
 	unConfTx := &wire.MsgTx{
 		TxOut: []*wire.TxOut{{
-			PkScript: fakeScript,
+			PkScript: nil,
 			Value:    5,
 		}},
 	}
@@ -244,7 +189,7 @@ func TestCalcSequenceLock(t *testing.T) {
 	utxoView.AddTxOuts(btcutil.NewTx(unConfTx), 0x7fffffff)
 
 	tests := []struct {
-		tx      *btcutil.Tx
+		tx      *wire.MsgTx
 		view    *blockchain.UtxoViewpoint
 		mempool bool
 		want    *blockchain.SequenceLock
@@ -253,13 +198,13 @@ func TestCalcSequenceLock(t *testing.T) {
 		// as the new sequence number semantics only apply to
 		// transactions version 2 or higher.
 		{
-			tx: btcutil.NewTx(&wire.MsgTx{
+			tx: &wire.MsgTx{
 				Version: 1,
 				TxIn: []*wire.TxIn{{
 					PreviousOutPoint: utxo,
 					Sequence:         blockchain.LockTimeToSequence(false, 3),
 				}},
-			}),
+			},
 			view: utxoView,
 			want: &blockchain.SequenceLock{
 				Seconds:     -1,
@@ -270,13 +215,13 @@ func TestCalcSequenceLock(t *testing.T) {
 		// This sequence number has the high bit set, so sequence locks
 		// should be disabled.
 		{
-			tx: btcutil.NewTx(&wire.MsgTx{
+			tx: &wire.MsgTx{
 				Version: 2,
 				TxIn: []*wire.TxIn{{
 					PreviousOutPoint: utxo,
 					Sequence:         wire.MaxTxInSequenceNum,
 				}},
-			}),
+			},
 			view: utxoView,
 			want: &blockchain.SequenceLock{
 				Seconds:     -1,
@@ -290,13 +235,13 @@ func TestCalcSequenceLock(t *testing.T) {
 		// seconds lock-time should be just before the median time of
 		// the targeted block.
 		{
-			tx: btcutil.NewTx(&wire.MsgTx{
+			tx: &wire.MsgTx{
 				Version: 2,
 				TxIn: []*wire.TxIn{{
 					PreviousOutPoint: utxo,
 					Sequence:         blockchain.LockTimeToSequence(true, 2),
 				}},
-			}),
+			},
 			view: utxoView,
 			want: &blockchain.SequenceLock{
 				Seconds:     medianTime - 1,
@@ -308,13 +253,13 @@ func TestCalcSequenceLock(t *testing.T) {
 		// seconds after the median past time of the last block in the
 		// chain.
 		{
-			tx: btcutil.NewTx(&wire.MsgTx{
+			tx: &wire.MsgTx{
 				Version: 2,
 				TxIn: []*wire.TxIn{{
 					PreviousOutPoint: utxo,
 					Sequence:         blockchain.LockTimeToSequence(true, 1024),
 				}},
-			}),
+			},
 			view: utxoView,
 			want: &blockchain.SequenceLock{
 				Seconds:     medianTime + 1023,
@@ -328,7 +273,7 @@ func TestCalcSequenceLock(t *testing.T) {
 		// bit set.  So the first lock should be selected as it's the
 		// latest lock that isn't disabled.
 		{
-			tx: btcutil.NewTx(&wire.MsgTx{
+			tx: &wire.MsgTx{
 				Version: 2,
 				TxIn: []*wire.TxIn{{
 					PreviousOutPoint: utxo,
@@ -341,7 +286,7 @@ func TestCalcSequenceLock(t *testing.T) {
 					Sequence: blockchain.LockTimeToSequence(false, 5) |
 						wire.SequenceLockTimeDisabled,
 				}},
-			}),
+			},
 			view: utxoView,
 			want: &blockchain.SequenceLock{
 				Seconds:     medianTime + (5 << wire.SequenceLockTimeGranularity) - 1,
@@ -353,13 +298,13 @@ func TestCalcSequenceLock(t *testing.T) {
 		// sequence lock should  have a value of -1 for seconds, but a
 		// height of 2 meaning it can be included at height 3.
 		{
-			tx: btcutil.NewTx(&wire.MsgTx{
+			tx: &wire.MsgTx{
 				Version: 2,
 				TxIn: []*wire.TxIn{{
 					PreviousOutPoint: utxo,
 					Sequence:         blockchain.LockTimeToSequence(false, 3),
 				}},
-			}),
+			},
 			view: utxoView,
 			want: &blockchain.SequenceLock{
 				Seconds:     -1,
@@ -370,7 +315,7 @@ func TestCalcSequenceLock(t *testing.T) {
 		// seconds.  The selected sequence lock value for seconds should
 		// be the time further in the future.
 		{
-			tx: btcutil.NewTx(&wire.MsgTx{
+			tx: &wire.MsgTx{
 				Version: 2,
 				TxIn: []*wire.TxIn{{
 					PreviousOutPoint: utxo,
@@ -379,7 +324,7 @@ func TestCalcSequenceLock(t *testing.T) {
 					PreviousOutPoint: utxo,
 					Sequence:         blockchain.LockTimeToSequence(true, 2560),
 				}},
-			}),
+			},
 			view: utxoView,
 			want: &blockchain.SequenceLock{
 				Seconds:     medianTime + (10 << wire.SequenceLockTimeGranularity) - 1,
@@ -391,7 +336,7 @@ func TestCalcSequenceLock(t *testing.T) {
 		// be the height further in the future, so a height of 10
 		// indicating it can be included at height 11.
 		{
-			tx: btcutil.NewTx(&wire.MsgTx{
+			tx: &wire.MsgTx{
 				Version: 2,
 				TxIn: []*wire.TxIn{{
 					PreviousOutPoint: utxo,
@@ -400,7 +345,7 @@ func TestCalcSequenceLock(t *testing.T) {
 					PreviousOutPoint: utxo,
 					Sequence:         blockchain.LockTimeToSequence(false, 11),
 				}},
-			}),
+			},
 			view: utxoView,
 			want: &blockchain.SequenceLock{
 				Seconds:     -1,
@@ -411,7 +356,7 @@ func TestCalcSequenceLock(t *testing.T) {
 		// based, and the other two are block based. The lock lying
 		// further into the future for both inputs should be chosen.
 		{
-			tx: btcutil.NewTx(&wire.MsgTx{
+			tx: &wire.MsgTx{
 				Version: 2,
 				TxIn: []*wire.TxIn{{
 					PreviousOutPoint: utxo,
@@ -426,7 +371,7 @@ func TestCalcSequenceLock(t *testing.T) {
 					PreviousOutPoint: utxo,
 					Sequence:         blockchain.LockTimeToSequence(false, 9),
 				}},
-			}),
+			},
 			view: utxoView,
 			want: &blockchain.SequenceLock{
 				Seconds:     medianTime + (13 << wire.SequenceLockTimeGranularity) - 1,
@@ -440,13 +385,13 @@ func TestCalcSequenceLock(t *testing.T) {
 		// *next* block height, indicating it can be included 2 blocks
 		// after that.
 		{
-			tx: btcutil.NewTx(&wire.MsgTx{
+			tx: &wire.MsgTx{
 				Version: 2,
 				TxIn: []*wire.TxIn{{
 					PreviousOutPoint: unConfUtxo,
 					Sequence:         blockchain.LockTimeToSequence(false, 2),
 				}},
-			}),
+			},
 			view:    utxoView,
 			mempool: true,
 			want: &blockchain.SequenceLock{
@@ -458,13 +403,13 @@ func TestCalcSequenceLock(t *testing.T) {
 		// a time based lock, so the lock time should be based off the
 		// MTP of the *next* block.
 		{
-			tx: btcutil.NewTx(&wire.MsgTx{
+			tx: &wire.MsgTx{
 				Version: 2,
 				TxIn: []*wire.TxIn{{
 					PreviousOutPoint: unConfUtxo,
 					Sequence:         blockchain.LockTimeToSequence(true, 1024),
 				}},
-			}),
+			},
 			view:    utxoView,
 			mempool: true,
 			want: &blockchain.SequenceLock{
@@ -476,7 +421,8 @@ func TestCalcSequenceLock(t *testing.T) {
 
 	t.Logf("Running %v SequenceLock tests", len(tests))
 	for i, test := range tests {
-		seqLock, err := chain.CalcSequenceLock(test.tx, test.view, test.mempool)
+		utilTx := btcutil.NewTx(test.tx)
+		seqLock, err := chain.CalcSequenceLock(utilTx, test.view, test.mempool)
 		if err != nil {
 			t.Fatalf("test #%d, unable to calc sequence lock: %v", i, err)
 		}
