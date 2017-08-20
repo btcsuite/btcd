@@ -18,7 +18,7 @@ implement and the API is not stable yet.
 
 ## Documentation
 
-* [API Reference](http://godoc.org/github.com/btcsuite/rpcclient)
+* [API Reference](http://godoc.org/github.com/btcsuite/btcrpcclient)
 * [btcd Websockets Example](https://github.com/btcsuite/btcd/rpcclient/blob/master/examples/btcdwebsockets)  
   Connects to a btcd RPC server using TLS-secured websockets, registers for
   block connected and block disconnected notifications, and gets the current
