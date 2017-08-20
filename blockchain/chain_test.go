@@ -2,13 +2,12 @@
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package blockchain_test
+package blockchain
 
 import (
 	"testing"
 	"time"
 
-	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
@@ -49,7 +48,7 @@ func TestHaveBlock(t *testing.T) {
 	chain.TstSetCoinbaseMaturity(1)
 
 	for i := 1; i < len(blocks); i++ {
-		_, isOrphan, err := chain.ProcessBlock(blocks[i], blockchain.BFNone)
+		_, isOrphan, err := chain.ProcessBlock(blocks[i], BFNone)
 		if err != nil {
 			t.Errorf("ProcessBlock fail on block %v: %v\n", i, err)
 			return
@@ -63,7 +62,7 @@ func TestHaveBlock(t *testing.T) {
 
 	// Insert an orphan block.
 	_, isOrphan, err := chain.ProcessBlock(btcutil.NewBlock(&Block100000),
-		blockchain.BFNone)
+		BFNone)
 	if err != nil {
 		t.Errorf("Unable to process block: %v", err)
 		return
@@ -125,12 +124,15 @@ func TestCalcSequenceLock(t *testing.T) {
 	blockVersion := int32(0x20000000 | (uint32(1) << csvBit))
 
 	// Generate enough synthetic blocks to activate CSV.
-	chain, node := blockchain.TstNewFakeChain(netParams)
+	chain := newFakeChain(netParams)
+	node := chain.bestNode
 	blockTime := node.Header().Timestamp
 	numBlocksToActivate := (netParams.MinerConfirmationWindow * 3)
 	for i := uint32(0); i < numBlocksToActivate; i++ {
 		blockTime = blockTime.Add(time.Second)
-		node = chain.TstNewFakeNode(node, blockVersion, 0, blockTime)
+		node = newFakeNode(node, blockVersion, 0, blockTime)
+		chain.index.AddNode(node)
+		chain.bestNode = node
 	}
 
 	// Create a utxo view with a fake utxo for the inputs used in the
@@ -142,11 +144,9 @@ func TestCalcSequenceLock(t *testing.T) {
 			Value:    10,
 		}},
 	})
-	utxoView := blockchain.NewUtxoViewpoint()
+	utxoView := NewUtxoViewpoint()
 	utxoView.AddTxOuts(targetTx, int32(numBlocksToActivate)-4)
-	bestHeader := node.Header()
-	bestHash := bestHeader.BlockHash()
-	utxoView.SetBestHash(&bestHash)
+	utxoView.SetBestHash(&node.hash)
 
 	// Create a utxo that spends the fake utxo created above for use in the
 	// transactions created in the tests.  It has an age of 4 blocks.  Note
@@ -190,9 +190,9 @@ func TestCalcSequenceLock(t *testing.T) {
 
 	tests := []struct {
 		tx      *wire.MsgTx
-		view    *blockchain.UtxoViewpoint
+		view    *UtxoViewpoint
 		mempool bool
-		want    *blockchain.SequenceLock
+		want    *SequenceLock
 	}{
 		// A transaction of version one should disable sequence locks
 		// as the new sequence number semantics only apply to
@@ -202,11 +202,11 @@ func TestCalcSequenceLock(t *testing.T) {
 				Version: 1,
 				TxIn: []*wire.TxIn{{
 					PreviousOutPoint: utxo,
-					Sequence:         blockchain.LockTimeToSequence(false, 3),
+					Sequence:         LockTimeToSequence(false, 3),
 				}},
 			},
 			view: utxoView,
-			want: &blockchain.SequenceLock{
+			want: &SequenceLock{
 				Seconds:     -1,
 				BlockHeight: -1,
 			},
@@ -223,7 +223,7 @@ func TestCalcSequenceLock(t *testing.T) {
 				}},
 			},
 			view: utxoView,
-			want: &blockchain.SequenceLock{
+			want: &SequenceLock{
 				Seconds:     -1,
 				BlockHeight: -1,
 			},
@@ -239,11 +239,11 @@ func TestCalcSequenceLock(t *testing.T) {
 				Version: 2,
 				TxIn: []*wire.TxIn{{
 					PreviousOutPoint: utxo,
-					Sequence:         blockchain.LockTimeToSequence(true, 2),
+					Sequence:         LockTimeToSequence(true, 2),
 				}},
 			},
 			view: utxoView,
-			want: &blockchain.SequenceLock{
+			want: &SequenceLock{
 				Seconds:     medianTime - 1,
 				BlockHeight: -1,
 			},
@@ -257,11 +257,11 @@ func TestCalcSequenceLock(t *testing.T) {
 				Version: 2,
 				TxIn: []*wire.TxIn{{
 					PreviousOutPoint: utxo,
-					Sequence:         blockchain.LockTimeToSequence(true, 1024),
+					Sequence:         LockTimeToSequence(true, 1024),
 				}},
 			},
 			view: utxoView,
-			want: &blockchain.SequenceLock{
+			want: &SequenceLock{
 				Seconds:     medianTime + 1023,
 				BlockHeight: -1,
 			},
@@ -277,18 +277,18 @@ func TestCalcSequenceLock(t *testing.T) {
 				Version: 2,
 				TxIn: []*wire.TxIn{{
 					PreviousOutPoint: utxo,
-					Sequence:         blockchain.LockTimeToSequence(true, 2560),
+					Sequence:         LockTimeToSequence(true, 2560),
 				}, {
 					PreviousOutPoint: utxo,
-					Sequence:         blockchain.LockTimeToSequence(false, 4),
+					Sequence:         LockTimeToSequence(false, 4),
 				}, {
 					PreviousOutPoint: utxo,
-					Sequence: blockchain.LockTimeToSequence(false, 5) |
+					Sequence: LockTimeToSequence(false, 5) |
 						wire.SequenceLockTimeDisabled,
 				}},
 			},
 			view: utxoView,
-			want: &blockchain.SequenceLock{
+			want: &SequenceLock{
 				Seconds:     medianTime + (5 << wire.SequenceLockTimeGranularity) - 1,
 				BlockHeight: prevUtxoHeight + 3,
 			},
@@ -302,11 +302,11 @@ func TestCalcSequenceLock(t *testing.T) {
 				Version: 2,
 				TxIn: []*wire.TxIn{{
 					PreviousOutPoint: utxo,
-					Sequence:         blockchain.LockTimeToSequence(false, 3),
+					Sequence:         LockTimeToSequence(false, 3),
 				}},
 			},
 			view: utxoView,
-			want: &blockchain.SequenceLock{
+			want: &SequenceLock{
 				Seconds:     -1,
 				BlockHeight: prevUtxoHeight + 2,
 			},
@@ -319,14 +319,14 @@ func TestCalcSequenceLock(t *testing.T) {
 				Version: 2,
 				TxIn: []*wire.TxIn{{
 					PreviousOutPoint: utxo,
-					Sequence:         blockchain.LockTimeToSequence(true, 5120),
+					Sequence:         LockTimeToSequence(true, 5120),
 				}, {
 					PreviousOutPoint: utxo,
-					Sequence:         blockchain.LockTimeToSequence(true, 2560),
+					Sequence:         LockTimeToSequence(true, 2560),
 				}},
 			},
 			view: utxoView,
-			want: &blockchain.SequenceLock{
+			want: &SequenceLock{
 				Seconds:     medianTime + (10 << wire.SequenceLockTimeGranularity) - 1,
 				BlockHeight: -1,
 			},
@@ -340,14 +340,14 @@ func TestCalcSequenceLock(t *testing.T) {
 				Version: 2,
 				TxIn: []*wire.TxIn{{
 					PreviousOutPoint: utxo,
-					Sequence:         blockchain.LockTimeToSequence(false, 1),
+					Sequence:         LockTimeToSequence(false, 1),
 				}, {
 					PreviousOutPoint: utxo,
-					Sequence:         blockchain.LockTimeToSequence(false, 11),
+					Sequence:         LockTimeToSequence(false, 11),
 				}},
 			},
 			view: utxoView,
-			want: &blockchain.SequenceLock{
+			want: &SequenceLock{
 				Seconds:     -1,
 				BlockHeight: prevUtxoHeight + 10,
 			},
@@ -360,20 +360,20 @@ func TestCalcSequenceLock(t *testing.T) {
 				Version: 2,
 				TxIn: []*wire.TxIn{{
 					PreviousOutPoint: utxo,
-					Sequence:         blockchain.LockTimeToSequence(true, 2560),
+					Sequence:         LockTimeToSequence(true, 2560),
 				}, {
 					PreviousOutPoint: utxo,
-					Sequence:         blockchain.LockTimeToSequence(true, 6656),
+					Sequence:         LockTimeToSequence(true, 6656),
 				}, {
 					PreviousOutPoint: utxo,
-					Sequence:         blockchain.LockTimeToSequence(false, 3),
+					Sequence:         LockTimeToSequence(false, 3),
 				}, {
 					PreviousOutPoint: utxo,
-					Sequence:         blockchain.LockTimeToSequence(false, 9),
+					Sequence:         LockTimeToSequence(false, 9),
 				}},
 			},
 			view: utxoView,
-			want: &blockchain.SequenceLock{
+			want: &SequenceLock{
 				Seconds:     medianTime + (13 << wire.SequenceLockTimeGranularity) - 1,
 				BlockHeight: prevUtxoHeight + 8,
 			},
@@ -389,12 +389,12 @@ func TestCalcSequenceLock(t *testing.T) {
 				Version: 2,
 				TxIn: []*wire.TxIn{{
 					PreviousOutPoint: unConfUtxo,
-					Sequence:         blockchain.LockTimeToSequence(false, 2),
+					Sequence:         LockTimeToSequence(false, 2),
 				}},
 			},
 			view:    utxoView,
 			mempool: true,
-			want: &blockchain.SequenceLock{
+			want: &SequenceLock{
 				Seconds:     -1,
 				BlockHeight: nextBlockHeight + 1,
 			},
@@ -407,12 +407,12 @@ func TestCalcSequenceLock(t *testing.T) {
 				Version: 2,
 				TxIn: []*wire.TxIn{{
 					PreviousOutPoint: unConfUtxo,
-					Sequence:         blockchain.LockTimeToSequence(true, 1024),
+					Sequence:         LockTimeToSequence(true, 1024),
 				}},
 			},
 			view:    utxoView,
 			mempool: true,
-			want: &blockchain.SequenceLock{
+			want: &SequenceLock{
 				Seconds:     nextMedianTime + 1023,
 				BlockHeight: -1,
 			},

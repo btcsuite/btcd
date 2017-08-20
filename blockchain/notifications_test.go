@@ -2,12 +2,11 @@
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package blockchain_test
+package blockchain
 
 import (
 	"testing"
 
-	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/chaincfg"
 )
 
@@ -27,8 +26,8 @@ func TestNotifications(t *testing.T) {
 	defer teardownFunc()
 
 	notificationCount := 0
-	callback := func(notification *blockchain.Notification) {
-		if notification.Type == blockchain.NTBlockAccepted {
+	callback := func(notification *Notification) {
+		if notification.Type == NTBlockAccepted {
 			notificationCount++
 		}
 	}
@@ -40,7 +39,7 @@ func TestNotifications(t *testing.T) {
 		chain.Subscribe(callback)
 	}
 
-	_, _, err = chain.ProcessBlock(blocks[1], blockchain.BFNone)
+	_, _, err = chain.ProcessBlock(blocks[1], BFNone)
 	if err != nil {
 		t.Fatalf("ProcessBlock fail on block 1: %v\n", err)
 	}

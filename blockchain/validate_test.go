@@ -1,8 +1,8 @@
-// Copyright (c) 2013-2016 The btcsuite developers
+// Copyright (c) 2013-2017 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package blockchain_test
+package blockchain
 
 import (
 	"math"
@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
@@ -20,15 +19,15 @@ import (
 // TestSequenceLocksActive tests the SequenceLockActive function to ensure it
 // works as expected in all possible combinations/scenarios.
 func TestSequenceLocksActive(t *testing.T) {
-	seqLock := func(h int32, s int64) *blockchain.SequenceLock {
-		return &blockchain.SequenceLock{
+	seqLock := func(h int32, s int64) *SequenceLock {
+		return &SequenceLock{
 			Seconds:     s,
 			BlockHeight: h,
 		}
 	}
 
 	tests := []struct {
-		seqLock     *blockchain.SequenceLock
+		seqLock     *SequenceLock
 		blockHeight int32
 		mtp         time.Time
 
@@ -55,7 +54,7 @@ func TestSequenceLocksActive(t *testing.T) {
 
 	t.Logf("Running %d sequence locks tests", len(tests))
 	for i, test := range tests {
-		got := blockchain.SequenceLockActive(test.seqLock,
+		got := SequenceLockActive(test.seqLock,
 			test.blockHeight, test.mtp)
 		if got != test.want {
 			t.Fatalf("SequenceLockActive #%d got %v want %v", i,
@@ -89,8 +88,8 @@ func TestCheckConnectBlock(t *testing.T) {
 func TestCheckBlockSanity(t *testing.T) {
 	powLimit := chaincfg.MainNetParams.PowLimit
 	block := btcutil.NewBlock(&Block100000)
-	timeSource := blockchain.NewMedianTime()
-	err := blockchain.CheckBlockSanity(block, powLimit, timeSource)
+	timeSource := NewMedianTime()
+	err := CheckBlockSanity(block, powLimit, timeSource)
 	if err != nil {
 		t.Errorf("CheckBlockSanity: %v", err)
 	}
@@ -99,7 +98,7 @@ func TestCheckBlockSanity(t *testing.T) {
 	// second fails.
 	timestamp := block.MsgBlock().Header.Timestamp
 	block.MsgBlock().Header.Timestamp = timestamp.Add(time.Nanosecond)
-	err = blockchain.CheckBlockSanity(block, powLimit, timeSource)
+	err = CheckBlockSanity(block, powLimit, timeSource)
 	if err == nil {
 		t.Errorf("CheckBlockSanity: error is nil when it shouldn't be")
 	}
@@ -115,11 +114,11 @@ func TestCheckSerializedHeight(t *testing.T) {
 	coinbaseTx.AddTxIn(wire.NewTxIn(coinbaseOutpoint, nil, nil))
 
 	// Expected rule errors.
-	missingHeightError := blockchain.RuleError{
-		ErrorCode: blockchain.ErrMissingCoinbaseHeight,
+	missingHeightError := RuleError{
+		ErrorCode: ErrMissingCoinbaseHeight,
 	}
-	badHeightError := blockchain.RuleError{
-		ErrorCode: blockchain.ErrBadCoinbaseHeight,
+	badHeightError := RuleError{
+		ErrorCode: ErrBadCoinbaseHeight,
 	}
 
 	tests := []struct {
@@ -151,15 +150,15 @@ func TestCheckSerializedHeight(t *testing.T) {
 		msgTx.TxIn[0].SignatureScript = test.sigScript
 		tx := btcutil.NewTx(msgTx)
 
-		err := blockchain.TstCheckSerializedHeight(tx, test.wantHeight)
+		err := checkSerializedHeight(tx, test.wantHeight)
 		if reflect.TypeOf(err) != reflect.TypeOf(test.err) {
 			t.Errorf("checkSerializedHeight #%d wrong error type "+
 				"got: %v <%T>, want: %T", i, err, err, test.err)
 			continue
 		}
 
-		if rerr, ok := err.(blockchain.RuleError); ok {
-			trerr := test.err.(blockchain.RuleError)
+		if rerr, ok := err.(RuleError); ok {
+			trerr := test.err.(RuleError)
 			if rerr.ErrorCode != trerr.ErrorCode {
 				t.Errorf("checkSerializedHeight #%d wrong "+
 					"error code got: %v, want: %v", i,

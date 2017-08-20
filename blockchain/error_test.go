@@ -1,59 +1,57 @@
-// Copyright (c) 2014 The btcsuite developers
+// Copyright (c) 2014-2017 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package blockchain_test
+package blockchain
 
 import (
 	"testing"
-
-	"github.com/btcsuite/btcd/blockchain"
 )
 
 // TestErrorCodeStringer tests the stringized output for the ErrorCode type.
 func TestErrorCodeStringer(t *testing.T) {
 	tests := []struct {
-		in   blockchain.ErrorCode
+		in   ErrorCode
 		want string
 	}{
-		{blockchain.ErrDuplicateBlock, "ErrDuplicateBlock"},
-		{blockchain.ErrBlockTooBig, "ErrBlockTooBig"},
-		{blockchain.ErrBlockVersionTooOld, "ErrBlockVersionTooOld"},
-		{blockchain.ErrInvalidTime, "ErrInvalidTime"},
-		{blockchain.ErrTimeTooOld, "ErrTimeTooOld"},
-		{blockchain.ErrTimeTooNew, "ErrTimeTooNew"},
-		{blockchain.ErrDifficultyTooLow, "ErrDifficultyTooLow"},
-		{blockchain.ErrUnexpectedDifficulty, "ErrUnexpectedDifficulty"},
-		{blockchain.ErrHighHash, "ErrHighHash"},
-		{blockchain.ErrBadMerkleRoot, "ErrBadMerkleRoot"},
-		{blockchain.ErrBadCheckpoint, "ErrBadCheckpoint"},
-		{blockchain.ErrForkTooOld, "ErrForkTooOld"},
-		{blockchain.ErrCheckpointTimeTooOld, "ErrCheckpointTimeTooOld"},
-		{blockchain.ErrNoTransactions, "ErrNoTransactions"},
-		{blockchain.ErrTooManyTransactions, "ErrTooManyTransactions"},
-		{blockchain.ErrNoTxInputs, "ErrNoTxInputs"},
-		{blockchain.ErrNoTxOutputs, "ErrNoTxOutputs"},
-		{blockchain.ErrTxTooBig, "ErrTxTooBig"},
-		{blockchain.ErrBadTxOutValue, "ErrBadTxOutValue"},
-		{blockchain.ErrDuplicateTxInputs, "ErrDuplicateTxInputs"},
-		{blockchain.ErrBadTxInput, "ErrBadTxInput"},
-		{blockchain.ErrBadCheckpoint, "ErrBadCheckpoint"},
-		{blockchain.ErrMissingTxOut, "ErrMissingTxOut"},
-		{blockchain.ErrUnfinalizedTx, "ErrUnfinalizedTx"},
-		{blockchain.ErrDuplicateTx, "ErrDuplicateTx"},
-		{blockchain.ErrOverwriteTx, "ErrOverwriteTx"},
-		{blockchain.ErrImmatureSpend, "ErrImmatureSpend"},
-		{blockchain.ErrSpendTooHigh, "ErrSpendTooHigh"},
-		{blockchain.ErrBadFees, "ErrBadFees"},
-		{blockchain.ErrTooManySigOps, "ErrTooManySigOps"},
-		{blockchain.ErrFirstTxNotCoinbase, "ErrFirstTxNotCoinbase"},
-		{blockchain.ErrMultipleCoinbases, "ErrMultipleCoinbases"},
-		{blockchain.ErrBadCoinbaseScriptLen, "ErrBadCoinbaseScriptLen"},
-		{blockchain.ErrBadCoinbaseValue, "ErrBadCoinbaseValue"},
-		{blockchain.ErrMissingCoinbaseHeight, "ErrMissingCoinbaseHeight"},
-		{blockchain.ErrBadCoinbaseHeight, "ErrBadCoinbaseHeight"},
-		{blockchain.ErrScriptMalformed, "ErrScriptMalformed"},
-		{blockchain.ErrScriptValidation, "ErrScriptValidation"},
+		{ErrDuplicateBlock, "ErrDuplicateBlock"},
+		{ErrBlockTooBig, "ErrBlockTooBig"},
+		{ErrBlockVersionTooOld, "ErrBlockVersionTooOld"},
+		{ErrInvalidTime, "ErrInvalidTime"},
+		{ErrTimeTooOld, "ErrTimeTooOld"},
+		{ErrTimeTooNew, "ErrTimeTooNew"},
+		{ErrDifficultyTooLow, "ErrDifficultyTooLow"},
+		{ErrUnexpectedDifficulty, "ErrUnexpectedDifficulty"},
+		{ErrHighHash, "ErrHighHash"},
+		{ErrBadMerkleRoot, "ErrBadMerkleRoot"},
+		{ErrBadCheckpoint, "ErrBadCheckpoint"},
+		{ErrForkTooOld, "ErrForkTooOld"},
+		{ErrCheckpointTimeTooOld, "ErrCheckpointTimeTooOld"},
+		{ErrNoTransactions, "ErrNoTransactions"},
+		{ErrTooManyTransactions, "ErrTooManyTransactions"},
+		{ErrNoTxInputs, "ErrNoTxInputs"},
+		{ErrNoTxOutputs, "ErrNoTxOutputs"},
+		{ErrTxTooBig, "ErrTxTooBig"},
+		{ErrBadTxOutValue, "ErrBadTxOutValue"},
+		{ErrDuplicateTxInputs, "ErrDuplicateTxInputs"},
+		{ErrBadTxInput, "ErrBadTxInput"},
+		{ErrBadCheckpoint, "ErrBadCheckpoint"},
+		{ErrMissingTxOut, "ErrMissingTxOut"},
+		{ErrUnfinalizedTx, "ErrUnfinalizedTx"},
+		{ErrDuplicateTx, "ErrDuplicateTx"},
+		{ErrOverwriteTx, "ErrOverwriteTx"},
+		{ErrImmatureSpend, "ErrImmatureSpend"},
+		{ErrSpendTooHigh, "ErrSpendTooHigh"},
+		{ErrBadFees, "ErrBadFees"},
+		{ErrTooManySigOps, "ErrTooManySigOps"},
+		{ErrFirstTxNotCoinbase, "ErrFirstTxNotCoinbase"},
+		{ErrMultipleCoinbases, "ErrMultipleCoinbases"},
+		{ErrBadCoinbaseScriptLen, "ErrBadCoinbaseScriptLen"},
+		{ErrBadCoinbaseValue, "ErrBadCoinbaseValue"},
+		{ErrMissingCoinbaseHeight, "ErrMissingCoinbaseHeight"},
+		{ErrBadCoinbaseHeight, "ErrBadCoinbaseHeight"},
+		{ErrScriptMalformed, "ErrScriptMalformed"},
+		{ErrScriptValidation, "ErrScriptValidation"},
 		{0xffff, "Unknown ErrorCode (65535)"},
 	}
 
@@ -71,15 +69,15 @@ func TestErrorCodeStringer(t *testing.T) {
 // TestRuleError tests the error output for the RuleError type.
 func TestRuleError(t *testing.T) {
 	tests := []struct {
-		in   blockchain.RuleError
+		in   RuleError
 		want string
 	}{
 		{
-			blockchain.RuleError{Description: "duplicate block"},
+			RuleError{Description: "duplicate block"},
 			"duplicate block",
 		},
 		{
-			blockchain.RuleError{Description: "human-readable error"},
+			RuleError{Description: "human-readable error"},
 			"human-readable error",
 		},
 	}
@@ -100,19 +98,19 @@ func TestDeploymentError(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		in   blockchain.DeploymentError
+		in   DeploymentError
 		want string
 	}{
 		{
-			blockchain.DeploymentError(0),
+			DeploymentError(0),
 			"deployment ID 0 does not exist",
 		},
 		{
-			blockchain.DeploymentError(10),
+			DeploymentError(10),
 			"deployment ID 10 does not exist",
 		},
 		{
-			blockchain.DeploymentError(123),
+			DeploymentError(123),
 			"deployment ID 123 does not exist",
 		},
 	}
