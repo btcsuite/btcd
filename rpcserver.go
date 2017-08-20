@@ -2186,26 +2186,7 @@ func handleGetHeaders(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) 
 			return nil, rpcDecodeHexError(c.HashStop)
 		}
 	}
-	blockHashes, err := s.cfg.SyncMgr.LocateBlocks(blockLocators, &hashStop)
-	if err != nil {
-		return nil, &btcjson.RPCError{
-			Code: btcjson.ErrRPCDatabase,
-			Message: "Failed to fetch hashes of block headers: " +
-				err.Error(),
-		}
-	}
-	headers := make([]wire.BlockHeader, 0, len(blockHashes))
-	for i := range blockHashes {
-		header, err := s.cfg.Chain.FetchHeader(&blockHashes[i])
-		if err != nil {
-			return nil, &btcjson.RPCError{
-				Code: btcjson.ErrRPCBlockNotFound,
-				Message: "Failed to fetch header of block: " +
-					err.Error(),
-			}
-		}
-		headers = append(headers, header)
-	}
+	headers := s.cfg.SyncMgr.LocateHeaders(blockLocators, &hashStop)
 
 	// Return the serialized block headers as hex-encoded strings.
 	hexBlockHeaders := make([]string, len(headers))
@@ -4143,11 +4124,11 @@ type rpcserverSyncManager interface {
 	// used to sync from or 0 if there is none.
 	SyncPeerID() int32
 
-	// LocateBlocks returns the hashes of the blocks after the first known
+	// LocateHeaders returns the headers of the blocks after the first known
 	// block in the provided locators until the provided stop hash or the
 	// current tip is reached, up to a max of wire.MaxBlockHeadersPerMsg
 	// hashes.
-	LocateBlocks(locators []*chainhash.Hash, hashStop *chainhash.Hash) ([]chainhash.Hash, error)
+	LocateHeaders(locators []*chainhash.Hash, hashStop *chainhash.Hash) []wire.BlockHeader
 }
 
 // rpcserverConfig is a descriptor containing the RPC server configuration.

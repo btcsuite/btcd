@@ -5,6 +5,7 @@
 package blockchain
 
 import (
+	"reflect"
 	"testing"
 	"time"
 
@@ -434,6 +435,368 @@ func TestCalcSequenceLock(t *testing.T) {
 		if seqLock.BlockHeight != test.want.BlockHeight {
 			t.Fatalf("test #%d got height of %v want height of %v ",
 				i, seqLock.BlockHeight, test.want.BlockHeight)
+		}
+	}
+}
+
+// nodeHashes is a convenience function that returns the hashes for all of the
+// passed indexes of the provided nodes.  It is used to construct expected hash
+// slices in the tests.
+func nodeHashes(nodes []*blockNode, indexes ...int) []chainhash.Hash {
+	hashes := make([]chainhash.Hash, 0, len(indexes))
+	for _, idx := range indexes {
+		hashes = append(hashes, nodes[idx].hash)
+	}
+	return hashes
+}
+
+// nodeHeaders is a convenience function that returns the headers for all of
+// the passed indexes of the provided nodes.  It is used to construct expected
+// located headers in the tests.
+func nodeHeaders(nodes []*blockNode, indexes ...int) []wire.BlockHeader {
+	headers := make([]wire.BlockHeader, 0, len(indexes))
+	for _, idx := range indexes {
+		headers = append(headers, nodes[idx].Header())
+	}
+	return headers
+}
+
+// TestLocateInventory ensures that locating inventory via the LocateHeaders and
+// LocateBlocks functions behaves as expected.
+func TestLocateInventory(t *testing.T) {
+	// Construct a synthetic block chain with a block index consisting of
+	// the following structure.
+	// 	genesis -> 1 -> 2 -> ... -> 15 -> 16  -> 17  -> 18
+	// 	                              \-> 16a -> 17a
+	tip := tstTip
+	chain := newFakeChain(&chaincfg.MainNetParams)
+	branch0Nodes := chainedNodes(chain.bestChain.Genesis(), 18)
+	branch1Nodes := chainedNodes(branch0Nodes[14], 2)
+	for _, node := range branch0Nodes {
+		chain.index.AddNode(node)
+	}
+	for _, node := range branch1Nodes {
+		chain.index.AddNode(node)
+	}
+	chain.bestChain.SetTip(tip(branch0Nodes))
+
+	// Create chain views for different branches of the overall chain to
+	// simulate a local and remote node on different parts of the chain.
+	localView := newChainView(tip(branch0Nodes))
+	remoteView := newChainView(tip(branch1Nodes))
+
+	// Create a chain view for a completely unrelated block chain to
+	// simulate a remote node on a totally different chain.
+	unrelatedBranchNodes := chainedNodes(nil, 5)
+	unrelatedView := newChainView(tip(unrelatedBranchNodes))
+
+	tests := []struct {
+		name       string
+		locator    BlockLocator       // locator for requested inventory
+		hashStop   chainhash.Hash     // stop hash for locator
+		maxAllowed uint32             // max to locate, 0 = wire const
+		headers    []wire.BlockHeader // expected located headers
+		hashes     []chainhash.Hash   // expected located hashes
+	}{
+		{
+			// Empty block locators and unknown stop hash.  No
+			// inventory should be located.
+			name:     "no locators, no stop",
+			locator:  nil,
+			hashStop: chainhash.Hash{},
+			headers:  nil,
+			hashes:   nil,
+		},
+		{
+			// Empty block locators and stop hash in side chain.
+			// The expected result is the requested block.
+			name:     "no locators, stop in side",
+			locator:  nil,
+			hashStop: tip(branch1Nodes).hash,
+			headers:  nodeHeaders(branch1Nodes, 1),
+			hashes:   nodeHashes(branch1Nodes, 1),
+		},
+		{
+			// Empty block locators and stop hash in main chain.
+			// The expected result is the requested block.
+			name:     "no locators, stop in main",
+			locator:  nil,
+			hashStop: branch0Nodes[12].hash,
+			headers:  nodeHeaders(branch0Nodes, 12),
+			hashes:   nodeHashes(branch0Nodes, 12),
+		},
+		{
+			// Locators based on remote being on side chain and a
+			// stop hash local node doesn't know about.  The
+			// expected result is the blocks after the fork point in
+			// the main chain and the stop hash has no effect.
+			name:     "remote side chain, unknown stop",
+			locator:  remoteView.BlockLocator(nil),
+			hashStop: chainhash.Hash{0x01},
+			headers:  nodeHeaders(branch0Nodes, 15, 16, 17),
+			hashes:   nodeHashes(branch0Nodes, 15, 16, 17),
+		},
+		{
+			// Locators based on remote being on side chain and a
+			// stop hash in side chain.  The expected result is the
+			// blocks after the fork point in the main chain and the
+			// stop hash has no effect.
+			name:     "remote side chain, stop in side",
+			locator:  remoteView.BlockLocator(nil),
+			hashStop: tip(branch1Nodes).hash,
+			headers:  nodeHeaders(branch0Nodes, 15, 16, 17),
+			hashes:   nodeHashes(branch0Nodes, 15, 16, 17),
+		},
+		{
+			// Locators based on remote being on side chain and a
+			// stop hash in main chain, but before fork point.  The
+			// expected result is the blocks after the fork point in
+			// the main chain and the stop hash has no effect.
+			name:     "remote side chain, stop in main before",
+			locator:  remoteView.BlockLocator(nil),
+			hashStop: branch0Nodes[13].hash,
+			headers:  nodeHeaders(branch0Nodes, 15, 16, 17),
+			hashes:   nodeHashes(branch0Nodes, 15, 16, 17),
+		},
+		{
+			// Locators based on remote being on side chain and a
+			// stop hash in main chain, but exactly at the fork
+			// point.  The expected result is the blocks after the
+			// fork point in the main chain and the stop hash has no
+			// effect.
+			name:     "remote side chain, stop in main exact",
+			locator:  remoteView.BlockLocator(nil),
+			hashStop: branch0Nodes[14].hash,
+			headers:  nodeHeaders(branch0Nodes, 15, 16, 17),
+			hashes:   nodeHashes(branch0Nodes, 15, 16, 17),
+		},
+		{
+			// Locators based on remote being on side chain and a
+			// stop hash in main chain just after the fork point.
+			// The expected result is the blocks after the fork
+			// point in the main chain up to and including the stop
+			// hash.
+			name:     "remote side chain, stop in main after",
+			locator:  remoteView.BlockLocator(nil),
+			hashStop: branch0Nodes[15].hash,
+			headers:  nodeHeaders(branch0Nodes, 15),
+			hashes:   nodeHashes(branch0Nodes, 15),
+		},
+		{
+			// Locators based on remote being on side chain and a
+			// stop hash in main chain some time after the fork
+			// point.  The expected result is the blocks after the
+			// fork point in the main chain up to and including the
+			// stop hash.
+			name:     "remote side chain, stop in main after more",
+			locator:  remoteView.BlockLocator(nil),
+			hashStop: branch0Nodes[16].hash,
+			headers:  nodeHeaders(branch0Nodes, 15, 16),
+			hashes:   nodeHashes(branch0Nodes, 15, 16),
+		},
+		{
+			// Locators based on remote being on main chain in the
+			// past and a stop hash local node doesn't know about.
+			// The expected result is the blocks after the known
+			// point in the main chain and the stop hash has no
+			// effect.
+			name:     "remote main chain past, unknown stop",
+			locator:  localView.BlockLocator(branch0Nodes[12]),
+			hashStop: chainhash.Hash{0x01},
+			headers:  nodeHeaders(branch0Nodes, 13, 14, 15, 16, 17),
+			hashes:   nodeHashes(branch0Nodes, 13, 14, 15, 16, 17),
+		},
+		{
+			// Locators based on remote being on main chain in the
+			// past and a stop hash in a side chain.  The expected
+			// result is the blocks after the known point in the
+			// main chain and the stop hash has no effect.
+			name:     "remote main chain past, stop in side",
+			locator:  localView.BlockLocator(branch0Nodes[12]),
+			hashStop: tip(branch1Nodes).hash,
+			headers:  nodeHeaders(branch0Nodes, 13, 14, 15, 16, 17),
+			hashes:   nodeHashes(branch0Nodes, 13, 14, 15, 16, 17),
+		},
+		{
+			// Locators based on remote being on main chain in the
+			// past and a stop hash in the main chain before that
+			// point.  The expected result is the blocks after the
+			// known point in the main chain and the stop hash has
+			// no effect.
+			name:     "remote main chain past, stop in main before",
+			locator:  localView.BlockLocator(branch0Nodes[12]),
+			hashStop: branch0Nodes[11].hash,
+			headers:  nodeHeaders(branch0Nodes, 13, 14, 15, 16, 17),
+			hashes:   nodeHashes(branch0Nodes, 13, 14, 15, 16, 17),
+		},
+		{
+			// Locators based on remote being on main chain in the
+			// past and a stop hash in the main chain exactly at that
+			// point.  The expected result is the blocks after the
+			// known point in the main chain and the stop hash has
+			// no effect.
+			name:     "remote main chain past, stop in main exact",
+			locator:  localView.BlockLocator(branch0Nodes[12]),
+			hashStop: branch0Nodes[12].hash,
+			headers:  nodeHeaders(branch0Nodes, 13, 14, 15, 16, 17),
+			hashes:   nodeHashes(branch0Nodes, 13, 14, 15, 16, 17),
+		},
+		{
+			// Locators based on remote being on main chain in the
+			// past and a stop hash in the main chain just after
+			// that point.  The expected result is the blocks after
+			// the known point in the main chain and the stop hash
+			// has no effect.
+			name:     "remote main chain past, stop in main after",
+			locator:  localView.BlockLocator(branch0Nodes[12]),
+			hashStop: branch0Nodes[13].hash,
+			headers:  nodeHeaders(branch0Nodes, 13),
+			hashes:   nodeHashes(branch0Nodes, 13),
+		},
+		{
+			// Locators based on remote being on main chain in the
+			// past and a stop hash in the main chain some time
+			// after that point.  The expected result is the blocks
+			// after the known point in the main chain and the stop
+			// hash has no effect.
+			name:     "remote main chain past, stop in main after more",
+			locator:  localView.BlockLocator(branch0Nodes[12]),
+			hashStop: branch0Nodes[15].hash,
+			headers:  nodeHeaders(branch0Nodes, 13, 14, 15),
+			hashes:   nodeHashes(branch0Nodes, 13, 14, 15),
+		},
+		{
+			// Locators based on remote being at exactly the same
+			// point in the main chain and a stop hash local node
+			// doesn't know about.  The expected result is no
+			// located inventory.
+			name:     "remote main chain same, unknown stop",
+			locator:  localView.BlockLocator(nil),
+			hashStop: chainhash.Hash{0x01},
+			headers:  nil,
+			hashes:   nil,
+		},
+		{
+			// Locators based on remote being at exactly the same
+			// point in the main chain and a stop hash at exactly
+			// the same point.  The expected result is no located
+			// inventory.
+			name:     "remote main chain same, stop same point",
+			locator:  localView.BlockLocator(nil),
+			hashStop: tip(branch0Nodes).hash,
+			headers:  nil,
+			hashes:   nil,
+		},
+		{
+			// Locators from remote that don't include any blocks
+			// the local node knows.  This would happen if the
+			// remote node is on a completely separate chain that
+			// isn't rooted with the same genesis block.  The
+			// expected result is the blocks after the genesis
+			// block.
+			name:     "remote unrelated chain",
+			locator:  unrelatedView.BlockLocator(nil),
+			hashStop: chainhash.Hash{},
+			headers: nodeHeaders(branch0Nodes, 0, 1, 2, 3, 4, 5, 6,
+				7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17),
+			hashes: nodeHashes(branch0Nodes, 0, 1, 2, 3, 4, 5, 6,
+				7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17),
+		},
+		{
+			// Locators from remote for second block in main chain
+			// and no stop hash, but with an overridden max limit.
+			// The expected result is the blocks after the second
+			// block limited by the max.
+			name:       "remote genesis",
+			locator:    locatorHashes(branch0Nodes, 0),
+			hashStop:   chainhash.Hash{},
+			maxAllowed: 3,
+			headers:    nodeHeaders(branch0Nodes, 1, 2, 3),
+			hashes:     nodeHashes(branch0Nodes, 1, 2, 3),
+		},
+		{
+			// Poorly formed locator.
+			//
+			// Locator from remote that only includes a single
+			// block on a side chain the local node knows.  The
+			// expected result is the blocks after the genesis
+			// block since even though the block is known, it is on
+			// a side chain and there are no more locators to find
+			// the fork point.
+			name:     "weak locator, single known side block",
+			locator:  locatorHashes(branch1Nodes, 1),
+			hashStop: chainhash.Hash{},
+			headers: nodeHeaders(branch0Nodes, 0, 1, 2, 3, 4, 5, 6,
+				7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17),
+			hashes: nodeHashes(branch0Nodes, 0, 1, 2, 3, 4, 5, 6,
+				7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17),
+		},
+		{
+			// Poorly formed locator.
+			//
+			// Locator from remote that only includes multiple
+			// blocks on a side chain the local node knows however
+			// none in the main chain.  The expected result is the
+			// blocks after the genesis block since even though the
+			// blocks are known, they are all on a side chain and
+			// there are no more locators to find the fork point.
+			name:     "weak locator, multiple known side blocks",
+			locator:  locatorHashes(branch1Nodes, 1),
+			hashStop: chainhash.Hash{},
+			headers: nodeHeaders(branch0Nodes, 0, 1, 2, 3, 4, 5, 6,
+				7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17),
+			hashes: nodeHashes(branch0Nodes, 0, 1, 2, 3, 4, 5, 6,
+				7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17),
+		},
+		{
+			// Poorly formed locator.
+			//
+			// Locator from remote that only includes multiple
+			// blocks on a side chain the local node knows however
+			// none in the main chain but includes a stop hash in
+			// the main chain.  The expected result is the blocks
+			// after the genesis block up to the stop hash since
+			// even though the blocks are known, they are all on a
+			// side chain and there are no more locators to find the
+			// fork point.
+			name:     "weak locator, multiple known side blocks, stop in main",
+			locator:  locatorHashes(branch1Nodes, 1),
+			hashStop: branch0Nodes[5].hash,
+			headers:  nodeHeaders(branch0Nodes, 0, 1, 2, 3, 4, 5),
+			hashes:   nodeHashes(branch0Nodes, 0, 1, 2, 3, 4, 5),
+		},
+	}
+	for _, test := range tests {
+		// Ensure the expected headers are located.
+		var headers []wire.BlockHeader
+		if test.maxAllowed != 0 {
+			// Need to use the unexported function to override the
+			// max allowed for headers.
+			chain.chainLock.RLock()
+			headers = chain.locateHeaders(test.locator,
+				&test.hashStop, test.maxAllowed)
+			chain.chainLock.RUnlock()
+		} else {
+			headers = chain.LocateHeaders(test.locator,
+				&test.hashStop)
+		}
+		if !reflect.DeepEqual(headers, test.headers) {
+			t.Errorf("%s: unxpected headers -- got %v, want %v",
+				test.name, headers, test.headers)
+			continue
+		}
+
+		// Ensure the expected block hashes are located.
+		maxAllowed := uint32(wire.MaxBlocksPerMsg)
+		if test.maxAllowed != 0 {
+			maxAllowed = test.maxAllowed
+		}
+		hashes := chain.LocateBlocks(test.locator, &test.hashStop,
+			maxAllowed)
+		if !reflect.DeepEqual(hashes, test.hashes) {
+			t.Errorf("%s: unxpected hashes -- got %v, want %v",
+				test.name, hashes, test.hashes)
+			continue
 		}
 	}
 }
