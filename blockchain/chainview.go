@@ -390,10 +390,10 @@ func (c *chainView) blockLocator(node *blockNode) BlockLocator {
 
 // BlockLocator returns a block locator for the passed block node.  The passed
 // node can be nil in which case the block locator for the current tip
-// associated with the view will be returned.  This only differs from the
-// exported version in that it is up to the caller to ensure the lock is held.
+// associated with the view will be returned.
 //
-// See BlockLocator for details on the algorithm used to create a block locator.
+// See the BlockLocator type for details on the algorithm used to create a block
+// locator.
 //
 // This function is safe for concurrent access.
 func (c *chainView) BlockLocator(node *blockNode) BlockLocator {
