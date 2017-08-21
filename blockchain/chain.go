@@ -105,10 +105,6 @@ type BlockChain struct {
 	// fields in this struct below this point.
 	chainLock sync.RWMutex
 
-	// These fields are configuration parameters that can be toggled at
-	// runtime.  They are protected by the chain lock.
-	noVerify bool
-
 	// These fields are related to the memory block index.  The best node
 	// is protected by the chain lock and the index has its own locks.
 	bestNode *blockNode
@@ -172,19 +168,6 @@ type BlockChain struct {
 	// certain blockchain events.
 	notificationsLock sync.RWMutex
 	notifications     []NotificationCallback
-}
-
-// DisableVerify provides a mechanism to disable transaction script validation
-// which you DO NOT want to do in production as it could allow double spends
-// and other undesirable things.  It is provided only for debug purposes since
-// script validation is extremely intensive and when debugging it is sometimes
-// nice to quickly get the chain.
-//
-// This function is safe for concurrent access.
-func (b *BlockChain) DisableVerify(disable bool) {
-	b.chainLock.Lock()
-	b.noVerify = disable
-	b.chainLock.Unlock()
 }
 
 // HaveBlock returns whether or not the chain instance has the block represented

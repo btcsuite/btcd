@@ -1153,7 +1153,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block, vi
 	// optimization because running the scripts is the most time consuming
 	// portion of block handling.
 	checkpoint := b.LatestCheckpoint()
-	runScripts := !b.noVerify
+	runScripts := true
 	if checkpoint != nil && node.height <= checkpoint.Height {
 		runScripts = false
 	}
