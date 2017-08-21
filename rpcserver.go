@@ -104,17 +104,6 @@ const (
 	// sstxCommitmentString is the string to insert when a verbose
 	// transaction output's pkscript type is a ticket commitment.
 	sstxCommitmentString = "sstxcommitment"
-
-	// maxSigOpsPerTx is the maximum number of signature operations
-	// in a single transaction we will relay or mine.  It is a fraction
-	// of the max signature operations for a block.
-	//
-	// NOTE: This is being added while syncing upstream because the code in
-	// the RPC server here is referencing the variable even though it most
-	// definitely shouldn't be.  It is a policy limit regarding what should
-	// be relayed or mined and thus should only apply in the mempool and/or
-	// possibly the mining code.
-	maxSigOpsPerTx = blockchain.MaxSigOpsPerBlock / 5
 )
 
 var (
@@ -2483,30 +2472,6 @@ func (state *gbtWorkState) blockTemplateResult(bm *blockManager, useCoinbaseValu
 
 	}
 
-	// Sometimes requests have a faulty fees or sig ops count. If we need to,
-	// we can recalculate these.
-	recalculateFeesAndSigsOps := true
-	if len(msgBlock.Transactions)+len(msgBlock.STransactions) ==
-		len(template.Fees) {
-		recalculateFeesAndSigsOps = false
-	}
-	if len(msgBlock.Transactions)+len(msgBlock.STransactions) ==
-		len(template.SigOpCounts) {
-		recalculateFeesAndSigsOps = false
-	}
-	newestBlock, _ := bm.chainState.Best()
-	if newestBlock == nil {
-		return nil, &dcrjson.RPCError{
-			Code:    dcrjson.ErrRPCBestBlockHash,
-			Message: fmt.Sprintf("Parent of block HEAD not found"),
-		}
-	}
-	// If we're mining on the parent with a cached template instead of on
-	// the newest block, we shouldn't recalculate fees and sigops.
-	if *newestBlock != msgBlock.Header.PrevBlock {
-		recalculateFeesAndSigsOps = false
-	}
-
 	// Convert each transaction in the block template to a template result
 	// transaction.  The result does not include the coinbase, so notice
 	// the adjustments to the various lengths and indices.
@@ -2559,55 +2524,8 @@ func (state *gbtWorkState) blockTemplateResult(bm *blockManager, useCoinbaseValu
 			txTypeStr = "error"
 		}
 
-		var fee, sigOps int64
-		if !recalculateFeesAndSigsOps {
-			fee = template.Fees[i]
-			sigOps = template.SigOpCounts[i]
-		} else {
-			txU := dcrutil.NewTx(tx)
-			isValid := dcrutil.IsFlagSet16(
-				template.Block.Header.VoteBits,
-				dcrutil.BlockValid)
-			view, err := bm.chain.FetchUtxoView(txU, isValid)
-			if err != nil {
-				context := "Could not fetch Utxo view"
-				return nil, rpcInternalError(err.Error(),
-					context)
-			}
-
-			fee, err = blockchain.CheckTransactionInputs(
-				bm.chain.FetchSubsidyCache(),
-				txU,
-				int64(template.Block.Header.Height),
-				view,
-				true, // Ensure fraud proofs are correct
-				bm.server.chainParams)
-			if err != nil {
-				context := "Invalid transaction inputs"
-				return nil, rpcInternalError(err.Error(),
-					context)
-			}
-
-			isSSGen := false
-			numSigOps, err := blockchain.CountP2SHSigOps(txU, false,
-				isSSGen, view)
-			if err != nil {
-				context := "Could not count sig ops"
-				return nil, rpcInternalError(err.Error(),
-					context)
-			}
-
-			numSigOps += blockchain.CountSigOps(txU, false,
-				isSSGen)
-			if numSigOps > maxSigOpsPerTx {
-				errStr := fmt.Sprintf("transaction %v has "+
-					"too many sigops: %d > %d", txHash,
-					numSigOps, maxSigOpsPerTx)
-				return nil, rpcInternalError(errStr, "")
-			}
-			sigOps = int64(numSigOps)
-		}
-
+		fee := template.Fees[i]
+		sigOps := template.SigOpCounts[i]
 		resultTx := dcrjson.GetBlockTemplateResultTx{
 			Data:    hex.EncodeToString(txBuf.Bytes()),
 			Hash:    txHash.String(),
@@ -2626,9 +2544,7 @@ func (state *gbtWorkState) blockTemplateResult(bm *blockManager, useCoinbaseValu
 	stxIndex := make(map[chainhash.Hash]int64, numSTx)
 	for i, stx := range msgBlock.STransactions {
 		stxHash := stx.TxHashFull()
-
 		stxIndex[stxHash] = int64(i)
-
 		// Create an array of 1-based indices to transactions that come
 		// before this one in the transactions list which this one
 		// depends on.  This is necessary since the created block must
@@ -2665,67 +2581,8 @@ func (state *gbtWorkState) blockTemplateResult(bm *blockManager, useCoinbaseValu
 			txTypeStr = "revocation"
 		}
 
-		var fee, sigOps int64
-		if !recalculateFeesAndSigsOps {
-			// Check bounds and throw an error if OOB. This should
-			// be looked into further, probably it's the result of
-			// a race.
-			// Decred TODO
-			allTxCount := len(msgBlock.Transactions) +
-				len(msgBlock.STransactions)
-			if allTxCount != len(template.Fees) ||
-				allTxCount != len(template.SigOpCounts) {
-				errStr := "failed to build template due to " +
-					"race"
-				return nil, rpcInternalError(errStr, "")
-			}
-
-			fee = template.Fees[i+len(msgBlock.Transactions)]
-			sigOps = template.SigOpCounts[i+len(msgBlock.Transactions)]
-		} else {
-			txU := dcrutil.NewTx(stx)
-			isValid := dcrutil.IsFlagSet16(
-				template.Block.Header.VoteBits,
-				dcrutil.BlockValid)
-			view, err := bm.chain.FetchUtxoView(txU, isValid)
-			if err != nil {
-				return nil, err
-			}
-
-			fee, err = blockchain.CheckTransactionInputs(
-				bm.chain.FetchSubsidyCache(),
-				txU,
-				int64(template.Block.Header.Height),
-				view,
-				true, // Ensure fraud proofs are correct
-				bm.server.chainParams)
-			if err != nil {
-				context := "Could not fetch transaction " +
-					"inputs"
-				return nil, rpcInternalError(err.Error(),
-					context)
-			}
-
-			isSSGen := txType == stake.TxTypeSSGen
-			numSigOps, err := blockchain.CountP2SHSigOps(txU,
-				false, isSSGen,
-				view)
-			if err != nil {
-				context := "Could not count sig ops "
-				return nil, rpcInternalError(err.Error(),
-					context)
-			}
-
-			numSigOps += blockchain.CountSigOps(txU, false, isSSGen)
-			if numSigOps > maxSigOpsPerTx {
-				errStr := fmt.Sprintf("transaction %v has "+
-					"too many sigops: %d > %d", stxHash,
-					numSigOps, maxSigOpsPerTx)
-				return nil, rpcInternalError(errStr, "")
-			}
-			sigOps = int64(numSigOps)
-		}
-
+		fee := template.Fees[i+len(msgBlock.Transactions)]
+		sigOps := template.SigOpCounts[i+len(msgBlock.Transactions)]
 		resultTx := dcrjson.GetBlockTemplateResultTx{
 			Data:    hex.EncodeToString(txBuf.Bytes()),
 			Hash:    stxHash.String(),
