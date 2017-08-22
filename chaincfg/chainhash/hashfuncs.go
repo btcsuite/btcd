@@ -6,7 +6,7 @@
 package chainhash
 
 import (
-	"github.com/decred/blake256"
+	"github.com/dchest/blake256"
 )
 
 // HashFunc calculates the hash of the supplied bytes.

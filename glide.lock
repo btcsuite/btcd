@@ -1,5 +1,5 @@
-hash: 153a3e6a1f31b2b29a113e953098f2b42a645103ee3e10040b5e03727a7b003c
-updated: 2017-08-05T15:46:49.461820462Z
+hash: 617b25dcb8c8d68092ef2c4b249a55d6b350c47daa480a4d9748049063182252
+updated: 2017-08-22T12:35:28.82633419-04:00
 imports:
 - name: github.com/agl/ed25519
   version: 278e1ec8e8a6e017cd07577924d6766039146ced
@@ -44,10 +44,10 @@ imports:
   version: adab96458c51a58dc1783b3335dcce5461522e75
   subpackages:
   - spew
+- name: github.com/dchest/blake256
+  version: dee3fe6eb0e98dc774a94fc231f85baf7c29d360
 - name: github.com/decred/bitset
   version: 484b833245d5f9046e2893a6bd2e54b1df3a53a4
-- name: github.com/decred/blake256
-  version: a840e32d7c31fe2e0218607334cb120a683951a4
 - name: github.com/decred/dcrrpcclient
   version: abc326aeb97b299c7eb6b13b81353fc375e9b95d
 - name: github.com/decred/dcrutil

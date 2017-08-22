@@ -27,8 +27,9 @@ import:
 - package: github.com/davecgh/go-spew
   subpackages:
   - spew
+- package: github.com/dchest/blake256
+  version: dee3fe6eb0e98dc774a94fc231f85baf7c29d360
 - package: github.com/decred/bitset
-- package: github.com/decred/blake256
 - package: github.com/decred/dcrrpcclient
 - package: github.com/decred/dcrutil
   subpackages:
