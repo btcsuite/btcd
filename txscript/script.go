@@ -554,6 +554,34 @@ func CalcWitnessSigHash(script []byte, sigHashes *TxSigHashes, hType SigHashType
 		amt)
 }
 
+// shallowCopyTx creates a shallow copy of the transaction for use when
+// calculating the signature hash.  It is used over the Copy method on the
+// transaction itself since that is a deep copy and therefore does more work and
+// allocates much more space than needed.
+func shallowCopyTx(tx *wire.MsgTx) wire.MsgTx {
+	// As an additional memory optimization, use contiguous backing arrays
+	// for the copied inputs and outputs and point the final slice of
+	// pointers into the contiguous arrays.  This avoids a lot of small
+	// allocations.
+	txCopy := wire.MsgTx{
+		Version:  tx.Version,
+		TxIn:     make([]*wire.TxIn, len(tx.TxIn)),
+		TxOut:    make([]*wire.TxOut, len(tx.TxOut)),
+		LockTime: tx.LockTime,
+	}
+	txIns := make([]wire.TxIn, len(tx.TxIn))
+	for i, oldTxIn := range tx.TxIn {
+		txIns[i] = *oldTxIn
+		txCopy.TxIn[i] = &txIns[i]
+	}
+	txOuts := make([]wire.TxOut, len(tx.TxOut))
+	for i, oldTxOut := range tx.TxOut {
+		txOuts[i] = *oldTxOut
+		txCopy.TxOut[i] = &txOuts[i]
+	}
+	return txCopy
+}
+
 // calcSignatureHash will, given a script and hash type for the current script
 // engine instance, calculate the signature hash to be used for signing and
 // verification.
@@ -587,9 +615,9 @@ func calcSignatureHash(script []parsedOpcode, hashType SigHashType, tx *wire.Msg
 	// Remove all instances of OP_CODESEPARATOR from the script.
 	script = removeOpcode(script, OP_CODESEPARATOR)
 
-	// Make a deep copy of the transaction, zeroing out the script for all
-	// inputs that are not currently being processed.
-	txCopy := tx.Copy()
+	// Make a shallow copy of the transaction, zeroing out the script for
+	// all inputs that are not currently being processed.
+	txCopy := shallowCopyTx(tx)
 	for i := range txCopy.TxIn {
 		if i == idx {
 			// UnparseScript cannot fail here because removeOpcode
