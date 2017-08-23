@@ -5,11 +5,10 @@
 package edwards
 
 import (
+	"bytes"
 	"encoding/hex"
 	"math/rand"
 	"testing"
-
-	"github.com/stretchr/testify/assert"
 )
 
 type XRecoveryVector struct {
@@ -58,22 +57,37 @@ func TestXRecovery(t *testing.T) {
 
 		x2 := curve.RecoverXBigInt(isNegative, y)
 		if !curve.IsOnCurve(x2, y) {
-			assert.Equal(t, notOnCurve, true)
+			if !notOnCurve {
+				t.Fatalf("expected %v, got %v", true, notOnCurve)
+			}
 		} else {
-			assert.Equal(t, notOnCurve, false)
+			if notOnCurve {
+				t.Fatalf("expected %v, got %v", false, notOnCurve)
+			}
 			b2 := BigIntPointToEncodedBytes(x2, y)
-			assert.Equal(t, vector.bIn, b2)
+			cmp := bytes.Compare(vector.bIn[:], b2[:]) == 0
+			if !cmp {
+				t.Fatalf("expected %v, got %v", true, cmp)
+			}
 		}
 
 		yFE := EncodedBytesToFieldElement(vector.bIn)
 		x3 := curve.RecoverXFieldElement(isNegative, yFE)
 		x3BI := FieldElementToBigInt(x3)
 		if !curve.IsOnCurve(x3BI, y) {
-			assert.Equal(t, notOnCurve, true)
+			if !notOnCurve {
+				t.Fatalf("expected %v, got %v", true, notOnCurve)
+			}
 		} else {
-			assert.Equal(t, notOnCurve, false)
+			if notOnCurve {
+				t.Fatalf("expected %v, got %v", false, notOnCurve)
+			}
+
 			b3 := BigIntPointToEncodedBytes(x3BI, y)
-			assert.Equal(t, vector.bIn, b3)
+			cmp := bytes.Compare(vector.bIn[:], b3[:]) == 0
+			if !cmp {
+				t.Fatalf("expected %v, got %v", true, cmp)
+			}
 		}
 	}
 }
@@ -125,7 +139,10 @@ func TestAdd(t *testing.T) {
 		pointEncAsStr := hex.EncodeToString(pointEnc[:])
 		// Assert our results.
 		pointHexStr := pointHexStrSet[pointHexStrIdx]
-		assert.Equal(t, pointEncAsStr, pointHexStr)
+		cmp := pointEncAsStr == pointHexStr
+		if !cmp {
+			t.Fatalf("expected %v, got %v", true, cmp)
+		}
 		pointHexStrIdx++
 	}
 }
@@ -205,6 +222,9 @@ func TestScalarMult(t *testing.T) {
 		sBig := EncodedBytesToBigInt(vector.s) // We need big endian
 		xMul, yMul := curve.ScalarMult(x, y, sBig.Bytes())
 		finalPoint := BigIntPointToEncodedBytes(xMul, yMul)
-		assert.Equal(t, vector.bRes, finalPoint)
+		cmp := bytes.Equal(vector.bRes[:], finalPoint[:])
+		if !cmp {
+			t.Fatalf("expected %v, got %v", true, cmp)
+		}
 	}
 }

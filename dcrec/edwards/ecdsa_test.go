@@ -15,8 +15,6 @@ import (
 	"os"
 	"strings"
 	"testing"
-
-	"github.com/stretchr/testify/assert"
 )
 
 func TestGolden(t *testing.T) {
@@ -82,24 +80,61 @@ func TestGolden(t *testing.T) {
 		pkS2 := privkeyS2.SerializeSecret()
 		pubkS1 := pubkeyS1.Serialize()
 		pubkS2 := pubkeyS2.Serialize()
-		assert.Equal(t, pkS1, pkS2)
-		assert.Equal(t, privArray, copyBytes64(pkS1))
-		assert.Equal(t, privArray, copyBytes64(pkS2))
-		assert.Equal(t, pubkS1, pubkS2)
-		assert.Equal(t, pubArray, copyBytes(pubkS1))
-		assert.Equal(t, pubArray, copyBytes(pubkS2))
+		cmp := bytes.Equal(pkS1[:], pkS2[:])
+		if !cmp {
+			t.Fatalf("expected %v, got %v", true, cmp)
+		}
+
+		cmp = bytes.Equal(privArray[:], copyBytes64(pkS1)[:])
+		if !cmp {
+			t.Fatalf("expected %v, got %v", true, cmp)
+		}
+
+		cmp = bytes.Equal(privArray[:], copyBytes64(pkS2)[:])
+		if !cmp {
+			t.Fatalf("expected %v, got %v", true, cmp)
+		}
+
+		cmp = bytes.Equal(pubkS1[:], pubkS2[:])
+		if !cmp {
+			t.Fatalf("expected %v, got %v", true, cmp)
+		}
+
+		cmp = bytes.Equal(pubArray[:], copyBytes(pubkS1)[:])
+		if !cmp {
+			t.Fatalf("expected %v, got %v", true, cmp)
+		}
+
+		cmp = bytes.Equal(pubArray[:], copyBytes(pubkS2)[:])
+		if !cmp {
+			t.Fatalf("expected %v, got %v", true, cmp)
+		}
 
 		// Deserialize pubkey and test functions.
 		pubkeyP, err := ParsePubKey(curve, pubKeyBytes)
 		pubkP := pubkeyP.Serialize()
-		assert.Equal(t, pubkS1, pubkP)
-		assert.Equal(t, pubkS2, pubkP)
-		assert.Equal(t, pubArray, copyBytes(pubkP))
+		cmp = bytes.Equal(pubkS1[:], pubkP[:])
+		if !cmp {
+			t.Fatalf("expected %v, got %v", true, cmp)
+		}
+
+		cmp = bytes.Equal(pubkS2[:], pubkP[:])
+		if !cmp {
+			t.Fatalf("expected %v, got %v", true, cmp)
+		}
+
+		cmp = bytes.Equal(pubArray[:], copyBytes(pubkP)[:])
+		if !cmp {
+			t.Fatalf("expected %v, got %v", true, cmp)
+		}
 
 		// Deserialize signature and test functions.
 		internalSig, err := ParseSignature(curve, sig)
 		iSigSerialized := internalSig.Serialize()
-		assert.Equal(t, sigArray, copyBytes64(iSigSerialized))
+		cmp = bytes.Equal(sigArray[:], copyBytes64(iSigSerialized)[:])
+		if !cmp {
+			t.Fatalf("expected %v, got %v", true, cmp)
+		}
 
 		sig2r, sig2s, err := Sign(curve, privkeyS2, msg)
 		sig2 := &Signature{sig2r, sig2s}
@@ -174,21 +209,39 @@ func TestNonStandardSignatures(t *testing.T) {
 	pks := randPrivScalarKeyList(curve, 50)
 	for _, pk := range pks {
 		r, s, err := Sign(curve, pk, msg)
-		assert.NoError(t, err)
+		if err != nil {
+			t.Fatalf("unexpected error %s", err)
+		}
 
 		pubX, pubY := pk.Public()
 		pub := NewPublicKey(curve, pubX, pubY)
 		ok := Verify(pub, msg, r, s)
-		assert.True(t, ok)
+		if !ok {
+			t.Fatalf("expected %v, got %v", true, ok)
+		}
 
 		// Test serializing/deserializing.
 		privKeyDupTest, _, err := PrivKeyFromScalar(curve,
 			copyBytes(pk.ecPk.D.Bytes())[:])
-		assert.NoError(t, err)
-		assert.Equal(t, privKeyDupTest.GetD(), pk.GetD())
+
+		if err != nil {
+			t.Fatalf("unexpected error %s", err)
+		}
+
+		cmp := privKeyDupTest.GetD().Cmp(pk.GetD()) == 0
+		if !cmp {
+			t.Fatalf("expected %v, got %v", true, cmp)
+		}
+
 		privKeyDupTest2, _, err := PrivKeyFromScalar(curve, pk.Serialize())
-		assert.NoError(t, err)
-		assert.Equal(t, privKeyDupTest2.GetD(), pk.GetD())
+		if err != nil {
+			t.Fatalf("unexpected error %s", err)
+		}
+
+		cmp = privKeyDupTest2.GetD().Cmp(pk.GetD()) == 0
+		if !cmp {
+			t.Fatalf("expected %v, got %v", true, cmp)
+		}
 
 		// Screw up a random bit in the signature and
 		// make sure it still fails.
@@ -204,7 +257,9 @@ func TestNonStandardSignatures(t *testing.T) {
 			continue
 		}
 		ok = Verify(pub, msg, bSig.GetR(), bSig.GetS())
-		assert.False(t, ok)
+		if ok {
+			t.Fatalf("expected %v, got %v", false, ok)
+		}
 
 		// Screw up a random bit in the pubkey and
 		// make sure it still fails.
@@ -220,7 +275,9 @@ func TestNonStandardSignatures(t *testing.T) {
 		bPub, err := ParsePubKey(curve, pkBad)
 		if err == nil && bPub != nil {
 			ok = Verify(bPub, msg, r, s)
-			assert.False(t, ok)
+			if ok {
+				t.Fatalf("expected %v, got %v", false, ok)
+			}
 		}
 	}
 }

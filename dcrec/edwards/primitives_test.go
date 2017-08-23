@@ -9,8 +9,6 @@ import (
 	"encoding/hex"
 	"math/rand"
 	"testing"
-
-	"github.com/stretchr/testify/assert"
 )
 
 type ConversionVector struct {
@@ -158,31 +156,49 @@ func TestConversion(t *testing.T) {
 		// Test encoding to FE --> bytes.
 		feFB := EncodedBytesToFieldElement(vector.bIn)
 		feTB := FieldElementToEncodedBytes(feFB)
-		assert.Equal(t, vector.bIn, feTB)
+		cmp := bytes.Equal(vector.bIn[:], feTB[:])
+		if !cmp {
+			t.Fatalf("expected %v, got %v", true, cmp)
+		}
 
 		// Test encoding to big int --> FE --> bytes.
 		big := EncodedBytesToBigInt(vector.bIn)
 		fe := BigIntToFieldElement(big)
 		b := FieldElementToEncodedBytes(fe)
-		assert.Equal(t, vector.bIn, b)
+		cmp = bytes.Equal(vector.bIn[:], b[:])
+		if !cmp {
+			t.Fatalf("expected %v, got %v", true, cmp)
+		}
 
 		// Test encoding to big int --> bytes.
 		b = BigIntToEncodedBytes(big)
-		assert.Equal(t, vector.bIn, b)
+		cmp = bytes.Equal(vector.bIn[:], b[:])
+		if !cmp {
+			t.Fatalf("expected %v, got %v", true, cmp)
+		}
 
 		// Test encoding FE --> big int --> bytes.
 		feBig := FieldElementToBigInt(fe)
 		b = BigIntToEncodedBytes(feBig)
-		assert.Equal(t, vector.bIn, b)
+		cmp = bytes.Equal(vector.bIn[:], b[:])
+		if !cmp {
+			t.Fatalf("expected %v, got %v", true, cmp)
+		}
 
 		// Asert our results.
 		encodedNumStr := encodedNumToStrSet[encodedNumToStrIdx]
-		assert.Equal(t, encodedNumStr, big.String())
+		cmp = encodedNumStr == big.String()
+		if !cmp {
+			t.Fatalf("expected %v, got %v", true, cmp)
+		}
 		encodedNumToStrIdx++
 
 		// Assert our results.
 		encodedBytesToStr := encodedBytesToStrSet[encodedBytesToStrIdx]
-		assert.Equal(t, hex.EncodeToString(vector.bIn[:]), encodedBytesToStr)
+		cmp = hex.EncodeToString(vector.bIn[:]) == encodedBytesToStr
+		if !cmp {
+			t.Fatalf("expected %v, got %v", true, cmp)
+		}
 		encodedBytesToStrIdx++
 	}
 }
@@ -280,7 +296,10 @@ func TestPointConversion(t *testing.T) {
 		}
 
 		yB := BigIntPointToEncodedBytes(x, y)
-		assert.Equal(t, vector.bIn, yB)
+		cmp := bytes.Equal(vector.bIn[:], yB[:])
+		if !cmp {
+			t.Fatalf("expected %v, got %v", true, cmp)
+		}
 
 		// Assert our results.
 		var buffer bytes.Buffer
@@ -289,12 +308,18 @@ func TestPointConversion(t *testing.T) {
 		buffer.WriteString(y.String())
 		localStr := buffer.String()
 		decodedPoint := decodedPointsSet[decodedPointsIdx]
-		assert.Equal(t, localStr, decodedPoint)
+		cmp = localStr == decodedPoint
+		if !cmp {
+			t.Fatalf("expected %v, got %v", true, cmp)
+		}
 		decodedPointsIdx++
 
 		// Assert our results.
 		encodedPoint := encodedPointsSet[encodedPointsIdx]
-		assert.Equal(t, hex.EncodeToString(vector.bIn[:]), encodedPoint)
+		cmp = hex.EncodeToString(vector.bIn[:]) == encodedPoint
+		if !cmp {
+			t.Fatalf("expected %v, got %v", true, cmp)
+		}
 		encodedPointsIdx++
 	}
 }

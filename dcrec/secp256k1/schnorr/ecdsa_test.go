@@ -12,7 +12,6 @@ import (
 
 	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/dcrec/secp256k1"
-	"github.com/stretchr/testify/assert"
 )
 
 type SchorrSigningTestVectorHex struct {
@@ -130,22 +129,33 @@ func TestSchnorrSigning(t *testing.T) {
 		sig, err :=
 			schnorrSign(curve, tv.msg, tv.priv, tv.nonce, nil, nil,
 				testSchnorrHash)
+		if err != nil {
+			t.Fatalf("unexpected error %v", err)
+		}
 
-		assert.NoError(t, err)
-		assert.Equal(t, sig.Serialize(), tv.sig)
+		cmp := bytes.Equal(sig.Serialize()[:], tv.sig[:])
+		if !cmp {
+			t.Fatalf("expected %v, got %v", true, cmp)
+		}
 
 		// Make sure they verify too while we're at it.
 		_, err = schnorrVerify(curve, sig.Serialize(), pubkey, tv.msg,
 			testSchnorrHash)
-		assert.NoError(t, err)
+		if err != nil {
+			t.Fatalf("unexpected error %v", err)
+		}
 
 		// See if we can recover the public keys OK.
 		var pkRecover *secp256k1.PublicKey
 		pkRecover, _, err = schnorrRecover(curve, sig.Serialize(), tv.msg,
 			testSchnorrHash)
-		assert.NoError(t, err)
-		if err == nil {
-			assert.Equal(t, pubkey.Serialize(), pkRecover.Serialize())
+		if err != nil {
+			t.Fatalf("unexpected error %v", err)
+		}
+
+		cmp = bytes.Equal(pubkey.Serialize()[:], pkRecover.Serialize()[:])
+		if !cmp {
+			t.Fatalf("expected %v, got %v", true, cmp)
 		}
 
 		// Screw up the signature at a random bit and make sure that breaks it.
@@ -155,16 +165,23 @@ func TestSchnorrSigning(t *testing.T) {
 		sigBad[pos] ^= 1 << uint8(bitPos)
 		_, err = schnorrVerify(curve, sigBad, pubkey, tv.msg,
 			testSchnorrHash)
-		assert.Error(t, err)
+		if err == nil {
+			t.Fatalf("expected an error, got %v", err)
+		}
 
 		// Make sure it breaks pubkey recovery too.
 		valid := false
 		pkRecover, valid, err = schnorrRecover(curve, sigBad, tv.msg,
 			testSchnorrHash)
 		if valid {
-			assert.NotEqual(t, pubkey.Serialize(), pkRecover.Serialize())
+			cmp = bytes.Equal(pubkey.Serialize()[:], pkRecover.Serialize()[:])
+			if cmp {
+				t.Fatalf("expected %v, got %v", false, cmp)
+			}
 		} else {
-			assert.Error(t, err)
+			if err == nil {
+				t.Fatalf("expected an error, got %v", err)
+			}
 		}
 	}
 }
@@ -279,18 +296,26 @@ func TestSignaturesAndRecovery(t *testing.T) {
 		// Make sure we can verify the original signature.
 		_, err := schnorrVerify(curve, sig.Serialize(), pubkey, tv.msg,
 			chainhash.HashB)
-		assert.NoError(t, err)
+		if err != nil {
+			t.Fatalf("expected an error, got %v", err)
+		}
 
 		ok := Verify(curve, pubkey, tv.msg, sig.R, sig.S)
-		assert.Equal(t, true, ok)
+		if !ok {
+			t.Fatalf("expected %v, got %v", true, ok)
+		}
 
 		// See if we can recover the public keys OK.
 		var pkRecover *secp256k1.PublicKey
 		pkRecover, _, err = schnorrRecover(curve, sig.Serialize(), tv.msg,
 			chainhash.HashB)
-		assert.NoError(t, err)
-		if err == nil {
-			assert.Equal(t, pubkey.Serialize(), pkRecover.Serialize())
+		if err != nil {
+			t.Fatalf("unexpected error %s", err)
+		}
+
+		cmp := bytes.Equal(pubkey.Serialize()[:], pkRecover.Serialize()[:])
+		if !cmp {
+			t.Fatalf("expected %v, got %v", true, cmp)
 		}
 
 		// Screw up the signature at some random bits and make sure
@@ -305,16 +330,23 @@ func TestSignaturesAndRecovery(t *testing.T) {
 		}
 		_, err = schnorrVerify(curve, sigBad, pubkey, tv.msg,
 			chainhash.HashB)
-		assert.Error(t, err)
+		if err == nil {
+			t.Fatalf("expected an error, got %v", err)
+		}
 
 		// Make sure it breaks pubkey recovery too.
 		valid := false
 		pkRecover, valid, err = schnorrRecover(curve, sigBad, tv.msg,
 			testSchnorrHash)
 		if valid {
-			assert.NotEqual(t, pubkey.Serialize(), pkRecover.Serialize())
+			cmp := bytes.Equal(pubkey.Serialize()[:], pkRecover.Serialize()[:])
+			if cmp {
+				t.Fatalf("expected %v, got %v", false, cmp)
+			}
 		} else {
-			assert.Error(t, err)
+			if err == nil {
+				t.Fatalf("expected an error, got %v", err)
+			}
 		}
 	}
 }
