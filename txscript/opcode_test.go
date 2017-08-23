@@ -1,5 +1,5 @@
-// Copyright (c) 2013-2015 The btcsuite developers
-// Copyright (c) 2015-2016 The Decred developers
+// Copyright (c) 2013-2016 The btcsuite developers
+// Copyright (c) 2015-2017 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -114,10 +114,14 @@ func TestOpcodeDisasm(t *testing.T) {
 
 		// OP_NOP1 through OP_NOP10.
 		case opcodeVal >= 0xb0 && opcodeVal <= 0xb9:
-			// OP_NOP2 is an alias of OP_CHECKLOCKTIMEVERIFY
-			if opcodeVal == 0xb1 {
+			switch opcodeVal {
+			case 0xb1:
+				// OP_NOP2 is an alias of OP_CHECKLOCKTIMEVERIFY
 				expectedStr = "OP_CHECKLOCKTIMEVERIFY"
-			} else {
+			case 0xb2:
+				// OP_NOP3 is an alias of OP_CHECKSEQUENCEVERIFY
+				expectedStr = "OP_CHECKSEQUENCEVERIFY"
+			default:
 				val := byte(opcodeVal - (0xb0 - 1))
 				expectedStr = "OP_NOP" + strconv.Itoa(int(val))
 			}
@@ -176,10 +180,14 @@ func TestOpcodeDisasm(t *testing.T) {
 
 		// OP_NOP1 through OP_NOP10.
 		case opcodeVal >= 0xb0 && opcodeVal <= 0xb9:
-			// OP_NOP2 is an alias of OP_CHECKLOCKTIMEVERIFY
-			if opcodeVal == 0xb1 {
+			switch opcodeVal {
+			case 0xb1:
+				// OP_NOP2 is an alias of OP_CHECKLOCKTIMEVERIFY
 				expectedStr = "OP_CHECKLOCKTIMEVERIFY"
-			} else {
+			case 0xb2:
+				// OP_NOP3 is an alias of OP_CHECKSEQUENCEVERIFY
+				expectedStr = "OP_CHECKSEQUENCEVERIFY"
+			default:
 				val := byte(opcodeVal - (0xb0 - 1))
 				expectedStr = "OP_NOP" + strconv.Itoa(int(val))
 			}
