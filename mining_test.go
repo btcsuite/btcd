@@ -19,19 +19,41 @@ import (
 // type.
 func TestStakeTxFeePrioHeap(t *testing.T) {
 	numElements := 1000
-	ph := newTxPriorityQueue(numElements, txPQByStakeAndFee)
+	numEdgeConditionElements := 12
+	// Create some fake priority items that exercise the expected sort
+	// edge conditions.
+	testItems := []*txPrioItem{
+		{feePerKB: 5678, txType: stake.TxTypeRegular, priority: 3},
+		{feePerKB: 5678, txType: stake.TxTypeRegular, priority: 1},
+		{feePerKB: 5678, txType: stake.TxTypeRegular, priority: 1}, // Duplicate fee and prio
+		{feePerKB: 5678, txType: stake.TxTypeRegular, priority: 5},
+		{feePerKB: 5678, txType: stake.TxTypeRegular, priority: 2},
+		{feePerKB: 1234, txType: stake.TxTypeRegular, priority: 3},
+		{feePerKB: 1234, txType: stake.TxTypeRegular, priority: 1},
+		{feePerKB: 1234, txType: stake.TxTypeRegular, priority: 5},
+		{feePerKB: 1234, txType: stake.TxTypeRegular, priority: 5}, // Duplicate fee and prio
+		{feePerKB: 1234, txType: stake.TxTypeRegular, priority: 2},
+		{feePerKB: 10000, txType: stake.TxTypeRegular, priority: 0}, // Higher fee, smaller prio
+		{feePerKB: 0, txType: stake.TxTypeRegular, priority: 10000}, // Higher prio, lower fee
+	}
+	ph := newTxPriorityQueue((numElements + numEdgeConditionElements), txPQByStakeAndFee)
 
-	for i := 0; i < numElements; i++ {
-		randType := stake.TxType(rand.Intn(4))
-		randPrio := rand.Float64() * 100
-		randFeePerKB := rand.Float64() * 10
-		prioItem := &txPrioItem{
-			tx:       nil,
-			txType:   randType,
-			priority: randPrio,
-			feePerKB: randFeePerKB,
+	// Add random data in addition to the edge conditions already manually
+	// specified.
+	for i := 0; i < (numElements + numEdgeConditionElements); i++ {
+		if i >= numEdgeConditionElements {
+			randType := stake.TxType(rand.Intn(4))
+			randPrio := rand.Float64() * 100
+			randFeePerKB := rand.Float64() * 10
+			testItems = append(testItems, &txPrioItem{
+				tx:       nil,
+				txType:   randType,
+				feePerKB: randFeePerKB,
+				priority: randPrio,
+			})
 		}
-		heap.Push(ph, prioItem)
+
+		heap.Push(ph, testItems[i])
 	}
 
 	// Test sorting by stake and fee per KB.
@@ -55,7 +77,7 @@ func TestStakeTxFeePrioHeap(t *testing.T) {
 		}
 	}
 
-	ph = newTxPriorityQueue(numElements, txPQByStakeAndFeeAndThenPriority)
+	ph = newTxPriorityQueue(len(testItems), txPQByStakeAndFeeAndThenPriority)
 	for i := 0; i < numElements; i++ {
 		randType := stake.TxType(rand.Intn(4))
 		randPrio := rand.Float64() * 100
@@ -63,8 +85,8 @@ func TestStakeTxFeePrioHeap(t *testing.T) {
 		prioItem := &txPrioItem{
 			tx:       nil,
 			txType:   randType,
-			priority: randPrio,
 			feePerKB: randFeePerKB,
+			priority: randPrio,
 		}
 		heap.Push(ph, prioItem)
 	}
