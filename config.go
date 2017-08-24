@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/btcsuite/btclog"
-	flags "github.com/btcsuite/go-flags"
 	"github.com/btcsuite/go-socks/socks"
 	"github.com/decred/dcrd/connmgr"
 	"github.com/decred/dcrd/database"
@@ -29,6 +28,7 @@ import (
 	"github.com/decred/dcrd/mempool"
 	"github.com/decred/dcrd/sampleconfig"
 	"github.com/decred/dcrutil"
+	flags "github.com/jessevdk/go-flags"
 )
 
 const (

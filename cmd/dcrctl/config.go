@@ -17,7 +17,7 @@ import (
 	"github.com/decred/dcrd/dcrjson"
 	"github.com/decred/dcrutil"
 
-	flags "github.com/btcsuite/go-flags"
+	flags "github.com/jessevdk/go-flags"
 )
 
 const (

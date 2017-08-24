@@ -1,5 +1,5 @@
-hash: 08687d42743fa8e53a336734ae67bd4801a606ced8c7c2dd774404f32391eca6
-updated: 2017-08-30T22:08:08.795369694Z
+hash: 5ff55cbde58db9eecfef0a796b2513f910996d6aaa1244f31475852835e48efe
+updated: 2017-08-30T23:46:58.835362449Z
 imports:
 - name: github.com/agl/ed25519
   version: 278e1ec8e8a6e017cd07577924d6766039146ced
@@ -7,8 +7,6 @@ imports:
   - edwards25519
 - name: github.com/btcsuite/btclog
   version: 84c8d2346e9fc8c7b947e243b9c24e6df9fd206a
-- name: github.com/btcsuite/go-flags
-  version: 6c288d648c1cc1befcb90cb5511dcacf64ae8e61
 - name: github.com/btcsuite/go-socks
   version: 4720035b7bfd2a9bb130b1c184f8bbe41b6f0d0f
   subpackages:
@@ -51,22 +49,24 @@ imports:
 - name: github.com/decred/dcrrpcclient
   version: abc326aeb97b299c7eb6b13b81353fc375e9b95d
 - name: github.com/decred/dcrutil
-  version: 4ce0f41cf3f957fcdf3f0de049602ac834449b9c
+  version: 166211f0196be1d3be344ae64149e7c4f5ca36b0
   subpackages:
   - base58
   - bloom
   - hdkeychain
+- name: github.com/jessevdk/go-flags
+  version: 48cf8722c3375517aba351d1f7577c40663a4407
 - name: github.com/jrick/logrotate
   version: a93b200c26cbae3bb09dd0dc2c7c7fe1468a034a
   subpackages:
   - rotator
 - name: golang.org/x/crypto
-  version: 6914964337150723782436d56b3f21610a74ce7b
+  version: 81e90905daefcd6fd217b62423c0908922eadb30
   subpackages:
   - ripemd160
   - ssh/terminal
 - name: golang.org/x/sys
-  version: 90796e5a05ce440b41c768bd9af257005e470461
+  version: bb24a47a89eac6c1227fbcb2ae37a8b9ed323366
   subpackages:
   - unix
 testImports: []

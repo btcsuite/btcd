@@ -1,11 +1,11 @@
 package: github.com/decred/dcrd
 import:
 - package: github.com/agl/ed25519
-  version: 278e1ec8e8a6e017cd07577924d6766039146ced
   subpackages:
   - edwards25519
 - package: github.com/btcsuite/btclog
-- package: github.com/btcsuite/go-flags
+- package: github.com/jessevdk/go-flags
+  version: ^v1.3.0
 - package: github.com/btcsuite/go-socks
   subpackages:
   - socks
