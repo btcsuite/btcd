@@ -424,19 +424,6 @@ func calcHashOutputs(tx *wire.MsgTx) chainhash.Hash {
 	return chainhash.DoubleHashH(b.Bytes())
 }
 
-// CalcWitnessSigHash exports calcWitnessSignatureHash so that signatures
-// can be verified.
-func CalcWitnessSigHash(subScript []byte, sigHashes *TxSigHashes,
-	hashType SigHashType, tx *wire.MsgTx, idx int, amt int64) ([]byte, error) {
-	parsedScript, err := parseScript(subScript)
-	if err != nil {
-		return nil, fmt.Errorf("cannot parse output script: %v", err)
-	}
-	sighash := calcWitnessSignatureHash(
-		parsedScript, sigHashes, hashType, tx, idx, amt)
-	return sighash, nil
-}
-
 // calcWitnessSignatureHash computes the sighash digest of a transaction's
 // segwit input using the new, optimized digest calculation algorithm defined
 // in BIP0143: https://github.com/bitcoin/bips/blob/master/bip-0143.mediawiki.
