@@ -15,7 +15,7 @@ type MsgGetCFilter struct {
 	Extended  bool
 }
 
-func (msg *MsgGetCFilter) BtcDecode(r io.Reader, pver uint32) error {
+func (msg *MsgGetCFilter) BtcDecode(r io.Reader, pver uint32, _ MessageEncoding) error {
 	err := readElement(r, &msg.BlockHash)
 	if err != nil {
 		return err
@@ -25,7 +25,7 @@ func (msg *MsgGetCFilter) BtcDecode(r io.Reader, pver uint32) error {
 
 // BtcEncode encodes the receiver to w using the bitcoin protocol encoding.
 // This is part of the Message interface implementation.
-func (msg *MsgGetCFilter) BtcEncode(w io.Writer, pver uint32) error {
+func (msg *MsgGetCFilter) BtcEncode(w io.Writer, pver uint32, _ MessageEncoding) error {
 	err := writeElement(w, &msg.BlockHash)
 	if err != nil {
 		return err
