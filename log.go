@@ -18,6 +18,7 @@ import (
 	"github.com/btcsuite/btcd/mempool"
 	"github.com/btcsuite/btcd/mining"
 	"github.com/btcsuite/btcd/mining/cpuminer"
+	"github.com/btcsuite/btcd/netsync"
 	"github.com/btcsuite/btcd/peer"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btclog"
@@ -56,7 +57,6 @@ var (
 	amgrLog = backendLog.Logger("AMGR")
 	cmgrLog = backendLog.Logger("CMGR")
 	bcdbLog = backendLog.Logger("BCDB")
-	bmgrLog = backendLog.Logger("BMGR")
 	btcdLog = backendLog.Logger("BTCD")
 	chanLog = backendLog.Logger("CHAN")
 	discLog = backendLog.Logger("DISC")
@@ -66,6 +66,7 @@ var (
 	rpcsLog = backendLog.Logger("RPCS")
 	scrpLog = backendLog.Logger("SCRP")
 	srvrLog = backendLog.Logger("SRVR")
+	syncLog = backendLog.Logger("SYNC")
 	txmpLog = backendLog.Logger("TXMP")
 )
 
@@ -80,6 +81,7 @@ func init() {
 	cpuminer.UseLogger(minrLog)
 	peer.UseLogger(peerLog)
 	txscript.UseLogger(scrpLog)
+	netsync.UseLogger(syncLog)
 	mempool.UseLogger(txmpLog)
 }
 
@@ -89,7 +91,6 @@ var subsystemLoggers = map[string]btclog.Logger{
 	"AMGR": amgrLog,
 	"CMGR": cmgrLog,
 	"BCDB": bcdbLog,
-	"BMGR": bmgrLog,
 	"BTCD": btcdLog,
 	"CHAN": chanLog,
 	"DISC": discLog,
@@ -99,6 +100,7 @@ var subsystemLoggers = map[string]btclog.Logger{
 	"RPCS": rpcsLog,
 	"SCRP": scrpLog,
 	"SRVR": srvrLog,
+	"SYNC": syncLog,
 	"TXMP": txmpLog,
 }
 
