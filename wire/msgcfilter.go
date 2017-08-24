@@ -24,7 +24,7 @@ type MsgCFilter struct {
 
 // BtcDecode decodes r using the bitcoin protocol encoding into the receiver.
 // This is part of the Message interface implementation.
-func (msg *MsgCFilter) BtcDecode(r io.Reader, pver uint32) error {
+func (msg *MsgCFilter) BtcDecode(r io.Reader, pver uint32, _ MessageEncoding) error {
 	var err error
 	// Read the hash of the filter's block
 	err = readElement(r, &msg.BlockHash)
@@ -44,7 +44,7 @@ func (msg *MsgCFilter) BtcDecode(r io.Reader, pver uint32) error {
 
 // BtcEncode encodes the receiver to w using the bitcoin protocol encoding.
 // This is part of the Message interface implementation.
-func (msg *MsgCFilter) BtcEncode(w io.Writer, pver uint32) error {
+func (msg *MsgCFilter) BtcEncode(w io.Writer, pver uint32, _ MessageEncoding) error {
 	size := len(msg.Data)
 	if size > MaxCFilterDataSize {
 		str := fmt.Sprintf("cfilter size too large for message "+
@@ -78,7 +78,7 @@ func (msg *MsgCFilter) Deserialize(r io.Reader) error {
 	// At the current time, there is no difference between the wire encoding
 	// and the stable long-term storage format.  As a result, make use of
 	// BtcDecode.
-	return msg.BtcDecode(r, 0)
+	return msg.BtcDecode(r, 0, BaseEncoding)
 }
 
 // Command returns the protocol command string for the message.  This is part
