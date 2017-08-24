@@ -7,7 +7,6 @@ package main
 
 import (
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 
@@ -31,7 +30,7 @@ type logWriter struct{}
 
 func (logWriter) Write(p []byte) (n int, err error) {
 	os.Stdout.Write(p)
-	logRotatorPipe.Write(p)
+	logRotator.Write(p)
 	return len(p), nil
 }
 
@@ -52,10 +51,6 @@ var (
 	// logRotator is one of the logging outputs.  It should be closed on
 	// application shutdown.
 	logRotator *rotator.Rotator
-
-	// logRotatorPipe is the write-end pipe for writing to the log rotator.  It
-	// is written to by the Write method of the logWriter type.
-	logRotatorPipe *io.PipeWriter
 
 	adxrLog = backendLog.Logger("ADXR")
 	amgrLog = backendLog.Logger("AMGR")
@@ -117,17 +112,13 @@ func initLogRotator(logFile string) {
 		fmt.Fprintf(os.Stderr, "failed to create log directory: %v\n", err)
 		os.Exit(1)
 	}
-	pr, pw := io.Pipe()
-	r, err := rotator.New(pr, logFile, 10*1024, false, 3)
+	r, err := rotator.New(logFile, 10*1024, false, 3)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to create file rotator: %v\n", err)
 		os.Exit(1)
 	}
 
-	go r.Run()
-
 	logRotator = r
-	logRotatorPipe = pw
 }
 
 // setLogLevel sets the logging level for provided subsystem.  Invalid
