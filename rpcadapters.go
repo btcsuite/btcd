@@ -10,6 +10,7 @@ import (
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/mempool"
+	"github.com/btcsuite/btcd/netsync"
 	"github.com/btcsuite/btcd/peer"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
@@ -225,8 +226,8 @@ func (cm *rpcConnManager) RelayTransactions(txns []*mempool.TxDesc) {
 // rpcSyncMgr provides a block manager for use with the RPC server and
 // implements the rpcserverSyncManager interface.
 type rpcSyncMgr struct {
-	server   *server
-	blockMgr *blockManager
+	server  *server
+	syncMgr *netsync.SyncManager
 }
 
 // Ensure rpcSyncMgr implements the rpcserverSyncManager interface.
@@ -238,7 +239,7 @@ var _ rpcserverSyncManager = (*rpcSyncMgr)(nil)
 // This function is safe for concurrent access and is part of the
 // rpcserverSyncManager interface implementation.
 func (b *rpcSyncMgr) IsCurrent() bool {
-	return b.blockMgr.IsCurrent()
+	return b.syncMgr.IsCurrent()
 }
 
 // SubmitBlock submits the provided block to the network after processing it
@@ -247,7 +248,7 @@ func (b *rpcSyncMgr) IsCurrent() bool {
 // This function is safe for concurrent access and is part of the
 // rpcserverSyncManager interface implementation.
 func (b *rpcSyncMgr) SubmitBlock(block *btcutil.Block, flags blockchain.BehaviorFlags) (bool, error) {
-	return b.blockMgr.ProcessBlock(block, flags)
+	return b.syncMgr.ProcessBlock(block, flags)
 }
 
 // Pause pauses the sync manager until the returned channel is closed.
@@ -255,7 +256,7 @@ func (b *rpcSyncMgr) SubmitBlock(block *btcutil.Block, flags blockchain.Behavior
 // This function is safe for concurrent access and is part of the
 // rpcserverSyncManager interface implementation.
 func (b *rpcSyncMgr) Pause() chan<- struct{} {
-	return b.blockMgr.Pause()
+	return b.syncMgr.Pause()
 }
 
 // SyncPeerID returns the peer that is currently the peer being used to sync
@@ -264,7 +265,7 @@ func (b *rpcSyncMgr) Pause() chan<- struct{} {
 // This function is safe for concurrent access and is part of the
 // rpcserverSyncManager interface implementation.
 func (b *rpcSyncMgr) SyncPeerID() int32 {
-	return b.blockMgr.SyncPeerID()
+	return b.syncMgr.SyncPeerID()
 }
 
 // LocateBlocks returns the hashes of the blocks after the first known block in
