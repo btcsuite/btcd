@@ -2,7 +2,7 @@
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package main
+package netsync
 
 import (
 	"container/list"
@@ -132,30 +132,6 @@ type pauseMsg struct {
 type headerNode struct {
 	height int32
 	hash   *chainhash.Hash
-}
-
-// PeerNotifier exposes methods to notify peers of status changes to
-// transactions, blocks, etc. Currently server implements this interface.
-type PeerNotifier interface {
-	AnnounceNewTransactions(newTxs []*mempool.TxDesc)
-
-	UpdatePeerHeights(latestBlkHash *chainhash.Hash, latestHeight int32, updateSource *peerpkg.Peer)
-
-	RelayInventory(invVect *wire.InvVect, data interface{})
-
-	TransactionConfirmed(tx *btcutil.Tx)
-}
-
-// blockManangerConfig is a configuration struct used to initialize a new
-// blockManager.
-type blockManagerConfig struct {
-	PeerNotifier PeerNotifier
-	Chain        *blockchain.BlockChain
-	TxMemPool    *mempool.TxPool
-	ChainParams  *chaincfg.Params
-
-	DisableCheckpoints bool
-	MaxPeers           int
 }
 
 // peerSyncState stores additional information that the blockManager tracks
