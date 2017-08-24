@@ -10,9 +10,9 @@ import (
 	"encoding/hex"
 	"encoding/json"
 
-	"github.com/btcsuite/btcd/btcjson"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/wire"
+	"github.com/roasbeef/btcd/btcjson"
+	"github.com/roasbeef/btcd/chaincfg/chainhash"
+	"github.com/roasbeef/btcd/wire"
 )
 
 // FutureGetBestBlockHashResult is a future promise to deliver the result of a
@@ -780,4 +780,113 @@ func (c *Client) InvalidateBlockAsync(blockHash *chainhash.Hash) FutureInvalidat
 // InvalidateBlock invalidates a specific block.
 func (c *Client) InvalidateBlock(blockHash *chainhash.Hash) error {
 	return c.InvalidateBlockAsync(blockHash).Receive()
+}
+
+// FutureGetCFilterResult is a future promise to deliver the result of a
+// GetCFilterAsync RPC invocation (or an applicable error).
+type FutureGetCFilterResult chan *response
+
+// Receive waits for the response promised by the future and returns the raw
+// filter requested from the server given its block hash.
+func (r FutureGetCFilterResult) Receive() (*wire.MsgCFilter, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal result as a string.
+	var filterHex string
+	err = json.Unmarshal(res, &filterHex)
+	if err != nil {
+		return nil, err
+	}
+
+	// Decode the serialized cf hex to raw bytes.
+	serializedFilter, err := hex.DecodeString(filterHex)
+	if err != nil {
+		return nil, err
+	}
+
+	// Assign the filter bytes to the correct field of the wire message.
+	// We aren't going to set the block hash or extended flag, since we
+	// don't actually get that back in the RPC response.
+	var msgCFilter wire.MsgCFilter
+	msgCFilter.Data = serializedFilter
+	return &msgCFilter, nil
+}
+
+// GetCFilterAsync returns an instance of a type that can be used to get the
+// result of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+//
+// See GetCFilter for the blocking version and more details.
+func (c *Client) GetCFilterAsync(blockHash *chainhash.Hash, extended bool) FutureGetCFilterResult {
+	hash := ""
+	if blockHash != nil {
+		hash = blockHash.String()
+	}
+
+	cmd := btcjson.NewGetCFilterCmd(hash, extended)
+	return c.sendCmd(cmd)
+}
+
+// GetCFilter returns a raw filter from the server given its block hash.
+func (c *Client) GetCFilter(blockHash *chainhash.Hash, extended bool) (*wire.MsgCFilter, error) {
+	return c.GetCFilterAsync(blockHash, extended).Receive()
+}
+
+// FutureGetCFilterHeaderResult is a future promise to deliver the result of a
+// GetCFilterHeaderAsync RPC invocation (or an applicable error).
+type FutureGetCFilterHeaderResult chan *response
+
+// Receive waits for the response promised by the future and returns the raw
+// filter header requested from the server given its block hash.
+func (r FutureGetCFilterHeaderResult) Receive() (*wire.MsgCFHeaders, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal result as a string.
+	var headerHex string
+	err = json.Unmarshal(res, &headerHex)
+	if err != nil {
+		return nil, err
+	}
+
+	// Assign the decoded header into a hash
+	headerHash, err := chainhash.NewHashFromStr(headerHex)
+	if err != nil {
+		return nil, err
+	}
+
+	// Assign the hash to a headers message and return it.
+	var msgCFHeaders wire.MsgCFHeaders
+	err = msgCFHeaders.AddCFHeader(headerHash)
+	if err != nil {
+		return nil, err
+	}
+	return &msgCFHeaders, nil
+
+}
+
+// GetCFilterHeaderAsync returns an instance of a type that can be used to get
+// the result of the RPC at some future time by invoking the Receive function
+// on the returned instance.
+//
+// See GetCFilterHeader for the blocking version and more details.
+func (c *Client) GetCFilterHeaderAsync(blockHash *chainhash.Hash, extended bool) FutureGetCFilterHeaderResult {
+	hash := ""
+	if blockHash != nil {
+		hash = blockHash.String()
+	}
+
+	cmd := btcjson.NewGetCFilterHeaderCmd(hash, extended)
+	return c.sendCmd(cmd)
+}
+
+// GetCFilterHeader returns a raw filter header from the server given its block
+// hash.
+func (c *Client) GetCFilterHeader(blockHash *chainhash.Hash, extended bool) (*wire.MsgCFHeaders, error) {
+	return c.GetCFilterHeaderAsync(blockHash, extended).Receive()
 }
