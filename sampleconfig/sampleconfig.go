@@ -5,7 +5,7 @@
 package sampleconfig
 
 // FileContents is a string containing the commented example config for dcrd.
-var FileContents = `[Application Options]
+const FileContents = `[Application Options]
 
 ; ------------------------------------------------------------------------------
 ; Data settings
