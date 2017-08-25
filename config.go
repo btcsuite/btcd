@@ -27,6 +27,7 @@ import (
 	"github.com/decred/dcrd/database"
 	_ "github.com/decred/dcrd/database/ffldb"
 	"github.com/decred/dcrd/mempool"
+	"github.com/decred/dcrd/sampleconfig"
 	"github.com/decred/dcrutil"
 )
 
@@ -353,7 +354,7 @@ func createDefaultConfigFile(destPath string) error {
 	// file contents with their generated values.
 	rpcUserRE := regexp.MustCompile(`(?m)^;\s*rpcuser=[^\s]*$`)
 	rpcPassRE := regexp.MustCompile(`(?m)^;\s*rpcpass=[^\s]*$`)
-	s := rpcUserRE.ReplaceAllString(sampleConfigFileContents, rpcUserLine)
+	s := rpcUserRE.ReplaceAllString(sampleconfig.FileContents, rpcUserLine)
 	s = rpcPassRE.ReplaceAllString(s, rpcPassLine)
 
 	// Create config file at the provided path.
