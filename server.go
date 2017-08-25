@@ -1202,7 +1202,7 @@ func (s *server) handleAddPeerMsg(state *peerState, sp *serverPeer) bool {
 	if banEnd, ok := state.banned[host]; ok {
 		if time.Now().Before(banEnd) {
 			srvrLog.Debugf("Peer %s is banned for another %v - disconnecting",
-				host, banEnd.Sub(time.Now()))
+				host, time.Until(banEnd))
 			sp.Disconnect()
 			return false
 		}
