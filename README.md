@@ -112,13 +112,6 @@ $ ./btcd
 - channel #btcd
 - [webchat](https://webchat.freenode.net/?channels=btcd)
 
-## Mailing lists
-
-- btcd: discussion of btcd and its packages.
-- btcd-commits: readonly mail-out of source code changes.
-
-To subscribe to a given list, send email to list+subscribe@opensource.conformal.com
-
 ## Issue Tracker
 
 The [integrated github issue tracker](https://github.com/btcsuite/btcd/issues)
@@ -134,8 +127,8 @@ All official release tags are signed by Conformal so users can ensure the code
 has not been tampered with and is coming from the btcsuite developers.  To
 verify the signature perform the following:
 
-- Download the public key from the Conformal website at
-  https://opensource.conformal.com/GIT-GPG-KEY-conformal.txt
+- Download the Conformal public key:
+  https://raw.githubusercontent.com/btcsuite/btcd/master/release/GIT-GPG-KEY-conformal.txt
 
 - Import the public key into your GPG keyring:
   ```bash
