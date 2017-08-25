@@ -398,7 +398,14 @@ func (cm *ConnManager) Stop() {
 		_ = listener.Close()
 	}
 
-	close(cm.quit)
+	// Preventing duplicate call in the concurrent context, which could cause program crash.
+	select {
+	case <-cm.quit:
+		// expect
+	default:
+		close(cm.quit)
+	}
+
 	log.Trace("Connection manager stopped")
 }
 
