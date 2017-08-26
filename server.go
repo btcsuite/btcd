@@ -377,7 +377,7 @@ func (sp *serverPeer) OnVersion(_ *peer.Peer, msg *wire.MsgVersion) {
 
 			if segwitActive && !sp.IsWitnessEnabled() {
 				peerLog.Infof("Disconnecting non-segwit "+
-					"peer %v, isn't segwit segwit enabled and "+
+					"peer %v, isn't segwit enabled and "+
 					"we need more segwit enabled peers", sp)
 				sp.Disconnect()
 				return
