@@ -64,10 +64,11 @@ func loadBlocks(t *testing.T, dataFile string, network wire.BitcoinNet) ([]*btcu
 	// Set the first block as the genesis block.
 	blocks := make([]*btcutil.Block, 0, 256)
 	genesis := btcutil.NewBlock(chaincfg.MainNetParams.GenesisBlock)
+	genesis.SetHeight(0)
 	blocks = append(blocks, genesis)
 
 	// Load the remaining blocks.
-	for height := 1; ; height++ {
+	for height := int32(1); ; height++ {
 		var net uint32
 		err := binary.Read(dr, binary.LittleEndian, &net)
 		if err == io.EOF {
@@ -103,6 +104,7 @@ func loadBlocks(t *testing.T, dataFile string, network wire.BitcoinNet) ([]*btcu
 
 		// Deserialize and store the block.
 		block, err := btcutil.NewBlockFromBytes(blockBytes)
+		block.SetHeight(height)
 		if err != nil {
 			t.Errorf("Failed to parse block %v: %v", height, err)
 			return nil, err
@@ -255,7 +257,7 @@ func testDeleteValues(tc *testContext, bucket database.Bucket, values []keyPair)
 	return true
 }
 
-// testCursorInterface ensures the cursor itnerface is working properly by
+// testCursorInterface ensures the cursor interface is working properly by
 // exercising all of its functions on the passed bucket.
 func testCursorInterface(tc *testContext, bucket database.Bucket) bool {
 	// Ensure a cursor can be obtained for the bucket.
@@ -1453,6 +1455,40 @@ func testFetchBlockIO(tc *testContext, tx database.Tx) bool {
 			tc.t.Errorf("HasBlocks(%d): should have block", i)
 			return false
 		}
+	}
+
+	// Ensure database provides an accurate count of blocks stored.
+	count, err := tx.GetBlockCount()
+	if err != nil {
+		tc.t.Errorf("GetBlockCount: unexpected error: %v", err)
+		return false
+	}
+	if int(count) != len(tc.blocks) {
+		tc.t.Errorf("GetBlockCount returned %d, expected %d", count,
+			len(tc.blocks))
+		return false
+	}
+
+	// Ensure ForEachBlockHeader iterates through all block headers in height
+	// order.
+	i := 0
+	err = tx.ForEachBlockHeader(func(headerBytes []byte) error {
+		wantBytes := allBlockBytes[i][0:wire.MaxBlockHeaderPayload]
+		if !bytes.Equal(headerBytes, wantBytes) {
+			tc.t.Errorf("ForEachBlockHeader(%d): bytes mismatch: got %x, "+
+				"want %x", i, headerBytes, wantBytes)
+		}
+		i++
+		return nil
+	})
+	if err != nil {
+		tc.t.Errorf("ForEachBlockHeader: unexpected error: %v", err)
+		return false
+	}
+	if i != len(tc.blocks) {
+		tc.t.Errorf("ForEachBlockHeader: only executed callback %d times, "+
+			"expected %d", i, len(tc.blocks))
+		return false
 	}
 
 	// -----------------------

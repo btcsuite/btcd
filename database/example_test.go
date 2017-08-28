@@ -135,8 +135,9 @@ func Example_blockStorageAndRetrieval() {
 	// read-write transaction and store a genesis block in the database as
 	// and example.
 	err = db.Update(func(tx database.Tx) error {
-		genesisBlock := chaincfg.MainNetParams.GenesisBlock
-		return tx.StoreBlock(btcutil.NewBlock(genesisBlock))
+		genesisBlock := btcutil.NewBlock(chaincfg.MainNetParams.GenesisBlock)
+		genesisBlock.SetHeight(0)
+		return tx.StoreBlock(genesisBlock)
 	})
 	if err != nil {
 		fmt.Println(err)

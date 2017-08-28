@@ -57,10 +57,11 @@ func loadBlocks(t *testing.T, dataFile string, network wire.BitcoinNet) ([]*btcu
 	// Set the first block as the genesis block.
 	blocks := make([]*btcutil.Block, 0, 256)
 	genesis := btcutil.NewBlock(chaincfg.MainNetParams.GenesisBlock)
+	genesis.SetHeight(0)
 	blocks = append(blocks, genesis)
 
 	// Load the remaining blocks.
-	for height := 1; ; height++ {
+	for height := int32(1); ; height++ {
 		var net uint32
 		err := binary.Read(dr, binary.LittleEndian, &net)
 		if err == io.EOF {
@@ -96,6 +97,7 @@ func loadBlocks(t *testing.T, dataFile string, network wire.BitcoinNet) ([]*btcu
 
 		// Deserialize and store the block.
 		block, err := btcutil.NewBlockFromBytes(blockBytes)
+		block.SetHeight(height)
 		if err != nil {
 			t.Errorf("Failed to parse block %v: %v", height, err)
 			return nil, err
@@ -278,6 +280,11 @@ func resetDatabase(tc *testContext) bool {
 		}
 
 		_, err := tx.Metadata().CreateBucket(blockIdxBucketName)
+		if err != nil {
+			return err
+		}
+
+		_, err = tx.Metadata().CreateBucket(blockIdx2BucketName)
 		return err
 	})
 	if err != nil {

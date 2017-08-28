@@ -37,6 +37,7 @@ func TestErrorCodeStringer(t *testing.T) {
 		{database.ErrBlockNotFound, "ErrBlockNotFound"},
 		{database.ErrBlockExists, "ErrBlockExists"},
 		{database.ErrBlockRegionInvalid, "ErrBlockRegionInvalid"},
+		{database.ErrBlockHeightUnknown, "ErrBlockHeightUnknown"},
 		{database.ErrDriverSpecific, "ErrDriverSpecific"},
 
 		{0xffff, "Unknown ErrorCode (65535)"},

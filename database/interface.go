@@ -389,6 +389,38 @@ type Tx interface {
 	// implementations.
 	FetchBlockRegions(regions []BlockRegion) ([][]byte, error)
 
+	// GetBlockCount counts all blocks stored in the database.
+	//
+	// Depending on the backend implementation, this function may have to
+	// iterate a cursor over all blocks and thus be relatively slow.
+	//
+	// The interface contract guarantees at least the following errors will
+	// be returned (other implementation-specific errors are possible):
+	//   - ErrTxClosed if the transaction has already been closed
+	GetBlockCount() (uint32, error)
+
+	// ForEachBlockHeader iterates through each stored block header and invokes
+	// the passed function with the raw serialized bytes for each one.  The raw
+	// bytes are in the format returned by Serialize on a wire.BlockHeader.  The
+	// function is called with block headers ordered ascending by height from
+	// the genesis block, so it is guaranteed to be called with a parent block
+	// before any child blocks.
+	//
+	// WARNING: It is not safe to mutate data while iterating with this
+	// method.  Doing so may cause the underlying cursor to be invalidated
+	// and return unexpected keys and/or values.
+	//
+	// The interface contract guarantees at least the following errors will
+	// be returned (other implementation-specific errors are possible):
+	//   - ErrTxClosed if the transaction has already been closed
+	//
+	// NOTE: The slices returned by this function are only valid during a
+	// transaction.  Attempting to access them after a transaction has ended
+	// results in undefined behavior.  Additionally, the slices must NOT
+	// be modified by the caller.  These constraints prevent additional data
+	// copies and allows support for memory-mapped database implementations.
+	ForEachBlockHeader(fn func(headerBytes []byte) error) error
+
 	// ******************************************************************
 	// Methods related to both atomic metadata storage and block storage.
 	// ******************************************************************

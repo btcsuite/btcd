@@ -1058,6 +1058,7 @@ func dbPutBestState(dbTx database.Tx, snapshot *BestState, workSum *big.Int) err
 func (b *BlockChain) createChainState() error {
 	// Create a new node from the genesis block and set it as the best node.
 	genesisBlock := btcutil.NewBlock(b.chainParams.GenesisBlock)
+	genesisBlock.SetHeight(0)
 	header := &genesisBlock.MsgBlock().Header
 	node := newBlockNode(header, 0)
 	b.bestChain.SetTip(node)
@@ -1131,6 +1132,8 @@ func (b *BlockChain) initChainState() error {
 	// Attempt to load the chain state from the database.
 	var isStateInitialized bool
 	err := b.db.View(func(dbTx database.Tx) error {
+		start := time.Now()
+
 		// Fetch the stored chain state from the database metadata.
 		// When it doesn't exist, it means the database hasn't been
 		// initialized for use with chain yet, so break out now to allow
@@ -1151,40 +1154,61 @@ func (b *BlockChain) initChainState() error {
 		// for them versus a whole bunch of little ones to reduce
 		// pressure on the GC.
 		log.Infof("Loading block index.  This might take a while...")
-		bestHeight := int32(state.height)
-		blockNodes := make([]blockNode, bestHeight+1)
-		var tip *blockNode
-		for height := int32(0); height <= bestHeight; height++ {
-			header, err := dbFetchHeaderByHeight(dbTx, height)
+
+		blockCount, err := dbTx.GetBlockCount()
+		if err != nil {
+			return err
+		}
+
+		blockNodes := make([]blockNode, blockCount)
+		var lastNode *blockNode
+		var i int32
+		dbTx.ForEachBlockHeader(func(headerBytes []byte) error {
+			var header wire.BlockHeader
+			err := header.Deserialize(bytes.NewReader(headerBytes))
 			if err != nil {
 				return err
 			}
 
 			// Initialize the block node for the block, connect it,
 			// and add it to the block index.
-			node := &blockNodes[height]
-			initBlockNode(node, header, height)
-			if tip != nil {
-				node.parent = tip
-				node.workSum = node.workSum.Add(tip.workSum,
-					node.workSum)
+			node := &blockNodes[i]
+			initBlockNode(node, &header, 0)
+			if lastNode == nil {
+				if header.BlockHash() != *b.chainParams.GenesisHash {
+					return AssertError(fmt.Sprintf("initChainState: Expected "+
+						"first entry in block index to be genesis block, "+
+						"found %s", header.BlockHash()))
+				}
+			} else {
+				// Since we iterate block headers in order of height, if the
+				// blocks are mostly linear there is a very good chance the
+				// previous header processed is the parent.
+				parent := lastNode
+				if header.PrevBlock != parent.hash {
+					parent = b.index.LookupNode(&header.PrevBlock)
+				}
+				if parent == nil {
+					return AssertError(fmt.Sprintf("initChainState: Could "+
+						"not find parent for block %s", header.BlockHash()))
+				}
+
+				node.parent = parent
+				node.height = parent.height + 1
+				node.workSum = node.workSum.Add(parent.workSum, node.workSum)
 			}
+
 			b.index.AddNode(node)
+			lastNode = node
+			i++
 
-			// This node is now the end of the best chain.
-			tip = node
-		}
+			return nil
+		})
 
-		// Ensure the resulting best chain matches the stored best state
-		// hash and set the best chain view accordingly.
-		if tip == nil || tip.hash != state.hash {
-			var tipHash chainhash.Hash
-			if tip != nil {
-				tipHash = tip.hash
-			}
-			return AssertError(fmt.Sprintf("initChainState: block "+
-				"index chain tip %s does not match stored "+
-				"best state %s", tipHash, state.hash))
+		tip := b.index.LookupNode(&state.hash)
+		if tip == nil {
+			return AssertError(fmt.Sprintf("initChainState: cannot find "+
+				"chain tip %s in block index", state.hash))
 		}
 		b.bestChain.SetTip(tip)
 
@@ -1206,6 +1230,9 @@ func (b *BlockChain) initChainState() error {
 		b.stateSnapshot = newBestState(tip, blockSize, blockWeight,
 			numTxns, state.totalTxns, tip.CalcPastMedianTime())
 		isStateInitialized = true
+
+		elapsed := time.Since(start)
+		log.Debugf("initChainState took %d seconds", int64(elapsed/time.Second))
 
 		return nil
 	})
