@@ -93,6 +93,28 @@ func (oa *onionAddr) Network() string {
 // Ensure onionAddr implements the net.Addr interface.
 var _ net.Addr = (*onionAddr)(nil)
 
+// onionAddr implements the net.Addr interface with two struct fields
+type simpleAddr struct {
+	net, addr string
+}
+
+// String returns the address.
+//
+// This is part of the net.Addr interface.
+func (a simpleAddr) String() string {
+	return a.addr
+}
+
+// Network returns the network.
+//
+// This is part of the net.Addr interface.
+func (a simpleAddr) Network() string {
+	return a.net
+}
+
+// Ensure simpleAddr implements the net.Addr interface.
+var _ net.Addr = simpleAddr{}
+
 // broadcastMsg provides the ability to house a bitcoin message to be broadcast
 // to all connected peers except specified excluded peers.
 type broadcastMsg struct {
@@ -1981,28 +2003,23 @@ func (s *server) ScheduleShutdown(duration time.Duration) {
 	}()
 }
 
-// parseListeners splits the list of listen addresses passed in addrs into
-// IPv4 and IPv6 slices and returns them.  This allows easy creation of the
-// listeners on the correct interface "tcp4" and "tcp6".  It also properly
-// detects addresses which apply to "all interfaces" and adds the address to
-// both slices.
-func parseListeners(addrs []string) ([]string, []string, bool, error) {
-	ipv4ListenAddrs := make([]string, 0, len(addrs)*2)
-	ipv6ListenAddrs := make([]string, 0, len(addrs)*2)
-	haveWildcard := false
-
+// parseListeners determines whether each listen address is IPv4 and IPv6 and
+// returns a slice of appropriate net.Addrs to listen on with TCP. It also
+// properly detects addresses which apply to "all interfaces" and adds the
+// address as both IPv4 and IPv6.
+func parseListeners(addrs []string) ([]net.Addr, error) {
+	netAddrs := make([]net.Addr, 0, len(addrs)*2)
 	for _, addr := range addrs {
 		host, _, err := net.SplitHostPort(addr)
 		if err != nil {
 			// Shouldn't happen due to already being normalized.
-			return nil, nil, false, err
+			return nil, err
 		}
 
 		// Empty host or host of * on plan9 is both IPv4 and IPv6.
 		if host == "" || (host == "*" && runtime.GOOS == "plan9") {
-			ipv4ListenAddrs = append(ipv4ListenAddrs, addr)
-			ipv6ListenAddrs = append(ipv6ListenAddrs, addr)
-			haveWildcard = true
+			netAddrs = append(netAddrs, simpleAddr{net: "tcp4", addr: addr})
+			netAddrs = append(netAddrs, simpleAddr{net: "tcp6", addr: addr})
 			continue
 		}
 
@@ -2016,19 +2033,18 @@ func parseListeners(addrs []string) ([]string, []string, bool, error) {
 		// Parse the IP.
 		ip := net.ParseIP(host)
 		if ip == nil {
-			return nil, nil, false, fmt.Errorf("'%s' is not a "+
-				"valid IP address", host)
+			return nil, fmt.Errorf("'%s' is not a valid IP address", host)
 		}
 
 		// To4 returns nil when the IP is not an IPv4 address, so use
 		// this determine the address type.
 		if ip.To4() == nil {
-			ipv6ListenAddrs = append(ipv6ListenAddrs, addr)
+			netAddrs = append(netAddrs, simpleAddr{net: "tcp6", addr: addr})
 		} else {
-			ipv4ListenAddrs = append(ipv4ListenAddrs, addr)
+			netAddrs = append(netAddrs, simpleAddr{net: "tcp4", addr: addr})
 		}
 	}
-	return ipv4ListenAddrs, ipv6ListenAddrs, haveWildcard, nil
+	return netAddrs, nil
 }
 
 func (s *server) upnpUpdateThread() {
@@ -2116,24 +2132,14 @@ func setupRPCListeners() ([]net.Listener, error) {
 		}
 	}
 
-	// TODO: This code is similar to the peer listener code.  It should be
-	// factored into something shared.
-	ipv4Addrs, ipv6Addrs, _, err := parseListeners(cfg.RPCListeners)
+	netAddrs, err := parseListeners(cfg.RPCListeners)
 	if err != nil {
 		return nil, err
 	}
-	listeners := make([]net.Listener, 0, len(ipv4Addrs)+len(ipv4Addrs))
-	for _, addr := range ipv4Addrs {
-		listener, err := listenFunc("tcp4", addr)
-		if err != nil {
-			rpcsLog.Warnf("Can't listen on %s: %v", addr, err)
-			continue
-		}
-		listeners = append(listeners, listener)
-	}
 
-	for _, addr := range ipv6Addrs {
-		listener, err := listenFunc("tcp6", addr)
+	listeners := make([]net.Listener, 0, len(netAddrs))
+	for _, addr := range netAddrs {
+		listener, err := listenFunc(addr.Network(), addr.String())
 		if err != nil {
 			rpcsLog.Warnf("Can't listen on %s: %v", addr, err)
 			continue
@@ -2158,122 +2164,11 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 	var listeners []net.Listener
 	var nat NAT
 	if !cfg.DisableListen {
-		ipv4Addrs, ipv6Addrs, wildcard, err :=
-			parseListeners(listenAddrs)
+		var err error
+		listeners, nat, err = initListeners(amgr, listenAddrs, services)
 		if err != nil {
 			return nil, err
 		}
-		listeners = make([]net.Listener, 0, len(ipv4Addrs)+len(ipv6Addrs))
-		discover := true
-		if len(cfg.ExternalIPs) != 0 {
-			discover = false
-			// if this fails we have real issues.
-			port, _ := strconv.ParseUint(
-				activeNetParams.DefaultPort, 10, 16)
-
-			for _, sip := range cfg.ExternalIPs {
-				eport := uint16(port)
-				host, portstr, err := net.SplitHostPort(sip)
-				if err != nil {
-					// no port, use default.
-					host = sip
-				} else {
-					port, err := strconv.ParseUint(
-						portstr, 10, 16)
-					if err != nil {
-						srvrLog.Warnf("Can not parse "+
-							"port from %s for "+
-							"externalip: %v", sip,
-							err)
-						continue
-					}
-					eport = uint16(port)
-				}
-				na, err := amgr.HostToNetAddress(host, eport,
-					services)
-				if err != nil {
-					srvrLog.Warnf("Not adding %s as "+
-						"externalip: %v", sip, err)
-					continue
-				}
-
-				err = amgr.AddLocalAddress(na, addrmgr.ManualPrio)
-				if err != nil {
-					amgrLog.Warnf("Skipping specified external IP: %v", err)
-				}
-			}
-		} else if cfg.Upnp {
-			nat, err = Discover()
-			if err != nil {
-				srvrLog.Warnf("Can't discover upnp: %v", err)
-			}
-			// nil nat here is fine, just means no upnp on network.
-		}
-
-		// TODO: nonstandard port...
-		if wildcard {
-			port, err :=
-				strconv.ParseUint(activeNetParams.DefaultPort,
-					10, 16)
-			if err != nil {
-				// I can't think of a cleaner way to do this...
-				goto nowc
-			}
-			addrs, err := net.InterfaceAddrs()
-			for _, a := range addrs {
-				ip, _, err := net.ParseCIDR(a.String())
-				if err != nil {
-					continue
-				}
-				na := wire.NewNetAddressIPPort(ip,
-					uint16(port), services)
-				if discover {
-					err = amgr.AddLocalAddress(na, addrmgr.InterfacePrio)
-					if err != nil {
-						amgrLog.Debugf("Skipping local address: %v", err)
-					}
-				}
-			}
-		}
-	nowc:
-
-		for _, addr := range ipv4Addrs {
-			listener, err := net.Listen("tcp4", addr)
-			if err != nil {
-				srvrLog.Warnf("Can't listen on %s: %v", addr,
-					err)
-				continue
-			}
-			listeners = append(listeners, listener)
-
-			if discover {
-				if na, err := amgr.DeserializeNetAddress(addr); err == nil {
-					err = amgr.AddLocalAddress(na, addrmgr.BoundPrio)
-					if err != nil {
-						amgrLog.Warnf("Skipping bound address: %v", err)
-					}
-				}
-			}
-		}
-
-		for _, addr := range ipv6Addrs {
-			listener, err := net.Listen("tcp6", addr)
-			if err != nil {
-				srvrLog.Warnf("Can't listen on %s: %v", addr,
-					err)
-				continue
-			}
-			listeners = append(listeners, listener)
-			if discover {
-				if na, err := amgr.DeserializeNetAddress(addr); err == nil {
-					err = amgr.AddLocalAddress(na, addrmgr.BoundPrio)
-					if err != nil {
-						amgrLog.Debugf("Skipping bound address: %v", err)
-					}
-				}
-			}
-		}
-
 		if len(listeners) == 0 {
 			return nil, errors.New("no valid listen address")
 		}
@@ -2537,6 +2432,84 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 	return &s, nil
 }
 
+// initListeners initializes the configured net listeners and adds any bound
+// addresses to the address manager. Returns the listeners and a NAT interface,
+// which is non-nil if UPnP is in use.
+func initListeners(amgr *addrmgr.AddrManager, listenAddrs []string, services wire.ServiceFlag) ([]net.Listener, NAT, error) {
+	// Listen for TCP connections at the configured addresses
+	netAddrs, err := parseListeners(listenAddrs)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	listeners := make([]net.Listener, 0, len(netAddrs))
+	for _, addr := range netAddrs {
+		listener, err := net.Listen(addr.Network(), addr.String())
+		if err != nil {
+			srvrLog.Warnf("Can't listen on %s: %v", addr, err)
+			continue
+		}
+		listeners = append(listeners, listener)
+	}
+
+	var nat NAT
+	if len(cfg.ExternalIPs) != 0 {
+		defaultPort, err := strconv.ParseUint(activeNetParams.DefaultPort, 10, 16)
+		if err != nil {
+			srvrLog.Errorf("Can not parse default port %s for active chain: %v",
+				activeNetParams.DefaultPort, err)
+			return nil, nil, err
+		}
+
+		for _, sip := range cfg.ExternalIPs {
+			eport := uint16(defaultPort)
+			host, portstr, err := net.SplitHostPort(sip)
+			if err != nil {
+				// no port, use default.
+				host = sip
+			} else {
+				port, err := strconv.ParseUint(portstr, 10, 16)
+				if err != nil {
+					srvrLog.Warnf("Can not parse port from %s for "+
+						"externalip: %v", sip, err)
+					continue
+				}
+				eport = uint16(port)
+			}
+			na, err := amgr.HostToNetAddress(host, eport, services)
+			if err != nil {
+				srvrLog.Warnf("Not adding %s as externalip: %v", sip, err)
+				continue
+			}
+
+			err = amgr.AddLocalAddress(na, addrmgr.ManualPrio)
+			if err != nil {
+				amgrLog.Warnf("Skipping specified external IP: %v", err)
+			}
+		}
+	} else {
+		if cfg.Upnp {
+			var err error
+			nat, err = Discover()
+			if err != nil {
+				srvrLog.Warnf("Can't discover upnp: %v", err)
+			}
+			// nil nat here is fine, just means no upnp on network.
+		}
+
+		// Add bound addresses to address manager to be advertised to peers.
+		for _, listener := range listeners {
+			addr := listener.Addr().String()
+			err := addLocalAddress(amgr, addr, services)
+			if err != nil {
+				amgrLog.Warnf("Skipping bound address %s: %v", addr, err)
+			}
+		}
+	}
+
+	return listeners, nat, nil
+}
+
 // addrStringToNetAddr takes an address in the form of 'host:port' and returns
 // a net.Addr which maps to the original address with any host names resolved
 // to IP addresses.  It also handles tor addresses properly by returning a
@@ -2583,6 +2556,52 @@ func addrStringToNetAddr(addr string) (net.Addr, error) {
 		IP:   ips[0],
 		Port: port,
 	}, nil
+}
+
+// addLocalAddress adds an address that this node is listening on to the
+// address manager so that it may be relayed to peers.
+func addLocalAddress(addrMgr *addrmgr.AddrManager, addr string, services wire.ServiceFlag) error {
+	host, portStr, err := net.SplitHostPort(addr)
+	if err != nil {
+		return err
+	}
+	port, err := strconv.ParseUint(portStr, 10, 16)
+	if err != nil {
+		return err
+	}
+
+	if ip := net.ParseIP(host); ip != nil && ip.IsUnspecified() {
+		// If bound to unspecified address, advertise all local interfaces
+		addrs, err := net.InterfaceAddrs()
+		if err != nil {
+			return err
+		}
+
+		for _, addr := range addrs {
+			ifaceIP, _, err := net.ParseCIDR(addr.String())
+			if err != nil {
+				continue
+			}
+
+			// If bound to 0.0.0.0, do not add IPv6 interfaces and if bound to
+			// ::, do not add IPv4 interfaces.
+			if (ip.To4() == nil) != (ifaceIP.To4() == nil) {
+				continue
+			}
+
+			netAddr := wire.NewNetAddressIPPort(ifaceIP, uint16(port), services)
+			addrMgr.AddLocalAddress(netAddr, addrmgr.BoundPrio)
+		}
+	} else {
+		netAddr, err := addrMgr.HostToNetAddress(host, uint16(port), services)
+		if err != nil {
+			return err
+		}
+
+		addrMgr.AddLocalAddress(netAddr, addrmgr.BoundPrio)
+	}
+
+	return nil
 }
 
 // dynamicTickDuration is a convenience function used to dynamically choose a
