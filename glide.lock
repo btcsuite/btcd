@@ -1,5 +1,5 @@
-hash: 617b25dcb8c8d68092ef2c4b249a55d6b350c47daa480a4d9748049063182252
-updated: 2017-08-22T12:35:28.82633419-04:00
+hash: 08687d42743fa8e53a336734ae67bd4801a606ced8c7c2dd774404f32391eca6
+updated: 2017-08-29T16:54:41.153871329-04:00
 imports:
 - name: github.com/agl/ed25519
   version: 278e1ec8e8a6e017cd07577924d6766039146ced
@@ -51,7 +51,7 @@ imports:
 - name: github.com/decred/dcrrpcclient
   version: abc326aeb97b299c7eb6b13b81353fc375e9b95d
 - name: github.com/decred/dcrutil
-  version: 4ce0f41cf3f957fcdf3f0de049602ac834449b9c
+  version: 166211f0196be1d3be344ae64149e7c4f5ca36b0
   subpackages:
   - base58
   - bloom
@@ -61,14 +61,15 @@ imports:
   subpackages:
   - rotator
 - name: golang.org/x/crypto
-  version: 6914964337150723782436d56b3f21610a74ce7b
+  version: 81e90905daefcd6fd217b62423c0908922eadb30
   subpackages:
   - ripemd160
   - ssh/terminal
 - name: golang.org/x/sys
-  version: 90796e5a05ce440b41c768bd9af257005e470461
+  version: ab9e364efd8b52800ff7ee48a9ffba4e0ed78dfb
   subpackages:
   - unix
+  - windows
 testImports:
 - name: github.com/pmezard/go-difflib
   version: d8ed2627bdf02c080bf22230dbb337003b7aba2d
