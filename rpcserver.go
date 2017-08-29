@@ -2150,6 +2150,13 @@ func handleGetBlockTemplate(s *rpcServer, cmd interface{}, closeChan <-chan stru
 
 // handleGetCFilter implements the getcfilter command.
 func handleGetCFilter(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	if s.cfg.CfIndex == nil {
+		return nil, &btcjson.RPCError{
+			Code:    btcjson.ErrRPCNoCFIndex,
+			Message: "The CF index must be enabled for this command",
+		}
+	}
+
 	c := cmd.(*btcjson.GetCFilterCmd)
 	hash, err := chainhash.NewHashFromStr(c.Hash)
 	if err != nil {
@@ -2172,6 +2179,13 @@ func handleGetCFilter(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) 
 
 // handleGetCFilterHeader implements the getcfilterheader command.
 func handleGetCFilterHeader(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	if s.cfg.CfIndex == nil {
+		return nil, &btcjson.RPCError{
+			Code:    btcjson.ErrRPCNoCFIndex,
+			Message: "The CF index must be enabled for this command",
+		}
+	}
+
 	c := cmd.(*btcjson.GetCFilterHeaderCmd)
 	hash, err := chainhash.NewHashFromStr(c.Hash)
 	if err != nil {
