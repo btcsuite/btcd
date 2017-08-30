@@ -16,8 +16,8 @@ import (
 // ProcessBlock before calling this function with it.
 //
 // The flags modify the behavior of this function as follows:
-//  - BFDryRun: The memory chain index will not be pruned and no accept
-//    notification will be sent since the block is not being accepted.
+//  - BFDryRun: The block index will not be updated and no accept notification
+//    will be sent since the block is not being accepted.
 //
 // The flags are also passed to checkBlockContext and connectBestChain.  See
 // their documentation for how the flags modify their behavior.
@@ -69,8 +69,7 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, flags BehaviorFlags)
 	}
 	b.index.AddNode(newNode)
 
-	// Disconnect it from the parent node when the function returns when
-	// running in dry run mode.
+	// Undo changes to the block index when running in dry run mode.
 	if dryRun {
 		defer func() {
 			b.index.RemoveNode(newNode)

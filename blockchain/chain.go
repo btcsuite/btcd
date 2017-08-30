@@ -984,9 +984,8 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List, flags 
 // The flags modify the behavior of this function as follows:
 //  - BFFastAdd: Avoids several expensive transaction validation operations.
 //    This is useful when using checkpoints.
-//  - BFDryRun: Prevents the block from being connected and avoids modifying the
-//    state of the memory chain index.  Also, any log messages related to
-//    modifying the state are avoided.
+//  - BFDryRun: Prevents the block from actually being connected and avoids any
+//    log messages related to modifying the state.
 //
 // This function MUST be called with the chain state lock held (for writes).
 func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, flags BehaviorFlags) (bool, error) {

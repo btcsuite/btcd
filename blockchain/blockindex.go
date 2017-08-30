@@ -225,7 +225,7 @@ func (bi *blockIndex) AddNode(node *blockNode) {
 	bi.Unlock()
 }
 
-// RemoveNode removes the provided node to the block index.  There is no check
+// RemoveNode removes the provided node from the block index.  There is no check
 // whether another node in the index depends on this one, so it is up to caller
 // to avoid that situation.
 //

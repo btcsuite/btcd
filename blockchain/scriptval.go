@@ -37,7 +37,7 @@ type txValidator struct {
 }
 
 // sendResult sends the result of a script pair validation on the internal
-// result channel while respecting the quit channel.  The allows orderly
+// result channel while respecting the quit channel.  This allows orderly
 // shutdown when the validation process is aborted early due to a validation
 // error in one of the other goroutines.
 func (v *txValidator) sendResult(result error) {
@@ -135,7 +135,7 @@ func (v *txValidator) Validate(items []*txValidateItem) error {
 	}
 
 	// Limit the number of goroutines to do script validation based on the
-	// number of processor cores.  This help ensure the system stays
+	// number of processor cores.  This helps ensure the system stays
 	// reasonably responsive under heavy load.
 	maxGoRoutines := runtime.NumCPU() * 3
 	if maxGoRoutines <= 0 {
