@@ -105,17 +105,9 @@ type BlockChain struct {
 	// parameters.  They are also set when the instance is created and
 	// can't be changed afterwards, so there is no need to protect them with
 	// a separate mutex.
-	//
-	// minMemoryNodes is the minimum number of consecutive nodes needed
-	// in memory in order to perform all necessary validation.  It is used
-	// to determine when it's safe to prune nodes from memory without
-	// causing constant dynamic reloading.  This is typically the same value
-	// as blocksPerRetarget, but it is separated here for tweakability and
-	// testability.
 	minRetargetTimespan int64 // target timespan / adjustment factor
 	maxRetargetTimespan int64 // target timespan * adjustment factor
 	blocksPerRetarget   int32 // target timespan / target time per block
-	minMemoryNodes      int32
 
 	// chainLock protects concurrent access to the vast majority of the
 	// fields in this struct below this point.
