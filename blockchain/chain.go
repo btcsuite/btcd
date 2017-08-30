@@ -648,7 +648,6 @@ func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block, view *U
 	view.commit()
 
 	// This node is now the end of the best chain.
-	b.index.AddNode(node)
 	b.bestChain.SetTip(node)
 
 	// Update the state for the best block.  Notice how this replaces the
@@ -1042,23 +1041,6 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, fla
 	if fastAdd {
 		log.Warnf("fastAdd set in the side chain case? %v\n",
 			block.Hash())
-	}
-
-	// We're extending (or creating) a side chain which may or may not
-	// become the main chain, but in either case the entry is needed in the
-	// index for future processing.
-	b.index.Lock()
-	b.index.index[node.hash] = node
-	b.index.Unlock()
-
-	// Disconnect it from the parent node when the function returns when
-	// running in dry run mode.
-	if dryRun {
-		defer func() {
-			b.index.Lock()
-			delete(b.index.index, node.hash)
-			b.index.Unlock()
-		}()
 	}
 
 	// We're extending (or creating) a side chain, but the cumulative

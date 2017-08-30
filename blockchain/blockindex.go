@@ -224,3 +224,14 @@ func (bi *blockIndex) AddNode(node *blockNode) {
 	bi.index[node.hash] = node
 	bi.Unlock()
 }
+
+// RemoveNode removes the provided node to the block index.  There is no check
+// whether another node in the index depends on this one, so it is up to caller
+// to avoid that situation.
+//
+// This function is safe for concurrent access.
+func (bi *blockIndex) RemoveNode(node *blockNode) {
+	bi.Lock()
+	delete(bi.index, node.hash)
+	bi.Unlock()
+}

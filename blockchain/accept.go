@@ -67,6 +67,15 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, flags BehaviorFlags)
 		newNode.height = blockHeight
 		newNode.workSum.Add(prevNode.workSum, newNode.workSum)
 	}
+	b.index.AddNode(newNode)
+
+	// Disconnect it from the parent node when the function returns when
+	// running in dry run mode.
+	if dryRun {
+		defer func() {
+			b.index.RemoveNode(newNode)
+		}()
+	}
 
 	// Connect the passed block to the chain while respecting proper chain
 	// selection according to the chain with the most proof of work.  This
