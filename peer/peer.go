@@ -82,11 +82,6 @@ var (
 	// sentNonces houses the unique nonces that are generated when pushing
 	// version messages that are used to detect self connections.
 	sentNonces = newMruNonceMap(50)
-
-	// allowSelfConns is only used to allow the tests to bypass the self
-	// connection detecting and disconnect logic since they intentionally
-	// do so for testing purposes.
-	allowSelfConns bool
 )
 
 // MessageListeners defines callback function pointers to invoke with message
@@ -245,6 +240,11 @@ type Config struct {
 	// Listeners houses callback functions to be invoked on receiving peer
 	// messages.
 	Listeners MessageListeners
+
+	// TstAllowSelfConnection is only used to allow the tests to bypass the self
+	// connection detecting and disconnect logic since they intentionally
+	// do so for testing purposes.
+	TstAllowSelfConnection bool
 }
 
 // minUint32 is a helper function to return the minimum of two uint32s.
@@ -1023,7 +1023,7 @@ func (p *Peer) PushRejectMsg(command string, code wire.RejectCode, reason string
 // is not compatible with ours.
 func (p *Peer) handleRemoteVersionMsg(msg *wire.MsgVersion) error {
 	// Detect self connections.
-	if !allowSelfConns && sentNonces.Exists(msg.Nonce) {
+	if !p.cfg.TstAllowSelfConnection && sentNonces.Exists(msg.Nonce) {
 		return errors.New("disconnecting peer connected to self")
 	}
 

@@ -11,6 +11,11 @@ import "github.com/btcsuite/btclog"
 // requests it.
 var log btclog.Logger
 
+// The default amount of logging is none.
+func init() {
+	DisableLog()
+}
+
 // DisableLog disables all library log output.  Logging output is disabled
 // by default until either UseLogger or SetLogWriter are called.
 func DisableLog() {

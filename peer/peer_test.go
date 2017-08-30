@@ -230,20 +230,22 @@ func TestPeerConnection(t *testing.T) {
 				}
 			},
 		},
-		UserAgentName:     "peer",
-		UserAgentVersion:  "1.0",
-		UserAgentComments: []string{"comment"},
-		ChainParams:       &chaincfg.MainNetParams,
-		ProtocolVersion:   wire.RejectVersion, // Configure with older version
-		Services:          0,
+		UserAgentName:          "peer",
+		UserAgentVersion:       "1.0",
+		UserAgentComments:      []string{"comment"},
+		ChainParams:            &chaincfg.MainNetParams,
+		ProtocolVersion:        wire.RejectVersion, // Configure with older version
+		Services:               0,
+		TstAllowSelfConnection: true,
 	}
 	peer2Cfg := &peer.Config{
-		Listeners:         peer1Cfg.Listeners,
-		UserAgentName:     "peer",
-		UserAgentVersion:  "1.0",
-		UserAgentComments: []string{"comment"},
-		ChainParams:       &chaincfg.MainNetParams,
-		Services:          wire.SFNodeNetwork | wire.SFNodeWitness,
+		Listeners:              peer1Cfg.Listeners,
+		UserAgentName:          "peer",
+		UserAgentVersion:       "1.0",
+		UserAgentComments:      []string{"comment"},
+		ChainParams:            &chaincfg.MainNetParams,
+		Services:               wire.SFNodeNetwork | wire.SFNodeWitness,
+		TstAllowSelfConnection: true,
 	}
 
 	wantStats1 := peerStats{
@@ -427,11 +429,12 @@ func TestPeerListeners(t *testing.T) {
 				ok <- msg
 			},
 		},
-		UserAgentName:     "peer",
-		UserAgentVersion:  "1.0",
-		UserAgentComments: []string{"comment"},
-		ChainParams:       &chaincfg.MainNetParams,
-		Services:          wire.SFNodeBloom,
+		UserAgentName:          "peer",
+		UserAgentVersion:       "1.0",
+		UserAgentComments:      []string{"comment"},
+		ChainParams:            &chaincfg.MainNetParams,
+		Services:               wire.SFNodeBloom,
+		TstAllowSelfConnection: true,
 	}
 	inConn, outConn := pipe(
 		&conn{raddr: "10.0.0.1:8333"},
@@ -813,9 +816,4 @@ func TestUnsupportedVersionPeer(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("Timeout waiting for remote reader to close")
 	}
-}
-
-func init() {
-	// Allow self connection when running the tests.
-	peer.TstAllowSelfConns()
 }

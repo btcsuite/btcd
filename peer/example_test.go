@@ -20,9 +20,10 @@ import (
 func mockRemotePeer() error {
 	// Configure peer to act as a simnet node that offers no services.
 	peerCfg := &peer.Config{
-		UserAgentName:    "peer",  // User agent name to advertise.
-		UserAgentVersion: "1.0.0", // User agent version to advertise.
-		ChainParams:      &chaincfg.SimNetParams,
+		UserAgentName:          "peer",  // User agent name to advertise.
+		UserAgentVersion:       "1.0.0", // User agent version to advertise.
+		ChainParams:            &chaincfg.SimNetParams,
+		TstAllowSelfConnection: true,
 	}
 
 	// Accept connections on the simnet port.
@@ -77,6 +78,7 @@ func Example_newOutboundPeer() {
 				verack <- struct{}{}
 			},
 		},
+		TstAllowSelfConnection: true,
 	}
 	p, err := peer.NewOutboundPeer(peerCfg, "127.0.0.1:18555")
 	if err != nil {
