@@ -317,7 +317,7 @@ type Vin struct {
 	Vout      uint32     `json:"vout"`
 	ScriptSig *ScriptSig `json:"scriptSig"`
 	Sequence  uint32     `json:"sequence"`
-	Witness   string     `json:"txinwitness"`
+	Witness   []string   `json:"txinwitness"`
 }
 
 // IsCoinBase returns a bool to show if a Vin is a Coinbase one or not.
@@ -335,9 +335,9 @@ func (v *Vin) HasWitness() bool {
 func (v *Vin) MarshalJSON() ([]byte, error) {
 	if v.IsCoinBase() {
 		coinbaseStruct := struct {
-			Coinbase string `json:"coinbase"`
-			Sequence uint32 `json:"sequence"`
-			Witness  string `json:"witness,omitempty"`
+			Coinbase string   `json:"coinbase"`
+			Sequence uint32   `json:"sequence"`
+			Witness  []string `json:"witness,omitempty"`
 		}{
 			Coinbase: v.Coinbase,
 			Sequence: v.Sequence,
@@ -351,7 +351,7 @@ func (v *Vin) MarshalJSON() ([]byte, error) {
 			Txid      string     `json:"txid"`
 			Vout      uint32     `json:"vout"`
 			ScriptSig *ScriptSig `json:"scriptSig"`
-			Witness   string     `json:"txinwitness"`
+			Witness   []string   `json:"txinwitness"`
 			Sequence  uint32     `json:"sequence"`
 		}{
 			Txid:      v.Txid,
@@ -389,7 +389,7 @@ type VinPrevOut struct {
 	Txid      string     `json:"txid"`
 	Vout      uint32     `json:"vout"`
 	ScriptSig *ScriptSig `json:"scriptSig"`
-	Witness   string     `json:"txinwitness"`
+	Witness   []string   `json:"txinwitness"`
 	PrevOut   *PrevOut   `json:"prevOut"`
 	Sequence  uint32     `json:"sequence"`
 }
@@ -423,7 +423,7 @@ func (v *VinPrevOut) MarshalJSON() ([]byte, error) {
 			Txid      string     `json:"txid"`
 			Vout      uint32     `json:"vout"`
 			ScriptSig *ScriptSig `json:"scriptSig"`
-			Witness   string     `json:"txinwitness"`
+			Witness   []string   `json:"txinwitness"`
 			PrevOut   *PrevOut   `json:"prevOut,omitempty"`
 			Sequence  uint32     `json:"sequence"`
 		}{

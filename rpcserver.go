@@ -629,6 +629,23 @@ func handleDebugLevel(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) 
 	return "Done.", nil
 }
 
+// witnessToHex formats the passed witness stack as a slice of hex-encoded
+// strings to be used in a JSON response.
+func witnessToHex(witness wire.TxWitness) []string {
+	// Ensure nil is returned when there are no entries versus an empty
+	// slice so it can properly be omitted as necessary.
+	if len(witness) == 0 {
+		return nil
+	}
+
+	result := make([]string, 0, len(witness))
+	for _, wit := range witness {
+		result = append(result, hex.EncodeToString(wit))
+	}
+
+	return result
+}
+
 // createVinList returns a slice of JSON objects for the inputs of the passed
 // transaction.
 func createVinList(mtx *wire.MsgTx) []btcjson.Vin {
@@ -638,7 +655,7 @@ func createVinList(mtx *wire.MsgTx) []btcjson.Vin {
 		txIn := mtx.TxIn[0]
 		vinList[0].Coinbase = hex.EncodeToString(txIn.SignatureScript)
 		vinList[0].Sequence = txIn.Sequence
-		vinList[0].Witness = witnessToSring(txIn.Witness)
+		vinList[0].Witness = witnessToHex(txIn.Witness)
 		return vinList
 	}
 
@@ -658,27 +675,11 @@ func createVinList(mtx *wire.MsgTx) []btcjson.Vin {
 		}
 
 		if mtx.HasWitness() {
-			vinEntry.Witness = witnessToSring(txIn.Witness)
+			vinEntry.Witness = witnessToHex(txIn.Witness)
 		}
 	}
 
 	return vinList
-}
-
-// witnessToSring formats the passed witness stack as a string to be used
-// within a JSON response. The witness is encoded as a single string with
-// spaces separating each witness element.
-func witnessToSring(witness wire.TxWitness) string {
-	var b bytes.Buffer
-	for i, wit := range witness {
-		if i > 0 {
-			b.WriteString(" ")
-		}
-
-		b.WriteString(hex.EncodeToString(wit))
-	}
-
-	return b.String()
 }
 
 // createVoutList returns a slice of JSON objects for the outputs of the passed
@@ -2852,7 +2853,7 @@ func createVinListPrevOut(s *rpcServer, mtx *wire.MsgTx, chainParams *chaincfg.P
 		}
 
 		if len(txIn.Witness) != 0 {
-			vinEntry.Witness = witnessToSring(txIn.Witness)
+			vinEntry.Witness = witnessToHex(txIn.Witness)
 		}
 
 		// Add the entry to the list now if it already passed the filter
