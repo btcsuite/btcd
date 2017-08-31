@@ -55,6 +55,12 @@ func migrateBlockIndex(db *db) error {
 			return err
 		}
 
+		blockHashBucket, err := dbTx.Metadata().CreateBucketIfNotExists(
+			blockHashBucketName)
+		if err != nil {
+			return err
+		}
+
 		// Scan the old block index bucket and construct a mapping of each block
 		// to all child blocks.
 		childBlocksMap, err := readBlockTree(oldBlockIdxBucket)
@@ -77,7 +83,14 @@ func migrateBlockIndex(db *db) error {
 			}
 
 			key := blockIndexKey(&hash, height)
-			return newBlockIdxBucket.Put(key, blockRow)
+			err := newBlockIdxBucket.Put(key, blockRow)
+			if err != nil {
+				return err
+			}
+
+			// First 4 bytes of the blockIdxKey are the block height
+			err = blockHashBucket.Put(hashBytes, key[0:4:4])
+			return err
 		})
 		if err != nil {
 			return err

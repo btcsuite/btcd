@@ -75,9 +75,14 @@ var (
 	// location.
 	writeLocKeyName = []byte("ffldb-writeloc")
 
-	// blockIdxBucketName is the bucket used internally to track block
-	// metadata.
+	// blockIdx2BucketName is the bucket used internally to track block
+	// metadata. This is the second version of this bucket.
 	blockIdx2BucketName = []byte("ffldb-blockidx-v2")
+
+	// blockHashBucketName is the name of the db bucket used track the block
+	// hash to height index. This can be used in conjuction with the v2 block
+	// index bucket to look up a block by hash.
+	blockHashBucketName = []byte("ffldb-hashidx")
 )
 
 // Common error strings.
@@ -966,6 +971,7 @@ type transaction struct {
 	metaBucket      *bucket          // The root metadata bucket.
 	blockIdxBucket  *bucket          // The v1 block index bucket.
 	blockIdx2Bucket *bucket          // The v2 block index bucket.
+	blockHashBucket *bucket          // The block hash -> height bucket.
 
 	// Blocks that need to be stored on commit.  The pendingBlocks map is
 	// kept to allow quick lookups of pending data by block hash.
@@ -1837,6 +1843,13 @@ func (tx *transaction) writePendingAndCommit() error {
 			rollback()
 			return err
 		}
+
+		// First 4 bytes of the blockIdxKey are the block height
+		err = tx.blockHashBucket.Put(blockData.hash[:], blockIdxKey[0:4:4])
+		if err != nil {
+			rollback()
+			return err
+		}
 	}
 
 	// Update the metadata for the current write file and offset.
@@ -1917,6 +1930,7 @@ type db struct {
 
 	// Stored IDs of internal buckets
 	blockIdx2BucketID [4]byte
+	blockHashBucketID [4]byte
 }
 
 // Enforce db implements the database.DB interface.
@@ -1983,9 +1997,12 @@ func (db *db) begin(writable bool) (*transaction, error) {
 	tx.metaBucket = &bucket{tx: tx, id: metadataBucketID}
 	tx.blockIdxBucket = &bucket{tx: tx, id: blockIdxBucketID}
 
-	// This should be set for all transactions created after openDB completes
+	// These should be set for all transactions created after openDB completes
 	if metadataBucketID != db.blockIdx2BucketID {
 		tx.blockIdx2Bucket = &bucket{tx: tx, id: db.blockIdx2BucketID}
+	}
+	if metadataBucketID != db.blockHashBucketID {
+		tx.blockHashBucket = &bucket{tx: tx, id: db.blockHashBucketID}
 	}
 
 	return tx, nil
@@ -2161,10 +2178,14 @@ func initDB(ldb *leveldb.DB) error {
 	// NOTE: Also note that blockIdxBucketName must be the first entry because
 	// its ID is hardcoded to 0x01. This can be removed when the bucket is
 	// permanently deprecated.
+	initialBuckets := [][]byte{
+		blockIdxBucketName,
+		blockIdx2BucketName,
+		blockHashBucketName,
+	}
+
 	var currentBucketNum uint32
 	var currentBucketID [4]byte
-
-	initialBuckets := [][]byte{blockIdxBucketName, blockIdx2BucketName}
 	for _, bucketName := range initialBuckets {
 		currentBucketNum++
 		binary.BigEndian.PutUint32(currentBucketID[:], currentBucketNum)
@@ -2247,6 +2268,14 @@ func openDB(dbPath string, network wire.BitcoinNet, create bool) (database.DB, e
 			return makeDbErr(database.ErrBucketNotFound, message, nil)
 		}
 		copy(pdb.blockIdx2BucketID[:], bucketID)
+
+		bucketKey = bucketIndexKey(metadataBucketID, blockHashBucketName)
+		bucketID = dbTx.fetchKey(bucketKey)
+		if bucketID == nil {
+			message := "Database is missing internal bucket: blockHashBucket"
+			return makeDbErr(database.ErrBucketNotFound, message, nil)
+		}
+		copy(pdb.blockHashBucketID[:], bucketID)
 
 		return nil
 	})

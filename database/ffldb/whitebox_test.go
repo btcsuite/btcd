@@ -285,6 +285,11 @@ func resetDatabase(tc *testContext) bool {
 		}
 
 		_, err = tx.Metadata().CreateBucket(blockIdx2BucketName)
+		if err != nil {
+			return err
+		}
+
+		_, err = tx.Metadata().CreateBucket(blockHashBucketName)
 		return err
 	})
 	if err != nil {
