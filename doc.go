@@ -35,10 +35,12 @@ Application Options:
                             (default all interfaces port: 8333, testnet: 18333)
       --maxpeers=           Max number of inbound and outbound peers (125)
       --nobanning           Disable banning of misbehaving peers
-      --banthreshold=       Maximum allowed ban score before disconnecting and
-                            banning misbehaving peers.
       --banduration=        How long to ban misbehaving peers.  Valid time units
                             are {s, m, h}.  Minimum 1 second (24h0m0s)
+      --banthreshold=       Maximum allowed ban score before disconnecting and
+                            banning misbehaving peers.
+      --whitelist=          Add an IP network or IP that will not be banned.
+                            (eg. 192.168.1.0/24 or ::1)
   -u, --rpcuser=            Username for RPC connections
   -P, --rpcpass=            Password for RPC connections
       --rpclimituser=       Username for limited RPC connections
