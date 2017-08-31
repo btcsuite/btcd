@@ -52,6 +52,14 @@ func (p *rpcPeer) BanScore() uint32 {
 	return (*serverPeer)(p).banScore.Int()
 }
 
+// IsWhitelisted returns whether or not the peer is whitelisted.
+//
+// This function is safe for concurrent access and is part of the rpcserverPeer
+// interface implementation.
+func (p *rpcPeer) IsWhitelisted() bool {
+	return (*serverPeer)(p).isWhitelisted
+}
+
 // FeeFilter returns the requested current minimum fee rate for which
 // transactions should be announced.
 //

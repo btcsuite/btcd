@@ -2407,6 +2407,7 @@ func handleGetPeerInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 			StartingHeight: statsSnap.StartingHeight,
 			CurrentHeight:  statsSnap.LastBlock,
 			BanScore:       int32(p.BanScore()),
+			Whitelisted:    p.IsWhitelisted(),
 			FeeFilter:      p.FeeFilter(),
 			SyncNode:       statsSnap.ID == syncPeerID,
 		}
@@ -4038,6 +4039,9 @@ type rpcserverPeer interface {
 	// BanScore returns the current integer value that represents how close
 	// the peer is to being banned.
 	BanScore() uint32
+
+	// IsWhitelisted returns whether or not the peer is whitelisted.
+	IsWhitelisted() bool
 
 	// FeeFilter returns the requested current minimum fee rate for which
 	// transactions should be announced.
