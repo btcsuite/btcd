@@ -434,7 +434,7 @@ func TestMarshalCmdErrors(t *testing.T) {
 
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
-		_, err := dcrjson.MarshalCmd(test.id, test.cmd)
+		_, err := dcrjson.MarshalCmd("1.0", test.id, test.cmd)
 		if reflect.TypeOf(err) != reflect.TypeOf(test.err) {
 			t.Errorf("Test #%d (%s) wrong error type - got `%T` (%v), want `%T`",
 				i, test.name, err, err, test.err)

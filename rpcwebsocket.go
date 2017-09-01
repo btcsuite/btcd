@@ -752,7 +752,7 @@ func (m *wsNotificationManager) notifyBlockConnected(clients map[chan struct{}]*
 		ntfn.SubscribedTxs = subscribedTxs[quitChan]
 
 		// Marshal and queue notification.
-		marshalledJSON, err := dcrjson.MarshalCmd(nil, &ntfn)
+		marshalledJSON, err := dcrjson.MarshalCmd("1.0", nil, &ntfn)
 		if err != nil {
 			rpcsLog.Errorf("Failed to marshal block connected "+
 				"notification: %v", err)
@@ -784,7 +784,7 @@ func (*wsNotificationManager) notifyBlockDisconnected(clients map[chan struct{}]
 	ntfn := dcrjson.BlockDisconnectedNtfn{
 		Header: hex.EncodeToString(headerBytes),
 	}
-	marshalledJSON, err := dcrjson.MarshalCmd(nil, &ntfn)
+	marshalledJSON, err := dcrjson.MarshalCmd("1.0", nil, &ntfn)
 	if err != nil {
 		rpcsLog.Errorf("Failed to marshal block disconnected "+
 			"notification: %v", err)
@@ -809,7 +809,7 @@ func (m *wsNotificationManager) notifyReorganization(clients map[chan struct{}]*
 		int32(rd.OldHeight),
 		rd.NewHash.String(),
 		int32(rd.NewHeight))
-	marshalledJSON, err := dcrjson.MarshalCmd(nil, ntfn)
+	marshalledJSON, err := dcrjson.MarshalCmd("1.0", nil, ntfn)
 	if err != nil {
 		rpcsLog.Errorf("Failed to marshal reorganization "+
 			"notification: %v", err)
@@ -847,7 +847,7 @@ func (*wsNotificationManager) notifyWinningTickets(
 	ntfn := dcrjson.NewWinningTicketsNtfn(wtnd.BlockHash.String(),
 		int32(wtnd.BlockHeight), ticketMap)
 
-	marshalledJSON, err := dcrjson.MarshalCmd(nil, ntfn)
+	marshalledJSON, err := dcrjson.MarshalCmd("1.0", nil, ntfn)
 	if err != nil {
 		rpcsLog.Errorf("Failed to marshal winning tickets notification: "+
 			"%v", err)
@@ -889,7 +889,7 @@ func (*wsNotificationManager) notifySpentAndMissedTickets(
 	ntfn := dcrjson.NewSpentAndMissedTicketsNtfn(tnd.Hash.String(),
 		int32(tnd.Height), tnd.StakeDifficulty, ticketMap)
 
-	marshalledJSON, err := dcrjson.MarshalCmd(nil, ntfn)
+	marshalledJSON, err := dcrjson.MarshalCmd("1.0", nil, ntfn)
 	if err != nil {
 		rpcsLog.Errorf("Failed to marshal spent and missed tickets "+
 			"notification: %v", err)
@@ -940,7 +940,7 @@ func (*wsNotificationManager) notifyNewTickets(clients map[chan struct{}]*wsClie
 	ntfn := dcrjson.NewNewTicketsNtfn(tnd.Hash.String(), int32(tnd.Height),
 		tnd.StakeDifficulty, tickets)
 
-	marshalledJSON, err := dcrjson.MarshalCmd(nil, ntfn)
+	marshalledJSON, err := dcrjson.MarshalCmd("1.0", nil, ntfn)
 	if err != nil {
 		rpcsLog.Errorf("Failed to marshal new tickets notification: "+
 			"%v", err)
@@ -962,7 +962,7 @@ func (*wsNotificationManager) notifyStakeDifficulty(
 		int32(sdnd.BlockHeight),
 		sdnd.StakeDifficulty)
 
-	marshalledJSON, err := dcrjson.MarshalCmd(nil, ntfn)
+	marshalledJSON, err := dcrjson.MarshalCmd("1.0", nil, ntfn)
 	if err != nil {
 		rpcsLog.Errorf("Failed to marshal stake difficulty notification: "+
 			"%v", err)
@@ -998,7 +998,7 @@ func (m *wsNotificationManager) notifyForNewTx(clients map[chan struct{}]*wsClie
 
 	ntfn := dcrjson.NewTxAcceptedNtfn(txHashStr,
 		dcrutil.Amount(amount).ToCoin())
-	marshalledJSON, err := dcrjson.MarshalCmd(nil, ntfn)
+	marshalledJSON, err := dcrjson.MarshalCmd("1.0", nil, ntfn)
 	if err != nil {
 		rpcsLog.Errorf("Failed to marshal tx notification: %s",
 			err.Error())
@@ -1022,7 +1022,7 @@ func (m *wsNotificationManager) notifyForNewTx(clients map[chan struct{}]*wsClie
 			}
 
 			verboseNtfn = dcrjson.NewTxAcceptedVerboseNtfn(*rawTx)
-			marshalledJSONVerbose, err = dcrjson.MarshalCmd(nil,
+			marshalledJSONVerbose, err = dcrjson.MarshalCmd("1.0", nil,
 				verboseNtfn)
 			if err != nil {
 				rpcsLog.Errorf("Failed to marshal verbose tx "+
@@ -1102,7 +1102,7 @@ func (m *wsNotificationManager) notifyRelevantTxAccepted(tx *dcrutil.Tx,
 
 	if len(clientsToNotify) != 0 {
 		n := dcrjson.NewRelevantTxAcceptedNtfn(txHexString(msgTx))
-		marshalled, err := dcrjson.MarshalCmd(nil, n)
+		marshalled, err := dcrjson.MarshalCmd("1.0", nil, n)
 		if err != nil {
 			rpcsLog.Errorf("Failed to marshal notification: %v", err)
 			return
@@ -1166,21 +1166,18 @@ type wsResponse struct {
 	doneChan chan bool
 }
 
-// wsClient provides an abstraction for handling a websocket client.  The
-// overall data flow is split into 3 main goroutines, a possible 4th goroutine
-// for long-running operations (only started if request is made), and a
-// websocket manager which is used to allow things such as broadcasting
-// requested notifications to all connected websocket clients.   Inbound
-// messages are read via the inHandler goroutine and generally dispatched to
-// their own handler.  However, certain potentially long-running operations such
-// as rescans, are sent to the asyncHander goroutine and are limited to one at a
-// time.  There are two outbound message types - one for responding to client
-// requests and another for async notifications.  Responses to client requests
-// use SendMessage which employs a buffered channel thereby limiting the number
-// of outstanding requests that can be made.  Notifications are sent via
-// QueueNotification which implements a queue via notificationQueueHandler to
-// ensure sending notifications from other subsystems can't block.  Ultimately,
-// all messages are sent via the outHandler.
+// wsClient provides an abstraction for handling a websocket client. The overall
+// data flow is split into 3 main goroutines. A websocket manager is used to
+// allow things such as broadcasting requested notifications to all connected
+// websocket clients. Inbound messages are read via the inHandler goroutine and
+// generally dispatched to their own handler. There are two outbound message
+// types - one for responding to client requests and another for async
+// notifications. Responses to client requests use SendMessage which employs a
+// buffered channel thereby limiting the number of outstanding requests that can
+// be made. Notifications are sent via QueueNotification which implements a
+// queue via notificationQueueHandler to ensure sending notifications from other
+// subsystems can't block.  Ultimately, all messages are sent via the
+// outHandler.
 type wsClient struct {
 	sync.Mutex
 
@@ -1247,137 +1244,436 @@ out:
 			break out
 		}
 
-		var request dcrjson.Request
-		err = json.Unmarshal(msg, &request)
-		if err != nil {
-			if !c.authenticated {
-				break out
-			}
+		var batchedRequest bool
 
-			jsonErr := &dcrjson.RPCError{
-				Code:    dcrjson.ErrRPCParse.Code,
-				Message: "Failed to parse request: " + err.Error(),
-			}
-			reply, err := createMarshalledReply(nil, nil, jsonErr)
+		// Determine request type
+		if bytes.HasPrefix(msg, batchedRequestPrefix) {
+			batchedRequest = true
+		}
+
+		// Process a single request
+		if !batchedRequest {
+			var req dcrjson.Request
+			var reply json.RawMessage
+			err = json.Unmarshal(msg, &req)
 			if err != nil {
-				rpcsLog.Errorf("Failed to marshal parse failure "+
-					"reply: %v", err)
-				continue
-			}
-			c.SendMessage(reply, nil)
-			continue
-		}
-
-		// Requests with no ID (notifications) must not have a response per the
-		// JSON-RPC spec.
-		if request.ID == nil {
-			if !c.authenticated {
-				break out
-			}
-			continue
-		}
-
-		cmd := parseCmd(&request)
-		if cmd.err != nil {
-			if !c.authenticated {
-				break out
-			}
-
-			reply, err := createMarshalledReply(cmd.id, nil, cmd.err)
-			if err != nil {
-				rpcsLog.Errorf("Failed to marshal parse failure "+
-					"reply: %v", err)
-				continue
-			}
-			c.SendMessage(reply, nil)
-			continue
-		}
-		rpcsLog.Debugf("Received command <%s> from %s", cmd.method, c.addr)
-
-		// Check auth.  The client is immediately disconnected if the
-		// first request of an unauthentiated websocket client is not
-		// the authenticate request, an authenticate request is received
-		// when the client is already authenticated, or incorrect
-		// authentication credentials are provided in the request.
-		switch authCmd, ok := cmd.cmd.(*dcrjson.AuthenticateCmd); {
-		case c.authenticated && ok:
-			rpcsLog.Warnf("Websocket client %s is already authenticated",
-				c.addr)
-			break out
-		case !c.authenticated && !ok:
-			rpcsLog.Warnf("Unauthenticated websocket message " +
-				"received")
-			break out
-		case !c.authenticated:
-			// Check credentials.
-			login := authCmd.Username + ":" + authCmd.Passphrase
-			auth := "Basic " + base64.StdEncoding.EncodeToString([]byte(login))
-			authSha := sha256.Sum256([]byte(auth))
-			cmp := subtle.ConstantTimeCompare(authSha[:], c.server.authsha[:])
-			limitcmp := subtle.ConstantTimeCompare(authSha[:], c.server.limitauthsha[:])
-			if cmp != 1 && limitcmp != 1 {
-				rpcsLog.Warnf("Auth failure.")
-				break out
-			}
-			c.authenticated = true
-			c.isAdmin = cmp == 1
-
-			// Marshal and send response.
-			reply, err := createMarshalledReply(cmd.id, nil, nil)
-			if err != nil {
-				rpcsLog.Errorf("Failed to marshal authenticate reply: "+
-					"%v", err.Error())
-				continue
-			}
-			c.SendMessage(reply, nil)
-			continue
-		}
-
-		// Check if the client is using limited RPC credentials and
-		// error when not authorized to call this RPC.
-		if !c.isAdmin {
-			if _, ok := rpcLimited[request.Method]; !ok {
-				jsonErr := &dcrjson.RPCError{
-					Code:    dcrjson.ErrRPCInvalidParams.Code,
-					Message: "limited user not authorized for this method",
+				// only process requests from authenticated clients
+				if !c.authenticated {
+					break out
 				}
-				// Marshal and send response.
-				reply, err := createMarshalledReply(request.ID, nil, jsonErr)
+
+				jsonErr := &dcrjson.RPCError{
+					Code:    dcrjson.ErrRPCParse.Code,
+					Message: "Failed to parse request: " + err.Error(),
+				}
+				reply, err = createMarshalledReply("1.0", nil, nil, jsonErr)
 				if err != nil {
-					rpcsLog.Errorf("Failed to marshal parse failure "+
-						"reply: %v", err)
+					rpcsLog.Errorf("Failed to marshal reply: %v", err)
 					continue
 				}
 				c.SendMessage(reply, nil)
 				continue
 			}
+
+			if req.Method == "" || req.Params == nil {
+				jsonErr := &dcrjson.RPCError{
+					Code:    dcrjson.ErrRPCInvalidRequest.Code,
+					Message: fmt.Sprintf("Invalid request: malformed"),
+				}
+				reply, err := createMarshalledReply(req.Jsonrpc, req.ID, nil, jsonErr)
+				if err != nil {
+					rpcsLog.Errorf("Failed to marshal reply: %v", err)
+					continue
+				}
+				c.SendMessage(reply, nil)
+				continue
+			}
+
+			// Valid requests with no ID (notifications) must not have a response
+			// per the JSON-RPC spec.
+			if req.ID == nil {
+				if !c.authenticated {
+					break out
+				}
+				continue
+			}
+
+			cmd := parseCmd(&req)
+			if cmd.err != nil {
+				// Only process requests from authenticated clients
+				if !c.authenticated {
+					break out
+				}
+
+				reply, err = createMarshalledReply(cmd.jsonrpc, cmd.id, nil, cmd.err)
+				if err != nil {
+					rpcsLog.Errorf("Failed to marshal reply: %v", err)
+					continue
+				}
+				c.SendMessage(reply, nil)
+				continue
+			}
+
+			rpcsLog.Debugf("Received command <%s> from %s", cmd.method, c.addr)
+
+			// Check auth.  The client is immediately disconnected if the
+			// first request of an unauthentiated websocket client is not
+			// the authenticate request, an authenticate request is received
+			// when the client is already authenticated, or incorrect
+			// authentication credentials are provided in the request.
+			switch authCmd, ok := cmd.cmd.(*dcrjson.AuthenticateCmd); {
+			case c.authenticated && ok:
+				rpcsLog.Warnf("Websocket client %s is already authenticated",
+					c.addr)
+				break out
+			case !c.authenticated && !ok:
+				rpcsLog.Warnf("Unauthenticated websocket message " +
+					"received")
+				break out
+			case !c.authenticated:
+				// Check credentials.
+				login := authCmd.Username + ":" + authCmd.Passphrase
+				auth := "Basic " + base64.StdEncoding.EncodeToString([]byte(login))
+				authSha := sha256.Sum256([]byte(auth))
+				cmp := subtle.ConstantTimeCompare(authSha[:], c.server.authsha[:])
+				limitcmp := subtle.ConstantTimeCompare(authSha[:], c.server.limitauthsha[:])
+				if cmp != 1 && limitcmp != 1 {
+					rpcsLog.Warnf("Auth failure.")
+					break out
+				}
+				c.authenticated = true
+				c.isAdmin = cmp == 1
+
+				// Marshal and send response.
+				reply, err = createMarshalledReply(cmd.jsonrpc, cmd.id, nil, nil)
+				if err != nil {
+					rpcsLog.Errorf("Failed to marshal authenticate reply: "+
+						"%v", err.Error())
+					continue
+				}
+				c.SendMessage(reply, nil)
+				continue
+			}
+
+			// Check if the client is using limited RPC credentials and
+			// error when not authorized to call the supplied RPC.
+			if !c.isAdmin {
+				if _, ok := rpcLimited[req.Method]; !ok {
+					jsonErr := &dcrjson.RPCError{
+						Code:    dcrjson.ErrRPCInvalidParams.Code,
+						Message: "limited user not authorized for this method",
+					}
+					// Marshal and send response.
+					reply, err = createMarshalledReply("", req.ID, nil, jsonErr)
+					if err != nil {
+						rpcsLog.Errorf("Failed to marshal parse failure "+
+							"reply: %v", err)
+						continue
+					}
+					c.SendMessage(reply, nil)
+					continue
+				}
+			}
+
+			// Asynchronously handle the request.  A semaphore is used to
+			// limit the number of concurrent requests currently being
+			// serviced.  If the semaphore can not be acquired, simply wait
+			// until a request finished before reading the next RPC request
+			// from the websocket client.
+			//
+			// This could be a little fancier by timing out and erroring
+			// when it takes too long to service the request, but if that is
+			// done, the read of the next request should not be blocked by
+			// this semaphore, otherwise the next request will be read and
+			// will probably sit here for another few seconds before timing
+			// out as well.  This will cause the total timeout duration for
+			// later requests to be much longer than the check here would
+			// imply.
+			//
+			// If a timeout is added, the semaphore acquiring should be
+			// moved inside of the new goroutine with a select statement
+			// that also reads a time.After channel.  This will unblock the
+			// read of the next request from the websocket client and allow
+			// many requests to be waited on concurrently.
+			c.serviceRequestSem.acquire()
+			go func() {
+				c.serviceRequest(cmd)
+				c.serviceRequestSem.release()
+			}()
 		}
 
-		// Asynchronously handle the request.  A semaphore is used to
-		// limit the number of concurrent requests currently being
-		// serviced.  If the semaphore can not be acquired, simply wait
-		// until a request finished before reading the next RPC request
-		// from the websocket client.
-		//
-		// This could be a little fancier by timing out and erroring
-		// when it takes too long to service the request, but if that is
-		// done, the read of the next request should not be blocked by
-		// this semaphore, otherwise the next request will be read and
-		// will probably sit here for another few seconds before timing
-		// out as well.  This will cause the total timeout duration for
-		// later requests to be much longer than the check here would
-		// imply.
-		//
-		// If a timeout is added, the semaphore acquiring should be
-		// moved inside of the new goroutine with a select statement
-		// that also reads a time.After channel.  This will unblock the
-		// read of the next request from the websocket client and allow
-		// many requests to be waited on concurrently.
-		c.serviceRequestSem.acquire()
-		go func() {
-			c.serviceRequest(cmd)
+		// Process a batched request
+		if batchedRequest {
+			var batchedRequests []interface{}
+			var results []json.RawMessage
+			var batchSize int
+			var reply json.RawMessage
+			c.serviceRequestSem.acquire()
+			err = json.Unmarshal(msg, &batchedRequests)
+			if err != nil {
+				// Only process requests from authenticated clients
+				if !c.authenticated {
+					break out
+				}
+
+				jsonErr := &dcrjson.RPCError{
+					Code: dcrjson.ErrRPCParse.Code,
+					Message: fmt.Sprintf("Failed to parse request: %v",
+						err),
+				}
+				reply, err = dcrjson.MarshalResponse("2.0", nil, nil, jsonErr)
+				if err != nil {
+					rpcsLog.Errorf("Failed to create reply: %v", err)
+				}
+
+				if reply != nil {
+					results = append(results, reply)
+				}
+			}
+
+			if err == nil {
+				// Response with an empty batch error if the batch size is zero
+				if len(batchedRequests) == 0 {
+					if !c.authenticated {
+						break out
+					}
+
+					jsonErr := &dcrjson.RPCError{
+						Code:    dcrjson.ErrRPCInvalidRequest.Code,
+						Message: fmt.Sprint("Invalid request: empty batch"),
+					}
+					reply, err = dcrjson.MarshalResponse("2.0", nil, nil, jsonErr)
+					if err != nil {
+						rpcsLog.Errorf("Failed to marshal reply: %v", err)
+					}
+
+					if reply != nil {
+						results = append(results, reply)
+					}
+				}
+
+				// Process each batch entry individually
+				if len(batchedRequests) > 0 {
+					batchSize = len(batchedRequests)
+					for _, entry := range batchedRequests {
+						var reqBytes []byte
+						reqBytes, err = json.Marshal(entry)
+						if err != nil {
+							// Only process requests from authenticated clients
+							if !c.authenticated {
+								break out
+							}
+
+							jsonErr := &dcrjson.RPCError{
+								Code: dcrjson.ErrRPCInvalidRequest.Code,
+								Message: fmt.Sprintf("Invalid request: %v",
+									err),
+							}
+							reply, err = dcrjson.MarshalResponse("2.0", nil, nil, jsonErr)
+							if err != nil {
+								rpcsLog.Errorf("Failed to create reply: %v", err)
+								continue
+							}
+
+							if reply != nil {
+								results = append(results, reply)
+							}
+							continue
+						}
+
+						var req dcrjson.Request
+						err := json.Unmarshal(reqBytes, &req)
+						if err != nil {
+							// Only process requests from authenticated clients
+							if !c.authenticated {
+								break out
+							}
+
+							jsonErr := &dcrjson.RPCError{
+								Code: dcrjson.ErrRPCInvalidRequest.Code,
+								Message: fmt.Sprintf("Invalid request: %v",
+									err),
+							}
+							reply, err = dcrjson.MarshalResponse("2.0", nil, nil, jsonErr)
+							if err != nil {
+								rpcsLog.Errorf("Failed to create reply: %v", err)
+								continue
+							}
+
+							if reply != nil {
+								results = append(results, reply)
+							}
+							continue
+						}
+
+						if req.Method == "" || req.Params == nil {
+							jsonErr := &dcrjson.RPCError{
+								Code:    dcrjson.ErrRPCInvalidRequest.Code,
+								Message: fmt.Sprintf("Invalid request: malformed"),
+							}
+							reply, err := createMarshalledReply(req.Jsonrpc, req.ID, nil, jsonErr)
+							if err != nil {
+								rpcsLog.Errorf("Failed to marshal reply: %v", err)
+								continue
+							}
+
+							if reply != nil {
+								results = append(results, reply)
+							}
+							continue
+						}
+
+						// Valid requests with no ID (notifications) must not have a response
+						// per the JSON-RPC spec.
+						if req.ID == nil {
+							if !c.authenticated {
+								break out
+							}
+							continue
+						}
+
+						cmd := parseCmd(&req)
+						if cmd.err != nil {
+							// Only process requests from authenticated clients
+							if !c.authenticated {
+								break out
+							}
+
+							reply, err = createMarshalledReply(cmd.jsonrpc, cmd.id, nil, cmd.err)
+							if err != nil {
+								rpcsLog.Errorf("Failed to marshal reply: %v", err)
+								continue
+							}
+
+							if reply != nil {
+								results = append(results, reply)
+							}
+							continue
+						}
+
+						rpcsLog.Debugf("Received command <%s> from %s", cmd.method, c.addr)
+
+						// Check auth.  The client is immediately disconnected if the
+						// first request of an unauthentiated websocket client is not
+						// the authenticate request, an authenticate request is received
+						// when the client is already authenticated, or incorrect
+						// authentication credentials are provided in the request.
+						switch authCmd, ok := cmd.cmd.(*dcrjson.AuthenticateCmd); {
+						case c.authenticated && ok:
+							rpcsLog.Warnf("Websocket client %s is already authenticated",
+								c.addr)
+							break out
+						case !c.authenticated && !ok:
+							rpcsLog.Warnf("Unauthenticated websocket message " +
+								"received")
+							break out
+						case !c.authenticated:
+							// Check credentials.
+							login := authCmd.Username + ":" + authCmd.Passphrase
+							auth := "Basic " + base64.StdEncoding.EncodeToString([]byte(login))
+							authSha := sha256.Sum256([]byte(auth))
+							cmp := subtle.ConstantTimeCompare(authSha[:], c.server.authsha[:])
+							limitcmp := subtle.ConstantTimeCompare(authSha[:], c.server.limitauthsha[:])
+							if cmp != 1 && limitcmp != 1 {
+								rpcsLog.Warnf("Auth failure.")
+								break out
+							}
+
+							c.authenticated = true
+							c.isAdmin = cmp == 1
+
+							// Marshal and send response.
+							reply, err = createMarshalledReply(cmd.jsonrpc, cmd.id, nil, nil)
+							if err != nil {
+								rpcsLog.Errorf("Failed to marshal authenticate reply: "+
+									"%v", err.Error())
+								continue
+							}
+
+							if reply != nil {
+								results = append(results, reply)
+							}
+							continue
+						}
+
+						// Check if the client is using limited RPC credentials and
+						// error when not authorized to call the supplied RPC.
+						if !c.isAdmin {
+							if _, ok := rpcLimited[req.Method]; !ok {
+								jsonErr := &dcrjson.RPCError{
+									Code:    dcrjson.ErrRPCInvalidParams.Code,
+									Message: "limited user not authorized for this method",
+								}
+								// Marshal and send response.
+								reply, err = createMarshalledReply(req.Jsonrpc, req.ID, nil, jsonErr)
+								if err != nil {
+									rpcsLog.Errorf("Failed to marshal parse failure "+
+										"reply: %v", err)
+									continue
+								}
+
+								if reply != nil {
+									results = append(results, reply)
+								}
+								continue
+							}
+						}
+
+						// Lookup the websocket extension for the command, if it doesn't
+						// exist fallback to handling the command as a standard command.
+						var resp interface{}
+						wsHandler, ok := wsHandlers[cmd.method]
+						if ok {
+							resp, err = wsHandler(c, cmd.cmd)
+						} else {
+							resp, err = c.server.standardCmdResult(cmd, nil)
+						}
+
+						// Marshal request output.
+						reply, err := createMarshalledReply(cmd.jsonrpc, cmd.id, resp, err)
+						if err != nil {
+							rpcsLog.Errorf("Failed to marshal reply for <%s> "+
+								"command: %v", cmd.method, err)
+							return
+						}
+
+						if reply != nil {
+							results = append(results, reply)
+						}
+					}
+				}
+			}
+
+			// generate reply
+			var payload = []byte{}
+			if batchedRequest && batchSize > 0 {
+				if len(results) > 0 {
+					// Form the batched response json
+					var buffer bytes.Buffer
+					buffer.WriteByte('[')
+					for idx, marshalledReply := range results {
+						if idx == len(results)-1 {
+							buffer.Write(marshalledReply)
+							buffer.WriteByte(']')
+							break
+						}
+						buffer.Write(marshalledReply)
+						buffer.WriteByte(',')
+					}
+					payload = buffer.Bytes()
+				}
+			}
+
+			if !batchedRequest || batchSize == 0 {
+				// Respond with the first results entry for single requests
+				if len(results) > 0 {
+					payload = results[0]
+				}
+			}
+
+			c.SendMessage(payload, nil)
 			c.serviceRequestSem.release()
-		}()
+		}
 	}
 
 	// Ensure the connection is closed.
@@ -1403,12 +1699,13 @@ func (c *wsClient) serviceRequest(r *parsedRPCCmd) {
 	} else {
 		result, err = c.server.standardCmdResult(r, nil)
 	}
-	reply, err := createMarshalledReply(r.id, result, err)
+	reply, err := createMarshalledReply(r.jsonrpc, r.id, result, err)
 	if err != nil {
 		rpcsLog.Errorf("Failed to marshal reply for <%s> "+
 			"command: %v", r.method, err)
 		return
 	}
+
 	c.SendMessage(reply, nil)
 }
 

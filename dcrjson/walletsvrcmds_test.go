@@ -1116,7 +1116,7 @@ func TestWalletSvrCmds(t *testing.T) {
 	for i, test := range tests {
 		// Marshal the command as created by the new static command
 		// creation function.
-		marshalled, err := dcrjson.MarshalCmd(testID, test.staticCmd())
+		marshalled, err := dcrjson.MarshalCmd("1.0", testID, test.staticCmd())
 		if err != nil {
 			t.Errorf("MarshalCmd #%d (%s) unexpected error: %v", i,
 				test.name, err)
@@ -1140,7 +1140,7 @@ func TestWalletSvrCmds(t *testing.T) {
 
 		// Marshal the command as created by the generic new command
 		// creation function.
-		marshalled, err = dcrjson.MarshalCmd(testID, cmd)
+		marshalled, err = dcrjson.MarshalCmd("1.0", testID, cmd)
 		if err != nil {
 			t.Errorf("MarshalCmd #%d (%s) unexpected error: %v", i,
 				test.name, err)

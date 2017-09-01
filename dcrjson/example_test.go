@@ -28,7 +28,7 @@ func ExampleMarshalCmd() {
 	// server.  Typically the client would increment the id here which is
 	// request so the response can be identified.
 	id := 1
-	marshalledBytes, err := dcrjson.MarshalCmd(id, gbCmd)
+	marshalledBytes, err := dcrjson.MarshalCmd("1.0", id, gbCmd)
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -98,7 +98,7 @@ func ExampleUnmarshalCmd() {
 func ExampleMarshalResponse() {
 	// Marshal a new JSON-RPC response.  For example, this is a response
 	// to a getblockheight request.
-	marshalledBytes, err := dcrjson.MarshalResponse(1, 350001, nil)
+	marshalledBytes, err := dcrjson.MarshalResponse("1.0", 1, 350001, nil)
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -110,7 +110,7 @@ func ExampleMarshalResponse() {
 	fmt.Printf("%s\n", marshalledBytes)
 
 	// Output:
-	// {"result":350001,"error":null,"id":1}
+	// {"jsonrpc":"1.0","result":350001,"error":null,"id":1}
 }
 
 // This example demonstrates how to unmarshal a JSON-RPC response and then

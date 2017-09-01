@@ -16,7 +16,6 @@ import (
 // TestIsValidIDType ensures the IsValidIDType function behaves as expected.
 func TestIsValidIDType(t *testing.T) {
 	t.Parallel()
-
 	tests := []struct {
 		name    string
 		id      interface{}
@@ -57,7 +56,6 @@ func TestIsValidIDType(t *testing.T) {
 // TestMarshalResponse ensures the MarshalResponse function works as expected.
 func TestMarshalResponse(t *testing.T) {
 	t.Parallel()
-
 	testID := 1
 	tests := []struct {
 		name     string
@@ -69,7 +67,7 @@ func TestMarshalResponse(t *testing.T) {
 			name:     "ordinary bool result with no error",
 			result:   true,
 			jsonErr:  nil,
-			expected: []byte(`{"result":true,"error":null,"id":1}`),
+			expected: []byte(`{"jsonrpc":"1.0","result":true,"error":null,"id":1}`),
 		},
 		{
 			name:   "result with error",
@@ -77,14 +75,14 @@ func TestMarshalResponse(t *testing.T) {
 			jsonErr: func() *dcrjson.RPCError {
 				return dcrjson.NewRPCError(dcrjson.ErrRPCBlockNotFound, "123 not found")
 			}(),
-			expected: []byte(`{"result":null,"error":{"code":-5,"message":"123 not found"},"id":1}`),
+			expected: []byte(`{"jsonrpc":"1.0","result":null,"error":{"code":-5,"message":"123 not found"},"id":1}`),
 		},
 	}
 
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
 		_, _ = i, test
-		marshalled, err := dcrjson.MarshalResponse(testID, test.result, test.jsonErr)
+		marshalled, err := dcrjson.MarshalResponse("1.0", testID, test.result, test.jsonErr)
 		if err != nil {
 			t.Errorf("Test #%d (%s) unexpected error: %v", i,
 				test.name, err)
@@ -102,10 +100,9 @@ func TestMarshalResponse(t *testing.T) {
 // TestMiscErrors tests a few error conditions not covered elsewhere.
 func TestMiscErrors(t *testing.T) {
 	t.Parallel()
-
 	// Force an error in NewRequest by giving it a parameter type that is
 	// not supported.
-	_, err := dcrjson.NewRequest(nil, "test", []interface{}{make(chan int)})
+	_, err := dcrjson.NewRequest("1.0", nil, "test", []interface{}{make(chan int)})
 	if err == nil {
 		t.Error("NewRequest: did not receive error")
 		return
@@ -114,7 +111,7 @@ func TestMiscErrors(t *testing.T) {
 	// Force an error in MarshalResponse by giving it an id type that is not
 	// supported.
 	wantErr := dcrjson.Error{Code: dcrjson.ErrInvalidType}
-	_, err = dcrjson.MarshalResponse(make(chan int), nil, nil)
+	_, err = dcrjson.MarshalResponse("", make(chan int), nil, nil)
 	if jerr, ok := err.(dcrjson.Error); !ok || jerr.Code != wantErr.Code {
 		t.Errorf("MarshalResult: did not receive expected error - got "+
 			"%v (%[1]T), want %v (%[2]T)", err, wantErr)
@@ -123,7 +120,7 @@ func TestMiscErrors(t *testing.T) {
 
 	// Force an error in MarshalResponse by giving it a result type that
 	// can't be marshalled.
-	_, err = dcrjson.MarshalResponse(1, make(chan int), nil)
+	_, err = dcrjson.MarshalResponse("1.0", 1, make(chan int), nil)
 	if _, ok := err.(*json.UnsupportedTypeError); !ok {
 		wantErr := &json.UnsupportedTypeError{}
 		t.Errorf("MarshalResult: did not receive expected error - got "+
@@ -135,7 +132,6 @@ func TestMiscErrors(t *testing.T) {
 // TestRPCError tests the error output for the RPCError type.
 func TestRPCError(t *testing.T) {
 	t.Parallel()
-
 	tests := []struct {
 		in   *dcrjson.RPCError
 		want string

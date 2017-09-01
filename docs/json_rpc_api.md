@@ -75,7 +75,7 @@ JSON-RPC API are:
 
 |   |HTTP POST Requests|Websockets|
 |---|------------------|----------|
-|Allows multiple requests across a single connection|No|Yes|
+|Allows multiple requests across a single connection|Yes|Yes|
 |Supports asynchronous notifications|No|Yes|
 |Scales well with large numbers of requests|No|Yes|
 

@@ -881,7 +881,7 @@ func (c *Client) sendCmd(cmd interface{}) chan *response {
 
 	// Marshal the command.
 	id := c.NextID()
-	marshalledJSON, err := dcrjson.MarshalCmd(id, cmd)
+	marshalledJSON, err := dcrjson.MarshalCmd("1.0", id, cmd)
 	if err != nil {
 		return newFutureError(err)
 	}
