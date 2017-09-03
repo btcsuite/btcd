@@ -289,7 +289,6 @@ type GetTxOutResult struct {
 	Confirmations int64              `json:"confirmations"`
 	Value         float64            `json:"value"`
 	ScriptPubKey  ScriptPubKeyResult `json:"scriptPubKey"`
-	Version       int32              `json:"version"`
 	Coinbase      bool               `json:"coinbase"`
 }
 

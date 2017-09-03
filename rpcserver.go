@@ -2667,7 +2667,6 @@ func handleGetTxOut(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 	// from there, otherwise attempt to fetch from the block database.
 	var bestBlockHash string
 	var confirmations int32
-	var txVersion int32
 	var value int64
 	var pkScript []byte
 	var isCoinbase bool
@@ -2702,12 +2701,12 @@ func handleGetTxOut(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 		best := s.cfg.Chain.BestSnapshot()
 		bestBlockHash = best.Hash.String()
 		confirmations = 0
-		txVersion = mtx.Version
 		value = txOut.Value
 		pkScript = txOut.PkScript
 		isCoinbase = blockchain.IsCoinBaseTx(mtx)
 	} else {
-		entry, err := s.cfg.Chain.FetchUtxoEntry(txHash)
+		out := wire.OutPoint{Hash: *txHash, Index: c.Vout}
+		entry, err := s.cfg.Chain.FetchUtxoEntry(out)
 		if err != nil {
 			return nil, rpcNoTxInfoError(txHash)
 		}
@@ -2717,16 +2716,15 @@ func handleGetTxOut(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 		// transaction already in the main chain.  Mined transactions
 		// that are spent by a mempool transaction are not affected by
 		// this.
-		if entry == nil || entry.IsOutputSpent(c.Vout) {
+		if entry == nil || entry.IsSpent() {
 			return nil, nil
 		}
 
 		best := s.cfg.Chain.BestSnapshot()
 		bestBlockHash = best.Hash.String()
 		confirmations = 1 + best.Height - entry.BlockHeight()
-		txVersion = entry.Version()
-		value = entry.AmountByIndex(c.Vout)
-		pkScript = entry.PkScriptByIndex(c.Vout)
+		value = entry.Amount()
+		pkScript = entry.PkScript()
 		isCoinbase = entry.IsCoinBase()
 	}
 
@@ -2749,7 +2747,6 @@ func handleGetTxOut(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 		BestBlock:     bestBlockHash,
 		Confirmations: int64(confirmations),
 		Value:         btcutil.Amount(value).ToBTC(),
-		Version:       txVersion,
 		ScriptPubKey: btcjson.ScriptPubKeyResult{
 			Asm:       disbuf,
 			Hex:       hex.EncodeToString(pkScript),

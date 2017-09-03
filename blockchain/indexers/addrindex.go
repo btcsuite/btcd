@@ -703,14 +703,12 @@ func (idx *AddrIndex) indexBlock(data writeIndexData, block *btcutil.Block, view
 				// The view should always have the input since
 				// the index contract requires it, however, be
 				// safe and simply ignore any missing entries.
-				origin := &txIn.PreviousOutPoint
-				entry := view.LookupEntry(&origin.Hash)
+				entry := view.LookupEntry(txIn.PreviousOutPoint)
 				if entry == nil {
 					continue
 				}
 
-				pkScript := entry.PkScriptByIndex(origin.Index)
-				idx.indexPkScript(data, pkScript, txIdx)
+				idx.indexPkScript(data, entry.PkScript(), txIdx)
 			}
 		}
 
@@ -872,15 +870,14 @@ func (idx *AddrIndex) AddUnconfirmedTx(tx *btcutil.Tx, utxoView *blockchain.Utxo
 	// transaction has already been validated and thus all inputs are
 	// already known to exist.
 	for _, txIn := range tx.MsgTx().TxIn {
-		entry := utxoView.LookupEntry(&txIn.PreviousOutPoint.Hash)
+		entry := utxoView.LookupEntry(txIn.PreviousOutPoint)
 		if entry == nil {
 			// Ignore missing entries.  This should never happen
 			// in practice since the function comments specifically
 			// call out all inputs must be available.
 			continue
 		}
-		pkScript := entry.PkScriptByIndex(txIn.PreviousOutPoint.Index)
-		idx.indexUnconfirmedAddresses(pkScript, tx)
+		idx.indexUnconfirmedAddresses(entry.PkScript(), tx)
 	}
 
 	// Index addresses of all created outputs.
