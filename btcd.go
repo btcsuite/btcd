@@ -57,7 +57,7 @@ func btcdMain(serverChan chan<- *server) error {
 	// Get a channel that will be closed when a shutdown signal has been
 	// triggered either from an OS signal such as SIGINT (Ctrl+C) or from
 	// another subsystem such as the RPC server.
-	interruptedChan := interruptListener()
+	interrupt := interruptListener()
 	defer btcdLog.Info("Shutdown complete")
 
 	// Show version at startup.
@@ -94,7 +94,7 @@ func btcdMain(serverChan chan<- *server) error {
 	}
 
 	// Return now if an interrupt signal was triggered.
-	if interruptRequested(interruptedChan) {
+	if interruptRequested(interrupt) {
 		return nil
 	}
 
@@ -111,7 +111,7 @@ func btcdMain(serverChan chan<- *server) error {
 	}()
 
 	// Return now if an interrupt signal was triggered.
-	if interruptRequested(interruptedChan) {
+	if interruptRequested(interrupt) {
 		return nil
 	}
 
@@ -120,7 +120,7 @@ func btcdMain(serverChan chan<- *server) error {
 	// NOTE: The order is important here because dropping the tx index also
 	// drops the address index since it relies on it.
 	if cfg.DropAddrIndex {
-		if err := indexers.DropAddrIndex(db); err != nil {
+		if err := indexers.DropAddrIndex(db, interrupt); err != nil {
 			btcdLog.Errorf("%v", err)
 			return err
 		}
@@ -128,7 +128,7 @@ func btcdMain(serverChan chan<- *server) error {
 		return nil
 	}
 	if cfg.DropTxIndex {
-		if err := indexers.DropTxIndex(db); err != nil {
+		if err := indexers.DropTxIndex(db, interrupt); err != nil {
 			btcdLog.Errorf("%v", err)
 			return err
 		}
@@ -137,7 +137,8 @@ func btcdMain(serverChan chan<- *server) error {
 	}
 
 	// Create server and start it.
-	server, err := newServer(cfg.Listeners, db, activeNetParams.Params)
+	server, err := newServer(cfg.Listeners, db, activeNetParams.Params,
+		interrupt)
 	if err != nil {
 		// TODO: this logging could do with some beautifying.
 		btcdLog.Errorf("Unable to start server on %v: %v",
@@ -158,7 +159,7 @@ func btcdMain(serverChan chan<- *server) error {
 	// Wait until the interrupt signal is received from an OS signal or
 	// shutdown is requested through one of the subsystems such as the RPC
 	// server.
-	<-interruptedChan
+	<-interrupt
 	return nil
 }
 

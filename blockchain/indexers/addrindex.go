@@ -958,6 +958,6 @@ func NewAddrIndex(db database.DB, chainParams *chaincfg.Params) *AddrIndex {
 
 // DropAddrIndex drops the address index from the provided database if it
 // exists.
-func DropAddrIndex(db database.DB) error {
-	return dropIndex(db, addrIndexKey, addrIndexName)
+func DropAddrIndex(db database.DB, interrupt <-chan struct{}) error {
+	return dropIndex(db, addrIndexKey, addrIndexName, interrupt)
 }

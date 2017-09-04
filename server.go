@@ -2153,7 +2153,7 @@ func setupRPCListeners() ([]net.Listener, error) {
 // newServer returns a new btcd server configured to listen on addr for the
 // bitcoin network type specified by chainParams.  Use start to begin accepting
 // connections from peers.
-func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Params) (*server, error) {
+func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Params, interrupt <-chan struct{}) (*server, error) {
 	services := defaultServices
 	if cfg.NoPeerBloomFilters {
 		services &^= wire.SFNodeBloom
@@ -2237,6 +2237,7 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 	var err error
 	s.chain, err = blockchain.New(&blockchain.Config{
 		DB:           s.db,
+		Interrupt:    interrupt,
 		ChainParams:  s.chainParams,
 		Checkpoints:  checkpoints,
 		TimeSource:   s.timeSource,

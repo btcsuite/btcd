@@ -469,10 +469,11 @@ func dropBlockIDIndex(db database.DB) error {
 // DropTxIndex drops the transaction index from the provided database if it
 // exists.  Since the address index relies on it, the address index will also be
 // dropped when it exists.
-func DropTxIndex(db database.DB) error {
-	if err := dropIndex(db, addrIndexKey, addrIndexName); err != nil {
+func DropTxIndex(db database.DB, interrupt <-chan struct{}) error {
+	err := dropIndex(db, addrIndexKey, addrIndexName, interrupt)
+	if err != nil {
 		return err
 	}
 
-	return dropIndex(db, txIndexKey, txIndexName)
+	return dropIndex(db, txIndexKey, txIndexName, interrupt)
 }
