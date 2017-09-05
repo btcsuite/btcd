@@ -74,6 +74,15 @@ var (
 	// writeLocKeyName is the key used to store the current write file
 	// location.
 	writeLocKeyName = []byte("ffldb-writeloc")
+
+	// blockIdx2BucketName is the bucket used internally to track block
+	// metadata. This is the second version of this bucket.
+	blockIdx2BucketName = []byte("ffldb-blockidx-v2")
+
+	// blockHashBucketName is the name of the db bucket used track the block
+	// hash to height index. This can be used in conjuction with the v2 block
+	// index bucket to look up a block by hash.
+	blockHashBucketName = []byte("ffldb-hashidx")
 )
 
 // Common error strings.
@@ -945,21 +954,24 @@ func (b *bucket) Delete(key []byte) error {
 // pendingBlock houses a block that will be written to disk when the database
 // transaction is committed.
 type pendingBlock struct {
-	hash  *chainhash.Hash
-	bytes []byte
+	hash   *chainhash.Hash
+	bytes  []byte
+	height uint32
 }
 
 // transaction represents a database transaction.  It can either be read-only or
 // read-write and implements the database.Bucket interface.  The transaction
 // provides a root bucket against which all read and writes occur.
 type transaction struct {
-	managed        bool             // Is the transaction managed?
-	closed         bool             // Is the transaction closed?
-	writable       bool             // Is the transaction writable?
-	db             *db              // DB instance the tx was created from.
-	snapshot       *dbCacheSnapshot // Underlying snapshot for txns.
-	metaBucket     *bucket          // The root metadata bucket.
-	blockIdxBucket *bucket          // The block index bucket.
+	managed         bool             // Is the transaction managed?
+	closed          bool             // Is the transaction closed?
+	writable        bool             // Is the transaction writable?
+	db              *db              // DB instance the tx was created from.
+	snapshot        *dbCacheSnapshot // Underlying snapshot for txns.
+	metaBucket      *bucket          // The root metadata bucket.
+	blockIdxBucket  *bucket          // The v1 block index bucket.
+	blockIdx2Bucket *bucket          // The v2 block index bucket.
+	blockHashBucket *bucket          // The block hash -> height bucket.
 
 	// Blocks that need to be stored on commit.  The pendingBlocks map is
 	// kept to allow quick lookups of pending data by block hash.
@@ -1132,7 +1144,7 @@ func (tx *transaction) hasBlock(hash *chainhash.Hash) bool {
 		return true
 	}
 
-	return tx.hasKey(bucketizedKey(blockIdxBucketID, hash[:]))
+	return tx.hasKey(bucketizedKey(tx.blockIdxBucket.id, hash[:]))
 }
 
 // StoreBlock stores the provided block into the database.  There are no checks
@@ -1172,6 +1184,12 @@ func (tx *transaction) StoreBlock(block *btcutil.Block) error {
 		return makeDbErr(database.ErrDriverSpecific, str, err)
 	}
 
+	if block.Height() == btcutil.BlockHeightUnknown {
+		str := fmt.Sprintf("cannot store block %s with unknown height",
+			blockHash)
+		return makeDbErr(database.ErrBlockHeightUnknown, str, err)
+	}
+
 	// Add the block to be stored to the list of pending blocks to store
 	// when the transaction is committed.  Also, add it to pending blocks
 	// map so it is easy to determine the block is pending based on the
@@ -1181,8 +1199,9 @@ func (tx *transaction) StoreBlock(block *btcutil.Block) error {
 	}
 	tx.pendingBlocks[*blockHash] = len(tx.pendingBlockData)
 	tx.pendingBlockData = append(tx.pendingBlockData, pendingBlock{
-		hash:  blockHash,
-		bytes: blockBytes,
+		hash:   blockHash,
+		bytes:  blockBytes,
+		height: uint32(block.Height()),
 	})
 	log.Tracef("Added block %s to pending blocks", blockHash)
 
@@ -1329,6 +1348,99 @@ func (tx *transaction) FetchBlockHeaders(hashes []chainhash.Hash) ([][]byte, err
 	}
 
 	return headers, nil
+}
+
+// GetBlockCount counts all blocks stored in the database. This function has to
+// iterate a cursor over all blocks and thus is relatively slow.
+//
+// The interface contract guarantees at least the following errors will
+// be returned (other implementation-specific errors are possible):
+//   - ErrTxClosed if the transaction has already been closed
+//
+// This function is part of the database.Tx interface implementation.
+func (tx *transaction) GetBlockCount() (uint32, error) {
+	// Ensure transaction state is valid.
+	if err := tx.checkClosed(); err != nil {
+		return 0, err
+	}
+
+	count := uint32(len(tx.pendingBlockData))
+	cursor := tx.blockIdx2Bucket.Cursor()
+	for ok := cursor.First(); ok; ok = cursor.Next() {
+		count++
+	}
+	return count, nil
+}
+
+// ForEachBlockHeader iterates through each stored block header and invokes
+// the passed function with the raw serialized bytes for each one.  The raw
+// bytes are in the format returned by Serialize on a wire.BlockHeader.  The
+// function is called with block headers ordered ascending by height from
+// the genesis block, so it is guaranteed to be called with a parent block
+// before any child blocks.
+//
+// WARNING: It is not safe to mutate data while iterating with this
+// method.  Doing so may cause the underlying cursor to be invalidated
+// and return unexpected keys and/or values.
+//
+// The interface contract guarantees at least the following errors will
+// be returned (other implementation-specific errors are possible):
+//   - ErrTxClosed if the transaction has already been closed
+//
+// NOTE: The slices returned by this function are only valid during a
+// transaction.  Attempting to access them after a transaction has ended
+// results in undefined behavior.  Additionally, the slices must NOT
+// be modified by the caller.  These constraints prevent additional data
+// copies and allows support for memory-mapped database implementations.
+//
+// This function is part of the database.Tx interface implementation.
+func (tx *transaction) ForEachBlockHeader(fn func(headerBytes []byte) error) error {
+	// Ensure transaction state is valid.
+	if err := tx.checkClosed(); err != nil {
+		return err
+	}
+
+	bucket := tx.blockIdx2Bucket
+	c := newCursor(bucket, bucket.id[:], ctKeys)
+	defer cursorFinalizer(c)
+
+	// Callback must be called with headers in ascending order by height, so we
+	// need to iterate through the pending blocks and stored blocks in parallel.
+	cursorValid := c.First()
+	pendingIdx := 0
+	cursorBlkHeight := -1
+	pendingBlkHeight := -1
+	for cursorValid || pendingIdx < len(tx.pendingBlockData) {
+		if cursorValid && cursorBlkHeight == -1 {
+			cursorBlkHeight = int(binary.BigEndian.Uint32(c.Key()))
+		}
+		if pendingIdx < len(tx.pendingBlockData) && pendingBlkHeight == -1 {
+			pendingBlkHeight = int(tx.pendingBlockData[pendingIdx].height)
+		}
+
+		// Determine whether the next stored block or pending block has a lesser
+		// height, then invoke callback with that one and increment pointer.
+		var headerBytes []byte
+		useCursorData := (pendingBlkHeight == -1) ||
+			(cursorBlkHeight != -1 && cursorBlkHeight < pendingBlkHeight)
+		if useCursorData {
+			endOffset := blockLocSize + blockHdrSize
+			headerBytes = c.Value()[blockLocSize:endOffset:endOffset]
+			cursorValid = c.Next()
+			cursorBlkHeight = -1
+		} else {
+			block := tx.pendingBlockData[pendingIdx]
+			headerBytes = block.bytes[0:blockHdrSize:blockHdrSize]
+			pendingIdx++
+			pendingBlkHeight = -1
+		}
+
+		if err := fn(headerBytes); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // FetchBlock returns the raw serialized bytes for the block identified by the
@@ -1669,6 +1781,16 @@ func serializeBlockRow(blockLoc blockLocation, blockHdr []byte) []byte {
 	return serializedRow
 }
 
+// blockIndexKey generates the binary key for an entry in the block index v2
+// bucket. The key is composed of the block height encoded as a big-endian
+// 32-bit unsigned int followed by the 32 byte block hash.
+func blockIndexKey(blockHash *chainhash.Hash, blockHeight uint32) []byte {
+	indexKey := make([]byte, chainhash.HashSize+4)
+	binary.BigEndian.PutUint32(indexKey[0:4], blockHeight)
+	copy(indexKey[4:chainhash.HashSize+4], blockHash[:])
+	return indexKey
+}
+
 // writePendingAndCommit writes pending block data to the flat block files,
 // updates the metadata with their locations as well as the new current write
 // location, and commits the metadata to the memory database cache.  It also
@@ -1708,7 +1830,22 @@ func (tx *transaction) writePendingAndCommit() error {
 		// so commonly needed.
 		blockHdr := blockData.bytes[0:blockHdrSize]
 		blockRow := serializeBlockRow(location, blockHdr)
+
 		err = tx.blockIdxBucket.Put(blockData.hash[:], blockRow)
+		if err != nil {
+			rollback()
+			return err
+		}
+
+		blockIdxKey := blockIndexKey(blockData.hash, blockData.height)
+		err = tx.blockIdx2Bucket.Put(blockIdxKey, blockRow)
+		if err != nil {
+			rollback()
+			return err
+		}
+
+		// First 4 bytes of the blockIdxKey are the block height
+		err = tx.blockHashBucket.Put(blockData.hash[:], blockIdxKey[0:4:4])
 		if err != nil {
 			rollback()
 			return err
@@ -1790,6 +1927,10 @@ type db struct {
 	closed    bool         // Is the database closed?
 	store     *blockStore  // Handles read/writing blocks to flat files.
 	cache     *dbCache     // Cache layer which wraps underlying leveldb DB.
+
+	// Stored IDs of internal buckets
+	blockIdx2BucketID [4]byte
+	blockHashBucketID [4]byte
 }
 
 // Enforce db implements the database.DB interface.
@@ -1855,6 +1996,15 @@ func (db *db) begin(writable bool) (*transaction, error) {
 	}
 	tx.metaBucket = &bucket{tx: tx, id: metadataBucketID}
 	tx.blockIdxBucket = &bucket{tx: tx, id: blockIdxBucketID}
+
+	// These should be set for all transactions created after openDB completes
+	if metadataBucketID != db.blockIdx2BucketID {
+		tx.blockIdx2Bucket = &bucket{tx: tx, id: db.blockIdx2BucketID}
+	}
+	if metadataBucketID != db.blockHashBucketID {
+		tx.blockHashBucket = &bucket{tx: tx, id: db.blockHashBucketID}
+	}
+
 	return tx, nil
 }
 
@@ -2024,9 +2174,25 @@ func initDB(ldb *leveldb.DB) error {
 	// there is no need to store the bucket index data for the metadata
 	// bucket in the database.  However, the first bucket ID to use does
 	// need to account for it to ensure there are no key collisions.
-	batch.Put(bucketIndexKey(metadataBucketID, blockIdxBucketName),
-		blockIdxBucketID[:])
-	batch.Put(curBucketIDKeyName, blockIdxBucketID[:])
+	//
+	// NOTE: Also note that blockIdxBucketName must be the first entry because
+	// its ID is hardcoded to 0x01. This can be removed when the bucket is
+	// permanently deprecated.
+	initialBuckets := [][]byte{
+		blockIdxBucketName,
+		blockIdx2BucketName,
+		blockHashBucketName,
+	}
+
+	var currentBucketNum uint32
+	var currentBucketID [4]byte
+	for _, bucketName := range initialBuckets {
+		currentBucketNum++
+		binary.BigEndian.PutUint32(currentBucketID[:], currentBucketNum)
+		batch.Put(bucketIndexKey(metadataBucketID, bucketName),
+			currentBucketID[:])
+	}
+	batch.Put(curBucketIDKeyName, currentBucketID[:])
 
 	// Write everything as a single batch.
 	if err := ldb.Write(batch, nil); err != nil {
@@ -2080,5 +2246,42 @@ func openDB(dbPath string, network wire.BitcoinNet, create bool) (database.DB, e
 
 	// Perform any reconciliation needed between the block and metadata as
 	// well as database initialization, if needed.
-	return reconcileDB(pdb, create)
+	if _, err := reconcileDB(pdb, create); err != nil {
+		return nil, err
+	}
+
+	if !create {
+		// Run all required data migrations
+		if err := migrateBlockIndex(pdb); err != nil {
+			return nil, err
+		}
+	}
+
+	// Lookup bucket IDs for internal buckets
+	err = pdb.View(func(dbTxUncast database.Tx) error {
+		dbTx := dbTxUncast.(*transaction)
+
+		bucketKey := bucketIndexKey(metadataBucketID, blockIdx2BucketName)
+		bucketID := dbTx.fetchKey(bucketKey)
+		if bucketID == nil {
+			message := "Database is missing internal bucket: blockIdx2Bucket"
+			return makeDbErr(database.ErrBucketNotFound, message, nil)
+		}
+		copy(pdb.blockIdx2BucketID[:], bucketID)
+
+		bucketKey = bucketIndexKey(metadataBucketID, blockHashBucketName)
+		bucketID = dbTx.fetchKey(bucketKey)
+		if bucketID == nil {
+			message := "Database is missing internal bucket: blockHashBucket"
+			return makeDbErr(database.ErrBucketNotFound, message, nil)
+		}
+		copy(pdb.blockHashBucketID[:], bucketID)
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return pdb, nil
 }

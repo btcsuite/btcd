@@ -117,6 +117,10 @@ const (
 	// ErrBlockNotFound instead.
 	ErrBlockRegionInvalid
 
+	// ErrBlockHeightUnknown indicates there was an attempt to persist a block
+	// without a known height.
+	ErrBlockHeightUnknown
+
 	// ***********************************
 	// Support for driver-specific errors.
 	// ***********************************
@@ -153,6 +157,7 @@ var errorCodeStrings = map[ErrorCode]string{
 	ErrBlockNotFound:      "ErrBlockNotFound",
 	ErrBlockExists:        "ErrBlockExists",
 	ErrBlockRegionInvalid: "ErrBlockRegionInvalid",
+	ErrBlockHeightUnknown: "ErrBlockHeightUnknown",
 	ErrDriverSpecific:     "ErrDriverSpecific",
 }
 
