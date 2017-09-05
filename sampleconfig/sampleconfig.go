@@ -333,8 +333,20 @@ const FileContents = `[Application Options]
 ; available subsystems.
 ; debuglevel=info
 
-; The port used to listen for HTTP profile requests.  The profile server will
-; be disabled if this option is not specified.  The profile information can be
-; accessed at http://localhost:<profileport>/debug/pprof once running.
-; profile=6061
+; ------------------------------------------------------------------------------
+; Profile - enable the HTTP profiler
+; ------------------------------------------------------------------------------
+
+; The profile server will be disabled if this option is not specified.  Profile
+; information can be accessed at http://ipaddr:<profileport>/debug/pprof once
+; running.  Note that the IP address will default to 127.0.0.1 if an IP address
+; is not specified, so that the profiler is not accessible on the network.
+; Listen on selected port on localhost only:
+;   profile=6061
+; Listen on selected port on all network interfaces:
+;   profile=:6061
+; Listen on single network ipv4 interface:
+;   profile=192.168.1.123:6061
+; Listen on ipv6 loopback interface:
+;   profile=[::1]:6061
 `

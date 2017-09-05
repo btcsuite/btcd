@@ -76,7 +76,7 @@ Application Options:
       --nocheckpoints       Disable built-in checkpoints.  Don't do this unless
                             you know what you're doing.
       --dbtype=             Database backend to use for the Block Chain (ffldb)
-      --profile=            Enable HTTP profiling on given port -- NOTE port
+      --profile=            Enable HTTP profiling on given [addr:]port -- NOTE: port
                             must be between 1024 and 65536
       --cpuprofile=         Write CPU profile to the specified file
       --memprofile=         Write mem profile to the specified file

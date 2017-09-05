@@ -7,7 +7,6 @@ package main
 
 import (
 	"fmt"
-	"net"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
@@ -58,7 +57,7 @@ func dcrdMain(serverChan chan<- *server) error {
 	// Enable http profiling server if requested.
 	if cfg.Profile != "" {
 		go func() {
-			listenAddr := net.JoinHostPort("", cfg.Profile)
+			listenAddr := cfg.Profile
 			dcrdLog.Infof("Creating profiling server "+
 				"listening on %s", listenAddr)
 			profileRedirect := http.RedirectHandler("/debug/pprof",

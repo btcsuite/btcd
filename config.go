@@ -126,7 +126,7 @@ type config struct {
 	SimNet               bool          `long:"simnet" description:"Use the simulation test network"`
 	DisableCheckpoints   bool          `long:"nocheckpoints" description:"Disable built-in checkpoints.  Don't do this unless you know what you're doing."`
 	DbType               string        `long:"dbtype" description:"Database backend to use for the Block Chain"`
-	Profile              string        `long:"profile" description:"Enable HTTP profiling on given port -- NOTE port must be between 1024 and 65536"`
+	Profile              string        `long:"profile" description:"Enable HTTP profiling on given [addr:]port -- NOTE port must be between 1024 and 65536"`
 	CPUProfile           string        `long:"cpuprofile" description:"Write CPU profile to the specified file"`
 	MemProfile           string        `long:"memprofile" description:"Write mem profile to the specified file"`
 	DumpBlockchain       string        `long:"dumpblockchain" description:"Write blockchain as a flat file of blocks for use with addblock, to the specified filename"`
@@ -636,12 +636,27 @@ func loadConfig() (*config, []string, error) {
 		return nil, nil, err
 	}
 
-	// Validate profile port number
+	// Validate format of profile, can be an address:port, or just a port.
 	if cfg.Profile != "" {
-		profilePort, err := strconv.Atoi(cfg.Profile)
-		if err != nil || profilePort < 1024 || profilePort > 65535 {
-			str := "%s: the profile port must be between 1024 and 65535"
-			err := fmt.Errorf(str, funcName)
+		// if profile is just a number, then add a default host of "127.0.0.1" such that Profile is a valid tcp address
+		if _, err := strconv.Atoi(cfg.Profile); err == nil {
+			cfg.Profile = net.JoinHostPort("127.0.0.1", cfg.Profile)
+		}
+
+		// check the Profile is a valid address
+		_, portStr, err := net.SplitHostPort(cfg.Profile)
+		if err != nil {
+			str := "%s: profile: %s"
+			err := fmt.Errorf(str, funcName, err)
+			fmt.Fprintln(os.Stderr, err)
+			fmt.Fprintln(os.Stderr, usageMessage)
+			return nil, nil, err
+		}
+
+		// finally, check the port is in range
+		if port, _ := strconv.Atoi(portStr); port < 1024 || port > 65535 {
+			str := "%s: profile: address %s: port must be between 1024 and 65535"
+			err := fmt.Errorf(str, funcName, cfg.Profile)
 			fmt.Fprintln(os.Stderr, err)
 			fmt.Fprintln(os.Stderr, usageMessage)
 			return nil, nil, err
