@@ -544,20 +544,6 @@ func (b *BlockChain) getReorganizeNodes(node *blockNode) (*list.List, *list.List
 	return detachNodes, attachNodes
 }
 
-// dbMaybeStoreBlock stores the provided block in the database if it's not
-// already there.
-func dbMaybeStoreBlock(dbTx database.Tx, block *btcutil.Block) error {
-	hasBlock, err := dbTx.HasBlock(block.Hash())
-	if err != nil {
-		return err
-	}
-	if hasBlock {
-		return nil
-	}
-
-	return dbTx.StoreBlock(block)
-}
-
 // connectBlock handles connecting the passed node/block to the end of the main
 // (best) chain.
 //

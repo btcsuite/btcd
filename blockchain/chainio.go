@@ -18,7 +18,18 @@ import (
 	"github.com/btcsuite/btcutil"
 )
 
+const (
+	// blockHdrSize is the size of a block header.  This is simply the
+	// constant from wire and is only provided here for convenience since
+	// wire.MaxBlockHeaderPayload is quite long.
+	blockHdrSize = wire.MaxBlockHeaderPayload
+)
+
 var (
+	// blockIndexBucketName is the name of the db bucket used to house to the
+	// block headers and contextual information.
+	blockIndexBucketName = []byte("blockheaderidx")
+
 	// hashIndexBucketName is the name of the db bucket used to house to the
 	// block hash -> block height index.
 	hashIndexBucketName = []byte("hashidx")
@@ -1058,6 +1069,7 @@ func dbPutBestState(dbTx database.Tx, snapshot *BestState, workSum *big.Int) err
 func (b *BlockChain) createChainState() error {
 	// Create a new node from the genesis block and set it as the best node.
 	genesisBlock := btcutil.NewBlock(b.chainParams.GenesisBlock)
+	genesisBlock.SetHeight(0)
 	header := &genesisBlock.MsgBlock().Header
 	node := newBlockNode(header, 0)
 	node.status = statusDataStored | statusValid
@@ -1077,10 +1089,17 @@ func (b *BlockChain) createChainState() error {
 	// Create the initial the database chain state including creating the
 	// necessary index buckets and inserting the genesis block.
 	err := b.db.Update(func(dbTx database.Tx) error {
+		meta := dbTx.Metadata()
+
+		// Create the bucket that houses the block index data.
+		_, err := meta.CreateBucket(blockIndexBucketName)
+		if err != nil {
+			return err
+		}
+
 		// Create the bucket that houses the chain block hash to height
 		// index.
-		meta := dbTx.Metadata()
-		_, err := meta.CreateBucket(hashIndexBucketName)
+		_, err = meta.CreateBucket(hashIndexBucketName)
 		if err != nil {
 			return err
 		}
@@ -1120,7 +1139,7 @@ func (b *BlockChain) createChainState() error {
 		}
 
 		// Store the genesis block into the database.
-		return dbTx.StoreBlock(genesisBlock)
+		return dbStoreBlock(dbTx, genesisBlock)
 	})
 	return err
 }
@@ -1271,6 +1290,60 @@ func dbFetchBlockByNode(dbTx database.Tx, node *blockNode) (*btcutil.Block, erro
 	block.SetHeight(node.height)
 
 	return block, nil
+}
+
+// dbStoreBlock stores the provided block in the database. The block header is
+// written to the block index bucket and full block data is written to ffldb.
+func dbStoreBlockHeader(dbTx database.Tx, blockHeader *wire.BlockHeader, height uint32) error {
+	// Serialize block data to be stored. This is just the serialized header.
+	w := bytes.NewBuffer(make([]byte, 0, blockHdrSize))
+	err := blockHeader.Serialize(w)
+	if err != nil {
+		return err
+	}
+	value := w.Bytes()
+
+	// Write block header data to block index bucket.
+	blockHash := blockHeader.BlockHash()
+	blockIndexBucket := dbTx.Metadata().Bucket(blockIndexBucketName)
+	key := blockIndexKey(&blockHash, height)
+	return blockIndexBucket.Put(key, value)
+}
+
+// dbStoreBlock stores the provided block in the database. The block header is
+// written to the block index bucket and full block data is written to ffldb.
+func dbStoreBlock(dbTx database.Tx, block *btcutil.Block) error {
+	if block.Height() == btcutil.BlockHeightUnknown {
+		return fmt.Errorf("cannot store block %s with unknown height",
+			block.Hash())
+	}
+
+	// First store block header in the block index bucket.
+	err := dbStoreBlockHeader(dbTx, &block.MsgBlock().Header,
+		uint32(block.Height()))
+	if err != nil {
+		return err
+	}
+
+	// Then store block data in ffldb if we haven't already.
+	hasBlock, err := dbTx.HasBlock(block.Hash())
+	if err != nil {
+		return err
+	}
+	if hasBlock {
+		return nil
+	}
+	return dbTx.StoreBlock(block)
+}
+
+// blockIndexKey generates the binary key for an entry in the block index
+// bucket. The key is composed of the block height encoded as a big-endian
+// 32-bit unsigned int followed by the 32 byte block hash.
+func blockIndexKey(blockHash *chainhash.Hash, blockHeight uint32) []byte {
+	indexKey := make([]byte, chainhash.HashSize+4)
+	binary.BigEndian.PutUint32(indexKey[0:4], blockHeight)
+	copy(indexKey[4:chainhash.HashSize+4], blockHash[:])
+	return indexKey
 }
 
 // BlockByHeight returns the block at the given height in the main chain.
