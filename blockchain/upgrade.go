@@ -72,8 +72,16 @@ func migrateBlockIndex(db database.DB) error {
 					"stored block %s", hash)
 			}
 
+			// Write header to v2 bucket
 			key := blockIndexKey(&hash, height)
-			return v2BlockIdxBucket.Put(key, headerBytes)
+			err := v2BlockIdxBucket.Put(key, headerBytes)
+			if err != nil {
+				return err
+			}
+
+			// Delete header from v1 bucket
+			truncatedRow := blockRow[0:blockHdrOffset:blockHdrOffset]
+			return v1BlockIdxBucket.Put(hashBytes, truncatedRow)
 		})
 	})
 	if err != nil {
