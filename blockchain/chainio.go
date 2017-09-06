@@ -1192,7 +1192,7 @@ func (b *BlockChain) initChainState() error {
 		// number of nodes are already known, perform a single alloc
 		// for them versus a whole bunch of little ones to reduce
 		// pressure on the GC.
-		log.Infof("Loading block index.  This might take a while...")
+		log.Infof("Loading block index...")
 
 		blockIndexBucket := dbTx.Metadata().Bucket(blockIndexBucketName)
 
