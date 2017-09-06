@@ -1148,17 +1148,39 @@ func (b *BlockChain) createChainState() error {
 // database.  When the db does not yet contain any chain state, both it and the
 // chain state are initialized to the genesis block.
 func (b *BlockChain) initChainState() error {
-	// Attempt to load the chain state from the database.
-	var isStateInitialized bool
+	// Determine the state of the chain database. We may need to initialize
+	// everything from scratch or upgrade certain buckets.
+	var initialized bool
+	var hasBlockIndex bool
 	err := b.db.View(func(dbTx database.Tx) error {
+		initialized = dbTx.Metadata().Get(chainStateKeyName) != nil
+		hasBlockIndex = dbTx.Metadata().Bucket(blockIndexBucketName) != nil
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	if !initialized {
+		// At this point the database has not already been initialized, so
+		// initialize both it and the chain state to the genesis block.
+		return b.createChainState()
+	}
+
+	if !hasBlockIndex {
+		err := migrateBlockIndex(b.db)
+		if err != nil {
+			return nil
+		}
+	}
+
+	// Attempt to load the chain state from the database.
+	return b.db.View(func(dbTx database.Tx) error {
 		// Fetch the stored chain state from the database metadata.
 		// When it doesn't exist, it means the database hasn't been
 		// initialized for use with chain yet, so break out now to allow
 		// that to happen under a writable database transaction.
 		serializedData := dbTx.Metadata().Get(chainStateKeyName)
-		if serializedData == nil {
-			return nil
-		}
 		log.Tracef("Serialized chain state: %x", serializedData)
 		state, err := deserializeBestChainState(serializedData)
 		if err != nil {
@@ -1253,22 +1275,9 @@ func (b *BlockChain) initChainState() error {
 		numTxns := uint64(len(block.Transactions))
 		b.stateSnapshot = newBestState(tip, blockSize, blockWeight,
 			numTxns, state.totalTxns, tip.CalcPastMedianTime())
-		isStateInitialized = true
 
 		return nil
 	})
-	if err != nil {
-		return err
-	}
-
-	// There is nothing more to do if the chain state was initialized.
-	if isStateInitialized {
-		return nil
-	}
-
-	// At this point the database has not already been initialized, so
-	// initialize both it and the chain state to the genesis block.
-	return b.createChainState()
 }
 
 // dbFetchHeaderByHash uses an existing database transaction to retrieve the
