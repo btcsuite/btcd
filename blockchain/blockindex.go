@@ -86,7 +86,7 @@ func newBlockNode(blockHeader *wire.BlockHeader, height int32) *blockNode {
 // This function is safe for concurrent access.
 func (node *blockNode) Header() wire.BlockHeader {
 	// No lock is needed because all accessed fields are immutable.
-	prevHash := zeroHash
+	prevHash := &zeroHash
 	if node.parent != nil {
 		prevHash = &node.parent.hash
 	}
