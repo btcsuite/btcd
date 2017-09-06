@@ -99,10 +99,6 @@ const (
 	// transaction.
 	ErrNoTransactions
 
-	// ErrTooManyTransactions indicates the block has more transactions than
-	// are allowed.
-	ErrTooManyTransactions
-
 	// ErrNoTxInputs indicates a transaction does not have any inputs.  A
 	// valid transaction must have at least one input.
 	ErrNoTxInputs
@@ -213,6 +209,13 @@ const (
 	// manually computed witness commitment.
 	ErrWitnessCommitmentMismatch
 
+	// ErrPreviousBlockUnknown indicates that the previous block is not known.
+	ErrPreviousBlockUnknown
+
+	// ErrInvalidAncestorBlock indicates that an ancestor of this block has
+	// already failed validation.
+	ErrInvalidAncestorBlock
+
 	// ErrPrevBlockNotBest indicates that the block's previous block is not the
 	// current chain tip. This is not a block validation rule, but is required
 	// for block proposals submitted via getblocktemplate RPC.
@@ -236,7 +239,6 @@ var errorCodeStrings = map[ErrorCode]string{
 	ErrForkTooOld:                "ErrForkTooOld",
 	ErrCheckpointTimeTooOld:      "ErrCheckpointTimeTooOld",
 	ErrNoTransactions:            "ErrNoTransactions",
-	ErrTooManyTransactions:       "ErrTooManyTransactions",
 	ErrNoTxInputs:                "ErrNoTxInputs",
 	ErrNoTxOutputs:               "ErrNoTxOutputs",
 	ErrTxTooBig:                  "ErrTxTooBig",
@@ -262,6 +264,8 @@ var errorCodeStrings = map[ErrorCode]string{
 	ErrUnexpectedWitness:         "ErrUnexpectedWitness",
 	ErrInvalidWitnessCommitment:  "ErrInvalidWitnessCommitment",
 	ErrWitnessCommitmentMismatch: "ErrWitnessCommitmentMismatch",
+	ErrPreviousBlockUnknown:      "ErrPreviousBlockUnknown",
+	ErrInvalidAncestorBlock:      "ErrInvalidAncestorBlock",
 	ErrPrevBlockNotBest:          "ErrPrevBlockNotBest",
 }
 

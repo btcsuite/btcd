@@ -5,6 +5,8 @@
 package blockchain
 
 import (
+	"fmt"
+
 	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcutil"
 )
@@ -22,11 +24,17 @@ import (
 func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, flags BehaviorFlags) (bool, error) {
 	// The height of this block is one more than the referenced previous
 	// block.
-	blockHeight := int32(0)
-	prevNode := b.index.LookupNode(&block.MsgBlock().Header.PrevBlock)
-	if prevNode != nil {
-		blockHeight = prevNode.height + 1
+	prevHash := &block.MsgBlock().Header.PrevBlock
+	prevNode := b.index.LookupNode(prevHash)
+	if prevNode == nil {
+		str := fmt.Sprintf("previous block %s is unknown", prevHash)
+		return false, ruleError(ErrPreviousBlockUnknown, str)
+	} else if prevNode.KnownInvalid() {
+		str := fmt.Sprintf("previous block %s is known to be invalid", prevHash)
+		return false, ruleError(ErrInvalidAncestorBlock, str)
 	}
+
+	blockHeight := prevNode.height + 1
 	block.SetHeight(blockHeight)
 
 	// The block must pass all of the validation rules which depend on the
@@ -56,6 +64,7 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, flags BehaviorFlags)
 	// block chain (could be either a side chain or the main chain).
 	blockHeader := &block.MsgBlock().Header
 	newNode := newBlockNode(blockHeader, blockHeight)
+	newNode.status |= statusDataStored
 	if prevNode != nil {
 		newNode.parent = prevNode
 		newNode.height = blockHeight

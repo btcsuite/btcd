@@ -1969,7 +1969,9 @@ func chainErrToGBTErrString(err error) string {
 	case blockchain.ErrDuplicateBlock:
 		return "duplicate"
 	case blockchain.ErrBlockTooBig:
-		return "bad-block-size"
+		return "bad-blk-length"
+	case blockchain.ErrBlockWeightTooHigh:
+		return "bad-blk-weight"
 	case blockchain.ErrBlockVersionTooOld:
 		return "bad-version"
 	case blockchain.ErrInvalidTime:
@@ -1994,8 +1996,6 @@ func chainErrToGBTErrString(err error) string {
 		return "checkpoint-time-too-old"
 	case blockchain.ErrNoTransactions:
 		return "bad-txns-none"
-	case blockchain.ErrTooManyTransactions:
-		return "bad-txns-toomany"
 	case blockchain.ErrNoTxInputs:
 		return "bad-txns-noinputs"
 	case blockchain.ErrNoTxOutputs:
@@ -2040,6 +2040,16 @@ func chainErrToGBTErrString(err error) string {
 		return "bad-script-malformed"
 	case blockchain.ErrScriptValidation:
 		return "bad-script-validate"
+	case blockchain.ErrUnexpectedWitness:
+		return "unexpected-witness"
+	case blockchain.ErrInvalidWitnessCommitment:
+		return "bad-witness-nonce-size"
+	case blockchain.ErrWitnessCommitmentMismatch:
+		return "bad-witness-merkle-match"
+	case blockchain.ErrPreviousBlockUnknown:
+		return "prev-blk-not-found"
+	case blockchain.ErrInvalidAncestorBlock:
+		return "bad-prevblk"
 	case blockchain.ErrPrevBlockNotBest:
 		return "inconclusive-not-best-prvblk"
 	}

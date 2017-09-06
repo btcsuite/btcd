@@ -482,11 +482,12 @@ func checkBlockSanity(block *btcutil.Block, powLimit *big.Int, timeSource Median
 			"any transactions")
 	}
 
-	// A block must not have more transactions than the max block payload.
-	if numTx > wire.MaxBlockPayload {
+	// A block must not have more transactions than the max block payload or
+	// else it is certainly over the weight limit.
+	if numTx > MaxBlockBaseSize {
 		str := fmt.Sprintf("block contains too many transactions - "+
-			"got %d, max %d", numTx, wire.MaxBlockPayload)
-		return ruleError(ErrTooManyTransactions, str)
+			"got %d, max %d", numTx, MaxBlockBaseSize)
+		return ruleError(ErrBlockTooBig, str)
 	}
 
 	// A block must not exceed the maximum allowed block payload when
@@ -644,11 +645,6 @@ func checkSerializedHeight(coinbaseTx *btcutil.Tx, wantHeight int32) error {
 //
 // This function MUST be called with the chain state lock held (for writes).
 func (b *BlockChain) checkBlockHeaderContext(header *wire.BlockHeader, prevNode *blockNode, flags BehaviorFlags) error {
-	// The genesis block is valid by definition.
-	if prevNode == nil {
-		return nil
-	}
-
 	fastAdd := flags&BFFastAdd == BFFastAdd
 	if !fastAdd {
 		// Ensure the difficulty specified in the block header matches
@@ -731,11 +727,6 @@ func (b *BlockChain) checkBlockHeaderContext(header *wire.BlockHeader, prevNode 
 //
 // This function MUST be called with the chain state lock held (for writes).
 func (b *BlockChain) checkBlockContext(block *btcutil.Block, prevNode *blockNode, flags BehaviorFlags) error {
-	// The genesis block is valid by definition.
-	if prevNode == nil {
-		return nil
-	}
-
 	// Perform all block header related validation checks.
 	header := &block.MsgBlock().Header
 	err := b.checkBlockHeaderContext(header, prevNode, flags)
@@ -822,7 +813,7 @@ func (b *BlockChain) checkBlockContext(block *btcutil.Block, prevNode *blockNode
 				str := fmt.Sprintf("block's weight metric is "+
 					"too high - got %v, max %v",
 					blockWeight, MaxBlockWeight)
-				return ruleError(ErrBlockVersionTooOld, str)
+				return ruleError(ErrBlockWeightTooHigh, str)
 			}
 		}
 	}
