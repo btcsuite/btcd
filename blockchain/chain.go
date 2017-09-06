@@ -497,10 +497,14 @@ func LockTimeToSequence(isSeconds bool, locktime uint32) uint32 {
 //
 // This function MUST be called with the chain state lock held (for reads).
 func (b *BlockChain) getReorganizeNodes(node *blockNode) (*list.List, *list.List) {
-	// Nothing to detach or attach if there is no node.
 	attachNodes := list.New()
 	detachNodes := list.New()
-	if node == nil {
+
+	// Do not reorganize to a known invalid chain. Ancestors deeper than the
+	// direct parent are checked below but this is a quick check before doing
+	// more unnecessary work.
+	if node.parent.KnownInvalid() {
+		node.status |= statusInvalidAncestor
 		return detachNodes, attachNodes
 	}
 
@@ -509,8 +513,25 @@ func (b *BlockChain) getReorganizeNodes(node *blockNode) (*list.List, *list.List
 	// so they are attached in the appropriate order when iterating the list
 	// later.
 	forkNode := b.bestChain.FindFork(node)
+	invalidChain := false
 	for n := node; n != nil && n != forkNode; n = n.parent {
+		if n.KnownInvalid() {
+			invalidChain = true
+			break
+		}
 		attachNodes.PushFront(n)
+	}
+
+	// If any of the node's ancestors are invalid, unwind attachNodes, marking
+	// each one as invalid for future reference.
+	if invalidChain {
+		var next *list.Element
+		for e := attachNodes.Front(); e != nil; e = next {
+			next = e.Next()
+			n := attachNodes.Remove(e).(*blockNode)
+			n.status |= statusInvalidAncestor
+		}
+		return detachNodes, attachNodes
 	}
 
 	// Start from the end of the main chain and work backwards until the
@@ -854,8 +875,17 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List) error 
 	// at least a couple of ways accomplish that rollback, but both involve
 	// tweaking the chain and/or database.  This approach catches these
 	// issues before ever modifying the chain.
+	var validationError error
 	for e := attachNodes.Front(); e != nil; e = e.Next() {
 		n := e.Value.(*blockNode)
+
+		// If any previous nodes in attachNodes failed validation,
+		// mark this one as having an invalid ancestor.
+		if validationError != nil {
+			n.status |= statusInvalidAncestor
+			continue
+		}
+
 		var block *btcutil.Block
 		err := b.db.View(func(dbTx database.Tx) error {
 			var err error
@@ -869,14 +899,42 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List) error 
 		// Store the loaded block for later.
 		attachBlocks = append(attachBlocks, block)
 
+		// Skip checks if node has already been fully validated. Although
+		// checkConnectBlock gets skipped, we still need to update the UTXO
+		// view.
+		if n.KnownValid() {
+			err = view.fetchInputUtxos(b.db, block)
+			if err != nil {
+				return err
+			}
+			err = view.connectTransactions(block, nil)
+			if err != nil {
+				return err
+			}
+			continue
+		}
+
 		// Notice the spent txout details are not requested here and
 		// thus will not be generated.  This is done because the state
 		// is not being immediately written to the database, so it is
 		// not needed.
 		err = b.checkConnectBlock(n, block, view, nil)
 		if err != nil {
+			// If the block failed validation mark it as invalid, then
+			// continue to loop through remaining nodes, marking them as
+			// having an invalid ancestor.
+			if _, ok := err.(RuleError); ok {
+				n.status |= statusValidateFailed
+				validationError = err
+				continue
+			}
 			return err
 		}
+		n.status |= statusValid
+	}
+
+	if validationError != nil {
+		return validationError
 	}
 
 	// Reset the view for the actual connection code below.  This is
@@ -975,6 +1033,9 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, fla
 	// most common case.
 	parentHash := &block.MsgBlock().Header.PrevBlock
 	if parentHash.IsEqual(&b.bestChain.Tip().hash) {
+		// Skip checks if node has already been fully validated.
+		fastAdd = fastAdd || node.KnownValid()
+
 		// Perform several checks to verify the block can be connected
 		// to the main chain without violating any rules and without
 		// actually connecting the block.
@@ -984,8 +1045,12 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, fla
 		if !fastAdd {
 			err := b.checkConnectBlock(node, block, view, &stxos)
 			if err != nil {
+				if _, ok := err.(RuleError); ok {
+					node.status |= statusValidateFailed
+				}
 				return false, err
 			}
+			node.status |= statusValid
 		}
 
 		// In the fast add case the code to check the block connection

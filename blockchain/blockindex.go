@@ -16,6 +16,29 @@ import (
 	"github.com/btcsuite/btcd/wire"
 )
 
+// blockStatus is a bit field representing the validation state of the block.
+type blockStatus byte
+
+const (
+	// statusDataStored indicates that the block's payload is stored on disk.
+	statusDataStored blockStatus = 1 << iota
+
+	// statusValid indicates that the block has been fully validated.
+	statusValid
+
+	// statusValidateFailed indicates that the block has failed validation.
+	statusValidateFailed
+
+	// statusInvalidAncestor indicates that one of the block's ancestors has
+	// has failed validation, thus the block is also invalid.
+	statusInvalidAncestor
+
+	// statusNone indicates that the block has no validation state flags set.
+	//
+	// NOTE: This must be defined last in order to avoid influencing iota.
+	statusNone blockStatus = 0
+)
+
 // blockNode represents a block within the block chain and is primarily used to
 // aid in selecting the best chain to be the main chain.  The main chain is
 // stored into the block database.
@@ -49,6 +72,9 @@ type blockNode struct {
 	nonce      uint32
 	timestamp  int64
 	merkleRoot chainhash.Hash
+
+	// status is a bitfield representing the validation state of the block
+	status blockStatus
 }
 
 // initBlockNode initializes a block node from the given header and height.  The
@@ -165,6 +191,20 @@ func (node *blockNode) CalcPastMedianTime() time.Time {
 	// even number, this code will be wrong.
 	medianTimestamp := timestamps[numNodes/2]
 	return time.Unix(medianTimestamp, 0)
+}
+
+// KnownValid returns whether the block is known to be valid. This will return
+// false for a valid block that has not been fully validated yet.
+func (node *blockNode) KnownValid() bool {
+	return node.status&statusValid != 0
+}
+
+// KnownInvalid returns whether the block is known to be invalid. This may be
+// because the block itself failed validation or any of its ancestors is
+// invalid. This will return false for invalid blocks that have not been proven
+// invalid yet.
+func (node *blockNode) KnownInvalid() bool {
+	return node.status&(statusValidateFailed|statusInvalidAncestor) != 0
 }
 
 // blockIndex provides facilities for keeping track of an in-memory index of the

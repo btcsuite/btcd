@@ -1060,6 +1060,7 @@ func (b *BlockChain) createChainState() error {
 	genesisBlock := btcutil.NewBlock(b.chainParams.GenesisBlock)
 	header := &genesisBlock.MsgBlock().Header
 	node := newBlockNode(header, 0)
+	node.status |= statusDataStored | statusValid
 	b.bestChain.SetTip(node)
 
 	// Add the new node to the index which is used for faster lookups.
@@ -1164,6 +1165,7 @@ func (b *BlockChain) initChainState() error {
 			// and add it to the block index.
 			node := &blockNodes[height]
 			initBlockNode(node, header, height)
+			node.status |= statusDataStored | statusValid
 			if tip != nil {
 				node.parent = tip
 				node.workSum = node.workSum.Add(tip.workSum,
