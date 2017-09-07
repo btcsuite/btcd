@@ -208,7 +208,7 @@ const (
 	OP_WITHIN              = 0xa5 // 165
 	OP_RIPEMD160           = 0xa6 // 166
 	OP_SHA1                = 0xa7 // 167
-	OP_SHA256              = 0xa8 // 168
+	OP_BLAKE256            = 0xa8 // 168
 	OP_HASH160             = 0xa9 // 169
 	OP_HASH256             = 0xaa // 170
 	OP_CODESEPARATOR       = 0xab // 171
@@ -498,7 +498,7 @@ var opcodeArray = [256]opcode{
 	// Crypto opcodes.
 	OP_RIPEMD160:           {OP_RIPEMD160, "OP_RIPEMD160", 1, opcodeRipemd160},
 	OP_SHA1:                {OP_SHA1, "OP_SHA1", 1, opcodeSha1},
-	OP_SHA256:              {OP_SHA256, "OP_SHA256", 1, opcodeSha256},
+	OP_BLAKE256:            {OP_BLAKE256, "OP_BLAKE256", 1, opcodeBlake256},
 	OP_HASH160:             {OP_HASH160, "OP_HASH160", 1, opcodeHash160},
 	OP_HASH256:             {OP_HASH256, "OP_HASH256", 1, opcodeHash256},
 	OP_CODESEPARATOR:       {OP_CODESEPARATOR, "OP_CODESEPARATOR", 1, opcodeDisabled}, // Disabled
@@ -1102,7 +1102,7 @@ func opcodeCheckLockTimeVerify(op *parsedOpcode, vm *Engine) error {
 }
 
 // opcodeCheckSequenceVerify compares the top item on the data stack to the
-// LockTime field of the transaction containing the script signature
+// Sequence field of the transaction containing the script signature
 // validating if the transaction outputs are spendable yet.  If flag
 // ScriptVerifyCheckSequenceVerify is not set, the code continues as if OP_NOP3
 // were executed.
@@ -2332,11 +2332,11 @@ func opcodeSha1(op *parsedOpcode, vm *Engine) error {
 	return nil
 }
 
-// opcodeSha256 treats the top item of the data stack as raw bytes and replaces
-// it with hash256(data).
+// opcodeBlake256 treats the top item of the data stack as raw bytes and
+// replaces it with blake256(data).
 //
-// Stack transformation: [... x1] -> [... hash256(x1)]
-func opcodeSha256(op *parsedOpcode, vm *Engine) error {
+// Stack transformation: [... x1] -> [... blake256(x1)]
+func opcodeBlake256(op *parsedOpcode, vm *Engine) error {
 	buf, err := vm.dstack.PopByteArray()
 	if err != nil {
 		return err
@@ -2348,9 +2348,9 @@ func opcodeSha256(op *parsedOpcode, vm *Engine) error {
 }
 
 // opcodeHash160 treats the top item of the data stack as raw bytes and replaces
-// it with ripemd160(hash256(data)).
+// it with ripemd160(blake256(data)).
 //
-// Stack transformation: [... x1] -> [... ripemd160(hash256(x1))]
+// Stack transformation: [... x1] -> [... ripemd160(blake256(x1))]
 func opcodeHash160(op *parsedOpcode, vm *Engine) error {
 	buf, err := vm.dstack.PopByteArray()
 	if err != nil {
@@ -2363,9 +2363,9 @@ func opcodeHash160(op *parsedOpcode, vm *Engine) error {
 }
 
 // opcodeHash256 treats the top item of the data stack as raw bytes and replaces
-// it with hash256(hash256(data)).
+// it with blake256(blake256(data)).
 //
-// Stack transformation: [... x1] -> [... hash256(hash256(x1))]
+// Stack transformation: [... x1] -> [... blake256(blake256(x1))]
 func opcodeHash256(op *parsedOpcode, vm *Engine) error {
 	buf, err := vm.dstack.PopByteArray()
 	if err != nil {
