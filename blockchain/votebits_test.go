@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/decred/dcrd/chaincfg"
-	"github.com/decred/dcrd/wire"
 )
 
 var (
@@ -155,43 +154,23 @@ func TestSerializeDeserialize(t *testing.T) {
 	}
 }
 
+// TestNoQuorum ensures that the quorum behavior works as expected with no
+// votes.
 func TestNoQuorum(t *testing.T) {
 	params := defaultParams(pedro)
 	bc := newFakeChain(&params)
-	genesisNode := genesisBlockNode(&params)
-	genesisNode.header.StakeVersion = posVersion
-
-	var currentNode *blockNode
-	currentNode = genesisNode
-	currentTimestamp := time.Now()
-	currentHeight := uint32(1)
+	node := bc.bestNode
+	node.header.StakeVersion = posVersion
 
 	// get to svi
+	curTimestamp := time.Now()
 	for i := uint32(0); i < uint32(params.StakeValidationHeight); i++ {
-		// Make up a header.
-		header := &wire.BlockHeader{
-			Version:      powVersion,
-			Height:       currentHeight,
-			Nonce:        uint32(0),
-			StakeVersion: posVersion,
-			Timestamp:    currentTimestamp,
-		}
-		hash := header.BlockHash()
-		node := newBlockNode(header, nil, nil, nil)
-		node.height = int64(currentHeight)
-		node.parent = currentNode
-
-		currentNode = node
-		bc.bestNode = currentNode
-
-		// fake index
-		bc.index[hash] = node
-
-		currentHeight++
-		currentTimestamp = currentTimestamp.Add(time.Second)
+		node = newFakeNode(node, powVersion, posVersion, 0, curTimestamp)
+		bc.bestNode = node
+		bc.index[node.hash] = node
+		curTimestamp = curTimestamp.Add(time.Second)
 	}
-	t.Logf("Height %v", currentNode.height)
-	ts, err := bc.ThresholdState(&currentNode.hash, posVersion, pedro.Id)
+	ts, err := bc.ThresholdState(&node.hash, posVersion, pedro.Id)
 	if err != nil {
 		t.Fatalf("ThresholdState(SVI): %v", err)
 	}
@@ -200,43 +179,20 @@ func TestNoQuorum(t *testing.T) {
 		Choice: invalidChoice,
 	}
 	if ts != tse {
-		t.Fatalf("expected %v got %v", ts.Choice, tse.Choice)
+		t.Fatalf("expected %+v got %+v", ts, tse)
 	}
 
 	// get to started
 	for i := uint32(0); i < uint32(params.RuleChangeActivationInterval-1); i++ {
-		// Make up a header.
-		header := &wire.BlockHeader{
-			Version:      powVersion,
-			Height:       currentHeight,
-			Nonce:        uint32(0),
-			StakeVersion: posVersion,
-			Timestamp:    currentTimestamp,
-		}
-		hash := header.BlockHash()
-		node := newBlockNode(header, nil, nil, nil)
-		node.height = int64(currentHeight)
-		node.parent = currentNode
-
-		// set stake versions and vote bits
-		for x := 0; x < int(params.TicketsPerBlock); x++ {
-			node.votes = append(node.votes, VoteVersionTuple{
-				Version: posVersion,
-				Bits:    0x01})
-		}
-
-		currentNode = node
-		bc.bestNode = currentNode
-
-		// fake index
-		bc.index[hash] = node
-
-		currentHeight++
-		currentTimestamp = currentTimestamp.Add(time.Second)
+		// Set stake versions and vote bits.
+		node = newFakeNode(node, powVersion, posVersion, 0, curTimestamp)
+		appendFakeVotes(node, params.TicketsPerBlock, posVersion, 0x01)
+		bc.bestNode = node
+		bc.index[node.hash] = node
+		curTimestamp = curTimestamp.Add(time.Second)
 	}
 
-	t.Logf("Height %v", currentNode.height)
-	ts, err = bc.ThresholdState(&currentNode.hash, posVersion, pedro.Id)
+	ts, err = bc.ThresholdState(&node.hash, posVersion, pedro.Id)
 	if err != nil {
 		t.Fatalf("ThresholdState(started): %v", err)
 	}
@@ -245,50 +201,29 @@ func TestNoQuorum(t *testing.T) {
 		Choice: invalidChoice,
 	}
 	if ts != tse {
-		t.Fatalf("expected %v got %v", ts.Choice, tse.Choice)
+		t.Fatalf("expected %+v got %+v", ts, tse)
 	}
 
 	// get to quorum - 1
 	voteCount := uint32(0)
 	for i := uint32(0); i < uint32(params.RuleChangeActivationInterval); i++ {
-		// Make up a header.
-		header := &wire.BlockHeader{
-			Version:      powVersion,
-			Height:       currentHeight,
-			Nonce:        uint32(0),
-			StakeVersion: posVersion,
-			Timestamp:    currentTimestamp,
-		}
-		hash := header.BlockHash()
-		node := newBlockNode(header, nil, nil, nil)
-		node.height = int64(currentHeight)
-		node.parent = currentNode
-
-		// set stake versions and vote bits
+		// Set stake versions and vote bits.
+		node = newFakeNode(node, powVersion, posVersion, 0, curTimestamp)
 		for x := 0; x < int(params.TicketsPerBlock); x++ {
-			v := VoteVersionTuple{
-				Version: posVersion,
-				Bits:    0x01,
-			}
+			bits := uint16(0x01) // abstain
 			if voteCount < params.RuleChangeActivationQuorum-1 {
-				v.Bits = 0x05 // vote no
+				bits = 0x05 // vote no
 			}
-			node.votes = append(node.votes, v)
+			appendFakeVotes(node, 1, posVersion, bits)
 			voteCount++
 		}
 
-		currentNode = node
-		bc.bestNode = currentNode
-
-		// fake index
-		bc.index[hash] = node
-
-		currentHeight++
-		currentTimestamp = currentTimestamp.Add(time.Second)
+		bc.bestNode = node
+		bc.index[node.hash] = node
+		curTimestamp = curTimestamp.Add(time.Second)
 	}
 
-	t.Logf("Height %v", currentNode.height)
-	ts, err = bc.ThresholdState(&currentNode.hash, posVersion, pedro.Id)
+	ts, err = bc.ThresholdState(&node.hash, posVersion, pedro.Id)
 	if err != nil {
 		t.Fatalf("ThresholdState(quorum-1): %v", err)
 	}
@@ -297,60 +232,35 @@ func TestNoQuorum(t *testing.T) {
 		Choice: invalidChoice,
 	}
 	if ts != tse {
-		t.Fatalf("expected %v got %v", ts.Choice, tse.Choice)
+		t.Fatalf("expected %+v got %+v", ts, tse)
 	}
 
-	// get to exact quorum but with 75%-1 yes votes
+	// get to exact quorum but with 75%%-1 yes votes
 	voteCount = uint32(0)
 	for i := uint32(0); i < uint32(params.RuleChangeActivationInterval); i++ {
-		// Make up a header.
-		header := &wire.BlockHeader{
-			Version:      powVersion,
-			Height:       currentHeight,
-			Nonce:        uint32(0),
-			StakeVersion: posVersion,
-			Timestamp:    currentTimestamp,
-		}
-		hash := header.BlockHash()
-		node := newBlockNode(header, nil, nil, nil)
-		node.height = int64(currentHeight)
-		node.parent = currentNode
-
-		// set stake versions and vote bits
+		// Set stake versions and vote bits.
+		node = newFakeNode(node, powVersion, posVersion, 0, curTimestamp)
 		for x := 0; x < int(params.TicketsPerBlock); x++ {
-			v := VoteVersionTuple{
-				Version: posVersion,
-				Bits:    0x01,
-			}
-			// 119 yes, 41 no -> 120 == 75% and 120 reaches quorum
+			// 119 no, 41 yes -> 120 == 75% and 120 reaches quorum
+			bits := uint16(0x01) // abstain
 			quorum := params.RuleChangeActivationQuorum*
 				params.RuleChangeActivationMultiplier/
 				params.RuleChangeActivationDivisor - 1
 			if voteCount < quorum {
-				v.Bits = 0x05 // vote no
-			} else {
-				if voteCount < params.RuleChangeActivationQuorum {
-					v.Bits = 0x03 // vote yes
-				} else {
-					v.Bits = 0x01 // ignore
-				}
+				bits = 0x05 // vote no
+			} else if voteCount < params.RuleChangeActivationQuorum {
+				bits = 0x03 // vote yes
 			}
-			node.votes = append(node.votes, v)
+			appendFakeVotes(node, 1, posVersion, bits)
 			voteCount++
 		}
 
-		currentNode = node
-		bc.bestNode = currentNode
-
-		// fake index
-		bc.index[hash] = node
-
-		currentHeight++
-		currentTimestamp = currentTimestamp.Add(time.Second)
+		bc.bestNode = node
+		bc.index[node.hash] = node
+		curTimestamp = curTimestamp.Add(time.Second)
 	}
 
-	t.Logf("Height %v", currentNode.height)
-	ts, err = bc.ThresholdState(&currentNode.hash, posVersion, pedro.Id)
+	ts, err = bc.ThresholdState(&node.hash, posVersion, pedro.Id)
 	if err != nil {
 		t.Fatalf("ThresholdState(quorum 75%%-1): %v", err)
 	}
@@ -359,60 +269,35 @@ func TestNoQuorum(t *testing.T) {
 		Choice: invalidChoice,
 	}
 	if ts != tse {
-		t.Fatalf("expected %v got %v", ts.Choice, tse.Choice)
+		t.Fatalf("expected %+v got %+v", ts, tse)
 	}
 
 	// get to exact quorum with exactly 75% of votes
 	voteCount = uint32(0)
 	for i := uint32(0); i < uint32(params.RuleChangeActivationInterval); i++ {
-		// Make up a header.
-		header := &wire.BlockHeader{
-			Version:      powVersion,
-			Height:       currentHeight,
-			Nonce:        uint32(0),
-			StakeVersion: posVersion,
-			Timestamp:    currentTimestamp,
-		}
-		hash := header.BlockHash()
-		node := newBlockNode(header, nil, nil, nil)
-		node.height = int64(currentHeight)
-		node.parent = currentNode
-
-		// set stake versions and vote bits
+		// Set stake versions and vote bits.
+		node = newFakeNode(node, powVersion, posVersion, 0, curTimestamp)
 		for x := 0; x < int(params.TicketsPerBlock); x++ {
-			v := VoteVersionTuple{
-				Version: posVersion,
-				Bits:    0x01,
-			}
-			// 120 yes, 40 no -> 120 == 75% and 120 reaches quorum
+			// 120 no, 40 yes -> 120 == 75% and 120 reaches quorum
+			bits := uint16(0x01) // abstain
 			quorum := params.RuleChangeActivationQuorum *
 				params.RuleChangeActivationMultiplier /
 				params.RuleChangeActivationDivisor
 			if voteCount < quorum {
-				v.Bits = 0x05 // vote no
-			} else {
-				if voteCount < params.RuleChangeActivationQuorum {
-					v.Bits = 0x03 // vote yes
-				} else {
-					v.Bits = 0x01 // ignore
-				}
+				bits = 0x05 // vote no
+			} else if voteCount < params.RuleChangeActivationQuorum {
+				bits = 0x03 // vote yes
 			}
-			node.votes = append(node.votes, v)
+			appendFakeVotes(node, 1, posVersion, bits)
 			voteCount++
 		}
 
-		currentNode = node
-		bc.bestNode = currentNode
-
-		// fake index
-		bc.index[hash] = node
-
-		currentHeight++
-		currentTimestamp = currentTimestamp.Add(time.Second)
+		bc.bestNode = node
+		bc.index[node.hash] = node
+		curTimestamp = curTimestamp.Add(time.Second)
 	}
 
-	t.Logf("Height %v", currentNode.height)
-	ts, err = bc.ThresholdState(&currentNode.hash, posVersion, pedro.Id)
+	ts, err = bc.ThresholdState(&node.hash, posVersion, pedro.Id)
 	if err != nil {
 		t.Fatalf("ThresholdState(quorum 75%%): %v", err)
 	}
@@ -421,47 +306,28 @@ func TestNoQuorum(t *testing.T) {
 		Choice: 0x02,
 	}
 	if ts != tse {
-		t.Fatalf("expected %v got %v", ts.Choice, tse.Choice)
+		t.Fatalf("expected %+v got %+v", ts, tse)
 	}
 }
 
+// TestNoQuorum ensures that the quorum behavior works as expected with yes
+// votes.
 func TestYesQuorum(t *testing.T) {
 	params := defaultParams(pedro)
 	bc := newFakeChain(&params)
-	genesisNode := genesisBlockNode(&params)
-	genesisNode.header.StakeVersion = posVersion
-
-	var currentNode *blockNode
-	currentNode = genesisNode
-	currentTimestamp := time.Now()
-	currentHeight := uint32(1)
+	node := bc.bestNode
+	node.header.StakeVersion = posVersion
 
 	// get to svi
+	curTimestamp := time.Now()
 	for i := uint32(0); i < uint32(params.StakeValidationHeight); i++ {
-		// Make up a header.
-		header := &wire.BlockHeader{
-			Version:      powVersion,
-			Height:       currentHeight,
-			Nonce:        uint32(0),
-			StakeVersion: posVersion,
-			Timestamp:    currentTimestamp,
-		}
-		hash := header.BlockHash()
-		node := newBlockNode(header, nil, nil, nil)
-		node.height = int64(currentHeight)
-		node.parent = currentNode
+		node = newFakeNode(node, powVersion, posVersion, 0, curTimestamp)
 
-		currentNode = node
-		bc.bestNode = currentNode
-
-		// fake index
-		bc.index[hash] = node
-
-		currentHeight++
-		currentTimestamp = currentTimestamp.Add(time.Second)
+		bc.bestNode = node
+		bc.index[node.hash] = node
+		curTimestamp = curTimestamp.Add(time.Second)
 	}
-	t.Logf("Height %v", currentNode.height)
-	ts, err := bc.ThresholdState(&currentNode.hash, posVersion, pedro.Id)
+	ts, err := bc.ThresholdState(&node.hash, posVersion, pedro.Id)
 	if err != nil {
 		t.Fatalf("ThresholdState(SVI): %v", err)
 	}
@@ -470,43 +336,20 @@ func TestYesQuorum(t *testing.T) {
 		Choice: invalidChoice,
 	}
 	if ts != tse {
-		t.Fatalf("expected %v got %v", ts.Choice, tse.Choice)
+		t.Fatalf("expected %+v got %+v", ts, tse)
 	}
 
 	// get to started
 	for i := uint32(0); i < uint32(params.RuleChangeActivationInterval-1); i++ {
-		// Make up a header.
-		header := &wire.BlockHeader{
-			Version:      powVersion,
-			Height:       currentHeight,
-			Nonce:        uint32(0),
-			StakeVersion: posVersion,
-			Timestamp:    currentTimestamp,
-		}
-		hash := header.BlockHash()
-		node := newBlockNode(header, nil, nil, nil)
-		node.height = int64(currentHeight)
-		node.parent = currentNode
-
-		// set stake versions and vote bits
-		for x := 0; x < int(params.TicketsPerBlock); x++ {
-			node.votes = append(node.votes, VoteVersionTuple{
-				Version: posVersion,
-				Bits:    0x01})
-		}
-
-		currentNode = node
-		bc.bestNode = currentNode
-
-		// fake index
-		bc.index[hash] = node
-
-		currentHeight++
-		currentTimestamp = currentTimestamp.Add(time.Second)
+		// Set stake versions and vote bits.
+		node = newFakeNode(node, powVersion, posVersion, 0, curTimestamp)
+		appendFakeVotes(node, params.TicketsPerBlock, posVersion, 0x01)
+		bc.bestNode = node
+		bc.index[node.hash] = node
+		curTimestamp = curTimestamp.Add(time.Second)
 	}
 
-	t.Logf("Height %v", currentNode.height)
-	ts, err = bc.ThresholdState(&currentNode.hash, posVersion, pedro.Id)
+	ts, err = bc.ThresholdState(&node.hash, posVersion, pedro.Id)
 	if err != nil {
 		t.Fatalf("ThresholdState(started): %v", err)
 	}
@@ -515,50 +358,29 @@ func TestYesQuorum(t *testing.T) {
 		Choice: invalidChoice,
 	}
 	if ts != tse {
-		t.Fatalf("expected %v got %v", ts.Choice, tse.Choice)
+		t.Fatalf("expected %+v got %+v", ts, tse)
 	}
 
 	// get to quorum - 1
 	voteCount := uint32(0)
 	for i := uint32(0); i < uint32(params.RuleChangeActivationInterval); i++ {
-		// Make up a header.
-		header := &wire.BlockHeader{
-			Version:      powVersion,
-			Height:       currentHeight,
-			Nonce:        uint32(0),
-			StakeVersion: posVersion,
-			Timestamp:    currentTimestamp,
-		}
-		hash := header.BlockHash()
-		node := newBlockNode(header, nil, nil, nil)
-		node.height = int64(currentHeight)
-		node.parent = currentNode
-
-		// set stake versions and vote bits
+		// Set stake versions and vote bits.
+		node = newFakeNode(node, powVersion, posVersion, 0, curTimestamp)
 		for x := 0; x < int(params.TicketsPerBlock); x++ {
-			v := VoteVersionTuple{
-				Version: posVersion,
-				Bits:    0x01,
-			}
+			bits := uint16(0x01) // abstain
 			if voteCount < params.RuleChangeActivationQuorum-1 {
-				v.Bits = 0x03 // vote yes
+				bits = 0x03 // vote yes
 			}
-			node.votes = append(node.votes, v)
+			appendFakeVotes(node, 1, posVersion, bits)
 			voteCount++
 		}
 
-		currentNode = node
-		bc.bestNode = currentNode
-
-		// fake index
-		bc.index[hash] = node
-
-		currentHeight++
-		currentTimestamp = currentTimestamp.Add(time.Second)
+		bc.bestNode = node
+		bc.index[node.hash] = node
+		curTimestamp = curTimestamp.Add(time.Second)
 	}
 
-	t.Logf("Height %v", currentNode.height)
-	ts, err = bc.ThresholdState(&currentNode.hash, posVersion, pedro.Id)
+	ts, err = bc.ThresholdState(&node.hash, posVersion, pedro.Id)
 	if err != nil {
 		t.Fatalf("ThresholdState(quorum-1): %v", err)
 	}
@@ -567,60 +389,35 @@ func TestYesQuorum(t *testing.T) {
 		Choice: invalidChoice,
 	}
 	if ts != tse {
-		t.Fatalf("expected %v got %v", ts.Choice, tse.Choice)
+		t.Fatalf("expected %+v got %+v", ts, tse)
 	}
 
 	// get to exact quorum but with 75%-1 yes votes
 	voteCount = uint32(0)
 	for i := uint32(0); i < uint32(params.RuleChangeActivationInterval); i++ {
-		// Make up a header.
-		header := &wire.BlockHeader{
-			Version:      powVersion,
-			Height:       currentHeight,
-			Nonce:        uint32(0),
-			StakeVersion: posVersion,
-			Timestamp:    currentTimestamp,
-		}
-		hash := header.BlockHash()
-		node := newBlockNode(header, nil, nil, nil)
-		node.height = int64(currentHeight)
-		node.parent = currentNode
-
-		// set stake versions and vote bits
+		// Set stake versions and vote bits.
+		node = newFakeNode(node, powVersion, posVersion, 0, curTimestamp)
 		for x := 0; x < int(params.TicketsPerBlock); x++ {
-			v := VoteVersionTuple{
-				Version: posVersion,
-				Bits:    0x01,
-			}
 			// 119 yes, 41 no -> 120 == 75% and 120 reaches quorum
+			bits := uint16(0x01) // abstain
 			quorum := params.RuleChangeActivationQuorum*
 				params.RuleChangeActivationMultiplier/
 				params.RuleChangeActivationDivisor - 1
 			if voteCount < quorum {
-				v.Bits = 0x03 // vote yes
-			} else {
-				if voteCount < params.RuleChangeActivationQuorum {
-					v.Bits = 0x05 // vote no
-				} else {
-					v.Bits = 0x01 // ignore
-				}
+				bits = 0x03 // vote yes
+			} else if voteCount < params.RuleChangeActivationQuorum {
+				bits = 0x05 // vote no
 			}
-			node.votes = append(node.votes, v)
+			appendFakeVotes(node, 1, posVersion, bits)
 			voteCount++
 		}
 
-		currentNode = node
-		bc.bestNode = currentNode
-
-		// fake index
-		bc.index[hash] = node
-
-		currentHeight++
-		currentTimestamp = currentTimestamp.Add(time.Second)
+		bc.bestNode = node
+		bc.index[node.hash] = node
+		curTimestamp = curTimestamp.Add(time.Second)
 	}
 
-	t.Logf("Height %v", currentNode.height)
-	ts, err = bc.ThresholdState(&currentNode.hash, posVersion, pedro.Id)
+	ts, err = bc.ThresholdState(&node.hash, posVersion, pedro.Id)
 	if err != nil {
 		t.Fatalf("ThresholdState(quorum 75%%-1): %v", err)
 	}
@@ -629,60 +426,36 @@ func TestYesQuorum(t *testing.T) {
 		Choice: invalidChoice,
 	}
 	if ts != tse {
-		t.Fatalf("expected %v got %v", ts.Choice, tse.Choice)
+		t.Fatalf("expected %+v got %+v", ts, tse)
 	}
 
 	// get to exact quorum with exactly 75% of votes
 	voteCount = uint32(0)
 	for i := uint32(0); i < uint32(params.RuleChangeActivationInterval); i++ {
-		// Make up a header.
-		header := &wire.BlockHeader{
-			Version:      powVersion,
-			Height:       currentHeight,
-			Nonce:        uint32(0),
-			StakeVersion: posVersion,
-			Timestamp:    currentTimestamp,
-		}
-		hash := header.BlockHash()
-		node := newBlockNode(header, nil, nil, nil)
-		node.height = int64(currentHeight)
-		node.parent = currentNode
-
-		// set stake versions and vote bits
+		// TODO(davec): Comment
+		// Set stake versions and vote bits.
+		node = newFakeNode(node, powVersion, posVersion, 0, curTimestamp)
 		for x := 0; x < int(params.TicketsPerBlock); x++ {
-			v := VoteVersionTuple{
-				Version: posVersion,
-				Bits:    0x01,
-			}
 			// 120 yes, 40 no -> 120 == 75% and 120 reaches quorum
+			bits := uint16(0x01) // abstain
 			quorum := params.RuleChangeActivationQuorum *
 				params.RuleChangeActivationMultiplier /
 				params.RuleChangeActivationDivisor
 			if voteCount < quorum {
-				v.Bits = 0x03 // vote yes
-			} else {
-				if voteCount < params.RuleChangeActivationQuorum {
-					v.Bits = 0x05 // vote no
-				} else {
-					v.Bits = 0x01 // ignore
-				}
+				bits = 0x03 // vote yes
+			} else if voteCount < params.RuleChangeActivationQuorum {
+				bits = 0x05 // vote no
 			}
-			node.votes = append(node.votes, v)
+			appendFakeVotes(node, 1, posVersion, bits)
 			voteCount++
 		}
 
-		currentNode = node
-		bc.bestNode = currentNode
-
-		// fake index
-		bc.index[hash] = node
-
-		currentHeight++
-		currentTimestamp = currentTimestamp.Add(time.Second)
+		bc.bestNode = node
+		bc.index[node.hash] = node
+		curTimestamp = curTimestamp.Add(time.Second)
 	}
 
-	t.Logf("Height %v", currentNode.height)
-	ts, err = bc.ThresholdState(&currentNode.hash, posVersion, pedro.Id)
+	ts, err = bc.ThresholdState(&node.hash, posVersion, pedro.Id)
 	if err != nil {
 		t.Fatalf("ThresholdState(quorum 75%%): %v", err)
 	}
@@ -691,10 +464,12 @@ func TestYesQuorum(t *testing.T) {
 		Choice: 0x01,
 	}
 	if ts != tse {
-		t.Fatalf("expected %v got %v", ts.Choice, tse.Choice)
+		t.Fatalf("expected %+v got %+v", ts, tse)
 	}
 }
 
+// TestVoting ensure the overall voting of an agenda works as expected including
+// a wide variety of conditions.
 func TestVoting(t *testing.T) {
 	params := defaultParams(chaincfg.Vote{})
 	rci := params.RuleChangeActivationInterval
@@ -720,572 +495,519 @@ func TestVoting(t *testing.T) {
 			vote:              pedro,
 			blockVersion:      powVersion,
 			startStakeVersion: posVersion,
-			voteBitsCounts: []voteCount{
-				{
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x01},
-					count: svh - 1,
+			voteBitsCounts: []voteCount{{
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x01,
 				},
-			},
-			expectedState: []ThresholdStateTuple{
-				{
-					State:  ThresholdDefined,
-					Choice: invalidChoice,
-				},
-			},
+				count: svh - 1,
+			}},
+			expectedState: []ThresholdStateTuple{{
+				State:  ThresholdDefined,
+				Choice: invalidChoice,
+			}},
 		},
 		{
 			name:              "pedro greater PoS version",
 			vote:              pedro,
 			blockVersion:      powVersion,
 			startStakeVersion: posVersion - 1,
-			voteBitsCounts: []voteCount{
-				{
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x01},
-					count: svh,
+			voteBitsCounts: []voteCount{{
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x01,
 				},
-				{
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x01},
-					count: svi - 1,
+				count: svh,
+			}, {
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x01,
 				},
-				{
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x01},
-					count: rci - svi,
+				count: svi - 1,
+			}, {
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x01,
 				},
-				{
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x03},
-					count: rci,
+				count: rci - svi,
+			}, {
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x03,
 				},
-			},
-			expectedState: []ThresholdStateTuple{
-				{
-					State:  ThresholdDefined,
-					Choice: invalidChoice,
-				},
-				{
-					State:  ThresholdDefined,
-					Choice: invalidChoice,
-				},
-				{
-					State:  ThresholdStarted,
-					Choice: invalidChoice,
-				},
-				{
-					State:  ThresholdLockedIn,
-					Choice: 1,
-				},
-			},
+				count: rci,
+			}},
+			expectedState: []ThresholdStateTuple{{
+				State:  ThresholdDefined,
+				Choice: invalidChoice,
+			}, {
+				State:  ThresholdDefined,
+				Choice: invalidChoice,
+			}, {
+				State:  ThresholdStarted,
+				Choice: invalidChoice,
+			}, {
+				State:  ThresholdLockedIn,
+				Choice: 1,
+			}},
 		},
 		{
 			name:              "pedro greater PoS version calcStakeVersion",
 			vote:              pedro,
 			blockVersion:      powVersion,
 			startStakeVersion: posVersion - 1,
-			voteBitsCounts: []voteCount{
-				{
-					vote: VoteVersionTuple{
-						Version: posVersion - 1,
-						Bits:    0x01},
-					count: svh + 2*svi - 1,
+			voteBitsCounts: []voteCount{{
+				vote: VoteVersionTuple{
+					Version: posVersion - 1,
+					Bits:    0x01,
 				},
-				{
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x01},
-					count: rci % svi,
+				count: svh + 2*svi - 1,
+			}, {
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x01,
 				},
-				{
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x01},
-					count: rci,
+				count: rci % svi,
+			}, {
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x01,
 				},
-				{
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x03},
-					count: rci,
-				},
-			},
-			expectedState: []ThresholdStateTuple{
-				{
-					State:  ThresholdDefined,
-					Choice: invalidChoice,
-				},
-				{
-					State:  ThresholdDefined,
-					Choice: invalidChoice,
-				},
-				{
-					State:  ThresholdStarted,
-					Choice: invalidChoice,
-				},
-				{
-					State:  ThresholdLockedIn,
-					Choice: 1,
-				},
-			},
+				count: rci,
+			}, {
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x03},
+				count: rci,
+			}},
+			expectedState: []ThresholdStateTuple{{
+				State:  ThresholdDefined,
+				Choice: invalidChoice,
+			}, {
+				State:  ThresholdDefined,
+				Choice: invalidChoice,
+			}, {
+				State:  ThresholdStarted,
+				Choice: invalidChoice,
+			}, {
+				State:  ThresholdLockedIn,
+				Choice: 1,
+			}},
 		},
 		{
 			name:              "pedro smaller PoS version",
 			vote:              pedro,
 			blockVersion:      powVersion,
 			startStakeVersion: posVersion + 1,
-			voteBitsCounts: []voteCount{
-				{
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x01},
-					count: svh,
+			voteBitsCounts: []voteCount{{
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x01,
 				},
-				{
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x01},
-					count: rci - 1,
+				count: svh,
+			}, {
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x01,
 				},
-				{
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x03},
-					count: rci,
+				count: rci - 1,
+			}, {
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x03,
 				},
-				{
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x03},
-					count: rci,
+				count: rci,
+			}, {
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x03,
 				},
-			},
-			expectedState: []ThresholdStateTuple{
-				{
-					State:  ThresholdDefined,
-					Choice: invalidChoice,
-				},
-				{
-					State:  ThresholdStarted,
-					Choice: invalidChoice,
-				},
-				{
-					State:  ThresholdLockedIn,
-					Choice: 0x01,
-				},
-				{
-					State:  ThresholdActive,
-					Choice: 0x01,
-				},
-			},
+				count: rci,
+			}},
+			expectedState: []ThresholdStateTuple{{
+				State:  ThresholdDefined,
+				Choice: invalidChoice,
+			}, {
+				State:  ThresholdStarted,
+				Choice: invalidChoice,
+			}, {
+				State:  ThresholdLockedIn,
+				Choice: 0x01,
+			}, {
+				State:  ThresholdActive,
+				Choice: 0x01,
+			}},
 		},
 		{
 			name:              "pedro smaller PoW version",
 			vote:              pedro,
 			blockVersion:      powVersion - 1,
 			startStakeVersion: posVersion,
-			voteBitsCounts: []voteCount{
-				{
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x01},
-					count: svh,
+			voteBitsCounts: []voteCount{{
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x01,
 				},
-				{
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x01},
-					count: rci - 1,
+				count: svh,
+			}, {
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x01,
 				},
-				{
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x03},
-					count: rci,
+				count: rci - 1,
+			}, {
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x03,
 				},
-			},
-			expectedState: []ThresholdStateTuple{
-				{
-					State:  ThresholdDefined,
-					Choice: invalidChoice,
-				},
-				{
-					State:  ThresholdDefined,
-					Choice: invalidChoice,
-				},
-				{
-					State:  ThresholdDefined,
-					Choice: invalidChoice,
-				},
-			},
+				count: rci,
+			}},
+			expectedState: []ThresholdStateTuple{{
+				State:  ThresholdDefined,
+				Choice: invalidChoice,
+			}, {
+				State:  ThresholdDefined,
+				Choice: invalidChoice,
+			}, {
+				State:  ThresholdDefined,
+				Choice: invalidChoice,
+			}},
 		},
 		{
 			name:              "pedro greater PoW version",
 			vote:              pedro,
 			blockVersion:      powVersion + 1,
 			startStakeVersion: posVersion,
-			voteBitsCounts: []voteCount{
-				{
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x01},
-					count: svh,
+			voteBitsCounts: []voteCount{{
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x01,
 				},
-				{
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x01},
-					count: rci - 1,
+				count: svh,
+			}, {
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x01,
 				},
-				{
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x03},
-					count: rci,
+				count: rci - 1,
+			}, {
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x03,
 				},
-				{
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x03},
-					count: rci,
+				count: rci,
+			}, {
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x03,
 				},
-			},
-			expectedState: []ThresholdStateTuple{
-				{
-					State:  ThresholdDefined,
-					Choice: invalidChoice,
-				},
-				{
-					State:  ThresholdStarted,
-					Choice: invalidChoice,
-				},
-				{
-					State:  ThresholdLockedIn,
-					Choice: 0x01,
-				},
-				{
-					State:  ThresholdActive,
-					Choice: 0x01,
-				},
-			},
+				count: rci,
+			}},
+			expectedState: []ThresholdStateTuple{{
+				State:  ThresholdDefined,
+				Choice: invalidChoice,
+			}, {
+				State:  ThresholdStarted,
+				Choice: invalidChoice,
+			}, {
+				State:  ThresholdLockedIn,
+				Choice: 0x01,
+			}, {
+				State:  ThresholdActive,
+				Choice: 0x01,
+			}},
 		},
 		{
 			name:              "pedro 100% yes, wrong version",
 			vote:              pedro,
 			blockVersion:      powVersion,
 			startStakeVersion: posVersion,
-			voteBitsCounts: []voteCount{
-				{
-					vote: VoteVersionTuple{
-						Version: posVersion + 1,
-						Bits:    0x01},
-					count: svh,
+			voteBitsCounts: []voteCount{{
+				vote: VoteVersionTuple{
+					Version: posVersion + 1,
+					Bits:    0x01,
 				},
-				{
-					vote: VoteVersionTuple{
-						Version: posVersion + 1,
-						Bits:    0x01},
-					count: rci - 1,
-				}, {
-					vote: VoteVersionTuple{
-						Version: posVersion + 1,
-						Bits:    0x03},
-					count: rci,
-				}, {
-					vote: VoteVersionTuple{
-						Version: posVersion + 1,
-						Bits:    0x03},
-					count: rci,
-				}, {
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x03},
-					count: rci,
-				}, {
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x03},
-					count: rci,
-				}, {
-					vote: VoteVersionTuple{
-						Version: posVersion + 1,
-						Bits:    0x01},
-					count: rci,
+				count: svh,
+			}, {
+				vote: VoteVersionTuple{
+					Version: posVersion + 1,
+					Bits:    0x01,
 				},
-			},
-			expectedState: []ThresholdStateTuple{
-				{
-					State:  ThresholdDefined,
-					Choice: invalidChoice,
+				count: rci - 1,
+			}, {
+				vote: VoteVersionTuple{
+					Version: posVersion + 1,
+					Bits:    0x03,
 				},
-				{
-					State:  ThresholdStarted,
-					Choice: invalidChoice,
+				count: rci,
+			}, {
+				vote: VoteVersionTuple{
+					Version: posVersion + 1,
+					Bits:    0x03,
 				},
-				{
-					State:  ThresholdStarted,
-					Choice: invalidChoice,
+				count: rci,
+			}, {
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x03,
 				},
-				{
-					State:  ThresholdStarted,
-					Choice: invalidChoice,
+				count: rci,
+			}, {
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x03,
 				},
-				{
-					State:  ThresholdLockedIn,
-					Choice: 0x01,
+				count: rci,
+			}, {
+				vote: VoteVersionTuple{
+					Version: posVersion + 1,
+					Bits:    0x01,
 				},
-				{
-					State:  ThresholdActive,
-					Choice: 0x01,
-				},
-				{
-					State:  ThresholdActive,
-					Choice: 0x01,
-				},
-			},
+				count: rci,
+			}},
+			expectedState: []ThresholdStateTuple{{
+				State:  ThresholdDefined,
+				Choice: invalidChoice,
+			}, {
+				State:  ThresholdStarted,
+				Choice: invalidChoice,
+			}, {
+				State:  ThresholdStarted,
+				Choice: invalidChoice,
+			}, {
+				State:  ThresholdStarted,
+				Choice: invalidChoice,
+			}, {
+				State:  ThresholdLockedIn,
+				Choice: 0x01,
+			}, {
+				State:  ThresholdActive,
+				Choice: 0x01,
+			}, {
+				State:  ThresholdActive,
+				Choice: 0x01,
+			}},
 		},
 		{
 			name:              "pedro 100% yes",
 			vote:              pedro,
 			blockVersion:      powVersion,
 			startStakeVersion: posVersion,
-			voteBitsCounts: []voteCount{
-				{
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x01},
-					count: svh,
+			voteBitsCounts: []voteCount{{
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x01,
 				},
-				{
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x01},
-					count: rci - 1,
-				}, {
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x03},
-					count: rci,
-				}, {
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x03},
-					count: rci,
-				}, {
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x01},
-					count: rci,
+				count: svh,
+			}, {
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x01,
 				},
-			},
-			expectedState: []ThresholdStateTuple{
-				{
-					State:  ThresholdDefined,
-					Choice: invalidChoice,
+				count: rci - 1,
+			}, {
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x03,
 				},
-				{
-					State:  ThresholdStarted,
-					Choice: invalidChoice,
+				count: rci,
+			}, {
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x03,
 				},
-				{
-					State:  ThresholdLockedIn,
-					Choice: 0x01,
+				count: rci,
+			}, {
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x01,
 				},
-				{
-					State:  ThresholdActive,
-					Choice: 0x01,
-				},
-				{
-					State:  ThresholdActive,
-					Choice: 0x01,
-				},
-			},
+				count: rci,
+			}},
+			expectedState: []ThresholdStateTuple{{
+				State:  ThresholdDefined,
+				Choice: invalidChoice,
+			}, {
+				State:  ThresholdStarted,
+				Choice: invalidChoice,
+			}, {
+				State:  ThresholdLockedIn,
+				Choice: 0x01,
+			}, {
+				State:  ThresholdActive,
+				Choice: 0x01,
+			}, {
+				State:  ThresholdActive,
+				Choice: 0x01,
+			}},
 		},
 		{
 			name:              "pedro 100% no",
 			vote:              pedro,
 			blockVersion:      powVersion,
 			startStakeVersion: posVersion,
-			voteBitsCounts: []voteCount{
-				{
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x01},
-					count: svh,
+			voteBitsCounts: []voteCount{{
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x01,
 				},
-				{
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x01},
-					count: rci - 1,
-				}, {
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x05},
-					count: rci,
-				}, {
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x05},
-					count: rci,
-				}, {
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x01},
-					count: rci,
+				count: svh,
+			}, {
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x01,
 				},
-			},
-			expectedState: []ThresholdStateTuple{
-				{
-					State:  ThresholdDefined,
-					Choice: invalidChoice,
+				count: rci - 1,
+			}, {
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x05,
 				},
-				{
-					State:  ThresholdStarted,
-					Choice: invalidChoice,
+				count: rci,
+			}, {
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x05,
 				},
-				{
-					State:  ThresholdFailed,
-					Choice: 0x02,
+				count: rci,
+			}, {
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x01,
 				},
-				{
-					State:  ThresholdFailed,
-					Choice: 0x02,
-				},
-				{
-					State:  ThresholdFailed,
-					Choice: 0x02,
-				},
-			},
+				count: rci,
+			}},
+			expectedState: []ThresholdStateTuple{{
+				State:  ThresholdDefined,
+				Choice: invalidChoice,
+			}, {
+				State:  ThresholdStarted,
+				Choice: invalidChoice,
+			}, {
+				State:  ThresholdFailed,
+				Choice: 0x02,
+			}, {
+				State:  ThresholdFailed,
+				Choice: 0x02,
+			}, {
+				State:  ThresholdFailed,
+				Choice: 0x02,
+			}},
 		},
 		{
 			name:              "pedro 100% invalid",
 			vote:              pedro,
 			blockVersion:      powVersion,
 			startStakeVersion: posVersion,
-			voteBitsCounts: []voteCount{
-				{
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x01},
-					count: svh,
+			voteBitsCounts: []voteCount{{
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x01,
 				},
-				{
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x01},
-					count: rci - 1,
-				}, {
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x06},
-					count: rci,
-				}, {
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x06},
-					count: rci,
-				}, {
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x03},
-					count: rci,
-				}, {
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x01},
-					count: rci,
+				count: svh,
+			}, {
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x01,
 				},
-			},
-			expectedState: []ThresholdStateTuple{
-				{
-					State:  ThresholdDefined,
-					Choice: invalidChoice,
+				count: rci - 1,
+			}, {
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x06,
 				},
-				{
-					State:  ThresholdStarted,
-					Choice: invalidChoice,
+				count: rci,
+			}, {
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x06,
 				},
-				{
-					State:  ThresholdStarted,
-					Choice: invalidChoice,
+				count: rci,
+			}, {
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x03,
 				},
-				{
-					State:  ThresholdStarted,
-					Choice: invalidChoice,
+				count: rci,
+			}, {
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x01,
 				},
-				{
-					State:  ThresholdLockedIn,
-					Choice: 0x01,
-				},
-				{
-					State:  ThresholdActive,
-					Choice: 0x01,
-				},
-			},
+				count: rci,
+			}},
+			expectedState: []ThresholdStateTuple{{
+				State:  ThresholdDefined,
+				Choice: invalidChoice,
+			}, {
+				State:  ThresholdStarted,
+				Choice: invalidChoice,
+			}, {
+				State:  ThresholdStarted,
+				Choice: invalidChoice,
+			}, {
+				State:  ThresholdStarted,
+				Choice: invalidChoice,
+			}, {
+				State:  ThresholdLockedIn,
+				Choice: 0x01,
+			}, {
+				State:  ThresholdActive,
+				Choice: 0x01,
+			}},
 		},
 		{
 			name:              "pedro 100% abstain",
 			vote:              pedro,
 			blockVersion:      powVersion,
 			startStakeVersion: posVersion,
-			voteBitsCounts: []voteCount{
-				{
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x01},
-					count: svh,
+			voteBitsCounts: []voteCount{{
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x01,
 				},
-				{
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x01},
-					count: rci - 1,
-				}, {
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x01},
-					count: rci,
-				}, {
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x01},
-					count: rci,
-				}, {
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x01},
-					count: rci,
+				count: svh,
+			}, {
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x01,
 				},
-			},
-			expectedState: []ThresholdStateTuple{
-				{
-					State:  ThresholdDefined,
-					Choice: invalidChoice,
+				count: rci - 1,
+			}, {
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x01,
 				},
-				{
-					State:  ThresholdStarted,
-					Choice: invalidChoice,
+				count: rci,
+			}, {
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x01,
 				},
-				{
-					State:  ThresholdStarted,
-					Choice: invalidChoice,
+				count: rci,
+			}, {
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x01,
 				},
-				{
-					State:  ThresholdStarted,
-					Choice: invalidChoice,
-				},
-				{
-					State:  ThresholdStarted,
-					Choice: invalidChoice,
-				},
-			},
+				count: rci,
+			}},
+			expectedState: []ThresholdStateTuple{{
+				State:  ThresholdDefined,
+				Choice: invalidChoice,
+			}, {
+				State:  ThresholdStarted,
+				Choice: invalidChoice,
+			}, {
+				State:  ThresholdStarted,
+				Choice: invalidChoice,
+			}, {
+				State:  ThresholdStarted,
+				Choice: invalidChoice,
+			}, {
+				State:  ThresholdStarted,
+				Choice: invalidChoice,
+			}},
 		},
 		{
 			name:              "pedro expire before started",
@@ -1296,40 +1018,35 @@ func TestVoting(t *testing.T) {
 				return uint64(t.Add(time.Second *
 					time.Duration(int64(svh)+int64(rci+rci/2))).Unix())
 			},
-			voteBitsCounts: []voteCount{
-				{
-					vote: VoteVersionTuple{
-						Version: posVersion - 1,
-						Bits:    0x01},
-					count: svh,
+			voteBitsCounts: []voteCount{{
+				vote: VoteVersionTuple{
+					Version: posVersion - 1,
+					Bits:    0x01,
 				},
-				{
-					vote: VoteVersionTuple{
-						Version: posVersion - 1,
-						Bits:    0x05},
-					count: rci - 1,
+				count: svh,
+			}, {
+				vote: VoteVersionTuple{
+					Version: posVersion - 1,
+					Bits:    0x05,
 				},
-				{
-					vote: VoteVersionTuple{
-						Version: posVersion - 1,
-						Bits:    0x05},
-					count: rci,
+				count: rci - 1,
+			}, {
+				vote: VoteVersionTuple{
+					Version: posVersion - 1,
+					Bits:    0x05,
 				},
-			},
-			expectedState: []ThresholdStateTuple{
-				{
-					State:  ThresholdDefined,
-					Choice: invalidChoice,
-				},
-				{
-					State:  ThresholdDefined,
-					Choice: invalidChoice,
-				},
-				{
-					State:  ThresholdFailed,
-					Choice: invalidChoice,
-				},
-			},
+				count: rci,
+			}},
+			expectedState: []ThresholdStateTuple{{
+				State:  ThresholdDefined,
+				Choice: invalidChoice,
+			}, {
+				State:  ThresholdDefined,
+				Choice: invalidChoice,
+			}, {
+				State:  ThresholdFailed,
+				Choice: invalidChoice,
+			}},
 		},
 		{
 			name:              "pedro expire after started",
@@ -1340,473 +1057,432 @@ func TestVoting(t *testing.T) {
 				return uint64(t.Add(time.Second *
 					time.Duration(int64(svh)+int64(rci+rci/2))).Unix())
 			},
-			voteBitsCounts: []voteCount{
-				{
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x01},
-					count: svh,
+			voteBitsCounts: []voteCount{{
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x01,
 				},
-				{
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x05},
-					count: rci - 1,
+				count: svh,
+			}, {
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x05,
 				},
-				{
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x05},
-					count: rci,
+				count: rci - 1,
+			}, {
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x05,
 				},
-			},
-			expectedState: []ThresholdStateTuple{
-				{
-					State:  ThresholdDefined,
-					Choice: invalidChoice,
-				},
-				{
-					State:  ThresholdStarted,
-					Choice: invalidChoice,
-				},
-				{
-					State:  ThresholdFailed,
-					Choice: invalidChoice,
-				},
-			},
+				count: rci,
+			}},
+			expectedState: []ThresholdStateTuple{{
+				State:  ThresholdDefined,
+				Choice: invalidChoice,
+			}, {
+				State:  ThresholdStarted,
+				Choice: invalidChoice,
+			}, {
+				State:  ThresholdFailed,
+				Choice: invalidChoice,
+			}},
 		},
 		{
 			name:              "pedro overlap",
 			vote:              pedro,
 			blockVersion:      powVersion,
 			startStakeVersion: posVersion - 1,
-			voteBitsCounts: []voteCount{
-				{
-					vote: VoteVersionTuple{
-						Version: posVersion - 1,
-						Bits:    0x01},
-					count: svh + 19*svi - 1,
+			voteBitsCounts: []voteCount{{
+				vote: VoteVersionTuple{
+					Version: posVersion - 1,
+					Bits:    0x01,
 				},
-				{
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x01},
-					count: svi - 1,
+				count: svh + 19*svi - 1,
+			}, {
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x01,
 				},
-				{
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x01},
-					count: 1,
+				count: svi - 1,
+			}, {
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x01,
 				},
-				{
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x03},
-					count: uint32(rci) - 1,
+				count: 1,
+			}, {
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x03,
 				},
-				{
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x03},
-					count: 1,
+				count: uint32(rci) - 1,
+			}, {
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x03,
 				},
-				{
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x01},
-					count: uint32(rci),
+				count: 1,
+			}, {
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x01,
 				},
-			},
-			expectedState: []ThresholdStateTuple{
-				{
-					State:  ThresholdDefined,
-					Choice: invalidChoice,
-				},
-				{
-					State:  ThresholdDefined,
-					Choice: invalidChoice,
-				},
-				{
-					State:  ThresholdStarted,
-					Choice: invalidChoice,
-				},
-				{
-					State:  ThresholdStarted,
-					Choice: invalidChoice,
-				},
-				{
-					State:  ThresholdLockedIn,
-					Choice: 1,
-				},
-				{
-					State:  ThresholdActive,
-					Choice: 1,
-				},
-			},
+				count: uint32(rci),
+			}},
+			expectedState: []ThresholdStateTuple{{
+				State:  ThresholdDefined,
+				Choice: invalidChoice,
+			}, {
+				State:  ThresholdDefined,
+				Choice: invalidChoice,
+			}, {
+				State:  ThresholdStarted,
+				Choice: invalidChoice,
+			}, {
+				State:  ThresholdStarted,
+				Choice: invalidChoice,
+			}, {
+				State:  ThresholdLockedIn,
+				Choice: 1,
+			}, {
+				State:  ThresholdActive,
+				Choice: 1,
+			}},
 		},
 		{
 			name:              "multiple choice 100% abstain",
 			vote:              multipleChoice,
 			blockVersion:      powVersion,
 			startStakeVersion: posVersion,
-			voteBitsCounts: []voteCount{
-				{
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x01},
-					count: svh,
+			voteBitsCounts: []voteCount{{
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x01,
 				},
-				{
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x01},
-					count: rci - 1,
-				}, {
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x01},
-					count: rci,
+				count: svh,
+			}, {
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x01,
 				},
-			},
-			expectedState: []ThresholdStateTuple{
-				{
-					State:  ThresholdDefined,
-					Choice: invalidChoice,
+				count: rci - 1,
+			}, {
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x01,
 				},
-				{
-					State:  ThresholdStarted,
-					Choice: invalidChoice,
-				},
-				{
-					State:  ThresholdStarted,
-					Choice: invalidChoice,
-				},
-			},
+				count: rci,
+			}},
+			expectedState: []ThresholdStateTuple{{
+				State:  ThresholdDefined,
+				Choice: invalidChoice,
+			}, {
+				State:  ThresholdStarted,
+				Choice: invalidChoice,
+			}, {
+				State:  ThresholdStarted,
+				Choice: invalidChoice,
+			}},
 		},
 		{
 			name:              "multiple choice 100% no",
 			vote:              multipleChoice,
 			blockVersion:      powVersion,
 			startStakeVersion: posVersion,
-			voteBitsCounts: []voteCount{
-				{
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x01},
-					count: svh,
+			voteBitsCounts: []voteCount{{
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x01,
 				},
-				{
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x01},
-					count: rci - 1,
-				}, {
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x21},
-					count: rci,
+				count: svh,
+			}, {
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x01,
 				},
-			},
-			expectedState: []ThresholdStateTuple{
-				{
-					State:  ThresholdDefined,
-					Choice: invalidChoice,
+				count: rci - 1,
+			}, {
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x21,
 				},
-				{
-					State:  ThresholdStarted,
-					Choice: invalidChoice,
-				},
-				{
-					State:  ThresholdFailed,
-					Choice: 2,
-				},
-			},
+				count: rci,
+			}},
+			expectedState: []ThresholdStateTuple{{
+				State:  ThresholdDefined,
+				Choice: invalidChoice,
+			}, {
+				State:  ThresholdStarted,
+				Choice: invalidChoice,
+			}, {
+				State:  ThresholdFailed,
+				Choice: 2,
+			}},
 		},
 		{
 			name:              "multiple choice 100% choice 1",
 			vote:              multipleChoice,
 			blockVersion:      powVersion,
 			startStakeVersion: posVersion,
-			voteBitsCounts: []voteCount{
-				{
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x01},
-					count: svh,
+			voteBitsCounts: []voteCount{{
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x01,
 				},
-				{
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x01},
-					count: rci - 1,
-				}, {
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x11},
-					count: rci,
-				}, {
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x11},
-					count: rci,
-				}, {
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x01},
-					count: rci,
+				count: svh,
+			}, {
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x01,
 				},
-			},
-			expectedState: []ThresholdStateTuple{
-				{
-					State:  ThresholdDefined,
-					Choice: invalidChoice,
+				count: rci - 1,
+			}, {
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x11,
 				},
-				{
-					State:  ThresholdStarted,
-					Choice: invalidChoice,
+				count: rci,
+			}, {
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x11,
 				},
-				{
-					State:  ThresholdLockedIn,
-					Choice: 1,
+				count: rci,
+			}, {
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x01,
 				},
-				{
-					State:  ThresholdActive,
-					Choice: 1,
-				},
-				{
-					State:  ThresholdActive,
-					Choice: 1,
-				},
-			},
+				count: rci,
+			}},
+			expectedState: []ThresholdStateTuple{{
+				State:  ThresholdDefined,
+				Choice: invalidChoice,
+			}, {
+				State:  ThresholdStarted,
+				Choice: invalidChoice,
+			}, {
+				State:  ThresholdLockedIn,
+				Choice: 1,
+			}, {
+				State:  ThresholdActive,
+				Choice: 1,
+			}, {
+				State:  ThresholdActive,
+				Choice: 1,
+			}},
 		},
 		{
 			name:              "multiple choice 100% choice 2",
 			vote:              multipleChoice,
 			blockVersion:      powVersion,
 			startStakeVersion: posVersion,
-			voteBitsCounts: []voteCount{
-				{
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x01},
-					count: svh,
+			voteBitsCounts: []voteCount{{
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x01,
 				},
-				{
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x01},
-					count: rci - 1,
-				}, {
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x31},
-					count: rci,
-				}, {
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x31},
-					count: rci,
-				}, {
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x01},
-					count: rci,
+				count: svh,
+			}, {
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x01,
 				},
-			},
-			expectedState: []ThresholdStateTuple{
-				{
-					State:  ThresholdDefined,
-					Choice: invalidChoice,
+				count: rci - 1,
+			}, {
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x31,
 				},
-				{
-					State:  ThresholdStarted,
-					Choice: invalidChoice,
+				count: rci,
+			}, {
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x31,
 				},
-				{
-					State:  ThresholdLockedIn,
-					Choice: 3,
+				count: rci,
+			}, {
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x01,
 				},
-				{
-					State:  ThresholdActive,
-					Choice: 3,
-				},
-				{
-					State:  ThresholdActive,
-					Choice: 3,
-				},
-			},
+				count: rci,
+			}},
+			expectedState: []ThresholdStateTuple{{
+				State:  ThresholdDefined,
+				Choice: invalidChoice,
+			}, {
+				State:  ThresholdStarted,
+				Choice: invalidChoice,
+			}, {
+				State:  ThresholdLockedIn,
+				Choice: 3,
+			}, {
+				State:  ThresholdActive,
+				Choice: 3,
+			}, {
+				State:  ThresholdActive,
+				Choice: 3,
+			}},
 		},
 		{
 			name:              "multiple choice 100% choice 3",
 			vote:              multipleChoice,
 			blockVersion:      powVersion,
 			startStakeVersion: posVersion,
-			voteBitsCounts: []voteCount{
-				{
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x01},
-					count: svh,
+			voteBitsCounts: []voteCount{{
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x01,
 				},
-				{
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x01},
-					count: rci - 1,
-				}, {
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x41},
-					count: rci,
-				}, {
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x41},
-					count: rci,
-				}, {
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x01},
-					count: rci,
+				count: svh,
+			}, {
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x01,
 				},
-			},
-			expectedState: []ThresholdStateTuple{
-				{
-					State:  ThresholdDefined,
-					Choice: invalidChoice,
+				count: rci - 1,
+			}, {
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x41,
 				},
-				{
-					State:  ThresholdStarted,
-					Choice: invalidChoice,
+				count: rci,
+			}, {
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x41,
 				},
-				{
-					State:  ThresholdLockedIn,
-					Choice: 4,
+				count: rci,
+			}, {
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x01,
 				},
-				{
-					State:  ThresholdActive,
-					Choice: 4,
-				},
-				{
-					State:  ThresholdActive,
-					Choice: 4,
-				},
-			},
+				count: rci,
+			}},
+			expectedState: []ThresholdStateTuple{{
+				State:  ThresholdDefined,
+				Choice: invalidChoice,
+			}, {
+				State:  ThresholdStarted,
+				Choice: invalidChoice,
+			}, {
+				State:  ThresholdLockedIn,
+				Choice: 4,
+			}, {
+				State:  ThresholdActive,
+				Choice: 4,
+			}, {
+				State:  ThresholdActive,
+				Choice: 4,
+			}},
 		},
 		{
 			name:              "multiple choice 100% choice 4",
 			vote:              multipleChoice,
 			blockVersion:      powVersion,
 			startStakeVersion: posVersion,
-			voteBitsCounts: []voteCount{
-				{
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x01},
-					count: svh,
+			voteBitsCounts: []voteCount{{
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x01,
 				},
-				{
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x01},
-					count: rci - 1,
-				}, {
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x51},
-					count: rci,
-				}, {
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x51},
-					count: rci,
-				}, {
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x01},
-					count: rci,
+				count: svh,
+			}, {
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x01,
 				},
-			},
-			expectedState: []ThresholdStateTuple{
-				{
-					State:  ThresholdDefined,
-					Choice: invalidChoice,
+				count: rci - 1,
+			}, {
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x51,
 				},
-				{
-					State:  ThresholdStarted,
-					Choice: invalidChoice,
+				count: rci,
+			}, {
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x51,
 				},
-				{
-					State:  ThresholdLockedIn,
-					Choice: 5,
+				count: rci,
+			}, {
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x01,
 				},
-				{
-					State:  ThresholdActive,
-					Choice: 5,
-				},
-				{
-					State:  ThresholdActive,
-					Choice: 5,
-				},
-			},
+				count: rci,
+			}},
+			expectedState: []ThresholdStateTuple{{
+				State:  ThresholdDefined,
+				Choice: invalidChoice,
+			}, {
+				State:  ThresholdStarted,
+				Choice: invalidChoice,
+			}, {
+				State:  ThresholdLockedIn,
+				Choice: 5,
+			}, {
+				State:  ThresholdActive,
+				Choice: 5,
+			}, {
+				State:  ThresholdActive,
+				Choice: 5,
+			}},
 		},
 		{
 			name:              "multiple choice 100% choice 5 (invalid)",
 			vote:              multipleChoice,
 			blockVersion:      powVersion,
 			startStakeVersion: posVersion,
-			voteBitsCounts: []voteCount{
-				{
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x01},
-					count: svh,
+			voteBitsCounts: []voteCount{{
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x01,
 				},
-				{
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x01},
-					count: rci - 1,
-				}, {
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x61},
-					count: rci,
-				}, {
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x61},
-					count: rci,
-				}, {
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x01},
-					count: rci,
+				count: svh,
+			}, {
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x01,
 				},
-			},
-			expectedState: []ThresholdStateTuple{
-				{
-					State:  ThresholdDefined,
-					Choice: invalidChoice,
+				count: rci - 1,
+			}, {
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x61,
 				},
-				{
-					State:  ThresholdStarted,
-					Choice: invalidChoice,
+				count: rci,
+			}, {
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x61,
 				},
-				{
-					State:  ThresholdStarted,
-					Choice: invalidChoice,
+				count: rci,
+			}, {
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x01,
 				},
-				{
-					State:  ThresholdStarted,
-					Choice: invalidChoice,
-				},
-				{
-					State:  ThresholdStarted,
-					Choice: invalidChoice,
-				},
-			},
+				count: rci,
+			}},
+			expectedState: []ThresholdStateTuple{{
+				State:  ThresholdDefined,
+				Choice: invalidChoice,
+			}, {
+				State:  ThresholdStarted,
+				Choice: invalidChoice,
+			}, {
+				State:  ThresholdStarted,
+				Choice: invalidChoice,
+			}, {
+				State:  ThresholdStarted,
+				Choice: invalidChoice,
+			}, {
+				State:  ThresholdStarted,
+				Choice: invalidChoice,
+			}},
 		},
 	}
 
@@ -1815,76 +1491,52 @@ func TestVoting(t *testing.T) {
 		params = defaultParams(test.vote)
 		// We have to reset the cache for every test.
 		bc := newFakeChain(&params)
-		genesisNode := genesisBlockNode(&params)
-		genesisNode.header.StakeVersion = test.startStakeVersion
+		node := bc.bestNode
+		node.header.StakeVersion = test.startStakeVersion
 
 		t.Logf("running: %v", test.name)
 
-		var currentNode *blockNode
-		currentNode = genesisNode
-
 		// Override start time.
-		currentTimestamp := time.Now()
+		curTimestamp := time.Now()
 
 		// Override expiration time.
 		if test.end != nil {
 			params.Deployments[posVersion][0].ExpireTime =
-				test.end(currentTimestamp)
+				test.end(curTimestamp)
 		}
 
-		t.Logf("currentTimestamp %v start %v expiration %v",
-			uint64(currentTimestamp.Unix()),
+		t.Logf("curTimestamp %v start %v expiration %v",
+			uint64(curTimestamp.Unix()),
 			params.Deployments[posVersion][0].StartTime,
 			params.Deployments[posVersion][0].ExpireTime)
 
-		currentHeight := uint32(1)
 		for k := range test.expectedState {
 			for i := uint32(0); i < test.voteBitsCounts[k].count; i++ {
-				// Make up a header.
-				header := &wire.BlockHeader{
-					Version:      test.blockVersion,
-					Height:       currentHeight,
-					Nonce:        uint32(0),
-					StakeVersion: test.startStakeVersion,
-					Timestamp:    currentTimestamp,
-				}
-				hash := header.BlockHash()
-				node := newBlockNode(header, nil, nil,
-					nil)
-				node.height = int64(currentHeight)
-				node.parent = currentNode
+				// Set stake versions and vote bits.
+				node = newFakeNode(node, test.blockVersion,
+					test.startStakeVersion, 0, curTimestamp)
+				vote := &test.voteBitsCounts[k].vote
+				appendFakeVotes(node, params.TicketsPerBlock,
+					vote.Version, vote.Bits)
 
-				// set stake versions and vote bits
-				for x := 0; x < int(params.TicketsPerBlock); x++ {
-					node.votes = append(node.votes,
-						test.voteBitsCounts[k].vote)
-				}
-
-				currentNode = node
-				bc.bestNode = currentNode
-
-				// fake index
-				bc.index[hash] = node
-
-				currentHeight++
-				currentTimestamp = currentTimestamp.Add(time.Second)
+				bc.bestNode = node
+				bc.index[node.hash] = node
+				curTimestamp = curTimestamp.Add(time.Second)
 			}
 			t.Logf("Height %v, Start time %v, curTime %v, delta %v",
-				currentNode.height, params.Deployments[4][0].StartTime,
-				currentNode.header.Timestamp.Unix(),
-				currentNode.header.Timestamp.Unix()-
+				node.height, params.Deployments[4][0].StartTime,
+				node.header.Timestamp.Unix(),
+				node.header.Timestamp.Unix()-
 					int64(params.Deployments[4][0].StartTime))
-			ts, err := bc.ThresholdState(&currentNode.hash,
-				posVersion, test.vote.Id)
+			ts, err := bc.ThresholdState(&node.hash, posVersion,
+				test.vote.Id)
 			if err != nil {
 				t.Fatalf("ThresholdState(%v): %v", k, err)
 			}
 			if ts != test.expectedState[k] {
-				t.Fatalf("%v.%v (%v) got state %v wanted state"+
-					" %v got choice %v wanted choice %v",
-					test.name, test.vote.Id, k, ts,
-					test.expectedState[k], ts.Choice,
-					test.expectedState[k].Choice)
+				t.Fatalf("%v.%v (%v) got state %+v wanted "+
+					"state %+v", test.name, test.vote.Id, k,
+					ts, test.expectedState[k])
 			}
 		}
 	}
@@ -1976,6 +1628,8 @@ func defaultParallelParams() chaincfg.Params {
 	return params
 }
 
+// TestParallelVoting ensures that two agendas running at the same time progress
+// through the expected states.
 func TestParallelVoting(t *testing.T) {
 	params := defaultParallelParams()
 
@@ -1997,95 +1651,84 @@ func TestParallelVoting(t *testing.T) {
 			vote:              []chaincfg.Vote{testDummy1, testDummy2},
 			blockVersion:      powVersion,
 			startStakeVersion: posVersion,
-			voteBitsCounts: []voteCount{
-				{
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x01},
-					count: uint32(params.StakeValidationHeight),
+			voteBitsCounts: []voteCount{{
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x01,
 				},
-				{
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x01},
-					count: params.RuleChangeActivationInterval - 1,
-				}, {
-					vote: VoteVersionTuple{
-						Version: posVersion - 1,
-						Bits:    vbTestDummy1Yes | vbTestDummy2No},
-					count: params.RuleChangeActivationInterval,
-				}, {
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    vbTestDummy1Yes | vbTestDummy2No},
-					count: params.RuleChangeActivationInterval,
-				}, {
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x01},
-					count: params.RuleChangeActivationInterval,
-				}, {
-					vote: VoteVersionTuple{
-						Version: posVersion,
-						Bits:    0x01},
-					count: params.RuleChangeActivationInterval,
+				count: uint32(params.StakeValidationHeight),
+			}, {
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x01,
 				},
-			},
+				count: params.RuleChangeActivationInterval - 1,
+			}, {
+				vote: VoteVersionTuple{
+					Version: posVersion - 1,
+					Bits:    vbTestDummy1Yes | vbTestDummy2No,
+				},
+				count: params.RuleChangeActivationInterval,
+			}, {
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    vbTestDummy1Yes | vbTestDummy2No,
+				},
+				count: params.RuleChangeActivationInterval,
+			}, {
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x01,
+				},
+				count: params.RuleChangeActivationInterval,
+			}, {
+				vote: VoteVersionTuple{
+					Version: posVersion,
+					Bits:    0x01,
+				},
+				count: params.RuleChangeActivationInterval,
+			}},
 			expectedState: [][]ThresholdStateTuple{
 				// 0
-				{
-					{
-						State:  ThresholdDefined,
-						Choice: invalidChoice,
-					},
-					{
-						State:  ThresholdStarted,
-						Choice: invalidChoice,
-					},
-					{
-						State:  ThresholdStarted,
-						Choice: invalidChoice,
-					},
-					{
-						State:  ThresholdLockedIn,
-						Choice: 0x02,
-					},
-					{
-						State:  ThresholdActive,
-						Choice: 0x02,
-					},
-					{
-						State:  ThresholdActive,
-						Choice: 0x02,
-					},
-				},
+				{{
+					State:  ThresholdDefined,
+					Choice: invalidChoice,
+				}, {
+					State:  ThresholdStarted,
+					Choice: invalidChoice,
+				}, {
+					State:  ThresholdStarted,
+					Choice: invalidChoice,
+				}, {
+					State:  ThresholdLockedIn,
+					Choice: 0x02,
+				}, {
+					State:  ThresholdActive,
+					Choice: 0x02,
+				}, {
+					State:  ThresholdActive,
+					Choice: 0x02,
+				}},
 				// 1
-				{
-					{
-						State:  ThresholdDefined,
-						Choice: invalidChoice,
-					},
-					{
-						State:  ThresholdStarted,
-						Choice: invalidChoice,
-					},
-					{
-						State:  ThresholdStarted,
-						Choice: invalidChoice,
-					},
-					{
-						State:  ThresholdFailed,
-						Choice: 0x01,
-					},
-					{
-						State:  ThresholdFailed,
-						Choice: 0x01,
-					},
-					{
-						State:  ThresholdFailed,
-						Choice: 0x01,
-					},
-				},
+				{{
+					State:  ThresholdDefined,
+					Choice: invalidChoice,
+				}, {
+					State:  ThresholdStarted,
+					Choice: invalidChoice,
+				}, {
+					State:  ThresholdStarted,
+					Choice: invalidChoice,
+				}, {
+					State:  ThresholdFailed,
+					Choice: 0x01,
+				}, {
+					State:  ThresholdFailed,
+					Choice: 0x01,
+				}, {
+					State:  ThresholdFailed,
+					Choice: 0x01,
+				}},
 			},
 		},
 	}
@@ -2095,62 +1738,35 @@ func TestParallelVoting(t *testing.T) {
 		params = defaultParallelParams()
 		// We have to reset the cache for every test.
 		bc := newFakeChain(&params)
-		genesisNode := genesisBlockNode(&params)
-		genesisNode.header.StakeVersion = test.startStakeVersion
+		node := bc.bestNode
+		node.header.StakeVersion = test.startStakeVersion
 
-		t.Logf("running: %v", test.name)
-
-		var currentNode *blockNode
-		currentNode = genesisNode
-		currentTimestamp := time.Now()
-		currentHeight := uint32(1)
+		curTimestamp := time.Now()
 		for k := range test.expectedState[0] {
 			for i := uint32(0); i < test.voteBitsCounts[k].count; i++ {
-				// Make up a header.
-				header := &wire.BlockHeader{
-					Version:      test.blockVersion,
-					Height:       currentHeight,
-					Nonce:        uint32(0),
-					StakeVersion: test.startStakeVersion,
-					Timestamp:    currentTimestamp,
-				}
-				hash := header.BlockHash()
-				node := newBlockNode(header, nil, nil,
-					nil)
-				node.height = int64(currentHeight)
-				node.parent = currentNode
+				// Set stake versions and vote bits.
+				node = newFakeNode(node, test.blockVersion,
+					test.startStakeVersion, 0, curTimestamp)
+				vote := &test.voteBitsCounts[k].vote
+				appendFakeVotes(node, params.TicketsPerBlock,
+					vote.Version, vote.Bits)
 
-				// set stake versions and vote bits
-				for x := 0; x < int(params.TicketsPerBlock); x++ {
-					node.votes = append(node.votes,
-						test.voteBitsCounts[k].vote)
-				}
-
-				currentNode = node
-				bc.bestNode = currentNode
-
-				// fake index
-				bc.index[hash] = node
-
-				currentHeight++
-				currentTimestamp = currentTimestamp.Add(time.Second)
+				bc.bestNode = node
+				bc.index[node.hash] = node
+				curTimestamp = curTimestamp.Add(time.Second)
 			}
-			t.Logf("Height %v", currentNode.height)
 			for i := range test.vote {
-				ts, err := bc.ThresholdState(&currentNode.hash,
+				ts, err := bc.ThresholdState(&node.hash,
 					posVersion, test.vote[i].Id)
 				if err != nil {
 					t.Fatalf("ThresholdState(%v): %v", k, err)
 				}
 
 				if ts != test.expectedState[i][k] {
-					t.Fatalf("%v.%v (%v) got state %v "+
-						"wanted state %v got choice "+
-						"%v wanted choice %v",
+					t.Fatalf("%v.%v (%v) got state %+v "+
+						"wanted state %+v",
 						test.name, test.vote[i].Id, k,
-						ts, test.expectedState[i][k],
-						ts.Choice,
-						test.expectedState[i][k].Choice)
+						ts, test.expectedState[i][k])
 				}
 			}
 		}

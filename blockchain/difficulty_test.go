@@ -395,7 +395,6 @@ func TestCalcNextRequiredStakeDiffV2(t *testing.T) {
 nextTest:
 	for _, test := range tests {
 		bc := newFakeChain(params)
-		bc.bestNode = genesisBlockNode(params)
 
 		// immatureTickets tracks which height the purchased tickets
 		// will mature and thus be eligible for admission to the live
@@ -698,7 +697,6 @@ func TestEstimateNextStakeDiffV2(t *testing.T) {
 nextTest:
 	for _, test := range tests {
 		bc := newFakeChain(params)
-		bc.bestNode = genesisBlockNode(params)
 
 		// immatureTickets track which height the purchased tickets will
 		// mature and thus be eligible for admission to the live ticket
