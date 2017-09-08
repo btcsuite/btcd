@@ -70,6 +70,11 @@ const (
 	// ScriptVerifyStrictEncoding defines that signature scripts and
 	// public keys must follow the strict encoding requirements.
 	ScriptVerifyStrictEncoding
+
+	// ScriptVerifySHA256 defines whether to treat opcode 192 (previously
+	// OP_UNKNOWN192) as the OP_SHA256 opcode which consumes the top item of
+	// the data stack and replaces it with the sha256 of it.
+	ScriptVerifySHA256
 )
 
 const (

@@ -8,6 +8,7 @@ package txscript
 import (
 	"bytes"
 	"crypto/sha1"
+	"crypto/sha256"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -234,7 +235,7 @@ const (
 	OP_SSTXCHANGE          = 0xbd // 189 DECRED
 	OP_CHECKSIGALT         = 0xbe // 190 DECRED
 	OP_CHECKSIGALTVERIFY   = 0xbf // 191 DECRED
-	OP_UNKNOWN192          = 0xc0 // 192
+	OP_SHA256              = 0xc0 // 192
 	OP_UNKNOWN193          = 0xc1 // 193
 	OP_UNKNOWN194          = 0xc2 // 194
 	OP_UNKNOWN195          = 0xc3 // 195
@@ -498,6 +499,7 @@ var opcodeArray = [256]opcode{
 	// Crypto opcodes.
 	OP_RIPEMD160:           {OP_RIPEMD160, "OP_RIPEMD160", 1, opcodeRipemd160},
 	OP_SHA1:                {OP_SHA1, "OP_SHA1", 1, opcodeSha1},
+	OP_SHA256:              {OP_SHA256, "OP_SHA256", 1, opcodeSha256},
 	OP_BLAKE256:            {OP_BLAKE256, "OP_BLAKE256", 1, opcodeBlake256},
 	OP_HASH160:             {OP_HASH160, "OP_HASH160", 1, opcodeHash160},
 	OP_HASH256:             {OP_HASH256, "OP_HASH256", 1, opcodeHash256},
@@ -528,7 +530,6 @@ var opcodeArray = [256]opcode{
 	OP_CHECKSIGALTVERIFY: {OP_CHECKSIGALTVERIFY, "OP_CHECKSIGALTVERIFY", 1, opcodeCheckSigAltVerify},
 
 	// Undefined opcodes.
-	OP_UNKNOWN192: {OP_UNKNOWN192, "OP_UNKNOWN192", 1, opcodeNop},
 	OP_UNKNOWN193: {OP_UNKNOWN193, "OP_UNKNOWN193", 1, opcodeNop},
 	OP_UNKNOWN194: {OP_UNKNOWN194, "OP_UNKNOWN194", 1, opcodeNop},
 	OP_UNKNOWN195: {OP_UNKNOWN195, "OP_UNKNOWN195", 1, opcodeNop},
@@ -863,7 +864,7 @@ func opcodeNop(op *parsedOpcode, vm *Engine) error {
 	switch op.opcode.value {
 	case OP_NOP1, OP_NOP4, OP_NOP5, OP_NOP6,
 		OP_NOP7, OP_NOP8, OP_NOP9, OP_NOP10,
-		OP_UNKNOWN192, OP_UNKNOWN193, OP_UNKNOWN194, OP_UNKNOWN195,
+		OP_UNKNOWN193, OP_UNKNOWN194, OP_UNKNOWN195,
 		OP_UNKNOWN196, OP_UNKNOWN197, OP_UNKNOWN198, OP_UNKNOWN199,
 		OP_UNKNOWN200, OP_UNKNOWN201, OP_UNKNOWN202, OP_UNKNOWN203,
 		OP_UNKNOWN204, OP_UNKNOWN205, OP_UNKNOWN206, OP_UNKNOWN207,
@@ -2343,6 +2344,30 @@ func opcodeBlake256(op *parsedOpcode, vm *Engine) error {
 	}
 
 	hash := chainhash.HashB(buf)
+	vm.dstack.PushByteArray(hash[:])
+	return nil
+}
+
+// opcodeSha256 treats the top item of the data stack as raw bytes and replaces
+// it with sha256(data).
+//
+// Stack transformation: [... x1] -> [... sha256(x1)]
+func opcodeSha256(op *parsedOpcode, vm *Engine) error {
+	// Treat the opcode as OP_UNKNOWN192 if the flag to interpret it as the
+	// SHA256 opcode is not set.
+	if !vm.hasFlag(ScriptVerifySHA256) {
+		if vm.hasFlag(ScriptDiscourageUpgradableNops) {
+			return errors.New("OP_UNKNOWN192 reserved for upgrades")
+		}
+		return nil
+	}
+
+	buf, err := vm.dstack.PopByteArray()
+	if err != nil {
+		return err
+	}
+
+	hash := sha256.Sum256(buf)
 	vm.dstack.PushByteArray(hash[:])
 	return nil
 }

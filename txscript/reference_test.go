@@ -148,6 +148,8 @@ func parseScriptFlags(flagStr string) (ScriptFlags, error) {
 			flags |= ScriptVerifySigPushOnly
 		case "STRICTENC":
 			flags |= ScriptVerifyStrictEncoding
+		case "SHA256":
+			flags |= ScriptVerifySHA256
 		default:
 			return flags, fmt.Errorf("invalid flag: %s", flag)
 		}
