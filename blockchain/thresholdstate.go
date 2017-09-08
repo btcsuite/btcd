@@ -10,6 +10,7 @@ import (
 
 	"github.com/decred/dcrd/chaincfg"
 	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/decred/dcrd/wire"
 )
 
 // ThresholdState define the various threshold states used when voting on
@@ -515,6 +516,49 @@ func (b *BlockChain) ThresholdState(hash *chainhash.Hash, version uint32, deploy
 	state, err := b.deploymentState(node, version, deploymentID)
 	b.chainLock.Unlock()
 	return state, err
+}
+
+// isLNFeaturesAgendaActive returns whether or not the LN features agenda vote,
+// as defined in DCP0002 and DCP0003 has passed and is now active from the point
+// of view of the passed block node.
+//
+// It is important to note that, as the variable name indicates, this function
+// expects the block node prior to the block for which the deployment state is
+// desired.  In other words, the returned deployment state is for the block
+// AFTER the passed node.
+//
+// This function MUST be called with the chain state lock held (for writes).
+func (b *BlockChain) isLNFeaturesAgendaActive(prevNode *blockNode) (bool, error) {
+	// Determine the version for the LN features agenda as defined in
+	// DCP0002 and DCP0003 for the provided network.
+	deploymentVer := uint32(5)
+	if b.chainParams.Net != wire.MainNet {
+		deploymentVer = 6
+	}
+
+	state, err := b.deploymentState(prevNode, deploymentVer,
+		chaincfg.VoteIDLNFeatures)
+	if err != nil {
+		return false, err
+	}
+
+	// NOTE: The choice field of the return threshold state is not examined
+	// here because there is only one possible choice that can be active for
+	// the agenda, which is yes, so there is no need to check it.
+	return state.State == ThresholdActive, nil
+
+}
+
+// IsLNFeaturesAgendaActive returns whether or not the LN features agenda vote,
+// as defined in DCP0002 and DCP0003 has passed and is now active for the block
+// AFTER the current best chain block.
+//
+// This function is safe for concurrent access.
+func (b *BlockChain) IsLNFeaturesAgendaActive() (bool, error) {
+	b.chainLock.Lock()
+	isActive, err := b.isLNFeaturesAgendaActive(b.bestNode)
+	b.chainLock.Unlock()
+	return isActive, err
 }
 
 // VoteCounts is a compacted struct that is used to message vote counts.

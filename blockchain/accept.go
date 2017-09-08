@@ -135,24 +135,37 @@ func (b *BlockChain) checkBlockContext(block *dcrutil.Block, prevNode *blockNode
 			return ruleError(ErrBlockTooBig, str)
 		}
 
+		// Switch to using the past median time of the block prior to
+		// the block being checked for all checks related to lock times
+		// once the stake vote for the agenda is active.
+		blockTime := header.Timestamp
+		lnFeaturesActive, err := b.isLNFeaturesAgendaActive(prevNode)
+		if err != nil {
+			return err
+		}
+		if lnFeaturesActive {
+			medianTime, err := b.calcPastMedianTime(prevNode)
+			if err != nil {
+				return err
+			}
+
+			blockTime = medianTime
+		}
+
 		// The height of this block is one more than the referenced
 		// previous block.
 		blockHeight := prevNode.height + 1
 
 		// Ensure all transactions in the block are finalized.
 		for _, tx := range block.Transactions() {
-			if !IsFinalizedTransaction(tx, blockHeight,
-				header.Timestamp) {
-
+			if !IsFinalizedTransaction(tx, blockHeight, blockTime) {
 				str := fmt.Sprintf("block contains unfinalized regular "+
 					"transaction %v", tx.Hash())
 				return ruleError(ErrUnfinalizedTx, str)
 			}
 		}
 		for _, stx := range block.STransactions() {
-			if !IsFinalizedTransaction(stx, blockHeight,
-				header.Timestamp) {
-
+			if !IsFinalizedTransaction(stx, blockHeight, blockTime) {
 				str := fmt.Sprintf("block contains unfinalized stake "+
 					"transaction %v", stx.Hash())
 				return ruleError(ErrUnfinalizedTx, str)
