@@ -778,8 +778,9 @@ func (c *Client) SearchRawTransactionsAsync(address dcrutil.Address, skip,
 
 	addr := address.EncodeAddress()
 	verbose := dcrjson.Int(0)
+	prevOut := dcrjson.Int(0)
 	cmd := dcrjson.NewSearchRawTransactionsCmd(addr, verbose, &skip, &count,
-		nil, &reverse, &filterAddrs)
+		prevOut, &reverse, &filterAddrs)
 	return c.sendCmd(cmd)
 }
 
@@ -831,7 +832,7 @@ func (c *Client) SearchRawTransactionsVerboseAsync(address dcrutil.Address, skip
 
 	addr := address.EncodeAddress()
 	verbose := dcrjson.Int(1)
-	var prevOut *int
+	prevOut := dcrjson.Int(0)
 	if includePrevOut {
 		prevOut = dcrjson.Int(1)
 	}
