@@ -62,7 +62,7 @@ func TestHashCacheAddContainsHashes(t *testing.T) {
 
 	var err error
 
-	// First, well generate 10 random transactions for use within our
+	// First, we'll generate 10 random transactions for use within our
 	// tests.
 	const numTxns = 10
 	txns := make([]*wire.MsgTx, numTxns)
@@ -104,8 +104,8 @@ func TestHashCacheAddContainsHashes(t *testing.T) {
 	}
 }
 
-// TestHashCacheAddGet tests that the sighahes for a particular transaction
-// care properly retrieved by the GetSigHashes function.
+// TestHashCacheAddGet tests that the sighashes for a particular transaction
+// are properly retrieved by the GetSigHashes function.
 func TestHashCacheAddGet(t *testing.T) {
 	t.Parallel()
 
@@ -170,8 +170,8 @@ func TestHashCachePurge(t *testing.T) {
 		cache.PurgeSigHashes(&txid)
 	}
 
-	// At this point, non of the transaction inserted into the hash cache
-	// should be found within the ache.
+	// At this point, none of the transactions inserted into the hash cache
+	// should be found within the cache.
 	for _, tx := range txns {
 		txid := tx.TxHash()
 		if ok := cache.ContainsHashes(&txid); ok {
