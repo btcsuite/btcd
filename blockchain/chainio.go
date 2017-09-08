@@ -1412,7 +1412,7 @@ func (b *BlockChain) initChainState() error {
 
 		// Die here if we started an upgrade and failed to finish it.
 		if dbInfo.upgradeStarted {
-			return fmt.Errorf("The blockchain database began an upgrade " +
+			return fmt.Errorf("the blockchain database began an upgrade " +
 				"but failed to complete it; delete the database and resync " +
 				"the blockchain")
 		}
@@ -1422,14 +1422,14 @@ func (b *BlockChain) initChainState() error {
 		// to ensure that the database is upgraded to the current version
 		// before hitting this.
 		if dbInfo.version > currentDatabaseVersion {
-			return fmt.Errorf("The blockchain database's version is %v "+
+			return fmt.Errorf("the blockchain database's version is %v "+
 				"but the current version of the software is %v",
 				dbInfo.version, currentDatabaseVersion)
 		}
 
 		// Die here if we're not on the current compression version, too.
 		if dbInfo.compVer > currentCompressionVersion {
-			return fmt.Errorf("The blockchain database's compression "+
+			return fmt.Errorf("the blockchain database's compression "+
 				"version is %v but the current version of the software is %v",
 				dbInfo.version, currentDatabaseVersion)
 		}

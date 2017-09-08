@@ -75,7 +75,7 @@ func setupGlobalConfig() error {
 		activeNetParams = &chaincfg.SimNetParams
 	}
 	if numNets > 1 {
-		return errors.New("The testnet and simnet params can't be " +
+		return errors.New("the testnet and simnet params can't be " +
 			"used together -- choose one of the two")
 	}
 

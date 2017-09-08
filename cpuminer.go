@@ -560,7 +560,7 @@ func (m *CPUMiner) GenerateNBlocks(n uint32) ([]*chainhash.Hash, error) {
 	// Respond with an error if there's virtually 0 chance of CPU-mining a block.
 	if !m.server.chainParams.GenerateSupported {
 		m.Unlock()
-		return nil, errors.New("No support for `generate` on the current " +
+		return nil, errors.New("no support for `generate` on the current " +
 			"network, " + m.server.chainParams.Net.String() +
 			", as it's unlikely to be possible to CPU-mine a block.")
 	}
@@ -568,7 +568,7 @@ func (m *CPUMiner) GenerateNBlocks(n uint32) ([]*chainhash.Hash, error) {
 	// Respond with an error if server is already mining.
 	if m.started || m.discreteMining {
 		m.Unlock()
-		return nil, errors.New("Server is already CPU mining. Please call " +
+		return nil, errors.New("server is already CPU mining. Please call " +
 			"`setgenerate 0` before calling discrete `generate` commands.")
 	}
 

@@ -269,7 +269,7 @@ func loadConfig() (*config, []string, error) {
 		numNets++
 	}
 	if numNets > 1 {
-		str := "%s: The testnet and simnet params can't be used " +
+		str := "%s: the testnet and simnet params can't be used " +
 			"together -- choose one of the two"
 		err := fmt.Errorf(str, "loadConfig")
 		fmt.Fprintln(os.Stderr, err)

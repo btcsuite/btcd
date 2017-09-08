@@ -916,7 +916,7 @@ func testMetadataTxInterface(tc *testContext) bool {
 
 		bucket1 := metadataBucket.Bucket(bucket1Name)
 		if bucket1 == nil {
-			return fmt.Errorf("Bucket1: unexpected nil bucket")
+			return fmt.Errorf("bucket1: unexpected nil bucket")
 		}
 
 		tc.isWritable = false
@@ -957,7 +957,7 @@ func testMetadataTxInterface(tc *testContext) bool {
 
 		bucket1 := metadataBucket.Bucket(bucket1Name)
 		if bucket1 == nil {
-			return fmt.Errorf("Bucket1: unexpected nil bucket")
+			return fmt.Errorf("bucket1: unexpected nil bucket")
 		}
 
 		tc.isWritable = true
@@ -1012,7 +1012,7 @@ func testMetadataTxInterface(tc *testContext) bool {
 
 		bucket1 := metadataBucket.Bucket(bucket1Name)
 		if bucket1 == nil {
-			return fmt.Errorf("Bucket1: unexpected nil bucket")
+			return fmt.Errorf("bucket1: unexpected nil bucket")
 		}
 
 		if !testPutValues(tc, bucket1, keyValues) {
@@ -1037,7 +1037,7 @@ func testMetadataTxInterface(tc *testContext) bool {
 
 		bucket1 := metadataBucket.Bucket(bucket1Name)
 		if bucket1 == nil {
-			return fmt.Errorf("Bucket1: unexpected nil bucket")
+			return fmt.Errorf("bucket1: unexpected nil bucket")
 		}
 
 		if !testGetValues(tc, bucket1, toGetValues(keyValues)) {
@@ -1062,7 +1062,7 @@ func testMetadataTxInterface(tc *testContext) bool {
 
 		bucket1 := metadataBucket.Bucket(bucket1Name)
 		if bucket1 == nil {
-			return fmt.Errorf("Bucket1: unexpected nil bucket")
+			return fmt.Errorf("bucket1: unexpected nil bucket")
 		}
 
 		if !testDeleteValues(tc, bucket1, keyValues) {

@@ -225,7 +225,7 @@ func TestPersistence(t *testing.T) {
 
 		bucket1 := metadataBucket.Bucket(bucket1Key)
 		if bucket1 == nil {
-			return fmt.Errorf("Bucket1: unexpected nil bucket")
+			return fmt.Errorf("bucket1: unexpected nil bucket")
 		}
 
 		for k, v := range storeValues {

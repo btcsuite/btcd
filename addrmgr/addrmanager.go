@@ -481,7 +481,7 @@ func (a *AddrManager) deserializePeers(filePath string) error {
 		for _, val := range sam.NewBuckets[i] {
 			ka, ok := a.addrIndex[val]
 			if !ok {
-				return fmt.Errorf("newbucket contains %s but "+
+				return fmt.Errorf("new buckets contains %s but "+
 					"none in address list", val)
 			}
 
@@ -496,7 +496,7 @@ func (a *AddrManager) deserializePeers(filePath string) error {
 		for _, val := range sam.TriedBuckets[i] {
 			ka, ok := a.addrIndex[val]
 			if !ok {
-				return fmt.Errorf("Newbucket contains %s but "+
+				return fmt.Errorf("tried buckets contains %s but "+
 					"none in address list", val)
 			}
 

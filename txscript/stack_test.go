@@ -161,7 +161,7 @@ func TestStack(t *testing.T) {
 					return err
 				}
 				if v != 0 {
-					return errors.New("0 != 0 on popInt")
+					return errors.New("0 != 0 on PopInt")
 				}
 				return nil
 			},
@@ -177,7 +177,7 @@ func TestStack(t *testing.T) {
 					return err
 				}
 				if v != 0 {
-					return errors.New("-0 != 0 on popInt")
+					return errors.New("-0 != 0 on PopInt")
 				}
 				return nil
 			},
@@ -193,7 +193,7 @@ func TestStack(t *testing.T) {
 					return err
 				}
 				if v != 1 {
-					return errors.New("1 != 1 on popInt")
+					return errors.New("1 != 1 on PopInt")
 				}
 				return nil
 			},
@@ -210,7 +210,7 @@ func TestStack(t *testing.T) {
 				}
 				if v != 1 {
 					fmt.Printf("%v != %v\n", v, 1)
-					return errors.New("1 != 1 on popInt")
+					return errors.New("1 != 1 on PopInt")
 				}
 				return nil
 			},
@@ -226,7 +226,7 @@ func TestStack(t *testing.T) {
 					return err
 				}
 				if v != -1 {
-					return errors.New("-1 != -1 on popInt")
+					return errors.New("-1 != -1 on PopInt")
 				}
 				return nil
 			},
@@ -243,7 +243,7 @@ func TestStack(t *testing.T) {
 				}
 				if v != -1 {
 					fmt.Printf("%v != %v\n", v, -1)
-					return errors.New("-1 != -1 on popInt")
+					return errors.New("-1 != -1 on PopInt")
 				}
 				return nil
 			},
@@ -261,7 +261,7 @@ func TestStack(t *testing.T) {
 				}
 				if v != -513 {
 					fmt.Printf("%v != %v\n", v, -513)
-					return errors.New("1 != 1 on popInt")
+					return errors.New("1 != 1 on PopInt")
 				}
 				return nil
 			},
@@ -279,7 +279,7 @@ func TestStack(t *testing.T) {
 				}
 				if v != -1 {
 					fmt.Printf("%v != %v\n", v, -1)
-					return errors.New("-1 != -1 on popInt")
+					return errors.New("-1 != -1 on PeekInt")
 				}
 				return nil
 			},

@@ -119,7 +119,7 @@ func loadConfig() (*config, []string, error) {
 		activeNetParams = &chaincfg.SimNetParams
 	}
 	if numNets > 1 {
-		str := "%s: The testnet, regtest, and simnet params can't be " +
+		str := "%s: the testnet, regtest, and simnet params can't be " +
 			"used together -- choose one of the three"
 		err := fmt.Errorf(str, funcName)
 		fmt.Fprintln(os.Stderr, err)
@@ -129,7 +129,7 @@ func loadConfig() (*config, []string, error) {
 
 	// Validate database type.
 	if !validDbType(cfg.DbType) {
-		str := "%s: The specified database type [%v] is invalid -- " +
+		str := "%s: the specified database type [%v] is invalid -- " +
 			"supported types %v"
 		err := fmt.Errorf(str, "loadConfig", cfg.DbType, knownDbTypes)
 		fmt.Fprintln(os.Stderr, err)
@@ -147,7 +147,7 @@ func loadConfig() (*config, []string, error) {
 
 	// Ensure the specified block file exists.
 	if !fileExists(cfg.InFile) {
-		str := "%s: The specified block file [%v] does not exist"
+		str := "%s: the specified block file [%v] does not exist"
 		err := fmt.Errorf(str, "loadConfig", cfg.InFile)
 		fmt.Fprintln(os.Stderr, err)
 		parser.WriteHelp(os.Stderr)

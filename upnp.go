@@ -239,22 +239,22 @@ func getServiceURL(rootURL string) (url string, err error) {
 	}
 	a := &root.Device
 	if a.DeviceType != "urn:schemas-upnp-org:device:InternetGatewayDevice:1" {
-		err = errors.New("no InternetGatewayDevice")
+		err = errors.New("no internet gateway device")
 		return
 	}
 	b := getChildDevice(a, "urn:schemas-upnp-org:device:WANDevice:1")
 	if b == nil {
-		err = errors.New("no WANDevice")
+		err = errors.New("no WAN device")
 		return
 	}
 	c := getChildDevice(b, "urn:schemas-upnp-org:device:WANConnectionDevice:1")
 	if c == nil {
-		err = errors.New("no WANConnectionDevice")
+		err = errors.New("no WAN connection device")
 		return
 	}
 	d := getChildService(c, "urn:schemas-upnp-org:service:WANIPConnection:1")
 	if d == nil {
-		err = errors.New("no WANIPConnection")
+		err = errors.New("no WAN IP connection")
 		return
 	}
 	url = combineURL(rootURL, d.ControlURL)
@@ -314,7 +314,7 @@ func soapRequest(url, function, message string) (replyXML []byte, err error) {
 
 	if r.StatusCode >= 400 {
 		// log.Stderr(function, r.StatusCode)
-		err = errors.New("Error " + strconv.Itoa(r.StatusCode) + " for " + function)
+		err = errors.New("error " + strconv.Itoa(r.StatusCode) + " for " + function)
 		r = nil
 		return
 	}

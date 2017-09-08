@@ -159,7 +159,7 @@ out:
 		// notify the status handler with the error and bail.
 		serializedBlock, err := bi.readBlock()
 		if err != nil {
-			bi.errChan <- fmt.Errorf("Error reading from input "+
+			bi.errChan <- fmt.Errorf("error reading from input "+
 				"file: %v", err.Error())
 			break out
 		}
