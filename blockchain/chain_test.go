@@ -1,5 +1,5 @@
 // Copyright (c) 2013-2016 The btcsuite developers
-// Copyright (c) 2015-2016 The Decred developers
+// Copyright (c) 2015-2017 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -14,27 +14,56 @@ import (
 	"testing"
 
 	"github.com/decred/dcrd/blockchain"
+	"github.com/decred/dcrd/chaincfg"
+	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrutil"
 )
+
+// cloneParams returns a deep copy of the provided parameters so the caller is
+// free to modify them without worrying about interfering with other tests.
+func cloneParams(params *chaincfg.Params) *chaincfg.Params {
+	// Encode via gob.
+	buf := new(bytes.Buffer)
+	enc := gob.NewEncoder(buf)
+	enc.Encode(params)
+
+	// Decode via gob to make a deep copy.
+	var paramsCopy chaincfg.Params
+	dec := gob.NewDecoder(buf)
+	dec.Decode(&paramsCopy)
+	return &paramsCopy
+}
+
+// mustParseHash converts the passed big-endian hex string into a
+// chainhash.Hash and will panic if there is an error.  It only differs from the
+// one available in chainhash in that it will panic so errors in the source code
+// be detected.  It will only (and must only) be called with hard-coded, and
+// therefore known good, hashes.
+func mustParseHash(s string) *chainhash.Hash {
+	hash, err := chainhash.NewHashFromStr(s)
+	if err != nil {
+		panic("invalid hash in source file: " + s)
+	}
+	return hash
+}
 
 // TestBlockchainFunction tests the various blockchain API to ensure proper
 // functionality.
 func TestBlockchainFunctions(t *testing.T) {
+	// Update simnet parameters to reflect what is expected by the legacy
+	// data.
+	params := cloneParams(&chaincfg.SimNetParams)
+	params.GenesisBlock.Header.MerkleRoot = *mustParseHash("a216ea043f0d481a072424af646787794c32bcefd3ed181a090319bbf8a37105")
+	genesisHash := params.GenesisBlock.BlockHash()
+	params.GenesisHash = &genesisHash
+
 	// Create a new database and chain instance to run tests against.
-	chain, teardownFunc, err := chainSetup("validateunittests",
-		simNetParams)
+	chain, teardownFunc, err := chainSetup("validateunittests", params)
 	if err != nil {
 		t.Errorf("Failed to setup chain instance: %v", err)
 		return
 	}
 	defer teardownFunc()
-
-	// The genesis block should fail to connect since it's already inserted.
-	genesisBlock := simNetParams.GenesisBlock
-	err = chain.CheckConnectBlock(dcrutil.NewBlock(genesisBlock))
-	if err == nil {
-		t.Errorf("CheckConnectBlock: Did not receive expected error")
-	}
 
 	// Load up the rest of the blocks up to HEAD~1.
 	filename := filepath.Join("testdata/", "blocks0to168.bz2")

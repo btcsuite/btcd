@@ -1,5 +1,5 @@
 // Copyright (c) 2013-2014 The btcsuite developers
-// Copyright (c) 2015-2016 The Decred developers
+// Copyright (c) 2015-2017 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -14,15 +14,15 @@ import (
 	"testing"
 
 	"github.com/decred/dcrd/blockchain"
+	"github.com/decred/dcrd/chaincfg"
 	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrutil"
 )
 
 // reorgTestLong does a single, large reorganization.
-func reorgTestLong(t *testing.T) {
+func reorgTestLong(t *testing.T, params *chaincfg.Params) {
 	// Create a new database and chain instance to run tests against.
-	chain, teardownFunc, err := chainSetup("reorgunittest",
-		simNetParams)
+	chain, teardownFunc, err := chainSetup("reorgunittest", params)
 	if err != nil {
 		t.Errorf("Failed to setup chain instance: %v", err)
 		return
@@ -31,8 +31,7 @@ func reorgTestLong(t *testing.T) {
 
 	// The genesis block should fail to connect since it's already
 	// inserted.
-	genesisBlock := simNetParams.GenesisBlock
-	err = chain.CheckConnectBlock(dcrutil.NewBlock(genesisBlock))
+	err = chain.CheckConnectBlock(dcrutil.NewBlock(params.GenesisBlock))
 	if err == nil {
 		t.Errorf("CheckConnectBlock: Did not receive expected error")
 	}
@@ -134,10 +133,9 @@ func reorgTestLong(t *testing.T) {
 
 // reorgTestsShort does short reorganizations to test multiple, frequent
 // reorganizations.
-func reorgTestShort(t *testing.T) {
+func reorgTestShort(t *testing.T, params *chaincfg.Params) {
 	// Create a new database and chain instance to run tests against.
-	chain, teardownFunc, err := chainSetup("reorgunittest",
-		simNetParams)
+	chain, teardownFunc, err := chainSetup("reorgunittestshort", params)
 	if err != nil {
 		t.Errorf("Failed to setup chain instance: %v", err)
 		return
@@ -146,8 +144,7 @@ func reorgTestShort(t *testing.T) {
 
 	// The genesis block should fail to connect since it's already
 	// inserted.
-	genesisBlock := simNetParams.GenesisBlock
-	err = chain.CheckConnectBlock(dcrutil.NewBlock(genesisBlock))
+	err = chain.CheckConnectBlock(dcrutil.NewBlock(params.GenesisBlock))
 	if err == nil {
 		t.Errorf("CheckConnectBlock: Did not receive expected error")
 	}
@@ -254,10 +251,9 @@ func reorgTestShort(t *testing.T) {
 }
 
 // reorgTestsForced tests a forced reorganization of a single block at HEAD.
-func reorgTestForced(t *testing.T) {
+func reorgTestForced(t *testing.T, params *chaincfg.Params) {
 	// Create a new database and chain instance to run tests against.
-	chain, teardownFunc, err := chainSetup("reorgunittest",
-		simNetParams)
+	chain, teardownFunc, err := chainSetup("reorgunittestforce", params)
 	if err != nil {
 		t.Errorf("Failed to setup chain instance: %v", err)
 		return
@@ -266,8 +262,7 @@ func reorgTestForced(t *testing.T) {
 
 	// The genesis block should fail to connect since it's already
 	// inserted.
-	genesisBlock := simNetParams.GenesisBlock
-	err = chain.CheckConnectBlock(dcrutil.NewBlock(genesisBlock))
+	err = chain.CheckConnectBlock(dcrutil.NewBlock(params.GenesisBlock))
 	if err == nil {
 		t.Errorf("CheckConnectBlock: Did not receive expected error")
 	}
@@ -372,7 +367,14 @@ func reorgTestForced(t *testing.T) {
 // TestReorganization loads a set of test blocks which force a chain
 // reorganization to test the block chain handling code.
 func TestReorganization(t *testing.T) {
-	reorgTestLong(t)
-	reorgTestShort(t)
-	reorgTestForced(t)
+	// Update simnet parameters to reflect what is expected by the legacy
+	// data.
+	params := cloneParams(&chaincfg.SimNetParams)
+	params.GenesisBlock.Header.MerkleRoot = *mustParseHash("a216ea043f0d481a072424af646787794c32bcefd3ed181a090319bbf8a37105")
+	genesisHash := params.GenesisBlock.BlockHash()
+	params.GenesisHash = &genesisHash
+
+	reorgTestLong(t, params)
+	reorgTestShort(t, params)
+	reorgTestForced(t, params)
 }

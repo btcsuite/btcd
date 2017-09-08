@@ -2,6 +2,7 @@
 // Copyright (c) 2015-2017 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
+
 package blockchain_test
 
 import (
@@ -9,8 +10,6 @@ import (
 	"compress/bzip2"
 	"encoding/gob"
 	"encoding/hex"
-	"math"
-	"math/big"
 	"os"
 	"path/filepath"
 	"testing"
@@ -57,9 +56,15 @@ func recalculateMsgBlockMerkleRootsSize(msgBlock *wire.MsgBlock) {
 // scenic pedigree quadrant hamburger Algol Yucatan erase impetus seabird
 // hemisphere drunken vacancy uncut caretaker Dupont
 func TestBlockValidationRules(t *testing.T) {
+	// Update simnet parameters to reflect what is expected by the legacy
+	// data.
+	params := cloneParams(&chaincfg.SimNetParams)
+	params.GenesisBlock.Header.MerkleRoot = *mustParseHash("a216ea043f0d481a072424af646787794c32bcefd3ed181a090319bbf8a37105")
+	genesisHash := params.GenesisBlock.BlockHash()
+	params.GenesisHash = &genesisHash
+
 	// Create a new database and chain instance to run tests against.
-	chain, teardownFunc, err := chainSetup("validateunittests",
-		simNetParams)
+	chain, teardownFunc, err := chainSetup("validateunittests", params)
 	if err != nil {
 		t.Errorf("Failed to setup chain instance: %v", err)
 		return
@@ -67,8 +72,7 @@ func TestBlockValidationRules(t *testing.T) {
 	defer teardownFunc()
 
 	// The genesis block should fail to connect since it's already inserted.
-	genesisBlock := simNetParams.GenesisBlock
-	err = chain.CheckConnectBlock(dcrutil.NewBlock(genesisBlock))
+	err = chain.CheckConnectBlock(dcrutil.NewBlock(params.GenesisBlock))
 	if err == nil {
 		t.Errorf("CheckConnectBlock: Did not receive expected error")
 	}
@@ -113,7 +117,7 @@ func TestBlockValidationRules(t *testing.T) {
 	recalculateMsgBlockMerkleRootsSize(noCoinbaseOuts1)
 	b1test := dcrutil.NewBlock(noCoinbaseOuts1)
 
-	err = blockchain.CheckWorklessBlockSanity(b1test, timeSource, simNetParams)
+	err = blockchain.CheckWorklessBlockSanity(b1test, timeSource, params)
 	if err != nil {
 		t.Errorf("Got unexpected error for ErrBlockOneOutputs test 2: %v", err)
 	}
@@ -135,7 +139,7 @@ func TestBlockValidationRules(t *testing.T) {
 	recalculateMsgBlockMerkleRootsSize(noCoinbaseOuts1)
 	b1test = dcrutil.NewBlock(noCoinbaseOuts1)
 
-	err = blockchain.CheckWorklessBlockSanity(b1test, timeSource, simNetParams)
+	err = blockchain.CheckWorklessBlockSanity(b1test, timeSource, params)
 	if err != nil {
 		t.Errorf("Got unexpected error for ErrBlockOneOutputs test 3: %v", err)
 	}
@@ -157,7 +161,7 @@ func TestBlockValidationRules(t *testing.T) {
 	recalculateMsgBlockMerkleRootsSize(noCoinbaseOuts1)
 	b1test = dcrutil.NewBlock(noCoinbaseOuts1)
 
-	err = blockchain.CheckWorklessBlockSanity(b1test, timeSource, simNetParams)
+	err = blockchain.CheckWorklessBlockSanity(b1test, timeSource, params)
 	if err != nil {
 		t.Errorf("Got unexpected error for ErrBlockOneOutputs test 4: %v", err)
 	}
@@ -208,7 +212,7 @@ func TestBlockValidationRules(t *testing.T) {
 	recalculateMsgBlockMerkleRootsSize(earlySSGen142)
 	b142test := dcrutil.NewBlock(earlySSGen142)
 
-	err = blockchain.CheckWorklessBlockSanity(b142test, timeSource, simNetParams)
+	err = blockchain.CheckWorklessBlockSanity(b142test, timeSource, params)
 	if err == nil {
 		t.Errorf("got no error for ErrInvalidEarlyStakeTx test")
 	}
@@ -228,7 +232,7 @@ func TestBlockValidationRules(t *testing.T) {
 	earlyBadVoteBits42.Header.VoteBits ^= 0x80
 	b142test = dcrutil.NewBlock(earlyBadVoteBits42)
 
-	err = blockchain.CheckWorklessBlockSanity(b142test, timeSource, simNetParams)
+	err = blockchain.CheckWorklessBlockSanity(b142test, timeSource, params)
 	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrInvalidEarlyVoteBits {
 		t.Errorf("Got unexpected no error or wrong error for "+
@@ -278,7 +282,7 @@ func TestBlockValidationRules(t *testing.T) {
 	badMerkleRoot153.Header.MerkleRoot[0] ^= 0x01
 	b153test := dcrutil.NewBlock(badMerkleRoot153)
 
-	err = blockchain.CheckWorklessBlockSanity(b153test, timeSource, simNetParams)
+	err = blockchain.CheckWorklessBlockSanity(b153test, timeSource, params)
 	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrBadMerkleRoot {
 		t.Errorf("Failed to get error or correct error for ErrBadMerkleRoot 1"+
@@ -300,7 +304,7 @@ func TestBlockValidationRules(t *testing.T) {
 	badMerkleRoot153.Header.StakeRoot[0] ^= 0x01
 	b153test = dcrutil.NewBlock(badMerkleRoot153)
 
-	err = blockchain.CheckWorklessBlockSanity(b153test, timeSource, simNetParams)
+	err = blockchain.CheckWorklessBlockSanity(b153test, timeSource, params)
 	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrBadMerkleRoot {
 		t.Errorf("Failed to get error or correct error for ErrBadMerkleRoot 2"+
@@ -363,7 +367,7 @@ func TestBlockValidationRules(t *testing.T) {
 	missingParent153.Header.PrevBlock[8] ^= 0x01
 	b153test = dcrutil.NewBlock(missingParent153)
 
-	err = blockchain.CheckWorklessBlockSanity(b153test, timeSource, simNetParams)
+	err = blockchain.CheckWorklessBlockSanity(b153test, timeSource, params)
 	if err != nil {
 		t.Errorf("Got unexpected sanity error for ErrMissingParent test: %v",
 			err)
@@ -383,7 +387,7 @@ func TestBlockValidationRules(t *testing.T) {
 	recalculateMsgBlockMerkleRootsSize(badSubsidy153)
 	b153test = dcrutil.NewBlock(badSubsidy153)
 
-	err = blockchain.CheckWorklessBlockSanity(b153test, timeSource, simNetParams)
+	err = blockchain.CheckWorklessBlockSanity(b153test, timeSource, params)
 	if err != nil {
 		t.Errorf("Got unexpected sanity error for ErrBadCoinbaseValue test: %v",
 			err)
@@ -405,7 +409,7 @@ func TestBlockValidationRules(t *testing.T) {
 	recalculateMsgBlockMerkleRootsSize(badCBOutpoint153)
 	b153test = dcrutil.NewBlock(badCBOutpoint153)
 
-	err = blockchain.CheckWorklessBlockSanity(b153test, timeSource, simNetParams)
+	err = blockchain.CheckWorklessBlockSanity(b153test, timeSource, params)
 	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrFirstTxNotCoinbase {
 		t.Errorf("Got no or unexpected sanity error for "+
@@ -425,7 +429,7 @@ func TestBlockValidationRules(t *testing.T) {
 	recalculateMsgBlockMerkleRootsSize(badCBFraudProof153)
 	b153test = dcrutil.NewBlock(badCBFraudProof153)
 
-	err = blockchain.CheckWorklessBlockSanity(b153test, timeSource, simNetParams)
+	err = blockchain.CheckWorklessBlockSanity(b153test, timeSource, params)
 	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrBadCoinbaseFraudProof {
 		t.Errorf("Got no or unexpected sanity error for "+
@@ -446,7 +450,7 @@ func TestBlockValidationRules(t *testing.T) {
 	recalculateMsgBlockMerkleRootsSize(badCBAmountIn153)
 	b153test = dcrutil.NewBlock(badCBAmountIn153)
 
-	err = blockchain.CheckWorklessBlockSanity(b153test, timeSource, simNetParams)
+	err = blockchain.CheckWorklessBlockSanity(b153test, timeSource, params)
 	if err != nil {
 		t.Errorf("Got unexpected error for ErrBadCoinbaseFraudProof test: %v",
 			err)
@@ -467,7 +471,7 @@ func TestBlockValidationRules(t *testing.T) {
 	recalculateMsgBlockMerkleRootsSize(badSBAmountIn153)
 	b153test = dcrutil.NewBlock(badSBAmountIn153)
 
-	err = blockchain.CheckWorklessBlockSanity(b153test, timeSource, simNetParams)
+	err = blockchain.CheckWorklessBlockSanity(b153test, timeSource, params)
 	if err != nil {
 		t.Errorf("Got unexpected error for ErrBadCoinbaseFraudProof test: %v",
 			err)
@@ -493,7 +497,7 @@ func TestBlockValidationRules(t *testing.T) {
 	badStakebaseOutpoint153.Header.Voters--
 	b153test = dcrutil.NewBlock(badStakebaseOutpoint153)
 
-	err = blockchain.CheckWorklessBlockSanity(b153test, timeSource, simNetParams)
+	err = blockchain.CheckWorklessBlockSanity(b153test, timeSource, params)
 	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrRegTxInStakeTree {
 		t.Errorf("Failed to get error or correct error for ErrRegTxInStakeTree "+
@@ -518,7 +522,7 @@ func TestBlockValidationRules(t *testing.T) {
 	recalculateMsgBlockMerkleRootsSize(ssgenInRegular153)
 	b153test = dcrutil.NewBlock(ssgenInRegular153)
 
-	err = blockchain.CheckWorklessBlockSanity(b153test, timeSource, simNetParams)
+	err = blockchain.CheckWorklessBlockSanity(b153test, timeSource, params)
 	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrStakeTxInRegularTree {
 		t.Errorf("Failed to get error or correct error for ErrRegTxInStakeTree "+
@@ -541,7 +545,7 @@ func TestBlockValidationRules(t *testing.T) {
 	recalculateMsgBlockMerkleRootsSize(badStakebaseSS153)
 	b153test = dcrutil.NewBlock(badStakebaseSS153)
 
-	err = blockchain.CheckWorklessBlockSanity(b153test, timeSource, simNetParams)
+	err = blockchain.CheckWorklessBlockSanity(b153test, timeSource, params)
 	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrBadStakebaseScriptLen {
 		t.Errorf("Failed to get error or correct error for bad stakebase "+
@@ -563,7 +567,7 @@ func TestBlockValidationRules(t *testing.T) {
 	recalculateMsgBlockMerkleRootsSize(badStakebaseScr153)
 	b153test = dcrutil.NewBlock(badStakebaseScr153)
 
-	err = blockchain.CheckWorklessBlockSanity(b153test, timeSource, simNetParams)
+	err = blockchain.CheckWorklessBlockSanity(b153test, timeSource, params)
 	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrBadStakebaseScrVal {
 		t.Errorf("Failed to get error or correct error for bad stakebase "+
@@ -585,7 +589,7 @@ func TestBlockValidationRules(t *testing.T) {
 
 	b153test = dcrutil.NewBlock(badSSRtxNum153)
 
-	err = blockchain.CheckWorklessBlockSanity(b153test, timeSource, simNetParams)
+	err = blockchain.CheckWorklessBlockSanity(b153test, timeSource, params)
 	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrRevocationsMismatch {
 		t.Errorf("got unexpected no error or other error for "+
@@ -611,7 +615,7 @@ func TestBlockValidationRules(t *testing.T) {
 	recalculateMsgBlockMerkleRootsSize(ssrtxPayeesMismatch153)
 	b153test = dcrutil.NewBlock(ssrtxPayeesMismatch153)
 
-	err = blockchain.CheckWorklessBlockSanity(b153test, timeSource, simNetParams)
+	err = blockchain.CheckWorklessBlockSanity(b153test, timeSource, params)
 	if err != nil {
 		t.Errorf("got unexpected error for ErrSSRtxPayeesMismatch sanity  "+
 			"check: %v", err)
@@ -635,7 +639,7 @@ func TestBlockValidationRules(t *testing.T) {
 	recalculateMsgBlockMerkleRootsSize(badSSRtxPayee153)
 	b153test = dcrutil.NewBlock(badSSRtxPayee153)
 
-	err = blockchain.CheckWorklessBlockSanity(b153test, timeSource, simNetParams)
+	err = blockchain.CheckWorklessBlockSanity(b153test, timeSource, params)
 	if err != nil {
 		t.Errorf("got unexpected error for ErrSSRtxPayees sanity  "+
 			"check 1: %v", err)
@@ -661,7 +665,7 @@ func TestBlockValidationRules(t *testing.T) {
 	recalculateMsgBlockMerkleRootsSize(badSSRtxPayee153)
 	b153test = dcrutil.NewBlock(badSSRtxPayee153)
 
-	err = blockchain.CheckWorklessBlockSanity(b153test, timeSource, simNetParams)
+	err = blockchain.CheckWorklessBlockSanity(b153test, timeSource, params)
 	if err != nil {
 		t.Errorf("got unexpected error for ErrSSRtxPayees sanity "+
 			"check 2: %v", err)
@@ -695,7 +699,7 @@ func TestBlockValidationRules(t *testing.T) {
 	recalculateMsgBlockMerkleRootsSize(badSSRtx153)
 	b153test = dcrutil.NewBlock(badSSRtx153)
 
-	// err = blockchain.CheckWorklessBlockSanity(b153test, timeSource, simNetParams)
+	// err = blockchain.CheckWorklessBlockSanity(b153test, timeSource, params)
 	// if err != nil {
 	//	t.Errorf("got unexpected error for ErrInvalidSSRtx sanity check: %v",
 	//		err)
@@ -724,7 +728,7 @@ func TestBlockValidationRules(t *testing.T) {
 	b154test := dcrutil.NewBlock(block154MsgBlock)
 
 	// The incoming block should pass fine.
-	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, simNetParams)
+	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, params)
 	if err != nil {
 		t.Errorf("Unexpected error for check block 154 sanity: %v", err.Error())
 	}
@@ -744,7 +748,7 @@ func TestBlockValidationRules(t *testing.T) {
 	b154test = dcrutil.NewBlock(notEnoughStake154)
 
 	// This fails both checks.
-	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, simNetParams)
+	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, params)
 	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrNotEnoughStake {
 		t.Errorf("Failed to get error or correct error for low stake amt "+
@@ -766,7 +770,7 @@ func TestBlockValidationRules(t *testing.T) {
 	b154test = dcrutil.NewBlock(badFreshStake154)
 
 	// Throws an error in stake consensus.
-	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, simNetParams)
+	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, params)
 	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrFreshStakeMismatch {
 		t.Errorf("Unexpected no or wrong error for ErrFreshStakeMismatch "+
@@ -794,7 +798,7 @@ func TestBlockValidationRules(t *testing.T) {
 	b154test = dcrutil.NewBlock(notEnoughVotes154)
 
 	// Fails and hits ErrNotEnoughVotes.
-	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, simNetParams)
+	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, params)
 	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrNotEnoughVotes {
 		t.Errorf("Got no or unexpected block sanity err for "+
@@ -826,7 +830,7 @@ func TestBlockValidationRules(t *testing.T) {
 	b154test = dcrutil.NewBlock(tooManyVotes154)
 
 	// Fails and hits ErrTooManyVotes.
-	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, simNetParams)
+	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, params)
 	if err == nil {
 		t.Errorf("got unexpected no error for ErrTooManyVotes sanity check")
 	}
@@ -840,7 +844,7 @@ func TestBlockValidationRules(t *testing.T) {
 	recalculateMsgBlockMerkleRootsSize(nonChosenTicket154)
 	b154test = dcrutil.NewBlock(nonChosenTicket154)
 
-	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, simNetParams)
+	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, params)
 	if err != nil {
 		t.Errorf("got unexpected error for ErrTicketUnavailable sanity check"+
 			": %v",
@@ -866,7 +870,7 @@ func TestBlockValidationRules(t *testing.T) {
 	recalculateMsgBlockMerkleRootsSize(wrongBlockVote154)
 	b154test = dcrutil.NewBlock(wrongBlockVote154)
 
-	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, simNetParams)
+	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, params)
 	if err != nil {
 		t.Errorf("got unexpected error for ErrVotesOnWrongBlock sanity check: %v",
 			err)
@@ -892,7 +896,7 @@ func TestBlockValidationRules(t *testing.T) {
 	b154test = dcrutil.NewBlock(votesMismatch154)
 
 	// Fails and hits ErrVotesMismatch.
-	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, simNetParams)
+	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, params)
 	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrVotesMismatch {
 		t.Errorf("got unexpected no or wrong error for ErrVotesMismatch "+
@@ -907,7 +911,7 @@ func TestBlockValidationRules(t *testing.T) {
 	badVoteBit154.Header.VoteBits &= 0xFFFE // Zero critical voteBit
 	b154test = dcrutil.NewBlock(badVoteBit154)
 
-	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, simNetParams)
+	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, params)
 	if err != nil {
 		t.Errorf("got unexpected error for ErrIncongruentVotebit 2 sanity  "+
 			"check: %v", err)
@@ -936,7 +940,7 @@ func TestBlockValidationRules(t *testing.T) {
 	recalculateMsgBlockMerkleRootsSize(badVoteBit154)
 	b154test = dcrutil.NewBlock(badVoteBit154)
 
-	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, simNetParams)
+	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, params)
 	if err != nil {
 		t.Errorf("got unexpected error for ErrIncongruentVotebit 2 sanity  "+
 			"check: %v", err)
@@ -965,7 +969,7 @@ func TestBlockValidationRules(t *testing.T) {
 	recalculateMsgBlockMerkleRootsSize(badVoteBit154)
 	b154test = dcrutil.NewBlock(badVoteBit154)
 
-	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, simNetParams)
+	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, params)
 	if err != nil {
 		t.Errorf("got unexpected error for ErrIncongruentVotebit 3 sanity  "+
 			"check: %v", err)
@@ -994,7 +998,7 @@ func TestBlockValidationRules(t *testing.T) {
 	recalculateMsgBlockMerkleRootsSize(badVoteBit154)
 	b154test = dcrutil.NewBlock(badVoteBit154)
 
-	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, simNetParams)
+	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, params)
 	if err != nil {
 		t.Errorf("got unexpected error for ErrIncongruentVotebit 4 sanity  "+
 			"check: %v", err)
@@ -1028,7 +1032,7 @@ func TestBlockValidationRules(t *testing.T) {
 	recalculateMsgBlockMerkleRootsSize(badVoteBit154)
 	b154test = dcrutil.NewBlock(badVoteBit154)
 
-	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, simNetParams)
+	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, params)
 	if err != nil {
 		t.Errorf("got unexpected error for ErrIncongruentVotebit 5 sanity  "+
 			"check: %v", err)
@@ -1062,7 +1066,7 @@ func TestBlockValidationRules(t *testing.T) {
 	recalculateMsgBlockMerkleRootsSize(badVoteBit154)
 	b154test = dcrutil.NewBlock(badVoteBit154)
 
-	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, simNetParams)
+	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, params)
 	if err != nil {
 		t.Errorf("got unexpected error for ErrIncongruentVotebit 6 sanity  "+
 			"check: %v", err)
@@ -1096,7 +1100,7 @@ func TestBlockValidationRules(t *testing.T) {
 	recalculateMsgBlockMerkleRootsSize(badVoteBit154)
 	b154test = dcrutil.NewBlock(badVoteBit154)
 
-	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, simNetParams)
+	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, params)
 	if err != nil {
 		t.Errorf("got unexpected error for ErrIncongruentVotebit 7 sanity  "+
 			"check: %v", err)
@@ -1122,7 +1126,7 @@ func TestBlockValidationRules(t *testing.T) {
 	recalculateMsgBlockMerkleRootsSize(badSStxCommit154)
 	b154test = dcrutil.NewBlock(badSStxCommit154)
 
-	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, simNetParams)
+	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, params)
 	if err != nil {
 		t.Errorf("got unexpected error for ErrSStxCommitment sanity check: %v",
 			err)
@@ -1155,7 +1159,7 @@ func TestBlockValidationRules(t *testing.T) {
 	recalculateMsgBlockMerkleRootsSize(badSSGenPayee154)
 	b154test = dcrutil.NewBlock(badSSGenPayee154)
 
-	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, simNetParams)
+	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, params)
 	if err != nil {
 		t.Errorf("got unexpected error for ErrSSGenPayeeOuts sanity  "+
 			"check: %v", err)
@@ -1179,7 +1183,7 @@ func TestBlockValidationRules(t *testing.T) {
 	recalculateMsgBlockMerkleRootsSize(badSSGenPayee154)
 	b154test = dcrutil.NewBlock(badSSGenPayee154)
 
-	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, simNetParams)
+	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, params)
 	if err != nil {
 		t.Errorf("got unexpected error for ErrSSGenPayeeOuts sanity  "+
 			"check2 : %v", err)
@@ -1240,7 +1244,7 @@ func TestBlockValidationRules(t *testing.T) {
 	recalculateMsgBlockMerkleRootsSize(spendTaggedIn154)
 	b154test = dcrutil.NewBlock(spendTaggedIn154)
 
-	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, simNetParams)
+	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, params)
 	if err != nil {
 		t.Errorf("got unexpected error for ErrTxSStxOutSpend sanity check: %v",
 			err)
@@ -1268,7 +1272,7 @@ func TestBlockValidationRules(t *testing.T) {
 	recalculateMsgBlockMerkleRootsSize(spendTaggedOut154)
 	b154test = dcrutil.NewBlock(spendTaggedOut154)
 
-	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, simNetParams)
+	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, params)
 	if err != nil {
 		t.Errorf("got unexpected error for ErrRegTxSpendStakeOut sanity check: %v",
 			err)
@@ -1289,7 +1293,7 @@ func TestBlockValidationRules(t *testing.T) {
 	badFinalState154.Header.FinalState[0] ^= 0x01
 	b154test = dcrutil.NewBlock(badFinalState154)
 
-	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, simNetParams)
+	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, params)
 	if err != nil {
 		t.Errorf("got unexpected error for ErrInvalidFinalState sanity check: %v",
 			err)
@@ -1310,7 +1314,7 @@ func TestBlockValidationRules(t *testing.T) {
 	badPoolSize154.Header.PoolSize++
 	b154test = dcrutil.NewBlock(badPoolSize154)
 
-	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, simNetParams)
+	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, params)
 	if err != nil {
 		t.Errorf("got unexpected error for ErrPoolSize sanity check: %v",
 			err)
@@ -1341,7 +1345,7 @@ func TestBlockValidationRules(t *testing.T) {
 	recalculateMsgBlockMerkleRootsSize(errTxTreeIn154)
 	b154test = dcrutil.NewBlock(errTxTreeIn154)
 
-	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, simNetParams)
+	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, params)
 	if err != nil {
 		t.Errorf("got unexpected error for ErrDiscordantTxTree sanity check: %v",
 			err)
@@ -1386,7 +1390,7 @@ func TestBlockValidationRules(t *testing.T) {
 	recalculateMsgBlockMerkleRootsSize(taxMissing154)
 	b154test = dcrutil.NewBlock(taxMissing154)
 
-	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, simNetParams)
+	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, params)
 	if err != nil {
 		t.Errorf("Got unexpected error for ErrNoTax "+
 			"test 1: %v", err)
@@ -1408,7 +1412,7 @@ func TestBlockValidationRules(t *testing.T) {
 	recalculateMsgBlockMerkleRootsSize(taxMissing154)
 	b154test = dcrutil.NewBlock(taxMissing154)
 
-	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, simNetParams)
+	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, params)
 	if err != nil {
 		t.Errorf("Got unexpected error for ErrNoTax test 2: %v", err)
 	}
@@ -1429,7 +1433,7 @@ func TestBlockValidationRules(t *testing.T) {
 	recalculateMsgBlockMerkleRootsSize(taxMissing154)
 	b154test = dcrutil.NewBlock(taxMissing154)
 
-	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, simNetParams)
+	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, params)
 	if err != nil {
 		t.Errorf("Got unexpected error for ErrNoTax test 3: %v", err)
 	}
@@ -1453,7 +1457,7 @@ func TestBlockValidationRules(t *testing.T) {
 	recalculateMsgBlockMerkleRootsSize(expiredTx154)
 	b154test = dcrutil.NewBlock(expiredTx154)
 
-	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, simNetParams)
+	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, params)
 	if err != nil {
 		t.Errorf("got unexpected error for ErrExpiredTx sanity check: %v",
 			err)
@@ -1479,7 +1483,7 @@ func TestBlockValidationRules(t *testing.T) {
 	recalculateMsgBlockMerkleRootsSize(badValueIn154)
 	b154test = dcrutil.NewBlock(badValueIn154)
 
-	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, simNetParams)
+	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, params)
 	if err != nil {
 		t.Errorf("got unexpected error for ErrFraudAmountIn sanity check: %v",
 			err)
@@ -1505,7 +1509,7 @@ func TestBlockValidationRules(t *testing.T) {
 	recalculateMsgBlockMerkleRootsSize(badHeightProof154)
 	b154test = dcrutil.NewBlock(badHeightProof154)
 
-	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, simNetParams)
+	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, params)
 	if err != nil {
 		t.Errorf("got unexpected error for ErrFraudBlockHeight sanity check: %v",
 			err)
@@ -1531,7 +1535,7 @@ func TestBlockValidationRules(t *testing.T) {
 	recalculateMsgBlockMerkleRootsSize(badIndexProof154)
 	b154test = dcrutil.NewBlock(badIndexProof154)
 
-	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, simNetParams)
+	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, params)
 	if err != nil {
 		t.Errorf("got unexpected error for ErrFraudBlockIndex sanity check: %v",
 			err)
@@ -1557,7 +1561,7 @@ func TestBlockValidationRules(t *testing.T) {
 	recalculateMsgBlockMerkleRootsSize(badScrVal154)
 	b154test = dcrutil.NewBlock(badScrVal154)
 
-	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, simNetParams)
+	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, params)
 	if err != nil {
 		t.Errorf("got unexpected error for ErrScriptValidation sanity check: %v",
 			err)
@@ -1579,7 +1583,7 @@ func TestBlockValidationRules(t *testing.T) {
 	recalculateMsgBlockMerkleRootsSize(badScrValS154)
 	b154test = dcrutil.NewBlock(badScrValS154)
 
-	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, simNetParams)
+	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, params)
 	if err != nil {
 		t.Errorf("got unexpected error for ErrScriptValidation sanity check: %v",
 			err)
@@ -1608,7 +1612,7 @@ func TestBlockValidationRules(t *testing.T) {
 	recalculateMsgBlockMerkleRootsSize(invalMissingInsS154)
 	b154test = dcrutil.NewBlock(invalMissingInsS154)
 
-	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, simNetParams)
+	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, params)
 	if err != nil {
 		t.Errorf("got unexpected error for invalMissingInsS154 sanity check: %v",
 			err)
@@ -1634,7 +1638,7 @@ func TestBlockValidationRules(t *testing.T) {
 	recalculateMsgBlockMerkleRootsSize(malformedScr154)
 	b154test = dcrutil.NewBlock(malformedScr154)
 
-	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, simNetParams)
+	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, params)
 	if err != nil {
 		t.Errorf("got unexpected error for ErrScriptValidation sanity check: %v",
 			err)
@@ -1674,7 +1678,7 @@ func TestBlockValidationRules(t *testing.T) {
 	recalculateMsgBlockMerkleRootsSize(spendZeroValueIn154)
 	b154test = dcrutil.NewBlock(spendZeroValueIn154)
 
-	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, simNetParams)
+	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, params)
 	if err != nil {
 		t.Errorf("got unexpected error for ErrZeroValueOutputSpend sanity "+
 			"check: %v", err)
@@ -1739,7 +1743,7 @@ func TestBlockValidationRules(t *testing.T) {
 	recalculateMsgBlockMerkleRootsSize(spendInvalid166)
 	b166test := dcrutil.NewBlock(spendInvalid166)
 
-	err = blockchain.CheckWorklessBlockSanity(b166test, timeSource, simNetParams)
+	err = blockchain.CheckWorklessBlockSanity(b166test, timeSource, params)
 	if err != nil {
 		t.Errorf("got unexpected error for ErrMissingTx test 1 sanity "+
 			"check: %v", err)
@@ -1785,7 +1789,7 @@ func TestBlockValidationRules(t *testing.T) {
 	recalculateMsgBlockMerkleRootsSize(sstxSpendInvalid166)
 	b166test = dcrutil.NewBlock(sstxSpendInvalid166)
 
-	err = blockchain.CheckWorklessBlockSanity(b166test, timeSource, simNetParams)
+	err = blockchain.CheckWorklessBlockSanity(b166test, timeSource, params)
 	if err != nil {
 		t.Errorf("got unexpected error for ErrMissingTx test 2 sanity "+
 			"check: %v", err)
@@ -1828,7 +1832,7 @@ func TestBlockValidationRules(t *testing.T) {
 	recalculateMsgBlockMerkleRootsSize(sstxSpend2Invalid166)
 	b166test = dcrutil.NewBlock(sstxSpend2Invalid166)
 
-	err = blockchain.CheckWorklessBlockSanity(b166test, timeSource, simNetParams)
+	err = blockchain.CheckWorklessBlockSanity(b166test, timeSource, params)
 	if err != nil {
 		t.Errorf("got unexpected error for ErrImmatureSpend test sanity "+
 			"check: %v", err)
@@ -1858,7 +1862,7 @@ func TestBlockValidationRules(t *testing.T) {
 	recalculateMsgBlockMerkleRootsSize(sstxSpend3Invalid166)
 	b166test = dcrutil.NewBlock(sstxSpend3Invalid166)
 
-	err = blockchain.CheckWorklessBlockSanity(b166test, timeSource, simNetParams)
+	err = blockchain.CheckWorklessBlockSanity(b166test, timeSource, params)
 	if err != nil {
 		t.Errorf("got unexpected error for double spend test 1 sanity "+
 			"check: %v", err)
@@ -1883,7 +1887,7 @@ func TestBlockValidationRules(t *testing.T) {
 	recalculateMsgBlockMerkleRootsSize(regTxSpendStakeIn166)
 	b166test = dcrutil.NewBlock(regTxSpendStakeIn166)
 
-	err = blockchain.CheckWorklessBlockSanity(b166test, timeSource, simNetParams)
+	err = blockchain.CheckWorklessBlockSanity(b166test, timeSource, params)
 	if err != nil {
 		t.Errorf("got unexpected error for deouble spend test 2 sanity "+
 			"check: %v", err)
@@ -1902,8 +1906,8 @@ func TestBlockValidationRules(t *testing.T) {
 // written to disk correctly on a live blockchain.
 func TestBlockchainSpendJournal(t *testing.T) {
 	// Create a new database and chain instance to run tests against.
-	chain, teardownFunc, err := chainSetup("reorgunittest",
-		simNetParams)
+	params := &chaincfg.SimNetParams
+	chain, teardownFunc, err := chainSetup("spendjournalunittest", params)
 	if err != nil {
 		t.Errorf("Failed to setup chain instance: %v", err)
 		return
@@ -1912,8 +1916,7 @@ func TestBlockchainSpendJournal(t *testing.T) {
 
 	// The genesis block should fail to connect since it's already
 	// inserted.
-	genesisBlock := simNetParams.GenesisBlock
-	err = chain.CheckConnectBlock(dcrutil.NewBlock(genesisBlock))
+	err = chain.CheckConnectBlock(dcrutil.NewBlock(params.GenesisBlock))
 	if err == nil {
 		t.Errorf("CheckConnectBlock: Did not receive expected error")
 	}
@@ -1960,9 +1963,10 @@ func TestBlockchainSpendJournal(t *testing.T) {
 // TestCheckBlockSanity tests the context free block sanity checks with blocks
 // not on a chain.
 func TestCheckBlockSanity(t *testing.T) {
+	params := &chaincfg.SimNetParams
 	timeSource := blockchain.NewMedianTime()
 	block := dcrutil.NewBlock(&badBlock)
-	err := blockchain.CheckBlockSanity(block, timeSource, simNetParams)
+	err := blockchain.CheckBlockSanity(block, timeSource, params)
 	if err == nil {
 		t.Fatalf("block should fail.\n")
 	}
@@ -1971,9 +1975,10 @@ func TestCheckBlockSanity(t *testing.T) {
 // TestCheckWorklessBlockSanity tests the context free workless block sanity
 // checks with blocks not on a chain.
 func TestCheckWorklessBlockSanity(t *testing.T) {
+	params := &chaincfg.SimNetParams
 	timeSource := blockchain.NewMedianTime()
 	block := dcrutil.NewBlock(&badBlock)
-	err := blockchain.CheckWorklessBlockSanity(block, timeSource, simNetParams)
+	err := blockchain.CheckWorklessBlockSanity(block, timeSource, params)
 	if err == nil {
 		t.Fatalf("block should fail.\n")
 	}
@@ -1983,9 +1988,10 @@ func TestCheckWorklessBlockSanity(t *testing.T) {
 // because it's previousNode is nil.
 func TestCheckBlockHeaderContext(t *testing.T) {
 	// Create a new database for the blocks.
+	params := &chaincfg.SimNetParams
 	dbPath := filepath.Join(os.TempDir(), "examplecheckheadercontext")
 	_ = os.RemoveAll(dbPath)
-	db, err := database.Create("ffldb", dbPath, simNetParams.Net)
+	db, err := database.Create("ffldb", dbPath, params.Net)
 	if err != nil {
 		t.Fatalf("Failed to create database: %v\n", err)
 		return
@@ -1997,7 +2003,7 @@ func TestCheckBlockHeaderContext(t *testing.T) {
 	// the simnet network.
 	chain, err := blockchain.New(&blockchain.Config{
 		DB:          db,
-		ChainParams: simNetParams,
+		ChainParams: params,
 		TimeSource:  blockchain.NewMedianTime(),
 	})
 	if err != nil {
@@ -2005,7 +2011,7 @@ func TestCheckBlockHeaderContext(t *testing.T) {
 		return
 	}
 
-	err = chain.TstCheckBlockHeaderContext(&simNetGenesisBlock.Header, nil, blockchain.BFNone)
+	err = chain.TstCheckBlockHeaderContext(&params.GenesisBlock.Header, nil, blockchain.BFNone)
 	if err != nil {
 		t.Fatalf("genesisblock should pass just by definition: %v\n", err)
 		return
@@ -2054,323 +2060,12 @@ func TestTxValidationErrors(t *testing.T) {
 	}
 }
 
-// simNetPowLimit is the highest proof of work value a Decred block
-// can have for the simulation test network.  It is the value 2^255 - 1.
-var simNetPowLimit = new(big.Int).Sub(new(big.Int).Lsh(bigOne, 255), bigOne)
-
-// SimNetParams defines the network parameters for the simulation test Decred
-// network.  This network is similar to the normal test network except it is
-// intended for private use within a group of individuals doing simulation
-// testing.  The functionality is intended to differ in that the only nodes
-// which are specifically specified are used to create the network rather than
-// following normal discovery rules.  This is important as otherwise it would
-// just turn into another public testnet.
-var simNetParams = &chaincfg.Params{
-	Name:        "simnet",
-	Net:         wire.SimNet,
-	DefaultPort: "18555",
-	DNSSeeds:    nil, // NOTE: There must NOT be any seeds.
-
-	// Chain parameters
-	GenesisBlock:             &simNetGenesisBlock,
-	GenesisHash:              &simNetGenesisHash,
-	PowLimit:                 simNetPowLimit,
-	PowLimitBits:             0x207fffff,
-	ReduceMinDifficulty:      false,
-	MinDiffReductionTime:     0, // Does not apply since ReduceMinDifficulty false
-	GenerateSupported:        true,
-	MaximumBlockSizes:        []int{1000000, 1310720},
-	MaxTxSize:                1000000,
-	TargetTimePerBlock:       time.Second,
-	WorkDiffAlpha:            1,
-	WorkDiffWindowSize:       8,
-	WorkDiffWindows:          4,
-	TargetTimespan:           time.Second * 8, // TimePerBlock * WindowSize
-	RetargetAdjustmentFactor: 4,
-
-	// Subsidy parameters.
-	BaseSubsidy:              50000000000,
-	MulSubsidy:               100,
-	DivSubsidy:               101,
-	SubsidyReductionInterval: 128,
-	WorkRewardProportion:     6,
-	StakeRewardProportion:    3,
-	BlockTaxProportion:       1,
-
-	// Checkpoints ordered from oldest to newest.
-	Checkpoints: nil,
-
-	// BIP0009 consensus rule change deployments.
-	//
-	// The miner confirmation window is defined as:
-	//   target proof of work timespan / target proof of work spacing
-	RuleChangeActivationQuorum:     160, // 10 % of RuleChangeActivationInterval * TicketsPerBlock
-	RuleChangeActivationMultiplier: 3,   // 75%
-	RuleChangeActivationDivisor:    4,
-	RuleChangeActivationInterval:   320, // 320 seconds
-	Deployments: map[uint32][]chaincfg.ConsensusDeployment{
-		4: {{
-			Vote: chaincfg.Vote{
-				Id:          chaincfg.VoteIDMaxBlockSize,
-				Description: "Change maximum allowed block size from 1MiB to 1.25MB",
-				Mask:        0x0006, // Bits 1 and 2
-				Choices: []chaincfg.Choice{{
-					Id:          "abstain",
-					Description: "abstain voting for change",
-					Bits:        0x0000,
-					IsAbstain:   true,
-					IsNo:        false,
-				}, {
-					Id:          "no",
-					Description: "reject changing max allowed block size",
-					Bits:        0x0002, // Bit 1
-					IsAbstain:   false,
-					IsNo:        true,
-				}, {
-					Id:          "yes",
-					Description: "accept changing max allowed block size",
-					Bits:        0x0004, // Bit 2
-					IsAbstain:   false,
-					IsNo:        false,
-				}},
-			},
-			StartTime:  0,             // Always available for vote
-			ExpireTime: math.MaxInt64, // Never expires
-		}},
-		5: {{
-			Vote: chaincfg.Vote{
-				Id:          chaincfg.VoteIDSDiffAlgorithm,
-				Description: "Change stake difficulty algorithm as defined in DCP0001",
-				Mask:        0x0006, // Bits 1 and 2
-				Choices: []chaincfg.Choice{{
-					Id:          "abstain",
-					Description: "abstain voting for change",
-					Bits:        0x0000,
-					IsAbstain:   true,
-					IsNo:        false,
-				}, {
-					Id:          "no",
-					Description: "keep the existing algorithm",
-					Bits:        0x0002, // Bit 1
-					IsAbstain:   false,
-					IsNo:        true,
-				}, {
-					Id:          "yes",
-					Description: "change to the new algorithm",
-					Bits:        0x0004, // Bit 2
-					IsAbstain:   false,
-					IsNo:        false,
-				}},
-			},
-			StartTime:  0,             // Always available for vote
-			ExpireTime: math.MaxInt64, // Never expires
-		}},
-	},
-
-	// Enforce current block version once majority of the network has
-	// upgraded.
-	// 51% (51 / 100)
-	// Reject previous block versions once a majority of the network has
-	// upgraded.
-	// 75% (75 / 100)
-	BlockEnforceNumRequired: 51,
-	BlockRejectNumRequired:  75,
-	BlockUpgradeNumToCheck:  100,
-
-	// Mempool parameters
-	RelayNonStdTxs: true,
-
-	// Address encoding magics
-	NetworkAddressPrefix: "S",
-	PubKeyAddrID:         [2]byte{0x27, 0x6f}, // starts with Sk
-	PubKeyHashAddrID:     [2]byte{0x0e, 0x91}, // starts with Ss
-	PKHEdwardsAddrID:     [2]byte{0x0e, 0x71}, // starts with Se
-	PKHSchnorrAddrID:     [2]byte{0x0e, 0x53}, // starts with SS
-	ScriptHashAddrID:     [2]byte{0x0e, 0x6c}, // starts with Sc
-	PrivateKeyID:         [2]byte{0x23, 0x07}, // starts with Ps
-
-	// BIP32 hierarchical deterministic extended key magics
-	HDPrivateKeyID: [4]byte{0x04, 0x20, 0xb9, 0x03}, // starts with sprv
-	HDPublicKeyID:  [4]byte{0x04, 0x20, 0xbd, 0x3d}, // starts with spub
-
-	// BIP44 coin type used in the hierarchical deterministic path for
-	// address generation.
-	HDCoinType: 115, // ASCII for s
-
-	// Decred PoS parameters
-	MinimumStakeDiff:      20000,
-	TicketPoolSize:        64,
-	TicketsPerBlock:       5,
-	TicketMaturity:        16,
-	TicketExpiry:          384, // 6*TicketPoolSize
-	CoinbaseMaturity:      16,
-	SStxChangeMaturity:    1,
-	TicketPoolSizeWeight:  4,
-	StakeDiffAlpha:        1,
-	StakeDiffWindowSize:   8,
-	StakeDiffWindows:      8,
-	MaxFreshStakePerBlock: 20,            // 4*TicketsPerBlock
-	StakeEnabledHeight:    16 + 16,       // CoinbaseMaturity + TicketMaturity
-	StakeValidationHeight: 16 + (64 * 2), // CoinbaseMaturity + TicketPoolSize*2
-	StakeBaseSigScript:    []byte{0xde, 0xad, 0xbe, 0xef},
-
-	// Decred organization related parameters
-	OrganizationPkScript:        chaincfg.SimNetParams.OrganizationPkScript,
-	OrganizationPkScriptVersion: chaincfg.SimNetParams.OrganizationPkScriptVersion,
-	BlockOneLedger: []*chaincfg.TokenPayout{
-		{Address: "Sshw6S86G2bV6W32cbc7EhtFy8f93rU6pae", Amount: 100000 * 1e8},
-		{Address: "SsjXRK6Xz6CFuBt6PugBvrkdAa4xGbcZ18w", Amount: 100000 * 1e8},
-		{Address: "SsfXiYkYkCoo31CuVQw428N6wWKus2ZEw5X", Amount: 100000 * 1e8},
-	},
-}
-
-var bigOne = new(big.Int).SetInt64(1)
-
-// simNetGenesisHash is the hash of the first block in the block chain for the
-// simulation test network.
-var simNetGenesisHash = simNetGenesisBlock.BlockHash()
-
-// simNetGenesisMerkleRoot is the hash of the first transaction in the genesis
-// block for the simulation test network.  It is the same as the merkle root for
-// the main network.
-var simNetGenesisMerkleRoot = genesisMerkleRoot
-
-// genesisCoinbaseTx legacy is the coinbase transaction for the genesis blocks for
-// the regression test network and test network.
-var genesisCoinbaseTxLegacy = wire.MsgTx{
-	SerType: wire.TxSerializeFull,
-	Version: 1,
-	TxIn: []*wire.TxIn{
-		{
-			PreviousOutPoint: wire.OutPoint{
-				Hash:  chainhash.Hash{},
-				Index: 0xffffffff,
-			},
-			SignatureScript: []byte{
-				0x04, 0xff, 0xff, 0x00, 0x1d, 0x01, 0x04, 0x45, /* |.......E| */
-				0x54, 0x68, 0x65, 0x20, 0x54, 0x69, 0x6d, 0x65, /* |The Time| */
-				0x73, 0x20, 0x30, 0x33, 0x2f, 0x4a, 0x61, 0x6e, /* |s 03/Jan| */
-				0x2f, 0x32, 0x30, 0x30, 0x39, 0x20, 0x43, 0x68, /* |/2009 Ch| */
-				0x61, 0x6e, 0x63, 0x65, 0x6c, 0x6c, 0x6f, 0x72, /* |ancellor| */
-				0x20, 0x6f, 0x6e, 0x20, 0x62, 0x72, 0x69, 0x6e, /* | on brin| */
-				0x6b, 0x20, 0x6f, 0x66, 0x20, 0x73, 0x65, 0x63, /* |k of sec|*/
-				0x6f, 0x6e, 0x64, 0x20, 0x62, 0x61, 0x69, 0x6c, /* |ond bail| */
-				0x6f, 0x75, 0x74, 0x20, 0x66, 0x6f, 0x72, 0x20, /* |out for |*/
-				0x62, 0x61, 0x6e, 0x6b, 0x73, /* |banks| */
-			},
-			Sequence: 0xffffffff,
-		},
-	},
-	TxOut: []*wire.TxOut{
-		{
-			Value: 0x00000000,
-			PkScript: []byte{
-				0x41, 0x04, 0x67, 0x8a, 0xfd, 0xb0, 0xfe, 0x55, /* |A.g....U| */
-				0x48, 0x27, 0x19, 0x67, 0xf1, 0xa6, 0x71, 0x30, /* |H'.g..q0| */
-				0xb7, 0x10, 0x5c, 0xd6, 0xa8, 0x28, 0xe0, 0x39, /* |..\..(.9| */
-				0x09, 0xa6, 0x79, 0x62, 0xe0, 0xea, 0x1f, 0x61, /* |..yb...a| */
-				0xde, 0xb6, 0x49, 0xf6, 0xbc, 0x3f, 0x4c, 0xef, /* |..I..?L.| */
-				0x38, 0xc4, 0xf3, 0x55, 0x04, 0xe5, 0x1e, 0xc1, /* |8..U....| */
-				0x12, 0xde, 0x5c, 0x38, 0x4d, 0xf7, 0xba, 0x0b, /* |..\8M...| */
-				0x8d, 0x57, 0x8a, 0x4c, 0x70, 0x2b, 0x6b, 0xf1, /* |.W.Lp+k.| */
-				0x1d, 0x5f, 0xac, /* |._.| */
-			},
-		},
-	},
-	LockTime: 0,
-	Expiry:   0,
-}
-
-// genesisMerkleRoot is the hash of the first transaction in the genesis block
-// for the main network.
-var genesisMerkleRoot = genesisCoinbaseTxLegacy.TxHash()
-
-var regTestGenesisCoinbaseTx = wire.MsgTx{
-	SerType: wire.TxSerializeFull,
-	Version: 1,
-	TxIn: []*wire.TxIn{
-		{
-			PreviousOutPoint: wire.OutPoint{
-				Hash:  chainhash.Hash{},
-				Index: 0xffffffff,
-			},
-			SignatureScript: []byte{
-				0x04, 0xff, 0xff, 0x00, 0x1d, 0x01, 0x04, 0x45, /* |.......E| */
-				0x54, 0x68, 0x65, 0x20, 0x54, 0x69, 0x6d, 0x65, /* |The Time| */
-				0x73, 0x20, 0x30, 0x33, 0x2f, 0x4a, 0x61, 0x6e, /* |s 03/Jan| */
-				0x2f, 0x32, 0x30, 0x30, 0x39, 0x20, 0x43, 0x68, /* |/2009 Ch| */
-				0x61, 0x6e, 0x63, 0x65, 0x6c, 0x6c, 0x6f, 0x72, /* |ancellor| */
-				0x20, 0x6f, 0x6e, 0x20, 0x62, 0x72, 0x69, 0x6e, /* | on brin| */
-				0x6b, 0x20, 0x6f, 0x66, 0x20, 0x73, 0x65, 0x63, /* |k of sec|*/
-				0x6f, 0x6e, 0x64, 0x20, 0x62, 0x61, 0x69, 0x6c, /* |ond bail| */
-				0x6f, 0x75, 0x74, 0x20, 0x66, 0x6f, 0x72, 0x20, /* |out for |*/
-				0x62, 0x61, 0x6e, 0x6b, 0x73, /* |banks| */
-			},
-			Sequence: 0xffffffff,
-		},
-	},
-	TxOut: []*wire.TxOut{
-		{
-			Value:   0x00000000,
-			Version: 0x0000,
-			PkScript: []byte{
-				0x41, 0x04, 0x67, 0x8a, 0xfd, 0xb0, 0xfe, 0x55, /* |A.g....U| */
-				0x48, 0x27, 0x19, 0x67, 0xf1, 0xa6, 0x71, 0x30, /* |H'.g..q0| */
-				0xb7, 0x10, 0x5c, 0xd6, 0xa8, 0x28, 0xe0, 0x39, /* |..\..(.9| */
-				0x09, 0xa6, 0x79, 0x62, 0xe0, 0xea, 0x1f, 0x61, /* |..yb...a| */
-				0xde, 0xb6, 0x49, 0xf6, 0xbc, 0x3f, 0x4c, 0xef, /* |..I..?L.| */
-				0x38, 0xc4, 0xf3, 0x55, 0x04, 0xe5, 0x1e, 0xc1, /* |8..U....| */
-				0x12, 0xde, 0x5c, 0x38, 0x4d, 0xf7, 0xba, 0x0b, /* |..\8M...| */
-				0x8d, 0x57, 0x8a, 0x4c, 0x70, 0x2b, 0x6b, 0xf1, /* |.W.Lp+k.| */
-				0x1d, 0x5f, 0xac, /* |._.| */
-			},
-		},
-	},
-	LockTime: 0,
-	Expiry:   0,
-}
-
-// simNetGenesisBlock defines the genesis block of the block chain which serves
-// as the public transaction ledger for the simulation test network.
-var simNetGenesisBlock = wire.MsgBlock{
-	Header: wire.BlockHeader{
-		Version: 1,
-		PrevBlock: chainhash.Hash([chainhash.HashSize]byte{ // Make go vet happy.
-			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		}),
-		MerkleRoot: simNetGenesisMerkleRoot,
-		StakeRoot: chainhash.Hash([chainhash.HashSize]byte{ // Make go vet happy.
-			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		}),
-		VoteBits:     uint16(0x0000),
-		FinalState:   [6]byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
-		Voters:       uint16(0x0000),
-		FreshStake:   uint8(0x00),
-		Revocations:  uint8(0x00),
-		Timestamp:    time.Unix(1401292357, 0), // 2009-01-08 20:54:25 -0600 CST
-		PoolSize:     uint32(0),
-		Bits:         0x207fffff, // 545259519
-		SBits:        int64(0x0000000000000000),
-		Nonce:        0x00000000,
-		StakeVersion: uint32(0),
-		Height:       uint32(0),
-	},
-	Transactions:  []*wire.MsgTx{&regTestGenesisCoinbaseTx},
-	STransactions: []*wire.MsgTx{},
-}
-
 // badBlock is an intentionally bad block that should fail the context-less
 // sanity checks.
 var badBlock = wire.MsgBlock{
 	Header: wire.BlockHeader{
 		Version:      1,
-		MerkleRoot:   simNetGenesisMerkleRoot,
+		MerkleRoot:   chaincfg.SimNetParams.GenesisBlock.Header.MerkleRoot,
 		VoteBits:     uint16(0x0000),
 		FinalState:   [6]byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
 		Voters:       uint16(0x0000),
