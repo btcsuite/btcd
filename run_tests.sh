@@ -25,12 +25,13 @@ TESTCMD="test -z \"\$(gometalinter --disable-all \
   --enable=vet \
   --enable=unconvert \
   --vendor \
-  --deadline=10m . | tee /dev/stderr)\"&& \
+  --deadline=10m . 2>&1 | tee /dev/stderr)\"&& \
   env GORACE='halt_on_error=1' go test -short -race \
   -tags rpctest \
   \$(glide novendor)"
 
 if [ $GOVERSION == "local" ]; then
+    go get -v github.com/alecthomas/gometalinter; gometalinter --install
     eval $TESTCMD
     exit
 fi
