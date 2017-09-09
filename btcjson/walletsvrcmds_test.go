@@ -11,7 +11,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/btcsuite/btcd/btcjson"
+	"github.com/btcd/btcd/btcjson"
 )
 
 // TestWalletSvrCmds tests all of the wallet server commands marshal and
@@ -59,6 +59,19 @@ func TestWalletSvrCmds(t *testing.T) {
 				NRequired: 2,
 				Keys:      []string{"031234", "035678"},
 				Account:   btcjson.String("test"),
+			},
+		},
+		{
+			name: "addwitnessaddress",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("addwitnessaddress", "1address")
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewAddWitnessAddressCmd("1address")
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"addwitnessaddress","params":["1address"],"id":1}`,
+			unmarshalled: &btcjson.AddWitnessAddressCmd{
+				Address: "1address",
 			},
 		},
 		{
