@@ -390,6 +390,42 @@ func (c *Client) GetBlockSubsidy(height int64, voters uint16) (*dcrjson.GetBlock
 	return c.GetBlockSubsidyAsync(height, voters).Receive()
 }
 
+// FutureGetCoinSupplyResult is a future promise to deliver the result of a
+// GetCoinSupplyAsync RPC invocation (or an applicable error).
+type FutureGetCoinSupplyResult chan *response
+
+// Receive waits for the response promised by the future and returns the
+// current coin supply
+func (r FutureGetCoinSupplyResult) Receive() (int64, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return 0, err
+	}
+
+	// Unmarshal the result
+	var cs int64
+	err = json.Unmarshal(res, &cs)
+	if err != nil {
+		return 0, err
+	}
+	return cs, nil
+}
+
+// GetCoinSupplyAsync returns an instance of a type that can be used to
+// get the result of the RPC at some future time by invoking the Receive
+// function on the returned instance.
+//
+// See GetCoinSupply for the blocking version and more details.
+func (c *Client) GetCoinSupplyAsync() FutureGetCoinSupplyResult {
+	cmd := dcrjson.NewGetCoinSupplyCmd()
+	return c.sendCmd(cmd)
+}
+
+// GetCoinSupply returns the current coin supply
+func (c *Client) GetCoinSupply() (int64, error) {
+	return c.GetCoinSupplyAsync().Receive()
+}
+
 // FutureGetRawMempoolResult is a future promise to deliver the result of a
 // GetRawMempoolAsync RPC invocation (or an applicable error).
 type FutureGetRawMempoolResult chan *response
