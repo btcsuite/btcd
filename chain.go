@@ -13,6 +13,7 @@ import (
 	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/dcrjson"
 	"github.com/decred/dcrd/wire"
+	"github.com/decred/dcrutil"
 )
 
 // FutureGetBestBlockHashResult is a future promise to deliver the result of a
@@ -396,19 +397,23 @@ type FutureGetCoinSupplyResult chan *response
 
 // Receive waits for the response promised by the future and returns the
 // current coin supply
-func (r FutureGetCoinSupplyResult) Receive() (int64, error) {
+func (r FutureGetCoinSupplyResult) Receive() (*dcrutil.Amount, error) {
 	res, err := receiveFuture(r)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	// Unmarshal the result
-	var cs int64
+	var cs float64
 	err = json.Unmarshal(res, &cs)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
-	return cs, nil
+	amt, err := dcrutil.NewAmount(cs)
+	if err != nil {
+		return nil, err
+	}
+	return &amt, nil
 }
 
 // GetCoinSupplyAsync returns an instance of a type that can be used to
@@ -422,7 +427,7 @@ func (c *Client) GetCoinSupplyAsync() FutureGetCoinSupplyResult {
 }
 
 // GetCoinSupply returns the current coin supply
-func (c *Client) GetCoinSupply() (int64, error) {
+func (c *Client) GetCoinSupply() (*dcrutil.Amount, error) {
 	return c.GetCoinSupplyAsync().Receive()
 }
 
