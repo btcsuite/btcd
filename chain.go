@@ -397,23 +397,19 @@ type FutureGetCoinSupplyResult chan *response
 
 // Receive waits for the response promised by the future and returns the
 // current coin supply
-func (r FutureGetCoinSupplyResult) Receive() (*dcrutil.Amount, error) {
+func (r FutureGetCoinSupplyResult) Receive() (dcrutil.Amount, error) {
 	res, err := receiveFuture(r)
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
 
 	// Unmarshal the result
-	var cs float64
+	var cs int64
 	err = json.Unmarshal(res, &cs)
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
-	amt, err := dcrutil.NewAmount(cs)
-	if err != nil {
-		return nil, err
-	}
-	return &amt, nil
+	return dcrutil.Amount(cs), nil
 }
 
 // GetCoinSupplyAsync returns an instance of a type that can be used to
@@ -427,7 +423,7 @@ func (c *Client) GetCoinSupplyAsync() FutureGetCoinSupplyResult {
 }
 
 // GetCoinSupply returns the current coin supply
-func (c *Client) GetCoinSupply() (*dcrutil.Amount, error) {
+func (c *Client) GetCoinSupply() (dcrutil.Amount, error) {
 	return c.GetCoinSupplyAsync().Receive()
 }
 
