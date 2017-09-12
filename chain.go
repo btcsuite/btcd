@@ -352,6 +352,44 @@ func (c *Client) GetBlockHeaderVerbose(hash *chainhash.Hash) (*dcrjson.GetBlockH
 	return c.GetBlockHeaderVerboseAsync(hash).Receive()
 }
 
+// FutureGetBlockSubsidyResult is a future promise to deliver the result of a
+// GetBlockSubsidyAsync RPC invocation (or an applicable error).
+type FutureGetBlockSubsidyResult chan *response
+
+// Receive waits for the response promised by the future and returns a data
+// structure of the block subsidy requested from the server given its height
+// and number of voters.
+func (r FutureGetBlockSubsidyResult) Receive() (*dcrjson.GetBlockSubsidyResult, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal the result
+	var bs dcrjson.GetBlockSubsidyResult
+	err = json.Unmarshal(res, &bs)
+	if err != nil {
+		return nil, err
+	}
+	return &bs, nil
+}
+
+// GetBlockSubsidyAsync returns an instance of a type that can be used to
+// get the result of the RPC at some future time by invoking the Receive
+// function on the returned instance.
+//
+// See GetBlockSubsidy for the blocking version and more details.
+func (c *Client) GetBlockSubsidyAsync(height int64, voters uint16) FutureGetBlockSubsidyResult {
+	cmd := dcrjson.NewGetBlockSubsidyCmd(height, voters)
+	return c.sendCmd(cmd)
+}
+
+// GetBlockSubsidy returns a data structure of the block subsidy
+// from the server given its height and number of voters.
+func (c *Client) GetBlockSubsidy(height int64, voters uint16) (*dcrjson.GetBlockSubsidyResult, error) {
+	return c.GetBlockSubsidyAsync(height, voters).Receive()
+}
+
 // FutureGetRawMempoolResult is a future promise to deliver the result of a
 // GetRawMempoolAsync RPC invocation (or an applicable error).
 type FutureGetRawMempoolResult chan *response
