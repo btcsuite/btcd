@@ -71,8 +71,10 @@ func TestMessage(t *testing.T) {
 	msgReject := NewMsgReject("block", RejectDuplicate, "duplicate block")
 	msgGetCFilter := NewMsgGetCFilter(&chainhash.Hash{}, 0)
 	msgGetCFHeaders := NewMsgGetCFHeaders()
+	msgGetCFTypes := NewMsgGetCFTypes()
 	msgCFilter := NewMsgCFilter(&chainhash.Hash{}, 1, []byte("payload"))
 	msgCFHeaders := NewMsgCFHeaders()
+	msgCFTypes := NewMsgCFTypes([]uint8{2})
 
 	tests := []struct {
 		in     Message    // Value to encode
@@ -104,8 +106,10 @@ func TestMessage(t *testing.T) {
 		{msgReject, msgReject, pver, MainNet, 79},
 		{msgGetCFilter, msgGetCFilter, pver, MainNet, 57},
 		{msgGetCFHeaders, msgGetCFHeaders, pver, MainNet, 62},
+		{msgGetCFTypes, msgGetCFTypes, pver, MainNet, 24},
 		{msgCFilter, msgCFilter, pver, MainNet, 65},
 		{msgCFHeaders, msgCFHeaders, pver, MainNet, 58},
+		{msgCFTypes, msgCFTypes, pver, MainNet, 26},
 	}
 
 	t.Logf("Running %d tests", len(tests))
