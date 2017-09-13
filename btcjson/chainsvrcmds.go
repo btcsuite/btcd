@@ -278,33 +278,34 @@ func NewGetBlockTemplateCmd(request *TemplateRequest) *GetBlockTemplateCmd {
 		Request: request,
 	}
 }
+
 // GetCFilterCmd defines the getcfilter JSON-RPC command.
 type GetCFilterCmd struct {
-	Hash     string
-	Extended bool
+	Hash       string
+	FilterType uint8
 }
 
 // NewGetCFilterCmd returns a new instance which can be used to issue a
 // getcfilter JSON-RPC command.
-func NewGetCFilterCmd(hash string, extended bool) *GetCFilterCmd {
+func NewGetCFilterCmd(hash string, filterType uint8) *GetCFilterCmd {
 	return &GetCFilterCmd{
-		Hash:     hash,
-		Extended: extended,
+		Hash:       hash,
+		FilterType: filterType,
 	}
 }
 
 // GetCFilterHeaderCmd defines the getcfilterheader JSON-RPC command.
 type GetCFilterHeaderCmd struct {
-	Hash     string
-	Extended bool
+	Hash       string
+	FilterType uint8
 }
 
 // NewGetCFilterHeaderCmd returns a new instance which can be used to issue a
 // getcfilterheader JSON-RPC command.
-func NewGetCFilterHeaderCmd(hash string, extended bool) *GetCFilterHeaderCmd {
+func NewGetCFilterHeaderCmd(hash string, filterType uint8) *GetCFilterHeaderCmd {
 	return &GetCFilterHeaderCmd{
-		Hash:     hash,
-		Extended: extended,
+		Hash:       hash,
+		FilterType: filterType,
 	}
 }
 

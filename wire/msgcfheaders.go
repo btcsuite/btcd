@@ -28,7 +28,7 @@ const (
 // MsgGetCFHeaders for details on requesting the headers.
 type MsgCFHeaders struct {
 	StopHash     chainhash.Hash
-	Extended     bool
+	FilterType   uint8
 	HeaderHashes []*chainhash.Hash
 }
 
@@ -53,8 +53,8 @@ func (msg *MsgCFHeaders) BtcDecode(r io.Reader, pver uint32, _ MessageEncoding) 
 		return err
 	}
 
-	// Read extended flag
-	err = readElement(r, &msg.Extended)
+	// Read filter type
+	err = readElement(r, &msg.FilterType)
 	if err != nil {
 		return err
 	}
@@ -97,8 +97,8 @@ func (msg *MsgCFHeaders) BtcEncode(w io.Writer, pver uint32, _ MessageEncoding) 
 		return err
 	}
 
-	// Write extended flag
-	err = writeElement(w, msg.Extended)
+	// Write filter type
+	err = writeElement(w, msg.FilterType)
 	if err != nil {
 		return err
 	}

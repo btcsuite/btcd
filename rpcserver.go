@@ -2163,7 +2163,7 @@ func handleGetCFilter(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) 
 		return nil, rpcDecodeHexError(c.Hash)
 	}
 
-	filterBytes, err := s.cfg.CfIndex.FilterByBlockHash(hash, c.Extended)
+	filterBytes, err := s.cfg.CfIndex.FilterByBlockHash(hash, c.FilterType)
 	if err != nil {
 		rpcsLog.Debugf("Could not find committed filter for %v: %v",
 			hash, err)
@@ -2192,7 +2192,7 @@ func handleGetCFilterHeader(s *rpcServer, cmd interface{}, closeChan <-chan stru
 		return nil, rpcDecodeHexError(c.Hash)
 	}
 
-	headerBytes, err := s.cfg.CfIndex.FilterHeaderByBlockHash(hash, c.Extended)
+	headerBytes, err := s.cfg.CfIndex.FilterHeaderByBlockHash(hash, c.FilterType)
 	if len(headerBytes) > 0 {
 		rpcsLog.Debugf("Found header of committed filter for %v", hash)
 	} else {
