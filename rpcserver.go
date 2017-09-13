@@ -4566,6 +4566,12 @@ func fetchInputTxos(s *rpcServer, tx *wire.MsgTx) (map[wire.OutPoint]wire.TxOut,
 	mp := s.server.txMemPool
 	originOutputs := make(map[wire.OutPoint]wire.TxOut)
 	for txInIndex, txIn := range tx.TxIn {
+		voteTx, _ := stake.IsSSGen(tx)
+		// vote tx have null input for vin[0],
+		// skip since it resolvces to an invalid transaction
+		if voteTx && txInIndex == 0 {
+			continue
+		}
 		// Attempt to fetch and use the referenced transaction from the
 		// memory pool.
 		origin := &txIn.PreviousOutPoint
