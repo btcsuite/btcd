@@ -747,7 +747,7 @@ func (sp *serverPeer) OnGetCFilter(_ *peer.Peer, msg *wire.MsgGetCFilter) {
 	}
 
 	filterBytes, err := sp.server.cfIndex.FilterByBlockHash(&msg.BlockHash,
-		msg.Extended)
+		msg.FilterType)
 
 	if len(filterBytes) > 0 {
 		peerLog.Tracef("Obtained CF for %v", msg.BlockHash)
@@ -756,7 +756,7 @@ func (sp *serverPeer) OnGetCFilter(_ *peer.Peer, msg *wire.MsgGetCFilter) {
 			err)
 	}
 
-	filterMsg := wire.NewMsgCFilter(&msg.BlockHash, msg.Extended,
+	filterMsg := wire.NewMsgCFilter(&msg.BlockHash, msg.FilterType,
 		filterBytes)
 	sp.QueueMessage(filterMsg, nil)
 }
@@ -789,7 +789,7 @@ func (sp *serverPeer) OnGetCFHeaders(_ *peer.Peer, msg *wire.MsgGetCFHeaders) {
 		// Fetch the raw committed filter header bytes from the
 		// database.
 		headerBytes, err := sp.server.cfIndex.FilterHeaderByBlockHash(
-			&msg.HashStop, msg.Extended)
+			&msg.HashStop, msg.FilterType)
 		if (err != nil) || (len(headerBytes) == 0) {
 			peerLog.Warnf("Could not obtain CF header for %v: %v",
 				msg.HashStop, err)
@@ -808,7 +808,7 @@ func (sp *serverPeer) OnGetCFHeaders(_ *peer.Peer, msg *wire.MsgGetCFHeaders) {
 		headersMsg := wire.NewMsgCFHeaders()
 		headersMsg.AddCFHeader(&header)
 		headersMsg.StopHash = msg.HashStop
-		headersMsg.Extended = msg.Extended
+		headersMsg.FilterType = msg.FilterType
 		sp.QueueMessage(headersMsg, nil)
 		return
 	}
@@ -849,7 +849,7 @@ func (sp *serverPeer) OnGetCFHeaders(_ *peer.Peer, msg *wire.MsgGetCFHeaders) {
 		// Fetch the raw committed filter header bytes from the
 		// database.
 		headerBytes, err := sp.server.cfIndex.FilterHeaderByBlockHash(
-			&hashList[i], msg.Extended)
+			&hashList[i], msg.FilterType)
 		if (err != nil) || (len(headerBytes) == 0) {
 			peerLog.Warnf("Could not obtain CF header for %v: %v",
 				hashList[i], err)
@@ -868,7 +868,7 @@ func (sp *serverPeer) OnGetCFHeaders(_ *peer.Peer, msg *wire.MsgGetCFHeaders) {
 		headersMsg.AddCFHeader(&header)
 	}
 
-	headersMsg.Extended = msg.Extended
+	headersMsg.FilterType = msg.FilterType
 	headersMsg.StopHash = hashList[len(hashList)-1]
 	sp.QueueMessage(headersMsg, nil)
 }

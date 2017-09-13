@@ -30,21 +30,21 @@ var (
 	// the index. The rest of the buckets live below this bucket.
 	cfIndexParentBucketKey = []byte("cfindexparentbucket")
 
-	// cfBasicIndexKey is the name of the db bucket used to house the
-	// block hash -> basic cf index (cf#0).
-	cfBasicIndexKey = []byte("cf0byhashidx")
+	// cfIndexKeys is an array of db bucket names used to house indexes of
+	// block hashes to cfilters.
+	cfIndexKeys = [][]byte{
+		[]byte("cf0byhashidx"),
+		[]byte("cf1byhashidx"),
+	}
 
-	// cfBasicHeaderKey is the name of the db bucket used to house the
-	// block hash -> basic cf header index (cf#0).
-	cfBasicHeaderKey = []byte("cf0headerbyhashidx")
+	// cfHeaderKeys is an array of db bucket names used to house indexes of
+	// block hashes to cf headers.
+	cfHeaderKeys = [][]byte{
+		[]byte("cf0headerbyhashidx"),
+		[]byte("cf1headerbyhashidx"),
+	}
 
-	// cfExtendedIndexKey is the name of the db bucket used to house the
-	// block hash -> extended cf index (cf#1).
-	cfExtendedIndexKey = []byte("cf1byhashidx")
-
-	// cfExtendedHeaderKey is the name of the db bucket used to house the
-	// block hash -> extended cf header index (cf#1).
-	cfExtendedHeaderKey = []byte("cf1headerbyhashidx")
+	maxFilterType = uint8(len(cfHeaderKeys) - 1)
 )
 
 // dbFetchFilter retrieves a block's basic or extended filter. A filter's
@@ -131,27 +131,25 @@ func (idx *CfIndex) Create(dbTx database.Tx) error {
 	if err != nil {
 		return err
 	}
-	_, err = cfIndexParentBucket.CreateBucket(cfBasicIndexKey)
-	if err != nil {
-		return err
+
+	for _, bucketName := range cfIndexKeys {
+		_, err = cfIndexParentBucket.CreateBucket(bucketName)
+		if err != nil {
+			return err
+		}
 	}
-	_, err = cfIndexParentBucket.CreateBucket(cfBasicHeaderKey)
-	if err != nil {
-		return err
-	}
-	_, err = cfIndexParentBucket.CreateBucket(cfExtendedIndexKey)
-	if err != nil {
-		return err
-	}
-	_, err = cfIndexParentBucket.CreateBucket(cfExtendedHeaderKey)
-	if err != nil {
-		return err
+
+	for _, bucketName := range cfHeaderKeys {
+		_, err = cfIndexParentBucket.CreateBucket(bucketName)
+		if err != nil {
+			return err
+		}
 	}
 
 	firstHeader := make([]byte, chainhash.HashSize)
 	err = dbStoreFilterHeader(
 		dbTx,
-		cfBasicHeaderKey,
+		cfHeaderKeys[0],
 		&idx.chainParams.GenesisBlock.Header.PrevBlock,
 		firstHeader,
 	)
@@ -161,7 +159,7 @@ func (idx *CfIndex) Create(dbTx database.Tx) error {
 
 	return dbStoreFilterHeader(
 		dbTx,
-		cfExtendedHeaderKey,
+		cfHeaderKeys[1],
 		&idx.chainParams.GenesisBlock.Header.PrevBlock,
 		firstHeader,
 	)
@@ -170,15 +168,14 @@ func (idx *CfIndex) Create(dbTx database.Tx) error {
 // storeFilter stores a given filter, and performs the steps needed to
 // generate the filter's header.
 func storeFilter(dbTx database.Tx, block *btcutil.Block, f *gcs.Filter,
-	extended bool) error {
+	filterType uint8) error {
+	if filterType > maxFilterType {
+		return errors.New("unsupported filter type")
+	}
 
 	// Figure out which buckets to use.
-	fkey := cfBasicIndexKey
-	hkey := cfBasicHeaderKey
-	if extended {
-		fkey = cfExtendedIndexKey
-		hkey = cfExtendedHeaderKey
-	}
+	fkey := cfIndexKeys[filterType]
+	hkey := cfHeaderKeys[filterType]
 
 	// Start by storing the filter.
 	h := block.Hash()
@@ -218,7 +215,7 @@ func (idx *CfIndex) ConnectBlock(dbTx database.Tx, block *btcutil.Block,
 		return err
 	}
 
-	if err := storeFilter(dbTx, block, f, false); err != nil {
+	if err := storeFilter(dbTx, block, f, 0); err != nil {
 		return err
 	}
 
@@ -227,7 +224,7 @@ func (idx *CfIndex) ConnectBlock(dbTx database.Tx, block *btcutil.Block,
 		return err
 	}
 
-	return storeFilter(dbTx, block, f, true)
+	return storeFilter(dbTx, block, f, 1)
 }
 
 // DisconnectBlock is invoked by the index manager when a block has been
@@ -236,26 +233,34 @@ func (idx *CfIndex) ConnectBlock(dbTx database.Tx, block *btcutil.Block,
 func (idx *CfIndex) DisconnectBlock(dbTx database.Tx, block *btcutil.Block,
 	view *blockchain.UtxoViewpoint) error {
 
-	err := dbDeleteFilter(dbTx, cfBasicIndexKey, block.Hash())
-	if err != nil {
-		return err
+	for _, key := range cfIndexKeys {
+		err := dbDeleteFilter(dbTx, key, block.Hash())
+		if err != nil {
+			return err
+		}
 	}
 
-	return dbDeleteFilter(dbTx, cfExtendedIndexKey, block.Hash())
+	for _, key := range cfHeaderKeys {
+		err := dbDeleteFilterHeader(dbTx, key, block.Hash())
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // FilterByBlockHash returns the serialized contents of a block's basic or
 // extended committed filter.
-func (idx *CfIndex) FilterByBlockHash(h *chainhash.Hash, extended bool) ([]byte, error) {
+func (idx *CfIndex) FilterByBlockHash(h *chainhash.Hash, filterType uint8) ([]byte, error) {
 	var f []byte
 	err := idx.db.View(func(dbTx database.Tx) error {
-		var err error
-		key := cfBasicIndexKey
-		if extended {
-			key = cfExtendedIndexKey
+		if filterType > maxFilterType {
+			return errors.New("unsupported filter type")
 		}
 
-		f, err = dbFetchFilter(dbTx, key, h)
+		var err error
+		f, err = dbFetchFilter(dbTx, cfIndexKeys[filterType], h)
 		return err
 	})
 	return f, err
@@ -263,16 +268,15 @@ func (idx *CfIndex) FilterByBlockHash(h *chainhash.Hash, extended bool) ([]byte,
 
 // FilterHeaderByBlockHash returns the serialized contents of a block's basic
 // or extended committed filter header.
-func (idx *CfIndex) FilterHeaderByBlockHash(h *chainhash.Hash, extended bool) ([]byte, error) {
+func (idx *CfIndex) FilterHeaderByBlockHash(h *chainhash.Hash, filterType uint8) ([]byte, error) {
 	var fh []byte
 	err := idx.db.View(func(dbTx database.Tx) error {
-		var err error
-		key := cfBasicHeaderKey
-		if extended {
-			key = cfExtendedHeaderKey
+		if filterType > 1 {
+			return errors.New("unsupported filter type")
 		}
 
-		fh, err = dbFetchFilterHeader(dbTx, key, h)
+		var err error
+		fh, err = dbFetchFilterHeader(dbTx, cfHeaderKeys[filterType], h)
 		return err
 	})
 	return fh, err

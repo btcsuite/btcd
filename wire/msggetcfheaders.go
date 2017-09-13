@@ -12,13 +12,13 @@ import (
 )
 
 // MsgGetCFHeaders is a message similar to MsgGetHeaders, but for committed
-// filter headers. It allows to set the Extended field to get headers in the
-// chain of basic (false) or extended (true) headers.
+// filter headers. It allows to set the FilterType field to get headers in the
+// chain of basic (0x00) or extended (0x01) headers.
 type MsgGetCFHeaders struct {
 	ProtocolVersion    uint32
 	BlockLocatorHashes []*chainhash.Hash
 	HashStop           chainhash.Hash
-	Extended           bool
+	FilterType         uint8
 }
 
 // AddBlockLocatorHash adds a new block locator hash to the message.
@@ -70,7 +70,7 @@ func (msg *MsgGetCFHeaders) BtcDecode(r io.Reader, pver uint32, _ MessageEncodin
 		return err
 	}
 
-	return readElement(r, &msg.Extended)
+	return readElement(r, &msg.FilterType)
 }
 
 // BtcEncode encodes the receiver to w using the bitcoin protocol encoding.
@@ -106,7 +106,7 @@ func (msg *MsgGetCFHeaders) BtcEncode(w io.Writer, pver uint32, _ MessageEncodin
 		return err
 	}
 
-	return writeElement(w, msg.Extended)
+	return writeElement(w, msg.FilterType)
 }
 
 // Command returns the protocol command string for the message.  This is part
@@ -119,7 +119,7 @@ func (msg *MsgGetCFHeaders) Command() string {
 // receiver.  This is part of the Message interface implementation.
 func (msg *MsgGetCFHeaders) MaxPayloadLength(pver uint32) uint32 {
 	// Version 4 bytes + num block locator hashes (varInt) + max allowed
-	// block locators + hash stop + Extended flag 1 byte.
+	// block locators + hash stop + filter type 1 byte.
 	return 4 + MaxVarIntPayload + (MaxBlockLocatorsPerMsg *
 		chainhash.HashSize) + chainhash.HashSize + 1
 }

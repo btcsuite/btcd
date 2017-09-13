@@ -69,9 +69,9 @@ func TestMessage(t *testing.T) {
 	bh := NewBlockHeader(1, &chainhash.Hash{}, &chainhash.Hash{}, 0, 0)
 	msgMerkleBlock := NewMsgMerkleBlock(bh)
 	msgReject := NewMsgReject("block", RejectDuplicate, "duplicate block")
-	msgGetCFilter := NewMsgGetCFilter(&chainhash.Hash{}, false)
+	msgGetCFilter := NewMsgGetCFilter(&chainhash.Hash{}, 0)
 	msgGetCFHeaders := NewMsgGetCFHeaders()
-	msgCFilter := NewMsgCFilter(&chainhash.Hash{}, true, []byte("payload"))
+	msgCFilter := NewMsgCFilter(&chainhash.Hash{}, 1, []byte("payload"))
 	msgCFHeaders := NewMsgCFHeaders()
 
 	tests := []struct {

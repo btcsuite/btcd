@@ -17,9 +17,9 @@ const (
 )
 
 type MsgCFilter struct {
-	BlockHash chainhash.Hash
-	Extended  bool
-	Data      []byte
+	BlockHash  chainhash.Hash
+	FilterType uint8
+	Data       []byte
 }
 
 // BtcDecode decodes r using the bitcoin protocol encoding into the receiver.
@@ -31,8 +31,8 @@ func (msg *MsgCFilter) BtcDecode(r io.Reader, pver uint32, _ MessageEncoding) er
 	if err != nil {
 		return err
 	}
-	// Read extended flag
-	err = readElement(r, &msg.Extended)
+	// Read filter type
+	err = readElement(r, &msg.FilterType)
 	if err != nil {
 		return err
 	}
@@ -57,7 +57,7 @@ func (msg *MsgCFilter) BtcEncode(w io.Writer, pver uint32, _ MessageEncoding) er
 		return err
 	}
 
-	err = writeElement(w, msg.Extended)
+	err = writeElement(w, msg.FilterType)
 	if err != nil {
 		return err
 	}
@@ -96,11 +96,11 @@ func (msg *MsgCFilter) MaxPayloadLength(pver uint32) uint32 {
 
 // NewMsgCFilter returns a new bitcoin cfilter message that conforms to the
 // Message interface. See MsgCFilter for details.
-func NewMsgCFilter(blockHash *chainhash.Hash, extended bool,
+func NewMsgCFilter(blockHash *chainhash.Hash, filterType uint8,
 	data []byte) *MsgCFilter {
 	return &MsgCFilter{
-		BlockHash: *blockHash,
-		Extended:  extended,
-		Data:      data,
+		BlockHash:  *blockHash,
+		FilterType: filterType,
+		Data:       data,
 	}
 }
