@@ -60,12 +60,18 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, flags BehaviorFlags)
 		return false, err
 	}
 
-	// Create a new block node for the block and add it to the in-memory
-	// block chain (could be either a side chain or the main chain).
+	// Create a new block node for the block and add it to the node index. Even
+	// if the block ultimately gets connected to the main chain, it starts out
+	// on a side chain.
 	blockHeader := &block.MsgBlock().Header
 	newNode := newBlockNode(blockHeader, prevNode)
 	newNode.status = statusDataStored
+
 	b.index.AddNode(newNode)
+	err = b.index.flushToDB()
+	if err != nil {
+		return false, err
+	}
 
 	// Connect the passed block to the chain while respecting proper chain
 	// selection according to the chain with the most proof of work.  This
