@@ -2213,6 +2213,14 @@ out:
 	s.wg.Done()
 }
 
+// standardScriptVerifyFlags returns the script flags that should be used when
+// executing transaction scripts to enforce additional checks which are required
+// for the script to be considered standard.  Note these flags are different
+// than what is required for the consensus rules in that they are more strict.
+func standardScriptVerifyFlags(chain *blockchain.BlockChain) (txscript.ScriptFlags, error) {
+	return mempool.BaseStandardVerifyFlags, nil
+}
+
 // newServer returns a new dcrd server configured to listen on addr for the
 // decred network type specified by chainParams.  Use start to begin accepting
 // connections from peers.
@@ -2421,6 +2429,9 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 			MaxSigOpsPerTx:       blockchain.MaxSigOpsPerBlock / 5,
 			MinRelayTxFee:        cfg.minRelayTxFee,
 			AllowOldVotes:        cfg.AllowOldVotes,
+			StandardVerifyFlags: func() (txscript.ScriptFlags, error) {
+				return standardScriptVerifyFlags(bm.chain)
+			},
 		},
 		ChainParams: chainParams,
 		NextStakeDifficulty: func() (int64, error) {

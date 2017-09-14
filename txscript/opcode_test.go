@@ -16,6 +16,21 @@ import (
 	"github.com/decred/dcrd/wire"
 )
 
+// testScriptFlags are the script flags which are used in the tests when
+// executing transaction scripts to enforce additional checks.  Note these flags
+// are different than what is required for the consensus rules in that they are
+// more strict.
+const testScriptFlags = ScriptBip16 |
+	ScriptVerifyDERSignatures |
+	ScriptVerifyStrictEncoding |
+	ScriptVerifyMinimalData |
+	ScriptDiscourageUpgradableNops |
+	ScriptVerifyCleanStack |
+	ScriptVerifyCheckLockTimeVerify |
+	ScriptVerifyCheckSequenceVerify |
+	ScriptVerifyLowS |
+	ScriptVerifySHA256
+
 // TestOpcodeDisabled tests the opcodeDisabled function manually because all
 // disabled opcodes result in a script execution failure when executed normally,
 // so the function is not called under normal circumstances.
@@ -475,8 +490,8 @@ func TestNewlyEnabledOpCodes(t *testing.T) {
 			Value:    0x00FFFFFF00000000,
 			PkScript: []byte{0x01},
 		})
-		flags := StandardVerifyFlags
-		engine, err := NewEngine(test.pkScript, msgTx, 0, flags, 0, nil)
+		engine, err := NewEngine(test.pkScript, msgTx, 0,
+			testScriptFlags, 0, nil)
 		if err != nil {
 			t.Errorf("Bad script result for test %v because of error: %v",
 				test.name, err.Error())
@@ -544,9 +559,8 @@ func TestForVMFailure(t *testing.T) {
 				Value:    0x00FFFFFF00000000,
 				PkScript: []byte{0x01},
 			})
-			flags := StandardVerifyFlags
-			engine, err := NewEngine(tests[j], msgTx, 0, flags, 0,
-				nil)
+			engine, err := NewEngine(tests[j], msgTx, 0,
+				testScriptFlags, 0, nil)
 
 			if err == nil {
 				engine.Execute()

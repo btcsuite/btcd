@@ -32,6 +32,7 @@ type fakeChain struct {
 	blocks        map[chainhash.Hash]*dcrutil.Block
 	currentHash   chainhash.Hash
 	currentHeight int64
+	scriptFlags   txscript.ScriptFlags
 }
 
 // NextStakeDifficulty returns the next stake difficulty associated with the
@@ -130,6 +131,18 @@ func (s *fakeChain) SetHeight(height int64) {
 	s.Lock()
 	s.currentHeight = height
 	s.Unlock()
+}
+
+// StandardVerifyFlags returns the standard verification script flags associated
+// with the fake chain instance.
+func (s *fakeChain) StandardVerifyFlags() (txscript.ScriptFlags, error) {
+	return s.scriptFlags, nil
+}
+
+// SetStandardVerifyFlags sets the standard verification script flags associated
+// with the fake chain instance.
+func (s *fakeChain) SetStandardVerifyFlags(flags txscript.ScriptFlags) {
+	s.scriptFlags = flags
 }
 
 // spendableOutput is a convenience type that houses a particular utxo and the
@@ -328,8 +341,9 @@ func newPoolHarness(chainParams *chaincfg.Params) (*poolHarness, []spendableOutp
 	// Create a new fake chain and harness bound to it.
 	subsidyCache := blockchain.NewSubsidyCache(0, chainParams)
 	chain := &fakeChain{
-		utxos:  blockchain.NewUtxoViewpoint(),
-		blocks: make(map[chainhash.Hash]*dcrutil.Block),
+		utxos:       blockchain.NewUtxoViewpoint(),
+		blocks:      make(map[chainhash.Hash]*dcrutil.Block),
+		scriptFlags: BaseStandardVerifyFlags,
 	}
 	harness := poolHarness{
 		signKey:     signKey,
@@ -347,6 +361,7 @@ func newPoolHarness(chainParams *chaincfg.Params) (*poolHarness, []spendableOutp
 				MaxOrphanTxSize:      1000,
 				MaxSigOpsPerTx:       blockchain.MaxSigOpsPerBlock / 5,
 				MinRelayTxFee:        1000, // 1 Satoshi per byte
+				StandardVerifyFlags:  chain.StandardVerifyFlags,
 			},
 			ChainParams:         chainParams,
 			NextStakeDifficulty: chain.NextStakeDifficulty,

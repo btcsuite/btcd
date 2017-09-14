@@ -55,6 +55,22 @@ const (
 	// in a multi-signature transaction output script for it to be
 	// considered standard.
 	maxStandardMultiSigKeys = 3
+
+	// BaseStandardVerifyFlags defines the script flags that should be used
+	// when executing transaction scripts to enforce additional checks which
+	// are required for the script to be considered standard regardless of
+	// the state of any agenda votes.  The full set of standard verification
+	// flags must include these flags as well as any additional flags that
+	// are conditionally enabled depending on the result of agenda votes.
+	BaseStandardVerifyFlags = txscript.ScriptBip16 |
+		txscript.ScriptVerifyDERSignatures |
+		txscript.ScriptVerifyStrictEncoding |
+		txscript.ScriptVerifyMinimalData |
+		txscript.ScriptDiscourageUpgradableNops |
+		txscript.ScriptVerifyCleanStack |
+		txscript.ScriptVerifyCheckLockTimeVerify |
+		txscript.ScriptVerifyCheckSequenceVerify |
+		txscript.ScriptVerifyLowS
 )
 
 // calcMinRequiredTxRelayFee returns the minimum transaction fee required for a

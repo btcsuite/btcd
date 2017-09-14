@@ -1149,6 +1149,13 @@ func NewBlockTemplate(policy *mining.Policy, server *server,
 	chainState := &blockManager.chainState
 	subsidyCache := blockManager.chain.FetchSubsidyCache()
 
+	// All transaction scripts are verified using the more strict standarad
+	// flags.
+	scriptFlags, err := standardScriptVerifyFlags(blockManager.chain)
+	if err != nil {
+		return nil, err
+	}
+
 	// Extend the most recently known best block.
 	// The most recently known best block is the top block that has the most
 	// ssgen votes for it. We only need this after the height in which stake voting
@@ -1599,7 +1606,7 @@ mempoolLoop:
 			continue
 		}
 		err = blockchain.ValidateTransactionScripts(tx, blockUtxos,
-			txscript.StandardVerifyFlags, server.sigCache)
+			scriptFlags, server.sigCache)
 		if err != nil {
 			minrLog.Tracef("Skipping tx %s due to error in "+
 				"ValidateTransactionScripts: %v", tx.Hash(), err)

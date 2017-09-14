@@ -171,6 +171,14 @@ type Policy struct {
 	// AllowOldVotes defines whether or not votes on old blocks will be
 	// admitted and relayed.
 	AllowOldVotes bool
+
+	// StandardVerifyFlags defines the function to retrieve the flags to
+	// use for verifying scripts for the block after the current best block.
+	// It must set the verification flags properly depending on the result
+	// of any agendas that affect them.
+	//
+	// This function must be safe for concurrent access.
+	StandardVerifyFlags func() (txscript.ScriptFlags, error)
 }
 
 // TxDesc is a descriptor containing a transaction in the mempool along with
@@ -1138,8 +1146,12 @@ func (mp *TxPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew, rateLimit, allow
 
 	// Verify crypto signatures for each input and reject the transaction if
 	// any don't verify.
-	err = blockchain.ValidateTransactionScripts(tx, utxoView,
-		txscript.StandardVerifyFlags, mp.cfg.SigCache)
+	flags, err := mp.cfg.Policy.StandardVerifyFlags()
+	if err != nil {
+		return nil, err
+	}
+	err = blockchain.ValidateTransactionScripts(tx, utxoView, flags,
+		mp.cfg.SigCache)
 	if err != nil {
 		if cerr, ok := err.(blockchain.RuleError); ok {
 			return nil, chainRuleError(cerr)
