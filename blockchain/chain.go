@@ -495,6 +495,8 @@ func LockTimeToSequence(isSeconds bool, locktime uint32) uint32 {
 // passed node is the new end of the main chain.  The lists will be empty if the
 // passed node is not on a side chain.
 //
+// This function may modify node statuses in the block index without flushing.
+//
 // This function MUST be called with the chain state lock held (for reads).
 func (b *BlockChain) getReorganizeNodes(node *blockNode) (*list.List, *list.List) {
 	attachNodes := list.New()
@@ -585,6 +587,12 @@ func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block, view *U
 		}
 	}
 
+	// Write any block status changes to DB before updating best state.
+	err := b.index.flushToDB()
+	if err != nil {
+		return err
+	}
+
 	// Generate a new best state snapshot that will be used to update the
 	// database and later memory if all database updates are successful.
 	b.stateLock.RLock()
@@ -597,7 +605,7 @@ func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block, view *U
 		curTotalTxns+numTxns, node.CalcPastMedianTime())
 
 	// Atomically insert info into the database.
-	err := b.db.Update(func(dbTx database.Tx) error {
+	err = b.db.Update(func(dbTx database.Tx) error {
 		// Update best block state.
 		err := dbPutBestState(dbTx, state, node.workSum)
 		if err != nil {
@@ -687,6 +695,12 @@ func (b *BlockChain) disconnectBlock(node *blockNode, block *btcutil.Block, view
 		prevBlock, err = dbFetchBlockByNode(dbTx, prevNode)
 		return err
 	})
+	if err != nil {
+		return err
+	}
+
+	// Write any block status changes to DB before updating best state.
+	err = b.index.flushToDB()
 	if err != nil {
 		return err
 	}
@@ -791,6 +805,8 @@ func countSpentOutputs(block *btcutil.Block) int {
 // disconnected must be in reverse order (think of popping them off the end of
 // the chain) and nodes the are being attached must be in forwards order
 // (think pushing them onto the end of the chain).
+//
+// This function may modify node statuses in the block index without flushing.
 //
 // This function MUST be called with the chain state lock held (for writes).
 func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List) error {
@@ -1030,13 +1046,26 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, fla
 		stxos := make([]spentTxOut, 0, countSpentOutputs(block))
 		if !fastAdd {
 			err := b.checkConnectBlock(node, block, view, &stxos)
-			if err != nil {
-				if _, ok := err.(RuleError); ok {
-					b.index.SetStatusFlags(node, statusValidateFailed)
-				}
+			if err == nil {
+				b.index.SetStatusFlags(node, statusValid)
+			} else if _, ok := err.(RuleError); ok {
+				b.index.SetStatusFlags(node, statusValidateFailed)
+			} else {
 				return false, err
 			}
-			b.index.SetStatusFlags(node, statusValid)
+
+			// Intentionally ignore errors writing updated node status to DB. If
+			// it fails to write, it's not the end of the world. If the block is
+			// valid, we flush in connectBlock and if the block is invalid, the
+			// worst that can happen is we revalidate the block after a restart.
+			if writeErr := b.index.flushToDB(); writeErr != nil {
+				log.Warnf("Error flushing block index changes to disk: %v",
+					writeErr)
+			}
+
+			if err != nil {
+				return false, err
+			}
 		}
 
 		// In the fast add case the code to check the block connection
@@ -1097,11 +1126,16 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, fla
 	// Reorganize the chain.
 	log.Infof("REORGANIZE: Block %v is causing a reorganize.", node.hash)
 	err := b.reorganizeChain(detachNodes, attachNodes)
-	if err != nil {
-		return false, err
+
+	// Either getReorganizeNodes or reorganizeChain could have made unsaved
+	// changes to the block index, so flush regardless of whether there was an
+	// error. The index would only be dirty if the block failed to connect, so
+	// we can ignore any errors writing.
+	if writeErr := b.index.flushToDB(); writeErr != nil {
+		log.Warnf("Error flushing block index changes to disk: %v", writeErr)
 	}
 
-	return true, nil
+	return err == nil, err
 }
 
 // isCurrent returns whether or not the chain believes it is current.  Several

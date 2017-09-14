@@ -1076,7 +1076,7 @@ func (b *BlockChain) createChainState() error {
 	b.bestChain.SetTip(node)
 
 	// Add the new node to the index which is used for faster lookups.
-	b.index.AddNode(node)
+	b.index.addNode(node)
 
 	// Initialize the state related to the best block.  Since it is the
 	// genesis block, use its timestamp for the median time.
@@ -1150,8 +1150,7 @@ func (b *BlockChain) createChainState() error {
 func (b *BlockChain) initChainState() error {
 	// Determine the state of the chain database. We may need to initialize
 	// everything from scratch or upgrade certain buckets.
-	var initialized bool
-	var hasBlockIndex bool
+	var initialized, hasBlockIndex bool
 	err := b.db.View(func(dbTx database.Tx) error {
 		initialized = dbTx.Metadata().Get(chainStateKeyName) != nil
 		hasBlockIndex = dbTx.Metadata().Bucket(blockIndexBucketName) != nil
@@ -1209,9 +1208,7 @@ func (b *BlockChain) initChainState() error {
 		var lastNode *blockNode
 		cursor = blockIndexBucket.Cursor()
 		for ok := cursor.First(); ok; ok = cursor.Next() {
-			var header wire.BlockHeader
-			headerBytes := cursor.Value()
-			err := header.Deserialize(bytes.NewReader(headerBytes))
+			header, status, err := deserializeBlockRow(cursor.Value())
 			if err != nil {
 				return err
 			}
@@ -1243,9 +1240,9 @@ func (b *BlockChain) initChainState() error {
 			// Initialize the block node for the block, connect it,
 			// and add it to the block index.
 			node := &blockNodes[i]
-			initBlockNode(node, &header, parent)
-			node.status = statusDataStored | statusValid
-			b.index.AddNode(node)
+			initBlockNode(node, header, parent)
+			node.status = status
+			b.index.addNode(node)
 
 			lastNode = node
 			i++
@@ -1279,6 +1276,25 @@ func (b *BlockChain) initChainState() error {
 
 		return nil
 	})
+}
+
+// deserializeBlockRow parses a value in the block index bucket into a block
+// header and block status bitfield.
+func deserializeBlockRow(blockRow []byte) (*wire.BlockHeader, blockStatus, error) {
+	buffer := bytes.NewReader(blockRow)
+
+	var header wire.BlockHeader
+	err := header.Deserialize(buffer)
+	if err != nil {
+		return nil, statusNone, err
+	}
+
+	statusByte, err := buffer.ReadByte()
+	if err != nil {
+		return nil, statusNone, err
+	}
+
+	return &header, blockStatus(statusByte), nil
 }
 
 // dbFetchHeaderByHash uses an existing database transaction to retrieve the
@@ -1329,40 +1345,31 @@ func dbFetchBlockByNode(dbTx database.Tx, node *blockNode) (*btcutil.Block, erro
 	return block, nil
 }
 
-// dbStoreBlock stores the provided block in the database. The block header is
-// written to the block index bucket and full block data is written to ffldb.
-func dbStoreBlockHeader(dbTx database.Tx, blockHeader *wire.BlockHeader, height uint32) error {
-	// Serialize block data to be stored. This is just the serialized header.
-	w := bytes.NewBuffer(make([]byte, 0, blockHdrSize))
-	err := blockHeader.Serialize(w)
+// dbStoreBlockNode stores the block header and validation status to the block
+// index bucket. This overwrites the current entry if there exists one.
+func dbStoreBlockNode(dbTx database.Tx, node *blockNode) error {
+	// Serialize block data to be stored.
+	w := bytes.NewBuffer(make([]byte, 0, blockHdrSize+1))
+	header := node.Header()
+	err := header.Serialize(w)
+	if err != nil {
+		return err
+	}
+	err = w.WriteByte(byte(node.status))
 	if err != nil {
 		return err
 	}
 	value := w.Bytes()
 
 	// Write block header data to block index bucket.
-	blockHash := blockHeader.BlockHash()
 	blockIndexBucket := dbTx.Metadata().Bucket(blockIndexBucketName)
-	key := blockIndexKey(&blockHash, height)
+	key := blockIndexKey(&node.hash, uint32(node.height))
 	return blockIndexBucket.Put(key, value)
 }
 
-// dbStoreBlock stores the provided block in the database. The block header is
-// written to the block index bucket and full block data is written to ffldb.
+// dbStoreBlock stores the provided block in the database if it is not already
+// there. The full block data is written to ffldb.
 func dbStoreBlock(dbTx database.Tx, block *btcutil.Block) error {
-	if block.Height() == btcutil.BlockHeightUnknown {
-		return fmt.Errorf("cannot store block %s with unknown height",
-			block.Hash())
-	}
-
-	// First store block header in the block index bucket.
-	err := dbStoreBlockHeader(dbTx, &block.MsgBlock().Header,
-		uint32(block.Height()))
-	if err != nil {
-		return err
-	}
-
-	// Then store block data in ffldb if we haven't already.
 	hasBlock, err := dbTx.HasBlock(block.Hash())
 	if err != nil {
 		return err

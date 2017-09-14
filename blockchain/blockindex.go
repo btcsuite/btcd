@@ -231,6 +231,7 @@ type blockIndex struct {
 
 	sync.RWMutex
 	index map[chainhash.Hash]*blockNode
+	dirty map[*blockNode]struct{}
 }
 
 // newBlockIndex returns a new empty instance of a block index.  The index will
@@ -241,6 +242,7 @@ func newBlockIndex(db database.DB, chainParams *chaincfg.Params) *blockIndex {
 		db:          db,
 		chainParams: chainParams,
 		index:       make(map[chainhash.Hash]*blockNode),
+		dirty:       make(map[*blockNode]struct{}),
 	}
 }
 
@@ -265,14 +267,23 @@ func (bi *blockIndex) LookupNode(hash *chainhash.Hash) *blockNode {
 	return node
 }
 
-// AddNode adds the provided node to the block index.  Duplicate entries are not
-// checked so it is up to caller to avoid adding them.
+// AddNode adds the provided node to the block index and marks it as dirty.
+// Duplicate entries are not checked so it is up to caller to avoid adding them.
 //
 // This function is safe for concurrent access.
 func (bi *blockIndex) AddNode(node *blockNode) {
 	bi.Lock()
-	bi.index[node.hash] = node
+	bi.addNode(node)
+	bi.dirty[node] = struct{}{}
 	bi.Unlock()
+}
+
+// addNode adds the provided node to the block index, but does not mark it as
+// dirty. This can be used while initializing the block index.
+//
+// This function is NOT safe for concurrent access.
+func (bi *blockIndex) addNode(node *blockNode) {
+	bi.index[node.hash] = node
 }
 
 // NodeStatus provides concurrent-safe access to the status field of a node.
@@ -293,6 +304,7 @@ func (bi *blockIndex) NodeStatus(node *blockNode) blockStatus {
 func (bi *blockIndex) SetStatusFlags(node *blockNode, flags blockStatus) {
 	bi.Lock()
 	node.status |= flags
+	bi.dirty[node] = struct{}{}
 	bi.Unlock()
 }
 
@@ -303,5 +315,34 @@ func (bi *blockIndex) SetStatusFlags(node *blockNode, flags blockStatus) {
 func (bi *blockIndex) UnsetStatusFlags(node *blockNode, flags blockStatus) {
 	bi.Lock()
 	node.status &^= flags
+	bi.dirty[node] = struct{}{}
 	bi.Unlock()
+}
+
+// flushToDB writes all dirty block nodes to the database. If all writes
+// succeed, this clears the dirty set.
+func (bi *blockIndex) flushToDB() error {
+	bi.Lock()
+	if len(bi.dirty) == 0 {
+		bi.Unlock()
+		return nil
+	}
+
+	err := bi.db.Update(func(dbTx database.Tx) error {
+		for node := range bi.dirty {
+			err := dbStoreBlockNode(dbTx, node)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+
+	// If write was successful, clear the dirty set.
+	if err == nil {
+		bi.dirty = make(map[*blockNode]struct{})
+	}
+
+	bi.Unlock()
+	return err
 }
