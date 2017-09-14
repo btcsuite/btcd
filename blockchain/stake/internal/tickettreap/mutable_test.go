@@ -144,7 +144,7 @@ func TestMutableSequential(t *testing.T) {
 		}
 
 		// Ensure the expected size is reported.
-		expectedSize += (nodeFieldsSize + uint64(len(key)) + 4)
+		expectedSize += (nodeFieldsSize + uint64(len(key)) + nodeValueSize)
 		if gotSize := testTreap.Size(); gotSize != expectedSize {
 			t.Fatalf("Size #%d: unexpected byte size - got %d, "+
 				"want %d", i, gotSize, expectedSize)
@@ -203,7 +203,7 @@ func TestMutableSequential(t *testing.T) {
 		}
 
 		// Ensure the expected size is reported.
-		expectedSize -= (nodeFieldsSize + uint64(len(key)) + 4)
+		expectedSize -= (nodeFieldsSize + uint64(len(key)) + nodeValueSize)
 		if gotSize := testTreap.Size(); gotSize != expectedSize {
 			t.Fatalf("Size #%d: unexpected byte size - got %d, "+
 				"want %d", i, gotSize, expectedSize)
@@ -245,7 +245,7 @@ func TestMutableReverseSequential(t *testing.T) {
 		}
 
 		// Ensure the expected size is reported.
-		expectedSize += (nodeFieldsSize + uint64(len(key)) + 4)
+		expectedSize += (nodeFieldsSize + uint64(len(key)) + nodeValueSize)
 		if gotSize := testTreap.Size(); gotSize != expectedSize {
 			t.Fatalf("Size #%d: unexpected byte size - got %d, "+
 				"want %d", i, gotSize, expectedSize)
@@ -305,7 +305,7 @@ func TestMutableReverseSequential(t *testing.T) {
 		}
 
 		// Ensure the expected size is reported.
-		expectedSize -= (nodeFieldsSize + uint64(len(key)) + 4)
+		expectedSize -= (nodeFieldsSize + uint64(len(key)) + nodeValueSize)
 		if gotSize := testTreap.Size(); gotSize != expectedSize {
 			t.Fatalf("Size #%d: unexpected byte size - got %d, "+
 				"want %d", i, gotSize, expectedSize)
@@ -348,7 +348,7 @@ func TestMutableUnordered(t *testing.T) {
 		}
 
 		// Ensure the expected size is reported.
-		expectedSize += nodeFieldsSize + uint64(len(key)) + 4
+		expectedSize += nodeFieldsSize + uint64(len(key)) + nodeValueSize
 		if gotSize := testTreap.Size(); gotSize != expectedSize {
 			t.Fatalf("Size #%d: unexpected byte size - got %d, "+
 				"want %d", i, gotSize, expectedSize)
@@ -381,7 +381,7 @@ func TestMutableUnordered(t *testing.T) {
 		}
 
 		// Ensure the expected size is reported.
-		expectedSize -= (nodeFieldsSize + uint64(len(key)) + 4)
+		expectedSize -= (nodeFieldsSize + uint64(len(key)) + nodeValueSize)
 		if gotSize := testTreap.Size(); gotSize != expectedSize {
 			t.Fatalf("Size #%d: unexpected byte size - got %d, "+
 				"want %d", i, gotSize, expectedSize)
@@ -402,7 +402,7 @@ func TestMutableDuplicatePut(t *testing.T) {
 		key := uint32ToKey(uint32(i))
 		value := &Value{Height: uint32(i)}
 		testTreap.Put(key, value)
-		expectedSize += nodeFieldsSize + uint64(len(key)) + 4
+		expectedSize += nodeFieldsSize + uint64(len(key)) + nodeValueSize
 
 		// Put a duplicate key with the the expected final value.
 		testTreap.Put(key, expectedVal)

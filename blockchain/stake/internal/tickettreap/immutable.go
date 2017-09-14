@@ -1,5 +1,5 @@
 // Copyright (c) 2015-2016 The btcsuite developers
-// Copyright (c) 2016 The Decred developers
+// Copyright (c) 2016-2017 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -16,6 +16,7 @@ func cloneTreapNode(node *treapNode) *treapNode {
 		key:      node.key,
 		value:    node.value,
 		priority: node.priority,
+		size:     node.size,
 		left:     node.left,
 		right:    node.right,
 	}
@@ -105,6 +106,12 @@ func (t *Immutable) Get(key Key) *Value {
 	return nil
 }
 
+// GetByIndex returns the (Key, *Value) at the given position and panics if idx
+// is out of bounds.
+func (t *Immutable) GetByIndex(idx int) (Key, *Value) {
+	return t.root.getByIndex(idx)
+}
+
 // Put inserts the passed key/value pair.  Passing a nil value will result in a
 // NOOP.
 func (t *Immutable) Put(key Key, value *Value) *Immutable {
@@ -162,8 +169,13 @@ func (t *Immutable) Put(key Key, value *Value) *Immutable {
 		return newImmutable(newRoot, t.count, t.totalSize)
 	}
 
-	// Link the new node into the binary tree in the correct position.
+	// Recompute the size member of all parents, to account for inserted item.
 	node := newTreapNode(key, value, rng.Int())
+	for i := 0; i < parents.Len(); i++ {
+		parents.At(i).size++
+	}
+
+	// Link the new node into the binary tree in the correct position.
 	parent := parents.At(0)
 	if compareResult < 0 {
 		parent.left = node
@@ -185,8 +197,18 @@ func (t *Immutable) Put(key Key, value *Value) *Immutable {
 		// Perform a right rotation if the node is on the left side or
 		// a left rotation if the node is on the right side.
 		if parent.left == node {
+			// just to help visualise right-rotation...
+			//        p               n
+			//       / \       ->    / \
+			//      n  p.r         n.l  p
+			//     / \                 / \
+			//   n.l n.r             n.r p.r
+			node.size += 1 + parent.rightSize()
+			parent.size -= 1 + node.leftSize()
 			node.right, parent.left = parent, node.right
 		} else {
+			node.size += 1 + parent.leftSize()
+			parent.size -= 1 + node.rightSize()
 			node.left, parent.right = parent, node.left
 		}
 
@@ -254,6 +276,7 @@ func (t *Immutable) Delete(key Key) *Immutable {
 	for i := parents.Len(); i > 0; i-- {
 		node := parents.At(i - 1)
 		nodeCopy := cloneTreapNode(node)
+		nodeCopy.size--
 		if oldParent := newParents.At(0); oldParent != nil {
 			if oldParent.left == node {
 				oldParent.left = nodeCopy
@@ -291,8 +314,10 @@ func (t *Immutable) Delete(key Key) *Immutable {
 		// min-heap.
 		child = cloneTreapNode(child)
 		if isLeft {
+			child.size += delNode.rightSize()
 			child.right, delNode.left = delNode, child.right
 		} else {
+			child.size += delNode.leftSize()
 			child.left, delNode.right = delNode, child.left
 		}
 

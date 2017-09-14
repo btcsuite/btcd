@@ -1,5 +1,5 @@
 // Copyright (c) 2015-2016 The btcsuite developers
-// Copyright (c) 2016 The Decred developers
+// Copyright (c) 2016-2017 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -11,9 +11,13 @@ import (
 	"time"
 
 	"github.com/decred/dcrd/chaincfg/chainhash"
+	"fmt"
 )
 
 const (
+	// ptrSize is the number of bytes in a native pointer
+	ptrSize = 4 << (^uintptr(0) >> 63)
+
 	// staticDepth is the size of the static array to use for keeping track
 	// of the parent stack during treap iteration.  Since a treap has a very
 	// high probability that the tree height is logarithmic, it is
@@ -22,15 +26,14 @@ const (
 	staticDepth = 128
 
 	// nodeFieldsSize is the size the fields of each node takes excluding
-	// the contents of the key and value.  It assumes 64-bit pointers so
-	// technically it is smaller on 32-bit platforms, but overestimating the
-	// size in that case is acceptable since it avoids the need to import
-	// unsafe.  It consists of 8 bytes for each of the value, priority,
-	// left, and right fields (8*4).
-	nodeFieldsSize = 32
+	// the contents of the key and value.
+	// Size = 32 (key) + 8 (value pointer) + 8 (priority) + 4 (size)
+	//      + 4 (padding) + 8 (left pointer) + 8 (right pointer).
+	nodeFieldsSize = 32 + ptrSize + 8 + 4 + 4 + 2 * ptrSize
 
-	// nodeValueSize is the size of the fixed-size fields of a Value.
-	nodeValueSize = 4
+	// nodeValueSize is the size of the fixed-size fields of a Value,
+	// Height (4 bytes) plus (4*1 byte).
+	nodeValueSize = 8
 )
 
 // lockedSource is a rng source that is safe for concurrent access.
@@ -88,6 +91,7 @@ type treapNode struct {
 	key      Key
 	value    *Value
 	priority int
+	size     uint32 // Count of items within this treap - the node itself counts as 1.
 	left     *treapNode
 	right    *treapNode
 }
@@ -101,7 +105,51 @@ func nodeSize(node *treapNode) uint64 {
 // newTreapNode returns a new node from the given key, value, and priority.  The
 // node is not initially linked to any others.
 func newTreapNode(key Key, value *Value, priority int) *treapNode {
-	return &treapNode{key: key, value: value, priority: priority}
+	return &treapNode{key: key, value: value, priority: priority, size: 1}
+}
+
+// leftSize returns the size of the subtree on the left-hand side, and zero if
+// there is no tree present there.
+func (t *treapNode) leftSize() uint32 {
+	if t.left != nil {
+		return t.left.size
+	}
+	return 0
+}
+
+// rightSize returns the size of the subtree on the right-hand side, and zero if
+// there is no tree present there.
+func (t *treapNode) rightSize() uint32 {
+	if t.right != nil {
+		return t.right.size
+	}
+	return 0
+}
+
+// getByIndex returns the (Key, *Value) at the given position and panics if idx is
+// out of bounds.
+func (t *treapNode) getByIndex(idx int) (Key, *Value) {
+	if idx < 0 || idx > int(t.size) {
+		panic(fmt.Sprintf("getByIndex(%v) index out of bounds", idx))
+	}
+	node := t
+	for {
+		if node.left == nil {
+			if idx == 0 {
+				return node.key, node.value
+			} else {
+				node, idx = node.right, idx-1
+			}
+		} else {
+			if idx < int(node.left.size) {
+				node = node.left
+			} else if idx == int(node.left.size) {
+				return node.key, node.value
+			} else {
+				node, idx = node.right, idx-int(node.left.size)-1
+			}
+		}
+	}
 }
 
 // parentStack represents a stack of parent treap nodes that are used during

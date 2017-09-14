@@ -10,6 +10,7 @@ import (
 	"encoding/hex"
 	"reflect"
 	"testing"
+	"unsafe"
 )
 
 // fromHex converts the passed hex string into a byte slice and will panic if
@@ -37,6 +38,24 @@ func uint32ToKey(ui uint32) Key {
 	binary.BigEndian.PutUint32(key[len(key)-4:], ui)
 	return key
 }
+
+// TestSizeValues are correct.
+func TestSizeValues(t *testing.T) {
+	var node treapNode
+	if unsafe.Sizeof(node) != nodeFieldsSize {
+		t.Errorf("Sizeof(treapNode) != nodeFieldsSize - %v != %v", unsafe.Sizeof(node), nodeFieldsSize)
+	} else {
+		t.Log("All good nodeFieldsSize")
+	}
+
+	var v Value
+	if unsafe.Sizeof(v) != nodeValueSize {
+		t.Errorf("Sizeof(Value) != nodeValueSize - %v != %v", unsafe.Sizeof(v), nodeValueSize)
+	} else {
+		t.Log("All good nodeValueSize")
+	}
+}
+
 
 // TestParentStack ensures the treapParentStack functionality works as intended.
 func TestParentStack(t *testing.T) {
