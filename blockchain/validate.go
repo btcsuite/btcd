@@ -1248,8 +1248,8 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block, vi
 }
 
 // CheckConnectBlockTemplate fully validates that connecting the passed block to
-// the main chain does not violate any rules, aside from the proof of work
-// requirement. The block must connect to the current tip of the main chain.
+// the main chain does not violate any consensus rules, aside from the proof of
+// work requirement. The block must connect to the current tip of the main chain.
 //
 // This function is safe for concurrent access.
 func (b *BlockChain) CheckConnectBlockTemplate(block *btcutil.Block) error {

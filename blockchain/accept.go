@@ -15,17 +15,11 @@ import (
 // before adding it.  The block is expected to have already gone through
 // ProcessBlock before calling this function with it.
 //
-// The flags modify the behavior of this function as follows:
-//  - BFDryRun: The block index will not be updated and no accept notification
-//    will be sent since the block is not being accepted.
-//
 // The flags are also passed to checkBlockContext and connectBestChain.  See
 // their documentation for how the flags modify their behavior.
 //
 // This function MUST be called with the chain state lock held (for writes).
 func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, flags BehaviorFlags) (bool, error) {
-	dryRun := flags&BFDryRun == BFDryRun
-
 	// The height of this block is one more than the referenced previous
 	// block.
 	blockHeight := int32(0)
@@ -69,13 +63,6 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, flags BehaviorFlags)
 	}
 	b.index.AddNode(newNode)
 
-	// Undo changes to the block index when running in dry run mode.
-	if dryRun {
-		defer func() {
-			b.index.RemoveNode(newNode)
-		}()
-	}
-
 	// Connect the passed block to the chain while respecting proper chain
 	// selection according to the chain with the most proof of work.  This
 	// also handles validation of the transaction scripts.
@@ -87,11 +74,9 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, flags BehaviorFlags)
 	// Notify the caller that the new block was accepted into the block
 	// chain.  The caller would typically want to react by relaying the
 	// inventory to other peers.
-	if !dryRun {
-		b.chainLock.Unlock()
-		b.sendNotification(NTBlockAccepted, block)
-		b.chainLock.Lock()
-	}
+	b.chainLock.Unlock()
+	b.sendNotification(NTBlockAccepted, block)
+	b.chainLock.Lock()
 
 	return isMainChain, nil
 }

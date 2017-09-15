@@ -63,8 +63,8 @@ func TestSequenceLocksActive(t *testing.T) {
 	}
 }
 
-// TestCheckConnectBlock tests the CheckConnectBlockTemplate function to ensure
-// it fails.
+// TestCheckConnectBlockTemplate tests the CheckConnectBlockTemplate function to
+// ensure it fails.
 func TestCheckConnectBlockTemplate(t *testing.T) {
 	// Create a new database and chain instance to run tests against.
 	chain, teardownFunc, err := chainSetup("checkconnectblocktemplate",
@@ -108,7 +108,7 @@ func TestCheckConnectBlockTemplate(t *testing.T) {
 		}
 	}
 
-	// The block 3 should fail to connect since it's already inserted.
+	// Block 3 should fail to connect since it's already inserted.
 	err = chain.CheckConnectBlockTemplate(blocks[3])
 	if err == nil {
 		t.Fatal("CheckConnectBlockTemplate: Did not received expected error " +
@@ -122,7 +122,7 @@ func TestCheckConnectBlockTemplate(t *testing.T) {
 			"block 4: %v", err)
 	}
 
-	// The block 3a should fail to connect since does not build on chain tip.
+	// Block 3a should fail to connect since does not build on chain tip.
 	err = chain.CheckConnectBlockTemplate(blocks[5])
 	if err == nil {
 		t.Fatal("CheckConnectBlockTemplate: Did not received expected error " +
