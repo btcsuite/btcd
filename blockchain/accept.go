@@ -55,12 +55,7 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, flags BehaviorFlags)
 	// Create a new block node for the block and add it to the in-memory
 	// block chain (could be either a side chain or the main chain).
 	blockHeader := &block.MsgBlock().Header
-	newNode := newBlockNode(blockHeader, blockHeight)
-	if prevNode != nil {
-		newNode.parent = prevNode
-		newNode.height = blockHeight
-		newNode.workSum.Add(prevNode.workSum, newNode.workSum)
-	}
+	newNode := newBlockNode(blockHeader, prevNode)
 	b.index.AddNode(newNode)
 
 	// Connect the passed block to the chain while respecting proper chain
