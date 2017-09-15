@@ -1071,7 +1071,7 @@ func (b *BlockChain) createChainState() error {
 	genesisBlock := btcutil.NewBlock(b.chainParams.GenesisBlock)
 	genesisBlock.SetHeight(0)
 	header := &genesisBlock.MsgBlock().Header
-	node := newBlockNode(header, 0)
+	node := newBlockNode(header, nil)
 	node.status = statusDataStored | statusValid
 	b.bestChain.SetTip(node)
 
@@ -1216,36 +1216,37 @@ func (b *BlockChain) initChainState() error {
 				return err
 			}
 
-			// Initialize the block node for the block, connect it,
-			// and add it to the block index.
-			node := &blockNodes[i]
-			initBlockNode(node, &header, 0)
-			node.status = statusDataStored | statusValid
+			// Determine the parent block node. Since we iterate block headers
+			// in order of height, if the blocks are mostly linear there is a
+			// very good chance the previous header processed is the parent.
+			var parent *blockNode
 			if lastNode == nil {
-				if node.hash != *b.chainParams.GenesisHash {
+				blockHash := header.BlockHash()
+				if !blockHash.IsEqual(b.chainParams.GenesisHash) {
 					return AssertError(fmt.Sprintf("initChainState: Expected "+
 						"first entry in block index to be genesis block, "+
-						"found %s", header.BlockHash()))
+						"found %s", blockHash))
 				}
-			} else {
+			} else if header.PrevBlock == lastNode.hash {
 				// Since we iterate block headers in order of height, if the
 				// blocks are mostly linear there is a very good chance the
 				// previous header processed is the parent.
-				parent := lastNode
-				if header.PrevBlock != parent.hash {
-					parent = b.index.LookupNode(&header.PrevBlock)
-				}
+				parent = lastNode
+			} else {
+				parent = b.index.LookupNode(&header.PrevBlock)
 				if parent == nil {
 					return AssertError(fmt.Sprintf("initChainState: Could "+
 						"not find parent for block %s", header.BlockHash()))
 				}
-
-				node.parent = parent
-				node.height = parent.height + 1
-				node.workSum = node.workSum.Add(parent.workSum, node.workSum)
 			}
 
+			// Initialize the block node for the block, connect it,
+			// and add it to the block index.
+			node := &blockNodes[i]
+			initBlockNode(node, &header, parent)
+			node.status = statusDataStored | statusValid
 			b.index.AddNode(node)
+
 			lastNode = node
 			i++
 		}

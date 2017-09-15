@@ -101,33 +101,33 @@ type blockNode struct {
 	status blockStatus
 }
 
-// initBlockNode initializes a block node from the given header and height.  The
-// node is completely disconnected from the chain and the workSum value is just
-// the work for the passed block.  The work sum must be updated accordingly when
-// the node is inserted into a chain.
-//
+// initBlockNode initializes a block node from the given header and parent node,
+// calculating the height and workSum from the respective fields on the parent.
 // This function is NOT safe for concurrent access.  It must only be called when
 // initially creating a node.
-func initBlockNode(node *blockNode, blockHeader *wire.BlockHeader, height int32) {
+func initBlockNode(node *blockNode, blockHeader *wire.BlockHeader, parent *blockNode) {
 	*node = blockNode{
 		hash:       blockHeader.BlockHash(),
 		workSum:    CalcWork(blockHeader.Bits),
-		height:     height,
 		version:    blockHeader.Version,
 		bits:       blockHeader.Bits,
 		nonce:      blockHeader.Nonce,
 		timestamp:  blockHeader.Timestamp.Unix(),
 		merkleRoot: blockHeader.MerkleRoot,
 	}
+	if parent != nil {
+		node.parent = parent
+		node.height = parent.height + 1
+		node.workSum = node.workSum.Add(parent.workSum, node.workSum)
+	}
 }
 
-// newBlockNode returns a new block node for the given block header.  It is
-// completely disconnected from the chain and the workSum value is just the work
-// for the passed block.  The work sum must be updated accordingly when the node
-// is inserted into a chain.
-func newBlockNode(blockHeader *wire.BlockHeader, height int32) *blockNode {
+// newBlockNode returns a new block node for the given block header and parent
+// node, calculating the height and workSum from the respective fields on the
+// parent. This function is NOT safe for concurrent access.
+func newBlockNode(blockHeader *wire.BlockHeader, parent *blockNode) *blockNode {
 	var node blockNode
-	initBlockNode(&node, blockHeader, height)
+	initBlockNode(&node, blockHeader, parent)
 	return &node
 }
 
