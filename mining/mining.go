@@ -879,7 +879,7 @@ mempoolLoop:
 	// chain with no issues.
 	block := btcutil.NewBlock(&msgBlock)
 	block.SetHeight(nextBlockHeight)
-	if err := g.chain.CheckConnectBlock(block); err != nil {
+	if err := g.chain.CheckConnectBlockTemplate(block); err != nil {
 		return nil, err
 	}
 
