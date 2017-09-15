@@ -212,6 +212,11 @@ const (
 	// included in the block's coinbase transaction doesn't match the
 	// manually computed witness commitment.
 	ErrWitnessCommitmentMismatch
+
+	// ErrPrevBlockNotBest indicates that the block's previous block is not the
+	// current chain tip. This is not a block validation rule, but is required
+	// for block proposals submitted via getblocktemplate RPC.
+	ErrPrevBlockNotBest
 )
 
 // Map of ErrorCode values back to their constant names for pretty printing.
@@ -257,6 +262,7 @@ var errorCodeStrings = map[ErrorCode]string{
 	ErrUnexpectedWitness:         "ErrUnexpectedWitness",
 	ErrInvalidWitnessCommitment:  "ErrInvalidWitnessCommitment",
 	ErrWitnessCommitmentMismatch: "ErrWitnessCommitmentMismatch",
+	ErrPrevBlockNotBest:          "ErrPrevBlockNotBest",
 }
 
 // String returns the ErrorCode as a human-readable name.

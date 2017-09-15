@@ -2040,6 +2040,8 @@ func chainErrToGBTErrString(err error) string {
 		return "bad-script-malformed"
 	case blockchain.ErrScriptValidation:
 		return "bad-script-validate"
+	case blockchain.ErrPrevBlockNotBest:
+		return "inconclusive-not-best-prvblk"
 	}
 
 	return "rejected: " + err.Error()
@@ -2088,9 +2090,7 @@ func handleGetBlockTemplateProposal(s *rpcServer, request *btcjson.TemplateReque
 		return "bad-prevblk", nil
 	}
 
-	flags := blockchain.BFDryRun | blockchain.BFNoPoWCheck
-	isOrphan, err := s.cfg.SyncMgr.SubmitBlock(block, flags)
-	if err != nil {
+	if err := s.cfg.Chain.CheckConnectBlockTemplate(block); err != nil {
 		if _, ok := err.(blockchain.RuleError); !ok {
 			errStr := fmt.Sprintf("Failed to process block proposal: %v", err)
 			rpcsLog.Error(errStr)
@@ -2102,9 +2102,6 @@ func handleGetBlockTemplateProposal(s *rpcServer, request *btcjson.TemplateReque
 
 		rpcsLog.Infof("Rejected block proposal: %v", err)
 		return chainErrToGBTErrString(err), nil
-	}
-	if isOrphan {
-		return "orphan", nil
 	}
 
 	return nil, nil
