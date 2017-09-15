@@ -785,12 +785,8 @@ func countSpentOutputs(block *btcutil.Block) int {
 // the chain) and nodes the are being attached must be in forwards order
 // (think pushing them onto the end of the chain).
 //
-// The flags modify the behavior of this function as follows:
-//  - BFDryRun: Only the checks which ensure the reorganize can be completed
-//    successfully are performed.  The chain is not reorganized.
-//
 // This function MUST be called with the chain state lock held (for writes).
-func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List, flags BehaviorFlags) error {
+func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List) error {
 	// All of the blocks to detach and related spend journal entries needed
 	// to unspend transaction outputs in the blocks being disconnected must
 	// be loaded from the database during the reorg check phase below and
@@ -883,12 +879,6 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List, flags 
 		}
 	}
 
-	// Skip disconnecting and connecting the blocks when running with the
-	// dry run flag set.
-	if flags&BFDryRun == BFDryRun {
-		return nil
-	}
-
 	// Reset the view for the actual connection code below.  This is
 	// required because the view was previously modified when checking if
 	// the reorg would be successful and the connection code requires the
@@ -976,13 +966,10 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List, flags 
 // The flags modify the behavior of this function as follows:
 //  - BFFastAdd: Avoids several expensive transaction validation operations.
 //    This is useful when using checkpoints.
-//  - BFDryRun: Prevents the block from actually being connected and avoids any
-//    log messages related to modifying the state.
 //
 // This function MUST be called with the chain state lock held (for writes).
 func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, flags BehaviorFlags) (bool, error) {
 	fastAdd := flags&BFFastAdd == BFFastAdd
-	dryRun := flags&BFDryRun == BFDryRun
 
 	// We are extending the main (best) chain with a new block.  This is the
 	// most common case.
@@ -999,11 +986,6 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, fla
 			if err != nil {
 				return false, err
 			}
-		}
-
-		// Don't connect the block if performing a dry run.
-		if dryRun {
-			return true, nil
 		}
 
 		// In the fast add case the code to check the block connection
@@ -1037,11 +1019,6 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, fla
 	// We're extending (or creating) a side chain, but the cumulative
 	// work for this new side chain is not enough to make it the new chain.
 	if node.workSum.Cmp(b.bestChain.Tip().workSum) <= 0 {
-		// Skip Logging info when the dry run flag is set.
-		if dryRun {
-			return false, nil
-		}
-
 		// Log information about how the block is forking the chain.
 		fork := b.bestChain.FindFork(node)
 		if fork.hash.IsEqual(parentHash) {
@@ -1067,11 +1044,8 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, fla
 	detachNodes, attachNodes := b.getReorganizeNodes(node)
 
 	// Reorganize the chain.
-	if !dryRun {
-		log.Infof("REORGANIZE: Block %v is causing a reorganize.",
-			node.hash)
-	}
-	err := b.reorganizeChain(detachNodes, attachNodes, flags)
+	log.Infof("REORGANIZE: Block %v is causing a reorganize.", node.hash)
+	err := b.reorganizeChain(detachNodes, attachNodes)
 	if err != nil {
 		return false, err
 	}
