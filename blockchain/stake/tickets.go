@@ -1,4 +1,4 @@
-// Copyright (c) 2015-2016 The Decred developers
+// Copyright (c) 2015-2017 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -505,26 +505,24 @@ func connectNode(node *Node, header wire.BlockHeader, ticketsSpentInBlock, revok
 			toExpireHeight = connectedNode.height -
 				connectedNode.params.TicketExpiry
 		}
-		expired := fetchExpired(toExpireHeight, connectedNode.liveTickets)
-		for _, treapKey := range expired {
-			v, err := safeGet(connectedNode.liveTickets, *treapKey)
-			if err != nil {
-				return nil, err
-			}
+		
+		connectedNode.liveTickets.ForEachByHeight(toExpireHeight+1, func(treapKey tickettreap.Key, value *tickettreap.Value) bool {
+			// Make a copy of the value.
+			v := *value
 			v.Missed = true
 			v.Expired = true
 			connectedNode.liveTickets, err =
-				safeDelete(connectedNode.liveTickets, *treapKey)
+				safeDelete(connectedNode.liveTickets, treapKey)
 			if err != nil {
-				return nil, err
+				return false
 			}
 			connectedNode.missedTickets, err =
-				safePut(connectedNode.missedTickets, *treapKey, v)
+				safePut(connectedNode.missedTickets, treapKey, &v)
 			if err != nil {
-				return nil, err
+				return false
 			}
 
-			ticketHash := chainhash.Hash(*treapKey)
+			ticketHash := chainhash.Hash(treapKey)
 			connectedNode.databaseUndoUpdate =
 				append(connectedNode.databaseUndoUpdate, ticketdb.UndoTicketData{
 					TicketHash:   ticketHash,
@@ -534,6 +532,12 @@ func connectNode(node *Node, header wire.BlockHeader, ticketsSpentInBlock, revok
 					Spent:        v.Spent,
 					Expired:      v.Expired,
 				})
+
+			return true
+		})
+
+		if err != nil {
+			return nil, err
 		}
 
 		// Process all the revocations, moving them from the missed to the

@@ -1,4 +1,4 @@
-// Copyright (c) 2016 The Decred developers
+// Copyright (c) 2016-2017 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -41,36 +41,6 @@ func genTicketKeys() []Key {
 	return ticketKeys
 }
 
-// BenchmarkMutableCopy benchmarks how long it takes to copy a mutable treap
-// to another one when it contains 'numTicketKeys' entries.
-func BenchmarkMutableCopy(b *testing.B) {
-	// Populate mutable treap with a bunch of key/value pairs.
-	testTreap := NewMutable()
-	ticketKeys := genTicketKeys()
-	for j := 0; j < len(ticketKeys); j++ {
-		hashBytes := ticketKeys[j]
-		value := &Value{Height: uint32(j)}
-		testTreap.Put(hashBytes, value)
-	}
-
-	b.ReportAllocs()
-	b.ResetTimer()
-
-	// Copying a mutable treap requires iterating all of the entries and
-	// populating them into a new treap all with a lock held for concurrency
-	// safety.
-	var mtx sync.RWMutex
-	for i := 0; i < b.N; i++ {
-		benchTreap := NewMutable()
-		mtx.Lock()
-		testTreap.ForEach(func(k Key, v *Value) bool {
-			benchTreap.Put(k, v)
-			return true
-		})
-		mtx.Unlock()
-	}
-}
-
 // BenchmarkImmutableCopy benchmarks how long it takes to copy an immutable
 // treap to another one when it contains 'numTicketKeys' entries.
 func BenchmarkImmutableCopy(b *testing.B) {
@@ -95,29 +65,6 @@ func BenchmarkImmutableCopy(b *testing.B) {
 		mtx.RUnlock()
 		_ = benchTreap
 	}
-}
-
-// BenchmarkMutableCopy benchmarks how long it takes to iterate a mutable treap
-// when it contains 'numTicketKeys' entries.
-func BenchmarkMutableIterate(b *testing.B) {
-	// Populate mutable treap with a bunch of key/value pairs.
-	testTreap := NewMutable()
-	ticketKeys := genTicketKeys()
-	for j := 0; j < len(ticketKeys); j++ {
-		hashBytes := ticketKeys[j]
-		value := &Value{Height: uint32(j)}
-		testTreap.Put(hashBytes, value)
-	}
-
-	b.ReportAllocs()
-	b.ResetTimer()
-
-	for i := 0; i < b.N; i++ {
-		testTreap.ForEach(func(k Key, v *Value) bool {
-			return true
-		})
-	}
-
 }
 
 // BenchmarkImmutableIterate benchmarks how long it takes to iterate an

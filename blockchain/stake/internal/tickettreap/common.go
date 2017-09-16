@@ -6,10 +6,6 @@
 package tickettreap
 
 import (
-	"math/rand"
-	"sync"
-	"time"
-
 	"github.com/decred/dcrd/chaincfg/chainhash"
 	"fmt"
 )
@@ -26,49 +22,14 @@ const (
 	staticDepth = 128
 
 	// nodeFieldsSize is the size the fields of each node takes excluding
-	// the contents of the key and value.
-	// Size = 32 (key) + 8 (value pointer) + 8 (priority) + 4 (size)
-	//      + 4 (padding) + 8 (left pointer) + 8 (right pointer).
-	nodeFieldsSize = 32 + ptrSize + 8 + 4 + 4 + 2 * ptrSize
+	// the contents of the value.
+	// Size = 32 (key) + 8 (value pointer) + 4 (priority) + 4 (size)
+	//      + 8 (left pointer) + 8 (right pointer).
+	nodeFieldsSize = 32 + ptrSize + 4 + 4 + 2 * ptrSize
 
 	// nodeValueSize is the size of the fixed-size fields of a Value,
 	// Height (4 bytes) plus (4*1 byte).
 	nodeValueSize = 8
-)
-
-// lockedSource is a rng source that is safe for concurrent access.
-type lockedSource struct {
-	lock sync.Mutex
-	src  rand.Source
-}
-
-// Int63 returns a non-negative pseudo-random 63-bit integer as an int64.
-//
-// This function is safe for concurrent access.
-//
-// This is part of the implementation for the rand.Source interface.
-func (r *lockedSource) Int63() int64 {
-	r.lock.Lock()
-	n := r.src.Int63()
-	r.lock.Unlock()
-	return n
-}
-
-// Seed uses the provided seed value to initialize the generator to a
-// deterministic state.
-//
-// This function is safe for concurrent access.
-//
-// This is part of the implementation for the rand.Source interface.
-func (r *lockedSource) Seed(seed int64) {
-	r.lock.Lock()
-	r.src.Seed(seed)
-	r.lock.Unlock()
-}
-
-var (
-	// rng is a new random number generator that is local to the package.
-	rng = rand.New(&lockedSource{src: rand.NewSource(time.Now().UnixNano())})
 )
 
 // Key defines the key used to add an associated value to the treap.
@@ -90,7 +51,7 @@ type Value struct {
 type treapNode struct {
 	key      Key
 	value    *Value
-	priority int
+	priority uint32
 	size     uint32 // Count of items within this treap - the node itself counts as 1.
 	left     *treapNode
 	right    *treapNode
@@ -104,7 +65,7 @@ func nodeSize(node *treapNode) uint64 {
 
 // newTreapNode returns a new node from the given key, value, and priority.  The
 // node is not initially linked to any others.
-func newTreapNode(key Key, value *Value, priority int) *treapNode {
+func newTreapNode(key Key, value *Value, priority uint32) *treapNode {
 	return &treapNode{key: key, value: value, priority: priority, size: 1}
 }
 

@@ -147,6 +147,11 @@ func TestImmutableSequential(t *testing.T) {
 		testTreap.GetByIndex(numItems)
 	})
 
+	if !testTreap.root.isHeap() {
+		t.Fatalf("Heap invariant violated")
+	}
+
+
 	// Ensure the all keys are iterated by ForEach in order.
 	var numIterated int
 	testTreap.ForEach(func(k Key, v *Value) bool {
@@ -172,6 +177,27 @@ func TestImmutableSequential(t *testing.T) {
 	if numIterated != numItems {
 		t.Fatalf("ForEach: unexpected iterate count - got %d, want %d",
 			numIterated, numItems)
+	}
+
+	numIterated = 0
+	// query top 5% of the tree, check height less than the less-than-height
+	// requested
+	queryHeight := uint32(50) / 20
+	testTreap.ForEachByHeight(queryHeight, func(k Key, v *Value) bool {
+		// Ensure the height is as expected.
+		if !(v.Height < queryHeight) {
+			t.Fatalf("ForEach #%d: unexpected value - got %v, want under %v",
+				numIterated, v, queryHeight)
+		}
+
+		numIterated++
+		return true
+	})
+
+	// Ensure all items were iterated.
+	if numIterated != int(queryHeight) {
+		t.Fatalf("ForEachByHeight: unexpected iterate count - got %d, want %d",
+			numIterated, int(queryHeight))
 	}
 
 	// Delete the keys one-by-one while checking several of the treap
@@ -276,6 +302,10 @@ func TestImmutableReverseSequential(t *testing.T) {
 		}
 	}
 
+	if !testTreap.root.isHeap() {
+		t.Fatalf("Heap invariant violated")
+	}
+
 	// Ensure the all keys are iterated by ForEach in order.
 	var numIterated int
 	testTreap.ForEach(func(k Key, v *Value) bool {
@@ -327,6 +357,10 @@ func TestImmutableReverseSequential(t *testing.T) {
 			t.Fatalf("Get #%d: unexpected value - got %v, want nil",
 				i, gotVal)
 		}
+
+		 if !testTreap.root.isHeap() {
+			 t.Fatalf("Heap invariant violated")
+		 }
 
 		// Ensure the expected size is reported.
 		expectedSize -= (nodeFieldsSize + uint64(len(key)) + nodeValueSize)

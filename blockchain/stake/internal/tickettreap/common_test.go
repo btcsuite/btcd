@@ -1,5 +1,5 @@
 // Copyright (c) 2015-2016 The btcsuite developers
-// Copyright (c) 2016 The Decred developers
+// Copyright (c) 2016-2017 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -10,7 +10,6 @@ import (
 	"encoding/hex"
 	"reflect"
 	"testing"
-	"unsafe"
 )
 
 // fromHex converts the passed hex string into a byte slice and will panic if
@@ -42,15 +41,17 @@ func uint32ToKey(ui uint32) Key {
 // TestSizeValues are correct.
 func TestSizeValues(t *testing.T) {
 	var node treapNode
-	if unsafe.Sizeof(node) != nodeFieldsSize {
-		t.Errorf("Sizeof(treapNode) != nodeFieldsSize - %v != %v", unsafe.Sizeof(node), nodeFieldsSize)
+	sizeOfNode := reflect.TypeOf(node).Size()
+	if sizeOfNode != nodeFieldsSize {
+		t.Errorf("Sizeof(treapNode) != nodeFieldsSize - %v != %v", sizeOfNode, nodeFieldsSize)
 	} else {
 		t.Log("All good nodeFieldsSize")
 	}
 
 	var v Value
-	if unsafe.Sizeof(v) != nodeValueSize {
-		t.Errorf("Sizeof(Value) != nodeValueSize - %v != %v", unsafe.Sizeof(v), nodeValueSize)
+	sizeOfValue := reflect.TypeOf(v).Size()
+	if sizeOfValue != nodeValueSize {
+		t.Errorf("Sizeof(Value) != nodeValueSize - %v != %v", sizeOfValue, nodeValueSize)
 	} else {
 		t.Log("All good nodeValueSize")
 	}
@@ -139,9 +140,4 @@ testLoop:
 			continue testLoop
 		}
 	}
-}
-
-func init() {
-	// Force the same pseudo random numbers for each test run.
-	rng.Seed(0)
 }

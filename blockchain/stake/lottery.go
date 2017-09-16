@@ -186,20 +186,3 @@ func fetchWinners(idxs []int, t *tickettreap.Immutable) ([]*tickettreap.Key, err
 
 	return winners, nil
 }
-
-// fetchExpired is a ticket database specific function which iterates over the
-// entire treap and finds tickets that are equal or less than the given height.
-// These are returned as a slice of pointers to keys, which can be recast as
-// []*chainhash.Hash.
-func fetchExpired(height uint32, t *tickettreap.Immutable) []*tickettreap.Key {
-	var expired []*tickettreap.Key
-	t.ForEach(func(k tickettreap.Key, v *tickettreap.Value) bool {
-		if v.Height <= height {
-			expired = append(expired, &k)
-		}
-
-		return true
-	})
-
-	return expired
-}
