@@ -51,9 +51,9 @@ import (
 
 // API version constants
 const (
-	jsonrpcSemverString = "3.1.0"
+	jsonrpcSemverString = "3.2.0"
 	jsonrpcSemverMajor  = 3
-	jsonrpcSemverMinor  = 1
+	jsonrpcSemverMinor  = 2
 	jsonrpcSemverPatch  = 0
 )
 
@@ -1219,6 +1219,18 @@ func createVinList(mtx *wire.MsgTx) []dcrjson.Vin {
 		txIn := mtx.TxIn[0]
 		vinEntry := &vinList[0]
 		vinEntry.Coinbase = hex.EncodeToString(txIn.SignatureScript)
+		vinEntry.Sequence = txIn.Sequence
+		vinEntry.AmountIn = dcrutil.Amount(txIn.ValueIn).ToCoin()
+		vinEntry.BlockHeight = txIn.BlockHeight
+		vinEntry.BlockIndex = txIn.BlockIndex
+		return vinList
+	}
+
+	stakeTx, _ := stake.IsSSGen(mtx)
+	if stakeTx {
+		txIn := mtx.TxIn[0]
+		vinEntry := &vinList[0]
+		vinEntry.Stakebase = txIn.PreviousOutPoint.Hash.String()
 		vinEntry.Sequence = txIn.Sequence
 		vinEntry.AmountIn = dcrutil.Amount(txIn.ValueIn).ToCoin()
 		vinEntry.BlockHeight = txIn.BlockHeight
@@ -4646,6 +4658,17 @@ func createVinListPrevOut(s *rpcServer, mtx *wire.MsgTx, chainParams *chaincfg.P
 		txIn := mtx.TxIn[0]
 		vinList := make([]dcrjson.VinPrevOut, 1)
 		vinList[0].Coinbase = hex.EncodeToString(txIn.SignatureScript)
+		amountIn := dcrutil.Amount(txIn.ValueIn).ToCoin()
+		vinList[0].AmountIn = &amountIn
+		vinList[0].Sequence = txIn.Sequence
+		return vinList, nil
+	}
+
+	stakeTx, _ := stake.IsSSGen(mtx)
+	if stakeTx {
+		txIn := mtx.TxIn[0]
+		vinList := make([]dcrjson.VinPrevOut, 1)
+		vinList[0].Stakebase = txIn.PreviousOutPoint.Hash.String()
 		amountIn := dcrutil.Amount(txIn.ValueIn).ToCoin()
 		vinList[0].AmountIn = &amountIn
 		vinList[0].Sequence = txIn.Sequence
