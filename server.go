@@ -2446,7 +2446,7 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 		BestHeight:      func() int64 { return bm.chain.BestSnapshot().Height },
 		SubsidyCache:    bm.chain.FetchSubsidyCache(),
 		SigCache:        s.sigCache,
-		TimeSource:      s.timeSource,
+		PastMedianTime:  func() time.Time { return bm.chain.BestSnapshot().MedianTime },
 		AddrIndex:       s.addrIndex,
 		ExistsAddrIndex: s.existsAddrIndex,
 	}

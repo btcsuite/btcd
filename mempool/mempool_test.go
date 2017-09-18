@@ -11,6 +11,7 @@ import (
 	"reflect"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/decred/dcrd/blockchain"
 	"github.com/decred/dcrd/chaincfg"
@@ -32,6 +33,7 @@ type fakeChain struct {
 	blocks        map[chainhash.Hash]*dcrutil.Block
 	currentHash   chainhash.Hash
 	currentHeight int64
+	medianTime    time.Time
 	scriptFlags   txscript.ScriptFlags
 }
 
@@ -130,6 +132,23 @@ func (s *fakeChain) BestHeight() int64 {
 func (s *fakeChain) SetHeight(height int64) {
 	s.Lock()
 	s.currentHeight = height
+	s.Unlock()
+}
+
+// PastMedianTime returns the current median time associated with the fake chain
+// instance.
+func (s *fakeChain) PastMedianTime() time.Time {
+	s.RLock()
+	medianTime := s.medianTime
+	s.RUnlock()
+	return medianTime
+}
+
+// SetPastMedianTime sets the current median time associated with the fake chain
+// instance.
+func (s *fakeChain) SetPastMedianTime(medianTime time.Time) {
+	s.Lock()
+	s.medianTime = medianTime
 	s.Unlock()
 }
 
@@ -369,9 +388,9 @@ func newPoolHarness(chainParams *chaincfg.Params) (*poolHarness, []spendableOutp
 			BlockByHash:         chain.BlockByHash,
 			BestHash:            chain.BestHash,
 			BestHeight:          chain.BestHeight,
+			PastMedianTime:      chain.PastMedianTime,
 			SubsidyCache:        subsidyCache,
 			SigCache:            nil,
-			TimeSource:          blockchain.NewMedianTime(),
 			AddrIndex:           nil,
 			ExistsAddrIndex:     nil,
 		}),
@@ -394,6 +413,7 @@ func newPoolHarness(chainParams *chaincfg.Params) (*poolHarness, []spendableOutp
 		outputs = append(outputs, txOutToSpendableOut(coinbase, i))
 	}
 	harness.chain.SetHeight(int64(chainParams.CoinbaseMaturity) + curHeight)
+	harness.chain.SetPastMedianTime(time.Now())
 
 	return &harness, outputs, nil
 }

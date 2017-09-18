@@ -108,14 +108,16 @@ type Config struct {
 	// the current best chain.
 	BestHeight func() int64
 
+	// PastMedianTime defines the function to use in order to access the
+	// median time calculated from the point-of-view of the current chain
+	// tip within the best chain.
+	PastMedianTime func() time.Time
+
 	// SubsidyCache defines a subsidy cache to use.
 	SubsidyCache *blockchain.SubsidyCache
 
 	// SigCache defines a signature cache to use.
 	SigCache *txscript.SigCache
-
-	// TimeSource defines the timesource to use.
-	TimeSource blockchain.MedianTimeSource
 
 	// AddrIndex defines the optional address index instance to use for
 	// indexing the unconfirmed transactions in the memory pool.
@@ -830,8 +832,9 @@ func (mp *TxPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew, rateLimit, allow
 	// Don't allow non-standard transactions if the network parameters
 	// forbid their relaying.
 	if !mp.cfg.Policy.RelayNonStd {
+		medianTime := mp.cfg.PastMedianTime()
 		err := checkTransactionStandard(tx, txType, nextBlockHeight,
-			mp.cfg.TimeSource, mp.cfg.Policy.MinRelayTxFee,
+			medianTime, mp.cfg.Policy.MinRelayTxFee,
 			mp.cfg.Policy.MaxTxVersion)
 		if err != nil {
 			// Attempt to extract a reject code from the error so

@@ -9,8 +9,8 @@ import (
 	"bytes"
 	"math/big"
 	"testing"
+	"time"
 
-	"github.com/decred/dcrd/blockchain"
 	"github.com/decred/dcrd/blockchain/stake"
 	"github.com/decred/dcrd/chaincfg"
 	"github.com/decred/dcrd/chaincfg/chainec"
@@ -514,12 +514,13 @@ func TestCheckTransactionStandard(t *testing.T) {
 		},
 	}
 
-	timeSource := blockchain.NewMedianTime()
+	medianTime := time.Now()
 	for _, test := range tests {
 		// Ensure standardness is as expected.
 		tx := dcrutil.NewTx(&test.tx)
 		err := checkTransactionStandard(tx, stake.DetermineTxType(&test.tx),
-			test.height, timeSource, DefaultMinRelayTxFee, maxTxVersion)
+			test.height, medianTime, DefaultMinRelayTxFee,
+			maxTxVersion)
 		if err == nil && test.isStandard {
 			// Test passes since function returned standard for a
 			// transaction which is intended to be standard.

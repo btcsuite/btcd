@@ -7,6 +7,7 @@ package mempool
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/decred/dcrd/blockchain"
 	"github.com/decred/dcrd/blockchain/stake"
@@ -363,7 +364,7 @@ func isDust(txOut *wire.TxOut, minRelayTxFee dcrutil.Amount) bool {
 // of recognized forms, and not containing "dust" outputs (those that are
 // so small it costs more to process them than they are worth).
 func checkTransactionStandard(tx *dcrutil.Tx, txType stake.TxType, height int64,
-	timeSource blockchain.MedianTimeSource, minRelayTxFee dcrutil.Amount,
+	medianTime time.Time, minRelayTxFee dcrutil.Amount,
 	maxTxVersion uint16) error {
 
 	// The transaction must be a currently supported version and serialize
@@ -382,8 +383,7 @@ func checkTransactionStandard(tx *dcrutil.Tx, txType stake.TxType, height int64,
 
 	// The transaction must be finalized to be standard and therefore
 	// considered for inclusion in a block.
-	adjustedTime := timeSource.AdjustedTime()
-	if !blockchain.IsFinalizedTransaction(tx, height, adjustedTime) {
+	if !blockchain.IsFinalizedTransaction(tx, height, medianTime) {
 		return txRuleError(wire.RejectNonstandard,
 			"transaction is not finalized")
 	}
