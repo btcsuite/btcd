@@ -20,6 +20,7 @@ set -ex
 GOVERSION=${1:-1.9}
 REPO=dcrd
 
+TESTDIRS=$(go list ./... | grep -v '/vendor/')
 TESTCMD="test -z \"\$(gometalinter --disable-all \
   --enable=gofmt \
   --enable=vet \
@@ -28,7 +29,7 @@ TESTCMD="test -z \"\$(gometalinter --disable-all \
   --deadline=10m . 2>&1 | tee /dev/stderr)\"&& \
   env GORACE='halt_on_error=1' go test -short -race \
   -tags rpctest \
-  \$(glide novendor)"
+  \${TESTDIRS}"
 
 if [ $GOVERSION == "local" ]; then
     go get -v github.com/alecthomas/gometalinter; gometalinter --install
@@ -44,8 +45,8 @@ docker run --rm -it -v $(pwd):/src decred/$DOCKER_IMAGE_TAG /bin/bash -c "\
   rsync -ra --filter=':- .gitignore'  \
   /src/ /go/src/github.com/decred/$REPO/ && \
   cd github.com/decred/$REPO/ && \
-  glide install && \
-  go install \$(glide novendor) && \
+  dep ensure && \
+  go install . ./cmd/... && \
   $TESTCMD
 "
 
