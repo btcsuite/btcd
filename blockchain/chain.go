@@ -890,94 +890,6 @@ func (b *BlockChain) GetTopBlock() (*dcrutil.Block, error) {
 	return block, err
 }
 
-// removeBlockNode removes the passed block node from the memory chain by
-// unlinking all of its children and removing it from the the node and
-// dependency indices.
-//
-// This function MUST be called with the chain state lock held (for writes).
-func (b *BlockChain) removeBlockNode(node *blockNode) error {
-	if node.parent != nil {
-		return AssertError(fmt.Sprintf("removeBlockNode must be "+
-			"called with a node at the front of the chain - node %v",
-			node.hash))
-	}
-
-	// Remove the node from the node index.
-	delete(b.index, node.hash)
-
-	// Unlink all of the node's children.
-	for _, child := range node.children {
-		child.parent = nil
-	}
-	node.children = nil
-
-	// Remove the reference from the dependency index.
-	prevHash := &node.header.PrevBlock
-	if children, ok := b.depNodes[*prevHash]; ok {
-		// Find the node amongst the children of the
-		// dependencies for the parent hash and remove it.
-		b.depNodes[*prevHash] = removeChildNode(children, node)
-
-		// Remove the map entry altogether if there are no
-		// longer any nodes which depend on the parent hash.
-		if len(b.depNodes[*prevHash]) == 0 {
-			delete(b.depNodes, *prevHash)
-		}
-	}
-
-	return nil
-}
-
-// pruneBlockNodes removes references to old block nodes which are no longer
-// needed so they may be garbage collected.  In order to validate block rules
-// and choose the best chain, only a portion of the nodes which form the block
-// chain are needed in memory.  This function walks the chain backwards from the
-// current best chain to find any nodes before the first needed block node.
-//
-// This function MUST be called with the chain state lock held (for writes).
-func (b *BlockChain) pruneBlockNodes() error {
-	// Walk the chain backwards to find what should be the new root node.
-	// Intentionally use node.parent instead of getPrevNodeFromNode since
-	// the latter loads the node and the goal is to find nodes still in
-	// memory that can be pruned.
-	newRootNode := b.bestNode
-	for i := int64(0); i < minMemoryNodes-1 && newRootNode != nil; i++ {
-		newRootNode = newRootNode.parent
-	}
-
-	// Nothing to do if there are not enough nodes.
-	if newRootNode == nil || newRootNode.parent == nil {
-		return nil
-	}
-
-	// Push the nodes to delete on a list in reverse order since it's easier
-	// to prune them going forwards than it is backwards.  This will
-	// typically end up being a single node since pruning is currently done
-	// just before each new node is created.  However, that might be tuned
-	// later to only prune at intervals, so the code needs to account for
-	// the possibility of multiple nodes.
-	deleteNodes := list.New()
-	for node := newRootNode.parent; node != nil; node = node.parent {
-		deleteNodes.PushFront(node)
-	}
-
-	// Loop through each node to prune, unlink its children, remove it from
-	// the dependency index, and remove it from the node index.
-	for e := deleteNodes.Front(); e != nil; e = e.Next() {
-		node := e.Value.(*blockNode)
-		// Do not attempt to prune if the node should already have been pruned,
-		// for example if you're adding an old side chain block.
-		if node.height > b.bestNode.height-minMemoryNodes {
-			err := b.removeBlockNode(node)
-			if err != nil {
-				return err
-			}
-		}
-	}
-
-	return nil
-}
-
 // pruneStakeNodes removes references to old stake nodes which should no
 // longer be held in memory so as to keep the maximum memory usage down.
 // It proceeds from the bestNode back to the determined minimum height node,
@@ -1022,19 +934,6 @@ func (b *BlockChain) pruneStakeNodes() {
 			node.ticketsRevoked = nil
 		}
 	}
-}
-
-// pruneNodes tranverses the blockchain and prunes nodes and stake data from
-// memory so that the memory can be recovered by the garbage collector.  This
-// allows the caller of the blockchain to manually handle GC related to the
-// blockchain.
-//
-// This function is NOT safe for concurrent access and must be called with
-// the chain lock held for writes.
-func (b *BlockChain) pruneNodes() error {
-	b.pruneStakeNodes()
-
-	return b.pruneBlockNodes()
 }
 
 // BestPrevHash returns the hash of the previous block of the block at HEAD.

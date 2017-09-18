@@ -256,13 +256,10 @@ func (b *BlockChain) maybeAcceptBlock(block *dcrutil.Block, flags BehaviorFlags)
 		return false, err
 	}
 
-	// Prune stake nodes and block nodes which are no longer needed before
-	// creating a new node.
+	// Prune stake nodes which are no longer needed before creating a new
+	// node.
 	if !dryRun {
-		err := b.pruner.pruneChainIfNeeded()
-		if err != nil {
-			return false, err
-		}
+		b.pruner.pruneChainIfNeeded()
 	}
 
 	// Create a new block node for the block and add it to the in-memory
