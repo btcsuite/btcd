@@ -204,7 +204,7 @@ comment can make.
 
 <a name="ModelGitCommitMessages" />
 
-### 4.4 Code Documentation and Commenting
+### 4.4 Model Git Commit Messages
 
 This project prefers to keep a clean commit history with well-formed commit
 messages.  This section illustrates a model commit message and provides a bit
