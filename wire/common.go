@@ -193,6 +193,22 @@ func readElement(r io.Reader, element interface{}) error {
 	// Attempt to read the element based on the concrete type via fast
 	// type assertions first.
 	switch e := element.(type) {
+	case *uint8:
+		rv, err := binarySerializer.Uint8(r)
+		if err != nil {
+			return err
+		}
+		*e = rv
+		return nil
+
+	case *uint16:
+		rv, err := binarySerializer.Uint16(r, littleEndian)
+		if err != nil {
+			return err
+		}
+		*e = rv
+		return nil
+
 	case *int32:
 		rv, err := binarySerializer.Uint32(r, littleEndian)
 		if err != nil {
@@ -263,6 +279,13 @@ func readElement(r io.Reader, element interface{}) error {
 		}
 		return nil
 
+	case *[6]byte:
+		_, err := io.ReadFull(r, e[:])
+		if err != nil {
+			return err
+		}
+		return nil
+
 	// Message header command.
 	case *[CommandSize]uint8:
 		_, err := io.ReadFull(r, e[:])
@@ -273,6 +296,13 @@ func readElement(r io.Reader, element interface{}) error {
 
 	// IP address.
 	case *[16]byte:
+		_, err := io.ReadFull(r, e[:])
+		if err != nil {
+			return err
+		}
+		return nil
+
+	case *[32]byte:
 		_, err := io.ReadFull(r, e[:])
 		if err != nil {
 			return err
