@@ -623,3 +623,70 @@ func ExtractPkScriptAddrs(pkScript []byte, chainParams *chaincfg.Params) (Script
 
 	return scriptClass, addrs, requiredSigs, nil
 }
+
+// AtomicSwapDataPushes houses the data pushes found in atomic swap contracts.
+type AtomicSwapDataPushes struct {
+	RecipientHash160 [20]byte
+	RefundHash160    [20]byte
+	SecretHash       [20]byte
+	LockTime         int64
+}
+
+// ExtractAtomicSwapDataPushes returns the data pushes from an atomic swap
+// contract.  If the script is not an atomic swap contract,
+// ExtractAtomicSwapDataPushes returns (nil, nil).  Non-nil errors are returned
+// for unparsable scripts.
+//
+// NOTE: Atomic swaps are not considered standard script types by the dcrd
+// mempool policy and should be used with P2SH.  The atomic swap format is also
+// expected to change to use a more secure hash function in the future.
+//
+// This function is only defined in the txscript package due to API limitations
+// which prevent callers using txscript to parse nonstandard scripts.
+func ExtractAtomicSwapDataPushes(pkScript []byte) (*AtomicSwapDataPushes, error) {
+	pops, err := parseScript(pkScript)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(pops) != 17 {
+		return nil, nil
+	}
+	isAtomicSwap := pops[0].opcode.value == OP_IF &&
+		pops[1].opcode.value == OP_RIPEMD160 &&
+		pops[2].opcode.value == OP_DATA_20 &&
+		pops[3].opcode.value == OP_EQUALVERIFY &&
+		pops[4].opcode.value == OP_DUP &&
+		pops[5].opcode.value == OP_HASH160 &&
+		pops[6].opcode.value == OP_DATA_20 &&
+		pops[7].opcode.value == OP_ELSE &&
+		canonicalPush(pops[8]) &&
+		pops[9].opcode.value == OP_CHECKLOCKTIMEVERIFY &&
+		pops[10].opcode.value == OP_DROP &&
+		pops[11].opcode.value == OP_DUP &&
+		pops[12].opcode.value == OP_HASH160 &&
+		pops[13].opcode.value == OP_DATA_20 &&
+		pops[14].opcode.value == OP_ENDIF &&
+		pops[15].opcode.value == OP_EQUALVERIFY &&
+		pops[16].opcode.value == OP_CHECKSIG
+	if !isAtomicSwap {
+		return nil, nil
+	}
+
+	pushes := new(AtomicSwapDataPushes)
+	copy(pushes.SecretHash[:], pops[2].data)
+	copy(pushes.RecipientHash160[:], pops[6].data)
+	copy(pushes.RefundHash160[:], pops[13].data)
+	if pops[8].data != nil {
+		locktime, err := makeScriptNum(pops[8].data, true, 5)
+		if err != nil {
+			return nil, nil
+		}
+		pushes.LockTime = int64(locktime)
+	} else if op := pops[8].opcode; isSmallInt(op) {
+		pushes.LockTime = int64(asSmallInt(op))
+	} else {
+		return nil, nil
+	}
+	return pushes, nil
+}
