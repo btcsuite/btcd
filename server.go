@@ -2420,7 +2420,7 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 
 	txC := mempool.Config{
 		Policy: mempool.Policy{
-			MaxTxVersion:         1,
+			MaxTxVersion:         2,
 			DisableRelayPriority: cfg.NoRelayPriority,
 			RelayNonStd:          cfg.RelayNonStd,
 			FreeTxRelayLimit:     cfg.FreeTxRelayLimit,
@@ -2440,15 +2440,16 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 			bm.chainState.Unlock()
 			return sDiff, nil
 		},
-		FetchUtxoView:   bm.chain.FetchUtxoView,
-		BlockByHash:     bm.chain.BlockByHash,
-		BestHash:        func() *chainhash.Hash { return bm.chain.BestSnapshot().Hash },
-		BestHeight:      func() int64 { return bm.chain.BestSnapshot().Height },
-		SubsidyCache:    bm.chain.FetchSubsidyCache(),
-		SigCache:        s.sigCache,
-		PastMedianTime:  func() time.Time { return bm.chain.BestSnapshot().MedianTime },
-		AddrIndex:       s.addrIndex,
-		ExistsAddrIndex: s.existsAddrIndex,
+		FetchUtxoView:    bm.chain.FetchUtxoView,
+		BlockByHash:      bm.chain.BlockByHash,
+		BestHash:         func() *chainhash.Hash { return bm.chain.BestSnapshot().Hash },
+		BestHeight:       func() int64 { return bm.chain.BestSnapshot().Height },
+		CalcSequenceLock: bm.chain.CalcSequenceLock,
+		SubsidyCache:     bm.chain.FetchSubsidyCache(),
+		SigCache:         s.sigCache,
+		PastMedianTime:   func() time.Time { return bm.chain.BestSnapshot().MedianTime },
+		AddrIndex:        s.addrIndex,
+		ExistsAddrIndex:  s.existsAddrIndex,
 	}
 	s.txMemPool = mempool.New(&txC)
 

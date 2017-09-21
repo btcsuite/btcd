@@ -152,6 +152,15 @@ func (s *fakeChain) SetPastMedianTime(medianTime time.Time) {
 	s.Unlock()
 }
 
+// CalcSequenceLock returns the current sequence lock for the passed transaction
+// associated with the fake chain instance.
+func (s *fakeChain) CalcSequenceLock(tx *dcrutil.Tx, view *blockchain.UtxoViewpoint) (*blockchain.SequenceLock, error) {
+	return &blockchain.SequenceLock{
+		MinHeight: -1,
+		MinTime:   -1,
+	}, nil
+}
+
 // StandardVerifyFlags returns the standard verification script flags associated
 // with the fake chain instance.
 func (s *fakeChain) StandardVerifyFlags() (txscript.ScriptFlags, error) {
@@ -389,6 +398,7 @@ func newPoolHarness(chainParams *chaincfg.Params) (*poolHarness, []spendableOutp
 			BestHash:            chain.BestHash,
 			BestHeight:          chain.BestHeight,
 			PastMedianTime:      chain.PastMedianTime,
+			CalcSequenceLock:    chain.CalcSequenceLock,
 			SubsidyCache:        subsidyCache,
 			SigCache:            nil,
 			AddrIndex:           nil,

@@ -113,6 +113,11 @@ type Config struct {
 	// tip within the best chain.
 	PastMedianTime func() time.Time
 
+	// CalcSequenceLock defines the function to use in order to generate
+	// the current sequence lock for the given transaction using the passed
+	// utxo view.
+	CalcSequenceLock func(*dcrutil.Tx, *blockchain.UtxoViewpoint) (*blockchain.SequenceLock, error)
+
 	// SubsidyCache defines a subsidy cache to use.
 	SubsidyCache *blockchain.SubsidyCache
 
@@ -831,8 +836,8 @@ func (mp *TxPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew, rateLimit, allow
 
 	// Don't allow non-standard transactions if the network parameters
 	// forbid their relaying.
+	medianTime := mp.cfg.PastMedianTime()
 	if !mp.cfg.Policy.RelayNonStd {
-		medianTime := mp.cfg.PastMedianTime()
 		err := checkTransactionStandard(tx, txType, nextBlockHeight,
 			medianTime, mp.cfg.Policy.MinRelayTxFee,
 			mp.cfg.Policy.MaxTxVersion)
@@ -989,6 +994,21 @@ func (mp *TxPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew, rateLimit, allow
 
 	if len(missingParents) > 0 {
 		return missingParents, nil
+	}
+
+	// Don't allow the transaction into the mempool unless its sequence
+	// lock is active, meaning that it'll be allowed into the next block
+	// with respect to its defined relative lock times.
+	seqLock, err := mp.cfg.CalcSequenceLock(tx, utxoView)
+	if err != nil {
+		if cerr, ok := err.(blockchain.RuleError); ok {
+			return nil, chainRuleError(cerr)
+		}
+		return nil, err
+	}
+	if !blockchain.SequenceLockActive(seqLock, nextBlockHeight, medianTime) {
+		return nil, txRuleError(wire.RejectNonstandard,
+			"transaction sequence locks on inputs not met")
 	}
 
 	// Perform several checks on the transaction inputs using the invariant
