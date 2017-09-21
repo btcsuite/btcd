@@ -118,6 +118,23 @@ func IsCoinBase(tx *dcrutil.Tx) bool {
 	return IsCoinBaseTx(tx.MsgTx())
 }
 
+// SequenceLockActive determines if all of the inputs to a given transaction
+// have achieved a relative age that surpasses the requirements specified by
+// their respective sequence locks as calculated by CalcSequenceLock.  A single
+// sequence lock is sufficient because the calculated lock selects the minimum
+// required time and block height from all of the non-disabled inputs after
+// which the transaction can be included.
+func SequenceLockActive(lock *SequenceLock, blockHeight int64, medianTime time.Time) bool {
+	// The transaction is not yet mature if it has not yet reached the
+	// required minimum time and block height according to its sequence
+	// locks.
+	if blockHeight <= lock.MinHeight || medianTime.Unix() <= lock.MinTime {
+		return false
+	}
+
+	return true
+}
+
 // CheckTransactionSanity performs some preliminary checks on a transaction to
 // ensure it is sane.  These checks are context free.
 func CheckTransactionSanity(tx *wire.MsgTx, params *chaincfg.Params) error {

@@ -63,11 +63,9 @@ func checkCoinbaseUniqueHeight(blockHeight int64, block *dcrutil.Block) error {
 }
 
 // IsFinalizedTransaction determines whether or not a transaction is finalized.
-func IsFinalizedTransaction(tx *dcrutil.Tx, blockHeight int64,
-	blockTime time.Time) bool {
-	msgTx := tx.MsgTx()
-
+func IsFinalizedTransaction(tx *dcrutil.Tx, blockHeight int64, blockTime time.Time) bool {
 	// Lock time of zero means the transaction is finalized.
+	msgTx := tx.MsgTx()
 	lockTime := msgTx.LockTime
 	if lockTime == 0 {
 		return true

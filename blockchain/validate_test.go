@@ -1960,6 +1960,94 @@ func TestBlockchainSpendJournal(t *testing.T) {
 	}
 }
 
+// TestSequenceLocksActive ensure the sequence locks are detected as active or
+// not as expected in all possible scenarios.
+func TestSequenceLocksActive(t *testing.T) {
+	now := time.Now().Unix()
+	tests := []struct {
+		name          string
+		seqLockHeight int64
+		seqLockTime   int64
+		blockHeight   int64
+		medianTime    int64
+		want          bool
+	}{
+		{
+			// Block based sequence lock with height at min
+			// required.
+			name:          "min active block height",
+			seqLockHeight: 1000,
+			seqLockTime:   -1,
+			blockHeight:   1001,
+			medianTime:    now + 31,
+			want:          true,
+		},
+		{
+			// Time based sequence lock with relative time at min
+			// required.
+			name:          "min active median time",
+			seqLockHeight: -1,
+			seqLockTime:   now + 30,
+			blockHeight:   1001,
+			medianTime:    now + 31,
+			want:          true,
+		},
+		{
+			// Block based sequence lock at same height.
+			name:          "same height",
+			seqLockHeight: 1000,
+			seqLockTime:   -1,
+			blockHeight:   1000,
+			medianTime:    now + 31,
+			want:          false,
+		},
+		{
+			// Time based sequence lock with relative time equal to
+			// lock time.
+			name:          "same median time",
+			seqLockHeight: -1,
+			seqLockTime:   now + 30,
+			blockHeight:   1001,
+			medianTime:    now + 30,
+			want:          false,
+		},
+		{
+			// Block based sequence lock with relative height below
+			// required.
+			name:          "height below required",
+			seqLockHeight: 1000,
+			seqLockTime:   -1,
+			blockHeight:   999,
+			medianTime:    now + 31,
+			want:          false,
+		},
+		{
+			// Time based sequence lock with relative time before
+			// required.
+			name:          "median time before required",
+			seqLockHeight: -1,
+			seqLockTime:   now + 30,
+			blockHeight:   1001,
+			medianTime:    now + 29,
+			want:          false,
+		},
+	}
+
+	for _, test := range tests {
+		seqLock := blockchain.SequenceLock{
+			MinHeight: test.seqLockHeight,
+			MinTime:   test.seqLockTime,
+		}
+		got := blockchain.SequenceLockActive(&seqLock, test.blockHeight,
+			time.Unix(test.medianTime, 0))
+		if got != test.want {
+			t.Errorf("%s: mismatched seqence lock status - got %v, "+
+				"want %v", test.name, got, test.want)
+			continue
+		}
+	}
+}
+
 // TestCheckBlockSanity tests the context free block sanity checks with blocks
 // not on a chain.
 func TestCheckBlockSanity(t *testing.T) {
