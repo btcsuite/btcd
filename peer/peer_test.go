@@ -11,6 +11,7 @@ import (
 	"io"
 	"net"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
@@ -207,6 +208,7 @@ func testPeer(t *testing.T, p *peer.Peer, s peerStats) {
 
 // TestPeerConnection tests connection between inbound and outbound peers.
 func TestPeerConnection(t *testing.T) {
+	var pause sync.Mutex
 	verack := make(chan struct{})
 	peerCfg := &peer.Config{
 		Listeners: peer.MessageListeners{
@@ -218,6 +220,8 @@ func TestPeerConnection(t *testing.T) {
 				if _, ok := msg.(*wire.MsgVerAck); ok {
 					verack <- struct{}{}
 				}
+				pause.Lock()
+				pause.Unlock()
 			},
 		},
 		UserAgentName:    "peer",
@@ -303,8 +307,11 @@ func TestPeerConnection(t *testing.T) {
 			t.Errorf("TestPeerConnection setup #%d: unexpected err %v", i, err)
 			return
 		}
+
+		pause.Lock()
 		testPeer(t, inPeer, wantStats)
 		testPeer(t, outPeer, wantStats)
+		pause.Unlock()
 
 		inPeer.Disconnect()
 		outPeer.Disconnect()
