@@ -70,7 +70,6 @@ const (
 		txscript.ScriptDiscourageUpgradableNops |
 		txscript.ScriptVerifyCleanStack |
 		txscript.ScriptVerifyCheckLockTimeVerify |
-		txscript.ScriptVerifyCheckSequenceVerify |
 		txscript.ScriptVerifyLowS
 )
 

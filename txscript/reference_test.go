@@ -128,8 +128,6 @@ func parseScriptFlags(flagStr string) (ScriptFlags, error) {
 			// Nothing.
 		case "CHECKLOCKTIMEVERIFY":
 			flags |= ScriptVerifyCheckLockTimeVerify
-		case "CHECKSEQUENCEVERIFY":
-			flags |= ScriptVerifyCheckSequenceVerify
 		case "CLEANSTACK":
 			flags |= ScriptVerifyCleanStack
 		case "DERSIG":

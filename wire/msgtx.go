@@ -57,20 +57,6 @@ const (
 	// TxTreeStake is the value for a stake transaction tree for a
 	// transaction's location in a block.
 	TxTreeStake int8 = 1
-
-	// SequenceLockTimeDisabled is a flag that if set on a transaction
-	// input's sequence number, the sequence number will not be interpreted
-	// as a relative locktime.
-	SequenceLockTimeDisabled = 1 << 31
-
-	// SequenceLockTimeIsSeconds is a flag that if set on a transaction
-	// input's sequence number, the relative locktime has units of 512
-	// seconds.
-	SequenceLockTimeIsSeconds = 1 << 22
-
-	// SequenceLockTimeMask is a mask that extracts the relative locktime
-	// when masked against the transaction input sequence number.
-	SequenceLockTimeMask = 0x0000ffff
 )
 
 const (
