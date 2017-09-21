@@ -1,5 +1,5 @@
-// Copyright (c) 2013-2015 The btcsuite developers
-// Copyright (c) 2015-2016 The Decred developers
+// Copyright (c) 2013-2016 The btcsuite developers
+// Copyright (c) 2015-2017 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -27,17 +27,22 @@ const (
 	ScriptStrictMultiSig
 
 	// ScriptDiscourageUpgradableNops defines whether to verify that
-	// NOP1 through NOP10 are reserved for future soft-fork upgrades.  This
-	// flag must not be used for consensus critical code nor applied to
-	// blocks as this flag is only for stricter standard transaction
-	// checks.  This flag is only applied when the above opcodes are
-	// executed.
+	// currently unused opcodes in the NOP and UNKNOWN families are reserved
+	// for future upgrades.  This flag must not be used for consensus
+	// critical code nor applied to blocks as this flag is only for stricter
+	// standard transaction checks.  This flag is only applied when the
+	// above opcodes are executed.
 	ScriptDiscourageUpgradableNops
 
 	// ScriptVerifyCheckLockTimeVerify defines whether to verify that
 	// a transaction output is spendable based on the locktime.
 	// This is BIP0065.
 	ScriptVerifyCheckLockTimeVerify
+
+	// ScriptVerifyCheckSequenceVerify defines whether to allow execution
+	// pathways of a script to be restricted based on the age of the output
+	// being spent.  This is BIP0112.
+	ScriptVerifyCheckSequenceVerify
 
 	// ScriptVerifyCleanStack defines that the stack must contain only
 	// one stack element after evaluation and that the element must be
