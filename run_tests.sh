@@ -18,7 +18,7 @@ set -ex
 # for more details.
 
 #Default GOVERSION
-GOVERSION=${1:-1.8}
+GOVERSION=${1:-1.9}
 REPO=dcrrpcclient
 
 TESTCMD="test -z \"\$(gometalinter --disable-all \
