@@ -1,5 +1,5 @@
 hash: 5ff55cbde58db9eecfef0a796b2513f910996d6aaa1244f31475852835e48efe
-updated: 2017-08-30T23:46:58.835362449Z
+updated: 2017-09-22T06:54:35.651501308-05:00
 imports:
 - name: github.com/agl/ed25519
   version: 278e1ec8e8a6e017cd07577924d6766039146ced
@@ -47,9 +47,9 @@ imports:
 - name: github.com/decred/bitset
   version: 484b833245d5f9046e2893a6bd2e54b1df3a53a4
 - name: github.com/decred/dcrrpcclient
-  version: abc326aeb97b299c7eb6b13b81353fc375e9b95d
+  version: bd992834efae9f8a81842221a634f4af22b77a0f
 - name: github.com/decred/dcrutil
-  version: 166211f0196be1d3be344ae64149e7c4f5ca36b0
+  version: ddbde93f65ab0692e54ed8a5ad325fa2e8af4daa
   subpackages:
   - base58
   - bloom
