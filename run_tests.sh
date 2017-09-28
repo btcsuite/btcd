@@ -21,13 +21,12 @@ set -ex
 GOVERSION=${1:-1.9}
 REPO=dcrrpcclient
 
-TESTCMD="test -z \"\$(gometalinter --disable-all \
+TESTCMD="test -z \"\$(gometalinter --vendor --disable-all \
   --enable=gofmt \
   --enable=golint \
   --enable=vet \
   --enable=goimports \
   --enable=unconvert \
-  --vendor \
   --deadline=20s ./... | grep -v 'ALL_CAPS\|OP_' 2>&1 | tee /dev/stderr)\""
 
 if [ $GOVERSION == "local" ]; then
@@ -43,8 +42,8 @@ docker run --rm -it -v $(pwd):/src decred/$DOCKER_IMAGE_TAG /bin/bash -c "\
   rsync -ra --filter=':- .gitignore'  \
   /src/ /go/src/github.com/decred/$REPO/ && \
   cd github.com/decred/$REPO/ && \
-  glide install && \
-  go install \$(glide novendor) && \
+  dep ensure && \
+  go build ./examples/... && \
   $TESTCMD
 "
 
