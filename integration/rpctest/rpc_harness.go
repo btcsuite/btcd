@@ -119,8 +119,13 @@ func New(activeNet *chaincfg.Params, handlers *rpcclient.NotificationHandlers,
 			"of the supported chain networks")
 	}
 
+	testDir, err := baseDir()
+	if err != nil {
+		return nil, err
+	}
+
 	harnessID := strconv.Itoa(numTestInstances)
-	nodeTestData, err := ioutil.TempDir("", "rpctest-"+harnessID)
+	nodeTestData, err := ioutil.TempDir(testDir, "harness-"+harnessID)
 	if err != nil {
 		return nil, err
 	}
@@ -452,4 +457,11 @@ func generateListeningAddresses() (string, string) {
 	p2p := net.JoinHostPort(localhost, portString(minPeerPort, maxPeerPort))
 	rpc := net.JoinHostPort(localhost, portString(minRPCPort, maxRPCPort))
 	return p2p, rpc
+}
+
+// baseDir is the directory path of the temp directory for all rpctest files.
+func baseDir() (string, error) {
+	dirPath := filepath.Join(os.TempDir(), "btcd", "rpctest")
+	err := os.MkdirAll(dirPath, 0755)
+	return dirPath, err
 }

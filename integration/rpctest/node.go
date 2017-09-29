@@ -42,6 +42,11 @@ type nodeConfig struct {
 
 // newConfig returns a newConfig with all default values.
 func newConfig(prefix, certFile, keyFile string, extra []string) (*nodeConfig, error) {
+	btcdPath, err := btcdExecutablePath()
+	if err != nil {
+		return nil, err
+	}
+
 	a := &nodeConfig{
 		listen:    "127.0.0.1:18555",
 		rpcListen: "127.0.0.1:18556",
@@ -49,11 +54,10 @@ func newConfig(prefix, certFile, keyFile string, extra []string) (*nodeConfig, e
 		rpcPass:   "pass",
 		extra:     extra,
 		prefix:    prefix,
-
-		exe:      "btcd",
-		endpoint: "ws",
-		certFile: certFile,
-		keyFile:  keyFile,
+		exe:       btcdPath,
+		endpoint:  "ws",
+		certFile:  certFile,
+		keyFile:   keyFile,
 	}
 	if err := a.setDefaults(); err != nil {
 		return nil, err
