@@ -53,6 +53,9 @@ func dcrdMain(serverChan chan<- *server) error {
 	// Show version and home dir at startup.
 	dcrdLog.Infof("Version %s (Go version %s)", version(), runtime.Version())
 	dcrdLog.Infof("Home dir: %s", cfg.HomeDir)
+	if cfg.NoFileLogging {
+		dcrdLog.Info("File logging disabled")
+	}
 
 	// Enable http profiling server if requested.
 	if cfg.Profile != "" {

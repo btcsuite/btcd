@@ -91,6 +91,7 @@ type config struct {
 	ConfigFile           string        `short:"C" long:"configfile" description:"Path to configuration file"`
 	DataDir              string        `short:"b" long:"datadir" description:"Directory to store data"`
 	LogDir               string        `long:"logdir" description:"Directory to log output."`
+	NoFileLogging        bool          `long:"nofilelogging" description:"Disable file logging."`
 	AddPeers             []string      `short:"a" long:"addpeer" description:"Add a peer to connect with at startup"`
 	ConnectPeers         []string      `long:"connect" description:"Connect only to the specified peers at startup"`
 	DisableListen        bool          `long:"nolisten" description:"Disable listening for incoming connections -- NOTE: Listening is automatically disabled if the --connect or --proxy options are used without also specifying listen interfaces via --listen"`
@@ -602,21 +603,23 @@ func loadConfig() (*config, []string, error) {
 	var oldTestNets []string
 	oldTestNets = append(oldTestNets, filepath.Join(cfg.DataDir, "testnet"))
 	cfg.DataDir = filepath.Join(cfg.DataDir, netName(activeNetParams))
+	logRotator = nil
+	if !cfg.NoFileLogging {
+		// Append the network type to the log directory so it is "namespaced"
+		// per network in the same fashion as the data directory.
+		cfg.LogDir = cleanAndExpandPath(cfg.LogDir)
+		cfg.LogDir = filepath.Join(cfg.LogDir, netName(activeNetParams))
 
-	// Append the network type to the log directory so it is "namespaced"
-	// per network in the same fashion as the data directory.
-	cfg.LogDir = cleanAndExpandPath(cfg.LogDir)
-	cfg.LogDir = filepath.Join(cfg.LogDir, netName(activeNetParams))
+		// Initialize log rotation.  After log rotation has been initialized, the
+		// logger variables may be used.
+		initLogRotator(filepath.Join(cfg.LogDir, defaultLogFilename))
+	}
 
 	// Special show command to list supported subsystems and exit.
 	if cfg.DebugLevel == "show" {
 		fmt.Println("Supported subsystems", supportedSubsystems())
 		os.Exit(0)
 	}
-
-	// Initialize log rotation.  After log rotation has been initialized, the
-	// logger variables may be used.
-	initLogRotator(filepath.Join(cfg.LogDir, defaultLogFilename))
 
 	// Parse, validate, and set debug log level(s).
 	if err := parseAndSetDebugLevels(cfg.DebugLevel); err != nil {

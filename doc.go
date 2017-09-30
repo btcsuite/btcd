@@ -26,6 +26,7 @@ Application Options:
   -C, --configfile=         Path to configuration file
   -b, --datadir=            Directory to store data
       --logdir=             Directory to log output.
+      --nofilelogging=      Disable file logging.
   -a, --addpeer=            Add a peer to connect with at startup
       --connect=            Connect only to the specified peers at startup
       --nolisten            Disable listening for incoming connections -- NOTE:
