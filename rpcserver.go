@@ -1226,19 +1226,22 @@ func createVinList(mtx *wire.MsgTx) []dcrjson.Vin {
 		return vinList
 	}
 
+	// Stakebase transactions (votes) have two inputs: a null stake base
+	// followed by an input consuming a ticket's stakesubmission.
 	stakeTx, _ := stake.IsSSGen(mtx)
-	if stakeTx {
-		txIn := mtx.TxIn[0]
-		vinEntry := &vinList[0]
-		vinEntry.Stakebase = txIn.PreviousOutPoint.Hash.String()
-		vinEntry.Sequence = txIn.Sequence
-		vinEntry.AmountIn = dcrutil.Amount(txIn.ValueIn).ToCoin()
-		vinEntry.BlockHeight = txIn.BlockHeight
-		vinEntry.BlockIndex = txIn.BlockIndex
-		return vinList
-	}
 
 	for i, txIn := range mtx.TxIn {
+		// Handle only the null input of a stakebase differently.
+		if stakeTx && i == 0 {
+			vinEntry := &vinList[0]
+			vinEntry.Stakebase = hex.EncodeToString(txIn.SignatureScript)
+			vinEntry.Sequence = txIn.Sequence
+			vinEntry.AmountIn = dcrutil.Amount(txIn.ValueIn).ToCoin()
+			vinEntry.BlockHeight = txIn.BlockHeight
+			vinEntry.BlockIndex = txIn.BlockIndex
+			continue
+		}
+
 		// The disassembled string will contain [error] inline
 		// if the script doesn't fully parse, so ignore the
 		// error here.
@@ -4664,17 +4667,6 @@ func createVinListPrevOut(s *rpcServer, mtx *wire.MsgTx, chainParams *chaincfg.P
 		return vinList, nil
 	}
 
-	stakeTx, _ := stake.IsSSGen(mtx)
-	if stakeTx {
-		txIn := mtx.TxIn[0]
-		vinList := make([]dcrjson.VinPrevOut, 1)
-		vinList[0].Stakebase = txIn.PreviousOutPoint.Hash.String()
-		amountIn := dcrutil.Amount(txIn.ValueIn).ToCoin()
-		vinList[0].AmountIn = &amountIn
-		vinList[0].Sequence = txIn.Sequence
-		return vinList, nil
-	}
-
 	// Use a dynamically sized list to accomodate the address filter.
 	vinList := make([]dcrjson.VinPrevOut, 0, len(mtx.TxIn))
 
@@ -4689,7 +4681,24 @@ func createVinListPrevOut(s *rpcServer, mtx *wire.MsgTx, chainParams *chaincfg.P
 		}
 	}
 
-	for _, txIn := range mtx.TxIn {
+	// Stakebase transactions (votes) have two inputs: a null stake base
+	// followed by an input consuming a ticket's stakesubmission.
+	stakeTx, _ := stake.IsSSGen(mtx)
+
+	for i, txIn := range mtx.TxIn {
+		// Handle only the null input of a stakebase differently.
+		if stakeTx && i == 0 {
+			amountIn := dcrutil.Amount(txIn.ValueIn).ToCoin()
+			vinEntry := dcrjson.VinPrevOut{
+				Stakebase: hex.EncodeToString(txIn.SignatureScript),
+				AmountIn:  &amountIn,
+				Sequence:  txIn.Sequence,
+			}
+			vinList = append(vinList, vinEntry)
+			// No previous outpoints to check against the address filter.
+			continue
+		}
+
 		// The disassembled string will contain [error] inline if the
 		// script doesn't fully parse, so ignore the error here.
 		disbuf, _ := txscript.DisasmString(txIn.SignatureScript)
