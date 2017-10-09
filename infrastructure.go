@@ -8,6 +8,7 @@ package dcrrpcclient
 import (
 	"bytes"
 	"container/list"
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
@@ -1281,14 +1282,13 @@ func New(config *ConnConfig, ntfnHandlers *NotificationHandlers) (*Client, error
 // a client was created after setting the DisableConnectOnNew field of the
 // Config struct.
 //
-// Up to tries number of connections (each after an increasing backoff) will
-// be tried if the connection can not be established.  The special value of 0
-// indicates an unlimited number of connection attempts.
+// If the connection fails and retry is true, this method will continue to try
+// reconnections with backoff until the context is done.
 //
 // This method will error if the client is not configured for websockets, if the
 // connection has already been established, or if none of the connection
 // attempts were successful.
-func (c *Client) Connect(tries int) error {
+func (c *Client) Connect(ctx context.Context, retry bool) error {
 	c.mtx.Lock()
 	defer c.mtx.Unlock()
 
@@ -1301,19 +1301,25 @@ func (c *Client) Connect(tries int) error {
 
 	// Begin connection attempts.  Increase the backoff after each failed
 	// attempt, up to a maximum of one minute.
-	var err error
 	var backoff time.Duration
-	for i := 0; tries == 0 || i < tries; i++ {
-		var wsConn *websocket.Conn
-		wsConn, err = dial(c.config)
+	for {
+		wsConn, err := dial(c.config)
 		if err != nil {
+			if !retry {
+				return err
+			}
+
 			log.Errorf("Connection attempt failed: %v", err)
-			backoff = connectionRetryInterval * time.Duration(i+1)
+			backoff += connectionRetryInterval
 			if backoff > time.Minute {
 				backoff = time.Minute
 			}
-			time.Sleep(backoff)
-			continue
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(backoff):
+				continue
+			}
 		}
 
 		// Connection was established.  Set the websocket connection
@@ -1330,7 +1336,4 @@ func (c *Client) Connect(tries int) error {
 		}
 		return nil
 	}
-
-	// All connection attempts failed, so return the last error.
-	return err
 }
