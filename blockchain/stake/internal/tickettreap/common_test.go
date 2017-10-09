@@ -57,7 +57,6 @@ func TestSizeValues(t *testing.T) {
 	}
 }
 
-
 // TestParentStack ensures the treapParentStack functionality works as intended.
 func TestParentStack(t *testing.T) {
 	t.Parallel()

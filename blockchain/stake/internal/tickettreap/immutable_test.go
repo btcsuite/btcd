@@ -29,13 +29,15 @@ func assertPanic(t *testing.T, f func()) {
 }
 
 // isHeap tests whether the treap meets the min-heap invariant.
-func (t* treapNode) isHeap() bool {
+func (t *treapNode) isHeap() bool {
 	if t == nil {
 		return true
 	}
 
-	return (t.left == nil || t.left.priority >= t.priority && t.left.isHeap()) && (
-		t.right == nil || t.right.priority >= t.priority && t.right.isHeap())
+	left := t.left == nil || t.left.priority >= t.priority && t.left.isHeap()
+	right := t.right == nil || t.right.priority >= t.priority && t.right.isHeap()
+
+	return left && right
 }
 
 // TestImmutableEmpty ensures calling functions on an empty immutable treap
@@ -151,7 +153,6 @@ func TestImmutableSequential(t *testing.T) {
 		t.Fatalf("Heap invariant violated")
 	}
 
-
 	// Ensure the all keys are iterated by ForEach in order.
 	var numIterated int
 	testTreap.ForEach(func(k Key, v *Value) bool {
@@ -206,8 +207,8 @@ func TestImmutableSequential(t *testing.T) {
 		key := uint32ToKey(uint32(i))
 		testTreap = testTreap.Delete(key)
 
-		expectedLen := numItems-i-1
-		expectedHeadValue := i+1
+		expectedLen := numItems - i - 1
+		expectedHeadValue := i + 1
 
 		// Ensure the treap length is the expected value.
 		if gotLen := testTreap.Len(); gotLen != expectedLen {
@@ -230,7 +231,7 @@ func TestImmutableSequential(t *testing.T) {
 
 		// test GetByIndex is correct at the mid of the treap.
 		if expectedLen > 0 {
-			halfIdx := expectedLen/2
+			halfIdx := expectedLen / 2
 			if k, _ := testTreap.GetByIndex(halfIdx); k != uint32ToKey(uint32(expectedHeadValue+halfIdx)) {
 				t.Fatalf("Get #%d: unexpected key - got %v, want %v",
 					i, k, key)
@@ -239,7 +240,7 @@ func TestImmutableSequential(t *testing.T) {
 
 		// test GetByIndex is correct at the tail of the treap.
 		if expectedLen > 0 {
-			if k, _ := testTreap.GetByIndex(expectedLen-1); k != uint32ToKey(uint32(expectedHeadValue+expectedLen-1)) {
+			if k, _ := testTreap.GetByIndex(expectedLen - 1); k != uint32ToKey(uint32(expectedHeadValue+expectedLen-1)) {
 				t.Fatalf("Get #%d: unexpected key - got %v, want %v",
 					i, k, key)
 			}
@@ -358,9 +359,9 @@ func TestImmutableReverseSequential(t *testing.T) {
 				i, gotVal)
 		}
 
-		 if !testTreap.root.isHeap() {
-			 t.Fatalf("Heap invariant violated")
-		 }
+		if !testTreap.root.isHeap() {
+			t.Fatalf("Heap invariant violated")
+		}
 
 		// Ensure the expected size is reported.
 		expectedSize -= (nodeFieldsSize + uint64(len(key)) + nodeValueSize)

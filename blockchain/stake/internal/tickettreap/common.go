@@ -6,8 +6,9 @@
 package tickettreap
 
 import (
-	"github.com/decred/dcrd/chaincfg/chainhash"
 	"fmt"
+
+	"github.com/decred/dcrd/chaincfg/chainhash"
 )
 
 const (
@@ -25,7 +26,7 @@ const (
 	// the contents of the value.
 	// Size = 32 (key) + 8 (value pointer) + 4 (priority) + 4 (size)
 	//      + 8 (left pointer) + 8 (right pointer).
-	nodeFieldsSize = 32 + ptrSize + 4 + 4 + 2 * ptrSize
+	nodeFieldsSize = 32 + ptrSize + 4 + 4 + 2*ptrSize
 
 	// nodeValueSize is the size of the fixed-size fields of a Value,
 	// Height (4 bytes) plus (4*1 byte).

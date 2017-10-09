@@ -505,7 +505,7 @@ func connectNode(node *Node, header wire.BlockHeader, ticketsSpentInBlock, revok
 			toExpireHeight = connectedNode.height -
 				connectedNode.params.TicketExpiry
 		}
-		
+
 		connectedNode.liveTickets.ForEachByHeight(toExpireHeight+1, func(treapKey tickettreap.Key, value *tickettreap.Value) bool {
 			// Make a copy of the value.
 			v := *value
