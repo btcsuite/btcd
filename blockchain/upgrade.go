@@ -23,6 +23,16 @@ const (
 	blockHdrOffset = 12
 )
 
+// blockChainContext represents a particular block's placement in the block
+// chain. This is used by the block index migration to track block metadata that
+// will be written to disk.
+type blockChainContext struct {
+	parent    *chainhash.Hash
+	children  []*chainhash.Hash
+	height    int32
+	mainChain bool
+}
+
 // migrateBlockIndex migrates all block entries from the v1 block index bucket
 // to the v2 bucket. The v1 bucket stores all block entries keyed by block hash,
 // whereas the v2 bucket stores the exact same values, but keyed instead by
@@ -47,15 +57,29 @@ func migrateBlockIndex(db database.DB) error {
 			return err
 		}
 
+		// Get tip of the main chain.
+		serializedData := dbTx.Metadata().Get(chainStateKeyName)
+		state, err := deserializeBestChainState(serializedData)
+		if err != nil {
+			return err
+		}
+		tip := &state.hash
+
 		// Scan the old block index bucket and construct a mapping of each block
-		// to all child blocks.
-		childBlocksMap, err := readBlockTree(v1BlockIdxBucket)
+		// to parent block and all child blocks.
+		blocksMap, err := readBlockTree(v1BlockIdxBucket)
 		if err != nil {
 			return err
 		}
 
 		// Use the block graph to calculate the height of each block.
-		blockHeights := determineBlockHeights(childBlocksMap)
+		err = determineBlockHeights(blocksMap)
+		if err != nil {
+			return err
+		}
+
+		// Find blocks on the main chain with the block graph and current tip.
+		determineMainChainBlocks(blocksMap, tip)
 
 		// Now that we have heights for all blocks, scan the old block index
 		// bucket and insert all rows into the new one.
@@ -65,16 +89,26 @@ func migrateBlockIndex(db database.DB) error {
 
 			var hash chainhash.Hash
 			copy(hash[:], hashBytes[0:chainhash.HashSize])
+			chainContext := blocksMap[hash]
 
-			height, exists := blockHeights[hash]
-			if !exists {
+			if chainContext.height == -1 {
 				return fmt.Errorf("Unable to calculate chain height for "+
 					"stored block %s", hash)
 			}
 
+			// Mark blocks as valid if they are part of the main chain.
+			status := statusDataStored
+			if chainContext.mainChain {
+				status |= statusValid
+			}
+
 			// Write header to v2 bucket
-			key := blockIndexKey(&hash, height)
-			err := v2BlockIdxBucket.Put(key, headerBytes)
+			value := make([]byte, blockHdrSize+1)
+			copy(value[0:blockHdrSize], headerBytes)
+			value[blockHdrSize] = byte(status)
+
+			key := blockIndexKey(&hash, uint32(chainContext.height))
+			err := v2BlockIdxBucket.Put(key, value)
 			if err != nil {
 				return err
 			}
@@ -93,10 +127,11 @@ func migrateBlockIndex(db database.DB) error {
 }
 
 // readBlockTree reads the old block index bucket and constructs a mapping of
-// each block to all child blocks. This mapping represents the full tree of
-// blocks.
-func readBlockTree(v1BlockIdxBucket database.Bucket) (map[chainhash.Hash][]*chainhash.Hash, error) {
-	childBlocksMap := make(map[chainhash.Hash][]*chainhash.Hash)
+// each block to its parent block and all child blocks. This mapping represents
+// the full tree of blocks. This function does not populate the height or
+// mainChain fields of the returned blockChainContext values.
+func readBlockTree(v1BlockIdxBucket database.Bucket) (map[chainhash.Hash]*blockChainContext, error) {
+	blocksMap := make(map[chainhash.Hash]*blockChainContext)
 	err := v1BlockIdxBucket.ForEach(func(_, blockRow []byte) error {
 		var header wire.BlockHeader
 		endOffset := blockHdrOffset + blockHdrSize
@@ -107,41 +142,65 @@ func readBlockTree(v1BlockIdxBucket database.Bucket) (map[chainhash.Hash][]*chai
 		}
 
 		blockHash := header.BlockHash()
-		childBlocksMap[header.PrevBlock] =
-			append(childBlocksMap[header.PrevBlock], &blockHash)
+		prevHash := header.PrevBlock
+
+		if blocksMap[blockHash] == nil {
+			blocksMap[blockHash] = &blockChainContext{height: -1}
+		}
+		if blocksMap[prevHash] == nil {
+			blocksMap[prevHash] = &blockChainContext{height: -1}
+		}
+
+		blocksMap[blockHash].parent = &prevHash
+		blocksMap[prevHash].children =
+			append(blocksMap[prevHash].children, &blockHash)
 		return nil
 	})
-	return childBlocksMap, err
+	return blocksMap, err
 }
 
 // determineBlockHeights takes a map of block hashes to a slice of child hashes
 // and uses it to compute the height for each block. The function assigns a
 // height of 0 to the genesis hash and explores the tree of blocks
 // breadth-first, assigning a height to every block with a path back to the
-// genesis block.
-func determineBlockHeights(childBlocksMap map[chainhash.Hash][]*chainhash.Hash) map[chainhash.Hash]uint32 {
-	blockHeights := make(map[chainhash.Hash]uint32)
+// genesis block. This function modifies the height field on the blocksMap
+// entries.
+func determineBlockHeights(blocksMap map[chainhash.Hash]*blockChainContext) error {
 	queue := list.New()
 
-	// The genesis block is included in childBlocksMap as a child of the zero
-	// hash because that is the value of the PrevBlock field in the genesis
-	// header.
-	for _, genesisHash := range childBlocksMap[zeroHash] {
-		blockHeights[*genesisHash] = 0
+	// The genesis block is included in blocksMap as a child of the zero hash
+	// because that is the value of the PrevBlock field in the genesis header.
+	preGenesisContext, exists := blocksMap[zeroHash]
+	if !exists || len(preGenesisContext.children) == 0 {
+		return fmt.Errorf("Unable to find genesis block")
+	}
+
+	for _, genesisHash := range preGenesisContext.children {
+		blocksMap[*genesisHash].height = 0
 		queue.PushBack(genesisHash)
 	}
 
 	for e := queue.Front(); e != nil; e = queue.Front() {
 		queue.Remove(e)
 		hash := e.Value.(*chainhash.Hash)
-		height := blockHeights[*hash]
+		height := blocksMap[*hash].height
 
 		// For each block with this one as a parent, assign it a height and
 		// push to queue for future processing.
-		for _, childHash := range childBlocksMap[*hash] {
-			blockHeights[*childHash] = height + 1
+		for _, childHash := range blocksMap[*hash].children {
+			blocksMap[*childHash].height = height + 1
 			queue.PushBack(childHash)
 		}
 	}
-	return blockHeights
+
+	return nil
+}
+
+// determineMainChainBlocks traverses the block graph down from the tip to
+// determine which block hashes that are part of the main chain. This function
+// modifies the mainChain field on the blocksMap entries.
+func determineMainChainBlocks(blocksMap map[chainhash.Hash]*blockChainContext, tip *chainhash.Hash) {
+	for nextHash := tip; *nextHash != zeroHash; nextHash = blocksMap[*nextHash].parent {
+		blocksMap[*nextHash].mainChain = true
+	}
 }
