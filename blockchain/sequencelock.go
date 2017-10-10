@@ -134,7 +134,7 @@ func (b *BlockChain) calcSequenceLock(node *blockNode, tx *dcrutil.Tx, view *Utx
 			// input height and required relative number of blocks.
 			// Also, subtract one from the relative lock in order to
 			// maintain the original lock time semantics.
-			minHeight := inputHeight + int64(relativeLock) - 1
+			minHeight := inputHeight + relativeLock - 1
 			if minHeight > sequenceLock.MinHeight {
 				sequenceLock.MinHeight = minHeight
 			}
