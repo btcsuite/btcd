@@ -15,7 +15,6 @@ import (
 // filter headers. It allows to set the FilterType field to get headers in the
 // chain of basic (0x00) or extended (0x01) headers.
 type MsgGetCFHeaders struct {
-	ProtocolVersion    uint32
 	BlockLocatorHashes []*chainhash.Hash
 	HashStop           chainhash.Hash
 	FilterType         uint8
@@ -36,11 +35,6 @@ func (msg *MsgGetCFHeaders) AddBlockLocatorHash(hash *chainhash.Hash) error {
 // BtcDecode decodes r using the bitcoin protocol encoding into the receiver.
 // This is part of the Message interface implementation.
 func (msg *MsgGetCFHeaders) BtcDecode(r io.Reader, pver uint32, _ MessageEncoding) error {
-	err := readElement(r, &msg.ProtocolVersion)
-	if err != nil {
-		return err
-	}
-
 	// Read num block locator hashes and limit to max.
 	count, err := ReadVarInt(r, pver)
 	if err != nil {
@@ -84,12 +78,7 @@ func (msg *MsgGetCFHeaders) BtcEncode(w io.Writer, pver uint32, _ MessageEncodin
 		return messageError("MsgGetHeaders.BtcEncode", str)
 	}
 
-	err := writeElement(w, msg.ProtocolVersion)
-	if err != nil {
-		return err
-	}
-
-	err = WriteVarInt(w, pver, uint64(count))
+	err := WriteVarInt(w, pver, uint64(count))
 	if err != nil {
 		return err
 	}
@@ -118,9 +107,9 @@ func (msg *MsgGetCFHeaders) Command() string {
 // MaxPayloadLength returns the maximum length the payload can be for the
 // receiver.  This is part of the Message interface implementation.
 func (msg *MsgGetCFHeaders) MaxPayloadLength(pver uint32) uint32 {
-	// Version 4 bytes + num block locator hashes (varInt) + max allowed
+	// Num block locator hashes (varInt) + max allowed
 	// block locators + hash stop + filter type 1 byte.
-	return 4 + MaxVarIntPayload + (MaxBlockLocatorsPerMsg *
+	return MaxVarIntPayload + (MaxBlockLocatorsPerMsg *
 		chainhash.HashSize) + chainhash.HashSize + 1
 }
 

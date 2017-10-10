@@ -10,11 +10,15 @@ import (
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 )
 
+// MsgGetCFilter implements the Message interface and represents a bitcoin
+// getcfilter message. It is used to request a committed filter for a block.
 type MsgGetCFilter struct {
 	BlockHash  chainhash.Hash
 	FilterType uint8
 }
 
+// BtcDecode decodes r using the bitcoin protocol encoding into the receiver.
+// This is part of the Message interface implementation.
 func (msg *MsgGetCFilter) BtcDecode(r io.Reader, pver uint32, _ MessageEncoding) error {
 	err := readElement(r, &msg.BlockHash)
 	if err != nil {
