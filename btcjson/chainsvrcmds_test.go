@@ -325,7 +325,7 @@ func TestChainSvrCmds(t *testing.T) {
 			staticCmd: func() interface{} {
 				return btcjson.NewGetCFilterCmd("123", 0)
 			},
-			marshalled: `{"jsonrpc":"1.0","method":"getcfilter","params":["123",false],"id":1}`,
+			marshalled: `{"jsonrpc":"1.0","method":"getcfilter","params":["123",0],"id":1}`,
 			unmarshalled: &btcjson.GetCFilterCmd{
 				Hash: "123",
 			},
@@ -338,7 +338,7 @@ func TestChainSvrCmds(t *testing.T) {
 			staticCmd: func() interface{} {
 				return btcjson.NewGetCFilterHeaderCmd("123", 0)
 			},
-			marshalled: `{"jsonrpc":"1.0","method":"getcfilterheader","params":["123",false],"id":1}`,
+			marshalled: `{"jsonrpc":"1.0","method":"getcfilterheader","params":["123",0],"id":1}`,
 			unmarshalled: &btcjson.GetCFilterHeaderCmd{
 				Hash: "123",
 			},
