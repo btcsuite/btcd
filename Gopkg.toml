@@ -1,7 +1,7 @@
 
 [[constraint]]
+  branch = "master"
   name = "github.com/agl/ed25519"
-  revision = "278e1ec8e8a6e017cd07577924d6766039146ced"
 
 [[constraint]]
   branch = "master"
@@ -24,8 +24,8 @@
   name = "github.com/btcsuite/winsvc"
 
 [[constraint]]
+  branch = "master"
   name = "github.com/davecgh/go-spew"
-  revision = "adab96458c51a58dc1783b3335dcce5461522e75"
 
 [[constraint]]
   branch = "master"
@@ -45,12 +45,12 @@
 
 [[constraint]]
   name = "github.com/jessevdk/go-flags"
-  revision = "48cf8722c3375517aba351d1f7577c40663a4407"
+  version = "1.2.0"
 
 [[constraint]]
   branch = "master"
   name = "github.com/jrick/logrotate"
 
 [[constraint]]
+  branch = "master"
   name = "golang.org/x/crypto"
-  revision = "81e90905daefcd6fd217b62423c0908922eadb30"

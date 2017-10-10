@@ -2,9 +2,10 @@
 
 
 [[projects]]
+  branch = "master"
   name = "github.com/agl/ed25519"
   packages = [".","edwards25519"]
-  revision = "278e1ec8e8a6e017cd07577924d6766039146ced"
+  revision = "5312a61534124124185d41f09206b9fef1d88403"
 
 [[projects]]
   branch = "master"
@@ -43,9 +44,10 @@
   revision = "f8fb11f83f7e860e3769a08e6811d1b399a43722"
 
 [[projects]]
+  branch = "master"
   name = "github.com/davecgh/go-spew"
   packages = ["spew"]
-  revision = "adab96458c51a58dc1783b3335dcce5461522e75"
+  revision = "ecdeabc65495df2dec95d7c4a4c3e021903035e5"
 
 [[projects]]
   branch = "master"
@@ -74,7 +76,8 @@
 [[projects]]
   name = "github.com/jessevdk/go-flags"
   packages = ["."]
-  revision = "48cf8722c3375517aba351d1f7577c40663a4407"
+  revision = "96dc06278ce32a0e9d957d590bb987c81ee66407"
+  version = "v1.3.0"
 
 [[projects]]
   branch = "master"
@@ -83,9 +86,10 @@
   revision = "a93b200c26cbae3bb09dd0dc2c7c7fe1468a034a"
 
 [[projects]]
+  branch = "master"
   name = "golang.org/x/crypto"
   packages = ["ripemd160","ssh/terminal"]
-  revision = "81e90905daefcd6fd217b62423c0908922eadb30"
+  revision = "9419663f5a44be8b34ca85f08abc5fe1be11f8a3"
 
 [[projects]]
   branch = "master"
@@ -96,6 +100,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "0560532e378b1147621a2d1c36d14c95a9ea488d893455e056dfeb811557674e"
+  inputs-digest = "3b94a684d1b9313903f6214238b0325fdd80cd85c28aa97cc1ad792b7b201ea2"
   solver-name = "gps-cdcl"
   solver-version = 1
