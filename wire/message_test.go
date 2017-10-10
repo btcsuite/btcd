@@ -105,7 +105,7 @@ func TestMessage(t *testing.T) {
 		{msgMerkleBlock, msgMerkleBlock, pver, MainNet, 110},
 		{msgReject, msgReject, pver, MainNet, 79},
 		{msgGetCFilter, msgGetCFilter, pver, MainNet, 57},
-		{msgGetCFHeaders, msgGetCFHeaders, pver, MainNet, 62},
+		{msgGetCFHeaders, msgGetCFHeaders, pver, MainNet, 58},
 		{msgGetCFTypes, msgGetCFTypes, pver, MainNet, 24},
 		{msgCFilter, msgCFilter, pver, MainNet, 65},
 		{msgCFHeaders, msgCFHeaders, pver, MainNet, 58},

@@ -13,9 +13,13 @@ import (
 
 const (
 	// MaxCFilterDataSize is the maximum byte size of a committed filter.
-	MaxCFilterDataSize = 262144
+	// The maximum size is currently defined as 256KiB.
+	MaxCFilterDataSize = 256 * 1024
 )
 
+// MsgCFilter implements the Message interface and represents a bitcoin cfilter
+// message. It is used to deliver a committed filter in response to a
+// getcfilter (MsgGetCFilter) message.
 type MsgCFilter struct {
 	BlockHash  chainhash.Hash
 	FilterType uint8
@@ -25,9 +29,8 @@ type MsgCFilter struct {
 // BtcDecode decodes r using the bitcoin protocol encoding into the receiver.
 // This is part of the Message interface implementation.
 func (msg *MsgCFilter) BtcDecode(r io.Reader, pver uint32, _ MessageEncoding) error {
-	var err error
 	// Read the hash of the filter's block
-	err = readElement(r, &msg.BlockHash)
+	err := readElement(r, &msg.BlockHash)
 	if err != nil {
 		return err
 	}
