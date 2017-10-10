@@ -8,6 +8,7 @@ import:
   - chaincfg/chainhash
   - txscript
   - wire
+- package: github.com/decred/base58
 - package: golang.org/x/crypto
   subpackages:
   - ripemd160

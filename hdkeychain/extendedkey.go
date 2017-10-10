@@ -19,11 +19,11 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/decred/base58"
 	"github.com/decred/dcrd/chaincfg"
 	"github.com/decred/dcrd/chaincfg/chainec"
 	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrutil"
-	"github.com/decred/dcrutil/base58"
 )
 
 const (
