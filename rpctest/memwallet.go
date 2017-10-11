@@ -15,9 +15,9 @@ import (
 	"github.com/decred/dcrd/chaincfg"
 	"github.com/decred/dcrd/chaincfg/chainec"
 	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/decred/dcrd/rpcclient"
 	"github.com/decred/dcrd/txscript"
 	"github.com/decred/dcrd/wire"
-	"github.com/decred/dcrrpcclient"
 	"github.com/decred/dcrutil"
 	"github.com/decred/dcrutil/hdkeychain"
 )
@@ -103,7 +103,7 @@ type memWallet struct {
 
 	net *chaincfg.Params
 
-	rpc *dcrrpcclient.Client
+	rpc *rpcclient.Client
 
 	sync.RWMutex
 }
@@ -172,7 +172,7 @@ func (m *memWallet) SyncedHeight() int64 {
 
 // SetRPCClient saves the passed rpc connection to dcrd as the wallet's
 // personal rpc connection.
-func (m *memWallet) SetRPCClient(rpcClient *dcrrpcclient.Client) {
+func (m *memWallet) SetRPCClient(rpcClient *rpcclient.Client) {
 	m.rpc = rpcClient
 }
 

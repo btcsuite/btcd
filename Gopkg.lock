@@ -63,12 +63,6 @@
 
 [[projects]]
   branch = "master"
-  name = "github.com/decred/dcrrpcclient"
-  packages = ["."]
-  revision = "56d3c92e1a95fe90c48019c31087a8475957a5ad"
-
-[[projects]]
-  branch = "master"
   name = "github.com/decred/dcrutil"
   packages = [".","base58","bloom","hdkeychain"]
   revision = "ddbde93f65ab0692e54ed8a5ad325fa2e8af4daa"
@@ -100,6 +94,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "3b94a684d1b9313903f6214238b0325fdd80cd85c28aa97cc1ad792b7b201ea2"
+  inputs-digest = "157f5cde02e5c841e2d3c676b639c10a259871b65775f5deaa8076c9239dc7b6"
   solver-name = "gps-cdcl"
   solver-version = 1

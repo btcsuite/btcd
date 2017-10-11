@@ -18,8 +18,8 @@ import (
 
 	"github.com/decred/dcrd/chaincfg"
 	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/decred/dcrd/rpcclient"
 	"github.com/decred/dcrd/wire"
-	"github.com/decred/dcrrpcclient"
 	"github.com/decred/dcrutil"
 )
 
@@ -81,9 +81,9 @@ type Harness struct {
 	// to.
 	ActiveNet *chaincfg.Params
 
-	Node     *dcrrpcclient.Client
+	Node     *rpcclient.Client
 	node     *node
-	handlers *dcrrpcclient.NotificationHandlers
+	handlers *rpcclient.NotificationHandlers
 
 	wallet *memWallet
 
@@ -100,7 +100,7 @@ type Harness struct {
 // used.
 //
 // NOTE: This function is safe for concurrent access.
-func New(activeNet *chaincfg.Params, handlers *dcrrpcclient.NotificationHandlers, extraArgs []string) (*Harness, error) {
+func New(activeNet *chaincfg.Params, handlers *rpcclient.NotificationHandlers, extraArgs []string) (*Harness, error) {
 	harnessStateMtx.Lock()
 	defer harnessStateMtx.Unlock()
 
@@ -142,7 +142,7 @@ func New(activeNet *chaincfg.Params, handlers *dcrrpcclient.NotificationHandlers
 	numTestInstances++
 
 	if handlers == nil {
-		handlers = &dcrrpcclient.NotificationHandlers{}
+		handlers = &rpcclient.NotificationHandlers{}
 	}
 
 	// If a handler for the OnBlockConnected/OnBlockDisconnected callback
@@ -281,12 +281,12 @@ func (h *Harness) TearDown() error {
 // we're not able to establish a connection, this function returns with an
 // error.
 func (h *Harness) connectRPCClient() error {
-	var client *dcrrpcclient.Client
+	var client *rpcclient.Client
 	var err error
 
 	rpcConf := h.node.config.rpcConnConfig()
 	for i := 0; i < h.maxConnRetries; i++ {
-		if client, err = dcrrpcclient.New(&rpcConf, h.handlers); err != nil {
+		if client, err = rpcclient.New(&rpcConf, h.handlers); err != nil {
 			time.Sleep(time.Duration(i) * 50 * time.Millisecond)
 			continue
 		}
@@ -353,7 +353,7 @@ func (h *Harness) UnlockOutputs(inputs []*wire.TxIn) {
 // RPCConfig returns the harnesses current rpc configuration. This allows other
 // potential RPC clients created within tests to connect to a given test
 // harness instance.
-func (h *Harness) RPCConfig() dcrrpcclient.ConnConfig {
+func (h *Harness) RPCConfig() rpcclient.ConnConfig {
 	return h.node.config.rpcConnConfig()
 }
 
