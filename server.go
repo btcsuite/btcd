@@ -23,6 +23,7 @@ import (
 	"github.com/decred/dcrd/addrmgr"
 	"github.com/decred/dcrd/blockchain"
 	"github.com/decred/dcrd/blockchain/indexers"
+	"github.com/decred/dcrd/bloom"
 	"github.com/decred/dcrd/chaincfg"
 	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/connmgr"
@@ -33,7 +34,6 @@ import (
 	"github.com/decred/dcrd/txscript"
 	"github.com/decred/dcrd/wire"
 	"github.com/decred/dcrutil"
-	"github.com/decred/dcrutil/bloom"
 )
 
 const (

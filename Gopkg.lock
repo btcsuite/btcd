@@ -64,7 +64,7 @@
 [[projects]]
   branch = "master"
   name = "github.com/decred/dcrutil"
-  packages = [".","base58","bloom","hdkeychain"]
+  packages = [".","base58","hdkeychain"]
   revision = "ddbde93f65ab0692e54ed8a5ad325fa2e8af4daa"
 
 [[projects]]
@@ -94,6 +94,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "157f5cde02e5c841e2d3c676b639c10a259871b65775f5deaa8076c9239dc7b6"
+  inputs-digest = "9f7191295caf3e7930cd45f5b3a0c5f4b84611c4cfdcf8c6cc042fcf84c3e904"
   solver-name = "gps-cdcl"
   solver-version = 1
