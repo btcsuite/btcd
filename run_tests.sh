@@ -39,15 +39,27 @@ fi
 DOCKER_IMAGE_TAG=decred-golang-builder-$GOVERSION
 
 docker pull decred/$DOCKER_IMAGE_TAG
+if [ $? != 0 ]; then
+	echo 'docker pull failed'
+	exit 1
+fi
 
+TMPFILE=$(mktemp)
 docker run --rm -it -v $(pwd):/src decred/$DOCKER_IMAGE_TAG /bin/bash -c "\
   rsync -ra --filter=':- .gitignore'  \
   /src/ /go/src/github.com/decred/$REPO/ && \
   cd github.com/decred/$REPO/ && \
+  cp Gopkg.lock $TMPFILE && \
   dep ensure && \
+  diff Gopkg.lock $TMPFILE >/dev/null || (echo 'lockfile must be updated with dep ensure'; exit 1) && \
   go install . ./cmd/... && \
   $TESTCMD
 "
+
+if [ $? != 0 ]; then
+	echo 'docker run failed'
+	exit 1
+fi
 
 echo "------------------------------------------"
 echo "Tests complete."
