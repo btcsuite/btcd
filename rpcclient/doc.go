@@ -1,10 +1,10 @@
 // Copyright (c) 2014 The btcsuite developers
-// Copyright (c) 2016 The Decred developers
+// Copyright (c) 2016-2017 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
 /*
-Package dcrrpcclient implements a websocket-enabled Decred JSON-RPC client.
+Package rpcclient implements a websocket-enabled Decred JSON-RPC client.
 
 Overview
 
@@ -173,4 +173,4 @@ The following full-blown client examples are in the examples directory:
    for notifications about changes to account balances, and gets a list of
    unspent transaction outputs (utxos) the wallet can sign
 */
-package dcrrpcclient
+package rpcclient

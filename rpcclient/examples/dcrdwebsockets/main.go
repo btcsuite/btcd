@@ -1,5 +1,5 @@
 // Copyright (c) 2014-2015 The btcsuite developers
-// Copyright (c) 2015-2016 The Decred developers
+// Copyright (c) 2015-2017 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -11,16 +11,16 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/decred/dcrrpcclient"
+	"github.com/decred/dcrd/rpcclient"
 	"github.com/decred/dcrutil"
 )
 
 func main() {
 	// Only override the handlers for notifications you care about.
 	// Also note most of these handlers will only be called if you register
-	// for notifications.  See the documentation of the dcrrpcclient
+	// for notifications.  See the documentation of the rpcclient.
 	// NotificationHandlers type for more details about each handler.
-	ntfnHandlers := dcrrpcclient.NotificationHandlers{
+	ntfnHandlers := rpcclient.NotificationHandlers{
 		OnBlockConnected: func(blockHeader []byte, transactions [][]byte) {
 			log.Printf("Block connected: %v %v", blockHeader, transactions)
 		},
@@ -35,14 +35,14 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	connCfg := &dcrrpcclient.ConnConfig{
+	connCfg := &rpcclient.ConnConfig{
 		Host:         "localhost:9109",
 		Endpoint:     "ws",
 		User:         "yourrpcuser",
 		Pass:         "yourrpcpass",
 		Certificates: certs,
 	}
-	client, err := dcrrpcclient.New(connCfg, &ntfnHandlers)
+	client, err := rpcclient.New(connCfg, &ntfnHandlers)
 	if err != nil {
 		log.Fatal(err)
 	}
