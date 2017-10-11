@@ -820,19 +820,21 @@ func (r FutureGetCFilterResult) Receive() (*wire.MsgCFilter, error) {
 // returned instance.
 //
 // See GetCFilter for the blocking version and more details.
-func (c *Client) GetCFilterAsync(blockHash *chainhash.Hash, extended bool) FutureGetCFilterResult {
+func (c *Client) GetCFilterAsync(blockHash *chainhash.Hash,
+	filterType uint8) FutureGetCFilterResult {
 	hash := ""
 	if blockHash != nil {
 		hash = blockHash.String()
 	}
 
-	cmd := btcjson.NewGetCFilterCmd(hash, extended)
+	cmd := btcjson.NewGetCFilterCmd(hash, filterType)
 	return c.sendCmd(cmd)
 }
 
 // GetCFilter returns a raw filter from the server given its block hash.
-func (c *Client) GetCFilter(blockHash *chainhash.Hash, extended bool) (*wire.MsgCFilter, error) {
-	return c.GetCFilterAsync(blockHash, extended).Receive()
+func (c *Client) GetCFilter(blockHash *chainhash.Hash,
+	filterType uint8) (*wire.MsgCFilter, error) {
+	return c.GetCFilterAsync(blockHash, filterType).Receive()
 }
 
 // FutureGetCFilterHeaderResult is a future promise to deliver the result of a
@@ -875,18 +877,20 @@ func (r FutureGetCFilterHeaderResult) Receive() (*wire.MsgCFHeaders, error) {
 // on the returned instance.
 //
 // See GetCFilterHeader for the blocking version and more details.
-func (c *Client) GetCFilterHeaderAsync(blockHash *chainhash.Hash, extended bool) FutureGetCFilterHeaderResult {
+func (c *Client) GetCFilterHeaderAsync(blockHash *chainhash.Hash,
+	filterType uint8) FutureGetCFilterHeaderResult {
 	hash := ""
 	if blockHash != nil {
 		hash = blockHash.String()
 	}
 
-	cmd := btcjson.NewGetCFilterHeaderCmd(hash, extended)
+	cmd := btcjson.NewGetCFilterHeaderCmd(hash, filterType)
 	return c.sendCmd(cmd)
 }
 
 // GetCFilterHeader returns a raw filter header from the server given its block
 // hash.
-func (c *Client) GetCFilterHeader(blockHash *chainhash.Hash, extended bool) (*wire.MsgCFHeaders, error) {
-	return c.GetCFilterHeaderAsync(blockHash, extended).Receive()
+func (c *Client) GetCFilterHeader(blockHash *chainhash.Hash,
+	filterType uint8) (*wire.MsgCFHeaders, error) {
+	return c.GetCFilterHeaderAsync(blockHash, filterType).Receive()
 }
