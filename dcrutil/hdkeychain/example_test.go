@@ -14,7 +14,7 @@ import (
 
 // This example demonstrates how to generate a cryptographically random seed
 // then use it to create a new master node (extended key).
-func ExampleNewMaster() {
+func Example_newMaster() {
 	// Generate a random seed at the recommended length.
 	seed, err := hdkeychain.GenerateSeed(hdkeychain.RecommendedSeedLen)
 	if err != nil {
