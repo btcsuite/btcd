@@ -8,7 +8,10 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"reflect"
 	"strconv"
+	"sync"
+	"unsafe"
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 )
@@ -126,7 +129,9 @@ var witessMarkerBytes = []byte{0x00, 0x01}
 //
 // The caller can obtain a buffer from the free list by calling the Borrow
 // function and should return it via the Return function when done using it.
-type scriptFreeList chan []byte
+type scriptFreeList struct {
+	sync.Pool
+}
 
 // Borrow returns a byte slice from the free list with a length according the
 // provided size.  A new buffer is allocated if there are any items available.
@@ -135,18 +140,11 @@ type scriptFreeList chan []byte
 // a new buffer of the appropriate size is allocated and returned.  It is safe
 // to attempt to return said buffer via the Return function as it will be
 // ignored and allowed to go the garbage collector.
-func (c scriptFreeList) Borrow(size uint64) []byte {
+func (c *scriptFreeList) Borrow(size uint64) []byte {
 	if size > freeListMaxScriptSize {
 		return make([]byte, size)
 	}
-
-	var buf []byte
-	select {
-	case buf = <-c:
-	default:
-		buf = make([]byte, freeListMaxScriptSize)
-	}
-	return buf[:size]
+	return *unsafeMakeSlice(c.Get().(*byte), int(size), freeListMaxScriptSize)
 }
 
 // Return puts the provided byte slice back on the free list when it has a cap
@@ -154,26 +152,38 @@ func (c scriptFreeList) Borrow(size uint64) []byte {
 // the Borrow function.  Any slices that are not of the appropriate size, such
 // as those whose size is greater than the largest allowed free list item size
 // are simply ignored so they can go to the garbage collector.
-func (c scriptFreeList) Return(buf []byte) {
+func (c *scriptFreeList) Return(buf []byte) {
 	// Ignore any buffers returned that aren't the expected size for the
 	// free list.
 	if cap(buf) != freeListMaxScriptSize {
 		return
 	}
-
-	// Return the buffer to the free list when it's not full.  Otherwise let
-	// it be garbage collected.
-	select {
-	case c <- buf:
-	default:
-		// Let it go to the garbage collector.
-	}
+	bp := extractBytePtr(buf)
+	c.Put(bp)
 }
 
-// Create the concurrent safe free list to use for script deserialization.  As
-// previously described, this free list is maintained to significantly reduce
-// the number of allocations.
-var scriptPool scriptFreeList = make(chan []byte, freeListMaxItems)
+func unsafeMakeSlice(bp *byte, len, cap int) *[]byte {
+	sh := reflect.SliceHeader{
+		Data: uintptr(unsafe.Pointer(bp)),
+		Len:  len,
+		Cap:  cap,
+	}
+	bp := (*[]byte)(unsafe.Pointer(&sh))
+	return bp
+}
+
+func extractBytePtr(b []byte) *byte {
+	return (*byte)(unsafe.Pointer((*reflect.SliceHeader)(unsafe.Pointer(&b)).Data))
+}
+
+var scriptPool = &scriptFreeList{
+	Pool: sync.Pool{
+		New: func() interface{} {
+			b := make([]byte, freeListMaxScriptSize)
+			return extractBytePtr(b)
+		},
+	},
+}
 
 // OutPoint defines a bitcoin data type that is used to track previous
 // transaction outputs.
