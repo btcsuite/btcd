@@ -738,10 +738,8 @@ func PayToSStx(addr dcrutil.Address) ([]byte, error) {
 		if addr.DSA(addr.Net()) != chainec.ECTypeSecp256k1 {
 			return nil, ErrUnsupportedAddress
 		}
-		break
 	case *dcrutil.AddressScriptHash:
 		scriptType = ScriptHashTy
-		break
 	default:
 		return nil, ErrUnsupportedAddress
 	}
@@ -773,10 +771,8 @@ func PayToSStxChange(addr dcrutil.Address) ([]byte, error) {
 		if addr.DSA(addr.Net()) != chainec.ECTypeSecp256k1 {
 			return nil, ErrUnsupportedAddress
 		}
-		break
 	case *dcrutil.AddressScriptHash:
 		scriptType = ScriptHashTy
-		break
 	default:
 		return nil, ErrUnsupportedAddress
 	}
@@ -808,10 +804,8 @@ func PayToSSGen(addr dcrutil.Address) ([]byte, error) {
 		if addr.DSA(addr.Net()) != chainec.ECTypeSecp256k1 {
 			return nil, ErrUnsupportedAddress
 		}
-		break
 	case *dcrutil.AddressScriptHash:
 		scriptType = ScriptHashTy
-		break
 	default:
 		return nil, ErrUnsupportedAddress
 	}
@@ -870,10 +864,8 @@ func PayToSSRtx(addr dcrutil.Address) ([]byte, error) {
 		if addr.DSA(addr.Net()) != chainec.ECTypeSecp256k1 {
 			return nil, ErrUnsupportedAddress
 		}
-		break
 	case *dcrutil.AddressScriptHash:
 		scriptType = ScriptHashTy
-		break
 	default:
 		return nil, ErrUnsupportedAddress
 	}
@@ -932,10 +924,8 @@ func GenerateSStxAddrPush(addr dcrutil.Address, amount dcrutil.Amount,
 		if addr.DSA(addr.Net()) != chainec.ECTypeSecp256k1 {
 			return nil, ErrUnsupportedAddress
 		}
-		break
 	case *dcrutil.AddressScriptHash:
 		scriptType = ScriptHashTy
-		break
 	default:
 		return nil, ErrUnsupportedAddress
 	}

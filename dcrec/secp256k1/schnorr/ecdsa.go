@@ -30,8 +30,6 @@ func zeroArray(a *[scalarSize]byte) {
 	for i := 0; i < scalarSize; i++ {
 		a[i] = 0x00
 	}
-
-	return
 }
 
 // zeroSlice zeroes the memory of a scalar byte slice.
@@ -39,8 +37,6 @@ func zeroSlice(s []byte) {
 	for i := 0; i < scalarSize; i++ {
 		s[i] = 0x00
 	}
-
-	return
 }
 
 // schnorrSign signs a Schnorr signature using a specified hash function
@@ -221,7 +217,7 @@ func schnorrVerify(curve *secp256k1.KoblitzCurve, sig []byte,
 
 	sigR := sig[:32]
 	sigS := sig[32:]
-	sigRCopy := make([]byte, scalarSize, scalarSize)
+	sigRCopy := make([]byte, scalarSize)
 	copy(sigRCopy, sigR)
 	toHash := append(sigRCopy, msg...)
 	h := hashFunc(toHash)
@@ -308,7 +304,7 @@ func schnorrRecover(curve *secp256k1.KoblitzCurve, sig, msg []byte,
 
 	sigR := sig[:32]
 	sigS := sig[32:]
-	sigRCopy := make([]byte, scalarSize, scalarSize)
+	sigRCopy := make([]byte, scalarSize)
 	copy(sigRCopy, sigR)
 	toHash := append(sigRCopy, msg...)
 	h := hashFunc(toHash)
@@ -343,7 +339,7 @@ func schnorrRecover(curve *secp256k1.KoblitzCurve, sig, msg []byte,
 
 	// Decompress the Y value. We know that the first bit must
 	// be even. Use the PublicKey struct to make it easier.
-	compressedPoint := make([]byte, PubKeyBytesLen, PubKeyBytesLen)
+	compressedPoint := make([]byte, PubKeyBytesLen)
 	compressedPoint[0] = pubkeyCompressed
 	copy(compressedPoint[1:], sigR)
 	rPoint, err := secp256k1.ParsePubKey(compressedPoint, curve)

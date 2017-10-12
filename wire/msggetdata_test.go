@@ -67,8 +67,6 @@ func TestGetData(t *testing.T) {
 		t.Errorf("NewMsgGetDataSizeHint: wrong cap for size hint - "+
 			"got %v, want %v", cap(msg.InvList), wantCap)
 	}
-
-	return
 }
 
 // TestGetDataWire tests the MsgGetData wire encode and decode for various

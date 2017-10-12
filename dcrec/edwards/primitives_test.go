@@ -19,7 +19,7 @@ func testConversionVectors() []ConversionVector {
 	r := rand.New(rand.NewSource(12345))
 
 	numCvs := 50
-	cvs := make([]ConversionVector, numCvs, numCvs)
+	cvs := make([]ConversionVector, numCvs)
 	for i := 0; i < numCvs; i++ {
 		bIn := new([32]byte)
 		for j := 0; j < fieldIntSize; j++ {
@@ -207,7 +207,7 @@ func testPointConversionVectors() []ConversionVector {
 	r := rand.New(rand.NewSource(54321))
 
 	numCvs := 50
-	cvs := make([]ConversionVector, numCvs, numCvs)
+	cvs := make([]ConversionVector, numCvs)
 	for i := 0; i < numCvs; i++ {
 		bIn := new([32]byte)
 		for j := 0; j < fieldIntSize; j++ {

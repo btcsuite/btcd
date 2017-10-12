@@ -167,7 +167,7 @@ func TestTicketSorting(t *testing.T) {
 	bucketsSize := 256
 
 	randomGen := rand.New(rand.NewSource(12345))
-	ticketMap := make([]SStxMemMap, int(bucketsSize), int(bucketsSize))
+	ticketMap := make([]SStxMemMap, int(bucketsSize))
 
 	for i := 0; i < bucketsSize; i++ {
 		ticketMap[i] = make(SStxMemMap)
@@ -178,7 +178,7 @@ func TestTicketSorting(t *testing.T) {
 		td := new(TicketData)
 
 		rint64 := randomGen.Int63n(1 << 62)
-		randBytes := make([]byte, 8, 8)
+		randBytes := make([]byte, 8)
 		binary.LittleEndian.PutUint64(randBytes, uint64(rint64))
 		h := chainhash.HashH(randBytes)
 		td.SStxHash = h
@@ -205,8 +205,7 @@ func TestTicketSorting(t *testing.T) {
 	// However, it should be the same as a sort without the buckets.
 	toSortSlice := make([]*TicketData, 0, totalTickets)
 	for i := 0; i < bucketsSize; i++ {
-		tempTdSlice := make([]*TicketData, len(ticketMap[i]),
-			len(ticketMap[i]))
+		tempTdSlice := make([]*TicketData, len(ticketMap[i]))
 		itr := 0 // Iterator
 		for _, td := range ticketMap[i] {
 			tempTdSlice[itr] = td

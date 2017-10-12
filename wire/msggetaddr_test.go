@@ -34,8 +34,6 @@ func TestGetAddr(t *testing.T) {
 			"protocol version %d - got %v, want %v", pver,
 			maxPayload, wantPayload)
 	}
-
-	return
 }
 
 // TestGetAddrWire tests the MsgGetAddr wire encode and decode for various

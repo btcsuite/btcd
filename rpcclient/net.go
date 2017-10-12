@@ -42,11 +42,7 @@ type FutureAddNodeResult chan *response
 // any occurred when performing the specified command.
 func (r FutureAddNodeResult) Receive() error {
 	_, err := receiveFuture(r)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // AddNodeAsync returns an instance of a type that can be used to get the result
@@ -194,11 +190,7 @@ type FuturePingResult chan *response
 // of queueing a ping to be sent to each connected peer.
 func (r FuturePingResult) Receive() error {
 	_, err := receiveFuture(r)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // PingAsync returns an instance of a type that can be used to get the result of

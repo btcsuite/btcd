@@ -29,12 +29,7 @@ func (msg *MsgFeeFilter) BtcDecode(r io.Reader, pver uint32) error {
 		return messageError("MsgFeeFilter.BtcDecode", str)
 	}
 
-	err := readElement(r, &msg.MinFee)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return readElement(r, &msg.MinFee)
 }
 
 // BtcEncode encodes the receiver to w using the protocol encoding.
@@ -46,12 +41,7 @@ func (msg *MsgFeeFilter) BtcEncode(w io.Writer, pver uint32) error {
 		return messageError("MsgFeeFilter.BtcEncode", str)
 	}
 
-	err := writeElement(w, msg.MinFee)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return writeElement(w, msg.MinFee)
 }
 
 // Command returns the protocol command string for the message.  This is part

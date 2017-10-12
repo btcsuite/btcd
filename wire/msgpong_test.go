@@ -62,8 +62,6 @@ func TestPongLatest(t *testing.T) {
 	if msg.Nonce != readmsg.Nonce {
 		t.Errorf("Should get same nonce for protocol version %d", pver)
 	}
-
-	return
 }
 
 // TestPongWire tests the MsgPong wire encode and decode for various protocol

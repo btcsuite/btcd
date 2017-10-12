@@ -75,8 +75,6 @@ func TestAddr(t *testing.T) {
 		t.Errorf("AddAddresses: expected error on too many addresses " +
 			"not received")
 	}
-
-	return
 }
 
 // TestAddrWire tests the MsgAddr wire encode and decode for various numbers

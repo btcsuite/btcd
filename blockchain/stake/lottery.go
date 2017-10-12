@@ -70,7 +70,7 @@ func (hp *Hash256PRNG) Hash256Rand() uint32 {
 
 	// 'roll over' the hash index to use and store it.
 	if hp.hashIdx > 7 {
-		idxB := make([]byte, 4, 4)
+		idxB := make([]byte, 4)
 		binary.BigEndian.PutUint32(idxB, uint32(hp.idx))
 		hp.lastHash = chainhash.HashH(append(hp.seed[:], idxB...))
 		hp.idx++

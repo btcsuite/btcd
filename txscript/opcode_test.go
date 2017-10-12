@@ -508,12 +508,12 @@ func TestNewlyEnabledOpCodes(t *testing.T) {
 func randByteSliceSlice(i int, maxLen int, src int) [][]byte {
 	r := rand.New(rand.NewSource(int64(src)))
 
-	slices := make([][]byte, i, i)
+	slices := make([][]byte, i)
 	for j := 0; j < i; j++ {
 		for {
 			sz := r.Intn(maxLen) + 1
 
-			sl := make([]byte, sz, sz)
+			sl := make([]byte, sz)
 			for k := 0; k < sz; k++ {
 				randByte := r.Intn(255)
 				sl[k] = uint8(randByte)

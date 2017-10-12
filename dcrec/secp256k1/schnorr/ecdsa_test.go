@@ -108,7 +108,7 @@ func GetSigningTestVectors() []*SchorrSigningTestVector {
 
 // Horribly broken hash function. Do not use for anything but tests.
 func testSchnorrHash(msg []byte) []byte {
-	h32 := make([]byte, scalarSize, scalarSize)
+	h32 := make([]byte, scalarSize)
 
 	j := 32
 	for i := 0; i < 32; i++ {
@@ -190,7 +190,7 @@ func randPrivKeyList(curve *secp256k1.KoblitzCurve,
 	i int) []*secp256k1.PrivateKey {
 	r := rand.New(rand.NewSource(54321))
 
-	privKeyList := make([]*secp256k1.PrivateKey, i, i)
+	privKeyList := make([]*secp256k1.PrivateKey, i)
 	for j := 0; j < i; j++ {
 		for {
 			bIn := new([32]byte)
@@ -228,7 +228,7 @@ type SignatureVerParams struct {
 func randSigList(curve *secp256k1.KoblitzCurve, i int) []*SignatureVerParams {
 	r := rand.New(rand.NewSource(54321))
 
-	privKeyList := make([]*secp256k1.PrivateKey, i, i)
+	privKeyList := make([]*secp256k1.PrivateKey, i)
 	for j := 0; j < i; j++ {
 		for {
 			bIn := new([32]byte)
@@ -247,9 +247,9 @@ func randSigList(curve *secp256k1.KoblitzCurve, i int) []*SignatureVerParams {
 		}
 	}
 
-	msgList := make([][]byte, i, i)
+	msgList := make([][]byte, i)
 	for j := 0; j < i; j++ {
-		m := make([]byte, 32, 32)
+		m := make([]byte, 32)
 		for k := 0; k < scalarSize; k++ {
 			randByte := r.Intn(255)
 			m[k] = uint8(randByte)
@@ -258,7 +258,7 @@ func randSigList(curve *secp256k1.KoblitzCurve, i int) []*SignatureVerParams {
 		r.Seed(int64(j) + 54321)
 	}
 
-	sigsList := make([]*Signature, i, i)
+	sigsList := make([]*Signature, i)
 	for j := 0; j < i; j++ {
 		r, s, err := Sign(curve, privKeyList[j], msgList[j])
 		if err != nil {
@@ -268,7 +268,7 @@ func randSigList(curve *secp256k1.KoblitzCurve, i int) []*SignatureVerParams {
 		sigsList[j] = sig
 	}
 
-	sigStructList := make([]*SignatureVerParams, i, i)
+	sigStructList := make([]*SignatureVerParams, i)
 	for j := 0; j < i; j++ {
 		ss := new(SignatureVerParams)
 		pkx, pky := privKeyList[j].Public()

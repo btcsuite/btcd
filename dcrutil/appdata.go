@@ -26,9 +26,7 @@ func appDataDir(goos, appName string, roaming bool) string {
 
 	// The caller really shouldn't prepend the appName with a period, but
 	// if they do, handle it gracefully by stripping it.
-	if strings.HasPrefix(appName, ".") {
-		appName = appName[1:]
-	}
+	appName = strings.TrimPrefix(appName, ".")
 	appNameUpper := string(unicode.ToUpper(rune(appName[0]))) + appName[1:]
 	appNameLower := string(unicode.ToLower(rune(appName[0]))) + appName[1:]
 

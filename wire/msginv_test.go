@@ -67,8 +67,6 @@ func TestInv(t *testing.T) {
 		t.Errorf("NewMsgInvSizeHint: wrong cap for size hint - "+
 			"got %v, want %v", cap(msg.InvList), wantCap)
 	}
-
-	return
 }
 
 // TestInvWire tests the MsgInv wire encode and decode for various numbers

@@ -177,7 +177,7 @@ type scriptFreeList chan []byte
 // ignored and allowed to go the garbage collector.
 func (c scriptFreeList) Borrow(size uint64) []byte {
 	if size > freeListMaxScriptSize {
-		return make([]byte, size, size)
+		return make([]byte, size)
 	}
 
 	var buf []byte
@@ -518,7 +518,7 @@ func (msg *MsgTx) Copy() *MsgTx {
 		oldScript := oldTxIn.SignatureScript
 		oldScriptLen := len(oldScript)
 		if oldScriptLen > 0 {
-			newScript = make([]byte, oldScriptLen, oldScriptLen)
+			newScript = make([]byte, oldScriptLen)
 			copy(newScript, oldScript[:oldScriptLen])
 		}
 
@@ -542,7 +542,7 @@ func (msg *MsgTx) Copy() *MsgTx {
 		oldScript := oldTxOut.PkScript
 		oldScriptLen := len(oldScript)
 		if oldScriptLen > 0 {
-			newScript = make([]byte, oldScriptLen, oldScriptLen)
+			newScript = make([]byte, oldScriptLen)
 			copy(newScript, oldScript[:oldScriptLen])
 		}
 

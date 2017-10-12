@@ -49,8 +49,6 @@ func TestFilterAddLatest(t *testing.T) {
 	if err != nil {
 		t.Errorf("decode of MsgFilterAdd failed [%v] err <%v>", buf, err)
 	}
-
-	return
 }
 
 // TestFilterAddMaxDataSize tests the MsgFilterAdd API maximum data size.

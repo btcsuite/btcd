@@ -321,15 +321,13 @@ func NewBlockDeepCopyCoinbase(msgBlock *wire.MsgBlock) *Block {
 
 	lenTxs := len(msgBlock.Transactions)
 	mtxsCopy := make([]*wire.MsgTx, lenTxs)
-	for i, mtx := range msgBlock.Transactions {
-		mtxsCopy[i] = mtx
-	}
+	copy(mtxsCopy, msgBlock.Transactions)
+
 	msgBlockCopy.Transactions = mtxsCopy
 	lenStxs := len(msgBlock.STransactions)
 	smtxsCopy := make([]*wire.MsgTx, lenStxs)
-	for i, smtx := range msgBlock.STransactions {
-		smtxsCopy[i] = smtx
-	}
+	copy(smtxsCopy, msgBlock.STransactions)
+
 	msgBlockCopy.STransactions = smtxsCopy
 	msgBlockCopy.Header = msgBlock.Header
 

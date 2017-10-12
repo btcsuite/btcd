@@ -953,8 +953,6 @@ func (b *blockManager) checkBlockForHiddenVotes(block *dcrutil.Block) {
 	template.Block.Header.Voters = uint16(votesTotal)
 	template.Block.Header.StakeRoot = *smerkles[len(smerkles)-1]
 	template.Block.Header.Size = uint32(template.Block.SerializeSize())
-
-	return
 }
 
 // handleBlockMsg handles block messages from all peers.
@@ -2531,7 +2529,6 @@ func (b *blockManager) SetCurrentTemplate(bt *BlockTemplate) {
 	reply := make(chan setCurrentTemplateResponse)
 	b.msgChan <- setCurrentTemplateMsg{Template: bt, reply: reply}
 	<-reply
-	return
 }
 
 // GetParentTemplate gets the current parent block template for mining.
@@ -2547,7 +2544,6 @@ func (b *blockManager) SetParentTemplate(bt *BlockTemplate) {
 	reply := make(chan setParentTemplateResponse)
 	b.msgChan <- setParentTemplateMsg{Template: bt, reply: reply}
 	<-reply
-	return
 }
 
 // newBlockManager returns a new decred block manager.

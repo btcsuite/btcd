@@ -95,12 +95,11 @@ func NewTx(msgTx *wire.MsgTx) *Tx {
 // so that there are new memory allocations, in case you were to somewhere
 // else modify the data assigned to these pointers.
 func NewTxDeep(msgTx *wire.MsgTx) *Tx {
-	txIns := make([]*wire.TxIn, len(msgTx.TxIn), len(msgTx.TxIn))
-	txOuts := make([]*wire.TxOut, len(msgTx.TxOut), len(msgTx.TxOut))
+	txIns := make([]*wire.TxIn, len(msgTx.TxIn))
+	txOuts := make([]*wire.TxOut, len(msgTx.TxOut))
 
 	for i, txin := range msgTx.TxIn {
-		sigScript := make([]byte, len(txin.SignatureScript),
-			len(txin.SignatureScript))
+		sigScript := make([]byte, len(txin.SignatureScript))
 		copy(sigScript[:], txin.SignatureScript[:])
 
 		txIns[i] = &wire.TxIn{
@@ -118,8 +117,7 @@ func NewTxDeep(msgTx *wire.MsgTx) *Tx {
 	}
 
 	for i, txout := range msgTx.TxOut {
-		pkScript := make([]byte, len(txout.PkScript),
-			len(txout.PkScript))
+		pkScript := make([]byte, len(txout.PkScript))
 		copy(pkScript[:], txout.PkScript[:])
 
 		txOuts[i] = &wire.TxOut{
@@ -166,7 +164,7 @@ func NewTxDeepTxIns(msgTx *wire.MsgTx) *Tx {
 	// Copy the TxIns deeply.
 	for _, txIn := range msgTx.TxIn {
 		sigScrLen := len(txIn.SignatureScript)
-		sigScrCopy := make([]byte, sigScrLen, sigScrLen)
+		sigScrCopy := make([]byte, sigScrLen)
 
 		txInCopy := new(wire.TxIn)
 		txInCopy.PreviousOutPoint.Hash = txIn.PreviousOutPoint.Hash

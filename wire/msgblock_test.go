@@ -105,8 +105,6 @@ func TestBlock(t *testing.T) {
 		t.Errorf("ClearTransactions: wrong transactions - got %v, want %v",
 			len(msg.STransactions), 0)
 	}
-
-	return
 }
 
 // TestBlockTxHashes tests the ability to generate a slice of all transaction

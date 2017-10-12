@@ -170,8 +170,6 @@ func TestVersion(t *testing.T) {
 		t.Errorf("NewMsgVersionFromConn: expected error not received "+
 			"- got %v, want %v", err, ErrInvalidNetAddr)
 	}
-
-	return
 }
 
 // TestVersionWire tests the MsgVersion wire encode and decode for various

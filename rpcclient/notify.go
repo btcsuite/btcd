@@ -1172,11 +1172,7 @@ type FutureNotifyBlocksResult chan *response
 // if the registration was not successful.
 func (r FutureNotifyBlocksResult) Receive() error {
 	_, err := receiveFuture(r)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // NotifyBlocksAsync returns an instance of a type that can be used to get the
@@ -1224,11 +1220,7 @@ type FutureNotifyWinningTicketsResult chan *response
 // if the registration was not successful.
 func (r FutureNotifyWinningTicketsResult) Receive() error {
 	_, err := receiveFuture(r)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // NotifyWinningTicketsAsync returns an instance of a type that can be used
@@ -1278,11 +1270,7 @@ type FutureNotifySpentAndMissedTicketsResult chan *response
 // if the registration was not successful.
 func (r FutureNotifySpentAndMissedTicketsResult) Receive() error {
 	_, err := receiveFuture(r)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // NotifySpentAndMissedTicketsAsync returns an instance of a type that can be used
@@ -1332,11 +1320,7 @@ type FutureNotifyNewTicketsResult chan *response
 // if the registration was not successful.
 func (r FutureNotifyNewTicketsResult) Receive() error {
 	_, err := receiveFuture(r)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // NotifyNewTicketsAsync returns an instance of a type that can be used to get the
@@ -1384,11 +1368,7 @@ type FutureNotifyStakeDifficultyResult chan *response
 // if the registration was not successful.
 func (r FutureNotifyStakeDifficultyResult) Receive() error {
 	_, err := receiveFuture(r)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // NotifyStakeDifficultyAsync returns an instance of a type that can be used to get the
@@ -1438,11 +1418,7 @@ type FutureNotifyNewTransactionsResult chan *response
 // if the registration was not successful.
 func (r FutureNotifyNewTransactionsResult) Receive() error {
 	_, err := receiveFuture(r)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // NotifyNewTransactionsAsync returns an instance of a type that can be used to

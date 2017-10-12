@@ -107,11 +107,7 @@ type FutureSetGenerateResult chan *response
 // any occurred when setting the server to generate coins (mine) or not.
 func (r FutureSetGenerateResult) Receive() error {
 	_, err := receiveFuture(r)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // SetGenerateAsync returns an instance of a type that can be used to get the

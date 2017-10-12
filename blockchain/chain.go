@@ -567,8 +567,6 @@ func (b *BlockChain) addOrphanBlock(block *dcrutil.Block) {
 	// Add to previous hash lookup index for faster dependency lookups.
 	prevHash := &block.MsgBlock().Header.PrevBlock
 	b.prevOrphans[*prevHash] = append(b.prevOrphans[*prevHash], oBlock)
-
-	return
 }
 
 // getGeneration gets a generation of blocks who all have the same parent by
@@ -598,7 +596,7 @@ func (b *BlockChain) getGeneration(h chainhash.Hash) ([]chainhash.Hash, error) {
 
 	// Store all the hashes in a new slice and return them.
 	lenChildren := len(p.children)
-	allChildren := make([]chainhash.Hash, lenChildren, lenChildren)
+	allChildren := make([]chainhash.Hash, lenChildren)
 	for i := 0; i < lenChildren; i++ {
 		allChildren[i] = p.children[i].hash
 	}

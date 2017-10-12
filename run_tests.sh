@@ -5,8 +5,9 @@ set -ex
 # including:
 # 1. gofmt         (http://golang.org/cmd/gofmt/)
 # 2. go vet        (http://golang.org/cmd/vet)
-# 3. unconvert     (https://github.com/mdempsky/unconvert)
-# 4. race detector (http://blog.golang.org/race-detector)
+# 3. gosimple      (https://github.com/dominikh/go-simple)
+# 4. unconvert     (https://github.com/mdempsky/unconvert)
+# 5. race detector (http://blog.golang.org/race-detector)
 
 # gometalinter (github.com/alecthomas/gometalinter) is used to run each each
 # static checker.
@@ -36,6 +37,7 @@ testrepo () {
   gometalinter --vendor --disable-all --deadline=10m \
     --enable=gofmt \
     --enable=vet \
+    --enable=gosimple \
     --enable=unconvert ./... | tee /dev/stderr
   if [ $? != 0 ]; then
     echo 'gometalinter has some complaints'

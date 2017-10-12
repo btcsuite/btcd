@@ -1279,7 +1279,7 @@ func (s *server) handleAddPeerMsg(state *peerState, sp *serverPeer) bool {
 	if banEnd, ok := state.banned[host]; ok {
 		if time.Now().Before(banEnd) {
 			srvrLog.Debugf("Peer %s is banned for another %v - disconnecting",
-				host, banEnd.Sub(time.Now()))
+				host, time.Until(banEnd))
 			sp.Disconnect()
 			return false
 		}
@@ -2503,7 +2503,7 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 
 				// only allow recent nodes (10mins) after we failed 30
 				// times
-				if tries < 30 && time.Now().Sub(addr.LastAttempt()) < 10*time.Minute {
+				if tries < 30 && time.Since(addr.LastAttempt()) < 10*time.Minute {
 					continue
 				}
 

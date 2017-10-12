@@ -56,13 +56,12 @@ func TestSchnorrThreshold(t *testing.T) {
 	for i := 0; i < numTests; i++ {
 		numKeysForTest := tRand.Intn(maxSignatories-2) + 2
 		keyIndex := i * maxSignatories
-		keysToUse := make([]*PrivateKey, numKeysForTest, numKeysForTest)
+		keysToUse := make([]*PrivateKey, numKeysForTest)
 		for j := 0; j < numKeysForTest; j++ {
 			keysToUse[j] = privkeys[j+keyIndex]
 		}
 
-		pubKeysToUse := make([]*PublicKey, numKeysForTest,
-			numKeysForTest)
+		pubKeysToUse := make([]*PublicKey, numKeysForTest)
 		for j := 0; j < numKeysForTest; j++ {
 			_, pubkey, _ := PrivKeyFromScalar(curve,
 				keysToUse[j].Serialize())
@@ -75,10 +74,8 @@ func TestSchnorrThreshold(t *testing.T) {
 
 		allPksSum := CombinePubkeys(curve, allPubkeys)
 
-		privNoncesToUse := make([]*PrivateKey, numKeysForTest,
-			numKeysForTest)
-		pubNoncesToUse := make([]*PublicKey, numKeysForTest,
-			numKeysForTest)
+		privNoncesToUse := make([]*PrivateKey, numKeysForTest)
+		pubNoncesToUse := make([]*PublicKey, numKeysForTest)
 		for j := 0; j < numKeysForTest; j++ {
 			nonce := nonceRFC6979(curve, keysToUse[j].Serialize(), msg, nil,
 				Sha512VersionStringRFC6979)
@@ -107,7 +104,7 @@ func TestSchnorrThreshold(t *testing.T) {
 			pubNoncesToUse[j] = pubNonce
 		}
 
-		partialSignatures := make([]*Signature, numKeysForTest, numKeysForTest)
+		partialSignatures := make([]*Signature, numKeysForTest)
 
 		// Partial signature generation.
 		publicNonceSum := CombinePubkeys(curve, pubNoncesToUse)
@@ -216,8 +213,7 @@ func TestSchnorrThreshold(t *testing.T) {
 
 		for j := range keysToUse {
 			thisPubNonce := pubNoncesToUse[j]
-			localPubNonces := make([]*PublicKey, numKeysForTest-1,
-				numKeysForTest-1)
+			localPubNonces := make([]*PublicKey, numKeysForTest-1)
 			itr := 0
 			for _, pubNonce := range pubNoncesToUse {
 				if bytes.Equal(thisPubNonce.Serialize(), pubNonce.Serialize()) {

@@ -1874,8 +1874,7 @@ func deserializeDeploymentCacheParams(serialized []byte) (chaincfg.ConsensusDepl
 	}
 
 	// Recreate array.
-	deployment.Vote.Choices = make([]chaincfg.Choice, choicesLen,
-		choicesLen)
+	deployment.Vote.Choices = make([]chaincfg.Choice, choicesLen)
 	for i := 0; i < int(choicesLen); i++ {
 		deployment.Vote.Choices[i].Bits =
 			byteOrder.Uint16(serialized[20+i*4:])

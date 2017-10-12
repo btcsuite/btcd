@@ -69,8 +69,6 @@ func TestSendHeaders(t *testing.T) {
 			"version %v err <%v>"
 		t.Errorf(s, msg, err)
 	}
-
-	return
 }
 
 // TestSendHeadersBIP0130 tests the MsgSendHeaders API against the protocol
@@ -96,8 +94,6 @@ func TestSendHeadersBIP0130(t *testing.T) {
 		t.Errorf("decode of MsgSendHeaders succeeded when it should " +
 			"have failed")
 	}
-
-	return
 }
 
 // TestSendHeadersCrossProtocol tests the MsgSendHeaders API when encoding with

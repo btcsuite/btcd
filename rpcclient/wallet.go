@@ -1559,11 +1559,7 @@ type FutureRenameAccountResult chan *response
 // result of creating new account.
 func (r FutureRenameAccountResult) Receive() error {
 	_, err := receiveFuture(r)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // RenameAccountAsync returns an instance of a type that can be used to get the
@@ -1627,11 +1623,7 @@ type FutureKeyPoolRefillResult chan *response
 // of refilling the key pool.
 func (r FutureKeyPoolRefillResult) Receive() error {
 	_, err := receiveFuture(r)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // KeyPoolRefillAsync returns an instance of a type that can be used to get the
@@ -2164,11 +2156,7 @@ type FutureWalletLockResult chan *response
 // of locking the wallet.
 func (r FutureWalletLockResult) Receive() error {
 	_, err := receiveFuture(r)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // WalletLockAsync returns an instance of a type that can be used to get the
@@ -2196,11 +2184,7 @@ func (c *Client) WalletLock() error {
 func (c *Client) WalletPassphrase(passphrase string, timeoutSecs int64) error {
 	cmd := dcrjson.NewWalletPassphraseCmd(passphrase, timeoutSecs)
 	_, err := c.sendCmdAndWait(cmd)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // FutureWalletPassphraseChangeResult is a future promise to deliver the result
@@ -2211,11 +2195,7 @@ type FutureWalletPassphraseChangeResult chan *response
 // of changing the wallet passphrase.
 func (r FutureWalletPassphraseChangeResult) Receive() error {
 	_, err := receiveFuture(r)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // WalletPassphraseChangeAsync returns an instance of a type that can be used to
@@ -2375,11 +2355,7 @@ type FutureImportAddressResult chan *response
 // of importing the passed public address.
 func (r FutureImportAddressResult) Receive() error {
 	_, err := receiveFuture(r)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // ImportAddressAsync returns an instance of a type that can be used to get the
@@ -2422,11 +2398,7 @@ type FutureImportPrivKeyResult chan *response
 // (WIF).
 func (r FutureImportPrivKeyResult) Receive() error {
 	_, err := receiveFuture(r)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // ImportPrivKeyAsync returns an instance of a type that can be used to get the
@@ -2525,11 +2497,7 @@ type FutureImportPubKeyResult chan *response
 // of importing the passed public key.
 func (r FutureImportPubKeyResult) Receive() error {
 	_, err := receiveFuture(r)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // ImportPubKeyAsync returns an instance of a type that can be used to get the
@@ -2570,11 +2538,7 @@ type FutureImportScriptResult chan *response
 // Receive waits for the response promised by the future.
 func (r FutureImportScriptResult) Receive() error {
 	_, err := receiveFuture(r)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // ImportScriptAsync returns an instance of a type that can be used to get the
@@ -2690,11 +2654,7 @@ type FutureAccountSyncAddressIndexResult chan *response
 // provided by the server.
 func (r FutureAccountSyncAddressIndexResult) Receive() error {
 	_, err := receiveFuture(r)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // AccountSyncAddressIndexAsync returns an instance of a type that can be used
@@ -2721,11 +2681,7 @@ type FutureRevokeTicketsResult chan *response
 // provided by the server.
 func (r FutureRevokeTicketsResult) Receive() error {
 	_, err := receiveFuture(r)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // RevokeTicketsAsync returns an instance of a type that can be used to get the result
@@ -2752,11 +2708,7 @@ type FutureAddTicketResult chan *response
 // provided by the server.
 func (r FutureAddTicketResult) Receive() error {
 	_, err := receiveFuture(r)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // AddTicketAsync returns an instance of a type that can be used to get the result
@@ -3005,11 +2957,7 @@ type FutureSetTicketFeeResult chan *response
 // provided by the server.
 func (r FutureSetTicketFeeResult) Receive() error {
 	_, err := receiveFuture(r)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // SetTicketFeeAsync returns an instance of a type that can be used to
@@ -3034,11 +2982,7 @@ type FutureSetTxFeeResult chan *response
 // Receive waits for the response promised by the future.
 func (r FutureSetTxFeeResult) Receive() error {
 	_, err := receiveFuture(r)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // SetTxFeeAsync returns an instance of a type that can be used to

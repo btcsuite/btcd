@@ -714,7 +714,6 @@ func (s *blockStore) handleRollback(oldBlockFileNum, oldBlockOffset uint32) {
 			wc.curFileNum, err)
 		return
 	}
-	return
 }
 
 // scanBlockFiles searches the database directory for all flat block files to

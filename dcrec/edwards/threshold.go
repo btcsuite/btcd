@@ -224,7 +224,7 @@ func schnorrCombineSigs(curve *TwistedEdwardsCurve, sigss [][]byte) (*big.Int,
 // generateNoncePair.
 func SchnorrCombineSigs(curve *TwistedEdwardsCurve,
 	sigs []*Signature) (*Signature, error) {
-	sigss := make([][]byte, len(sigs), len(sigs))
+	sigss := make([][]byte, len(sigs))
 	for i, sig := range sigs {
 		if sig == nil {
 			return nil, fmt.Errorf("nil signature")

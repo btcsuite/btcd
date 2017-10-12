@@ -193,7 +193,7 @@ func standardCoinbaseOpReturnScript(blockHeight uint32) []byte {
 		panic(err)
 	}
 
-	data := make([]byte, 36, 36)
+	data := make([]byte, 36)
 	binary.LittleEndian.PutUint32(data[0:4], blockHeight)
 	binary.LittleEndian.PutUint64(data[28:36], rand)
 	return opReturnScript(data)

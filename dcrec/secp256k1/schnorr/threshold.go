@@ -214,7 +214,7 @@ func schnorrCombineSigs(curve *secp256k1.KoblitzCurve, sigss [][]byte) (*big.Int
 // generateNoncePair.
 func CombineSigs(curve *secp256k1.KoblitzCurve,
 	sigs []*Signature) (*Signature, error) {
-	sigss := make([][]byte, len(sigs), len(sigs))
+	sigss := make([][]byte, len(sigs))
 	for i, sig := range sigs {
 		if sig == nil {
 			return nil, fmt.Errorf("nil signature")

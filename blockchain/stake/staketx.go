@@ -287,7 +287,7 @@ func SStxStakeOutputInfo(outs []*MinimalOutput) ([]bool, [][]byte, []int64,
 		if (idx > 0) && (idx%2 != 0) {
 			// The MSB (sign), not used ever normally, encodes whether
 			// or not it is a P2PKH or P2SH for the input.
-			amtEncoded := make([]byte, 8, 8)
+			amtEncoded := make([]byte, 8)
 			copy(amtEncoded, out.PkScript[22:30])
 			isP2SH[idx/2] = !(amtEncoded[7]&(1<<7) == 0) // MSB set?
 			amtEncoded[7] &= ^uint8(1 << 7)              // Clear bit
@@ -297,8 +297,8 @@ func SStxStakeOutputInfo(outs []*MinimalOutput) ([]bool, [][]byte, []int64,
 
 			// Get flags and restrictions for the outputs to be
 			// make in either a vote or revocation.
-			spendRules := make([]bool, 2, 2)
-			spendLimits := make([]uint16, 2, 2)
+			spendRules := make([]bool, 2)
+			spendLimits := make([]uint16, 2)
 
 			// This bitflag is true/false.
 			feeLimitUint16 := binary.LittleEndian.Uint16(out.PkScript[30:32])
@@ -346,7 +346,7 @@ func AddrFromSStxPkScrCommitment(pkScript []byte,
 
 	// The MSB (sign), not used ever normally, encodes whether
 	// or not it is a P2PKH or P2SH for the input.
-	amtEncoded := make([]byte, 8, 8)
+	amtEncoded := make([]byte, 8)
 	copy(amtEncoded, pkScript[22:30])
 	isP2SH := !(amtEncoded[7]&(1<<7) == 0) // MSB set?
 
@@ -375,7 +375,7 @@ func AmountFromSStxPkScrCommitment(pkScript []byte) (dcrutil.Amount, error) {
 
 	// The MSB (sign), not used ever normally, encodes whether
 	// or not it is a P2PKH or P2SH for the input.
-	amtEncoded := make([]byte, 8, 8)
+	amtEncoded := make([]byte, 8)
 	copy(amtEncoded, pkScript[22:30])
 	amtEncoded[7] &= ^uint8(1 << 7) // Clear bit for P2SH flag
 

@@ -57,8 +57,6 @@ func TestHeaders(t *testing.T) {
 		t.Errorf("AddBlockHeader: expected error on too many headers " +
 			"not received")
 	}
-
-	return
 }
 
 // TestHeadersWire tests the MsgHeaders wire encode and decode for various

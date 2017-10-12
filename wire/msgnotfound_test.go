@@ -58,8 +58,6 @@ func TestNotFound(t *testing.T) {
 		t.Errorf("AddInvVect: expected error on too many inventory " +
 			"vectors not received")
 	}
-
-	return
 }
 
 // TestNotFoundWire tests the MsgNotFound wire encode and decode for various

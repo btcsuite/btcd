@@ -169,7 +169,6 @@ func (entry *UtxoEntry) SpendOutput(outputIndex uint32) {
 
 	entry.modified = true
 	output.spent = true
-	return
 }
 
 // IsFullySpent returns whether or not the transaction the utxo entry represents
@@ -379,7 +378,6 @@ func (view *UtxoViewpoint) AddTxOuts(tx *dcrutil.Tx, blockHeight int64,
 			compressed:    false,
 		}
 	}
-	return
 }
 
 // connectTransaction updates the view by adding all new utxos created by the

@@ -44,8 +44,6 @@ func TestPing(t *testing.T) {
 			"protocol version %d - got %v, want %v", pver,
 			maxPayload, wantPayload)
 	}
-
-	return
 }
 
 // TestPingWire tests the MsgPing wire encode and decode for various protocol

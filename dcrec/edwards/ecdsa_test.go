@@ -155,7 +155,7 @@ func TestGolden(t *testing.T) {
 func randPrivScalarKeyList(curve *TwistedEdwardsCurve, i int) []*PrivateKey {
 	r := rand.New(rand.NewSource(54321))
 
-	privKeyList := make([]*PrivateKey, i, i)
+	privKeyList := make([]*PrivateKey, i)
 	for j := 0; j < i; j++ {
 		for {
 			bIn := new([32]byte)
@@ -285,7 +285,7 @@ func TestNonStandardSignatures(t *testing.T) {
 func randPrivKeyList(curve *TwistedEdwardsCurve, i int) []*PrivateKey {
 	r := rand.New(rand.NewSource(54321))
 
-	privKeyList := make([]*PrivateKey, i, i)
+	privKeyList := make([]*PrivateKey, i)
 	for j := 0; j < i; j++ {
 		for {
 			bIn := new([32]byte)
@@ -382,7 +382,7 @@ type SignatureVerParams struct {
 func randSigList(curve *TwistedEdwardsCurve, i int) []*SignatureVerParams {
 	r := rand.New(rand.NewSource(54321))
 
-	privKeyList := make([]*PrivateKey, i, i)
+	privKeyList := make([]*PrivateKey, i)
 	for j := 0; j < i; j++ {
 		for {
 			bIn := new([32]byte)
@@ -401,9 +401,9 @@ func randSigList(curve *TwistedEdwardsCurve, i int) []*SignatureVerParams {
 		}
 	}
 
-	msgList := make([][]byte, i, i)
+	msgList := make([][]byte, i)
 	for j := 0; j < i; j++ {
-		m := make([]byte, 32, 32)
+		m := make([]byte, 32)
 		for k := 0; k < fieldIntSize; k++ {
 			randByte := r.Intn(255)
 			m[k] = uint8(randByte)
@@ -412,7 +412,7 @@ func randSigList(curve *TwistedEdwardsCurve, i int) []*SignatureVerParams {
 		r.Seed(int64(j) + 54321)
 	}
 
-	sigsList := make([]*Signature, i, i)
+	sigsList := make([]*Signature, i)
 	for j := 0; j < i; j++ {
 		r, s, err := Sign(curve, privKeyList[j], msgList[j])
 		if err != nil {
@@ -422,7 +422,7 @@ func randSigList(curve *TwistedEdwardsCurve, i int) []*SignatureVerParams {
 		sigsList[j] = sig
 	}
 
-	sigStructList := make([]*SignatureVerParams, i, i)
+	sigStructList := make([]*SignatureVerParams, i)
 	for j := 0; j < i; j++ {
 		ss := new(SignatureVerParams)
 		pkx, pky := privKeyList[j].Public()
