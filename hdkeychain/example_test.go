@@ -9,7 +9,7 @@ import (
 	"fmt"
 
 	"github.com/decred/dcrd/chaincfg"
-	"github.com/decred/dcrd/dcrutil/hdkeychain"
+	"github.com/decred/dcrd/hdkeychain"
 )
 
 // This example demonstrates how to generate a cryptographically random seed
