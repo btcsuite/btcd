@@ -112,6 +112,10 @@ func TestGolden(t *testing.T) {
 
 		// Deserialize pubkey and test functions.
 		pubkeyP, err := ParsePubKey(curve, pubKeyBytes)
+		if err != nil {
+			t.Fatalf("ParsePubKey: %v", err)
+		}
+
 		pubkP := pubkeyP.Serialize()
 		cmp = bytes.Equal(pubkS1[:], pubkP[:])
 		if !cmp {
@@ -130,6 +134,9 @@ func TestGolden(t *testing.T) {
 
 		// Deserialize signature and test functions.
 		internalSig, err := ParseSignature(curve, sig)
+		if err != nil {
+			t.Fatalf("ParseSignature failed: %v", err)
+		}
 		iSigSerialized := internalSig.Serialize()
 		cmp = bytes.Equal(sigArray[:], copyBytes64(iSigSerialized)[:])
 		if !cmp {
@@ -137,6 +144,9 @@ func TestGolden(t *testing.T) {
 		}
 
 		sig2r, sig2s, err := Sign(curve, privkeyS2, msg)
+		if err != nil {
+			t.Fatalf("Sign failed: %v", err)
+		}
 		sig2 := &Signature{sig2r, sig2s}
 		sig2B := sig2.Serialize()
 		if !bytes.Equal(sig, sig2B[:]) {

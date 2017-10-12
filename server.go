@@ -2308,6 +2308,9 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 				goto nowc
 			}
 			addrs, err := net.InterfaceAddrs()
+			if err != nil {
+				srvrLog.Warnf("Unable to get interface addresses: %v", err)
+			}
 			for _, a := range addrs {
 				ip, _, err := net.ParseCIDR(a.String())
 				if err != nil {

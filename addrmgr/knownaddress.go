@@ -47,12 +47,8 @@ func (ka *KnownAddress) chance() float64 {
 	ka.mtx.Lock()
 	defer ka.mtx.Unlock()
 	now := time.Now()
-	lastSeen := now.Sub(ka.na.Timestamp)
 	lastAttempt := now.Sub(ka.lastattempt)
 
-	if lastSeen < 0 {
-		lastSeen = 0
-	}
 	if lastAttempt < 0 {
 		lastAttempt = 0
 	}

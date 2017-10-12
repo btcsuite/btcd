@@ -385,7 +385,10 @@ func calcSignatureHash(script []parsedOpcode, hashType SigHashType,
 	}
 	if hashType&SigHashAnyOneCanPay != 0 {
 		txCopy.TxIn = txCopy.TxIn[idx : idx+1]
-		idx = 0
+
+		// Future code that may need the index
+		// should consider resetting it.
+		// idx = 0
 	}
 
 	// The final hash (message to sign) is the hash of:

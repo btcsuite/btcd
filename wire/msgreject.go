@@ -151,13 +151,10 @@ func (msg *MsgReject) Command() string {
 // MaxPayloadLength returns the maximum length the payload can be for the
 // receiver.  This is part of the Message interface implementation.
 func (msg *MsgReject) MaxPayloadLength(pver uint32) uint32 {
-	plen := uint32(0)
 	// Unfortunately the decred protocol does not enforce a sane
 	// limit on the length of the reason, so the max payload is the
 	// overall maximum message payload.
-	plen = MaxMessagePayload
-
-	return plen
+	return uint32(MaxMessagePayload)
 }
 
 // NewMsgReject returns a new decred reject message that conforms to the

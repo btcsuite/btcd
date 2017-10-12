@@ -46,7 +46,6 @@ func serviceControlPipeRx(fd uintptr) {
 	for {
 		_, err := r.Discard(1024)
 		if err == io.EOF {
-			err = nil
 			break
 		}
 		if err != nil {

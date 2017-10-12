@@ -501,6 +501,10 @@ func TestSignTxOutput(t *testing.T) {
 			msg := fmt.Sprintf("%d:%d", hashType, i)
 
 			keyDB, _, _, err := secp256k1.GenerateKey(rand.Reader)
+			if err != nil {
+				t.Errorf("failed to generate key: %v", err)
+				break
+			}
 			key, pk := secp256k1.PrivKeyFromBytes(keyDB)
 			pkBytes := pk.SerializeCompressed()
 
@@ -543,6 +547,10 @@ func TestSignTxOutput(t *testing.T) {
 			msg := fmt.Sprintf("%d:%d", hashType, i)
 
 			keyDB, _, _, err := secp256k1.GenerateKey(rand.Reader)
+			if err != nil {
+				t.Errorf("failed to generate key: %v", err)
+				break
+			}
 			key, pk := secp256k1.PrivKeyFromBytes(keyDB)
 			pkBytes := pk.SerializeCompressed()
 
@@ -585,6 +593,10 @@ func TestSignTxOutput(t *testing.T) {
 			msg := fmt.Sprintf("%d:%d", hashType, i)
 
 			keyDB, _, _, err := secp256k1.GenerateKey(rand.Reader)
+			if err != nil {
+				t.Errorf("failed to generate key: %v", err)
+				break
+			}
 			key, pk := secp256k1.PrivKeyFromBytes(keyDB)
 			pkBytes := pk.SerializeCompressed()
 
@@ -627,6 +639,10 @@ func TestSignTxOutput(t *testing.T) {
 			msg := fmt.Sprintf("%d:%d", hashType, i)
 
 			keyDB, _, _, err := secp256k1.GenerateKey(rand.Reader)
+			if err != nil {
+				t.Errorf("failed to generate key: %v", err)
+				break
+			}
 			key, pk := secp256k1.PrivKeyFromBytes(keyDB)
 			pkBytes := pk.SerializeCompressed()
 
@@ -670,6 +686,10 @@ func TestSignTxOutput(t *testing.T) {
 				msg := fmt.Sprintf("%d:%d:%d", hashType, i, suite)
 
 				keyDB, _, _, err := secp256k1.GenerateKey(rand.Reader)
+				if err != nil {
+					t.Errorf("failed to generate key: %v", err)
+					break
+				}
 				key, pk := secp256k1.PrivKeyFromBytes(keyDB)
 				// For address generation, consensus rules require using
 				// a compressed public key. Look up ExtractPkScriptAddrs
@@ -1104,7 +1124,7 @@ func TestSignTxOutput(t *testing.T) {
 					break
 				}
 
-				sigScript, err := txscript.SignTxOutput(
+				_, err = txscript.SignTxOutput(
 					testingParams, tx, i, scriptPkScript,
 					hashType, mkGetKey(map[string]addressToKey{
 						address.EncodeAddress(): {&key, false},
@@ -1119,7 +1139,7 @@ func TestSignTxOutput(t *testing.T) {
 
 				// by the above loop, this should be valid, now sign
 				// again and merge.
-				sigScript, err = txscript.SignTxOutput(
+				sigScript, err := txscript.SignTxOutput(
 					testingParams, tx, i, scriptPkScript,
 					hashType, mkGetKey(map[string]addressToKey{
 						address.EncodeAddress(): {&key, false},
@@ -1275,7 +1295,7 @@ func TestSignTxOutput(t *testing.T) {
 					break
 				}
 
-				sigScript, err := txscript.SignTxOutput(
+				_, err = txscript.SignTxOutput(
 					testingParams, tx, i, scriptPkScript,
 					hashType, mkGetKey(map[string]addressToKey{
 						address.EncodeAddress(): {&key, true},
@@ -1290,7 +1310,7 @@ func TestSignTxOutput(t *testing.T) {
 
 				// by the above loop, this should be valid, now sign
 				// again and merge.
-				sigScript, err = txscript.SignTxOutput(
+				sigScript, err := txscript.SignTxOutput(
 					testingParams, tx, i, scriptPkScript,
 					hashType, mkGetKey(map[string]addressToKey{
 						address.EncodeAddress(): {&key, true},
@@ -1484,7 +1504,7 @@ func TestSignTxOutput(t *testing.T) {
 					break
 				}
 
-				sigScript, err := txscript.SignTxOutput(
+				_, err = txscript.SignTxOutput(
 					testingParams, tx, i, scriptPkScript,
 					hashType, mkGetKey(map[string]addressToKey{
 						address.EncodeAddress(): {&key, false},
@@ -1499,7 +1519,7 @@ func TestSignTxOutput(t *testing.T) {
 
 				// by the above loop, this should be valid, now sign
 				// again and merge.
-				sigScript, err = txscript.SignTxOutput(
+				sigScript, err := txscript.SignTxOutput(
 					testingParams, tx, i, scriptPkScript,
 					hashType, mkGetKey(map[string]addressToKey{
 						address.EncodeAddress(): {&key, false},
@@ -1687,7 +1707,7 @@ func TestSignTxOutput(t *testing.T) {
 					break
 				}
 
-				sigScript, err := txscript.SignTxOutput(
+				_, err = txscript.SignTxOutput(
 					testingParams, tx, i, scriptPkScript,
 					hashType, mkGetKey(map[string]addressToKey{
 						address.EncodeAddress(): {&key, true},
@@ -1702,7 +1722,7 @@ func TestSignTxOutput(t *testing.T) {
 
 				// by the above loop, this should be valid, now sign
 				// again and merge.
-				sigScript, err = txscript.SignTxOutput(
+				sigScript, err := txscript.SignTxOutput(
 					testingParams, tx, i, scriptPkScript,
 					hashType, mkGetKey(map[string]addressToKey{
 						address.EncodeAddress(): {&key, true},
@@ -1731,6 +1751,10 @@ func TestSignTxOutput(t *testing.T) {
 			msg := fmt.Sprintf("%d:%d", hashType, i)
 
 			keyDB1, _, _, err := secp256k1.GenerateKey(rand.Reader)
+			if err != nil {
+				t.Errorf("failed to generate key: %v", err)
+				break
+			}
 			key1, pk1 := secp256k1.PrivKeyFromBytes(keyDB1)
 
 			address1, err := dcrutil.NewAddressSecpPubKeyCompressed(pk1,
@@ -1742,6 +1766,10 @@ func TestSignTxOutput(t *testing.T) {
 			}
 
 			keyDB2, _, _, err := secp256k1.GenerateKey(rand.Reader)
+			if err != nil {
+				t.Errorf("failed to generate key: %v", err)
+				break
+			}
 			key2, pk2 := secp256k1.PrivKeyFromBytes(keyDB2)
 
 			address2, err := dcrutil.NewAddressSecpPubKeyCompressed(pk2,
@@ -1806,6 +1834,10 @@ func TestSignTxOutput(t *testing.T) {
 			msg := fmt.Sprintf("%d:%d", hashType, i)
 
 			keyDB1, _, _, err := secp256k1.GenerateKey(rand.Reader)
+			if err != nil {
+				t.Errorf("failed to generate key: %v", err)
+				break
+			}
 			key1, pk1 := secp256k1.PrivKeyFromBytes(keyDB1)
 
 			address1, err := dcrutil.NewAddressSecpPubKeyCompressed(pk1,
@@ -1817,6 +1849,10 @@ func TestSignTxOutput(t *testing.T) {
 			}
 
 			keyDB2, _, _, err := secp256k1.GenerateKey(rand.Reader)
+			if err != nil {
+				t.Errorf("failed to generate key: %v", err)
+				break
+			}
 			key2, pk2 := secp256k1.PrivKeyFromBytes(keyDB2)
 
 			address2, err := dcrutil.NewAddressSecpPubKeyCompressed(pk2,
@@ -1901,6 +1937,10 @@ func TestSignTxOutput(t *testing.T) {
 			msg := fmt.Sprintf("%d:%d", hashType, i)
 
 			keyDB1, _, _, err := secp256k1.GenerateKey(rand.Reader)
+			if err != nil {
+				t.Errorf("failed to generate key: %v", err)
+				break
+			}
 			key1, pk1 := secp256k1.PrivKeyFromBytes(keyDB1)
 
 			address1, err := dcrutil.NewAddressSecpPubKeyCompressed(pk1,
@@ -1912,6 +1952,10 @@ func TestSignTxOutput(t *testing.T) {
 			}
 
 			keyDB2, _, _, err := secp256k1.GenerateKey(rand.Reader)
+			if err != nil {
+				t.Errorf("failed to generate key: %v", err)
+				break
+			}
 			key2, pk2 := secp256k1.PrivKeyFromBytes(keyDB2)
 			address2, err := dcrutil.NewAddressSecpPubKeyCompressed(pk2,
 				testingParams)

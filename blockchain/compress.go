@@ -539,7 +539,7 @@ func decompressTxOutAmount(amount uint64) uint64 {
 	// The decompressed amount is now one of the following two equations:
 	// x = 9*n + d - 1  | where e < 9
 	// x = n - 1        | where e = 9
-	n := uint64(0)
+	var n uint64
 	if exponent < 9 {
 		lastDigit := amount%9 + 1
 		amount /= 9

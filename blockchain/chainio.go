@@ -876,7 +876,6 @@ func deserializeUtxoEntry(serialized []byte) (*UtxoEntry, error) {
 		stakeExtra := make([]byte, len(serialized[offset:]))
 		copy(stakeExtra, serialized[offset:])
 		entry.stakeExtra = stakeExtra
-		offset += len(serialized[offset:])
 	}
 
 	return entry, nil

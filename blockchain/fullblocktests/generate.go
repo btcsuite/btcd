@@ -2168,7 +2168,7 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 	testInstances = nil
 	reorgSpend = *outs[spendableOutOffset]
 	reorgTicketSpends = ticketOuts[spendableOutOffset]
-	chain2TipName := g.TipName()
+	var chain2TipName string
 	for i := int32(0); i < numLargeReorgBlocks; i++ {
 		chain2TipName = fmt.Sprintf("bralt%d", i)
 		g.NextBlock(chain2TipName, &reorgSpend, reorgTicketSpends)
@@ -2206,11 +2206,9 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 	//      \-> bralt0 -> ... -> bralt# -> bralt#+1
 	g.SetTip(chain1TipName)
 	g.NextBlock(fmt.Sprintf("br%d", numLargeReorgBlocks), nil, nil)
-	chain1TipName = g.TipName()
 	acceptedToSideChainWithExpectedTip(chain2TipName)
 
 	g.NextBlock(fmt.Sprintf("br%d", numLargeReorgBlocks+1), nil, nil)
-	chain1TipName = g.TipName()
 	accepted()
 
 	return tests, nil

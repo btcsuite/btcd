@@ -92,12 +92,12 @@ func TestCiphering(t *testing.T) {
 		"04f86635c50baca78d11189d4dc02c2f32c4c11e9d50b04eb2d3ff4b9f95e7f2e90e" +
 		"0f4a8d64a2a4149c27d21f88f2dedc200f4b609936c0d67ca98")
 
-	dec, err := Decrypt(c, privkey, out)
+	_, err = Decrypt(c, privkey, out)
 	if err != nil {
 		t.Fatal("failed to decrypt:", err)
 	}
 
-	dec, err = Decrypt(c, privkey, localOut)
+	dec, err := Decrypt(c, privkey, localOut)
 	if err != nil {
 		t.Fatal("failed to decrypt:", err)
 	}

@@ -323,11 +323,10 @@ func (b *BlockChain) calcNextRequiredDifficulty(curNode *blockNode,
 
 	// Regress through all of the previous blocks and store the percent changes
 	// per window period; use bigInts to emulate 64.32 bit fixed point.
+	var olderTime, windowPeriod int64
+	var weights uint64
 	oldNode := curNode
-	windowPeriod := int64(0)
-	weights := uint64(0)
 	recentTime := curNode.header.Timestamp.UnixNano()
-	olderTime := int64(0)
 
 	for i := int64(0); ; i++ {
 		// Store and reset after reaching the end of every window period.

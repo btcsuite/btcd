@@ -154,6 +154,10 @@ func Example_decryptMessage() {
 		"00207cf4ac6057406e40f79961c973309a892732ae7a74ee96cd89823913b8b8d650" +
 		"a44166dc61ea1c419d47077b748a9c06b8d57af72deb2819d98a9d503efc59fc8307" +
 		"d14174f8b83354fac3ff56075162")
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
 
 	// Try decrypting the message.
 	plaintext, err := secp256k1.Decrypt(privKey, ciphertext)

@@ -7,7 +7,8 @@ set -ex
 # 2. go vet        (http://golang.org/cmd/vet)
 # 3. gosimple      (https://github.com/dominikh/go-simple)
 # 4. unconvert     (https://github.com/mdempsky/unconvert)
-# 5. race detector (http://blog.golang.org/race-detector)
+# 5. ineffassign   (https://github.com/gordonklaus/ineffassign)
+# 6. race detector (http://blog.golang.org/race-detector)
 
 # gometalinter (github.com/alecthomas/gometalinter) is used to run each each
 # static checker.
@@ -38,7 +39,8 @@ testrepo () {
     --enable=gofmt \
     --enable=vet \
     --enable=gosimple \
-    --enable=unconvert ./... | tee /dev/stderr
+    --enable=unconvert \
+    --enable=ineffassign ./... | tee /dev/stderr
   if [ $? != 0 ]; then
     echo 'gometalinter has some complaints'
     exit 1

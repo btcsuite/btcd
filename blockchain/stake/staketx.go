@@ -698,8 +698,8 @@ func VerifyStakingPkhsAndAmounts(
 	}
 
 	for idx, amt := range ssSpendAmts {
-		rule := false
-		limit := uint16(0)
+		var rule bool
+		var limit uint16
 		if isVote {
 			// Vote.
 			rule = spendRules[idx][0]

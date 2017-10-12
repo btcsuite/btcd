@@ -158,7 +158,7 @@ func TestDecodeConcatenatedVoteBits(t *testing.T) {
 	}
 	encodedBytesStr = hex.EncodeToString(encodedBytes)
 
-	decodedSlice, err = dcrjson.DecodeConcatenatedVoteBits(encodedBytesStr)
+	_, err = dcrjson.DecodeConcatenatedVoteBits(encodedBytesStr)
 	if err == nil {
 		t.Fatalf("expected short read error")
 	}
@@ -173,7 +173,7 @@ func TestDecodeConcatenatedVoteBits(t *testing.T) {
 	}
 	encodedBytesStr = hex.EncodeToString(encodedBytes)
 
-	decodedSlice, err = dcrjson.DecodeConcatenatedVoteBits(encodedBytesStr)
+	_, err = dcrjson.DecodeConcatenatedVoteBits(encodedBytesStr)
 	if err == nil {
 		t.Fatalf("expected corruption error")
 	}
@@ -188,7 +188,7 @@ func TestDecodeConcatenatedVoteBits(t *testing.T) {
 	}
 	encodedBytesStr = hex.EncodeToString(encodedBytes)
 
-	decodedSlice, err = dcrjson.DecodeConcatenatedVoteBits(encodedBytesStr)
+	_, err = dcrjson.DecodeConcatenatedVoteBits(encodedBytesStr)
 	if err == nil {
 		t.Fatalf("expected corruption error")
 	}

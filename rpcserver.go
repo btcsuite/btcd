@@ -2552,8 +2552,7 @@ func (state *gbtWorkState) blockTemplateResult(bm *blockManager, useCoinbaseValu
 			txTypeStr = "error"
 		}
 
-		fee := int64(0)
-		sigOps := int64(0)
+		var fee, sigOps int64
 		if !recalculateFeesAndSigsOps {
 			fee = template.Fees[i]
 			sigOps = template.SigOpCounts[i]
@@ -2659,8 +2658,7 @@ func (state *gbtWorkState) blockTemplateResult(bm *blockManager, useCoinbaseValu
 			txTypeStr = "revocation"
 		}
 
-		fee := int64(0)
-		sigOps := int64(0)
+		var fee, sigOps int64
 		if !recalculateFeesAndSigsOps {
 			// Check bounds and throw an error if OOB. This should
 			// be looked into further, probably it's the result of
@@ -5550,7 +5548,7 @@ func handleTicketVWAP(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) 
 	// The default VWAP is for the past WorkDiffWindows * WorkDiffWindowSize
 	// many blocks.
 	_, bestHeight := s.server.blockManager.chainState.Best()
-	start := uint32(0)
+	var start uint32
 	if c.Start == nil {
 		toEval := activeNetParams.WorkDiffWindows *
 			activeNetParams.WorkDiffWindowSize
@@ -5638,7 +5636,7 @@ func handleTxFeeInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (
 	// default range is for the past WorkDiffWindowSize many blocks.
 	var feeInfoRange dcrjson.FeeInfoRange
 
-	start := uint32(0)
+	var start uint32
 	if c.RangeStart == nil {
 		toEval := activeNetParams.WorkDiffWindowSize
 		startI64 := bestHeight - toEval

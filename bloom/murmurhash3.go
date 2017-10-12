@@ -25,9 +25,9 @@ const (
 // effectively randomize the hash function.  This makes it ideal for use in
 // bloom filters which need multiple independent hash functions.
 func MurmurHash3(seed uint32, data []byte) uint32 {
+	var k uint32
 	dataLen := uint32(len(data))
 	hash := seed
-	k := uint32(0)
 	numBlocks := dataLen / 4
 
 	// Calculate the hash in 4-byte chunks.
