@@ -9,7 +9,7 @@ import (
 	"math"
 
 	"github.com/decred/dcrd/chaincfg/chainhash"
-	"github.com/decred/dcrutil"
+	"github.com/decred/dcrd/dcrutil"
 )
 
 // nextPowerOfTwo returns the next highest power of two from a given number if

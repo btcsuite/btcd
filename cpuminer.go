@@ -15,9 +15,9 @@ import (
 	"github.com/decred/dcrd/blockchain"
 	"github.com/decred/dcrd/chaincfg"
 	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/decred/dcrd/dcrutil"
 	"github.com/decred/dcrd/mining"
 	"github.com/decred/dcrd/wire"
-	"github.com/decred/dcrutil"
 )
 
 const (

@@ -13,8 +13,8 @@ import (
 
 	"github.com/decred/dcrd/blockchain/stake"
 	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/decred/dcrd/dcrutil"
 	"github.com/decred/dcrd/txscript"
-	"github.com/decred/dcrutil"
 )
 
 // checkCoinbaseUniqueHeight checks to ensure that for all blocks height > 1

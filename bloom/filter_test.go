@@ -12,8 +12,8 @@ import (
 
 	"github.com/decred/dcrd/bloom"
 	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/decred/dcrd/dcrutil"
 	"github.com/decred/dcrd/wire"
-	"github.com/decred/dcrutil"
 )
 
 // TestFilterLarge ensures a maximum sized filter can be created.

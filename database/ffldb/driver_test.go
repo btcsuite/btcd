@@ -16,7 +16,7 @@ import (
 	"github.com/decred/dcrd/chaincfg"
 	"github.com/decred/dcrd/database"
 	"github.com/decred/dcrd/database/ffldb"
-	"github.com/decred/dcrutil"
+	"github.com/decred/dcrd/dcrutil"
 )
 
 // dbType is the database type name for this driver.

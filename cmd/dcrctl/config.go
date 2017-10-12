@@ -15,7 +15,7 @@ import (
 	"strings"
 
 	"github.com/decred/dcrd/dcrjson"
-	"github.com/decred/dcrutil"
+	"github.com/decred/dcrd/dcrutil"
 
 	flags "github.com/jessevdk/go-flags"
 )

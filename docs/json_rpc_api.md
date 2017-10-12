@@ -1015,7 +1015,7 @@ package main
 
 import (
 	"github.com/decred/dcrrpcclient"
-	"github.com/decred/dcrutil"
+	"github.com/decred/dcrd/dcrutil"
 	"io/ioutil"
 	"log"
 	"path/filepath"
@@ -1076,7 +1076,7 @@ package main
 
 import (
 	"github.com/decred/dcrrpcclient"
-	"github.com/decred/dcrutil"
+	"github.com/decred/dcrd/dcrutil"
 	"github.com/decred/dcrd/wire"
 	"io/ioutil"
 	"log"
@@ -1167,7 +1167,7 @@ package main
 
 import (
 	"github.com/decred/dcrrpcclient"
-	"github.com/decred/dcrutil"
+	"github.com/decred/dcrd/dcrutil"
 	"github.com/decred/dcrd/wire"
 	"io/ioutil"
 	"log"

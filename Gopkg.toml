@@ -32,11 +32,11 @@
 
 [[constraint]]
   branch = "master"
-  name = "github.com/decred/bitset"
+  name = "github.com/decred/base58"
 
 [[constraint]]
   branch = "master"
-  name = "github.com/decred/dcrutil"
+  name = "github.com/decred/bitset"
 
 [[constraint]]
   name = "github.com/jessevdk/go-flags"

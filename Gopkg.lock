@@ -57,15 +57,15 @@
 
 [[projects]]
   branch = "master"
-  name = "github.com/decred/bitset"
+  name = "github.com/decred/base58"
   packages = ["."]
-  revision = "484b833245d5f9046e2893a6bd2e54b1df3a53a4"
+  revision = "b3520e187fa8ebe65eb74245408cf4b83e6a65d3"
 
 [[projects]]
   branch = "master"
-  name = "github.com/decred/dcrutil"
-  packages = [".","base58","hdkeychain"]
-  revision = "ddbde93f65ab0692e54ed8a5ad325fa2e8af4daa"
+  name = "github.com/decred/bitset"
+  packages = ["."]
+  revision = "484b833245d5f9046e2893a6bd2e54b1df3a53a4"
 
 [[projects]]
   name = "github.com/jessevdk/go-flags"
@@ -94,6 +94,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "9f7191295caf3e7930cd45f5b3a0c5f4b84611c4cfdcf8c6cc042fcf84c3e904"
+  inputs-digest = "51999d250cc8d4082114b01f3bd8ea4887cd823769dbd41c3ed4c7eeb6c821e5"
   solver-name = "gps-cdcl"
   solver-version = 1

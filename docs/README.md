@@ -216,7 +216,7 @@ information.
 	  Decred scripts
     * [database](https://github.com/decred/dcrd/tree/master/database) -
 	  Provides a database interface for the Decred block chain
-    * [dcrutil](https://github.com/decred/dcrutil) - Provides Decred-specific
+    * [dcrutil](https://github.com/decred/dcrd/tree/master/dcrutil) - Provides Decred-specific
 	  convenience functions and types
     * [chainhash](https://github.com/decred/dcrd/tree/master/chaincfg/chainhash) -
 	  Provides a generic hash type and associated functions that allows the

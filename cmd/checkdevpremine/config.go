@@ -11,7 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/decred/dcrutil"
+	"github.com/decred/dcrd/dcrutil"
 
 	flags "github.com/jessevdk/go-flags"
 )
