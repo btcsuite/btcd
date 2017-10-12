@@ -12,6 +12,7 @@ import (
 
 	"github.com/decred/dcrd/bloom"
 	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/decred/dcrd/wire"
 )
 
 // This example demonstrates how to create a new bloom filter, add a transaction
