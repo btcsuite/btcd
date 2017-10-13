@@ -585,7 +585,6 @@ func TestIsUnspendable(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name     string
 		amount   int64
 		pkScript []byte
 		expected bool

@@ -210,7 +210,6 @@ type TxPool struct {
 	pool          map[chainhash.Hash]*TxDesc
 	orphans       map[chainhash.Hash]*dcrutil.Tx
 	orphansByPrev map[chainhash.Hash]map[chainhash.Hash]*dcrutil.Tx
-	addrindex     map[string]map[chainhash.Hash]struct{} // maps address to txs
 	outpoints     map[wire.OutPoint]*dcrutil.Tx
 
 	// Votes on blocks.

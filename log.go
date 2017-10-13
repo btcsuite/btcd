@@ -23,12 +23,6 @@ import (
 	"github.com/jrick/logrotate/rotator"
 )
 
-const (
-	// maxRejectReasonLen is the maximum length of a sanitized reject reason
-	// that will be logged.
-	maxRejectReasonLen = 250
-)
-
 // logWriter implements an io.Writer that outputs to both standard output and
 // the write-end pipe of an initialized log rotator.
 type logWriter struct{}

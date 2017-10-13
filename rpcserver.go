@@ -5853,11 +5853,6 @@ type rpcServer struct {
 	helpCacher             *helpCacher
 	requestProcessShutdown chan struct{}
 	quit                   chan int
-
-	// coin supply caching values
-	coinSupplyMtx    sync.Mutex
-	coinSupplyHeight int64
-	coinSupplyTotal  int64
 }
 
 // httpStatusLine returns a response Status-Line (RFC 2616 Section 6.1) for the

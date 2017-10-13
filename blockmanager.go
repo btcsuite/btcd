@@ -330,7 +330,6 @@ type chainState struct {
 	missedTickets       []chainhash.Hash
 	curPrevHash         chainhash.Hash
 	pastMedianTime      time.Time
-	stakeVersion        uint32
 }
 
 // Best returns the block hash and height known for the tip of the best known

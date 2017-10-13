@@ -12,34 +12,6 @@ import (
 	"testing"
 )
 
-type signerHex struct {
-	privkey          string
-	privateNonce     string
-	pubKeySumLocal   string
-	partialSignature string
-}
-
-type ThresholdTestVectorHex struct {
-	msg               string
-	signersHex        []signerHex
-	combinedSignature string
-}
-
-type signer struct {
-	privkey          []byte
-	pubkey           *PublicKey
-	privateNonce     []byte
-	publicNonce      *PublicKey
-	pubKeySumLocal   *PublicKey
-	partialSignature []byte
-}
-
-type ThresholdTestVector struct {
-	msg               []byte
-	signers           []signer
-	combinedSignature []byte
-}
-
 func TestSchnorrThreshold(t *testing.T) {
 	tRand := rand.New(rand.NewSource(543212345))
 	maxSignatories := 10

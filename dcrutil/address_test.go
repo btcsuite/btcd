@@ -15,13 +15,9 @@ import (
 	"github.com/decred/dcrd/chaincfg"
 	"github.com/decred/dcrd/chaincfg/chainec"
 	"github.com/decred/dcrd/dcrutil"
-	"github.com/decred/dcrd/wire"
 
 	"golang.org/x/crypto/ripemd160"
 )
-
-// invalidNet is an invalid network.
-const invalidNet = wire.CurrencyNet(0xffffffff)
 
 func TestAddresses(t *testing.T) {
 	tests := []struct {

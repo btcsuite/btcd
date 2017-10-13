@@ -11,7 +11,6 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
-	"time"
 
 	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/dcrjson"
@@ -858,43 +857,6 @@ func parseStakeDifficultyNtfnParams(params []json.RawMessage) (
 	}
 
 	return bHash, bHeight, stakeDiff, nil
-}
-
-// parseRescanProgressParams parses out the height of the last rescanned block
-// from the parameters of rescanfinished and rescanprogress notifications.
-func parseRescanProgressParams(params []json.RawMessage) (*chainhash.Hash, int32, time.Time, error) {
-	if len(params) != 3 {
-		return nil, 0, time.Time{}, wrongNumParams(len(params))
-	}
-
-	// Unmarshal first parameter as an string.
-	var hashStr string
-	err := json.Unmarshal(params[0], &hashStr)
-	if err != nil {
-		return nil, 0, time.Time{}, err
-	}
-
-	// Unmarshal second parameter as an integer.
-	var height int32
-	err = json.Unmarshal(params[1], &height)
-	if err != nil {
-		return nil, 0, time.Time{}, err
-	}
-
-	// Unmarshal third parameter as an integer.
-	var blkTime int64
-	err = json.Unmarshal(params[2], &blkTime)
-	if err != nil {
-		return nil, 0, time.Time{}, err
-	}
-
-	// Decode string encoding of block hash.
-	hash, err := chainhash.NewHashFromStr(hashStr)
-	if err != nil {
-		return nil, 0, time.Time{}, err
-	}
-
-	return hash, height, time.Unix(blkTime, 0), nil
 }
 
 // parseTxAcceptedNtfnParams parses out the transaction hash and total amount
