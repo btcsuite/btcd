@@ -39,6 +39,27 @@ const (
 	statusNone blockStatus = 0
 )
 
+// HaveData returns whether the full block data is stored in the database. This
+// will return false for a block node where only the header is downloaded or
+// kept.
+func (status blockStatus) HaveData() bool {
+	return status&statusDataStored != 0
+}
+
+// KnownValid returns whether the block is known to be valid. This will return
+// false for a valid block that has not been fully validated yet.
+func (status blockStatus) KnownValid() bool {
+	return status&statusValid != 0
+}
+
+// KnownInvalid returns whether the block is known to be invalid. This may be
+// because the block itself failed validation or any of its ancestors is
+// invalid. This will return false for invalid blocks that have not been proven
+// invalid yet.
+func (status blockStatus) KnownInvalid() bool {
+	return status&(statusValidateFailed|statusInvalidAncestor) != 0
+}
+
 // blockNode represents a block within the block chain and is primarily used to
 // aid in selecting the best chain to be the main chain.  The main chain is
 // stored into the block database.
@@ -73,7 +94,10 @@ type blockNode struct {
 	timestamp  int64
 	merkleRoot chainhash.Hash
 
-	// status is a bitfield representing the validation state of the block
+	// status is a bitfield representing the validation state of the block. The
+	// status field, unlike the other fields, may be written to and so should
+	// only be accessed using the concurrent-safe NodeStatus method on
+	// blockIndex once the node has been added to the global index.
 	status blockStatus
 }
 
@@ -193,20 +217,6 @@ func (node *blockNode) CalcPastMedianTime() time.Time {
 	return time.Unix(medianTimestamp, 0)
 }
 
-// KnownValid returns whether the block is known to be valid. This will return
-// false for a valid block that has not been fully validated yet.
-func (node *blockNode) KnownValid() bool {
-	return node.status&statusValid != 0
-}
-
-// KnownInvalid returns whether the block is known to be invalid. This may be
-// because the block itself failed validation or any of its ancestors is
-// invalid. This will return false for invalid blocks that have not been proven
-// invalid yet.
-func (node *blockNode) KnownInvalid() bool {
-	return node.status&(statusValidateFailed|statusInvalidAncestor) != 0
-}
-
 // blockIndex provides facilities for keeping track of an in-memory index of the
 // block chain.  Although the name block chain suggests a single chain of
 // blocks, it is actually a tree-shaped structure where any node can have
@@ -265,13 +275,33 @@ func (bi *blockIndex) AddNode(node *blockNode) {
 	bi.Unlock()
 }
 
-// RemoveNode removes the provided node from the block index.  There is no check
-// whether another node in the index depends on this one, so it is up to caller
-// to avoid that situation.
+// NodeStatus provides concurrent-safe access to the status field of a node.
 //
 // This function is safe for concurrent access.
-func (bi *blockIndex) RemoveNode(node *blockNode) {
+func (bi *blockIndex) NodeStatus(node *blockNode) blockStatus {
+	bi.RLock()
+	status := node.status
+	bi.RUnlock()
+	return status
+}
+
+// SetStatusFlags flips the provided status flags on the block node to on,
+// regardless of whether they were on or off previously. This does not unset any
+// flags currently on.
+//
+// This function is safe for concurrent access.
+func (bi *blockIndex) SetStatusFlags(node *blockNode, flags blockStatus) {
 	bi.Lock()
-	delete(bi.index, node.hash)
+	node.status |= flags
+	bi.Unlock()
+}
+
+// UnsetStatusFlags flips the provided status flags on the block node to off,
+// regardless of whether they were on or off previously.
+//
+// This function is safe for concurrent access.
+func (bi *blockIndex) UnsetStatusFlags(node *blockNode, flags blockStatus) {
+	bi.Lock()
+	node.status &^= flags
 	bi.Unlock()
 }

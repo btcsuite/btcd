@@ -29,7 +29,7 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, flags BehaviorFlags)
 	if prevNode == nil {
 		str := fmt.Sprintf("previous block %s is unknown", prevHash)
 		return false, ruleError(ErrPreviousBlockUnknown, str)
-	} else if prevNode.KnownInvalid() {
+	} else if b.index.NodeStatus(prevNode).KnownInvalid() {
 		str := fmt.Sprintf("previous block %s is known to be invalid", prevHash)
 		return false, ruleError(ErrInvalidAncestorBlock, str)
 	}
@@ -64,7 +64,7 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, flags BehaviorFlags)
 	// block chain (could be either a side chain or the main chain).
 	blockHeader := &block.MsgBlock().Header
 	newNode := newBlockNode(blockHeader, blockHeight)
-	newNode.status |= statusDataStored
+	newNode.status = statusDataStored
 	if prevNode != nil {
 		newNode.parent = prevNode
 		newNode.height = blockHeight
