@@ -4184,7 +4184,11 @@ func handleGetWorkRequest(s *rpcServer) (interface{}, error) {
 		// Update the time of the block template to the current time
 		// while accounting for the median time of the past several
 		// blocks per the chain consensus rules.
-		UpdateBlockTime(msgBlock, s.server.blockManager)
+		err := UpdateBlockTime(msgBlock, s.server.blockManager)
+		if err != nil {
+			return nil, rpcInternalError(err.Error(),
+				"Failed to update block time")
+		}
 
 		if templateCopy.Height > 1 {
 			// Increment the extra nonce and update the block template
