@@ -6,17 +6,12 @@
 package blockchain_test
 
 import (
-	"compress/bzip2"
-	"encoding/binary"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/decred/dcrd/blockchain"
 	"github.com/decred/dcrd/chaincfg"
-	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/database"
 	_ "github.com/decred/dcrd/database/ffldb"
 	"github.com/decred/dcrd/txscript"
@@ -128,65 +123,4 @@ func chainSetup(dbName string, params *chaincfg.Params) (*blockchain.BlockChain,
 	}
 
 	return chain, teardown, nil
-}
-
-// loadUtxoView returns a utxo view loaded from a file.
-func loadUtxoView(filename string) (*blockchain.UtxoViewpoint, error) {
-	// The utxostore file format is:
-	// <tx hash><serialized utxo len><serialized utxo>
-	//
-	// The serialized utxo len is a little endian uint32 and the serialized
-	// utxo uses the format described in chainio.go.
-
-	filename = filepath.Join("testdata", filename)
-	fi, err := os.Open(filename)
-	if err != nil {
-		return nil, err
-	}
-
-	// Choose read based on whether the file is compressed or not.
-	var r io.Reader
-	if strings.HasSuffix(filename, ".bz2") {
-		r = bzip2.NewReader(fi)
-	} else {
-		r = fi
-	}
-	defer fi.Close()
-
-	view := blockchain.NewUtxoViewpoint()
-	for {
-		// Hash of the utxo entry.
-		var hash chainhash.Hash
-		_, err := io.ReadAtLeast(r, hash[:], len(hash[:]))
-		if err != nil {
-			// Expected EOF at the right offset.
-			if err == io.EOF {
-				break
-			}
-			return nil, err
-		}
-
-		// Num of serialize utxo entry bytes.
-		var numBytes uint32
-		err = binary.Read(r, binary.LittleEndian, &numBytes)
-		if err != nil {
-			return nil, err
-		}
-
-		// Serialized utxo entry.
-		serialized := make([]byte, numBytes)
-		_, err = io.ReadAtLeast(r, serialized, int(numBytes))
-		if err != nil {
-			return nil, err
-		}
-
-		// Deserialize it and add it to the view.
-		utxoEntry, err := blockchain.TstDeserializeUtxoEntry(serialized)
-		if err != nil {
-			return nil, err
-		}
-		view.Entries()[hash] = utxoEntry
-	}
-
-	return view, nil
 }

@@ -44,20 +44,8 @@ type TicketData struct {
 // SStxMemMap is a memory map of SStx keyed to the txHash.
 type SStxMemMap map[chainhash.Hash]*TicketData
 
-func swap(s []byte) []byte {
-	for i, j := 0, len(s)-1; i < j; i, j = i+1, j-1 {
-		s[i], s[j] = s[j], s[i]
-	}
-	return s
-}
-
 // TicketDataSlice is a sortable data structure of pointers to TicketData.
 type TicketDataSlice []*TicketData
-
-func NewTicketDataSliceEmpty() TicketDataSlice {
-	var slice []*TicketData
-	return TicketDataSlice(slice)
-}
 
 func NewTicketDataSlice(size int) TicketDataSlice {
 	slice := make([]*TicketData, size)

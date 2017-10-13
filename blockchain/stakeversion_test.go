@@ -749,7 +749,6 @@ func TestLarge(t *testing.T) {
 	tests := []struct {
 		name                 string
 		numNodes             int64
-		set                  func(*blockNode)
 		blockVersion         int32
 		startStakeVersion    uint32
 		expectedStakeVersion uint32

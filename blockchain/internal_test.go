@@ -33,14 +33,6 @@ func TstSetMaxMedianTimeEntries(val int) {
 	maxMedianTimeEntries = val
 }
 
-// TstCheckBlockScripts makes the internal checkBlockScripts function available
-// to the test package.
-var TstCheckBlockScripts = checkBlockScripts
-
-// TstDeserializeUtxoEntry makes the internal deserializeUtxoEntry function
-// available to the test package.
-var TstDeserializeUtxoEntry = deserializeUtxoEntry
-
 // TstCheckBlockHeaderContext makes the internal checkBlockHeaderContext
 // function available to the test package.
 func (b *BlockChain) TstCheckBlockHeaderContext(header *wire.BlockHeader, prevNode *blockNode, flags BehaviorFlags) error {

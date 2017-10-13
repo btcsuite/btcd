@@ -1545,12 +1545,10 @@ func TestVoting(t *testing.T) {
 // Parallel test.
 const (
 	testDummy1ID    = "testdummy1"
-	vbTestDummy1No  = 0x02
 	vbTestDummy1Yes = 0x04
 
-	testDummy2ID    = "testdummy2"
-	vbTestDummy2No  = 0x08
-	vbTestDummy2Yes = 0x10
+	testDummy2ID   = "testdummy2"
+	vbTestDummy2No = 0x08
 )
 
 var (

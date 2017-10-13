@@ -93,7 +93,6 @@ type blockNode struct {
 	// remove stake nodes, so that the stake node itself may be pruneable
 	// to save memory while maintaining high throughput efficiency for the
 	// evaluation of sidechains.
-	stakeDataLock  sync.Mutex
 	stakeNode      *stake.Node
 	newTickets     []chainhash.Hash
 	stakeUndoData  stake.UndoTicketDataSlice

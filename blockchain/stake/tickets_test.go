@@ -94,19 +94,6 @@ func ticketsSpentInBlock(bl *dcrutil.Block) []chainhash.Hash {
 	return tickets
 }
 
-// votesInBlock finds all the votes in the block.
-func votesInBlock(bl *dcrutil.Block) []chainhash.Hash {
-	votes := make([]chainhash.Hash, 0)
-	for _, stx := range bl.STransactions() {
-		if DetermineTxType(stx.MsgTx()) == TxTypeSSGen {
-			h := stx.Hash()
-			votes = append(votes, *h)
-		}
-	}
-
-	return votes
-}
-
 // revokedTicketsInBlock finds all the revoked tickets in the block.
 func revokedTicketsInBlock(bl *dcrutil.Block) []chainhash.Hash {
 	tickets := make([]chainhash.Hash, 0)
@@ -203,47 +190,6 @@ func nodesEqual(a *Node, b *Node) error {
 	}
 
 	return nil
-}
-
-// findDifferences finds individual differences in two treaps and prints
-// them.  For use in debugging.
-func findDifferences(a *tickettreap.Immutable, b *tickettreap.Immutable) {
-	aMap := make(map[tickettreap.Key]*tickettreap.Value)
-	a.ForEach(func(k tickettreap.Key, v *tickettreap.Value) bool {
-		aMap[k] = v
-		return true
-	})
-
-	bMap := make(map[tickettreap.Key]*tickettreap.Value)
-	b.ForEach(func(k tickettreap.Key, v *tickettreap.Value) bool {
-		bMap[k] = v
-		return true
-	})
-
-	for k, v := range aMap {
-		h := chainhash.Hash(k)
-		vB := bMap[k]
-		if vB == nil {
-			fmt.Printf("Second map missing key %v\n", h)
-		} else {
-			if *v != *vB {
-				fmt.Printf("Second map val for %v is %v, first map %v\n", h,
-					vB, v)
-			}
-		}
-	}
-	for k, v := range bMap {
-		h := chainhash.Hash(k)
-		vA := aMap[k]
-		if vA == nil {
-			fmt.Printf("First map missing key %v\n", h)
-		} else {
-			if *v != *vA {
-				fmt.Printf("First map val for %v is %v, second map %v\n", h,
-					vA, v)
-			}
-		}
-	}
 }
 
 func TestTicketDBLongChain(t *testing.T) {
