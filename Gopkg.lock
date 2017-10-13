@@ -62,16 +62,16 @@
   revision = "b3520e187fa8ebe65eb74245408cf4b83e6a65d3"
 
 [[projects]]
-  branch = "master"
-  name = "github.com/decred/bitset"
-  packages = ["."]
-  revision = "484b833245d5f9046e2893a6bd2e54b1df3a53a4"
-
-[[projects]]
   name = "github.com/jessevdk/go-flags"
   packages = ["."]
   revision = "96dc06278ce32a0e9d957d590bb987c81ee66407"
   version = "v1.3.0"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/jrick/bitset"
+  packages = ["."]
+  revision = "06eae37cdf93c699c0503c23f998167ce841974c"
 
 [[projects]]
   branch = "master"
@@ -94,6 +94,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "51999d250cc8d4082114b01f3bd8ea4887cd823769dbd41c3ed4c7eeb6c821e5"
+  inputs-digest = "5cf2099b8e421fbffa28900a9219be9502dcf345d8772e14756a4846412fd80c"
   solver-name = "gps-cdcl"
   solver-version = 1

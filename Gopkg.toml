@@ -35,12 +35,12 @@
   name = "github.com/decred/base58"
 
 [[constraint]]
-  branch = "master"
-  name = "github.com/decred/bitset"
-
-[[constraint]]
   name = "github.com/jessevdk/go-flags"
   version = "1.2.0"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/jrick/bitset"
 
 [[constraint]]
   branch = "master"

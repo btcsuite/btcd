@@ -34,7 +34,6 @@ import (
 
 	"github.com/btcsuite/websocket"
 
-	"github.com/decred/bitset"
 	"github.com/decred/dcrd/blockchain"
 	"github.com/decred/dcrd/blockchain/stake"
 	"github.com/decred/dcrd/certgen"
@@ -48,6 +47,7 @@ import (
 	"github.com/decred/dcrd/mining"
 	"github.com/decred/dcrd/txscript"
 	"github.com/decred/dcrd/wire"
+	"github.com/jrick/bitset"
 )
 
 // API version constants
