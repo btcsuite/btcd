@@ -17,8 +17,11 @@ func TestServiceFlagStringer(t *testing.T) {
 		{SFNodeGetUTXO, "SFNodeGetUTXO"},
 		{SFNodeBloom, "SFNodeBloom"},
 		{SFNodeWitness, "SFNodeWitness"},
+		{SFNodeXthin, "SFNodeXthin"},
+		{SFNodeBit5, "SFNodeBit5"},
 		{SFNodeCF, "SFNodeCF"},
-		{0xffffffff, "SFNodeNetwork|SFNodeGetUTXO|SFNodeBloom|SFNodeWitness|SFNodeCF|0xffffffe0"},
+		{SFNode2X, "SFNode2X"},
+		{0xffffffff, "SFNodeNetwork|SFNodeGetUTXO|SFNodeBloom|SFNodeWitness|SFNodeXthin|SFNodeBit5|SFNodeCF|SFNode2X|0xffffff00"},
 	}
 
 	t.Logf("Running %d tests", len(tests))
