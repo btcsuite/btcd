@@ -294,6 +294,45 @@ func NewPurchaseTicketCmd(fromAccount string, spendLimit float64, minConf *int,
 	}
 }
 
+// StartAutoBuyerCmd is a type handling custom marshaling and
+// unmarshaling of startautobuyer JSON RPC commands.
+type StartAutoBuyerCmd struct {
+	Account           string
+	BalanceToMaintain *int64
+	MaxFeePerKb       *int64
+	MaxPriceRelative  *float64
+	MaxPriceAbsolute  *int64
+	VotingAddress     *string
+	PoolAddres        *string
+	PoolFees          *float64
+	MaxPerBlock       *int64
+}
+
+// NewStartAutoBuyerCmd creates a new StartAutoBuyerCmd.
+func NewStartAutoBuyerCmd(account string, balanceToMaintain *int64, maxFeePerKb *int64, maxPriceRelative *float64, maxPriceAbsolute *int64, votingAddress *string, poolAddress *string, poolFees *float64,
+	maxPerBlock *int64) *StartAutoBuyerCmd {
+	return &StartAutoBuyerCmd{
+		Account:           account,
+		BalanceToMaintain: balanceToMaintain,
+		MaxFeePerKb:       maxFeePerKb,
+		MaxPriceRelative:  maxPriceRelative,
+		MaxPriceAbsolute:  maxPriceAbsolute,
+		VotingAddress:     votingAddress,
+		PoolAddres:        poolAddress,
+		MaxPerBlock:       maxPerBlock,
+	}
+}
+
+// StopAutoBuyerCmd is a type handling custom marshaling and
+// unmarshaling of stopautobuyer JSON RPC commands.
+type StopAutoBuyerCmd struct {
+}
+
+// NewStopAutoBuyerCmd creates a new StopAutoBuyerCmd.
+func NewStopAutoBuyerCmd() *StopAutoBuyerCmd {
+	return &StopAutoBuyerCmd{}
+}
+
 // RedeemMultiSigOutCmd is a type handling custom marshaling and
 // unmarshaling of redeemmultisigout JSON RPC commands.
 type RedeemMultiSigOutCmd struct {
@@ -586,6 +625,8 @@ func init() {
 	MustRegisterCmd("setvotechoice", (*SetVoteChoiceCmd)(nil), flags)
 	MustRegisterCmd("signrawtransactions", (*SignRawTransactionsCmd)(nil), flags)
 	MustRegisterCmd("stakepooluserinfo", (*StakePoolUserInfoCmd)(nil), flags)
+	MustRegisterCmd("startautobuyer", (*StartAutoBuyerCmd)(nil), flags)
+	MustRegisterCmd("stopautobuyer", (*StartAutoBuyerCmd)(nil), flags)
 	MustRegisterCmd("sweepaccount", (*SweepAccountCmd)(nil), flags)
 	MustRegisterCmd("walletinfo", (*WalletInfoCmd)(nil), flags)
 }
