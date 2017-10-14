@@ -761,7 +761,7 @@ func (r FuturePurchaseTicketResult) Receive() ([]*chainhash.Hash, error) {
 func (c *Client) PurchaseTicketAsync(fromAccount string,
 	spendLimit dcrutil.Amount, minConf *int, ticketAddress dcrutil.Address,
 	numTickets *int, poolAddress dcrutil.Address, poolFees *dcrutil.Amount,
-	expiry *int, noSplitTransaction *bool) FuturePurchaseTicketResult {
+	expiry *int, noSplitTransaction *bool, ticketFee *dcrutil.Amount) FuturePurchaseTicketResult {
 	// An empty string is used to keep the sendCmd
 	// passing of the command from accidentally
 	// removing certain fields. We fill in the
@@ -798,9 +798,14 @@ func (c *Client) PurchaseTicketAsync(fromAccount string,
 		expiryVal = *expiry
 	}
 
+	ticketFeeFloat := 0.0
+	if ticketFee != nil {
+		ticketFeeFloat = ticketFee.ToCoin()
+	}
+
 	cmd := dcrjson.NewPurchaseTicketCmd(fromAccount, spendLimit.ToCoin(),
 		&minConfVal, &ticketAddrStr, &numTicketsVal, &poolAddrStr,
-		&poolFeesFloat, &expiryVal, nil, noSplitTransaction)
+		&poolFeesFloat, &expiryVal, nil, noSplitTransaction, &ticketFeeFloat)
 
 	return c.sendCmd(cmd)
 }
@@ -810,10 +815,10 @@ func (c *Client) PurchaseTicketAsync(fromAccount string,
 func (c *Client) PurchaseTicket(fromAccount string,
 	spendLimit dcrutil.Amount, minConf *int, ticketAddress dcrutil.Address,
 	numTickets *int, poolAddress dcrutil.Address, poolFees *dcrutil.Amount,
-	expiry *int, noSplitTransaction *bool) ([]*chainhash.Hash, error) {
+	expiry *int, noSplitTransaction *bool, ticketFee *dcrutil.Amount) ([]*chainhash.Hash, error) {
 
 	return c.PurchaseTicketAsync(fromAccount, spendLimit, minConf, ticketAddress,
-		numTickets, poolAddress, poolFees, expiry, noSplitTransaction).Receive()
+		numTickets, poolAddress, poolFees, expiry, noSplitTransaction, ticketFee).Receive()
 }
 
 // SStx generation RPC call handling
