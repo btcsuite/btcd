@@ -45,12 +45,20 @@ func solveBlock(header *wire.BlockHeader, targetDifficulty *big.Int) bool {
 				hdr.Nonce = i
 				hash := hdr.BlockHash()
 				if blockchain.HashToBig(&hash).Cmp(targetDifficulty) <= 0 {
-					results <- sbResult{true, i}
-					return
+					select {
+					case results <- sbResult{true, i}:
+						return
+					case <-quit:
+						return
+					}
 				}
 			}
 		}
-		results <- sbResult{false, 0}
+		select {
+		case results <- sbResult{false, 0}:
+		case <-quit:
+			return
+		}
 	}
 
 	startNonce := uint32(0)
