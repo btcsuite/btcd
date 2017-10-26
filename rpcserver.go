@@ -4358,7 +4358,7 @@ func handleGetWorkSubmission(s *rpcServer, hexData string) (interface{}, error) 
 	// nodes.  This will in turn relay it to the network like normal.
 	isOrphan, err := s.server.blockManager.ProcessBlock(block,
 		blockchain.BFNone)
-	if err != nil || isOrphan {
+	if err != nil {
 		// Anything other than a rule violation is an unexpected error,
 		// so return that error as an internal error.
 		if _, ok := err.(blockchain.RuleError); !ok {
@@ -4367,6 +4367,12 @@ func handleGetWorkSubmission(s *rpcServer, hexData string) (interface{}, error) 
 		}
 
 		rpcsLog.Infof("Block submitted via getwork rejected: %v", err)
+		return false, nil
+	}
+
+	if isOrphan {
+		rpcsLog.Infof("Block submitted via getwork rejected: an orphan building "+
+			"on parent %v", block.MsgBlock().Header.PrevBlock)
 		return false, nil
 	}
 
