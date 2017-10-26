@@ -3975,7 +3975,7 @@ func TestRemoveOpcodes(t *testing.T) {
 			after:  "CAT",
 		},
 		{
-			name:   "invalid length (insruction)",
+			name:   "invalid length (instruction)",
 			before: "PUSHDATA1",
 			remove: OP_CODESEPARATOR,
 			err:    scriptError(ErrMalformedPush, ""),
