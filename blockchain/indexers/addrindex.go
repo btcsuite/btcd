@@ -651,7 +651,7 @@ func (idx *AddrIndex) Create(dbTx database.Tx) error {
 }
 
 // writeIndexData represents the address index data to be written for one block.
-// It consistens of the address mapped to an ordered list of the transactions
+// It consists of the address mapped to an ordered list of the transactions
 // that involve the address in block.  It is ordered so the transactions can be
 // stored in the order they appear in the block.
 type writeIndexData map[[addrKeySize]byte][]int
@@ -690,7 +690,7 @@ func (idx *AddrIndex) indexPkScript(data writeIndexData, pkScript []byte, txIdx 
 }
 
 // indexBlock extract all of the standard addresses from all of the transactions
-// in the passed block and maps each of them to the assocaited transaction using
+// in the passed block and maps each of them to the associated transaction using
 // the passed map.
 func (idx *AddrIndex) indexBlock(data writeIndexData, block *btcutil.Block, view *blockchain.UtxoViewpoint) {
 	for txIdx, tx := range block.Transactions() {

@@ -219,7 +219,7 @@ type BlockTemplate struct {
 	WitnessCommitment []byte
 }
 
-// mergeUtxoView adds all of the entries in view to viewA.  The result is that
+// mergeUtxoView adds all of the entries in viewB to viewA.  The result is that
 // viewA will contain all of its original entries plus all of the entries
 // in viewB.  It will replace any entries in viewB which also exist in viewA
 // if the entry in viewA is fully spent.
@@ -828,7 +828,7 @@ mempoolLoop:
 		// witness preimage generated above. With the commitment
 		// generated, the witness script for the output is: OP_RETURN
 		// OP_DATA_36 {0xaa21a9ed || witnessCommitment}. The leading
-		// prefix is refered to as the "witness magic bytes".
+		// prefix is referred to as the "witness magic bytes".
 		witnessCommitment = chainhash.DoubleHashB(witnessPreimage[:])
 		witnessScript := append(blockchain.WitnessMagicBytes, witnessCommitment...)
 

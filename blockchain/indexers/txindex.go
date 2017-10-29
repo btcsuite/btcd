@@ -40,7 +40,7 @@ var (
 
 // -----------------------------------------------------------------------------
 // The transaction index consists of an entry for every transaction in the main
-// chain.  In order to significanly optimize the space requirements a separate
+// chain.  In order to significantly optimize the space requirements a separate
 // index which provides an internal mapping between each block that has been
 // indexed and a unique ID for use within the hash to location mappings.  The ID
 // is simply a sequentially incremented uint32.  This is useful because it is

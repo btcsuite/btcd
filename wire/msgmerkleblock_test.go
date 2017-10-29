@@ -405,7 +405,7 @@ var merkleBlockOne = MsgMerkleBlock{
 }
 
 // merkleBlockOneBytes is the serialized bytes for a merkle block created from
-// block one of the block chain where the first transation matches.
+// block one of the block chain where the first transaction matches.
 var merkleBlockOneBytes = []byte{
 	0x01, 0x00, 0x00, 0x00, // Version 1
 	0x6f, 0xe2, 0x8c, 0x0a, 0xb6, 0xf1, 0xb3, 0x72,

@@ -791,7 +791,7 @@ func (b *BlockChain) checkBlockContext(block *btcutil.Block, prevNode *blockNode
 		}
 
 		// If segwit is active, then we'll need to fully validate the
-		// new witness commitment for adherance to the rules.
+		// new witness commitment for adherence to the rules.
 		if segwitState == ThresholdActive {
 			// Validate the witness commitment (if any) within the
 			// block.  This involves asserting that if the coinbase

@@ -2101,7 +2101,7 @@ out:
 	s.wg.Done()
 }
 
-// setupRPCListeners returns a slice of listners that are configured for use
+// setupRPCListeners returns a slice of listeners that are configured for use
 // with the RPC server depending on the configuration settings for listen
 // addresses and TLS.
 func setupRPCListeners() ([]net.Listener, error) {

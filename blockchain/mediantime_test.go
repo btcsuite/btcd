@@ -45,7 +45,7 @@ func TestMedianTime(t *testing.T) {
 		// be ignored.
 		{in: []int64{-4201, 4202, -4203, 4204, -4205}, wantOffset: 0},
 
-		// Excerise the condition where the median offset is greater
+		// Exercise the condition where the median offset is greater
 		// than the max allowed adjustment, but there is at least one
 		// sample that is close enough to the current time to avoid
 		// triggering a warning about an invalid local clock.
