@@ -923,7 +923,7 @@ func writeOutPoint(w io.Writer, pver uint32, version int32, op *OutPoint) error 
 // script.  It is encoded as a varInt containing the length of the array
 // followed by the bytes themselves.  An error is returned if the length is
 // greater than the passed maxAllowed parameter which helps protect against
-// memory exhuastion attacks and forced panics thorugh malformed messages.  The
+// memory exhaustion attacks and forced panics through malformed messages.  The
 // fieldName parameter is only used for the error message so it provides more
 // context in the error.
 func readScript(r io.Reader, pver uint32, maxAllowed uint32, fieldName string) ([]byte, error) {

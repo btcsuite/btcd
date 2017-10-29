@@ -148,7 +148,7 @@ type FutureListUnspentResult chan *response
 
 // Receive waits for the response promised by the future and returns all
 // unspent wallet transaction outputs returned by the RPC call.  If the
-// future wac returnd by a call to ListUnspentMinAsync, ListUnspentMinMaxAsync,
+// future wac returned by a call to ListUnspentMinAsync, ListUnspentMinMaxAsync,
 // or ListUnspentMinMaxAddressesAsync, the range may be limited by the
 // parameters of the RPC invocation.
 func (r FutureListUnspentResult) Receive() ([]btcjson.ListUnspentResult, error) {
@@ -1397,7 +1397,7 @@ func (r FutureGetBalanceResult) Receive() (btcutil.Amount, error) {
 // FutureGetBalanceParseResult is same as FutureGetBalanceResult except
 // that the result is expected to be a string which is then parsed into
 // a float64 value
-// This is required for compatiblity with servers like blockchain.info
+// This is required for compatibility with servers like blockchain.info
 type FutureGetBalanceParseResult chan *response
 
 // Receive waits for the response promised by the future and returns the

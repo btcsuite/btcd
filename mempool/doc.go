@@ -16,7 +16,7 @@ further filtered based upon a configurable policy.
 
 One of the policy configuration options controls whether or not "standard"
 transactions are accepted.  In essence, a "standard" transaction is one that
-satisfies a fairly strict set of requirements that are largley intended to help
+satisfies a fairly strict set of requirements that are largely intended to help
 provide fair use of the system to all users.  It is important to note that what
 is considered a "standard" transaction changes over time.  For some insight, at
 the time of this writing, an example of SOME of the criteria that are required

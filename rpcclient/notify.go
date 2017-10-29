@@ -28,7 +28,7 @@ var (
 		"to use this feature")
 )
 
-// notificationState is used to track the current state of successfuly
+// notificationState is used to track the current state of successfully
 // registered notification so the state can be automatically re-established on
 // reconnect.
 type notificationState struct {

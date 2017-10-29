@@ -21,7 +21,7 @@ const (
 	WalletLockStateNtfnMethod = "walletlockstate"
 
 	// NewTxNtfnMethod is the method used to notify that a wallet server has
-	// added a new transaction to the transaciton store.
+	// added a new transaction to the transaction store.
 	NewTxNtfnMethod = "newtx"
 )
 

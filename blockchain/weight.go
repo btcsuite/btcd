@@ -27,7 +27,7 @@ const (
 
 	// MaxBlockSigOpsCost is the maximum number of signature operations
 	// allowed for a block. It is calculated via a weighted algorithm which
-	// weights segragated witness sig ops lower than regular sig ops.
+	// weights segregated witness sig ops lower than regular sig ops.
 	MaxBlockSigOpsCost = 80000
 
 	// WitnessScaleFactor determines the level of "discount" witness data

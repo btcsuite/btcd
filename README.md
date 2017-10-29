@@ -92,7 +92,7 @@ $ go install . ./cmd/...
 
 ## Getting Started
 
-btcd has several configuration options avilable to tweak how it runs, but all
+btcd has several configuration options available to tweak how it runs, but all
 of the basic operations described in the intro section work with zero
 configuration.
 

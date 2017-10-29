@@ -88,7 +88,7 @@ func makeTestOutput(r *rpctest.Harness, t *testing.T,
 	return key, utxo, selfAddrScript, nil
 }
 
-// TestBIP0113Activation tests for proper adherance of the BIP 113 rule
+// TestBIP0113Activation tests for proper adherence of the BIP 113 rule
 // constraint which requires all transaction finality tests to use the MTP of
 // the last 11 blocks, rather than the timestamp of the block which includes
 // them.
@@ -188,7 +188,7 @@ func TestBIP0113Activation(t *testing.T) {
 	// At this point, the block height should be 103: we mined 101 blocks
 	// to create a single mature output, then an additional block to create
 	// a new output, and then mined a single block above to include our
-	// transation.
+	// transaction.
 	assertChainHeight(r, t, 103)
 
 	// Next, mine enough blocks to ensure that the soft-fork becomes
