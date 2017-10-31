@@ -28,7 +28,7 @@ const (
 // MsgGetCFHeaders for details on requesting the headers.
 type MsgCFHeaders struct {
 	StopHash     chainhash.Hash
-	FilterType   uint8
+	FilterType   FilterType
 	HeaderHashes []*chainhash.Hash
 }
 

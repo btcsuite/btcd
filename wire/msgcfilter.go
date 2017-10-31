@@ -22,7 +22,7 @@ const (
 // getcfilter (MsgGetCFilter) message.
 type MsgCFilter struct {
 	BlockHash  chainhash.Hash
-	FilterType uint8
+	FilterType FilterType
 	Data       []byte
 }
 
@@ -99,7 +99,7 @@ func (msg *MsgCFilter) MaxPayloadLength(pver uint32) uint32 {
 
 // NewMsgCFilter returns a new bitcoin cfilter message that conforms to the
 // Message interface. See MsgCFilter for details.
-func NewMsgCFilter(blockHash *chainhash.Hash, filterType uint8,
+func NewMsgCFilter(blockHash *chainhash.Hash, filterType FilterType,
 	data []byte) *MsgCFilter {
 	return &MsgCFilter{
 		BlockHash:  *blockHash,

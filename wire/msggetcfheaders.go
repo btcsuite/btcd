@@ -17,7 +17,7 @@ import (
 type MsgGetCFHeaders struct {
 	BlockLocatorHashes []*chainhash.Hash
 	HashStop           chainhash.Hash
-	FilterType         uint8
+	FilterType         FilterType
 }
 
 // AddBlockLocatorHash adds a new block locator hash to the message.

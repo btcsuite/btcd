@@ -15,6 +15,7 @@ import (
 	"github.com/btcsuite/btcutil/gcs"
 	"github.com/btcsuite/btcutil/gcs/builder"
 	"github.com/btcsuite/fastsha256"
+	"github.com/roasbeef/btcd/wire"
 )
 
 const (
@@ -149,7 +150,7 @@ func (idx *CfIndex) Create(dbTx database.Tx) error {
 	firstHeader := make([]byte, chainhash.HashSize)
 	err = dbStoreFilterHeader(
 		dbTx,
-		cfHeaderKeys[0],
+		cfHeaderKeys[wire.GCSFilterRegular],
 		&idx.chainParams.GenesisBlock.Header.PrevBlock,
 		firstHeader,
 	)
@@ -159,7 +160,7 @@ func (idx *CfIndex) Create(dbTx database.Tx) error {
 
 	return dbStoreFilterHeader(
 		dbTx,
-		cfHeaderKeys[1],
+		cfHeaderKeys[wire.GCSFilterExtended],
 		&idx.chainParams.GenesisBlock.Header.PrevBlock,
 		firstHeader,
 	)
@@ -168,8 +169,8 @@ func (idx *CfIndex) Create(dbTx database.Tx) error {
 // storeFilter stores a given filter, and performs the steps needed to
 // generate the filter's header.
 func storeFilter(dbTx database.Tx, block *btcutil.Block, f *gcs.Filter,
-	filterType uint8) error {
-	if filterType > maxFilterType {
+	filterType wire.FilterType) error {
+	if uint8(filterType) > maxFilterType {
 		return errors.New("unsupported filter type")
 	}
 
@@ -215,7 +216,8 @@ func (idx *CfIndex) ConnectBlock(dbTx database.Tx, block *btcutil.Block,
 		return err
 	}
 
-	if err := storeFilter(dbTx, block, f, 0); err != nil {
+	if err := storeFilter(dbTx, block, f,
+		wire.GCSFilterRegular); err != nil {
 		return err
 	}
 
@@ -224,7 +226,7 @@ func (idx *CfIndex) ConnectBlock(dbTx database.Tx, block *btcutil.Block,
 		return err
 	}
 
-	return storeFilter(dbTx, block, f, 1)
+	return storeFilter(dbTx, block, f, wire.GCSFilterExtended)
 }
 
 // DisconnectBlock is invoked by the index manager when a block has been
@@ -252,10 +254,11 @@ func (idx *CfIndex) DisconnectBlock(dbTx database.Tx, block *btcutil.Block,
 
 // FilterByBlockHash returns the serialized contents of a block's basic or
 // extended committed filter.
-func (idx *CfIndex) FilterByBlockHash(h *chainhash.Hash, filterType uint8) ([]byte, error) {
+func (idx *CfIndex) FilterByBlockHash(h *chainhash.Hash,
+	filterType wire.FilterType) ([]byte, error) {
 	var f []byte
 	err := idx.db.View(func(dbTx database.Tx) error {
-		if filterType > maxFilterType {
+		if uint8(filterType) > maxFilterType {
 			return errors.New("unsupported filter type")
 		}
 
@@ -268,15 +271,17 @@ func (idx *CfIndex) FilterByBlockHash(h *chainhash.Hash, filterType uint8) ([]by
 
 // FilterHeaderByBlockHash returns the serialized contents of a block's basic
 // or extended committed filter header.
-func (idx *CfIndex) FilterHeaderByBlockHash(h *chainhash.Hash, filterType uint8) ([]byte, error) {
+func (idx *CfIndex) FilterHeaderByBlockHash(h *chainhash.Hash,
+	filterType wire.FilterType) ([]byte, error) {
 	var fh []byte
 	err := idx.db.View(func(dbTx database.Tx) error {
-		if filterType > 1 {
+		if uint8(filterType) > maxFilterType {
 			return errors.New("unsupported filter type")
 		}
 
 		var err error
-		fh, err = dbFetchFilterHeader(dbTx, cfHeaderKeys[filterType], h)
+		fh, err = dbFetchFilterHeader(dbTx,
+			cfHeaderKeys[filterType], h)
 		return err
 	})
 	return fh, err

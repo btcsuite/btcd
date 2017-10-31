@@ -881,7 +881,8 @@ func (sp *serverPeer) OnGetCFTypes(_ *peer.Peer, msg *wire.MsgGetCFTypes) {
 		return
 	}
 
-	cfTypesMsg := wire.NewMsgCFTypes([]uint8{0, 1})
+	cfTypesMsg := wire.NewMsgCFTypes([]wire.FilterType{
+		wire.GCSFilterRegular, wire.GCSFilterExtended})
 	sp.QueueMessage(cfTypesMsg, nil)
 }
 
