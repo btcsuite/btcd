@@ -881,6 +881,8 @@ func (sp *serverPeer) OnGetCFTypes(_ *peer.Peer, msg *wire.MsgGetCFTypes) {
 		return
 	}
 
+	// TODO: update to query blockchain indexes and/or config for supported
+	// filter types.
 	cfTypesMsg := wire.NewMsgCFTypes([]wire.FilterType{
 		wire.GCSFilterRegular, wire.GCSFilterExtended})
 	sp.QueueMessage(cfTypesMsg, nil)
