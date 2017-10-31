@@ -6,28 +6,40 @@ package wire
 
 import "io"
 
+// FilterType is used to represent a filter type.
+type FilterType uint8
+
+const (
+	// GCSFilterRegular is the regular filter type.
+	GCSFilterRegular FilterType = iota
+
+	// GCSFilterExtended is the extended filter type.
+	GCSFilterExtended
+)
+
 // MsgCFTypes is the cftypes message.
 type MsgCFTypes struct {
-	NumFilters       uint8
-	SupportedFilters []uint8
+	SupportedFilters []FilterType
 }
 
 // BtcDecode decodes r using the bitcoin protocol encoding into the receiver.
 // This is part of the Message interface implementation.
 func (msg *MsgCFTypes) BtcDecode(r io.Reader, pver uint32, _ MessageEncoding) error {
-	// Read the number of filter types supported
-	err := readElement(r, &msg.NumFilters)
+	// Read the number of filter types supported.
+	count, err := ReadVarInt(r, pver)
 	if err != nil {
 		return err
 	}
 
 	// Read each filter type.
-	msg.SupportedFilters = make([]uint8, msg.NumFilters)
-	for i := uint8(0); i < msg.NumFilters; i++ {
-		err = readElement(r, &msg.SupportedFilters[i])
+	msg.SupportedFilters = make([]FilterType, count)
+	for i := uint64(0); i < count; i++ {
+		var filterType uint8
+		err = readElement(r, &filterType)
 		if err != nil {
 			return err
 		}
+		msg.SupportedFilters[i] = FilterType(filterType)
 	}
 
 	return nil
@@ -36,9 +48,8 @@ func (msg *MsgCFTypes) BtcDecode(r io.Reader, pver uint32, _ MessageEncoding) er
 // BtcEncode encodes the receiver to w using the bitcoin protocol encoding.
 // This is part of the Message interface implementation.
 func (msg *MsgCFTypes) BtcEncode(w io.Writer, pver uint32, _ MessageEncoding) error {
-	// Write length of supported filters slice; don't trust that the caller
-	// has set it correctly.
-	err := writeElement(w, uint8(len(msg.SupportedFilters)))
+	// Write length of supported filters slice. We assume it's deduplicated.
+	err := WriteVarInt(w, pver, uint64(len(msg.SupportedFilters)))
 	if err != nil {
 		return err
 	}
@@ -78,15 +89,14 @@ func (msg *MsgCFTypes) Command() string {
 // MaxPayloadLength returns the maximum length the payload can be for the
 // receiver.  This is part of the Message interface implementation.
 func (msg *MsgCFTypes) MaxPayloadLength(pver uint32) uint32 {
-	// 1 byte for NumFilters, and 1 byte for up to 255 filter types.
-	return 256
+	// 2 bytes for filter count, and 1 byte for up to 256 filter types.
+	return 258
 }
 
 // NewMsgCFTypes returns a new bitcoin cftypes message that conforms to the
 // Message interface. See MsgCFTypes for details.
-func NewMsgCFTypes(filterTypes []uint8) *MsgCFTypes {
+func NewMsgCFTypes(filterTypes []FilterType) *MsgCFTypes {
 	return &MsgCFTypes{
-		NumFilters:       uint8(len(filterTypes)),
 		SupportedFilters: filterTypes,
 	}
 }

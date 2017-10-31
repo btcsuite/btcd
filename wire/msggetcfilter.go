@@ -14,7 +14,7 @@ import (
 // getcfilter message. It is used to request a committed filter for a block.
 type MsgGetCFilter struct {
 	BlockHash  chainhash.Hash
-	FilterType uint8
+	FilterType FilterType
 }
 
 // BtcDecode decodes r using the bitcoin protocol encoding into the receiver.
@@ -53,7 +53,8 @@ func (msg *MsgGetCFilter) MaxPayloadLength(pver uint32) uint32 {
 // NewMsgGetCFilter returns a new bitcoin getcfilter message that conforms to
 // the Message interface using the passed parameters and defaults for the
 // remaining fields.
-func NewMsgGetCFilter(blockHash *chainhash.Hash, filterType uint8) *MsgGetCFilter {
+func NewMsgGetCFilter(blockHash *chainhash.Hash,
+	filterType FilterType) *MsgGetCFilter {
 	return &MsgGetCFilter{
 		BlockHash:  *blockHash,
 		FilterType: filterType,

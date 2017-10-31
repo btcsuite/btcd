@@ -10,6 +10,8 @@ package btcjson
 import (
 	"encoding/json"
 	"fmt"
+
+	"github.com/roasbeef/btcd/wire"
 )
 
 // AddNodeSubCmd defines the type used in the addnode JSON-RPC command for the
@@ -282,12 +284,12 @@ func NewGetBlockTemplateCmd(request *TemplateRequest) *GetBlockTemplateCmd {
 // GetCFilterCmd defines the getcfilter JSON-RPC command.
 type GetCFilterCmd struct {
 	Hash       string
-	FilterType uint8
+	FilterType wire.FilterType
 }
 
 // NewGetCFilterCmd returns a new instance which can be used to issue a
 // getcfilter JSON-RPC command.
-func NewGetCFilterCmd(hash string, filterType uint8) *GetCFilterCmd {
+func NewGetCFilterCmd(hash string, filterType wire.FilterType) *GetCFilterCmd {
 	return &GetCFilterCmd{
 		Hash:       hash,
 		FilterType: filterType,
@@ -297,12 +299,13 @@ func NewGetCFilterCmd(hash string, filterType uint8) *GetCFilterCmd {
 // GetCFilterHeaderCmd defines the getcfilterheader JSON-RPC command.
 type GetCFilterHeaderCmd struct {
 	Hash       string
-	FilterType uint8
+	FilterType wire.FilterType
 }
 
 // NewGetCFilterHeaderCmd returns a new instance which can be used to issue a
 // getcfilterheader JSON-RPC command.
-func NewGetCFilterHeaderCmd(hash string, filterType uint8) *GetCFilterHeaderCmd {
+func NewGetCFilterHeaderCmd(hash string,
+	filterType wire.FilterType) *GetCFilterHeaderCmd {
 	return &GetCFilterHeaderCmd{
 		Hash:       hash,
 		FilterType: filterType,

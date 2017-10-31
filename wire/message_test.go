@@ -69,12 +69,13 @@ func TestMessage(t *testing.T) {
 	bh := NewBlockHeader(1, &chainhash.Hash{}, &chainhash.Hash{}, 0, 0)
 	msgMerkleBlock := NewMsgMerkleBlock(bh)
 	msgReject := NewMsgReject("block", RejectDuplicate, "duplicate block")
-	msgGetCFilter := NewMsgGetCFilter(&chainhash.Hash{}, 0)
+	msgGetCFilter := NewMsgGetCFilter(&chainhash.Hash{}, GCSFilterExtended)
 	msgGetCFHeaders := NewMsgGetCFHeaders()
 	msgGetCFTypes := NewMsgGetCFTypes()
-	msgCFilter := NewMsgCFilter(&chainhash.Hash{}, 1, []byte("payload"))
+	msgCFilter := NewMsgCFilter(&chainhash.Hash{}, GCSFilterExtended,
+		[]byte("payload"))
 	msgCFHeaders := NewMsgCFHeaders()
-	msgCFTypes := NewMsgCFTypes([]uint8{2})
+	msgCFTypes := NewMsgCFTypes([]FilterType{GCSFilterExtended})
 
 	tests := []struct {
 		in     Message    // Value to encode

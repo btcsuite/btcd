@@ -821,7 +821,7 @@ func (r FutureGetCFilterResult) Receive() (*wire.MsgCFilter, error) {
 //
 // See GetCFilter for the blocking version and more details.
 func (c *Client) GetCFilterAsync(blockHash *chainhash.Hash,
-	filterType uint8) FutureGetCFilterResult {
+	filterType wire.FilterType) FutureGetCFilterResult {
 	hash := ""
 	if blockHash != nil {
 		hash = blockHash.String()
@@ -833,7 +833,7 @@ func (c *Client) GetCFilterAsync(blockHash *chainhash.Hash,
 
 // GetCFilter returns a raw filter from the server given its block hash.
 func (c *Client) GetCFilter(blockHash *chainhash.Hash,
-	filterType uint8) (*wire.MsgCFilter, error) {
+	filterType wire.FilterType) (*wire.MsgCFilter, error) {
 	return c.GetCFilterAsync(blockHash, filterType).Receive()
 }
 
@@ -878,7 +878,7 @@ func (r FutureGetCFilterHeaderResult) Receive() (*wire.MsgCFHeaders, error) {
 //
 // See GetCFilterHeader for the blocking version and more details.
 func (c *Client) GetCFilterHeaderAsync(blockHash *chainhash.Hash,
-	filterType uint8) FutureGetCFilterHeaderResult {
+	filterType wire.FilterType) FutureGetCFilterHeaderResult {
 	hash := ""
 	if blockHash != nil {
 		hash = blockHash.String()
@@ -891,6 +891,6 @@ func (c *Client) GetCFilterHeaderAsync(blockHash *chainhash.Hash,
 // GetCFilterHeader returns a raw filter header from the server given its block
 // hash.
 func (c *Client) GetCFilterHeader(blockHash *chainhash.Hash,
-	filterType uint8) (*wire.MsgCFHeaders, error) {
+	filterType wire.FilterType) (*wire.MsgCFHeaders, error) {
 	return c.GetCFilterHeaderAsync(blockHash, filterType).Receive()
 }
