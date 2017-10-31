@@ -222,7 +222,7 @@ func (idx *CfIndex) ConnectBlock(dbTx database.Tx, block *btcutil.Block,
 	}
 
 	f, err = builder.BuildExtFilter(block.MsgBlock())
-	if err != nil {
+	if err != nil && err != gcs.ErrNoData {
 		return err
 	}
 
