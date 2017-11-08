@@ -166,6 +166,14 @@ func dcrdMain(serverChan chan<- *server) error {
 
 		return nil
 	}
+	if cfg.DropCFIndex {
+		if err := indexers.DropCfIndex(db, interrupt); err != nil {
+			dcrdLog.Errorf("%v", err)
+			return err
+		}
+
+		return nil
+	}
 
 	// Create server and start it.
 	lifetimeNotifier.notifyStartupEvent(lifetimeEventP2PServer)

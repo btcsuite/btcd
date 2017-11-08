@@ -53,6 +53,12 @@ const (
 	CmdReject         = "reject"
 	CmdSendHeaders    = "sendheaders"
 	CmdFeeFilter      = "feefilter"
+	CmdGetCFilter     = "getcfilter"
+	CmdGetCFHeaders   = "getcfheaders"
+	CmdGetCFTypes     = "getcftypes"
+	CmdCFilter        = "cfilter"
+	CmdCFHeaders      = "cfheaders"
+	CmdCFTypes        = "cftypes"
 )
 
 // Message is an interface that describes a Decred message.  A type that
@@ -142,6 +148,24 @@ func makeEmptyMessage(command string) (Message, error) {
 
 	case CmdFeeFilter:
 		msg = &MsgFeeFilter{}
+
+	case CmdGetCFilter:
+		msg = &MsgGetCFilter{}
+
+	case CmdGetCFHeaders:
+		msg = &MsgGetCFHeaders{}
+
+	case CmdGetCFTypes:
+		msg = &MsgGetCFTypes{}
+
+	case CmdCFilter:
+		msg = &MsgCFilter{}
+
+	case CmdCFHeaders:
+		msg = &MsgCFHeaders{}
+
+	case CmdCFTypes:
+		msg = &MsgCFTypes{}
 
 	default:
 		return nil, fmt.Errorf("unhandled command [%s]", command)

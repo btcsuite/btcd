@@ -3,6 +3,12 @@
 
 [[projects]]
   branch = "master"
+  name = "github.com/aead/siphash"
+  packages = ["."]
+  revision = "e404fcfc888570cadd1610538e2dbc89f66af814"
+
+[[projects]]
+  branch = "master"
   name = "github.com/agl/ed25519"
   packages = [
     ".",
@@ -122,6 +128,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "dac2b0bbb944e27f7652fb08881c0de11c94472c2041f5ff3a75a4064dae5439"
+  inputs-digest = "d190067efa8c61778ef133b4f695f26aa8e0333625b7f0172788009b68567f3d"
   solver-name = "gps-cdcl"
   solver-version = 1

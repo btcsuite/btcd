@@ -58,6 +58,7 @@ const (
 	defaultSigCacheMaxSize       = 100000
 	defaultTxIndex               = false
 	defaultNoExistsAddrIndex     = false
+	defaultNoCFilters            = false
 )
 
 var (
@@ -159,6 +160,8 @@ type config struct {
 	DropAddrIndex        bool          `long:"dropaddrindex" description:"Deletes the address-based transaction index from the database on start up and then exits."`
 	NoExistsAddrIndex    bool          `long:"noexistsaddrindex" description:"Disable the exists address index, which tracks whether or not an address has even been used."`
 	DropExistsAddrIndex  bool          `long:"dropexistsaddrindex" description:"Deletes the exists address index from the database on start up and then exits."`
+	NoCFilters           bool          `long:"nocfilters" description:"Disable compact filtering (CF) support"`
+	DropCFIndex          bool          `long:"dropcfindex" description:"Deletes the index used for compact filtering (CF) support from the database on start up and then exits."`
 	PipeRx               uint          `long:"piperx" description:"File descriptor of read end pipe to enable parent -> child process communication"`
 	PipeTx               uint          `long:"pipetx" description:"File descriptor of write end pipe to enable parent <- child process communication"`
 	LifetimeEvents       bool          `long:"lifetimeevents" description:"Send lifetime notifications over the TX pipe"`
@@ -447,6 +450,7 @@ func loadConfig() (*config, []string, error) {
 		AddrIndex:            defaultAddrIndex,
 		AllowOldVotes:        defaultAllowOldVotes,
 		NoExistsAddrIndex:    defaultNoExistsAddrIndex,
+		NoCFilters:           defaultNoCFilters,
 	}
 
 	// Service options which are only added on Windows.
@@ -896,6 +900,14 @@ func loadConfig() (*config, []string, error) {
 	if !cfg.NoExistsAddrIndex && cfg.DropExistsAddrIndex {
 		err := fmt.Errorf("dropexistsaddrindex cannot be activated when " +
 			"existsaddressindex is on (try setting --noexistsaddrindex)")
+		fmt.Fprintln(os.Stderr, err)
+		fmt.Fprintln(os.Stderr, usageMessage)
+		return nil, nil, err
+	}
+
+	// !--nocfilters and --dropcfindex do not mix.
+	if !cfg.NoCFilters && cfg.DropCFIndex {
+		err := errors.New("dropcfindex cannot be actived without nocfilters")
 		fmt.Fprintln(os.Stderr, err)
 		fmt.Fprintln(os.Stderr, usageMessage)
 		return nil, nil, err

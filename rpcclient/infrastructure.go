@@ -298,6 +298,13 @@ type response struct {
 	err    error
 }
 
+// futureError returns a buffered response channel containing the error.
+func futureError(err error) chan *response {
+	c := make(chan *response, 1)
+	c <- &response{err: err}
+	return c
+}
+
 // result checks whether the unmarshaled response contains a non-nil error,
 // returning an unmarshaled dcrjson.RPCError (or an unmarshaling error) if so.
 // If the response is not an error, the raw bytes of the request are

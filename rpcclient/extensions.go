@@ -617,7 +617,7 @@ func (r FutureGetHeadersResult) Receive() (*dcrjson.GetHeadersResult, error) {
 // of the RPC at some future time by invoking the Receive function on the returned instance.
 //
 // See GetHeaders for the blocking version and more details.
-func (c *Client) GetHeadersAsync(blockLocators []chainhash.Hash, hashStop *chainhash.Hash) FutureGetHeadersResult {
+func (c *Client) GetHeadersAsync(blockLocators []*chainhash.Hash, hashStop *chainhash.Hash) FutureGetHeadersResult {
 	concatenatedLocators := make([]byte, chainhash.HashSize*len(blockLocators))
 	for i := range blockLocators {
 		copy(concatenatedLocators[i*chainhash.HashSize:], blockLocators[i][:])
@@ -630,7 +630,7 @@ func (c *Client) GetHeadersAsync(blockLocators []chainhash.Hash, hashStop *chain
 // GetHeaders mimics the wire protocol getheaders and headers messages by
 // returning all headers on the main chain after the first known block in the
 // locators, up until a block hash matches hashStop.
-func (c *Client) GetHeaders(blockLocators []chainhash.Hash, hashStop *chainhash.Hash) (*dcrjson.GetHeadersResult, error) {
+func (c *Client) GetHeaders(blockLocators []*chainhash.Hash, hashStop *chainhash.Hash) (*dcrjson.GetHeadersResult, error) {
 	return c.GetHeadersAsync(blockLocators, hashStop).Receive()
 }
 

@@ -409,6 +409,18 @@ var helpDescsEnUS = map[string]string{
 	"getblocktemplate--condition2": "mode=proposal, accepted",
 	"getblocktemplate--result1":    "An error string which represents why the proposal was rejected or nothing if accepted",
 
+	// GetCFilterCmd help.
+	"getcfilter--synopsis":  "Returns the committed filter for a block",
+	"getcfilter--result0":   "The committed filter serialized with the N value and encoded as a hex string",
+	"getcfilter-hash":       "The block hash of the filter being queried",
+	"getcfilter-filtertype": "The type of committed filter to return",
+
+	// GetCFilterHeaderCmd help.
+	"getcfilterheader--synopsis":  "Returns the filter header hash committing to all filters in the chain up through a block",
+	"getcfilterheader--result0":   "The filter header commitment hash",
+	"getcfilterheader-hash":       "The block hash of the filter header being queried",
+	"getcfilterheader-filtertype": "The type of committed filter to return the header commitment for",
+
 	// GetChainTips help.
 	"getchaintips--synopsis": "Returns information about all known chain tips the in the block tree.\n\n" +
 		"The statuses in the result have the following meanings:\n" +
@@ -929,6 +941,8 @@ var rpcResultTypes = map[string][]interface{}{
 	"getblockheader":        {(*string)(nil), (*dcrjson.GetBlockHeaderVerboseResult)(nil)},
 	"getblocksubsidy":       {(*dcrjson.GetBlockSubsidyResult)(nil)},
 	"getblocktemplate":      {(*dcrjson.GetBlockTemplateResult)(nil), (*string)(nil), nil},
+	"getcfilter":            {(*string)(nil)},
+	"getcfilterheader":      {(*string)(nil)},
 	"getchaintips":          {(*[]dcrjson.GetChainTipsResult)(nil)},
 	"getconnectioncount":    {(*int32)(nil)},
 	"getcurrentnet":         {(*uint32)(nil)},

@@ -9,10 +9,13 @@ import (
 	"bytes"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 
 	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/dcrjson"
 	"github.com/decred/dcrd/dcrutil"
+	"github.com/decred/dcrd/gcs"
+	"github.com/decred/dcrd/gcs/blockcf"
 	"github.com/decred/dcrd/wire"
 )
 
@@ -701,4 +704,101 @@ func (c *Client) RescanAsync(blockHashes []chainhash.Hash) FutureRescanResult {
 // chain, but they do need to be adjacent to each other.
 func (c *Client) Rescan(blockHashes []chainhash.Hash) (*dcrjson.RescanResult, error) {
 	return c.RescanAsync(blockHashes).Receive()
+}
+
+// FutureGetCFilterResult is a future promise to deliver the result of a
+// GetCFilterAsync RPC invocation (or an applicable error).
+type FutureGetCFilterResult chan *response
+
+// Receive waits for the response promised by the future and returns the
+// discovered rescan data.
+func (r FutureGetCFilterResult) Receive() (*gcs.Filter, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	var filterHex string
+	err = json.Unmarshal(res, &filterHex)
+	if err != nil {
+		return nil, err
+	}
+	filterNBytes, err := hex.DecodeString(filterHex)
+	if err != nil {
+		return nil, err
+	}
+
+	return gcs.FromNBytes(blockcf.P, filterNBytes)
+}
+
+// GetCFilterAsync returns an instance of a type that can be used to get the
+// result of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+//
+// See GetCFilter for the blocking version and more details.
+func (c *Client) GetCFilterAsync(blockHash *chainhash.Hash, filterType wire.FilterType) FutureGetCFilterResult {
+	var ft string
+	switch filterType {
+	case wire.GCSFilterRegular:
+		ft = "regular"
+	case wire.GCSFilterExtended:
+		ft = "extended"
+	default:
+		return futureError(errors.New("unknown filter type"))
+	}
+
+	cmd := dcrjson.NewGetCFilterCmd(blockHash.String(), ft)
+	return c.sendCmd(cmd)
+}
+
+// GetCFilter returns the committed filter of type filterType for a block.
+func (c *Client) GetCFilter(blockHash *chainhash.Hash, filterType wire.FilterType) (*gcs.Filter, error) {
+	return c.GetCFilterAsync(blockHash, filterType).Receive()
+}
+
+// FutureGetCFilterHeaderResult is a future promise to deliver the result of a
+// GetCFilterHeaderAsync RPC invocation (or an applicable error).
+type FutureGetCFilterHeaderResult chan *response
+
+// Receive waits for the response promised by the future and returns the
+// discovered rescan data.
+func (r FutureGetCFilterHeaderResult) Receive() (*chainhash.Hash, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	var filterHeaderHex string
+	err = json.Unmarshal(res, &filterHeaderHex)
+	if err != nil {
+		return nil, err
+	}
+
+	return chainhash.NewHashFromStr(filterHeaderHex)
+}
+
+// GetCFilterHeaderAsync returns an instance of a type that can be used to get
+// the result of the RPC at some future time by invoking the Receive function on
+// the returned instance.
+//
+// See GetCFilterHeader for the blocking version and more details.
+func (c *Client) GetCFilterHeaderAsync(blockHash *chainhash.Hash, filterType wire.FilterType) FutureGetCFilterHeaderResult {
+	var ft string
+	switch filterType {
+	case wire.GCSFilterRegular:
+		ft = "regular"
+	case wire.GCSFilterExtended:
+		ft = "extended"
+	default:
+		return futureError(errors.New("unknown filter type"))
+	}
+
+	cmd := dcrjson.NewGetCFilterHeaderCmd(blockHash.String(), ft)
+	return c.sendCmd(cmd)
+}
+
+// GetCFilterHeader returns the committed filter header hash of type filterType
+// for a block.
+func (c *Client) GetCFilterHeader(blockHash *chainhash.Hash, filterType wire.FilterType) (*chainhash.Hash, error) {
+	return c.GetCFilterHeaderAsync(blockHash, filterType).Receive()
 }

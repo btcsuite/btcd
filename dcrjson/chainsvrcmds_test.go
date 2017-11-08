@@ -332,6 +332,34 @@ func TestChainSvrCmds(t *testing.T) {
 			},
 		},
 		{
+			name: "getcfilter",
+			newCmd: func() (interface{}, error) {
+				return dcrjson.NewCmd("getcfilter", "123", "extended")
+			},
+			staticCmd: func() interface{} {
+				return dcrjson.NewGetCFilterCmd("123", "extended")
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"getcfilter","params":["123","extended"],"id":1}`,
+			unmarshalled: &dcrjson.GetCFilterCmd{
+				Hash:       "123",
+				FilterType: "extended",
+			},
+		},
+		{
+			name: "getcfilterheader",
+			newCmd: func() (interface{}, error) {
+				return dcrjson.NewCmd("getcfilterheader", "123", "extended")
+			},
+			staticCmd: func() interface{} {
+				return dcrjson.NewGetCFilterHeaderCmd("123", "extended")
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"getcfilterheader","params":["123","extended"],"id":1}`,
+			unmarshalled: &dcrjson.GetCFilterHeaderCmd{
+				Hash:       "123",
+				FilterType: "extended",
+			},
+		},
+		{
 			name: "getchaintips",
 			newCmd: func() (interface{}, error) {
 				return dcrjson.NewCmd("getchaintips")

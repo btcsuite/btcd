@@ -72,6 +72,13 @@ func TestMessage(t *testing.T) {
 	msgFilterAdd := NewMsgFilterAdd([]byte{0x01})
 	msgFilterClear := NewMsgFilterClear()
 	msgFilterLoad := NewMsgFilterLoad([]byte{0x01}, 10, 0, BloomUpdateNone)
+	msgGetCFilter := NewMsgGetCFilter(&chainhash.Hash{}, GCSFilterExtended)
+	msgGetCFHeaders := NewMsgGetCFHeaders()
+	msgGetCFTypes := NewMsgGetCFTypes()
+	msgCFilter := NewMsgCFilter(&chainhash.Hash{}, GCSFilterExtended,
+		[]byte("payload"))
+	msgCFHeaders := NewMsgCFHeaders()
+	msgCFTypes := NewMsgCFTypes([]FilterType{GCSFilterExtended})
 	bh := NewBlockHeader(
 		int32(0),                                    // Version
 		&chainhash.Hash{},                           // PrevHash
@@ -101,26 +108,32 @@ func TestMessage(t *testing.T) {
 		dcrnet CurrencyNet // Network to use for wire encoding
 		bytes  int         // Expected num bytes read/written
 	}{
-		{msgVersion, msgVersion, pver, MainNet, 125},         // [0]
-		{msgVerack, msgVerack, pver, MainNet, 24},            // [1]
-		{msgGetAddr, msgGetAddr, pver, MainNet, 24},          // [2]
-		{msgAddr, msgAddr, pver, MainNet, 25},                // [3]
-		{msgGetBlocks, msgGetBlocks, pver, MainNet, 61},      // [4]
-		{msgBlock, msgBlock, pver, MainNet, 522},             // [5]
-		{msgInv, msgInv, pver, MainNet, 25},                  // [6]
-		{msgGetData, msgGetData, pver, MainNet, 25},          // [7]
-		{msgNotFound, msgNotFound, pver, MainNet, 25},        // [8]
-		{msgTx, msgTx, pver, MainNet, 39},                    // [9]
-		{msgPing, msgPing, pver, MainNet, 32},                // [10]
-		{msgPong, msgPong, pver, MainNet, 32},                // [11]
-		{msgGetHeaders, msgGetHeaders, pver, MainNet, 61},    // [12]
-		{msgHeaders, msgHeaders, pver, MainNet, 25},          // [13]
-		{msgMemPool, msgMemPool, pver, MainNet, 24},          // [15]
-		{msgFilterAdd, msgFilterAdd, pver, MainNet, 26},      // [16]
-		{msgFilterClear, msgFilterClear, pver, MainNet, 24},  // [17]
-		{msgFilterLoad, msgFilterLoad, pver, MainNet, 35},    // [18]
-		{msgMerkleBlock, msgMerkleBlock, pver, MainNet, 215}, // [19]
-		{msgReject, msgReject, pver, MainNet, 79},            // [20]
+		{msgVersion, msgVersion, pver, MainNet, 125},          // [0]
+		{msgVerack, msgVerack, pver, MainNet, 24},             // [1]
+		{msgGetAddr, msgGetAddr, pver, MainNet, 24},           // [2]
+		{msgAddr, msgAddr, pver, MainNet, 25},                 // [3]
+		{msgGetBlocks, msgGetBlocks, pver, MainNet, 61},       // [4]
+		{msgBlock, msgBlock, pver, MainNet, 522},              // [5]
+		{msgInv, msgInv, pver, MainNet, 25},                   // [6]
+		{msgGetData, msgGetData, pver, MainNet, 25},           // [7]
+		{msgNotFound, msgNotFound, pver, MainNet, 25},         // [8]
+		{msgTx, msgTx, pver, MainNet, 39},                     // [9]
+		{msgPing, msgPing, pver, MainNet, 32},                 // [10]
+		{msgPong, msgPong, pver, MainNet, 32},                 // [11]
+		{msgGetHeaders, msgGetHeaders, pver, MainNet, 61},     // [12]
+		{msgHeaders, msgHeaders, pver, MainNet, 25},           // [13]
+		{msgMemPool, msgMemPool, pver, MainNet, 24},           // [15]
+		{msgFilterAdd, msgFilterAdd, pver, MainNet, 26},       // [16]
+		{msgFilterClear, msgFilterClear, pver, MainNet, 24},   // [17]
+		{msgFilterLoad, msgFilterLoad, pver, MainNet, 35},     // [18]
+		{msgMerkleBlock, msgMerkleBlock, pver, MainNet, 215},  // [19]
+		{msgReject, msgReject, pver, MainNet, 79},             // [20]
+		{msgGetCFilter, msgGetCFilter, pver, MainNet, 57},     // [21]
+		{msgGetCFHeaders, msgGetCFHeaders, pver, MainNet, 58}, // [22]
+		{msgGetCFTypes, msgGetCFTypes, pver, MainNet, 24},     // [23]
+		{msgCFilter, msgCFilter, pver, MainNet, 65},           // [24]
+		{msgCFHeaders, msgCFHeaders, pver, MainNet, 58},       // [25]
+		{msgCFTypes, msgCFTypes, pver, MainNet, 26},           // [26]
 	}
 
 	t.Logf("Running %d tests", len(tests))
