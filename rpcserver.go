@@ -132,6 +132,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"debuglevel":            handleDebugLevel,
 	"decoderawtransaction":  handleDecodeRawTransaction,
 	"decodescript":          handleDecodeScript,
+	"estimatefee":           handleEstimateFee,
 	"generate":              handleGenerate,
 	"getaddednodeinfo":      handleGetAddedNodeInfo,
 	"getbestblock":          handleGetBestBlock,
@@ -224,7 +225,6 @@ var rpcAskWallet = map[string]struct{}{
 
 // Commands that are currently unimplemented, but should ultimately be.
 var rpcUnimplemented = map[string]struct{}{
-	"estimatefee":      {},
 	"estimatepriority": {},
 	"getchaintips":     {},
 	"getmempoolentry":  {},
@@ -254,6 +254,7 @@ var rpcLimited = map[string]struct{}{
 	"createrawtransaction":  {},
 	"decoderawtransaction":  {},
 	"decodescript":          {},
+	"estimatefee":           {},
 	"getbestblock":          {},
 	"getbestblockhash":      {},
 	"getblock":              {},
@@ -851,6 +852,28 @@ func handleDecodeScript(s *rpcServer, cmd interface{}, closeChan <-chan struct{}
 		reply.P2sh = p2sh.EncodeAddress()
 	}
 	return reply, nil
+}
+
+// handleEstimateFee handles estimatefee commands.
+func handleEstimateFee(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	c := cmd.(*btcjson.EstimateFeeCmd)
+
+	if s.cfg.FeeEstimator == nil {
+		return nil, errors.New("Fee estimation disabled")
+	}
+
+	if c.NumBlocks <= 0 {
+		return -1.0, errors.New("Parameter NumBlocks must be positive")
+	}
+
+	feeRate, err := s.cfg.FeeEstimator.EstimateFee(uint32(c.NumBlocks))
+
+	if err != nil {
+		return -1.0, err
+	}
+
+	// Convert to satoshis per kb.
+	return float64(feeRate.ToSatoshiPerKb()), nil
 }
 
 // handleGenerate handles generate commands.
@@ -4247,6 +4270,10 @@ type rpcserverConfig struct {
 	TxIndex   *indexers.TxIndex
 	AddrIndex *indexers.AddrIndex
 	CfIndex   *indexers.CfIndex
+
+	// The fee estimator keeps track of how long transactions are left in
+	// the mempool before they are mined into blocks.
+	FeeEstimator *mempool.FeeEstimator
 }
 
 // newRPCServer returns a new instance of the rpcServer struct.

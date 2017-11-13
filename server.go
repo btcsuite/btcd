@@ -2572,20 +2572,21 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 		}
 
 		s.rpcServer, err = newRPCServer(&rpcserverConfig{
-			Listeners:   rpcListeners,
-			StartupTime: s.startupTime,
-			ConnMgr:     &rpcConnManager{&s},
-			SyncMgr:     &rpcSyncMgr{&s, s.syncManager},
-			TimeSource:  s.timeSource,
-			Chain:       s.chain,
-			ChainParams: chainParams,
-			DB:          db,
-			TxMemPool:   s.txMemPool,
-			Generator:   blockTemplateGenerator,
-			CPUMiner:    s.cpuMiner,
-			TxIndex:     s.txIndex,
-			AddrIndex:   s.addrIndex,
-			CfIndex:     s.cfIndex,
+			Listeners:    rpcListeners,
+			StartupTime:  s.startupTime,
+			ConnMgr:      &rpcConnManager{&s},
+			SyncMgr:      &rpcSyncMgr{&s, s.syncManager},
+			TimeSource:   s.timeSource,
+			Chain:        s.chain,
+			ChainParams:  chainParams,
+			DB:           db,
+			TxMemPool:    s.txMemPool,
+			Generator:    blockTemplateGenerator,
+			CPUMiner:     s.cpuMiner,
+			TxIndex:      s.txIndex,
+			AddrIndex:    s.addrIndex,
+			CfIndex:      s.cfIndex,
+			FeeEstimator: feeEstimator,
 		})
 		if err != nil {
 			return nil, err

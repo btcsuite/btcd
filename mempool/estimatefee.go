@@ -12,9 +12,9 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/mining"
-	"github.com/btcsuite/btcutil"
+	"github.com/roasbeef/btcd/chaincfg/chainhash"
+	"github.com/roasbeef/btcd/mining"
+	"github.com/roasbeef/btcutil"
 )
 
 // TODO incorporate Alex Morcos' modifications to Gavin's initial model
