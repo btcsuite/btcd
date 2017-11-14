@@ -33,20 +33,27 @@ const (
 	// estimateFeeMaxReplacements is the max number of replacements that
 	// can be made by the txs found in a given block.
 	estimateFeeMaxReplacements = 10
+
+	bytePerKb = 1024
+
+	btcPerSatoshi = 1E-8
 )
 
 // SatoshiPerByte is number with units of satoshis per byte.
 type SatoshiPerByte float64
 
-// ToSatoshiPerKb returns a float value that represents the given
+// BtcPerKilobyte is number with units of bitcoins per kilobyte.
+type BtcPerKilobyte float64
+
+// ToBtcPerKb returns a float value that represents the given
 // SatoshiPerByte converted to satoshis per kb.
-func (rate SatoshiPerByte) ToSatoshiPerKb() float64 {
+func (rate SatoshiPerByte) ToBtcPerKb() BtcPerKilobyte {
 	// If our rate is the error value, return that.
 	if rate == SatoshiPerByte(-1.0) {
 		return -1.0
 	}
 
-	return float64(rate) * 1024
+	return BtcPerKilobyte(float64(rate) * bytePerKb * btcPerSatoshi)
 }
 
 // Fee returns the fee for a transaction of a given size for
@@ -88,7 +95,7 @@ type observedTransaction struct {
 // is used if Rollback is called to reverse the effect of registering
 // a block.
 type registeredBlock struct {
-	hash         *chainhash.Hash
+	hash         chainhash.Hash
 	transactions []*observedTransaction
 }
 
@@ -96,11 +103,11 @@ type registeredBlock struct {
 // fee estimations. It is safe for concurrent access.
 type FeeEstimator struct {
 	maxRollback uint32
-	binSize     int
+	binSize     int32
 
 	// The maximum number of replacements that can be made in a single
 	// bin per block. Default is estimateFeeMaxReplacements
-	maxReplacements int
+	maxReplacements int32
 
 	// The minimum number of blocks that can be registered with the fee
 	// estimator before it will provide answers.
@@ -109,17 +116,19 @@ type FeeEstimator struct {
 	// The last known height.
 	lastKnownHeight int32
 
-	sync.RWMutex
-	observed            map[chainhash.Hash]observedTransaction
-	bin                 [estimateFeeDepth][]*observedTransaction
-	numBlocksRegistered uint32 // The number of blocks that have been registered.
+	// The number of blocks that have been registered.
+	numBlocksRegistered uint32
+
+	mtx      sync.RWMutex
+	observed map[chainhash.Hash]*observedTransaction
+	bin      [estimateFeeDepth][]*observedTransaction
 
 	// The cached estimates.
 	cached []SatoshiPerByte
 
 	// Transactions that have been removed from the bins. This allows us to
 	// revert in case of an orphaned block.
-	dropped []registeredBlock
+	dropped []*registeredBlock
 }
 
 // NewFeeEstimator creates a FeeEstimator for which at most maxRollback blocks
@@ -132,21 +141,27 @@ func NewFeeEstimator(maxRollback, minRegisteredBlocks uint32) *FeeEstimator {
 		lastKnownHeight:     mining.UnminedHeight,
 		binSize:             estimateFeeBinSize,
 		maxReplacements:     estimateFeeMaxReplacements,
-		observed:            make(map[chainhash.Hash]observedTransaction),
-		dropped:             make([]registeredBlock, 0, maxRollback),
+		observed:            make(map[chainhash.Hash]*observedTransaction),
+		dropped:             make([]*registeredBlock, 0, maxRollback),
 	}
 }
 
 // ObserveTransaction is called when a new transaction is observed in the mempool.
 func (ef *FeeEstimator) ObserveTransaction(t *TxDesc) {
-	ef.Lock()
-	defer ef.Unlock()
+	ef.mtx.Lock()
+	defer ef.mtx.Unlock()
+
+	// If we haven't seen a block yet we don't know when this one arrived,
+	// so we ignore it.
+	if ef.lastKnownHeight == mining.UnminedHeight {
+		return
+	}
 
 	hash := *t.Tx.Hash()
 	if _, ok := ef.observed[hash]; !ok {
 		size := uint32(t.Tx.MsgTx().SerializeSize())
 
-		ef.observed[hash] = observedTransaction{
+		ef.observed[hash] = &observedTransaction{
 			hash:     hash,
 			feeRate:  NewSatoshiPerByte(btcutil.Amount(t.Fee), size),
 			observed: t.Height,
@@ -157,8 +172,8 @@ func (ef *FeeEstimator) ObserveTransaction(t *TxDesc) {
 
 // RegisterBlock informs the fee estimator of a new block to take into account.
 func (ef *FeeEstimator) RegisterBlock(block *btcutil.Block) error {
-	ef.Lock()
-	defer ef.Unlock()
+	ef.mtx.Lock()
+	defer ef.mtx.Unlock()
 
 	// The previous sorted list is invalid, so delete it.
 	ef.cached = nil
@@ -184,8 +199,8 @@ func (ef *FeeEstimator) RegisterBlock(block *btcutil.Block) error {
 	var replacementCounts [estimateFeeDepth]int
 
 	// Keep track of which txs were dropped in case of an orphan block.
-	dropped := registeredBlock{
-		hash:         block.Hash(),
+	dropped := &registeredBlock{
+		hash:         *block.Hash(),
 		transactions: make([]*observedTransaction, 0, 100),
 	}
 
@@ -200,41 +215,50 @@ func (ef *FeeEstimator) RegisterBlock(block *btcutil.Block) error {
 		}
 
 		// Put the observed tx in the oppropriate bin.
-		o.mined = height
-
 		blocksToConfirm := height - o.observed - 1
 
+		// This shouldn't happen if the fee estimator works correctly,
+		// but return an error if it does.
+		if o.mined != mining.UnminedHeight {
+			log.Error("Estimate fee: transaction ", hash.String(), " has already been mined")
+			return errors.New("Transaction has already been mined")
+		}
+
 		// This shouldn't happen but check just in case to avoid
-		// a panic later.
+		// an out-of-bounds array index later.
 		if blocksToConfirm >= estimateFeeDepth {
 			continue
 		}
 
 		// Make sure we do not replace too many transactions per min.
-		if replacementCounts[blocksToConfirm] == ef.maxReplacements {
+		if replacementCounts[blocksToConfirm] == int(ef.maxReplacements) {
 			continue
 		}
+
+		o.mined = height
 
 		replacementCounts[blocksToConfirm]++
 
 		bin := ef.bin[blocksToConfirm]
 
 		// Remove a random element and replace it with this new tx.
-		if len(bin) == ef.binSize {
-			l := ef.binSize - replacementCounts[blocksToConfirm]
+		if len(bin) == int(ef.binSize) {
+			// Don't drop transactions we have just added from this same block.
+			l := int(ef.binSize) - replacementCounts[blocksToConfirm]
 			drop := rand.Intn(l)
 			dropped.transactions = append(dropped.transactions, bin[drop])
 
 			bin[drop] = bin[l-1]
-			bin[l-1] = &o
+			bin[l-1] = o
 		} else {
-			ef.bin[blocksToConfirm] = append(bin, &o)
+			bin = append(bin, o)
 		}
+		ef.bin[blocksToConfirm] = bin
 	}
 
 	// Go through the mempool for txs that have been in too long.
 	for hash, o := range ef.observed {
-		if height-o.observed >= estimateFeeDepth {
+		if o.mined == mining.UnminedHeight && height-o.observed >= estimateFeeDepth {
 			delete(ef.observed, hash)
 		}
 	}
@@ -253,6 +277,14 @@ func (ef *FeeEstimator) RegisterBlock(block *btcutil.Block) error {
 	return nil
 }
 
+// LastKnownHeight returns the height of the last block which was registered.
+func (ef *FeeEstimator) LastKnownHeight() int32 {
+	ef.mtx.Lock()
+	defer ef.mtx.Unlock()
+
+	return ef.lastKnownHeight
+}
+
 // Rollback unregisters a recently registered block from the FeeEstimator.
 // This can be used to reverse the effect of an orphaned block on the fee
 // estimator. The maximum number of rollbacks allowed is given by
@@ -262,29 +294,24 @@ func (ef *FeeEstimator) RegisterBlock(block *btcutil.Block) error {
 // deleted if they have been observed too long ago. That means the result
 // of Rollback won't always be exactly the same as if the last block had not
 // happened, but it should be close enough.
-func (ef *FeeEstimator) Rollback(block *btcutil.Block) error {
-	ef.Lock()
-	defer ef.Unlock()
-
-	hash := block.Hash()
+func (ef *FeeEstimator) Rollback(hash *chainhash.Hash) error {
+	ef.mtx.Lock()
+	defer ef.mtx.Unlock()
 
 	// Find this block in the stack of recent registered blocks.
 	var n int
-	for n = 1; n < len(ef.dropped); n++ {
+	for n = 1; n <= len(ef.dropped); n++ {
 		if ef.dropped[len(ef.dropped)-n].hash.IsEqual(hash) {
 			break
 		}
 	}
 
-	if n == len(ef.dropped) {
+	if n > len(ef.dropped) {
 		return errors.New("no such block was recently registered")
 	}
 
 	for i := 0; i < n; i++ {
-		err := ef.rollback()
-		if err != nil {
-			return err
-		}
+		ef.rollback()
 	}
 
 	return nil
@@ -292,27 +319,23 @@ func (ef *FeeEstimator) Rollback(block *btcutil.Block) error {
 
 // rollback rolls back the effect of the last block in the stack
 // of registered blocks.
-func (ef *FeeEstimator) rollback() error {
-
+func (ef *FeeEstimator) rollback() {
 	// The previous sorted list is invalid, so delete it.
 	ef.cached = nil
 
 	// pop the last list of dropped txs from the stack.
 	last := len(ef.dropped) - 1
 	if last == -1 {
-		// Return if we cannot rollback.
-		return errors.New("max rollbacks reached")
+		// Cannot really happen because the exported calling function
+		// only rolls back a block already known to be in the list
+		// of dropped transactions.
+		return
 	}
 
-	ef.numBlocksRegistered--
-
 	dropped := ef.dropped[last]
-	ef.dropped = ef.dropped[0:last]
 
 	// where we are in each bin as we replace txs?
 	var replacementCounters [estimateFeeDepth]int
-
-	var err error
 
 	// Go through the txs in the dropped block.
 	for _, o := range dropped.transactions {
@@ -326,9 +349,8 @@ func (ef *FeeEstimator) rollback() error {
 		// Continue to go through that bin where we left off.
 		for {
 			if counter >= len(bin) {
-				// Create an error but keep going in case we can roll back
-				// more transactions successfully.
-				err = errors.New("illegal state: cannot rollback dropped transaction")
+				// Panic, as we have entered an unrecoverable invalid state.
+				panic(errors.New("illegal state: cannot rollback dropped transaction"))
 			}
 
 			prev := bin[counter]
@@ -344,6 +366,8 @@ func (ef *FeeEstimator) rollback() error {
 
 			counter++
 		}
+
+		replacementCounters[blocksToConfirm] = counter
 	}
 
 	// Continue going through bins to find other txs to remove
@@ -373,9 +397,11 @@ func (ef *FeeEstimator) rollback() error {
 		}
 	}
 
-	ef.lastKnownHeight--
+	ef.dropped = ef.dropped[0:last]
 
-	return err
+	// The number of blocks the fee estimator has seen is decrimented.
+	ef.numBlocksRegistered--
+	ef.lastKnownHeight--
 }
 
 // estimateFeeSet is a set of txs that can that is sorted
@@ -407,19 +433,26 @@ func (b *estimateFeeSet) estimateFee(confirmations int) SatoshiPerByte {
 		return 0
 	}
 
-	var min, max uint32 = 0, 0
-	for i := 0; i < confirmations-1; i++ {
-		min += b.bin[i]
-	}
-
-	max = min + b.bin[confirmations-1]
-
 	// We don't have any transactions!
-	if min == 0 && max == 0 {
+	if len(b.feeRate) == 0 {
 		return 0
 	}
 
-	return b.feeRate[(min+max-1)/2] * 1E-8
+	var min, max int = 0, 0
+	for i := 0; i < confirmations-1; i++ {
+		min += int(b.bin[i])
+	}
+
+	max = min + int(b.bin[confirmations-1]) - 1
+	if max < min {
+		max = min
+	}
+	feeIndex := (min + max) / 2
+	if feeIndex >= len(b.feeRate) {
+		feeIndex = len(b.feeRate) - 1
+	}
+
+	return b.feeRate[feeIndex]
 }
 
 // newEstimateFeeSet creates a temporary data structure that
@@ -464,9 +497,9 @@ func (ef *FeeEstimator) estimates() []SatoshiPerByte {
 
 // EstimateFee estimates the fee per byte to have a tx confirmed a given
 // number of blocks from now.
-func (ef *FeeEstimator) EstimateFee(numBlocks uint32) (SatoshiPerByte, error) {
-	ef.Lock()
-	defer ef.Unlock()
+func (ef *FeeEstimator) EstimateFee(numBlocks uint32) (BtcPerKilobyte, error) {
+	ef.mtx.Lock()
+	defer ef.mtx.Unlock()
 
 	// If the number of registered blocks is below the minimum, return
 	// an error.
@@ -489,5 +522,5 @@ func (ef *FeeEstimator) EstimateFee(numBlocks uint32) (SatoshiPerByte, error) {
 		ef.cached = ef.estimates()
 	}
 
-	return ef.cached[int(numBlocks)-1], nil
+	return ef.cached[int(numBlocks)-1].ToBtcPerKb(), nil
 }
