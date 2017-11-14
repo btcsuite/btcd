@@ -2249,6 +2249,10 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 		return nil, err
 	}
 
+	feeEstimator := mempool.NewFeeEstimator(
+		mempool.DefaultEstimateFeeMaxRollback,
+		mempool.DefaultEstimateFeeMinRegisteredBlocks)
+
 	txC := mempool.Config{
 		Policy: mempool.Policy{
 			DisableRelayPriority: cfg.NoRelayPriority,
@@ -2271,6 +2275,7 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 		SigCache:           s.sigCache,
 		HashCache:          s.hashCache,
 		AddrIndex:          s.addrIndex,
+		FeeEstimator:       feeEstimator,
 	}
 	s.txMemPool = mempool.New(&txC)
 

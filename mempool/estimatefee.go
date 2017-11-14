@@ -34,6 +34,15 @@ const (
 	// can be made by the txs found in a given block.
 	estimateFeeMaxReplacements = 10
 
+	// DefaultEstimateFeeMaxRollback is the default number of rollbacks
+	// allowed by the fee estimator for orphaned blocks.
+	DefaultEstimateFeeMaxRollback = 2
+
+	// DefaultEstimateFeeMinRegisteredBlocks is the default minimum
+	// number of blocks which must be observed by the fee estimator before
+	// it will provide fee estimations.
+	DefaultEstimateFeeMinRegisteredBlocks = 3
+
 	bytePerKb = 1024
 
 	btcPerSatoshi = 1E-8
