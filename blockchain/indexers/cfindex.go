@@ -299,6 +299,6 @@ func NewCfIndex(db database.DB, chainParams *chaincfg.Params) *CfIndex {
 }
 
 // DropCfIndex drops the CF index from the provided database if exists.
-func DropCfIndex(db database.DB) error {
-	return dropIndex(db, cfIndexParentBucketKey, cfIndexName)
+func DropCfIndex(db database.DB, interrupt <-chan struct{}) error {
+	return dropIndex(db, cfIndexParentBucketKey, cfIndexName, interrupt)
 }
