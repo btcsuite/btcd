@@ -183,7 +183,9 @@ func (a *AddrManager) updateAddress(netAddr, srcAddr *wire.NetAddress) {
 			naCopy := *ka.na
 			naCopy.Timestamp = netAddr.Timestamp
 			naCopy.AddService(netAddr.Services)
+			ka.mtx.Lock()
 			ka.na = &naCopy
+			ka.mtx.Unlock()
 		}
 
 		// If already in tried, we have nothing to do here.
@@ -823,9 +825,12 @@ func (a *AddrManager) Attempt(addr *wire.NetAddress) {
 	if ka == nil {
 		return
 	}
+
 	// set last tried time to now
+	ka.mtx.Lock()
 	ka.attempts++
 	ka.lastattempt = time.Now()
+	ka.mtx.Unlock()
 }
 
 // Connected Marks the given address as currently connected and working at the

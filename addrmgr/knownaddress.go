@@ -6,6 +6,7 @@
 package addrmgr
 
 import (
+	"sync"
 	"time"
 
 	"github.com/decred/dcrd/wire"
@@ -14,6 +15,7 @@ import (
 // KnownAddress tracks information about a known network address that is used
 // to determine how viable an address is.
 type KnownAddress struct {
+	mtx         sync.Mutex
 	na          *wire.NetAddress
 	srcAddr     *wire.NetAddress
 	attempts    int
@@ -26,11 +28,15 @@ type KnownAddress struct {
 // NetAddress returns the underlying wire.NetAddress associated with the
 // known address.
 func (ka *KnownAddress) NetAddress() *wire.NetAddress {
+	ka.mtx.Lock()
+	defer ka.mtx.Unlock()
 	return ka.na
 }
 
 // LastAttempt returns the last time the known address was attempted.
 func (ka *KnownAddress) LastAttempt() time.Time {
+	ka.mtx.Lock()
+	defer ka.mtx.Unlock()
 	return ka.lastattempt
 }
 
@@ -38,6 +44,8 @@ func (ka *KnownAddress) LastAttempt() time.Time {
 // depends upon how recently the address has been seen, how recently it was last
 // attempted and how often attempts to connect to it have failed.
 func (ka *KnownAddress) chance() float64 {
+	ka.mtx.Lock()
+	defer ka.mtx.Unlock()
 	now := time.Now()
 	lastSeen := now.Sub(ka.na.Timestamp)
 	lastAttempt := now.Sub(ka.lastattempt)
@@ -73,6 +81,8 @@ func (ka *KnownAddress) chance() float64 {
 // All addresses that meet these criteria are assumed to be worthless and not
 // worth keeping hold of.
 func (ka *KnownAddress) isBad() bool {
+	ka.mtx.Lock()
+	defer ka.mtx.Unlock()
 	if ka.lastattempt.After(time.Now().Add(-1 * time.Minute)) {
 		return false
 	}

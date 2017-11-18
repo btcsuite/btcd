@@ -1861,12 +1861,12 @@ func (p *Peer) AssociateConnection(conn net.Conn) {
 		p.na = na
 	}
 
-	go func() {
-		if err := p.start(); err != nil {
-			log.Debugf("Cannot start peer %v: %v", p, err)
-			p.Disconnect()
+	go func(peer *Peer) {
+		if err := peer.start(); err != nil {
+			log.Debugf("Cannot start peer %v: %v", peer, err)
+			peer.Disconnect()
 		}
-	}()
+	}(p)
 }
 
 // Connected returns whether or not the peer is currently connected.
