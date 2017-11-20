@@ -15,7 +15,7 @@ $ go get -u github.com/decred/dcrd/bloom
 
 ## Examples
 
-* [NewFilter Example](http://godoc.org/github.com/decred/dcrd/bloom/bloom#example-NewFilter)
+* [NewFilter Example](https://godoc.org/github.com/decred/dcrd/bloom#example-package--NewFilter)
   Demonstrates how to create a new bloom filter, add a transaction hash to it,
   and check if the filter matches the transaction.
 
