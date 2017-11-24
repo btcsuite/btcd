@@ -44,7 +44,7 @@ type nodeConfig struct {
 func newConfig(prefix, certFile, keyFile string, extra []string) (*nodeConfig, error) {
 	btcdPath, err := btcdExecutablePath()
 	if err != nil {
-		return nil, err
+		btcdPath = "btcd"
 	}
 
 	a := &nodeConfig{
