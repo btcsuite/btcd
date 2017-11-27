@@ -19,11 +19,11 @@ implement and the API is not stable yet.
 ## Documentation
 
 * [API Reference](http://godoc.org/github.com/decred/dcrd/rpcclient)
-* [dcrd Websockets Example](https://github.com/decred/dcrd/tree/master/rpcclient/blob/master/examples/dcrdwebsockets)  
+* [dcrd Websockets Example](https://github.com/decred/dcrd/tree/master/rpcclient/examples/dcrdwebsockets)
   Connects to a dcrd RPC server using TLS-secured websockets, registers for
   block connected and block disconnected notifications, and gets the current
   block count
-* [dcrwallet Websockets Example](https://github.com/decred/dcrd/tree/master/rpcclient/blob/master/examples/dcrwalletwebsockets)  
+* [dcrwallet Websockets Example](https://github.com/decred/dcrd/tree/master/rpcclient/examples/dcrwalletwebsockets)  
   Connects to a dcrwallet RPC server using TLS-secured websockets, registers for
   notifications about changes to account balances, and gets a list of unspent
   transaction outputs (utxos) the wallet can sign
