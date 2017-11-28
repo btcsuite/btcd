@@ -79,7 +79,7 @@ type DecodeScriptResult struct {
 	ReqSigs   int32    `json:"reqSigs,omitempty"`
 	Type      string   `json:"type"`
 	Addresses []string `json:"addresses,omitempty"`
-	P2sh      string   `json:"p2sh"`
+	P2sh      string   `json:"p2sh,omitempty"`
 }
 
 // GetAddedNodeInfoResultAddr models the data of the addresses portion of the
