@@ -197,6 +197,7 @@ type GetPeerInfoResult struct {
 	Addr           string  `json:"addr"`
 	AddrLocal      string  `json:"addrlocal,omitempty"`
 	Services       string  `json:"services"`
+	RelayTxes      bool    `json:"relaytxes"`
 	LastSend       int64   `json:"lastsend"`
 	LastRecv       int64   `json:"lastrecv"`
 	BytesSent      uint64  `json:"bytessent"`

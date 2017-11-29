@@ -3463,7 +3463,9 @@ func handleGetPeerInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 		info := &dcrjson.GetPeerInfoResult{
 			ID:             statsSnap.ID,
 			Addr:           statsSnap.Addr,
+			AddrLocal:      p.LocalAddr().String(),
 			Services:       fmt.Sprintf("%08d", uint64(statsSnap.Services)),
+			RelayTxes:      !p.disableRelayTx,
 			LastSend:       statsSnap.LastSend.Unix(),
 			LastRecv:       statsSnap.LastRecv.Unix(),
 			BytesSent:      statsSnap.BytesSent,

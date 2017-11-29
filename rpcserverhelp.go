@@ -569,6 +569,7 @@ var helpDescsEnUS = map[string]string{
 	"getpeerinforesult-addr":           "The ip address and port of the peer",
 	"getpeerinforesult-addrlocal":      "Local address",
 	"getpeerinforesult-services":       "Services bitmask which represents the services supported by the peer",
+	"getpeerinforesult-relaytxes":      "Peer has requested transactions be relayed to it",
 	"getpeerinforesult-lastsend":       "Time the last message was received in seconds since 1 Jan 1970 GMT",
 	"getpeerinforesult-lastrecv":       "Time the last message was sent in seconds since 1 Jan 1970 GMT",
 	"getpeerinforesult-bytessent":      "Total bytes sent",
