@@ -815,19 +815,15 @@ func TestCalcMultiSigStats(t *testing.T) {
 	}
 }
 
-// scriptClassTest houses a test used to ensure various scripts have the
-// expected class.
-type scriptClassTest struct {
-	name   string
-	script string
-	class  txscript.ScriptClass
-}
-
 // scriptClassTests houses several test scripts used to ensure various class
 // determination is working as expected.  It's defined as a test global versus
 // inside a function scope since this spans both the standard tests and the
 // consensus tests (pay-to-script-hash is part of consensus).
-var scriptClassTests = []scriptClassTest{
+var scriptClassTests = []struct {
+	name   string
+	script string
+	class  txscript.ScriptClass
+}{
 	{
 		name: "Pay Pubkey",
 		script: "DATA_65 0x0411db93e1dcdb8a016b49840f8c53bc1eb68a382e" +
@@ -858,21 +854,56 @@ var scriptClassTests = []scriptClassTest{
 			"9ae88 EQUAL",
 		class: txscript.ScriptHashTy,
 	},
+
 	{
 		// Nulldata with no data at all.
-		name:   "nulldata",
+		name:   "nulldata no data",
 		script: "RETURN",
 		class:  txscript.NullDataTy,
 	},
 	{
-		// Nulldata with small data.
-		name:   "nulldata2",
+		// Nulldata with single zero push.
+		name:   "nulldata zero",
+		script: "RETURN 0",
+		class:  txscript.NullDataTy,
+	},
+	{
+		// Nulldata with small integer push.
+		name:   "nulldata small int",
+		script: "RETURN 1",
+		class:  txscript.NullDataTy,
+	},
+	{
+		// Nulldata with max small integer push.
+		name:   "nulldata max small int",
+		script: "RETURN 16",
+		class:  txscript.NullDataTy,
+	},
+	{
+		// Nulldata with small data push.
+		name:   "nulldata small data",
 		script: "RETURN DATA_8 0x046708afdb0fe554",
 		class:  txscript.NullDataTy,
 	},
 	{
-		// Nulldata with max allowed data.
-		name: "nulldata3",
+		// Canonical nulldata with 60-byte data push.
+		name: "canonical nulldata 60-byte push",
+		script: "RETURN 0x3c 0x046708afdb0fe5548271967f1a67130b7105cd" +
+			"6a828e03909a67962e0ea1f61deb649f6bc3f4cef3046708afdb" +
+			"0fe5548271967f1a67130b7105cd6a",
+		class: txscript.NullDataTy,
+	},
+	{
+		// Non-canonical nulldata with 60-byte data push.
+		name: "non-canonical nulldata 60-byte push",
+		script: "RETURN PUSHDATA1 0x3c 0x046708afdb0fe5548271967f1a67" +
+			"130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef3" +
+			"046708afdb0fe5548271967f1a67130b7105cd6a",
+		class: txscript.NullDataTy,
+	},
+	{
+		// Nulldata with max allowed data to be considered standard.
+		name: "nulldata max standard push",
 		script: "RETURN PUSHDATA1 0x50 0x046708afdb0fe5548271967f1a67" +
 			"130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef3" +
 			"046708afdb0fe5548271967f1a67130b7105cd6a828e03909a67" +
@@ -880,9 +911,9 @@ var scriptClassTests = []scriptClassTest{
 		class: txscript.NullDataTy,
 	},
 	{
-		// Nulldata with more than max allowed data (so therefore
-		// nonstandard)
-		name: "nulldata4",
+		// Nulldata with more than max allowed data to be considered
+		// standard (so therefore nonstandard)
+		name: "nulldata exceed max standard push",
 		script: "RETURN PUSHDATA2 0x1801 0x046708afdb0fe5548271967f1a670" +
 			"46708afdb0fe5548271967f1a67046708afdb0fe5548271967f1a670467" +
 			"08afdb0fe5548271967f1a67046708afdb0fe5548271967f1a67046708a" +
@@ -894,7 +925,7 @@ var scriptClassTests = []scriptClassTest{
 	{
 		// Almost nulldata, but add an additional opcode after the data
 		// to make it nonstandard.
-		name:   "nulldata5",
+		name:   "almost nulldata",
 		script: "RETURN 4 TRUE",
 		class:  txscript.NonStandardTy,
 	},
@@ -964,8 +995,8 @@ func TestScriptClass(t *testing.T) {
 		script := mustParseShortForm(test.script)
 		class := txscript.GetScriptClass(txscript.DefaultScriptVersion, script)
 		if class != test.class {
-			t.Errorf("%s: expected %s got %s", test.name,
-				test.class, class)
+			t.Errorf("%s: expected %s got %s (script %x)", test.name,
+				test.class, class, script)
 			return
 		}
 	}

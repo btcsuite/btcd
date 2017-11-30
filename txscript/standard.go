@@ -234,7 +234,8 @@ func isNullData(pops []parsedOpcode) bool {
 
 	return l == 2 &&
 		pops[0].opcode.value == OP_RETURN &&
-		pops[1].opcode.value <= OP_PUSHDATA4 &&
+		(isSmallInt(pops[1].opcode) || pops[1].opcode.value <=
+			OP_PUSHDATA4) &&
 		len(pops[1].data) <= MaxDataCarrierSize
 }
 
