@@ -687,6 +687,17 @@ func (p *Peer) LastRecv() time.Time {
 	return time.Unix(atomic.LoadInt64(&p.lastRecv), 0)
 }
 
+// LocalAddr returns the local address of the connection.
+//
+// This function is safe fo concurrent access.
+func (p *Peer) LocalAddr() net.Addr {
+	var localAddr net.Addr
+	if p.Connected() {
+		localAddr = p.conn.LocalAddr()
+	}
+	return localAddr
+}
+
 // BytesSent returns the total number of bytes sent by the peer.
 //
 // This function is safe for concurrent access.
