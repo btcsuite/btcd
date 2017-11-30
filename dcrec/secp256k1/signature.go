@@ -95,7 +95,7 @@ func (sig *Signature) IsEqual(otherSig *Signature) bool {
 		sig.S.Cmp(otherSig.S) == 0
 }
 
-func parseSig(sigStr []byte, curve elliptic.Curve, der bool) (*Signature, error) {
+func parseSig(sigStr []byte, der bool) (*Signature, error) {
 	// Originally this code used encoding/asn1 in order to parse the
 	// signature, but a number of problems were found with this approach.
 	// Despite the fact that signatures are stored as DER, the difference
@@ -107,6 +107,7 @@ func parseSig(sigStr []byte, curve elliptic.Curve, der bool) (*Signature, error)
 	// <length of S> <S>.
 
 	signature := &Signature{}
+	curve := S256()
 
 	// minimal message is when both numbers are 1 bytes. adding up to:
 	// 0x30 + len + 0x02 + 0x01 + <byte> + 0x2 + 0x01 + <byte>
@@ -213,14 +214,14 @@ func parseSig(sigStr []byte, curve elliptic.Curve, der bool) (*Signature, error)
 // into a Signature type, perfoming some basic sanity checks.  If parsing
 // according to the more strict DER format is needed, use ParseDERSignature.
 func ParseSignature(sigStr []byte, curve elliptic.Curve) (*Signature, error) {
-	return parseSig(sigStr, curve, false)
+	return parseSig(sigStr, false)
 }
 
 // ParseDERSignature parses a signature in DER format for the curve type
 // `curve` into a Signature type.  If parsing according to the less strict
 // BER format is needed, use ParseSignature.
 func ParseDERSignature(sigStr []byte, curve elliptic.Curve) (*Signature, error) {
-	return parseSig(sigStr, curve, true)
+	return parseSig(sigStr, true)
 }
 
 // canonicalizeInt returns the bytes for the passed big integer adjusted as
@@ -264,8 +265,8 @@ func canonicalPadding(b []byte) error {
 // OpenSSL right shifts excess bits from the number if the hash is too large
 // and we mirror that too.
 // This is borrowed from crypto/ecdsa.
-func hashToInt(hash []byte, c elliptic.Curve) *big.Int {
-	orderBits := c.Params().N.BitLen()
+func hashToInt(hash []byte) *big.Int {
+	orderBits := S256().Params().N.BitLen()
 	orderBytes := (orderBits + 7) / 8
 	if len(hash) > orderBytes {
 		hash = hash[:orderBytes]
@@ -286,9 +287,10 @@ func hashToInt(hash []byte, c elliptic.Curve) *big.Int {
 // of the loop * 2 - on the first iteration of j we do the R case, else the -R
 // case in step 1.6. This counter is used in the decred compressed signature
 // format and thus we match bitcoind's behaviour here.
-func recoverKeyFromSignature(curve *KoblitzCurve, sig *Signature, msg []byte,
+func recoverKeyFromSignature(sig *Signature, msg []byte,
 	iter int, doChecks bool) (*PublicKey, error) {
 	// 1.1 x = (n * i) + r
+	curve := S256()
 	Rx := new(big.Int).Mul(curve.Params().N,
 		new(big.Int).SetInt64(int64(iter/2)))
 	Rx.Add(Rx, sig.R)
@@ -299,7 +301,7 @@ func recoverKeyFromSignature(curve *KoblitzCurve, sig *Signature, msg []byte,
 	// convert 02<Rx> to point R. (step 1.2 and 1.3). If we are on an odd
 	// iteration then 1.6 will be done with -R, so we calculate the other
 	// term when uncompressing the point.
-	Ry, err := decompressPoint(curve, Rx, iter%2 == 1)
+	Ry, err := decompressPoint(Rx, iter%2 == 1)
 	if err != nil {
 		return nil, err
 	}
@@ -314,7 +316,7 @@ func recoverKeyFromSignature(curve *KoblitzCurve, sig *Signature, msg []byte,
 
 	// 1.5 calculate e from message using the same algorithm as ecdsa
 	// signature calculation.
-	e := hashToInt(msg, curve)
+	e := hashToInt(msg)
 
 	// Step 1.6.1:
 	// We calculate the two terms sR and eG separately multiplied by the
@@ -352,18 +354,19 @@ func recoverKeyFromSignature(curve *KoblitzCurve, sig *Signature, msg []byte,
 // returned in the format:
 // <(byte of 27+public key solution)+4 if compressed >< padded bytes for signature R><padded bytes for signature S>
 // where the R and S parameters are padde up to the bitlengh of the curve.
-func SignCompact(curve *KoblitzCurve, key *PrivateKey,
+func SignCompact(key *PrivateKey,
 	hash []byte, isCompressedKey bool) ([]byte, error) {
 	sig, err := key.Sign(hash)
 	if err != nil {
 		return nil, err
 	}
 
+	curve := S256()
 	// bitcoind checks the bit length of R and S here. The ecdsa signature
 	// algorithm returns R and S mod N therefore they will be the bitsize of
 	// the curve, and thus correctly sized.
 	for i := 0; i < (curve.H+1)*2; i++ {
-		pk, err := recoverKeyFromSignature(curve, sig, hash, i, true)
+		pk, err := recoverKeyFromSignature(sig, hash, i, true)
 		if err == nil && pk.X.Cmp(key.X) == 0 && pk.Y.Cmp(key.Y) == 0 {
 			result := make([]byte, 1, 2*curve.byteSize+1)
 			result[0] = 27 + byte(i)
@@ -399,9 +402,9 @@ func SignCompact(curve *KoblitzCurve, key *PrivateKey,
 // Koblitz curve in "curve". If the signature matches then the recovered public
 // key will be returned as well as a boolen if the original key was compressed
 // or not, else an error will be returned.
-func RecoverCompact(curve *KoblitzCurve, signature,
+func RecoverCompact(signature,
 	hash []byte) (*PublicKey, bool, error) {
-	bitlen := (curve.BitSize + 7) / 8
+	bitlen := (S256().BitSize + 7) / 8
 	if len(signature) != 1+bitlen*2 {
 		return nil, false, errors.New("invalid compact signature size")
 	}
@@ -414,7 +417,7 @@ func RecoverCompact(curve *KoblitzCurve, signature,
 		S: new(big.Int).SetBytes(signature[bitlen+1:]),
 	}
 	// The iteration used here was encoded
-	key, err := recoverKeyFromSignature(curve, sig, hash, iteration, false)
+	key, err := recoverKeyFromSignature(sig, hash, iteration, false)
 	if err != nil {
 		return nil, false, err
 	}
@@ -439,7 +442,7 @@ func signRFC6979(privateKey *PrivateKey, hash []byte) (*Signature, error) {
 		return nil, errors.New("calculated R is zero")
 	}
 
-	e := hashToInt(hash, privkey.Curve)
+	e := hashToInt(hash)
 	s := new(big.Int).Mul(privkey.D, r)
 	s.Add(s, e)
 	s.Mul(s, inv)
@@ -467,7 +470,7 @@ func NonceRFC6979(privkey *big.Int, hash []byte, extra []byte,
 	qlen := q.BitLen()
 	holen := alg().Size()
 	rolen := (qlen + 7) >> 3
-	bx := append(int2octets(x, rolen), bits2octets(hash, curve, rolen)...)
+	bx := append(int2octets(x, rolen), bits2octets(hash, rolen)...)
 	if len(extra) == 32 {
 		bx = append(bx, extra...)
 	}
@@ -509,7 +512,7 @@ func NonceRFC6979(privkey *big.Int, hash []byte, extra []byte,
 		}
 
 		// Step H3
-		secret := hashToInt(t, curve)
+		secret := hashToInt(t)
 		if secret.Cmp(one) >= 0 && secret.Cmp(q) < 0 {
 			return secret
 		}
@@ -547,9 +550,9 @@ func int2octets(v *big.Int, rolen int) []byte {
 }
 
 // https://tools.ietf.org/html/rfc6979#section-2.3.4
-func bits2octets(in []byte, curve elliptic.Curve, rolen int) []byte {
-	z1 := hashToInt(in, curve)
-	z2 := new(big.Int).Sub(z1, curve.Params().N)
+func bits2octets(in []byte, rolen int) []byte {
+	z1 := hashToInt(in)
+	z2 := new(big.Int).Sub(z1, S256().Params().N)
 	if z2.Sign() < 0 {
 		return int2octets(z1, rolen)
 	}

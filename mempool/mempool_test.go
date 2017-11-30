@@ -350,7 +350,7 @@ func newPoolHarness(chainParams *chaincfg.Params) (*poolHarness, []spendableOutp
 	if err != nil {
 		return nil, nil, err
 	}
-	signKey, signPub := secp256k1.PrivKeyFromBytes(secp256k1.S256(), keyBytes)
+	signKey, signPub := secp256k1.PrivKeyFromBytes(keyBytes)
 
 	// Generate associated pay-to-script-hash address and resulting payment
 	// script.

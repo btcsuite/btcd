@@ -22,9 +22,9 @@ var BlakeVersionStringRFC6979 = []byte("Schnorr+BLAKE256")
 
 // CombinePubkeys combines a slice of public keys into a single public key
 // by adding them together with point addition.
-func CombinePubkeys(curve *secp256k1.KoblitzCurve,
-	pks []*secp256k1.PublicKey) *secp256k1.PublicKey {
+func CombinePubkeys(pks []*secp256k1.PublicKey) *secp256k1.PublicKey {
 	numPubKeys := len(pks)
+	curve := secp256k1.S256()
 
 	// Have to have at least two pubkeys.
 	if numPubKeys < 1 {
@@ -54,7 +54,7 @@ func CombinePubkeys(curve *secp256k1.KoblitzCurve,
 		return nil
 	}
 
-	return secp256k1.NewPublicKey(curve, pkSumX, pkSumY)
+	return secp256k1.NewPublicKey(pkSumX, pkSumY)
 }
 
 // nonceRFC6979 is a local instatiation of deterministic nonce generation
@@ -72,11 +72,12 @@ func nonceRFC6979(privkey []byte, hash []byte, extra []byte,
 // generateNoncePair deterministically generate a nonce pair for use in
 // partial signing of a message. Returns a public key (nonce to dissemanate)
 // and a private nonce to keep as a secret for the signer.
-func generateNoncePair(curve *secp256k1.KoblitzCurve, msg []byte, priv []byte,
+func generateNoncePair(msg []byte, priv []byte,
 	nonceFunction func([]byte, []byte, []byte, []byte) []byte, extra []byte,
 	version []byte) ([]byte, *secp256k1.PublicKey, error) {
 	k := nonceFunction(priv, msg, extra, version)
 	bigK := new(big.Int).SetBytes(k)
+	curve := secp256k1.S256()
 
 	// k scalar sanity checks.
 	if bigK.Cmp(bigZero) == 0 {
@@ -90,7 +91,7 @@ func generateNoncePair(curve *secp256k1.KoblitzCurve, msg []byte, priv []byte,
 	bigK.SetInt64(0)
 
 	pubx, puby := curve.ScalarBaseMult(k)
-	pubnonce := secp256k1.NewPublicKey(curve, pubx, puby)
+	pubnonce := secp256k1.NewPublicKey(pubx, puby)
 
 	return k, pubnonce, nil
 }
@@ -99,14 +100,13 @@ func generateNoncePair(curve *secp256k1.KoblitzCurve, msg []byte, priv []byte,
 func GenerateNoncePair(curve *secp256k1.KoblitzCurve, msg []byte,
 	privkey *secp256k1.PrivateKey, extra []byte,
 	version []byte) (*secp256k1.PrivateKey, *secp256k1.PublicKey, error) {
-	priv, pubNonce, err := generateNoncePair(curve, msg, privkey.Serialize(),
+	priv, pubNonce, err := generateNoncePair(msg, privkey.Serialize(),
 		nonceRFC6979, extra, version)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	privNonce := secp256k1.NewPrivateKey(curve,
-		EncodedBytesToBigInt(copyBytes(priv)))
+	privNonce := secp256k1.NewPrivateKey(EncodedBytesToBigInt(copyBytes(priv)))
 	return privNonce, pubNonce, nil
 }
 
@@ -163,7 +163,7 @@ func schnorrPartialSign(curve *secp256k1.KoblitzCurve, msg []byte, priv []byte,
 		return nil, schnorrError(ErrInputValue, str)
 	}
 
-	return schnorrSign(curve, msg, priv, privNonce, pubSum.GetX(),
+	return schnorrSign(msg, priv, privNonce, pubSum.GetX(),
 		pubSum.GetY(), hashFunc)
 }
 

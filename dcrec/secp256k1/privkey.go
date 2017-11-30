@@ -19,22 +19,23 @@ type PrivateKey ecdsa.PrivateKey
 
 // NewPrivateKey instantiates a new private key from a scalar encoded as a
 // big integer.
-func NewPrivateKey(curve *KoblitzCurve, d *big.Int) *PrivateKey {
+func NewPrivateKey(d *big.Int) *PrivateKey {
 	b := make([]byte, 0, PrivKeyBytesLen)
 	dB := paddedAppend(PrivKeyBytesLen, b, d.Bytes())
-	priv, _ := PrivKeyFromBytes(curve, dB)
+	priv, _ := PrivKeyFromBytes(dB)
 	return priv
 }
 
 // PrivKeyFromBytes returns a private and public key for `curve' based on the
 // private key passed as an argument as a byte slice.
-func PrivKeyFromBytes(curve *KoblitzCurve, pk []byte) (*PrivateKey,
+func PrivKeyFromBytes(pk []byte) (*PrivateKey,
 	*PublicKey) {
+	curve := S256()
 	x, y := curve.ScalarBaseMult(pk)
 
 	priv := &ecdsa.PrivateKey{
 		PublicKey: ecdsa.PublicKey{
-			Curve: curve,
+			Curve: S256(),
 			X:     x,
 			Y:     y,
 		},
@@ -45,15 +46,15 @@ func PrivKeyFromBytes(curve *KoblitzCurve, pk []byte) (*PrivateKey,
 }
 
 // PrivKeyFromScalar is the same as PrivKeyFromBytes in secp256k1.
-func PrivKeyFromScalar(curve *KoblitzCurve, s []byte) (*PrivateKey,
+func PrivKeyFromScalar(s []byte) (*PrivateKey,
 	*PublicKey) {
-	return PrivKeyFromBytes(curve, s)
+	return PrivKeyFromBytes(s)
 }
 
 // GeneratePrivateKey is a wrapper for ecdsa.GenerateKey that returns a PrivateKey
 // instead of the normal ecdsa.PrivateKey.
-func GeneratePrivateKey(curve *KoblitzCurve) (*PrivateKey, error) {
-	key, err := ecdsa.GenerateKey(curve, rand.Reader)
+func GeneratePrivateKey() (*PrivateKey, error) {
+	key, err := ecdsa.GenerateKey(S256(), rand.Reader)
 	if err != nil {
 		return nil, err
 	}
@@ -62,9 +63,9 @@ func GeneratePrivateKey(curve *KoblitzCurve) (*PrivateKey, error) {
 
 // GenerateKey generates a key using a random number generator, returning
 // the private scalar and the corresponding public key points.
-func GenerateKey(curve *KoblitzCurve, rand io.Reader) (priv []byte, x,
+func GenerateKey(rand io.Reader) (priv []byte, x,
 	y *big.Int, err error) {
-	key, err := ecdsa.GenerateKey(curve, rand)
+	key, err := ecdsa.GenerateKey(S256(), rand)
 	priv = key.D.Bytes()
 	x = key.PublicKey.X
 	y = key.PublicKey.Y

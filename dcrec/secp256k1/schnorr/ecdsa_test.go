@@ -121,13 +121,12 @@ func testSchnorrHash(msg []byte) []byte {
 
 func TestSchnorrSigning(t *testing.T) {
 	tRand := rand.New(rand.NewSource(54321))
-	curve := secp256k1.S256()
 	tvs := GetSigningTestVectors()
 	for _, tv := range tvs {
-		_, pubkey := secp256k1.PrivKeyFromBytes(curve, tv.priv)
+		_, pubkey := secp256k1.PrivKeyFromBytes(tv.priv)
 
 		sig, err :=
-			schnorrSign(curve, tv.msg, tv.priv, tv.nonce, nil, nil,
+			schnorrSign(tv.msg, tv.priv, tv.nonce, nil, nil,
 				testSchnorrHash)
 		if err != nil {
 			t.Fatalf("unexpected error %v", err)
@@ -139,7 +138,7 @@ func TestSchnorrSigning(t *testing.T) {
 		}
 
 		// Make sure they verify too while we're at it.
-		_, err = schnorrVerify(curve, sig.Serialize(), pubkey, tv.msg,
+		_, err = schnorrVerify(sig.Serialize(), pubkey, tv.msg,
 			testSchnorrHash)
 		if err != nil {
 			t.Fatalf("unexpected error %v", err)
@@ -147,7 +146,7 @@ func TestSchnorrSigning(t *testing.T) {
 
 		// See if we can recover the public keys OK.
 		var pkRecover *secp256k1.PublicKey
-		pkRecover, _, err = schnorrRecover(curve, sig.Serialize(), tv.msg,
+		pkRecover, _, err = schnorrRecover(sig.Serialize(), tv.msg,
 			testSchnorrHash)
 		if err != nil {
 			t.Fatalf("unexpected error %v", err)
@@ -163,15 +162,15 @@ func TestSchnorrSigning(t *testing.T) {
 		pos := tRand.Intn(63)
 		bitPos := tRand.Intn(7)
 		sigBad[pos] ^= 1 << uint8(bitPos)
-		_, err = schnorrVerify(curve, sigBad, pubkey, tv.msg,
+		_, err = schnorrVerify(sigBad, pubkey, tv.msg,
 			testSchnorrHash)
 		if err == nil {
 			t.Fatalf("expected an error, got %v", err)
 		}
 
 		// Make sure it breaks pubkey recovery too.
-		var valid bool
-		pkRecover, valid, err = schnorrRecover(curve, sigBad, tv.msg,
+		valid := false
+		pkRecover, valid, err = schnorrRecover(sigBad, tv.msg,
 			testSchnorrHash)
 		if valid {
 			cmp = bytes.Equal(pubkey.Serialize()[:], pkRecover.Serialize()[:])
@@ -186,8 +185,7 @@ func TestSchnorrSigning(t *testing.T) {
 	}
 }
 
-func randPrivKeyList(curve *secp256k1.KoblitzCurve,
-	i int) []*secp256k1.PrivateKey {
+func randPrivKeyList(i int) []*secp256k1.PrivateKey {
 	r := rand.New(rand.NewSource(54321))
 
 	privKeyList := make([]*secp256k1.PrivateKey, i)
@@ -199,7 +197,7 @@ func randPrivKeyList(curve *secp256k1.KoblitzCurve,
 				bIn[k] = uint8(randByte)
 			}
 
-			pks, _ := secp256k1.PrivKeyFromBytes(curve, bIn[:])
+			pks, _ := secp256k1.PrivKeyFromBytes(bIn[:])
 			if pks == nil {
 				continue
 			}
@@ -225,7 +223,7 @@ type SignatureVerParams struct {
 	sig    *Signature
 }
 
-func randSigList(curve *secp256k1.KoblitzCurve, i int) []*SignatureVerParams {
+func randSigList(i int) []*SignatureVerParams {
 	r := rand.New(rand.NewSource(54321))
 
 	privKeyList := make([]*secp256k1.PrivateKey, i)
@@ -237,7 +235,7 @@ func randSigList(curve *secp256k1.KoblitzCurve, i int) []*SignatureVerParams {
 				bIn[k] = uint8(randByte)
 			}
 
-			pks, _ := secp256k1.PrivKeyFromBytes(curve, bIn[:])
+			pks, _ := secp256k1.PrivKeyFromBytes(bIn[:])
 			if pks == nil {
 				continue
 			}
@@ -260,7 +258,7 @@ func randSigList(curve *secp256k1.KoblitzCurve, i int) []*SignatureVerParams {
 
 	sigsList := make([]*Signature, i)
 	for j := 0; j < i; j++ {
-		r, s, err := Sign(curve, privKeyList[j], msgList[j])
+		r, s, err := Sign(privKeyList[j], msgList[j])
 		if err != nil {
 			panic("sign failure")
 		}
@@ -272,7 +270,7 @@ func randSigList(curve *secp256k1.KoblitzCurve, i int) []*SignatureVerParams {
 	for j := 0; j < i; j++ {
 		ss := new(SignatureVerParams)
 		pkx, pky := privKeyList[j].Public()
-		ss.pubkey = secp256k1.NewPublicKey(curve, pkx, pky)
+		ss.pubkey = secp256k1.NewPublicKey(pkx, pky)
 		ss.msg = msgList[j]
 		ss.sig = sigsList[j]
 		sigStructList[j] = ss
@@ -283,31 +281,30 @@ func randSigList(curve *secp256k1.KoblitzCurve, i int) []*SignatureVerParams {
 
 // Use our actual hashing algorithm here.
 func TestSignaturesAndRecovery(t *testing.T) {
-	curve := secp256k1.S256()
 	r := rand.New(rand.NewSource(54321))
 
 	numSigs := 128
-	sigList := randSigList(curve, numSigs)
+	sigList := randSigList(numSigs)
 
 	for _, tv := range sigList {
 		pubkey := tv.pubkey
 		sig := tv.sig
 
 		// Make sure we can verify the original signature.
-		_, err := schnorrVerify(curve, sig.Serialize(), pubkey, tv.msg,
+		_, err := schnorrVerify(sig.Serialize(), pubkey, tv.msg,
 			chainhash.HashB)
 		if err != nil {
 			t.Fatalf("expected an error, got %v", err)
 		}
 
-		ok := Verify(curve, pubkey, tv.msg, sig.R, sig.S)
+		ok := Verify(pubkey, tv.msg, sig.R, sig.S)
 		if !ok {
 			t.Fatalf("expected %v, got %v", true, ok)
 		}
 
 		// See if we can recover the public keys OK.
 		var pkRecover *secp256k1.PublicKey
-		pkRecover, _, err = schnorrRecover(curve, sig.Serialize(), tv.msg,
+		pkRecover, _, err = schnorrRecover(sig.Serialize(), tv.msg,
 			chainhash.HashB)
 		if err != nil {
 			t.Fatalf("unexpected error %s", err)
@@ -328,15 +325,15 @@ func TestSignaturesAndRecovery(t *testing.T) {
 			bitPos := r.Intn(7)
 			sigBad[pos] ^= 1 << uint8(bitPos)
 		}
-		_, err = schnorrVerify(curve, sigBad, pubkey, tv.msg,
+		_, err = schnorrVerify(sigBad, pubkey, tv.msg,
 			chainhash.HashB)
 		if err == nil {
 			t.Fatalf("expected an error, got %v", err)
 		}
 
 		// Make sure it breaks pubkey recovery too.
-		var valid bool
-		pkRecover, valid, err = schnorrRecover(curve, sigBad, tv.msg,
+		valid := false
+		pkRecover, valid, err = schnorrRecover(sigBad, tv.msg,
 			testSchnorrHash)
 		if valid {
 			cmp := bytes.Equal(pubkey.Serialize()[:], pkRecover.Serialize()[:])
@@ -352,8 +349,6 @@ func TestSignaturesAndRecovery(t *testing.T) {
 }
 
 func benchmarkSigning(b *testing.B) {
-	curve := secp256k1.S256()
-
 	r := rand.New(rand.NewSource(54321))
 	msg := []byte{
 		0xbe, 0x13, 0xae, 0xf4,
@@ -367,11 +362,11 @@ func benchmarkSigning(b *testing.B) {
 	}
 
 	numKeys := 1024
-	privKeyList := randPrivKeyList(curve, numKeys)
+	privKeyList := randPrivKeyList(numKeys)
 
 	for n := 0; n < b.N; n++ {
 		randIndex := r.Intn(numKeys - 1)
-		_, _, err := Sign(curve, privKeyList[randIndex], msg)
+		_, _, err := Sign(privKeyList[randIndex], msg)
 		if err != nil {
 			panic("sign failure")
 		}
@@ -381,16 +376,14 @@ func benchmarkSigning(b *testing.B) {
 func BenchmarkSigning(b *testing.B) { benchmarkSigning(b) }
 
 func benchmarkVerification(b *testing.B) {
-	curve := secp256k1.S256()
 	r := rand.New(rand.NewSource(54321))
 
 	numSigs := 1024
-	sigList := randSigList(curve, numSigs)
+	sigList := randSigList(numSigs)
 
 	for n := 0; n < b.N; n++ {
 		randIndex := r.Intn(numSigs - 1)
-		ver := Verify(curve,
-			sigList[randIndex].pubkey,
+		ver := Verify(sigList[randIndex].pubkey,
 			sigList[randIndex].msg,
 			sigList[randIndex].sig.R,
 			sigList[randIndex].sig.S)

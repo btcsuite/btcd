@@ -42,5 +42,5 @@ func ParsePubKey(curve *secp256k1.KoblitzCurve,
 		return
 	}
 
-	return secp256k1.ParsePubKey(pubKeyStr, curve)
+	return secp256k1.ParsePubKey(pubKeyStr)
 }

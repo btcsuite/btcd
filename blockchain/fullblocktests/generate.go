@@ -1233,7 +1233,7 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 	// ---------------------------------------------------------------------
 
 	// Create a private/public key pair for signing transactions.
-	privKey, err := secp256k1.GeneratePrivateKey(secp256k1.S256())
+	privKey, err := secp256k1.GeneratePrivateKey()
 	if err != nil {
 		panic(err)
 	}

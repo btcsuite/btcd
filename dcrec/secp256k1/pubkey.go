@@ -25,10 +25,11 @@ func isOdd(a *big.Int) bool {
 
 // decompressPoint decompresses a point on the given curve given the X point and
 // the solution to use.
-func decompressPoint(curve *KoblitzCurve, x *big.Int, ybit bool) (*big.Int, error) {
+func decompressPoint(x *big.Int, ybit bool) (*big.Int, error) {
 	// TODO(oga) This will probably only work for secp256k1 due to
 	// optimizations.
 
+	curve := S256()
 	// Y = +-sqrt(x^3 + B)
 	x3 := new(big.Int).Mul(x, x)
 	x3.Mul(x3, x)
@@ -56,17 +57,17 @@ const (
 )
 
 // NewPublicKey instantiates a new public key with the given X,Y coordinates.
-func NewPublicKey(curve *KoblitzCurve, x *big.Int, y *big.Int) *PublicKey {
-	return &PublicKey{curve, x, y}
+func NewPublicKey(x *big.Int, y *big.Int) *PublicKey {
+	return &PublicKey{S256(), x, y}
 }
 
 // ParsePubKey parses a public key for a koblitz curve from a bytestring into a
 // ecdsa.Publickey, verifying that it is valid. It supports compressed,
 // uncompressed and hybrid signature formats.
-func ParsePubKey(pubKeyStr []byte, curve *KoblitzCurve) (key *PublicKey,
+func ParsePubKey(pubKeyStr []byte) (key *PublicKey,
 	err error) {
 	pubkey := PublicKey{}
-	pubkey.Curve = curve
+	pubkey.Curve = S256()
 
 	if len(pubKeyStr) == 0 {
 		return nil, errors.New("pubkey string is empty")
@@ -98,7 +99,7 @@ func ParsePubKey(pubKeyStr []byte, curve *KoblitzCurve) (key *PublicKey,
 				"pubkey string: %d", pubKeyStr[0])
 		}
 		pubkey.X = new(big.Int).SetBytes(pubKeyStr[1:33])
-		pubkey.Y, err = decompressPoint(curve, pubkey.X, ybit)
+		pubkey.Y, err = decompressPoint(pubkey.X, ybit)
 		if err != nil {
 			return nil, err
 		}
