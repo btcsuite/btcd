@@ -9,20 +9,20 @@ dcrd is a Decred full node implementation written in Go (golang).
 
 This acts as a chain daemon for the [Decred](https://decred.org) cryptocurrency.
 dcrd maintains the entire past transactional ledger of Decred and allows
- relaying of transactions to other Decred nodes across the world.  To read more 
-about Decred please see the 
+ relaying of transactions to other Decred nodes across the world.  To read more
+about Decred please see the
 [project documentation](https://docs.decred.org/#overview).
 
 Note: To send or receive funds and join Proof-of-Stake mining, you will also need
 [dcrwallet](https://github.com/decred/dcrwallet).
 
 This project is currently under active development and is in a Beta state.  It
-is extremely stable and has been in production use since February 2016.  
+is extremely stable and has been in production use since February 2016.
 
 It is forked from [btcd](https://github.com/btcsuite/btcd) which is a bitcoin
-full node implementation written in Go.  btcd is a ongoing project under active 
-development.  Because dcrd is constantly synced with btcd codebase, it will 
-get the benefit of btcd's ongoing upgrades to peer and connection handling, 
+full node implementation written in Go.  btcd is a ongoing project under active
+development.  Because dcrd is constantly synced with btcd codebase, it will
+get the benefit of btcd's ongoing upgrades to peer and connection handling,
 database optimization and other blockchain related technology improvements.
 
 ## Requirements
@@ -80,14 +80,14 @@ go install . ./cmd/...
 ```
 
 For more information about decred and how to set up your software please go to
-our docs page at [docs.decred.org](https://docs.decred.org/getting-started/beginner-guide/).  
+our docs page at [docs.decred.org](https://docs.decred.org/getting-started/beginner-guide/).
 
 ## Docker
 
 All tests and linters may be run in a docker container using the script `run_tests.sh`.  This script defaults to using the current supported version of go.  You can run it with the major version of go you would like to use as the only arguement to test a previous on a previous version of go (generally decred supports the current version of go and the previous one).
 
 ```
-./run_tests.sh 1.7
+./run_tests.sh 1.8
 ```
 
 To run the tests locally without docker:
