@@ -314,6 +314,8 @@ func (c *Client) handleMessage(msg []byte) {
 	// Attempt to unmarshal the message as either a notification or
 	// response.
 	var in inMessage
+	in.rawResponse = &rawResponse{}
+	in.rawNotification = &rawNotification{}
 	err := json.Unmarshal(msg, &in)
 	if err != nil {
 		log.Warnf("Remote server sent invalid message: %v", err)
