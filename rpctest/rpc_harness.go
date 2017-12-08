@@ -104,6 +104,20 @@ func New(activeNet *chaincfg.Params, handlers *rpcclient.NotificationHandlers, e
 	harnessStateMtx.Lock()
 	defer harnessStateMtx.Unlock()
 
+	// Add a flag for the appropriate network type based on the provided
+	// chain params.
+	switch activeNet.Net {
+	case wire.MainNet:
+		// No extra flags since mainnet is the default
+	case wire.TestNet2:
+		extraArgs = append(extraArgs, "--testnet")
+	case wire.SimNet:
+		extraArgs = append(extraArgs, "--simnet")
+	default:
+		return nil, fmt.Errorf("rpctest.New must be called with one " +
+			"of the supported chain networks")
+	}
+
 	harnessID := strconv.Itoa(numTestInstances)
 	nodeTestData, err := ioutil.TempDir("", "rpctest-"+harnessID)
 	if err != nil {

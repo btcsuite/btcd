@@ -14,12 +14,10 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"time"
 
 	"github.com/decred/dcrd/certgen"
 	rpc "github.com/decred/dcrd/rpcclient"
-	"github.com/decred/dcrd/wire"
 )
 
 // nodeConfig contains all the args, and data required to launch a dcrd process
@@ -83,8 +81,6 @@ func (n *nodeConfig) setDefaults() error {
 // process.
 func (n *nodeConfig) arguments() []string {
 	args := []string{}
-	// --simnet
-	args = append(args, fmt.Sprintf("--%s", strings.ToLower(wire.SimNet.String())))
 	if n.rpcUser != "" {
 		// --rpcuser
 		args = append(args, fmt.Sprintf("--rpcuser=%s", n.rpcUser))
