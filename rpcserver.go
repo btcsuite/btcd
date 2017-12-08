@@ -391,6 +391,13 @@ func rpcRuleError(fmtStr string, args ...interface{}) *dcrjson.RPCError {
 		fmt.Sprintf(fmtStr, args...))
 }
 
+// rpcDuplicateTxError is a convenience function to convert a
+// rejected duplicate tx  error to an RPC error with the appropriate code set.
+func rpcDuplicateTxError(fmtStr string, args ...interface{}) *dcrjson.RPCError {
+	return dcrjson.NewRPCError(dcrjson.ErrRPCDuplicateTx,
+		fmt.Sprintf(fmtStr, args...))
+}
+
 // rpcAddressKeyError is a convenience function to convert an address/key error to
 // an RPC error with the appropriate code set.  It also logs the error to the
 // RPC server subsystem since internal errors really should not occur.  The
@@ -5124,6 +5131,15 @@ func handleSendRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan st
 			err = fmt.Errorf("Rejected transaction %v: %v", tx.Hash(),
 				err)
 			rpcsLog.Debugf("%v", err)
+			txRuleErr, ok := err.(mempool.TxRuleError)
+			if ok {
+				if txRuleErr.RejectCode == wire.RejectDuplicate {
+					// return a dublicate tx error
+					return nil, rpcDuplicateTxError("%v", err)
+				}
+			}
+
+			// return a generic rule error
 			return nil, rpcRuleError("%v", err)
 		}
 
