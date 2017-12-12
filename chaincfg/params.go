@@ -465,7 +465,6 @@ var MainNetParams = Params{
 	DNSSeeds: []string{
 		"mainnet-seed.decred.mindcry.org",
 		"mainnet-seed.decred.netpurgatory.com",
-		"mainnet.decredseed.org",
 		"mainnet-seed.decred.org",
 	},
 
@@ -673,8 +672,7 @@ var TestNet2Params = Params{
 	DefaultPort: "19108",
 	DNSSeeds: []string{
 		"testnet-seed.decred.mindcry.org",
-		"testnet-seed.decred.netpurgatory.org",
-		"testnet.decredseed.org",
+		"testnet-seed.decred.netpurgatory.com",
 		"testnet-seed.decred.org",
 	},
 
