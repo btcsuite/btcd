@@ -292,12 +292,6 @@ func removeOpcodeByData(pkscript []parsedOpcode, data []byte) []parsedOpcode {
 
 }
 
-// CalcSignatureHash is an exported version for testing.
-func CalcSignatureHash(script []parsedOpcode, hashType SigHashType,
-	tx *wire.MsgTx, idx int, cachedPrefix *chainhash.Hash) ([]byte, error) {
-	return calcSignatureHash(script, hashType, tx, idx, cachedPrefix)
-}
-
 // calcSignatureHash will, given a script and hash type for the current script
 // engine instance, calculate the signature hash to be used for signing and
 // verification.
@@ -427,6 +421,20 @@ func calcSignatureHash(script []parsedOpcode, hashType SigHashType,
 	wbuf.Write(prefixHash[:])
 	wbuf.Write(witnessHash[:])
 	return chainhash.HashB(wbuf.Bytes()), nil
+}
+
+// CalcSignatureHash computes the signature hash for the specified input of
+// the target transaction observing the desired signature hash type.  The
+// cached prefix parameter allows the caller to optimize the calculation by
+// providing the prefix hash to be reused in the case of SigHashAll without the
+// SigHashAnyOneCanPay flag set.
+func CalcSignatureHash(script []byte, hashType SigHashType, tx *wire.MsgTx, idx int, cachedPrefix *chainhash.Hash) ([]byte, error) {
+	pops, err := parseScript(script)
+	if err != nil {
+		return nil, err
+	}
+
+	return calcSignatureHash(pops, hashType, tx, idx, cachedPrefix)
 }
 
 // asSmallInt returns the passed opcode, which must be true according to

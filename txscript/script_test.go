@@ -7,7 +7,6 @@ package txscript_test
 
 import (
 	"bytes"
-	"encoding/hex"
 	"reflect"
 	"testing"
 
@@ -524,35 +523,35 @@ func TestCalcSignatureHash(t *testing.T) {
 	}
 	for i := 0; i < 2; i++ {
 		txOut := new(wire.TxOut)
-		txOut.PkScript = []byte{0x01, 0x01, 0x02, 0x03}
+		txOut.PkScript = decodeHex("51")
 		txOut.Value = 0x0000FF00FF00FF00
 		tx.AddTxOut(txOut)
 	}
 
-	want, _ := hex.DecodeString("d09285b6f60c71329323bc2e76c48" +
-		"a462cde4e1032aa8f59c55823f1722c7f4a")
-	pops, _ := txscript.TstParseScript([]byte{0x01, 0x01, 0x02, 0x03})
+	want := decodeHex("4ce2cd042d64e35b36fdbd16aff0d38a5abebff0e5e8f6b6b31" +
+		"fcd4ac6957905")
+	script := decodeHex("51")
 
 	// Test prefix caching.
-	msg1, err := txscript.CalcSignatureHash(pops, txscript.SigHashAll, tx, 0, nil)
+	msg1, err := txscript.CalcSignatureHash(script, txscript.SigHashAll, tx, 0, nil)
 	if err != nil {
 		t.Fatalf("unexpected error %v", err.Error())
 	}
 
 	prefixHash := tx.TxHash()
-	msg2, err := txscript.CalcSignatureHash(pops, txscript.SigHashAll, tx, 0,
+	msg2, err := txscript.CalcSignatureHash(script, txscript.SigHashAll, tx, 0,
 		&prefixHash)
 	if err != nil {
 		t.Fatalf("unexpected error %v", err.Error())
 	}
 
 	if !bytes.Equal(msg1, want) {
-		t.Errorf("for sighash all sig noncached wrong msg %x given, want %x",
+		t.Errorf("for sighash all sig noncached wrong msg -- got %x, want %x",
 			msg1,
 			want)
 	}
 	if !bytes.Equal(msg2, want) {
-		t.Errorf("for sighash all sig cached wrong msg %x given, want %x",
+		t.Errorf("for sighash all sig cached wrong msg -- got %x, want %x",
 			msg1,
 			want)
 	}
@@ -565,7 +564,7 @@ func TestCalcSignatureHash(t *testing.T) {
 
 	// Move the index and make sure that we get a whole new hash, despite
 	// using the same TxOuts.
-	msg3, err := txscript.CalcSignatureHash(pops, txscript.SigHashAll, tx, 1,
+	msg3, err := txscript.CalcSignatureHash(script, txscript.SigHashAll, tx, 1,
 		&prefixHash)
 	if err != nil {
 		t.Fatalf("unexpected error %v", err.Error())
