@@ -30,6 +30,18 @@ func decodeHex(hexStr string) []byte {
 	return b
 }
 
+// hexToBytes converts the passed hex string into bytes and will panic if there
+// is an error.  This is only provided for the hard-coded constants so errors in
+// the source code can be detected. It will only (and must only) be called with
+// hard-coded values.
+func hexToBytes(s string) []byte {
+	b, err := hex.DecodeString(s)
+	if err != nil {
+		panic("invalid hex in source file: " + s)
+	}
+	return b
+}
+
 // mustParseShortForm parses the passed short form script and returns the
 // resulting bytes.  It panics if an error occurs.  This is only used in the
 // tests as a helper since the only way it can fail is if there is an error in
@@ -1054,6 +1066,109 @@ func TestStringifyClass(t *testing.T) {
 		if typeString != test.stringed {
 			t.Errorf("%s: got %#q, want %#q", test.name,
 				typeString, test.stringed)
+		}
+	}
+}
+
+// TestNullDataScript tests whether NullDataScript returns a valid script.
+func TestNullDataScript(t *testing.T) {
+	tests := []struct {
+		name     string
+		data     []byte
+		expected []byte
+		err      error
+		class    txscript.ScriptClass
+	}{
+		{
+			name:     "small int",
+			data:     hexToBytes("01"),
+			expected: mustParseShortForm("RETURN 1"),
+			err:      nil,
+			class:    txscript.NullDataTy,
+		},
+		{
+			name:     "max small int",
+			data:     hexToBytes("10"),
+			expected: mustParseShortForm("RETURN 16"),
+			err:      nil,
+			class:    txscript.NullDataTy,
+		},
+		{
+			name: "data of size before OP_PUSHDATA1 is needed",
+			data: hexToBytes("0102030405060708090a0b0c0d0e0f10111" +
+				"2131415161718"),
+			expected: mustParseShortForm("RETURN 0x18 0x01020304" +
+				"05060708090a0b0c0d0e0f101112131415161718"),
+			err:   nil,
+			class: txscript.NullDataTy,
+		},
+		{
+			name: "just right",
+			data: hexToBytes("000102030405060708090a0b0c0d0e0f1011121" +
+				"31415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f3" +
+				"03132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4" +
+				"d4e4f202122232425262728292a2b2c2d2e2f303132333435363738393" +
+				"a3b3c3d3e3f404142434445464748494a4b4c4d4e4f202122232425262" +
+				"728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434" +
+				"445464748494a4b4c4d4e4f202122232425262728292a2b2c2d2e2f303" +
+				"132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4" +
+				"e4f202122232425262728292a2b2c2d2e2f303132333435363738393a3" +
+				"b3c3d3e"),
+			expected: mustParseShortForm("RETURN PUSHDATA1 0xFF " +
+				"0x000102030405060708090a0b0c0d0e0f101112131415161" +
+				"718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f" +
+				"303132333435363738393a3b3c3d3e3f40414243444546474" +
+				"8494a4b4c4d4e4f202122232425262728292a2b2c2d2e2f30" +
+				"3132333435363738393a3b3c3d3e3f4041424344454647484" +
+				"94a4b4c4d4e4f202122232425262728292a2b2c2d2e2f3031" +
+				"32333435363738393a3b3c3d3e3f404142434445464748494" +
+				"a4b4c4d4e4f202122232425262728292a2b2c2d2e2f303132" +
+				"333435363738393a3b3c3d3e3f404142434445464748494a4" +
+				"b4c4d4e4f202122232425262728292a2b2c2d2e2f30313233" +
+				"3435363738393a3b3c3d3e"),
+			err:   nil,
+			class: txscript.NullDataTy,
+		},
+		{
+			name: "too big",
+			data: hexToBytes("000102030405060708090a0b0c0d0e0f10111213141516" +
+				"1718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363" +
+				"738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f2021222324252627" +
+				"28292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f40414243444546474" +
+				"8494a4b4c4d4e4f202122232425262728292a2b2c2d2e2f303132333435363738" +
+				"393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f2021222324252627282" +
+				"92a2b2c2d2e2f303132333435363738393a3b3c3d3e3f40414243444546474849" +
+				"4a4b4c4d4e4f202122232425262728292a2b2c2d2e2f303132333435363738393" +
+				"a3b3c3d3e3f3f"),
+			expected: nil,
+			err:      txscript.ErrStackLongScript,
+			class:    txscript.NonStandardTy,
+		},
+	}
+
+	for i, test := range tests {
+		script, err := txscript.NullDataScript(test.data)
+		if err != test.err {
+			t.Errorf("NullDataScript: #%d (%s) unexpected error: "+
+				"got %v, want %v", i, test.name, err, test.err)
+			continue
+		}
+
+		// Check that the expected result was returned.
+		if !bytes.Equal(script, test.expected) {
+			t.Errorf("NullDataScript: #%d (%s) wrong result\n"+
+				"got: %x\nwant: %x", i, test.name, script,
+				test.expected)
+			continue
+		}
+
+		// Check that the script has the correct type.
+		scriptType := txscript.GetScriptClass(txscript.DefaultScriptVersion, script)
+		if scriptType != test.class {
+			t.Errorf("GetScriptClass: #%d (%s) wrong result -- "+
+				"got: %v, want: %v", i, test.name, scriptType,
+				test.class)
+			continue
 		}
 	}
 }
