@@ -1000,6 +1000,10 @@ func GenerateSSGenVotes(votebits uint16) ([]byte, error) {
 
 // GenerateProvablyPruneableOut creates an OP_RETURN push of arbitrary data.
 func GenerateProvablyPruneableOut(data []byte) ([]byte, error) {
+	if len(data) > MaxDataCarrierSize {
+		return nil, ErrStackLongScript
+	}
+
 	return NewScriptBuilder().AddOp(OP_RETURN).AddData(data).Script()
 }
 
@@ -1046,16 +1050,6 @@ func PayToAddrScript(addr dcrutil.Address) ([]byte, error) {
 	}
 
 	return nil, ErrUnsupportedAddress
-}
-
-// NullDataScript creates a provably-prunable script containing OP_RETURN
-// followed by the passed data.
-func NullDataScript(data []byte) ([]byte, error) {
-	if len(data) > MaxDataCarrierSize {
-		return nil, ErrStackLongScript
-	}
-
-	return NewScriptBuilder().AddOp(OP_RETURN).AddData(data).Script()
 }
 
 // MultiSigScript returns a valid script for a multisignature redemption where

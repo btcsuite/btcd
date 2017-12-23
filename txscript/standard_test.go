@@ -1070,8 +1070,8 @@ func TestStringifyClass(t *testing.T) {
 	}
 }
 
-// TestNullDataScript tests whether NullDataScript returns a valid script.
-func TestNullDataScript(t *testing.T) {
+// TestGenerateProvablyPruneableOut tests whether GenerateProvablyPruneableOut returns a valid script.
+func TestGenerateProvablyPruneableOut(t *testing.T) {
 	tests := []struct {
 		name     string
 		data     []byte
@@ -1147,16 +1147,16 @@ func TestNullDataScript(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		script, err := txscript.NullDataScript(test.data)
+		script, err := txscript.GenerateProvablyPruneableOut(test.data)
 		if err != test.err {
-			t.Errorf("NullDataScript: #%d (%s) unexpected error: "+
+			t.Errorf("GenerateProvablyPruneableOut: #%d (%s) unexpected error: "+
 				"got %v, want %v", i, test.name, err, test.err)
 			continue
 		}
 
 		// Check that the expected result was returned.
 		if !bytes.Equal(script, test.expected) {
-			t.Errorf("NullDataScript: #%d (%s) wrong result\n"+
+			t.Errorf("GenerateProvablyPruneableOut: #%d (%s) wrong result\n"+
 				"got: %x\nwant: %x", i, test.name, script,
 				test.expected)
 			continue
