@@ -292,7 +292,7 @@ const (
 	OP_UNKNOWN246          = 0xf6 // 246
 	OP_UNKNOWN247          = 0xf7 // 247
 	OP_UNKNOWN248          = 0xf8 // 248
-	OP_SMALLDATA           = 0xf9 // 249 - bitcoin core internal
+	OP_INVALID249          = 0xf9 // 249 - bitcoin core internal
 	OP_SMALLINTEGER        = 0xfa // 250 - bitcoin core internal
 	OP_PUBKEYS             = 0xfb // 251 - bitcoin core internal
 	OP_UNKNOWN252          = 0xfc // 252
@@ -588,7 +588,7 @@ var opcodeArray = [256]opcode{
 	OP_UNKNOWN248: {OP_UNKNOWN248, "OP_UNKNOWN248", 1, opcodeNop},
 
 	// Bitcoin Core internal use opcode.  Defined here for completeness.
-	OP_SMALLDATA:    {OP_SMALLDATA, "OP_SMALLDATA", 1, opcodeInvalid},
+	OP_INVALID249:   {OP_INVALID249, "OP_INVALID249", 1, opcodeInvalid},
 	OP_SMALLINTEGER: {OP_SMALLINTEGER, "OP_SMALLINTEGER", 1, opcodeInvalid},
 	OP_PUBKEYS:      {OP_PUBKEYS, "OP_PUBKEYS", 1, opcodeInvalid},
 	OP_UNKNOWN252:   {OP_UNKNOWN252, "OP_UNKNOWN252", 1, opcodeInvalid},

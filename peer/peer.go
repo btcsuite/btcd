@@ -1846,8 +1846,9 @@ func (p *Peer) QueueInventory(invVect *wire.InvVect) {
 	p.outputInvChan <- invVect
 }
 
-// AssociateConnection associates the given conn to the peer.   Calling this
-// function when the peer is already connected will have no effect.
+// AssociateConnection associates the given conn to the peer.
+// Calling this function when the peer is already connected will
+// have no effect.
 func (p *Peer) AssociateConnection(conn net.Conn) {
 	// Already connected?
 	if !atomic.CompareAndSwapInt32(&p.connected, 0, 1) {
