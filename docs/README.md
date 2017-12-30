@@ -199,27 +199,29 @@ information.
 <a name="GoPackages" />
 
 * The Decred-related Go Packages:
-    * [dcrrpcclient](https://github.com/decred/dcrrpcclient) - Implements a
-	  robust and easy to use Websocket-enabled Decred JSON-RPC client
-    * [dcrjson](https://github.com/decred/dcrjson) - Provides an extensive API
-	  for the underlying JSON-RPC command and return values
-    * [wire](https://github.com/decred/dcrd/tree/master/wire) - Implements the
-	  Decred wire protocol
-    * [peer](https://github.com/decred/dcrd/tree/master/peer) -
-	  Provides a common base for creating and managing Decred network peers.
-    * [blockchain](https://github.com/decred/dcrd/tree/master/blockchain) -
-	  Implements Decred block handling and chain selection rules
-    * [txscript](https://github.com/decred/dcrd/tree/master/txscript) -
-	  Implements the Decred transaction scripting language
-    * [dcrec](https://github.com/decred/dcrd/tree/master/dcrec) - Implements
-	  support for the elliptic curve cryptographic functions needed for the
-	  Decred scripts
-    * [database](https://github.com/decred/dcrd/tree/master/database) -
-	  Provides a database interface for the Decred block chain
-    * [dcrutil](https://github.com/decred/dcrd/tree/master/dcrutil) - Provides Decred-specific
-	  convenience functions and types
-    * [chainhash](https://github.com/decred/dcrd/tree/master/chaincfg/chainhash) -
-	  Provides a generic hash type and associated functions that allows the
-	  specific hash algorithm to be abstracted.
-    * [connmgr](https://github.com/decred/dcrd/tree/master/connmgr) -
-      Package connmgr implements a generic Decred network connection manager.
+  * [dcrrpcclient](https://github.com/decred/dcrrpcclient) - Implements a
+    robust and easy to use Websocket-enabled Decred JSON-RPC client
+  * [dcrjson](https://github.com/decred/dcrjson) - Provides an extensive API
+    for the underlying JSON-RPC command and return values
+  * [wire](https://github.com/decred/dcrd/tree/master/wire) - Implements the
+    Decred wire protocol
+  * [peer](https://github.com/decred/dcrd/tree/master/peer) -
+    Provides a common base for creating and managing Decred network peers.
+  * [blockchain](https://github.com/decred/dcrd/tree/master/blockchain) -
+    Implements Decred block handling and chain selection rules
+  * [blockchain/fullblocktests](https://github.com/decred/dcrd/tree/master/blockchain/fullblocktests) -
+    Provides a set of block tests for testing the consensus validation rules
+  * [txscript](https://github.com/decred/dcrd/tree/master/txscript) -
+    Implements the Decred transaction scripting language
+  * [dcrec](https://github.com/decred/dcrd/tree/master/dcrec) - Implements
+    support for the elliptic curve cryptographic functions needed for the
+    Decred scripts
+  * [database](https://github.com/decred/dcrd/tree/master/database) -
+    Provides a database interface for the Decred block chain
+  * [dcrutil](https://github.com/decred/dcrd/tree/master/dcrutil) - Provides
+    Decred-specific convenience functions and types
+  * [chainhash](https://github.com/decred/dcrd/tree/master/chaincfg/chainhash) -
+    Provides a generic hash type and associated functions that allows the
+    specific hash algorithm to be abstracted.
+  * [connmgr](https://github.com/decred/dcrd/tree/master/connmgr) -
+    Package connmgr implements a generic Decred network connection manager.
