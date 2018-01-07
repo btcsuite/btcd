@@ -12,7 +12,9 @@ import (
 )
 
 const (
-	// ptrSize is the number of bytes in a native pointer
+	// ptrSize is the number of bytes in a native pointer.
+	//
+	// nolint: vet
 	ptrSize = 4 << (^uintptr(0) >> 63)
 
 	// staticDepth is the size of the static array to use for keeping track
