@@ -5563,17 +5563,15 @@ func handleTxFeeInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (
 // handleValidateAddress implements the validateaddress command.
 func handleValidateAddress(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	c := cmd.(*dcrjson.ValidateAddressCmd)
-
 	result := dcrjson.ValidateAddressChainResult{}
 	addr, err := dcrutil.DecodeAddress(c.Address)
-	if err != nil {
+	if err != nil || !addr.IsForNet(s.server.chainParams) {
 		// Return the default value (false) for IsValid.
 		return result, nil
 	}
 
 	result.Address = addr.EncodeAddress()
 	result.IsValid = true
-
 	return result, nil
 }
 
