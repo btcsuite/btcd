@@ -199,6 +199,16 @@ type TokenPayout struct {
 	Amount  int64
 }
 
+// DNSSeed identifies a DNS seed.
+type DNSSeed struct {
+	// Host defines the hostname of the seed.
+	Host string
+
+	// HasFiltering defines whether the seed supports filtering
+	// by service flags (wire.ServiceFlag).
+	HasFiltering bool
+}
+
 // Params defines a Decred network by its parameters.  These parameters may be
 // used by Decred applications to differentiate networks as well as addresses
 // and keys for one network from those intended for use on another network.
@@ -214,7 +224,7 @@ type Params struct {
 
 	// DNSSeeds defines a list of DNS seeds for the network that are used
 	// as one method to discover peers.
-	DNSSeeds []string
+	DNSSeeds []DNSSeed
 
 	// GenesisBlock defines the first block of the chain.
 	GenesisBlock *wire.MsgBlock
@@ -462,10 +472,10 @@ var MainNetParams = Params{
 	Name:        "mainnet",
 	Net:         wire.MainNet,
 	DefaultPort: "9108",
-	DNSSeeds: []string{
-		"mainnet-seed.decred.mindcry.org",
-		"mainnet-seed.decred.netpurgatory.com",
-		"mainnet-seed.decred.org",
+	DNSSeeds: []DNSSeed{
+		{"mainnet-seed.decred.mindcry.org", true},
+		{"mainnet-seed.decred.netpurgatory.com", true},
+		{"mainnet-seed.decred.org", true},
 	},
 
 	// Chain parameters
@@ -670,10 +680,10 @@ var TestNet2Params = Params{
 	Name:        "testnet2",
 	Net:         wire.TestNet2,
 	DefaultPort: "19108",
-	DNSSeeds: []string{
-		"testnet-seed.decred.mindcry.org",
-		"testnet-seed.decred.netpurgatory.com",
-		"testnet-seed.decred.org",
+	DNSSeeds: []DNSSeed{
+		{"testnet-seed.decred.mindcry.org", true},
+		{"testnet-seed.decred.netpurgatory.com", true},
+		{"testnet-seed.decred.org", true},
 	},
 
 	// Chain parameters
@@ -853,7 +863,7 @@ var SimNetParams = Params{
 	Name:        "simnet",
 	Net:         wire.SimNet,
 	DefaultPort: "18555",
-	DNSSeeds:    []string{}, // NOTE: There must NOT be any seeds.
+	DNSSeeds:    []DNSSeed{}, // NOTE: There must NOT be any seeds.
 
 	// Chain parameters
 	GenesisBlock:             &simNetGenesisBlock,
@@ -1085,6 +1095,11 @@ var (
 	scriptHashAddrIDs = make(map[[2]byte]struct{})
 	hdPrivToPubKeyIDs = make(map[[4]byte][]byte)
 )
+
+// String returns the hostname of the DNS seed in human-readable form.
+func (d DNSSeed) String() string {
+	return d.Host
+}
 
 // Register registers the network parameters for a Decred network.  This may
 // error with ErrDuplicateNet if the network is already registered (either

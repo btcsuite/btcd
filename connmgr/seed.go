@@ -5,6 +5,7 @@
 package connmgr
 
 import (
+	"fmt"
 	mrand "math/rand"
 	"net"
 	"strconv"
@@ -29,19 +30,26 @@ type OnSeed func(addrs []*wire.NetAddress)
 type LookupFunc func(string) ([]net.IP, error)
 
 // SeedFromDNS uses DNS seeding to populate the address manager with peers.
-func SeedFromDNS(chainParams *chaincfg.Params, lookupFn LookupFunc, seedFn OnSeed) {
-	for _, seeder := range chainParams.DNSSeeds {
-		go func(seeder string) {
+func SeedFromDNS(chainParams *chaincfg.Params, reqServices wire.ServiceFlag, lookupFn LookupFunc, seedFn OnSeed) {
+	for _, dnsseed := range chainParams.DNSSeeds {
+		var host string
+		if !dnsseed.HasFiltering || reqServices == wire.SFNodeNetwork {
+			host = dnsseed.Host
+		} else {
+			host = fmt.Sprintf("x%x.%s", uint64(reqServices), dnsseed.Host)
+		}
+
+		go func(host string) {
 			randSource := mrand.New(mrand.NewSource(time.Now().UnixNano()))
 
-			seedpeers, err := lookupFn(seeder)
+			seedpeers, err := lookupFn(host)
 			if err != nil {
-				log.Infof("DNS discovery failed on seed %s: %v", seeder, err)
+				log.Infof("DNS discovery failed on seed %s: %v", host, err)
 				return
 			}
 			numPeers := len(seedpeers)
 
-			log.Infof("%d addresses found from DNS seed %s", numPeers, seeder)
+			log.Infof("%d addresses found from DNS seed %s", numPeers, host)
 
 			if numPeers == 0 {
 				return
@@ -60,6 +68,6 @@ func SeedFromDNS(chainParams *chaincfg.Params, lookupFn LookupFunc, seedFn OnSee
 			}
 
 			seedFn(addresses)
-		}(seeder)
+		}(host)
 	}
 }
