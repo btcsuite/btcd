@@ -10,7 +10,7 @@ Address Manager Overview
 
 In order maintain the peer-to-peer Decred network, there needs to be a source
 of addresses to connect to as nodes come and go.  The Decred protocol provides
-a the getaddr and addr messages to allow peers to communicate known addresses
+the getaddr and addr messages to allow peers to communicate known addresses
 with each other.  However, there needs to a mechanism to store those results and
 select peers from them.  It is also important to note that remote peers can't
 be trusted to send valid peers nor attempt to provide you with only peers they
