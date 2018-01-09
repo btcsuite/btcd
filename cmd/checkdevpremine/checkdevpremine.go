@@ -54,8 +54,7 @@ func newHashFromStr(hexStr string) *chainhash.Hash {
 }
 
 // usage displays the general usage when the help flag is not displayed and
-// and an invalid command was specified.  The commandUsage function is used
-// instead when a valid command was specified.
+// and no single argument was specified.
 func usage(errorMessage string) {
 	appName := filepath.Base(os.Args[0])
 	appName = strings.TrimSuffix(appName, filepath.Ext(appName))
