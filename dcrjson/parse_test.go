@@ -8,12 +8,12 @@ import (
 	"bytes"
 	"encoding/hex"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/decred/dcrd/blockchain/stake"
 	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/dcrjson"
-	"strings"
 )
 
 func decodeHash(reversedHash string) chainhash.Hash {
