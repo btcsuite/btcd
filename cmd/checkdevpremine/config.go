@@ -28,14 +28,13 @@ var (
 //
 // See loadConfig for details on the configuration load process.
 type config struct {
-	ConfigFile    string `short:"C" long:"configfile" description:"Path to configuration file"`
-	RPCUser       string `short:"u" long:"rpcuser" description:"RPC username"`
-	RPCPassword   string `short:"P" long:"rpcpass" default-mask:"-" description:"RPC password"`
-	RPCServer     string `short:"s" long:"rpcserver" description:"RPC server to connect to"`
-	RPCCert       string `short:"c" long:"rpccert" description:"RPC server certificate chain for validation"`
-	NoTLS         bool   `long:"notls" description:"Disable TLS"`
-	TLSSkipVerify bool   `long:"skipverify" description:"Do not verify tls certificates (not recommended!)"`
-	Quiet         bool   `long:"quiet" description:"Do not print any found outpoints which can be useful if only relying on the return code"`
+	ConfigFile  string `short:"C" long:"configfile" description:"Path to configuration file"`
+	RPCUser     string `short:"u" long:"rpcuser" description:"RPC username"`
+	RPCPassword string `short:"P" long:"rpcpass" default-mask:"-" description:"RPC password"`
+	RPCServer   string `short:"s" long:"rpcserver" description:"RPC server to connect to"`
+	RPCCert     string `short:"c" long:"rpccert" description:"RPC server certificate chain for validation"`
+	NoTLS       bool   `long:"notls" description:"Disable TLS"`
+	Quiet       bool   `long:"quiet" description:"Do not print any found outpoints which can be useful if only relying on the return code"`
 }
 
 // normalizeAddress returns addr with the default port appended if there is not
