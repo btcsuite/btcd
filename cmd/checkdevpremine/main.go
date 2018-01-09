@@ -225,6 +225,7 @@ func realMain() int {
 		Endpoint:     "ws",
 		User:         cfg.RPCUser,
 		Pass:         cfg.RPCPassword,
+		DisableTLS:   cfg.NoTLS,
 		Certificates: certs,
 	}
 	client, err := rpcclient.New(connCfg, nil)
