@@ -1081,9 +1081,9 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/dcrutil"
 	"github.com/decred/dcrd/rpcclient"
-	"github.com/decred/dcrd/wire"
 )
 
 func main() {
@@ -1100,7 +1100,7 @@ func main() {
 	// not long-lived, the connection will be closed as soon as the program
 	// exits.
 	connCfg := &rpcclient.ConnConfig{
-		Host:         "localhost:19109",
+		Host:         "localhost:9109",
 		Endpoint:     "ws",
 		User:         "yourrpcuser",
 		Pass:         "yourrpcpass",
@@ -1115,8 +1115,8 @@ func main() {
 	// Query the RPC server for the genesis block using the "getblock"
 	// command with the verbose flag set to true and the verboseTx flag
 	// set to false.
-	genesisHashStr := "000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f"
-	blockHash, err := wire.NewShaHashFromStr(genesisHashStr)
+	genesisHashStr := "298e5cc3d985bfe7f81dc135f360abe089edd4396b86d2de66b0cef42b21d980"
+	blockHash, err := chainhash.NewHashFromStr(genesisHashStr)
 	if err != nil {
 		log.Fatal(err)
 	}
