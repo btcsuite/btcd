@@ -994,7 +994,7 @@ various languages.
 **8.1 Go**
 
 This section provides examples of using the RPC interface using Go and the
-[dcrrpcclient](https://github.com/decred/dcrrpcclient) package.
+[rpcclient](https://github.com/decred/dcrd/tree/master/rpcclient) package.
 
 * [Using getblockcount to Retrieve the Current Block Height](#ExampleGetBlockCount)
 * [Using getblock to Retrieve the Genesis Block](#ExampleGetBlock)
@@ -1006,7 +1006,7 @@ This section provides examples of using the RPC interface using Go and the
 **8.1.1 Using getblockcount to Retrieve the Current Block Height**<br />
 
 The following is an example Go application which uses the
-[dcrrpcclient](https://github.com/decred/dcrrpcclient) package to connect with
+[rpcclient](https://github.com/decred/dcrd/tree/master/rpcclient) package to connect with
 a dcrd instance via Websockets, issues [getblockcount](#getblockcount) to
 retrieve the current block height, and displays it.
 
@@ -1014,11 +1014,12 @@ retrieve the current block height, and displays it.
 package main
 
 import (
-	"github.com/decred/dcrrpcclient"
-	"github.com/decred/dcrd/dcrutil"
 	"io/ioutil"
 	"log"
 	"path/filepath"
+
+	"github.com/decred/dcrd/dcrutil"
+	"github.com/decred/dcrd/rpcclient"
 )
 
 func main() {
@@ -1034,14 +1035,14 @@ func main() {
 	// Create a new RPC client using websockets.  Since this example is
 	// not long-lived, the connection will be closed as soon as the program
 	// exits.
-	connCfg := &dcrrpcclient.ConnConfig{
+	connCfg := &rpcclient.ConnConfig{
 		Host:         "localhost:9109",
 		Endpoint:     "ws",
 		User:         "yourrpcuser",
 		Pass:         "yourrpcpass",
 		Certificates: certs,
 	}
-	client, err := dcrrpcclient.New(connCfg, nil)
+	client, err := rpcclient.New(connCfg, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -1059,7 +1060,7 @@ func main() {
 Which results in:
 
 ```bash
-Block count: 276978
+Block count: 203528
 ```
 
 <a name="ExampleGetBlock" />
@@ -1067,7 +1068,7 @@ Block count: 276978
 **8.1.2 Using getblock to Retrieve the Genesis Block**<br />
 
 The following is an example Go application which uses the
-[dcrrpcclient](https://github.com/decred/dcrrpcclient) package to connect with
+[rpcclient](https://github.com/decred/dcrd/tree/master/rpcclient) package to connect with
 a dcrd instance via Websockets, issues [getblock](#getblock) to retrieve
 information about the Genesis block, and display a few details about it.
 
@@ -1075,13 +1076,14 @@ information about the Genesis block, and display a few details about it.
 package main
 
 import (
-	"github.com/decred/dcrrpcclient"
-	"github.com/decred/dcrd/dcrutil"
-	"github.com/decred/dcrd/wire"
 	"io/ioutil"
 	"log"
 	"path/filepath"
 	"time"
+
+	"github.com/decred/dcrd/dcrutil"
+	"github.com/decred/dcrd/rpcclient"
+	"github.com/decred/dcrd/wire"
 )
 
 func main() {
@@ -1097,14 +1099,14 @@ func main() {
 	// Create a new RPC client using websockets.  Since this example is
 	// not long-lived, the connection will be closed as soon as the program
 	// exits.
-	connCfg := &dcrrpcclient.ConnConfig{
+	connCfg := &rpcclient.ConnConfig{
 		Host:         "localhost:19109",
 		Endpoint:     "ws",
 		User:         "yourrpcuser",
 		Pass:         "yourrpcpass",
 		Certificates: certs,
 	}
-	client, err := dcrrpcclient.New(connCfg, nil)
+	client, err := rpcclient.New(connCfg, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -1139,14 +1141,14 @@ func main() {
 Which results in:
 
 ```bash
-Hash: 000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f
+Hash: 298e5cc3d985bfe7f81dc135f360abe089edd4396b86d2de66b0cef42b21d980
 Previous Block: 0000000000000000000000000000000000000000000000000000000000000000
-Next Block: 00000000839a8e6886ab5951d76f411475428afc90947ee320161bbf18eb6048
-Merkle root: 4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b
-Timestamp: 2009-01-03 18:15:05 +0000 UTC
-Confirmations: 277290
-Difficulty: 1.000000
-Size (in bytes): 285
+Next Block: 000000000000437482b6d47f82f374cde539440ddb108b0a76886f0d87d126b9
+Merkle root: 66aa7491b9adce110585ccab7e3fb5fe280de174530cca10eba2c6c3df01c10d
+Timestamp: 2016-02-08 18:00:00 +0000 UTC
+Confirmations: 203529
+Difficulty: 32767.749998
+Size (in bytes): 0
 Num transactions: 1
 ```
 
@@ -1156,7 +1158,7 @@ Num transactions: 1
 Notifications (Websocket-specific)**<br />
 
 The following is an example Go application which uses the
-[dcrrpcclient](https://github.com/decred/dcrrpcclient) package to connect with
+[rpcclient](https://github.com/decred/dcrd/tree/master/rpcclient) package to connect with
 a dcrd instance via Websockets and registers for
 [blockconnected](#blockconnected) and [blockdisconnected](#blockdisconnected)
 notifications with [notifyblocks](#notifyblocks).  It also sets up handlers for
@@ -1166,24 +1168,25 @@ the notifications.
 package main
 
 import (
-	"github.com/decred/dcrrpcclient"
-	"github.com/decred/dcrd/dcrutil"
-	"github.com/decred/dcrd/wire"
 	"io/ioutil"
 	"log"
 	"path/filepath"
 	"time"
+
+	"github.com/decred/dcrd/dcrutil"
+	"github.com/decred/dcrd/rpcclient"
 )
 
 func main() {
 	// Setup handlers for blockconnected and blockdisconnected
 	// notifications.
-	ntfnHandlers := dcrrpcclient.NotificationHandlers{
-		OnBlockConnected: func(hash *wire.ShaHash, height int32) {
-			log.Printf("Block connected: %v (%d)", hash, height)
+	ntfnHandlers := rpcclient.NotificationHandlers{
+		OnBlockConnected: func(blockHeader []byte, transactions [][]byte) {
+			log.Printf("Block connected: %x (%d txs)", blockHeader, len(transactions))
+
 		},
-		OnBlockDisconnected: func(hash *wire.ShaHash, height int32) {
-			log.Printf("Block disconnected: %v", hash, height)
+		OnBlockDisconnected: func(blockHeader []byte) {
+			log.Printf("Block disconnected: %x", blockHeader)
 		},
 	}
 
@@ -1197,14 +1200,14 @@ func main() {
 	}
 
 	// Create a new RPC client using websockets.
-	connCfg := &dcrrpcclient.ConnConfig{
+	connCfg := &rpcclient.ConnConfig{
 		Host:         "localhost:9109",
 		Endpoint:     "ws",
 		User:         "yourrpcuser",
 		Pass:         "yourrpcpass",
 		Certificates: certs,
 	}
-	client, err := dcrrpcclient.New(connCfg, &ntfnHandlers)
+	client, err := rpcclient.New(connCfg, &ntfnHandlers)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -1234,10 +1237,10 @@ func main() {
 Example output:
 
 ```
-2014/05/12 20:33:17 Client shutdown in 10 seconds...
-2014/05/12 20:33:19 Block connected: 000000000000000007dff1f95f7b3f5eac2892a4123069517caf34e2c417650d (300461)
-2014/05/12 20:33:27 Client shutting down...
-2014/05/12 20:31:27 Client shutdown complete.
+Client shutdown in 10 seconds...
+Block connected: 050000008478546af6812f4b3cb2148b5967b2dab78c3438d31821760f000000000000002c5f513f6ed478b90a7fc3525bbd64d16ab9b577c6b01861a1e9438f42e22ad95369522fdb6d393edf7eff3f0b33e93b60361fef1ec678843faae2caec0b782701003406e68c8961050013004aa00000e21668193dcd2d0302000000a21d03002bed00003b125d5a005fd38e00000000f1ea07e25fff20eb000000000000000000000000000000000000000005000000 (0 txs)
+Client shutting down...
+Client shutdown complete.
 ```
 
 <a name="ExampleNodeJsCode" />
