@@ -868,7 +868,7 @@ func handleGenerate(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 			Code: btcjson.ErrRPCDifficulty,
 			Message: fmt.Sprintf("No support for `generate` on "+
 				"the current network, %s, as it's unlikely to "+
-				"be possible to main a block with the CPU.",
+				"be possible to mine a block with the CPU.",
 				s.cfg.ChainParams.Net),
 		}
 	}
