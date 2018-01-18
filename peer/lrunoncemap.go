@@ -12,10 +12,10 @@ import (
 	"sync"
 )
 
-// mruNonceMap provides a concurrency safe map that is limited to a maximum
+// lruNonceMap provides a concurrency safe map that is limited to a maximum
 // number of items with eviction for the oldest entry when the limit is
 // exceeded.
-type mruNonceMap struct {
+type lruNonceMap struct {
 	mtx       sync.Mutex
 	nonceMap  map[uint64]*list.Element // nearly O(1) lookups
 	nonceList *list.List               // O(1) insert, update, delete
@@ -25,7 +25,7 @@ type mruNonceMap struct {
 // String returns the map as a human-readable string.
 //
 // This function is safe for concurrent access.
-func (m *mruNonceMap) String() string {
+func (m *lruNonceMap) String() string {
 	m.mtx.Lock()
 	defer m.mtx.Unlock()
 
@@ -47,7 +47,7 @@ func (m *mruNonceMap) String() string {
 // Exists returns whether or not the passed nonce is in the map.
 //
 // This function is safe for concurrent access.
-func (m *mruNonceMap) Exists(nonce uint64) bool {
+func (m *lruNonceMap) Exists(nonce uint64) bool {
 	m.mtx.Lock()
 	_, exists := m.nonceMap[nonce]
 	m.mtx.Unlock()
@@ -60,7 +60,7 @@ func (m *mruNonceMap) Exists(nonce uint64) bool {
 // makes it the most recently used item.
 //
 // This function is safe for concurrent access.
-func (m *mruNonceMap) Add(nonce uint64) {
+func (m *lruNonceMap) Add(nonce uint64) {
 	m.mtx.Lock()
 	defer m.mtx.Unlock()
 
@@ -103,7 +103,7 @@ func (m *mruNonceMap) Add(nonce uint64) {
 // Delete deletes the passed nonce from the map (if it exists).
 //
 // This function is safe for concurrent access.
-func (m *mruNonceMap) Delete(nonce uint64) {
+func (m *lruNonceMap) Delete(nonce uint64) {
 	m.mtx.Lock()
 	if node, exists := m.nonceMap[nonce]; exists {
 		m.nonceList.Remove(node)
@@ -112,12 +112,12 @@ func (m *mruNonceMap) Delete(nonce uint64) {
 	m.mtx.Unlock()
 }
 
-// newMruNonceMap returns a new nonce map that is limited to the number of
+// newLruNonceMap returns a new nonce map that is limited to the number of
 // entries specified by limit.  When the number of entries exceeds the limit,
 // the oldest (least recently used) entry will be removed to make room for the
 // new entry.
-func newMruNonceMap(limit uint) *mruNonceMap {
-	m := mruNonceMap{
+func newLruNonceMap(limit uint) *lruNonceMap {
+	m := lruNonceMap{
 		nonceMap:  make(map[uint64]*list.Element),
 		nonceList: list.New(),
 		limit:     limit,

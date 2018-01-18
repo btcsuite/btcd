@@ -14,10 +14,10 @@ import (
 	"github.com/decred/dcrd/wire"
 )
 
-// mruInventoryMap provides a concurrency safe map that is limited to a maximum
+// lruInventoryMap provides a concurrency safe map that is limited to a maximum
 // number of items with eviction for the oldest entry when the limit is
 // exceeded.
-type mruInventoryMap struct {
+type lruInventoryMap struct {
 	invMtx  sync.Mutex
 	invMap  map[wire.InvVect]*list.Element // nearly O(1) lookups
 	invList *list.List                     // O(1) insert, update, delete
@@ -27,7 +27,7 @@ type mruInventoryMap struct {
 // String returns the map as a human-readable string.
 //
 // This function is safe for concurrent access.
-func (m *mruInventoryMap) String() string {
+func (m *lruInventoryMap) String() string {
 	m.invMtx.Lock()
 	defer m.invMtx.Unlock()
 
@@ -49,7 +49,7 @@ func (m *mruInventoryMap) String() string {
 // Exists returns whether or not the passed inventory item is in the map.
 //
 // This function is safe for concurrent access.
-func (m *mruInventoryMap) Exists(iv *wire.InvVect) bool {
+func (m *lruInventoryMap) Exists(iv *wire.InvVect) bool {
 	m.invMtx.Lock()
 	_, exists := m.invMap[*iv]
 	m.invMtx.Unlock()
@@ -62,7 +62,7 @@ func (m *mruInventoryMap) Exists(iv *wire.InvVect) bool {
 // item makes it the most recently used item.
 //
 // This function is safe for concurrent access.
-func (m *mruInventoryMap) Add(iv *wire.InvVect) {
+func (m *lruInventoryMap) Add(iv *wire.InvVect) {
 	m.invMtx.Lock()
 	defer m.invMtx.Unlock()
 
@@ -105,7 +105,7 @@ func (m *mruInventoryMap) Add(iv *wire.InvVect) {
 // Delete deletes the passed inventory item from the map (if it exists).
 //
 // This function is safe for concurrent access.
-func (m *mruInventoryMap) Delete(iv *wire.InvVect) {
+func (m *lruInventoryMap) Delete(iv *wire.InvVect) {
 	m.invMtx.Lock()
 	if node, exists := m.invMap[*iv]; exists {
 		m.invList.Remove(node)
@@ -114,12 +114,12 @@ func (m *mruInventoryMap) Delete(iv *wire.InvVect) {
 	m.invMtx.Unlock()
 }
 
-// newMruInventoryMap returns a new inventory map that is limited to the number
+// newLruInventoryMap returns a new inventory map that is limited to the number
 // of entries specified by limit.  When the number of entries exceeds the limit,
 // the oldest (least recently used) entry will be removed to make room for the
 // new entry.
-func newMruInventoryMap(limit uint) *mruInventoryMap {
-	m := mruInventoryMap{
+func newLruInventoryMap(limit uint) *lruInventoryMap {
+	m := lruInventoryMap{
 		invMap:  make(map[wire.InvVect]*list.Element),
 		invList: list.New(),
 		limit:   limit,

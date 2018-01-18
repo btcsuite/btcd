@@ -78,7 +78,7 @@ var (
 
 	// sentNonces houses the unique nonces that are generated when pushing
 	// version messages that are used to detect self connections.
-	sentNonces = newMruNonceMap(50)
+	sentNonces = newLruNonceMap(50)
 
 	// allowSelfConns is only used to allow the tests to bypass the self
 	// connection detecting and disconnect logic since they intentionally
@@ -414,7 +414,7 @@ type Peer struct {
 	versionSent          bool
 	verAckReceived       bool
 
-	knownInventory     *mruInventoryMap
+	knownInventory     *lruInventoryMap
 	prevGetBlocksMtx   sync.Mutex
 	prevGetBlocksBegin *chainhash.Hash
 	prevGetBlocksStop  *chainhash.Hash
@@ -2035,7 +2035,7 @@ func newPeerBase(cfg *Config, inbound bool) *Peer {
 
 	p := Peer{
 		inbound:         inbound,
-		knownInventory:  newMruInventoryMap(maxKnownInventory),
+		knownInventory:  newLruInventoryMap(maxKnownInventory),
 		stallControl:    make(chan stallControlMsg, 1), // nonblocking sync
 		outputQueue:     make(chan outMsg, outputBufferSize),
 		sendQueue:       make(chan outMsg, 1),   // nonblocking sync
