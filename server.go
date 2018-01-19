@@ -788,13 +788,28 @@ func (sp *serverPeer) OnGetCFHeaders(_ *peer.Peer, msg *wire.MsgGetCFHeaders) {
 		return
 	}
 
+	startHeight := int32(msg.StartHeight)
+	maxResults := wire.MaxCFHeadersPerMsg
+
+	// If StartHeight is positive, fetch the predecessor block hash so we can
+	// populate the PrevFilterHeader field.
+	if msg.StartHeight > 0 {
+		startHeight--
+		maxResults++
+	}
+
 	// Fetch the hashes from the block index.
-	hashList, err := sp.server.chain.HeightToHashRange(int32(msg.StartHeight),
-		&msg.StopHash, wire.MaxCFHeadersPerMsg)
+	hashList, err := sp.server.chain.HeightToHashRange(startHeight,
+		&msg.StopHash, maxResults)
 	if err != nil {
 		peerLog.Debugf("Invalid getcfheaders request: %v", err)
 	}
-	if len(hashList) == 0 {
+
+	// This is possible if StartHeight is one greater that the height of
+	// StopHash, and we pull a valid range of hashes including the previous
+	// filter header.
+	if len(hashList) == 0 || (msg.StartHeight > 0 && len(hashList) == 1) {
+		peerLog.Debug("No results for getcfheaders request")
 		return
 	}
 
@@ -815,6 +830,37 @@ func (sp *serverPeer) OnGetCFHeaders(_ *peer.Peer, msg *wire.MsgGetCFHeaders) {
 
 	// Generate cfheaders message and send it.
 	headersMsg := wire.NewMsgCFHeaders()
+
+	// Populate the PrevFilterHeader field.
+	if msg.StartHeight > 0 {
+		prevBlockHash := &hashList[0]
+
+		// Fetch the raw committed filter header bytes from the
+		// database.
+		headerBytes, err := sp.server.cfIndex.FilterHeaderByBlockHash(
+			prevBlockHash, msg.FilterType)
+		if err != nil {
+			peerLog.Errorf("Error retrieving CF header: %v", err)
+			return
+		}
+		if len(headerBytes) == 0 {
+			peerLog.Warnf("Could not obtain CF header for %v", prevBlockHash)
+			return
+		}
+
+		// Deserialize the hash into PrevFilterHeader.
+		err = headersMsg.PrevFilterHeader.SetBytes(headerBytes)
+		if err != nil {
+			peerLog.Warnf("Committed filter header deserialize "+
+				"failed: %v", err)
+			return
+		}
+
+		hashList = hashList[1:]
+		filterHeaders = filterHeaders[1:]
+	}
+
+	// Populate HeaderHashes.
 	for i, headerBytes := range filterHeaders {
 		if len(headerBytes) == 0 {
 			peerLog.Warnf("Could not obtain CF header for %v", hashList[i])
