@@ -11,6 +11,17 @@ import (
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 )
 
+// FilterType is used to represent a filter type.
+type FilterType uint8
+
+const (
+	// GCSFilterRegular is the regular filter type.
+	GCSFilterRegular FilterType = iota
+
+	// GCSFilterExtended is the extended filter type.
+	GCSFilterExtended
+)
+
 const (
 	// MaxCFilterDataSize is the maximum byte size of a committed filter.
 	// The maximum size is currently defined as 256KiB.

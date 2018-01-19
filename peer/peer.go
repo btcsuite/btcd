@@ -130,9 +130,6 @@ type MessageListeners struct {
 	// message.
 	OnCFHeaders func(p *Peer, msg *wire.MsgCFHeaders)
 
-	// OnCFTypes is invoked when a peer receives a cftypes bitcoin message.
-	OnCFTypes func(p *Peer, msg *wire.MsgCFTypes)
-
 	// OnInv is invoked when a peer receives an inv bitcoin message.
 	OnInv func(p *Peer, msg *wire.MsgInv)
 
@@ -161,10 +158,6 @@ type MessageListeners struct {
 	// OnGetCFHeaders is invoked when a peer receives a getcfheaders
 	// bitcoin message.
 	OnGetCFHeaders func(p *Peer, msg *wire.MsgGetCFHeaders)
-
-	// OnGetCFTypes is invoked when a peer receives a getcftypes bitcoin
-	// message.
-	OnGetCFTypes func(p *Peer, msg *wire.MsgGetCFTypes)
 
 	// OnFeeFilter is invoked when a peer receives a feefilter bitcoin message.
 	OnFeeFilter func(p *Peer, msg *wire.MsgFeeFilter)
@@ -1608,11 +1601,6 @@ out:
 				p.cfg.Listeners.OnGetCFHeaders(p, msg)
 			}
 
-		case *wire.MsgGetCFTypes:
-			if p.cfg.Listeners.OnGetCFTypes != nil {
-				p.cfg.Listeners.OnGetCFTypes(p, msg)
-			}
-
 		case *wire.MsgCFilter:
 			if p.cfg.Listeners.OnCFilter != nil {
 				p.cfg.Listeners.OnCFilter(p, msg)
@@ -1621,11 +1609,6 @@ out:
 		case *wire.MsgCFHeaders:
 			if p.cfg.Listeners.OnCFHeaders != nil {
 				p.cfg.Listeners.OnCFHeaders(p, msg)
-			}
-
-		case *wire.MsgCFTypes:
-			if p.cfg.Listeners.OnCFTypes != nil {
-				p.cfg.Listeners.OnCFTypes(p, msg)
 			}
 
 		case *wire.MsgFeeFilter:

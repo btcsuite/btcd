@@ -877,21 +877,6 @@ func (sp *serverPeer) OnGetCFHeaders(_ *peer.Peer, msg *wire.MsgGetCFHeaders) {
 	sp.QueueMessage(headersMsg, nil)
 }
 
-// OnGetCFTypes is invoked when a peer receives a getcftypes bitcoin message.
-func (sp *serverPeer) OnGetCFTypes(_ *peer.Peer, msg *wire.MsgGetCFTypes) {
-	// Ignore getcftypes requests if cfg.NoCFilters is set or we're not in
-	// sync.
-	if cfg.NoCFilters || !sp.server.syncManager.IsCurrent() {
-		return
-	}
-
-	// TODO: update to query blockchain indexes and/or config for supported
-	// filter types.
-	cfTypesMsg := wire.NewMsgCFTypes([]wire.FilterType{
-		wire.GCSFilterRegular, wire.GCSFilterExtended})
-	sp.QueueMessage(cfTypesMsg, nil)
-}
-
 // enforceNodeBloomFlag disconnects the peer if the server is not configured to
 // allow bloom filters.  Additionally, if the peer has negotiated to a protocol
 // version  that is high enough to observe the bloom filter service support bit,
@@ -1741,7 +1726,6 @@ func newPeerConfig(sp *serverPeer) *peer.Config {
 			OnGetHeaders:   sp.OnGetHeaders,
 			OnGetCFilter:   sp.OnGetCFilter,
 			OnGetCFHeaders: sp.OnGetCFHeaders,
-			OnGetCFTypes:   sp.OnGetCFTypes,
 			OnFeeFilter:    sp.OnFeeFilter,
 			OnFilterAdd:    sp.OnFilterAdd,
 			OnFilterClear:  sp.OnFilterClear,
