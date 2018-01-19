@@ -788,91 +788,36 @@ func (sp *serverPeer) OnGetCFHeaders(_ *peer.Peer, msg *wire.MsgGetCFHeaders) {
 		return
 	}
 
-	// Attempt to look up the height of the provided stop hash.
-	chain := sp.server.chain
-	endIdx := int32(math.MaxInt32)
-	height, err := chain.BlockHeightByHash(&msg.HashStop)
-	if err == nil {
-		endIdx = height + 1
-	}
-
-	// There are no block locators so a specific header is being requested
-	// as identified by the stop hash.
-	if len(msg.BlockLocatorHashes) == 0 {
-		// No blocks with the stop hash were found so there is nothing
-		// to do.  Just return.  This behavior mirrors the reference
-		// implementation.
-		if endIdx == math.MaxInt32 {
-			return
-		}
-
-		// Fetch the raw committed filter header bytes from the
-		// database.
-		headerBytes, err := sp.server.cfIndex.FilterHeaderByBlockHash(
-			&msg.HashStop, msg.FilterType)
-		if (err != nil) || (len(headerBytes) == 0) {
-			peerLog.Warnf("Could not obtain CF header for %v: %v",
-				msg.HashStop, err)
-			return
-		}
-
-		// Deserialize the hash.
-		var header chainhash.Hash
-		err = header.SetBytes(headerBytes)
-		if err != nil {
-			peerLog.Warnf("Committed filter header deserialize "+
-				"failed: %v", err)
-			return
-		}
-
-		headersMsg := wire.NewMsgCFHeaders()
-		headersMsg.AddCFHeader(&header)
-		headersMsg.StopHash = msg.HashStop
-		headersMsg.FilterType = msg.FilterType
-		sp.QueueMessage(headersMsg, nil)
-		return
-	}
-
-	// Find the most recent known block based on the block locator.
-	// Use the block after the genesis block if no other blocks in the
-	// provided locator are known.  This does mean the client will start
-	// over with the genesis block if unknown block locators are provided.
-	// This mirrors the behavior in the reference implementation.
-	startIdx := int32(1)
-	for _, hash := range msg.BlockLocatorHashes {
-		height, err := chain.BlockHeightByHash(hash)
-		if err == nil {
-			// Start with the next hash since we know this one.
-			startIdx = height + 1
-			break
-		}
-	}
-
-	// Don't attempt to fetch more than we can put into a single message.
-	if endIdx-startIdx > wire.MaxBlockHeadersPerMsg {
-		endIdx = startIdx + wire.MaxBlockHeadersPerMsg
-	}
-
-	// Fetch the inventory from the block database.
-	hashList, err := chain.HeightRange(startIdx, endIdx)
+	// Fetch the hashes from the block index.
+	hashList, err := sp.server.chain.HeightToHashRange(int32(msg.StartHeight),
+		&msg.StopHash, wire.MaxCFHeadersPerMsg)
 	if err != nil {
-		peerLog.Warnf("Header lookup failed: %v", err)
-		return
+		peerLog.Debugf("Invalid getcfheaders request: %v", err)
 	}
 	if len(hashList) == 0 {
 		return
 	}
 
+	// Create []*chainhash.Hash from []chainhash.Hash to pass to
+	// FilterHeadersByBlockHashes.
+	hashPtrs := make([]*chainhash.Hash, len(hashList))
+	for i := range hashList {
+		hashPtrs[i] = &hashList[i]
+	}
+
+	// Fetch the raw filter header bytes from the database for all blocks.
+	filterHeaders, err := sp.server.cfIndex.FilterHeadersByBlockHashes(hashPtrs,
+		msg.FilterType)
+	if err != nil {
+		peerLog.Errorf("Error retrieving cfilters: %v", err)
+		return
+	}
+
 	// Generate cfheaders message and send it.
 	headersMsg := wire.NewMsgCFHeaders()
-	for i := range hashList {
-		// Fetch the raw committed filter header bytes from the
-		// database.
-		headerBytes, err := sp.server.cfIndex.FilterHeaderByBlockHash(
-			&hashList[i], msg.FilterType)
-		if (err != nil) || (len(headerBytes) == 0) {
-			peerLog.Warnf("Could not obtain CF header for %v: %v",
-				hashList[i], err)
+	for i, headerBytes := range filterHeaders {
+		if len(headerBytes) == 0 {
+			peerLog.Warnf("Could not obtain CF header for %v", hashList[i])
 			return
 		}
 
