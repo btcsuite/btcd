@@ -360,8 +360,8 @@ func checkProofOfWork(header *wire.BlockHeader, powLimit *big.Int, flags Behavio
 // CheckProofOfWork ensures the block header bits which indicate the target
 // difficulty is in min/max range and that the block hash is less than the
 // target difficulty as claimed.
-func CheckProofOfWork(block *dcrutil.Block, powLimit *big.Int) error {
-	return checkProofOfWork(&block.MsgBlock().Header, powLimit, BFNone)
+func CheckProofOfWork(header *wire.BlockHeader, powLimit *big.Int) error {
+	return checkProofOfWork(header, powLimit, BFNone)
 }
 
 // checkBlockHeaderSanity performs some preliminary checks on a block header to
