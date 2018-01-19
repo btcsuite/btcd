@@ -106,7 +106,7 @@ func TestMessage(t *testing.T) {
 		{msgGetCFilters, msgGetCFilters, pver, MainNet, 61},
 		{msgGetCFHeaders, msgGetCFHeaders, pver, MainNet, 61},
 		{msgCFilter, msgCFilter, pver, MainNet, 65},
-		{msgCFHeaders, msgCFHeaders, pver, MainNet, 58},
+		{msgCFHeaders, msgCFHeaders, pver, MainNet, 90},
 	}
 
 	t.Logf("Running %d tests", len(tests))
