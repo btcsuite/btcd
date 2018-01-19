@@ -30,26 +30,28 @@ const (
 
 // MsgCFilter implements the Message interface and represents a bitcoin cfilter
 // message. It is used to deliver a committed filter in response to a
-// getcfilter (MsgGetCFilter) message.
+// getcfilters (MsgGetCFilters) message.
 type MsgCFilter struct {
-	BlockHash  chainhash.Hash
 	FilterType FilterType
+	BlockHash  chainhash.Hash
 	Data       []byte
 }
 
 // BtcDecode decodes r using the bitcoin protocol encoding into the receiver.
 // This is part of the Message interface implementation.
 func (msg *MsgCFilter) BtcDecode(r io.Reader, pver uint32, _ MessageEncoding) error {
-	// Read the hash of the filter's block
-	err := readElement(r, &msg.BlockHash)
-	if err != nil {
-		return err
-	}
 	// Read filter type
-	err = readElement(r, &msg.FilterType)
+	err := readElement(r, &msg.FilterType)
 	if err != nil {
 		return err
 	}
+
+	// Read the hash of the filter's block
+	err = readElement(r, &msg.BlockHash)
+	if err != nil {
+		return err
+	}
+
 	// Read filter data
 	msg.Data, err = ReadVarBytes(r, pver, MaxCFilterDataSize,
 		"cfilter data")
@@ -66,12 +68,12 @@ func (msg *MsgCFilter) BtcEncode(w io.Writer, pver uint32, _ MessageEncoding) er
 		return messageError("MsgCFilter.BtcEncode", str)
 	}
 
-	err := writeElement(w, msg.BlockHash)
+	err := writeElement(w, msg.FilterType)
 	if err != nil {
 		return err
 	}
 
-	err = writeElement(w, msg.FilterType)
+	err = writeElement(w, msg.BlockHash)
 	if err != nil {
 		return err
 	}
@@ -110,11 +112,11 @@ func (msg *MsgCFilter) MaxPayloadLength(pver uint32) uint32 {
 
 // NewMsgCFilter returns a new bitcoin cfilter message that conforms to the
 // Message interface. See MsgCFilter for details.
-func NewMsgCFilter(blockHash *chainhash.Hash, filterType FilterType,
+func NewMsgCFilter(filterType FilterType, blockHash *chainhash.Hash,
 	data []byte) *MsgCFilter {
 	return &MsgCFilter{
-		BlockHash:  *blockHash,
 		FilterType: filterType,
+		BlockHash:  *blockHash,
 		Data:       data,
 	}
 }

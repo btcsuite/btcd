@@ -743,26 +743,42 @@ func (sp *serverPeer) OnGetHeaders(_ *peer.Peer, msg *wire.MsgGetHeaders) {
 	sp.QueueMessage(&wire.MsgHeaders{Headers: blockHeaders}, nil)
 }
 
-// OnGetCFilter is invoked when a peer receives a getcfilter bitcoin message.
-func (sp *serverPeer) OnGetCFilter(_ *peer.Peer, msg *wire.MsgGetCFilter) {
-	// Ignore getcfilter requests if not in sync.
+// OnGetCFilters is invoked when a peer receives a getcfilters bitcoin message.
+func (sp *serverPeer) OnGetCFilters(_ *peer.Peer, msg *wire.MsgGetCFilters) {
+	// Ignore getcfilters requests if not in sync.
 	if !sp.server.syncManager.IsCurrent() {
 		return
 	}
 
-	filterBytes, err := sp.server.cfIndex.FilterByBlockHash(&msg.BlockHash,
-		msg.FilterType)
-
-	if len(filterBytes) > 0 {
-		peerLog.Tracef("Obtained CF for %v", msg.BlockHash)
-	} else {
-		peerLog.Warnf("Could not obtain CF for %v: %v", msg.BlockHash,
-			err)
+	hashes, err := sp.server.chain.HeightToHashRange(int32(msg.StartHeight),
+		&msg.StopHash, wire.MaxGetCFiltersReqRange)
+	if err != nil {
+		peerLog.Debugf("Invalid getcfilters request: %v", err)
+		return
 	}
 
-	filterMsg := wire.NewMsgCFilter(&msg.BlockHash, msg.FilterType,
-		filterBytes)
-	sp.QueueMessage(filterMsg, nil)
+	// Create []*chainhash.Hash from []chainhash.Hash to pass to
+	// FiltersByBlockHashes.
+	hashPtrs := make([]*chainhash.Hash, len(hashes))
+	for i := range hashes {
+		hashPtrs[i] = &hashes[i]
+	}
+
+	filters, err := sp.server.cfIndex.FiltersByBlockHashes(hashPtrs,
+		msg.FilterType)
+	if err != nil {
+		peerLog.Errorf("Error retrieving cfilters: %v", err)
+		return
+	}
+
+	for i, filterBytes := range filters {
+		if len(filterBytes) == 0 {
+			peerLog.Warnf("Could not obtain cfilter for %v", hashes[i])
+			return
+		}
+		filterMsg := wire.NewMsgCFilter(msg.FilterType, &hashes[i], filterBytes)
+		sp.QueueMessage(filterMsg, nil)
+	}
 }
 
 // OnGetCFHeaders is invoked when a peer receives a getcfheader bitcoin message.
@@ -1724,7 +1740,7 @@ func newPeerConfig(sp *serverPeer) *peer.Config {
 			OnGetData:      sp.OnGetData,
 			OnGetBlocks:    sp.OnGetBlocks,
 			OnGetHeaders:   sp.OnGetHeaders,
-			OnGetCFilter:   sp.OnGetCFilter,
+			OnGetCFilters:  sp.OnGetCFilters,
 			OnGetCFHeaders: sp.OnGetCFHeaders,
 			OnFeeFilter:    sp.OnFeeFilter,
 			OnFilterAdd:    sp.OnFilterAdd,

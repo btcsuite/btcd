@@ -69,9 +69,9 @@ func TestMessage(t *testing.T) {
 	bh := NewBlockHeader(1, &chainhash.Hash{}, &chainhash.Hash{}, 0, 0)
 	msgMerkleBlock := NewMsgMerkleBlock(bh)
 	msgReject := NewMsgReject("block", RejectDuplicate, "duplicate block")
-	msgGetCFilter := NewMsgGetCFilter(&chainhash.Hash{}, GCSFilterExtended)
+	msgGetCFilters := NewMsgGetCFilters(GCSFilterExtended, 0, &chainhash.Hash{})
 	msgGetCFHeaders := NewMsgGetCFHeaders()
-	msgCFilter := NewMsgCFilter(&chainhash.Hash{}, GCSFilterExtended,
+	msgCFilter := NewMsgCFilter(GCSFilterExtended, &chainhash.Hash{},
 		[]byte("payload"))
 	msgCFHeaders := NewMsgCFHeaders()
 
@@ -103,7 +103,7 @@ func TestMessage(t *testing.T) {
 		{msgFilterLoad, msgFilterLoad, pver, MainNet, 35},
 		{msgMerkleBlock, msgMerkleBlock, pver, MainNet, 110},
 		{msgReject, msgReject, pver, MainNet, 79},
-		{msgGetCFilter, msgGetCFilter, pver, MainNet, 57},
+		{msgGetCFilters, msgGetCFilters, pver, MainNet, 61},
 		{msgGetCFHeaders, msgGetCFHeaders, pver, MainNet, 58},
 		{msgCFilter, msgCFilter, pver, MainNet, 65},
 		{msgCFHeaders, msgCFHeaders, pver, MainNet, 58},
