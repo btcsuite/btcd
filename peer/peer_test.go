@@ -540,7 +540,7 @@ func TestPeerListeners(t *testing.T) {
 		},
 		{
 			"OnGetCFHeaders",
-			wire.NewMsgGetCFHeaders(),
+			wire.NewMsgGetCFHeaders(wire.GCSFilterRegular, 0, &chainhash.Hash{}),
 		},
 		{
 			"OnCFilter",

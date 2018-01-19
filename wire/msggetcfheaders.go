@@ -5,7 +5,6 @@
 package wire
 
 import (
-	"fmt"
 	"io"
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
@@ -15,87 +14,51 @@ import (
 // filter headers. It allows to set the FilterType field to get headers in the
 // chain of basic (0x00) or extended (0x01) headers.
 type MsgGetCFHeaders struct {
-	BlockLocatorHashes []*chainhash.Hash
-	HashStop           chainhash.Hash
-	FilterType         FilterType
-}
-
-// AddBlockLocatorHash adds a new block locator hash to the message.
-func (msg *MsgGetCFHeaders) AddBlockLocatorHash(hash *chainhash.Hash) error {
-	if len(msg.BlockLocatorHashes)+1 > MaxBlockLocatorsPerMsg {
-		str := fmt.Sprintf("too many block locator hashes for message [max %v]",
-			MaxBlockLocatorsPerMsg)
-		return messageError("MsgGetCFHeaders.AddBlockLocatorHash", str)
-	}
-
-	msg.BlockLocatorHashes = append(msg.BlockLocatorHashes, hash)
-	return nil
+	FilterType  FilterType
+	StartHeight uint32
+	StopHash    chainhash.Hash
 }
 
 // BtcDecode decodes r using the bitcoin protocol encoding into the receiver.
 // This is part of the Message interface implementation.
 func (msg *MsgGetCFHeaders) BtcDecode(r io.Reader, pver uint32, _ MessageEncoding) error {
-	// Read num block locator hashes and limit to max.
-	count, err := ReadVarInt(r, pver)
-	if err != nil {
-		return err
-	}
-	if count > MaxBlockLocatorsPerMsg {
-		str := fmt.Sprintf("too many block locator hashes for message "+
-			"[count %v, max %v]", count, MaxBlockLocatorsPerMsg)
-		return messageError("MsgGetHeaders.BtcDecode", str)
-	}
-
-	// Create a contiguous slice of hashes to deserialize into in order to
-	// reduce the number of allocations.
-	locatorHashes := make([]chainhash.Hash, count)
-	msg.BlockLocatorHashes = make([]*chainhash.Hash, 0, count)
-	for i := uint64(0); i < count; i++ {
-		hash := &locatorHashes[i]
-		err := readElement(r, hash)
-		if err != nil {
-			return err
-		}
-		msg.AddBlockLocatorHash(hash)
-	}
-
-	err = readElement(r, &msg.HashStop)
+	err := readElement(r, &msg.FilterType)
 	if err != nil {
 		return err
 	}
 
-	return readElement(r, &msg.FilterType)
+	err = readElement(r, &msg.StartHeight)
+	if err != nil {
+		return err
+	}
+
+	err = readElement(r, &msg.StopHash)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // BtcEncode encodes the receiver to w using the bitcoin protocol encoding.
 // This is part of the Message interface implementation.
 func (msg *MsgGetCFHeaders) BtcEncode(w io.Writer, pver uint32, _ MessageEncoding) error {
-	// Limit to max block locator hashes per message.
-	count := len(msg.BlockLocatorHashes)
-	if count > MaxBlockLocatorsPerMsg {
-		str := fmt.Sprintf("too many block locator hashes for message "+
-			"[count %v, max %v]", count, MaxBlockLocatorsPerMsg)
-		return messageError("MsgGetHeaders.BtcEncode", str)
-	}
-
-	err := WriteVarInt(w, pver, uint64(count))
+	err := writeElement(w, msg.FilterType)
 	if err != nil {
 		return err
 	}
 
-	for _, hash := range msg.BlockLocatorHashes {
-		err := writeElement(w, hash)
-		if err != nil {
-			return err
-		}
-	}
-
-	err = writeElement(w, &msg.HashStop)
+	err = writeElement(w, &msg.StartHeight)
 	if err != nil {
 		return err
 	}
 
-	return writeElement(w, msg.FilterType)
+	err = writeElement(w, &msg.StopHash)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // Command returns the protocol command string for the message.  This is part
@@ -107,18 +70,18 @@ func (msg *MsgGetCFHeaders) Command() string {
 // MaxPayloadLength returns the maximum length the payload can be for the
 // receiver.  This is part of the Message interface implementation.
 func (msg *MsgGetCFHeaders) MaxPayloadLength(pver uint32) uint32 {
-	// Num block locator hashes (varInt) + max allowed
-	// block locators + hash stop + filter type 1 byte.
-	return MaxVarIntPayload + (MaxBlockLocatorsPerMsg *
-		chainhash.HashSize) + chainhash.HashSize + 1
+	// Filter type + uint32 + block hash
+	return 1 + 4 + chainhash.HashSize
 }
 
 // NewMsgGetCFHeaders returns a new bitcoin getcfheader message that conforms to
 // the Message interface using the passed parameters and defaults for the
 // remaining fields.
-func NewMsgGetCFHeaders() *MsgGetCFHeaders {
+func NewMsgGetCFHeaders(filterType FilterType, startHeight uint32,
+	stopHash *chainhash.Hash) *MsgGetCFHeaders {
 	return &MsgGetCFHeaders{
-		BlockLocatorHashes: make([]*chainhash.Hash, 0,
-			MaxBlockLocatorsPerMsg),
+		FilterType:  filterType,
+		StartHeight: startHeight,
+		StopHash:    *stopHash,
 	}
 }
