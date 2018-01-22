@@ -53,6 +53,7 @@ const (
 	CmdFeeFilter    = "feefilter"
 	CmdGetCFilters  = "getcfilters"
 	CmdGetCFHeaders = "getcfheaders"
+	CmdGetCFCheckpt = "getcfcheckpt"
 	CmdCFilter      = "cfilter"
 	CmdCFHeaders    = "cfheaders"
 )
@@ -165,6 +166,9 @@ func makeEmptyMessage(command string) (Message, error) {
 
 	case CmdGetCFHeaders:
 		msg = &MsgGetCFHeaders{}
+
+	case CmdGetCFCheckpt:
+		msg = &MsgGetCFCheckpt{}
 
 	case CmdCFilter:
 		msg = &MsgCFilter{}
