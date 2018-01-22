@@ -30,18 +30,18 @@ type MsgCFHeaders struct {
 	FilterType       FilterType
 	StopHash         chainhash.Hash
 	PrevFilterHeader chainhash.Hash
-	HeaderHashes     []*chainhash.Hash
+	FilterHashes     []*chainhash.Hash
 }
 
 // AddCFHeader adds a new committed filter header to the message.
-func (msg *MsgCFHeaders) AddCFHeader(headerHash *chainhash.Hash) error {
-	if len(msg.HeaderHashes)+1 > MaxCFHeadersPerMsg {
+func (msg *MsgCFHeaders) AddCFHash(hash *chainhash.Hash) error {
+	if len(msg.FilterHashes)+1 > MaxCFHeadersPerMsg {
 		str := fmt.Sprintf("too many block headers in message [max %v]",
 			MaxBlockHeadersPerMsg)
-		return messageError("MsgCFHeaders.AddCFHeader", str)
+		return messageError("MsgCFHeaders.AddCFHash", str)
 	}
 
-	msg.HeaderHashes = append(msg.HeaderHashes, headerHash)
+	msg.FilterHashes = append(msg.FilterHashes, hash)
 	return nil
 }
 
@@ -80,16 +80,16 @@ func (msg *MsgCFHeaders) BtcDecode(r io.Reader, pver uint32, _ MessageEncoding) 
 		return messageError("MsgCFHeaders.BtcDecode", str)
 	}
 
-	// Create a contiguous slice of headers to deserialize into in order to
+	// Create a contiguous slice of hashes to deserialize into in order to
 	// reduce the number of allocations.
-	msg.HeaderHashes = make([]*chainhash.Hash, 0, count)
+	msg.FilterHashes = make([]*chainhash.Hash, 0, count)
 	for i := uint64(0); i < count; i++ {
 		var cfh chainhash.Hash
 		err := readElement(r, &cfh)
 		if err != nil {
 			return err
 		}
-		msg.AddCFHeader(&cfh)
+		msg.AddCFHash(&cfh)
 	}
 
 	return nil
@@ -117,7 +117,7 @@ func (msg *MsgCFHeaders) BtcEncode(w io.Writer, pver uint32, _ MessageEncoding) 
 	}
 
 	// Limit to max committed headers per message.
-	count := len(msg.HeaderHashes)
+	count := len(msg.FilterHashes)
 	if count > MaxCFHeadersPerMsg {
 		str := fmt.Sprintf("too many committed filter headers for "+
 			"message [count %v, max %v]", count,
@@ -130,7 +130,7 @@ func (msg *MsgCFHeaders) BtcEncode(w io.Writer, pver uint32, _ MessageEncoding) 
 		return err
 	}
 
-	for _, cfh := range msg.HeaderHashes {
+	for _, cfh := range msg.FilterHashes {
 		err := writeElement(w, cfh)
 		if err != nil {
 			return err
@@ -175,6 +175,6 @@ func (msg *MsgCFHeaders) MaxPayloadLength(pver uint32) uint32 {
 // the Message interface. See MsgCFHeaders for details.
 func NewMsgCFHeaders() *MsgCFHeaders {
 	return &MsgCFHeaders{
-		HeaderHashes: make([]*chainhash.Hash, 0, MaxCFHeadersPerMsg),
+		FilterHashes: make([]*chainhash.Hash, 0, MaxCFHeadersPerMsg),
 	}
 }
