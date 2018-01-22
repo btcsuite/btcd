@@ -159,6 +159,10 @@ type MessageListeners struct {
 	// bitcoin message.
 	OnGetCFHeaders func(p *Peer, msg *wire.MsgGetCFHeaders)
 
+	// OnGetCFCheckpt is invoked when a peer receives a getcfcheckpt
+	// bitcoin message.
+	OnGetCFCheckpt func(p *Peer, msg *wire.MsgGetCFCheckpt)
+
 	// OnFeeFilter is invoked when a peer receives a feefilter bitcoin message.
 	OnFeeFilter func(p *Peer, msg *wire.MsgFeeFilter)
 
@@ -1599,6 +1603,11 @@ out:
 		case *wire.MsgGetCFHeaders:
 			if p.cfg.Listeners.OnGetCFHeaders != nil {
 				p.cfg.Listeners.OnGetCFHeaders(p, msg)
+			}
+
+		case *wire.MsgGetCFCheckpt:
+			if p.cfg.Listeners.OnGetCFCheckpt != nil {
+				p.cfg.Listeners.OnGetCFCheckpt(p, msg)
 			}
 
 		case *wire.MsgCFilter:
