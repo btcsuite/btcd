@@ -820,11 +820,11 @@ func (sp *serverPeer) OnGetCFHeaders(_ *peer.Peer, msg *wire.MsgGetCFHeaders) {
 		hashPtrs[i] = &hashList[i]
 	}
 
-	// Fetch the raw filter header bytes from the database for all blocks.
-	filterHeaders, err := sp.server.cfIndex.FilterHeadersByBlockHashes(hashPtrs,
+	// Fetch the raw filter hash bytes from the database for all blocks.
+	filterHashes, err := sp.server.cfIndex.FilterHashesByBlockHashes(hashPtrs,
 		msg.FilterType)
 	if err != nil {
-		peerLog.Errorf("Error retrieving cfilters: %v", err)
+		peerLog.Errorf("Error retrieving cfilter hashes: %v", err)
 		return
 	}
 
@@ -857,30 +857,29 @@ func (sp *serverPeer) OnGetCFHeaders(_ *peer.Peer, msg *wire.MsgGetCFHeaders) {
 		}
 
 		hashList = hashList[1:]
-		filterHeaders = filterHeaders[1:]
+		filterHashes = filterHashes[1:]
 	}
 
 	// Populate HeaderHashes.
-	for i, headerBytes := range filterHeaders {
-		if len(headerBytes) == 0 {
-			peerLog.Warnf("Could not obtain CF header for %v", hashList[i])
+	for i, hashBytes := range filterHashes {
+		if len(hashBytes) == 0 {
+			peerLog.Warnf("Could not obtain CF hash for %v", hashList[i])
 			return
 		}
 
 		// Deserialize the hash.
-		var header chainhash.Hash
-		err = header.SetBytes(headerBytes)
+		filterHash, err := chainhash.NewHash(hashBytes)
 		if err != nil {
-			peerLog.Warnf("Committed filter header deserialize "+
+			peerLog.Warnf("Committed filter hash deserialize "+
 				"failed: %v", err)
 			return
 		}
 
-		headersMsg.AddCFHeader(&header)
+		headersMsg.AddCFHash(filterHash)
 	}
 
 	headersMsg.FilterType = msg.FilterType
-	headersMsg.StopHash = hashList[len(hashList)-1]
+	headersMsg.StopHash = msg.StopHash
 	sp.QueueMessage(headersMsg, nil)
 }
 
