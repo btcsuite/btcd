@@ -59,7 +59,7 @@
   branch = "master"
   name = "github.com/decred/base58"
   packages = ["."]
-  revision = "b3520e187fa8ebe65eb74245408cf4b83e6a65d3"
+  revision = "a5d313ea54d82327fbdc0fefc817776aa74f44f0"
 
 [[projects]]
   name = "github.com/jessevdk/go-flags"
@@ -83,13 +83,13 @@
   branch = "master"
   name = "golang.org/x/crypto"
   packages = ["ripemd160","ssh/terminal"]
-  revision = "9419663f5a44be8b34ca85f08abc5fe1be11f8a3"
+  revision = "31469a2049ca68f6ce80281568c2d81dc700f104"
 
 [[projects]]
   branch = "master"
   name = "golang.org/x/sys"
   packages = ["unix","windows"]
-  revision = "ebfc5b4631820b793c9010c87fd8fef0f39eb082"
+  revision = "af50095a40f9041b3b38960738837185c26e9419"
 
 [solve-meta]
   analyzer-name = "dep"
