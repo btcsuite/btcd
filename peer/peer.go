@@ -130,6 +130,10 @@ type MessageListeners struct {
 	// message.
 	OnCFHeaders func(p *Peer, msg *wire.MsgCFHeaders)
 
+	// OnCFCheckpt is invoked when a peer receives a cfcheckpt bitcoin
+	// message.
+	OnCFCheckpt func(p *Peer, msg *wire.MsgCFCheckpt)
+
 	// OnInv is invoked when a peer receives an inv bitcoin message.
 	OnInv func(p *Peer, msg *wire.MsgInv)
 
