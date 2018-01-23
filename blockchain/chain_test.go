@@ -892,3 +892,75 @@ func TestHeightToHashRange(t *testing.T) {
 		}
 	}
 }
+
+// TestIntervalBlockHashes ensures that fetching block hashes at specified
+// intervals by end hash works as expected.
+func TestIntervalBlockHashes(t *testing.T) {
+	// Construct a synthetic block chain with a block index consisting of
+	// the following structure.
+	// 	genesis -> 1 -> 2 -> ... -> 15 -> 16  -> 17  -> 18
+	// 	                              \-> 16a -> 17a -> 18a (unvalidated)
+	tip := tstTip
+	chain := newFakeChain(&chaincfg.MainNetParams)
+	branch0Nodes := chainedNodes(chain.bestChain.Genesis(), 18)
+	branch1Nodes := chainedNodes(branch0Nodes[14], 3)
+	for _, node := range branch0Nodes {
+		chain.index.SetStatusFlags(node, statusValid)
+		chain.index.AddNode(node)
+	}
+	for _, node := range branch1Nodes {
+		if node.height < 18 {
+			chain.index.SetStatusFlags(node, statusValid)
+		}
+		chain.index.AddNode(node)
+	}
+	chain.bestChain.SetTip(tip(branch0Nodes))
+
+	tests := []struct {
+		name        string
+		endHash     chainhash.Hash
+		interval    int
+		hashes      []chainhash.Hash
+		expectError bool
+	}{
+		{
+			name:     "blocks on main chain",
+			endHash:  branch0Nodes[17].hash,
+			interval: 8,
+			hashes:   nodeHashes(branch0Nodes, 7, 15),
+		},
+		{
+			name:     "blocks on stale chain",
+			endHash:  branch1Nodes[1].hash,
+			interval: 8,
+			hashes: append(nodeHashes(branch0Nodes, 7),
+				nodeHashes(branch1Nodes, 0)...),
+		},
+		{
+			name:     "no results",
+			endHash:  branch0Nodes[17].hash,
+			interval: 20,
+			hashes:   []chainhash.Hash{},
+		},
+		{
+			name:        "unvalidated block",
+			endHash:     branch1Nodes[2].hash,
+			interval:    8,
+			expectError: true,
+		},
+	}
+	for _, test := range tests {
+		hashes, err := chain.IntervalBlockHashes(&test.endHash, test.interval)
+		if err != nil {
+			if !test.expectError {
+				t.Errorf("%s: unexpected error: %v", test.name, err)
+			}
+			continue
+		}
+
+		if !reflect.DeepEqual(hashes, test.hashes) {
+			t.Errorf("%s: unxpected hashes -- got %v, want %v",
+				test.name, hashes, test.hashes)
+		}
+	}
+}

@@ -1364,6 +1364,45 @@ func (b *BlockChain) HeightToHashRange(startHeight int32,
 	return hashes, nil
 }
 
+// IntervalBlockHashes returns hashes for all blocks that are ancestors of
+// endHash where the block height is a positive multiple of interval.
+//
+// This function is safe for concurrent access.
+func (b *BlockChain) IntervalBlockHashes(endHash *chainhash.Hash, interval int,
+) ([]chainhash.Hash, error) {
+
+	endNode := b.index.LookupNode(endHash)
+	if endNode == nil {
+		return nil, fmt.Errorf("no known block header with hash %v", endHash)
+	}
+	if !b.index.NodeStatus(endNode).KnownValid() {
+		return nil, fmt.Errorf("block %v is not yet validated", endHash)
+	}
+	endHeight := endNode.height
+
+	resultsLength := int(endHeight) / interval
+	hashes := make([]chainhash.Hash, resultsLength)
+
+	b.bestChain.mtx.Lock()
+	defer b.bestChain.mtx.Unlock()
+
+	blockNode := endNode
+	for index := int(endHeight) / interval; index > 0; index-- {
+		// Use the bestChain chainView for faster lookups once lookup intersects
+		// the best chain.
+		blockHeight := int32(index * interval)
+		if b.bestChain.contains(blockNode) {
+			blockNode = b.bestChain.nodeByHeight(blockHeight)
+		} else {
+			blockNode = blockNode.Ancestor(blockHeight)
+		}
+
+		hashes[index-1] = blockNode.hash
+	}
+
+	return hashes, nil
+}
+
 // locateInventory returns the node of the block after the first known block in
 // the locator along with the number of subsequent nodes needed to either reach
 // the provided stop hash or the provided max number of entries.
