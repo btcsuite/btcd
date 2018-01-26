@@ -1054,13 +1054,13 @@ func handleGetBlock(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 		}
 	}
 
-	// When the verbose flag isn't set, simply return the serialized block
+	// When the verbosity value setted to 0, simply return the serialized block
 	// as a hex-encoded string.
-	if c.Verbose != nil && !*c.Verbose {
+	if c.Verbosity != nil && *c.Verbosity == 0 {
 		return hex.EncodeToString(blkBytes), nil
 	}
 
-	// The verbose flag is set, so generate the JSON object and return it.
+	// Generate the JSON object and return it.
 
 	// Deserialize the block.
 	blk, err := btcutil.NewBlockFromBytes(blkBytes)
@@ -1109,7 +1109,8 @@ func handleGetBlock(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 		NextHash:      nextHashString,
 	}
 
-	if c.VerboseTx == nil || !*c.VerboseTx {
+	// When the verbosity value isn't set, setted to 1 or not equal 0 or 2
+	if c.Verbosity == nil || *c.Verbosity == 1 || (*c.Verbosity != 0 && *c.Verbosity != 2) {
 		transactions := blk.Transactions()
 		txNames := make([]string, len(transactions))
 		for i, tx := range transactions {
