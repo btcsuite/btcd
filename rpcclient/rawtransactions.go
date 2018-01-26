@@ -624,3 +624,41 @@ func (c *Client) SearchRawTransactionsVerbose(address btcutil.Address, skip,
 	return c.SearchRawTransactionsVerboseAsync(address, skip, count,
 		includePrevOut, reverse, &filterAddrs).Receive()
 }
+
+// FutureDecodeScriptResult is a future promise to deliver the result
+// of a DecodeScriptAsync RPC invocation (or an applicable error).
+type FutureDecodeScriptResult chan *response
+
+// Receive waits for the response promised by the future and returns information
+// about a script given its serialized bytes.
+func (r FutureDecodeScriptResult) Receive() (*btcjson.DecodeScriptResult, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal result as a decodescript result object.
+	var decodeScriptResult btcjson.DecodeScriptResult
+	err = json.Unmarshal(res, &decodeScriptResult)
+	if err != nil {
+		return nil, err
+	}
+
+	return &decodeScriptResult, nil
+}
+
+// DecodeScriptAsync returns an instance of a type that can be used to
+// get the result of the RPC at some future time by invoking the Receive
+// function on the returned instance.
+//
+// See DecodeScript for the blocking version and more details.
+func (c *Client) DecodeScriptAsync(serializedScript []byte) FutureDecodeScriptResult {
+	scriptHex := hex.EncodeToString(serializedScript)
+	cmd := btcjson.NewDecodeScriptCmd(scriptHex)
+	return c.sendCmd(cmd)
+}
+
+// DecodeScript returns information about a script given its serialized bytes.
+func (c *Client) DecodeScript(serializedScript []byte) (*btcjson.DecodeScriptResult, error) {
+	return c.DecodeScriptAsync(serializedScript).Receive()
+}
