@@ -162,11 +162,13 @@ var helpDescsEnUS = map[string]string{
 	// GetBlockCmd help.
 	"getblock--synopsis":   "Returns information about a block given its hash.",
 	"getblock-hash":        "The hash of the block",
-	"getblock-verbose":     "Specifies the block is returned as a JSON object instead of hex-encoded string",
-	"getblock-verbosetx":   "Specifies that each transaction is returned as a JSON object and only applies if the verbose flag is true (btcd extension)",
-	"getblock--condition0": "verbose=false",
-	"getblock--condition1": "verbose=true",
+	"getblock-verbosity":   "Specifies the block format returns",
+	"getblock--condition0": "verbosity=0",
+	"getblock--condition1": "verbosity=1",
+	"getblock--condition2": "verbosity=2",
 	"getblock--result0":    "Hex-encoded bytes of the serialized block",
+	"getblock--result1":    "JSON object with information about block",
+	"getblock--result2":    "JSON object with information about block and information about each transaction.",
 
 	// GetBlockChainInfoCmd help.
 	"getblockchaininfo--synopsis": "Returns information about the current blockchain state and the status of any active soft-fork deployments.",
@@ -225,23 +227,27 @@ var helpDescsEnUS = map[string]string{
 	"searchrawtransactionsresult-vsize":         "The virtual size of the transaction in bytes",
 
 	// GetBlockVerboseResult help.
-	"getblockverboseresult-hash":              "The hash of the block (same as provided)",
-	"getblockverboseresult-confirmations":     "The number of confirmations",
-	"getblockverboseresult-size":              "The size of the block",
-	"getblockverboseresult-height":            "The height of the block in the block chain",
-	"getblockverboseresult-version":           "The block version",
-	"getblockverboseresult-versionHex":        "The block version in hexadecimal",
-	"getblockverboseresult-merkleroot":        "Root hash of the merkle tree",
-	"getblockverboseresult-tx":                "The transaction hashes (only when verbosetx=false)",
-	"getblockverboseresult-rawtx":             "The transactions as JSON objects (only when verbosetx=true)",
-	"getblockverboseresult-time":              "The block time in seconds since 1 Jan 1970 GMT",
-	"getblockverboseresult-nonce":             "The block nonce",
-	"getblockverboseresult-bits":              "The bits which represent the block difficulty",
-	"getblockverboseresult-difficulty":        "The proof-of-work difficulty as a multiple of the minimum difficulty",
-	"getblockverboseresult-previousblockhash": "The hash of the previous block",
-	"getblockverboseresult-nextblockhash":     "The hash of the next block (only if there is one)",
-	"getblockverboseresult-strippedsize":      "The size of the block without witness data",
-	"getblockverboseresult-weight":            "The weight of the block",
+	"getblockverboseresult-tx": "The transaction hashes",
+
+	// GetBlockVerboseTxResult help
+	"getblockverbosetxresult-tx": "The transaction hashes (verbosity = 1) or the transactions as JSON objects (verbosity = 2)",
+
+	// GetBlockBaseVerboseResult help.
+	"getblockbaseverboseresult-hash":              "The hash of the block (same as provided)",
+	"getblockbaseverboseresult-confirmations":     "The number of confirmations",
+	"getblockbaseverboseresult-size":              "The size of the block",
+	"getblockbaseverboseresult-height":            "The height of the block in the block chain",
+	"getblockbaseverboseresult-version":           "The block version",
+	"getblockbaseverboseresult-versionHex":        "The block version in hexadecimal",
+	"getblockbaseverboseresult-merkleroot":        "Root hash of the merkle tree",
+	"getblockbaseverboseresult-time":              "The block time in seconds since 1 Jan 1970 GMT",
+	"getblockbaseverboseresult-nonce":             "The block nonce",
+	"getblockbaseverboseresult-bits":              "The bits which represent the block difficulty",
+	"getblockbaseverboseresult-difficulty":        "The proof-of-work difficulty as a multiple of the minimum difficulty",
+	"getblockbaseverboseresult-previousblockhash": "The hash of the previous block",
+	"getblockbaseverboseresult-nextblockhash":     "The hash of the next block (only if there is one)",
+	"getblockbaseverboseresult-weight":            "The weight of the block",
+	"getblockbaseverboseresult-strippedsize":      "The size of the block without witness data",
 
 	// GetBlockCountCmd help.
 	"getblockcount--synopsis": "Returns the number of blocks in the longest block chain.",
@@ -684,7 +690,7 @@ var rpcResultTypes = map[string][]interface{}{
 	"getaddednodeinfo":      {(*[]string)(nil), (*[]btcjson.GetAddedNodeInfoResult)(nil)},
 	"getbestblock":          {(*btcjson.GetBestBlockResult)(nil)},
 	"getbestblockhash":      {(*string)(nil)},
-	"getblock":              {(*string)(nil), (*btcjson.GetBlockVerboseResult)(nil)},
+	"getblock":              {(*string)(nil), (*btcjson.GetBlockVerboseResult)(nil), (*btcjson.GetBlockVerboseTxResult)(nil)},
 	"getblockcount":         {(*int64)(nil)},
 	"getblockhash":          {(*string)(nil)},
 	"getblockheader":        {(*string)(nil), (*btcjson.GetBlockHeaderVerboseResult)(nil)},

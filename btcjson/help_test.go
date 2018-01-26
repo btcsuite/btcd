@@ -246,7 +246,7 @@ func TestHelpReflectInternals(t *testing.T) {
 
 		// Ensure the generated example is as expected.
 		examples, isComplex := btcjson.TstReflectTypeToJSONExample(xT,
-			test.reflectType, test.indentLevel, "fdk")
+			test.reflectType, test.indentLevel, "fdk", false)
 		if isComplex != test.isComplex {
 			t.Errorf("Test #%d (%s) unexpected isComplex - got: %v, "+
 				"want: %v", i, test.name, isComplex,
