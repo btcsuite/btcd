@@ -1,5 +1,5 @@
 // Copyright (c) 2013-2016 The btcsuite developers
-// Copyright (c) 2015-2016 The Decred developers
+// Copyright (c) 2015-2018 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -16,8 +16,7 @@ import (
 // nodeAtHeightFromTopNode goes backwards through a node until it a reaches
 // the node with a desired block height; it returns this block.  The benefit is
 // this works for both the main chain and the side chain.
-func (b *BlockChain) nodeAtHeightFromTopNode(node *blockNode,
-	toTraverse int64) (*blockNode, error) {
+func (b *BlockChain) nodeAtHeightFromTopNode(node *blockNode, toTraverse int64) (*blockNode, error) {
 	oldNode := node
 	var err error
 

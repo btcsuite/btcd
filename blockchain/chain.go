@@ -1,5 +1,5 @@
 // Copyright (c) 2013-2016 The btcsuite developers
-// Copyright (c) 2015-2017 The Decred developers
+// Copyright (c) 2015-2018 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -741,8 +741,7 @@ func (b *BlockChain) findNode(nodeHash *chainhash.Hash, searchDepth int) (*block
 // it.  The returned node will be nil if the genesis block is passed.
 //
 // This function MUST be called with the chain state lock held (for writes).
-func (b *BlockChain) getPrevNodeFromBlock(block *dcrutil.Block) (*blockNode,
-	error) {
+func (b *BlockChain) getPrevNodeFromBlock(block *dcrutil.Block) (*blockNode, error) {
 	// Genesis block.
 	prevHash := &block.MsgBlock().Header.PrevBlock
 	if prevHash.IsEqual(zeroHash) {
@@ -832,8 +831,7 @@ func (b *BlockChain) ancestorNode(node *blockNode, height int64) (*blockNode, er
 // an attempt to find the block.  If it finds the block, it returns it.
 //
 // This function is NOT safe for concurrent access.
-func (b *BlockChain) fetchBlockFromHash(hash *chainhash.Hash) (*dcrutil.Block,
-	error) {
+func (b *BlockChain) fetchBlockFromHash(hash *chainhash.Hash) (*dcrutil.Block, error) {
 	// Check side chain block cache
 	b.blockCacheLock.RLock()
 	blockSidechain, existsSidechain := b.blockCache[*hash]
@@ -875,8 +873,7 @@ func (b *BlockChain) fetchBlockFromHash(hash *chainhash.Hash) (*dcrutil.Block,
 
 // FetchBlockFromHash is the generalized and exported version of
 // fetchBlockFromHash.  It is safe for concurrent access.
-func (b *BlockChain) FetchBlockFromHash(hash *chainhash.Hash) (*dcrutil.Block,
-	error) {
+func (b *BlockChain) FetchBlockFromHash(hash *chainhash.Hash) (*dcrutil.Block, error) {
 	return b.fetchBlockFromHash(hash)
 }
 
@@ -1520,8 +1517,7 @@ func countNumberOfTransactions(block, parent *dcrutil.Block) uint64 {
 //    successfully are performed.  The chain is not reorganized.
 //
 // This function MUST be called with the chain state lock held (for writes).
-func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List,
-	flags BehaviorFlags) error {
+func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List, flags BehaviorFlags) error {
 	formerBestHash := b.bestNode.hash
 	formerBestHeight := b.bestNode.height
 

@@ -1,4 +1,5 @@
 // Copyright (c) 2015-2016 The btcsuite developers
+// Copyright (c) 2015-2018 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -716,8 +717,7 @@ const (
 )
 
 // encodeFlags encodes transaction flags into a single byte.
-func encodeFlags(isCoinBase bool, hasExpiry bool, txType stake.TxType,
-	fullySpent bool) byte {
+func encodeFlags(isCoinBase bool, hasExpiry bool, txType stake.TxType, fullySpent bool) byte {
 	b := uint8(txType)
 	b <<= txTypeShift
 

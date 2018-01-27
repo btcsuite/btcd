@@ -1,5 +1,5 @@
 // Copyright (c) 2015-2016 The btcsuite developers
-// Copyright (c) 2016-2017 The Decred developers
+// Copyright (c) 2016-2018 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -316,8 +316,7 @@ func putSpentTxOut(target []byte, stxo *spentTxOut) int {
 //
 // An error will be returned if the version is not serialized as a part of the
 // stxo and is also not provided to the function.
-func decodeSpentTxOut(serialized []byte, stxo *spentTxOut, amount int64,
-	height uint32, index uint32) (int, error) {
+func decodeSpentTxOut(serialized []byte, stxo *spentTxOut, amount int64, height uint32, index uint32) (int, error) {
 	// Ensure there are bytes to decode.
 	if len(serialized) == 0 {
 		return 0, errDeserialize("no serialized bytes")
@@ -630,8 +629,7 @@ func dbRemoveSpendJournalEntry(dbTx database.Tx, blockHash *chainhash.Hash) erro
 // utxoEntryHeaderCode returns the calculated header code to be used when
 // serializing the provided utxo entry and the number of bytes needed to encode
 // the unspentness bitmap.
-func utxoEntryHeaderCode(entry *UtxoEntry, highestOutputIndex uint32) (uint64, int,
-	error) {
+func utxoEntryHeaderCode(entry *UtxoEntry, highestOutputIndex uint32) (uint64, int, error) {
 	// The first two outputs are encoded separately, so offset the index
 	// accordingly to calculate the correct number of bytes needed to encode
 	// up to the highest unspent output index.
@@ -1254,8 +1252,7 @@ func deserializeBestChainState(serializedData []byte) (bestChainState, error) {
 
 // dbPutBestState uses an existing database transaction to update the best chain
 // state with the given parameters.
-func dbPutBestState(dbTx database.Tx, snapshot *BestState,
-	workSum *big.Int) error {
+func dbPutBestState(dbTx database.Tx, snapshot *BestState, workSum *big.Int) error {
 	// Serialize the current best chain state.
 	serializedData := serializeBestChainState(bestChainState{
 		hash:         *snapshot.Hash,
@@ -1513,8 +1510,7 @@ func dbFetchHeaderByHash(dbTx database.Tx, hash *chainhash.Hash) (*wire.BlockHea
 
 // dbFetchHeaderByHeight uses an existing database transaction to retrieve the
 // block header for the provided height.
-func dbFetchHeaderByHeight(dbTx database.Tx, height int64) (*wire.BlockHeader,
-	error) {
+func dbFetchHeaderByHeight(dbTx database.Tx, height int64) (*wire.BlockHeader, error) {
 	hash, err := dbFetchHashByHeight(dbTx, height)
 	if err != nil {
 		return nil, err
@@ -1524,8 +1520,7 @@ func dbFetchHeaderByHeight(dbTx database.Tx, height int64) (*wire.BlockHeader,
 }
 
 // DBFetchHeaderByHeight is the exported version of dbFetchHeaderByHeight.
-func DBFetchHeaderByHeight(dbTx database.Tx, height int64) (*wire.BlockHeader,
-	error) {
+func DBFetchHeaderByHeight(dbTx database.Tx, height int64) (*wire.BlockHeader, error) {
 	return dbFetchHeaderByHeight(dbTx, height)
 }
 

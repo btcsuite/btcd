@@ -1,5 +1,5 @@
 // Copyright (c) 2013-2016 The btcsuite developers
-// Copyright (c) 2015-2017 The Decred developers
+// Copyright (c) 2015-2018 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -168,8 +168,7 @@ func CalcWork(bits uint32) *big.Int {
 // can have given starting difficulty bits and a duration.  It is mainly used to
 // verify that claimed proof of work by a block is sane as compared to a
 // known good checkpoint.
-func (b *BlockChain) calcEasiestDifficulty(bits uint32,
-	duration time.Duration) uint32 {
+func (b *BlockChain) calcEasiestDifficulty(bits uint32, duration time.Duration) uint32 {
 	// Convert types used in the calculations below.
 	durationVal := int64(duration)
 	adjustmentFactor := big.NewInt(b.chainParams.RetargetAdjustmentFactor)
@@ -244,8 +243,7 @@ func (b *BlockChain) findPrevTestNetDifficulty(startNode *blockNode) (uint32, er
 // while this function accepts any block node.
 //
 // This function MUST be called with the chain state lock held (for writes).
-func (b *BlockChain) calcNextRequiredDifficulty(curNode *blockNode,
-	newBlockTime time.Time) (uint32, error) {
+func (b *BlockChain) calcNextRequiredDifficulty(curNode *blockNode, newBlockTime time.Time) (uint32, error) {
 	// Genesis block.
 	if curNode == nil {
 		return b.chainParams.PowLimitBits, nil
@@ -436,8 +434,7 @@ func (b *BlockChain) calcNextRequiredDifficulty(curNode *blockNode,
 // given with the passed hash along with the given timestamp.
 //
 // This function is NOT safe for concurrent access.
-func (b *BlockChain) CalcNextRequiredDiffFromNode(hash *chainhash.Hash,
-	timestamp time.Time) (uint32, error) {
+func (b *BlockChain) CalcNextRequiredDiffFromNode(hash *chainhash.Hash, timestamp time.Time) (uint32, error) {
 	// Fetch the block to get the difficulty for.
 	node, err := b.findNode(hash, maxSearchDepth)
 	if err != nil {
@@ -452,8 +449,7 @@ func (b *BlockChain) CalcNextRequiredDiffFromNode(hash *chainhash.Hash,
 // rules.
 //
 // This function is safe for concurrent access.
-func (b *BlockChain) CalcNextRequiredDifficulty(timestamp time.Time) (uint32,
-	error) {
+func (b *BlockChain) CalcNextRequiredDifficulty(timestamp time.Time) (uint32, error) {
 	b.chainLock.Lock()
 	difficulty, err := b.calcNextRequiredDifficulty(b.bestNode, timestamp)
 	b.chainLock.Unlock()
