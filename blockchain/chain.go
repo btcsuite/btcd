@@ -85,7 +85,9 @@ type blockNode struct {
 	inMainChain bool
 
 	// Some fields from block headers to aid in best chain selection and
-	// validation.
+	// reconstructing headers from memory.  These must be treated as
+	// immutable and are intentionally ordered to avoid padding on 64-bit
+	// platforms.
 	blockVersion int32
 	voteBits     uint16
 	finalState   [6]byte
@@ -95,6 +97,12 @@ type blockNode struct {
 	bits         uint32
 	sbits        int64
 	timestamp    int64
+	merkleRoot   chainhash.Hash
+	stakeRoot    chainhash.Hash
+	revocations  uint8
+	blockSize    uint32
+	nonce        uint32
+	extraData    [32]byte
 	stakeVersion uint32
 
 	// stakeNode contains all the consensus information required for the
@@ -146,13 +154,47 @@ func newBlockNode(blockHeader *wire.BlockHeader, spentTickets *stake.SpentTicket
 		bits:           blockHeader.Bits,
 		sbits:          blockHeader.SBits,
 		timestamp:      blockHeader.Timestamp.Unix(),
+		merkleRoot:     blockHeader.MerkleRoot,
+		stakeRoot:      blockHeader.StakeRoot,
+		revocations:    blockHeader.Revocations,
+		blockSize:      blockHeader.Size,
+		nonce:          blockHeader.Nonce,
+		extraData:      blockHeader.ExtraData,
 		stakeVersion:   blockHeader.StakeVersion,
 		lotteryIV:      stake.CalcHash256PRNGIV(hB),
 		ticketsSpent:   spentTickets.VotedTickets,
 		ticketsRevoked: spentTickets.RevokedTickets,
 		votes:          spentTickets.Votes,
 	}
+
 	return &node
+}
+
+// Header constructs a block header from the node and returns it.
+//
+// This function is safe for concurrent access.
+func (node *blockNode) Header() wire.BlockHeader {
+	// No lock is needed because all accessed fields are immutable.
+	return wire.BlockHeader{
+		Version:      node.blockVersion,
+		PrevBlock:    node.parentHash,
+		MerkleRoot:   node.merkleRoot,
+		StakeRoot:    node.stakeRoot,
+		VoteBits:     node.voteBits,
+		FinalState:   node.finalState,
+		Voters:       node.voters,
+		FreshStake:   node.freshStake,
+		Revocations:  node.revocations,
+		PoolSize:     node.poolSize,
+		Bits:         node.bits,
+		SBits:        node.sbits,
+		Height:       uint32(node.height),
+		Size:         node.blockSize,
+		Timestamp:    time.Unix(node.timestamp, 0),
+		Nonce:        node.nonce,
+		ExtraData:    node.extraData,
+		StakeVersion: node.stakeVersion,
+	}
 }
 
 // orphanBlock represents a block that we don't yet have the parent for.  It
@@ -2143,6 +2185,32 @@ func (b *BlockChain) MaxBlockSize() (int64, error) {
 	maxSize, err := b.maxBlockSize(b.bestNode)
 	b.chainLock.Unlock()
 	return maxSize, err
+}
+
+// FetchHeader returns the block header identified by the given hash or an error
+// if it doesn't exist.
+//
+// This function is safe for concurrent access.
+func (b *BlockChain) FetchHeader(hash *chainhash.Hash) (wire.BlockHeader, error) {
+	// Reconstruct the header from the block index if possible.
+	b.chainLock.RLock()
+	node, ok := b.index[*hash]
+	b.chainLock.RUnlock()
+	if ok {
+		return node.Header(), nil
+	}
+
+	// Fall back to loading it from the database.
+	var header *wire.BlockHeader
+	err := b.db.View(func(dbTx database.Tx) error {
+		var err error
+		header, err = dbFetchHeaderByHash(dbTx, hash)
+		return err
+	})
+	if err != nil {
+		return wire.BlockHeader{}, err
+	}
+	return *header, nil
 }
 
 // IndexManager provides a generic interface that the is called when blocks are
