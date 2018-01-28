@@ -529,9 +529,13 @@ func (b *blockManager) startSync(peers *list.List) {
 			continue
 		}
 
-		// TODO(davec): Use a better algorithm to choose the best peer.
-		// For now, just pick the first available candidate.
-		bestPeer = sp
+		// the best sync candidate is the most updated peer
+		if bestPeer == nil {
+			bestPeer = sp
+		}
+		if bestPeer.LastBlock() < sp.LastBlock() {
+			bestPeer = sp
+		}
 	}
 
 	// Start syncing from the best peer if one was selected.
