@@ -16,7 +16,7 @@ import (
 
 var (
 	// seedConst is a constant derived from the hex representation of pi. It
-	// is used alonwith a caller-provided seed when initializing
+	// is used along with a caller-provided seed when initializing
 	// the deterministic lottery prng.
 	seedConst = [8]byte{0x24, 0x3F, 0x6A, 0x88, 0x85, 0xA3, 0x08, 0xD3}
 )
@@ -31,8 +31,25 @@ type Hash256PRNG struct {
 	lastHash chainhash.Hash // Cached last hash used
 }
 
-// NewHash256PRNG creates a pointer to a newly created hash256PRNG.
-func NewHash256PRNG(seed []byte) *Hash256PRNG {
+// CalcHash256PRNGIV calculates and returns the initialization vector for a
+// given seed.  This can be used in conjunction with the NewHash256PRNGFromIV
+// function to arrive at the same values that are produced when calling
+// NewHash256PRNG with the seed.
+func CalcHash256PRNGIV(seed []byte) chainhash.Hash {
+	buf := make([]byte, len(seed)+len(seedConst))
+	copy(buf, seed)
+	copy(buf[len(seed):], seedConst[:])
+	return chainhash.HashH(buf)
+}
+
+// NewHash256PRNGFromIV returns a deterministic pseudorandom number generator
+// that uses a 256-bit secure hashing function to generate random uint32s given
+// an initialization vector.  The CalcHash256PRNGIV can be used to calculate an
+// initialization vector for a given seed such that the generator will produce
+// the same values as if NewHash256PRNG were called with the same seed.  This
+// allows callers to cache and reuse the initialization vector for a given seed
+// to avoid recomputation.
+func NewHash256PRNGFromIV(iv chainhash.Hash) *Hash256PRNG {
 	// idx and lastHash are automatically initialized
 	// as 0.  We initialize the seed by appending a constant
 	// to it and hashing to give 32 bytes. This ensures
@@ -42,10 +59,17 @@ func NewHash256PRNG(seed []byte) *Hash256PRNG {
 	// derived from the hexadecimal representation of
 	// pi.
 	hp := new(Hash256PRNG)
-	hp.seed = chainhash.HashH(append(seed, seedConst[:]...))
+	hp.seed = iv
 	hp.lastHash = hp.seed
 	hp.idx = 0
 	return hp
+}
+
+// NewHash256PRNG returns a deterministic pseudorandom number generator that
+// uses a 256-bit secure hashing function to generate random uint32s given a
+// seed.
+func NewHash256PRNG(seed []byte) *Hash256PRNG {
+	return NewHash256PRNGFromIV(CalcHash256PRNGIV(seed))
 }
 
 // StateHash returns a hash referencing the current state the deterministic PRNG.
