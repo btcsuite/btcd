@@ -180,17 +180,6 @@ func NewGetMasterPubkeyCmd(acct *string) *GetMasterPubkeyCmd {
 	return &GetMasterPubkeyCmd{Account: acct}
 }
 
-// GetSeedCmd is a type handling custom marshaling and
-// unmarshaling of getseed JSON wallet extension
-// commands.
-type GetSeedCmd struct {
-}
-
-// NewGetSeedCmd creates a new GetSeedCmd.
-func NewGetSeedCmd() *GetSeedCmd {
-	return &GetSeedCmd{}
-}
-
 // GetStakeInfoCmd is a type handling custom marshaling and
 // unmarshaling of getstakeinfo JSON wallet extension commands.
 type GetStakeInfoCmd struct {
@@ -558,7 +547,6 @@ func init() {
 	MustRegisterCmd("generatevote", (*GenerateVoteCmd)(nil), flags)
 	MustRegisterCmd("getmultisigoutinfo", (*GetMultisigOutInfoCmd)(nil), flags)
 	MustRegisterCmd("getmasterpubkey", (*GetMasterPubkeyCmd)(nil), flags)
-	MustRegisterCmd("getseed", (*GetSeedCmd)(nil), flags)
 	MustRegisterCmd("getstakeinfo", (*GetStakeInfoCmd)(nil), flags)
 	MustRegisterCmd("getticketfee", (*GetTicketFeeCmd)(nil), flags)
 	MustRegisterCmd("gettickets", (*GetTicketsCmd)(nil), flags)
