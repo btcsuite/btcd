@@ -58,9 +58,13 @@ func (b *BlockChain) upgradeToVersion2() error {
 
 			// Iteratively connect the stake nodes in memory.
 			header := block.MsgBlock().Header
-			bestStakeNode, errLocal = bestStakeNode.ConnectNode(header,
-				ticketsSpentInBlock(block), ticketsRevokedInBlock(block),
-				newTickets)
+			hB, errLocal := header.Bytes()
+			if errLocal != nil {
+				return errLocal
+			}
+			bestStakeNode, errLocal = bestStakeNode.ConnectNode(
+				stake.CalcHash256PRNGIV(hB), ticketsSpentInBlock(block),
+				ticketsRevokedInBlock(block), newTickets)
 			if errLocal != nil {
 				return errLocal
 			}

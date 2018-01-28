@@ -85,7 +85,9 @@ type blockNode struct {
 	// staking system.  The node also caches information required to add or
 	// remove stake nodes, so that the stake node itself may be pruneable
 	// to save memory while maintaining high throughput efficiency for the
-	// evaluation of sidechains.
+	// evaluation of sidechains.  The lotteryIV contains the initialization
+	// vector for the deterministic PRNG used to determine winning tickets.
+	lotteryIV      chainhash.Hash
 	stakeNode      *stake.Node
 	newTickets     []chainhash.Hash
 	stakeUndoData  stake.UndoTicketDataSlice
@@ -101,6 +103,16 @@ type blockNode struct {
 // for the passed block.  The work sum is updated accordingly when the node is
 // inserted into a chain.
 func newBlockNode(blockHeader *wire.BlockHeader, spentTickets *stake.SpentTicketsInBlock) *blockNode {
+	// Serialize the block header for use in calculating the initialization
+	// vector for the ticket lottery.  The only way this can fail is if the
+	// process is out of memory in which case it would panic anyways, so
+	// although panics are generally frowned upon in package code, it is
+	// acceptable here.
+	hB, err := blockHeader.Bytes()
+	if err != nil {
+		panic(err)
+	}
+
 	// Make a copy of the hash so the node doesn't keep a reference to part
 	// of the full block/block header preventing it from being garbage
 	// collected.
@@ -109,6 +121,7 @@ func newBlockNode(blockHeader *wire.BlockHeader, spentTickets *stake.SpentTicket
 		workSum:        CalcWork(blockHeader.Bits),
 		height:         int64(blockHeader.Height),
 		header:         *blockHeader,
+		lotteryIV:      stake.CalcHash256PRNGIV(hB),
 		ticketsSpent:   spentTickets.VotedTickets,
 		ticketsRevoked: spentTickets.RevokedTickets,
 		votes:          spentTickets.Votes,
