@@ -1,4 +1,4 @@
-// Copyright (c) 2016 The Decred developers
+// Copyright (c) 2016-2018 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -170,7 +170,7 @@ func (b *BlockChain) isStakeMajorityVersion(minVer uint32, prevNode *blockNode) 
 	versionCount := int32(0)
 	iterNode := node
 	for i := int64(0); i < b.chainParams.StakeVersionInterval && iterNode != nil; i++ {
-		if iterNode.header.StakeVersion >= minVer {
+		if iterNode.stakeVersion >= minVer {
 			versionCount += 1
 		}
 
@@ -219,7 +219,7 @@ func (b *BlockChain) calcPriorStakeVersion(prevNode *blockNode) (uint32, error) 
 	versions := make(map[uint32]int32) // [version][count]
 	iterNode := node
 	for i := int64(0); i < b.chainParams.StakeVersionInterval && iterNode != nil; i++ {
-		versions[iterNode.header.StakeVersion]++
+		versions[iterNode.stakeVersion]++
 
 		var err error
 		iterNode, err = b.getPrevNodeFromNode(iterNode)

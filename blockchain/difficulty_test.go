@@ -1,5 +1,5 @@
 // Copyright (c) 2014 The btcsuite developers
-// Copyright (c) 2015-2017 The Decred developers
+// Copyright (c) 2015-2018 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -421,7 +421,7 @@ nextTest:
 
 			for i := uint32(0); i < ticketInfo.numNodes; i++ {
 				// Make up a header.
-				nextHeight := bc.bestNode.header.Height + 1
+				nextHeight := uint32(bc.bestNode.height) + 1
 				header := &wire.BlockHeader{
 					Version:    4,
 					SBits:      ticketInfo.stakeDiff,
@@ -723,7 +723,7 @@ nextTest:
 
 			for i := uint32(0); i < ticketInfo.numNodes; i++ {
 				// Make up a header.
-				nextHeight := bc.bestNode.header.Height + 1
+				nextHeight := uint32(bc.bestNode.height) + 1
 				header := &wire.BlockHeader{
 					Version:    4,
 					SBits:      ticketInfo.stakeDiff,

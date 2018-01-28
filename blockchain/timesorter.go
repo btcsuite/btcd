@@ -1,17 +1,13 @@
 // Copyright (c) 2013-2014 The btcsuite developers
-// Copyright (c) 2015-2016 The Decred developers
+// Copyright (c) 2015-2018 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
 package blockchain
 
-import (
-	"time"
-)
-
 // timeSorter implements sort.Interface to allow a slice of timestamps to
 // be sorted.
-type timeSorter []time.Time
+type timeSorter []int64
 
 // Len returns the number of timestamps in the slice.  It is part of the
 // sort.Interface implementation.
@@ -28,5 +24,5 @@ func (s timeSorter) Swap(i, j int) {
 // Less returns whether the timstamp with index i should sort before the
 // timestamp with index j.  It is part of the sort.Interface implementation.
 func (s timeSorter) Less(i, j int) bool {
-	return s[i].Before(s[j])
+	return s[i] < s[j]
 }

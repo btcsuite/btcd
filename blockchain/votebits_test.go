@@ -1,4 +1,4 @@
-// Copyright (c) 2017 The Decred developers
+// Copyright (c) 2017-2018 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -161,7 +161,7 @@ func TestNoQuorum(t *testing.T) {
 	params := defaultParams(pedro)
 	bc := newFakeChain(&params)
 	node := bc.bestNode
-	node.header.StakeVersion = posVersion
+	node.stakeVersion = posVersion
 
 	// get to svi
 	curTimestamp := time.Now()
@@ -317,7 +317,7 @@ func TestYesQuorum(t *testing.T) {
 	params := defaultParams(pedro)
 	bc := newFakeChain(&params)
 	node := bc.bestNode
-	node.header.StakeVersion = posVersion
+	node.stakeVersion = posVersion
 
 	// get to svi
 	curTimestamp := time.Now()
@@ -1493,7 +1493,7 @@ func TestVoting(t *testing.T) {
 		// We have to reset the cache for every test.
 		bc := newFakeChain(&params)
 		node := bc.bestNode
-		node.header.StakeVersion = test.startStakeVersion
+		node.stakeVersion = test.startStakeVersion
 
 		t.Logf("running: %v", test.name)
 
@@ -1526,8 +1526,7 @@ func TestVoting(t *testing.T) {
 			}
 			t.Logf("Height %v, Start time %v, curTime %v, delta %v",
 				node.height, params.Deployments[4][0].StartTime,
-				node.header.Timestamp.Unix(),
-				node.header.Timestamp.Unix()-
+				node.timestamp, node.timestamp-
 					int64(params.Deployments[4][0].StartTime))
 			ts, err := bc.ThresholdState(&node.hash, posVersion,
 				test.vote.Id)
@@ -1738,7 +1737,7 @@ func TestParallelVoting(t *testing.T) {
 		// We have to reset the cache for every test.
 		bc := newFakeChain(&params)
 		node := bc.bestNode
-		node.header.StakeVersion = test.startStakeVersion
+		node.stakeVersion = test.startStakeVersion
 
 		curTimestamp := time.Now()
 		for k := range test.expectedState[0] {

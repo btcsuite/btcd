@@ -1285,7 +1285,7 @@ func (b *BlockChain) createChainState() error {
 	numTxns := uint64(len(genesisBlock.MsgBlock().Transactions))
 	blockSize := uint64(genesisBlock.MsgBlock().SerializeSize())
 	b.stateSnapshot = newBestState(b.bestNode, blockSize, numTxns, numTxns,
-		b.bestNode.header.Timestamp, 0)
+		time.Unix(b.bestNode.timestamp, 0), 0)
 
 	// Create the initial the database chain state including creating the
 	// necessary index buckets and inserting the genesis block.
@@ -1445,7 +1445,7 @@ func (b *BlockChain) initChainState() error {
 		// set.
 		if dbInfo.version >= 2 {
 			node.stakeNode, err = stake.LoadBestNode(dbTx, uint32(node.height),
-				node.hash, node.header, b.chainParams)
+				node.hash, *header, b.chainParams)
 			if err != nil {
 				return err
 			}
@@ -1456,9 +1456,9 @@ func (b *BlockChain) initChainState() error {
 		b.bestNode = node
 
 		// Add the new node to the indices for faster lookups.
-		prevHash := node.header.PrevBlock
+		prevHash := &node.parentHash
 		b.index[node.hash] = node
-		b.depNodes[prevHash] = append(b.depNodes[prevHash], node)
+		b.depNodes[*prevHash] = append(b.depNodes[*prevHash], node)
 
 		// Calculate the median time for the block.
 		medianTime, err := b.calcPastMedianTime(node)

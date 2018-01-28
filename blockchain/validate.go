@@ -1,5 +1,5 @@
 // Copyright (c) 2013-2016 The btcsuite developers
-// Copyright (c) 2015-2017 The Decred developers
+// Copyright (c) 2015-2018 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -852,7 +852,7 @@ func (b *BlockChain) CheckBlockStakeSanity(stakeValidationHeight int64, node *bl
 	blockHash := block.Hash()
 	prevBlockHash := &msgBlock.Header.PrevBlock
 	poolSize := int(msgBlock.Header.PoolSize)
-	finalState := node.header.FinalState
+	finalState := msgBlock.Header.FinalState
 
 	ticketsPerBlock := int(b.chainParams.TicketsPerBlock)
 
@@ -2226,7 +2226,7 @@ func (b *BlockChain) checkTransactionsAndConnect(subsidyCache *SubsidyCache, inp
 	if txTree { //TxTreeRegular
 		// Apply penalty to fees if we're at stake validation height.
 		if node.height >= b.chainParams.StakeValidationHeight {
-			totalFees *= int64(node.header.Voters)
+			totalFees *= int64(node.voters)
 			totalFees /= int64(b.chainParams.TicketsPerBlock)
 		}
 
@@ -2241,9 +2241,9 @@ func (b *BlockChain) checkTransactionsAndConnect(subsidyCache *SubsidyCache, inp
 			expAtomOut = subsidyCache.CalcBlockSubsidy(node.height)
 		} else {
 			subsidyWork := CalcBlockWorkSubsidy(subsidyCache,
-				node.height, node.header.Voters, b.chainParams)
+				node.height, node.voters, b.chainParams)
 			subsidyTax := CalcBlockTaxSubsidy(subsidyCache,
-				node.height, node.header.Voters, b.chainParams)
+				node.height, node.voters, b.chainParams)
 			expAtomOut = subsidyWork + subsidyTax + totalFees
 		}
 
@@ -2294,7 +2294,7 @@ func (b *BlockChain) checkTransactionsAndConnect(subsidyCache *SubsidyCache, inp
 			// with the height of the current block.
 			expAtomOut = CalcStakeVoteSubsidy(subsidyCache,
 				node.height-1, b.chainParams) *
-				int64(node.header.Voters)
+				int64(node.voters)
 		} else {
 			expAtomOut = totalFees
 		}
@@ -2360,7 +2360,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *dcrutil.Block, ut
 	// allowed a block that is no longer valid.  However, since the
 	// implementation only currently uses memory for the side chain blocks,
 	// it isn't currently necessary.
-	parentBlock, err := b.fetchBlockFromHash(&node.header.PrevBlock)
+	parentBlock, err := b.fetchBlockFromHash(&node.parentHash)
 	if err != nil {
 		return ruleError(ErrMissingParent, err.Error())
 	}
@@ -2373,16 +2373,16 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *dcrutil.Block, ut
 	}
 
 	// Ensure the view is for the node being checked.
-	if !utxoView.BestHash().IsEqual(&node.header.PrevBlock) {
+	if !utxoView.BestHash().IsEqual(&node.parentHash) {
 		return AssertError(fmt.Sprintf("inconsistent view when "+
 			"checking block connection: best hash is %v instead "+
 			"of expected %v", utxoView.BestHash(),
-			node.header.PrevBlock))
+			node.parentHash))
 	}
 
 	// Check that the coinbase pays the tax, if applicable.
-	err = CoinbasePaysTax(b.subsidyCache, block.Transactions()[0],
-		node.header.Height, node.header.Voters, b.chainParams)
+	err = CoinbasePaysTax(b.subsidyCache, block.Transactions()[0], node.height,
+		node.voters, b.chainParams)
 	if err != nil {
 		return err
 	}
@@ -2422,7 +2422,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *dcrutil.Block, ut
 	// signature operations in each of the input transaction public key
 	// scripts.
 	// Do this for all TxTrees.
-	regularTxTreeValid := dcrutil.IsFlagSet16(node.header.VoteBits,
+	regularTxTreeValid := dcrutil.IsFlagSet16(node.voteBits,
 		dcrutil.BlockValid)
 	thisNodeStakeViewpoint := ViewpointPrevInvalidStake
 	thisNodeRegularViewpoint := ViewpointPrevInvalidRegular
@@ -2657,7 +2657,7 @@ func (b *BlockChain) CheckConnectBlock(block *dcrutil.Block) error {
 			return err
 		}
 
-		parent, err := b.fetchBlockFromHash(&n.header.PrevBlock)
+		parent, err := b.fetchBlockFromHash(&n.parentHash)
 		if err != nil {
 			return err
 		}
@@ -2701,7 +2701,7 @@ func (b *BlockChain) CheckConnectBlock(block *dcrutil.Block) error {
 				n.hash)
 		}
 
-		parent, err := b.fetchBlockFromHash(&n.header.PrevBlock)
+		parent, err := b.fetchBlockFromHash(&n.parentHash)
 		if err != nil {
 			return err
 		}

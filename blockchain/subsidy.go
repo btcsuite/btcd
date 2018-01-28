@@ -282,7 +282,7 @@ func BlockOneCoinbasePaysTokens(tx *dcrutil.Tx, params *chaincfg.Params) error {
 
 // CoinbasePaysTax checks to see if a given block's coinbase correctly pays
 // tax to the developer organization.
-func CoinbasePaysTax(subsidyCache *SubsidyCache, tx *dcrutil.Tx, height uint32, voters uint16, params *chaincfg.Params) error {
+func CoinbasePaysTax(subsidyCache *SubsidyCache, tx *dcrutil.Tx, height int64, voters uint16, params *chaincfg.Params) error {
 	// Taxes only apply from block 2 onwards.
 	if height <= 1 {
 		return nil
@@ -311,7 +311,7 @@ func CoinbasePaysTax(subsidyCache *SubsidyCache, tx *dcrutil.Tx, height uint32, 
 
 	// Get the amount of subsidy that should have been paid out to
 	// the organization, then check it.
-	orgSubsidy := CalcBlockTaxSubsidy(subsidyCache, int64(height), voters, params)
+	orgSubsidy := CalcBlockTaxSubsidy(subsidyCache, height, voters, params)
 	if orgSubsidy != taxOutput.Value {
 		errStr := fmt.Sprintf("amount in output 0 has non matching org "+
 			"calculated amount; got %v, want %v", taxOutput.Value,

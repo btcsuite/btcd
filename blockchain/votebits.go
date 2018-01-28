@@ -1,4 +1,4 @@
-// Copyright (c) 2017 The decred developers
+// Copyright (c) 2017-2018 The Decred developers
 // Copyright (c) 2016 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.

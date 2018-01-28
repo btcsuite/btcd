@@ -1,4 +1,4 @@
-// Copyright (c) 2017 The Decred developers
+// Copyright (c) 2017-2018 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -37,7 +37,7 @@ func TestCalcSequenceLock(t *testing.T) {
 	params := &chaincfg.SimNetParams
 	bc := newFakeChain(params)
 	node := bc.bestNode
-	blockTime := node.header.Timestamp
+	blockTime := time.Unix(node.timestamp, 0)
 	for i := uint32(0); i < numBlocks; i++ {
 		blockTime = blockTime.Add(time.Second)
 		node = newFakeNode(node, 1, 1, 0, blockTime)

@@ -63,8 +63,14 @@ type blockNode struct {
 	// is when the best chain selection algorithm is used.
 	children []*blockNode
 
-	// hash is the double sha 256 of the block.
+	// hash is the hash of the block this node represents.
 	hash chainhash.Hash
+
+	// parentHash is the hash of the parent block of the block this node
+	// represents.  This is kept here over simply relying on parent.hash
+	// directly since block nodes are sparse and the parent node might not be
+	// in memory when its hash is needed.
+	parentHash chainhash.Hash
 
 	// height is the position in the block chain.
 	height int64
@@ -78,8 +84,18 @@ type blockNode struct {
 	// ancestor when switching chains.
 	inMainChain bool
 
-	// header is the full block header.
-	header wire.BlockHeader
+	// Some fields from block headers to aid in best chain selection and
+	// validation.
+	blockVersion int32
+	voteBits     uint16
+	finalState   [6]byte
+	voters       uint16
+	freshStake   uint8
+	poolSize     uint32
+	bits         uint32
+	sbits        int64
+	timestamp    int64
+	stakeVersion uint32
 
 	// stakeNode contains all the consensus information required for the
 	// staking system.  The node also caches information required to add or
@@ -118,9 +134,19 @@ func newBlockNode(blockHeader *wire.BlockHeader, spentTickets *stake.SpentTicket
 	// collected.
 	node := blockNode{
 		hash:           blockHeader.BlockHash(),
+		parentHash:     blockHeader.PrevBlock,
 		workSum:        CalcWork(blockHeader.Bits),
 		height:         int64(blockHeader.Height),
-		header:         *blockHeader,
+		blockVersion:   blockHeader.Version,
+		voteBits:       blockHeader.VoteBits,
+		finalState:     blockHeader.FinalState,
+		voters:         blockHeader.Voters,
+		freshStake:     blockHeader.FreshStake,
+		poolSize:       blockHeader.PoolSize,
+		bits:           blockHeader.Bits,
+		sbits:          blockHeader.SBits,
+		timestamp:      blockHeader.Timestamp.Unix(),
+		stakeVersion:   blockHeader.StakeVersion,
 		lotteryIV:      stake.CalcHash256PRNGIV(hB),
 		ticketsSpent:   spentTickets.VotedTickets,
 		ticketsRevoked: spentTickets.RevokedTickets,
@@ -186,7 +212,7 @@ func newBestState(node *blockNode, blockSize, numTxns, totalTxns uint64, medianT
 	return &BestState{
 		Hash:         &node.hash,
 		Height:       node.height,
-		Bits:         node.header.Bits,
+		Bits:         node.bits,
 		BlockSize:    blockSize,
 		NumTxns:      numTxns,
 		TotalTxns:    totalTxns,
@@ -349,8 +375,8 @@ func (b *BlockChain) GetStakeVersions(hash *chainhash.Hash, count int32) ([]Stak
 		sv := StakeVersions{
 			Hash:         prevNode.hash,
 			Height:       prevNode.height,
-			BlockVersion: prevNode.header.Version,
-			StakeVersion: prevNode.header.StakeVersion,
+			BlockVersion: prevNode.blockVersion,
+			StakeVersion: prevNode.stakeVersion,
 			Votes:        prevNode.votes,
 		}
 
@@ -666,7 +692,7 @@ func (b *BlockChain) loadBlockNode(dbTx database.Tx, hash *chainhash.Hash) (*blo
 		// further down the line in the blockchain to which the block
 		// could be attached, for example if the node had been pruned from
 		// the index.
-		foundParent, err := b.findNode(&node.header.PrevBlock, maxSearchDepth)
+		foundParent, err := b.findNode(&node.parentHash, maxSearchDepth)
 		if err == nil {
 			node.workSum = node.workSum.Add(foundParent.workSum, node.workSum)
 			foundParent.children = append(foundParent.children, node)
@@ -711,7 +737,7 @@ func (b *BlockChain) findNode(nodeHash *chainhash.Hash, searchDepth int) (*block
 					break
 				}
 
-				last := foundPrev.header.PrevBlock
+				last := foundPrev.parentHash
 				foundPrev = foundPrev.parent
 				if foundPrev == nil {
 					parent, err := b.loadBlockNode(dbTx, &last)
@@ -794,7 +820,7 @@ func (b *BlockChain) getPrevNodeFromNode(node *blockNode) (*blockNode, error) {
 	var prevBlockNode *blockNode
 	err := b.db.View(func(dbTx database.Tx) error {
 		var err error
-		prevBlockNode, err = b.loadBlockNode(dbTx, &node.header.PrevBlock)
+		prevBlockNode, err = b.loadBlockNode(dbTx, &node.parentHash)
 		return err
 	})
 	return prevBlockNode, err
@@ -942,7 +968,7 @@ func (b *BlockChain) BestPrevHash() chainhash.Hash {
 	b.chainLock.Lock()
 	defer b.chainLock.Unlock()
 
-	return b.bestNode.header.PrevBlock
+	return b.bestNode.parentHash
 }
 
 // isMajorityVersion determines if a previous number of blocks in the chain
@@ -955,7 +981,7 @@ func (b *BlockChain) isMajorityVersion(minVer int32, startNode *blockNode, numRe
 	for i := uint64(0); i < b.chainParams.BlockUpgradeNumToCheck &&
 		numFound < numRequired && iterNode != nil; i++ {
 		// This node has a version that is at least the minimum version.
-		if iterNode.header.Version >= minVer {
+		if iterNode.blockVersion >= minVer {
 			numFound++
 		}
 
@@ -987,11 +1013,11 @@ func (b *BlockChain) calcPastMedianTime(startNode *blockNode) (time.Time, error)
 
 	// Create a slice of the previous few block timestamps used to calculate
 	// the median per the number defined by the constant medianTimeBlocks.
-	timestamps := make([]time.Time, medianTimeBlocks)
+	timestamps := make([]int64, medianTimeBlocks)
 	numNodes := 0
 	iterNode := startNode
 	for i := 0; i < medianTimeBlocks && iterNode != nil; i++ {
-		timestamps[i] = iterNode.header.Timestamp
+		timestamps[i] = iterNode.timestamp
 		numNodes++
 
 		// Get the previous block node.  This function is used over
@@ -1026,7 +1052,7 @@ func (b *BlockChain) calcPastMedianTime(startNode *blockNode) (time.Time, error)
 	// however, be aware that should the medianTimeBlocks constant ever be
 	// changed to an even number, this code will be wrong.
 	medianTimestamp := timestamps[numNodes/2]
-	return medianTimestamp, nil
+	return time.Unix(medianTimestamp, 0), nil
 }
 
 // getReorganizeNodes finds the fork point between the main chain and the passed
@@ -1075,7 +1101,7 @@ func (b *BlockChain) getReorganizeNodes(node *blockNode) (*list.List, *list.List
 
 		if n.parent == nil {
 			var err error
-			n.parent, err = b.findNode(&n.header.PrevBlock, maxSearchDepth)
+			n.parent, err = b.findNode(&n.parentHash, maxSearchDepth)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -1564,7 +1590,7 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List, flags 
 		if err != nil {
 			return err
 		}
-		parent, err = b.fetchBlockFromHash(&n.header.PrevBlock)
+		parent, err = b.fetchBlockFromHash(&n.parentHash)
 		if err != nil {
 			return err
 		}
@@ -1664,7 +1690,7 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List, flags 
 	for i, e := 0, detachNodes.Front(); e != nil; i, e = i+1, e.Next() {
 		n := e.Value.(*blockNode)
 		block := detachBlocks[i]
-		parent, err := b.fetchBlockFromHash(&n.header.PrevBlock)
+		parent, err := b.fetchBlockFromHash(&n.parentHash)
 		if err != nil {
 			return err
 		}
@@ -1698,7 +1724,7 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List, flags 
 		block := b.blockCache[n.hash]
 		b.blockCacheLock.RUnlock()
 
-		parent, err := b.fetchBlockFromHash(&n.header.PrevBlock)
+		parent, err := b.fetchBlockFromHash(&n.parentHash)
 		if err != nil {
 			return err
 		}
@@ -1778,7 +1804,7 @@ func (b *BlockChain) forceHeadReorganization(formerBest chainhash.Hash, newBest 
 
 	// Check to make sure our forced-in node validates correctly.
 	view := NewUtxoViewpoint()
-	view.SetBestHash(&b.bestNode.header.PrevBlock)
+	view.SetBestHash(&b.bestNode.parentHash)
 	view.SetStakeViewpoint(ViewpointPrevValidInitial)
 
 	formerBestBlock, err := b.fetchBlockFromHash(&formerBest)
@@ -1862,12 +1888,12 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *dcrutil.Block, fla
 
 	// We are extending the main (best) chain with a new block.  This is the
 	// most common case.
-	if node.header.PrevBlock == b.bestNode.hash {
+	if node.parentHash == b.bestNode.hash {
 		// Perform several checks to verify the block can be connected
 		// to the main chain without violating any rules and without
 		// actually connecting the block.
 		view := NewUtxoViewpoint()
-		view.SetBestHash(&node.header.PrevBlock)
+		view.SetBestHash(&node.parentHash)
 		view.SetStakeViewpoint(ViewpointPrevValidInitial)
 		var stxos []spentTxOut
 		if !fastAdd {
@@ -1887,7 +1913,7 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *dcrutil.Block, fla
 		// utxos, spend them, and add the new utxos being created by
 		// this block.
 		if fastAdd {
-			parent, err := b.fetchBlockFromHash(&node.header.PrevBlock)
+			parent, err := b.fetchBlockFromHash(&node.parentHash)
 			if err != nil {
 				return false, err
 			}
@@ -1913,7 +1939,7 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *dcrutil.Block, fla
 		}
 
 		validateStr := "validating"
-		txTreeRegularValid := dcrutil.IsFlagSet16(node.header.VoteBits,
+		txTreeRegularValid := dcrutil.IsFlagSet16(node.voteBits,
 			dcrutil.BlockValid)
 		if !txTreeRegularValid {
 			validateStr = "invalidating"
@@ -2048,8 +2074,8 @@ func (b *BlockChain) isCurrent() bool {
 	//
 	// The chain appears to be current if none of the checks reported
 	// otherwise.
-	minus24Hours := b.timeSource.AdjustedTime().Add(-24 * time.Hour)
-	return !b.bestNode.header.Timestamp.Before(minus24Hours)
+	minus24Hours := b.timeSource.AdjustedTime().Add(-24 * time.Hour).Unix()
+	return b.bestNode.timestamp >= minus24Hours
 }
 
 // IsCurrent returns whether or not the chain believes it is current.  Several

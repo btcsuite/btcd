@@ -1,4 +1,4 @@
-// Copyright (c) 2016 The Decred developers
+// Copyright (c) 2016-2018 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -350,8 +350,8 @@ func TestCalcStakeVersionByNode(t *testing.T) {
 			set: func(node *blockNode) {
 				if int64(node.height) > svh {
 					appendFakeVotes(node, tpb, 3, 0)
-					node.header.StakeVersion = 2
-					node.header.Version = 3
+					node.stakeVersion = 2
+					node.blockVersion = 3
 				}
 			},
 		},
@@ -362,8 +362,8 @@ func TestCalcStakeVersionByNode(t *testing.T) {
 			set: func(node *blockNode) {
 				if int64(node.height) > svh {
 					appendFakeVotes(node, tpb, 2, 0)
-					node.header.StakeVersion = 3
-					node.header.Version = 3
+					node.stakeVersion = 3
+					node.blockVersion = 3
 				}
 			},
 		},
@@ -705,7 +705,7 @@ func TestIsStakeMajorityVersion(t *testing.T) {
 		// Create new BlockChain in order to blow away cache.
 		bc := newFakeChain(params)
 		node := bc.bestNode
-		node.header.StakeVersion = test.startStakeVersion
+		node.stakeVersion = test.startStakeVersion
 
 		ticketCount = 0
 
@@ -778,7 +778,7 @@ func TestLarge(t *testing.T) {
 		// Create new BlockChain in order to blow away cache.
 		bc := newFakeChain(params)
 		node := bc.bestNode
-		node.header.StakeVersion = test.startStakeVersion
+		node.stakeVersion = test.startStakeVersion
 
 		for i := int64(1); i <= test.numNodes; i++ {
 			node = newFakeNode(node, test.blockVersion,

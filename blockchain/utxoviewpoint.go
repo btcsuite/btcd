@@ -1093,7 +1093,7 @@ func (b *BlockChain) FetchUtxoView(tx *dcrutil.Tx, treeValid bool) (*UtxoViewpoi
 		if err != nil {
 			return nil, err
 		}
-		parent, err := b.fetchBlockFromHash(&b.bestNode.header.PrevBlock)
+		parent, err := b.fetchBlockFromHash(&b.bestNode.parentHash)
 		if err != nil {
 			return nil, err
 		}
