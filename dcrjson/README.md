@@ -16,7 +16,7 @@ projects needing to marshal to and from bitcoin JSON-RPC requests and responses.
 Note that although it's possible to use this package directly to implement an
 RPC client, it is not recommended since it is only intended as an infrastructure
 package.  Instead, RPC clients should use the
-[dcrrpcclient](https://github.com/decred/dcrrpcclient) package which provides
+[rpcclient](https://github.com/decred/dcrd/tree/master/rpcclient) package which provides
 a full blown RPC client with many features such as automatic connection
 management, websocket support, automatic notification re-registration on
 reconnect, and conversion from the raw underlying RPC types (strings, floats,
