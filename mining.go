@@ -1196,7 +1196,7 @@ func NewBlockTemplate(policy *mining.Policy, server *server,
 	chainState.Unlock()
 
 	chainBest := blockManager.chain.BestSnapshot()
-	if *prevHash != *chainBest.Hash ||
+	if *prevHash != chainBest.Hash ||
 		nextBlockHeight-1 != chainBest.Height {
 		return nil, fmt.Errorf("chain state is not syncronized to the "+
 			"blockchain (got %v:%v, want %v,%v",

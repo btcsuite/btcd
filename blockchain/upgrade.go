@@ -71,7 +71,7 @@ func (b *BlockChain) upgradeToVersion2() error {
 
 			// Write the top block stake node to the database.
 			errLocal = stake.WriteConnectedBestNode(dbTx, bestStakeNode,
-				*best.Hash)
+				best.Hash)
 			if errLocal != nil {
 				return errLocal
 			}

@@ -161,7 +161,7 @@ func TestFullBlocks(t *testing.T) {
 
 		// Ensure hash and height match.
 		best := chain.BestSnapshot()
-		if *best.Hash != item.Block.BlockHash() ||
+		if best.Hash != item.Block.BlockHash() ||
 			best.Height != int64(blockHeight) {
 
 			t.Fatalf("block %q (hash %s, height %d) should be "+

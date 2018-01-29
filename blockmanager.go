@@ -690,7 +690,7 @@ func (b *blockManager) handleDonePeerMsg(peers *list.List, sp *serverPeer) {
 		b.syncPeer = nil
 		if b.headersFirstMode {
 			best := b.chain.BestSnapshot()
-			b.resetHeaderState(best.Hash, best.Height)
+			b.resetHeaderState(&best.Hash, best.Height)
 		}
 		b.startSync(peers)
 	}
@@ -1163,7 +1163,7 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 				// current stake difficulty.
 				r.ntfnMgr.NotifyStakeDifficulty(
 					&StakeDifficultyNtfnData{
-						*best.Hash,
+						best.Hash,
 						best.Height,
 						nextStakeDiff,
 					})
@@ -1179,14 +1179,14 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 					"data for new best block: %v", err)
 			}
 
-			b.updateChainState(best.Hash, best.Height, finalState,
+			b.updateChainState(&best.Hash, best.Height, finalState,
 				uint32(poolSize), nextStakeDiff, winningTickets,
 				missedTickets, curPrevHash)
 
 			// Update this peer's latest block height, for future
 			// potential sync node candidancy.
 			heightUpdate = best.Height
-			blkHashUpdate = best.Hash
+			blkHashUpdate = &best.Hash
 
 			// Clear the rejected transactions.
 			b.rejectedTxns = make(map[chainhash.Hash]struct{})
@@ -1713,7 +1713,7 @@ out:
 
 					// Fetch the required lottery data.
 					winningTickets, poolSize, finalState, err :=
-						b.chain.LotteryDataForBlock(best.Hash)
+						b.chain.LotteryDataForBlock(&best.Hash)
 
 					// Update registered websocket clients on the
 					// current stake difficulty.
@@ -1727,7 +1727,7 @@ out:
 					if r != nil && errSDiff == nil {
 						r.ntfnMgr.NotifyStakeDifficulty(
 							&StakeDifficultyNtfnData{
-								*best.Hash,
+								best.Hash,
 								best.Height,
 								nextStakeDiff,
 							})
@@ -1747,7 +1747,7 @@ out:
 					best = b.chain.BestSnapshot()
 					curPrevHash := b.chain.BestPrevHash()
 
-					b.updateChainState(best.Hash,
+					b.updateChainState(&best.Hash,
 						best.Height,
 						finalState,
 						uint32(poolSize),
@@ -1853,7 +1853,7 @@ out:
 						if r != nil {
 							r.ntfnMgr.NotifyStakeDifficulty(
 								&StakeDifficultyNtfnData{
-									*best.Hash,
+									best.Hash,
 									best.Height,
 									nextStakeDiff,
 								})
@@ -1880,7 +1880,7 @@ out:
 							best.Hash, err)
 					}
 
-					b.updateChainState(best.Hash,
+					b.updateChainState(&best.Hash,
 						best.Height,
 						finalState,
 						uint32(poolSize),
@@ -2584,7 +2584,7 @@ func newBlockManager(s *server, indexManager blockchain.IndexManager) (*blockMan
 		// Initialize the next checkpoint based on the current height.
 		bm.nextCheckpoint = bm.findNextHeaderCheckpoint(best.Height)
 		if bm.nextCheckpoint != nil {
-			bm.resetHeaderState(best.Hash, best.Height)
+			bm.resetHeaderState(&best.Hash, best.Height)
 		}
 	} else {
 		bmgrLog.Info("Checkpoints are disabled")
@@ -2601,7 +2601,7 @@ func newBlockManager(s *server, indexManager blockchain.IndexManager) (*blockMan
 	}
 
 	// Query the DB for the current winning ticket data.
-	wt, ps, fs, err := bm.chain.LotteryDataForBlock(best.Hash)
+	wt, ps, fs, err := bm.chain.LotteryDataForBlock(&best.Hash)
 	if err != nil {
 		return nil, err
 	}
@@ -2620,7 +2620,7 @@ func newBlockManager(s *server, indexManager blockchain.IndexManager) (*blockMan
 	}
 	bmgrLog.Infof("Next required Stake difficulty: %d", nextStakeDiff)
 
-	bm.updateChainState(best.Hash,
+	bm.updateChainState(&best.Hash,
 		best.Height,
 		fs,
 		uint32(ps),

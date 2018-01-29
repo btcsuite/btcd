@@ -3574,7 +3574,7 @@ func handleGetStakeVersionInfo(s *rpcServer, cmd interface{}, closeChan <-chan s
 	startHeight := snapshot.Height
 	endHeight := s.chain.CalcWantHeight(interval,
 		snapshot.Height) + 1
-	hash := snapshot.Hash
+	hash := &snapshot.Hash
 	adjust := int32(1) // We are off by one on the initial iteration.
 	for i := int32(0); i < count; i++ {
 		numBlocks := int32(startHeight - endHeight)
@@ -3705,7 +3705,7 @@ func handleGetVoteInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 			"Could not count voter versions")
 	}
 
-	vi, err := s.chain.GetVoteInfo(snapshot.Hash, c.Version)
+	vi, err := s.chain.GetVoteInfo(&snapshot.Hash, c.Version)
 	if err != nil {
 		return nil, rpcInternalError(err.Error(),
 			"Could not obtain vote info")
@@ -3736,7 +3736,7 @@ func handleGetVoteInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 		}
 
 		// Obtain status of agenda.
-		state, err := s.chain.ThresholdState(snapshot.Hash, c.Version,
+		state, err := s.chain.ThresholdState(&snapshot.Hash, c.Version,
 			agenda.Vote.Id)
 		if err != nil {
 			return nil, err

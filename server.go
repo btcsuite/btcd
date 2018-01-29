@@ -225,7 +225,7 @@ func newServerPeer(s *server, isPersistent bool) *serverPeer {
 // required by the configuration for the peer package.
 func (sp *serverPeer) newestBlock() (*chainhash.Hash, int64, error) {
 	best := sp.server.blockManager.chain.BestSnapshot()
-	return best.Hash, best.Height, nil
+	return &best.Hash, best.Height, nil
 }
 
 // addKnownAddresses adds the given addresses to the set of known addreses to
@@ -1157,7 +1157,7 @@ func (s *server) pushBlockMsg(sp *serverPeer, hash *chainhash.Hash, doneChan cha
 	if sendInv {
 		best := sp.server.blockManager.chain.BestSnapshot()
 		invMsg := wire.NewMsgInvSizeHint(1)
-		iv := wire.NewInvVect(wire.InvTypeBlock, best.Hash)
+		iv := wire.NewInvVect(wire.InvTypeBlock, &best.Hash)
 		invMsg.AddInvVect(iv)
 		sp.QueueMessage(invMsg, doneChan)
 		sp.continueHash = nil
@@ -2452,7 +2452,7 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 		},
 		FetchUtxoView:    bm.chain.FetchUtxoView,
 		BlockByHash:      bm.chain.BlockByHash,
-		BestHash:         func() *chainhash.Hash { return bm.chain.BestSnapshot().Hash },
+		BestHash:         func() *chainhash.Hash { return &bm.chain.BestSnapshot().Hash },
 		BestHeight:       func() int64 { return bm.chain.BestSnapshot().Height },
 		CalcSequenceLock: bm.chain.CalcSequenceLock,
 		SubsidyCache:     bm.chain.FetchSubsidyCache(),

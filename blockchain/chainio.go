@@ -1254,7 +1254,7 @@ func deserializeBestChainState(serializedData []byte) (bestChainState, error) {
 func dbPutBestState(dbTx database.Tx, snapshot *BestState, workSum *big.Int) error {
 	// Serialize the current best chain state.
 	serializedData := serializeBestChainState(bestChainState{
-		hash:         *snapshot.Hash,
+		hash:         snapshot.Hash,
 		height:       uint32(snapshot.Height),
 		totalTxns:    snapshot.TotalTxns,
 		totalSubsidy: snapshot.TotalSubsidy,
