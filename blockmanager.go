@@ -2619,6 +2619,7 @@ func newBlockManager(s *server, indexManager blockchain.IndexManager) (*blockMan
 	if err != nil {
 		return nil, err
 	}
+	bmgrLog.Infof("Next required Stake difficulty: %d", nextStakeDiff)
 
 	bm.updateChainState(best.Hash,
 		best.Height,

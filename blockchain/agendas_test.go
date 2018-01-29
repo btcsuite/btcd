@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/decred/dcrd/blockchain/stake"
 	"github.com/decred/dcrd/chaincfg"
 	"github.com/decred/dcrd/txscript"
 )
@@ -120,7 +121,7 @@ func testLNFeaturesDeployment(t *testing.T, params *chaincfg.Params, deploymentV
 			// Create fake votes that vote yes on the agenda to
 			// ensure it is activated.
 			for j := uint16(0); j < params.TicketsPerBlock; j++ {
-				node.votes = append(node.votes, VoteVersionTuple{
+				node.votes = append(node.votes, stake.VoteVersionTuple{
 					Version: deploymentVer,
 					Bits:    yesChoice.Bits | 0x01,
 				})

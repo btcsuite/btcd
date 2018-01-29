@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/decred/dcrd/blockchain/stake"
 	"github.com/decred/dcrd/chaincfg"
 )
 
@@ -477,7 +478,7 @@ func TestVoting(t *testing.T) {
 	svi := uint32(params.StakeVersionInterval)
 
 	type voteCount struct {
-		vote  VoteVersionTuple
+		vote  stake.VoteVersionTuple
 		count uint32
 	}
 
@@ -496,7 +497,7 @@ func TestVoting(t *testing.T) {
 			blockVersion:      powVersion,
 			startStakeVersion: posVersion,
 			voteBitsCounts: []voteCount{{
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x01,
 				},
@@ -513,25 +514,25 @@ func TestVoting(t *testing.T) {
 			blockVersion:      powVersion,
 			startStakeVersion: posVersion - 1,
 			voteBitsCounts: []voteCount{{
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x01,
 				},
 				count: svh,
 			}, {
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x01,
 				},
 				count: svi - 1,
 			}, {
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x01,
 				},
 				count: rci - svi,
 			}, {
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x03,
 				},
@@ -557,25 +558,25 @@ func TestVoting(t *testing.T) {
 			blockVersion:      powVersion,
 			startStakeVersion: posVersion - 1,
 			voteBitsCounts: []voteCount{{
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion - 1,
 					Bits:    0x01,
 				},
 				count: svh + 2*svi - 1,
 			}, {
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x01,
 				},
 				count: rci % svi,
 			}, {
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x01,
 				},
 				count: rci,
 			}, {
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x03},
 				count: rci,
@@ -600,25 +601,25 @@ func TestVoting(t *testing.T) {
 			blockVersion:      powVersion,
 			startStakeVersion: posVersion + 1,
 			voteBitsCounts: []voteCount{{
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x01,
 				},
 				count: svh,
 			}, {
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x01,
 				},
 				count: rci - 1,
 			}, {
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x03,
 				},
 				count: rci,
 			}, {
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x03,
 				},
@@ -644,19 +645,19 @@ func TestVoting(t *testing.T) {
 			blockVersion:      powVersion - 1,
 			startStakeVersion: posVersion,
 			voteBitsCounts: []voteCount{{
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x01,
 				},
 				count: svh,
 			}, {
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x01,
 				},
 				count: rci - 1,
 			}, {
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x03,
 				},
@@ -679,25 +680,25 @@ func TestVoting(t *testing.T) {
 			blockVersion:      powVersion + 1,
 			startStakeVersion: posVersion,
 			voteBitsCounts: []voteCount{{
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x01,
 				},
 				count: svh,
 			}, {
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x01,
 				},
 				count: rci - 1,
 			}, {
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x03,
 				},
 				count: rci,
 			}, {
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x03,
 				},
@@ -723,43 +724,43 @@ func TestVoting(t *testing.T) {
 			blockVersion:      powVersion,
 			startStakeVersion: posVersion,
 			voteBitsCounts: []voteCount{{
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion + 1,
 					Bits:    0x01,
 				},
 				count: svh,
 			}, {
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion + 1,
 					Bits:    0x01,
 				},
 				count: rci - 1,
 			}, {
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion + 1,
 					Bits:    0x03,
 				},
 				count: rci,
 			}, {
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion + 1,
 					Bits:    0x03,
 				},
 				count: rci,
 			}, {
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x03,
 				},
 				count: rci,
 			}, {
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x03,
 				},
 				count: rci,
 			}, {
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion + 1,
 					Bits:    0x01,
 				},
@@ -794,31 +795,31 @@ func TestVoting(t *testing.T) {
 			blockVersion:      powVersion,
 			startStakeVersion: posVersion,
 			voteBitsCounts: []voteCount{{
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x01,
 				},
 				count: svh,
 			}, {
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x01,
 				},
 				count: rci - 1,
 			}, {
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x03,
 				},
 				count: rci,
 			}, {
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x03,
 				},
 				count: rci,
 			}, {
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x01,
 				},
@@ -847,31 +848,31 @@ func TestVoting(t *testing.T) {
 			blockVersion:      powVersion,
 			startStakeVersion: posVersion,
 			voteBitsCounts: []voteCount{{
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x01,
 				},
 				count: svh,
 			}, {
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x01,
 				},
 				count: rci - 1,
 			}, {
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x05,
 				},
 				count: rci,
 			}, {
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x05,
 				},
 				count: rci,
 			}, {
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x01,
 				},
@@ -900,37 +901,37 @@ func TestVoting(t *testing.T) {
 			blockVersion:      powVersion,
 			startStakeVersion: posVersion,
 			voteBitsCounts: []voteCount{{
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x01,
 				},
 				count: svh,
 			}, {
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x01,
 				},
 				count: rci - 1,
 			}, {
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x06,
 				},
 				count: rci,
 			}, {
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x06,
 				},
 				count: rci,
 			}, {
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x03,
 				},
 				count: rci,
 			}, {
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x01,
 				},
@@ -962,31 +963,31 @@ func TestVoting(t *testing.T) {
 			blockVersion:      powVersion,
 			startStakeVersion: posVersion,
 			voteBitsCounts: []voteCount{{
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x01,
 				},
 				count: svh,
 			}, {
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x01,
 				},
 				count: rci - 1,
 			}, {
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x01,
 				},
 				count: rci,
 			}, {
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x01,
 				},
 				count: rci,
 			}, {
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x01,
 				},
@@ -1019,19 +1020,19 @@ func TestVoting(t *testing.T) {
 					time.Duration(int64(svh)+int64(rci+rci/2))).Unix())
 			},
 			voteBitsCounts: []voteCount{{
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion - 1,
 					Bits:    0x01,
 				},
 				count: svh,
 			}, {
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion - 1,
 					Bits:    0x05,
 				},
 				count: rci - 1,
 			}, {
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion - 1,
 					Bits:    0x05,
 				},
@@ -1058,19 +1059,19 @@ func TestVoting(t *testing.T) {
 					time.Duration(int64(svh)+int64(rci+rci/2))).Unix())
 			},
 			voteBitsCounts: []voteCount{{
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x01,
 				},
 				count: svh,
 			}, {
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x05,
 				},
 				count: rci - 1,
 			}, {
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x05,
 				},
@@ -1093,37 +1094,37 @@ func TestVoting(t *testing.T) {
 			blockVersion:      powVersion,
 			startStakeVersion: posVersion - 1,
 			voteBitsCounts: []voteCount{{
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion - 1,
 					Bits:    0x01,
 				},
 				count: svh + 19*svi - 1,
 			}, {
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x01,
 				},
 				count: svi - 1,
 			}, {
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x01,
 				},
 				count: 1,
 			}, {
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x03,
 				},
 				count: uint32(rci) - 1,
 			}, {
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x03,
 				},
 				count: 1,
 			}, {
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x01,
 				},
@@ -1155,19 +1156,19 @@ func TestVoting(t *testing.T) {
 			blockVersion:      powVersion,
 			startStakeVersion: posVersion,
 			voteBitsCounts: []voteCount{{
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x01,
 				},
 				count: svh,
 			}, {
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x01,
 				},
 				count: rci - 1,
 			}, {
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x01,
 				},
@@ -1190,19 +1191,19 @@ func TestVoting(t *testing.T) {
 			blockVersion:      powVersion,
 			startStakeVersion: posVersion,
 			voteBitsCounts: []voteCount{{
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x01,
 				},
 				count: svh,
 			}, {
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x01,
 				},
 				count: rci - 1,
 			}, {
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x21,
 				},
@@ -1225,31 +1226,31 @@ func TestVoting(t *testing.T) {
 			blockVersion:      powVersion,
 			startStakeVersion: posVersion,
 			voteBitsCounts: []voteCount{{
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x01,
 				},
 				count: svh,
 			}, {
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x01,
 				},
 				count: rci - 1,
 			}, {
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x11,
 				},
 				count: rci,
 			}, {
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x11,
 				},
 				count: rci,
 			}, {
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x01,
 				},
@@ -1278,31 +1279,31 @@ func TestVoting(t *testing.T) {
 			blockVersion:      powVersion,
 			startStakeVersion: posVersion,
 			voteBitsCounts: []voteCount{{
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x01,
 				},
 				count: svh,
 			}, {
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x01,
 				},
 				count: rci - 1,
 			}, {
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x31,
 				},
 				count: rci,
 			}, {
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x31,
 				},
 				count: rci,
 			}, {
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x01,
 				},
@@ -1331,31 +1332,31 @@ func TestVoting(t *testing.T) {
 			blockVersion:      powVersion,
 			startStakeVersion: posVersion,
 			voteBitsCounts: []voteCount{{
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x01,
 				},
 				count: svh,
 			}, {
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x01,
 				},
 				count: rci - 1,
 			}, {
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x41,
 				},
 				count: rci,
 			}, {
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x41,
 				},
 				count: rci,
 			}, {
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x01,
 				},
@@ -1384,31 +1385,31 @@ func TestVoting(t *testing.T) {
 			blockVersion:      powVersion,
 			startStakeVersion: posVersion,
 			voteBitsCounts: []voteCount{{
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x01,
 				},
 				count: svh,
 			}, {
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x01,
 				},
 				count: rci - 1,
 			}, {
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x51,
 				},
 				count: rci,
 			}, {
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x51,
 				},
 				count: rci,
 			}, {
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x01,
 				},
@@ -1437,31 +1438,31 @@ func TestVoting(t *testing.T) {
 			blockVersion:      powVersion,
 			startStakeVersion: posVersion,
 			voteBitsCounts: []voteCount{{
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x01,
 				},
 				count: svh,
 			}, {
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x01,
 				},
 				count: rci - 1,
 			}, {
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x61,
 				},
 				count: rci,
 			}, {
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x61,
 				},
 				count: rci,
 			}, {
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x01,
 				},
@@ -1632,7 +1633,7 @@ func TestParallelVoting(t *testing.T) {
 	params := defaultParallelParams()
 
 	type voteCount struct {
-		vote  VoteVersionTuple
+		vote  stake.VoteVersionTuple
 		count uint32
 	}
 
@@ -1650,37 +1651,37 @@ func TestParallelVoting(t *testing.T) {
 			blockVersion:      powVersion,
 			startStakeVersion: posVersion,
 			voteBitsCounts: []voteCount{{
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x01,
 				},
 				count: uint32(params.StakeValidationHeight),
 			}, {
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x01,
 				},
 				count: params.RuleChangeActivationInterval - 1,
 			}, {
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion - 1,
 					Bits:    vbTestDummy1Yes | vbTestDummy2No,
 				},
 				count: params.RuleChangeActivationInterval,
 			}, {
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    vbTestDummy1Yes | vbTestDummy2No,
 				},
 				count: params.RuleChangeActivationInterval,
 			}, {
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x01,
 				},
 				count: params.RuleChangeActivationInterval,
 			}, {
-				vote: VoteVersionTuple{
+				vote: stake.VoteVersionTuple{
 					Version: posVersion,
 					Bits:    0x01,
 				},

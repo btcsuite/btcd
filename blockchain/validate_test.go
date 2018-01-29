@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/decred/dcrd/blockchain"
+	"github.com/decred/dcrd/blockchain/stake"
 	"github.com/decred/dcrd/chaincfg"
 	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/database"
@@ -2109,7 +2110,7 @@ func TestCheckBlockHeaderContext(t *testing.T) {
 	// fails.
 	block := dcrutil.NewBlock(&badBlock)
 	newNode := blockchain.TstNewBlockNode(&block.MsgBlock().Header,
-		nil, nil, nil)
+		&stake.SpentTicketsInBlock{})
 	err = chain.TstCheckBlockHeaderContext(&block.MsgBlock().Header, newNode, blockchain.BFNone)
 	if err == nil {
 		t.Fatalf("Should fail due to bad diff in newNode\n")

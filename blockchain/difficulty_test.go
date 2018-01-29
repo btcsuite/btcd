@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/decred/dcrd/blockchain/stake"
 	"github.com/decred/dcrd/chaincfg"
 	"github.com/decred/dcrd/wire"
 )
@@ -429,7 +430,7 @@ nextTest:
 					PoolSize:   poolSize,
 				}
 				node := newBlockNode(header,
-					nil, nil, nil)
+					&stake.SpentTicketsInBlock{})
 				node.parent = bc.bestNode
 
 				// Update the pool size for the next header.
@@ -731,7 +732,7 @@ nextTest:
 					PoolSize:   poolSize,
 				}
 				node := newBlockNode(header,
-					nil, nil, nil)
+					&stake.SpentTicketsInBlock{})
 				node.parent = bc.bestNode
 
 				// Update the pool size for the next header.

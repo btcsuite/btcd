@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/decred/dcrd/blockchain/stake"
 	"github.com/decred/dcrd/chaincfg"
 	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/wire"
@@ -21,7 +22,7 @@ import (
 func newFakeChain(params *chaincfg.Params) *BlockChain {
 	// Create a genesis block node and block index index populated with it
 	// for use when creating the fake chain below.
-	node := newBlockNode(&params.GenesisBlock.Header, nil, nil, nil)
+	node := newBlockNode(&params.GenesisBlock.Header, &stake.SpentTicketsInBlock{})
 	node.inMainChain = true
 	index := make(map[chainhash.Hash]*blockNode)
 	index[node.hash] = node
@@ -52,7 +53,7 @@ func newFakeNode(parent *blockNode, blockVersion int32, stakeVersion uint32, bit
 		Timestamp:    timestamp,
 		StakeVersion: stakeVersion,
 	}
-	node := newBlockNode(header, nil, nil, nil)
+	node := newBlockNode(header, &stake.SpentTicketsInBlock{})
 	node.parent = parent
 	node.workSum.Add(parent.workSum, node.workSum)
 	return node
@@ -62,7 +63,7 @@ func newFakeNode(parent *blockNode, blockVersion int32, stakeVersion uint32, bit
 // provided version and vote bits.
 func appendFakeVotes(node *blockNode, numVotes uint16, voteVersion uint32, voteBits uint16) {
 	for i := uint16(0); i < numVotes; i++ {
-		node.votes = append(node.votes, VoteVersionTuple{
+		node.votes = append(node.votes, stake.VoteVersionTuple{
 			Version: voteVersion,
 			Bits:    voteBits,
 		})

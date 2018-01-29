@@ -51,13 +51,6 @@ const (
 	maxSearchDepth = 2880
 )
 
-// VoteVersionTuple contains the extracted vote bits and version from votes
-// (SSGen).
-type VoteVersionTuple struct {
-	Version uint32
-	Bits    uint16
-}
-
 // blockNode represents a block within the block chain and is primarily used to
 // aid in selecting the best chain to be the main chain.  The main chain is
 // stored into the block database.
@@ -100,14 +93,14 @@ type blockNode struct {
 	ticketsRevoked []chainhash.Hash
 
 	// Keep track of all vote version and bits in this block.
-	votes []VoteVersionTuple
+	votes []stake.VoteVersionTuple
 }
 
 // newBlockNode returns a new block node for the given block header.  It is
 // completely disconnected from the chain and the workSum value is just the work
 // for the passed block.  The work sum is updated accordingly when the node is
 // inserted into a chain.
-func newBlockNode(blockHeader *wire.BlockHeader, ticketsSpent []chainhash.Hash, ticketsRevoked []chainhash.Hash, votes []VoteVersionTuple) *blockNode {
+func newBlockNode(blockHeader *wire.BlockHeader, spentTickets *stake.SpentTicketsInBlock) *blockNode {
 	// Make a copy of the hash so the node doesn't keep a reference to part
 	// of the full block/block header preventing it from being garbage
 	// collected.
@@ -116,9 +109,9 @@ func newBlockNode(blockHeader *wire.BlockHeader, ticketsSpent []chainhash.Hash, 
 		workSum:        CalcWork(blockHeader.Bits),
 		height:         int64(blockHeader.Height),
 		header:         *blockHeader,
-		ticketsSpent:   ticketsSpent,
-		ticketsRevoked: ticketsRevoked,
-		votes:          votes,
+		ticketsSpent:   spentTickets.VotedTickets,
+		ticketsRevoked: spentTickets.RevokedTickets,
+		votes:          spentTickets.Votes,
 	}
 	return &node
 }
@@ -300,7 +293,7 @@ type StakeVersions struct {
 	Height       int64
 	BlockVersion int32
 	StakeVersion uint32
-	Votes        []VoteVersionTuple
+	Votes        []stake.VoteVersionTuple
 }
 
 // GetStakeVersions returns a cooked array of StakeVersions.  We do this in
@@ -623,8 +616,7 @@ func (b *BlockChain) loadBlockNode(dbTx database.Tx, hash *chainhash.Hash) (*blo
 	}
 
 	blockHeader := block.MsgBlock().Header
-	node := newBlockNode(&blockHeader, ticketsSpentInBlock(block),
-		ticketsRevokedInBlock(block), voteBitsInBlock(block))
+	node := newBlockNode(&blockHeader, stake.FindSpentTicketsInBlock(block.MsgBlock()))
 	node.inMainChain = true
 	prevHash := &blockHeader.PrevBlock
 

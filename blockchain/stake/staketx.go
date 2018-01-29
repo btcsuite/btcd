@@ -193,6 +193,21 @@ type VoteBits struct {
 	ExtendedBits []byte
 }
 
+// VoteVersionTuple contains the extracted vote bits and version from votes
+// (SSGen).
+type VoteVersionTuple struct {
+	Version uint32
+	Bits    uint16
+}
+
+// SpentTicketsInBlock stores the hashes of the spent (both voted and revoked)
+// tickets of a given block, along with the vote information.
+type SpentTicketsInBlock struct {
+	VotedTickets   []chainhash.Hash
+	RevokedTickets []chainhash.Hash
+	Votes          []VoteVersionTuple
+}
+
 // --------------------------------------------------------------------------------
 // Accessory Stake Functions
 // --------------------------------------------------------------------------------
@@ -1202,4 +1217,33 @@ func SetTxTree(tx *dcrutil.Tx) {
 // has passed IsSStx.
 func IsStakeSubmissionTxOut(index int) bool {
 	return (index % 2) != 0
+}
+
+// FindSpentTicketsInBlock returns information about tickets spent in a given
+// block. This includes voted and revoked tickets, and the vote bits of each
+// spent ticket. This is faster than calling the individual functions to
+// determine ticket state if all information regarding spent tickets is needed.
+//
+// Note that the returned hashes are of the originally purchased *tickets* and
+// **NOT** of the vote/revoke transaction.
+//
+// The tickets are determined **only** from the STransactions of the provided
+// block and no validation is performed.
+func FindSpentTicketsInBlock(block *wire.MsgBlock) *SpentTicketsInBlock {
+	res := &SpentTicketsInBlock{}
+
+	for _, stx := range block.STransactions {
+		if is, _ := IsSSGen(stx); is {
+			res.VotedTickets = append(res.VotedTickets,
+				stx.TxIn[1].PreviousOutPoint.Hash)
+			res.Votes = append(res.Votes, VoteVersionTuple{
+				Version: SSGenVersion(stx),
+				Bits:    SSGenVoteBits(stx),
+			})
+		} else if is, _ := IsSSRtx(stx); is {
+			res.RevokedTickets = append(res.RevokedTickets,
+				stx.TxIn[0].PreviousOutPoint.Hash)
+		}
+	}
+	return res
 }
