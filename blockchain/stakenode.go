@@ -22,7 +22,7 @@ func (b *BlockChain) nodeAtHeightFromTopNode(node *blockNode, toTraverse int64) 
 
 	for i := 0; i < int(toTraverse); i++ {
 		// Get the previous block node.
-		oldNode, err = b.getPrevNodeFromNode(oldNode)
+		oldNode, err = b.index.PrevNodeFromNode(oldNode)
 		if err != nil {
 			return nil, err
 		}

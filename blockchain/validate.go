@@ -682,9 +682,9 @@ func (b *BlockChain) checkBlockHeaderContext(header *wire.BlockHeader, prevNode 
 
 		// Ensure the timestamp for the block header is after the
 		// median time of the last several blocks (medianTimeBlocks).
-		medianTime, err := b.calcPastMedianTime(prevNode)
+		medianTime, err := b.index.CalcPastMedianTime(prevNode)
 		if err != nil {
-			log.Errorf("calcPastMedianTime: %v", err)
+			log.Errorf("CalcPastMedianTime: %v", err)
 			return err
 		}
 		if !header.Timestamp.After(medianTime) {
@@ -2482,7 +2482,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *dcrutil.Block, ut
 		// Use the past median time of the *previous* block in order
 		// to determine if the transactions in the current block are
 		// final.
-		prevMedianTime, err = b.calcPastMedianTime(node.parent)
+		prevMedianTime, err = b.index.CalcPastMedianTime(node.parent)
 		if err != nil {
 			return err
 		}
@@ -2620,10 +2620,6 @@ func (b *BlockChain) CheckConnectBlock(block *dcrutil.Block) error {
 		stake.FindSpentTicketsInBlock(block.MsgBlock()))
 	newNode.parent = prevNode
 	newNode.workSum.Add(prevNode.workSum, newNode.workSum)
-	if prevNode != nil {
-		newNode.parent = prevNode
-		newNode.workSum.Add(prevNode.workSum, newNode.workSum)
-	}
 
 	// If we are extending the main (best) chain with a new block, just use
 	// the ticket database we already have.

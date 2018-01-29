@@ -1,5 +1,5 @@
 // Copyright (c) 2013-2014 The btcsuite developers
-// Copyright (c) 2015-2016 The Decred developers
+// Copyright (c) 2015-2018 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -51,7 +51,7 @@ func (b *BlockChain) lotteryDataForNode(node *blockNode) ([]chainhash.Hash, int,
 // held for write access.
 func (b *BlockChain) lotteryDataForBlock(hash *chainhash.Hash) ([]chainhash.Hash, int, [6]byte, error) {
 	var node *blockNode
-	if n, exists := b.index[*hash]; exists {
+	if n := b.index.LookupNode(hash); n != nil {
 		node = n
 	} else {
 		var err error

@@ -1,5 +1,5 @@
 // Copyright (c) 2013-2016 The btcsuite developers
-// Copyright (c) 2015-2016 The Decred developers
+// Copyright (c) 2015-2018 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -44,8 +44,8 @@ const (
 //
 // This function MUST be called with the chain state lock held (for reads).
 func (b *BlockChain) blockExists(hash *chainhash.Hash) (bool, error) {
-	// Check memory chain first (could be main chain or side chain blocks).
-	if _, ok := b.index[*hash]; ok {
+	// Check block index first (could be main chain or side chain blocks).
+	if b.index.HaveBlock(hash) {
 		return true, nil
 	}
 

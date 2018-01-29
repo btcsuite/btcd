@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/decred/dcrd/blockchain/stake"
 	"github.com/decred/dcrd/chaincfg"
 	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/wire"
@@ -55,8 +54,8 @@ func TestBlockNodeHeader(t *testing.T) {
 		ExtraData:    [32]byte{0xbb},
 		StakeVersion: 5,
 	}
-	node := newBlockNode(&testHeader, &stake.SpentTicketsInBlock{})
-	bc.index[node.hash] = node
+	node := newBlockNode(&testHeader, nil)
+	bc.index.AddNode(node)
 	node.parent = bc.bestNode
 
 	// Ensure reconstructing the header for the node produces the same header

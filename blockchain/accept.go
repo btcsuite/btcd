@@ -1,5 +1,5 @@
 // Copyright (c) 2013-2016 The btcsuite developers
-// Copyright (c) 2015-2016 The Decred developers
+// Copyright (c) 2015-2018 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -144,7 +144,7 @@ func (b *BlockChain) checkBlockContext(block *dcrutil.Block, prevNode *blockNode
 			return err
 		}
 		if lnFeaturesActive {
-			medianTime, err := b.calcPastMedianTime(prevNode)
+			medianTime, err := b.index.CalcPastMedianTime(prevNode)
 			if err != nil {
 				return err
 			}
@@ -252,7 +252,7 @@ func (b *BlockChain) maybeAcceptBlock(block *dcrutil.Block, flags BehaviorFlags)
 
 	// Get a block node for the block previous to this one.  Will be nil
 	// if this is the genesis block.
-	prevNode, err := b.getPrevNodeFromBlock(block)
+	prevNode, err := b.index.PrevNodeFromBlock(block)
 	if err != nil {
 		log.Debugf("getPrevNodeFromBlock: %v", err)
 		return false, err

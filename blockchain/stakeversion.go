@@ -75,7 +75,7 @@ func (b *BlockChain) findStakeVersionPriorNode(prevNode *blockNode) (*blockNode,
 	iterNode := prevNode
 	for iterNode.height > wantHeight {
 		var err error
-		iterNode, err = b.getPrevNodeFromNode(iterNode)
+		iterNode, err = b.index.PrevNodeFromNode(iterNode)
 		if err != nil {
 			return nil, err
 		}
@@ -123,7 +123,7 @@ func (b *BlockChain) isVoterMajorityVersion(minVer uint32, prevNode *blockNode) 
 		}
 
 		var err error
-		iterNode, err = b.getPrevNodeFromNode(iterNode)
+		iterNode, err = b.index.PrevNodeFromNode(iterNode)
 		if err != nil {
 			return false
 		}
@@ -175,7 +175,7 @@ func (b *BlockChain) isStakeMajorityVersion(minVer uint32, prevNode *blockNode) 
 		}
 
 		var err error
-		iterNode, err = b.getPrevNodeFromNode(iterNode)
+		iterNode, err = b.index.PrevNodeFromNode(iterNode)
 		if err != nil {
 			b.isStakeMajorityVersionCache[key] = false
 			return false
@@ -222,7 +222,7 @@ func (b *BlockChain) calcPriorStakeVersion(prevNode *blockNode) (uint32, error) 
 		versions[iterNode.stakeVersion]++
 
 		var err error
-		iterNode, err = b.getPrevNodeFromNode(iterNode)
+		iterNode, err = b.index.PrevNodeFromNode(iterNode)
 		if err != nil {
 			return 0, err
 		}
@@ -273,7 +273,7 @@ func (b *BlockChain) calcVoterVersionInterval(prevNode *blockNode) (uint32, erro
 			versions[v.Version]++
 		}
 
-		iterNode, err = b.getPrevNodeFromNode(iterNode)
+		iterNode, err = b.index.PrevNodeFromNode(iterNode)
 		if err != nil {
 			return 0, err
 		}
@@ -329,7 +329,7 @@ func (b *BlockChain) calcVoterVersion(prevNode *blockNode) (uint32, *blockNode) 
 
 		// findStakeVersionPriorNode increases the height so we need to
 		// compensate by loading the prior node.
-		iterNode, err = b.getPrevNodeFromNode(iterNode)
+		iterNode, err = b.index.PrevNodeFromNode(iterNode)
 		if err != nil {
 			break
 		}
@@ -370,7 +370,7 @@ func (b *BlockChain) calcStakeVersion(prevNode *blockNode) uint32 {
 	iterNode := node
 	for iterNode.height > startIntervalHeight {
 		var err error
-		iterNode, err = b.getPrevNodeFromNode(iterNode)
+		iterNode, err = b.index.PrevNodeFromNode(iterNode)
 		if err != nil || iterNode == nil {
 			b.calcStakeVersionCache[node.hash] = 0
 			return 0

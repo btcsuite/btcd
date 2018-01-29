@@ -41,7 +41,7 @@ func TestCalcSequenceLock(t *testing.T) {
 	for i := uint32(0); i < numBlocks; i++ {
 		blockTime = blockTime.Add(time.Second)
 		node = newFakeNode(node, 1, 1, 0, blockTime)
-		bc.index[node.hash] = node
+		bc.index.AddNode(node)
 		bc.bestNode = node
 	}
 
@@ -74,11 +74,11 @@ func TestCalcSequenceLock(t *testing.T) {
 	// Obtain the median time past from the PoV of the input created above.
 	// The median time for the input is the median time from the PoV of the
 	// block *prior* to the one that included it.
-	medianNode, err := bc.ancestorNode(node, node.height-5)
+	medianNode, err := bc.index.AncestorNode(node, node.height-5)
 	if err != nil {
 		t.Fatalf("Unable to obtain median node: %v", err)
 	}
-	medianT, err := bc.calcPastMedianTime(medianNode)
+	medianT, err := bc.index.CalcPastMedianTime(medianNode)
 	if err != nil {
 		t.Fatalf("Unable to obtain median node time: %v", err)
 	}
@@ -88,7 +88,7 @@ func TestCalcSequenceLock(t *testing.T) {
 	// test chain.  For unconfirmed inputs, this value will be used since
 	// the median time will be calculated from the PoV of the
 	// yet-to-be-mined block.
-	nextMedianT, err := bc.calcPastMedianTime(node)
+	nextMedianT, err := bc.index.CalcPastMedianTime(node)
 	if err != nil {
 		t.Fatalf("Unable to obtain next median node time: %v", err)
 	}

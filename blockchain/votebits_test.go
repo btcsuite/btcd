@@ -168,7 +168,7 @@ func TestNoQuorum(t *testing.T) {
 	for i := uint32(0); i < uint32(params.StakeValidationHeight); i++ {
 		node = newFakeNode(node, powVersion, posVersion, 0, curTimestamp)
 		bc.bestNode = node
-		bc.index[node.hash] = node
+		bc.index.AddNode(node)
 		curTimestamp = curTimestamp.Add(time.Second)
 	}
 	ts, err := bc.ThresholdState(&node.hash, posVersion, pedro.Id)
@@ -189,7 +189,7 @@ func TestNoQuorum(t *testing.T) {
 		node = newFakeNode(node, powVersion, posVersion, 0, curTimestamp)
 		appendFakeVotes(node, params.TicketsPerBlock, posVersion, 0x01)
 		bc.bestNode = node
-		bc.index[node.hash] = node
+		bc.index.AddNode(node)
 		curTimestamp = curTimestamp.Add(time.Second)
 	}
 
@@ -220,7 +220,7 @@ func TestNoQuorum(t *testing.T) {
 		}
 
 		bc.bestNode = node
-		bc.index[node.hash] = node
+		bc.index.AddNode(node)
 		curTimestamp = curTimestamp.Add(time.Second)
 	}
 
@@ -257,7 +257,7 @@ func TestNoQuorum(t *testing.T) {
 		}
 
 		bc.bestNode = node
-		bc.index[node.hash] = node
+		bc.index.AddNode(node)
 		curTimestamp = curTimestamp.Add(time.Second)
 	}
 
@@ -294,7 +294,7 @@ func TestNoQuorum(t *testing.T) {
 		}
 
 		bc.bestNode = node
-		bc.index[node.hash] = node
+		bc.index.AddNode(node)
 		curTimestamp = curTimestamp.Add(time.Second)
 	}
 
@@ -325,7 +325,7 @@ func TestYesQuorum(t *testing.T) {
 		node = newFakeNode(node, powVersion, posVersion, 0, curTimestamp)
 
 		bc.bestNode = node
-		bc.index[node.hash] = node
+		bc.index.AddNode(node)
 		curTimestamp = curTimestamp.Add(time.Second)
 	}
 	ts, err := bc.ThresholdState(&node.hash, posVersion, pedro.Id)
@@ -346,7 +346,7 @@ func TestYesQuorum(t *testing.T) {
 		node = newFakeNode(node, powVersion, posVersion, 0, curTimestamp)
 		appendFakeVotes(node, params.TicketsPerBlock, posVersion, 0x01)
 		bc.bestNode = node
-		bc.index[node.hash] = node
+		bc.index.AddNode(node)
 		curTimestamp = curTimestamp.Add(time.Second)
 	}
 
@@ -377,7 +377,7 @@ func TestYesQuorum(t *testing.T) {
 		}
 
 		bc.bestNode = node
-		bc.index[node.hash] = node
+		bc.index.AddNode(node)
 		curTimestamp = curTimestamp.Add(time.Second)
 	}
 
@@ -414,7 +414,7 @@ func TestYesQuorum(t *testing.T) {
 		}
 
 		bc.bestNode = node
-		bc.index[node.hash] = node
+		bc.index.AddNode(node)
 		curTimestamp = curTimestamp.Add(time.Second)
 	}
 
@@ -452,7 +452,7 @@ func TestYesQuorum(t *testing.T) {
 		}
 
 		bc.bestNode = node
-		bc.index[node.hash] = node
+		bc.index.AddNode(node)
 		curTimestamp = curTimestamp.Add(time.Second)
 	}
 
@@ -1521,7 +1521,7 @@ func TestVoting(t *testing.T) {
 					vote.Version, vote.Bits)
 
 				bc.bestNode = node
-				bc.index[node.hash] = node
+				bc.index.AddNode(node)
 				curTimestamp = curTimestamp.Add(time.Second)
 			}
 			t.Logf("Height %v, Start time %v, curTime %v, delta %v",
@@ -1750,7 +1750,7 @@ func TestParallelVoting(t *testing.T) {
 					vote.Version, vote.Bits)
 
 				bc.bestNode = node
-				bc.index[node.hash] = node
+				bc.index.AddNode(node)
 				curTimestamp = curTimestamp.Add(time.Second)
 			}
 			for i := range test.vote {

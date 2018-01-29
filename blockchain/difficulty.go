@@ -10,7 +10,6 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/decred/dcrd/blockchain/stake"
 	"github.com/decred/dcrd/chaincfg"
 	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/wire"
@@ -221,9 +220,9 @@ func (b *BlockChain) findPrevTestNetDifficulty(startNode *blockNode) (uint32, er
 		// helps allow only the pieces of the chain that are needed
 		// to remain in memory.
 		var err error
-		iterNode, err = b.getPrevNodeFromNode(iterNode)
+		iterNode, err = b.index.PrevNodeFromNode(iterNode)
 		if err != nil {
-			log.Errorf("getPrevNodeFromNode: %v", err)
+			log.Errorf("PrevNodeFromNode: %v", err)
 			return 0, err
 		}
 	}
@@ -377,7 +376,7 @@ func (b *BlockChain) calcNextRequiredDifficulty(curNode *blockNode, newBlockTime
 		// to remain in memory.
 		var err error
 		tempNode := oldNode
-		oldNode, err = b.getPrevNodeFromNode(oldNode)
+		oldNode, err = b.index.PrevNodeFromNode(oldNode)
 		if err != nil {
 			return 0, err
 		}
@@ -585,7 +584,7 @@ func (b *BlockChain) calcNextRequiredStakeDifficultyV1(curNode *blockNode) (int6
 		// Get the previous block node.
 		var err error
 		tempNode := oldNode
-		oldNode, err = b.getPrevNodeFromNode(oldNode)
+		oldNode, err = b.index.PrevNodeFromNode(oldNode)
 		if err != nil {
 			return 0, err
 		}
@@ -680,7 +679,7 @@ func (b *BlockChain) calcNextRequiredStakeDifficultyV1(curNode *blockNode) (int6
 		// Get the previous block node.
 		var err error
 		tempNode := oldNode
-		oldNode, err = b.getPrevNodeFromNode(oldNode)
+		oldNode, err = b.index.PrevNodeFromNode(oldNode)
 		if err != nil {
 			return 0, err
 		}
@@ -803,7 +802,7 @@ func (b *BlockChain) sumPurchasedTickets(startNode *blockNode, numToSum int64) (
 		// helps allow only the pieces of the chain that are needed
 		// to remain in memory.
 		var err error
-		node, err = b.getPrevNodeFromNode(node)
+		node, err = b.index.PrevNodeFromNode(node)
 		if err != nil {
 			return 0, err
 		}
@@ -922,7 +921,7 @@ func (b *BlockChain) calcNextRequiredStakeDifficultyV2(curNode *blockNode) (int6
 	// originally calculated.
 	var prevPoolSize int64
 	prevRetargetHeight := nextHeight - intervalSize - 1
-	prevRetargetNode, err := b.ancestorNode(curNode, prevRetargetHeight)
+	prevRetargetNode, err := b.index.AncestorNode(curNode, prevRetargetHeight)
 	if err != nil {
 		return 0, err
 	}
@@ -1088,7 +1087,7 @@ func (b *BlockChain) estimateNextStakeDifficultyV1(curNode *blockNode, ticketsIn
 			// Connect the header.
 			emptyHeader.PrevBlock = topNode.hash
 
-			thisNode := newBlockNode(&emptyHeader, &stake.SpentTicketsInBlock{})
+			thisNode := newBlockNode(&emptyHeader, nil)
 			thisNode.parent = topNode
 			topNode = thisNode
 		}
@@ -1153,7 +1152,7 @@ func (b *BlockChain) estimateNextStakeDifficultyV1(curNode *blockNode, ticketsIn
 		// Get the previous block node.
 		var err error
 		tempNode := oldNode
-		oldNode, err = b.getPrevNodeFromNode(oldNode)
+		oldNode, err = b.index.PrevNodeFromNode(oldNode)
 		if err != nil {
 			return 0, err
 		}
@@ -1248,7 +1247,7 @@ func (b *BlockChain) estimateNextStakeDifficultyV1(curNode *blockNode, ticketsIn
 		// Get the previous block node.
 		var err error
 		tempNode := oldNode
-		oldNode, err = b.getPrevNodeFromNode(oldNode)
+		oldNode, err = b.index.PrevNodeFromNode(oldNode)
 		if err != nil {
 			return 0, err
 		}
@@ -1380,7 +1379,7 @@ func (b *BlockChain) estimateNextStakeDifficultyV2(curNode *blockNode, newTicket
 	// originally calculated.
 	var prevPoolSize int64
 	prevRetargetHeight := nextRetargetHeight - intervalSize - 1
-	prevRetargetNode, err := b.ancestorNode(curNode, prevRetargetHeight)
+	prevRetargetNode, err := b.index.AncestorNode(curNode, prevRetargetHeight)
 	if err != nil {
 		return 0, err
 	}
@@ -1417,7 +1416,8 @@ func (b *BlockChain) estimateNextStakeDifficultyV2(curNode *blockNode, newTicket
 	// maturing at the height in which they mature since they are not
 	// eligible for selection until the next block, so exclude them by
 	// starting one block before the next maturity floor.
-	nextMaturityFloorNode, err := b.ancestorNode(curNode, nextMaturityFloor-1)
+	nextMaturityFloorNode, err := b.index.AncestorNode(curNode,
+		nextMaturityFloor-1)
 	if err != nil {
 		return 0, err
 	}

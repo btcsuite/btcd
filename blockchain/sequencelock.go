@@ -1,4 +1,4 @@
-// Copyright (c) 2017 The Decred developers
+// Copyright (c) 2017-2018 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -101,14 +101,14 @@ func (b *BlockChain) calcSequenceLock(node *blockNode, tx *dcrutil.Tx, view *Utx
 			if prevInputHeight < 0 {
 				prevInputHeight = 0
 			}
-			blockNode, err := b.ancestorNode(node, prevInputHeight)
+			blockNode, err := b.index.AncestorNode(node, prevInputHeight)
 			if err != nil {
 				return sequenceLock, err
 			}
 
 			// Calculate the past median time of the block prior to
 			// the one which included the output being spent.
-			medianTime, err := b.calcPastMedianTime(blockNode)
+			medianTime, err := b.index.CalcPastMedianTime(blockNode)
 			if err != nil {
 				return sequenceLock, err
 			}

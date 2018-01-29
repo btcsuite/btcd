@@ -1,5 +1,5 @@
-// Copyright (c) 2017 The decred developers
 // Copyright (c) 2016 The btcsuite developers
+// Copyright (c) 2017-2018 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -234,7 +234,7 @@ func (b *BlockChain) thresholdState(version uint32, prevNode *blockNode, checker
 		int64(checker.RuleChangeActivationInterval()),
 		prevNode.height+1)
 	var err error
-	prevNode, err = b.ancestorNode(prevNode, wantHeight)
+	prevNode, err = b.index.AncestorNode(prevNode, wantHeight)
 	if err != nil {
 		return newThresholdState(ThresholdFailed, invalidChoice), err
 	}
@@ -251,7 +251,7 @@ func (b *BlockChain) thresholdState(version uint32, prevNode *blockNode, checker
 
 		// The start and expiration times are based on the median block
 		// time, so calculate it now.
-		medianTime, err := b.calcPastMedianTime(prevNode)
+		medianTime, err := b.index.CalcPastMedianTime(prevNode)
 		if err != nil {
 			return newThresholdState(ThresholdFailed,
 				invalidChoice), err
@@ -273,7 +273,7 @@ func (b *BlockChain) thresholdState(version uint32, prevNode *blockNode, checker
 
 		// Get the ancestor that is the last block of the previous
 		// confirmation window.
-		prevNode, err = b.ancestorNode(prevNode, prevNode.height-
+		prevNode, err = b.index.AncestorNode(prevNode, prevNode.height-
 			confirmationWindow)
 		if err != nil {
 			return newThresholdState(ThresholdFailed,
@@ -310,7 +310,7 @@ func (b *BlockChain) thresholdState(version uint32, prevNode *blockNode, checker
 
 			// The deployment of the rule change fails if it expires
 			// before it is accepted and locked in.
-			medianTime, err := b.calcPastMedianTime(prevNode)
+			medianTime, err := b.index.CalcPastMedianTime(prevNode)
 			if err != nil {
 				return newThresholdState(ThresholdFailed,
 					invalidChoice), err
@@ -346,7 +346,7 @@ func (b *BlockChain) thresholdState(version uint32, prevNode *blockNode, checker
 		case ThresholdStarted:
 			// The deployment of the rule change fails if it expires
 			// before it is accepted and locked in.
-			medianTime, err := b.calcPastMedianTime(prevNode)
+			medianTime, err := b.index.CalcPastMedianTime(prevNode)
 			if err != nil {
 				return newThresholdState(ThresholdFailed,
 					invalidChoice), err
@@ -395,7 +395,7 @@ func (b *BlockChain) thresholdState(version uint32, prevNode *blockNode, checker
 				// previous block nodes as needed.  This helps
 				// allow only the pieces of the chain that are
 				// needed to remain in memory.
-				countNode, err = b.getPrevNodeFromNode(countNode)
+				countNode, err = b.index.PrevNodeFromNode(countNode)
 				if err != nil {
 					return newThresholdState(
 						ThresholdFailed, invalidChoice), err
@@ -501,10 +501,8 @@ func (b *BlockChain) deploymentState(prevNode *blockNode, version uint32, deploy
 //
 // This function is safe for concurrent access.
 func (b *BlockChain) ThresholdState(hash *chainhash.Hash, version uint32, deploymentID string) (ThresholdStateTuple, error) {
-	b.chainLock.Lock()
-	node, ok := b.index[*hash]
-	b.chainLock.Unlock()
-	if !ok {
+	node := b.index.LookupNode(hash)
+	if node == nil {
 		invalidState := ThresholdStateTuple{
 			State:  ThresholdInvalid,
 			Choice: invalidChoice,
@@ -608,7 +606,7 @@ func (b *BlockChain) getVoteCounts(node *blockNode, version uint32, d chaincfg.C
 		// previous block nodes as needed.  This helps
 		// allow only the pieces of the chain that are
 		// needed to remain in memory.
-		countNode, err = b.getPrevNodeFromNode(countNode)
+		countNode, err = b.index.PrevNodeFromNode(countNode)
 		if err != nil {
 			return VoteCounts{}, err
 		}
@@ -665,7 +663,7 @@ func (b *BlockChain) CountVoteVersion(version uint32) (uint32, error) {
 		// previous block nodes as needed.  This helps
 		// allow only the pieces of the chain that are
 		// needed to remain in memory.
-		countNode, err = b.getPrevNodeFromNode(countNode)
+		countNode, err = b.index.PrevNodeFromNode(countNode)
 		if err != nil {
 			return 0, err
 		}
