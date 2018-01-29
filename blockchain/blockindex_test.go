@@ -78,3 +78,101 @@ func TestBlockNodeHeader(t *testing.T) {
 			gotHeader, testHeader)
 	}
 }
+
+// TestCalcPastMedianTime ensures the CalcPastMedianTie function works as
+// intended including when there are less than the typical number of blocks
+// which happens near the beginning of the chain.
+func TestCalcPastMedianTime(t *testing.T) {
+	tests := []struct {
+		name       string
+		timestamps []int64
+		expected   int64
+	}{
+		{
+			name:       "one block",
+			timestamps: []int64{1517188771},
+			expected:   1517188771,
+		},
+		{
+			name:       "two blocks, in order",
+			timestamps: []int64{1517188771, 1517188831},
+			expected:   1517188771,
+		},
+		{
+			name:       "three blocks, in order",
+			timestamps: []int64{1517188771, 1517188831, 1517188891},
+			expected:   1517188831,
+		},
+		{
+			name:       "three blocks, out of order",
+			timestamps: []int64{1517188771, 1517188891, 1517188831},
+			expected:   1517188831,
+		},
+		{
+			name:       "four blocks, in order",
+			timestamps: []int64{1517188771, 1517188831, 1517188891, 1517188951},
+			expected:   1517188831,
+		},
+		{
+			name:       "four blocks, out of order",
+			timestamps: []int64{1517188831, 1517188771, 1517188951, 1517188891},
+			expected:   1517188831,
+		},
+		{
+			name: "eleven blocks, in order",
+			timestamps: []int64{1517188771, 1517188831, 1517188891, 1517188951,
+				1517189011, 1517189071, 1517189131, 1517189191, 1517189251,
+				1517189311, 1517189371},
+			expected: 1517189071,
+		},
+		{
+			name: "eleven blocks, out of order",
+			timestamps: []int64{1517188831, 1517188771, 1517188891, 1517189011,
+				1517188951, 1517189071, 1517189131, 1517189191, 1517189251,
+				1517189371, 1517189311},
+			expected: 1517189071,
+		},
+		{
+			name: "fifteen blocks, in order",
+			timestamps: []int64{1517188771, 1517188831, 1517188891, 1517188951,
+				1517189011, 1517189071, 1517189131, 1517189191, 1517189251,
+				1517189311, 1517189371, 1517189431, 1517189491, 1517189551,
+				1517189611},
+			expected: 1517189311,
+		},
+		{
+			name: "fifteen blocks, out of order",
+			timestamps: []int64{1517188771, 1517188891, 1517188831, 1517189011,
+				1517188951, 1517189131, 1517189071, 1517189251, 1517189191,
+				1517189371, 1517189311, 1517189491, 1517189431, 1517189611,
+				1517189551},
+			expected: 1517189311,
+		},
+	}
+
+	params := &chaincfg.SimNetParams
+	for _, test := range tests {
+		// Create a synthetic chain with the correct number of nodes and the
+		// timestamps as specified by the test.
+		bc := newFakeChain(params)
+		node := bc.bestNode
+		for _, timestamp := range test.timestamps {
+			node = newFakeNode(node, 0, 0, 0, time.Unix(timestamp, 0))
+			bc.index.AddNode(node)
+			bc.bestNode = node
+		}
+
+		// Ensure the median time is the expected value.
+		gotTime, err := bc.index.CalcPastMedianTime(node)
+		if err != nil {
+			t.Errorf("%s: unexpected error: %v", test.name, err)
+			continue
+		}
+		wantTime := time.Unix(test.expected, 0)
+		if !gotTime.Equal(wantTime) {
+			t.Errorf("%s: mismatched timestamps -- got: %v, want: %v",
+				test.name, gotTime, wantTime)
+			continue
+		}
+	}
+}
