@@ -86,7 +86,7 @@ type EstimateFeeCmd struct {
 	NumBlocks int64
 }
 
-// NewEstimateFeeCmd returns a new instance which can be used to issue a
+// NewEstimateFeeCmd returns a new instance which can be used to issue an
 // estimatefee JSON-RPC command.
 func NewEstimateFeeCmd(numBlocks int64) *EstimateFeeCmd {
 	return &EstimateFeeCmd{
@@ -99,11 +99,37 @@ type EstimatePriorityCmd struct {
 	NumBlocks int64
 }
 
-// NewEstimatePriorityCmd returns a new instance which can be used to issue a
+// NewEstimatePriorityCmd returns a new instance which can be used to issue an
 // estimatepriority JSON-RPC command.
 func NewEstimatePriorityCmd(numBlocks int64) *EstimatePriorityCmd {
 	return &EstimatePriorityCmd{
 		NumBlocks: numBlocks,
+	}
+}
+
+// EstimateRawFeeCmd defines the estimaterawfee JSON-RPC command.
+type EstimateRawFeeCmd struct {
+	ConfTarget int64
+}
+
+// NewEstimateRawFeeCmd returns a new instance which can be used to issue an
+// estimaterawfee JSON-RPC command.
+func NewEstimateRawFeeCmd(confTarget int64) *EstimateRawFeeCmd {
+	return &EstimateRawFeeCmd{
+		ConfTarget: confTarget,
+	}
+}
+
+// EstimateSmartFeeCmd defines the estimatesmartfee JSON-RPC command.
+type EstimateSmartFeeCmd struct {
+	ConfTarget int64
+}
+
+// NewEstimateSmartFeeCmd returns a new instance which can be used to issue an
+// estimatesmartfee JSON-RPC command.
+func NewEstimateSmartFeeCmd(confTarget int64) *EstimateSmartFeeCmd {
+	return &EstimateSmartFeeCmd{
+		ConfTarget: confTarget,
 	}
 }
 
@@ -664,6 +690,8 @@ func init() {
 	MustRegisterCmd("encryptwallet", (*EncryptWalletCmd)(nil), flags)
 	MustRegisterCmd("estimatefee", (*EstimateFeeCmd)(nil), flags)
 	MustRegisterCmd("estimatepriority", (*EstimatePriorityCmd)(nil), flags)
+	MustRegisterCmd("estimaterawfee", (*EstimateRawFeeCmd)(nil), flags)
+	MustRegisterCmd("estimatesmartfee", (*EstimateSmartFeeCmd)(nil), flags)
 	MustRegisterCmd("getaccount", (*GetAccountCmd)(nil), flags)
 	MustRegisterCmd("getaccountaddress", (*GetAccountAddressCmd)(nil), flags)
 	MustRegisterCmd("getaddressesbyaccount", (*GetAddressesByAccountCmd)(nil), flags)

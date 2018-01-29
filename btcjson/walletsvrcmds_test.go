@@ -142,6 +142,32 @@ func TestWalletSvrCmds(t *testing.T) {
 			},
 		},
 		{
+			name: "estimaterawfee",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("estimaterawfee", 6)
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewEstimateRawFeeCmd(6)
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"estimaterawfee","params":[6],"id":1}`,
+			unmarshalled: &btcjson.EstimateRawFeeCmd{
+				ConfTarget: 6,
+			},
+		},
+		{
+			name: "estimatesmartfee",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("estimatesmartfee", 6)
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewEstimateSmartFeeCmd(6)
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"estimatesmartfee","params":[6],"id":1}`,
+			unmarshalled: &btcjson.EstimateSmartFeeCmd{
+				ConfTarget: 6,
+			},
+		},
+		{
 			name: "getaccount",
 			newCmd: func() (interface{}, error) {
 				return btcjson.NewCmd("getaccount", "1Address")
