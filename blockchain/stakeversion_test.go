@@ -20,8 +20,8 @@ import (
 // it is not usable with all functions and the tests must take care when making
 // use of it.
 func newFakeChain(params *chaincfg.Params) *BlockChain {
-	// Create a genesis block node and block index index populated with it
-	// for use when creating the fake chain below.
+	// Create a genesis block node and block index populated with it for use
+	// when creating the fake chain below.
 	node := newBlockNode(&params.GenesisBlock.Header, &stake.SpentTicketsInBlock{})
 	node.inMainChain = true
 	index := make(map[chainhash.Hash]*blockNode)

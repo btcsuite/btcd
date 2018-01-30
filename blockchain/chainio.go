@@ -512,8 +512,7 @@ func serializeSpendJournalEntry(stxos []spentTxOut) ([]byte, error) {
 // view MUST have the utxos referenced by all of the transactions available for
 // the passed block since that information is required to reconstruct the spent
 // txouts.
-func dbFetchSpendJournalEntry(dbTx database.Tx, block *dcrutil.Block,
-	parent *dcrutil.Block) ([]spentTxOut, error) {
+func dbFetchSpendJournalEntry(dbTx database.Tx, block *dcrutil.Block, parent *dcrutil.Block) ([]spentTxOut, error) {
 	// Exclude the coinbase transaction since it can't spend anything.
 	spendBucket := dbTx.Metadata().Bucket(dbnamespace.SpendJournalBucketName)
 	serialized := spendBucket.Get(block.Hash()[:])
@@ -964,9 +963,9 @@ func dbPutUtxoView(dbTx database.Tx, view *UtxoViewpoint) error {
 }
 
 // -----------------------------------------------------------------------------
-// The block index consists of two buckets with an entry for every block in the
-// main chain.  One bucket is for the hash to height mapping and the other is
-// for the height to hash mapping.
+// The main chain index consists of two buckets with an entry for every block in
+// the main chain.  One bucket is for the hash to height mapping and the other
+// is for the height to hash mapping.
 //
 // The serialized format for values in the hash to height bucket is:
 //   <height>
@@ -981,10 +980,10 @@ func dbPutUtxoView(dbTx database.Tx, view *UtxoViewpoint) error {
 //   hash       chainhash.Hash   chainhash.HashSize
 // -----------------------------------------------------------------------------
 
-// dbPutBlockIndex uses an existing database transaction to update or add the
-// block index entries for the hash to height and height to hash mappings for
-// the provided values.
-func dbPutBlockIndex(dbTx database.Tx, hash *chainhash.Hash, height int64) error {
+// dbPutMainChainIndex uses an existing database transaction to update or add
+// index entries for the hash to height and height to hash mappings for the
+// provided values.
+func dbPutMainChainIndex(dbTx database.Tx, hash *chainhash.Hash, height int64) error {
 	// Serialize the height for use in the index entries.
 	var serializedHeight [4]byte
 	dbnamespace.ByteOrder.PutUint32(serializedHeight[:], uint32(height))
@@ -1001,10 +1000,10 @@ func dbPutBlockIndex(dbTx database.Tx, hash *chainhash.Hash, height int64) error
 	return heightIndex.Put(serializedHeight[:], hash[:])
 }
 
-// dbRemoveBlockIndex uses an existing database transaction remove block index
-// entries from the hash to height and height to hash mappings for the provided
-// values.
-func dbRemoveBlockIndex(dbTx database.Tx, hash *chainhash.Hash, height int64) error {
+// dbRemoveMainChainIndex uses an existing database transaction remove main
+// chain index entries from the hash to height and height to hash mappings for
+// the provided values.
+func dbRemoveMainChainIndex(dbTx database.Tx, hash *chainhash.Hash, height int64) error {
 	// Remove the block hash to height mapping.
 	meta := dbTx.Metadata()
 	hashIndex := meta.Bucket(dbnamespace.HashIndexBucketName)
@@ -1340,7 +1339,7 @@ func (b *BlockChain) createChainState() error {
 
 		// Add the genesis block hash to height and height to hash
 		// mappings to the index.
-		err = dbPutBlockIndex(dbTx, &b.bestNode.hash, b.bestNode.height)
+		err = dbPutMainChainIndex(dbTx, &b.bestNode.hash, b.bestNode.height)
 		if err != nil {
 			return err
 		}

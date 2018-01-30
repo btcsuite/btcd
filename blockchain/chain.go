@@ -1252,9 +1252,8 @@ func (b *BlockChain) connectBlock(node *blockNode, block *dcrutil.Block, view *U
 			return err
 		}
 
-		// Add the block hash and height to the block index which tracks
-		// the main chain.
-		err = dbPutBlockIndex(dbTx, block.Hash(), node.height)
+		// Add the block hash and height to the main chain index.
+		err = dbPutMainChainIndex(dbTx, block.Hash(), node.height)
 		if err != nil {
 			return err
 		}
@@ -1456,9 +1455,8 @@ func (b *BlockChain) disconnectBlock(node *blockNode, block *dcrutil.Block, view
 			return err
 		}
 
-		// Remove the block hash and height from the block index which
-		// tracks the main chain.
-		err = dbRemoveBlockIndex(dbTx, block.Hash(), node.height)
+		// Remove the block hash and height from the main chain index.
+		err = dbRemoveMainChainIndex(dbTx, block.Hash(), node.height)
 		if err != nil {
 			return err
 		}
