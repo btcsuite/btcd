@@ -760,7 +760,7 @@ func (idx *AddrIndex) indexBlock(data writeIndexData, block, parent *dcrutil.Blo
 		msgTx := tx.MsgTx()
 		thisTxOffset := txIdx + len(parentRegularTxs)
 
-		isSSGen, _ := stake.IsSSGen(msgTx)
+		isSSGen := stake.IsSSGen(msgTx)
 		for i, txIn := range msgTx.TxIn {
 			// Skip stakebases.
 			if isSSGen && i == 0 {
@@ -786,7 +786,7 @@ func (idx *AddrIndex) indexBlock(data writeIndexData, block, parent *dcrutil.Blo
 				txType == stake.TxTypeSStx)
 		}
 
-		isSStx, _ := stake.IsSStx(msgTx)
+		isSStx := stake.IsSStx(msgTx)
 		for _, txOut := range msgTx.TxOut {
 			idx.indexPkScript(data, txOut.Version, txOut.PkScript,
 				thisTxOffset, isSStx)
@@ -992,7 +992,7 @@ func (idx *AddrIndex) AddUnconfirmedTx(tx *dcrutil.Tx, utxoView *blockchain.Utxo
 	// transaction has already been validated and thus all inputs are
 	// already known to exist.
 	msgTx := tx.MsgTx()
-	isSSGen, _ := stake.IsSSGen(msgTx)
+	isSSGen := stake.IsSSGen(msgTx)
 	for i, txIn := range msgTx.TxIn {
 		// Skip stakebase.
 		if i == 0 && isSSGen {
@@ -1014,7 +1014,7 @@ func (idx *AddrIndex) AddUnconfirmedTx(tx *dcrutil.Tx, utxoView *blockchain.Utxo
 	}
 
 	// Index addresses of all created outputs.
-	isSStx, _ := stake.IsSStx(msgTx)
+	isSStx := stake.IsSStx(msgTx)
 	for _, txOut := range msgTx.TxOut {
 		idx.indexUnconfirmedAddresses(txOut.Version, txOut.PkScript, tx,
 			isSStx)

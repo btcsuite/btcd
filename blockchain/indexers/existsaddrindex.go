@@ -225,7 +225,7 @@ func (idx *ExistsAddrIndex) ConnectBlock(dbTx database.Tx, block, parent *dcruti
 
 	for _, tx := range allTxns {
 		msgTx := tx.MsgTx()
-		isSStx, _ := stake.IsSStx(msgTx)
+		isSStx := stake.IsSStx(msgTx)
 		for _, txIn := range msgTx.TxIn {
 			if txscript.IsMultisigSigScript(txIn.SignatureScript) {
 				rs, err :=
@@ -331,7 +331,7 @@ func (idx *ExistsAddrIndex) DisconnectBlock(dbTx database.Tx, block, parent *dcr
 // addUnconfirmedTx adds all addresses related to the transaction to the
 // unconfirmed (memory-only) exists address index.
 func (idx *ExistsAddrIndex) addUnconfirmedTx(tx *wire.MsgTx) {
-	isSStx, _ := stake.IsSStx(tx)
+	isSStx := stake.IsSStx(tx)
 	for _, txIn := range tx.TxIn {
 		if txscript.IsMultisigSigScript(txIn.SignatureScript) {
 			rs, err :=

@@ -981,7 +981,7 @@ func (view *UtxoViewpoint) fetchInputUtxos(db database.DB, block, parent *dcruti
 		// the stake tx tree, so don't do any of those expensive checks and
 		// just append it to the tx slice.
 		for _, tx := range block.MsgBlock().STransactions {
-			isSSGen, _ := stake.IsSSGen(tx)
+			isSSGen := stake.IsSSGen(tx)
 
 			for i, txIn := range tx.TxIn {
 				// Ignore stakebases.
@@ -1118,7 +1118,7 @@ func (b *BlockChain) FetchUtxoView(tx *dcrutil.Tx, treeValid bool) (*UtxoViewpoi
 	txNeededSet := make(map[chainhash.Hash]struct{})
 	txNeededSet[*tx.Hash()] = struct{}{}
 	msgTx := tx.MsgTx()
-	isSSGen, _ := stake.IsSSGen(msgTx)
+	isSSGen := stake.IsSSGen(msgTx)
 	if !IsCoinBaseTx(msgTx) {
 		for i, txIn := range msgTx.TxIn {
 			if isSSGen && i == 0 {

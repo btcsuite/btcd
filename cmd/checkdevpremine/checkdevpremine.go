@@ -121,8 +121,7 @@ func traceDevPremineOuts(client *rpcclient.Client, txHash *chainhash.Hash) ([]wi
 		// stake generation transaction still need to be traced since
 		// they represent the coins that purchased the ticket.
 		txIns := tx.MsgTx().TxIn
-		isSSGen, _ := stake.IsSSGen(tx.MsgTx())
-		if isSSGen {
+		if stake.IsSSGen(tx.MsgTx()) {
 			txIns = txIns[1:]
 		}
 		for _, txIn := range txIns {

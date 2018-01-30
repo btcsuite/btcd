@@ -723,7 +723,7 @@ func maybeInsertStakeTx(bm *blockManager, stx *dcrutil.Tx, treeValid bool) bool 
 		return false
 	}
 	mstx := stx.MsgTx()
-	isSSGen, _ := stake.IsSSGen(mstx)
+	isSSGen := stake.IsSSGen(mstx)
 	for i, txIn := range mstx.TxIn {
 		// Evaluate if this is a stakebase input or not. If it
 		// is, continue without evaluation of the input.
@@ -1688,7 +1688,7 @@ mempoolLoop:
 			break // No SSGen should be present before this height.
 		}
 
-		if isSSGen, _ := stake.IsSSGen(msgTx); isSSGen {
+		if stake.IsSSGen(msgTx) {
 			txCopy := dcrutil.NewTxDeepTxIns(msgTx)
 			if maybeInsertStakeTx(blockManager, txCopy, treeValid) {
 				vb := stake.SSGenVoteBits(txCopy.MsgTx())
@@ -1786,8 +1786,7 @@ mempoolLoop:
 	freshStake := 0
 	for _, tx := range blockTxns {
 		msgTx := tx.MsgTx()
-		isSStx, _ := stake.IsSStx(msgTx)
-		if tx.Tree() == wire.TxTreeStake && isSStx {
+		if tx.Tree() == wire.TxTreeStake && stake.IsSStx(msgTx) {
 			// A ticket can not spend an input from TxTreeRegular, since it
 			// has not yet been validated.
 			if containsTxIns(blockTxns, tx) {
@@ -1818,8 +1817,7 @@ mempoolLoop:
 		}
 
 		msgTx := tx.MsgTx()
-		isSSRtx, _ := stake.IsSSRtx(msgTx)
-		if tx.Tree() == wire.TxTreeStake && isSSRtx {
+		if tx.Tree() == wire.TxTreeStake && stake.IsSSRtx(msgTx) {
 			txCopy := dcrutil.NewTxDeepTxIns(msgTx)
 			if maybeInsertStakeTx(blockManager, txCopy, treeValid) {
 				blockTxnsStake = append(blockTxnsStake, txCopy)

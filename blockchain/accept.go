@@ -223,7 +223,7 @@ func ticketsRevokedInBlock(bl *dcrutil.Block) []chainhash.Hash {
 func voteBitsInBlock(bl *dcrutil.Block) []stake.VoteVersionTuple {
 	var voteBits []stake.VoteVersionTuple
 	for _, stx := range bl.MsgBlock().STransactions {
-		if is, _ := stake.IsSSGen(stx); !is {
+		if stake.IsSSGen(stx) {
 			continue
 		}
 

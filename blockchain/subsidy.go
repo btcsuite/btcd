@@ -336,7 +336,7 @@ func CalculateAddedSubsidy(block, parent *dcrutil.Block) int64 {
 	}
 
 	for _, stx := range block.MsgBlock().STransactions {
-		if isSSGen, _ := stake.IsSSGen(stx); isSSGen {
+		if stake.IsSSGen(stx) {
 			subsidy += stx.TxIn[0].ValueIn
 		}
 	}

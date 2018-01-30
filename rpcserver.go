@@ -900,7 +900,7 @@ func handleCreateRawSStx(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 	}
 
 	// Make sure we generated a valid SStx.
-	if _, err := stake.IsSStx(mtx); err != nil {
+	if err := stake.CheckSStx(mtx); err != nil {
 		return nil, rpcInternalError(err.Error(),
 			"Invalid SStx")
 	}
@@ -1049,7 +1049,7 @@ func handleCreateRawSSGenTx(s *rpcServer, cmd interface{}, closeChan <-chan stru
 	}
 
 	// Check to make sure our SSGen was created correctly.
-	_, err = stake.IsSSGen(mtx)
+	err = stake.CheckSSGen(mtx)
 	if err != nil {
 		return nil, rpcInternalError(err.Error(), "Invalid SSGen")
 	}
@@ -1175,7 +1175,7 @@ func handleCreateRawSSRtx(s *rpcServer, cmd interface{}, closeChan <-chan struct
 	}
 
 	// Check to make sure our SSRtx was created correctly.
-	_, err = stake.IsSSRtx(mtx)
+	err = stake.CheckSSRtx(mtx)
 	if err != nil {
 		return nil, rpcInternalError(err.Error(), "Invalid SSRtx")
 	}
@@ -1225,11 +1225,11 @@ func createVinList(mtx *wire.MsgTx) []dcrjson.Vin {
 
 	// Stakebase transactions (votes) have two inputs: a null stake base
 	// followed by an input consuming a ticket's stakesubmission.
-	stakeTx, _ := stake.IsSSGen(mtx)
+	isSSGen := stake.IsSSGen(mtx)
 
 	for i, txIn := range mtx.TxIn {
 		// Handle only the null input of a stakebase differently.
-		if stakeTx && i == 0 {
+		if isSSGen && i == 0 {
 			vinEntry := &vinList[0]
 			vinEntry.Stakebase = hex.EncodeToString(txIn.SignatureScript)
 			vinEntry.Sequence = txIn.Sequence
@@ -4425,8 +4425,8 @@ type retrievedTx struct {
 func fetchInputTxos(s *rpcServer, tx *wire.MsgTx) (map[wire.OutPoint]wire.TxOut, error) {
 	mp := s.server.txMemPool
 	originOutputs := make(map[wire.OutPoint]wire.TxOut)
+	voteTx := stake.IsSSGen(tx)
 	for txInIndex, txIn := range tx.TxIn {
-		voteTx, _ := stake.IsSSGen(tx)
 		// vote tx have null input for vin[0],
 		// skip since it resolvces to an invalid transaction
 		if voteTx && txInIndex == 0 {
@@ -4528,11 +4528,11 @@ func createVinListPrevOut(s *rpcServer, mtx *wire.MsgTx, chainParams *chaincfg.P
 
 	// Stakebase transactions (votes) have two inputs: a null stake base
 	// followed by an input consuming a ticket's stakesubmission.
-	stakeTx, _ := stake.IsSSGen(mtx)
+	isSSGen := stake.IsSSGen(mtx)
 
 	for i, txIn := range mtx.TxIn {
 		// Handle only the null input of a stakebase differently.
-		if stakeTx && i == 0 {
+		if isSSGen && i == 0 {
 			amountIn := dcrutil.Amount(txIn.ValueIn).ToCoin()
 			vinEntry := dcrjson.VinPrevOut{
 				Stakebase: hex.EncodeToString(txIn.SignatureScript),

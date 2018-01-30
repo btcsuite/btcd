@@ -72,7 +72,7 @@ func (b *BlockChain) fetchNewTicketsForNode(node *blockNode) ([]chainhash.Hash, 
 
 	tickets := []chainhash.Hash{}
 	for _, stx := range matureBlock.MsgBlock().STransactions {
-		if is, _ := stake.IsSStx(stx); is {
+		if stake.IsSStx(stx) {
 			h := stx.TxHash()
 			tickets = append(tickets, h)
 		}

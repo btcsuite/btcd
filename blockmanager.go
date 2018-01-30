@@ -791,8 +791,7 @@ func (b *blockManager) current() bool {
 func (b *blockManager) checkBlockForHiddenVotes(block *dcrutil.Block) {
 	var votesFromBlock []*dcrutil.Tx
 	for _, stx := range block.STransactions() {
-		isSSGen, _ := stake.IsSSGen(stx.MsgTx())
-		if isSSGen {
+		if stake.IsSSGen(stx.MsgTx()) {
 			votesFromBlock = append(votesFromBlock, stx)
 		}
 	}
