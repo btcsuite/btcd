@@ -18,7 +18,7 @@ import (
 )
 
 // This example demonstrates how to create a new chain instance and use
-// ProcessBlock to attempt to attempt add a block to the chain.  As the package
+// ProcessBlock to attempt to add a block to the chain.  As the package
 // overview documentation describes, this includes all of the Bitcoin consensus
 // rules.  This example intentionally attempts to insert a duplicate genesis
 // block to illustrate how an invalid block is handled.
