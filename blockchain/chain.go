@@ -564,28 +564,14 @@ func (b *BlockChain) findNode(nodeHash *chainhash.Hash, searchDepth int) (*block
 	return node, err
 }
 
-// fetchBlockFromHash searches the internal chain block stores and the database in
-// an attempt to find the block.  If it finds the block, it returns it.
+// fetchMainChainBlockByHash returns the block from the main chain with the
+// given hash.  It first attempts to use cache and then falls back to loading it
+// from the database.
+// An error is returned if the block is either not found or not in the main
+// chain.
 //
-// This function is NOT safe for concurrent access.
-func (b *BlockChain) fetchBlockFromHash(hash *chainhash.Hash) (*dcrutil.Block, error) {
-	// Check side chain block cache
-	b.blockCacheLock.RLock()
-	blockSidechain, existsSidechain := b.blockCache[*hash]
-	b.blockCacheLock.RUnlock()
-	if existsSidechain {
-		return blockSidechain, nil
-	}
-
-	// Check orphan cache
-	b.orphanLock.RLock()
-	orphan, existsOrphans := b.orphans[*hash]
-	b.orphanLock.RUnlock()
-	if existsOrphans {
-		return orphan.block, nil
-	}
-
-	// Check main chain
+// This function is safe for concurrent access.
+func (b *BlockChain) fetchMainChainBlockByHash(hash *chainhash.Hash) (*dcrutil.Block, error) {
 	b.mainchainBlockCacheLock.RLock()
 	block, ok := b.mainchainBlockCache[*hash]
 	b.mainchainBlockCacheLock.RUnlock()
@@ -593,32 +579,81 @@ func (b *BlockChain) fetchBlockFromHash(hash *chainhash.Hash) (*dcrutil.Block, e
 		return block, nil
 	}
 
-	var blockMainchain *dcrutil.Block
-	errFetchMainchain := b.db.View(func(dbTx database.Tx) error {
+	err := b.db.View(func(dbTx database.Tx) error {
 		var err error
-		blockMainchain, err = dbFetchBlockByHash(dbTx, hash)
+		block, err = dbFetchBlockByHash(dbTx, hash)
 		return err
 	})
-	if errFetchMainchain == nil && blockMainchain != nil {
-		return blockMainchain, nil
-	}
-
-	// Implicit !existsMainchain && !existsSidechain && !existsOrphans
-	return nil, fmt.Errorf("unable to find block %v in "+
-		"side chain cache, orphan cache, and main chain db", hash)
+	return block, err
 }
 
-// FetchBlockFromHash is the generalized and exported version of
-// fetchBlockFromHash.  It is safe for concurrent access.
-func (b *BlockChain) FetchBlockFromHash(hash *chainhash.Hash) (*dcrutil.Block, error) {
-	return b.fetchBlockFromHash(hash)
+// fetchBlockByHash returns the block with the given hash from all known sources
+// such as the internal caches and the database.
+//
+// This function is safe for concurrent access.
+func (b *BlockChain) fetchBlockByHash(hash *chainhash.Hash) (*dcrutil.Block, error) {
+	// Check side chain block cache.
+	b.blockCacheLock.RLock()
+	block, existsSidechain := b.blockCache[*hash]
+	b.blockCacheLock.RUnlock()
+	if existsSidechain {
+		return block, nil
+	}
+
+	// Check orphan cache.
+	b.orphanLock.RLock()
+	orphan, existsOrphans := b.orphans[*hash]
+	b.orphanLock.RUnlock()
+	if existsOrphans {
+		return orphan.block, nil
+	}
+
+	// Check main chain cache.
+	b.mainchainBlockCacheLock.RLock()
+	block, ok := b.mainchainBlockCache[*hash]
+	b.mainchainBlockCacheLock.RUnlock()
+	if ok {
+		return block, nil
+	}
+
+	// Attempt to load the block from the database.
+	err := b.db.View(func(dbTx database.Tx) error {
+		// NOTE: This does not use the dbFetchBlockByHash function since that
+		// function only works with main chain blocks.
+		blockBytes, err := dbTx.FetchBlock(hash)
+		if err != nil {
+			return err
+		}
+
+		block, err = dcrutil.NewBlockFromBytes(blockBytes)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+	if err == nil && block != nil {
+		return block, nil
+	}
+
+	return nil, fmt.Errorf("unable to find block %v in cache or db", hash)
+}
+
+// FetchBlockByHash searches the internal chain block stores and the database
+// in an attempt to find the requested block.
+//
+// This function differs from BlockByHash in that this one also returns blocks
+// that are not part of the main chain (if they are known).
+//
+// This function is safe for concurrent access.
+func (b *BlockChain) FetchBlockByHash(hash *chainhash.Hash) (*dcrutil.Block, error) {
+	return b.fetchBlockByHash(hash)
 }
 
 // GetTopBlock returns the current block at HEAD on the blockchain.  Needed
 // for mining in the daemon.
 func (b *BlockChain) GetTopBlock() (*dcrutil.Block, error) {
-	block, err := b.fetchBlockFromHash(&b.bestNode.hash)
-	return block, err
+	return b.fetchMainChainBlockByHash(&b.bestNode.hash)
 }
 
 // pruneStakeNodes removes references to old stake nodes which should no
@@ -1256,7 +1291,7 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List, flags 
 		block := nextBlockToDetach
 		if block == nil {
 			var err error
-			block, err = b.fetchBlockFromHash(&n.hash)
+			block, err = b.fetchMainChainBlockByHash(&n.hash)
 			if err != nil {
 				return err
 			}
@@ -1270,7 +1305,7 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List, flags 
 		// Grab the parent of the current block and also save a reference to it
 		// as the next block to detach so it doesn't need to be loaded again on
 		// the next iteration.
-		parent, err := b.fetchBlockFromHash(&n.parentHash)
+		parent, err := b.fetchMainChainBlockByHash(&n.parentHash)
 		if err != nil {
 			return err
 		}
@@ -1319,7 +1354,7 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List, flags 
 			return err
 		}
 
-		forkBlock, err = b.fetchBlockFromHash(&forkNode.hash)
+		forkBlock, err = b.fetchMainChainBlockByHash(&forkNode.hash)
 		if err != nil {
 			return err
 		}
@@ -1517,7 +1552,7 @@ func (b *BlockChain) forceHeadReorganization(formerBest chainhash.Hash, newBest 
 			"common parent for forced reorg")
 	}
 
-	newBestBlock, err := b.fetchBlockFromHash(&newBest)
+	newBestBlock, err := b.fetchBlockByHash(&newBest)
 	if err != nil {
 		return err
 	}
@@ -1527,11 +1562,12 @@ func (b *BlockChain) forceHeadReorganization(formerBest chainhash.Hash, newBest 
 	view.SetBestHash(&b.bestNode.parentHash)
 	view.SetStakeViewpoint(ViewpointPrevValidInitial)
 
-	formerBestBlock, err := b.fetchBlockFromHash(&formerBest)
+	formerBestBlock, err := b.fetchBlockByHash(&formerBest)
 	if err != nil {
 		return err
 	}
-	commonParentBlock, err := b.fetchBlockFromHash(&formerBestNode.parent.hash)
+	commonParentBlock, err := b.fetchMainChainBlockByHash(
+		&formerBestNode.parent.hash)
 	if err != nil {
 		return err
 	}

@@ -1123,7 +1123,7 @@ func (s *server) pushTxMsg(sp *serverPeer, hash *chainhash.Hash, doneChan chan<-
 // pushBlockMsg sends a block message for the provided block hash to the
 // connected peer.  An error is returned if the block hash is not known.
 func (s *server) pushBlockMsg(sp *serverPeer, hash *chainhash.Hash, doneChan chan<- struct{}, waitChan <-chan struct{}) error {
-	block, err := sp.server.blockManager.chain.FetchBlockFromHash(hash)
+	block, err := sp.server.blockManager.chain.FetchBlockByHash(hash)
 	if err != nil {
 		peerLog.Tracef("Unable to fetch requested block hash %v: %v",
 			hash, err)

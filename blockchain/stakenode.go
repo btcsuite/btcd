@@ -65,7 +65,7 @@ func (b *BlockChain) fetchNewTicketsForNode(node *blockNode) ([]chainhash.Hash, 
 		return nil, err
 	}
 
-	matureBlock, errBlock := b.fetchBlockFromHash(&matureNode.hash)
+	matureBlock, errBlock := b.fetchBlockByHash(&matureNode.hash)
 	if errBlock != nil {
 		return nil, errBlock
 	}

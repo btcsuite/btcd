@@ -296,7 +296,7 @@ func (b *BlockChain) maybeAcceptBlock(block *dcrutil.Block, flags BehaviorFlags)
 
 	// Grab the parent block since it is required throughout the block
 	// connection process.
-	parent, err := b.fetchBlockFromHash(&newNode.parentHash)
+	parent, err := b.fetchBlockByHash(&newNode.parentHash)
 	if err != nil {
 		return false, err
 	}

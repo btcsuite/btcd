@@ -2612,13 +2612,6 @@ func (b *BlockChain) CheckConnectBlock(block *dcrutil.Block) error {
 		return ruleError(ErrMissingParent, err.Error())
 	}
 
-	// Grab the parent block since it is required throughout the block
-	// connection process.
-	parent, err := b.fetchBlockFromHash(&parentHash)
-	if err != nil {
-		return ruleError(ErrMissingParent, err.Error())
-	}
-
 	newNode := newBlockNode(&block.MsgBlock().Header,
 		stake.FindSpentTicketsInBlock(block.MsgBlock()))
 	newNode.parent = prevNode
@@ -2628,6 +2621,14 @@ func (b *BlockChain) CheckConnectBlock(block *dcrutil.Block) error {
 	// the ticket database we already have.
 	if b.bestNode == nil || (prevNode != nil &&
 		prevNode.hash == b.bestNode.hash) {
+
+		// Grab the parent block since it is required throughout the block
+		// connection process.
+		parent, err := b.fetchMainChainBlockByHash(&parentHash)
+		if err != nil {
+			return ruleError(ErrMissingParent, err.Error())
+		}
+
 		view := NewUtxoViewpoint()
 		view.SetBestHash(&prevNode.hash)
 		return b.checkConnectBlock(newNode, block, parent, view, nil)
@@ -2647,23 +2648,35 @@ func (b *BlockChain) CheckConnectBlock(block *dcrutil.Block) error {
 	view.SetBestHash(&b.bestNode.hash)
 	view.SetStakeViewpoint(ViewpointPrevValidInitial)
 	var stxos []spentTxOut
+	var nextBlockToDetach *dcrutil.Block
 	for e := detachNodes.Front(); e != nil; e = e.Next() {
+		// Grab the block to detach based on the node.  Use the fact that the
+		// parent of the block is already required, and the next block to detach
+		// will also be the parent to optimize.
 		n := e.Value.(*blockNode)
-		block, err := b.fetchBlockFromHash(&n.hash)
+		block := nextBlockToDetach
+		if block == nil {
+			var err error
+			block, err = b.fetchMainChainBlockByHash(&n.hash)
+			if err != nil {
+				return err
+			}
+		}
+		if n.hash != *block.Hash() {
+			return AssertError(fmt.Sprintf("detach block node hash %v (height "+
+				"%v) does not match previous parent block hash %v", &n.hash,
+				n.height, block.Hash()))
+		}
+
+		parent, err := b.fetchMainChainBlockByHash(&n.parentHash)
 		if err != nil {
 			return err
 		}
+		nextBlockToDetach = parent
 
-		parent, err := b.fetchBlockFromHash(&n.parentHash)
-		if err != nil {
-			return err
-		}
-
-		// Load all of the spent txos for the block from the spend
-		// journal.
+		// Load all of the spent txos for the block from the spend journal.
 		err = b.db.View(func(dbTx database.Tx) error {
-			stxos, err = dbFetchSpendJournalEntry(dbTx, block,
-				parent)
+			stxos, err = dbFetchSpendJournalEntry(dbTx, block, parent)
 			return err
 		})
 		if err != nil {
@@ -2683,13 +2696,25 @@ func (b *BlockChain) CheckConnectBlock(block *dcrutil.Block) error {
 	// attachNodes list indicate the requested node is on a side chain, so
 	// if there are no nodes to attach, we're done.
 	if attachNodes.Len() == 0 {
+		// Grab the parent block since it is required throughout the block
+		// connection process.
+		parent, err := b.fetchMainChainBlockByHash(&parentHash)
+		if err != nil {
+			return ruleError(ErrMissingParent, err.Error())
+		}
+
 		view.SetBestHash(&parentHash)
 		return b.checkConnectBlock(newNode, block, parent, view, nil)
 	}
 
 	// The requested node is on a side chain, so we need to apply the
 	// transactions and spend information from each of the nodes to attach.
+	var prevAttachBlock *dcrutil.Block
 	for e := attachNodes.Front(); e != nil; e = e.Next() {
+		// Grab the block to attach based on the node.  Use the fact that the
+		// parent of the block is either the fork point for the first node being
+		// attached or the previous one that was attached for subsequent blocks
+		// to optimize.
 		n := e.Value.(*blockNode)
 		block, exists := b.blockCache[n.hash]
 		if !exists {
@@ -2697,16 +2722,34 @@ func (b *BlockChain) CheckConnectBlock(block *dcrutil.Block) error {
 				"side chain cache for utxo view construction",
 				n.hash)
 		}
-
-		parent, err := b.fetchBlockFromHash(&n.parentHash)
-		if err != nil {
-			return err
+		parent := prevAttachBlock
+		if parent == nil {
+			var err error
+			parent, err = b.fetchMainChainBlockByHash(&n.parentHash)
+			if err != nil {
+				return err
+			}
 		}
+		if n.parentHash != *parent.Hash() {
+			return AssertError(fmt.Sprintf("attach block node hash %v (height "+
+				"%v) parent hash %v does not match previous parent block "+
+				"hash %v", &n.hash, n.height, &n.parentHash, parent.Hash()))
+		}
+
+		// Store the loaded block for the next iteration.
+		prevAttachBlock = block
 
 		err = b.connectTransactions(view, block, parent, &stxos)
 		if err != nil {
 			return err
 		}
+	}
+
+	// Grab the parent block since it is required throughout the block
+	// connection process.
+	parent, err := b.fetchBlockByHash(&parentHash)
+	if err != nil {
+		return ruleError(ErrMissingParent, err.Error())
 	}
 
 	view.SetBestHash(&parentHash)

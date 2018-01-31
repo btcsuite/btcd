@@ -1656,15 +1656,14 @@ func (b *BlockChain) BlockByHeight(blockHeight int64) (*dcrutil.Block, error) {
 	return block, err
 }
 
-// BlockByHash returns the block from the main chain with the given hash with
-// the appropriate chain height set.
+// BlockByHash returns the block from the main chain with the given hash.
 //
 // This function is safe for concurrent access.
 func (b *BlockChain) BlockByHash(hash *chainhash.Hash) (*dcrutil.Block, error) {
 	b.chainLock.RLock()
 	defer b.chainLock.RUnlock()
 
-	return b.fetchBlockFromHash(hash)
+	return b.fetchMainChainBlockByHash(hash)
 }
 
 // HeightRange returns a range of block hashes for the given start and end
