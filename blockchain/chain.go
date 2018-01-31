@@ -802,7 +802,7 @@ func dbMaybeStoreBlock(dbTx database.Tx, block *dcrutil.Block) error {
 // it would be inefficient to repeat it.
 //
 // This function MUST be called with the chain state lock held (for writes).
-func (b *BlockChain) connectBlock(node *blockNode, block *dcrutil.Block, view *UtxoViewpoint, stxos []spentTxOut) error {
+func (b *BlockChain) connectBlock(node *blockNode, block, parent *dcrutil.Block, view *UtxoViewpoint, stxos []spentTxOut) error {
 	// Make sure it's extending the end of the best chain.
 	prevHash := block.MsgBlock().Header.PrevBlock
 	if prevHash != b.bestNode.hash {
@@ -811,10 +811,6 @@ func (b *BlockChain) connectBlock(node *blockNode, block *dcrutil.Block, view *U
 	}
 
 	// Sanity check the correct number of stxos are provided.
-	parent, err := b.fetchBlockFromHash(&node.parent.hash)
-	if err != nil {
-		return err
-	}
 	if len(stxos) != countSpentOutputs(block, parent) {
 		return AssertError("connectBlock called with inconsistent " +
 			"spent transaction out information")
@@ -997,7 +993,7 @@ func (b *BlockChain) dropMainChainBlockCache(block *dcrutil.Block) {
 // the main (best) chain.
 //
 // This function MUST be called with the chain state lock held (for writes).
-func (b *BlockChain) disconnectBlock(node *blockNode, block *dcrutil.Block, view *UtxoViewpoint) error {
+func (b *BlockChain) disconnectBlock(node *blockNode, block, parent *dcrutil.Block, view *UtxoViewpoint) error {
 	// Make sure the node being disconnected is the end of the best chain.
 	if node.hash != b.bestNode.hash {
 		return AssertError("disconnectBlock must be called with the " +
@@ -1015,12 +1011,6 @@ func (b *BlockChain) disconnectBlock(node *blockNode, block *dcrutil.Block, view
 
 	// Calculate the median time for the previous block.
 	medianTime, err := b.index.CalcPastMedianTime(prevNode)
-	if err != nil {
-		return err
-	}
-
-	// Load the previous block since some details for it are needed below.
-	parent, err := b.fetchBlockFromHash(&prevNode.hash)
 	if err != nil {
 		return err
 	}
@@ -1248,6 +1238,7 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List, flags 
 	// Rather than doing two loads, cache the loaded data into these slices.
 	detachBlocks := make([]*dcrutil.Block, 0, detachNodes.Len())
 	detachSpentTxOuts := make([][]spentTxOut, 0, detachNodes.Len())
+	attachBlocks := make([]*dcrutil.Block, 0, attachNodes.Len())
 
 	// Disconnect all of the blocks back to the point of the fork.  This
 	// entails loading the blocks and their associated spent txos from the
@@ -1346,17 +1337,33 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List, flags 
 	// at least a couple of ways accomplish that rollback, but both involve
 	// tweaking the chain and/or database.  This approach catches these
 	// issues before ever modifying the chain.
-	for e := attachNodes.Front(); e != nil; e = e.Next() {
+	for i, e := 0, attachNodes.Front(); e != nil; i, e = i+1, e.Next() {
+		// Grab the block to attach based on the node.  Use the fact that the
+		// parent of the block is either the fork point for the first node being
+		// attached or the previous one that was attached for subsequent blocks
+		// to optimize.
 		n := e.Value.(*blockNode)
 		b.blockCacheLock.RLock()
 		block := b.blockCache[n.hash]
 		b.blockCacheLock.RUnlock()
+		parent := forkBlock
+		if i > 0 {
+			parent = attachBlocks[i-1]
+		}
+		if n.parentHash != *parent.Hash() {
+			return AssertError(fmt.Sprintf("attach block node hash %v (height "+
+				"%v) parent hash %v does not match previous parent block "+
+				"hash %v", &n.hash, n.height, &n.parentHash, parent.Hash()))
+		}
+
+		// Store the loaded block for later.
+		attachBlocks = append(attachBlocks, block)
 
 		// Notice the spent txout details are not requested here and
 		// thus will not be generated.  This is done because the state
 		// is not being immediately written to the database, so it is
 		// not needed.
-		err := b.checkConnectBlock(n, block, view, nil)
+		err := b.checkConnectBlock(n, block, parent, view, nil)
 		if err != nil {
 			return err
 		}
@@ -1425,22 +1432,28 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List, flags 
 		}
 
 		// Update the database and chain state.
-		err = b.disconnectBlock(n, block, view)
+		err = b.disconnectBlock(n, block, parent, view)
 		if err != nil {
 			return err
 		}
 	}
 
 	// Connect the new best chain blocks.
-	for e := attachNodes.Front(); e != nil; e = e.Next() {
+	for i, e := 0, attachNodes.Front(); e != nil; i, e = i+1, e.Next() {
+		// Grab the block to attach based on the node.  Use the fact that the
+		// parent of the block is either the fork point for the first node being
+		// attached or the previous one that was attached for subsequent blocks
+		// to optimize.
 		n := e.Value.(*blockNode)
-		b.blockCacheLock.RLock()
-		block := b.blockCache[n.hash]
-		b.blockCacheLock.RUnlock()
-
-		parent, err := b.fetchBlockFromHash(&n.parentHash)
-		if err != nil {
-			return err
+		block := attachBlocks[i]
+		parent := forkBlock
+		if i > 0 {
+			parent = attachBlocks[i-1]
+		}
+		if n.parentHash != *parent.Hash() {
+			return AssertError(fmt.Sprintf("attach block node hash %v (height "+
+				"%v) parent hash %v does not match previous parent block "+
+				"hash %v", &n.hash, n.height, &n.parentHash, parent.Hash()))
 		}
 
 		// Update the view to mark all utxos referenced by the block
@@ -1448,13 +1461,13 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List, flags 
 		// to it.  Also, provide an stxo slice so the spent txout
 		// details are generated.
 		stxos := make([]spentTxOut, 0, countSpentOutputs(block, parent))
-		err = b.connectTransactions(view, block, parent, &stxos)
+		err := b.connectTransactions(view, block, parent, &stxos)
 		if err != nil {
 			return err
 		}
 
 		// Update the database and chain state.
-		err = b.connectBlock(n, block, view, stxos)
+		err = b.connectBlock(n, block, parent, view, stxos)
 		if err != nil {
 			return err
 		}
@@ -1552,7 +1565,8 @@ func (b *BlockChain) forceHeadReorganization(formerBest chainhash.Hash, newBest 
 		return err
 	}
 
-	err = b.checkConnectBlock(newBestNode, newBestBlock, view, nil)
+	err = b.checkConnectBlock(newBestNode, newBestBlock, commonParentBlock,
+		view, nil)
 	if err != nil {
 		return err
 	}
@@ -1589,9 +1603,15 @@ func (b *BlockChain) ForceHeadReorganization(formerBest chainhash.Hash, newBest 
 //    modifying the state are avoided.
 //
 // This function MUST be called with the chain state lock held (for writes).
-func (b *BlockChain) connectBestChain(node *blockNode, block *dcrutil.Block, flags BehaviorFlags) (bool, error) {
+func (b *BlockChain) connectBestChain(node *blockNode, block, parent *dcrutil.Block, flags BehaviorFlags) (bool, error) {
 	fastAdd := flags&BFFastAdd == BFFastAdd
 	dryRun := flags&BFDryRun == BFDryRun
+
+	// Ensure the passed parent is actually the parent of the block.
+	if *parent.Hash() != node.parentHash {
+		return false, AssertError("connectBlock must be called with the " +
+			"correct parent block")
+	}
 
 	// We are extending the main (best) chain with a new block.  This is the
 	// most common case.
@@ -1604,7 +1624,8 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *dcrutil.Block, fla
 		view.SetStakeViewpoint(ViewpointPrevValidInitial)
 		var stxos []spentTxOut
 		if !fastAdd {
-			err := b.checkConnectBlock(node, block, view, &stxos)
+			err := b.checkConnectBlock(node, block, parent, view,
+				&stxos)
 			if err != nil {
 				return false, err
 			}
@@ -1620,11 +1641,7 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *dcrutil.Block, fla
 		// utxos, spend them, and add the new utxos being created by
 		// this block.
 		if fastAdd {
-			parent, err := b.fetchBlockFromHash(&node.parentHash)
-			if err != nil {
-				return false, err
-			}
-			err = view.fetchInputUtxos(b.db, block, parent)
+			err := view.fetchInputUtxos(b.db, block, parent)
 			if err != nil {
 				return false, err
 			}
@@ -1635,7 +1652,7 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *dcrutil.Block, fla
 		}
 
 		// Connect the block to the main chain.
-		err := b.connectBlock(node, block, view, stxos)
+		err := b.connectBlock(node, block, parent, view, stxos)
 		if err != nil {
 			return false, err
 		}

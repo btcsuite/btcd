@@ -294,10 +294,17 @@ func (b *BlockChain) maybeAcceptBlock(block *dcrutil.Block, flags BehaviorFlags)
 		newNode.stakeUndoData = newNode.stakeNode.UndoData()
 	}
 
+	// Grab the parent block since it is required throughout the block
+	// connection process.
+	parent, err := b.fetchBlockFromHash(&newNode.parentHash)
+	if err != nil {
+		return false, err
+	}
+
 	// Connect the passed block to the chain while respecting proper chain
 	// selection according to the chain with the most proof of work.  This
 	// also handles validation of the transaction scripts.
-	isMainChain, err := b.connectBestChain(newNode, block, flags)
+	isMainChain, err := b.connectBestChain(newNode, block, parent, flags)
 	if err != nil {
 		return false, err
 	}

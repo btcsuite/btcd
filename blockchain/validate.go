@@ -2352,16 +2352,12 @@ func (b *BlockChain) consensusScriptVerifyFlags(node *blockNode) (txscript.Scrip
 // checks performed by this function.
 //
 // This function MUST be called with the chain state lock held (for writes).
-func (b *BlockChain) checkConnectBlock(node *blockNode, block *dcrutil.Block, utxoView *UtxoViewpoint, stxos *[]spentTxOut) error {
+func (b *BlockChain) checkConnectBlock(node *blockNode, block, parent *dcrutil.Block, utxoView *UtxoViewpoint, stxos *[]spentTxOut) error {
 	// If the side chain blocks end up in the database, a call to
 	// CheckBlockSanity should be done here in case a previous version
 	// allowed a block that is no longer valid.  However, since the
 	// implementation only currently uses memory for the side chain blocks,
 	// it isn't currently necessary.
-	parentBlock, err := b.fetchBlockFromHash(&node.parentHash)
-	if err != nil {
-		return ruleError(ErrMissingParent, err.Error())
-	}
 
 	// The coinbase for the Genesis block is not spendable, so just return
 	// an error now.
@@ -2379,14 +2375,14 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *dcrutil.Block, ut
 	}
 
 	// Check that the coinbase pays the tax, if applicable.
-	err = CoinbasePaysTax(b.subsidyCache, block.Transactions()[0], node.height,
+	err := CoinbasePaysTax(b.subsidyCache, block.Transactions()[0], node.height,
 		node.voters, b.chainParams)
 	if err != nil {
 		return err
 	}
 
 	err = b.CheckBlockStakeSanity(b.chainParams.StakeValidationHeight, node,
-		block, parentBlock, b.chainParams)
+		block, parent, b.chainParams)
 	if err != nil {
 		log.Tracef("CheckBlockStakeSanity failed for incoming node "+
 			"%v; error given: %v", node.hash, err)
@@ -2429,12 +2425,12 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *dcrutil.Block, ut
 		thisNodeRegularViewpoint = ViewpointPrevValidRegular
 
 		utxoView.SetStakeViewpoint(ViewpointPrevValidInitial)
-		err = utxoView.fetchInputUtxos(b.db, block, parentBlock)
+		err = utxoView.fetchInputUtxos(b.db, block, parent)
 		if err != nil {
 			return err
 		}
 
-		for i, tx := range parentBlock.Transactions() {
+		for i, tx := range parent.Transactions() {
 			err := utxoView.connectTransaction(tx,
 				node.parent.height, uint32(i), stxos)
 			if err != nil {
@@ -2451,7 +2447,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *dcrutil.Block, ut
 		return err
 	}
 
-	err = utxoView.fetchInputUtxos(b.db, block, parentBlock)
+	err = utxoView.fetchInputUtxos(b.db, block, parent)
 	if err != nil {
 		return err
 	}
@@ -2526,7 +2522,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *dcrutil.Block, ut
 		return err
 	}
 
-	err = utxoView.fetchInputUtxos(b.db, block, parentBlock)
+	err = utxoView.fetchInputUtxos(b.db, block, parent)
 	if err != nil {
 		return err
 	}
@@ -2616,6 +2612,13 @@ func (b *BlockChain) CheckConnectBlock(block *dcrutil.Block) error {
 		return ruleError(ErrMissingParent, err.Error())
 	}
 
+	// Grab the parent block since it is required throughout the block
+	// connection process.
+	parent, err := b.fetchBlockFromHash(&parentHash)
+	if err != nil {
+		return ruleError(ErrMissingParent, err.Error())
+	}
+
 	newNode := newBlockNode(&block.MsgBlock().Header,
 		stake.FindSpentTicketsInBlock(block.MsgBlock()))
 	newNode.parent = prevNode
@@ -2627,7 +2630,7 @@ func (b *BlockChain) CheckConnectBlock(block *dcrutil.Block) error {
 		prevNode.hash == b.bestNode.hash) {
 		view := NewUtxoViewpoint()
 		view.SetBestHash(&prevNode.hash)
-		return b.checkConnectBlock(newNode, block, view, nil)
+		return b.checkConnectBlock(newNode, block, parent, view, nil)
 	}
 
 	// The requested node is either on a side chain or is a node on the
@@ -2681,7 +2684,7 @@ func (b *BlockChain) CheckConnectBlock(block *dcrutil.Block) error {
 	// if there are no nodes to attach, we're done.
 	if attachNodes.Len() == 0 {
 		view.SetBestHash(&parentHash)
-		return b.checkConnectBlock(newNode, block, view, nil)
+		return b.checkConnectBlock(newNode, block, parent, view, nil)
 	}
 
 	// The requested node is on a side chain, so we need to apply the
@@ -2707,5 +2710,5 @@ func (b *BlockChain) CheckConnectBlock(block *dcrutil.Block) error {
 	}
 
 	view.SetBestHash(&parentHash)
-	return b.checkConnectBlock(newNode, block, view, &stxos)
+	return b.checkConnectBlock(newNode, block, parent, view, &stxos)
 }
