@@ -54,6 +54,23 @@ func (b *BlockChain) blockExists(hash *chainhash.Hash) (bool, error) {
 	err := b.db.View(func(dbTx database.Tx) error {
 		var err error
 		exists, err = dbTx.HasBlock(hash)
+		if err != nil || !exists {
+			return err
+		}
+
+		// Ignore side chain blocks in the database.  This is necessary
+		// because there is not currently any record of the associated
+		// block index data, so it's not yet possible to efficiently load the
+		// block and do anything useful with it.
+		//
+		// Ultimately the entire block index should be serialized
+		// instead of only the current main chain so it can be consulted
+		// directly.
+		_, err = dbFetchHeightByHash(dbTx, hash)
+		if isNotInMainChainErr(err) {
+			exists = false
+			return nil
+		}
 		return err
 	})
 	return exists, err

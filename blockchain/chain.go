@@ -128,12 +128,10 @@ type BlockChain struct {
 
 	// These fields are related to handling of orphan blocks.  They are
 	// protected by a combination of the chain lock and the orphan lock.
-	orphanLock     sync.RWMutex
-	orphans        map[chainhash.Hash]*orphanBlock
-	prevOrphans    map[chainhash.Hash][]*orphanBlock
-	oldestOrphan   *orphanBlock
-	blockCacheLock sync.RWMutex
-	blockCache     map[chainhash.Hash]*dcrutil.Block
+	orphanLock   sync.RWMutex
+	orphans      map[chainhash.Hash]*orphanBlock
+	prevOrphans  map[chainhash.Hash][]*orphanBlock
+	oldestOrphan *orphanBlock
 
 	// The block cache for mainchain blocks, to facilitate faster
 	// reorganizations.
@@ -567,6 +565,7 @@ func (b *BlockChain) findNode(nodeHash *chainhash.Hash, searchDepth int) (*block
 // fetchMainChainBlockByHash returns the block from the main chain with the
 // given hash.  It first attempts to use cache and then falls back to loading it
 // from the database.
+//
 // An error is returned if the block is either not found or not in the main
 // chain.
 //
@@ -592,14 +591,6 @@ func (b *BlockChain) fetchMainChainBlockByHash(hash *chainhash.Hash) (*dcrutil.B
 //
 // This function is safe for concurrent access.
 func (b *BlockChain) fetchBlockByHash(hash *chainhash.Hash) (*dcrutil.Block, error) {
-	// Check side chain block cache.
-	b.blockCacheLock.RLock()
-	block, existsSidechain := b.blockCache[*hash]
-	b.blockCacheLock.RUnlock()
-	if existsSidechain {
-		return block, nil
-	}
-
 	// Check orphan cache.
 	b.orphanLock.RLock()
 	orphan, existsOrphans := b.orphans[*hash]
@@ -909,12 +900,6 @@ func (b *BlockChain) connectBlock(node *blockNode, block, parent *dcrutil.Block,
 			return err
 		}
 
-		// Insert the block into the database if it's not already there.
-		err = dbMaybeStoreBlock(dbTx, block)
-		if err != nil {
-			return err
-		}
-
 		// Insert the block into the stake database.
 		err = stake.WriteConnectedBestNode(dbTx, stakeNode, node.hash)
 		if err != nil {
@@ -1131,11 +1116,8 @@ func (b *BlockChain) disconnectBlock(node *blockNode, block, parent *dcrutil.Blo
 	// now that the modifications have been committed to the database.
 	view.commit()
 
-	// Put block in the side chain cache.
+	// Mark block as being in a side chain.
 	node.inMainChain = false
-	b.blockCacheLock.Lock()
-	b.blockCache[node.hash] = block
-	b.blockCacheLock.Unlock()
 
 	// This node's parent is now the end of the best chain.
 	b.bestNode = node.parent
@@ -1237,19 +1219,6 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List, flags 
 				"same fork point -- first attach parent %v, last detach "+
 				"parent %v", &firstAttachNode.parentHash,
 				&lastDetachNode.parentHash))
-		}
-	}
-
-	// Ensure all of the needed side chain blocks are in the cache.
-	for e := attachNodes.Front(); e != nil; e = e.Next() {
-		n := e.Value.(*blockNode)
-
-		b.blockCacheLock.RLock()
-		_, exists := b.blockCache[n.hash]
-		b.blockCacheLock.RUnlock()
-		if !exists {
-			return AssertError(fmt.Sprintf("block %v is missing "+
-				"from the side chain block cache", n.hash))
 		}
 	}
 
@@ -1369,9 +1338,10 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List, flags 
 		// attached or the previous one that was attached for subsequent blocks
 		// to optimize.
 		n := e.Value.(*blockNode)
-		b.blockCacheLock.RLock()
-		block := b.blockCache[n.hash]
-		b.blockCacheLock.RUnlock()
+		block, err := b.fetchBlockByHash(&n.hash)
+		if err != nil {
+			return err
+		}
 		parent := forkBlock
 		if i > 0 {
 			parent = attachBlocks[i-1]
@@ -1389,7 +1359,7 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List, flags 
 		// thus will not be generated.  This is done because the state
 		// is not being immediately written to the database, so it is
 		// not needed.
-		err := b.checkConnectBlock(n, block, parent, view, nil)
+		err = b.checkConnectBlock(n, block, parent, view, nil)
 		if err != nil {
 			return err
 		}
@@ -1498,7 +1468,6 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List, flags 
 		if err != nil {
 			return err
 		}
-		delete(b.blockCache, n.hash)
 	}
 
 	// Log the point where the chain forked and old and new best chain
@@ -1712,15 +1681,8 @@ func (b *BlockChain) connectBestChain(node *blockNode, block, parent *dcrutil.Bl
 	}
 
 	// We're extending (or creating) a side chain which may or may not
-	// become the main chain, but in either case we need the block stored
-	// for future processing, so add the block to the side chain holding
-	// cache.
-	if !dryRun {
-		log.Debugf("Adding block %v to side chain cache", node.hash)
-	}
-	b.blockCacheLock.Lock()
-	b.blockCache[node.hash] = block
-	b.blockCacheLock.Unlock()
+	// become the main chain, but in either case the entry is needed in the
+	// index for future processing.
 	b.index.Lock()
 	b.index.index[node.hash] = node
 	b.index.Unlock()
@@ -1729,8 +1691,8 @@ func (b *BlockChain) connectBestChain(node *blockNode, block, parent *dcrutil.Bl
 	node.inMainChain = false
 	node.parent.children = append(node.parent.children, node)
 
-	// Remove the block from the side chain cache and disconnect it from the
-	// parent node when the function returns when running in dry run mode.
+	// Disconnect it from the parent node when the function returns when
+	// running in dry run mode.
 	if dryRun {
 		defer func() {
 			children := node.parent.children
@@ -1740,9 +1702,6 @@ func (b *BlockChain) connectBestChain(node *blockNode, block, parent *dcrutil.Bl
 			b.index.Lock()
 			delete(b.index.index, node.hash)
 			b.index.Unlock()
-			b.blockCacheLock.Lock()
-			delete(b.blockCache, node.hash)
-			b.blockCacheLock.Unlock()
 		}()
 	}
 
@@ -2024,7 +1983,6 @@ func New(config *Config) (*BlockChain, error) {
 		index:                         newBlockIndex(config.DB, params),
 		orphans:                       make(map[chainhash.Hash]*orphanBlock),
 		prevOrphans:                   make(map[chainhash.Hash][]*orphanBlock),
-		blockCache:                    make(map[chainhash.Hash]*dcrutil.Block),
 		mainchainBlockCache:           make(map[chainhash.Hash]*dcrutil.Block),
 		mainchainBlockCacheSize:       mainchainBlockCacheSize,
 		deploymentCaches:              newThresholdCaches(params),

@@ -2705,11 +2705,9 @@ func (b *BlockChain) CheckConnectBlock(block *dcrutil.Block, flags BehaviorFlags
 		// attached or the previous one that was attached for subsequent blocks
 		// to optimize.
 		n := e.Value.(*blockNode)
-		block, exists := b.blockCache[n.hash]
-		if !exists {
-			return fmt.Errorf("unable to find block %v in "+
-				"side chain cache for utxo view construction",
-				n.hash)
+		block, err := b.fetchBlockByHash(&n.hash)
+		if err != nil {
+			return err
 		}
 		parent := prevAttachBlock
 		if parent == nil {
