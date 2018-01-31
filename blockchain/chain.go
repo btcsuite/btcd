@@ -1197,8 +1197,32 @@ func countNumberOfTransactions(block, parent *dcrutil.Block) uint64 {
 //
 // This function MUST be called with the chain state lock held (for writes).
 func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List, flags BehaviorFlags) error {
-	formerBestHash := b.bestNode.hash
-	formerBestHeight := b.bestNode.height
+	// Nothing to do if no reorganize nodes were provided.
+	if detachNodes.Len() == 0 && attachNodes.Len() == 0 {
+		return nil
+	}
+
+	// Ensure the provided nodes match the current best chain.
+	if detachNodes.Len() != 0 {
+		firstDetachNode := detachNodes.Front().Value.(*blockNode)
+		if firstDetachNode.hash != b.bestNode.hash {
+			return AssertError(fmt.Sprintf("reorganize nodes to detach are "+
+				"not for the current best chain -- first detach node %v, "+
+				"current chain %v", &firstDetachNode.hash, &b.bestNode.hash))
+		}
+	}
+
+	// Ensure the provided nodes are for the same fork point.
+	if attachNodes.Len() != 0 && detachNodes.Len() != 0 {
+		firstAttachNode := attachNodes.Front().Value.(*blockNode)
+		lastDetachNode := detachNodes.Back().Value.(*blockNode)
+		if firstAttachNode.parentHash != lastDetachNode.parentHash {
+			return AssertError(fmt.Sprintf("reorganize nodes do not have the "+
+				"same fork point -- first attach parent %v, last detach "+
+				"parent %v", &firstAttachNode.parentHash,
+				&lastDetachNode.parentHash))
+		}
+	}
 
 	// Ensure all of the needed side chain blocks are in the cache.
 	for e := attachNodes.Front(); e != nil; e = e.Next() {
@@ -1213,6 +1237,10 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List, flags 
 		}
 	}
 
+	// Track the old and new best chains heads.
+	oldBest := b.bestNode
+	newBest := b.bestNode
+
 	// All of the blocks to detach and related spend journal entries needed
 	// to unspend transaction outputs in the blocks being disconnected must
 	// be loaded from the database during the reorg check phase below and
@@ -1226,22 +1254,36 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List, flags 
 	// database and using that information to unspend all of the spent txos
 	// and remove the utxos created by the blocks.
 	view := NewUtxoViewpoint()
-	view.SetBestHash(&formerBestHash)
+	view.SetBestHash(&oldBest.hash)
 	view.SetStakeViewpoint(ViewpointPrevValidInitial)
-	i := 0
+	var nextBlockToDetach *dcrutil.Block
 	for e := detachNodes.Front(); e != nil; e = e.Next() {
+		// Grab the block to detach based on the node.  Use the fact that the
+		// blocks are being detached in reverse order, so the parent of the
+		// current block being detached is the next one being detached.
 		n := e.Value.(*blockNode)
-		var block *dcrutil.Block
-		var parent *dcrutil.Block
-		var err error
-		block, err = b.fetchBlockFromHash(&n.hash)
+		block := nextBlockToDetach
+		if block == nil {
+			var err error
+			block, err = b.fetchBlockFromHash(&n.hash)
+			if err != nil {
+				return err
+			}
+		}
+		if n.hash != *block.Hash() {
+			return AssertError(fmt.Sprintf("detach block node hash %v (height "+
+				"%v) does not match previous parent block hash %v", &n.hash,
+				n.height, block.Hash()))
+		}
+
+		// Grab the parent of the current block and also save a reference to it
+		// as the next block to detach so it doesn't need to be loaded again on
+		// the next iteration.
+		parent, err := b.fetchBlockFromHash(&n.parentHash)
 		if err != nil {
 			return err
 		}
-		parent, err = b.fetchBlockFromHash(&n.parentHash)
-		if err != nil {
-			return err
-		}
+		nextBlockToDetach = parent
 
 		// Load all of the spent txos for the block from the spend
 		// journal.
@@ -1271,7 +1313,25 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List, flags 
 			return err
 		}
 
-		i++
+		newBest = n
+	}
+
+	// Set the fork point and grab the fork block when there are nodes to be
+	// attached.  The fork block is used as the parent to the first node to be
+	// attached below.
+	var forkNode *blockNode
+	var forkBlock *dcrutil.Block
+	if attachNodes.Len() > 0 {
+		var err error
+		forkNode, err = b.index.PrevNodeFromNode(newBest)
+		if err != nil {
+			return err
+		}
+
+		forkBlock, err = b.fetchBlockFromHash(&forkNode.hash)
+		if err != nil {
+			return err
+		}
 	}
 
 	// Perform several checks to verify each block that needs to be attached
@@ -1286,7 +1346,6 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List, flags 
 	// at least a couple of ways accomplish that rollback, but both involve
 	// tweaking the chain and/or database.  This approach catches these
 	// issues before ever modifying the chain.
-	var topBlock *blockNode
 	for e := attachNodes.Front(); e != nil; e = e.Next() {
 		n := e.Value.(*blockNode)
 		b.blockCacheLock.RLock()
@@ -1301,10 +1360,9 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List, flags 
 		if err != nil {
 			return err
 		}
-		topBlock = n
+
+		newBest = n
 	}
-	newHash := topBlock.hash
-	newHeight := topBlock.height
 	log.Debugf("New best chain validation completed successfully, " +
 		"commencing with the reorganization.")
 
@@ -1316,10 +1374,10 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List, flags 
 
 	// Send a notification that a blockchain reorganization is in progress.
 	reorgData := &ReorganizationNtfnsData{
-		formerBestHash,
-		formerBestHeight,
-		newHash,
-		newHeight,
+		oldBest.hash,
+		oldBest.height,
+		newBest.hash,
+		newBest.height,
 	}
 	b.chainLock.Unlock()
 	b.sendNotification(NTReorganization, reorgData)
@@ -1331,21 +1389,29 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List, flags 
 	// view to be valid from the viewpoint of each block being connected or
 	// disconnected.
 	view = NewUtxoViewpoint()
-	view.SetBestHash(&formerBestHash)
+	view.SetBestHash(&oldBest.hash)
 	view.SetStakeViewpoint(ViewpointPrevValidInitial)
 
 	// Disconnect blocks from the main chain.
 	for i, e := 0, detachNodes.Front(); e != nil; i, e = i+1, e.Next() {
+		// Since the blocks are being detached in reverse order, the parent of
+		// current block being detached is the next one being detached up to
+		// the  point of the fork at which point it's the fork block.
 		n := e.Value.(*blockNode)
 		block := detachBlocks[i]
-		parent, err := b.fetchBlockFromHash(&n.parentHash)
-		if err != nil {
-			return err
+		parent := forkBlock
+		if i < len(detachBlocks)-1 {
+			parent = detachBlocks[i+1]
+		}
+		if n.parentHash != *parent.Hash() {
+			return AssertError(fmt.Sprintf("detach block node hash %v (height "+
+				"%v) parent hash %v does not match previous parent block "+
+				"hash %v", &n.hash, n.height, &n.parentHash, parent.Hash()))
 		}
 
 		// Load all of the utxos referenced by the block that aren't
 		// already in the view.
-		err = view.fetchInputUtxos(b.db, block, parent)
+		err := view.fetchInputUtxos(b.db, block, parent)
 		if err != nil {
 			return err
 		}
@@ -1395,23 +1461,16 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List, flags 
 		delete(b.blockCache, n.hash)
 	}
 
-	// Log the point where the chain forked.
-	firstAttachNode := attachNodes.Front().Value.(*blockNode)
-	forkNode, err := b.index.PrevNodeFromNode(firstAttachNode)
-	if err == nil {
-		log.Infof("REORGANIZE: Chain forks at %v, height %v",
-			forkNode.hash,
-			forkNode.height)
+	// Log the point where the chain forked and old and new best chain
+	// heads.
+	if forkNode != nil {
+		log.Infof("REORGANIZE: Chain forks at %v (height %v)",
+			forkNode.hash, forkNode.height)
 	}
-
-	// Log the old and new best chain heads.
-	lastAttachNode := attachNodes.Back().Value.(*blockNode)
-	log.Infof("REORGANIZE: Old best chain head was %v, height %v",
-		formerBestHash,
-		formerBestHeight)
-	log.Infof("REORGANIZE: New best chain head is %v, height %v",
-		lastAttachNode.hash,
-		lastAttachNode.height)
+	log.Infof("REORGANIZE: Old best chain head was %v (height %v)",
+		&oldBest.hash, oldBest.height)
+	log.Infof("REORGANIZE: New best chain head is %v (height %v)",
+		newBest.hash, newBest.height)
 
 	return nil
 }
