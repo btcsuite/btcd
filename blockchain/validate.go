@@ -412,6 +412,14 @@ func checkBlockHeaderSanity(header *wire.BlockHeader, timeSource MedianTimeSourc
 		}
 	}
 
+	// The block header must not claim to contain more votes than the
+	// maximum allowed.
+	if header.Voters > chainParams.TicketsPerBlock {
+		errStr := fmt.Sprintf("block commits to too many votes (max: "+
+			"%d, got %d)", chainParams.TicketsPerBlock, header.Voters)
+		return ruleError(ErrTooManyVotes, errStr)
+	}
+
 	return nil
 }
 
@@ -530,14 +538,6 @@ func checkBlockSanity(block *dcrutil.Block, timeSource MedianTimeSource, flags B
 			"header reports %v", totalTickets,
 			block.MsgBlock().Header.FreshStake)
 		return ruleError(ErrFreshStakeMismatch, errStr)
-	}
-
-	if totalVotes > int(chainParams.TicketsPerBlock) {
-		errStr := fmt.Sprintf("the number of SSGen tx in block %v "+
-			"was %v, overflowing the maximum allowed (%v)",
-			block.Hash(), totalVotes,
-			int(chainParams.TicketsPerBlock))
-		return ruleError(ErrTooManyVotes, errStr)
 	}
 
 	if totalVotes != int(block.MsgBlock().Header.Voters) {
