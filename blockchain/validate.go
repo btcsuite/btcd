@@ -400,6 +400,18 @@ func checkBlockHeaderSanity(header *wire.BlockHeader, timeSource MedianTimeSourc
 		return ruleError(ErrTimeTooNew, str)
 	}
 
+	// A block must not contain more votes than the minimum required to
+	// reach majority once stake validation height has been reached.
+	if header.Height >= uint32(chainParams.StakeValidationHeight) {
+		majority := (chainParams.TicketsPerBlock / 2) + 1
+		if header.Voters < majority {
+			errStr := fmt.Sprintf("block does not commit to enough "+
+				"votes (min: %d, got %d)", majority,
+				header.Voters)
+			return ruleError(ErrNotEnoughVotes, errStr)
+		}
+	}
+
 	return nil
 }
 
@@ -518,15 +530,6 @@ func checkBlockSanity(block *dcrutil.Block, timeSource MedianTimeSource, flags B
 			"header reports %v", totalTickets,
 			block.MsgBlock().Header.FreshStake)
 		return ruleError(ErrFreshStakeMismatch, errStr)
-	}
-
-	// Not enough voters on this block.
-	if block.Height() >= chainParams.StakeValidationHeight &&
-		totalVotes <= int(chainParams.TicketsPerBlock)/2 {
-		errStr := fmt.Sprintf("block contained too few votes! %v "+
-			"votes but %v or more required", totalVotes,
-			(int(chainParams.TicketsPerBlock)/2)+1)
-		return ruleError(ErrNotEnoughVotes, errStr)
 	}
 
 	if totalVotes > int(chainParams.TicketsPerBlock) {
@@ -987,26 +990,6 @@ func (b *BlockChain) CheckBlockStakeSanity(stakeValidationHeight int64, node *bl
 		}
 
 		return nil
-	}
-
-	// -------------------------------------------------------------------
-	// General Purpose Checks
-	// -------------------------------------------------------------------
-	// 1. Check that we have a majority vote of potential voters.
-
-	// 1. Check to make sure we have a majority of the potential voters voting.
-	if msgBlock.Header.Voters == 0 {
-		errStr := fmt.Sprintf("Error: no voters in block %v",
-			blockHash)
-		return ruleError(ErrNotEnoughVotes, errStr)
-	}
-
-	majority := (chainParams.TicketsPerBlock / 2) + 1
-	if msgBlock.Header.Voters < majority {
-		errStr := fmt.Sprintf("Error in stake consensus: the number "+
-			"of voters is not in the majority as compared to "+
-			"potential votes for block %v", blockHash)
-		return ruleError(ErrNotEnoughVotes, errStr)
 	}
 
 	// -------------------------------------------------------------------

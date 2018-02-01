@@ -795,6 +795,7 @@ func TestBlockValidationRules(t *testing.T) {
 	notEnoughVotes154.FromBytes(block154Bytes)
 	notEnoughVotes154.STransactions = notEnoughVotes154.STransactions[0:2]
 	notEnoughVotes154.Header.FreshStake = 0
+	notEnoughVotes154.Header.Voters = 2
 	recalculateMsgBlockMerkleRootsSize(notEnoughVotes154)
 	b154test = dcrutil.NewBlock(notEnoughVotes154)
 
