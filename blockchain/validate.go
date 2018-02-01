@@ -676,9 +676,23 @@ func (b *BlockChain) checkBlockHeaderContext(header *wire.BlockHeader, prevNode 
 		blockDifficulty := header.Bits
 		if blockDifficulty != expDiff {
 			str := fmt.Sprintf("block difficulty of %d is not the"+
-				" expected "+"value of %d", blockDifficulty,
+				" expected value of %d", blockDifficulty,
 				expDiff)
 			return ruleError(ErrUnexpectedDifficulty, str)
+		}
+
+		// Ensure the stake difficulty specified in the block header
+		// matches the calculated difficulty based on the previous block
+		// and difficulty retarget rules.
+		expSDiff, err := b.calcNextRequiredStakeDifficulty(prevNode)
+		if err != nil {
+			return err
+		}
+		if header.SBits != expSDiff {
+			errStr := fmt.Sprintf("block stake difficulty of %d "+
+				"is not the expected value of %d", header.SBits,
+				expSDiff)
+			return ruleError(ErrUnexpectedDifficulty, errStr)
 		}
 
 		// Ensure the timestamp for the block header is after the
@@ -904,20 +918,6 @@ func (b *BlockChain) CheckBlockStakeSanity(stakeValidationHeight int64, node *bl
 		errStr := fmt.Sprintf("block contained votes or revocations " +
 			"before the stake validation height")
 		return ruleError(ErrInvalidEarlyStakeTx, errStr)
-	}
-
-	// Check the stake difficulty.
-	calcSBits, err := b.calcNextRequiredStakeDifficulty(node.parent)
-	if err != nil {
-		errStr := fmt.Sprintf("couldn't calculate stake difficulty "+
-			"for block node %v: %v", node.hash, err)
-		return ruleError(ErrUnexpectedDifficulty, errStr)
-	}
-	if block.MsgBlock().Header.SBits != calcSBits {
-		errStr := fmt.Sprintf("block had unexpected stake difficulty "+
-			"(%v given, %v expected)",
-			block.MsgBlock().Header.SBits, calcSBits)
-		return ruleError(ErrUnexpectedDifficulty, errStr)
 	}
 
 	// --------------------------------------------------------------------
