@@ -277,8 +277,9 @@ func CheckTransactionSanity(tx *wire.MsgTx, params *chaincfg.Params) error {
 	return nil
 }
 
-// checkProofOfStake checks to see that all new SStx tx in a block are actually
-// at the network stake target.
+// checkProofOfStake ensures that all ticket purchases in the block pay at least
+// the amount required by the block header stake bits which indicate the target
+// stake difficulty (aka ticket price) as claimed.
 func checkProofOfStake(block *dcrutil.Block, posLimit int64) error {
 	msgBlock := block.MsgBlock()
 	for _, staketx := range block.STransactions() {
@@ -311,7 +312,9 @@ func checkProofOfStake(block *dcrutil.Block, posLimit int64) error {
 	return nil
 }
 
-// CheckProofOfStake exports the above func.
+// CheckProofOfStake ensures that all ticket purchases in the block pay at least
+// the amount required by the block header stake bits which indicate the target
+// stake difficulty (aka ticket price) as claimed.
 func CheckProofOfStake(block *dcrutil.Block, posLimit int64) error {
 	return checkProofOfStake(block, posLimit)
 }
@@ -368,22 +371,11 @@ func CheckProofOfWork(header *wire.BlockHeader, powLimit *big.Int) error {
 //
 // The flags do not modify the behavior of this function directly, however they
 // are needed to pass along to checkProofOfWork.
-func checkBlockHeaderSanity(block *dcrutil.Block, timeSource MedianTimeSource, flags BehaviorFlags, chainParams *chaincfg.Params) error {
-	powLimit := chainParams.PowLimit
-	posLimit := chainParams.MinimumStakeDiff
-	header := &block.MsgBlock().Header
-
+func checkBlockHeaderSanity(header *wire.BlockHeader, timeSource MedianTimeSource, flags BehaviorFlags, chainParams *chaincfg.Params) error {
 	// Ensure the proof of work bits in the block header is in min/max
 	// range and the block hash is less than the target value described by
 	// the bits.
-	err := checkProofOfWork(header, powLimit, flags)
-	if err != nil {
-		return err
-	}
-
-	// Check to make sure that all newly purchased tickets meet the
-	// difficulty specified in the block.
-	err = checkProofOfStake(block, posLimit)
+	err := checkProofOfWork(header, chainParams.PowLimit, flags)
 	if err != nil {
 		return err
 	}
@@ -418,10 +410,16 @@ func checkBlockHeaderSanity(block *dcrutil.Block, timeSource MedianTimeSource, f
 // The flags do not modify the behavior of this function directly, however they
 // are needed to pass along to checkBlockHeaderSanity.
 func checkBlockSanity(block *dcrutil.Block, timeSource MedianTimeSource, flags BehaviorFlags, chainParams *chaincfg.Params) error {
-
 	msgBlock := block.MsgBlock()
 	header := &msgBlock.Header
-	err := checkBlockHeaderSanity(block, timeSource, flags, chainParams)
+	err := checkBlockHeaderSanity(header, timeSource, flags, chainParams)
+	if err != nil {
+		return err
+	}
+
+	// All ticket purchases must meet the difficulty specified by the block
+	// header.
+	err = checkProofOfStake(block, chainParams.MinimumStakeDiff)
 	if err != nil {
 		return err
 	}
