@@ -271,11 +271,42 @@ func (idx *CfIndex) entryByBlockHash(filterTypeKeys [][]byte,
 	return entry, err
 }
 
+// entriesByBlockHashes batch fetches a filter index entry of a particular type
+// (eg. filter, filter header, etc) for a filter type and slice of block hashes.
+func (idx *CfIndex) entriesByBlockHashes(filterTypeKeys [][]byte,
+	filterType wire.FilterType, blockHashes []*chainhash.Hash) ([][]byte, error) {
+
+	if uint8(filterType) > maxFilterType {
+		return nil, errors.New("unsupported filter type")
+	}
+	key := filterTypeKeys[filterType]
+
+	entries := make([][]byte, 0, len(blockHashes))
+	err := idx.db.View(func(dbTx database.Tx) error {
+		for _, blockHash := range blockHashes {
+			entry, err := dbFetchFilterIdxEntry(dbTx, key, blockHash)
+			if err != nil {
+				return err
+			}
+			entries = append(entries, entry)
+		}
+		return nil
+	})
+	return entries, err
+}
+
 // FilterByBlockHash returns the serialized contents of a block's basic or
 // extended committed filter.
 func (idx *CfIndex) FilterByBlockHash(h *chainhash.Hash,
 	filterType wire.FilterType) ([]byte, error) {
 	return idx.entryByBlockHash(cfIndexKeys, filterType, h)
+}
+
+// FiltersByBlockHashes returns the serialized contents of a block's basic or
+// extended committed filter for a set of blocks by hash.
+func (idx *CfIndex) FiltersByBlockHashes(blockHashes []*chainhash.Hash,
+	filterType wire.FilterType) ([][]byte, error) {
+	return idx.entriesByBlockHashes(cfIndexKeys, filterType, blockHashes)
 }
 
 // FilterHeaderByBlockHash returns the serialized contents of a block's basic
@@ -285,11 +316,25 @@ func (idx *CfIndex) FilterHeaderByBlockHash(h *chainhash.Hash,
 	return idx.entryByBlockHash(cfHeaderKeys, filterType, h)
 }
 
-// FilterHeaderByBlockHash returns the serialized contents of a block's basic
+// FilterHeadersByBlockHashes returns the serialized contents of a block's basic
+// or extended committed filter header for a set of blocks by hash.
+func (idx *CfIndex) FilterHeadersByBlockHashes(blockHashes []*chainhash.Hash,
+	filterType wire.FilterType) ([][]byte, error) {
+	return idx.entriesByBlockHashes(cfHeaderKeys, filterType, blockHashes)
+}
+
+// FilterHashByBlockHash returns the serialized contents of a block's basic
 // or extended committed filter hash.
 func (idx *CfIndex) FilterHashByBlockHash(h *chainhash.Hash,
 	filterType wire.FilterType) ([]byte, error) {
 	return idx.entryByBlockHash(cfHashKeys, filterType, h)
+}
+
+// FilterHashesByBlockHashes returns the serialized contents of a block's basic
+// or extended committed filter hash for a set of blocks by hash.
+func (idx *CfIndex) FilterHashesByBlockHashes(blockHashes []*chainhash.Hash,
+	filterType wire.FilterType) ([][]byte, error) {
+	return idx.entriesByBlockHashes(cfHashKeys, filterType, blockHashes)
 }
 
 // NewCfIndex returns a new instance of an indexer that is used to create a
