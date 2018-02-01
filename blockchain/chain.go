@@ -1438,10 +1438,11 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List, flags 
 	for i, e := 0, detachNodes.Front(); e != nil; i, e = i+1, e.Next() {
 		// Since the blocks are being detached in reverse order, the parent of
 		// current block being detached is the next one being detached up to
-		// the  point of the fork at which point it's the fork block.
+		// the final one at which point it's the block that is already saved
+		// from the next block to detach above.
 		n := e.Value.(*blockNode)
 		block := detachBlocks[i]
-		parent := forkBlock
+		parent := nextBlockToDetach
 		if i < len(detachBlocks)-1 {
 			parent = detachBlocks[i+1]
 		}
