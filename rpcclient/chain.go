@@ -900,11 +900,7 @@ func (r FutureGetCFilterHeaderResult) Receive() (*wire.MsgCFHeaders, error) {
 	}
 
 	// Assign the hash to a headers message and return it.
-	var msgCFHeaders wire.MsgCFHeaders
-	err = msgCFHeaders.AddCFHeader(headerHash)
-	if err != nil {
-		return nil, err
-	}
+	msgCFHeaders := wire.MsgCFHeaders{PrevFilterHeader: *headerHash}
 	return &msgCFHeaders, nil
 
 }
