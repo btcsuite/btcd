@@ -449,6 +449,15 @@ func checkBlockHeaderSanity(header *wire.BlockHeader, timeSource MedianTimeSourc
 		return ruleError(ErrTooManyVotes, errStr)
 	}
 
+	// The block must not contain more ticket purchases than the maximum
+	// allowed.
+	if header.FreshStake > chainParams.MaxFreshStakePerBlock {
+		errStr := fmt.Sprintf("block commits to too many ticket "+
+			"purchases (max: %d, got %d)",
+			chainParams.MaxFreshStakePerBlock, header.FreshStake)
+		return ruleError(ErrTooManySStxs, errStr)
+	}
+
 	return nil
 }
 
@@ -914,8 +923,6 @@ func (b *BlockChain) CheckBlockStakeSanity(stakeValidationHeight int64, node *bl
 	//    equal to the target of the last block (sBits).
 	// 2. Ensure the the number of SStx tx in the block is the same as
 	//    FreshStake in the header.
-	// PER BLOCK
-	// 3. Check to make sure we haven't exceeded max number of new SStx.
 
 	numSStxTx := 0
 
@@ -941,16 +948,6 @@ func (b *BlockChain) CheckBlockStakeSanity(stakeValidationHeight int64, node *bl
 	// 2. Ensure the the number of SStx tx in the block is the same as
 	// FreshStake in the header.  This is also tested for in
 	// checkBlockSanity.
-
-	// 3. Check to make sure we haven't exceeded max number of new SStx.
-	// May not need this check, as the above one should fail if you
-	// overflow uint8.
-	if numSStxTx > int(chainParams.MaxFreshStakePerBlock) {
-		errStr := fmt.Sprintf("Error in stake consensus: the number "+
-			"of SStx tx "+"in block %v was %v, overflowing the "+
-			"maximum allowed (255)", blockHash, numSStxTx)
-		return ruleError(ErrTooManySStxs, errStr)
-	}
 
 	// Break if the stake system is otherwise disabled.
 	if block.Height() < stakeValidationHeight {
