@@ -410,8 +410,8 @@ func checkBlockHeaderSanity(header *wire.BlockHeader, timeSource MedianTimeSourc
 		return ruleError(ErrTimeTooNew, str)
 	}
 
-	// The block must not contain any votes or revocations before stake
-	// validation begins.
+	// A block must not contain any votes or revocations and its vote bits
+	// must be 0x0001 before stake validation begins.
 	if header.Height < stakeValidationHeight {
 		if header.Voters > 0 {
 			errStr := fmt.Sprintf("block at height %d commits to "+
@@ -420,12 +420,22 @@ func checkBlockHeaderSanity(header *wire.BlockHeader, timeSource MedianTimeSourc
 				stakeValidationHeight)
 			return ruleError(ErrInvalidEarlyStakeTx, errStr)
 		}
+
 		if header.Revocations > 0 {
 			errStr := fmt.Sprintf("block at height %d commits to "+
 				"%d revocations before stake validation height %d",
 				header.Height, header.Revocations,
 				stakeValidationHeight)
 			return ruleError(ErrInvalidEarlyStakeTx, errStr)
+		}
+
+		if header.VoteBits != earlyVoteBitsValue {
+			errStr := fmt.Sprintf("block at height %d commits to "+
+				"invalid vote bits before stake validation "+
+				"height %d (expected %x, got %x)",
+				header.Height, stakeValidationHeight,
+				earlyVoteBitsValue, header.VoteBits)
+			return ruleError(ErrInvalidEarlyVoteBits, errStr)
 		}
 	}
 
@@ -655,18 +665,6 @@ func checkBlockSanity(block *dcrutil.Block, timeSource MedianTimeSource, flags B
 				"operations - got %v, max %v", totalSigOps,
 				MaxSigOpsPerBlock)
 			return ruleError(ErrTooManySigOps, str)
-		}
-	}
-
-	// Blocks before stake validation height may only have 0x0001 as their
-	// VoteBits in the header.
-	if int64(header.Height) < chainParams.StakeValidationHeight {
-		if header.VoteBits != earlyVoteBitsValue {
-			str := fmt.Sprintf("pre stake validation height "+
-				"block %v contained an invalid votebits value"+
-				" (expected %v, got %v)", block.Hash(),
-				earlyVoteBitsValue, header.VoteBits)
-			return ruleError(ErrInvalidEarlyVoteBits, str)
 		}
 	}
 
