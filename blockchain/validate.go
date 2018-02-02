@@ -615,6 +615,26 @@ func checkBlockSanity(block *dcrutil.Block, timeSource MedianTimeSource, flags B
 		return ruleError(ErrRevocationsMismatch, errStr)
 	}
 
+	// A block must not contain anything other than ticket purchases prior to
+	// stake validation height.
+	//
+	// NOTE: This case is impossible to hit at this point at the time this
+	// comment was written since the votes and revocations have already been
+	// proven to be zero before stake validation height and the only other
+	// type at the current time is ticket purchases, however, if another
+	// stake type is ever added, consensus would break without this check.
+	// It's better to be safe and it's a cheap check.
+	if header.Height < uint32(chainParams.StakeValidationHeight) {
+		if int64(len(msgBlock.STransactions)) != totalTickets {
+			errStr := fmt.Sprintf("block contains stake "+
+				"transactions other than ticket purchases before "+
+				"stake validation height %d (total: %d, expected %d)",
+				uint32(chainParams.StakeValidationHeight),
+				len(msgBlock.STransactions), header.FreshStake)
+			return ruleError(ErrInvalidEarlyStakeTx, errStr)
+		}
+	}
+
 	// Build merkle tree and ensure the calculated merkle root matches the
 	// entry in the block header.  This also has the effect of caching all
 	// of the transaction hashes in the block to speed up future hash
@@ -1000,7 +1020,6 @@ func (b *BlockChain) checkDupTxs(txSet []*dcrutil.Tx, view *UtxoViewpoint) error
 // PoW it seems unlikely that it will have stake errors (because the miner is
 // then just wasting hash power).
 func (b *BlockChain) CheckBlockStakeSanity(stakeValidationHeight int64, node *blockNode, block *dcrutil.Block, parent *dcrutil.Block, chainParams *chaincfg.Params) error {
-
 	// Setup variables.
 	stakeTransactions := block.STransactions()
 	msgBlock := block.MsgBlock()
@@ -1033,18 +1052,6 @@ func (b *BlockChain) CheckBlockStakeSanity(stakeValidationHeight int64, node *bl
 
 	// Break if the stake system is otherwise disabled.
 	if block.Height() < stakeValidationHeight {
-		stakeTxSum := numSStxTx
-
-		// Check and make sure we're only including SStx in the stake
-		// tx tree.
-		if stakeTxSum != len(stakeTransactions) {
-			errStr := fmt.Sprintf("Error in stake consensus: the "+
-				"number of stake tx in block %v was %v, "+
-				"however we expected %v", block.Hash(),
-				stakeTxSum, len(stakeTransactions))
-			return ruleError(ErrInvalidEarlyStakeTx, errStr)
-		}
-
 		// Check the ticket pool size.
 		if parentStakeNode.PoolSize() != poolSize {
 			errStr := fmt.Sprintf("Error in stake consensus: the "+

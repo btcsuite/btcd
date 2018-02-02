@@ -197,29 +197,24 @@ func TestBlockValidationRules(t *testing.T) {
 	earlySSGen142.FromBytes(block142Bytes)
 
 	ssgenTx, _ := hex.DecodeString("01000000020000000000000000000000000000000" +
-		"000000000000000000000000000000000ffffffff00ffffffff76dfeab65ad4ca743" +
-		"4d5455e824c3871ed0b23ba967de53e417d9bdd7a6e42a60000000001ffffffff030" +
-		"00000000000000000002a6a28c5fca7895d9e1eeb7cf05755dfb5a7aa7b80b3fa8c6" +
-		"8c77ea3ae0dc5cd0fab198f0000000000000000000000000000000000046a02ffffe" +
-		"5700bb10000000000001abb76a91442f39dc794d4c68529baf41ffbd0613c16fddef" +
-		"a88ac000000000000000002c5220bb10000000000000000ffffffff04deadbeef204" +
-		"e00000000000019000000120000006b483045022100e0e8ffe608bdc274ac5aad896" +
-		"5faaa1a56341896fddf6470db4ea2509c71be1302207661b453473f3ce2e7b3311ef" +
-		"a0097d6fdbc5217e171cca04202b40d00b39e0f012103c8cbbf90d716d4840f05aef" +
-		"7b0232fd0dc3276219574a4919f0b26f62e3365e3")
+		"000000000000000000000000000000000ffffffff00ffffffff228896eaaeba3e57d" +
+		"5e2b7d9e38ed1ce9918db5dd8159620f34c0f1fff860f590000000001ffffffff030" +
+		"0000000000000000000266a2494f455952f88b4ff019c6673f3f01541b76e700e0c8" +
+		"a2ab9da000000000000009f86010000000000000000000000046a02010066cf98a80" +
+		"000000000001abb76a914efb4777e0c06c73883d6104a49739302db8058af88ac000" +
+		"00000000000000221b683090000000000000000ffffffff04deadbeef4519159f000" +
+		"000008e6b0100160000006a47304402202cc7a2938643d2e42e4363faa948bd19bfa" +
+		"d7a4f46ad040c34af9cb5d71b23d20220268189f6fd7ed2a0be573293e8814daac53" +
+		"01a01787c8d8d346c8b681ed91d4f0121031d90b4e6394841780c7292e385d7161cc" +
+		"3cacc46c894cbc7b82a2fbcae12e773")
 	mtxFromB := new(wire.MsgTx)
 	mtxFromB.FromBytes(ssgenTx)
 	earlySSGen142.AddSTransaction(mtxFromB)
+	earlySSGen142.Header.Voters++
 	recalculateMsgBlockMerkleRootsSize(earlySSGen142)
 	b142test := dcrutil.NewBlock(earlySSGen142)
 
 	err = blockchain.CheckWorklessBlockSanity(b142test, timeSource, params)
-	if err == nil {
-		t.Errorf("got no error for ErrInvalidEarlyStakeTx test")
-	}
-
-	// Hits error here.
-	err = chain.CheckConnectBlock(b142test)
 	if err == nil || err.(blockchain.RuleError).ErrorCode !=
 		blockchain.ErrInvalidEarlyStakeTx {
 		t.Errorf("Got unexpected no error or wrong error for "+
