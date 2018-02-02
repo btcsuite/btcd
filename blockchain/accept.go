@@ -122,23 +122,6 @@ func ticketsRevokedInBlock(bl *dcrutil.Block) []chainhash.Hash {
 	return tickets
 }
 
-// voteBitsInBlock returns a list of vote bits for the voters in this block.
-func voteBitsInBlock(bl *dcrutil.Block) []stake.VoteVersionTuple {
-	var voteBits []stake.VoteVersionTuple
-	for _, stx := range bl.MsgBlock().STransactions {
-		if stake.IsSSGen(stx) {
-			continue
-		}
-
-		voteBits = append(voteBits, stake.VoteVersionTuple{
-			Version: stake.SSGenVersion(stx),
-			Bits:    stake.SSGenVoteBits(stx),
-		})
-	}
-
-	return voteBits
-}
-
 // maybeAcceptBlock potentially accepts a block into the block chain and, if
 // accepted, returns whether or not it is on the main chain.  It performs
 // several validation checks which depend on its position within the block chain
