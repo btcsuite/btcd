@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/decred/dcrd/blockchain/stake"
-	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/dcrutil"
 	"github.com/decred/dcrd/txscript"
 )
@@ -94,32 +93,6 @@ func IsFinalizedTransaction(tx *dcrutil.Tx, blockHeight int64, blockTime time.Ti
 		}
 	}
 	return true
-}
-
-// ticketsSpentInBlock fetches a list of tickets that were spent in the
-// block.
-func ticketsSpentInBlock(bl *dcrutil.Block) []chainhash.Hash {
-	var tickets []chainhash.Hash
-	for _, stx := range bl.MsgBlock().STransactions {
-		if stake.DetermineTxType(stx) == stake.TxTypeSSGen {
-			tickets = append(tickets, stx.TxIn[1].PreviousOutPoint.Hash)
-		}
-	}
-
-	return tickets
-}
-
-// ticketsRevokedInBlock fetches a list of tickets that were revoked in the
-// block.
-func ticketsRevokedInBlock(bl *dcrutil.Block) []chainhash.Hash {
-	var tickets []chainhash.Hash
-	for _, stx := range bl.MsgBlock().STransactions {
-		if stake.DetermineTxType(stx) == stake.TxTypeSSRtx {
-			tickets = append(tickets, stx.TxIn[0].PreviousOutPoint.Hash)
-		}
-	}
-
-	return tickets
 }
 
 // maybeAcceptBlock potentially accepts a block into the block chain and, if

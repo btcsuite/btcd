@@ -10,7 +10,34 @@ import (
 	"github.com/decred/dcrd/blockchain/stake"
 	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/database"
+	"github.com/decred/dcrd/dcrutil"
 )
+
+// ticketsSpentInBlock fetches a list of tickets that were spent in the
+// block.
+func ticketsSpentInBlock(bl *dcrutil.Block) []chainhash.Hash {
+	var tickets []chainhash.Hash
+	for _, stx := range bl.MsgBlock().STransactions {
+		if stake.DetermineTxType(stx) == stake.TxTypeSSGen {
+			tickets = append(tickets, stx.TxIn[1].PreviousOutPoint.Hash)
+		}
+	}
+
+	return tickets
+}
+
+// ticketsRevokedInBlock fetches a list of tickets that were revoked in the
+// block.
+func ticketsRevokedInBlock(bl *dcrutil.Block) []chainhash.Hash {
+	var tickets []chainhash.Hash
+	for _, stx := range bl.MsgBlock().STransactions {
+		if stake.DetermineTxType(stx) == stake.TxTypeSSRtx {
+			tickets = append(tickets, stx.TxIn[0].PreviousOutPoint.Hash)
+		}
+	}
+
+	return tickets
+}
 
 // upgradeToVersion2 upgrades a version 1 blockchain to version 2, allowing
 // use of the new on-disk ticket database.
