@@ -749,6 +749,15 @@ func (b *BlockChain) checkBlockHeaderContext(header *wire.BlockHeader, prevNode 
 	// block.
 	blockHeight := prevNode.height + 1
 
+	// Ensure the header commits to the correct height based on the height it
+	// actually connects in the blockchain.
+	if int64(header.Height) != blockHeight {
+		errStr := fmt.Sprintf("block header commitment to height %d "+
+			"does not match chain height %d", header.Height,
+			blockHeight)
+		return ruleError(ErrBadBlockHeight, errStr)
+	}
+
 	// Ensure chain matches up to predetermined checkpoints.
 	blockHash := header.BlockHash()
 	if !b.verifyCheckpoint(blockHeight, &blockHash) {

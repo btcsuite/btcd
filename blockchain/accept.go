@@ -172,14 +172,6 @@ func (b *BlockChain) checkBlockContext(block *dcrutil.Block, prevNode *blockNode
 			}
 		}
 
-		// Check that the node is at the correct height in the blockchain,
-		// as specified in the block header.
-		if blockHeight != int64(block.MsgBlock().Header.Height) {
-			errStr := fmt.Sprintf("Block header height invalid; expected %v"+
-				" but %v was found", blockHeight, header.Height)
-			return ruleError(ErrBadBlockHeight, errStr)
-		}
-
 		// Check that the coinbase contains at minimum the block
 		// height in output 1.
 		if blockHeight > 1 {
