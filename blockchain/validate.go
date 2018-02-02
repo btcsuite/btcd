@@ -516,14 +516,14 @@ func checkBlockSanity(block *dcrutil.Block, timeSource MedianTimeSource, flags B
 			"max %d", serializedSize, wire.MaxBlockPayload)
 		return ruleError(ErrBlockTooBig, str)
 	}
-	if msgBlock.Header.Size != uint32(serializedSize) {
+	if header.Size != uint32(serializedSize) {
 		str := fmt.Sprintf("serialized block is not size indicated in "+
-			"header - got %d, expected %d", msgBlock.Header.Size,
+			"header - got %d, expected %d", header.Size,
 			serializedSize)
 		return ruleError(ErrWrongBlockSize, str)
 	}
 
-	// The first transaction in a block's txtreeregular must be a coinbase.
+	// The first transaction in a block's regular tree must be a coinbase.
 	transactions := block.Transactions()
 	if !IsCoinBaseTx(transactions[0].MsgTx()) {
 		return ruleError(ErrFirstTxNotCoinbase, "first transaction in "+
@@ -539,35 +539,42 @@ func checkBlockSanity(block *dcrutil.Block, timeSource MedianTimeSource, flags B
 		}
 	}
 
-	// Do some preliminary checks on each transaction to ensure they are
-	// sane before continuing.
-	for _, tx := range transactions {
+	// Do some preliminary checks on each regular transaction to ensure they
+	// are sane before continuing.
+	for i, tx := range transactions {
+		// A block must not have stake transactions in the regular
+		// transaction tree.
 		msgTx := tx.MsgTx()
 		txType := stake.DetermineTxType(msgTx)
 		if txType != stake.TxTypeRegular {
-			errStr := fmt.Sprintf("found stake tx in regular tx " +
-				"tree")
+			errStr := fmt.Sprintf("block contains a stake "+
+				"transaction in the regular transaction tree at "+
+				"index %d", i)
 			return ruleError(ErrStakeTxInRegularTree, errStr)
 		}
+
 		err := CheckTransactionSanity(msgTx, chainParams)
 		if err != nil {
 			return err
 		}
 	}
 
-	totalTickets := 0
-	totalVotes := 0
-	totalRevocations := 0
-	for _, stx := range block.MsgBlock().STransactions {
+	// Do some preliminary checks on each stake transaction to ensure they
+	// are sane while tallying each type before continuing.
+	var totalTickets, totalVotes, totalRevocations int64
+	for i, stx := range msgBlock.STransactions {
 		err := CheckTransactionSanity(stx, chainParams)
 		if err != nil {
 			return err
 		}
 
+		// A block must not have regular transactions in the stake
+		// transaction tree.
 		txType := stake.DetermineTxType(stx)
 		if txType == stake.TxTypeRegular {
-			errStr := fmt.Sprintf("found regular tx in stake tx " +
-				"tree")
+			errStr := fmt.Sprintf("block contains regular "+
+				"transaction in stake transaction tree at "+
+				"index %d", i)
 			return ruleError(ErrRegTxInStakeTree, errStr)
 		}
 
@@ -581,29 +588,32 @@ func checkBlockSanity(block *dcrutil.Block, timeSource MedianTimeSource, flags B
 		}
 	}
 
-	if totalTickets != int(block.MsgBlock().Header.FreshStake) {
-		errStr := fmt.Sprintf("%v tickets found in block, while "+
-			"header reports %v", totalTickets,
-			block.MsgBlock().Header.FreshStake)
+	// A block header must commit to the actual number of tickets purchases that
+	// are in the block.
+	if int64(header.FreshStake) != totalTickets {
+		errStr := fmt.Sprintf("block header commitment to %d ticket "+
+			"purchases does not match %d contained in the block",
+			header.FreshStake, totalTickets)
 		return ruleError(ErrFreshStakeMismatch, errStr)
 	}
 
-	if totalVotes != int(block.MsgBlock().Header.Voters) {
-		errStr := fmt.Sprintf("%v votes found in block, while header "+
-			"reports %v", totalVotes,
-			block.MsgBlock().Header.Voters)
+	// A block header must commit to the the actual number of votes that are
+	// in the block.
+	if int64(header.Voters) != totalVotes {
+		errStr := fmt.Sprintf("block header commitment to %d votes "+
+			"does not match %d contained in the block",
+			header.Voters, totalVotes)
 		return ruleError(ErrVotesMismatch, errStr)
 	}
 
-	if totalRevocations != int(block.MsgBlock().Header.Revocations) {
-		errStr := fmt.Sprintf("%v revocations found in block, while "+
-			"header reports %v", totalRevocations,
-			block.MsgBlock().Header.Revocations)
+	// A block header must commit to the actual number of revocations that
+	// are in the block.
+	if int64(header.Revocations) != totalRevocations {
+		errStr := fmt.Sprintf("block header commitment to %d revocations "+
+			"does not match %d contained in the block",
+			header.Revocations, totalRevocations)
 		return ruleError(ErrRevocationsMismatch, errStr)
 	}
-
-	// The number of votes must be the same as the number declared in the
-	// header.  The same is true for tickets and revocations.
 
 	// Build merkle tree and ensure the calculated merkle root matches the
 	// entry in the block header.  This also has the effect of caching all
@@ -632,7 +642,7 @@ func checkBlockSanity(block *dcrutil.Block, timeSource MedianTimeSource, flags B
 
 	// Check for duplicate transactions.  This check will be fairly quick
 	// since the transaction hashes are already cached due to building the
-	// merkle tree above.
+	// merkle trees above.
 	existingTxHashes := make(map[chainhash.Hash]struct{})
 	stakeTransactions := block.STransactions()
 	allTransactions := append(transactions, stakeTransactions...)
@@ -651,14 +661,13 @@ func checkBlockSanity(block *dcrutil.Block, timeSource MedianTimeSource, flags B
 	// allowed per block.
 	totalSigOps := 0
 	for _, tx := range allTransactions {
-		msgTx := tx.MsgTx()
 		// We could potentially overflow the accumulator so check for
 		// overflow.
 		lastSigOps := totalSigOps
 
-		isSSGen := stake.IsSSGen(msgTx)
+		msgTx := tx.MsgTx()
 		isCoinBase := IsCoinBaseTx(msgTx)
-
+		isSSGen := stake.IsSSGen(msgTx)
 		totalSigOps += CountSigOps(tx, isCoinBase, isSSGen)
 		if totalSigOps < lastSigOps || totalSigOps > MaxSigOpsPerBlock {
 			str := fmt.Sprintf("block contains too many signature "+
