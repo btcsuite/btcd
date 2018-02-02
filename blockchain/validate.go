@@ -372,6 +372,16 @@ func CheckProofOfWork(header *wire.BlockHeader, powLimit *big.Int) error {
 // The flags do not modify the behavior of this function directly, however they
 // are needed to pass along to checkProofOfWork.
 func checkBlockHeaderSanity(header *wire.BlockHeader, timeSource MedianTimeSource, flags BehaviorFlags, chainParams *chaincfg.Params) error {
+	// The stake validation height should always be at least stake enabled
+	// height, so assert it because the code below relies on that assumption.
+	stakeValidationHeight := uint32(chainParams.StakeValidationHeight)
+	stakeEnabledHeight := uint32(chainParams.StakeEnabledHeight)
+	if stakeEnabledHeight > stakeValidationHeight {
+		return AssertError(fmt.Sprintf("checkBlockHeaderSanity called "+
+			"with stake enabled height %d after stake validation "+
+			"height %d", stakeEnabledHeight, stakeValidationHeight))
+	}
+
 	// Ensure the proof of work bits in the block header is in min/max
 	// range and the block hash is less than the target value described by
 	// the bits.
@@ -400,9 +410,28 @@ func checkBlockHeaderSanity(header *wire.BlockHeader, timeSource MedianTimeSourc
 		return ruleError(ErrTimeTooNew, str)
 	}
 
+	// The block must not contain any votes or revocations before stake
+	// validation begins.
+	if header.Height < stakeValidationHeight {
+		if header.Voters > 0 {
+			errStr := fmt.Sprintf("block at height %d commits to "+
+				"%d votes before stake validation height %d",
+				header.Height, header.Voters,
+				stakeValidationHeight)
+			return ruleError(ErrInvalidEarlyStakeTx, errStr)
+		}
+		if header.Revocations > 0 {
+			errStr := fmt.Sprintf("block at height %d commits to "+
+				"%d revocations before stake validation height %d",
+				header.Height, header.Revocations,
+				stakeValidationHeight)
+			return ruleError(ErrInvalidEarlyStakeTx, errStr)
+		}
+	}
+
 	// A block must not contain more votes than the minimum required to
 	// reach majority once stake validation height has been reached.
-	if header.Height >= uint32(chainParams.StakeValidationHeight) {
+	if header.Height >= stakeValidationHeight {
 		majority := (chainParams.TicketsPerBlock / 2) + 1
 		if header.Voters < majority {
 			errStr := fmt.Sprintf("block does not commit to enough "+
@@ -872,52 +901,9 @@ func (b *BlockChain) CheckBlockStakeSanity(stakeValidationHeight int64, node *bl
 	txTreeRegularValid := dcrutil.IsFlagSet16(msgBlock.Header.VoteBits,
 		dcrutil.BlockValid)
 
-	stakeEnabledHeight := chainParams.StakeEnabledHeight
-
 	parentStakeNode, err := b.fetchStakeNode(node.parent)
 	if err != nil {
 		return err
-	}
-
-	// Do some preliminary checks on each stake transaction to ensure they
-	// are sane before continuing.
-	ssGens := 0 // Votes
-	ssRtxs := 0 // Revocations
-	for i, tx := range stakeTransactions {
-		msgTx := tx.MsgTx()
-		isSSGen := stake.IsSSGen(msgTx)
-		isSSRtx := stake.IsSSRtx(msgTx)
-
-		if isSSGen {
-			ssGens++
-		}
-
-		if isSSRtx {
-			ssRtxs++
-		}
-
-		// If we haven't reached the point in which staking is enabled,
-		// there should be absolutely no SSGen or SSRtx transactions.
-		if (isSSGen && (block.Height() < stakeEnabledHeight)) ||
-			(isSSRtx && (block.Height() < stakeEnabledHeight)) {
-			errStr := fmt.Sprintf("block contained SSGen or SSRtx "+
-				"transaction at idx %v, which was before stake"+
-				" voting was enabled; block height %v, stake "+
-				"enabled height %v", i, block.Height(),
-				stakeEnabledHeight)
-			return ruleError(ErrInvalidEarlyStakeTx, errStr)
-		}
-	}
-
-	// Make sure we have no votes or revocations if stake validation is not
-	// enabled.
-	containsVotes := ssGens > 0
-	containsRevocations := ssRtxs > 0
-	if node.height < chainParams.StakeValidationHeight &&
-		(containsVotes || containsRevocations) {
-		errStr := fmt.Sprintf("block contained votes or revocations " +
-			"before the stake validation height")
-		return ruleError(ErrInvalidEarlyStakeTx, errStr)
 	}
 
 	// --------------------------------------------------------------------
