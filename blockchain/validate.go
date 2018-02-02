@@ -1004,7 +1004,6 @@ func (b *BlockChain) CheckBlockStakeSanity(stakeValidationHeight int64, node *bl
 	// Setup variables.
 	stakeTransactions := block.STransactions()
 	msgBlock := block.MsgBlock()
-	sbits := msgBlock.Header.SBits
 	blockHash := block.Hash()
 	prevBlockHash := &msgBlock.Header.PrevBlock
 	poolSize := int(msgBlock.Header.PoolSize)
@@ -1023,36 +1022,14 @@ func (b *BlockChain) CheckBlockStakeSanity(stakeValidationHeight int64, node *bl
 	// --------------------------------------------------------------------
 	// SStx Tx Handling
 	// --------------------------------------------------------------------
-	// PER SSTX
-	// 1. Check to make sure that the amount committed with the SStx is
-	//    equal to the target of the last block (sBits).
-	// 2. Ensure the the number of SStx tx in the block is the same as
-	//    FreshStake in the header.
 
 	numSStxTx := 0
-
 	for _, staketx := range stakeTransactions {
 		msgTx := staketx.MsgTx()
 		if stake.IsSStx(msgTx) {
 			numSStxTx++
-
-			// 1. Make sure that we're committing enough coins.
-			// Checked already when we check stake difficulty, so
-			// may not be needed.
-			if msgTx.TxOut[0].Value < sbits {
-				txHash := staketx.Hash()
-				errStr := fmt.Sprintf("Error in stake "+
-					"consensus: the amount committed in "+
-					"SStx %v was less than the sBits "+
-					"value %v", txHash, sbits)
-				return ruleError(ErrNotEnoughStake, errStr)
-			}
 		}
 	}
-
-	// 2. Ensure the the number of SStx tx in the block is the same as
-	// FreshStake in the header.  This is also tested for in
-	// checkBlockSanity.
 
 	// Break if the stake system is otherwise disabled.
 	if block.Height() < stakeValidationHeight {
