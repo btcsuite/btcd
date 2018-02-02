@@ -1593,6 +1593,11 @@ func (b *BlockChain) forceHeadReorganization(formerBest chainhash.Hash, newBest 
 		return err
 	}
 
+	err = b.checkBlockContext(newBestBlock, newBestNode.parent, BFNone)
+	if err != nil {
+		return err
+	}
+
 	err = b.checkConnectBlock(newBestNode, newBestBlock, commonParentBlock,
 		view, nil)
 	if err != nil {

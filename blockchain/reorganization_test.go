@@ -31,7 +31,8 @@ func reorgTestLong(t *testing.T, params *chaincfg.Params) {
 
 	// The genesis block should fail to connect since it's already
 	// inserted.
-	err = chain.CheckConnectBlock(dcrutil.NewBlock(params.GenesisBlock))
+	err = chain.CheckConnectBlock(dcrutil.NewBlock(params.GenesisBlock),
+		blockchain.BFNone)
 	if err == nil {
 		t.Errorf("CheckConnectBlock: Did not receive expected error")
 	}
@@ -142,7 +143,8 @@ func reorgTestShort(t *testing.T, params *chaincfg.Params) {
 
 	// The genesis block should fail to connect since it's already
 	// inserted.
-	err = chain.CheckConnectBlock(dcrutil.NewBlock(params.GenesisBlock))
+	err = chain.CheckConnectBlock(dcrutil.NewBlock(params.GenesisBlock),
+		blockchain.BFNone)
 	if err == nil {
 		t.Errorf("CheckConnectBlock: Did not receive expected error")
 	}
@@ -258,7 +260,8 @@ func reorgTestForced(t *testing.T, params *chaincfg.Params) {
 
 	// The genesis block should fail to connect since it's already
 	// inserted.
-	err = chain.CheckConnectBlock(dcrutil.NewBlock(params.GenesisBlock))
+	err = chain.CheckConnectBlock(dcrutil.NewBlock(params.GenesisBlock),
+		blockchain.BFNone)
 	if err == nil {
 		t.Errorf("CheckConnectBlock: Did not receive expected error")
 	}

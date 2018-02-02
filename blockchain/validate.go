@@ -2646,8 +2646,14 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block, parent *dcrutil.B
 // block, invalid values in relation to the expected block subsidy, or fail
 // transaction script validation.
 //
+// The flags modify the behavior of this function as follows:
+//  - BFNoPoWCheck: The check to ensure the block hash is less than the target
+//    difficulty is not performed.
+//  - BFFastAdd: The transactions are not checked to see if they are finalized
+//    and the somewhat expensive duplication transaction check is not performed.
+//
 // This function is safe for concurrent access.
-func (b *BlockChain) CheckConnectBlock(block *dcrutil.Block) error {
+func (b *BlockChain) CheckConnectBlock(block *dcrutil.Block, flags BehaviorFlags) error {
 	b.chainLock.Lock()
 	defer b.chainLock.Unlock()
 
@@ -2655,6 +2661,19 @@ func (b *BlockChain) CheckConnectBlock(block *dcrutil.Block) error {
 	prevNode, err := b.findNode(&parentHash, maxSearchDepth)
 	if err != nil {
 		return ruleError(ErrMissingParent, err.Error())
+	}
+
+	// Perform context-free sanity checks on the block and its transactions.
+	err = checkBlockSanity(block, b.timeSource, flags, b.chainParams)
+	if err != nil {
+		return err
+	}
+
+	// The block must pass all of the validation rules which depend on the
+	// position of the block within the block chain.
+	err = b.checkBlockContext(block, prevNode, flags)
+	if err != nil {
+		return err
 	}
 
 	newNode := newBlockNode(&block.MsgBlock().Header,

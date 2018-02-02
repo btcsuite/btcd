@@ -877,14 +877,8 @@ func handleTooFewVoters(subsidyCache *blockchain.SubsidyCache,
 
 				// Make sure the block validates.
 				block := dcrutil.NewBlockDeepCopyCoinbase(cptCopy.Block)
-				if err := blockchain.CheckWorklessBlockSanity(block,
-					bm.server.timeSource,
-					bm.server.chainParams); err != nil {
-					return nil, miningRuleError(ErrCheckConnectBlock,
-						err.Error())
-				}
-
-				if err := bm.chain.CheckConnectBlock(block); err != nil {
+				err = bm.chain.CheckConnectBlock(block, blockchain.BFNoPoWCheck)
+				if err != nil {
 					minrLog.Errorf("failed to check template while "+
 						"duplicating a parent: %v", err.Error())
 					return nil, miningRuleError(ErrCheckConnectBlock,
@@ -983,17 +977,8 @@ func handleTooFewVoters(subsidyCache *blockchain.SubsidyCache,
 
 				// Make sure the block validates.
 				btBlock := dcrutil.NewBlockDeepCopyCoinbase(btMsgBlock)
-				if err := blockchain.CheckWorklessBlockSanity(btBlock,
-					bm.server.timeSource,
-					bm.server.chainParams); err != nil {
-					str := fmt.Sprintf("failed to check sanity of template "+
-						"while constructing a new parent: %v",
-						err.Error())
-					return nil, miningRuleError(ErrCheckConnectBlock,
-						str)
-				}
-
-				if err := bm.chain.CheckConnectBlock(btBlock); err != nil {
+				err = bm.chain.CheckConnectBlock(btBlock, blockchain.BFNoPoWCheck)
+				if err != nil {
 					str := fmt.Sprintf("failed to check template: %v while "+
 						"constructing a new parent", err.Error())
 					return nil, miningRuleError(ErrCheckConnectBlock,
@@ -2095,17 +2080,8 @@ mempoolLoop:
 	// consensus rules to ensure it properly connects to the current best
 	// chain with no issues.
 	block := dcrutil.NewBlockDeepCopyCoinbase(&msgBlock)
-
-	if err := blockchain.CheckWorklessBlockSanity(block,
-		server.timeSource,
-		server.chainParams); err != nil {
-		str := fmt.Sprintf("failed to do final check for block workless "+
-			"sanity when making new block template: %v",
-			err.Error())
-		return nil, miningRuleError(ErrCheckConnectBlock, str)
-	}
-
-	if err := blockManager.chain.CheckConnectBlock(block); err != nil {
+	err = blockManager.chain.CheckConnectBlock(block, blockchain.BFNoPoWCheck)
+	if err != nil {
 		str := fmt.Sprintf("failed to do final check for check connect "+
 			"block when making new block template: %v",
 			err.Error())
