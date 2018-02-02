@@ -154,7 +154,7 @@ func TestVersion(t *testing.T) {
 		localAddr:  &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 8333},
 		remoteAddr: tcpAddrYou,
 	}
-	msg, err = NewMsgVersionFromConn(conn, nonce, lastBlock)
+	_, err = NewMsgVersionFromConn(conn, nonce, lastBlock)
 	if err != ErrInvalidNetAddr {
 		t.Errorf("NewMsgVersionFromConn: expected error not received "+
 			"- got %v, want %v", err, ErrInvalidNetAddr)
@@ -165,7 +165,7 @@ func TestVersion(t *testing.T) {
 		localAddr:  tcpAddrMe,
 		remoteAddr: &net.UDPAddr{IP: net.ParseIP("192.168.0.1"), Port: 8333},
 	}
-	msg, err = NewMsgVersionFromConn(conn, nonce, lastBlock)
+	_, err = NewMsgVersionFromConn(conn, nonce, lastBlock)
 	if err != ErrInvalidNetAddr {
 		t.Errorf("NewMsgVersionFromConn: expected error not received "+
 			"- got %v, want %v", err, ErrInvalidNetAddr)

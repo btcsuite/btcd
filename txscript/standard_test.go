@@ -113,6 +113,7 @@ func TestExtractPkScriptAddrs(t *testing.T) {
 		addrs   []dcrutil.Address
 		reqSigs int
 		class   txscript.ScriptClass
+		noparse bool
 	}{
 		{
 			name: "standard p2pk with compressed pubkey (0x02)",
@@ -371,14 +372,18 @@ func TestExtractPkScriptAddrs(t *testing.T) {
 			addrs:   nil,
 			reqSigs: 0,
 			class:   txscript.NonStandardTy,
+			noparse: true,
 		},
 	}
 
 	t.Logf("Running %d tests.", len(tests))
 	for i, test := range tests {
 		class, addrs, reqSigs, err := txscript.ExtractPkScriptAddrs(
-			txscript.DefaultScriptVersion, test.script, &chaincfg.MainNetParams)
-		if err != nil {
+			txscript.DefaultScriptVersion, test.script,
+			&chaincfg.MainNetParams)
+		if err != nil && !test.noparse {
+			t.Errorf("ExtractPkScriptAddrs #%d (%s): %v", i,
+				test.name, err)
 		}
 
 		if !reflect.DeepEqual(addrs, test.addrs) {

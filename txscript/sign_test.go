@@ -752,7 +752,6 @@ func TestSignTxOutput(t *testing.T) {
 					if err != nil {
 						t.Errorf("failed to make address for %s: %v",
 							msg, err)
-						break
 					}
 
 				case edwards:
@@ -764,7 +763,6 @@ func TestSignTxOutput(t *testing.T) {
 					if err != nil {
 						t.Errorf("failed to make address for %s: %v",
 							msg, err)
-						break
 					}
 
 				case secSchnorr:
@@ -776,7 +774,6 @@ func TestSignTxOutput(t *testing.T) {
 					if err != nil {
 						t.Errorf("failed to make address for %s: %v",
 							msg, err)
-						break
 					}
 				}
 
@@ -784,7 +781,6 @@ func TestSignTxOutput(t *testing.T) {
 				if err != nil {
 					t.Errorf("failed to make pkscript "+
 						"for %s: %v", msg, err)
-
 				}
 
 				sigScript, err := txscript.SignTxOutput(
@@ -795,7 +791,6 @@ func TestSignTxOutput(t *testing.T) {
 				if err != nil {
 					t.Errorf("failed to sign output %s: %v", msg,
 						err)
-					break
 				}
 
 				// by the above loop, this should be valid, now sign
@@ -808,14 +803,12 @@ func TestSignTxOutput(t *testing.T) {
 				if err != nil {
 					t.Errorf("failed to sign output %s a "+
 						"second time: %v", msg, err)
-					break
 				}
 
 				err = checkScripts(msg, tx, i, sigScript, pkScript)
 				if err != nil {
 					t.Errorf("twice signed script invalid for "+
 						"%s: %v", msg, err)
-					break
 				}
 			}
 		}
@@ -845,7 +838,6 @@ func TestSignTxOutput(t *testing.T) {
 					if err != nil {
 						t.Errorf("failed to make address for %s: %v",
 							msg, err)
-						break
 					}
 
 				case edwards:
@@ -857,7 +849,6 @@ func TestSignTxOutput(t *testing.T) {
 					if err != nil {
 						t.Errorf("failed to make address for %s: %v",
 							msg, err)
-						break
 					}
 
 				case secSchnorr:
@@ -869,7 +860,6 @@ func TestSignTxOutput(t *testing.T) {
 					if err != nil {
 						t.Errorf("failed to make address for %s: %v",
 							msg, err)
-						break
 					}
 				}
 
@@ -920,7 +910,6 @@ func TestSignTxOutput(t *testing.T) {
 					if err != nil {
 						t.Errorf("failed to make address for %s: %v",
 							msg, err)
-						break
 					}
 
 				case edwards:
@@ -932,7 +921,6 @@ func TestSignTxOutput(t *testing.T) {
 					if err != nil {
 						t.Errorf("failed to make address for %s: %v",
 							msg, err)
-						break
 					}
 
 				case secSchnorr:
@@ -944,7 +932,6 @@ func TestSignTxOutput(t *testing.T) {
 					if err != nil {
 						t.Errorf("failed to make address for %s: %v",
 							msg, err)
-						break
 					}
 				}
 
@@ -1357,7 +1344,6 @@ func TestSignTxOutput(t *testing.T) {
 					if err != nil {
 						t.Errorf("failed to make address for %s: %v",
 							msg, err)
-						break
 					}
 
 				case edwards:
@@ -1369,7 +1355,6 @@ func TestSignTxOutput(t *testing.T) {
 					if err != nil {
 						t.Errorf("failed to make address for %s: %v",
 							msg, err)
-						break
 					}
 
 				case secSchnorr:
@@ -1381,7 +1366,6 @@ func TestSignTxOutput(t *testing.T) {
 					if err != nil {
 						t.Errorf("failed to make address for %s: %v",
 							msg, err)
-						break
 					}
 				}
 
@@ -1396,7 +1380,6 @@ func TestSignTxOutput(t *testing.T) {
 				if err != nil {
 					t.Errorf("failed to make p2sh addr for %s: %v",
 						msg, err)
-					break
 				}
 
 				scriptPkScript, err := txscript.PayToAddrScript(
@@ -1404,7 +1387,6 @@ func TestSignTxOutput(t *testing.T) {
 				if err != nil {
 					t.Errorf("failed to make script pkscript for "+
 						"%s: %v", msg, err)
-					break
 				}
 
 				if err := signAndCheck(msg, tx, i, scriptPkScript,
@@ -1415,7 +1397,6 @@ func TestSignTxOutput(t *testing.T) {
 						scriptAddr.EncodeAddress(): pkScript,
 					}), nil, suite); err != nil {
 					t.Error(err)
-					break
 				}
 
 				if err := signBadAndCheck(msg, tx, i, pkScript, hashType,
@@ -1454,7 +1435,6 @@ func TestSignTxOutput(t *testing.T) {
 					if err != nil {
 						t.Errorf("failed to make address for %s: %v",
 							msg, err)
-						break
 					}
 
 				case edwards:
@@ -1466,7 +1446,6 @@ func TestSignTxOutput(t *testing.T) {
 					if err != nil {
 						t.Errorf("failed to make address for %s: %v",
 							msg, err)
-						break
 					}
 
 				case secSchnorr:
@@ -1478,7 +1457,6 @@ func TestSignTxOutput(t *testing.T) {
 					if err != nil {
 						t.Errorf("failed to make address for %s: %v",
 							msg, err)
-						break
 					}
 				}
 
@@ -1493,7 +1471,6 @@ func TestSignTxOutput(t *testing.T) {
 				if err != nil {
 					t.Errorf("failed to make p2sh addr for %s: %v",
 						msg, err)
-					break
 				}
 
 				scriptPkScript, err := txscript.PayToAddrScript(
@@ -1501,7 +1478,6 @@ func TestSignTxOutput(t *testing.T) {
 				if err != nil {
 					t.Errorf("failed to make script pkscript for "+
 						"%s: %v", msg, err)
-					break
 				}
 
 				_, err = txscript.SignTxOutput(
@@ -1563,7 +1539,6 @@ func TestSignTxOutput(t *testing.T) {
 					if err != nil {
 						t.Errorf("failed to make address for %s: %v",
 							msg, err)
-						break
 					}
 
 				case edwards:
@@ -1575,7 +1550,6 @@ func TestSignTxOutput(t *testing.T) {
 					if err != nil {
 						t.Errorf("failed to make address for %s: %v",
 							msg, err)
-						break
 					}
 
 				case secSchnorr:
@@ -1587,7 +1561,6 @@ func TestSignTxOutput(t *testing.T) {
 					if err != nil {
 						t.Errorf("failed to make address for %s: %v",
 							msg, err)
-						break
 					}
 				}
 
@@ -1657,7 +1630,6 @@ func TestSignTxOutput(t *testing.T) {
 					if err != nil {
 						t.Errorf("failed to make address for %s: %v",
 							msg, err)
-						break
 					}
 
 				case edwards:
@@ -1669,7 +1641,6 @@ func TestSignTxOutput(t *testing.T) {
 					if err != nil {
 						t.Errorf("failed to make address for %s: %v",
 							msg, err)
-						break
 					}
 
 				case secSchnorr:
@@ -1681,7 +1652,6 @@ func TestSignTxOutput(t *testing.T) {
 					if err != nil {
 						t.Errorf("failed to make address for %s: %v",
 							msg, err)
-						break
 					}
 				}
 

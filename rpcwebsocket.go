@@ -442,42 +442,6 @@ func (f *wsClientFilter) existsAddress(a dcrutil.Address) bool {
 	return ok
 }
 
-func (f *wsClientFilter) removeAddress(a dcrutil.Address) {
-	switch a := a.(type) {
-	case *dcrutil.AddressPubKeyHash:
-		delete(f.pubKeyHashes, *a.Hash160())
-		return
-	case *dcrutil.AddressScriptHash:
-		delete(f.scriptHashes, *a.Hash160())
-		return
-	case *dcrutil.AddressSecpPubKey:
-		serializedPubKey := a.ScriptAddress()
-		switch len(serializedPubKey) {
-		case 33: // compressed
-			var compressedPubKey [33]byte
-			copy(compressedPubKey[:], serializedPubKey)
-			delete(f.compressedPubKeys, compressedPubKey)
-			return
-		case 65: // uncompressed
-			var uncompressedPubKey [65]byte
-			copy(uncompressedPubKey[:], serializedPubKey)
-			delete(f.uncompressedPubKeys, uncompressedPubKey)
-			return
-		}
-	}
-
-	delete(f.otherAddresses, a.EncodeAddress())
-}
-
-func (f *wsClientFilter) removeAddressStr(s string) {
-	a, err := dcrutil.DecodeAddress(s)
-	if err == nil {
-		f.removeAddress(a)
-	} else {
-		delete(f.otherAddresses, s)
-	}
-}
-
 func (f *wsClientFilter) addUnspentOutPoint(op *wire.OutPoint) {
 	f.unspent[*op] = struct{}{}
 }
@@ -485,10 +449,6 @@ func (f *wsClientFilter) addUnspentOutPoint(op *wire.OutPoint) {
 func (f *wsClientFilter) existsUnspentOutPoint(op *wire.OutPoint) bool {
 	_, ok := f.unspent[*op]
 	return ok
-}
-
-func (f *wsClientFilter) removeUnspentOutPoint(op *wire.OutPoint) {
-	delete(f.unspent, *op)
 }
 
 // Notification types

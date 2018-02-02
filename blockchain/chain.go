@@ -626,11 +626,7 @@ func (b *BlockChain) fetchBlockByHash(hash *chainhash.Hash) (*dcrutil.Block, err
 		}
 
 		block, err = dcrutil.NewBlockFromBytes(blockBytes)
-		if err != nil {
-			return err
-		}
-
-		return nil
+		return err
 	})
 	if err == nil && block != nil {
 		return block, nil

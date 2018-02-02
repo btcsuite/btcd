@@ -266,6 +266,9 @@ func reorgTestForced(t *testing.T, params *chaincfg.Params) {
 	// Load up the rest of the blocks up to HEAD.
 	filename := filepath.Join("testdata/", "reorgto179.bz2")
 	fi, err := os.Open(filename)
+	if err != nil {
+		t.Errorf("Failed to open %s: %v", filename, err)
+	}
 	bcStream := bzip2.NewReader(fi)
 	defer fi.Close()
 
@@ -305,6 +308,9 @@ func reorgTestForced(t *testing.T, params *chaincfg.Params) {
 	// Load up the rest of the blocks up to HEAD.
 	filename = filepath.Join("testdata/", "reorgto180.bz2")
 	fi, err = os.Open(filename)
+	if err != nil {
+		t.Errorf("Failed to open %s: %v", filename, err)
+	}
 	bcStream = bzip2.NewReader(fi)
 	defer fi.Close()
 

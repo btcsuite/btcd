@@ -540,6 +540,9 @@ func TestTicketDBGeneral(t *testing.T) {
 	testBCHeight := int64(168)
 	filename := filepath.Join("..", "/../blockchain/testdata", "blocks0to168.bz2")
 	fi, err := os.Open(filename)
+	if err != nil {
+		t.Errorf("Failed to open %s: %v", filename, err)
+	}
 	bcStream := bzip2.NewReader(fi)
 	defer fi.Close()
 
