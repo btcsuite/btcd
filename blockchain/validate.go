@@ -889,6 +889,20 @@ func (b *BlockChain) checkBlockHeaderContext(header *wire.BlockHeader, prevNode 
 				return ruleError(ErrBadStakeVersion, str)
 			}
 		}
+
+		// Ensure the header commits to the correct pool size based on
+		// its position within the chain.
+		parentStakeNode, err := b.fetchStakeNode(prevNode)
+		if err != nil {
+			return err
+		}
+		calcPoolSize := uint32(parentStakeNode.PoolSize())
+		if header.PoolSize != calcPoolSize {
+			errStr := fmt.Sprintf("block header commitment to "+
+				"pool size %d does not match expected size %d",
+				header.PoolSize, calcPoolSize)
+			return ruleError(ErrPoolSize, errStr)
+		}
 	}
 
 	return nil
@@ -1038,7 +1052,6 @@ func (b *BlockChain) CheckBlockStakeSanity(stakeValidationHeight int64, node *bl
 	msgBlock := block.MsgBlock()
 	blockHash := block.Hash()
 	prevBlockHash := &msgBlock.Header.PrevBlock
-	poolSize := int(msgBlock.Header.PoolSize)
 	finalState := msgBlock.Header.FinalState
 
 	ticketsPerBlock := int(b.chainParams.TicketsPerBlock)
@@ -1064,15 +1077,6 @@ func (b *BlockChain) CheckBlockStakeSanity(stakeValidationHeight int64, node *bl
 
 	// Break if the stake system is otherwise disabled.
 	if block.Height() < stakeValidationHeight {
-		// Check the ticket pool size.
-		if parentStakeNode.PoolSize() != poolSize {
-			errStr := fmt.Sprintf("Error in stake consensus: the "+
-				"poolsize in block %v was %v, however we "+
-				"expected %v", node.hash, poolSize,
-				parentStakeNode.PoolSize())
-			return ruleError(ErrPoolSize, errStr)
-		}
-
 		return nil
 	}
 
@@ -1106,7 +1110,6 @@ func (b *BlockChain) CheckBlockStakeSanity(stakeValidationHeight int64, node *bl
 	ticketsWhichCouldBeUsed := make(map[chainhash.Hash]struct{},
 		ticketsPerBlock)
 	ticketSlice := parentStakeNode.Winners()
-	calcPoolSize := parentStakeNode.PoolSize()
 	finalStateCalc := parentStakeNode.FinalState()
 
 	// 2. Obtain the tickets which could have been used on the block for
@@ -1255,8 +1258,6 @@ func (b *BlockChain) CheckBlockStakeSanity(stakeValidationHeight int64, node *bl
 	// -------------------------------------------------------------------
 	// 1. Make sure that all the tx in the stake tx tree are either SStx,
 	//    SSGen, or SSRtx.
-	// 2. Check and make sure that the ticketpool size is calculated
-	//    correctly after account for spent, missed, and expired tickets.
 
 	// 1. Ensure that all stake transactions are accounted for.  If not,
 	//    this indicates that there was some sort of non-standard stake tx
@@ -1269,14 +1270,6 @@ func (b *BlockChain) CheckBlockStakeSanity(stakeValidationHeight int64, node *bl
 			"of stake tx in block %v was %v, however we expected "+
 			"%v", block.Hash(), stakeTxSum, len(stakeTransactions))
 		return ruleError(ErrNonstandardStakeTx, errStr)
-	}
-
-	// 2. Check the ticket pool size.
-	if calcPoolSize != poolSize {
-		errStr := fmt.Sprintf("Error in stake consensus: the poolsize "+
-			"in block %v was %v, however we expected %v", node.hash,
-			poolSize, calcPoolSize)
-		return ruleError(ErrPoolSize, errStr)
 	}
 
 	return nil
