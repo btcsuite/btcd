@@ -1141,10 +1141,6 @@ func TestBlockValidationRules(t *testing.T) {
 	}
 
 	// ----------------------------------------------------------------------------
-	// ErrUnparseableSSGen
-	// This should be impossible to hit unless there's a local memory failure.
-
-	// ----------------------------------------------------------------------------
 	// ErrInvalidSSGenInput
 	// It doesn't look like this one can actually be hit since checking if
 	// IsSSGen should fail first.

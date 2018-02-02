@@ -324,10 +324,6 @@ const (
 	// of an SStx did not match those found in the commitment outputs.
 	ErrSStxCommitment
 
-	// ErrUnparseableSSGen indicates that the SSGen block vote or votebits data
-	// was unparseable from the null data outputs.
-	ErrUnparseableSSGen
-
 	// ErrInvalidSSGenInput indicates that the input SStx to the SSGen tx was
 	// invalid because it was not an SStx.
 	ErrInvalidSSGenInput
@@ -520,7 +516,6 @@ var errorCodeStrings = map[ErrorCode]string{
 	ErrRevocationsMismatch:    "ErrRevocationsMismatch",
 	ErrTooManyRevocations:     "ErrTooManyRevocations",
 	ErrSStxCommitment:         "ErrSStxCommitment",
-	ErrUnparseableSSGen:       "ErrUnparseableSSGen",
 	ErrInvalidSSGenInput:      "ErrInvalidSSGenInput",
 	ErrSSGenPayeeNum:          "ErrSSGenPayeeNum",
 	ErrSSGenPayeeOuts:         "ErrSSGenPayeeOuts",
