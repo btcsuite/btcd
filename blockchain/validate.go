@@ -1139,13 +1139,7 @@ func (b *BlockChain) CheckBlockStakeSanity(stakeValidationHeight int64, node *bl
 
 			// 3. Check to make sure that the SSGen tx votes on the
 			//    parent block of the block in which it is included.
-			voteHash, voteHgt, err := stake.SSGenBlockVotedOn(msgTx)
-			if err != nil {
-				errStr := fmt.Sprintf("unexpected vote tx "+
-					"decode error: %v", err)
-				return ruleError(ErrUnparseableSSGen, errStr)
-			}
-
+			voteHash, voteHgt := stake.SSGenBlockVotedOn(msgTx)
 			if !(voteHash.IsEqual(prevBlockHash)) ||
 				(voteHgt != uint32(block.Height())-1) {
 				txHash := msgTx.TxHash()
@@ -1419,14 +1413,7 @@ func CheckTransactionInputs(subsidyCache *SubsidyCache, tx *dcrutil.Tx, txHeight
 		// Calculate the theoretical stake vote subsidy by extracting
 		// the vote height.  Should be impossible because IsSSGen
 		// requires this byte string to be a certain number of bytes.
-		_, heightVotingOn, err := stake.SSGenBlockVotedOn(msgTx)
-		if err != nil {
-			errStr := fmt.Sprintf("Could not parse SSGen block "+
-				"vote information from SSGen %v:  %v", txHash,
-				err)
-			return 0, ruleError(ErrUnparseableSSGen, errStr)
-		}
-
+		_, heightVotingOn := stake.SSGenBlockVotedOn(msgTx)
 		stakeVoteSubsidy := CalcStakeVoteSubsidy(subsidyCache,
 			int64(heightVotingOn), chainParams)
 
@@ -1681,12 +1668,7 @@ func CheckTransactionInputs(subsidyCache *SubsidyCache, tx *dcrutil.Tx, txHeight
 		// Inputs won't exist for stakebase tx, so ignore them.
 		if isSSGen && idx == 0 {
 			// However, do add the reward amount.
-			_, heightVotingOn, err := stake.SSGenBlockVotedOn(msgTx)
-			if err != nil {
-				errStr := fmt.Sprintf("unexpected vote tx "+
-					"decode error: %v", err)
-				return 0, ruleError(ErrUnparseableSSGen, errStr)
-			}
+			_, heightVotingOn := stake.SSGenBlockVotedOn(msgTx)
 			stakeVoteSubsidy := CalcStakeVoteSubsidy(subsidyCache,
 				int64(heightVotingOn), chainParams)
 			totalAtomIn += stakeVoteSubsidy

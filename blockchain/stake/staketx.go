@@ -452,17 +452,17 @@ func TxSSGenStakeOutputInfo(tx *wire.MsgTx, params *chaincfg.Params) ([]bool,
 //
 // This function is only safe to be called on a transaction that
 // has passed IsSSGen.
-func SSGenBlockVotedOn(tx *wire.MsgTx) (chainhash.Hash, uint32, error) {
-	// Get the block header hash.
-	blockHash, err := chainhash.NewHash(tx.TxOut[0].PkScript[2:34])
-	if err != nil {
-		return chainhash.Hash{}, 0, err
-	}
+func SSGenBlockVotedOn(tx *wire.MsgTx) (chainhash.Hash, uint32) {
+	// Get the block header hash.  Note that the actual number of bytes is
+	// specified here over using chainhash.HashSize in order to statically
+	// assert hash sizes have not changed.
+	var blockHash [32]byte
+	copy(blockHash[:], tx.TxOut[0].PkScript[2:34])
 
 	// Get the block height.
 	height := binary.LittleEndian.Uint32(tx.TxOut[0].PkScript[34:38])
 
-	return *blockHash, height, nil
+	return chainhash.Hash(blockHash), height
 }
 
 // SSGenVoteBits takes an SSGen tx as input and scans through its

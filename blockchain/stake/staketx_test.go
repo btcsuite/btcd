@@ -793,7 +793,7 @@ func TestGetSSGenBlockVotedOn(t *testing.T) {
 	ssgen.SetTree(wire.TxTreeStake)
 	ssgen.SetIndex(0)
 
-	blockHash, height, err := stake.SSGenBlockVotedOn(ssgen.MsgTx())
+	blockHash, height := stake.SSGenBlockVotedOn(ssgen.MsgTx())
 
 	correctBlockHash, _ := chainhash.NewHash(
 		[]byte{
@@ -809,18 +809,14 @@ func TestGetSSGenBlockVotedOn(t *testing.T) {
 
 	correctheight := uint32(0x2123e300)
 
-	if err != nil {
-		t.Errorf("Error thrown on TestGetSSGenBlockVotedOn: %v", err)
-	}
-
 	if !reflect.DeepEqual(blockHash, *correctBlockHash) {
 		t.Errorf("Error thrown on TestGetSSGenBlockVotedOn: Looking for "+
-			"hash %v, got hash %v: %v", *correctBlockHash, blockHash, err)
+			"hash %v, got hash %v", *correctBlockHash, blockHash)
 	}
 
 	if height != correctheight {
 		t.Errorf("Error thrown on TestGetSSGenBlockVotedOn: Looking for "+
-			"height %v, got height %v: %v", correctheight, height, err)
+			"height %v, got height %v", correctheight, height)
 	}
 }
 

@@ -1322,13 +1322,7 @@ mempoolLoop:
 		// the ticket number.
 		isSSGen := txDesc.Type == stake.TxTypeSSGen
 		if isSSGen {
-			blockHash, blockHeight, err := stake.SSGenBlockVotedOn(msgTx)
-			if err != nil { // Should theoretically never fail.
-				minrLog.Tracef("Skipping ssgen tx %s because of failure "+
-					"to extract block voting data", tx.Hash())
-				continue
-			}
-
+			blockHash, blockHeight := stake.SSGenBlockVotedOn(msgTx)
 			if !((blockHash == *prevHash) &&
 				(int64(blockHeight) == nextBlockHeight-1)) {
 				minrLog.Tracef("Skipping ssgen tx %s because it does "+

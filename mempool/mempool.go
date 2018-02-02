@@ -229,10 +229,7 @@ func (mp *TxPool) insertVote(ssgen *dcrutil.Tx) error {
 	ticketHash := &msgTx.TxIn[1].PreviousOutPoint.Hash
 
 	// Get the block it is voting on; here we're agnostic of height.
-	blockHash, blockHeight, err := stake.SSGenBlockVotedOn(msgTx)
-	if err != nil {
-		return err
-	}
+	blockHash, blockHeight := stake.SSGenBlockVotedOn(msgTx)
 
 	// If there are currently no votes for this block,
 	// start a new buffered slice and store it.
@@ -923,11 +920,7 @@ func (mp *TxPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew, rateLimit, allow
 
 	// Votes that are on too old of blocks are rejected.
 	if txType == stake.TxTypeSSGen {
-		_, voteHeight, err := stake.SSGenBlockVotedOn(msgTx)
-		if err != nil {
-			return nil, err
-		}
-
+		_, voteHeight := stake.SSGenBlockVotedOn(msgTx)
 		if (int64(voteHeight) < nextBlockHeight-maximumVoteAgeDelta) &&
 			!mp.cfg.Policy.AllowOldVotes {
 			str := fmt.Sprintf("transaction %v votes on old "+
