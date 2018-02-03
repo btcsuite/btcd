@@ -535,18 +535,28 @@ func isRevocationTx(tx *wire.MsgTx) bool {
 }
 
 // voteBlockScript returns a standard provably-pruneable OP_RETURN script
-// suitable for use in a vote tx (ssgen) given the block to vote on.
-func voteBlockScript(parentBlock *wire.MsgBlock) []byte {
+// suitable for use in a vote tx (ssgen) given the block hash and height to vote
+// on.
+func voteCommitmentScript(hash chainhash.Hash, height uint32) []byte {
+	// The vote commitment consists of a 32-byte hash of the block it is
+	// voting on along with its expected height as a 4-byte little-endian
+	// uint32.  32-byte hash + 4-byte uint32 = 36 bytes.
 	var data [36]byte
-	parentHash := parentBlock.BlockHash()
-	copy(data[:], parentHash[:])
-	binary.LittleEndian.PutUint32(data[32:], parentBlock.Header.Height)
+	copy(data[:], hash[:])
+	binary.LittleEndian.PutUint32(data[32:], height)
 	script, err := txscript.NewScriptBuilder().AddOp(txscript.OP_RETURN).
 		AddData(data[:]).Script()
 	if err != nil {
 		panic(err)
 	}
 	return script
+}
+
+// voteBlockScript returns a standard provably-pruneable OP_RETURN script
+// suitable for use in a vote tx (ssgen) given the block to vote on.
+func voteBlockScript(parentBlock *wire.MsgBlock) []byte {
+	return voteCommitmentScript(parentBlock.BlockHash(),
+		parentBlock.Header.Height)
 }
 
 // voteBitsScript returns a standard provably-pruneable OP_RETURN script
@@ -1609,6 +1619,20 @@ func (g *Generator) SetTip(blockName string) {
 	g.tipName = blockName
 }
 
+// updateVoteCommitments updates all of the votes in the passed block to commit
+// to the previous block hash and previous height based on the values specified
+// in the header.
+func updateVoteCommitments(block *wire.MsgBlock) {
+	for _, stx := range block.STransactions {
+		if !isVoteTx(stx) {
+			continue
+		}
+
+		stx.TxOut[0].PkScript = voteCommitmentScript(block.Header.PrevBlock,
+			block.Header.Height-1)
+	}
+}
+
 // NextBlock builds a new block that extends the current tip associated with the
 // generator and updates the generator's tip to the newly generated block.
 //
@@ -1641,6 +1665,8 @@ func (g *Generator) SetTip(blockName string) {
 //
 // In order to simply the logic in the munge functions, the following rules are
 // applied after all munge functions have been invoked:
+// - All votes will have their commitments updated if the previous hash or
+//   height was manually changed after stake validation height has been reached
 // - The merkle root will be recalculated unless it was manually changed
 // - The stake root will be recalculated unless it was manually changed
 // - The size of the block will be recalculated unless it was manually changed
@@ -1800,15 +1826,22 @@ func (g *Generator) NextBlock(blockName string, spend *SpendableOut, ticketSpend
 	}
 	block.Header.Size = uint32(block.SerializeSize())
 
-	// Perform any block munging just before solving.  Only recalculate the
-	// merkle roots and block size if they weren't manually changed by a
-	// munge function.
+	// Perform any block munging just before solving.  Once stake validation
+	// height has been reached, update the vote commitments accordingly if the
+	// header height or previous hash was manually changed by a munge function.
+	// Also, only recalculate the merkle roots and block size if they weren't
+	// manually changed by a munge function.
 	curMerkleRoot := block.Header.MerkleRoot
 	curStakeRoot := block.Header.StakeRoot
 	curSize := block.Header.Size
 	curNonce := block.Header.Nonce
 	for _, f := range mungers {
 		f(&block)
+	}
+	if block.Header.Height != nextHeight || block.Header.PrevBlock != prevHash {
+		if int64(nextHeight) >= g.params.StakeValidationHeight {
+			updateVoteCommitments(&block)
+		}
 	}
 	if block.Header.MerkleRoot == curMerkleRoot {
 		block.Header.MerkleRoot = calcMerkleRoot(block.Transactions)
