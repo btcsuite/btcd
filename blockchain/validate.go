@@ -58,6 +58,19 @@ var (
 	zeroHash = &chainhash.Hash{}
 )
 
+// voteBitsApproveParent returns whether or not the passed vote bits indicate
+// the regular transaction tree of the parent block should be considered valid.
+func voteBitsApproveParent(voteBits uint16) bool {
+	return dcrutil.IsFlagSet16(voteBits, dcrutil.BlockValid)
+}
+
+// approvesParent returns whether or not the vote bits in the passed header
+// indicate the regular transaction tree of the parent block should be
+// considered valid.
+func headerApprovesParent(header *wire.BlockHeader) bool {
+	return voteBitsApproveParent(header.VoteBits)
+}
+
 // isNullOutpoint determines whether or not a previous transaction output point
 // is set.
 func isNullOutpoint(outpoint *wire.OutPoint) bool {
@@ -1030,8 +1043,7 @@ func (b *BlockChain) CheckBlockStakeSanity(stakeValidationHeight int64, node *bl
 
 	ticketsPerBlock := int(b.chainParams.TicketsPerBlock)
 
-	txTreeRegularValid := dcrutil.IsFlagSet16(msgBlock.Header.VoteBits,
-		dcrutil.BlockValid)
+	txTreeRegularValid := headerApprovesParent(&msgBlock.Header)
 
 	parentStakeNode, err := b.fetchStakeNode(node.parent)
 	if err != nil {
@@ -1113,8 +1125,7 @@ func (b *BlockChain) CheckBlockStakeSanity(stakeValidationHeight int64, node *bl
 			numSSGenTx++
 
 			// Check and store the vote for TxTreeRegular.
-			ssGenVoteBits := stake.SSGenVoteBits(msgTx)
-			if dcrutil.IsFlagSet16(ssGenVoteBits, dcrutil.BlockValid) {
+			if voteBitsApproveParent(stake.SSGenVoteBits(msgTx)) {
 				voteYea++
 			} else {
 				voteNay++
@@ -2451,8 +2462,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block, parent *dcrutil.B
 	// signature operations in each of the input transaction public key
 	// scripts.
 	// Do this for all TxTrees.
-	regularTxTreeValid := dcrutil.IsFlagSet16(node.voteBits,
-		dcrutil.BlockValid)
+	regularTxTreeValid := voteBitsApproveParent(node.voteBits)
 	thisNodeStakeViewpoint := ViewpointPrevInvalidStake
 	thisNodeRegularViewpoint := ViewpointPrevInvalidRegular
 	if regularTxTreeValid {

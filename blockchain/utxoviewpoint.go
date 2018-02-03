@@ -457,8 +457,7 @@ func (view *UtxoViewpoint) connectTransaction(tx *dcrutil.Tx, blockHeight int64,
 // In addition, when the 'stxos' argument is not nil, it will be updated to
 // append an entry for each spent txout.
 func (b *BlockChain) connectTransactions(view *UtxoViewpoint, block *dcrutil.Block, parent *dcrutil.Block, stxos *[]spentTxOut) error {
-	regularTxTreeValid := dcrutil.IsFlagSet16(block.MsgBlock().Header.VoteBits,
-		dcrutil.BlockValid)
+	regularTxTreeValid := headerApprovesParent(&block.MsgBlock().Header)
 	thisNodeStakeViewpoint := ViewpointPrevInvalidStake
 	if regularTxTreeValid {
 		thisNodeStakeViewpoint = ViewpointPrevValidStake
@@ -470,9 +469,6 @@ func (b *BlockChain) connectTransactions(view *UtxoViewpoint, block *dcrutil.Blo
 		if err != nil {
 			return err
 		}
-		mBlock := block.MsgBlock()
-		votebits := mBlock.Header.VoteBits
-		regularTxTreeValid := dcrutil.IsFlagSet16(votebits, dcrutil.BlockValid)
 		if regularTxTreeValid {
 			for i, tx := range parent.Transactions() {
 				err := view.connectTransaction(tx, parent.Height(), uint32(i),
@@ -521,8 +517,7 @@ func (b *BlockChain) disconnectTransactions(view *UtxoViewpoint, block *dcrutil.
 	// Loop backwards through all transactions so everything is unspent in
 	// reverse order.  This is necessary since transactions later in a block
 	// can spend from previous ones.
-	regularTxTreeValid := dcrutil.IsFlagSet16(block.MsgBlock().Header.VoteBits,
-		dcrutil.BlockValid)
+	regularTxTreeValid := headerApprovesParent(&block.MsgBlock().Header)
 	thisNodeStakeViewpoint := ViewpointPrevInvalidStake
 	if regularTxTreeValid {
 		thisNodeStakeViewpoint = ViewpointPrevValidStake

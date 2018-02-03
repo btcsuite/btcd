@@ -1169,10 +1169,8 @@ func countSpentOutputs(block *dcrutil.Block, parent *dcrutil.Block) int {
 	// We need to skip the regular tx tree if it's not valid.
 	// We also exclude the coinbase transaction since it can't
 	// spend anything.
-	regularTxTreeValid := dcrutil.IsFlagSet16(block.MsgBlock().Header.VoteBits,
-		dcrutil.BlockValid)
 	var numSpent int
-	if regularTxTreeValid {
+	if headerApprovesParent(&block.MsgBlock().Header) {
 		for _, tx := range parent.Transactions()[1:] {
 			numSpent += len(tx.MsgTx().TxIn)
 		}
@@ -1193,10 +1191,7 @@ func countSpentOutputs(block *dcrutil.Block, parent *dcrutil.Block) int {
 // adding the block.
 func countNumberOfTransactions(block, parent *dcrutil.Block) uint64 {
 	var numTxns uint64
-
-	regularTxTreeValid := dcrutil.IsFlagSet16(block.MsgBlock().Header.VoteBits,
-		dcrutil.BlockValid)
-	if regularTxTreeValid {
+	if headerApprovesParent(&block.MsgBlock().Header) {
 		numTxns += uint64(len(parent.Transactions()))
 	}
 	numTxns += uint64(len(block.STransactions()))
@@ -1696,9 +1691,7 @@ func (b *BlockChain) connectBestChain(node *blockNode, block, parent *dcrutil.Bl
 		}
 
 		validateStr := "validating"
-		txTreeRegularValid := dcrutil.IsFlagSet16(node.voteBits,
-			dcrutil.BlockValid)
-		if !txTreeRegularValid {
+		if !voteBitsApproveParent(node.voteBits) {
 			validateStr = "invalidating"
 		}
 

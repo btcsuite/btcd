@@ -518,9 +518,7 @@ func dbFetchSpendJournalEntry(dbTx database.Tx, block *dcrutil.Block, parent *dc
 	serialized := spendBucket.Get(block.Hash()[:])
 
 	var blockTxns []*wire.MsgTx
-	regularTxTreeValid := dcrutil.IsFlagSet16(block.MsgBlock().Header.VoteBits,
-		dcrutil.BlockValid)
-	if regularTxTreeValid {
+	if headerApprovesParent(&block.MsgBlock().Header) {
 		blockTxns = append(blockTxns, parent.MsgBlock().Transactions[1:]...)
 	}
 	blockTxns = append(blockTxns, block.MsgBlock().STransactions...)
