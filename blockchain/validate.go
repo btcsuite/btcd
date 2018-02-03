@@ -574,8 +574,10 @@ func checkBlockSanity(block *dcrutil.Block, timeSource MedianTimeSource, flags B
 
 	// Do some preliminary checks on each stake transaction to ensure they
 	// are sane while tallying each type before continuing.
+	stakeValidationHeight := uint32(chainParams.StakeValidationHeight)
 	var totalTickets, totalVotes, totalRevocations int64
-	for i, stx := range msgBlock.STransactions {
+	var totalYesVotes int64
+	for txIdx, stx := range msgBlock.STransactions {
 		err := CheckTransactionSanity(stx, chainParams)
 		if err != nil {
 			return err
@@ -587,15 +589,40 @@ func checkBlockSanity(block *dcrutil.Block, timeSource MedianTimeSource, flags B
 		if txType == stake.TxTypeRegular {
 			errStr := fmt.Sprintf("block contains regular "+
 				"transaction in stake transaction tree at "+
-				"index %d", i)
+				"index %d", txIdx)
 			return ruleError(ErrRegTxInStakeTree, errStr)
 		}
 
 		switch txType {
 		case stake.TxTypeSStx:
 			totalTickets++
+
 		case stake.TxTypeSSGen:
 			totalVotes++
+
+			// All votes in a block must commit to the parent of the
+			// block once stake validation height has been reached.
+			if header.Height >= stakeValidationHeight {
+				votedHash, votedHeight := stake.SSGenBlockVotedOn(stx)
+				if (votedHash != header.PrevBlock) || (votedHeight !=
+					header.Height-1) {
+
+					errStr := fmt.Sprintf("vote %s at index %d is "+
+						"for parent block %s (height %d) versus "+
+						"expected parent block %s (height %d)",
+						stx.TxHash(), txIdx, votedHash,
+						votedHeight, header.PrevBlock,
+						header.Height-1)
+					return ruleError(ErrVotesOnWrongBlock, errStr)
+				}
+
+				// Tally how many votes approve the previous block for use
+				// when validating the header commitment.
+				if voteBitsApproveParent(stake.SSGenVoteBits(stx)) {
+					totalYesVotes++
+				}
+			}
+
 		case stake.TxTypeSSRtx:
 			totalRevocations++
 		}
@@ -628,6 +655,21 @@ func checkBlockSanity(block *dcrutil.Block, timeSource MedianTimeSource, flags B
 		return ruleError(ErrRevocationsMismatch, errStr)
 	}
 
+	// A block header must commit to the same previous block acceptance
+	// semantics expressed by the votes once stake validation height has
+	// been reached.
+	if header.Height >= stakeValidationHeight {
+		totalNoVotes := totalVotes - totalYesVotes
+		headerApproves := headerApprovesParent(header)
+		votesApprove := totalYesVotes > totalNoVotes
+		if headerApproves != votesApprove {
+			errStr := fmt.Sprintf("block header commitment to previous "+
+				"block approval does not match votes (header claims: %v, "+
+				"votes: %v)", headerApproves, votesApprove)
+			return ruleError(ErrIncongruentVotebit, errStr)
+		}
+	}
+
 	// A block must not contain anything other than ticket purchases prior to
 	// stake validation height.
 	//
@@ -637,7 +679,7 @@ func checkBlockSanity(block *dcrutil.Block, timeSource MedianTimeSource, flags B
 	// type at the current time is ticket purchases, however, if another
 	// stake type is ever added, consensus would break without this check.
 	// It's better to be safe and it's a cheap check.
-	if header.Height < uint32(chainParams.StakeValidationHeight) {
+	if header.Height < stakeValidationHeight {
 		if int64(len(msgBlock.STransactions)) != totalTickets {
 			errStr := fmt.Sprintf("block contains stake "+
 				"transactions other than ticket purchases before "+
@@ -1051,12 +1093,9 @@ func (b *BlockChain) CheckBlockStakeSanity(stakeValidationHeight int64, node *bl
 	stakeTransactions := block.STransactions()
 	msgBlock := block.MsgBlock()
 	blockHash := block.Hash()
-	prevBlockHash := &msgBlock.Header.PrevBlock
 	finalState := msgBlock.Header.FinalState
 
 	ticketsPerBlock := int(b.chainParams.TicketsPerBlock)
-
-	txTreeRegularValid := headerApprovesParent(&msgBlock.Header)
 
 	parentStakeNode, err := b.fetchStakeNode(node.parent)
 	if err != nil {
@@ -1100,10 +1139,8 @@ func (b *BlockChain) CheckBlockStakeSanity(stakeValidationHeight int64, node *bl
 	//    block in the way of the majority of the voters.
 	// 7. Check final state and ensure that it matches.
 
-	// Store the number of SSGen tx and votes to check later.
+	// Store the number of SSGen tx to check later.
 	numSSGenTx := 0
-	voteYea := 0
-	voteNay := 0
 
 	// 1. Retrieve an emulated ticket database of SStxMemMaps from both the
 	//    ticket database and the ticket store.
@@ -1127,13 +1164,6 @@ func (b *BlockChain) CheckBlockStakeSanity(stakeValidationHeight int64, node *bl
 		if stake.IsSSGen(msgTx) {
 			numSSGenTx++
 
-			// Check and store the vote for TxTreeRegular.
-			if voteBitsApproveParent(stake.SSGenVoteBits(msgTx)) {
-				voteYea++
-			} else {
-				voteNay++
-			}
-
 			// Grab the input SStx hash from the inputs of the
 			// transaction.
 			sstxIn := msgTx.TxIn[1] // sstx input
@@ -1150,23 +1180,11 @@ func (b *BlockChain) CheckBlockStakeSanity(stakeValidationHeight int64, node *bl
 					sstxHash, blockHash)
 				return ruleError(ErrTicketUnavailable, errStr)
 			}
-
-			// 3. Check to make sure that the SSGen tx votes on the
-			//    parent block of the block in which it is included.
-			voteHash, voteHgt := stake.SSGenBlockVotedOn(msgTx)
-			if !(voteHash.IsEqual(prevBlockHash)) ||
-				(voteHgt != uint32(block.Height())-1) {
-				txHash := msgTx.TxHash()
-				errStr := fmt.Sprintf("Error in stake "+
-					"consensus: SSGen %v voted on block "+
-					"%v at height %v, however it was "+
-					"found inside block %v at height %v!",
-					txHash, voteHash, voteHgt,
-					prevBlockHash, block.Height()-1)
-				return ruleError(ErrVotesOnWrongBlock, errStr)
-			}
 		}
 	}
+
+	// 3. Check to make sure that the SSGen votes on the correct
+	//    block/height.  Already checked in checkBlockSanity.
 
 	// 4. Check and make sure that we have the same number of SSGen tx as
 	//    we do votes.  Already checked in checkBlockSanity.
@@ -1174,21 +1192,8 @@ func (b *BlockChain) CheckBlockStakeSanity(stakeValidationHeight int64, node *bl
 	// 5. Check for too many voters.  Already checked in checkBlockSanity.
 
 	// 6. Determine if TxTreeRegular should be valid or not, and then check
-	//    it against what is provided in the block header.
-	if (voteYea <= voteNay) && txTreeRegularValid {
-		errStr := fmt.Sprintf("Error in stake consensus: the voters "+
-			"voted against parent TxTreeRegular inclusion in "+
-			"block %v, but the block header indicates it was "+
-			"voted for", blockHash)
-		return ruleError(ErrIncongruentVotebit, errStr)
-	}
-	if (voteYea > voteNay) && !txTreeRegularValid {
-		errStr := fmt.Sprintf("Error in stake consensus: the voters "+
-			"voted for parent TxTreeRegular inclusion in block %v,"+
-			" but the block header indicates it was voted against",
-			blockHash)
-		return ruleError(ErrIncongruentVotebit, errStr)
-	}
+	//    it against what is provided in the block header.  Already checked
+	//    in checkBlockSanity.
 
 	// 7. Check the final state of the lottery PRNG and ensure that it
 	// matches.

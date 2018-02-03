@@ -8,6 +8,7 @@ package blockchain_test
 import (
 	"bytes"
 	"compress/bzip2"
+	"encoding/binary"
 	"encoding/gob"
 	"encoding/hex"
 	"os"
@@ -36,6 +37,23 @@ func recalculateMsgBlockMerkleRootsSize(msgBlock *wire.MsgBlock) {
 	msgBlock.Header.MerkleRoot = *merkles[len(merkles)-1]
 	msgBlock.Header.StakeRoot = *merklesStake[len(merklesStake)-1]
 	msgBlock.Header.Size = uint32(msgBlock.SerializeSize())
+}
+
+// updateVoteCommitments updates all of the votes in the passed block to commit
+// to the previous block and height specified by the header.
+func updateVoteCommitments(msgBlock *wire.MsgBlock) {
+	for _, stx := range msgBlock.STransactions {
+		if !stake.IsSSGen(stx) {
+			continue
+		}
+
+		// Generate and set the commitment.
+		var commitment [36]byte
+		copy(commitment[:], msgBlock.Header.PrevBlock[:])
+		binary.LittleEndian.PutUint32(commitment[32:], msgBlock.Header.Height-1)
+		pkScript, _ := txscript.GenerateProvablyPruneableOut(commitment[:])
+		stx.TxOut[0].PkScript = pkScript
+	}
 }
 
 // TestBlockValidationRules unit tests various block validation rules.
@@ -366,6 +384,8 @@ func TestBlockValidationRules(t *testing.T) {
 	missingParent153 := new(wire.MsgBlock)
 	missingParent153.FromBytes(block153Bytes)
 	missingParent153.Header.PrevBlock[8] ^= 0x01
+	updateVoteCommitments(missingParent153)
+	recalculateMsgBlockMerkleRootsSize(missingParent153)
 	b153test = dcrutil.NewBlock(missingParent153)
 
 	err = blockchain.CheckWorklessBlockSanity(b153test, timeSource, params)
@@ -847,7 +867,7 @@ func TestBlockValidationRules(t *testing.T) {
 	nonChosenTicket154 := new(wire.MsgBlock)
 	nonChosenTicket154.FromBytes(block154Bytes)
 	nonChosenTicket154.STransactions[4] = mtxFromB
-
+	updateVoteCommitments(nonChosenTicket154)
 	recalculateMsgBlockMerkleRootsSize(nonChosenTicket154)
 	b154test = dcrutil.NewBlock(nonChosenTicket154)
 
@@ -878,8 +898,9 @@ func TestBlockValidationRules(t *testing.T) {
 	b154test = dcrutil.NewBlock(wrongBlockVote154)
 
 	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, params)
-	if err != nil {
-		t.Errorf("got unexpected error for ErrVotesOnWrongBlock sanity check: %v",
+	if err == nil || err.(blockchain.RuleError).ErrorCode !=
+		blockchain.ErrVotesOnWrongBlock {
+		t.Errorf("Unexpected no or wrong error for ErrVotesOnWrongBlock test: %v",
 			err)
 	}
 
@@ -919,9 +940,10 @@ func TestBlockValidationRules(t *testing.T) {
 	b154test = dcrutil.NewBlock(badVoteBit154)
 
 	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, params)
-	if err != nil {
-		t.Errorf("got unexpected error for ErrIncongruentVotebit 2 sanity  "+
-			"check: %v", err)
+	if err == nil || err.(blockchain.RuleError).ErrorCode !=
+		blockchain.ErrIncongruentVotebit {
+		t.Errorf("Unexpected no or wrong error for ErrIncongruentVotebit "+
+			"test 1: %v", err)
 	}
 
 	// Fails and hits ErrIncongruentVotebit.
@@ -948,9 +970,10 @@ func TestBlockValidationRules(t *testing.T) {
 	b154test = dcrutil.NewBlock(badVoteBit154)
 
 	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, params)
-	if err != nil {
-		t.Errorf("got unexpected error for ErrIncongruentVotebit 2 sanity  "+
-			"check: %v", err)
+	if err == nil || err.(blockchain.RuleError).ErrorCode !=
+		blockchain.ErrIncongruentVotebit {
+		t.Errorf("Unexpected no or wrong error for ErrIncongruentVotebit "+
+			"test 2: %v", err)
 	}
 
 	// Fails and hits ErrIncongruentVotebit.
@@ -977,9 +1000,10 @@ func TestBlockValidationRules(t *testing.T) {
 	b154test = dcrutil.NewBlock(badVoteBit154)
 
 	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, params)
-	if err != nil {
-		t.Errorf("got unexpected error for ErrIncongruentVotebit 3 sanity  "+
-			"check: %v", err)
+	if err == nil || err.(blockchain.RuleError).ErrorCode !=
+		blockchain.ErrIncongruentVotebit {
+		t.Errorf("Unexpected no or wrong error for ErrIncongruentVotebit "+
+			"test 3: %v", err)
 	}
 
 	// Fails and hits ErrIncongruentVotebit.
@@ -1006,9 +1030,10 @@ func TestBlockValidationRules(t *testing.T) {
 	b154test = dcrutil.NewBlock(badVoteBit154)
 
 	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, params)
-	if err != nil {
-		t.Errorf("got unexpected error for ErrIncongruentVotebit 4 sanity  "+
-			"check: %v", err)
+	if err == nil || err.(blockchain.RuleError).ErrorCode !=
+		blockchain.ErrIncongruentVotebit {
+		t.Errorf("Unexpected no or wrong error for ErrIncongruentVotebit "+
+			"test 4: %v", err)
 	}
 
 	// Fails and hits ErrIncongruentVotebit.
@@ -1040,9 +1065,10 @@ func TestBlockValidationRules(t *testing.T) {
 	b154test = dcrutil.NewBlock(badVoteBit154)
 
 	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, params)
-	if err != nil {
-		t.Errorf("got unexpected error for ErrIncongruentVotebit 5 sanity  "+
-			"check: %v", err)
+	if err == nil || err.(blockchain.RuleError).ErrorCode !=
+		blockchain.ErrIncongruentVotebit {
+		t.Errorf("Unexpected no or wrong error for ErrIncongruentVotebit "+
+			"test 5: %v", err)
 	}
 
 	// Fails and hits ErrIncongruentVotebit.
@@ -1074,9 +1100,10 @@ func TestBlockValidationRules(t *testing.T) {
 	b154test = dcrutil.NewBlock(badVoteBit154)
 
 	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, params)
-	if err != nil {
-		t.Errorf("got unexpected error for ErrIncongruentVotebit 6 sanity  "+
-			"check: %v", err)
+	if err == nil || err.(blockchain.RuleError).ErrorCode !=
+		blockchain.ErrIncongruentVotebit {
+		t.Errorf("Unexpected no or wrong error for ErrIncongruentVotebit "+
+			"test 6: %v", err)
 	}
 
 	// Fails and hits ErrIncongruentVotebit.
@@ -1108,9 +1135,10 @@ func TestBlockValidationRules(t *testing.T) {
 	b154test = dcrutil.NewBlock(badVoteBit154)
 
 	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, params)
-	if err != nil {
-		t.Errorf("got unexpected error for ErrIncongruentVotebit 7 sanity  "+
-			"check: %v", err)
+	if err == nil || err.(blockchain.RuleError).ErrorCode !=
+		blockchain.ErrIncongruentVotebit {
+		t.Errorf("Unexpected no or wrong error for ErrIncongruentVotebit "+
+			"test 7: %v", err)
 	}
 
 	// Fails and hits ErrIncongruentVotebit.
@@ -1373,6 +1401,8 @@ func TestBlockValidationRules(t *testing.T) {
 	badBlockHeight154 := new(wire.MsgBlock)
 	badBlockHeight154.FromBytes(block154Bytes)
 	badBlockHeight154.Header.Height++
+	updateVoteCommitments(badBlockHeight154)
+	recalculateMsgBlockMerkleRootsSize(badBlockHeight154)
 	b154test = dcrutil.NewBlock(badBlockHeight154)
 
 	// Throws ProcessBlock error through checkBlockContext.
