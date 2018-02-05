@@ -359,8 +359,9 @@ type Params struct {
 	// The number of nodes to check.
 	BlockUpgradeNumToCheck uint64
 
-	// Mempool parameters
-	RelayNonStdTxs bool
+	// AcceptNonStdTxs is a mempool param to either accept and relay
+	// non standard txs to the network or reject them
+	AcceptNonStdTxs bool
 
 	// NetworkAddressPrefix is the first letter of the network
 	// for any given address encoded as a string.
@@ -626,8 +627,9 @@ var MainNetParams = Params{
 	BlockRejectNumRequired:  950,
 	BlockUpgradeNumToCheck:  1000,
 
-	// Mempool parameters
-	RelayNonStdTxs: false,
+	// AcceptNonStdTxs is a mempool param to either accept and relay
+	// non standard txs to the network or reject them
+	AcceptNonStdTxs: false,
 
 	// Address encoding magics
 	NetworkAddressPrefix: "D",
@@ -805,8 +807,9 @@ var TestNet2Params = Params{
 	BlockRejectNumRequired:  75,
 	BlockUpgradeNumToCheck:  100,
 
-	// Mempool parameters
-	RelayNonStdTxs: true,
+	// AcceptNonStdTxs is a mempool param to either accept and relay
+	// non standard txs to the network or reject them
+	AcceptNonStdTxs: true,
 
 	// Address encoding magics
 	NetworkAddressPrefix: "T",
@@ -999,8 +1002,9 @@ var SimNetParams = Params{
 	BlockRejectNumRequired:  75,
 	BlockUpgradeNumToCheck:  100,
 
-	// Mempool parameters
-	RelayNonStdTxs: true,
+	// AcceptNonStdTxs is a mempool param to either accept and relay
+	// non standard txs to the network or reject them
+	AcceptNonStdTxs: true,
 
 	// Address encoding magics
 	NetworkAddressPrefix: "S",

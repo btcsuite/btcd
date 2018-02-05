@@ -245,8 +245,9 @@ var simNetParams = &chaincfg.Params{
 	BlockRejectNumRequired:  75,
 	BlockUpgradeNumToCheck:  100,
 
-	// Mempool parameters
-	RelayNonStdTxs: true,
+	// AcceptNonStdTxs is a Mempool param to accept and relay non standard
+	// txs to the network or reject them
+	AcceptNonStdTxs: true,
 
 	// Address encoding magics
 	NetworkAddressPrefix: "S",
