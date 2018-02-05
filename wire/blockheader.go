@@ -23,7 +23,7 @@ type BlockHeader struct {
 	// Version of the block.  This is not the same as the protocol version.
 	Version int32
 
-	// Hash of the previous block in the block chain.
+	// Hash of the previous block header in the block chain.
 	PrevBlock chainhash.Hash
 
 	// Merkle tree reference to hash of all transactions for the block.
