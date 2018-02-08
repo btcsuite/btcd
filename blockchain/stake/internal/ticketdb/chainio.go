@@ -136,8 +136,8 @@ const databaseInfoSize = 8
 
 // DatabaseInfo is the structure for a database.
 type DatabaseInfo struct {
-	Version        uint32
 	Date           time.Time
+	Version        uint32
 	UpgradeStarted bool
 }
 

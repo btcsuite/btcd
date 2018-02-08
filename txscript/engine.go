@@ -95,21 +95,22 @@ var halfOrder = new(big.Int).Rsh(chainec.Secp256k1.GetN(), 1)
 
 // Engine is the virtual machine that executes scripts.
 type Engine struct {
-	version         uint16
 	scripts         [][]parsedOpcode
-	scriptIdx       int
-	scriptOff       int
-	lastCodeSep     int
-	dstack          stack // data stack
-	astack          stack // alt stack
-	tx              wire.MsgTx
-	txIdx           int
-	condStack       []int
-	numOps          int
-	flags           ScriptFlags
-	sigCache        *SigCache
-	bip16           bool     // treat execution as pay-to-script-hash
 	savedFirstStack [][]byte // stack from first script for bip16 scripts
+	sigCache        *SigCache
+
+	scriptIdx   int
+	scriptOff   int
+	lastCodeSep int
+	dstack      stack // data stack
+	astack      stack // alt stack
+	tx          wire.MsgTx
+	txIdx       int
+	condStack   []int
+	numOps      int
+	flags       ScriptFlags
+	version     uint16
+	bip16       bool // treat execution as pay-to-script-hash
 }
 
 // hasFlag returns whether the script engine instance has the passed flag set.

@@ -40,8 +40,8 @@ var (
 type utxo struct {
 	pkScript       []byte
 	value          dcrutil.Amount
-	keyIndex       uint32
 	maturityHeight int64
+	keyIndex       uint32
 	isLocked       bool
 }
 

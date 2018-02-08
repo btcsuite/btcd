@@ -102,10 +102,10 @@ type ExtendedKey struct {
 	key       []byte // This will be the pubkey for extended pub keys
 	pubKey    []byte // This will only be set for extended priv keys
 	chainCode []byte
-	depth     uint16
 	parentFP  []byte
-	childNum  uint32
 	version   []byte
+	childNum  uint32
+	depth     uint16
 	isPrivate bool
 }
 

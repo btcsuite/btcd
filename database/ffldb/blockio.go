@@ -108,17 +108,17 @@ type writeCursor struct {
 // blockStore houses information used to handle reading and writing blocks (and
 // part of blocks) into flat files with support for multiple concurrent readers.
 type blockStore struct {
+	// maxBlockFileSize is the maximum size for each file used to store
+	// blocks.  It is defined on the store so the whitebox tests can
+	// override the value.
+	maxBlockFileSize uint32
+
 	// network is the specific network to use in the flat files for each
 	// block.
 	network wire.CurrencyNet
 
 	// basePath is the base path used for the flat block files and metadata.
 	basePath string
-
-	// maxBlockFileSize is the maximum size for each file used to store
-	// blocks.  It is defined on the store so the whitebox tests can
-	// override the value.
-	maxBlockFileSize uint32
 
 	// The following fields are related to the flat files which hold the
 	// actual blocks.   The number of open files is limited by maxOpenFiles.

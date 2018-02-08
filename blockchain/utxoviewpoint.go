@@ -92,10 +92,10 @@ type UtxoEntry struct {
 	sparseOutputs map[uint32]*utxoOutput // Sparse map of unspent outputs.
 	stakeExtra    []byte                 // Extra data for the staking system.
 
-	txVersion uint16       // The tx version of this tx.
+	txType    stake.TxType // The stake type of the transaction.
 	height    uint32       // Height of block containing tx.
 	index     uint32       // Index of containing tx in block.
-	txType    stake.TxType // The stake type of the transaction.
+	txVersion uint16       // The tx version of this tx.
 
 	isCoinBase bool // Whether entry is a coinbase tx.
 	hasExpiry  bool // Whether entry has an expiry.

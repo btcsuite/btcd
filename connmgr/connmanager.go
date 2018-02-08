@@ -58,13 +58,13 @@ type ConnReq struct {
 	// The following variables must only be used atomically.
 	id uint64
 
-	Addr      net.Addr
-	Permanent bool
+	Addr net.Addr
 
 	conn       net.Conn
-	state      ConnState
 	stateMtx   sync.RWMutex
 	retryCount uint32
+	Permanent  bool
+	state      ConnState
 }
 
 // updateState updates the state of the connection request.

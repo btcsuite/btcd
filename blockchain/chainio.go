@@ -237,20 +237,20 @@ func ConvertUtxosToMinimalOutputs(entry *UtxoEntry) []*stake.MinimalOutput {
 //
 // The struct is aligned for memory efficiency.
 type spentTxOut struct {
-	pkScript      []byte       // The public key script for the output.
-	stakeExtra    []byte       // Extra information for the staking system.
+	pkScript   []byte // The public key script for the output.
+	stakeExtra []byte // Extra information for the staking system.
+
 	amount        int64        // The amount of the output.
-	txVersion     uint16       // The version of creating tx.
+	txType        stake.TxType // The stake type of the transaction.
 	height        uint32       // Height of the the block containing the tx.
 	index         uint32       // Index in the block of the transaction.
 	scriptVersion uint16       // The version of the scripting language.
-	txType        stake.TxType // The stake type of the transaction.
+	txVersion     uint16       // The version of creating tx.
 
 	txFullySpent bool // Whether or not the transaction is fully spent.
 	isCoinBase   bool // Whether creating tx is a coinbase.
 	hasExpiry    bool // The expiry of the creating tx.
-
-	compressed bool // Whether or not the script is compressed.
+	compressed   bool // Whether or not the script is compressed.
 }
 
 // spentTxOutSerializeSize returns the number of bytes it would take to
