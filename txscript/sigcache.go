@@ -59,16 +59,13 @@ func NewSigCache(maxEntries uint) *SigCache {
 // unless there exists a writer, adding an entry to the SigCache.
 func (s *SigCache) Exists(sigHash chainhash.Hash, sig chainec.Signature, pubKey chainec.PublicKey) bool {
 	s.RLock()
-	defer s.RUnlock()
+	entry, ok := s.validSigs[sigHash]
+	s.RUnlock()
 
-	if entry, ok := s.validSigs[sigHash]; ok {
-		pkEqual := bytes.Equal(entry.pubKey.SerializeCompressed(),
-			pubKey.SerializeCompressed())
-		sigEqual := bytes.Equal(entry.sig.Serialize(), sig.Serialize())
-		return pkEqual && sigEqual
-	}
-
-	return false
+	return ok &&
+		bytes.Equal(entry.pubKey.SerializeCompressed(),
+			pubKey.SerializeCompressed()) &&
+		bytes.Equal(entry.sig.Serialize(), sig.Serialize())
 }
 
 // Add adds an entry for a signature over 'sigHash' under public key 'pubKey'

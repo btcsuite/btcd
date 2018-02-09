@@ -422,7 +422,7 @@ type blockManager struct {
 	// yet for any given block, so notifications are never
 	// duplicated.
 	lotteryDataBroadcast      map[chainhash.Hash]struct{}
-	lotteryDataBroadcastMutex sync.Mutex
+	lotteryDataBroadcastMutex sync.RWMutex
 
 	cachedCurrentTemplate *BlockTemplate
 	cachedParentTemplate  *BlockTemplate
@@ -1113,9 +1113,9 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 				BlockHash:   *blockHash,
 				BlockHeight: int64(bmsg.block.MsgBlock().Header.Height),
 				Tickets:     winningTickets}
-			b.lotteryDataBroadcastMutex.Lock()
+			b.lotteryDataBroadcastMutex.RLock()
 			_, beenNotified := b.lotteryDataBroadcast[*blockHash]
-			b.lotteryDataBroadcastMutex.Unlock()
+			b.lotteryDataBroadcastMutex.RUnlock()
 			if !beenNotified && r != nil &&
 				int64(bmsg.block.MsgBlock().Header.Height) >
 					b.server.chainParams.LatestCheckpointHeight() {
@@ -1795,9 +1795,9 @@ out:
 				tooOldForLotteryData := blockHeight <=
 					(bestHeight - maxLotteryDataBlockDelta)
 				if !isOrphan && !tooOldForLotteryData {
-					b.lotteryDataBroadcastMutex.Lock()
+					b.lotteryDataBroadcastMutex.RLock()
 					_, beenNotified := b.lotteryDataBroadcast[*msg.block.Hash()]
-					b.lotteryDataBroadcastMutex.Unlock()
+					b.lotteryDataBroadcastMutex.RUnlock()
 					winningTickets, _, _, err :=
 						b.chain.LotteryDataForBlock(msg.block.Hash())
 					if err != nil && int64(msg.block.MsgBlock().Header.Height) >=
