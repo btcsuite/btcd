@@ -39,7 +39,7 @@ var (
 )
 
 // ConnState represents the state of the requested connection.
-type ConnState uint8
+type ConnState uint32
 
 // ConnState can be either pending, established, disconnected or failed.  When
 // a new connection is requested, it is attempted and categorized as
@@ -56,22 +56,18 @@ const (
 // connection will be retried on disconnection.
 type ConnReq struct {
 	// The following variables must only be used atomically.
-	id uint64
+	id    uint64
+	state uint32
 
-	Addr net.Addr
-
-	conn       net.Conn
-	stateMtx   sync.RWMutex
 	retryCount uint32
+	conn       net.Conn
+	Addr       net.Addr
 	Permanent  bool
-	state      ConnState
 }
 
 // updateState updates the state of the connection request.
 func (c *ConnReq) updateState(state ConnState) {
-	c.stateMtx.Lock()
-	c.state = state
-	c.stateMtx.Unlock()
+	atomic.StoreUint32(&c.state, uint32(state))
 }
 
 // ID returns a unique identifier for the connection request.
@@ -81,10 +77,7 @@ func (c *ConnReq) ID() uint64 {
 
 // State is the connection state of the requested connection.
 func (c *ConnReq) State() ConnState {
-	c.stateMtx.RLock()
-	state := c.state
-	c.stateMtx.RUnlock()
-	return state
+	return ConnState(atomic.LoadUint32(&c.state))
 }
 
 // String returns a human-readable string for the connection request.
