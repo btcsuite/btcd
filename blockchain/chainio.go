@@ -1125,6 +1125,12 @@ func (b *BlockChain) createChainState() error {
 			return err
 		}
 
+		// Save the genesis block to the block index database.
+		err = dbStoreBlockNode(dbTx, node)
+		if err != nil {
+			return err
+		}
+
 		// Add the genesis block hash to height and height to hash
 		// mappings to the index.
 		err = dbPutBlockIndex(dbTx, &node.hash, node.height)
