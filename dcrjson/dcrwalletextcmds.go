@@ -532,6 +532,24 @@ func NewWalletInfoCmd() *WalletInfoCmd {
 	return &WalletInfoCmd{}
 }
 
+// SweepAccountCmd defines the sweep account JSON-RPC command.
+type SweepAccountCmd struct {
+	SourceAccount         string
+	DestinationAddress    string
+	RequiredConfirmations *uint32
+	FeePerKb              *float64
+}
+
+// NewSweepAccountCmd returns a new instance which can be used to issue a JSON-RPC SweepAccountCmd command.
+func NewSweepAccountCmd(sourceAccount string, destinationAddress string, requiredConfs *uint32, feePerKb *float64) *SweepAccountCmd {
+	return &SweepAccountCmd{
+		SourceAccount:         sourceAccount,
+		DestinationAddress:    destinationAddress,
+		RequiredConfirmations: requiredConfs,
+		FeePerKb:              feePerKb,
+	}
+}
+
 func init() {
 	// The commands in this file are only usable with a wallet
 	// server.
@@ -568,5 +586,6 @@ func init() {
 	MustRegisterCmd("setvotechoice", (*SetVoteChoiceCmd)(nil), flags)
 	MustRegisterCmd("signrawtransactions", (*SignRawTransactionsCmd)(nil), flags)
 	MustRegisterCmd("stakepooluserinfo", (*StakePoolUserInfoCmd)(nil), flags)
+	MustRegisterCmd("sweepaccount", (*SweepAccountCmd)(nil), flags)
 	MustRegisterCmd("walletinfo", (*WalletInfoCmd)(nil), flags)
 }

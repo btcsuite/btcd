@@ -141,3 +141,12 @@ type WalletInfoResult struct {
 	VoteVersion      uint32  `json:"voteversion"`
 	Voting           bool    `json:"voting"`
 }
+
+// SweepAccountResult models the data returned from the sweepaccount
+// command.
+type SweepAccountResult struct {
+	UnsignedTransaction       string  `json:"unsignedtransaction"`
+	TotalPreviousOutputAmount float64 `json:"totalpreviousoutputamount"`
+	TotalOutputAmount         float64 `json:"totaloutputamount"`
+	EstimatedSignedSize       uint32  `json:"estimatedsignedsize"`
+}

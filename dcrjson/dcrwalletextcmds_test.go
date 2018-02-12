@@ -28,7 +28,40 @@ func TestDcrWalletExtCmds(t *testing.T) {
 		staticCmd    func() interface{}
 		marshalled   string
 		unmarshalled interface{}
-	}{}
+	}{
+		{
+			name: "sweepaccount - optionals provided",
+			newCmd: func() (interface{}, error) {
+				return dcrjson.NewCmd("sweepaccount", "default", "DsUZxxoHJSty8DCfwfartwTYbuhmVct7tJu", 6, 0.05)
+			},
+			staticCmd: func() interface{} {
+				return dcrjson.NewSweepAccountCmd("default", "DsUZxxoHJSty8DCfwfartwTYbuhmVct7tJu",
+					func(i uint32) *uint32 { return &i }(6),
+					func(i float64) *float64 { return &i }(0.05))
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"sweepaccount","params":["default","DsUZxxoHJSty8DCfwfartwTYbuhmVct7tJu",6,0.05],"id":1}`,
+			unmarshalled: &dcrjson.SweepAccountCmd{
+				SourceAccount:         "default",
+				DestinationAddress:    "DsUZxxoHJSty8DCfwfartwTYbuhmVct7tJu",
+				RequiredConfirmations: func(i uint32) *uint32 { return &i }(6),
+				FeePerKb:              func(i float64) *float64 { return &i }(0.05),
+			},
+		},
+		{
+			name: "sweepaccount - optionals omitted",
+			newCmd: func() (interface{}, error) {
+				return dcrjson.NewCmd("sweepaccount", "default", "DsUZxxoHJSty8DCfwfartwTYbuhmVct7tJu")
+			},
+			staticCmd: func() interface{} {
+				return dcrjson.NewSweepAccountCmd("default", "DsUZxxoHJSty8DCfwfartwTYbuhmVct7tJu", nil, nil)
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"sweepaccount","params":["default","DsUZxxoHJSty8DCfwfartwTYbuhmVct7tJu"],"id":1}`,
+			unmarshalled: &dcrjson.SweepAccountCmd{
+				SourceAccount:      "default",
+				DestinationAddress: "DsUZxxoHJSty8DCfwfartwTYbuhmVct7tJu",
+			},
+		},
+	}
 
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
