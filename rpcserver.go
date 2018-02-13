@@ -278,6 +278,7 @@ var rpcAskWallet = map[string]struct{}{
 	"settxfee":                {},
 	"signmessage":             {},
 	"signrawtransaction":      {},
+	"sweepaccount":            {},
 	"stakepooluserinfo":       {},
 	"walletinfo":              {},
 	"walletlock":              {},
