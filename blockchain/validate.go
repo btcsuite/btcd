@@ -1006,6 +1006,38 @@ func (b *BlockChain) checkBlockHeaderContext(header *wire.BlockHeader, prevNode 
 	return nil
 }
 
+// checkAllowedVotes performs validation of all votes in the block to ensure
+// they spend tickets that are actually allowed to vote per the lottery.
+//
+// This function is safe for concurrent access.
+func (b *BlockChain) checkAllowedVotes(parentStakeNode *stake.Node, block *wire.MsgBlock) error {
+	// Determine the winning ticket hashes and create a map for faster lookup.
+	ticketsPerBlock := int(b.chainParams.TicketsPerBlock)
+	winningHashes := make(map[chainhash.Hash]struct{}, ticketsPerBlock)
+	for _, ticketHash := range parentStakeNode.Winners() {
+		winningHashes[ticketHash] = struct{}{}
+	}
+
+	for _, stx := range block.STransactions {
+		// Ignore non-vote stake transactions.
+		if !stake.IsSSGen(stx) {
+			continue
+		}
+
+		// Ensure the ticket being spent is actually eligible to vote in
+		// this block.
+		ticketHash := stx.TxIn[1].PreviousOutPoint.Hash
+		if _, ok := winningHashes[ticketHash]; !ok {
+			errStr := fmt.Sprintf("block contains vote for "+
+				"ineligible ticket %s (eligible tickets: %s)",
+				ticketHash, winningHashes)
+			return ruleError(ErrTicketUnavailable, errStr)
+		}
+	}
+
+	return nil
+}
+
 // checkBlockContext peforms several validation checks on the block which depend
 // on its position within the block chain.
 //
@@ -1090,6 +1122,19 @@ func (b *BlockChain) checkBlockContext(block *dcrutil.Block, prevNode *blockNode
 				return err
 			}
 		}
+
+		// Ensure that all votes are only for winning tickets once stake
+		// validation height has been reached.
+		if blockHeight >= b.chainParams.StakeValidationHeight {
+			parentStakeNode, err := b.fetchStakeNode(prevNode)
+			if err != nil {
+				return err
+			}
+			err = b.checkAllowedVotes(parentStakeNode, block.MsgBlock())
+			if err != nil {
+				return err
+			}
+		}
 	}
 
 	return nil
@@ -1148,7 +1193,6 @@ func (b *BlockChain) CheckBlockStakeSanity(stakeValidationHeight int64, node *bl
 	// Setup variables.
 	stakeTransactions := block.STransactions()
 	blockHash := block.Hash()
-	ticketsPerBlock := int(b.chainParams.TicketsPerBlock)
 
 	parentStakeNode, err := b.fetchStakeNode(node.parent)
 	if err != nil {
@@ -1159,75 +1203,6 @@ func (b *BlockChain) CheckBlockStakeSanity(stakeValidationHeight int64, node *bl
 	if block.Height() < stakeValidationHeight {
 		return nil
 	}
-
-	// -------------------------------------------------------------------
-	// SSGen Tx Handling
-	// -------------------------------------------------------------------
-	// PER SSGEN
-	// 1. Retrieve an emulated ticket database of SStxMemMaps from both the
-	//    ticket database and the ticket store.
-	// 2. Check to ensure that the tickets included in the block are the
-	//    ones that indeed should have been included according to the
-	//    emulated ticket database.
-	// 3. Check to make sure that the SSGen votes on the correct
-	//    block/height.
-
-	// PER BLOCK
-	// 4. Check and make sure that we have the same number of SSGen tx as
-	//    we do votes.
-	// 5. Check for voters overflows (highly unlikely, but check anyway).
-	// 6. Ensure that the block votes on tx tree regular of the previous
-	//    block in the way of the majority of the voters.
-
-	// 1. Retrieve an emulated ticket database of SStxMemMaps from both the
-	//    ticket database and the ticket store.
-	ticketsWhichCouldBeUsed := make(map[chainhash.Hash]struct{},
-		ticketsPerBlock)
-	ticketSlice := parentStakeNode.Winners()
-
-	// 2. Obtain the tickets which could have been used on the block for
-	//    votes and then check below to make sure that these were indeed
-	//    the tickets used.
-	for _, ticketHash := range ticketSlice {
-		ticketsWhichCouldBeUsed[ticketHash] = struct{}{}
-		// Fetch utxo details for all of the transactions in this
-		// block.  Typically, there will not be any utxos for any of
-		// the transactions.
-	}
-
-	for _, staketx := range stakeTransactions {
-		msgTx := staketx.MsgTx()
-		if stake.IsSSGen(msgTx) {
-			// Grab the input SStx hash from the inputs of the
-			// transaction.
-			sstxIn := msgTx.TxIn[1] // sstx input
-			sstxHash := sstxIn.PreviousOutPoint.Hash
-
-			// Check to make sure this was actually a ticket we
-			// were allowed to use.
-			_, ticketAvailable := ticketsWhichCouldBeUsed[sstxHash]
-			if !ticketAvailable {
-				errStr := fmt.Sprintf("Error in stake "+
-					"consensus: Ticket %v was not found "+
-					"to be available in the stake patch "+
-					"or database, yet block %v spends it!",
-					sstxHash, blockHash)
-				return ruleError(ErrTicketUnavailable, errStr)
-			}
-		}
-	}
-
-	// 3. Check to make sure that the SSGen votes on the correct
-	//    block/height.  Already checked in checkBlockSanity.
-
-	// 4. Check and make sure that we have the same number of SSGen tx as
-	//    we do votes.  Already checked in checkBlockSanity.
-
-	// 5. Check for too many voters.  Already checked in checkBlockSanity.
-
-	// 6. Determine if TxTreeRegular should be valid or not, and then check
-	//    it against what is provided in the block header.  Already checked
-	//    in checkBlockSanity.
 
 	// -------------------------------------------------------------------
 	// SSRtx Tx Handling
