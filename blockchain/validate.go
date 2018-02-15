@@ -655,6 +655,24 @@ func checkBlockSanity(block *dcrutil.Block, timeSource MedianTimeSource, flags B
 		return ruleError(ErrTooManyRevocations, errStr)
 	}
 
+	// A block must only contain stake transactions of the the allowed
+	// types.
+	//
+	// NOTE: This is not possible to hit at the time this comment was
+	// written because all transactions which are not specifically one of
+	// the recognized stake transaction forms are considered regular
+	// transactions and those are rejected above.  However, if a new stake
+	// transaction type is added, that implicit condition would no longer
+	// hold and therefore an explicit check is performed here.
+	numStakeTx := int64(len(msgBlock.STransactions))
+	calcStakeTx := totalTickets + totalVotes + totalRevocations
+	if numStakeTx != calcStakeTx {
+		errStr := fmt.Sprintf("block contains an unexpected number "+
+			"of stake transactions (contains %d, expected %d)",
+			numStakeTx, calcStakeTx)
+		return ruleError(ErrNonstandardStakeTx, errStr)
+	}
+
 	// A block header must commit to the actual number of tickets purchases that
 	// are in the block.
 	if int64(header.FreshStake) != totalTickets {
@@ -1137,18 +1155,6 @@ func (b *BlockChain) CheckBlockStakeSanity(stakeValidationHeight int64, node *bl
 		return err
 	}
 
-	// --------------------------------------------------------------------
-	// SStx Tx Handling
-	// --------------------------------------------------------------------
-
-	numSStxTx := 0
-	for _, staketx := range stakeTransactions {
-		msgTx := staketx.MsgTx()
-		if stake.IsSStx(msgTx) {
-			numSStxTx++
-		}
-	}
-
 	// Break if the stake system is otherwise disabled.
 	if block.Height() < stakeValidationHeight {
 		return nil
@@ -1173,9 +1179,6 @@ func (b *BlockChain) CheckBlockStakeSanity(stakeValidationHeight int64, node *bl
 	// 6. Ensure that the block votes on tx tree regular of the previous
 	//    block in the way of the majority of the voters.
 
-	// Store the number of SSGen tx to check later.
-	numSSGenTx := 0
-
 	// 1. Retrieve an emulated ticket database of SStxMemMaps from both the
 	//    ticket database and the ticket store.
 	ticketsWhichCouldBeUsed := make(map[chainhash.Hash]struct{},
@@ -1195,8 +1198,6 @@ func (b *BlockChain) CheckBlockStakeSanity(stakeValidationHeight int64, node *bl
 	for _, staketx := range stakeTransactions {
 		msgTx := staketx.MsgTx()
 		if stake.IsSSGen(msgTx) {
-			numSSGenTx++
-
 			// Grab the input SStx hash from the inputs of the
 			// transaction.
 			sstxIn := msgTx.TxIn[1] // sstx input
@@ -1238,14 +1239,9 @@ func (b *BlockChain) CheckBlockStakeSanity(stakeValidationHeight int64, node *bl
 	// 2. Ensure that at least ticketMaturity many blocks has passed since
 	//    the SStx it references was included in the blockchain.
 	// PER BLOCK
-	// 3. Check and make sure that we have the same number of SSRtx tx as
-	//    we do revocations.
-	numSSRtxTx := 0
 	for _, staketx := range stakeTransactions {
 		msgTx := staketx.MsgTx()
 		if stake.IsSSRtx(msgTx) {
-			numSSRtxTx++
-
 			// Grab the input SStx hash from the inputs of the
 			// transaction.
 			sstxIn := msgTx.TxIn[0] // sstx input
@@ -1266,28 +1262,6 @@ func (b *BlockChain) CheckBlockStakeSanity(stakeValidationHeight int64, node *bl
 				return ruleError(ErrInvalidSSRtx, errStr)
 			}
 		}
-	}
-
-	// 3. Check and make sure that we have the same number of SSRtx tx as
-	//    we do revocations.  Already checked in checkBlockSanity.
-
-	// -------------------------------------------------------------------
-	// Final Checks
-	// -------------------------------------------------------------------
-	// 1. Make sure that all the tx in the stake tx tree are either SStx,
-	//    SSGen, or SSRtx.
-
-	// 1. Ensure that all stake transactions are accounted for.  If not,
-	//    this indicates that there was some sort of non-standard stake tx
-	//    present in the block.  This is already checked before, but check
-	//    again here.
-	stakeTxSum := numSStxTx + numSSGenTx + numSSRtxTx
-
-	if stakeTxSum != len(stakeTransactions) {
-		errStr := fmt.Sprintf("Error in stake consensus: the number "+
-			"of stake tx in block %v was %v, however we expected "+
-			"%v", block.Hash(), stakeTxSum, len(stakeTransactions))
-		return ruleError(ErrNonstandardStakeTx, errStr)
 	}
 
 	return nil
