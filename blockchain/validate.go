@@ -1038,6 +1038,32 @@ func (b *BlockChain) checkAllowedVotes(parentStakeNode *stake.Node, block *wire.
 	return nil
 }
 
+// checkAllowedRevocations performs validation of all revocations in the block
+// to ensure they spend tickets that are actually allowed to be revoked per the
+// lottery.  Tickets are only eligible to be revoked if they were missed or have
+// expired.
+//
+// This function is safe for concurrent access.
+func (b *BlockChain) checkAllowedRevocations(parentStakeNode *stake.Node, block *wire.MsgBlock) error {
+	for _, stx := range block.STransactions {
+		// Ignore non-revocation stake transactions.
+		if !stake.IsSSRtx(stx) {
+			continue
+		}
+
+		// Ensure the ticket being spent is actually eligible to be
+		// revoked in this block.
+		ticketHash := stx.TxIn[0].PreviousOutPoint.Hash
+		if !parentStakeNode.ExistsMissedTicket(ticketHash) {
+			errStr := fmt.Sprintf("block contains revocation of "+
+				"ineligible ticket %s", ticketHash)
+			return ruleError(ErrInvalidSSRtx, errStr)
+		}
+	}
+
+	return nil
+}
+
 // checkBlockContext peforms several validation checks on the block which depend
 // on its position within the block chain.
 //
@@ -1123,7 +1149,8 @@ func (b *BlockChain) checkBlockContext(block *dcrutil.Block, prevNode *blockNode
 			}
 		}
 
-		// Ensure that all votes are only for winning tickets once stake
+		// Ensure that all votes are only for winning tickets and all
+		// revocations are actually eligible to be revoked once stake
 		// validation height has been reached.
 		if blockHeight >= b.chainParams.StakeValidationHeight {
 			parentStakeNode, err := b.fetchStakeNode(prevNode)
@@ -1131,6 +1158,12 @@ func (b *BlockChain) checkBlockContext(block *dcrutil.Block, prevNode *blockNode
 				return err
 			}
 			err = b.checkAllowedVotes(parentStakeNode, block.MsgBlock())
+			if err != nil {
+				return err
+			}
+
+			err = b.checkAllowedRevocations(parentStakeNode,
+				block.MsgBlock())
 			if err != nil {
 				return err
 			}
@@ -1176,66 +1209,6 @@ func (b *BlockChain) checkDupTxs(txSet []*dcrutil.Tx, view *UtxoViewpoint) error
 				"at block height %d that is not fully spent",
 				tx.Hash(), txEntry.BlockHeight())
 			return ruleError(ErrOverwriteTx, str)
-		}
-	}
-
-	return nil
-}
-
-// CheckBlockStakeSanity performs a series of checks on a block to ensure that
-// the information from the block's header about stake is sane.  For instance,
-// the number of SSGen tx must be equal to voters.
-// TODO: We can consider breaking this into two functions and making some of
-// these checks go through in processBlock, however if a block has demonstrable
-// PoW it seems unlikely that it will have stake errors (because the miner is
-// then just wasting hash power).
-func (b *BlockChain) CheckBlockStakeSanity(stakeValidationHeight int64, node *blockNode, block *dcrutil.Block, parent *dcrutil.Block, chainParams *chaincfg.Params) error {
-	// Setup variables.
-	stakeTransactions := block.STransactions()
-	blockHash := block.Hash()
-
-	parentStakeNode, err := b.fetchStakeNode(node.parent)
-	if err != nil {
-		return err
-	}
-
-	// Break if the stake system is otherwise disabled.
-	if block.Height() < stakeValidationHeight {
-		return nil
-	}
-
-	// -------------------------------------------------------------------
-	// SSRtx Tx Handling
-	// -------------------------------------------------------------------
-	// PER SSRTX
-	// 1. Ensure that the SSRtx has been marked missed in the ticket patch
-	//    data and, if not, ensure it has been marked missed in the ticket
-	//    database.
-	// 2. Ensure that at least ticketMaturity many blocks has passed since
-	//    the SStx it references was included in the blockchain.
-	// PER BLOCK
-	for _, staketx := range stakeTransactions {
-		msgTx := staketx.MsgTx()
-		if stake.IsSSRtx(msgTx) {
-			// Grab the input SStx hash from the inputs of the
-			// transaction.
-			sstxIn := msgTx.TxIn[0] // sstx input
-			sstxHash := sstxIn.PreviousOutPoint.Hash
-
-			ticketMissed := false
-
-			if parentStakeNode.ExistsMissedTicket(sstxHash) {
-				ticketMissed = true
-			}
-
-			if !ticketMissed {
-				errStr := fmt.Sprintf("Error in stake "+
-					"consensus: Ticket %v was not found "+
-					"to be missed in the stake patch or "+
-					"database, yet block %v spends it!",
-					sstxHash, blockHash)
-				return ruleError(ErrInvalidSSRtx, errStr)
-			}
 		}
 	}
 
@@ -2384,14 +2357,6 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block, parent *dcrutil.B
 	err := CoinbasePaysTax(b.subsidyCache, block.Transactions()[0], node.height,
 		node.voters, b.chainParams)
 	if err != nil {
-		return err
-	}
-
-	err = b.CheckBlockStakeSanity(b.chainParams.StakeValidationHeight, node,
-		block, parent, b.chainParams)
-	if err != nil {
-		log.Tracef("CheckBlockStakeSanity failed for incoming node "+
-			"%v; error given: %v", node.hash, err)
 		return err
 	}
 
