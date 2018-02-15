@@ -147,11 +147,11 @@ type Policy struct {
 	// transactions that do not have enough priority to be relayed.
 	DisableRelayPriority bool
 
-	// RelayNonStd defines whether to relay non-standard transactions. If
-	// true, non-standard transactions will be accepted into the mempool
-	// and relayed. Otherwise, all non-standard transactions will be
-	// rejected.
-	RelayNonStd bool
+	// AcceptNonStd defines whether to accept and relay non-standard
+	// transactions to the network. If true, non-standard transactions
+	// will be accepted into the mempool and relayed to the rest of the
+	// network. Otherwise, all non-standard transactions will be rejected.
+	AcceptNonStd bool
 
 	// FreeTxRelayLimit defines the given amount in thousands of bytes
 	// per minute that transactions with no fee are rate limited to.
@@ -830,10 +830,10 @@ func (mp *TxPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew, rateLimit, allow
 		tx.SetTree(wire.TxTreeStake)
 	}
 
-	// Don't allow non-standard transactions if the network parameters
-	// forbid their relaying.
+	// Don't allow non-standard transactions if the mempool config forbids
+	// their acceptance and relaying.
 	medianTime := mp.cfg.PastMedianTime()
-	if !mp.cfg.Policy.RelayNonStd {
+	if !mp.cfg.Policy.AcceptNonStd {
 		err := checkTransactionStandard(tx, txType, nextBlockHeight,
 			medianTime, mp.cfg.Policy.MinRelayTxFee,
 			mp.cfg.Policy.MaxTxVersion)
@@ -1017,9 +1017,9 @@ func (mp *TxPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew, rateLimit, allow
 		return nil, err
 	}
 
-	// Don't allow transactions with non-standard inputs if the network
-	// parameters forbid their relaying.
-	if !mp.cfg.Policy.RelayNonStd {
+	// Don't allow transactions with non-standard inputs if the mempool config
+	// forbids their acceptance and relaying.
+	if !mp.cfg.Policy.AcceptNonStd {
 		err := checkInputsStandard(tx, txType, utxoView)
 		if err != nil {
 			// Attempt to extract a reject code from the error so

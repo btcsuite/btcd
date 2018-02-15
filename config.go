@@ -150,7 +150,7 @@ type config struct {
 	NoMiningStateSync    bool          `long:"nominingstatesync" description:"Disable synchronizing the mining state with other nodes"`
 	AllowOldVotes        bool          `long:"allowoldvotes" description:"Enable the addition of very old votes to the mempool"`
 	BlocksOnly           bool          `long:"blocksonly" description:"Do not accept transactions from remote peers."`
-	RelayNonStd          bool          `long:"relaynonstd" description:"Relay non-standard transactions regardless of the default settings for the active network."`
+	AcceptNonStd         bool          `long:"acceptnonstd" description:"Accept and relay non-standard transactions to the network regardless of the default settings for the active network."`
 	RejectNonStd         bool          `long:"rejectnonstd" description:"Reject non-standard transactions regardless of the default settings for the active network."`
 	TxIndex              bool          `long:"txindex" description:"Maintain a full hash-based transaction index which makes all transactions available via the getrawtransaction RPC"`
 	DropTxIndex          bool          `long:"droptxindex" description:"Deletes the hash-based transaction index from the database on start up and then exits."`
@@ -574,21 +574,21 @@ func loadConfig() (*config, []string, error) {
 	// according to the default of the active network. The set
 	// configuration value takes precedence over the default value for the
 	// selected network.
-	relayNonStd := activeNetParams.RelayNonStdTxs
+	acceptNonStd := activeNetParams.AcceptNonStdTxs
 	switch {
-	case cfg.RelayNonStd && cfg.RejectNonStd:
-		str := "%s: rejectnonstd and relaynonstd cannot be used " +
+	case cfg.AcceptNonStd && cfg.RejectNonStd:
+		str := "%s: rejectnonstd and acceptnonstd cannot be used " +
 			"together -- choose only one"
 		err := fmt.Errorf(str, funcName)
 		fmt.Fprintln(os.Stderr, err)
 		fmt.Fprintln(os.Stderr, usageMessage)
 		return nil, nil, err
 	case cfg.RejectNonStd:
-		relayNonStd = false
-	case cfg.RelayNonStd:
-		relayNonStd = true
+		acceptNonStd = false
+	case cfg.AcceptNonStd:
+		acceptNonStd = true
 	}
-	cfg.RelayNonStd = relayNonStd
+	cfg.AcceptNonStd = acceptNonStd
 
 	// Append the network type to the data directory so it is "namespaced"
 	// per network.  In addition to the block database, there are other
