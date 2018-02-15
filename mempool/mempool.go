@@ -527,7 +527,7 @@ func (mp *TxPool) addTransaction(utxoView *blockchain.UtxoViewpoint, tx *btcutil
 			Added:    time.Now(),
 			Height:   height,
 			Fee:      fee,
-			FeePerKB: fee * 1000 / int64(tx.MsgTx().SerializeSize()),
+			FeePerKB: fee * 1000 / GetTxVirtualSize(tx),
 		},
 		StartingPriority: mining.CalcPriority(tx.MsgTx(), utxoView, height),
 	}
