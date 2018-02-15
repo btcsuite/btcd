@@ -959,6 +959,17 @@ func (b *BlockChain) checkBlockHeaderContext(header *wire.BlockHeader, prevNode 
 				header.PoolSize, calcPoolSize)
 			return ruleError(ErrPoolSize, errStr)
 		}
+
+		// Ensure the header commits to the correct final state of the
+		// ticket lottery.
+		calcFinalState := parentStakeNode.FinalState()
+		if header.FinalState != calcFinalState {
+			errStr := fmt.Sprintf("block header commitment to "+
+				"final state of the ticket lottery %x does not "+
+				"match expected value %x", header.FinalState,
+				calcFinalState)
+			return ruleError(ErrInvalidFinalState, errStr)
+		}
 	}
 
 	return nil
@@ -1105,10 +1116,7 @@ func (b *BlockChain) checkDupTxs(txSet []*dcrutil.Tx, view *UtxoViewpoint) error
 func (b *BlockChain) CheckBlockStakeSanity(stakeValidationHeight int64, node *blockNode, block *dcrutil.Block, parent *dcrutil.Block, chainParams *chaincfg.Params) error {
 	// Setup variables.
 	stakeTransactions := block.STransactions()
-	msgBlock := block.MsgBlock()
 	blockHash := block.Hash()
-	finalState := msgBlock.Header.FinalState
-
 	ticketsPerBlock := int(b.chainParams.TicketsPerBlock)
 
 	parentStakeNode, err := b.fetchStakeNode(node.parent)
@@ -1151,7 +1159,6 @@ func (b *BlockChain) CheckBlockStakeSanity(stakeValidationHeight int64, node *bl
 	// 5. Check for voters overflows (highly unlikely, but check anyway).
 	// 6. Ensure that the block votes on tx tree regular of the previous
 	//    block in the way of the majority of the voters.
-	// 7. Check final state and ensure that it matches.
 
 	// Store the number of SSGen tx to check later.
 	numSSGenTx := 0
@@ -1161,7 +1168,6 @@ func (b *BlockChain) CheckBlockStakeSanity(stakeValidationHeight int64, node *bl
 	ticketsWhichCouldBeUsed := make(map[chainhash.Hash]struct{},
 		ticketsPerBlock)
 	ticketSlice := parentStakeNode.Winners()
-	finalStateCalc := parentStakeNode.FinalState()
 
 	// 2. Obtain the tickets which could have been used on the block for
 	//    votes and then check below to make sure that these were indeed
@@ -1208,16 +1214,6 @@ func (b *BlockChain) CheckBlockStakeSanity(stakeValidationHeight int64, node *bl
 	// 6. Determine if TxTreeRegular should be valid or not, and then check
 	//    it against what is provided in the block header.  Already checked
 	//    in checkBlockSanity.
-
-	// 7. Check the final state of the lottery PRNG and ensure that it
-	// matches.
-	if finalStateCalc != finalState {
-		errStr := fmt.Sprintf("Error in stake consensus: the final "+
-			"state of the lottery PRNG was calculated to be %x, "+
-			"but %x was found in the block", finalStateCalc,
-			finalState)
-		return ruleError(ErrInvalidFinalState, errStr)
-	}
 
 	// -------------------------------------------------------------------
 	// SSRtx Tx Handling
