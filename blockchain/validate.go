@@ -56,6 +56,10 @@ var (
 	// package level variable to avoid the need to create a new instance
 	// every time a check is needed.
 	zeroHash = &chainhash.Hash{}
+
+	// earlyFinalState is the only value of the final state allowed in a
+	// block header before stake validation height.
+	earlyFinalState = [6]byte{0x00}
 )
 
 // voteBitsApproveParent returns whether or not the passed vote bits indicate
@@ -423,8 +427,9 @@ func checkBlockHeaderSanity(header *wire.BlockHeader, timeSource MedianTimeSourc
 		return ruleError(ErrTimeTooNew, str)
 	}
 
-	// A block must not contain any votes or revocations and its vote bits
-	// must be 0x0001 before stake validation begins.
+	// A block must not contain any votes or revocations, its vote bits
+	// must be 0x0001, and its final state must be all zeroes before
+	// stake validation begins.
 	if header.Height < stakeValidationHeight {
 		if header.Voters > 0 {
 			errStr := fmt.Sprintf("block at height %d commits to "+
@@ -449,6 +454,15 @@ func checkBlockHeaderSanity(header *wire.BlockHeader, timeSource MedianTimeSourc
 				header.Height, stakeValidationHeight,
 				earlyVoteBitsValue, header.VoteBits)
 			return ruleError(ErrInvalidEarlyVoteBits, errStr)
+		}
+
+		if header.FinalState != earlyFinalState {
+			errStr := fmt.Sprintf("block at height %d commits to "+
+				"invalid final state before stake validation "+
+				"height %d (expected %x, got %x)",
+				header.Height, stakeValidationHeight,
+				earlyFinalState, header.FinalState)
+			return ruleError(ErrInvalidEarlyFinalState, errStr)
 		}
 	}
 
