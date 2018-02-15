@@ -45,7 +45,7 @@ const (
 	// it will provide fee estimations.
 	DefaultEstimateFeeMinRegisteredBlocks = 3
 
-	bytePerKb = 1024
+	bytePerKb = 1000
 
 	btcPerSatoshi = 1E-8
 )
