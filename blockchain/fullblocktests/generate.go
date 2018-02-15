@@ -549,13 +549,16 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 	// allowing the immature tickets to mature and thus become live.
 	//
 	// While doing so, also generate blocks that have the required early
-	// vote unset to ensure they are properly rejected.
+	// vote unset and other that have a non-zero early final state to ensure
+	// they are properly rejected.
 	//
 	//   ... -> bse# -> bsv0 -> bsv1 -> ... -> bsv#
 	//             \       \       \        \-> bevbad#
 	//              |       |       \-> bevbad2
-	//              |       \-> bevbad1
-	//              \-> bevbad0
+	//              |       \-> bevbad1     \-> befsbad#
+	//              \-> bevbad0     \-> befsbad2
+	//              |       \-> befsbad1
+	//              \-> befsbad0
 	// ---------------------------------------------------------------------
 
 	testInstances = nil
@@ -572,6 +575,20 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 			testInstances = append(testInstances, rejectBlock(
 				g.TipName(), g.Tip(),
 				blockchain.ErrInvalidEarlyVoteBits))
+			g.SetTip(prevTip)
+		}
+
+		// Until stake validation height is reached, test that any
+		// blocks without a zero final state are rejected.
+		if int64(g.Tip().Header.Height) < stakeValidationHeight-1 {
+			prevTip := g.TipName()
+			blockName := fmt.Sprintf("befsbad%d", i)
+			g.NextBlock(blockName, nil, nil, func(b *wire.MsgBlock) {
+				b.Header.FinalState = [6]byte{0x01}
+			})
+			testInstances = append(testInstances, rejectBlock(
+				g.TipName(), g.Tip(),
+				blockchain.ErrInvalidEarlyFinalState))
 			g.SetTip(prevTip)
 		}
 
