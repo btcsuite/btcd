@@ -692,7 +692,7 @@ func (b *BlockChain) pruneStakeNodes() {
 			node.stakeNode = nil
 			node.stakeUndoData = nil
 			node.newTickets = nil
-			node.ticketsSpent = nil
+			node.ticketsVoted = nil
 			node.ticketsRevoked = nil
 		}
 	}
@@ -1003,7 +1003,7 @@ func (b *BlockChain) connectBlock(node *blockNode, block, parent *dcrutil.Block,
 		b.bestNode.parent.stakeNode = nil
 		b.bestNode.parent.stakeUndoData = nil
 		b.bestNode.parent.newTickets = nil
-		b.bestNode.parent.ticketsSpent = nil
+		b.bestNode.parent.ticketsVoted = nil
 		b.bestNode.parent.ticketsRevoked = nil
 	}
 

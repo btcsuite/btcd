@@ -417,7 +417,7 @@ func safeDelete(t *tickettreap.Immutable, k tickettreap.Key) (*tickettreap.Immut
 // the argument node is the parent node, and that the child stake node is
 // returned after subsequent modification of the parent node's immutable
 // data.
-func connectNode(node *Node, lotteryIV chainhash.Hash, ticketsSpentInBlock, revokedTickets, newTickets []chainhash.Hash) (*Node, error) {
+func connectNode(node *Node, lotteryIV chainhash.Hash, ticketsVoted, revokedTickets, newTickets []chainhash.Hash) (*Node, error) {
 	if node == nil {
 		return nil, fmt.Errorf("missing stake node pointer input when connecting")
 	}
@@ -438,11 +438,11 @@ func connectNode(node *Node, lotteryIV chainhash.Hash, ticketsSpentInBlock, revo
 	var err error
 	if connectedNode.height >= uint32(connectedNode.params.StakeEnabledHeight) {
 		// Basic sanity check.
-		for i := range ticketsSpentInBlock {
-			if !hashInSlice(ticketsSpentInBlock[i], node.nextWinners) {
+		for i := range ticketsVoted {
+			if !hashInSlice(ticketsVoted[i], node.nextWinners) {
 				return nil, stakeRuleError(ErrUnknownTicketSpent,
 					fmt.Sprintf("unknown ticket %v spent in block",
-						ticketsSpentInBlock[i]))
+						ticketsVoted[i]))
 			}
 		}
 
@@ -463,7 +463,7 @@ func connectNode(node *Node, lotteryIV chainhash.Hash, ticketsSpentInBlock, revo
 			// ticket should still be in the live tickets treap, we probably
 			// do not have to use the safe delete functions, but do so anyway
 			// just to be safe.
-			if hashInSlice(ticket, ticketsSpentInBlock) {
+			if hashInSlice(ticket, ticketsVoted) {
 				v.Spent = true
 				v.Missed = false
 				connectedNode.liveTickets, err =
@@ -636,8 +636,8 @@ func connectNode(node *Node, lotteryIV chainhash.Hash, ticketsSpentInBlock, revo
 
 // ConnectNode connects a stake node to the node and returns a pointer
 // to the stake node of the child.
-func (sn *Node) ConnectNode(lotteryIV chainhash.Hash, ticketsSpentInBlock, revokedTickets, newTickets []chainhash.Hash) (*Node, error) {
-	return connectNode(sn, lotteryIV, ticketsSpentInBlock, revokedTickets,
+func (sn *Node) ConnectNode(lotteryIV chainhash.Hash, ticketsVoted, revokedTickets, newTickets []chainhash.Hash) (*Node, error) {
+	return connectNode(sn, lotteryIV, ticketsVoted, revokedTickets,
 		newTickets)
 }
 

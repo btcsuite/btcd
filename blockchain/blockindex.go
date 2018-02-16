@@ -91,7 +91,7 @@ type blockNode struct {
 	stakeNode      *stake.Node
 	newTickets     []chainhash.Hash
 	stakeUndoData  stake.UndoTicketDataSlice
-	ticketsSpent   []chainhash.Hash
+	ticketsVoted   []chainhash.Hash
 	ticketsRevoked []chainhash.Hash
 
 	// Keep track of all vote version and bits in this block.
@@ -113,10 +113,10 @@ func newBlockNode(blockHeader *wire.BlockHeader, spentTickets *stake.SpentTicket
 		panic(err)
 	}
 
-	var ticketsSpent, ticketsRevoked []chainhash.Hash
+	var ticketsVoted, ticketsRevoked []chainhash.Hash
 	var votes []stake.VoteVersionTuple
 	if spentTickets != nil {
-		ticketsSpent = spentTickets.VotedTickets
+		ticketsVoted = spentTickets.VotedTickets
 		ticketsRevoked = spentTickets.RevokedTickets
 		votes = spentTickets.Votes
 	}
@@ -146,7 +146,7 @@ func newBlockNode(blockHeader *wire.BlockHeader, spentTickets *stake.SpentTicket
 		extraData:      blockHeader.ExtraData,
 		stakeVersion:   blockHeader.StakeVersion,
 		lotteryIV:      stake.CalcHash256PRNGIV(hB),
-		ticketsSpent:   ticketsSpent,
+		ticketsVoted:   ticketsVoted,
 		ticketsRevoked: ticketsRevoked,
 		votes:          votes,
 	}

@@ -13,12 +13,12 @@ import (
 	"github.com/decred/dcrd/dcrutil"
 )
 
-// ticketsSpentInBlock fetches a list of tickets that were spent in the
+// ticketsVotedInBlock fetches a list of tickets that were voted in the
 // block.
-func ticketsSpentInBlock(bl *dcrutil.Block) []chainhash.Hash {
+func ticketsVotedInBlock(bl *dcrutil.Block) []chainhash.Hash {
 	var tickets []chainhash.Hash
 	for _, stx := range bl.MsgBlock().STransactions {
-		if stake.DetermineTxType(stx) == stake.TxTypeSSGen {
+		if stake.IsSSGen(stx) {
 			tickets = append(tickets, stx.TxIn[1].PreviousOutPoint.Hash)
 		}
 	}
@@ -90,7 +90,7 @@ func (b *BlockChain) upgradeToVersion2() error {
 				return errLocal
 			}
 			bestStakeNode, errLocal = bestStakeNode.ConnectNode(
-				stake.CalcHash256PRNGIV(hB), ticketsSpentInBlock(block),
+				stake.CalcHash256PRNGIV(hB), ticketsVotedInBlock(block),
 				ticketsRevokedInBlock(block), newTickets)
 			if errLocal != nil {
 				return errLocal
@@ -108,7 +108,7 @@ func (b *BlockChain) upgradeToVersion2() error {
 				b.bestNode.stakeNode = bestStakeNode
 				b.bestNode.stakeUndoData = bestStakeNode.UndoData()
 				b.bestNode.newTickets = newTickets
-				b.bestNode.ticketsSpent = ticketsSpentInBlock(block)
+				b.bestNode.ticketsVoted = ticketsVotedInBlock(block)
 				b.bestNode.ticketsRevoked = ticketsRevokedInBlock(block)
 			}
 
