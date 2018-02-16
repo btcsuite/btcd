@@ -20,13 +20,6 @@ import (
 	"github.com/decred/dcrd/wire"
 )
 
-// VoteVersionTuple contains the extracted vote bits and version from votes
-// (SSGen).
-type VoteVersionTuple struct {
-	Version uint32
-	Bits    uint16
-}
-
 // blockNode represents a block within the block chain and is primarily used to
 // aid in selecting the best chain to be the main chain.  The main chain is
 // stored into the block database.
