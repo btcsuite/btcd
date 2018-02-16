@@ -90,14 +90,15 @@ type blockNode struct {
 	votes []stake.VoteVersionTuple
 }
 
-// newBlockNode returns a new block node for the given block header and parent
-// node.  The workSum is calculated based on the parent, or, in the case no
-// parent is provided, it will just be the work for the passed block.
-func newBlockNode(blockHeader *wire.BlockHeader, parent *blockNode) *blockNode {
-	// Make a copy of the hash so the node doesn't keep a reference to part
-	// of the full block/block header preventing it from being garbage
-	// collected.
-	node := blockNode{
+// initBlockNode initializes a block node from the given header, initialization
+// vector for the ticket lottery, and parent node.  The workSum is calculated
+// based on the parent, or, in the case no parent is provided, it will just be
+// the work for the passed block.
+//
+// This function is NOT safe for concurrent access.  It must only be called when
+// initially creating a node.
+func initBlockNode(node *blockNode, blockHeader *wire.BlockHeader, parent *blockNode) {
+	*node = blockNode{
 		hash:         blockHeader.BlockHash(),
 		parentHash:   blockHeader.PrevBlock,
 		workSum:      CalcWork(blockHeader.Bits),
@@ -123,7 +124,14 @@ func newBlockNode(blockHeader *wire.BlockHeader, parent *blockNode) *blockNode {
 		node.parent = parent
 		node.workSum = node.workSum.Add(parent.workSum, node.workSum)
 	}
+}
 
+// newBlockNode returns a new block node for the given block header and parent
+// node.  The workSum is calculated based on the parent, or, in the case no
+// parent is provided, it will just be the work for the passed block.
+func newBlockNode(blockHeader *wire.BlockHeader, parent *blockNode) *blockNode {
+	var node blockNode
+	initBlockNode(&node, blockHeader, parent)
 	return &node
 }
 

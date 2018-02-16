@@ -50,4 +50,9 @@ var (
 	// UtxoSetBucketName is the name of the db bucket used to house the
 	// unspent transaction output set.
 	UtxoSetBucketName = []byte("utxoset")
+
+	// BlockIndexBucketName is the name of the db bucket used to house the
+	// block index which consists of metadata for all known blocks both in
+	// the main chain and on side chains.
+	BlockIndexBucketName = []byte("blockidx")
 )

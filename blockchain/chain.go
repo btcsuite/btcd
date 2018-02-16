@@ -799,20 +799,6 @@ func (b *BlockChain) pushMainChainBlockCache(block *dcrutil.Block) {
 	b.mainchainBlockCacheLock.Unlock()
 }
 
-// dbMaybeStoreBlock stores the provided block in the database if it's not
-// already there.
-func dbMaybeStoreBlock(dbTx database.Tx, block *dcrutil.Block) error {
-	hasBlock, err := dbTx.HasBlock(block.Hash())
-	if err != nil {
-		return err
-	}
-	if hasBlock {
-		return nil
-	}
-
-	return dbTx.StoreBlock(block)
-}
-
 // connectBlock handles connecting the passed node/block to the end of the main
 // (best) chain.
 //

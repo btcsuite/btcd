@@ -32,6 +32,11 @@ const (
 	// currentDatabaseVersion indicates what the current database
 	// version is.
 	currentDatabaseVersion = 2
+
+	// blockHdrSize is the size of a block header.  This is simply the
+	// constant from wire and is only provided here for convenience since
+	// wire.MaxBlockHeaderPayload is quite long.
+	blockHdrSize = wire.MaxBlockHeaderPayload
 )
 
 // errNotInMainChain signifies that a block hash or height that is not in the
@@ -165,6 +170,253 @@ func ConvertUtxosToMinimalOutputs(entry *UtxoEntry) []*stake.MinimalOutput {
 	minOuts, _ := deserializeToMinimalOutputs(entry.stakeExtra)
 
 	return minOuts
+}
+
+// -----------------------------------------------------------------------------
+// The block index consists of an entry for every known block.  It consists of
+// information such as the block header and hashes of tickets voted and revoked.
+//
+// The serialized key format is:
+//
+//   <block height><block hash>
+//
+//   Field           Type              Size
+//   block height    uint32            4 bytes
+//   block hash      chainhash.Hash    chainhash.HashSize
+//
+// The serialized value format is:
+//
+//   <block header><num votes><votes info><num revoked><revoked tickets>
+//
+//   Field              Type                Size
+//   block header       wire.BlockHeader    180 bytes
+//   num votes          VLQ                 variable
+//   vote info
+//     ticket hash      chainhash.Hash      chainhash.HashSize
+//     vote version     VLQ                 variable
+//     vote bits        VLQ                 variable
+//   num revoked        VLQ                 variable
+//   revoked tickets
+//     ticket hash      chainhash.Hash      chainhash.HashSize
+// -----------------------------------------------------------------------------
+
+// blockIndexKey generates the binary key for an entry in the block index
+// bucket.  The key is composed of the block height encoded as a big-endian
+// 32-bit unsigned int followed by the 32 byte block hash.  Big endian is used
+// here so the entries can easily be iterated by height.
+func blockIndexKey(blockHash *chainhash.Hash, blockHeight uint32) []byte {
+	indexKey := make([]byte, chainhash.HashSize+4)
+	binary.BigEndian.PutUint32(indexKey[0:4], blockHeight)
+	copy(indexKey[4:chainhash.HashSize+4], blockHash[:])
+	return indexKey
+}
+
+// blockNodeSerializeSize returns the number of bytes it would take to serialize
+// the passed block node according to the format described above.
+func blockNodeSerializeSize(node *blockNode) int {
+	voteInfoSize := 0
+	for i := range node.votes {
+		voteInfoSize += chainhash.HashSize +
+			serializeSizeVLQ(uint64(node.votes[i].Version)) +
+			serializeSizeVLQ(uint64(node.votes[i].Bits))
+	}
+
+	return blockHdrSize + serializeSizeVLQ(uint64(len(node.votes))) +
+		voteInfoSize + serializeSizeVLQ(uint64(len(node.ticketsRevoked))) +
+		chainhash.HashSize*len(node.ticketsRevoked)
+}
+
+// putBlockNode serializes the passed block node according to the format
+// described above directly into the passed target byte slice.  The target byte
+// slice must be at least large enough to handle the number of bytes returned by
+// the blockNodeSerializeSize function or it will panic.
+func putBlockNode(target []byte, node *blockNode) (int, error) {
+	if len(node.ticketsVoted) != len(node.votes) {
+		return 0, AssertError("putBlockNode called with a block node " +
+			"that has a mismatched number of tickets voted and " +
+			"votes")
+	}
+
+	// Serialize the entire block header.
+	w := bytes.NewBuffer(target[0:0])
+	header := node.Header()
+	if err := header.Serialize(w); err != nil {
+		return 0, err
+	}
+
+	// Serialize the number of votes and associated vote information.
+	offset := blockHdrSize
+	offset += putVLQ(target[offset:], uint64(len(node.votes)))
+	for i := range node.votes {
+		offset += copy(target[offset:], node.ticketsVoted[i][:])
+		offset += putVLQ(target[offset:], uint64(node.votes[i].Version))
+		offset += putVLQ(target[offset:], uint64(node.votes[i].Bits))
+	}
+
+	// Serialize the number of revocations and associated revocation
+	// information.
+	offset += putVLQ(target[offset:], uint64(len(node.ticketsRevoked)))
+	for i := range node.ticketsRevoked {
+		offset += copy(target[offset:], node.ticketsRevoked[i][:])
+	}
+
+	return offset, nil
+}
+
+// serializeBlockNode serializes the passed block node into a single byte slice
+// according to the format described in detail above.
+func serializeBlockNode(node *blockNode) ([]byte, error) {
+	serialized := make([]byte, blockNodeSerializeSize(node))
+	_, err := putBlockNode(serialized, node)
+	return serialized, err
+}
+
+// decodeBlockNode decodes the passed serialized block node into the passed
+// struct according to the format described above.  It returns the number of
+// bytes read.
+func decodeBlockNode(serialized []byte, node *blockNode) (int, error) {
+	// Ensure there are enough bytes to decode header.
+	if len(serialized) < blockHdrSize {
+		return 0, errDeserialize("unexpected end of data while " +
+			"reading block header")
+	}
+	hB := serialized[0:blockHdrSize]
+
+	// Deserialize the header.
+	var header wire.BlockHeader
+	if err := header.Deserialize(bytes.NewReader(hB)); err != nil {
+		return 0, err
+	}
+	offset := blockHdrSize
+
+	// Deserialize the number of tickets spent.
+	var ticketsVoted []chainhash.Hash
+	var votes []stake.VoteVersionTuple
+	numVotes, bytesRead := deserializeVLQ(serialized[offset:])
+	if bytesRead == 0 {
+		return offset, errDeserialize("unexpected end of data while " +
+			"reading num votes")
+	}
+	offset += bytesRead
+	if numVotes > 0 {
+		ticketsVoted = make([]chainhash.Hash, numVotes)
+		votes = make([]stake.VoteVersionTuple, numVotes)
+		for i := uint64(0); i < numVotes; i++ {
+			// Deserialize the ticket hash associated with the vote.
+			if offset+chainhash.HashSize > len(serialized) {
+				return offset, errDeserialize(fmt.Sprintf("unexpected "+
+					"end of data while reading vote #%d hash",
+					i))
+			}
+			copy(ticketsVoted[i][:], serialized[offset:])
+			offset += chainhash.HashSize
+
+			// Deserialize the vote version.
+			version, bytesRead := deserializeVLQ(serialized[offset:])
+			if bytesRead == 0 {
+				return offset, errDeserialize(fmt.Sprintf("unexpected "+
+					"end of data while reading vote #%d version",
+					i))
+			}
+			offset += bytesRead
+
+			// Deserialize the vote bits.
+			voteBits, bytesRead := deserializeVLQ(serialized[offset:])
+			if bytesRead == 0 {
+				return offset, errDeserialize(fmt.Sprintf("unexpected "+
+					"end of data while reading vote #%d bits",
+					i))
+			}
+			offset += bytesRead
+
+			votes[i].Version = uint32(version)
+			votes[i].Bits = uint16(voteBits)
+		}
+	}
+
+	// Deserialize the number of tickets revoked.
+	var ticketsRevoked []chainhash.Hash
+	numTicketsRevoked, bytesRead := deserializeVLQ(serialized[offset:])
+	if bytesRead == 0 {
+		return offset, errDeserialize("unexpected end of data while " +
+			"reading num tickets revoked")
+	}
+	offset += bytesRead
+	if numTicketsRevoked > 0 {
+		ticketsRevoked = make([]chainhash.Hash, numTicketsRevoked)
+		for i := uint64(0); i < numTicketsRevoked; i++ {
+			// Deserialize the ticket hash associated with the
+			// revocation.
+			if offset+chainhash.HashSize > len(serialized) {
+				return offset, errDeserialize(fmt.Sprintf("unexpected "+
+					"end of data while reading revocation "+
+					"#%d", i))
+			}
+			copy(ticketsRevoked[i][:], serialized[offset:])
+			offset += chainhash.HashSize
+		}
+	}
+
+	initBlockNode(node, &header, nil)
+	node.populateTicketInfo(&stake.SpentTicketsInBlock{
+		VotedTickets:   ticketsVoted,
+		RevokedTickets: ticketsRevoked,
+		Votes:          votes,
+	})
+
+	return offset, nil
+}
+
+// deserializeBlockNode decodes the passed serialized byte slice into a block
+// node according to the format described above.
+func deserializeBlockNode(serialized []byte) (*blockNode, error) {
+	var node blockNode
+	if _, err := decodeBlockNode(serialized, &node); err != nil {
+		return nil, err
+	}
+	return &node, nil
+}
+
+// dbPutBlockNode stores the information needed to reconstruct the provided
+// block node in the block index according to the format described above.
+func dbPutBlockNode(dbTx database.Tx, node *blockNode) error {
+	serialized, err := serializeBlockNode(node)
+	if err != nil {
+		return err
+	}
+
+	bucket := dbTx.Metadata().Bucket(dbnamespace.BlockIndexBucketName)
+	key := blockIndexKey(&node.hash, uint32(node.height))
+	return bucket.Put(key, serialized)
+}
+
+// dbFetchBlockNode fetches the block node for the passed hash and height from
+// the block index.
+func dbFetchBlockNode(dbTx database.Tx, hash *chainhash.Hash, height uint32) (*blockNode, error) {
+	bucket := dbTx.Metadata().Bucket(dbnamespace.BlockIndexBucketName)
+	key := blockIndexKey(hash, height)
+	serialized := bucket.Get(key)
+	if serialized == nil {
+		return nil, AssertError(fmt.Sprintf("missing block node %s "+
+			"(height %d)", hash, height))
+	}
+
+	return deserializeBlockNode(serialized)
+}
+
+// dbMaybeStoreBlock stores the provided block in the database if it's not
+// already there.
+func dbMaybeStoreBlock(dbTx database.Tx, block *dcrutil.Block) error {
+	// Store the block in ffldb if not already done.
+	hasBlock, err := dbTx.HasBlock(block.Hash())
+	if err != nil {
+		return err
+	}
+	if hasBlock {
+		return nil
+	}
+
+	return dbTx.StoreBlock(block)
 }
 
 // -----------------------------------------------------------------------------
