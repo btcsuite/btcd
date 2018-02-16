@@ -411,7 +411,7 @@ func (bi *blockIndex) AncestorNode(node *blockNode, height int64) (*blockNode, e
 		var err error
 		iterNode, err = bi.prevNodeFromNode(iterNode)
 		if err != nil {
-			log.Errorf("getPrevNodeFromNode: %v", err)
+			log.Errorf("prevNodeFromNode: %v", err)
 			return nil, err
 		}
 	}
@@ -473,7 +473,7 @@ func (bi *blockIndex) CalcPastMedianTime(startNode *blockNode) (time.Time, error
 		iterNode, err = bi.prevNodeFromNode(iterNode)
 		if err != nil {
 			bi.Unlock()
-			log.Errorf("getPrevNodeFromNode failed to find node: %v", err)
+			log.Errorf("prevNodeFromNode failed to find node: %v", err)
 			return time.Time{}, err
 		}
 	}

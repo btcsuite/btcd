@@ -113,7 +113,7 @@ func (b *BlockChain) maybeAcceptBlock(block *dcrutil.Block, flags BehaviorFlags)
 	// if this is the genesis block.
 	prevNode, err := b.index.PrevNodeFromBlock(block)
 	if err != nil {
-		log.Debugf("getPrevNodeFromBlock: %v", err)
+		log.Debugf("PrevNodeFromBlock: %v", err)
 		return false, err
 	}
 

@@ -433,7 +433,6 @@ func TestYesQuorum(t *testing.T) {
 	// get to exact quorum with exactly 75% of votes
 	voteCount = uint32(0)
 	for i := uint32(0); i < uint32(params.RuleChangeActivationInterval); i++ {
-		// TODO(davec): Comment
 		// Set stake versions and vote bits.
 		node = newFakeNode(node, powVersion, posVersion, 0, curTimestamp)
 		for x := 0; x < int(params.TicketsPerBlock); x++ {
