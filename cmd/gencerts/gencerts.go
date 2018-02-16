@@ -10,12 +10,13 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"os/user"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
 	"github.com/decred/dcrd/certgen"
-	"github.com/decred/dcrd/dcrutil"
 	flags "github.com/jessevdk/go-flags"
 )
 
@@ -79,19 +80,53 @@ func main() {
 	}
 }
 
-// cleanAndExpandPath expands environement variables and leading ~ in the
+// cleanAndExpandPath expands environment variables and leading ~ in the
 // passed path, cleans the result, and returns it.
 func cleanAndExpandPath(path string) string {
-	// Expand initial ~ to OS specific home directory.
-	if strings.HasPrefix(path, "~") {
-		appHomeDir := dcrutil.AppDataDir("gencerts", false)
-		homeDir := filepath.Dir(appHomeDir)
-		path = strings.Replace(path, "~", homeDir, 1)
+	// NOTE: The os.ExpandEnv doesn't work with Windows cmd.exe-style
+	// %VARIABLE%, but the variables can still be expanded via POSIX-style
+	// $VARIABLE.
+	path = os.ExpandEnv(path)
+
+	if !strings.HasPrefix(path, "~") {
+		return filepath.Clean(path)
 	}
 
-	// NOTE: The os.ExpandEnv doesn't work with Windows-style %VARIABLE%,
-	// but they variables can still be expanded via POSIX-style $VARIABLE.
-	return filepath.Clean(os.ExpandEnv(path))
+	// Expand initial ~ to the current user's home directory, or ~otheruser
+	// to otheruser's home directory.  On Windows, both forward and backward
+	// slashes can be used.
+	path = path[1:]
+
+	var pathSeparators string
+	if runtime.GOOS == "windows" {
+		pathSeparators = string(os.PathSeparator) + "/"
+	} else {
+		pathSeparators = string(os.PathSeparator)
+	}
+
+	userName := ""
+	if i := strings.IndexAny(path, pathSeparators); i != -1 {
+		userName = path[:i]
+		path = path[i:]
+	}
+
+	homeDir := ""
+	var u *user.User
+	var err error
+	if userName == "" {
+		u, err = user.Current()
+	} else {
+		u, err = user.Lookup(userName)
+	}
+	if err == nil {
+		homeDir = u.HomeDir
+	}
+	// Fallback to CWD if user lookup fails or user has no home directory.
+	if homeDir == "" {
+		homeDir = "."
+	}
+
+	return filepath.Join(homeDir, path)
 }
 
 // filesExists reports whether the named file or directory exists.
