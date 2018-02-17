@@ -169,7 +169,7 @@ func TestSchnorrSigning(t *testing.T) {
 		}
 
 		// Make sure it breaks pubkey recovery too.
-		valid := false
+		var valid bool
 		pkRecover, valid, err = schnorrRecover(sigBad, tv.msg,
 			testSchnorrHash)
 		if valid {
@@ -332,7 +332,7 @@ func TestSignaturesAndRecovery(t *testing.T) {
 		}
 
 		// Make sure it breaks pubkey recovery too.
-		valid := false
+		var valid bool
 		pkRecover, valid, err = schnorrRecover(sigBad, tv.msg,
 			testSchnorrHash)
 		if valid {

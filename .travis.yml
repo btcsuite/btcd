@@ -1,15 +1,18 @@
+language: go
+go:
+  - 1.8.x
+  - 1.9.x
 sudo: required
 
-language: go
+before_install:
+  - sudo apt-get -qq update
+  - sudo apt-get install -y rng-tools
+  - sudo rngd -r /dev/urandom
 
-services:
-  - docker
-
-env:
-  - GOVERSION=1.8
-  - GOVERSION=1.9
-
-install: true
+install:
+  - go get -v github.com/golang/dep/cmd/dep
+  - go get -v github.com/alecthomas/gometalinter
+  - gometalinter --install
 
 script:
-  - ./run_tests.sh $GOVERSION
+  - ./run_tests.sh
