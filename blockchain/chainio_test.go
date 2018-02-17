@@ -1,4 +1,5 @@
 // Copyright (c) 2015-2016 The btcsuite developers
+// Copyright (c) 2015-2018 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -11,7 +12,6 @@ import (
 	"math/big"
 	"reflect"
 	"testing"
-	"time"
 
 	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/database"
@@ -1061,65 +1061,6 @@ func TestUtxoEntryDeserializeErrors(t *testing.T) {
 		if entry != nil {
 			t.Errorf("deserializeUtxoEntry (%s): returned entry "+
 				"is not nil", test.name)
-			continue
-		}
-	}
-}
-
-// TestDatabaseInfoSerialization ensures serializing and deserializing the
-// database version information works as expected.
-func TestDatabaseInfoSerialization(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name       string
-		info       databaseInfo
-		serialized []byte
-	}{
-		{
-			name: "not upgrade",
-			info: databaseInfo{
-				version:        2,
-				compVer:        1,
-				date:           time.Unix(int64(0x57acca95), 0),
-				upgradeStarted: false,
-			},
-			serialized: hexToBytes("020000000100000095caac57"),
-		},
-		{
-			name: "upgrade",
-			info: databaseInfo{
-				version:        2,
-				compVer:        1,
-				date:           time.Unix(int64(0x57acca95), 0),
-				upgradeStarted: true,
-			},
-			serialized: hexToBytes("020000800100000095caac57"),
-		},
-	}
-
-	for i, test := range tests {
-		// Ensure the state serializes to the expected value.
-		gotBytes := serializeDatabaseInfo(&test.info)
-		if !bytes.Equal(gotBytes, test.serialized) {
-			t.Errorf("serializeDatabaseInfo #%d (%s): mismatched "+
-				"bytes - got %x, want %x", i, test.name,
-				gotBytes, test.serialized)
-			continue
-		}
-
-		// Ensure the serialized bytes are decoded back to the expected
-		// state.
-		info, err := deserializeDatabaseInfo(test.serialized)
-		if err != nil {
-			t.Errorf("deserializeDatabaseInfo #%d (%s) "+
-				"unexpected error: %v", i, test.name, err)
-			continue
-		}
-		if !reflect.DeepEqual(info, &test.info) {
-			t.Errorf("deserializeDatabaseInfo #%d (%s) "+
-				"mismatched state - got %v, want %v", i,
-				test.name, info, test.info)
 			continue
 		}
 	}

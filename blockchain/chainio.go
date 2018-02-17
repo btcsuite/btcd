@@ -29,11 +29,6 @@ var (
 )
 
 const (
-	// upgradeStartedBit if the bit flag for whether or not a database
-	// upgrade is in progress. It is used to determine if the database
-	// is in an inconsistent state from the update.
-	upgradeStartedBit = 0x80000000
-
 	// currentDatabaseVersion indicates what the current database
 	// version is.
 	currentDatabaseVersion = 2
@@ -1053,96 +1048,99 @@ func dbFetchHashByHeight(dbTx database.Tx, height int64) (*chainhash.Hash, error
 // The database information contains information about the version and date
 // of the blockchain database.
 //
-//   Field      Type     Size      Description
-//   version    uint32   4 bytes   The version of the database
-//   compVer    uint32   4 bytes   The script compression version of the database
-//   date       uint32   4 bytes   The date of the creation of the database
+// It consists of a separate key for each individual piece of information:
 //
-// The high bit (0x80000000) is used on version to indicate that an upgrade
-// is in progress and used to confirm the database fidelity on start up.
+//   Key        Value    Size      Description
+//   version    uint32   4 bytes   The version of the database
+//   compver    uint32   4 bytes   The script compression version of the database
+//   created    uint64   8 bytes   The date of the creation of the database
 // -----------------------------------------------------------------------------
 
 // databaseInfo is the structure for a database.
 type databaseInfo struct {
-	version        uint32
-	compVer        uint32
-	date           time.Time
-	upgradeStarted bool
-}
-
-// serializeDatabaseInfo serializes a database information struct.
-func serializeDatabaseInfo(dbi *databaseInfo) []byte {
-	version := dbi.version
-	if dbi.upgradeStarted {
-		version |= upgradeStartedBit
-	}
-
-	val := make([]byte, 4+4+4)
-	versionBytes := make([]byte, 4)
-	dbnamespace.ByteOrder.PutUint32(versionBytes, version)
-	copy(val[0:4], versionBytes)
-	compVerBytes := make([]byte, 4)
-	dbnamespace.ByteOrder.PutUint32(compVerBytes, dbi.compVer)
-	copy(val[4:8], compVerBytes)
-	timestampBytes := make([]byte, 4)
-	dbnamespace.ByteOrder.PutUint32(timestampBytes, uint32(dbi.date.Unix()))
-	copy(val[8:12], timestampBytes)
-
-	return val
+	version uint32
+	compVer uint32
+	created time.Time
 }
 
 // dbPutDatabaseInfo uses an existing database transaction to store the database
 // information.
 func dbPutDatabaseInfo(dbTx database.Tx, dbi *databaseInfo) error {
+	// uint32Bytes is a helper function to convert a uint32 to a byte slice
+	// using the byte order specified by the database namespace.
+	uint32Bytes := func(ui32 uint32) []byte {
+		var b [4]byte
+		dbnamespace.ByteOrder.PutUint32(b[:], ui32)
+		return b[:]
+	}
+
+	// uint64Bytes is a helper function to convert a uint64 to a byte slice
+	// using the byte order specified by the database namespace.
+	uint64Bytes := func(ui64 uint64) []byte {
+		var b [8]byte
+		dbnamespace.ByteOrder.PutUint64(b[:], ui64)
+		return b[:]
+	}
+
+	// Store the database version.
 	meta := dbTx.Metadata()
-	bucket := meta.Bucket(dbnamespace.BlockChainDbInfoBucketName)
-	val := serializeDatabaseInfo(dbi)
+	bucket := meta.Bucket(dbnamespace.BCDBInfoBucketName)
+	err := bucket.Put(dbnamespace.BCDBInfoVersionKeyName,
+		uint32Bytes(dbi.version))
+	if err != nil {
+		return err
+	}
 
-	// Store the current best chain state into the database.
-	return bucket.Put(dbnamespace.BlockChainDbInfoBucketName, val)
+	// Store the compression version.
+	err = bucket.Put(dbnamespace.BCDBInfoCompressionVersionKeyName,
+		uint32Bytes(dbi.compVer))
+	if err != nil {
+		return err
+	}
+
+	// Store the database creation date.
+	return bucket.Put(dbnamespace.BCDBInfoCreatedKeyName,
+		uint64Bytes(uint64(dbi.created.Unix())))
 }
 
-// deserializeDatabaseInfo deserializes a database information struct.
-func deserializeDatabaseInfo(dbInfoBytes []byte) (*databaseInfo, error) {
-	rawVersion := dbnamespace.ByteOrder.Uint32(dbInfoBytes[0:4])
-	upgradeStarted := (upgradeStartedBit & rawVersion) > 0
-	version := rawVersion &^ upgradeStartedBit
-	compVer := dbnamespace.ByteOrder.Uint32(dbInfoBytes[4:8])
-	ts := dbnamespace.ByteOrder.Uint32(dbInfoBytes[8:12])
-
-	return &databaseInfo{
-		version:        version,
-		compVer:        compVer,
-		date:           time.Unix(int64(ts), 0),
-		upgradeStarted: upgradeStarted,
-	}, nil
-}
-
-// dbFetchSubsidyForHeightInterval uses an existing database transaction to
-// fetch the database versioning and creation information.
+// dbFetchDatabaseInfo uses an existing database transaction to fetch the
+// database versioning and creation information.
 func dbFetchDatabaseInfo(dbTx database.Tx) (*databaseInfo, error) {
 	meta := dbTx.Metadata()
-	bucket := meta.Bucket(dbnamespace.BlockChainDbInfoBucketName)
+	bucket := meta.Bucket(dbnamespace.BCDBInfoBucketName)
 
 	// Uninitialized state.
 	if bucket == nil {
 		return nil, nil
 	}
 
-	dbInfoBytes := bucket.Get(dbnamespace.BlockChainDbInfoBucketName)
-	if dbInfoBytes == nil {
-		return nil, errDeserialize("missing value for database info")
+	// Load the database version.
+	var version uint32
+	versionBytes := bucket.Get(dbnamespace.BCDBInfoVersionKeyName)
+	if versionBytes != nil {
+		version = dbnamespace.ByteOrder.Uint32(versionBytes)
 	}
 
-	if len(dbInfoBytes) < 4+4+4 {
-		return nil, database.Error{
-			ErrorCode: database.ErrCorruption,
-			Description: fmt.Sprintf("corrupt best database info: min %v "+
-				"got %v", 12, len(dbInfoBytes)),
-		}
+	// Load the database compression version.
+	var compVer uint32
+	compVerBytes := bucket.Get(dbnamespace.BCDBInfoCompressionVersionKeyName)
+	if compVerBytes != nil {
+		compVer = dbnamespace.ByteOrder.Uint32(compVerBytes)
 	}
 
-	return deserializeDatabaseInfo(dbInfoBytes)
+	// Load the database creation date.
+	var created time.Time
+	createdBytes := bucket.Get(dbnamespace.BCDBInfoCreatedKeyName)
+	if createdBytes != nil {
+		ts := dbnamespace.ByteOrder.Uint64(createdBytes)
+		created = time.Unix(int64(ts), 0)
+	}
+
+	return &databaseInfo{
+		version: version,
+		compVer: compVer,
+		created: created,
+	}, nil
 }
 
 // -----------------------------------------------------------------------------
@@ -1287,16 +1285,15 @@ func (b *BlockChain) createChainState() error {
 
 		// Create the bucket that houses information about the database's
 		// creation and version.
-		_, err := meta.CreateBucket(dbnamespace.BlockChainDbInfoBucketName)
+		_, err := meta.CreateBucket(dbnamespace.BCDBInfoBucketName)
 		if err != nil {
 			return err
 		}
 
 		b.dbInfo = &databaseInfo{
-			version:        currentDatabaseVersion,
-			compVer:        currentCompressionVersion,
-			date:           time.Now(),
-			upgradeStarted: false,
+			version: currentDatabaseVersion,
+			compVer: currentCompressionVersion,
+			created: time.Now(),
 		}
 		err = dbPutDatabaseInfo(dbTx, b.dbInfo)
 		if err != nil {
@@ -1361,9 +1358,41 @@ func (b *BlockChain) createChainState() error {
 // database.  When the db does not yet contain any chain state, both it and the
 // chain state are initialized to the genesis block.
 func (b *BlockChain) initChainState() error {
+	// Update database versioning scheme if needed.
+	err := b.db.Update(func(dbTx database.Tx) error {
+		// No versioning upgrade is needed if the dbinfo bucket does not
+		// exist or the legacy key does not exist.
+		bucket := dbTx.Metadata().Bucket(dbnamespace.BCDBInfoBucketName)
+		if bucket == nil {
+			return nil
+		}
+		legacyBytes := bucket.Get(dbnamespace.BCDBInfoBucketName)
+		if legacyBytes == nil {
+			return nil
+		}
+
+		// No versioning upgrade is needed if the new version key exists.
+		if bucket.Get(dbnamespace.BCDBInfoVersionKeyName) != nil {
+			return nil
+		}
+
+		// Load and deserialize the legacy version information.
+		log.Infof("Migrating versioning scheme...")
+		dbi, err := deserializeDatabaseInfoV2(legacyBytes)
+		if err != nil {
+			return err
+		}
+
+		// Store the database version info using the new format.
+		return dbPutDatabaseInfo(dbTx, dbi)
+	})
+	if err != nil {
+		return err
+	}
+
 	// Determine the state of the database.
 	var isStateInitialized bool
-	err := b.db.View(func(dbTx database.Tx) error {
+	err = b.db.View(func(dbTx database.Tx) error {
 		// Fetch the database versioning information.
 		dbInfo, err := dbFetchDatabaseInfo(dbTx)
 		if err != nil {
@@ -1375,28 +1404,20 @@ func (b *BlockChain) initChainState() error {
 			return nil
 		}
 
-		// Die here if we started an upgrade and failed to finish it.
-		if dbInfo.upgradeStarted {
-			return fmt.Errorf("the blockchain database began an upgrade " +
-				"but failed to complete it; delete the database and resync " +
-				"the blockchain")
-		}
-
-		// Die here if the version of the software is not the current version
-		// of the database. In the future we can add upgrade path before this
-		// to ensure that the database is upgraded to the current version
-		// before hitting this.
+		// Don't allow downgrades of the blockchain database.
 		if dbInfo.version > currentDatabaseVersion {
-			return fmt.Errorf("the blockchain database's version is %v "+
-				"but the current version of the software is %v",
-				dbInfo.version, currentDatabaseVersion)
+			return fmt.Errorf("the current blockchain database is "+
+				"no longer compatible with this version of "+
+				"the software (%d > %d)", dbInfo.version,
+				currentDatabaseVersion)
 		}
 
-		// Die here if we're not on the current compression version, too.
+		// Don't allow downgrades of the database compression version.
 		if dbInfo.compVer > currentCompressionVersion {
-			return fmt.Errorf("the blockchain database's compression "+
-				"version is %v but the current version of the software is %v",
-				dbInfo.version, currentDatabaseVersion)
+			return fmt.Errorf("the current database compression "+
+				"version is no longer compatible with this "+
+				"version of the software (%d > %d)",
+				dbInfo.compVer, currentCompressionVersion)
 		}
 		b.dbInfo = dbInfo
 

@@ -12,10 +12,24 @@ var (
 	// fields for storage in the database.
 	ByteOrder = binary.LittleEndian
 
-	// BlockChainDbInfoBucketName is the name of the database bucket used to
-	// house a single k->v that stores global versioning and date information for
-	// the database.
-	BlockChainDbInfoBucketName = []byte("dbinfo")
+	// BCDBInfoBucketName is the name of the database bucket used to house
+	// global versioning and date information for the blockchain database.
+	BCDBInfoBucketName = []byte("dbinfo")
+
+	// BCDBInfoVersionKeyName is the name of the database key used to house
+	// the database version.  It is itself under the BCDBInfoBucketName
+	// bucket.
+	BCDBInfoVersionKeyName = []byte("version")
+
+	// BCDBInfoCompressionVersionKeyName is the name of the database key
+	// used to house the database compression version.  It is itself under
+	// the BCDBInfoBucketName bucket.
+	BCDBInfoCompressionVersionKeyName = []byte("compver")
+
+	// BCDBInfoCreatedKeyName is the name of the database key used to house
+	// date the database was created.  It is itself under the
+	// BCDBInfoBucketName bucket.
+	BCDBInfoCreatedKeyName = []byte("created")
 
 	// HashIndexBucketName is the name of the db bucket used to house to the
 	// block hash -> block height index.

@@ -1,17 +1,59 @@
 // Copyright (c) 2013-2016 The btcsuite developers
-// Copyright (c) 2015-2016 The Decred developers
+// Copyright (c) 2015-2018 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
 package blockchain
 
 import (
+	"encoding/binary"
+	"time"
+
 	"github.com/decred/dcrd/blockchain/internal/progresslog"
 	"github.com/decred/dcrd/blockchain/stake"
 	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/database"
 	"github.com/decred/dcrd/dcrutil"
 )
+
+// deserializeDatabaseInfoV2 deserializes a database information struct from the
+// passed serialized byte slice according to the legacy version 2 format.
+//
+// The legacy format is as follows:
+//
+//   Field      Type     Size      Description
+//   version    uint32   4 bytes   The version of the database
+//   compVer    uint32   4 bytes   The script compression version of the database
+//   created    uint32   4 bytes   The date of the creation of the database
+//
+// The high bit (0x80000000) is used on version to indicate that an upgrade
+// is in progress and used to confirm the database fidelity on start up.
+func deserializeDatabaseInfoV2(dbInfoBytes []byte) (*databaseInfo, error) {
+	// upgradeStartedBit if the bit flag for whether or not a database
+	// upgrade is in progress. It is used to determine if the database
+	// is in an inconsistent state from the update.
+	const upgradeStartedBit = 0x80000000
+
+	byteOrder := binary.LittleEndian
+
+	rawVersion := byteOrder.Uint32(dbInfoBytes[0:4])
+	upgradeStarted := (upgradeStartedBit & rawVersion) > 0
+	version := rawVersion &^ upgradeStartedBit
+	compVer := byteOrder.Uint32(dbInfoBytes[4:8])
+	ts := byteOrder.Uint32(dbInfoBytes[8:12])
+
+	if upgradeStarted {
+		return nil, AssertError("database is in the upgrade started " +
+			"state before resumable upgrades were supported - " +
+			"delete the database and resync the blockchain")
+	}
+
+	return &databaseInfo{
+		version: version,
+		compVer: compVer,
+		created: time.Unix(int64(ts), 0),
+	}, nil
+}
 
 // ticketsVotedInBlock fetches a list of tickets that were voted in the
 // block.
