@@ -11,6 +11,7 @@ import (
 
 	"github.com/decred/dcrd/blockchain/internal/progresslog"
 	"github.com/decred/dcrd/blockchain/stake"
+	"github.com/decred/dcrd/chaincfg"
 	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/database"
 	"github.com/decred/dcrd/dcrutil"
@@ -83,17 +84,26 @@ func ticketsRevokedInBlock(bl *dcrutil.Block) []chainhash.Hash {
 
 // upgradeToVersion2 upgrades a version 1 blockchain to version 2, allowing
 // use of the new on-disk ticket database.
-func (b *BlockChain) upgradeToVersion2() error {
+func upgradeToVersion2(db database.DB, chainParams *chaincfg.Params, dbInfo *databaseInfo) error {
+	// Hardcoded so updates to the global values do not affect old upgrades.
+	chainStateKeyName := []byte("chainstate")
+
 	log.Infof("Initializing upgrade to database version 2")
-	best := b.BestSnapshot()
 	progressLogger := progresslog.NewBlockProgressLogger("Upgraded", log)
 
 	// The upgrade is atomic, so there is no need to set the flag that
 	// the database is undergoing an upgrade here.  Get the stake node
 	// for the genesis block, and then begin connecting stake nodes
 	// incrementally.
-	err := b.db.Update(func(dbTx database.Tx) error {
-		bestStakeNode, errLocal := stake.InitDatabaseState(dbTx, b.chainParams)
+	err := db.Update(func(dbTx database.Tx) error {
+		// Fetch the stored best chain state from the database metadata.
+		serializedData := dbTx.Metadata().Get(chainStateKeyName)
+		best, err := deserializeBestChainState(serializedData)
+		if err != nil {
+			return err
+		}
+
+		bestStakeNode, errLocal := stake.InitDatabaseState(dbTx, chainParams)
 		if errLocal != nil {
 			return errLocal
 		}
@@ -103,7 +113,7 @@ func (b *BlockChain) upgradeToVersion2() error {
 			return errLocal
 		}
 
-		for i := int64(1); i <= best.Height; i++ {
+		for i := int64(1); i <= int64(best.height); i++ {
 			block, errLocal := dbFetchBlockByHeight(dbTx, i)
 			if errLocal != nil {
 				return errLocal
@@ -111,8 +121,8 @@ func (b *BlockChain) upgradeToVersion2() error {
 
 			// If we need the tickets, fetch them too.
 			var newTickets []chainhash.Hash
-			if i >= b.chainParams.StakeEnabledHeight {
-				matureHeight := i - int64(b.chainParams.TicketMaturity)
+			if i >= chainParams.StakeEnabledHeight {
+				matureHeight := i - int64(chainParams.TicketMaturity)
 				matureBlock, errLocal := dbFetchBlockByHeight(dbTx, matureHeight)
 				if errLocal != nil {
 					return errLocal
@@ -140,18 +150,9 @@ func (b *BlockChain) upgradeToVersion2() error {
 
 			// Write the top block stake node to the database.
 			errLocal = stake.WriteConnectedBestNode(dbTx, bestStakeNode,
-				best.Hash)
+				best.hash)
 			if errLocal != nil {
 				return errLocal
-			}
-
-			// Write the best block node when we reach it.
-			if i == best.Height {
-				b.bestNode.stakeNode = bestStakeNode
-				b.bestNode.stakeUndoData = bestStakeNode.UndoData()
-				b.bestNode.newTickets = newTickets
-				b.bestNode.ticketsVoted = ticketsVotedInBlock(block)
-				b.bestNode.ticketsRevoked = ticketsRevokedInBlock(block)
 			}
 
 			progressLogger.LogBlockHeight(block.MsgBlock(), parent.MsgBlock())
@@ -159,8 +160,8 @@ func (b *BlockChain) upgradeToVersion2() error {
 		}
 
 		// Write the new database version.
-		b.dbInfo.version = 2
-		return dbPutDatabaseInfo(dbTx, b.dbInfo)
+		dbInfo.version = 2
+		return dbPutDatabaseInfo(dbTx, dbInfo)
 	})
 	if err != nil {
 		return err
@@ -171,15 +172,15 @@ func (b *BlockChain) upgradeToVersion2() error {
 	return nil
 }
 
-// upgrade applies all possible upgrades to the blockchain database iteratively,
-// updating old clients to the newest version.
-func (b *BlockChain) upgrade() error {
-	if b.dbInfo.version == 1 {
-		err := b.upgradeToVersion2()
-		if err != nil {
+// upgradeDB upgrades old database versions to the newest version by applying
+// all possible upgrades iteratively.
+//
+// NOTE: The passed database info will be updated with the latest versions.
+func upgradeDB(db database.DB, chainParams *chaincfg.Params, dbInfo *databaseInfo) error {
+	if dbInfo.version == 1 {
+		if err := upgradeToVersion2(db, chainParams, dbInfo); err != nil {
 			return err
 		}
 	}
-
 	return nil
 }

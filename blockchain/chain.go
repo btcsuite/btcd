@@ -2008,11 +2008,6 @@ func New(config *Config) (*BlockChain, error) {
 		}
 	}
 
-	// Apply any upgrades as needed.
-	if err := b.upgrade(); err != nil {
-		return nil, err
-	}
-
 	b.subsidyCache = NewSubsidyCache(b.bestNode.height, b.chainParams)
 	b.pruner = newChainPruner(&b)
 

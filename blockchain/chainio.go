@@ -1435,6 +1435,11 @@ func (b *BlockChain) initChainState() error {
 		}
 	}
 
+	// Upgrade the database as needed.
+	if err := upgradeDB(b.db, b.chainParams, b.dbInfo); err != nil {
+		return err
+	}
+
 	// Attempt to load the chain state from the database.
 	err = b.db.View(func(dbTx database.Tx) error {
 		// Fetch the stored chain state from the database metadata.
