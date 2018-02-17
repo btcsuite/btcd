@@ -26,6 +26,11 @@ var (
 	// the BCDBInfoBucketName bucket.
 	BCDBInfoCompressionVersionKeyName = []byte("compver")
 
+	// BCDBInfoBlockIndexVersionKeyName is the name of the database key
+	// used to house the database block index version.  It is itself under
+	// the BCDBInfoBucketName bucket.
+	BCDBInfoBlockIndexVersionKeyName = []byte("bidxver")
+
 	// BCDBInfoCreatedKeyName is the name of the database key used to house
 	// date the database was created.  It is itself under the
 	// BCDBInfoBucketName bucket.

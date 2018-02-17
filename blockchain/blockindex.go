@@ -314,17 +314,18 @@ func (bi *blockIndex) HaveBlock(hash *chainhash.Hash) bool {
 // This function MUST be called with the block index lock held (for writes).
 // The database transaction may be read-only.
 func (bi *blockIndex) loadBlockNode(dbTx database.Tx, hash *chainhash.Hash) (*blockNode, error) {
-	// Load the block from the db.
-	block, err := dbFetchBlockByHash(dbTx, hash)
+	// Try to look up the height for passed block hash in the main chain.
+	height, err := dbFetchHeightByHash(dbTx, hash)
 	if err != nil {
 		return nil, err
 	}
 
-	// Create the new block node for the block.
-	blockHeader := block.MsgBlock().Header
-	node := newBlockNode(&blockHeader, nil)
-	node.populateTicketInfo(stake.FindSpentTicketsInBlock(block.MsgBlock()))
-	node.status = statusDataStored | statusValid
+	// Load the block node for the provided hash and height from the
+	// database.
+	node, err := dbFetchBlockNode(dbTx, hash, uint32(height))
+	if err != nil {
+		return nil, err
+	}
 	node.inMainChain = true
 
 	// Add the node to the chain.
@@ -333,7 +334,7 @@ func (bi *blockIndex) loadBlockNode(dbTx database.Tx, hash *chainhash.Hash) (*bl
 	//  2) This node is the parent of one or more nodes
 	//  3) Neither 1 or 2 is true which implies it's an orphan block and
 	//     therefore is an error to insert into the chain
-	prevHash := &blockHeader.PrevBlock
+	prevHash := &node.parentHash
 	if parentNode, ok := bi.index[*prevHash]; ok {
 		// Case 1 -- This node is a child of an existing block node.
 		// Update the node's work sum with the sum of the parent node's

@@ -745,7 +745,7 @@ func (b *BlockChain) getReorganizeNodes(node *blockNode) (*list.List, *list.List
 		return detachNodes, attachNodes, nil
 	}
 
-	// Don't allow a reorganize to a descendant of an known invalid block.
+	// Don't allow a reorganize to a descendant of a known invalid block.
 	if b.index.NodeStatus(node.parent).KnownInvalid() {
 		b.index.SetStatusFlags(node, statusInvalidAncestor)
 		return detachNodes, attachNodes, nil
@@ -867,6 +867,16 @@ func (b *BlockChain) connectBlock(node *blockNode, block, parent *dcrutil.Block,
 	err = b.db.Update(func(dbTx database.Tx) error {
 		// Update best block state.
 		err := dbPutBestState(dbTx, state, node.workSum)
+		if err != nil {
+			return err
+		}
+
+		// Add the block to the block index.  Ultimately the block index
+		// should track modified nodes and persist all of them prior
+		// this point as opposed to unconditionally peristing the node
+		// again.  However, this is needed for now in lieu of that to
+		// ensure the updated status is written to the database.
+		err = dbPutBlockNode(dbTx, node)
 		if err != nil {
 			return err
 		}
@@ -1994,8 +2004,9 @@ func New(config *Config) (*BlockChain, error) {
 	b.subsidyCache = NewSubsidyCache(b.bestNode.height, b.chainParams)
 	b.pruner = newChainPruner(&b)
 
-	log.Infof("Blockchain database version %v loaded",
-		b.dbInfo.version)
+	log.Infof("Blockchain database version info: chain: %d, compression: "+
+		"%d, block index: %d", b.dbInfo.version, b.dbInfo.compVer,
+		b.dbInfo.bidxVer)
 
 	log.Infof("Chain state: height %d, hash %v, total transactions %d, "+
 		"work %v, stake version %v", b.bestNode.height, b.bestNode.hash,

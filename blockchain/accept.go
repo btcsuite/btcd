@@ -142,6 +142,21 @@ func (b *BlockChain) maybeAcceptBlock(block *dcrutil.Block, flags BehaviorFlags)
 		return false, err
 	}
 
+	// Prune stake nodes which are no longer needed before creating a new
+	// node.
+	if !dryRun {
+		b.pruner.pruneChainIfNeeded()
+	}
+
+	// Create a new block node for the block and add it to the block index.
+	// The block could either be on a side chain or the main chain, but it
+	// starts off as a side chain regardless.
+	blockHeader := &block.MsgBlock().Header
+	newNode := newBlockNode(blockHeader, prevNode)
+	newNode.populateTicketInfo(stake.FindSpentTicketsInBlock(block.MsgBlock()))
+	newNode.status = statusDataStored
+	b.index.AddNode(newNode)
+
 	// Insert the block into the database if it's not already there.  Even
 	// though it is possible the block will ultimately fail to connect, it
 	// has already passed all proof-of-work and validity tests which means
@@ -151,26 +166,25 @@ func (b *BlockChain) maybeAcceptBlock(block *dcrutil.Block, flags BehaviorFlags)
 	// expensive connection logic.  It also has some other nice properties
 	// such as making blocks that never become part of the main chain or
 	// blocks that fail to connect available for further analysis.
+	//
+	// Also, store the associated block index entry when not running in dry
+	// run mode.
 	err = b.db.Update(func(dbTx database.Tx) error {
-		return dbMaybeStoreBlock(dbTx, block)
+		if err := dbMaybeStoreBlock(dbTx, block); err != nil {
+			return err
+		}
+
+		if !dryRun {
+			if err := dbPutBlockNode(dbTx, newNode); err != nil {
+				return err
+			}
+		}
+
+		return nil
 	})
 	if err != nil {
 		return false, err
 	}
-
-	// Prune stake nodes which are no longer needed before creating a new
-	// node.
-	if !dryRun {
-		b.pruner.pruneChainIfNeeded()
-	}
-
-	// Create a new block node for the block and add it to the in-memory
-	// block chain (could be either a side chain or the main chain).
-	blockHeader := &block.MsgBlock().Header
-	newNode := newBlockNode(blockHeader, prevNode)
-	newNode.populateTicketInfo(stake.FindSpentTicketsInBlock(block.MsgBlock()))
-	newNode.status = statusDataStored
-	b.index.AddNode(newNode)
 
 	// Remove the node from the block index and disconnect it from the
 	// parent node when running in dry run mode.

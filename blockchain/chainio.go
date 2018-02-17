@@ -31,7 +31,11 @@ var (
 const (
 	// currentDatabaseVersion indicates what the current database
 	// version is.
-	currentDatabaseVersion = 2
+	currentDatabaseVersion = 3
+
+	// currentBlockIndexVersion indicates what the current block index
+	// database version.
+	currentBlockIndexVersion = 2
 
 	// blockHdrSize is the size of a block header.  This is simply the
 	// constant from wire and is only provided here for convenience since
@@ -1319,6 +1323,7 @@ func dbFetchHashByHeight(dbTx database.Tx, height int64) (*chainhash.Hash, error
 //   Key        Value    Size      Description
 //   version    uint32   4 bytes   The version of the database
 //   compver    uint32   4 bytes   The script compression version of the database
+//   bidxver    uint32   4 bytes   The block index version of the database
 //   created    uint64   8 bytes   The date of the creation of the database
 // -----------------------------------------------------------------------------
 
@@ -1326,6 +1331,7 @@ func dbFetchHashByHeight(dbTx database.Tx, height int64) (*chainhash.Hash, error
 type databaseInfo struct {
 	version uint32
 	compVer uint32
+	bidxVer uint32
 	created time.Time
 }
 
@@ -1364,6 +1370,13 @@ func dbPutDatabaseInfo(dbTx database.Tx, dbi *databaseInfo) error {
 		return err
 	}
 
+	// Store the block index version.
+	err = bucket.Put(dbnamespace.BCDBInfoBlockIndexVersionKeyName,
+		uint32Bytes(dbi.bidxVer))
+	if err != nil {
+		return err
+	}
+
 	// Store the database creation date.
 	return bucket.Put(dbnamespace.BCDBInfoCreatedKeyName,
 		uint64Bytes(uint64(dbi.created.Unix())))
@@ -1394,6 +1407,13 @@ func dbFetchDatabaseInfo(dbTx database.Tx) (*databaseInfo, error) {
 		compVer = dbnamespace.ByteOrder.Uint32(compVerBytes)
 	}
 
+	// Load the database block index version.
+	var bidxVer uint32
+	bidxVerBytes := bucket.Get(dbnamespace.BCDBInfoBlockIndexVersionKeyName)
+	if bidxVerBytes != nil {
+		bidxVer = dbnamespace.ByteOrder.Uint32(bidxVerBytes)
+	}
+
 	// Load the database creation date.
 	var created time.Time
 	createdBytes := bucket.Get(dbnamespace.BCDBInfoCreatedKeyName)
@@ -1405,6 +1425,7 @@ func dbFetchDatabaseInfo(dbTx database.Tx) (*databaseInfo, error) {
 	return &databaseInfo{
 		version: version,
 		compVer: compVer,
+		bidxVer: bidxVer,
 		created: created,
 	}, nil
 }
@@ -1560,9 +1581,16 @@ func (b *BlockChain) createChainState() error {
 		b.dbInfo = &databaseInfo{
 			version: currentDatabaseVersion,
 			compVer: currentCompressionVersion,
+			bidxVer: currentBlockIndexVersion,
 			created: time.Now(),
 		}
 		err = dbPutDatabaseInfo(dbTx, b.dbInfo)
+		if err != nil {
+			return err
+		}
+
+		// Create the bucket that houses the block index data.
+		_, err = meta.CreateBucket(dbnamespace.BlockIndexBucketName)
 		if err != nil {
 			return err
 		}
@@ -1591,6 +1619,12 @@ func (b *BlockChain) createChainState() error {
 		// genesis block coinbase transaction is intentionally not
 		// inserted here since it is not spendable by consensus rules.
 		_, err = meta.CreateBucket(dbnamespace.UtxoSetBucketName)
+		if err != nil {
+			return err
+		}
+
+		// Add the genesis block to the block index.
+		err = dbPutBlockNode(dbTx, node)
 		if err != nil {
 			return err
 		}
@@ -1691,8 +1725,16 @@ func (b *BlockChain) initChainState(interrupt <-chan struct{}) error {
 				"version of the software (%d > %d)",
 				dbInfo.compVer, currentCompressionVersion)
 		}
-		b.dbInfo = dbInfo
 
+		// Don't allow downgrades of the block index.
+		if dbInfo.bidxVer > currentBlockIndexVersion {
+			return fmt.Errorf("the current database block index "+
+				"version is no longer compatible with this "+
+				"version of the software (%d > %d)",
+				dbInfo.bidxVer, currentBlockIndexVersion)
+		}
+
+		b.dbInfo = dbInfo
 		isStateInitialized = true
 		return nil
 	})
