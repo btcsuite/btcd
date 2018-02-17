@@ -225,7 +225,7 @@ func TestInvalidDecodeConcatenatedHashes(t *testing.T) {
 		_, err := dcrjson.DecodeConcatenatedHashes(str.str)
 		if err == nil {
 			t.Fatalf("DecodeConcatenatedHashes passed on '%s' "+
-				"when it should have failed", str)
+				"when it should have failed", str.str)
 		}
 		rpcError, ok := err.(*dcrjson.RPCError)
 		if !ok {
