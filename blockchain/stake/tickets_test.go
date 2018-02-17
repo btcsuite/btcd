@@ -96,7 +96,7 @@ func ticketsInBlock(bl *dcrutil.Block) []chainhash.Hash {
 
 // ticketsSpentInBlock finds all the tickets spent in the block.
 func ticketsSpentInBlock(bl *dcrutil.Block) []chainhash.Hash {
-	tickets := make([]chainhash.Hash, 0)
+	tickets := make([]chainhash.Hash, 0, bl.MsgBlock().Header.Voters)
 	for _, stx := range bl.STransactions() {
 		if DetermineTxType(stx.MsgTx()) == TxTypeSSGen {
 			tickets = append(tickets, stx.MsgTx().TxIn[1].PreviousOutPoint.Hash)
@@ -108,7 +108,7 @@ func ticketsSpentInBlock(bl *dcrutil.Block) []chainhash.Hash {
 
 // revokedTicketsInBlock finds all the revoked tickets in the block.
 func revokedTicketsInBlock(bl *dcrutil.Block) []chainhash.Hash {
-	tickets := make([]chainhash.Hash, 0)
+	tickets := make([]chainhash.Hash, 0, bl.MsgBlock().Header.Revocations)
 	for _, stx := range bl.STransactions() {
 		if DetermineTxType(stx.MsgTx()) == TxTypeSSRtx {
 			tickets = append(tickets, stx.MsgTx().TxIn[0].PreviousOutPoint.Hash)

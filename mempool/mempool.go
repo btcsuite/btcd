@@ -213,8 +213,8 @@ type TxPool struct {
 	outpoints     map[wire.OutPoint]*dcrutil.Tx
 
 	// Votes on blocks.
-	votesMtx sync.Mutex
-	votes    map[chainhash.Hash][]*VoteTx
+	votesMtx sync.RWMutex
+	votes    map[chainhash.Hash][]VoteTx
 
 	pennyTotal    float64 // exponentially decaying total for penny spends.
 	lastPennyUnix int64   // unix time of last ``penny spend''
@@ -224,7 +224,6 @@ type TxPool struct {
 //
 // This function MUST be called with the vote mutex locked (for writes).
 func (mp *TxPool) insertVote(ssgen *dcrutil.Tx) error {
-	voteHash := ssgen.Hash()
 	msgTx := ssgen.MsgTx()
 	ticketHash := &msgTx.TxIn[1].PreviousOutPoint.Hash
 
@@ -235,8 +234,7 @@ func (mp *TxPool) insertVote(ssgen *dcrutil.Tx) error {
 	// start a new buffered slice and store it.
 	vts, exists := mp.votes[blockHash]
 	if !exists {
-		vts = make([]*VoteTx, 0, mp.cfg.ChainParams.TicketsPerBlock)
-		mp.votes[blockHash] = vts
+		vts = make([]VoteTx, 0, mp.cfg.ChainParams.TicketsPerBlock)
 	}
 
 	// Nothing to do if a vote for the ticket is already known.
@@ -246,10 +244,17 @@ func (mp *TxPool) insertVote(ssgen *dcrutil.Tx) error {
 		}
 	}
 
-	// Append the new vote.
+	voteHash := ssgen.Hash()
 	voteBits := stake.SSGenVoteBits(msgTx)
 	vote := dcrutil.IsFlagSet16(voteBits, dcrutil.BlockValid)
-	mp.votes[blockHash] = append(vts, &VoteTx{*voteHash, *ticketHash, vote})
+	voteTx := VoteTx{
+		SsgenHash: *voteHash,
+		SstxHash:  *ticketHash,
+		Vote:      vote,
+	}
+
+	// Append the new vote.
+	mp.votes[blockHash] = append(vts, voteTx)
 
 	log.Debugf("Accepted vote %v for block hash %v (height %v), voting "+
 		"%v on the transaction tree", voteHash, blockHash, blockHeight,
@@ -263,11 +268,11 @@ func (mp *TxPool) insertVote(ssgen *dcrutil.Tx) error {
 //
 // This function is safe for concurrent access.
 func (mp *TxPool) VoteHashesForBlock(blockHash chainhash.Hash) []chainhash.Hash {
-	mp.votesMtx.Lock()
-	defer mp.votesMtx.Unlock()
+	mp.votesMtx.RLock()
+	vts, exists := mp.votes[blockHash]
+	mp.votesMtx.RUnlock()
 
 	// Lookup the vote metadata for the block.
-	vts, exists := mp.votes[blockHash]
 	if !exists || len(vts) == 0 {
 		return nil
 	}
@@ -285,16 +290,15 @@ func (mp *TxPool) VoteHashesForBlock(blockHash chainhash.Hash) []chainhash.Hash 
 // block hashes that are currently available in the mempool.
 //
 // This function is safe for concurrent access.
-func (mp *TxPool) VotesForBlocks(hashes []chainhash.Hash) [][]*VoteTx {
-	result := make([][]*VoteTx, 0, len(hashes))
-	mp.votesMtx.Lock()
+func (mp *TxPool) VotesForBlocks(hashes []chainhash.Hash) [][]VoteTx {
+	result := make([][]VoteTx, 0, len(hashes))
+
+	mp.votesMtx.RLock()
 	for _, hash := range hashes {
 		votes := mp.votes[hash]
-		votesCopy := make([]*VoteTx, len(votes))
-		copy(votesCopy, votes)
-		result = append(result, votesCopy)
+		result = append(result, votes)
 	}
-	mp.votesMtx.Unlock()
+	mp.votesMtx.RUnlock()
 
 	return result
 }
@@ -665,11 +669,15 @@ func (mp *TxPool) checkPoolDoubleSpend(tx *dcrutil.Tx, txType stake.TxType) erro
 	return nil
 }
 
-// isTxTreeValid checks the map of votes for a block to see if the tx
+// IsTxTreeValid checks the map of votes for a block to see if the tx
 // tree regular for the block at HEAD is valid.
-func (mp *TxPool) isTxTreeValid(newestHash *chainhash.Hash) bool {
-	// There are no votes on the block currently; assume it's valid.
-	vts := mp.votes[*newestHash]
+//
+// The function is safe for concurrent access.
+func (mp *TxPool) IsTxTreeValid(best *chainhash.Hash) bool {
+	mp.votesMtx.RLock()
+	vts := mp.votes[*best]
+	mp.votesMtx.RUnlock()
+
 	if len(vts) == 0 {
 		return true
 	}
@@ -692,15 +700,6 @@ func (mp *TxPool) isTxTreeValid(newestHash *chainhash.Hash) bool {
 	}
 
 	return yea > nay
-}
-
-// IsTxTreeValid calls isTxTreeValid, but makes it safe for concurrent access.
-func (mp *TxPool) IsTxTreeValid(best *chainhash.Hash) bool {
-	mp.votesMtx.Lock()
-	isValid := mp.isTxTreeValid(best)
-	mp.votesMtx.Unlock()
-
-	return isValid
 }
 
 // fetchInputUtxos loads utxo details about the input transactions referenced by
@@ -1589,6 +1588,6 @@ func New(cfg *Config) *TxPool {
 		orphans:       make(map[chainhash.Hash]*dcrutil.Tx),
 		orphansByPrev: make(map[chainhash.Hash]map[chainhash.Hash]*dcrutil.Tx),
 		outpoints:     make(map[wire.OutPoint]*dcrutil.Tx),
-		votes:         make(map[chainhash.Hash][]*VoteTx),
+		votes:         make(map[chainhash.Hash][]VoteTx),
 	}
 }
