@@ -1272,17 +1272,13 @@ func (b *BlockChain) createChainState() error {
 	header := &genesisBlock.MsgBlock().Header
 	node := newBlockNode(header, nil)
 	node.inMainChain = true
-	b.bestNode = node
-
-	// Add the new node to the index which is used for faster lookups.
-	b.index.AddNode(node)
 
 	// Initialize the state related to the best block.  Since it is the
 	// genesis block, use its timestamp for the median time.
 	numTxns := uint64(len(genesisBlock.MsgBlock().Transactions))
 	blockSize := uint64(genesisBlock.MsgBlock().SerializeSize())
-	b.stateSnapshot = newBestState(b.bestNode, blockSize, numTxns, numTxns,
-		time.Unix(b.bestNode.timestamp, 0), 0)
+	stateSnapshot := newBestState(node, blockSize, numTxns, numTxns,
+		time.Unix(node.timestamp, 0), 0)
 
 	// Create the initial the database chain state including creating the
 	// necessary index buckets and inserting the genesis block.
@@ -1337,20 +1333,20 @@ func (b *BlockChain) createChainState() error {
 
 		// Add the genesis block hash to height and height to hash
 		// mappings to the index.
-		err = dbPutMainChainIndex(dbTx, &b.bestNode.hash, b.bestNode.height)
+		err = dbPutMainChainIndex(dbTx, &node.hash, node.height)
 		if err != nil {
 			return err
 		}
 
 		// Store the current best chain state into the database.
-		err = dbPutBestState(dbTx, b.stateSnapshot, b.bestNode.workSum)
+		err = dbPutBestState(dbTx, stateSnapshot, node.workSum)
 		if err != nil {
 			return err
 		}
 
 		// Initialize the stake buckets in the database, along with
 		// the best state for the stake database.
-		b.bestNode.stakeNode, err = stake.InitDatabaseState(dbTx, b.chainParams)
+		_, err = stake.InitDatabaseState(dbTx, b.chainParams)
 		if err != nil {
 			return err
 		}
@@ -1365,7 +1361,7 @@ func (b *BlockChain) createChainState() error {
 // database.  When the db does not yet contain any chain state, both it and the
 // chain state are initialized to the genesis block.
 func (b *BlockChain) initChainState() error {
-	// Attempt to load the chain state from the database.
+	// Determine the state of the database.
 	var isStateInitialized bool
 	err := b.db.View(func(dbTx database.Tx) error {
 		// Fetch the database versioning information.
@@ -1402,9 +1398,24 @@ func (b *BlockChain) initChainState() error {
 				"version is %v but the current version of the software is %v",
 				dbInfo.version, currentDatabaseVersion)
 		}
-
 		b.dbInfo = dbInfo
 
+		isStateInitialized = true
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	// Initialize the database if it has not already been done.
+	if !isStateInitialized {
+		if err := b.createChainState(); err != nil {
+			return err
+		}
+	}
+
+	// Attempt to load the chain state from the database.
+	err = b.db.View(func(dbTx database.Tx) error {
 		// Fetch the stored chain state from the database metadata.
 		// When it doesn't exist, it means the database hasn't been
 		// initialized for use with chain yet, so break out now to allow
@@ -1440,7 +1451,7 @@ func (b *BlockChain) initChainState() error {
 		// Exception for version 1 blockchains: skip loading the stake
 		// node, as the upgrade path handles ensuring this is correctly
 		// set.
-		if dbInfo.version >= 2 {
+		if b.dbInfo.version >= 2 {
 			node.stakeNode, err = stake.LoadBestNode(dbTx, uint32(node.height),
 				node.hash, *header, b.chainParams)
 			if err != nil {
@@ -1467,21 +1478,9 @@ func (b *BlockChain) initChainState() error {
 		b.stateSnapshot = newBestState(b.bestNode, blockSize, numTxns,
 			state.totalTxns, medianTime, state.totalSubsidy)
 
-		isStateInitialized = true
 		return nil
 	})
-	if err != nil {
-		return err
-	}
-
-	// There is nothing more to do if the chain state was initialized.
-	if isStateInitialized {
-		return nil
-	}
-
-	// At this point the database has not already been initialized, so
-	// initialize both it and the chain state to the genesis block.
-	return b.createChainState()
+	return err
 }
 
 // dbFetchHeaderByHash uses an existing database transaction to retrieve the
