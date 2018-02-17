@@ -1240,21 +1240,31 @@ func IsStakeSubmissionTxOut(index int) bool {
 //
 // The tickets are determined **only** from the STransactions of the provided
 // block and no validation is performed.
+//
+// This function is only safe to be called with a block that has previously
+// had all header commitments validated.
 func FindSpentTicketsInBlock(block *wire.MsgBlock) *SpentTicketsInBlock {
-	res := &SpentTicketsInBlock{}
+	votes := make([]VoteVersionTuple, 0, block.Header.Voters)
+	voters := make([]chainhash.Hash, 0, block.Header.Voters)
+	revocations := make([]chainhash.Hash, 0, block.Header.Revocations)
 
 	for _, stx := range block.STransactions {
 		if IsSSGen(stx) {
-			res.VotedTickets = append(res.VotedTickets,
-				stx.TxIn[1].PreviousOutPoint.Hash)
-			res.Votes = append(res.Votes, VoteVersionTuple{
+			voters = append(voters, stx.TxIn[1].PreviousOutPoint.Hash)
+			votes = append(votes, VoteVersionTuple{
 				Version: SSGenVersion(stx),
 				Bits:    SSGenVoteBits(stx),
 			})
-		} else if IsSSRtx(stx) {
-			res.RevokedTickets = append(res.RevokedTickets,
-				stx.TxIn[0].PreviousOutPoint.Hash)
+			continue
+		}
+		if IsSSRtx(stx) {
+			revocations = append(revocations, stx.TxIn[0].PreviousOutPoint.Hash)
+			continue
 		}
 	}
-	return res
+	return &SpentTicketsInBlock{
+		VotedTickets:   voters,
+		Votes:          votes,
+		RevokedTickets: revocations,
+	}
 }
