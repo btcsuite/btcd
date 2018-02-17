@@ -2550,7 +2550,7 @@ func (b *blockManager) SetParentTemplate(bt *BlockTemplate) {
 
 // newBlockManager returns a new decred block manager.
 // Use Start to begin processing asynchronous block and inv updates.
-func newBlockManager(s *server, indexManager blockchain.IndexManager) (*blockManager, error) {
+func newBlockManager(s *server, indexManager blockchain.IndexManager, interrupt <-chan struct{}) (*blockManager, error) {
 	bm := blockManager{
 		server:              s,
 		rejectedTxns:        make(map[chainhash.Hash]struct{}),
@@ -2569,6 +2569,7 @@ func newBlockManager(s *server, indexManager blockchain.IndexManager) (*blockMan
 	var err error
 	bm.chain, err = blockchain.New(&blockchain.Config{
 		DB:            s.db,
+		Interrupt:     interrupt,
 		ChainParams:   s.chainParams,
 		TimeSource:    s.timeSource,
 		Notifications: bm.handleNotifyMsg,

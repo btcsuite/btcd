@@ -151,7 +151,7 @@ func indexDropKey(idxKey []byte) []byte {
 // of being dropped and finishes dropping them when the are.  This is necessary
 // because dropping and index has to be done in several atomic steps rather than
 // one big atomic step due to the massive number of entries.
-func (m *Manager) maybeFinishDrops() error {
+func (m *Manager) maybeFinishDrops(interrupt <-chan struct{}) error {
 	indexNeedsDrop := make([]bool, len(m.enabledIndexes))
 	err := m.db.View(func(dbTx database.Tx) error {
 		// None of the indexes needs to be dropped if the index tips
@@ -161,7 +161,7 @@ func (m *Manager) maybeFinishDrops() error {
 			return nil
 		}
 
-		// Make the indexer as requiring a drop if one is already in
+		// Mark the indexer as requiring a drop if one is already in
 		// progress.
 		for i, indexer := range m.enabledIndexes {
 			dropKey := indexDropKey(indexer.Key())
@@ -176,6 +176,10 @@ func (m *Manager) maybeFinishDrops() error {
 		return err
 	}
 
+	if interruptRequested(interrupt) {
+		return errInterruptRequested
+	}
+
 	// Finish dropping any of the enabled indexes that are already in the
 	// middle of being dropped.
 	for i, indexer := range m.enabledIndexes {
@@ -184,7 +188,7 @@ func (m *Manager) maybeFinishDrops() error {
 		}
 
 		log.Infof("Resuming %s drop", indexer.Name())
-		err := dropIndex(m.db, indexer.Key(), indexer.Name())
+		err := dropIndex(m.db, indexer.Key(), indexer.Name(), interrupt)
 		if err != nil {
 			return err
 		}
@@ -231,14 +235,18 @@ func (m *Manager) maybeCreateIndexes(dbTx database.Tx) error {
 // catch up due to the I/O contention.
 //
 // This is part of the blockchain.IndexManager interface.
-func (m *Manager) Init(chain *blockchain.BlockChain) error {
+func (m *Manager) Init(chain *blockchain.BlockChain, interrupt <-chan struct{}) error {
 	// Nothing to do when no indexes are enabled.
 	if len(m.enabledIndexes) == 0 {
 		return nil
 	}
 
+	if interruptRequested(interrupt) {
+		return errInterruptRequested
+	}
+
 	// Finish any drops that were previously interrupted.
-	if err := m.maybeFinishDrops(); err != nil {
+	if err := m.maybeFinishDrops(interrupt); err != nil {
 		return err
 	}
 
@@ -290,13 +298,10 @@ func (m *Manager) Init(chain *blockchain.BlockChain) error {
 		}
 
 		// Loop until the tip is a block that exists in the main chain.
+		var interrupted bool
 		initialHeight := height
 		err = m.db.Update(func(dbTx database.Tx) error {
-			for {
-				if blockchain.DBMainChainHasBlock(dbTx, hash) {
-					break
-				}
-
+			for !blockchain.DBMainChainHasBlock(dbTx, hash) {
 				// Get the block, unless it's already cached.
 				var block *dcrutil.Block
 				if cachedBlock == nil && height > 0 {
@@ -324,7 +329,8 @@ func (m *Manager) Init(chain *blockchain.BlockChain) error {
 				var view *blockchain.UtxoViewpoint
 				if indexNeedsInputs(indexer) {
 					var err error
-					view, err = makeUtxoView(dbTx, block, parent)
+					view, err = makeUtxoView(dbTx, block, parent,
+						interrupt)
 					if err != nil {
 						return err
 					}
@@ -341,12 +347,24 @@ func (m *Manager) Init(chain *blockchain.BlockChain) error {
 				// Update the tip to the previous block.
 				hash = &block.MsgBlock().Header.PrevBlock
 				height--
+
+				// NOTE: This does not return as it does
+				// elsewhere since it would cause the
+				// database transaction to rollback and
+				// undo all work that has been done.
+				if interruptRequested(interrupt) {
+					interrupted = true
+					break
+				}
 			}
 
 			return nil
 		})
 		if err != nil {
 			return err
+		}
+		if interrupted {
+			return errInterruptRequested
 		}
 
 		if initialHeight != height {
@@ -400,6 +418,10 @@ func (m *Manager) Init(chain *blockchain.BlockChain) error {
 
 	var cachedParent *dcrutil.Block
 	for height := lowestHeight + 1; height <= bestHeight; height++ {
+		if interruptRequested(interrupt) {
+			return errInterruptRequested
+		}
+
 		var block, parent *dcrutil.Block
 		err = m.db.Update(func(dbTx database.Tx) error {
 			// Get the parent of the block, unless it's already cached.
@@ -422,6 +444,10 @@ func (m *Manager) Init(chain *blockchain.BlockChain) error {
 			}
 			cachedParent = block
 
+			if interruptRequested(interrupt) {
+				return errInterruptRequested
+			}
+
 			// Connect the block for all indexes that need it.
 			var view *blockchain.UtxoViewpoint
 			for i, indexer := range m.enabledIndexes {
@@ -437,7 +463,8 @@ func (m *Manager) Init(chain *blockchain.BlockChain) error {
 				// index.
 				if view == nil && indexNeedsInputs(indexer) {
 					var errMakeView error
-					view, errMakeView = makeUtxoView(dbTx, block, parent)
+					view, errMakeView = makeUtxoView(dbTx, block, parent,
+						interrupt)
 					if errMakeView != nil {
 						return errMakeView
 					}
@@ -506,7 +533,7 @@ func dbFetchTx(dbTx database.Tx, hash *chainhash.Hash) (*wire.MsgTx, error) {
 // transactions in the block.  This is sometimes needed when catching indexes up
 // because many of the txouts could actually already be spent however the
 // associated scripts are still required to index them.
-func makeUtxoView(dbTx database.Tx, block, parent *dcrutil.Block) (*blockchain.UtxoViewpoint, error) {
+func makeUtxoView(dbTx database.Tx, block, parent *dcrutil.Block, interrupt <-chan struct{}) (*blockchain.UtxoViewpoint, error) {
 	view := blockchain.NewUtxoViewpoint()
 	var parentRegularTxs []*dcrutil.Tx
 	if approvesParent(block) {
@@ -539,6 +566,10 @@ func makeUtxoView(dbTx database.Tx, block, parent *dcrutil.Block) (*blockchain.U
 				int64(wire.NullBlockHeight),
 				wire.NullBlockIndex)
 		}
+
+		if interruptRequested(interrupt) {
+			return nil, errInterruptRequested
+		}
 	}
 
 	for _, tx := range block.STransactions() {
@@ -565,6 +596,10 @@ func makeUtxoView(dbTx database.Tx, block, parent *dcrutil.Block) (*blockchain.U
 
 			view.AddTxOuts(dcrutil.NewTx(originTx), int64(wire.NullBlockHeight),
 				wire.NullBlockIndex)
+		}
+
+		if interruptRequested(interrupt) {
+			return nil, errInterruptRequested
 		}
 	}
 
@@ -623,7 +658,7 @@ func NewManager(db database.DB, enabledIndexes []Indexer, params *chaincfg.Param
 // keep memory usage to reasonable levels.  It also marks the drop in progress
 // so the drop can be resumed if it is stopped before it is done before the
 // index can be used again.
-func dropIndex(db database.DB, idxKey []byte, idxName string) error {
+func dropIndex(db database.DB, idxKey []byte, idxName string, interrupt <-chan struct{}) error {
 	// Nothing to do if the index doesn't already exist.
 	var needsDelete bool
 	err := db.View(func(dbTx database.Tx) error {
@@ -684,6 +719,10 @@ func dropIndex(db database.DB, idxKey []byte, idxName string) error {
 			totalDeleted += uint64(numDeleted)
 			log.Infof("Deleted %d keys (%d total) from %s",
 				numDeleted, totalDeleted, idxName)
+		}
+
+		if interruptRequested(interrupt) {
+			return errInterruptRequested
 		}
 	}
 

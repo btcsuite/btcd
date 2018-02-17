@@ -1891,8 +1891,11 @@ func (b *BlockChain) FetchHeader(hash *chainhash.Hash) (wire.BlockHeader, error)
 // purpose of supporting optional indexes.
 type IndexManager interface {
 	// Init is invoked during chain initialize in order to allow the index
-	// manager to initialize itself and any indexes it is managing.
-	Init(*BlockChain) error
+	// manager to initialize itself and any indexes it is managing.  The
+	// channel parameter specifies a channel the caller can close to signal
+	// that the process should be interrupted.  It can be nil if that
+	// behavior is not desired.
+	Init(*BlockChain, <-chan struct{}) error
 
 	// ConnectBlock is invoked when a new block has been connected to the
 	// main chain.
@@ -1910,6 +1913,13 @@ type Config struct {
 	//
 	// This field is required.
 	DB database.DB
+
+	// Interrupt specifies a channel the caller can close to signal that
+	// long running operations, such as catching up indexes or performing
+	// database migrations, should be interrupted.
+	//
+	// This field can be nil if the caller does not desire the behavior.
+	Interrupt <-chan struct{}
 
 	// ChainParams identifies which chain parameters the chain is associated
 	// with.
@@ -1996,14 +2006,15 @@ func New(config *Config) (*BlockChain, error) {
 	// Initialize the chain state from the passed database.  When the db
 	// does not yet contain any chain state, both it and the chain state
 	// will be initialized to contain only the genesis block.
-	if err := b.initChainState(); err != nil {
+	if err := b.initChainState(config.Interrupt); err != nil {
 		return nil, err
 	}
 
 	// Initialize and catch up all of the currently active optional indexes
 	// as needed.
 	if config.IndexManager != nil {
-		if err := config.IndexManager.Init(&b); err != nil {
+		err := config.IndexManager.Init(&b, config.Interrupt)
+		if err != nil {
 			return nil, err
 		}
 	}

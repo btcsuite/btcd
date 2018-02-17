@@ -176,7 +176,7 @@ func upgradeToVersion2(db database.DB, chainParams *chaincfg.Params, dbInfo *dat
 // all possible upgrades iteratively.
 //
 // NOTE: The passed database info will be updated with the latest versions.
-func upgradeDB(db database.DB, chainParams *chaincfg.Params, dbInfo *databaseInfo) error {
+func upgradeDB(db database.DB, chainParams *chaincfg.Params, dbInfo *databaseInfo, interrupt <-chan struct{}) error {
 	if dbInfo.version == 1 {
 		if err := upgradeToVersion2(db, chainParams, dbInfo); err != nil {
 			return err

@@ -10,6 +10,7 @@ package indexers
 
 import (
 	"encoding/binary"
+	"errors"
 
 	"github.com/decred/dcrd/blockchain"
 	"github.com/decred/dcrd/database"
@@ -20,6 +21,10 @@ var (
 	// byteOrder is the preferred byte order used for serializing numeric
 	// fields for storage in the database.
 	byteOrder = binary.LittleEndian
+
+	// errInterruptRequested indicates that an operation was cancelled due
+	// to a user-requested interrupt.
+	errInterruptRequested = errors.New("interrupt requested")
 )
 
 // NeedsInputser provides a generic interface for an indexer to specify the it
@@ -96,4 +101,17 @@ type internalBucket interface {
 func approvesParent(block *dcrutil.Block) bool {
 	return dcrutil.IsFlagSet16(block.MsgBlock().Header.VoteBits,
 		dcrutil.BlockValid)
+}
+
+// interruptRequested returns true when the provided channel has been closed.
+// This simplifies early shutdown slightly since the caller can just use an if
+// statement instead of a select.
+func interruptRequested(interrupted <-chan struct{}) bool {
+	select {
+	case <-interrupted:
+		return true
+	default:
+	}
+
+	return false
 }

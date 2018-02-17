@@ -410,6 +410,7 @@ func (idx *ExistsAddrIndex) AddUnconfirmedTx(tx *wire.MsgTx) {
 
 // DropExistsAddrIndex drops the exists address index from the provided
 // database if it exists.
-func DropExistsAddrIndex(db database.DB) error {
-	return dropIndex(db, existsAddrIndexKey, existsAddressIndexName)
+func DropExistsAddrIndex(db database.DB, interrupt <-chan struct{}) error {
+	return dropIndex(db, existsAddrIndexKey, existsAddressIndexName,
+		interrupt)
 }
