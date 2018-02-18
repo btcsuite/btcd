@@ -1384,7 +1384,12 @@ func (b *BlockChain) initChainState(interrupt <-chan struct{}) error {
 		}
 
 		// Store the database version info using the new format.
-		return dbPutDatabaseInfo(dbTx, dbi)
+		if err := dbPutDatabaseInfo(dbTx, dbi); err != nil {
+			return err
+		}
+
+		// Remove the legacy version information.
+		return bucket.Delete(dbnamespace.BCDBInfoBucketName)
 	})
 	if err != nil {
 		return err
