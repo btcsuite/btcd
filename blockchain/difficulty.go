@@ -1087,8 +1087,7 @@ func (b *BlockChain) estimateNextStakeDifficultyV1(curNode *blockNode, ticketsIn
 			// Connect the header.
 			emptyHeader.PrevBlock = topNode.hash
 
-			thisNode := newBlockNode(&emptyHeader)
-			thisNode.parent = topNode
+			thisNode := newBlockNode(&emptyHeader, topNode)
 			topNode = thisNode
 		}
 	}

@@ -39,6 +39,6 @@ func (b *BlockChain) TstCheckBlockHeaderContext(header *wire.BlockHeader, prevNo
 
 // TstNewBlockNode makes the internal newBlockNode function available to the
 // test package.
-func TstNewBlockNode(blockHeader *wire.BlockHeader) *blockNode {
-	return newBlockNode(blockHeader)
+func TstNewBlockNode(blockHeader *wire.BlockHeader, parent *blockNode) *blockNode {
+	return newBlockNode(blockHeader, parent)
 }

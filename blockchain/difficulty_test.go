@@ -428,8 +428,7 @@ nextTest:
 					FreshStake: ticketInfo.newTickets,
 					PoolSize:   poolSize,
 				}
-				node := newBlockNode(header)
-				node.parent = bc.bestNode
+				node := newBlockNode(header, bc.bestNode)
 
 				// Update the pool size for the next header.
 				// Notice how tickets that mature for this block
@@ -729,8 +728,7 @@ nextTest:
 					FreshStake: ticketInfo.newTickets,
 					PoolSize:   poolSize,
 				}
-				node := newBlockNode(header)
-				node.parent = bc.bestNode
+				node := newBlockNode(header, bc.bestNode)
 
 				// Update the pool size for the next header.
 				// Notice how tickets that mature for this block

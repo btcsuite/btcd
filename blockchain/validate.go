@@ -2601,10 +2601,8 @@ func (b *BlockChain) CheckConnectBlock(block *dcrutil.Block, flags BehaviorFlags
 		return err
 	}
 
-	newNode := newBlockNode(&block.MsgBlock().Header)
+	newNode := newBlockNode(&block.MsgBlock().Header, prevNode)
 	newNode.populateTicketInfo(stake.FindSpentTicketsInBlock(block.MsgBlock()))
-	newNode.parent = prevNode
-	newNode.workSum.Add(prevNode.workSum, newNode.workSum)
 
 	// If we are extending the main (best) chain with a new block, just use
 	// the ticket database we already have.

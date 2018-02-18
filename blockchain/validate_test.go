@@ -2110,7 +2110,7 @@ func TestCheckWorklessBlockSanity(t *testing.T) {
 }
 
 // TestCheckBlockHeaderContext tests that genesis block passes context headers
-// because it's previousNode is nil.
+// because its parent is nil.
 func TestCheckBlockHeaderContext(t *testing.T) {
 	// Create a new database for the blocks.
 	params := &chaincfg.SimNetParams
@@ -2145,7 +2145,7 @@ func TestCheckBlockHeaderContext(t *testing.T) {
 	// Test failing checkBlockHeaderContext when calcNextRequiredDifficulty
 	// fails.
 	block := dcrutil.NewBlock(&badBlock)
-	newNode := blockchain.TstNewBlockNode(&block.MsgBlock().Header)
+	newNode := blockchain.TstNewBlockNode(&block.MsgBlock().Header, nil)
 	err = chain.TstCheckBlockHeaderContext(&block.MsgBlock().Header, newNode, blockchain.BFNone)
 	if err == nil {
 		t.Fatalf("Should fail due to bad diff in newNode\n")

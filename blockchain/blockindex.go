@@ -91,11 +91,10 @@ type blockNode struct {
 	votes []stake.VoteVersionTuple
 }
 
-// newBlockNode returns a new block node for the given block header.  It is
-// completely disconnected from the chain and the workSum value is just the work
-// for the passed block.  The work sum is updated accordingly when the node is
-// inserted into a chain.
-func newBlockNode(blockHeader *wire.BlockHeader) *blockNode {
+// newBlockNode returns a new block node for the given block header and parent
+// node.  The workSum is calculated based on the parent, or, in the case no
+// parent is provided, it will just be the work for the passed block.
+func newBlockNode(blockHeader *wire.BlockHeader, parent *blockNode) *blockNode {
 	// Serialize the block header for use in calculating the initialization
 	// vector for the ticket lottery.  The only way this can fail is if the
 	// process is out of memory in which case it would panic anyways, so
@@ -131,6 +130,10 @@ func newBlockNode(blockHeader *wire.BlockHeader) *blockNode {
 		extraData:    blockHeader.ExtraData,
 		stakeVersion: blockHeader.StakeVersion,
 		lotteryIV:    stake.CalcHash256PRNGIV(hB),
+	}
+	if parent != nil {
+		node.parent = parent
+		node.workSum = node.workSum.Add(parent.workSum, node.workSum)
 	}
 
 	return &node
@@ -253,7 +256,7 @@ func (bi *blockIndex) loadBlockNode(dbTx database.Tx, hash *chainhash.Hash) (*bl
 
 	// Create the new block node for the block.
 	blockHeader := block.MsgBlock().Header
-	node := newBlockNode(&blockHeader)
+	node := newBlockNode(&blockHeader, nil)
 	node.populateTicketInfo(stake.FindSpentTicketsInBlock(block.MsgBlock()))
 	node.inMainChain = true
 
