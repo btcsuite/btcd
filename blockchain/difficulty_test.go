@@ -428,7 +428,7 @@ nextTest:
 					FreshStake: ticketInfo.newTickets,
 					PoolSize:   poolSize,
 				}
-				node := newBlockNode(header, nil)
+				node := newBlockNode(header)
 				node.parent = bc.bestNode
 
 				// Update the pool size for the next header.
@@ -729,7 +729,7 @@ nextTest:
 					FreshStake: ticketInfo.newTickets,
 					PoolSize:   poolSize,
 				}
-				node := newBlockNode(header, nil)
+				node := newBlockNode(header)
 				node.parent = bc.bestNode
 
 				// Update the pool size for the next header.

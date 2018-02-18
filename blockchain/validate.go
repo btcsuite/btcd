@@ -2601,8 +2601,8 @@ func (b *BlockChain) CheckConnectBlock(block *dcrutil.Block, flags BehaviorFlags
 		return err
 	}
 
-	newNode := newBlockNode(&block.MsgBlock().Header,
-		stake.FindSpentTicketsInBlock(block.MsgBlock()))
+	newNode := newBlockNode(&block.MsgBlock().Header)
+	newNode.populateTicketInfo(stake.FindSpentTicketsInBlock(block.MsgBlock()))
 	newNode.parent = prevNode
 	newNode.workSum.Add(prevNode.workSum, newNode.workSum)
 

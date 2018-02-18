@@ -54,7 +54,7 @@ func TestBlockNodeHeader(t *testing.T) {
 		ExtraData:    [32]byte{0xbb},
 		StakeVersion: 5,
 	}
-	node := newBlockNode(&testHeader, nil)
+	node := newBlockNode(&testHeader)
 	bc.index.AddNode(node)
 	node.parent = bc.bestNode
 

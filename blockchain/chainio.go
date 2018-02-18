@@ -1268,7 +1268,7 @@ func (b *BlockChain) createChainState() error {
 	// Create a new node from the genesis block and set it as the best node.
 	genesisBlock := dcrutil.NewBlock(b.chainParams.GenesisBlock)
 	header := &genesisBlock.MsgBlock().Header
-	node := newBlockNode(header, nil)
+	node := newBlockNode(header)
 	node.inMainChain = true
 
 	// Initialize the state related to the best block.  Since it is the
@@ -1476,7 +1476,8 @@ func (b *BlockChain) initChainState(interrupt <-chan struct{}) error {
 		// Create a new node and set it as the best node.  The preceding
 		// nodes will be loaded on demand as needed.
 		header := &block.Header
-		node := newBlockNode(header, stake.FindSpentTicketsInBlock(&block))
+		node := newBlockNode(header)
+		node.populateTicketInfo(stake.FindSpentTicketsInBlock(&block))
 		node.inMainChain = true
 		node.workSum = state.workSum
 

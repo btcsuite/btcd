@@ -22,7 +22,7 @@ import (
 func newFakeChain(params *chaincfg.Params) *BlockChain {
 	// Create a genesis block node and block index populated with it for use
 	// when creating the fake chain below.
-	node := newBlockNode(&params.GenesisBlock.Header, nil)
+	node := newBlockNode(&params.GenesisBlock.Header)
 	node.inMainChain = true
 	index := newBlockIndex(nil, params)
 	index.AddNode(node)
@@ -53,7 +53,7 @@ func newFakeNode(parent *blockNode, blockVersion int32, stakeVersion uint32, bit
 		Timestamp:    timestamp,
 		StakeVersion: stakeVersion,
 	}
-	node := newBlockNode(header, nil)
+	node := newBlockNode(header)
 	node.parent = parent
 	node.workSum.Add(parent.workSum, node.workSum)
 	return node

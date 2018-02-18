@@ -95,7 +95,7 @@ type blockNode struct {
 // completely disconnected from the chain and the workSum value is just the work
 // for the passed block.  The work sum is updated accordingly when the node is
 // inserted into a chain.
-func newBlockNode(blockHeader *wire.BlockHeader, spentTickets *stake.SpentTicketsInBlock) *blockNode {
+func newBlockNode(blockHeader *wire.BlockHeader) *blockNode {
 	// Serialize the block header for use in calculating the initialization
 	// vector for the ticket lottery.  The only way this can fail is if the
 	// process is out of memory in which case it would panic anyways, so
@@ -106,42 +106,31 @@ func newBlockNode(blockHeader *wire.BlockHeader, spentTickets *stake.SpentTicket
 		panic(err)
 	}
 
-	var ticketsVoted, ticketsRevoked []chainhash.Hash
-	var votes []stake.VoteVersionTuple
-	if spentTickets != nil {
-		ticketsVoted = spentTickets.VotedTickets
-		ticketsRevoked = spentTickets.RevokedTickets
-		votes = spentTickets.Votes
-	}
-
 	// Make a copy of the hash so the node doesn't keep a reference to part
 	// of the full block/block header preventing it from being garbage
 	// collected.
 	node := blockNode{
-		hash:           blockHeader.BlockHash(),
-		parentHash:     blockHeader.PrevBlock,
-		workSum:        CalcWork(blockHeader.Bits),
-		height:         int64(blockHeader.Height),
-		blockVersion:   blockHeader.Version,
-		voteBits:       blockHeader.VoteBits,
-		finalState:     blockHeader.FinalState,
-		voters:         blockHeader.Voters,
-		freshStake:     blockHeader.FreshStake,
-		poolSize:       blockHeader.PoolSize,
-		bits:           blockHeader.Bits,
-		sbits:          blockHeader.SBits,
-		timestamp:      blockHeader.Timestamp.Unix(),
-		merkleRoot:     blockHeader.MerkleRoot,
-		stakeRoot:      blockHeader.StakeRoot,
-		revocations:    blockHeader.Revocations,
-		blockSize:      blockHeader.Size,
-		nonce:          blockHeader.Nonce,
-		extraData:      blockHeader.ExtraData,
-		stakeVersion:   blockHeader.StakeVersion,
-		lotteryIV:      stake.CalcHash256PRNGIV(hB),
-		ticketsVoted:   ticketsVoted,
-		ticketsRevoked: ticketsRevoked,
-		votes:          votes,
+		hash:         blockHeader.BlockHash(),
+		parentHash:   blockHeader.PrevBlock,
+		workSum:      CalcWork(blockHeader.Bits),
+		height:       int64(blockHeader.Height),
+		blockVersion: blockHeader.Version,
+		voteBits:     blockHeader.VoteBits,
+		finalState:   blockHeader.FinalState,
+		voters:       blockHeader.Voters,
+		freshStake:   blockHeader.FreshStake,
+		poolSize:     blockHeader.PoolSize,
+		bits:         blockHeader.Bits,
+		sbits:        blockHeader.SBits,
+		timestamp:    blockHeader.Timestamp.Unix(),
+		merkleRoot:   blockHeader.MerkleRoot,
+		stakeRoot:    blockHeader.StakeRoot,
+		revocations:  blockHeader.Revocations,
+		blockSize:    blockHeader.Size,
+		nonce:        blockHeader.Nonce,
+		extraData:    blockHeader.ExtraData,
+		stakeVersion: blockHeader.StakeVersion,
+		lotteryIV:    stake.CalcHash256PRNGIV(hB),
 	}
 
 	return &node
@@ -172,6 +161,17 @@ func (node *blockNode) Header() wire.BlockHeader {
 		ExtraData:    node.extraData,
 		StakeVersion: node.stakeVersion,
 	}
+}
+
+// populateTicketInfo sets prunable ticket information in the provided block
+// node.
+//
+// This function is NOT safe for concurrent access.  It must only be called when
+// initially creating a node.
+func (node *blockNode) populateTicketInfo(spentTickets *stake.SpentTicketsInBlock) {
+	node.ticketsVoted = spentTickets.VotedTickets
+	node.ticketsRevoked = spentTickets.RevokedTickets
+	node.votes = spentTickets.Votes
 }
 
 // removeChildNode deletes node from the provided slice of child block
@@ -253,7 +253,8 @@ func (bi *blockIndex) loadBlockNode(dbTx database.Tx, hash *chainhash.Hash) (*bl
 
 	// Create the new block node for the block.
 	blockHeader := block.MsgBlock().Header
-	node := newBlockNode(&blockHeader, stake.FindSpentTicketsInBlock(block.MsgBlock()))
+	node := newBlockNode(&blockHeader)
+	node.populateTicketInfo(stake.FindSpentTicketsInBlock(block.MsgBlock()))
 	node.inMainChain = true
 
 	// Add the node to the chain.
