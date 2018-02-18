@@ -862,7 +862,7 @@ func (mp *TxPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew, rateLimit, allow
 
 		if msgTx.TxOut[0].Value < sDiff {
 			str := fmt.Sprintf("transaction %v has not enough funds "+
-				"to meet stake difficuly (ticket diff %v < next diff %v)",
+				"to meet stake difficulty (ticket diff %v < next diff %v)",
 				txHash, msgTx.TxOut[0].Value, sDiff)
 			return nil, txRuleError(wire.RejectInsufficientFee, str)
 		}

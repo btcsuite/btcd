@@ -27,7 +27,7 @@ var (
 		"to use this feature")
 )
 
-// notificationState is used to track the current state of successfuly
+// notificationState is used to track the current state of successfully
 // registered notification so the state can be automatically re-established on
 // reconnect.
 type notificationState struct {
@@ -1461,7 +1461,7 @@ func (c *Client) LoadTxFilterAsync(reload bool, addresses []dcrutil.Address,
 
 // LoadTxFilter loads, reloads, or adds data to a websocket client's transaction
 // filter.  The filter is consistently updated based on inspected transactions
-// during mempool acceptence, block acceptence, and for all rescanned blocks.
+// during mempool acceptance, block acceptance, and for all rescanned blocks.
 //
 // NOTE: This is a dcrd extension and requires a websocket connection.
 func (c *Client) LoadTxFilter(reload bool, addresses []dcrutil.Address, outPoints []wire.OutPoint) error {

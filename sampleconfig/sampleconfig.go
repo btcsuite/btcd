@@ -293,7 +293,7 @@ const FileContents = `[Application Options]
 ; Enable built-in CPU mining.
 ;
 ; NOTE: This is typically only useful for testing purposes such as testnet or
-; simnet since the difficutly on mainnet is far too high for CPU mining to be
+; simnet since the difficulty on mainnet is far too high for CPU mining to be
 ; worth your while.
 ; generate=false
 

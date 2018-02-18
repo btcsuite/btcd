@@ -680,7 +680,7 @@ func handleCreateRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan 
 		pkScript, err := txscript.PayToAddrScript(addr)
 		if err != nil {
 			return nil, rpcInternalError(err.Error(),
-				"Pay to adress script")
+				"Pay to address script")
 		}
 
 		atomic, err := dcrutil.NewAmount(amount)
@@ -3769,7 +3769,7 @@ func handleGetVoteInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 		}
 		a.QuorumProgress = float64(qmin) / float64(quorum)
 
-		// Calcualte choice progress.
+		// Calculate choice progress.
 		for k := range a.Choices {
 			a.Choices[k].Count = counts.VoteChoices[k]
 			a.Choices[k].Progress = float64(counts.VoteChoices[k]) /
@@ -3840,7 +3840,7 @@ func handleGetTxOut(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 		if c.Vout > uint32(len(mtx.TxOut)-1) {
 			return nil, &dcrjson.RPCError{
 				Code: dcrjson.ErrRPCInvalidTxVout,
-				Message: "Ouput index number (vout) does not " +
+				Message: "Output index number (vout) does not " +
 					"exist for transaction.",
 			}
 		}
@@ -4516,7 +4516,7 @@ func createVinListPrevOut(s *rpcServer, mtx *wire.MsgTx, chainParams *chaincfg.P
 		return vinList, nil
 	}
 
-	// Use a dynamically sized list to accomodate the address filter.
+	// Use a dynamically sized list to accommodate the address filter.
 	vinList := make([]dcrjson.VinPrevOut, 0, len(mtx.TxIn))
 
 	// Lookup all of the referenced transaction outputs needed to populate

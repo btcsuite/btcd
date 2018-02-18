@@ -369,7 +369,7 @@ func (c *Client) GetWorkSubmit(data string) (bool, error) {
 type FutureGetBlockTemplate chan *response
 
 // Receive waits for the response promised by the future and returns an error if
-// any occured while generating the block template.
+// any occurred while generating the block template.
 func (r FutureGetBlockTemplate) Receive() (*dcrjson.GetBlockTemplateResult, error) {
 	res, err := receiveFuture(r)
 	if err != nil {

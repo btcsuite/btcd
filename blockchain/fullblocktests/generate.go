@@ -185,7 +185,7 @@ func opReturnScript(data []byte) []byte {
 // height and is followed by 32 bytes which are treated as 4 uint64 extra
 // nonces.  This implementation puts a cryptographically random value into the
 // final extra nonce position.  The actual format of the data after the block
-// height is not defined however this effectivley mirrors the actual mining code
+// height is not defined however this effectively mirrors the actual mining code
 // at the time it was written.
 func standardCoinbaseOpReturnScript(blockHeight uint32) []byte {
 	rand, err := wire.RandomUint64()

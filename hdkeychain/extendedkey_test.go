@@ -907,7 +907,7 @@ func TestZero(t *testing.T) {
 		wantAddr := "DsWuefL3Rgj6NXoMFqqBzxY2nmh87RZyPkv"
 		addr, err := key.Address(&chaincfg.MainNetParams)
 		if err != nil {
-			t.Errorf("Addres s #%d (%s): unexpected error: %v", i,
+			t.Errorf("Address #%d (%s): unexpected error: %v", i,
 				testName, err)
 			return false
 		}

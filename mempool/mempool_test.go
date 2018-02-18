@@ -25,7 +25,7 @@ import (
 
 // fakeChain is used by the pool harness to provide generated test utxos and
 // a current faked chain height to the pool callbacks.  This, in turn, allows
-// transations to be appear as though they are spending completely valid utxos.
+// transactions to be appear as though they are spending completely valid utxos.
 type fakeChain struct {
 	sync.RWMutex
 	nextStakeDiff int64

@@ -164,37 +164,37 @@ var helpDescsEnUS = map[string]string{
 	"decodescript-hexscript": "Hex-encoded script",
 
 	// ExistsAddressCmd help.
-	"existsaddress--synopsis": "Test for the existance of the provided address",
+	"existsaddress--synopsis": "Test for the existence of the provided address",
 	"existsaddress-address":   "The address to check",
 	"existsaddress--result0":  "Bool showing if address exists or not",
 
 	// ExistsAddressesCmd help.
-	"existsaddresses--synopsis": "Test for the existance of the provided addresses in the blockchain or memory pool",
+	"existsaddresses--synopsis": "Test for the existence of the provided addresses in the blockchain or memory pool",
 	"existsaddresses-addresses": "The addresses to check",
 	"existsaddresses--result0":  "Bitset of bools showing if addresses exist or not",
 
 	// ExitsMissedTicketsCmd help.
-	"existsmissedtickets--synopsis":  "Test for the existance of the provided tickets in the missed ticket map",
+	"existsmissedtickets--synopsis":  "Test for the existence of the provided tickets in the missed ticket map",
 	"existsmissedtickets-txhashblob": "Blob containing the hashes to check",
 	"existsmissedtickets--result0":   "Bool blob showing if the ticket exists in the missed ticket database or not",
 
 	// ExistsExpiredTicketsCmd help.
-	"existsexpiredtickets--synopsis":  "Test for the existance of the provided tickets in the expired ticket map",
+	"existsexpiredtickets--synopsis":  "Test for the existence of the provided tickets in the expired ticket map",
 	"existsexpiredtickets-txhashblob": "Blob containing the hashes to check",
 	"existsexpiredtickets--result0":   "Bool blob showing if ticket exists in the expired ticket database or not",
 
 	// ExistsLiveTicketCmd help.
-	"existsliveticket--synopsis": "Test for the existance of the provided ticket",
+	"existsliveticket--synopsis": "Test for the existence of the provided ticket",
 	"existsliveticket-txhash":    "The ticket hash to check",
 	"existsliveticket--result0":  "Bool showing if address exists in the live ticket database or not",
 
 	// ExistsLiveTicketsCmd help.
-	"existslivetickets--synopsis":  "Test for the existance of the provided tickets in the live ticket map",
+	"existslivetickets--synopsis":  "Test for the existence of the provided tickets in the live ticket map",
 	"existslivetickets-txhashblob": "Blob containing the hashes to check",
 	"existslivetickets--result0":   "Bool blob showing if ticket exists in the live ticket database or not",
 
 	// ExistsMempoolTxsCmd help.
-	"existsmempooltxs--synopsis":  "Test for the existance of the provided txs in the mempool",
+	"existsmempooltxs--synopsis":  "Test for the existence of the provided txs in the mempool",
 	"existsmempooltxs-txhashblob": "Blob containing the hashes to check",
 	"existsmempooltxs--result0":   "Bool blob showing if txs exist in the mempool or not",
 

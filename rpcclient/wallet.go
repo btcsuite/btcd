@@ -148,7 +148,7 @@ type FutureListUnspentResult chan *response
 
 // Receive waits for the response promised by the future and returns all
 // unspent wallet transaction outputs returned by the RPC call.  If the
-// future wac returnd by a call to ListUnspentMinAsync, ListUnspentMinMaxAsync,
+// future was returned by a call to ListUnspentMinAsync, ListUnspentMinMaxAsync,
 // or ListUnspentMinMaxAddressesAsync, the range may be limited by the
 // parameters of the RPC invocation.
 func (r FutureListUnspentResult) Receive() ([]dcrjson.ListUnspentResult, error) {
@@ -756,7 +756,7 @@ func (r FuturePurchaseTicketResult) Receive() ([]*chainhash.Hash, error) {
 }
 
 // PurchaseTicketAsync takes an account and a spending limit and returns a
-// future chan to recieve the transactions representing the purchased tickets
+// future chan to receive the transactions representing the purchased tickets
 // when they come.
 func (c *Client) PurchaseTicketAsync(fromAccount string,
 	spendLimit dcrutil.Amount, minConf *int, ticketAddress dcrutil.Address,

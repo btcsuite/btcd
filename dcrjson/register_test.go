@@ -248,7 +248,7 @@ func TestMustRegisterCmdPanic(t *testing.T) {
 func TestRegisteredCmdMethods(t *testing.T) {
 	t.Parallel()
 
-	// Ensure the registerd methods are returned.
+	// Ensure the registered methods are returned.
 	methods := dcrjson.RegisteredCmdMethods()
 	if len(methods) == 0 {
 		t.Fatal("RegisteredCmdMethods: no methods")

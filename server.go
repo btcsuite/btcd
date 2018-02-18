@@ -1545,7 +1545,7 @@ func (s *server) handleQuery(state *peerState, querymsg interface{}) {
 		}
 	// Request a list of the persistent (added) peers.
 	case getAddedNodesMsg:
-		// Respond with a slice of the relavent peers.
+		// Respond with a slice of the relevant peers.
 		peers := make([]*serverPeer, 0, len(state.persistentPeers))
 		for _, sp := range state.persistentPeers {
 			peers = append(peers, sp)
@@ -2206,7 +2206,7 @@ out:
 	if err := s.nat.DeletePortMapping("tcp", int(lport), int(lport)); err != nil {
 		srvrLog.Warnf("unable to remove UPnP port mapping: %v", err)
 	} else {
-		srvrLog.Debugf("succesfully disestablished UPnP port mapping")
+		srvrLog.Debugf("successfully disestablished UPnP port mapping")
 	}
 
 	s.wg.Done()

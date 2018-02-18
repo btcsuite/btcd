@@ -663,7 +663,7 @@ func (idx *AddrIndex) Create(dbTx database.Tx) error {
 }
 
 // writeIndexData represents the address index data to be written for one block.
-// It consistens of the address mapped to an ordered list of the transactions
+// It consists of the address mapped to an ordered list of the transactions
 // that involve the address in block.  It is ordered so the transactions can be
 // stored in the order they appear in the block.
 type writeIndexData map[[addrKeySize]byte][]int

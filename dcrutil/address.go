@@ -23,7 +23,7 @@ var (
 
 	// ErrUnknownAddressType describes an error where an address can not
 	// decoded as a specific address type due to the string encoding
-	// begining with an identifier byte unknown to any standard or
+	// beginning with an identifier byte unknown to any standard or
 	// registered (via chaincfg.Register) network.
 	ErrUnknownAddressType = errors.New("unknown address type")
 
@@ -289,7 +289,7 @@ func (a *AddressPubKeyHash) String() string {
 }
 
 // Hash160 returns the underlying array of the pubkey hash.  This can be useful
-// when an array is more appropiate than a slice (for example, when used as map
+// when an array is more appropriate than a slice (for example, when used as map
 // keys).
 func (a *AddressPubKeyHash) Hash160() *[ripemd160.Size]byte {
 	return &a.hash
@@ -391,7 +391,7 @@ func (a *AddressScriptHash) String() string {
 }
 
 // Hash160 returns the underlying array of the script hash.  This can be useful
-// when an array is more appropiate than a slice (for example, when used as map
+// when an array is more appropriate than a slice (for example, when used as map
 // keys).
 func (a *AddressScriptHash) Hash160() *[ripemd160.Size]byte {
 	return &a.hash
@@ -501,7 +501,7 @@ func (a *AddressSecpPubKey) ScriptAddress() []byte {
 }
 
 // Hash160 returns the underlying array of the pubkey hash.  This can be useful
-// when an array is more appropiate than a slice (for example, when used as map
+// when an array is more appropriate than a slice (for example, when used as map
 // keys).
 func (a *AddressSecpPubKey) Hash160() *[ripemd160.Size]byte {
 	h160 := Hash160(a.pubKey.SerializeCompressed())
@@ -614,7 +614,7 @@ func (a *AddressEdwardsPubKey) ScriptAddress() []byte {
 }
 
 // Hash160 returns the underlying array of the pubkey hash.  This can be useful
-// when an array is more appropiate than a slice (for example, when used as map
+// when an array is more appropriate than a slice (for example, when used as map
 // keys).
 func (a *AddressEdwardsPubKey) Hash160() *[ripemd160.Size]byte {
 	h160 := Hash160(a.pubKey.Serialize())
@@ -713,7 +713,7 @@ func (a *AddressSecSchnorrPubKey) ScriptAddress() []byte {
 }
 
 // Hash160 returns the underlying array of the pubkey hash.  This can be useful
-// when an array is more appropiate than a slice (for example, when used as map
+// when an array is more appropriate than a slice (for example, when used as map
 // keys).
 func (a *AddressSecSchnorrPubKey) Hash160() *[ripemd160.Size]byte {
 	h160 := Hash160(a.pubKey.Serialize())

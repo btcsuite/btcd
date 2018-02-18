@@ -528,19 +528,19 @@ func TestCalcScriptInfo(t *testing.T) {
 // unsupported address types are handled properly.
 type bogusAddress struct{}
 
-// EncodeAddress simply returns an empty string.  It exists to satsify the
+// EncodeAddress simply returns an empty string.  It exists to satisfy the
 // dcrutil.Address interface.
 func (b *bogusAddress) EncodeAddress() string {
 	return ""
 }
 
-// ScriptAddress simply returns an empty byte slice.  It exists to satsify the
+// ScriptAddress simply returns an empty byte slice.  It exists to satisfy the
 // dcrutil.Address interface.
 func (b *bogusAddress) ScriptAddress() []byte {
 	return nil
 }
 
-// Hash160 simply returns an empty byte slice.  It exists to satsify the
+// Hash160 simply returns an empty byte slice.  It exists to satisfy the
 // dcrutil.Address interface.
 func (b *bogusAddress) Hash160() *[20]byte {
 	return nil
@@ -551,7 +551,7 @@ func (b *bogusAddress) IsForNet(chainParams *chaincfg.Params) bool {
 	return true // why not?
 }
 
-// String simply returns an empty string.  It exists to satsify the
+// String simply returns an empty string.  It exists to satisfy the
 // dcrutil.Address interface.
 func (b *bogusAddress) String() string {
 	return ""

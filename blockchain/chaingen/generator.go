@@ -24,7 +24,7 @@ import (
 
 var (
 	// hash256prngSeedConst is a constant derived from the hex
-	// representation of pi and is used in conjuction with a caller-provided
+	// representation of pi and is used in conjunction with a caller-provided
 	// seed when initializing the deterministic lottery prng.
 	hash256prngSeedConst = []byte{0x24, 0x3f, 0x6a, 0x88, 0x85, 0xa3, 0x08,
 		0xd3}
@@ -324,7 +324,7 @@ func (g *Generator) calcDevSubsidy(fullSubsidy dcrutil.Amount, blockHeight uint3
 // height and is followed by 32 bytes which are treated as 4 uint64 extra
 // nonces.  This implementation puts a cryptographically random value into the
 // final extra nonce position.  The actual format of the data after the block
-// height is not defined however this effectivley mirrors the actual mining code
+// height is not defined however this effectively mirrors the actual mining code
 // at the time it was written.
 func standardCoinbaseOpReturnScript(blockHeight uint32) []byte {
 	rand, err := wire.RandomUint64()
@@ -357,7 +357,7 @@ func (g *Generator) addCoinbaseTxOutputs(tx *wire.MsgTx, blockHeight uint32, dev
 	tx.AddTxOut(wire.NewTxOut(0, standardCoinbaseOpReturnScript(blockHeight)))
 
 	// Final outputs are the proof-of-work subsidy split into more than one
-	// output.  These are in turn used througout the tests as inputs to
+	// output.  These are in turn used throughout the tests as inputs to
 	// other transactions such as ticket purchases and additional spend
 	// transactions.
 	const numPoWOutputs = 6
@@ -784,7 +784,7 @@ func (g *Generator) calcNextRequiredDifficulty() uint32 {
 		weightSum.Add(weightSum, weight)
 	}
 
-	// Calculate the retarget difficulty based on the exponential weigthed
+	// Calculate the retarget difficulty based on the exponential weighted
 	// average and shift the result back down 32 bits to account for the
 	// previous shift up in order to avoid losing precision.  Then, limit it
 	// to the maximum allowed retarget adjustment factor.
@@ -918,7 +918,7 @@ func (g *Generator) calcNextRequiredStakeDifficulty() int64 {
 	}
 
 	// Calculate the pool size retarget difficulty based on the exponential
-	// weigthed average and shift the result back down 32 bits to account
+	// weighted average and shift the result back down 32 bits to account
 	// for the previous shift up in order to avoid losing precision.  Then,
 	// limit it to the maximum allowed retarget adjustment factor.
 	//

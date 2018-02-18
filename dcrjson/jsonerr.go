@@ -17,7 +17,7 @@ var (
 	}
 	ErrInvalidParams = Error{
 		Code:    -32602,
-		Message: "Invalid paramaters",
+		Message: "Invalid parameters",
 	}
 	ErrInternal = Error{
 		Code:    -32603,
@@ -151,7 +151,7 @@ var (
 	}
 	ErrInvalidTxVout = Error{
 		Code:    -5,
-		Message: "Ouput index number (vout) does not exist for transaction.",
+		Message: "Output index number (vout) does not exist for transaction.",
 	}
 	ErrRawTxString = Error{
 		Code:    -32602,

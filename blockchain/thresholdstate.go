@@ -23,7 +23,7 @@ type ThresholdState byte
 // since these values are serialized and must be stable for long-term storage.
 const (
 	// ThresholdDefined is the first state for each deployment and is the
-	// state for the genesis block has by defintion for all deployments.
+	// state for the genesis block has by definition for all deployments.
 	ThresholdDefined ThresholdState = 0
 
 	// ThresholdStarted is the state for a deployment once its start time

@@ -850,7 +850,7 @@ func calcNextStakeDiffV2(params *chaincfg.Params, nextHeight, curDiff, prevPoolS
 	//          targetPoolSize / votesPerBlock
 	//
 	// In order to avoid the need to perform floating point math which could
-	// be problematic across langauges due to uncertainty in floating point
+	// be problematic across languages due to uncertainty in floating point
 	// math libs, this is further simplified to integer math as follows:
 	//
 	//                   curDiff * curPoolSizeAll^2

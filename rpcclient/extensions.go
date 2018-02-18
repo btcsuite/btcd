@@ -591,7 +591,7 @@ func (c *Client) GetCurrentNet() (wire.CurrencyNet, error) {
 	return c.GetCurrentNetAsync().Receive()
 }
 
-// FutureGetHeadersResult is a future promise to delivere the result of a
+// FutureGetHeadersResult is a future promise to deliver the result of a
 // getheaders RPC invocation (or an applicable error).
 type FutureGetHeadersResult chan *response
 
@@ -1192,7 +1192,7 @@ func (c *Client) TxFeeInfo(blocks *uint32, start *uint32, end *uint32) (*dcrjson
 	return c.TxFeeInfoAsync(blocks, start, end).Receive()
 }
 
-// FutureVersionResult is a future promise to delivere the result of a version
+// FutureVersionResult is a future promise to deliver the result of a version
 // RPC invocation (or an applicable error).
 type FutureVersionResult chan *response
 

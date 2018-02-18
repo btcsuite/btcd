@@ -95,7 +95,7 @@ func (request *Request) UnmarshalJSON(b []byte) error {
 	}
 	paramsValue, hasParams := data["params"]
 	if !hasParams {
-		// set the request param to an empty array if it is ommited in the request
+		// set the request param to an empty array if it is omitted in the request
 		request.Params = []json.RawMessage{}
 	}
 	if hasParams {

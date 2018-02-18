@@ -1683,7 +1683,7 @@ out:
 }
 
 // serviceRequest services a parsed RPC request by looking up and executing the
-// appropiate RPC handler.  The response is marshalled and sent to the websocket
+// appropriate RPC handler.  The response is marshalled and sent to the websocket
 // client.
 func (c *wsClient) serviceRequest(r *parsedRPCCmd) {
 	var (
