@@ -118,6 +118,14 @@ func (b *BlockChain) maybeAcceptBlock(block *dcrutil.Block, flags BehaviorFlags)
 		return false, err
 	}
 
+	// This function should never be called with orphan blocks or the
+	// genesis block.
+	if prevNode == nil {
+		prevHash := &block.MsgBlock().Header.PrevBlock
+		str := fmt.Sprintf("previous block %s is not known", prevHash)
+		return false, ruleError(ErrMissingParent, str)
+	}
+
 	blockHeight := block.Height()
 
 	// The block must pass all of the validation rules which depend on the
@@ -154,11 +162,9 @@ func (b *BlockChain) maybeAcceptBlock(block *dcrutil.Block, flags BehaviorFlags)
 	blockHeader := &block.MsgBlock().Header
 	newNode := newBlockNode(blockHeader,
 		stake.FindSpentTicketsInBlock(block.MsgBlock()))
-	if prevNode != nil {
-		newNode.parent = prevNode
-		newNode.height = blockHeight
-		newNode.workSum.Add(prevNode.workSum, newNode.workSum)
-	}
+	newNode.parent = prevNode
+	newNode.height = blockHeight
+	newNode.workSum.Add(prevNode.workSum, newNode.workSum)
 
 	// Fetching a stake node could enable a new DoS vector, so restrict
 	// this only to blocks that are recent in history.
