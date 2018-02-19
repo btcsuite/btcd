@@ -218,6 +218,9 @@ information.
     Decred scripts
   * [database](https://github.com/decred/dcrd/tree/master/database) -
     Provides a database interface for the Decred block chain
+  * [mempool](https://github.com/decred/dcrd/tree/master/mempool) -
+    Package mempool provides a policy-enforced pool of unmined decred
+    transactions.
   * [dcrutil](https://github.com/decred/dcrd/tree/master/dcrutil) - Provides
     Decred-specific convenience functions and types
   * [chainhash](https://github.com/decred/dcrd/tree/master/chaincfg/chainhash) -
