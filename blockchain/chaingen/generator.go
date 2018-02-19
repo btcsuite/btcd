@@ -1,4 +1,4 @@
-// Copyright (c) 2016-2017 The Decred developers
+// Copyright (c) 2016-2018 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -1281,6 +1281,35 @@ func (g *Generator) ReplaceWithNVotes(numVotes uint16) func(*wire.MsgBlock) {
 	}
 }
 
+// ReplaceVoteBitsN returns a function that itself takes a block and modifies
+// it by replacing the vote bits of the vote located at the provided index.  It
+// will panic if the stake transaction at the provided index is not already a
+// vote.
+//
+// NOTE: This must only be used as a munger to the 'NextBlock' function or it
+// will lead to an invalid live ticket pool.
+func (generator *Generator) ReplaceVoteBitsN(voteNum int, voteBits uint16) func(*wire.MsgBlock) {
+	return func(b *wire.MsgBlock) {
+		// Attempt to prevent misuse of this function by ensuring the
+		// provided stake transaction number is actually a vote.
+		stx := b.STransactions[voteNum]
+		if !isVoteTx(stx) {
+			panic(fmt.Sprintf("attempt to replace non-vote "+
+				"transaction #%d for for block %s", voteNum,
+				b.BlockHash()))
+		}
+
+		// Extract the existing vote version.
+		existingScript := stx.TxOut[1].PkScript
+		var voteVersion uint32
+		if len(existingScript) >= 8 {
+			voteVersion = binary.LittleEndian.Uint32(existingScript[4:8])
+		}
+
+		stx.TxOut[1].PkScript = voteBitsScript(voteBits, voteVersion)
+	}
+}
+
 // ReplaceBlockVersion returns a function that itself takes a block and modifies
 // it by replacing the stake version of the header.
 func ReplaceBlockVersion(newVersion int32) func(*wire.MsgBlock) {
@@ -2086,6 +2115,17 @@ func (g *Generator) AssertTipBlockMerkleRoot(expected chainhash.Hash) {
 	hash := g.tip.Header.MerkleRoot
 	if hash != expected {
 		panic(fmt.Sprintf("merkle root of block %q (height %d) is %v "+
+			"instead of expected %v", g.tipName,
+			g.tip.Header.Height, hash, expected))
+	}
+}
+
+// AssertTipBlockStakeRoot panics if the stake root in header of the current
+// tip block associated with the generator does not match the specified hash.
+func (g *Generator) AssertTipBlockStakeRoot(expected chainhash.Hash) {
+	hash := g.tip.Header.StakeRoot
+	if hash != expected {
+		panic(fmt.Sprintf("stake root of block %q (height %d) is %v "+
 			"instead of expected %v", g.tipName,
 			g.tip.Header.Height, hash, expected))
 	}
