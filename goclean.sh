@@ -11,21 +11,14 @@
 
 set -ex
 
-# Make sure glide is installed and $GOPATH/bin is in your path.
-# $ go get -u github.com/Masterminds/glide
-# $ glide install
-if [ ! -x "$(type -p glide)" ]; then
-  exit 1
-fi
-
 # Make sure gometalinter is installed and $GOPATH/bin is in your path.
-# $ go get -v github.com/alecthomas/gometalinter"
-# $ gometalinter --install"
+# $ go get -v github.com/alecthomas/gometalinter
+# $ gometalinter --install
 if [ ! -x "$(type -p gometalinter.v2)" ]; then
   exit 1
 fi
 
-linter_targets=$(glide novendor)
+linter_targets=$(go list ./... | grep -v '/vendor/')
 
 # Automatic checks
 test -z "$(gometalinter.v2 -j 4 --disable-all \
