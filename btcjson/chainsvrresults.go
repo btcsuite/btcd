@@ -501,7 +501,7 @@ type InfoChainResult struct {
 
 // TxRawResult models the data from the getrawtransaction command.
 type TxRawResult struct {
-	Hex           string `json:"hex"`
+	Hex           string `json:"hex,omitempty"`
 	Txid          string `json:"txid"`
 	Hash          string `json:"hash,omitempty"`
 	Size          int32  `json:"size,omitempty"`
