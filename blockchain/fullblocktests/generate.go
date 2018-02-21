@@ -718,7 +718,7 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 	acceptedToSideChainWithExpectedTip("b6")
 
 	g.NextBlock("b8", outs[4], ticketOuts[4])
-	rejected(blockchain.ErrMissingTx)
+	rejected(blockchain.ErrMissingTxOut)
 
 	// ---------------------------------------------------------------------
 	// Too much proof-of-work coinbase tests.
@@ -888,7 +888,7 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 	//    \-> b3(1) -> b4(2)
 	g.SetTip("b21")
 	g.NextBlock("b23", &b3Tx1Out, nil)
-	rejected(blockchain.ErrMissingTx)
+	rejected(blockchain.ErrMissingTxOut)
 
 	// Create block that forks and spends a tx created on a third fork.
 	//
@@ -900,7 +900,7 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 	acceptedToSideChainWithExpectedTip("b21")
 
 	g.NextBlock("b25", outs[6], ticketOuts[6])
-	rejected(blockchain.ErrMissingTx)
+	rejected(blockchain.ErrMissingTxOut)
 
 	// ---------------------------------------------------------------------
 	// Immature coinbase tests.
@@ -1238,12 +1238,11 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 	doubleSpendTx := g.CreateSpendTx(outs[12], lowFee)
 	g.NextBlock("b42", outs[12], ticketOuts[12], additionalPoWTx(doubleSpendTx))
 	b42Tx1Out := chaingen.MakeSpendableOut(g.Tip(), 1, 0)
-	// TODO: This really shoud be ErrDoubleSpend
-	rejected(blockchain.ErrMissingTx)
+	rejected(blockchain.ErrMissingTxOut)
 
 	g.SetTip("b41")
 	g.NextBlock("b43", &b42Tx1Out, ticketOuts[12])
-	rejected(blockchain.ErrMissingTx)
+	rejected(blockchain.ErrMissingTxOut)
 
 	// ---------------------------------------------------------------------
 	// Pay-to-script-hash signature operation count tests.
@@ -1528,7 +1527,7 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 		b.Transactions[1].TxIn[0].PreviousOutPoint.Hash = *hash
 		b.Transactions[1].TxIn[0].PreviousOutPoint.Index = 0
 	})
-	rejected(blockchain.ErrMissingTx)
+	rejected(blockchain.ErrMissingTxOut)
 
 	// Create block with stake tx in regular tx tree.
 	//
@@ -1598,7 +1597,7 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 	g.NextBlock("b58", outs[16], ticketOuts[16], func(b *wire.MsgBlock) {
 		b.Transactions[1].TxIn[0].PreviousOutPoint.Index = 42
 	})
-	rejected(blockchain.ErrMissingTx)
+	rejected(blockchain.ErrMissingTxOut)
 
 	// Create block with transaction that pays more than its inputs.
 	//
@@ -1715,7 +1714,7 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 		b.AddTransaction(tx3)
 		b.AddTransaction(tx2)
 	})
-	rejected(blockchain.ErrMissingTx)
+	rejected(blockchain.ErrMissingTxOut)
 
 	// Create block that double spends a transaction created in the same
 	// block.
@@ -1730,8 +1729,7 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 		b.AddTransaction(tx3)
 		b.AddTransaction(tx4)
 	})
-	// TODO: This really shoud be ErrDoubleSpend
-	rejected(blockchain.ErrMissingTx)
+	rejected(blockchain.ErrMissingTxOut)
 
 	// ---------------------------------------------------------------------
 	// Extra subsidy tests.
@@ -2086,7 +2084,7 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 		tx := g.CreateSpendTx(&b87OpReturnOut, zeroFee)
 		b.AddTransaction(tx)
 	})
-	rejected(blockchain.ErrMissingTx)
+	rejected(blockchain.ErrMissingTxOut)
 
 	// Create a block that has a transaction with multiple OP_RETURNs.  Even
 	// though a transaction with a large number of OP_RETURNS is not

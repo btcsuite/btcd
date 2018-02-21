@@ -1228,7 +1228,6 @@ func (b *BlockChain) checkDupTxs(txSet []*dcrutil.Tx, view *UtxoViewpoint) error
 // NOTE: The transaction MUST have already been sanity checked with the
 // CheckTransactionSanity function prior to calling this function.
 func CheckTransactionInputs(subsidyCache *SubsidyCache, tx *dcrutil.Tx, txHeight int64, utxoView *UtxoViewpoint, checkFraudProof bool, chainParams *chaincfg.Params) (int64, error) {
-
 	msgTx := tx.MsgTx()
 
 	// Expired transactions are not allowed.
@@ -1267,22 +1266,15 @@ func CheckTransactionInputs(subsidyCache *SubsidyCache, tx *dcrutil.Tx, txHeight
 
 		for idx, txIn := range msgTx.TxIn {
 			// Ensure the input is available.
-			txInHash := &txIn.PreviousOutPoint.Hash
-			utxoEntry, exists := utxoView.entries[*txInHash]
-			if !exists || utxoEntry == nil {
-				str := fmt.Sprintf("unable to find input "+
-					"transaction %v for transaction %v",
-					txInHash, txHash)
-				return 0, ruleError(ErrMissingTx, str)
-			}
-
-			// Ensure the transaction is not double spending coins.
+			originTxHash := &txIn.PreviousOutPoint.Hash
 			originTxIndex := txIn.PreviousOutPoint.Index
-			if utxoEntry.IsOutputSpent(originTxIndex) {
-				str := fmt.Sprintf("transaction %s:%d tried "+
-					"to double spend output %v", txHash,
-					idx, txIn.PreviousOutPoint)
-				return 0, ruleError(ErrDoubleSpend, str)
+			utxoEntry := utxoView.LookupEntry(originTxHash)
+			if utxoEntry == nil || utxoEntry.IsOutputSpent(originTxIndex) {
+				str := fmt.Sprintf("output %v referenced from "+
+					"transaction %s:%d either does not exist or "+
+					"has already been spent", txIn.PreviousOutPoint,
+					txHash, idx)
+				return 0, ruleError(ErrMissingTxOut, str)
 			}
 
 			// Check and make sure that the input is P2PKH or P2SH.
@@ -1299,7 +1291,7 @@ func CheckTransactionInputs(subsidyCache *SubsidyCache, tx *dcrutil.Tx, txHeight
 					", txout %v referenced a txout that "+
 					"was not a PubKeyHashTy or "+
 					"ScriptHashTy pkScrpt (class: %v, "+
-					"version %v, script %x)", txInHash,
+					"version %v, script %x)", originTxHash,
 					originTxIndex, class, pkVer, pkScrpt)
 				return 0, ruleError(ErrSStxInScrType, errStr)
 			}
@@ -1375,12 +1367,13 @@ func CheckTransactionInputs(subsidyCache *SubsidyCache, tx *dcrutil.Tx, txHeight
 		// We also need to make sure that the SSGen outputs that are
 		// P2PKH go to the addresses specified in the original SSTx.
 		// Check that too.
-		utxoEntrySstx, exists := utxoView.entries[sstxHash]
-		if !exists || utxoEntrySstx == nil {
-			errStr := fmt.Sprintf("Unable to find input sstx "+
-				"transaction %v for transaction %v", sstxHash,
-				txHash)
-			return 0, ruleError(ErrMissingTx, errStr)
+		utxoEntrySstx := utxoView.LookupEntry(&sstxHash)
+		if utxoEntrySstx == nil {
+			str := fmt.Sprintf("ticket output %v referenced from "+
+				"transaction %s:%d either does not exist or "+
+				"has already been spent", sstxIn.PreviousOutPoint,
+				txHash, 1)
+			return 0, ruleError(ErrMissingTxOut, str)
 		}
 
 		// While we're here, double check to make sure that the input
@@ -1512,12 +1505,13 @@ func CheckTransactionInputs(subsidyCache *SubsidyCache, tx *dcrutil.Tx, txHeight
 		// We also need to make sure that the SSGen outputs that are
 		// P2PKH go to the addresses specified in the original SSTx.
 		// Check that too.
-		utxoEntrySstx, exists := utxoView.entries[sstxHash]
-		if !exists || utxoEntrySstx == nil {
-			errStr := fmt.Sprintf("Unable to find input sstx "+
-				"transaction %v for transaction %v", sstxHash,
-				txHash)
-			return 0, ruleError(ErrMissingTx, errStr)
+		utxoEntrySstx := utxoView.LookupEntry(&sstxHash)
+		if utxoEntrySstx == nil {
+			str := fmt.Sprintf("ticket output %v referenced from "+
+				"transaction %s:%d either does not exist or "+
+				"has already been spent", sstxIn.PreviousOutPoint,
+				txHash, 0)
+			return 0, ruleError(ErrMissingTxOut, str)
 		}
 
 		// While we're here, double check to make sure that the input
@@ -1620,15 +1614,17 @@ func CheckTransactionInputs(subsidyCache *SubsidyCache, tx *dcrutil.Tx, txHeight
 		}
 
 		txInHash := &txIn.PreviousOutPoint.Hash
-		utxoEntry, exists := utxoView.entries[*txInHash]
-		if !exists || utxoEntry == nil {
-			str := fmt.Sprintf("unable to find input transaction "+
-				"%v for transaction %v", txInHash, txHash)
-			return 0, ruleError(ErrMissingTx, str)
+		originTxIndex := txIn.PreviousOutPoint.Index
+		utxoEntry := utxoView.LookupEntry(txInHash)
+		if utxoEntry == nil || utxoEntry.IsOutputSpent(originTxIndex) {
+			str := fmt.Sprintf("output %v referenced from "+
+				"transaction %s:%d either does not exist or "+
+				"has already been spent", txIn.PreviousOutPoint,
+				txHash, idx)
+			return 0, ruleError(ErrMissingTxOut, str)
 		}
 
 		// Check fraud proof witness data.
-		originTxIndex := txIn.PreviousOutPoint.Index
 
 		// Using zero value outputs as inputs is banned.
 		if utxoEntry.AmountByIndex(originTxIndex) == 0 {
@@ -1697,14 +1693,6 @@ func CheckTransactionInputs(subsidyCache *SubsidyCache, tx *dcrutil.Tx, txHeight
 					txHeight, coinbaseMaturity)
 				return 0, ruleError(ErrExpiryTxSpentEarly, str)
 			}
-		}
-
-		// Ensure the transaction is not double spending coins.
-		if utxoEntry.IsOutputSpent(originTxIndex) {
-			str := fmt.Sprintf("transaction %s:%d tried to double "+
-				"spend output %v", txHash, originTxIndex,
-				txIn.PreviousOutPoint)
-			return 0, ruleError(ErrDoubleSpend, str)
 		}
 
 		// Ensure that the outpoint's tx tree makes sense.
@@ -1929,22 +1917,13 @@ func CountP2SHSigOps(tx *dcrutil.Tx, isCoinBaseTx bool, isStakeBaseTx bool, utxo
 		// Ensure the referenced input transaction is available.
 		originTxHash := &txIn.PreviousOutPoint.Hash
 		originTxIndex := txIn.PreviousOutPoint.Index
-		utxoEntry, ok := utxoView.entries[*originTxHash]
-		if !ok || utxoEntry == nil {
-			str := fmt.Sprintf("unable to find unspent transaction"+
-				" %v referenced from transaction %s:%d during "+
-				"CountP2SHSigOps: output missing",
-				txIn.PreviousOutPoint.Hash, tx.Hash(),
-				txInIndex)
-			return 0, ruleError(ErrMissingTx, str)
-		}
-
-		if utxoEntry.IsOutputSpent(originTxIndex) {
-			str := fmt.Sprintf("unable to find unspent output "+
-				"%v referenced from transaction %s:%d during "+
-				"CountP2SHSigOps: output spent",
-				txIn.PreviousOutPoint, tx.Hash(), txInIndex)
-			return 0, ruleError(ErrMissingTx, str)
+		utxoEntry := utxoView.LookupEntry(originTxHash)
+		if utxoEntry == nil || utxoEntry.IsOutputSpent(originTxIndex) {
+			str := fmt.Sprintf("output %v referenced from "+
+				"transaction %s:%d either does not exist or "+
+				"has already been spent", txIn.PreviousOutPoint,
+				tx.Hash(), txInIndex)
+			return 0, ruleError(ErrMissingTxOut, str)
 		}
 
 		// We're only interested in pay-to-script-hash types, so skip
@@ -2342,7 +2321,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block, parent *dcrutil.B
 	// an error now.
 	if node.hash.IsEqual(b.chainParams.GenesisHash) {
 		str := "the coinbase for the genesis block is not spendable"
-		return ruleError(ErrMissingTx, str)
+		return ruleError(ErrMissingTxOut, str)
 	}
 
 	// Ensure the view is for the node being checked.

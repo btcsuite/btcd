@@ -1651,10 +1651,10 @@ func TestBlockValidationRules(t *testing.T) {
 			err)
 	}
 
-	// Fails and hits ErrMissingTx.
+	// Fails and hits ErrMissingTxOut.
 	err = chain.CheckConnectBlock(b154test, blockchain.BFNoPoWCheck)
 	if err == nil || err.(blockchain.RuleError).ErrorCode !=
-		blockchain.ErrMissingTx {
+		blockchain.ErrMissingTxOut {
 		t.Errorf("Unexpected no or wrong error for invalMissingInsS154 test: %v",
 			err)
 	}
@@ -1686,7 +1686,7 @@ func TestBlockValidationRules(t *testing.T) {
 	}
 
 	// ----------------------------------------------------------------------------
-	// ErrMissingTx (formerly ErrZeroValueOutputSpend). In the latest version of
+	// ErrMissingTxOut (formerly ErrZeroValueOutputSpend). In the latest version of
 	// the database, zero value outputs are automatically pruned, so the output
 	// is simply missing.
 	mtxFromB = new(wire.MsgTx)
@@ -1720,9 +1720,9 @@ func TestBlockValidationRules(t *testing.T) {
 	// Fails and hits ErrZeroValueOutputSpend.
 	err = chain.CheckConnectBlock(b154test, blockchain.BFNoPoWCheck)
 	if err == nil || err.(blockchain.RuleError).ErrorCode !=
-		blockchain.ErrMissingTx {
+		blockchain.ErrMissingTxOut {
 		t.Errorf("Unexpected no or wrong error for "+
-			"ErrMissingTx test: %v", err)
+			"ErrMissingTxOut test: %v", err)
 	}
 
 	// ----------------------------------------------------------------------------
@@ -1778,16 +1778,16 @@ func TestBlockValidationRules(t *testing.T) {
 
 	err = blockchain.CheckWorklessBlockSanity(b166test, timeSource, params)
 	if err != nil {
-		t.Errorf("got unexpected error for ErrMissingTx test 1 sanity "+
+		t.Errorf("got unexpected error for ErrMissingTxOut test 1 sanity "+
 			"check: %v", err)
 	}
 
-	// Fails and hits ErrMissingTx.
+	// Fails and hits ErrMissingTxOut.
 	err = chain.CheckConnectBlock(b166test, blockchain.BFNoPoWCheck)
 	if err == nil || err.(blockchain.RuleError).ErrorCode !=
-		blockchain.ErrMissingTx {
+		blockchain.ErrMissingTxOut {
 		t.Errorf("Unexpected no or wrong error for "+
-			"ErrMissingTx test 1: %v", err)
+			"ErrMissingTxOut test 1: %v", err)
 	}
 
 	// ----------------------------------------------------------------------------
@@ -1824,16 +1824,16 @@ func TestBlockValidationRules(t *testing.T) {
 
 	err = blockchain.CheckWorklessBlockSanity(b166test, timeSource, params)
 	if err != nil {
-		t.Errorf("got unexpected error for ErrMissingTx test 2 sanity "+
+		t.Errorf("got unexpected error for ErrMissingTxOut test 2 sanity "+
 			"check: %v", err)
 	}
 
-	// Fails and hits ErrMissingTx.
+	// Fails and hits ErrMissingTxOut.
 	err = chain.CheckConnectBlock(b166test, blockchain.BFNoPoWCheck)
 	if err == nil || err.(blockchain.RuleError).ErrorCode !=
-		blockchain.ErrMissingTx {
+		blockchain.ErrMissingTxOut {
 		t.Errorf("Unexpected no or wrong error for "+
-			"ErrMissingTx test 2: %v", err)
+			"ErrMissingTxOut test 2: %v", err)
 	}
 
 	// ----------------------------------------------------------------------------
@@ -1871,7 +1871,7 @@ func TestBlockValidationRules(t *testing.T) {
 			"check: %v", err)
 	}
 
-	// Fails and hits ErrMissingTx. It may not be immediately clear
+	// Fails and hits ErrMissingTxOut. It may not be immediately clear
 	// why this happens, but in the case of the stake transaction
 	// tree, because you can't spend in chains, the txlookup code
 	// doesn't even bother to populate the spent list in the txlookup
@@ -1901,10 +1901,10 @@ func TestBlockValidationRules(t *testing.T) {
 			"check: %v", err)
 	}
 
-	// Fails and hits ErrMissingTx.
+	// Fails and hits ErrMissingTxOut.
 	err = chain.CheckConnectBlock(b166test, blockchain.BFNoPoWCheck)
 	if err == nil || err.(blockchain.RuleError).ErrorCode !=
-		blockchain.ErrMissingTx {
+		blockchain.ErrMissingTxOut {
 		t.Errorf("Unexpected no or wrong error for "+
 			"double spend test 1: %v", err)
 	}
@@ -1926,10 +1926,10 @@ func TestBlockValidationRules(t *testing.T) {
 			"check: %v", err)
 	}
 
-	// Fails and hits ErrMissingTx.
+	// Fails and hits ErrMissingTxOut.
 	err = chain.CheckConnectBlock(b166test, blockchain.BFNoPoWCheck)
 	if err == nil || err.(blockchain.RuleError).ErrorCode !=
-		blockchain.ErrMissingTx {
+		blockchain.ErrMissingTxOut {
 		t.Errorf("Unexpected no or wrong error for "+
 			"double spend test 2: %v", err)
 	}

@@ -63,7 +63,7 @@ out:
 					"transaction %v referenced from "+
 					"transaction %v", originTxHash,
 					txVI.tx.Hash())
-				err := ruleError(ErrMissingTx, str)
+				err := ruleError(ErrMissingTxOut, str)
 				v.sendResult(err)
 				break out
 			}

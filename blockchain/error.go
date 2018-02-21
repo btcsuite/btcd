@@ -157,9 +157,9 @@ const (
 	// range or not referencing one at all.
 	ErrBadTxInput
 
-	// ErrMissingTx indicates a transaction referenced by an input is
-	// missing.
-	ErrMissingTx
+	// ErrMissingTxOut indicates a transaction output referenced by an input
+	// either does not exist or has already been spent.
+	ErrMissingTxOut
 
 	// ErrUnfinalizedTx indicates a transaction has not been finalized.
 	// A valid block may only contain finalized transactions.
@@ -178,10 +178,6 @@ const (
 	// ErrImmatureSpend indicates a transaction is attempting to spend a
 	// coinbase that has not yet reached the required maturity.
 	ErrImmatureSpend
-
-	// ErrDoubleSpend indicates a transaction is attempting to spend coins
-	// that have already been spent.
-	ErrDoubleSpend
 
 	// ErrSpendTooHigh indicates a transaction is attempting to spend more
 	// value than the sum of all of its inputs.
@@ -480,12 +476,11 @@ var errorCodeStrings = map[ErrorCode]string{
 	ErrBadTxOutValue:          "ErrBadTxOutValue",
 	ErrDuplicateTxInputs:      "ErrDuplicateTxInputs",
 	ErrBadTxInput:             "ErrBadTxInput",
-	ErrMissingTx:              "ErrMissingTx",
+	ErrMissingTxOut:           "ErrMissingTxOut",
 	ErrUnfinalizedTx:          "ErrUnfinalizedTx",
 	ErrDuplicateTx:            "ErrDuplicateTx",
 	ErrOverwriteTx:            "ErrOverwriteTx",
 	ErrImmatureSpend:          "ErrImmatureSpend",
-	ErrDoubleSpend:            "ErrDoubleSpend",
 	ErrSpendTooHigh:           "ErrSpendTooHigh",
 	ErrBadFees:                "ErrBadFees",
 	ErrTooManySigOps:          "ErrTooManySigOps",

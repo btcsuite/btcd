@@ -67,10 +67,11 @@ func (b *BlockChain) calcSequenceLock(node *blockNode, tx *dcrutil.Tx, view *Utx
 
 		utxo := view.LookupEntry(&txIn.PreviousOutPoint.Hash)
 		if utxo == nil {
-			str := fmt.Sprintf("unable to find unspent output "+
-				"%v referenced from transaction %s:%d",
-				txIn.PreviousOutPoint, tx.Hash(), txInIndex)
-			return sequenceLock, ruleError(ErrMissingTx, str)
+			str := fmt.Sprintf("output %v referenced from "+
+				"transaction %s:%d either does not exist or "+
+				"has already been spent", txIn.PreviousOutPoint,
+				tx.Hash(), txInIndex)
+			return sequenceLock, ruleError(ErrMissingTxOut, str)
 		}
 
 		// Calculate the sequence locks from the point of view of the
