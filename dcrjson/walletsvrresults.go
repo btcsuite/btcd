@@ -24,8 +24,15 @@ type GetAccountBalanceResult struct {
 
 // GetBalanceResult models the data from the getbalance command.
 type GetBalanceResult struct {
-	Balances  []GetAccountBalanceResult `json:"balances"`
-	BlockHash string                    `json:"blockhash"`
+	Balances                     []GetAccountBalanceResult `json:"balances"`
+	BlockHash                    string                    `json:"blockhash"`
+	TotalImmatureCoinbaseRewards float64                   `json:"totalimmaturecoinbaserewards,omitempty"`
+	TotalImmatureStakeGeneration float64                   `json:"totalimmaturestakegeneration,omitempty"`
+	TotalLockedByTickets         float64                   `json:"totallockedbytickets,omitempty"`
+	TotalSpendable               float64                   `json:"totalspendable,omitempty"`
+	CumulativeTotal              float64                   `json:"cumulativetotal,omitempty"`
+	TotalUnconfirmed             float64                   `json:"totalunconfirmed,omitempty"`
+	TotalVotingAuthority         float64                   `json:"totalvotingauthority,omitempty"`
 }
 
 // GetTransactionDetailsResult models the details data from the gettransaction command.
