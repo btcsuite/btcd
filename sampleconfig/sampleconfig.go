@@ -247,8 +247,8 @@ const FileContents = `[Application Options]
 ; Do not accept transactions from remote peers.
 ; blocksonly=1
 
-; Accept and relay non-standard transactions to the network regardless
- default network settings.
+; Accept and relay non-standard transactions to the network regardless of the
+; default network settings.
 ; acceptnonstd=1
 
 ; Reject non-standard transactions regardless of default network settings.
