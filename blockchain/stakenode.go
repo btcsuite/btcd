@@ -114,7 +114,7 @@ func (b *BlockChain) fetchStakeNode(node *blockNode) (*stake.Node, error) {
 			}
 
 			node.stakeNode, err = node.parent.stakeNode.ConnectNode(
-				node.lotteryIV, node.ticketsVoted, node.ticketsRevoked,
+				node.lotteryIV(), node.ticketsVoted, node.ticketsRevoked,
 				node.newTickets)
 			if err != nil {
 				return nil, err
@@ -144,7 +144,7 @@ func (b *BlockChain) fetchStakeNode(node *blockNode) (*stake.Node, error) {
 			if n.stakeNode == nil {
 				var errLocal error
 				n.stakeNode, errLocal =
-					current.stakeNode.DisconnectNode(n.lotteryIV,
+					current.stakeNode.DisconnectNode(n.lotteryIV(),
 						n.stakeUndoData, n.newTickets, dbTx)
 				if errLocal != nil {
 					return errLocal
@@ -165,7 +165,7 @@ func (b *BlockChain) fetchStakeNode(node *blockNode) (*stake.Node, error) {
 		if current.parent.stakeNode == nil {
 			var errLocal error
 			current.parent.stakeNode, errLocal =
-				current.stakeNode.DisconnectNode(current.parent.lotteryIV,
+				current.stakeNode.DisconnectNode(current.parent.lotteryIV(),
 					current.parent.stakeUndoData, current.parent.newTickets, dbTx)
 			if errLocal != nil {
 				return errLocal
@@ -205,7 +205,7 @@ func (b *BlockChain) fetchStakeNode(node *blockNode) (*stake.Node, error) {
 				}
 			}
 
-			n.stakeNode, err = current.stakeNode.ConnectNode(n.lotteryIV,
+			n.stakeNode, err = current.stakeNode.ConnectNode(n.lotteryIV(),
 				n.ticketsVoted, n.ticketsRevoked, n.newTickets)
 			if err != nil {
 				return nil, err

@@ -6,6 +6,7 @@
 package blockchain
 
 import (
+	"bytes"
 	"fmt"
 	"math/big"
 	"sort"
@@ -78,9 +79,7 @@ type blockNode struct {
 	// staking system.  The node also caches information required to add or
 	// remove stake nodes, so that the stake node itself may be pruneable
 	// to save memory while maintaining high throughput efficiency for the
-	// evaluation of sidechains.  The lotteryIV contains the initialization
-	// vector for the deterministic PRNG used to determine winning tickets.
-	lotteryIV      chainhash.Hash
+	// evaluation of sidechains.
 	stakeNode      *stake.Node
 	newTickets     []chainhash.Hash
 	stakeUndoData  stake.UndoTicketDataSlice
@@ -95,16 +94,6 @@ type blockNode struct {
 // node.  The workSum is calculated based on the parent, or, in the case no
 // parent is provided, it will just be the work for the passed block.
 func newBlockNode(blockHeader *wire.BlockHeader, parent *blockNode) *blockNode {
-	// Serialize the block header for use in calculating the initialization
-	// vector for the ticket lottery.  The only way this can fail is if the
-	// process is out of memory in which case it would panic anyways, so
-	// although panics are generally frowned upon in package code, it is
-	// acceptable here.
-	hB, err := blockHeader.Bytes()
-	if err != nil {
-		panic(err)
-	}
-
 	// Make a copy of the hash so the node doesn't keep a reference to part
 	// of the full block/block header preventing it from being garbage
 	// collected.
@@ -129,7 +118,6 @@ func newBlockNode(blockHeader *wire.BlockHeader, parent *blockNode) *blockNode {
 		nonce:        blockHeader.Nonce,
 		extraData:    blockHeader.ExtraData,
 		stakeVersion: blockHeader.StakeVersion,
-		lotteryIV:    stake.CalcHash256PRNGIV(hB),
 	}
 	if parent != nil {
 		node.parent = parent
@@ -164,6 +152,25 @@ func (node *blockNode) Header() wire.BlockHeader {
 		ExtraData:    node.extraData,
 		StakeVersion: node.stakeVersion,
 	}
+}
+
+// lotteryIV returns the initialization vector for the deterministic PRNG used
+// to determine winning tickets.
+//
+// This function is safe for concurrent access.
+func (node *blockNode) lotteryIV() chainhash.Hash {
+	// Serialize the block header for use in calculating the initialization
+	// vector for the ticket lottery.  The only way this can fail is if the
+	// process is out of memory in which case it would panic anyways, so
+	// although panics are generally frowned upon in package code, it is
+	// acceptable here.
+	buf := bytes.NewBuffer(make([]byte, 0, wire.MaxBlockHeaderPayload))
+	header := node.Header()
+	if err := header.Serialize(buf); err != nil {
+		panic(err)
+	}
+
+	return stake.CalcHash256PRNGIV(buf.Bytes())
 }
 
 // populateTicketInfo sets prunable ticket information in the provided block
