@@ -21,6 +21,50 @@ import (
 	"github.com/decred/dcrd/wire"
 )
 
+// blockStatus is a bit field representing the validation state of the block.
+type blockStatus byte
+
+// The following constants specify possible status bit flags for a block.
+//
+// NOTE: This section specifically does not use iota since the block status is
+// serialized and must be stable for long-term storage.
+const (
+	// statusNone indicates that the block has no validation state flags set.
+	statusNone blockStatus = 0
+
+	// statusDataStored indicates that the block's payload is stored on disk.
+	statusDataStored blockStatus = 1 << 0
+
+	// statusValid indicates that the block has been fully validated.
+	statusValid blockStatus = 1 << 1
+
+	// statusValidateFailed indicates that the block has failed validation.
+	statusValidateFailed blockStatus = 1 << 2
+
+	// statusInvalidAncestor indicates that one of the ancestors of the block
+	// has failed validation, thus the block is also invalid.
+	statusInvalidAncestor = 1 << 3
+)
+
+// HaveData returns whether the full block data is stored in the database.  This
+// will return false for a block node where only the header is downloaded or
+// stored.
+func (status blockStatus) HaveData() bool {
+	return status&statusDataStored != 0
+}
+
+// KnownValid returns whether the block is known to be valid.  This will return
+// false for a valid block that has not been fully validated yet.
+func (status blockStatus) KnownValid() bool {
+	return status&statusValid != 0
+}
+
+// KnownInvalid returns whether the block is known to be invalid.  This will
+// return false for invalid blocks that have not been proven invalid yet.
+func (status blockStatus) KnownInvalid() bool {
+	return status&(statusValidateFailed|statusInvalidAncestor) != 0
+}
+
 // blockNode represents a block within the block chain and is primarily used to
 // aid in selecting the best chain to be the main chain.  The main chain is
 // stored into the block database.
@@ -74,6 +118,13 @@ type blockNode struct {
 	nonce        uint32
 	extraData    [32]byte
 	stakeVersion uint32
+
+	// status is a bitfield representing the validation state of the block.
+	// This field, unlike the other fields, may be changed after the block
+	// node is created, so it must only be accessed or updated using the
+	// concurrent-safe NodeStatus, SetStatusFlags, and UnsetStatusFlags
+	// methods on blockIndex once the node has been added to the index.
+	status blockStatus
 
 	// stakeNode contains all the consensus information required for the
 	// staking system.  The node also caches information required to add or
@@ -273,6 +324,7 @@ func (bi *blockIndex) loadBlockNode(dbTx database.Tx, hash *chainhash.Hash) (*bl
 	blockHeader := block.MsgBlock().Header
 	node := newBlockNode(&blockHeader, nil)
 	node.populateTicketInfo(stake.FindSpentTicketsInBlock(block.MsgBlock()))
+	node.status = statusDataStored | statusValid
 	node.inMainChain = true
 
 	// Add the node to the chain.
@@ -480,6 +532,36 @@ func (bi *blockIndex) LookupNode(hash *chainhash.Hash) *blockNode {
 	node := bi.index[*hash]
 	bi.RUnlock()
 	return node
+}
+
+// NodeStatus returns the status associated with the provided node.
+//
+// This function is safe for concurrent access.
+func (bi *blockIndex) NodeStatus(node *blockNode) blockStatus {
+	bi.RLock()
+	status := node.status
+	bi.RUnlock()
+	return status
+}
+
+// SetStatusFlags sets the provided status flags for the given block node
+// regardless of their previous state.  It does not unset any flags.
+//
+// This function is safe for concurrent access.
+func (bi *blockIndex) SetStatusFlags(node *blockNode, flags blockStatus) {
+	bi.Lock()
+	node.status |= flags
+	bi.Unlock()
+}
+
+// UnsetStatusFlags unsets the provided status flags for the given block node
+// regardless of their previous state.
+//
+// This function is safe for concurrent access.
+func (bi *blockIndex) UnsetStatusFlags(node *blockNode, flags blockStatus) {
+	bi.Lock()
+	node.status &^= flags
+	bi.Unlock()
 }
 
 // CalcPastMedianTime calculates the median time of the previous few blocks

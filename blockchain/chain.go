@@ -745,6 +745,12 @@ func (b *BlockChain) getReorganizeNodes(node *blockNode) (*list.List, *list.List
 		return detachNodes, attachNodes, nil
 	}
 
+	// Don't allow a reorganize to a descendant of an known invalid block.
+	if b.index.NodeStatus(node.parent).KnownInvalid() {
+		b.index.SetStatusFlags(node, statusInvalidAncestor)
+		return detachNodes, attachNodes, nil
+	}
+
 	// Find the fork point (if any) adding each block to the list of nodes
 	// to attach to the main tree.  Push them onto the list in reverse order
 	// so they are attached in the appropriate order when iterating the list
@@ -1602,6 +1608,10 @@ func (b *BlockChain) connectBestChain(node *blockNode, block, parent *dcrutil.Bl
 	// We are extending the main (best) chain with a new block.  This is the
 	// most common case.
 	if node.parentHash == b.bestNode.hash {
+		// Skip expensive checks if the block has already been fully
+		// validated.
+		fastAdd = fastAdd || b.index.NodeStatus(node).KnownValid()
+
 		// Perform several checks to verify the block can be connected
 		// to the main chain without violating any rules and without
 		// actually connecting the block.
@@ -1613,8 +1623,12 @@ func (b *BlockChain) connectBestChain(node *blockNode, block, parent *dcrutil.Bl
 			err := b.checkConnectBlock(node, block, parent, view,
 				&stxos)
 			if err != nil {
+				if _, ok := err.(RuleError); ok {
+					b.index.SetStatusFlags(node, statusValidateFailed)
+				}
 				return false, err
 			}
+			b.index.SetStatusFlags(node, statusValid)
 		}
 
 		// Don't connect the block if performing a dry run.

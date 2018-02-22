@@ -449,6 +449,10 @@ const (
 	// height had a non-zero final state.
 	ErrInvalidEarlyFinalState
 
+	// ErrInvalidAncestorBlock indicates that an ancestor of this block has
+	// failed validation.
+	ErrInvalidAncestorBlock
+
 	// numErrorCodes is the maximum error code number used in tests.
 	numErrorCodes
 )
@@ -550,6 +554,7 @@ var errorCodeStrings = map[ErrorCode]string{
 	ErrZeroValueOutputSpend:   "ErrZeroValueOutputSpend",
 	ErrInvalidEarlyVoteBits:   "ErrInvalidEarlyVoteBits",
 	ErrInvalidEarlyFinalState: "ErrInvalidEarlyFinalState",
+	ErrInvalidAncestorBlock:   "ErrInvalidAncestorBlock",
 }
 
 // String returns the ErrorCode as a human-readable name.

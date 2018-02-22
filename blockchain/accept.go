@@ -126,6 +126,15 @@ func (b *BlockChain) maybeAcceptBlock(block *dcrutil.Block, flags BehaviorFlags)
 		return false, ruleError(ErrMissingParent, str)
 	}
 
+	// There is no need to validate the block if an ancestor is already
+	// known to be invalid.
+	if b.index.NodeStatus(prevNode).KnownInvalid() {
+		prevHash := &block.MsgBlock().Header.PrevBlock
+		str := fmt.Sprintf("previous block %s is known to be invalid",
+			prevHash)
+		return false, ruleError(ErrInvalidAncestorBlock, str)
+	}
+
 	// The block must pass all of the validation rules which depend on the
 	// position of the block within the block chain.
 	err = b.checkBlockContext(block, prevNode, flags)
@@ -160,6 +169,7 @@ func (b *BlockChain) maybeAcceptBlock(block *dcrutil.Block, flags BehaviorFlags)
 	blockHeader := &block.MsgBlock().Header
 	newNode := newBlockNode(blockHeader, prevNode)
 	newNode.populateTicketInfo(stake.FindSpentTicketsInBlock(block.MsgBlock()))
+	newNode.status = statusDataStored
 	b.index.AddNode(newNode)
 
 	// Remove the node from the block index and disconnect it from the

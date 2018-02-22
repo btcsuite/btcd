@@ -186,10 +186,11 @@ func ConvertUtxosToMinimalOutputs(entry *UtxoEntry) []*stake.MinimalOutput {
 //
 // The serialized value format is:
 //
-//   <block header><num votes><votes info><num revoked><revoked tickets>
+//   <block header><status><num votes><votes info><num revoked><revoked tickets>
 //
 //   Field              Type                Size
 //   block header       wire.BlockHeader    180 bytes
+//   status             blockStatus         1 byte
 //   num votes          VLQ                 variable
 //   vote info
 //     ticket hash      chainhash.Hash      chainhash.HashSize
@@ -221,7 +222,7 @@ func blockNodeSerializeSize(node *blockNode) int {
 			serializeSizeVLQ(uint64(node.votes[i].Bits))
 	}
 
-	return blockHdrSize + serializeSizeVLQ(uint64(len(node.votes))) +
+	return blockHdrSize + 1 + serializeSizeVLQ(uint64(len(node.votes))) +
 		voteInfoSize + serializeSizeVLQ(uint64(len(node.ticketsRevoked))) +
 		chainhash.HashSize*len(node.ticketsRevoked)
 }
@@ -244,8 +245,12 @@ func putBlockNode(target []byte, node *blockNode) (int, error) {
 		return 0, err
 	}
 
-	// Serialize the number of votes and associated vote information.
+	// Serialize the status.
 	offset := blockHdrSize
+	target[offset] = byte(node.status)
+	offset++
+
+	// Serialize the number of votes and associated vote information.
 	offset += putVLQ(target[offset:], uint64(len(node.votes)))
 	for i := range node.votes {
 		offset += copy(target[offset:], node.ticketsVoted[i][:])
@@ -288,6 +293,14 @@ func decodeBlockNode(serialized []byte, node *blockNode) (int, error) {
 		return 0, err
 	}
 	offset := blockHdrSize
+
+	// Deserialize the status.
+	if offset+1 > len(serialized) {
+		return offset, errDeserialize("unexpected end of data while " +
+			"reading status")
+	}
+	status := blockStatus(serialized[offset])
+	offset++
 
 	// Deserialize the number of tickets spent.
 	var ticketsVoted []chainhash.Hash
@@ -358,6 +371,7 @@ func decodeBlockNode(serialized []byte, node *blockNode) (int, error) {
 	}
 
 	initBlockNode(node, &header, nil)
+	node.status = status
 	node.populateTicketInfo(&stake.SpentTicketsInBlock{
 		VotedTickets:   ticketsVoted,
 		RevokedTickets: ticketsRevoked,
@@ -1521,6 +1535,7 @@ func (b *BlockChain) createChainState() error {
 	genesisBlock := dcrutil.NewBlock(b.chainParams.GenesisBlock)
 	header := &genesisBlock.MsgBlock().Header
 	node := newBlockNode(header, nil)
+	node.status = statusDataStored | statusValid
 	node.inMainChain = true
 
 	// Initialize the state related to the best block.  Since it is the
@@ -1730,6 +1745,7 @@ func (b *BlockChain) initChainState(interrupt <-chan struct{}) error {
 		header := &block.Header
 		node := newBlockNode(header, nil)
 		node.populateTicketInfo(stake.FindSpentTicketsInBlock(&block))
+		node.status = statusDataStored | statusValid
 		node.inMainChain = true
 		node.workSum = state.workSum
 

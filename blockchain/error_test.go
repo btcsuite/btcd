@@ -110,6 +110,7 @@ func TestErrorCodeStringer(t *testing.T) {
 		{ErrZeroValueOutputSpend, "ErrZeroValueOutputSpend"},
 		{ErrInvalidEarlyVoteBits, "ErrInvalidEarlyVoteBits"},
 		{ErrInvalidEarlyFinalState, "ErrInvalidEarlyFinalState"},
+		{ErrInvalidAncestorBlock, "ErrInvalidAncestorBlock"},
 		{0xffff, "Unknown ErrorCode (65535)"},
 	}
 
