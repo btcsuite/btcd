@@ -448,6 +448,9 @@ const (
 	// ErrInvalidEarlyFinalState indicates that a block before stake validation
 	// height had a non-zero final state.
 	ErrInvalidEarlyFinalState
+
+	// numErrorCodes is the maximum error code number used in tests.
+	numErrorCodes
 )
 
 // Map of ErrorCode values back to their constant names for pretty printing.
@@ -457,7 +460,7 @@ var errorCodeStrings = map[ErrorCode]string{
 	ErrBlockTooBig:            "ErrBlockTooBig",
 	ErrWrongBlockSize:         "ErrWrongBlockSize",
 	ErrBlockVersionTooOld:     "ErrBlockVersionTooOld",
-	ErrBadStakeVersion:        "ErrBlockStakeVersion",
+	ErrBadStakeVersion:        "ErrBadStakeVersion",
 	ErrInvalidTime:            "ErrInvalidTime",
 	ErrTimeTooOld:             "ErrTimeTooOld",
 	ErrTimeTooNew:             "ErrTimeTooNew",
