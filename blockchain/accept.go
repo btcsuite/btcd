@@ -160,6 +160,15 @@ func (b *BlockChain) maybeAcceptBlock(block *dcrutil.Block, flags BehaviorFlags)
 	blockHeader := &block.MsgBlock().Header
 	newNode := newBlockNode(blockHeader, prevNode)
 	newNode.populateTicketInfo(stake.FindSpentTicketsInBlock(block.MsgBlock()))
+	b.index.AddNode(newNode)
+
+	// Remove the node from the block index and disconnect it from the
+	// parent node when running in dry run mode.
+	if dryRun {
+		defer func() {
+			b.index.RemoveNode(newNode)
+		}()
+	}
 
 	// Fetching a stake node could enable a new DoS vector, so restrict
 	// this only to blocks that are recent in history.

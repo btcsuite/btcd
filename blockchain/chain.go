@@ -926,10 +926,8 @@ func (b *BlockChain) connectBlock(node *blockNode, block, parent *dcrutil.Block,
 	// now that the modifications have been committed to the database.
 	view.commit()
 
-	// Add the new node to the memory main chain indices for faster
-	// lookups.
+	// Mark block as being in the main chain.
 	node.inMainChain = true
-	b.index.AddNode(node)
 
 	// This node is now the end of the best chain.
 	b.bestNode = node
@@ -1659,11 +1657,6 @@ func (b *BlockChain) connectBestChain(node *blockNode, block, parent *dcrutil.Bl
 			return false, err
 		}
 
-		// Connect the parent node to this node.
-		if node.parent != nil {
-			node.parent.children = append(node.parent.children, node)
-		}
-
 		validateStr := "validating"
 		if !voteBitsApproveParent(node.voteBits) {
 			validateStr = "invalidating"
@@ -1681,29 +1674,8 @@ func (b *BlockChain) connectBestChain(node *blockNode, block, parent *dcrutil.Bl
 	}
 
 	// We're extending (or creating) a side chain which may or may not
-	// become the main chain, but in either case the entry is needed in the
-	// index for future processing.
-	b.index.Lock()
-	b.index.index[node.hash] = node
-	b.index.Unlock()
-
-	// Connect the parent node to this node.
+	// become the main chain.
 	node.inMainChain = false
-	node.parent.children = append(node.parent.children, node)
-
-	// Disconnect it from the parent node when the function returns when
-	// running in dry run mode.
-	if dryRun {
-		defer func() {
-			children := node.parent.children
-			children = removeChildNode(children, node)
-			node.parent.children = children
-
-			b.index.Lock()
-			delete(b.index.index, node.hash)
-			b.index.Unlock()
-		}()
-	}
 
 	// We're extending (or creating) a side chain, but the cumulative
 	// work for this new side chain is not enough to make it the new chain.

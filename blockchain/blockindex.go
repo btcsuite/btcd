@@ -434,6 +434,32 @@ func (bi *blockIndex) AddNode(node *blockNode) {
 	if prevHash := node.parentHash; prevHash != *zeroHash {
 		bi.depNodes[prevHash] = append(bi.depNodes[prevHash], node)
 	}
+	if node.parent != nil {
+		node.parent.children = append(node.parent.children, node)
+	}
+	bi.Unlock()
+}
+
+// RemoveNode removes the provided node from the block index.  No checks are
+// performed to ensure the node already exists, so it's up to the caller to
+// avoid removing them.
+//
+// This function is safe for concurrent access.
+func (bi *blockIndex) RemoveNode(node *blockNode) {
+	bi.Lock()
+	if parent := node.parent; parent != nil {
+		parent.children = removeChildNode(parent.children, node)
+	}
+	if prevHash := node.parentHash; prevHash != *zeroHash {
+		depNodes := bi.depNodes[prevHash]
+		depNodes = removeChildNode(depNodes, node)
+		if len(depNodes) == 0 {
+			delete(bi.depNodes, prevHash)
+		} else {
+			bi.depNodes[prevHash] = depNodes
+		}
+	}
+	delete(bi.index, node.hash)
 	bi.Unlock()
 }
 
