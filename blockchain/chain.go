@@ -1500,15 +1500,9 @@ func (b *BlockChain) forceHeadReorganization(formerBest chainhash.Hash, newBest 
 			"on wrong chain")
 	}
 
-	var newBestNode *blockNode
-	for _, n := range formerBestNode.parent.children {
-		if n.hash.IsEqual(&newBest) {
-			newBestNode = n
-		}
-	}
-
 	// Child to reorganize to is missing.
-	if newBestNode == nil {
+	newBestNode := b.index.LookupNode(&newBest)
+	if newBestNode == nil || newBestNode.parentHash != formerBestNode.parentHash {
 		return ruleError(ErrForceReorgMissingChild, "missing child of "+
 			"common parent for forced reorg")
 	}
