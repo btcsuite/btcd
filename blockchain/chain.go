@@ -209,7 +209,6 @@ func (b *BlockChain) GetStakeVersions(hash *chainhash.Hash, count int32) ([]Stak
 	if err != nil {
 		return nil, err
 	}
-
 	if !exists {
 		return nil, fmt.Errorf("hash '%s' not found on chain", hash.String())
 	}
@@ -227,13 +226,14 @@ func (b *BlockChain) GetStakeVersions(hash *chainhash.Hash, count int32) ([]Stak
 	b.chainLock.Lock()
 	defer b.chainLock.Unlock()
 
-	if count > int32(b.bestNode.height) {
-		count = int32(b.bestNode.height)
-	}
-
 	startNode, err := b.findNode(hash, 0)
 	if err != nil {
 		return nil, err
+	}
+
+	// Limit the requested count to the max possible for the requested block.
+	if count > int32(startNode.height+1) {
+		count = int32(startNode.height + 1)
 	}
 
 	result := make([]StakeVersions, 0, count)
