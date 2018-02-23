@@ -303,23 +303,26 @@ func migrateBlockIndex(db database.DB, interrupt <-chan struct{}) error {
 				return err
 			}
 
-			// Construct a block node from the block.
-			blockNode := newBlockNode(&block.Header, nil)
-			blockNode.populateTicketInfo(stake.FindSpentTicketsInBlock(&block))
-			blockNode.status = statusDataStored
-
 			// Mark the block as valid if it's part of the main chain.  While it
 			// is possible side chain blocks were validated too, there was
 			// previously no tracking of that information, so there is no way to
 			// know for sure.  It's better to be safe and just assume side chain
 			// blocks were never validated.
+			status := statusDataStored
 			if hashIdxBucket.Get(blockHash[:]) != nil {
-				blockNode.status |= statusValid
+				status |= statusValid
 			}
 
-			// Write the serialized block node to the new bucket keyed by its
-			// hash and height.
-			serialized, err := serializeBlockNode(blockNode)
+			// Write the serialized block index entry to the new bucket keyed by
+			// its hash and height.
+			ticketInfo := stake.FindSpentTicketsInBlock(&block)
+			serialized, err := serializeBlockIndexEntry(&blockIndexEntry{
+				header:         block.Header,
+				status:         status,
+				voteInfo:       ticketInfo.Votes,
+				ticketsVoted:   ticketInfo.VotedTickets,
+				ticketsRevoked: ticketInfo.RevokedTickets,
+			})
 			if err != nil {
 				return err
 			}

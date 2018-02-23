@@ -322,10 +322,15 @@ func (bi *blockIndex) loadBlockNode(dbTx database.Tx, hash *chainhash.Hash) (*bl
 
 	// Load the block node for the provided hash and height from the
 	// database.
-	node, err := dbFetchBlockNode(dbTx, hash, uint32(height))
+	entry, err := dbFetchBlockIndexEntry(dbTx, hash, uint32(height))
 	if err != nil {
 		return nil, err
 	}
+	node := new(blockNode)
+	initBlockNode(node, &entry.header, nil)
+	node.ticketsVoted = entry.ticketsVoted
+	node.ticketsRevoked = entry.ticketsRevoked
+	node.votes = entry.voteInfo
 	node.inMainChain = true
 
 	// Add the node to the chain.
