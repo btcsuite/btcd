@@ -3,15 +3,17 @@
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package blockchain_test
+package blockchain
 
 import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
-	"github.com/decred/dcrd/blockchain"
+	"github.com/decred/dcrd/blockchain/stake"
 	"github.com/decred/dcrd/chaincfg"
+	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/database"
 	_ "github.com/decred/dcrd/database/ffldb"
 	"github.com/decred/dcrd/txscript"
@@ -55,7 +57,7 @@ func isSupportedDbType(dbType string) bool {
 // chainSetup is used to create a new db and chain instance with the genesis
 // block already inserted.  In addition to the new chain instance, it returns
 // a teardown function the caller should invoke when done testing to clean up.
-func chainSetup(dbName string, params *chaincfg.Params) (*blockchain.BlockChain, func(), error) {
+func chainSetup(dbName string, params *chaincfg.Params) (*BlockChain, func(), error) {
 	if !isSupportedDbType(testDbType) {
 		return nil, nil, fmt.Errorf("unsupported db type %v", testDbType)
 	}
@@ -109,10 +111,10 @@ func chainSetup(dbName string, params *chaincfg.Params) (*blockchain.BlockChain,
 	paramsCopy := *params
 
 	// Create the main chain instance.
-	chain, err := blockchain.New(&blockchain.Config{
+	chain, err := New(&Config{
 		DB:          db,
 		ChainParams: &paramsCopy,
-		TimeSource:  blockchain.NewMedianTime(),
+		TimeSource:  NewMedianTime(),
 		SigCache:    txscript.NewSigCache(1000),
 	})
 
@@ -123,4 +125,56 @@ func chainSetup(dbName string, params *chaincfg.Params) (*blockchain.BlockChain,
 	}
 
 	return chain, teardown, nil
+}
+
+// newFakeChain returns a chain that is usable for syntetic tests.  It is
+// important to note that this chain has no database associated with it, so
+// it is not usable with all functions and the tests must take care when making
+// use of it.
+func newFakeChain(params *chaincfg.Params) *BlockChain {
+	// Create a genesis block node and block index populated with it for use
+	// when creating the fake chain below.
+	node := newBlockNode(&params.GenesisBlock.Header, nil)
+	node.inMainChain = true
+	index := newBlockIndex(nil, params)
+	index.AddNode(node)
+
+	return &BlockChain{
+		chainParams:      params,
+		deploymentCaches: newThresholdCaches(params),
+		bestNode:         node,
+		index:            index,
+		isVoterMajorityVersionCache:   make(map[[stakeMajorityCacheKeySize]byte]bool),
+		isStakeMajorityVersionCache:   make(map[[stakeMajorityCacheKeySize]byte]bool),
+		calcPriorStakeVersionCache:    make(map[[chainhash.HashSize]byte]uint32),
+		calcVoterVersionIntervalCache: make(map[[chainhash.HashSize]byte]uint32),
+		calcStakeVersionCache:         make(map[[chainhash.HashSize]byte]uint32),
+	}
+}
+
+// newFakeNode creates a block node connected to the passed parent with the
+// provided fields populated and fake values for the other fields.
+func newFakeNode(parent *blockNode, blockVersion int32, stakeVersion uint32, bits uint32, timestamp time.Time) *blockNode {
+	// Make up a header and create a block node from it.
+	header := &wire.BlockHeader{
+		Version:      blockVersion,
+		PrevBlock:    parent.hash,
+		VoteBits:     0x01,
+		Bits:         bits,
+		Height:       uint32(parent.height) + 1,
+		Timestamp:    timestamp,
+		StakeVersion: stakeVersion,
+	}
+	return newBlockNode(header, parent)
+}
+
+// appendFakeVotes appends the passed number of votes to the node with the
+// provided version and vote bits.
+func appendFakeVotes(node *blockNode, numVotes uint16, voteVersion uint32, voteBits uint16) {
+	for i := uint16(0); i < numVotes; i++ {
+		node.votes = append(node.votes, stake.VoteVersionTuple{
+			Version: voteVersion,
+			Bits:    voteBits,
+		})
+	}
 }

@@ -1,8 +1,8 @@
-// Copyright (c) 2017 The Decred developers
+// Copyright (c) 2017-2018 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package blockchain_test
+package blockchain
 
 import (
 	"fmt"
@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/decred/dcrd/blockchain"
 	"github.com/decred/dcrd/blockchain/chaingen"
 	"github.com/decred/dcrd/chaincfg"
 	"github.com/decred/dcrd/dcrutil"
@@ -20,10 +19,6 @@ const (
 	// vbPrevBlockValid defines the vote bit necessary to vote yes to the
 	// previous block being valid.
 	vbPrevBlockValid = 0x01
-
-	// invalidChoice is the value returns by thresholdState when not in a
-	// state where the choice can be valid.
-	invalidChoice = 0xffffffff
 
 	// testDummy1ID is the human-readable ID for the first test dummy voting
 	// agenda.
@@ -167,8 +162,7 @@ func TestThresholdState(t *testing.T) {
 		t.Logf("Testing block %s (hash %s, height %d)",
 			g.TipName(), block.Hash(), blockHeight)
 
-		isMainChain, isOrphan, err := chain.ProcessBlock(block,
-			blockchain.BFNone)
+		isMainChain, isOrphan, err := chain.ProcessBlock(block, BFNone)
 		if err != nil {
 			t.Fatalf("block %q (hash %s, height %d) should "+
 				"have been accepted: %v", g.TipName(),
@@ -192,7 +186,7 @@ func TestThresholdState(t *testing.T) {
 	// testThresholdState queries the threshold state from the current
 	// tip block associated with the generator and expects the returned
 	// state and choice to match the provided values.
-	testThresholdState := func(id string, state blockchain.ThresholdState, choice uint32) {
+	testThresholdState := func(id string, state ThresholdState, choice uint32) {
 		tipHash := g.Tip().BlockHash()
 		s, err := chain.ThresholdState(&tipHash, posVersion, id)
 		if err != nil {
@@ -238,8 +232,8 @@ func TestThresholdState(t *testing.T) {
 	g.CreatePremineBlock("bp", 0)
 	g.AssertTipHeight(1)
 	accepted()
-	testThresholdState(testDummy1ID, blockchain.ThresholdDefined, invalidChoice)
-	testThresholdState(testDummy2ID, blockchain.ThresholdDefined, invalidChoice)
+	testThresholdState(testDummy1ID, ThresholdDefined, invalidChoice)
+	testThresholdState(testDummy2ID, ThresholdDefined, invalidChoice)
 
 	// ---------------------------------------------------------------------
 	// Generate enough blocks to have mature coinbase outputs to work with.
@@ -254,8 +248,8 @@ func TestThresholdState(t *testing.T) {
 		accepted()
 	}
 	g.AssertTipHeight(uint32(coinbaseMaturity) + 1)
-	testThresholdState(testDummy1ID, blockchain.ThresholdDefined, invalidChoice)
-	testThresholdState(testDummy2ID, blockchain.ThresholdDefined, invalidChoice)
+	testThresholdState(testDummy1ID, ThresholdDefined, invalidChoice)
+	testThresholdState(testDummy2ID, ThresholdDefined, invalidChoice)
 
 	// ---------------------------------------------------------------------
 	// Generate enough blocks to reach the stake enabled height while
@@ -276,8 +270,8 @@ func TestThresholdState(t *testing.T) {
 		accepted()
 	}
 	g.AssertTipHeight(uint32(stakeEnabledHeight))
-	testThresholdState(testDummy1ID, blockchain.ThresholdDefined, invalidChoice)
-	testThresholdState(testDummy2ID, blockchain.ThresholdDefined, invalidChoice)
+	testThresholdState(testDummy1ID, ThresholdDefined, invalidChoice)
+	testThresholdState(testDummy2ID, ThresholdDefined, invalidChoice)
 
 	// ---------------------------------------------------------------------
 	// Generate enough blocks to reach the stake validation height while
@@ -311,8 +305,8 @@ func TestThresholdState(t *testing.T) {
 		accepted()
 	}
 	g.AssertTipHeight(uint32(stakeValidationHeight))
-	testThresholdState(testDummy1ID, blockchain.ThresholdDefined, invalidChoice)
-	testThresholdState(testDummy2ID, blockchain.ThresholdDefined, invalidChoice)
+	testThresholdState(testDummy1ID, ThresholdDefined, invalidChoice)
+	testThresholdState(testDummy2ID, ThresholdDefined, invalidChoice)
 
 	// ---------------------------------------------------------------------
 	// Generate enough blocks to reach one block before the next stake
@@ -340,8 +334,8 @@ func TestThresholdState(t *testing.T) {
 	g.AssertTipHeight(uint32(stakeValidationHeight + stakeVerInterval - 1))
 	g.AssertBlockVersion(3)
 	g.AssertStakeVersion(0)
-	testThresholdState(testDummy1ID, blockchain.ThresholdDefined, invalidChoice)
-	testThresholdState(testDummy2ID, blockchain.ThresholdDefined, invalidChoice)
+	testThresholdState(testDummy1ID, ThresholdDefined, invalidChoice)
+	testThresholdState(testDummy2ID, ThresholdDefined, invalidChoice)
 
 	// ---------------------------------------------------------------------
 	// Generate enough blocks to reach one block before the next rule change
@@ -368,8 +362,8 @@ func TestThresholdState(t *testing.T) {
 	g.AssertTipHeight(uint32(stakeValidationHeight + ruleChangeInterval - 2))
 	g.AssertBlockVersion(3)
 	g.AssertStakeVersion(3)
-	testThresholdState(testDummy1ID, blockchain.ThresholdDefined, invalidChoice)
-	testThresholdState(testDummy2ID, blockchain.ThresholdDefined, invalidChoice)
+	testThresholdState(testDummy1ID, ThresholdDefined, invalidChoice)
+	testThresholdState(testDummy2ID, ThresholdDefined, invalidChoice)
 
 	// ---------------------------------------------------------------------
 	// Generate enough blocks to reach one block before the next stake
@@ -399,8 +393,8 @@ func TestThresholdState(t *testing.T) {
 	g.AssertTipHeight(uint32(stakeValidationHeight + stakeVerInterval*4 - 1))
 	g.AssertBlockVersion(3)
 	g.AssertStakeVersion(3)
-	testThresholdState(testDummy1ID, blockchain.ThresholdDefined, invalidChoice)
-	testThresholdState(testDummy2ID, blockchain.ThresholdDefined, invalidChoice)
+	testThresholdState(testDummy1ID, ThresholdDefined, invalidChoice)
+	testThresholdState(testDummy2ID, ThresholdDefined, invalidChoice)
 
 	// ---------------------------------------------------------------------
 	// Generate enough blocks to reach the next rule change interval with
@@ -432,8 +426,8 @@ func TestThresholdState(t *testing.T) {
 	g.AssertTipHeight(uint32(stakeValidationHeight + ruleChangeInterval*2 - 1))
 	g.AssertBlockVersion(4)
 	g.AssertStakeVersion(4)
-	testThresholdState(testDummy1ID, blockchain.ThresholdDefined, invalidChoice)
-	testThresholdState(testDummy2ID, blockchain.ThresholdDefined, invalidChoice)
+	testThresholdState(testDummy1ID, ThresholdDefined, invalidChoice)
+	testThresholdState(testDummy2ID, ThresholdDefined, invalidChoice)
 
 	// ---------------------------------------------------------------------
 	// Generate enough blocks to achieve proof-of-work block version lockin
@@ -466,8 +460,8 @@ func TestThresholdState(t *testing.T) {
 		1 + powNumToCheck))
 	g.AssertBlockVersion(4)
 	g.AssertStakeVersion(4)
-	testThresholdState(testDummy1ID, blockchain.ThresholdDefined, invalidChoice)
-	testThresholdState(testDummy2ID, blockchain.ThresholdDefined, invalidChoice)
+	testThresholdState(testDummy1ID, ThresholdDefined, invalidChoice)
+	testThresholdState(testDummy2ID, ThresholdDefined, invalidChoice)
 
 	// ---------------------------------------------------------------------
 	// Generate enough blocks to reach the next rule change interval with
@@ -498,8 +492,8 @@ func TestThresholdState(t *testing.T) {
 	g.AssertTipHeight(uint32(stakeValidationHeight + ruleChangeInterval*3 - 1))
 	g.AssertBlockVersion(4)
 	g.AssertStakeVersion(4)
-	testThresholdState(testDummy1ID, blockchain.ThresholdStarted, invalidChoice)
-	testThresholdState(testDummy2ID, blockchain.ThresholdStarted, invalidChoice)
+	testThresholdState(testDummy1ID, ThresholdStarted, invalidChoice)
+	testThresholdState(testDummy2ID, ThresholdStarted, invalidChoice)
 
 	// ---------------------------------------------------------------------
 	// Generate enough blocks to reach the next rule change interval with
@@ -528,8 +522,8 @@ func TestThresholdState(t *testing.T) {
 	g.AssertTipHeight(uint32(stakeValidationHeight + ruleChangeInterval*4 - 1))
 	g.AssertBlockVersion(4)
 	g.AssertStakeVersion(4)
-	testThresholdState(testDummy1ID, blockchain.ThresholdStarted, invalidChoice)
-	testThresholdState(testDummy2ID, blockchain.ThresholdStarted, invalidChoice)
+	testThresholdState(testDummy1ID, ThresholdStarted, invalidChoice)
+	testThresholdState(testDummy2ID, ThresholdStarted, invalidChoice)
 
 	// ---------------------------------------------------------------------
 	// Generate enough blocks to reach the next rule change interval with
@@ -564,8 +558,8 @@ func TestThresholdState(t *testing.T) {
 	g.AssertTipHeight(uint32(stakeValidationHeight + ruleChangeInterval*5 - 1))
 	g.AssertBlockVersion(4)
 	g.AssertStakeVersion(4)
-	testThresholdState(testDummy1ID, blockchain.ThresholdStarted, invalidChoice)
-	testThresholdState(testDummy2ID, blockchain.ThresholdStarted, invalidChoice)
+	testThresholdState(testDummy1ID, ThresholdStarted, invalidChoice)
+	testThresholdState(testDummy2ID, ThresholdStarted, invalidChoice)
 
 	// ---------------------------------------------------------------------
 	// Generate enough blocks to reach the next rule change interval with
@@ -608,8 +602,8 @@ func TestThresholdState(t *testing.T) {
 	g.AssertTipHeight(uint32(stakeValidationHeight + ruleChangeInterval*6 - 1))
 	g.AssertBlockVersion(4)
 	g.AssertStakeVersion(4)
-	testThresholdState(testDummy1ID, blockchain.ThresholdStarted, invalidChoice)
-	testThresholdState(testDummy2ID, blockchain.ThresholdStarted, invalidChoice)
+	testThresholdState(testDummy1ID, ThresholdStarted, invalidChoice)
+	testThresholdState(testDummy2ID, ThresholdStarted, invalidChoice)
 
 	// ---------------------------------------------------------------------
 	// Generate enough blocks to reach the next rule change interval with
@@ -639,8 +633,8 @@ func TestThresholdState(t *testing.T) {
 	g.AssertTipHeight(uint32(stakeValidationHeight + ruleChangeInterval*7 - 1))
 	g.AssertBlockVersion(4)
 	g.AssertStakeVersion(4)
-	testThresholdState(testDummy1ID, blockchain.ThresholdLockedIn, testDummy1YesIndex)
-	testThresholdState(testDummy2ID, blockchain.ThresholdFailed, testDummy2NoIndex)
+	testThresholdState(testDummy1ID, ThresholdLockedIn, testDummy1YesIndex)
+	testThresholdState(testDummy2ID, ThresholdFailed, testDummy2NoIndex)
 
 	// ---------------------------------------------------------------------
 	// Generate enough blocks to reach the next rule change interval with
@@ -672,6 +666,6 @@ func TestThresholdState(t *testing.T) {
 	g.AssertTipHeight(uint32(stakeValidationHeight + ruleChangeInterval*8 - 1))
 	g.AssertBlockVersion(4)
 	g.AssertStakeVersion(4)
-	testThresholdState(testDummy1ID, blockchain.ThresholdActive, testDummy1YesIndex)
-	testThresholdState(testDummy2ID, blockchain.ThresholdFailed, testDummy2NoIndex)
+	testThresholdState(testDummy1ID, ThresholdActive, testDummy1YesIndex)
+	testThresholdState(testDummy2ID, ThresholdFailed, testDummy2NoIndex)
 }

@@ -3,7 +3,7 @@
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package blockchain_test
+package blockchain
 
 import (
 	"bytes"
@@ -14,10 +14,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/decred/dcrd/blockchain"
 	"github.com/decred/dcrd/blockchain/chaingen"
 	"github.com/decred/dcrd/chaincfg"
-	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/dcrutil"
 )
 
@@ -34,19 +32,6 @@ func cloneParams(params *chaincfg.Params) *chaincfg.Params {
 	dec := gob.NewDecoder(buf)
 	dec.Decode(&paramsCopy)
 	return &paramsCopy
-}
-
-// mustParseHash converts the passed big-endian hex string into a
-// chainhash.Hash and will panic if there is an error.  It only differs from the
-// one available in chainhash in that it will panic so errors in the source code
-// be detected.  It will only (and must only) be called with hard-coded, and
-// therefore known good, hashes.
-func mustParseHash(s string) *chainhash.Hash {
-	hash, err := chainhash.NewHashFromStr(s)
-	if err != nil {
-		panic("invalid hash in source file: " + s)
-	}
-	return hash
 }
 
 // TestBlockchainFunction tests the various blockchain API to ensure proper
@@ -96,7 +81,7 @@ func TestBlockchainFunctions(t *testing.T) {
 			t.Errorf("NewBlockFromBytes error: %v", err.Error())
 		}
 
-		_, _, err = chain.ProcessBlock(bl, blockchain.BFNone)
+		_, _, err = chain.ProcessBlock(bl, BFNone)
 		if err != nil {
 			t.Fatalf("ProcessBlock error at height %v: %v", i, err.Error())
 		}
@@ -173,8 +158,7 @@ func TestForceHeadReorg(t *testing.T) {
 		t.Logf("Testing block %s (hash %s, height %d)",
 			g.TipName(), block.Hash(), blockHeight)
 
-		isMainChain, isOrphan, err := chain.ProcessBlock(block,
-			blockchain.BFNone)
+		isMainChain, isOrphan, err := chain.ProcessBlock(block, BFNone)
 		if err != nil {
 			t.Fatalf("block %q (hash %s, height %d) should "+
 				"have been accepted: %v", g.TipName(),
@@ -213,8 +197,7 @@ func TestForceHeadReorg(t *testing.T) {
 		t.Logf("Testing block %s (hash %s, height %d)",
 			g.TipName(), block.Hash(), blockHeight)
 
-		isMainChain, isOrphan, err := chain.ProcessBlock(block,
-			blockchain.BFNone)
+		isMainChain, isOrphan, err := chain.ProcessBlock(block, BFNone)
 		if err != nil {
 			t.Fatalf("block %q (hash %s, height %d) should "+
 				"have been accepted: %v", g.TipName(),

@@ -9,63 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/decred/dcrd/blockchain/stake"
 	"github.com/decred/dcrd/chaincfg"
 	"github.com/decred/dcrd/chaincfg/chainhash"
-	"github.com/decred/dcrd/wire"
 )
-
-// newFakeChain returns a chain that is usable for syntetic tests.  It is
-// important to note that this chain has no database associated with it, so
-// it is not usable with all functions and the tests must take care when making
-// use of it.
-func newFakeChain(params *chaincfg.Params) *BlockChain {
-	// Create a genesis block node and block index populated with it for use
-	// when creating the fake chain below.
-	node := newBlockNode(&params.GenesisBlock.Header, nil)
-	node.inMainChain = true
-	index := newBlockIndex(nil, params)
-	index.AddNode(node)
-
-	return &BlockChain{
-		chainParams:      params,
-		deploymentCaches: newThresholdCaches(params),
-		bestNode:         node,
-		index:            index,
-		isVoterMajorityVersionCache:   make(map[[stakeMajorityCacheKeySize]byte]bool),
-		isStakeMajorityVersionCache:   make(map[[stakeMajorityCacheKeySize]byte]bool),
-		calcPriorStakeVersionCache:    make(map[[chainhash.HashSize]byte]uint32),
-		calcVoterVersionIntervalCache: make(map[[chainhash.HashSize]byte]uint32),
-		calcStakeVersionCache:         make(map[[chainhash.HashSize]byte]uint32),
-	}
-}
-
-// newFakeNode creates a block node connected to the passed parent with the
-// provided fields populated and fake values for the other fields.
-func newFakeNode(parent *blockNode, blockVersion int32, stakeVersion uint32, bits uint32, timestamp time.Time) *blockNode {
-	// Make up a header and create a block node from it.
-	header := &wire.BlockHeader{
-		Version:      blockVersion,
-		PrevBlock:    parent.hash,
-		VoteBits:     0x01,
-		Bits:         bits,
-		Height:       uint32(parent.height) + 1,
-		Timestamp:    timestamp,
-		StakeVersion: stakeVersion,
-	}
-	return newBlockNode(header, parent)
-}
-
-// appendFakeVotes appends the passed number of votes to the node with the
-// provided version and vote bits.
-func appendFakeVotes(node *blockNode, numVotes uint16, voteVersion uint32, voteBits uint16) {
-	for i := uint16(0); i < numVotes; i++ {
-		node.votes = append(node.votes, stake.VoteVersionTuple{
-			Version: voteVersion,
-			Bits:    voteBits,
-		})
-	}
-}
 
 func TestCalcWantHeight(t *testing.T) {
 	// For example, if StakeVersionInterval = 11 and StakeValidationHeight = 13 the

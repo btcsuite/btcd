@@ -1,14 +1,13 @@
-// Copyright (c) 2016-2017 The Decred developers
+// Copyright (c) 2016-2018 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package blockchain_test
+package blockchain
 
 import (
 	"fmt"
 	"testing"
 
-	"github.com/decred/dcrd/blockchain"
 	"github.com/decred/dcrd/blockchain/chaingen"
 	"github.com/decred/dcrd/chaincfg"
 	"github.com/decred/dcrd/dcrutil"
@@ -47,8 +46,7 @@ func TestStakeVersion(t *testing.T) {
 		t.Logf("Testing block %s (hash %s, height %d)",
 			g.TipName(), block.Hash(), blockHeight)
 
-		isMainChain, isOrphan, err := chain.ProcessBlock(block,
-			blockchain.BFNone)
+		isMainChain, isOrphan, err := chain.ProcessBlock(block, BFNone)
 		if err != nil {
 			t.Fatalf("block %q (hash %s, height %d) should "+
 				"have been accepted: %v", g.TipName(),
@@ -68,14 +66,14 @@ func TestStakeVersion(t *testing.T) {
 				block.Hash(), blockHeight, isOrphan)
 		}
 	}
-	rejected := func(code blockchain.ErrorCode) {
+	rejected := func(code ErrorCode) {
 		msgBlock := g.Tip()
 		blockHeight := msgBlock.Header.Height
 		block := dcrutil.NewBlock(msgBlock)
 		t.Logf("Testing block %s (hash %s, height %d)", g.TipName(),
 			block.Hash(), blockHeight)
 
-		_, _, err := chain.ProcessBlock(block, blockchain.BFNone)
+		_, _, err := chain.ProcessBlock(block, BFNone)
 		if err == nil {
 			t.Fatalf("block %q (hash %s, height %d) should not "+
 				"have been accepted", g.TipName(), block.Hash(),
@@ -84,7 +82,7 @@ func TestStakeVersion(t *testing.T) {
 
 		// Ensure the error code is of the expected type and the reject
 		// code matches the value specified in the test instance.
-		rerr, ok := err.(blockchain.RuleError)
+		rerr, ok := err.(RuleError)
 		if !ok {
 			t.Fatalf("block %q (hash %s, height %d) returned "+
 				"unexpected error type -- got %T, want "+
@@ -270,7 +268,7 @@ func TestStakeVersion(t *testing.T) {
 	g.AssertTipHeight(uint32(stakeValidationHeight + 2*stakeVerInterval))
 	g.AssertBlockVersion(3)
 	g.AssertStakeVersion(2)
-	rejected(blockchain.ErrBadStakeVersion)
+	rejected(ErrBadStakeVersion)
 
 	// ---------------------------------------------------------------------
 	// Generate a single block with block version 3, stake version 1, and
@@ -290,7 +288,7 @@ func TestStakeVersion(t *testing.T) {
 	g.AssertTipHeight(uint32(stakeValidationHeight + 2*stakeVerInterval))
 	g.AssertBlockVersion(3)
 	g.AssertStakeVersion(1)
-	rejected(blockchain.ErrBadStakeVersion)
+	rejected(ErrBadStakeVersion)
 
 	// ---------------------------------------------------------------------
 	// Generate enough blocks to reach one block before the next stake
@@ -331,7 +329,7 @@ func TestStakeVersion(t *testing.T) {
 	g.AssertTipHeight(uint32(stakeValidationHeight + 3*stakeVerInterval))
 	g.AssertBlockVersion(3)
 	g.AssertStakeVersion(2)
-	rejected(blockchain.ErrBadStakeVersion)
+	rejected(ErrBadStakeVersion)
 
 	// ---------------------------------------------------------------------
 	// Generate a single block with block version 3, stake version 4, and
@@ -349,7 +347,7 @@ func TestStakeVersion(t *testing.T) {
 	g.AssertTipHeight(uint32(stakeValidationHeight + 3*stakeVerInterval))
 	g.AssertBlockVersion(3)
 	g.AssertStakeVersion(4)
-	rejected(blockchain.ErrBadStakeVersion)
+	rejected(ErrBadStakeVersion)
 
 	// ---------------------------------------------------------------------
 	// Generate enough blocks to reach one block before the next stake
@@ -391,7 +389,7 @@ func TestStakeVersion(t *testing.T) {
 	g.AssertTipHeight(uint32(stakeValidationHeight + 4*stakeVerInterval))
 	g.AssertBlockVersion(3)
 	g.AssertStakeVersion(2)
-	rejected(blockchain.ErrBadStakeVersion)
+	rejected(ErrBadStakeVersion)
 
 	// ---------------------------------------------------------------------
 	// Generate a single block with block version 3, stake version 4, and
@@ -409,7 +407,7 @@ func TestStakeVersion(t *testing.T) {
 	g.AssertTipHeight(uint32(stakeValidationHeight + 4*stakeVerInterval))
 	g.AssertBlockVersion(3)
 	g.AssertStakeVersion(4)
-	rejected(blockchain.ErrBadStakeVersion)
+	rejected(ErrBadStakeVersion)
 
 	// ---------------------------------------------------------------------
 	// Generate enough blocks to reach one block before the next stake
@@ -466,7 +464,7 @@ func TestStakeVersion(t *testing.T) {
 	g.AssertTipHeight(uint32(stakeValidationHeight + 5*stakeVerInterval))
 	g.AssertBlockVersion(3)
 	g.AssertStakeVersion(4)
-	rejected(blockchain.ErrBadStakeVersion)
+	rejected(ErrBadStakeVersion)
 
 	// ---------------------------------------------------------------------
 	// Generate enough blocks to reach one block before the next stake
@@ -519,7 +517,7 @@ func TestStakeVersion(t *testing.T) {
 	g.AssertTipHeight(uint32(stakeValidationHeight + 6*stakeVerInterval))
 	g.AssertBlockVersion(3)
 	g.AssertStakeVersion(3)
-	rejected(blockchain.ErrBadStakeVersion)
+	rejected(ErrBadStakeVersion)
 
 	// ---------------------------------------------------------------------
 	// Generate a single block with block version 3, stake version 4, and

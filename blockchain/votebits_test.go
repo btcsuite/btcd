@@ -1541,69 +1541,6 @@ func TestVoting(t *testing.T) {
 	}
 }
 
-// Parallel test.
-const (
-	testDummy1ID    = "testdummy1"
-	vbTestDummy1Yes = 0x04
-
-	testDummy2ID   = "testdummy2"
-	vbTestDummy2No = 0x08
-)
-
-var (
-	// testDummy1 is a voting agenda used throughout these tests.
-	testDummy1 = chaincfg.Vote{
-		Id:          testDummy1ID,
-		Description: "",
-		Mask:        0x6, // 0b0110
-		Choices: []chaincfg.Choice{{
-			Id:          "abstain",
-			Description: "abstain voting for change",
-			Bits:        0x0000,
-			IsAbstain:   true,
-			IsNo:        false,
-		}, {
-			Id:          "no",
-			Description: "vote no",
-			Bits:        0x0002, // Bit 1
-			IsAbstain:   false,
-			IsNo:        true,
-		}, {
-			Id:          "yes",
-			Description: "vote yes",
-			Bits:        0x0004, // Bit 2
-			IsAbstain:   false,
-			IsNo:        false,
-		}},
-	}
-
-	// testDummy2 is a voting agenda used throughout these tests.
-	testDummy2 = chaincfg.Vote{
-		Id:          testDummy2ID,
-		Description: "",
-		Mask:        0x18, // 0b11000
-		Choices: []chaincfg.Choice{{
-			Id:          "abstain",
-			Description: "abstain voting for change",
-			Bits:        0x0000,
-			IsAbstain:   true,
-			IsNo:        false,
-		}, {
-			Id:          "no",
-			Description: "vote no",
-			Bits:        0x0008, // Bit 3
-			IsAbstain:   false,
-			IsNo:        true,
-		}, {
-			Id:          "yes",
-			Description: "vote yes",
-			Bits:        0x0010, // Bit 4
-			IsAbstain:   false,
-			IsNo:        false,
-		}},
-	}
-)
-
 func defaultParallelParams() chaincfg.Params {
 	params := chaincfg.SimNetParams
 	params.Deployments = make(map[uint32][]chaincfg.ConsensusDeployment)
