@@ -382,11 +382,11 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 	//
 	// rejectNonCanonicalBlock creates a test instance that encodes the
 	// provided block using a non-canonical encoded as described by the
-	// encodeNonCanonicalBlock function and expected it to be rejected.
+	// encodeNonCanonicalBlock function and expects it to be rejected.
 	//
-	// orphanOrRejectBlock creates a test instance that expected the
-	// provided block to either by accepted as an orphan or rejected by the
-	// consensus rules.
+	// orphanOrRejectBlock creates a test instance that expects the provided
+	// block to either be accepted as an orphan or rejected by the consensus
+	// rules.
 	//
 	// expectTipBlock creates a test instance that expects the provided
 	// block to be the current tip of the block chain.
@@ -1464,7 +1464,6 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 		coinbaseOuts := g.OldestCoinbaseOuts()
 		outs = append(outs, &coinbaseOuts[0])
 		ticketOuts = append(ticketOuts, coinbaseOuts[1:])
-
 	}
 
 	// ---------------------------------------------------------------------

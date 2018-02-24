@@ -1701,6 +1701,11 @@ func updateVoteCommitments(block *wire.MsgBlock) {
 // - The size of the block will be recalculated unless it was manually changed
 // - The block will be solved unless the nonce was changed
 func (g *Generator) NextBlock(blockName string, spend *SpendableOut, ticketSpends []SpendableOut, mungers ...func(*wire.MsgBlock)) *wire.MsgBlock {
+	// Prevent block name collisions.
+	if g.blocksByName[blockName] != nil {
+		panic(fmt.Sprintf("block name %s already exists", blockName))
+	}
+
 	// Calculate the next required stake difficulty (aka ticket price).
 	ticketPrice := dcrutil.Amount(g.calcNextRequiredStakeDifficulty())
 
