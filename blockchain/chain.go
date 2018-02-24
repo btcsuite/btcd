@@ -468,23 +468,13 @@ func (b *BlockChain) addOrphanBlock(block *dcrutil.Block) {
 	b.prevOrphans[*prevHash] = append(b.prevOrphans[*prevHash], oBlock)
 }
 
-// getGeneration gets a generation of blocks who all have the same parent by
-// taking a hash as input, locating its parent node, and then returning all
-// children for that parent node including the hash passed.  This can then be
-// used by the mempool downstream to locate all potential block template
-// parents.
-func (b *BlockChain) getGeneration(h chainhash.Hash) ([]chainhash.Hash, error) {
-	// This typically happens because the main chain has recently
-	// reorganized and the block the miner is looking at is on
-	// a fork.  Usually it corrects itself after failure.
-	node, err := b.findNode(&h, maxSearchDepth)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't find block node in best chain: %v",
-			err.Error())
-	}
-
-	// Get the parent of this node.
-	p, err := b.index.PrevNodeFromNode(node)
+// tipGeneration returns the entire generation of blocks stemming from the
+// parent of the current tip.
+//
+// This function MUST be called with the chain lock held (for reads).
+func (b *BlockChain) tipGeneration() ([]chainhash.Hash, error) {
+	// Get the parent of this tip.
+	p, err := b.index.PrevNodeFromNode(b.bestNode)
 	if err != nil {
 		return nil, fmt.Errorf("block is orphan (parent missing)")
 	}
@@ -502,9 +492,15 @@ func (b *BlockChain) getGeneration(h chainhash.Hash) ([]chainhash.Hash, error) {
 	return allChildren, nil
 }
 
-// GetGeneration is the exported version of getGeneration.
-func (b *BlockChain) GetGeneration(hash chainhash.Hash) ([]chainhash.Hash, error) {
-	return b.getGeneration(hash)
+// TipGeneration returns the entire generation of blocks stemming from the
+// parent of the current tip.
+//
+// The function is safe for concurrent access.
+func (b *BlockChain) TipGeneration() ([]chainhash.Hash, error) {
+	b.chainLock.Lock()
+	children, err := b.tipGeneration()
+	b.chainLock.Unlock()
+	return children, err
 }
 
 // findNode finds the node scaling backwards from best chain or return an

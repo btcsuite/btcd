@@ -163,19 +163,18 @@ type calcNextReqStakeDifficultyMsg struct {
 	reply chan calcNextReqStakeDifficultyResponse
 }
 
-// getGenerationResponse is a response sent to the reply channel of a
-// getGenerationMsg query.
-type getGenerationResponse struct {
+// tipGenerationResponse is a response sent to the reply channel of a
+// tipGenerationMsg query.
+type tipGenerationResponse struct {
 	hashes []chainhash.Hash
 	err    error
 }
 
-// getGenerationMsg is a message type to be sent across the message
+// tipGenerationMsg is a message type to be sent across the message
 // channel for requesting the required the entire generation of a
 // block node.
-type getGenerationMsg struct {
-	hash  chainhash.Hash
-	reply chan getGenerationResponse
+type tipGenerationMsg struct {
+	reply chan tipGenerationResponse
 }
 
 // forceReorganizationResponse is a response sent to the reply channel of a
@@ -1761,9 +1760,9 @@ out:
 					err: err,
 				}
 
-			case getGenerationMsg:
-				g, err := b.chain.GetGeneration(msg.hash)
-				msg.reply <- getGenerationResponse{
+			case tipGenerationMsg:
+				g, err := b.chain.TipGeneration()
+				msg.reply <- tipGenerationResponse{
 					hashes: g,
 					err:    err,
 				}
@@ -2453,12 +2452,12 @@ func (b *blockManager) ForceReorganization(formerBest, newBest chainhash.Hash) e
 	return response.err
 }
 
-// GetGeneration returns the hashes of all the children of a parent for the
-// block hash that is passed to the function. It is funneled through the block
-// manager since blockchain is not safe for concurrent access.
-func (b *blockManager) GetGeneration(h chainhash.Hash) ([]chainhash.Hash, error) {
-	reply := make(chan getGenerationResponse)
-	b.msgChan <- getGenerationMsg{hash: h, reply: reply}
+// TipGeneration returns the hashes of all the children of the current best
+// chain tip.  It is funneled through the block manager since blockchain is not
+// safe for concurrent access.
+func (b *blockManager) TipGeneration() ([]chainhash.Hash, error) {
+	reply := make(chan tipGenerationResponse)
+	b.msgChan <- tipGenerationMsg{reply: reply}
 	response := <-reply
 	return response.hashes, response.err
 }

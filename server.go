@@ -463,7 +463,7 @@ func (sp *serverPeer) OnGetMiningState(p *peer.Peer, msg *wire.MsgGetMiningState
 
 	// Obtain the entire generation of blocks stemming from the parent of
 	// the current tip.
-	children, err := bm.GetGeneration(*newest)
+	children, err := bm.TipGeneration()
 	if err != nil {
 		peerLog.Warnf("failed to access block manager to get the generation "+
 			"for a mining state request (block: %v): %v", newest, err)
