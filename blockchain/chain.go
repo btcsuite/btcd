@@ -1189,12 +1189,8 @@ func countNumberOfTransactions(block, parent *dcrutil.Block) uint64 {
 // the chain) and nodes the are being attached must be in forwards order
 // (think pushing them onto the end of the chain).
 //
-// The flags modify the behavior of this function as follows:
-//  - BFDryRun: Only the checks which ensure the reorganize can be completed
-//    successfully are performed.  The chain is not reorganized.
-//
 // This function MUST be called with the chain state lock held (for writes).
-func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List, flags BehaviorFlags) error {
+func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List) error {
 	// Nothing to do if no reorganize nodes were provided.
 	if detachNodes.Len() == 0 && attachNodes.Len() == 0 {
 		return nil
@@ -1368,12 +1364,6 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List, flags 
 	}
 	log.Debugf("New best chain validation completed successfully, " +
 		"commencing with the reorganization.")
-
-	// Skip disconnecting and connecting the blocks when running with the
-	// dry run flag set.
-	if flags&BFDryRun == BFDryRun {
-		return nil
-	}
 
 	// Send a notification that a blockchain reorganization is in progress.
 	reorgData := &ReorganizationNtfnsData{
@@ -1572,7 +1562,7 @@ func (b *BlockChain) forceHeadReorganization(formerBest chainhash.Hash, newBest 
 		return err
 	}
 
-	return b.reorganizeChain(attach, detach, BFNone)
+	return b.reorganizeChain(attach, detach)
 }
 
 // ForceHeadReorganization is the exported version of forceHeadReorganization.
@@ -1594,14 +1584,10 @@ func (b *BlockChain) ForceHeadReorganization(formerBest chainhash.Hash, newBest 
 // The flags modify the behavior of this function as follows:
 //  - BFFastAdd: Avoids several expensive transaction validation operations.
 //    This is useful when using checkpoints.
-//  - BFDryRun: Prevents the block from being connected and avoids modifying the
-//    state of the memory chain index.  Also, any log messages related to
-//    modifying the state are avoided.
 //
 // This function MUST be called with the chain state lock held (for writes).
 func (b *BlockChain) connectBestChain(node *blockNode, block, parent *dcrutil.Block, flags BehaviorFlags) (bool, error) {
 	fastAdd := flags&BFFastAdd == BFFastAdd
-	dryRun := flags&BFDryRun == BFDryRun
 
 	// Ensure the passed parent is actually the parent of the block.
 	if *parent.Hash() != node.parentHash {
@@ -1633,11 +1619,6 @@ func (b *BlockChain) connectBestChain(node *blockNode, block, parent *dcrutil.Bl
 				return false, err
 			}
 			b.index.SetStatusFlags(node, statusValid)
-		}
-
-		// Don't connect the block if performing a dry run.
-		if dryRun {
-			return true, nil
 		}
 
 		// In the fast add case the code to check the block connection
@@ -1684,11 +1665,6 @@ func (b *BlockChain) connectBestChain(node *blockNode, block, parent *dcrutil.Bl
 	// We're extending (or creating) a side chain, but the cumulative
 	// work for this new side chain is not enough to make it the new chain.
 	if node.workSum.Cmp(b.bestNode.workSum) <= 0 {
-		// Skip Logging info when the dry run flag is set.
-		if dryRun {
-			return false, nil
-		}
-
 		// Find the fork point.
 		fork := node
 		for fork.parent != nil {
@@ -1736,11 +1712,8 @@ func (b *BlockChain) connectBestChain(node *blockNode, block, parent *dcrutil.Bl
 	}
 
 	// Reorganize the chain.
-	if !dryRun {
-		log.Infof("REORGANIZE: Block %v is causing a reorganize.",
-			node.hash)
-	}
-	err = b.reorganizeChain(detachNodes, attachNodes, flags)
+	log.Infof("REORGANIZE: Block %v is causing a reorganize.", node.hash)
+	err = b.reorganizeChain(detachNodes, attachNodes)
 	if err != nil {
 		return false, err
 	}

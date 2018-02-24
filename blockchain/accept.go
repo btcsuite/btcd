@@ -102,14 +102,11 @@ func IsFinalizedTransaction(tx *dcrutil.Tx, blockHeight int64, blockTime time.Ti
 // before adding it.  The block is expected to have already gone through
 // ProcessBlock before calling this function with it.
 //
-// The flags modify the behavior of this function as follows:
-//  - BFDryRun: The memory chain index will not be pruned and no accept
-//    notification will be sent since the block is not being accepted.
+// The flags are also passed to checkBlockContext and connectBestChain.  See
+// their documentation for how the flags modify their behavior.
 //
 // This function MUST be called with the chain state lock held (for writes).
 func (b *BlockChain) maybeAcceptBlock(block *dcrutil.Block, flags BehaviorFlags) (bool, error) {
-	dryRun := flags&BFDryRun == BFDryRun
-
 	// Get a block node for the block previous to this one.  Will be nil
 	// if this is the genesis block.
 	prevNode, err := b.index.PrevNodeFromBlock(block)
@@ -144,9 +141,7 @@ func (b *BlockChain) maybeAcceptBlock(block *dcrutil.Block, flags BehaviorFlags)
 
 	// Prune stake nodes which are no longer needed before creating a new
 	// node.
-	if !dryRun {
-		b.pruner.pruneChainIfNeeded()
-	}
+	b.pruner.pruneChainIfNeeded()
 
 	// Create a new block node for the block and add it to the block index.
 	// The block could either be on a side chain or the main chain, but it
@@ -167,31 +162,20 @@ func (b *BlockChain) maybeAcceptBlock(block *dcrutil.Block, flags BehaviorFlags)
 	// such as making blocks that never become part of the main chain or
 	// blocks that fail to connect available for further analysis.
 	//
-	// Also, store the associated block index entry when not running in dry
-	// run mode.
+	// Also, store the associated block index entry.
 	err = b.db.Update(func(dbTx database.Tx) error {
 		if err := dbMaybeStoreBlock(dbTx, block); err != nil {
 			return err
 		}
 
-		if !dryRun {
-			if err := dbPutBlockNode(dbTx, newNode); err != nil {
-				return err
-			}
+		if err := dbPutBlockNode(dbTx, newNode); err != nil {
+			return err
 		}
 
 		return nil
 	})
 	if err != nil {
 		return false, err
-	}
-
-	// Remove the node from the block index and disconnect it from the
-	// parent node when running in dry run mode.
-	if dryRun {
-		defer func() {
-			b.index.RemoveNode(newNode)
-		}()
 	}
 
 	// Fetching a stake node could enable a new DoS vector, so restrict
@@ -222,12 +206,12 @@ func (b *BlockChain) maybeAcceptBlock(block *dcrutil.Block, flags BehaviorFlags)
 	// Notify the caller that the new block was accepted into the block
 	// chain.  The caller would typically want to react by relaying the
 	// inventory to other peers.
-	if !dryRun {
-		b.chainLock.Unlock()
-		b.sendNotification(NTBlockAccepted,
-			&BlockAcceptedNtfnsData{isMainChain, block})
-		b.chainLock.Lock()
-	}
+	b.chainLock.Unlock()
+	b.sendNotification(NTBlockAccepted, &BlockAcceptedNtfnsData{
+		OnMainChain: isMainChain,
+		Block:       block,
+	})
+	b.chainLock.Lock()
 
 	return isMainChain, nil
 }
