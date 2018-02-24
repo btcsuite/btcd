@@ -90,13 +90,6 @@ func TestBlockValidationRules(t *testing.T) {
 	}
 	defer teardownFunc()
 
-	// The genesis block should fail to connect since it's already inserted.
-	err = chain.CheckConnectBlock(dcrutil.NewBlock(params.GenesisBlock),
-		blockchain.BFNone)
-	if err == nil {
-		t.Errorf("CheckConnectBlock: Did not receive expected error")
-	}
-
 	// Load up the rest of the blocks up to HEAD~1.
 	filename := filepath.Join("testdata/", "blocks0to168.bz2")
 	fi, err := os.Open(filename)
@@ -1946,14 +1939,6 @@ func TestBlockchainSpendJournal(t *testing.T) {
 		return
 	}
 	defer teardownFunc()
-
-	// The genesis block should fail to connect since it's already
-	// inserted.
-	err = chain.CheckConnectBlock(dcrutil.NewBlock(params.GenesisBlock),
-		blockchain.BFNone)
-	if err == nil {
-		t.Errorf("CheckConnectBlock: Did not receive expected error")
-	}
 
 	// Load up the rest of the blocks up to HEAD.
 	filename := filepath.Join("testdata/", "reorgto179.bz2")
