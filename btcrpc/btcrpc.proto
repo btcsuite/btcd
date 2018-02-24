@@ -1,0 +1,684 @@
+//TODO what to use for hashes: bytes or string?
+
+syntax = "proto3";
+
+package btcrpc;
+
+service btcd {
+
+	// SYSTEM MANAGEMENT
+
+	// Get various system and runtime-related info.
+	rpc GetSystemInfo(GetSystemInfoRequest)
+		returns (GetSystemInfoResponse) {
+	}
+
+	// Set the debug level of the daemon.
+	rpc SetDebugLevel(SetDebugLevelRequest)
+		returns (SetDebugLevelResponse) {
+	}
+	//TODO(stevenroose) getter for current levels? could be in systemInfo
+
+	// Stop the daemon.
+	rpc StopDaemon(StopDaemonRequest)
+		returns (StopDaemonResponse) {
+	}
+
+	// NETWORK
+
+	// Get various state info.
+	//TODO(stevenroose) merge with GetSystemInfo into GetInfo maybe?
+	rpc GetNetworkInfo(GetNetworkInfoRequest)
+		returns (GetNetworkInfoResponse) {
+	}
+
+	// Get the total hashrate of the network.
+	rpc GetNetworkHashRate(GetNetworkHashRateRequest)
+		returns (GetNetworkHashRateResponse){
+	}
+
+
+	// MEMPOOL
+
+	// Get info about the mempool.
+	rpc GetMempoolInfo(GetMempoolInfoRequest)
+		returns (GetMempoolInfoResponse) {
+	}
+
+	// Get the transactions in the mempool.
+	rpc GetMempool(GetMempoolRequest)
+		returns (GetMempoolResponse) {
+	}
+
+	// Get all mempool transactions in serialized format.
+	//TODO(stevenroose) should this be a streaming response because of the size?
+	rpc GetRawMempool(GetRawMempoolRequest)
+		returns (GetRawMempoolResponse) {
+	}
+
+	
+	// BLOCKS
+
+	// Get info about the most recent block in the longest blockchain.
+	rpc GetBestBlockInfo(GetBestBlockInfoRequest)
+		returns (GetBestBlockInfoResponse) {
+	}
+
+	// Get info about the given block.
+	rpc GetBlockInfo(GetBlockInfoRequest)
+		returns (GetBlockInfoResponse) {
+	}
+
+	// Get a block.
+	rpc GetBlock(GetBlockRequest)
+		returns (GetBlockResponse) {
+	}
+
+	// Get a serialized block.
+	rpc GetRawBlock(GetRawBlockRequest)
+		returns (GetRawBlockResponse) {
+	}
+
+	// Submit the block to all connected peers.
+	rpc SubmitBlock(SubmitBlockRequest)
+		returns (SubmitBlockResponse) {
+	}
+
+	
+	// TRANSACTIONS
+
+	// Get a transaction given its hash.
+	// This call requires the transaction index to be enabled to be able to 
+	// find transactions that are noto in the mempool.
+	rpc GetTransaction(GetTransactionRequest)
+		returns (GetTransactionResponse) {
+	}
+
+	// Get a serialized transaction given its hash.
+	// This call requires the transaction index to be enabled to be able to 
+	// find transactions that are noto in the mempool.
+	rpc GetRawTransaction(GetRawTransactionRequest)
+		returns (GetRawTransactionResponse) {
+	}
+
+	// Rescan part of the blockchain for relevant transactions.
+	//TODO(stevenroose) are progress updates useful?
+	//  could make a response message that is a oneof tx or update
+	//TODO(stevenroose) should there be more info than simply the tx? 
+	//  like incoming or outgoing, ...
+	rpc RescanTransactions(RescanTransactionsRequest)
+		returns (stream Transaction) {
+	}
+
+	//// Search for transactions by a given address.
+	//// This call requires the address index to be enabled.
+	//TODO(stevenroose) how is this different than rescan? other than being syncronized
+	//rpc SearchTransactions(SearchTransactionsRequest)
+	//	returns (SearchTransactionsResponse) {
+	//}
+
+	// Submit a transaction to all connected peers.
+	rpc SubmitTransaction(SubmitTransactionRequest)
+		returns (SubmitTransactionResponse) {
+	}
+
+	// Returns all known transactions for the given address.
+	//
+	// This method requires the address and transaction index.
+	rpc GetAddressTransactions(GetAddressTransactionsRequest)
+		returns (GetAddressTransactionsResponse) {
+	}
+
+	// Returns all the unspent transaction outpoints for the given address.
+	//
+	// This method requires the address and transaction index.
+	rpc GetAddressUnspentOutputs(GetAddressUnspentOutputsRequest)
+		returns (GetAddressUnspentOutputsResponse) {
+	}
+
+
+	// SUBSCRIPTIONS
+
+	// Subscribe to relevant transactions based on the subscription requests.
+	// The parameters to filter transactions on can be updated by sending new
+	// SubscribeTransactionsRequest objects on the stream.
+	rpc SubscribeTransactions(stream SubscribeTransactionsRequest)
+		returns (stream TransactionNotification) {
+	}
+
+	// Subscribe to notifications of new blocks being connected to the blockchain
+	// or blocks being disconnected.
+	//TODO(stevenroose) give option to not get disconnected blocks?
+	rpc SubscribeBlocks(SubscribeBlocksRequest)
+		returns (stream BlockNotification) {
+	}
+
+
+	// PEERS
+
+	// Get info about the peers this node is connected to.
+	// Set permanent to get the permanent peer list.
+	rpc GetPeers(GetPeersRequest)
+		returns (GetPeersResponse) {
+	}
+
+	// Connect to a new peer.
+	// Set permanent to true to add to permanent peer list.
+	//TODO(stevenroose) is it worth/possible to have a flag to make it a blocking
+	// call with a success flag
+	rpc ConnectPeer(ConnectPeerRequest)
+		returns (ConnectPeerResponse) {
+	}
+
+	// Disconnect from a peer.
+	// Set permanent to true to remove from permanent peer list.
+	rpc DisconnectPeer(DisconnectPeerRequest)
+		returns (DisconnectPeerResponse) {
+	}
+
+
+	// MINING
+
+	// Get info related to the miner.
+	rpc GetMiningInfo(GetMiningInfoRequest)
+		returns (GetMiningInfoResponse) {
+	}
+}
+
+service regtest {
+	// Set the properties for the built-in CPR miner.
+	// Also allows to add new payout addresses.
+	rpc SetGenerate(SetGenerateRequest)
+		returns (SetGenerateResponse) {
+	}
+  
+	// Get info about the CPU block generator.
+	rpc GetGenerateInfo(GetGenerateInfoRequest)
+		returns (GetGenerateInfoResponse) {
+	}
+  
+	// Generate a number of blocks.
+	// Also allows to add new payout addresses.
+	rpc GenerateBlocks(GenerateBlocksRequest)
+		returns (GenerateBlocksResponse) {
+	}
+}
+
+
+
+// DATA MESSAGES
+
+message Block {
+	BlockInfo info = 1;
+	// Either one of the two following is provided, depending on the request.
+	repeated bytes transaction_hashes = 2;
+	repeated Transaction transactions = 3;
+}
+
+//TODO(stevenroose) include header bytes?
+message BlockInfo {
+	// Identification.
+	bytes hash = 1;
+	int32 height = 2;
+
+	// Block header data.
+	int32 version = 3;
+	bytes previous_block = 4;
+	bytes merkle_root = 5;
+	int64 time = 6;
+	uint32 bits = 7;
+	uint32 nonce = 8;
+
+	// Metadata.
+	int32 confirmations = 9;
+	double difficulty = 10;
+	bytes next_block_hash = 11;
+}
+
+// BlockLocator identifies a block.  Provide EITHER hash or height.
+message BlockLocator {
+	oneof locator {
+		bytes hash = 1;
+		int32 height = 2;
+	}
+}
+
+message NodeInfo {
+	enum ConnectedStatus {
+		DISCONNECTED = 0;
+		OUTBOUND = 1;
+		INBOUND = 2;
+	}
+	message Address {
+		string address = 1;
+		ConnectedStatus connected = 2;
+	}
+
+	string peer_address = 1;
+	bool connected = 2;
+	repeated Address addresses = 3;
+}
+
+message Transaction {
+	message Input {
+		message Outpoint {
+			bytes hash = 1;
+			uint32 index = 2;
+		}
+
+		bool coinbase = 1;
+		Outpoint outpoint = 2;
+		bytes signature_script = 3;
+		//TODO(stevenroose) is decoded script required? tooling should do that I guess
+		uint32 sequence = 4;
+		repeated bytes witness_data = 5;
+
+		//TODO(stevenroose) can we provided these always? 
+		//  (they are provided in the searchrawtransactions call)
+		int64 value = 6;
+	}
+	message Output {
+		uint32 index = 1;
+		int64 value = 2;
+		bytes pubkey_script = 3;
+		//TODO(stevenroose) are the extra script values relevant?
+		// - addresses
+		// - disassembled script
+		// - script class
+		// - ReqSigs
+	}
+
+	bytes hash = 1;
+	//TODO(stevenroose) is it ok to also send encoded all the time? could be
+	// performance problem and also make things prettier (encoding returns errors)
+	// Besides, we could have Raw endpoints as an alternative.
+	bytes serialized = 2;
+	int32 version = 3;
+	repeated Input inputs = 4;
+	repeated Output outputs = 5;
+	uint32 lock_time = 6;
+
+	// Whether the transaction has witness data.
+	bool has_witness = 7;
+	// The withness data hash.
+	bytes witness_hash = 8;
+
+	// Metadata
+	int64 time = 9;
+	//TODO(stevenroose) should we make explicit difference between unconfirmed and unknown?
+	int32 confirmations = 10;
+	bytes block_hash = 11;
+}
+
+message TransactionFilter {
+	repeated string addresses = 1;
+	repeated Transaction.Input.Outpoint outpoints = 2;
+}
+
+//TODO(stevenroose) is it worth it to expose this??
+message MempoolTransaction {
+	Transaction transaction = 1;
+
+	// The time when the transaction was added too the pool.
+	int64 added_time = 2;
+	// The total fee in satoshi the transaction pays.
+	int64 fee = 3;
+	// The fee in satoshi per byte the transaction pays.
+	int64 fee_per_byte = 4;
+	// The block height when the transaction was added to the pool.
+	int32 height = 5;
+	// The priority of the transaction when it was added to the pool.
+	double starting_priority = 6;
+}
+
+message UnspentOutput {
+	Transaction.Input.Outpoint outpoint = 1;
+	//TODO(stevenroose) should we move away from scriptsig and scriptpubkey to 
+	// just output script and input script?
+	bytes pubkey_script = 2;
+	int64 value = 3;
+
+	bool is_coinbase = 4;
+	int32 block_height = 5;
+}
+
+
+// NOTIFICATIONS
+
+message BlockNotification {
+	enum Type {
+		CONNECTED = 0;
+		DISCONNECTED = 1;
+	}
+
+	Type type = 1;
+	Block block = 2;
+}
+
+message TransactionNotification {
+	enum Type {
+		ACCEPTED = 0;
+		CONFIRMED = 1;
+	}
+
+	Type type = 1;
+	oneof transaction {
+		Transaction confirmed_transaction = 2;
+		MempoolTransaction accepted_transaction = 3;
+	}
+}
+
+
+// RPC MESSAGES
+
+message ConnectPeerRequest {
+	string peer_address = 1;
+	bool permanent = 2;
+}
+message ConnectPeerResponse {}
+
+message SetDebugLevelRequest {
+	enum DebugLevel {
+		TRACE = 0;
+		DEBUG = 1;
+		INFO = 2;
+		WARN = 3;
+		ERROR = 4;
+		CRITICAL = 5;
+	}
+	enum Subsystem {
+		ALL = 0;
+		ADXR = 1;
+		AMGR = 2;
+		CMGR = 3;
+		BCDB = 4;
+		BTCD = 5;
+		CHAN = 6;
+		DISC = 7;
+		INDX = 8;
+		MINR = 9;
+		PEER = 10;
+		RPCS = 11;
+		SCRP = 12;
+		SRVR = 13;
+		SYNC = 14;
+		TXMP = 15;
+	}
+	DebugLevel level = 1;
+	Subsystem subsystem = 2;
+}
+message SetDebugLevelResponse {}
+
+message DisconnectPeerRequest {
+	oneof peer {
+		string peer_address = 1;
+		uint32 peer_id = 2;
+	}
+	bool permanent = 3;
+}
+message DisconnectPeerResponse {}
+
+message GenerateBlocksRequest {
+	uint32 nb_blocks = 1;
+	string payout_address = 2;
+}
+message GenerateBlocksResponse {
+	repeated bytes block_hashes = 1;
+}
+
+message GetBestBlockInfoRequest {}
+message GetBestBlockInfoResponse {
+	BlockInfo info = 1;
+}
+
+message GetBlockRequest {
+	BlockLocator locator = 1;
+	// Provide full transaction info instead of only the hashes.
+	bool full_transactions = 2;
+}
+message GetBlockResponse {
+	Block block = 1;
+}
+
+message GetBlockCountRequest {}
+message GetBlockCountResponse {
+	uint32 block_count = 1;
+}
+
+message GetBlockInfoRequest {
+	BlockLocator locator = 1;
+}
+message GetBlockInfoResponse {
+	BlockInfo info = 1;
+}
+
+message GetGenerateInfoRequest {}
+message GetGenerateInfoResponse {
+	bool generate = 1;
+	int32 nb_workers = 2;
+	uint64 hashrate = 3;
+	double difficulty = 4;
+	uint32 nb_pooled_transactions = 5;
+}
+
+message GetMempoolRequest {
+	// Provide full transaction info instead of only the hashes.
+	bool full_transactions = 1;
+}
+message GetMempoolResponse {
+	// Either one of the two following is provided, depending on the request.
+	repeated bytes transaction_hashes = 1;
+	repeated MempoolTransaction transactions = 2;
+}
+
+message GetMempoolInfoRequest {}
+message GetMempoolInfoResponse {
+	uint32 nb_transactions = 1;
+	uint64 nb_bytes = 2;
+	//TODO(stevenroose) anything else relevant here?
+}
+
+message GetMiningInfoRequest {}
+message GetMiningInfoResponse {
+	uint64 network_hashrate = 1;
+	int32 current_block_height = 2;
+	uint64 current_block_size = 3;
+	uint64 current_block_weight = 4;
+	uint32 current_block_nb_transactions = 5;
+	double difficulty = 6;
+	string errors = 7;
+}
+
+message GetNetworkHashRateRequest {
+	// The height of the block at which to calculate the hashrate.
+	// The default is the current best height.
+	int32 end_height = 1;
+	// The amount of blocks in the period to use for the calculation.
+	// Use -1 to use the number of blocks since the last difficulty change.
+	// The default is 120.
+	int32 nb_blocks = 2;
+
+}
+message GetNetworkHashRateResponse {
+	uint64 hashrate = 1;
+}
+
+message GetNetworkInfoRequest {}
+message GetNetworkInfoResponse {
+	enum BitcoinNet {
+		MAINNET = 0;
+		TESTNET = 1;
+		TESTNET3 = 2;
+		SIMNET = 3;
+	}
+
+	BitcoinNet bitcoin_net = 1;
+	int32 best_height = 2;
+	int64 time_offset = 3;
+	double difficulty = 4;
+	uint64 hashrate = 5;
+	double relay_fee = 6;
+}
+
+message GetPeersRequest {
+	bool permanent = 1;
+}
+message GetPeersResponse {
+	message PeerInfo {
+		int32 id = 1;
+		string address = 2;
+		string local_address = 3;
+		uint32 version = 4;
+		string user_agent = 5;
+		//TODO(stevenroose) this is string in current API, why?
+		string services = 6;
+		bool inbound = 7;
+		bool sync_node = 8;
+		bool relay_txs = 9;
+		int64 last_send_time = 10;
+		int64 last_recv_time = 11;
+		int64 connection_time = 12;
+		uint64 bytes_sent = 13;
+		uint64 bytes_received = 14;
+		int64 time_offset = 15;
+		int64 last_ping_time = 16;
+		int64 last_ping_micros = 17;
+		int32 starting_height = 18;
+		int32 current_height = 19;
+		int32 ban_score = 20;
+		int64 fee_filter = 21;
+	}
+
+	repeated PeerInfo peers = 1;
+}
+
+message GetRawBlockRequest {
+	BlockLocator locator = 1;
+}
+message GetRawBlockResponse {
+	bytes block = 1;
+}
+
+message GetRawMempoolRequest {}
+message GetRawMempoolResponse {
+	repeated bytes transactions = 1;
+}
+
+message GetRawTransactionRequest {
+	bytes hash = 1;
+}
+message GetRawTransactionResponse {
+	bytes transaction = 1;
+}
+
+message GetSystemInfoRequest {}
+message GetSystemInfoResponse {
+	uint32 version = 1;
+	uint32 protocol_version = 2;
+	int64 current_time_millis = 3;
+	int64 running_time = 4;
+	uint64 total_bytes_received = 5;
+	uint64 total_bytes_sent = 6;
+	string proxy = 7;
+	uint32 nb_connections = 8;
+}
+
+message GetTransactionRequest {
+	bytes hash = 1;
+}
+message GetTransactionResponse {
+	Transaction transaction = 1;
+}
+
+message RemoveNodeRequest {
+	string peer_address = 1;
+	uint32 peer_id = 2;
+}
+message RemoveNodeResponse {}
+
+message RescanBlocksRequest {
+	repeated BlockLocator blocks = 1;
+}
+
+message RescanTransactionsRequest {
+	BlockLocator start_block = 1;
+	BlockLocator stop_block = 2;
+	TransactionFilter filter = 3;
+}
+
+message SetGenerateRequest {
+	bool generate = 1;
+	//TODO(stevenroose) since mining is only done is regtest, does this still make sense?
+	int32 nb_workers = 2;
+	string payout_address = 3;
+}
+message SetGenerateResponse{}
+
+message SearchTransactionsRequest {
+	string address = 1;
+
+	int32 skip = 2;
+	int32 limit = 3;
+	
+	// Provide the transactions in encoded form.
+	bool encoded = 4;
+}
+message SearchTransactionsResponse {
+	repeated Transaction transactions = 1;
+	repeated bytes encoded = 2;
+}
+
+message SubmitTransactionRequest {
+	bytes transaction = 1;
+}
+message SubmitTransactionResponse {
+	bytes hash = 1;
+}
+
+message GetAddressTransactionsRequest {
+	string address = 1;
+
+	// Control the number of transactions to be fetched from the blockchain.
+	// These controls only apply to the confirmed transactions. All unconfirmed 
+	// ones will be returned always.
+	//TODO(stevenroose) is this worth it instead of just always returning all of 
+	// them?  The current implementation allows this, though. So why not.
+	uint32 nb_skip = 2;
+	uint32 nb_fetch = 3;
+}
+message GetAddressTransactionsResponse {
+	repeated Transaction confirmed_transactions = 1;
+	repeated Transaction unconfirmed_transactions = 2;
+}
+
+message GetAddressUnspentOutputsRequest {
+	string address = 1;
+}
+message GetAddressUnspentOutputsResponse {
+	repeated UnspentOutput outputs = 1;
+}
+
+message SubmitBlockRequest {
+	bytes block = 1;
+}
+message SubmitBlockResponse {
+	bytes hash = 1;
+}
+
+message SubscribeBlocksRequest {
+	// Provide full transaction info instead of only the hashes.
+	bool full_transactions = 1;
+}
+
+message SubscribeTransactionsRequest {
+	TransactionFilter subscribe = 1;
+	TransactionFilter unsubscribe = 2;
+
+	// When this is true, also new transactions coming in from the mempool are 
+	// included apart from the ones confirmed in a block.  These transactions
+	// will be sent again when they are confirmed.
+	bool include_mempool = 3;
+}
+
+message StopDaemonRequest {}
+message StopDaemonResponse {}

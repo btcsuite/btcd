@@ -145,54 +145,6 @@ type jsonrpcWsNotificationManager struct {
 	quit chan struct{}
 }
 
-// queueHandler manages a queue of empty interfaces, reading from in and
-// sending the oldest unsent to out.  This handler stops when either of the
-// in or quit channels are closed, and closes out before returning, without
-// waiting to send any variables still remaining in the queue.
-func queueHandler(in <-chan interface{}, out chan<- interface{}, quit <-chan struct{}) {
-	var q []interface{}
-	var dequeue chan<- interface{}
-	skipQueue := out
-	var next interface{}
-out:
-	for {
-		select {
-		case n, ok := <-in:
-			if !ok {
-				// Sender closed input channel.
-				break out
-			}
-
-			// Either send to out immediately if skipQueue is
-			// non-nil (queue is empty) and reader is ready,
-			// or append to the queue and send later.
-			select {
-			case skipQueue <- n:
-			default:
-				q = append(q, n)
-				dequeue = out
-				skipQueue = nil
-				next = q[0]
-			}
-
-		case dequeue <- next:
-			copy(q, q[1:])
-			q[len(q)-1] = nil // avoid leak
-			q = q[:len(q)-1]
-			if len(q) == 0 {
-				dequeue = nil
-				skipQueue = out
-			} else {
-				next = q[0]
-			}
-
-		case <-quit:
-			break out
-		}
-	}
-	close(out)
-}
-
 // queueHandler maintains a queue of notifications and notification handler
 // control messages.
 func (m *jsonrpcWsNotificationManager) queueHandler() {
@@ -231,18 +183,13 @@ func (m *jsonrpcWsNotificationManager) NotifyBlockDisconnected(block *btcutil.Bl
 // notification manager for transaction notification processing.  If
 // isNew is true, the tx is is a new transaction, rather than one
 // added to the mempool during a reorg.
-func (m *jsonrpcWsNotificationManager) NotifyMempoolTx(tx *btcutil.Tx, isNew bool) {
-	n := &notificationTxAcceptedByMempool{
-		isNew: isNew,
-		tx:    tx,
-	}
-
+func (m *jsonrpcWsNotificationManager) NotifyMempoolTx(tx *btcutil.Tx) {
 	// As NotifyMempoolTx will be called by mempool and the RPC server
 	// may no longer be running, use a select statement to unblock
 	// enqueuing the notification once the RPC server has begun
 	// shutting down.
 	select {
-	case m.queueNotification <- n:
+	case m.queueNotification <- (*notificationTxAcceptedByMempool)(tx):
 	case <-m.quit:
 	}
 }
@@ -448,10 +395,7 @@ func (f *jsonrpcWsClientFilter) removeUnspentOutPoint(op *wire.OutPoint) {
 // Notification types
 type notificationBlockConnected btcutil.Block
 type notificationBlockDisconnected btcutil.Block
-type notificationTxAcceptedByMempool struct {
-	isNew bool
-	tx    *btcutil.Tx
-}
+type notificationTxAcceptedByMempool btcutil.Tx
 
 // Notification control requests
 type notificationRegisterClient jsonrpcWsClient
@@ -534,11 +478,12 @@ out:
 				}
 
 			case *notificationTxAcceptedByMempool:
-				if n.isNew && len(txNotifications) != 0 {
-					m.notifyForNewTx(txNotifications, n.tx)
+				tx := (*btcutil.Tx)(n)
+				if len(txNotifications) != 0 {
+					m.notifyForNewTx(txNotifications, tx)
 				}
-				m.notifyForTx(watchedOutPoints, watchedAddrs, n.tx, nil)
-				m.notifyRelevantTxAccepted(n.tx, clients)
+				m.notifyForTx(watchedOutPoints, watchedAddrs, tx, nil)
+				m.notifyRelevantTxAccepted(tx, clients)
 
 			case *notificationRegisterBlocks:
 				wsc := (*jsonrpcWsClient)(n)

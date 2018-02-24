@@ -587,22 +587,35 @@ func (mp *TxPool) fetchInputUtxos(tx *btcutil.Tx) (*blockchain.UtxoViewpoint, er
 	return utxoView, nil
 }
 
-// FetchTransaction returns the requested transaction from the transaction pool.
-// This only fetches from the main transaction pool and does not include
+// FetchTxDesc returns the requested transaction descriptor from the transaction
+// pool.  This only fetches from the main transaction pool and does not include
 // orphans.
 //
 // This function is safe for concurrent access.
-func (mp *TxPool) FetchTransaction(txHash *chainhash.Hash) (*btcutil.Tx, error) {
+func (mp *TxPool) FetchTxDesc(txHash *chainhash.Hash) (*TxDesc, error) {
 	// Protect concurrent access.
 	mp.mtx.RLock()
 	txDesc, exists := mp.pool[*txHash]
 	mp.mtx.RUnlock()
 
 	if exists {
-		return txDesc.Tx, nil
+		return txDesc, nil
 	}
 
 	return nil, fmt.Errorf("transaction is not in the pool")
+}
+
+// FetchTransaction returns the requested transaction from the transaction pool.
+// This only fetches from the main transaction pool and does not include
+// orphans.
+//
+// This function is safe for concurrent access.
+func (mp *TxPool) FetchTransaction(txHash *chainhash.Hash) (*btcutil.Tx, error) {
+	txDesc, err := mp.FetchTxDesc(txHash)
+	if err != nil {
+		return nil, err
+	}
+	return txDesc.Tx, nil
 }
 
 // maybeAcceptTransaction is the internal function which implements the public
