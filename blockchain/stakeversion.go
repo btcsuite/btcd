@@ -244,30 +244,40 @@ func (b *BlockChain) calcPriorStakeVersion(prevNode *blockNode) (uint32, error) 
 }
 
 // calcVoterVersionInterval tallies all voter versions in an interval and
-// returns a version that has reached 75% majority.  This function assumes that
-// prevNode is at a valid StakeVersionInterval.  It does not test for this and
-// if prevNode is not sitting on a valid StakeVersionInterval it'll walk the
-// chain backwards and find the next valid interval.
+// returns a version that has reached 75% majority.  This function MUST be
+// called with a node that is the final node in a valid stake version interval
+// and greater than or equal to the stake validation height or it will result in
+// an assertion error.
+//
 // This function is really meant to be called internally only from this file.
 //
 // This function MUST be called with the chain state lock held (for writes).
 func (b *BlockChain) calcVoterVersionInterval(prevNode *blockNode) (uint32, error) {
-	// Note that we are NOT checking if we are on interval!
-	var err error
+	// Ensure the provided node is the final node in a valid stake version
+	// interval and is greater than or equal to the stake validation height
+	// since the logic below relies on these assumptions.
+	svh := b.chainParams.StakeValidationHeight
+	svi := b.chainParams.StakeVersionInterval
+	expectedHeight := calcWantHeight(svh, svi, prevNode.height+1)
+	if prevNode.height != expectedHeight || expectedHeight < svh {
+		return 0, AssertError(fmt.Sprintf("calcVoterVersionInterval "+
+			"must be called with a node that is the final node "+
+			"in a stake version interval -- called with node %s "+
+			"(height %d)", prevNode.hash, prevNode.height))
+	}
 
-	// See if we have cached results.  Note that we assume that we are on
-	// an interval.  If we are not we are going to keep way too many cache
-	// entries!
+	// See if we have cached results.
 	if result, ok := b.calcVoterVersionIntervalCache[prevNode.hash]; ok {
 		return result, nil
 	}
 
 	// Tally both the total number of votes in the previous stake version validation
 	// interval and how many of each version those votes have.
+	var err error
 	versions := make(map[uint32]int32) // [version][count]
 	totalVotesFound := int32(0)
 	iterNode := prevNode
-	for i := int64(0); i < b.chainParams.StakeVersionInterval && iterNode != nil; i++ {
+	for i := int64(0); i < svi && iterNode != nil; i++ {
 		totalVotesFound += int32(len(iterNode.votes))
 		for _, v := range iterNode.votes {
 			versions[v.Version]++
@@ -277,16 +287,6 @@ func (b *BlockChain) calcVoterVersionInterval(prevNode *blockNode) (uint32, erro
 		if err != nil {
 			return 0, err
 		}
-	}
-
-	// Assert that we have enough votes in case this function is called at
-	// an invalid interval.
-	if int64(totalVotesFound) < b.chainParams.StakeVersionInterval*
-		(int64(b.chainParams.TicketsPerBlock/2)+1) {
-		return 0, AssertError(fmt.Sprintf("Not enough "+
-			"votes: %v expected: %v ", totalVotesFound,
-			b.chainParams.StakeVersionInterval*
-				(int64(b.chainParams.TicketsPerBlock/2)+1)))
 	}
 
 	// Determine the required amount of votes to reach supermajority.
@@ -316,26 +316,20 @@ func (b *BlockChain) calcVoterVersion(prevNode *blockNode) (uint32, *blockNode) 
 		return 0, nil
 	}
 
-	// Iterate over versions until we find a majority.
-	iterNode := node
-	for iterNode != nil {
-		version, err := b.calcVoterVersionInterval(iterNode)
+	// Iterate over versions until a majority is found.  Don't try to count
+	// votes before the stake validation height since there could not
+	// possibly have been any.
+	for node != nil && node.height >= b.chainParams.StakeValidationHeight {
+		version, err := b.calcVoterVersionInterval(node)
 		if err == nil {
-			return version, iterNode
+			return version, node
 		}
 		if err != errVoterVersionMajorityNotFound {
 			break
 		}
 
-		// findStakeVersionPriorNode increases the height so we need to
-		// compensate by loading the prior node.
-		iterNode, err = b.index.PrevNodeFromNode(iterNode)
-		if err != nil {
-			break
-		}
-
-		// Walk blockchain back to prior interval.
-		iterNode, err = b.findStakeVersionPriorNode(iterNode)
+		prevIntervalHeight := node.height - b.chainParams.StakeVersionInterval
+		node, err = b.index.AncestorNode(node, prevIntervalHeight)
 		if err != nil {
 			break
 		}
