@@ -164,10 +164,7 @@ func TestCalcStakeVersionCorners(t *testing.T) {
 
 	// Generate 3 intervals with v2 votes and calculated stake version.
 	for i := int64(0); i < svi*3; i++ {
-		sv, err := bc.calcStakeVersionByNode(node)
-		if err != nil {
-			t.Fatalf("calcStakeVersionByNode: unexpected error: %v", err)
-		}
+		sv := bc.calcStakeVersion(node)
 
 		// Set vote and stake versions.
 		node = newFakeNode(node, 3, sv, 0, time.Now())
@@ -189,10 +186,7 @@ func TestCalcStakeVersionCorners(t *testing.T) {
 
 	// Generate 3 intervals with v4 votes and calculated stake version.
 	for i := int64(0); i < svi*3; i++ {
-		sv, err := bc.calcStakeVersionByNode(node)
-		if err != nil {
-			t.Fatalf("calcStakeVersionByNode: unexpected error: %v", err)
-		}
+		sv := bc.calcStakeVersion(node)
 
 		// Set vote and stake versions.
 		node = newFakeNode(node, 3, sv, 0, time.Now())
@@ -215,10 +209,7 @@ func TestCalcStakeVersionCorners(t *testing.T) {
 
 	// Generate 3 intervals with v2 votes and calculated stake version.
 	for i := int64(0); i < svi*3; i++ {
-		sv, err := bc.calcStakeVersionByNode(node)
-		if err != nil {
-			t.Fatalf("calcStakeVersionByNode: unexpected error: %v", err)
-		}
+		sv := bc.calcStakeVersion(node)
 
 		// Set vote and stake versions.
 		node = newFakeNode(node, 3, sv, 0, time.Now())
@@ -243,10 +234,7 @@ func TestCalcStakeVersionCorners(t *testing.T) {
 
 	// Generate 2 intervals with v5 votes and calculated stake version.
 	for i := int64(0); i < svi*2; i++ {
-		sv, err := bc.calcStakeVersionByNode(node)
-		if err != nil {
-			t.Fatalf("calcStakeVersionByNode: unexpected error: %v", err)
-		}
+		sv := bc.calcStakeVersion(node)
 
 		// Set vote and stake versions.
 		node = newFakeNode(node, 3, sv, 0, time.Now())
@@ -269,10 +257,7 @@ func TestCalcStakeVersionCorners(t *testing.T) {
 
 	// Generate 1 interval with v4 votes to test the edge condition.
 	for i := int64(0); i < svi; i++ {
-		sv, err := bc.calcStakeVersionByNode(node)
-		if err != nil {
-			t.Fatalf("calcStakeVersionByNode: unexpected error: %v", err)
-		}
+		sv := bc.calcStakeVersion(node)
 
 		// Set vote and stake versions.
 		node = newFakeNode(node, 3, sv, 0, time.Now())
@@ -298,10 +283,7 @@ func TestCalcStakeVersionCorners(t *testing.T) {
 
 	// Generate another interval with v4 votes.
 	for i := int64(0); i < svi; i++ {
-		sv, err := bc.calcStakeVersionByNode(node)
-		if err != nil {
-			t.Fatalf("calcStakeVersionByNode: unexpected error: %v", err)
-		}
+		sv := bc.calcStakeVersion(node)
 
 		// Set stake versions.
 		node = newFakeNode(node, 3, sv, 0, time.Now())
@@ -376,11 +358,7 @@ func TestCalcStakeVersionByNode(t *testing.T) {
 			bc.bestNode = node
 		}
 
-		version, err := bc.calcStakeVersionByNode(bc.bestNode)
-		if err != nil {
-			t.Fatalf("calcStakeVersionByNode: unexpected error: %v",
-				err)
-		}
+		version := bc.calcStakeVersion(bc.bestNode)
 		if version != test.expectVersion {
 			t.Fatalf("version mismatch: got %v expected %v",
 				version, test.expectVersion)
@@ -727,10 +705,7 @@ func TestIsStakeMajorityVersion(t *testing.T) {
 		}
 
 		// validate calcStakeVersion
-		version, err := bc.calcStakeVersionByNode(node)
-		if err != nil {
-			t.Fatalf("calcStakeVersionByNode: unexpected error: %v", err)
-		}
+		version := bc.calcStakeVersion(node)
 		if version != test.expectedCalcVersion {
 			t.Fatalf("%v calcStakeVersionByNode got %v expected %v",
 				test.name, version, test.expectedCalcVersion)
@@ -795,10 +770,7 @@ func TestLarge(t *testing.T) {
 			}
 
 			// validate calcStakeVersion
-			version, err := bc.calcStakeVersionByNode(node)
-			if err != nil {
-				t.Fatalf("calcStakeVersionByNode: unexpected error: %v", err)
-			}
+			version := bc.calcStakeVersion(node)
 			if version != test.expectedCalcVersion {
 				t.Fatalf("%v calcStakeVersionByNode got %v expected %v",
 					test.name, version, test.expectedCalcVersion)

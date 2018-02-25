@@ -410,14 +410,6 @@ func (b *BlockChain) calcStakeVersionByHash(hash *chainhash.Hash) (uint32, error
 		return 0, err
 	}
 
-	return b.calcStakeVersionByNode(prevNode)
-}
-
-// calcStakeVersionByNode is identical to calcStakeVersionByHash but takes a
-// *blockNode instead.
-//
-// This function MUST be called with the chain state lock held (for writes).
-func (b *BlockChain) calcStakeVersionByNode(prevNode *blockNode) (uint32, error) {
 	return b.calcStakeVersion(prevNode), nil
 }
 
