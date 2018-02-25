@@ -2982,8 +2982,7 @@ func handleGetBlockTemplateProposal(s *rpcServer, request *dcrjson.TemplateReque
 		return "bad-prevblk", nil
 	}
 
-	flags := blockchain.BFNoPoWCheck
-	err = s.server.blockManager.chain.CheckConnectBlock(block, flags)
+	err = s.server.blockManager.chain.CheckConnectBlockTemplate(block)
 	if err != nil {
 		if _, ok := err.(blockchain.RuleError); !ok {
 			errStr := fmt.Sprintf("Failed to process block "+

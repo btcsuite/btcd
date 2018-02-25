@@ -828,7 +828,7 @@ func handleTooFewVoters(subsidyCache *blockchain.SubsidyCache, nextHeight int64,
 
 				// Make sure the block validates.
 				block := dcrutil.NewBlockDeepCopyCoinbase(cptCopy.Block)
-				err = bm.chain.CheckConnectBlock(block, blockchain.BFNoPoWCheck)
+				err = bm.chain.CheckConnectBlockTemplate(block)
 				if err != nil {
 					minrLog.Errorf("failed to check template while "+
 						"duplicating a parent: %v", err.Error())
@@ -931,7 +931,7 @@ func handleTooFewVoters(subsidyCache *blockchain.SubsidyCache, nextHeight int64,
 
 				// Make sure the block validates.
 				btBlock := dcrutil.NewBlockDeepCopyCoinbase(btMsgBlock)
-				err = bm.chain.CheckConnectBlock(btBlock, blockchain.BFNoPoWCheck)
+				err = bm.chain.CheckConnectBlockTemplate(btBlock)
 				if err != nil {
 					str := fmt.Sprintf("failed to check template: %v while "+
 						"constructing a new parent", err.Error())
@@ -2016,7 +2016,7 @@ mempoolLoop:
 	// consensus rules to ensure it properly connects to the current best
 	// chain with no issues.
 	block := dcrutil.NewBlockDeepCopyCoinbase(&msgBlock)
-	err = blockManager.chain.CheckConnectBlock(block, blockchain.BFNoPoWCheck)
+	err = blockManager.chain.CheckConnectBlockTemplate(block)
 	if err != nil {
 		str := fmt.Sprintf("failed to do final check for check connect "+
 			"block when making new block template: %v",

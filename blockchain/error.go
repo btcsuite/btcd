@@ -453,6 +453,10 @@ const (
 	// failed validation.
 	ErrInvalidAncestorBlock
 
+	// ErrInvalidTemplateParent indicates that a block template builds on a
+	// block that is either not the current best chain tip or its parent.
+	ErrInvalidTemplateParent
+
 	// numErrorCodes is the maximum error code number used in tests.
 	numErrorCodes
 )
@@ -555,6 +559,7 @@ var errorCodeStrings = map[ErrorCode]string{
 	ErrInvalidEarlyVoteBits:   "ErrInvalidEarlyVoteBits",
 	ErrInvalidEarlyFinalState: "ErrInvalidEarlyFinalState",
 	ErrInvalidAncestorBlock:   "ErrInvalidAncestorBlock",
+	ErrInvalidTemplateParent:  "ErrInvalidTemplateParent",
 }
 
 // String returns the ErrorCode as a human-readable name.
