@@ -533,10 +533,10 @@ func isRevocationTx(tx *wire.MsgTx) bool {
 	return scriptClass == txscript.StakeRevocationTy
 }
 
-// voteBlockScript returns a standard provably-pruneable OP_RETURN script
+// VoteCommitmentScript returns a standard provably-pruneable OP_RETURN script
 // suitable for use in a vote tx (ssgen) given the block hash and height to vote
 // on.
-func voteCommitmentScript(hash chainhash.Hash, height uint32) []byte {
+func VoteCommitmentScript(hash chainhash.Hash, height uint32) []byte {
 	// The vote commitment consists of a 32-byte hash of the block it is
 	// voting on along with its expected height as a 4-byte little-endian
 	// uint32.  32-byte hash + 4-byte uint32 = 36 bytes.
@@ -554,7 +554,7 @@ func voteCommitmentScript(hash chainhash.Hash, height uint32) []byte {
 // voteBlockScript returns a standard provably-pruneable OP_RETURN script
 // suitable for use in a vote tx (ssgen) given the block to vote on.
 func voteBlockScript(parentBlock *wire.MsgBlock) []byte {
-	return voteCommitmentScript(parentBlock.BlockHash(),
+	return VoteCommitmentScript(parentBlock.BlockHash(),
 		parentBlock.Header.Height)
 }
 
@@ -1825,7 +1825,7 @@ func updateVoteCommitments(block *wire.MsgBlock) {
 			continue
 		}
 
-		stx.TxOut[0].PkScript = voteCommitmentScript(block.Header.PrevBlock,
+		stx.TxOut[0].PkScript = VoteCommitmentScript(block.Header.PrevBlock,
 			block.Header.Height-1)
 	}
 }
