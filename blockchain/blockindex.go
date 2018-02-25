@@ -280,8 +280,9 @@ type blockIndex struct {
 	chainParams *chaincfg.Params
 
 	sync.RWMutex
-	index    map[chainhash.Hash]*blockNode
-	depNodes map[chainhash.Hash][]*blockNode
+	index     map[chainhash.Hash]*blockNode
+	depNodes  map[chainhash.Hash][]*blockNode
+	chainTips map[int64][]*blockNode
 }
 
 // newBlockIndex returns a new empty instance of a block index.  The index will
@@ -293,6 +294,7 @@ func newBlockIndex(db database.DB, chainParams *chaincfg.Params) *blockIndex {
 		chainParams: chainParams,
 		index:       make(map[chainhash.Hash]*blockNode),
 		depNodes:    make(map[chainhash.Hash][]*blockNode),
+		chainTips:   make(map[int64][]*blockNode),
 	}
 }
 
@@ -526,6 +528,66 @@ func (bi *blockIndex) RemoveNode(node *blockNode) {
 		}
 	}
 	delete(bi.index, node.hash)
+	bi.Unlock()
+}
+
+// addChainTip adds the passed block node as a new chain tip.
+//
+// This function MUST be called with the block index lock held (for writes).
+func (bi *blockIndex) addChainTip(tip *blockNode) {
+	bi.chainTips[tip.height] = append(bi.chainTips[tip.height], tip)
+}
+
+// removeChainTip removes the passed block node from the available chain tips.
+//
+// This function MUST be called with the block index lock held (for writes).
+func (bi *blockIndex) removeChainTip(tip *blockNode) {
+	nodes := bi.chainTips[tip.height]
+	for i, n := range nodes {
+		if n == tip {
+			copy(nodes[i:], nodes[i+1:])
+			nodes[len(nodes)-1] = nil
+			nodes = nodes[:len(nodes)-1]
+			break
+		}
+	}
+
+	// Either update the map entry for the height with the remaining nodes
+	// or remove it altogether if there are no more nodes left.
+	if len(nodes) == 0 {
+		delete(bi.chainTips, tip.height)
+	} else {
+		bi.chainTips[tip.height] = nodes
+	}
+}
+
+// AddChainTip adds the passed block node as a new chain tip.
+//
+// This function is safe for concurrent access.
+func (bi *blockIndex) AddChainTip(tip *blockNode) {
+	bi.Lock()
+	bi.addChainTip(tip)
+	bi.Unlock()
+}
+
+// RemoveChainTip removes the passed block node from the available chain tips.
+//
+// This function is safe for concurrent access.
+func (bi *blockIndex) RemoveChainTip(tip *blockNode) {
+	bi.Lock()
+	bi.removeChainTip(tip)
+	bi.Unlock()
+}
+
+// UpdateChainTips removes an old tip from the available chain tips and adds a
+// new one in its place.  This is useful when connecting and disconnect a node
+// from a chain to perform the swap a single atomic operation.
+//
+// This function is safe for concurrent access.
+func (bi *blockIndex) UpdateChainTips(oldTip, newTip *blockNode) {
+	bi.Lock()
+	bi.removeChainTip(oldTip)
+	bi.addChainTip(newTip)
 	bi.Unlock()
 }
 

@@ -930,6 +930,9 @@ func (b *BlockChain) connectBlock(node *blockNode, block, parent *dcrutil.Block,
 	// This node is now the end of the best chain.
 	b.bestNode = node
 
+	// Update the chain tips by replacing the node that was just extended.
+	b.index.UpdateChainTips(node.parent, node)
+
 	// Update the state for the best block.  Notice how this replaces the
 	// entire struct instead of updating the existing one.  This effectively
 	// allows the old version to act as a snapshot which callers can use
@@ -1117,6 +1120,10 @@ func (b *BlockChain) disconnectBlock(node *blockNode, block, parent *dcrutil.Blo
 
 	// This node's parent is now the end of the best chain.
 	b.bestNode = node.parent
+
+	// Update the chain tips by replacing the node that was just
+	// disconnected.
+	b.index.UpdateChainTips(node, node.parent)
 
 	// Update the state for the best block.  Notice how this replaces the
 	// entire struct instead of updating the existing one.  This effectively
@@ -1691,6 +1698,10 @@ func (b *BlockChain) connectBestChain(node *blockNode, block, parent *dcrutil.Bl
 				fork.height,
 				fork.hash)
 		}
+
+		// The node is a new chain tip since it was connected without
+		// becoming the main chain.
+		b.index.AddChainTip(node)
 
 		return false, nil
 	}
