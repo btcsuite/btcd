@@ -237,27 +237,6 @@ func TestBlockValidationRules(t *testing.T) {
 	}
 
 	// ----------------------------------------------------------------------------
-	// ErrInvalidEarlyVoteBits
-	earlyBadVoteBits42 := new(wire.MsgBlock)
-	earlyBadVoteBits42.FromBytes(block142Bytes)
-	earlyBadVoteBits42.Header.VoteBits ^= 0x80
-	b142test = dcrutil.NewBlock(earlyBadVoteBits42)
-
-	err = blockchain.CheckWorklessBlockSanity(b142test, timeSource, params)
-	if err == nil || err.(blockchain.RuleError).ErrorCode !=
-		blockchain.ErrInvalidEarlyVoteBits {
-		t.Errorf("Got unexpected no error or wrong error for "+
-			"ErrInvalidEarlyVoteBits test: %v", err)
-	}
-
-	err = chain.CheckConnectBlock(b142test, blockchain.BFNoPoWCheck)
-	if err == nil || err.(blockchain.RuleError).ErrorCode !=
-		blockchain.ErrInvalidEarlyVoteBits {
-		t.Errorf("Got unexpected no error or wrong error for "+
-			"ErrInvalidEarlyVoteBits test: %v", err)
-	}
-
-	// ----------------------------------------------------------------------------
 	// Add blocks up to the first stage of testing.
 	testsIdx1 := 153
 	testsIdx2 := 154
@@ -465,76 +444,12 @@ func TestBlockValidationRules(t *testing.T) {
 	}
 
 	// ----------------------------------------------------------------------------
-	// ErrNotEnoughStake
-	notEnoughStake154 := new(wire.MsgBlock)
-	notEnoughStake154.FromBytes(block154Bytes)
-	notEnoughStake154.STransactions[5].TxOut[0].Value--
-	notEnoughStake154.AddSTransaction(mtxFromB)
-	recalculateMsgBlockMerkleRootsSize(notEnoughStake154)
-	b154test = dcrutil.NewBlock(notEnoughStake154)
-
-	// This fails both checks.
-	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, params)
-	if err == nil || err.(blockchain.RuleError).ErrorCode !=
-		blockchain.ErrNotEnoughStake {
-		t.Errorf("Failed to get error or correct error for low stake amt "+
-			"test (err: %v)", err)
-	}
-
-	// Throws an error in stake consensus.
-	err = chain.CheckConnectBlock(b154test, blockchain.BFNoPoWCheck)
-	if err == nil {
-		t.Errorf("Unexpected error for low stake amt test: %v", err.Error())
-	}
-
-	// ----------------------------------------------------------------------------
-	// ErrFreshStakeMismatch
-	badFreshStake154 := new(wire.MsgBlock)
-	badFreshStake154.FromBytes(block154Bytes)
-	badFreshStake154.Header.FreshStake++
-	recalculateMsgBlockMerkleRootsSize(badFreshStake154)
-	b154test = dcrutil.NewBlock(badFreshStake154)
-
-	// Throws an error in stake consensus.
-	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, params)
-	if err == nil || err.(blockchain.RuleError).ErrorCode !=
-		blockchain.ErrFreshStakeMismatch {
-		t.Errorf("Unexpected no or wrong error for ErrFreshStakeMismatch "+
-			"sanity check test: %v", err.Error())
-	}
-
-	err = chain.CheckConnectBlock(b154test, blockchain.BFNoPoWCheck)
-	if err == nil || err.(blockchain.RuleError).ErrorCode !=
-		blockchain.ErrFreshStakeMismatch {
-		t.Errorf("Unexpected no or wrong error for ErrFreshStakeMismatch "+
-			"sanity check test: %v", err.Error())
-	}
-
-	// ----------------------------------------------------------------------------
 	// ErrStakeBelowMinimum still needs to be tested, can't on this blockchain
 	// because it's above minimum and it'll always trigger failure on that
 	// condition first.
 
 	// ----------------------------------------------------------------------------
-	// ErrNotEnoughVotes
-	notEnoughVotes154 := new(wire.MsgBlock)
-	notEnoughVotes154.FromBytes(block154Bytes)
-	notEnoughVotes154.STransactions = notEnoughVotes154.STransactions[0:2]
-	notEnoughVotes154.Header.FreshStake = 0
-	notEnoughVotes154.Header.Voters = 2
-	recalculateMsgBlockMerkleRootsSize(notEnoughVotes154)
-	b154test = dcrutil.NewBlock(notEnoughVotes154)
-
-	// Fails and hits ErrNotEnoughVotes.
-	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, params)
-	if err == nil || err.(blockchain.RuleError).ErrorCode !=
-		blockchain.ErrNotEnoughVotes {
-		t.Errorf("Got no or unexpected block sanity err for "+
-			"not enough votes (err: %v)", err)
-	}
-
-	// ----------------------------------------------------------------------------
-	// ErrTooManyVotes
+	// ErrTicketUnavailable
 	invalidSSGenFor154, _ := hex.DecodeString("0100000002000000000000000000000" +
 		"0000000000000000000000000000000000000000000ffffffff00ffffffff9a4fc238" +
 		"0060cd86a65620f43af5d641a15c11cba8a3b41cb0f87c2e5795ef590000000001fff" +
@@ -549,22 +464,6 @@ func TestBlockValidationRules(t *testing.T) {
 	mtxFromB = new(wire.MsgTx)
 	mtxFromB.FromBytes(invalidSSGenFor154)
 
-	tooManyVotes154 := new(wire.MsgBlock)
-	tooManyVotes154.FromBytes(block154Bytes)
-	tooManyVotes154.AddSTransaction(mtxFromB)
-	tooManyVotes154.Header.Voters = 6
-
-	recalculateMsgBlockMerkleRootsSize(tooManyVotes154)
-	b154test = dcrutil.NewBlock(tooManyVotes154)
-
-	// Fails and hits ErrTooManyVotes.
-	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, params)
-	if err == nil {
-		t.Errorf("got unexpected no error for ErrTooManyVotes sanity check")
-	}
-
-	// ----------------------------------------------------------------------------
-	// ErrTicketUnavailable
 	nonChosenTicket154 := new(wire.MsgBlock)
 	nonChosenTicket154.FromBytes(block154Bytes)
 	nonChosenTicket154.STransactions[4] = mtxFromB
@@ -587,7 +486,6 @@ func TestBlockValidationRules(t *testing.T) {
 			err)
 	}
 
-	// ----------------------------------------------------------------------------
 	// ----------------------------------------------------------------------------
 	// ErrVotesMismatch
 	votesMismatch154 := new(wire.MsgBlock)
@@ -997,27 +895,6 @@ func TestBlockValidationRules(t *testing.T) {
 		blockchain.ErrNoTax {
 		t.Errorf("Got no error or unexpected error for ErrNoTax "+
 			"test 1: %v", err)
-	}
-
-	// ErrNoTax 2
-	// Wrong hash paid to
-	taxMissing154 = new(wire.MsgBlock)
-	taxMissing154.FromBytes(block154Bytes)
-	taxMissing154.Transactions[0].TxOut[0].PkScript[8] ^= 0x01
-
-	recalculateMsgBlockMerkleRootsSize(taxMissing154)
-	b154test = dcrutil.NewBlock(taxMissing154)
-
-	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, params)
-	if err != nil {
-		t.Errorf("Got unexpected error for ErrNoTax test 2: %v", err)
-	}
-
-	err = chain.CheckConnectBlock(b154test, blockchain.BFNoPoWCheck)
-	if err == nil || err.(blockchain.RuleError).ErrorCode !=
-		blockchain.ErrNoTax {
-		t.Errorf("Got no error or unexpected error for ErrNoTax "+
-			"test 2: %v", err)
 	}
 
 	// ErrNoTax 3
