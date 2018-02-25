@@ -468,39 +468,21 @@ func (b *BlockChain) addOrphanBlock(block *dcrutil.Block) {
 	b.prevOrphans[*prevHash] = append(b.prevOrphans[*prevHash], oBlock)
 }
 
-// tipGeneration returns the entire generation of blocks stemming from the
-// parent of the current tip.
-//
-// This function MUST be called with the chain lock held (for reads).
-func (b *BlockChain) tipGeneration() ([]chainhash.Hash, error) {
-	// Get the parent of this tip.
-	p, err := b.index.PrevNodeFromNode(b.bestNode)
-	if err != nil {
-		return nil, fmt.Errorf("block is orphan (parent missing)")
-	}
-	if p == nil {
-		return nil, fmt.Errorf("no need to get children of genesis block")
-	}
-
-	// Store all the hashes in a new slice and return them.
-	lenChildren := len(p.children)
-	allChildren := make([]chainhash.Hash, lenChildren)
-	for i := 0; i < lenChildren; i++ {
-		allChildren[i] = p.children[i].hash
-	}
-
-	return allChildren, nil
-}
-
 // TipGeneration returns the entire generation of blocks stemming from the
 // parent of the current tip.
 //
 // The function is safe for concurrent access.
 func (b *BlockChain) TipGeneration() ([]chainhash.Hash, error) {
 	b.chainLock.Lock()
-	children, err := b.tipGeneration()
+	b.index.RLock()
+	nodes := b.index.chainTips[b.bestNode.height]
+	nodeHashes := make([]chainhash.Hash, len(nodes))
+	for i, n := range nodes {
+		nodeHashes[i] = n.hash
+	}
+	b.index.RUnlock()
 	b.chainLock.Unlock()
-	return children, err
+	return nodeHashes, nil
 }
 
 // findNode finds the node scaling backwards from best chain or return an
