@@ -60,13 +60,17 @@ recommended that `GOPATH` is set to a directory in your home directory such as
 `~/goprojects` to avoid write permission issues.  It is also recommended to add
 `$GOPATH/bin` to your `PATH` at this point.
 
+- Make sure `dep`, the dependency manager of Go, is installed:
+
+Go to the [dep installation instructions](https://golang.github.io/dep/docs/installation.html) 
+or run `go get -u github.com/golang/dep/cmd/dep` for an install from source.
+
 - Run the following commands to obtain btcd, all dependencies, and install it:
 
 ```bash
-$ go get -u github.com/Masterminds/glide
 $ git clone https://github.com/btcsuite/btcd $GOPATH/src/github.com/btcsuite/btcd
 $ cd $GOPATH/src/github.com/btcsuite/btcd
-$ glide install
+$ dep ensure
 $ go install . ./cmd/...
 ```
 
@@ -86,7 +90,7 @@ Install a newer MSI
 
 ```bash
 $ cd $GOPATH/src/github.com/btcsuite/btcd
-$ git pull && glide install
+$ git pull && dep ensure
 $ go install . ./cmd/...
 ```
 
