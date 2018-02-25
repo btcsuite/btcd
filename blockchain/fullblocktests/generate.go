@@ -1094,13 +1094,47 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 	})
 	rejected(blockchain.ErrFreshStakeMismatch)
 
-	// Attempt to add block with tickets voting on the wrong block.
+	// Attempt to add block with a ticket voting on the parent of the actual
+	// block it should be voting for.
 	//
 	//   ... -> bsl5(8)
 	//                 \-> bv6(9)
 	g.SetTip("bsl5")
 	g.NextBlock("bv6", outs[9], ticketOuts[9], func(b *wire.MsgBlock) {
-		b.STransactions[0].TxOut[0].PkScript[2] ^= 0x55
+		parent := g.BlockByHash(&b.Header.PrevBlock)
+		voteBlock := g.BlockByHash(&parent.Header.PrevBlock)
+		script := chaingen.VoteCommitmentScript(voteBlock.BlockHash(),
+			voteBlock.Header.Height)
+		b.STransactions[0].TxOut[0].PkScript = script
+	})
+	rejected(blockchain.ErrVotesOnWrongBlock)
+
+	// Attempt to add block with a ticket voting on the correct block hash,
+	// but the wrong block height.
+	//
+	//   ... -> bsl5(8)
+	//                \-> bv6a(9)
+	g.SetTip("bsl5")
+	g.NextBlock("bv6a", outs[9], ticketOuts[9], func(b *wire.MsgBlock) {
+		parent := g.BlockByHash(&b.Header.PrevBlock)
+		script := chaingen.VoteCommitmentScript(parent.BlockHash(),
+			b.Header.Height)
+		b.STransactions[1].TxOut[0].PkScript = script
+	})
+	rejected(blockchain.ErrVotesOnWrongBlock)
+
+	// Attempt to add block with a ticket voting on the correct block height,
+	// but the wrong block hash.
+	//
+	//   ... -> bsl5(8)
+	//                \-> bv6b(9)
+	g.SetTip("bsl5")
+	g.NextBlock("bv6b", outs[9], ticketOuts[9], func(b *wire.MsgBlock) {
+		parent := g.BlockByHash(&b.Header.PrevBlock)
+		voteBlock := g.BlockByHash(&parent.Header.PrevBlock)
+		script := chaingen.VoteCommitmentScript(voteBlock.BlockHash(),
+			parent.Header.Height)
+		b.STransactions[2].TxOut[0].PkScript = script
 	})
 	rejected(blockchain.ErrVotesOnWrongBlock)
 
