@@ -1533,18 +1533,12 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 	bmf3 := g.NextBlock("bmf3", outs[15], ticketOuts[15])
 	// This can't be done inside a munge function passed to NextBlock
 	// because the block is solved after the function returns and this test
-	// requires an unsolved block.
+	// requires an unsolved block.  Thus, just increment the nonce until
+	// it's not solved and then replace it in the generator's state.
 	{
 		origHash := bmf3.BlockHash()
-		for {
-			// Keep incrementing the nonce until the hash treated as
-			// a uint256 is higher than the limit.
-			bmf3.Header.Nonce += 1
-			hash := bmf3.BlockHash()
-			hashNum := blockchain.HashToBig(&hash)
-			if hashNum.Cmp(g.Params().PowLimit) >= 0 {
-				break
-			}
+		for chaingen.IsSolved(&bmf3.Header) {
+			bmf3.Header.Nonce++
 		}
 		g.UpdateBlockState("bmf3", origHash, "bmf3", bmf3)
 	}
