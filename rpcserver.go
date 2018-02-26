@@ -194,6 +194,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"getblockhash":          handleGetBlockHash,
 	"getblockheader":        handleGetBlockHeader,
 	"getblocksubsidy":       handleGetBlockSubsidy,
+	"getchaintips":          handleGetChainTips,
 	"getcoinsupply":         handleGetCoinSupply,
 	"getconnectioncount":    handleGetConnectionCount,
 	"getcurrentnet":         handleGetCurrentNet,
@@ -295,7 +296,6 @@ var rpcUnimplemented = map[string]struct{}{
 	"estimatepriority":  {},
 	"getblocktemplate":  {},
 	"getblockchaininfo": {},
-	"getchaintips":      {},
 	"getnetworkinfo":    {},
 }
 
@@ -321,6 +321,7 @@ var rpcLimited = map[string]struct{}{
 	"getblock":              {},
 	"getblockcount":         {},
 	"getblockhash":          {},
+	"getchaintips":          {},
 	"getcurrentnet":         {},
 	"getdifficulty":         {},
 	"getinfo":               {},
@@ -3020,6 +3021,11 @@ func handleGetBlockTemplate(s *rpcServer, cmd interface{}, closeChan <-chan stru
 	}
 
 	return nil, rpcInvalidError("Invalid mode: %v", mode)
+}
+
+// handleGetChainTips implements the getchaintips command.
+func handleGetChainTips(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	return s.chain.ChainTips(), nil
 }
 
 // handleGetCoinSupply implements the getcoinsupply command.
