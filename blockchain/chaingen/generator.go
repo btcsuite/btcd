@@ -2092,7 +2092,7 @@ func (g *Generator) NextBlock(blockName string, spend *SpendableOut, ticketSpend
 // premine payouts.  The additional amount parameter can be used to create a
 // block that is otherwise a completely valid premine block except it adds the
 // extra amount to each payout and thus create a block that violates consensus.
-func (g *Generator) CreatePremineBlock(blockName string, additionalAmount dcrutil.Amount) *wire.MsgBlock {
+func (g *Generator) CreatePremineBlock(blockName string, additionalAmount dcrutil.Amount, mungers ...func(*wire.MsgBlock)) *wire.MsgBlock {
 	coinbaseTx := wire.NewMsgTx()
 	coinbaseTx.AddTxIn(&wire.TxIn{
 		PreviousOutPoint: *wire.NewOutPoint(&chainhash.Hash{},
@@ -2127,9 +2127,11 @@ func (g *Generator) CreatePremineBlock(blockName string, additionalAmount dcruti
 	coinbaseTx.TxIn[0].ValueIn = int64(totalSubsidy)
 
 	// Generate the block with the specially created regular transactions.
-	return g.NextBlock(blockName, nil, nil, func(b *wire.MsgBlock) {
+	munger := func(b *wire.MsgBlock) {
 		b.Transactions = []*wire.MsgTx{coinbaseTx}
-	})
+	}
+	mungers = append([]func(*wire.MsgBlock){munger}, mungers...)
+	return g.NextBlock(blockName, nil, nil, mungers...)
 }
 
 // UpdateBlockState manually updates the generator state to remove all internal
