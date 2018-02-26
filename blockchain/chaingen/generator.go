@@ -1324,6 +1324,14 @@ func compactToBig(compact uint32) *big.Int {
 	return bn
 }
 
+// IsSolved returns whether or not the header hashes to a value that is less
+// than or equal to the target difficulty as specified by its bits field.
+func IsSolved(header *wire.BlockHeader) bool {
+	targetDifficulty := compactToBig(header.Bits)
+	hash := header.BlockHash()
+	return hashToBig(&hash).Cmp(targetDifficulty) <= 0
+}
+
 // solveBlock attempts to find a nonce which makes the passed block header hash
 // to a value less than the target difficulty.  When a successful solution is
 // found, true is returned and the nonce field of the passed header is updated
