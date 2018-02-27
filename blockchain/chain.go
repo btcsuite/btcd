@@ -616,12 +616,6 @@ func (b *BlockChain) FetchBlockByHash(hash *chainhash.Hash) (*dcrutil.Block, err
 	return b.fetchBlockByHash(hash)
 }
 
-// GetTopBlock returns the current block at HEAD on the blockchain.  Needed
-// for mining in the daemon.
-func (b *BlockChain) GetTopBlock() (*dcrutil.Block, error) {
-	return b.fetchMainChainBlockByHash(&b.bestNode.hash)
-}
-
 // pruneStakeNodes removes references to old stake nodes which should no
 // longer be held in memory so as to keep the maximum memory usage down.
 // It proceeds from the bestNode back to the determined minimum height node,
