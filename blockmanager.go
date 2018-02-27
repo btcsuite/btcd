@@ -192,20 +192,6 @@ type forceReorganizationMsg struct {
 	reply      chan forceReorganizationResponse
 }
 
-// getTopBlockResponse is a response to the request for the block at HEAD of the
-// blockchain. We need to be able to obtain this from blockChain for mining
-// purposes.
-type getTopBlockResponse struct {
-	block *dcrutil.Block
-	err   error
-}
-
-// getTopBlockMsg is a message type to be sent across the message
-// channel for requesting the required stake difficulty of the next block.
-type getTopBlockMsg struct {
-	reply chan getTopBlockResponse
-}
-
 // processBlockResponse is a response sent to the reply channel of a
 // processBlockMsg.
 type processBlockResponse struct {
@@ -1767,13 +1753,6 @@ out:
 					err:    err,
 				}
 
-			case getTopBlockMsg:
-				b, err := b.chain.GetTopBlock()
-				msg.reply <- getTopBlockResponse{
-					block: b,
-					err:   err,
-				}
-
 			case processBlockMsg:
 				onMainChain, isOrphan, err := b.chain.ProcessBlock(
 					msg.block, msg.flags)
@@ -2460,15 +2439,6 @@ func (b *blockManager) TipGeneration() ([]chainhash.Hash, error) {
 	b.msgChan <- tipGenerationMsg{reply: reply}
 	response := <-reply
 	return response.hashes, response.err
-}
-
-// GetTopBlockFromChain obtains the current top block from HEAD of the blockchain.
-// Returns a pointer to the cached copy of the block in memory.
-func (b *blockManager) GetTopBlockFromChain() (*dcrutil.Block, error) {
-	reply := make(chan getTopBlockResponse)
-	b.msgChan <- getTopBlockMsg{reply: reply}
-	response := <-reply
-	return response.block, response.err
 }
 
 // ProcessBlock makes use of ProcessBlock on an internal instance of a block

@@ -806,10 +806,7 @@ func deepCopyBlockTemplate(blockTemplate *BlockTemplate) *BlockTemplate {
 // work off of is present, it will return a copy of that template to pass to the
 // miner.
 // Safe for concurrent access.
-func handleTooFewVoters(subsidyCache *blockchain.SubsidyCache,
-	nextHeight int64,
-	miningAddress dcrutil.Address,
-	bm *blockManager) (*BlockTemplate, error) {
+func handleTooFewVoters(subsidyCache *blockchain.SubsidyCache, nextHeight int64, miningAddress dcrutil.Address, bm *blockManager) (*BlockTemplate, error) {
 	timeSource := bm.server.timeSource
 	chainState := &bm.chainState
 	stakeValidationHeight := bm.server.chainParams.StakeValidationHeight
@@ -896,11 +893,11 @@ func handleTooFewVoters(subsidyCache *blockchain.SubsidyCache,
 				// and the contents of that stake tree. In the future
 				// we should have the option of readding some
 				// transactions from this block, too.
-				topBlock, err :=
-					bm.GetTopBlockFromChain()
+				topBlock, err := bm.chain.FetchBlockByHash(&prevBlockHash)
 				if err != nil {
-					return nil, fmt.Errorf("failed to get top block from " +
-						"chain")
+					str := fmt.Sprintf("unable to get tip block %s",
+						prevBlockHash)
+					return nil, miningRuleError(ErrGetTopBlock, str)
 				}
 				btMsgBlock := new(wire.MsgBlock)
 				rand, err := wire.RandomUint64()
@@ -1721,12 +1718,10 @@ mempoolLoop:
 
 			// Retrieve the current top block, whose TxTreeRegular was voted
 			// out.
-			// Decred TODO: This is super inefficient, this block should be
-			// cached and stored somewhere.
-			topBlock, err := blockManager.GetTopBlockFromChain()
+			topBlock, err := blockManager.chain.FetchBlockByHash(prevHash)
 			if err != nil {
-				return nil, miningRuleError(ErrGetTopBlock, "couldn't get "+
-					"top block")
+				str := fmt.Sprintf("unable to get tip block %s", prevHash)
+				return nil, miningRuleError(ErrGetTopBlock, str)
 			}
 			topBlockRegTx := topBlock.Transactions()
 
