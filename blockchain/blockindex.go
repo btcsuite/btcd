@@ -352,6 +352,11 @@ func (bi *blockIndex) loadBlockNode(dbTx database.Tx, hash *chainhash.Hash) (*bl
 		parentNode.children = append(parentNode.children, node)
 		node.parent = parentNode
 
+		// Also, since this node is extending an existing chain it is a
+		// new chain tip and the parent is no longer a tip.
+		bi.addChainTip(node)
+		bi.removeChainTip(parentNode)
+
 	} else if childNodes, ok := bi.depNodes[*hash]; ok {
 		// Case 2 -- This node is the parent of one or more nodes.
 		// Update the node's work sum by subtracting this node's work
@@ -502,8 +507,16 @@ func (bi *blockIndex) AddNode(node *blockNode) {
 	if prevHash := node.parentHash; prevHash != *zeroHash {
 		bi.depNodes[prevHash] = append(bi.depNodes[prevHash], node)
 	}
+
+	// Since the block index does not support nodes that do not connect to
+	// an existing node (except the genesis block), all new nodes are either
+	// extending an existing chain or are on a side chain, but in either
+	// case, are a new chain tip.  In the case the node is extending a
+	// chain, the parent is no longer a tip.
+	bi.addChainTip(node)
 	if node.parent != nil {
 		node.parent.children = append(node.parent.children, node)
+		bi.removeChainTip(node.parent)
 	}
 	bi.Unlock()
 }
@@ -559,36 +572,6 @@ func (bi *blockIndex) removeChainTip(tip *blockNode) {
 	} else {
 		bi.chainTips[tip.height] = nodes
 	}
-}
-
-// AddChainTip adds the passed block node as a new chain tip.
-//
-// This function is safe for concurrent access.
-func (bi *blockIndex) AddChainTip(tip *blockNode) {
-	bi.Lock()
-	bi.addChainTip(tip)
-	bi.Unlock()
-}
-
-// RemoveChainTip removes the passed block node from the available chain tips.
-//
-// This function is safe for concurrent access.
-func (bi *blockIndex) RemoveChainTip(tip *blockNode) {
-	bi.Lock()
-	bi.removeChainTip(tip)
-	bi.Unlock()
-}
-
-// UpdateChainTips removes an old tip from the available chain tips and adds a
-// new one in its place.  This is useful when connecting and disconnect a node
-// from a chain to perform the swap a single atomic operation.
-//
-// This function is safe for concurrent access.
-func (bi *blockIndex) UpdateChainTips(oldTip, newTip *blockNode) {
-	bi.Lock()
-	bi.removeChainTip(oldTip)
-	bi.addChainTip(newTip)
-	bi.Unlock()
 }
 
 // LookupNode returns the block node identified by the provided hash.  It will

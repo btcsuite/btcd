@@ -1818,7 +1818,6 @@ func (b *BlockChain) initChainState(interrupt <-chan struct{}) error {
 
 		// Add the new node to the indices for faster lookups.
 		b.index.AddNode(node)
-		b.index.AddChainTip(node)
 
 		// Calculate the median time for the block.
 		medianTime, err := b.index.CalcPastMedianTime(node)
