@@ -110,51 +110,6 @@ func defaultParams(vote chaincfg.Vote) chaincfg.Params {
 	return params
 }
 
-func TestSerializeDeserialize(t *testing.T) {
-	params := defaultParams(pedro)
-	ourDeployment := &params.Deployments[posVersion][0]
-	blob := serializeDeploymentCacheParams(ourDeployment)
-
-	deserialized, err := deserializeDeploymentCacheParams(blob)
-	if err != nil {
-		t.Fatalf("%v", err)
-	}
-	if deserialized.Vote.Mask != pedro.Mask {
-		t.Fatalf("invalid Mask")
-	}
-	if deserialized.StartTime != ourDeployment.StartTime {
-		t.Fatalf("invalid StartTime")
-	}
-	if deserialized.ExpireTime != ourDeployment.ExpireTime {
-		t.Fatalf("invalid ExpireTime")
-	}
-	if len(deserialized.Vote.Choices) != len(ourDeployment.Vote.Choices) {
-		t.Fatalf("invalid len deserialized.Vote.Choices got "+
-			"%v expected %v", len(deserialized.Vote.Choices),
-			len(ourDeployment.Vote.Choices))
-	}
-	for i := 0; i < len(deserialized.Vote.Choices); i++ {
-		if deserialized.Vote.Choices[i].Bits !=
-			ourDeployment.Vote.Choices[i].Bits {
-			t.Fatalf("invalid Bits %v got %v expected %v", i,
-				deserialized.Vote.Choices[i].Bits,
-				ourDeployment.Vote.Choices[i].Bits)
-		}
-		if deserialized.Vote.Choices[i].IsAbstain !=
-			ourDeployment.Vote.Choices[i].IsAbstain {
-			t.Fatalf("invalid IsAbstain %v got %v expected %v", i,
-				deserialized.Vote.Choices[i].IsAbstain,
-				ourDeployment.Vote.Choices[i].IsAbstain)
-		}
-		if deserialized.Vote.Choices[i].IsNo !=
-			ourDeployment.Vote.Choices[i].IsNo {
-			t.Fatalf("invalid IsNo %v got %v expected %v", i,
-				deserialized.Vote.Choices[i].IsNo,
-				ourDeployment.Vote.Choices[i].IsNo)
-		}
-	}
-}
-
 // TestNoQuorum ensures that the quorum behavior works as expected with no
 // votes.
 func TestNoQuorum(t *testing.T) {
