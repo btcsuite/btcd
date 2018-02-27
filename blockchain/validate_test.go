@@ -113,77 +113,12 @@ func TestBlockValidationRules(t *testing.T) {
 
 	// Insert blocks 1 to 142 and perform various test. Block 1 has
 	// special properties, so make sure those validate correctly first.
-	block1Bytes := blockChain[int64(1)]
 	timeSource := NewMedianTime()
 
 	// ----------------------------------------------------------------------------
 	// ErrBlockOneOutputs 1
 	// No coinbase outputs check can't trigger because it throws an error
 	// elsewhere.
-
-	// ----------------------------------------------------------------------------
-	// ErrBlockOneOutputs 2
-	// Remove one of the premine outputs and make sure it fails.
-	noCoinbaseOuts1 := new(wire.MsgBlock)
-	noCoinbaseOuts1.FromBytes(block1Bytes)
-	noCoinbaseOuts1.Transactions[0].TxOut =
-		noCoinbaseOuts1.Transactions[0].TxOut[:2]
-
-	recalculateMsgBlockMerkleRootsSize(noCoinbaseOuts1)
-	b1test := dcrutil.NewBlock(noCoinbaseOuts1)
-
-	err = CheckWorklessBlockSanity(b1test, timeSource, params)
-	if err != nil {
-		t.Errorf("Got unexpected error for ErrBlockOneOutputs test 2: %v", err)
-	}
-
-	err = chain.CheckConnectBlock(b1test, BFNoPoWCheck)
-	if err == nil || err.(RuleError).ErrorCode != ErrBlockOneOutputs {
-		t.Errorf("Got no error or unexpected error for ErrBlockOneOutputs "+
-			"test 2: %v", err)
-	}
-
-	// ----------------------------------------------------------------------------
-	// ErrBlockOneOutputs 3
-	// Bad pay to hash.
-	noCoinbaseOuts1 = new(wire.MsgBlock)
-	noCoinbaseOuts1.FromBytes(block1Bytes)
-	noCoinbaseOuts1.Transactions[0].TxOut[0].PkScript[8] ^= 0x01
-
-	recalculateMsgBlockMerkleRootsSize(noCoinbaseOuts1)
-	b1test = dcrutil.NewBlock(noCoinbaseOuts1)
-
-	err = CheckWorklessBlockSanity(b1test, timeSource, params)
-	if err != nil {
-		t.Errorf("Got unexpected error for ErrBlockOneOutputs test 3: %v", err)
-	}
-
-	err = chain.CheckConnectBlock(b1test, BFNoPoWCheck)
-	if err == nil || err.(RuleError).ErrorCode != ErrBlockOneOutputs {
-		t.Errorf("Got no error or unexpected error for ErrBlockOneOutputs "+
-			"test 3: %v", err)
-	}
-
-	// ----------------------------------------------------------------------------
-	// ErrBlockOneOutputs 4
-	// Bad pay to amount.
-	noCoinbaseOuts1 = new(wire.MsgBlock)
-	noCoinbaseOuts1.FromBytes(block1Bytes)
-	noCoinbaseOuts1.Transactions[0].TxOut[0].Value--
-
-	recalculateMsgBlockMerkleRootsSize(noCoinbaseOuts1)
-	b1test = dcrutil.NewBlock(noCoinbaseOuts1)
-
-	err = CheckWorklessBlockSanity(b1test, timeSource, params)
-	if err != nil {
-		t.Errorf("Got unexpected error for ErrBlockOneOutputs test 4: %v", err)
-	}
-
-	err = chain.CheckConnectBlock(b1test, BFNoPoWCheck)
-	if err == nil || err.(RuleError).ErrorCode != ErrBlockOneOutputs {
-		t.Errorf("Got no error or unexpected error for ErrBlockOneOutputs "+
-			"test 4: %v", err)
-	}
 
 	// ----------------------------------------------------------------------------
 	// Add the rest of the blocks up to the stake early test block.
@@ -278,26 +213,6 @@ func TestBlockValidationRules(t *testing.T) {
 	err = chain.CheckConnectBlock(b153test, BFNoPoWCheck)
 	if err == nil || err.(RuleError).ErrorCode != ErrMissingParent {
 		t.Errorf("Got no or unexpected error for ErrMissingParent test %v", err)
-	}
-
-	// ----------------------------------------------------------------------------
-	// ErrBadCoinbaseFraudProof
-	badCBFraudProof153 := new(wire.MsgBlock)
-	badCBFraudProof153.FromBytes(block153Bytes)
-	badCBFraudProof153.Transactions[0].TxIn[0].BlockHeight = 0x12345678
-	recalculateMsgBlockMerkleRootsSize(badCBFraudProof153)
-	b153test = dcrutil.NewBlock(badCBFraudProof153)
-
-	err = CheckWorklessBlockSanity(b153test, timeSource, params)
-	if err == nil || err.(RuleError).ErrorCode != ErrBadCoinbaseFraudProof {
-		t.Errorf("Got no or unexpected sanity error for "+
-			"ErrBadCoinbaseFraudProof test: %v", err)
-	}
-
-	err = chain.CheckConnectBlock(b153test, BFNoPoWCheck)
-	if err == nil || err.(RuleError).ErrorCode != ErrBadCoinbaseFraudProof {
-		t.Errorf("Got no or unexpected sanity error for "+
-			"ErrBadCoinbaseFraudProof test: %v", err)
 	}
 
 	// ----------------------------------------------------------------------------
@@ -474,197 +389,9 @@ func TestBlockValidationRules(t *testing.T) {
 	}
 
 	// ----------------------------------------------------------------------------
-	// ErrVotesMismatch
-	votesMismatch154 := new(wire.MsgBlock)
-	votesMismatch154.FromBytes(block154Bytes)
-	sstxsIn154 := votesMismatch154.STransactions[5:]
-	votesMismatch154.STransactions = votesMismatch154.STransactions[0:4] // 4 Votes
-	votesMismatch154.STransactions = append(votesMismatch154.STransactions,
-		sstxsIn154...)
-	recalculateMsgBlockMerkleRootsSize(votesMismatch154)
-	b154test = dcrutil.NewBlock(votesMismatch154)
-
-	// Fails and hits ErrVotesMismatch.
-	err = CheckWorklessBlockSanity(b154test, timeSource, params)
-	if err == nil || err.(RuleError).ErrorCode != ErrVotesMismatch {
-		t.Errorf("got unexpected no or wrong error for ErrVotesMismatch "+
-			"sanity check: %v", err)
-	}
-
-	// ----------------------------------------------------------------------------
-	// ErrIncongruentVotebit 5
-	// 4x Voters
-	// 2x Nay 2x Yea, but block header says Yea
-	badVoteBit154 := new(wire.MsgBlock)
-	badVoteBit154.FromBytes(block154Bytes)
-	badVoteBit154.STransactions = badVoteBit154.STransactions[0:4] // 4 Votes
-	badVoteBit154.Header.FreshStake = 0
-	badVoteBit154.Header.VoteBits = 0x0001
-	badVoteBit154.Header.Voters = 4
-	badVoteBit154.Transactions[0].TxOut[0].Value = 3960396039
-	for i, stx := range badVoteBit154.STransactions {
-		if i < 2 {
-			// VoteBits is encoded little endian.
-			stx.TxOut[1].PkScript[2] = 0x00
-		}
-	}
-	recalculateMsgBlockMerkleRootsSize(badVoteBit154)
-	b154test = dcrutil.NewBlock(badVoteBit154)
-
-	err = CheckWorklessBlockSanity(b154test, timeSource, params)
-	if err == nil || err.(RuleError).ErrorCode != ErrIncongruentVotebit {
-		t.Errorf("Unexpected no or wrong error for ErrIncongruentVotebit "+
-			"test 5: %v", err)
-	}
-
-	// Fails and hits ErrIncongruentVotebit.
-	err = chain.CheckConnectBlock(b154test, BFNoPoWCheck)
-	if err == nil || err.(RuleError).ErrorCode != ErrIncongruentVotebit {
-		t.Errorf("Unexpected no or wrong error for ErrIncongruentVotebit "+
-			"test 5: %v", err)
-	}
-
-	// ----------------------------------------------------------------------------
-	// ErrIncongruentVotebit 6
-	// 3x Voters
-	// 2x Nay 1x Yea, but block header says Yea
-	badVoteBit154 = new(wire.MsgBlock)
-	badVoteBit154.FromBytes(block154Bytes)
-	badVoteBit154.STransactions = badVoteBit154.STransactions[0:3]
-	badVoteBit154.Header.FreshStake = 0
-	badVoteBit154.Header.VoteBits = 0x0001
-	badVoteBit154.Header.Voters = 3
-	badVoteBit154.Transactions[0].TxOut[0].Value = 2970297029
-	for i, stx := range badVoteBit154.STransactions {
-		if i < 2 {
-			// VoteBits is encoded little endian.
-			stx.TxOut[1].PkScript[2] = 0x00
-		}
-	}
-	recalculateMsgBlockMerkleRootsSize(badVoteBit154)
-	b154test = dcrutil.NewBlock(badVoteBit154)
-
-	err = CheckWorklessBlockSanity(b154test, timeSource, params)
-	if err == nil || err.(RuleError).ErrorCode != ErrIncongruentVotebit {
-		t.Errorf("Unexpected no or wrong error for ErrIncongruentVotebit "+
-			"test 6: %v", err)
-	}
-
-	// Fails and hits ErrIncongruentVotebit.
-	err = chain.CheckConnectBlock(b154test, BFNoPoWCheck)
-	if err == nil || err.(RuleError).ErrorCode != ErrIncongruentVotebit {
-		t.Errorf("Unexpected no or wrong error for ErrIncongruentVotebit "+
-			"test 6: %v", err)
-	}
-
-	// ----------------------------------------------------------------------------
-	// ErrIncongruentVotebit 7
-	// 3x Voters
-	// 1x Nay 2x Yea, but block header says Nay
-	badVoteBit154 = new(wire.MsgBlock)
-	badVoteBit154.FromBytes(block154Bytes)
-	badVoteBit154.STransactions = badVoteBit154.STransactions[0:3]
-	badVoteBit154.Header.FreshStake = 0
-	badVoteBit154.Header.VoteBits = 0x0000
-	badVoteBit154.Header.Voters = 3
-	badVoteBit154.Transactions[0].TxOut[0].Value = 2970297029
-	for i, stx := range badVoteBit154.STransactions {
-		if i < 1 {
-			// VoteBits is encoded little endian.
-			stx.TxOut[1].PkScript[2] = 0x00
-		}
-	}
-	recalculateMsgBlockMerkleRootsSize(badVoteBit154)
-	b154test = dcrutil.NewBlock(badVoteBit154)
-
-	err = CheckWorklessBlockSanity(b154test, timeSource, params)
-	if err == nil || err.(RuleError).ErrorCode != ErrIncongruentVotebit {
-		t.Errorf("Unexpected no or wrong error for ErrIncongruentVotebit "+
-			"test 7: %v", err)
-	}
-
-	// Fails and hits ErrIncongruentVotebit.
-	err = chain.CheckConnectBlock(b154test, BFNoPoWCheck)
-	if err == nil || err.(RuleError).ErrorCode != ErrIncongruentVotebit {
-		t.Errorf("Unexpected no or wrong error for ErrIncongruentVotebit "+
-			"test 7: %v", err)
-	}
-
-	// ----------------------------------------------------------------------------
-	// ErrSStxCommitment
-	badCommitScrB, _ := hex.DecodeString("6a1ea495e69ddfe8b9770b823314ba66d4ca0" +
-		"6201310540cce08000000001234")
-
-	badSStxCommit154 := new(wire.MsgBlock)
-	badSStxCommit154.FromBytes(block154Bytes)
-	badSStxCommit154.STransactions[5].TxOut[1].PkScript = badCommitScrB
-
-	recalculateMsgBlockMerkleRootsSize(badSStxCommit154)
-	b154test = dcrutil.NewBlock(badSStxCommit154)
-
-	err = CheckWorklessBlockSanity(b154test, timeSource, params)
-	if err != nil {
-		t.Errorf("got unexpected error for ErrSStxCommitment sanity check: %v",
-			err)
-	}
-
-	// Fails and hits ErrSStxCommitment.
-	err = chain.CheckConnectBlock(b154test, BFNoPoWCheck)
-	if err == nil || err.(RuleError).ErrorCode != ErrSStxCommitment {
-		t.Errorf("Unexpected no or wrong error for ErrSStxCommitment test: %v",
-			err)
-	}
-
-	// ----------------------------------------------------------------------------
 	// ErrInvalidSSGenInput
 	// It doesn't look like this one can actually be hit since checking if
 	// IsSSGen should fail first.
-
-	// ----------------------------------------------------------------------------
-	// ErrSSGenPayeeOuts 1
-	// Corrupt the payee
-	badSSGenPayee154 := new(wire.MsgBlock)
-	badSSGenPayee154.FromBytes(block154Bytes)
-	badSSGenPayee154.STransactions[0].TxOut[2].PkScript[8] ^= 0x01
-
-	recalculateMsgBlockMerkleRootsSize(badSSGenPayee154)
-	b154test = dcrutil.NewBlock(badSSGenPayee154)
-
-	err = CheckWorklessBlockSanity(b154test, timeSource, params)
-	if err != nil {
-		t.Errorf("got unexpected error for ErrSSGenPayeeOuts sanity  "+
-			"check: %v", err)
-	}
-
-	// Fails and hits ErrSSGenPayeeOuts.
-	err = chain.CheckConnectBlock(b154test, BFNoPoWCheck)
-	if err == nil || err.(RuleError).ErrorCode != ErrSSGenPayeeOuts {
-		t.Errorf("Unexpected no or wrong error for ErrSSGenPayeeOuts "+
-			"test: %v", err)
-	}
-
-	// ----------------------------------------------------------------------------
-	// ErrSSGenPayeeOuts 2
-	// Corrupt the amount
-	badSSGenPayee154 = new(wire.MsgBlock)
-	badSSGenPayee154.FromBytes(block154Bytes)
-	badSSGenPayee154.STransactions[0].TxOut[2].Value += 1
-
-	recalculateMsgBlockMerkleRootsSize(badSSGenPayee154)
-	b154test = dcrutil.NewBlock(badSSGenPayee154)
-
-	err = CheckWorklessBlockSanity(b154test, timeSource, params)
-	if err != nil {
-		t.Errorf("got unexpected error for ErrSSGenPayeeOuts sanity  "+
-			"check2 : %v", err)
-	}
-
-	// Fails and hits ErrSSGenPayeeOuts.
-	err = chain.CheckConnectBlock(b154test, BFNoPoWCheck)
-	if err == nil || err.(RuleError).ErrorCode != ErrSSGenPayeeOuts {
-		t.Errorf("Unexpected no or wrong error for ErrSSGenPayeeOuts "+
-			"test 2: %v", err)
-	}
 
 	// ----------------------------------------------------------------------------
 	// ErrSSGenSubsidy
@@ -754,46 +481,6 @@ func TestBlockValidationRules(t *testing.T) {
 	}
 
 	// ----------------------------------------------------------------------------
-	// ErrInvalidFinalState
-	badFinalState154 := new(wire.MsgBlock)
-	badFinalState154.FromBytes(block154Bytes)
-	badFinalState154.Header.FinalState[0] ^= 0x01
-	b154test = dcrutil.NewBlock(badFinalState154)
-
-	err = CheckWorklessBlockSanity(b154test, timeSource, params)
-	if err != nil {
-		t.Errorf("got unexpected error for ErrInvalidFinalState sanity check: %v",
-			err)
-	}
-
-	// Fails and hits ErrInvalidFinalState.
-	err = chain.CheckConnectBlock(b154test, BFNoPoWCheck)
-	if err == nil || err.(RuleError).ErrorCode != ErrInvalidFinalState {
-		t.Errorf("Unexpected no or wrong error for ErrInvalidFinalState test: %v",
-			err)
-	}
-
-	// ----------------------------------------------------------------------------
-	// ErrPoolSize
-	badPoolSize154 := new(wire.MsgBlock)
-	badPoolSize154.FromBytes(block154Bytes)
-	badPoolSize154.Header.PoolSize++
-	b154test = dcrutil.NewBlock(badPoolSize154)
-
-	err = CheckWorklessBlockSanity(b154test, timeSource, params)
-	if err != nil {
-		t.Errorf("got unexpected error for ErrPoolSize sanity check: %v",
-			err)
-	}
-
-	// Fails and hits ErrPoolSize.
-	err = chain.CheckConnectBlock(b154test, BFNoPoWCheck)
-	if err == nil || err.(RuleError).ErrorCode != ErrPoolSize {
-		t.Errorf("Unexpected no or wrong error for ErrPoolSize test: %v",
-			err)
-	}
-
-	// ----------------------------------------------------------------------------
 	// ErrBadStakebaseValue doesn't seem be be able to be hit because
 	// ErrSSGenPayeeOuts is hit first. The code should be kept in in case
 	// the first check somehow fails to catch inflation.
@@ -828,22 +515,6 @@ func TestBlockValidationRules(t *testing.T) {
 	// It should be impossible for this to ever be triggered because of the
 	// paranoid around transaction inflation, but leave it in anyway just
 	// in case there is database corruption etc.
-
-	// ----------------------------------------------------------------------------
-	// ErrBadBlockHeight
-	badBlockHeight154 := new(wire.MsgBlock)
-	badBlockHeight154.FromBytes(block154Bytes)
-	badBlockHeight154.Header.Height++
-	updateVoteCommitments(badBlockHeight154)
-	recalculateMsgBlockMerkleRootsSize(badBlockHeight154)
-	b154test = dcrutil.NewBlock(badBlockHeight154)
-
-	// Throws ProcessBlock error through checkBlockContext.
-	_, _, err = chain.ProcessBlock(b154test, BFNoPoWCheck)
-	if err == nil || err.(RuleError).ErrorCode != ErrBadBlockHeight {
-		t.Errorf("ProcessBlock ErrBadBlockHeight test no or unexpected "+
-			"error: %v", err)
-	}
 
 	// ----------------------------------------------------------------------------
 	// ErrNoTax 1
@@ -885,106 +556,6 @@ func TestBlockValidationRules(t *testing.T) {
 	if err == nil || err.(RuleError).ErrorCode != ErrNoTax {
 		t.Errorf("Got no error or unexpected error for ErrNoTax "+
 			"test 3: %v", err)
-	}
-
-	// ----------------------------------------------------------------------------
-	// ErrExpiredTx
-	mtxFromB = new(wire.MsgTx)
-	mtxFromB.FromBytes(regularTx154)
-	mtxFromB.Expiry = 154
-
-	expiredTx154 := new(wire.MsgBlock)
-	expiredTx154.FromBytes(block154Bytes)
-	expiredTx154.Transactions[11] = mtxFromB
-	recalculateMsgBlockMerkleRootsSize(expiredTx154)
-	b154test = dcrutil.NewBlock(expiredTx154)
-
-	err = CheckWorklessBlockSanity(b154test, timeSource, params)
-	if err != nil {
-		t.Errorf("got unexpected error for ErrExpiredTx sanity check: %v",
-			err)
-	}
-
-	// Fails and hits ErrExpiredTx.
-	err = chain.CheckConnectBlock(b154test, BFNoPoWCheck)
-	if err == nil || err.(RuleError).ErrorCode != ErrExpiredTx {
-		t.Errorf("Unexpected no or wrong error for ErrExpiredTx test: %v",
-			err)
-	}
-
-	// ----------------------------------------------------------------------------
-	// ErrFraudAmountIn
-	mtxFromB = new(wire.MsgTx)
-	mtxFromB.FromBytes(regularTx154)
-	mtxFromB.TxIn[0].ValueIn--
-
-	badValueIn154 := new(wire.MsgBlock)
-	badValueIn154.FromBytes(block154Bytes)
-	badValueIn154.Transactions[11] = mtxFromB
-	recalculateMsgBlockMerkleRootsSize(badValueIn154)
-	b154test = dcrutil.NewBlock(badValueIn154)
-
-	err = CheckWorklessBlockSanity(b154test, timeSource, params)
-	if err != nil {
-		t.Errorf("got unexpected error for ErrFraudAmountIn sanity check: %v",
-			err)
-	}
-
-	// Fails and hits ErrFraudAmountIn.
-	err = chain.CheckConnectBlock(b154test, BFNoPoWCheck)
-	if err == nil || err.(RuleError).ErrorCode != ErrFraudAmountIn {
-		t.Errorf("Unexpected no or wrong error for ErrFraudAmountIn test: %v",
-			err)
-	}
-
-	// ----------------------------------------------------------------------------
-	// ErrFraudBlockHeight
-	mtxFromB = new(wire.MsgTx)
-	mtxFromB.FromBytes(regularTx154)
-	mtxFromB.TxIn[0].BlockHeight++
-
-	badHeightProof154 := new(wire.MsgBlock)
-	badHeightProof154.FromBytes(block154Bytes)
-	badHeightProof154.Transactions[11] = mtxFromB
-	recalculateMsgBlockMerkleRootsSize(badHeightProof154)
-	b154test = dcrutil.NewBlock(badHeightProof154)
-
-	err = CheckWorklessBlockSanity(b154test, timeSource, params)
-	if err != nil {
-		t.Errorf("got unexpected error for ErrFraudBlockHeight sanity check: %v",
-			err)
-	}
-
-	// Fails and hits ErrFraudBlockHeight.
-	err = chain.CheckConnectBlock(b154test, BFNoPoWCheck)
-	if err == nil || err.(RuleError).ErrorCode != ErrFraudBlockHeight {
-		t.Errorf("Unexpected no or wrong error for ErrFraudBlockHeight test: %v",
-			err)
-	}
-
-	// ----------------------------------------------------------------------------
-	// ErrFraudBlockIndex
-	mtxFromB = new(wire.MsgTx)
-	mtxFromB.FromBytes(regularTx154)
-	mtxFromB.TxIn[0].BlockIndex++
-
-	badIndexProof154 := new(wire.MsgBlock)
-	badIndexProof154.FromBytes(block154Bytes)
-	badIndexProof154.Transactions[11] = mtxFromB
-	recalculateMsgBlockMerkleRootsSize(badIndexProof154)
-	b154test = dcrutil.NewBlock(badIndexProof154)
-
-	err = CheckWorklessBlockSanity(b154test, timeSource, params)
-	if err != nil {
-		t.Errorf("got unexpected error for ErrFraudBlockIndex sanity check: %v",
-			err)
-	}
-
-	// Fails and hits ErrFraudBlockIndex.
-	err = chain.CheckConnectBlock(b154test, BFNoPoWCheck)
-	if err == nil || err.(RuleError).ErrorCode != ErrFraudBlockIndex {
-		t.Errorf("Unexpected no or wrong error for ErrFraudBlockIndex test: %v",
-			err)
 	}
 
 	// ----------------------------------------------------------------------------
@@ -1058,31 +629,6 @@ func TestBlockValidationRules(t *testing.T) {
 	err = chain.CheckConnectBlock(b154test, BFNoPoWCheck)
 	if err == nil || err.(RuleError).ErrorCode != ErrMissingTxOut {
 		t.Errorf("Unexpected no or wrong error for invalMissingInsS154 test: %v",
-			err)
-	}
-
-	// ----------------------------------------------------------------------------
-	// ErrScriptMalformed
-	mtxFromB = new(wire.MsgTx)
-	mtxFromB.FromBytes(regularTx154)
-	mtxFromB.TxOut[0].PkScript = []byte{0x01, 0x02, 0x03, 0x04}
-
-	malformedScr154 := new(wire.MsgBlock)
-	malformedScr154.FromBytes(block154Bytes)
-	malformedScr154.Transactions[11] = mtxFromB
-	recalculateMsgBlockMerkleRootsSize(malformedScr154)
-	b154test = dcrutil.NewBlock(malformedScr154)
-
-	err = CheckWorklessBlockSanity(b154test, timeSource, params)
-	if err != nil {
-		t.Errorf("got unexpected error for ErrScriptValidation sanity check: %v",
-			err)
-	}
-
-	// Fails and hits ErrScriptMalformed.
-	err = chain.CheckConnectBlock(b154test, BFNoPoWCheck)
-	if err == nil || err.(RuleError).ErrorCode != ErrScriptMalformed {
-		t.Errorf("Unexpected no or wrong error for ErrScriptMalformed test: %v",
 			err)
 	}
 

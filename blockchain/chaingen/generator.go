@@ -199,6 +199,12 @@ func (g *Generator) TipName() string {
 	return g.tipName
 }
 
+// P2shOpTrueAddr returns the generator p2sh script that is composed with
+// a single OP_TRUE.
+func (g *Generator) P2shOpTrueAddr() dcrutil.Address {
+	return g.p2shOpTrueAddr
+}
+
 // BlockByName returns the block associated with the provided block name.  It
 // will panic if the specified block name does not exist.
 func (g *Generator) BlockByName(blockName string) *wire.MsgBlock {
@@ -400,10 +406,10 @@ func (g *Generator) CreateCoinbaseTx(blockHeight uint32, numVotes uint16) *wire.
 	return tx
 }
 
-// purchaseCommitmentScript returns a standard provably-pruneable OP_RETURN
+// PurchaseCommitmentScript returns a standard provably-pruneable OP_RETURN
 // commitment script suitable for use in a ticket purchase tx (sstx) using the
 // provided target address, amount, and fee limits.
-func purchaseCommitmentScript(addr dcrutil.Address, amount, voteFeeLimit, revocationFeeLimit dcrutil.Amount) []byte {
+func PurchaseCommitmentScript(addr dcrutil.Address, amount, voteFeeLimit, revocationFeeLimit dcrutil.Amount) []byte {
 	// The limits are defined in terms of the closest base 2 exponent and
 	// a bit that must be set to specify the limit is to be applied.  The
 	// vote fee exponent is in the bottom 8 bits, while the revocation fee
@@ -453,7 +459,7 @@ func (g *Generator) createTicketPurchaseTx(spend *SpendableOut, ticketPrice, fee
 	}
 
 	// Generate the commitment script.
-	commitScript := purchaseCommitmentScript(g.p2shOpTrueAddr,
+	commitScript := PurchaseCommitmentScript(g.p2shOpTrueAddr,
 		ticketPrice+fee, 0, ticketPrice)
 
 	// Calculate change and generate script to deliver it.
@@ -701,7 +707,7 @@ func (g *Generator) limitRetarget(oldDiff, newDiff int64) int64 {
 	return newDiff
 }
 
-// calcNextRequiredDifficulty returns the required proof-of-work difficulty for
+// CalcNextRequiredDifficulty returns the required proof-of-work difficulty for
 // the block after the current tip block the generator is associated with.
 //
 // An overview of the algorithm is as follows:
@@ -715,7 +721,7 @@ func (g *Generator) limitRetarget(oldDiff, newDiff int64) int64 {
 //    weight
 // 4) Calculate the final retarget difficulty based on the exponential weighted
 //    average and ensure it is limited to the max retarget adjustment factor
-func (g *Generator) calcNextRequiredDifficulty() uint32 {
+func (g *Generator) CalcNextRequiredDifficulty() uint32 {
 	// Target difficulty before the first retarget interval is the pow
 	// limit.
 	nextHeight := g.tip.Header.Height + 1
@@ -802,7 +808,7 @@ func (g *Generator) calcNextRequiredDifficulty() uint32 {
 	return uint32(nextDiff)
 }
 
-// calcNextRequiredStakeDifficulty returns the required stake difficulty (aka
+// CalcNextRequiredStakeDifficulty returns the required stake difficulty (aka
 // ticket price) for the block after the current tip block the generator is
 // associated with.
 //
@@ -839,7 +845,7 @@ func (g *Generator) calcNextRequiredDifficulty() uint32 {
 // tests are low enough that this is not an issue for the tests.  Anyone looking
 // at this code should NOT use it for mainnet calculations as is since it will
 // not always yield the correct results.
-func (g *Generator) calcNextRequiredStakeDifficulty() int64 {
+func (g *Generator) CalcNextRequiredStakeDifficulty() int64 {
 	// Stake difficulty before any tickets could possibly be purchased is
 	// the minimum value.
 	nextHeight := g.tip.Header.Height + 1
@@ -1883,7 +1889,7 @@ func (g *Generator) NextBlock(blockName string, spend *SpendableOut, ticketSpend
 	}
 
 	// Calculate the next required stake difficulty (aka ticket price).
-	ticketPrice := dcrutil.Amount(g.calcNextRequiredStakeDifficulty())
+	ticketPrice := dcrutil.Amount(g.CalcNextRequiredStakeDifficulty())
 
 	// Generate the appropriate votes and ticket purchases based on the
 	// current tip block and provided ticket spendable outputs.
@@ -2022,7 +2028,7 @@ func (g *Generator) NextBlock(blockName string, spend *SpendableOut, ticketSpend
 			FreshStake:   uint8(len(ticketPurchases)),
 			Revocations:  numTicketRevocations,
 			PoolSize:     uint32(len(g.liveTickets)),
-			Bits:         g.calcNextRequiredDifficulty(),
+			Bits:         g.CalcNextRequiredDifficulty(),
 			SBits:        int64(ticketPrice),
 			Height:       nextHeight,
 			Size:         0, // Filled in below.
