@@ -4,7 +4,10 @@
 [[projects]]
   branch = "master"
   name = "github.com/agl/ed25519"
-  packages = [".","edwards25519"]
+  packages = [
+    ".",
+    "edwards25519"
+  ]
   revision = "5312a61534124124185d41f09206b9fef1d88403"
 
 [[projects]]
@@ -22,7 +25,20 @@
 [[projects]]
   branch = "master"
   name = "github.com/btcsuite/goleveldb"
-  packages = ["leveldb","leveldb/cache","leveldb/comparer","leveldb/errors","leveldb/filter","leveldb/iterator","leveldb/journal","leveldb/memdb","leveldb/opt","leveldb/storage","leveldb/table","leveldb/util"]
+  packages = [
+    "leveldb",
+    "leveldb/cache",
+    "leveldb/comparer",
+    "leveldb/errors",
+    "leveldb/filter",
+    "leveldb/iterator",
+    "leveldb/journal",
+    "leveldb/memdb",
+    "leveldb/opt",
+    "leveldb/storage",
+    "leveldb/table",
+    "leveldb/util"
+  ]
   revision = "7834afc9e8cd15233b6c3d97e12674a31ca24602"
 
 [[projects]]
@@ -40,14 +56,20 @@
 [[projects]]
   branch = "master"
   name = "github.com/btcsuite/winsvc"
-  packages = ["eventlog","mgr","registry","svc","winapi"]
+  packages = [
+    "eventlog",
+    "mgr",
+    "registry",
+    "svc",
+    "winapi"
+  ]
   revision = "f8fb11f83f7e860e3769a08e6811d1b399a43722"
 
 [[projects]]
   branch = "master"
   name = "github.com/davecgh/go-spew"
   packages = ["spew"]
-  revision = "ecdeabc65495df2dec95d7c4a4c3e021903035e5"
+  revision = "8991bc29aa16c548c550c7ff78260e27b9ab7c73"
 
 [[projects]]
   branch = "master"
@@ -59,7 +81,7 @@
   branch = "master"
   name = "github.com/decred/base58"
   packages = ["."]
-  revision = "a5d313ea54d82327fbdc0fefc817776aa74f44f0"
+  revision = "229e657bc9be5d592855a910428907f851950ed5"
 
 [[projects]]
   name = "github.com/jessevdk/go-flags"
@@ -82,18 +104,24 @@
 [[projects]]
   branch = "master"
   name = "golang.org/x/crypto"
-  packages = ["ripemd160","ssh/terminal"]
-  revision = "31469a2049ca68f6ce80281568c2d81dc700f104"
+  packages = [
+    "ripemd160",
+    "ssh/terminal"
+  ]
+  revision = "beaf6a35706e5032ae4c3fcf342c663c069f44d2"
 
 [[projects]]
   branch = "master"
   name = "golang.org/x/sys"
-  packages = ["unix","windows"]
-  revision = "af50095a40f9041b3b38960738837185c26e9419"
+  packages = [
+    "unix",
+    "windows"
+  ]
+  revision = "f6cff0780e542efa0c8e864dc8fa522808f6a598"
 
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "5cf2099b8e421fbffa28900a9219be9502dcf345d8772e14756a4846412fd80c"
+  inputs-digest = "dac2b0bbb944e27f7652fb08881c0de11c94472c2041f5ff3a75a4064dae5439"
   solver-name = "gps-cdcl"
   solver-version = 1
