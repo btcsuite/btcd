@@ -175,3 +175,64 @@ func TestCalcPastMedianTime(t *testing.T) {
 		}
 	}
 }
+
+// TestChainTips ensures the chain tip tracking in the block index works
+// as expected.
+func TestChainTips(t *testing.T) {
+	params := &chaincfg.SimNetParams
+	bc := newFakeChain(params)
+	genesis := bc.bestNode
+
+	// Construct a synthetic simnet chain consisting of the following structure.
+	// 0 -> 1 -> 2  -> 3  -> 4
+	//  |    \-> 2a -> 3a -> 4a -> 5a -> 6a -> 7a -> ... -> 26a
+	//  |    |     \-> 3b -> 4b -> 5b
+	//  |    \-> 2c -> 3c -> 4c -> 5c -> 6c -> 7c -> ... -> 26c
+	//  \-> 1d
+	//  \-> 1e
+	branches := make([][]*blockNode, 6)
+	branches[0] = chainedFakeNodes(genesis, 4)
+	branches[1] = chainedFakeNodes(branches[0][0], 25)
+	branches[2] = chainedFakeNodes(branches[1][0], 3)
+	branches[3] = chainedFakeNodes(branches[0][0], 25)
+	branches[4] = chainedFakeNodes(genesis, 1)
+	branches[5] = chainedFakeNodes(genesis, 1)
+
+	// Add all of the nodes to the index.
+	for _, branch := range branches {
+		for _, node := range branch {
+			bc.index.AddNode(node)
+		}
+	}
+
+	// Create a map of all of the chain tips the block index believes exist.
+	chainTips := make(map[*blockNode]struct{})
+	bc.index.RLock()
+	for _, nodes := range bc.index.chainTips {
+		for _, node := range nodes {
+			chainTips[node] = struct{}{}
+		}
+	}
+	bc.index.RUnlock()
+
+	// The expected chain tips are the tips of all of the branches.
+	tip := func(nodes []*blockNode) *blockNode {
+		return nodes[len(nodes)-1]
+	}
+	expectedTips := make(map[*blockNode]struct{})
+	for _, branch := range branches {
+		expectedTips[tip(branch)] = struct{}{}
+	}
+
+	// Ensure the chain tips are the expected values.
+	if len(chainTips) != len(expectedTips) {
+		t.Fatalf("block index reports %d chain tips, but %d were expected",
+			len(chainTips), len(expectedTips))
+	}
+	for node := range expectedTips {
+		if _, ok := chainTips[node]; !ok {
+			t.Fatalf("block index does not contain expected tip %s (height %d)",
+				node.hash, node.height)
+		}
+	}
+}

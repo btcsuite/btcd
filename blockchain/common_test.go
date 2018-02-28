@@ -7,6 +7,7 @@ package blockchain
 
 import (
 	"fmt"
+	mrand "math/rand"
 	"os"
 	"path/filepath"
 	"time"
@@ -152,6 +153,10 @@ func newFakeChain(params *chaincfg.Params) *BlockChain {
 	}
 }
 
+// testNoncePrng provides a deterministic prng for the nonce in generated fake
+// nodes.  The ensures that the nodes have unique hashes.
+var testNoncePrng = mrand.New(mrand.NewSource(0))
+
 // newFakeNode creates a block node connected to the passed parent with the
 // provided fields populated and fake values for the other fields.
 func newFakeNode(parent *blockNode, blockVersion int32, stakeVersion uint32, bits uint32, timestamp time.Time) *blockNode {
@@ -163,9 +168,30 @@ func newFakeNode(parent *blockNode, blockVersion int32, stakeVersion uint32, bit
 		Bits:         bits,
 		Height:       uint32(parent.height) + 1,
 		Timestamp:    timestamp,
+		Nonce:        testNoncePrng.Uint32(),
 		StakeVersion: stakeVersion,
 	}
 	return newBlockNode(header, parent)
+}
+
+// chainedFakeNodes returns the specified number of nodes constructed such that
+// each subsequent node points to the previous one to create a chain.  The first
+// node will point to the passed parent which can be nil if desired.
+func chainedFakeNodes(parent *blockNode, numNodes int) []*blockNode {
+	nodes := make([]*blockNode, numNodes)
+	tip := parent
+	blockTime := time.Now()
+	if tip != nil {
+		blockTime = time.Unix(tip.timestamp, 0)
+	}
+	for i := 0; i < numNodes; i++ {
+		blockTime = blockTime.Add(time.Second)
+		node := newFakeNode(tip, 1, 1, 0, blockTime)
+		tip = node
+
+		nodes[i] = node
+	}
+	return nodes
 }
 
 // appendFakeVotes appends the passed number of votes to the node with the
