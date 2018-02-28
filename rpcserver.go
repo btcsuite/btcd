@@ -25,6 +25,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -52,9 +53,9 @@ import (
 
 // API version constants
 const (
-	jsonrpcSemverString = "3.2.0"
+	jsonrpcSemverString = "3.3.0"
 	jsonrpcSemverMajor  = 3
-	jsonrpcSemverMinor  = 2
+	jsonrpcSemverMinor  = 3
 	jsonrpcSemverPatch  = 0
 )
 
@@ -5665,12 +5666,25 @@ func handleVerifyMessage(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 
 // handleVersion implements the version command.
 func handleVersion(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	runtimeVer := strings.Replace(runtime.Version(), ".", "-", -1)
+	buildMeta := normalizeBuildString(runtimeVer)
+	if build := normalizeBuildString(appBuild); build != "" {
+		buildMeta = fmt.Sprintf("%s.%s", build, buildMeta)
+	}
 	result := map[string]dcrjson.VersionResult{
 		"dcrdjsonrpcapi": {
 			VersionString: jsonrpcSemverString,
 			Major:         jsonrpcSemverMajor,
 			Minor:         jsonrpcSemverMinor,
 			Patch:         jsonrpcSemverPatch,
+		},
+		"dcrd": {
+			VersionString: version(),
+			Major:         uint32(appMajor),
+			Minor:         uint32(appMinor),
+			Patch:         uint32(appPatch),
+			Prerelease:    normalizePreRelString(appPreRelease),
+			BuildMetadata: buildMeta,
 		},
 	}
 	return result, nil
