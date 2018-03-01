@@ -1781,22 +1781,26 @@ func (b *BlockChain) initChainState(interrupt <-chan struct{}) error {
 			return err
 		}
 
-		// Load the raw block bytes for the best block.
-		blockBytes, err := dbTx.FetchBlock(&state.hash)
+		// Load the best and parent blocks and cache them.
+		utilBlock, err := dbFetchBlockByHash(dbTx, &state.hash)
 		if err != nil {
 			return err
 		}
-		var block wire.MsgBlock
-		err = block.Deserialize(bytes.NewReader(blockBytes))
-		if err != nil {
-			return err
+		b.mainchainBlockCache[state.hash] = utilBlock
+		block := utilBlock.MsgBlock()
+		header := &block.Header
+		if header.Height > 0 {
+			parentBlock, err := dbFetchBlockByHash(dbTx, &header.PrevBlock)
+			if err != nil {
+				return err
+			}
+			b.mainchainBlockCache[header.PrevBlock] = parentBlock
 		}
 
 		// Create a new node and set it as the best node.  The preceding
 		// nodes will be loaded on demand as needed.
-		header := &block.Header
 		node := newBlockNode(header, nil)
-		node.populateTicketInfo(stake.FindSpentTicketsInBlock(&block))
+		node.populateTicketInfo(stake.FindSpentTicketsInBlock(block))
 		node.status = statusDataStored | statusValid
 		node.inMainChain = true
 		node.workSum = state.workSum
@@ -1826,7 +1830,7 @@ func (b *BlockChain) initChainState(interrupt <-chan struct{}) error {
 		}
 
 		// Initialize the state related to the best block.
-		blockSize := uint64(len(blockBytes))
+		blockSize := uint64(block.SerializeSize())
 		numTxns := uint64(len(block.Transactions))
 		b.stateSnapshot = newBestState(b.bestNode, blockSize, numTxns,
 			state.totalTxns, medianTime, state.totalSubsidy)

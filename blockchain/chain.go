@@ -556,6 +556,7 @@ func (b *BlockChain) fetchMainChainBlockByHash(hash *chainhash.Hash) (*dcrutil.B
 		return block, nil
 	}
 
+	// Load the block from the database.
 	err := b.db.View(func(dbTx database.Tx) error {
 		var err error
 		block, err = dbFetchBlockByHash(dbTx, hash)
