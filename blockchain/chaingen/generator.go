@@ -138,6 +138,7 @@ type Generator struct {
 	tip              *wire.MsgBlock
 	tipName          string
 	blocks           map[chainhash.Hash]*wire.MsgBlock
+	blockHeights     map[chainhash.Hash]uint32
 	blocksByName     map[string]*wire.MsgBlock
 	p2shOpTrueAddr   dcrutil.Address
 	p2shOpTrueScript []byte
@@ -176,6 +177,7 @@ func MakeGenerator(params *chaincfg.Params) (Generator, error) {
 		tip:              genesis,
 		tipName:          "genesis",
 		blocks:           map[chainhash.Hash]*wire.MsgBlock{genesisHash: genesis},
+		blockHeights:     map[chainhash.Hash]uint32{genesis.BlockHash(): 0},
 		blocksByName:     map[string]*wire.MsgBlock{"genesis": genesis},
 		p2shOpTrueAddr:   p2shOpTrueAddr,
 		p2shOpTrueScript: p2shOpTrueScript,
@@ -223,6 +225,16 @@ func (g *Generator) BlockByHash(hash *chainhash.Hash) *wire.MsgBlock {
 		panic(fmt.Sprintf("block with hash %s does not exist", hash))
 	}
 	return block
+}
+
+// blockHeight returns the block height associated with the provided block hash.
+// It will panic if the specified block hash does not exist.
+func (g *Generator) blockHeight(hash chainhash.Hash) uint32 {
+	height, ok := g.blockHeights[hash]
+	if !ok {
+		panic(fmt.Sprintf("no block height found for block %s", hash))
+	}
+	return height
 }
 
 // opReturnScript returns a provably-pruneable OP_RETURN script with the
@@ -1666,18 +1678,18 @@ func (g *Generator) connectBlockTickets(b *wire.MsgBlock) {
 	}
 
 	// Extract the ticket purchases (sstx) from the block.
-	height := b.Header.Height
 	var purchases []*stakeTicket
+	blockHash := b.BlockHash()
+	blockHeight := g.blockHeight(b.BlockHash())
 	for txIdx, tx := range b.STransactions {
 		if isTicketPurchaseTx(tx) {
-			ticket := &stakeTicket{tx, height, uint32(txIdx)}
+			ticket := &stakeTicket{tx, blockHeight, uint32(txIdx)}
 			purchases = append(purchases, ticket)
 		}
 	}
 
 	// Update the live ticket pool and associated data structures.
-	blockHash := b.BlockHash()
-	g.connectLiveTickets(&blockHash, height, winners, purchases)
+	g.connectLiveTickets(&blockHash, blockHeight, winners, purchases)
 }
 
 // disconnectBlockTickets updates the live ticket pool and associated data
@@ -1692,7 +1704,8 @@ func (g *Generator) disconnectBlockTickets(b *wire.MsgBlock) {
 	}
 
 	// Remove tickets created in the block from the immature ticket pool.
-	blockHeight := b.Header.Height
+	blockHash := b.BlockHash()
+	blockHeight := g.blockHeight(b.BlockHash())
 	for i := 0; i < len(g.immatureTickets); i++ {
 		ticket := g.immatureTickets[i]
 		if ticket.blockHeight == blockHeight {
@@ -1743,7 +1756,6 @@ func (g *Generator) disconnectBlockTickets(b *wire.MsgBlock) {
 
 	// Add the winning tickets consumed by the block back to the live ticket
 	// pool.
-	blockHash := b.BlockHash()
 	g.liveTickets = append(g.liveTickets, g.wonTickets[blockHash]...)
 	delete(g.wonTickets, blockHash)
 
@@ -1782,14 +1794,13 @@ func (g *Generator) SetTip(blockName string) {
 	var connect, disconnect []*wire.MsgBlock
 	oldBranch, newBranch := g.tip, newTip
 	for oldBranch != newBranch {
-		// As long as the two branches are not at the same height, add
-		// the tip of the longest one to the appropriate connect or
-		// disconnect list and move its tip back to its previous block.
-		if oldBranch.Header.Height > newBranch.Header.Height {
+		oldBranchHeight := g.blockHeight(oldBranch.BlockHash())
+		newBranchHeight := g.blockHeight(newBranch.BlockHash())
+		if oldBranchHeight > newBranchHeight {
 			disconnect = append(disconnect, oldBranch)
 			oldBranch = g.originalParent(oldBranch)
 			continue
-		} else if newBranch.Header.Height > oldBranch.Header.Height {
+		} else if newBranchHeight > oldBranchHeight {
 			connect = append(connect, newBranch)
 			newBranch = g.originalParent(newBranch)
 			continue
@@ -2072,7 +2083,7 @@ func (g *Generator) NextBlock(blockName string, spend *SpendableOut, ticketSpend
 	// Only solve the block if the nonce wasn't manually changed by a munge
 	// function.
 	if block.Header.Nonce == curNonce && !solveBlock(&block.Header) {
-		panic(fmt.Sprintf("Unable to solve block at height %d",
+		panic(fmt.Sprintf("unable to solve block at height %d",
 			block.Header.Height))
 	}
 
@@ -2088,6 +2099,7 @@ func (g *Generator) NextBlock(blockName string, spend *SpendableOut, ticketSpend
 	g.connectLiveTickets(&blockHash, nextHeight, ticketWinners,
 		ticketPurchases)
 	g.blocks[blockHash] = &block
+	g.blockHeights[blockHash] = nextHeight
 	g.blocksByName[blockName] = &block
 	g.tip = &block
 	g.tipName = blockName
@@ -2147,13 +2159,16 @@ func (g *Generator) CreatePremineBlock(blockName string, additionalAmount dcruti
 func (g *Generator) UpdateBlockState(oldBlockName string, oldBlockHash chainhash.Hash, newBlockName string, newBlock *wire.MsgBlock) {
 	// Remove existing entries.
 	wonTickets := g.wonTickets[oldBlockHash]
+	existingHeight := g.blockHeights[oldBlockHash]
 	delete(g.blocks, oldBlockHash)
+	delete(g.blockHeights, oldBlockHash)
 	delete(g.blocksByName, oldBlockName)
 	delete(g.wonTickets, oldBlockHash)
 
 	// Add new entries.
 	newBlockHash := newBlock.BlockHash()
 	g.blocks[newBlockHash] = newBlock
+	g.blockHeights[newBlockHash] = existingHeight
 	g.blocksByName[newBlockName] = newBlock
 	g.wonTickets[newBlockHash] = wonTickets
 }
@@ -2325,7 +2340,7 @@ func (g *Generator) AssertTipBlockStakeRoot(expected chainhash.Hash) {
 // the provided tx index and output index.
 func (g *Generator) AssertTipBlockTxOutOpReturn(txIndex, txOutIndex uint32) {
 	if txIndex >= uint32(len(g.tip.Transactions)) {
-		panic(fmt.Sprintf("Transaction index %d in block %q "+
+		panic(fmt.Sprintf("transaction index %d in block %q "+
 			"(height %d) does not exist", txIndex, g.tipName,
 			g.tip.Header.Height))
 	}
