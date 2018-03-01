@@ -1184,7 +1184,7 @@ func hashMerkleBranches(left *chainhash.Hash, right *chainhash.Hash) *chainhash.
 // is stored in a linear array.
 //
 // A merkle tree is a tree in which every non-leaf node is the hash of its
-// children nodes.  A diagram depicting how this works for decred transactions
+// children nodes.  A diagram depicting how this works for Decred transactions
 // where h(x) is a blake256 hash follows:
 //
 //	         root = h1234 = h(h12 + h34)
@@ -1299,7 +1299,7 @@ func hashToBig(hash *chainhash.Hash) *big.Int {
 // The formula to calculate N is:
 // 	N = (-1^sign) * mantissa * 256^(exponent-3)
 //
-// This compact form is only used in decred to encode unsigned 256-bit numbers
+// This compact form is only used in Decred to encode unsigned 256-bit numbers
 // which represent difficulty targets, thus there really is not a need for a
 // sign bit, but it is implemented here to stay consistent with bitcoind.
 func compactToBig(compact uint32) *big.Int {

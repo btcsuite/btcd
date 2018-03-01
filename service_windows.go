@@ -26,7 +26,7 @@ const (
 	svcDisplayName = "Dcrd Service"
 
 	// svcDesc is the description of the service.
-	svcDesc = "Downloads and stays synchronized with the decred block " +
+	svcDesc = "Downloads and stays synchronized with the Decred block " +
 		"chain and provides chain services to applications."
 )
 

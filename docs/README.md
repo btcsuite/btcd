@@ -23,7 +23,7 @@
 <a name="About" />
 
 ### 1. About
-dcrd is a full node decred implementation written in [Go](http://golang.org),
+dcrd is a full node Decred implementation written in [Go](http://golang.org),
 licensed under the [copyfree](http://www.copyfree.org) ISC License.
 
 This project is currently under active development and is in a Beta state. It is

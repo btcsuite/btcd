@@ -10,7 +10,7 @@ Decred (secp256k1 only for now). It is designed so that it may be used with the
 standard crypto/ecdsa packages provided with go.  A comprehensive suite of test
 is provided to ensure proper functionality.  Package dcrec was originally based
 on work from ThePiachu which is licensed under the same terms as Go, but it has
-signficantly diverged since then.  The decred developers original is licensed
+signficantly diverged since then.  The Decred developers original is licensed
 under the liberal ISC license.
 
 Although this package was primarily written for dcrd, it has intentionally been

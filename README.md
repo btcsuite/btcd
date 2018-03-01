@@ -79,12 +79,12 @@ dep ensure
 go install . ./cmd/...
 ```
 
-For more information about decred and how to set up your software please go to
+For more information about Decred and how to set up your software please go to
 our docs page at [docs.decred.org](https://docs.decred.org/getting-started/beginner-guide/).
 
 ## Docker
 
-All tests and linters may be run in a docker container using the script `run_tests.sh`.  This script defaults to using the current supported version of go.  You can run it with the major version of go you would like to use as the only arguement to test a previous on a previous version of go (generally decred supports the current version of go and the previous one).
+All tests and linters may be run in a docker container using the script `run_tests.sh`.  This script defaults to using the current supported version of go.  You can run it with the major version of go you would like to use as the only arguement to test a previous on a previous version of go (generally Decred supports the current version of go and the previous one).
 
 ```
 ./run_tests.sh 1.8

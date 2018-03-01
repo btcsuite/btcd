@@ -449,7 +449,7 @@ func (c *Client) SubmitBlockAsync(block *dcrutil.Block, options *dcrjson.SubmitB
 	return c.sendCmd(cmd)
 }
 
-// SubmitBlock attempts to submit a new block into the decred network.
+// SubmitBlock attempts to submit a new block into the Decred network.
 func (c *Client) SubmitBlock(block *dcrutil.Block, options *dcrjson.SubmitBlockOptions) error {
 	return c.SubmitBlockAsync(block, options).Receive()
 }

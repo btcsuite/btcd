@@ -23,8 +23,8 @@ import (
 func makeHeader(dcrnet CurrencyNet, command string,
 	payloadLen uint32, checksum uint32) []byte {
 
-	// The length of a decred message header is 24 bytes.
-	// 4 byte magic number of the decred network + 12 byte command + 4 byte
+	// The length of a Decred message header is 24 bytes.
+	// 4 byte magic number of the Decred network + 12 byte command + 4 byte
 	// payload length + 4 byte checksum.
 	buf := make([]byte, 24)
 	binary.LittleEndian.PutUint32(buf, uint32(dcrnet))

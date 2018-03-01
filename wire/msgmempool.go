@@ -9,7 +9,7 @@ import (
 	"io"
 )
 
-// MsgMemPool implements the Message interface and represents a decred mempool
+// MsgMemPool implements the Message interface and represents a Decred mempool
 // message.  It is used to request a list of transactions still in the active
 // memory pool of a relay.
 //
@@ -17,13 +17,13 @@ import (
 // starting with BIP0035Version.
 type MsgMemPool struct{}
 
-// BtcDecode decodes r using the decred protocol encoding into the receiver.
+// BtcDecode decodes r using the Decred protocol encoding into the receiver.
 // This is part of the Message interface implementation.
 func (msg *MsgMemPool) BtcDecode(r io.Reader, pver uint32) error {
 	return nil
 }
 
-// BtcEncode encodes the receiver to w using the decred protocol encoding.
+// BtcEncode encodes the receiver to w using the Decred protocol encoding.
 // This is part of the Message interface implementation.
 func (msg *MsgMemPool) BtcEncode(w io.Writer, pver uint32) error {
 	return nil
@@ -41,7 +41,7 @@ func (msg *MsgMemPool) MaxPayloadLength(pver uint32) uint32 {
 	return 0
 }
 
-// NewMsgMemPool returns a new decred pong message that conforms to the Message
+// NewMsgMemPool returns a new Decred pong message that conforms to the Message
 // interface.  See MsgPong for details.
 func NewMsgMemPool() *MsgMemPool {
 	return &MsgMemPool{}

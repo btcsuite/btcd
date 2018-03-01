@@ -295,7 +295,7 @@ func TestRemoveOpcodeByData(t *testing.T) {
 			remove: []byte{1, 2, 3, 5},
 			after:  []byte{txscript.OP_DATA_4, 1, 2, 3, 4},
 		},
-		// fix to allow for decred tests too
+		// fix to allow for Decred tests too
 		/*
 			{
 				name:        "stakesubmission",

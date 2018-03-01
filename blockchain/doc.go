@@ -4,12 +4,12 @@
 // license that can be found in the LICENSE file.
 
 /*
-Package blockchain implements decred block handling and chain selection rules.
+Package blockchain implements Decred block handling and chain selection rules.
 
-The decred block handling and chain selection rules are an integral, and quite
+The Decred block handling and chain selection rules are an integral, and quite
 likely the most important, part of decred.  Unfortunately, at the time of
 this writing, these rules are also largely undocumented and had to be
-ascertained from the bitcoind source code.  At its core, decred is a
+ascertained from the bitcoind source code.  At its core, Decred is a
 distributed consensus of which blocks are valid and which ones will comprise the
 main block chain (public ledger) that ultimately determines accepted
 transactions, so it is extremely important that fully validating nodes agree on
@@ -21,7 +21,7 @@ functionality such as rejecting duplicate blocks, ensuring blocks and
 transactions follow all rules, orphan handling, and best chain selection along
 with reorganization.
 
-Since this package does not deal with other decred specifics such as network
+Since this package does not deal with other Decred specifics such as network
 communication or wallets, it provides a notification system which gives the
 caller a high level of flexibility in how they want to react to certain events
 such as orphan blocks which need their parents requested and newly connected

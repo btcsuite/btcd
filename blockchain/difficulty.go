@@ -67,7 +67,7 @@ func HashToBig(hash *chainhash.Hash) *big.Int {
 // The formula to calculate N is:
 // 	N = (-1^sign) * mantissa * 256^(exponent-3)
 //
-// This compact form is only used in decred to encode unsigned 256-bit numbers
+// This compact form is only used in Decred to encode unsigned 256-bit numbers
 // which represent difficulty targets, thus there really is not a need for a
 // sign bit, but it is implemented here to stay consistent with bitcoind.
 func CompactToBig(compact uint32) *big.Int {

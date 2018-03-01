@@ -1783,7 +1783,7 @@ func handleGenerate(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 func handleGetAddedNodeInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	c := cmd.(*dcrjson.GetAddedNodeInfoCmd)
 
-	// Retrieve a list of persistent (added) peers from the decred server
+	// Retrieve a list of persistent (added) peers from the Decred server
 	// and filter the list of peers per the specified address (if any).
 	peers := s.server.AddedNodeInfo()
 	if c.Node != nil {

@@ -1587,7 +1587,7 @@ func (c *Client) RenameAccount(oldAccount, newAccount string) error {
 type FutureValidateAddressResult chan *response
 
 // Receive waits for the response promised by the future and returns information
-// about the given decred address.
+// about the given Decred address.
 func (r FutureValidateAddressResult) Receive() (*dcrjson.ValidateAddressWalletResult, error) {
 	res, err := receiveFuture(r)
 	if err != nil {
@@ -1615,7 +1615,7 @@ func (c *Client) ValidateAddressAsync(address dcrutil.Address) FutureValidateAdd
 	return c.sendCmd(cmd)
 }
 
-// ValidateAddress returns information about the given decred address.
+// ValidateAddress returns information about the given Decred address.
 func (c *Client) ValidateAddress(address dcrutil.Address) (*dcrjson.ValidateAddressWalletResult, error) {
 	return c.ValidateAddressAsync(address).Receive()
 }

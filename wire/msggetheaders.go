@@ -46,7 +46,7 @@ func (msg *MsgGetHeaders) AddBlockLocatorHash(hash *chainhash.Hash) error {
 	return nil
 }
 
-// BtcDecode decodes r using the decred protocol encoding into the receiver.
+// BtcDecode decodes r using the Decred protocol encoding into the receiver.
 // This is part of the Message interface implementation.
 func (msg *MsgGetHeaders) BtcDecode(r io.Reader, pver uint32) error {
 	err := readElement(r, &msg.ProtocolVersion)
@@ -81,7 +81,7 @@ func (msg *MsgGetHeaders) BtcDecode(r io.Reader, pver uint32) error {
 	return readElement(r, &msg.HashStop)
 }
 
-// BtcEncode encodes the receiver to w using the decred protocol encoding.
+// BtcEncode encodes the receiver to w using the Decred protocol encoding.
 // This is part of the Message interface implementation.
 func (msg *MsgGetHeaders) BtcEncode(w io.Writer, pver uint32) error {
 	// Limit to max block locator hashes per message.
@@ -127,7 +127,7 @@ func (msg *MsgGetHeaders) MaxPayloadLength(pver uint32) uint32 {
 		chainhash.HashSize) + chainhash.HashSize
 }
 
-// NewMsgGetHeaders returns a new decred getheaders message that conforms to
+// NewMsgGetHeaders returns a new Decred getheaders message that conforms to
 // the Message interface.  See MsgGetHeaders for details.
 func NewMsgGetHeaders() *MsgGetHeaders {
 	return &MsgGetHeaders{

@@ -9,20 +9,20 @@ import (
 	"io"
 )
 
-// MsgVerAck defines a decred verack message which is used for a peer to
+// MsgVerAck defines a Decred verack message which is used for a peer to
 // acknowledge a version message (MsgVersion) after it has used the information
 // to negotiate parameters.  It implements the Message interface.
 //
 // This message has no payload.
 type MsgVerAck struct{}
 
-// BtcDecode decodes r using the decred protocol encoding into the receiver.
+// BtcDecode decodes r using the Decred protocol encoding into the receiver.
 // This is part of the Message interface implementation.
 func (msg *MsgVerAck) BtcDecode(r io.Reader, pver uint32) error {
 	return nil
 }
 
-// BtcEncode encodes the receiver to w using the decred protocol encoding.
+// BtcEncode encodes the receiver to w using the Decred protocol encoding.
 // This is part of the Message interface implementation.
 func (msg *MsgVerAck) BtcEncode(w io.Writer, pver uint32) error {
 	return nil
@@ -40,7 +40,7 @@ func (msg *MsgVerAck) MaxPayloadLength(pver uint32) uint32 {
 	return 0
 }
 
-// NewMsgVerAck returns a new decred verack message that conforms to the
+// NewMsgVerAck returns a new Decred verack message that conforms to the
 // Message interface.
 func NewMsgVerAck() *MsgVerAck {
 	return &MsgVerAck{}

@@ -26,7 +26,7 @@ type MsgFilterAdd struct {
 	Data []byte
 }
 
-// BtcDecode decodes r using the decred protocol encoding into the receiver.
+// BtcDecode decodes r using the Decred protocol encoding into the receiver.
 // This is part of the Message interface implementation.
 func (msg *MsgFilterAdd) BtcDecode(r io.Reader, pver uint32) error {
 	var err error
@@ -35,7 +35,7 @@ func (msg *MsgFilterAdd) BtcDecode(r io.Reader, pver uint32) error {
 	return err
 }
 
-// BtcEncode encodes the receiver to w using the decred protocol encoding.
+// BtcEncode encodes the receiver to w using the Decred protocol encoding.
 // This is part of the Message interface implementation.
 func (msg *MsgFilterAdd) BtcEncode(w io.Writer, pver uint32) error {
 	size := len(msg.Data)
@@ -61,7 +61,7 @@ func (msg *MsgFilterAdd) MaxPayloadLength(pver uint32) uint32 {
 		MaxFilterAddDataSize
 }
 
-// NewMsgFilterAdd returns a new decred filteradd message that conforms to the
+// NewMsgFilterAdd returns a new Decred filteradd message that conforms to the
 // Message interface.  See MsgFilterAdd for details.
 func NewMsgFilterAdd(data []byte) *MsgFilterAdd {
 	return &MsgFilterAdd{

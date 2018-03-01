@@ -19,7 +19,7 @@ import (
 // typical case.
 const defaultInvListAlloc = 1000
 
-// MsgInv implements the Message interface and represents a decred inv message.
+// MsgInv implements the Message interface and represents a Decred inv message.
 // It is used to advertise a peer's known data such as blocks and transactions
 // through inventory vectors.  It may be sent unsolicited to inform other peers
 // of the data or in response to a getblocks message (MsgGetBlocks).  Each
@@ -44,7 +44,7 @@ func (msg *MsgInv) AddInvVect(iv *InvVect) error {
 	return nil
 }
 
-// BtcDecode decodes r using the decred protocol encoding into the receiver.
+// BtcDecode decodes r using the Decred protocol encoding into the receiver.
 // This is part of the Message interface implementation.
 func (msg *MsgInv) BtcDecode(r io.Reader, pver uint32) error {
 	count, err := ReadVarInt(r, pver)
@@ -74,7 +74,7 @@ func (msg *MsgInv) BtcDecode(r io.Reader, pver uint32) error {
 	return nil
 }
 
-// BtcEncode encodes the receiver to w using the decred protocol encoding.
+// BtcEncode encodes the receiver to w using the Decred protocol encoding.
 // This is part of the Message interface implementation.
 func (msg *MsgInv) BtcEncode(w io.Writer, pver uint32) error {
 	// Limit to max inventory vectors per message.
@@ -112,7 +112,7 @@ func (msg *MsgInv) MaxPayloadLength(pver uint32) uint32 {
 	return MaxVarIntPayload + (MaxInvPerMsg * maxInvVectPayload)
 }
 
-// NewMsgInv returns a new decred inv message that conforms to the Message
+// NewMsgInv returns a new Decred inv message that conforms to the Message
 // interface.  See MsgInv for details.
 func NewMsgInv() *MsgInv {
 	return &MsgInv{
@@ -120,7 +120,7 @@ func NewMsgInv() *MsgInv {
 	}
 }
 
-// NewMsgInvSizeHint returns a new decred inv message that conforms to the
+// NewMsgInvSizeHint returns a new Decred inv message that conforms to the
 // Message interface.  See MsgInv for details.  This function differs from
 // NewMsgInv in that it allows a default allocation size for the backing array
 // which houses the inventory vector list.  This allows callers who know in

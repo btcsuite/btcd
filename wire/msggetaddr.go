@@ -17,13 +17,13 @@ import (
 // This message has no payload.
 type MsgGetAddr struct{}
 
-// BtcDecode decodes r using the decred protocol encoding into the receiver.
+// BtcDecode decodes r using the Decred protocol encoding into the receiver.
 // This is part of the Message interface implementation.
 func (msg *MsgGetAddr) BtcDecode(r io.Reader, pver uint32) error {
 	return nil
 }
 
-// BtcEncode encodes the receiver to w using the decred protocol encoding.
+// BtcEncode encodes the receiver to w using the Decred protocol encoding.
 // This is part of the Message interface implementation.
 func (msg *MsgGetAddr) BtcEncode(w io.Writer, pver uint32) error {
 	return nil
@@ -41,7 +41,7 @@ func (msg *MsgGetAddr) MaxPayloadLength(pver uint32) uint32 {
 	return 0
 }
 
-// NewMsgGetAddr returns a new decred getaddr message that conforms to the
+// NewMsgGetAddr returns a new Decred getaddr message that conforms to the
 // Message interface.  See MsgGetAddr for details.
 func NewMsgGetAddr() *MsgGetAddr {
 	return &MsgGetAddr{}

@@ -182,7 +182,7 @@ func CheckTransactionSanity(tx *wire.MsgTx, params *chaincfg.Params) error {
 	// output must not be negative or more than the max allowed per
 	// transaction.  Also, the total of all outputs must abide by the same
 	// restrictions.  All amounts in a transaction are in a unit value
-	// known as an atom.  One decred is a quantity of atoms as defined by
+	// known as an atom.  One Decred is a quantity of atoms as defined by
 	// the AtomsPerCoin constant.
 	var totalAtom int64
 	for _, txOut := range tx.TxOut {
@@ -1221,7 +1221,7 @@ func (b *BlockChain) checkDupTxs(txSet []*dcrutil.Tx, view *UtxoViewpoint) error
 // requirements are met, detecting double spends, validating all values and
 // fees are in the legal range and the total output amount doesn't exceed the
 // input amount, and verifying the signatures to prove the spender was the
-// owner of the decred and therefore allowed to spend them.  As it checks the
+// owner of the Decred and therefore allowed to spend them.  As it checks the
 // inputs, it also calculates the total fees for the transaction and returns
 // that value.
 //
@@ -1773,7 +1773,7 @@ func CheckTransactionInputs(subsidyCache *SubsidyCache, tx *dcrutil.Tx, txHeight
 		// output values of the input transactions must not be negative
 		// or more than the max allowed per transaction.  All amounts
 		// in a transaction are in a unit value known as an atom.  One
-		// decred is a quantity of atoms as defined by the AtomPerCoin
+		// Decred is a quantity of atoms as defined by the AtomPerCoin
 		// constant.
 		originTxAtom := utxoEntry.AmountByIndex(originTxIndex)
 		if originTxAtom < 0 {

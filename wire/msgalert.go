@@ -313,7 +313,7 @@ func NewAlertFromPayload(serializedPayload []byte, pver uint32) (*Alert, error) 
 	return &alert, nil
 }
 
-// MsgAlert  implements the Message interface and defines a decred alert
+// MsgAlert  implements the Message interface and defines a Decred alert
 // message.
 //
 // This is a signed message that provides notifications that the client should
@@ -332,7 +332,7 @@ type MsgAlert struct {
 	Payload *Alert
 }
 
-// BtcDecode decodes r using the decred protocol encoding into the receiver.
+// BtcDecode decodes r using the Decred protocol encoding into the receiver.
 // This is part of the Message interface implementation.
 func (msg *MsgAlert) BtcDecode(r io.Reader, pver uint32) error {
 	var err error
@@ -353,7 +353,7 @@ func (msg *MsgAlert) BtcDecode(r io.Reader, pver uint32) error {
 	return err
 }
 
-// BtcEncode encodes the receiver to w using the decred protocol encoding.
+// BtcEncode encodes the receiver to w using the Decred protocol encoding.
 // This is part of the Message interface implementation.
 func (msg *MsgAlert) BtcEncode(w io.Writer, pver uint32) error {
 	var err error
@@ -397,7 +397,7 @@ func (msg *MsgAlert) MaxPayloadLength(pver uint32) uint32 {
 	return MaxMessagePayload
 }
 
-// NewMsgAlert returns a new decred alert message that conforms to the Message
+// NewMsgAlert returns a new Decred alert message that conforms to the Message
 // interface.  See MsgAlert for details.
 func NewMsgAlert(serializedPayload []byte, signature []byte) *MsgAlert {
 	return &MsgAlert{

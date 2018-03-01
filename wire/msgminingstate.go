@@ -188,7 +188,7 @@ func (msg *MsgMiningState) MaxPayloadLength(pver uint32) uint32 {
 		chainhash.HashSize)
 }
 
-// NewMsgMiningState returns a new decred miningstate message that conforms to
+// NewMsgMiningState returns a new Decred miningstate message that conforms to
 // the Message interface using the defaults for the fields.
 func NewMsgMiningState() *MsgMiningState {
 	return &MsgMiningState{

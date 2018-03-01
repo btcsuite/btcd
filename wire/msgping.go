@@ -9,7 +9,7 @@ import (
 	"io"
 )
 
-// MsgPing implements the Message interface and represents a decred ping
+// MsgPing implements the Message interface and represents a Decred ping
 // message.
 //
 // For versions BIP0031Version and earlier, it is used primarily to confirm
@@ -26,14 +26,14 @@ type MsgPing struct {
 	Nonce uint64
 }
 
-// BtcDecode decodes r using the decred protocol encoding into the receiver.
+// BtcDecode decodes r using the Decred protocol encoding into the receiver.
 // This is part of the Message interface implementation.
 func (msg *MsgPing) BtcDecode(r io.Reader, pver uint32) error {
 	err := readElement(r, &msg.Nonce)
 	return err
 }
 
-// BtcEncode encodes the receiver to w using the decred protocol encoding.
+// BtcEncode encodes the receiver to w using the Decred protocol encoding.
 // This is part of the Message interface implementation.
 func (msg *MsgPing) BtcEncode(w io.Writer, pver uint32) error {
 	err := writeElement(w, msg.Nonce)
@@ -57,7 +57,7 @@ func (msg *MsgPing) MaxPayloadLength(pver uint32) uint32 {
 	return plen
 }
 
-// NewMsgPing returns a new decred ping message that conforms to the Message
+// NewMsgPing returns a new Decred ping message that conforms to the Message
 // interface.  See MsgPing for details.
 func NewMsgPing(nonce uint64) *MsgPing {
 	return &MsgPing{

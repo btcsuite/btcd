@@ -4,7 +4,7 @@
 // license that can be found in the LICENSE file.
 
 /*
-Package dcrjson provides primitives for working with the decred JSON-RPC API.
+Package dcrjson provides primitives for working with the Decred JSON-RPC API.
 
 Overview
 

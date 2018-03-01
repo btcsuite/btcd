@@ -4,7 +4,7 @@
 // license that can be found in the LICENSE file.
 
 /*
-Package txscript implements the decred transaction script language.
+Package txscript implements the Decred transaction script language.
 
 This package provides data structures and functions to parse and execute
 decred transaction scripts.
@@ -13,7 +13,7 @@ Script Overview
 
 Decred transaction scripts are written in a stack-base, FORTH-like language.
 
-The decred script language consists of a number of opcodes which fall into
+The Decred script language consists of a number of opcodes which fall into
 several categories such pushing and popping data to and from the stack,
 performing basic and bitwise arithmetic, conditional branching, comparing
 hashes, and checking cryptographic signatures.  Scripts are processed from left

@@ -1,6 +1,6 @@
 ============================================================================
 User visible changes for dcrd
-  A full-node decred implementation written in Go
+  A full-node Decred implementation written in Go
 ============================================================================
 
 Changes in 0.11.1 (Wed May 27 2015)

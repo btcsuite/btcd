@@ -644,8 +644,8 @@ func TestPayToAddrScript(t *testing.T) {
 				"f9137f23c2c409273eb16e65 CHECKSIG",
 			nil,
 		},
-		// pay-to-pubkey address on mainnet. for decred this would
-		// be uncompressed, but standard for decred is 33 byte
+		// pay-to-pubkey address on mainnet. for Decred this would
+		// be uncompressed, but standard for Decred is 33 byte
 		// compressed public keys.
 		{
 			p2pkUncompressedMain,

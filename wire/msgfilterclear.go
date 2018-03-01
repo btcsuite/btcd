@@ -16,13 +16,13 @@ import (
 // no payload.
 type MsgFilterClear struct{}
 
-// BtcDecode decodes r using the decred protocol encoding into the receiver.
+// BtcDecode decodes r using the Decred protocol encoding into the receiver.
 // This is part of the Message interface implementation.
 func (msg *MsgFilterClear) BtcDecode(r io.Reader, pver uint32) error {
 	return nil
 }
 
-// BtcEncode encodes the receiver to w using the decred protocol encoding.
+// BtcEncode encodes the receiver to w using the Decred protocol encoding.
 // This is part of the Message interface implementation.
 func (msg *MsgFilterClear) BtcEncode(w io.Writer, pver uint32) error {
 	return nil
@@ -40,7 +40,7 @@ func (msg *MsgFilterClear) MaxPayloadLength(pver uint32) uint32 {
 	return 0
 }
 
-// NewMsgFilterClear returns a new decred filterclear message that conforms to the Message
+// NewMsgFilterClear returns a new Decred filterclear message that conforms to the Message
 // interface.  See MsgFilterClear for details.
 func NewMsgFilterClear() *MsgFilterClear {
 	return &MsgFilterClear{}

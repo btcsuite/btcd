@@ -49,7 +49,7 @@ func (msg *MsgGetBlocks) AddBlockLocatorHash(hash *chainhash.Hash) error {
 	return nil
 }
 
-// BtcDecode decodes r using the decred protocol encoding into the receiver.
+// BtcDecode decodes r using the Decred protocol encoding into the receiver.
 // This is part of the Message interface implementation.
 func (msg *MsgGetBlocks) BtcDecode(r io.Reader, pver uint32) error {
 	err := readElement(r, &msg.ProtocolVersion)
@@ -84,7 +84,7 @@ func (msg *MsgGetBlocks) BtcDecode(r io.Reader, pver uint32) error {
 	return readElement(r, &msg.HashStop)
 }
 
-// BtcEncode encodes the receiver to w using the decred protocol encoding.
+// BtcEncode encodes the receiver to w using the Decred protocol encoding.
 // This is part of the Message interface implementation.
 func (msg *MsgGetBlocks) BtcEncode(w io.Writer, pver uint32) error {
 	count := len(msg.BlockLocatorHashes)
@@ -128,7 +128,7 @@ func (msg *MsgGetBlocks) MaxPayloadLength(pver uint32) uint32 {
 	return 4 + MaxVarIntPayload + (MaxBlockLocatorsPerMsg * chainhash.HashSize) + chainhash.HashSize
 }
 
-// NewMsgGetBlocks returns a new decred getblocks message that conforms to the
+// NewMsgGetBlocks returns a new Decred getblocks message that conforms to the
 // Message interface using the passed parameters and defaults for the remaining
 // fields.
 func NewMsgGetBlocks(hashStop *chainhash.Hash) *MsgGetBlocks {
