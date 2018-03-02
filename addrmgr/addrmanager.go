@@ -27,6 +27,9 @@ import (
 	"github.com/decred/dcrd/wire"
 )
 
+// PeersFilename is the default filename to store serialized peers.
+const PeersFilename = "peers.json"
+
 // AddrManager provides a concurrency safe address manager for caching potential
 // peers on the Decred network.
 type AddrManager struct {
@@ -363,8 +366,7 @@ func (a *AddrManager) savePeers() {
 	a.mtx.Lock()
 	defer a.mtx.Unlock()
 
-	// First we make a serialisable datastructure so we can encode it to
-	// json.
+	// First we make a serialisable datastructure so we can encode it to JSON.
 	sam := new(serializedAddrManager)
 	sam.Version = serialisationVersion
 	copy(sam.Key[:], a.key[:])
@@ -687,14 +689,14 @@ func (a *AddrManager) reset() {
 }
 
 // HostToNetAddress returns a netaddress given a host address. If the address is
-// a tor .onion address this will be taken care of. else if the host is not an
-// IP address it will be resolved (via tor if required).
+// a Tor .onion address this will be taken care of. Else if the host is not an
+// IP address it will be resolved (via Tor if required).
 func (a *AddrManager) HostToNetAddress(host string, port uint16, services wire.ServiceFlag) (*wire.NetAddress, error) {
-	// tor address is 16 char base32 + ".onion"
+	// Tor address is 16 char base32 + ".onion"
 	var ip net.IP
 	if len(host) == 22 && host[16:] == ".onion" {
 		// go base32 encoding uses capitals (as does the rfc
-		// but tor and bitcoind tend to user lowercase, so we switch
+		// but Tor and bitcoind tend to user lowercase, so we switch
 		// case here.
 		data, err := base32.StdEncoding.DecodeString(
 			strings.ToUpper(host[:16]))
@@ -718,7 +720,7 @@ func (a *AddrManager) HostToNetAddress(host string, port uint16, services wire.S
 }
 
 // ipString returns a string for the ip from the provided NetAddress. If the
-// ip is in the range used for tor addresses then it will be transformed into
+// ip is in the range used for Tor addresses then it will be transformed into
 // the relevant .onion address.
 func ipString(na *wire.NetAddress) string {
 	if IsOnionCatTor(na) {
@@ -1091,7 +1093,7 @@ func (a *AddrManager) GetBestLocalAddress(remoteAddr *wire.NetAddress) *wire.Net
 // Use Start to begin processing asynchronous address updates.
 func New(dataDir string, lookupFunc func(string) ([]net.IP, error)) *AddrManager {
 	am := AddrManager{
-		peersFile:      filepath.Join(dataDir, "peers.json"),
+		peersFile:      filepath.Join(dataDir, PeersFilename),
 		lookupFunc:     lookupFunc,
 		rand:           rand.New(rand.NewSource(time.Now().UnixNano())),
 		quit:           make(chan struct{}),

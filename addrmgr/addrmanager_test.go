@@ -8,7 +8,10 @@ package addrmgr_test
 import (
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"net"
+	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
 	"time"
@@ -106,8 +109,7 @@ func lookupFunc(host string) ([]net.IP, error) {
 func TestStartStop(t *testing.T) {
 	n := addrmgr.New("teststartstop", lookupFunc)
 	n.Start()
-	err := n.Stop()
-	if err != nil {
+	if err := n.Stop(); err != nil {
 		t.Fatalf("Address Manager failed to stop: %v", err)
 	}
 }
@@ -137,7 +139,13 @@ func TestAddAddressByIP(t *testing.T) {
 		},
 	}
 
-	amgr := addrmgr.New("testaddressbyip", nil)
+	dir, err := ioutil.TempDir("", "testaddressbyip")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+	amgr := addrmgr.New(dir, nil)
+	amgr.Start()
 	for i, test := range tests {
 		err := amgr.AddAddressByIP(test.addrIP)
 		if test.err != nil && err == nil {
@@ -153,6 +161,25 @@ func TestAddAddressByIP(t *testing.T) {
 				reflect.TypeOf(err), reflect.TypeOf(test.err))
 			continue
 		}
+	}
+	if err := amgr.Stop(); err != nil {
+		t.Fatalf("Address Manager failed to stop: %v", err)
+	}
+
+	// make sure the peers file has been written
+	peersFile := filepath.Join(dir, addrmgr.PeersFilename)
+	if _, err := os.Stat(peersFile); err != nil {
+		t.Fatalf("Peer file does not exist: %s", peersFile)
+	}
+
+	// start address manager again to read peers file
+	amgr = addrmgr.New(dir, nil)
+	amgr.Start()
+	if ka := amgr.GetAddress(); ka == nil {
+		t.Fatalf("Address Manager should contain known address")
+	}
+	if err := amgr.Stop(); err != nil {
+		t.Fatalf("Address Manager failed to stop: %v", err)
 	}
 }
 
@@ -442,7 +469,7 @@ func TestGetBestLocalAddress(t *testing.T) {
 		}
 	}
 	/*
-		// Add a tor generated IP address
+		// Add a Tor generated IP address
 		localAddr = wire.NetAddress{IP: net.ParseIP("fd87:d87e:eb43:25::1")}
 		amgr.AddLocalAddress(&localAddr, addrmgr.ManualPrio)
 

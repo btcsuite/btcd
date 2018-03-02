@@ -29,7 +29,7 @@ generally helps provide greater peer diversity, and perhaps more importantly,
 drastically reduces the chances an attacker is able to coerce your peer into
 only connecting to nodes they control.
 
-The address manager also understands routability and tor addresses and tries
+The address manager also understands routability and Tor addresses and tries
 hard to only return routable addresses.  In addition, it uses the information
 provided by the caller about connected, known good, and attempted addresses to
 periodically purge peers which no longer appear to be good peers as well as
