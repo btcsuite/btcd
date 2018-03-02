@@ -60,9 +60,9 @@ func (c mockConn) SetWriteDeadline(t time.Time) error { return nil }
 
 // mockDialer mocks the net.Dial interface by returning a mock connection to
 // the given address.
-func mockDialer(addr net.Addr) (net.Conn, error) {
+func mockDialer(network, addr string) (net.Conn, error) {
 	r, w := io.Pipe()
-	c := &mockConn{rAddr: addr}
+	c := &mockConn{rAddr: &mockAddr{network, addr}}
 	c.Reader = r
 	c.Writer = w
 	return c, nil
@@ -307,10 +307,10 @@ func TestMaxRetryDuration(t *testing.T) {
 	time.AfterFunc(5*time.Millisecond, func() {
 		close(networkUp)
 	})
-	timedDialer := func(addr net.Addr) (net.Conn, error) {
+	timedDialer := func(network, addr string) (net.Conn, error) {
 		select {
 		case <-networkUp:
-			return mockDialer(addr)
+			return mockDialer(network, addr)
 		default:
 			return nil, errors.New("network down")
 		}
@@ -352,7 +352,7 @@ func TestMaxRetryDuration(t *testing.T) {
 // failure gracefully.
 func TestNetworkFailure(t *testing.T) {
 	var dials uint32
-	errDialer := func(net net.Addr) (net.Conn, error) {
+	errDialer := func(network, addr string) (net.Conn, error) {
 		atomic.AddUint32(&dials, 1)
 		return nil, errors.New("network down")
 	}
@@ -391,7 +391,7 @@ func TestNetworkFailure(t *testing.T) {
 // the failure.
 func TestStopFailed(t *testing.T) {
 	done := make(chan struct{}, 1)
-	waitDialer := func(addr net.Addr) (net.Conn, error) {
+	waitDialer := func(network, addr string) (net.Conn, error) {
 		done <- struct{}{}
 		time.Sleep(time.Millisecond)
 		return nil, errors.New("network down")

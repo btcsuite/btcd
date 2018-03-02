@@ -20,7 +20,7 @@ import (
 const maxFailedAttempts = 25
 
 var (
-	//ErrDialNil is used to indicate that Dial cannot be nil in the configuration.
+	// ErrDialNil is used to indicate that Dial cannot be nil in the configuration.
 	ErrDialNil = errors.New("config: dial cannot be nil")
 
 	// maxRetryDuration is the max duration of time retrying of a persistent
@@ -134,7 +134,7 @@ type Config struct {
 	GetNewAddress func() (net.Addr, error)
 
 	// Dial connects to the address on the named network. It cannot be nil.
-	Dial func(net.Addr) (net.Conn, error)
+	Dial func(network, addr string) (net.Conn, error)
 }
 
 // handleConnected is used to queue a successful connection.
@@ -300,7 +300,7 @@ func (cm *ConnManager) Connect(c *ConnReq) {
 		atomic.StoreUint64(&c.id, atomic.AddUint64(&cm.connReqCount, 1))
 	}
 	log.Debugf("Attempting to connect to %v", c)
-	conn, err := cm.cfg.Dial(c.Addr)
+	conn, err := cm.cfg.Dial(c.Addr.Network(), c.Addr.String())
 	if err != nil {
 		cm.requests <- handleFailed{c, err}
 	} else {

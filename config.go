@@ -1126,11 +1126,11 @@ func loadConfig() (*config, []string, error) {
 // example, .onion addresses will be dialed using the onion specific proxy if
 // one was specified, but will otherwise use the normal dial function (which
 // could itself use a proxy or not).
-func dcrdDial(addr net.Addr) (net.Conn, error) {
-	if strings.Contains(addr.String(), ".onion:") {
-		return cfg.oniondial(addr.Network(), addr.String())
+func dcrdDial(network, addr string) (net.Conn, error) {
+	if strings.Contains(addr, ".onion:") {
+		return cfg.oniondial(network, addr)
 	}
-	return cfg.dial(addr.Network(), addr.String())
+	return cfg.dial(network, addr)
 }
 
 // dcrdLookup returns the correct DNS lookup function to use depending on the
