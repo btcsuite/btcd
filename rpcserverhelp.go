@@ -315,7 +315,7 @@ var helpDescsEnUS = map[string]string{
 	"getblockheader-verbose":     "Specifies the block header is returned as a JSON object instead of hex-encoded string",
 	"getblockheader--condition0": "verbose=false",
 	"getblockheader--condition1": "verbose=true",
-	"getblockheader--result0":    "The block header hash",
+	"getblockheader--result0":    "The serialized block header.",
 
 	// GetBlockHeaderVerboseResult help.
 	"getblockheaderverboseresult-hash":              "The hash of the block (same as provided)",
