@@ -169,7 +169,7 @@ const FileContents = `[Application Options]
 ; Disable listening for incoming connections.  This will override all listeners.
 ; nolisten=1
 
-; Disable peer bloom filtering.  See BIP0111.
+; Disable peer bloom filtering.
 ; nopeerbloomfilters=1
 
 

@@ -866,7 +866,7 @@ func (sp *serverPeer) enforceNodeBloomFlag(cmd string) bool {
 		// whether or not banning is enabled, it is checked here as well
 		// to ensure the violation is logged and the peer is
 		// disconnected regardless.
-		if sp.ProtocolVersion() >= wire.BIP0111Version &&
+		if sp.ProtocolVersion() >= wire.NodeBloomVersion &&
 			!cfg.DisableBanning {
 
 			// Disonnect the peer regardless of whether it was
