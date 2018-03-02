@@ -50,13 +50,14 @@ the following basic qualifications you will likely find it quite difficult to
 contribute.
 
 - A reasonable understanding of bitcoin at a high level (see the
-  [Required Reading](#ReqReading) section for the original white paper)
-- Experience in some type of C-like language
-- An understanding of data structures and their performance implications
-- Familiarity with unit testing
-- Debugging experience
+  [Required Reading](#ReqReading) section for the original white paper).
+- Experience in some type of C-like language.
+- An understanding of data structures and their performance implications.
+- Familiarity with unit testing.
+- Debugging experience.
 - Ability to understand not only the area you are making a change in, but also
-  the code your change relies on, and the code which relies on your changed code
+  the code your change relies on, and the code which relies on your changed
+  code.
 
 Building on top of those core competencies, the recommended skill set largely
 depends on the specific areas you are looking to contribute to.  For example,
@@ -71,8 +72,9 @@ security and performance implications.
 - [Effective Go](http://golang.org/doc/effective_go.html) - The entire dcrd
   suite follows the guidelines in this document.  For your code to be accepted,
   it must follow the guidelines therein.
-- [Original Satoshi Whitepaper](http://www.google.com/url?sa=t&rct=j&q=&esrc=s&source=web&cd=1&cad=rja&ved=0CCkQFjAA&url=http%3A%2F%2Fbitcoin.org%2Fbitcoin.pdf&ei=os3VUuH8G4SlsASV74GoAg&usg=AFQjCNEipPLigou_1MfB7DQjXCNdlylrBg&sig2=FaHDuT5z36GMWDEnybDJLg&bvm=bv.59378465,d.b2I) - This is the white paper that started it all.  Having a solid
-  foundation to build on will make the code much more comprehensible.
+- [Original Satoshi Whitepaper](https://bitcoin.org/bitcoin.pdf) - This is the
+  white paper that started it all.  Having a solid foundation to build on will
+  make the code much more comprehensible.
 
 <a name="DevelopmentPractices" />
 
@@ -94,16 +96,16 @@ reviewable commits.
 This approach has several benefits:
 
 - Announcing your plans to work on a feature **before** you begin work avoids
-  duplicate work
+  duplicate work.
 - It permits discussions which can help you achieve your goals in a way that is
-  consistent with the existing architecture
+  consistent with the existing architecture.
 - It minimizes the chances of you spending time and energy on a change that
   might not fit with the consensus of the community or existing architecture and
-  potentially be rejected as a result
+  potentially be rejected as a result.
 - Incremental development helps ensure you are on the right track with regards
-  to the rest of the community
+  to the rest of the community.
 - The quicker your changes are merged to master, the less time you will need to
-  spend rebasing and otherwise trying to keep up with the main code base
+  spend rebasing and otherwise trying to keep up with the main code base.
 
 <a name="Testing" />
 
@@ -123,14 +125,20 @@ code works correctly when it is fed correct data as well as incorrect data
 
 Go provides an excellent test framework that makes writing test code and
 checking coverage statistics straight forward.  For more information about the
-test coverage tools, see the [golang cover blog post](http://blog.golang.org/cover).
+test coverage tools, see the [Golang cover blog post](http://blog.golang.org/cover).
+
+A simple way to check the coverage of a package and all its functions is to call
+```
+go test -coverprofile=cov.out; go tool cover -html=cov.out
+```
+in the package directory.
 
 A quick summary of test practices follows:
 - All new code should be accompanied by tests that ensure the code behaves
   correctly when given expected values, and, perhaps even more importantly, that
-  it handles errors gracefully
+  it handles errors gracefully.
 - When you fix a bug, it should be accompanied by tests which exercise the bug
-  to both prove it has been resolved and to prevent future regressions
+  to both prove it has been resolved and to prevent future regressions.
 
 <a name="CodeDocumentation" />
 
@@ -139,13 +147,13 @@ A quick summary of test practices follows:
 - At a minimum every function must be commented with its intended purpose and
   any assumptions that it makes
   - Function comments must always begin with the name of the function per
-    [Effective Go](http://golang.org/doc/effective_go.html)
+    [Effective Go](http://golang.org/doc/effective_go.html).
   - Function comments should be complete sentences since they allow a wide
-    variety of automated presentations such as [godoc.org](https://godoc.org)
+    variety of automated presentations such as [godoc.org](https://godoc.org).
   - The general rule of thumb is to look at it as if you were completely
     unfamiliar with the code and ask yourself, would this give me enough
-	information to understand what this function does and how I'd probably want
-	to use it?
+    information to understand what this function does and how I'd probably want
+    to use it?
 - Exported functions should also include detailed information the caller of the
   function will likely need to know and/or understand:<br /><br />
 **WRONG**
@@ -236,16 +244,16 @@ Further paragraphs come after blank lines.
 - Use a hanging indent
 ```
 
-The commit prefix is always of the form `prefix: `. It is for the sole  
-purpose of indicating which package or component was touched in a  
-commit.  
+The commit prefix is always of the form `prefix: `. It is for the sole
+purpose of indicating which package or component was touched in a
+commit.
 
 Here is how the right prefix for a commit is chosen.
-- If a commit modifies a component in the main package  
+- If a commit modifies a component in the main package
   (eg. `blocklogger`) use the component name as the commit prefix.
-- If a commit modifies a component in any of the packages besides the main  
+- If a commit modifies a component in any of the packages besides the main
   package use the package name as the commit prefix (eg. `dcrjson`).
-- If a commit modifies components in multiple packages use the word `multi`  
+- If a commit modifies components in multiple packages use the word `multi`
   as the commit prefix.
 
 Here are some of the reasons why wrapping your commit messages to 72 columns is
