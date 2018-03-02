@@ -38,10 +38,6 @@ const (
 	// transaction to be considered high priority.
 	MinHighPriority = dcrutil.AtomsPerCoin * 144.0 / 250
 
-	// mempoolHeight is the height used for the "block" height field of the
-	// contextual transaction information provided in a transaction view.
-	mempoolHeight = 0x7fffffff
-
 	// maxRelayFeeMultiplier is the factor that we disallow fees / kB above the
 	// minimum tx fee.  At the current default minimum relay fee of 0.001
 	// DCR/kB, this results in a maximum allowed high fee of 1 DCR/kB.
@@ -628,7 +624,7 @@ func (mp *TxPool) addTransaction(utxoView *blockchain.UtxoViewpoint,
 			Height: height,
 			Fee:    fee,
 		},
-		StartingPriority: CalcPriority(msgTx, utxoView, height),
+		StartingPriority: mining.CalcPriority(msgTx, utxoView, height),
 	}
 	for _, txIn := range msgTx.TxIn {
 		mp.outpoints[txIn.PreviousOutPoint] = tx
@@ -722,7 +718,7 @@ func (mp *TxPool) fetchInputUtxos(tx *dcrutil.Tx) (*blockchain.UtxoViewpoint, er
 		}
 
 		if poolTxDesc, exists := mp.pool[originHash]; exists {
-			utxoView.AddTxOuts(poolTxDesc.Tx, mempoolHeight,
+			utxoView.AddTxOuts(poolTxDesc.Tx, mining.UnminedHeight,
 				wire.NullBlockIndex)
 		}
 	}
@@ -1094,7 +1090,7 @@ func (mp *TxPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew, rateLimit, allow
 	if isNew && !mp.cfg.Policy.DisableRelayPriority && txFee < minFee &&
 		txType == stake.TxTypeRegular {
 
-		currentPriority := CalcPriority(msgTx, utxoView,
+		currentPriority := mining.CalcPriority(msgTx, utxoView,
 			nextBlockHeight)
 		if currentPriority <= MinHighPriority {
 			str := fmt.Sprintf("transaction %v has insufficient "+
@@ -1527,7 +1523,7 @@ func (mp *TxPool) RawMempoolVerbose(filterType *stake.TxType) map[string]*dcrjso
 		var currentPriority float64
 		utxos, err := mp.fetchInputUtxos(tx)
 		if err == nil {
-			currentPriority = CalcPriority(tx.MsgTx(), utxos,
+			currentPriority = mining.CalcPriority(tx.MsgTx(), utxos,
 				bestHeight+1)
 		}
 
