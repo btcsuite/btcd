@@ -27,7 +27,7 @@ database optimization and other blockchain related technology improvements.
 
 ## Requirements
 
-[Go](http://golang.org) 1.7 or newer.
+[Go](http://golang.org) 1.9 or newer.
 
 ## Getting Started
 
@@ -84,10 +84,14 @@ our docs page at [docs.decred.org](https://docs.decred.org/getting-started/begin
 
 ## Docker
 
-All tests and linters may be run in a docker container using the script `run_tests.sh`.  This script defaults to using the current supported version of go.  You can run it with the major version of go you would like to use as the only arguement to test a previous on a previous version of go (generally Decred supports the current version of go and the previous one).
+All tests and linters may be run in a docker container using the script
+`run_tests.sh`.  This script defaults to using the current supported version of
+go.  You can run it with the major version of Go you would like to use as the
+only arguement to test a previous on a previous version of Go (generally Decred
+supports the current version of Go and the previous one).
 
 ```
-./run_tests.sh 1.8
+./run_tests.sh 1.9
 ```
 
 To run the tests locally without docker:
@@ -112,7 +116,8 @@ is used for this project.
 
 ## Documentation
 
-The documentation is a work-in-progress.  It is located in the [docs](https://github.com/decred/dcrd/tree/master/docs) folder.
+The documentation is a work-in-progress.  It is located in the
+[docs](https://github.com/decred/dcrd/tree/master/docs) folder.
 
 ## License
 
