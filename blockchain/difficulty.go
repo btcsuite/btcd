@@ -1327,21 +1327,10 @@ func (b *BlockChain) estimateNextStakeDifficultyV2(curNode *blockNode, newTicket
 	if curNode != nil {
 		curHeight = curNode.height
 	}
+	ticketMaturity := int64(b.chainParams.TicketMaturity)
 	intervalSize := b.chainParams.StakeDiffWindowSize
 	blocksUntilRetarget := intervalSize - curHeight%intervalSize
 	nextRetargetHeight := curHeight + blocksUntilRetarget
-
-	// This code really should be updated to work with retarget interval
-	// size greater than the ticket maturity, such as is the case on
-	// testnet, but since it does not currently work under that scenario,
-	// return an error rather than incorrect results.
-	ticketMaturity := int64(b.chainParams.TicketMaturity)
-	if intervalSize > ticketMaturity {
-		return 0, fmt.Errorf("stake difficulty estimation does not "+
-			"currently work when the retarget interval is larger "+
-			"than the ticket maturity (interval %d, ticket "+
-			"maturity %d)", intervalSize, ticketMaturity)
-	}
 
 	// Calculate the maximum possible number of tickets that could be sold
 	// in the remainder of the interval and potentially override the number
@@ -1400,31 +1389,67 @@ func (b *BlockChain) estimateNextStakeDifficultyV2(curNode *blockNode, newTicket
 	}
 
 	// Calculate the number of tickets that will still be immature at the
-	// next retarget based on the known data.
+	// next retarget based on the known (non-estimated) data.
+	//
+	// Note that when the interval size is larger than the ticket maturity,
+	// the current height might be before the maturity floor (the point
+	// after which the remaining tickets will remain immature).  There are
+	// therefore no possible remaining immature tickets from the blocks that
+	// are not being estimated in that case.
+	var remainingImmatureTickets int64
 	nextMaturityFloor := nextRetargetHeight - ticketMaturity - 1
-	remainingImmatureTickets, err := b.sumPurchasedTickets(curNode,
-		curHeight-nextMaturityFloor)
-	if err != nil {
-		return 0, err
+	if curHeight > nextMaturityFloor {
+		remainingImmatureTickets, err = b.sumPurchasedTickets(curNode,
+			curHeight-nextMaturityFloor)
+		if err != nil {
+			return 0, err
+		}
+	}
+
+	// Add the number of tickets that will still be immature at the next
+	// retarget based on the estimated data.
+	maxImmatureTickets := ticketMaturity * maxTicketsPerBlock
+	if newTickets > maxImmatureTickets {
+		remainingImmatureTickets += maxImmatureTickets
+	} else {
+		remainingImmatureTickets += newTickets
 	}
 
 	// Calculate the number of tickets that will mature in the remainder of
-	// the interval.
+	// the interval based on the known (non-estimated) data.
 	//
 	// NOTE: The pool size in the block headers does not include the tickets
 	// maturing at the height in which they mature since they are not
 	// eligible for selection until the next block, so exclude them by
 	// starting one block before the next maturity floor.
-	nextMaturityFloorNode, err := b.index.AncestorNode(curNode,
-		nextMaturityFloor-1)
+	finalMaturingHeight := nextMaturityFloor - 1
+	if finalMaturingHeight > curHeight {
+		finalMaturingHeight = curHeight
+	}
+	finalMaturingNode, err := b.index.AncestorNode(curNode, finalMaturingHeight)
 	if err != nil {
 		return 0, err
 	}
-	curMaturityFloor := curHeight - ticketMaturity
-	maturingTickets, err := b.sumPurchasedTickets(nextMaturityFloorNode,
-		nextMaturityFloor-curMaturityFloor)
+	firstMaturingHeight := curHeight - ticketMaturity
+	maturingTickets, err := b.sumPurchasedTickets(finalMaturingNode,
+		finalMaturingHeight-firstMaturingHeight+1)
 	if err != nil {
 		return 0, err
+	}
+
+	// Add the number of tickets that will mature based on the estimated data.
+	//
+	// Note that when the ticket maturity is greater than or equal to the
+	// interval size, the current height will always be after the maturity
+	// floor.  There are therefore no possible maturing estimated tickets
+	// in that case.
+	if curHeight < nextMaturityFloor {
+		maturingEstimateNodes := nextMaturityFloor - curHeight - 1
+		maturingEstimatedTickets := maxTicketsPerBlock * maturingEstimateNodes
+		if maturingEstimatedTickets > newTickets {
+			maturingEstimatedTickets = newTickets
+		}
+		maturingTickets += maturingEstimatedTickets
 	}
 
 	// Calculate the number of votes that will occur during the remainder of
@@ -1443,8 +1468,7 @@ func (b *BlockChain) estimateNextStakeDifficultyV2(curNode *blockNode, newTicket
 	// Calculate what the pool size would be as of the next interval.
 	curPoolSize := int64(curNode.poolSize)
 	estimatedPoolSize := curPoolSize + maturingTickets - pendingVotes
-	estimatedImmatureTickets := remainingImmatureTickets + newTickets
-	estimatedPoolSizeAll := estimatedPoolSize + estimatedImmatureTickets
+	estimatedPoolSizeAll := estimatedPoolSize + remainingImmatureTickets
 
 	// Calculate and return the final estimated difficulty.
 	return calcNextStakeDiffV2(b.chainParams, nextRetargetHeight, curDiff,
