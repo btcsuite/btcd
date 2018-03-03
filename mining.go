@@ -1,5 +1,5 @@
 // Copyright (c) 2014-2016 The btcsuite developers
-// Copyright (c) 2015-2017 The Decred developers
+// Copyright (c) 2015-2018 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -222,8 +222,7 @@ func txPQByStakeAndFeeAndThenPriority(pq *txPriorityQueue, i, j int) bool {
 // less than function lessFunc to sort the items in the min heap. The priority
 // queue can grow larger than the reserved space, but extra copies of the
 // underlying array can be avoided by reserving a sane value.
-func newTxPriorityQueue(reserve int, lessFunc func(*txPriorityQueue, int,
-	int) bool) *txPriorityQueue {
+func newTxPriorityQueue(reserve int, lessFunc func(*txPriorityQueue, int, int) bool) *txPriorityQueue {
 	pq := &txPriorityQueue{
 		items: make([]*txPrioItem, 0, reserve),
 	}
@@ -419,8 +418,7 @@ func txIndexFromTxList(hash chainhash.Hash, list []*dcrutil.Tx) int {
 
 // standardCoinbaseOpReturn creates a standard OP_RETURN output to insert into
 // coinbase to use as extranonces. The OP_RETURN pushes 32 bytes.
-func standardCoinbaseOpReturn(height uint32, extraNonces []uint64) ([]byte,
-	error) {
+func standardCoinbaseOpReturn(height uint32, extraNonces []uint64) ([]byte, error) {
 	if len(extraNonces) != 4 {
 		return nil, fmt.Errorf("extranonces has wrong num uint64s")
 	}
@@ -491,8 +489,7 @@ func getCoinbaseExtranonces(msgBlock *wire.MsgBlock) []uint64 {
 // block by regenerating the coinbase script with the passed value and block
 // height.  It also recalculates and updates the new merkle root that results
 // from changing the coinbase script.
-func UpdateExtraNonce(msgBlock *wire.MsgBlock, blockHeight int64,
-	extraNonces []uint64) error {
+func UpdateExtraNonce(msgBlock *wire.MsgBlock, blockHeight int64, extraNonces []uint64) error {
 	// First block has no extranonce.
 	if blockHeight == 1 {
 		return nil
@@ -525,14 +522,7 @@ func UpdateExtraNonce(msgBlock *wire.MsgBlock, blockHeight int64,
 //
 // See the comment for NewBlockTemplate for more information about why the nil
 // address handling is useful.
-func createCoinbaseTx(subsidyCache *blockchain.SubsidyCache,
-	coinbaseScript []byte,
-	opReturnPkScript []byte,
-	nextBlockHeight int64,
-	addr dcrutil.Address,
-	voters uint16,
-	params *chaincfg.Params) (*dcrutil.Tx, error) {
-
+func createCoinbaseTx(subsidyCache *blockchain.SubsidyCache, coinbaseScript []byte, opReturnPkScript []byte, nextBlockHeight int64, addr dcrutil.Address, voters uint16, params *chaincfg.Params) (*dcrutil.Tx, error) {
 	tx := wire.NewMsgTx()
 	tx.AddTxIn(&wire.TxIn{
 		// Coinbase transactions have no inputs, so previous outpoint is
@@ -640,8 +630,7 @@ func createCoinbaseTx(subsidyCache *blockchain.SubsidyCache,
 // spendTransaction updates the passed view by marking the inputs to the passed
 // transaction as spent.  It also adds all outputs in the passed transaction
 // which are not provably unspendable as available unspent transaction outputs.
-func spendTransaction(utxoView *blockchain.UtxoViewpoint, tx *dcrutil.Tx,
-	height int64) error {
+func spendTransaction(utxoView *blockchain.UtxoViewpoint, tx *dcrutil.Tx, height int64) error {
 	for _, txIn := range tx.MsgTx().TxIn {
 		originHash := &txIn.PreviousOutPoint.Hash
 		originIndex := txIn.PreviousOutPoint.Index
@@ -683,8 +672,7 @@ func minimumMedianTime(chainState *chainState) (time.Time, error) {
 // medianAdjustedTime returns the current time adjusted to ensure it is at least
 // one second after the median timestamp of the last several blocks per the
 // chain consensus rules.
-func medianAdjustedTime(chainState *chainState,
-	timeSource blockchain.MedianTimeSource) (time.Time, error) {
+func medianAdjustedTime(chainState *chainState, timeSource blockchain.MedianTimeSource) (time.Time, error) {
 	chainState.Lock()
 	defer chainState.Unlock()
 
@@ -998,8 +986,7 @@ func handleTooFewVoters(subsidyCache *blockchain.SubsidyCache, nextHeight int64,
 // the appropriate cache if needed, then returns the template to the miner to
 // work on. The stored template is a copy of the template, to prevent races
 // from occurring in case the template is mined on by the CPUminer.
-func handleCreatedBlockTemplate(blockTemplate *BlockTemplate,
-	bm *blockManager) (*BlockTemplate, error) {
+func handleCreatedBlockTemplate(blockTemplate *BlockTemplate, bm *blockManager) (*BlockTemplate, error) {
 	curTemplate := bm.GetCurrentTemplate()
 
 	nextBlockHeight := blockTemplate.Height
@@ -1116,9 +1103,7 @@ func handleCreatedBlockTemplate(blockTemplate *BlockTemplate,
 //
 //  This function returns nil, nil if there are not enough voters on any of
 //  the current top blocks to create a new block template.
-func NewBlockTemplate(policy *mining.Policy, server *server,
-	payToAddress dcrutil.Address) (*BlockTemplate, error) {
-
+func NewBlockTemplate(policy *mining.Policy, server *server, payToAddress dcrutil.Address) (*BlockTemplate, error) {
 	// TODO: The mempool should be completely separated via the TxSource
 	// interface so this function is fully decoupled.
 	mp := server.txMemPool

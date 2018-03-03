@@ -1,5 +1,5 @@
 // Copyright (c) 2014-2016 The btcsuite developers
-// Copyright (c) 2015-2016 The Decred developers
+// Copyright (c) 2015-2018 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -187,9 +187,7 @@ func (m *CPUMiner) submitBlock(block *dcrutil.Block) bool {
 // This function will return early with false when conditions that trigger a
 // stale block such as a new block showing up or periodically when there are
 // new transactions and enough time has elapsed without finding a solution.
-func (m *CPUMiner) solveBlock(msgBlock *wire.MsgBlock, ticker *time.Ticker,
-	quit chan struct{}) bool {
-
+func (m *CPUMiner) solveBlock(msgBlock *wire.MsgBlock, ticker *time.Ticker, quit chan struct{}) bool {
 	blockHeight := int64(msgBlock.Header.Height)
 
 	// Choose a random extra nonce offset for this block template and

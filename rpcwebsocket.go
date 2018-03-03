@@ -1,5 +1,5 @@
 // Copyright (c) 2013-2016 The btcsuite developers
-// Copyright (c) 2015-2016 The Decred developers
+// Copyright (c) 2015-2018 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -82,9 +82,7 @@ var wsHandlersBeforeInit = map[string]wsCommandHandler{
 // must be run in a separate goroutine.  It should be invoked from the websocket
 // server handler which runs each new connection in a new goroutine thereby
 // satisfying the requirement.
-func (s *rpcServer) WebsocketHandler(conn *websocket.Conn, remoteAddr string,
-	authenticated bool, isAdmin bool) {
-
+func (s *rpcServer) WebsocketHandler(conn *websocket.Conn, remoteAddr string, authenticated bool, isAdmin bool) {
 	// Clear the read deadline that was set before the websocket hijacked
 	// the connection.
 	conn.SetReadDeadline(timeZeroVal)
@@ -654,9 +652,7 @@ func (m *wsNotificationManager) UnregisterBlockUpdates(wsc *wsClient) {
 // spending a watched output or outputting to a watched address.  Matching
 // client's filters are updated based on this transaction's outputs and output
 // addresses that may be relevant for a client.
-func (m *wsNotificationManager) subscribedClients(tx *dcrutil.Tx,
-	clients map[chan struct{}]*wsClient) map[chan struct{}]struct{} {
-
+func (m *wsNotificationManager) subscribedClients(tx *dcrutil.Tx, clients map[chan struct{}]*wsClient) map[chan struct{}]struct{} {
 	// Use a map of client quit channels as keys to prevent duplicates when
 	// multiple inputs and/or outputs are relevant to the client.
 	subscribed := make(map[chan struct{}]struct{})
@@ -707,9 +703,7 @@ func (m *wsNotificationManager) subscribedClients(tx *dcrutil.Tx,
 
 // notifyBlockConnected notifies websocket clients that have registered for
 // block updates when a block is connected to the main chain.
-func (m *wsNotificationManager) notifyBlockConnected(clients map[chan struct{}]*wsClient,
-	block *dcrutil.Block) {
-
+func (m *wsNotificationManager) notifyBlockConnected(clients map[chan struct{}]*wsClient, block *dcrutil.Block) {
 	// Create the common portion of the notification that is the same for
 	// every client.
 	headerBytes, err := block.MsgBlock().Header.Bytes()
@@ -873,9 +867,7 @@ func (m *wsNotificationManager) UnregisterSpentAndMissedTickets(wsc *wsClient) {
 
 // notifySpentAndMissedTickets notifies websocket clients that have registered for
 // spent and missed ticket updates.
-func (*wsNotificationManager) notifySpentAndMissedTickets(
-	clients map[chan struct{}]*wsClient, tnd *blockchain.TicketNotificationsData) {
-
+func (*wsNotificationManager) notifySpentAndMissedTickets(clients map[chan struct{}]*wsClient, tnd *blockchain.TicketNotificationsData) {
 	// Create a ticket map to export as JSON.
 	ticketMap := make(map[string]string)
 	for _, ticket := range tnd.TicketsMissed {
@@ -927,9 +919,7 @@ func (m *wsNotificationManager) UnregisterStakeDifficulty(wsc *wsClient) {
 
 // notifyNewTickets notifies websocket clients that have registered for
 // maturing ticket updates.
-func (*wsNotificationManager) notifyNewTickets(clients map[chan struct{}]*wsClient,
-	tnd *blockchain.TicketNotificationsData) {
-
+func (*wsNotificationManager) notifyNewTickets(clients map[chan struct{}]*wsClient, tnd *blockchain.TicketNotificationsData) {
 	// Create a ticket map to export as JSON.
 	var tickets []string
 	for _, h := range tnd.TicketsNew {
@@ -953,10 +943,7 @@ func (*wsNotificationManager) notifyNewTickets(clients map[chan struct{}]*wsClie
 
 // notifyStakeDifficulty notifies websocket clients that have registered for
 // maturing ticket updates.
-func (*wsNotificationManager) notifyStakeDifficulty(
-	clients map[chan struct{}]*wsClient,
-	sdnd *StakeDifficultyNtfnData) {
-
+func (*wsNotificationManager) notifyStakeDifficulty(clients map[chan struct{}]*wsClient, sdnd *StakeDifficultyNtfnData) {
 	// Notify interested websocket clients about the connected block.
 	ntfn := dcrjson.NewStakeDifficultyNtfn(sdnd.BlockHash.String(),
 		int32(sdnd.BlockHeight),
@@ -2040,32 +2027,28 @@ func handleSession(wsc *wsClient, icmd interface{}) (interface{}, error) {
 
 // handleWinningTickets implements the notifywinningtickets command
 // extension for websocket connections.
-func handleWinningTickets(wsc *wsClient, icmd interface{}) (interface{},
-	error) {
+func handleWinningTickets(wsc *wsClient, icmd interface{}) (interface{}, error) {
 	wsc.server.ntfnMgr.RegisterWinningTickets(wsc)
 	return nil, nil
 }
 
 // handleSpentAndMissedTickets implements the notifyspentandmissedtickets command
 // extension for websocket connections.
-func handleSpentAndMissedTickets(wsc *wsClient, icmd interface{}) (interface{},
-	error) {
+func handleSpentAndMissedTickets(wsc *wsClient, icmd interface{}) (interface{}, error) {
 	wsc.server.ntfnMgr.RegisterSpentAndMissedTickets(wsc)
 	return nil, nil
 }
 
 // handleNewTickets implements the notifynewtickets command extension for
 // websocket connections.
-func handleNewTickets(wsc *wsClient, icmd interface{}) (interface{},
-	error) {
+func handleNewTickets(wsc *wsClient, icmd interface{}) (interface{}, error) {
 	wsc.server.ntfnMgr.RegisterNewTickets(wsc)
 	return nil, nil
 }
 
 // handleStakeDifficulty implements the notifystakedifficulty command extension
 // for websocket connections.
-func handleStakeDifficulty(wsc *wsClient, icmd interface{}) (interface{},
-	error) {
+func handleStakeDifficulty(wsc *wsClient, icmd interface{}) (interface{}, error) {
 	wsc.server.ntfnMgr.RegisterStakeDifficulty(wsc)
 	return nil, nil
 }
