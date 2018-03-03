@@ -7,10 +7,8 @@ package mempool
 
 import (
 	"container/list"
-	"crypto/rand"
 	"fmt"
 	"math"
-	"math/big"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -350,35 +348,19 @@ func (mp *TxPool) RemoveOrphan(txHash *chainhash.Hash) {
 //
 // This function MUST be called with the mempool lock held (for writes).
 func (mp *TxPool) limitNumOrphans() error {
-	if len(mp.orphans)+1 > mp.cfg.Policy.MaxOrphanTxs &&
-		mp.cfg.Policy.MaxOrphanTxs > 0 {
+	if len(mp.orphans)+1 <= mp.cfg.Policy.MaxOrphanTxs {
+		return nil
+	}
 
-		// Generate a cryptographically random hash.
-		randHashBytes := make([]byte, chainhash.HashSize)
-		_, err := rand.Read(randHashBytes)
-		if err != nil {
-			return err
-		}
-		randHashNum := new(big.Int).SetBytes(randHashBytes)
-
-		// Try to find the first entry that is greater than the random
-		// hash.  Use the first entry (which is already pseudorandom due
-		// to Go's range statement over maps) as a fallback if none of
-		// the hashes in the orphan pool are larger than the random
-		// hash.
-		var foundHash *chainhash.Hash
-		for txHash := range mp.orphans {
-			if foundHash == nil {
-				foundHash = &txHash
-			}
-			txHashNum := blockchain.HashToBig(&txHash)
-			if txHashNum.Cmp(randHashNum) > 0 {
-				foundHash = &txHash
-				break
-			}
-		}
-
-		mp.removeOrphan(foundHash)
+	// Remove a random entry from the map.  For most compilers, Go's
+	// range statement iterates starting at a random item although
+	// that is not 100% guaranteed by the spec.  The iteration order
+	// is not important here because an adversary would have to be
+	// able to pull off preimage attacks on the hashing function in
+	// order to target eviction of specific entries anyways.
+	for txHash := range mp.orphans {
+		mp.removeOrphan(&txHash)
+		break
 	}
 
 	return nil
@@ -388,6 +370,11 @@ func (mp *TxPool) limitNumOrphans() error {
 //
 // This function MUST be called with the mempool lock held (for writes).
 func (mp *TxPool) addOrphan(tx *dcrutil.Tx) {
+	// Nothing to do if no orphans are allowed.
+	if mp.cfg.Policy.MaxOrphanTxs <= 0 {
+		return
+	}
+
 	// Limit the number orphan transactions to prevent memory exhaustion.  A
 	// random orphan is evicted to make room if needed.
 	mp.limitNumOrphans()
