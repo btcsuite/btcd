@@ -4033,10 +4033,9 @@ func handleGetWorkRequest(s *rpcServer) (interface{}, error) {
 			// Increment the extra nonce and update the block template
 			// with the new value by regenerating the coinbase script and
 			// setting the merkle root to the new value.
-			ens := getCoinbaseExtranonces(msgBlock)
+			en := extractCoinbaseExtraNonce(msgBlock) + 1
 			state.extraNonce++
-			ens[0]++
-			err := UpdateExtraNonce(msgBlock, latestHeight+1, ens)
+			err := UpdateExtraNonce(msgBlock, latestHeight+1, en)
 			if err != nil {
 				errStr := fmt.Sprintf("Failed to update extra nonce: "+
 					"%v", err)

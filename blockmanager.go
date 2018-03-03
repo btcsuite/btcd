@@ -1,5 +1,5 @@
 // Copyright (c) 2013-2016 The btcsuite developers
-// Copyright (c) 2015-2016 The Decred developers
+// Copyright (c) 2015-2018 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -898,8 +898,7 @@ func (b *blockManager) checkBlockForHiddenVotes(block *dcrutil.Block) {
 		return
 	}
 	height := block.MsgBlock().Header.Height
-	opReturnPkScript, err := standardCoinbaseOpReturn(height,
-		[]uint64{0, 0, 0, random})
+	opReturnPkScript, err := standardCoinbaseOpReturn(height, random)
 	if err != nil {
 		// Stopping at this step will lead to a corrupted block template
 		// because the stake tree has already been manipulated, so throw

@@ -212,14 +212,10 @@ func (m *CPUMiner) solveBlock(msgBlock *wire.MsgBlock, ticker *time.Ticker, quit
 	// added relying on the fact that overflow will wrap around 0 as
 	// provided by the Go spec.
 	for extraNonce := uint64(0); extraNonce < maxExtraNonce; extraNonce++ {
-		// Get the old nonce values.
-		ens := getCoinbaseExtranonces(msgBlock)
-		ens[2] = extraNonce + enOffset
-
 		// Update the extra nonce in the block template with the
 		// new value by regenerating the coinbase script and
-		// setting the merkle root to the new value.  The
-		err := UpdateExtraNonce(msgBlock, blockHeight, ens)
+		// setting the merkle root to the new value.
+		err := UpdateExtraNonce(msgBlock, blockHeight, extraNonce+enOffset)
 		if err != nil {
 			minrLog.Warnf("Unable to update CPU miner extranonce: %v",
 				err)

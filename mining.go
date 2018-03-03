@@ -418,17 +418,10 @@ func txIndexFromTxList(hash chainhash.Hash, list []*dcrutil.Tx) int {
 
 // standardCoinbaseOpReturn creates a standard OP_RETURN output to insert into
 // coinbase to use as extranonces. The OP_RETURN pushes 32 bytes.
-func standardCoinbaseOpReturn(height uint32, extraNonces []uint64) ([]byte, error) {
-	if len(extraNonces) != 4 {
-		return nil, fmt.Errorf("extranonces has wrong num uint64s")
-	}
-
-	enData := make([]byte, 36)
+func standardCoinbaseOpReturn(height uint32, extraNonce uint64) ([]byte, error) {
+	enData := make([]byte, 12)
 	binary.LittleEndian.PutUint32(enData[0:4], height)
-	binary.LittleEndian.PutUint64(enData[4:12], extraNonces[0])
-	binary.LittleEndian.PutUint64(enData[12:20], extraNonces[1])
-	binary.LittleEndian.PutUint64(enData[20:28], extraNonces[2])
-	binary.LittleEndian.PutUint64(enData[28:36], extraNonces[3])
+	binary.LittleEndian.PutUint64(enData[4:12], extraNonce)
 	extraNonceScript, err := txscript.GenerateProvablyPruneableOut(enData)
 	if err != nil {
 		return nil, err
@@ -437,69 +430,45 @@ func standardCoinbaseOpReturn(height uint32, extraNonces []uint64) ([]byte, erro
 	return extraNonceScript, nil
 }
 
-// getCoinbaseExtranonce extracts the extranonce from a block template's
-// coinbase transaction.
-func (bt *BlockTemplate) getCoinbaseExtranonces() []uint64 {
-	if len(bt.Block.Transactions[0].TxOut) < 2 {
-		return []uint64{0, 0, 0, 0}
+// extractCoinbaseTxExtraNonce extracts the extra nonce from a standard coinbase
+// OP_RETURN output.  It will return 0 if either the provided transaction does
+// not have the relevant output or the script is not large enough to perform the
+// extraction.
+func extractCoinbaseTxExtraNonce(coinbaseTx *wire.MsgTx) uint64 {
+	if len(coinbaseTx.TxOut) < 2 {
+		return 0
 	}
-
-	if len(bt.Block.Transactions[0].TxOut[1].PkScript) < 38 {
-		return []uint64{0, 0, 0, 0}
+	script := coinbaseTx.TxOut[1].PkScript
+	if len(script) < 14 {
+		return 0
 	}
-
-	ens := make([]uint64, 4) // 32-bytes
-	ens[0] = binary.LittleEndian.Uint64(
-		bt.Block.Transactions[0].TxOut[1].PkScript[6:14])
-	ens[1] = binary.LittleEndian.Uint64(
-		bt.Block.Transactions[0].TxOut[1].PkScript[14:22])
-	ens[2] = binary.LittleEndian.Uint64(
-		bt.Block.Transactions[0].TxOut[1].PkScript[22:30])
-	ens[3] = binary.LittleEndian.Uint64(
-		bt.Block.Transactions[0].TxOut[1].PkScript[30:38])
-
-	return ens
+	return binary.LittleEndian.Uint64(script[6:14])
 }
 
-// getCoinbaseExtranonce extracts the extranonce from a block template's
+// extractCoinbaseExtraNonce extracts the extra nonce from a block template's
 // coinbase transaction.
-func getCoinbaseExtranonces(msgBlock *wire.MsgBlock) []uint64 {
-	if len(msgBlock.Transactions[0].TxOut) < 2 {
-		return []uint64{0, 0, 0, 0}
-	}
+func (bt *BlockTemplate) extractCoinbaseExtraNonce() uint64 {
+	return extractCoinbaseTxExtraNonce(bt.Block.Transactions[0])
+}
 
-	if len(msgBlock.Transactions[0].TxOut[1].PkScript) < 38 {
-		return []uint64{0, 0, 0, 0}
-	}
-
-	ens := make([]uint64, 4) // 32-bytes
-	ens[0] = binary.LittleEndian.Uint64(
-		msgBlock.Transactions[0].TxOut[1].PkScript[6:14])
-	ens[1] = binary.LittleEndian.Uint64(
-		msgBlock.Transactions[0].TxOut[1].PkScript[14:22])
-	ens[2] = binary.LittleEndian.Uint64(
-		msgBlock.Transactions[0].TxOut[1].PkScript[22:30])
-	ens[3] = binary.LittleEndian.Uint64(
-		msgBlock.Transactions[0].TxOut[1].PkScript[30:38])
-
-	return ens
+// extractCoinbaseExtraNonce extracts the extra nonce from a block template's
+// coinbase transaction.
+func extractCoinbaseExtraNonce(msgBlock *wire.MsgBlock) uint64 {
+	return extractCoinbaseTxExtraNonce(msgBlock.Transactions[0])
 }
 
 // UpdateExtraNonce updates the extra nonce in the coinbase script of the passed
 // block by regenerating the coinbase script with the passed value and block
 // height.  It also recalculates and updates the new merkle root that results
 // from changing the coinbase script.
-func UpdateExtraNonce(msgBlock *wire.MsgBlock, blockHeight int64, extraNonces []uint64) error {
+func UpdateExtraNonce(msgBlock *wire.MsgBlock, blockHeight int64, extraNonce uint64) error {
 	// First block has no extranonce.
 	if blockHeight == 1 {
 		return nil
 	}
-	if len(extraNonces) != 4 {
-		return fmt.Errorf("not enough nonce information passed")
-	}
 
 	coinbaseOpReturn, err := standardCoinbaseOpReturn(uint32(blockHeight),
-		extraNonces)
+		extraNonce)
 	if err != nil {
 		return err
 	}
@@ -841,19 +810,18 @@ func handleTooFewVoters(subsidyCache *blockchain.SubsidyCache, nextHeight int64,
 					cptCopy.Block.Header.Bits = requiredDifficulty
 				}
 
-				// Choose a new extranonce value that is one greater
-				// than the previous extranonce, so we don't remine the
+				// Choose a new extra nonce value that is one greater
+				// than the previous extra nonce, so we don't remine the
 				// same block and choose the same winners as before.
-				ens := cptCopy.getCoinbaseExtranonces()
-				ens[0]++
-				err = UpdateExtraNonce(cptCopy.Block, cptCopy.Height, ens)
+				en := cptCopy.extractCoinbaseExtraNonce() + 1
+				err = UpdateExtraNonce(cptCopy.Block, cptCopy.Height, en)
 				if err != nil {
 					return nil, err
 				}
 
 				// Update extranonce of the original template too, so
 				// we keep getting unique numbers.
-				err = UpdateExtraNonce(curTemplate.Block, curTemplate.Height, ens)
+				err = UpdateExtraNonce(curTemplate.Block, curTemplate.Height, en)
 				if err != nil {
 					return nil, err
 				}
@@ -892,7 +860,7 @@ func handleTooFewVoters(subsidyCache *blockchain.SubsidyCache, nextHeight int64,
 				}
 				opReturnPkScript, err :=
 					standardCoinbaseOpReturn(topBlock.MsgBlock().Header.Height,
-						[]uint64{0, 0, 0, rand})
+						rand)
 				if err != nil {
 					return nil, err
 				}
@@ -994,8 +962,7 @@ func handleCreatedBlockTemplate(blockTemplate *BlockTemplate, bm *blockManager) 
 	// This is where we begin storing block templates, when either the
 	// program is freshly started or the chain is matured to stake
 	// validation height.
-	if curTemplate == nil &&
-		nextBlockHeight >= stakeValidationHeight-2 {
+	if curTemplate == nil && nextBlockHeight >= stakeValidationHeight-2 {
 		bm.SetCurrentTemplate(blockTemplate)
 	}
 
@@ -1003,8 +970,7 @@ func handleCreatedBlockTemplate(blockTemplate *BlockTemplate, bm *blockManager) 
 	// so we check to if CachedCurrentTemplate is out of date. If it is,
 	// we store it as the cached parent template, and store the new block
 	// template as the currenct template.
-	if curTemplate != nil &&
-		nextBlockHeight >= stakeValidationHeight-1 {
+	if curTemplate != nil && nextBlockHeight >= stakeValidationHeight-1 {
 		if curTemplate.Height < nextBlockHeight {
 			bm.SetParentTemplate(curTemplate)
 			bm.SetCurrentTemplate(blockTemplate)
@@ -1801,7 +1767,7 @@ mempoolLoop:
 		return nil, err
 	}
 	opReturnPkScript, err := standardCoinbaseOpReturn(uint32(nextBlockHeight),
-		[]uint64{0, 0, 0, rand})
+		rand)
 	if err != nil {
 		return nil, err
 	}
