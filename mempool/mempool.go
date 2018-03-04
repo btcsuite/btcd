@@ -652,37 +652,33 @@ func (mp *TxPool) checkPoolDoubleSpend(tx *dcrutil.Tx, txType stake.TxType) erro
 	return nil
 }
 
-// IsTxTreeValid checks the map of votes for a block to see if the tx
-// tree regular for the block at HEAD is valid.
+// IsTxTreeKnownInvalid returns whether or not the transaction tree of the
+// provided hash is knwon to be invalid according to the votes currently in the
+// memory pool.
 //
 // The function is safe for concurrent access.
-func (mp *TxPool) IsTxTreeValid(best *chainhash.Hash) bool {
+func (mp *TxPool) IsTxTreeKnownInvalid(hash *chainhash.Hash) bool {
 	mp.votesMtx.RLock()
-	vts := mp.votes[*best]
+	vts := mp.votes[*hash]
 	mp.votesMtx.RUnlock()
 
-	if len(vts) == 0 {
-		return true
-	}
-
-	// There are not possibly enough votes to tell if the txTree is valid;
-	// assume it's valid.
+	// There are not possibly enough votes to tell if the regular transaction
+	// tree is valid or not, so assume it's valid.
 	if len(vts) <= int(mp.cfg.ChainParams.TicketsPerBlock/2) {
-		return true
+		return false
 	}
 
 	// Otherwise, tally the votes and determine if it's valid or not.
-	yea := 0
-	nay := 0
+	var yes, no int
 	for _, vote := range vts {
 		if vote.Vote {
-			yea++
+			yes++
 		} else {
-			nay++
+			no++
 		}
 	}
 
-	return yea > nay
+	return yes <= no
 }
 
 // fetchInputUtxos loads utxo details about the input transactions referenced by
@@ -692,8 +688,8 @@ func (mp *TxPool) IsTxTreeValid(best *chainhash.Hash) bool {
 //
 // This function MUST be called with the mempool lock held (for reads).
 func (mp *TxPool) fetchInputUtxos(tx *dcrutil.Tx) (*blockchain.UtxoViewpoint, error) {
-	tv := mp.IsTxTreeValid(mp.cfg.BestHash())
-	utxoView, err := mp.cfg.FetchUtxoView(tx, tv)
+	knownInvalid := mp.IsTxTreeKnownInvalid(mp.cfg.BestHash())
+	utxoView, err := mp.cfg.FetchUtxoView(tx, !knownInvalid)
 	if err != nil {
 		return nil, err
 	}
