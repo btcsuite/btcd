@@ -1513,7 +1513,7 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 
 	// Create block with duplicate transactions.
 	//
-	// This test relies on the shape of the shape of the merkle tree to test
+	// This test relies on the shape of the merkle tree to test
 	// the intended condition and thus is asserted below.
 	//
 	//   ... -> b43(13)

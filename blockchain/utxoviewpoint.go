@@ -291,7 +291,7 @@ func (view *UtxoViewpoint) connectTransaction(tx *btcutil.Tx, blockHeight int32,
 		entry := view.entries[txIn.PreviousOutPoint.Hash]
 
 		// Ensure the referenced utxo exists in the view.  This should
-		// never happen unless there is a bug is introduced in the code.
+		// never happen unless a bug is introduced in the code.
 		if entry == nil {
 			return AssertError(fmt.Sprintf("view missing input %v",
 				txIn.PreviousOutPoint))
