@@ -279,7 +279,7 @@ func (b byNumberOfVotes) Less(i, j int) bool {
 // at least a majority number of votes) sorted by number of votes, descending.
 //
 // This function is safe for concurrent access.
-func SortParentsByVotes(mp *mempool.TxPool, currentTopBlock chainhash.Hash, blocks []chainhash.Hash, params *chaincfg.Params) []chainhash.Hash {
+func SortParentsByVotes(txSource mining.TxSource, currentTopBlock chainhash.Hash, blocks []chainhash.Hash, params *chaincfg.Params) []chainhash.Hash {
 	// Return now when no blocks were provided.
 	lenBlocks := len(blocks)
 	if lenBlocks == 0 {
@@ -290,7 +290,7 @@ func SortParentsByVotes(mp *mempool.TxPool, currentTopBlock chainhash.Hash, bloc
 	// mempool and filter out any blocks that do not have the minimum
 	// required number of votes.
 	minVotesRequired := (params.TicketsPerBlock / 2) + 1
-	voteMetadata := mp.VotesForBlocks(blocks)
+	voteMetadata := txSource.VotesForBlocks(blocks)
 	filtered := make([]*blockWithNumVotes, 0, lenBlocks)
 	for i := range blocks {
 		numVotes := uint16(len(voteMetadata[i]))
@@ -319,7 +319,7 @@ func SortParentsByVotes(mp *mempool.TxPool, currentTopBlock chainhash.Hash, bloc
 	// the same amount of votes as the current leader after the sort. After this
 	// point, all blocks listed in sortedUsefulBlocks definitely also have the
 	// minimum number of votes required.
-	curVoteMetadata := mp.VotesForBlocks([]chainhash.Hash{currentTopBlock})
+	curVoteMetadata := txSource.VotesForBlocks([]chainhash.Hash{currentTopBlock})
 	numTopBlockVotes := uint16(len(curVoteMetadata))
 	if filtered[0].NumVotes == numTopBlockVotes && filtered[0].Hash !=
 		currentTopBlock {
@@ -1070,10 +1070,6 @@ func handleCreatedBlockTemplate(blockTemplate *BlockTemplate, bm *blockManager) 
 //  This function returns nil, nil if there are not enough voters on any of
 //  the current top blocks to create a new block template.
 func NewBlockTemplate(policy *mining.Policy, server *server, payToAddress dcrutil.Address) (*BlockTemplate, error) {
-	// TODO: The mempool should be completely separated via the TxSource
-	// interface so this function is fully decoupled.
-	mp := server.txMemPool
-
 	var txSource mining.TxSource = server.txMemPool
 	blockManager := server.blockManager
 	timeSource := server.timeSource
@@ -1147,7 +1143,7 @@ func NewBlockTemplate(policy *mining.Policy, server *server, payToAddress dcruti
 		// Get the list of blocks that we can actually build on top of. If we're
 		// not currently on the block that has the most votes, switch to that
 		// block.
-		eligibleParents := SortParentsByVotes(mp, *prevHash, children,
+		eligibleParents := SortParentsByVotes(txSource, *prevHash, children,
 			blockManager.server.chainParams)
 		if len(eligibleParents) == 0 {
 			minrLog.Debugf("Too few voters found on any HEAD block, " +
@@ -1163,8 +1159,9 @@ func NewBlockTemplate(policy *mining.Policy, server *server, payToAddress dcruti
 		// Force a reorganization to the parent with the most votes if we need
 		// to.
 		if eligibleParents[0] != *prevHash {
-			for _, newHead := range eligibleParents {
-				err := blockManager.ForceReorganization(*prevHash, newHead)
+			for i := range eligibleParents {
+				newHead := &eligibleParents[i]
+				err := blockManager.ForceReorganization(*prevHash, *newHead)
 				if err != nil {
 					minrLog.Errorf("failed to reorganize to new parent: %v", err)
 					continue
@@ -1172,16 +1169,16 @@ func NewBlockTemplate(policy *mining.Policy, server *server, payToAddress dcruti
 
 				// Check to make sure we actually have the transactions
 				// (votes) we need in the mempool.
-				voteHashes := mp.VoteHashesForBlock(newHead)
+				voteHashes := txSource.VoteHashesForBlock(newHead)
 				if len(voteHashes) == 0 {
 					return nil, fmt.Errorf("no vote metadata for block %v",
 						newHead)
 				}
 
-				if exist := mp.CheckIfTxsExist(voteHashes); !exist {
+				if exist := txSource.HaveAllTransactions(voteHashes); !exist {
 					continue
 				} else {
-					prevHash = &newHead
+					prevHash = newHead
 					break
 				}
 			}
@@ -1230,7 +1227,7 @@ func NewBlockTemplate(policy *mining.Policy, server *server, payToAddress dcruti
 
 	minrLog.Debugf("Considering %d transactions for inclusion to new block",
 		len(sourceTxns))
-	treeKnownInvalid := mp.IsTxTreeKnownInvalid(prevHash)
+	treeKnownInvalid := txSource.IsTxTreeKnownInvalid(prevHash)
 
 mempoolLoop:
 	for _, txDesc := range sourceTxns {

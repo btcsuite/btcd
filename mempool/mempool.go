@@ -63,13 +63,6 @@ const (
 	maxNullDataOutputs = 4
 )
 
-// VoteTx is a struct describing a block vote (SSGen).
-type VoteTx struct {
-	SsgenHash chainhash.Hash // Vote
-	SstxHash  chainhash.Hash // Ticket
-	Vote      bool
-}
-
 // Config is a descriptor containing the memory pool configuration.
 type Config struct {
 	// Policy defines the various mempool configuration options related
@@ -208,7 +201,7 @@ type TxPool struct {
 
 	// Votes on blocks.
 	votesMtx sync.RWMutex
-	votes    map[chainhash.Hash][]VoteTx
+	votes    map[chainhash.Hash][]mining.VoteDesc
 
 	pennyTotal    float64 // exponentially decaying total for penny spends.
 	lastPennyUnix int64   // unix time of last ``penny spend''
@@ -228,12 +221,12 @@ func (mp *TxPool) insertVote(ssgen *dcrutil.Tx) error {
 	// start a new buffered slice and store it.
 	vts, exists := mp.votes[blockHash]
 	if !exists {
-		vts = make([]VoteTx, 0, mp.cfg.ChainParams.TicketsPerBlock)
+		vts = make([]mining.VoteDesc, 0, mp.cfg.ChainParams.TicketsPerBlock)
 	}
 
 	// Nothing to do if a vote for the ticket is already known.
 	for _, vt := range vts {
-		if vt.SstxHash.IsEqual(ticketHash) {
+		if vt.TicketHash.IsEqual(ticketHash) {
 			return nil
 		}
 	}
@@ -241,10 +234,10 @@ func (mp *TxPool) insertVote(ssgen *dcrutil.Tx) error {
 	voteHash := ssgen.Hash()
 	voteBits := stake.SSGenVoteBits(msgTx)
 	vote := dcrutil.IsFlagSet16(voteBits, dcrutil.BlockValid)
-	voteTx := VoteTx{
-		SsgenHash: *voteHash,
-		SstxHash:  *ticketHash,
-		Vote:      vote,
+	voteTx := mining.VoteDesc{
+		VoteHash:       *voteHash,
+		TicketHash:     *ticketHash,
+		ApprovesParent: vote,
 	}
 
 	// Append the new vote.
@@ -261,9 +254,9 @@ func (mp *TxPool) insertVote(ssgen *dcrutil.Tx) error {
 // hash that are currently available in the mempool.
 //
 // This function is safe for concurrent access.
-func (mp *TxPool) VoteHashesForBlock(blockHash chainhash.Hash) []chainhash.Hash {
+func (mp *TxPool) VoteHashesForBlock(blockHash *chainhash.Hash) []chainhash.Hash {
 	mp.votesMtx.RLock()
-	vts, exists := mp.votes[blockHash]
+	vts, exists := mp.votes[*blockHash]
 	mp.votesMtx.RUnlock()
 
 	// Lookup the vote metadata for the block.
@@ -274,7 +267,7 @@ func (mp *TxPool) VoteHashesForBlock(blockHash chainhash.Hash) []chainhash.Hash 
 	// Copy the vote hashes from the vote metadata.
 	hashes := make([]chainhash.Hash, 0, len(vts))
 	for _, vt := range vts {
-		hashes = append(hashes, vt.SsgenHash)
+		hashes = append(hashes, vt.VoteHash)
 	}
 
 	return hashes
@@ -284,8 +277,8 @@ func (mp *TxPool) VoteHashesForBlock(blockHash chainhash.Hash) []chainhash.Hash 
 // block hashes that are currently available in the mempool.
 //
 // This function is safe for concurrent access.
-func (mp *TxPool) VotesForBlocks(hashes []chainhash.Hash) [][]VoteTx {
-	result := make([][]VoteTx, 0, len(hashes))
+func (mp *TxPool) VotesForBlocks(hashes []chainhash.Hash) [][]mining.VoteDesc {
+	result := make([][]mining.VoteDesc, 0, len(hashes))
 
 	mp.votesMtx.RLock()
 	for _, hash := range hashes {
@@ -516,6 +509,23 @@ func (mp *TxPool) HaveTransactions(hashes []*chainhash.Hash) []bool {
 	return haveTxns
 }
 
+// HaveAllTransactions returns whether or not all of the passed transaction
+// hashes exist in the mempool.
+//
+// This function is safe for concurrent access.
+func (mp *TxPool) HaveAllTransactions(hashes []chainhash.Hash) bool {
+	mp.mtx.RLock()
+	inPool := true
+	for _, h := range hashes {
+		if _, exists := mp.pool[h]; !exists {
+			inPool = false
+			break
+		}
+	}
+	mp.mtx.RUnlock()
+	return inPool
+}
+
 // removeTransaction is the internal function which implements the public
 // RemoveTransaction.  See the comment for RemoveTransaction for more details.
 //
@@ -671,7 +681,7 @@ func (mp *TxPool) IsTxTreeKnownInvalid(hash *chainhash.Hash) bool {
 	// Otherwise, tally the votes and determine if it's valid or not.
 	var yes, no int
 	for _, vote := range vts {
-		if vote.Vote {
+		if vote.ApprovesParent {
 			yes++
 		} else {
 			no++
@@ -1541,23 +1551,6 @@ func (mp *TxPool) LastUpdated() time.Time {
 	return time.Unix(atomic.LoadInt64(&mp.lastUpdated), 0)
 }
 
-// CheckIfTxsExist checks a list of transaction hashes against the mempool
-// and returns true if they all exist in the mempool, otherwise false.
-//
-// This function is safe for concurrent access.
-func (mp *TxPool) CheckIfTxsExist(hashes []chainhash.Hash) bool {
-	mp.mtx.RLock()
-	inPool := true
-	for _, h := range hashes {
-		if _, exists := mp.pool[h]; !exists {
-			inPool = false
-			break
-		}
-	}
-	mp.mtx.RUnlock()
-	return inPool
-}
-
 // New returns a new memory pool for validating and storing standalone
 // transactions until they are mined into a block.
 func New(cfg *Config) *TxPool {
@@ -1567,6 +1560,6 @@ func New(cfg *Config) *TxPool {
 		orphans:       make(map[chainhash.Hash]*dcrutil.Tx),
 		orphansByPrev: make(map[chainhash.Hash]map[chainhash.Hash]*dcrutil.Tx),
 		outpoints:     make(map[wire.OutPoint]*dcrutil.Tx),
-		votes:         make(map[chainhash.Hash][]VoteTx),
+		votes:         make(map[chainhash.Hash][]mining.VoteDesc),
 	}
 }

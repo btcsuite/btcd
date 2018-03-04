@@ -486,8 +486,9 @@ func (sp *serverPeer) OnGetMiningState(p *peer.Peer, msg *wire.MsgGetMiningState
 
 	// Construct the set of votes to send.
 	voteHashes := make([]chainhash.Hash, 0, wire.MaxMSVotesAtHeadPerMsg)
-	for _, bh := range blockHashes {
+	for i := range blockHashes {
 		// Fetch the vote hashes themselves and append them.
+		bh := &blockHashes[i]
 		vhsForBlock := mp.VoteHashesForBlock(bh)
 		if len(vhsForBlock) == 0 {
 			peerLog.Warnf("unexpected error while fetching vote hashes "+
