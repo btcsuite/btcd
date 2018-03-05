@@ -33,22 +33,22 @@ const PeersFilename = "peers.json"
 // AddrManager provides a concurrency safe address manager for caching potential
 // peers on the Decred network.
 type AddrManager struct {
-	mtx            sync.Mutex
-	peersFile      string
-	lookupFunc     func(string) ([]net.IP, error)
-	rand           *rand.Rand
-	key            [32]byte
-	addrIndex      map[string]*KnownAddress // address key to ka for all addrs.
-	addrNew        [newBucketCount]map[string]*KnownAddress
-	addrTried      [triedBucketCount]*list.List
-	started        int32
-	shutdown       int32
-	wg             sync.WaitGroup
-	quit           chan struct{}
-	nTried         int
-	nNew           int
-	lamtx          sync.Mutex
-	localAddresses map[string]*localAddress
+	mtx            sync.Mutex                               // main mutex used to sync methods
+	peersFile      string                                   // path of file to store peers in
+	lookupFunc     func(string) ([]net.IP, error)           // for DNS lookups
+	rand           *rand.Rand                               // internal PRNG
+	key            [32]byte                                 // cryptographically secure random bytes
+	addrIndex      map[string]*KnownAddress                 // address key to ka for all addresses
+	addrNew        [newBucketCount]map[string]*KnownAddress // storage for new addresses
+	addrTried      [triedBucketCount]*list.List             // storage for tried addresses
+	started        int32                                    // is 1 if started
+	shutdown       int32                                    // is 1 if shutdown is done or in progress
+	wg             sync.WaitGroup                           // wait group used by main handler
+	quit           chan struct{}                            // channel to notify main handler of shutdown
+	nTried         int                                      // number of tried addresses
+	nNew           int                                      // number of new addresses (i.e., not tried)
+	lamtx          sync.Mutex                               // local address mutex
+	localAddresses map[string]*localAddress                 // address key to la for all local addresses
 }
 
 type serializedKnownAddress struct {
@@ -664,7 +664,7 @@ func (a *AddrManager) AddressCache() []*wire.NetAddress {
 	// `numAddresses' since we are throwing the rest.
 	for i := 0; i < numAddresses; i++ {
 		// pick a number between current index and the end
-		j := rand.Intn(addrIndexLen-i) + i
+		j := a.rand.Intn(addrIndexLen-i) + i
 		allAddr[i], allAddr[j] = allAddr[j], allAddr[i]
 	}
 
@@ -936,7 +936,7 @@ func (a *AddrManager) Good(addr *wire.NetAddress) {
 	rmka.refs++
 
 	// We don't touch a.nTried here since the number of tried stays the same
-	// but we decemented new above, raise it again since we're putting
+	// but we decremented a.nNew above, raise it again since we're putting
 	// something back.
 	a.nNew++
 
@@ -1091,6 +1091,7 @@ func (a *AddrManager) GetBestLocalAddress(remoteAddr *wire.NetAddress) *wire.Net
 
 // New returns a new Decred address manager.
 // Use Start to begin processing asynchronous address updates.
+// The address manager uses lookupFunc for necessary DNS lookups.
 func New(dataDir string, lookupFunc func(string) ([]net.IP, error)) *AddrManager {
 	am := AddrManager{
 		peersFile:      filepath.Join(dataDir, PeersFilename),
