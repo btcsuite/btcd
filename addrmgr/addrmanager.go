@@ -723,7 +723,7 @@ func (a *AddrManager) HostToNetAddress(host string, port uint16, services wire.S
 // ip is in the range used for Tor addresses then it will be transformed into
 // the relevant .onion address.
 func ipString(na *wire.NetAddress) string {
-	if IsOnionCatTor(na) {
+	if isOnionCatTor(na) {
 		// We know now that na.IP is long enogh.
 		base32 := base32.StdEncoding.EncodeToString(na.IP[6:])
 		return strings.ToLower(base32) + ".onion"
@@ -989,36 +989,36 @@ func getReachabilityFrom(localAddr, remoteAddr *wire.NetAddress) int {
 		return Unreachable
 	}
 
-	if IsOnionCatTor(remoteAddr) {
-		if IsOnionCatTor(localAddr) {
+	if isOnionCatTor(remoteAddr) {
+		if isOnionCatTor(localAddr) {
 			return Private
 		}
 
-		if IsRoutable(localAddr) && IsIPv4(localAddr) {
+		if IsRoutable(localAddr) && isIPv4(localAddr) {
 			return Ipv4
 		}
 
 		return Default
 	}
 
-	if IsRFC4380(remoteAddr) {
+	if isRFC4380(remoteAddr) {
 		if !IsRoutable(localAddr) {
 			return Default
 		}
 
-		if IsRFC4380(localAddr) {
+		if isRFC4380(localAddr) {
 			return Teredo
 		}
 
-		if IsIPv4(localAddr) {
+		if isIPv4(localAddr) {
 			return Ipv4
 		}
 
 		return Ipv6Weak
 	}
 
-	if IsIPv4(remoteAddr) {
-		if IsRoutable(localAddr) && IsIPv4(localAddr) {
+	if isIPv4(remoteAddr) {
+		if IsRoutable(localAddr) && isIPv4(localAddr) {
 			return Ipv4
 		}
 		return Unreachable
@@ -1026,8 +1026,8 @@ func getReachabilityFrom(localAddr, remoteAddr *wire.NetAddress) int {
 
 	/* ipv6 */
 	var tunnelled bool
-	// Is our v6 is tunnelled?
-	if IsRFC3964(localAddr) || IsRFC6052(localAddr) || IsRFC6145(localAddr) {
+	// Is our v6 tunnelled?
+	if isRFC3964(localAddr) || isRFC6052(localAddr) || isRFC6145(localAddr) {
 		tunnelled = true
 	}
 
@@ -1035,11 +1035,11 @@ func getReachabilityFrom(localAddr, remoteAddr *wire.NetAddress) int {
 		return Default
 	}
 
-	if IsRFC4380(localAddr) {
+	if isRFC4380(localAddr) {
 		return Teredo
 	}
 
-	if IsIPv4(localAddr) {
+	if isIPv4(localAddr) {
 		return Ipv4
 	}
 
@@ -1078,7 +1078,7 @@ func (a *AddrManager) GetBestLocalAddress(remoteAddr *wire.NetAddress) *wire.Net
 
 		// Send something unroutable if nothing suitable.
 		var ip net.IP
-		if !IsIPv4(remoteAddr) && !IsOnionCatTor(remoteAddr) {
+		if !isIPv4(remoteAddr) && !isOnionCatTor(remoteAddr) {
 			ip = net.IPv6zero
 		} else {
 			ip = net.IPv4zero
