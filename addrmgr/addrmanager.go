@@ -404,15 +404,24 @@ func (a *AddrManager) savePeers() {
 		}
 	}
 
-	w, err := os.Create(a.peersFile)
+	// Write temporary peers file and then move it into place.
+	tmpfile := a.peersFile + ".new"
+	w, err := os.Create(tmpfile)
 	if err != nil {
-		log.Errorf("Error opening file %s: %v", a.peersFile, err)
+		log.Errorf("Error opening file %s: %v", tmpfile, err)
 		return
 	}
 	enc := json.NewEncoder(w)
-	defer w.Close()
 	if err := enc.Encode(&sam); err != nil {
-		log.Errorf("Failed to encode file %s: %v", a.peersFile, err)
+		log.Errorf("Failed to encode file %s: %v", tmpfile, err)
+		return
+	}
+	if err := w.Close(); err != nil {
+		log.Errorf("Error closing file %s: %v", tmpfile, err)
+		return
+	}
+	if err := os.Rename(tmpfile, a.peersFile); err != nil {
+		log.Errorf("Error writing file %s: %v", a.peersFile, err)
 		return
 	}
 }
