@@ -41,6 +41,7 @@ type AddrManager struct {
 	addrIndex      map[string]*KnownAddress                 // address key to ka for all addresses
 	addrNew        [newBucketCount]map[string]*KnownAddress // storage for new addresses
 	addrTried      [triedBucketCount]*list.List             // storage for tried addresses
+	addrChanged    bool                                     // true if address state needs saving
 	started        int32                                    // is 1 if started
 	shutdown       int32                                    // is 1 if shutdown is done or in progress
 	wg             sync.WaitGroup                           // wait group used by main handler
@@ -215,6 +216,7 @@ func (a *AddrManager) updateAddress(netAddr, srcAddr *wire.NetAddress) {
 		ka = &KnownAddress{na: &netAddrCopy, srcAddr: srcAddr}
 		a.addrIndex[addr] = ka
 		a.nNew++
+		a.addrChanged = true
 		// XXX time penalty?
 	}
 
@@ -234,6 +236,7 @@ func (a *AddrManager) updateAddress(netAddr, srcAddr *wire.NetAddress) {
 	// Add to new bucket.
 	ka.refs++
 	a.addrNew[bucket][addr] = ka
+	a.addrChanged = true
 
 	log.Tracef("Added new address %s for a total of %d addresses", addr,
 		a.nTried+a.nNew)
@@ -252,6 +255,7 @@ func (a *AddrManager) expireNew(bucket int) {
 		if v.isBad() {
 			log.Tracef("expiring bad address %v", k)
 			delete(a.addrNew[bucket], k)
+			a.addrChanged = true
 			v.refs--
 			if v.refs == 0 {
 				a.nNew--
@@ -271,6 +275,7 @@ func (a *AddrManager) expireNew(bucket int) {
 		log.Tracef("expiring oldest address %v", key)
 
 		delete(a.addrNew[bucket], key)
+		a.addrChanged = true
 		oldest.refs--
 		if oldest.refs == 0 {
 			a.nNew--
@@ -363,6 +368,10 @@ out:
 // savePeers saves all the known addresses to a file so they can be read back
 // in at next run.
 func (a *AddrManager) savePeers() {
+	if !a.addrChanged {
+		// Nothing changed since last savePeers call.
+		return
+	}
 	a.mtx.Lock()
 	defer a.mtx.Unlock()
 
@@ -424,6 +433,7 @@ func (a *AddrManager) savePeers() {
 		log.Errorf("Error writing file %s: %v", a.peersFile, err)
 		return
 	}
+	a.addrChanged = false
 }
 
 // loadPeers loads the known address from the saved file.  If empty, missing, or
@@ -448,7 +458,6 @@ func (a *AddrManager) loadPeers() {
 }
 
 func (a *AddrManager) deserializePeers(filePath string) error {
-
 	_, err := os.Stat(filePath)
 	if os.IsNotExist(err) {
 		return nil
@@ -695,6 +704,7 @@ func (a *AddrManager) reset() {
 	for i := range a.addrTried {
 		a.addrTried[i] = list.New()
 	}
+	a.addrChanged = true
 }
 
 // HostToNetAddress returns a netaddress given a host address. If the address is
@@ -901,6 +911,7 @@ func (a *AddrManager) Good(addr *wire.NetAddress) {
 		// we check for existence so we can record the first one
 		if _, ok := a.addrNew[i][addrKey]; ok {
 			delete(a.addrNew[i], addrKey)
+			a.addrChanged = true
 			ka.refs--
 			if oldBucket == -1 {
 				oldBucket = i
@@ -920,6 +931,7 @@ func (a *AddrManager) Good(addr *wire.NetAddress) {
 	if a.addrTried[bucket].Len() < triedBucketSize {
 		ka.tried = true
 		a.addrTried[bucket].PushBack(ka)
+		a.addrChanged = true
 		a.nTried++
 		return
 	}
