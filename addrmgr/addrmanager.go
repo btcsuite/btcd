@@ -177,7 +177,7 @@ func (a *AddrManager) updateAddress(netAddr, srcAddr *wire.NetAddress) {
 		// TODO(oga) only update addresses periodically.
 		// Update the last seen time and services.
 		// note that to prevent causing excess garbage on getaddr
-		// messages the netaddresses in addrmaanger are *immutable*,
+		// messages the netaddresses in addrmanager are *immutable*,
 		// if we need to change them then we replace the pointer with a
 		// new copy so that we don't have to copy every na for getaddr.
 		if netAddr.Timestamp.After(ka.na.Timestamp) ||
