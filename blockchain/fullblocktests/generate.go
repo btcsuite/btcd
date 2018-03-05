@@ -2517,6 +2517,36 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 	accepted()
 
 	// ---------------------------------------------------------------------
+	// Revocation tests.
+	// ---------------------------------------------------------------------
+
+	// Create valid block that misses a vote.
+	//
+	//   ... -> bor7(23) -> brt1(24)
+	g.NextBlock("brt1", outs[24], ticketOuts[24], g.ReplaceWithNVotes(4))
+	accepted()
+
+	// Create block that contains a revocation due to previous missed vote and
+	// a header that commits to more revocations than the block actually
+	// contains.
+	//
+	//   ... -> brt1(24)
+	//                  \-> brt2(25)
+	g.NextBlock("brt2", outs[25], ticketOuts[25], func(b *wire.MsgBlock) {
+		b.Header.Revocations++
+	})
+	g.AssertTipNumRevocations(2)
+	rejected(blockchain.ErrRevocationsMismatch)
+
+	// Create block that contains a revocation due to previous missed vote.
+	//
+	//   ... -> brt1(24) -> brt3(25)
+	g.SetTip("brt1")
+	g.NextBlock("brt3", outs[25], ticketOuts[25])
+	g.AssertTipNumRevocations(1)
+	accepted()
+
+	// ---------------------------------------------------------------------
 	// Large block re-org test.
 	// ---------------------------------------------------------------------
 
@@ -2526,9 +2556,9 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 
 	// Ensure the tip the re-org test builds on is the best chain tip.
 	//
-	//   ... -> bor7(23) -> ...
-	g.SetTip("bor7")
-	spendableOutOffset := int32(24) // Next spendable offset.
+	//   ... -> brt3(25) -> ...
+	g.SetTip("brt3")
+	spendableOutOffset := int32(26) // Next spendable offset.
 
 	// Collect all of the spendable coinbase outputs from the previous
 	// collection point up to the current tip.
