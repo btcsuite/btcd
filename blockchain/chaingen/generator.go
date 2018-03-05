@@ -147,12 +147,13 @@ type Generator struct {
 	spendableOuts     [][]SpendableOut
 	prevCollectedHash chainhash.Hash
 
-	// Used for tracking the live ticket pool.
+	// Used for tracking the live ticket pool and revocations.
 	originalParents map[chainhash.Hash]chainhash.Hash
 	immatureTickets []*stakeTicket
 	liveTickets     []*stakeTicket
 	wonTickets      map[chainhash.Hash][]*stakeTicket
 	expiredTickets  []*stakeTicket
+	missedVotes     map[chainhash.Hash][]*stakeTicket
 }
 
 // MakeGenerator returns a generator instance initialized with the genesis block
@@ -183,6 +184,7 @@ func MakeGenerator(params *chaincfg.Params) (Generator, error) {
 		p2shOpTrueScript: p2shOpTrueScript,
 		originalParents:  make(map[chainhash.Hash]chainhash.Hash),
 		wonTickets:       make(map[chainhash.Hash][]*stakeTicket),
+		missedVotes:      make(map[chainhash.Hash][]*stakeTicket),
 	}, nil
 }
 
@@ -650,6 +652,40 @@ func (g *Generator) createVoteTx(parentBlock *wire.MsgBlock, ticket *stakeTicket
 	tx.AddTxOut(wire.NewTxOut(0, blockScript))
 	tx.AddTxOut(wire.NewTxOut(0, voteScript))
 	tx.AddTxOut(wire.NewTxOut(int64(voteSubsidy+ticketPrice), stakeGenScript))
+	return tx
+}
+
+// createRevocationTx returns a new transaction (ssrtx) refunding the ticket
+// price for a ticket which either missed its vote or expired.
+//
+// The transaction consists of the following inputs:
+// - The outpoint of the ticket that was missed or expired.
+//
+// The transaction consists of the following outputs:
+// - The payouts according to the ticket commitments.
+func (g *Generator) createRevocationTx(ticket *stakeTicket) *wire.MsgTx {
+	// The outputs pay the original commitment amounts.  This impl uses the
+	// standard pay-to-script-hash to an OP_TRUE.
+	revokeScript, err := txscript.PayToSSRtx(g.p2shOpTrueAddr)
+	if err != nil {
+		panic(err)
+	}
+
+	// Generate and return the transaction spending from the provided ticket
+	// along with the previously described outputs.
+	ticketPrice := ticket.tx.TxOut[0].Value
+	ticketHash := ticket.tx.CachedTxHash()
+	tx := wire.NewMsgTx()
+	tx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: *wire.NewOutPoint(ticketHash, 0,
+			wire.TxTreeStake),
+		Sequence:        wire.MaxTxInSequenceNum,
+		ValueIn:         ticketPrice,
+		BlockHeight:     ticket.blockHeight,
+		BlockIndex:      ticket.blockIndex,
+		SignatureScript: opTrueRedeemScript,
+	})
+	tx.AddTxOut(wire.NewTxOut(ticketPrice, revokeScript))
 	return tx
 }
 
@@ -1658,15 +1694,58 @@ func (g *Generator) connectLiveTickets(blockHash *chainhash.Hash, height uint32,
 	g.immatureTickets = append(g.immatureTickets, purchases...)
 }
 
+// addMissedVotes adds any of the passed winning tickets as missed votes if the
+// passed block does not cast those votes.
+func (g *Generator) addMissedVotes(blockHash *chainhash.Hash, stakeTxns []*wire.MsgTx, winners []*stakeTicket) {
+	// Nothing to do before there are any winning tickets.
+	if len(winners) == 0 {
+		return
+	}
+
+	// Assume all of the winning tickets were missed.
+	missedVotes := make(map[chainhash.Hash]*stakeTicket)
+	for _, ticket := range winners {
+		missedVotes[ticket.tx.TxHash()] = ticket
+	}
+
+	// Remove the entries for which the block actually contains votes.
+	for _, stx := range stakeTxns {
+		// Ignore all stake transactions that are not votes.
+		if !isVoteTx(stx) {
+			continue
+		}
+
+		// Ignore the vote if it is not for one of the winning tickets.
+		ticketInput := stx.TxIn[1]
+		ticketHash := ticketInput.PreviousOutPoint.Hash
+		missedVote, ok := missedVotes[ticketHash]
+		if !ok || missedVote.blockHeight != ticketInput.BlockHeight ||
+			missedVote.blockIndex != ticketInput.BlockIndex {
+
+			continue
+		}
+
+		delete(missedVotes, ticketHash)
+	}
+
+	// Add the missed votes to the generator state so future blocks will
+	// generate revocations for them.
+	for _, missedVote := range missedVotes {
+		g.missedVotes[*blockHash] = append(g.missedVotes[*blockHash],
+			missedVote)
+	}
+}
+
 // connectBlockTickets updates the live ticket pool and associated data structs
 // by for the passed block.  It will panic if the specified block does not
 // connect to the current tip block.
 func (g *Generator) connectBlockTickets(b *wire.MsgBlock) {
 	// Attempt to prevent misuse of this function by ensuring the provided
 	// block connects to the current tip.
+	blockHash := b.BlockHash()
 	if b.Header.PrevBlock != g.tip.BlockHash() {
 		panic(fmt.Sprintf("attempt to connect block %s with parent %s "+
-			"that is not the current tip %s", b.BlockHash(),
+			"that is not the current tip %s", blockHash,
 			b.Header.PrevBlock, g.tip.BlockHash()))
 	}
 
@@ -1677,10 +1756,12 @@ func (g *Generator) connectBlockTickets(b *wire.MsgBlock) {
 		panic(err)
 	}
 
+	// Keep track of any missed votes.
+	g.addMissedVotes(&blockHash, b.STransactions, winners)
+
 	// Extract the ticket purchases (sstx) from the block.
 	var purchases []*stakeTicket
-	blockHash := b.BlockHash()
-	blockHeight := g.blockHeight(b.BlockHash())
+	blockHeight := g.blockHeight(blockHash)
 	for txIdx, tx := range b.STransactions {
 		if isTicketPurchaseTx(tx) {
 			ticket := &stakeTicket{tx, blockHeight, uint32(txIdx)}
@@ -1698,14 +1779,14 @@ func (g *Generator) connectBlockTickets(b *wire.MsgBlock) {
 func (g *Generator) disconnectBlockTickets(b *wire.MsgBlock) {
 	// Attempt to prevent misuse of this function by ensuring the provided
 	// block is the current tip.
+	blockHash := b.BlockHash()
 	if b != g.tip {
 		panic(fmt.Sprintf("attempt to disconnect block %s that is not "+
-			"the current tip %s", b.BlockHash(), g.tip.BlockHash()))
+			"the current tip %s", blockHash, g.tip.BlockHash()))
 	}
 
 	// Remove tickets created in the block from the immature ticket pool.
-	blockHash := b.BlockHash()
-	blockHeight := g.blockHeight(b.BlockHash())
+	blockHeight := g.blockHeight(blockHash)
 	for i := 0; i < len(g.immatureTickets); i++ {
 		ticket := g.immatureTickets[i]
 		if ticket.blockHeight == blockHeight {
@@ -1758,6 +1839,9 @@ func (g *Generator) disconnectBlockTickets(b *wire.MsgBlock) {
 	// pool.
 	g.liveTickets = append(g.liveTickets, g.wonTickets[blockHash]...)
 	delete(g.wonTickets, blockHash)
+
+	// Remove any votes missed by the block.
+	delete(g.missedVotes, blockHash)
 
 	// Resort the ticket pool now that all live ticket pool manipulations
 	// are done.
@@ -1942,6 +2026,14 @@ func (g *Generator) NextBlock(blockName string, spend *SpendableOut, ticketSpend
 				stakeTxns = append(stakeTxns, purchaseTx)
 			}
 		}
+
+		// Generate and add revocations for any missed tickets.
+		for _, missedVotes := range g.missedVotes {
+			for _, missedVote := range missedVotes {
+				revocationTx := g.createRevocationTx(missedVote)
+				stakeTxns = append(stakeTxns, revocationTx)
+			}
+		}
 	}
 
 	// Create stake tickets for the ticket purchases (sstx), count the
@@ -2096,6 +2188,7 @@ func (g *Generator) NextBlock(blockName string, spend *SpendableOut, ticketSpend
 		// it.
 		g.originalParents[blockHash] = prevHash
 	}
+	g.addMissedVotes(&blockHash, block.STransactions, ticketWinners)
 	g.connectLiveTickets(&blockHash, nextHeight, ticketWinners,
 		ticketPurchases)
 	g.blocks[blockHash] = &block
@@ -2377,5 +2470,17 @@ func (g *Generator) AssertBlockVersion(expected int32) {
 	if blockVersion != expected {
 		panic(fmt.Sprintf("block version for block %q is %d instead of "+
 			"expected %d", g.tipName, blockVersion, expected))
+	}
+}
+
+// AssertTipNumRevocations panics if the number of revocations in header of the
+// current tip block associated with the generator does not match the specified
+// value.
+func (g *Generator) AssertTipNumRevocations(expected uint8) {
+	numRevocations := g.tip.Header.Revocations
+	if numRevocations != expected {
+		panic(fmt.Sprintf("number of revocations in block %q (height "+
+			"%d) is %d instead of expected %d", g.tipName,
+			g.tip.Header.Height, numRevocations, expected))
 	}
 }
