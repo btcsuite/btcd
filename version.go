@@ -27,17 +27,21 @@ const (
 	appMajor uint = 1
 	appMinor uint = 1
 	appPatch uint = 2
-
-	// appPreRelease MUST only contain characters from semanticAlphabet
-	// per the semantic versioning spec.
-	appPreRelease = ""
 )
 
-// appBuild is defined as a variable so it can be overridden during the build
-// process with '-ldflags "-X main.appBuild=foo' if needed.  It MUST only
-// contain characters from semanticBuildAlphabet per the semantic versioning
-// spec.
-var appBuild = "dev"
+var (
+	// appPreRelease is defined as a variable so it can be overridden during
+	// the build process with '-ldflags "-X main.appPreRelease=foo"' if
+	// needed.  It MUST only contain characters from semanticAlphabet per
+	// the semantic versioning spec.
+	appPreRelease = ""
+
+	// appBuild is defined as a variable so it can be overridden during the
+	// build process with '-ldflags "-X main.appBuild=foo"' if needed.  It
+	// MUST only contain characters from semanticBuildAlphabet per the
+	// semantic versioning spec.
+	appBuild = "dev"
+)
 
 // version returns the application version as a properly formed string per the
 // semantic versioning 2.0.0 spec (http://semver.org/).
