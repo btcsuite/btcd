@@ -25,7 +25,7 @@ to right and intentionally do not provide loops.
 The vast majority of Bitcoin scripts at the time of this writing are of several
 standard forms which consist of a spender providing a public key and a signature
 which proves the spender owns the associated private key.  This information
-is used to prove the the spender is authorized to perform the transaction.
+is used to prove the spender is authorized to perform the transaction.
 
 One benefit of using a scripting language is added flexibility in specifying
 what conditions must be met in order to spend bitcoins.

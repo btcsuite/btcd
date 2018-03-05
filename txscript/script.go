@@ -275,7 +275,9 @@ func parseScriptTemplate(script []byte, opcodes *[256]opcode) ([]parsedOpcode, e
 		retScript = append(retScript, pop)
 	}
 
-	return retScript, nil
+	ret := make([]parsedOpcode, len(retScript))
+	copy(ret, retScript)
+	return ret, nil
 }
 
 // parseScript preparses the script in bytes into a list of parsedOpcodes while
