@@ -153,7 +153,7 @@ func (vm *Engine) isBranchExecuting() bool {
 	return vm.condStack[len(vm.condStack)-1] == OpCondTrue
 }
 
-// executeOpcode peforms execution on the passed opcode.  It takes into account
+// executeOpcode performs execution on the passed opcode.  It takes into account
 // whether or not it is hidden by conditionals, but some rules still must be
 // tested in this case.
 func (vm *Engine) executeOpcode(pop *parsedOpcode) error {
