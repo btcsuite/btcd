@@ -662,31 +662,39 @@ func (a *AddrManager) AddressCache() []*wire.NetAddress {
 	a.mtx.Lock()
 	defer a.mtx.Unlock()
 
-	addrIndexLen := len(a.addrIndex)
-	if addrIndexLen == 0 {
+	// Determine length of all addresses in index.
+	addrLen := len(a.addrIndex)
+	if addrLen == 0 {
 		return nil
 	}
 
-	allAddr := make([]*wire.NetAddress, 0, addrIndexLen)
+	allAddr := make([]*wire.NetAddress, 0, addrLen)
 	// Iteration order is undefined here, but we randomise it anyway.
 	for _, v := range a.addrIndex {
+		// Skip low quality addresses.
+		if v.isBad() {
+			continue
+		}
 		allAddr = append(allAddr, v.na)
 	}
 
-	numAddresses := addrIndexLen * getAddrPercent / 100
+	// Adjust length, we only deal with high quality addresses now.
+	addrLen = len(allAddr)
+
+	numAddresses := addrLen * getAddrPercent / 100
 	if numAddresses > getAddrMax {
 		numAddresses = getAddrMax
 	}
 
 	// Fisher-Yates shuffle the array. We only need to do the first
-	// `numAddresses' since we are throwing the rest.
+	// numAddresses since we are throwing away the rest.
 	for i := 0; i < numAddresses; i++ {
-		// pick a number between current index and the end
-		j := a.rand.Intn(addrIndexLen-i) + i
+		// Pick a number between current index and the end.
+		j := a.rand.Intn(addrLen-i) + i
 		allAddr[i], allAddr[j] = allAddr[j], allAddr[i]
 	}
 
-	// slice off the limit we are willing to share.
+	// Slice off the limit we are willing to share.
 	return allAddr[0:numAddresses]
 }
 
