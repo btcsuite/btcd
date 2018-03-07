@@ -3,7 +3,7 @@
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package addrmgr_test
+package addrmgr
 
 import (
 	"errors"
@@ -16,7 +16,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/decred/dcrd/addrmgr"
 	"github.com/decred/dcrd/wire"
 )
 
@@ -107,7 +106,7 @@ func lookupFunc(host string) ([]net.IP, error) {
 }
 
 func TestStartStop(t *testing.T) {
-	n := addrmgr.New("teststartstop", lookupFunc)
+	n := New("teststartstop", lookupFunc)
 	n.Start()
 	if err := n.Stop(); err != nil {
 		t.Fatalf("Address Manager failed to stop: %v", err)
@@ -144,10 +143,10 @@ func TestAddAddressByIP(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(dir)
-	amgr := addrmgr.New(dir, nil)
+	amgr := New(dir, nil)
 	amgr.Start()
 	for i, test := range tests {
-		err := amgr.AddAddressByIP(test.addrIP)
+		err := amgr.addAddressByIP(test.addrIP)
 		if test.err != nil && err == nil {
 			t.Errorf("TestGood test %d failed expected an error and got none", i)
 			continue
@@ -167,13 +166,13 @@ func TestAddAddressByIP(t *testing.T) {
 	}
 
 	// make sure the peers file has been written
-	peersFile := filepath.Join(dir, addrmgr.PeersFilename)
+	peersFile := filepath.Join(dir, PeersFilename)
 	if _, err := os.Stat(peersFile); err != nil {
 		t.Fatalf("Peers file does not exist: %s", peersFile)
 	}
 
 	// start address manager again to read peers file
-	amgr = addrmgr.New(dir, nil)
+	amgr = New(dir, nil)
 	amgr.Start()
 	if ka := amgr.GetAddress(); ka == nil {
 		t.Fatalf("Address Manager should contain known address")
@@ -186,41 +185,41 @@ func TestAddAddressByIP(t *testing.T) {
 func TestAddLocalAddress(t *testing.T) {
 	var tests = []struct {
 		address  wire.NetAddress
-		priority addrmgr.AddressPriority
+		priority AddressPriority
 		valid    bool
 	}{
 		{
 			wire.NetAddress{IP: net.ParseIP("192.168.0.100")},
-			addrmgr.InterfacePrio,
+			InterfacePrio,
 			false,
 		},
 		{
 			wire.NetAddress{IP: net.ParseIP("204.124.1.1")},
-			addrmgr.InterfacePrio,
+			InterfacePrio,
 			true,
 		},
 		{
 			wire.NetAddress{IP: net.ParseIP("204.124.1.1")},
-			addrmgr.BoundPrio,
+			BoundPrio,
 			true,
 		},
 		{
 			wire.NetAddress{IP: net.ParseIP("::1")},
-			addrmgr.InterfacePrio,
+			InterfacePrio,
 			false,
 		},
 		{
 			wire.NetAddress{IP: net.ParseIP("fe80::1")},
-			addrmgr.InterfacePrio,
+			InterfacePrio,
 			false,
 		},
 		{
 			wire.NetAddress{IP: net.ParseIP("2620:100::1")},
-			addrmgr.InterfacePrio,
+			InterfacePrio,
 			true,
 		},
 	}
-	amgr := addrmgr.New("testaddlocaladdress", nil)
+	amgr := New("testaddlocaladdress", nil)
 	for x, test := range tests {
 		result := amgr.AddLocalAddress(&test.address, test.priority)
 		if result == nil && !test.valid {
@@ -237,10 +236,10 @@ func TestAddLocalAddress(t *testing.T) {
 }
 
 func TestAttempt(t *testing.T) {
-	n := addrmgr.New("testattempt", lookupFunc)
+	n := New("testattempt", lookupFunc)
 
 	// Add a new address and get it
-	err := n.AddAddressByIP(someIP + ":8333")
+	err := n.addAddressByIP(someIP + ":8333")
 	if err != nil {
 		t.Fatalf("Adding address failed: %v", err)
 	}
@@ -259,10 +258,10 @@ func TestAttempt(t *testing.T) {
 }
 
 func TestConnected(t *testing.T) {
-	n := addrmgr.New("testconnected", lookupFunc)
+	n := New("testconnected", lookupFunc)
 
 	// Add a new address and get it
-	err := n.AddAddressByIP(someIP + ":8333")
+	err := n.addAddressByIP(someIP + ":8333")
 	if err != nil {
 		t.Fatalf("Adding address failed: %v", err)
 	}
@@ -279,7 +278,7 @@ func TestConnected(t *testing.T) {
 }
 
 func TestNeedMoreAddresses(t *testing.T) {
-	n := addrmgr.New("testneedmoreaddresses", lookupFunc)
+	n := New("testneedmoreaddresses", lookupFunc)
 	addrsToAdd := 1500
 	b := n.NeedMoreAddresses()
 	if !b {
@@ -299,7 +298,7 @@ func TestNeedMoreAddresses(t *testing.T) {
 	srcAddr := wire.NewNetAddressIPPort(net.IPv4(173, 144, 173, 111), 8333, 0)
 
 	n.AddAddresses(addrs, srcAddr)
-	numAddrs := n.NumAddresses()
+	numAddrs := n.numAddresses()
 	if numAddrs > addrsToAdd {
 		t.Errorf("Number of addresses is too many %d vs %d", numAddrs, addrsToAdd)
 	}
@@ -311,7 +310,7 @@ func TestNeedMoreAddresses(t *testing.T) {
 }
 
 func TestGood(t *testing.T) {
-	n := addrmgr.New("testgood", lookupFunc)
+	n := New("testgood", lookupFunc)
 	addrsToAdd := 64 * 64
 	addrs := make([]*wire.NetAddress, addrsToAdd)
 
@@ -331,7 +330,7 @@ func TestGood(t *testing.T) {
 		n.Good(addr)
 	}
 
-	numAddrs := n.NumAddresses()
+	numAddrs := n.numAddresses()
 	if numAddrs >= addrsToAdd {
 		t.Errorf("Number of addresses is too many: %d vs %d", numAddrs, addrsToAdd)
 	}
@@ -343,7 +342,7 @@ func TestGood(t *testing.T) {
 }
 
 func TestGetAddress(t *testing.T) {
-	n := addrmgr.New("testgetaddress", lookupFunc)
+	n := New("testgetaddress", lookupFunc)
 
 	// Get an address from an empty set (should error)
 	if rv := n.GetAddress(); rv != nil {
@@ -351,7 +350,7 @@ func TestGetAddress(t *testing.T) {
 	}
 
 	// Add a new address and get it
-	err := n.AddAddressByIP(someIP + ":8333")
+	err := n.addAddressByIP(someIP + ":8333")
 	if err != nil {
 		t.Fatalf("Adding address failed: %v", err)
 	}
@@ -373,7 +372,7 @@ func TestGetAddress(t *testing.T) {
 		t.Errorf("Wrong IP: got %v, want %v", ka.NetAddress().IP.String(), someIP)
 	}
 
-	numAddrs := n.NumAddresses()
+	numAddrs := n.numAddresses()
 	if numAddrs != 1 {
 		t.Errorf("Wrong number of addresses: got %d, want %d", numAddrs, 1)
 	}
@@ -429,7 +428,7 @@ func TestGetBestLocalAddress(t *testing.T) {
 		*/
 	}
 
-	amgr := addrmgr.New("testgetbestlocaladdress", nil)
+	amgr := New("testgetbestlocaladdress", nil)
 
 	// Test against default when there's no address
 	for x, test := range tests {
@@ -442,7 +441,7 @@ func TestGetBestLocalAddress(t *testing.T) {
 	}
 
 	for _, localAddr := range localAddrs {
-		amgr.AddLocalAddress(&localAddr, addrmgr.InterfacePrio)
+		amgr.AddLocalAddress(&localAddr, InterfacePrio)
 	}
 
 	// Test against want1
@@ -457,7 +456,7 @@ func TestGetBestLocalAddress(t *testing.T) {
 
 	// Add a public IP to the list of local addresses.
 	localAddr := wire.NetAddress{IP: net.ParseIP("204.124.8.100")}
-	amgr.AddLocalAddress(&localAddr, addrmgr.InterfacePrio)
+	amgr.AddLocalAddress(&localAddr, InterfacePrio)
 
 	// Test against want2
 	for x, test := range tests {
@@ -471,7 +470,7 @@ func TestGetBestLocalAddress(t *testing.T) {
 	/*
 		// Add a Tor generated IP address
 		localAddr = wire.NetAddress{IP: net.ParseIP("fd87:d87e:eb43:25::1")}
-		amgr.AddLocalAddress(&localAddr, addrmgr.ManualPrio)
+		amgr.AddLocalAddress(&localAddr, ManualPrio)
 
 		// Test against want3
 		for x, test := range tests {
@@ -490,7 +489,7 @@ func TestNetAddressKey(t *testing.T) {
 
 	t.Logf("Running %d tests", len(naTests))
 	for i, test := range naTests {
-		key := addrmgr.NetAddressKey(&test.in)
+		key := NetAddressKey(&test.in)
 		if key != test.want {
 			t.Errorf("NetAddressKey #%d\n got: %s want: %s", i, key, test.want)
 			continue
@@ -505,7 +504,7 @@ func TestCorruptPeersFile(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(dir)
-	peersFile := filepath.Join(dir, addrmgr.PeersFilename)
+	peersFile := filepath.Join(dir, PeersFilename)
 	// create corrupt (empty) peers file
 	fp, err := os.Create(peersFile)
 	if err != nil {
@@ -514,7 +513,7 @@ func TestCorruptPeersFile(t *testing.T) {
 	if err := fp.Close(); err != nil {
 		t.Fatalf("Could not write empty peers file: %s", peersFile)
 	}
-	amgr := addrmgr.New(dir, nil)
+	amgr := New(dir, nil)
 	amgr.Start()
 	amgr.Stop()
 	if _, err := os.Stat(peersFile); err != nil {

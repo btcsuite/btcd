@@ -612,9 +612,9 @@ func (a *AddrManager) AddAddress(addr, srcAddr *wire.NetAddress) {
 	a.updateAddress(addr, srcAddr)
 }
 
-// AddAddressByIP adds an address where we are given an ip:port and not a
+// addAddressByIP adds an address where we are given an ip:port and not a
 // wire.NetAddress.
-func (a *AddrManager) AddAddressByIP(addrIP string) error {
+func (a *AddrManager) addAddressByIP(addrIP string) error {
 	// Split IP and port
 	addr, portStr, err := net.SplitHostPort(addrIP)
 	if err != nil {
@@ -634,17 +634,9 @@ func (a *AddrManager) AddAddressByIP(addrIP string) error {
 	return nil
 }
 
-// NumAddresses returns the number of addresses known to the address manager.
+// numAddresses returns the number of addresses known to the address manager.
 func (a *AddrManager) numAddresses() int {
 	return a.nTried + a.nNew
-}
-
-// NumAddresses returns the number of addresses known to the address manager.
-func (a *AddrManager) NumAddresses() int {
-	a.mtx.Lock()
-	defer a.mtx.Unlock()
-
-	return a.numAddresses()
 }
 
 // NeedMoreAddresses returns whether or not the address manager needs more
