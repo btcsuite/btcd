@@ -729,6 +729,7 @@ var TestNet2Params = Params{
 		{140000, newHashFromStr("00000000015736a13fb25ef414947a8a7a4359ef5a00e3a03d6089f38f16f2de")},
 		{157500, newHashFromStr("00000000052684525a3fedd619247b148eaa3ac38ab45781a1571099fd6036cf")},
 		{175000, newHashFromStr("0000000000320a623fcc6453986ef13423f455ddf0f788ad1f2bda43858ccb8d")},
+		{249802, newHashFromStr("0000000000153386623d86ce70cc9372fa000ac3b999eff11b9fc7a3ca0d072a")},
 	},
 
 	// Consensus rule change deployments.
