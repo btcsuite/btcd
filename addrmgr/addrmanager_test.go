@@ -175,7 +175,46 @@ func TestAddAddressByIP(t *testing.T) {
 	amgr = New(dir, nil)
 	amgr.Start()
 	if ka := amgr.GetAddress(); ka == nil {
-		t.Fatalf("Address Manager should contain known address")
+		t.Errorf("Address Manager should contain known address")
+	}
+	if err := amgr.Stop(); err != nil {
+		t.Fatalf("Address Manager failed to stop: %v", err)
+	}
+}
+
+func TestAddAddressUpdate(t *testing.T) {
+	amgr := New("testaddaddressupdate", nil)
+	amgr.Start()
+	if ka := amgr.GetAddress(); ka != nil {
+		t.Fatalf("Address Manager should contain no address")
+	}
+	ip := net.ParseIP(someIP)
+	if ip == nil {
+		t.Fatalf("Invalid IP address %s", someIP)
+	}
+	na := wire.NewNetAddressIPPort(ip, 8333, 0)
+	amgr.AddAddress(na, na)
+	ka := amgr.GetAddress()
+	if ka == nil {
+		t.Errorf("Address Manager should contain known address")
+	}
+	if !reflect.DeepEqual(ka.NetAddress(), na) {
+		t.Errorf("Address Manager should contain address that was added")
+	}
+	// add address again, but with different time stamp (to trigger update)
+	ts := na.Timestamp.Add(time.Second)
+	na.Timestamp = ts
+	amgr.AddAddress(na, na)
+	// address should be in there
+	ka = amgr.GetAddress()
+	if ka == nil {
+		t.Errorf("Address Manager should contain known address")
+	}
+	if !reflect.DeepEqual(ka.NetAddress(), na) {
+		t.Errorf("Address Manager should contain address that was added")
+	}
+	if !ka.NetAddress().Timestamp.Equal(ts) {
+		t.Errorf("Address Manager did not update timestamp")
 	}
 	if err := amgr.Stop(); err != nil {
 		t.Fatalf("Address Manager failed to stop: %v", err)
