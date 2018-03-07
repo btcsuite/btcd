@@ -764,7 +764,6 @@ func NetAddressKey(na *wire.NetAddress) string {
 // have not been used recently and should not pick 'close' addresses
 // consecutively.
 func (a *AddrManager) GetAddress() *KnownAddress {
-	// Protect concurrent access.
 	a.mtx.Lock()
 	defer a.mtx.Unlock()
 
@@ -773,21 +772,20 @@ func (a *AddrManager) GetAddress() *KnownAddress {
 	}
 
 	// Use a 50% chance for choosing between tried and new table entries.
+	large := 1 << 30
+	factor := 1.0
 	if a.nTried > 0 && (a.nNew == 0 || a.rand.Intn(2) == 0) {
 		// Tried entry.
-		large := 1 << 30
-		factor := 1.0
 		for {
-			// pick a random bucket.
+			// Pick a random bucket.
 			bucket := a.rand.Intn(len(a.addrTried))
 			if a.addrTried[bucket].Len() == 0 {
 				continue
 			}
 
-			// Pick a random entry in the list
+			// Then, a random entry in the list.
 			e := a.addrTried[bucket].Front()
-			for i :=
-				a.rand.Int63n(int64(a.addrTried[bucket].Len())); i > 0; i-- {
+			for i := a.rand.Int63n(int64(a.addrTried[bucket].Len())); i > 0; i-- {
 				e = e.Next()
 			}
 			ka := e.Value.(*KnownAddress)
@@ -800,16 +798,14 @@ func (a *AddrManager) GetAddress() *KnownAddress {
 			factor *= 1.2
 		}
 	} else {
-		// new node.
-		// XXX use a closure/function to avoid repeating this.
-		large := 1 << 30
-		factor := 1.0
+		// New node.
 		for {
 			// Pick a random bucket.
 			bucket := a.rand.Intn(len(a.addrNew))
 			if len(a.addrNew[bucket]) == 0 {
 				continue
 			}
+
 			// Then, a random entry in it.
 			var ka *KnownAddress
 			nth := a.rand.Intn(len(a.addrNew[bucket]))
