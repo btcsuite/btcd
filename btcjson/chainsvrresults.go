@@ -170,7 +170,7 @@ type GetBlockTemplateResult struct {
 
 	// Block proposal from BIP 0023.
 	Capabilities  []string `json:"capabilities,omitempty"`
-	RejectReasion string   `json:"reject-reason,omitempty"`
+	RejectReason string   `json:"reject-reason,omitempty"`
 }
 
 // GetMempoolEntryResult models the data returned from the getmempoolentry
