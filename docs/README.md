@@ -199,9 +199,9 @@ information.
 <a name="GoPackages" />
 
 * The Decred-related Go Packages:
-  * [dcrrpcclient](https://github.com/decred/dcrrpcclient) - Implements a
+  * [rpcclient](https://github.com/decred/dcrd/tree/master/rpcclient) - Implements a
     robust and easy to use Websocket-enabled Decred JSON-RPC client
-  * [dcrjson](https://github.com/decred/dcrjson) - Provides an extensive API
+  * [dcrjson](https://github.com/decred/dcrd/tree/master/dcrjson) - Provides an extensive API
     for the underlying JSON-RPC command and return values
   * [wire](https://github.com/decred/dcrd/tree/master/wire) - Implements the
     Decred wire protocol
