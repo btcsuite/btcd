@@ -298,6 +298,7 @@ func NewPurchaseTicketCmd(fromAccount string, spendLimit float64, minConf *int,
 // unmarshaling of startautobuyer JSON RPC commands.
 type StartAutoBuyerCmd struct {
 	Account           string
+	Passphrase        string
 	BalanceToMaintain *int64
 	MaxFeePerKb       *int64
 	MaxPriceRelative  *float64
@@ -309,10 +310,11 @@ type StartAutoBuyerCmd struct {
 }
 
 // NewStartAutoBuyerCmd creates a new StartAutoBuyerCmd.
-func NewStartAutoBuyerCmd(account string, balanceToMaintain *int64, maxFeePerKb *int64, maxPriceRelative *float64, maxPriceAbsolute *int64, votingAddress *string, poolAddress *string, poolFees *float64,
+func NewStartAutoBuyerCmd(account string, passphrase string, balanceToMaintain *int64, maxFeePerKb *int64, maxPriceRelative *float64, maxPriceAbsolute *int64, votingAddress *string, poolAddress *string, poolFees *float64,
 	maxPerBlock *int64) *StartAutoBuyerCmd {
 	return &StartAutoBuyerCmd{
 		Account:           account,
+		Passphrase:        passphrase,
 		BalanceToMaintain: balanceToMaintain,
 		MaxFeePerKb:       maxFeePerKb,
 		MaxPriceRelative:  maxPriceRelative,
