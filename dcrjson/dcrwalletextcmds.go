@@ -303,7 +303,7 @@ type StartAutoBuyerCmd struct {
 	MaxPriceRelative  *float64
 	MaxPriceAbsolute  *int64
 	VotingAddress     *string
-	PoolAddres        *string
+	PoolAddress       *string
 	PoolFees          *float64
 	MaxPerBlock       *int64
 }
@@ -318,7 +318,7 @@ func NewStartAutoBuyerCmd(account string, balanceToMaintain *int64, maxFeePerKb 
 		MaxPriceRelative:  maxPriceRelative,
 		MaxPriceAbsolute:  maxPriceAbsolute,
 		VotingAddress:     votingAddress,
-		PoolAddres:        poolAddress,
+		PoolAddress:       poolAddress,
 		MaxPerBlock:       maxPerBlock,
 	}
 }
