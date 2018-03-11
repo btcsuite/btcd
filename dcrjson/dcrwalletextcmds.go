@@ -321,6 +321,7 @@ func NewStartAutoBuyerCmd(account string, passphrase string, balanceToMaintain *
 		MaxPriceAbsolute:  maxPriceAbsolute,
 		VotingAddress:     votingAddress,
 		PoolAddress:       poolAddress,
+		PoolFees:          poolFees,
 		MaxPerBlock:       maxPerBlock,
 	}
 }
@@ -628,7 +629,7 @@ func init() {
 	MustRegisterCmd("signrawtransactions", (*SignRawTransactionsCmd)(nil), flags)
 	MustRegisterCmd("stakepooluserinfo", (*StakePoolUserInfoCmd)(nil), flags)
 	MustRegisterCmd("startautobuyer", (*StartAutoBuyerCmd)(nil), flags)
-	MustRegisterCmd("stopautobuyer", (*StartAutoBuyerCmd)(nil), flags)
+	MustRegisterCmd("stopautobuyer", (*StopAutoBuyerCmd)(nil), flags)
 	MustRegisterCmd("sweepaccount", (*SweepAccountCmd)(nil), flags)
 	MustRegisterCmd("walletinfo", (*WalletInfoCmd)(nil), flags)
 }
