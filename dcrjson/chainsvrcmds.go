@@ -58,6 +58,7 @@ type CreateRawTransactionCmd struct {
 	Inputs   []TransactionInput
 	Amounts  map[string]float64 `jsonrpcusage:"{\"address\":amount,...}"` // In DCR
 	LockTime *int64
+	Expiry   *int64
 }
 
 // NewCreateRawTransactionCmd returns a new instance which can be used to issue
@@ -65,12 +66,13 @@ type CreateRawTransactionCmd struct {
 //
 // Amounts are in BTC.
 func NewCreateRawTransactionCmd(inputs []TransactionInput, amounts map[string]float64,
-	lockTime *int64) *CreateRawTransactionCmd {
+	lockTime *int64, expiry *int64) *CreateRawTransactionCmd {
 
 	return &CreateRawTransactionCmd{
 		Inputs:   inputs,
 		Amounts:  amounts,
 		LockTime: lockTime,
+		Expiry:   expiry,
 	}
 }
 

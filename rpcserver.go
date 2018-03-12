@@ -621,6 +621,11 @@ func messageToHex(msg wire.Message) (string, error) {
 func handleCreateRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	c := cmd.(*dcrjson.CreateRawTransactionCmd)
 
+	// Validate expiry, if given.
+	if c.Expiry != nil && *c.Expiry < 0 {
+		return nil, rpcInvalidError("Expiry out of range")
+	}
+
 	// Validate the locktime, if given.
 	if c.LockTime != nil &&
 		(*c.LockTime < 0 ||
@@ -701,6 +706,11 @@ func handleCreateRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan 
 	// Set the Locktime, if given.
 	if c.LockTime != nil {
 		mtx.LockTime = uint32(*c.LockTime)
+	}
+
+	// Set the Expiry, if given.
+	if c.Expiry != nil {
+		mtx.Expiry = uint32(*c.Expiry)
 	}
 
 	// Return the serialized and hex-encoded transaction.  Note that this
