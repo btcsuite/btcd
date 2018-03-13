@@ -122,6 +122,16 @@ service btcd {
 		returns (SubmitTransactionResponse) {
 	}
 
+	// Stream the entire UTXO set.
+	// In order to communicate the block hash at which the UTXO set is streamed,
+	// the caller can provide the latest block hash at the time of calling and 
+	// this method will fail if that hash is already outdated when the stream 
+	// starts.  If the caller is not care about the block the UTXO set 
+	// corresponds to, he can ignore this argument.
+	rpc GetUnspentTransactionOutputSet(GetUnspentTransactionOutputSetRequest)
+		returns (stream UnspentOutput) {
+	}
+
 	// Returns all known transactions for the given address.
 	//
 	// This method requires the address and transaction index.
@@ -633,6 +643,15 @@ message SubmitTransactionRequest {
 }
 message SubmitTransactionResponse {
 	bytes hash = 1;
+}
+
+message GetUnspentTransactionOutputSetRequest {
+	// In order to communicate the block hash at which the UTXO set is streamed,
+	// the caller can provide the latest block hash at the time of calling and 
+	// this method will fail if that hash is already outdated when the stream 
+	// starts.  If the caller is not care about the block the UTXO set 
+	// corresponds to, he can ignore this argument.
+	bytes latest_block_hash = 1;
 }
 
 message GetAddressTransactionsRequest {

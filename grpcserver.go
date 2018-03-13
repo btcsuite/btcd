@@ -1261,6 +1261,71 @@ func (s *grpcServer) SubmitTransaction(ctx context.Context, req *btcrpc.SubmitTr
 	return &btcrpc.SubmitTransactionResponse{Hash: tx.Hash()[:]}, nil
 }
 
+func (s *grpcServer) GetUnspentTransactionOutputSet(req *btcrpc.GetUnspentTransactionOutputSetRequest, stream btcrpc.Btcd_GetUnspentTransactionOutputSetServer) error {
+
+	stopSignal := make(chan struct{})
+	bestState, utxoStream, err := s.server.chain.StreamEntireUtxoSet(stopSignal)
+	if err != nil {
+		return err
+	}
+
+	defer close(stopSignal)
+
+	if latestBlockHash := req.GetLatestBlockHash(); len(latestBlockHash) != 0 {
+		// Caller wants to make sure he knows what block the UTXO set is for.
+		hash, err := chainhash.NewHash(latestBlockHash)
+		if err != nil {
+			return err
+		}
+		if !bestState.Hash.IsEqual(hash) {
+			return errors.New("latest block hash out of date, try again")
+		}
+	}
+
+	for {
+		var entry *blockchain.StreamedUtxoEntry
+		select {
+		case <-s.quit:
+			return errors.New("btcd shutting down")
+
+		case <-stream.Context().Done():
+			return nil // client disconnected
+
+		case e, done := <-utxoStream:
+			if done {
+				return nil
+			}
+			entry = e
+		}
+
+		if entry.Err != nil {
+			return entry.Err
+		}
+
+		highestUnspent := entry.Utxo.HighestUnspentOutput()
+		for i := uint32(0); i < highestUnspent; i++ {
+			if entry.Utxo.IsOutputSpent(i) {
+				continue
+			}
+
+			toStream := &btcrpc.UnspentOutput{
+				Outpoint: &btcrpc.Transaction_Input_Outpoint{
+					Hash:  entry.TxHash[:],
+					Index: i,
+				},
+				PubkeyScript: entry.Utxo.PkScriptByIndex(i),
+				Value:        entry.Utxo.AmountByIndex(i),
+				IsCoinbase:   entry.Utxo.IsCoinBase(),
+				BlockHeight:  entry.Utxo.BlockHeight(),
+			}
+
+			if err := stream.Send(toStream); err != nil {
+				return err
+			}
+		}
+	}
+}
+
 func (s *grpcServer) GetAddressTransactions(ctx context.Context, req *btcrpc.GetAddressTransactionsRequest) (*btcrpc.GetAddressTransactionsResponse, error) {
 	if s.server.addrIndex == nil {
 		return nil, errors.New("addrindex required for this call")
