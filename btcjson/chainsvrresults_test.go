@@ -17,6 +17,8 @@ import (
 func TestChainSvrCustomResults(t *testing.T) {
 	t.Parallel()
 
+	staticFee := float64(0.00002)
+
 	tests := []struct {
 		name     string
 		result   interface{}
@@ -67,6 +69,22 @@ func TestChainSvrCustomResults(t *testing.T) {
 				Sequence: 4294967295,
 			},
 			expected: `{"txid":"123","vout":1,"scriptSig":{"asm":"0","hex":"00"},"prevOut":{"addresses":["addr1"],"value":0},"sequence":4294967295}`,
+		},
+		{
+			name: "estimatesmartfee with no errors",
+			result: &btcjson.EstimateSmartFeeResult{
+				FeeRate: &staticFee,
+				Blocks:  6,
+			},
+			expected: `{"feerate":0.00002,"blocks":6}`,
+		},
+		{
+			name: "estimatesmartfee with errors",
+			result: &btcjson.EstimateSmartFeeResult{
+				Errors: &[]string{"An error has occurred"},
+				Blocks: 6,
+			},
+			expected: `{"errors":["An error has occurred"],"blocks":6}`,
 		},
 	}
 
