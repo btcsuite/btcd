@@ -480,12 +480,13 @@ func (b *BlockChain) connectTransactions(view *UtxoViewpoint, block *dcrutil.Blo
 		}
 	}
 
+	view.SetStakeViewpoint(thisNodeStakeViewpoint)
+	err := view.fetchInputUtxos(b.db, block, parent)
+	if err != nil {
+		return err
+	}
+
 	for i, stx := range block.STransactions() {
-		view.SetStakeViewpoint(thisNodeStakeViewpoint)
-		err := view.fetchInputUtxos(b.db, block, parent)
-		if err != nil {
-			return err
-		}
 		err = view.connectTransaction(stx, block.Height(), uint32(i), stxos)
 		if err != nil {
 			return err
