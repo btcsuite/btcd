@@ -419,11 +419,11 @@ const (
 	// PKFCompressed indicates the pay-to-pubkey address format is a
 	// compressed public key.
 	PKFCompressed
-
-	// PKFHybrid indicates the pay-to-pubkey address format is a hybrid
-	// public key.
-	PKFHybrid
 )
+
+// ErrInvalidPubKeyFormat indicates that a serialized pubkey is unusable as it
+// is neither in the uncompressed or compressed format.
+var ErrInvalidPubKeyFormat = errors.New("invalid pubkey format")
 
 // AddressSecpPubKey is an Address for a secp256k1 pay-to-pubkey transaction.
 type AddressSecpPubKey struct {
@@ -435,8 +435,7 @@ type AddressSecpPubKey struct {
 
 // NewAddressSecpPubKey returns a new AddressSecpPubKey which represents a
 // pay-to-pubkey address, using a secp256k1 pubkey.  The serializedPubKey
-// parameter must be a valid pubkey and can be uncompressed, compressed, or
-// hybrid.
+// parameter must be a valid pubkey and must be uncompressed or compressed.
 func NewAddressSecpPubKey(serializedPubKey []byte,
 	net *chaincfg.Params) (*AddressSecpPubKey, error) {
 	pubKey, err := chainec.Secp256k1.ParsePubKey(serializedPubKey)
@@ -448,12 +447,14 @@ func NewAddressSecpPubKey(serializedPubKey []byte,
 	// from dcrec, but do it here to avoid API churn.  We already know the
 	// pubkey is valid since it parsed above, so it's safe to simply examine
 	// the leading byte to get the format.
-	pkFormat := PKFUncompressed
+	var pkFormat PubKeyFormat
 	switch serializedPubKey[0] {
 	case 0x02, 0x03:
 		pkFormat = PKFCompressed
-	case 0x06, 0x07:
-		pkFormat = PKFHybrid
+	case 0x04:
+		pkFormat = PKFUncompressed
+	default:
+		return nil, ErrInvalidPubKeyFormat
 	}
 
 	return &AddressSecpPubKey{
@@ -475,9 +476,6 @@ func (a *AddressSecpPubKey) serialize() []byte {
 
 	case PKFCompressed:
 		return a.pubKey.SerializeCompressed()
-
-	case PKFHybrid:
-		return a.pubKey.SerializeHybrid()
 	}
 }
 
@@ -671,8 +669,7 @@ type AddressSecSchnorrPubKey struct {
 
 // NewAddressSecSchnorrPubKey returns a new AddressSecpPubKey which represents a
 // pay-to-pubkey address, using a secp256k1 pubkey.  The serializedPubKey
-// parameter must be a valid pubkey and can be uncompressed, compressed, or
-// hybrid.
+// parameter must be a valid pubkey and must be compressed.
 func NewAddressSecSchnorrPubKey(serializedPubKey []byte,
 	net *chaincfg.Params) (*AddressSecSchnorrPubKey, error) {
 	pubKey, err := chainec.SecSchnorr.ParsePubKey(serializedPubKey)
