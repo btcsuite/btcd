@@ -76,11 +76,6 @@ func (p PublicKey) SerializeCompressed() []byte {
 	return p.Serialize()
 }
 
-// SerializeHybrid satisfies the chainec PublicKey interface.
-func (p PublicKey) SerializeHybrid() []byte {
-	return p.Serialize()
-}
-
 // GetCurve satisfies the chainec PublicKey interface.
 func (p PublicKey) GetCurve() interface{} {
 	return p.Curve

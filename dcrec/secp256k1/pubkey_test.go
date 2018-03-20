@@ -86,8 +86,7 @@ var pubKeyTests = []pubKeyTest{
 			0xd4, 0xc0, 0x3f, 0x99, 0x9b, 0x86, 0x43, 0xf6, 0x56,
 			0xb4, 0x12, 0xa3,
 		},
-		isValid: true,
-		format:  pubkeyHybrid,
+		isValid: false,
 	},
 	{
 		name: "uncompressed as hybrid wrong",
@@ -210,8 +209,7 @@ var pubKeyTests = []pubKeyTest{
 			0xa6, 0x85, 0x54, 0x19, 0x9c, 0x47, 0xd0, 0x8f, 0xfb,
 			0x10, 0xd4, 0xb8,
 		},
-		format:  pubkeyHybrid,
-		isValid: true,
+		isValid: false,
 	},
 }
 
@@ -236,8 +234,6 @@ func TestPubKeys(t *testing.T) {
 			pkStr = (*PublicKey)(pk).SerializeUncompressed()
 		case pubkeyCompressed:
 			pkStr = (*PublicKey)(pk).SerializeCompressed()
-		case pubkeyHybrid:
-			pkStr = (*PublicKey)(pk).SerializeHybrid()
 		}
 		if !bytes.Equal(test.key, pkStr) {
 			t.Errorf("%s pubkey: serialized keys do not match.",

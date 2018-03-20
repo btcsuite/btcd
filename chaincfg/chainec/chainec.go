@@ -25,10 +25,6 @@ type PublicKey interface {
 	// available).
 	SerializeCompressed() []byte
 
-	// SerializeHybrid serializes to the hybrid format (if
-	// available).
-	SerializeHybrid() []byte
-
 	// ToECDSA converts the public key to an ECDSA public key.
 	ToECDSA() *ecdsa.PublicKey
 
@@ -156,10 +152,6 @@ type DSA interface {
 	// PubKeyBytesLenCompressed returns the length of the compressed
 	// serialization method for a public key.
 	PubKeyBytesLenCompressed() int
-
-	// PubKeyBytesLenHybrid returns the length of the hybrid
-	// serialization method for a public key.
-	PubKeyBytesLenHybrid() int
 
 	// ----------------------------------------------------------------------------
 	// Signatures

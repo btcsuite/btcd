@@ -36,7 +36,6 @@ type secp256k1DSA struct {
 	pubKeyBytesLen             func() int
 	pubKeyBytesLenUncompressed func() int
 	pubKeyBytesLenCompressed   func() int
-	pubKeyBytesLenHybrid       func() int
 
 	// Signatures
 	newSignature      func(r *big.Int, s *big.Int) Signature
@@ -110,9 +109,6 @@ func (sp secp256k1DSA) PubKeyBytesLenUncompressed() int {
 	return sp.pubKeyBytesLenUncompressed()
 }
 func (sp secp256k1DSA) PubKeyBytesLenCompressed() int {
-	return sp.pubKeyBytesLenCompressed()
-}
-func (sp secp256k1DSA) PubKeyBytesLenHybrid() int {
 	return sp.pubKeyBytesLenCompressed()
 }
 
@@ -248,9 +244,6 @@ func newSecp256k1DSA() DSA {
 		},
 		pubKeyBytesLenCompressed: func() int {
 			return secp256k1.PubKeyBytesLenCompressed
-		},
-		pubKeyBytesLenHybrid: func() int {
-			return secp256k1.PubKeyBytesLenHybrid
 		},
 
 		// Signatures

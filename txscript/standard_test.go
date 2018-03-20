@@ -144,22 +144,6 @@ func TestExtractPkScriptAddrs(t *testing.T) {
 			class:   txscript.PubKeyTy,
 		},
 		{
-			name: "standard p2pk with hybrid pubkey (0x06)",
-			script: decodeHex("4106192d74d0cb94344c9569c2e7790157" +
-				"3d8d7903c3ebec3a957724895dca52c6b40d45264838" +
-				"c0bd96852662ce6a847b197376830160c6d2eb5e6a4c" +
-				"44d33f453eac"),
-			addrs: []dcrutil.Address{
-				newAddressPubKey(decodeHex("06192d74d0cb94344" +
-					"c9569c2e77901573d8d7903c3ebec3a95772" +
-					"4895dca52c6b40d45264838c0bd96852662c" +
-					"e6a847b197376830160c6d2eb5e6a4c44d33" +
-					"f453e")),
-			},
-			reqSigs: 1,
-			class:   txscript.PubKeyTy,
-		},
-		{
 			name: "standard p2pk with compressed pubkey (0x03)",
 			script: decodeHex("2103b0bd634234abbb1ba1e986e884185c" +
 				"61cf43e001f9137f23c2c409273eb16e65ac"),
@@ -179,22 +163,6 @@ func TestExtractPkScriptAddrs(t *testing.T) {
 				"1e0908ef7bac"),
 			addrs: []dcrutil.Address{
 				newAddressPubKey(decodeHex("04b0bd634234abbb1" +
-					"ba1e986e884185c61cf43e001f9137f23c2c" +
-					"409273eb16e6537a576782eba668a7ef8bd3" +
-					"b3cfb1edb7117ab65129b8a2e681f3c1e090" +
-					"8ef7b")),
-			},
-			reqSigs: 1,
-			class:   txscript.PubKeyTy,
-		},
-		{
-			name: "standard p2pk with hybrid pubkey (0x07)",
-			script: decodeHex("4107b0bd634234abbb1ba1e986e884185c" +
-				"61cf43e001f9137f23c2c409273eb16e6537a576782e" +
-				"ba668a7ef8bd3b3cfb1edb7117ab65129b8a2e681f3c" +
-				"1e0908ef7bac"),
-			addrs: []dcrutil.Address{
-				newAddressPubKey(decodeHex("07b0bd634234abbb1" +
 					"ba1e986e884185c61cf43e001f9137f23c2c" +
 					"409273eb16e6537a576782eba668a7ef8bd3" +
 					"b3cfb1edb7117ab65129b8a2e681f3c1e090" +

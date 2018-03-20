@@ -36,7 +36,6 @@ type secSchnorrDSA struct {
 	pubKeyBytesLen             func() int
 	pubKeyBytesLenUncompressed func() int
 	pubKeyBytesLenCompressed   func() int
-	pubKeyBytesLenHybrid       func() int
 
 	// Signatures
 	newSignature      func(r *big.Int, s *big.Int) Signature
@@ -106,9 +105,6 @@ func (sp secSchnorrDSA) PubKeyBytesLenUncompressed() int {
 	return sp.pubKeyBytesLenUncompressed()
 }
 func (sp secSchnorrDSA) PubKeyBytesLenCompressed() int {
-	return sp.pubKeyBytesLenCompressed()
-}
-func (sp secSchnorrDSA) PubKeyBytesLenHybrid() int {
 	return sp.pubKeyBytesLenCompressed()
 }
 
@@ -243,9 +239,6 @@ func newSecSchnorrDSA() DSA {
 			return schnorr.PubKeyBytesLen
 		},
 		pubKeyBytesLenCompressed: func() int {
-			return schnorr.PubKeyBytesLen
-		},
-		pubKeyBytesLenHybrid: func() int {
 			return schnorr.PubKeyBytesLen
 		},
 
