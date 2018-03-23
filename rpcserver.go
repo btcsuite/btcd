@@ -6058,7 +6058,7 @@ func (s *rpcServer) jsonRPCRead(w http.ResponseWriter, r *http.Request, isAdmin 
 	// the CloseNotifer on the ResponseWriter is not available.
 	closeChan := make(chan struct{}, 1)
 	go func() {
-		_, err = conn.Read(make([]byte, 1))
+		_, err := conn.Read(make([]byte, 1))
 		if err != nil {
 			close(closeChan)
 		}
