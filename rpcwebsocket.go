@@ -883,7 +883,7 @@ func (m *wsNotificationManager) RegisterSpentRequests(wsc *wsClient, ops []*wire
 // addSpentRequests modifies a map of watched outpoints to sets of websocket
 // clients to add a new request watch all of the outpoints in ops and create
 // and send a notification when spent to the websocket client wsc.
-func (*wsNotificationManager) addSpentRequests(opMap map[wire.OutPoint]map[chan struct{}]*wsClient,
+func (m *wsNotificationManager) addSpentRequests(opMap map[wire.OutPoint]map[chan struct{}]*wsClient,
 	wsc *wsClient, ops []*wire.OutPoint) {
 
 	for _, op := range ops {
@@ -899,6 +899,22 @@ func (*wsNotificationManager) addSpentRequests(opMap map[wire.OutPoint]map[chan 
 			opMap[*op] = cmap
 		}
 		cmap[wsc.quit] = wsc
+	}
+
+	// Check if any transactions spending these outputs already exists in
+	// the mempool, if so send the notification immediately.
+	spends := make(map[chainhash.Hash]*btcutil.Tx)
+	for _, op := range ops {
+		spend := m.server.cfg.TxMemPool.CheckSpend(*op)
+		if spend != nil {
+			rpcsLog.Debugf("Found existing mempool spend for "+
+				"outpoint<%v>: %v", op, spend.Hash())
+			spends[*spend.Hash()] = spend
+		}
+	}
+
+	for _, spend := range spends {
+		m.notifyForTx(opMap, nil, spend, nil)
 	}
 }
 
