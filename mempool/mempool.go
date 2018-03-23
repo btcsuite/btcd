@@ -571,6 +571,17 @@ func (mp *TxPool) checkPoolDoubleSpend(tx *btcutil.Tx) error {
 	return nil
 }
 
+// CheckSpends checks whether the passed outpoint is already spent by a
+// transaction in the mempool. If that's the case the spending transaction will
+// be returned, if not nil will be returned.
+func (mp *TxPool) CheckSpend(op wire.OutPoint) *btcutil.Tx {
+	mp.mtx.RLock()
+	txR := mp.outpoints[op]
+	mp.mtx.RUnlock()
+
+	return txR
+}
+
 // fetchInputUtxos loads utxo details about the input transactions referenced by
 // the passed transaction.  First, it loads the details form the viewpoint of
 // the main chain, then it adjusts them based upon the contents of the
