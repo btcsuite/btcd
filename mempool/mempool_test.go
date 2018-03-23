@@ -794,3 +794,72 @@ func TestMultiInputOrphanDoubleSpend(t *testing.T) {
 	// was not moved to the transaction pool.
 	testPoolMembership(tc, doubleSpendTx, false, false)
 }
+
+// TestCheckSpend tests that CheckSpend returns the expected spends found in
+// the mempool.
+func TestCheckSpend(t *testing.T) {
+	t.Parallel()
+
+	harness, outputs, err := newPoolHarness(&chaincfg.MainNetParams)
+	if err != nil {
+		t.Fatalf("unable to create test pool: %v", err)
+	}
+
+	// The mempool is empty, so none of the spendable outputs should have a
+	// spend there.
+	for _, op := range outputs {
+		spend := harness.txPool.CheckSpend(op.outPoint)
+		if spend != nil {
+			t.Fatalf("Unexpeced spend found in pool: %v", spend)
+		}
+	}
+
+	// Create a chain of transactions rooted with the first spendable
+	// output provided by the harness.
+	const txChainLength = 5
+	chainedTxns, err := harness.CreateTxChain(outputs[0], txChainLength)
+	if err != nil {
+		t.Fatalf("unable to create transaction chain: %v", err)
+	}
+	for _, tx := range chainedTxns {
+		_, err := harness.txPool.ProcessTransaction(tx, true,
+			false, 0)
+		if err != nil {
+			t.Fatalf("ProcessTransaction: failed to accept "+
+				"tx: %v", err)
+		}
+	}
+
+	// The first tx in the chain should be the spend of the spendable
+	// output.
+	op := outputs[0].outPoint
+	spend := harness.txPool.CheckSpend(op)
+	if spend != chainedTxns[0] {
+		t.Fatalf("expected %v to be spent by %v, instead "+
+			"got %v", op, chainedTxns[0], spend)
+	}
+
+	// Now all but the last tx should be spent by the next.
+	for i := 0; i < len(chainedTxns)-1; i++ {
+		op = wire.OutPoint{
+			Hash:  *chainedTxns[i].Hash(),
+			Index: 0,
+		}
+		expSpend := chainedTxns[i+1]
+		spend = harness.txPool.CheckSpend(op)
+		if spend != expSpend {
+			t.Fatalf("expected %v to be spent by %v, instead "+
+				"got %v", op, expSpend, spend)
+		}
+	}
+
+	// The last tx should have no spend.
+	op = wire.OutPoint{
+		Hash:  *chainedTxns[txChainLength-1].Hash(),
+		Index: 0,
+	}
+	spend = harness.txPool.CheckSpend(op)
+	if spend != nil {
+		t.Fatalf("Unexpeced spend found in pool: %v", spend)
+	}
+}
