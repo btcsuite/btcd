@@ -509,10 +509,64 @@ func dropBlockIDIndex(db database.DB) error {
 // exists.  Since the address index relies on it, the address index will also be
 // dropped when it exists.
 func DropTxIndex(db database.DB, interrupt <-chan struct{}) error {
-	err := dropIndex(db, addrIndexKey, addrIndexName, interrupt)
+	// Nothing to do if the index doesn't already exist.
+	exists, err := existsIndex(db, txIndexKey, txIndexName)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		log.Infof("Not dropping %s because it does not exist", txIndexName)
+		return nil
+	}
+
+	// Mark that the index is in the process of being dropped so that it
+	// can be resumed on the next start if interrupted before the process is
+	// complete.
+	err = markIndexDeletion(db, txIndexKey)
 	if err != nil {
 		return err
 	}
 
-	return dropIndex(db, txIndexKey, txIndexName, interrupt)
+	// Drop the address index if it exists, as it depends on the transaction
+	// index.
+	err = DropAddrIndex(db, interrupt)
+	if err != nil {
+		return err
+	}
+
+	log.Infof("Dropping all %s entries.  This might take a while...",
+		txIndexName)
+
+	// Since the indexes can be so large, attempting to simply delete
+	// the bucket in a single database transaction would result in massive
+	// memory usage and likely crash many systems due to ulimits.  In order
+	// to avoid this, use a cursor to delete a maximum number of entries out
+	// of the bucket at a time.
+	err = incrementalFlatDrop(db, txIndexKey, txIndexName, interrupt)
+	if err != nil {
+		return err
+	}
+
+	// Call extra index specific deinitialization for the transaction index.
+	err = dropBlockIDIndex(db)
+	if err != nil {
+		return err
+	}
+
+	// Remove the index tip, index bucket, and in-progress drop flag now
+	// that all index entries have been removed.
+	err = dropIndexMetadata(db, txIndexKey, txIndexName)
+	if err != nil {
+		return err
+	}
+
+	log.Infof("Dropped %s", txIndexName)
+	return nil
+}
+
+// DropIndex drops the transaction index from the provided database if it
+// exists.  Since the address index relies on it, the address index will also be
+// dropped when it exists.
+func (*TxIndex) DropIndex(db database.DB, interrupt <-chan struct{}) error {
+	return DropTxIndex(db, interrupt)
 }

@@ -60,6 +60,13 @@ type Indexer interface {
 	DisconnectBlock(dbTx database.Tx, block, parent *dcrutil.Block, view *blockchain.UtxoViewpoint) error
 }
 
+// IndexDropper provides a method to remove an index from the database. Indexers
+// may implement this for a more efficient way of deleting themselves from the
+// database rather than simply dropping a bucket.
+type IndexDropper interface {
+	DropIndex(db database.DB, interrupt <-chan struct{}) error
+}
+
 // AssertError identifies an error that indicates an internal code consistency
 // issue and should be treated as a critical and unrecoverable error.
 type AssertError string
