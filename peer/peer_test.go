@@ -1,5 +1,5 @@
 // Copyright (c) 2015-2016 The btcsuite developers
-// Copyright (c) 2016-2017 The Decred developers
+// Copyright (c) 2016-2018 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -338,9 +338,6 @@ func TestPeerListeners(t *testing.T) {
 			OnPong: func(p *peer.Peer, msg *wire.MsgPong) {
 				ok <- msg
 			},
-			OnAlert: func(p *peer.Peer, msg *wire.MsgAlert) {
-				ok <- msg
-			},
 			OnMemPool: func(p *peer.Peer, msg *wire.MsgMemPool) {
 				ok <- msg
 			},
@@ -448,10 +445,6 @@ func TestPeerListeners(t *testing.T) {
 		{
 			"OnPong",
 			wire.NewMsgPong(42),
-		},
-		{
-			"OnAlert",
-			wire.NewMsgAlert([]byte("payload"), []byte("signature")),
 		},
 		{
 			"OnMemPool",

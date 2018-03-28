@@ -1,5 +1,5 @@
 // Copyright (c) 2013-2016 The btcsuite developers
-// Copyright (c) 2015-2016 The Decred developers
+// Copyright (c) 2015-2018 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -68,7 +68,6 @@ func TestMessage(t *testing.T) {
 	msgPong := NewMsgPong(123123)
 	msgGetHeaders := NewMsgGetHeaders()
 	msgHeaders := NewMsgHeaders()
-	msgAlert := NewMsgAlert([]byte("payload"), []byte("signature"))
 	msgMemPool := NewMsgMemPool()
 	msgFilterAdd := NewMsgFilterAdd([]byte{0x01})
 	msgFilterClear := NewMsgFilterClear()
@@ -116,7 +115,6 @@ func TestMessage(t *testing.T) {
 		{msgPong, msgPong, pver, MainNet, 32},                // [11]
 		{msgGetHeaders, msgGetHeaders, pver, MainNet, 61},    // [12]
 		{msgHeaders, msgHeaders, pver, MainNet, 25},          // [13]
-		{msgAlert, msgAlert, pver, MainNet, 42},              // [14]
 		{msgMemPool, msgMemPool, pver, MainNet, 24},          // [15]
 		{msgFilterAdd, msgFilterAdd, pver, MainNet, 26},      // [16]
 		{msgFilterClear, msgFilterClear, pver, MainNet, 24},  // [17]
