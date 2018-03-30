@@ -87,7 +87,7 @@
   branch = "master"
   name = "github.com/decred/base58"
   packages = ["."]
-  revision = "229e657bc9be5d592855a910428907f851950ed5"
+  revision = "56c501706f00d9e1cfacee19a27117e12da24734"
 
 [[projects]]
   name = "github.com/jessevdk/go-flags"
@@ -114,7 +114,7 @@
     "ripemd160",
     "ssh/terminal"
   ]
-  revision = "beaf6a35706e5032ae4c3fcf342c663c069f44d2"
+  revision = "88942b9c40a4c9d203b82b3731787b672d6e809b"
 
 [[projects]]
   branch = "master"
@@ -123,7 +123,7 @@
     "unix",
     "windows"
   ]
-  revision = "f6cff0780e542efa0c8e864dc8fa522808f6a598"
+  revision = "13d03a9a82fba647c21a0ef8fba44a795d0f0835"
 
 [solve-meta]
   analyzer-name = "dep"

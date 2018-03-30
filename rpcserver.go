@@ -287,6 +287,7 @@ var rpcAskWallet = map[string]struct{}{
 	"signrawtransaction":      {},
 	"sweepaccount":            {},
 	"stakepooluserinfo":       {},
+	"verifyseed":              {},
 	"walletinfo":              {},
 	"walletlock":              {},
 	"walletpassphrase":        {},

@@ -1,5 +1,5 @@
 // Copyright (c) 2014 The btcsuite developers
-// Copyright (c) 2015-2016 The Decred developers
+// Copyright (c) 2015-2018 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -1069,6 +1069,35 @@ func TestWalletSvrCmds(t *testing.T) {
 				Inputs:   &[]dcrjson.RawTxInput{},
 				PrivKeys: &[]string{},
 				Flags:    dcrjson.String("ALL"),
+			},
+		},
+		{
+			name: "verifyseed",
+			newCmd: func() (interface{}, error) {
+				return dcrjson.NewCmd("verifyseed", "abc")
+			},
+			staticCmd: func() interface{} {
+				return dcrjson.NewVerifySeedCmd("abc", nil)
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"verifyseed","params":["abc"],"id":1}`,
+			unmarshalled: &dcrjson.VerifySeedCmd{
+				Seed:    "abc",
+				Account: nil,
+			},
+		},
+		{
+			name: "verifyseed optional",
+			newCmd: func() (interface{}, error) {
+				return dcrjson.NewCmd("verifyseed", "abc", 5)
+			},
+			staticCmd: func() interface{} {
+				account := dcrjson.Uint32(5)
+				return dcrjson.NewVerifySeedCmd("abc", account)
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"verifyseed","params":["abc",5],"id":1}`,
+			unmarshalled: &dcrjson.VerifySeedCmd{
+				Seed:    "abc",
+				Account: dcrjson.Uint32(5),
 			},
 		},
 		{

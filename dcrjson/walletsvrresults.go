@@ -1,5 +1,5 @@
 // Copyright (c) 2014 The btcsuite developers
-// Copyright (c) 2015-2016 The Decred developers
+// Copyright (c) 2015-2018 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -185,6 +185,13 @@ type SignRawTransactionResult struct {
 	Hex      string                    `json:"hex"`
 	Complete bool                      `json:"complete"`
 	Errors   []SignRawTransactionError `json:"errors,omitempty"`
+}
+
+// VerifySeedResult models the data returned by the wallet server verify
+// seed command.
+type VerifySeedResult struct {
+	Result   bool   `json:"keyresult"`
+	CoinType uint32 `json:"cointype"`
 }
 
 // ValidateAddressWalletResult models the data returned by the wallet server
