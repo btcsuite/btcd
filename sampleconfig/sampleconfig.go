@@ -169,9 +169,6 @@ const FileContents = `[Application Options]
 ; Disable listening for incoming connections.  This will override all listeners.
 ; nolisten=1
 
-; Disable peer bloom filtering.
-; nopeerbloomfilters=1
-
 
 ; ------------------------------------------------------------------------------
 ; RPC server options - The following options control the built-in RPC server

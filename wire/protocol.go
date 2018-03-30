@@ -20,7 +20,7 @@ const (
 	ProtocolVersion uint32 = 6
 
 	// NodeBloomVersion is the protocol version which added the SFNodeBloom
-	// service flag.
+	// service flag (unused).
 	NodeBloomVersion uint32 = 2
 
 	// SendHeadersVersion is the protocol version which added a new

@@ -46,10 +46,6 @@ const (
 	CmdMemPool        = "mempool"
 	CmdMiningState    = "miningstate"
 	CmdGetMiningState = "getminings"
-	CmdFilterAdd      = "filteradd"
-	CmdFilterClear    = "filterclear"
-	CmdFilterLoad     = "filterload"
-	CmdMerkleBlock    = "merkleblock"
 	CmdReject         = "reject"
 	CmdSendHeaders    = "sendheaders"
 	CmdFeeFilter      = "feefilter"
@@ -127,18 +123,6 @@ func makeEmptyMessage(command string) (Message, error) {
 
 	case CmdGetMiningState:
 		msg = &MsgGetMiningState{}
-
-	case CmdFilterAdd:
-		msg = &MsgFilterAdd{}
-
-	case CmdFilterClear:
-		msg = &MsgFilterClear{}
-
-	case CmdFilterLoad:
-		msg = &MsgFilterLoad{}
-
-	case CmdMerkleBlock:
-		msg = &MsgMerkleBlock{}
 
 	case CmdReject:
 		msg = &MsgReject{}

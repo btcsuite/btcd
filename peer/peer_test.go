@@ -386,18 +386,6 @@ func TestPeerListeners(t *testing.T) {
 			OnFeeFilter: func(p *peer.Peer, msg *wire.MsgFeeFilter) {
 				ok <- msg
 			},
-			OnFilterAdd: func(p *peer.Peer, msg *wire.MsgFilterAdd) {
-				ok <- msg
-			},
-			OnFilterClear: func(p *peer.Peer, msg *wire.MsgFilterClear) {
-				ok <- msg
-			},
-			OnFilterLoad: func(p *peer.Peer, msg *wire.MsgFilterLoad) {
-				ok <- msg
-			},
-			OnMerkleBlock: func(p *peer.Peer, msg *wire.MsgMerkleBlock) {
-				ok <- msg
-			},
 			OnVersion: func(p *peer.Peer, msg *wire.MsgVersion) {
 				ok <- msg
 			},
@@ -533,26 +521,6 @@ func TestPeerListeners(t *testing.T) {
 		{
 			"OnFeeFilter",
 			wire.NewMsgFeeFilter(15000),
-		},
-		{
-			"OnFilterAdd",
-			wire.NewMsgFilterAdd([]byte{0x01}),
-		},
-		{
-			"OnFilterClear",
-			wire.NewMsgFilterClear(),
-		},
-		{
-			"OnFilterLoad",
-			wire.NewMsgFilterLoad([]byte{0x01}, 10, 0, wire.BloomUpdateNone),
-		},
-		{
-			"OnMerkleBlock",
-			wire.NewMsgMerkleBlock(wire.NewBlockHeader(0,
-				&chainhash.Hash{}, &chainhash.Hash{},
-				&chainhash.Hash{}, 1, [6]byte{},
-				1, 1, 1, 1, 1, 1, 1, 1, 1, [32]byte{},
-				binary.LittleEndian.Uint32([]byte{0xb0, 0x1d, 0xfa, 0xce}))),
 		},
 		// only one version message is allowed
 		// only one verack message is allowed

@@ -117,7 +117,6 @@ Application Options:
       --nominingstatesync   Disable synchronizing the mining state with other nodes
       --allowoldvotes       Enable the addition of very old votes to the mempool
 
-      --nopeerbloomfilters  Disable bloom filtering support.
       --sigcachemaxsize=    The maximum number of entries in the signature
                             verification cache.
       --blocksonly          Do not accept transactions from remote peers.

@@ -340,14 +340,6 @@ func readElement(r io.Reader, element interface{}) error {
 		*e = CurrencyNet(rv)
 		return nil
 
-	case *BloomUpdateType:
-		rv, err := binarySerializer.Uint8(r)
-		if err != nil {
-			return err
-		}
-		*e = BloomUpdateType(rv)
-		return nil
-
 	case *RejectCode:
 		rv, err := binarySerializer.Uint8(r)
 		if err != nil {
@@ -466,13 +458,6 @@ func writeElement(w io.Writer, element interface{}) error {
 
 	case CurrencyNet:
 		err := binarySerializer.PutUint32(w, littleEndian, uint32(e))
-		if err != nil {
-			return err
-		}
-		return nil
-
-	case BloomUpdateType:
-		err := binarySerializer.PutUint8(w, uint8(e))
 		if err != nil {
 			return err
 		}

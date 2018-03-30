@@ -69,9 +69,6 @@ func TestMessage(t *testing.T) {
 	msgGetHeaders := NewMsgGetHeaders()
 	msgHeaders := NewMsgHeaders()
 	msgMemPool := NewMsgMemPool()
-	msgFilterAdd := NewMsgFilterAdd([]byte{0x01})
-	msgFilterClear := NewMsgFilterClear()
-	msgFilterLoad := NewMsgFilterLoad([]byte{0x01}, 10, 0, BloomUpdateNone)
 	msgGetCFilter := NewMsgGetCFilter(&chainhash.Hash{}, GCSFilterExtended)
 	msgGetCFHeaders := NewMsgGetCFHeaders()
 	msgGetCFTypes := NewMsgGetCFTypes()
@@ -79,26 +76,6 @@ func TestMessage(t *testing.T) {
 		[]byte("payload"))
 	msgCFHeaders := NewMsgCFHeaders()
 	msgCFTypes := NewMsgCFTypes([]FilterType{GCSFilterExtended})
-	bh := NewBlockHeader(
-		int32(0),                                    // Version
-		&chainhash.Hash{},                           // PrevHash
-		&chainhash.Hash{},                           // MerkleRoot
-		&chainhash.Hash{},                           // StakeRoot
-		uint16(0x0000),                              // VoteBits
-		[6]byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, // FinalState
-		uint16(0x0000),                              // Voters
-		uint8(0x00),                                 // FreshStake
-		uint8(0x00),                                 // Revocations
-		uint32(0),                                   // Poolsize
-		uint32(0x00000000),                          // Bits
-		int64(0x0000000000000000),                   // Sbits
-		uint32(0),                                   // Height
-		uint32(0),                                   // Size
-		uint32(0x00000000),                          // Nonce
-		[32]byte{},                                  // ExtraData
-		uint32(0xcab005e0),                          // StakeVersion
-	)
-	msgMerkleBlock := NewMsgMerkleBlock(bh)
 	msgReject := NewMsgReject("block", RejectDuplicate, "duplicate block")
 
 	tests := []struct {
@@ -123,10 +100,6 @@ func TestMessage(t *testing.T) {
 		{msgGetHeaders, msgGetHeaders, pver, MainNet, 61},     // [12]
 		{msgHeaders, msgHeaders, pver, MainNet, 25},           // [13]
 		{msgMemPool, msgMemPool, pver, MainNet, 24},           // [15]
-		{msgFilterAdd, msgFilterAdd, pver, MainNet, 26},       // [16]
-		{msgFilterClear, msgFilterClear, pver, MainNet, 24},   // [17]
-		{msgFilterLoad, msgFilterLoad, pver, MainNet, 35},     // [18]
-		{msgMerkleBlock, msgMerkleBlock, pver, MainNet, 215},  // [19]
 		{msgReject, msgReject, pver, MainNet, 79},             // [20]
 		{msgGetCFilter, msgGetCFilter, pver, MainNet, 57},     // [21]
 		{msgGetCFHeaders, msgGetCFHeaders, pver, MainNet, 58}, // [22]

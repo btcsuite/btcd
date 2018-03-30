@@ -30,17 +30,13 @@ A quick overview of the major features peer provides are as follows:
      they see fit (proxies, etc)
    - User agent name and version
    - Decred network
-   - Service support signalling (full nodes, bloom filters, etc)
+   - Service support signalling (full nodes, etc)
    - Maximum supported protocol version
    - Ability to register callbacks for handling Decred protocol messages
  - Inventory message batching and send trickling with known inventory detection
    and avoidance
  - Automatic periodic keep-alive pinging and pong responses
  - Random nonce generation and self connection detection
- - Proper handling of bloom filter related commands when the caller does not
-   specify the related flag to signal support
-   - Disconnects the peer when the protocol version is high enough
-   - Does not invoke the related callbacks for older protocol versions
  - Snapshottable peer statistics such as the total number of bytes read and
    written, the remote address, user agent, and negotiated protocol version
  - Helper functions pushing addresses, getblocks, getheaders, and reject

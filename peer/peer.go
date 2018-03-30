@@ -169,21 +169,6 @@ type MessageListeners struct {
 	// OnFeeFilter is invoked when a peer receives a feefilter wire message.
 	OnFeeFilter func(p *Peer, msg *wire.MsgFeeFilter)
 
-	// OnFilterAdd is invoked when a peer receives a filteradd wire message.
-	OnFilterAdd func(p *Peer, msg *wire.MsgFilterAdd)
-
-	// OnFilterClear is invoked when a peer receives a filterclear wire
-	// message.
-	OnFilterClear func(p *Peer, msg *wire.MsgFilterClear)
-
-	// OnFilterLoad is invoked when a peer receives a filterload wire
-	// message.
-	OnFilterLoad func(p *Peer, msg *wire.MsgFilterLoad)
-
-	// OnMerkleBlock  is invoked when a peer receives a merkleblock wire
-	// message.
-	OnMerkleBlock func(p *Peer, msg *wire.MsgMerkleBlock)
-
 	// OnVersion is invoked when a peer receives a version wire message.
 	OnVersion func(p *Peer, msg *wire.MsgVersion)
 
@@ -1567,26 +1552,6 @@ out:
 		case *wire.MsgFeeFilter:
 			if p.cfg.Listeners.OnFeeFilter != nil {
 				p.cfg.Listeners.OnFeeFilter(p, msg)
-			}
-
-		case *wire.MsgFilterAdd:
-			if p.cfg.Listeners.OnFilterAdd != nil {
-				p.cfg.Listeners.OnFilterAdd(p, msg)
-			}
-
-		case *wire.MsgFilterClear:
-			if p.cfg.Listeners.OnFilterClear != nil {
-				p.cfg.Listeners.OnFilterClear(p, msg)
-			}
-
-		case *wire.MsgFilterLoad:
-			if p.cfg.Listeners.OnFilterLoad != nil {
-				p.cfg.Listeners.OnFilterLoad(p, msg)
-			}
-
-		case *wire.MsgMerkleBlock:
-			if p.cfg.Listeners.OnMerkleBlock != nil {
-				p.cfg.Listeners.OnMerkleBlock(p, msg)
 			}
 
 		case *wire.MsgReject:

@@ -627,47 +627,6 @@ func BenchmarkDecodeNotFound(b *testing.B) {
 	}
 }
 
-// BenchmarkDecodeMerkleBlock performs a benchmark on how long it takes to
-// decode a reasonably sized merkleblock message.
-func BenchmarkDecodeMerkleBlock(b *testing.B) {
-	// Create a message with random data.
-	pver := ProtocolVersion
-	var m MsgMerkleBlock
-	hash, err := chainhash.NewHashFromStr(fmt.Sprintf("%x", 10000))
-	if err != nil {
-		b.Fatalf("NewHashFromStr: unexpected error: %v", err)
-	}
-	m.Header = *NewBlockHeader(1, hash, hash, hash, 0,
-		[6]byte{}, 0, 0, 0, 0, 0, 0, 0, 0, uint32(10000),
-		[32]byte{}, 0xbadc0ffe)
-	for i := 0; i < 105; i++ {
-		hash, err := chainhash.NewHashFromStr(fmt.Sprintf("%x", i))
-		if err != nil {
-			b.Fatalf("NewHashFromStr: unexpected error: %v", err)
-		}
-		m.AddTxHash(hash)
-		m.AddSTxHash(hash)
-		if i%8 == 0 {
-			m.Flags = append(m.Flags, uint8(i))
-		}
-	}
-
-	// Serialize it so the bytes are available to test the decode below.
-	var bb bytes.Buffer
-	if err := m.BtcEncode(&bb, pver); err != nil {
-		b.Fatalf("MsgMerkleBlock.BtcEncode: unexpected error: %v", err)
-	}
-	buf := bb.Bytes()
-
-	r := bytes.NewReader(buf)
-	var msg MsgMerkleBlock
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		r.Seek(0, 0)
-		msg.BtcDecode(r, pver)
-	}
-}
-
 // BenchmarkTxHash performs a benchmark on how long it takes to hash a
 // transaction.
 func BenchmarkTxHash(b *testing.B) {
