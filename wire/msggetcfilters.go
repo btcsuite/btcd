@@ -12,7 +12,7 @@ import (
 
 // MaxGetCFiltersReqRange the maximum number of filters that may be requested in
 // a getcfheaders message.
-const MaxGetCFiltersReqRange = 100
+const MaxGetCFiltersReqRange = 1000
 
 // MsgGetCFilters implements the Message interface and represents a bitcoin
 // getcfilters message. It is used to request committed filters for a range of
