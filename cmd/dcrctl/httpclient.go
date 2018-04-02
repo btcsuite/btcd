@@ -37,20 +37,22 @@ func newHTTPClient(cfg *config) (*http.Client, error) {
 
 	// Configure TLS if needed.
 	var tlsConfig *tls.Config
-	if !cfg.NoTLS && cfg.RPCCert != "" {
-		pem, err := ioutil.ReadFile(cfg.RPCCert)
-		if err != nil {
-			return nil, err
-		}
-
-		pool := x509.NewCertPool()
-		if ok := pool.AppendCertsFromPEM(pem); !ok {
-			return nil, fmt.Errorf("invalid certificate file: %v",
-				cfg.RPCCert)
-		}
+	if !cfg.NoTLS {
 		tlsConfig = &tls.Config{
-			RootCAs:            pool,
 			InsecureSkipVerify: cfg.TLSSkipVerify,
+		}
+		if !cfg.TLSSkipVerify && cfg.RPCCert != "" {
+			pem, err := ioutil.ReadFile(cfg.RPCCert)
+			if err != nil {
+				return nil, err
+			}
+
+			pool := x509.NewCertPool()
+			if ok := pool.AppendCertsFromPEM(pem); !ok {
+				return nil, fmt.Errorf("invalid certificate file: %v",
+					cfg.RPCCert)
+			}
+			tlsConfig.RootCAs = pool
 		}
 	}
 
