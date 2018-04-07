@@ -524,7 +524,7 @@ type SendToAddressCmd struct {
 	Amount                float64
 	Comment               *string
 	CommentTo             *string
-	SubtractFeeFromAmount bool
+	SubtractFeeFromAmount *bool
 }
 
 // NewSendToAddressCmd returns a new instance which can be used to issue a
@@ -538,7 +538,7 @@ func NewSendToAddressCmd(address string, amount float64, comment, commentTo *str
 		Amount:                amount,
 		Comment:               comment,
 		CommentTo:             commentTo,
-		SubtractFeeFromAmount: subtractFeeFromAmount,
+		SubtractFeeFromAmount: &subtractFeeFromAmount,
 	}
 }
 
