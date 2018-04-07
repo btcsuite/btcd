@@ -520,10 +520,11 @@ func NewSendManyCmd(fromAccount string, amounts map[string]float64, minConf *int
 
 // SendToAddressCmd defines the sendtoaddress JSON-RPC command.
 type SendToAddressCmd struct {
-	Address   string
-	Amount    float64
-	Comment   *string
-	CommentTo *string
+	Address               string
+	Amount                float64
+	Comment               *string
+	CommentTo             *string
+	SubtractFeeFromAmount bool
 }
 
 // NewSendToAddressCmd returns a new instance which can be used to issue a
@@ -531,12 +532,13 @@ type SendToAddressCmd struct {
 //
 // The parameters which are pointers indicate they are optional.  Passing nil
 // for optional parameters will use the default value.
-func NewSendToAddressCmd(address string, amount float64, comment, commentTo *string) *SendToAddressCmd {
+func NewSendToAddressCmd(address string, amount float64, comment, commentTo *string, subtractFeeFromAmount bool) *SendToAddressCmd {
 	return &SendToAddressCmd{
-		Address:   address,
-		Amount:    amount,
-		Comment:   comment,
-		CommentTo: commentTo,
+		Address:               address,
+		Amount:                amount,
+		Comment:               comment,
+		CommentTo:             commentTo,
+		SubtractFeeFromAmount: subtractFeeFromAmount,
 	}
 }
 

@@ -471,7 +471,7 @@ func (r FutureSendToAddressResult) Receive() (*chainhash.Hash, error) {
 // See SendToAddress for the blocking version and more details.
 func (c *Client) SendToAddressAsync(address btcutil.Address, amount btcutil.Amount) FutureSendToAddressResult {
 	addr := address.EncodeAddress()
-	cmd := btcjson.NewSendToAddressCmd(addr, amount.ToBTC(), nil, nil)
+	cmd := btcjson.NewSendToAddressCmd(addr, amount.ToBTC(), nil, nil, false)
 	return c.sendCmd(cmd)
 }
 
@@ -517,6 +517,41 @@ func (c *Client) SendToAddressCommentAsync(address btcutil.Address,
 func (c *Client) SendToAddressComment(address btcutil.Address, amount btcutil.Amount, comment, commentTo string) (*chainhash.Hash, error) {
 	return c.SendToAddressCommentAsync(address, amount, comment,
 		commentTo).Receive()
+}
+
+// SendToAddressCommentSubFeeAsync returns an instance of a type that can be used to
+// get the result of the RPC at some future time by invoking the Receive
+// function on the returned instance.
+//
+// See SendToAddressComment for the blocking version and more details.
+func (c *Client) SendToAddressCommentSubFeeAsync(address btcutil.Address,
+	amount btcutil.Amount, comment,
+	commentTo string, subtractFeeFromAmount bool) FutureSendToAddressResult {
+
+	addr := address.EncodeAddress()
+	cmd := btcjson.NewSendToAddressCmd(addr, amount.ToBTC(), &comment,
+		&commentTo)
+	return c.sendCmd(cmd)
+}
+
+// SendToAddressCommentSubFee sends the passed amount to the given address and stores
+// the provided comment and comment to in the wallet. The fee is subtracted from the amount.
+// The comment parameter is intended to be used for the purpose of the transaction while the commentTo
+// parameter is indended to be used for who the transaction is being sent to.
+//
+// The comments are not part of the transaction and are only internal
+// to the wallet.
+//
+// The transaction fee is subtracted from the amount.
+//
+// See SendToAddressComment to avoid using subtractFeeFromAmount.
+// See SendToAddress to avoid using comments.
+//
+// NOTE: This function requires to the wallet to be unlocked.  See the
+// WalletPassphrase function for more details.
+func (c *Client) SendToAddressCommentSubFee(address btcutil.Address, amount btcutil.Amount, comment, commentTo string, subtractFeeFromAmount bool) (*chainhash.Hash, error) {
+	return c.SendToAddressCommentAsync(address, amount, comment,
+		commentTo, subtractFeeFromAmount).Receive()
 }
 
 // FutureSendFromResult is a future promise to deliver the result of a
