@@ -471,7 +471,7 @@ func (r FutureSendToAddressResult) Receive() (*chainhash.Hash, error) {
 // See SendToAddress for the blocking version and more details.
 func (c *Client) SendToAddressAsync(address btcutil.Address, amount btcutil.Amount) FutureSendToAddressResult {
 	addr := address.EncodeAddress()
-	cmd := btcjson.NewSendToAddressCmd(addr, amount.ToBTC(), nil, nil, false)
+	cmd := btcjson.NewSendToAddressCmd(addr, amount.ToBTC(), nil, nil, nil)
 	return c.sendCmd(cmd)
 }
 
@@ -498,7 +498,7 @@ func (c *Client) SendToAddressCommentAsync(address btcutil.Address,
 
 	addr := address.EncodeAddress()
 	cmd := btcjson.NewSendToAddressCmd(addr, amount.ToBTC(), &comment,
-		&commentTo, false)
+		&commentTo, nil)
 	return c.sendCmd(cmd)
 }
 
@@ -530,7 +530,7 @@ func (c *Client) SendToAddressCommentSubFeeAsync(address btcutil.Address,
 
 	addr := address.EncodeAddress()
 	cmd := btcjson.NewSendToAddressCmd(addr, amount.ToBTC(), &comment,
-		&commentTo, subtractFeeFromAmount)
+		&commentTo, &subtractFeeFromAmount)
 	return c.sendCmd(cmd)
 }
 
