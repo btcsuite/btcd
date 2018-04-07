@@ -498,7 +498,7 @@ func (c *Client) SendToAddressCommentAsync(address btcutil.Address,
 
 	addr := address.EncodeAddress()
 	cmd := btcjson.NewSendToAddressCmd(addr, amount.ToBTC(), &comment,
-		&commentTo)
+		&commentTo, false)
 	return c.sendCmd(cmd)
 }
 
@@ -530,7 +530,7 @@ func (c *Client) SendToAddressCommentSubFeeAsync(address btcutil.Address,
 
 	addr := address.EncodeAddress()
 	cmd := btcjson.NewSendToAddressCmd(addr, amount.ToBTC(), &comment,
-		&commentTo)
+		&commentTo, false)
 	return c.sendCmd(cmd)
 }
 
@@ -550,7 +550,7 @@ func (c *Client) SendToAddressCommentSubFeeAsync(address btcutil.Address,
 // NOTE: This function requires to the wallet to be unlocked.  See the
 // WalletPassphrase function for more details.
 func (c *Client) SendToAddressCommentSubFee(address btcutil.Address, amount btcutil.Amount, comment, commentTo string, subtractFeeFromAmount bool) (*chainhash.Hash, error) {
-	return c.SendToAddressCommentAsync(address, amount, comment,
+	return c.SendToAddressCommentSubFeeAsync(address, amount, comment,
 		commentTo, subtractFeeFromAmount).Receive()
 }
 
