@@ -524,7 +524,7 @@ type SendToAddressCmd struct {
 	Amount                float64
 	Comment               *string
 	CommentTo             *string
-	SubtractFeeFromAmount *bool
+	SubtractFeeFromAmount *bool `jsonrpcdefault:"false"`
 }
 
 // NewSendToAddressCmd returns a new instance which can be used to issue a

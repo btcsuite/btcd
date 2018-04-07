@@ -530,7 +530,7 @@ func (c *Client) SendToAddressCommentSubFeeAsync(address btcutil.Address,
 
 	addr := address.EncodeAddress()
 	cmd := btcjson.NewSendToAddressCmd(addr, amount.ToBTC(), &comment,
-		&commentTo, false)
+		&commentTo, subtractFeeFromAmount)
 	return c.sendCmd(cmd)
 }
 
