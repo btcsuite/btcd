@@ -51,6 +51,10 @@ var (
 	// chain state.
 	chainStateKeyName = []byte("chainstate")
 
+	// utxoStateConsistencyKeyName is the name of the db key used to store the
+	// consistency status of the utxo state.
+	utxoStateConsistencyKeyName = []byte("utxostateconsistency")
+
 	// spendJournalVersionKeyName is the name of the db key used to store
 	// the version of the spend journal currently in the database.
 	spendJournalVersionKeyName = []byte("spendjournalversion")
@@ -766,47 +770,37 @@ func dbFetchUtxoEntry(dbTx database.Tx, outpoint wire.OutPoint) (*UtxoEntry, err
 	return entry, nil
 }
 
-// dbPutUtxoView uses an existing database transaction to update the utxo set
-// in the database based on the provided utxo view contents and state.  In
-// particular, only the entries that have been marked as modified are written
-// to the database.
-func dbPutUtxoView(dbTx database.Tx, view *UtxoViewpoint) error {
+// dbPutUtxoEntry uses an existing database transaction to update the utxo entry
+// in the database.
+func dbPutUtxoEntry(dbTx database.Tx, outpoint wire.OutPoint, entry *UtxoEntry) error {
 	utxoBucket := dbTx.Metadata().Bucket(utxoSetBucketName)
-	for outpoint, entry := range view.entries {
-		// No need to update the database if the entry was not modified.
-		if entry == nil || !entry.isModified() {
-			continue
-		}
 
-		// Remove the utxo entry if it is spent.
-		if entry.IsSpent() {
-			key := outpointKey(outpoint)
-			err := utxoBucket.Delete(*key)
-			recycleOutpointKey(key)
-			if err != nil {
-				return err
-			}
-
-			continue
-		}
-
-		// Serialize and store the utxo entry.
-		serialized, err := serializeUtxoEntry(entry)
-		if err != nil {
-			return err
-		}
-		key := outpointKey(outpoint)
-		err = utxoBucket.Put(*key, serialized)
-		// NOTE: The key is intentionally not recycled here since the
-		// database interface contract prohibits modifications.  It will
-		// be garbage collected normally when the database is done with
-		// it.
-		if err != nil {
-			return err
-		}
+	if entry == nil || entry.IsSpent() {
+		return AssertError("trying to store nil or spent entry")
 	}
 
-	return nil
+	// Serialize and store the utxo entry.
+	serialized, err := serializeUtxoEntry(entry)
+	if err != nil {
+		return err
+	}
+	key := outpointKey(outpoint)
+	return utxoBucket.Put(*key, serialized)
+	// NOTE: The key is intentionally not recycled here since the
+	// database interface contract prohibits modifications.  It will
+	// be garbage collected normally when the database is done with
+	// it.
+}
+
+// dbDeleteUtxoEntry uses an existing database transaction to delete the utxo
+// entry from the database.
+func dbDeleteUtxoEntry(dbTx database.Tx, outpoint wire.OutPoint) error {
+	utxoBucket := dbTx.Metadata().Bucket(utxoSetBucketName)
+
+	key := outpointKey(outpoint)
+	err := utxoBucket.Delete(*key)
+	recycleOutpointKey(key)
+	return err
 }
 
 // -----------------------------------------------------------------------------
@@ -997,6 +991,101 @@ func dbPutBestState(dbTx database.Tx, snapshot *BestState, workSum *big.Int) err
 
 	// Store the current best chain state into the database.
 	return dbTx.Metadata().Put(chainStateKeyName, serializedData)
+}
+
+// -----------------------------------------------------------------------------
+// The utxo state consistency status is stored as the last hash at which the
+// state finished a flush and an indicator whether it was left in the middle
+// of a flush.
+//
+// The serialized format is:
+//
+//   <status code><consistent hash>
+//
+//   Field             Type             Size
+//   status code       byte             1
+//   consistent hash   chainhash.Hash   chainhash.HashSize
+//
+// The possible values for the state code are:
+//
+//   1: consistent with the given hash, no flush ongoing
+//   2: flush ongoing from the stored consistent hash to best state (see best
+//      state bucket)
+// -----------------------------------------------------------------------------
+
+const (
+	// UTXO consistency status (UCS) codes are used to indicate the
+	// consistency status of the utxo state in the database.
+
+	// ucsEmpty is used as a return value to indicate that no status was
+	// stored.  The zero value should not be stored in the database.
+	ucsEmpty byte = 0
+
+	ucsConsistent   = 1
+	ucsFlushOngoing = 2
+
+	// ucsNbCodes is the number of valid utxo consistency status codes.
+	ucsNbCodes = 3
+)
+
+// serializeUtxoStateConsistency serializes the utxo state consistency status
+// based on the given status code and hash.
+func serializeUtxoStateConsistency(code byte, hash *chainhash.Hash) []byte {
+	// Serialize the data as code + hash.
+	serialized := make([]byte, 1+chainhash.HashSize)
+	serialized[0] = code
+	copy(serialized[1:], hash[:])
+
+	return serialized
+}
+
+// deserializeUtxoStateConsistency deserializes the bytes representing the utxo
+// state consistency status into the status code and hash.
+func deserializeUtxoStateConsistency(serialized []byte) (byte, *chainhash.Hash, error) {
+	// Size must be status code byte + single hash.
+	if len(serialized) != chainhash.HashSize+1 {
+		return 0, nil, database.Error{
+			ErrorCode:   database.ErrCorruption,
+			Description: "corrupt utxo state consistency status",
+		}
+	}
+
+	code := serialized[0]
+	if code >= ucsNbCodes {
+		return 0, nil, database.Error{
+			ErrorCode:   database.ErrCorruption,
+			Description: "corrupt utxo state consistency status: unknown code",
+		}
+	}
+
+	// Ignore error as this only fails on incorrect hash size.
+	hash, _ := chainhash.NewHash(serialized[1 : 1+chainhash.HashSize])
+	return code, hash, nil
+}
+
+// dbPutUtxoStateConsistency uses an existing database transaction to
+// update the utxo state consistency status with the given parameters.
+func dbPutUtxoStateConsistency(dbTx database.Tx, code byte, hash *chainhash.Hash) error {
+	// Seralize the utxo state consistency status.
+	serialized := serializeUtxoStateConsistency(code, hash)
+
+	// Store the utxo state consistency status into the database.
+	return dbTx.Metadata().Put(utxoStateConsistencyKeyName, serialized)
+}
+
+// dbFetchUtxoStateConsistency uses an existing database transaction to retrieve
+// the utxo state consistency status from the database.  The code is 0 when
+// nothing was found.
+func dbFetchUtxoStateConsistency(dbTx database.Tx) (byte, *chainhash.Hash, error) {
+	// Fetch the serialized data from the database.
+	serialized := dbTx.Metadata().Get(utxoStateConsistencyKeyName)
+	if serialized == nil {
+		// Not stored, so return empty state.
+		return ucsEmpty, nil, nil
+	}
+
+	// Deserialize to the consistency status.
+	return deserializeUtxoStateConsistency(serialized)
 }
 
 // createChainState initializes both the database and the chain state to the
@@ -1201,6 +1290,7 @@ func (b *BlockChain) initChainState() error {
 			lastNode = node
 			i++
 		}
+		log.Debug("Done loading block index")
 
 		// Set the best chain view to the stored best state.
 		tip := b.index.LookupNode(&state.hash)
