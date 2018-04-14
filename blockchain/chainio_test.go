@@ -11,6 +11,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcd/wire"
 )
@@ -711,6 +712,115 @@ func TestBestChainStateDeserializeErrors(t *testing.T) {
 			tderr := test.errType.(database.Error)
 			if derr.ErrorCode != tderr.ErrorCode {
 				t.Errorf("deserializeBestChainState (%s): "+
+					"wrong  error code got: %v, want: %v",
+					test.name, derr.ErrorCode,
+					tderr.ErrorCode)
+				continue
+			}
+		}
+	}
+}
+
+// TestUtxoConsistencySerialization ensures serializing and deserializing the
+// utxo consistency statuses works as expected.
+func TestUtxoConsistencySerialization(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		statusCode byte
+		statusHash *chainhash.Hash
+		serialized []byte
+	}{
+		{
+			name:       "consistent",
+			statusCode: ucsConsistent,
+			statusHash: newHashFromStr("000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f"),
+			serialized: hexToBytes("016fe28c0ab6f1b372c1a6a246ae63f74f931e8365e15a089c68d6190000000000"),
+		},
+		{
+			name:       "flushongoing",
+			statusCode: ucsFlushOngoing,
+			statusHash: newHashFromStr("000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f"),
+			serialized: hexToBytes("026fe28c0ab6f1b372c1a6a246ae63f74f931e8365e15a089c68d6190000000000"),
+		},
+	}
+
+	for i, test := range tests {
+		// Ensure the state serializes to the expected value.
+		gotBytes := serializeUtxoStateConsistency(test.statusCode, test.statusHash)
+		if !bytes.Equal(gotBytes, test.serialized) {
+			t.Errorf("serializeUtxoStateConsistency #%d (%s): mismatched "+
+				"bytes - got %x, want %x", i, test.name,
+				gotBytes, test.serialized)
+			continue
+		}
+
+		// Ensure the serialized bytes are decoded back to the expected
+		// state.
+		code, hash, err := deserializeUtxoStateConsistency(test.serialized)
+		if err != nil {
+			t.Errorf("deserializeUtxoStateConsistency #%d (%s) "+
+				"unexpected error: %v", i, test.name, err)
+			continue
+		}
+		if code != test.statusCode {
+			t.Errorf("deserializeUtxoStateConsistency #%d (%s) "+
+				"mismatched code - got %v, want %v", i,
+				test.name, code, test.statusCode)
+			continue
+		}
+		if !test.statusHash.IsEqual(hash) {
+			t.Errorf("deserializeUtxoStateConsistency #%d (%s) "+
+				"mismatched hash - got %v, want %v", i,
+				test.name, hash, test.statusHash)
+			continue
+
+		}
+	}
+}
+
+// TestUtxoConsistencyDeserializeErrors performs negative tests against
+// deserializing the utxo consistency status to ensure error paths work as
+// expected.
+func TestUtxoConsistencyDeserializeErrors(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		serialized []byte
+		errType    error
+	}{
+		{
+			name:       "nothing serialized",
+			serialized: hexToBytes(""),
+			errType:    database.Error{ErrorCode: database.ErrCorruption},
+		},
+		{
+			name:       "short data in hash",
+			serialized: hexToBytes("0100"),
+			errType:    database.Error{ErrorCode: database.ErrCorruption},
+		},
+		{
+			name:       "inexistent code",
+			serialized: hexToBytes("036fe28c0ab6f1b372c1a6a246ae63f74f931e8365e15a089c68d6190000000000"),
+			errType:    database.Error{ErrorCode: database.ErrCorruption},
+		},
+	}
+
+	for _, test := range tests {
+		// Ensure the expected error type and code is returned.
+		_, _, err := deserializeUtxoStateConsistency(test.serialized)
+		if reflect.TypeOf(err) != reflect.TypeOf(test.errType) {
+			t.Errorf("deserializeUtxoStateConsistency (%s): expected "+
+				"error type does not match - got %T, want %T",
+				test.name, err, test.errType)
+			continue
+		}
+		if derr, ok := err.(database.Error); ok {
+			tderr := test.errType.(database.Error)
+			if derr.ErrorCode != tderr.ErrorCode {
+				t.Errorf("deserializeUtxoStateConsistency (%s): "+
 					"wrong  error code got: %v, want: %v",
 					test.name, derr.ErrorCode,
 					tderr.ErrorCode)

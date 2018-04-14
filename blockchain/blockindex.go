@@ -217,6 +217,47 @@ func (node *blockNode) CalcPastMedianTime() time.Time {
 	return time.Unix(medianTimestamp, 0)
 }
 
+// findHighestCommonAncestor searches for the highest common node between the
+// ancestors of the two given nodes.
+func findHighestCommonAncestor(node1, node2 *blockNode) *blockNode {
+	// Since the common ancestor cannot be higher than the lowest node, put
+	// the higher one to it's ancestor at the lower one's height.
+	if node1.height > node2.height {
+		node1 = node1.Ancestor(node2.height)
+	} else {
+		node2 = node2.Ancestor(node1.height)
+	}
+
+	// The search strategy used is to exponentially look back until the ancestor
+	// matches (or they are nil, in which case we reached the genesis block.
+	// Then, we go back from the last height that was not common to with linear
+	// steps until we find the first ancestor.
+
+	distance := int32(1)
+	for {
+		new1 := node1.RelativeAncestor(distance)
+		new2 := node2.RelativeAncestor(distance)
+		distance *= 2
+
+		if new1 == nil || new2 == nil || new1 == new2 {
+			break
+		}
+
+		node1, node2 = new1, new2
+	}
+
+	for node1 != node2 {
+		node1 = node1.parent
+		node2 = node2.parent
+
+		if node1 == nil || node2 == nil {
+			return nil
+		}
+	}
+
+	return node1
+}
+
 // blockIndex provides facilities for keeping track of an in-memory index of the
 // block chain.  Although the name block chain suggests a single chain of
 // blocks, it is actually a tree-shaped structure where any node can have

@@ -79,3 +79,6 @@ This package includes spec changes outlined by the following BIPs:
 		BIP0034 (https://en.bitcoin.it/wiki/BIP_0034)
 */
 package blockchain
+
+//TODO(stevenroose) update the BIP list there
+//TODO(stevenroose) add utxo cache stuffs
