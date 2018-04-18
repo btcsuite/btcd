@@ -372,9 +372,9 @@ func paddedAppend(size uint, dst, src []byte) []byte {
 }
 
 // String returns the extended key as a human-readable base58-encoded string.
-func (k *ExtendedKey) String() (string, error) {
+func (k *ExtendedKey) String() string {
 	if len(k.key) == 0 {
-		return "", fmt.Errorf("zeroed extended key")
+		return "zeroed extended key"
 	}
 
 	var childNumBytes [4]byte
@@ -399,7 +399,7 @@ func (k *ExtendedKey) String() (string, error) {
 
 	checkSum := chainhash.HashB(chainhash.HashB(serializedBytes))[:4]
 	serializedBytes = append(serializedBytes, checkSum...)
-	return base58.Encode(serializedBytes), nil
+	return base58.Encode(serializedBytes)
 }
 
 // IsForNet returns whether or not the extended key is associated with the

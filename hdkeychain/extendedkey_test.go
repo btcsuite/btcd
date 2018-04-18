@@ -213,7 +213,7 @@ tests:
 			}
 		}
 
-		privStr, _ := extKey.String()
+		privStr := extKey.String()
 		if privStr != test.wantPriv {
 			t.Errorf("Serialize #%d (%s): mismatched serialized "+
 				"private extended key -- got: %s, want: %s", i,
@@ -236,7 +236,7 @@ tests:
 			return
 		}
 
-		pubStr, _ := pubKey.String()
+		pubStr := pubKey.String()
 		if pubStr != test.wantPub {
 			t.Errorf("Neuter #%d (%s): mismatched serialized "+
 				"public extended key -- got: %s, want: %s", i,
@@ -364,7 +364,7 @@ tests:
 			}
 		}
 
-		privStr, _ := extKey.String()
+		privStr := extKey.String()
 		if privStr != test.wantPriv {
 			t.Errorf("Child #%d (%s): mismatched serialized "+
 				"private extended key -- got: %s, want: %s", i,
@@ -483,7 +483,7 @@ tests:
 			}
 		}
 
-		pubStr, _ := extKey.String()
+		pubStr := extKey.String()
 		if pubStr != test.wantPub {
 			t.Errorf("Child #%d (%s): mismatched serialized "+
 				"public extended key -- got: %s, want: %s", i,
@@ -586,7 +586,7 @@ func TestExtendedKeyAPI(t *testing.T) {
 			continue
 		}
 
-		serializedKey, _ := key.String()
+		serializedKey := key.String()
 		if serializedKey != test.extKey {
 			t.Errorf("String #%d (%s): mismatched serialized key "+
 				"-- want %s, got %s", i, test.name, test.extKey,
@@ -713,7 +713,7 @@ func TestNet(t *testing.T) {
 		}
 
 		if test.isPrivate {
-			privStr, _ := extKey.String()
+			privStr := extKey.String()
 			if privStr != test.newPriv {
 				t.Errorf("Serialize #%d (%s): mismatched serialized "+
 					"private extended key -- got: %s, want: %s", i,
@@ -729,7 +729,7 @@ func TestNet(t *testing.T) {
 			}
 		}
 
-		pubStr, _ := extKey.String()
+		pubStr := extKey.String()
 		if pubStr != test.newPub {
 			t.Errorf("Neuter #%d (%s): mismatched serialized "+
 				"public extended key -- got: %s, want: %s", i,
@@ -880,11 +880,11 @@ func TestZero(t *testing.T) {
 		}
 
 		wantKey := "zeroed extended key"
-		_, errZeroed := key.String()
-		if errZeroed.Error() != wantKey {
+		serializedKey := key.String()
+		if serializedKey != wantKey {
 			t.Errorf("String #%d (%s): mismatched serialized key "+
 				"-- want %s, got %s", i, testName, wantKey,
-				errZeroed)
+				serializedKey)
 			return false
 		}
 

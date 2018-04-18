@@ -176,11 +176,7 @@ func Example_audits() {
 	}
 
 	// Share the master public extended key with the auditor.
-	mpks, err := masterPubKey.String()
-	if err != nil {
-		panic("unexpected error creating string of extended public key")
-	}
-	fmt.Println("Audit key N(m/*):", mpks)
+	fmt.Println("Audit key N(m/*):", masterPubKey)
 
 	// Output:
 	// Audit key N(m/*): dpubZ9169KDAEUnypHbWCe2Vu5TxGEcqJeNeX6XCYFU1fqw2iQZK7fsMhzsEFArbLmyUdprUw9aXHneUNd92bjc31TqC6sUduMY6PK2z4JXDS8j
