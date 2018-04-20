@@ -761,8 +761,8 @@ func (c *helpCacher) rpcUsage(includeWebsockets bool) (string, error) {
 	}
 
 	// Generate a list of one-line usage for every command.
-	usageTexts := make([]string, 0, len(rpcHandlers))
-	for k := range rpcHandlers {
+	usageTexts := make([]string, 0, len(jsonrpcHandlers))
+	for k := range jsonrpcHandlers {
 		usage, err := btcjson.MethodUsageText(k)
 		if err != nil {
 			return "", err
@@ -772,7 +772,7 @@ func (c *helpCacher) rpcUsage(includeWebsockets bool) (string, error) {
 
 	// Include websockets commands if requested.
 	if includeWebsockets {
-		for k := range wsHandlers {
+		for k := range jsonrpcWsHandlers {
 			usage, err := btcjson.MethodUsageText(k)
 			if err != nil {
 				return "", err

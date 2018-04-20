@@ -16,18 +16,18 @@ import (
 	"github.com/btcsuite/btcutil"
 )
 
-// rpcPeer provides a peer for use with the RPC server and implements the
+// jsonrpcPeer provides a peer for use with the RPC server and implements the
 // rpcserverPeer interface.
-type rpcPeer serverPeer
+type jsonrpcPeer serverPeer
 
 // Ensure rpcPeer implements the rpcserverPeer interface.
-var _ rpcserverPeer = (*rpcPeer)(nil)
+var _ jsonrpcserverPeer = (*jsonrpcPeer)(nil)
 
 // ToPeer returns the underlying peer instance.
 //
 // This function is safe for concurrent access and is part of the rpcserverPeer
 // interface implementation.
-func (p *rpcPeer) ToPeer() *peer.Peer {
+func (p *jsonrpcPeer) ToPeer() *peer.Peer {
 	if p == nil {
 		return nil
 	}
@@ -39,7 +39,7 @@ func (p *rpcPeer) ToPeer() *peer.Peer {
 //
 // This function is safe for concurrent access and is part of the rpcserverPeer
 // interface implementation.
-func (p *rpcPeer) IsTxRelayDisabled() bool {
+func (p *jsonrpcPeer) IsTxRelayDisabled() bool {
 	return (*serverPeer)(p).disableRelayTx
 }
 
@@ -48,7 +48,7 @@ func (p *rpcPeer) IsTxRelayDisabled() bool {
 //
 // This function is safe for concurrent access and is part of the rpcserverPeer
 // interface implementation.
-func (p *rpcPeer) BanScore() uint32 {
+func (p *jsonrpcPeer) BanScore() uint32 {
 	return (*serverPeer)(p).banScore.Int()
 }
 
@@ -57,18 +57,18 @@ func (p *rpcPeer) BanScore() uint32 {
 //
 // This function is safe for concurrent access and is part of the rpcserverPeer
 // interface implementation.
-func (p *rpcPeer) FeeFilter() int64 {
+func (p *jsonrpcPeer) FeeFilter() int64 {
 	return atomic.LoadInt64(&(*serverPeer)(p).feeFilter)
 }
 
-// rpcConnManager provides a connection manager for use with the RPC server and
+// jsonrpcConnManager provides a connection manager for use with the RPC server and
 // implements the rpcserverConnManager interface.
-type rpcConnManager struct {
+type jsonrpcConnManager struct {
 	server *server
 }
 
 // Ensure rpcConnManager implements the rpcserverConnManager interface.
-var _ rpcserverConnManager = &rpcConnManager{}
+var _ jsonrpcserverConnManager = &jsonrpcConnManager{}
 
 // Connect adds the provided address as a new outbound peer.  The permanent flag
 // indicates whether or not to make the peer persistent and reconnect if the
@@ -77,7 +77,7 @@ var _ rpcserverConnManager = &rpcConnManager{}
 //
 // This function is safe for concurrent access and is part of the
 // rpcserverConnManager interface implementation.
-func (cm *rpcConnManager) Connect(addr string, permanent bool) error {
+func (cm *jsonrpcConnManager) Connect(addr string, permanent bool) error {
 	replyChan := make(chan error)
 	cm.server.query <- connectNodeMsg{
 		addr:      addr,
@@ -93,7 +93,7 @@ func (cm *rpcConnManager) Connect(addr string, permanent bool) error {
 //
 // This function is safe for concurrent access and is part of the
 // rpcserverConnManager interface implementation.
-func (cm *rpcConnManager) RemoveByID(id int32) error {
+func (cm *jsonrpcConnManager) RemoveByID(id int32) error {
 	replyChan := make(chan error)
 	cm.server.query <- removeNodeMsg{
 		cmp:   func(sp *serverPeer) bool { return sp.ID() == id },
@@ -108,7 +108,7 @@ func (cm *rpcConnManager) RemoveByID(id int32) error {
 //
 // This function is safe for concurrent access and is part of the
 // rpcserverConnManager interface implementation.
-func (cm *rpcConnManager) RemoveByAddr(addr string) error {
+func (cm *jsonrpcConnManager) RemoveByAddr(addr string) error {
 	replyChan := make(chan error)
 	cm.server.query <- removeNodeMsg{
 		cmp:   func(sp *serverPeer) bool { return sp.Addr() == addr },
@@ -123,7 +123,7 @@ func (cm *rpcConnManager) RemoveByAddr(addr string) error {
 //
 // This function is safe for concurrent access and is part of the
 // rpcserverConnManager interface implementation.
-func (cm *rpcConnManager) DisconnectByID(id int32) error {
+func (cm *jsonrpcConnManager) DisconnectByID(id int32) error {
 	replyChan := make(chan error)
 	cm.server.query <- disconnectNodeMsg{
 		cmp:   func(sp *serverPeer) bool { return sp.ID() == id },
@@ -138,7 +138,7 @@ func (cm *rpcConnManager) DisconnectByID(id int32) error {
 //
 // This function is safe for concurrent access and is part of the
 // rpcserverConnManager interface implementation.
-func (cm *rpcConnManager) DisconnectByAddr(addr string) error {
+func (cm *jsonrpcConnManager) DisconnectByAddr(addr string) error {
 	replyChan := make(chan error)
 	cm.server.query <- disconnectNodeMsg{
 		cmp:   func(sp *serverPeer) bool { return sp.Addr() == addr },
@@ -151,7 +151,7 @@ func (cm *rpcConnManager) DisconnectByAddr(addr string) error {
 //
 // This function is safe for concurrent access and is part of the
 // rpcserverConnManager interface implementation.
-func (cm *rpcConnManager) ConnectedCount() int32 {
+func (cm *jsonrpcConnManager) ConnectedCount() int32 {
 	return cm.server.ConnectedCount()
 }
 
@@ -160,7 +160,7 @@ func (cm *rpcConnManager) ConnectedCount() int32 {
 //
 // This function is safe for concurrent access and is part of the
 // rpcserverConnManager interface implementation.
-func (cm *rpcConnManager) NetTotals() (uint64, uint64) {
+func (cm *jsonrpcConnManager) NetTotals() (uint64, uint64) {
 	return cm.server.NetTotals()
 }
 
@@ -168,15 +168,15 @@ func (cm *rpcConnManager) NetTotals() (uint64, uint64) {
 //
 // This function is safe for concurrent access and is part of the
 // rpcserverConnManager interface implementation.
-func (cm *rpcConnManager) ConnectedPeers() []rpcserverPeer {
+func (cm *jsonrpcConnManager) ConnectedPeers() []jsonrpcserverPeer {
 	replyChan := make(chan []*serverPeer)
 	cm.server.query <- getPeersMsg{reply: replyChan}
 	serverPeers := <-replyChan
 
 	// Convert to RPC server peers.
-	peers := make([]rpcserverPeer, 0, len(serverPeers))
+	peers := make([]jsonrpcserverPeer, 0, len(serverPeers))
 	for _, sp := range serverPeers {
-		peers = append(peers, (*rpcPeer)(sp))
+		peers = append(peers, (*jsonrpcPeer)(sp))
 	}
 	return peers
 }
@@ -186,15 +186,15 @@ func (cm *rpcConnManager) ConnectedPeers() []rpcserverPeer {
 //
 // This function is safe for concurrent access and is part of the
 // rpcserverConnManager interface implementation.
-func (cm *rpcConnManager) PersistentPeers() []rpcserverPeer {
+func (cm *jsonrpcConnManager) PersistentPeers() []jsonrpcserverPeer {
 	replyChan := make(chan []*serverPeer)
 	cm.server.query <- getAddedNodesMsg{reply: replyChan}
 	serverPeers := <-replyChan
 
 	// Convert to generic peers.
-	peers := make([]rpcserverPeer, 0, len(serverPeers))
+	peers := make([]jsonrpcserverPeer, 0, len(serverPeers))
 	for _, sp := range serverPeers {
-		peers = append(peers, (*rpcPeer)(sp))
+		peers = append(peers, (*jsonrpcPeer)(sp))
 	}
 	return peers
 }
@@ -203,7 +203,7 @@ func (cm *rpcConnManager) PersistentPeers() []rpcserverPeer {
 //
 // This function is safe for concurrent access and is part of the
 // rpcserverConnManager interface implementation.
-func (cm *rpcConnManager) BroadcastMessage(msg wire.Message) {
+func (cm *jsonrpcConnManager) BroadcastMessage(msg wire.Message) {
 	cm.server.BroadcastMessage(msg)
 }
 
@@ -213,32 +213,32 @@ func (cm *rpcConnManager) BroadcastMessage(msg wire.Message) {
 //
 // This function is safe for concurrent access and is part of the
 // rpcserverConnManager interface implementation.
-func (cm *rpcConnManager) AddRebroadcastInventory(iv *wire.InvVect, data interface{}) {
+func (cm *jsonrpcConnManager) AddRebroadcastInventory(iv *wire.InvVect, data interface{}) {
 	cm.server.AddRebroadcastInventory(iv, data)
 }
 
 // RelayTransactions generates and relays inventory vectors for all of the
 // passed transactions to all connected peers.
-func (cm *rpcConnManager) RelayTransactions(txns []*mempool.TxDesc) {
+func (cm *jsonrpcConnManager) RelayTransactions(txns []*mempool.TxDesc) {
 	cm.server.relayTransactions(txns)
 }
 
-// rpcSyncMgr provides a block manager for use with the RPC server and
+// jsonrpcSyncMgr provides a block manager for use with the RPC server and
 // implements the rpcserverSyncManager interface.
-type rpcSyncMgr struct {
+type jsonrpcSyncMgr struct {
 	server  *server
 	syncMgr *netsync.SyncManager
 }
 
 // Ensure rpcSyncMgr implements the rpcserverSyncManager interface.
-var _ rpcserverSyncManager = (*rpcSyncMgr)(nil)
+var _ jsonrpcserverSyncManager = (*jsonrpcSyncMgr)(nil)
 
 // IsCurrent returns whether or not the sync manager believes the chain is
 // current as compared to the rest of the network.
 //
 // This function is safe for concurrent access and is part of the
 // rpcserverSyncManager interface implementation.
-func (b *rpcSyncMgr) IsCurrent() bool {
+func (b *jsonrpcSyncMgr) IsCurrent() bool {
 	return b.syncMgr.IsCurrent()
 }
 
@@ -247,7 +247,7 @@ func (b *rpcSyncMgr) IsCurrent() bool {
 //
 // This function is safe for concurrent access and is part of the
 // rpcserverSyncManager interface implementation.
-func (b *rpcSyncMgr) SubmitBlock(block *btcutil.Block, flags blockchain.BehaviorFlags) (bool, error) {
+func (b *jsonrpcSyncMgr) SubmitBlock(block *btcutil.Block, flags blockchain.BehaviorFlags) (bool, error) {
 	return b.syncMgr.ProcessBlock(block, flags)
 }
 
@@ -255,7 +255,7 @@ func (b *rpcSyncMgr) SubmitBlock(block *btcutil.Block, flags blockchain.Behavior
 //
 // This function is safe for concurrent access and is part of the
 // rpcserverSyncManager interface implementation.
-func (b *rpcSyncMgr) Pause() chan<- struct{} {
+func (b *jsonrpcSyncMgr) Pause() chan<- struct{} {
 	return b.syncMgr.Pause()
 }
 
@@ -264,7 +264,7 @@ func (b *rpcSyncMgr) Pause() chan<- struct{} {
 //
 // This function is safe for concurrent access and is part of the
 // rpcserverSyncManager interface implementation.
-func (b *rpcSyncMgr) SyncPeerID() int32 {
+func (b *jsonrpcSyncMgr) SyncPeerID() int32 {
 	return b.syncMgr.SyncPeerID()
 }
 
@@ -274,6 +274,6 @@ func (b *rpcSyncMgr) SyncPeerID() int32 {
 //
 // This function is safe for concurrent access and is part of the
 // rpcserverSyncManager interface implementation.
-func (b *rpcSyncMgr) LocateHeaders(locators []*chainhash.Hash, hashStop *chainhash.Hash) []wire.BlockHeader {
+func (b *jsonrpcSyncMgr) LocateHeaders(locators []*chainhash.Hash, hashStop *chainhash.Hash) []wire.BlockHeader {
 	return b.server.chain.LocateHeaders(locators, hashStop)
 }

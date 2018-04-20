@@ -90,6 +90,21 @@ func (entry *UtxoEntry) IsOutputSpent(outputIndex uint32) bool {
 	return output.spent
 }
 
+// HighestUnspentOutput returns the highest index an unspent output of the
+// transaction this utxo entry represents will possibly be.  This does not
+// guarantee there is an unspent output at the returned index but instead
+// that all unspent outputs will have indices lower that the returned value.
+func (entry *UtxoEntry) HighestUnspentOutput() uint32 {
+	var highestUnspent uint32
+	for idx, output := range entry.sparseOutputs {
+		if !output.spent && idx > highestUnspent {
+			highestUnspent = idx
+		}
+	}
+
+	return highestUnspent
+}
+
 // SpendOutput marks the output at the provided index as spent.  Specifying an
 // output index that does not exist will not have any effect.
 func (entry *UtxoEntry) SpendOutput(outputIndex uint32) {
@@ -629,4 +644,126 @@ func (b *BlockChain) FetchUtxoEntry(txHash *chainhash.Hash) (*UtxoEntry, error) 
 	}
 
 	return entry, nil
+}
+
+// StreamedUtxoEntry wraps a UtxoEntry together with the transaction hash of the
+// entry it represents and an error object.
+// This allows a stream of UtxoEntry objects to indicate an error.  When the Err
+// variable is not nil, the content of the UtxoEntry should be disregarded.
+type StreamedUtxoEntry struct {
+	TxHash *chainhash.Hash
+	Utxo   *UtxoEntry
+	Err    error
+}
+
+// StreamEntireUtxoSet provides access to the entire unspent transaction output
+// set in an asynchronous fashion.  It provides a consistent snapshot at the
+// returned best state.  The provided stopChannel can be used to interrupt the
+// streaming before it is finished.  When an error occurs during the streaming,
+// the channel will return a last element with the Err variable not nil.  After
+// that, the channel will be closed.
+//
+// This function is safe for concurrent access.
+func (b *BlockChain) StreamEntireUtxoSet(stopSignal chan struct{}) (*BestState, <-chan *StreamedUtxoEntry, error) {
+	// In order to be able to report the best block at which the UTXO set
+	// snapshot is taken, we need to hold the chainLock up to the start of the
+	// new DB transactions. From then on, we iterate over the DB snapshot that
+	// is made with the transaction.
+	b.chainLock.RLock()
+	defer b.chainLock.RUnlock()
+
+	dbTx, err := b.db.Begin(false)
+	if err != nil {
+		return nil, nil, err
+	}
+	cursor := dbTx.Metadata().Bucket(utxoSetBucketName).Cursor()
+
+	// Non-blocking so we can fetch the next item while the caller handles the
+	// previous item.
+	stream := make(chan *StreamedUtxoEntry, 1)
+
+	// Stream new items in a new goroutine until the stopChannel is closed.
+	// The chainLock can be
+	go func() {
+		defer func() {
+			close(stream)
+			if err := dbTx.Rollback(); err != nil {
+				log.Warnf("Error closing read-only database transaction after "+
+					"streaming the UTXO set: %v", err)
+			}
+		}()
+
+		if !cursor.First() {
+			// UTXO set empty.
+			return
+		}
+
+		streamEntry := func(txHash *chainhash.Hash, utxo *UtxoEntry, err error) {
+			item := &StreamedUtxoEntry{
+				TxHash: txHash,
+				Utxo:   utxo,
+				Err:    err,
+			}
+
+			select {
+			case <-stopSignal:
+			case stream <- item:
+			}
+		}
+
+		for {
+			select {
+			case <-stopSignal:
+				return
+			default:
+			}
+
+			txHash, err := chainhash.NewHash(cursor.Key())
+			if err != nil {
+				streamEntry(nil, nil, AssertError(fmt.Sprintf(
+					"database contains UTXO entry with key that is not a valid "+
+						"tx hash '%x': %v", cursor.Key(), err)))
+				return
+			}
+
+			serializedUtxo := cursor.Value()
+			//TODO(stevenroose) this can't be nil right?
+
+			// A non-nil zero-length entry means there is an entry in the
+			// database for a fully spent transaction which should never be the
+			// case.
+			if len(serializedUtxo) == 0 {
+				streamEntry(nil, nil, AssertError(fmt.Sprintf(
+					"database contains entry for fully spent tx %v", txHash)))
+				return
+			}
+
+			// Deserialize the utxo entry and stream it.
+			entry, err := deserializeUtxoEntry(serializedUtxo)
+			if err != nil {
+				// Ensure any deserialization errors are returned as database
+				// corruption errors.
+				if isDeserializeErr(err) {
+					err = database.Error{
+						ErrorCode: database.ErrCorruption,
+						Description: fmt.Sprintf("corrupt utxo entry "+
+							"for %v: %v", txHash, err),
+					}
+					log.Errorf("Database corruption detected while streaming "+
+						"UTXO set: %v", err)
+				}
+
+				streamEntry(nil, nil, err)
+				return
+			}
+
+			streamEntry(txHash, entry, nil)
+
+			if !cursor.Next() {
+				return
+			}
+		}
+	}()
+
+	return b.BestSnapshot(), stream, nil
 }
