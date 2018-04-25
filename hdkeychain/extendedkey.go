@@ -302,7 +302,7 @@ func (k *ExtendedKey) Child(i uint32) (*ExtendedKey, error) {
 	}
 
 	// The fingerprint of the parent for the derived child is the first 4
-	// bytes of the RIPEMD160(SHA256(parentPubKey)).
+	// bytes of the RIPEMD160(BLAKE256(parentPubKey)).
 	parentFP := dcrutil.Hash160(k.pubKeyBytes())[:4]
 	return newExtendedKey(k.version, childKey, childChainCode, parentFP,
 		k.depth+1, i, isPrivate), nil
