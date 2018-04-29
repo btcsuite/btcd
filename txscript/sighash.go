@@ -23,7 +23,6 @@ const (
 	SigHashAll          SigHashType = 0x1
 	SigHashNone         SigHashType = 0x2
 	SigHashSingle       SigHashType = 0x3
-	SigHashAllValue     SigHashType = 0x4
 	SigHashAnyOneCanPay SigHashType = 0x80
 
 	// sigHashMask defines the number of bits of the hash type which is used
@@ -111,8 +110,6 @@ func calcSignatureHash(script []parsedOpcode, hashType SigHashType,
 		fallthrough
 	case SigHashOld:
 		fallthrough
-	case SigHashAllValue:
-		fallthrough
 	case SigHashAll:
 		// Nothing special here.
 	}
@@ -127,7 +124,7 @@ func calcSignatureHash(script []parsedOpcode, hashType SigHashType,
 	// The final hash (message to sign) is the hash of:
 	// 1) the hash type (encoded as a 4-byte little-endian value)
 	// 2) hash of the prefix ||
-	// 3) hash of the witness for signing ||
+	// 3) hash of the witness for signing
 	var wbuf bytes.Buffer
 	wbuf.Grow(chainhash.HashSize*2 + 4)
 	binary.Write(&wbuf, binary.LittleEndian, uint32(hashType))
@@ -148,15 +145,8 @@ func calcSignatureHash(script []parsedOpcode, hashType SigHashType,
 		prefixHash = txCopy.TxHash()
 	}
 
-	// If the ValueIn is to be included in what we're signing, sign
-	// the witness hash that includes it. Otherwise, just sign the
-	// prefix and signature scripts.
-	var witnessHash chainhash.Hash
-	if hashType&sigHashMask != SigHashAllValue {
-		witnessHash = txCopy.TxHashWitnessSigning()
-	} else {
-		witnessHash = txCopy.TxHashWitnessValueSigning()
-	}
+	witnessHash := txCopy.TxHashWitnessSigning()
+
 	wbuf.Write(prefixHash[:])
 	wbuf.Write(witnessHash[:])
 	return chainhash.HashB(wbuf.Bytes()), nil

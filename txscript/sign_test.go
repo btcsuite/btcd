@@ -120,12 +120,6 @@ func signBadAndCheck(msg string, tx *wire.MsgTx, idx int, pkScript []byte,
 	randScriptHash := chainhash.HashB(pkScript)
 	tRand := mrand.New(mrand.NewSource(int64(randScriptHash[0])))
 
-	// Test SigHashAllValue by corrupting the transaction's ValueIn so that
-	// the signature becomes invalid.
-	if hashType == txscript.SigHashAllValue {
-		tx.TxIn[0].ValueIn = 1
-	}
-
 	sigScript, err := txscript.SignTxOutput(testingParams, tx,
 		idx, pkScript, hashType, kdb, sdb, nil, suite)
 	if err != nil {
@@ -137,11 +131,9 @@ func signBadAndCheck(msg string, tx *wire.MsgTx, idx int, pkScript []byte,
 	tx.TxIn[0].ValueIn = testValueIn
 
 	// Corrupt a random bit in the signature.
-	if hashType != txscript.SigHashAllValue {
-		pos := tRand.Intn(len(sigScript) - 1)
-		bitPos := tRand.Intn(7)
-		sigScript[pos] ^= 1 << uint8(bitPos)
-	}
+	pos := tRand.Intn(len(sigScript) - 1)
+	bitPos := tRand.Intn(7)
+	sigScript[pos] ^= 1 << uint8(bitPos)
 
 	return checkScripts(msg, tx, idx, sigScript, pkScript)
 }
@@ -157,11 +149,9 @@ func TestSignTxOutput(t *testing.T) {
 		txscript.SigHashAll,
 		txscript.SigHashNone,
 		txscript.SigHashSingle,
-		txscript.SigHashAllValue,
 		txscript.SigHashAll | txscript.SigHashAnyOneCanPay,
 		txscript.SigHashNone | txscript.SigHashAnyOneCanPay,
 		txscript.SigHashSingle | txscript.SigHashAnyOneCanPay,
-		txscript.SigHashAllValue | txscript.SigHashAnyOneCanPay,
 	}
 	signatureSuites := []int{
 		secp,
