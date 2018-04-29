@@ -3,14 +3,13 @@
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package txscript_test
+package txscript
 
 import (
 	"bytes"
 	"testing"
 
 	"github.com/decred/dcrd/chaincfg/chainhash"
-	"github.com/decred/dcrd/txscript"
 	"github.com/decred/dcrd/wire"
 )
 
@@ -29,24 +28,23 @@ func TestCalcSignatureHash(t *testing.T) {
 	}
 	for i := 0; i < 2; i++ {
 		txOut := new(wire.TxOut)
-		txOut.PkScript = decodeHex("51")
+		txOut.PkScript = hexToBytes("51")
 		txOut.Value = 0x0000FF00FF00FF00
 		tx.AddTxOut(txOut)
 	}
 
-	want := decodeHex("4ce2cd042d64e35b36fdbd16aff0d38a5abebff0e5e8f6b6b31" +
-		"fcd4ac6957905")
-	script := decodeHex("51")
+	want := hexToBytes("4ce2cd042d64e35b36fdbd16aff0d38a5abebff0e5e8f6b6b" +
+		"31fcd4ac6957905")
+	script := hexToBytes("51")
 
 	// Test prefix caching.
-	msg1, err := txscript.CalcSignatureHash(script, txscript.SigHashAll, tx, 0, nil)
+	msg1, err := CalcSignatureHash(script, SigHashAll, tx, 0, nil)
 	if err != nil {
 		t.Fatalf("unexpected error %v", err.Error())
 	}
 
 	prefixHash := tx.TxHash()
-	msg2, err := txscript.CalcSignatureHash(script, txscript.SigHashAll, tx, 0,
-		&prefixHash)
+	msg2, err := CalcSignatureHash(script, SigHashAll, tx, 0, &prefixHash)
 	if err != nil {
 		t.Fatalf("unexpected error %v", err.Error())
 	}
@@ -70,8 +68,7 @@ func TestCalcSignatureHash(t *testing.T) {
 
 	// Move the index and make sure that we get a whole new hash, despite
 	// using the same TxOuts.
-	msg3, err := txscript.CalcSignatureHash(script, txscript.SigHashAll, tx, 1,
-		&prefixHash)
+	msg3, err := CalcSignatureHash(script, SigHashAll, tx, 1, &prefixHash)
 	if err != nil {
 		t.Fatalf("unexpected error %v", err.Error())
 	}
@@ -79,7 +76,6 @@ func TestCalcSignatureHash(t *testing.T) {
 	if bytes.Equal(msg1, msg3) {
 		t.Errorf("for sighash all sig equivalent msgs %x and %x were "+
 			"returned when using a cached prefix but different indices",
-			msg1,
-			msg3)
+			msg1, msg3)
 	}
 }

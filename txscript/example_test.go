@@ -1,5 +1,5 @@
 // Copyright (c) 2014-2016 The btcsuite developers
-// Copyright (c) 2015-2016 The Decred developers
+// Copyright (c) 2015-2018 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -16,10 +16,6 @@ import (
 	"github.com/decred/dcrd/txscript"
 	"github.com/decred/dcrd/wire"
 )
-
-var secp = 0
-var edwards = 1
-var secSchnorr = 2
 
 // This example demonstrates creating a script which pays to a Decred address.
 // It also prints the created script hex and uses the DisasmString function to
@@ -158,7 +154,8 @@ func ExampleSignTxOutput() {
 	// being signed.
 	sigScript, err := txscript.SignTxOutput(&chaincfg.MainNetParams,
 		redeemTx, 0, originTx.TxOut[0].PkScript, txscript.SigHashAll,
-		txscript.KeyClosure(lookupKey), nil, nil, secp)
+		txscript.KeyClosure(lookupKey), nil, nil,
+		chainec.ECTypeSecp256k1)
 	if err != nil {
 		fmt.Println(err)
 		return

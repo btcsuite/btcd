@@ -1,9 +1,9 @@
 // Copyright (c) 2013-2016 The btcsuite developers
-// Copyright (c) 2015-2016 The Decred developers
+// Copyright (c) 2015-2018 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package txscript_test
+package txscript
 
 import (
 	"encoding/hex"
@@ -17,7 +17,6 @@ import (
 
 	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/dcrutil"
-	. "github.com/decred/dcrd/txscript"
 	"github.com/decred/dcrd/wire"
 )
 
@@ -102,7 +101,12 @@ func parseShortForm(script string) ([]byte, error) {
 			builder.AddInt64(num)
 			continue
 		} else if bts, err := parseHex(tok); err == nil {
-			builder.TstConcatRawScript(bts)
+			// Concatenate the bytes manually since the test code
+			// intentionally creates scripts that are too large and
+			// would cause the builder to error otherwise.
+			if builder.err == nil {
+				builder.script = append(builder.script, bts...)
+			}
 		} else if len(tok) >= 2 &&
 			tok[0] == '\'' && tok[len(tok)-1] == '\'' {
 			builder.AddFullData([]byte(tok[1 : len(tok)-1]))

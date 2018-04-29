@@ -1,9 +1,9 @@
 // Copyright (c) 2013-2016 The btcsuite developers
-// Copyright (c) 2015-2016 The Decred developers
+// Copyright (c) 2015-2018 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package txscript_test
+package txscript
 
 import (
 	"crypto/rand"
@@ -16,7 +16,6 @@ import (
 	"github.com/decred/dcrd/chaincfg/chainec"
 	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/dcrutil"
-	"github.com/decred/dcrd/txscript"
 	"github.com/decred/dcrd/wire"
 )
 
@@ -31,14 +30,14 @@ type addressToKey struct {
 	compressed bool
 }
 
-func mkGetKey(keys map[string]addressToKey) txscript.KeyDB {
+func mkGetKey(keys map[string]addressToKey) KeyDB {
 	if keys == nil {
-		return txscript.KeyClosure(func(addr dcrutil.Address) (chainec.PrivateKey,
+		return KeyClosure(func(addr dcrutil.Address) (chainec.PrivateKey,
 			bool, error) {
 			return nil, false, errors.New("nope 1")
 		})
 	}
-	return txscript.KeyClosure(func(addr dcrutil.Address) (chainec.PrivateKey,
+	return KeyClosure(func(addr dcrutil.Address) (chainec.PrivateKey,
 		bool, error) {
 		a2k, ok := keys[addr.EncodeAddress()]
 		if !ok {
@@ -48,14 +47,14 @@ func mkGetKey(keys map[string]addressToKey) txscript.KeyDB {
 	})
 }
 
-func mkGetKeyPub(keys map[string]addressToKey) txscript.KeyDB {
+func mkGetKeyPub(keys map[string]addressToKey) KeyDB {
 	if keys == nil {
-		return txscript.KeyClosure(func(addr dcrutil.Address) (chainec.PrivateKey,
+		return KeyClosure(func(addr dcrutil.Address) (chainec.PrivateKey,
 			bool, error) {
 			return nil, false, errors.New("nope 1")
 		})
 	}
-	return txscript.KeyClosure(func(addr dcrutil.Address) (chainec.PrivateKey,
+	return KeyClosure(func(addr dcrutil.Address) (chainec.PrivateKey,
 		bool, error) {
 		a2k, ok := keys[addr.String()]
 		if !ok {
@@ -65,14 +64,14 @@ func mkGetKeyPub(keys map[string]addressToKey) txscript.KeyDB {
 	})
 }
 
-func mkGetScript(scripts map[string][]byte) txscript.ScriptDB {
+func mkGetScript(scripts map[string][]byte) ScriptDB {
 	if scripts == nil {
-		return txscript.ScriptClosure(func(addr dcrutil.Address) (
+		return ScriptClosure(func(addr dcrutil.Address) (
 			[]byte, error) {
 			return nil, errors.New("nope 3")
 		})
 	}
-	return txscript.ScriptClosure(func(addr dcrutil.Address) ([]byte,
+	return ScriptClosure(func(addr dcrutil.Address) ([]byte,
 		error) {
 		script, ok := scripts[addr.EncodeAddress()]
 		if !ok {
@@ -84,8 +83,8 @@ func mkGetScript(scripts map[string][]byte) txscript.ScriptDB {
 
 func checkScripts(msg string, tx *wire.MsgTx, idx int, sigScript, pkScript []byte) error {
 	tx.TxIn[idx].SignatureScript = sigScript
-	vm, err := txscript.NewEngine(pkScript, tx, idx,
-		txscript.ScriptBip16|txscript.ScriptVerifyDERSignatures, 0, nil)
+	vm, err := NewEngine(pkScript, tx, idx,
+		ScriptBip16|ScriptVerifyDERSignatures, 0, nil)
 	if err != nil {
 		return fmt.Errorf("failed to make script engine for %s: %v",
 			msg, err)
@@ -101,11 +100,11 @@ func checkScripts(msg string, tx *wire.MsgTx, idx int, sigScript, pkScript []byt
 }
 
 func signAndCheck(msg string, tx *wire.MsgTx, idx int, pkScript []byte,
-	hashType txscript.SigHashType, kdb txscript.KeyDB, sdb txscript.ScriptDB,
+	hashType SigHashType, kdb KeyDB, sdb ScriptDB,
 	previousScript []byte, suite int) error {
 
-	sigScript, err := txscript.SignTxOutput(testingParams, tx, idx,
-		pkScript, hashType, kdb, sdb, nil, suite)
+	sigScript, err := SignTxOutput(testingParams, tx, idx, pkScript,
+		hashType, kdb, sdb, nil, suite)
 	if err != nil {
 		return fmt.Errorf("failed to sign output %s: %v", msg, err)
 	}
@@ -114,13 +113,13 @@ func signAndCheck(msg string, tx *wire.MsgTx, idx int, pkScript []byte,
 }
 
 func signBadAndCheck(msg string, tx *wire.MsgTx, idx int, pkScript []byte,
-	hashType txscript.SigHashType, kdb txscript.KeyDB, sdb txscript.ScriptDB,
+	hashType SigHashType, kdb KeyDB, sdb ScriptDB,
 	previousScript []byte, suite int) error {
 	// Setup a PRNG.
 	randScriptHash := chainhash.HashB(pkScript)
 	tRand := mrand.New(mrand.NewSource(int64(randScriptHash[0])))
 
-	sigScript, err := txscript.SignTxOutput(testingParams, tx,
+	sigScript, err := SignTxOutput(testingParams, tx,
 		idx, pkScript, hashType, kdb, sdb, nil, suite)
 	if err != nil {
 		return fmt.Errorf("failed to sign output %s: %v", msg, err)
@@ -144,19 +143,19 @@ func TestSignTxOutput(t *testing.T) {
 	// make key
 	// make script based on key.
 	// sign with magic pixie dust.
-	hashTypes := []txscript.SigHashType{
-		txscript.SigHashOld, // no longer used but should act like all
-		txscript.SigHashAll,
-		txscript.SigHashNone,
-		txscript.SigHashSingle,
-		txscript.SigHashAll | txscript.SigHashAnyOneCanPay,
-		txscript.SigHashNone | txscript.SigHashAnyOneCanPay,
-		txscript.SigHashSingle | txscript.SigHashAnyOneCanPay,
+	hashTypes := []SigHashType{
+		SigHashOld, // no longer used but should act like all
+		SigHashAll,
+		SigHashNone,
+		SigHashSingle,
+		SigHashAll | SigHashAnyOneCanPay,
+		SigHashNone | SigHashAnyOneCanPay,
+		SigHashSingle | SigHashAnyOneCanPay,
 	}
 	signatureSuites := []int{
-		secp,
-		edwards,
-		secSchnorr,
+		chainec.ECTypeSecp256k1,
+		chainec.ECTypeEdwards,
+		chainec.ECTypeSecSchnorr,
 	}
 	tx := &wire.MsgTx{
 		SerType: wire.TxSerializeFull,
@@ -224,15 +223,15 @@ func TestSignTxOutput(t *testing.T) {
 				var pk chainec.PublicKey
 
 				switch suite {
-				case secp:
+				case chainec.ECTypeSecp256k1:
 					keyDB, _, _, _ = secp256k1.GenerateKey(rand.Reader)
 					key, pk = secp256k1.PrivKeyFromBytes(keyDB)
 					pkBytes = pk.SerializeUncompressed()
-				case edwards:
+				case chainec.ECTypeEdwards:
 					keyDB, _, _, _ = chainec.Edwards.GenerateKey(rand.Reader)
 					key, pk = chainec.Edwards.PrivKeyFromBytes(keyDB)
 					pkBytes = pk.SerializeUncompressed()
-				case secSchnorr:
+				case chainec.ECTypeSecSchnorr:
 					keyDB, _, _, _ = chainec.SecSchnorr.GenerateKey(
 						rand.Reader)
 					key, pk = chainec.SecSchnorr.PrivKeyFromBytes(keyDB)
@@ -251,7 +250,7 @@ func TestSignTxOutput(t *testing.T) {
 					break
 				}
 
-				pkScript, err := txscript.PayToAddrScript(address)
+				pkScript, err := PayToAddrScript(address)
 				if err != nil {
 					t.Errorf("failed to make pkscript "+
 						"for %s: %v", msg, err)
@@ -286,15 +285,15 @@ func TestSignTxOutput(t *testing.T) {
 				var pk chainec.PublicKey
 
 				switch suite {
-				case secp:
+				case chainec.ECTypeSecp256k1:
 					keyDB, _, _, _ = secp256k1.GenerateKey(rand.Reader)
 					key, pk = secp256k1.PrivKeyFromBytes(keyDB)
 					pkBytes = pk.SerializeUncompressed()
-				case edwards:
+				case chainec.ECTypeEdwards:
 					keyDB, _, _, _ = chainec.Edwards.GenerateKey(rand.Reader)
 					key, pk = chainec.Edwards.PrivKeyFromBytes(keyDB)
 					pkBytes = pk.SerializeUncompressed()
-				case secSchnorr:
+				case chainec.ECTypeSecSchnorr:
 					keyDB, _, _, _ = chainec.SecSchnorr.GenerateKey(rand.Reader)
 					key, pk = chainec.SecSchnorr.PrivKeyFromBytes(keyDB)
 					pkBytes = pk.Serialize()
@@ -311,13 +310,13 @@ func TestSignTxOutput(t *testing.T) {
 					break
 				}
 
-				pkScript, err := txscript.PayToAddrScript(address)
+				pkScript, err := PayToAddrScript(address)
 				if err != nil {
 					t.Errorf("failed to make pkscript "+
 						"for %s: %v", msg, err)
 				}
 
-				sigScript, err := txscript.SignTxOutput(
+				sigScript, err := SignTxOutput(
 					testingParams, tx, i, pkScript,
 					hashType, mkGetKey(map[string]addressToKey{
 						address.EncodeAddress(): {&key, false},
@@ -330,7 +329,7 @@ func TestSignTxOutput(t *testing.T) {
 
 				// by the above loop, this should be valid, now sign
 				// again and merge.
-				sigScript, err = txscript.SignTxOutput(
+				sigScript, err = SignTxOutput(
 					testingParams, tx, i, pkScript,
 					hashType, mkGetKey(map[string]addressToKey{
 						address.EncodeAddress(): {&key, false},
@@ -360,15 +359,15 @@ func TestSignTxOutput(t *testing.T) {
 				var pk chainec.PublicKey
 
 				switch suite {
-				case secp:
+				case chainec.ECTypeSecp256k1:
 					keyDB, _, _, _ = secp256k1.GenerateKey(rand.Reader)
 					key, pk = secp256k1.PrivKeyFromBytes(keyDB)
 					pkBytes = pk.SerializeCompressed()
-				case edwards:
+				case chainec.ECTypeEdwards:
 					keyDB, _, _, _ = chainec.Edwards.GenerateKey(rand.Reader)
 					key, pk = chainec.Edwards.PrivKeyFromBytes(keyDB)
 					pkBytes = pk.SerializeCompressed()
-				case secSchnorr:
+				case chainec.ECTypeSecSchnorr:
 					keyDB, _, _, _ = chainec.SecSchnorr.GenerateKey(rand.Reader)
 					key, pk = chainec.SecSchnorr.PrivKeyFromBytes(keyDB)
 					pkBytes = pk.SerializeCompressed()
@@ -385,7 +384,7 @@ func TestSignTxOutput(t *testing.T) {
 					break
 				}
 
-				pkScript, err := txscript.PayToAddrScript(address)
+				pkScript, err := PayToAddrScript(address)
 				if err != nil {
 					t.Errorf("failed to make pkscript "+
 						"for %s: %v", msg, err)
@@ -420,15 +419,15 @@ func TestSignTxOutput(t *testing.T) {
 				var pk chainec.PublicKey
 
 				switch suite {
-				case secp:
+				case chainec.ECTypeSecp256k1:
 					keyDB, _, _, _ = secp256k1.GenerateKey(rand.Reader)
 					key, pk = secp256k1.PrivKeyFromBytes(keyDB)
 					pkBytes = pk.SerializeCompressed()
-				case edwards:
+				case chainec.ECTypeEdwards:
 					keyDB, _, _, _ = chainec.Edwards.GenerateKey(rand.Reader)
 					key, pk = chainec.Edwards.PrivKeyFromBytes(keyDB)
 					pkBytes = pk.SerializeCompressed()
-				case secSchnorr:
+				case chainec.ECTypeSecSchnorr:
 					keyDB, _, _, _ = chainec.SecSchnorr.GenerateKey(rand.Reader)
 					key, pk = chainec.SecSchnorr.PrivKeyFromBytes(keyDB)
 					pkBytes = pk.SerializeCompressed()
@@ -445,15 +444,15 @@ func TestSignTxOutput(t *testing.T) {
 					break
 				}
 
-				pkScript, err := txscript.PayToAddrScript(address)
+				pkScript, err := PayToAddrScript(address)
 				if err != nil {
 					t.Errorf("failed to make pkscript "+
 						"for %s: %v", msg, err)
 				}
 
-				sigScript, err := txscript.SignTxOutput(
-					testingParams, tx, i, pkScript,
-					hashType, mkGetKey(map[string]addressToKey{
+				sigScript, err := SignTxOutput(testingParams,
+					tx, i, pkScript, hashType,
+					mkGetKey(map[string]addressToKey{
 						address.EncodeAddress(): {&key, true},
 					}), mkGetScript(nil), nil, suite)
 				if err != nil {
@@ -464,8 +463,8 @@ func TestSignTxOutput(t *testing.T) {
 
 				// by the above loop, this should be valid, now sign
 				// again and merge.
-				sigScript, err = txscript.SignTxOutput(
-					testingParams, tx, i, pkScript,
+				sigScript, err = SignTxOutput(testingParams,
+					tx, i, pkScript,
 					hashType, mkGetKey(map[string]addressToKey{
 						address.EncodeAddress(): {&key, true},
 					}), mkGetScript(nil), sigScript, suite)
@@ -499,14 +498,15 @@ func TestSignTxOutput(t *testing.T) {
 			pkBytes := pk.SerializeCompressed()
 
 			address, err := dcrutil.NewAddressPubKeyHash(
-				dcrutil.Hash160(pkBytes), testingParams, secp)
+				dcrutil.Hash160(pkBytes), testingParams,
+				chainec.ECTypeSecp256k1)
 			if err != nil {
 				t.Errorf("failed to make address for %s: %v",
 					msg, err)
 				break
 			}
 
-			pkScript, err := txscript.PayToSStx(address)
+			pkScript, err := PayToSStx(address)
 			if err != nil {
 				t.Errorf("failed to make pkscript "+
 					"for %s: %v", msg, err)
@@ -515,7 +515,8 @@ func TestSignTxOutput(t *testing.T) {
 			if err := signAndCheck(msg, tx, i, pkScript, hashType,
 				mkGetKey(map[string]addressToKey{
 					address.EncodeAddress(): {&key, true},
-				}), mkGetScript(nil), nil, secp); err != nil {
+				}), mkGetScript(nil), nil,
+				chainec.ECTypeSecp256k1); err != nil {
 				t.Error(err)
 				break
 			}
@@ -523,7 +524,8 @@ func TestSignTxOutput(t *testing.T) {
 			if err := signBadAndCheck(msg, tx, i, pkScript, hashType,
 				mkGetKey(map[string]addressToKey{
 					address.EncodeAddress(): {&key, true},
-				}), mkGetScript(nil), nil, secp); err == nil {
+				}), mkGetScript(nil), nil,
+				chainec.ECTypeSecp256k1); err == nil {
 				t.Errorf("corrupted signature validated %s: %v",
 					msg, err)
 				break
@@ -545,14 +547,15 @@ func TestSignTxOutput(t *testing.T) {
 			pkBytes := pk.SerializeCompressed()
 
 			address, err := dcrutil.NewAddressPubKeyHash(
-				dcrutil.Hash160(pkBytes), testingParams, secp)
+				dcrutil.Hash160(pkBytes), testingParams,
+				chainec.ECTypeSecp256k1)
 			if err != nil {
 				t.Errorf("failed to make address for %s: %v",
 					msg, err)
 				break
 			}
 
-			pkScript, err := txscript.PayToSStxChange(address)
+			pkScript, err := PayToSStxChange(address)
 			if err != nil {
 				t.Errorf("failed to make pkscript "+
 					"for %s: %v", msg, err)
@@ -561,7 +564,8 @@ func TestSignTxOutput(t *testing.T) {
 			if err := signAndCheck(msg, tx, i, pkScript, hashType,
 				mkGetKey(map[string]addressToKey{
 					address.EncodeAddress(): {&key, true},
-				}), mkGetScript(nil), nil, secp); err != nil {
+				}), mkGetScript(nil), nil,
+				chainec.ECTypeSecp256k1); err != nil {
 				t.Error(err)
 				break
 			}
@@ -569,7 +573,8 @@ func TestSignTxOutput(t *testing.T) {
 			if err := signBadAndCheck(msg, tx, i, pkScript, hashType,
 				mkGetKey(map[string]addressToKey{
 					address.EncodeAddress(): {&key, true},
-				}), mkGetScript(nil), nil, secp); err == nil {
+				}), mkGetScript(nil), nil,
+				chainec.ECTypeSecp256k1); err == nil {
 				t.Errorf("corrupted signature validated %s: %v",
 					msg, err)
 				break
@@ -591,14 +596,15 @@ func TestSignTxOutput(t *testing.T) {
 			pkBytes := pk.SerializeCompressed()
 
 			address, err := dcrutil.NewAddressPubKeyHash(
-				dcrutil.Hash160(pkBytes), testingParams, secp)
+				dcrutil.Hash160(pkBytes), testingParams,
+				chainec.ECTypeSecp256k1)
 			if err != nil {
 				t.Errorf("failed to make address for %s: %v",
 					msg, err)
 				break
 			}
 
-			pkScript, err := txscript.PayToSSGen(address)
+			pkScript, err := PayToSSGen(address)
 			if err != nil {
 				t.Errorf("failed to make pkscript "+
 					"for %s: %v", msg, err)
@@ -607,7 +613,8 @@ func TestSignTxOutput(t *testing.T) {
 			if err := signAndCheck(msg, tx, i, pkScript, hashType,
 				mkGetKey(map[string]addressToKey{
 					address.EncodeAddress(): {&key, true},
-				}), mkGetScript(nil), nil, secp); err != nil {
+				}), mkGetScript(nil), nil,
+				chainec.ECTypeSecp256k1); err != nil {
 				t.Error(err)
 				break
 			}
@@ -615,7 +622,8 @@ func TestSignTxOutput(t *testing.T) {
 			if err := signBadAndCheck(msg, tx, i, pkScript, hashType,
 				mkGetKey(map[string]addressToKey{
 					address.EncodeAddress(): {&key, true},
-				}), mkGetScript(nil), nil, secp); err == nil {
+				}), mkGetScript(nil), nil,
+				chainec.ECTypeSecp256k1); err == nil {
 				t.Errorf("corrupted signature validated %s: %v",
 					msg, err)
 				break
@@ -637,14 +645,15 @@ func TestSignTxOutput(t *testing.T) {
 			pkBytes := pk.SerializeCompressed()
 
 			address, err := dcrutil.NewAddressPubKeyHash(
-				dcrutil.Hash160(pkBytes), testingParams, secp)
+				dcrutil.Hash160(pkBytes), testingParams,
+				chainec.ECTypeSecp256k1)
 			if err != nil {
 				t.Errorf("failed to make address for %s: %v",
 					msg, err)
 				break
 			}
 
-			pkScript, err := txscript.PayToSSRtx(address)
+			pkScript, err := PayToSSRtx(address)
 			if err != nil {
 				t.Errorf("failed to make pkscript "+
 					"for %s: %v", msg, err)
@@ -653,7 +662,8 @@ func TestSignTxOutput(t *testing.T) {
 			if err := signAndCheck(msg, tx, i, pkScript, hashType,
 				mkGetKey(map[string]addressToKey{
 					address.EncodeAddress(): {&key, true},
-				}), mkGetScript(nil), nil, secp); err != nil {
+				}), mkGetScript(nil), nil,
+				chainec.ECTypeSecp256k1); err != nil {
 				t.Error(err)
 				break
 			}
@@ -661,7 +671,8 @@ func TestSignTxOutput(t *testing.T) {
 			if err := signBadAndCheck(msg, tx, i, pkScript, hashType,
 				mkGetKey(map[string]addressToKey{
 					address.EncodeAddress(): {&key, true},
-				}), mkGetScript(nil), nil, secp); err == nil {
+				}), mkGetScript(nil), nil,
+				chainec.ECTypeSecp256k1); err == nil {
 				t.Errorf("corrupted signature validated %s: %v",
 					msg, err)
 				break
@@ -692,7 +703,7 @@ func TestSignTxOutput(t *testing.T) {
 					break
 				}
 
-				pkScript, err := txscript.PayToAddrScript(address)
+				pkScript, err := PayToAddrScript(address)
 				if err != nil {
 					t.Errorf("failed to make pkscript "+
 						"for %s: %v", msg, err)
@@ -731,7 +742,7 @@ func TestSignTxOutput(t *testing.T) {
 				msg := fmt.Sprintf("%d:%d:%d", hashType, i, suite)
 
 				switch suite {
-				case secp:
+				case chainec.ECTypeSecp256k1:
 					keyDB, _, _, _ = secp256k1.GenerateKey(rand.Reader)
 					key, pk = secp256k1.PrivKeyFromBytes(keyDB)
 					// For address generation, consensus rules require using
@@ -744,7 +755,7 @@ func TestSignTxOutput(t *testing.T) {
 							msg, err)
 					}
 
-				case edwards:
+				case chainec.ECTypeEdwards:
 					keyDB, _, _, _ = chainec.Edwards.GenerateKey(rand.Reader)
 					key, pk = chainec.Edwards.PrivKeyFromBytes(keyDB)
 					pkBytes = pk.SerializeUncompressed()
@@ -755,7 +766,7 @@ func TestSignTxOutput(t *testing.T) {
 							msg, err)
 					}
 
-				case secSchnorr:
+				case chainec.ECTypeSecSchnorr:
 					keyDB, _, _, _ = chainec.SecSchnorr.GenerateKey(rand.Reader)
 					key, pk = chainec.SecSchnorr.PrivKeyFromBytes(keyDB)
 					pkBytes = pk.Serialize()
@@ -767,15 +778,15 @@ func TestSignTxOutput(t *testing.T) {
 					}
 				}
 
-				pkScript, err := txscript.PayToAddrScript(address)
+				pkScript, err := PayToAddrScript(address)
 				if err != nil {
 					t.Errorf("failed to make pkscript "+
 						"for %s: %v", msg, err)
 				}
 
-				sigScript, err := txscript.SignTxOutput(
-					testingParams, tx, i, pkScript,
-					hashType, mkGetKeyPub(map[string]addressToKey{
+				sigScript, err := SignTxOutput(testingParams,
+					tx, i, pkScript, hashType,
+					mkGetKeyPub(map[string]addressToKey{
 						address.String(): {&key, false},
 					}), mkGetScript(nil), nil, suite)
 				if err != nil {
@@ -785,9 +796,9 @@ func TestSignTxOutput(t *testing.T) {
 
 				// by the above loop, this should be valid, now sign
 				// again and merge.
-				sigScript, err = txscript.SignTxOutput(
-					testingParams, tx, i, pkScript,
-					hashType, mkGetKeyPub(map[string]addressToKey{
+				sigScript, err = SignTxOutput(testingParams,
+					tx, i, pkScript, hashType,
+					mkGetKeyPub(map[string]addressToKey{
 						address.String(): {&key, false},
 					}), mkGetScript(nil), sigScript, suite)
 				if err != nil {
@@ -817,7 +828,7 @@ func TestSignTxOutput(t *testing.T) {
 				msg := fmt.Sprintf("%d:%d:%d", hashType, i, suite)
 
 				switch suite {
-				case secp:
+				case chainec.ECTypeSecp256k1:
 					keyDB, _, _, _ = secp256k1.GenerateKey(rand.Reader)
 					key, pk = secp256k1.PrivKeyFromBytes(keyDB)
 					// For address generation, consensus rules require using
@@ -830,7 +841,7 @@ func TestSignTxOutput(t *testing.T) {
 							msg, err)
 					}
 
-				case edwards:
+				case chainec.ECTypeEdwards:
 					keyDB, _, _, _ = chainec.Edwards.GenerateKey(rand.Reader)
 					key, pk = chainec.Edwards.PrivKeyFromBytes(keyDB)
 					pkBytes = pk.SerializeCompressed()
@@ -841,7 +852,7 @@ func TestSignTxOutput(t *testing.T) {
 							msg, err)
 					}
 
-				case secSchnorr:
+				case chainec.ECTypeSecSchnorr:
 					keyDB, _, _, _ = chainec.SecSchnorr.GenerateKey(rand.Reader)
 					key, pk = chainec.SecSchnorr.PrivKeyFromBytes(keyDB)
 					pkBytes = pk.Serialize()
@@ -853,7 +864,7 @@ func TestSignTxOutput(t *testing.T) {
 					}
 				}
 
-				pkScript, err := txscript.PayToAddrScript(address)
+				pkScript, err := PayToAddrScript(address)
 				if err != nil {
 					t.Errorf("failed to make pkscript "+
 						"for %s: %v", msg, err)
@@ -892,7 +903,7 @@ func TestSignTxOutput(t *testing.T) {
 				msg := fmt.Sprintf("%d:%d:%d", hashType, i, suite)
 
 				switch suite {
-				case secp:
+				case chainec.ECTypeSecp256k1:
 					keyDB, _, _, _ = secp256k1.GenerateKey(rand.Reader)
 					key, pk = secp256k1.PrivKeyFromBytes(keyDB)
 					address, err = dcrutil.NewAddressSecpPubKeyCompressed(pk,
@@ -902,7 +913,7 @@ func TestSignTxOutput(t *testing.T) {
 							msg, err)
 					}
 
-				case edwards:
+				case chainec.ECTypeEdwards:
 					keyDB, _, _, _ = chainec.Edwards.GenerateKey(rand.Reader)
 					key, pk = chainec.Edwards.PrivKeyFromBytes(keyDB)
 					pkBytes = pk.SerializeCompressed()
@@ -913,7 +924,7 @@ func TestSignTxOutput(t *testing.T) {
 							msg, err)
 					}
 
-				case secSchnorr:
+				case chainec.ECTypeSecSchnorr:
 					keyDB, _, _, _ = chainec.SecSchnorr.GenerateKey(rand.Reader)
 					key, pk = chainec.SecSchnorr.PrivKeyFromBytes(keyDB)
 					pkBytes = pk.Serialize()
@@ -925,15 +936,15 @@ func TestSignTxOutput(t *testing.T) {
 					}
 				}
 
-				pkScript, err := txscript.PayToAddrScript(address)
+				pkScript, err := PayToAddrScript(address)
 				if err != nil {
 					t.Errorf("failed to make pkscript "+
 						"for %s: %v", msg, err)
 				}
 
-				sigScript, err := txscript.SignTxOutput(
-					testingParams, tx, i, pkScript,
-					hashType, mkGetKey(map[string]addressToKey{
+				sigScript, err := SignTxOutput(testingParams,
+					tx, i, pkScript, hashType,
+					mkGetKey(map[string]addressToKey{
 						address.EncodeAddress(): {&key, true},
 					}), mkGetScript(nil), nil, suite)
 				if err != nil {
@@ -944,9 +955,9 @@ func TestSignTxOutput(t *testing.T) {
 
 				// by the above loop, this should be valid, now sign
 				// again and merge.
-				sigScript, err = txscript.SignTxOutput(
-					testingParams, tx, i, pkScript,
-					hashType, mkGetKey(map[string]addressToKey{
+				sigScript, err = SignTxOutput(testingParams,
+					tx, i, pkScript, hashType,
+					mkGetKey(map[string]addressToKey{
 						address.EncodeAddress(): {&key, true},
 					}), mkGetScript(nil), sigScript, suite)
 				if err != nil {
@@ -975,15 +986,15 @@ func TestSignTxOutput(t *testing.T) {
 				var pk chainec.PublicKey
 
 				switch suite {
-				case secp:
+				case chainec.ECTypeSecp256k1:
 					keyDB, _, _, _ = secp256k1.GenerateKey(rand.Reader)
 					key, pk = secp256k1.PrivKeyFromBytes(keyDB)
 					pkBytes = pk.SerializeUncompressed()
-				case edwards:
+				case chainec.ECTypeEdwards:
 					keyDB, _, _, _ = chainec.Edwards.GenerateKey(rand.Reader)
 					key, pk = chainec.Edwards.PrivKeyFromBytes(keyDB)
 					pkBytes = pk.SerializeUncompressed()
-				case secSchnorr:
+				case chainec.ECTypeSecSchnorr:
 					keyDB, _, _, _ = chainec.SecSchnorr.GenerateKey(rand.Reader)
 					key, pk = chainec.SecSchnorr.PrivKeyFromBytes(keyDB)
 					pkBytes = pk.Serialize()
@@ -999,7 +1010,7 @@ func TestSignTxOutput(t *testing.T) {
 					break
 				}
 
-				pkScript, err := txscript.PayToAddrScript(address)
+				pkScript, err := PayToAddrScript(address)
 				if err != nil {
 					t.Errorf("failed to make pkscript "+
 						"for %s: %v", msg, err)
@@ -1014,7 +1025,7 @@ func TestSignTxOutput(t *testing.T) {
 					break
 				}
 
-				scriptPkScript, err := txscript.PayToAddrScript(
+				scriptPkScript, err := PayToAddrScript(
 					scriptAddr)
 				if err != nil {
 					t.Errorf("failed to make script pkscript for "+
@@ -1054,15 +1065,15 @@ func TestSignTxOutput(t *testing.T) {
 				var pk chainec.PublicKey
 
 				switch suite {
-				case secp:
+				case chainec.ECTypeSecp256k1:
 					keyDB, _, _, _ = secp256k1.GenerateKey(rand.Reader)
 					key, pk = secp256k1.PrivKeyFromBytes(keyDB)
 					pkBytes = pk.SerializeUncompressed()
-				case edwards:
+				case chainec.ECTypeEdwards:
 					keyDB, _, _, _ = chainec.Edwards.GenerateKey(rand.Reader)
 					key, pk = chainec.Edwards.PrivKeyFromBytes(keyDB)
 					pkBytes = pk.SerializeUncompressed()
-				case secSchnorr:
+				case chainec.ECTypeSecSchnorr:
 					keyDB, _, _, _ = chainec.SecSchnorr.GenerateKey(rand.Reader)
 					key, pk = chainec.SecSchnorr.PrivKeyFromBytes(keyDB)
 					pkBytes = pk.Serialize()
@@ -1078,7 +1089,7 @@ func TestSignTxOutput(t *testing.T) {
 					break
 				}
 
-				pkScript, err := txscript.PayToAddrScript(address)
+				pkScript, err := PayToAddrScript(address)
 				if err != nil {
 					t.Errorf("failed to make pkscript "+
 						"for %s: %v", msg, err)
@@ -1093,7 +1104,7 @@ func TestSignTxOutput(t *testing.T) {
 					break
 				}
 
-				scriptPkScript, err := txscript.PayToAddrScript(
+				scriptPkScript, err := PayToAddrScript(
 					scriptAddr)
 				if err != nil {
 					t.Errorf("failed to make script pkscript for "+
@@ -1101,9 +1112,9 @@ func TestSignTxOutput(t *testing.T) {
 					break
 				}
 
-				_, err = txscript.SignTxOutput(
-					testingParams, tx, i, scriptPkScript,
-					hashType, mkGetKey(map[string]addressToKey{
+				_, err = SignTxOutput(testingParams, tx, i,
+					scriptPkScript, hashType,
+					mkGetKey(map[string]addressToKey{
 						address.EncodeAddress(): {&key, false},
 					}), mkGetScript(map[string][]byte{
 						scriptAddr.EncodeAddress(): pkScript,
@@ -1116,9 +1127,9 @@ func TestSignTxOutput(t *testing.T) {
 
 				// by the above loop, this should be valid, now sign
 				// again and merge.
-				sigScript, err := txscript.SignTxOutput(
-					testingParams, tx, i, scriptPkScript,
-					hashType, mkGetKey(map[string]addressToKey{
+				sigScript, err := SignTxOutput(testingParams,
+					tx, i, scriptPkScript, hashType,
+					mkGetKey(map[string]addressToKey{
 						address.EncodeAddress(): {&key, false},
 					}), mkGetScript(map[string][]byte{
 						scriptAddr.EncodeAddress(): pkScript,
@@ -1148,15 +1159,15 @@ func TestSignTxOutput(t *testing.T) {
 				var pk chainec.PublicKey
 
 				switch suite {
-				case secp:
+				case chainec.ECTypeSecp256k1:
 					keyDB, _, _, _ = secp256k1.GenerateKey(rand.Reader)
 					key, pk = secp256k1.PrivKeyFromBytes(keyDB)
 					pkBytes = pk.SerializeCompressed()
-				case edwards:
+				case chainec.ECTypeEdwards:
 					keyDB, _, _, _ = chainec.Edwards.GenerateKey(rand.Reader)
 					key, pk = chainec.Edwards.PrivKeyFromBytes(keyDB)
 					pkBytes = pk.SerializeCompressed()
-				case secSchnorr:
+				case chainec.ECTypeSecSchnorr:
 					keyDB, _, _, _ = chainec.SecSchnorr.GenerateKey(rand.Reader)
 					key, pk = chainec.SecSchnorr.PrivKeyFromBytes(keyDB)
 					pkBytes = pk.SerializeCompressed()
@@ -1172,7 +1183,7 @@ func TestSignTxOutput(t *testing.T) {
 					break
 				}
 
-				pkScript, err := txscript.PayToAddrScript(address)
+				pkScript, err := PayToAddrScript(address)
 				if err != nil {
 					t.Errorf("failed to make pkscript "+
 						"for %s: %v", msg, err)
@@ -1186,7 +1197,7 @@ func TestSignTxOutput(t *testing.T) {
 					break
 				}
 
-				scriptPkScript, err := txscript.PayToAddrScript(
+				scriptPkScript, err := PayToAddrScript(
 					scriptAddr)
 				if err != nil {
 					t.Errorf("failed to make script pkscript for "+
@@ -1226,15 +1237,15 @@ func TestSignTxOutput(t *testing.T) {
 				var pk chainec.PublicKey
 
 				switch suite {
-				case secp:
+				case chainec.ECTypeSecp256k1:
 					keyDB, _, _, _ = secp256k1.GenerateKey(rand.Reader)
 					key, pk = secp256k1.PrivKeyFromBytes(keyDB)
 					pkBytes = pk.SerializeCompressed()
-				case edwards:
+				case chainec.ECTypeEdwards:
 					keyDB, _, _, _ = chainec.Edwards.GenerateKey(rand.Reader)
 					key, pk = chainec.Edwards.PrivKeyFromBytes(keyDB)
 					pkBytes = pk.SerializeCompressed()
-				case secSchnorr:
+				case chainec.ECTypeSecSchnorr:
 					keyDB, _, _, _ = chainec.SecSchnorr.GenerateKey(rand.Reader)
 					key, pk = chainec.SecSchnorr.PrivKeyFromBytes(keyDB)
 					pkBytes = pk.SerializeCompressed()
@@ -1250,7 +1261,7 @@ func TestSignTxOutput(t *testing.T) {
 					break
 				}
 
-				pkScript, err := txscript.PayToAddrScript(address)
+				pkScript, err := PayToAddrScript(address)
 				if err != nil {
 					t.Errorf("failed to make pkscript "+
 						"for %s: %v", msg, err)
@@ -1264,7 +1275,7 @@ func TestSignTxOutput(t *testing.T) {
 					break
 				}
 
-				scriptPkScript, err := txscript.PayToAddrScript(
+				scriptPkScript, err := PayToAddrScript(
 					scriptAddr)
 				if err != nil {
 					t.Errorf("failed to make script pkscript for "+
@@ -1272,9 +1283,9 @@ func TestSignTxOutput(t *testing.T) {
 					break
 				}
 
-				_, err = txscript.SignTxOutput(
-					testingParams, tx, i, scriptPkScript,
-					hashType, mkGetKey(map[string]addressToKey{
+				_, err = SignTxOutput(testingParams,
+					tx, i, scriptPkScript, hashType,
+					mkGetKey(map[string]addressToKey{
 						address.EncodeAddress(): {&key, true},
 					}), mkGetScript(map[string][]byte{
 						scriptAddr.EncodeAddress(): pkScript,
@@ -1287,9 +1298,9 @@ func TestSignTxOutput(t *testing.T) {
 
 				// by the above loop, this should be valid, now sign
 				// again and merge.
-				sigScript, err := txscript.SignTxOutput(
-					testingParams, tx, i, scriptPkScript,
-					hashType, mkGetKey(map[string]addressToKey{
+				sigScript, err := SignTxOutput(testingParams,
+					tx, i, scriptPkScript, hashType,
+					mkGetKey(map[string]addressToKey{
 						address.EncodeAddress(): {&key, true},
 					}), mkGetScript(map[string][]byte{
 						scriptAddr.EncodeAddress(): pkScript,
@@ -1323,7 +1334,7 @@ func TestSignTxOutput(t *testing.T) {
 				msg := fmt.Sprintf("%d:%d:%d", hashType, i, suite)
 
 				switch suite {
-				case secp:
+				case chainec.ECTypeSecp256k1:
 					keyDB, _, _, _ = secp256k1.GenerateKey(rand.Reader)
 					key, pk = secp256k1.PrivKeyFromBytes(keyDB)
 					// For address generation, consensus rules require using
@@ -1336,7 +1347,7 @@ func TestSignTxOutput(t *testing.T) {
 							msg, err)
 					}
 
-				case edwards:
+				case chainec.ECTypeEdwards:
 					keyDB, _, _, _ = chainec.Edwards.GenerateKey(rand.Reader)
 					key, pk = chainec.Edwards.PrivKeyFromBytes(keyDB)
 					pkBytes = pk.SerializeUncompressed()
@@ -1347,7 +1358,7 @@ func TestSignTxOutput(t *testing.T) {
 							msg, err)
 					}
 
-				case secSchnorr:
+				case chainec.ECTypeSecSchnorr:
 					keyDB, _, _, _ = chainec.SecSchnorr.GenerateKey(rand.Reader)
 					key, pk = chainec.SecSchnorr.PrivKeyFromBytes(keyDB)
 					pkBytes = pk.Serialize()
@@ -1359,7 +1370,7 @@ func TestSignTxOutput(t *testing.T) {
 					}
 				}
 
-				pkScript, err := txscript.PayToAddrScript(address)
+				pkScript, err := PayToAddrScript(address)
 				if err != nil {
 					t.Errorf("failed to make pkscript "+
 						"for %s: %v", msg, err)
@@ -1372,7 +1383,7 @@ func TestSignTxOutput(t *testing.T) {
 						msg, err)
 				}
 
-				scriptPkScript, err := txscript.PayToAddrScript(
+				scriptPkScript, err := PayToAddrScript(
 					scriptAddr)
 				if err != nil {
 					t.Errorf("failed to make script pkscript for "+
@@ -1414,7 +1425,7 @@ func TestSignTxOutput(t *testing.T) {
 				msg := fmt.Sprintf("%d:%d:%d", hashType, i, suite)
 
 				switch suite {
-				case secp:
+				case chainec.ECTypeSecp256k1:
 					keyDB, _, _, _ = secp256k1.GenerateKey(rand.Reader)
 					key, pk = secp256k1.PrivKeyFromBytes(keyDB)
 					// For address generation, consensus rules require using
@@ -1427,7 +1438,7 @@ func TestSignTxOutput(t *testing.T) {
 							msg, err)
 					}
 
-				case edwards:
+				case chainec.ECTypeEdwards:
 					keyDB, _, _, _ = chainec.Edwards.GenerateKey(rand.Reader)
 					key, pk = chainec.Edwards.PrivKeyFromBytes(keyDB)
 					pkBytes = pk.SerializeUncompressed()
@@ -1438,7 +1449,7 @@ func TestSignTxOutput(t *testing.T) {
 							msg, err)
 					}
 
-				case secSchnorr:
+				case chainec.ECTypeSecSchnorr:
 					keyDB, _, _, _ = chainec.SecSchnorr.GenerateKey(rand.Reader)
 					key, pk = chainec.SecSchnorr.PrivKeyFromBytes(keyDB)
 					pkBytes = pk.Serialize()
@@ -1450,7 +1461,7 @@ func TestSignTxOutput(t *testing.T) {
 					}
 				}
 
-				pkScript, err := txscript.PayToAddrScript(address)
+				pkScript, err := PayToAddrScript(address)
 				if err != nil {
 					t.Errorf("failed to make pkscript "+
 						"for %s: %v", msg, err)
@@ -1463,16 +1474,16 @@ func TestSignTxOutput(t *testing.T) {
 						msg, err)
 				}
 
-				scriptPkScript, err := txscript.PayToAddrScript(
+				scriptPkScript, err := PayToAddrScript(
 					scriptAddr)
 				if err != nil {
 					t.Errorf("failed to make script pkscript for "+
 						"%s: %v", msg, err)
 				}
 
-				_, err = txscript.SignTxOutput(
-					testingParams, tx, i, scriptPkScript,
-					hashType, mkGetKey(map[string]addressToKey{
+				_, err = SignTxOutput(testingParams,
+					tx, i, scriptPkScript, hashType,
+					mkGetKey(map[string]addressToKey{
 						address.EncodeAddress(): {&key, false},
 					}), mkGetScript(map[string][]byte{
 						scriptAddr.EncodeAddress(): pkScript,
@@ -1485,9 +1496,9 @@ func TestSignTxOutput(t *testing.T) {
 
 				// by the above loop, this should be valid, now sign
 				// again and merge.
-				sigScript, err := txscript.SignTxOutput(
-					testingParams, tx, i, scriptPkScript,
-					hashType, mkGetKey(map[string]addressToKey{
+				sigScript, err := SignTxOutput(testingParams,
+					tx, i, scriptPkScript, hashType,
+					mkGetKey(map[string]addressToKey{
 						address.EncodeAddress(): {&key, false},
 					}), mkGetScript(map[string][]byte{
 						scriptAddr.EncodeAddress(): pkScript,
@@ -1521,7 +1532,7 @@ func TestSignTxOutput(t *testing.T) {
 				msg := fmt.Sprintf("%d:%d:%d", hashType, i, suite)
 
 				switch suite {
-				case secp:
+				case chainec.ECTypeSecp256k1:
 					keyDB, _, _, _ = secp256k1.GenerateKey(rand.Reader)
 					key, pk = secp256k1.PrivKeyFromBytes(keyDB)
 					address, err = dcrutil.NewAddressSecpPubKeyCompressed(pk,
@@ -1531,7 +1542,7 @@ func TestSignTxOutput(t *testing.T) {
 							msg, err)
 					}
 
-				case edwards:
+				case chainec.ECTypeEdwards:
 					keyDB, _, _, _ = chainec.Edwards.GenerateKey(rand.Reader)
 					key, pk = chainec.Edwards.PrivKeyFromBytes(keyDB)
 					pkBytes = pk.SerializeCompressed()
@@ -1542,7 +1553,7 @@ func TestSignTxOutput(t *testing.T) {
 							msg, err)
 					}
 
-				case secSchnorr:
+				case chainec.ECTypeSecSchnorr:
 					keyDB, _, _, _ = chainec.SecSchnorr.GenerateKey(rand.Reader)
 					key, pk = chainec.SecSchnorr.PrivKeyFromBytes(keyDB)
 					pkBytes = pk.Serialize()
@@ -1554,7 +1565,7 @@ func TestSignTxOutput(t *testing.T) {
 					}
 				}
 
-				pkScript, err := txscript.PayToAddrScript(address)
+				pkScript, err := PayToAddrScript(address)
 				if err != nil {
 					t.Errorf("failed to make pkscript "+
 						"for %s: %v", msg, err)
@@ -1568,7 +1579,7 @@ func TestSignTxOutput(t *testing.T) {
 					break
 				}
 
-				scriptPkScript, err := txscript.PayToAddrScript(
+				scriptPkScript, err := PayToAddrScript(
 					scriptAddr)
 				if err != nil {
 					t.Errorf("failed to make script pkscript for "+
@@ -1612,7 +1623,7 @@ func TestSignTxOutput(t *testing.T) {
 				msg := fmt.Sprintf("%d:%d:%d", hashType, i, suite)
 
 				switch suite {
-				case secp:
+				case chainec.ECTypeSecp256k1:
 					keyDB, _, _, _ = secp256k1.GenerateKey(rand.Reader)
 					key, pk = secp256k1.PrivKeyFromBytes(keyDB)
 					address, err = dcrutil.NewAddressSecpPubKeyCompressed(pk,
@@ -1622,7 +1633,7 @@ func TestSignTxOutput(t *testing.T) {
 							msg, err)
 					}
 
-				case edwards:
+				case chainec.ECTypeEdwards:
 					keyDB, _, _, _ = chainec.Edwards.GenerateKey(rand.Reader)
 					key, pk = chainec.Edwards.PrivKeyFromBytes(keyDB)
 					pkBytes = pk.SerializeCompressed()
@@ -1633,7 +1644,7 @@ func TestSignTxOutput(t *testing.T) {
 							msg, err)
 					}
 
-				case secSchnorr:
+				case chainec.ECTypeSecSchnorr:
 					keyDB, _, _, _ = chainec.SecSchnorr.GenerateKey(rand.Reader)
 					key, pk = chainec.SecSchnorr.PrivKeyFromBytes(keyDB)
 					pkBytes = pk.Serialize()
@@ -1645,7 +1656,7 @@ func TestSignTxOutput(t *testing.T) {
 					}
 				}
 
-				pkScript, err := txscript.PayToAddrScript(address)
+				pkScript, err := PayToAddrScript(address)
 				if err != nil {
 					t.Errorf("failed to make pkscript "+
 						"for %s: %v", msg, err)
@@ -1659,7 +1670,7 @@ func TestSignTxOutput(t *testing.T) {
 					break
 				}
 
-				scriptPkScript, err := txscript.PayToAddrScript(
+				scriptPkScript, err := PayToAddrScript(
 					scriptAddr)
 				if err != nil {
 					t.Errorf("failed to make script pkscript for "+
@@ -1667,9 +1678,9 @@ func TestSignTxOutput(t *testing.T) {
 					break
 				}
 
-				_, err = txscript.SignTxOutput(
-					testingParams, tx, i, scriptPkScript,
-					hashType, mkGetKey(map[string]addressToKey{
+				_, err = SignTxOutput(testingParams,
+					tx, i, scriptPkScript, hashType,
+					mkGetKey(map[string]addressToKey{
 						address.EncodeAddress(): {&key, true},
 					}), mkGetScript(map[string][]byte{
 						scriptAddr.EncodeAddress(): pkScript,
@@ -1682,9 +1693,9 @@ func TestSignTxOutput(t *testing.T) {
 
 				// by the above loop, this should be valid, now sign
 				// again and merge.
-				sigScript, err := txscript.SignTxOutput(
-					testingParams, tx, i, scriptPkScript,
-					hashType, mkGetKey(map[string]addressToKey{
+				sigScript, err := SignTxOutput(testingParams,
+					tx, i, scriptPkScript, hashType,
+					mkGetKey(map[string]addressToKey{
 						address.EncodeAddress(): {&key, true},
 					}), mkGetScript(map[string][]byte{
 						scriptAddr.EncodeAddress(): pkScript,
@@ -1740,7 +1751,7 @@ func TestSignTxOutput(t *testing.T) {
 				break
 			}
 
-			pkScript, err := txscript.MultiSigScript(
+			pkScript, err := MultiSigScript(
 				[]*dcrutil.AddressSecpPubKey{address1, address2},
 				2)
 			if err != nil {
@@ -1756,8 +1767,7 @@ func TestSignTxOutput(t *testing.T) {
 				break
 			}
 
-			scriptPkScript, err := txscript.PayToAddrScript(
-				scriptAddr)
+			scriptPkScript, err := PayToAddrScript(scriptAddr)
 			if err != nil {
 				t.Errorf("failed to make script pkscript for "+
 					"%s: %v", msg, err)
@@ -1771,7 +1781,7 @@ func TestSignTxOutput(t *testing.T) {
 					address2.EncodeAddress(): {&key2, true},
 				}), mkGetScript(map[string][]byte{
 					scriptAddr.EncodeAddress(): pkScript,
-				}), nil, secp); err != nil {
+				}), nil, chainec.ECTypeSecp256k1); err != nil {
 				t.Error(err)
 				break
 			}
@@ -1780,7 +1790,8 @@ func TestSignTxOutput(t *testing.T) {
 				mkGetKey(map[string]addressToKey{
 					address1.EncodeAddress(): {&key1, true},
 					address2.EncodeAddress(): {&key2, true},
-				}), mkGetScript(nil), nil, secp); err == nil {
+				}), mkGetScript(nil), nil,
+				chainec.ECTypeSecp256k1); err == nil {
 				t.Errorf("corrupted signature validated %s: %v",
 					msg, err)
 				break
@@ -1823,7 +1834,7 @@ func TestSignTxOutput(t *testing.T) {
 				break
 			}
 
-			pkScript, err := txscript.MultiSigScript(
+			pkScript, err := MultiSigScript(
 				[]*dcrutil.AddressSecpPubKey{address1, address2},
 				2)
 			if err != nil {
@@ -1839,21 +1850,20 @@ func TestSignTxOutput(t *testing.T) {
 				break
 			}
 
-			scriptPkScript, err := txscript.PayToAddrScript(
-				scriptAddr)
+			scriptPkScript, err := PayToAddrScript(scriptAddr)
 			if err != nil {
 				t.Errorf("failed to make script pkscript for "+
 					"%s: %v", msg, err)
 				break
 			}
 
-			sigScript, err := txscript.SignTxOutput(
-				testingParams, tx, i, scriptPkScript,
-				hashType, mkGetKey(map[string]addressToKey{
+			sigScript, err := SignTxOutput(testingParams, tx, i,
+				scriptPkScript, hashType,
+				mkGetKey(map[string]addressToKey{
 					address1.EncodeAddress(): {&key1, true},
 				}), mkGetScript(map[string][]byte{
 					scriptAddr.EncodeAddress(): pkScript,
-				}), nil, secp)
+				}), nil, chainec.ECTypeSecp256k1)
 			if err != nil {
 				t.Errorf("failed to sign output %s: %v", msg,
 					err)
@@ -1868,13 +1878,13 @@ func TestSignTxOutput(t *testing.T) {
 			}
 
 			// Sign with the other key and merge
-			sigScript, err = txscript.SignTxOutput(
-				testingParams, tx, i, scriptPkScript,
-				hashType, mkGetKey(map[string]addressToKey{
+			sigScript, err = SignTxOutput(testingParams, tx, i,
+				scriptPkScript, hashType,
+				mkGetKey(map[string]addressToKey{
 					address2.EncodeAddress(): {&key2, true},
 				}), mkGetScript(map[string][]byte{
 					scriptAddr.EncodeAddress(): pkScript,
-				}), sigScript, secp)
+				}), sigScript, chainec.ECTypeSecp256k1)
 			if err != nil {
 				t.Errorf("failed to sign output %s: %v", msg, err)
 				break
@@ -1925,7 +1935,7 @@ func TestSignTxOutput(t *testing.T) {
 				break
 			}
 
-			pkScript, err := txscript.MultiSigScript(
+			pkScript, err := MultiSigScript(
 				[]*dcrutil.AddressSecpPubKey{address1, address2},
 				2)
 			if err != nil {
@@ -1941,21 +1951,20 @@ func TestSignTxOutput(t *testing.T) {
 				break
 			}
 
-			scriptPkScript, err := txscript.PayToAddrScript(
-				scriptAddr)
+			scriptPkScript, err := PayToAddrScript(scriptAddr)
 			if err != nil {
 				t.Errorf("failed to make script pkscript for "+
 					"%s: %v", msg, err)
 				break
 			}
 
-			sigScript, err := txscript.SignTxOutput(
-				testingParams, tx, i, scriptPkScript,
-				hashType, mkGetKey(map[string]addressToKey{
+			sigScript, err := SignTxOutput(testingParams, tx, i,
+				scriptPkScript, hashType,
+				mkGetKey(map[string]addressToKey{
 					address1.EncodeAddress(): {&key1, true},
 				}), mkGetScript(map[string][]byte{
 					scriptAddr.EncodeAddress(): pkScript,
-				}), nil, secp)
+				}), nil, chainec.ECTypeSecp256k1)
 			if err != nil {
 				t.Errorf("failed to sign output %s: %v", msg,
 					err)
@@ -1970,14 +1979,14 @@ func TestSignTxOutput(t *testing.T) {
 			}
 
 			// Sign with the other key and merge
-			sigScript, err = txscript.SignTxOutput(
-				testingParams, tx, i, scriptPkScript,
-				hashType, mkGetKey(map[string]addressToKey{
+			sigScript, err = SignTxOutput(testingParams, tx, i,
+				scriptPkScript, hashType,
+				mkGetKey(map[string]addressToKey{
 					address1.EncodeAddress(): {&key1, true},
 					address2.EncodeAddress(): {&key2, true},
 				}), mkGetScript(map[string][]byte{
 					scriptAddr.EncodeAddress(): pkScript,
-				}), sigScript, secp)
+				}), sigScript, chainec.ECTypeSecp256k1)
 			if err != nil {
 				t.Errorf("failed to sign output %s: %v", msg, err)
 				break
@@ -2005,7 +2014,7 @@ type tstInput struct {
 type tstSigScript struct {
 	name               string
 	inputs             []tstInput
-	hashType           txscript.SigHashType
+	hashType           SigHashType
 	compress           bool
 	scriptAtWrongIndex bool
 }
@@ -2024,12 +2033,12 @@ var (
 	_, thisPubKey     = chainec.Secp256k1.PrivKeyFromBytes(privKeyD)
 	thisAddressUnc, _ = dcrutil.NewAddressPubKeyHash(
 		dcrutil.Hash160(thisPubKey.SerializeUncompressed()),
-		testingParams, secp)
-	uncompressedPkScript, _ = txscript.PayToAddrScript(thisAddressUnc)
+		testingParams, chainec.ECTypeSecp256k1)
+	uncompressedPkScript, _ = PayToAddrScript(thisAddressUnc)
 	thisAddressCom, _       = dcrutil.NewAddressPubKeyHash(
 		dcrutil.Hash160(thisPubKey.SerializeCompressed()),
-		testingParams, secp)
-	compressedPkScript, _ = txscript.PayToAddrScript(thisAddressCom)
+		testingParams, chainec.ECTypeSecp256k1)
+	compressedPkScript, _ = PayToAddrScript(thisAddressCom)
 	shortPkScript         = []byte{0x76, 0xa9, 0x14, 0xd1, 0x7c, 0xb5,
 		0xeb, 0xa4, 0x02, 0xcb, 0x68, 0xe0, 0x69, 0x56, 0xbf, 0x32,
 		0x53, 0x90, 0x0e, 0x0a, 0x88, 0xac}
@@ -2050,7 +2059,7 @@ var sigScriptTests = []tstSigScript{
 				indexOutOfRange:    false,
 			},
 		},
-		hashType:           txscript.SigHashAll,
+		hashType:           SigHashAll,
 		compress:           false,
 		scriptAtWrongIndex: false,
 	},
@@ -2070,7 +2079,7 @@ var sigScriptTests = []tstSigScript{
 				indexOutOfRange:    false,
 			},
 		},
-		hashType:           txscript.SigHashAll,
+		hashType:           SigHashAll,
 		compress:           false,
 		scriptAtWrongIndex: false,
 	},
@@ -2084,7 +2093,7 @@ var sigScriptTests = []tstSigScript{
 				indexOutOfRange:    false,
 			},
 		},
-		hashType:           txscript.SigHashAll,
+		hashType:           SigHashAll,
 		compress:           true,
 		scriptAtWrongIndex: false,
 	},
@@ -2104,7 +2113,7 @@ var sigScriptTests = []tstSigScript{
 				indexOutOfRange:    false,
 			},
 		},
-		hashType:           txscript.SigHashAll,
+		hashType:           SigHashAll,
 		compress:           true,
 		scriptAtWrongIndex: false,
 	},
@@ -2118,7 +2127,7 @@ var sigScriptTests = []tstSigScript{
 				indexOutOfRange:    false,
 			},
 		},
-		hashType:           txscript.SigHashNone,
+		hashType:           SigHashNone,
 		compress:           false,
 		scriptAtWrongIndex: false,
 	},
@@ -2132,7 +2141,7 @@ var sigScriptTests = []tstSigScript{
 				indexOutOfRange:    false,
 			},
 		},
-		hashType:           txscript.SigHashSingle,
+		hashType:           SigHashSingle,
 		compress:           false,
 		scriptAtWrongIndex: false,
 	},
@@ -2146,7 +2155,7 @@ var sigScriptTests = []tstSigScript{
 				indexOutOfRange:    false,
 			},
 		},
-		hashType:           txscript.SigHashAnyOneCanPay,
+		hashType:           SigHashAnyOneCanPay,
 		compress:           false,
 		scriptAtWrongIndex: false,
 	},
@@ -2174,7 +2183,7 @@ var sigScriptTests = []tstSigScript{
 				indexOutOfRange:    false,
 			},
 		},
-		hashType:           txscript.SigHashAll,
+		hashType:           SigHashAll,
 		compress:           true,
 		scriptAtWrongIndex: false,
 	},
@@ -2187,7 +2196,7 @@ var sigScriptTests = []tstSigScript{
 				indexOutOfRange:    false,
 			},
 		},
-		hashType:           txscript.SigHashAll,
+		hashType:           SigHashAll,
 		compress:           false,
 		scriptAtWrongIndex: false,
 	},
@@ -2207,7 +2216,7 @@ var sigScriptTests = []tstSigScript{
 				indexOutOfRange:    false,
 			},
 		},
-		hashType:           txscript.SigHashAll,
+		hashType:           SigHashAll,
 		compress:           false,
 		scriptAtWrongIndex: true,
 	},
@@ -2227,7 +2236,7 @@ var sigScriptTests = []tstSigScript{
 				indexOutOfRange:    false,
 			},
 		},
-		hashType:           txscript.SigHashAll,
+		hashType:           SigHashAll,
 		compress:           false,
 		scriptAtWrongIndex: true,
 	},
@@ -2246,7 +2255,7 @@ nexttest:
 	for i := range sigScriptTests {
 		tx := wire.NewMsgTx()
 
-		output := wire.NewTxOut(500, []byte{txscript.OP_RETURN})
+		output := wire.NewTxOut(500, []byte{OP_RETURN})
 		tx.AddTxOut(output)
 
 		for range sigScriptTests[i].inputs {
@@ -2264,7 +2273,7 @@ nexttest:
 			} else {
 				idx = j
 			}
-			script, err = txscript.SignatureScript(tx, idx,
+			script, err = SignatureScript(tx, idx,
 				sigScriptTests[i].inputs[j].txout.PkScript,
 				sigScriptTests[i].hashType, privKey,
 				sigScriptTests[i].compress)
@@ -2296,10 +2305,10 @@ nexttest:
 		}
 
 		// Validate tx input scripts
-		scriptFlags := txscript.ScriptBip16 | txscript.ScriptVerifyDERSignatures
+		scriptFlags := ScriptBip16 | ScriptVerifyDERSignatures
 		for j := range tx.TxIn {
-			vm, err := txscript.NewEngine(sigScriptTests[i].
-				inputs[j].txout.PkScript, tx, j, scriptFlags, 0,
+			vm, err := NewEngine(sigScriptTests[i].inputs[j].txout.
+				PkScript, tx, j, scriptFlags, 0,
 				nil)
 			if err != nil {
 				t.Errorf("cannot create script vm for test %v: %v",
