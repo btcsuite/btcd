@@ -6,6 +6,7 @@
 package txscript
 
 import (
+	"bytes"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -618,6 +619,137 @@ testloop:
 					"%v", i, test, k, err)
 				continue
 			}
+		}
+	}
+}
+
+// parseSigHashExpectedResult parses the provided expected result string into
+// allowed error codes.  An error is returned if the expected result string is
+// not supported.
+func parseSigHashExpectedResult(expected string) (error, error) {
+	switch expected {
+	case "OK":
+		return nil, nil
+	case "SIGHASH_SINGLE_IDX":
+		return ErrSighashSingleIdx, nil
+	}
+
+	return nil, fmt.Errorf("unrecognized expected result in test data: %v",
+		expected)
+}
+
+// TestCalcSignatureHashReference runs the reference signature hash calculation
+// tests in sighash.json.
+func TestCalcSignatureHashReference(t *testing.T) {
+	file, err := ioutil.ReadFile("data/sighash.json")
+	if err != nil {
+		t.Fatalf("TestCalcSignatureHash: %v\n", err)
+	}
+
+	var tests [][]interface{}
+	err = json.Unmarshal(file, &tests)
+	if err != nil {
+		t.Fatalf("TestCalcSignatureHash couldn't Unmarshal: %v\n", err)
+	}
+
+	for i, test := range tests {
+		// Skip comment lines.
+		if len(test) == 1 {
+			continue
+		}
+
+		// Ensure test is well formed.
+		if len(test) < 6 || len(test) > 7 {
+			t.Fatalf("Test #%d: wrong length %d", i, len(test))
+		}
+
+		// Extract and parse the transaction from the test fields.
+		txHex, ok := test[0].(string)
+		if !ok {
+			t.Errorf("Test #%d: transaction is not a string", i)
+			continue
+		}
+		rawTx, err := hex.DecodeString(txHex)
+		if err != nil {
+			t.Errorf("Test #%d: unable to parse transaction: %v", i, err)
+			continue
+		}
+		var tx wire.MsgTx
+		err = tx.Deserialize(bytes.NewReader(rawTx))
+		if err != nil {
+			t.Errorf("Test #%d: unable to deserialize transaction: %v", i, err)
+			continue
+		}
+
+		// Extract and parse the script from the test fields.
+		subScriptStr, ok := test[1].(string)
+		if !ok {
+			t.Errorf("Test #%d: script is not a string", i)
+			continue
+		}
+		subScript, err := hex.DecodeString(subScriptStr)
+		if err != nil {
+			t.Errorf("Test #%d: unable to decode script: %v", i,
+				err)
+			continue
+		}
+		parsedScript, err := parseScript(subScript)
+		if err != nil {
+			t.Errorf("Test #%d: unable to parse script: %v", i, err)
+			continue
+		}
+
+		// Extract the input index from the test fields.
+		inputIdxF64, ok := test[2].(float64)
+		if !ok {
+			t.Errorf("Test #%d: input idx is not numeric", i)
+			continue
+		}
+
+		// Extract and parse the hash type from the test fields.
+		hashTypeF64, ok := test[3].(float64)
+		if !ok {
+			t.Errorf("Test #%d: hash type is not numeric", i)
+			continue
+		}
+		hashType := SigHashType(testVecF64ToUint32(hashTypeF64))
+
+		// Extract and parse the signature hash from the test fields.
+		expectedHashStr, ok := test[4].(string)
+		if !ok {
+			t.Errorf("Test #%d: signature hash is not a string", i)
+			continue
+		}
+		expectedHash, err := hex.DecodeString(expectedHashStr)
+		if err != nil {
+			t.Errorf("Test #%d: unable to sig hash: %v", i, err)
+			continue
+		}
+
+		// Extract and parse the expected result from the test fields.
+		expectedErrStr, ok := test[5].(string)
+		if !ok {
+			t.Errorf("Test #%d: result field is not a string", i)
+			continue
+		}
+		expectedErr, err := parseSigHashExpectedResult(expectedErrStr)
+		if err != nil {
+			t.Errorf("Test #%d: %v", i, err)
+			continue
+		}
+
+		// Calculate the signature hash and verify expected result.
+		hash, err := calcSignatureHash(parsedScript, hashType, &tx,
+			int(inputIdxF64), nil)
+		if err != expectedErr {
+			t.Errorf("Test #%d: unexpected error: want %v, got %v", i,
+				expectedErr, err)
+			continue
+		}
+		if !bytes.Equal(hash, expectedHash) {
+			t.Errorf("Test #%d: signature hash mismatch - got %x, "+
+				"want %x", i, hash, expectedHash)
+			continue
 		}
 	}
 }
