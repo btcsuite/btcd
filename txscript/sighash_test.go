@@ -13,6 +13,68 @@ import (
 	"github.com/decred/dcrd/wire"
 )
 
+// TestVarIntSerializeSize ensures the serialize size for variable length
+// integers works as intended.
+func TestVarIntSerializeSize(t *testing.T) {
+	tests := []struct {
+		val  uint64 // Value to get the serialized size for
+		size int    // Expected serialized size
+	}{
+
+		{0, 1},                  // Single byte encoded
+		{0xfc, 1},               // Max single byte encoded
+		{0xfd, 3},               // Min 3-byte encoded
+		{0xffff, 3},             // Max 3-byte encoded
+		{0x10000, 5},            // Min 5-byte encoded
+		{0xffffffff, 5},         // Max 5-byte encoded
+		{0x100000000, 9},        // Min 9-byte encoded
+		{0xffffffffffffffff, 9}, // Max 9-byte encoded
+	}
+
+	for i, test := range tests {
+		serializedSize := varIntSerializeSize(test.val)
+		if serializedSize != test.size {
+			t.Errorf("varIntSerializeSize #%d got: %d, want: %d", i,
+				serializedSize, test.size)
+			continue
+		}
+	}
+}
+
+// TestPutVarInt ensures encoding variable length integers works as intended.
+func TestPutVarInt(t *testing.T) {
+	tests := []struct {
+		val     uint64 // Value to encode
+		encoded []byte // expected encoding
+	}{
+
+		{0, hexToBytes("00")},                                  // Single byte
+		{0xfc, hexToBytes("fc")},                               // Max single
+		{0xfd, hexToBytes("fdfd00")},                           // Min 3-byte
+		{0xffff, hexToBytes("fdffff")},                         // Max 3-byte
+		{0x10000, hexToBytes("fe00000100")},                    // Min 5-byte
+		{0xffffffff, hexToBytes("feffffffff")},                 // Max 5-byte
+		{0x100000000, hexToBytes("ff0000000001000000")},        // Min 9-byte
+		{0xffffffffffffffff, hexToBytes("ffffffffffffffffff")}, // Max 9-byte
+	}
+
+	for i, test := range tests {
+		encoded := make([]byte, varIntSerializeSize(test.val))
+		gotBytesWritten := putVarInt(encoded, test.val)
+		if !bytes.Equal(encoded, test.encoded) {
+			t.Errorf("putVarInt #%d\n got: %x want: %x", i, encoded,
+				test.encoded)
+			continue
+		}
+		if gotBytesWritten != len(test.encoded) {
+			t.Errorf("putVarInt: did not get expected number of bytes written "+
+				"for %d - got %d, want %d", test.val, gotBytesWritten,
+				len(test.encoded))
+			continue
+		}
+	}
+}
+
 // TestCalcSignatureHash does some rudimentary testing of msg hash calculation.
 func TestCalcSignatureHash(t *testing.T) {
 	tx := new(wire.MsgTx)
