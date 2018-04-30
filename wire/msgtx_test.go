@@ -616,97 +616,6 @@ func TestTxSerializeWitness(t *testing.T) {
 	}
 }
 
-// TestTxSerializeWitnessSigning tests MsgTx serialize and deserialize.
-func TestTxSerializeWitnessSigning(t *testing.T) {
-	noTx := NewMsgTx()
-	noTx.SerType = TxSerializeWitnessSigning
-	noTx.Version = 1
-	noTxEncoded := []byte{
-		0x01, 0x00, 0x03, 0x00, // Version
-		0x00, // Varint for number of input signatures
-	}
-
-	tests := []struct {
-		in           *MsgTx // Message to encode
-		out          *MsgTx // Expected decoded message
-		buf          []byte // Serialized data
-		pkScriptLocs []int  // Expected output script locations
-	}{
-		// No transactions.
-		{
-			noTx,
-			noTx,
-			noTxEncoded,
-			nil,
-		},
-
-		// Multiple transactions.
-		{
-			multiTxWitnessSigning,
-			multiTxWitnessSigning,
-			multiTxWitnessSigningEncoded,
-			nil,
-		},
-	}
-
-	t.Logf("Running %d tests", len(tests))
-	for i, test := range tests {
-		// Serialize the transaction.
-		buf := bytes.NewBuffer(make([]byte, 0, test.in.SerializeSize()))
-		err := test.in.Serialize(buf)
-		if err != nil {
-			t.Errorf("Serialize #%d error %v", i, err)
-			continue
-		}
-		if !bytes.Equal(buf.Bytes(), test.buf) {
-			t.Errorf("Serialize #%d\n got: %s want: %s", i,
-				spew.Sdump(buf.Bytes()), spew.Sdump(test.buf))
-			continue
-		}
-
-		// Test SerializeSize.
-		sz := test.in.SerializeSize()
-		actualSz := len(buf.Bytes())
-		if sz != actualSz {
-			t.Errorf("Wrong serialize size #%d\n got: %d want: %d", i,
-				sz, actualSz)
-		}
-
-		// Deserialize the transaction.
-		var tx MsgTx
-		rbuf := bytes.NewReader(test.buf)
-		err = tx.Deserialize(rbuf)
-		if err != nil {
-			t.Errorf("Deserialize #%d error %v", i, err)
-			continue
-		}
-		if !reflect.DeepEqual(&tx, test.out) {
-			t.Errorf("Deserialize #%d\n got: %s want: %s", i,
-				spew.Sdump(&tx), spew.Sdump(test.out))
-			continue
-		}
-
-		// Ensure the public key script locations are accurate.
-		pkScriptLocs := test.in.PkScriptLocs()
-		if !reflect.DeepEqual(pkScriptLocs, test.pkScriptLocs) {
-			t.Errorf("PkScriptLocs #%d\n got: %s want: %s", i,
-				spew.Sdump(pkScriptLocs),
-				spew.Sdump(test.pkScriptLocs))
-			continue
-		}
-		for j, loc := range pkScriptLocs {
-			wantPkScript := test.in.TxOut[j].PkScript
-			gotPkScript := test.buf[loc : loc+len(wantPkScript)]
-			if !bytes.Equal(gotPkScript, wantPkScript) {
-				t.Errorf("PkScriptLocs #%d:%d\n unexpected "+
-					"script got: %s want: %s", i, j,
-					spew.Sdump(gotPkScript),
-					spew.Sdump(wantPkScript))
-			}
-		}
-	}
-}
-
 // TestTxSerializeErrors performs negative tests against wire encode and decode
 // of MsgTx to confirm error paths work correctly.
 func TestTxSerializeErrors(t *testing.T) {
@@ -1066,20 +975,6 @@ var multiTxWitness = &MsgTx{
 	TxOut: []*TxOut{},
 }
 
-// multiTxWitnessSigning is a MsgTx witness with only input witness sigscripts.
-var multiTxWitnessSigning = &MsgTx{
-	SerType: TxSerializeWitnessSigning,
-	Version: 1,
-	TxIn: []*TxIn{
-		{
-			SignatureScript: []byte{
-				0x04, 0x31, 0xdc, 0x00, 0x1b, 0x01, 0x62,
-			},
-		},
-	},
-	TxOut: []*TxOut{},
-}
-
 // multiTxEncoded is the wire encoded bytes for multiTx using protocol version
 // 0 and is used in the various tests.
 var multiTxEncoded = []byte{
@@ -1184,15 +1079,6 @@ var multiTxWitnessEncoded = []byte{
 	0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12, // ValueIn
 	0x15, 0x15, 0x15, 0x15, // BlockHeight
 	0x34, 0x34, 0x34, 0x34, // BlockIndex
-	0x07,                                     // Varint for length of signature script
-	0x04, 0x31, 0xdc, 0x00, 0x1b, 0x01, 0x62, // Signature script
-}
-
-// multiTxWitnessSigningEncoded is the wire encoded bytes for multiTx using protocol version
-// 1 and is used in the various tests.
-var multiTxWitnessSigningEncoded = []byte{
-	0x01, 0x00, 0x03, 0x00, // Version
-	0x01,                                     // Varint for number of input signature
 	0x07,                                     // Varint for length of signature script
 	0x04, 0x31, 0xdc, 0x00, 0x1b, 0x01, 0x62, // Signature script
 }
