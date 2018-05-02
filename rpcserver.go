@@ -6307,6 +6307,11 @@ func (s *rpcServer) jsonRPCRead(w http.ResponseWriter, r *http.Request, isAdmin 
 	if _, err := buf.Write(msg); err != nil {
 		rpcsLog.Errorf("Failed to write marshalled reply: %v", err)
 	}
+
+	// Terminate with newline to maintain compatibility with Bitcoin Core.
+	if err := buf.WriteByte('\n'); err != nil {
+		rpcsLog.Errorf("Failed to append terminating newline to reply: %v", err)
+	}
 }
 
 // jsonAuthFail sends a message back to the client if the http auth is rejected.
