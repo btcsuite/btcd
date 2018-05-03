@@ -151,6 +151,11 @@ func normalizeAddress(addr string, useTestNet, useSimNet, useWallet bool) string
 // cleanAndExpandPath expands environment variables and leading ~ in the
 // passed path, cleans the result, and returns it.
 func cleanAndExpandPath(path string) string {
+	// Nothing to do when no path is given.
+	if path == "" {
+		return path
+	}
+
 	// NOTE: The os.ExpandEnv doesn't work with Windows cmd.exe-style
 	// %VARIABLE%, but the variables can still be expanded via POSIX-style
 	// $VARIABLE.
