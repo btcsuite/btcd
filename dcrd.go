@@ -89,7 +89,7 @@ func dcrdMain(serverChan chan<- *server) error {
 	if cfg.MemProfile != "" {
 		f, err := os.Create(cfg.MemProfile)
 		if err != nil {
-			dcrdLog.Errorf("Unable to create cpu profile: %v", err)
+			dcrdLog.Errorf("Unable to create mem profile: %v", err)
 			return err
 		}
 		timer := time.NewTimer(time.Minute * 20) // 20 minutes
