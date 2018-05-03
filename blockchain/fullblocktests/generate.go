@@ -1940,7 +1940,7 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 	})
 	rejected(blockchain.ErrFraudAmountIn)
 
-	// Create block with an expired transaction.
+	// Create block with an expired transaction in the regular tx tree.
 	//
 	//   ... -> brs3(14)
 	//                  \-> bmf20(15)
@@ -1948,8 +1948,18 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 	g.NextBlock("bmf20", outs[15], ticketOuts[15], func(b *wire.MsgBlock) {
 		txOut := chaingen.MakeSpendableOut(b, 1, 0)
 		tx := g.CreateSpendTx(&txOut, lowFee)
-		tx.Expiry = 1
+		tx.Expiry = b.Header.Height
 		b.AddTransaction(tx)
+	})
+	rejected(blockchain.ErrExpiredTx)
+
+	// Create block with an expired transaction in the stake tx tree.
+	//
+	//   ... -> brs3(14)
+	//                  \-> bmf20b(15)
+	g.SetTip("brs3")
+	g.NextBlock("bmf20b", outs[15], ticketOuts[15], func(b *wire.MsgBlock) {
+		b.STransactions[5].Expiry = b.Header.Height
 	})
 	rejected(blockchain.ErrExpiredTx)
 
