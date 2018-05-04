@@ -808,6 +808,13 @@ func (mp *TxPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew, rateLimit, allow
 	bestHeight := mp.cfg.BestHeight()
 	nextBlockHeight := bestHeight + 1
 
+	// Don't accept transactions that will be expired as of the next block.
+	if blockchain.IsExpired(tx, nextBlockHeight) {
+		str := fmt.Sprintf("transaction %v expired at height %d",
+			txHash, msgTx.Expiry)
+		return nil, txRuleError(wire.RejectInvalid, str)
+	}
+
 	// Determine what type of transaction we're dealing with (regular or stake).
 	// Then, be sure to set the tx tree correctly as it's possible a use submitted
 	// it to the network with TxTreeUnknown.

@@ -139,6 +139,25 @@ func IsCoinBase(tx *dcrutil.Tx) bool {
 	return IsCoinBaseTx(tx.MsgTx())
 }
 
+// IsExpiredTx returns where or not the passed transaction is expired according
+// to the given block height.
+//
+// This function only differs from IsExpired in that it works with a raw wire
+// transaction as opposed to a higher level util transaction.
+func IsExpiredTx(tx *wire.MsgTx, blockHeight int64) bool {
+	expiry := tx.Expiry
+	return expiry != wire.NoExpiryValue && blockHeight >= int64(expiry)
+}
+
+// IsExpired returns where or not the passed transaction is expired according to
+// the given block height.
+//
+// This function only differs from IsExpiredTx in that it works with a higher
+// level util transaction as opposed to a raw wire transaction.
+func IsExpired(tx *dcrutil.Tx, blockHeight int64) bool {
+	return IsExpiredTx(tx.MsgTx(), blockHeight)
+}
+
 // SequenceLockActive determines if all of the inputs to a given transaction
 // have achieved a relative age that surpasses the requirements specified by
 // their respective sequence locks as calculated by CalcSequenceLock.  A single
@@ -1124,12 +1143,21 @@ func (b *BlockChain) checkBlockContext(block *dcrutil.Block, prevNode *blockNode
 		// previous block.
 		blockHeight := prevNode.height + 1
 
-		// Ensure all transactions in the block are finalized.
+		// Ensure all transactions in the block are finalized and are
+		// not expired.
 		for _, tx := range block.Transactions() {
 			if !IsFinalizedTransaction(tx, blockHeight, blockTime) {
 				str := fmt.Sprintf("block contains unfinalized regular "+
 					"transaction %v", tx.Hash())
 				return ruleError(ErrUnfinalizedTx, str)
+			}
+
+			// The transaction must not be expired.
+			if IsExpired(tx, blockHeight) {
+				errStr := fmt.Sprintf("block contains expired regular "+
+					"transaction %v (expiration height %d)", tx.Hash(),
+					tx.MsgTx().Expiry)
+				return ruleError(ErrExpiredTx, errStr)
 			}
 		}
 		for _, stx := range block.STransactions() {
@@ -1137,6 +1165,14 @@ func (b *BlockChain) checkBlockContext(block *dcrutil.Block, prevNode *blockNode
 				str := fmt.Sprintf("block contains unfinalized stake "+
 					"transaction %v", stx.Hash())
 				return ruleError(ErrUnfinalizedTx, str)
+			}
+
+			// The transaction must not be expired.
+			if IsExpired(stx, blockHeight) {
+				errStr := fmt.Sprintf("block contains expired stake "+
+					"transaction %v (expiration height %d)", stx.Hash(),
+					stx.MsgTx().Expiry)
+				return ruleError(ErrExpiredTx, errStr)
 			}
 		}
 
@@ -1229,16 +1265,6 @@ func (b *BlockChain) checkDupTxs(txSet []*dcrutil.Tx, view *UtxoViewpoint) error
 // CheckTransactionSanity function prior to calling this function.
 func CheckTransactionInputs(subsidyCache *SubsidyCache, tx *dcrutil.Tx, txHeight int64, utxoView *UtxoViewpoint, checkFraudProof bool, chainParams *chaincfg.Params) (int64, error) {
 	msgTx := tx.MsgTx()
-
-	// Expired transactions are not allowed.
-	if msgTx.Expiry != wire.NoExpiryValue {
-		if txHeight >= int64(msgTx.Expiry) {
-			errStr := fmt.Sprintf("Transaction indicated an "+
-				"expiry of %v while the current height is %v",
-				tx.MsgTx().Expiry, txHeight)
-			return 0, ruleError(ErrExpiredTx, errStr)
-		}
-	}
 
 	ticketMaturity := int64(chainParams.TicketMaturity)
 	stakeEnabledHeight := chainParams.StakeEnabledHeight
@@ -1482,7 +1508,6 @@ func CheckTransactionInputs(subsidyCache *SubsidyCache, tx *dcrutil.Tx, txHeight
 	// Save whether or not this is an SSRtx tx; if it is, we need to know
 	// this later input check for OP_SSTX outs.
 	isSSRtx := stake.IsSSRtx(msgTx)
-
 	if isSSRtx {
 		// Cursory check to see if we've even reach stake-enabled
 		// height.  Note for an SSRtx to be valid a vote must be
