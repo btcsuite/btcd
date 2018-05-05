@@ -220,6 +220,10 @@ func (f *fieldVal) SetBytes(b *[32]byte) *fieldVal {
 // The field value is returned to support chaining.  This enables syntax like:
 // f := new(fieldVal).SetByteSlice(byteSlice)
 func (f *fieldVal) SetByteSlice(b []byte) *fieldVal {
+	if len(b) > 32 {
+		b = b[:32]
+	}
+
 	var b32 [32]byte
 	for i := 0; i < len(b); i++ {
 		if i < 32 {
