@@ -1325,7 +1325,7 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 	g.SetTip("bsl5")
 	g.NextBlock("bv15", outs[9], ticketOuts[9], func(b *wire.MsgBlock) {
 		ticketFee := dcrutil.Amount(2)
-		ticketPrice := dcrutil.Amount(g.CalcNextRequiredStakeDifficulty())
+		ticketPrice := dcrutil.Amount(g.CalcNextReqStakeDifficulty(g.Tip()))
 		ticketPrice--
 		b.STransactions[5].TxOut[1].PkScript =
 			chaingen.PurchaseCommitmentScript(g.P2shOpTrueAddr(),
@@ -1347,7 +1347,7 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 
 		prevBlock := g.Tip()
 		spend := chaingen.MakeSpendableOut(prevBlock, 1, 0)
-		ticketPrice := dcrutil.Amount(b.STransactions[5].TxOut[0].Value)
+		ticketPrice := dcrutil.Amount(g.CalcNextReqStakeDifficulty(g.Tip()))
 		ticket := g.CreateTicketPurchaseTx(&spend, ticketPrice, lowFee)
 		b.AddSTransaction(ticket)
 		b.Header.FreshStake++
@@ -2015,7 +2015,7 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 	g.SetTip("brs3")
 	g.NextBlock("bmf25", outs[15], ticketOuts[15], func(b *wire.MsgBlock) {
 		spendOut := chaingen.MakeSpendableStakeOut(b, 0, 2)
-		ticketPrice := dcrutil.Amount(b.STransactions[5].TxOut[0].Value)
+		ticketPrice := dcrutil.Amount(g.CalcNextReqStakeDifficulty(g.Tip()))
 		ticket := g.CreateTicketPurchaseTx(&spendOut, ticketPrice, lowFee)
 		b.AddSTransaction(ticket)
 		b.Header.FreshStake++
@@ -2083,7 +2083,7 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 	g.SetTip("brs3")
 	g.NextBlock("bmf31", outs[15], ticketOuts[15], func(b *wire.MsgBlock) {
 		spend := chaingen.MakeSpendableOut(b, 0, 0)
-		ticketPrice := dcrutil.Amount(b.STransactions[5].TxOut[0].Value)
+		ticketPrice := dcrutil.Amount(g.CalcNextReqStakeDifficulty(g.Tip()))
 		ticket := g.CreateTicketPurchaseTx(&spend, ticketPrice, lowFee)
 		b.AddSTransaction(ticket)
 		b.Header.FreshStake++
@@ -2142,7 +2142,7 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 	g.SetTip("brs3")
 	g.NextBlock("bmf35", outs[15], ticketOuts[15], func(b *wire.MsgBlock) {
 		spend := chaingen.MakeSpendableStakeOut(b, 5, 2)
-		ticketPrice := dcrutil.Amount(b.STransactions[5].TxOut[0].Value)
+		ticketPrice := dcrutil.Amount(g.CalcNextReqStakeDifficulty(g.Tip()))
 		ticket := g.CreateTicketPurchaseTx(&spend, ticketPrice, lowFee)
 		b.AddSTransaction(ticket)
 		b.Header.FreshStake++

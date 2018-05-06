@@ -888,47 +888,15 @@ func (g *Generator) CalcNextRequiredDifficulty() uint32 {
 	return uint32(nextDiff)
 }
 
-// CalcNextRequiredStakeDifficulty returns the required stake difficulty (aka
-// ticket price) for the block after the current tip block the generator is
+// CalcNextReqStakeDifficulty returns the required stake difficulty (aka
+// ticket price) for the block after the provided block the generator is
 // associated with.
 //
-// An overview of the algorithm is as follows:
-// 1) Use the minimum value for any blocks before any tickets could have
-//    possibly been purchased due to coinbase maturity requirements
-// 2) Return 0 if the current tip block stake difficulty is 0.  This is a
-//    safety check against a condition that should never actually happen.
-// 3) Use the previous block's difficulty if the next block is not at a retarget
-//    interval
-// 4) Calculate the ideal retarget difficulty for each window based on the
-//    actual pool size in the window versus the target pool size skewed by a
-//    constant factor to weight the ticket pool size instead of the tickets per
-//    block and exponentially weight each difficulty such that the most recent
-//    window has the highest weight
-// 5) Calculate the pool size retarget difficulty based on the exponential
-//    weighted average and ensure it is limited to the max retarget adjustment
-//    factor -- This is the first metric used to calculate the final difficulty
-// 6) Calculate the ideal retarget difficulty for each window based on the
-//    actual new tickets in the window versus the target new tickets per window
-//    and exponentially weight each difficulty such that the most recent window
-//    has the highest weight
-// 7) Calculate the tickets per window retarget difficulty based on the
-//    exponential weighted average and ensure it is limited to the max retarget
-//    adjustment factor
-// 8) Calculate the final difficulty by averaging the pool size retarget
-//    difficulty from #5 and the tickets per window retarget difficulty from #7
-//    using scaled multiplication and ensure it is limited to the max retarget
-//    adjustment factor
-//
-// NOTE: In order to simplify the test code, this implementation does not use
-// big integers so it will NOT match the actual consensus code for really big
-// numbers.  However, the parameters on simnet and the pool sizes used in these
-// tests are low enough that this is not an issue for the tests.  Anyone looking
-// at this code should NOT use it for mainnet calculations as is since it will
-// not always yield the correct results.
-func (g *Generator) CalcNextRequiredStakeDifficulty() int64 {
+// See the documentation of CalcNextRequiredStakeDifficulty for more details.
+func (g *Generator) CalcNextReqStakeDifficulty(prevBlock *wire.MsgBlock) int64 {
 	// Stake difficulty before any tickets could possibly be purchased is
 	// the minimum value.
-	nextHeight := g.tip.Header.Height + 1
+	nextHeight := prevBlock.Header.Height + 1
 	stakeDiffStartHeight := uint32(g.params.CoinbaseMaturity) + 1
 	if nextHeight < stakeDiffStartHeight {
 		return g.params.MinimumStakeDiff
@@ -960,9 +928,9 @@ func (g *Generator) CalcNextRequiredStakeDifficulty() int64 {
 	var weightedPoolSizeSum, weightSum uint64
 	ticketsPerBlock := int64(g.params.TicketsPerBlock)
 	targetPoolSize := ticketsPerBlock * int64(g.params.TicketPoolSize)
+	block := prevBlock
 	numWindows := g.params.StakeDiffWindows
 	weightAlpha := g.params.StakeDiffAlpha
-	block := g.tip
 	for i := int64(0); i < numWindows; i++ {
 		// Get the pool size for the block at the start of the window.
 		// Use zero if there are not yet enough blocks left to cover the
@@ -1020,7 +988,7 @@ func (g *Generator) CalcNextRequiredStakeDifficulty() int64 {
 	// per window and exponentially weight them.
 	var weightedTicketsSum uint64
 	targetTicketsPerWindow := ticketsPerBlock * windowSize
-	block = g.tip
+	block = prevBlock
 	for i := int64(0); i < numWindows; i++ {
 		// Since the difficulty for the next block after the current tip
 		// is being calculated and there is no such block yet, the sum
@@ -1076,6 +1044,47 @@ func (g *Generator) CalcNextRequiredStakeDifficulty() int64 {
 		return g.params.MinimumStakeDiff
 	}
 	return nextDiff
+}
+
+// CalcNextRequiredStakeDifficulty returns the required stake difficulty (aka
+// ticket price) for the block after the current tip block the generator is
+// associated with.
+//
+// An overview of the algorithm is as follows:
+// 1) Use the minimum value for any blocks before any tickets could have
+//    possibly been purchased due to coinbase maturity requirements
+// 2) Return 0 if the current tip block stake difficulty is 0.  This is a
+//    safety check against a condition that should never actually happen.
+// 3) Use the previous block's difficulty if the next block is not at a retarget
+//    interval
+// 4) Calculate the ideal retarget difficulty for each window based on the
+//    actual pool size in the window versus the target pool size skewed by a
+//    constant factor to weight the ticket pool size instead of the tickets per
+//    block and exponentially weight each difficulty such that the most recent
+//    window has the highest weight
+// 5) Calculate the pool size retarget difficulty based on the exponential
+//    weighted average and ensure it is limited to the max retarget adjustment
+//    factor -- This is the first metric used to calculate the final difficulty
+// 6) Calculate the ideal retarget difficulty for each window based on the
+//    actual new tickets in the window versus the target new tickets per window
+//    and exponentially weight each difficulty such that the most recent window
+//    has the highest weight
+// 7) Calculate the tickets per window retarget difficulty based on the
+//    exponential weighted average and ensure it is limited to the max retarget
+//    adjustment factor
+// 8) Calculate the final difficulty by averaging the pool size retarget
+//    difficulty from #5 and the tickets per window retarget difficulty from #7
+//    using scaled multiplication and ensure it is limited to the max retarget
+//    adjustment factor
+//
+// NOTE: In order to simplify the test code, this implementation does not use
+// big integers so it will NOT match the actual consensus code for really big
+// numbers.  However, the parameters on simnet and the pool sizes used in these
+// tests are low enough that this is not an issue for the tests.  Anyone looking
+// at this code should NOT use it for mainnet calculations as is since it will
+// not always yield the correct results.
+func (g *Generator) CalcNextRequiredStakeDifficulty() int64 {
+	return g.CalcNextReqStakeDifficulty(g.tip)
 }
 
 // hash256prng is a determinstic pseudorandom number generator that uses a
