@@ -1823,7 +1823,7 @@ func CheckTransactionInputs(subsidyCache *SubsidyCache, tx *dcrutil.Tx, txHeight
 					"included stake output type %v at in "+
 					"txout at position %v", txHash,
 					scriptClass, i)
-				return 0, ruleError(ErrRegTxSpendStakeOut, errStr)
+				return 0, ruleError(ErrRegTxCreateStakeOut, errStr)
 			}
 
 			// Check to make sure that non-stake transactions also

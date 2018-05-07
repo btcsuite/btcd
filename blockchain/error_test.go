@@ -88,7 +88,7 @@ func TestErrorCodeStringer(t *testing.T) {
 		{ErrSSRtxPayeesMismatch, "ErrSSRtxPayeesMismatch"},
 		{ErrSSRtxPayees, "ErrSSRtxPayees"},
 		{ErrTxSStxOutSpend, "ErrTxSStxOutSpend"},
-		{ErrRegTxSpendStakeOut, "ErrRegTxSpendStakeOut"},
+		{ErrRegTxCreateStakeOut, "ErrRegTxCreateStakeOut"},
 		{ErrInvalidFinalState, "ErrInvalidFinalState"},
 		{ErrPoolSize, "ErrPoolSize"},
 		{ErrForceReorgWrongChain, "ErrForceReorgWrongChain"},

@@ -2381,7 +2381,7 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 		tx.AddTxOut(b.STransactions[5].TxOut[0])
 		b.AddTransaction(tx)
 	})
-	rejected(blockchain.ErrRegTxSpendStakeOut)
+	rejected(blockchain.ErrRegTxCreateStakeOut)
 
 	// ---------------------------------------------------------------------
 	// Extra subsidy tests.
