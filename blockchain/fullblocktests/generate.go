@@ -525,10 +525,32 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 	g.AssertTipHeight(1)
 	accepted()
 
-	// TODO:
-	// - Try to spend premine output before maturity in the regular tree
-	// - Try to spend premine output before maturity in the stake tree by
-	//   creating a ticket purchase
+	// Create block that tries to spend premine output before
+	// maturity in the regular tree
+	//
+	// genesis -> bp
+	//              \-> bpi0
+	g.NextBlock("bpi0", nil, nil, func(b *wire.MsgBlock) {
+		spendOut := chaingen.MakeSpendableOut(g.Tip(), 0, 0)
+		tx := g.CreateSpendTx(&spendOut, lowFee)
+		b.AddTransaction(tx)
+	})
+	rejected(blockchain.ErrImmatureSpend)
+
+	// Create block that tries to spend premine output before
+	// maturity in the stake tree by creating a ticket purchase
+	//
+	// genesis -> bp
+	//              \-> bpi1
+	g.SetTip("bp")
+	g.NextBlock("bpi1", nil, nil, func(b *wire.MsgBlock) {
+		spendOut := chaingen.MakeSpendableOut(g.Tip(), 0, 0)
+		ticketPrice := dcrutil.Amount(g.CalcNextRequiredStakeDifficulty())
+		tx := g.CreateTicketPurchaseTx(&spendOut, ticketPrice, lowFee)
+		b.AddSTransaction(tx)
+		b.Header.FreshStake++
+	})
+	rejected(blockchain.ErrImmatureSpend)
 
 	// ---------------------------------------------------------------------
 	// Generate enough blocks to have mature coinbase outputs to work with.
@@ -536,6 +558,7 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 	//   genesis -> bp -> bm0 -> bm1 -> ... -> bm#
 	// ---------------------------------------------------------------------
 
+	g.SetTip("bp")
 	var testInstances []TestInstance
 	for i := uint16(0); i < coinbaseMaturity; i++ {
 		blockName := fmt.Sprintf("bm%d", i)
@@ -572,16 +595,6 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 	tests = append(tests, testInstances)
 	g.AssertTipHeight(uint32(beforeLiveTickets))
 	bseTipName := g.TipName()
-
-	// TODO: Modify the above to generate a few less so this section can
-	// test negative validation failures such as the following items and
-	// then finish generating the rest after to reach the stake enabled
-	// height.
-	//
-	// - Ticket purchase with various malformed transactions such as
-	//   incorrectly ordered txouts, scripts that do not involve p2pkh or
-	//   p2sh addresses, etc
-	// - Try to vote with an immature ticket
 
 	// Create block that tries to vote before stake validation height.
 	//   bse#
@@ -2148,6 +2161,39 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 		b.Header.FreshStake++
 	})
 	rejected(blockchain.ErrImmatureSpend)
+
+	// Create block with a malformed outputs order for a ticket purchase.
+	//
+	//   ... -> brs3(14)
+	//                  \-> bmf36(15)
+	g.SetTip("brs3")
+	g.NextBlock("bmf36", outs[15], ticketOuts[15], func(b *wire.MsgBlock) {
+		prevBlock := g.Tip()
+		spendOut := chaingen.MakeSpendableOut(prevBlock, 1, 0)
+		ticketPrice := dcrutil.Amount(g.CalcNextRequiredStakeDifficulty())
+		ticket := g.CreateTicketPurchaseTx(&spendOut, ticketPrice, lowFee)
+		ticket.TxOut[0], ticket.TxOut[2] = ticket.TxOut[2], ticket.TxOut[0]
+		b.AddSTransaction(ticket)
+		b.Header.FreshStake++
+	})
+	rejected(blockchain.ErrRegTxInStakeTree)
+
+	// Create block with scripts that do not involve p2pkh or
+	// p2sh addresses for a ticket purchase.
+	//
+	//   ... -> brs3(14)
+	//                  \-> bmf37(15)
+	g.SetTip("brs3")
+	g.NextBlock("bmf37", outs[15], ticketOuts[15], func(b *wire.MsgBlock) {
+		prevBlock := g.Tip()
+		spendOut := chaingen.MakeSpendableOut(prevBlock, 1, 0)
+		ticketPrice := dcrutil.Amount(g.CalcNextRequiredStakeDifficulty())
+		ticket := g.CreateTicketPurchaseTx(&spendOut, ticketPrice, lowFee)
+		ticket.TxOut[0].PkScript = opTrueScript
+		b.AddSTransaction(ticket)
+		b.Header.FreshStake++
+	})
+	rejected(blockchain.ErrRegTxInStakeTree)
 
 	// ---------------------------------------------------------------------
 	// Block header median time tests.
