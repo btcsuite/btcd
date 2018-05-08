@@ -17,8 +17,8 @@ import (
 	"github.com/decred/dcrd/txscript"
 )
 
-// checkCoinbaseUniqueHeight checks to ensure that for all blocks height > 1
-// that the coinbase contains the height encoding to make coinbase hash collisions
+// checkCoinbaseUniqueHeight checks to ensure that for all blocks height > 1 the
+// coinbase contains the height encoding to make coinbase hash collisions
 // impossible.
 func checkCoinbaseUniqueHeight(blockHeight int64, block *dcrutil.Block) error {
 	// Coinbase TxOut[0] is always tax, TxOut[1] is always
@@ -30,21 +30,26 @@ func checkCoinbaseUniqueHeight(blockHeight int64, block *dcrutil.Block) error {
 		return ruleError(ErrFirstTxNotCoinbase, str)
 	}
 
-	// The first 4 bytes of the NullData output must be the
-	// encoded height of the block, so that every coinbase
-	// created has a unique transaction hash.
-	nullData, err := txscript.GetNullDataContent(
-		block.MsgBlock().Transactions[0].TxOut[1].Version,
-		block.MsgBlock().Transactions[0].TxOut[1].PkScript)
-	if err != nil {
-		str := fmt.Sprintf("block %v txOut 1 has wrong pkScript "+
-			"type", block.Hash())
+	// Only version 0 scripts are currently valid.
+	nullDataOut := block.MsgBlock().Transactions[0].TxOut[1]
+	if nullDataOut.Version != 0 {
+		str := fmt.Sprintf("block %v output 1 has wrong script version",
+			block.Hash())
 		return ruleError(ErrFirstTxNotCoinbase, str)
 	}
 
+	// The first 4 bytes of the null data output must be the encoded height
+	// of the block, so that every coinbase created has a unique transaction
+	// hash.
+	nullData, err := txscript.ExtractCoinbaseNullData(nullDataOut.PkScript)
+	if err != nil {
+		str := fmt.Sprintf("block %v output 1 has wrong script type",
+			block.Hash())
+		return ruleError(ErrFirstTxNotCoinbase, str)
+	}
 	if len(nullData) < 4 {
-		str := fmt.Sprintf("block %v txOut 1 has too short nullData "+
-			"push to contain height", block.Hash())
+		str := fmt.Sprintf("block %v output 1 data push too short to "+
+			"contain height", block.Hash())
 		return ruleError(ErrFirstTxNotCoinbase, str)
 	}
 
@@ -52,7 +57,7 @@ func checkCoinbaseUniqueHeight(blockHeight int64, block *dcrutil.Block) error {
 	cbHeight := binary.LittleEndian.Uint32(nullData[0:4])
 	if cbHeight != uint32(blockHeight) {
 		prevBlock := block.MsgBlock().Header.PrevBlock
-		str := fmt.Sprintf("block %v txOut 1 has wrong height in "+
+		str := fmt.Sprintf("block %v output 1 has wrong height in "+
 			"coinbase; want %v, got %v; prevBlock %v, header height %v",
 			block.Hash(), blockHeight, cbHeight, prevBlock,
 			block.MsgBlock().Header.Height)

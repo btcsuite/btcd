@@ -1343,22 +1343,6 @@ func ExtractPkScriptAltSigType(pkScript []byte) (int, error) {
 	return -1, fmt.Errorf("bad signature scheme type")
 }
 
-// GetNullDataContent returns the content of a NullData (OP_RETURN) data push
-// and an error if the script is not a NullData script.
-func GetNullDataContent(version uint16, pkScript []byte) ([]byte, error) {
-	class := GetScriptClass(version, pkScript)
-	if class != NullDataTy {
-		return nil, fmt.Errorf("not nulldata script")
-	}
-
-	pops, err := parseScript(pkScript)
-	if err != nil {
-		return nil, fmt.Errorf("script parse failure")
-	}
-
-	return pops[1].data, nil
-}
-
 // AtomicSwapDataPushes houses the data pushes found in atomic swap contracts.
 type AtomicSwapDataPushes struct {
 	RecipientHash160 [20]byte
