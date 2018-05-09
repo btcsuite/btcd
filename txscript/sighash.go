@@ -156,7 +156,7 @@ func putUint32LE(buf []byte, val uint32) int {
 }
 
 // putUint64LE writes the provided uint64 as little endian to the provided slice
-// and returns 8 to signifiy the number of bytes written.  The target byte slice
+// and returns 8 to signify the number of bytes written.  The target byte slice
 // must be at least large enough to handle the write or it will panic.
 func putUint64LE(buf []byte, val uint64) int {
 	binary.LittleEndian.PutUint64(buf, val)

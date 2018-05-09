@@ -43,7 +43,7 @@ func ExtractCoinbaseNullData(pkScript []byte) ([]byte, error) {
 	// numbers via small opcodes, however the consensus rules require the block
 	// height to be encoded as a 4-byte little-endian uint32 pushed via a normal
 	// data push, as opposed to using the normal number handling semantics of
-	// scripts, so this is specialized to accomodate that.
+	// scripts, so this is specialized to accommodate that.
 	if len(pops) == 1 && pops[0].opcode.value == OP_RETURN {
 		return nil, nil
 	}

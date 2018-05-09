@@ -2101,7 +2101,7 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 		zeroOutputTx := g.CreateSpendTx(&spend, spend.Amount())
 		b.AddTransaction(zeroOutputTx)
 
-		// Spend from zero value ouput that was just created.
+		// Spend from zero value output that was just created.
 		zeroSpend := chaingen.MakeSpendableOut(b, 2, 0)
 		zeroSpendTx := g.CreateSpendTx(&zeroSpend, 0)
 		b.AddTransaction(zeroSpendTx)

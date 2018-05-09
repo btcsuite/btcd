@@ -521,7 +521,7 @@ func TestCheckConnectBlockTemplate(t *testing.T) {
 	}
 
 	// changeNonce is a munger that modifies the block by changing the header
-	// nonce to a psuedo-random value.
+	// nonce to a pseudo-random value.
 	prng := mrand.New(mrand.NewSource(0))
 	changeNonce := func(b *wire.MsgBlock) {
 		// Change the nonce so the block isn't actively solved.
