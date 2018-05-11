@@ -1322,25 +1322,29 @@ func (mp *TxPool) pruneStakeTx(requiredStakeDifficulty, height int64) {
 	}
 }
 
+// pruneExpiredTx prunes expired transactions from the mempool that may no longer
+// be able to be included into a block.
+//
+// This function MUST be called with the mempool lock held (for writes).
+func (mp *TxPool) pruneExpiredTx(height int64) {
+	for _, tx := range mp.pool {
+		if blockchain.IsExpired(tx.Tx, height) {
+			log.Debugf("Pruning expired transaction %v from the mempool",
+				tx.Tx.Hash())
+			mp.removeTransaction(tx.Tx, true)
+		}
+	}
+}
+
 // PruneExpiredTx prunes expired transactions from the mempool that may no longer
 // be able to be included into a block.
+//
+// This function is safe for concurrent access.
 func (mp *TxPool) PruneExpiredTx(height int64) {
 	// Protect concurrent access.
 	mp.mtx.Lock()
 	mp.pruneExpiredTx(height)
 	mp.mtx.Unlock()
-}
-
-func (mp *TxPool) pruneExpiredTx(height int64) {
-	for _, tx := range mp.pool {
-		if tx.Tx.MsgTx().Expiry != 0 {
-			if height >= int64(tx.Tx.MsgTx().Expiry) {
-				log.Debugf("Pruning expired transaction %v "+
-					"from the mempool", tx.Tx.Hash())
-				mp.removeTransaction(tx.Tx, true)
-			}
-		}
-	}
 }
 
 // ProcessOrphans determines if there are any orphans which depend on the passed
