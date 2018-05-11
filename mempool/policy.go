@@ -50,7 +50,7 @@ const (
 	// It is also used to help determine if a transaction is considered dust
 	// and as a base for calculating minimum required fees for larger
 	// transactions.  This value is in Atoms/1000 bytes.
-	DefaultMinRelayTxFee = dcrutil.Amount(1e5)
+	DefaultMinRelayTxFee = dcrutil.Amount(1e4)
 
 	// maxStandardMultiSigKeys is the maximum number of public keys allowed
 	// in a multi-signature transaction output script for it to be
@@ -272,7 +272,7 @@ func isDust(txOut *wire.TxOut, minRelayTxFee dcrutil.Amount) bool {
 	//
 	// Using the typical values for a pay-to-pubkey-hash transaction from
 	// the breakdown above and the default minimum free transaction relay
-	// fee of 100000, this equates to values less than 60300 atoms being
+	// fee of 10000, this equates to values less than 6030 atoms being
 	// considered dust.
 	//
 	// The following is equivalent to (value/totalSize) * (1/3) * 1000

@@ -231,7 +231,7 @@ const FileContents = `[Application Options]
 ; ------------------------------------------------------------------------------
 
 ; Set the minimum transaction fee to be considered a non-zero fee,
-; minrelaytxfee=0.001
+; minrelaytxfee=0.0001
 
 ; Rate-limit free transactions to the value 15 * 1000 bytes per
 ; minute.

@@ -37,9 +37,9 @@ const (
 	MinHighPriority = dcrutil.AtomsPerCoin * 144.0 / 250
 
 	// maxRelayFeeMultiplier is the factor that we disallow fees / kB above the
-	// minimum tx fee.  At the current default minimum relay fee of 0.001
+	// minimum tx fee.  At the current default minimum relay fee of 0.0001
 	// DCR/kB, this results in a maximum allowed high fee of 1 DCR/kB.
-	maxRelayFeeMultiplier = 1000
+	maxRelayFeeMultiplier = 1e4
 
 	// maxSSGensDoubleSpends is the maximum number of SSGen double spends
 	// allowed in the pool.
