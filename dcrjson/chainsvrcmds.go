@@ -107,11 +107,40 @@ type EstimateFeeCmd struct {
 	NumBlocks int64
 }
 
-// NewEstimateFeeCmd returns a new instance which can be used to issue a
+// NewEstimateFeeCmd returns a new instance which can be used to issue an
 // estimatefee JSON-RPC command.
 func NewEstimateFeeCmd(numBlocks int64) *EstimateFeeCmd {
 	return &EstimateFeeCmd{
 		NumBlocks: numBlocks,
+	}
+}
+
+// EstimateSmartFeeMode defines estimation mode to be used with
+// the estimatesmartfee command.
+type EstimateSmartFeeMode string
+
+const (
+	// EstimateSmartFeeEconomical returns an
+	// economical result.
+	EstimateSmartFeeEconomical EstimateSmartFeeMode = "economical"
+
+	// EstimateSmartFeeConservative potentially returns
+	// a conservative result.
+	EstimateSmartFeeConservative = "conservative"
+)
+
+// EstimateSmartFeeCmd defines the estimatesmartfee JSON-RPC command.
+type EstimateSmartFeeCmd struct {
+	Confirmations int64
+	Mode          EstimateSmartFeeMode
+}
+
+// NewEstimateSmartFeeCmd returns a new instance which can be used to issue an
+// estimatesmartfee JSON-RPC command.
+func NewEstimateSmartFeeCmd(confirmations int64, mode EstimateSmartFeeMode) *EstimateSmartFeeCmd {
+	return &EstimateSmartFeeCmd{
+		Confirmations: confirmations,
+		Mode:          mode,
 	}
 }
 
@@ -758,6 +787,7 @@ func init() {
 	MustRegisterCmd("decoderawtransaction", (*DecodeRawTransactionCmd)(nil), flags)
 	MustRegisterCmd("decodescript", (*DecodeScriptCmd)(nil), flags)
 	MustRegisterCmd("estimatefee", (*EstimateFeeCmd)(nil), flags)
+	MustRegisterCmd("estimatesmartfee", (*EstimateSmartFeeCmd)(nil), flags)
 	MustRegisterCmd("getaddednodeinfo", (*GetAddedNodeInfoCmd)(nil), flags)
 	MustRegisterCmd("getbestblockhash", (*GetBestBlockHashCmd)(nil), flags)
 	MustRegisterCmd("getblock", (*GetBlockCmd)(nil), flags)

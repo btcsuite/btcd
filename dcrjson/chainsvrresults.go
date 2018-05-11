@@ -82,6 +82,14 @@ type DecodeScriptResult struct {
 	P2sh      string   `json:"p2sh,omitempty"`
 }
 
+// EstimateSmartFeeResult models the data returned from the estimatesmartfee
+// command.
+type EstimateSmartFeeResult struct {
+	FeeRate float64  `json:"feerate"`
+	Errors  []string `json:"errors"`
+	Blocks  int64    `json:"blocks"`
+}
+
 // GetAddedNodeInfoResultAddr models the data of the addresses portion of the
 // getaddednodeinfo command.
 type GetAddedNodeInfoResultAddr struct {

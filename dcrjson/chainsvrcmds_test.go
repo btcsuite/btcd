@@ -104,6 +104,17 @@ func TestChainSvrCmds(t *testing.T) {
 			unmarshalled: &dcrjson.DecodeScriptCmd{HexScript: "00"},
 		},
 		{
+			name: "estimatesmartfee",
+			newCmd: func() (interface{}, error) {
+				return dcrjson.NewCmd("estimatesmartfee", 6, dcrjson.EstimateSmartFeeConservative)
+			},
+			staticCmd: func() interface{} {
+				return dcrjson.NewEstimateSmartFeeCmd(6, dcrjson.EstimateSmartFeeConservative)
+			},
+			marshalled:   `{"jsonrpc":"1.0","method":"estimatesmartfee","params":[6,"conservative"],"id":1}`,
+			unmarshalled: &dcrjson.EstimateSmartFeeCmd{Confirmations: 6, Mode: dcrjson.EstimateSmartFeeConservative},
+		},
+		{
 			name: "getaddednodeinfo",
 			newCmd: func() (interface{}, error) {
 				return dcrjson.NewCmd("getaddednodeinfo", true)
