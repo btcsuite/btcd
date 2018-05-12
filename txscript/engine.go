@@ -22,10 +22,6 @@ const (
 	// pay-to-script hash transactions will be fully validated.
 	ScriptBip16 ScriptFlags = 1 << iota
 
-	// ScriptStrictMultiSig defines whether to verify the stack item
-	// used by CHECKMULTISIG is zero length.
-	ScriptStrictMultiSig
-
 	// ScriptDiscourageUpgradableNops defines whether to verify that
 	// currently unused opcodes in the NOP and UNKNOWN families are reserved
 	// for future upgrades.  This flag must not be used for consensus
