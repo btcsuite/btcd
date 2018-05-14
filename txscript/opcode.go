@@ -1418,39 +1418,45 @@ func opcodeSubstr(op *parsedOpcode, vm *Engine) error {
 	if err != nil {
 		return err
 	}
-	aLen := len(a)
 
-	// Golang uses ints for the indices of slices. Assume that we can get
-	// whatever we need from a slice within the boundaries of an int32
-	// register.
-	v0Recast := int(v0.Int32())
-	v1Recast := int(v1.Int32())
+	// All data pushes and pops are effectivley limited to 32-bits, as are
+	// all math-related numeric pushes, so it is safe to cast the length to
+	// int32.  The numeric values are also clamped to int32 accordingly.
+	aLen := int32(len(a))
+	startIdx := v0.Int32()
+	endIdx := v1.Int32()
 
+	// WARNING: This check really should be after the bounds checking since
+	// performing it here allows arbitrary indices to be used which is a
+	// source of malleability.  Unfortunately, this is now part of
+	// consensus, so changing it requires a hard fork vote.
 	if aLen == 0 {
 		vm.dstack.PushByteArray(nil)
 		return nil
 	}
-	if v0Recast < 0 || v1Recast < 0 {
+
+	// Ensure the provided indices are in bounds.
+	//
+	// Take special note that the start index check is > as opposed to >=,
+	// which means it is possible to provide a start index just after the
+	// final character in the string, so long as the end index is the same
+	// value, and an empty byte push will be produced.
+	if startIdx < 0 || endIdx < 0 {
 		return ErrSubstrIdxNegative
 	}
-	if v0Recast > aLen {
+	if startIdx > aLen {
 		return ErrSubstrIdxOutOfBounds
 	}
-	if v1Recast > aLen {
+	if endIdx > aLen {
 		return ErrSubstrIdxOutOfBounds
 	}
-	if v0Recast > v1Recast {
+	if startIdx > endIdx {
 		return ErrSubstrIdxOutOfBounds
 	}
 
-	// A substr of the same indices return an empty stack item, similar to
-	// Golang.
-	if v0Recast == v1Recast {
-		vm.dstack.PushByteArray(nil)
-		return nil
-	}
-
-	vm.dstack.PushByteArray(a[v0Recast:v1Recast])
+	// Push the requested substring back to the stack.  Note that identical
+	// start and end indices produces an empty byte push.
+	vm.dstack.PushByteArray(a[startIdx:endIdx])
 	return nil
 }
 
