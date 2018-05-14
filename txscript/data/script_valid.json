@@ -32,8 +32,16 @@
 ["'a' 'b'", "CAT", "P2SH,STRICTENC"],
 ["'a' 'b' 0", "IF CAT ELSE 1 ENDIF", "P2SH,STRICTENC"],
 
-["'abc' 2 1", "SUBSTR", "P2SH,STRICTENC"],
-["'abc' 1 1 0", "IF SUBSTR ELSE 1 ENDIF", "P2SH,STRICTENC"],
+["Substring related test coverage"],
+["'abcd' 1 0", "SUBSTR 'a' EQUAL", "P2SH,STRICTENC", "SUBSTR uses 0-based indices"],
+["'abcd' 3 1", "SUBSTR 'bc' EQUAL", "P2SH,STRICTENC", "SUBSTR end index is exclusive"],
+["'abcd' 1 1", "SUBSTR NOT", "P2SH,STRICTENC", "SUBSTR same index must produce empty byte push which is equivalent to FALSE"],
+["'abcd' 4 4", "SUBSTR '' EQUAL", "P2SH,STRICTENC", "SUBSTR start and end index at exact length produces empty byte push"],
+["'abcd' 2 1 1", "IF SUBSTR ELSE 0 ENDIF 'b' EQUAL", "P2SH,STRICTENC", "SUBSTR works in a conditional branch"],
+["'abcd' 1 1 0", "IF SUBSTR ELSE 1 ENDIF", "P2SH,STRICTENC", "SUBSTR must not modify the stack if in an unexecuted branch"],
+["'' 2147483647 2147483646", "SUBSTR '' EQUAL", "P2SH,STRICTENC", "SUBSTR of an empty string produces an empty byte push regardless of out of bounds indices <=4 bytes"],
+["'abcd' 3 3 1SUB", "SUBSTR 'c' EQUAL", "P2SH,STRICTENC", "SUBSTR start index must work with the result of math operations"],
+["'abcd' 4 1 SUB 2", "SUBSTR 'c' EQUAL", "P2SH,STRICTENC", "SUBSTR end index must work with the result of math operations"],
 ["'abc' 2 0", "IF LEFT ELSE 1 ENDIF", "P2SH,STRICTENC"],
 ["'abc' 2 0", "IF RIGHT ELSE 1 ENDIF", "P2SH,STRICTENC"],
 
