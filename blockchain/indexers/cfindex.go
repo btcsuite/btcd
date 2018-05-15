@@ -14,7 +14,7 @@ import (
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcutil/gcs"
 	"github.com/btcsuite/btcutil/gcs/builder"
-	"github.com/roasbeef/btcd/wire"
+	"github.com/btcsuite/btcd/wire"
 )
 
 const (
