@@ -69,7 +69,7 @@ details on how to install on the supported operating systems.
 
 **2.1.1 Windows Installation**<br />
 
-* Install the MSI available at: https://github.com/roasbeef/btcd/releases
+* Install the MSI available at: https://github.com/btcsuite/btcd/releases
 * Launch btcd from the Start Menu
 
 <a name="PosixInstallation" />
@@ -96,8 +96,8 @@ recommended that `GOPATH` is set to a directory in your home directory such as
 
 ```bash
 $ go get -u github.com/Masterminds/glide
-$ git clone https://github.com/roasbeef/btcd $GOPATH/src/github.com/roasbeef/btcd
-$ cd $GOPATH/src/github.com/roasbeef/btcd
+$ git clone https://github.com/btcsuite/btcd $GOPATH/src/github.com/btcsuite/btcd
+$ cd $GOPATH/src/github.com/btcsuite/btcd
 $ glide install
 $ go install . ./cmd/...
 ```
@@ -111,7 +111,7 @@ $ go install . ./cmd/...
 - Run the following commands to update btcd, all dependencies, and install it:
 
 ```bash
-$ cd $GOPATH/src/github.com/roasbeef/btcd
+$ cd $GOPATH/src/github.com/btcsuite/btcd
 $ git pull && glide install
 $ go install . ./cmd/...
 ```
@@ -129,7 +129,7 @@ $ go install . ./cmd/...
 
 **2.2 Configuration**
 
-btcd has a number of [configuration](http://godoc.org/github.com/roasbeef/btcd)
+btcd has a number of [configuration](http://godoc.org/github.com/btcsuite/btcd)
 options, which can be viewed by running: `$ btcd --help`.
 
 <a name="BtcctlConfig" />
@@ -213,16 +213,16 @@ configuration necessary, however, there is an optional method to use a
 
 **3.1.1 bootstrap.dat**
 
-* [Using bootstrap.dat](https://github.com/roasbeef/btcd/tree/master/docs/using_bootstrap_dat.md)
+* [Using bootstrap.dat](https://github.com/btcsuite/btcd/tree/master/docs/using_bootstrap_dat.md)
 
 <a name="NetworkConfig" />
 
 **3.1.2 Network Configuration**
 
-* [What Ports Are Used by Default?](https://github.com/roasbeef/btcd/tree/master/docs/default_ports.md)
-* [How To Listen on Specific Interfaces](https://github.com/roasbeef/btcd/tree/master/docs/configure_peer_server_listen_interfaces.md)
-* [How To Configure RPC Server to Listen on Specific Interfaces](https://github.com/roasbeef/btcd/tree/master/docs/configure_rpc_server_listen_interfaces.md)
-* [Configuring btcd with Tor](https://github.com/roasbeef/btcd/tree/master/docs/configuring_tor.md)
+* [What Ports Are Used by Default?](https://github.com/btcsuite/btcd/tree/master/docs/default_ports.md)
+* [How To Listen on Specific Interfaces](https://github.com/btcsuite/btcd/tree/master/docs/configure_peer_server_listen_interfaces.md)
+* [How To Configure RPC Server to Listen on Specific Interfaces](https://github.com/btcsuite/btcd/tree/master/docs/configure_rpc_server_listen_interfaces.md)
+* [Configuring btcd with Tor](https://github.com/btcsuite/btcd/tree/master/docs/configuring_tor.md)
 
 <a name="Wallet" />
 
@@ -258,12 +258,12 @@ information.
 
 <a name="ContributionGuidelines" />
 
-* [Code Contribution Guidelines](https://github.com/roasbeef/btcd/tree/master/docs/code_contribution_guidelines.md)
+* [Code Contribution Guidelines](https://github.com/btcsuite/btcd/tree/master/docs/code_contribution_guidelines.md)
 
 <a name="JSONRPCReference" />
 
-* [JSON-RPC Reference](https://github.com/roasbeef/btcd/tree/master/docs/json_rpc_api.md)
-    * [RPC Examples](https://github.com/roasbeef/btcd/tree/master/docs/json_rpc_api.md#ExampleCode)
+* [JSON-RPC Reference](https://github.com/btcsuite/btcd/tree/master/docs/json_rpc_api.md)
+    * [RPC Examples](https://github.com/btcsuite/btcd/tree/master/docs/json_rpc_api.md#ExampleCode)
 
 <a name="GoPackages" />
 
@@ -272,28 +272,28 @@ information.
       robust and easy to use Websocket-enabled Bitcoin JSON-RPC client
     * [btcjson](https://github.com/btcsuite/btcd/tree/master/btcjson) - Provides an extensive API
       for the underlying JSON-RPC command and return values
-    * [wire](https://github.com/roasbeef/btcd/tree/master/wire) - Implements the
+    * [wire](https://github.com/btcsuite/btcd/tree/master/wire) - Implements the
       Bitcoin wire protocol
-    * [peer](https://github.com/roasbeef/btcd/tree/master/peer) -
+    * [peer](https://github.com/btcsuite/btcd/tree/master/peer) -
       Provides a common base for creating and managing Bitcoin network peers.
-    * [blockchain](https://github.com/roasbeef/btcd/tree/master/blockchain) -
+    * [blockchain](https://github.com/btcsuite/btcd/tree/master/blockchain) -
       Implements Bitcoin block handling and chain selection rules
-    * [blockchain/fullblocktests](https://github.com/roasbeef/btcd/tree/master/blockchain/fullblocktests) -
+    * [blockchain/fullblocktests](https://github.com/btcsuite/btcd/tree/master/blockchain/fullblocktests) -
       Provides a set of block tests for testing the consensus validation rules
-    * [txscript](https://github.com/roasbeef/btcd/tree/master/txscript) -
+    * [txscript](https://github.com/btcsuite/btcd/tree/master/txscript) -
       Implements the Bitcoin transaction scripting language
-    * [btcec](https://github.com/roasbeef/btcd/tree/master/btcec) - Implements
+    * [btcec](https://github.com/btcsuite/btcd/tree/master/btcec) - Implements
       support for the elliptic curve cryptographic functions needed for the
       Bitcoin scripts
-    * [database](https://github.com/roasbeef/btcd/tree/master/database) -
+    * [database](https://github.com/btcsuite/btcd/tree/master/database) -
       Provides a database interface for the Bitcoin block chain
-    * [mempool](https://github.com/roasbeef/btcd/tree/master/mempool) -
+    * [mempool](https://github.com/btcsuite/btcd/tree/master/mempool) -
       Package mempool provides a policy-enforced pool of unmined bitcoin
       transactions.
-    * [btcutil](https://github.com/roasbeef/btcutil) - Provides Bitcoin-specific
+    * [btcutil](https://github.com/btcsuite/btcutil) - Provides Bitcoin-specific
       convenience functions and types
-    * [chainhash](https://github.com/roasbeef/btcd/tree/master/chaincfg/chainhash) -
+    * [chainhash](https://github.com/btcsuite/btcd/tree/master/chaincfg/chainhash) -
       Provides a generic hash type and associated functions that allows the
       specific hash algorithm to be abstracted.
-    * [connmgr](https://github.com/roasbeef/btcd/tree/master/connmgr) -
+    * [connmgr](https://github.com/btcsuite/btcd/tree/master/connmgr) -
       Package connmgr implements a generic Bitcoin network connection manager.
