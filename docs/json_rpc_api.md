@@ -1270,6 +1270,9 @@ issues [notifyblocks](#notifyblocks) to register for
 [blockconnected](#blockconnected) and [blockdisconnected](#blockdisconnected)
 notifications, and displays all incoming messages.
 
+This code has only been confirmed to work as of node.js 8.11.1 LTS.  It might
+not work with earlier versions.
+
 ```javascript
 var fs = require('fs');
 var WebSocket = require('ws');
@@ -1287,9 +1290,10 @@ var password = "yourpassword";
 // for the certificate to properly validate.
 var ws = new WebSocket('wss://127.0.0.1:9109/ws', {
   headers: {
-    'Authorization': 'Basic '+new Buffer(user+':'+password).toString('base64')
+    'Authorization': 'Basic '+Buffer.from(user+':'+password).toString('base64')
   },
   cert: cert,
+  ecdhCurve: 'secp521r1', // Required for node.js v8.11.1 LTS, not for v10.1.0.
   ca: [cert]
 });
 ws.on('open', function() {
