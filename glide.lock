@@ -1,12 +1,13 @@
 hash: 976decfaf173d97d2e4572399490637aa12e217312a7d8b28813780a738e1151
-updated: 2017-08-24T17:28:45.8117156-05:00
+updated: 2018-05-15T19:16:29.311905983-07:00
 imports:
 - name: github.com/btcsuite/btclog
   version: 84c8d2346e9fc8c7b947e243b9c24e6df9fd206a
 - name: github.com/btcsuite/btcutil
-  version: 501929d3d046174c3d39f0ea54ece471aa17238c
+  version: b9afb0b9868a757e8fcc3c3adf5b129979f9b3e6
   subpackages:
   - base58
+  - bech32
   - bloom
   - hdkeychain
 - name: github.com/btcsuite/go-socks
@@ -41,7 +42,7 @@ imports:
   - svc
   - winapi
 - name: github.com/davecgh/go-spew
-  version: 346938d642f2ec3594ed81d874461961cd0faa76
+  version: 8991bc29aa16c548c550c7ff78260e27b9ab7c73
   subpackages:
   - spew
 - name: github.com/jessevdk/go-flags
@@ -51,7 +52,7 @@ imports:
   subpackages:
   - rotator
 - name: golang.org/x/crypto
-  version: 122d919ec1efcfb58483215da23f815853e24b81
+  version: 1a580b3eff7814fc9b40602fd35256c63b50f491
   subpackages:
   - ripemd160
 testImports: []
