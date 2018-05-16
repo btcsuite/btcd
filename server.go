@@ -902,7 +902,7 @@ func (sp *serverPeer) OnAddr(_ *peer.Peer, msg *wire.MsgAddr) {
 	// A message that has no addresses is invalid.
 	if len(msg.AddrList) == 0 {
 		peerLog.Errorf("Command [%s] from %s does not contain any addresses",
-			msg.Command(), sp)
+			msg.Command(), sp.Peer)
 		sp.Disconnect()
 		return
 	}
