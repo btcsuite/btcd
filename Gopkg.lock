@@ -17,7 +17,7 @@
     "bloom",
     "hdkeychain"
   ]
-  revision = "501929d3d046174c3d39f0ea54ece471aa17238c"
+  revision = "b9afb0b9868a757e8fcc3c3adf5b129979f9b3e6"
 
 [[projects]]
   branch = "master"
@@ -90,7 +90,7 @@
   branch = "master"
   name = "golang.org/x/crypto"
   packages = ["ripemd160"]
-  revision = "432090b8f568c018896cd8a0fb0345872bbac6ce"
+  revision = "1a580b3eff7814fc9b40602fd35256c63b50f491"
 
 [solve-meta]
   analyzer-name = "dep"
