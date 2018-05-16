@@ -10,8 +10,8 @@ install:
   - export PATH=$PATH:$PWD/linux-amd64/
   - glide install
   - go install . ./cmd/...
-  - go get -v github.com/alecthomas/gometalinter
-  - gometalinter --install
+  - go get -u gopkg.in/alecthomas/gometalinter.v2
+  - gometalinter.v2 --install
 script:
   - export PATH=$PATH:$HOME/gopath/bin
   - ./goclean.sh

@@ -21,14 +21,14 @@ fi
 # Make sure gometalinter is installed and $GOPATH/bin is in your path.
 # $ go get -v github.com/alecthomas/gometalinter"
 # $ gometalinter --install"
-if [ ! -x "$(type -p gometalinter)" ]; then
+if [ ! -x "$(type -p gometalinter.v2)" ]; then
   exit 1
 fi
 
 linter_targets=$(glide novendor)
 
 # Automatic checks
-test -z "$(gometalinter -j 4 --disable-all \
+test -z "$(gometalinter.v2 -j 4 --disable-all \
 --enable=gofmt \
 --enable=golint \
 --enable=vet \
