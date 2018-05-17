@@ -11,8 +11,8 @@ import (
 )
 
 const (
-	// ProtocolVersion is the latest protocol version this package supports.
-	ProtocolVersion uint32 = 70013
+	// ProtocolVersion is the latest protocol version this package supports. checked
+	ProtocolVersion uint32 = 70015
 
 	// MultipleAddressVersion is the protocol version which added multiple
 	// addresses per message (pver >= MultipleAddressVersion).
@@ -40,15 +40,15 @@ const (
 	RejectVersion uint32 = 70002
 
 	// BIP0111Version is the protocol version which added the SFNodeBloom
-	// service flag.
+	// service flag. checked
 	BIP0111Version uint32 = 70011
 
 	// SendHeadersVersion is the protocol version which added a new
-	// sendheaders message.
+	// sendheaders message. checked
 	SendHeadersVersion uint32 = 70012
 
 	// FeeFilterVersion is the protocol version which added a new
-	// feefilter message.
+	// feefilter message. checked
 	FeeFilterVersion uint32 = 70013
 )
 
