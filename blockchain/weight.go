@@ -72,7 +72,7 @@ func GetTransactionWeight(tx *btcutil.Tx) int64 {
 // count for all p2sh inputs scaled by the WitnessScaleFactor, and finally the
 // unscaled sig op count for any inputs spending witness programs.
 func GetSigOpCost(tx *btcutil.Tx, isCoinBaseTx bool, utxoView *UtxoViewpoint,
-	bip16, segWit bool) (int, error) {
+	bip16 bool) (int, error) {
 
 	numSigOps := CountSigOps(tx) * WitnessScaleFactor
 	if bip16 {
@@ -83,7 +83,7 @@ func GetSigOpCost(tx *btcutil.Tx, isCoinBaseTx bool, utxoView *UtxoViewpoint,
 		numSigOps += (numP2SHSigOps * WitnessScaleFactor)
 	}
 
-	if segWit && !isCoinBaseTx {
+	if !isCoinBaseTx {
 		msgTx := tx.MsgTx()
 		for txInIndex, txIn := range msgTx.TxIn {
 			// Ensure the referenced input transaction is available.

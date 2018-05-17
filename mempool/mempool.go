@@ -616,18 +616,18 @@ func (mp *TxPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit, rejec
 	// If a transaction has iwtness data, and segwit isn't active yet, If
 	// segwit isn't active yet, then we won't accept it into the mempool as
 	// it can't be mined yet.
-	if tx.MsgTx().HasWitness() {
-		segwitActive, err := mp.cfg.IsDeploymentActive(chaincfg.DeploymentSegwit)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		if !segwitActive {
-			str := fmt.Sprintf("transaction %v has witness data, "+
-				"but segwit isn't active yet", txHash)
-			return nil, nil, txRuleError(wire.RejectNonstandard, str)
-		}
-	}
+	//if tx.MsgTx().HasWitness() {		// todo remove
+	//	segwitActive, err := mp.cfg.IsDeploymentActive(chaincfg.DeploymentSegwit)
+	//	if err != nil {
+	//		return nil, nil, err
+	//	}
+	//
+	//	if !segwitActive {
+	//		str := fmt.Sprintf("transaction %v has witness data, "+
+	//			"but segwit isn't active yet", txHash)
+	//		return nil, nil, txRuleError(wire.RejectNonstandard, str)
+	//	}
+	//}
 
 	// Don't accept the transaction if it already exists in the pool.  This
 	// applies to orphan transactions as well when the reject duplicate
@@ -796,7 +796,7 @@ func (mp *TxPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit, rejec
 	// maximum allowed signature operations per transaction is less than
 	// the maximum allowed signature operations per block.
 	// TODO(roasbeef): last bool should be conditional on segwit activation
-	sigOpCost, err := blockchain.GetSigOpCost(tx, false, utxoView, true, true)
+	sigOpCost, err := blockchain.GetSigOpCost(tx, false, utxoView, true)
 	if err != nil {
 		if cerr, ok := err.(blockchain.RuleError); ok {
 			return nil, nil, chainRuleError(cerr)

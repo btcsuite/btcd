@@ -226,11 +226,11 @@ func (sm *SyncManager) startSync() {
 	// Once the segwit soft-fork package has activated, we only
 	// want to sync from peers which are witness enabled to ensure
 	// that we fully validate all blockchain data.
-	segwitActive, err := sm.chain.IsDeploymentActive(chaincfg.DeploymentSegwit)
-	if err != nil {
-		log.Errorf("Unable to query for segwit soft-fork state: %v", err)
-		return
-	}
+	//segwitActive, err := sm.chain.IsDeploymentActive(chaincfg.DeploymentSegwit)		// todo remove
+	//if err != nil {
+	//	log.Errorf("Unable to query for segwit soft-fork state: %v", err)
+	//	return
+	//}
 
 	best := sm.chain.BestSnapshot()
 	var bestPeer *peerpkg.Peer
@@ -239,10 +239,10 @@ func (sm *SyncManager) startSync() {
 			continue
 		}
 
-		if segwitActive && !peer.IsWitnessEnabled() {
-			log.Debugf("peer %v not witness enabled, skipping", peer)
-			continue
-		}
+		//if segwitActive && !peer.IsWitnessEnabled() {		// todo remove
+		//	log.Debugf("peer %v not witness enabled, skipping", peer)
+		//	continue
+		//}
 
 		// Remove sync candidate peers that are no longer candidates due
 		// to passing their latest known block.  NOTE: The < is
@@ -333,14 +333,13 @@ func (sm *SyncManager) isSyncCandidate(peer *peerpkg.Peer) bool {
 		// The peer is not a candidate for sync if it's not a full
 		// node. Additionally, if the segwit soft-fork package has
 		// activated, then the peer must also be upgraded.
-		segwitActive, err := sm.chain.IsDeploymentActive(chaincfg.DeploymentSegwit)
-		if err != nil {
-			log.Errorf("Unable to query for segwit "+
-				"soft-fork state: %v", err)
-		}
+		//segwitActive, err := sm.chain.IsDeploymentActive(chaincfg.DeploymentSegwit)		// todo remove
+		//if err != nil {
+		//	log.Errorf("Unable to query for segwit "+
+		//		"soft-fork state: %v", err)
+		//}
 		nodeServices := peer.Services()
-		if nodeServices&wire.SFNodeNetwork != wire.SFNodeNetwork ||
-			(segwitActive && !peer.IsWitnessEnabled()) {
+		if nodeServices&wire.SFNodeNetwork != wire.SFNodeNetwork { // todo have modified
 			return false
 		}
 	}

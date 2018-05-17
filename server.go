@@ -395,21 +395,21 @@ func (sp *serverPeer) OnVersion(_ *peer.Peer, msg *wire.MsgVersion) {
 			// After soft-fork activation, only make outbound
 			// connection to peers if they flag that they're segwit
 			// enabled.
-			chain := sp.server.chain
-			segwitActive, err := chain.IsDeploymentActive(chaincfg.DeploymentSegwit)
-			if err != nil {
-				peerLog.Errorf("Unable to query for segwit "+
-					"soft-fork state: %v", err)
-				return
-			}
+			//chain := sp.server.chain			// todo remove
+			//segwitActive, err := chain.IsDeploymentActive(chaincfg.DeploymentSegwit)
+			//if err != nil {
+			//	peerLog.Errorf("Unable to query for segwit "+
+			//		"soft-fork state: %v", err)
+			//	return
+			//}
 
-			if segwitActive && !sp.IsWitnessEnabled() {
-				peerLog.Infof("Disconnecting non-segwit "+
-					"peer %v, isn't segwit enabled and "+
-					"we need more segwit enabled peers", sp)
-				sp.Disconnect()
-				return
-			}
+			//if segwitActive && !sp.IsWitnessEnabled() {
+			//	peerLog.Infof("Disconnecting non-segwit "+
+			//		"peer %v, isn't segwit enabled and "+
+			//		"we need more segwit enabled peers", sp)
+			//	sp.Disconnect()
+			//	return
+			//}
 
 			// TODO(davec): Only do this if not doing the initial block
 			// download and the local address is routable.

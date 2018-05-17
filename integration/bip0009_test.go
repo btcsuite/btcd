@@ -299,7 +299,6 @@ func TestBIP0009(t *testing.T) {
 	t.Parallel()
 
 	testBIP0009(t, "dummy", chaincfg.DeploymentTestDummy)
-	testBIP0009(t, "segwit", chaincfg.DeploymentSegwit)
 }
 
 // TestBIP0009Mining ensures blocks built via btcd's CPU miner follow the rules
