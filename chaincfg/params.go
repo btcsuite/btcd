@@ -227,12 +227,12 @@ var MainNetParams = Params{
 	Net:         wire.MainNet,
 	DefaultPort: "8333",
 	DNSSeeds: []DNSSeed{
-		{"seed.bitcoinabc.org", true},
-		{"seed-abc.bitcoinforks.org", true},
-		{"btccash-seeder.bitcoinunlimited.info", true},
-		{"seed.bitprim.org", true},
-		{"seed.deadalnix.me", true},
-		{"seeder.criptolayer.net", true},
+		{"seed.bitcoinabc.org", true},                  // Bitcoin ABC seeder
+		{"seed-abc.bitcoinforks.org", true},            // bitcoinforks seeders
+		{"btccash-seeder.bitcoinunlimited.info", true}, // BU backed seeder
+		{"seed.bitprim.org", true},                     // Bitprim
+		{"seed.deadalnix.me", true},                    // Amaury SÉCHET
+		{"seeder.criptolayer.net", true},               // criptolayer.net
 	},
 
 	// Chain parameters
@@ -267,11 +267,11 @@ var MainNetParams = Params{
 		{250000, newHashFromStr("000000000000003887df1f29024b06fc2200b55f8af8f35453d7be294df2d214")},
 		{267300, newHashFromStr("000000000000000a83fbd660e918f218bf37edd92b748ad940483c7c116179ac")},
 		{279000, newHashFromStr("0000000000000001ae8c72a0b0c301f67e3afca10e819efa9041e458e9bd7e40")},
-		{300255, newHashFromStr("0000000000000000162804527c6e9b9f0563a280525f9d08c12041def0a0f3b2")},
-		{319400, newHashFromStr("000000000000000021c6052e9becade189495d1c539aa37c58917305fd15f13b")},
-		{343185, newHashFromStr("0000000000000000072b8bf361d01a6ba7d445dd024203fafc78768ed4368554")},
-		{352940, newHashFromStr("000000000000000010755df42dba556bb72be6a32f3ce0b6941ce4430152c9ff")},
-		{382320, newHashFromStr("00000000000000000a8dc6ed5b133d0eb2fd6af56203e4159789b092defd8ab2")},
+		{295000, newHashFromStr("00000000000000004d9b4ef50f0f9d686fd69db2e03af35a100370c64632a983")},
+		// UAHF fork block.
+		{478558, newHashFromStr("0000000000000000011865af4122fe3b144e2cbeea86142e8ff2fb4107352d43")},
+		// Nov, 13 DAA activation block.
+		{504031, newHashFromStr("0000000000000000011ebf65b60d0a3de80b8175be709d653b4c1a1beeb6ab9c")},
 	},
 
 	// Consensus rule change deployments.
@@ -291,11 +291,11 @@ var MainNetParams = Params{
 			StartTime:  1462060800, // May 1st, 2016
 			ExpireTime: 1493596800, // May 1st, 2017
 		},
-		DeploymentSegwit: {
-			BitNumber:  1,
-			StartTime:  1479168000, // November 15, 2016 UTC
-			ExpireTime: 1510704000, // November 15, 2017 UTC.
-		},
+		//DeploymentSegwit: {
+		//	BitNumber:  1,
+		//	StartTime:  1479168000, // November 15, 2016 UTC
+		//	ExpireTime: 1510704000, // November 15, 2017 UTC.
+		//},
 	},
 
 	// Mempool parameters
@@ -303,14 +303,14 @@ var MainNetParams = Params{
 
 	// Human-readable part for Bech32 encoded segwit addresses, as defined in
 	// BIP 173.
-	Bech32HRPSegwit: "bc", // always bc for main net
+	Bech32HRPSegwit: "bc", // always bc for main net		// todo remove
 
 	// Address encoding magics
 	PubKeyHashAddrID:        0x00, // starts with 1
 	ScriptHashAddrID:        0x05, // starts with 3
 	PrivateKeyID:            0x80, // starts with 5 (uncompressed) or K (compressed)
-	WitnessPubKeyHashAddrID: 0x06, // starts with p2
-	WitnessScriptHashAddrID: 0x0A, // starts with 7Xh
+	WitnessPubKeyHashAddrID: 0x06, // starts with p2		// todo remove
+	WitnessScriptHashAddrID: 0x0A, // starts with 7Xh		// todo remove
 
 	// BIP32 hierarchical deterministic extended key magics
 	HDPrivateKeyID: [4]byte{0x04, 0x88, 0xad, 0xe4}, // starts with xprv
@@ -368,11 +368,11 @@ var RegressionNetParams = Params{
 			StartTime:  0,             // Always available for vote
 			ExpireTime: math.MaxInt64, // Never expires
 		},
-		DeploymentSegwit: {
-			BitNumber:  1,
-			StartTime:  0,             // Always available for vote
-			ExpireTime: math.MaxInt64, // Never expires.
-		},
+		//DeploymentSegwit: {
+		//	BitNumber:  1,
+		//	StartTime:  0,             // Always available for vote
+		//	ExpireTime: math.MaxInt64, // Never expires.
+		//},
 	},
 
 	// Mempool parameters
@@ -404,11 +404,11 @@ var TestNet3Params = Params{
 	Net:         wire.TestNet3,
 	DefaultPort: "18333",
 	DNSSeeds: []DNSSeed{
-		{"testnet-seed.bitcoinabc.org", true},
-		{"testnet-seed-abc.bitcoinforks.org", true},
-		{"testnet-seed.bitprim.org", true},
-		{"testnet-seed.deadalnix.me", true},
-		{"testnet-seeder.criptolayer.net", true},
+		{"testnet-seed.bitcoinabc.org", true},       // Bitcoin ABC seeder
+		{"testnet-seed-abc.bitcoinforks.org", true}, // bitcoinforks seeders
+		{"testnet-seed.bitprim.org", true},          // Bitprim
+		{"testnet-seed.deadalnix.me", true},         // Amaury SÉCHET
+		{"testnet-seeder.criptolayer.net", true},    // criptolayer.net
 	},
 
 	// Chain parameters
@@ -431,16 +431,8 @@ var TestNet3Params = Params{
 	// Checkpoints ordered from oldest to newest.
 	Checkpoints: []Checkpoint{
 		{546, newHashFromStr("000000002a936ca763904c3c35fce2f3556c559c0214345d31b1bcebf76acb70")},
-		{100000, newHashFromStr("00000000009e2958c15ff9290d571bf9459e93b19765c6801ddeccadbb160a1e")},
-		{200000, newHashFromStr("0000000000287bffd321963ef05feab753ebe274e1d78b2fd4e2bfe9ad3aa6f2")},
-		{300001, newHashFromStr("0000000000004829474748f3d1bc8fcf893c88be255e6d7f571c548aff57abf4")},
-		{400002, newHashFromStr("0000000005e2c73b8ecb82ae2dbc2e8274614ebad7172b53528aba7501f5a089")},
-		{500011, newHashFromStr("00000000000929f63977fbac92ff570a9bd9e7715401ee96f2848f7b07750b02")},
-		{600002, newHashFromStr("000000000001f471389afd6ee94dcace5ccc44adc18e8bff402443f034b07240")},
-		{700000, newHashFromStr("000000000000406178b12a4dea3b27e13b3c4fe4510994fd667d7c1e6a3f4dc1")},
-		{800010, newHashFromStr("000000000017ed35296433190b6829db01e657d80631d43f5983fa403bfdb4c1")},
-		{900000, newHashFromStr("0000000000356f8d8924556e765b7a94aaebc6b5c8685dcfa2b1ee8b41acd89b")},
-		{1000007, newHashFromStr("00000000001ccb893d8a1f25b70ad173ce955e5f50124261bbbc50379a612ddf")},
+		{1155875, newHashFromStr("00000000f17c850672894b9a75b63a1e72830bbd5f4c8889b5c1a80e7faef138")},
+		{1188697, newHashFromStr("0000000000170ed0918077bde7b4d36cc4c91be69fa09211f748240dabe047fb")},
 	},
 
 	// Consensus rule change deployments.
@@ -460,11 +452,11 @@ var TestNet3Params = Params{
 			StartTime:  1456790400, // March 1st, 2016
 			ExpireTime: 1493596800, // May 1st, 2017
 		},
-		DeploymentSegwit: {
-			BitNumber:  1,
-			StartTime:  1462060800, // May 1, 2016 UTC
-			ExpireTime: 1493596800, // May 1, 2017 UTC.
-		},
+		//DeploymentSegwit: {
+		//	BitNumber:  1,
+		//	StartTime:  1462060800, // May 1, 2016 UTC
+		//	ExpireTime: 1493596800, // May 1, 2017 UTC.
+		//},
 	},
 
 	// Mempool parameters
@@ -472,7 +464,7 @@ var TestNet3Params = Params{
 
 	// Human-readable part for Bech32 encoded segwit addresses, as defined in
 	// BIP 173.
-	Bech32HRPSegwit: "tb", // always tb for test net
+	Bech32HRPSegwit: "tb", // always tb for test net		// todo remove
 
 	// Address encoding magics
 	PubKeyHashAddrID:        0x6f, // starts with m or n
@@ -540,11 +532,11 @@ var SimNetParams = Params{
 			StartTime:  0,             // Always available for vote
 			ExpireTime: math.MaxInt64, // Never expires
 		},
-		DeploymentSegwit: {
-			BitNumber:  1,
-			StartTime:  0,             // Always available for vote
-			ExpireTime: math.MaxInt64, // Never expires.
-		},
+		//DeploymentSegwit: {
+		//	BitNumber:  1,
+		//	StartTime:  0,             // Always available for vote
+		//	ExpireTime: math.MaxInt64, // Never expires.
+		//},
 	},
 
 	// Mempool parameters
