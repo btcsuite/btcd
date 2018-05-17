@@ -23,11 +23,11 @@ const (
 type Policy struct {
 	// BlockMinWeight is the minimum block weight to be used when
 	// generating a block template.
-	BlockMinWeight uint32
+	//BlockMinWeight uint32		// todo remove
 
 	// BlockMaxWeight is the maximum block weight to be used when
 	// generating a block template.
-	BlockMaxWeight uint32
+	//BlockMaxWeight uint32		// todo remove
 
 	// BlockMinWeight is the minimum block size to be used when generating
 	// a block template.

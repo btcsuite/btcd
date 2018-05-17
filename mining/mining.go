@@ -464,7 +464,9 @@ func (g *BlkTmplGenerator) NewBlockTemplate(payToAddress btcutil.Address) (*Bloc
 	if err != nil {
 		return nil, err
 	}
-	coinbaseSigOpCost := int64(blockchain.CountSigOps(coinbaseTx)) * blockchain.WitnessScaleFactor
+	// todo remove(have modified)
+	//coinbaseSigOpCost := int64(blockchain.CountSigOps(coinbaseTx)) * blockchain.WitnessScaleFactor
+	coinbaseSigOpCost := int64(blockchain.CountSigOps(coinbaseTx))
 
 	// Get the current source transactions and create a priority queue to
 	// hold the transactions which are ready for inclusion into a block
@@ -668,14 +670,14 @@ mempoolLoop:
 		// Enforce maximum block size.  Also check for overflow.
 		txWeight := uint32(blockchain.GetTransactionWeight(tx))
 		blockPlusTxWeight := blockWeight + txWeight
-		if blockPlusTxWeight < blockWeight ||
-			blockPlusTxWeight >= g.policy.BlockMaxWeight {
-
-			log.Tracef("Skipping tx %s because it would exceed "+
-				"the max block weight", tx.Hash())
-			logSkippedDeps(tx, deps)
-			continue
-		}
+		//if blockPlusTxWeight < blockWeight ||						// todo limit block size
+		//	blockPlusTxWeight >= g.policy.BlockMaxWeight {
+		//
+		//	log.Tracef("Skipping tx %s because it would exceed "+
+		//		"the max block weight", tx.Hash())
+		//	logSkippedDeps(tx, deps)
+		//	continue
+		//}
 
 		// Enforce maximum signature operation cost per block.  Also
 		// check for overflow.
@@ -698,14 +700,12 @@ mempoolLoop:
 		// Skip free transactions once the block is larger than the
 		// minimum block size.
 		if sortedByFee &&
-			prioItem.feePerKB < int64(g.policy.TxMinFreeFee) &&
-			blockPlusTxWeight >= g.policy.BlockMinWeight {
+			prioItem.feePerKB < int64(g.policy.TxMinFreeFee) {
+			//blockPlusTxWeight >= g.policy.BlockMinWeight {	// todo check and remove
 
 			log.Tracef("Skipping tx %s with feePerKB %d "+
-				"< TxMinFreeFee %d and block weight %d >= "+
-				"minBlockWeight %d", tx.Hash(), prioItem.feePerKB,
-				g.policy.TxMinFreeFee, blockPlusTxWeight,
-				g.policy.BlockMinWeight)
+				"< TxMinFreeFee %d", tx.Hash(), prioItem.feePerKB,
+				g.policy.TxMinFreeFee)
 			logSkippedDeps(tx, deps)
 			continue
 		}

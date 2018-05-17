@@ -21,9 +21,8 @@ const (
 	// less than, or equal to MaxBlockWeight.
 	MaxBlockWeight = 4000000
 
-	// MaxBlockBaseSize is the maximum number of bytes within a block
-	// which can be allocated to non-witness data.
-	MaxBlockBaseSize = 1000000
+	// DefaultMaxBlockSize is the maximum number of bytes within a block
+	DefaultMaxBlockSize = 32000000
 
 	// MaxBlockSigOpsCost is the maximum number of signature operations
 	// allowed for a block. It is calculated via a weighted algorithm which

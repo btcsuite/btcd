@@ -33,28 +33,28 @@ import (
 )
 
 const (
-	defaultConfigFilename        = "btcd.conf"
-	defaultDataDirname           = "data"
-	defaultLogLevel              = "info"
-	defaultLogDirname            = "logs"
-	defaultLogFilename           = "btcd.log"
-	defaultMaxPeers              = 125
-	defaultBanDuration           = time.Hour * 24
-	defaultBanThreshold          = 100
-	defaultConnectTimeout        = time.Second * 30
-	defaultMaxRPCClients         = 10
-	defaultMaxRPCWebsockets      = 25
-	defaultMaxRPCConcurrentReqs  = 20
-	defaultDbType                = "ffldb"
-	defaultFreeTxRelayLimit      = 15.0
-	defaultBlockMinSize          = 0
-	defaultBlockMaxSize          = 750000
-	defaultBlockMinWeight        = 0
-	defaultBlockMaxWeight        = 3000000
-	blockMaxSizeMin              = 1000
-	blockMaxSizeMax              = blockchain.MaxBlockBaseSize - 1000
-	blockMaxWeightMin            = 4000
-	blockMaxWeightMax            = blockchain.MaxBlockWeight - 4000
+	defaultConfigFilename       = "btcd.conf"
+	defaultDataDirname          = "data"
+	defaultLogLevel             = "info"
+	defaultLogDirname           = "logs"
+	defaultLogFilename          = "btcd.log"
+	defaultMaxPeers             = 125
+	defaultBanDuration          = time.Hour * 24
+	defaultBanThreshold         = 100
+	defaultConnectTimeout       = time.Second * 30
+	defaultMaxRPCClients        = 10
+	defaultMaxRPCWebsockets     = 25
+	defaultMaxRPCConcurrentReqs = 20
+	defaultDbType               = "ffldb"
+	defaultFreeTxRelayLimit     = 15.0
+	defaultBlockMinSize         = 0
+	//defaultBlockMaxSize         = 32000000 // 32M
+	//defaultBlockMinWeight        = 0		// todo remove
+	//defaultBlockMaxWeight        = 3000000
+	blockMaxSizeMin = 1000
+	blockMaxSizeMax = blockchain.DefaultMaxBlockSize - 1000
+	//blockMaxWeightMin            = 4000	// todo remove
+	//blockMaxWeightMax            = blockchain.MaxBlockWeight - 4000
 	defaultGenerate              = false
 	defaultMaxOrphanTransactions = 100
 	defaultMaxOrphanTxSize       = 100000
@@ -145,26 +145,27 @@ type config struct {
 	MiningAddrs          []string      `long:"miningaddr" description:"Add the specified payment address to the list of addresses to use for generated blocks -- At least one address is required if the generate option is set"`
 	BlockMinSize         uint32        `long:"blockminsize" description:"Mininum block size in bytes to be used when creating a block"`
 	BlockMaxSize         uint32        `long:"blockmaxsize" description:"Maximum block size in bytes to be used when creating a block"`
-	BlockMinWeight       uint32        `long:"blockminweight" description:"Mininum block weight to be used when creating a block"`
-	BlockMaxWeight       uint32        `long:"blockmaxweight" description:"Maximum block weight to be used when creating a block"`
-	BlockPrioritySize    uint32        `long:"blockprioritysize" description:"Size in bytes for high-priority/low-fee transactions when creating a block"`
-	UserAgentComments    []string      `long:"uacomment" description:"Comment to add to the user agent -- See BIP 14 for more information."`
-	NoPeerBloomFilters   bool          `long:"nopeerbloomfilters" description:"Disable bloom filtering support"`
-	SigCacheMaxSize      uint          `long:"sigcachemaxsize" description:"The maximum number of entries in the signature verification cache"`
-	BlocksOnly           bool          `long:"blocksonly" description:"Do not accept transactions from remote peers."`
-	TxIndex              bool          `long:"txindex" description:"Maintain a full hash-based transaction index which makes all transactions available via the getrawtransaction RPC"`
-	DropTxIndex          bool          `long:"droptxindex" description:"Deletes the hash-based transaction index from the database on start up and then exits."`
-	AddrIndex            bool          `long:"addrindex" description:"Maintain a full address-based transaction index which makes the searchrawtransactions RPC available"`
-	DropAddrIndex        bool          `long:"dropaddrindex" description:"Deletes the address-based transaction index from the database on start up and then exits."`
-	RelayNonStd          bool          `long:"relaynonstd" description:"Relay non-standard transactions regardless of the default settings for the active network."`
-	RejectNonStd         bool          `long:"rejectnonstd" description:"Reject non-standard transactions regardless of the default settings for the active network."`
-	lookup               func(string) ([]net.IP, error)
-	oniondial            func(string, string, time.Duration) (net.Conn, error)
-	dial                 func(string, string, time.Duration) (net.Conn, error)
-	addCheckpoints       []chaincfg.Checkpoint
-	miningAddrs          []btcutil.Address
-	minRelayTxFee        btcutil.Amount
-	whitelists           []*net.IPNet
+	// todo remove
+	//BlockMinWeight       uint32        `long:"blockminweight" description:"Mininum block weight to be used when creating a block"`
+	//BlockMaxWeight       uint32        `long:"blockmaxweight" description:"Maximum block weight to be used when creating a block"`
+	BlockPrioritySize  uint32   `long:"blockprioritysize" description:"Size in bytes for high-priority/low-fee transactions when creating a block"`
+	UserAgentComments  []string `long:"uacomment" description:"Comment to add to the user agent -- See BIP 14 for more information."`
+	NoPeerBloomFilters bool     `long:"nopeerbloomfilters" description:"Disable bloom filtering support"`
+	SigCacheMaxSize    uint     `long:"sigcachemaxsize" description:"The maximum number of entries in the signature verification cache"`
+	BlocksOnly         bool     `long:"blocksonly" description:"Do not accept transactions from remote peers."`
+	TxIndex            bool     `long:"txindex" description:"Maintain a full hash-based transaction index which makes all transactions available via the getrawtransaction RPC"`
+	DropTxIndex        bool     `long:"droptxindex" description:"Deletes the hash-based transaction index from the database on start up and then exits."`
+	AddrIndex          bool     `long:"addrindex" description:"Maintain a full address-based transaction index which makes the searchrawtransactions RPC available"`
+	DropAddrIndex      bool     `long:"dropaddrindex" description:"Deletes the address-based transaction index from the database on start up and then exits."`
+	RelayNonStd        bool     `long:"relaynonstd" description:"Relay non-standard transactions regardless of the default settings for the active network."`
+	RejectNonStd       bool     `long:"rejectnonstd" description:"Reject non-standard transactions regardless of the default settings for the active network."`
+	lookup             func(string) ([]net.IP, error)
+	oniondial          func(string, string, time.Duration) (net.Conn, error)
+	dial               func(string, string, time.Duration) (net.Conn, error)
+	addCheckpoints     []chaincfg.Checkpoint
+	miningAddrs        []btcutil.Address
+	minRelayTxFee      btcutil.Amount
+	whitelists         []*net.IPNet
 }
 
 // serviceOptions defines the configuration options for the daemon as a service on
@@ -414,15 +415,15 @@ func loadConfig() (*config, []string, error) {
 		MinRelayTxFee:        mempool.DefaultMinRelayTxFee.ToBTC(),
 		FreeTxRelayLimit:     defaultFreeTxRelayLimit,
 		BlockMinSize:         defaultBlockMinSize,
-		BlockMaxSize:         defaultBlockMaxSize,
-		BlockMinWeight:       defaultBlockMinWeight,
-		BlockMaxWeight:       defaultBlockMaxWeight,
-		BlockPrioritySize:    mempool.DefaultBlockPrioritySize,
-		MaxOrphanTxs:         defaultMaxOrphanTransactions,
-		SigCacheMaxSize:      defaultSigCacheMaxSize,
-		Generate:             defaultGenerate,
-		TxIndex:              defaultTxIndex,
-		AddrIndex:            defaultAddrIndex,
+		BlockMaxSize:         blockchain.DefaultMaxBlockSize - 1000,
+		//BlockMinWeight:       defaultBlockMinWeight,		// todo remove
+		//BlockMaxWeight:       defaultBlockMaxWeight,
+		BlockPrioritySize: mempool.DefaultBlockPrioritySize,
+		MaxOrphanTxs:      defaultMaxOrphanTransactions,
+		SigCacheMaxSize:   defaultSigCacheMaxSize,
+		Generate:          defaultGenerate,
+		TxIndex:           defaultTxIndex,
+		AddrIndex:         defaultAddrIndex,
 	}
 
 	// Service options which are only added on Windows.
@@ -770,17 +771,17 @@ func loadConfig() (*config, []string, error) {
 	}
 
 	// Limit the max block weight to a sane value.
-	if cfg.BlockMaxWeight < blockMaxWeightMin ||
-		cfg.BlockMaxWeight > blockMaxWeightMax {
-
-		str := "%s: The blockmaxweight option must be in between %d " +
-			"and %d -- parsed [%d]"
-		err := fmt.Errorf(str, funcName, blockMaxWeightMin,
-			blockMaxWeightMax, cfg.BlockMaxWeight)
-		fmt.Fprintln(os.Stderr, err)
-		fmt.Fprintln(os.Stderr, usageMessage)
-		return nil, nil, err
-	}
+	//if cfg.BlockMaxWeight < blockMaxWeightMin ||   			// todo remove
+	//	cfg.BlockMaxWeight > blockMaxWeightMax {
+	//
+	//	str := "%s: The blockmaxweight option must be in between %d " +
+	//		"and %d -- parsed [%d]"
+	//	err := fmt.Errorf(str, funcName, blockMaxWeightMin,
+	//		blockMaxWeightMax, cfg.BlockMaxWeight)
+	//	fmt.Fprintln(os.Stderr, err)
+	//	fmt.Fprintln(os.Stderr, usageMessage)
+	//	return nil, nil, err
+	//}
 
 	// Limit the max orphan count to a sane vlue.
 	if cfg.MaxOrphanTxs < 0 {
@@ -795,23 +796,26 @@ func loadConfig() (*config, []string, error) {
 	// Limit the block priority and minimum block sizes to max block size.
 	cfg.BlockPrioritySize = minUint32(cfg.BlockPrioritySize, cfg.BlockMaxSize)
 	cfg.BlockMinSize = minUint32(cfg.BlockMinSize, cfg.BlockMaxSize)
-	cfg.BlockMinWeight = minUint32(cfg.BlockMinWeight, cfg.BlockMaxWeight)
+	//cfg.BlockMinWeight = minUint32(cfg.BlockMinWeight, cfg.BlockMaxWeight)	// todo remove
 
-	switch {
-	// If the max block size isn't set, but the max weight is, then we'll
-	// set the limit for the max block size to a safe limit so weight takes
-	// precedence.
-	case cfg.BlockMaxSize == defaultBlockMaxSize &&
-		cfg.BlockMaxWeight != defaultBlockMaxWeight:
-
-		cfg.BlockMaxSize = blockchain.MaxBlockBaseSize - 1000
-
-	// If the max block weight isn't set, but the block size is, then we'll
-	// scale the set weight accordingly based on the max block size value.
-	case cfg.BlockMaxSize != defaultBlockMaxSize &&
-		cfg.BlockMaxWeight == defaultBlockMaxWeight:
-
-		cfg.BlockMaxWeight = cfg.BlockMaxSize * blockchain.WitnessScaleFactor
+	//switch {																	// todo remove
+	//// If the max block size isn't set, but the max weight is, then we'll
+	//// set the limit for the max block size to a safe limit so weight takes
+	//// precedence.
+	//case cfg.BlockMaxSize == defaultBlockMaxSize &&
+	//	cfg.BlockMaxWeight != defaultBlockMaxWeight:
+	//
+	//	cfg.BlockMaxSize = blockchain.MaxBlockBaseSize - 1000
+	//
+	//// If the max block weight isn't set, but the block size is, then we'll
+	//// scale the set weight accordingly based on the max block size value.
+	//case cfg.BlockMaxSize != defaultBlockMaxSize &&
+	//	cfg.BlockMaxWeight == defaultBlockMaxWeight:
+	//
+	//	cfg.BlockMaxWeight = cfg.BlockMaxSize * blockchain.WitnessScaleFactor
+	//}
+	if cfg.BlockMaxSize >= blockchain.DefaultMaxBlockSize-1000 {
+		cfg.BlockMaxSize = blockchain.DefaultMaxBlockSize - 1000
 	}
 
 	// Look for illegal characters in the user agent comments.
