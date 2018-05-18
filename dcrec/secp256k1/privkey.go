@@ -78,6 +78,11 @@ func (p PrivateKey) Public() (*big.Int, *big.Int) {
 	return p.PublicKey.X, p.PublicKey.Y
 }
 
+// PubKey returns the PublicKey corresponding to this private key.
+func (p *PrivateKey) PubKey() *PublicKey {
+	return (*PublicKey)(&p.PublicKey)
+}
+
 // ToECDSA returns the private key as a *ecdsa.PrivateKey.
 func (p *PrivateKey) ToECDSA() *ecdsa.PrivateKey {
 	return (*ecdsa.PrivateKey)(p)
