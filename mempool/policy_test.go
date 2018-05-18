@@ -15,6 +15,7 @@ import (
 	"github.com/decred/dcrd/chaincfg"
 	"github.com/decred/dcrd/chaincfg/chainec"
 	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/decred/dcrd/dcrec/secp256k1"
 	"github.com/decred/dcrd/dcrutil"
 	"github.com/decred/dcrd/txscript"
 	"github.com/decred/dcrd/wire"
@@ -101,8 +102,8 @@ func TestCalcMinRequiredTxRelayFee(t *testing.T) {
 func TestCheckPkScriptStandard(t *testing.T) {
 	var pubKeys [][]byte
 	for i := 0; i < 4; i++ {
-		pk := chainec.Secp256k1.NewPrivateKey(big.NewInt(int64(chainec.ECTypeSecp256k1)))
-		pubKeys = append(pubKeys, chainec.Secp256k1.NewPublicKey(pk.Public()).SerializeCompressed())
+		pk := secp256k1.NewPrivateKey(big.NewInt(0))
+		pubKeys = append(pubKeys, (*secp256k1.PublicKey)(&pk.PublicKey).SerializeCompressed())
 	}
 
 	tests := []struct {
