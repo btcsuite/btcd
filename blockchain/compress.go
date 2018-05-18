@@ -9,7 +9,7 @@ import (
 	"fmt"
 
 	"github.com/decred/dcrd/blockchain/stake"
-	"github.com/decred/dcrd/chaincfg/chainec"
+	"github.com/decred/dcrd/dcrec/secp256k1"
 	"github.com/decred/dcrd/txscript"
 )
 
@@ -228,7 +228,7 @@ func isPubKey(script []byte) (bool, []byte) {
 
 		// Ensure the public key is valid.
 		serializedPubKey := script[1:34]
-		_, err := chainec.Secp256k1.ParsePubKey(serializedPubKey)
+		_, err := secp256k1.ParsePubKey(serializedPubKey)
 		if err == nil {
 			return true, serializedPubKey
 		}
@@ -240,7 +240,7 @@ func isPubKey(script []byte) (bool, []byte) {
 
 		// Ensure the public key is valid.
 		serializedPubKey := script[1:66]
-		_, err := chainec.Secp256k1.ParsePubKey(serializedPubKey)
+		_, err := secp256k1.ParsePubKey(serializedPubKey)
 		if err == nil {
 			return true, serializedPubKey
 		}
@@ -429,7 +429,7 @@ func decompressScript(compressedPkScript []byte,
 		}
 		compressedKey[0] = oddness
 		copy(compressedKey[1:], compressedPkScript[1:])
-		key, err := chainec.Secp256k1.ParsePubKey(compressedKey)
+		key, err := secp256k1.ParsePubKey(compressedKey)
 		if err != nil {
 			return nil
 		}
