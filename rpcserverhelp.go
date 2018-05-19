@@ -333,9 +333,16 @@ var helpDescsEnUS = map[string]string{
 	"getblocktemplate--result1":    "An error string which represents why the proposal was rejected or nothing if accepted",
 
 	// GetCFilterCmd help.
-	"getcfilter--synopsis": "Returns a block's committed filter given its hash.",
-	"getcfilter-hash":      "The hash of the block",
-	"getcfilter--result0":  "The block's committed filter",
+	"getcfilter--synopsis":  "Returns a block's committed filter given its hash.",
+	"getcfilter-filtertype": "The type of filter to return (0=regular, 1=extended)",
+	"getcfilter-hash":       "The hash of the block",
+	"getcfilter--result0":   "The block's committed filter",
+
+	// GetCFilterHeaderCmd help.
+	"getcfilterheader--synopsis":  "Returns a block's compact filter header given its hash.",
+	"getcfilterheader-filtertype": "The type of filter header to return (0=regular, 1=extended)",
+	"getcfilterheader-hash":       "The hash of the block",
+	"getcfilterheader--result0":   "The block's gcs filter header",
 
 	// GetConnectionCountCmd help.
 	"getconnectioncount--synopsis": "Returns the number of active connections to other peers.",
@@ -684,6 +691,7 @@ var rpcResultTypes = map[string][]interface{}{
 	"getblocktemplate":      {(*btcjson.GetBlockTemplateResult)(nil), (*string)(nil), nil},
 	"getblockchaininfo":     {(*btcjson.GetBlockChainInfoResult)(nil)},
 	"getcfilter":            {(*string)(nil)},
+	"getcfilterheader":      {(*string)(nil)},
 	"getconnectioncount":    {(*int32)(nil)},
 	"getcurrentnet":         {(*uint32)(nil)},
 	"getdifficulty":         {(*float64)(nil)},
