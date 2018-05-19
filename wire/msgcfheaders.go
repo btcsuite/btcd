@@ -33,7 +33,7 @@ type MsgCFHeaders struct {
 	FilterHashes     []*chainhash.Hash
 }
 
-// AddCFHeader adds a new committed filter header to the message.
+// AddCFHash adds a new filter hash to the message.
 func (msg *MsgCFHeaders) AddCFHash(hash *chainhash.Hash) error {
 	if len(msg.FilterHashes)+1 > MaxCFHeadersPerMsg {
 		str := fmt.Sprintf("too many block headers in message [max %v]",

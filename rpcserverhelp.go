@@ -333,9 +333,9 @@ var helpDescsEnUS = map[string]string{
 	"getblocktemplate--result1":    "An error string which represents why the proposal was rejected or nothing if accepted",
 
 	// GetCFilterCmd help.
-	"getcfilter--synopsis":   "Returns a block's committed filter given its hash.",
-	"getcfilter-hash":        "The hash of the block",
-	"getcfilter--result0":    "The block's committed filter",
+	"getcfilter--synopsis": "Returns a block's committed filter given its hash.",
+	"getcfilter-hash":      "The hash of the block",
+	"getcfilter--result0":  "The block's committed filter",
 
 	// GetConnectionCountCmd help.
 	"getconnectioncount--synopsis": "Returns the number of active connections to other peers.",

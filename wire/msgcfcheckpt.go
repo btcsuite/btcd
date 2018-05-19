@@ -12,6 +12,8 @@ import (
 )
 
 const (
+	// CFCheckptInterval is the gap (in number of blocks) between each
+	// filter header checkpoint.
 	CFCheckptInterval = 1000
 )
 
@@ -60,7 +62,7 @@ func (msg *MsgCFCheckpt) BtcDecode(r io.Reader, pver uint32, _ MessageEncoding) 
 
 	// Create a contiguous slice of hashes to deserialize into in order to
 	// reduce the number of allocations.
-	msg.FilterHeaders = make([]*chainhash.Hash, count, count)
+	msg.FilterHeaders = make([]*chainhash.Hash, count)
 	for i := uint64(0); i < count; i++ {
 		var cfh chainhash.Hash
 		err := readElement(r, &cfh)

@@ -36,12 +36,7 @@ func (msg *MsgGetCFilters) BtcDecode(r io.Reader, pver uint32, _ MessageEncoding
 		return err
 	}
 
-	err = readElement(r, &msg.StopHash)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return readElement(r, &msg.StopHash)
 }
 
 // BtcEncode encodes the receiver to w using the bitcoin protocol encoding.
@@ -57,12 +52,7 @@ func (msg *MsgGetCFilters) BtcEncode(w io.Writer, pver uint32, _ MessageEncoding
 		return err
 	}
 
-	err = writeElement(w, &msg.StopHash)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return writeElement(w, &msg.StopHash)
 }
 
 // Command returns the protocol command string for the message.  This is part
