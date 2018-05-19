@@ -228,6 +228,10 @@ type server struct {
 	// do not need to be protected for concurrent access.
 	txIndex   *indexers.TxIndex
 	addrIndex *indexers.AddrIndex
+
+	// The fee estimator keeps track of how long transactions are left in
+	// the mempool before they are mined into blocks.
+	feeEstimator *mempool.FeeEstimator
 }
 
 // serverPeer extends the peer to maintain state shared by the server and
@@ -1953,6 +1957,14 @@ func (s *server) Stop() error {
 		s.rpcServer.Stop()
 	}
 
+	// Save fee estimator state in the database.
+	s.db.Update(func(tx database.Tx) error {
+		metadata := tx.Metadata()
+		metadata.Put(mempool.EstimateFeeDatabaseKey, s.feeEstimator.Save())
+
+		return nil
+	})
+
 	// Signal the remaining goroutines to quit.
 	close(s.quit)
 	return nil
@@ -2249,6 +2261,36 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 		return nil, err
 	}
 
+	// Search for a FeeEstimator state in the database. If none can be found
+	// or if it cannot be loaded, create a new one.
+	db.Update(func(tx database.Tx) error {
+		metadata := tx.Metadata()
+		feeEstimationData := metadata.Get(mempool.EstimateFeeDatabaseKey)
+		if feeEstimationData != nil {
+			// delete it from the database so that we don't try to restore the
+			// same thing again somehow.
+			metadata.Delete(mempool.EstimateFeeDatabaseKey)
+
+			// If there is an error, log it and make a new fee estimator.
+			var err error
+			s.feeEstimator, err = mempool.RestoreFeeEstimator(feeEstimationData)
+
+			if err != nil {
+				peerLog.Errorf("Failed to restore fee estimator %v", err)
+			}
+		}
+
+		return nil
+	})
+
+	// If no feeEstimator has been found, or if the one that has been found
+	// is behind somehow, create a new one and start over.
+	if s.feeEstimator == nil || s.feeEstimator.LastKnownHeight() != s.chain.BestSnapshot().Height {
+		s.feeEstimator = mempool.NewFeeEstimator(
+			mempool.DefaultEstimateFeeMaxRollback,
+			mempool.DefaultEstimateFeeMinRegisteredBlocks)
+	}
+
 	txC := mempool.Config{
 		Policy: mempool.Policy{
 			DisableRelayPriority: cfg.NoRelayPriority,
@@ -2271,6 +2313,7 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 		SigCache:           s.sigCache,
 		HashCache:          s.hashCache,
 		AddrIndex:          s.addrIndex,
+		FeeEstimator:       s.feeEstimator,
 	}
 	s.txMemPool = mempool.New(&txC)
 
@@ -2405,19 +2448,20 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 		}
 
 		s.rpcServer, err = newRPCServer(&rpcserverConfig{
-			Listeners:   rpcListeners,
-			StartupTime: s.startupTime,
-			ConnMgr:     &rpcConnManager{&s},
-			SyncMgr:     &rpcSyncMgr{&s, s.syncManager},
-			TimeSource:  s.timeSource,
-			Chain:       s.chain,
-			ChainParams: chainParams,
-			DB:          db,
-			TxMemPool:   s.txMemPool,
-			Generator:   blockTemplateGenerator,
-			CPUMiner:    s.cpuMiner,
-			TxIndex:     s.txIndex,
-			AddrIndex:   s.addrIndex,
+			Listeners:    rpcListeners,
+			StartupTime:  s.startupTime,
+			ConnMgr:      &rpcConnManager{&s},
+			SyncMgr:      &rpcSyncMgr{&s, s.syncManager},
+			TimeSource:   s.timeSource,
+			Chain:        s.chain,
+			ChainParams:  chainParams,
+			DB:           db,
+			TxMemPool:    s.txMemPool,
+			Generator:    blockTemplateGenerator,
+			CPUMiner:     s.cpuMiner,
+			TxIndex:      s.txIndex,
+			AddrIndex:    s.addrIndex,
+			FeeEstimator: s.feeEstimator,
 		})
 		if err != nil {
 			return nil, err
