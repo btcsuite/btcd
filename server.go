@@ -202,7 +202,7 @@ type server struct {
 	connManager          *connmgr.ConnManager
 	sigCache             *txscript.SigCache
 	hashCache            *txscript.HashCache
-	rpcServer            *rpcServer
+	rpcServer            *jsonrpcServer
 	syncManager          *netsync.SyncManager
 	chain                *blockchain.BlockChain
 	txMemPool            *mempool.TxPool
@@ -2404,11 +2404,11 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 			return nil, errors.New("RPCS: No valid listen address")
 		}
 
-		s.rpcServer, err = newRPCServer(&rpcserverConfig{
+		s.rpcServer, err = newJSONRPCServer(&jsonrpcserverConfig{
 			Listeners:   rpcListeners,
 			StartupTime: s.startupTime,
-			ConnMgr:     &rpcConnManager{&s},
-			SyncMgr:     &rpcSyncMgr{&s, s.syncManager},
+			ConnMgr:     &jsonrpcConnManager{&s},
+			SyncMgr:     &jsonrpcSyncMgr{&s, s.syncManager},
 			TimeSource:  s.timeSource,
 			Chain:       s.chain,
 			ChainParams: chainParams,

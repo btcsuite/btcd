@@ -11,7 +11,7 @@ import "testing"
 // help text can be generated for them.
 func TestHelp(t *testing.T) {
 	// Ensure there are result types specified for every handler.
-	for k := range rpcHandlers {
+	for k := range jsonrpcHandlers {
 		if _, ok := rpcResultTypes[k]; !ok {
 			t.Errorf("RPC handler defined for method '%v' without "+
 				"also specifying result types", k)
@@ -19,7 +19,7 @@ func TestHelp(t *testing.T) {
 		}
 
 	}
-	for k := range wsHandlers {
+	for k := range jsonrpcWsHandlers {
 		if _, ok := rpcResultTypes[k]; !ok {
 			t.Errorf("RPC handler defined for method '%v' without "+
 				"also specifying result types", k)
@@ -38,7 +38,7 @@ func TestHelp(t *testing.T) {
 	}
 
 	// Ensure the help for every command can be generated without errors.
-	for k := range rpcHandlers {
+	for k := range jsonrpcHandlers {
 		if _, err := helpCacher.rpcMethodHelp(k); err != nil {
 			t.Errorf("Failed to generate help for method '%v': %v",
 				k, err)
@@ -50,7 +50,7 @@ func TestHelp(t *testing.T) {
 			continue
 		}
 	}
-	for k := range wsHandlers {
+	for k := range jsonrpcWsHandlers {
 		if _, err := helpCacher.rpcMethodHelp(k); err != nil {
 			t.Errorf("Failed to generate help for method '%v': %v",
 				k, err)
