@@ -248,6 +248,29 @@ func NewImportScriptCmd(hex string, rescan *bool, scanFrom *int) *ImportScriptCm
 	return &ImportScriptCmd{hex, rescan, scanFrom}
 }
 
+// CreateVotingAccountCmd is a type for handling custom marshaling and
+// unmarshalling of createvotingaccount JSON-RPC command.
+type CreateVotingAccountCmd struct {
+	Name       string
+	PubKey     string
+	ChildIndex *uint32 `jsonrpcdefault:"0"`
+}
+
+// NewCreateVotingAccountCmd creates a new CreateVotingAccountCmd.
+func NewCreateVotingAccountCmd(name, pubKey string, childIndex *uint32) *CreateVotingAccountCmd {
+	return &CreateVotingAccountCmd{name, pubKey, childIndex}
+}
+
+// DropVotingAccountCmd is a type for handling custom marshaling and
+// unmarshalling of dropvotingaccount JSON-RPC command
+type DropVotingAccountCmd struct {
+}
+
+// NewDropVotingAccountCmd creates a new DropVotingAccountCmd.
+func NewDropVotingAccountCmd() *DropVotingAccountCmd {
+	return &DropVotingAccountCmd{}
+}
+
 // ListScriptsCmd is a type for handling custom marshaling and
 // unmarshaling of listscripts JSON wallet extension commands.
 type ListScriptsCmd struct {
@@ -612,6 +635,8 @@ func init() {
 	MustRegisterCmd("gettickets", (*GetTicketsCmd)(nil), flags)
 	MustRegisterCmd("getvotechoices", (*GetVoteChoicesCmd)(nil), flags)
 	MustRegisterCmd("importscript", (*ImportScriptCmd)(nil), flags)
+	MustRegisterCmd("createvotingaccount", (*CreateVotingAccountCmd)(nil), flags)
+	MustRegisterCmd("dropvotingaccount", (*DropVotingAccountCmd)(nil), flags)
 	MustRegisterCmd("listscripts", (*ListScriptsCmd)(nil), flags)
 	MustRegisterCmd("purchaseticket", (*PurchaseTicketCmd)(nil), flags)
 	MustRegisterCmd("redeemmultisigout", (*RedeemMultiSigOutCmd)(nil), flags)
