@@ -1,5 +1,5 @@
 // Copyright (c) 2015-2016 The btcsuite developers
-// Copyright (c) 2016 The Decred developers
+// Copyright (c) 2016-2018 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -8,7 +8,7 @@ package database
 import (
 	"fmt"
 
-	"github.com/btcsuite/btclog"
+	"github.com/decred/slog"
 )
 
 // Driver defines a structure for backend drivers to use when they register
@@ -29,7 +29,7 @@ type Driver struct {
 	Open func(args ...interface{}) (DB, error)
 
 	// UseLogger uses a specified Logger to output package logging info.
-	UseLogger func(logger btclog.Logger)
+	UseLogger func(logger slog.Logger)
 }
 
 // driverList holds all of the registered database backends.

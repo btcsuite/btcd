@@ -1,5 +1,5 @@
 // Copyright (c) 2015-2016 The btcsuite developers
-// Copyright (c) 2016 The Decred developers
+// Copyright (c) 2016-2018 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -8,12 +8,12 @@ package ffldb
 import (
 	"fmt"
 
-	"github.com/btcsuite/btclog"
 	"github.com/decred/dcrd/database"
 	"github.com/decred/dcrd/wire"
+	"github.com/decred/slog"
 )
 
-var log = btclog.Disabled
+var log = slog.Disabled
 
 const (
 	dbType = "ffldb"
@@ -66,7 +66,7 @@ func createDBDriver(args ...interface{}) (database.DB, error) {
 
 // useLogger is the callback provided during driver registration that sets the
 // current logger to the provided one.
-func useLogger(logger btclog.Logger) {
+func useLogger(logger slog.Logger) {
 	log = logger
 }
 

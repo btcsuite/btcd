@@ -1,5 +1,5 @@
 // Copyright (c) 2013-2017 The btcsuite developers
-// Copyright (c) 2015-2017 The Decred developers
+// Copyright (c) 2015-2018 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -10,7 +10,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/btcsuite/btclog"
 	"github.com/decred/dcrd/addrmgr"
 	"github.com/decred/dcrd/blockchain"
 	"github.com/decred/dcrd/blockchain/indexers"
@@ -20,6 +19,7 @@ import (
 	"github.com/decred/dcrd/mempool"
 	"github.com/decred/dcrd/peer"
 	"github.com/decred/dcrd/txscript"
+	"github.com/decred/slog"
 	"github.com/jrick/logrotate/rotator"
 )
 
@@ -47,7 +47,7 @@ var (
 	// backendLog is the logging backend used to create all subsystem loggers.
 	// The backend must not be used before the log rotator has been initialized,
 	// or data races and/or nil pointer dereferences will occur.
-	backendLog = btclog.NewBackend(logWriter{})
+	backendLog = slog.NewBackend(logWriter{})
 
 	// logRotator is one of the logging outputs.  It should be closed on
 	// application shutdown.
@@ -85,7 +85,7 @@ func init() {
 }
 
 // subsystemLoggers maps each subsystem identifier to its associated logger.
-var subsystemLoggers = map[string]btclog.Logger{
+var subsystemLoggers = map[string]slog.Logger{
 	"ADXR": adxrLog,
 	"AMGR": amgrLog,
 	"CMGR": cmgrLog,
@@ -134,7 +134,7 @@ func setLogLevel(subsystemID string, logLevel string) {
 	}
 
 	// Defaults to info if the log level is invalid.
-	level, _ := btclog.LevelFromString(logLevel)
+	level, _ := slog.LevelFromString(logLevel)
 	logger.SetLevel(level)
 }
 

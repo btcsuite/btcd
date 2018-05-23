@@ -18,12 +18,6 @@
 
 [[projects]]
   branch = "master"
-  name = "github.com/btcsuite/btclog"
-  packages = ["."]
-  revision = "84c8d2346e9fc8c7b947e243b9c24e6df9fd206a"
-
-[[projects]]
-  branch = "master"
   name = "github.com/btcsuite/go-socks"
   packages = ["socks"]
   revision = "4720035b7bfd2a9bb130b1c184f8bbe41b6f0d0f"
@@ -90,6 +84,12 @@
   revision = "56c501706f00d9e1cfacee19a27117e12da24734"
 
 [[projects]]
+  branch = "master"
+  name = "github.com/decred/slog"
+  packages = ["."]
+  revision = "fbd821ef791ba2b8ae945f5d44f4e49396d230c5"
+
+[[projects]]
   name = "github.com/jessevdk/go-flags"
   packages = ["."]
   revision = "96dc06278ce32a0e9d957d590bb987c81ee66407"
@@ -128,6 +128,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "d190067efa8c61778ef133b4f695f26aa8e0333625b7f0172788009b68567f3d"
+  inputs-digest = "7e35e404b5345ce203e720970beeeb83e0c38ac93e0437b0a4c1f1c1f2ce0254"
   solver-name = "gps-cdcl"
   solver-version = 1

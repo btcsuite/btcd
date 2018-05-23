@@ -5,10 +5,6 @@
 
 [[constraint]]
   branch = "master"
-  name = "github.com/btcsuite/btclog"
-
-[[constraint]]
-  branch = "master"
   name = "github.com/btcsuite/go-socks"
 
 [[constraint]]
@@ -34,6 +30,10 @@
 [[constraint]]
   branch = "master"
   name = "github.com/decred/base58"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/decred/slog"
 
 [[constraint]]
   name = "github.com/jessevdk/go-flags"

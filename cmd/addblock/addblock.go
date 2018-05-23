@@ -1,5 +1,5 @@
 // Copyright (c) 2013-2016 The btcsuite developers
-// Copyright (c) 2015-2016 The Decred developers
+// Copyright (c) 2015-2018 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -10,11 +10,11 @@ import (
 	"path/filepath"
 	"runtime"
 
-	"github.com/btcsuite/btclog"
 	"github.com/decred/dcrd/blockchain"
 	"github.com/decred/dcrd/blockchain/indexers"
 	"github.com/decred/dcrd/database"
 	"github.com/decred/dcrd/limits"
+	"github.com/decred/slog"
 )
 
 const (
@@ -24,7 +24,7 @@ const (
 
 var (
 	cfg *config
-	log btclog.Logger
+	log slog.Logger
 )
 
 // loadBlockDB opens the block database and returns a handle to it.
@@ -70,7 +70,7 @@ func realMain() error {
 	cfg = tcfg
 
 	// Setup logging.
-	backendLogger := btclog.NewBackend(os.Stdout)
+	backendLogger := slog.NewBackend(os.Stdout)
 	defer os.Stdout.Sync()
 	log = backendLogger.Logger("MAIN")
 	database.UseLogger(backendLogger.Logger("BCDB"))
