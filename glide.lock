@@ -1,12 +1,12 @@
 hash: 976decfaf173d97d2e4572399490637aa12e217312a7d8b28813780a738e1151
-updated: 2018-05-15T21:02:54.227187628-07:00
+updated: 2018-05-22T17:49:05.731817524-07:00
 imports:
 - name: github.com/aead/siphash
   version: e404fcfc888570cadd1610538e2dbc89f66af814
 - name: github.com/btcsuite/btclog
   version: 84c8d2346e9fc8c7b947e243b9c24e6df9fd206a
 - name: github.com/btcsuite/btcutil
-  version: b9afb0b9868a757e8fcc3c3adf5b129979f9b3e6
+  version: 45edb4b6e59ef7890c7f4be92da61d5ebfa50b65
   subpackages:
   - base58
   - bech32
@@ -57,11 +57,6 @@ imports:
   - rotator
 - name: github.com/kkdai/bstream
   version: f71540b9dfdcfe64dbf2818e9b66423c6aafcacd
-- name: github.com/roasbeef/btcd
-  version: 9978b939c33973be19b932fa7b936079bb7ba38d
-  subpackages:
-  - chaincfg/chainhash
-  - wire
 - name: golang.org/x/crypto
   version: 1a580b3eff7814fc9b40602fd35256c63b50f491
   subpackages:
