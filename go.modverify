@@ -10,6 +10,7 @@ github.com/davecgh/go-spew v1.1.0 h1:ZDRjVQ15GmhC3fiQ8ni8+OwkZQO4DARzQgrnXU1Liz8
 github.com/dchest/blake256 v0.0.0-20150903101604-dee3fe6eb0e9 h1:R1zSOsHbPX/UQdOJzWPonBFMFa8BJpd3BIfK9nRXF70=
 github.com/decred/base58 v0.0.0-20180302003706-56c501706f00 h1:ejXqeY7P4O22qIxzhsWOq9N3An1kEmWcTjFfM6QGkyg=
 github.com/decred/slog v1.0.0 h1:Dl+W8O6/JH6n2xIFN2p3DNjCmjYwvrXsjlSJTQQ4MhE=
+github.com/gorilla/websocket v1.2.0 h1:VJtLvh6VQym50czpZzx07z/kw9EgAxI3x1ZB8taTMQQ=
 github.com/jessevdk/go-flags v1.4.0 h1:4IU2WS7AumrZ/40jfhf4QVDMsQwqA7VEHozFRrGARJA=
 github.com/jrick/bitset v1.0.0 h1:Ws0PXV3PwXqWK2n7Vz6idCdrV/9OrBXgHEJi27ZB9Dw=
 github.com/jrick/logrotate v0.0.0-20170628183752-a93b200c26cb h1:rP491SxtBTd8SPgOu8fii6f1/pX+AfEu7bPHTegdRYc=

@@ -49,12 +49,6 @@
 
 [[projects]]
   branch = "master"
-  name = "github.com/btcsuite/websocket"
-  packages = ["."]
-  revision = "31079b6807923eb23992c421b114992b95131b55"
-
-[[projects]]
-  branch = "master"
   name = "github.com/btcsuite/winsvc"
   packages = [
     "eventlog",
@@ -88,6 +82,12 @@
   name = "github.com/decred/slog"
   packages = ["."]
   revision = "fbd821ef791ba2b8ae945f5d44f4e49396d230c5"
+
+[[projects]]
+  name = "github.com/gorilla/websocket"
+  packages = ["."]
+  revision = "ea4d1f681babbce9545c9c5f3d5194a789c89f5b"
+  version = "v1.2.0"
 
 [[projects]]
   name = "github.com/jessevdk/go-flags"
@@ -128,6 +128,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "7e35e404b5345ce203e720970beeeb83e0c38ac93e0437b0a4c1f1c1f2ce0254"
+  inputs-digest = "449d7c8bffc532ba95de7b1ff1610a127446bc19afd8071dbc023bb8d978da13"
   solver-name = "gps-cdcl"
   solver-version = 1

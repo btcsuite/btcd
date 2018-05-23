@@ -13,10 +13,6 @@
 
 [[constraint]]
   branch = "master"
-  name = "github.com/btcsuite/websocket"
-
-[[constraint]]
-  branch = "master"
   name = "github.com/btcsuite/winsvc"
 
 [[constraint]]
@@ -34,6 +30,10 @@
 [[constraint]]
   branch = "master"
   name = "github.com/decred/slog"
+
+[[constraint]]
+  name = "github.com/gorilla/websocket"
+  version = "1.2.0"
 
 [[constraint]]
   name = "github.com/jessevdk/go-flags"
