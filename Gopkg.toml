@@ -28,8 +28,8 @@
   name = "github.com/decred/base58"
 
 [[constraint]]
-  branch = "master"
   name = "github.com/decred/slog"
+  version = "1.0.0"
 
 [[constraint]]
   name = "github.com/gorilla/websocket"
