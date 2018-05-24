@@ -1,12 +1,12 @@
-hash: 976decfaf173d97d2e4572399490637aa12e217312a7d8b28813780a738e1151
-updated: 2018-05-22T17:49:05.731817524-07:00
+hash: c8cc08c3afbedc99feda4fed38a64bb1aa42da128520dcac028cfc7e7de06a6e
+updated: 2018-05-23T20:46:41.891755246-07:00
 imports:
 - name: github.com/aead/siphash
   version: e404fcfc888570cadd1610538e2dbc89f66af814
 - name: github.com/btcsuite/btclog
   version: 84c8d2346e9fc8c7b947e243b9c24e6df9fd206a
 - name: github.com/btcsuite/btcutil
-  version: 45edb4b6e59ef7890c7f4be92da61d5ebfa50b65
+  version: d4cc87b860166d00d6b5b9e0d3b3d71d6088d4d4
   subpackages:
   - base58
   - bech32
@@ -46,7 +46,7 @@ imports:
   - svc
   - winapi
 - name: github.com/davecgh/go-spew
-  version: 8991bc29aa16c548c550c7ff78260e27b9ab7c73
+  version: ecdeabc65495df2dec95d7c4a4c3e021903035e5
   subpackages:
   - spew
 - name: github.com/jessevdk/go-flags
@@ -56,9 +56,9 @@ imports:
   subpackages:
   - rotator
 - name: github.com/kkdai/bstream
-  version: f71540b9dfdcfe64dbf2818e9b66423c6aafcacd
+  version: f391b8402d23024e7c0f624b31267a89998fca95
 - name: golang.org/x/crypto
-  version: 1a580b3eff7814fc9b40602fd35256c63b50f491
+  version: 9419663f5a44be8b34ca85f08abc5fe1be11f8a3
   subpackages:
   - ripemd160
 testImports: []
