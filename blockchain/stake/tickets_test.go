@@ -200,6 +200,10 @@ func nodesEqual(a *Node, b *Node) error {
 		return fmt.Errorf("missedbyblock were not equal between nodes; "+
 			"a: %x, b: %x", a.MissedByBlock(), b.MissedByBlock())
 	}
+	if !reflect.DeepEqual(a.ExpiredByBlock(), b.ExpiredByBlock()) {
+		return fmt.Errorf("expiredbyblock were not equal between nodes; "+
+			"a: %x, b: %x", a.ExpiredByBlock(), b.ExpiredByBlock())
+	}
 
 	return nil
 }
@@ -269,6 +273,57 @@ func TestTicketDBLongChain(t *testing.T) {
 			ticketsToAdd)
 		if err != nil {
 			t.Fatalf("couldn't connect node: %v", err.Error())
+		}
+
+		// UndoTicketDataSlice tests
+
+		// Check that spent tickets in undo data are not in the live, missed, or
+		// revoked treaps. Spent only refers to votes, not revocations.
+		voted := bestNode.SpentByBlock()
+		for ie := range voted {
+			if exists := bestNode.ExistsLiveTicket(voted[ie]); exists {
+				t.Errorf("voted ticket in undo data in live treap")
+			}
+			if exists := bestNode.ExistsMissedTicket(voted[ie]); exists {
+				t.Errorf("voted ticket in undo data in missed treap")
+			}
+			if exists := bestNode.ExistsRevokedTicket(voted[ie]); exists {
+				t.Errorf("voted ticket in undo data in revoked treap")
+			}
+		}
+
+		// Check that expired tickets in undo data are in both the expired and
+		// missed treaps. Expired is a subset of missed.
+		expired := bestNode.ExpiredByBlock()
+		for ie := range expired {
+			if exists := bestNode.ExistsExpiredTicket(expired[ie]); !exists {
+				t.Errorf("expired ticket in undo data not in expired treap")
+			}
+			if exists := bestNode.ExistsMissedTicket(expired[ie]); !exists {
+				t.Errorf("expired ticket in undo data not in missed treap")
+			}
+		}
+
+		// Check that missed tickets in undo data are in either the missed or
+		// revoked treap. This is because tickets in undo data flagged as
+		// Revoked are removed from the missed treap and added to the revoked
+		// treap despite still being flagged as Missed.
+		missed := bestNode.MissedByBlock()
+		for ie := range missed {
+			exists := bestNode.ExistsMissedTicket(missed[ie]) ||
+				bestNode.ExistsRevokedTicket(missed[ie])
+			if !exists {
+				t.Errorf("missed ticket in undo data not in missed or revoked treap")
+			}
+		}
+
+		// Verify that each expired ticket is also in missed undo data. The
+		// UndoTicketData for an expired ticket will always have both Missed and
+		// Expired set to true.
+		for ie := range expired {
+			if !hashInSlice(expired[ie], missed) {
+				t.Errorf("expired ticket not found in missed undo data")
+			}
 		}
 
 		nodesForward[i] = bestNode
