@@ -321,6 +321,8 @@ func (c *Client) ListSinceBlockMinConfWatchOnlyAsync(blockHash *chainhash.Hash, 
 	var hash *string
 	if blockHash != nil {
 		hash = btcjson.String(blockHash.String())
+	} else {
+		hash = btcjson.String("")
 	}
 
 	cmd := btcjson.NewListSinceBlockCmd(hash, &minConfirms, watchOnly)
