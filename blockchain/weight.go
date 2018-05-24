@@ -24,7 +24,7 @@ const (
 
 	// MaxBlockBaseSize is the maximum number of bytes within a block
 	// which can be allocated to non-witness data.
-	MaxBlockBaseSize = 1000000
+	MaxBlockBaseSize = 2000000
 
 	// MaxBlockSigOpsCost is the maximum number of signature operations
 	// allowed for a block. It is calculated via a weighted algorithm which
