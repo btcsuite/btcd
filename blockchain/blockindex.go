@@ -93,6 +93,7 @@ type blockNode struct {
 	nonce      uint32
 	timestamp  int64
 	merkleRoot chainhash.Hash
+	claimTrie  chainhash.Hash
 
 	// status is a bitfield representing the validation state of the block. The
 	// status field, unlike the other fields, may be written to and so should
@@ -114,6 +115,7 @@ func initBlockNode(node *blockNode, blockHeader *wire.BlockHeader, parent *block
 		nonce:      blockHeader.Nonce,
 		timestamp:  blockHeader.Timestamp.Unix(),
 		merkleRoot: blockHeader.MerkleRoot,
+		claimTrie:  blockHeader.ClaimTrie,
 	}
 	if parent != nil {
 		node.parent = parent
@@ -144,6 +146,7 @@ func (node *blockNode) Header() wire.BlockHeader {
 		Version:    node.version,
 		PrevBlock:  *prevHash,
 		MerkleRoot: node.merkleRoot,
+		ClaimTrie:  node.claimTrie,
 		Timestamp:  time.Unix(node.timestamp, 0),
 		Bits:       node.bits,
 		Nonce:      node.nonce,
