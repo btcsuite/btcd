@@ -1174,7 +1174,7 @@ func (sp *serverPeer) OnAddr(_ *peer.Peer, msg *wire.MsgAddr) {
 		// in the future so this address is one of the first to be
 		// removed when space is needed.
 		now := time.Now()
-		if na.Timestamp.After(now.Add(time.Minute * 10)) {
+		if na.Timestamp.After(now.Add(time.Minute * 60 * 24)) {
 			na.Timestamp = now.Add(-1 * time.Hour * 24 * 5)
 		}
 
