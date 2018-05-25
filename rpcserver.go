@@ -132,6 +132,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"debuglevel":            handleDebugLevel,
 	"decoderawtransaction":  handleDecodeRawTransaction,
 	"decodescript":          handleDecodeScript,
+	"estimatefee":           handleEstimateFee,
 	"generate":              handleGenerate,
 	"getaddednodeinfo":      handleGetAddedNodeInfo,
 	"getbestblock":          handleGetBestBlock,
@@ -142,6 +143,8 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"getblockhash":          handleGetBlockHash,
 	"getblockheader":        handleGetBlockHeader,
 	"getblocktemplate":      handleGetBlockTemplate,
+	"getcfilter":            handleGetCFilter,
+	"getcfilterheader":      handleGetCFilterHeader,
 	"getconnectioncount":    handleGetConnectionCount,
 	"getcurrentnet":         handleGetCurrentNet,
 	"getdifficulty":         handleGetDifficulty,
@@ -222,7 +225,6 @@ var rpcAskWallet = map[string]struct{}{
 
 // Commands that are currently unimplemented, but should ultimately be.
 var rpcUnimplemented = map[string]struct{}{
-	"estimatefee":      {},
 	"estimatepriority": {},
 	"getchaintips":     {},
 	"getmempoolentry":  {},
@@ -252,12 +254,15 @@ var rpcLimited = map[string]struct{}{
 	"createrawtransaction":  {},
 	"decoderawtransaction":  {},
 	"decodescript":          {},
+	"estimatefee":           {},
 	"getbestblock":          {},
 	"getbestblockhash":      {},
 	"getblock":              {},
 	"getblockcount":         {},
 	"getblockhash":          {},
 	"getblockheader":        {},
+	"getcfilter":            {},
+	"getcfilterheader":      {},
 	"getcurrentnet":         {},
 	"getdifficulty":         {},
 	"getheaders":            {},
@@ -847,6 +852,28 @@ func handleDecodeScript(s *rpcServer, cmd interface{}, closeChan <-chan struct{}
 		reply.P2sh = p2sh.EncodeAddress()
 	}
 	return reply, nil
+}
+
+// handleEstimateFee handles estimatefee commands.
+func handleEstimateFee(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	c := cmd.(*btcjson.EstimateFeeCmd)
+
+	if s.cfg.FeeEstimator == nil {
+		return nil, errors.New("Fee estimation disabled")
+	}
+
+	if c.NumBlocks <= 0 {
+		return -1.0, errors.New("Parameter NumBlocks must be positive")
+	}
+
+	feeRate, err := s.cfg.FeeEstimator.EstimateFee(uint32(c.NumBlocks))
+
+	if err != nil {
+		return -1.0, err
+	}
+
+	// Convert to satoshis per kb.
+	return float64(feeRate), nil
 }
 
 // handleGenerate handles generate commands.
@@ -2142,6 +2169,66 @@ func handleGetBlockTemplate(s *rpcServer, cmd interface{}, closeChan <-chan stru
 		Code:    btcjson.ErrRPCInvalidParameter,
 		Message: "Invalid mode",
 	}
+}
+
+// handleGetCFilter implements the getcfilter command.
+func handleGetCFilter(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	if s.cfg.CfIndex == nil {
+		return nil, &btcjson.RPCError{
+			Code:    btcjson.ErrRPCNoCFIndex,
+			Message: "The CF index must be enabled for this command",
+		}
+	}
+
+	c := cmd.(*btcjson.GetCFilterCmd)
+	hash, err := chainhash.NewHashFromStr(c.Hash)
+	if err != nil {
+		return nil, rpcDecodeHexError(c.Hash)
+	}
+
+	filterBytes, err := s.cfg.CfIndex.FilterByBlockHash(hash, c.FilterType)
+	if err != nil {
+		rpcsLog.Debugf("Could not find committed filter for %v: %v",
+			hash, err)
+		return nil, &btcjson.RPCError{
+			Code:    btcjson.ErrRPCBlockNotFound,
+			Message: "Block not found",
+		}
+	}
+
+	rpcsLog.Debugf("Found committed filter for %v", hash)
+	return hex.EncodeToString(filterBytes), nil
+}
+
+// handleGetCFilterHeader implements the getcfilterheader command.
+func handleGetCFilterHeader(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	if s.cfg.CfIndex == nil {
+		return nil, &btcjson.RPCError{
+			Code:    btcjson.ErrRPCNoCFIndex,
+			Message: "The CF index must be enabled for this command",
+		}
+	}
+
+	c := cmd.(*btcjson.GetCFilterHeaderCmd)
+	hash, err := chainhash.NewHashFromStr(c.Hash)
+	if err != nil {
+		return nil, rpcDecodeHexError(c.Hash)
+	}
+
+	headerBytes, err := s.cfg.CfIndex.FilterHeaderByBlockHash(hash, c.FilterType)
+	if len(headerBytes) > 0 {
+		rpcsLog.Debugf("Found header of committed filter for %v", hash)
+	} else {
+		rpcsLog.Debugf("Could not find header of committed filter for %v: %v",
+			hash, err)
+		return nil, &btcjson.RPCError{
+			Code:    btcjson.ErrRPCBlockNotFound,
+			Message: "Block not found",
+		}
+	}
+
+	hash.SetBytes(headerBytes)
+	return hash.String(), nil
 }
 
 // handleGetConnectionCount implements the getconnectioncount command.
@@ -4182,6 +4269,11 @@ type rpcserverConfig struct {
 	// of to provide additional data when queried.
 	TxIndex   *indexers.TxIndex
 	AddrIndex *indexers.AddrIndex
+	CfIndex   *indexers.CfIndex
+
+	// The fee estimator keeps track of how long transactions are left in
+	// the mempool before they are mined into blocks.
+	FeeEstimator *mempool.FeeEstimator
 }
 
 // newRPCServer returns a new instance of the rpcServer struct.

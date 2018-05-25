@@ -89,6 +89,10 @@ type Config struct {
 	// indexing the unconfirmed transactions in the memory pool.
 	// This can be nil if the address index is not enabled.
 	AddrIndex *indexers.AddrIndex
+
+	// FeeEstimatator provides a feeEstimator. If it is not nil, the mempool
+	// records all new transactions it observes into the feeEstimator.
+	FeeEstimator *FeeEstimator
 }
 
 // Policy houses the policy (configuration parameters) which is used to
@@ -523,12 +527,12 @@ func (mp *TxPool) addTransaction(utxoView *blockchain.UtxoViewpoint, tx *btcutil
 			Added:    time.Now(),
 			Height:   height,
 			Fee:      fee,
-			FeePerKB: fee * 1000 / int64(tx.MsgTx().SerializeSize()),
+			FeePerKB: fee * 1000 / GetTxVirtualSize(tx),
 		},
 		StartingPriority: mining.CalcPriority(tx.MsgTx(), utxoView, height),
 	}
-	mp.pool[*tx.Hash()] = txD
 
+	mp.pool[*tx.Hash()] = txD
 	for _, txIn := range tx.MsgTx().TxIn {
 		mp.outpoints[txIn.PreviousOutPoint] = tx
 	}
@@ -538,6 +542,11 @@ func (mp *TxPool) addTransaction(utxoView *blockchain.UtxoViewpoint, tx *btcutil
 	// if enabled.
 	if mp.cfg.AddrIndex != nil {
 		mp.cfg.AddrIndex.AddUnconfirmedTx(tx, utxoView)
+	}
+
+	// Record this tx for fee estimation if enabled.
+	if mp.cfg.FeeEstimator != nil {
+		mp.cfg.FeeEstimator.ObserveTransaction(txD)
 	}
 
 	return txD
@@ -560,6 +569,17 @@ func (mp *TxPool) checkPoolDoubleSpend(tx *btcutil.Tx) error {
 	}
 
 	return nil
+}
+
+// CheckSpend checks whether the passed outpoint is already spent by a
+// transaction in the mempool. If that's the case the spending transaction will
+// be returned, if not nil will be returned.
+func (mp *TxPool) CheckSpend(op wire.OutPoint) *btcutil.Tx {
+	mp.mtx.RLock()
+	txR := mp.outpoints[op]
+	mp.mtx.RUnlock()
+
+	return txR
 }
 
 // fetchInputUtxos loads utxo details about the input transactions referenced by

@@ -609,37 +609,90 @@ func dropIndex(db database.DB, idxKey []byte, idxName string, interrupt <-chan s
 	// the bucket in a single database transaction would result in massive
 	// memory usage and likely crash many systems due to ulimits.  In order
 	// to avoid this, use a cursor to delete a maximum number of entries out
-	// of the bucket at a time.
+	// of the bucket at a time. Recurse buckets depth-first to delete any
+	// sub-buckets.
 	const maxDeletions = 2000000
 	var totalDeleted uint64
-	for numDeleted := maxDeletions; numDeleted == maxDeletions; {
-		numDeleted = 0
-		err := db.Update(func(dbTx database.Tx) error {
-			bucket := dbTx.Metadata().Bucket(idxKey)
-			cursor := bucket.Cursor()
-			for ok := cursor.First(); ok; ok = cursor.Next() &&
-				numDeleted < maxDeletions {
 
-				if err := cursor.Delete(); err != nil {
-					return err
-				}
-				numDeleted++
-			}
-			return nil
-		})
-		if err != nil {
-			return err
+	// Recurse through all buckets in the index, cataloging each for
+	// later deletion.
+	var subBuckets [][][]byte
+	var subBucketClosure func(database.Tx, []byte, [][]byte) error
+	subBucketClosure = func(dbTx database.Tx,
+		subBucket []byte, tlBucket [][]byte) error {
+		// Get full bucket name and append to subBuckets for later
+		// deletion.
+		var bucketName [][]byte
+		if (tlBucket == nil) || (len(tlBucket) == 0) {
+			bucketName = append(bucketName, subBucket)
+		} else {
+			bucketName = append(tlBucket, subBucket)
 		}
+		subBuckets = append(subBuckets, bucketName)
+		// Recurse sub-buckets to append to subBuckets slice.
+		bucket := dbTx.Metadata()
+		for _, subBucketName := range bucketName {
+			bucket = bucket.Bucket(subBucketName)
+		}
+		return bucket.ForEachBucket(func(k []byte) error {
+			return subBucketClosure(dbTx, k, bucketName)
+		})
+	}
 
-		if numDeleted > 0 {
-			totalDeleted += uint64(numDeleted)
-			log.Infof("Deleted %d keys (%d total) from %s",
-				numDeleted, totalDeleted, idxName)
+	// Call subBucketClosure with top-level bucket.
+	err = db.View(func(dbTx database.Tx) error {
+		return subBucketClosure(dbTx, idxKey, nil)
+	})
+	if err != nil {
+		return nil
+	}
+
+	// Iterate through each sub-bucket in reverse, deepest-first, deleting
+	// all keys inside them and then dropping the buckets themselves.
+	for i := range subBuckets {
+		bucketName := subBuckets[len(subBuckets)-1-i]
+		// Delete maxDeletions key/value pairs at a time.
+		for numDeleted := maxDeletions; numDeleted == maxDeletions; {
+			numDeleted = 0
+			err := db.Update(func(dbTx database.Tx) error {
+				subBucket := dbTx.Metadata()
+				for _, subBucketName := range bucketName {
+					subBucket = subBucket.Bucket(subBucketName)
+				}
+				cursor := subBucket.Cursor()
+				for ok := cursor.First(); ok; ok = cursor.Next() &&
+					numDeleted < maxDeletions {
+
+					if err := cursor.Delete(); err != nil {
+						return err
+					}
+					numDeleted++
+				}
+				return nil
+			})
+			if err != nil {
+				return err
+			}
+
+			if numDeleted > 0 {
+				totalDeleted += uint64(numDeleted)
+				log.Infof("Deleted %d keys (%d total) from %s",
+					numDeleted, totalDeleted, idxName)
+			}
 		}
 
 		if interruptRequested(interrupt) {
 			return errInterruptRequested
 		}
+
+		// Drop the bucket itself.
+		err = db.Update(func(dbTx database.Tx) error {
+			bucket := dbTx.Metadata()
+			for j := 0; j < len(bucketName)-1; j++ {
+				bucket = bucket.Bucket(bucketName[j])
+			}
+			return bucket.DeleteBucket(bucketName[len(bucketName)-1])
+		})
 	}
 
 	// Call extra index specific deinitialization for the transaction index.
@@ -655,10 +708,6 @@ func dropIndex(db database.DB, idxKey []byte, idxName string, interrupt <-chan s
 		meta := dbTx.Metadata()
 		indexesBucket := meta.Bucket(indexTipsBucketName)
 		if err := indexesBucket.Delete(idxKey); err != nil {
-			return err
-		}
-
-		if err := meta.DeleteBucket(idxKey); err != nil {
 			return err
 		}
 

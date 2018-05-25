@@ -6,6 +6,7 @@ package connmgr
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"sync/atomic"
@@ -266,7 +267,7 @@ func TestRetryPermanent(t *testing.T) {
 		t.Fatalf("retry: %v - want ID %v, got ID %v", cr.Addr, wantID, gotID)
 	}
 	gotState = cr.State()
-	wantState = ConnDisconnected
+	wantState = ConnPending
 	if gotState != wantState {
 		t.Fatalf("retry: %v - want state %v, got state %v", cr.Addr, wantState, gotState)
 	}
@@ -419,6 +420,136 @@ func TestStopFailed(t *testing.T) {
 	}
 	go cmgr.Connect(cr)
 	cmgr.Wait()
+}
+
+// TestRemovePendingConnection tests that it's possible to cancel a pending
+// connection, removing its internal state from the ConnMgr.
+func TestRemovePendingConnection(t *testing.T) {
+	// Create a ConnMgr instance with an instance of a dialer that'll never
+	// succeed.
+	wait := make(chan struct{})
+	indefiniteDialer := func(addr net.Addr) (net.Conn, error) {
+		<-wait
+		return nil, fmt.Errorf("error")
+	}
+	cmgr, err := New(&Config{
+		Dial: indefiniteDialer,
+	})
+	if err != nil {
+		t.Fatalf("New error: %v", err)
+	}
+	cmgr.Start()
+
+	// Establish a connection request to a random IP we've chosen.
+	cr := &ConnReq{
+		Addr: &net.TCPAddr{
+			IP:   net.ParseIP("127.0.0.1"),
+			Port: 18555,
+		},
+		Permanent: true,
+	}
+	go cmgr.Connect(cr)
+
+	time.Sleep(10 * time.Millisecond)
+
+	if cr.State() != ConnPending {
+		t.Fatalf("pending request hasn't been registered, status: %v",
+			cr.State())
+	}
+
+	// The request launched above will actually never be able to establish
+	// a connection. So we'll cancel it _before_ it's able to be completed.
+	cmgr.Remove(cr.ID())
+
+	time.Sleep(10 * time.Millisecond)
+
+	// Now examine the status of the connection request, it should read a
+	// status of failed.
+	if cr.State() != ConnCanceled {
+		t.Fatalf("request wasn't canceled, status is: %v", cr.State())
+	}
+
+	close(wait)
+	cmgr.Stop()
+}
+
+// TestCancelIgnoreDelayedConnection tests that a canceled connection request will
+// not execute the on connection callback, even if an outstanding retry
+// succeeds.
+func TestCancelIgnoreDelayedConnection(t *testing.T) {
+	retryTimeout := 10 * time.Millisecond
+
+	// Setup a dialer that will continue to return an error until the
+	// connect chan is signaled, the dial attempt immediately after will
+	// succeed in returning a connection.
+	connect := make(chan struct{})
+	failingDialer := func(addr net.Addr) (net.Conn, error) {
+		select {
+		case <-connect:
+			return mockDialer(addr)
+		default:
+		}
+
+		return nil, fmt.Errorf("error")
+	}
+
+	connected := make(chan *ConnReq)
+	cmgr, err := New(&Config{
+		Dial:          failingDialer,
+		RetryDuration: retryTimeout,
+		OnConnection: func(c *ConnReq, conn net.Conn) {
+			connected <- c
+		},
+	})
+	if err != nil {
+		t.Fatalf("New error: %v", err)
+	}
+	cmgr.Start()
+	defer cmgr.Stop()
+
+	// Establish a connection request to a random IP we've chosen.
+	cr := &ConnReq{
+		Addr: &net.TCPAddr{
+			IP:   net.ParseIP("127.0.0.1"),
+			Port: 18555,
+		},
+	}
+	cmgr.Connect(cr)
+
+	// Allow for the first retry timeout to elapse.
+	time.Sleep(2 * retryTimeout)
+
+	// Connection be marked as failed, even after reattempting to
+	// connect.
+	if cr.State() != ConnFailing {
+		t.Fatalf("failing request should have status failed, status: %v",
+			cr.State())
+	}
+
+	// Remove the connection, and then immediately allow the next connection
+	// to succeed.
+	cmgr.Remove(cr.ID())
+	close(connect)
+
+	// Allow the connection manager to process the removal.
+	time.Sleep(5 * time.Millisecond)
+
+	// Now examine the status of the connection request, it should read a
+	// status of canceled.
+	if cr.State() != ConnCanceled {
+		t.Fatalf("request wasn't canceled, status is: %v", cr.State())
+	}
+
+	// Finally, the connection manager should not signal the on-connection
+	// callback, since we explicitly canceled this request. We give a
+	// generous window to ensure the connection manager's lienar backoff is
+	// allowed to properly elapse.
+	select {
+	case <-connected:
+		t.Fatalf("on-connect should not be called for canceled req")
+	case <-time.After(5 * retryTimeout):
+	}
+
 }
 
 // mockListener implements the net.Listener interface and is used to test
