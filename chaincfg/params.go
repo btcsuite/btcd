@@ -211,6 +211,7 @@ type Params struct {
 	PrivateKeyID            byte // First byte of a WIF private key
 	WitnessPubKeyHashAddrID byte // First byte of a P2WPKH address
 	WitnessScriptHashAddrID byte // First byte of a P2WSH address
+	CashAddrPrefix          string
 
 	// BIP32 hierarchical deterministic extended key magics
 	HDPrivateKeyID [4]byte
@@ -316,84 +317,11 @@ var MainNetParams = Params{
 	HDPrivateKeyID: [4]byte{0x04, 0x88, 0xad, 0xe4}, // starts with xprv
 	HDPublicKeyID:  [4]byte{0x04, 0x88, 0xb2, 0x1e}, // starts with xpub
 
+	CashAddrPrefix: "bitcoincash",
+
 	// BIP44 coin type used in the hierarchical deterministic path for
 	// address generation.
 	HDCoinType: 0,
-}
-
-// RegressionNetParams defines the network parameters for the regression test
-// Bitcoin network.  Not to be confused with the test Bitcoin network (version
-// 3), this network is sometimes simply called "testnet".
-var RegressionNetParams = Params{
-	Name:        "regtest",
-	Net:         wire.TestNet,
-	DefaultPort: "18444",
-	// Regtest mode doesn't have any DNS seeds
-	DNSSeeds: []DNSSeed{},
-
-	// Chain parameters
-	GenesisBlock:             &regTestGenesisBlock,
-	GenesisHash:              &regTestGenesisHash,
-	PowLimit:                 regressionPowLimit,
-	PowLimitBits:             0x207fffff,
-	CoinbaseMaturity:         100,
-	BIP0034Height:            100000000, // Not active - Permit ver 1 blocks
-	BIP0065Height:            1351,      // Used by regression tests
-	BIP0066Height:            1251,      // Used by regression tests
-	SubsidyReductionInterval: 150,
-	TargetTimespan:           time.Hour * 24 * 14, // 14 days
-	TargetTimePerBlock:       time.Minute * 10,    // 10 minutes
-	RetargetAdjustmentFactor: 4,                   // 25% less, 400% more
-	ReduceMinDifficulty:      true,
-	MinDiffReductionTime:     time.Minute * 20, // TargetTimePerBlock * 2
-	GenerateSupported:        true,
-
-	// Checkpoints ordered from oldest to newest.
-	Checkpoints: nil,
-
-	// Consensus rule change deployments.
-	//
-	// The miner confirmation window is defined as:
-	//   target proof of work timespan / target proof of work spacing
-	RuleChangeActivationThreshold: 108, // 75%  of MinerConfirmationWindow
-	MinerConfirmationWindow:       144,
-	Deployments: [DefinedDeployments]ConsensusDeployment{
-		DeploymentTestDummy: {
-			BitNumber:  28,
-			StartTime:  0,             // Always available for vote
-			ExpireTime: math.MaxInt64, // Never expires
-		},
-		DeploymentCSV: {
-			BitNumber:  0,
-			StartTime:  0,             // Always available for vote
-			ExpireTime: math.MaxInt64, // Never expires
-		},
-		//DeploymentSegwit: {		// todo remove
-		//	BitNumber:  1,
-		//	StartTime:  0,             // Always available for vote
-		//	ExpireTime: math.MaxInt64, // Never expires.
-		//},
-	},
-
-	// Mempool parameters
-	RelayNonStdTxs: true,
-
-	// Human-readable part for Bech32 encoded segwit addresses, as defined in
-	// BIP 173.
-	Bech32HRPSegwit: "bcrt", // always bcrt for reg test net
-
-	// Address encoding magics
-	PubKeyHashAddrID: 0x6f, // starts with m or n
-	ScriptHashAddrID: 0xc4, // starts with 2
-	PrivateKeyID:     0xef, // starts with 9 (uncompressed) or c (compressed)
-
-	// BIP32 hierarchical deterministic extended key magics
-	HDPrivateKeyID: [4]byte{0x04, 0x35, 0x83, 0x94}, // starts with tprv
-	HDPublicKeyID:  [4]byte{0x04, 0x35, 0x87, 0xcf}, // starts with tpub
-
-	// BIP44 coin type used in the hierarchical deterministic path for
-	// address generation.
-	HDCoinType: 1,
 }
 
 // TestNet3Params defines the network parameters for the test Bitcoin network
@@ -477,6 +405,85 @@ var TestNet3Params = Params{
 	HDPrivateKeyID: [4]byte{0x04, 0x35, 0x83, 0x94}, // starts with tprv
 	HDPublicKeyID:  [4]byte{0x04, 0x35, 0x87, 0xcf}, // starts with tpub
 
+	CashAddrPrefix: "bchtest",
+
+	// BIP44 coin type used in the hierarchical deterministic path for
+	// address generation.
+	HDCoinType: 1,
+}
+
+// RegressionNetParams defines the network parameters for the regression test
+// Bitcoin network.  Not to be confused with the test Bitcoin network (version
+// 3), this network is sometimes simply called "testnet".
+var RegressionNetParams = Params{
+	Name:        "regtest",
+	Net:         wire.TestNet,
+	DefaultPort: "18444",
+	// Regtest mode doesn't have any DNS seeds
+	DNSSeeds: []DNSSeed{},
+
+	// Chain parameters
+	GenesisBlock:             &regTestGenesisBlock,
+	GenesisHash:              &regTestGenesisHash,
+	PowLimit:                 regressionPowLimit,
+	PowLimitBits:             0x207fffff,
+	CoinbaseMaturity:         100,
+	BIP0034Height:            100000000, // Not active - Permit ver 1 blocks
+	BIP0065Height:            1351,      // Used by regression tests
+	BIP0066Height:            1251,      // Used by regression tests
+	SubsidyReductionInterval: 150,
+	TargetTimespan:           time.Hour * 24 * 14, // 14 days
+	TargetTimePerBlock:       time.Minute * 10,    // 10 minutes
+	RetargetAdjustmentFactor: 4,                   // 25% less, 400% more
+	ReduceMinDifficulty:      true,
+	MinDiffReductionTime:     time.Minute * 20, // TargetTimePerBlock * 2
+	GenerateSupported:        true,
+
+	// Checkpoints ordered from oldest to newest.
+	Checkpoints: nil,
+
+	// Consensus rule change deployments.
+	//
+	// The miner confirmation window is defined as:
+	//   target proof of work timespan / target proof of work spacing
+	RuleChangeActivationThreshold: 108, // 75%  of MinerConfirmationWindow
+	MinerConfirmationWindow:       144,
+	Deployments: [DefinedDeployments]ConsensusDeployment{
+		DeploymentTestDummy: {
+			BitNumber:  28,
+			StartTime:  0,             // Always available for vote
+			ExpireTime: math.MaxInt64, // Never expires
+		},
+		DeploymentCSV: {
+			BitNumber:  0,
+			StartTime:  0,             // Always available for vote
+			ExpireTime: math.MaxInt64, // Never expires
+		},
+		//DeploymentSegwit: {		// todo remove
+		//	BitNumber:  1,
+		//	StartTime:  0,             // Always available for vote
+		//	ExpireTime: math.MaxInt64, // Never expires.
+		//},
+	},
+
+	// Mempool parameters
+	RelayNonStdTxs: true,
+
+	// Human-readable part for Bech32 encoded segwit addresses, as defined in
+	// BIP 173.
+	Bech32HRPSegwit: "bcrt", // always bcrt for reg test net
+
+	// Address encoding magics
+	PubKeyHashAddrID: 0x6f, // starts with m or n
+	ScriptHashAddrID: 0xc4, // starts with 2
+	PrivateKeyID:     0xef, // starts with 9 (uncompressed) or c (compressed)
+
+	// BIP32 hierarchical deterministic extended key magics
+	HDPrivateKeyID: [4]byte{0x04, 0x35, 0x83, 0x94}, // starts with tprv
+	HDPublicKeyID:  [4]byte{0x04, 0x35, 0x87, 0xcf}, // starts with tpub
+
+	CashAddrPrefix: "bchreg",
+
 	// BIP44 coin type used in the hierarchical deterministic path for
 	// address generation.
 	HDCoinType: 1,
@@ -556,6 +563,8 @@ var SimNetParams = Params{
 	// BIP32 hierarchical deterministic extended key magics
 	HDPrivateKeyID: [4]byte{0x04, 0x20, 0xb9, 0x00}, // starts with sprv
 	HDPublicKeyID:  [4]byte{0x04, 0x20, 0xbd, 0x3a}, // starts with spub
+
+	CashAddrPrefix: "bchsim",
 
 	// BIP44 coin type used in the hierarchical deterministic path for
 	// address generation.
