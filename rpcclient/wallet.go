@@ -810,7 +810,7 @@ func (c *Client) PurchaseTicketAsync(fromAccount string,
 
 	cmd := dcrjson.NewPurchaseTicketCmd(fromAccount, spendLimit.ToCoin(),
 		&minConfVal, &ticketAddrStr, &numTicketsVal, &poolAddrStr,
-		&poolFeesFloat, &expiryVal, nil, &splitTxVal, &ticketFeeFloat)
+		&poolFeesFloat, &expiryVal, dcrjson.String(""), &splitTxVal, &ticketFeeFloat)
 
 	return c.sendCmd(cmd)
 }
