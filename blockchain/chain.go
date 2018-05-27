@@ -1550,21 +1550,23 @@ func (b *BlockChain) ForceHeadReorganization(formerBest chainhash.Hash, newBest 
 // proof of work.  In the typical case, the new block simply extends the main
 // chain.  However, it may also be extending (or creating) a side chain (fork)
 // which may or may not end up becoming the main chain depending on which fork
-// cumulatively has the most proof of work.  It returns whether or not the block
-// ended up on the main chain (either due to extending the main chain or causing
-// a reorganization to become the main chain).
+// cumulatively has the most proof of work.  It returns the resulting fork
+// length, that is to say the number of blocks to the fork point from the main
+// chain, which will be zero if the block ends up on the main chain (either
+// due to extending the main chain or causing a reorganization to become the
+// main chain).
 //
 // The flags modify the behavior of this function as follows:
 //  - BFFastAdd: Avoids several expensive transaction validation operations.
 //    This is useful when using checkpoints.
 //
 // This function MUST be called with the chain state lock held (for writes).
-func (b *BlockChain) connectBestChain(node *blockNode, block, parent *dcrutil.Block, flags BehaviorFlags) (bool, error) {
+func (b *BlockChain) connectBestChain(node *blockNode, block, parent *dcrutil.Block, flags BehaviorFlags) (int64, error) {
 	fastAdd := flags&BFFastAdd == BFFastAdd
 
 	// Ensure the passed parent is actually the parent of the block.
 	if *parent.Hash() != node.parentHash {
-		return false, AssertError("connectBlock must be called with the " +
+		return 0, AssertError("connectBlock must be called with the " +
 			"correct parent block")
 	}
 
@@ -1589,7 +1591,7 @@ func (b *BlockChain) connectBestChain(node *blockNode, block, parent *dcrutil.Bl
 				if _, ok := err.(RuleError); ok {
 					b.index.SetStatusFlags(node, statusValidateFailed)
 				}
-				return false, err
+				return 0, err
 			}
 			b.index.SetStatusFlags(node, statusValid)
 		}
@@ -1601,18 +1603,18 @@ func (b *BlockChain) connectBestChain(node *blockNode, block, parent *dcrutil.Bl
 		if fastAdd {
 			err := view.fetchInputUtxos(b.db, block, parent)
 			if err != nil {
-				return false, err
+				return 0, err
 			}
 			err = b.connectTransactions(view, block, parent, &stxos)
 			if err != nil {
-				return false, err
+				return 0, err
 			}
 		}
 
 		// Connect the block to the main chain.
 		err := b.connectBlock(node, block, parent, view, stxos)
 		if err != nil {
-			return false, err
+			return 0, err
 		}
 
 		validateStr := "validating"
@@ -1624,7 +1626,9 @@ func (b *BlockChain) connectBestChain(node *blockNode, block, parent *dcrutil.Bl
 			"%v the previous block", node.hash, node.height,
 			validateStr)
 
-		return true, nil
+		// The fork length is zero since the block is now the tip of the
+		// best chain.
+		return 0, nil
 	}
 	if fastAdd {
 		log.Warnf("fastAdd set in the side chain case? %v\n",
@@ -1647,7 +1651,7 @@ func (b *BlockChain) connectBestChain(node *blockNode, block, parent *dcrutil.Bl
 			var err error
 			fork, err = b.index.PrevNodeFromNode(fork)
 			if err != nil {
-				return false, err
+				return 0, err
 			}
 		}
 
@@ -1655,21 +1659,15 @@ func (b *BlockChain) connectBestChain(node *blockNode, block, parent *dcrutil.Bl
 		if fork.hash == node.parent.hash {
 			log.Infof("FORK: Block %v (height %v) forks the chain at height "+
 				"%d/block %v, but does not cause a reorganize",
-				node.hash,
-				node.height,
-				fork.height,
-				fork.hash)
+				node.hash, node.height, fork.height, fork.hash)
 		} else {
 			log.Infof("EXTEND FORK: Block %v (height %v) extends a side chain "+
-				"which forks the chain at height "+
-				"%d/block %v",
-				node.hash,
-				node.height,
-				fork.height,
-				fork.hash)
+				"which forks the chain at height %d/block %v",
+				node.hash, node.height, fork.height, fork.hash)
 		}
 
-		return false, nil
+		forkLen := node.height - fork.height
+		return forkLen, nil
 	}
 
 	// We're extending (or creating) a side chain and the cumulative work
@@ -1681,17 +1679,19 @@ func (b *BlockChain) connectBestChain(node *blockNode, block, parent *dcrutil.Bl
 	// common ancenstor (the point where the chain forked).
 	detachNodes, attachNodes, err := b.getReorganizeNodes(node)
 	if err != nil {
-		return false, err
+		return 0, err
 	}
 
 	// Reorganize the chain.
 	log.Infof("REORGANIZE: Block %v is causing a reorganize.", node.hash)
 	err = b.reorganizeChain(detachNodes, attachNodes)
 	if err != nil {
-		return false, err
+		return 0, err
 	}
 
-	return true, nil
+	// The fork length is zero since the block is now the tip of the best
+	// chain.
+	return 0, nil
 }
 
 // isCurrent returns whether or not the chain believes it is current.  Several

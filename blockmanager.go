@@ -195,9 +195,9 @@ type forceReorganizationMsg struct {
 // processBlockResponse is a response sent to the reply channel of a
 // processBlockMsg.
 type processBlockResponse struct {
-	onMainChain bool
-	isOrphan    bool
-	err         error
+	forkLen  int64
+	isOrphan bool
+	err      error
 }
 
 // processBlockMsg is a message type to be sent across the message channel
@@ -1000,7 +1000,7 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 
 	// Process the block to include validation, best chain selection, orphan
 	// handling, etc.
-	onMainChain, isOrphan, err := b.chain.ProcessBlock(bmsg.block,
+	forkLen, isOrphan, err := b.chain.ProcessBlock(bmsg.block,
 		behaviorFlags)
 	if err != nil {
 		// When the error is a rule error, it means the block was simply
@@ -1111,6 +1111,7 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 			}
 		}
 
+		onMainChain := !isOrphan && forkLen == 0
 		if onMainChain {
 			// A new block is connected, however, this new block may have
 			// votes in it that were hidden from the network and which
@@ -1753,13 +1754,13 @@ out:
 				}
 
 			case processBlockMsg:
-				onMainChain, isOrphan, err := b.chain.ProcessBlock(
+				forkLen, isOrphan, err := b.chain.ProcessBlock(
 					msg.block, msg.flags)
 				if err != nil {
 					msg.reply <- processBlockResponse{
-						onMainChain: onMainChain,
-						isOrphan:    isOrphan,
-						err:         err,
+						forkLen:  forkLen,
+						isOrphan: isOrphan,
+						err:      err,
 					}
 					continue
 				}
@@ -1812,6 +1813,7 @@ out:
 
 				// If the block added to the main chain, then we need to
 				// update the tip locally on block manager.
+				onMainChain := !isOrphan && forkLen == 0
 				if onMainChain {
 					// Query the chain for the latest best block
 					// since the block that was processed could be

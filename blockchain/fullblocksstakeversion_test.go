@@ -46,7 +46,7 @@ func TestStakeVersion(t *testing.T) {
 		t.Logf("Testing block %s (hash %s, height %d)",
 			g.TipName(), block.Hash(), blockHeight)
 
-		isMainChain, isOrphan, err := chain.ProcessBlock(block, BFNone)
+		forkLen, isOrphan, err := chain.ProcessBlock(block, BFNone)
 		if err != nil {
 			t.Fatalf("block %q (hash %s, height %d) should "+
 				"have been accepted: %v", g.TipName(),
@@ -55,6 +55,7 @@ func TestStakeVersion(t *testing.T) {
 
 		// Ensure the main chain and orphan flags match the values
 		// specified in the test.
+		isMainChain := !isOrphan && forkLen == 0
 		if !isMainChain {
 			t.Fatalf("block %q (hash %s, height %d) unexpected main "+
 				"chain flag -- got %v, want true", g.TipName(),

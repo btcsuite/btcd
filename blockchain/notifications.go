@@ -69,8 +69,8 @@ func (n NotificationType) String() string {
 // BlockAcceptedNtfnsData is the structure for data indicating information
 // about a block being accepted.
 type BlockAcceptedNtfnsData struct {
-	OnMainChain bool
-	Block       *dcrutil.Block
+	ForkLen int64
+	Block   *dcrutil.Block
 }
 
 // ReorganizationNtfnsData is the structure for data indicating information

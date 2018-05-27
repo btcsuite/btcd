@@ -102,22 +102,24 @@ func IsFinalizedTransaction(tx *dcrutil.Tx, blockHeight int64, blockTime time.Ti
 }
 
 // maybeAcceptBlock potentially accepts a block into the block chain and, if
-// accepted, returns whether or not it is on the main chain.  It performs
+// accepted, returns the length of the fork the block extended.  It performs
 // several validation checks which depend on its position within the block chain
 // before adding it.  The block is expected to have already gone through
-// ProcessBlock before calling this function with it.
+// ProcessBlock before calling this function with it.  In the case the block
+// extends the best chain or is now the tip of the best chain due to causing a
+// reorganize, the fork length will be 0.
 //
 // The flags are also passed to checkBlockContext and connectBestChain.  See
 // their documentation for how the flags modify their behavior.
 //
 // This function MUST be called with the chain state lock held (for writes).
-func (b *BlockChain) maybeAcceptBlock(block *dcrutil.Block, flags BehaviorFlags) (bool, error) {
+func (b *BlockChain) maybeAcceptBlock(block *dcrutil.Block, flags BehaviorFlags) (int64, error) {
 	// Get a block node for the block previous to this one.  Will be nil
 	// if this is the genesis block.
 	prevNode, err := b.index.PrevNodeFromBlock(block)
 	if err != nil {
 		log.Debugf("PrevNodeFromBlock: %v", err)
-		return false, err
+		return 0, err
 	}
 
 	// This function should never be called with orphan blocks or the
@@ -125,7 +127,7 @@ func (b *BlockChain) maybeAcceptBlock(block *dcrutil.Block, flags BehaviorFlags)
 	if prevNode == nil {
 		prevHash := &block.MsgBlock().Header.PrevBlock
 		str := fmt.Sprintf("previous block %s is not known", prevHash)
-		return false, ruleError(ErrMissingParent, str)
+		return 0, ruleError(ErrMissingParent, str)
 	}
 
 	// There is no need to validate the block if an ancestor is already
@@ -134,14 +136,14 @@ func (b *BlockChain) maybeAcceptBlock(block *dcrutil.Block, flags BehaviorFlags)
 		prevHash := &block.MsgBlock().Header.PrevBlock
 		str := fmt.Sprintf("previous block %s is known to be invalid",
 			prevHash)
-		return false, ruleError(ErrInvalidAncestorBlock, str)
+		return 0, ruleError(ErrInvalidAncestorBlock, str)
 	}
 
 	// The block must pass all of the validation rules which depend on the
 	// position of the block within the block chain.
 	err = b.checkBlockContext(block, prevNode, flags)
 	if err != nil {
-		return false, err
+		return 0, err
 	}
 
 	// Prune stake nodes which are no longer needed before creating a new
@@ -180,7 +182,7 @@ func (b *BlockChain) maybeAcceptBlock(block *dcrutil.Block, flags BehaviorFlags)
 		return nil
 	})
 	if err != nil {
-		return false, err
+		return 0, err
 	}
 
 	// Fetching a stake node could enable a new DoS vector, so restrict
@@ -188,7 +190,7 @@ func (b *BlockChain) maybeAcceptBlock(block *dcrutil.Block, flags BehaviorFlags)
 	if newNode.height < b.bestNode.height-minMemoryNodes {
 		newNode.stakeNode, err = b.fetchStakeNode(newNode)
 		if err != nil {
-			return false, err
+			return 0, err
 		}
 		newNode.stakeUndoData = newNode.stakeNode.UndoData()
 	}
@@ -197,15 +199,15 @@ func (b *BlockChain) maybeAcceptBlock(block *dcrutil.Block, flags BehaviorFlags)
 	// connection process.
 	parent, err := b.fetchBlockByHash(&newNode.parentHash)
 	if err != nil {
-		return false, err
+		return 0, err
 	}
 
 	// Connect the passed block to the chain while respecting proper chain
 	// selection according to the chain with the most proof of work.  This
 	// also handles validation of the transaction scripts.
-	isMainChain, err := b.connectBestChain(newNode, block, parent, flags)
+	forkLen, err := b.connectBestChain(newNode, block, parent, flags)
 	if err != nil {
-		return false, err
+		return 0, err
 	}
 
 	// Notify the caller that the new block was accepted into the block
@@ -213,10 +215,10 @@ func (b *BlockChain) maybeAcceptBlock(block *dcrutil.Block, flags BehaviorFlags)
 	// inventory to other peers.
 	b.chainLock.Unlock()
 	b.sendNotification(NTBlockAccepted, &BlockAcceptedNtfnsData{
-		OnMainChain: isMainChain,
-		Block:       block,
+		ForkLen: forkLen,
+		Block:   block,
 	})
 	b.chainLock.Lock()
 
-	return isMainChain, nil
+	return forkLen, nil
 }

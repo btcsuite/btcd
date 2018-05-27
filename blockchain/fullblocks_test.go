@@ -154,7 +154,7 @@ func TestFullBlocks(t *testing.T) {
 		t.Logf("Testing block %s (hash %s, height %d)",
 			item.Name, block.Hash(), blockHeight)
 
-		isMainChain, isOrphan, err := chain.ProcessBlock(block,
+		forkLen, isOrphan, err := chain.ProcessBlock(block,
 			blockchain.BFNone)
 		if err != nil {
 			t.Fatalf("block %q (hash %s, height %d) should "+
@@ -164,6 +164,7 @@ func TestFullBlocks(t *testing.T) {
 
 		// Ensure the main chain and orphan flags match the values
 		// specified in the test.
+		isMainChain := !isOrphan && forkLen == 0
 		if isMainChain != item.IsMainChain {
 			t.Fatalf("block %q (hash %s, height %d) unexpected main "+
 				"chain flag -- got %v, want %v", item.Name,
