@@ -145,14 +145,13 @@ func (b *BlockChain) ProcessBlock(block *dcrutil.Block, flags BehaviorFlags) (in
 	// used to eat memory, and ensuring expected (versus claimed) proof of
 	// work requirements since the previous checkpoint are met.
 	blockHeader := &block.MsgBlock().Header
-	checkpointBlock, err := b.findPreviousCheckpoint()
+	checkpointNode, err := b.findPreviousCheckpoint()
 	if err != nil {
 		return 0, false, err
 	}
-	if checkpointBlock != nil {
+	if checkpointNode != nil {
 		// Ensure the block timestamp is after the checkpoint timestamp.
-		checkpointHeader := &checkpointBlock.MsgBlock().Header
-		checkpointTime := checkpointHeader.Timestamp
+		checkpointTime := time.Unix(checkpointNode.timestamp, 0)
 		if blockHeader.Timestamp.Before(checkpointTime) {
 			str := fmt.Sprintf("block %v has timestamp %v before "+
 				"last checkpoint timestamp %v", blockHash,
@@ -169,7 +168,7 @@ func (b *BlockChain) ProcessBlock(block *dcrutil.Block, flags BehaviorFlags) (in
 			// maximum adjustment allowed by the retarget rules.
 			duration := blockHeader.Timestamp.Sub(checkpointTime)
 			requiredTarget := CompactToBig(b.calcEasiestDifficulty(
-				checkpointHeader.Bits, duration))
+				checkpointNode.bits, duration))
 			currentTarget := CompactToBig(blockHeader.Bits)
 			if currentTarget.Cmp(requiredTarget) > 0 {
 				str := fmt.Sprintf("block target difficulty of %064x "+
