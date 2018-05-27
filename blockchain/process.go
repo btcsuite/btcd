@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/decred/dcrd/chaincfg/chainhash"
-	"github.com/decred/dcrd/database"
 	"github.com/decred/dcrd/dcrutil"
 )
 
@@ -33,43 +32,6 @@ const (
 	// BFNone is a convenience value to specifically indicate no flags.
 	BFNone BehaviorFlags = 0
 )
-
-// blockExists determines whether a block with the given hash exists either in
-// the main chain or any side chains.
-//
-// This function MUST be called with the chain state lock held (for reads).
-func (b *BlockChain) blockExists(hash *chainhash.Hash) (bool, error) {
-	// Check block index first (could be main chain or side chain blocks).
-	if b.index.HaveBlock(hash) {
-		return true, nil
-	}
-
-	// Check in the database.
-	var exists bool
-	err := b.db.View(func(dbTx database.Tx) error {
-		var err error
-		exists, err = dbTx.HasBlock(hash)
-		if err != nil || !exists {
-			return err
-		}
-
-		// Ignore side chain blocks in the database.  This is necessary
-		// because there is not currently any record of the associated
-		// block index data, so it's not yet possible to efficiently load the
-		// block and do anything useful with it.
-		//
-		// Ultimately the entire block index should be serialized
-		// instead of only the current main chain so it can be consulted
-		// directly.
-		_, err = dbFetchHeightByHash(dbTx, hash)
-		if isNotInMainChainErr(err) {
-			exists = false
-			return nil
-		}
-		return err
-	})
-	return exists, err
-}
 
 // processOrphans determines if there are any orphans which depend on the passed
 // block hash (they are no longer orphans if true) and potentially accepts them.
@@ -159,11 +121,7 @@ func (b *BlockChain) ProcessBlock(block *dcrutil.Block, flags BehaviorFlags) (in
 	}()
 
 	// The block must not already exist in the main chain or side chains.
-	exists, err := b.blockExists(blockHash)
-	if err != nil {
-		return 0, false, err
-	}
-	if exists {
+	if b.index.HaveBlock(blockHash) {
 		str := fmt.Sprintf("already have block %v", blockHash)
 		return 0, false, ruleError(ErrDuplicateBlock, str)
 	}
@@ -175,7 +133,7 @@ func (b *BlockChain) ProcessBlock(block *dcrutil.Block, flags BehaviorFlags) (in
 	}
 
 	// Perform preliminary sanity checks on the block and its transactions.
-	err = checkBlockSanity(block, b.timeSource, flags, b.chainParams)
+	err := checkBlockSanity(block, b.timeSource, flags, b.chainParams)
 	if err != nil {
 		return 0, false, err
 	}
@@ -224,11 +182,7 @@ func (b *BlockChain) ProcessBlock(block *dcrutil.Block, flags BehaviorFlags) (in
 
 	// Handle orphan blocks.
 	prevHash := &blockHeader.PrevBlock
-	prevHashExists, err := b.blockExists(prevHash)
-	if err != nil {
-		return 0, false, err
-	}
-	if !prevHashExists {
+	if !b.index.HaveBlock(prevHash) {
 		log.Infof("Adding orphan block %v with parent %v", blockHash,
 			prevHash)
 		b.addOrphanBlock(block)

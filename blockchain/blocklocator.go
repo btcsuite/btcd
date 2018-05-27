@@ -112,12 +112,6 @@ func (bi *blockIndex) blockLocatorFromHash(hash *chainhash.Hash) BlockLocator {
 			// backwards along the side chain nodes to each block
 			// height.
 			if forkHeight != -1 && blockHeight > forkHeight {
-				// Intentionally use parent field instead of the
-				// PrevNodeFromNode function since we don't
-				// want to dynamically load nodes when building
-				// block locators.  Side chain blocks should
-				// always be in memory already, and if they
-				// aren't for some reason it's ok to skip them.
 				for iterNode != nil && blockHeight > iterNode.height {
 					iterNode = iterNode.parent
 				}

@@ -205,7 +205,7 @@ func (b *BlockChain) calcEasiestDifficulty(bits uint32, duration time.Duration) 
 // did not have the special testnet minimum difficulty rule applied.
 //
 // This function MUST be called with the chain state lock held (for writes).
-func (b *BlockChain) findPrevTestNetDifficulty(startNode *blockNode) (uint32, error) {
+func (b *BlockChain) findPrevTestNetDifficulty(startNode *blockNode) uint32 {
 	// Search backwards through the chain for the last block without
 	// the special rule applied.
 	blocksPerRetarget := b.chainParams.WorkDiffWindowSize *
@@ -214,17 +214,7 @@ func (b *BlockChain) findPrevTestNetDifficulty(startNode *blockNode) (uint32, er
 	for iterNode != nil && iterNode.height%blocksPerRetarget != 0 &&
 		iterNode.bits == b.chainParams.PowLimitBits {
 
-		// Get the previous block node.  This function is used over
-		// simply accessing iterNode.parent directly as it will
-		// dynamically create previous block nodes as needed.  This
-		// helps allow only the pieces of the chain that are needed
-		// to remain in memory.
-		var err error
-		iterNode, err = b.index.PrevNodeFromNode(iterNode)
-		if err != nil {
-			log.Errorf("PrevNodeFromNode: %v", err)
-			return 0, err
-		}
+		iterNode = iterNode.parent
 	}
 
 	// Return the found difficulty or the minimum difficulty if no
@@ -233,7 +223,7 @@ func (b *BlockChain) findPrevTestNetDifficulty(startNode *blockNode) (uint32, er
 	if iterNode != nil {
 		lastBits = iterNode.bits
 	}
-	return lastBits, nil
+	return lastBits
 }
 
 // calcNextRequiredDifficulty calculates the required difficulty for the block
@@ -241,8 +231,6 @@ func (b *BlockChain) findPrevTestNetDifficulty(startNode *blockNode) (uint32, er
 // This function differs from the exported CalcNextRequiredDifficulty in that
 // the exported version uses the current best chain as the previous block node
 // while this function accepts any block node.
-//
-// This function MUST be called with the chain state lock held (for writes).
 func (b *BlockChain) calcNextRequiredDifficulty(curNode *blockNode, newBlockTime time.Time) (uint32, error) {
 	// Genesis block.
 	if curNode == nil {
@@ -294,11 +282,7 @@ func (b *BlockChain) calcNextRequiredDifficulty(curNode *blockNode, newBlockTime
 			// The block was mined within the desired timeframe, so
 			// return the difficulty for the last block which did
 			// not have the special minimum difficulty rule applied.
-			prevBits, err := b.findPrevTestNetDifficulty(curNode)
-			if err != nil {
-				return 0, err
-			}
-			return prevBits, nil
+			return b.findPrevTestNetDifficulty(curNode), nil
 		}
 
 		return oldDiff, nil
@@ -369,22 +353,10 @@ func (b *BlockChain) calcNextRequiredDifficulty(curNode *blockNode, newBlockTime
 			break // Exit for loop when we hit the end.
 		}
 
-		// Get the previous block node.  This function is used over
-		// simply accessing firstNode.parent directly as it will
-		// dynamically create previous block nodes as needed.  This
-		// helps allow only the pieces of the chain that are needed
-		// to remain in memory.
-		var err error
-		tempNode := oldNode
-		oldNode, err = b.index.PrevNodeFromNode(oldNode)
-		if err != nil {
-			return 0, err
-		}
-
-		// If we're at the genesis block, reset the oldNode
-		// so that it stays at the genesis block.
-		if oldNode == nil {
-			oldNode = tempNode
+		// Get the previous node while staying at the genesis block as
+		// needed.
+		if oldNode.parent != nil {
+			oldNode = oldNode.parent
 		}
 	}
 
@@ -439,10 +411,9 @@ func (b *BlockChain) calcNextRequiredDifficulty(curNode *blockNode, newBlockTime
 //
 // This function is NOT safe for concurrent access.
 func (b *BlockChain) CalcNextRequiredDiffFromNode(hash *chainhash.Hash, timestamp time.Time) (uint32, error) {
-	// Fetch the block to get the difficulty for.
-	node, err := b.findNode(hash, maxSearchDepth)
-	if err != nil {
-		return 0, err
+	node := b.index.LookupNode(hash)
+	if node == nil {
+		return 0, fmt.Errorf("block %s is not known", hash)
 	}
 
 	return b.calcNextRequiredDifficulty(node, timestamp)
@@ -581,18 +552,10 @@ func (b *BlockChain) calcNextRequiredStakeDifficultyV1(curNode *blockNode) (int6
 			break // Exit for loop when we hit the end.
 		}
 
-		// Get the previous block node.
-		var err error
-		tempNode := oldNode
-		oldNode, err = b.index.PrevNodeFromNode(oldNode)
-		if err != nil {
-			return 0, err
-		}
-
-		// If we're at the genesis block, reset the oldNode
-		// so that it stays at the genesis block.
-		if oldNode == nil {
-			oldNode = tempNode
+		// Get the previous node while staying at the genesis block as
+		// needed.
+		if oldNode.parent != nil {
+			oldNode = oldNode.parent
 		}
 	}
 
@@ -676,18 +639,10 @@ func (b *BlockChain) calcNextRequiredStakeDifficultyV1(curNode *blockNode) (int6
 			break // Exit for loop when we hit the end.
 		}
 
-		// Get the previous block node.
-		var err error
-		tempNode := oldNode
-		oldNode, err = b.index.PrevNodeFromNode(oldNode)
-		if err != nil {
-			return 0, err
-		}
-
-		// If we're at the genesis block, reset the oldNode
-		// so that it stays at the genesis block.
-		if oldNode == nil {
-			oldNode = tempNode
+		// Get the previous node while staying at the genesis block as
+		// needed.
+		if oldNode.parent != nil {
+			oldNode = oldNode.parent
 		}
 	}
 
@@ -787,28 +742,16 @@ func estimateSupply(params *chaincfg.Params, height int64) int64 {
 // sumPurchasedTickets returns the sum of the number of tickets purchased in the
 // most recent specified number of blocks from the point of view of the passed
 // node.
-//
-// This function MUST be called with the chain state lock held (for writes).
-func (b *BlockChain) sumPurchasedTickets(startNode *blockNode, numToSum int64) (int64, error) {
+func (b *BlockChain) sumPurchasedTickets(startNode *blockNode, numToSum int64) int64 {
 	var numPurchased int64
 	for node, numTraversed := startNode, int64(0); node != nil &&
 		numTraversed < numToSum; numTraversed++ {
 
 		numPurchased += int64(node.freshStake)
-
-		// Get the previous block node.  This function is used over
-		// simply accessing iterNode.parent directly as it will
-		// dynamically create previous block nodes as needed.  This
-		// helps allow only the pieces of the chain that are needed
-		// to remain in memory.
-		var err error
-		node, err = b.index.PrevNodeFromNode(node)
-		if err != nil {
-			return 0, err
-		}
+		node = node.parent
 	}
 
-	return numPurchased, nil
+	return numPurchased
 }
 
 // calcNextStakeDiffV2 calculates the next stake difficulty for the given set
@@ -921,19 +864,13 @@ func (b *BlockChain) calcNextRequiredStakeDifficultyV2(curNode *blockNode) (int6
 	// originally calculated.
 	var prevPoolSize int64
 	prevRetargetHeight := nextHeight - intervalSize - 1
-	prevRetargetNode, err := b.index.AncestorNode(curNode, prevRetargetHeight)
-	if err != nil {
-		return 0, err
-	}
+	prevRetargetNode := curNode.Ancestor(prevRetargetHeight)
 	if prevRetargetNode != nil {
 		prevPoolSize = int64(prevRetargetNode.poolSize)
 	}
 	ticketMaturity := int64(b.chainParams.TicketMaturity)
-	prevImmatureTickets, err := b.sumPurchasedTickets(prevRetargetNode,
+	prevImmatureTickets := b.sumPurchasedTickets(prevRetargetNode,
 		ticketMaturity)
-	if err != nil {
-		return 0, err
-	}
 
 	// Return the existing ticket price for the first few intervals to avoid
 	// division by zero and encourage initial pool population.
@@ -943,10 +880,7 @@ func (b *BlockChain) calcNextRequiredStakeDifficultyV2(curNode *blockNode) (int6
 	}
 
 	// Count the number of currently immature tickets.
-	immatureTickets, err := b.sumPurchasedTickets(curNode, ticketMaturity)
-	if err != nil {
-		return 0, err
-	}
+	immatureTickets := b.sumPurchasedTickets(curNode, ticketMaturity)
 
 	// Calculate and return the final next required difficulty.
 	curPoolSizeAll := int64(curNode.poolSize) + immatureTickets
@@ -1148,18 +1082,10 @@ func (b *BlockChain) estimateNextStakeDifficultyV1(curNode *blockNode, ticketsIn
 			break // Exit for loop when we hit the end.
 		}
 
-		// Get the previous block node.
-		var err error
-		tempNode := oldNode
-		oldNode, err = b.index.PrevNodeFromNode(oldNode)
-		if err != nil {
-			return 0, err
-		}
-
-		// If we're at the genesis block, reset the oldNode
-		// so that it stays at the genesis block.
-		if oldNode == nil {
-			oldNode = tempNode
+		// Get the previous node while staying at the genesis block as
+		// needed.
+		if oldNode.parent != nil {
+			oldNode = oldNode.parent
 		}
 	}
 
@@ -1243,18 +1169,10 @@ func (b *BlockChain) estimateNextStakeDifficultyV1(curNode *blockNode, ticketsIn
 			break // Exit for loop when we hit the end.
 		}
 
-		// Get the previous block node.
-		var err error
-		tempNode := oldNode
-		oldNode, err = b.index.PrevNodeFromNode(oldNode)
-		if err != nil {
-			return 0, err
-		}
-
-		// If we're at the genesis block, reset the oldNode
-		// so that it stays at the genesis block.
-		if oldNode == nil {
-			oldNode = tempNode
+		// Get the previous node while staying at the genesis block as
+		// needed.
+		if oldNode.parent != nil {
+			oldNode = oldNode.parent
 		}
 	}
 
@@ -1367,18 +1285,12 @@ func (b *BlockChain) estimateNextStakeDifficultyV2(curNode *blockNode, newTicket
 	// originally calculated.
 	var prevPoolSize int64
 	prevRetargetHeight := nextRetargetHeight - intervalSize - 1
-	prevRetargetNode, err := b.index.AncestorNode(curNode, prevRetargetHeight)
-	if err != nil {
-		return 0, err
-	}
+	prevRetargetNode := curNode.Ancestor(prevRetargetHeight)
 	if prevRetargetNode != nil {
 		prevPoolSize = int64(prevRetargetNode.poolSize)
 	}
-	prevImmatureTickets, err := b.sumPurchasedTickets(prevRetargetNode,
+	prevImmatureTickets := b.sumPurchasedTickets(prevRetargetNode,
 		ticketMaturity)
-	if err != nil {
-		return 0, err
-	}
 
 	// Return the existing ticket price for the first few intervals to avoid
 	// division by zero and encourage initial pool population.
@@ -1399,11 +1311,8 @@ func (b *BlockChain) estimateNextStakeDifficultyV2(curNode *blockNode, newTicket
 	var remainingImmatureTickets int64
 	nextMaturityFloor := nextRetargetHeight - ticketMaturity - 1
 	if curHeight > nextMaturityFloor {
-		remainingImmatureTickets, err = b.sumPurchasedTickets(curNode,
+		remainingImmatureTickets = b.sumPurchasedTickets(curNode,
 			curHeight-nextMaturityFloor)
-		if err != nil {
-			return 0, err
-		}
 	}
 
 	// Add the number of tickets that will still be immature at the next
@@ -1426,16 +1335,10 @@ func (b *BlockChain) estimateNextStakeDifficultyV2(curNode *blockNode, newTicket
 	if finalMaturingHeight > curHeight {
 		finalMaturingHeight = curHeight
 	}
-	finalMaturingNode, err := b.index.AncestorNode(curNode, finalMaturingHeight)
-	if err != nil {
-		return 0, err
-	}
+	finalMaturingNode := curNode.Ancestor(finalMaturingHeight)
 	firstMaturingHeight := curHeight - ticketMaturity
-	maturingTickets, err := b.sumPurchasedTickets(finalMaturingNode,
+	maturingTickets := b.sumPurchasedTickets(finalMaturingNode,
 		finalMaturingHeight-firstMaturingHeight+1)
-	if err != nil {
-		return 0, err
-	}
 
 	// Add the number of tickets that will mature based on the estimated data.
 	//

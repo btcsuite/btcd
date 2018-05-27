@@ -23,7 +23,7 @@ var (
 // version and a hash.  This is used for caches that require a version in
 // addition to a simple hash.
 func stakeMajorityCacheVersionKey(version uint32, hash *chainhash.Hash) [stakeMajorityCacheKeySize]byte {
-	key := [stakeMajorityCacheKeySize]byte{}
+	var key [stakeMajorityCacheKeySize]byte
 	binary.LittleEndian.PutUint32(key[0:], version)
 	copy(key[4:], hash[:])
 	return key
@@ -33,13 +33,11 @@ func stakeMajorityCacheVersionKey(version uint32, hash *chainhash.Hash) [stakeMa
 // interval given a stake validation height, stake validation interval, and
 // block height.
 func calcWantHeight(stakeValidationHeight, interval, height int64) int64 {
-	intervalOffset := stakeValidationHeight % interval
-
 	// The adjusted height accounts for the fact the starting validation
 	// height does not necessarily start on an interval and thus the
 	// intervals might not be zero-based.
+	intervalOffset := stakeValidationHeight % interval
 	adjustedHeight := height - intervalOffset - 1
-
 	return (adjustedHeight - ((adjustedHeight + 1) % interval)) +
 		intervalOffset
 }
@@ -58,30 +56,18 @@ func (b *BlockChain) CalcWantHeight(interval, height int64) int64 {
 // prior to the stake validation interval.
 //
 // This function MUST be called with the chain state lock held (for writes).
-func (b *BlockChain) findStakeVersionPriorNode(prevNode *blockNode) (*blockNode, error) {
+func (b *BlockChain) findStakeVersionPriorNode(prevNode *blockNode) *blockNode {
 	// Check to see if the blockchain is high enough to begin accounting
 	// stake versions.
+	svh := b.chainParams.StakeValidationHeight
+	svi := b.chainParams.StakeVersionInterval
 	nextHeight := prevNode.height + 1
-	if nextHeight < b.chainParams.StakeValidationHeight+
-		b.chainParams.StakeVersionInterval {
-		return nil, nil
+	if nextHeight < svh+svi {
+		return nil
 	}
 
-	wantHeight := calcWantHeight(b.chainParams.StakeValidationHeight,
-		b.chainParams.StakeVersionInterval, nextHeight)
-
-	// Walk backwards until we find an interval block and make sure we
-	// don't blow through the minimum height.
-	iterNode := prevNode
-	for iterNode.height > wantHeight {
-		var err error
-		iterNode, err = b.index.PrevNodeFromNode(iterNode)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return iterNode, nil
+	wantHeight := calcWantHeight(svh, svi, nextHeight)
+	return prevNode.Ancestor(wantHeight)
 }
 
 // isVoterMajorityVersion determines if minVer requirement is met based on
@@ -94,10 +80,7 @@ func (b *BlockChain) findStakeVersionPriorNode(prevNode *blockNode) (*blockNode,
 // This function MUST be called with the chain state lock held (for writes).
 func (b *BlockChain) isVoterMajorityVersion(minVer uint32, prevNode *blockNode) bool {
 	// Walk blockchain backwards to calculate version.
-	node, err := b.findStakeVersionPriorNode(prevNode)
-	if err != nil {
-		return false
-	}
+	node := b.findStakeVersionPriorNode(prevNode)
 	if node == nil {
 		return 0 >= minVer
 	}
@@ -122,11 +105,7 @@ func (b *BlockChain) isVoterMajorityVersion(minVer uint32, prevNode *blockNode) 
 			}
 		}
 
-		var err error
-		iterNode, err = b.index.PrevNodeFromNode(iterNode)
-		if err != nil {
-			return false
-		}
+		iterNode = iterNode.parent
 	}
 
 	// Determine the required amount of votes to reach supermajority.
@@ -150,10 +129,7 @@ func (b *BlockChain) isVoterMajorityVersion(minVer uint32, prevNode *blockNode) 
 // This function MUST be called with the chain state lock held (for writes).
 func (b *BlockChain) isStakeMajorityVersion(minVer uint32, prevNode *blockNode) bool {
 	// Walk blockchain backwards to calculate version.
-	node, err := b.findStakeVersionPriorNode(prevNode)
-	if err != nil {
-		return false
-	}
+	node := b.findStakeVersionPriorNode(prevNode)
 	if node == nil {
 		return 0 >= minVer
 	}
@@ -164,9 +140,9 @@ func (b *BlockChain) isStakeMajorityVersion(minVer uint32, prevNode *blockNode) 
 		return result
 	}
 
-	// Tally how many of the block headers in the previous stake version validation
-	// interval have their stake version set to at least the requested minimum
-	// version.
+	// Tally how many of the block headers in the previous stake version
+	// validation interval have their stake version set to at least the
+	// requested minimum version.
 	versionCount := int32(0)
 	iterNode := node
 	for i := int64(0); i < b.chainParams.StakeVersionInterval && iterNode != nil; i++ {
@@ -174,12 +150,7 @@ func (b *BlockChain) isStakeMajorityVersion(minVer uint32, prevNode *blockNode) 
 			versionCount += 1
 		}
 
-		var err error
-		iterNode, err = b.index.PrevNodeFromNode(iterNode)
-		if err != nil {
-			b.isStakeMajorityVersionCache[key] = false
-			return false
-		}
+		iterNode = iterNode.parent
 	}
 
 	// Determine the required amount of votes to reach supermajority.
@@ -201,10 +172,7 @@ func (b *BlockChain) isStakeMajorityVersion(minVer uint32, prevNode *blockNode) 
 // This function MUST be called with the chain state lock held (for writes).
 func (b *BlockChain) calcPriorStakeVersion(prevNode *blockNode) (uint32, error) {
 	// Walk blockchain backwards to calculate version.
-	node, err := b.findStakeVersionPriorNode(prevNode)
-	if err != nil {
-		return 0, err
-	}
+	node := b.findStakeVersionPriorNode(prevNode)
 	if node == nil {
 		return 0, nil
 	}
@@ -221,11 +189,7 @@ func (b *BlockChain) calcPriorStakeVersion(prevNode *blockNode) (uint32, error) 
 	for i := int64(0); i < b.chainParams.StakeVersionInterval && iterNode != nil; i++ {
 		versions[iterNode.stakeVersion]++
 
-		var err error
-		iterNode, err = b.index.PrevNodeFromNode(iterNode)
-		if err != nil {
-			return 0, err
-		}
+		iterNode = iterNode.parent
 	}
 
 	// Determine the required amount of votes to reach supermajority.
@@ -273,7 +237,6 @@ func (b *BlockChain) calcVoterVersionInterval(prevNode *blockNode) (uint32, erro
 
 	// Tally both the total number of votes in the previous stake version validation
 	// interval and how many of each version those votes have.
-	var err error
 	versions := make(map[uint32]int32) // [version][count]
 	totalVotesFound := int32(0)
 	iterNode := prevNode
@@ -283,10 +246,7 @@ func (b *BlockChain) calcVoterVersionInterval(prevNode *blockNode) (uint32, erro
 			versions[v.Version]++
 		}
 
-		iterNode, err = b.index.PrevNodeFromNode(iterNode)
-		if err != nil {
-			return 0, err
-		}
+		iterNode = iterNode.parent
 	}
 
 	// Determine the required amount of votes to reach supermajority.
@@ -311,10 +271,7 @@ func (b *BlockChain) calcVoterVersionInterval(prevNode *blockNode) (uint32, erro
 // This function MUST be called with the chain state lock held (for writes).
 func (b *BlockChain) calcVoterVersion(prevNode *blockNode) (uint32, *blockNode) {
 	// Walk blockchain backwards to find interval.
-	node, err := b.findStakeVersionPriorNode(prevNode)
-	if err != nil {
-		return 0, nil
-	}
+	node := b.findStakeVersionPriorNode(prevNode)
 
 	// Iterate over versions until a majority is found.  Don't try to count
 	// votes before the stake validation height since there could not
@@ -328,26 +285,22 @@ func (b *BlockChain) calcVoterVersion(prevNode *blockNode) (uint32, *blockNode) 
 			break
 		}
 
-		prevIntervalHeight := node.height - b.chainParams.StakeVersionInterval
-		node, err = b.index.AncestorNode(node, prevIntervalHeight)
-		if err != nil {
-			break
-		}
+		node = node.RelativeAncestor(b.chainParams.StakeVersionInterval)
 	}
 
-	// We didn't find a marority version.
+	// No majority version found.
 	return 0, nil
 }
 
-// calcStakeVersion calculates the header stake version based on voter
-// versions.  If there is a majority of voter versions it uses the header stake
-// version to prevent reverting to a prior version.
+// calcStakeVersion calculates the header stake version based on voter versions.
+// If there is a majority of voter versions it uses the header stake version to
+// prevent reverting to a prior version.
 //
 // This function MUST be called with the chain state lock held (for writes).
 func (b *BlockChain) calcStakeVersion(prevNode *blockNode) uint32 {
 	version, node := b.calcVoterVersion(prevNode)
 	if version == 0 || node == nil {
-		// short circuit
+		// Short circuit.
 		return 0
 	}
 
@@ -361,35 +314,34 @@ func (b *BlockChain) calcStakeVersion(prevNode *blockNode) uint32 {
 	// prior interval; hence the + 1.
 	startIntervalHeight := calcWantHeight(b.chainParams.StakeValidationHeight,
 		b.chainParams.StakeVersionInterval, node.height) + 1
-	iterNode := node
-	for iterNode.height > startIntervalHeight {
-		var err error
-		iterNode, err = b.index.PrevNodeFromNode(iterNode)
-		if err != nil || iterNode == nil {
-			b.calcStakeVersionCache[node.hash] = 0
-			return 0
-		}
+	startNode := node.Ancestor(startIntervalHeight)
+	if startNode == nil {
+		// Note that should this not be possible to hit because a
+		// majority voter version was obtained above, which means there
+		// is at least an interval of nodes.  However, be paranoid.
+		b.calcStakeVersionCache[node.hash] = 0
 	}
 
-	// See if we are enforcing V3 blocks yet.  Just return V0 since it it
+	// See if we are enforcing V3 blocks yet.  Just return V0 since it
 	// wasn't enforced and therefore irrelevant.
-	if !b.isMajorityVersion(3, iterNode,
+	if !b.isMajorityVersion(3, startNode,
 		b.chainParams.BlockRejectNumRequired) {
 		b.calcStakeVersionCache[node.hash] = 0
 		return 0
 	}
 
-	ourVersion := version
+	// Don't allow the stake version to go backwards once it has been locked
+	// in by a previous majority, even if the majority of votes are now a
+	// lower version.
 	if b.isStakeMajorityVersion(version, node) {
 		priorVersion, _ := b.calcPriorStakeVersion(node)
-		if version <= priorVersion {
-			ourVersion = priorVersion
+		if priorVersion > version {
+			version = priorVersion
 		}
 	}
 
-	b.calcStakeVersionCache[node.hash] = ourVersion
-
-	return ourVersion
+	b.calcStakeVersionCache[node.hash] = version
+	return version
 }
 
 // calcStakeVersionByHash calculates the last prior valid majority stake
@@ -399,16 +351,16 @@ func (b *BlockChain) calcStakeVersion(prevNode *blockNode) uint32 {
 //
 // This function MUST be called with the chain state lock held (for writes).
 func (b *BlockChain) calcStakeVersionByHash(hash *chainhash.Hash) (uint32, error) {
-	prevNode, err := b.findNode(hash, 0)
-	if err != nil {
-		return 0, err
+	prevNode := b.index.LookupNode(hash)
+	if prevNode == nil {
+		return 0, fmt.Errorf("block %s is not known", hash)
 	}
 
 	return b.calcStakeVersion(prevNode), nil
 }
 
-// CalcStakeVersionByHash calculates the expected stake version for the
-// provided block hash.
+// CalcStakeVersionByHash calculates the expected stake version for the block
+// AFTER provided block hash.
 //
 // This function is safe for concurrent access.
 func (b *BlockChain) CalcStakeVersionByHash(hash *chainhash.Hash) (uint32, error) {

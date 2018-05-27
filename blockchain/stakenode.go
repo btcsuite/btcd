@@ -13,29 +13,6 @@ import (
 	"github.com/decred/dcrd/database"
 )
 
-// nodeAtHeightFromTopNode goes backwards through a node until it a reaches
-// the node with a desired block height; it returns this block.  The benefit is
-// this works for both the main chain and the side chain.
-func (b *BlockChain) nodeAtHeightFromTopNode(node *blockNode, toTraverse int64) (*blockNode, error) {
-	oldNode := node
-	var err error
-
-	for i := 0; i < int(toTraverse); i++ {
-		// Get the previous block node.
-		oldNode, err = b.index.PrevNodeFromNode(oldNode)
-		if err != nil {
-			return nil, err
-		}
-
-		if oldNode == nil {
-			return nil, fmt.Errorf("unable to obtain previous node; " +
-				"ancestor is genesis block")
-		}
-	}
-
-	return oldNode, nil
-}
-
 // fetchNewTicketsForNode fetches the list of newly maturing tickets for a
 // given node by traversing backwards through its parents until it finds the
 // block that contains the original tickets to mature.
@@ -59,10 +36,10 @@ func (b *BlockChain) fetchNewTicketsForNode(node *blockNode) ([]chainhash.Hash, 
 
 	// Calculate block number for where new tickets matured from and retrieve
 	// this block from DB or in memory if it's a sidechain.
-	matureNode, err := b.nodeAtHeightFromTopNode(node,
-		int64(b.chainParams.TicketMaturity))
-	if err != nil {
-		return nil, err
+	matureNode := node.RelativeAncestor(int64(b.chainParams.TicketMaturity))
+	if matureNode == nil {
+		return nil, fmt.Errorf("unable to obtain previous node; " +
+			"ancestor is genesis block")
 	}
 
 	matureBlock, errBlock := b.fetchBlockByHash(&matureNode.hash)
@@ -128,17 +105,14 @@ func (b *BlockChain) fetchStakeNode(node *blockNode) (*stake.Node, error) {
 	// it through the entire path.  The bestNode stake node must
 	// always be filled in, so assume it is safe to begin working
 	// backwards from there.
-	detachNodes, attachNodes, err := b.getReorganizeNodes(node)
-	if err != nil {
-		return nil, err
-	}
+	detachNodes, attachNodes := b.getReorganizeNodes(node)
 	current := b.bestNode
 
 	// Move backwards through the main chain, undoing the ticket
 	// treaps for each block.  The database is passed because the
 	// undo data and new tickets data for each block may not yet
 	// be filled in and may require the database to look up.
-	err = b.db.View(func(dbTx database.Tx) error {
+	err := b.db.View(func(dbTx database.Tx) error {
 		for e := detachNodes.Front(); e != nil; e = e.Next() {
 			n := e.Value.(*blockNode)
 			if n.stakeNode == nil {

@@ -162,11 +162,7 @@ func TestCalcPastMedianTime(t *testing.T) {
 		}
 
 		// Ensure the median time is the expected value.
-		gotTime, err := bc.index.CalcPastMedianTime(node)
-		if err != nil {
-			t.Errorf("%s: unexpected error: %v", test.name, err)
-			continue
-		}
+		gotTime := node.CalcPastMedianTime()
 		wantTime := time.Unix(test.expected, 0)
 		if !gotTime.Equal(wantTime) {
 			t.Errorf("%s: mismatched timestamps -- got: %v, want: %v",

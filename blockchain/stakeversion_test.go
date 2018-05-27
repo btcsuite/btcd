@@ -254,9 +254,9 @@ func TestCalcStakeVersionCorners(t *testing.T) {
 	}
 }
 
-// TestCalcStakeVersionByNode ensures that stake version calculation works as
+// TestCalcStakeVersion ensures that stake version calculation works as
 // intended when
-func TestCalcStakeVersionByNode(t *testing.T) {
+func TestCalcStakeVersion(t *testing.T) {
 	params := &chaincfg.SimNetParams
 	svh := params.StakeValidationHeight
 	svi := params.StakeVersionInterval
@@ -718,7 +718,7 @@ func TestLarge(t *testing.T) {
 			// validate calcStakeVersion
 			version := bc.calcStakeVersion(node)
 			if version != test.expectedCalcVersion {
-				t.Fatalf("%v calcStakeVersionByNode got %v expected %v",
+				t.Fatalf("%v calcStakeVersion got %v expected %v",
 					test.name, version, test.expectedCalcVersion)
 			}
 			end := time.Now()

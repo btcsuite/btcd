@@ -1080,16 +1080,26 @@ func (b *BlockChain) FetchUtxoView(tx *dcrutil.Tx, treeValid bool) (*UtxoViewpoi
 	b.chainLock.RLock()
 	defer b.chainLock.RUnlock()
 
+	// The genesis block does not have any spendable transactions, so there
+	// can't possibly be any details about it.  This is also necessary
+	// because the code below requires the parent block and the genesis
+	// block doesn't have one.
+	tip := b.bestNode
+	view := NewUtxoViewpoint()
+	if tip.height == 0 {
+		view.SetBestHash(&tip.hash)
+		return view, nil
+	}
+
 	// Request the utxos from the point of view of the end of the main
 	// chain.
-	view := NewUtxoViewpoint()
 	if treeValid {
 		view.SetStakeViewpoint(ViewpointPrevValidRegular)
-		block, err := b.fetchMainChainBlockByHash(&b.bestNode.hash)
+		block, err := b.fetchMainChainBlockByHash(&tip.hash)
 		if err != nil {
 			return nil, err
 		}
-		parent, err := b.fetchMainChainBlockByHash(&b.bestNode.parentHash)
+		parent, err := b.fetchMainChainBlockByHash(&tip.parent.hash)
 		if err != nil {
 			return nil, err
 		}
@@ -1098,14 +1108,14 @@ func (b *BlockChain) FetchUtxoView(tx *dcrutil.Tx, treeValid bool) (*UtxoViewpoi
 			return nil, err
 		}
 		for i, blockTx := range block.Transactions() {
-			err := view.connectTransaction(blockTx, b.bestNode.height,
+			err := view.connectTransaction(blockTx, tip.height,
 				uint32(i), nil)
 			if err != nil {
 				return nil, err
 			}
 		}
 	}
-	view.SetBestHash(&b.bestNode.hash)
+	view.SetBestHash(&tip.hash)
 
 	// Create a set of needed transactions based on those referenced by the
 	// inputs of the passed transaction.  Also, add the passed transaction

@@ -6,6 +6,8 @@
 package blockchain
 
 import (
+	"fmt"
+
 	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/database"
 	"github.com/decred/dcrd/dcrutil"
@@ -50,15 +52,9 @@ func (b *BlockChain) lotteryDataForNode(node *blockNode) ([]chainhash.Hash, int,
 // This function is NOT safe for concurrent access and must have the chainLock
 // held for write access.
 func (b *BlockChain) lotteryDataForBlock(hash *chainhash.Hash) ([]chainhash.Hash, int, [6]byte, error) {
-	var node *blockNode
-	if n := b.index.LookupNode(hash); n != nil {
-		node = n
-	} else {
-		var err error
-		node, err = b.findNode(hash, maxSearchDepth)
-		if err != nil {
-			return nil, 0, [6]byte{}, err
-		}
+	node := b.index.LookupNode(hash)
+	if node == nil {
+		return nil, 0, [6]byte{}, fmt.Errorf("block %s is not known", hash)
 	}
 
 	winningTickets, poolSize, finalState, err := b.lotteryDataForNode(node)
@@ -73,15 +69,15 @@ func (b *BlockChain) lotteryDataForBlock(hash *chainhash.Hash) ([]chainhash.Hash
 // chain, including side chain blocks.
 //
 // It is safe for concurrent access.
-// TODO An optimization can be added that only calls the read lock if the
-//   block is not minMemoryStakeNodes blocks before the current best node.
-//   This is because all the data for these nodes can be assumed to be
-//   in memory.
 func (b *BlockChain) LotteryDataForBlock(hash *chainhash.Hash) ([]chainhash.Hash, int, [6]byte, error) {
+	// TODO: An optimization can be added that only calls the read lock if the
+	// block is not minMemoryStakeNodes blocks before the current best node.
+	// This is because all the data for these nodes can be assumed to be
+	// in memory.
 	b.chainLock.Lock()
-	defer b.chainLock.Unlock()
-
-	return b.lotteryDataForBlock(hash)
+	winningTickets, poolSize, finalState, err := b.lotteryDataForBlock(hash)
+	b.chainLock.Unlock()
+	return winningTickets, poolSize, finalState, err
 }
 
 // LiveTickets returns all currently live tickets from the stake database.

@@ -39,8 +39,6 @@ func isStakeBaseTx(tx *wire.MsgTx) bool {
 // from the point of view of the block node passed in as the first argument.
 //
 // See the CalcSequenceLock comments for more details.
-//
-// This function MUST be called with the chain state lock held (for writes).
 func (b *BlockChain) calcSequenceLock(node *blockNode, tx *dcrutil.Tx, view *UtxoViewpoint, isActive bool) (*SequenceLock, error) {
 	// A value of -1 for each lock type allows a transaction to be included
 	// in a block at any given height or time.
@@ -102,17 +100,8 @@ func (b *BlockChain) calcSequenceLock(node *blockNode, tx *dcrutil.Tx, view *Utx
 			if prevInputHeight < 0 {
 				prevInputHeight = 0
 			}
-			blockNode, err := b.index.AncestorNode(node, prevInputHeight)
-			if err != nil {
-				return sequenceLock, err
-			}
-
-			// Calculate the past median time of the block prior to
-			// the one which included the output being spent.
-			medianTime, err := b.index.CalcPastMedianTime(blockNode)
-			if err != nil {
-				return sequenceLock, err
-			}
+			blockNode := node.Ancestor(prevInputHeight)
+			medianTime := blockNode.CalcPastMedianTime()
 
 			// Calculate the minimum required timestamp based on the
 			// sum of the aforementioned past median time and

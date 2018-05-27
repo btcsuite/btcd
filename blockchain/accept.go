@@ -114,18 +114,11 @@ func IsFinalizedTransaction(tx *dcrutil.Tx, blockHeight int64, blockTime time.Ti
 //
 // This function MUST be called with the chain state lock held (for writes).
 func (b *BlockChain) maybeAcceptBlock(block *dcrutil.Block, flags BehaviorFlags) (int64, error) {
-	// Get a block node for the block previous to this one.  Will be nil
-	// if this is the genesis block.
-	prevNode, err := b.index.PrevNodeFromBlock(block)
-	if err != nil {
-		log.Debugf("PrevNodeFromBlock: %v", err)
-		return 0, err
-	}
-
 	// This function should never be called with orphan blocks or the
 	// genesis block.
+	prevHash := &block.MsgBlock().Header.PrevBlock
+	prevNode := b.index.LookupNode(prevHash)
 	if prevNode == nil {
-		prevHash := &block.MsgBlock().Header.PrevBlock
 		str := fmt.Sprintf("previous block %s is not known", prevHash)
 		return 0, ruleError(ErrMissingParent, str)
 	}
@@ -133,7 +126,6 @@ func (b *BlockChain) maybeAcceptBlock(block *dcrutil.Block, flags BehaviorFlags)
 	// There is no need to validate the block if an ancestor is already
 	// known to be invalid.
 	if b.index.NodeStatus(prevNode).KnownInvalid() {
-		prevHash := &block.MsgBlock().Header.PrevBlock
 		str := fmt.Sprintf("previous block %s is known to be invalid",
 			prevHash)
 		return 0, ruleError(ErrInvalidAncestorBlock, str)
@@ -141,7 +133,7 @@ func (b *BlockChain) maybeAcceptBlock(block *dcrutil.Block, flags BehaviorFlags)
 
 	// The block must pass all of the validation rules which depend on the
 	// position of the block within the block chain.
-	err = b.checkBlockContext(block, prevNode, flags)
+	err := b.checkBlockContext(block, prevNode, flags)
 	if err != nil {
 		return 0, err
 	}
@@ -197,7 +189,7 @@ func (b *BlockChain) maybeAcceptBlock(block *dcrutil.Block, flags BehaviorFlags)
 
 	// Grab the parent block since it is required throughout the block
 	// connection process.
-	parent, err := b.fetchBlockByHash(&newNode.parentHash)
+	parent, err := b.fetchBlockByHash(&newNode.parent.hash)
 	if err != nil {
 		return 0, err
 	}

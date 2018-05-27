@@ -418,20 +418,6 @@ func dbPutBlockNode(dbTx database.Tx, node *blockNode) error {
 	return bucket.Put(key, serialized)
 }
 
-// dbFetchBlockIndexEntry fetches the block index entry for the passed hash and
-// height from the block index.
-func dbFetchBlockIndexEntry(dbTx database.Tx, hash *chainhash.Hash, height uint32) (*blockIndexEntry, error) {
-	bucket := dbTx.Metadata().Bucket(dbnamespace.BlockIndexBucketName)
-	key := blockIndexKey(hash, height)
-	serialized := bucket.Get(key)
-	if serialized == nil {
-		return nil, AssertError(fmt.Sprintf("missing block node %s "+
-			"(height %d)", hash, height))
-	}
-
-	return deserializeBlockIndexEntry(serialized)
-}
-
 // dbMaybeStoreBlock stores the provided block in the database if it's not
 // already there.
 func dbMaybeStoreBlock(dbTx database.Tx, block *dcrutil.Block) error {
@@ -1771,7 +1757,8 @@ func (b *BlockChain) initChainState(interrupt <-chan struct{}) error {
 		// When it doesn't exist, it means the database hasn't been
 		// initialized for use with chain yet, so break out now to allow
 		// that to happen under a writable database transaction.
-		serializedData := dbTx.Metadata().Get(dbnamespace.ChainStateKeyName)
+		meta := dbTx.Metadata()
+		serializedData := meta.Get(dbnamespace.ChainStateKeyName)
 		if serializedData == nil {
 			return nil
 		}
@@ -1781,59 +1768,119 @@ func (b *BlockChain) initChainState(interrupt <-chan struct{}) error {
 			return err
 		}
 
-		// Load the best and parent blocks and cache them.
-		utilBlock, err := dbFetchBlockByHash(dbTx, &state.hash)
-		if err != nil {
-			return err
+		log.Infof("Loading block index...")
+		bidxStart := time.Now()
+
+		// Determine how many blocks will be loaded into the index in order to
+		// allocate the right amount as a single alloc versus a whole bunch of
+		// littles ones to reduce pressure on the GC.
+		blockIndexBucket := meta.Bucket(dbnamespace.BlockIndexBucketName)
+		var blockCount int32
+		cursor := blockIndexBucket.Cursor()
+		for ok := cursor.First(); ok; ok = cursor.Next() {
+			blockCount++
 		}
-		b.mainchainBlockCache[state.hash] = utilBlock
-		block := utilBlock.MsgBlock()
-		header := &block.Header
-		if header.Height > 0 {
-			parentBlock, err := dbFetchBlockByHash(dbTx, &header.PrevBlock)
+		blockNodes := make([]blockNode, blockCount)
+
+		// Load all of the block index entries and construct the block index
+		// accordingly.
+		//
+		// NOTE: No locks are used on the block index here since this is
+		// initialization code.
+		var i int32
+		var lastNode *blockNode
+		cursor = blockIndexBucket.Cursor()
+		for ok := cursor.First(); ok; ok = cursor.Next() {
+			entry, err := deserializeBlockIndexEntry(cursor.Value())
 			if err != nil {
 				return err
 			}
-			b.mainchainBlockCache[header.PrevBlock] = parentBlock
+			header := &entry.header
+
+			// Determine the parent block node.  Since the block headers are
+			// iterated in order of height, there is a very good chance the
+			// previous header processed is the parent.
+			var parent *blockNode
+			if lastNode == nil {
+				blockHash := header.BlockHash()
+				if blockHash != *b.chainParams.GenesisHash {
+					return AssertError(fmt.Sprintf("initChainState: expected "+
+						"first entry in block index to be genesis block, "+
+						"found %s", blockHash))
+				}
+			} else if header.PrevBlock == lastNode.hash {
+				parent = lastNode
+			} else {
+				parent = b.index.lookupNode(&header.PrevBlock)
+				if parent == nil {
+					return AssertError(fmt.Sprintf("initChainState: could "+
+						"not find parent for block %s", header.BlockHash()))
+				}
+			}
+
+			// Initialize the block node, connect it, and add it to the block
+			// index.
+			node := &blockNodes[i]
+			initBlockNode(node, header, parent)
+			node.ticketsVoted = entry.ticketsVoted
+			node.ticketsRevoked = entry.ticketsRevoked
+			node.votes = entry.voteInfo
+			b.index.addNode(node)
+
+			lastNode = node
+			i++
 		}
 
-		// Create a new node and set it as the best node.  The preceding
-		// nodes will be loaded on demand as needed.
-		node := newBlockNode(header, nil)
-		node.populateTicketInfo(stake.FindSpentTicketsInBlock(block))
-		node.status = statusDataStored | statusValid
-		node.inMainChain = true
-		node.workSum = state.workSum
+		// Set the best chain to the stored best state.
+		tip := b.index.lookupNode(&state.hash)
+		if tip == nil {
+			return AssertError(fmt.Sprintf("initChainState: cannot find "+
+				"chain tip %s in block index", state.hash))
+		}
+		b.bestNode = tip
+
+		// Mark all of the nodes from the tip back to the genesis block
+		// as part of the main chain.
+		for n := tip; n != nil; n = n.parent {
+			n.inMainChain = true
+		}
+
+		log.Debugf("Block index loaded in %v", time.Since(bidxStart))
 
 		// Exception for version 1 blockchains: skip loading the stake
 		// node, as the upgrade path handles ensuring this is correctly
 		// set.
 		if b.dbInfo.version >= 2 {
-			node.stakeNode, err = stake.LoadBestNode(dbTx, uint32(node.height),
-				node.hash, *header, b.chainParams)
+			tip.stakeNode, err = stake.LoadBestNode(dbTx, uint32(tip.height),
+				tip.hash, tip.Header(), b.chainParams)
 			if err != nil {
 				return err
 			}
-			node.stakeUndoData = node.stakeNode.UndoData()
-			node.newTickets = node.stakeNode.NewTickets()
+			tip.stakeUndoData = tip.stakeNode.UndoData()
+			tip.newTickets = tip.stakeNode.NewTickets()
 		}
 
-		b.bestNode = node
-
-		// Add the new node to the indices for faster lookups.
-		b.index.AddNode(node)
-
-		// Calculate the median time for the block.
-		medianTime, err := b.index.CalcPastMedianTime(node)
+		// Load the best and parent blocks and cache them.
+		utilBlock, err := dbFetchBlockByHash(dbTx, &tip.hash)
 		if err != nil {
 			return err
 		}
+		b.mainchainBlockCache[tip.hash] = utilBlock
+		if tip.parent != nil {
+			parentBlock, err := dbFetchBlockByHash(dbTx, &tip.parent.hash)
+			if err != nil {
+				return err
+			}
+			b.mainchainBlockCache[tip.parent.hash] = parentBlock
+		}
 
 		// Initialize the state related to the best block.
+		block := utilBlock.MsgBlock()
 		blockSize := uint64(block.SerializeSize())
 		numTxns := uint64(len(block.Transactions))
-		b.stateSnapshot = newBestState(b.bestNode, blockSize, numTxns,
-			state.totalTxns, medianTime, state.totalSubsidy)
+		b.stateSnapshot = newBestState(tip, blockSize, numTxns,
+			state.totalTxns, tip.CalcPastMedianTime(),
+			state.totalSubsidy)
 
 		return nil
 	})

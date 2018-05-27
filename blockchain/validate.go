@@ -881,11 +881,7 @@ func (b *BlockChain) checkBlockHeaderContext(header *wire.BlockHeader, prevNode 
 
 		// Ensure the timestamp for the block header is after the
 		// median time of the last several blocks (medianTimeBlocks).
-		medianTime, err := b.index.CalcPastMedianTime(prevNode)
-		if err != nil {
-			log.Errorf("CalcPastMedianTime: %v", err)
-			return err
-		}
+		medianTime := prevNode.CalcPastMedianTime()
 		if !header.Timestamp.After(medianTime) {
 			str := "block timestamp of %v is not after expected %v"
 			str = fmt.Sprintf(str, header.Timestamp, medianTime)
@@ -1131,12 +1127,7 @@ func (b *BlockChain) checkBlockContext(block *dcrutil.Block, prevNode *blockNode
 			return err
 		}
 		if lnFeaturesActive {
-			medianTime, err := b.index.CalcPastMedianTime(prevNode)
-			if err != nil {
-				return err
-			}
-
-			blockTime = medianTime
+			blockTime = prevNode.CalcPastMedianTime()
 		}
 
 		// The height of this block is one more than the referenced
@@ -2349,11 +2340,11 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block, parent *dcrutil.B
 	}
 
 	// Ensure the view is for the node being checked.
-	if !utxoView.BestHash().IsEqual(&node.parentHash) {
+	parentHash := &block.MsgBlock().Header.PrevBlock
+	if !utxoView.BestHash().IsEqual(parentHash) {
 		return AssertError(fmt.Sprintf("inconsistent view when "+
 			"checking block connection: best hash is %v instead "+
-			"of expected %v", utxoView.BestHash(),
-			node.parentHash))
+			"of expected %v", utxoView.BestHash(), parentHash))
 	}
 
 	// Check that the coinbase pays the tax, if applicable.
@@ -2451,10 +2442,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block, parent *dcrutil.B
 		// Use the past median time of the *previous* block in order
 		// to determine if the transactions in the current block are
 		// final.
-		prevMedianTime, err = b.index.CalcPastMedianTime(node.parent)
-		if err != nil {
-			return err
-		}
+		prevMedianTime = node.parent.CalcPastMedianTime()
 
 		// Skip the coinbase since it does not have any inputs and thus
 		// lock times do not apply.
@@ -2590,9 +2578,15 @@ func (b *BlockChain) CheckConnectBlockTemplate(block *dcrutil.Block) error {
 		prevNode = tip.parent
 	}
 	if prevNode == nil {
-		str := fmt.Sprintf("previous block must be the current chain "+
-			"tip %s or its parent %s, but got %s", tip.hash,
-			tip.parentHash, parentHash)
+		var str string
+		if tip.parent != nil {
+			str = fmt.Sprintf("previous block must be the current chain tip "+
+				"%s or its parent %s, but got %s", tip.hash, tip.parent.hash,
+				parentHash)
+		} else {
+			str = fmt.Sprintf("previous block must be the current chain tip "+
+				"%s, but got %s", tip.hash, parentHash)
+		}
 		return ruleError(ErrInvalidTemplateParent, str)
 	}
 
@@ -2631,10 +2625,7 @@ func (b *BlockChain) CheckConnectBlockTemplate(block *dcrutil.Block) error {
 	// the transactions and spend information for the blocks which would be
 	// disconnected during a reorganize to the point of view of the node
 	// just before the requested node.
-	detachNodes, attachNodes, err := b.getReorganizeNodes(prevNode)
-	if err != nil {
-		return err
-	}
+	detachNodes, attachNodes := b.getReorganizeNodes(prevNode)
 
 	view := NewUtxoViewpoint()
 	view.SetBestHash(&tip.hash)
@@ -2659,7 +2650,7 @@ func (b *BlockChain) CheckConnectBlockTemplate(block *dcrutil.Block) error {
 				block.Hash())
 		}
 
-		parent, err := b.fetchMainChainBlockByHash(&n.parentHash)
+		parent, err := b.fetchMainChainBlockByHash(&n.parent.hash)
 		if err != nil {
 			return err
 		}
@@ -2714,15 +2705,15 @@ func (b *BlockChain) CheckConnectBlockTemplate(block *dcrutil.Block) error {
 		parent := prevAttachBlock
 		if parent == nil {
 			var err error
-			parent, err = b.fetchMainChainBlockByHash(&n.parentHash)
+			parent, err = b.fetchMainChainBlockByHash(&n.parent.hash)
 			if err != nil {
 				return err
 			}
 		}
-		if n.parentHash != *parent.Hash() {
+		if n.parent.hash != *parent.Hash() {
 			panicf("attach block node hash %v (height %v) parent hash %v does "+
 				"not match previous parent block hash %v", &n.hash, n.height,
-				&n.parentHash, parent.Hash())
+				&n.parent.hash, parent.Hash())
 		}
 
 		// Store the loaded block for the next iteration.
