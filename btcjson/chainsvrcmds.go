@@ -725,6 +725,12 @@ func NewValidateAddressCmd(address string) *ValidateAddressCmd {
 	}
 }
 
+// ConvCashAddrCmd defines the convCashAddr JSON-RPC command.
+// transform the address form between bitcoin classic address and bitcoin-abc address
+type ConvCashAddrCmd struct {
+	Address string
+}
+
 // VerifyChainCmd defines the verifychain JSON-RPC command.
 type VerifyChainCmd struct {
 	CheckLevel *int32 `jsonrpcdefault:"3"`
@@ -778,6 +784,7 @@ func init() {
 	flags := UsageFlag(0)
 
 	MustRegisterCmd("addnode", (*AddNodeCmd)(nil), flags)
+	MustRegisterCmd("convcashaddr", (*ConvCashAddrCmd)(nil), flags)
 	MustRegisterCmd("createrawtransaction", (*CreateRawTransactionCmd)(nil), flags)
 	MustRegisterCmd("decoderawtransaction", (*DecodeRawTransactionCmd)(nil), flags)
 	MustRegisterCmd("decodescript", (*DecodeScriptCmd)(nil), flags)

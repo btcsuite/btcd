@@ -128,6 +128,7 @@ type commandHandler func(*rpcServer, interface{}, <-chan struct{}) (interface{},
 var rpcHandlers map[string]commandHandler
 var rpcHandlersBeforeInit = map[string]commandHandler{
 	"addnode":               handleAddNode,
+	"convcashaddr":          convCashAddr,
 	"createrawtransaction":  handleCreateRawTransaction,
 	"debuglevel":            handleDebugLevel,
 	"decoderawtransaction":  handleDecodeRawTransaction,
@@ -3474,6 +3475,26 @@ func handleValidateAddress(s *rpcServer, cmd interface{}, closeChan <-chan struc
 	result.IsValid = true
 
 	return result, nil
+}
+
+func convCashAddr(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	c := cmd.(*btcjson.ConvCashAddrCmd)
+
+	if len(c.Address) >= 42 {
+		addr, err := btcutil.DecodeCashAddr(c.Address, s.cfg.ChainParams)
+		if err != nil {
+			return nil, btcjson.ErrRPCInvalidParams
+		}
+
+		return addr.EncodeAddress(), nil
+	}
+
+	addr, err := btcutil.DecodeAddress(c.Address, s.cfg.ChainParams)
+	if err != nil {
+		return nil, btcjson.ErrRPCInvalidParams
+	}
+
+	return btcutil.EncodeCashAddr(addr, s.cfg.ChainParams), nil
 }
 
 func verifyChain(s *rpcServer, level, depth int32) error {
