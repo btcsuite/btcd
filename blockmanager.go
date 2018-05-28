@@ -53,14 +53,20 @@ const (
 	// hashes to store in memory.
 	maxRequestedTxns = wire.MaxInvPerMsg
 
-	// maxLotteryDataBlockDelta is maximum number of blocks from the current
-	// best block to cut off block lottery calculation data for.  Below
-	// bestBlockHeight-maxLotteryDataBlockDelta, block lottery data will
-	// not be calculated.  This helps to reduce exhaustion attacks that
-	// might arise from sending old orphan blocks and forcing nodes to
-	// do expensive lottery data look ups for these blocks.  It is
-	// equivalent to 24 hours of work on mainnet.
-	maxLotteryDataBlockDelta = 288
+	// maxReorgDepthNotify specifies the maximum reorganization depth for
+	// which winning ticket notifications will be sent over RPC.  The reorg
+	// depth is the number of blocks that would be reorganized out of the
+	// current best chain if a side chain being considered for notifications
+	// were to ultimately be extended to be longer than the current one.
+	//
+	// In effect, this helps to prevent large reorgs by refusing to send the
+	// winning ticket information to RPC clients, such as voting wallets,
+	// which depend on it to cast votes.
+	//
+	// This check also doubles to help reduce exhaustion attacks that could
+	// otherwise arise from sending old orphan blocks and forcing nodes to
+	// do expensive lottery data calculations for them.
+	maxReorgDepthNotify = 6
 )
 
 // zeroHash is the zero value hash (all zeros).  It is defined as a convenience.
@@ -1069,48 +1075,6 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 		b.progressLogger.logBlockHeight(bmsg.block)
 		r := b.server.rpcServer
 
-		// Determine if this block is recent enough that we need to calculate
-		// block lottery data for it.
-		_, bestHeight := b.chainState.Best()
-		blockHeight := int64(bmsg.block.MsgBlock().Header.Height)
-		tooOldForLotteryData := blockHeight <=
-			(bestHeight - maxLotteryDataBlockDelta)
-		if !tooOldForLotteryData {
-			// Query the DB for the winning SStx for the next top block if we've
-			// reached stake validation height.  Broadcast them if this is the
-			// first time determining them and we're synced to the latest
-			// checkpoint.
-			winningTickets, _, _, err :=
-				b.chain.LotteryDataForBlock(blockHash)
-			if err != nil && int64(bmsg.block.MsgBlock().Header.Height) >=
-				b.server.chainParams.StakeValidationHeight-1 {
-				bmgrLog.Errorf("Failed to get next winning tickets: %v", err)
-
-				code, reason := mempool.ErrToRejectErr(err)
-				bmsg.peer.PushRejectMsg(wire.CmdBlock, code, reason,
-					blockHash, false)
-				return
-			}
-
-			// Push winning tickets notifications if we need to.
-			winningTicketsNtfn := &WinningTicketsNtfnData{
-				BlockHash:   *blockHash,
-				BlockHeight: int64(bmsg.block.MsgBlock().Header.Height),
-				Tickets:     winningTickets}
-			b.lotteryDataBroadcastMutex.RLock()
-			_, beenNotified := b.lotteryDataBroadcast[*blockHash]
-			b.lotteryDataBroadcastMutex.RUnlock()
-			if !beenNotified && r != nil &&
-				int64(bmsg.block.MsgBlock().Header.Height) >
-					b.server.chainParams.LatestCheckpointHeight() {
-				r.ntfnMgr.NotifyWinningTickets(winningTicketsNtfn)
-
-				b.lotteryDataBroadcastMutex.Lock()
-				b.lotteryDataBroadcast[*blockHash] = struct{}{}
-				b.lotteryDataBroadcastMutex.Unlock()
-			}
-		}
-
 		onMainChain := !isOrphan && forkLen == 0
 		if onMainChain {
 			// A new block is connected, however, this new block may have
@@ -1765,52 +1729,6 @@ out:
 					continue
 				}
 
-				// Get the winning tickets if the block is not an
-				// orphan and if it's recent. If they've yet to be
-				// broadcasted, broadcast them.
-				_, bestHeight := b.chainState.Best()
-				blockHeight := int64(msg.block.MsgBlock().Header.Height)
-				tooOldForLotteryData := blockHeight <=
-					(bestHeight - maxLotteryDataBlockDelta)
-				if !isOrphan && !tooOldForLotteryData {
-					b.lotteryDataBroadcastMutex.RLock()
-					_, beenNotified := b.lotteryDataBroadcast[*msg.block.Hash()]
-					b.lotteryDataBroadcastMutex.RUnlock()
-					winningTickets, _, _, err :=
-						b.chain.LotteryDataForBlock(msg.block.Hash())
-					if err != nil && int64(msg.block.MsgBlock().Header.Height) >=
-						b.server.chainParams.StakeValidationHeight-1 {
-						bmgrLog.Warnf("Stake failure in lottery tickets "+
-							"calculation: %v", err)
-						msg.reply <- processBlockResponse{
-							isOrphan: false,
-							err:      err,
-						}
-						continue
-					}
-
-					// Notify registered websocket clients of newly
-					// eligible tickets to vote on if needed. Only
-					// do this if we're above the latest checkpoint
-					// height.
-					r := b.server.rpcServer
-					if r != nil && !isOrphan && !beenNotified &&
-						(msg.block.Height() >=
-							b.server.chainParams.StakeValidationHeight-1) &&
-						(msg.block.Height() >
-							b.server.chainParams.LatestCheckpointHeight()) {
-						ntfnData := &WinningTicketsNtfnData{
-							*msg.block.Hash(),
-							int64(msg.block.MsgBlock().Header.Height),
-							winningTickets}
-
-						r.ntfnMgr.NotifyWinningTickets(ntfnData)
-						b.lotteryDataBroadcastMutex.Lock()
-						b.lotteryDataBroadcast[*msg.block.Hash()] = struct{}{}
-						b.lotteryDataBroadcastMutex.Unlock()
-					}
-				}
-
 				// If the block added to the main chain, then we need to
 				// update the tip locally on block manager.
 				onMainChain := !isOrphan && forkLen == 0
@@ -1931,16 +1849,26 @@ out:
 	bmgrLog.Trace("Block handler done")
 }
 
+// notifiedWinningTickets returns whether or not the winning tickets
+// notification for the specified block hash has already been sent.
+func (b *blockManager) notifiedWinningTickets(hash *chainhash.Hash) bool {
+	b.lotteryDataBroadcastMutex.Lock()
+	_, beenNotified := b.lotteryDataBroadcast[*hash]
+	b.lotteryDataBroadcastMutex.Unlock()
+	return beenNotified
+}
+
 // handleNotifyMsg handles notifications from blockchain.  It does things such
 // as request orphan block parents and relay accepted blocks to connected peers.
 func (b *blockManager) handleNotifyMsg(notification *blockchain.Notification) {
 	switch notification.Type {
-	// A block has been accepted into the block chain.  Relay it to other
-	// peers.
-
+	// A block has been accepted into the block chain.  Relay it to other peers
+	// and possibly notify RPC clients with the winning tickets.
 	case blockchain.NTBlockAccepted:
-		// Don't relay if we are not current. Other peers that are
-		// current should already know about it.
+		// Don't relay or notify RPC clients with winning tickets if we
+		// are not current. Other peers that are current should already
+		// know about it and clients, such as wallets, shouldn't be voting on
+		// old blocks.
 		if !b.current() {
 			return
 		}
@@ -1952,54 +1880,65 @@ func (b *blockManager) handleNotifyMsg(notification *blockchain.Notification) {
 			break
 		}
 		block := band.Block
-		r := b.server.rpcServer
 
-		// Determine the winning tickets for this block if it hasn't
-		// already been sent out.  Skip notifications if we're not
-		// yet synced to the latest checkpoint or if we're before
-		// the height where we begin voting.
-		_, bestHeight := b.chainState.Best()
+		// Send a winning tickets notification as needed.  The notification will
+		// only be sent when the following conditions hold:
+		//
+		// - The RPC server is running
+		// - The block that would build on this one is at or after the height
+		//   voting begins
+		// - The block that would build on this one would not cause a reorg
+		//   larger than the max reorg notify depth
+		// - This block is after the final checkpoint height
+		// - A notification for this block has not already been sent
+		//
+		// To help visualize the math here, consider the following two competing
+		// branches:
+		//
+		// 100 -> 101  -> 102  -> 103 -> 104 -> 105 -> 106
+		//    \-> 101' -> 102'
+		//
+		// Further, assume that this is a notification for block 103', or in
+		// other words, it is extending the shorter side chain.  The reorg depth
+		// would be 106 - (103 - 3) = 6.  This should intuitively make sense,
+		// because if the side chain were to be extended enough to become the
+		// best chain, it would result in a a reorg that would remove 6 blocks,
+		// namely blocks 101, 102, 103, 104, 105, and 106.
+		blockHash := block.Hash()
+		bestHeight := band.BestHeight
 		blockHeight := int64(block.MsgBlock().Header.Height)
-		tooOldForLotteryData := blockHeight <=
-			(bestHeight - maxLotteryDataBlockDelta)
-		if block.Height() >=
-			b.server.chainParams.StakeValidationHeight-1 &&
-			!tooOldForLotteryData &&
-			block.Height() > b.server.chainParams.LatestCheckpointHeight() &&
-			r != nil {
-
-			hash := block.Hash()
-			b.lotteryDataBroadcastMutex.Lock()
-			_, beenNotified := b.lotteryDataBroadcast[*hash]
-			b.lotteryDataBroadcastMutex.Unlock()
+		reorgDepth := bestHeight - (blockHeight - band.ForkLen)
+		if b.server.rpcServer != nil &&
+			blockHeight >= b.server.chainParams.StakeValidationHeight-1 &&
+			reorgDepth < maxReorgDepthNotify &&
+			blockHeight > b.server.chainParams.LatestCheckpointHeight() &&
+			!b.notifiedWinningTickets(blockHash) {
 
 			// Obtain the winning tickets for this block.  handleNotifyMsg
 			// should be safe for concurrent access of things contained
 			// within blockchain.
-			wt, _, _, err := b.chain.LotteryDataForBlock(hash)
+			wt, _, _, err := b.chain.LotteryDataForBlock(blockHash)
 			if err != nil {
 				bmgrLog.Errorf("Couldn't calculate winning tickets for "+
-					"accepted block %v: %v", block.Hash(), err.Error())
+					"accepted block %v: %v", blockHash, err.Error())
 			} else {
-				if !beenNotified {
-					ntfnData := &WinningTicketsNtfnData{
-						BlockHash:   *hash,
-						BlockHeight: block.Height(),
-						Tickets:     wt,
-					}
-
-					// Notify registered websocket clients of newly
-					// eligible tickets to vote on.
-					r.ntfnMgr.NotifyWinningTickets(ntfnData)
-					b.lotteryDataBroadcastMutex.Lock()
-					b.lotteryDataBroadcast[*hash] = struct{}{}
-					b.lotteryDataBroadcastMutex.Unlock()
+				ntfnData := &WinningTicketsNtfnData{
+					BlockHash:   *blockHash,
+					BlockHeight: blockHeight,
+					Tickets:     wt,
 				}
+
+				// Notify registered websocket clients of newly
+				// eligible tickets to vote on.
+				b.server.rpcServer.ntfnMgr.NotifyWinningTickets(ntfnData)
+				b.lotteryDataBroadcastMutex.Lock()
+				b.lotteryDataBroadcast[*blockHash] = struct{}{}
+				b.lotteryDataBroadcastMutex.Unlock()
 			}
 		}
 
 		// Generate the inventory vector and relay it.
-		iv := wire.NewInvVect(wire.InvTypeBlock, block.Hash())
+		iv := wire.NewInvVect(wire.InvTypeBlock, blockHash)
 		b.server.RelayInventory(iv, block.MsgBlock().Header)
 
 	// A block has been connected to the main block chain.

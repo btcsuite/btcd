@@ -213,10 +213,12 @@ func (b *BlockChain) maybeAcceptBlock(block *dcrutil.Block, flags BehaviorFlags)
 	// Notify the caller that the new block was accepted into the block
 	// chain.  The caller would typically want to react by relaying the
 	// inventory to other peers.
+	bestHeight := b.bestNode.height
 	b.chainLock.Unlock()
 	b.sendNotification(NTBlockAccepted, &BlockAcceptedNtfnsData{
-		ForkLen: forkLen,
-		Block:   block,
+		BestHeight: bestHeight,
+		ForkLen:    forkLen,
+		Block:      block,
 	})
 	b.chainLock.Lock()
 
