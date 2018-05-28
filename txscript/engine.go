@@ -572,7 +572,7 @@ func (vm *Engine) checkHashTypeEncoding(hashType SigHashType) error {
 	}
 
 	sigHashType := hashType & ^SigHashAnyOneCanPay
-	if sigHashType < SigHashAll || sigHashType > SigHashSingle {
+	if sigHashType < SigHashAll || sigHashType > SigHashForkID|SigHashSingle {
 		str := fmt.Sprintf("invalid hash type 0x%x", hashType)
 		return scriptError(ErrInvalidSigHashType, str)
 	}
