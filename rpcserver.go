@@ -4477,7 +4477,7 @@ func handleRebroadcastMissed(s *rpcServer, cmd interface{}, closeChan <-chan str
 
 // handleRebroadcastWinners implements the rebroadcastwinners command.
 func handleRebroadcastWinners(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
-	hash, height := s.server.blockManager.chainState.Best()
+	_, height := s.server.blockManager.chainState.Best()
 	blocks, err := s.server.blockManager.TipGeneration()
 	if err != nil {
 		return nil, rpcInternalError("Could not get generation "+
@@ -4492,7 +4492,7 @@ func handleRebroadcastWinners(s *rpcServer, cmd interface{}, closeChan <-chan st
 				"failed: "+err.Error(), "")
 		}
 		ntfnData := &WinningTicketsNtfnData{
-			BlockHash:   *hash,
+			BlockHash:   blocks[i],
 			BlockHeight: height,
 			Tickets:     winningTickets,
 		}
