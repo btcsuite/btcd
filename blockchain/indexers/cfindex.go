@@ -202,7 +202,7 @@ func storeFilter(dbTx database.Tx, block *btcutil.Block, f *gcs.Filter,
 // connected to the main chain. This indexer adds a hash-to-cf mapping for
 // every passed block. This is part of the Indexer interface.
 func (idx *CfIndex) ConnectBlock(dbTx database.Tx, block *btcutil.Block,
-	view *blockchain.UtxoViewpoint) error {
+	stxos []blockchain.SpentTxOut) error {
 
 	f, err := builder.BuildBasicFilter(block.MsgBlock())
 	if err != nil {
@@ -226,7 +226,7 @@ func (idx *CfIndex) ConnectBlock(dbTx database.Tx, block *btcutil.Block,
 // disconnected from the main chain.  This indexer removes the hash-to-cf
 // mapping for every passed block. This is part of the Indexer interface.
 func (idx *CfIndex) DisconnectBlock(dbTx database.Tx, block *btcutil.Block,
-	view *blockchain.UtxoViewpoint) error {
+	_ []blockchain.SpentTxOut) error {
 
 	for _, key := range cfIndexKeys {
 		err := dbDeleteFilterIdxEntry(dbTx, key, block.Hash())
