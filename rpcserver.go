@@ -552,7 +552,7 @@ func handleCreateRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan 
 		}
 
 		// Decode the provided address.
-		addr, err := btcutil.DecodeAddress(encodedAddr, params)
+		addr, err := btcutil.DecodeCashAddr(encodedAddr, params)
 		if err != nil {
 			return nil, &btcjson.RPCError{
 				Code:    btcjson.ErrRPCInvalidAddressOrKey,
@@ -708,7 +708,7 @@ func createVoutList(mtx *wire.MsgTx, chainParams *chaincfg.Params, filterAddrMap
 		passesFilter := len(filterAddrMap) == 0
 		encodedAddrs := make([]string, len(addrs))
 		for j, addr := range addrs {
-			encodedAddr := addr.EncodeAddress()
+			encodedAddr := btcutil.EncodeCashAddr(addr, chainParams)
 			encodedAddrs[j] = encodedAddr
 
 			// No need to check the map again if the filter already
@@ -832,7 +832,7 @@ func handleDecodeScript(s *rpcServer, cmd interface{}, closeChan <-chan struct{}
 		s.cfg.ChainParams)
 	addresses := make([]string, len(addrs))
 	for i, addr := range addrs {
-		addresses[i] = addr.EncodeAddress()
+		addresses[i] = btcutil.EncodeCashAddr(addr, s.cfg.ChainParams)
 	}
 
 	// Convert the script itself to a pay-to-script-hash address.
@@ -850,7 +850,7 @@ func handleDecodeScript(s *rpcServer, cmd interface{}, closeChan <-chan struct{}
 		Addresses: addresses,
 	}
 	if scriptClass != txscript.ScriptHashTy {
-		reply.P2sh = p2sh.EncodeAddress()
+		reply.P2sh = btcutil.EncodeCashAddr(p2sh, s.cfg.ChainParams)
 	}
 	return reply, nil
 }
@@ -2743,7 +2743,7 @@ func handleGetTxOut(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 		s.cfg.ChainParams)
 	addresses := make([]string, len(addrs))
 	for i, addr := range addrs {
-		addresses[i] = addr.EncodeAddress()
+		addresses[i] = btcutil.EncodeCashAddr(addr, s.cfg.ChainParams)
 	}
 
 	txOutReply := &btcjson.GetTxOutResult{
@@ -2978,7 +2978,7 @@ func createVinListPrevOut(s *rpcServer, mtx *wire.MsgTx, chainParams *chaincfg.P
 		// filter when needed.
 		encodedAddrs := make([]string, len(addrs))
 		for j, addr := range addrs {
-			encodedAddr := addr.EncodeAddress()
+			encodedAddr := btcutil.EncodeCashAddr(addr, chainParams)
 			encodedAddrs[j] = encodedAddr
 
 			// No need to check the map again if the filter already
@@ -3068,7 +3068,7 @@ func handleSearchRawTransactions(s *rpcServer, cmd interface{}, closeChan <-chan
 
 	// Attempt to decode the supplied address.
 	params := s.cfg.ChainParams
-	addr, err := btcutil.DecodeAddress(c.Address, params)
+	addr, err := btcutil.DecodeCashAddr(c.Address, params)
 	if err != nil {
 		return nil, &btcjson.RPCError{
 			Code:    btcjson.ErrRPCInvalidAddressOrKey,
@@ -3465,13 +3465,13 @@ func handleValidateAddress(s *rpcServer, cmd interface{}, closeChan <-chan struc
 	c := cmd.(*btcjson.ValidateAddressCmd)
 
 	result := btcjson.ValidateAddressChainResult{}
-	addr, err := btcutil.DecodeAddress(c.Address, s.cfg.ChainParams)
+	addr, err := btcutil.DecodeCashAddr(c.Address, s.cfg.ChainParams)
 	if err != nil {
 		// Return the default value (false) for IsValid.
 		return result, nil
 	}
 
-	result.Address = addr.EncodeAddress()
+	result.Address = btcutil.EncodeCashAddr(addr, s.cfg.ChainParams)
 	result.IsValid = true
 
 	return result, nil
@@ -3554,7 +3554,7 @@ func handleVerifyMessage(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 
 	// Decode the provided address.
 	params := s.cfg.ChainParams
-	addr, err := btcutil.DecodeAddress(c.Address, params)
+	addr, err := btcutil.DecodeCashAddr(c.Address, params)
 	if err != nil {
 		return nil, &btcjson.RPCError{
 			Code:    btcjson.ErrRPCInvalidAddressOrKey,
@@ -3608,7 +3608,7 @@ func handleVerifyMessage(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 	}
 
 	// Return boolean if addresses match.
-	return address.EncodeAddress() == c.Address, nil
+	return btcutil.EncodeCashAddr(address, s.cfg.ChainParams) == c.Address, nil
 }
 
 // handleVersion implements the version command.
