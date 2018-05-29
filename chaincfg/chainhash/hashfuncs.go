@@ -5,7 +5,12 @@
 
 package chainhash
 
-import "crypto/sha256"
+import (
+	"crypto/sha256"
+	"crypto/sha512"
+
+	"golang.org/x/crypto/ripemd160"
+)
 
 // HashB calculates hash(b) and returns the resulting bytes.
 func HashB(b []byte) []byte {
@@ -30,4 +35,27 @@ func DoubleHashB(b []byte) []byte {
 func DoubleHashH(b []byte) Hash {
 	first := sha256.Sum256(b)
 	return Hash(sha256.Sum256(first[:]))
+}
+
+// LbryPoWHashH calculates returns the PoW Hash.
+//
+//   doubled  := SHA256(SHA256(b))
+//   expanded := SHA512(doubled)
+//   left     := RIPEMD160(expanded[0:32])
+//   right    := RIPEMD160(expanded[32:64])
+//   result   := SHA256(SHA256(left||right))
+func LbryPoWHashH(b []byte) Hash {
+	doubled := DoubleHashB(b)
+	expanded := sha512.Sum512(doubled)
+
+	r := ripemd160.New()
+	r.Reset()
+	r.Write(expanded[:sha256.Size])
+	left := r.Sum(nil)
+
+	r.Reset()
+	r.Write(expanded[sha256.Size:])
+
+	combined := r.Sum(left)
+	return DoubleHashH(combined)
 }
