@@ -135,6 +135,11 @@ type BlockChain struct {
 	bestNode *blockNode
 	index    *blockIndex
 
+	// This field allows efficient lookup of nodes in the main chain by
+	// height.  It is protected by the height lock.
+	heightLock        sync.RWMutex
+	mainNodesByHeight map[int64]*blockNode
+
 	// These fields are related to handling of orphan blocks.  They are
 	// protected by a combination of the chain lock and the orphan lock.
 	orphanLock   sync.RWMutex
@@ -814,6 +819,9 @@ func (b *BlockChain) connectBlock(node *blockNode, block, parent *dcrutil.Block,
 
 	// Mark block as being in the main chain.
 	node.inMainChain = true
+	b.heightLock.Lock()
+	b.mainNodesByHeight[node.height] = node
+	b.heightLock.Unlock()
 
 	// This node is now the end of the best chain.
 	b.bestNode = node
@@ -989,6 +997,9 @@ func (b *BlockChain) disconnectBlock(node *blockNode, block, parent *dcrutil.Blo
 
 	// Mark block as being in a side chain.
 	node.inMainChain = false
+	b.heightLock.Lock()
+	delete(b.mainNodesByHeight, node.height)
+	b.heightLock.Unlock()
 
 	// This node's parent is now the end of the best chain.
 	b.bestNode = node.parent
@@ -1693,6 +1704,169 @@ func (b *BlockChain) FetchHeader(hash *chainhash.Hash) (wire.BlockHeader, error)
 	return *header, nil
 }
 
+// locateInventory returns the node of the block after the first known block in
+// the locator along with the number of subsequent nodes needed to either reach
+// the provided stop hash or the provided max number of entries.
+//
+// In addition, there are two special cases:
+//
+// - When no locators are provided, the stop hash is treated as a request for
+//   that block, so it will either return the node associated with the stop hash
+//   if it is known, or nil if it is unknown
+// - When locators are provided, but none of them are known, nodes starting
+//   after the genesis block will be returned
+//
+// This is primarily a helper function for the locateBlocks and locateHeaders
+// functions.
+//
+// This function MUST be called with the chain state lock held (for reads).
+func (b *BlockChain) locateInventory(locator BlockLocator, hashStop *chainhash.Hash, maxEntries uint32) (*blockNode, uint32) {
+	// There are no block locators so a specific block is being requested
+	// as identified by the stop hash.
+	stopNode := b.index.LookupNode(hashStop)
+	if len(locator) == 0 {
+		if stopNode == nil {
+			// No blocks with the stop hash were found so there is
+			// nothing to do.
+			return nil, 0
+		}
+		return stopNode, 1
+	}
+
+	// Find the most recent locator block hash in the main chain.  In the
+	// case none of the hashes in the locator are in the main chain, fall
+	// back to the genesis block.
+	b.heightLock.RLock()
+	startNode := b.mainNodesByHeight[0]
+	b.heightLock.RUnlock()
+	for _, hash := range locator {
+		node := b.index.LookupNode(hash)
+		if node != nil && node.inMainChain {
+			startNode = node
+			break
+		}
+	}
+
+	// Start at the block after the most recently known block.  When there
+	// is no next block it means the most recently known block is the tip of
+	// the best chain, so there is nothing more to do.
+	if startNode != nil {
+		b.heightLock.RLock()
+		startNode = b.mainNodesByHeight[startNode.height+1]
+		b.heightLock.RUnlock()
+	}
+	if startNode == nil {
+		return nil, 0
+	}
+
+	// Calculate how many entries are needed.
+	total := uint32((b.bestNode.height - startNode.height) + 1)
+	if stopNode != nil && stopNode.inMainChain && stopNode.height >=
+		startNode.height {
+
+		total = uint32((stopNode.height - startNode.height) + 1)
+	}
+	if total > maxEntries {
+		total = maxEntries
+	}
+
+	return startNode, total
+}
+
+// locateBlocks returns the hashes of the blocks after the first known block in
+// the locator until the provided stop hash is reached, or up to the provided
+// max number of block hashes.
+//
+// See the comment on the exported function for more details on special cases.
+//
+// This function MUST be called with the chain state lock held (for reads).
+func (b *BlockChain) locateBlocks(locator BlockLocator, hashStop *chainhash.Hash, maxHashes uint32) []chainhash.Hash {
+	// Find the node after the first known block in the locator and the
+	// total number of nodes after it needed while respecting the stop hash
+	// and max entries.
+	node, total := b.locateInventory(locator, hashStop, maxHashes)
+	if total == 0 {
+		return nil
+	}
+
+	// Populate and return the found hashes.
+	hashes := make([]chainhash.Hash, 0, total)
+	b.heightLock.RLock()
+	for i := uint32(0); i < total; i++ {
+		hashes = append(hashes, node.hash)
+		node = b.mainNodesByHeight[node.height+1]
+	}
+	b.heightLock.RUnlock()
+	return hashes
+}
+
+// LocateBlocks returns the hashes of the blocks after the first known block in
+// the locator until the provided stop hash is reached, or up to the provided
+// max number of block hashes.
+//
+// In addition, there are two special cases:
+//
+// - When no locators are provided, the stop hash is treated as a request for
+//   that block, so it will either return the stop hash itself if it is known,
+//   or nil if it is unknown
+// - When locators are provided, but none of them are known, hashes starting
+//   after the genesis block will be returned
+//
+// This function is safe for concurrent access.
+func (b *BlockChain) LocateBlocks(locator BlockLocator, hashStop *chainhash.Hash, maxHashes uint32) []chainhash.Hash {
+	b.chainLock.RLock()
+	hashes := b.locateBlocks(locator, hashStop, maxHashes)
+	b.chainLock.RUnlock()
+	return hashes
+}
+
+// locateHeaders returns the headers of the blocks after the first known block
+// in the locator until the provided stop hash is reached, or up to the provided
+// max number of block headers.
+//
+// See the comment on the exported function for more details on special cases.
+//
+// This function MUST be called with the chain state lock held (for reads).
+func (b *BlockChain) locateHeaders(locator BlockLocator, hashStop *chainhash.Hash, maxHeaders uint32) []wire.BlockHeader {
+	// Find the node after the first known block in the locator and the
+	// total number of nodes after it needed while respecting the stop hash
+	// and max entries.
+	node, total := b.locateInventory(locator, hashStop, maxHeaders)
+	if total == 0 {
+		return nil
+	}
+
+	// Populate and return the found headers.
+	headers := make([]wire.BlockHeader, 0, total)
+	for i := uint32(0); i < total; i++ {
+		headers = append(headers, node.Header())
+		b.heightLock.RLock()
+		node = b.mainNodesByHeight[node.height+1]
+		b.heightLock.RUnlock()
+	}
+	return headers
+}
+
+// LocateHeaders returns the headers of the blocks after the first known block
+// in the locator until the provided stop hash is reached, or up to a max of
+// wire.MaxBlockHeadersPerMsg headers.
+//
+// In addition, there are two special cases:
+//
+// - When no locators are provided, the stop hash is treated as a request for
+//   that header, so it will either return the header for the stop hash itself
+//   if it is known, or nil if it is unknown
+// - When locators are provided, but none of them are known, headers starting
+//   after the genesis block will be returned
+//
+// This function is safe for concurrent access.
+func (b *BlockChain) LocateHeaders(locator BlockLocator, hashStop *chainhash.Hash) []wire.BlockHeader {
+	b.chainLock.RLock()
+	headers := b.locateHeaders(locator, hashStop, wire.MaxBlockHeadersPerMsg)
+	b.chainLock.RUnlock()
+	return headers
+}
+
 // IndexManager provides a generic interface that the is called when blocks are
 // connected and disconnected to and from the tip of the main chain for the
 // purpose of supporting optional indexes.
@@ -1798,6 +1972,7 @@ func New(config *Config) (*BlockChain, error) {
 		sigCache:                      config.SigCache,
 		indexManager:                  config.IndexManager,
 		index:                         newBlockIndex(config.DB, params),
+		mainNodesByHeight:             make(map[int64]*blockNode),
 		orphans:                       make(map[chainhash.Hash]*orphanBlock),
 		prevOrphans:                   make(map[chainhash.Hash][]*orphanBlock),
 		mainchainBlockCache:           make(map[chainhash.Hash]*dcrutil.Block),

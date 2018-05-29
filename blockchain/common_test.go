@@ -139,12 +139,15 @@ func newFakeChain(params *chaincfg.Params) *BlockChain {
 	node.inMainChain = true
 	index := newBlockIndex(nil, params)
 	index.AddNode(node)
+	mainNodesByHeight := make(map[int64]*blockNode)
+	mainNodesByHeight[node.height] = node
 
 	return &BlockChain{
-		chainParams:      params,
-		deploymentCaches: newThresholdCaches(params),
-		bestNode:         node,
-		index:            index,
+		chainParams:                   params,
+		deploymentCaches:              newThresholdCaches(params),
+		bestNode:                      node,
+		index:                         index,
+		mainNodesByHeight:             mainNodesByHeight,
 		isVoterMajorityVersionCache:   make(map[[stakeMajorityCacheKeySize]byte]bool),
 		isStakeMajorityVersionCache:   make(map[[stakeMajorityCacheKeySize]byte]bool),
 		calcPriorStakeVersionCache:    make(map[[chainhash.HashSize]byte]uint32),
@@ -192,6 +195,12 @@ func chainedFakeNodes(parent *blockNode, numNodes int) []*blockNode {
 		nodes[i] = node
 	}
 	return nodes
+}
+
+// branchTip is a convenience function to grab the tip of a chain of block nodes
+// created via chainedFakeNodes.
+func branchTip(nodes []*blockNode) *blockNode {
+	return nodes[len(nodes)-1]
 }
 
 // appendFakeVotes appends the passed number of votes to the node with the

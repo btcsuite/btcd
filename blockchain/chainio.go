@@ -1840,9 +1840,10 @@ func (b *BlockChain) initChainState(interrupt <-chan struct{}) error {
 		b.bestNode = tip
 
 		// Mark all of the nodes from the tip back to the genesis block
-		// as part of the main chain.
+		// as part of the main chain and build the by height map.
 		for n := tip; n != nil; n = n.parent {
 			n.inMainChain = true
+			b.mainNodesByHeight[n.height] = n
 		}
 
 		log.Debugf("Block index loaded in %v", time.Since(bidxStart))

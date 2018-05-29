@@ -3168,35 +3168,24 @@ func handleGetHeaders(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) 
 				"hashstop: %v", err)
 		}
 	}
+
 	// Until wire.MsgGetHeaders uses []Hash instead of the []*Hash, this
 	// conversion is necessary.  The wire protocol getheaders is (probably)
-	// called much more often than this RPC, so server.locateBlocks is
+	// called much more often than this RPC, so chain.LocateHeaders is
 	// optimized for that and this is given the performance penality.
-	pBlockLocators := make([]*chainhash.Hash, len(blockLocators))
+	locators := make(blockchain.BlockLocator, len(blockLocators))
 	for i := range blockLocators {
-		pBlockLocators[i] = &blockLocators[i]
-	}
-	blockHashes, err := s.server.locateBlocks(pBlockLocators, &hashStop)
-	if err != nil {
-		return nil, &dcrjson.RPCError{
-			Code: dcrjson.ErrRPCDatabase,
-			Message: "Failed to fetch hashes of block " +
-				"headers: " + err.Error(),
-		}
-	}
-	blockHeaders, err := fetchHeaders(s.chain, blockHashes)
-	if err != nil {
-		return nil, &dcrjson.RPCError{
-			Code: dcrjson.ErrRPCDatabase,
-			Message: "Failed to fetch headers of located blocks: " +
-				err.Error(),
-		}
+		locators[i] = &blockLocators[i]
 	}
 
-	hexBlockHeaders := make([]string, len(blockHeaders))
+	chain := s.server.blockManager.chain
+	headers := chain.LocateHeaders(locators, &hashStop)
+
+	// Return the serialized block headers as hex-encoded strings.
+	hexBlockHeaders := make([]string, len(headers))
 	var buf bytes.Buffer
 	buf.Grow(wire.MaxBlockHeaderPayload)
-	for i, h := range blockHeaders {
+	for i, h := range headers {
 		err := h.Serialize(&buf)
 		if err != nil {
 			return nil, rpcInternalError(err.Error(),
