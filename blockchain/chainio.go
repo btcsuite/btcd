@@ -246,6 +246,30 @@ type spentTxOut struct {
 	isCoinBase bool   // Whether creating tx is a coinbase.
 }
 
+// FetchSpendJournal attempts to retrieve the spend journal, or the set of
+// outputs spent for the target block. This provides a view of all the outputs
+// that will be consumed once the target block is connected to the end of the
+// main chain.
+//
+// This function is safe for concurrent access.
+func (b *BlockChain) FetchSpendJournal(targetBlock *btcutil.Block) ([]SpentTxOut, error) {
+	b.chainLock.RLock()
+	defer b.chainLock.RUnlock()
+
+	var spendEntries []SpentTxOut
+	err := b.db.View(func(dbTx database.Tx) error {
+		var err error
+
+		spendEntries, err = dbFetchSpendJournalEntry(dbTx, targetBlock)
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return spendEntries, nil
+}
+
 // spentTxOutHeaderCode returns the calculated header code to be used when
 // serializing the provided stxo entry.
 func spentTxOutHeaderCode(stxo *spentTxOut) uint64 {
