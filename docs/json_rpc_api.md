@@ -947,7 +947,7 @@ The following is an overview of the JSON-RPC notifications used for Websocket co
 |---|---|
 |Method|txaccepted|
 |Request|[notifynewtransactions](#notifynewtransactions)|
-|Parameters|1. `TxSha`: `(string)` hex-encoded bytes of the transaction hash.<br />2. `Amount`: `(numeric)` sum of the value of all the transaction outpoints.|
+|Parameters|1. `TxId`: `(string)` hex-encoded bytes of the transaction hash.<br />2. `Amount`: `(numeric)` sum of the value of all the transaction outpoints.|
 |Description|Notifies when a new transaction has been accepted and the client has requested standard transaction details.|
 |Example|Example txaccepted notification for mainnet transaction id `16c54c9d02fe570b9d41b518c0daefae81cc05c69bbe842058e84c6ed5826261` (newlines added for readability):<br /><br />`{"jsonrpc": "1.0", "method": "txaccepted", "params": ["16c54c9d02fe570b9d41b518c0daefae81cc05c69bbe842058e84c6ed5826261", 55838384], "id": null}`|
 [Return to Overview](#NotificationOverview)<br />
