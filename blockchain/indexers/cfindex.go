@@ -22,39 +22,36 @@ const (
 	cfIndexName = "committed filter index"
 )
 
-// Committed filters come in two flavours: basic and extended. They are
-// generated and dropped in pairs, and both are indexed by a block's hash.
-// Besides holding different content, they also live in different buckets.
+// Committed filters come in one flavor currently: basic. They are generated
+// and dropped in pairs, and both are indexed by a block's hash.  Besides
+// holding different content, they also live in different buckets.
 var (
-	// cfIndexParentBucketKey is the name of the parent bucket used to house
-	// the index. The rest of the buckets live below this bucket.
+	// cfIndexParentBucketKey is the name of the parent bucket used to
+	// house the index. The rest of the buckets live below this bucket.
 	cfIndexParentBucketKey = []byte("cfindexparentbucket")
 
 	// cfIndexKeys is an array of db bucket names used to house indexes of
 	// block hashes to cfilters.
 	cfIndexKeys = [][]byte{
 		[]byte("cf0byhashidx"),
-		[]byte("cf1byhashidx"),
 	}
 
 	// cfHeaderKeys is an array of db bucket names used to house indexes of
 	// block hashes to cf headers.
 	cfHeaderKeys = [][]byte{
 		[]byte("cf0headerbyhashidx"),
-		[]byte("cf1headerbyhashidx"),
 	}
 
 	// cfHashKeys is an array of db bucket names used to house indexes of
 	// block hashes to cf hashes.
 	cfHashKeys = [][]byte{
 		[]byte("cf0hashbyhashidx"),
-		[]byte("cf1hashbyhashidx"),
 	}
 
 	maxFilterType = uint8(len(cfHeaderKeys) - 1)
 
-	// zeroHash is the chainhash.Hash value of all zero bytes, defined here for
-	// convenience.
+	// zeroHash is the chainhash.Hash value of all zero bytes, defined here
+	// for convenience.
 	zeroHash chainhash.Hash
 )
 
@@ -106,7 +103,7 @@ func (idx *CfIndex) Name() string {
 
 // Create is invoked when the indexer manager determines the index needs to
 // be created for the first time. It creates buckets for the two hash-based cf
-// indexes (simple, extended).
+// indexes (regular only currently).
 func (idx *CfIndex) Create(dbTx database.Tx) error {
 	meta := dbTx.Metadata()
 
@@ -209,17 +206,7 @@ func (idx *CfIndex) ConnectBlock(dbTx database.Tx, block *btcutil.Block,
 		return err
 	}
 
-	err = storeFilter(dbTx, block, f, wire.GCSFilterRegular)
-	if err != nil {
-		return err
-	}
-
-	f, err = builder.BuildExtFilter(block.MsgBlock())
-	if err != nil {
-		return err
-	}
-
-	return storeFilter(dbTx, block, f, wire.GCSFilterExtended)
+	return storeFilter(dbTx, block, f, wire.GCSFilterRegular)
 }
 
 // DisconnectBlock is invoked by the index manager when a block has been
@@ -296,42 +283,42 @@ func (idx *CfIndex) entriesByBlockHashes(filterTypeKeys [][]byte,
 }
 
 // FilterByBlockHash returns the serialized contents of a block's basic or
-// extended committed filter.
+// committed filter.
 func (idx *CfIndex) FilterByBlockHash(h *chainhash.Hash,
 	filterType wire.FilterType) ([]byte, error) {
 	return idx.entryByBlockHash(cfIndexKeys, filterType, h)
 }
 
 // FiltersByBlockHashes returns the serialized contents of a block's basic or
-// extended committed filter for a set of blocks by hash.
+// committed filter for a set of blocks by hash.
 func (idx *CfIndex) FiltersByBlockHashes(blockHashes []*chainhash.Hash,
 	filterType wire.FilterType) ([][]byte, error) {
 	return idx.entriesByBlockHashes(cfIndexKeys, filterType, blockHashes)
 }
 
 // FilterHeaderByBlockHash returns the serialized contents of a block's basic
-// or extended committed filter header.
+// committed filter header.
 func (idx *CfIndex) FilterHeaderByBlockHash(h *chainhash.Hash,
 	filterType wire.FilterType) ([]byte, error) {
 	return idx.entryByBlockHash(cfHeaderKeys, filterType, h)
 }
 
-// FilterHeadersByBlockHashes returns the serialized contents of a block's basic
-// or extended committed filter header for a set of blocks by hash.
+// FilterHeadersByBlockHashes returns the serialized contents of a block's
+// basic committed filter header for a set of blocks by hash.
 func (idx *CfIndex) FilterHeadersByBlockHashes(blockHashes []*chainhash.Hash,
 	filterType wire.FilterType) ([][]byte, error) {
 	return idx.entriesByBlockHashes(cfHeaderKeys, filterType, blockHashes)
 }
 
 // FilterHashByBlockHash returns the serialized contents of a block's basic
-// or extended committed filter hash.
+// committed filter hash.
 func (idx *CfIndex) FilterHashByBlockHash(h *chainhash.Hash,
 	filterType wire.FilterType) ([]byte, error) {
 	return idx.entryByBlockHash(cfHashKeys, filterType, h)
 }
 
 // FilterHashesByBlockHashes returns the serialized contents of a block's basic
-// or extended committed filter hash for a set of blocks by hash.
+// committed filter hash for a set of blocks by hash.
 func (idx *CfIndex) FilterHashesByBlockHashes(blockHashes []*chainhash.Hash,
 	filterType wire.FilterType) ([][]byte, error) {
 	return idx.entriesByBlockHashes(cfHashKeys, filterType, blockHashes)
