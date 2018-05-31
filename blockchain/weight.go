@@ -39,10 +39,10 @@ const (
 // Currently the weight metric is simply the sum of the block's serialized size
 // without any witness data scaled proportionally by the WitnessScaleFactor,
 // and the block's serialized size including any witness data.
-func GetBlockWeight(blk *btcutil.Block) int64 {
+func GetBlockWeight(blk *btcutil.Block) int64 { // todo remove
 	msgBlock := blk.MsgBlock()
 
-	baseSize := msgBlock.SerializeSizeStripped()
+	baseSize := msgBlock.SerializeSize()
 	totalSize := msgBlock.SerializeSize()
 
 	// (baseSize * 3) + totalSize

@@ -107,18 +107,6 @@ func (msg *MsgBlock) Deserialize(r io.Reader) error {
 	// At the current time, there is no difference between the wire encoding
 	// at protocol version 0 and the stable long-term storage format.  As
 	// a result, make use of BtcDecode.
-	//
-	// Passing an encoding type of WitnessEncoding to BtcEncode for the
-	// MessageEncoding parameter indicates that the transactions within the
-	// block are expected to be serialized according to the new
-	// serialization structure defined in BIP0141.
-	return msg.BtcDecode(r, 0)
-}
-
-// DeserializeNoWitness decodes a block from r into the receiver similar to
-// Deserialize, however DeserializeWitness strips all (if any) witness data
-// from the transactions within the block before encoding them.
-func (msg *MsgBlock) DeserializeNoWitness(r io.Reader) error {
 	return msg.BtcDecode(r, 0)
 }
 
@@ -207,39 +195,12 @@ func (msg *MsgBlock) Serialize(w io.Writer) error {
 	// At the current time, there is no difference between the wire encoding
 	// at protocol version 0 and the stable long-term storage format.  As
 	// a result, make use of BtcEncode.
-	//
-	// Passing WitnessEncoding as the encoding type here indicates that
-	// each of the transactions should be serialized using the witness
-	// serialization structure defined in BIP0141.
-	return msg.BtcEncode(w, 0)
-}
-
-// SerializeNoWitness encodes a block to w using an identical format to
-// Serialize, with all (if any) witness data stripped from all transactions.
-// This method is provided in additon to the regular Serialize, in order to
-// allow one to selectively encode transaction witness data to non-upgraded
-// peers which are unaware of the new encoding.
-func (msg *MsgBlock) SerializeNoWitness(w io.Writer) error {
 	return msg.BtcEncode(w, 0)
 }
 
 // SerializeSize returns the number of bytes it would take to serialize the
-// block, factoring in any witness data within transaction.
+// block.
 func (msg *MsgBlock) SerializeSize() int {
-	// Block header bytes + Serialized varint size for the number of
-	// transactions.
-	n := blockHeaderLen + VarIntSerializeSize(uint64(len(msg.Transactions)))
-
-	for _, tx := range msg.Transactions {
-		n += tx.SerializeSize()
-	}
-
-	return n
-}
-
-// SerializeSizeStripped returns the number of bytes it would take to serialize
-// the block, excluding any witness data (if any).
-func (msg *MsgBlock) SerializeSizeStripped() int {
 	// Block header bytes + Serialized varint size for the number of
 	// transactions.
 	n := blockHeaderLen + VarIntSerializeSize(uint64(len(msg.Transactions)))

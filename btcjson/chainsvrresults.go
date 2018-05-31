@@ -30,7 +30,6 @@ type GetBlockHeaderVerboseResult struct {
 type GetBlockVerboseResult struct {
 	Hash          string        `json:"hash"`
 	Confirmations uint64        `json:"confirmations"`
-	StrippedSize  int32         `json:"strippedsize"`
 	Size          int32         `json:"size"`
 	Weight        int32         `json:"weight"`
 	Height        int64         `json:"height"`

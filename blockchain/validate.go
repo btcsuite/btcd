@@ -492,7 +492,7 @@ func checkBlockSanity(block *btcutil.Block, powLimit *big.Int, timeSource Median
 
 	// A block must not exceed the maximum allowed block payload when
 	// serialized.
-	serializedSize := msgBlock.SerializeSizeStripped()
+	serializedSize := msgBlock.SerializeSize()
 	if serializedSize > DefaultMaxBlockSize {
 		str := fmt.Sprintf("serialized block is too big - got %d, "+
 			"max %d", serializedSize, DefaultMaxBlockSize)
