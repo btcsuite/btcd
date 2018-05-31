@@ -34,6 +34,13 @@ var helpDescsEnUS = map[string]string{
 	"addnode-addr":      "IP address and port of the peer to operate on",
 	"addnode-subcmd":    "'add' to add a persistent peer, 'remove' to remove a persistent peer, or 'onetry' to try a single connection to a peer",
 
+	// ConvCashAddrCmd help
+	"convcashaddr--synopsis":   "Convert address format between the classic bitcoin address format and bitcoin-abc cashaddr format",
+	"convcashaddr-address":     "The valid address string with the classic bitcoin-address or bitcoin-abc cashaddr format",
+	"convcashaddr--condition0": "Invalid address parameter",
+	"convcashaddr--condition1": "Valid address parameter",
+	"convcashaddr--result1":    "The another bitcoin address format",
+
 	// NodeCmd help.
 	"node--synopsis":     "Attempts to add or remove a peer.",
 	"node-subcmd":        "'disconnect' to remove all matching non-persistent peers, 'remove' to remove a persistent peer, or 'connect' to connect to a peer",
@@ -675,6 +682,7 @@ var helpDescsEnUS = map[string]string{
 // pointer to the type (or nil to indicate no return value).
 var rpcResultTypes = map[string][]interface{}{
 	"addnode":               nil,
+	"convcashaddr":          {nil, (*string)(nil)},
 	"createrawtransaction":  {(*string)(nil)},
 	"debuglevel":            {(*string)(nil), (*string)(nil)},
 	"decoderawtransaction":  {(*btcjson.TxRawDecodeResult)(nil)},
