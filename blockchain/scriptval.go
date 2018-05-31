@@ -206,28 +206,6 @@ func ValidateTransactionScripts(tx *btcutil.Tx, utxoView *UtxoViewpoint,
 	flags txscript.ScriptFlags, sigCache *txscript.SigCache,
 	hashCache *txscript.HashCache) error {
 
-	// First determine if segwit is active according to the scriptFlags. If
-	// it isn't then we don't need to interact with the HashCache.
-	segwitActive := flags&txscript.ScriptVerifyWitness == txscript.ScriptVerifyWitness
-
-	// If the hashcache doesn't yet has the sighash midstate for this
-	// transaction, then we'll compute them now so we can re-use them
-	// amongst all worker validation goroutines.
-	if segwitActive && tx.MsgTx().HasWitness() &&
-		!hashCache.ContainsHashes(tx.Hash()) {
-		hashCache.AddSigHashes(tx.MsgTx())
-	}
-
-	var cachedHashes *txscript.TxSigHashes
-	if segwitActive && tx.MsgTx().HasWitness() {
-		// The same pointer to the transaction's sighash midstate will
-		// be re-used amongst all validation goroutines. By
-		// pre-computing the sighash here instead of during validation,
-		// we ensure the sighashes
-		// are only computed once.
-		cachedHashes, _ = hashCache.GetSigHashes(tx.Hash())
-	}
-
 	// Collect all of the transaction inputs and required information for
 	// validation.
 	txIns := tx.MsgTx().TxIn
@@ -242,7 +220,7 @@ func ValidateTransactionScripts(tx *btcutil.Tx, utxoView *UtxoViewpoint,
 			txInIndex: txInIdx,
 			txIn:      txIn,
 			tx:        tx,
-			sigHashes: cachedHashes,
+			sigHashes: nil, // todo calculate sigHash in witness logic code
 		}
 		txValItems = append(txValItems, txVI)
 	}
@@ -258,10 +236,6 @@ func checkBlockScripts(block *btcutil.Block, utxoView *UtxoViewpoint,
 	scriptFlags txscript.ScriptFlags, sigCache *txscript.SigCache,
 	hashCache *txscript.HashCache) error {
 
-	// First determine if segwit is active according to the scriptFlags. If
-	// it isn't then we don't need to interact with the HashCache.
-	segwitActive := scriptFlags&txscript.ScriptVerifyWitness == txscript.ScriptVerifyWitness
-
 	// Collect all of the transaction inputs and required information for
 	// validation for all transactions in the block into a single slice.
 	numInputs := 0
@@ -270,28 +244,7 @@ func checkBlockScripts(block *btcutil.Block, utxoView *UtxoViewpoint,
 	}
 	txValItems := make([]*txValidateItem, 0, numInputs)
 	for _, tx := range block.Transactions() {
-		hash := tx.Hash()
-
-		// If the HashCache is present, and it doesn't yet contain the
-		// partial sighashes for this transaction, then we add the
-		// sighashes for the transaction. This allows us to take
-		// advantage of the potential speed savings due to the new
-		// digest algorithm (BIP0143).
-		if segwitActive && tx.HasWitness() && hashCache != nil &&
-			!hashCache.ContainsHashes(hash) {
-
-			hashCache.AddSigHashes(tx.MsgTx())
-		}
-
-		var cachedHashes *txscript.TxSigHashes
-		if segwitActive && tx.HasWitness() {
-			if hashCache != nil {
-				cachedHashes, _ = hashCache.GetSigHashes(hash)
-			} else {
-				cachedHashes = txscript.NewTxSigHashes(tx.MsgTx())
-			}
-		}
-
+		cachedHashes := txscript.NewTxSigHashes(tx.MsgTx())
 		for txInIdx, txIn := range tx.MsgTx().TxIn {
 			// Skip coinbases.
 			if txIn.PreviousOutPoint.Index == math.MaxUint32 {
@@ -318,16 +271,16 @@ func checkBlockScripts(block *btcutil.Block, utxoView *UtxoViewpoint,
 
 	log.Tracef("block %v took %v to verify", block.Hash(), elapsed)
 
-	// If the HashCache is present, once we have validated the block, we no
-	// longer need the cached hashes for these transactions, so we purge
-	// them from the cache.
-	if segwitActive && hashCache != nil {
-		for _, tx := range block.Transactions() {
-			if tx.MsgTx().HasWitness() {
-				hashCache.PurgeSigHashes(tx.Hash())
-			}
-		}
-	}
+	//// If the HashCache is present, once we have validated the block, we no
+	//// longer need the cached hashes for these transactions, so we purge
+	//// them from the cache.
+	//if segwitActive && hashCache != nil {
+	//	for _, tx := range block.Transactions() {
+	//		if tx.MsgTx().HasWitness() {
+	//			hashCache.PurgeSigHashes(tx.Hash())		// todo check whether clear sigcache or not
+	//		}
+	//	}
+	//}
 
 	return nil
 }

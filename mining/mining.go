@@ -813,8 +813,7 @@ mempoolLoop:
 		// Next, obtain the merkle root of a tree which consists of the
 		// wtxid of all transactions in the block. The coinbase
 		// transaction will have a special wtxid of all zeroes.
-		witnessMerkleTree := blockchain.BuildMerkleTreeStore(blockTxns,
-			true)
+		witnessMerkleTree := blockchain.BuildMerkleTreeStore(blockTxns)
 		witnessMerkleRoot := witnessMerkleTree[len(witnessMerkleTree)-1]
 
 		// The preimage to the witness commitment is:
@@ -858,7 +857,7 @@ mempoolLoop:
 	}
 
 	// Create a new block ready to be solved.
-	merkles := blockchain.BuildMerkleTreeStore(blockTxns, false)
+	merkles := blockchain.BuildMerkleTreeStore(blockTxns)
 	var msgBlock wire.MsgBlock
 	msgBlock.Header = wire.BlockHeader{
 		Version:    nextBlockVersion,
@@ -945,7 +944,7 @@ func (g *BlkTmplGenerator) UpdateExtraNonce(msgBlock *wire.MsgBlock, blockHeight
 
 	// Recalculate the merkle root with the updated extra nonce.
 	block := btcutil.NewBlock(msgBlock)
-	merkles := blockchain.BuildMerkleTreeStore(block.Transactions(), false)
+	merkles := blockchain.BuildMerkleTreeStore(block.Transactions())
 	msgBlock.Header.MerkleRoot = *merkles[len(merkles)-1]
 	return nil
 }

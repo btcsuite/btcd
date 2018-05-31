@@ -317,7 +317,6 @@ type Vin struct {
 	Vout      uint32     `json:"vout"`
 	ScriptSig *ScriptSig `json:"scriptSig"`
 	Sequence  uint32     `json:"sequence"`
-	Witness   []string   `json:"txinwitness"`
 }
 
 // IsCoinBase returns a bool to show if a Vin is a Coinbase one or not.
@@ -325,42 +324,17 @@ func (v *Vin) IsCoinBase() bool {
 	return len(v.Coinbase) > 0
 }
 
-// HasWitness returns a bool to show if a Vin has any witness data associated
-// with it or not.
-func (v *Vin) HasWitness() bool {
-	return len(v.Witness) > 0
-}
-
 // MarshalJSON provides a custom Marshal method for Vin.
 func (v *Vin) MarshalJSON() ([]byte, error) {
 	if v.IsCoinBase() {
 		coinbaseStruct := struct {
-			Coinbase string   `json:"coinbase"`
-			Sequence uint32   `json:"sequence"`
-			Witness  []string `json:"witness,omitempty"`
+			Coinbase string `json:"coinbase"`
+			Sequence uint32 `json:"sequence"`
 		}{
 			Coinbase: v.Coinbase,
 			Sequence: v.Sequence,
-			Witness:  v.Witness,
 		}
 		return json.Marshal(coinbaseStruct)
-	}
-
-	if v.HasWitness() {
-		txStruct := struct {
-			Txid      string     `json:"txid"`
-			Vout      uint32     `json:"vout"`
-			ScriptSig *ScriptSig `json:"scriptSig"`
-			Witness   []string   `json:"txinwitness"`
-			Sequence  uint32     `json:"sequence"`
-		}{
-			Txid:      v.Txid,
-			Vout:      v.Vout,
-			ScriptSig: v.ScriptSig,
-			Witness:   v.Witness,
-			Sequence:  v.Sequence,
-		}
-		return json.Marshal(txStruct)
 	}
 
 	txStruct := struct {
