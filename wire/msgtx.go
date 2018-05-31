@@ -240,23 +240,6 @@ func NewTxIn(prevOut *OutPoint, signatureScript []byte, witness [][]byte) *TxIn 
 // a slice of byte slices, or a stack with one or many elements.
 type TxWitness [][]byte
 
-// SerializeSize returns the number of bytes it would take to serialize the the
-// transaction input's witness.
-func (t TxWitness) SerializeSize() int {
-	// A varint to signal the number of elements the witness has.
-	n := VarIntSerializeSize(uint64(len(t)))
-
-	// For each element in the witness, we'll need a varint to signal the
-	// size of the element, then finally the number of bytes the element
-	// itself comprises.
-	for _, witItem := range t {
-		n += VarIntSerializeSize(uint64(len(witItem)))
-		n += len(witItem)
-	}
-
-	return n
-}
-
 // TxOut defines a bitcoin transaction output.
 type TxOut struct {
 	Value    int64
@@ -309,7 +292,7 @@ func (msg *MsgTx) TxHash() chainhash.Hash {
 	// Ignore the error returns since the only way the encode could fail
 	// is being out of memory or due to nil pointers, both of which would
 	// cause a run-time panic.
-	buf := bytes.NewBuffer(make([]byte, 0, msg.SerializeSizeStripped()))
+	buf := bytes.NewBuffer(make([]byte, 0, msg.SerializeSize()))
 	_ = msg.SerializeNoWitness(buf)
 	return chainhash.DoubleHashH(buf.Bytes())
 }
@@ -786,7 +769,7 @@ func (msg *MsgTx) SerializeNoWitness(w io.Writer) error {
 
 // baseSize returns the serialized size of the transaction without accounting
 // for any witness data.
-func (msg *MsgTx) baseSize() int {
+func (msg *MsgTx) SerializeSize() int {
 	// Version 4 bytes + LockTime 4 bytes + Serialized varint size for the
 	// number of transaction inputs and outputs.
 	n := 8 + VarIntSerializeSize(uint64(len(msg.TxIn))) +
@@ -801,31 +784,6 @@ func (msg *MsgTx) baseSize() int {
 	}
 
 	return n
-}
-
-// SerializeSize returns the number of bytes it would take to serialize the
-// the transaction.
-func (msg *MsgTx) SerializeSize() int {
-	n := msg.baseSize()
-
-	if msg.HasWitness() {
-		// The marker, and flag fields take up two additional bytes.
-		n += 2
-
-		// Additionally, factor in the serialized size of each of the
-		// witnesses for each txin.
-		for _, txin := range msg.TxIn {
-			n += txin.Witness.SerializeSize()
-		}
-	}
-
-	return n
-}
-
-// SerializeSizeStripped returns the number of bytes it would take to serialize
-// the transaction, excluding any included witness data.
-func (msg *MsgTx) SerializeSizeStripped() int {
-	return msg.baseSize()
 }
 
 // Command returns the protocol command string for the message.  This is part

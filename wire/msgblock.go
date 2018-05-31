@@ -245,7 +245,7 @@ func (msg *MsgBlock) SerializeSizeStripped() int {
 	n := blockHeaderLen + VarIntSerializeSize(uint64(len(msg.Transactions)))
 
 	for _, tx := range msg.Transactions {
-		n += tx.SerializeSizeStripped()
+		n += tx.SerializeSize()
 	}
 
 	return n

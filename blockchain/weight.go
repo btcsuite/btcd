@@ -57,7 +57,7 @@ func GetBlockWeight(blk *btcutil.Block) int64 {
 func GetTransactionWeight(tx *btcutil.Tx) int64 {
 	msgTx := tx.MsgTx()
 
-	baseSize := msgTx.SerializeSizeStripped()
+	baseSize := msgTx.SerializeSize()
 	totalSize := msgTx.SerializeSize()
 
 	// (baseSize * 3) + totalSize

@@ -746,7 +746,7 @@ func TestTxSerializeSizeStripped(t *testing.T) {
 
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
-		serializedSize := test.in.SerializeSizeStripped()
+		serializedSize := test.in.SerializeSize()
 		if serializedSize != test.size {
 			t.Errorf("MsgTx.SerializeSizeStripped: #%d got: %d, want: %d", i,
 				serializedSize, test.size)
