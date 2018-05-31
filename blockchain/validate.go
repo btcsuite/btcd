@@ -2654,9 +2654,9 @@ func (b *BlockChain) CheckConnectBlockTemplate(block *dcrutil.Block) error {
 			}
 		}
 		if n.hash != *block.Hash() {
-			return AssertError(fmt.Sprintf("detach block node hash %v (height "+
-				"%v) does not match previous parent block hash %v", &n.hash,
-				n.height, block.Hash()))
+			panicf("detach block node hash %v (height %v) does not match "+
+				"previous parent block hash %v", &n.hash, n.height,
+				block.Hash())
 		}
 
 		parent, err := b.fetchMainChainBlockByHash(&n.parentHash)
@@ -2720,9 +2720,9 @@ func (b *BlockChain) CheckConnectBlockTemplate(block *dcrutil.Block) error {
 			}
 		}
 		if n.parentHash != *parent.Hash() {
-			return AssertError(fmt.Sprintf("attach block node hash %v (height "+
-				"%v) parent hash %v does not match previous parent block "+
-				"hash %v", &n.hash, n.height, &n.parentHash, parent.Hash()))
+			panicf("attach block node hash %v (height %v) parent hash %v does "+
+				"not match previous parent block hash %v", &n.hash, n.height,
+				&n.parentHash, parent.Hash())
 		}
 
 		// Store the loaded block for the next iteration.

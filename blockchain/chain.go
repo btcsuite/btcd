@@ -49,6 +49,15 @@ const (
 	maxSearchDepth = 2880
 )
 
+// panicf is a convenience function that formats according to the given format
+// specifier and arguments and then logs the result at the critical level and
+// panics with it.
+func panicf(format string, args ...interface{}) {
+	str := fmt.Sprintf(format, args...)
+	log.Critical(str)
+	panic(str)
+}
+
 // orphanBlock represents a block that we don't yet have the parent for.  It
 // is a normal block plus an expiration time to prevent caching the orphan
 // forever.
@@ -793,14 +802,16 @@ func (b *BlockChain) connectBlock(node *blockNode, block, parent *dcrutil.Block,
 	// Make sure it's extending the end of the best chain.
 	prevHash := block.MsgBlock().Header.PrevBlock
 	if prevHash != b.bestNode.hash {
-		return AssertError("connectBlock must be called with a block " +
-			"that extends the main chain")
+		panicf("block %v (height %v) connects to block %v instead of "+
+			"extending the best chain (hash %v, height %v)", node.hash,
+			node.height, prevHash, b.bestNode.hash, b.bestNode.height)
 	}
 
 	// Sanity check the correct number of stxos are provided.
 	if len(stxos) != countSpentOutputs(block, parent) {
-		return AssertError("connectBlock called with inconsistent " +
-			"spent transaction out information")
+		panicf("provided %v stxos for block %v (height %v), but counted %v "+
+			"spent utxos", len(stxos), node.hash, node.height,
+			countSpentOutputs(block, parent))
 	}
 
 	// Calculate the median time for the block.
@@ -985,8 +996,9 @@ func (b *BlockChain) dropMainChainBlockCache(block *dcrutil.Block) {
 func (b *BlockChain) disconnectBlock(node *blockNode, block, parent *dcrutil.Block, view *UtxoViewpoint) error {
 	// Make sure the node being disconnected is the end of the best chain.
 	if node.hash != b.bestNode.hash {
-		return AssertError("disconnectBlock must be called with the " +
-			"block at the end of the main chain")
+		panicf("block %v (height %v) is not the end of the best chain "+
+			"(hash %v, height %v)", node.hash, node.height, b.bestNode.hash,
+			b.bestNode.height)
 	}
 
 	// Get the previous block node.  This function is used over simply
@@ -1173,9 +1185,9 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List) error 
 	if detachNodes.Len() != 0 {
 		firstDetachNode := detachNodes.Front().Value.(*blockNode)
 		if firstDetachNode.hash != b.bestNode.hash {
-			return AssertError(fmt.Sprintf("reorganize nodes to detach are "+
-				"not for the current best chain -- first detach node %v, "+
-				"current chain %v", &firstDetachNode.hash, &b.bestNode.hash))
+			panicf("reorganize nodes to detach are not for the current best "+
+				"chain -- first detach node %v, current chain %v",
+				&firstDetachNode.hash, &b.bestNode.hash)
 		}
 	}
 
@@ -1184,10 +1196,9 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List) error 
 		firstAttachNode := attachNodes.Front().Value.(*blockNode)
 		lastDetachNode := detachNodes.Back().Value.(*blockNode)
 		if firstAttachNode.parentHash != lastDetachNode.parentHash {
-			return AssertError(fmt.Sprintf("reorganize nodes do not have the "+
-				"same fork point -- first attach parent %v, last detach "+
-				"parent %v", &firstAttachNode.parentHash,
-				&lastDetachNode.parentHash))
+			panicf("reorganize nodes do not have the same fork point -- first "+
+				"attach parent %v, last detach parent %v",
+				&firstAttachNode.parentHash, &lastDetachNode.parentHash)
 		}
 	}
 
@@ -1226,9 +1237,9 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List) error 
 			}
 		}
 		if n.hash != *block.Hash() {
-			return AssertError(fmt.Sprintf("detach block node hash %v (height "+
-				"%v) does not match previous parent block hash %v", &n.hash,
-				n.height, block.Hash()))
+			panicf("detach block node hash %v (height %v) does not match "+
+				"previous parent block hash %v", &n.hash, n.height,
+				block.Hash())
 		}
 
 		// Grab the parent of the current block and also save a reference to it
@@ -1253,10 +1264,9 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List) error 
 
 		// Quick sanity test.
 		if len(stxos) != countSpentOutputs(block, parent) {
-			return AssertError(fmt.Sprintf("retrieved %v stxos when trying to "+
-				"disconnect block %v (height %v), yet counted %v "+
-				"many spent utxos", len(stxos), block.Hash(), block.Height(),
-				countSpentOutputs(block, parent)))
+			panicf("retrieved %v stxos when trying to disconnect block %v "+
+				"(height %v), yet counted %v many spent utxos", len(stxos),
+				block.Hash(), block.Height(), countSpentOutputs(block, parent))
 		}
 
 		// Store the loaded block and spend journal entry for later.
@@ -1316,9 +1326,9 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List) error 
 			parent = attachBlocks[i-1]
 		}
 		if n.parentHash != *parent.Hash() {
-			return AssertError(fmt.Sprintf("attach block node hash %v (height "+
-				"%v) parent hash %v does not match previous parent block "+
-				"hash %v", &n.hash, n.height, &n.parentHash, parent.Hash()))
+			panicf("attach block node hash %v (height %v) parent hash %v does "+
+				"not match previous parent block hash %v", &n.hash, n.height,
+				&n.parentHash, parent.Hash())
 		}
 
 		// Store the loaded block for later.
@@ -1371,9 +1381,9 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List) error 
 			parent = detachBlocks[i+1]
 		}
 		if n.parentHash != *parent.Hash() {
-			return AssertError(fmt.Sprintf("detach block node hash %v (height "+
-				"%v) parent hash %v does not match previous parent block "+
-				"hash %v", &n.hash, n.height, &n.parentHash, parent.Hash()))
+			panicf("detach block node hash %v (height %v) parent hash %v does "+
+				"not match previous parent block hash %v", &n.hash, n.height,
+				&n.parentHash, parent.Hash())
 		}
 
 		// Load all of the utxos referenced by the block that aren't
@@ -1411,9 +1421,9 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List) error 
 			parent = attachBlocks[i-1]
 		}
 		if n.parentHash != *parent.Hash() {
-			return AssertError(fmt.Sprintf("attach block node hash %v (height "+
-				"%v) parent hash %v does not match previous parent block "+
-				"hash %v", &n.hash, n.height, &n.parentHash, parent.Hash()))
+			panicf("attach block node hash %v (height %v) parent hash %v does "+
+				"not match previous parent block hash %v", &n.hash, n.height,
+				&n.parentHash, parent.Hash())
 		}
 
 		// Update the view to mark all utxos referenced by the block
@@ -1501,11 +1511,11 @@ func (b *BlockChain) forceHeadReorganization(formerBest chainhash.Hash, newBest 
 
 	// Quick sanity test.
 	if len(stxos) != countSpentOutputs(formerBestBlock, commonParentBlock) {
-		return AssertError(fmt.Sprintf("retrieved %v stxos when trying to "+
-			"disconnect block %v (height %v), yet counted %v "+
-			"many spent utxos when trying to force head reorg", len(stxos),
-			formerBestBlock.Hash(), formerBestBlock.Height(),
-			countSpentOutputs(formerBestBlock, commonParentBlock)))
+		panicf("retrieved %v stxos when trying to disconnect block %v (height "+
+			"%v), yet counted %v many spent utxos when trying to force head "+
+			"reorg", len(stxos), formerBestBlock.Hash(),
+			formerBestBlock.Height(),
+			countSpentOutputs(formerBestBlock, commonParentBlock))
 	}
 
 	err = b.disconnectTransactions(view, formerBestBlock, commonParentBlock,
@@ -1566,8 +1576,9 @@ func (b *BlockChain) connectBestChain(node *blockNode, block, parent *dcrutil.Bl
 
 	// Ensure the passed parent is actually the parent of the block.
 	if *parent.Hash() != node.parentHash {
-		return 0, AssertError("connectBlock must be called with the " +
-			"correct parent block")
+		panicf("parent block %v (height %v) does not match expected parent %v "+
+			"(height %v)", parent.Hash(), parent.MsgBlock().Header.Height,
+			node.parentHash, node.height-1)
 	}
 
 	// We are extending the main (best) chain with a new block.  This is the
