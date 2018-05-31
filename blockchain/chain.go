@@ -399,7 +399,7 @@ func (b *BlockChain) calcSequenceLock(node *blockNode, tx *btcutil.Tx, utxoView 
 	nextHeight := node.height + 1
 
 	for txInIndex, txIn := range mTx.TxIn {
-		utxo := utxoView.LookupEntry(&txIn.PreviousOutPoint.Hash)
+		utxo := utxoView.LookupEntry(txIn.PreviousOutPoint)
 		if utxo == nil {
 			str := fmt.Sprintf("output %v referenced from "+
 				"transaction %s:%d either does not exist or "+
@@ -848,7 +848,7 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List) error 
 		// journal.
 		var stxos []spentTxOut
 		err = b.db.View(func(dbTx database.Tx) error {
-			stxos, err = dbFetchSpendJournalEntry(dbTx, block, view)
+			stxos, err = dbFetchSpendJournalEntry(dbTx, block)
 			return err
 		})
 		if err != nil {
@@ -859,7 +859,7 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List) error 
 		detachBlocks = append(detachBlocks, block)
 		detachSpentTxOuts = append(detachSpentTxOuts, stxos)
 
-		err = view.disconnectTransactions(block, stxos)
+		err = view.disconnectTransactions(b.db, block, stxos)
 		if err != nil {
 			return err
 		}
@@ -961,7 +961,8 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List) error 
 
 		// Update the view to unspend all of the spent txos and remove
 		// the utxos created by the block.
-		err = view.disconnectTransactions(block, detachSpentTxOuts[i])
+		err = view.disconnectTransactions(b.db, block,
+			detachSpentTxOuts[i])
 		if err != nil {
 			return err
 		}
@@ -1699,6 +1700,11 @@ func New(config *Config) (*BlockChain, error) {
 	// does not yet contain any chain state, both it and the chain state
 	// will be initialized to contain only the genesis block.
 	if err := b.initChainState(); err != nil {
+		return nil, err
+	}
+
+	// Perform any upgrades to the various chain-specific buckets as needed.
+	if err := b.maybeUpgradeDbBuckets(config.Interrupt); err != nil {
 		return nil, err
 	}
 

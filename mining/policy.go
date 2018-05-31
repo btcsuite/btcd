@@ -67,16 +67,14 @@ func calcInputValueAge(tx *wire.MsgTx, utxoView *blockchain.UtxoViewpoint, nextB
 	for _, txIn := range tx.TxIn {
 		// Don't attempt to accumulate the total input age if the
 		// referenced transaction output doesn't exist.
-		originHash := &txIn.PreviousOutPoint.Hash
-		originIndex := txIn.PreviousOutPoint.Index
-		txEntry := utxoView.LookupEntry(originHash)
-		if txEntry != nil && !txEntry.IsOutputSpent(originIndex) {
+		entry := utxoView.LookupEntry(txIn.PreviousOutPoint)
+		if entry != nil && !entry.IsSpent() {
 			// Inputs with dependencies currently in the mempool
 			// have their block height set to a special constant.
 			// Their input age should computed as zero since their
 			// parent hasn't made it into a block yet.
 			var inputAge int32
-			originHeight := txEntry.BlockHeight()
+			originHeight := entry.BlockHeight()
 			if originHeight == UnminedHeight {
 				inputAge = 0
 			} else {
@@ -84,7 +82,7 @@ func calcInputValueAge(tx *wire.MsgTx, utxoView *blockchain.UtxoViewpoint, nextB
 			}
 
 			// Sum the input value times age.
-			inputValue := txEntry.AmountByIndex(originIndex)
+			inputValue := entry.Amount()
 			totalInputAge += float64(inputValue * int64(inputAge))
 		}
 	}
