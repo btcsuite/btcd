@@ -500,15 +500,6 @@ func (vm *Engine) Step() (done bool, err error) {
 			// Set stack to be the stack from first script minus the
 			// script itself
 			vm.SetStack(vm.savedFirstStack[:len(vm.savedFirstStack)-1])
-		} else if (vm.scriptIdx == 1 && vm.witnessProgram != nil) ||
-			(vm.scriptIdx == 2 && vm.witnessProgram != nil && vm.bip16) { // Nested P2SH.
-
-			vm.scriptIdx++
-
-			witness := vm.tx.TxIn[vm.txIdx].Witness
-			if err := vm.verifyWitnessProgram(witness); err != nil {
-				return false, err
-			}
 		} else {
 			vm.scriptIdx++
 		}
