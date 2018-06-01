@@ -878,8 +878,6 @@ func (sm *SyncManager) haveInventory(invVect *wire.InvVect) (bool, error) {
 		// chain, side chain, or orphan).
 		return sm.chain.HaveBlock(&invVect.Hash)
 
-	case wire.InvTypeWitnessTx:
-		fallthrough
 	case wire.InvTypeTx:
 		// Ask the transaction memory pool if the transaction is known
 		// to it in any form (main pool or orphan).
@@ -955,7 +953,6 @@ func (sm *SyncManager) handleInvMsg(imsg *invMsg) {
 		switch iv.Type {
 		case wire.InvTypeBlock:
 		case wire.InvTypeTx:
-		case wire.InvTypeWitnessTx:
 		default:
 			continue
 		}
