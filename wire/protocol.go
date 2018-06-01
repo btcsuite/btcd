@@ -75,10 +75,6 @@ const (
 	// SFNodeXthin is a flag used to indicate a peer supports xthin blocks.
 	SFNodeXthin
 
-	// SFNodeBit5 is a flag used to indicate a peer supports a service
-	// defined by bit 5.
-	SFNodeBit5
-
 	// SFNodeCF is a flag used to indicate a peer supports committed
 	// filters (CFs).
 	SFNodeCF
@@ -107,7 +103,6 @@ var sfStrings = map[ServiceFlag]string{
 	SFNodeBloom:   "SFNodeBloom",
 	SFNodeWitness: "SFNodeWitness",
 	SFNodeXthin:   "SFNodeXthin",
-	SFNodeBit5:    "SFNodeBit5",
 	SFNodeCF:      "SFNodeCF",
 }
 
@@ -119,7 +114,6 @@ var orderedSFStrings = []ServiceFlag{
 	SFNodeBloom,
 	SFNodeWitness,
 	SFNodeXthin,
-	SFNodeBit5,
 	SFNodeCF,
 }
 
