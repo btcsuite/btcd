@@ -2425,9 +2425,6 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 	if cfg.NoPeerBloomFilters {
 		services &^= wire.SFNodeBloom
 	}
-	if cfg.NoCFilters {
-		services &^= wire.SFNodeCF
-	}
 
 	amgr := addrmgr.New(cfg.DataDir, btcdLookup)
 

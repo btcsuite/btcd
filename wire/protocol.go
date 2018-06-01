@@ -71,10 +71,6 @@ const (
 	// SFNodeXthin is a flag used to indicate a peer supports xthin blocks.
 	SFNodeXthin
 
-	// SFNodeCF is a flag used to indicate a peer supports committed
-	// filters (CFs).
-	SFNodeCF
-
 	// NODE_BITCOIN_CASH means the node supports Bitcoin Cash and the
 	// associated consensus rule changes.
 	// This service bit is intended to be used prior until some time after the
@@ -98,7 +94,6 @@ var sfStrings = map[ServiceFlag]string{
 	SFNodeGetUTXO: "SFNodeGetUTXO",
 	SFNodeBloom:   "SFNodeBloom",
 	SFNodeXthin:   "SFNodeXthin",
-	SFNodeCF:      "SFNodeCF",
 }
 
 // orderedSFStrings is an ordered list of service flags from highest to
@@ -108,7 +103,6 @@ var orderedSFStrings = []ServiceFlag{
 	SFNodeGetUTXO,
 	SFNodeBloom,
 	SFNodeXthin,
-	SFNodeCF,
 }
 
 // String returns the ServiceFlag in human-readable form.
