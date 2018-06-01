@@ -83,9 +83,21 @@ const (
 	// filters (CFs).
 	SFNodeCF
 
-	// SFNode2X is a flag used to indicate a peer is running the Segwit2X
-	// software.
-	SFNode2X
+	// NODE_BITCOIN_CASH means the node supports Bitcoin Cash and the
+	// associated consensus rule changes.
+	// This service bit is intended to be used prior until some time after the
+	// UAHF activation when the Bitcoin Cash network has adequately separated.
+	// TODO: remove (free up) the NODE_BITCOIN_CASH service bit once no longer
+	// needed.
+	NODE_BITCOIN_CASH
+
+	// Bits 24-31 are reserved for temporary experiments. Just pick a bit that
+	// isn't getting used, or one not being used much, and notify the
+	// bitcoin-development mailing list. Remember that service bits are just
+	// unauthenticated advertisements, so your code must be robust against
+	// collisions and other cases where nodes may be advertising a service they
+	// do not actually support. Other service bits should be allocated via the
+	// BIP process.
 )
 
 // Map of service flags back to their constant names for pretty printing.
@@ -97,7 +109,6 @@ var sfStrings = map[ServiceFlag]string{
 	SFNodeXthin:   "SFNodeXthin",
 	SFNodeBit5:    "SFNodeBit5",
 	SFNodeCF:      "SFNodeCF",
-	SFNode2X:      "SFNode2X",
 }
 
 // orderedSFStrings is an ordered list of service flags from highest to
@@ -110,7 +121,6 @@ var orderedSFStrings = []ServiceFlag{
 	SFNodeXthin,
 	SFNodeBit5,
 	SFNodeCF,
-	SFNode2X,
 }
 
 // String returns the ServiceFlag in human-readable form.
