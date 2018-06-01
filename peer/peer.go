@@ -324,7 +324,6 @@ func newNetAddress(addr net.Addr, services wire.ServiceFlag) (*wire.NetAddress, 
 type outMsg struct {
 	msg      wire.Message
 	doneChan chan<- struct{}
-	encoding wire.MessageEncoding
 }
 
 // stallControlCmd represents the command of a stall control message.
