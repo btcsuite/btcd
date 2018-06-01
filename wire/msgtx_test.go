@@ -64,11 +64,7 @@ func TestTx(t *testing.T) {
 
 	// Ensure we get the same transaction input back out.
 	sigScript := []byte{0x04, 0x31, 0xdc, 0x00, 0x1b, 0x01, 0x62}
-	witnessData := [][]byte{
-		{0x04, 0x31},
-		{0x01, 0x43},
-	}
-	txIn := NewTxIn(prevOut, sigScript, witnessData)
+	txIn := NewTxIn(prevOut, sigScript)
 	if !reflect.DeepEqual(&txIn.PreviousOutPoint, prevOut) {
 		t.Errorf("NewTxIn: wrong prev outpoint - got %v, want %v",
 			spew.Sprint(&txIn.PreviousOutPoint),
@@ -78,11 +74,6 @@ func TestTx(t *testing.T) {
 		t.Errorf("NewTxIn: wrong signature script - got %v, want %v",
 			spew.Sdump(txIn.SignatureScript),
 			spew.Sdump(sigScript))
-	}
-	if !reflect.DeepEqual(txIn.Witness, TxWitness(witnessData)) {
-		t.Errorf("NewTxIn: wrong witness data - got %v, want %v",
-			spew.Sdump(txIn.Witness),
-			spew.Sdump(witnessData))
 	}
 
 	// Ensure we get the same transaction output back out.
@@ -393,7 +384,6 @@ func TestTxSerialize(t *testing.T) {
 		out          *MsgTx // Expected decoded message
 		buf          []byte // Serialized data
 		pkScriptLocs []int  // Expected output script locations
-		witness      bool   // Serialize using the witness encoding
 	}{
 		// No transactions.
 		{
@@ -401,7 +391,6 @@ func TestTxSerialize(t *testing.T) {
 			noTx,
 			noTxEncoded,
 			nil,
-			false,
 		},
 
 		// Multiple transactions.
@@ -410,7 +399,6 @@ func TestTxSerialize(t *testing.T) {
 			multiTx,
 			multiTxEncoded,
 			multiTxPkScriptLocs,
-			false,
 		},
 	}
 
@@ -432,11 +420,8 @@ func TestTxSerialize(t *testing.T) {
 		// Deserialize the transaction.
 		var tx MsgTx
 		rbuf := bytes.NewReader(test.buf)
-		if test.witness {
-			err = tx.Deserialize(rbuf)
-		} else {
-			err = tx.DeserializeNoWitness(rbuf)
-		}
+
+		err = tx.Deserialize(rbuf)
 		if err != nil {
 			t.Errorf("Deserialize #%d error %v", i, err)
 			continue
@@ -721,7 +706,3 @@ var multiTxEncoded = []byte{
 // multiTxPkScriptLocs is the location information for the public key scripts
 // located in multiTx.
 var multiTxPkScriptLocs = []int{63, 139}
-
-// multiTxPkScriptLocs is the location information for the public key scripts
-// located in multiWitnessTx.
-var multiWitnessTxPkScriptLocs = []int{58}

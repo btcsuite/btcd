@@ -2941,10 +2941,6 @@ func createVinListPrevOut(s *rpcServer, mtx *wire.MsgTx, chainParams *chaincfg.P
 			},
 		}
 
-		if len(txIn.Witness) != 0 {
-			vinEntry.Witness = witnessToHex(txIn.Witness)
-		}
-
 		// Add the entry to the list now if it already passed the filter
 		// since the previous output might not be available.
 		passesFilter := len(filterAddrMap) == 0

@@ -86,7 +86,6 @@ out:
 
 			// Create a new script engine for the script pair.
 			sigScript := txIn.SignatureScript
-			witness := txIn.Witness
 			inputAmount := txEntry.AmountByIndex(originTxIndex)
 			vm, err := txscript.NewEngine(pkScript, txVI.tx.MsgTx(),
 				txVI.txInIndex, v.flags, v.sigCache, txVI.sigHashes,
@@ -94,10 +93,9 @@ out:
 			if err != nil {
 				str := fmt.Sprintf("failed to parse input "+
 					"%s:%d which references output %s:%d - "+
-					"%v (input witness %x, input script "+
-					"bytes %x, prev output script bytes %x)",
+					"%v (input script bytes %x, prev output script bytes %x)",
 					txVI.tx.Hash(), txVI.txInIndex, originTxHash,
-					originTxIndex, err, witness, sigScript,
+					originTxIndex, err, sigScript,
 					pkScript)
 				err := ruleError(ErrScriptMalformed, str)
 				v.sendResult(err)
@@ -108,11 +106,10 @@ out:
 			if err := vm.Execute(); err != nil {
 				str := fmt.Sprintf("failed to validate input "+
 					"%s:%d which references output %s:%d - "+
-					"%v (input witness %x, input script "+
-					"bytes %x, prev output script bytes %x)",
+					"%v (input script bytes %x, prev output script bytes %x)",
 					txVI.tx.Hash(), txVI.txInIndex,
 					originTxHash, originTxIndex, err,
-					witness, sigScript, pkScript)
+					sigScript, pkScript)
 				err := ruleError(ErrScriptValidation, str)
 				v.sendResult(err)
 				break out

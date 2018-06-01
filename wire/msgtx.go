@@ -187,7 +187,6 @@ func (o OutPoint) String() string {
 type TxIn struct {
 	PreviousOutPoint OutPoint
 	SignatureScript  []byte
-	Witness          TxWitness
 	Sequence         uint32
 }
 
@@ -309,18 +308,6 @@ func (msg *MsgTx) Copy() *MsgTx {
 			Sequence:         oldTxIn.Sequence,
 		}
 
-		// If the transaction is witnessy, then also copy the
-		// witnesses.
-		if len(oldTxIn.Witness) != 0 {
-			// Deep copy the old witness data.
-			newTxIn.Witness = make([][]byte, len(oldTxIn.Witness))
-			for i, oldItem := range oldTxIn.Witness {
-				newItem := make([]byte, len(oldItem))
-				copy(newItem, oldItem)
-				newTxIn.Witness[i] = newItem
-			}
-		}
-
 		// Finally, append this fully copied txin.
 		newTx.TxIn = append(newTx.TxIn, &newTxIn)
 	}
@@ -387,12 +374,6 @@ func (msg *MsgTx) BtcDecode(r io.Reader, pver uint32) error {
 
 			if txIn.SignatureScript != nil {
 				scriptPool.Return(txIn.SignatureScript)
-			}
-
-			for _, witnessElem := range txIn.Witness {
-				if witnessElem != nil {
-					scriptPool.Return(witnessElem)
-				}
 			}
 		}
 		for _, txOut := range msg.TxOut {
@@ -490,26 +471,8 @@ func (msg *MsgTx) BtcDecode(r io.Reader, pver uint32) error {
 
 		// Return the temporary script buffer to the pool.
 		scriptPool.Return(signatureScript)
-
-		for j := 0; j < len(msg.TxIn[i].Witness); j++ {
-			// Copy each item within the witness stack for this
-			// input into the contiguous buffer at the appropriate
-			// offset.
-			witnessElem := msg.TxIn[i].Witness[j]
-			copy(scripts[offset:], witnessElem)
-
-			// Reset the witness item within the stack to the slice
-			// of the contiguous buffer where the witness lives.
-			witnessElemSize := uint64(len(witnessElem))
-			end := offset + witnessElemSize
-			msg.TxIn[i].Witness[j] = scripts[offset:end:end]
-			offset += witnessElemSize
-
-			// Return the temporary buffer used for the witness stack
-			// item to the pool.
-			scriptPool.Return(witnessElem)
-		}
 	}
+
 	for i := 0; i < len(msg.TxOut); i++ {
 		// Copy the public key script into the contiguous buffer at the
 		// appropriate offset.
@@ -594,18 +557,6 @@ func (msg *MsgTx) BtcEncode(w io.Writer, pver uint32) error {
 	return binarySerializer.PutUint32(w, littleEndian, msg.LockTime)
 }
 
-// HasWitness returns false if none of the inputs within the transaction
-// contain witness data, true false otherwise.
-func (msg *MsgTx) HasWitness() bool {
-	for _, txIn := range msg.TxIn {
-		if len(txIn.Witness) != 0 {
-			return true
-		}
-	}
-
-	return false
-}
-
 // Serialize encodes the transaction to w using a format that suitable for
 // long-term storage such as a database while respecting the Version field in
 // the transaction.  This function differs from BtcEncode in that BtcEncode
@@ -672,12 +623,6 @@ func (msg *MsgTx) PkScriptLocs() []int {
 	// input.
 	n := 4 + VarIntSerializeSize(uint64(len(msg.TxIn))) +
 		VarIntSerializeSize(uint64(numTxOut))
-
-	// If this transaction has a witness input, the an additional two bytes
-	// for the marker, and flag byte need to be taken into account.
-	if len(msg.TxIn) > 0 && msg.TxIn[0].Witness != nil {
-		n += 2
-	}
 
 	for _, txIn := range msg.TxIn {
 		n += txIn.SerializeSize()
