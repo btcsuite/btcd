@@ -1914,18 +1914,6 @@ out:
 //
 // This function is safe for concurrent access.
 func (p *Peer) QueueMessage(msg wire.Message, doneChan chan<- struct{}) {
-	p.QueueMessageWithEncoding(msg, doneChan, wire.BaseEncoding)
-}
-
-// QueueMessageWithEncoding adds the passed bitcoin message to the peer send
-// queue. This function is identical to QueueMessage, however it allows the
-// caller to specify the wire encoding type that should be used when
-// encoding/decoding blocks and transactions.
-//
-// This function is safe for concurrent access.
-func (p *Peer) QueueMessageWithEncoding(msg wire.Message, doneChan chan<- struct{},
-	encoding wire.MessageEncoding) {
-
 	// Avoid risk of deadlock if goroutine already exited.  The goroutine
 	// we will be sending to hangs around until it knows for a fact that
 	// it is marked as disconnected and *then* it drains the channels.
@@ -1937,7 +1925,7 @@ func (p *Peer) QueueMessageWithEncoding(msg wire.Message, doneChan chan<- struct
 		}
 		return
 	}
-	p.outputQueue <- outMsg{msg: msg, encoding: encoding, doneChan: doneChan}
+	p.outputQueue <- outMsg{msg: msg, doneChan: doneChan}
 }
 
 // QueueInventory adds the passed inventory to the inventory send queue which

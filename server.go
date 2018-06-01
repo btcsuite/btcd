@@ -1302,7 +1302,7 @@ func (s *server) pushTxMsg(sp *serverPeer, hash *chainhash.Hash, doneChan chan<-
 		<-waitChan
 	}
 
-	sp.QueueMessageWithEncoding(tx.MsgTx(), doneChan, encoding)
+	sp.QueueMessage(tx.MsgTx(), doneChan)
 
 	return nil
 }
@@ -1355,7 +1355,7 @@ func (s *server) pushBlockMsg(sp *serverPeer, hash *chainhash.Hash, doneChan cha
 	if !sendInv {
 		dc = doneChan
 	}
-	sp.QueueMessageWithEncoding(&msgBlock, dc, encoding)
+	sp.QueueMessage(&msgBlock, dc)
 
 	// When the peer requests the final block that was advertised in
 	// response to a getblocks message which requested more blocks than
@@ -1426,8 +1426,7 @@ func (s *server) pushMerkleBlockMsg(sp *serverPeer, hash *chainhash.Hash,
 			dc = doneChan
 		}
 		if txIndex < uint32(len(blkTransactions)) {
-			sp.QueueMessageWithEncoding(blkTransactions[txIndex], dc,
-				encoding)
+			sp.QueueMessage(blkTransactions[txIndex], dc)
 		}
 	}
 
