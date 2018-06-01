@@ -325,24 +325,23 @@ func TestGetBlocksWireErrors(t *testing.T) {
 	}
 
 	tests := []struct {
-		in       *MsgGetBlocks   // Value to encode
-		buf      []byte          // Wire encoding
-		pver     uint32          // Protocol version for wire encoding
-		enc      MessageEncoding // Message encoding format
-		max      int             // Max size of fixed buffer to induce errors
-		writeErr error           // Expected write error
-		readErr  error           // Expected read error
+		in       *MsgGetBlocks // Value to encode
+		buf      []byte        // Wire encoding
+		pver     uint32        // Protocol version for wire encoding
+		max      int           // Max size of fixed buffer to induce errors
+		writeErr error         // Expected write error
+		readErr  error         // Expected read error
 	}{
 		// Force error in protocol version.
-		{baseGetBlocks, baseGetBlocksEncoded, pver, BaseEncoding, 0, io.ErrShortWrite, io.EOF},
+		{baseGetBlocks, baseGetBlocksEncoded, pver, 0, io.ErrShortWrite, io.EOF},
 		// Force error in block locator hash count.
-		{baseGetBlocks, baseGetBlocksEncoded, pver, BaseEncoding, 4, io.ErrShortWrite, io.EOF},
+		{baseGetBlocks, baseGetBlocksEncoded, pver, 4, io.ErrShortWrite, io.EOF},
 		// Force error in block locator hashes.
-		{baseGetBlocks, baseGetBlocksEncoded, pver, BaseEncoding, 5, io.ErrShortWrite, io.EOF},
+		{baseGetBlocks, baseGetBlocksEncoded, pver, 5, io.ErrShortWrite, io.EOF},
 		// Force error in stop hash.
-		{baseGetBlocks, baseGetBlocksEncoded, pver, BaseEncoding, 69, io.ErrShortWrite, io.EOF},
+		{baseGetBlocks, baseGetBlocksEncoded, pver, 69, io.ErrShortWrite, io.EOF},
 		// Force error with greater than max block locator hashes.
-		{maxGetBlocks, maxGetBlocksEncoded, pver, BaseEncoding, 7, wireErr, wireErr},
+		{maxGetBlocks, maxGetBlocksEncoded, pver, 7, wireErr, wireErr},
 	}
 
 	t.Logf("Running %d tests", len(tests))

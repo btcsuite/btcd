@@ -282,25 +282,24 @@ func TestHeadersWireErrors(t *testing.T) {
 	}
 
 	tests := []struct {
-		in       *MsgHeaders     // Value to encode
-		buf      []byte          // Wire encoding
-		pver     uint32          // Protocol version for wire encoding
-		enc      MessageEncoding // Message encoding format
-		max      int             // Max size of fixed buffer to induce errors
-		writeErr error           // Expected write error
-		readErr  error           // Expected read error
+		in       *MsgHeaders // Value to encode
+		buf      []byte      // Wire encoding
+		pver     uint32      // Protocol version for wire encoding
+		max      int         // Max size of fixed buffer to induce errors
+		writeErr error       // Expected write error
+		readErr  error       // Expected read error
 	}{
 		// Latest protocol version with intentional read/write errors.
 		// Force error in header count.
-		{oneHeader, oneHeaderEncoded, pver, BaseEncoding, 0, io.ErrShortWrite, io.EOF},
+		{oneHeader, oneHeaderEncoded, pver, 0, io.ErrShortWrite, io.EOF},
 		// Force error in block header.
-		{oneHeader, oneHeaderEncoded, pver, BaseEncoding, 5, io.ErrShortWrite, io.EOF},
+		{oneHeader, oneHeaderEncoded, pver, 5, io.ErrShortWrite, io.EOF},
 		// Force error with greater than max headers.
-		{maxHeaders, maxHeadersEncoded, pver, BaseEncoding, 3, wireErr, wireErr},
+		{maxHeaders, maxHeadersEncoded, pver, 3, wireErr, wireErr},
 		// Force error with number of transactions.
-		{transHeader, transHeaderEncoded, pver, BaseEncoding, 81, io.ErrShortWrite, io.EOF},
+		{transHeader, transHeaderEncoded, pver, 81, io.ErrShortWrite, io.EOF},
 		// Force error with included transactions.
-		{transHeader, transHeaderEncoded, pver, BaseEncoding, len(transHeaderEncoded), nil, wireErr},
+		{transHeader, transHeaderEncoded, pver, len(transHeaderEncoded), nil, wireErr},
 	}
 
 	t.Logf("Running %d tests", len(tests))
