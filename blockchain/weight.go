@@ -7,7 +7,6 @@ package blockchain
 import (
 	"fmt"
 
-	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcutil"
 )
 
@@ -82,7 +81,7 @@ func GetSigOpCost(tx *btcutil.Tx, isCoinBaseTx bool, utxoView *UtxoViewpoint,
 		numSigOps += (numP2SHSigOps * WitnessScaleFactor)
 	}
 
-	if !isCoinBaseTx {
+	if !isCoinBaseTx { // todo is necessary <check IsSpent in getsigopcost function>
 		msgTx := tx.MsgTx()
 		for txInIndex, txIn := range msgTx.TxIn {
 			// Ensure the referenced input transaction is available.
@@ -97,10 +96,6 @@ func GetSigOpCost(tx *btcutil.Tx, isCoinBaseTx bool, utxoView *UtxoViewpoint,
 					txInIndex)
 				return 0, ruleError(ErrMissingTxOut, str)
 			}
-
-			sigScript := txIn.SignatureScript
-			pkScript := txEntry.PkScriptByIndex(originTxIndex)
-			numSigOps += txscript.GetWitnessSigOpCount(sigScript, pkScript, witness)
 		}
 
 	}
