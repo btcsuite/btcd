@@ -93,20 +93,6 @@ const (
 	// peers.  Thus, the peak usage of the free list is 12,500 * 512 =
 	// 6,400,000 bytes.
 	freeListMaxItems = 12500
-
-	// maxWitnessItemsPerInput is the maximum number of witness items to
-	// be read for the witness data for a single TxIn. This number is
-	// derived using a possble lower bound for the encoding of a witness
-	// item: 1 byte for length + 1 byte for the witness item itself, or two
-	// bytes. This value is then divided by the currently allowed maximum
-	// "cost" for a transaction.
-	maxWitnessItemsPerInput = 500000
-
-	// maxWitnessItemSize is the maximum allowed size for an item within
-	// an input's witness data. This number is derived from the fact that
-	// for script validation, each pushed item onto the stack must be less
-	// than 10k bytes.
-	maxWitnessItemSize = 11000
 )
 
 // witnessMarkerBytes are a pair of bytes specific to the witness encoding. If
