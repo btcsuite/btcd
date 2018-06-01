@@ -77,7 +77,7 @@ const (
 	// UAHF activation when the Bitcoin Cash network has adequately separated.
 	// TODO: remove (free up) the NODE_BITCOIN_CASH service bit once no longer
 	// needed.
-	NODE_BITCOIN_CASH
+	SFNodeBitcoinCash
 
 	// Bits 24-31 are reserved for temporary experiments. Just pick a bit that
 	// isn't getting used, or one not being used much, and notify the
