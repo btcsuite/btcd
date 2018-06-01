@@ -176,7 +176,7 @@ func TestCheckSerializedHeight(t *testing.T) {
 	// Create an empty coinbase template to be used in the tests below.
 	coinbaseOutpoint := wire.NewOutPoint(&chainhash.Hash{}, math.MaxUint32)
 	coinbaseTx := wire.NewMsgTx(1)
-	coinbaseTx.AddTxIn(wire.NewTxIn(coinbaseOutpoint, nil, nil))
+	coinbaseTx.AddTxIn(wire.NewTxIn(coinbaseOutpoint, nil))
 
 	// Expected rule errors.
 	missingHeightError := RuleError{

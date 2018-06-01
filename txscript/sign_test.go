@@ -1645,7 +1645,7 @@ nexttest:
 		tx.AddTxOut(output)
 
 		for range sigScriptTests[i].inputs {
-			txin := wire.NewTxIn(coinbaseOutPoint, nil, nil)
+			txin := wire.NewTxIn(coinbaseOutPoint, nil)
 			tx.AddTxIn(txin)
 		}
 

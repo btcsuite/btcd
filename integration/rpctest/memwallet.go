@@ -403,7 +403,7 @@ func (m *memWallet) fundTx(tx *wire.MsgTx, amt btcutil.Amount, feeRate btcutil.A
 		// Add the selected output to the transaction, updating the
 		// current tx size while accounting for the size of the future
 		// sigScript.
-		tx.AddTxIn(wire.NewTxIn(&outPoint, nil, nil))
+		tx.AddTxIn(wire.NewTxIn(&outPoint, nil))
 		txSize = tx.SerializeSize() + spendSize*len(tx.TxIn)
 
 		// Calculate the fee required for the txn at this point
