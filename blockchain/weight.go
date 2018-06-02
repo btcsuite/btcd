@@ -26,8 +26,8 @@ const (
 	// weights segregated witness sig ops lower than regular sig ops.
 	MaxBlockSigOpsCost = 80000
 
-	// MaxTxSigopsCount allowed number of signature check operations per transaction. */
-	MaxTxSigopsCount = 20000
+	// MaxTxSigOpsCount allowed number of signature check operations per transaction. */
+	MaxTxSigOpsCount = 20000
 
 	// OneMegaByte is the convenient bytes value representing of 1M
 	OneMegaByte = 1000000

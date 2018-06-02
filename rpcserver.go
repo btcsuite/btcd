@@ -2350,17 +2350,16 @@ func handleGetMiningInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 
 	best := s.cfg.Chain.BestSnapshot()
 	result := btcjson.GetMiningInfoResult{
-		Blocks:             int64(best.Height),
-		CurrentBlockSize:   best.BlockSize,
-		CurrentBlockWeight: best.BlockWeight,
-		CurrentBlockTx:     best.NumTxns,
-		Difficulty:         getDifficultyRatio(best.Bits, s.cfg.ChainParams),
-		Generate:           s.cfg.CPUMiner.IsMining(),
-		GenProcLimit:       s.cfg.CPUMiner.NumWorkers(),
-		HashesPerSec:       int64(s.cfg.CPUMiner.HashesPerSecond()),
-		NetworkHashPS:      networkHashesPerSec,
-		PooledTx:           uint64(s.cfg.TxMemPool.Count()),
-		TestNet:            cfg.TestNet3,
+		Blocks:           int64(best.Height),
+		CurrentBlockSize: best.BlockSize,
+		CurrentBlockTx:   best.NumTxns,
+		Difficulty:       getDifficultyRatio(best.Bits, s.cfg.ChainParams),
+		Generate:         s.cfg.CPUMiner.IsMining(),
+		GenProcLimit:     s.cfg.CPUMiner.NumWorkers(),
+		HashesPerSec:     int64(s.cfg.CPUMiner.HashesPerSecond()),
+		NetworkHashPS:    networkHashesPerSec,
+		PooledTx:         uint64(s.cfg.TxMemPool.Count()),
+		TestNet:          cfg.TestNet3,
 	}
 	return &result, nil
 }
