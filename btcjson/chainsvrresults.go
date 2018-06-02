@@ -260,7 +260,6 @@ type GetPeerInfoResult struct {
 // getrawmempool returns an array of transaction hashes.
 type GetRawMempoolVerboseResult struct {
 	Size             int32    `json:"size"`
-	Vsize            int32    `json:"vsize"`
 	Fee              float64  `json:"fee"`
 	Time             int64    `json:"time"`
 	Height           int64    `json:"height"`
@@ -474,7 +473,6 @@ type TxRawResult struct {
 	Txid          string `json:"txid"`
 	Hash          string `json:"hash,omitempty"`
 	Size          int32  `json:"size,omitempty"`
-	Vsize         int32  `json:"vsize,omitempty"`
 	Version       int32  `json:"version"`
 	LockTime      uint32 `json:"locktime"`
 	Vin           []Vin  `json:"vin"`
@@ -492,7 +490,6 @@ type SearchRawTransactionsResult struct {
 	Txid          string       `json:"txid"`
 	Hash          string       `json:"hash"`
 	Size          string       `json:"size"`
-	Vsize         string       `json:"vsize"`
 	Version       int32        `json:"version"`
 	LockTime      uint32       `json:"locktime"`
 	Vin           []VinPrevOut `json:"vin"`

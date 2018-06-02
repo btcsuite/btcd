@@ -208,7 +208,7 @@ func (ef *FeeEstimator) ObserveTransaction(t *TxDesc) {
 
 	hash := *t.Tx.Hash()
 	if _, ok := ef.observed[hash]; !ok {
-		size := uint32(GetTxVirtualSize(t.Tx))
+		size := uint32(t.Tx.MsgTx().SerializeSize())
 
 		ef.observed[hash] = &observedTransaction{
 			hash:     hash,
