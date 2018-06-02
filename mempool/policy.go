@@ -23,6 +23,9 @@ const (
 	// according to the current default policy.
 	maxStandardTxWeight = 400000
 
+	// maxStandardTxSize is the maximum allowed size for a transaction, in bytes
+	maxStandardTxSize = 1000000
+
 	// maxStandardSigScriptSize is the maximum size allowed for a
 	// transaction input signature script to be considered standard.  This
 	// value allows for a 15-of-15 CHECKMULTISIG pay-to-script-hash with
@@ -276,10 +279,10 @@ func checkTransactionStandard(tx *btcutil.Tx, height int32,
 	// almost as much to process as the sender fees, limit the maximum
 	// size of a transaction.  This also helps mitigate CPU exhaustion
 	// attacks.
-	txWeight := blockchain.GetTransactionWeight(tx)
-	if txWeight > maxStandardTxWeight {
+	txSize := tx.MsgTx().SerializeSize()
+	if txSize > maxStandardTxSize {
 		str := fmt.Sprintf("weight of transaction %v is larger than max "+
-			"allowed weight of %v", txWeight, maxStandardTxWeight)
+			"allowed weight of %v", txSize, maxStandardTxSize)
 		return txRuleError(wire.RejectNonstandard, str)
 	}
 

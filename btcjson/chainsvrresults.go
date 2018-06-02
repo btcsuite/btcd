@@ -120,7 +120,6 @@ type GetBlockTemplateResultTx struct {
 	Depends []int64 `json:"depends"`
 	Fee     int64   `json:"fee"`
 	SigOps  int64   `json:"sigops"`
-	Weight  int64   `json:"weight"`
 }
 
 // GetBlockTemplateResultAux models the coinbaseaux field of the

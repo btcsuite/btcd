@@ -4,10 +4,6 @@
 
 package blockchain
 
-import (
-	"github.com/btcsuite/btcutil"
-)
-
 const (
 	// DefaultMaxBlockSize is the maximum number of bytes within a block
 	DefaultMaxBlockSize = 32000000
@@ -27,17 +23,6 @@ const (
 	// block (network rule)
 	MaxBlockSigOpsPerMB = 2000
 )
-
-// GetTransactionWeight computes the value of the weight metric for a given
-// transaction. Currently the weight metric is simply the sum of the
-// transactions's serialized size without any witness data scaled
-// proportionally by the WitnessScaleFactor, and the transaction's serialized
-// size including any witness data.
-func GetTransactionWeight(tx *btcutil.Tx) int64 {
-	msgTx := tx.MsgTx()
-
-	return int64(msgTx.SerializeSize())
-}
 
 func GetMaxBlockSigOpsCount(blocksize int) int {
 	mbRoundedUp := 1 + ((blocksize - 1) / OneMegaByte)

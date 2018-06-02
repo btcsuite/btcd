@@ -1712,14 +1712,12 @@ func (state *gbtWorkState) blockTemplateResult(useCoinbaseValue bool, submitOld 
 			return nil, internalRPCError(err.Error(), context)
 		}
 
-		bTx := btcutil.NewTx(tx)
 		resultTx := btcjson.GetBlockTemplateResultTx{
 			Data:    hex.EncodeToString(txBuf.Bytes()),
 			Hash:    txHash.String(),
 			Depends: depends,
 			Fee:     template.Fees[i],
 			SigOps:  template.SigOpCosts[i],
-			Weight:  blockchain.GetTransactionWeight(bTx),
 		}
 		transactions = append(transactions, resultTx)
 	}
