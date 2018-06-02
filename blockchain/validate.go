@@ -482,14 +482,6 @@ func checkBlockSanity(block *btcutil.Block, powLimit *big.Int, timeSource Median
 			"any transactions")
 	}
 
-	// A block must not have more transactions than the max block payload or
-	// else it is certainly over the weight limit.
-	if numTx > DefaultMaxBlockSize { // todo limit max number tx
-		str := fmt.Sprintf("block contains too many transactions - "+
-			"got %d, max %d", numTx, DefaultMaxBlockSize)
-		return ruleError(ErrBlockTooBig, str)
-	}
-
 	// A block must not exceed the maximum allowed block payload when
 	// serialized.
 	serializedSize := msgBlock.SerializeSize()
@@ -780,41 +772,6 @@ func (b *BlockChain) checkBlockContext(block *btcutil.Block, prevNode *blockNode
 				return err
 			}
 		}
-
-		// Query for the Version Bits state for the segwit soft-fork
-		// deployment. If segwit is active, we'll switch over to
-		// enforcing all the new rules.
-		//segwitState, err := b.deploymentState(prevNode, chaincfg.DeploymentSegwit)		// todo remove
-		//if err != nil {
-		//	return err
-		//}
-
-		// If segwit is active, then we'll need to fully validate the
-		// new witness commitment for adherence to the rules.
-		//if segwitState == ThresholdActive {
-		//	// Validate the witness commitment (if any) within the
-		//	// block.  This involves asserting that if the coinbase
-		//	// contains the special commitment output, then this
-		//	// merkle root matches a computed merkle root of all
-		//	// the wtxid's of the transactions within the block. In
-		//	// addition, various other checks against the
-		//	// coinbase's witness stack.
-		//	if err := ValidateWitnessCommitment(block); err != nil {
-		//		return err
-		//	}
-		//
-		//	// Once the witness commitment, witness nonce, and sig
-		//	// op cost have been validated, we can finally assert
-		//	// that the block's weight doesn't exceed the current
-		//	// consensus parameter.
-		//	blockWeight := GetBlockWeight(block)
-		//	if blockWeight > MaxBlockWeight {
-		//		str := fmt.Sprintf("block's weight metric is "+
-		//			"too high - got %v, max %v",
-		//			blockWeight, MaxBlockWeight)
-		//		return ruleError(ErrBlockWeightTooHigh, str)
-		//	}
-		//}
 	}
 
 	return nil

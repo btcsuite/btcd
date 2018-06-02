@@ -19,10 +19,6 @@ const (
 	// that are considered standard in a pay-to-script-hash script.
 	maxStandardP2SHSigOps = 15
 
-	// maxStandardTxCost is the max weight permitted by any transaction
-	// according to the current default policy.
-	maxStandardTxWeight = 400000
-
 	// maxStandardTxSize is the maximum allowed size for a transaction, in bytes
 	maxStandardTxSize = 1000000
 
@@ -281,8 +277,8 @@ func checkTransactionStandard(tx *btcutil.Tx, height int32,
 	// attacks.
 	txSize := tx.MsgTx().SerializeSize()
 	if txSize > maxStandardTxSize {
-		str := fmt.Sprintf("weight of transaction %v is larger than max "+
-			"allowed weight of %v", txSize, maxStandardTxSize)
+		str := fmt.Sprintf("size of transaction %v is larger than max "+
+			"allowed size of %v", txSize, maxStandardTxSize)
 		return txRuleError(wire.RejectNonstandard, str)
 	}
 

@@ -16,7 +16,6 @@ func TestErrorCodeStringer(t *testing.T) {
 	}{
 		{ErrDuplicateBlock, "ErrDuplicateBlock"},
 		{ErrBlockTooBig, "ErrBlockTooBig"},
-		{ErrBlockWeightTooHigh, "ErrBlockWeightTooHigh"},
 		{ErrBlockVersionTooOld, "ErrBlockVersionTooOld"},
 		{ErrInvalidTime, "ErrInvalidTime"},
 		{ErrTimeTooOld, "ErrTimeTooOld"},

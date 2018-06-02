@@ -248,7 +248,6 @@ var helpDescsEnUS = map[string]string{
 	"getblockverboseresult-previousblockhash": "The hash of the previous block",
 	"getblockverboseresult-nextblockhash":     "The hash of the next block (only if there is one)",
 	"getblockverboseresult-strippedsize":      "The size of the block without witness data",
-	"getblockverboseresult-weight":            "The weight of the block",
 
 	// GetBlockCountCmd help.
 	"getblockcount--synopsis": "Returns the number of blocks in the longest block chain.",
@@ -298,7 +297,6 @@ var helpDescsEnUS = map[string]string{
 	"getblocktemplateresulttx-depends": "Other transactions before this one (by 1-based index in the 'transactions'  list) that must be present in the final block if this one is",
 	"getblocktemplateresulttx-fee":     "Difference in value between transaction inputs and outputs (in Satoshi)",
 	"getblocktemplateresulttx-sigops":  "Total number of signature operations as counted for purposes of block limits",
-	"getblocktemplateresulttx-weight":  "The weight of the transaction",
 
 	// GetBlockTemplateResultAux help.
 	"getblocktemplateresultaux-flags": "Hex-encoded byte-for-byte data to include in the coinbase signature script",
@@ -328,7 +326,6 @@ var helpDescsEnUS = map[string]string{
 	"getblocktemplateresult-capabilities":               "List of server capabilities including 'proposal' to indicate support for block proposals",
 	"getblocktemplateresult-reject-reason":              "Reason the proposal was invalid as-is (only applies to proposal responses)",
 	"getblocktemplateresult-default_witness_commitment": "The witness commitment itself. Will be populated if the block has witness data",
-	"getblocktemplateresult-weightlimit":                "The current limit on the max allowed weight of a block",
 
 	// GetBlockTemplateCmd help.
 	"getblocktemplate--synopsis": "Returns a JSON object with information necessary to construct a block to mine or accepts a proposal to validate.\n" +
@@ -418,18 +415,17 @@ var helpDescsEnUS = map[string]string{
 	"getmempoolinforesult-size":  "Number of transactions in the mempool",
 
 	// GetMiningInfoResult help.
-	"getmininginforesult-blocks":             "Height of the latest best block",
-	"getmininginforesult-currentblocksize":   "Size of the latest best block",
-	"getmininginforesult-currentblockweight": "Weight of the latest best block",
-	"getmininginforesult-currentblocktx":     "Number of transactions in the latest best block",
-	"getmininginforesult-difficulty":         "Current target difficulty",
-	"getmininginforesult-errors":             "Any current errors",
-	"getmininginforesult-generate":           "Whether or not server is set to generate coins",
-	"getmininginforesult-genproclimit":       "Number of processors to use for coin generation (-1 when disabled)",
-	"getmininginforesult-hashespersec":       "Recent hashes per second performance measurement while generating coins",
-	"getmininginforesult-networkhashps":      "Estimated network hashes per second for the most recent blocks",
-	"getmininginforesult-pooledtx":           "Number of transactions in the memory pool",
-	"getmininginforesult-testnet":            "Whether or not server is using testnet",
+	"getmininginforesult-blocks":           "Height of the latest best block",
+	"getmininginforesult-currentblocksize": "Size of the latest best block",
+	"getmininginforesult-currentblocktx":   "Number of transactions in the latest best block",
+	"getmininginforesult-difficulty":       "Current target difficulty",
+	"getmininginforesult-errors":           "Any current errors",
+	"getmininginforesult-generate":         "Whether or not server is set to generate coins",
+	"getmininginforesult-genproclimit":     "Number of processors to use for coin generation (-1 when disabled)",
+	"getmininginforesult-hashespersec":     "Recent hashes per second performance measurement while generating coins",
+	"getmininginforesult-networkhashps":    "Estimated network hashes per second for the most recent blocks",
+	"getmininginforesult-pooledtx":         "Number of transactions in the memory pool",
+	"getmininginforesult-testnet":          "Whether or not server is using testnet",
 
 	// GetMiningInfoCmd help.
 	"getmininginfo--synopsis": "Returns a JSON object containing mining-related information.",

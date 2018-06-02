@@ -21,7 +21,7 @@ const (
 // the generation of block templates.  See the documentation for
 // NewBlockTemplate for more details on each of these parameters are used.
 type Policy struct {
-	// BlockMinWeight is the minimum block size to be used when generating
+	// BlockMinSize is the minimum block size to be used when generating
 	// a block template.
 	BlockMinSize uint32
 
