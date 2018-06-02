@@ -35,11 +35,6 @@ const (
 	// MaxBlockSigOpsPerMB The maximum allowed number of signature check operations per MB in a
 	// block (network rule)
 	MaxBlockSigOpsPerMB = 2000
-
-	// WitnessScaleFactor determines the level of "discount" witness data
-	// receives compared to "base" data. A scale factor of 4, denotes that
-	// witness data is 1/4 as cheap as regular non-witness data.
-	WitnessScaleFactor = 4
 )
 
 // GetBlockWeight computes the value of the weight metric for a given block.
@@ -49,11 +44,7 @@ const (
 func GetBlockWeight(blk *btcutil.Block) int64 { // todo remove
 	msgBlock := blk.MsgBlock()
 
-	baseSize := msgBlock.SerializeSize()
-	totalSize := msgBlock.SerializeSize()
-
-	// (baseSize * 3) + totalSize
-	return int64((baseSize * (WitnessScaleFactor - 1)) + totalSize)
+	return int64(msgBlock.SerializeSize())
 }
 
 // GetTransactionWeight computes the value of the weight metric for a given
@@ -64,11 +55,7 @@ func GetBlockWeight(blk *btcutil.Block) int64 { // todo remove
 func GetTransactionWeight(tx *btcutil.Tx) int64 {
 	msgTx := tx.MsgTx()
 
-	baseSize := msgTx.SerializeSize()
-	totalSize := msgTx.SerializeSize()
-
-	// (baseSize * 3) + totalSize
-	return int64((baseSize * (WitnessScaleFactor - 1)) + totalSize)
+	return int64(msgTx.SerializeSize())
 }
 
 func GetMaxBlockSigOpsCount(blocksize int) int {
