@@ -8,11 +8,6 @@ const (
 	// DefaultMaxBlockSize is the maximum number of bytes within a block
 	DefaultMaxBlockSize = 32000000
 
-	// MaxBlockSigOpsCost is the maximum number of signature operations
-	// allowed for a block. It is calculated via a weighted algorithm which
-	// weights segregated witness sig ops lower than regular sig ops.
-	MaxBlockSigOpsCost = 80000
-
 	// MaxTxSigOpsCount allowed number of signature check operations per transaction. */
 	MaxTxSigOpsCount = 20000
 

@@ -1733,7 +1733,7 @@ func (state *gbtWorkState) blockTemplateResult(useCoinbaseValue bool, submitOld 
 		CurTime:      header.Timestamp.Unix(),
 		Height:       int64(template.Height),
 		PreviousHash: header.PrevBlock.String(),
-		SigOpLimit:   blockchain.MaxBlockSigOpsCost,
+		SigOpLimit:   int64(blockchain.GetMaxBlockSigOpsCount(blockchain.DefaultMaxBlockSize)),
 		SizeLimit:    wire.MaxBlockPayload,
 		Transactions: transactions,
 		Version:      header.Version,

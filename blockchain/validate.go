@@ -561,10 +561,10 @@ func checkBlockSanity(block *btcutil.Block, powLimit *big.Int, timeSource Median
 		// overflow.
 		lastSigOps := totalSigOps
 		totalSigOps += GetSigOpCost(tx)
-		if totalSigOps < lastSigOps || totalSigOps > MaxBlockSigOpsCost {
+		if totalSigOps < lastSigOps || totalSigOps > GetMaxBlockSigOpsCount(serializedSize) {
 			str := fmt.Sprintf("block contains too many signature "+
 				"operations - got %v, max %v", totalSigOps,
-				MaxBlockSigOpsCost)
+				GetMaxBlockSigOpsCount(serializedSize))
 			return ruleError(ErrTooManySigOps, str)
 		}
 	}
@@ -1046,21 +1046,13 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block, vi
 	// https://en.bitcoin.it/wiki/BIP_0016 for more details.
 	enforceBIP0016 := node.timestamp >= txscript.Bip16Activation.Unix()
 
-	// Query for the Version Bits state for the segwit soft-fork
-	// deployment. If segwit is active, we'll switch over to enforcing all
-	// the new rules.
-	//segwitState, err := b.deploymentState(node.parent, chaincfg.DeploymentSegwit)	// todo remove
-	//if err != nil {
-	//	return err
-	//}
-	//enforceSegWit := segwitState == ThresholdActive
-
 	// The number of signature operations must be less than the maximum
 	// allowed per block.  Note that the preliminary sanity checks on a
 	// block also include a check similar to this one, but this check
 	// expands the count to include a precise count of pay-to-script-hash
 	// signature operations in each of the input transaction public key
 	// scripts.
+	serializeSize := block.MsgBlock().SerializeSize()
 	transactions := block.Transactions()
 	totalSigOpCost := 0
 	for _, tx := range transactions {
@@ -1076,10 +1068,10 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block, vi
 		// this on every loop iteration to avoid overflow.
 		lastSigOpCost := totalSigOpCost
 		totalSigOpCost += sigOpCost
-		if totalSigOpCost < lastSigOpCost || totalSigOpCost > MaxBlockSigOpsCost {
+		if totalSigOpCost < lastSigOpCost || totalSigOpCost > GetMaxBlockSigOpsCount(serializeSize) {
 			str := fmt.Sprintf("block contains too many "+
 				"signature operations - got %v, max %v",
-				totalSigOpCost, MaxBlockSigOpsCost)
+				totalSigOpCost, GetMaxBlockSigOpsCount(serializeSize))
 			return ruleError(ErrTooManySigOps, str)
 		}
 	}
@@ -1206,13 +1198,6 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block, vi
 			}
 		}
 	}
-
-	// Enforce the segwit soft-fork package once the soft-fork has shifted
-	// into the "active" version bits state.
-	//if enforceSegWit {												// todo remove
-	//	scriptFlags |= txscript.ScriptVerifyWitness
-	//	scriptFlags |= txscript.ScriptStrictMultiSig
-	//}
 
 	// Now that the inexpensive checks are done and have passed, verify the
 	// transactions are actually allowed to spend the coins by running the
