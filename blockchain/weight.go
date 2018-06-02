@@ -5,8 +5,6 @@
 package blockchain
 
 import (
-	"fmt"
-
 	"github.com/btcsuite/btcutil"
 )
 
@@ -27,6 +25,16 @@ const (
 	// allowed for a block. It is calculated via a weighted algorithm which
 	// weights segregated witness sig ops lower than regular sig ops.
 	MaxBlockSigOpsCost = 80000
+
+	// MaxTxSigopsCount allowed number of signature check operations per transaction. */
+	MaxTxSigopsCount = 20000
+
+	// OneMegaByte is the convenient bytes value representing of 1M
+	OneMegaByte = 1000000
+
+	// MaxBlockSigOpsPerMB The maximum allowed number of signature check operations per MB in a
+	// block (network rule)
+	MaxBlockSigOpsPerMB = 2000
 
 	// WitnessScaleFactor determines the level of "discount" witness data
 	// receives compared to "base" data. A scale factor of 4, denotes that
@@ -63,42 +71,7 @@ func GetTransactionWeight(tx *btcutil.Tx) int64 {
 	return int64((baseSize * (WitnessScaleFactor - 1)) + totalSize)
 }
 
-// GetSigOpCost returns the unified sig op cost for the passed transaction
-// respecting current active soft-forks which modified sig op cost counting.
-// The unified sig op cost for a transaction is computed as the sum of: the
-// legacy sig op count scaled according to the WitnessScaleFactor, the sig op
-// count for all p2sh inputs scaled by the WitnessScaleFactor, and finally the
-// unscaled sig op count for any inputs spending witness programs.
-func GetSigOpCost(tx *btcutil.Tx, isCoinBaseTx bool, utxoView *UtxoViewpoint,
-	bip16 bool) (int, error) {
-
-	numSigOps := CountSigOps(tx) * WitnessScaleFactor
-	if bip16 {
-		numP2SHSigOps, err := CountP2SHSigOps(tx, isCoinBaseTx, utxoView)
-		if err != nil {
-			return 0, nil
-		}
-		numSigOps += (numP2SHSigOps * WitnessScaleFactor)
-	}
-
-	if !isCoinBaseTx { // todo is necessary <check IsSpent in getsigopcost function>
-		msgTx := tx.MsgTx()
-		for txInIndex, txIn := range msgTx.TxIn {
-			// Ensure the referenced input transaction is available.
-			originTxHash := &txIn.PreviousOutPoint.Hash
-			originTxIndex := txIn.PreviousOutPoint.Index
-			txEntry := utxoView.LookupEntry(originTxHash)
-			if txEntry == nil || txEntry.IsOutputSpent(originTxIndex) {
-				str := fmt.Sprintf("output %v referenced from "+
-					"transaction %s:%d either does not "+
-					"exist or has already been spent",
-					txIn.PreviousOutPoint, tx.Hash(),
-					txInIndex)
-				return 0, ruleError(ErrMissingTxOut, str)
-			}
-		}
-
-	}
-
-	return numSigOps, nil
+func GetMaxBlockSigOpsCount(blocksize int) int {
+	mbRoundedUp := 1 + ((blocksize - 1) / OneMegaByte)
+	return mbRoundedUp * MaxBlockSigOpsPerMB
 }

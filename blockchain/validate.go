@@ -348,7 +348,7 @@ func CheckProofOfWork(block *btcutil.Block, powLimit *big.Int) error {
 // input and output scripts in the provided transaction.  This uses the
 // quicker, but imprecise, signature operation counting mechanism from
 // txscript.
-func CountSigOps(tx *btcutil.Tx) int {
+func GetSigOpCost(tx *btcutil.Tx) int {
 	msgTx := tx.MsgTx()
 
 	// Accumulate the number of signature operations in all transaction
@@ -560,7 +560,7 @@ func checkBlockSanity(block *btcutil.Block, powLimit *big.Int, timeSource Median
 		// We could potentially overflow the accumulator so check for
 		// overflow.
 		lastSigOps := totalSigOps
-		totalSigOps += (CountSigOps(tx) * WitnessScaleFactor)
+		totalSigOps += GetSigOpCost(tx)
 		if totalSigOps < lastSigOps || totalSigOps > MaxBlockSigOpsCost {
 			str := fmt.Sprintf("block contains too many signature "+
 				"operations - got %v, max %v", totalSigOps,
@@ -1063,17 +1063,14 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block, vi
 	// scripts.
 	transactions := block.Transactions()
 	totalSigOpCost := 0
-	for i, tx := range transactions {
+	for _, tx := range transactions {
 		// Since the first (and only the first) transaction has
 		// already been verified to be a coinbase transaction,
 		// use i == 0 as an optimization for the flag to
 		// countP2SHSigOps for whether or not the transaction is
 		// a coinbase transaction rather than having to do a
 		// full coinbase check again.
-		sigOpCost, err := GetSigOpCost(tx, i == 0, view, enforceBIP0016)
-		if err != nil {
-			return err
-		}
+		sigOpCost := GetSigOpCost(tx)
 
 		// Check for overflow or going over the limits.  We have to do
 		// this on every loop iteration to avoid overflow.
