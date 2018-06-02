@@ -510,14 +510,6 @@ func (msg *MsgTx) Deserialize(r io.Reader) error {
 	return msg.BtcDecode(r, 0)
 }
 
-// DeserializeNoWitness decodes a transaction from r into the receiver, where
-// the transaction encoding format within r MUST NOT utilize the new
-// serialization format created to encode transaction bearing witness data
-// within inputs.
-func (msg *MsgTx) DeserializeNoWitness(r io.Reader) error {
-	return msg.BtcDecode(r, 0)
-}
-
 // BtcEncode encodes the receiver to w using the bitcoin protocol encoding.
 // This is part of the Message interface implementation.
 // See Serialize for encoding transactions to be stored to disk, such as in a
@@ -767,20 +759,4 @@ func WriteTxOut(w io.Writer, pver uint32, version int32, to *TxOut) error {
 	}
 
 	return WriteVarBytes(w, pver, to.PkScript)
-}
-
-// writeTxWitness encodes the bitcoin protocol encoding for a transaction
-// input's witness into to w.
-func writeTxWitness(w io.Writer, pver uint32, version int32, wit [][]byte) error {
-	err := WriteVarInt(w, pver, uint64(len(wit)))
-	if err != nil {
-		return err
-	}
-	for _, item := range wit {
-		err = WriteVarBytes(w, pver, item)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
 }
