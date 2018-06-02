@@ -37,16 +37,6 @@ const (
 	MaxBlockSigOpsPerMB = 2000
 )
 
-// GetBlockWeight computes the value of the weight metric for a given block.
-// Currently the weight metric is simply the sum of the block's serialized size
-// without any witness data scaled proportionally by the WitnessScaleFactor,
-// and the block's serialized size including any witness data.
-func GetBlockWeight(blk *btcutil.Block) int64 { // todo remove
-	msgBlock := blk.MsgBlock()
-
-	return int64(msgBlock.SerializeSize())
-}
-
 // GetTransactionWeight computes the value of the weight metric for a given
 // transaction. Currently the weight metric is simply the sum of the
 // transactions's serialized size without any witness data scaled
