@@ -60,8 +60,14 @@ func updateVoteCommitments(msgBlock *wire.MsgBlock) {
 // TestBlockchainSpendJournal tests for whether or not the spend journal is being
 // written to disk correctly on a live blockchain.
 func TestBlockchainSpendJournal(t *testing.T) {
+	// Update simnet parameters to reflect what is expected by the legacy
+	// data.
+	params := cloneParams(&chaincfg.SimNetParams)
+	params.GenesisBlock.Header.MerkleRoot = *mustParseHash("a216ea043f0d481a072424af646787794c32bcefd3ed181a090319bbf8a37105")
+	genesisHash := params.GenesisBlock.BlockHash()
+	params.GenesisHash = &genesisHash
+
 	// Create a new database and chain instance to run tests against.
-	params := &chaincfg.SimNetParams
 	chain, teardownFunc, err := chainSetup("spendjournalunittest", params)
 	if err != nil {
 		t.Errorf("Failed to setup chain instance: %v", err)
@@ -99,15 +105,62 @@ func TestBlockchainSpendJournal(t *testing.T) {
 			t.Fatalf("NewBlockFromBytes error: %v", err.Error())
 		}
 
-		_, _, err = chain.ProcessBlock(bl, BFNone)
+		forkLen, isOrphan, err := chain.ProcessBlock(bl, BFNone)
 		if err != nil {
 			t.Fatalf("ProcessBlock error at height %v: %v", i, err.Error())
 		}
+		isMainChain := !isOrphan && forkLen == 0
+		if !isMainChain {
+			t.Fatalf("block %s (height %d) should have been "+
+				"accepted to the main chain", bl.Hash(),
+				bl.MsgBlock().Header.Height)
+		}
 	}
 
-	err = chain.DoStxoTest()
+	// Loop through all of the blocks and ensure the number of spent outputs
+	// matches up with the information loaded from the spend journal.
+	err = chain.db.View(func(dbTx database.Tx) error {
+		parentNode := chain.bestNode.parent
+		if parentNode == nil {
+			str := fmt.Sprintf("no block at height %d exists", 1)
+			return errNotInMainChain(str)
+		}
+		parent, err := dbFetchBlockByHash(dbTx, &parentNode.hash)
+		if err != nil {
+			return err
+		}
+
+		for i := int64(2); i <= chain.bestNode.height; i++ {
+			node := chain.bestNode.Ancestor(i)
+			if node == nil {
+				str := fmt.Sprintf("no block at height %d exists", i)
+				return errNotInMainChain(str)
+			}
+			block, err := dbFetchBlockByHash(dbTx, &node.hash)
+			if err != nil {
+				return err
+			}
+
+			ntx := countSpentOutputs(block, parent)
+			stxos, err := dbFetchSpendJournalEntry(dbTx, block,
+				parent)
+			if err != nil {
+				return err
+			}
+
+			if ntx != len(stxos) {
+				return fmt.Errorf("bad number of stxos "+
+					"calculated at "+"height %v, got %v "+
+					"expected %v", i, len(stxos), ntx)
+			}
+
+			parent = block
+		}
+
+		return nil
+	})
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Errorf("unexpected error: %v", err)
 	}
 }
 

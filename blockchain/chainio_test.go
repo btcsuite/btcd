@@ -9,7 +9,6 @@ import (
 	"bytes"
 	"encoding/hex"
 	"errors"
-	"fmt"
 	"math/big"
 	"reflect"
 	"testing"
@@ -64,39 +63,6 @@ func hexToExtraData(s string) [32]byte {
 	}
 	copy(extraData[:], b)
 	return extraData
-}
-
-// DoStxoTest does a test on a simulated blockchain to ensure that the data
-// stored in the STXO buckets is not corrupt.
-func (b *BlockChain) DoStxoTest() error {
-	return b.db.View(func(dbTx database.Tx) error {
-		for i := int64(2); i <= b.bestNode.height; i++ {
-			block, err := dbFetchBlockByHeight(dbTx, i)
-			if err != nil {
-				return err
-			}
-
-			parent, err := dbFetchBlockByHeight(dbTx, i-1)
-			if err != nil {
-				return err
-			}
-
-			ntx := countSpentOutputs(block, parent)
-			stxos, err := dbFetchSpendJournalEntry(dbTx, block,
-				parent)
-			if err != nil {
-				return err
-			}
-
-			if ntx != len(stxos) {
-				return fmt.Errorf("bad number of stxos "+
-					"calculated at "+"height %v, got %v "+
-					"expected %v", i, len(stxos), ntx)
-			}
-		}
-
-		return nil
-	})
 }
 
 // TestErrNotInMainChain ensures the functions related to errNotInMainChain work
