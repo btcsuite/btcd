@@ -31,7 +31,6 @@ type GetBlockVerboseResult struct {
 	Hash          string        `json:"hash"`
 	Confirmations uint64        `json:"confirmations"`
 	Size          int32         `json:"size"`
-	Weight        int32         `json:"weight"`
 	Height        int64         `json:"height"`
 	Version       int32         `json:"version"`
 	VersionHex    string        `json:"versionHex"`
