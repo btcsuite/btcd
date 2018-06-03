@@ -499,7 +499,7 @@ func checkBlockSanity(block *btcutil.Block, powLimit *big.Int, timeSource Median
 	}
 
 	// A block must not have more than one coinbase.
-	for i, tx := range transactions[1:] {
+	for i, tx := range transactions[1:] { // todo optimize many loops for transactions
 		if IsCoinBase(tx) {
 			str := fmt.Sprintf("block contains second coinbase at "+
 				"index %d", i+1)
@@ -547,18 +547,18 @@ func checkBlockSanity(block *btcutil.Block, powLimit *big.Int, timeSource Median
 
 	// The number of signature operations must be less than the maximum
 	// allowed per block.
-	totalSigOps := 0
+	var totalSigOps, lastSigOps int
 	for _, tx := range transactions {
 		// We could potentially overflow the accumulator so check for
 		// overflow.
-		lastSigOps := totalSigOps
+		lastSigOps = totalSigOps
 		totalSigOps += GetSigOpCost(tx)
-		if totalSigOps < lastSigOps || totalSigOps > GetMaxBlockSigOpsCount(serializedSize) {
-			str := fmt.Sprintf("block contains too many signature "+
-				"operations - got %v, max %v", totalSigOps,
-				GetMaxBlockSigOpsCount(serializedSize))
-			return ruleError(ErrTooManySigOps, str)
-		}
+	}
+	if totalSigOps < lastSigOps || totalSigOps > GetMaxBlockSigOpsCount(serializedSize) {
+		str := fmt.Sprintf("block contains too many signature "+
+			"operations - got %v, max %v", totalSigOps,
+			GetMaxBlockSigOpsCount(serializedSize))
+		return ruleError(ErrTooManySigOps, str)
 	}
 
 	return nil
