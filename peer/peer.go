@@ -1737,13 +1737,61 @@ func (p *Peer) Disconnect() {
 	close(p.quit)
 }
 
-// handleRemoteVersionMsg is invoked when a version wire message is received
-// from the remote peer.  It will return an error if the remote peer's version
-// is not compatible with ours.
-func (p *Peer) handleRemoteVersionMsg(msg *wire.MsgVersion) error {
+// readRemoteVersionMsg waits for the next message to arrive from the remote
+// peer.  If the next message is not a version message or the version is not
+// acceptable then return an error.
+func (p *Peer) readRemoteVersionMsg() error {
+	// Read their version message.
+	remoteMsg, _, err := p.readMessage()
+	if err != nil {
+		return err
+	}
+
+	// Notify and disconnect clients if the first message is not a version
+	// message.
+	msg, ok := remoteMsg.(*wire.MsgVersion)
+	if !ok {
+		reason := "a version message must precede all others"
+		rejectMsg := wire.NewMsgReject(msg.Command(), wire.RejectMalformed,
+			reason)
+		_ = p.writeMessage(rejectMsg)
+		return errors.New(reason)
+	}
+
 	// Detect self connections.
 	if !allowSelfConns && sentNonces.Exists(msg.Nonce) {
 		return errors.New("disconnecting peer connected to self")
+	}
+
+	// Negotiate the protocol version and set the services to what the remote
+	// peer advertised.
+	p.flagsMtx.Lock()
+	p.advertisedProtoVer = uint32(msg.ProtocolVersion)
+	p.protocolVersion = minUint32(p.protocolVersion, p.advertisedProtoVer)
+	p.versionKnown = true
+	p.services = msg.Services
+	p.flagsMtx.Unlock()
+	log.Debugf("Negotiated protocol version %d for peer %s",
+		p.protocolVersion, p)
+
+	// Updating a bunch of stats.
+	p.statsMtx.Lock()
+	p.lastBlock = int64(msg.LastBlock)
+	p.startingHeight = int64(msg.LastBlock)
+
+	// Set the peer's time offset.
+	p.timeOffset = msg.Timestamp.Unix() - time.Now().Unix()
+	p.statsMtx.Unlock()
+
+	// Set the peer's ID and user agent.
+	p.flagsMtx.Lock()
+	p.id = atomic.AddInt32(&nodeCount, 1)
+	p.userAgent = msg.UserAgent
+	p.flagsMtx.Unlock()
+
+	// Invoke the callback if specified.
+	if p.cfg.Listeners.OnVersion != nil {
+		p.cfg.Listeners.OnVersion(p, msg)
 	}
 
 	// Notify and disconnect clients that have a protocol version that is
@@ -1756,63 +1804,10 @@ func (p *Peer) handleRemoteVersionMsg(msg *wire.MsgVersion) error {
 			wire.InitialProcotolVersion)
 		rejectMsg := wire.NewMsgReject(msg.Command(), wire.RejectObsolete,
 			reason)
-		return p.writeMessage(rejectMsg)
+		_ = p.writeMessage(rejectMsg)
+		return errors.New(reason)
 	}
 
-	// Updating a bunch of stats.
-	p.statsMtx.Lock()
-	p.lastBlock = int64(msg.LastBlock)
-	p.startingHeight = int64(msg.LastBlock)
-
-	// Set the peer's time offset.
-	p.timeOffset = msg.Timestamp.Unix() - time.Now().Unix()
-	p.statsMtx.Unlock()
-
-	// Negotiate the protocol version.
-	p.flagsMtx.Lock()
-	p.advertisedProtoVer = uint32(msg.ProtocolVersion)
-	p.protocolVersion = minUint32(p.protocolVersion, p.advertisedProtoVer)
-	p.versionKnown = true
-	log.Debugf("Negotiated protocol version %d for peer %s",
-		p.protocolVersion, p)
-	// Set the peer's ID.
-	p.id = atomic.AddInt32(&nodeCount, 1)
-	// Set the supported services for the peer to what the remote peer
-	// advertised.
-	p.services = msg.Services
-	// Set the remote peer's user agent.
-	p.userAgent = msg.UserAgent
-	p.flagsMtx.Unlock()
-	return nil
-}
-
-// readRemoteVersionMsg waits for the next message to arrive from the remote
-// peer.  If the next message is not a version message or the version is not
-// acceptable then return an error.
-func (p *Peer) readRemoteVersionMsg() error {
-	// Read their version message.
-	msg, _, err := p.readMessage()
-	if err != nil {
-		return err
-	}
-
-	remoteVerMsg, ok := msg.(*wire.MsgVersion)
-	if !ok {
-		errStr := "A version message must precede all others"
-		log.Errorf(errStr)
-
-		rejectMsg := wire.NewMsgReject(msg.Command(), wire.RejectMalformed,
-			errStr)
-		return p.writeMessage(rejectMsg)
-	}
-
-	if err := p.handleRemoteVersionMsg(remoteVerMsg); err != nil {
-		return err
-	}
-
-	if p.cfg.Listeners.OnVersion != nil {
-		p.cfg.Listeners.OnVersion(p, remoteVerMsg)
-	}
 	return nil
 }
 
@@ -1953,9 +1948,11 @@ func (p *Peer) start() error {
 	select {
 	case err := <-negotiateErr:
 		if err != nil {
+			p.Disconnect()
 			return err
 		}
 	case <-time.After(negotiateTimeout):
+		p.Disconnect()
 		return errors.New("protocol negotiation timeout")
 	}
 	log.Debugf("Connected to %s", p.Addr())
