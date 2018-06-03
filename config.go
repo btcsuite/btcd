@@ -49,7 +49,6 @@ const (
 	defaultFreeTxRelayLimit      = 15.0
 	defaultBlockMinSize          = 0
 	blockMaxSizeMin              = 1000
-	blockMaxSizeMax              = blockchain.DefaultMaxBlockSize - 1000
 	defaultGenerate              = false
 	defaultMaxOrphanTransactions = 100
 	defaultMaxOrphanTxSize       = 100000
@@ -409,7 +408,7 @@ func loadConfig() (*config, []string, error) {
 		MinRelayTxFee:        mempool.DefaultMinRelayTxFee.ToBTC(),
 		FreeTxRelayLimit:     defaultFreeTxRelayLimit,
 		BlockMinSize:         defaultBlockMinSize,
-		BlockMaxSize:         blockchain.DefaultMaxBlockSize - 1000,
+		BlockMaxSize:         blockchain.DefaultMaxBlockSize,
 		BlockPrioritySize:    mempool.DefaultBlockPrioritySize,
 		MaxOrphanTxs:         defaultMaxOrphanTransactions,
 		SigCacheMaxSize:      defaultSigCacheMaxSize,
@@ -751,12 +750,12 @@ func loadConfig() (*config, []string, error) {
 
 	// Limit the max block size to a sane value.
 	if cfg.BlockMaxSize < blockMaxSizeMin ||
-		cfg.BlockMaxSize > blockMaxSizeMax {
+		cfg.BlockMaxSize > blockchain.DefaultMaxBlockSize {
 
 		str := "%s: The blockmaxsize option must be in between %d " +
 			"and %d -- parsed [%d]"
 		err := fmt.Errorf(str, funcName, blockMaxSizeMin,
-			blockMaxSizeMax, cfg.BlockMaxSize)
+			blockchain.DefaultMaxBlockSize, cfg.BlockMaxSize)
 		fmt.Fprintln(os.Stderr, err)
 		fmt.Fprintln(os.Stderr, usageMessage)
 		return nil, nil, err
@@ -776,8 +775,8 @@ func loadConfig() (*config, []string, error) {
 	cfg.BlockPrioritySize = minUint32(cfg.BlockPrioritySize, cfg.BlockMaxSize)
 	cfg.BlockMinSize = minUint32(cfg.BlockMinSize, cfg.BlockMaxSize)
 
-	if cfg.BlockMaxSize >= blockchain.DefaultMaxBlockSize-1000 {
-		cfg.BlockMaxSize = blockchain.DefaultMaxBlockSize - 1000
+	if cfg.BlockMaxSize >= blockchain.DefaultMaxBlockSize {
+		cfg.BlockMaxSize = blockchain.DefaultMaxBlockSize
 	}
 
 	// Look for illegal characters in the user agent comments.
