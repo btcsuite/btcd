@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"hash"
 
+	"github.com/btcsuite/btcutil"
 	"golang.org/x/crypto/ripemd160"
 
 	"github.com/btcsuite/btcd/btcec"
@@ -2108,7 +2109,7 @@ func opcodeCheckSig(op *parsedOpcode, vm *Engine) error {
 		// to sign itself.
 		subScript = removeOpcodeByData(subScript, fullSigBytes)
 
-		hash = calcSignatureHash(subScript, hashType, &vm.tx, vm.txIdx)
+		hash = calcSignatureHash(subScript, hashType, &vm.tx, vm.txIdx, btcutil.Amount(0), StandardVerifyFlags)
 	}
 
 	pubKey, err := btcec.ParsePubKey(pkBytes, btcec.S256())
@@ -2377,7 +2378,7 @@ func opcodeCheckMultiSig(op *parsedOpcode, vm *Engine) error {
 				return err
 			}
 		} else {
-			hash = calcSignatureHash(script, hashType, &vm.tx, vm.txIdx)
+			hash = calcSignatureHash(script, hashType, &vm.tx, vm.txIdx, btcutil.Amount(0), StandardVerifyFlags)
 		}
 
 		var valid bool

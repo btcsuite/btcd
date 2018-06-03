@@ -835,7 +835,7 @@ func TestCalcSignatureHash(t *testing.T) {
 			// Skip first line -- contains comments only.
 			continue
 		}
-		if len(test) != 5 {
+		if len(test) != 7 {
 			t.Fatalf("TestCalcSignatureHash: Test #%d has "+
 				"wrong length.", i)
 		}
@@ -857,10 +857,33 @@ func TestCalcSignatureHash(t *testing.T) {
 		}
 
 		hashType := SigHashType(testVecF64ToUint32(test[3].(float64)))
-		hash := calcSignatureHash(parsedScript, hashType, &tx,
-			int(test[2].(float64)))
 
+		// signature_hash (regular)
+		hash := calcSignatureHash(parsedScript, hashType, &tx,
+			int(test[2].(float64)), btcutil.Amount(0),
+			ScriptEnableSighashForkid)
 		expectedHash, _ := chainhash.NewHashFromStr(test[4].(string))
+		if !bytes.Equal(hash, expectedHash[:]) {
+			t.Errorf("TestCalcSignatureHash failed test #%d: "+
+				"Signature hash mismatch.", i)
+		}
+
+		// signature_hash(no forkid)
+		hash = calcSignatureHash(parsedScript, hashType, &tx,
+			int(test[2].(float64)), btcutil.Amount(0), 0)
+
+		expectedHash, _ = chainhash.NewHashFromStr(test[5].(string))
+		if !bytes.Equal(hash, expectedHash[:]) {
+			t.Errorf("TestCalcSignatureHash failed test #%d: "+
+				"Signature hash mismatch.", i)
+		}
+
+		// signature_hash(replay protected)
+		hash = calcSignatureHash(parsedScript, hashType, &tx,
+			int(test[2].(float64)), btcutil.Amount(0),
+			ScriptEnableSighashForkid|ScriptEnableReplayProtection)
+
+		expectedHash, _ = chainhash.NewHashFromStr(test[6].(string))
 		if !bytes.Equal(hash, expectedHash[:]) {
 			t.Errorf("TestCalcSignatureHash failed test #%d: "+
 				"Signature hash mismatch.", i)
