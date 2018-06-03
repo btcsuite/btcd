@@ -373,9 +373,10 @@ func (sp *serverPeer) OnVersion(p *peer.Peer, msg *wire.MsgVersion) *wire.MsgRej
 	// to specified peers and actively avoids advertising and connecting to
 	// discovered peers.
 	if !cfg.SimNet && !isInbound {
-		// TODO(davec): Only do this if not doing the initial block
-		// download and the local address is routable.
-		if !cfg.DisableListen /* && isCurrent? */ {
+		// Advertise the local address when the server accepts incoming
+		// connections and it believes itself to be close to the best
+		// known tip.
+		if !cfg.DisableListen && sp.server.blockManager.IsCurrent() {
 			// Get address that best matches.
 			lna := addrManager.GetBestLocalAddress(p.NA())
 			if addrmgr.IsRoutable(lna) {
