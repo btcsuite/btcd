@@ -82,6 +82,19 @@ func TestChainSvrCmds(t *testing.T) {
 			},
 		},
 		{
+			name: "debuglevel",
+			newCmd: func() (interface{}, error) {
+				return dcrjson.NewCmd("debuglevel", "trace")
+			},
+			staticCmd: func() interface{} {
+				return dcrjson.NewDebugLevelCmd("trace")
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"debuglevel","params":["trace"],"id":1}`,
+			unmarshalled: &dcrjson.DebugLevelCmd{
+				LevelSpec: "trace",
+			},
+		},
+		{
 			name: "decoderawtransaction",
 			newCmd: func() (interface{}, error) {
 				return dcrjson.NewCmd("decoderawtransaction", "123")
@@ -115,6 +128,19 @@ func TestChainSvrCmds(t *testing.T) {
 			unmarshalled: &dcrjson.EstimateSmartFeeCmd{Confirmations: 6, Mode: dcrjson.EstimateSmartFeeConservative},
 		},
 		{
+			name: "generate",
+			newCmd: func() (interface{}, error) {
+				return dcrjson.NewCmd("generate", 1)
+			},
+			staticCmd: func() interface{} {
+				return dcrjson.NewGenerateCmd(1)
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"generate","params":[1],"id":1}`,
+			unmarshalled: &dcrjson.GenerateCmd{
+				NumBlocks: 1,
+			},
+		},
+		{
 			name: "getaddednodeinfo",
 			newCmd: func() (interface{}, error) {
 				return dcrjson.NewCmd("getaddednodeinfo", true)
@@ -138,6 +164,17 @@ func TestChainSvrCmds(t *testing.T) {
 				DNS:  true,
 				Node: dcrjson.String("127.0.0.1"),
 			},
+		},
+		{
+			name: "getbestblock",
+			newCmd: func() (interface{}, error) {
+				return dcrjson.NewCmd("getbestblock")
+			},
+			staticCmd: func() interface{} {
+				return dcrjson.NewGetBestBlockCmd()
+			},
+			marshalled:   `{"jsonrpc":"1.0","method":"getbestblock","params":[],"id":1}`,
+			unmarshalled: &dcrjson.GetBestBlockCmd{},
 		},
 		{
 			name: "getbestblockhash",
@@ -394,6 +431,17 @@ func TestChainSvrCmds(t *testing.T) {
 			unmarshalled: &dcrjson.GetConnectionCountCmd{},
 		},
 		{
+			name: "getcurrentnet",
+			newCmd: func() (interface{}, error) {
+				return dcrjson.NewCmd("getcurrentnet")
+			},
+			staticCmd: func() interface{} {
+				return dcrjson.NewGetCurrentNetCmd()
+			},
+			marshalled:   `{"jsonrpc":"1.0","method":"getcurrentnet","params":[],"id":1}`,
+			unmarshalled: &dcrjson.GetCurrentNetCmd{},
+		},
+		{
 			name: "getdifficulty",
 			newCmd: func() (interface{}, error) {
 				return dcrjson.NewCmd("getdifficulty")
@@ -603,6 +651,20 @@ func TestChainSvrCmds(t *testing.T) {
 			},
 		},
 		{
+			name: "getstakeversions",
+			newCmd: func() (interface{}, error) {
+				return dcrjson.NewCmd("getstakeversions", "deadbeef", 1)
+			},
+			staticCmd: func() interface{} {
+				return dcrjson.NewGetStakeVersionsCmd("deadbeef", 1)
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"getstakeversions","params":["deadbeef",1],"id":1}`,
+			unmarshalled: &dcrjson.GetStakeVersionsCmd{
+				Hash:  "deadbeef",
+				Count: 1,
+			},
+		},
+		{
 			name: "gettxout",
 			newCmd: func() (interface{}, error) {
 				return dcrjson.NewCmd("gettxout", "123", 1)
@@ -642,6 +704,19 @@ func TestChainSvrCmds(t *testing.T) {
 			},
 			marshalled:   `{"jsonrpc":"1.0","method":"gettxoutsetinfo","params":[],"id":1}`,
 			unmarshalled: &dcrjson.GetTxOutSetInfoCmd{},
+		},
+		{
+			name: "getvoteinfo",
+			newCmd: func() (interface{}, error) {
+				return dcrjson.NewCmd("getvoteinfo", 1)
+			},
+			staticCmd: func() interface{} {
+				return dcrjson.NewGetVoteInfoCmd(1)
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"getvoteinfo","params":[1],"id":1}`,
+			unmarshalled: &dcrjson.GetVoteInfoCmd{
+				Version: 1,
+			},
 		},
 		{
 			name: "getwork",
@@ -693,6 +768,49 @@ func TestChainSvrCmds(t *testing.T) {
 			marshalled: `{"jsonrpc":"1.0","method":"help","params":["getblock"],"id":1}`,
 			unmarshalled: &dcrjson.HelpCmd{
 				Command: dcrjson.String("getblock"),
+			},
+		},
+		{
+			name: "node option remove",
+			newCmd: func() (interface{}, error) {
+				return dcrjson.NewCmd("node", dcrjson.NRemove, "1.1.1.1")
+			},
+			staticCmd: func() interface{} {
+				return dcrjson.NewNodeCmd("remove", "1.1.1.1", nil)
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"node","params":["remove","1.1.1.1"],"id":1}`,
+			unmarshalled: &dcrjson.NodeCmd{
+				SubCmd: dcrjson.NRemove,
+				Target: "1.1.1.1",
+			},
+		},
+		{
+			name: "node option disconnect",
+			newCmd: func() (interface{}, error) {
+				return dcrjson.NewCmd("node", dcrjson.NDisconnect, "1.1.1.1")
+			},
+			staticCmd: func() interface{} {
+				return dcrjson.NewNodeCmd("disconnect", "1.1.1.1", nil)
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"node","params":["disconnect","1.1.1.1"],"id":1}`,
+			unmarshalled: &dcrjson.NodeCmd{
+				SubCmd: dcrjson.NDisconnect,
+				Target: "1.1.1.1",
+			},
+		},
+		{
+			name: "node option connect",
+			newCmd: func() (interface{}, error) {
+				return dcrjson.NewCmd("node", dcrjson.NConnect, "1.1.1.1", "perm")
+			},
+			staticCmd: func() interface{} {
+				return dcrjson.NewNodeCmd("connect", "1.1.1.1", dcrjson.String("perm"))
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"node","params":["connect","1.1.1.1","perm"],"id":1}`,
+			unmarshalled: &dcrjson.NodeCmd{
+				SubCmd:        dcrjson.NConnect,
+				Target:        "1.1.1.1",
+				ConnectSubCmd: dcrjson.String("perm"),
 			},
 		},
 		{

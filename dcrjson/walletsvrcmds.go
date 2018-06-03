@@ -8,6 +8,41 @@
 
 package dcrjson
 
+// AccountAddressIndexCmd is a type handling custom marshaling and
+// unmarshaling of accountaddressindex JSON wallet extension
+// commands.
+type AccountAddressIndexCmd struct {
+	Account string `json:"account"`
+	Branch  int    `json:"branch"`
+}
+
+// NewAccountAddressIndexCmd creates a new AccountAddressIndexCmd.
+func NewAccountAddressIndexCmd(acct string, branch int) *AccountAddressIndexCmd {
+	return &AccountAddressIndexCmd{
+		Account: acct,
+		Branch:  branch,
+	}
+}
+
+// AccountSyncAddressIndexCmd is a type handling custom marshaling and
+// unmarshaling of accountsyncaddressindex JSON wallet extension
+// commands.
+type AccountSyncAddressIndexCmd struct {
+	Account string `json:"account"`
+	Branch  int    `json:"branch"`
+	Index   int    `json:"index"`
+}
+
+// NewAccountSyncAddressIndexCmd creates a new AccountSyncAddressIndexCmd.
+func NewAccountSyncAddressIndexCmd(acct string, branch int,
+	idx int) *AccountSyncAddressIndexCmd {
+	return &AccountSyncAddressIndexCmd{
+		Account: acct,
+		Branch:  branch,
+		Index:   idx,
+	}
+}
+
 // AddMultisigAddressCmd defines the addmutisigaddress JSON-RPC command.
 type AddMultisigAddressCmd struct {
 	NRequired int
@@ -28,6 +63,39 @@ func NewAddMultisigAddressCmd(nRequired int, keys []string, account *string) *Ad
 	}
 }
 
+// AddTicketCmd forces a ticket into the wallet stake manager, for example if
+// someone made an invalid ticket for a stake pool and the pool manager wanted
+// to manually add it.
+type AddTicketCmd struct {
+	TicketHex string `json:"tickethex"`
+}
+
+// NewAddTicketCmd creates a new AddTicketCmd.
+func NewAddTicketCmd(ticketHex string) *AddTicketCmd {
+	return &AddTicketCmd{TicketHex: ticketHex}
+}
+
+// ConsolidateCmd is a type handling custom marshaling and
+// unmarshaling of consolidate JSON wallet extension
+// commands.
+type ConsolidateCmd struct {
+	Inputs  int `json:"inputs"`
+	Account *string
+	Address *string
+}
+
+// CreateMultiSigResult models the data returned from the createmultisig
+// command.
+type CreateMultiSigResult struct {
+	Address      string `json:"address"`
+	RedeemScript string `json:"redeemScript"`
+}
+
+// NewConsolidateCmd creates a new ConsolidateCmd.
+func NewConsolidateCmd(inputs int, acct *string, addr *string) *ConsolidateCmd {
+	return &ConsolidateCmd{Inputs: inputs, Account: acct, Address: addr}
+}
+
 // CreateMultisigCmd defines the createmultisig JSON-RPC command.
 type CreateMultisigCmd struct {
 	NRequired int
@@ -41,6 +109,109 @@ func NewCreateMultisigCmd(nRequired int, keys []string) *CreateMultisigCmd {
 		NRequired: nRequired,
 		Keys:      keys,
 	}
+}
+
+// CreateNewAccountCmd defines the createnewaccount JSON-RPC command.
+type CreateNewAccountCmd struct {
+	Account string
+}
+
+// NewCreateNewAccountCmd returns a new instance which can be used to issue a
+// createnewaccount JSON-RPC command.
+func NewCreateNewAccountCmd(account string) *CreateNewAccountCmd {
+	return &CreateNewAccountCmd{
+		Account: account,
+	}
+}
+
+// SStxInput represents the inputs to an SStx transaction. Specifically a
+// transactionsha and output number pair, along with the output amounts.
+type SStxInput struct {
+	Txid string `json:"txid"`
+	Vout uint32 `json:"vout"`
+	Tree int8   `json:"tree"`
+	Amt  int64  `json:"amt"`
+}
+
+// SStxCommitOut represents the output to an SStx transaction. Specifically a
+// a commitment address and amount, and a change address and amount.
+type SStxCommitOut struct {
+	Addr       string `json:"addr"`
+	CommitAmt  int64  `json:"commitamt"`
+	ChangeAddr string `json:"changeaddr"`
+	ChangeAmt  int64  `json:"changeamt"`
+}
+
+// CreateRawSStxCmd is a type handling custom marshaling and
+// unmarshaling of createrawsstx JSON RPC commands.
+type CreateRawSStxCmd struct {
+	Inputs []SStxInput
+	Amount map[string]int64
+	COuts  []SStxCommitOut
+}
+
+// NewCreateRawSStxCmd creates a new CreateRawSStxCmd.
+func NewCreateRawSStxCmd(inputs []SStxInput, amount map[string]int64,
+	couts []SStxCommitOut) *CreateRawSStxCmd {
+	return &CreateRawSStxCmd{
+		Inputs: inputs,
+		Amount: amount,
+		COuts:  couts,
+	}
+}
+
+// CreateRawSSGenTxCmd is a type handling custom marshaling and
+// unmarshaling of createrawssgentxcmd JSON RPC commands.
+type CreateRawSSGenTxCmd struct {
+	Inputs   []TransactionInput
+	VoteBits uint16
+}
+
+// NewCreateRawSSGenTxCmd creates a new CreateRawSSGenTxCmd.
+func NewCreateRawSSGenTxCmd(inputs []TransactionInput,
+	vb uint16) *CreateRawSSGenTxCmd {
+	return &CreateRawSSGenTxCmd{
+		Inputs:   inputs,
+		VoteBits: vb,
+	}
+}
+
+// CreateRawSSRtxCmd is a type handling custom marshaling and
+// unmarshaling of createrawssrtx JSON RPC commands.
+type CreateRawSSRtxCmd struct {
+	Inputs []TransactionInput
+	Fee    *float64
+}
+
+// NewCreateRawSSRtxCmd creates a new CreateRawSSRtxCmd.
+func NewCreateRawSSRtxCmd(inputs []TransactionInput, fee *float64) *CreateRawSSRtxCmd {
+	return &CreateRawSSRtxCmd{
+		Inputs: inputs,
+		Fee:    fee,
+	}
+}
+
+// CreateVotingAccountCmd is a type for handling custom marshaling and
+// unmarshalling of createvotingaccount JSON-RPC command.
+type CreateVotingAccountCmd struct {
+	Name       string
+	PubKey     string
+	ChildIndex *uint32 `jsonrpcdefault:"0"`
+}
+
+// NewCreateVotingAccountCmd creates a new CreateVotingAccountCmd.
+func NewCreateVotingAccountCmd(name, pubKey string, childIndex *uint32) *CreateVotingAccountCmd {
+	return &CreateVotingAccountCmd{name, pubKey, childIndex}
+}
+
+// DropVotingAccountCmd is a type for handling custom marshaling and
+// unmarshalling of dropvotingaccount JSON-RPC command
+type DropVotingAccountCmd struct {
+}
+
+// NewDropVotingAccountCmd creates a new DropVotingAccountCmd.
+func NewDropVotingAccountCmd() *DropVotingAccountCmd {
+	return &DropVotingAccountCmd{}
 }
 
 // DumpPrivKeyCmd defines the dumpprivkey JSON-RPC command.
@@ -66,6 +237,27 @@ type EstimatePriorityCmd struct {
 func NewEstimatePriorityCmd(numBlocks int64) *EstimatePriorityCmd {
 	return &EstimatePriorityCmd{
 		NumBlocks: numBlocks,
+	}
+}
+
+// GenerateVoteCmd is a type handling custom marshaling and
+// unmarshaling of generatevote JSON wallet extension commands.
+type GenerateVoteCmd struct {
+	BlockHash   string
+	Height      int64
+	TicketHash  string
+	VoteBits    uint16
+	VoteBitsExt string
+}
+
+// NewGenerateVoteCmd creates a new GenerateVoteCmd.
+func NewGenerateVoteCmd(blockhash string, height int64, tickethash string, votebits uint16, voteBitsExt string) *GenerateVoteCmd {
+	return &GenerateVoteCmd{
+		BlockHash:   blockhash,
+		Height:      height,
+		TicketHash:  tickethash,
+		VoteBits:    votebits,
+		VoteBitsExt: voteBitsExt,
 	}
 }
 
@@ -124,6 +316,30 @@ func NewGetBalanceCmd(account *string, minConf *int) *GetBalanceCmd {
 		Account: account,
 		MinConf: minConf,
 	}
+}
+
+// GetMasterPubkeyCmd is a type handling custom marshaling and unmarshaling of
+// getmasterpubkey JSON wallet extension commands.
+type GetMasterPubkeyCmd struct {
+	Account *string
+}
+
+// NewGetMasterPubkeyCmd creates a new GetMasterPubkeyCmd.
+func NewGetMasterPubkeyCmd(acct *string) *GetMasterPubkeyCmd {
+	return &GetMasterPubkeyCmd{Account: acct}
+}
+
+// GetMultisigOutInfoCmd is a type handling custom marshaling and
+// unmarshaling of getmultisigoutinfo JSON websocket extension
+// commands.
+type GetMultisigOutInfoCmd struct {
+	Hash  string
+	Index uint32
+}
+
+// NewGetMultisigOutInfoCmd creates a new GetMultisigOutInfoCmd.
+func NewGetMultisigOutInfoCmd(hash string, index uint32) *GetMultisigOutInfoCmd {
+	return &GetMultisigOutInfoCmd{hash, index}
 }
 
 // GetNewAddressCmd defines the getnewaddress JSON-RPC command.
@@ -196,6 +412,40 @@ func NewGetReceivedByAddressCmd(address string, minConf *int) *GetReceivedByAddr
 	}
 }
 
+// GetStakeInfoCmd is a type handling custom marshaling and
+// unmarshaling of getstakeinfo JSON wallet extension commands.
+type GetStakeInfoCmd struct {
+}
+
+// NewGetStakeInfoCmd creates a new GetStakeInfoCmd.
+func NewGetStakeInfoCmd() *GetStakeInfoCmd {
+	return &GetStakeInfoCmd{}
+}
+
+// GetTicketFeeCmd is a type handling custom marshaling and
+// unmarshaling of getticketfee JSON wallet extension
+// commands.
+type GetTicketFeeCmd struct {
+}
+
+// NewGetTicketFeeCmd creates a new GetTicketFeeCmd.
+func NewGetTicketFeeCmd() *GetTicketFeeCmd {
+	return &GetTicketFeeCmd{}
+}
+
+// GetTicketsCmd is a type handling custom marshaling and
+// unmarshaling of gettickets JSON wallet extension
+// commands.
+type GetTicketsCmd struct {
+	IncludeImmature bool
+}
+
+// NewGetTicketsCmd returns a new instance which can be used to issue a
+// gettickets JSON-RPC command.
+func NewGetTicketsCmd(includeImmature bool) *GetTicketsCmd {
+	return &GetTicketsCmd{includeImmature}
+}
+
 // GetTransactionCmd defines the gettransaction JSON-RPC command.
 type GetTransactionCmd struct {
 	Txid             string
@@ -211,6 +461,42 @@ func NewGetTransactionCmd(txHash string, includeWatchOnly *bool) *GetTransaction
 	return &GetTransactionCmd{
 		Txid:             txHash,
 		IncludeWatchOnly: includeWatchOnly,
+	}
+}
+
+// GetVoteChoicesCmd returns a new instance which can be used to issue a
+// getvotechoices JSON-RPC command.
+type GetVoteChoicesCmd struct {
+}
+
+// NewGetVoteChoicesCmd returns a new instance which can be used to
+// issue a JSON-RPC getvotechoices command.
+func NewGetVoteChoicesCmd() *GetVoteChoicesCmd {
+	return &GetVoteChoicesCmd{}
+}
+
+// GetWalletFeeCmd defines the getwalletfee JSON-RPC command.
+type GetWalletFeeCmd struct{}
+
+// NewGetWalletFeeCmd returns a new instance which can be used to issue a
+// getwalletfee JSON-RPC command.
+//
+func NewGetWalletFeeCmd() *GetWalletFeeCmd {
+	return &GetWalletFeeCmd{}
+}
+
+// ImportAddressCmd defines the importaddress JSON-RPC command.
+type ImportAddressCmd struct {
+	Address string
+	Rescan  *bool `jsonrpcdefault:"true"`
+}
+
+// NewImportAddressCmd returns a new instance which can be used to issue an
+// importaddress JSON-RPC command.
+func NewImportAddressCmd(address string, rescan *bool) *ImportAddressCmd {
+	return &ImportAddressCmd{
+		Address: address,
+		Rescan:  rescan,
 	}
 }
 
@@ -234,6 +520,34 @@ func NewImportPrivKeyCmd(privKey string, label *string, rescan *bool, scanFrom *
 		Rescan:   rescan,
 		ScanFrom: scanFrom,
 	}
+}
+
+// ImportPubKeyCmd defines the importpubkey JSON-RPC command.
+type ImportPubKeyCmd struct {
+	PubKey string
+	Rescan *bool `jsonrpcdefault:"true"`
+}
+
+// NewImportPubKeyCmd returns a new instance which can be used to issue an
+// importpubkey JSON-RPC command.
+func NewImportPubKeyCmd(pubKey string, rescan *bool) *ImportPubKeyCmd {
+	return &ImportPubKeyCmd{
+		PubKey: pubKey,
+		Rescan: rescan,
+	}
+}
+
+// ImportScriptCmd is a type for handling custom marshaling and
+// unmarshaling of importscript JSON wallet extension commands.
+type ImportScriptCmd struct {
+	Hex      string
+	Rescan   *bool `jsonrpcdefault:"true"`
+	ScanFrom *int
+}
+
+// NewImportScriptCmd creates a new GetImportScriptCmd.
+func NewImportScriptCmd(hex string, rescan *bool, scanFrom *int) *ImportScriptCmd {
+	return &ImportScriptCmd{hex, rescan, scanFrom}
 }
 
 // KeyPoolRefillCmd defines the keypoolrefill JSON-RPC command.
@@ -317,6 +631,17 @@ func NewListReceivedByAddressCmd(minConf *int, includeEmpty, includeWatchOnly *b
 	}
 }
 
+// ListScriptsCmd is a type for handling custom marshaling and
+// unmarshaling of listscripts JSON wallet extension commands.
+type ListScriptsCmd struct {
+}
+
+// NewListScriptsCmd returns a new instance which can be used to issue a
+// listscripts JSON-RPC command.
+func NewListScriptsCmd() *ListScriptsCmd {
+	return &ListScriptsCmd{}
+}
+
 // ListSinceBlockCmd defines the listsinceblock JSON-RPC command.
 type ListSinceBlockCmd struct {
 	BlockHash           *string
@@ -394,6 +719,108 @@ func NewLockUnspentCmd(unlock bool, transactions []TransactionInput) *LockUnspen
 	}
 }
 
+// PurchaseTicketCmd is a type handling custom marshaling and
+// unmarshaling of purchaseticket JSON RPC commands.
+type PurchaseTicketCmd struct {
+	FromAccount   string
+	SpendLimit    float64 // In Coins
+	MinConf       *int    `jsonrpcdefault:"1"`
+	TicketAddress *string
+	NumTickets    *int
+	PoolAddress   *string
+	PoolFees      *float64
+	Expiry        *int
+	Comment       *string
+	TicketChange  *bool
+	TicketFee     *float64
+}
+
+// NewPurchaseTicketCmd creates a new PurchaseTicketCmd.
+func NewPurchaseTicketCmd(fromAccount string, spendLimit float64, minConf *int,
+	ticketAddress *string, numTickets *int, poolAddress *string, poolFees *float64,
+	expiry *int, comment *string, ticketChange *bool, ticketFee *float64) *PurchaseTicketCmd {
+	return &PurchaseTicketCmd{
+		FromAccount:   fromAccount,
+		SpendLimit:    spendLimit,
+		MinConf:       minConf,
+		TicketAddress: ticketAddress,
+		NumTickets:    numTickets,
+		PoolAddress:   poolAddress,
+		PoolFees:      poolFees,
+		Expiry:        expiry,
+		Comment:       comment,
+		TicketChange:  ticketChange,
+		TicketFee:     ticketFee,
+	}
+}
+
+// RedeemMultiSigOutCmd is a type handling custom marshaling and
+// unmarshaling of redeemmultisigout JSON RPC commands.
+type RedeemMultiSigOutCmd struct {
+	Hash    string
+	Index   uint32
+	Tree    int8
+	Address *string
+}
+
+// NewRedeemMultiSigOutCmd creates a new RedeemMultiSigOutCmd.
+func NewRedeemMultiSigOutCmd(hash string, index uint32, tree int8,
+	address *string) *RedeemMultiSigOutCmd {
+	return &RedeemMultiSigOutCmd{
+		Hash:    hash,
+		Index:   index,
+		Tree:    tree,
+		Address: address,
+	}
+}
+
+// RedeemMultiSigOutsCmd is a type handling custom marshaling and
+// unmarshaling of redeemmultisigout JSON RPC commands.
+type RedeemMultiSigOutsCmd struct {
+	FromScrAddress string
+	ToAddress      *string
+	Number         *int
+}
+
+// NewRedeemMultiSigOutsCmd creates a new RedeemMultiSigOutsCmd.
+func NewRedeemMultiSigOutsCmd(from string, to *string,
+	number *int) *RedeemMultiSigOutsCmd {
+	return &RedeemMultiSigOutsCmd{
+		FromScrAddress: from,
+		ToAddress:      to,
+		Number:         number,
+	}
+}
+
+// RenameAccountCmd defines the renameaccount JSON-RPC command.
+type RenameAccountCmd struct {
+	OldAccount string
+	NewAccount string
+}
+
+// NewRenameAccountCmd returns a new instance which can be used to issue a
+// renameaccount JSON-RPC command.
+func NewRenameAccountCmd(oldAccount, newAccount string) *RenameAccountCmd {
+	return &RenameAccountCmd{
+		OldAccount: oldAccount,
+		NewAccount: newAccount,
+	}
+}
+
+// RescanWalletCmd describes the rescanwallet JSON-RPC request and parameters.
+type RescanWalletCmd struct {
+	BeginHeight *int `jsonrpcdefault:"0"`
+}
+
+// RevokeTicketsCmd describes the revoketickets JSON-RPC request and parameters.
+type RevokeTicketsCmd struct {
+}
+
+// NewRevokeTicketsCmd creates a new RevokeTicketsCmd.
+func NewRevokeTicketsCmd() *RevokeTicketsCmd {
+	return &RevokeTicketsCmd{}
+}
+
 // SendFromCmd defines the sendfrom JSON-RPC command.
 type SendFromCmd struct {
 	FromAccount string
@@ -464,6 +891,113 @@ func NewSendToAddressCmd(address string, amount float64, comment, commentTo *str
 	}
 }
 
+// SendToMultiSigCmd is a type handling custom marshaling and
+// unmarshaling of sendtomultisig JSON RPC commands.
+type SendToMultiSigCmd struct {
+	FromAccount string
+	Amount      float64
+	Pubkeys     []string
+	NRequired   *int `jsonrpcdefault:"1"`
+	MinConf     *int `jsonrpcdefault:"1"`
+	Comment     *string
+}
+
+// NewSendToMultiSigCmd creates a new SendToMultiSigCmd.
+func NewSendToMultiSigCmd(fromaccount string, amount float64, pubkeys []string,
+	nrequired *int, minConf *int, comment *string) *SendToMultiSigCmd {
+	return &SendToMultiSigCmd{
+		FromAccount: fromaccount,
+		Amount:      amount,
+		Pubkeys:     pubkeys,
+		NRequired:   nrequired,
+		MinConf:     minConf,
+		Comment:     comment,
+	}
+}
+
+// SendToSStxCmd is a type handling custom marshaling and
+// unmarshaling of sendtosstx JSON RPC commands.
+type SendToSStxCmd struct {
+	FromAccount string
+	Amounts     map[string]int64
+	Inputs      []SStxInput
+	COuts       []SStxCommitOut
+	MinConf     *int `jsonrpcdefault:"1"`
+	Comment     *string
+}
+
+// NewSendToSStxCmd creates a new SendToSStxCmd. Optionally a
+// pointer to a TemplateRequest may be provided.
+func NewSendToSStxCmd(fromaccount string, amounts map[string]int64,
+	inputs []SStxInput, couts []SStxCommitOut, minConf *int,
+	comment *string) *SendToSStxCmd {
+	return &SendToSStxCmd{
+		FromAccount: fromaccount,
+		Amounts:     amounts,
+		Inputs:      inputs,
+		COuts:       couts,
+		MinConf:     minConf,
+		Comment:     comment,
+	}
+}
+
+// SendToSSGenCmd models the data needed for sendtossgen.
+type SendToSSGenCmd struct {
+	FromAccount string
+	TicketHash  string
+	BlockHash   string
+	Height      int64
+	VoteBits    uint16
+	Comment     *string
+}
+
+// NewSendToSSGenCmd creates a new SendToSSGenCmd. Optionally a
+// pointer to a TemplateRequest may be provided.
+func NewSendToSSGenCmd(fromaccount string, tickethash string, blockhash string,
+	height int64, votebits uint16, comment *string) *SendToSSGenCmd {
+	return &SendToSSGenCmd{
+		FromAccount: fromaccount,
+		TicketHash:  tickethash,
+		BlockHash:   blockhash,
+		Height:      height,
+		VoteBits:    votebits,
+		Comment:     comment,
+	}
+}
+
+// SendToSSRtxCmd is a type handling custom marshaling and
+// unmarshaling of sendtossrtx JSON RPC commands.
+type SendToSSRtxCmd struct {
+	FromAccount string
+	TicketHash  string
+	Comment     *string
+}
+
+// NewSendToSSRtxCmd creates a new SendToSSRtxCmd. Optionally a
+// pointer to a TemplateRequest may be provided.
+func NewSendToSSRtxCmd(fromaccount string, tickethash string,
+	comment *string) *SendToSSRtxCmd {
+	return &SendToSSRtxCmd{
+		FromAccount: fromaccount,
+		TicketHash:  tickethash,
+		Comment:     comment,
+	}
+}
+
+// SetBalanceToMaintainCmd is a type handling custom marshaling and
+// unmarshaling of setbalancetomaintain JSON RPC commands.
+type SetBalanceToMaintainCmd struct {
+	Balance float64
+}
+
+// NewSetBalanceToMaintainCmd creates a new instance of the setticketfee
+// command.
+func NewSetBalanceToMaintainCmd(balance float64) *SetBalanceToMaintainCmd {
+	return &SetBalanceToMaintainCmd{
+		Balance: balance,
+	}
+}
+
 // SetTxFeeCmd defines the settxfee JSON-RPC command.
 type SetTxFeeCmd struct {
 	Amount float64 // In DCR
@@ -475,6 +1009,46 @@ func NewSetTxFeeCmd(amount float64) *SetTxFeeCmd {
 	return &SetTxFeeCmd{
 		Amount: amount,
 	}
+}
+
+// SetTicketFeeCmd is a type handling custom marshaling and
+// unmarshaling of setticketfee JSON RPC commands.
+type SetTicketFeeCmd struct {
+	Fee float64
+}
+
+// NewSetTicketFeeCmd creates a new instance of the setticketfee
+// command.
+func NewSetTicketFeeCmd(fee float64) *SetTicketFeeCmd {
+	return &SetTicketFeeCmd{
+		Fee: fee,
+	}
+}
+
+// SetTicketMaxPriceCmd is a type handling custom marshaling and
+// unmarshaling of setticketmaxprice JSON RPC commands.
+type SetTicketMaxPriceCmd struct {
+	Max float64
+}
+
+// NewSetTicketMaxPriceCmd creates a new instance of the setticketmaxprice
+// command.
+func NewSetTicketMaxPriceCmd(max float64) *SetTicketMaxPriceCmd {
+	return &SetTicketMaxPriceCmd{
+		Max: max,
+	}
+}
+
+// SetVoteChoiceCmd defines the parameters to the setvotechoice method.
+type SetVoteChoiceCmd struct {
+	AgendaID string
+	ChoiceID string
+}
+
+// NewSetVoteChoiceCmd returns a new instance which can be used to issue a
+// setvotechoice JSON-RPC command.
+func NewSetVoteChoiceCmd(agendaID, choiceID string) *SetVoteChoiceCmd {
+	return &SetVoteChoiceCmd{AgendaID: agendaID, ChoiceID: choiceID}
 }
 
 // SignMessageCmd defines the signmessage JSON-RPC command.
@@ -524,6 +1098,95 @@ func NewSignRawTransactionCmd(hexEncodedTx string, inputs *[]RawTxInput, privKey
 	}
 }
 
+// SignRawTransactionsCmd defines the signrawtransactions JSON-RPC command.
+type SignRawTransactionsCmd struct {
+	RawTxs []string
+	Send   *bool `jsonrpcdefault:"true"`
+}
+
+// NewSignRawTransactionsCmd returns a new instance which can be used to issue a
+// signrawtransactions JSON-RPC command.
+func NewSignRawTransactionsCmd(hexEncodedTxs []string,
+	send *bool) *SignRawTransactionsCmd {
+	return &SignRawTransactionsCmd{
+		RawTxs: hexEncodedTxs,
+		Send:   send,
+	}
+}
+
+// StakePoolUserInfoCmd defines the stakepooluserinfo JSON-RPC command.
+type StakePoolUserInfoCmd struct {
+	User string
+}
+
+// NewStakePoolUserInfoCmd returns a new instance which can be used to issue a
+// signrawtransactions JSON-RPC command.
+func NewStakePoolUserInfoCmd(user string) *StakePoolUserInfoCmd {
+	return &StakePoolUserInfoCmd{
+		User: user,
+	}
+}
+
+// StartAutoBuyerCmd is a type handling custom marshaling and
+// unmarshaling of startautobuyer JSON RPC commands.
+type StartAutoBuyerCmd struct {
+	Account           string
+	Passphrase        string
+	BalanceToMaintain *int64
+	MaxFeePerKb       *int64
+	MaxPriceRelative  *float64
+	MaxPriceAbsolute  *int64
+	VotingAddress     *string
+	PoolAddress       *string
+	PoolFees          *float64
+	MaxPerBlock       *int64
+}
+
+// NewStartAutoBuyerCmd creates a new StartAutoBuyerCmd.
+func NewStartAutoBuyerCmd(account string, passphrase string, balanceToMaintain *int64, maxFeePerKb *int64, maxPriceRelative *float64, maxPriceAbsolute *int64, votingAddress *string, poolAddress *string, poolFees *float64,
+	maxPerBlock *int64) *StartAutoBuyerCmd {
+	return &StartAutoBuyerCmd{
+		Account:           account,
+		Passphrase:        passphrase,
+		BalanceToMaintain: balanceToMaintain,
+		MaxFeePerKb:       maxFeePerKb,
+		MaxPriceRelative:  maxPriceRelative,
+		MaxPriceAbsolute:  maxPriceAbsolute,
+		VotingAddress:     votingAddress,
+		PoolAddress:       poolAddress,
+		PoolFees:          poolFees,
+		MaxPerBlock:       maxPerBlock,
+	}
+}
+
+// StopAutoBuyerCmd is a type handling custom marshaling and
+// unmarshaling of stopautobuyer JSON RPC commands.
+type StopAutoBuyerCmd struct {
+}
+
+// NewStopAutoBuyerCmd creates a new StopAutoBuyerCmd.
+func NewStopAutoBuyerCmd() *StopAutoBuyerCmd {
+	return &StopAutoBuyerCmd{}
+}
+
+// SweepAccountCmd defines the sweep account JSON-RPC command.
+type SweepAccountCmd struct {
+	SourceAccount         string
+	DestinationAddress    string
+	RequiredConfirmations *uint32
+	FeePerKb              *float64
+}
+
+// NewSweepAccountCmd returns a new instance which can be used to issue a JSON-RPC SweepAccountCmd command.
+func NewSweepAccountCmd(sourceAccount string, destinationAddress string, requiredConfs *uint32, feePerKb *float64) *SweepAccountCmd {
+	return &SweepAccountCmd{
+		SourceAccount:         sourceAccount,
+		DestinationAddress:    destinationAddress,
+		RequiredConfirmations: requiredConfs,
+		FeePerKb:              feePerKb,
+	}
+}
+
 // VerifySeedCmd defines the verifyseed JSON-RPC command.
 type VerifySeedCmd struct {
 	Seed    string
@@ -540,6 +1203,16 @@ func NewVerifySeedCmd(seed string, account *uint32) *VerifySeedCmd {
 		Seed:    seed,
 		Account: account,
 	}
+}
+
+// WalletInfoCmd defines the walletinfo JSON-RPC command.
+type WalletInfoCmd struct {
+}
+
+// NewWalletInfoCmd returns a new instance which can be used to issue a
+// walletinfo JSON-RPC command.
+func NewWalletInfoCmd() *WalletInfoCmd {
+	return &WalletInfoCmd{}
 }
 
 // WalletLockCmd defines the walletlock JSON-RPC command.
@@ -585,37 +1258,78 @@ func init() {
 	// The commands in this file are only usable with a wallet server.
 	flags := UFWalletOnly
 
+	MustRegisterCmd("accountaddressindex", (*AccountAddressIndexCmd)(nil), flags)
+	MustRegisterCmd("accountsyncaddressindex", (*AccountSyncAddressIndexCmd)(nil), flags)
 	MustRegisterCmd("addmultisigaddress", (*AddMultisigAddressCmd)(nil), flags)
+	MustRegisterCmd("addticket", (*AddTicketCmd)(nil), flags)
+	MustRegisterCmd("consolidate", (*ConsolidateCmd)(nil), flags)
 	MustRegisterCmd("createmultisig", (*CreateMultisigCmd)(nil), flags)
+	MustRegisterCmd("createnewaccount", (*CreateNewAccountCmd)(nil), flags)
+	MustRegisterCmd("createrawsstx", (*CreateRawSStxCmd)(nil), flags)
+	MustRegisterCmd("createrawssgentx", (*CreateRawSSGenTxCmd)(nil), flags)
+	MustRegisterCmd("createrawssrtx", (*CreateRawSSRtxCmd)(nil), flags)
+	MustRegisterCmd("createvotingaccount", (*CreateVotingAccountCmd)(nil), flags)
+	MustRegisterCmd("dropvotingaccount", (*DropVotingAccountCmd)(nil), flags)
 	MustRegisterCmd("dumpprivkey", (*DumpPrivKeyCmd)(nil), flags)
 	MustRegisterCmd("estimatepriority", (*EstimatePriorityCmd)(nil), flags)
+	MustRegisterCmd("generatevote", (*GenerateVoteCmd)(nil), flags)
 	MustRegisterCmd("getaccount", (*GetAccountCmd)(nil), flags)
 	MustRegisterCmd("getaccountaddress", (*GetAccountAddressCmd)(nil), flags)
 	MustRegisterCmd("getaddressesbyaccount", (*GetAddressesByAccountCmd)(nil), flags)
 	MustRegisterCmd("getbalance", (*GetBalanceCmd)(nil), flags)
+	MustRegisterCmd("getmasterpubkey", (*GetMasterPubkeyCmd)(nil), flags)
+	MustRegisterCmd("getmultisigoutinfo", (*GetMultisigOutInfoCmd)(nil), flags)
 	MustRegisterCmd("getnewaddress", (*GetNewAddressCmd)(nil), flags)
 	MustRegisterCmd("getrawchangeaddress", (*GetRawChangeAddressCmd)(nil), flags)
 	MustRegisterCmd("getreceivedbyaccount", (*GetReceivedByAccountCmd)(nil), flags)
 	MustRegisterCmd("getreceivedbyaddress", (*GetReceivedByAddressCmd)(nil), flags)
+	MustRegisterCmd("getstakeinfo", (*GetStakeInfoCmd)(nil), flags)
+	MustRegisterCmd("getticketfee", (*GetTicketFeeCmd)(nil), flags)
+	MustRegisterCmd("gettickets", (*GetTicketsCmd)(nil), flags)
 	MustRegisterCmd("gettransaction", (*GetTransactionCmd)(nil), flags)
+	MustRegisterCmd("getvotechoices", (*GetVoteChoicesCmd)(nil), flags)
 	MustRegisterCmd("getwalletfee", (*GetWalletFeeCmd)(nil), flags)
+	MustRegisterCmd("importaddress", (*ImportAddressCmd)(nil), flags)
 	MustRegisterCmd("importprivkey", (*ImportPrivKeyCmd)(nil), flags)
+	MustRegisterCmd("importpubkey", (*ImportPubKeyCmd)(nil), flags)
+	MustRegisterCmd("importscript", (*ImportScriptCmd)(nil), flags)
 	MustRegisterCmd("keypoolrefill", (*KeyPoolRefillCmd)(nil), flags)
 	MustRegisterCmd("listaccounts", (*ListAccountsCmd)(nil), flags)
 	MustRegisterCmd("listlockunspent", (*ListLockUnspentCmd)(nil), flags)
 	MustRegisterCmd("listreceivedbyaccount", (*ListReceivedByAccountCmd)(nil), flags)
 	MustRegisterCmd("listreceivedbyaddress", (*ListReceivedByAddressCmd)(nil), flags)
+	MustRegisterCmd("listscripts", (*ListScriptsCmd)(nil), flags)
 	MustRegisterCmd("listsinceblock", (*ListSinceBlockCmd)(nil), flags)
 	MustRegisterCmd("listtransactions", (*ListTransactionsCmd)(nil), flags)
 	MustRegisterCmd("listunspent", (*ListUnspentCmd)(nil), flags)
 	MustRegisterCmd("lockunspent", (*LockUnspentCmd)(nil), flags)
+	MustRegisterCmd("purchaseticket", (*PurchaseTicketCmd)(nil), flags)
+	MustRegisterCmd("redeemmultisigout", (*RedeemMultiSigOutCmd)(nil), flags)
+	MustRegisterCmd("redeemmultisigouts", (*RedeemMultiSigOutsCmd)(nil), flags)
+	MustRegisterCmd("renameaccount", (*RenameAccountCmd)(nil), flags)
+	MustRegisterCmd("rescanwallet", (*RescanWalletCmd)(nil), flags)
+	MustRegisterCmd("revoketickets", (*RevokeTicketsCmd)(nil), flags)
 	MustRegisterCmd("sendfrom", (*SendFromCmd)(nil), flags)
 	MustRegisterCmd("sendmany", (*SendManyCmd)(nil), flags)
 	MustRegisterCmd("sendtoaddress", (*SendToAddressCmd)(nil), flags)
+	MustRegisterCmd("sendtomultisig", (*SendToMultiSigCmd)(nil), flags)
+	MustRegisterCmd("sendtosstx", (*SendToSStxCmd)(nil), flags)
+	MustRegisterCmd("sendtossgen", (*SendToSSGenCmd)(nil), flags)
+	MustRegisterCmd("sendtossrtx", (*SendToSSRtxCmd)(nil), flags)
+	MustRegisterCmd("setbalancetomaintain", (*SetBalanceToMaintainCmd)(nil), flags)
 	MustRegisterCmd("settxfee", (*SetTxFeeCmd)(nil), flags)
+	MustRegisterCmd("setticketfee", (*SetTicketFeeCmd)(nil), flags)
+	MustRegisterCmd("setticketmaxprice", (*SetTicketMaxPriceCmd)(nil), flags)
+	MustRegisterCmd("setvotechoice", (*SetVoteChoiceCmd)(nil), flags)
 	MustRegisterCmd("signmessage", (*SignMessageCmd)(nil), flags)
 	MustRegisterCmd("signrawtransaction", (*SignRawTransactionCmd)(nil), flags)
+	MustRegisterCmd("signrawtransactions", (*SignRawTransactionsCmd)(nil), flags)
+	MustRegisterCmd("stakepooluserinfo", (*StakePoolUserInfoCmd)(nil), flags)
+	MustRegisterCmd("startautobuyer", (*StartAutoBuyerCmd)(nil), flags)
+	MustRegisterCmd("stopautobuyer", (*StopAutoBuyerCmd)(nil), flags)
+	MustRegisterCmd("sweepaccount", (*SweepAccountCmd)(nil), flags)
 	MustRegisterCmd("verifyseed", (*VerifySeedCmd)(nil), flags)
+	MustRegisterCmd("walletinfo", (*WalletInfoCmd)(nil), flags)
 	MustRegisterCmd("walletlock", (*WalletLockCmd)(nil), flags)
 	MustRegisterCmd("walletpassphrase", (*WalletPassphraseCmd)(nil), flags)
 	MustRegisterCmd("walletpassphrasechange", (*WalletPassphraseChangeCmd)(nil), flags)

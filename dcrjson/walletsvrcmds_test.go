@@ -78,6 +78,19 @@ func TestWalletSvrCmds(t *testing.T) {
 			},
 		},
 		{
+			name: "createnewaccount",
+			newCmd: func() (interface{}, error) {
+				return dcrjson.NewCmd("createnewaccount", "acct")
+			},
+			staticCmd: func() interface{} {
+				return dcrjson.NewCreateNewAccountCmd("acct")
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"createnewaccount","params":["acct"],"id":1}`,
+			unmarshalled: &dcrjson.CreateNewAccountCmd{
+				Account: "acct",
+			},
+		},
+		{
 			name: "dumpprivkey",
 			newCmd: func() (interface{}, error) {
 				return dcrjson.NewCmd("dumpprivkey", "1Address")
@@ -336,6 +349,34 @@ func TestWalletSvrCmds(t *testing.T) {
 			},
 		},
 		{
+			name: "importaddress",
+			newCmd: func() (interface{}, error) {
+				return dcrjson.NewCmd("importaddress", "1Address")
+			},
+			staticCmd: func() interface{} {
+				return dcrjson.NewImportAddressCmd("1Address", nil)
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"importaddress","params":["1Address"],"id":1}`,
+			unmarshalled: &dcrjson.ImportAddressCmd{
+				Address: "1Address",
+				Rescan:  dcrjson.Bool(true),
+			},
+		},
+		{
+			name: "importaddress optional",
+			newCmd: func() (interface{}, error) {
+				return dcrjson.NewCmd("importaddress", "1Address", false)
+			},
+			staticCmd: func() interface{} {
+				return dcrjson.NewImportAddressCmd("1Address", dcrjson.Bool(false))
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"importaddress","params":["1Address",false],"id":1}`,
+			unmarshalled: &dcrjson.ImportAddressCmd{
+				Address: "1Address",
+				Rescan:  dcrjson.Bool(false),
+			},
+		},
+		{
 			name: "importprivkey",
 			newCmd: func() (interface{}, error) {
 				return dcrjson.NewCmd("importprivkey", "abc")
@@ -394,6 +435,34 @@ func TestWalletSvrCmds(t *testing.T) {
 				Label:    dcrjson.String("label"),
 				Rescan:   dcrjson.Bool(false),
 				ScanFrom: dcrjson.Int(12345),
+			},
+		},
+		{
+			name: "importpubkey",
+			newCmd: func() (interface{}, error) {
+				return dcrjson.NewCmd("importpubkey", "031234")
+			},
+			staticCmd: func() interface{} {
+				return dcrjson.NewImportPubKeyCmd("031234", nil)
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"importpubkey","params":["031234"],"id":1}`,
+			unmarshalled: &dcrjson.ImportPubKeyCmd{
+				PubKey: "031234",
+				Rescan: dcrjson.Bool(true),
+			},
+		},
+		{
+			name: "importpubkey optional",
+			newCmd: func() (interface{}, error) {
+				return dcrjson.NewCmd("importpubkey", "031234", false)
+			},
+			staticCmd: func() interface{} {
+				return dcrjson.NewImportPubKeyCmd("031234", dcrjson.Bool(false))
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"importpubkey","params":["031234",false],"id":1}`,
+			unmarshalled: &dcrjson.ImportPubKeyCmd{
+				PubKey: "031234",
+				Rescan: dcrjson.Bool(false),
 			},
 		},
 		{
@@ -802,6 +871,20 @@ func TestWalletSvrCmds(t *testing.T) {
 			},
 		},
 		{
+			name: "renameaccount",
+			newCmd: func() (interface{}, error) {
+				return dcrjson.NewCmd("renameaccount", "oldacct", "newacct")
+			},
+			staticCmd: func() interface{} {
+				return dcrjson.NewRenameAccountCmd("oldacct", "newacct")
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"renameaccount","params":["oldacct","newacct"],"id":1}`,
+			unmarshalled: &dcrjson.RenameAccountCmd{
+				OldAccount: "oldacct",
+				NewAccount: "newacct",
+			},
+		},
+		{
 			name: "sendfrom",
 			newCmd: func() (interface{}, error) {
 				return dcrjson.NewCmd("sendfrom", "from", "1Address", 0.5)
@@ -1069,6 +1152,38 @@ func TestWalletSvrCmds(t *testing.T) {
 				Inputs:   &[]dcrjson.RawTxInput{},
 				PrivKeys: &[]string{},
 				Flags:    dcrjson.String("ALL"),
+			},
+		},
+		{
+			name: "sweepaccount - optionals provided",
+			newCmd: func() (interface{}, error) {
+				return dcrjson.NewCmd("sweepaccount", "default", "DsUZxxoHJSty8DCfwfartwTYbuhmVct7tJu", 6, 0.05)
+			},
+			staticCmd: func() interface{} {
+				return dcrjson.NewSweepAccountCmd("default", "DsUZxxoHJSty8DCfwfartwTYbuhmVct7tJu",
+					func(i uint32) *uint32 { return &i }(6),
+					func(i float64) *float64 { return &i }(0.05))
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"sweepaccount","params":["default","DsUZxxoHJSty8DCfwfartwTYbuhmVct7tJu",6,0.05],"id":1}`,
+			unmarshalled: &dcrjson.SweepAccountCmd{
+				SourceAccount:         "default",
+				DestinationAddress:    "DsUZxxoHJSty8DCfwfartwTYbuhmVct7tJu",
+				RequiredConfirmations: func(i uint32) *uint32 { return &i }(6),
+				FeePerKb:              func(i float64) *float64 { return &i }(0.05),
+			},
+		},
+		{
+			name: "sweepaccount - optionals omitted",
+			newCmd: func() (interface{}, error) {
+				return dcrjson.NewCmd("sweepaccount", "default", "DsUZxxoHJSty8DCfwfartwTYbuhmVct7tJu")
+			},
+			staticCmd: func() interface{} {
+				return dcrjson.NewSweepAccountCmd("default", "DsUZxxoHJSty8DCfwfartwTYbuhmVct7tJu", nil, nil)
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"sweepaccount","params":["default","DsUZxxoHJSty8DCfwfartwTYbuhmVct7tJu"],"id":1}`,
+			unmarshalled: &dcrjson.SweepAccountCmd{
+				SourceAccount:      "default",
+				DestinationAddress: "DsUZxxoHJSty8DCfwfartwTYbuhmVct7tJu",
 			},
 		},
 		{

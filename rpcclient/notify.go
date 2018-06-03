@@ -152,12 +152,12 @@ type NotificationHandlers struct {
 	// made to register for the notification and the function is non-nil.
 	OnTxAcceptedVerbose func(txDetails *dcrjson.TxRawResult)
 
-	// OnBtcdConnected is invoked when a wallet connects or disconnects from
+	// OnDcrdConnected is invoked when a wallet connects or disconnects from
 	// dcrd.
 	//
 	// This will only be available when client is connected to a wallet
 	// server such as dcrwallet.
-	OnBtcdConnected func(connected bool)
+	OnDcrdConnected func(connected bool)
 
 	// OnAccountBalance is invoked with account balance updates.
 	//
@@ -397,22 +397,22 @@ func (c *Client) handleNotification(ntfn *rawNotification) {
 
 		c.ntfnHandlers.OnTxAcceptedVerbose(rawTx)
 
-	// OnBtcdConnected
-	case dcrjson.BtcdConnectedNtfnMethod:
+		// OnDcrdConnected
+	case dcrjson.DcrdConnectedNtfnMethod:
 		// Ignore the notification if the client is not interested in
 		// it.
-		if c.ntfnHandlers.OnBtcdConnected == nil {
+		if c.ntfnHandlers.OnDcrdConnected == nil {
 			return
 		}
 
-		connected, err := parseBtcdConnectedNtfnParams(ntfn.Params)
+		connected, err := parseDcrdConnectedNtfnParams(ntfn.Params)
 		if err != nil {
 			log.Warnf("Received invalid dcrd connected "+
 				"notification: %v", err)
 			return
 		}
 
-		c.ntfnHandlers.OnBtcdConnected(connected)
+		c.ntfnHandlers.OnDcrdConnected(connected)
 
 	// OnAccountBalance
 	case dcrjson.AccountBalanceNtfnMethod:
@@ -919,9 +919,9 @@ func parseTxAcceptedVerboseNtfnParams(params []json.RawMessage) (*dcrjson.TxRawR
 	return &rawTx, nil
 }
 
-// parseBtcdConnectedNtfnParams parses out the connection status of dcrd
-// and dcrwallet from the parameters of a btcdconnected notification.
-func parseBtcdConnectedNtfnParams(params []json.RawMessage) (bool, error) {
+// parseDcrdConnectedNtfnParams parses out the connection status of dcrd
+// and dcrwallet from the parameters of a dcrdconnected notification.
+func parseDcrdConnectedNtfnParams(params []json.RawMessage) (bool, error) {
 	if len(params) != 1 {
 		return false, wrongNumParams(len(params))
 	}
