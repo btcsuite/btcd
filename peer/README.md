@@ -3,7 +3,7 @@ peer
 
 [![Build Status](http://img.shields.io/travis/btcsuite/btcd.svg)](https://travis-ci.org/btcsuite/btcd)
 [![ISC License](http://img.shields.io/badge/license-ISC-blue.svg)](http://copyfree.org)
-[![GoDoc](https://img.shields.io/badge/godoc-reference-blue.svg)](http://godoc.org/github.com/btcsuite/btcd/peer)
+[![GoDoc](https://img.shields.io/badge/godoc-reference-blue.svg)](http://godoc.org/github.com/daglabs/btcd/peer)
 
 Package peer provides a common base for creating and managing bitcoin network
 peers.
@@ -58,12 +58,12 @@ A quick overview of the major features peer provides are as follows:
 ## Installation and Updating
 
 ```bash
-$ go get -u github.com/btcsuite/btcd/peer
+$ go get -u github.com/daglabs/btcd/peer
 ```
 
 ## Examples
 
-* [New Outbound Peer Example](https://godoc.org/github.com/btcsuite/btcd/peer#example-package--NewOutboundPeer)  
+* [New Outbound Peer Example](https://godoc.org/github.com/daglabs/btcd/peer#example-package--NewOutboundPeer)  
   Demonstrates the basic process for initializing and creating an outbound peer.
   Peers negotiate by exchanging version and verack messages.  For demonstration,
   a simple handler for the version message is attached to the peer.
