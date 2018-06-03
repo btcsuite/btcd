@@ -16,7 +16,7 @@ const (
 
 	// MaxBlockSigOpsPerMB The maximum allowed number of signature check operations per MB in a
 	// block (network rule)
-	MaxBlockSigOpsPerMB = 2000
+	MaxBlockSigOpsPerMB = 20000
 )
 
 func GetMaxBlockSigOpsCount(blocksize int) int {
