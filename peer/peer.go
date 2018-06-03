@@ -1280,6 +1280,7 @@ out:
 		p.stallControl <- stallControlMsg{sccHandlerStart, rmsg}
 		switch msg := rmsg.(type) {
 		case *wire.MsgVersion:
+			// Limit to one version message per peer.
 			p.PushRejectMsg(msg.Command(), wire.RejectDuplicate,
 				"duplicate version message", nil, true)
 			break out
@@ -1756,18 +1757,6 @@ func (p *Peer) handleRemoteVersionMsg(msg *wire.MsgVersion) error {
 		rejectMsg := wire.NewMsgReject(msg.Command(), wire.RejectObsolete,
 			reason)
 		return p.writeMessage(rejectMsg)
-	}
-
-	// Limit to one version message per peer.
-	// No read lock is necessary because versionKnown is not written to in any
-	// other goroutine
-	if p.versionKnown {
-		// Send a reject message indicating the version message was
-		// incorrectly sent twice and wait for the message to be sent
-		// before disconnecting.
-		p.PushRejectMsg(msg.Command(), wire.RejectDuplicate,
-			"duplicate version message", nil, true)
-		return errors.New("only one version message per peer is allowed")
 	}
 
 	// Updating a bunch of stats.
