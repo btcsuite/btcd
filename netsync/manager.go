@@ -167,6 +167,9 @@ type SyncManager struct {
 	headerList       *list.List
 	startHeader      *list.Element
 	nextCheckpoint   *chaincfg.Checkpoint
+
+	// An optional fee estimator.
+	feeEstimator *mempool.FeeEstimator
 }
 
 // resetHeaderState sets the headers-first mode state to values appropriate for
@@ -895,12 +898,26 @@ func (sm *SyncManager) haveInventory(invVect *wire.InvVect) (bool, error) {
 		}
 
 		// Check if the transaction exists from the point of view of the
-		// end of the main chain.
-		entry, err := sm.chain.FetchUtxoEntry(&invVect.Hash)
-		if err != nil {
-			return false, err
+		// end of the main chain.  Note that this is only a best effort
+		// since it is expensive to check existence of every output and
+		// the only purpose of this check is to avoid downloading
+		// already known transactions.  Only the first two outputs are
+		// checked because the vast majority of transactions consist of
+		// two outputs where one is some form of "pay-to-somebody-else"
+		// and the other is a change output.
+		prevOut := wire.OutPoint{Hash: invVect.Hash}
+		for i := uint32(0); i < 2; i++ {
+			prevOut.Index = i
+			entry, err := sm.chain.FetchUtxoEntry(prevOut)
+			if err != nil {
+				return false, err
+			}
+			if entry != nil && !entry.IsSpent() {
+				return true, nil
+			}
 		}
-		return entry != nil && !entry.IsFullySpent(), nil
+
+		return false, nil
 	}
 
 	// The requested inventory is is an unsupported type, so just claim
@@ -1249,6 +1266,20 @@ func (sm *SyncManager) handleBlockchainNotification(notification *blockchain.Not
 			sm.peerNotifier.AnnounceNewTransactions(acceptedTxs)
 		}
 
+		// Register block with the fee estimator, if it exists.
+		if sm.feeEstimator != nil {
+			err := sm.feeEstimator.RegisterBlock(block)
+
+			// If an error is somehow generated then the fee estimator
+			// has entered an invalid state. Since it doesn't know how
+			// to recover, create a new one.
+			if err != nil {
+				sm.feeEstimator = mempool.NewFeeEstimator(
+					mempool.DefaultEstimateFeeMaxRollback,
+					mempool.DefaultEstimateFeeMinRegisteredBlocks)
+			}
+		}
+
 	// A block has been disconnected from the main block chain.
 	case blockchain.NTBlockDisconnected:
 		block, ok := notification.Data.(*btcutil.Block)
@@ -1268,6 +1299,11 @@ func (sm *SyncManager) handleBlockchainNotification(notification *blockchain.Not
 				// the transaction pool.
 				sm.txMemPool.RemoveTransaction(tx, true)
 			}
+		}
+
+		// Rollback previous block recorded by the fee estimator.
+		if sm.feeEstimator != nil {
+			sm.feeEstimator.Rollback(block.Hash())
 		}
 	}
 }
@@ -1417,6 +1453,7 @@ func New(config *Config) (*SyncManager, error) {
 		msgChan:         make(chan interface{}, config.MaxPeers*3),
 		headerList:      list.New(),
 		quit:            make(chan struct{}),
+		feeEstimator:    config.FeeEstimator,
 	}
 
 	best := sm.chain.BestSnapshot()

@@ -1,7 +1,7 @@
 language: go
 go:
-  - 1.8.x
-  - 1.9.x
+  - "1.9.5"
+  - "1.10.1"
 sudo: false
 install:
   - GLIDE_TAG=v0.12.3
@@ -10,8 +10,8 @@ install:
   - export PATH=$PATH:$PWD/linux-amd64/
   - glide install
   - go install . ./cmd/...
-  - go get -v github.com/alecthomas/gometalinter
-  - gometalinter --install
+  - go get -u gopkg.in/alecthomas/gometalinter.v2
+  - gometalinter.v2 --install
 script:
   - export PATH=$PATH:$HOME/gopath/bin
   - ./goclean.sh

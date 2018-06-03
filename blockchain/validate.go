@@ -286,8 +286,7 @@ func CheckTransactionSanity(tx *btcutil.Tx) error {
 		// Previous transaction outputs referenced by the inputs to this
 		// transaction must not be null.
 		for _, txIn := range msgTx.TxIn {
-			prevOut := &txIn.PreviousOutPoint
-			if isNullOutpoint(prevOut) {
+			if isNullOutpoint(&txIn.PreviousOutPoint) {
 				return ruleError(ErrBadTxInput, "transaction "+
 					"input refers to previous output that "+
 					"is null")
@@ -385,10 +384,8 @@ func CountP2SHSigOps(tx *btcutil.Tx, isCoinBaseTx bool, utxoView *UtxoViewpoint)
 	totalSigOps := 0
 	for txInIndex, txIn := range msgTx.TxIn {
 		// Ensure the referenced input transaction is available.
-		originTxHash := &txIn.PreviousOutPoint.Hash
-		originTxIndex := txIn.PreviousOutPoint.Index
-		txEntry := utxoView.LookupEntry(originTxHash)
-		if txEntry == nil || txEntry.IsOutputSpent(originTxIndex) {
+		utxo := utxoView.LookupEntry(txIn.PreviousOutPoint)
+		if utxo == nil || utxo.IsSpent() {
 			str := fmt.Sprintf("output %v referenced from "+
 				"transaction %s:%d either does not exist or "+
 				"has already been spent", txIn.PreviousOutPoint,
@@ -398,7 +395,7 @@ func CountP2SHSigOps(tx *btcutil.Tx, isCoinBaseTx bool, utxoView *UtxoViewpoint)
 
 		// We're only interested in pay-to-script-hash types, so skip
 		// this input if it's not one.
-		pkScript := txEntry.PkScriptByIndex(originTxIndex)
+		pkScript := utxo.PkScript()
 		if !txscript.IsPayToScriptHash(pkScript) {
 			continue
 		}
@@ -827,16 +824,21 @@ func (b *BlockChain) checkBlockContext(block *btcutil.Block, prevNode *blockNode
 // duplicated to effectively revert the overwritten transactions to a single
 // confirmation thereby making them vulnerable to a double spend.
 //
-// For more details, see https://en.bitcoin.it/wiki/BIP_0030 and
+// For more details, see
+// https://github.com/bitcoin/bips/blob/master/bip-0030.mediawiki and
 // http://r6.ca/blog/20120206T005236Z.html.
 //
 // This function MUST be called with the chain state lock held (for reads).
 func (b *BlockChain) checkBIP0030(node *blockNode, block *btcutil.Block, view *UtxoViewpoint) error {
-	// Fetch utxo details for all of the transactions in this block.
-	// Typically, there will not be any utxos for any of the transactions.
-	fetchSet := make(map[chainhash.Hash]struct{})
+	// Fetch utxos for all of the transaction ouputs in this block.
+	// Typically, there will not be any utxos for any of the outputs.
+	fetchSet := make(map[wire.OutPoint]struct{})
 	for _, tx := range block.Transactions() {
-		fetchSet[*tx.Hash()] = struct{}{}
+		prevOut := wire.OutPoint{Hash: *tx.Hash()}
+		for txOutIdx := range tx.MsgTx().TxOut {
+			prevOut.Index = uint32(txOutIdx)
+			fetchSet[prevOut] = struct{}{}
+		}
 	}
 	err := view.fetchUtxos(b.db, fetchSet)
 	if err != nil {
@@ -845,12 +847,12 @@ func (b *BlockChain) checkBIP0030(node *blockNode, block *btcutil.Block, view *U
 
 	// Duplicate transactions are only allowed if the previous transaction
 	// is fully spent.
-	for _, tx := range block.Transactions() {
-		txEntry := view.LookupEntry(tx.Hash())
-		if txEntry != nil && !txEntry.IsFullySpent() {
+	for outpoint := range fetchSet {
+		utxo := view.LookupEntry(outpoint)
+		if utxo != nil && !utxo.IsSpent() {
 			str := fmt.Sprintf("tried to overwrite transaction %v "+
 				"at block height %d that is not fully spent",
-				tx.Hash(), txEntry.blockHeight)
+				outpoint.Hash, utxo.BlockHeight())
 			return ruleError(ErrOverwriteTx, str)
 		}
 	}
@@ -879,10 +881,8 @@ func CheckTransactionInputs(tx *btcutil.Tx, txHeight int32, utxoView *UtxoViewpo
 	var totalSatoshiIn int64
 	for txInIndex, txIn := range tx.MsgTx().TxIn {
 		// Ensure the referenced input transaction is available.
-		originTxHash := &txIn.PreviousOutPoint.Hash
-		originTxIndex := txIn.PreviousOutPoint.Index
-		utxoEntry := utxoView.LookupEntry(originTxHash)
-		if utxoEntry == nil || utxoEntry.IsOutputSpent(originTxIndex) {
+		utxo := utxoView.LookupEntry(txIn.PreviousOutPoint)
+		if utxo == nil || utxo.IsSpent() {
 			str := fmt.Sprintf("output %v referenced from "+
 				"transaction %s:%d either does not exist or "+
 				"has already been spent", txIn.PreviousOutPoint,
@@ -892,15 +892,15 @@ func CheckTransactionInputs(tx *btcutil.Tx, txHeight int32, utxoView *UtxoViewpo
 
 		// Ensure the transaction is not spending coins which have not
 		// yet reached the required coinbase maturity.
-		if utxoEntry.IsCoinBase() {
-			originHeight := utxoEntry.BlockHeight()
+		if utxo.IsCoinBase() {
+			originHeight := utxo.BlockHeight()
 			blocksSincePrev := txHeight - originHeight
 			coinbaseMaturity := int32(chainParams.CoinbaseMaturity)
 			if blocksSincePrev < coinbaseMaturity {
 				str := fmt.Sprintf("tried to spend coinbase "+
-					"transaction %v from height %v at "+
-					"height %v before required maturity "+
-					"of %v blocks", originTxHash,
+					"transaction output %v from height %v "+
+					"at height %v before required maturity "+
+					"of %v blocks", txIn.PreviousOutPoint,
 					originHeight, txHeight,
 					coinbaseMaturity)
 				return 0, ruleError(ErrImmatureSpend, str)
@@ -913,7 +913,7 @@ func CheckTransactionInputs(tx *btcutil.Tx, txHeight int32, utxoView *UtxoViewpo
 		// a transaction are in a unit value known as a satoshi.  One
 		// bitcoin is a quantity of satoshi as defined by the
 		// SatoshiPerBitcoin constant.
-		originTxSatoshi := utxoEntry.AmountByIndex(originTxIndex)
+		originTxSatoshi := utxo.Amount()
 		if originTxSatoshi < 0 {
 			str := fmt.Sprintf("transaction output has negative "+
 				"value of %v", btcutil.Amount(originTxSatoshi))

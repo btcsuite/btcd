@@ -112,6 +112,7 @@ Application Options:
       --blockprioritysize=  Size in bytes for high-priority/low-fee transactions
                             when creating a block (50000)
       --nopeerbloomfilters  Disable bloom filtering support.
+      --nocfilters          Disable committed filtering (CF) support.
       --sigcachemaxsize=    The maximum number of entries in the signature
                             verification cache.
       --blocksonly          Do not accept transactions from remote peers.

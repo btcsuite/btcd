@@ -222,14 +222,14 @@ type BlockTemplate struct {
 // mergeUtxoView adds all of the entries in viewB to viewA.  The result is that
 // viewA will contain all of its original entries plus all of the entries
 // in viewB.  It will replace any entries in viewB which also exist in viewA
-// if the entry in viewA is fully spent.
+// if the entry in viewA is spent.
 func mergeUtxoView(viewA *blockchain.UtxoViewpoint, viewB *blockchain.UtxoViewpoint) {
 	viewAEntries := viewA.Entries()
-	for hash, entryB := range viewB.Entries() {
-		if entryA, exists := viewAEntries[hash]; !exists ||
-			entryA == nil || entryA.IsFullySpent() {
+	for outpoint, entryB := range viewB.Entries() {
+		if entryA, exists := viewAEntries[outpoint]; !exists ||
+			entryA == nil || entryA.IsSpent() {
 
-			viewAEntries[hash] = entryB
+			viewAEntries[outpoint] = entryB
 		}
 	}
 }
@@ -291,11 +291,9 @@ func createCoinbaseTx(params *chaincfg.Params, coinbaseScript []byte, nextBlockH
 // which are not provably unspendable as available unspent transaction outputs.
 func spendTransaction(utxoView *blockchain.UtxoViewpoint, tx *btcutil.Tx, height int32) error {
 	for _, txIn := range tx.MsgTx().TxIn {
-		originHash := &txIn.PreviousOutPoint.Hash
-		originIndex := txIn.PreviousOutPoint.Index
-		entry := utxoView.LookupEntry(originHash)
+		entry := utxoView.LookupEntry(txIn.PreviousOutPoint)
 		if entry != nil {
-			entry.SpendOutput(originIndex)
+			entry.Spend()
 		}
 	}
 
@@ -540,9 +538,8 @@ mempoolLoop:
 		prioItem := &txPrioItem{tx: tx}
 		for _, txIn := range tx.MsgTx().TxIn {
 			originHash := &txIn.PreviousOutPoint.Hash
-			originIndex := txIn.PreviousOutPoint.Index
-			utxoEntry := utxos.LookupEntry(originHash)
-			if utxoEntry == nil || utxoEntry.IsOutputSpent(originIndex) {
+			entry := utxos.LookupEntry(txIn.PreviousOutPoint)
+			if entry == nil || entry.IsSpent() {
 				if !g.txSource.HaveTransaction(originHash) {
 					log.Tracef("Skipping tx %s because it "+
 						"references unspent output %s "+

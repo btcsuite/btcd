@@ -399,7 +399,7 @@ func (b *BlockChain) calcSequenceLock(node *blockNode, tx *btcutil.Tx, utxoView 
 	nextHeight := node.height + 1
 
 	for txInIndex, txIn := range mTx.TxIn {
-		utxo := utxoView.LookupEntry(&txIn.PreviousOutPoint.Hash)
+		utxo := utxoView.LookupEntry(txIn.PreviousOutPoint)
 		if utxo == nil {
 			str := fmt.Sprintf("output %v referenced from "+
 				"transaction %s:%d either does not exist or "+
@@ -848,7 +848,7 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List) error 
 		// journal.
 		var stxos []spentTxOut
 		err = b.db.View(func(dbTx database.Tx) error {
-			stxos, err = dbFetchSpendJournalEntry(dbTx, block, view)
+			stxos, err = dbFetchSpendJournalEntry(dbTx, block)
 			return err
 		})
 		if err != nil {
@@ -859,7 +859,7 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List) error 
 		detachBlocks = append(detachBlocks, block)
 		detachSpentTxOuts = append(detachSpentTxOuts, stxos)
 
-		err = view.disconnectTransactions(block, stxos)
+		err = view.disconnectTransactions(b.db, block, stxos)
 		if err != nil {
 			return err
 		}
@@ -961,7 +961,8 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List) error 
 
 		// Update the view to unspend all of the spent txos and remove
 		// the utxos created by the block.
-		err = view.disconnectTransactions(block, detachSpentTxOuts[i])
+		err = view.disconnectTransactions(b.db, block,
+			detachSpentTxOuts[i])
 		if err != nil {
 			return err
 		}
@@ -1322,6 +1323,87 @@ func (b *BlockChain) HeightRange(startHeight, endHeight int32) ([]chainhash.Hash
 	return hashes, nil
 }
 
+// HeightToHashRange returns a range of block hashes for the given start height
+// and end hash, inclusive on both ends.  The hashes are for all blocks that are
+// ancestors of endHash with height greater than or equal to startHeight.  The
+// end hash must belong to a block that is known to be valid.
+//
+// This function is safe for concurrent access.
+func (b *BlockChain) HeightToHashRange(startHeight int32,
+	endHash *chainhash.Hash, maxResults int) ([]chainhash.Hash, error) {
+
+	endNode := b.index.LookupNode(endHash)
+	if endNode == nil {
+		return nil, fmt.Errorf("no known block header with hash %v", endHash)
+	}
+	if !b.index.NodeStatus(endNode).KnownValid() {
+		return nil, fmt.Errorf("block %v is not yet validated", endHash)
+	}
+	endHeight := endNode.height
+
+	if startHeight < 0 {
+		return nil, fmt.Errorf("start height (%d) is below 0", startHeight)
+	}
+	if startHeight > endHeight {
+		return nil, fmt.Errorf("start height (%d) is past end height (%d)",
+			startHeight, endHeight)
+	}
+
+	resultsLength := int(endHeight - startHeight + 1)
+	if resultsLength > maxResults {
+		return nil, fmt.Errorf("number of results (%d) would exceed max (%d)",
+			resultsLength, maxResults)
+	}
+
+	// Walk backwards from endHeight to startHeight, collecting block hashes.
+	node := endNode
+	hashes := make([]chainhash.Hash, resultsLength)
+	for i := resultsLength - 1; i >= 0; i-- {
+		hashes[i] = node.hash
+		node = node.parent
+	}
+	return hashes, nil
+}
+
+// IntervalBlockHashes returns hashes for all blocks that are ancestors of
+// endHash where the block height is a positive multiple of interval.
+//
+// This function is safe for concurrent access.
+func (b *BlockChain) IntervalBlockHashes(endHash *chainhash.Hash, interval int,
+) ([]chainhash.Hash, error) {
+
+	endNode := b.index.LookupNode(endHash)
+	if endNode == nil {
+		return nil, fmt.Errorf("no known block header with hash %v", endHash)
+	}
+	if !b.index.NodeStatus(endNode).KnownValid() {
+		return nil, fmt.Errorf("block %v is not yet validated", endHash)
+	}
+	endHeight := endNode.height
+
+	resultsLength := int(endHeight) / interval
+	hashes := make([]chainhash.Hash, resultsLength)
+
+	b.bestChain.mtx.Lock()
+	defer b.bestChain.mtx.Unlock()
+
+	blockNode := endNode
+	for index := int(endHeight) / interval; index > 0; index-- {
+		// Use the bestChain chainView for faster lookups once lookup intersects
+		// the best chain.
+		blockHeight := int32(index * interval)
+		if b.bestChain.contains(blockNode) {
+			blockNode = b.bestChain.nodeByHeight(blockHeight)
+		} else {
+			blockNode = blockNode.Ancestor(blockHeight)
+		}
+
+		hashes[index-1] = blockNode.hash
+	}
+
+	return hashes, nil
+}
+
 // locateInventory returns the node of the block after the first known block in
 // the locator along with the number of subsequent nodes needed to either reach
 // the provided stop hash or the provided max number of entries.
@@ -1618,6 +1700,11 @@ func New(config *Config) (*BlockChain, error) {
 	// does not yet contain any chain state, both it and the chain state
 	// will be initialized to contain only the genesis block.
 	if err := b.initChainState(); err != nil {
+		return nil, err
+	}
+
+	// Perform any upgrades to the various chain-specific buckets as needed.
+	if err := b.maybeUpgradeDbBuckets(config.Interrupt); err != nil {
 		return nil, err
 	}
 

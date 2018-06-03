@@ -89,6 +89,10 @@ type Config struct {
 	// indexing the unconfirmed transactions in the memory pool.
 	// This can be nil if the address index is not enabled.
 	AddrIndex *indexers.AddrIndex
+
+	// FeeEstimatator provides a feeEstimator. If it is not nil, the mempool
+	// records all new transactions it observes into the feeEstimator.
+	FeeEstimator *FeeEstimator
 }
 
 // Policy houses the policy (configuration parameters) which is used to
@@ -523,12 +527,12 @@ func (mp *TxPool) addTransaction(utxoView *blockchain.UtxoViewpoint, tx *btcutil
 			Added:    time.Now(),
 			Height:   height,
 			Fee:      fee,
-			FeePerKB: fee * 1000 / int64(tx.MsgTx().SerializeSize()),
+			FeePerKB: fee * 1000 / GetTxVirtualSize(tx),
 		},
 		StartingPriority: mining.CalcPriority(tx.MsgTx(), utxoView, height),
 	}
-	mp.pool[*tx.Hash()] = txD
 
+	mp.pool[*tx.Hash()] = txD
 	for _, txIn := range tx.MsgTx().TxIn {
 		mp.outpoints[txIn.PreviousOutPoint] = tx
 	}
@@ -538,6 +542,11 @@ func (mp *TxPool) addTransaction(utxoView *blockchain.UtxoViewpoint, tx *btcutil
 	// if enabled.
 	if mp.cfg.AddrIndex != nil {
 		mp.cfg.AddrIndex.AddUnconfirmedTx(tx, utxoView)
+	}
+
+	// Record this tx for fee estimation if enabled.
+	if mp.cfg.FeeEstimator != nil {
+		mp.cfg.FeeEstimator.ObserveTransaction(txD)
 	}
 
 	return txD
@@ -562,6 +571,17 @@ func (mp *TxPool) checkPoolDoubleSpend(tx *btcutil.Tx) error {
 	return nil
 }
 
+// CheckSpend checks whether the passed outpoint is already spent by a
+// transaction in the mempool. If that's the case the spending transaction will
+// be returned, if not nil will be returned.
+func (mp *TxPool) CheckSpend(op wire.OutPoint) *btcutil.Tx {
+	mp.mtx.RLock()
+	txR := mp.outpoints[op]
+	mp.mtx.RUnlock()
+
+	return txR
+}
+
 // fetchInputUtxos loads utxo details about the input transactions referenced by
 // the passed transaction.  First, it loads the details form the viewpoint of
 // the main chain, then it adjusts them based upon the contents of the
@@ -575,15 +595,21 @@ func (mp *TxPool) fetchInputUtxos(tx *btcutil.Tx) (*blockchain.UtxoViewpoint, er
 	}
 
 	// Attempt to populate any missing inputs from the transaction pool.
-	for originHash, entry := range utxoView.Entries() {
-		if entry != nil && !entry.IsFullySpent() {
+	for _, txIn := range tx.MsgTx().TxIn {
+		prevOut := &txIn.PreviousOutPoint
+		entry := utxoView.LookupEntry(*prevOut)
+		if entry != nil && !entry.IsSpent() {
 			continue
 		}
 
-		if poolTxDesc, exists := mp.pool[originHash]; exists {
-			utxoView.AddTxOuts(poolTxDesc.Tx, mining.UnminedHeight)
+		if poolTxDesc, exists := mp.pool[prevOut.Hash]; exists {
+			// AddTxOut ignores out of range index values, so it is
+			// safe to call without bounds checking here.
+			utxoView.AddTxOut(poolTxDesc.Tx, prevOut.Index,
+				mining.UnminedHeight)
 		}
 	}
+
 	return utxoView, nil
 }
 
@@ -713,25 +739,29 @@ func (mp *TxPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit, rejec
 
 	// Don't allow the transaction if it exists in the main chain and is not
 	// not already fully spent.
-	txEntry := utxoView.LookupEntry(txHash)
-	if txEntry != nil && !txEntry.IsFullySpent() {
-		return nil, nil, txRuleError(wire.RejectDuplicate,
-			"transaction already exists")
+	prevOut := wire.OutPoint{Hash: *txHash}
+	for txOutIdx := range tx.MsgTx().TxOut {
+		prevOut.Index = uint32(txOutIdx)
+		entry := utxoView.LookupEntry(prevOut)
+		if entry != nil && !entry.IsSpent() {
+			return nil, nil, txRuleError(wire.RejectDuplicate,
+				"transaction already exists")
+		}
+		utxoView.RemoveEntry(prevOut)
 	}
-	delete(utxoView.Entries(), *txHash)
 
-	// Transaction is an orphan if any of the referenced input transactions
-	// don't exist.  Adding orphans to the orphan pool is not handled by
-	// this function, and the caller should use maybeAddOrphan if this
-	// behavior is desired.
+	// Transaction is an orphan if any of the referenced transaction outputs
+	// don't exist or are already spent.  Adding orphans to the orphan pool
+	// is not handled by this function, and the caller should use
+	// maybeAddOrphan if this behavior is desired.
 	var missingParents []*chainhash.Hash
-	for originHash, entry := range utxoView.Entries() {
-		if entry == nil || entry.IsFullySpent() {
+	for outpoint, entry := range utxoView.Entries() {
+		if entry == nil || entry.IsSpent() {
 			// Must make a copy of the hash here since the iterator
 			// is replaced and taking its address directly would
 			// result in all of the entries pointing to the same
 			// memory location and thus all be the final hash.
-			hashCopy := originHash
+			hashCopy := outpoint.Hash
 			missingParents = append(missingParents, &hashCopy)
 		}
 	}

@@ -46,9 +46,10 @@ type ConnState uint8
 // connection which was disconnected is categorized as disconnected.
 const (
 	ConnPending ConnState = iota
+	ConnFailing
+	ConnCanceled
 	ConnEstablished
 	ConnDisconnected
-	ConnFailed
 )
 
 // ConnReq is the connection request to a network address. If permanent, the
@@ -143,6 +144,15 @@ type Config struct {
 	Dial func(net.Addr) (net.Conn, error)
 }
 
+// registerPending is used to register a pending connection attempt. By
+// registering pending connection attempts we allow callers to cancel pending
+// connection attempts before their successful or in the case they're not
+// longer wanted.
+type registerPending struct {
+	c    *ConnReq
+	done chan struct{}
+}
+
 // handleConnected is used to queue a successful connection.
 type handleConnected struct {
 	c    *ConnReq
@@ -216,15 +226,40 @@ func (cm *ConnManager) handleFailedConn(c *ConnReq) {
 // connections so that we remain connected to the network.  Connection requests
 // are processed and mapped by their assigned ids.
 func (cm *ConnManager) connHandler() {
-	conns := make(map[uint64]*ConnReq, cm.cfg.TargetOutbound)
+
+	var (
+		// pending holds all registered conn requests that have yet to
+		// succeed.
+		pending = make(map[uint64]*ConnReq)
+
+		// conns represents the set of all actively connected peers.
+		conns = make(map[uint64]*ConnReq, cm.cfg.TargetOutbound)
+	)
+
 out:
 	for {
 		select {
 		case req := <-cm.requests:
 			switch msg := req.(type) {
 
+			case registerPending:
+				connReq := msg.c
+				connReq.updateState(ConnPending)
+				pending[msg.c.id] = connReq
+				close(msg.done)
+
 			case handleConnected:
 				connReq := msg.c
+
+				if _, ok := pending[connReq.id]; !ok {
+					if msg.conn != nil {
+						msg.conn.Close()
+					}
+					log.Debugf("Ignoring connection for "+
+						"canceled connreq=%v", connReq)
+					continue
+				}
+
 				connReq.updateState(ConnEstablished)
 				connReq.conn = msg.conn
 				conns[connReq.id] = connReq
@@ -232,34 +267,83 @@ out:
 				connReq.retryCount = 0
 				cm.failedAttempts = 0
 
+				delete(pending, connReq.id)
+
 				if cm.cfg.OnConnection != nil {
 					go cm.cfg.OnConnection(connReq, msg.conn)
 				}
 
 			case handleDisconnected:
-				if connReq, ok := conns[msg.id]; ok {
+				connReq, ok := conns[msg.id]
+				if !ok {
+					connReq, ok = pending[msg.id]
+					if !ok {
+						log.Errorf("Unknown connid=%d",
+							msg.id)
+						continue
+					}
+
+					// Pending connection was found, remove
+					// it from pending map if we should
+					// ignore a later, successful
+					// connection.
+					connReq.updateState(ConnCanceled)
+					log.Debugf("Canceling: %v", connReq)
+					delete(pending, msg.id)
+					continue
+
+				}
+
+				// An existing connection was located, mark as
+				// disconnected and execute disconnection
+				// callback.
+				log.Debugf("Disconnected from %v", connReq)
+				delete(conns, msg.id)
+
+				if connReq.conn != nil {
+					connReq.conn.Close()
+				}
+
+				if cm.cfg.OnDisconnection != nil {
+					go cm.cfg.OnDisconnection(connReq)
+				}
+
+				// All internal state has been cleaned up, if
+				// this connection is being removed, we will
+				// make no further attempts with this request.
+				if !msg.retry {
 					connReq.updateState(ConnDisconnected)
-					if connReq.conn != nil {
-						connReq.conn.Close()
-					}
-					log.Debugf("Disconnected from %v", connReq)
-					delete(conns, msg.id)
+					continue
+				}
 
-					if cm.cfg.OnDisconnection != nil {
-						go cm.cfg.OnDisconnection(connReq)
-					}
+				// Otherwise, we will attempt a reconnection if
+				// we do not have enough peers, or if this is a
+				// persistent peer. The connection request is
+				// re added to the pending map, so that
+				// subsequent processing of connections and
+				// failures do not ignore the request.
+				if uint32(len(conns)) < cm.cfg.TargetOutbound ||
+					connReq.Permanent {
 
-					if uint32(len(conns)) < cm.cfg.TargetOutbound && msg.retry {
-						cm.handleFailedConn(connReq)
-					}
-				} else {
-					log.Errorf("Unknown connection: %d", msg.id)
+					connReq.updateState(ConnPending)
+					log.Debugf("Reconnecting to %v",
+						connReq)
+					pending[msg.id] = connReq
+					cm.handleFailedConn(connReq)
 				}
 
 			case handleFailed:
 				connReq := msg.c
-				connReq.updateState(ConnFailed)
-				log.Debugf("Failed to connect to %v: %v", connReq, msg.err)
+
+				if _, ok := pending[connReq.id]; !ok {
+					log.Debugf("Ignoring connection for "+
+						"canceled conn req: %v", connReq)
+					continue
+				}
+
+				connReq.updateState(ConnFailing)
+				log.Debugf("Failed to connect to %v: %v",
+					connReq, msg.err)
 				cm.handleFailedConn(connReq)
 			}
 
@@ -285,9 +369,31 @@ func (cm *ConnManager) NewConnReq() {
 	c := &ConnReq{}
 	atomic.StoreUint64(&c.id, atomic.AddUint64(&cm.connReqCount, 1))
 
+	// Submit a request of a pending connection attempt to the connection
+	// manager. By registering the id before the connection is even
+	// established, we'll be able to later cancel the connection via the
+	// Remove method.
+	done := make(chan struct{})
+	select {
+	case cm.requests <- registerPending{c, done}:
+	case <-cm.quit:
+		return
+	}
+
+	// Wait for the registration to successfully add the pending conn req to
+	// the conn manager's internal state.
+	select {
+	case <-done:
+	case <-cm.quit:
+		return
+	}
+
 	addr, err := cm.cfg.GetNewAddress()
 	if err != nil {
-		cm.requests <- handleFailed{c, err}
+		select {
+		case cm.requests <- handleFailed{c, err}:
+		case <-cm.quit:
+		}
 		return
 	}
 
@@ -304,13 +410,41 @@ func (cm *ConnManager) Connect(c *ConnReq) {
 	}
 	if atomic.LoadUint64(&c.id) == 0 {
 		atomic.StoreUint64(&c.id, atomic.AddUint64(&cm.connReqCount, 1))
+
+		// Submit a request of a pending connection attempt to the
+		// connection manager. By registering the id before the
+		// connection is even established, we'll be able to later
+		// cancel the connection via the Remove method.
+		done := make(chan struct{})
+		select {
+		case cm.requests <- registerPending{c, done}:
+		case <-cm.quit:
+			return
+		}
+
+		// Wait for the registration to successfully add the pending
+		// conn req to the conn manager's internal state.
+		select {
+		case <-done:
+		case <-cm.quit:
+			return
+		}
 	}
+
 	log.Debugf("Attempting to connect to %v", c)
+
 	conn, err := cm.cfg.Dial(c.Addr)
 	if err != nil {
-		cm.requests <- handleFailed{c, err}
-	} else {
-		cm.requests <- handleConnected{c, conn}
+		select {
+		case cm.requests <- handleFailed{c, err}:
+		case <-cm.quit:
+		}
+		return
+	}
+
+	select {
+	case cm.requests <- handleConnected{c, conn}:
+	case <-cm.quit:
 	}
 }
 
@@ -321,16 +455,27 @@ func (cm *ConnManager) Disconnect(id uint64) {
 	if atomic.LoadInt32(&cm.stop) != 0 {
 		return
 	}
-	cm.requests <- handleDisconnected{id, true}
+
+	select {
+	case cm.requests <- handleDisconnected{id, true}:
+	case <-cm.quit:
+	}
 }
 
-// Remove removes the connection corresponding to the given connection
-// id from known connections.
+// Remove removes the connection corresponding to the given connection id from
+// known connections.
+//
+// NOTE: This method can also be used to cancel a lingering connection attempt
+// that hasn't yet succeeded.
 func (cm *ConnManager) Remove(id uint64) {
 	if atomic.LoadInt32(&cm.stop) != 0 {
 		return
 	}
-	cm.requests <- handleDisconnected{id, false}
+
+	select {
+	case cm.requests <- handleDisconnected{id, false}:
+	case <-cm.quit:
+	}
 }
 
 // listenHandler accepts incoming connections on a given listener.  It must be
