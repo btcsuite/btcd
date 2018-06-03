@@ -11,12 +11,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/btcsuite/btcd/blockchain"
-	"github.com/btcsuite/btcd/blockchain/indexers"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/database"
-	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil"
+	"github.com/daglabs/btcd/blockchain"
+	"github.com/daglabs/btcd/blockchain/indexers"
+	"github.com/daglabs/btcd/chaincfg/chainhash"
+	"github.com/daglabs/btcd/database"
+	"github.com/daglabs/btcd/wire"
+	"github.com/daglabs/btcutil"
 )
 
 var zeroHash = chainhash.Hash{}

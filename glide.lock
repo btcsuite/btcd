@@ -5,7 +5,7 @@ imports:
   version: e404fcfc888570cadd1610538e2dbc89f66af814
 - name: github.com/btcsuite/btclog
   version: 84c8d2346e9fc8c7b947e243b9c24e6df9fd206a
-- name: github.com/btcsuite/btcutil
+- name: github.com/daglabs/btcutil
   version: d4cc87b860166d00d6b5b9e0d3b3d71d6088d4d4
   subpackages:
   - base58
