@@ -170,7 +170,9 @@ type MessageListeners struct {
 	OnFeeFilter func(p *Peer, msg *wire.MsgFeeFilter)
 
 	// OnVersion is invoked when a peer receives a version wire message.
-	OnVersion func(p *Peer, msg *wire.MsgVersion)
+	// The caller may return a reject message in which case the message will
+	// be sent to the peer and the peer will be disconnected.
+	OnVersion func(p *Peer, msg *wire.MsgVersion) *wire.MsgReject
 
 	// OnVerAck is invoked when a peer receives a verack wire message.
 	OnVerAck func(p *Peer, msg *wire.MsgVerAck)
@@ -1789,9 +1791,14 @@ func (p *Peer) readRemoteVersionMsg() error {
 	p.userAgent = msg.UserAgent
 	p.flagsMtx.Unlock()
 
-	// Invoke the callback if specified.
+	// Invoke the callback if specified.  In the case the callback returns a
+	// reject message, notify and disconnect the peer accordingly.
 	if p.cfg.Listeners.OnVersion != nil {
-		p.cfg.Listeners.OnVersion(p, msg)
+		rejectMsg := p.cfg.Listeners.OnVersion(p, msg)
+		if rejectMsg != nil {
+			_ = p.writeMessage(rejectMsg)
+			return errors.New(rejectMsg.Reason)
+		}
 	}
 
 	// Notify and disconnect clients that have a protocol version that is
