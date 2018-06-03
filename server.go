@@ -333,6 +333,21 @@ func hasServices(advertised, desired wire.ServiceFlag) bool {
 // to negotiate the protocol version details as well as kick start the
 // communications.
 func (sp *serverPeer) OnVersion(p *peer.Peer, msg *wire.MsgVersion) *wire.MsgReject {
+	// Update the address manager with the advertised services for outbound
+	// connections in case they have changed.  This is not done for inbound
+	// connections to help prevent malicious behavior and is skipped when
+	// running on the simulation test network since it is only intended to
+	// connect to specified peers and actively avoids advertising and
+	// connecting to discovered peers.
+	//
+	// NOTE: This is done before rejecting peers that are too old to ensure
+	// it is updated regardless in the case a new minimum protocol version is
+	// enforced and the remote node has not upgraded yet.
+	addrManager := sp.server.addrManager
+	if !cfg.SimNet && !sp.Inbound() {
+		addrManager.SetServices(sp.NA(), msg.Services)
+	}
+
 	// Ignore peers that have a protcol version that is too old.  The peer
 	// negotiation logic will disconnect it after this callback returns.
 	if msg.ProtocolVersion < int32(wire.InitialProcotolVersion) {
@@ -367,7 +382,6 @@ func (sp *serverPeer) OnVersion(p *peer.Peer, msg *wire.MsgVersion) *wire.MsgRej
 	// to specified peers and actively avoids advertising and connecting to
 	// discovered peers.
 	if !cfg.SimNet {
-		addrManager := sp.server.addrManager
 		// Outbound connections.
 		if !p.Inbound() {
 			// TODO(davec): Only do this if not doing the initial block
