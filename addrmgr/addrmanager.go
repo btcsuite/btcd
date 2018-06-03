@@ -1,5 +1,5 @@
 // Copyright (c) 2013-2014 The btcsuite developers
-// Copyright (c) 2015-2016 The Decred developers
+// Copyright (c) 2015-2018 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -868,9 +868,11 @@ func (a *AddrManager) Connected(addr *wire.NetAddress) {
 	now := time.Now()
 	if now.After(ka.na.Timestamp.Add(time.Minute * 20)) {
 		// ka.na is immutable, so replace it.
+		ka.mtx.Lock()
 		naCopy := *ka.na
 		naCopy.Timestamp = time.Now()
 		ka.na = &naCopy
+		ka.mtx.Unlock()
 	}
 }
 
@@ -963,6 +965,27 @@ func (a *AddrManager) Good(addr *wire.NetAddress) {
 
 	// We made sure there is space here just above.
 	a.addrNew[newBucket][rmkey] = rmka
+}
+
+// SetServices sets the services for the giiven address to the provided value.
+func (a *AddrManager) SetServices(addr *wire.NetAddress, services wire.ServiceFlag) {
+	a.mtx.Lock()
+	defer a.mtx.Unlock()
+
+	ka := a.find(addr)
+	if ka == nil {
+		return
+	}
+
+	// Update the services if needed.
+	if ka.na.Services != services {
+		// ka.na is immutable, so replace it.
+		ka.mtx.Lock()
+		naCopy := *ka.na
+		naCopy.Services = services
+		ka.na = &naCopy
+		ka.mtx.Unlock()
+	}
 }
 
 // AddLocalAddress adds na to the list of known local addresses to advertise
