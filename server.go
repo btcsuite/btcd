@@ -201,6 +201,10 @@ type serverPeer struct {
 	banScore        connmgr.DynamicBanScore
 	quit            chan struct{}
 
+	// addrsSent tracks whether or not the peer has responded to a getaddr
+	// request.  It is used to prevent more than one response per connection.
+	addrsSent bool
+
 	// The following chans are used to sync blockmanager and server.
 	txProcessed    chan struct{}
 	blockProcessed chan struct{}
@@ -1014,6 +1018,14 @@ func (sp *serverPeer) OnGetAddr(p *peer.Peer, msg *wire.MsgGetAddr) {
 	if !p.Inbound() {
 		return
 	}
+
+	// Only respond with addresses once per connection.  This helps reduce
+	// traffic and further reduces fingerprinting attacks.
+	if sp.addrsSent {
+		peerLog.Tracef("Ignoring getaddr from %v - already sent", sp.Peer)
+		return
+	}
+	sp.addrsSent = true
 
 	// Get the current known addresses from the address manager.
 	addrCache := sp.server.addrManager.AddressCache()
