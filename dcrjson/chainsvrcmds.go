@@ -80,7 +80,7 @@ type CreateRawTransactionCmd struct {
 // NewCreateRawTransactionCmd returns a new instance which can be used to issue
 // a createrawtransaction JSON-RPC command.
 //
-// Amounts are in BTC.
+// Amounts are in DCR.
 func NewCreateRawTransactionCmd(inputs []TransactionInput, amounts map[string]float64,
 	lockTime *int64, expiry *int64) *CreateRawTransactionCmd {
 
