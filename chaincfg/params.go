@@ -206,12 +206,10 @@ type Params struct {
 	Bech32HRPSegwit string
 
 	// Address encoding magics
-	PubKeyHashAddrID        byte // First byte of a P2PKH address
-	ScriptHashAddrID        byte // First byte of a P2SH address
-	PrivateKeyID            byte // First byte of a WIF private key
-	WitnessPubKeyHashAddrID byte // First byte of a P2WPKH address
-	WitnessScriptHashAddrID byte // First byte of a P2WSH address
-	CashAddrPrefix          string
+	PubKeyHashAddrID byte // First byte of a P2PKH address
+	ScriptHashAddrID byte // First byte of a P2SH address
+	PrivateKeyID     byte // First byte of a WIF private key
+	CashAddrPrefix   string
 
 	// BIP32 hierarchical deterministic extended key magics
 	HDPrivateKeyID [4]byte
@@ -307,11 +305,9 @@ var MainNetParams = Params{
 	Bech32HRPSegwit: "bc", // always bc for main net		// todo remove
 
 	// Address encoding magics
-	PubKeyHashAddrID:        0x00, // starts with 1
-	ScriptHashAddrID:        0x05, // starts with 3
-	PrivateKeyID:            0x80, // starts with 5 (uncompressed) or K (compressed)
-	WitnessPubKeyHashAddrID: 0x06, // starts with p2		// todo remove
-	WitnessScriptHashAddrID: 0x0A, // starts with 7Xh		// todo remove
+	PubKeyHashAddrID: 0x00, // starts with 1
+	ScriptHashAddrID: 0x05, // starts with 3
+	PrivateKeyID:     0x80, // starts with 5 (uncompressed) or K (compressed)
 
 	// BIP32 hierarchical deterministic extended key magics
 	HDPrivateKeyID: [4]byte{0x04, 0x88, 0xad, 0xe4}, // starts with xprv
@@ -395,11 +391,9 @@ var TestNet3Params = Params{
 	Bech32HRPSegwit: "tb", // always tb for test net		// todo remove
 
 	// Address encoding magics
-	PubKeyHashAddrID:        0x6f, // starts with m or n
-	ScriptHashAddrID:        0xc4, // starts with 2
-	WitnessPubKeyHashAddrID: 0x03, // starts with QW
-	WitnessScriptHashAddrID: 0x28, // starts with T7n
-	PrivateKeyID:            0xef, // starts with 9 (uncompressed) or c (compressed)
+	PubKeyHashAddrID: 0x6f, // starts with m or n
+	ScriptHashAddrID: 0xc4, // starts with 2
+	PrivateKeyID:     0xef, // starts with 9 (uncompressed) or c (compressed)
 
 	// BIP32 hierarchical deterministic extended key magics
 	HDPrivateKeyID: [4]byte{0x04, 0x35, 0x83, 0x94}, // starts with tprv
