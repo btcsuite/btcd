@@ -344,9 +344,10 @@ func (sp *serverPeer) OnVersion(p *peer.Peer, msg *wire.MsgVersion) *wire.MsgRej
 	// it is updated regardless in the case a new minimum protocol version is
 	// enforced and the remote node has not upgraded yet.
 	isInbound := sp.Inbound()
+	remoteAddr := sp.NA()
 	addrManager := sp.server.addrManager
 	if !cfg.SimNet && !isInbound {
-		addrManager.SetServices(sp.NA(), msg.Services)
+		addrManager.SetServices(remoteAddr, msg.Services)
 	}
 
 	// Ignore peers that have a protcol version that is too old.  The peer
@@ -378,7 +379,7 @@ func (sp *serverPeer) OnVersion(p *peer.Peer, msg *wire.MsgVersion) *wire.MsgRej
 		// known tip.
 		if !cfg.DisableListen && sp.server.blockManager.IsCurrent() {
 			// Get address that best matches.
-			lna := addrManager.GetBestLocalAddress(p.NA())
+			lna := addrManager.GetBestLocalAddress(remoteAddr)
 			if addrmgr.IsRoutable(lna) {
 				// Filter addresses the peer already knows about.
 				addresses := []*wire.NetAddress{lna}
@@ -393,7 +394,7 @@ func (sp *serverPeer) OnVersion(p *peer.Peer, msg *wire.MsgVersion) *wire.MsgRej
 		}
 
 		// Mark the address as a known good address.
-		addrManager.Good(p.NA())
+		addrManager.Good(remoteAddr)
 	}
 
 	// Choose whether or not to relay transactions.
