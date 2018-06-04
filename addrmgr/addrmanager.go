@@ -368,12 +368,13 @@ out:
 // savePeers saves all the known addresses to a file so they can be read back
 // in at next run.
 func (a *AddrManager) savePeers() {
+	a.mtx.Lock()
+	defer a.mtx.Unlock()
+
 	if !a.addrChanged {
 		// Nothing changed since last savePeers call.
 		return
 	}
-	a.mtx.Lock()
-	defer a.mtx.Unlock()
 
 	// First we make a serialisable datastructure so we can encode it to JSON.
 	sam := new(serializedAddrManager)
