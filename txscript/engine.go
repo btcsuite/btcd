@@ -103,7 +103,7 @@ const (
 	MaxStackSize = 1000
 
 	// MaxScriptSize is the maximum allowed length of a raw script.
-	MaxScriptSize = 10000
+	MaxScriptSize = 20005
 
 	// payToWitnessPubKeyHashDataSize is the size of the witness program's
 	// data push for a pay-to-witness-pub-key-hash output.
