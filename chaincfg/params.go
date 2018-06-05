@@ -591,6 +591,10 @@ var SimNetParams = Params{
 	HDCoinType: 1, // ASCII for s
 }
 
+func (param *Params) DifficultyAdjustmentInterval() int64 {
+	return int64(param.TargetTimespan / param.TargetTimePerBlock)
+}
+
 var (
 	// ErrDuplicateNet describes an error where the parameters for a Bitcoin
 	// network could not be set due to the network already being a standard

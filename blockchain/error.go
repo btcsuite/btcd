@@ -70,6 +70,9 @@ const (
 	// range.
 	ErrUnexpectedDifficulty
 
+	// ErrCalcDifficulty indicates any error when calculating difficulty
+	ErrCalcDifficulty
+
 	// ErrHighHash indicates the block does not hash to a value which is
 	// lower than the required target difficultly.
 	ErrHighHash
@@ -228,6 +231,7 @@ var errorCodeStrings = map[ErrorCode]string{
 	ErrTimeTooNew:                "ErrTimeTooNew",
 	ErrDifficultyTooLow:          "ErrDifficultyTooLow",
 	ErrUnexpectedDifficulty:      "ErrUnexpectedDifficulty",
+	ErrCalcDifficulty:            "ErrCalcDifficulty",
 	ErrHighHash:                  "ErrHighHash",
 	ErrBadMerkleRoot:             "ErrBadMerkleRoot",
 	ErrBadCheckpoint:             "ErrBadCheckpoint",

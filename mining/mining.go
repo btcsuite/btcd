@@ -735,21 +735,17 @@ mempoolLoop:
 	coinbaseTx.MsgTx().TxOut[0].Value += totalFees
 	txFees[0] = -totalFees
 
-	// Calculate the required difficulty for the block.  The timestamp
-	// is potentially adjusted to ensure it comes after the median time of
-	// the last several blocks per the chain consensus rules.
-	ts := medianAdjustedTime(best, g.timeSource)
-	reqDifficulty, err := g.chain.CalcNextRequiredDifficulty(ts)
-	if err != nil {
-		return nil, err
-	}
-
 	// Calculate the next expected block version based on the state of the
 	// rule change deployments.
 	nextBlockVersion, err := g.chain.CalcNextBlockVersion()
 	if err != nil {
 		return nil, err
 	}
+
+	// Calculate the required difficulty for the block.  The timestamp
+	// is potentially adjusted to ensure it comes after the median time of
+	// the last several blocks per the chain consensus rules.
+	ts := medianAdjustedTime(best, g.timeSource)
 
 	// Create a new block ready to be solved.
 	merkles := blockchain.BuildMerkleTreeStore(blockTxns)
@@ -759,8 +755,14 @@ mempoolLoop:
 		PrevBlock:  best.Hash,
 		MerkleRoot: *merkles[len(merkles)-1],
 		Timestamp:  ts,
-		Bits:       reqDifficulty,
 	}
+
+	reqDifficulty, err := g.chain.GetNextWorkRequired(&msgBlock.Header)
+	if err != nil {
+		return nil, err
+	}
+	msgBlock.Header.Bits = reqDifficulty
+
 	for _, tx := range blockTxns {
 		if err := msgBlock.AddTransaction(tx.MsgTx()); err != nil {
 			return nil, err
@@ -805,7 +807,7 @@ func (g *BlkTmplGenerator) UpdateBlockTime(msgBlock *wire.MsgBlock) error {
 
 	// Recalculate the difficulty if running on a network that requires it.
 	if g.chainParams.ReduceMinDifficulty {
-		difficulty, err := g.chain.CalcNextRequiredDifficulty(newTime)
+		difficulty, err := g.chain.GetNextWorkRequired(&msgBlock.Header)
 		if err != nil {
 			return err
 		}
