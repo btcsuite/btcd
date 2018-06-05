@@ -69,7 +69,7 @@ func main() {
 	}
 
 	// Write cert and key files.
-	if err = ioutil.WriteFile(certFile, cert, 0666); err != nil {
+	if err = ioutil.WriteFile(certFile, cert, 0644); err != nil {
 		fmt.Fprintf(os.Stderr, "cannot write cert: %v\n", err)
 		os.Exit(1)
 	}
