@@ -1,8 +1,10 @@
-// Copyright (c) 2013-2016 The btcsuite developers
+// Copyright (c) 2013-2017 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
 package blockchain
+
+import "github.com/btcsuite/btcd/wire"
 
 const (
 	// DefaultMaxBlockSize is the maximum number of bytes within a block
@@ -17,6 +19,10 @@ const (
 	// MaxBlockSigOpsPerMB The maximum allowed number of signature check operations per MB in a
 	// block (network rule)
 	MaxBlockSigOpsPerMB = 20000
+
+	// MaxOutputsPerBlock is the maximum number of transaction outputs there
+	// can be in a block of max weight size.
+	MaxOutputsPerBlock = DefaultMaxBlockSize / wire.MinTxOutPayload
 )
 
 func GetMaxBlockSigOpsCount(blocksize int) int {

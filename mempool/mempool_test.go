@@ -31,10 +31,10 @@ type fakeChain struct {
 	medianTimePast time.Time
 }
 
-// FetchUtxoView loads utxo details about the input transactions referenced by
-// the passed transaction from the point of view of the fake chain.
-// It also attempts to fetch the utxo details for the transaction itself so the
-// returned view can be examined for duplicate unspent transaction outputs.
+// FetchUtxoView loads utxo details about the inputs referenced by the passed
+// transaction from the point of view of the fake chain.  It also attempts to
+// fetch the utxos for the outputs of the transaction itself so the returned
+// view can be examined for duplicate transactions.
 //
 // This function is safe for concurrent access however the returned view is NOT.
 func (s *fakeChain) FetchUtxoView(tx *btcutil.Tx) (*blockchain.UtxoViewpoint, error) {
@@ -46,14 +46,17 @@ func (s *fakeChain) FetchUtxoView(tx *btcutil.Tx) (*blockchain.UtxoViewpoint, er
 
 	// Add an entry for the tx itself to the new view.
 	viewpoint := blockchain.NewUtxoViewpoint()
-	entry := s.utxos.LookupEntry(tx.Hash())
-	viewpoint.Entries()[*tx.Hash()] = entry.Clone()
+	prevOut := wire.OutPoint{Hash: *tx.Hash()}
+	for txOutIdx := range tx.MsgTx().TxOut {
+		prevOut.Index = uint32(txOutIdx)
+		entry := s.utxos.LookupEntry(prevOut)
+		viewpoint.Entries()[prevOut] = entry.Clone()
+	}
 
 	// Add entries for all of the inputs to the tx to the new view.
 	for _, txIn := range tx.MsgTx().TxIn {
-		originHash := &txIn.PreviousOutPoint.Hash
-		entry := s.utxos.LookupEntry(originHash)
-		viewpoint.Entries()[*originHash] = entry.Clone()
+		entry := s.utxos.LookupEntry(txIn.PreviousOutPoint)
+		viewpoint.Entries()[txIn.PreviousOutPoint] = entry.Clone()
 	}
 
 	return viewpoint, nil

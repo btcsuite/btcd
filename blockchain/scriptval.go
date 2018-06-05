@@ -55,48 +55,34 @@ out:
 	for {
 		select {
 		case txVI := <-v.validateChan:
-			// Ensure the referenced input transaction is available.
+			// Ensure the referenced input utxo is available.
 			txIn := txVI.txIn
-			originTxHash := &txIn.PreviousOutPoint.Hash
-			originTxIndex := txIn.PreviousOutPoint.Index
-			txEntry := v.utxoView.LookupEntry(originTxHash)
-			if txEntry == nil {
-				str := fmt.Sprintf("unable to find input "+
-					"transaction %v referenced from "+
-					"transaction %v", originTxHash,
-					txVI.tx.Hash())
-				err := ruleError(ErrMissingTxOut, str)
-				v.sendResult(err)
-				break out
-			}
-
-			// Ensure the referenced input transaction public key
-			// script is available.
-			pkScript := txEntry.PkScriptByIndex(originTxIndex)
-			if pkScript == nil {
+			utxo := v.utxoView.LookupEntry(txIn.PreviousOutPoint)
+			if utxo == nil {
 				str := fmt.Sprintf("unable to find unspent "+
-					"output %v script referenced from "+
+					"output %v referenced from "+
 					"transaction %s:%d",
 					txIn.PreviousOutPoint, txVI.tx.Hash(),
 					txVI.txInIndex)
-				err := ruleError(ErrBadTxInput, str)
+				err := ruleError(ErrMissingTxOut, str)
 				v.sendResult(err)
 				break out
 			}
 
 			// Create a new script engine for the script pair.
 			sigScript := txIn.SignatureScript
-			inputAmount := txEntry.AmountByIndex(originTxIndex)
+			pkScript := utxo.PkScript()
+			inputAmount := utxo.Amount()
 			vm, err := txscript.NewEngine(pkScript, txVI.tx.MsgTx(),
 				txVI.txInIndex, v.flags, v.sigCache, txVI.sigHashes,
 				inputAmount)
 			if err != nil {
 				str := fmt.Sprintf("failed to parse input "+
-					"%s:%d which references output %s:%d - "+
-					"%v (input script bytes %x, prev output script bytes %x)",
-					txVI.tx.Hash(), txVI.txInIndex, originTxHash,
-					originTxIndex, err, sigScript,
-					pkScript)
+					"%s:%d which references output %v - %v (input"+
+					" script bytes %x, prev output script bytes %x)",
+					txVI.tx.Hash(), txVI.txInIndex,
+					txIn.PreviousOutPoint, err,
+					sigScript, pkScript)
 				err := ruleError(ErrScriptMalformed, str)
 				v.sendResult(err)
 				break out
@@ -105,10 +91,10 @@ out:
 			// Execute the script pair.
 			if err := vm.Execute(); err != nil {
 				str := fmt.Sprintf("failed to validate input "+
-					"%s:%d which references output %s:%d - "+
-					"%v (input script bytes %x, prev output script bytes %x)",
+					"%s:%d which references output %v - %v ( input "+
+					"script bytes %x, prev output script bytes %x)",
 					txVI.tx.Hash(), txVI.txInIndex,
-					originTxHash, originTxIndex, err,
+					txIn.PreviousOutPoint, err,
 					sigScript, pkScript)
 				err := ruleError(ErrScriptValidation, str)
 				v.sendResult(err)
