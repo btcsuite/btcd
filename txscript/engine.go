@@ -79,11 +79,11 @@ const (
 
 	// ScriptVerifyWitness defines whether or not to verify a transaction
 	// output using a witness program template.
-	ScriptVerifyWitness
+	ScriptVerifyWitness // todo remove
 
 	// ScriptVerifyDiscourageUpgradeableWitnessProgram makes witness
 	// program with versions 2-16 non-standard.
-	ScriptVerifyDiscourageUpgradeableWitnessProgram
+	ScriptVerifyDiscourageUpgradeableWitnessProgram // todo remove
 
 	// ScriptVerifyMinimalIf makes a script with an OP_IF/OP_NOTIF whose
 	// operand is anything other than empty vector or [0x01] non-standard.
@@ -92,7 +92,13 @@ const (
 	// ScriptVerifyWitnessPubKeyType makes a script within a check-sig
 	// operation whose public key isn't serialized in a compressed format
 	// non-standard.
-	ScriptVerifyWitnessPubKeyType
+	ScriptVerifyWitnessPubKeyType // todo remove
+
+	// Do we accept signature using SigHashForkID.
+	ScriptEnableSighashForkid
+
+	// Do we accept activate replay protection using a different fork id.
+	ScriptEnableReplayProtection
 )
 
 const (
@@ -105,11 +111,11 @@ const (
 
 	// payToWitnessPubKeyHashDataSize is the size of the witness program's
 	// data push for a pay-to-witness-pub-key-hash output.
-	payToWitnessPubKeyHashDataSize = 20
+	payToWitnessPubKeyHashDataSize = 20 // todo remove
 
 	// payToWitnessScriptHashDataSize is the size of the witness program's
 	// data push for a pay-to-witness-script-hash output.
-	payToWitnessScriptHashDataSize = 32
+	payToWitnessScriptHashDataSize = 32 // todo remove
 )
 
 // halforder is used to tame ECDSA malleability (see BIP0062).

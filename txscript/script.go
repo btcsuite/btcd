@@ -12,6 +12,7 @@ import (
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
+	"github.com/btcsuite/btcutil"
 )
 
 // Bip16Activation is the timestamp where BIP0016 is valid to use in the
@@ -35,6 +36,39 @@ const (
 	// to identify which outputs are signed.
 	sigHashMask = 0x1f
 )
+
+func (st SigHashType) getBaseType() SigHashType {
+	return st & SigHashType(sigHashMask)
+}
+
+func (st SigHashType) getForkValue() uint32 {
+	return uint32(st) >> 8
+}
+
+func (st SigHashType) isDefined() bool {
+	baseType := st & (^(SigHashForkID | SigHashAnyOneCanPay))
+	return baseType >= SigHashAll && baseType <= SigHashSingle
+}
+
+func (st SigHashType) hasForkID() bool {
+	return st&SigHashForkID != 0
+}
+
+func (st SigHashType) hasAnyoneCanPay() bool {
+	return st&SigHashAnyOneCanPay != 0
+}
+
+func (st SigHashType) withForkId(forkID bool) SigHashType {
+	if forkID {
+		return st&(^SigHashForkID) | SigHashForkID
+	}
+
+	return st
+}
+
+func (st SigHashType) withForkValue(forkID uint32) SigHashType {
+	return SigHashType((forkID << 8) | (uint32(st) & 0xff))
+}
 
 // These are the constants specified for maximums in individual scripts.
 const (
@@ -591,13 +625,92 @@ func CalcSignatureHash(script []byte, hashType SigHashType, tx *wire.MsgTx, idx 
 	if err != nil {
 		return nil, fmt.Errorf("cannot parse output script: %v", err)
 	}
-	return calcSignatureHash(parsedScript, hashType, tx, idx), nil
+	return calcSignatureHash(parsedScript, hashType, tx, idx, btcutil.Amount(0), ScriptEnableSighashForkid), nil
 }
 
 // calcSignatureHash will, given a script and hash type for the current script
 // engine instance, calculate the signature hash to be used for signing and
 // verification.
-func calcSignatureHash(script []parsedOpcode, hashType SigHashType, tx *wire.MsgTx, idx int) []byte {
+func calcSignatureHash(script []parsedOpcode, hashType SigHashType, tx *wire.MsgTx, idx int, amount btcutil.Amount,
+	flags ScriptFlags) []byte {
+
+	if flags&ScriptEnableReplayProtection != 0 {
+		// Legacy chain's value for fork id must be of the form 0xffxxxx.
+		// By xoring with 0xdead, we ensure that the value will be different
+		// from the original one, even if it already starts with 0xff.
+		newForkValue := hashType.getForkValue() ^ 0xdead
+		hashType = hashType.withForkValue(0xff0000 | newForkValue)
+	}
+
+	if hashType.hasForkID() && (flags&ScriptEnableSighashForkid != 0) {
+		var hashPrevouts, hashSequence, hashOutputs chainhash.Hash
+
+		if !hashType.hasAnyoneCanPay() {
+			hashPrevouts = calcHashPrevOuts(tx)
+		}
+
+		if !hashType.hasAnyoneCanPay() &&
+			(hashType.getBaseType() != SigHashSingle) &&
+			hashType.getBaseType() != SigHashNone {
+			hashSequence = calcHashSequence(tx)
+		}
+
+		if hashType.getBaseType() != SigHashSingle &&
+			hashType.getBaseType() != SigHashNone {
+			hashOutputs = calcHashOutputs(tx)
+		} else if hashType.getBaseType() == SigHashSingle &&
+			idx < len(tx.TxOut) {
+			buf := bytes.NewBuffer(make([]byte, 0, tx.TxOut[idx].SerializeSize()))
+			err := wire.WriteTxOut(buf, 0, 0, tx.TxOut[idx])
+			if err != nil {
+				// TODO the function caller should deal with this error
+				return nil
+			}
+
+			hashOutputs = chainhash.DoubleHashH(buf.Bytes())
+		}
+		_ = hashOutputs
+
+		ret := bytes.NewBuffer(nil)
+		// version
+		var buf4Bytes [4]byte
+		binary.LittleEndian.PutUint32(buf4Bytes[:], uint32(tx.Version))
+		ret.Write(buf4Bytes[:])
+
+		// Input prevouts/nSequence (none/all, depending on flags)
+		ret.Write(hashPrevouts[:])
+		ret.Write(hashSequence[:])
+
+		// The input being signed (replacing the scriptSig with scriptCode +
+		// amount). The prevout may already be contained in hashPrevout, and the
+		// nSequence may already be contain in hashSequence.
+		ret.Write(tx.TxIn[idx].PreviousOutPoint.Hash[:])
+		binary.LittleEndian.PutUint32(buf4Bytes[:], tx.TxIn[idx].PreviousOutPoint.Index)
+		ret.Write(buf4Bytes[:])
+
+		sigScript, _ := unparseScript(script)
+		wire.WriteVarInt(ret, 0, uint64(len(sigScript)))
+		ret.Write(sigScript)
+
+		var buf8Bytes [8]byte
+		binary.LittleEndian.PutUint64(buf8Bytes[:], uint64(amount))
+		ret.Write(buf8Bytes[:])
+
+		binary.LittleEndian.PutUint32(buf4Bytes[:], tx.TxIn[idx].Sequence)
+		ret.Write(buf4Bytes[:])
+
+		// Outputs (none/one/all, depending on flags)
+		ret.Write(hashOutputs[:])
+		// locktime
+		binary.LittleEndian.PutUint32(buf4Bytes[:], tx.LockTime)
+		ret.Write(buf4Bytes[:])
+		// SigHash type
+		binary.LittleEndian.PutUint32(buf4Bytes[:], uint32(hashType))
+		ret.Write(buf4Bytes[:])
+
+		return chainhash.DoubleHashB(ret.Bytes())
+	}
+
 	// The SigHashSingle signature type signs only the corresponding input
 	// and output (the output with the same index number as the input).
 	//
@@ -618,6 +731,11 @@ func calcSignatureHash(script []parsedOpcode, hashType SigHashType, tx *wire.Msg
 	// hash of 1.  This in turn presents an opportunity for attackers to
 	// cleverly construct transactions which can steal those coins provided
 	// they can reuse signatures.
+	if idx >= len(tx.TxIn) {
+		//  nIn out of range
+		return chainhash.HashOne[:]
+	}
+
 	if hashType&sigHashMask == SigHashSingle && idx >= len(tx.TxOut) {
 		var hash chainhash.Hash
 		hash[0] = 0x01

@@ -222,8 +222,8 @@ func (msg *MsgBlock) Command() string {
 // receiver.  This is part of the Message interface implementation.
 func (msg *MsgBlock) MaxPayloadLength(pver uint32) uint32 {
 	// Block header at 80 bytes + transaction count + max transactions
-	// which can vary up to the MaxBlockPayload (including the block header
-	// and transaction count).
+	//	// which can vary up to the MaxBlockPayload (including the block header
+	//	// and transaction count).
 	return MaxBlockPayload
 }
 
