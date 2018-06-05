@@ -19,7 +19,7 @@ const (
 	// that are considered standard in a pay-to-script-hash script.
 	maxStandardP2SHSigOps = 15
 
-	// maxStandardTxCost is the max weight permitted by any transaction
+	// maxStandardTxWeight is the max weight permitted by any transaction
 	// according to the current default policy.
 	maxStandardTxWeight = 400000
 
