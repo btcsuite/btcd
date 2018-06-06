@@ -95,9 +95,9 @@ func (b *ScriptBuilder) AddOps(opcodes []byte) *ScriptBuilder {
 	return b
 }
 
-// canonicalDataSize returns the number of bytes the canonical encoding of the
+// CanonicalDataSize returns the number of bytes the canonical encoding of the
 // data will take.
-func canonicalDataSize(data []byte) int {
+func CanonicalDataSize(data []byte) int {
 	dataLen := len(data)
 
 	// When the data consists of a single number that can be represented
@@ -198,7 +198,7 @@ func (b *ScriptBuilder) AddData(data []byte) *ScriptBuilder {
 
 	// Pushes that would cause the script to exceed the largest allowed
 	// script size would result in a non-canonical script.
-	dataSize := canonicalDataSize(data)
+	dataSize := CanonicalDataSize(data)
 	if len(b.script)+dataSize > maxScriptSize {
 		str := fmt.Sprintf("adding %d bytes of data would exceed the "+
 			"maximum allowed canonical script length of %d",
