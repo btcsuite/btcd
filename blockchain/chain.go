@@ -1764,6 +1764,20 @@ func New(config *Config) (*BlockChain, error) {
 		return nil, err
 	}
 
+	// Helper function to insert the output in genesis block in to the
+	// transaction database.
+	fn := func(dbTx database.Tx) error {
+		genesisBlock := btcutil.NewBlock(b.chainParams.GenesisBlock)
+		view := NewUtxoViewpoint()
+		if err := view.connectTransactions(genesisBlock, nil); err != nil {
+			return err
+		}
+		return dbPutUtxoView(dbTx, view)
+	}
+	if err := b.db.Update(fn); err != nil {
+		return nil, err
+	}
+
 	// Perform any upgrades to the various chain-specific buckets as needed.
 	if err := b.maybeUpgradeDbBuckets(config.Interrupt); err != nil {
 		return nil, err
