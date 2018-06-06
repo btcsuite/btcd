@@ -558,6 +558,12 @@ func NewHelpCmd(command *string) *HelpCmd {
 	}
 }
 
+// RmMempoolTransactionCmd defines the rmmempooltransaction JSON-RPC command.
+type RmMempoolTransactionCmd struct {
+	TxID            string
+	RemoveRedeemers *bool `jsonrpcdefault:"true"`
+}
+
 // InvalidateBlockCmd defines the invalidateblock JSON-RPC command.
 type InvalidateBlockCmd struct {
 	BlockHash string
@@ -818,6 +824,7 @@ func init() {
 	MustRegisterCmd("gettxoutsetinfo", (*GetTxOutSetInfoCmd)(nil), flags)
 	MustRegisterCmd("getwork", (*GetWorkCmd)(nil), flags)
 	MustRegisterCmd("help", (*HelpCmd)(nil), flags)
+	MustRegisterCmd("rmmempooltransaction", (*RmMempoolTransactionCmd)(nil), flags)
 	MustRegisterCmd("invalidateblock", (*InvalidateBlockCmd)(nil), flags)
 	MustRegisterCmd("ping", (*PingCmd)(nil), flags)
 	MustRegisterCmd("preciousblock", (*PreciousBlockCmd)(nil), flags)

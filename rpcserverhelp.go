@@ -518,6 +518,13 @@ var helpDescsEnUS = map[string]string{
 	"ping--synopsis": "Queues a ping to be sent to each connected peer.\n" +
 		"Ping times are provided by getpeerinfo via the pingtime and pingwait fields.",
 
+	// RmMempoolTransactionCmd help.
+	"rmmempooltransaction--synopsis": "Remove the specified transaction from mempool. " +
+		"If 'RemoveRedeemers' is set true, all relative transaction will be removed at the same time.",
+	"rmmempooltransaction-txid":            "The hash of the transaction",
+	"rmmempooltransaction-removeredeemers": "Whether remove transactions relative to the specified transaction or not",
+	"rmmempooltransaction--result0":        "Return true if remove successfully, false otherwise.",
+
 	// SearchRawTransactionsCmd help.
 	"searchrawtransactions--synopsis": "Returns raw data for transactions involving the passed address.\n" +
 		"Returned transactions are pulled from both the database, and transactions currently in the mempool.\n" +
@@ -711,6 +718,7 @@ var rpcResultTypes = map[string][]interface{}{
 	"node":                  nil,
 	"help":                  {(*string)(nil), (*string)(nil)},
 	"ping":                  nil,
+	"rmmempooltransaction":  {(*bool)(nil)},
 	"searchrawtransactions": {(*string)(nil), (*[]btcjson.SearchRawTransactionsResult)(nil)},
 	"sendrawtransaction":    {(*string)(nil)},
 	"setgenerate":           nil,

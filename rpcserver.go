@@ -164,6 +164,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"help":                  handleHelp,
 	"node":                  handleNode,
 	"ping":                  handlePing,
+	"rmmempooltransaction":  handleRmMempoolTransaction,
 	"searchrawtransactions": handleSearchRawTransactions,
 	"sendrawtransaction":    handleSendRawTransaction,
 	"setgenerate":           handleSetGenerate,
@@ -2796,6 +2797,24 @@ func handlePing(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (inter
 	s.cfg.ConnMgr.BroadcastMessage(wire.NewMsgPing(nonce))
 
 	return nil, nil
+}
+
+// handleRmMempoolTransaction implement the rmmempooltransaction command.
+func handleRmMempoolTransaction(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	c := cmd.(*btcjson.RmMempoolTransactionCmd)
+
+	hash, err := chainhash.NewHashFromStr(c.TxID)
+	if err != nil {
+		return false, rpcDecodeHexError(c.TxID)
+	}
+
+	mempoolTx, err := s.cfg.TxMemPool.FetchTransaction(hash)
+	if err != nil {
+		return false, btcjson.NewRPCError(btcjson.RPCErrorCode(404), err.Error())
+	}
+
+	s.cfg.TxMemPool.RemoveTransaction(mempoolTx, *c.RemoveRedeemers)
+	return true, nil
 }
 
 // retrievedTx represents a transaction that was either loaded from the
