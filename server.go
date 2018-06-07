@@ -726,7 +726,6 @@ func (sp *serverPeer) OnGetBlocks(p *peer.Peer, msg *wire.MsgGetBlocks) {
 	// wire.MaxBlocksPerMsg have been fetched or the provided stop hash is
 	// encountered.
 	//
-	// Find the most recent known block based on the block locator.
 	// Use the block after the genesis block if no other blocks in the
 	// provided locator are known.  This does mean the client will start
 	// over with the genesis block if unknown block locators are provided.
