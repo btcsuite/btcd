@@ -27,19 +27,6 @@ func NewAddMultisigAddressCmd(nRequired int, keys []string, account *string) *Ad
 	}
 }
 
-// AddWitnessAddressCmd defines the addwitnessaddress JSON-RPC command.
-type AddWitnessAddressCmd struct {
-	Address string
-}
-
-// NewAddWitnessAddressCmd returns a new instance which can be used to issue a
-// addwitnessaddress JSON-RPC command.
-func NewAddWitnessAddressCmd(address string) *AddWitnessAddressCmd {
-	return &AddWitnessAddressCmd{
-		Address: address,
-	}
-}
-
 // CreateMultisigCmd defines the createmultisig JSON-RPC command.
 type CreateMultisigCmd struct {
 	NRequired int
@@ -658,7 +645,6 @@ func init() {
 	flags := UFWalletOnly
 
 	MustRegisterCmd("addmultisigaddress", (*AddMultisigAddressCmd)(nil), flags)
-	MustRegisterCmd("addwitnessaddress", (*AddWitnessAddressCmd)(nil), flags)
 	MustRegisterCmd("createmultisig", (*CreateMultisigCmd)(nil), flags)
 	MustRegisterCmd("dumpprivkey", (*DumpPrivKeyCmd)(nil), flags)
 	MustRegisterCmd("encryptwallet", (*EncryptWalletCmd)(nil), flags)

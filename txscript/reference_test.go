@@ -261,24 +261,6 @@ func parseExpectedResult(expected string) ([]ErrorCode, error) {
 		return []ErrorCode{ErrNegativeLockTime}, nil
 	case "UNSATISFIED_LOCKTIME":
 		return []ErrorCode{ErrUnsatisfiedLockTime}, nil
-	case "MINIMALIF":
-		return []ErrorCode{ErrMinimalIf}, nil
-	case "DISCOURAGE_UPGRADABLE_WITNESS_PROGRAM":
-		return []ErrorCode{ErrDiscourageUpgradableWitnessProgram}, nil
-	case "WITNESS_PROGRAM_WRONG_LENGTH":
-		return []ErrorCode{ErrWitnessProgramWrongLength}, nil
-	case "WITNESS_PROGRAM_WITNESS_EMPTY":
-		return []ErrorCode{ErrWitnessProgramEmpty}, nil
-	case "WITNESS_PROGRAM_MISMATCH":
-		return []ErrorCode{ErrWitnessProgramMismatch}, nil
-	case "WITNESS_MALLEATED":
-		return []ErrorCode{ErrWitnessMalleated}, nil
-	case "WITNESS_MALLEATED_P2SH":
-		return []ErrorCode{ErrWitnessMalleatedP2SH}, nil
-	case "WITNESS_UNEXPECTED":
-		return []ErrorCode{ErrWitnessUnexpected}, nil
-	case "WITNESS_PUBKEYTYPE":
-		return []ErrorCode{ErrWitnessPubKeyType}, nil
 	}
 
 	return nil, fmt.Errorf("unrecognized expected result in test data: %v",
@@ -287,7 +269,7 @@ func parseExpectedResult(expected string) ([]ErrorCode, error) {
 
 // createSpendTx generates a basic spending transaction given the passed
 // signature, witness and public key scripts.
-func createSpendingTx(witness [][]byte, sigScript, pkScript []byte,
+func createSpendingTx(sigScript, pkScript []byte,
 	outputValue int64) *wire.MsgTx {
 
 	coinbaseTx := wire.NewMsgTx(wire.TxVersion)
@@ -312,7 +294,7 @@ func createSpendingTx(witness [][]byte, sigScript, pkScript []byte,
 
 // scriptWithInputVal wraps a target pkScript with the value of the output in
 // which it is contained. The inputVal is necessary in order to properly
-// validate inputs which spend nested, or native witness programs.
+// validate inputs which spend nested.
 type scriptWithInputVal struct {
 	inputVal int64
 	pkScript []byte
@@ -346,35 +328,12 @@ func testScripts(t *testing.T, tests [][]interface{}, useSigCache bool) {
 		}
 
 		var (
-			witness  wire.TxWitness
 			inputAmt btcutil.Amount
 		)
 
 		// When the first field of the test data is a slice it contains
 		// witness data and everything else is offset by 1 as a result.
 		witnessOffset := 0
-		if witnessData, ok := test[0].([]interface{}); ok {
-			witnessOffset++
-
-			// If this is a witness test, then the final element
-			// within the slice is the input amount, so we ignore
-			// all but the last element in order to parse the
-			// witness stack.
-			strWitnesses := witnessData[:len(witnessData)-1]
-			witness, err = parseWitnessStack(strWitnesses)
-			if err != nil {
-				t.Errorf("%s: can't parse witness; %v", name, err)
-				continue
-			}
-
-			inputAmt, err = btcutil.NewAmount(witnessData[len(witnessData)-1].(float64))
-			if err != nil {
-				t.Errorf("%s: can't parse input amt: %v",
-					name, err)
-				continue
-			}
-
-		}
 
 		// Extract and parse the signature script from the test fields.
 		scriptSigStr, ok := test[witnessOffset].(string)
@@ -435,7 +394,7 @@ func testScripts(t *testing.T, tests [][]interface{}, useSigCache bool) {
 		// Generate a transaction pair such that one spends from the
 		// other and the provided signature and public key scripts are
 		// used, then create a new engine to execute the scripts.
-		tx := createSpendingTx(witness, scriptSig, scriptPubKey,
+		tx := createSpendingTx(scriptSig, scriptPubKey,
 			int64(inputAmt))
 		vm, err := NewEngine(scriptPubKey, tx, 0, flags, sigCache, nil,
 			int64(inputAmt))

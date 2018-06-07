@@ -210,12 +210,6 @@ type BlockTemplate struct {
 	// NewBlockTemplate for details on which this can be useful to generate
 	// templates without a coinbase payment address.
 	ValidPayAddress bool
-
-	// WitnessCommitment is a commitment to the witness data (if any)
-	// within the block. This field will only be populted once segregated
-	// witness has been activated, and the block contains a transaction
-	// which has witness data.
-	WitnessCommitment []byte // todo remove
 }
 
 // mergeUtxoView adds all of the entries in viewB to viewA.  The result is that

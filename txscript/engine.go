@@ -5,8 +5,6 @@
 package txscript
 
 import (
-	"bytes"
-	"crypto/sha256"
 	"fmt"
 	"math/big"
 
@@ -254,115 +252,6 @@ func (vm *Engine) isWitnessVersionActive(version uint) bool {
 	return vm.witnessProgram != nil && uint(vm.witnessVersion) == version
 }
 
-// verifyWitnessProgram validates the stored witness program using the passed
-// witness as input.
-func (vm *Engine) verifyWitnessProgram(witness [][]byte) error {
-	if vm.isWitnessVersionActive(0) {
-		switch len(vm.witnessProgram) {
-		case payToWitnessPubKeyHashDataSize: // P2WKH
-			// The witness stack should consist of exactly two
-			// items: the signature, and the pubkey.
-			if len(witness) != 2 {
-				err := fmt.Sprintf("should have exactly two "+
-					"items in witness, instead have %v", len(witness))
-				return scriptError(ErrWitnessProgramMismatch, err)
-			}
-
-			// Now we'll resume execution as if it were a regular
-			// p2pkh transaction.
-			pkScript, err := payToPubKeyHashScript(vm.witnessProgram)
-			if err != nil {
-				return err
-			}
-			pops, err := parseScript(pkScript)
-			if err != nil {
-				return err
-			}
-
-			// Set the stack to the provided witness stack, then
-			// append the pkScript generated above as the next
-			// script to execute.
-			vm.scripts = append(vm.scripts, pops)
-			vm.SetStack(witness)
-
-		case payToWitnessScriptHashDataSize: // P2WSH
-			// Additionally, The witness stack MUST NOT be empty at
-			// this point.
-			if len(witness) == 0 {
-				return scriptError(ErrWitnessProgramEmpty, "witness "+
-					"program empty passed empty witness")
-			}
-
-			// Obtain the witness script which should be the last
-			// element in the passed stack. The size of the script
-			// MUST NOT exceed the max script size.
-			witnessScript := witness[len(witness)-1]
-			if len(witnessScript) > MaxScriptSize {
-				str := fmt.Sprintf("witnessScript size %d "+
-					"is larger than max allowed size %d",
-					len(witnessScript), MaxScriptSize)
-				return scriptError(ErrScriptTooBig, str)
-			}
-
-			// Ensure that the serialized pkScript at the end of
-			// the witness stack matches the witness program.
-			witnessHash := sha256.Sum256(witnessScript)
-			if !bytes.Equal(witnessHash[:], vm.witnessProgram) {
-				return scriptError(ErrWitnessProgramMismatch,
-					"witness program hash mismatch")
-			}
-
-			// With all the validity checks passed, parse the
-			// script into individual op-codes so w can execute it
-			// as the next script.
-			pops, err := parseScript(witnessScript)
-			if err != nil {
-				return err
-			}
-
-			// The hash matched successfully, so use the witness as
-			// the stack, and set the witnessScript to be the next
-			// script executed.
-			vm.scripts = append(vm.scripts, pops)
-			vm.SetStack(witness[:len(witness)-1])
-
-		default:
-			errStr := fmt.Sprintf("length of witness program "+
-				"must either be %v or %v bytes, instead is %v bytes",
-				payToWitnessPubKeyHashDataSize,
-				payToWitnessScriptHashDataSize,
-				len(vm.witnessProgram))
-			return scriptError(ErrWitnessProgramWrongLength, errStr)
-		}
-	} else if vm.hasFlag(ScriptVerifyDiscourageUpgradeableWitnessProgram) {
-		errStr := fmt.Sprintf("new witness program versions "+
-			"invalid: %v", vm.witnessProgram)
-		return scriptError(ErrDiscourageUpgradableWitnessProgram, errStr)
-	} else {
-		// If we encounter an unknown witness program version and we
-		// aren't discouraging future unknown witness based soft-forks,
-		// then we de-activate the segwit behavior within the VM for
-		// the remainder of execution.
-		vm.witnessProgram = nil
-	}
-
-	if vm.isWitnessVersionActive(0) {
-		// All elements within the witness stack must not be greater
-		// than the maximum bytes which are allowed to be pushed onto
-		// the stack.
-		for _, witElement := range vm.GetStack() {
-			if len(witElement) > MaxScriptElementSize {
-				str := fmt.Sprintf("element size %d exceeds "+
-					"max allowed size %d", len(witElement),
-					MaxScriptElementSize)
-				return scriptError(ErrElementTooBig, str)
-			}
-		}
-	}
-
-	return nil
-}
-
 // DisasmPC returns the string for the disassembly of the opcode that will be
 // next to execute when Step() is called.
 func (vm *Engine) DisasmPC() (string, error) {
@@ -579,13 +468,6 @@ func (vm *Engine) checkHashTypeEncoding(hashType SigHashType) error {
 // checkPubKeyEncoding returns whether or not the passed public key adheres to
 // the strict encoding requirements if enabled.
 func (vm *Engine) checkPubKeyEncoding(pubKey []byte) error {
-	if vm.hasFlag(ScriptVerifyWitnessPubKeyType) &&
-		vm.isWitnessVersionActive(0) && !btcec.IsCompressedPubKey(pubKey) {
-
-		str := "only uncompressed keys are accepted post-segwit"
-		return scriptError(ErrWitnessPubKeyType, str)
-	}
-
 	if !vm.hasFlag(ScriptVerifyStrictEncoding) {
 		return nil
 	}

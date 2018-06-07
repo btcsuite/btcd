@@ -82,6 +82,7 @@ func loadBlocks(filename string) (blocks []*btcutil.Block, err error) {
 	var block *btcutil.Block
 
 	err = nil
+	// file content: [ {network block-length block-bytes}, ... ]
 	for height := int64(1); err == nil; height++ {
 		var rintbuf uint32
 		err = binary.Read(dr, binary.LittleEndian, &rintbuf)

@@ -566,8 +566,7 @@ func (msg *MsgTx) Serialize(w io.Writer) error {
 	return msg.BtcEncode(w, 0)
 }
 
-// baseSize returns the serialized size of the transaction without accounting
-// for any witness data.
+// SerializeSize returns the serialized size of the transaction.
 func (msg *MsgTx) SerializeSize() int {
 	// Version 4 bytes + LockTime 4 bytes + Serialized varint size for the
 	// number of transaction inputs and outputs.
@@ -749,9 +748,6 @@ func readTxOut(r io.Reader, pver uint32, version int32, to *TxOut) error {
 
 // WriteTxOut encodes to into the bitcoin protocol encoding for a transaction
 // output (TxOut) to w.
-//
-// NOTE: This function is exported in order to allow txscript to compute the
-// new sighashes for witness transactions (BIP0143).
 func WriteTxOut(w io.Writer, pver uint32, version int32, to *TxOut) error {
 	err := binarySerializer.PutUint64(w, littleEndian, uint64(to.Value))
 	if err != nil {

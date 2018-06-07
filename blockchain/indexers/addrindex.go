@@ -51,18 +51,6 @@ const (
 	// hash.
 	addrKeyTypeScriptHash = 1
 
-	// addrKeyTypePubKeyHash is the address type in an address key which
-	// represents a pay-to-witness-pubkey-hash address. This is required
-	// as the 20-byte data push of a p2wkh witness program may be the same
-	// data push used a p2pkh address.
-	addrKeyTypeWitnessPubKeyHash = 2
-
-	// addrKeyTypeScriptHash is the address type in an address key which
-	// represents a pay-to-witness-script-hash address. This is required,
-	// as p2wsh are distinct from p2sh addresses since they use a new
-	// script template, as well as a 32-byte data push.
-	addrKeyTypeWitnessScriptHash = 3
-
 	// Size of a transaction entry.  It consists of 4 bytes block id + 4
 	// bytes offset + 4 bytes length.
 	txEntrySize = 4 + 4 + 4
@@ -545,24 +533,6 @@ func addrToKey(addr btcutil.Address) ([addrKeySize]byte, error) {
 		var result [addrKeySize]byte
 		result[0] = addrKeyTypePubKeyHash
 		copy(result[1:], addr.AddressPubKeyHash().Hash160()[:])
-		return result, nil
-
-	case *btcutil.AddressWitnessScriptHash:
-		var result [addrKeySize]byte
-		result[0] = addrKeyTypeWitnessScriptHash
-
-		// P2WSH outputs utilize a 32-byte data push created by hashing
-		// the script with sha256 instead of hash160. In order to keep
-		// all address entries within the database uniform and compact,
-		// we use a hash160 here to reduce the size of the salient data
-		// push to 20-bytes.
-		copy(result[1:], btcutil.Hash160(addr.ScriptAddress()))
-		return result, nil
-
-	case *btcutil.AddressWitnessPubKeyHash:
-		var result [addrKeySize]byte
-		result[0] = addrKeyTypeWitnessPubKeyHash
-		copy(result[1:], addr.Hash160()[:])
 		return result, nil
 	}
 

@@ -160,7 +160,6 @@ func TestBlockWire(t *testing.T) {
 			blockOneTxLocs,
 			MultipleAddressVersion,
 		},
-		// TODO(roasbeef): add case for witnessy block
 	}
 
 	t.Logf("Running %d tests", len(tests))

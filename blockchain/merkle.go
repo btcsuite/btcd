@@ -8,35 +8,7 @@ import (
 	"math"
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcutil"
-)
-
-const (
-	// CoinbaseWitnessDataLen is the required length of the only element within
-	// the coinbase's witness data if the coinbase transaction contains a
-	// witness commitment.
-	CoinbaseWitnessDataLen = 32
-
-	// CoinbaseWitnessPkScriptLength is the length of the public key script
-	// containing an OP_RETURN, the WitnessMagicBytes, and the witness
-	// commitment itself. In order to be a valid candidate for the output
-	// containing the witness commitment
-	CoinbaseWitnessPkScriptLength = 38
-)
-
-var (
-	// WitnessMagicBytes is the prefix marker within the public key script
-	// of a coinbase output to indicate that this output holds the witness
-	// commitment for a block.
-	WitnessMagicBytes = []byte{
-		txscript.OP_RETURN,
-		txscript.OP_DATA_36,
-		0xaa,
-		0x21,
-		0xa9,
-		0xed,
-	}
 )
 
 // nextPowerOfTwo returns the next highest power of two from a given number if

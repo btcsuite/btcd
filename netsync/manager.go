@@ -226,26 +226,12 @@ func (sm *SyncManager) startSync() {
 		return
 	}
 
-	// Once the segwit soft-fork package has activated, we only
-	// want to sync from peers which are witness enabled to ensure
-	// that we fully validate all blockchain data.
-	//segwitActive, err := sm.chain.IsDeploymentActive(chaincfg.DeploymentSegwit)		// todo remove
-	//if err != nil {
-	//	log.Errorf("Unable to query for segwit soft-fork state: %v", err)
-	//	return
-	//}
-
 	best := sm.chain.BestSnapshot()
 	var bestPeer *peerpkg.Peer
 	for peer, state := range sm.peerStates {
 		if !state.syncCandidate {
 			continue
 		}
-
-		//if segwitActive && !peer.IsWitnessEnabled() {		// todo remove
-		//	log.Debugf("peer %v not witness enabled, skipping", peer)
-		//	continue
-		//}
 
 		// Remove sync candidate peers that are no longer candidates due
 		// to passing their latest known block.  NOTE: The < is

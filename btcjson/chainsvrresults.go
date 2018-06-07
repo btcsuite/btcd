@@ -146,9 +146,6 @@ type GetBlockTemplateResult struct {
 	CoinbaseValue *int64                     `json:"coinbasevalue,omitempty"`
 	WorkID        string                     `json:"workid,omitempty"`
 
-	// Witness commitment defined in BIP 0141.
-	DefaultWitnessCommitment string `json:"default_witness_commitment,omitempty"`
-
 	// Optional long polling from BIP 0022.
 	LongPollID  string `json:"longpollid,omitempty"`
 	LongPollURI string `json:"longpolluri,omitempty"`
@@ -357,7 +354,6 @@ type VinPrevOut struct {
 	Txid      string     `json:"txid"`
 	Vout      uint32     `json:"vout"`
 	ScriptSig *ScriptSig `json:"scriptSig"`
-	Witness   []string   `json:"txinwitness"`
 	PrevOut   *PrevOut   `json:"prevOut"`
 	Sequence  uint32     `json:"sequence"`
 }
@@ -365,12 +361,6 @@ type VinPrevOut struct {
 // IsCoinBase returns a bool to show if a Vin is a Coinbase one or not.
 func (v *VinPrevOut) IsCoinBase() bool {
 	return len(v.Coinbase) > 0
-}
-
-// HasWitness returns a bool to show if a Vin has any witness data associated
-// with it or not.
-func (v *VinPrevOut) HasWitness() bool {
-	return len(v.Witness) > 0
 }
 
 // MarshalJSON provides a custom Marshal method for VinPrevOut.
@@ -384,25 +374,6 @@ func (v *VinPrevOut) MarshalJSON() ([]byte, error) {
 			Sequence: v.Sequence,
 		}
 		return json.Marshal(coinbaseStruct)
-	}
-
-	if v.HasWitness() {
-		txStruct := struct {
-			Txid      string     `json:"txid"`
-			Vout      uint32     `json:"vout"`
-			ScriptSig *ScriptSig `json:"scriptSig"`
-			Witness   []string   `json:"txinwitness"`
-			PrevOut   *PrevOut   `json:"prevOut,omitempty"`
-			Sequence  uint32     `json:"sequence"`
-		}{
-			Txid:      v.Txid,
-			Vout:      v.Vout,
-			ScriptSig: v.ScriptSig,
-			Witness:   v.Witness,
-			PrevOut:   v.PrevOut,
-			Sequence:  v.Sequence,
-		}
-		return json.Marshal(txStruct)
 	}
 
 	txStruct := struct {

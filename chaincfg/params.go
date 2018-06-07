@@ -91,11 +91,6 @@ const (
 	// 68, 112, and 113.
 	DeploymentCSV
 
-	// DeploymentSegwit defines the rule change deployment ID for the
-	// Segregated Witness (segwit) soft-fork package. The segwit package
-	// includes the deployment of BIPS 141, 142, 144, 145, 147 and 173.
-	//DeploymentSegwit			// todo remove
-
 	// NOTE: DefinedDeployments must always come last since it is used to
 	// determine how many defined deployments there currently are.
 
@@ -564,8 +559,6 @@ var SimNetParams = Params{
 	//PubKeyHashAddrID:        0x3f, // starts with S
 	//ScriptHashAddrID:        0x7b, // starts with s
 	//PrivateKeyID:            0x64, // starts with 4 (uncompressed) or F (compressed)
-	//WitnessPubKeyHashAddrID: 0x19, // starts with Gg
-	//WitnessScriptHashAddrID: 0x28, // starts with ?
 	//
 	//// BIP32 hierarchical deterministic extended key magics
 	//HDPrivateKeyID: [4]byte{0x04, 0x20, 0xb9, 0x00}, // starts with sprv

@@ -224,8 +224,7 @@ func isDust(txOut *wire.TxOut, minRelayTxFee btcutil.Amount) bool {
 	//
 	// The most common scripts are pay-to-pubkey-hash, and as per the above
 	// breakdown, the minimum size of a p2pkh input script is 148 bytes.  So
-	// that figure is used. If the output being spent is a witness program,
-	// then we apply the witness discount to the size of the signature.
+	// that figure is used.
 	totalSize := txOut.SerializeSize() + 41 + 107
 
 	// The output is considered dust if the cost to the network to spend the
