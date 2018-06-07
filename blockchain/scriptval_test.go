@@ -18,7 +18,7 @@ func TestCheckBlockScripts(t *testing.T) {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
 	testBlockNum := 277647
-	blockDataFile := fmt.Sprintf("%d.dat.bz2", testBlockNum)
+	blockDataFile := fmt.Sprintf("%d.dat", testBlockNum)
 	blocks, err := loadBlocks(blockDataFile)
 	if err != nil {
 		t.Errorf("Error loading file: %v\n", err)

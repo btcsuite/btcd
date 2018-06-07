@@ -12,7 +12,7 @@ import (
 
 // TestNotifications ensures that notification callbacks are fired on events.
 func TestNotifications(t *testing.T) {
-	blocks, err := loadBlocks("blk_0_to_4.dat.bz2")
+	blocks, err := loadBlocks("blk_0_to_4.dat")
 	if err != nil {
 		t.Fatalf("Error loading file: %v\n", err)
 	}

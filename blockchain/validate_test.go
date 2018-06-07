@@ -83,8 +83,8 @@ func TestCheckConnectBlockTemplate(t *testing.T) {
 	// (genesis block) -> 1 -> 2 -> 3 -> 4
 	//                          \-> 3a
 	testFiles := []string{
-		"blk_0_to_4.dat.bz2",
-		"blk_3A.dat.bz2",
+		"blk_0_to_4.dat",
+		"blk_3A.dat",
 	}
 
 	var blocks []*btcutil.Block

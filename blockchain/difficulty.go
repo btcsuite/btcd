@@ -154,11 +154,14 @@ func CalcWork(bits uint32) *big.Int {
 }
 
 func (b *BlockChain) GetNextWorkRequired(header *wire.BlockHeader) (uint32, error) {
-	b.chainLock.Lock()
-	defer b.chainLock.Unlock()
-
 	prevNode := b.index.index[header.PrevBlock]
+	// orphan block
+	if prevNode == nil {
+		return BigToCompact(b.chainParams.PowLimit), nil
+	}
+
 	tip := b.bestChain.Tip()
+	// genesis block
 	if tip == nil {
 		return BigToCompact(b.chainParams.PowLimit), nil
 	}
