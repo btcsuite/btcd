@@ -3,6 +3,7 @@
 
 # IDE
 .idea
+.DS_Store
 
 # Databases
 btcd.db
