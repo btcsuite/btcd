@@ -292,11 +292,6 @@ var MainNetParams = Params{
 			StartTime:  1462060800, // May 1st, 2016
 			ExpireTime: 1493596800, // May 1st, 2017
 		},
-		//DeploymentSegwit: {		// todo remove
-		//	BitNumber:  1,
-		//	StartTime:  1479168000, // November 15, 2016 UTC
-		//	ExpireTime: 1510704000, // November 15, 2017 UTC.
-		//},
 	},
 
 	// Mempool parameters
@@ -380,11 +375,6 @@ var TestNet3Params = Params{
 			StartTime:  1456790400, // March 1st, 2016
 			ExpireTime: 1493596800, // May 1st, 2017
 		},
-		//DeploymentSegwit: {		// todo remove
-		//	BitNumber:  1,
-		//	StartTime:  1462060800, // May 1, 2016 UTC
-		//	ExpireTime: 1493596800, // May 1, 2017 UTC.
-		//},
 	},
 
 	// Mempool parameters
@@ -459,11 +449,6 @@ var RegressionNetParams = Params{
 			StartTime:  0,             // Always available for vote
 			ExpireTime: math.MaxInt64, // Never expires
 		},
-		//DeploymentSegwit: {		// todo remove
-		//	BitNumber:  1,
-		//	StartTime:  0,             // Always available for vote
-		//	ExpireTime: math.MaxInt64, // Never expires.
-		//},
 	},
 
 	// Mempool parameters
@@ -541,11 +526,6 @@ var SimNetParams = Params{
 			StartTime:  0,             // Always available for vote
 			ExpireTime: math.MaxInt64, // Never expires
 		},
-		//DeploymentSegwit: {		// todo remove
-		//	BitNumber:  1,
-		//	StartTime:  0,             // Always available for vote
-		//	ExpireTime: math.MaxInt64, // Never expires.
-		//},
 	},
 
 	// Mempool parameters
