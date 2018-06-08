@@ -167,7 +167,7 @@ func (b *BlockChain) GetNextWorkRequired(header *wire.BlockHeader) (uint32, erro
 	}
 
 	// Special rule for regTest: we never retarget.
-	if b.chainParams == &chaincfg.RegressionNetParams {
+	if b.chainParams.Net == wire.TestNet {
 		return prevNode.bits, nil
 	}
 
@@ -202,7 +202,7 @@ func (b *BlockChain) getNextCashWorkRequired(prevNode *blockNode, header *wire.B
 	firstHeight := prevNode.height - 144
 	firstNode := b.getSuitableBlock(b.bestChain.NodeByHeight(firstHeight))
 	if firstNode == nil {
-		panic("the indexFirst should not equal nil")
+		panic("the firstNode should not equal nil")
 	}
 
 	// Compute the target based on time and work done during the interval.
@@ -282,7 +282,7 @@ func (b *BlockChain) getNextEDAWorkRequired(prevNode *blockNode, header *wire.Bl
 }
 
 func (b *BlockChain) calculateNextWorkRequired(prevNode *blockNode, firstBlockTime int64) (uint32, error) {
-	if b.chainParams == &chaincfg.RegressionNetParams {
+	if b.chainParams.Net == wire.TestNet {
 		return prevNode.bits, nil
 	}
 
@@ -342,6 +342,8 @@ func (b *BlockChain) computeTarget(indexFirst, indexLast *blockNode) *big.Int {
 	return new(big.Int).Sub(new(big.Int).Div(oneLsh256, work), big.NewInt(1))
 }
 
+// To reduce the impact of timestamp manipulation, we select the block we are
+// basing our computation on via a median of 3.
 func (b *BlockChain) getSuitableBlock(lastNode *blockNode) *blockNode {
 	// In order to avoid a block is a very skewed timestamp to have too much
 	// influence, we select the median of the 3 top most nodes as a starting
