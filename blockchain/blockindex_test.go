@@ -68,12 +68,12 @@ func TestBlockNodeHeader(t *testing.T) {
 	// Ensure fetching the header from the chain produces the same header used
 	// to create the node.
 	testHeaderHash := testHeader.BlockHash()
-	gotHeader, err := bc.FetchHeader(&testHeaderHash)
+	gotHeader, err := bc.HeaderByHash(&testHeaderHash)
 	if err != nil {
-		t.Fatalf("FetchHeader: unexpected error: %v", err)
+		t.Fatalf("HeaderByHash: unexpected error: %v", err)
 	}
 	if !reflect.DeepEqual(gotHeader, testHeader) {
-		t.Fatalf("FetchHeader: mismatched headers: got %+v, want %+v",
+		t.Fatalf("HeaderByHash: mismatched headers: got %+v, want %+v",
 			gotHeader, testHeader)
 	}
 }

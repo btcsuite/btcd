@@ -1681,27 +1681,18 @@ func (b *BlockChain) MaxBlockSize() (int64, error) {
 	return maxSize, err
 }
 
-// FetchHeader returns the block header identified by the given hash or an error
-// if it doesn't exist.
+// HeaderByHash returns the block header identified by the given hash or an
+// error if it doesn't exist.  Note that this will return headers from both the
+// main chain and any side chains.
 //
 // This function is safe for concurrent access.
-func (b *BlockChain) FetchHeader(hash *chainhash.Hash) (wire.BlockHeader, error) {
-	// Reconstruct the header from the block index if possible.
-	if node := b.index.LookupNode(hash); node != nil {
-		return node.Header(), nil
+func (b *BlockChain) HeaderByHash(hash *chainhash.Hash) (wire.BlockHeader, error) {
+	node := b.index.LookupNode(hash)
+	if node == nil {
+		return wire.BlockHeader{}, fmt.Errorf("block %s is not known", hash)
 	}
 
-	// Fall back to loading it from the database.
-	var header *wire.BlockHeader
-	err := b.db.View(func(dbTx database.Tx) error {
-		var err error
-		header, err = dbFetchHeaderByHash(dbTx, hash)
-		return err
-	})
-	if err != nil {
-		return wire.BlockHeader{}, err
-	}
-	return *header, nil
+	return node.Header(), nil
 }
 
 // locateInventory returns the node of the block after the first known block in
