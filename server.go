@@ -791,7 +791,7 @@ func (sp *serverPeer) OnGetHeaders(p *peer.Peer, msg *wire.MsgGetHeaders) {
 // support bit, it will be banned since it is intentionally violating the
 // protocol.
 func (sp *serverPeer) enforceNodeCFFlag(cmd string) bool {
-	if sp.server.services&wire.SFNodeCF != wire.SFNodeCF {
+	if !hasServices(sp.server.services, wire.SFNodeCF) {
 		// Ban the peer if the protocol version is high enough that the peer is
 		// knowingly violating the protocol and banning is enabled.
 		//
@@ -799,7 +799,7 @@ func (sp *serverPeer) enforceNodeCFFlag(cmd string) bool {
 		// or not banning is enabled, it is checked here as well to ensure the
 		// violation is logged and the peer is disconnected regardless.
 		if sp.ProtocolVersion() >= wire.NodeCFVersion && !cfg.DisableBanning {
-			// Disonnect the peer regardless of whether it was banned.
+			// Disconnect the peer regardless of whether it was banned.
 			sp.addBanScore(100, 0, cmd)
 			sp.Disconnect()
 			return false
@@ -823,7 +823,7 @@ func (sp *serverPeer) OnGetCFilter(p *peer.Peer, msg *wire.MsgGetCFilter) {
 		return
 	}
 
-	// Ignore getcfilter requests if cfg.NoCFilters is set or we're not in sync.
+	// Ignore request if CFs are disabled or the chain is not yet synced.
 	if cfg.NoCFilters || !sp.server.blockManager.IsCurrent() {
 		return
 	}
@@ -896,8 +896,7 @@ func (sp *serverPeer) OnGetCFHeaders(p *peer.Peer, msg *wire.MsgGetCFHeaders) {
 		return
 	}
 
-	// Ignore getcfheader requests if cfg.NoCFilters is set or we're not in
-	// sync.
+	// Ignore request if CFs are disabled or the chain is not yet synced.
 	if cfg.NoCFilters || !sp.server.blockManager.IsCurrent() {
 		return
 	}
@@ -911,91 +910,31 @@ func (sp *serverPeer) OnGetCFHeaders(p *peer.Peer, msg *wire.MsgGetCFHeaders) {
 		return
 	}
 
-	// Attempt to look up the height of the provided stop hash.
+	// Find the most recent known block in the best chain based on the block
+	// locator and fetch all of the block hashes after it until either
+	// wire.MaxCFHeadersPerMsg have been fetched or the provided stop hash is
+	// encountered.
+	//
+	// Use the block after the genesis block if no other blocks in the provided
+	// locator are known.  This does mean the served filter headers will start
+	// over at the genesis block if unknown block locators are provided.
 	chain := sp.server.blockManager.chain
-	endIdx := int64(math.MaxInt64)
-	height, err := chain.BlockHeightByHash(&msg.HashStop)
-	if err == nil {
-		endIdx = height + 1
-	}
-
-	// There are no block locators so a specific header is being requested
-	// as identified by the stop hash.
-	if len(msg.BlockLocatorHashes) == 0 {
-		// No blocks with the stop hash were found so there is nothing
-		// to do.  Just return.  This behavior mirrors the reference
-		// implementation.
-		if endIdx == math.MaxInt32 {
-			return
-		}
-
-		// Fetch the raw committed filter header bytes from the
-		// database.
-		headerBytes, err := sp.server.cfIndex.FilterHeaderByBlockHash(
-			&msg.HashStop, msg.FilterType)
-		if err != nil || len(headerBytes) == 0 {
-			peerLog.Warnf("Could not obtain CF header for %v: %v",
-				msg.HashStop, err)
-			return
-		}
-
-		// Deserialize the hash.
-		var header chainhash.Hash
-		err = header.SetBytes(headerBytes)
-		if err != nil {
-			peerLog.Warnf("Committed filter header deserialize "+
-				"failed: %v", err)
-			return
-		}
-
-		headersMsg := wire.NewMsgCFHeaders()
-		headersMsg.AddCFHeader(&header)
-		headersMsg.StopHash = msg.HashStop
-		headersMsg.FilterType = msg.FilterType
-		sp.QueueMessage(headersMsg, nil)
-		return
-	}
-
-	// Find the most recent known block based on the block locator.
-	// Use the block after the genesis block if no other blocks in the
-	// provided locator are known.  This does mean the client will start
-	// over with the genesis block if unknown block locators are provided.
-	// This mirrors the behavior in the reference implementation.
-	startIdx := int64(1)
-	for _, hash := range msg.BlockLocatorHashes {
-		height, err := chain.BlockHeightByHash(hash)
-		if err == nil {
-			// Start with the next hash since we know this one.
-			startIdx = height + 1
-			break
-		}
-	}
-
-	// Don't attempt to fetch more than we can put into a single message.
-	if endIdx-startIdx > wire.MaxBlockHeadersPerMsg {
-		endIdx = startIdx + wire.MaxBlockHeadersPerMsg
-	}
-
-	// Fetch the inventory from the block database.
-	hashList, err := chain.HeightRange(startIdx, endIdx)
-	if err != nil {
-		peerLog.Warnf("Header lookup failed: %v", err)
-		return
-	}
+	hashList := chain.LocateBlocks(msg.BlockLocatorHashes, &msg.HashStop,
+		wire.MaxCFHeadersPerMsg)
 	if len(hashList) == 0 {
 		return
 	}
 
 	// Generate cfheaders message and send it.
+	cfIndex := sp.server.cfIndex
 	headersMsg := wire.NewMsgCFHeaders()
 	for i := range hashList {
-		// Fetch the raw committed filter header bytes from the
-		// database.
-		headerBytes, err := sp.server.cfIndex.FilterHeaderByBlockHash(
-			&hashList[i], msg.FilterType)
-		if (err != nil) || (len(headerBytes) == 0) {
-			peerLog.Warnf("Could not obtain CF header for %v: %v",
-				hashList[i], err)
+		// Fetch the raw committed filter header bytes from the database.
+		hash := &hashList[i]
+		headerBytes, err := cfIndex.FilterHeaderByBlockHash(hash,
+			msg.FilterType)
+		if err != nil || len(headerBytes) == 0 {
+			peerLog.Warnf("Could not obtain CF header for %v: %v", hash, err)
 			return
 		}
 
@@ -1003,14 +942,12 @@ func (sp *serverPeer) OnGetCFHeaders(p *peer.Peer, msg *wire.MsgGetCFHeaders) {
 		var header chainhash.Hash
 		err = header.SetBytes(headerBytes)
 		if err != nil {
-			peerLog.Warnf("Committed filter header deserialize "+
-				"failed: %v", err)
+			peerLog.Warnf("Committed filter header deserialize failed: %v", err)
 			return
 		}
 
 		headersMsg.AddCFHeader(&header)
 	}
-
 	headersMsg.FilterType = msg.FilterType
 	headersMsg.StopHash = hashList[len(hashList)-1]
 	sp.QueueMessage(headersMsg, nil)
@@ -1024,7 +961,7 @@ func (sp *serverPeer) OnGetCFTypes(p *peer.Peer, msg *wire.MsgGetCFTypes) {
 		return
 	}
 
-	// Ignore getcftypes requests if cfg.NoCFilters is set.
+	// Ignore request if CFs are disabled.
 	if cfg.NoCFilters {
 		return
 	}
