@@ -30,26 +30,18 @@ RUN mkdir /src && \
     chown $USER /src && \
     mkdir -p /go/src/github.com/decred/dcrd && \
     mkdir -p /go/src/github.com/decred/dcrwallet && \
-    mkdir -p /go/src/github.com/decred/dcrctl && \
-    mkdir -p /go/src/github.com/decred/dcrrpcclient && \
     chown -R $USER /go/src
 
 # switch user
 USER $USER
 ENV HOME /home/$USER
 
-#Get deps
+# get deps
 ENV DEP_TAG v0.4.1
-ENV GLIDE_TAG v0.13.1
 ENV GOMETALINTER_TAG v2.0.5
 
 WORKDIR /go/src
-RUN go get -v github.com/Masterminds/glide && \
-    cd /go/src/github.com/Masterminds/glide && \
-    git checkout $GLIDE_TAG && \
-    make build && \
-    mv glide `which glide` && \
-    go get -v github.com/alecthomas/gometalinter && \
+RUN go get -v github.com/alecthomas/gometalinter && \
     cd /go/src/github.com/alecthomas/gometalinter && \
     git checkout $GOMETALINTER_TAG && \
     go install && \
