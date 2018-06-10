@@ -1,11 +1,9 @@
 chaingen
 ========
 
-[![Build Status](https://travis-ci.org/decred/dcrd.png?branch=master)]
-(https://travis-ci.org/decred/dcrd) [![ISC License]
-(http://img.shields.io/badge/license-ISC-blue.svg)](http://copyfree.org)
-[![GoDoc](https://img.shields.io/badge/godoc-reference-blue.svg)]
-(http://godoc.org/github.com/decred/dcrd/blockchain/chaingen)
+[![Build Status](https://travis-ci.org/decred/dcrd.png?branch=master)](https://travis-ci.org/decred/dcrd)
+[![ISC License](http://img.shields.io/badge/license-ISC-blue.svg)](http://copyfree.org)
+[![GoDoc](https://img.shields.io/badge/godoc-reference-blue.svg)](http://godoc.org/github.com/decred/dcrd/blockchain/chaingen)
 
 Package chaingen provides facilities for generating a full chain of blocks.
 

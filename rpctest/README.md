@@ -1,11 +1,9 @@
 rpctest
 =======
 
-[![Build Status](http://img.shields.io/travis/decred/dcrd.svg)]
-(https://travis-ci.org/decred/dcrd) [![ISC License]
-(http://img.shields.io/badge/license-ISC-blue.svg)](http://copyfree.org)
-[![GoDoc](https://img.shields.io/badge/godoc-reference-blue.svg)]
-(http://godoc.org/github.com/decred/dcrd/rpctest)
+[![Build Status](http://img.shields.io/travis/decred/dcrd.svg)](https://travis-ci.org/decred/dcrd)
+[![ISC License](http://img.shields.io/badge/license-ISC-blue.svg)](http://copyfree.org)
+[![GoDoc](https://img.shields.io/badge/godoc-reference-blue.svg)](http://godoc.org/github.com/decred/dcrd/rpctest)
 
 Package rpctest provides a dcrd-specific RPC testing harness crafting and
 executing integration tests by driving a `dcrd` instance via the `RPC`
