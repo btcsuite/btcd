@@ -731,14 +731,13 @@ type PurchaseTicketCmd struct {
 	PoolFees      *float64
 	Expiry        *int
 	Comment       *string
-	TicketChange  *bool
 	TicketFee     *float64
 }
 
 // NewPurchaseTicketCmd creates a new PurchaseTicketCmd.
 func NewPurchaseTicketCmd(fromAccount string, spendLimit float64, minConf *int,
 	ticketAddress *string, numTickets *int, poolAddress *string, poolFees *float64,
-	expiry *int, comment *string, ticketChange *bool, ticketFee *float64) *PurchaseTicketCmd {
+	expiry *int, comment *string, ticketFee *float64) *PurchaseTicketCmd {
 	return &PurchaseTicketCmd{
 		FromAccount:   fromAccount,
 		SpendLimit:    spendLimit,
@@ -749,7 +748,6 @@ func NewPurchaseTicketCmd(fromAccount string, spendLimit float64, minConf *int,
 		PoolFees:      poolFees,
 		Expiry:        expiry,
 		Comment:       comment,
-		TicketChange:  ticketChange,
 		TicketFee:     ticketFee,
 	}
 }
