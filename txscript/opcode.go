@@ -1506,9 +1506,12 @@ func opcodeLeft(op *parsedOpcode, vm *Engine) error {
 	return nil
 }
 
-// opcodeRight pops the first item off the stack as an int and the second item off
-// the stack as a slice. The opcode then prunes the second item from the given int
-// index to ending index. Similar to substr, see above comments.
+// opcodeRight treats the top item of data stack as an integer representing a
+// zero-based start index, the second item as raw bytes to operate on, and
+// replaces them both with data[startIdx:].  That is to say the result is the
+// bytes to the right of, and including, the specified zero-based start index of
+// the given raw bytes.
+//
 // Stack transformation: [... x1 x2] -> [... x1[x2:]]
 func opcodeRight(op *parsedOpcode, vm *Engine) error {
 	v0, err := vm.dstack.PopInt(mathOpCodeMaxScriptNumLen) // x2
@@ -1519,28 +1522,39 @@ func opcodeRight(op *parsedOpcode, vm *Engine) error {
 	if err != nil {
 		return err
 	}
-	aLen := len(a)
 
-	v0Recast := int(v0.Int32())
+	// All data pushes and pops are effectivley limited to 32-bits, as are
+	// all math-related numeric pushes, so it is safe to cast the length to
+	// int32.  The numeric values are also clamped to int32 accordingly.
+	aLen := int32(len(a))
+	startIdx := v0.Int32()
 
+	// WARNING: This check really should be after the bounds checking since
+	// performing it here allows an arbitrary index to be used which is a
+	// source of malleability.  Unfortunately, this is now part of
+	// consensus, so changing it requires a hard fork vote.
 	if aLen == 0 {
 		vm.dstack.PushByteArray(nil)
 		return nil
 	}
-	if v0Recast < 0 {
+
+	// Ensure the provided index is in bounds.
+	//
+	// Take special note that the start index check is > as opposed to >=,
+	// which means it is possible to provide a start index just after the
+	// final character in the string, and an empty byte push will be
+	// produced.
+	if startIdx < 0 {
 		return ErrSubstrIdxNegative
 	}
-	if v0Recast > aLen {
+	if startIdx > aLen {
 		return ErrSubstrIdxOutOfBounds
 	}
 
-	// x1[len(a):]
-	if v0Recast == aLen {
-		vm.dstack.PushByteArray(nil)
-		return nil
-	}
-
-	vm.dstack.PushByteArray(a[v0Recast:])
+	// Push the requested substring back to the stack.  Note that a start
+	// index that is identical to the length of the string produces an
+	// empty byte push.
+	vm.dstack.PushByteArray(a[startIdx:])
 	return nil
 }
 
