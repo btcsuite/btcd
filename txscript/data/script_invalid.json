@@ -43,6 +43,16 @@
 ["'' 4 2147483648", "SUBSTR NOT", "P2SH,STRICTENC", "SUBSTR with empty string must fail with start index >4 bytes"],
 ["'' 2147483648 4", "SUBSTR NOT", "P2SH,STRICTENC", "SUBSTR with empty string must fail with end index >4 bytes"],
 
+["Left substring related test coverage"],
+["", "LEFT NOT", "P2SH,STRICTENC", "LEFT requires a string to operate on"],
+["'abcd'", "LEFT NOT", "P2SH,STRICTENC", "LEFT requires an index"],
+["NOP 0", "LEFT NOT", "P2SH,STRICTENC", "LEFT must only operate on byte pushes"],
+["'abcd' NOP", "LEFT NOT", "P2SH,STRICTENC", "LEFT index must be numeric"],
+["'abcd' 0", "LEFT", "P2SH,STRICTENC", "LEFT index of zero must produce empty byte push which is equivalent to FALSE"],
+["'abcd' -1", "LEFT NOT", "P2SH,STRICTENC", "LEFT must fail with negative index"],
+["'abc' 4", "LEFT NOT", "P2SH,STRICTENC", "LEFT must fail with index too large"],
+["'' 2147483648", "LEFT NOT", "P2SH,STRICTENC", "LEFT with empty string must fail with index >4 bytes"],
+
 ["1", "IF 0x50 ENDIF 1", "P2SH,STRICTENC", "0x50 is reserved"],
 ["0x52", "0x5f ADD 0x60 EQUAL", "P2SH,STRICTENC", "0x51 through 0x60 push 1 through 16 onto stack"],
 ["0","NOP", "P2SH,STRICTENC"],

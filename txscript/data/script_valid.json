@@ -45,6 +45,14 @@
 ["'abc' 2 0", "IF LEFT ELSE 1 ENDIF", "P2SH,STRICTENC"],
 ["'abc' 2 0", "IF RIGHT ELSE 1 ENDIF", "P2SH,STRICTENC"],
 
+["Left substring related test coverage"],
+["'abcd' 0", "LEFT NOT", "P2SH,STRICTENC", "LEFT index of zero must produce empty byte push which is equivalent to FALSE"],
+["'abcd' 1", "LEFT 'a' EQUAL", "P2SH,STRICTENC", "LEFT uses 0-based end index"],
+["'abcd' 4", "LEFT 'abcd' EQUAL", "P2SH,STRICTENC", "LEFT produces entire string when end index equals string length"],
+["'abcd' 2 1", "IF LEFT ELSE 0 ENDIF 'ab' EQUAL", "P2SH,STRICTENC", "LEFT works in a conditional branch"],
+["'abcd' 0 0", "IF LEFT ELSE 1 ENDIF", "P2SH,STRICTENC", "LEFT must not modify the stack if in an unexecuted branch"],
+["'' 2147483647", "LEFT '' EQUAL", "P2SH,STRICTENC", "LEFT of an empty string produces an empty byte push regardless of out of bounds index <=4 bytes"],
+
 ["1 2 0 IF AND ELSE 1 ENDIF", "NOP", "P2SH,STRICTENC"],
 ["1 2 0 IF OR ELSE 1 ENDIF", "NOP", "P2SH,STRICTENC"],
 ["1 2 0 IF XOR ELSE 1 ENDIF", "NOP", "P2SH,STRICTENC"],

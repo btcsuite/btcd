@@ -1460,10 +1460,13 @@ func opcodeSubstr(op *parsedOpcode, vm *Engine) error {
 	return nil
 }
 
-// opcodeLeft pops the first item off the stack as an int and the second item off
-// the stack as a slice. The opcode then prunes the second item from the start
-// index to the given int. Similar to substr, see above comments.
-// Stack transformation: [... x1 x2] -> [... x1[:x2]]
+// opcodeLeft treats the top item of data stack as an integer representing a
+// zero-based end index, the second item as raw bytes to operate on, and
+// replaces them both with data[0:endIdx].  That is to say the result is the
+// bytes up to, but excluding, the specified zero-based end index of the given
+// raw bytes.
+//
+// Stack transformation: [... x1 x2] -> [... x1[0:x2]]
 func opcodeLeft(op *parsedOpcode, vm *Engine) error {
 	v0, err := vm.dstack.PopInt(mathOpCodeMaxScriptNumLen) // x2
 	if err != nil {
@@ -1473,28 +1476,33 @@ func opcodeLeft(op *parsedOpcode, vm *Engine) error {
 	if err != nil {
 		return err
 	}
-	aLen := len(a)
 
-	v0Recast := int(v0.Int32())
+	// All data pushes and pops are effectivley limited to 32-bits, as are
+	// all math-related numeric pushes, so it is safe to cast the length to
+	// int32.  The numeric values are also clamped to int32 accordingly.
+	aLen := int32(len(a))
+	endIdx := v0.Int32()
 
+	// WARNING: This check really should be after the bounds checking since
+	// performing it here allows an arbitrary index to be used which is a
+	// source of malleability.  Unfortunately, this is now part of
+	// consensus, so changing it requires a hard fork vote.
 	if aLen == 0 {
 		vm.dstack.PushByteArray(nil)
 		return nil
 	}
-	if v0Recast < 0 {
+
+	// Ensure the provided index is in bounds.
+	if endIdx < 0 {
 		return ErrSubstrIdxNegative
 	}
-	if v0Recast > aLen {
+	if endIdx > aLen {
 		return ErrSubstrIdxOutOfBounds
 	}
 
-	// x1[:0]
-	if v0Recast == 0 {
-		vm.dstack.PushByteArray(nil)
-		return nil
-	}
-
-	vm.dstack.PushByteArray(a[:v0Recast])
+	// Push the requested substring back to the stack.  Note that a zero
+	// end index produces an empty byte push.
+	vm.dstack.PushByteArray(a[:endIdx])
 	return nil
 }
 
