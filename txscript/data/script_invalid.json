@@ -88,6 +88,16 @@
 ["2147483648 1", "ROTL 1 EQUAL", "P2SH,STRICTENC", "ROTL must fail with input value >4 bytes"],
 ["1 2147483648", "ROTL TRUE", "P2SH,STRICTENC", "ROTL must fail with rotation count >4 bytes"],
 
+["Left bit shift related test coverage"],
+["", "LSHIFT NOT", "P2SH,STRICTENC", "LSHIFT requires an input value"],
+["1", "LSHIFT TRUE", "P2SH,STRICTENC", "LSHIFT requires a shift count"],
+["NOP 1", "LSHIFT NOT", "P2SH,STRICTENC", "LSHIFT input value must be numeric"],
+["1 NOP", "LSHIFT TRUE", "P2SH,STRICTENC", "LSHIFT shift count must be numeric"],
+["2 -1", "LSHIFT 1 EQUAL", "P2SH,STRICTENC", "LSHIFT must fail with negative shift count"],
+["1 33", "LSHIFT 0 EQUAL", "P2SH,STRICTENC", "LSHIFT must fail with shift count >32"],
+["2147483648 1", "LSHIFT TRUE", "P2SH,STRICTENC", "LSHIFT must fail with input value >4 bytes"],
+["1 2147483648", "LSHIFT TRUE", "P2SH,STRICTENC", "LSHIFT must fail with shift count >4 bytes"],
+
 ["1", "IF 0x50 ENDIF 1", "P2SH,STRICTENC", "0x50 is reserved"],
 ["0x52", "0x5f ADD 0x60 EQUAL", "P2SH,STRICTENC", "0x51 through 0x60 push 1 through 16 onto stack"],
 ["0","NOP", "P2SH,STRICTENC"],

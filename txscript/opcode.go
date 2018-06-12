@@ -1994,34 +1994,47 @@ func opcodeMod(op *parsedOpcode, vm *Engine) error {
 	return nil
 }
 
-// opcodeLShift pushes the top two items off the stack as integers. Both ints are
-// interpreted as int32s. The first item becomes the depth to shift left, while
-// the second item is shifted that depth to the left. The shifted item is pushed
-// back to the stack as an integer.
+// opcodeLShift treats the top two items of the data stack as 32-bit integers
+// where the top item represents the number of bits to left shift (up to 32),
+// and the second item represents the value to shift, and replaces them both
+// with the result of the shift.
+//
 // Stack transformation: [... x1 x2] -> [... x1 << x2]
 func opcodeLShift(op *parsedOpcode, vm *Engine) error {
+	// WARNING: Since scriptNums are signed, a standard 4-byte scriptNum only
+	// supports up to a maximum of 2^31-1.  The value (v1) really should allow
+	// 5-byte scriptNums and have an overflow check later to clamp it to uint32,
+	// so the full range of uint32 could be covered.  This has undesirable
+	// consequences on the semantics of left shift such that attempting to
+	// do ((0x40000000 << 1) << 1) will fail due to the first shift producing
+	// a value greater than the max int32 while (0x40000000 << 2) will work as
+	// expected.
+	//
+	// Unfortunately, a 4-byte scriptNum is now part of consensus, so changing
+	// it requires a consensus vote.
 	v0, err := vm.dstack.PopInt(mathOpCodeMaxScriptNumLen) // x2
 	if err != nil {
 		return err
 	}
-
 	v1, err := vm.dstack.PopInt(mathOpCodeMaxScriptNumLen) // x1
 	if err != nil {
 		return err
 	}
 
-	v032 := v0.Int32()
-	v132 := v1.Int32()
+	// The count and value are limited to int32 via the above, so it is safe to
+	// cast them.
+	count := v0.Int32()
+	value := v1.Int32()
 
 	// Don't allow invalid or pointless shifts.
-	if v032 < 0 {
+	if count < 0 {
 		return ErrNegativeShift
 	}
-	if v032 > 32 {
+	if count > 32 {
 		return ErrShiftOverflow
 	}
 
-	vm.dstack.PushInt(scriptNum(v132 << uint(v032)))
+	vm.dstack.PushInt(scriptNum(value << uint(count)))
 	return nil
 }
 
