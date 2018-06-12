@@ -78,6 +78,16 @@
 ["2147483648 1", "ROTR 1073741824 EQUAL", "P2SH,STRICTENC", "ROTR must fail with input value >4 bytes"],
 ["1 2147483648", "ROTR TRUE", "P2SH,STRICTENC", "ROTR must fail with rotation count >4 bytes"],
 
+["Left bit rotation related test coverage"],
+["", "ROTL NOT", "P2SH,STRICTENC", "ROTL requires an input value"],
+["1", "ROTL TRUE", "P2SH,STRICTENC", "ROTL requires a rotation count"],
+["NOP 1", "ROTL NOT", "P2SH,STRICTENC", "ROTL input value must be numeric"],
+["1 NOP", "ROTL TRUE", "P2SH,STRICTENC", "ROTL rotation count must be numeric"],
+["2 -1", "ROTL 1 EQUAL", "P2SH,STRICTENC", "ROTL must fail with negative rotation count"],
+["1 32", "ROTL 1 EQUAL", "P2SH,STRICTENC", "ROTL must fail with rotation count >31"],
+["2147483648 1", "ROTL 1 EQUAL", "P2SH,STRICTENC", "ROTL must fail with input value >4 bytes"],
+["1 2147483648", "ROTL TRUE", "P2SH,STRICTENC", "ROTL must fail with rotation count >4 bytes"],
+
 ["1", "IF 0x50 ENDIF 1", "P2SH,STRICTENC", "0x50 is reserved"],
 ["0x52", "0x5f ADD 0x60 EQUAL", "P2SH,STRICTENC", "0x51 through 0x60 push 1 through 16 onto stack"],
 ["0","NOP", "P2SH,STRICTENC"],
