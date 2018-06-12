@@ -25,6 +25,11 @@
 ["0x4d0200ff","0x01 NOP", "P2SH,STRICTENC", "PUSHDATA2 with not enough bytes"],
 ["0x4e03000000ffff","0x01 NOP", "P2SH,STRICTENC", "PUSHDATA4 with not enough bytes"],
 
+["Cat related test coverage"],
+["", "CAT TRUE", "P2SH,STRICTENC", "CAT requires an input arg"],
+["'ab'", "CAT TRUE", "P2SH,STRICTENC", "CAT requires a second input arg"],
+["'a' 'abcdefghijklmnop' DUP CAT DUP CAT DUP CAT DUP CAT DUP CAT DUP CAT DUP CAT", "CAT", "P2SH,STRICTENC", "CAT must fail if the result would exceed max allowed stack item size"],
+
 ["Substring related test coverage"],
 ["", "SUBSTR NOT", "P2SH,STRICTENC", "SUBSTR requires a string to operate on"],
 ["'abcd'", "SUBSTR NOT", "P2SH,STRICTENC", "SUBSTR requires an end index"],

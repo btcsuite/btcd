@@ -1359,9 +1359,10 @@ func opcodeTuck(op *parsedOpcode, vm *Engine) error {
 	return vm.dstack.Tuck()
 }
 
-// opcodeCat concatenates the top two stack elements after popping them off, then
-// pushes the result back onto the stack. The opcode fails if the concatenated
-// stack element is too large.
+// opcodeCat treats the top two items of the data stack as raw bytes and
+// replaces them with their concatenation.  An error is returned if the result
+// of the concatenation would exceed the max allowed stack item size.
+//
 // Stack transformation: [... x1 x2] -> [... x1 || x2]
 func opcodeCat(op *parsedOpcode, vm *Engine) error {
 	a, err := vm.dstack.PopByteArray() // x2
@@ -1389,13 +1390,16 @@ func opcodeCat(op *parsedOpcode, vm *Engine) error {
 		return nil
 	}
 
-	// We can't overflow the maximum stack item size.
-	if len(a)+len(b) > MaxScriptElementSize {
+	// Ensure the result does not overflow the maximum stack item size.
+	combinedLen := len(a) + len(b)
+	if combinedLen > MaxScriptElementSize {
 		return ErrStackElementTooBig
 	}
 
-	c := append(b, a...)
-
+	// Push the concatenated result back to the stack.
+	c := make([]byte, combinedLen)
+	copy(c, b)
+	copy(c[len(b):], a)
 	vm.dstack.PushByteArray(c)
 	return nil
 }
@@ -1404,6 +1408,7 @@ func opcodeCat(op *parsedOpcode, vm *Engine) error {
 // integers. If the indices indicated exist within the next stack item that is
 // also popped off, return the relevant substring based on the given start and
 // end indexes.
+//
 // Stack transformation: [... x1 x2 x3] -> [... x1[x3:x2]]
 func opcodeSubstr(op *parsedOpcode, vm *Engine) error {
 	v0, err := vm.dstack.PopInt(mathOpCodeMaxScriptNumLen) // x3

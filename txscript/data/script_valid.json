@@ -29,8 +29,14 @@
 ["0x4d 0x0100 0x08","8 EQUAL", "P2SH,STRICTENC", "0x4d is OP_PUSHDATA2"],
 ["0x4e 0x01000000 0x09","9 EQUAL", "P2SH,STRICTENC", "0x4e is OP_PUSHDATA4"],
 
-["'a' 'b'", "CAT", "P2SH,STRICTENC"],
-["'a' 'b' 0", "IF CAT ELSE 1 ENDIF", "P2SH,STRICTENC"],
+["Cat related test coverage"],
+["'a' 'b'", "CAT 'ab' EQUAL", "P2SH,STRICTENC", "CAT concatenates two input args"],
+["'a' 2147483648", "CAT 0x06 0x610000008000 EQUAL", "P2SH,STRICTENC", "CAT must treat arguments as bytes as opposed to numeric"],
+["'' ''", "CAT '' EQUAL", "P2SH,STRICTENC", "CAT with two empty args must result in a single empty item on the stack"],
+["'a' ''", "CAT 'a' EQUAL", "P2SH,STRICTENC", "CAT with empty right-hand side must return left-hand side"],
+["'' 'b'", "CAT 'b' EQUAL", "P2SH,STRICTENC", "CAT with empty left-hand side must return right-hand side"],
+["'a' 'b' 1", "IF CAT ELSE 1 ENDIF 'ab' EQUAL", "P2SH,STRICTENC", "CAT works in a conditional branch"],
+["'a' 'b' 0", "IF CAT ELSE 2DROP 1 ENDIF 1 EQUAL", "P2SH,STRICTENC", "CAT must not modify the stack if in an unexecuted branch"],
 
 ["Substring related test coverage"],
 ["'abcd' 1 0", "SUBSTR 'a' EQUAL", "P2SH,STRICTENC", "SUBSTR uses 0-based indices"],
