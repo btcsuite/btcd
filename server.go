@@ -772,10 +772,6 @@ func (sp *serverPeer) OnGetHeaders(p *peer.Peer, msg *wire.MsgGetHeaders) {
 	// over with the genesis block if unknown block locators are provided.
 	chain := sp.server.blockManager.chain
 	headers := chain.LocateHeaders(msg.BlockLocatorHashes, &msg.HashStop)
-	if len(headers) == 0 {
-		// Nothing to send.
-		return
-	}
 
 	// Send found headers to the requesting peer.
 	blockHeaders := make([]*wire.BlockHeader, len(headers))
