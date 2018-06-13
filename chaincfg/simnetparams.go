@@ -178,7 +178,8 @@ var SimNetParams = Params{
 
 	// BIP44 coin type used in the hierarchical deterministic path for
 	// address generation.
-	HDCoinType: 115, // ASCII for s
+	SLIP0044CoinType: 1,   // SLIP0044, Testnet (all coins)
+	LegacyCoinType:   115, // ASCII for s, for backwards compatibility
 
 	// Decred PoS parameters
 	MinimumStakeDiff:        20000,

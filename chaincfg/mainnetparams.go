@@ -190,7 +190,8 @@ var MainNetParams = Params{
 
 	// BIP44 coin type used in the hierarchical deterministic path for
 	// address generation.
-	HDCoinType: 20,
+	SLIP0044CoinType: 42, // SLIP0044, Decred
+	LegacyCoinType:   20, // for backwards compatibility
 
 	// Decred PoS parameters
 	MinimumStakeDiff:        2 * 1e8, // 2 Coin

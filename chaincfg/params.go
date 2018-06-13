@@ -378,9 +378,17 @@ type Params struct {
 	HDPrivateKeyID [4]byte
 	HDPublicKeyID  [4]byte
 
-	// BIP44 coin type used in the hierarchical deterministic path for
-	// address generation.
-	HDCoinType uint32
+	// SLIP-0044 registered coin type used for BIP44, used in the hierarchical
+	// deterministic path for address generation.
+	// All SLIP-0044 registered coin types are are defined here:
+	// https://github.com/satoshilabs/slips/blob/master/slip-0044.md
+	SLIP0044CoinType uint32
+
+	// Legacy BIP44 coin type used in the hierarchical deterministic path for
+	// address generation. Previous name was HDCoinType, the LegacyCoinType
+	// was introduced for backwards compatibility. Usually, SLIP0044CoinType
+	// should be used instead.
+	LegacyCoinType uint32
 
 	// MinimumStakeDiff if the minimum amount of Atoms required to purchase a
 	// stake ticket.
