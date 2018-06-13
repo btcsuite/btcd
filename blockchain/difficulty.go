@@ -159,7 +159,6 @@ func CalcWork(bits uint32) *big.Int {
 func (b *BlockChain) calcEasiestDifficulty(bits uint32, duration time.Duration) uint32 {
 	// Convert types used in the calculations below.
 	durationVal := int64(duration / time.Second)
-	adjustmentFactor := big.NewInt(b.chainParams.RetargetAdjustmentFactor)
 
 	// The test network rules allow minimum difficulty blocks after more
 	// than twice the desired amount of time needed to generate a block has
@@ -178,7 +177,8 @@ func (b *BlockChain) calcEasiestDifficulty(bits uint32, duration time.Duration) 
 	// multiplied by the max adjustment factor.
 	newTarget := CompactToBig(bits)
 	for durationVal > 0 && newTarget.Cmp(b.chainParams.PowLimit) < 0 {
-		newTarget.Mul(newTarget, adjustmentFactor)
+		adj := new(big.Int).Div(newTarget, big.NewInt(2))
+		newTarget.Add(newTarget, adj)
 		durationVal -= b.maxRetargetTimespan
 	}
 
@@ -224,47 +224,44 @@ func (b *BlockChain) calcNextRequiredDifficulty(lastNode *blockNode, newBlockTim
 		return b.chainParams.PowLimitBits, nil
 	}
 
-	// Return the previous block's difficulty requirements if this block
-	// is not at a difficulty retarget interval.
-	if (lastNode.height+1)%b.blocksPerRetarget != 0 {
-		// For networks that support it, allow special reduction of the
-		// required difficulty once too much time has elapsed without
-		// mining a block.
-		if b.chainParams.ReduceMinDifficulty {
-			// Return minimum difficulty when more than the desired
-			// amount of time has elapsed without mining a block.
-			reductionTime := int64(b.chainParams.MinDiffReductionTime /
-				time.Second)
-			allowMinTime := lastNode.timestamp + reductionTime
-			if newBlockTime.Unix() > allowMinTime {
-				return b.chainParams.PowLimitBits, nil
-			}
-
-			// The block was mined within the desired timeframe, so
-			// return the difficulty for the last block which did
-			// not have the special minimum difficulty rule applied.
-			return b.findPrevTestNetDifficulty(lastNode), nil
+	// For networks that support it, allow special reduction of the
+	// required difficulty once too much time has elapsed without
+	// mining a block.
+	if b.chainParams.ReduceMinDifficulty {
+		// Return minimum difficulty when more than the desired
+		// amount of time has elapsed without mining a block.
+		reductionTime := int64(b.chainParams.MinDiffReductionTime /
+			time.Second)
+		allowMinTime := lastNode.timestamp + reductionTime
+		if newBlockTime.Unix() > allowMinTime {
+			return b.chainParams.PowLimitBits, nil
 		}
 
-		// For the main network (or any unrecognized networks), simply
-		// return the previous block's difficulty requirements.
-		return lastNode.bits, nil
+		// The block was mined within the desired timeframe, so
+		// return the difficulty for the last block which did
+		// not have the special minimum difficulty rule applied.
+		return b.findPrevTestNetDifficulty(lastNode), nil
 	}
 
 	// Get the block node at the previous retarget (targetTimespan days
 	// worth of blocks).
-	firstNode := lastNode.RelativeAncestor(b.blocksPerRetarget - 1)
+	firstNode := lastNode.RelativeAncestor(b.blocksPerRetarget)
+	if lastNode.height == 0 {
+		firstNode = lastNode
+	}
 	if firstNode == nil {
 		return 0, AssertError("unable to obtain previous retarget block")
 	}
 
+	targetTimeSpan := int64(b.chainParams.TargetTimespan / time.Second)
+
 	// Limit the amount of adjustment that can occur to the previous
 	// difficulty.
 	actualTimespan := lastNode.timestamp - firstNode.timestamp
-	adjustedTimespan := actualTimespan
-	if actualTimespan < b.minRetargetTimespan {
+	adjustedTimespan := targetTimeSpan + (actualTimespan-targetTimeSpan)/8
+	if adjustedTimespan < b.minRetargetTimespan {
 		adjustedTimespan = b.minRetargetTimespan
-	} else if actualTimespan > b.maxRetargetTimespan {
+	} else if adjustedTimespan > b.maxRetargetTimespan {
 		adjustedTimespan = b.maxRetargetTimespan
 	}
 
@@ -275,7 +272,6 @@ func (b *BlockChain) calcNextRequiredDifficulty(lastNode *blockNode, newBlockTim
 	// result.
 	oldTarget := CompactToBig(lastNode.bits)
 	newTarget := new(big.Int).Mul(oldTarget, big.NewInt(adjustedTimespan))
-	targetTimeSpan := int64(b.chainParams.TargetTimespan / time.Second)
 	newTarget.Div(newTarget, big.NewInt(targetTimeSpan))
 
 	// Limit new value to the proof of work limit.
