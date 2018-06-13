@@ -151,7 +151,17 @@
 ["2 2 0 IF RSHIFT ELSE 1 ENDIF", "NOP", "P2SH,STRICTENC"],
 
 ["2 DUP MUL", "4 EQUAL", "P2SH,STRICTENC"],
+
+["Division related test coverage"],
+["7 3", "DIV 2 EQUAL", "STRICTENC", "DIV must perform integer division (7 / 3)"],
+["8 3", "DIV 2 EQUAL", "STRICTENC", "DIV must perform integer division (8 / 3)"],
+["6 3", "DIV 2 EQUAL", "STRICTENC", "DIV must support a positive dividend and divisor"],
+["-6 3", "DIV -2 EQUAL", "STRICTENC", "DIV must support a negative dividend with positive divisor"],
+["6 -3", "DIV -2 EQUAL", "STRICTENC", "DIV must support a positive dividend with negative divisor"],
+["-6 -3", "DIV 2 EQUAL", "STRICTENC", "DIV must support a negative dividend and divisor"],
+["-2147483647 DUP", "DIV 1 EQUAL", "STRICTENC", "DIV must support 4-byte negative int32"],
 ["2 DUP DIV", "1 EQUAL", "P2SH,STRICTENC"],
+
 ["7 3 MOD", "1 EQUAL", "P2SH,STRICTENC"],
 
 ["Left bit shift related test coverage"],

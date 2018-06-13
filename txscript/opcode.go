@@ -1952,19 +1952,21 @@ func opcodeDiv(op *parsedOpcode, vm *Engine) error {
 	if err != nil {
 		return err
 	}
-
 	v1, err := vm.dstack.PopInt(mathOpCodeMaxScriptNumLen)
 	if err != nil {
 		return err
 	}
 
-	if v0.Int32() == 0 {
+	// The dividend and divisor are limited to int32 via the above, so it is
+	// safe to cast them.
+	divisor := v0.Int32()
+	dividend := v1.Int32()
+
+	if divisor == 0 {
 		return ErrDivideByZero
 	}
 
-	v2 := v1.Int32() / v0.Int32()
-
-	vm.dstack.PushInt(scriptNum(v2))
+	vm.dstack.PushInt(scriptNum(dividend / divisor))
 	return nil
 }
 
