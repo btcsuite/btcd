@@ -154,7 +154,7 @@ func CalcWork(bits uint32) *big.Int {
 }
 
 func (b *BlockChain) GetNextWorkRequired(header *wire.BlockHeader) (uint32, error) {
-	prevNode := b.index.index[header.PrevBlock]
+	prevNode := b.index.index[header.BlockHash()]
 	// orphan block
 	if prevNode == nil {
 		return BigToCompact(b.chainParams.PowLimit), nil
@@ -233,7 +233,7 @@ func (b *BlockChain) getNextEDAWorkRequired(prevNode *blockNode, header *wire.Bl
 		// Special difficulty rule for testnet:
 		// If the new block's timestamp is more than 2* 10 minutes then allow
 		// mining of a min-difficulty block.
-		if int64(header.Timestamp.Second()) > prevNode.timestamp+2*int64(b.chainParams.TargetTimePerBlock) {
+		if int64(header.Timestamp.Second()) > prevNode.timestamp+2*int64(b.chainParams.TargetTimePerBlock.Seconds()) {
 			return proofOfWorkLimit, nil
 		}
 
@@ -260,7 +260,7 @@ func (b *BlockChain) getNextEDAWorkRequired(prevNode *blockNode, header *wire.Bl
 	if node6 == nil {
 		panic("the block Index should not equal nil")
 	}
-	mtp6Blocks := prevNode.CalcPastMedianTime().Second() - node6.CalcPastMedianTime().Second()
+	mtp6Blocks := prevNode.CalcPastMedianTime().Unix() - node6.CalcPastMedianTime().Unix()
 	if mtp6Blocks < 12*3600 {
 		return bits, nil
 	}
@@ -288,18 +288,19 @@ func (b *BlockChain) calculateNextWorkRequired(prevNode *blockNode, firstBlockTi
 
 	// Limit adjustment step
 	actualTimeSpan := prevNode.timestamp - firstBlockTime
-	if actualTimeSpan < int64(b.chainParams.TargetTimespan)/4 {
-		actualTimeSpan = int64(b.chainParams.TargetTimespan) / 4
+	targetTimeSpan := int64(b.chainParams.TargetTimespan.Seconds())
+	if actualTimeSpan < targetTimeSpan/4 {
+		actualTimeSpan = targetTimeSpan / 4
 	}
 
-	if actualTimeSpan > int64(b.chainParams.TargetTimespan)*4 {
-		actualTimeSpan = int64(b.chainParams.TargetTimespan) * 4
+	if actualTimeSpan > targetTimeSpan*4 {
+		actualTimeSpan = targetTimeSpan * 4
 	}
 
 	// Retarget
 	bnNew := CompactToBig(prevNode.bits)
 	bnNew.Mul(bnNew, big.NewInt(int64(actualTimeSpan)))
-	bnNew.Div(bnNew, big.NewInt(int64(b.chainParams.TargetTimespan)))
+	bnNew.Div(bnNew, big.NewInt(targetTimeSpan))
 	if bnNew.Cmp(b.chainParams.PowLimit) > 0 {
 		bnNew = b.chainParams.PowLimit
 	}
@@ -319,7 +320,7 @@ func (b *BlockChain) computeTarget(indexFirst, indexLast *blockNode) *big.Int {
 	* between blocks.
 	 */
 	work := new(big.Int).Sub(indexLast.workSum, indexFirst.workSum)
-	work.Mul(work, big.NewInt(int64(b.chainParams.TargetTimePerBlock)))
+	work.Mul(work, big.NewInt(int64(b.chainParams.TargetTimePerBlock.Seconds())))
 
 	// In order to avoid difficulty cliffs, we bound the amplitude of the
 	// adjustement we are going to do.
@@ -327,10 +328,11 @@ func (b *BlockChain) computeTarget(indexFirst, indexLast *blockNode) *big.Int {
 		panic("indexLast time should greater than indexFirst time ")
 	}
 	actualTimeSpan := indexLast.timestamp - indexFirst.timestamp
-	if actualTimeSpan > int64(288*b.chainParams.TargetTimePerBlock) {
-		actualTimeSpan = int64(288 * b.chainParams.TargetTimePerBlock)
-	} else if actualTimeSpan < int64(72*b.chainParams.TargetTimePerBlock) {
-		actualTimeSpan = 72 * int64(b.chainParams.TargetTimePerBlock)
+	interval := int64(b.chainParams.TargetTimePerBlock.Seconds())
+	if actualTimeSpan > 288*interval {
+		actualTimeSpan = 288 * interval
+	} else if actualTimeSpan < 72*interval {
+		actualTimeSpan = 72 * interval
 	}
 
 	work.Div(work, big.NewInt(int64(actualTimeSpan)))
