@@ -162,7 +162,14 @@
 ["-2147483647 DUP", "DIV 1 EQUAL", "STRICTENC", "DIV must support 4-byte negative int32"],
 ["2 DUP DIV", "1 EQUAL", "P2SH,STRICTENC"],
 
-["7 3 MOD", "1 EQUAL", "P2SH,STRICTENC"],
+["Modular division related test coverage"],
+["7 3", "MOD 1 EQUAL", "STRICTENC", "MOD must produce expected result (7%3)"],
+["8 3", "MOD 2 EQUAL", "STRICTENC", "MOD must produce expected result (8%3)"],
+["6 3", "MOD 0 EQUAL", "STRICTENC", "MOD must support a positive dividend and divisor"],
+["-7 3", "MOD -1 EQUAL", "STRICTENC", "MOD must support a negative dividend with positive divisor with negative result"],
+["7 -3", "MOD 1 EQUAL", "STRICTENC", "MOD must support a positive dividend with negative divisor with positve result"],
+["-7 -3", "MOD -1 EQUAL", "STRICTENC", "MOD must support a negative dividend and divisor with negative result"],
+["-2147483647 1073741823", "MOD -1 EQUAL", "STRICTENC", "MOD must support 4-byte negative int32"],
 
 ["Left bit shift related test coverage"],
 ["1 1", "LSHIFT 2 EQUAL", "P2SH,STRICTENC", "LSHIFT 0x1 << 1"],

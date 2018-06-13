@@ -1971,8 +1971,11 @@ func opcodeDiv(op *parsedOpcode, vm *Engine) error {
 }
 
 // opcodeMod treats the top two items on the data stack as integers and replaces
-// them with the result of the modulus the top entry by the second-to-top entry as
-// 4-byte integers.
+// them with the result of the modulus of the top entry by the second-to-top
+// entry as 4-byte integers.  Since the value to shift is treated as a
+// signed 32-bit integer, truncated division semantics are used when negative
+// values are used.  In other words, the result will have the same sign as the
+// dividend.
 //
 // Stack transformation: [... x1 x2] -> [... x1/x2]
 func opcodeMod(op *parsedOpcode, vm *Engine) error {
@@ -1980,19 +1983,21 @@ func opcodeMod(op *parsedOpcode, vm *Engine) error {
 	if err != nil {
 		return err
 	}
-
 	v1, err := vm.dstack.PopInt(mathOpCodeMaxScriptNumLen)
 	if err != nil {
 		return err
 	}
 
-	if v0.Int32() == 0 {
+	// The dividend and divisor are limited to int32 via the above, so it is
+	// safe to cast them.
+	divisor := v0.Int32()
+	dividend := v1.Int32()
+
+	if divisor == 0 {
 		return ErrDivideByZero
 	}
 
-	v2 := v1.Int32() % v0.Int32()
-
-	vm.dstack.PushInt(scriptNum(v2))
+	vm.dstack.PushInt(scriptNum(dividend % divisor))
 	return nil
 }
 

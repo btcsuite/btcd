@@ -97,6 +97,15 @@
 ["2147483648 1073741824", "DIV TRUE", "P2SH,STRICTENC", "DIV must fail with dividend >4 bytes"],
 ["1 2147483648", "DIV TRUE", "P2SH,STRICTENC", "DIV must fail with divisor >4 bytes"],
 
+["Modular division related test coverage"],
+["", "MOD TRUE", "P2SH,STRICTENC", "MOD requires a divisor"],
+["3", "MOD TRUE", "P2SH,STRICTENC", "MOD requires a dividend"],
+["NOP 3", "MOD TRUE", "P2SH,STRICTENC", "MOD dividend must be numeric"],
+["6 NOP", "MOD TRUE", "P2SH,STRICTENC", "MOD divisor must be numeric"],
+["6 0", "MOD TRUE", "P2SH,STRICTENC", "MOD must fail with zero divisor"],
+["2147483648 1073741824", "MOD TRUE", "P2SH,STRICTENC", "MOD must fail with dividend >4 bytes"],
+["1 2147483648", "MOD TRUE", "P2SH,STRICTENC", "MOD must fail with divisor >4 bytes"],
+
 ["Left bit shift related test coverage"],
 ["", "LSHIFT NOT", "P2SH,STRICTENC", "LSHIFT requires an input value"],
 ["1", "LSHIFT TRUE", "P2SH,STRICTENC", "LSHIFT requires a shift count"],
