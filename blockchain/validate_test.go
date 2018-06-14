@@ -326,7 +326,7 @@ func TestTxValidationErrors(t *testing.T) {
 	// Create a transaction that is too large
 	tx := wire.NewMsgTx()
 	prevOut := wire.NewOutPoint(&chainhash.Hash{0x01}, 0, wire.TxTreeRegular)
-	tx.AddTxIn(wire.NewTxIn(prevOut, nil))
+	tx.AddTxIn(wire.NewTxIn(prevOut, 0, nil))
 	pkScript := bytes.Repeat([]byte{0x00}, wire.MaxBlockPayload)
 	tx.AddTxOut(wire.NewTxOut(0, pkScript))
 

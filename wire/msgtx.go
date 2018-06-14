@@ -305,12 +305,12 @@ func (t *TxIn) SerializeSizeWitness() int {
 // NewTxIn returns a new Decred transaction input with the provided
 // previous outpoint point and signature script with a default sequence of
 // MaxTxInSequenceNum.
-func NewTxIn(prevOut *OutPoint, signatureScript []byte) *TxIn {
+func NewTxIn(prevOut *OutPoint, valueIn int64, signatureScript []byte) *TxIn {
 	return &TxIn{
 		PreviousOutPoint: *prevOut,
 		Sequence:         MaxTxInSequenceNum,
 		SignatureScript:  signatureScript,
-		ValueIn:          NullValueIn,
+		ValueIn:          valueIn,
 		BlockHeight:      NullBlockHeight,
 		BlockIndex:       NullBlockIndex,
 	}

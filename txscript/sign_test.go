@@ -2259,7 +2259,7 @@ nexttest:
 		tx.AddTxOut(output)
 
 		for range sigScriptTests[i].inputs {
-			txin := wire.NewTxIn(coinbaseOutPoint, nil)
+			txin := wire.NewTxIn(coinbaseOutPoint, 500, nil)
 			tx.AddTxIn(txin)
 		}
 

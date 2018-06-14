@@ -104,7 +104,7 @@ func ExampleSignTxOutput() {
 	// contains a single output that pays to address in the amount of 1 DCR.
 	originTx := wire.NewMsgTx()
 	prevOut := wire.NewOutPoint(&chainhash.Hash{}, ^uint32(0), wire.TxTreeRegular)
-	txIn := wire.NewTxIn(prevOut, []byte{txscript.OP_0, txscript.OP_0})
+	txIn := wire.NewTxIn(prevOut, 100000000, []byte{txscript.OP_0, txscript.OP_0})
 	originTx.AddTxIn(txIn)
 	pkScript, err := txscript.PayToAddrScript(addr)
 	if err != nil {
@@ -122,7 +122,7 @@ func ExampleSignTxOutput() {
 	// signature script at this point since it hasn't been created or signed
 	// yet, hence nil is provided for it.
 	prevOut = wire.NewOutPoint(&originTxHash, 0, wire.TxTreeRegular)
-	txIn = wire.NewTxIn(prevOut, nil)
+	txIn = wire.NewTxIn(prevOut, 100000000, nil)
 	redeemTx.AddTxIn(txIn)
 
 	// Ordinarily this would contain that actual destination of the funds,

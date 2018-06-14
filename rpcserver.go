@@ -649,7 +649,7 @@ func handleCreateRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan 
 		}
 
 		prevOut := wire.NewOutPoint(txHash, input.Vout, input.Tree)
-		txIn := wire.NewTxIn(prevOut, []byte{})
+		txIn := wire.NewTxIn(prevOut, wire.NullValueIn, []byte{})
 		if c.LockTime != nil && *c.LockTime != 0 {
 			txIn.Sequence = wire.MaxTxInSequenceNum - 1
 		}
@@ -759,7 +759,7 @@ func handleCreateRawSStx(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 		}
 
 		prevOut := wire.NewOutPoint(txHash, input.Vout, input.Tree)
-		txIn := wire.NewTxIn(prevOut, []byte{})
+		txIn := wire.NewTxIn(prevOut, wire.NullValueIn, []byte{})
 		mtx.AddTxIn(txIn)
 	}
 
@@ -985,7 +985,7 @@ func handleCreateRawSSGenTx(s *rpcServer, cmd interface{}, closeChan <-chan stru
 
 	stakeBaseOutPoint := wire.NewOutPoint(&chainhash.Hash{},
 		uint32(0xFFFFFFFF), int8(0x01))
-	txInStakeBase := wire.NewTxIn(stakeBaseOutPoint, []byte{})
+	txInStakeBase := wire.NewTxIn(stakeBaseOutPoint, stakeVoteSubsidy, []byte{})
 	mtx.AddTxIn(txInStakeBase)
 
 	for _, input := range c.Inputs {
@@ -1004,7 +1004,7 @@ func handleCreateRawSSGenTx(s *rpcServer, cmd interface{}, closeChan <-chan stru
 		}
 
 		prevOut := wire.NewOutPoint(txHash, input.Vout, input.Tree)
-		txIn := wire.NewTxIn(prevOut, []byte{})
+		txIn := wire.NewTxIn(prevOut, wire.NullValueIn, []byte{})
 		mtx.AddTxIn(txIn)
 	}
 
@@ -1145,7 +1145,7 @@ func handleCreateRawSSRtx(s *rpcServer, cmd interface{}, closeChan <-chan struct
 		}
 
 		prevOut := wire.NewOutPoint(txHash, input.Vout, input.Tree)
-		txIn := wire.NewTxIn(prevOut, []byte{})
+		txIn := wire.NewTxIn(prevOut, wire.NullValueIn, []byte{})
 		mtx.AddTxIn(txIn)
 	}
 
