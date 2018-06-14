@@ -161,6 +161,25 @@ type Client struct {
 	wg              sync.WaitGroup
 }
 
+// String implements fmt.Stringer by returning the URL of the RPC server the
+// client makes requests to.
+func (c *Client) String() string {
+	var u url.URL
+	switch {
+	case c.config.HTTPPostMode && c.config.DisableTLS:
+		u.Scheme = "http"
+	case c.config.HTTPPostMode:
+		u.Scheme = "https"
+	case c.config.DisableTLS:
+		u.Scheme = "ws"
+	default:
+		u.Scheme = "wss"
+	}
+	u.Host = c.config.Host
+	u.Path = c.config.Endpoint
+	return u.String()
+}
+
 // NextID returns the next id to be used when sending a JSON-RPC message.  This
 // ID allows responses to be associated with particular requests per the
 // JSON-RPC specification.  Typically the consumer of the client does not need
