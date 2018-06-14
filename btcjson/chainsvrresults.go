@@ -548,3 +548,43 @@ type ValidateAddressChainResult struct {
 	IsValid bool   `json:"isvalid"`
 	Address string `json:"address,omitempty"`
 }
+
+// GetBlockStatsResult models the data from the getblockstast command.
+type GetBlockStatsResult struct {
+	AverageFee     int64 `json:"avgfee"`
+	AverageFeeRate int64 `json:"avgfeerate"`
+	AverageTxSize  int64 `json:"avgtxsize"`
+
+	Hash   string `json:"blockhash"`
+	Height int64  `json:"height"`
+	Ins    int64  `json:"ins"`
+
+	MaxFee     int64 `json:"maxfee"`
+	MaxFeeRate int64 `json:"maxfeerate"`
+	MaxTxSize  int64 `json:"maxtxsize"`
+
+	MedianFee     int64 `json:"medianfee"`
+	MedianFeeRate int64 `json:"medianfeerate"`
+	MedianTime    int64 `json:"mediantime"`
+	MedianTxSize  int64 `json:"mediantxsize"`
+
+	MinFee     int64 `json:"minfee"`
+	MinFeeRate int64 `json:"minfeerate"`
+	MinTxSize  int64 `json:"mintxsize"`
+
+	Outs              int64 `json:"outs"`
+	Subsidy           int64 `json:"subsidy"`
+	SegWitTotalSize   int64 `json:"swtotal_size"`
+	SegWitTotalWeight int64 `json:"swtotal_weight"`
+	SegWitTxs         int64 `json:"swtxs"`
+
+	Time        int64 `json:"time"`
+	TotalOut    int64 `json:"total_out"`
+	TotalSize   int64 `json:"total_size"`
+	TotalWeight int64 `json:"total_weight"`
+	TotalFee    int64 `json:"totalfee"`
+
+	Txs              int64 `json:"txs"`
+	UTXOIncrease     int64 `json:"utxo_increase"`
+	UTXOSizeIncrease int64 `json:"utxo_size_inc"`
+}

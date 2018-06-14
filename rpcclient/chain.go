@@ -927,3 +927,40 @@ func (c *Client) GetCFilterHeader(blockHash *chainhash.Hash,
 	filterType wire.FilterType) (*wire.MsgCFHeaders, error) {
 	return c.GetCFilterHeaderAsync(blockHash, filterType).Receive()
 }
+
+// FutureGetBlockStatsResult is a future promise to deliver the result of a
+// FutureGetBlockStatsResult RPC invocation (or an applicable error).
+type FutureGetBlockStatsResult chan *response
+
+// GetBlockStatsAsync returns an instance of a type that can be used to get
+// the result of the RPC at some future time by invoking the Receive function
+// on the returned instance.
+//
+// See GetBlockStats for the blocking version and more details.
+func (c *Client) GetBlockStatsAsync(blockHeight int64, stats *[]string) FutureGetBlockStatsResult {
+	cmd := btcjson.NewGetBlockStatsCmd(blockHeight, stats)
+	return c.sendCmd(cmd)
+}
+
+// Receive waits for the response promised by the future and returns the stats of
+// the block in the best block chain at the given height.
+func (r FutureGetBlockStatsResult) Receive() (*btcjson.GetBlockStatsResult, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal the raw result into a BlockResult.
+	var blockStatsResult btcjson.GetBlockStatsResult
+	err = json.Unmarshal(res, &blockStatsResult)
+	if err != nil {
+		return nil, err
+	}
+	return &blockStatsResult, nil
+}
+
+// GetBlockStats returns a struct of statistics about a block at a certain height and optionally allows for
+// the client to select which statistics they would like to see.
+func (c *Client) GetBlockStats(blockHeight int64, stats *[]string) (*btcjson.GetBlockStatsResult, error) {
+	return c.GetBlockStatsAsync(blockHeight, stats).Receive()
+}

@@ -773,6 +773,21 @@ func NewVerifyTxOutProofCmd(proof string) *VerifyTxOutProofCmd {
 	}
 }
 
+// GetBlockStatsCmd defines the getblockstats JSON-RPC command.
+type GetBlockStatsCmd struct {
+	Height int64
+	Stats  *[]string
+}
+
+// NewGetBlockStatsCmd returns a new instance which can be used to issue a
+// getblockstats JSON-RPC command.
+func NewGetBlockStatsCmd(height int64, stats *[]string) *GetBlockStatsCmd {
+	return &GetBlockStatsCmd{
+		Height: height,
+		Stats:  stats,
+	}
+}
+
 func init() {
 	// No special flags for commands in this file.
 	flags := UsageFlag(0)
@@ -825,4 +840,6 @@ func init() {
 	MustRegisterCmd("verifychain", (*VerifyChainCmd)(nil), flags)
 	MustRegisterCmd("verifymessage", (*VerifyMessageCmd)(nil), flags)
 	MustRegisterCmd("verifytxoutproof", (*VerifyTxOutProofCmd)(nil), flags)
+
+	MustRegisterCmd("getblockstats", (*GetBlockStatsCmd)(nil), flags)
 }
