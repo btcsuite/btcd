@@ -636,7 +636,7 @@ func (sm *SyncManager) handleBlockMsg(bmsg *blockMsg) {
 	} else {
 		// When the block is not an orphan, log information about it and
 		// update the chain state.
-		sm.progressLogger.LogBlockHeight(bmsg.block)
+		sm.progressLogger.LogBlockHeight(bmsg.block, sm.chain)
 
 		// Update this peer's latest block height, for future
 		// potential sync node candidacy.

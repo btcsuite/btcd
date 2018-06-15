@@ -1762,6 +1762,12 @@ func New(config *Config) (*BlockChain, error) {
 	return &b, nil
 }
 
+// CachedStateSize returns the total size of the cached state of the blockchain
+// in bytes.
+func (b *BlockChain) CachedStateSize() uint64 {
+	return b.utxoCache.TotalMemoryUsage()
+}
+
 // FlushCachedState flushes all the cached state of the blockchain to the
 // database.
 //
