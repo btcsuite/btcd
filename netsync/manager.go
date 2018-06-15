@@ -928,6 +928,12 @@ func (sm *SyncManager) haveInventory(invVect *wire.InvVect) (bool, error) {
 // handleInvMsg handles inv messages from all peers.
 // We examine the inventory advertised by the remote peer and act accordingly.
 func (sm *SyncManager) handleInvMsg(imsg *invMsg) {
+	segwitActive, err := sm.chain.IsDeploymentActive(chaincfg.DeploymentSegwit)
+	if err != nil {
+		log.Errorf("Unable to query for segwit soft-fork state: %v", err)
+		return
+	}
+
 	peer := imsg.peer
 	state, exists := sm.peerStates[peer]
 	if !exists {
@@ -1015,7 +1021,8 @@ func (sm *SyncManager) handleInvMsg(imsg *invMsg) {
 			// peers, as after segwit activation we only want to
 			// download from peers that can provide us full witness
 			// data for blocks.
-			if !peer.IsWitnessEnabled() && iv.Type == wire.InvTypeBlock {
+			if segwitActive && !peer.IsWitnessEnabled() && iv.Type == wire.InvTypeBlock {
+				log.Debugf("peer %v not witness enabled, skipping inv", peer)
 				continue
 			}
 
