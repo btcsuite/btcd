@@ -231,8 +231,8 @@ func withinLevelBounds(reduction int64, lv int64) bool {
 }
 
 // CheckTransactionSanity performs some preliminary checks on a transaction to
-// ensure it is sane.  These checks are context free.
-func CheckTransactionSanity(tx *btcutil.Tx) error {
+// ensure it is sane.
+func CheckTransactionSanity(tx *btcutil.Tx, enforceSoftFork bool) error {
 	// A transaction must have at least one input.
 	msgTx := tx.MsgTx()
 	if len(msgTx.TxIn) == 0 {
@@ -290,6 +290,11 @@ func CheckTransactionSanity(tx *btcutil.Tx) error {
 				"allowed value of %v", totalSatoshi,
 				btcutil.MaxSatoshi)
 			return ruleError(ErrBadTxOutValue, str)
+		}
+
+		err := txscript.AllClaimsAreSane(txOut.PkScript, enforceSoftFork)
+		if err != nil {
+			return ruleError(ErrBadTxOutValue, err.Error())
 		}
 	}
 
@@ -545,7 +550,7 @@ func checkBlockSanity(block *btcutil.Block, powLimit *big.Int, timeSource Median
 	// Do some preliminary checks on each transaction to ensure they are
 	// sane before continuing.
 	for _, tx := range transactions {
-		err := CheckTransactionSanity(tx)
+		err := CheckTransactionSanity(tx, false)
 		if err != nil {
 			return err
 		}

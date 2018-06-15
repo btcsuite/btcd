@@ -99,7 +99,7 @@ func checkInputsStandard(tx *btcutil.Tx, utxoView *blockchain.UtxoViewpoint) err
 		// they have already been checked prior to calling this
 		// function.
 		entry := utxoView.LookupEntry(txIn.PreviousOutPoint)
-		originPkScript := entry.PkScript()
+		originPkScript := txscript.StripClaimScriptPrefix(entry.PkScript())
 		switch txscript.GetScriptClass(originPkScript) {
 		case txscript.ScriptHashTy:
 			numSigOps := txscript.GetPreciseSigOpCount(
@@ -339,8 +339,9 @@ func checkTransactionStandard(tx *btcutil.Tx, height int32,
 	// be "dust" (except when the script is a null data script).
 	numNullDataOutputs := 0
 	for i, txOut := range msgTx.TxOut {
-		scriptClass := txscript.GetScriptClass(txOut.PkScript)
-		err := checkPkScriptStandard(txOut.PkScript, scriptClass)
+		pkScript := txscript.StripClaimScriptPrefix(txOut.PkScript)
+		scriptClass := txscript.GetScriptClass(pkScript)
+		err := checkPkScriptStandard(pkScript, scriptClass)
 		if err != nil {
 			// Attempt to extract a reject code from the error so
 			// it can be retained.  When not possible, fall back to
