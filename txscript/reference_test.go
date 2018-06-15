@@ -23,6 +23,16 @@ import (
 )
 
 var (
+	// tokenRE is a regular expression used to parse tokens from short form
+	// scripts.  It splits on repeated tokens and spaces.  Repeated tokens are
+	// denoted by being wrapped in angular brackets followed by a suffix which
+	// consists of a number inside braces.
+	tokenRE = regexp.MustCompile(`\<.+?\>\{[0-9]+\}|[^\s]+`)
+
+	// repTokenRE is a regular expression used to parse short form scripts
+	// for a series of tokens repeated a specified number of times.
+	repTokenRE = regexp.MustCompile(`^\<(.+)\>\{([0-9]+)\}$`)
+
 	// repRawRE is a regular expression used to parse short form scripts
 	// for raw data that is to be repeated a specified number of times.
 	repRawRE = regexp.MustCompile(`^(0[xX][0-9a-fA-F]+)\{([0-9]+)\}$`)
@@ -72,11 +82,15 @@ var shortFormOps map[string]byte
 //     OP_DATA_20)
 //   - Numbers beginning with 0x which have a suffix which consists of a number
 //     in braces (e.g. 0x6161{10}) repeat the raw bytes the specified number of
-//     times and are inserted as-is.
+//     times and are inserted as-is
 //   - Single quoted strings are pushed as data
 //   - Single quoted strings that have a suffix which consists of a number in
 //     braces (e.g. 'b'{10}) repeat the data the specified number of times and
 //     are pushed as a single data push
+//   - Tokens inside of angular brackets with a suffix which consists of a
+//     number in braces (e.g. <0 0 CHECKMULTSIG>{5}) is parsed as if the tokens
+//     inside the angular brackets were manually repeated the specified number
+//     of times
 //   - Anything else is an error
 func parseShortForm(script string) ([]byte, error) {
 	// Only create the short form opcode map once.
@@ -104,60 +118,95 @@ func parseShortForm(script string) ([]byte, error) {
 		shortFormOps = ops
 	}
 
-	// Split only does one separator so convert all \n and tab into  space.
-	script = strings.Replace(script, "\n", " ", -1)
-	script = strings.Replace(script, "\t", " ", -1)
-	tokens := strings.Split(script, " ")
 	builder := NewScriptBuilder()
 
-	for _, tok := range tokens {
-		if len(tok) == 0 {
-			continue
+	var handleToken func(tok string) error
+	handleToken = func(tok string) error {
+		// Multiple repeated tokens.
+		if m := repTokenRE.FindStringSubmatch(tok); m != nil {
+			count, err := strconv.ParseInt(m[2], 10, 32)
+			if err != nil {
+				return fmt.Errorf("bad token %q", tok)
+			}
+			tokens := tokenRE.FindAllStringSubmatch(m[1], -1)
+			for i := 0; i < int(count); i++ {
+				for _, t := range tokens {
+					if err := handleToken(t[0]); err != nil {
+						return err
+					}
+				}
+			}
+			return nil
 		}
-		// if parses as a plain number
+
+		// Plain number.
 		if num, err := strconv.ParseInt(tok, 10, 64); err == nil {
 			builder.AddInt64(num)
-			continue
-		} else if bts, err := parseHex(tok); err == nil {
+			return nil
+		}
+
+		// Raw data.
+		if bts, err := parseHex(tok); err == nil {
 			// Concatenate the bytes manually since the test code
 			// intentionally creates scripts that are too large and
 			// would cause the builder to error otherwise.
 			if builder.err == nil {
 				builder.script = append(builder.script, bts...)
 			}
-		} else if m := repRawRE.FindStringSubmatch(tok); m != nil {
-			// Repeated raw bytes.
+			return nil
+		}
+
+		// Repeated raw bytes.
+		if m := repRawRE.FindStringSubmatch(tok); m != nil {
 			bts, err := parseHex(m[1])
 			if err != nil {
-				return nil, fmt.Errorf("bad token %q", tok)
+				return fmt.Errorf("bad token %q", tok)
 			}
 			count, err := strconv.ParseInt(m[2], 10, 32)
 			if err != nil {
-				return nil, fmt.Errorf("bad token %q", tok)
+				return fmt.Errorf("bad token %q", tok)
 			}
-			bts = bytes.Repeat(bts, int(count))
+
 			// Concatenate the bytes manually since the test code
 			// intentionally creates scripts that are too large and
 			// would cause the builder to error otherwise.
+			bts = bytes.Repeat(bts, int(count))
 			if builder.err == nil {
 				builder.script = append(builder.script, bts...)
 			}
-		} else if len(tok) >= 2 && tok[0] == '\'' && tok[len(tok)-1] == '\'' {
+			return nil
+		}
+
+		// Quoted data.
+		if len(tok) >= 2 && tok[0] == '\'' && tok[len(tok)-1] == '\'' {
 			builder.AddFullData([]byte(tok[1 : len(tok)-1]))
-		} else if m := repQuoteRE.FindStringSubmatch(tok); m != nil {
-			// Repeated quoted data.
+			return nil
+		}
+
+		// Repeated quoted data.
+		if m := repQuoteRE.FindStringSubmatch(tok); m != nil {
 			count, err := strconv.ParseInt(m[2], 10, 32)
 			if err != nil {
-				return nil, fmt.Errorf("bad token %q", tok)
+				return fmt.Errorf("bad token %q", tok)
 			}
 			data := strings.Repeat(m[1], int(count))
 			builder.AddFullData([]byte(data))
-		} else if opcode, ok := shortFormOps[tok]; ok {
-			builder.AddOp(opcode)
-		} else {
-			return nil, fmt.Errorf("bad token %q", tok)
+			return nil
 		}
 
+		// Named opcode.
+		if opcode, ok := shortFormOps[tok]; ok {
+			builder.AddOp(opcode)
+			return nil
+		}
+
+		return fmt.Errorf("bad token %q", tok)
+	}
+
+	for _, tokens := range tokenRE.FindAllStringSubmatch(script, -1) {
+		if err := handleToken(tokens[0]); err != nil {
+			return nil, err
+		}
 	}
 	return builder.Script()
 }
