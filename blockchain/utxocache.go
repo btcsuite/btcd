@@ -232,6 +232,16 @@ func (s *utxoCache) totalMemoryUsage() uint64 {
 	return nbEntries*outpointSize + nbEntries*8 + s.totalEntryMemory
 }
 
+// TotalMemoryUsage returns the total memory usage in bytes of the UTXO cache.
+//
+// This method is safe for concurrent access.
+func (s *utxoCache) TotalMemoryUsage() uint64 {
+	s.mtx.Lock()
+	tmu := s.totalMemoryUsage()
+	s.mtx.Unlock()
+	return tmu
+}
+
 // fetchAndCacheEntry tries to fetch an entry from the database.  In none is
 // found, nil is returned.  If an entry is found, it is cached.
 //

@@ -5,9 +5,11 @@
 package netsync
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
+	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btclog"
 	"github.com/btcsuite/btcutil"
 )
@@ -40,7 +42,7 @@ func newBlockProgressLogger(progressMessage string, logger btclog.Logger) *block
 // LogBlockHeight logs a new block height as an information message to show
 // progress to the user. In order to prevent spam, it limits logging to one
 // message every 10 seconds with duration and totals included.
-func (b *blockProgressLogger) LogBlockHeight(block *btcutil.Block) {
+func (b *blockProgressLogger) LogBlockHeight(block *btcutil.Block, chain *blockchain.BlockChain) {
 	b.Lock()
 	defer b.Unlock()
 
@@ -66,9 +68,10 @@ func (b *blockProgressLogger) LogBlockHeight(block *btcutil.Block) {
 	if b.receivedLogTx == 1 {
 		txStr = "transaction"
 	}
-	b.subsystemLogger.Infof("%s %d %s in the last %s (%d %s, height %d, %s)",
+	cacheSizeStr := fmt.Sprintf("~%d MiB", chain.CachedStateSize()/1024/1024)
+	b.subsystemLogger.Infof("%s %d %s in the last %s (%d %s, height %d, %s, %s cache)",
 		b.progressAction, b.receivedLogBlocks, blockStr, tDuration, b.receivedLogTx,
-		txStr, block.Height(), block.MsgBlock().Header.Timestamp)
+		txStr, block.Height(), block.MsgBlock().Header.Timestamp, cacheSizeStr)
 
 	b.receivedLogBlocks = 0
 	b.receivedLogTx = 0
