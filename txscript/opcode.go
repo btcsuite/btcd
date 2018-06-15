@@ -220,9 +220,9 @@ const (
 	OP_CHECKSEQUENCEVERIFY = 0xb2 // 178 - AKA OP_NOP3
 	OP_NOP4                = 0xb3 // 179
 	OP_NOP5                = 0xb4 // 180
-	OP_NOP6                = 0xb5 // 181
-	OP_NOP7                = 0xb6 // 182
-	OP_NOP8                = 0xb7 // 183
+	OP_CLAIMNAME           = 0xb5 // 181 - AKA OP_NOP6
+	OP_SUPPORTCLAIM        = 0xb6 // 182 - AKA OP_NOP7
+	OP_UPDATECLAIM         = 0xb7 // 183 - AKA OP_NOP8
 	OP_NOP9                = 0xb8 // 184
 	OP_NOP10               = 0xb9 // 185
 	OP_UNKNOWN186          = 0xba // 186
@@ -501,14 +501,14 @@ var opcodeArray = [256]opcode{
 	OP_CHECKMULTISIGVERIFY: {OP_CHECKMULTISIGVERIFY, "OP_CHECKMULTISIGVERIFY", 1, opcodeCheckMultiSigVerify},
 
 	// Reserved opcodes.
-	OP_NOP1:  {OP_NOP1, "OP_NOP1", 1, opcodeNop},
-	OP_NOP4:  {OP_NOP4, "OP_NOP4", 1, opcodeNop},
-	OP_NOP5:  {OP_NOP5, "OP_NOP5", 1, opcodeNop},
-	OP_NOP6:  {OP_NOP6, "OP_NOP6", 1, opcodeNop},
-	OP_NOP7:  {OP_NOP7, "OP_NOP7", 1, opcodeNop},
-	OP_NOP8:  {OP_NOP8, "OP_NOP8", 1, opcodeNop},
-	OP_NOP9:  {OP_NOP9, "OP_NOP9", 1, opcodeNop},
-	OP_NOP10: {OP_NOP10, "OP_NOP10", 1, opcodeNop},
+	OP_NOP1:         {OP_NOP1, "OP_NOP1", 1, opcodeNop},
+	OP_NOP4:         {OP_NOP4, "OP_NOP4", 1, opcodeNop},
+	OP_NOP5:         {OP_NOP5, "OP_NOP5", 1, opcodeNop},
+	OP_CLAIMNAME:    {OP_CLAIMNAME, "OP_CLAIMNAME", 1, opcodeClaimScript},
+	OP_SUPPORTCLAIM: {OP_SUPPORTCLAIM, "OP_SUPPORTCLAIM", 1, opcodeClaimScript},
+	OP_UPDATECLAIM:  {OP_UPDATECLAIM, "OP_UPDATECLAIM", 1, opcodeClaimScript},
+	OP_NOP9:         {OP_NOP9, "OP_NOP9", 1, opcodeNop},
+	OP_NOP10:        {OP_NOP10, "OP_NOP10", 1, opcodeNop},
 
 	// Undefined opcodes.
 	OP_UNKNOWN186: {OP_UNKNOWN186, "OP_UNKNOWN186", 1, opcodeInvalid},
@@ -725,14 +725,18 @@ func opcodeN(op *opcode, data []byte, vm *Engine) error {
 func opcodeNop(op *opcode, data []byte, vm *Engine) error {
 	switch op.value {
 	case OP_NOP1, OP_NOP4, OP_NOP5,
-		OP_NOP6, OP_NOP7, OP_NOP8, OP_NOP9, OP_NOP10:
-
+		OP_NOP9, OP_NOP10:
 		if vm.hasFlag(ScriptDiscourageUpgradableNops) {
 			str := fmt.Sprintf("%v reserved for soft-fork "+
 				"upgrades", op.name)
 			return scriptError(ErrDiscourageUpgradableNOPs, str)
 		}
 	}
+	return nil
+}
+
+func opcodeClaimScript(op *opcode, data []byte, vm *Engine) error {
+	vm.dstack.PushByteArray([]byte{0})
 	return nil
 }
 
