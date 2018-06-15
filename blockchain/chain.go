@@ -694,7 +694,7 @@ func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block,
 	b.sendNotification(NTBlockConnected, block)
 	b.chainLock.Lock()
 
-	// Since we just changed the UTXO cache, we make sure it didn't excee its
+	// Since we just changed the UTXO cache, we make sure it didn't exceed its
 	// maximum size.
 	if err := b.utxoCache.Flush(FlushIfNeeded, state); err != nil {
 		return err
@@ -811,7 +811,7 @@ func (b *BlockChain) disconnectBlock(node *blockNode, block *btcutil.Block, view
 	b.sendNotification(NTBlockDisconnected, block)
 	b.chainLock.Lock()
 
-	// Since we just changed the UTXO cache, we make sure it didn't excee its
+	// Since we just changed the UTXO cache, we make sure it didn't exceed its
 	// maximum size.
 	if err := b.utxoCache.Flush(FlushIfNeeded, state); err != nil {
 		return err
@@ -1784,7 +1784,7 @@ func New(config *Config) (*BlockChain, error) {
 		maxRetargetTimespan: targetTimespan * adjustmentFactor,
 		blocksPerRetarget:   int32(targetTimespan / targetTimePerBlock),
 		index:               newBlockIndex(config.DB, params),
-		utxoCache:           newUtxoState(config.DB, config.UtxoCacheMaxSize),
+		utxoCache:           newUtxoCache(config.DB, config.UtxoCacheMaxSize),
 		hashCache:           config.HashCache,
 		bestChain:           newChainView(nil),
 		orphans:             make(map[chainhash.Hash]*orphanBlock),

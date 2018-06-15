@@ -205,8 +205,9 @@ type utxoCache struct {
 	lastFlushHash    chainhash.Hash
 }
 
-// newUtxoState initiates a new utxo state instance.
-func newUtxoState(db database.DB, maxTotalMemoryUsage uint64) *utxoCache {
+// newUtxoCache initiates a new utxo cache instance with its memory usage limited
+// to the given maximum.
+func newUtxoCache(db database.DB, maxTotalMemoryUsage uint64) *utxoCache {
 	return &utxoCache{
 		db:                  db,
 		maxTotalMemoryUsage: maxTotalMemoryUsage,
@@ -225,7 +226,10 @@ func (s *utxoCache) totalMemoryUsage() uint64 {
 
 	// Total memory is all the keys plus the total memory of all the entries.
 	nbEntries := uint64(len(s.cachedEntries))
-	return nbEntries*outpointSize + s.totalEntryMemory
+
+	// Total size is total size of the keys + total size of the pointers in the
+	// map + total size of the elements held in the pointers.
+	return nbEntries*outpointSize + nbEntries*8 + s.totalEntryMemory
 }
 
 // fetchAndCacheEntry tries to fetch an entry from the database.  In none is
@@ -327,7 +331,7 @@ func (s *utxoCache) getEntryByHash(hash *chainhash.Hash) (*UtxoEntry, error) {
 func (s *utxoCache) FetchEntryByHash(hash *chainhash.Hash) (*UtxoEntry, error) {
 	s.mtx.Lock()
 	entry, err := s.getEntryByHash(hash)
-	defer s.mtx.Unlock()
+	s.mtx.Unlock()
 	return entry.Clone(), err
 }
 
