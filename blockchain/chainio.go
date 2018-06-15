@@ -770,37 +770,45 @@ func dbFetchUtxoEntry(dbTx database.Tx, outpoint wire.OutPoint) (*UtxoEntry, err
 	return entry, nil
 }
 
-// dbPutUtxoEntry uses an existing database transaction to update the utxo entry
-// in the database.
-func dbPutUtxoEntry(dbTx database.Tx, outpoint wire.OutPoint, entry *UtxoEntry) error {
+// dbPutUtxoEntries uses an existing database transaction to update the utxo
+// entries in the database.
+func dbPutUtxoEntries(dbTx database.Tx, entries map[wire.OutPoint]*UtxoEntry) error {
 	utxoBucket := dbTx.Metadata().Bucket(utxoSetBucketName)
 
-	if entry == nil || entry.IsSpent() {
-		return AssertError("trying to store nil or spent entry")
-	}
+	for outpoint, entry := range entries {
+		if entry == nil || entry.IsSpent() {
+			return AssertError("trying to store nil or spent entry")
+		}
 
-	// Serialize and store the utxo entry.
-	serialized, err := serializeUtxoEntry(entry)
-	if err != nil {
-		return err
+		// Serialize and store the utxo entry.
+		serialized, err := serializeUtxoEntry(entry)
+		if err != nil {
+			return err
+		}
+		key := outpointKey(outpoint)
+		return utxoBucket.Put(*key, serialized)
+		// NOTE: The key is intentionally not recycled here since the
+		// database interface contract prohibits modifications.  It will
+		// be garbage collected normally when the database is done with
+		// it.
 	}
-	key := outpointKey(outpoint)
-	return utxoBucket.Put(*key, serialized)
-	// NOTE: The key is intentionally not recycled here since the
-	// database interface contract prohibits modifications.  It will
-	// be garbage collected normally when the database is done with
-	// it.
+	return nil
 }
 
-// dbDeleteUtxoEntry uses an existing database transaction to delete the utxo
-// entry from the database.
-func dbDeleteUtxoEntry(dbTx database.Tx, outpoint wire.OutPoint) error {
+// dbDeleteUtxoEntries uses an existing database transaction to delete the utxo
+// entries from the database.
+func dbDeleteUtxoEntries(dbTx database.Tx, outpoints []wire.OutPoint) error {
 	utxoBucket := dbTx.Metadata().Bucket(utxoSetBucketName)
 
-	key := outpointKey(outpoint)
-	err := utxoBucket.Delete(*key)
-	recycleOutpointKey(key)
-	return err
+	for _, outpoint := range outpoints {
+		key := outpointKey(outpoint)
+		err := utxoBucket.Delete(*key)
+		recycleOutpointKey(key)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // -----------------------------------------------------------------------------
