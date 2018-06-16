@@ -14,6 +14,10 @@ import (
 	"github.com/decred/base58"
 	"github.com/decred/dcrd/chaincfg"
 	"github.com/decred/dcrd/chaincfg/chainec"
+	"github.com/decred/dcrd/dcrec"
+	"github.com/decred/dcrd/dcrec/edwards"
+	"github.com/decred/dcrd/dcrec/secp256k1"
+	"github.com/decred/dcrd/dcrec/secp256k1/schnorr"
 )
 
 var (
@@ -52,22 +56,22 @@ func encodeAddress(hash160 []byte, netID [2]byte) string {
 
 // encodePKAddress returns a human-readable payment address to a public key
 // given a serialized public key, a netID, and a signature suite.
-func encodePKAddress(serializedPK []byte, netID [2]byte, algo int) string {
+func encodePKAddress(serializedPK []byte, netID [2]byte, algo dcrec.SignatureType) string {
 	pubKeyBytes := []byte{0x00}
 
 	switch algo {
-	case chainec.ECTypeSecp256k1:
-		pubKeyBytes[0] = byte(chainec.ECTypeSecp256k1)
-	case chainec.ECTypeEdwards:
-		pubKeyBytes[0] = byte(chainec.ECTypeEdwards)
-	case chainec.ECTypeSecSchnorr:
-		pubKeyBytes[0] = byte(chainec.ECTypeSecSchnorr)
+	case dcrec.STEcdsaSecp256k1:
+		pubKeyBytes[0] = byte(dcrec.STEcdsaSecp256k1)
+	case dcrec.STEd25519:
+		pubKeyBytes[0] = byte(dcrec.STEd25519)
+	case dcrec.STSchnorrSecp256k1:
+		pubKeyBytes[0] = byte(dcrec.STSchnorrSecp256k1)
 	}
 
 	// Pubkeys are encoded as [0] = type/ybit, [1:33] = serialized pubkey
 	compressed := serializedPK
-	if algo == chainec.ECTypeSecp256k1 || algo == chainec.ECTypeSecSchnorr {
-		pub, err := chainec.Secp256k1.ParsePubKey(serializedPK)
+	if algo == dcrec.STEcdsaSecp256k1 || algo == dcrec.STSchnorrSecp256k1 {
+		pub, err := secp256k1.ParsePubKey(serializedPK)
 		if err != nil {
 			return ""
 		}
@@ -119,7 +123,7 @@ type Address interface {
 	IsForNet(*chaincfg.Params) bool
 
 	// DSA returns the digital signature algorithm for the address.
-	DSA(*chaincfg.Params) int
+	DSA(*chaincfg.Params) dcrec.SignatureType
 
 	// Net returns the network parameters of the address.
 	Net() *chaincfg.Params
@@ -138,14 +142,14 @@ func NewAddressPubKey(decoded []byte, net *chaincfg.Params) (Address, error) {
 			toAppend = 0x03
 		}
 
-		switch int(suite) {
-		case chainec.ECTypeSecp256k1:
+		switch dcrec.SignatureType(suite) {
+		case dcrec.STEcdsaSecp256k1:
 			return NewAddressSecpPubKey(
 				append([]byte{toAppend}, decoded[1:]...),
 				net)
-		case chainec.ECTypeEdwards:
+		case dcrec.STEd25519:
 			return NewAddressEdwardsPubKey(decoded, net)
-		case chainec.ECTypeSecSchnorr:
+		case dcrec.STSchnorrSecp256k1:
 			return NewAddressSecSchnorrPubKey(
 				append([]byte{toAppend}, decoded[1:]...),
 				net)
@@ -178,13 +182,13 @@ func DecodeAddress(addr string) (Address, error) {
 		return NewAddressPubKey(decoded, net)
 
 	case net.PubKeyHashAddrID:
-		return NewAddressPubKeyHash(decoded, net, chainec.ECTypeSecp256k1)
+		return NewAddressPubKeyHash(decoded, net, dcrec.STEcdsaSecp256k1)
 
 	case net.PKHEdwardsAddrID:
-		return NewAddressPubKeyHash(decoded, net, chainec.ECTypeEdwards)
+		return NewAddressPubKeyHash(decoded, net, dcrec.STEd25519)
 
 	case net.PKHSchnorrAddrID:
-		return NewAddressPubKeyHash(decoded, net, chainec.ECTypeSecSchnorr)
+		return NewAddressPubKeyHash(decoded, net, dcrec.STSchnorrSecp256k1)
 
 	case net.ScriptHashAddrID:
 		return NewAddressScriptHashFromHash(decoded, net)
@@ -225,14 +229,14 @@ type AddressPubKeyHash struct {
 // NewAddressPubKeyHash returns a new AddressPubKeyHash.  pkHash must
 // be 20 bytes.
 func NewAddressPubKeyHash(pkHash []byte, net *chaincfg.Params,
-	algo int) (*AddressPubKeyHash, error) {
+	algo dcrec.SignatureType) (*AddressPubKeyHash, error) {
 	var addrID [2]byte
 	switch algo {
-	case chainec.ECTypeSecp256k1:
+	case dcrec.STEcdsaSecp256k1:
 		addrID = net.PubKeyHashAddrID
-	case chainec.ECTypeEdwards:
+	case dcrec.STEd25519:
 		addrID = net.PKHEdwardsAddrID
-	case chainec.ECTypeSecSchnorr:
+	case dcrec.STSchnorrSecp256k1:
 		addrID = net.PKHSchnorrAddrID
 	default:
 		return nil, errors.New("unknown ECDSA algorithm")
@@ -297,14 +301,14 @@ func (a *AddressPubKeyHash) Hash160() *[ripemd160.Size]byte {
 
 // DSA returns the digital signature algorithm for the associated public key
 // hash.
-func (a *AddressPubKeyHash) DSA(net *chaincfg.Params) int {
+func (a *AddressPubKeyHash) DSA(net *chaincfg.Params) dcrec.SignatureType {
 	switch a.netID {
 	case net.PubKeyHashAddrID:
-		return chainec.ECTypeSecp256k1
+		return dcrec.STEcdsaSecp256k1
 	case net.PKHEdwardsAddrID:
-		return chainec.ECTypeEdwards
+		return dcrec.STEd25519
 	case net.PKHSchnorrAddrID:
-		return chainec.ECTypeSecSchnorr
+		return dcrec.STSchnorrSecp256k1
 	}
 	return -1
 }
@@ -399,7 +403,7 @@ func (a *AddressScriptHash) Hash160() *[ripemd160.Size]byte {
 
 // DSA returns -1 (invalid) as the digital signature algorithm for scripts,
 // as scripts may not involve digital signatures at all.
-func (a *AddressScriptHash) DSA(net *chaincfg.Params) int {
+func (a *AddressScriptHash) DSA(net *chaincfg.Params) dcrec.SignatureType {
 	return -1
 }
 
@@ -438,7 +442,7 @@ type AddressSecpPubKey struct {
 // parameter must be a valid pubkey and must be uncompressed or compressed.
 func NewAddressSecpPubKey(serializedPubKey []byte,
 	net *chaincfg.Params) (*AddressSecpPubKey, error) {
-	pubKey, err := chainec.Secp256k1.ParsePubKey(serializedPubKey)
+	pubKey, err := secp256k1.ParsePubKey(serializedPubKey)
 	if err != nil {
 		return nil, err
 	}
@@ -519,7 +523,7 @@ func (a *AddressSecpPubKey) IsForNet(net *chaincfg.Params) bool {
 // address.  This is not the same as calling EncodeAddress.
 func (a *AddressSecpPubKey) String() string {
 	return encodePKAddress(a.serialize(), a.net.PubKeyAddrID,
-		chainec.ECTypeSecp256k1)
+		dcrec.STEcdsaSecp256k1)
 }
 
 // Format returns the format (uncompressed, compressed, etc) of the
@@ -547,12 +551,12 @@ func (a *AddressSecpPubKey) PubKey() chainec.PublicKey {
 
 // DSA returns the underlying digital signature algorithm for the
 // address.
-func (a *AddressSecpPubKey) DSA(net *chaincfg.Params) int {
+func (a *AddressSecpPubKey) DSA(net *chaincfg.Params) dcrec.SignatureType {
 	switch a.pubKeyHashID {
 	case net.PubKeyHashAddrID:
-		return chainec.ECTypeSecp256k1
+		return dcrec.STEcdsaSecp256k1
 	case net.PKHSchnorrAddrID:
-		return chainec.ECTypeSecSchnorr
+		return dcrec.STSchnorrSecp256k1
 	}
 	return -1
 }
@@ -579,7 +583,7 @@ type AddressEdwardsPubKey struct {
 // parameter must be a valid 32 byte serialized public key.
 func NewAddressEdwardsPubKey(serializedPubKey []byte,
 	net *chaincfg.Params) (*AddressEdwardsPubKey, error) {
-	pubKey, err := chainec.Edwards.ParsePubKey(serializedPubKey)
+	pubKey, err := edwards.ParsePubKey(edwards.Edwards(), serializedPubKey)
 	if err != nil {
 		return nil, err
 	}
@@ -632,7 +636,7 @@ func (a *AddressEdwardsPubKey) IsForNet(net *chaincfg.Params) bool {
 // address.  This is not the same as calling EncodeAddress.
 func (a *AddressEdwardsPubKey) String() string {
 	return encodePKAddress(a.serialize(), a.net.PubKeyAddrID,
-		chainec.ECTypeEdwards)
+		dcrec.STEd25519)
 }
 
 // AddressPubKeyHash returns the pay-to-pubkey address converted to a
@@ -650,8 +654,8 @@ func (a *AddressEdwardsPubKey) PubKey() chainec.PublicKey {
 
 // DSA returns the underlying digital signature algorithm for the
 // address.
-func (a *AddressEdwardsPubKey) DSA(net *chaincfg.Params) int {
-	return chainec.ECTypeEdwards
+func (a *AddressEdwardsPubKey) DSA(net *chaincfg.Params) dcrec.SignatureType {
+	return dcrec.STEd25519
 }
 
 // Net returns the network for the address.
@@ -672,7 +676,7 @@ type AddressSecSchnorrPubKey struct {
 // parameter must be a valid pubkey and must be compressed.
 func NewAddressSecSchnorrPubKey(serializedPubKey []byte,
 	net *chaincfg.Params) (*AddressSecSchnorrPubKey, error) {
-	pubKey, err := chainec.SecSchnorr.ParsePubKey(serializedPubKey)
+	pubKey, err := schnorr.ParsePubKey(secp256k1.S256(), serializedPubKey)
 	if err != nil {
 		return nil, err
 	}
@@ -730,7 +734,7 @@ func (a *AddressSecSchnorrPubKey) IsForNet(net *chaincfg.Params) bool {
 // address.  This is not the same as calling EncodeAddress.
 func (a *AddressSecSchnorrPubKey) String() string {
 	return encodePKAddress(a.serialize(), a.net.PubKeyAddrID,
-		chainec.ECTypeSecSchnorr)
+		dcrec.STSchnorrSecp256k1)
 }
 
 // AddressPubKeyHash returns the pay-to-pubkey address converted to a
@@ -743,8 +747,8 @@ func (a *AddressSecSchnorrPubKey) AddressPubKeyHash() *AddressPubKeyHash {
 
 // DSA returns the underlying digital signature algorithm for the
 // address.
-func (a *AddressSecSchnorrPubKey) DSA(net *chaincfg.Params) int {
-	return chainec.ECTypeSecSchnorr
+func (a *AddressSecSchnorrPubKey) DSA(net *chaincfg.Params) dcrec.SignatureType {
+	return dcrec.STSchnorrSecp256k1
 }
 
 // Net returns the network for the address.

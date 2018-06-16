@@ -11,6 +11,7 @@ import (
 
 	"github.com/decred/dcrd/chaincfg"
 	"github.com/decred/dcrd/chaincfg/chainec"
+	"github.com/decred/dcrd/dcrec"
 	"github.com/decred/dcrd/dcrutil"
 	"github.com/decred/dcrd/wire"
 )
@@ -41,7 +42,7 @@ func RawTxInSignature(tx *wire.MsgTx, idx int, subScript []byte,
 // RawTxInSignatureAlt returns the serialized ECDSA signature for the input idx of
 // the given transaction, with hashType appended to it.
 func RawTxInSignatureAlt(tx *wire.MsgTx, idx int, subScript []byte,
-	hashType SigHashType, key chainec.PrivateKey, sigType sigTypes) ([]byte,
+	hashType SigHashType, key chainec.PrivateKey, sigType dcrec.SignatureType) ([]byte,
 	error) {
 
 	parsedScript, err := parseScript(subScript)
@@ -55,13 +56,13 @@ func RawTxInSignatureAlt(tx *wire.MsgTx, idx int, subScript []byte,
 
 	var sig chainec.Signature
 	switch sigType {
-	case edwards:
+	case dcrec.STEd25519:
 		r, s, err := chainec.Edwards.Sign(key, hash)
 		if err != nil {
 			return nil, fmt.Errorf("cannot sign tx input: %s", err)
 		}
 		sig = chainec.Edwards.NewSignature(r, s)
-	case secSchnorr:
+	case dcrec.STSchnorrSecp256k1:
 		r, s, err := chainec.SecSchnorr.Sign(key, hash)
 		if err != nil {
 			return nil, fmt.Errorf("cannot sign tx input: %s", err)
@@ -112,20 +113,20 @@ func SignatureScript(tx *wire.MsgTx, idx int, subscript []byte,
 // address, or the script validation will fail.
 func SignatureScriptAlt(tx *wire.MsgTx, idx int, subscript []byte,
 	hashType SigHashType, privKey chainec.PrivateKey, compress bool,
-	sigType int) ([]byte,
+	sigType dcrec.SignatureType) ([]byte,
 	error) {
 	sig, err := RawTxInSignatureAlt(tx, idx, subscript, hashType, privKey,
-		sigTypes(sigType))
+		sigType)
 	if err != nil {
 		return nil, err
 	}
 
 	pubx, puby := privKey.Public()
 	var pub chainec.PublicKey
-	switch sigTypes(sigType) {
-	case edwards:
+	switch sigType {
+	case dcrec.STEd25519:
 		pub = chainec.Edwards.NewPublicKey(pubx, puby)
-	case secSchnorr:
+	case dcrec.STSchnorrSecp256k1:
 		pub = chainec.SecSchnorr.NewPublicKey(pubx, puby)
 	}
 	pkData := pub.Serialize()
@@ -147,7 +148,7 @@ func p2pkSignatureScript(tx *wire.MsgTx, idx int, subScript []byte,
 // p2pkSignatureScript constructs a pay-to-pubkey signature script for alternative
 // ECDSA types.
 func p2pkSignatureScriptAlt(tx *wire.MsgTx, idx int, subScript []byte,
-	hashType SigHashType, privKey chainec.PrivateKey, sigType sigTypes) ([]byte,
+	hashType SigHashType, privKey chainec.PrivateKey, sigType dcrec.SignatureType) ([]byte,
 	error) {
 	sig, err := RawTxInSignatureAlt(tx, idx, subScript, hashType, privKey,
 		sigType)
@@ -227,7 +228,7 @@ func handleStakeOutSign(chainParams *chaincfg.Params, tx *wire.MsgTx, idx int,
 // addresses involved, and the number of signatures required.
 func sign(chainParams *chaincfg.Params, tx *wire.MsgTx, idx int,
 	subScript []byte, hashType SigHashType, kdb KeyDB, sdb ScriptDB,
-	sigType sigTypes) ([]byte,
+	sigType dcrec.SignatureType) ([]byte,
 	ScriptClass, []dcrutil.Address, int, error) {
 
 	class, addresses, nrequired, err := ExtractPkScriptAddrs(DefaultScriptVersion,
@@ -303,7 +304,7 @@ func sign(chainParams *chaincfg.Params, tx *wire.MsgTx, idx int,
 		}
 
 		script, err := SignatureScriptAlt(tx, idx, subScript, hashType,
-			key, compressed, int(sigType))
+			key, compressed, sigType)
 		if err != nil {
 			return nil, class, nil, 0, err
 		}
@@ -577,9 +578,9 @@ func (sc ScriptClosure) GetScript(address dcrutil.Address) ([]byte, error) {
 // signature script.
 func SignTxOutput(chainParams *chaincfg.Params, tx *wire.MsgTx, idx int,
 	pkScript []byte, hashType SigHashType, kdb KeyDB, sdb ScriptDB,
-	previousScript []byte, sigType int) ([]byte, error) {
+	previousScript []byte, sigType dcrec.SignatureType) ([]byte, error) {
 	sigScript, class, addresses, nrequired, err := sign(chainParams, tx,
-		idx, pkScript, hashType, kdb, sdb, sigTypes(sigType))
+		idx, pkScript, hashType, kdb, sdb, sigType)
 	if err != nil {
 		return nil, err
 	}
@@ -598,7 +599,7 @@ func SignTxOutput(chainParams *chaincfg.Params, tx *wire.MsgTx, idx int,
 	if class == ScriptHashTy {
 		// TODO keep the sub addressed and pass down to merge.
 		realSigScript, _, _, _, err := sign(chainParams, tx, idx,
-			sigScript, hashType, kdb, sdb, sigTypes(sigType))
+			sigScript, hashType, kdb, sdb, sigType)
 		if err != nil {
 			return nil, err
 		}

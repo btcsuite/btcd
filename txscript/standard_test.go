@@ -11,7 +11,8 @@ import (
 	"testing"
 
 	"github.com/decred/dcrd/chaincfg"
-	"github.com/decred/dcrd/chaincfg/chainec"
+	"github.com/decred/dcrd/dcrec"
+	"github.com/decred/dcrd/dcrec/secp256k1"
 	"github.com/decred/dcrd/dcrutil"
 )
 
@@ -34,7 +35,7 @@ func mustParseShortForm(script string) []byte {
 // the tests as a helper since the only way it can fail is if there is an error
 // in the test source code.
 func newAddressPubKey(serializedPubKey []byte) dcrutil.Address {
-	pubkey, err := chainec.Secp256k1.ParsePubKey(serializedPubKey)
+	pubkey, err := secp256k1.ParsePubKey(serializedPubKey)
 	if err != nil {
 		panic("invalid public key in test source")
 	}
@@ -53,7 +54,7 @@ func newAddressPubKey(serializedPubKey []byte) dcrutil.Address {
 // test source code.
 func newAddressPubKeyHash(pkHash []byte) dcrutil.Address {
 	addr, err := dcrutil.NewAddressPubKeyHash(pkHash, &chaincfg.MainNetParams,
-		chainec.ECTypeSecp256k1)
+		dcrec.STEcdsaSecp256k1)
 	if err != nil {
 		panic("invalid public key hash in test source")
 	}
@@ -493,7 +494,7 @@ func (b *bogusAddress) String() string {
 }
 
 // DSA returns -1.
-func (b *bogusAddress) DSA(chainParams *chaincfg.Params) int {
+func (b *bogusAddress) DSA(chainParams *chaincfg.Params) dcrec.SignatureType {
 	return -1
 }
 
@@ -510,7 +511,7 @@ func TestPayToAddrScript(t *testing.T) {
 	// 1MirQ9bwyQcGVJPwKUgapu5ouK2E2Ey4gX
 	p2pkhMain, err := dcrutil.NewAddressPubKeyHash(hexToBytes("e34cce70c86"+
 		"373273efcc54ce7d2a491bb4a0e84"), &chaincfg.MainNetParams,
-		chainec.ECTypeSecp256k1)
+		dcrec.STEcdsaSecp256k1)
 	if err != nil {
 		t.Fatalf("Unable to create public key hash address: %v", err)
 	}

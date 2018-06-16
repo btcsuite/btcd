@@ -15,8 +15,8 @@ import (
 
 	"github.com/decred/dcrd/blockchain"
 	"github.com/decred/dcrd/blockchain/chaingen"
-	"github.com/decred/dcrd/chaincfg/chainec"
 	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/decred/dcrd/dcrec"
 	"github.com/decred/dcrd/dcrec/secp256k1"
 	"github.com/decred/dcrd/dcrutil"
 	"github.com/decred/dcrd/txscript"
@@ -857,7 +857,7 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 			p2shTaxAddr := addrs[0].(*dcrutil.AddressScriptHash)
 			p2pkhTaxAddr, err := dcrutil.NewAddressPubKeyHash(
 				p2shTaxAddr.Hash160()[:], g.Params(),
-				chainec.ECTypeSecp256k1)
+				dcrec.STEcdsaSecp256k1)
 			if err != nil {
 				panic(err)
 			}

@@ -16,8 +16,8 @@ import (
 	"math/big"
 
 	"github.com/decred/dcrd/chaincfg"
-	"github.com/decred/dcrd/chaincfg/chainec"
 	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/decred/dcrd/dcrec"
 	"github.com/decred/dcrd/dcrutil"
 	"github.com/decred/dcrd/txscript"
 	"github.com/decred/dcrd/wire"
@@ -374,7 +374,7 @@ func AddrFromSStxPkScrCommitment(pkScript []byte,
 		addr, err = dcrutil.NewAddressScriptHashFromHash(hashBytes, params)
 	} else {
 		addr, err = dcrutil.NewAddressPubKeyHash(hashBytes, params,
-			chainec.ECTypeSecp256k1)
+			dcrec.STEcdsaSecp256k1)
 	}
 
 	return addr, err

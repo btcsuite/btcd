@@ -13,6 +13,9 @@ import (
 	"github.com/decred/dcrd/chaincfg"
 	"github.com/decred/dcrd/chaincfg/chainec"
 	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/decred/dcrd/dcrec"
+	"github.com/decred/dcrd/dcrec/edwards"
+	"github.com/decred/dcrd/dcrec/secp256k1"
 )
 
 // ErrMalformedPrivateKey describes an error where a WIF-encoded private
@@ -29,7 +32,7 @@ var ErrMalformedPrivateKey = errors.New("malformed private key")
 // by calling NewWIF.
 type WIF struct {
 	// ecType is the type of ECDSA used.
-	ecType int
+	ecType dcrec.SignatureType
 
 	// PrivKey is the private key being imported or exported.
 	PrivKey chainec.PrivateKey
@@ -43,7 +46,7 @@ type WIF struct {
 // as a string encoded in the Wallet Import Format.  The compress argument
 // specifies whether the address intended to be imported or exported was created
 // by serializing the public key compressed rather than uncompressed.
-func NewWIF(privKey chainec.PrivateKey, net *chaincfg.Params, ecType int) (*WIF,
+func NewWIF(privKey chainec.PrivateKey, net *chaincfg.Params, ecType dcrec.SignatureType) (*WIF,
 	error) {
 	if net == nil {
 		return nil, errors.New("no network")
@@ -92,20 +95,20 @@ func DecodeWIF(wif string) (*WIF, error) {
 	netID := [2]byte{decoded[0], decoded[1]}
 	var privKey chainec.PrivateKey
 
-	ecType := 0
-	switch int(decoded[2]) {
-	case chainec.ECTypeSecp256k1:
-		privKeyBytes := decoded[3 : 3+chainec.Secp256k1.PrivKeyBytesLen()]
-		privKey, _ = chainec.Secp256k1.PrivKeyFromScalar(privKeyBytes)
-		ecType = chainec.ECTypeSecp256k1
-	case chainec.ECTypeEdwards:
-		privKeyBytes := decoded[3 : 3+32]
-		privKey, _ = chainec.Edwards.PrivKeyFromScalar(privKeyBytes)
-		ecType = chainec.ECTypeEdwards
-	case chainec.ECTypeSecSchnorr:
-		privKeyBytes := decoded[3 : 3+chainec.SecSchnorr.PrivKeyBytesLen()]
-		privKey, _ = chainec.SecSchnorr.PrivKeyFromScalar(privKeyBytes)
-		ecType = chainec.ECTypeSecSchnorr
+	var ecType dcrec.SignatureType
+	switch dcrec.SignatureType(decoded[2]) {
+	case dcrec.STEcdsaSecp256k1:
+		privKeyBytes := decoded[3 : 3+secp256k1.PrivKeyBytesLen]
+		privKey, _ = secp256k1.PrivKeyFromScalar(privKeyBytes)
+		ecType = dcrec.STEcdsaSecp256k1
+	case dcrec.STEd25519:
+		privKeyBytes := decoded[3 : 3+edwards.PrivScalarSize]
+		privKey, _, _ = edwards.PrivKeyFromScalar(edwards.Edwards(), privKeyBytes)
+		ecType = dcrec.STEd25519
+	case dcrec.STSchnorrSecp256k1:
+		privKeyBytes := decoded[3 : 3+secp256k1.PrivKeyBytesLen]
+		privKey, _ = secp256k1.PrivKeyFromScalar(privKeyBytes)
+		ecType = dcrec.STSchnorrSecp256k1
 	}
 
 	return &WIF{ecType, privKey, netID}, nil
@@ -138,18 +141,18 @@ func (w *WIF) SerializePubKey() []byte {
 	var pk chainec.PublicKey
 
 	switch w.ecType {
-	case chainec.ECTypeSecp256k1:
-		pk = chainec.Secp256k1.NewPublicKey(pkx, pky)
-	case chainec.ECTypeEdwards:
-		pk = chainec.Edwards.NewPublicKey(pkx, pky)
-	case chainec.ECTypeSecSchnorr:
-		pk = chainec.SecSchnorr.NewPublicKey(pkx, pky)
+	case dcrec.STEcdsaSecp256k1:
+		pk = secp256k1.NewPublicKey(pkx, pky)
+	case dcrec.STEd25519:
+		pk = edwards.NewPublicKey(edwards.Edwards(), pkx, pky)
+	case dcrec.STSchnorrSecp256k1:
+		pk = secp256k1.NewPublicKey(pkx, pky)
 	}
 
 	return pk.SerializeCompressed()
 }
 
 // DSA returns the ECDSA type for the private key.
-func (w *WIF) DSA() int {
+func (w *WIF) DSA() dcrec.SignatureType {
 	return w.ecType
 }

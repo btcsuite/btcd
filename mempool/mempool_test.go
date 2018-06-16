@@ -16,7 +16,6 @@ import (
 
 	"github.com/decred/dcrd/blockchain"
 	"github.com/decred/dcrd/chaincfg"
-	"github.com/decred/dcrd/chaincfg/chainec"
 	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/dcrec/secp256k1"
 	"github.com/decred/dcrd/dcrutil"
@@ -200,7 +199,7 @@ type poolHarness struct {
 	//
 	// payAddr is the p2sh address for the signing key and is used for the
 	// payment address throughout the tests.
-	signKey     chainec.PrivateKey
+	signKey     *secp256k1.PrivateKey
 	payAddr     dcrutil.Address
 	payScript   []byte
 	chainParams *chaincfg.Params

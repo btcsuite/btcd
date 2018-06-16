@@ -13,8 +13,8 @@ import (
 
 	"github.com/decred/dcrd/blockchain/stake"
 	"github.com/decred/dcrd/chaincfg"
-	"github.com/decred/dcrd/chaincfg/chainec"
 	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/decred/dcrd/dcrec"
 	"github.com/decred/dcrd/dcrec/secp256k1"
 	"github.com/decred/dcrd/dcrutil"
 	"github.com/decred/dcrd/txscript"
@@ -321,7 +321,7 @@ func TestCheckTransactionStandard(t *testing.T) {
 	}
 	addrHash := [20]byte{0x01}
 	addr, err := dcrutil.NewAddressPubKeyHash(addrHash[:],
-		&chaincfg.TestNet2Params, chainec.ECTypeSecp256k1)
+		&chaincfg.TestNet2Params, dcrec.STEcdsaSecp256k1)
 	if err != nil {
 		t.Fatalf("NewAddressPubKeyHash: unexpected error: %v", err)
 	}

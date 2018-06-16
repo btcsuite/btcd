@@ -13,9 +13,9 @@ import (
 	"github.com/decred/dcrd/blockchain"
 	"github.com/decred/dcrd/blockchain/stake"
 	"github.com/decred/dcrd/chaincfg"
-	"github.com/decred/dcrd/chaincfg/chainec"
 	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/database"
+	"github.com/decred/dcrd/dcrec"
 	"github.com/decred/dcrd/dcrutil"
 	"github.com/decred/dcrd/txscript"
 	"github.com/decred/dcrd/wire"
@@ -536,17 +536,17 @@ func addrToKey(addr dcrutil.Address, params *chaincfg.Params) ([addrKeySize]byte
 	switch addr := addr.(type) {
 	case *dcrutil.AddressPubKeyHash:
 		switch addr.DSA(params) {
-		case chainec.ECTypeSecp256k1:
+		case dcrec.STEcdsaSecp256k1:
 			var result [addrKeySize]byte
 			result[0] = addrKeyTypePubKeyHash
 			copy(result[1:], addr.Hash160()[:])
 			return result, nil
-		case chainec.ECTypeEdwards:
+		case dcrec.STEd25519:
 			var result [addrKeySize]byte
 			result[0] = addrKeyTypePubKeyHashEdwards
 			copy(result[1:], addr.Hash160()[:])
 			return result, nil
-		case chainec.ECTypeSecSchnorr:
+		case dcrec.STSchnorrSecp256k1:
 			var result [addrKeySize]byte
 			result[0] = addrKeyTypePubKeyHashSchnorr
 			copy(result[1:], addr.Hash160()[:])

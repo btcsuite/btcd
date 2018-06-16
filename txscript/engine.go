@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/decred/dcrd/chaincfg/chainec"
+	"github.com/decred/dcrd/dcrec/secp256k1"
 	"github.com/decred/dcrd/wire"
 )
 
@@ -66,7 +66,7 @@ const (
 )
 
 // halforder is used to tame ECDSA malleability (see BIP0062).
-var halfOrder = new(big.Int).Rsh(chainec.Secp256k1.GetN(), 1)
+var halfOrder = new(big.Int).Rsh(secp256k1.S256().N, 1)
 
 // Engine is the virtual machine that executes scripts.
 type Engine struct {

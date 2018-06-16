@@ -16,8 +16,11 @@ import (
 	"golang.org/x/crypto/ripemd160"
 
 	"github.com/decred/dcrd/chaincfg"
-	"github.com/decred/dcrd/chaincfg/chainec"
 	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/decred/dcrd/dcrec"
+	"github.com/decred/dcrd/dcrec/edwards"
+	"github.com/decred/dcrd/dcrec/secp256k1"
+	"github.com/decred/dcrd/dcrec/secp256k1/schnorr"
 	"github.com/decred/dcrd/wire"
 )
 
@@ -1463,7 +1466,7 @@ func opcodeSubstr(op *parsedOpcode, vm *Engine) error {
 		return err
 	}
 
-	// All data pushes and pops are effectivley limited to 32-bits, as are
+	// All data pushes and pops are effectively limited to 32-bits, as are
 	// all math-related numeric pushes, so it is safe to cast the length to
 	// int32.  The numeric values are also clamped to int32 accordingly.
 	aLen := int32(len(a))
@@ -1532,7 +1535,7 @@ func opcodeLeft(op *parsedOpcode, vm *Engine) error {
 		return err
 	}
 
-	// All data pushes and pops are effectivley limited to 32-bits, as are
+	// All data pushes and pops are effectively limited to 32-bits, as are
 	// all math-related numeric pushes, so it is safe to cast the length to
 	// int32.  The numeric values are also clamped to int32 accordingly.
 	aLen := int32(len(a))
@@ -1580,7 +1583,7 @@ func opcodeRight(op *parsedOpcode, vm *Engine) error {
 		return err
 	}
 
-	// All data pushes and pops are effectivley limited to 32-bits, as are
+	// All data pushes and pops are effectively limited to 32-bits, as are
 	// all math-related numeric pushes, so it is safe to cast the length to
 	// int32.  The numeric values are also clamped to int32 accordingly.
 	aLen := int32(len(a))
@@ -2629,13 +2632,13 @@ func opcodeCheckSig(op *parsedOpcode, vm *Engine) error {
 		return nil
 	}
 
-	pubKey, err := chainec.Secp256k1.ParsePubKey(pkBytes)
+	pubKey, err := secp256k1.ParsePubKey(pkBytes)
 	if err != nil {
 		vm.dstack.PushBool(false)
 		return nil
 	}
 
-	signature, err := chainec.Secp256k1.ParseDERSignature(sigBytes)
+	signature, err := secp256k1.ParseDERSignature(sigBytes, secp256k1.S256())
 	if err != nil {
 		vm.dstack.PushBool(false)
 		return nil
@@ -2647,15 +2650,12 @@ func opcodeCheckSig(op *parsedOpcode, vm *Engine) error {
 		copy(sigHash[:], hash)
 
 		valid = vm.sigCache.Exists(sigHash, signature, pubKey)
-		if !valid && chainec.Secp256k1.Verify(pubKey, hash,
-			signature.GetR(), signature.GetS()) {
-
+		if !valid && signature.Verify(hash, pubKey) {
 			vm.sigCache.Add(sigHash, signature, pubKey)
 			valid = true
 		}
 	} else {
-		valid = chainec.Secp256k1.Verify(pubKey, hash, signature.GetR(),
-			signature.GetS())
+		valid = signature.Verify(hash, pubKey)
 	}
 
 	vm.dstack.PushBool(valid)
@@ -2680,7 +2680,7 @@ func opcodeCheckSigVerify(op *parsedOpcode, vm *Engine) error {
 // the same signature multiple times when verifying a multisig.
 type parsedSigInfo struct {
 	signature       []byte
-	parsedSignature chainec.Signature
+	parsedSignature *secp256k1.Signature
 	parsed          bool
 }
 
@@ -2799,7 +2799,7 @@ func opcodeCheckMultiSig(op *parsedOpcode, vm *Engine) error {
 		signature := rawSig[:len(rawSig)-1]
 
 		// Only parse and check the signature encoding once.
-		var parsedSig chainec.Signature
+		var parsedSig *secp256k1.Signature
 		if !sigInfo.parsed {
 			if err := vm.checkHashTypeEncoding(hashType); err != nil {
 				return err
@@ -2810,7 +2810,7 @@ func opcodeCheckMultiSig(op *parsedOpcode, vm *Engine) error {
 
 			// Parse the signature.
 			var err error
-			parsedSig, err = chainec.Secp256k1.ParseDERSignature(signature)
+			parsedSig, err = secp256k1.ParseDERSignature(signature, secp256k1.S256())
 			sigInfo.parsed = true
 			if err != nil {
 				continue
@@ -2831,7 +2831,7 @@ func opcodeCheckMultiSig(op *parsedOpcode, vm *Engine) error {
 		}
 
 		// Parse the pubkey.
-		parsedPubKey, err := chainec.Secp256k1.ParsePubKey(pubKey)
+		parsedPubKey, err := secp256k1.ParsePubKey(pubKey)
 		if err != nil {
 			continue
 		}
@@ -2853,15 +2853,12 @@ func opcodeCheckMultiSig(op *parsedOpcode, vm *Engine) error {
 			copy(sigHash[:], hash)
 
 			valid = vm.sigCache.Exists(sigHash, parsedSig, parsedPubKey)
-			if !valid && chainec.Secp256k1.Verify(parsedPubKey, hash,
-				parsedSig.GetR(), parsedSig.GetS()) {
-
+			if !valid && parsedSig.Verify(hash, parsedPubKey) {
 				vm.sigCache.Add(sigHash, parsedSig, parsedPubKey)
 				valid = true
 			}
 		} else {
-			valid = chainec.Secp256k1.Verify(parsedPubKey, hash,
-				parsedSig.GetR(), parsedSig.GetS())
+			valid = parsedSig.Verify(hash, parsedPubKey)
 		}
 
 		if valid {
@@ -2889,14 +2886,6 @@ func opcodeCheckMultiSigVerify(op *parsedOpcode, vm *Engine) error {
 	return err
 }
 
-// ECDSA signature schemes encoded as a single byte. Secp256k1 traditional
-// is non-accessible through CheckSigAlt, but is used elsewhere for in the
-// sign function to indicate the type of signature to generate.
-type sigTypes uint8
-
-var edwards = sigTypes(chainec.ECTypeEdwards)
-var secSchnorr = sigTypes(chainec.ECTypeSecSchnorr)
-
 // opcodeCheckSigAlt accepts a three item stack and pops off the first three
 // items. The first item is a signature type (1-255, can not be zero or the
 // soft fork will fail). Any unused signature types return true, so that future
@@ -2913,14 +2902,14 @@ func opcodeCheckSigAlt(op *parsedOpcode, vm *Engine) error {
 		return err
 	}
 
-	switch sigTypes(sigType) {
-	case sigTypes(0):
+	switch sigType {
+	case 0:
 		// Zero case; pre-softfork clients will return 0 in this case as well.
 		vm.dstack.PushBool(false)
 		return nil
-	case edwards:
+	case dcrec.STEd25519:
 		break
-	case secSchnorr:
+	case dcrec.STSchnorrSecp256k1:
 		break
 	default:
 		// Caveat: All unknown signature types return true, allowing for future
@@ -2937,13 +2926,13 @@ func opcodeCheckSigAlt(op *parsedOpcode, vm *Engine) error {
 	// Check the public key lengths. Only 33-byte compressed secp256k1 keys
 	// are allowed for secp256k1 Schnorr signatures, which 32 byte keys
 	// are used for Curve25519.
-	switch sigTypes(sigType) {
-	case edwards:
+	switch sigType {
+	case dcrec.STEd25519:
 		if len(pkBytes) != 32 {
 			vm.dstack.PushBool(false)
 			return nil
 		}
-	case secSchnorr:
+	case dcrec.STSchnorrSecp256k1:
 		if len(pkBytes) != 33 {
 			vm.dstack.PushBool(false)
 			return nil
@@ -2957,13 +2946,13 @@ func opcodeCheckSigAlt(op *parsedOpcode, vm *Engine) error {
 
 	// Schnorr signatures are 65 bytes in length (64 bytes for [r,s] and
 	// 1 byte appened to the end for hashType).
-	switch sigTypes(sigType) {
-	case edwards:
+	switch sigType {
+	case dcrec.STEd25519:
 		if len(fullSigBytes) != 65 {
 			vm.dstack.PushBool(false)
 			return nil
 		}
-	case secSchnorr:
+	case dcrec.STSchnorrSecp256k1:
 		if len(fullSigBytes) != 65 {
 			vm.dstack.PushBool(false)
 			return nil
@@ -3011,56 +3000,33 @@ func opcodeCheckSigAlt(op *parsedOpcode, vm *Engine) error {
 	}
 
 	// Get the public key from bytes.
-	var pubKey chainec.PublicKey
-	switch sigTypes(sigType) {
-	case edwards:
-		pubKeyEd, err := chainec.Edwards.ParsePubKey(pkBytes)
+	switch sigType {
+	case dcrec.STEd25519:
+		pubKeyEd, err := edwards.ParsePubKey(edwards.Edwards(), pkBytes)
 		if err != nil {
 			vm.dstack.PushBool(false)
 			return nil
 		}
-		pubKey = pubKeyEd
-	case secSchnorr:
-		pubKeySec, err := chainec.SecSchnorr.ParsePubKey(pkBytes)
+		sigEd, err := edwards.ParseSignature(edwards.Edwards(), sigBytes)
 		if err != nil {
 			vm.dstack.PushBool(false)
 			return nil
 		}
-		pubKey = pubKeySec
-	}
-
-	// Get the signature from bytes.
-	var signature chainec.Signature
-	switch sigTypes(sigType) {
-	case edwards:
-		sigEd, err := chainec.Edwards.ParseSignature(sigBytes)
-		if err != nil {
-			vm.dstack.PushBool(false)
-			return nil
-		}
-		signature = sigEd
-	case secSchnorr:
-		sigSec, err := chainec.SecSchnorr.ParseSignature(sigBytes)
-		if err != nil {
-			vm.dstack.PushBool(false)
-			return nil
-		}
-		signature = sigSec
-	default:
-		vm.dstack.PushBool(false)
-		return nil
-	}
-
-	// Attempt to validate the signature.
-	switch sigTypes(sigType) {
-	case edwards:
-		ok := chainec.Edwards.Verify(pubKey, hash, signature.GetR(),
-			signature.GetS())
+		ok := edwards.Verify(pubKeyEd, hash, sigEd.GetR(), sigEd.GetS())
 		vm.dstack.PushBool(ok)
 		return nil
-	case secSchnorr:
-		ok := chainec.SecSchnorr.Verify(pubKey, hash, signature.GetR(),
-			signature.GetS())
+	case dcrec.STSchnorrSecp256k1:
+		pubKeySec, err := schnorr.ParsePubKey(secp256k1.S256(), pkBytes)
+		if err != nil {
+			vm.dstack.PushBool(false)
+			return nil
+		}
+		sigSec, err := schnorr.ParseSignature(sigBytes)
+		if err != nil {
+			vm.dstack.PushBool(false)
+			return nil
+		}
+		ok := schnorr.Verify(pubKeySec, hash, sigSec.GetR(), sigSec.GetS())
 		vm.dstack.PushBool(ok)
 		return nil
 	}
