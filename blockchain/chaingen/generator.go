@@ -1559,7 +1559,7 @@ func (g *Generator) ReplaceWithNVotes(numVotes uint16) func(*wire.MsgBlock) {
 //
 // NOTE: This must only be used as a munger to the 'NextBlock' function or it
 // will lead to an invalid live ticket pool.
-func (generator *Generator) ReplaceVoteBitsN(voteNum int, voteBits uint16) func(*wire.MsgBlock) {
+func (g *Generator) ReplaceVoteBitsN(voteNum int, voteBits uint16) func(*wire.MsgBlock) {
 	return func(b *wire.MsgBlock) {
 		// Attempt to prevent misuse of this function by ensuring the
 		// provided stake transaction number is actually a vote.

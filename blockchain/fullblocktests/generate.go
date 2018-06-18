@@ -1165,7 +1165,7 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 	//                 \-> bv5(9)
 	g.SetTip("bsl5")
 	g.NextBlock("bv5", outs[9], ticketOuts[9], func(b *wire.MsgBlock) {
-		b.Header.FreshStake -= 1
+		b.Header.FreshStake--
 	})
 	rejected(blockchain.ErrFreshStakeMismatch)
 
@@ -1396,7 +1396,7 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 	//                 \-> bsd0(9)
 	g.SetTip("bsl5")
 	g.NextBlock("bsd0", outs[9], ticketOuts[9], func(b *wire.MsgBlock) {
-		b.STransactions[5].TxOut[0].Value -= 1
+		b.STransactions[5].TxOut[0].Value--
 	})
 	rejected(blockchain.ErrNotEnoughStake)
 
@@ -1845,7 +1845,7 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 	g.SetTip("brs3")
 	g.NextBlock("bmf11", outs[15], ticketOuts[15], func(b *wire.MsgBlock) {
 		// Set an invalid POW limit.
-		b.Header.Bits -= 1
+		b.Header.Bits--
 	})
 	rejected(blockchain.ErrUnexpectedDifficulty)
 

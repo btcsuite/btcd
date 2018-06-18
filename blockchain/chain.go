@@ -41,12 +41,6 @@ const (
 	// mainchainBlockCacheSize is the number of mainchain blocks to
 	// keep in memory, by height from the tip of the mainchain.
 	mainchainBlockCacheSize = 12
-
-	// maxSearchDepth is the distance in block nodes to search down the
-	// blockchain to find some parent, loading block nodes from the
-	// database if necessary.  Reorganizations longer than this disance may
-	// fail.
-	maxSearchDepth = 2880
 )
 
 // panicf is a convenience function that formats according to the given format
@@ -1670,7 +1664,7 @@ func (b *BlockChain) maxBlockSize(prevNode *blockNode) (int64, error) {
 	return maxSize, nil
 }
 
-// MaximumBlockSize returns the maximum permitted block size for the block AFTER
+// MaxBlockSize returns the maximum permitted block size for the block AFTER
 // the end of the current best chain.
 //
 // This function is safe for concurrent access.

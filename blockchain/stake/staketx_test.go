@@ -993,18 +993,22 @@ func TestGetSSRtxStakeOutputInfo(t *testing.T) {
 }
 
 func TestGetSStxNullOutputAmounts(t *testing.T) {
-	commitAmts := []int64{int64(0x2122e300),
-		int64(0x12000000),
-		int64(0x12300000)}
-	changeAmts := []int64{int64(0x0122e300),
-		int64(0x02000000),
-		int64(0x02300000)}
+	commitAmts := []int64{
+		0x2122e300,
+		0x12000000,
+		0x12300000,
+	}
+	changeAmts := []int64{
+		0x0122e300,
+		0x02000000,
+		0x02300000,
+	}
 	amtTicket := int64(0x9122e300)
 
 	_, _, err := stake.SStxNullOutputAmounts(
 		[]int64{
-			int64(0x12000000),
-			int64(0x12300000),
+			0x12000000,
+			0x12300000,
 		},
 		changeAmts,
 		amtTicket)
@@ -1027,9 +1031,11 @@ func TestGetSStxNullOutputAmounts(t *testing.T) {
 	}
 
 	// overspending error
-	tooMuchChangeAmts := []int64{int64(0x0122e300),
-		int64(0x02000000),
-		int64(0x12300001)}
+	tooMuchChangeAmts := []int64{
+		0x0122e300,
+		0x02000000,
+		0x12300001,
+	}
 
 	_, _, err = stake.SStxNullOutputAmounts(
 		commitAmts,
@@ -1055,9 +1061,10 @@ func TestGetSStxNullOutputAmounts(t *testing.T) {
 			"but got %v", expectedFees, fees)
 	}
 
-	expectedAmts := []int64{int64(0x20000000),
-		int64(0x10000000),
-		int64(0x10000000),
+	expectedAmts := []int64{
+		0x20000000,
+		0x10000000,
+		0x10000000,
 	}
 
 	if !reflect.DeepEqual(expectedAmts, amts) {
@@ -1068,9 +1075,10 @@ func TestGetSStxNullOutputAmounts(t *testing.T) {
 
 func TestGetStakeRewards(t *testing.T) {
 	// SSGen example with >0 subsidy
-	amounts := []int64{int64(21000000),
-		int64(11000000),
-		int64(10000000),
+	amounts := []int64{
+		21000000,
+		11000000,
+		10000000,
 	}
 	amountTicket := int64(42000000)
 	subsidy := int64(400000)
@@ -1078,9 +1086,10 @@ func TestGetStakeRewards(t *testing.T) {
 	outAmts := stake.CalculateRewards(amounts, amountTicket, subsidy)
 
 	// SSRtx example with 0 subsidy
-	expectedAmts := []int64{int64(21200000),
-		int64(11104761),
-		int64(10095238),
+	expectedAmts := []int64{
+		21200000,
+		11104761,
+		10095238,
 	}
 
 	if !reflect.DeepEqual(expectedAmts, outAmts) {
@@ -1090,13 +1099,15 @@ func TestGetStakeRewards(t *testing.T) {
 }
 
 func TestVerifySStxAmounts(t *testing.T) {
-	amounts := []int64{int64(21000000),
-		int64(11000000),
+	amounts := []int64{
+		21000000,
+		11000000,
 		int64(10000000),
 	}
-	calcAmounts := []int64{int64(21000000),
-		int64(11000000),
-		int64(10000000),
+	calcAmounts := []int64{
+		21000000,
+		11000000,
+		10000000,
 	}
 
 	// len error for slices
@@ -1111,9 +1122,10 @@ func TestVerifySStxAmounts(t *testing.T) {
 	}
 
 	// non-congruent slices error
-	calcAmountsBad = []int64{int64(21000000),
-		int64(11000000),
-		int64(10000001),
+	calcAmountsBad = []int64{
+		21000000,
+		11000000,
+		10000001,
 	}
 	err = stake.VerifySStxAmounts(amounts,
 		calcAmountsBad)
@@ -1131,8 +1143,9 @@ func TestVerifySStxAmounts(t *testing.T) {
 
 func TestVerifyStakingPkhsAndAmounts(t *testing.T) {
 	types := []bool{false, false}
-	amounts := []int64{int64(21000000),
-		int64(11000000),
+	amounts := []int64{
+		21000000,
+		11000000,
 	}
 	pkhs := [][]byte{
 		{0x00, 0x01, 0x02, 0x00,
@@ -1146,8 +1159,8 @@ func TestVerifyStakingPkhsAndAmounts(t *testing.T) {
 			0x00, 0x01, 0x02, 0x00,
 			0x00, 0x01, 0x02, 0x03}}
 	spendTypes := []bool{false, false}
-	spendAmounts := []int64{int64(21000000),
-		int64(11000000),
+	spendAmounts := []int64{21000000,
+		11000000,
 	}
 	spendPkhs := [][]byte{
 		{0x00, 0x01, 0x02, 0x00,
@@ -1200,7 +1213,7 @@ func TestVerifyStakingPkhsAndAmounts(t *testing.T) {
 	}
 
 	// len error for amt slices
-	spendAmountsBad := []int64{int64(11000111)}
+	spendAmountsBad := []int64{11000111}
 	err = stake.VerifyStakingPkhsAndAmounts(types,
 		pkhs,
 		amounts,
@@ -1238,8 +1251,10 @@ func TestVerifyStakingPkhsAndAmounts(t *testing.T) {
 	}
 
 	// amount non-equivalence in position 1
-	spendAmountsNonequiv := []int64{int64(21000000),
-		int64(11000000)}
+	spendAmountsNonequiv := []int64{
+		21000000,
+		11000000,
+	}
 	spendAmountsNonequiv[1]--
 
 	err = stake.VerifyStakingPkhsAndAmounts(types,
@@ -1287,16 +1302,21 @@ func TestVerifyStakingPkhsAndAmounts(t *testing.T) {
 	spendRulesNonequivV := [][]bool{
 		{false, false},
 		{true, false}}
-	spendAmountsNonequivV := []int64{int64(21000000),
-		int64(10934463)}
-	spendAmountsNonequivVTooBig := []int64{int64(21000000),
-		int64(11000001)}
-
+	spendAmountsNonequivV := []int64{
+		21000000,
+		10934463,
+	}
+	spendAmountsNonequivVTooBig := []int64{
+		21000000,
+		11000001,
+	}
 	spendRulesNonequivR := [][]bool{
 		{false, false},
 		{false, true}}
-	spendAmountsNonequivR := []int64{int64(21000000),
-		int64(9951423)}
+	spendAmountsNonequivR := []int64{
+		21000000,
+		9951423,
+	}
 
 	// vote
 	// original amount: 11000000

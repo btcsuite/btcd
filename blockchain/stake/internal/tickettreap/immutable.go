@@ -378,14 +378,14 @@ func (t *Immutable) ForEach(fn func(k Key, v *Value) bool) {
 		parents.Push(node)
 	}
 	for parents.Len() > 0 {
-		node := parents.Pop()
-		if !fn(node.key, node.value) {
+		pnode := parents.Pop()
+		if !fn(pnode.key, pnode.value) {
 			return
 		}
 
 		// Extend the nodes to traverse by all children to the left of
 		// the current node's right child.
-		for node := node.right; node != nil; node = node.left {
+		for node := pnode.right; node != nil; node = node.left {
 			parents.Push(node)
 		}
 	}
@@ -402,14 +402,14 @@ func (t *Immutable) ForEachByHeight(heightLessThan uint32, fn func(k Key, v *Val
 		parents.Push(node)
 	}
 	for parents.Len() > 0 {
-		node := parents.Pop()
-		if !fn(node.key, node.value) {
+		pnode := parents.Pop()
+		if !fn(pnode.key, pnode.value) {
 			return
 		}
 
 		// Extend the nodes to traverse by all children to the left of
 		// the current node's right child.
-		for node := node.right; node != nil && node.priority < heightLessThan; node = node.left {
+		for node := pnode.right; node != nil && node.priority < heightLessThan; node = node.left {
 			parents.Push(node)
 		}
 	}

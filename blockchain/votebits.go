@@ -127,7 +127,7 @@ func (c deploymentChecker) Condition(node *blockNode, version uint32) ([]thresho
 			// Invalid choice.
 			continue
 		}
-		tally[idx].count += 1
+		tally[idx].count++
 	}
 
 	return tally, nil

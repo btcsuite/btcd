@@ -624,9 +624,7 @@ func CalculateRewards(amounts []int64, amountTicket int64,
 		amountBig.Rsh(amountBig, 32)
 
 		// make int64
-		amountFinal := int64(amountBig.Uint64())
-
-		outputsAmounts[idx] = amountFinal
+		outputsAmounts[idx] = amountBig.Int64()
 	}
 
 	return outputsAmounts

@@ -101,7 +101,7 @@ func (b *BlockChain) isVoterMajorityVersion(minVer uint32, prevNode *blockNode) 
 		totalVotesFound += int32(len(iterNode.votes))
 		for _, v := range iterNode.votes {
 			if v.Version >= minVer {
-				versionCount += 1
+				versionCount++
 			}
 		}
 
@@ -147,7 +147,7 @@ func (b *BlockChain) isStakeMajorityVersion(minVer uint32, prevNode *blockNode) 
 	iterNode := node
 	for i := int64(0); i < b.chainParams.StakeVersionInterval && iterNode != nil; i++ {
 		if iterNode.stakeVersion >= minVer {
-			versionCount += 1
+			versionCount++
 		}
 
 		iterNode = iterNode.parent

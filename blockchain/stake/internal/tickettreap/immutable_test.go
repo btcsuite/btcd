@@ -98,7 +98,7 @@ func TestImmutableSequential(t *testing.T) {
 
 	// Insert a bunch of sequential keys while checking several of the treap
 	// functions work as expected.
-	expectedSize := uint64(0)
+	var expectedSize uint64
 	numItems := 1000
 	testTreap := NewImmutable()
 	for i := 0; i < numItems; i++ {
@@ -125,7 +125,7 @@ func TestImmutableSequential(t *testing.T) {
 		}
 
 		// Ensure the expected size is reported.
-		expectedSize += (nodeFieldsSize + uint64(len(key)) + nodeValueSize)
+		expectedSize += nodeFieldsSize + uint64(len(key)) + nodeValueSize
 		if gotSize := testTreap.Size(); gotSize != expectedSize {
 			t.Fatalf("Size #%d: unexpected byte size - got %d, "+
 				"want %d", i, gotSize, expectedSize)
@@ -254,7 +254,7 @@ func TestImmutableSequential(t *testing.T) {
 		}
 
 		// Ensure the expected size is reported.
-		expectedSize -= (nodeFieldsSize + uint64(len(key)) + nodeValueSize)
+		expectedSize -= nodeFieldsSize + uint64(len(key)) + nodeValueSize
 		if gotSize := testTreap.Size(); gotSize != expectedSize {
 			t.Fatalf("Size #%d: unexpected byte size - got %d, "+
 				"want %d", i, gotSize, expectedSize)
@@ -269,7 +269,7 @@ func TestImmutableReverseSequential(t *testing.T) {
 
 	// Insert a bunch of sequential keys while checking several of the treap
 	// functions work as expected.
-	expectedSize := uint64(0)
+	var expectedSize uint64
 	numItems := 1000
 	testTreap := NewImmutable()
 	for i := 0; i < numItems; i++ {
@@ -296,7 +296,7 @@ func TestImmutableReverseSequential(t *testing.T) {
 		}
 
 		// Ensure the expected size is reported.
-		expectedSize += (nodeFieldsSize + uint64(len(key)) + nodeValueSize)
+		expectedSize += nodeFieldsSize + uint64(len(key)) + nodeValueSize
 		if gotSize := testTreap.Size(); gotSize != expectedSize {
 			t.Fatalf("Size #%d: unexpected byte size - got %d, "+
 				"want %d", i, gotSize, expectedSize)
@@ -364,7 +364,7 @@ func TestImmutableReverseSequential(t *testing.T) {
 		}
 
 		// Ensure the expected size is reported.
-		expectedSize -= (nodeFieldsSize + uint64(len(key)) + nodeValueSize)
+		expectedSize -= nodeFieldsSize + uint64(len(key)) + nodeValueSize
 		if gotSize := testTreap.Size(); gotSize != expectedSize {
 			t.Fatalf("Size #%d: unexpected byte size - got %d, "+
 				"want %d", i, gotSize, expectedSize)
@@ -379,7 +379,7 @@ func TestImmutableUnordered(t *testing.T) {
 
 	// Insert a bunch of out-of-order keys while checking several of the
 	// treap functions work as expected.
-	expectedSize := uint64(0)
+	var expectedSize uint64
 	numItems := 1000
 	testTreap := NewImmutable()
 	for i := 0; i < numItems; i++ {
@@ -440,7 +440,7 @@ func TestImmutableUnordered(t *testing.T) {
 		}
 
 		// Ensure the expected size is reported.
-		expectedSize -= (nodeFieldsSize + uint64(len(key)) + nodeValueSize)
+		expectedSize -= nodeFieldsSize + uint64(len(key)) + nodeValueSize
 		if gotSize := testTreap.Size(); gotSize != expectedSize {
 			t.Fatalf("Size #%d: unexpected byte size - got %d, "+
 				"want %d", i, gotSize, expectedSize)
@@ -454,7 +454,7 @@ func TestImmutableDuplicatePut(t *testing.T) {
 	t.Parallel()
 
 	expectedVal := &Value{Height: 10000}
-	expectedSize := uint64(0)
+	var expectedSize uint64
 	numItems := 1000
 	testTreap := NewImmutable()
 	for i := 0; i < numItems; i++ {
@@ -538,7 +538,7 @@ func TestImmutableSnapshot(t *testing.T) {
 
 	// Insert a bunch of sequential keys while checking several of the treap
 	// functions work as expected.
-	expectedSize := uint64(0)
+	var expectedSize uint64
 	numItems := 1000
 	testTreap := NewImmutable()
 	for i := 0; i < numItems; i++ {
@@ -572,7 +572,7 @@ func TestImmutableSnapshot(t *testing.T) {
 			t.Fatalf("Size #%d: unexpected byte size - got %d, "+
 				"want %d", i, gotSize, expectedSize)
 		}
-		expectedSize += (nodeFieldsSize + uint64(len(key)) + nodeValueSize)
+		expectedSize += nodeFieldsSize + uint64(len(key)) + nodeValueSize
 	}
 
 	// Delete the keys one-by-one while checking several of the treap
@@ -608,7 +608,7 @@ func TestImmutableSnapshot(t *testing.T) {
 			t.Fatalf("Size #%d: unexpected byte size - got %d, "+
 				"want %d", i, gotSize, expectedSize)
 		}
-		expectedSize -= (nodeFieldsSize + uint64(len(key)) + nodeValueSize)
+		expectedSize -= nodeFieldsSize + uint64(len(key)) + nodeValueSize
 	}
 }
 
@@ -686,7 +686,7 @@ func TestImmutableMemory(t *testing.T) {
 		}
 
 		perBlock := int(chaincfg.MainNetParams.TicketsPerBlock)
-		for i := 0; i < perBlock; i++ {
+		for j := 0; j < perBlock; j++ {
 			randomHash := randHash(randSource)
 			treapCopy = treapCopy.Put(Key(*randomHash),
 				&Value{uint32(randSource.Int63()), false, true, false, true})

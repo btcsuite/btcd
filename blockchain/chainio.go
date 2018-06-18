@@ -21,12 +21,6 @@ import (
 	"github.com/decred/dcrd/wire"
 )
 
-var (
-	// byteOrder is the preferred byte order used for serializing numeric
-	// fields for storage in the database.
-	byteOrder = binary.LittleEndian
-)
-
 const (
 	// currentDatabaseVersion indicates what the current database
 	// version is.

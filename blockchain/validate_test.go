@@ -8,7 +8,6 @@ package blockchain
 import (
 	"bytes"
 	"compress/bzip2"
-	"encoding/binary"
 	"encoding/gob"
 	"fmt"
 	mrand "math/rand"
@@ -18,44 +17,12 @@ import (
 	"time"
 
 	"github.com/decred/dcrd/blockchain/chaingen"
-	"github.com/decred/dcrd/blockchain/stake"
 	"github.com/decred/dcrd/chaincfg"
 	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/database"
 	"github.com/decred/dcrd/dcrutil"
-	"github.com/decred/dcrd/txscript"
 	"github.com/decred/dcrd/wire"
 )
-
-// recalculateMsgBlockMerkleRootsSize recalculates the merkle roots for a msgBlock,
-// then stores them in the msgBlock's header. It also updates the block size.
-func recalculateMsgBlockMerkleRootsSize(msgBlock *wire.MsgBlock) {
-	tempBlock := dcrutil.NewBlock(msgBlock)
-
-	merkles := BuildMerkleTreeStore(tempBlock.Transactions())
-	merklesStake := BuildMerkleTreeStore(tempBlock.STransactions())
-
-	msgBlock.Header.MerkleRoot = *merkles[len(merkles)-1]
-	msgBlock.Header.StakeRoot = *merklesStake[len(merklesStake)-1]
-	msgBlock.Header.Size = uint32(msgBlock.SerializeSize())
-}
-
-// updateVoteCommitments updates all of the votes in the passed block to commit
-// to the previous block and height specified by the header.
-func updateVoteCommitments(msgBlock *wire.MsgBlock) {
-	for _, stx := range msgBlock.STransactions {
-		if !stake.IsSSGen(stx) {
-			continue
-		}
-
-		// Generate and set the commitment.
-		var commitment [36]byte
-		copy(commitment[:], msgBlock.Header.PrevBlock[:])
-		binary.LittleEndian.PutUint32(commitment[32:], msgBlock.Header.Height-1)
-		pkScript, _ := txscript.GenerateProvablyPruneableOut(commitment[:])
-		stx.TxOut[0].PkScript = pkScript
-	}
-}
 
 // TestBlockchainSpendJournal tests for whether or not the spend journal is being
 // written to disk correctly on a live blockchain.

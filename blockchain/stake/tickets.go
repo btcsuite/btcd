@@ -21,10 +21,11 @@ import (
 type UndoTicketDataSlice []ticketdb.UndoTicketData
 
 // Node is in-memory stake data for a node.  It contains a list of database
-// updates to be written in the case that the block is inserted in the main chain
-// database.  Because of its use of immutable treap data structures, it allows for
-// a fast, efficient in-memory representation of the ticket database for each
-// node.  It handles connection of and disconnection of new blocks simply.
+// updates to be written in the case that the block is inserted in the main
+// chain database.  Because of its use of immutable treap data structures, it
+// allows for a fast, efficient in-memory representation of the ticket database
+// for each node.  It handles connection of and disconnection of new blocks
+// simply.
 //
 // Like the immutable treap structures, stake nodes themselves are considered
 // to be immutable.  The connection or disconnection of past or future nodes
