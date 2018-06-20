@@ -13,8 +13,8 @@ dcrd maintains the entire past transactional ledger of Decred and allows
 about Decred please see the
 [project documentation](https://docs.decred.org/#overview).
 
-Note: To send or receive funds and join Proof-of-Stake mining, you will also need
-[dcrwallet](https://github.com/decred/dcrwallet).
+Note: To send or receive funds and join Proof-of-Stake mining, you will also 
+need [dcrwallet](https://github.com/decred/dcrwallet).
 
 This project is currently under active development and is in a Beta state.  It
 is extremely stable and has been in production use since February 2016.
@@ -80,9 +80,58 @@ go install . ./cmd/...
 ```
 
 For more information about Decred and how to set up your software please go to
-our docs page at [docs.decred.org](https://docs.decred.org/getting-started/beginner-guide/).
+our docs page at
+[docs.decred.org](https://docs.decred.org/getting-started/beginner-guide/).
 
 ## Docker
+
+### Running dcrd
+
+You can run a decred node from inside a docker container.  To build the image
+yourself, use the following command:
+
+```
+docker build -t decred/dcrd .
+```
+
+Or you can create an alpine based image (requires Docker 17.05 or higher):
+
+```
+docker build -t decred/dcrd:alpine -f Dockerfile.alpine .
+```
+
+You can then run the image using:
+
+```
+docker run decred/dcrd
+```
+
+You may wish to use an external volume to customise your config and persist the
+data in an external volume:
+
+```
+docker run --rm -v /home/user/dcrdata:/root/.dcrd/data decred/dcrd
+```
+
+For a minimal image, you can use the decred/dcrd:alpine tag.  This is typically
+a more secure option while also being a much smaller image.
+
+You can run dcrctl from inside the image.  For example, run an image (mounting
+your data from externally) with:
+
+```
+docker run --rm -ti --name=dcrd-1 -v /home/user/.dcrd:/root/.dcrd \
+  decred/dcrd:alpine
+```
+
+And then run dcrctl commands against it.  For example:
+
+```
+docker exec -ti dcrd-1 dcrctl getbestblock
+```
+
+
+### Running Tests
 
 All tests and linters may be run in a docker container using the script
 `run_tests.sh`.  This script defaults to using the current supported version of
