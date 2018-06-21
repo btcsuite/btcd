@@ -234,7 +234,7 @@ func parseScriptFlags(flagStr string) (ScriptFlags, error) {
 		case "CLEANSTACK":
 			flags |= ScriptVerifyCleanStack
 		case "DERSIG":
-			flags |= ScriptVerifyDERSignatures
+			// Always active in Decred.
 		case "DISCOURAGE_UPGRADABLE_NOPS":
 			flags |= ScriptDiscourageUpgradableNops
 		case "MINIMALDATA":

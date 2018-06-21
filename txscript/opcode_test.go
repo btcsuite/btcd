@@ -20,8 +20,7 @@ import (
 // executing transaction scripts to enforce additional checks.  Note these flags
 // are different than what is required for the consensus rules in that they are
 // more strict.
-const testScriptFlags = ScriptVerifyDERSignatures |
-	ScriptVerifyMinimalData |
+const testScriptFlags = ScriptVerifyMinimalData |
 	ScriptDiscourageUpgradableNops |
 	ScriptVerifyCleanStack |
 	ScriptVerifyCheckLockTimeVerify |

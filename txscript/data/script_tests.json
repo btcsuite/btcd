@@ -1030,24 +1030,6 @@
     "DERSIG", "OK",
     "CHECKSIG must push false with invalid non-null DER-compliant sig with DERSIG (P2PK NOT min sig)"
 ],
-[
-    "1",
-    "0x21 0x03fff97bd5755eeea420453a14355235d382f6472f8568a18b2f057a1460297556 CHECKSIG NOT",
-    "NONE", "OK",
-    "CHECKSIG must push false with invalid non-DER-compliant sig without DERSIG"
-],
-[
-    "0x48 0x304402204de4b86166781ffbd4375650776a338d53a0eabcc61f371ce256364f058f88ba0220597090d34c536b727fb555d61b100703a3f63b7a6ad7aa0164138c6ab3c63f880101",
-    "0x21 0x0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 CHECKSIG",
-    "NONE", "OK",
-    "CHECKSIG must push true for otherwise valid sig with multi-byte hash type without DERSIG"
-],
-[
-    "0x48 0x304502204fc10344934662ca0a93a84d14d650d8a21cf2ab91f608e8783d2999c95544320221008441aacd6b17038ff3f6700b042934f9a6fea0cec2051b51dc709e52a5bb7d6101",
-    "0x21 0x0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 CHECKSIG",
-    "NONE", "OK",
-    "CHECKSIG must push true when S is greater than the curve half order and sig is valid without DERSIG"
-],
 ["", "CHECKSIG NOT", "", "ERR_INVALID_STACK_OPERATION", "CHECKSIG must error when there are no stack items"],
 ["0", "CHECKSIG NOT", "", "ERR_INVALID_STACK_OPERATION","CHECKSIG must error when there are not 2 stack items"],
 ["''", "0x21 0x0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 CHECKSIG", "", "ERR_EVAL_FALSE", "CHECKSIG must evaluate 0-length signatures to false"],
@@ -1282,20 +1264,8 @@
 [
     "0",
     "0x21 0x03fff97bd5755eeea420453a14355235d382f6472f8568a18b2f057a1460297556 CHECKSIG",
-    "", "ERR_EVAL_FALSE",
-    "CHECKSIG must evaluate 0 sig to false without DERSIG"
-],
-[
-    "0",
-    "0x21 0x03fff97bd5755eeea420453a14355235d382f6472f8568a18b2f057a1460297556 CHECKSIG",
     "DERSIG", "ERR_EVAL_FALSE",
-    "CHECKSIG must consider 0 sig value and evaluate to false with DERSIG"
-],
-[
-    "1",
-    "0x21 0x03fff97bd5755eeea420453a14355235d382f6472f8568a18b2f057a1460297556 CHECKSIG",
-    "", "ERR_EVAL_FALSE",
-    "CHECKSIG must evaluate non-DER-compliant sig to false without DERSIG"
+    "CHECKSIG must consider 0 sig valid and evaluate to false with DERSIG"
 ],
 
 ["Additional test coverage with standard payment forms involving CHECKSIG"],
@@ -1416,16 +1386,10 @@
     "CHECKMULTISIG must work in a P2SH redeem script (2-of-3, 2 valid sigs)"
 ],
 [
-    "0 0x47 0x30440220ea377dcb8630e68da3a0eeb57e96e195b4d9c437381f76912c0e6fc28bae6e3502204096da36de10b7261bfa6ae0fddbe11428c1d13160bcb1110ed04f3f7d2f389f01",
-    "2 0x21 0x0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 0x21 0x02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9 2 CHECKMULTISIG NOT",
-    "NONE", "OK",
-    "CHECKMULTISIG must not error with sigs where R is negative without DERSIG (2-of-2, first sig valid non-DER, second sig invalid but DER compliant)"
-],
-[
     "0x47 0x30440220eb8231fbc543176e5ee8b80591b7db91d4dab835daada515d95f3532eb54b86102203e76890b026b24030a99a2ae5957d573b7a9ecbc382d613b18c25c124d0fac9a01 0",
     "2 0x21 0x0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 0x21 0x02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9 2 CHECKMULTISIG NOT",
     "NONE", "OK",
-    "CHECKMULTISIG must not error with sigs where R is negative without DERSIG (2-of-2, first sig invalid but DER compliant, second sig valid non-DER)"
+    "CHECKMULTISIG must not error with sigs where R is negative in unparsed signature (2-of-2, first sig invalid but DER compliant, second sig valid non-DER)"
 ],
 ["", "CHECKMULTISIG NOT", "", "ERR_INVALID_STACK_OPERATION", "CHECKMULTISIG must error when there are no stack items"],
 ["", "-1 CHECKMULTISIG NOT", "", "ERR_PUBKEY_COUNT", "CHECKMULTISIG must error when the specified number of pubkeys is negative"],

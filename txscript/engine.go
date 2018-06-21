@@ -42,10 +42,6 @@ const (
 	// This flag should never be used without the ScriptBip16 flag.
 	ScriptVerifyCleanStack
 
-	// ScriptVerifyDERSignatures defines that signatures are required
-	// to compily with the DER format.
-	ScriptVerifyDERSignatures
-
 	// ScriptVerifyMinimalData defines that signatures must use the smallest
 	// push operator. This is both rules 3 and 4 of BIP0062.
 	ScriptVerifyMinimalData
@@ -398,7 +394,7 @@ func (vm *Engine) subScript() []parsedOpcode {
 }
 
 // checkHashTypeEncoding returns whether or not the passed hashtype adheres to
-// the strict encoding requirements if enabled.
+// the strict encoding requirements.
 func (vm *Engine) checkHashTypeEncoding(hashType SigHashType) error {
 	sigHashType := hashType & ^SigHashAnyOneCanPay
 	if sigHashType < SigHashAll || sigHashType > SigHashSingle {
@@ -409,7 +405,7 @@ func (vm *Engine) checkHashTypeEncoding(hashType SigHashType) error {
 }
 
 // checkPubKeyEncoding returns whether or not the passed public key adheres to
-// the strict encoding requirements if enabled.
+// the strict encoding requirements.
 func (vm *Engine) checkPubKeyEncoding(pubKey []byte) error {
 	if len(pubKey) == 33 && (pubKey[0] == 0x02 || pubKey[0] == 0x03) {
 		// Compressed
@@ -423,12 +419,8 @@ func (vm *Engine) checkPubKeyEncoding(pubKey []byte) error {
 }
 
 // checkSignatureEncoding returns whether or not the passed signature adheres to
-// the strict encoding requirements if enabled.
+// the strict encoding requirements.
 func (vm *Engine) checkSignatureEncoding(sig []byte) error {
-	if !vm.hasFlag(ScriptVerifyDERSignatures) {
-		return nil
-	}
-
 	// The format of a DER encoded signature is as follows:
 	//
 	// 0x30 <total length> 0x02 <length of R> <R> 0x02 <length of S> <S>
