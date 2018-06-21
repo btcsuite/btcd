@@ -22,7 +22,6 @@ import (
 // more strict.
 const testScriptFlags = ScriptBip16 |
 	ScriptVerifyDERSignatures |
-	ScriptVerifyStrictEncoding |
 	ScriptVerifyMinimalData |
 	ScriptDiscourageUpgradableNops |
 	ScriptVerifyCleanStack |

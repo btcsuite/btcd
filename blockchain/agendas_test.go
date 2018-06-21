@@ -21,7 +21,6 @@ func testLNFeaturesDeployment(t *testing.T, params *chaincfg.Params, deploymentV
 	// agenda is not active.
 	const baseConsensusScriptVerifyFlags = txscript.ScriptBip16 |
 		txscript.ScriptVerifyDERSignatures |
-		txscript.ScriptVerifyStrictEncoding |
 		txscript.ScriptVerifyMinimalData |
 		txscript.ScriptVerifyCleanStack |
 		txscript.ScriptVerifyCheckLockTimeVerify

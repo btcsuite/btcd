@@ -2575,13 +2575,7 @@ func opcodeCheckSig(op *parsedOpcode, vm *Engine) error {
 		return nil
 	}
 
-	var signature chainec.Signature
-	if vm.hasFlag(ScriptVerifyStrictEncoding) ||
-		vm.hasFlag(ScriptVerifyDERSignatures) {
-		signature, err = chainec.Secp256k1.ParseDERSignature(sigBytes)
-	} else {
-		signature, err = chainec.Secp256k1.ParseSignature(sigBytes)
-	}
+	signature, err := chainec.Secp256k1.ParseDERSignature(sigBytes)
 	if err != nil {
 		vm.dstack.PushBool(false)
 		return nil
@@ -2744,13 +2738,7 @@ func opcodeCheckMultiSig(op *parsedOpcode, vm *Engine) error {
 
 			// Parse the signature.
 			var err error
-			if vm.hasFlag(ScriptVerifyStrictEncoding) ||
-				vm.hasFlag(ScriptVerifyDERSignatures) {
-
-				parsedSig, err = chainec.Secp256k1.ParseDERSignature(signature)
-			} else {
-				parsedSig, err = chainec.Secp256k1.ParseSignature(signature)
-			}
+			parsedSig, err = chainec.Secp256k1.ParseDERSignature(signature)
 			sigInfo.parsed = true
 			if err != nil {
 				continue

@@ -2154,7 +2154,7 @@ var sigScriptTests = []tstSigScript{
 				indexOutOfRange:    false,
 			},
 		},
-		hashType:           SigHashAnyOneCanPay,
+		hashType:           SigHashAnyOneCanPay | SigHashAll,
 		compress:           false,
 		scriptAtWrongIndex: false,
 	},
@@ -2164,7 +2164,7 @@ var sigScriptTests = []tstSigScript{
 			{
 				txout:              wire.NewTxOut(coinbaseVal, uncompressedPkScript),
 				sigscriptGenerates: true,
-				inputValidates:     true,
+				inputValidates:     false,
 				indexOutOfRange:    false,
 			},
 		},

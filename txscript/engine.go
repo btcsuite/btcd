@@ -58,10 +58,6 @@ const (
 	// only pushed data.  This is rule 2 of BIP0062.
 	ScriptVerifySigPushOnly
 
-	// ScriptVerifyStrictEncoding defines that signature scripts and
-	// public keys must follow the strict encoding requirements.
-	ScriptVerifyStrictEncoding
-
 	// ScriptVerifySHA256 defines whether to treat opcode 192 (previously
 	// OP_UNKNOWN192) as the OP_SHA256 opcode which consumes the top item of
 	// the data stack and replaces it with the sha256 of it.
@@ -386,10 +382,6 @@ func (vm *Engine) subScript() []parsedOpcode {
 // checkHashTypeEncoding returns whether or not the passed hashtype adheres to
 // the strict encoding requirements if enabled.
 func (vm *Engine) checkHashTypeEncoding(hashType SigHashType) error {
-	if !vm.hasFlag(ScriptVerifyStrictEncoding) {
-		return nil
-	}
-
 	sigHashType := hashType & ^SigHashAnyOneCanPay
 	if sigHashType < SigHashAll || sigHashType > SigHashSingle {
 		return fmt.Errorf("invalid hashtype: 0x%x\n", hashType)
@@ -400,10 +392,6 @@ func (vm *Engine) checkHashTypeEncoding(hashType SigHashType) error {
 // checkPubKeyEncoding returns whether or not the passed public key adheres to
 // the strict encoding requirements if enabled.
 func (vm *Engine) checkPubKeyEncoding(pubKey []byte) error {
-	if !vm.hasFlag(ScriptVerifyStrictEncoding) {
-		return nil
-	}
-
 	if len(pubKey) == 33 && (pubKey[0] == 0x02 || pubKey[0] == 0x03) {
 		// Compressed
 		return nil
@@ -418,9 +406,7 @@ func (vm *Engine) checkPubKeyEncoding(pubKey []byte) error {
 // checkSignatureEncoding returns whether or not the passed signature adheres to
 // the strict encoding requirements if enabled.
 func (vm *Engine) checkSignatureEncoding(sig []byte) error {
-	if !vm.hasFlag(ScriptVerifyDERSignatures) &&
-		!vm.hasFlag(ScriptVerifyStrictEncoding) {
-
+	if !vm.hasFlag(ScriptVerifyDERSignatures) {
 		return nil
 	}
 

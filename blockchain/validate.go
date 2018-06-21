@@ -2288,7 +2288,6 @@ func (b *BlockChain) checkTransactionsAndConnect(subsidyCache *SubsidyCache, inp
 func (b *BlockChain) consensusScriptVerifyFlags(node *blockNode) (txscript.ScriptFlags, error) {
 	scriptFlags := txscript.ScriptBip16 |
 		txscript.ScriptVerifyDERSignatures |
-		txscript.ScriptVerifyStrictEncoding |
 		txscript.ScriptVerifyMinimalData |
 		txscript.ScriptVerifyCleanStack |
 		txscript.ScriptVerifyCheckLockTimeVerify

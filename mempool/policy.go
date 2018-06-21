@@ -65,7 +65,6 @@ const (
 	// are conditionally enabled depending on the result of agenda votes.
 	BaseStandardVerifyFlags = txscript.ScriptBip16 |
 		txscript.ScriptVerifyDERSignatures |
-		txscript.ScriptVerifyStrictEncoding |
 		txscript.ScriptVerifyMinimalData |
 		txscript.ScriptDiscourageUpgradableNops |
 		txscript.ScriptVerifyCleanStack |
