@@ -19,7 +19,6 @@ type SigHashType byte
 
 // Hash type bits from the end of a signature.
 const (
-	SigHashOld          SigHashType = 0x0
 	SigHashAll          SigHashType = 0x1
 	SigHashNone         SigHashType = 0x2
 	SigHashSingle       SigHashType = 0x3
@@ -329,8 +328,6 @@ func calcSignatureHash(prevOutScript []parsedOpcode, hashType SigHashType, tx *w
 		case SigHashSingle:
 			txOuts = tx.TxOut[:idx+1]
 		default:
-			fallthrough
-		case SigHashOld:
 			fallthrough
 		case SigHashAll:
 			// Nothing special here.
