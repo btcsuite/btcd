@@ -239,8 +239,6 @@ func parseScriptFlags(flagStr string) (ScriptFlags, error) {
 			flags |= ScriptBip16
 		case "SIGPUSHONLY":
 			flags |= ScriptVerifySigPushOnly
-		case "STRICTENC":
-			// Always active in Decred.
 		case "SHA256":
 			flags |= ScriptVerifySHA256
 		default:
