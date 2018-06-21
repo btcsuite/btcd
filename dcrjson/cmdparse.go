@@ -472,7 +472,7 @@ func assignField(paramNum int, fieldName string, dest reflect.Value, src reflect
 			err := json.Unmarshal([]byte(src.String()), &concreteVal)
 			if err != nil {
 				str := fmt.Sprintf("parameter #%d '%s' must "+
-					"be valid JSON which unsmarshals to a %v",
+					"be valid JSON which unmarshals to a %v",
 					paramNum, fieldName, destBaseType)
 				return makeError(ErrInvalidType, str)
 			}

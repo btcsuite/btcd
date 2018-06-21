@@ -214,10 +214,10 @@ the method name for further details such as parameter and return information.
 |   |   |
 |---|---|
 |Method|createrawtransaction|
-|Parameters|1. `transaction inputs`:  `(JSON array, required)` json array of json objects.<br />`hash`: `(string, required)` the hash of the input.</br> `vout`: (numeric, required) the specific output of the input transaction to redeem transaction.<br /><br />`[{"txid": "hash", "vout": n}, ...]`<br /><br />2. `addresses and amounts`: `(JSON object, required)` - json object with addresses as keys and amounts as values.</br>`address`:   `(numeric, required)` the address to send to as the key and the amount in DCR as the value.<br /><br />`{"address": n.nnn, ...}`|
+|Parameters|1. `transaction inputs`:  `(JSON array, required)` json array of json objects.</br> `amount`: `(numeric)` the previous output amount.<br />`hash`: `(string, required)` the hash of the input.</br> `vout`: (numeric, required) the specific output of the input transaction to redeem transaction.<br /><br />`[{"amount": n.nnn, "txid": "hash", "vout": n}, ...]`<br /><br />2. `addresses and amounts`: `(JSON object, required)` - json object with addresses as keys and output amounts as values.</br>`address`: `(string, required)` the address to send the specified output amount to.<br /><br />`{"address": n.nnn, ...}`|
 |Description|Returns a new transaction spending the provided inputs and sending to the provided addresses.The transaction inputs are not signed in the created transaction.<br /><br />The `signrawtransaction` RPC command provided by wallet must be used to sign the resulting transaction.|
 |Returns|`"transaction" (string) hex-encoded bytes of the serialized transaction`|
-|Example Parameters|1. transaction inputs `[{"txid":"e6da89de7a6b8508ce8f371a3d0535b04b5e108cb1a6e9284602d3bfd357c018", "vout":1}]`<br /><br />2. addresses and amounts ```{"13cgrTP7wgbZYWrY9BZ22BV6p82QXQT3nY": 0.49213337}```|
+|Example Parameters|1. transaction inputs `[{"amount":0.49213337, "txid":"e6da89de7a6b8508ce8f371a3d0535b04b5e108cb1a6e9284602d3bfd357c018", "vout":1}]`<br /><br />2. addresses and amounts ```{"13cgrTP7wgbZYWrY9BZ22BV6p82QXQT3nY": 0.49213337}```|
 |Example Return|Newlines added for display purposes.  The actual return does not contain newlines.<br />`010000000118c057d3bfd3024628e9a6b18c105e4bb035053d1a378fce08856b7ade89dae6010000`<br />`0000ffffffff0199efee02000000001976a9141cb013db35ecccc156fdfd81d03a11c51998f99388`<br />`ac00000000`|
 [Return to Overview](#MethodOverview)<br />
 

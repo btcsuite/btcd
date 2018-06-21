@@ -648,8 +648,17 @@ func handleCreateRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan 
 				"or stake")
 		}
 
+		prevOutV := wire.NullValueIn
+		if input.Amount > 0 {
+			amt, err := dcrutil.NewAmount(input.Amount)
+			if err != nil {
+				return nil, rpcInvalidError(err.Error())
+			}
+			prevOutV = int64(amt)
+		}
+
 		prevOut := wire.NewOutPoint(txHash, input.Vout, input.Tree)
-		txIn := wire.NewTxIn(prevOut, wire.NullValueIn, []byte{})
+		txIn := wire.NewTxIn(prevOut, prevOutV, []byte{})
 		if c.LockTime != nil && *c.LockTime != 0 {
 			txIn.Sequence = wire.MaxTxInSequenceNum - 1
 		}
@@ -1003,8 +1012,17 @@ func handleCreateRawSSGenTx(s *rpcServer, cmd interface{}, closeChan <-chan stru
 				"TxTreeStake type")
 		}
 
+		prevOutV := wire.NullValueIn
+		if input.Amount > 0 {
+			amt, err := dcrutil.NewAmount(input.Amount)
+			if err != nil {
+				return nil, rpcInvalidError(err.Error())
+			}
+			prevOutV = int64(amt)
+		}
+
 		prevOut := wire.NewOutPoint(txHash, input.Vout, input.Tree)
-		txIn := wire.NewTxIn(prevOut, wire.NullValueIn, []byte{})
+		txIn := wire.NewTxIn(prevOut, prevOutV, []byte{})
 		mtx.AddTxIn(txIn)
 	}
 
@@ -1144,8 +1162,17 @@ func handleCreateRawSSRtx(s *rpcServer, cmd interface{}, closeChan <-chan struct
 				"TxTreeStake type")
 		}
 
+		prevOutV := wire.NullValueIn
+		if input.Amount > 0 {
+			amt, err := dcrutil.NewAmount(input.Amount)
+			if err != nil {
+				return nil, rpcInvalidError(err.Error())
+			}
+			prevOutV = int64(amt)
+		}
+
 		prevOut := wire.NewOutPoint(txHash, input.Vout, input.Tree)
-		txIn := wire.NewTxIn(prevOut, wire.NullValueIn, []byte{})
+		txIn := wire.NewTxIn(prevOut, prevOutV, []byte{})
 		mtx.AddTxIn(txIn)
 	}
 

@@ -41,9 +41,10 @@ var helpDescsEnUS = map[string]string{
 	"node-connectsubcmd": "'perm' to make the connected peer a permanent one, 'temp' to try a single connect to a peer",
 
 	// TransactionInput help.
-	"transactioninput-txid": "The hash of the input transaction",
-	"transactioninput-vout": "The specific output of the input transaction to redeem",
-	"transactioninput-tree": "The tree that the transaction input is located",
+	"transactioninput-amount": "The previous output amount",
+	"transactioninput-txid":   "The hash of the input transaction",
+	"transactioninput-vout":   "The specific output of the input transaction to redeem",
+	"transactioninput-tree":   "The tree that the transaction input is located",
 	// TODO review cmd help messages for stake stuff
 	// CreateRawSSTxCmd help.
 	"createrawsstx--synopsis": "Returns a new transaction spending the provided inputs and sending to the provided addresses.\n" +
