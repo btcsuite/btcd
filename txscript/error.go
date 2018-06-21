@@ -117,9 +117,8 @@ var (
 	// is over the limit.
 	ErrStackOverflow = errors.New("stack overflow")
 
-	// ErrStackInvalidLowSSignature is returned when the ScriptVerifyLowS
-	// flag is set and the script contains any signatures whose S values
-	// are higher than the half order.
+	// ErrStackInvalidLowSSignature is returned when the script contains any
+	// signatures whose S values are higher than the half order.
 	ErrStackInvalidLowSSignature = errors.New("invalid low s signature")
 
 	// ErrStackInvalidPubKey is returned when the ScriptVerifyScriptEncoding

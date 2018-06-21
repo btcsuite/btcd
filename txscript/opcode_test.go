@@ -28,7 +28,6 @@ const testScriptFlags = ScriptBip16 |
 	ScriptVerifyCleanStack |
 	ScriptVerifyCheckLockTimeVerify |
 	ScriptVerifyCheckSequenceVerify |
-	ScriptVerifyLowS |
 	ScriptVerifySHA256
 
 // TestOpcodeDisabled tests the opcodeDisabled function manually because all

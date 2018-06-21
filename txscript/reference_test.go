@@ -231,8 +231,6 @@ func parseScriptFlags(flagStr string) (ScriptFlags, error) {
 			flags |= ScriptVerifyDERSignatures
 		case "DISCOURAGE_UPGRADABLE_NOPS":
 			flags |= ScriptDiscourageUpgradableNops
-		case "LOW_S":
-			flags |= ScriptVerifyLowS
 		case "MINIMALDATA":
 			flags |= ScriptVerifyMinimalData
 		case "NONE":

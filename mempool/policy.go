@@ -70,8 +70,7 @@ const (
 		txscript.ScriptDiscourageUpgradableNops |
 		txscript.ScriptVerifyCleanStack |
 		txscript.ScriptVerifyCheckLockTimeVerify |
-		txscript.ScriptVerifyCheckSequenceVerify |
-		txscript.ScriptVerifyLowS
+		txscript.ScriptVerifyCheckSequenceVerify
 )
 
 // calcMinRequiredTxRelayFee returns the minimum transaction fee required for a

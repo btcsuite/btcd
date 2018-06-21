@@ -50,11 +50,6 @@ const (
 	// to compily with the DER format.
 	ScriptVerifyDERSignatures
 
-	// ScriptVerifyLowS defines that signtures are required to comply with
-	// the DER format and whose S value is <= order / 2.  This is rule 5
-	// of BIP0062.
-	ScriptVerifyLowS
-
 	// ScriptVerifyMinimalData defines that signatures must use the smallest
 	// push operator. This is both rules 3 and 4 of BIP0062.
 	ScriptVerifyMinimalData
@@ -424,7 +419,6 @@ func (vm *Engine) checkPubKeyEncoding(pubKey []byte) error {
 // the strict encoding requirements if enabled.
 func (vm *Engine) checkSignatureEncoding(sig []byte) error {
 	if !vm.hasFlag(ScriptVerifyDERSignatures) &&
-		!vm.hasFlag(ScriptVerifyLowS) &&
 		!vm.hasFlag(ScriptVerifyStrictEncoding) {
 
 		return nil
@@ -541,11 +535,9 @@ func (vm *Engine) checkSignatureEncoding(sig []byte) error {
 	// valid transaction with the complement while still being a valid
 	// signature that verifies.  This would result in changing the
 	// transaction hash and thus is source of malleability.
-	if vm.hasFlag(ScriptVerifyLowS) {
-		sValue := new(big.Int).SetBytes(sig[rLen+6 : rLen+6+sLen])
-		if sValue.Cmp(halfOrder) > 0 {
-			return ErrStackInvalidLowSSignature
-		}
+	sValue := new(big.Int).SetBytes(sig[rLen+6 : rLen+6+sLen])
+	if sValue.Cmp(halfOrder) > 0 {
+		return ErrStackInvalidLowSSignature
 	}
 
 	return nil
