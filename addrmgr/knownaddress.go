@@ -73,7 +73,7 @@ func (ka *KnownAddress) chance() float64 {
 // 1) It claims to be from the future
 // 2) It hasn't been seen in over a month
 // 3) It has failed at least three times and never succeeded
-// 4) It has failed ten times in the last week
+// 4) It has failed a total of maxFailures in the last week
 // All addresses that meet these criteria are assumed to be worthless and not
 // worth keeping hold of.
 func (ka *KnownAddress) isBad() bool {

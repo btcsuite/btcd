@@ -143,14 +143,14 @@ const (
 
 	// maxFailures is the maximum number of failures we will accept without
 	// a success before considering an address bad.
-	maxFailures = 10
+	maxFailures = 5
 
 	// minBadDays is the number of days since the last success before we
 	// will consider evicting an address.
 	minBadDays = 7
 
 	// getAddrMax is the most addresses that we will send in response
-	// to a getAddr (in practise the most addresses we will return from a
+	// to a getAddr (in practice the most addresses we will return from a
 	// call to AddressCache()).
 	getAddrMax = 2500
 
@@ -666,6 +666,10 @@ func (a *AddrManager) AddressCache() []*wire.NetAddress {
 	for _, v := range a.addrIndex {
 		// Skip low quality addresses.
 		if v.isBad() {
+			continue
+		}
+		// Skip addresses that never succeeded.
+		if v.lastsuccess.IsZero() {
 			continue
 		}
 		allAddr = append(allAddr, v.na)
