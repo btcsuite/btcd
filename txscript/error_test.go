@@ -57,6 +57,9 @@ func TestErrorCodeStringer(t *testing.T) {
 		{ErrDiscourageUpgradableNOPs, "ErrDiscourageUpgradableNOPs"},
 		{ErrNegativeLockTime, "ErrNegativeLockTime"},
 		{ErrUnsatisfiedLockTime, "ErrUnsatisfiedLockTime"},
+		{ErrScriptMinimalIf, "ErrScriptMinimalIf"},
+		{ErrScriptIllegalForkId, "ErrScriptIllegalForkId"},
+		{ErrScriptMustUseForkid, "ErrScriptMustUseForkid"},
 		{0xffff, "Unknown ErrorCode (65535)"},
 	}
 

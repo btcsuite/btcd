@@ -227,6 +227,11 @@ const (
 	// reached.
 	ErrUnsatisfiedLockTime
 
+	ErrScriptMinimalIf
+	ErrScriptIllegalForkId
+
+	ErrScriptMustUseForkid
+
 	// numErrorCodes is the maximum error code number used in tests.  This
 	// entry MUST be the last entry in the enum.
 	numErrorCodes
@@ -275,6 +280,9 @@ var errorCodeStrings = map[ErrorCode]string{
 	ErrDiscourageUpgradableNOPs: "ErrDiscourageUpgradableNOPs",
 	ErrNegativeLockTime:         "ErrNegativeLockTime",
 	ErrUnsatisfiedLockTime:      "ErrUnsatisfiedLockTime",
+	ErrScriptMinimalIf:          "ErrScriptMinimalIf",
+	ErrScriptIllegalForkId:      "ErrScriptIllegalForkId",
+	ErrScriptMustUseForkid:      "ErrScriptMustUseForkid",
 }
 
 // String returns the ErrorCode as a human-readable name.

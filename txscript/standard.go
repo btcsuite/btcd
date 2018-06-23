@@ -41,6 +41,7 @@ const (
 		ScriptVerifyWitness |
 		ScriptVerifyDiscourageUpgradeableWitnessProgram |
 		ScriptVerifyMinimalIf |
+		ScriptEnableSighashForkid |
 		ScriptVerifyWitnessPubKeyType
 )
 

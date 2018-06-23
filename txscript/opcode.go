@@ -934,6 +934,16 @@ func popIfBool(vm *Engine) (bool, error) {
 		return false, err
 	}
 
+	if vm.hasFlag(ScriptVerifyMinimalIf) {
+		if len(so) > 1 {
+			return false, scriptError(ErrScriptMinimalIf, "")
+		}
+
+		if len(so) == 1 && so[0] != 1 {
+			return false, scriptError(ErrScriptMinimalIf, "")
+		}
+	}
+
 	return asBool(so), nil
 }
 
@@ -2073,7 +2083,7 @@ func opcodeCheckSig(op *parsedOpcode, vm *Engine) error {
 	// to sign itself.
 	subScript = removeOpcodeByData(subScript, fullSigBytes)
 
-	hash = calcSignatureHash(subScript, hashType, &vm.tx, vm.txIdx, btcutil.Amount(0), StandardVerifyFlags)
+	hash = calcSignatureHash(subScript, hashType, &vm.tx, vm.txIdx, btcutil.Amount(vm.inputAmount), vm.flags)
 
 	pubKey, err := btcec.ParsePubKey(pkBytes, btcec.S256())
 	if err != nil {

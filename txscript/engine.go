@@ -46,15 +46,14 @@ const (
 	// ScriptVerifyCleanStack defines that the stack must contain only
 	// one stack element after evaluation and that the element must be
 	// true if interpreted as a boolean.  This is rule 6 of BIP0062.
-	// This flag should never be used without the ScriptBip16 flag nor the
-	// ScriptVerifyWitness flag.
+	// This flag should never be used without the ScriptBip16 flag.
 	ScriptVerifyCleanStack
 
 	// ScriptVerifyDERSignatures defines that signatures are required
-	// to compily with the DER format.
+	// to comply with the DER format.
 	ScriptVerifyDERSignatures
 
-	// ScriptVerifyLowS defines that signtures are required to comply with
+	// ScriptVerifyLowS defines that signatures are required to comply with
 	// the DER format and whose S value is <= order / 2.  This is rule 5
 	// of BIP0062.
 	ScriptVerifyLowS
@@ -106,14 +105,6 @@ const (
 
 	// MaxScriptSize is the maximum allowed length of a raw script.
 	MaxScriptSize = 10000
-
-	// payToWitnessPubKeyHashDataSize is the size of the witness program's
-	// data push for a pay-to-witness-pub-key-hash output.
-	payToWitnessPubKeyHashDataSize = 20 // todo remove
-
-	// payToWitnessScriptHashDataSize is the size of the witness program's
-	// data push for a pay-to-witness-script-hash output.
-	payToWitnessScriptHashDataSize = 32 // todo remove
 )
 
 // halforder is used to tame ECDSA malleability (see BIP0062).
@@ -413,6 +404,10 @@ func (vm *Engine) Step() (done bool, err error) {
 // Execute will execute all scripts in the script engine and return either nil
 // for successful validation or an error if one occurred.
 func (vm *Engine) Execute() (err error) {
+	if vm.hasFlag(ScriptEnableSighashForkid) {
+		vm.flags |= ScriptVerifyStrictEncoding
+	}
+
 	done := false
 	for !done {
 		log.Tracef("%v", newLogClosure(func() string {
@@ -457,11 +452,23 @@ func (vm *Engine) checkHashTypeEncoding(hashType SigHashType) error {
 		return nil
 	}
 
-	sigHashType := hashType & ^SigHashAnyOneCanPay
-	if sigHashType < SigHashAll || sigHashType > SigHashForkID|SigHashSingle {
+	if !hashType.isDefined() {
 		str := fmt.Sprintf("invalid hash type 0x%x", hashType)
 		return scriptError(ErrInvalidSigHashType, str)
 	}
+
+	usesForkId := hashType.hasForkID()
+	forkIDEnabled := vm.hasFlag(ScriptEnableSighashForkid)
+	if !forkIDEnabled && usesForkId {
+		return scriptError(ErrScriptIllegalForkId,
+			"sigHashForkid not enabled, but sig has the flag")
+	}
+
+	if forkIDEnabled && !usesForkId {
+		return scriptError(ErrScriptMustUseForkid,
+			"sigHashForkid enabled, but sig has not the flag")
+	}
+
 	return nil
 }
 
@@ -700,19 +707,16 @@ func NewEngine(scriptPubKey []byte, tx *wire.MsgTx, txIdx int, flags ScriptFlags
 	}
 
 	// The clean stack flag (ScriptVerifyCleanStack) is not allowed without
-	// either the pay-to-script-hash (P2SH) evaluation (ScriptBip16)
-	// flag or the Segregated Witness (ScriptVerifyWitness) flag.
+	// either the pay-to-script-hash (P2SH) evaluation (ScriptBip16).
 	//
 	// Recall that evaluating a P2SH script without the flag set results in
 	// non-P2SH evaluation which leaves the P2SH inputs on the stack.
 	// Thus, allowing the clean stack flag without the P2SH flag would make
 	// it possible to have a situation where P2SH would not be a soft fork
-	// when it should be. The same goes for segwit which will pull in
-	// additional scripts for execution from the witness stack.
+	// when it should be.
 	vm := Engine{flags: flags, sigCache: sigCache, hashCache: hashCache,
 		inputAmount: inputAmount}
-	if vm.hasFlag(ScriptVerifyCleanStack) && (!vm.hasFlag(ScriptBip16) &&
-		!vm.hasFlag(ScriptVerifyWitness)) {
+	if vm.hasFlag(ScriptVerifyCleanStack) && !vm.hasFlag(ScriptBip16) {
 		return nil, scriptError(ErrInvalidFlags,
 			"invalid flags combination")
 	}
