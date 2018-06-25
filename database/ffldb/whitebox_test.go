@@ -8,7 +8,6 @@
 package ffldb
 
 import (
-	"compress/bzip2"
 	"encoding/binary"
 	"fmt"
 	"hash/crc32"
@@ -31,7 +30,7 @@ var (
 
 	// blockDataFile is the path to a file containing the first 256 blocks
 	// of the block chain.
-	blockDataFile = filepath.Join("..", "testdata", "blocks1-256.bz2")
+	blockDataFile = filepath.Join("..", "testdata", "blocks1-256")
 
 	// errSubTestFail is used to signal that a sub test returned false.
 	errSubTestFail = fmt.Errorf("sub test failure")
@@ -52,7 +51,6 @@ func loadBlocks(t *testing.T, dataFile string, network wire.BitcoinNet) ([]*btcu
 				err)
 		}
 	}()
-	dr := bzip2.NewReader(fi)
 
 	// Set the first block as the genesis block.
 	blocks := make([]*btcutil.Block, 0, 256)
@@ -62,7 +60,7 @@ func loadBlocks(t *testing.T, dataFile string, network wire.BitcoinNet) ([]*btcu
 	// Load the remaining blocks.
 	for height := 1; ; height++ {
 		var net uint32
-		err := binary.Read(dr, binary.LittleEndian, &net)
+		err := binary.Read(fi, binary.LittleEndian, &net)
 		if err == io.EOF {
 			// Hit end of file at the expected offset.  No error.
 			break
@@ -72,14 +70,14 @@ func loadBlocks(t *testing.T, dataFile string, network wire.BitcoinNet) ([]*btcu
 				height, err)
 			return nil, err
 		}
-		if net != uint32(network) {
-			t.Errorf("Block doesn't match network: %v expects %v",
-				net, network)
+		if net != 0xe8f3e1e3 {
+			t.Errorf("Block doesn't match network: %#x expects %#x",
+				net, uint32(network))
 			return nil, err
 		}
 
 		var blockLen uint32
-		err = binary.Read(dr, binary.LittleEndian, &blockLen)
+		err = binary.Read(fi, binary.LittleEndian, &blockLen)
 		if err != nil {
 			t.Errorf("Failed to load block size for block %d: %v",
 				height, err)
@@ -88,7 +86,7 @@ func loadBlocks(t *testing.T, dataFile string, network wire.BitcoinNet) ([]*btcu
 
 		// Read the block.
 		blockBytes := make([]byte, blockLen)
-		_, err = io.ReadFull(dr, blockBytes)
+		_, err = io.ReadFull(fi, blockBytes)
 		if err != nil {
 			t.Errorf("Failed to load block %d: %v", height, err)
 			return nil, err
