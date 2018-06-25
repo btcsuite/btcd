@@ -253,6 +253,7 @@ var rpcAskWallet = map[string]struct{}{
 	"createencryptedwallet":   {},
 	"createmultisig":          {},
 	"dumpprivkey":             {},
+	"fundrawtransaction":      {},
 	"getaccount":              {},
 	"getaccountaddress":       {},
 	"getaddressesbyaccount":   {},

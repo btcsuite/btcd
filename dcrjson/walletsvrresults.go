@@ -5,6 +5,12 @@
 
 package dcrjson
 
+// FundRawTransactionResult models the data from the fundrawtransaction command.
+type FundRawTransactionResult struct {
+	Hex string  `json:"hex"`
+	Fee float64 `json:"fee"`
+}
+
 // GenerateVoteResult models the data from the generatevote command.
 type GenerateVoteResult struct {
 	Hex string `json:"hex"`
