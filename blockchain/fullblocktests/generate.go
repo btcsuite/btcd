@@ -31,7 +31,7 @@ const (
 	// Intentionally defined here rather than using constants from codebase
 	// to ensure consensus changes are detected.
 	maxBlockSigOps       = 20000
-	maxBlockSize         = 1000000
+	maxBlockSize         = 32000000
 	minCoinbaseScriptLen = 2
 	maxCoinbaseScriptLen = 100
 	medianTimeBlocks     = 11
@@ -1003,7 +1003,7 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 	// Too much proof-of-work coinbase tests.
 	// ---------------------------------------------------------------------
 
-	// Create a block that generates too coinbase.
+	// Create a block that generates too much coinbase.
 	//
 	//   ... -> b1(0) -> b2(1) -> b5(2) -> b6(3)
 	//                                         \-> b9(4)
@@ -1195,7 +1195,7 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 	accepted()
 
 	// ---------------------------------------------------------------------
-	// Multisig[Verify]/ChecksigVerifiy signature operation count tests.
+	// Multisig[Verify]/ChecksigVerify signature operation count tests.
 	// ---------------------------------------------------------------------
 
 	// Create block with max signature operations as OP_CHECKMULTISIG.
