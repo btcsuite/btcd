@@ -1005,12 +1005,18 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List) error 
 
 	// Log the point where the chain forked and old and new best chain
 	// heads.
-	firstAttachNode := attachNodes.Front().Value.(*blockNode)
-	firstDetachNode := detachNodes.Front().Value.(*blockNode)
-	lastAttachNode := attachNodes.Back().Value.(*blockNode)
-	log.Infof("REORGANIZE: Chain forks at %v", firstAttachNode.parent.hash)
-	log.Infof("REORGANIZE: Old best chain head was %v", firstDetachNode.hash)
-	log.Infof("REORGANIZE: New best chain head is %v", lastAttachNode.hash)
+	if attachNodes.Len() > 0 {
+		firstAttachNode := attachNodes.Front().Value.(*blockNode)
+		log.Infof("REORGANIZE: Chain forks at %v", firstAttachNode.parent.hash)
+	}
+	if detachNodes.Len() > 0 {
+		firstDetachNode := detachNodes.Front().Value.(*blockNode)
+		log.Infof("REORGANIZE: Old best chain head was %v", firstDetachNode.hash)
+	}
+	if attachNodes.Len() > 0 {
+		lastAttachNode := attachNodes.Back().Value.(*blockNode)
+		log.Infof("REORGANIZE: New best chain head is %v", lastAttachNode.hash)
+	}
 
 	return nil
 }
