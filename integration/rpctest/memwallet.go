@@ -498,7 +498,7 @@ func (m *memWallet) CreateTransaction(outputs []*wire.TxOut, feeRate btcutil.Amo
 			return nil, err
 		}
 
-		sigScript, err := txscript.SignatureScript(tx, i, utxo.pkScript,
+		sigScript, err := txscript.SignatureScript(tx, i, utxo.pkScript, utxo.value,
 			txscript.SigHashAll, privKey, true)
 		if err != nil {
 			return nil, err

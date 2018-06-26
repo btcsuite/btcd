@@ -396,12 +396,12 @@ func shallowCopyTx(tx *wire.MsgTx) wire.MsgTx {
 // CalcSignatureHash will, given a script and hash type for the current script
 // engine instance, calculate the signature hash to be used for signing and
 // verification.
-func CalcSignatureHash(script []byte, hashType SigHashType, tx *wire.MsgTx, idx int) ([]byte, error) {
+func CalcSignatureHash(script []byte, amount btcutil.Amount, hashType SigHashType, tx *wire.MsgTx, idx int) ([]byte, error) {
 	parsedScript, err := parseScript(script)
 	if err != nil {
 		return nil, fmt.Errorf("cannot parse output script: %v", err)
 	}
-	return calcSignatureHash(parsedScript, hashType, tx, idx, btcutil.Amount(0), ScriptEnableSighashForkid), nil
+	return calcSignatureHash(parsedScript, hashType, tx, idx, amount, ScriptEnableSighashForkid), nil
 }
 
 // calcSignatureHash will, given a script and hash type for the current script

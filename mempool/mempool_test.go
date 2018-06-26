@@ -220,8 +220,8 @@ func (p *poolHarness) CreateSignedTx(inputs []spendableOutput, numOutputs uint32
 
 	// Sign the new transaction.
 	for i := range tx.TxIn {
-		sigScript, err := txscript.SignatureScript(tx, i, p.payScript,
-			txscript.SigHashAll, p.signKey, true)
+		sigScript, err := txscript.SignatureScript(tx, i, p.payScript, inputs[i].amount,
+			txscript.SigHashAll|txscript.SigHashForkID, p.signKey, true)
 		if err != nil {
 			return nil, err
 		}
@@ -255,8 +255,8 @@ func (p *poolHarness) CreateTxChain(firstOutput spendableOutput, numTxns uint32)
 		})
 
 		// Sign the new transaction.
-		sigScript, err := txscript.SignatureScript(tx, 0, p.payScript,
-			txscript.SigHashAll, p.signKey, true)
+		sigScript, err := txscript.SignatureScript(tx, 0, p.payScript, spendableAmount,
+			txscript.SigHashAll|txscript.SigHashForkID, p.signKey, true)
 		if err != nil {
 			return nil, err
 		}

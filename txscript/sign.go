@@ -16,10 +16,10 @@ import (
 
 // RawTxInSignature returns the serialized ECDSA signature for the input idx of
 // the given transaction, with hashType appended to it.
-func RawTxInSignature(tx *wire.MsgTx, idx int, subScript []byte,
+func RawTxInSignature(tx *wire.MsgTx, idx int, subScript []byte, amount btcutil.Amount,
 	hashType SigHashType, key *btcec.PrivateKey) ([]byte, error) {
 
-	hash, err := CalcSignatureHash(subScript, hashType, tx, idx)
+	hash, err := CalcSignatureHash(subScript, amount, hashType, tx, idx)
 	if err != nil {
 		return nil, err
 	}
@@ -39,8 +39,10 @@ func RawTxInSignature(tx *wire.MsgTx, idx int, subScript []byte,
 // as the idx'th input. privKey is serialized in either a compressed or
 // uncompressed format based on compress. This format must match the same format
 // used to generate the payment address, or the script validation will fail.
-func SignatureScript(tx *wire.MsgTx, idx int, subscript []byte, hashType SigHashType, privKey *btcec.PrivateKey, compress bool) ([]byte, error) {
-	sig, err := RawTxInSignature(tx, idx, subscript, hashType, privKey)
+func SignatureScript(tx *wire.MsgTx, idx int, subscript []byte, amount btcutil.Amount,
+	hashType SigHashType, privKey *btcec.PrivateKey, compress bool) ([]byte, error) {
+
+	sig, err := RawTxInSignature(tx, idx, subscript, amount, hashType, privKey)
 	if err != nil {
 		return nil, err
 	}
@@ -56,8 +58,9 @@ func SignatureScript(tx *wire.MsgTx, idx int, subscript []byte, hashType SigHash
 	return NewScriptBuilder().AddData(sig).AddData(pkData).Script()
 }
 
-func p2pkSignatureScript(tx *wire.MsgTx, idx int, subScript []byte, hashType SigHashType, privKey *btcec.PrivateKey) ([]byte, error) {
-	sig, err := RawTxInSignature(tx, idx, subScript, hashType, privKey)
+func p2pkSignatureScript(tx *wire.MsgTx, idx int, subScript []byte, amount btcutil.Amount,
+	hashType SigHashType, privKey *btcec.PrivateKey) ([]byte, error) {
+	sig, err := RawTxInSignature(tx, idx, subScript, amount, hashType, privKey)
 	if err != nil {
 		return nil, err
 	}
@@ -69,7 +72,7 @@ func p2pkSignatureScript(tx *wire.MsgTx, idx int, subScript []byte, hashType Sig
 // possible. It returns the generated script and a boolean if the script fulfils
 // the contract (i.e. nrequired signatures are provided).  Since it is arguably
 // legal to not be able to sign any of the outputs, no error is returned.
-func signMultiSig(tx *wire.MsgTx, idx int, subScript []byte, hashType SigHashType,
+func signMultiSig(tx *wire.MsgTx, idx int, subScript []byte, amount btcutil.Amount, hashType SigHashType,
 	addresses []btcutil.Address, nRequired int, kdb KeyDB) ([]byte, bool) {
 	// We start with a single OP_FALSE to work around the (now standard)
 	// but in the reference implementation that causes a spurious pop at
@@ -81,7 +84,7 @@ func signMultiSig(tx *wire.MsgTx, idx int, subScript []byte, hashType SigHashTyp
 		if err != nil {
 			continue
 		}
-		sig, err := RawTxInSignature(tx, idx, subScript, hashType, key)
+		sig, err := RawTxInSignature(tx, idx, subScript, amount, hashType, key)
 		if err != nil {
 			continue
 		}
@@ -116,7 +119,7 @@ func sign(chainParams *chaincfg.Params, tx *wire.MsgTx, idx int,
 			return nil, class, nil, 0, err
 		}
 
-		script, err := p2pkSignatureScript(tx, idx, subScript, hashType,
+		script, err := p2pkSignatureScript(tx, idx, subScript, 0, hashType,
 			key)
 		if err != nil {
 			return nil, class, nil, 0, err
@@ -130,7 +133,7 @@ func sign(chainParams *chaincfg.Params, tx *wire.MsgTx, idx int,
 			return nil, class, nil, 0, err
 		}
 
-		script, err := SignatureScript(tx, idx, subScript, hashType,
+		script, err := SignatureScript(tx, idx, subScript, 0, hashType,
 			key, compressed)
 		if err != nil {
 			return nil, class, nil, 0, err
@@ -145,7 +148,7 @@ func sign(chainParams *chaincfg.Params, tx *wire.MsgTx, idx int,
 
 		return script, class, addresses, nrequired, nil
 	case MultiSigTy:
-		script, _ := signMultiSig(tx, idx, subScript, hashType,
+		script, _ := signMultiSig(tx, idx, subScript, 0, hashType,
 			addresses, nrequired, kdb)
 		return script, class, addresses, nrequired, nil
 	case NullDataTy:

@@ -98,6 +98,9 @@ func TestSignTxOutput(t *testing.T) {
 		SigHashAll | SigHashAnyOneCanPay,
 		SigHashNone | SigHashAnyOneCanPay,
 		SigHashSingle | SigHashAnyOneCanPay,
+		//SigHashAll | SigHashForkID | SigHashAnyOneCanPay,		// TODO:open
+		//SigHashNone | SigHashForkID | SigHashAnyOneCanPay,
+		//SigHashSingle | SigHashForkID | SigHashAnyOneCanPay,
 	}
 	inputAmounts := []int64{5, 10, 15}
 	tx := &wire.MsgTx{
@@ -1661,6 +1664,7 @@ nexttest:
 			}
 			script, err = SignatureScript(tx, idx,
 				sigScriptTests[i].inputs[j].txout.PkScript,
+				btcutil.Amount(sigScriptTests[i].inputs[j].txout.Value),
 				sigScriptTests[i].hashType, privKey,
 				sigScriptTests[i].compress)
 
