@@ -648,66 +648,6 @@
 ["NOP", "NOP9 1", "P2SH"],
 ["NOP", "NOP10 1", "P2SH"],
 
-["", "0 0 CHECKMULTISIG VERIFY DEPTH 0 EQUAL", "P2SH", "CHECKMULTISIG is allowed to have zero keys and/or sigs"],
-["", "0 0 CHECKMULTISIGVERIFY DEPTH 0 EQUAL", "P2SH"],
-["", "0 0 1 CHECKMULTISIG VERIFY DEPTH 0 EQUAL", "P2SH", "Zero sigs means no sigs are checked"],
-["", "0 0 1 CHECKMULTISIGVERIFY DEPTH 0 EQUAL", "P2SH"],
-
-["", "0 0 CHECKMULTISIG VERIFY DEPTH 0 EQUAL", "P2SH", "CHECKMULTISIG is allowed to have zero keys and/or sigs"],
-["", "0 0 CHECKMULTISIGVERIFY DEPTH 0 EQUAL", "P2SH"],
-["", "0 0 1 CHECKMULTISIG VERIFY DEPTH 0 EQUAL", "P2SH", "Zero sigs means no sigs are checked"],
-["", "0 0 1 CHECKMULTISIGVERIFY DEPTH 0 EQUAL", "P2SH"],
-
-["", "0 'a' 'b' 2 CHECKMULTISIG VERIFY DEPTH 0 EQUAL", "P2SH", "Test from up to 20 pubkeys, all not checked"],
-["", "0 'a' 'b' 'c' 3 CHECKMULTISIG VERIFY DEPTH 0 EQUAL", "P2SH"],
-["", "0 'a' 'b' 'c' 'd' 4 CHECKMULTISIG VERIFY DEPTH 0 EQUAL", "P2SH"],
-["", "0 'a' 'b' 'c' 'd' 'e' 5 CHECKMULTISIG VERIFY DEPTH 0 EQUAL", "P2SH"],
-["", "0 'a' 'b' 'c' 'd' 'e' 'f' 6 CHECKMULTISIG VERIFY DEPTH 0 EQUAL", "P2SH"],
-["", "0 'a' 'b' 'c' 'd' 'e' 'f' 'g' 7 CHECKMULTISIG VERIFY DEPTH 0 EQUAL", "P2SH"],
-["", "0 'a' 'b' 'c' 'd' 'e' 'f' 'g' 'h' 8 CHECKMULTISIG VERIFY DEPTH 0 EQUAL", "P2SH"],
-["", "0 'a' 'b' 'c' 'd' 'e' 'f' 'g' 'h' 'i' 9 CHECKMULTISIG VERIFY DEPTH 0 EQUAL", "P2SH"],
-["", "0 'a' 'b' 'c' 'd' 'e' 'f' 'g' 'h' 'i' 'j' 10 CHECKMULTISIG VERIFY DEPTH 0 EQUAL", "P2SH"],
-["", "0 'a' 'b' 'c' 'd' 'e' 'f' 'g' 'h' 'i' 'j' 'k' 11 CHECKMULTISIG VERIFY DEPTH 0 EQUAL", "P2SH"],
-["", "0 'a' 'b' 'c' 'd' 'e' 'f' 'g' 'h' 'i' 'j' 'k' 'l' 12 CHECKMULTISIG VERIFY DEPTH 0 EQUAL", "P2SH"],
-["", "0 'a' 'b' 'c' 'd' 'e' 'f' 'g' 'h' 'i' 'j' 'k' 'l' 'm' 13 CHECKMULTISIG VERIFY DEPTH 0 EQUAL", "P2SH"],
-["", "0 'a' 'b' 'c' 'd' 'e' 'f' 'g' 'h' 'i' 'j' 'k' 'l' 'm' 'n' 14 CHECKMULTISIG VERIFY DEPTH 0 EQUAL", "P2SH"],
-["", "0 'a' 'b' 'c' 'd' 'e' 'f' 'g' 'h' 'i' 'j' 'k' 'l' 'm' 'n' 'o' 15 CHECKMULTISIG VERIFY DEPTH 0 EQUAL", "P2SH"],
-["", "0 'a' 'b' 'c' 'd' 'e' 'f' 'g' 'h' 'i' 'j' 'k' 'l' 'm' 'n' 'o' 'p' 16 CHECKMULTISIG VERIFY DEPTH 0 EQUAL", "P2SH"],
-["", "0 'a' 'b' 'c' 'd' 'e' 'f' 'g' 'h' 'i' 'j' 'k' 'l' 'm' 'n' 'o' 'p' 'q' 17 CHECKMULTISIG VERIFY DEPTH 0 EQUAL", "P2SH"],
-["", "0 'a' 'b' 'c' 'd' 'e' 'f' 'g' 'h' 'i' 'j' 'k' 'l' 'm' 'n' 'o' 'p' 'q' 'r' 18 CHECKMULTISIG VERIFY DEPTH 0 EQUAL", "P2SH"],
-["", "0 'a' 'b' 'c' 'd' 'e' 'f' 'g' 'h' 'i' 'j' 'k' 'l' 'm' 'n' 'o' 'p' 'q' 'r' 's' 19 CHECKMULTISIG VERIFY DEPTH 0 EQUAL", "P2SH"],
-["", "0 'a' 'b' 'c' 'd' 'e' 'f' 'g' 'h' 'i' 'j' 'k' 'l' 'm' 'n' 'o' 'p' 'q' 'r' 's' 't' 20 CHECKMULTISIG VERIFY DEPTH 0 EQUAL", "P2SH"],
-["", "0 'a' 1 CHECKMULTISIGVERIFY DEPTH 0 EQUAL", "P2SH"],
-["", "0 'a' 'b' 2 CHECKMULTISIGVERIFY DEPTH 0 EQUAL", "P2SH"],
-["", "0 'a' 'b' 'c' 3 CHECKMULTISIGVERIFY DEPTH 0 EQUAL", "P2SH"],
-["", "0 'a' 'b' 'c' 'd' 4 CHECKMULTISIGVERIFY DEPTH 0 EQUAL", "P2SH"],
-["", "0 'a' 'b' 'c' 'd' 'e' 5 CHECKMULTISIGVERIFY DEPTH 0 EQUAL", "P2SH"],
-["", "0 'a' 'b' 'c' 'd' 'e' 'f' 6 CHECKMULTISIGVERIFY DEPTH 0 EQUAL", "P2SH"],
-["", "0 'a' 'b' 'c' 'd' 'e' 'f' 'g' 7 CHECKMULTISIGVERIFY DEPTH 0 EQUAL", "P2SH"],
-["", "0 'a' 'b' 'c' 'd' 'e' 'f' 'g' 'h' 8 CHECKMULTISIGVERIFY DEPTH 0 EQUAL", "P2SH"],
-["", "0 'a' 'b' 'c' 'd' 'e' 'f' 'g' 'h' 'i' 9 CHECKMULTISIGVERIFY DEPTH 0 EQUAL", "P2SH"],
-["", "0 'a' 'b' 'c' 'd' 'e' 'f' 'g' 'h' 'i' 'j' 10 CHECKMULTISIGVERIFY DEPTH 0 EQUAL", "P2SH"],
-["", "0 'a' 'b' 'c' 'd' 'e' 'f' 'g' 'h' 'i' 'j' 'k' 11 CHECKMULTISIGVERIFY DEPTH 0 EQUAL", "P2SH"],
-["", "0 'a' 'b' 'c' 'd' 'e' 'f' 'g' 'h' 'i' 'j' 'k' 'l' 12 CHECKMULTISIGVERIFY DEPTH 0 EQUAL", "P2SH"],
-["", "0 'a' 'b' 'c' 'd' 'e' 'f' 'g' 'h' 'i' 'j' 'k' 'l' 'm' 13 CHECKMULTISIGVERIFY DEPTH 0 EQUAL", "P2SH"],
-["", "0 'a' 'b' 'c' 'd' 'e' 'f' 'g' 'h' 'i' 'j' 'k' 'l' 'm' 'n' 14 CHECKMULTISIGVERIFY DEPTH 0 EQUAL", "P2SH"],
-["", "0 'a' 'b' 'c' 'd' 'e' 'f' 'g' 'h' 'i' 'j' 'k' 'l' 'm' 'n' 'o' 15 CHECKMULTISIGVERIFY DEPTH 0 EQUAL", "P2SH"],
-["", "0 'a' 'b' 'c' 'd' 'e' 'f' 'g' 'h' 'i' 'j' 'k' 'l' 'm' 'n' 'o' 'p' 16 CHECKMULTISIGVERIFY DEPTH 0 EQUAL", "P2SH"],
-["", "0 'a' 'b' 'c' 'd' 'e' 'f' 'g' 'h' 'i' 'j' 'k' 'l' 'm' 'n' 'o' 'p' 'q' 17 CHECKMULTISIGVERIFY DEPTH 0 EQUAL", "P2SH"],
-["", "0 'a' 'b' 'c' 'd' 'e' 'f' 'g' 'h' 'i' 'j' 'k' 'l' 'm' 'n' 'o' 'p' 'q' 'r' 18 CHECKMULTISIGVERIFY DEPTH 0 EQUAL", "P2SH"],
-["", "0 'a' 'b' 'c' 'd' 'e' 'f' 'g' 'h' 'i' 'j' 'k' 'l' 'm' 'n' 'o' 'p' 'q' 'r' 's' 19 CHECKMULTISIGVERIFY DEPTH 0 EQUAL", "P2SH"],
-["", "0 'a' 'b' 'c' 'd' 'e' 'f' 'g' 'h' 'i' 'j' 'k' 'l' 'm' 'n' 'o' 'p' 'q' 'r' 's' 't' 20 CHECKMULTISIGVERIFY DEPTH 0 EQUAL", "P2SH"],
-
-["", "<0 0 CHECKMULTISIG>{255}", "P2SH",
-  "nOpCount is incremented by the number of keys evaluated in addition to the usual one op per op. In this case we have zero keys, so we can execute 255 CHECKMULTISIGS"],
-
-["1", "<0 0 CHECKMULTISIGVERIFY>{255}", "P2SH"],
-
-["", "<NOP>{3} <0 'a' 'b' 'c' 'd' 'e' 'f' 'g' 'h' 'i' 'j' 'k' 'l' 'm' 'n' 'o' 'p' 'q' 'r' 's' 't' 20 CHECKMULTISIG>{12}", "P2SH",
-  "Even though there are no signatures being checked nOpCount is incremented by the number of keys."],
-
-["1","<NOP>{3} <0 'a' 'b' 'c' 'd' 'e' 'f' 'g' 'h' 'i' 'j' 'k' 'l' 'm' 'n' 'o' 'p' 'q' 'r' 's' 't' 20 CHECKMULTISIGVERIFY>{12}", "P2SH"],
-
 ["0 0x01 1", "HASH160 0x14 0xf5a8302ee8695bf836258b8f2b57b38a0be14e47 EQUAL", "P2SH", "Very basic P2SH"],
 ["0x4c 0 0x01 1", "HASH160 0x14 0xf5a8302ee8695bf836258b8f2b57b38a0be14e47 EQUAL", "P2SH"],
 
@@ -853,10 +793,272 @@
 ["0 0 0x02 0x0000", "CHECKMULTISIGVERIFY 1", ""],
 ["0 0x02 0x0000 0", "CHECKMULTISIGVERIFY 1", ""],
 
-["While not really correctly DER encoded, the empty signature is allowed by"],
-["strict encoding to provide a compact way to provide a delibrately invalid signature."],
-["0", "0x21 0x02865c40293a680cb9c020e7b1e106d8c1916d3cef99aa431a56d253e69256dac0 CHECKSIG NOT", ""],
-["0 0", "1 0x21 0x02865c40293a680cb9c020e7b1e106d8c1916d3cef99aa431a56d253e69256dac0 1 CHECKMULTISIG NOT", ""],
+["Test coverage for CHECKSIG"],
+["NOTE: The following keys are used throughout the signature tests:"],
+["               private key 1: 0x0000000000000000000000000000000000000000000000000000000000000001"],
+["         compressed pubkey 1: 0x0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"],
+["       uncompressed pubkey 1: 0x0479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8"],
+["             hybrid pubkey 1: 0x0579be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8"],
+["    compressed pubkey hash 1: 0xe280cb6e66b96679aec288b1fbdbd4db08077a1b"],
+["  uncompressed pubkey hash 1: 0x76a2e145da57d32c5a40f6406287c9248e0d5040"],
+["               private key 2: 0x0000000000000000000000000000000000000000000000000000000000000003"],
+["         compressed pubkey 2: 0x02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9"],
+["       uncompressed pubkey 2: 0x04f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9388f7b0f632de8140fe337e62a37f3566500a99934c2231b6cb9fd7584b8e672"],
+["             hybrid pubkey 2: 0x05f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9388f7b0f632de8140fe337e62a37f3566500a99934c2231b6cb9fd7584b8e672"],
+["    compressed pubkey hash 2: 0x01557763e0252dc0ff9e0996ad1d04b167bb993c"],
+["  uncompressed pubkey hash 2: 0x84e54168b44c30bc76a97ac78b53ecbd75106e13"],
+["               private key 3: 0x0000000000000000000000000000000000000000000000000000000000000006"],
+["         compressed pubkey 3: 0x03fff97bd5755eeea420453a14355235d382f6472f8568a18b2f057a1460297556"],
+["       uncompressed pubkey 3: 0x04fff97bd5755eeea420453a14355235d382f6472f8568a18b2f057a1460297556ae12777aacfbb620f3be96017f45c560de80f0f6518fe4a03c870c36b075f297"],
+["             hybrid pubkey 3: 0x06fff97bd5755eeea420453a14355235d382f6472f8568a18b2f057a1460297556ae12777aacfbb620f3be96017f45c560de80f0f6518fe4a03c870c36b075f297"],
+["    compressed pubkey hash 3: 0x2f0b8922f80989a85a53e136af931e473343bcad"],
+["  uncompressed pubkey hash 3: 0x1891523d072e152ef254f4326eba0729a9131ef8"],
+[
+    "0x48 0x3045022100f5353150d31a63f4a0d06d1f5a01ac65f7267a719e49f2a1ac584fd546bef074022030e09575e7a1541aa018876a4003cefe1b061a90556b5140c63e0ef84813524801",
+    "0x21 0x0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 CHECKSIG",
+    "",
+    "CHECKSIG must work with compressed pubkeys under SigHashAll"
+],
+[
+    "0x48 0x304502210098676274838e0f45ca405918668201eeafb7c829f043daf77c3055dda4bb73ac022019202b189d1324533a82906e546d24d468b854cbb13a03e5fca7ca9e45b835eb02",
+    "0x21 0x0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 CHECKSIG",
+    "",
+    "CHECKSIG must work with compressed pubkeys under SigHashNone"
+],
+[
+    "0x47 0x304402207a5a5a18fd1c0f3e76fa5f0a06751e52e1246a2361843d40c13e95906feccc9a0220642530a8aeff9b8242ee1a6110a6d951707ae28bed6b4367790ebc8829ad1a9503",
+    "0x21 0x0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 CHECKSIG",
+    "",
+    "CHECKSIG must work with compressed pubkeys under SigHashSingle"
+],
+[
+    "0x48 0x3045022100a22bcae4c96e7fd7251e92c3542a21304701d5c8f94b31035b060f2b96a5cd410220526ffd300f848fb0e5eda14fb410221999e837e3bfbff5c75e20270336c501cc81",
+    "0x21 0x0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 CHECKSIG",
+    "",
+    "CHECKSIG must work with compressed pubkeys under SigHashAll|SigHashAnyOneCanPay"
+],
+[
+    "0x47 0x304402206aa27c6d7d5db864eb06eb163231a49598f71efab7c07a9091bf6620b2f49c8d022069a8b9ceb0d79034a9c582b465432826a10b97bee29ddfc56534d04ba50a315e82",
+    "0x21 0x0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 CHECKSIG",
+    "",
+    "CHECKSIG must work with compressed pubkeys under SigHashNone|SigHashAnyOneCanPay"
+],
+[
+    "0x47 0x304402200f9d9048a7b313ebe540a895f1721fc327477e11a3ca3a6a7f9e2af11374bbb20220202914bec4369f8d9e70c82c720d9d87d52c5ced7f804ac1f70a3cf993341ba983",
+    "0x21 0x0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 CHECKSIG",
+    "",
+    "CHECKSIG must work with compressed pubkeys under SigHashSingle|SigHashAnyOneCanPay"
+],
+[
+    "0x47 0x304402206f02f07d84e9bef57e3c211887902f0e3d2067e210678e7637927a3397e38ecc0220795a47bcc1585e8b329a5172fb412c51368dd4d273e8e0766e918590a3141bfe01",
+    "0x41 0x0479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8 CHECKSIG",
+    "",
+    "CHECKSIG must work with uncompressed pubkeys under SigHashAll"
+],
+[
+    "0x47 0x304402201c57a7b1befacfc8b6a02d83724334966a3d9a214c54661fecc9ecc4f90c421f02201bcd5bc018f66ef0f9b1445fbbf2336a9e8fb405e4b93ac8b61b9d7ebe613d8602",
+    "0x41 0x0479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8 CHECKSIG",
+    "",
+    "CHECKSIG must work with uncompressed pubkeys under SigHashNone"
+],
+[
+    "0x48 0x3045022100e977d8f5826d5b0faa2ec19e55c82e8d2e77b510b37455dcb0fee6a97f7297c50220139b3bb22739e4cb2b21ae285eb0a6fb83888762cdccdbd7adf596d429a5ab7b03",
+    "0x41 0x0479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8 CHECKSIG",
+    "",
+    "CHECKSIG must work with uncompressed pubkeys under SigHashSingle"
+],
+[
+    "0x47 0x304402200e1bf09e5bd4493bcac49225fe0858fe820ac23f3f81a9ebcf89c562c21ba60202200e3e8ce3dafdbc661fc16e34c2b8ed87f46c2600eed06fafafc6c5e6acce4abb81",
+    "0x41 0x0479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8 CHECKSIG",
+    "",
+    "CHECKSIG must work with uncompressed pubkeys under SigHashAll|SigHashAnyOneCanPay"
+],
+[
+    "0x47 0x304402202ed7cbdec56c056cba689ca9f097f245de82b4732eed17060443349aa1098b6a022046dba0f9c0b807ab4f8cbcf9853548d86e4e3847103e662063e764248d27c25982",
+    "0x41 0x0479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8 CHECKSIG",
+    "",
+    "CHECKSIG must work with uncompressed pubkeys under SigHashNone|SigHashAnyOneCanPay"
+],
+[
+    "0x48 0x304502210093515fc4e75735746b8e7468b5855cd2ed2be85e48ca9771f18ab3e757e37497022003aab10a26f94122c186e9705c902e249f12a31ac96de9f5c5a7ce6e5f76bd9483",
+    "0x41 0x0479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8 CHECKSIG",
+    "",
+    "CHECKSIG must work with uncompressed pubkeys under SigHashSingle|SigHashAnyOneCanPay"
+],
+[
+    "0x48 0x3045022100dfe97c482347767875efb2d95ae94cb21d3a2f5e798c48fe202595ed8128038202201c49c43648d581280d1921e2837972a8bd800d85065a8e1f41e61161524c450d01",
+    "0x21 0x03fff97bd5755eeea420453a14355235d382f6472f8568a18b2f057a1460297556 CHECKSIG",
+    "",
+    "CHECKSIG must work with compressed pubkeys with y bit set (P2PK)"
+],
+[
+    "0x48 0x3045022100e67ff2e958d066294263617782bedca9eddf1a88e15711caa8a0dd5db5317cfb0220490ca23dced8b91476492ef7e510847f2dd9e67c8f4a7f24ad2bc0e6e574b70201 0x21 0x0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+    "DUP HASH160 0x14 0xe280cb6e66b96679aec288b1fbdbd4db08077a1b EQUALVERIFY CHECKSIG",
+    "",
+    "CHECKSIG must work with compressed pubkeys without y bit set (P2PKH)"
+],
+[
+    "0x47 0x304402204344dda380768b2b87bf3ca615682a2630e7c957f9bfd27725a705305ea5581702203ac1b46f6e37263af61a9c5459a40505fd250e3cd07af88a311a3b60ad28dc8001 0x21 0x03fff97bd5755eeea420453a14355235d382f6472f8568a18b2f057a1460297556",
+    "DUP HASH160 0x14 0x2f0b8922f80989a85a53e136af931e473343bcad EQUALVERIFY CHECKSIG",
+    "",
+    "CHECKSIG must work with compressed pubkeys with y bit set (P2PKH)"
+],
+[
+    "0x47 0x304402200cde54f44c5cfc3bf6fd71f18ac0570ab18b5a4e643145fd00cd9863da17bb0102200ad95f822df6fc4c7c4d1dd8fe9b554044bdc2c44aaf6b0843d46fed9f38d7b101 0x41 0x04f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9388f7b0f632de8140fe337e62a37f3566500a99934c2231b6cb9fd7584b8e672",
+    "DUP HASH160 0x14 0x84e54168b44c30bc76a97ac78b53ecbd75106e13 EQUALVERIFY CHECKSIG",
+    "",
+    "CHECKSIG must work with uncompressed pubkeys (P2PKH)"
+],
+[
+    "0x47 0x304402205550606a87650619f98b261adde6d343aad0c3fdd526c68d5ed718819ee59a7e0220335af6a47a18064681a77f8387c95934439bdf74b61e290a3353528311b8c99301 0x23 0x210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798ac",
+    "HASH160 0x14 0xe57d091fa806258280dc78a1d8544a47a5b16a19 EQUAL",
+    "P2SH",
+    "CHECKSIG must work with compressed pubkeys with y bit set when in a P2SH redeem script"
+],
+[
+    "0x47 0x304402205708a07bf55b7ce3961d25e2495d522c7130261f00fb145525af4ac176b4656b02207ffad7719f55d73ccb57ccc4f139511f8c9325f8d1258adc63a441871c83c3ae01 0x23 0x2103fff97bd5755eeea420453a14355235d382f6472f8568a18b2f057a1460297556ac",
+    "HASH160 0x14 0xfa07a95bb9386647aa5a40555415277be50d4ff1 EQUAL",
+    "P2SH",
+    "CHECKSIG must work with compressed pubkeys without y bit set when in a P2SH redeem script"
+],
+[
+    "0x47 0x304402202dba5e6a3653b0e6117e1e96abd8c0ab026963d4ba57505b876ee8f728c43d9d02204cf1113ea5bd191addaff587809ac7bca1bf0a4e12e9a18a81c69ffbf23ce1fc01 0x21 0x0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 0x19 0x76a914e280cb6e66b96679aec288b1fbdbd4db08077a1b88ac",
+    "HASH160 0x14 0x6c3d84ad3f335eb67d9b66245b6b45cb8154bc5a EQUAL",
+    "P2SH",
+    "CHECKSIG must work with uncompressed pubkeys when in a P2SH redeem script"
+],
+[
+    "0",
+    "0x21 0x03fff97bd5755eeea420453a14355235d382f6472f8568a18b2f057a1460297556 CHECKSIG NOT",
+    "DERSIG",
+    "CHECKSIG must push false with invalid non-null DER-compliant sig with DERSIG (P2PK NOT 0 sig)"
+],
+[
+    "0x09 0x300602010102010101",
+    "0x21 0x03fff97bd5755eeea420453a14355235d382f6472f8568a18b2f057a1460297556 CHECKSIG NOT",
+    "DERSIG",
+    "CHECKSIG must push false with invalid non-null DER-compliant sig with DERSIG (P2PK NOT min sig)"
+],
+[
+    "1",
+    "0x21 0x03fff97bd5755eeea420453a14355235d382f6472f8568a18b2f057a1460297556 CHECKSIG NOT",
+    "",
+    "CHECKSIG must push false with invalid non-DER-compliant sig without DERSIG"
+],
+[
+    "0x48 0x304402204de4b86166781ffbd4375650776a338d53a0eabcc61f371ce256364f058f88ba0220597090d34c536b727fb555d61b100703a3f63b7a6ad7aa0164138c6ab3c63f880101",
+    "0x21 0x0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 CHECKSIG",
+    "",
+    "CHECKSIG must push true for otherwise valid sig with multi-byte hash type without DERSIG"
+],
+[
+    "0x48 0x304502204fc10344934662ca0a93a84d14d650d8a21cf2ab91f608e8783d2999c95544320221008441aacd6b17038ff3f6700b042934f9a6fea0cec2051b51dc709e52a5bb7d6101",
+    "0x21 0x0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 CHECKSIG",
+    "",
+    "CHECKSIG must push true when S is greater than the curve half order and sig is valid without DERSIG"
+],
+
+
+["Additional test coverage with standard payment forms involving CHECKSIG"],
+[
+    "0x48 0x3045022100f5353150d31a63f4a0d06d1f5a01ac65f7267a719e49f2a1ac584fd546bef074022030e09575e7a1541aa018876a4003cefe1b061a90556b5140c63e0ef84813524801 NOP",
+    "0x21 0x0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 CHECKSIG",
+    "",
+    "Execution must not error with non-push-only sig script without P2SH or SIGPUSHONLY"
+],
+[
+    "0x48 0x3045022100f5353150d31a63f4a0d06d1f5a01ac65f7267a719e49f2a1ac584fd546bef074022030e09575e7a1541aa018876a4003cefe1b061a90556b5140c63e0ef84813524801 NOP",
+    "0x21 0x0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 CHECKSIG",
+    "P2SH",
+    "Execution must not error with non-push-only sig script with P2SH and without SIGPUSHONLY"
+],
+[
+    "0x47 0x304402205550606a87650619f98b261adde6d343aad0c3fdd526c68d5ed718819ee59a7e0220335af6a47a18064681a77f8387c95934439bdf74b61e290a3353528311b8c99301 NOP 0x23 0x21 0x0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 CHECKSIG",
+    "HASH160 0x14 0xe57d091fa806258280dc78a1d8544a47a5b16a19 EQUAL",
+    "",
+    "Unexecuted P2SH must not error with non-push-only sig script without P2SH or SIGPUSHONLY"
+],
+[
+    "11 0x48 0x3045022100f5353150d31a63f4a0d06d1f5a01ac65f7267a719e49f2a1ac584fd546bef074022030e09575e7a1541aa018876a4003cefe1b061a90556b5140c63e0ef84813524801",
+    "0x21 0x0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 CHECKSIG",
+    "P2SH",
+    "Execution must not error when the script finishes with data on the stack without CLEANSTACK (P2PK with extra input)"
+],
+[
+    "0x47 0x304402205550606a87650619f98b261adde6d343aad0c3fdd526c68d5ed718819ee59a7e0220335af6a47a18064681a77f8387c95934439bdf74b61e290a3353528311b8c99301 0x23 0x21 0x0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 CHECKSIG",
+    "HASH160 0x14 0xe57d091fa806258280dc78a1d8544a47a5b16a19 EQUAL",
+    "CLEANSTACK,P2SH",
+    "P2SH execution must not error when the script finishes without data on the stack with CLEANSTACK"
+],
+[
+    "11 0x47 0x304402205550606a87650619f98b261adde6d343aad0c3fdd526c68d5ed718819ee59a7e0220335af6a47a18064681a77f8387c95934439bdf74b61e290a3353528311b8c99301 0x23 0x21 0x0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 CHECKSIG",
+    "HASH160 0x14 0xe57d091fa806258280dc78a1d8544a47a5b16a19 EQUAL",
+    "P2SH",
+    "P2SH execution must not error when the script finishes with data on the stack without CLEANSTACK"
+],
+
+["Test coverage for CHECKMULTISIG"],
+["NOTE: See the CHECKSIG section above for information about the keys used in these tests:"],
+["", "<0 0 CHECKMULTISIG>{255}", "P2SH", "CHECKMULTSIG increments op count by num pubkeys evaluated in addition to the usual one per op"],
+[
+    "",
+    "<NOP>{3} <0 'a' 'b' 'c' 'd' 'e' 'f' 'g' 'h' 'i' 'j' 'k' 'l' 'm' 'n' 'o' 'p' 'q' 'r' 's' 't' 20 CHECKMULTISIG>{12}",
+    "P2SH",
+    "CHECKMULTISIG with no sigs checked still increments op count by num pubkeys evaluated (12 * 21 + 3 = 255)"
+],
+["", "0 0 CHECKMULTISIG VERIFY DEPTH 0 EQUAL", "P2SH", "CHECKMULTISIG is allowed to have zero pubkeys and/or sigs"],
+["", "0 0 1 CHECKMULTISIG VERIFY DEPTH 0 EQUAL", "P2SH", "CHECKMULTISIG zero sigs means no sigs or pubkeys are checked"],
+["", "0 <0>{2} 2 CHECKMULTISIG VERIFY DEPTH 0 EQUAL", "P2SH", "CHECKMULTISIG must allow 2 pubkeys"],
+["", "0 <0>{3} 3 CHECKMULTISIG VERIFY DEPTH 0 EQUAL", "P2SH", "CHECKMULTISIG must allow 3 pubkeys"],
+["", "0 <0>{4} 4 CHECKMULTISIG VERIFY DEPTH 0 EQUAL", "P2SH", "CHECKMULTISIG must allow 4 pubkeys"],
+["", "0 <0>{5} 5 CHECKMULTISIG VERIFY DEPTH 0 EQUAL", "P2SH", "CHECKMULTISIG must allow 5 pubkeys"],
+["", "0 <0>{6} 6 CHECKMULTISIG VERIFY DEPTH 0 EQUAL", "P2SH", "CHECKMULTISIG must allow 6 pubkeys"],
+["", "0 <0>{7} 7 CHECKMULTISIG VERIFY DEPTH 0 EQUAL", "P2SH", "CHECKMULTISIG must allow 7 pubkeys"],
+["", "0 <0>{8} 8 CHECKMULTISIG VERIFY DEPTH 0 EQUAL", "P2SH", "CHECKMULTISIG must allow 8 pubkeys"],
+["", "0 <0>{9} 9 CHECKMULTISIG VERIFY DEPTH 0 EQUAL", "P2SH", "CHECKMULTISIG must allow 9 pubkeys"],
+["", "0 <0>{10} 10 CHECKMULTISIG VERIFY DEPTH 0 EQUAL", "P2SH", "CHECKMULTISIG must allow 10 pubkeys"],
+["", "0 <0>{11} 11 CHECKMULTISIG VERIFY DEPTH 0 EQUAL", "P2SH", "CHECKMULTISIG must allow 11 pubkeys"],
+["", "0 <0>{12} 12 CHECKMULTISIG VERIFY DEPTH 0 EQUAL", "P2SH", "CHECKMULTISIG must allow 12 pubkeys"],
+["", "0 <0>{13} 13 CHECKMULTISIG VERIFY DEPTH 0 EQUAL", "P2SH", "CHECKMULTISIG must allow 13 pubkeys"],
+["", "0 <0>{14} 14 CHECKMULTISIG VERIFY DEPTH 0 EQUAL", "P2SH", "CHECKMULTISIG must allow 14 pubkeys"],
+["", "0 <0>{15} 15 CHECKMULTISIG VERIFY DEPTH 0 EQUAL", "P2SH", "CHECKMULTISIG must allow 15 pubkeys"],
+["", "0 <0>{16} 16 CHECKMULTISIG VERIFY DEPTH 0 EQUAL", "P2SH", "CHECKMULTISIG must allow 16 pubkeys"],
+["", "0 <0>{17} 17 CHECKMULTISIG VERIFY DEPTH 0 EQUAL", "P2SH", "CHECKMULTISIG must allow 17 pubkeys"],
+["", "0 <0>{18} 18 CHECKMULTISIG VERIFY DEPTH 0 EQUAL", "P2SH", "CHECKMULTISIG must allow 18 pubkeys"],
+["", "0 <0>{19} 19 CHECKMULTISIG VERIFY DEPTH 0 EQUAL", "P2SH", "CHECKMULTISIG must allow 19 pubkeys"],
+["", "0 <0>{20} 20 CHECKMULTISIG VERIFY DEPTH 0 EQUAL", "P2SH", "CHECKMULTISIG must allow 20 pubkeys"],
+[
+    "0x47 0x304402203f419012d8e26a336579b8a1410c6a2bb460965d093beee381851998e946013b02205281ee195559c758fb3a3abb9d38ad32ed83d53e319793fb7e5fab31ac48ec0c01 0x47 0x304402206c5bb54f2a8681d4ebbd762042addc2837d2a0e3dc3e600a09c1901512643e8b022072f3acdcce1f2adde1fddfc642e2403f84f040e7dbb0d4249a9b837f98ad259101 0x48 0x3045022100c99fdb4f2f1df128d5646dd24b603c3a7c3a93912f457a03a38a70d83acd1f52022059929aa3f91bdc711d20a4c6773fac5ef7b12b0a12c1f93192ba0eefa3bdb3d301",
+    "3 0x21 0x0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 0x21 0x02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9 0x21 0x03fff97bd5755eeea420453a14355235d382f6472f8568a18b2f057a1460297556 3 CHECKMULTISIG",
+    "",
+    "CHECKMULTISIG must push true when provided the specified number of valid sigs (3-of-3, 3 valid sigs)"
+],
+[
+    "0x47 0x3044022015dd38cbf89c82f64393ffed0dc2a388a791086950d82fd201e5a8395fc79a2e0220379c89ff963bd904614e5e2b12acbdd14b927f35232bf53b1d598e45a4ed922c01 0x48 0x3045022100aa2c8c3d545d53109b9f9c1c808026c328e5a171c06b9202352530ab9c43c21d0220476e919d7e5c6cf8832122b33ba57aed45c83f481296d89b8f61d30f1c4271e601 0x4c69 2 0x21 0x0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 0x21 0x02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9 0x21 0x03fff97bd5755eeea420453a14355235d382f6472f8568a18b2f057a1460297556 3 CHECKMULTISIG",
+    "HASH160 0x14 0xf86b5a7c6d32566aa4dccc04d1533530b4d64cf3 EQUAL",
+    "P2SH",
+    "CHECKMULTISIG must work in a P2SH redeem script (2-of-3, 2 valid sigs)"
+],
+[
+    "0 0x47 0x30440220ea377dcb8630e68da3a0eeb57e96e195b4d9c437381f76912c0e6fc28bae6e3502204096da36de10b7261bfa6ae0fddbe11428c1d13160bcb1110ed04f3f7d2f389f01",
+    "2 0x21 0x0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 0x21 0x02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9 2 CHECKMULTISIG NOT",
+    "",
+    "CHECKMULTISIG must not error with sigs where R is negative without DERSIG (2-of-2, first sig valid non-DER, second sig invalid but DER compliant)"
+],
+[
+    "0x47 0x30440220eb8231fbc543176e5ee8b80591b7db91d4dab835daada515d95f3532eb54b86102203e76890b026b24030a99a2ae5957d573b7a9ecbc382d613b18c25c124d0fac9a01 0",
+    "2 0x21 0x0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 0x21 0x02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9 2 CHECKMULTISIG NOT",
+    "",
+    "CHECKMULTISIG must not error with sigs where R is negative without DERSIG (2-of-2, first sig invalid but DER compliant, second sig valid non-DER)"
+],
+
+["Additional test coverage with standard payment forms involving CHECKMULTISIG"],
+[
+    "0x48 0x3045022100c40b401e745675a9280ef213d6bfc453bd941d61004e30acdcc2704c5098bcbb02206d2f2549311cf537b67a46840044124f2068759d3ba0ac4f1d377ded06d3532101 DUP",
+    "2 0x21 0x0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 DUP 2 CHECKMULTISIG",
+    "",
+    "Execution must not error when signature script contains non-push-only opcodes without SIGPUSHONLY (2-of-2, identical keys and sigs pushed via DUP)"
+],
 
 ["CHECKMULTISIG evaluation order tests. CHECKMULTISIG evaluates signatures and"],
 ["pubkeys in a specific order, and will exit early if the number of signatures"],
@@ -878,6 +1080,41 @@
     "",
     "2-of-2 CHECKMULTISIG NOT with both pubkeys valid, but second signature invalid. Valid pubkey fails, and CHECKMULTISIG exits early, prior to evaluation of second invalid signature."
 ],
+
+["While not really correctly DER encoded, the empty signature is allowed by"],
+["strict encoding to provide a compact way to provide a delibrately invalid signature."],
+["0", "0x21 0x02865c40293a680cb9c020e7b1e106d8c1916d3cef99aa431a56d253e69256dac0 CHECKSIG NOT", ""],
+["0", "1 0x21 0x02865c40293a680cb9c020e7b1e106d8c1916d3cef99aa431a56d253e69256dac0 1 CHECKMULTISIG NOT", ""],
+
+["Test coverage for CHECKMULTISIGVERIFY"],
+["1", "<0 0 CHECKMULTISIGVERIFY>{255}", "P2SH", "CHECKMULTSIGVERIFY increments op count by num pubkeys evaluated in addition to the usual one per op"],
+[
+    "1",
+    "<NOP>{3} <0 'a' 'b' 'c' 'd' 'e' 'f' 'g' 'h' 'i' 'j' 'k' 'l' 'm' 'n' 'o' 'p' 'q' 'r' 's' 't' 20 CHECKMULTISIGVERIFY>{12}",
+    "P2SH",
+    "CHECKMULTISIGVERIFY with no sigs checked still increments op count by num pubkeys evaluated (12 * 21 + 3 = 255)"
+],
+["", "0 0 CHECKMULTISIGVERIFY DEPTH 0 EQUAL", "P2SH", "CHECKMULTISIGVERIFY is allowed to have zero pubkeys and/or sigs"],
+["", "0 0 1 CHECKMULTISIGVERIFY DEPTH 0 EQUAL", "P2SH",  "CHECKMULTISIGVERIFY zero sigs means no sigs or pubkeys are checked"],
+["", "0 <0>{2} 2 CHECKMULTISIGVERIFY DEPTH 0 EQUAL", "P2SH", "CHECKMULTISIGVERIFY must allow 2 pubkeys"],
+["", "0 <0>{3} 3 CHECKMULTISIGVERIFY DEPTH 0 EQUAL", "P2SH", "CHECKMULTISIGVERIFY must allow 3 pubkeys"],
+["", "0 <0>{4} 4 CHECKMULTISIGVERIFY DEPTH 0 EQUAL", "P2SH", "CHECKMULTISIGVERIFY must allow 4 pubkeys"],
+["", "0 <0>{5} 5 CHECKMULTISIGVERIFY DEPTH 0 EQUAL", "P2SH", "CHECKMULTISIGVERIFY must allow 5 pubkeys"],
+["", "0 <0>{6} 6 CHECKMULTISIGVERIFY DEPTH 0 EQUAL", "P2SH", "CHECKMULTISIGVERIFY must allow 6 pubkeys"],
+["", "0 <0>{7} 7 CHECKMULTISIGVERIFY DEPTH 0 EQUAL", "P2SH", "CHECKMULTISIGVERIFY must allow 7 pubkeys"],
+["", "0 <0>{8} 8 CHECKMULTISIGVERIFY DEPTH 0 EQUAL", "P2SH", "CHECKMULTISIGVERIFY must allow 8 pubkeys"],
+["", "0 <0>{9} 9 CHECKMULTISIGVERIFY DEPTH 0 EQUAL", "P2SH", "CHECKMULTISIGVERIFY must allow 9 pubkeys"],
+["", "0 <0>{10} 10 CHECKMULTISIGVERIFY DEPTH 0 EQUAL", "P2SH", "CHECKMULTISIGVERIFY must allow 10 pubkeys"],
+["", "0 <0>{11} 11 CHECKMULTISIGVERIFY DEPTH 0 EQUAL", "P2SH", "CHECKMULTISIGVERIFY must allow 11 pubkeys"],
+["", "0 <0>{12} 12 CHECKMULTISIGVERIFY DEPTH 0 EQUAL", "P2SH", "CHECKMULTISIGVERIFY must allow 12 pubkeys"],
+["", "0 <0>{13} 13 CHECKMULTISIGVERIFY DEPTH 0 EQUAL", "P2SH", "CHECKMULTISIGVERIFY must allow 13 pubkeys"],
+["", "0 <0>{14} 14 CHECKMULTISIGVERIFY DEPTH 0 EQUAL", "P2SH", "CHECKMULTISIGVERIFY must allow 14 pubkeys"],
+["", "0 <0>{15} 15 CHECKMULTISIGVERIFY DEPTH 0 EQUAL", "P2SH", "CHECKMULTISIGVERIFY must allow 15 pubkeys"],
+["", "0 <0>{16} 16 CHECKMULTISIGVERIFY DEPTH 0 EQUAL", "P2SH", "CHECKMULTISIGVERIFY must allow 16 pubkeys"],
+["", "0 <0>{17} 17 CHECKMULTISIGVERIFY DEPTH 0 EQUAL", "P2SH", "CHECKMULTISIGVERIFY must allow 17 pubkeys"],
+["", "0 <0>{18} 18 CHECKMULTISIGVERIFY DEPTH 0 EQUAL", "P2SH", "CHECKMULTISIGVERIFY must allow 18 pubkeys"],
+["", "0 <0>{19} 19 CHECKMULTISIGVERIFY DEPTH 0 EQUAL", "P2SH", "CHECKMULTISIGVERIFY must allow 19 pubkeys"],
+["", "0 <0>{20} 20 CHECKMULTISIGVERIFY DEPTH 0 EQUAL", "P2SH", "CHECKMULTISIGVERIFY must allow 20 pubkeys"],
 
 ["The End"]
 ]

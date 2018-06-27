@@ -2524,17 +2524,14 @@ func opcodeCheckSig(op *parsedOpcode, vm *Engine) error {
 	}
 
 	// Trim off hashtype from the signature string and check if the
-	// signature and pubkey conform to the strict encoding requirements
-	// depending on the flags.
+	// signature and pubkey conform to the strict encoding requirements.
 	//
-	// NOTE: When the strict encoding flags are set, any errors in the
-	// signature or public encoding here result in an immediate script error
+	// NOTE:The strict encoding requirements cause any errors in the
+	// signature or public encoding to result in an immediate script error
 	// (and thus no result bool is pushed to the data stack).  This differs
 	// from the logic below where any errors in parsing the signature is
 	// treated as the signature failure resulting in false being pushed to
-	// the data stack.  This is required because the more general script
-	// validation consensus rules do not have the new strict encoding
-	// requirements enabled by the flags.
+	// the data stack.
 	hashType := SigHashType(fullSigBytes[len(fullSigBytes)-1])
 	sigBytes := fullSigBytes[:len(fullSigBytes)-1]
 	if err := vm.checkHashTypeEncoding(hashType); err != nil {
@@ -2556,11 +2553,8 @@ func opcodeCheckSig(op *parsedOpcode, vm *Engine) error {
 
 	// Generate the signature hash based on the signature hash type.
 	var prefixHash *chainhash.Hash
-	if hashType&sigHashMask == SigHashAll {
-		if optimizeSigVerification {
-			ph := vm.tx.CachedTxHash()
-			prefixHash = ph
-		}
+	if hashType&sigHashMask == SigHashAll && optimizeSigVerification {
+		prefixHash = vm.tx.CachedTxHash()
 	}
 	hash, err := calcSignatureHash(subScript, hashType, &vm.tx, vm.txIdx,
 		prefixHash)
@@ -2636,7 +2630,7 @@ type parsedSigInfo struct {
 // for verifying each signature.
 //
 // Stack transformation:
-// [... dummy [sig ...] numsigs [pubkey ...] numpubkeys] -> [... bool]
+// [... [sig ...] numsigs [pubkey ...] numpubkeys] -> [... bool]
 func opcodeCheckMultiSig(op *parsedOpcode, vm *Engine) error {
 	numKeys, err := vm.dstack.PopInt(mathOpCodeMaxScriptNumLen)
 	if err != nil {
@@ -2714,7 +2708,7 @@ func opcodeCheckMultiSig(op *parsedOpcode, vm *Engine) error {
 
 		// The order of the signature and public key evaluation is
 		// important here since it can be distinguished by an
-		// OP_CHECKMULTISIG NOT when the strict encoding flag is set.
+		// OP_CHECKMULTISIG NOT.
 
 		rawSig := sigInfo.signature
 		if len(rawSig) == 0 {
@@ -2766,11 +2760,8 @@ func opcodeCheckMultiSig(op *parsedOpcode, vm *Engine) error {
 
 		// Generate the signature hash based on the signature hash type.
 		var prefixHash *chainhash.Hash
-		if hashType&sigHashMask == SigHashAll {
-			if optimizeSigVerification {
-				ph := vm.tx.CachedTxHash()
-				prefixHash = ph
-			}
+		if hashType&sigHashMask == SigHashAll && optimizeSigVerification {
+			prefixHash = vm.tx.CachedTxHash()
 		}
 		hash, err := calcSignatureHash(script, hashType, &vm.tx, vm.txIdx,
 			prefixHash)

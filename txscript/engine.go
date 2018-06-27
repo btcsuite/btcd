@@ -428,53 +428,100 @@ func (vm *Engine) checkSignatureEncoding(sig []byte) error {
 	//   - S is the arbitrary length big-endian encoded number which
 	//     represents the S value of the signature.  The encoding rules are
 	//     identical as those for R.
+	const (
+		asn1SequenceID = 0x30
+		asn1IntegerID  = 0x02
 
-	// Minimum length is when both numbers are 1 byte each.
-	// 0x30 + <1-byte> + 0x02 + 0x01 + <byte> + 0x2 + 0x01 + <byte>
-	if len(sig) < 8 {
-		// Too short
-		return fmt.Errorf("malformed signature: too short: %d < 8",
-			len(sig))
+		// minSigLen is the minimum length of a DER encoded signature and is
+		// when both R and S are 1 byte each.
+		//
+		// 0x30 + <1-byte> + 0x02 + 0x01 + <byte> + 0x2 + 0x01 + <byte>
+		minSigLen = 8
+
+		// maxSigLen is the maximum length of a DER encoded signature and is
+		// when both R and S are 33 bytes each.  It is 33 bytes because a
+		// 256-bit integer requires 32 bytes and an additional leading null byte
+		// might required if the high bit is set in the value.
+		//
+		// 0x30 + <1-byte> + 0x02 + 0x21 + <33 bytes> + 0x2 + 0x21 + <33 bytes>
+		maxSigLen = 72
+
+		// sequenceOffset is the byte offset within the signature of the
+		// expected ASN.1 sequence identifier.
+		sequenceOffset = 0
+
+		// dataLenOffset is the byte offset within the signature of the expected
+		// total length of all remaining data in the signature.
+		dataLenOffset = 1
+
+		// rTypeOffset is the byte offset within the signature of the ASN.1
+		// identifier for R and is expected to indicate an ASN.1 integer.
+		rTypeOffset = 2
+
+		// rLenOffset is the byte offset within the signature of the length of
+		// R.
+		rLenOffset = 3
+
+		// rOffset is the byte offset within the signature of R.
+		rOffset = 4
+	)
+
+	// The signature must adhere to the minimum and maximum allowed length.
+	sigLen := len(sig)
+	if sigLen < minSigLen {
+		return fmt.Errorf("malformed signature: too short: %d < %d", sigLen,
+			minSigLen)
+	}
+	if sigLen > maxSigLen {
+		return fmt.Errorf("malformed signature: too long: %d > %d", sigLen,
+			maxSigLen)
 	}
 
-	// Maximum length is when both numbers are 33 bytes each.  It is 33
-	// bytes because a 256-bit integer requires 32 bytes and an additional
-	// leading null byte might required if the high bit is set in the value.
-	// 0x30 + <1-byte> + 0x02 + 0x21 + <33 bytes> + 0x2 + 0x21 + <33 bytes>
-	if len(sig) > 72 {
-		// Too long
-		return fmt.Errorf("malformed signature: too long: %d > 72",
-			len(sig))
+	// The signature must start with the ASN.1 sequence identifier.
+	if sig[sequenceOffset] != asn1SequenceID {
+		return fmt.Errorf("malformed signature: format has wrong type: %#x",
+			sig[sequenceOffset])
 	}
-	if sig[0] != 0x30 {
-		// Wrong type
-		return fmt.Errorf("malformed signature: format has wrong type: 0x%x",
-			sig[0])
-	}
-	if int(sig[1]) != len(sig)-2 {
-		// Invalid length
+
+	// The signature must indicate the correct amount of data for all elements
+	// related to R and S.
+	if int(sig[dataLenOffset]) != sigLen-2 {
 		return fmt.Errorf("malformed signature: bad length: %d != %d",
-			sig[1], len(sig)-2)
+			sig[dataLenOffset], sigLen-2)
 	}
 
-	rLen := int(sig[3])
-
-	// Make sure S is inside the signature.
-	if rLen+5 > len(sig) {
+	// Calculate the offsets of the elements related to S and ensure S is inside
+	// the signature.
+	//
+	// rLen specifies the length of the big-endian encoded number which
+	// represents the R value of the signature.
+	//
+	// sTypeOffset is the offset of the ASN.1 identifier for S and, like its R
+	// counterpart, is expected to indicate an ASN.1 integer.
+	//
+	// sLenOffset and sOffset are the byte offsets within the signature of the
+	// length of S and S itself, respectively.
+	rLen := int(sig[rLenOffset])
+	sTypeOffset := rOffset + rLen
+	sLenOffset := sTypeOffset + 1
+	sOffset := sLenOffset + 1
+	if sOffset > sigLen {
 		return fmt.Errorf("malformed signature: S out of bounds")
 	}
 
-	sLen := int(sig[rLen+5])
-
-	// The length of the elements does not match the length of the
-	// signature.
-	if rLen+sLen+6 != len(sig) {
-		return fmt.Errorf("malformed signature: invalid R length")
+	// The lengths of R and S must match the overall length of the signature.
+	//
+	// sLen specifies the length of the big-endian encoded number which
+	// represents the S value of the signature.
+	sLen := int(sig[sLenOffset])
+	if sOffset+sLen != sigLen {
+		return fmt.Errorf("malformed signature: invalid S length")
 	}
 
-	// R elements must be integers.
-	if sig[2] != 0x02 {
-		return fmt.Errorf("malformed signature: missing first integer marker")
+	// R elements must be ASN.1 integers.
+	if sig[rTypeOffset] != asn1IntegerID {
+		return fmt.Errorf("malformed signature: R integer marker: %#x != %#x",
+			sig[rTypeOffset], asn1IntegerID)
 	}
 
 	// Zero-length integers are not allowed for R.
@@ -483,19 +530,20 @@ func (vm *Engine) checkSignatureEncoding(sig []byte) error {
 	}
 
 	// R must not be negative.
-	if sig[4]&0x80 != 0 {
+	if sig[rOffset]&0x80 != 0 {
 		return fmt.Errorf("malformed signature: R value is negative")
 	}
 
-	// Null bytes at the start of R are not allowed, unless R would
-	// otherwise be interpreted as a negative number.
-	if rLen > 1 && sig[4] == 0x00 && sig[5]&0x80 == 0 {
+	// Null bytes at the start of R are not allowed, unless R would otherwise be
+	// interpreted as a negative number.
+	if rLen > 1 && sig[rOffset] == 0x00 && sig[rOffset+1]&0x80 == 0 {
 		return fmt.Errorf("malformed signature: invalid R value")
 	}
 
-	// S elements must be integers.
-	if sig[rLen+4] != 0x02 {
-		return fmt.Errorf("malformed signature: missing second integer marker")
+	// S elements must be ASN.1 integers.
+	if sig[sTypeOffset] != asn1IntegerID {
+		return fmt.Errorf("malformed signature: S integer marker: %#x != %#x",
+			sig[sTypeOffset], asn1IntegerID)
 	}
 
 	// Zero-length integers are not allowed for S.
@@ -504,24 +552,20 @@ func (vm *Engine) checkSignatureEncoding(sig []byte) error {
 	}
 
 	// S must not be negative.
-	if sig[rLen+6]&0x80 != 0 {
+	if sig[sOffset]&0x80 != 0 {
 		return fmt.Errorf("malformed signature: S value is negative")
 	}
 
-	// Null bytes at the start of S are not allowed, unless S would
-	// otherwise be interpreted as a negative number.
-	if sLen > 1 && sig[rLen+6] == 0x00 && sig[rLen+7]&0x80 == 0 {
+	// Null bytes at the start of S are not allowed, unless S would otherwise be
+	// interpreted as a negative number.
+	if sLen > 1 && sig[sOffset] == 0x00 && sig[sOffset+1]&0x80 == 0 {
 		return fmt.Errorf("malformed signature: invalid S value")
 	}
 
-	// Verify the S value is <= half the order of the curve.  This check is
-	// done because when it is higher, the complement modulo the order can
-	// be used instead which is a shorter encoding by 1 byte.  Further,
-	// without enforcing this, it is possible to replace a signature in a
-	// valid transaction with the complement while still being a valid
-	// signature that verifies.  This would result in changing the
-	// transaction hash and thus is source of malleability.
-	sValue := new(big.Int).SetBytes(sig[rLen+6 : rLen+6+sLen])
+	// Verify the S value is <= half the order of the curve.  This check is done
+	// because when it is higher, the complement modulo the order can be used
+	// instead which is a shorter encoding by 1 byte.
+	sValue := new(big.Int).SetBytes(sig[sOffset : sOffset+sLen])
 	if sValue.Cmp(halfOrder) > 0 {
 		return ErrStackInvalidLowSSignature
 	}
