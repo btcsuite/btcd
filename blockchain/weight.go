@@ -10,6 +10,9 @@ const (
 	// DefaultMaxBlockSize is the maximum number of bytes within a block
 	DefaultMaxBlockSize = 32000000
 
+	// MaxTransactionSize is the maximum size for transactions we're willing to relay/mine
+	MaxTransactionSize = 100000
+
 	// MaxTxSigOpsCount allowed number of signature check operations per transaction. */
 	MaxTxSigOpsCount = 20000
 

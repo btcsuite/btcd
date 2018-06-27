@@ -217,9 +217,9 @@ func CheckTransactionSanity(tx *btcutil.Tx) error {
 	// A transaction must not exceed the maximum allowed block payload when
 	// serialized.
 	serializedTxSize := tx.MsgTx().SerializeSize()
-	if serializedTxSize > DefaultMaxBlockSize {
+	if serializedTxSize > MaxTransactionSize {
 		str := fmt.Sprintf("serialized transaction is too big - got "+
-			"%d, max %d", serializedTxSize, DefaultMaxBlockSize)
+			"%d, max %d", serializedTxSize, MaxTransactionSize)
 		return ruleError(ErrTxTooBig, str)
 	}
 
