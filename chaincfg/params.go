@@ -139,6 +139,8 @@ type Params struct {
 	UAHFHeight int32
 	// Block height at which the new DAA becomes active
 	DAAHeight int32
+	// Unix time used for MTP activation of May 15 2018, hardfork
+	MagneticAnomalyActivationTime int
 
 	// CoinbaseMaturity is the number of blocks required before newly mined
 	// coins (coinbase transactions) can be spent.
@@ -235,23 +237,24 @@ var MainNetParams = Params{
 	},
 
 	// Chain parameters
-	GenesisBlock:             &genesisBlock,
-	GenesisHash:              &genesisHash,
-	PowLimit:                 mainPowLimit,
-	PowLimitBits:             0x1d00ffff,
-	BIP0034Height:            227931, // 000000000000024b89b42a942fe0d9fea3bb44ab7bd1b19115dd6a759c0808b8
-	BIP0065Height:            388381, // 000000000000000004c2b624ed5d7756c508d90fd0da2c7c679febfa6c4735f0
-	BIP0066Height:            363725, // 00000000000000000379eaa19dce8c9b722d46ae6a57c2f1a988119488b50931
-	UAHFHeight:               478558, // 0000000000000000011865af4122fe3b144e2cbeea86142e8ff2fb4107352d43
-	DAAHeight:                504031, // 0000000000000000011ebf65b60d0a3de80b8175be709d653b4c1a1beeb6ab9c
-	CoinbaseMaturity:         100,
-	SubsidyReductionInterval: 210000,
-	TargetTimespan:           time.Hour * 24 * 14, // 14 days
-	TargetTimePerBlock:       time.Minute * 10,    // 10 minutes
-	RetargetAdjustmentFactor: 4,                   // 25% less, 400% more
-	ReduceMinDifficulty:      false,
-	MinDiffReductionTime:     0,
-	GenerateSupported:        false,
+	GenesisBlock:                  &genesisBlock,
+	GenesisHash:                   &genesisHash,
+	PowLimit:                      mainPowLimit,
+	PowLimitBits:                  0x1d00ffff,
+	BIP0034Height:                 227931,     // 000000000000024b89b42a942fe0d9fea3bb44ab7bd1b19115dd6a759c0808b8
+	BIP0065Height:                 388381,     // 000000000000000004c2b624ed5d7756c508d90fd0da2c7c679febfa6c4735f0
+	BIP0066Height:                 363725,     // 00000000000000000379eaa19dce8c9b722d46ae6a57c2f1a988119488b50931
+	UAHFHeight:                    478558,     // 0000000000000000011865af4122fe3b144e2cbeea86142e8ff2fb4107352d43
+	DAAHeight:                     504031,     // 0000000000000000011ebf65b60d0a3de80b8175be709d653b4c1a1beeb6ab9c
+	MagneticAnomalyActivationTime: 1542300000, // 0000000000000000011ada8bd08f46074f44a8f155396f43e38acf9501c49103
+	CoinbaseMaturity:              100,
+	SubsidyReductionInterval:      210000,
+	TargetTimespan:                time.Hour * 24 * 14, // 14 days
+	TargetTimePerBlock:            time.Minute * 10,    // 10 minutes
+	RetargetAdjustmentFactor:      4,                   // 25% less, 400% more
+	ReduceMinDifficulty:           false,
+	MinDiffReductionTime:          0,
+	GenerateSupported:             false,
 
 	// Checkpoints ordered from oldest to newest.
 	Checkpoints: []Checkpoint{
@@ -335,23 +338,24 @@ var TestNet3Params = Params{
 	},
 
 	// Chain parameters
-	GenesisBlock:             &testNet3GenesisBlock,
-	GenesisHash:              &testNet3GenesisHash,
-	PowLimit:                 testNet3PowLimit,
-	PowLimitBits:             0x1d00ffff,
-	BIP0034Height:            21111,   // 0000000023b3a96d3484e5abb3755c413e7d41500f8e2a5c3f0dd01299cd8ef8
-	BIP0065Height:            581885,  // 00000000007f6655f22f98e72ed80d8b06dc761d5da09df0fa1dc4be4f861eb6
-	BIP0066Height:            330776,  // 000000002104c8c45e99a8853285a3b592602a3ccde2b832481da85e9e4ba182
-	UAHFHeight:               1155875, // 00000000f17c850672894b9a75b63a1e72830bbd5f4c8889b5c1a80e7faef138
-	DAAHeight:                1188697, // 0000000000170ed0918077bde7b4d36cc4c91be69fa09211f748240dabe047fb
-	CoinbaseMaturity:         100,
-	SubsidyReductionInterval: 210000,
-	TargetTimespan:           time.Hour * 24 * 14, // 14 days
-	TargetTimePerBlock:       time.Minute * 10,    // 10 minutes
-	RetargetAdjustmentFactor: 4,                   // 25% less, 400% more
-	ReduceMinDifficulty:      true,
-	MinDiffReductionTime:     time.Minute * 20, // TargetTimePerBlock * 2
-	GenerateSupported:        false,
+	GenesisBlock:                  &testNet3GenesisBlock,
+	GenesisHash:                   &testNet3GenesisHash,
+	PowLimit:                      testNet3PowLimit,
+	PowLimitBits:                  0x1d00ffff,
+	BIP0034Height:                 21111,   // 0000000023b3a96d3484e5abb3755c413e7d41500f8e2a5c3f0dd01299cd8ef8
+	BIP0065Height:                 581885,  // 00000000007f6655f22f98e72ed80d8b06dc761d5da09df0fa1dc4be4f861eb6
+	BIP0066Height:                 330776,  // 000000002104c8c45e99a8853285a3b592602a3ccde2b832481da85e9e4ba182
+	UAHFHeight:                    1155875, // 00000000f17c850672894b9a75b63a1e72830bbd5f4c8889b5c1a80e7faef138
+	DAAHeight:                     1188697, // 0000000000170ed0918077bde7b4d36cc4c91be69fa09211f748240dabe047fb
+	MagneticAnomalyActivationTime: 1542300000,
+	CoinbaseMaturity:              100,
+	SubsidyReductionInterval:      210000,
+	TargetTimespan:                time.Hour * 24 * 14, // 14 days
+	TargetTimePerBlock:            time.Minute * 10,    // 10 minutes
+	RetargetAdjustmentFactor:      4,                   // 25% less, 400% more
+	ReduceMinDifficulty:           true,
+	MinDiffReductionTime:          time.Minute * 20, // TargetTimePerBlock * 2
+	GenerateSupported:             false,
 
 	// Checkpoints ordered from oldest to newest.
 	Checkpoints: []Checkpoint{
@@ -413,23 +417,24 @@ var RegressionNetParams = Params{
 	DNSSeeds: []DNSSeed{},
 
 	// Chain parameters
-	GenesisBlock:             &regTestGenesisBlock,
-	GenesisHash:              &regTestGenesisHash,
-	PowLimit:                 regressionPowLimit,
-	PowLimitBits:             0x207fffff,
-	CoinbaseMaturity:         100,
-	BIP0034Height:            100000000, // Not active - Permit ver 1 blocks
-	BIP0065Height:            1351,      // Used by regression tests
-	BIP0066Height:            1251,      // Used by regression tests
-	UAHFHeight:               0,         // UAHF is always enabled on regtest
-	DAAHeight:                0,         // November 13, 2017 hard fork is always on on regtest
-	SubsidyReductionInterval: 150,
-	TargetTimespan:           time.Hour * 24 * 14, // 14 days
-	TargetTimePerBlock:       time.Minute * 10,    // 10 minutes
-	RetargetAdjustmentFactor: 4,                   // 25% less, 400% more
-	ReduceMinDifficulty:      true,
-	MinDiffReductionTime:     time.Minute * 20, // TargetTimePerBlock * 2
-	GenerateSupported:        true,
+	GenesisBlock:                  &regTestGenesisBlock,
+	GenesisHash:                   &regTestGenesisHash,
+	PowLimit:                      regressionPowLimit,
+	PowLimitBits:                  0x207fffff,
+	CoinbaseMaturity:              100,
+	BIP0034Height:                 100000000, // Not active - Permit ver 1 blocks
+	BIP0065Height:                 1351,      // Used by regression tests
+	BIP0066Height:                 1251,      // Used by regression tests
+	UAHFHeight:                    0,         // UAHF is always enabled on regtest
+	DAAHeight:                     0,         // November 13, 2017 hard fork is always on on regtest
+	MagneticAnomalyActivationTime: 1542300000,
+	SubsidyReductionInterval:      150,
+	TargetTimespan:                time.Hour * 24 * 14, // 14 days
+	TargetTimePerBlock:            time.Minute * 10,    // 10 minutes
+	RetargetAdjustmentFactor:      4,                   // 25% less, 400% more
+	ReduceMinDifficulty:           true,
+	MinDiffReductionTime:          time.Minute * 20, // TargetTimePerBlock * 2
+	GenerateSupported:             true,
 
 	// Checkpoints ordered from oldest to newest.
 	Checkpoints: nil,
@@ -490,23 +495,24 @@ var SimNetParams = Params{
 	DNSSeeds:    []DNSSeed{}, // NOTE: There must NOT be any seeds.
 
 	// Chain parameters
-	GenesisBlock:             &simNetGenesisBlock,
-	GenesisHash:              &simNetGenesisHash,
-	PowLimit:                 simNetPowLimit,
-	PowLimitBits:             0x207fffff,
-	BIP0034Height:            0, // Always active on simnet
-	BIP0065Height:            0, // Always active on simnet
-	BIP0066Height:            0, // Always active on simnet
-	UAHFHeight:               0, // UAHF is always enabled on regtest
-	DAAHeight:                0, // November 13, 2017 hard fork is always on on regtest
-	CoinbaseMaturity:         100,
-	SubsidyReductionInterval: 210000,
-	TargetTimespan:           time.Hour * 24 * 14, // 14 days
-	TargetTimePerBlock:       time.Minute * 10,    // 10 minutes
-	RetargetAdjustmentFactor: 4,                   // 25% less, 400% more
-	ReduceMinDifficulty:      true,
-	MinDiffReductionTime:     time.Minute * 20, // TargetTimePerBlock * 2
-	GenerateSupported:        true,
+	GenesisBlock:                  &simNetGenesisBlock,
+	GenesisHash:                   &simNetGenesisHash,
+	PowLimit:                      simNetPowLimit,
+	PowLimitBits:                  0x207fffff,
+	BIP0034Height:                 0, // Always active on simnet
+	BIP0065Height:                 0, // Always active on simnet
+	BIP0066Height:                 0, // Always active on simnet
+	UAHFHeight:                    0, // UAHF is always enabled on regtest
+	DAAHeight:                     0, // November 13, 2017 hard fork is always on on regtest
+	MagneticAnomalyActivationTime: 1542300000,
+	CoinbaseMaturity:              100,
+	SubsidyReductionInterval:      210000,
+	TargetTimespan:                time.Hour * 24 * 14, // 14 days
+	TargetTimePerBlock:            time.Minute * 10,    // 10 minutes
+	RetargetAdjustmentFactor:      4,                   // 25% less, 400% more
+	ReduceMinDifficulty:           true,
+	MinDiffReductionTime:          time.Minute * 20, // TargetTimePerBlock * 2
+	GenerateSupported:             true,
 
 	// Checkpoints ordered from oldest to newest.
 	Checkpoints: nil,
