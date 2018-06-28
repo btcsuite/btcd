@@ -1155,6 +1155,11 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block, vi
 		}
 	}
 
+	// DAA activated
+	if IsDAAEnabled(node, b.chainParams) {
+		scriptFlags |= txscript.ScriptEnableSighashForkid
+	}
+
 	// Now that the inexpensive checks are done and have passed, verify the
 	// transactions are actually allowed to spend the coins by running the
 	// expensive ECDSA signature check scripts.  Doing this last helps
