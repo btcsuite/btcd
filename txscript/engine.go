@@ -223,13 +223,6 @@ func (vm *Engine) curPC() (script int, off int, err error) {
 	return vm.scriptIdx, vm.scriptOff, nil
 }
 
-// isWitnessVersionActive returns true if a witness program was extracted
-// during the initialization of the Engine, and the program's version matches
-// the specified version.
-func (vm *Engine) isWitnessVersionActive(version uint) bool {
-	return vm.witnessProgram != nil && uint(vm.witnessVersion) == version
-}
-
 // DisasmPC returns the string for the disassembly of the opcode that will be
 // next to execute when Step() is called.
 func (vm *Engine) DisasmPC() (string, error) {
@@ -266,14 +259,6 @@ func (vm *Engine) CheckErrorCondition(finalScript bool) error {
 	if vm.scriptIdx < len(vm.scripts) {
 		return scriptError(ErrScriptUnfinished,
 			"error check when script unfinished")
-	}
-
-	// If we're in version zero witness execution mode, and this was the
-	// final script, then the stack MUST be clean in order to maintain
-	// compatibility with BIP16.
-	if finalScript && vm.isWitnessVersionActive(0) && vm.dstack.Depth() != 1 {
-		return scriptError(ErrEvalFalse, "witness program must "+
-			"have clean stack")
 	}
 
 	if finalScript && vm.hasFlag(ScriptVerifyCleanStack) &&

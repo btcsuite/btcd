@@ -2249,12 +2249,9 @@ func opcodeCheckMultiSig(op *parsedOpcode, vm *Engine) error {
 	// Get script starting from the most recent OP_CODESEPARATOR.
 	script := vm.subScript()
 
-	// Remove the signature in pre version 0 segwit scripts since there is
-	// no way for a signature to sign itself.
-	if !vm.isWitnessVersionActive(0) {
-		for _, sigInfo := range signatures {
-			script = removeOpcodeByData(script, sigInfo.signature)
-		}
+	// Remove the signature in scripts since no way for a signature to sign itself.
+	for _, sigInfo := range signatures {
+		script = removeOpcodeByData(script, sigInfo.signature)
 	}
 
 	success := true
