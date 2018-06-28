@@ -83,6 +83,9 @@ const (
 
 	// Do we accept activate replay protection using a different fork id.
 	ScriptEnableReplayProtection
+
+	// Enable new opcodes.
+	ScriptEnableMonolith
 )
 
 const (

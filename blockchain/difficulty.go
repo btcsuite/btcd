@@ -7,7 +7,6 @@ package blockchain
 import (
 	"math/big"
 
-	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 )
@@ -376,12 +375,4 @@ func (b *BlockChain) CheckProofOfWork(hash *chainhash.Hash, bits uint32) bool {
 	}
 
 	return true
-}
-
-func IsDAAEnabled(currentNode *blockNode, params *chaincfg.Params) bool {
-	if currentNode == nil {
-		return false
-	}
-
-	return currentNode.height >= params.DAAHeight
 }

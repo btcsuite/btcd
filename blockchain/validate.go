@@ -1218,3 +1218,19 @@ func (b *BlockChain) CheckConnectBlockTemplate(block *btcutil.Block) error {
 	newNode := newBlockNode(&header, tip)
 	return b.checkConnectBlock(newNode, block, view, nil)
 }
+
+func IsDAAEnabled(currentNode *blockNode, params *chaincfg.Params) bool {
+	if currentNode == nil {
+		return false
+	}
+
+	return currentNode.height >= params.DAAHeight
+}
+
+func IsMonolithEnabled(currentNode *blockNode, params *chaincfg.Params) bool {
+	if currentNode == nil {
+		return false
+	}
+
+	return currentNode.CalcPastMedianTime().Unix() >= int64(params.MagneticAnomalyActivationTime)
+}
