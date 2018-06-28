@@ -38,11 +38,8 @@ const (
 		ScriptVerifyCheckSequenceVerify |
 		ScriptVerifyLowS |
 		ScriptStrictMultiSig |
-		ScriptVerifyWitness |
-		ScriptVerifyDiscourageUpgradeableWitnessProgram |
 		ScriptVerifyMinimalIf |
-		ScriptEnableSighashForkid |
-		ScriptVerifyWitnessPubKeyType
+		ScriptEnableSighashForkid
 )
 
 // ScriptClass is an enumeration for the list of standard types of script.

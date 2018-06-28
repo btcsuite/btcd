@@ -74,22 +74,9 @@ const (
 	// public keys must follow the strict encoding requirements.
 	ScriptVerifyStrictEncoding
 
-	// ScriptVerifyWitness defines whether or not to verify a transaction
-	// output using a witness program template.
-	ScriptVerifyWitness // todo remove
-
-	// ScriptVerifyDiscourageUpgradeableWitnessProgram makes witness
-	// program with versions 2-16 non-standard.
-	ScriptVerifyDiscourageUpgradeableWitnessProgram // todo remove
-
 	// ScriptVerifyMinimalIf makes a script with an OP_IF/OP_NOTIF whose
 	// operand is anything other than empty vector or [0x01] non-standard.
 	ScriptVerifyMinimalIf
-
-	// ScriptVerifyWitnessPubKeyType makes a script within a check-sig
-	// operation whose public key isn't serialized in a compressed format
-	// non-standard.
-	ScriptVerifyWitnessPubKeyType // todo remove
 
 	// Do we accept signature using SigHashForkID.
 	ScriptEnableSighashForkid
