@@ -30,7 +30,6 @@ const (
 		ScriptVerifyDERSignatures |
 		ScriptVerifyStrictEncoding |
 		ScriptVerifyMinimalData |
-		ScriptStrictMultiSig |
 		ScriptDiscourageUpgradableNops |
 		ScriptVerifyCleanStack |
 		ScriptVerifyNullFail |
