@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"math"
 	"strconv"
 	"strings"
 	"testing"
@@ -525,6 +526,11 @@ testloop:
 			continue
 		}
 
+		err = CheckTransactionSanity(tx)
+		if err != nil {
+			continue
+		}
+
 		prevOuts := make(map[wire.OutPoint]scriptWithInputVal)
 		for j, iinput := range inputs {
 			input, ok := iinput.([]interface{})
@@ -849,3 +855,135 @@ func TestCalcSignatureHash(t *testing.T) {
 		}
 	}
 }
+
+// CheckTransactionSanity performs some preliminary checks on a transaction to
+// ensure it is sane.  These checks are context free.
+func CheckTransactionSanity(tx *btcutil.Tx) error {
+	// A transaction must have at least one input.
+	msgTx := tx.MsgTx()
+	if len(msgTx.TxIn) == 0 {
+		return errors.New("transaction has no inputs")
+	}
+
+	// A transaction must have at least one output.
+	if len(msgTx.TxOut) == 0 {
+		return errors.New("transaction has no outputs")
+	}
+
+	// A transaction must not exceed the maximum allowed block payload when
+	// serialized.
+	serializedTxSize := tx.MsgTx().SerializeSize()
+	if serializedTxSize > 100000 {
+		str := fmt.Sprintf("serialized transaction is too big - got "+
+			"%d, max %d", serializedTxSize, 100000)
+		return errors.New(str)
+	}
+
+	// Ensure the transaction amounts are in range.  Each transaction
+	// output must not be negative or more than the max allowed per
+	// transaction.  Also, the total of all outputs must abide by the same
+	// restrictions.  All amounts in a transaction are in a unit value known
+	// as a satoshi.  One bitcoin is a quantity of satoshi as defined by the
+	// SatoshiPerBitcoin constant.
+	var totalSatoshi int64
+	for _, txOut := range msgTx.TxOut {
+		satoshi := txOut.Value
+		if satoshi < 0 {
+			str := fmt.Sprintf("transaction output has negative "+
+				"value of %v", satoshi)
+			return errors.New(str)
+		}
+		if satoshi > btcutil.MaxSatoshi {
+			str := fmt.Sprintf("transaction output value of %v is "+
+				"higher than max allowed value of %v", satoshi,
+				btcutil.MaxSatoshi)
+			return errors.New(str)
+		}
+
+		// Two's complement int64 overflow guarantees that any overflow
+		// is detected and reported.  This is impossible for Bitcoin, but
+		// perhaps possible if an alt increases the total money supply.
+		totalSatoshi += satoshi
+		if totalSatoshi < 0 {
+			str := fmt.Sprintf("total value of all transaction "+
+				"outputs exceeds max allowed value of %v",
+				btcutil.MaxSatoshi)
+			return errors.New(str)
+		}
+		if totalSatoshi > btcutil.MaxSatoshi {
+			str := fmt.Sprintf("total value of all transaction "+
+				"outputs is %v which is higher than max "+
+				"allowed value of %v", totalSatoshi,
+				btcutil.MaxSatoshi)
+			return errors.New(str)
+		}
+	}
+
+	// Check for duplicate transaction inputs.
+	existingTxOut := make(map[wire.OutPoint]struct{})
+	for _, txIn := range msgTx.TxIn {
+		if _, exists := existingTxOut[txIn.PreviousOutPoint]; exists {
+			return errors.New("transaction " +
+				"contains duplicate inputs")
+		}
+		existingTxOut[txIn.PreviousOutPoint] = struct{}{}
+	}
+
+	// Coinbase script length must be between min and max length.
+	if IsCoinBaseTx(tx.MsgTx()) {
+		slen := len(msgTx.TxIn[0].SignatureScript)
+		if slen < 2 || slen > 100 {
+			str := fmt.Sprintf("coinbase transaction script length "+
+				"of %d is out of range (min: %d, max: %d)",
+				slen, 2, 100)
+			return errors.New(str)
+		}
+	} else {
+		// Previous transaction outputs referenced by the inputs to this
+		// transaction must not be null.
+		for _, txIn := range msgTx.TxIn {
+			if isNullOutpoint(&txIn.PreviousOutPoint) {
+				return errors.New("transaction " +
+					"input refers to previous output that " +
+					"is null")
+			}
+		}
+	}
+
+	return nil
+}
+
+// IsCoinBaseTx determines whether or not a transaction is a coinbase.  A coinbase
+// is a special transaction created by miners that has no inputs.  This is
+// represented in the block chain by a transaction with a single input that has
+// a previous output transaction index set to the maximum value along with a
+// zero hash.
+//
+// This function only differs from IsCoinBase in that it works with a raw wire
+// transaction as opposed to a higher level util transaction.
+func IsCoinBaseTx(msgTx *wire.MsgTx) bool {
+	// A coin base must only have one transaction input.
+	if len(msgTx.TxIn) != 1 {
+		return false
+	}
+
+	// The previous output of a coin base must have a max value index and
+	// a zero hash.
+	prevOut := &msgTx.TxIn[0].PreviousOutPoint
+	if prevOut.Index != math.MaxUint32 || prevOut.Hash != zeroHash {
+		return false
+	}
+
+	return true
+}
+
+// isNullOutpoint determines whether or not a previous transaction output point
+// is set.
+func isNullOutpoint(outpoint *wire.OutPoint) bool {
+	if outpoint.Index == math.MaxUint32 && outpoint.Hash == zeroHash {
+		return true
+	}
+	return false
+}
+
+var zeroHash chainhash.Hash
