@@ -317,7 +317,7 @@ func (b *BlockChain) computeTarget(indexFirst, indexLast *blockNode) *big.Int {
 	work.Mul(work, big.NewInt(int64(b.chainParams.TargetTimePerBlock.Seconds())))
 
 	// In order to avoid difficulty cliffs, we bound the amplitude of the
-	// adjustement we are going to do.
+	// adjustment we are going to do.
 	if indexLast.timestamp <= indexFirst.timestamp {
 		panic("indexLast time should greater than indexFirst time ")
 	}
