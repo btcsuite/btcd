@@ -2337,7 +2337,7 @@ func opcodeCheckMultiSig(op *parsedOpcode, vm *Engine) error {
 
 		// Generate the signature hash based on the signature hash type.
 		var hash []byte
-		hash = calcSignatureHash(script, hashType, &vm.tx, vm.txIdx, btcutil.Amount(0), StandardVerifyFlags)
+		hash = calcSignatureHash(script, hashType, &vm.tx, vm.txIdx, btcutil.Amount(vm.inputAmount), vm.flags)
 
 		var valid bool
 		if vm.sigCache != nil {
