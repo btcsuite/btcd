@@ -241,8 +241,6 @@ func parseScriptFlags(flagStr string) (ScriptFlags, error) {
 			flags |= ScriptVerifyMinimalData
 		case "NONE":
 			// Nothing.
-		case "P2SH":
-			// Always active in Decred.
 		case "SIGPUSHONLY":
 			flags |= ScriptVerifySigPushOnly
 		case "SHA256":
