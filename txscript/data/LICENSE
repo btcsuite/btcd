@@ -1,7 +1,15 @@
-The script_invalid.json, script_valid.json, tx_invalid.json, and tx_valid.json
-files in this directory originally came from the bitcoin project
-(https://github.com/bitcoin/bitcoin) and are released under the following
-license:
+The script_tests.json, tx_invalid.json, and tx_valid.json files in this
+directory originally came from the bitcoin project
+(https://github.com/bitcoin/bitcoin).
+
+The script_tests.json file has significantly diverged from its original
+form to the point it has little resemblance to the original, but several tests
+are still intact and thus the license is maintained for those tests.  All
+modifications made by the Decred project are released under the ISC Licsense as
+detailed below.
+
+The imported tests in script_test.json, tx_invalid.json, and tx_valid.json are
+released under the following license:
 
    Copyright (c) 2009-2014 Bitcoin Developers
 
