@@ -242,7 +242,7 @@ func parseScriptFlags(flagStr string) (ScriptFlags, error) {
 		case "NONE":
 			// Nothing.
 		case "P2SH":
-			flags |= ScriptBip16
+			// Always active in Decred.
 		case "SIGPUSHONLY":
 			flags |= ScriptVerifySigPushOnly
 		case "SHA256":

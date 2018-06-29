@@ -1312,12 +1312,6 @@
     "Execution must not error with non-push-only sig script with P2SH and without SIGPUSHONLY"
 ],
 [
-    "0x47 0x304402205550606a87650619f98b261adde6d343aad0c3fdd526c68d5ed718819ee59a7e0220335af6a47a18064681a77f8387c95934439bdf74b61e290a3353528311b8c99301 NOP 0x23 0x21 0x0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 CHECKSIG",
-    "HASH160 0x14 0xe57d091fa806258280dc78a1d8544a47a5b16a19 EQUAL",
-    "", "OK",
-    "Unexecuted P2SH must not error with non-push-only sig script without P2SH or SIGPUSHONLY"
-],
-[
     "11 0x48 0x3045022100f5353150d31a63f4a0d06d1f5a01ac65f7267a719e49f2a1ac584fd546bef074022030e09575e7a1541aa018876a4003cefe1b061a90556b5140c63e0ef84813524801",
     "0x21 0x0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 CHECKSIG",
     "P2SH", "OK",
@@ -1357,13 +1351,13 @@
     "0x47 0x304402205550606a87650619f98b261adde6d343aad0c3fdd526c68d5ed718819ee59a7e0220335af6a47a18064681a77f8387c95934439bdf74b61e290a3353528311b8c99301 NOP 0x23 0x21 0x0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 CHECKSIG",
     "HASH160 0x14 0xe57d091fa806258280dc78a1d8544a47a5b16a19 EQUAL",
     "P2SH", "ERR_SIG_PUSHONLY",
-    "Execution must error when signature script contains non-push-only opcodes with P2SH and without SIGPUSHONLY (executed redeem script)"
+    "P2SH execution must error when signature script contains non-push-only opcodes without SIGPUSHONLY"
 ],
 [
     "0x47 0x304402205550606a87650619f98b261adde6d343aad0c3fdd526c68d5ed718819ee59a7e0220335af6a47a18064681a77f8387c95934439bdf74b61e290a3353528311b8c99301 NOP 0x23 0x21 0x0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 CHECKSIG",
     "HASH160 0x14 0xe57d091fa806258280dc78a1d8544a47a5b16a19 EQUAL",
     "SIGPUSHONLY", "ERR_SIG_PUSHONLY",
-    "Execution must error when signature script contains non-push-only opcodes without P2SH and with SIGPUSHONLY (unexecuted redeem script)"
+    "P2SH execution must error when signature script contains non-push-only opcodes with SIGPUSHONLY"
 ],
 [
     "11 0x48 0x3045022100f5353150d31a63f4a0d06d1f5a01ac65f7267a719e49f2a1ac584fd546bef074022030e09575e7a1541aa018876a4003cefe1b061a90556b5140c63e0ef84813524801",

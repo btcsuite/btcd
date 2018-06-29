@@ -18,17 +18,13 @@ import (
 type ScriptFlags uint32
 
 const (
-	// ScriptBip16 defines whether the bip16 threshold has passed and thus
-	// pay-to-script hash transactions will be fully validated.
-	ScriptBip16 ScriptFlags = 1 << iota
-
 	// ScriptDiscourageUpgradableNops defines whether to verify that
 	// currently unused opcodes in the NOP and UNKNOWN families are reserved
 	// for future upgrades.  This flag must not be used for consensus
 	// critical code nor applied to blocks as this flag is only for stricter
 	// standard transaction checks.  This flag is only applied when the
 	// above opcodes are executed.
-	ScriptDiscourageUpgradableNops
+	ScriptDiscourageUpgradableNops ScriptFlags = 1 << iota
 
 	// ScriptVerifyCheckLockTimeVerify defines whether to verify that
 	// a transaction output is spendable based on the locktime.
@@ -681,22 +677,9 @@ func NewEngine(scriptPubKey []byte, tx *wire.MsgTx, txIdx int, flags ScriptFlags
 			"false stack entry at end of script execution")
 	}
 
-	// The clean stack flag (ScriptVerifyCleanStack) is not allowed without
-	// the pay-to-script-hash (P2SH) evaluation (ScriptBip16) flag.
-	//
-	// Recall that evaluating a P2SH script without the flag set results in
-	// non-P2SH evaluation which leaves the P2SH inputs on the stack.  Thus,
-	// allowing the clean stack flag without the P2SH flag would make it
-	// possible to have a situation where P2SH would not be a soft fork when
-	// it should be.
-	vm := Engine{version: scriptVersion, flags: flags, sigCache: sigCache}
-	if vm.hasFlag(ScriptVerifyCleanStack) && !vm.hasFlag(ScriptBip16) {
-		return nil, scriptError(ErrInvalidFlags,
-			"invalid flags combination")
-	}
-
 	// The signature script must only contain data pushes when the
 	// associated flag is set.
+	vm := Engine{version: scriptVersion, flags: flags, sigCache: sigCache}
 	if vm.hasFlag(ScriptVerifySigPushOnly) && !IsPushOnlyScript(scriptSig) {
 		return nil, scriptError(ErrNotPushOnly,
 			"signature script is not push only")
@@ -738,7 +721,7 @@ func NewEngine(scriptPubKey []byte, tx *wire.MsgTx, txIdx int, flags ScriptFlags
 		vm.scriptIdx++
 	}
 
-	if vm.hasFlag(ScriptBip16) && isAnyKindOfScriptHash(vm.scripts[1]) {
+	if isAnyKindOfScriptHash(vm.scripts[1]) {
 		// Only accept input scripts that push data for P2SH.
 		if !isPushOnly(vm.scripts[0]) {
 			return nil, scriptError(ErrNotPushOnly,

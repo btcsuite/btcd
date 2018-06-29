@@ -149,53 +149,6 @@ func TestCheckErrorCondition(t *testing.T) {
 	}
 }
 
-// TestInvalidFlagCombinations ensures the script engine returns the expected
-// error when disallowed flag combinations are specified.
-func TestInvalidFlagCombinations(t *testing.T) {
-	t.Parallel()
-
-	tests := []ScriptFlags{
-		ScriptVerifyCleanStack,
-	}
-
-	// tx with almost empty scripts.
-	tx := &wire.MsgTx{
-		SerType: wire.TxSerializeFull,
-		Version: 1,
-		TxIn: []*wire.TxIn{{
-			PreviousOutPoint: wire.OutPoint{
-				Hash: chainhash.Hash([32]byte{
-					0xc9, 0x97, 0xa5, 0xe5,
-					0x6e, 0x10, 0x41, 0x02,
-					0xfa, 0x20, 0x9c, 0x6a,
-					0x85, 0x2d, 0xd9, 0x06,
-					0x60, 0xa2, 0x0b, 0x2d,
-					0x9c, 0x35, 0x24, 0x23,
-					0xed, 0xce, 0x25, 0x85,
-					0x7f, 0xcd, 0x37, 0x04,
-				}),
-				Index: 0,
-			},
-			SignatureScript: []uint8{OP_NOP},
-			Sequence:        4294967295,
-		}},
-		TxOut: []*wire.TxOut{{
-			Value:    1000000000,
-			PkScript: nil,
-		}},
-		LockTime: 0,
-	}
-	pkScript := []byte{OP_NOP}
-
-	for i, test := range tests {
-		_, err := NewEngine(pkScript, tx, 0, test, 0, nil)
-		if !IsErrorCode(err, ErrInvalidFlags) {
-			t.Fatalf("TestInvalidFlagCombinations #%d unexpected "+
-				"error: %v", i, err)
-		}
-	}
-}
-
 // TestCheckPubKeyEncoding ensures the internal checkPubKeyEncoding function
 // works as expected.
 func TestCheckPubKeyEncoding(t *testing.T) {

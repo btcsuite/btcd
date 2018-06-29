@@ -19,8 +19,7 @@ import (
 func testLNFeaturesDeployment(t *testing.T, params *chaincfg.Params, deploymentVer uint32) {
 	// baseConsensusScriptVerifyFlags are the expected script flags when the
 	// agenda is not active.
-	const baseConsensusScriptVerifyFlags = txscript.ScriptBip16 |
-		txscript.ScriptVerifyDERSignatures |
+	const baseConsensusScriptVerifyFlags = txscript.ScriptVerifyDERSignatures |
 		txscript.ScriptVerifyMinimalData |
 		txscript.ScriptVerifyCleanStack |
 		txscript.ScriptVerifyCheckLockTimeVerify

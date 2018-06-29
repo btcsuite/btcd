@@ -23,10 +23,6 @@ const (
 	// Failures related to improper API usage.
 	// ---------------------------------------
 
-	// ErrInvalidFlags is returned when the passed flags to NewEngine
-	// contain an invalid combination.
-	ErrInvalidFlags
-
 	// ErrInvalidIndex is returned when an out-of-bounds index is passed to
 	// a function.
 	ErrInvalidIndex
@@ -345,7 +341,6 @@ const (
 // Map of ErrorCode values back to their constant names for pretty printing.
 var errorCodeStrings = map[ErrorCode]string{
 	ErrInternal:                  "ErrInternal",
-	ErrInvalidFlags:              "ErrInvalidFlags",
 	ErrInvalidIndex:              "ErrInvalidIndex",
 	ErrInvalidSigHashSingleIndex: "ErrInvalidSigHashSingleIndex",
 	ErrUnsupportedAddress:        "ErrUnsupportedAddress",
