@@ -273,6 +273,8 @@ var MainNetParams = Params{
 		{478558, newHashFromStr("0000000000000000011865af4122fe3b144e2cbeea86142e8ff2fb4107352d43")},
 		// Nov, 13 DAA activation block.
 		{504031, newHashFromStr("0000000000000000011ebf65b60d0a3de80b8175be709d653b4c1a1beeb6ab9c")},
+		// Monolith activation.
+		{530359, newHashFromStr("0000000000000000011ada8bd08f46074f44a8f155396f43e38acf9501c49103")},
 	},
 
 	// Consensus rule change deployments.
