@@ -131,34 +131,6 @@ func isPubkeyHashAlt(pops []parsedOpcode) bool {
 		pops[5].opcode.value == OP_CHECKSIGALT
 }
 
-// isScriptHash returns true if the script passed is a pay-to-script-hash
-// transaction, false otherwise.
-func isScriptHash(pops []parsedOpcode) bool {
-	return len(pops) == 3 &&
-		pops[0].opcode.value == OP_HASH160 &&
-		pops[1].opcode.value == OP_DATA_20 &&
-		pops[2].opcode.value == OP_EQUAL
-}
-
-// isAnyKindOfScriptHash returns true if the script passed is a pay-to-script-hash
-// or stake pay-to-script-hash transaction, false otherwise. Used to make the
-// engine have the correct behaviour.
-func isAnyKindOfScriptHash(pops []parsedOpcode) bool {
-	standardP2SH := len(pops) == 3 &&
-		pops[0].opcode.value == OP_HASH160 &&
-		pops[1].opcode.value == OP_DATA_20 &&
-		pops[2].opcode.value == OP_EQUAL
-	if standardP2SH {
-		return true
-	}
-
-	return len(pops) == 4 &&
-		(pops[0].opcode.value >= 186 && pops[0].opcode.value <= 189) &&
-		pops[1].opcode.value == OP_HASH160 &&
-		pops[2].opcode.value == OP_DATA_20 &&
-		pops[3].opcode.value == OP_EQUAL
-}
-
 // isMultiSig returns true if the passed script is a multisig transaction, false
 // otherwise.
 func isMultiSig(pops []parsedOpcode) bool {
@@ -493,7 +465,7 @@ func GetStakeOutSubclass(pkScript []byte) (ScriptClass, error) {
 	if isStake {
 		var stakeSubscript []parsedOpcode
 		for _, pop := range pkPops {
-			if pop.opcode.value >= 186 && pop.opcode.value <= 189 {
+			if isStakeOpcode(pop.opcode) {
 				continue
 			}
 			stakeSubscript = append(stakeSubscript, pop)
@@ -522,7 +494,7 @@ func ContainsStakeOpCodes(pkScript []byte) (bool, error) {
 	}
 
 	for _, pop := range shPops {
-		if pop.opcode.value >= 186 && pop.opcode.value <= 189 {
+		if isStakeOpcode(pop.opcode) {
 			return true, nil
 		}
 	}

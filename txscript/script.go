@@ -65,6 +65,37 @@ func IsPushOnlyScript(script []byte) bool {
 	return isPushOnly(pops)
 }
 
+// isStakeOpcode returns whether or not the opcode is one of the stake tagging
+// opcodes.
+func isStakeOpcode(op *opcode) bool {
+	return op.value >= OP_SSTX && op.value <= OP_SSTXCHANGE
+}
+
+// isScriptHash returns whether or not the passed script is a regular
+// pay-to-script-hash script.
+func isScriptHash(pops []parsedOpcode) bool {
+	return len(pops) == 3 &&
+		pops[0].opcode.value == OP_HASH160 &&
+		pops[1].opcode.value == OP_DATA_20 &&
+		pops[2].opcode.value == OP_EQUAL
+}
+
+// isStakeScriptHash returns whether or not the passed script is a stake
+// pay-to-script-hash script.
+func isStakeScriptHash(pops []parsedOpcode) bool {
+	return len(pops) == 4 &&
+		isStakeOpcode(pops[0].opcode) &&
+		pops[1].opcode.value == OP_HASH160 &&
+		pops[2].opcode.value == OP_DATA_20 &&
+		pops[3].opcode.value == OP_EQUAL
+}
+
+// isAnyKindOfScriptHash returns whether or not the passed script is either a
+// regular pay-to-script-hash script or a stake pay-to-script-hash script.
+func isAnyKindOfScriptHash(pops []parsedOpcode) bool {
+	return isScriptHash(pops) || isStakeScriptHash(pops)
+}
+
 // HasP2SHScriptSigStakeOpCodes returns an error is the p2sh script has either
 // stake opcodes or if the pkscript cannot be retrieved.
 func HasP2SHScriptSigStakeOpCodes(version uint16, scriptSig,
