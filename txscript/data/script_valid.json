@@ -48,8 +48,6 @@
 ["'' 2147483647 2147483646", "SUBSTR '' EQUAL", "P2SH", "SUBSTR of an empty string produces an empty byte push regardless of out of bounds indices <=4 bytes"],
 ["'abcd' 3 3 1SUB", "SUBSTR 'c' EQUAL", "P2SH", "SUBSTR start index must work with the result of math operations"],
 ["'abcd' 4 1 SUB 2", "SUBSTR 'c' EQUAL", "P2SH", "SUBSTR end index must work with the result of math operations"],
-["'abc' 2 0", "IF LEFT ELSE 1 ENDIF", "P2SH"],
-["'abc' 2 0", "IF RIGHT ELSE 1 ENDIF", "P2SH"],
 
 ["Left substring related test coverage"],
 ["'abcd' 0", "LEFT NOT", "P2SH", "LEFT index of zero must produce empty byte push which is equivalent to FALSE"],

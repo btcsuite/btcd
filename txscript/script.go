@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2016 The btcsuite developers
+// Copyright (c) 2013-2017 The btcsuite developers
 // Copyright (c) 2015-2018 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
@@ -98,8 +98,7 @@ func isAnyKindOfScriptHash(pops []parsedOpcode) bool {
 
 // HasP2SHScriptSigStakeOpCodes returns an error is the p2sh script has either
 // stake opcodes or if the pkscript cannot be retrieved.
-func HasP2SHScriptSigStakeOpCodes(version uint16, scriptSig,
-	scriptPubKey []byte) error {
+func HasP2SHScriptSigStakeOpCodes(version uint16, scriptSig, scriptPubKey []byte) error {
 	class := GetScriptClass(version, scriptPubKey)
 	if IsStakeOutput(scriptPubKey) {
 		class, _ = GetStakeOutSubclass(scriptPubKey)
@@ -110,11 +109,11 @@ func HasP2SHScriptSigStakeOpCodes(version uint16, scriptSig,
 		// any stake tagging OP codes.
 		pData, err := PushedData(scriptSig)
 		if err != nil {
-			return fmt.Errorf("error retrieving pushed data "+
-				"from script: %v", err)
+			return err
 		}
 		if len(pData) == 0 {
-			return fmt.Errorf("script has no pushed data")
+			str := "script has no pushed data"
+			return scriptError(ErrNotPushOnly, str)
 		}
 
 		// The pay-to-hash-script is the final data push of the
@@ -123,11 +122,11 @@ func HasP2SHScriptSigStakeOpCodes(version uint16, scriptSig,
 
 		hasStakeOpCodes, err := ContainsStakeOpCodes(shScript)
 		if err != nil {
-			return fmt.Errorf("unexpected error checking pkscript "+
-				"from p2sh transaction: %v", err.Error())
+			return err
 		}
 		if hasStakeOpCodes {
-			return ErrP2SHStakeOpCodes
+			str := "stake opcodes were found in a p2sh script"
+			return scriptError(ErrP2SHStakeOpCodes, str)
 		}
 	}
 
@@ -137,8 +136,7 @@ func HasP2SHScriptSigStakeOpCodes(version uint16, scriptSig,
 // parseScriptTemplate is the same as parseScript but allows the passing of the
 // template list for testing purposes.  When there are parse errors, it returns
 // the list of parsed opcodes up to the point of failure along with the error.
-func parseScriptTemplate(script []byte, opcodes *[256]opcode) ([]parsedOpcode,
-	error) {
+func parseScriptTemplate(script []byte, opcodes *[256]opcode) ([]parsedOpcode, error) {
 	retScript := make([]parsedOpcode, 0, len(script))
 	for i := 0; i < len(script); {
 		instr := script[i]
@@ -156,7 +154,11 @@ func parseScriptTemplate(script []byte, opcodes *[256]opcode) ([]parsedOpcode,
 		// Data pushes of specific lengths -- OP_DATA_[1-75].
 		case op.length > 1:
 			if len(script[i:]) < op.length {
-				return retScript, ErrStackShortScript
+				str := fmt.Sprintf("opcode %s requires %d "+
+					"bytes, but script only has %d remaining",
+					op.name, op.length, len(script[i:]))
+				return retScript, scriptError(ErrMalformedPush,
+					str)
 			}
 
 			// Slice out the data.
@@ -169,7 +171,11 @@ func parseScriptTemplate(script []byte, opcodes *[256]opcode) ([]parsedOpcode,
 			off := i + 1
 
 			if len(script[off:]) < -op.length {
-				return retScript, ErrStackShortScript
+				str := fmt.Sprintf("opcode %s requires %d "+
+					"bytes, but script only has %d remaining",
+					op.name, -op.length, len(script[off:]))
+				return retScript, scriptError(ErrMalformedPush,
+					str)
 			}
 
 			// Next -length bytes are little endian length of data.
@@ -185,9 +191,10 @@ func parseScriptTemplate(script []byte, opcodes *[256]opcode) ([]parsedOpcode,
 					(uint(script[off+1]) << 8) |
 					uint(script[off]))
 			default:
-				return retScript,
-					fmt.Errorf("invalid opcode length %d",
-						op.length)
+				str := fmt.Sprintf("invalid opcode length %d",
+					op.length)
+				return retScript, scriptError(ErrMalformedPush,
+					str)
 			}
 
 			// Move offset to beginning of the data.
@@ -196,7 +203,11 @@ func parseScriptTemplate(script []byte, opcodes *[256]opcode) ([]parsedOpcode,
 			// Disallow entries that do not fit script or were
 			// sign extended.
 			if int(l) > len(script[off:]) || int(l) < 0 {
-				return retScript, ErrStackShortScript
+				str := fmt.Sprintf("opcode %s pushes %d bytes, "+
+					"but script only has %d remaining",
+					op.name, int(l), len(script[off:]))
+				return retScript, scriptError(ErrMalformedPush,
+					str)
 			}
 
 			pop.data = script[off : off+int(l)]

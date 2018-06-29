@@ -712,12 +712,13 @@ testloop:
 // parseSigHashExpectedResult parses the provided expected result string into
 // allowed error codes.  An error is returned if the expected result string is
 // not supported.
-func parseSigHashExpectedResult(expected string) (error, error) {
+func parseSigHashExpectedResult(expected string) (*ErrorCode, error) {
 	switch expected {
 	case "OK":
 		return nil, nil
 	case "SIGHASH_SINGLE_IDX":
-		return ErrSighashSingleIdx, nil
+		code := ErrInvalidSigHashSingleIndex
+		return &code, nil
 	}
 
 	return nil, fmt.Errorf("unrecognized expected result in test data: %v",
@@ -827,14 +828,21 @@ func TestCalcSignatureHashReference(t *testing.T) {
 		// Calculate the signature hash and verify expected result.
 		hash, err := calcSignatureHash(parsedScript, hashType, &tx,
 			int(inputIdxF64), nil)
-		if err != expectedErr {
-			t.Errorf("Test #%d: unexpected error: want %v, got %v", i,
-				expectedErr, err)
+		if (err == nil) != (expectedErr == nil) ||
+			expectedErr != nil && !IsErrorCode(err, *expectedErr) {
+
+			if serr, ok := err.(Error); ok {
+				t.Errorf("Test #%d: want error code %v, got %v", i, expectedErr,
+					serr.ErrorCode)
+				continue
+			}
+			t.Errorf("Test #%d: want error code %v, got err: %v (%T)", i,
+				expectedErr, err, err)
 			continue
 		}
 		if !bytes.Equal(hash, expectedHash) {
-			t.Errorf("Test #%d: signature hash mismatch - got %x, "+
-				"want %x", i, hash, expectedHash)
+			t.Errorf("Test #%d: signature hash mismatch - got %x, want %x", i,
+				hash, expectedHash)
 			continue
 		}
 	}

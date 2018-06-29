@@ -28,7 +28,7 @@ const (
 func ExtractCoinbaseNullData(pkScript []byte) ([]byte, error) {
 	pops, err := parseScript(pkScript)
 	if err != nil {
-		return nil, fmt.Errorf("script parse failure")
+		return nil, err
 	}
 
 	// The nulldata in the coinbase must be a single OP_RETURN followed by a
@@ -54,5 +54,7 @@ func ExtractCoinbaseNullData(pkScript []byte) ([]byte, error) {
 		return pops[1].data, nil
 	}
 
-	return nil, fmt.Errorf("not a properly-formed nulldata script")
+	str := fmt.Sprintf("script %x is not well-formed coinbase nulldata",
+		pkScript)
+	return nil, scriptError(ErrMalformedCoinbaseNullData, str)
 }

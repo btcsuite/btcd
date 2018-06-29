@@ -7,6 +7,7 @@ package txscript
 
 import (
 	"encoding/binary"
+	"fmt"
 	"math"
 
 	"github.com/decred/dcrd/chaincfg"
@@ -234,7 +235,9 @@ func calcSignatureHash(prevOutScript []parsedOpcode, hashType SigHashType, tx *w
 	// is improper to use SigHashSingle on input indices that don't have a
 	// corresponding output.
 	if hashType&sigHashMask == SigHashSingle && idx >= len(tx.TxOut) {
-		return nil, ErrSighashSingleIdx
+		str := fmt.Sprintf("attempt to sign single input at index %d "+
+			">= %d outputs", idx, len(tx.TxOut))
+		return nil, scriptError(ErrInvalidSigHashSingleIndex, str)
 	}
 
 	// Remove all instances of OP_CODESEPARATOR from the script.

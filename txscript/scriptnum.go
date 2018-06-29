@@ -1,9 +1,13 @@
-// Copyright (c) 2015 The btcsuite developers
-// Copyright (c) 2015-2016 The Decred developers
+// Copyright (c) 2015-2017 The btcsuite developers
+// Copyright (c) 2015-2018 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
 package txscript
+
+import (
+	"fmt"
+)
 
 const (
 	maxInt32 = 1<<31 - 1
@@ -66,7 +70,9 @@ func checkMinimalDataEncoding(v []byte) error {
 		// is +-255, which encode to 0xff00 and 0xff80 respectively.
 		// (big-endian).
 		if len(v) == 1 || v[len(v)-2]&0x80 == 0 {
-			return ErrStackMinimalData
+			str := fmt.Sprintf("numeric value encoded as %x is "+
+				"not minimally encoded", v)
+			return scriptError(ErrMinimalData, str)
 		}
 	}
 
@@ -174,8 +180,8 @@ func (n scriptNum) Int32() int32 {
 // requireMinimal enabled.
 //
 // The scriptNumLen is the maximum number of bytes the encoded value can be
-// before an ErrStackNumberTooBig is returned.  This effectively limits the
-// range of allowed values.
+// before an ErrNumberTooBig is returned.  This effectively limits the range of
+// allowed values.
 // WARNING:  Great care should be taken if passing a value larger than
 // defaultScriptNumLen, which could lead to addition and multiplication
 // overflows.
@@ -185,7 +191,10 @@ func makeScriptNum(v []byte, requireMinimal bool, scriptNumLen int) (scriptNum, 
 	// Interpreting data requires that it is not larger than
 	// the the passed scriptNumLen value.
 	if len(v) > scriptNumLen {
-		return 0, ErrStackNumberTooBig
+		str := fmt.Sprintf("numeric value encoded as %x is %d bytes "+
+			"which exceeds the max allowed of %d", v, len(v),
+			scriptNumLen)
+		return 0, scriptError(ErrNumOutOfRange, str)
 	}
 
 	// Enforce minimal encoded if requested.
