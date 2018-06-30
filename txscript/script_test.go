@@ -2659,65 +2659,65 @@ func TestUnparsingInvalidOpcodes(t *testing.T) {
 			expectedErr: scriptError(ErrInternal, ""),
 		},
 		{
-			name: "OP_SUBSTR",
+			name: "OP_SPLIT",
 			pop: &parsedOpcode{
-				opcode: &opcodeArray[OP_SUBSTR],
+				opcode: &opcodeArray[OP_SPLIT],
 				data:   nil,
 			},
 			expectedErr: nil,
 		},
 		{
-			name: "OP_SUBSTR long",
+			name: "OP_SPLIT long",
 			pop: &parsedOpcode{
-				opcode: &opcodeArray[OP_SUBSTR],
+				opcode: &opcodeArray[OP_SPLIT],
 				data:   make([]byte, 1),
 			},
 			expectedErr: scriptError(ErrInternal, ""),
 		},
 		{
-			name: "OP_LEFT",
+			name: "OP_NUM2BIN",
 			pop: &parsedOpcode{
-				opcode: &opcodeArray[OP_LEFT],
+				opcode: &opcodeArray[OP_NUM2BIN],
 				data:   nil,
 			},
 			expectedErr: nil,
 		},
 		{
-			name: "OP_LEFT long",
+			name: "OP_NUM2BIN long",
 			pop: &parsedOpcode{
-				opcode: &opcodeArray[OP_LEFT],
+				opcode: &opcodeArray[OP_NUM2BIN],
 				data:   make([]byte, 1),
 			},
 			expectedErr: scriptError(ErrInternal, ""),
 		},
 		{
-			name: "OP_LEFT",
+			name: "OP_NUM2BIN",
 			pop: &parsedOpcode{
-				opcode: &opcodeArray[OP_LEFT],
+				opcode: &opcodeArray[OP_NUM2BIN],
 				data:   nil,
 			},
 			expectedErr: nil,
 		},
 		{
-			name: "OP_LEFT long",
+			name: "OP_NUM2BIN long",
 			pop: &parsedOpcode{
-				opcode: &opcodeArray[OP_LEFT],
+				opcode: &opcodeArray[OP_NUM2BIN],
 				data:   make([]byte, 1),
 			},
 			expectedErr: scriptError(ErrInternal, ""),
 		},
 		{
-			name: "OP_RIGHT",
+			name: "OP_BIN2NUM",
 			pop: &parsedOpcode{
-				opcode: &opcodeArray[OP_RIGHT],
+				opcode: &opcodeArray[OP_BIN2NUM],
 				data:   nil,
 			},
 			expectedErr: nil,
 		},
 		{
-			name: "OP_RIGHT long",
+			name: "OP_BIN2NUM long",
 			pop: &parsedOpcode{
-				opcode: &opcodeArray[OP_RIGHT],
+				opcode: &opcodeArray[OP_BIN2NUM],
 				data:   make([]byte, 1),
 			},
 			expectedErr: scriptError(ErrInternal, ""),

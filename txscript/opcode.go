@@ -164,9 +164,9 @@ const (
 	OP_SWAP                = 0x7c // 124
 	OP_TUCK                = 0x7d // 125
 	OP_CAT                 = 0x7e // 126
-	OP_SUBSTR              = 0x7f // 127
-	OP_LEFT                = 0x80 // 128
-	OP_RIGHT               = 0x81 // 129
+	OP_SPLIT               = 0x7f // 127
+	OP_NUM2BIN             = 0x80 // 128
+	OP_BIN2NUM             = 0x81 // 129
 	OP_SIZE                = 0x82 // 130
 	OP_INVERT              = 0x83 // 131
 	OP_AND                 = 0x84 // 132
@@ -443,17 +443,17 @@ var opcodeArray = [256]opcode{
 	OP_TUCK:         {OP_TUCK, "OP_TUCK", 1, opcodeTuck},
 
 	// Splice opcodes.
-	OP_CAT:    {OP_CAT, "OP_CAT", 1, opcodeDisabled},
-	OP_SUBSTR: {OP_SUBSTR, "OP_SUBSTR", 1, opcodeDisabled},
-	OP_LEFT:   {OP_LEFT, "OP_LEFT", 1, opcodeDisabled},
-	OP_RIGHT:  {OP_RIGHT, "OP_RIGHT", 1, opcodeDisabled},
-	OP_SIZE:   {OP_SIZE, "OP_SIZE", 1, opcodeSize},
+	OP_CAT:     {OP_CAT, "OP_CAT", 1, opcodeCat},
+	OP_SPLIT:   {OP_SPLIT, "OP_SPLIT", 1, opcodeSplit},
+	OP_NUM2BIN: {OP_NUM2BIN, "OP_NUM2BIN", 1, opcodeNum2bin},
+	OP_BIN2NUM: {OP_BIN2NUM, "OP_BIN2NUM", 1, opcodeBin2num},
+	OP_SIZE:    {OP_SIZE, "OP_SIZE", 1, opcodeSize},
 
 	// Bitwise logic opcodes.
 	OP_INVERT:      {OP_INVERT, "OP_INVERT", 1, opcodeDisabled},
-	OP_AND:         {OP_AND, "OP_AND", 1, opcodeDisabled},
-	OP_OR:          {OP_OR, "OP_OR", 1, opcodeDisabled},
-	OP_XOR:         {OP_XOR, "OP_XOR", 1, opcodeDisabled},
+	OP_AND:         {OP_AND, "OP_AND", 1, opcodeAnd},
+	OP_OR:          {OP_OR, "OP_OR", 1, opcodeOr},
+	OP_XOR:         {OP_XOR, "OP_XOR", 1, opcodeXor},
 	OP_EQUAL:       {OP_EQUAL, "OP_EQUAL", 1, opcodeEqual},
 	OP_EQUALVERIFY: {OP_EQUALVERIFY, "OP_EQUALVERIFY", 1, opcodeEqualVerify},
 	OP_RESERVED1:   {OP_RESERVED1, "OP_RESERVED1", 1, opcodeReserved},
@@ -471,8 +471,8 @@ var opcodeArray = [256]opcode{
 	OP_ADD:                {OP_ADD, "OP_ADD", 1, opcodeAdd},
 	OP_SUB:                {OP_SUB, "OP_SUB", 1, opcodeSub},
 	OP_MUL:                {OP_MUL, "OP_MUL", 1, opcodeDisabled},
-	OP_DIV:                {OP_DIV, "OP_DIV", 1, opcodeDisabled},
-	OP_MOD:                {OP_MOD, "OP_MOD", 1, opcodeDisabled},
+	OP_DIV:                {OP_DIV, "OP_DIV", 1, opcodeDiv},
+	OP_MOD:                {OP_MOD, "OP_MOD", 1, opcodeMod},
 	OP_LSHIFT:             {OP_LSHIFT, "OP_LSHIFT", 1, opcodeDisabled},
 	OP_RSHIFT:             {OP_RSHIFT, "OP_RSHIFT", 1, opcodeDisabled},
 	OP_BOOLAND:            {OP_BOOLAND, "OP_BOOLAND", 1, opcodeBoolAnd},
@@ -620,23 +620,9 @@ type parsedOpcode struct {
 
 // isDisabled returns whether or not the opcode is disabled and thus is always
 // bad to see in the instruction stream (even if turned off by a conditional).
-func (pop *parsedOpcode) isDisabled() bool {
+func (pop *parsedOpcode) isDisabled(flags ScriptFlags) bool {
 	switch pop.opcode.value {
-	case OP_CAT:
-		return true
-	case OP_SUBSTR:
-		return true
-	case OP_LEFT:
-		return true
-	case OP_RIGHT:
-		return true
 	case OP_INVERT:
-		return true
-	case OP_AND:
-		return true
-	case OP_OR:
-		return true
-	case OP_XOR:
 		return true
 	case OP_2MUL:
 		return true
@@ -644,13 +630,16 @@ func (pop *parsedOpcode) isDisabled() bool {
 		return true
 	case OP_MUL:
 		return true
-	case OP_DIV:
-		return true
-	case OP_MOD:
-		return true
 	case OP_LSHIFT:
 		return true
 	case OP_RSHIFT:
+		return true
+
+	case OP_CAT, OP_SPLIT, OP_NUM2BIN, OP_BIN2NUM, OP_AND, OP_OR, OP_XOR, OP_DIV, OP_MOD:
+		// Opcodes that have been reenabled.
+		if flags&ScriptEnableMonolith != 0 {
+			return false
+		}
 		return true
 	default:
 		return false
@@ -1630,6 +1619,48 @@ func opcodeSub(op *parsedOpcode, vm *Engine) error {
 	return nil
 }
 
+func opcodeDiv(p *parsedOpcode, vm *Engine) error {
+	v0, err := vm.dstack.PopInt()
+	if err != nil {
+		return err
+	}
+
+	v1, err := vm.dstack.PopInt()
+	if err != nil {
+		return err
+	}
+
+	// denominator must not be 0
+	if v0 == 0 {
+		return scriptError(ErrScriptDivByZero, "division by zero error")
+	}
+	bn := v1 / v0
+	vm.dstack.PushInt(bn)
+
+	return nil
+}
+
+func opcodeMod(p *parsedOpcode, vm *Engine) error {
+	v0, err := vm.dstack.PopInt()
+	if err != nil {
+		return err
+	}
+
+	v1, err := vm.dstack.PopInt()
+	if err != nil {
+		return err
+	}
+
+	// divisor must not be 0
+	if v0 == 0 {
+		return scriptError(ErrScriptModByZero, "modulo by zero error")
+	}
+	bn := v1 % v0
+	vm.dstack.PushInt(bn)
+
+	return nil
+}
+
 // opcodeBoolAnd treats the top two items on the data stack as integers.  When
 // both of them are not zero, they are replaced with a 1, otherwise a 0.
 //
@@ -2382,6 +2413,209 @@ func opcodeCheckMultiSigVerify(op *parsedOpcode, vm *Engine) error {
 		err = abstractVerify(op, vm, ErrCheckMultiSigVerify)
 	}
 	return err
+}
+
+// opcodeCat join the two top stack elements together
+//
+// Stack transformation:
+// [ ... ele2 ele1 ] -> [ ... ele2+ele1]
+func opcodeCat(op *parsedOpcode, vm *Engine) error {
+	if len(vm.dstack.stk) < 2 {
+		str := "not enough data for opcodeCat operation"
+		return scriptError(ErrInvalidStackOperation, str)
+	}
+
+	bytes1, err := vm.dstack.PopByteArray()
+	if err != nil {
+		return err
+	}
+	bytes2, err := vm.dstack.PopByteArray()
+	if err != nil {
+		return err
+	}
+
+	if len(bytes1)+len(bytes2) > MaxScriptElementSize {
+		return scriptError(ErrElementTooBig, "push element size is too big")
+	}
+
+	buf := bytes.NewBuffer(make([]byte, 0, len(bytes1)+len(bytes2)))
+	buf.Write(bytes2)
+	buf.Write(bytes1)
+
+	vm.dstack.PushByteArray(buf.Bytes())
+
+	return nil
+}
+
+// opcodeSubstr split the second to last bytes according to the first to last bytes.
+//
+// Stack information:
+// [ ... ele2 ele1 ] -> [... sub2 sub1 ]
+func opcodeSplit(p *parsedOpcode, vm *Engine) error {
+	if len(vm.dstack.stk) < 2 {
+		str := "not enough data for opcodeCat operation"
+		return scriptError(ErrInvalidStackOperation, str)
+	}
+
+	bytes1, err := vm.dstack.PopByteArray()
+	if err != nil {
+		return err
+	}
+	bytes2, err := vm.dstack.PopByteArray()
+	if err != nil {
+		return err
+	}
+
+	// Make sure the split point is appropriate.
+	position, err := makeScriptNum(bytes1,
+		vm.flags&ScriptVerifyMinimalData != 0, defaultScriptNumLen)
+	if err != nil {
+		return err
+	}
+
+	if int(position.Int32()) > len(bytes2) || position.Int32() < 0 {
+		str := "split position exceed the target length"
+		return scriptError(ErrInvalidSplitRange, str)
+	}
+
+	// Prepare the results in their own buffer as `data`
+	// will be invalidated.
+	ret1 := bytes2[:position.Int32()]
+	ret2 := bytes2[position.Int32():]
+
+	vm.dstack.PushByteArray(ret1)
+	vm.dstack.PushByteArray(ret2)
+
+	return nil
+}
+
+func opcodeNum2bin(p *parsedOpcode, vm *Engine) error {
+	// (in size -- out)
+	if len(vm.dstack.stk) < 2 {
+		str := "not enough data for opcodeCat operation"
+		return scriptError(ErrInvalidStackOperation, str)
+	}
+
+	i, err := vm.dstack.PopInt()
+	size := uint64(i)
+	if err != nil {
+		return err
+	}
+	if size > MaxScriptElementSize {
+		return scriptError(ErrElementTooBig, "push element size is too big")
+	}
+
+	rawnum, err := vm.dstack.PopByteArray()
+	// Try to see if we can fit that number in the number of
+	// byte requested.
+	minimallyEncode(&rawnum)
+	if uint64(len(rawnum)) > size {
+		// We definitively cannot.
+		str := "the requested encoding is impossible to satisfy"
+		return scriptError(ErrImpossibleEncoding, str)
+	}
+
+	// We already have an element of the right size, we
+	// don't need to do anything.
+	if uint64(len(rawnum)) == size {
+		vm.dstack.PushByteArray(rawnum)
+		return nil
+	}
+
+	signBit := byte(0x00)
+	if len(rawnum) > 0 {
+		signBit = rawnum[len(rawnum)-1] & 0x80
+		rawnum[len(rawnum)-1] = rawnum[len(rawnum)-1] & 0x7f
+	}
+
+	for uint64(len(rawnum)) < size-1 {
+		rawnum = append(rawnum, byte(0x00))
+	}
+
+	rawnum = append(rawnum, signBit)
+	vm.dstack.PushByteArray(rawnum)
+
+	return nil
+}
+
+func opcodeBin2num(p *parsedOpcode, vm *Engine) error {
+	if len(vm.dstack.stk) < 1 {
+		str := "operation not valid with the current stack size"
+		return scriptError(ErrInvalidStackOperation, str)
+	}
+
+	n, err := vm.dstack.PopByteArray()
+	if err != nil {
+		return err
+	}
+	minimallyEncode(&n)
+	if len(n) > defaultScriptNumLen {
+		str := "given operand is not a number within the valid range"
+		return scriptError(ErrInvalidNumberRange, str)
+	}
+	// The resulting number must be a valid number.
+	if err = checkMinimalDataEncoding(n); err != nil {
+		if err != nil {
+			str := "given operand is not a number within the valid range"
+			return scriptError(ErrInvalidNumberRange, str)
+		}
+	}
+	vm.dstack.PushByteArray(n)
+
+	return nil
+}
+
+func opcodeAnd(p *parsedOpcode, vm *Engine) error {
+	return bytesOperate(p, vm)
+}
+
+func opcodeOr(p *parsedOpcode, vm *Engine) error {
+	return bytesOperate(p, vm)
+}
+
+func opcodeXor(p *parsedOpcode, vm *Engine) error {
+	return bytesOperate(p, vm)
+}
+
+func bytesOperate(p *parsedOpcode, vm *Engine) error {
+	if len(vm.dstack.stk) < 2 {
+		str := "operation not valid with the current stack size"
+		return scriptError(ErrInvalidStackOperation, str)
+	}
+
+	bytes1, err := vm.dstack.PopByteArray()
+	if err != nil {
+		return err
+	}
+	bytes2, err := vm.dstack.PopByteArray()
+	if err != nil {
+		return err
+	}
+
+	// Inputs must be the same size
+	if len(bytes1) != len(bytes2) {
+		return scriptError(ErrInvalidOperandSize, "invalid operand size")
+	}
+
+	// To avoid allocating, we modify vch1 in place.
+	switch p.opcode.value {
+	case OP_AND:
+		for i := 0; i < len(bytes1); i++ {
+			bytes2[i] &= bytes1[i]
+		}
+	case OP_OR:
+		for i := 0; i < len(bytes1); i++ {
+			bytes2[i] |= bytes1[i]
+		}
+	case OP_XOR:
+		for i := 0; i < len(bytes1); i++ {
+			bytes2[i] ^= bytes1[i]
+		}
+	}
+
+	vm.dstack.PushByteArray(bytes2)
+
+	return nil
 }
 
 // OpcodeByName is a map that can be used to lookup an opcode by its

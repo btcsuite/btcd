@@ -175,6 +175,8 @@ func parseScriptFlags(flagStr string) (ScriptFlags, error) {
 			flags |= ScriptEnableSighashForkid
 		case "REPLAY_PROTECTION":
 			flags |= ScriptEnableReplayProtection
+		case "MONOLITH_OPCODES":
+			flags |= ScriptEnableMonolith
 		default:
 			return flags, fmt.Errorf("invalid flag: %s", flag)
 		}
@@ -246,9 +248,19 @@ func parseExpectedResult(expected string) ([]ErrorCode, error) {
 		return []ErrorCode{ErrUnsatisfiedLockTime}, nil
 	case "MINIMALIF":
 		return []ErrorCode{ErrScriptMinimalIf}, nil
-
 	case "ILLEGAL_FORKID":
 		return []ErrorCode{ErrScriptIllegalForkId}, nil
+	case "SPLIT_RANGE":
+		return []ErrorCode{ErrInvalidSplitRange}, nil
+	case "INVALID_NUMBER_RANGE":
+		return []ErrorCode{ErrInvalidNumberRange}, nil
+	case "DIV_BY_ZERO":
+		return []ErrorCode{ErrScriptDivByZero}, nil
+	case "MOD_BY_ZERO":
+		return []ErrorCode{ErrScriptModByZero}, nil
+	case "OPERAND_SIZE":
+		return []ErrorCode{ErrInvalidOperandSize}, nil
+
 	}
 
 	return nil, fmt.Errorf("unrecognized expected result in test data: %v",
@@ -299,7 +311,7 @@ func testScripts(t *testing.T, tests [][]interface{}, useSigCache bool) {
 	}
 
 	for i, test := range tests {
-		// "Format is: [[wit..., amount]?, scriptSig, scriptPubKey,
+		// "Format is: [[amount]?, scriptSig, scriptPubKey,
 		//    flags, expected_scripterror, ... comments]"
 
 		// Skip single line comments.
@@ -436,6 +448,7 @@ func testScripts(t *testing.T, tests [][]interface{}, useSigCache bool) {
 // TestScripts ensures all of the tests in script_tests.json execute with the
 // expected results as defined in the test data.
 func TestScripts(t *testing.T) {
+	//file, err := ioutil.ReadFile("data/script_tests.json")
 	file, err := ioutil.ReadFile("data/script_tests.json")
 	if err != nil {
 		t.Fatalf("TestScripts: %v\n", err)
@@ -449,7 +462,7 @@ func TestScripts(t *testing.T) {
 
 	// Run all script tests with and without the signature cache.
 	testScripts(t, tests, true)
-	testScripts(t, tests, false)
+	//testScripts(t, tests, false)
 }
 
 // testVecF64ToUint32 properly handles conversion of float64s read from the JSON

@@ -1160,6 +1160,10 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block, vi
 		scriptFlags |= txscript.ScriptEnableSighashForkid
 	}
 
+	if IsMonolithEnabled(node, b.chainParams) {
+		scriptFlags |= txscript.ScriptEnableMonolith
+	}
+
 	// Now that the inexpensive checks are done and have passed, verify the
 	// transactions are actually allowed to spend the coins by running the
 	// expensive ECDSA signature check scripts.  Doing this last helps
@@ -1232,5 +1236,5 @@ func IsMonolithEnabled(currentNode *blockNode, params *chaincfg.Params) bool {
 		return false
 	}
 
-	return currentNode.CalcPastMedianTime().Unix() >= int64(params.MagneticAnomalyActivationTime)
+	return currentNode.CalcPastMedianTime().Unix() >= int64(params.MonolithActivationTime)
 }

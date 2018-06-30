@@ -78,6 +78,9 @@ const (
 	// operand is anything other than empty vector or [0x01] non-standard.
 	ScriptVerifyMinimalIf
 
+	// Public keys in scripts must be compressed
+	ScriptVerifyCompressedPubkey
+
 	// Do we accept signature using SigHashForkID.
 	ScriptEnableSighashForkid
 
@@ -143,7 +146,7 @@ func (vm *Engine) isBranchExecuting() bool {
 // tested in this case.
 func (vm *Engine) executeOpcode(pop *parsedOpcode) error {
 	// Disabled opcodes are fail on program counter.
-	if pop.isDisabled() {
+	if pop.isDisabled(vm.flags) {
 		str := fmt.Sprintf("attempt to execute disabled opcode %s",
 			pop.opcode.name)
 		return scriptError(ErrDisabledOpcode, str)
@@ -461,6 +464,11 @@ func (vm *Engine) checkPubKeyEncoding(pubKey []byte) error {
 	if len(pubKey) == 65 && pubKey[0] == 0x04 {
 		// Uncompressed
 		return nil
+	}
+
+	// Only compressed keys are accepted when ScriptVerifyCompressedPubkey is enabled.
+	if vm.hasFlag(ScriptVerifyCompressedPubkey) && len(pubKey) == 65 && pubKey[0] == 0x04 {
+		return scriptError(ErrUncompressedPubKey, "Compressed PubKey is needed")
 	}
 
 	return scriptError(ErrPubKeyType, "unsupported public key type")

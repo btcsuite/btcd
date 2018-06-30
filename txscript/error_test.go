@@ -58,8 +58,15 @@ func TestErrorCodeStringer(t *testing.T) {
 		{ErrNegativeLockTime, "ErrNegativeLockTime"},
 		{ErrUnsatisfiedLockTime, "ErrUnsatisfiedLockTime"},
 		{ErrScriptMinimalIf, "ErrScriptMinimalIf"},
+		{ErrUncompressedPubKey, "ErrUncompressedPubKey"},
+		{ErrInvalidSplitRange, "ErrInvalidSplitRange"},
+		{ErrInvalidNumberRange, "ErrInvalidNumberRange"},
+		{ErrInvalidOperandSize, "ErrInvalidOperandSize"},
+		{ErrImpossibleEncoding, "ErrImpossibleEncoding"},
 		{ErrScriptIllegalForkId, "ErrScriptIllegalForkId"},
 		{ErrScriptMustUseForkid, "ErrScriptMustUseForkid"},
+		{ErrScriptDivByZero, "ErrScriptDivByZero"},
+		{ErrScriptModByZero, "ErrScriptModByZero"},
 		{0xffff, "Unknown ErrorCode (65535)"},
 	}
 
