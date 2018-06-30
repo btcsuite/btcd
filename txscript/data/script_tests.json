@@ -1021,14 +1021,14 @@
 [
     "0",
     "0x21 0x03fff97bd5755eeea420453a14355235d382f6472f8568a18b2f057a1460297556 CHECKSIG NOT",
-    "DERSIG", "OK",
-    "CHECKSIG must push false with invalid non-null DER-compliant sig with DERSIG (P2PK NOT 0 sig)"
+    "NONE", "OK",
+    "CHECKSIG must push false with invalid non-null DER-compliant sig (P2PK NOT 0 sig)"
 ],
 [
     "0x09 0x300602010102010101",
     "0x21 0x03fff97bd5755eeea420453a14355235d382f6472f8568a18b2f057a1460297556 CHECKSIG NOT",
-    "DERSIG", "OK",
-    "CHECKSIG must push false with invalid non-null DER-compliant sig with DERSIG (P2PK NOT min sig)"
+    "NONE", "OK",
+    "CHECKSIG must push false with invalid non-null DER-compliant sig (P2PK NOT min sig)"
 ],
 ["", "CHECKSIG NOT", "", "ERR_INVALID_STACK_OPERATION", "CHECKSIG must error when there are no stack items"],
 ["0", "CHECKSIG NOT", "", "ERR_INVALID_STACK_OPERATION","CHECKSIG must error when there are not 2 stack items"],
@@ -1048,146 +1048,146 @@
 [
     "0x48 0x304402204de4b86166781ffbd4375650776a338d53a0eabcc61f371ce256364f058f88ba0220597090d34c536b727fb555d61b100703a3f63b7a6ad7aa0164138c6ab3c63f880101",
     "0x21 0x0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 CHECKSIG",
-    "DERSIG", "ERR_SIG_INVALID_DATA_LEN",
-    "CHECKSIG must error on multi-byte hash type with DERSIG"
+    "NONE", "ERR_SIG_INVALID_DATA_LEN",
+    "CHECKSIG must error on multi-byte hash type"
 ],
 [
     "1",
     "0x21 0x03fff97bd5755eeea420453a14355235d382f6472f8568a18b2f057a1460297556 CHECKSIG",
-    "DERSIG", "ERR_SIG_TOO_SHORT",
-    "CHECKSIG must error on non-DER-compliant sig with DERSIG"
+    "NONE", "ERR_SIG_TOO_SHORT",
+    "CHECKSIG must error on non-DER-compliant sigs"
 ],
 [
     "1",
     "0x21 0x03fff97bd5755eeea420453a14355235d382f6472f8568a18b2f057a1460297556 CHECKSIG NOT",
-    "DERSIG", "ERR_SIG_TOO_SHORT",
-    "CHECKSIG must error on non-DER-compliant sig with DERSIG (P2PK NOT)"
+    "NONE", "ERR_SIG_TOO_SHORT",
+    "CHECKSIG must error on non-DER-compliant sig (P2PK NOT)"
 ],
 [
     "0x08 0x3005020100020001",
     "0x21 0x0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 CHECKSIG NOT",
-    "DERSIG", "ERR_SIG_TOO_SHORT",
-    "CHECKSIG must error with too short signature with DERSIG"
+    "NONE", "ERR_SIG_TOO_SHORT",
+    "CHECKSIG must error with too short signature"
 ],
 [
     "0x4a 0x3045022100f5353150d31a63f4a0d06d1f5a01ac65f7267a719e49f2a1ac584fd546bef074022030e09575e7a1541aa018876a4003cefe1b061a90556b5140c63e0ef848135248010101",
     "0x21 0x0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 CHECKSIG",
-    "DERSIG", "ERR_SIG_TOO_LONG",
-    "CHECKSIG must error with too long signature with DERSIG"
+    "NONE", "ERR_SIG_TOO_LONG",
+    "CHECKSIG must error with too long signature"
 ],
 [
     "0x48 0x3145022100f5353150d31a63f4a0d06d1f5a01ac65f7267a719e49f2a1ac584fd546bef074022030e09575e7a1541aa018876a4003cefe1b061a90556b5140c63e0ef84813524801",
     "0x21 0x0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 CHECKSIG",
-    "DERSIG", "ERR_SIG_INVALID_SEQ_ID",
-    "CHECKSIG must error when first byte of signature is not the ASN.1 sequence ID with DERSIG"
+    "NONE", "ERR_SIG_INVALID_SEQ_ID",
+    "CHECKSIG must error when first byte of signature is not the ASN.1 sequence ID"
 ],
 [
     "0x48 0x3044022100f5353150d31a63f4a0d06d1f5a01ac65f7267a719e49f2a1ac584fd546bef074022030e09575e7a1541aa018876a4003cefe1b061a90556b5140c63e0ef84813524801",
     "0x21 0x0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 CHECKSIG",
-    "DERSIG", "ERR_SIG_INVALID_DATA_LEN",
-    "CHECKSIG must error when data len inside signature does not match the remaining len (one too small) with DERSIG"
+    "NONE", "ERR_SIG_INVALID_DATA_LEN",
+    "CHECKSIG must error when data len inside signature does not match the remaining len (one too small)"
 ],
 [
     "0x48 0x3046022100f5353150d31a63f4a0d06d1f5a01ac65f7267a719e49f2a1ac584fd546bef074022030e09575e7a1541aa018876a4003cefe1b061a90556b5140c63e0ef84813524801",
     "0x21 0x0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 CHECKSIG",
-    "DERSIG", "ERR_SIG_INVALID_DATA_LEN",
-    "CHECKSIG must error when data len inside signature does not match the remaining len (one too big) with DERSIG"
+    "NONE", "ERR_SIG_INVALID_DATA_LEN",
+    "CHECKSIG must error when data len inside signature does not match the remaining len (one too big)"
 ],
 [
     "0x26 0x3023022100f5353150d31a63f4a0d06d1f5a01ac65f7267a719e49f2a1ac584fd546bef07401",
     "0x21 0x0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 CHECKSIG",
-    "DERSIG", "ERR_SIG_MISSING_S_TYPE_ID",
-    "CHECKSIG must error when S ASN.1 integer ID is missing with DERSIG"
+    "NONE", "ERR_SIG_MISSING_S_TYPE_ID",
+    "CHECKSIG must error when S ASN.1 integer ID is missing"
 ],
 [
     "0x27 0x3024022100f5353150d31a63f4a0d06d1f5a01ac65f7267a719e49f2a1ac584fd546bef0740201",
     "0x21 0x0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 CHECKSIG",
-    "DERSIG", "ERR_SIG_MISSING_S_LEN",
-    "CHECKSIG must error when S length is missing with DERSIG"
+    "NONE", "ERR_SIG_MISSING_S_LEN",
+    "CHECKSIG must error when S length is missing"
 ],
 [
     "0x48 0x3045022100f5353150d31a63f4a0d06d1f5a01ac65f7267a719e49f2a1ac584fd546bef074021f30e09575e7a1541aa018876a4003cefe1b061a90556b5140c63e0ef84813524801",
     "0x21 0x0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 CHECKSIG",
-    "DERSIG", "ERR_SIG_INVALID_S_LEN",
-    "CHECKSIG must error when S length is invalid (one too small) with DERSIG"
+    "NONE", "ERR_SIG_INVALID_S_LEN",
+    "CHECKSIG must error when S length is invalid (one too small)"
 ],
 [
     "0x48 0x3045022100f5353150d31a63f4a0d06d1f5a01ac65f7267a719e49f2a1ac584fd546bef074022130e09575e7a1541aa018876a4003cefe1b061a90556b5140c63e0ef84813524801",
     "0x21 0x0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 CHECKSIG",
-    "DERSIG", "ERR_SIG_INVALID_S_LEN",
-    "CHECKSIG must error when S length is invalid (one too big) with DERSIG"
+    "NONE", "ERR_SIG_INVALID_S_LEN",
+    "CHECKSIG must error when S length is invalid (one too big)"
 ],
 [
     "0x48 0x3045032100f5353150d31a63f4a0d06d1f5a01ac65f7267a719e49f2a1ac584fd546bef074022030e09575e7a1541aa018876a4003cefe1b061a90556b5140c63e0ef84813524801",
     "0x21 0x0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 CHECKSIG",
-    "DERSIG", "ERR_SIG_INVALID_R_INT_ID",
-    "CHECKSIG must error when R is not marked as ASN.1 integer with DERSIG"
+    "NONE", "ERR_SIG_INVALID_R_INT_ID",
+    "CHECKSIG must error when R is not marked as ASN.1 integer"
 ],
 [
     "0x27 0x30240200022030e09575e7a1541aa018876a4003cefe1b061a90556b5140c63e0ef84813524801",
     "0x21 0x0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 CHECKSIG",
-    "DERSIG", "ERR_SIG_ZERO_R_LEN",
-    "CHECKSIG must error when R has length zero with DERSIG"
+    "NONE", "ERR_SIG_ZERO_R_LEN",
+    "CHECKSIG must error when R has length zero"
 ],
 [
     "0x47 0x30440220b2ec8d34d473c3aa2ab5eb7cc4a0783977e5db8c8daf777e0b6d7bfa6b6623f302207df6f09af2c40460da2c2c5778f636d3b2e27e20d10d90f5a5afb4523145470001",
     "0x21 0x03fff97bd5755eeea420453a14355235d382f6472f8568a18b2f057a1460297556 CHECKSIG",
-    "DERSIG", "ERR_SIG_NEGATIVE_R",
-    "CHECKSIG must error when R is negative (too little padding) with DERSIG"
+    "NONE", "ERR_SIG_NEGATIVE_R",
+    "CHECKSIG must error when R is negative (too little padding)"
 ],
 [
     "0x47 0x30440220b20cd6f4b8496af01fe3e35b86139947ddb2f8a54cc1139d1839e2120de9fe540220261bd8ad7c1ab57912d5f432431001c26b72adc9cd7fde73c7776f7585c8538d01",
     "0x21 0x03fff97bd5755eeea420453a14355235d382f6472f8568a18b2f057a1460297556 CHECKSIG NOT",
-    "DERSIG", "ERR_SIG_NEGATIVE_R",
-    "CHECKSIG must error when R is negative (too little padding) with DERSIG (P2PK NOT)"
+    "NONE", "ERR_SIG_NEGATIVE_R",
+    "CHECKSIG must error when R is negative (too little padding) (P2PK NOT)"
 ],
 [
     "0x47 0x304402200077f6e93de5ed43cf1dfddaa79fca4b766e1a8fc879b0333d377f62538d7eb5022054fed940d227ed06d6ef08f320976503848ed1f52d0dd6d17f80c9c160b01d8601",
     "0x21 0x03fff97bd5755eeea420453a14355235d382f6472f8568a18b2f057a1460297556 CHECKSIG",
-    "DERSIG", "ERR_SIG_TOO_MUCH_R_PADDING",
-    "CHECKSIG must error with otherwise valid sig when R has too much padding with DERSIG"
+    "NONE", "ERR_SIG_TOO_MUCH_R_PADDING",
+    "CHECKSIG must error with otherwise valid sig when R has too much padding"
 ],
 [
     "0x47 0x304402200077f6e93de5ed43cf1dfddaa79fca4b766e1a8fc879b0333d377f62538d7eb5022054fed940d227ed06d6ef08f320976503848ed1f52d0dd6d17f80c9c160b01d8601",
     "0x21 0x03fff97bd5755eeea420453a14355235d382f6472f8568a18b2f057a1460297556 CHECKSIG NOT",
-    "DERSIG", "ERR_SIG_TOO_MUCH_R_PADDING",
-    "CHECKSIG must error with invalid sig when R has too much padding (P2PK NOT) with DERSIG (sig invalidated via 8th byte ^= 0x55)"
+    "NONE", "ERR_SIG_TOO_MUCH_R_PADDING",
+    "CHECKSIG must error with invalid sig when R has too much padding (P2PK NOT, sig invalidated via 8th byte ^= 0x55)"
 ],
 [
     "0x48 0x3045022100f5353150d31a63f4a0d06d1f5a01ac65f7267a719e49f2a1ac584fd546bef074032030e09575e7a1541aa018876a4003cefe1b061a90556b5140c63e0ef84813524801",
     "0x21 0x0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 CHECKSIG",
-    "DERSIG", "ERR_SIG_INVALID_S_INT_ID",
-    "CHECKSIG must error when S is not marked as ASN.1 integer with DERSIG"
+    "NONE", "ERR_SIG_INVALID_S_INT_ID",
+    "CHECKSIG must error when S is not marked as ASN.1 integer"
 ],
 [
     "0x28 0x3025022100f5353150d31a63f4a0d06d1f5a01ac65f7267a719e49f2a1ac584fd546bef074020001",
     "0x21 0x0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 CHECKSIG",
-    "DERSIG", "ERR_SIG_ZERO_S_LEN",
-    "CHECKSIG must error when S has length zero with DERSIG"
+    "NONE", "ERR_SIG_ZERO_S_LEN",
+    "CHECKSIG must error when S has length zero"
 ],
 [
     "0x47 0x304402204fc10344934662ca0a93a84d14d650d8a21cf2ab91f608e8783d2999c955443202208441aacd6b17038ff3f6700b042934f9a6fea0cec2051b51dc709e52a5bb7d6101",
     "0x21 0x0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 CHECKSIG",
-    "DERSIG", "ERR_SIG_NEGATIVE_S",
-    "CHECKSIG must error when S is negative (too little padding) with DERSIG"
+    "NONE", "ERR_SIG_NEGATIVE_S",
+    "CHECKSIG must error when S is negative (too little padding)"
 ],
 [
     "0x47 0x304402206ad2fdaf8caba0f2cb2484e61b81ced77474b4c2aa069c852df1351b3314fe20022000695ad175b09a4a41cd9433f6b2e8e83253d6a7402096ba313a7be1f086dde501",
     "0x21 0x03fff97bd5755eeea420453a14355235d382f6472f8568a18b2f057a1460297556 CHECKSIG",
-    "DERSIG", "ERR_SIG_TOO_MUCH_S_PADDING",
-    "CHECKSIG must error with otherwise valid sig when S has too much padding with DERSIG"
+    "NONE", "ERR_SIG_TOO_MUCH_S_PADDING",
+    "CHECKSIG must error with otherwise valid sig when S has too much padding"
 ],
 [
     "0x47 0x3044022079c8f3b4a84d0df95faa3459ed65e0094dc842521706ec9a2253a32c43c41feb02200036479eca243e68e312586061c803ddd8d2ce564ab395aa061938cf6e4d011401",
     "0x21 0x03fff97bd5755eeea420453a14355235d382f6472f8568a18b2f057a1460297556 CHECKSIG NOT",
-    "DERSIG", "ERR_SIG_TOO_MUCH_S_PADDING",
-    "CHECKSIG must error with otherwise valid sig when S has too much padding with DERSIG (P2PK NOT)"
+    "NONE", "ERR_SIG_TOO_MUCH_S_PADDING",
+    "CHECKSIG must error with otherwise valid sig when S has too much padding (P2PK NOT)"
 ],
 [
     "0x48 0x304502204fc10344934662ca0a93a84d14d650d8a21cf2ab91f608e8783d2999c95544320221008441aacd6b17038ff3f6700b042934f9a6fea0cec2051b51dc709e52a5bb7d6101",
     "0x21 0x0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 CHECKSIG",
-    "DERSIG", "ERR_SIG_HIGH_S",
-    "CHECKSIG must error when S is greater than the curve half order even though it is otherwise valid with DERSIG"
+    "NONE", "ERR_SIG_HIGH_S",
+    "CHECKSIG must error when S is greater than the curve half order even though it is otherwise valid"
 ],
 [
     "0x48 0x3045022100f5353150d31a63f4a0d06d1f5a01ac65f7267a719e49f2a1ac584fd546bef074022030e09575e7a1541aa018876a4003cefe1b061a90556b5140c63e0ef84813524801",
@@ -1264,8 +1264,8 @@
 [
     "0",
     "0x21 0x03fff97bd5755eeea420453a14355235d382f6472f8568a18b2f057a1460297556 CHECKSIG",
-    "DERSIG", "ERR_EVAL_FALSE",
-    "CHECKSIG must consider 0 sig valid and evaluate to false with DERSIG"
+    "NONE", "ERR_EVAL_FALSE",
+    "CHECKSIG must consider 0 sig valid and evaluate to false"
 ],
 
 ["Additional test coverage with standard payment forms involving CHECKSIG"],
@@ -1450,193 +1450,193 @@
 [
     "0x49 0x3045022100a1206e43320cc02d97c76eb2d575cdb1215b491c5b0c7a7865d3a4bea2a7a39a02207eb5a56828d164f158812e0ad8d39588258ae0e369cb918bfaab6d61ba90d80d0101",
     "1 0x21 0x02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9 1 CHECKMULTISIG NOT",
-    "DERSIG", "ERR_SIG_INVALID_DATA_LEN",
-    "CHECKMULTISIG must error on multi-byte hash type with DERSIG"
+    "NONE", "ERR_SIG_INVALID_DATA_LEN",
+    "CHECKMULTISIG must error on multi-byte hash type"
 ],
 [
     "0x08 0x3005020100020001",
     "1 0x21 0x02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9 1 CHECKMULTISIG NOT",
-    "DERSIG", "ERR_SIG_TOO_SHORT",
-    "CHECKMULTISIG must error with too short signature with DERSIG"
+    "NONE", "ERR_SIG_TOO_SHORT",
+    "CHECKMULTISIG must error with too short signature"
 ],
 [
     "0x4a 0x3045022100a1206e43320cc02d97c76eb2d575cdb1215b491c5b0c7a7865d3a4bea2a7a39a02207eb5a56828d164f158812e0ad8d39588258ae0e369cb918bfaab6d61ba90d80d010101",
     "1 0x21 0x02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9 1 CHECKMULTISIG NOT",
-    "DERSIG", "ERR_SIG_TOO_LONG",
-    "CHECKMULTISIG must error with too long signature with DERSIG"
+    "NONE", "ERR_SIG_TOO_LONG",
+    "CHECKMULTISIG must error with too long signature"
 ],
 [
     "0x48 0x3145022100a1206e43320cc02d97c76eb2d575cdb1215b491c5b0c7a7865d3a4bea2a7a39a02207eb5a56828d164f158812e0ad8d39588258ae0e369cb918bfaab6d61ba90d80d01",
     "1 0x21 0x02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9 1 CHECKMULTISIG NOT",
-    "DERSIG", "ERR_SIG_INVALID_SEQ_ID",
-    "CHECKMULTISIG must error when first byte of signature is not the ASN.1 sequence ID with DERSIG"
+    "NONE", "ERR_SIG_INVALID_SEQ_ID",
+    "CHECKMULTISIG must error when first byte of signature is not the ASN.1 sequence ID"
 ],
 [
     "0x48 0x3044022100a1206e43320cc02d97c76eb2d575cdb1215b491c5b0c7a7865d3a4bea2a7a39a02207eb5a56828d164f158812e0ad8d39588258ae0e369cb918bfaab6d61ba90d80d01",
     "1 0x21 0x02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9 1 CHECKMULTISIG NOT",
-    "DERSIG", "ERR_SIG_INVALID_DATA_LEN",
-    "CHECKMULTISIG must error when data len inside signature does not match the remaining len (one too small) with DERSIG"
+    "NONE", "ERR_SIG_INVALID_DATA_LEN",
+    "CHECKMULTISIG must error when data len inside signature does not match the remaining len (one too small)"
 ],
 [
     "0x48 0x3046022100a1206e43320cc02d97c76eb2d575cdb1215b491c5b0c7a7865d3a4bea2a7a39a02207eb5a56828d164f158812e0ad8d39588258ae0e369cb918bfaab6d61ba90d80d01",
     "1 0x21 0x02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9 1 CHECKMULTISIG NOT",
-    "DERSIG", "ERR_SIG_INVALID_DATA_LEN",
-    "CHECKMULTISIG must error when data len inside signature does not match the remaining len (one too big) with DERSIG"
+    "NONE", "ERR_SIG_INVALID_DATA_LEN",
+    "CHECKMULTISIG must error when data len inside signature does not match the remaining len (one too big)"
 ],
 [
     "0x26 0x3023022100a1206e43320cc02d97c76eb2d575cdb1215b491c5b0c7a7865d3a4bea2a7a39a01",
     "1 0x21 0x02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9 1 CHECKMULTISIG NOT",
-    "DERSIG", "ERR_SIG_MISSING_S_TYPE_ID",
-    "CHECKMULTISIG must error when S ASN.1 integer ID is missing with DERSIG"
+    "NONE", "ERR_SIG_MISSING_S_TYPE_ID",
+    "CHECKMULTISIG must error when S ASN.1 integer ID is missing"
 ],
 [
     "0x27 0x3024022100a1206e43320cc02d97c76eb2d575cdb1215b491c5b0c7a7865d3a4bea2a7a39a0201",
     "1 0x21 0x02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9 1 CHECKMULTISIG NOT",
-    "DERSIG", "ERR_SIG_MISSING_S_LEN",
-    "CHECKMULTISIG must error when S length is missing with DERSIG"
+    "NONE", "ERR_SIG_MISSING_S_LEN",
+    "CHECKMULTISIG must error when S length is missing"
 ],
 [
     "0x48 0x3045022100a1206e43320cc02d97c76eb2d575cdb1215b491c5b0c7a7865d3a4bea2a7a39a021f7eb5a56828d164f158812e0ad8d39588258ae0e369cb918bfaab6d61ba90d80d01",
     "1 0x21 0x02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9 1 CHECKMULTISIG NOT",
-    "DERSIG", "ERR_SIG_INVALID_S_LEN",
-    "CHECKMULTISIG must error when S length is invalid (one too small) with DERSIG"
+    "NONE", "ERR_SIG_INVALID_S_LEN",
+    "CHECKMULTISIG must error when S length is invalid (one too small)"
 ],
 [
     "0x48 0x3045022100a1206e43320cc02d97c76eb2d575cdb1215b491c5b0c7a7865d3a4bea2a7a39a02217eb5a56828d164f158812e0ad8d39588258ae0e369cb918bfaab6d61ba90d80d01",
     "1 0x21 0x02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9 1 CHECKMULTISIG NOT",
-    "DERSIG", "ERR_SIG_INVALID_S_LEN",
-    "CHECKMULTISIG must error when S length is invalid (one too big) with DERSIG"
+    "NONE", "ERR_SIG_INVALID_S_LEN",
+    "CHECKMULTISIG must error when S length is invalid (one too big)"
 ],
 [
     "0x48 0x3045032100a1206e43320cc02d97c76eb2d575cdb1215b491c5b0c7a7865d3a4bea2a7a39a02207eb5a56828d164f158812e0ad8d39588258ae0e369cb918bfaab6d61ba90d80d01",
     "1 0x21 0x02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9 1 CHECKMULTISIG NOT",
-    "DERSIG", "ERR_SIG_INVALID_R_INT_ID",
-    "CHECKMULTISIG must error when R is not marked as ASN.1 integer with DERSIG"
+    "NONE", "ERR_SIG_INVALID_R_INT_ID",
+    "CHECKMULTISIG must error when R is not marked as ASN.1 integer"
 ],
 [
     "0x27 0x3024020002207eb5a56828d164f158812e0ad8d39588258ae0e369cb918bfaab6d61ba90d80d01",
     "1 0x21 0x02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9 1 CHECKMULTISIG NOT",
-    "DERSIG", "ERR_SIG_ZERO_R_LEN",
-    "CHECKMULTISIG must error when R has length zero with DERSIG"
+    "NONE", "ERR_SIG_ZERO_R_LEN",
+    "CHECKMULTISIG must error when R has length zero"
 ],
 [
     "0x47 0x30440220a1206e43320cc02d97c76eb2d575cdb1215b491c5b0c7a7865d3a4bea2a7a39a02207eb5a56828d164f158812e0ad8d39588258ae0e369cb918bfaab6d61ba90d80d01",
     "1 0x21 0x02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9 1 CHECKMULTISIG NOT",
-    "DERSIG", "ERR_SIG_NEGATIVE_R",
-    "CHECKMULTISIG must error when R is negative (too little padding) with DERSIG"
+    "NONE", "ERR_SIG_NEGATIVE_R",
+    "CHECKMULTISIG must error when R is negative (too little padding)"
 ],
 [
     "0x47 0x30440220eb8231fbc543176e5ee8b80591b7db91d4dab835daada515d95f3532eb54b86102203e76890b026b24030a99a2ae5957d573b7a9ecbc382d613b18c25c124d0fac9a01 0x48 0x3045022100b6d7a4f10cd430b1292b761e2cf3ef1284dc4b8276a6d4895d955016f06f1bb702205d8f79c45719eae0985ce7602ddf4ec2427de5c353f4e642f9e4855d159f6a7801",
     "2 0x21 0x0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 0x21 0x02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9 2 CHECKMULTISIG NOT",
-    "DERSIG", "ERR_SIG_NEGATIVE_R",
-    "CHECKMULTISIG must error when R is negative with DERSIG (2-of-2, first sig valid DER, second sig valid non-DER)"
+    "NONE", "ERR_SIG_NEGATIVE_R",
+    "CHECKMULTISIG must error when R is negative  (2-of-2, first sig valid DER, second sig valid non-DER)"
 ],
 [
     "0x47 0x3044022058e3e5d0c457d3b41d7b555366410fb233e00f504812e87602cd5f9174cbe2fc02201805a21251d62eae7ce92ba4235bd553a38ac0e0ffe9bac0f2fa9ccfc6abdcdc01 0x47 0x30440220a1bf7167ce8c49568537045e70f689b90f42a496d75947f14e6dbfdbfa6b0fc602200564205c85c3003f5e3442eeb4632c4fc5928838727324ae3b11f8de3579981501",
     "2 0x21 0x0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 0x21 0x02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9 2 CHECKMULTISIG NOT",
-    "DERSIG", "ERR_SIG_NEGATIVE_R",
-    "CHECKMULTISIG must error when R is negative with DERSIG (2-of-2, first sig valid non-DER, second sig valid DER)"
+    "NONE", "ERR_SIG_NEGATIVE_R",
+    "CHECKMULTISIG must error when R is negative (2-of-2, first sig valid non-DER, second sig valid DER)"
 ],
 [
     "0 0x47 0x30440220ea377dcb8630e68da3a0eeb57e96e195b4d9c437381f76912c0e6fc28bae6e3502204096da36de10b7261bfa6ae0fddbe11428c1d13160bcb1110ed04f3f7d2f389f01",
     "2 0x21 0x0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 0x21 0x02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9 2 CHECKMULTISIG NOT",
-    "DERSIG", "ERR_SIG_NEGATIVE_R",
-    "CHECKMULTISIG must error when R is negative with DERSIG (2-of-2, first sig valid non-DER, second sig invalid but DER compliant)"
+    "NONE", "ERR_SIG_NEGATIVE_R",
+    "CHECKMULTISIG must error when R is negative (2-of-2, first sig valid non-DER, second sig invalid but DER compliant)"
 ],
 [
     "0x47 0x30440220b35d1861ac81cd15748dbf82a67931057600f5596cde464621f8a8afeea84862022076aea5e870ed4d82955b1c803de191fc4c82c8b6c6e243d3e17295506f276e7301 0",
     "2 0x21 0x0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 0x21 0x02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9 2 CHECKMULTISIG",
-    "DERSIG", "ERR_EVAL_FALSE",
-    "CHECKMULTISIG must push false even if an unevaluated signature is not DER compliant with DERSIG (2-of-2, first sig invalid but DER compliant, second sig valid non-DER)"
+    "NONE", "ERR_EVAL_FALSE",
+    "CHECKMULTISIG must push false even if an unevaluated signature is not DER compliant (2-of-2, first sig invalid but DER compliant, second sig valid non-DER)"
 ],
 [
     "0x49 0x304602220000a1206e43320cc02d97c76eb2d575cdb1215b491c5b0c7a7865d3a4bea2a7a39a02207eb5a56828d164f158812e0ad8d39588258ae0e369cb918bfaab6d61ba90d80d01",
     "1 0x21 0x02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9 1 CHECKMULTISIG NOT",
-    "DERSIG", "ERR_SIG_TOO_MUCH_R_PADDING",
-    "CHECKMULTISIG must error with otherwise valid sig when R has too much padding with DERSIG"
+    "NONE", "ERR_SIG_TOO_MUCH_R_PADDING",
+    "CHECKMULTISIG must error with otherwise valid sig when R has too much padding"
 ],
 [
     "0x49 0x304602220000a1756e43320cc02d97c76eb2d575cdb1215b491c5b0c7a7865d3a4bea2a7a39a02207eb5a56828d164f158812e0ad8d39588258ae0e369cb918bfaab6d61ba90d80d01",
     "1 0x21 0x02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9 1 CHECKMULTISIG NOT",
-    "DERSIG", "ERR_SIG_TOO_MUCH_R_PADDING",
-    "CHECKMULTISIG must error with invalid sig when R has too much padding with DERSIG (sig invalidated via 8th byte ^= 0x55)"
+    "NONE", "ERR_SIG_TOO_MUCH_R_PADDING",
+    "CHECKMULTISIG must error with invalid sig when R has too much padding (sig invalidated via 8th byte ^= 0x55)"
 ],
 [
     "0x48 0x3045022100a1206e43320cc02d97c76eb2d575cdb1215b491c5b0c7a7865d3a4bea2a7a39a03207eb5a56828d164f158812e0ad8d39588258ae0e369cb918bfaab6d61ba90d80d01",
     "1 0x21 0x02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9 1 CHECKMULTISIG NOT",
-    "DERSIG", "ERR_SIG_INVALID_S_INT_ID",
-    "CHECKMULTISIG must error when S is not marked as ASN.1 integer with DERSIG"
+    "NONE", "ERR_SIG_INVALID_S_INT_ID",
+    "CHECKMULTISIG must error when S is not marked as ASN.1 integer"
 ],
 [
     "0x28 0x3025022100a1206e43320cc02d97c76eb2d575cdb1215b491c5b0c7a7865d3a4bea2a7a39a020001",
     "1 0x21 0x02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9 1 CHECKMULTISIG NOT",
-    "DERSIG", "ERR_SIG_ZERO_S_LEN",
-    "CHECKMULTISIG must error when S has length zero with DERSIG"
+    "NONE", "ERR_SIG_ZERO_S_LEN",
+    "CHECKMULTISIG must error when S has length zero"
 ],
 [
     "0x48 0x3045022100a1206e43320cc02d97c76eb2d575cdb1215b491c5b0c7a7865d3a4bea2a7a39a0220feb5a56828d164f158812e0ad8d39588258ae0e369cb918bfaab6d61ba90d80d01",
     "1 0x21 0x02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9 1 CHECKMULTISIG NOT",
-    "DERSIG", "ERR_SIG_NEGATIVE_S",
-    "CHECKMULTISIG must error when S is negative (too little padding) with DERSIG"
+    "NONE", "ERR_SIG_NEGATIVE_S",
+    "CHECKMULTISIG must error when S is negative (too little padding)"
 ],
 [
     "0x49 0x3046022100a1206e43320cc02d97c76eb2d575cdb1215b491c5b0c7a7865d3a4bea2a7a39a0221007eb5a56828d164f158812e0ad8d39588258ae0e369cb918bfaab6d61ba90d80d01",
     "1 0x21 0x02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9 1 CHECKMULTISIG NOT",
-    "DERSIG", "ERR_SIG_TOO_MUCH_S_PADDING",
-    "CHECKMULTISIG must error with otherwise valid sig when S has too much padding with DERSIG"
+    "NONE", "ERR_SIG_TOO_MUCH_S_PADDING",
+    "CHECKMULTISIG must error with otherwise valid sig when S has too much padding"
 ],
 [
     "0x48 0x30450220432c00086747ac31b5fca8ba1cc987eb8eb0f52315ce9fc03bc383780377c3aa022100adc9314c1b1551133e9ae1ec837e2e3820263a1f0a9553c885d39e3003d9300d01",
     "1 0x21 0x02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9 1 CHECKMULTISIG NOT",
-    "DERSIG", "ERR_SIG_HIGH_S",
-    "CHECKMULTISIG must error when S is greater than the curve half order even though it is otherwise valid with DERSIG"
+    "NONE", "ERR_SIG_HIGH_S",
+    "CHECKMULTISIG must error when S is greater than the curve half order even though it is otherwise valid"
 ],
 [
     "0x48 0x3045022100a1206e43320cc02d97c76eb2d575cdb1215b491c5b0c7a7865d3a4bea2a7a39a02207eb5a56828d164f158812e0ad8d39588258ae0e369cb918bfaab6d61ba90d80d01",
     "1 0x20 0x02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036 1 CHECKMULTISIG NOT",
-    "DERSIG", "ERR_PUBKEY_TYPE",
+    "NONE", "ERR_PUBKEY_TYPE",
     "CHECKMULTISIG must error with compressed pubkeys that are not exactly 33 bytes (one too small)"
 ],
 [
     "0x48 0x3045022100a1206e43320cc02d97c76eb2d575cdb1215b491c5b0c7a7865d3a4bea2a7a39a02207eb5a56828d164f158812e0ad8d39588258ae0e369cb918bfaab6d61ba90d80d01",
     "1 0x22 0x0200f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9 1 CHECKMULTISIG NOT",
-    "DERSIG", "ERR_PUBKEY_TYPE",
+    "NONE", "ERR_PUBKEY_TYPE",
     "CHECKMULTISIG must error with compressed pubkeys that are not exactly 33 bytes (one too big)"
 ],
 [
     "0x48 0x3045022100a1206e43320cc02d97c76eb2d575cdb1215b491c5b0c7a7865d3a4bea2a7a39a02207eb5a56828d164f158812e0ad8d39588258ae0e369cb918bfaab6d61ba90d80d01",
     "1 0x21 0x0579be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 1 CHECKMULTISIG NOT",
-    "DERSIG", "ERR_PUBKEY_TYPE",
+    "NONE", "ERR_PUBKEY_TYPE",
     "CHECKMULTISIG must error with compressed pubkeys that do not start with 0x02 or 0x03 (modified to use hybrid indicator)"
 ],
 [
     "0x47 0x3044022001f819d40db86ba57450d99dc1ed009e1a55f633a78ef6ff4ca955961cef3f530220770013aee8e7f47c1c1b8a9fe90f9f6e5e59fbecd5ed4f37a99dfd112ad4e07901",
     "1 0x40 0x0479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4 1 CHECKMULTISIG NOT",
-    "DERSIG", "ERR_PUBKEY_TYPE",
+    "NONE", "ERR_PUBKEY_TYPE",
     "CHECKMULTISIG must error with uncompressed pubkeys that are not exactly 65 bytes (one too small)"
 ],
 [
     "0x47 0x3044022001f819d40db86ba57450d99dc1ed009e1a55f633a78ef6ff4ca955961cef3f530220770013aee8e7f47c1c1b8a9fe90f9f6e5e59fbecd5ed4f37a99dfd112ad4e07901",
     "1 0x42 0x040079be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8 1 CHECKMULTISIG NOT",
-    "DERSIG", "ERR_PUBKEY_TYPE",
+    "NONE", "ERR_PUBKEY_TYPE",
     "CHECKMULTISIG must error with compressed pubkeys that are not exactly 33 bytes (one too big)"
 ],
 [
     "0x47 0x3044022001f819d40db86ba57450d99dc1ed009e1a55f633a78ef6ff4ca955961cef3f530220770013aee8e7f47c1c1b8a9fe90f9f6e5e59fbecd5ed4f37a99dfd112ad4e07901",
     "1 0x41 0x0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8 1 CHECKMULTISIG NOT",
-    "DERSIG", "ERR_PUBKEY_TYPE",
+    "NONE", "ERR_PUBKEY_TYPE",
     "CHECKMULTISIG must error with uncompressed pubkeys that do not start with 0x04 (modified to use compressed indicator)"
 ],
 [
     "0x47 0x3044022001f819d40db86ba57450d99dc1ed009e1a55f633a78ef6ff4ca955961cef3f530220770013aee8e7f47c1c1b8a9fe90f9f6e5e59fbecd5ed4f37a99dfd112ad4e07901",
     "1 0x41 0x0579be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8 1 CHECKMULTISIG NOT",
-    "DERSIG", "ERR_PUBKEY_TYPE",
+    "NONE", "ERR_PUBKEY_TYPE",
     "CHECKMULTISIG must error with hybrid pubkeys despite being valid"
 ],
 [
     "0x47 0x3044022001f819810db86ba57450d99dc1ed009e1a55f633a78ef6ff4ca955961cef3f530220770013aee8e7f47c1c1b8a9fe90f9f6e5e59fbecd5ed4f37a99dfd112ad4e07901",
     "1 0x41 0x0579be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8 1 CHECKMULTISIG NOT",
-    "DERSIG", "ERR_PUBKEY_TYPE",
+    "NONE", "ERR_PUBKEY_TYPE",
     "CHECKMULTISIG must error with hybrid pubkeys with invalid sigs (sig invalidated via 8th byte ^= 0x55)"
 ],
 [
@@ -1648,7 +1648,7 @@
 [
     "0x48 0x3045022100a12e942a32c449814862a6fa80a9c2a5668cd598b3e16615bb9fdcb90489b408022058c53de4979498219cabbdac166789ff6cc8402a271ec332b74deae4fd304a3101",
     "1 0x41 0x0479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8 1 CHECKMULTISIG",
-    "DERSIG", "ERR_EVAL_FALSE",
+    "NONE", "ERR_EVAL_FALSE",
     "CHECKSIG must push false for valid sigs for other hash types (anyonecanpay sig marked with all hash type)"
 ],
 [
@@ -1700,13 +1700,13 @@
 [
     "0x47 0x3044022044dc17b0887c161bb67ba9635bf758735bdde503e4b0a0987f587f14a4e1143d022009a215772d49a85dae40d8ca03955af26ad3978a0ff965faa12915e9586249a501 0x47 0x3044022044dc17b0887c161bb67ba9635bf758735bdde503e4b0a0987f587f14a4e1143d022009a215772d49a85dae40d8ca03955af26ad3978a0ff965faa12915e9586249a501",
     "2 0x21 0x02865c40293a680cb9c020e7b1e106d8c1916d3cef99aa431a56d253e69256dac0 0 2 CHECKMULTISIG NOT",
-    "DERSIG", "ERR_PUBKEY_TYPE",
+    "NONE", "ERR_PUBKEY_TYPE",
     "2-of-2 CHECKMULTISIG NOT with the first pubkey invalid, and both signatures validly encoded"
 ],
 [
     "0x47 0x3044022044dc17b0887c161bb67ba9635bf758735bdde503e4b0a0987f587f14a4e1143d022009a215772d49a85dae40d8ca03955af26ad3978a0ff965faa12915e9586249a501 1",
     "2 0x21 0x02865c40293a680cb9c020e7b1e106d8c1916d3cef99aa431a56d253e69256dac0 0x21 0x02865c40293a680cb9c020e7b1e106d8c1916d3cef99aa431a56d253e69256dac0 2 CHECKMULTISIG NOT",
-    "DERSIG", "ERR_SIG_TOO_SHORT",
+    "NONE", "ERR_SIG_TOO_SHORT",
     "2-of-2 CHECKMULTISIG NOT with both pubkeys valid, but first signature invalid"
 ],
 
