@@ -2286,8 +2286,7 @@ func (b *BlockChain) checkTransactionsAndConnect(subsidyCache *SubsidyCache, inp
 // any flags required as the result of any agendas that have passed and become
 // active.
 func (b *BlockChain) consensusScriptVerifyFlags(node *blockNode) (txscript.ScriptFlags, error) {
-	scriptFlags := txscript.ScriptVerifyMinimalData |
-		txscript.ScriptVerifyCleanStack |
+	scriptFlags := txscript.ScriptVerifyCleanStack |
 		txscript.ScriptVerifyCheckLockTimeVerify
 
 	// Enable enforcement of OP_CSV and OP_SHA256 if the stake vote

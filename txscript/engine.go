@@ -42,10 +42,6 @@ const (
 	// This flag should never be used without the ScriptBip16 flag.
 	ScriptVerifyCleanStack
 
-	// ScriptVerifyMinimalData defines that signatures must use the smallest
-	// push operator. This is both rules 3 and 4 of BIP0062.
-	ScriptVerifyMinimalData
-
 	// ScriptVerifySigPushOnly defines that signature scripts must contain
 	// only pushed data.  This is rule 2 of BIP0062.
 	ScriptVerifySigPushOnly
@@ -147,10 +143,9 @@ func (vm *Engine) executeOpcode(pop *parsedOpcode) error {
 		return nil
 	}
 
-	// Ensure all executed data push opcodes use the minimal encoding when
-	// the minimal data verification flag is set.
-	if vm.dstack.verifyMinimalData && vm.isBranchExecuting() &&
-		pop.opcode.value >= 0 && pop.opcode.value <= OP_PUSHDATA4 {
+	// Ensure all executed data push opcodes use the minimal encoding.
+	if vm.isBranchExecuting() && pop.opcode.value >= 0 &&
+		pop.opcode.value <= OP_PUSHDATA4 {
 
 		if err := pop.checkMinimalDataPush(); err != nil {
 			return err
@@ -720,10 +715,6 @@ func NewEngine(scriptPubKey []byte, tx *wire.MsgTx, txIdx int, flags ScriptFlags
 				"pay to script hash is not push only")
 		}
 		vm.bip16 = true
-	}
-	if vm.hasFlag(ScriptVerifyMinimalData) {
-		vm.dstack.verifyMinimalData = true
-		vm.astack.verifyMinimalData = true
 	}
 
 	vm.tx = *tx

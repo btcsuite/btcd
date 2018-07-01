@@ -63,8 +63,7 @@ const (
 	// the state of any agenda votes.  The full set of standard verification
 	// flags must include these flags as well as any additional flags that
 	// are conditionally enabled depending on the result of agenda votes.
-	BaseStandardVerifyFlags = txscript.ScriptVerifyMinimalData |
-		txscript.ScriptDiscourageUpgradableNops |
+	BaseStandardVerifyFlags = txscript.ScriptDiscourageUpgradableNops |
 		txscript.ScriptVerifyCleanStack |
 		txscript.ScriptVerifyCheckLockTimeVerify |
 		txscript.ScriptVerifyCheckSequenceVerify

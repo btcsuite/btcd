@@ -236,7 +236,7 @@ func parseScriptFlags(flagStr string) (ScriptFlags, error) {
 		case "DISCOURAGE_UPGRADABLE_NOPS":
 			flags |= ScriptDiscourageUpgradableNops
 		case "MINIMALDATA":
-			flags |= ScriptVerifyMinimalData
+			// Always active in Decred.
 		case "NONE":
 			// Nothing.
 		case "SIGPUSHONLY":

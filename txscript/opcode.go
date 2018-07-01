@@ -1105,7 +1105,7 @@ func opcodeCheckLockTimeVerify(op *parsedOpcode, vm *Engine) error {
 	if err != nil {
 		return err
 	}
-	lockTime, err := makeScriptNum(so, vm.dstack.verifyMinimalData, 5)
+	lockTime, err := makeScriptNum(so, true, 5)
 	if err != nil {
 		return err
 	}
@@ -1179,7 +1179,7 @@ func opcodeCheckSequenceVerify(op *parsedOpcode, vm *Engine) error {
 	if err != nil {
 		return err
 	}
-	stackSequence, err := makeScriptNum(so, vm.dstack.verifyMinimalData, 5)
+	stackSequence, err := makeScriptNum(so, true, 5)
 	if err != nil {
 		return err
 	}
