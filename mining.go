@@ -848,7 +848,7 @@ func handleTooFewVoters(subsidyCache *blockchain.SubsidyCache, nextHeight int64,
 				// we should have the option of readding some
 				// transactions from this block, too.
 				bestHash, _ := chainState.Best()
-				topBlock, err := bm.chain.FetchBlockByHash(bestHash)
+				topBlock, err := bm.chain.BlockByHash(bestHash)
 				if err != nil {
 					str := fmt.Sprintf("unable to get tip block %s",
 						prevBlockHash)
@@ -1659,7 +1659,7 @@ mempoolLoop:
 
 			// Retrieve the current top block, whose TxTreeRegular was voted
 			// out.
-			topBlock, err := blockManager.chain.FetchBlockByHash(prevHash)
+			topBlock, err := blockManager.chain.BlockByHash(prevHash)
 			if err != nil {
 				str := fmt.Sprintf("unable to get tip block %s", prevHash)
 				return nil, miningRuleError(ErrGetTopBlock, str)

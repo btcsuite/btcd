@@ -498,7 +498,8 @@ func (b *BlockChain) fetchMainChainBlockByHash(hash *chainhash.Hash) (*dcrutil.B
 }
 
 // fetchBlockByHash returns the block with the given hash from all known sources
-// such as the internal caches and the database.
+// such as the internal caches and the database.  This function returns blocks
+// regardless or whether or not they are part of the main chain.
 //
 // This function is safe for concurrent access.
 func (b *BlockChain) fetchBlockByHash(hash *chainhash.Hash) (*dcrutil.Block, error) {
@@ -535,17 +536,6 @@ func (b *BlockChain) fetchBlockByHash(hash *chainhash.Hash) (*dcrutil.Block, err
 	}
 
 	return nil, fmt.Errorf("unable to find block %v in cache or db", hash)
-}
-
-// FetchBlockByHash searches the internal chain block stores and the database
-// in an attempt to find the requested block.
-//
-// This function differs from BlockByHash in that this one also returns blocks
-// that are not part of the main chain (if they are known).
-//
-// This function is safe for concurrent access.
-func (b *BlockChain) FetchBlockByHash(hash *chainhash.Hash) (*dcrutil.Block, error) {
-	return b.fetchBlockByHash(hash)
 }
 
 // pruneStakeNodes removes references to old stake nodes which should no

@@ -844,8 +844,7 @@ func (sp *serverPeer) OnGetCFilter(p *peer.Peer, msg *wire.MsgGetCFilter) {
 	// block was disconnected, or this has always been a sidechain block) build
 	// the filter on the spot.
 	if len(filterBytes) == 0 {
-		block, err := sp.server.blockManager.chain.FetchBlockByHash(
-			&msg.BlockHash)
+		block, err := sp.server.blockManager.chain.BlockByHash(&msg.BlockHash)
 		if err != nil {
 			peerLog.Errorf("OnGetCFilter: failed to fetch non-mainchain "+
 				"block %v: %v", &msg.BlockHash, err)
@@ -1154,7 +1153,7 @@ func (s *server) pushTxMsg(sp *serverPeer, hash *chainhash.Hash, doneChan chan<-
 // pushBlockMsg sends a block message for the provided block hash to the
 // connected peer.  An error is returned if the block hash is not known.
 func (s *server) pushBlockMsg(sp *serverPeer, hash *chainhash.Hash, doneChan chan<- struct{}, waitChan <-chan struct{}) error {
-	block, err := sp.server.blockManager.chain.FetchBlockByHash(hash)
+	block, err := sp.server.blockManager.chain.BlockByHash(hash)
 	if err != nil {
 		peerLog.Tracef("Unable to fetch requested block hash %v: %v",
 			hash, err)

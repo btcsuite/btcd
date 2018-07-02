@@ -1947,7 +1947,7 @@ func handleGetBlock(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 	if err != nil {
 		return nil, rpcDecodeHexError(c.Hash)
 	}
-	blk, err := s.server.blockManager.chain.FetchBlockByHash(hash)
+	blk, err := s.server.blockManager.chain.BlockByHash(hash)
 	if err != nil {
 		return nil, &dcrjson.RPCError{
 			Code:    dcrjson.ErrRPCBlockNotFound,
