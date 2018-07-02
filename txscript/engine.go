@@ -376,6 +376,7 @@ func (vm *Engine) Step() (done bool, err error) {
 			return true, nil
 		}
 	}
+
 	return false, nil
 }
 
@@ -393,9 +394,8 @@ func (vm *Engine) Execute() (err error) {
 			if err != nil {
 				return fmt.Sprintf("stepping (%v)", err)
 			}
-			return fmt.Sprintf("stepping %v", dis)
+			return fmt.Sprintf("stepping %v\n", dis)
 		}))
-
 		done, err = vm.Step()
 		if err != nil {
 			return err
@@ -405,10 +405,10 @@ func (vm *Engine) Execute() (err error) {
 
 			// if we're tracing, dump the stacks.
 			if vm.dstack.Depth() != 0 {
-				dstr = "Stack:\n" + vm.dstack.String()
+				dstr = "\nStack:\n" + vm.dstack.String() + "\n"
 			}
 			if vm.astack.Depth() != 0 {
-				astr = "AltStack:\n" + vm.astack.String()
+				astr = "\nAltStack:\n" + vm.astack.String() + "\n"
 			}
 
 			return dstr + astr

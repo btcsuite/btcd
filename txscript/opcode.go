@@ -2505,11 +2505,14 @@ func opcodeNum2bin(p *parsedOpcode, vm *Engine) error {
 		return scriptError(ErrElementTooBig, "push element size is too big")
 	}
 
-	rawnum, err := vm.dstack.PopByteArray()
-	// Try to see if we can fit that number in the number of
-	// byte requested.
-	minimallyEncode(&rawnum)
-	if uint64(len(rawnum)) > size {
+	origin, err := vm.dstack.PopByteArray()
+
+	// Copy origin bytes from stack to avoid bother origin stack information
+	target := make([]byte, len(origin))
+	copy(target, origin)
+
+	minimallyEncode(&target)
+	if uint64(len(target)) > size {
 		// We definitively cannot.
 		str := "the requested encoding is impossible to satisfy"
 		return scriptError(ErrImpossibleEncoding, str)
@@ -2517,23 +2520,23 @@ func opcodeNum2bin(p *parsedOpcode, vm *Engine) error {
 
 	// We already have an element of the right size, we
 	// don't need to do anything.
-	if uint64(len(rawnum)) == size {
-		vm.dstack.PushByteArray(rawnum)
+	if uint64(len(target)) == size {
+		vm.dstack.PushByteArray(target)
 		return nil
 	}
 
 	signBit := byte(0x00)
-	if len(rawnum) > 0 {
-		signBit = rawnum[len(rawnum)-1] & 0x80
-		rawnum[len(rawnum)-1] = rawnum[len(rawnum)-1] & 0x7f
+	if len(target) > 0 {
+		signBit = target[len(target)-1] & 0x80
+		target[len(target)-1] = target[len(target)-1] & 0x7f
 	}
 
-	for uint64(len(rawnum)) < size-1 {
-		rawnum = append(rawnum, byte(0x00))
+	for uint64(len(target)) < size-1 {
+		target = append(target, byte(0x00))
 	}
 
-	rawnum = append(rawnum, signBit)
-	vm.dstack.PushByteArray(rawnum)
+	target = append(target, signBit)
+	vm.dstack.PushByteArray(target)
 
 	return nil
 }

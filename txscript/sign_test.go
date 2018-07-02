@@ -98,7 +98,7 @@ func TestSignTxOutput(t *testing.T) {
 		SigHashAll | SigHashAnyOneCanPay,
 		SigHashNone | SigHashAnyOneCanPay,
 		SigHashSingle | SigHashAnyOneCanPay,
-		//SigHashAll | SigHashForkID | SigHashAnyOneCanPay,		// TODO:open
+		//SigHashAll | SigHashForkID | SigHashAnyOneCanPay, // TODO:open
 		//SigHashNone | SigHashForkID | SigHashAnyOneCanPay,
 		//SigHashSingle | SigHashForkID | SigHashAnyOneCanPay,
 	}
