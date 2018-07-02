@@ -187,7 +187,7 @@ func (n scriptNum) Int32() int32 {
 // overflows.
 //
 // See the Bytes function documentation for example encodings.
-func makeScriptNum(v []byte, requireMinimal bool, scriptNumLen int) (scriptNum, error) {
+func makeScriptNum(v []byte, scriptNumLen int) (scriptNum, error) {
 	// Interpreting data requires that it is not larger than
 	// the the passed scriptNumLen value.
 	if len(v) > scriptNumLen {
@@ -197,11 +197,9 @@ func makeScriptNum(v []byte, requireMinimal bool, scriptNumLen int) (scriptNum, 
 		return 0, scriptError(ErrNumOutOfRange, str)
 	}
 
-	// Enforce minimal encoded if requested.
-	if requireMinimal {
-		if err := checkMinimalDataEncoding(v); err != nil {
-			return 0, err
-		}
+	// Enforce minimal encoding.
+	if err := checkMinimalDataEncoding(v); err != nil {
+		return 0, err
 	}
 
 	// Zero is encoded as an empty byte slice.
