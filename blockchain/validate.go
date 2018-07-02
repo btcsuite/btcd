@@ -2605,7 +2605,7 @@ func (b *BlockChain) CheckConnectBlockTemplate(block *dcrutil.Block) error {
 	if prevNode.hash == tip.hash {
 		// Grab the parent block since it is required throughout the block
 		// connection process.
-		parent, err := b.fetchMainChainBlockByHash(&prevNode.hash)
+		parent, err := b.fetchMainChainBlockByNode(prevNode)
 		if err != nil {
 			return ruleError(ErrMissingParent, err.Error())
 		}
@@ -2634,7 +2634,7 @@ func (b *BlockChain) CheckConnectBlockTemplate(block *dcrutil.Block) error {
 		block := nextBlockToDetach
 		if block == nil {
 			var err error
-			block, err = b.fetchMainChainBlockByHash(&n.hash)
+			block, err = b.fetchMainChainBlockByNode(n)
 			if err != nil {
 				return err
 			}
@@ -2645,7 +2645,7 @@ func (b *BlockChain) CheckConnectBlockTemplate(block *dcrutil.Block) error {
 				block.Hash())
 		}
 
-		parent, err := b.fetchMainChainBlockByHash(&n.parent.hash)
+		parent, err := b.fetchMainChainBlockByNode(n.parent)
 		if err != nil {
 			return err
 		}
@@ -2676,7 +2676,7 @@ func (b *BlockChain) CheckConnectBlockTemplate(block *dcrutil.Block) error {
 	if attachNodes.Len() == 0 {
 		// Grab the parent block since it is required throughout the block
 		// connection process.
-		parent, err := b.fetchMainChainBlockByHash(&prevNode.hash)
+		parent, err := b.fetchMainChainBlockByNode(prevNode)
 		if err != nil {
 			return ruleError(ErrMissingParent, err.Error())
 		}
@@ -2693,14 +2693,14 @@ func (b *BlockChain) CheckConnectBlockTemplate(block *dcrutil.Block) error {
 		// attached or the previous one that was attached for subsequent blocks
 		// to optimize.
 		n := e.Value.(*blockNode)
-		block, err := b.fetchBlockByHash(&n.hash)
+		block, err := b.fetchBlockByNode(n)
 		if err != nil {
 			return err
 		}
 		parent := prevAttachBlock
 		if parent == nil {
 			var err error
-			parent, err = b.fetchMainChainBlockByHash(&n.parent.hash)
+			parent, err = b.fetchMainChainBlockByNode(n.parent)
 			if err != nil {
 				return err
 			}
@@ -2722,7 +2722,7 @@ func (b *BlockChain) CheckConnectBlockTemplate(block *dcrutil.Block) error {
 
 	// Grab the parent block since it is required throughout the block
 	// connection process.
-	parent, err := b.fetchBlockByHash(&prevNode.hash)
+	parent, err := b.fetchBlockByNode(prevNode)
 	if err != nil {
 		return ruleError(ErrMissingParent, err.Error())
 	}

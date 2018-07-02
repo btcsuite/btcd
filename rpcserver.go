@@ -1549,17 +1549,14 @@ func handleEstimateStakeDiff(s *rpcServer, cmd interface{}, closeChan <-chan str
 	nextAdjustment := ((bestHeight / activeNetParams.StakeDiffWindowSize) +
 		1) * activeNetParams.StakeDiffWindowSize
 	totalTickets := 0
-	err = s.server.db.View(func(dbTx database.Tx) error {
-		for i := lastAdjustment; i <= bestHeight; i++ {
-			bh, err := blockchain.DBFetchHeaderByHeight(dbTx, i)
-			if err != nil {
-				return err
-			}
-			totalTickets += int(bh.FreshStake)
+	for i := lastAdjustment; i <= bestHeight; i++ {
+		bh, err := chain.HeaderByHeight(i)
+		if err != nil {
+			return nil, rpcInternalError(err.Error(), "Could not "+
+				"estimate next stake difficulty")
 		}
-
-		return nil
-	})
+		totalTickets += int(bh.FreshStake)
+	}
 	blocksSince := float64(bestHeight - lastAdjustment + 1)
 	remaining := float64(nextAdjustment - bestHeight - 1)
 	averagePerBlock := float64(totalTickets) / blocksSince
@@ -1969,14 +1966,11 @@ func handleGetBlock(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 
 	best := s.chain.BestSnapshot()
 
-	// See if this block is an orphan and adjust Confirmations accordingly.
-	onMainChain, _ := s.chain.MainChainHasBlock(hash)
-
 	// Get next block hash unless there are none.
 	var nextHashString string
 	blockHeader := &blk.MsgBlock().Header
 	confirmations := int64(-1)
-	if onMainChain {
+	if s.chain.MainChainHasBlock(hash) {
 		if int64(blockHeader.Height) < best.Height {
 			nextHash, err := s.chain.BlockHashByHeight(int64(blockHeader.Height + 1))
 			if err != nil {
@@ -2120,14 +2114,11 @@ func handleGetBlockHeader(s *rpcServer, cmd interface{}, closeChan <-chan struct
 
 	best := s.chain.BestSnapshot()
 
-	// See if this block is an orphan and adjust Confirmations accordingly.
-	onMainChain, _ := s.chain.MainChainHasBlock(hash)
-
 	// Get next block hash unless there are none.
 	var nextHashString string
 	confirmations := int64(-1)
 	height := int64(blockHeader.Height)
-	if onMainChain {
+	if s.chain.MainChainHasBlock(hash) {
 		if height < best.Height {
 			nextHash, err := s.chain.BlockHashByHeight(height + 1)
 			if err != nil {

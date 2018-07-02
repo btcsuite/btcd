@@ -472,70 +472,66 @@ func (b *BlockChain) TipGeneration() ([]chainhash.Hash, error) {
 	return nodeHashes, nil
 }
 
-// fetchMainChainBlockByHash returns the block from the main chain with the
-// given hash.  It first attempts to use cache and then falls back to loading it
-// from the database.
+// fetchMainChainBlockByNode returns the block from the main chain associated
+// with the given node.  It first attempts to use cache and then falls back to
+// loading it from the database.
 //
 // An error is returned if the block is either not found or not in the main
 // chain.
 //
-// This function is safe for concurrent access.
-func (b *BlockChain) fetchMainChainBlockByHash(hash *chainhash.Hash) (*dcrutil.Block, error) {
+// This function MUST be called with the chain lock held (for reads).
+func (b *BlockChain) fetchMainChainBlockByNode(node *blockNode) (*dcrutil.Block, error) {
 	b.mainchainBlockCacheLock.RLock()
-	block, ok := b.mainchainBlockCache[*hash]
+	block, ok := b.mainchainBlockCache[node.hash]
 	b.mainchainBlockCacheLock.RUnlock()
 	if ok {
 		return block, nil
+	}
+
+	// Ensure the block in the main chain.
+	if !node.inMainChain {
+		str := fmt.Sprintf("block %s is not in the main chain", node.hash)
+		return nil, errNotInMainChain(str)
 	}
 
 	// Load the block from the database.
 	err := b.db.View(func(dbTx database.Tx) error {
 		var err error
-		block, err = dbFetchBlockByHash(dbTx, hash)
+		block, err = dbFetchBlockByNode(dbTx, node)
 		return err
 	})
 	return block, err
 }
 
-// fetchBlockByHash returns the block with the given hash from all known sources
-// such as the internal caches and the database.  This function returns blocks
-// regardless or whether or not they are part of the main chain.
+// fetchBlockByNode returns the block associated with the given node all known
+// sources such as the internal caches and the database.  This function returns
+// blocks regardless or whether or not they are part of the main chain.
 //
 // This function is safe for concurrent access.
-func (b *BlockChain) fetchBlockByHash(hash *chainhash.Hash) (*dcrutil.Block, error) {
-	// Check orphan cache.
-	b.orphanLock.RLock()
-	orphan, existsOrphans := b.orphans[*hash]
-	b.orphanLock.RUnlock()
-	if existsOrphans {
-		return orphan.block, nil
-	}
-
+func (b *BlockChain) fetchBlockByNode(node *blockNode) (*dcrutil.Block, error) {
 	// Check main chain cache.
 	b.mainchainBlockCacheLock.RLock()
-	block, ok := b.mainchainBlockCache[*hash]
+	block, ok := b.mainchainBlockCache[node.hash]
 	b.mainchainBlockCacheLock.RUnlock()
 	if ok {
 		return block, nil
 	}
 
-	// Attempt to load the block from the database.
-	err := b.db.View(func(dbTx database.Tx) error {
-		// NOTE: This does not use the dbFetchBlockByHash function since that
-		// function only works with main chain blocks.
-		blockBytes, err := dbTx.FetchBlock(hash)
-		if err != nil {
-			return err
-		}
-
-		block, err = dcrutil.NewBlockFromBytes(blockBytes)
-		return err
-	})
-	if err == nil && block != nil {
-		return block, nil
+	// Check orphan cache.
+	b.orphanLock.RLock()
+	orphan, existsOrphans := b.orphans[node.hash]
+	b.orphanLock.RUnlock()
+	if existsOrphans {
+		return orphan.block, nil
 	}
 
-	return nil, fmt.Errorf("unable to find block %v in cache or db", hash)
+	// Load the block from the database.
+	err := b.db.View(func(dbTx database.Tx) error {
+		var err error
+		block, err = dbFetchBlockByNode(dbTx, node)
+		return err
+	})
+	return block, err
 }
 
 // pruneStakeNodes removes references to old stake nodes which should no
@@ -1112,7 +1108,7 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List) error 
 		block := nextBlockToDetach
 		if block == nil {
 			var err error
-			block, err = b.fetchMainChainBlockByHash(&n.hash)
+			block, err = b.fetchMainChainBlockByNode(n)
 			if err != nil {
 				return err
 			}
@@ -1126,7 +1122,7 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List) error 
 		// Grab the parent of the current block and also save a reference to it
 		// as the next block to detach so it doesn't need to be loaded again on
 		// the next iteration.
-		parent, err := b.fetchMainChainBlockByHash(&n.parent.hash)
+		parent, err := b.fetchMainChainBlockByNode(n.parent)
 		if err != nil {
 			return err
 		}
@@ -1171,7 +1167,7 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List) error 
 		forkNode = newBest
 
 		var err error
-		forkBlock, err = b.fetchMainChainBlockByHash(&forkNode.hash)
+		forkBlock, err = b.fetchMainChainBlockByNode(forkNode)
 		if err != nil {
 			return err
 		}
@@ -1195,7 +1191,7 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List) error 
 		// attached or the previous one that was attached for subsequent blocks
 		// to optimize.
 		n := e.Value.(*blockNode)
-		block, err := b.fetchBlockByHash(&n.hash)
+		block, err := b.fetchBlockByNode(n)
 		if err != nil {
 			return err
 		}
@@ -1360,7 +1356,7 @@ func (b *BlockChain) forceHeadReorganization(formerBest chainhash.Hash, newBest 
 			"common parent for forced reorg")
 	}
 
-	newBestBlock, err := b.fetchBlockByHash(&newBest)
+	newBestBlock, err := b.fetchBlockByNode(newBestNode)
 	if err != nil {
 		return err
 	}
@@ -1370,12 +1366,11 @@ func (b *BlockChain) forceHeadReorganization(formerBest chainhash.Hash, newBest 
 	view.SetBestHash(&b.bestNode.parent.hash)
 	view.SetStakeViewpoint(ViewpointPrevValidInitial)
 
-	formerBestBlock, err := b.fetchBlockByHash(&formerBest)
+	formerBestBlock, err := b.fetchBlockByNode(formerBestNode)
 	if err != nil {
 		return err
 	}
-	commonParentBlock, err := b.fetchMainChainBlockByHash(
-		&formerBestNode.parent.hash)
+	commonParentBlock, err := b.fetchMainChainBlockByNode(formerBestNode.parent)
 	if err != nil {
 		return err
 	}
@@ -1677,6 +1672,155 @@ func (b *BlockChain) HeaderByHash(hash *chainhash.Hash) (wire.BlockHeader, error
 	}
 
 	return node.Header(), nil
+}
+
+// HeaderByHeight returns the block header at the given height in the main
+// chain.
+//
+// This function is safe for concurrent access.
+func (b *BlockChain) HeaderByHeight(height int64) (wire.BlockHeader, error) {
+	b.heightLock.RLock()
+	node := b.mainNodesByHeight[height]
+	b.heightLock.RUnlock()
+	if node == nil {
+		str := fmt.Sprintf("no block at height %d exists", height)
+		return wire.BlockHeader{}, errNotInMainChain(str)
+	}
+
+	return node.Header(), nil
+}
+
+// BlockByHash searches the internal chain block stores and the database in an
+// attempt to find the requested block and returns it.  This function returns
+// blocks regardless of whether or not they are part of the main chain.
+//
+// This function is safe for concurrent access.
+func (b *BlockChain) BlockByHash(hash *chainhash.Hash) (*dcrutil.Block, error) {
+	node := b.index.LookupNode(hash)
+	if node == nil {
+		return nil, fmt.Errorf("block %s is not known", hash)
+	}
+
+	// Return the block from either cache or the database.
+	return b.fetchBlockByNode(node)
+}
+
+// BlockByHeight returns the block at the given height in the main chain.
+//
+// This function is safe for concurrent access.
+func (b *BlockChain) BlockByHeight(height int64) (*dcrutil.Block, error) {
+	b.heightLock.RLock()
+	node := b.mainNodesByHeight[height]
+	b.heightLock.RUnlock()
+	if node == nil {
+		str := fmt.Sprintf("no block at height %d exists", height)
+		return nil, errNotInMainChain(str)
+	}
+
+	// Return the block from either cache or the database.  Note that this is
+	// not using fetchMainChainBlockByNode since the main chain check has
+	// already been done.
+	return b.fetchBlockByNode(node)
+}
+
+// MainChainHasBlock returns whether or not the block with the given hash is in
+// the main chain.
+//
+// This function is safe for concurrent access.
+func (b *BlockChain) MainChainHasBlock(hash *chainhash.Hash) bool {
+	node := b.index.LookupNode(hash)
+	b.chainLock.RLock()
+	hasBlock := node != nil && node.inMainChain
+	b.chainLock.RUnlock()
+	return hasBlock
+}
+
+// BlockHeightByHash returns the height of the block with the given hash in the
+// main chain.
+//
+// This function is safe for concurrent access.
+func (b *BlockChain) BlockHeightByHash(hash *chainhash.Hash) (int64, error) {
+	node := b.index.LookupNode(hash)
+	b.chainLock.RLock()
+	if node == nil || !node.inMainChain {
+		b.chainLock.RUnlock()
+		str := fmt.Sprintf("block %s is not in the main chain", hash)
+		return 0, errNotInMainChain(str)
+	}
+	b.chainLock.RUnlock()
+
+	return node.height, nil
+}
+
+// BlockHashByHeight returns the hash of the block at the given height in the
+// main chain.
+//
+// This function is safe for concurrent access.
+func (b *BlockChain) BlockHashByHeight(height int64) (*chainhash.Hash, error) {
+	b.heightLock.RLock()
+	node := b.mainNodesByHeight[height]
+	b.heightLock.RUnlock()
+	if node == nil {
+		str := fmt.Sprintf("no block at height %d exists", height)
+		return nil, errNotInMainChain(str)
+	}
+
+	return &node.hash, nil
+}
+
+// HeightRange returns a range of block hashes for the given start and end
+// heights.  It is inclusive of the start height and exclusive of the end
+// height.  In other words, it is the half open range [startHeight, endHeight).
+//
+// The end height will be limited to the current main chain height.
+//
+// This function is safe for concurrent access.
+func (b *BlockChain) HeightRange(startHeight, endHeight int64) ([]chainhash.Hash, error) {
+	// Ensure requested heights are sane.
+	if startHeight < 0 {
+		return nil, fmt.Errorf("start height of fetch range must not "+
+			"be less than zero - got %d", startHeight)
+	}
+	if endHeight < startHeight {
+		return nil, fmt.Errorf("end height of fetch range must not "+
+			"be less than the start height - got start %d, end %d",
+			startHeight, endHeight)
+	}
+
+	// There is nothing to do when the start and end heights are the same,
+	// so return now to avoid the chain lock.
+	if startHeight == endHeight {
+		return nil, nil
+	}
+
+	// When the requested start height is after the most recent best chain
+	// height, there is nothing to do.
+	b.chainLock.RLock()
+	tip := b.bestNode
+	b.chainLock.RUnlock()
+	latestHeight := tip.height
+	if startHeight > latestHeight {
+		return nil, nil
+	}
+
+	// Limit the ending height to the latest height of the chain.
+	if endHeight > latestHeight+1 {
+		endHeight = latestHeight + 1
+	}
+
+	// Fetch requested hashes.
+	hashes := make([]chainhash.Hash, endHeight-startHeight)
+	b.heightLock.RLock()
+	iterNode := b.mainNodesByHeight[endHeight-1]
+	b.heightLock.RUnlock()
+	for i := startHeight; i < endHeight; i++ {
+		// Since the desired result is from the starting node to the
+		// ending node in forward order, but they are iterated in
+		// reverse, add them in reverse order.
+		hashes[endHeight-i-1] = iterNode.hash
+		iterNode = iterNode.parent
+	}
+	return hashes, nil
 }
 
 // locateInventory returns the node of the block after the first known block in

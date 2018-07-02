@@ -92,7 +92,7 @@ func TestBlockchainSpendJournal(t *testing.T) {
 			str := fmt.Sprintf("no block at height %d exists", 1)
 			return errNotInMainChain(str)
 		}
-		parent, err := dbFetchBlockByHash(dbTx, &parentNode.hash)
+		parent, err := dbFetchBlockByNode(dbTx, parentNode)
 		if err != nil {
 			return err
 		}
@@ -103,7 +103,7 @@ func TestBlockchainSpendJournal(t *testing.T) {
 				str := fmt.Sprintf("no block at height %d exists", i)
 				return errNotInMainChain(str)
 			}
-			block, err := dbFetchBlockByHash(dbTx, &node.hash)
+			block, err := dbFetchBlockByNode(dbTx, node)
 			if err != nil {
 				return err
 			}

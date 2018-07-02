@@ -113,6 +113,30 @@ func upgradeToVersion2(db database.DB, chainParams *chaincfg.Params, dbInfo *dat
 	// Hardcoded so updates to the global values do not affect old upgrades.
 	chainStateKeyName := []byte("chainstate")
 
+	// This is a legacy function that relied on information in the database that
+	// is no longer available in more recent code.
+	dbFetchBlockByHeight := func(dbTx database.Tx, height int64) (*dcrutil.Block, error) {
+		// First find the hash associated with the provided height in the index.
+		hash, err := dbFetchHashByHeight(dbTx, height)
+		if err != nil {
+			return nil, err
+		}
+
+		// Load the raw block bytes from the database.
+		blockBytes, err := dbTx.FetchBlock(hash)
+		if err != nil {
+			return nil, err
+		}
+
+		// Create the encapsulated block and set the height appropriately.
+		block, err := dcrutil.NewBlockFromBytes(blockBytes)
+		if err != nil {
+			return nil, err
+		}
+
+		return block, nil
+	}
+
 	log.Infof("Initializing upgrade to database version 2")
 	progressLogger := progresslog.NewBlockProgressLogger("Upgraded", log)
 

@@ -48,13 +48,11 @@ func (b *BlockChain) ChainTips() []dcrjson.GetChainTipsResult {
 	}
 	b.index.RUnlock()
 
-	b.chainLock.Lock()
-	bestTip := b.bestNode
-	b.chainLock.Unlock()
-
 	// Generate the results sorted by descending height.
 	sort.Sort(sort.Reverse(nodeHeightSorter(chainTips)))
 	results := make([]dcrjson.GetChainTipsResult, len(chainTips))
+	b.chainLock.RLock()
+	bestTip := b.bestNode
 	for i, tip := range chainTips {
 		// Find the fork point in order calculate the branch length later.
 		fork := tip
@@ -101,5 +99,6 @@ func (b *BlockChain) ChainTips() []dcrjson.GetChainTipsResult {
 			result.Status = "valid-headers"
 		}
 	}
+	b.chainLock.RUnlock()
 	return results
 }

@@ -1095,11 +1095,11 @@ func (b *BlockChain) FetchUtxoView(tx *dcrutil.Tx, treeValid bool) (*UtxoViewpoi
 	// chain.
 	if treeValid {
 		view.SetStakeViewpoint(ViewpointPrevValidRegular)
-		block, err := b.fetchMainChainBlockByHash(&tip.hash)
+		block, err := b.fetchMainChainBlockByNode(tip)
 		if err != nil {
 			return nil, err
 		}
-		parent, err := b.fetchMainChainBlockByHash(&tip.parent.hash)
+		parent, err := b.fetchMainChainBlockByNode(tip.parent)
 		if err != nil {
 			return nil, err
 		}

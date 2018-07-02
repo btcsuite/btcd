@@ -1856,13 +1856,13 @@ func (b *BlockChain) initChainState(interrupt <-chan struct{}) error {
 		}
 
 		// Load the best and parent blocks and cache them.
-		utilBlock, err := dbFetchBlockByHash(dbTx, &tip.hash)
+		utilBlock, err := dbFetchBlockByNode(dbTx, tip)
 		if err != nil {
 			return err
 		}
 		b.mainchainBlockCache[tip.hash] = utilBlock
 		if tip.parent != nil {
-			parentBlock, err := dbFetchBlockByHash(dbTx, &tip.parent.hash)
+			parentBlock, err := dbFetchBlockByNode(dbTx, tip.parent)
 			if err != nil {
 				return err
 			}
@@ -1882,67 +1882,11 @@ func (b *BlockChain) initChainState(interrupt <-chan struct{}) error {
 	return err
 }
 
-// dbFetchHeaderByHash uses an existing database transaction to retrieve the
-// block header for the provided hash.
-func dbFetchHeaderByHash(dbTx database.Tx, hash *chainhash.Hash) (*wire.BlockHeader, error) {
-	headerBytes, err := dbTx.FetchBlockHeader(hash)
-	if err != nil {
-		return nil, err
-	}
-
-	var header wire.BlockHeader
-	err = header.Deserialize(bytes.NewReader(headerBytes))
-	if err != nil {
-		return nil, err
-	}
-
-	return &header, nil
-}
-
-// dbFetchHeaderByHeight uses an existing database transaction to retrieve the
-// block header for the provided height.
-func dbFetchHeaderByHeight(dbTx database.Tx, height int64) (*wire.BlockHeader, error) {
-	hash, err := dbFetchHashByHeight(dbTx, height)
-	if err != nil {
-		return nil, err
-	}
-
-	return dbFetchHeaderByHash(dbTx, hash)
-}
-
-// DBFetchHeaderByHeight is the exported version of dbFetchHeaderByHeight.
-func DBFetchHeaderByHeight(dbTx database.Tx, height int64) (*wire.BlockHeader, error) {
-	return dbFetchHeaderByHeight(dbTx, height)
-}
-
-// HeaderByHeight is the exported version of dbFetchHeaderByHeight that
-// internally creates a database transaction to do the lookup.
-func (b *BlockChain) HeaderByHeight(height int64) (*wire.BlockHeader, error) {
-	var header *wire.BlockHeader
-	err := b.db.View(func(dbTx database.Tx) error {
-		var errLocal error
-		header, errLocal = dbFetchHeaderByHeight(dbTx, height)
-		return errLocal
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return header, nil
-}
-
-// dbFetchBlockByHash uses an existing database transaction to retrieve the raw
-// block for the provided hash, deserialize it, retrieve the appropriate height
-// from the index, and return a dcrutil.Block with the height set.
-func dbFetchBlockByHash(dbTx database.Tx, hash *chainhash.Hash) (*dcrutil.Block, error) {
-	// Check if the block is in the main chain.
-	if !dbMainChainHasBlock(dbTx, hash) {
-		str := fmt.Sprintf("block %s is not in the main chain", hash)
-		return nil, errNotInMainChain(str)
-	}
-
+// dbFetchBlockByNode uses an existing database transaction to retrieve the raw
+// block for the provided node, deserialize it, and return a dcrutil.Block.
+func dbFetchBlockByNode(dbTx database.Tx, node *blockNode) (*dcrutil.Block, error) {
 	// Load the raw block bytes from the database.
-	blockBytes, err := dbTx.FetchBlock(hash)
+	blockBytes, err := dbTx.FetchBlock(&node.hash)
 	if err != nil {
 		return nil, err
 	}
@@ -1954,171 +1898,4 @@ func dbFetchBlockByHash(dbTx database.Tx, hash *chainhash.Hash) (*dcrutil.Block,
 	}
 
 	return block, nil
-}
-
-// dbFetchBlockByHeight uses an existing database transaction to retrieve the
-// raw block for the provided height, deserialize it, and return a dcrutil.Block
-// with the height set.
-func dbFetchBlockByHeight(dbTx database.Tx, height int64) (*dcrutil.Block, error) {
-	// First find the hash associated with the provided height in the index.
-	hash, err := dbFetchHashByHeight(dbTx, height)
-	if err != nil {
-		return nil, err
-	}
-
-	// Load the raw block bytes from the database.
-	blockBytes, err := dbTx.FetchBlock(hash)
-	if err != nil {
-		return nil, err
-	}
-
-	// Create the encapsulated block and set the height appropriately.
-	block, err := dcrutil.NewBlockFromBytes(blockBytes)
-	if err != nil {
-		return nil, err
-	}
-
-	return block, nil
-}
-
-// DBFetchBlockByHeight is the exported version of dbFetchBlockByHeight.
-func DBFetchBlockByHeight(dbTx database.Tx, height int64) (*dcrutil.Block, error) {
-	return dbFetchBlockByHeight(dbTx, height)
-}
-
-// dbMainChainHasBlock uses an existing database transaction to return whether
-// or not the main chain contains the block identified by the provided hash.
-func dbMainChainHasBlock(dbTx database.Tx, hash *chainhash.Hash) bool {
-	hashIndex := dbTx.Metadata().Bucket(dbnamespace.HashIndexBucketName)
-	return hashIndex.Get(hash[:]) != nil
-}
-
-// DBMainChainHasBlock is the exported version of dbMainChainHasBlock.
-func DBMainChainHasBlock(dbTx database.Tx, hash *chainhash.Hash) bool {
-	return dbMainChainHasBlock(dbTx, hash)
-}
-
-// MainChainHasBlock returns whether or not the block with the given hash is in
-// the main chain.
-//
-// This function is safe for concurrent access.
-func (b *BlockChain) MainChainHasBlock(hash *chainhash.Hash) (bool, error) {
-	var exists bool
-	err := b.db.View(func(dbTx database.Tx) error {
-		exists = dbMainChainHasBlock(dbTx, hash)
-		return nil
-	})
-	return exists, err
-}
-
-// BlockHeightByHash returns the height of the block with the given hash in the
-// main chain.
-//
-// This function is safe for concurrent access.
-func (b *BlockChain) BlockHeightByHash(hash *chainhash.Hash) (int64, error) {
-	var height int64
-	err := b.db.View(func(dbTx database.Tx) error {
-		var err error
-		height, err = dbFetchHeightByHash(dbTx, hash)
-		return err
-	})
-	return height, err
-}
-
-// BlockHashByHeight returns the hash of the block at the given height in the
-// main chain.
-//
-// This function is safe for concurrent access.
-func (b *BlockChain) BlockHashByHeight(blockHeight int64) (*chainhash.Hash, error) {
-	var hash *chainhash.Hash
-	err := b.db.View(func(dbTx database.Tx) error {
-		var err error
-		hash, err = dbFetchHashByHeight(dbTx, blockHeight)
-		return err
-	})
-	return hash, err
-}
-
-// BlockByHeight returns the block at the given height in the main chain.
-//
-// This function is safe for concurrent access.
-func (b *BlockChain) BlockByHeight(blockHeight int64) (*dcrutil.Block, error) {
-	var block *dcrutil.Block
-	err := b.db.View(func(dbTx database.Tx) error {
-		var err error
-		block, err = dbFetchBlockByHeight(dbTx, blockHeight)
-		return err
-	})
-	return block, err
-}
-
-// BlockByHash searches the internal chain block stores and the database in an
-// attempt to find the requested block and returns it.  This function returns
-// blocks regardless of whether or not they are part of the main chain.
-//
-// This function is safe for concurrent access.
-func (b *BlockChain) BlockByHash(hash *chainhash.Hash) (*dcrutil.Block, error) {
-	b.chainLock.RLock()
-	block, err := b.fetchBlockByHash(hash)
-	b.chainLock.RUnlock()
-	return block, err
-}
-
-// HeightRange returns a range of block hashes for the given start and end
-// heights.  It is inclusive of the start height and exclusive of the end
-// height.  The end height will be limited to the current main chain height.
-//
-// This function is safe for concurrent access.
-func (b *BlockChain) HeightRange(startHeight, endHeight int64) ([]chainhash.Hash, error) {
-	// Ensure requested heights are sane.
-	if startHeight < 0 {
-		return nil, fmt.Errorf("start height of fetch range must not "+
-			"be less than zero - got %d", startHeight)
-	}
-	if endHeight < startHeight {
-		return nil, fmt.Errorf("end height of fetch range must not "+
-			"be less than the start height - got start %d, end %d",
-			startHeight, endHeight)
-	}
-
-	// There is nothing to do when the start and end heights are the same,
-	// so return now to avoid the chain lock and a database transaction.
-	if startHeight == endHeight {
-		return nil, nil
-	}
-
-	// Grab a lock on the chain to prevent it from changing due to a reorg
-	// while building the hashes.
-	b.chainLock.RLock()
-	defer b.chainLock.RUnlock()
-
-	// When the requested start height is after the most recent best chain
-	// height, there is nothing to do.
-	latestHeight := b.bestNode.height
-	if startHeight > latestHeight {
-		return nil, nil
-	}
-
-	// Limit the ending height to the latest height of the chain.
-	if endHeight > latestHeight+1 {
-		endHeight = latestHeight + 1
-	}
-
-	// Fetch as many as are available within the specified range.
-	var hashList []chainhash.Hash
-	err := b.db.View(func(dbTx database.Tx) error {
-		hashes := make([]chainhash.Hash, 0, endHeight-startHeight)
-		for i := startHeight; i < endHeight; i++ {
-			hash, err := dbFetchHashByHeight(dbTx, i)
-			if err != nil {
-				return err
-			}
-			hashes = append(hashes, *hash)
-		}
-
-		// Set the list to be returned to the constructed list.
-		hashList = hashes
-		return nil
-	})
-	return hashList, err
 }

@@ -236,6 +236,16 @@ func (m *Manager) maybeCreateIndexes(dbTx database.Tx) error {
 	return nil
 }
 
+// dbFetchBlockByHash uses an existing database transaction to retrieve the raw
+// block for the provided hash, deserialize it, and return a dcrutil.Block.
+func dbFetchBlockByHash(dbTx database.Tx, hash *chainhash.Hash) (*dcrutil.Block, error) {
+	blockBytes, err := dbTx.FetchBlock(hash)
+	if err != nil {
+		return nil, err
+	}
+	return dcrutil.NewBlockFromBytes(blockBytes)
+}
+
 // Init initializes the enabled indexes.  This is called during chain
 // initialization and primarily consists of catching up all indexes to the
 // current best chain tip.  This is necessary since each index can be disabled
@@ -310,12 +320,11 @@ func (m *Manager) Init(chain *blockchain.BlockChain, interrupt <-chan struct{}) 
 		var interrupted bool
 		initialHeight := height
 		err = m.db.Update(func(dbTx database.Tx) error {
-			for !blockchain.DBMainChainHasBlock(dbTx, hash) {
+			for !chain.MainChainHasBlock(hash) {
 				// Get the block, unless it's already cached.
 				var block *dcrutil.Block
 				if cachedBlock == nil && height > 0 {
-					block, err = blockchain.DBFetchBlockByHeight(dbTx,
-						int64(height))
+					block, err = dbFetchBlockByHash(dbTx, hash)
 					if err != nil {
 						return err
 					}
@@ -325,8 +334,8 @@ func (m *Manager) Init(chain *blockchain.BlockChain, interrupt <-chan struct{}) 
 
 				// Load the parent block for the height since it is
 				// required to remove it.
-				parent, err := blockchain.DBFetchBlockByHeight(dbTx,
-					int64(height)-1)
+				parentHash := &block.MsgBlock().Header.PrevBlock
+				parent, err := dbFetchBlockByHash(dbTx, parentHash)
 				if err != nil {
 					return err
 				}
@@ -435,8 +444,11 @@ func (m *Manager) Init(chain *blockchain.BlockChain, interrupt <-chan struct{}) 
 		err = m.db.Update(func(dbTx database.Tx) error {
 			// Get the parent of the block, unless it's already cached.
 			if cachedParent == nil && height > 0 {
-				parent, err = blockchain.DBFetchBlockByHeight(
-					dbTx, int64(height-1))
+				parentHash, err := chain.BlockHashByHeight(int64(height - 1))
+				if err != nil {
+					return err
+				}
+				parent, err = dbFetchBlockByHash(dbTx, parentHash)
 				if err != nil {
 					return err
 				}
@@ -446,8 +458,11 @@ func (m *Manager) Init(chain *blockchain.BlockChain, interrupt <-chan struct{}) 
 
 			// Load the block for the height since it is required to index
 			// it.
-			block, err = blockchain.DBFetchBlockByHeight(dbTx,
-				int64(height))
+			hash, err := chain.BlockHashByHeight(int64(height))
+			if err != nil {
+				return err
+			}
+			block, err = dbFetchBlockByHash(dbTx, hash)
 			if err != nil {
 				return err
 			}
