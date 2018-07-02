@@ -1098,14 +1098,7 @@ func opcodeCheckLockTimeVerify(op *parsedOpcode, vm *Engine) error {
 	// maximum of 2^31-1 (the year 2038).  Thus, a 5-byte scriptNum is used
 	// here since it will support up to 2^39-1 which allows dates beyond the
 	// current locktime limit.
-	//
-	// PeekByteArray is used here instead of PeekInt because we do not want
-	// to be limited to a 4-byte integer for reasons specified above.
-	so, err := vm.dstack.PeekByteArray(0)
-	if err != nil {
-		return err
-	}
-	lockTime, err := makeScriptNum(so, 5)
+	lockTime, err := vm.dstack.PeekInt(0, 5)
 	if err != nil {
 		return err
 	}
@@ -1172,14 +1165,7 @@ func opcodeCheckSequenceVerify(op *parsedOpcode, vm *Engine) error {
 	// 2^31-1.  Thus, a 5-byte scriptNum is used here since it will support
 	// up to 2^39-1 which allows sequences beyond the current sequence
 	// limit.
-	//
-	// PeekByteArray is used here instead of PeekInt because we do not want
-	// to be limited to a 4-byte integer for reasons specified above.
-	so, err := vm.dstack.PeekByteArray(0)
-	if err != nil {
-		return err
-	}
-	stackSequence, err := makeScriptNum(so, 5)
+	stackSequence, err := vm.dstack.PeekInt(0, 5)
 	if err != nil {
 		return err
 	}

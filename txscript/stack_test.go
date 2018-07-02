@@ -79,7 +79,7 @@ func TestStack(t *testing.T) {
 			"peek underflow (int)",
 			[][]byte{{1}, {2}, {3}, {4}, {5}},
 			func(s *stack) error {
-				_, err := s.PeekInt(5)
+				_, err := s.PeekInt(5, mathOpCodeMaxScriptNumLen)
 				return err
 			},
 			scriptError(ErrInvalidStackOperation, ""),
@@ -238,7 +238,7 @@ func TestStack(t *testing.T) {
 			nil,
 		},
 		{
-			"non-minal popInt 1 leading 0",
+			"non-minimal popInt 1 leading 0",
 			[][]byte{{0x01, 0x00, 0x00, 0x00}},
 			func(s *stack) error {
 				_, err := s.PopInt(mathOpCodeMaxScriptNumLen)
@@ -261,6 +261,42 @@ func TestStack(t *testing.T) {
 				return nil
 			},
 			nil,
+			nil,
+		},
+		{
+			"popInt 5 byte",
+			[][]byte{{0xff, 0xff, 0xff, 0xff, 0x7f}},
+			func(s *stack) error {
+				v, err := s.PopInt(5)
+				if err != nil {
+					return err
+				}
+				if v != 549755813887 {
+					return fmt.Errorf("%v != 549755813887 on PopInt", v)
+				}
+				return nil
+			},
+			nil,
+			nil,
+		},
+		{
+			"non-minimal popInt 5-byte leading 0",
+			[][]byte{{0xff, 0xff, 0xff, 0x7f, 0x00}},
+			func(s *stack) error {
+				_, err := s.PopInt(5)
+				return err
+			},
+			scriptError(ErrMinimalData, ""),
+			nil,
+		},
+		{
+			"too big popInt 5-byte leading 0",
+			[][]byte{{0xff, 0xff, 0xff, 0xff, 0x7f, 0x00}},
+			func(s *stack) error {
+				_, err := s.PopInt(5)
+				return err
+			},
+			scriptError(ErrNumOutOfRange, ""),
 			nil,
 		},
 		// Triggers the multibyte case in asInt
@@ -286,7 +322,7 @@ func TestStack(t *testing.T) {
 			"peekint nomodify -1",
 			[][]byte{{0x81}},
 			func(s *stack) error {
-				v, err := s.PeekInt(0)
+				v, err := s.PeekInt(0, mathOpCodeMaxScriptNumLen)
 				if err != nil {
 					return err
 				}
@@ -821,7 +857,7 @@ func TestStack(t *testing.T) {
 			func(s *stack) error {
 				// Peek int is otherwise pretty well tested,
 				// just check it works.
-				val, err := s.PeekInt(0)
+				val, err := s.PeekInt(0, mathOpCodeMaxScriptNumLen)
 				if err != nil {
 					return err
 				}
@@ -839,7 +875,7 @@ func TestStack(t *testing.T) {
 			func(s *stack) error {
 				// Peek int is otherwise pretty well tested,
 				// just check it works.
-				val, err := s.PeekInt(0)
+				val, err := s.PeekInt(0, mathOpCodeMaxScriptNumLen)
 				if err != nil {
 					return err
 				}
@@ -852,12 +888,46 @@ func TestStack(t *testing.T) {
 			[][]byte{nil},
 		},
 		{
+			"peekInt 5 byte",
+			[][]byte{{0xff, 0xff, 0xff, 0xff, 0x7f}, nil},
+			func(s *stack) error {
+				v, err := s.PeekInt(1, 5)
+				if err != nil {
+					return err
+				}
+				if v != 549755813887 {
+					return fmt.Errorf("%v != 549755813887 on PeekInt", v)
+				}
+				return nil
+			},
+			nil,
+			[][]byte{{0xff, 0xff, 0xff, 0xff, 0x7f}, nil},
+		},
+		{
+			"non-minimal peekInt 5-byte leading 0",
+			[][]byte{{0xff, 0xff, 0xff, 0x7f, 0x00}, nil},
+			func(s *stack) error {
+				_, err := s.PeekInt(1, 5)
+				return err
+			},
+			scriptError(ErrMinimalData, ""),
+			nil,
+		},
+		{
+			"too big peekInt 5-byte leading 0",
+			[][]byte{{0xff, 0xff, 0xff, 0xff, 0x7f, 0x00}, nil},
+			func(s *stack) error {
+				_, err := s.PeekInt(1, 5)
+				return err
+			},
+			scriptError(ErrNumOutOfRange, ""),
+			nil,
+		},
+		{
 			"pop int",
 			nil,
 			func(s *stack) error {
 				s.PushInt(scriptNum(1))
-				// Peek int is otherwise pretty well tested,
-				// just check it works.
 				val, err := s.PopInt(mathOpCodeMaxScriptNumLen)
 				if err != nil {
 					return err
@@ -874,8 +944,6 @@ func TestStack(t *testing.T) {
 			"pop empty",
 			nil,
 			func(s *stack) error {
-				// Peek int is otherwise pretty well tested,
-				// just check it works.
 				_, err := s.PopInt(mathOpCodeMaxScriptNumLen)
 				return err
 			},

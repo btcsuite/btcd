@@ -80,13 +80,13 @@ func (s *stack) PopByteArray() ([]byte, error) {
 // consensus rules imposed on data interpreted as numbers.
 //
 // Stack transformation: [... x1 x2 x3] -> [... x1 x2]
-func (s *stack) PopInt(maxLen int) (scriptNum, error) {
+func (s *stack) PopInt(maxScriptNumLen int) (scriptNum, error) {
 	so, err := s.PopByteArray()
 	if err != nil {
 		return 0, err
 	}
 
-	return makeScriptNum(so, maxLen)
+	return makeScriptNum(so, maxScriptNumLen)
 }
 
 // PopBool pops the value off the top of the stack, converts it into a bool, and
@@ -117,13 +117,13 @@ func (s *stack) PeekByteArray(idx int32) ([]byte, error) {
 // PeekInt returns the Nth item on the stack as a script num without removing
 // it.  The act of converting to a script num enforces the consensus rules
 // imposed on data interpreted as numbers.
-func (s *stack) PeekInt(idx int32) (scriptNum, error) {
+func (s *stack) PeekInt(idx int32, maxScriptNumLen int) (scriptNum, error) {
 	so, err := s.PeekByteArray(idx)
 	if err != nil {
 		return 0, err
 	}
 
-	return makeScriptNum(so, mathOpCodeMaxScriptNumLen)
+	return makeScriptNum(so, maxScriptNumLen)
 }
 
 // PeekBool returns the Nth item on the stack as a bool without removing it.
