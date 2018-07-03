@@ -750,12 +750,6 @@ func (b *BlockChain) connectBlock(node *blockNode, block, parent *dcrutil.Block,
 			return err
 		}
 
-		// Add the block hash and height to the main chain index.
-		err = dbPutMainChainIndex(dbTx, block.Hash(), node.height)
-		if err != nil {
-			return err
-		}
-
 		// Update the utxo set using the state of the utxo view.  This
 		// entails removing all of the utxos spent and adding the new
 		// ones created by the block.
@@ -924,12 +918,6 @@ func (b *BlockChain) disconnectBlock(node *blockNode, block, parent *dcrutil.Blo
 	err = b.db.Update(func(dbTx database.Tx) error {
 		// Update best block state.
 		err := dbPutBestState(dbTx, state, node.workSum)
-		if err != nil {
-			return err
-		}
-
-		// Remove the block hash and height from the main chain index.
-		err = dbRemoveMainChainIndex(dbTx, block.Hash(), node.height)
 		if err != nil {
 			return err
 		}

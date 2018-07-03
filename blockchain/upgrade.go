@@ -111,10 +111,28 @@ func ticketsRevokedInBlock(bl *dcrutil.Block) []chainhash.Hash {
 // use of the new on-disk ticket database.
 func upgradeToVersion2(db database.DB, chainParams *chaincfg.Params, dbInfo *databaseInfo) error {
 	// Hardcoded so updates to the global values do not affect old upgrades.
+	byteOrder := binary.LittleEndian
 	chainStateKeyName := []byte("chainstate")
+	heightIdxBucketName := []byte("heightidx")
 
-	// This is a legacy function that relied on information in the database that
-	// is no longer available in more recent code.
+	// These are legacy functions that relied on information in the database
+	// that is no longer available in more recent code.
+	dbFetchHashByHeight := func(dbTx database.Tx, height int64) (*chainhash.Hash, error) {
+		var serializedHeight [4]byte
+		byteOrder.PutUint32(serializedHeight[:], uint32(height))
+
+		meta := dbTx.Metadata()
+		heightIndex := meta.Bucket(heightIdxBucketName)
+		hashBytes := heightIndex.Get(serializedHeight[:])
+		if hashBytes == nil {
+			str := fmt.Sprintf("no block at height %d exists", height)
+			return nil, errNotInMainChain(str)
+		}
+
+		var hash chainhash.Hash
+		copy(hash[:], hashBytes)
+		return &hash, nil
+	}
 	dbFetchBlockByHeight := func(dbTx database.Tx, height int64) (*dcrutil.Block, error) {
 		// First find the hash associated with the provided height in the index.
 		hash, err := dbFetchHashByHeight(dbTx, height)
@@ -419,6 +437,78 @@ func upgradeToVersion3(db database.DB, dbInfo *databaseInfo, interrupt <-chan st
 	})
 }
 
+// removeMainChainIndex removes the main chain hash index and height index
+// buckets.  These are no longer needed due to using the full block index in
+// memory.
+//
+// The database is guaranteed to be fully updated if this returns without
+// failure.
+func removeMainChainIndex(db database.DB, interrupt <-chan struct{}) error {
+	// Hardcoded bucket names so updates to the global values do not affect old
+	// upgrades.
+	hashIdxBucketName := []byte("hashidx")
+	heightIdxBucketName := []byte("heightidx")
+
+	log.Info("Removing unneeded indexes in the database...")
+	start := time.Now()
+
+	// Delete the main chain index buckets.
+	err := db.Update(func(dbTx database.Tx) error {
+		// Delete the main chain hash to height index.
+		meta := dbTx.Metadata()
+		hashIdxBucket := meta.Bucket(hashIdxBucketName)
+		if hashIdxBucket != nil {
+			if err := meta.DeleteBucket(hashIdxBucketName); err != nil {
+				return err
+			}
+			log.Infof("Removed hash index.")
+		}
+
+		if interruptRequested(interrupt) {
+			// No error here so the database transaction is not cancelled
+			// and therefore outstanding work is written to disk.  The
+			// outer function will exit with an interrupted error below due
+			// to another interrupted check.
+			return nil
+		}
+
+		// Delete the main chain hash to height index.
+		heightIdxBucket := meta.Bucket(heightIdxBucketName)
+		if heightIdxBucket != nil {
+			if err := meta.DeleteBucket(heightIdxBucketName); err != nil {
+				return err
+			}
+			log.Infof("Removed height index.")
+		}
+
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	if interruptRequested(interrupt) {
+		return errInterruptRequested
+	}
+
+	elapsed := time.Since(start).Round(time.Millisecond)
+	log.Infof("Done upgrading database in %v.", elapsed)
+	return nil
+}
+
+// upgradeToVersion4 upgrades a version 3 blockchain database to version 4.
+func upgradeToVersion4(db database.DB, dbInfo *databaseInfo, interrupt <-chan struct{}) error {
+	if err := removeMainChainIndex(db, interrupt); err != nil {
+		return err
+	}
+
+	// Update and persist the updated database versions.
+	dbInfo.version = 4
+	return db.Update(func(dbTx database.Tx) error {
+		return dbPutDatabaseInfo(dbTx, dbInfo)
+	})
+}
+
 // upgradeDB upgrades old database versions to the newest version by applying
 // all possible upgrades iteratively.
 //
@@ -435,6 +525,13 @@ func upgradeDB(db database.DB, chainParams *chaincfg.Params, dbInfo *databaseInf
 	// a block index version.
 	if dbInfo.version == 2 && dbInfo.bidxVer < 2 {
 		if err := upgradeToVersion3(db, dbInfo, interrupt); err != nil {
+			return err
+		}
+	}
+
+	// Remove the main chain index from the database if needed.
+	if dbInfo.version == 3 {
+		if err := upgradeToVersion4(db, dbInfo, interrupt); err != nil {
 			return err
 		}
 	}

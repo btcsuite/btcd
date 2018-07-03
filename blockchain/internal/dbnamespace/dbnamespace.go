@@ -36,14 +36,6 @@ var (
 	// BCDBInfoBucketName bucket.
 	BCDBInfoCreatedKeyName = []byte("created")
 
-	// HashIndexBucketName is the name of the db bucket used to house to the
-	// block hash -> block height index.
-	HashIndexBucketName = []byte("hashidx")
-
-	// HeightIndexBucketName is the name of the db bucket used to house to
-	// the block height -> block hash index.
-	HeightIndexBucketName = []byte("heightidx")
-
 	// ChainStateKeyName is the name of the db key used to store the best
 	// chain state.
 	ChainStateKeyName = []byte("chainstate")

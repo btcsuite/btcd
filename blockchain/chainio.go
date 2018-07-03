@@ -24,7 +24,7 @@ import (
 const (
 	// currentDatabaseVersion indicates what the current database
 	// version is.
-	currentDatabaseVersion = 3
+	currentDatabaseVersion = 4
 
 	// currentBlockIndexVersion indicates what the current block index
 	// database version.
@@ -1216,95 +1216,6 @@ func dbPutUtxoView(dbTx database.Tx, view *UtxoViewpoint) error {
 }
 
 // -----------------------------------------------------------------------------
-// The main chain index consists of two buckets with an entry for every block in
-// the main chain.  One bucket is for the hash to height mapping and the other
-// is for the height to hash mapping.
-//
-// The serialized format for values in the hash to height bucket is:
-//   <height>
-//
-//   Field      Type     Size
-//   height     uint32   4 bytes
-//
-// The serialized format for values in the height to hash bucket is:
-//   <hash>
-//
-//   Field      Type             Size
-//   hash       chainhash.Hash   chainhash.HashSize
-// -----------------------------------------------------------------------------
-
-// dbPutMainChainIndex uses an existing database transaction to update or add
-// index entries for the hash to height and height to hash mappings for the
-// provided values.
-func dbPutMainChainIndex(dbTx database.Tx, hash *chainhash.Hash, height int64) error {
-	// Serialize the height for use in the index entries.
-	var serializedHeight [4]byte
-	dbnamespace.ByteOrder.PutUint32(serializedHeight[:], uint32(height))
-
-	// Add the block hash to height mapping to the index.
-	meta := dbTx.Metadata()
-	hashIndex := meta.Bucket(dbnamespace.HashIndexBucketName)
-	if err := hashIndex.Put(hash[:], serializedHeight[:]); err != nil {
-		return err
-	}
-
-	// Add the block height to hash mapping to the index.
-	heightIndex := meta.Bucket(dbnamespace.HeightIndexBucketName)
-	return heightIndex.Put(serializedHeight[:], hash[:])
-}
-
-// dbRemoveMainChainIndex uses an existing database transaction remove main
-// chain index entries from the hash to height and height to hash mappings for
-// the provided values.
-func dbRemoveMainChainIndex(dbTx database.Tx, hash *chainhash.Hash, height int64) error {
-	// Remove the block hash to height mapping.
-	meta := dbTx.Metadata()
-	hashIndex := meta.Bucket(dbnamespace.HashIndexBucketName)
-	if err := hashIndex.Delete(hash[:]); err != nil {
-		return err
-	}
-
-	// Remove the block height to hash mapping.
-	var serializedHeight [4]byte
-	dbnamespace.ByteOrder.PutUint32(serializedHeight[:], uint32(height))
-	heightIndex := meta.Bucket(dbnamespace.HeightIndexBucketName)
-	return heightIndex.Delete(serializedHeight[:])
-}
-
-// dbFetchHeightByHash uses an existing database transaction to retrieve the
-// height for the provided hash from the index.
-func dbFetchHeightByHash(dbTx database.Tx, hash *chainhash.Hash) (int64, error) {
-	meta := dbTx.Metadata()
-	hashIndex := meta.Bucket(dbnamespace.HashIndexBucketName)
-	serializedHeight := hashIndex.Get(hash[:])
-	if serializedHeight == nil {
-		str := fmt.Sprintf("block %s is not in the main chain", hash)
-		return 0, errNotInMainChain(str)
-	}
-
-	return int64(dbnamespace.ByteOrder.Uint32(serializedHeight)), nil
-}
-
-// dbFetchHashByHeight uses an existing database transaction to retrieve the
-// hash for the provided height from the index.
-func dbFetchHashByHeight(dbTx database.Tx, height int64) (*chainhash.Hash, error) {
-	var serializedHeight [4]byte
-	dbnamespace.ByteOrder.PutUint32(serializedHeight[:], uint32(height))
-
-	meta := dbTx.Metadata()
-	heightIndex := meta.Bucket(dbnamespace.HeightIndexBucketName)
-	hashBytes := heightIndex.Get(serializedHeight[:])
-	if hashBytes == nil {
-		str := fmt.Sprintf("no block at height %d exists", height)
-		return nil, errNotInMainChain(str)
-	}
-
-	var hash chainhash.Hash
-	copy(hash[:], hashBytes)
-	return &hash, nil
-}
-
-// -----------------------------------------------------------------------------
 // The database information contains information about the version and date
 // of the blockchain database.
 //
@@ -1585,20 +1496,6 @@ func (b *BlockChain) createChainState() error {
 			return err
 		}
 
-		// Create the bucket that houses the chain block hash to height
-		// index.
-		_, err = meta.CreateBucket(dbnamespace.HashIndexBucketName)
-		if err != nil {
-			return err
-		}
-
-		// Create the bucket that houses the chain block height to hash
-		// index.
-		_, err = meta.CreateBucket(dbnamespace.HeightIndexBucketName)
-		if err != nil {
-			return err
-		}
-
 		// Create the bucket that houses the spend journal data.
 		_, err = meta.CreateBucket(dbnamespace.SpendJournalBucketName)
 		if err != nil {
@@ -1615,13 +1512,6 @@ func (b *BlockChain) createChainState() error {
 
 		// Add the genesis block to the block index.
 		err = dbPutBlockNode(dbTx, node)
-		if err != nil {
-			return err
-		}
-
-		// Add the genesis block hash to height and height to hash
-		// mappings to the index.
-		err = dbPutMainChainIndex(dbTx, &node.hash, node.height)
 		if err != nil {
 			return err
 		}
