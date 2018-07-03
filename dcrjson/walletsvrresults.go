@@ -61,20 +61,25 @@ type GetMultisigOutInfoResult struct {
 // GetStakeInfoResult models the data returned from the getstakeinfo
 // command.
 type GetStakeInfoResult struct {
-	BlockHeight      int64   `json:"blockheight"`
-	PoolSize         uint32  `json:"poolsize"`
-	Difficulty       float64 `json:"difficulty"`
-	AllMempoolTix    uint32  `json:"allmempooltix"`
-	OwnMempoolTix    uint32  `json:"ownmempooltix"`
-	Immature         uint32  `json:"immature"`
-	Live             uint32  `json:"live"`
-	ProportionLive   float64 `json:"proportionlive"`
-	Voted            uint32  `json:"voted"`
-	TotalSubsidy     float64 `json:"totalsubsidy"`
-	Missed           uint32  `json:"missed"`
-	ProportionMissed float64 `json:"proportionmissed"`
-	Revoked          uint32  `json:"revoked"`
-	Expired          uint32  `json:"expired"`
+	BlockHeight  int64   `json:"blockheight"`
+	Difficulty   float64 `json:"difficulty"`
+	TotalSubsidy float64 `json:"totalsubsidy"`
+
+	OwnMempoolTix  uint32 `json:"ownmempooltix"`
+	Immature       uint32 `json:"immature"`
+	Unspent        uint32 `json:"unspent"`
+	Voted          uint32 `json:"voted"`
+	Revoked        uint32 `json:"revoked"`
+	UnspentExpired uint32 `json:"unspentexpired"`
+
+	// Not available to SPV wallets
+	PoolSize         uint32  `json:"poolsize,omitempty"`
+	AllMempoolTix    uint32  `json:"allmempooltix,omitempty"`
+	Live             uint32  `json:"live,omitempty"`
+	ProportionLive   float64 `json:"proportionlive,omitempty"`
+	Missed           uint32  `json:"missed,omitempty"`
+	ProportionMissed float64 `json:"proportionmissed,omitempty"`
+	Expired          uint32  `json:"expired,omitempty"`
 }
 
 // GetTicketsResult models the data returned from the gettickets
