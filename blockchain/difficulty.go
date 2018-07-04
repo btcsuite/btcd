@@ -7,6 +7,7 @@ package blockchain
 import (
 	"math/big"
 
+	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 )
@@ -160,7 +161,7 @@ func (b *BlockChain) GetNextWorkRequired(header *wire.BlockHeader) (uint32, erro
 	}
 
 	// Special rule for regTest: we never retarget.
-	if b.chainParams.Net == wire.TestNet {
+	if b.chainParams == &chaincfg.RegressionNetParams {
 		return prevBlock.bits, nil
 	}
 
@@ -304,7 +305,7 @@ func (b *BlockChain) calculateNextWorkRequired(prevNode *blockNode, firstBlockTi
 // required to produce that work.
 func (b *BlockChain) computeTarget(indexFirst, indexLast *blockNode) *big.Int {
 	if indexLast.height <= indexFirst.height {
-		panic("indexLast height should greater the indexFirst height ")
+		panic("indexLast height should be greater than indexFirst height ")
 	}
 
 	/**
