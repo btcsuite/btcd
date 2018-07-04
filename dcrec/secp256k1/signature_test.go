@@ -331,9 +331,9 @@ func TestSignatures(t *testing.T) {
 	for _, test := range signatureTests {
 		var err error
 		if test.der {
-			_, err = ParseDERSignature(test.sig, S256())
+			_, err = ParseDERSignature(test.sig)
 		} else {
-			_, err = ParseSignature(test.sig, S256())
+			_, err = ParseSignature(test.sig)
 		}
 		if err != nil {
 			if test.isValid {

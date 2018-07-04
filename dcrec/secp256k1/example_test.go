@@ -72,7 +72,7 @@ func Example_verifySignature() {
 		fmt.Println(err)
 		return
 	}
-	signature, err := secp256k1.ParseSignature(sigBytes, secp256k1.S256())
+	signature, err := secp256k1.ParseDERSignature(sigBytes)
 	if err != nil {
 		fmt.Println(err)
 		return

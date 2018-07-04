@@ -2638,7 +2638,7 @@ func opcodeCheckSig(op *parsedOpcode, vm *Engine) error {
 		return nil
 	}
 
-	signature, err := secp256k1.ParseDERSignature(sigBytes, secp256k1.S256())
+	signature, err := secp256k1.ParseDERSignature(sigBytes)
 	if err != nil {
 		vm.dstack.PushBool(false)
 		return nil
@@ -2810,7 +2810,7 @@ func opcodeCheckMultiSig(op *parsedOpcode, vm *Engine) error {
 
 			// Parse the signature.
 			var err error
-			parsedSig, err = secp256k1.ParseDERSignature(signature, secp256k1.S256())
+			parsedSig, err = secp256k1.ParseDERSignature(signature)
 			sigInfo.parsed = true
 			if err != nil {
 				continue

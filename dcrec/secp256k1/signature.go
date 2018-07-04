@@ -8,7 +8,6 @@ package secp256k1
 import (
 	"bytes"
 	"crypto/ecdsa"
-	"crypto/elliptic"
 	"crypto/hmac"
 	"crypto/sha256"
 	"errors"
@@ -213,14 +212,14 @@ func parseSig(sigStr []byte, der bool) (*Signature, error) {
 // ParseSignature parses a signature in BER format for the curve type `curve'
 // into a Signature type, perfoming some basic sanity checks.  If parsing
 // according to the more strict DER format is needed, use ParseDERSignature.
-func ParseSignature(sigStr []byte, curve elliptic.Curve) (*Signature, error) {
+func ParseSignature(sigStr []byte) (*Signature, error) {
 	return parseSig(sigStr, false)
 }
 
 // ParseDERSignature parses a signature in DER format for the curve type
 // `curve` into a Signature type.  If parsing according to the less strict
 // BER format is needed, use ParseSignature.
-func ParseDERSignature(sigStr []byte, curve elliptic.Curve) (*Signature, error) {
+func ParseDERSignature(sigStr []byte) (*Signature, error) {
 	return parseSig(sigStr, true)
 }
 

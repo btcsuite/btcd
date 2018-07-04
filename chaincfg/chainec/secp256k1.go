@@ -253,7 +253,7 @@ func newSecp256k1DSA() DSA {
 			return ts
 		},
 		parseDERSignature: func(sigStr []byte) (Signature, error) {
-			sig, err := secp256k1.ParseDERSignature(sigStr, secp256k1Curve)
+			sig, err := secp256k1.ParseDERSignature(sigStr)
 			if err != nil {
 				return nil, err
 			}
@@ -261,7 +261,7 @@ func newSecp256k1DSA() DSA {
 			return ts, err
 		},
 		parseSignature: func(sigStr []byte) (Signature, error) {
-			sig, err := secp256k1.ParseSignature(sigStr, secp256k1Curve)
+			sig, err := secp256k1.ParseSignature(sigStr)
 			if err != nil {
 				return nil, err
 			}
