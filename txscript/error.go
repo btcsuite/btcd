@@ -209,95 +209,83 @@ const (
 	// Failures related to malleability.
 	// ---------------------------------
 
-	// ErrMinimalData is returned when the ScriptVerifyMinimalData flag
-	// is set and the script contains push operations that do not use
-	// the minimal opcode required.
+	// ErrMinimalData is returned when the script contains push operations
+	// that do not use the minimal opcode required.
 	ErrMinimalData
 
 	// ErrInvalidSigHashType is returned when a signature hash type is not
 	// one of the supported types.
 	ErrInvalidSigHashType
 
-	// ErrSigTooShort is returned when the ScriptVerifyDERSignatures flag is
-	// set and a signature that should be a canonically-encoded DER
-	// signature is too short.
+	// ErrSigTooShort is returned when a signature that should be a
+	// canonically-encoded DER signature is too short.
 	ErrSigTooShort
 
-	// ErrSigTooLong is returned when the ScriptVerifyDERSignatures flag is
-	// set and a signature that should be a canonically-encoded DER
-	// signature is too long.
+	// ErrSigTooLong is returned when a signature that should be a
+	// canonically-encoded DER signature is too long.
 	ErrSigTooLong
 
-	// ErrSigInvalidSeqID is returned when the ScriptVerifyDERSignatures
-	// flag is set and a signature that should be a canonically-encoded DER
-	// signature does not have the expected ASN.1 sequence ID.
+	// ErrSigInvalidSeqID is returned when a signature that should be a
+	// canonically-encoded DER signature does not have the expected ASN.1
+	// sequence ID.
 	ErrSigInvalidSeqID
 
-	// ErrSigInvalidDataLen is returned when the ScriptVerifyDERSignatures
-	// flag is set and a signature that should be a canonically-encoded DER
-	// signature does not specify the correct number of remaining bytes for
-	// the R and S portions.
+	// ErrSigInvalidDataLen is returned a signature that should be a
+	// canonically-encoded DER signature does not specify the correct number
+	// of remaining bytes for the R and S portions.
 	ErrSigInvalidDataLen
 
-	// ErrSigMissingSTypeID is returned when the ScriptVerifyDERSignatures
-	// flag is set and a signature that should be a canonically-encoded DER
-	// signature does not provide the ASN.1 type ID for S.
+	// ErrSigMissingSTypeID is returned a signature that should be a
+	// canonically-encoded DER signature does not provide the ASN.1 type ID
+	// for S.
 	ErrSigMissingSTypeID
 
-	// ErrSigMissingSLen is returned when the ScriptVerifyDERSignatures flag
-	// is set and a signature that should be a canonically-encoded DER
-	// signature does not provide the length of S.
+	// ErrSigMissingSLen is returned when a signature that should be a
+	// canonically-encoded DER signature does not provide the length of S.
 	ErrSigMissingSLen
 
-	// ErrSigInvalidSLen is returned when the ScriptVerifyDERSignatures flag
-	// is set and a signature that should be a canonically-encoded DER
-	// signature does not specify the correct number of bytes for the S
-	// portion.
+	// ErrSigInvalidSLen is returned a signature that should be a
+	// canonically-encoded DER signature does not specify the correct number
+	// of bytes for the S portion.
 	ErrSigInvalidSLen
 
-	// ErrSigInvalidRIntID is returned when the ScriptVerifyDERSignatures
-	// flag is set and a signature that should be a canonically-encoded DER
-	// signature does not have the expected ASN.1 integer ID for R.
+	// ErrSigInvalidRIntID is returned when a signature that should be a
+	// canonically-encoded DER signature does not have the expected ASN.1
+	// integer ID for R.
 	ErrSigInvalidRIntID
 
-	// ErrSigZeroRLen is returned when the ScriptVerifyDERSignatures flag is
-	// set and a signature that should be a canonically-encoded DER
-	// signature has an R length of zero.
+	// ErrSigZeroRLen is returned when a signature that should be a
+	// canonically-encoded DER signature has an R length of zero.
 	ErrSigZeroRLen
 
-	// ErrSigNegativeR is returned when the ScriptVerifyDERSignatures flag
-	// is set and a signature that should be a canonically-encoded DER
-	// signature has a negative value for R.
+	// ErrSigNegativeR is returned when a signature that should be a
+	// canonically-encoded DER signature has a negative value for R.
 	ErrSigNegativeR
 
-	// ErrSigTooMuchRPadding is returned when the ScriptVerifyDERSignatures flag
-	// is set and a signature that should be a canonically-encoded DER
-	// signature has too much padding for R.
+	// ErrSigTooMuchRPadding is returned when a signature that should be a
+	// canonically-encoded DER signature has too much padding for R.
 	ErrSigTooMuchRPadding
 
-	// ErrSigInvalidSIntID is returned when the ScriptVerifyDERSignatures
-	// flag is set and a signature that should be a canonically-encoded DER
-	// signature does not have the expected ASN.1 integer ID for S.
+	// ErrSigInvalidSIntID is returned when a signature that should be a
+	// canonically-encoded DER signature does not have the expected ASN.1
+	// integer ID for S.
 	ErrSigInvalidSIntID
 
-	// ErrSigZeroSLen is returned when the ScriptVerifyDERSignatures flag is
-	// set and a signature that should be a canonically-encoded DER
-	// signature has an S length of zero.
+	// ErrSigZeroSLen is returned when a signature that should be a
+	// canonically-encoded DER signature has an S length of zero.
 	ErrSigZeroSLen
 
-	// ErrSigNegativeS is returned when the ScriptVerifyDERSignatures flag
-	// is set and a signature that should be a canonically-encoded DER
-	// signature has a negative value for S.
+	// ErrSigNegativeS is returned when a signature that should be a
+	// canonically-encoded DER signature has a negative value for S.
 	ErrSigNegativeS
 
-	// ErrSigTooMuchSPadding is returned when the ScriptVerifyDERSignatures flag
-	// is set and a signature that should be a canonically-encoded DER
-	// signature has too much padding for S.
+	// ErrSigTooMuchSPadding is returned when a signature that should be a
+	// canonically-encoded DER signature has too much padding for S.
 	ErrSigTooMuchSPadding
 
-	// ErrSigHighS is returned when the ScriptVerifyDERSignatures flag is
-	// set and a signature that should be a canonically-encoded DER signature
-	// has an S value that is higher than the curve half order.
+	// ErrSigHighS is returned when a signature that should be a
+	// canonically-encoded DER signature has an S value that is higher than
+	// the curve half order.
 	ErrSigHighS
 
 	// ErrNotPushOnly is returned when a script that is required to only
@@ -306,8 +294,7 @@ const (
 	// bip16 is active and when the ScriptVerifySigPushOnly flag is set.
 	ErrNotPushOnly
 
-	// ErrPubKeyType is returned when the ScriptVerifyStrictEncoding
-	// flag is set and the script contains invalid public keys.
+	// ErrPubKeyType is returned when the script contains invalid public keys.
 	ErrPubKeyType
 
 	// ErrCleanStack is returned when the ScriptVerifyCleanStack flag
@@ -448,9 +435,6 @@ func IsErrorCode(err error, c ErrorCode) bool {
 // IsDERSigError returns whether or not the provided error is a script error
 // with one of the error codes which are caused due to encountering a signature
 // that is not a canonically-encoded DER signature.
-//
-// Note that the strict DER signature checks are only performed if scripts
-// are executed with the ScriptVerifyDERSignatures flag.
 func IsDERSigError(err error) bool {
 	serr, ok := err.(Error)
 	if !ok {
