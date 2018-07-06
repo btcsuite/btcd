@@ -2,7 +2,7 @@ package: github.com/btcsuite/btcd
 import:
 - package: github.com/btcsuite/btclog
 - package: github.com/btcsuite/btcutil
-  version: d4cc87b860166d00d6b5b9e0d3b3d71d6088d4d4
+  version: ab6388e0c60ae4834a1f57511e20c17b5f78be4b
   subpackages:
   - bloom
   - hdkeychain
