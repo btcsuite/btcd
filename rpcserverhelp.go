@@ -334,13 +334,13 @@ var helpDescsEnUS = map[string]string{
 
 	// GetCFilterCmd help.
 	"getcfilter--synopsis":  "Returns a block's committed filter given its hash.",
-	"getcfilter-filtertype": "The type of filter to return (0=regular, 1=extended)",
+	"getcfilter-filtertype": "The type of filter to return (0=regular)",
 	"getcfilter-hash":       "The hash of the block",
 	"getcfilter--result0":   "The block's committed filter",
 
 	// GetCFilterHeaderCmd help.
 	"getcfilterheader--synopsis":  "Returns a block's compact filter header given its hash.",
-	"getcfilterheader-filtertype": "The type of filter header to return (0=regular, 1=extended)",
+	"getcfilterheader-filtertype": "The type of filter header to return (0=regular)",
 	"getcfilterheader-hash":       "The hash of the block",
 	"getcfilterheader--result0":   "The block's gcs filter header",
 
