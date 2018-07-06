@@ -11,6 +11,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/big"
+	"reflect"
 	"testing"
 )
 
@@ -520,6 +521,67 @@ func TestSignCompact(t *testing.T) {
 		}
 		compressed := i%2 != 0
 		testSignCompact(t, name, S256(), data, compressed)
+	}
+}
+
+// recoveryTests assert basic tests for public key recovery from signatures.
+// The cases are borrowed from github.com/fjl/btcec-issue.
+var recoveryTests = []struct {
+	msg string
+	sig string
+	pub string
+	err error
+}{
+	{
+		// Valid curve point recovered.
+		msg: "ce0677bb30baa8cf067c88db9811f4333d131bf8bcf12fe7065d211dce971008",
+		sig: "0190f27b8b488db00b00606796d2987f6a5f59ae62ea05effe84fef5b8b0e549984a691139ad57a3f0b906637673aa2f63d1f55cb1a69199d4009eea23ceaddc93",
+		pub: "04E32DF42865E97135ACFB65F3BAE71BDC86F4D49150AD6A440B6F15878109880A0A2B2667F7E725CEEA70C673093BF67663E0312623C8E091B13CF2C0F11EF652",
+	},
+	{
+		// Invalid curve point recovered.
+		msg: "00c547e4f7b0f325ad1e56f57e26c745b09a3e503d86e00e5255ff7f715d3d1c",
+		sig: "0100b1693892219d736caba55bdb67216e485557ea6b6af75f37096c9aa6a5a75f00b940b1d03b21e36b0e47e79769f095fe2ab855bd91e3a38756b7d75a9c4549",
+		err: fmt.Errorf("invalid square root"),
+	},
+	{
+		// Low R and S values.
+		msg: "ba09edc1275a285fb27bfe82c4eea240a907a0dbaf9e55764b8f318c37d5974f",
+		sig: "00000000000000000000000000000000000000000000000000000000000000002c0000000000000000000000000000000000000000000000000000000000000004",
+		pub: "04A7640409AA2083FDAD38B2D8DE1263B2251799591D840653FB02DBBA503D7745FCB83D80E08A1E02896BE691EA6AFFB8A35939A646F1FC79052A744B1C82EDC3",
+	},
+}
+
+func TestRecoverCompact(t *testing.T) {
+	for i, test := range recoveryTests {
+		msg := decodeHex(test.msg)
+		sig := decodeHex(test.sig)
+
+		// Magic DER constant.
+		sig[0] += 27
+
+		pub, _, err := RecoverCompact(S256(), sig, msg)
+
+		// Verify that returned error matches as expected.
+		if !reflect.DeepEqual(test.err, err) {
+			t.Errorf("unexpected error returned from pubkey "+
+				"recovery #%d: wanted %v, got %v",
+				i, test.err, err)
+			continue
+		}
+
+		// If check succeeded because a proper error was returned, we
+		// ignore the returned pubkey.
+		if err != nil {
+			continue
+		}
+
+		// Otherwise, ensure the correct public key was recovered.
+		exPub, _ := ParsePubKey(decodeHex(test.pub), S256())
+		if !exPub.IsEqual(pub) {
+			t.Errorf("unexpected recovered public key #%d: "+
+				"want %v, got %v", i, exPub, pub)
+		}
 	}
 }
 
