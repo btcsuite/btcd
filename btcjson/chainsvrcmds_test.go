@@ -1191,8 +1191,8 @@ func TestChainSvrCmdErrors(t *testing.T) {
 	for i, test := range tests {
 		err := json.Unmarshal([]byte(test.marshalled), &test.result)
 		if reflect.TypeOf(err) != reflect.TypeOf(test.err) {
-			t.Errorf("Test #%d (%s) wrong error - got %T (%[2]v), "+
-				"want %T", i, test.name, err, test.err)
+			t.Errorf("Test #%d (%s) wrong error - got %T (%v), "+
+				"want %T", i, test.name, err, err, test.err)
 			continue
 		}
 
