@@ -164,12 +164,18 @@ var testNoncePrng = mrand.New(mrand.NewSource(0))
 // provided fields populated and fake values for the other fields.
 func newFakeNode(parent *blockNode, blockVersion int32, stakeVersion uint32, bits uint32, timestamp time.Time) *blockNode {
 	// Make up a header and create a block node from it.
+	var prevHash chainhash.Hash
+	var height uint32
+	if parent != nil {
+		prevHash = parent.hash
+		height = uint32(parent.height + 1)
+	}
 	header := &wire.BlockHeader{
 		Version:      blockVersion,
-		PrevBlock:    parent.hash,
+		PrevBlock:    prevHash,
 		VoteBits:     0x01,
 		Bits:         bits,
-		Height:       uint32(parent.height) + 1,
+		Height:       height,
 		Timestamp:    timestamp,
 		Nonce:        testNoncePrng.Uint32(),
 		StakeVersion: stakeVersion,

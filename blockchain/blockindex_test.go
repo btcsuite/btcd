@@ -212,12 +212,9 @@ func TestChainTips(t *testing.T) {
 	bc.index.RUnlock()
 
 	// The expected chain tips are the tips of all of the branches.
-	tip := func(nodes []*blockNode) *blockNode {
-		return nodes[len(nodes)-1]
-	}
 	expectedTips := make(map[*blockNode]struct{})
 	for _, branch := range branches {
-		expectedTips[tip(branch)] = struct{}{}
+		expectedTips[branchTip(branch)] = struct{}{}
 	}
 
 	// Ensure the chain tips are the expected values.
