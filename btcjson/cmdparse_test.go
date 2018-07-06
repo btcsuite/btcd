@@ -387,8 +387,8 @@ func TestNewCmdErrors(t *testing.T) {
 	for i, test := range tests {
 		_, err := btcjson.NewCmd(test.method, test.args...)
 		if reflect.TypeOf(err) != reflect.TypeOf(test.err) {
-			t.Errorf("Test #%d (%s) wrong error - got %T (%[2]v), "+
-				"want %T", i, test.name, err, test.err)
+			t.Errorf("Test #%d (%s) wrong error - got %T (%v), "+
+				"want %T", i, test.name, err, err, test.err)
 			continue
 		}
 		gotErrorCode := err.(btcjson.Error).ErrorCode
@@ -435,8 +435,8 @@ func TestMarshalCmdErrors(t *testing.T) {
 	for i, test := range tests {
 		_, err := btcjson.MarshalCmd(test.id, test.cmd)
 		if reflect.TypeOf(err) != reflect.TypeOf(test.err) {
-			t.Errorf("Test #%d (%s) wrong error - got %T (%[2]v), "+
-				"want %T", i, test.name, err, test.err)
+			t.Errorf("Test #%d (%s) wrong error - got %T (%v), "+
+				"want %T", i, test.name, err, err, test.err)
 			continue
 		}
 		gotErrorCode := err.(btcjson.Error).ErrorCode
@@ -504,8 +504,8 @@ func TestUnmarshalCmdErrors(t *testing.T) {
 	for i, test := range tests {
 		_, err := btcjson.UnmarshalCmd(&test.request)
 		if reflect.TypeOf(err) != reflect.TypeOf(test.err) {
-			t.Errorf("Test #%d (%s) wrong error - got %T (%[2]v), "+
-				"want %T", i, test.name, err, test.err)
+			t.Errorf("Test #%d (%s) wrong error - got %T (%v), "+
+				"want %T", i, test.name, err, err, test.err)
 			continue
 		}
 		gotErrorCode := err.(btcjson.Error).ErrorCode

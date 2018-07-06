@@ -557,7 +557,9 @@ func (b *BlockChain) getReorganizeNodes(node *blockNode) (*list.List, *list.List
 // it would be inefficient to repeat it.
 //
 // This function MUST be called with the chain state lock held (for writes).
-func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block, view *UtxoViewpoint, stxos []spentTxOut) error {
+func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block,
+	view *UtxoViewpoint, stxos []SpentTxOut) error {
+
 	// Make sure it's extending the end of the best chain.
 	prevHash := &block.MsgBlock().Header.PrevBlock
 	if !prevHash.IsEqual(&b.bestChain.Tip().hash) {
@@ -638,7 +640,7 @@ func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block, view *U
 		// optional indexes with the block being connected so they can
 		// update themselves accordingly.
 		if b.indexManager != nil {
-			err := b.indexManager.ConnectBlock(dbTx, block, view)
+			err := b.indexManager.ConnectBlock(dbTx, block, stxos)
 			if err != nil {
 				return err
 			}
@@ -739,8 +741,15 @@ func (b *BlockChain) disconnectBlock(node *blockNode, block *btcutil.Block, view
 			return err
 		}
 
+		// Before we delete the spend journal entry for this back,
+		// we'll fetch it as is so the indexers can utilize if needed.
+		stxos, err := dbFetchSpendJournalEntry(dbTx, block)
+		if err != nil {
+			return err
+		}
+
 		// Update the transaction spend journal by removing the record
-		// that contains all txos spent by the block .
+		// that contains all txos spent by the block.
 		err = dbRemoveSpendJournalEntry(dbTx, block.Hash())
 		if err != nil {
 			return err
@@ -750,7 +759,7 @@ func (b *BlockChain) disconnectBlock(node *blockNode, block *btcutil.Block, view
 		// optional indexes with the block being disconnected so they
 		// can update themselves accordingly.
 		if b.indexManager != nil {
-			err := b.indexManager.DisconnectBlock(dbTx, block, view)
+			err := b.indexManager.DisconnectBlock(dbTx, block, stxos)
 			if err != nil {
 				return err
 			}
@@ -816,7 +825,7 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List) error 
 	// then they are needed again when doing the actual database updates.
 	// Rather than doing two loads, cache the loaded data into these slices.
 	detachBlocks := make([]*btcutil.Block, 0, detachNodes.Len())
-	detachSpentTxOuts := make([][]spentTxOut, 0, detachNodes.Len())
+	detachSpentTxOuts := make([][]SpentTxOut, 0, detachNodes.Len())
 	attachBlocks := make([]*btcutil.Block, 0, attachNodes.Len())
 
 	// Disconnect all of the blocks back to the point of the fork.  This
@@ -846,7 +855,7 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List) error 
 
 		// Load all of the spent txos for the block from the spend
 		// journal.
-		var stxos []spentTxOut
+		var stxos []SpentTxOut
 		err = b.db.View(func(dbTx database.Tx) error {
 			stxos, err = dbFetchSpendJournalEntry(dbTx, block)
 			return err
@@ -990,7 +999,7 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List) error 
 		// as spent and add all transactions being created by this block
 		// to it.  Also, provide an stxo slice so the spent txout
 		// details are generated.
-		stxos := make([]spentTxOut, 0, countSpentOutputs(block))
+		stxos := make([]SpentTxOut, 0, countSpentOutputs(block))
 		err = view.connectTransactions(block, &stxos)
 		if err != nil {
 			return err
@@ -1044,7 +1053,7 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, fla
 		// actually connecting the block.
 		view := NewUtxoViewpoint()
 		view.SetBestHash(parentHash)
-		stxos := make([]spentTxOut, 0, countSpentOutputs(block))
+		stxos := make([]SpentTxOut, 0, countSpentOutputs(block))
 		if !fastAdd {
 			err := b.checkConnectBlock(node, block, view, &stxos)
 			if err == nil {
@@ -1569,12 +1578,16 @@ type IndexManager interface {
 	Init(*BlockChain, <-chan struct{}) error
 
 	// ConnectBlock is invoked when a new block has been connected to the
-	// main chain.
-	ConnectBlock(database.Tx, *btcutil.Block, *UtxoViewpoint) error
+	// main chain. The set of output spent within a block is also passed in
+	// so indexers can access the previous output scripts input spent if
+	// required.
+	ConnectBlock(database.Tx, *btcutil.Block, []SpentTxOut) error
 
 	// DisconnectBlock is invoked when a block has been disconnected from
-	// the main chain.
-	DisconnectBlock(database.Tx, *btcutil.Block, *UtxoViewpoint) error
+	// the main chain. The set of outputs scripts that were spent within
+	// this block is also returned so indexers can clean up the prior index
+	// state for this block.
+	DisconnectBlock(database.Tx, *btcutil.Block, []SpentTxOut) error
 }
 
 // Config is a descriptor which specifies the blockchain instance configuration.
