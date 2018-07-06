@@ -2493,7 +2493,7 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 		indexes = append(indexes, s.addrIndex)
 	}
 	if !cfg.NoCFilters {
-		indxLog.Info("cf index is enabled")
+		indxLog.Info("Committed filter index is enabled")
 		s.cfIndex = indexers.NewCfIndex(db, chainParams)
 		indexes = append(indexes, s.cfIndex)
 	}
