@@ -83,6 +83,17 @@ type CfIndex struct {
 // Ensure the CfIndex type implements the Indexer interface.
 var _ Indexer = (*CfIndex)(nil)
 
+// Ensure the CfIndex type implements the NeedsInputser interface.
+var _ NeedsInputser = (*CfIndex)(nil)
+
+// NeedsInputs signals that the index requires the referenced inputs in order
+// to properly create the index.
+//
+// This implements the NeedsInputser interface.
+func (idx *CfIndex) NeedsInputs() bool {
+	return true
+}
+
 // Init initializes the hash-based cf index. This is part of the Indexer
 // interface.
 func (idx *CfIndex) Init() error {

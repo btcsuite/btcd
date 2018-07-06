@@ -494,42 +494,6 @@ func dbFetchTx(dbTx database.Tx, hash *chainhash.Hash) (*wire.MsgTx, error) {
 	return &msgTx, nil
 }
 
-// makeUtxoView creates a mock unspent transaction output view by using the
-// transaction index in order to look up all inputs referenced by the
-// transactions in the block.  This is sometimes needed when catching indexes up
-// because many of the txouts could actually already be spent however the
-// associated scripts are still required to index them.
-func makeUtxoView(dbTx database.Tx, block *btcutil.Block, interrupt <-chan struct{}) (*blockchain.UtxoViewpoint, error) {
-	view := blockchain.NewUtxoViewpoint()
-	for txIdx, tx := range block.Transactions() {
-		// Coinbases do not reference any inputs.  Since the block is
-		// required to have already gone through full validation, it has
-		// already been proven on the first transaction in the block is
-		// a coinbase.
-		if txIdx == 0 {
-			continue
-		}
-
-		// Use the transaction index to load all of the referenced
-		// inputs and add their outputs to the view.
-		for _, txIn := range tx.MsgTx().TxIn {
-			originOut := &txIn.PreviousOutPoint
-			originTx, err := dbFetchTx(dbTx, &originOut.Hash)
-			if err != nil {
-				return nil, err
-			}
-
-			view.AddTxOuts(btcutil.NewTx(originTx), 0)
-		}
-
-		if interruptRequested(interrupt) {
-			return nil, errInterruptRequested
-		}
-	}
-
-	return view, nil
-}
-
 // ConnectBlock must be invoked when a block is extending the main chain.  It
 // keeps track of the state of each index it is managing, performs some sanity
 // checks, and invokes each indexer.
