@@ -5081,16 +5081,7 @@ func handleSendRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan st
 	//
 	// Note that votes are only valid for a specific block and are time
 	// sensitive, so they should not be added to the rebroadcast logic.
-	//
-	// TODO: Ideally ticket purchases and revocations could be added to the
-	// rebroadcast logic as well, however, they would need to be removed under
-	// certain circumstances such as when the stake difficulty interval changes
-	// and if a revocation is for a ticket that was missed, but then becomes
-	// live again due to a reorg.  All stake transactions are ignored here since
-	// there is no clean infrastructure in place currently to handle those
-	// removals and perpetually broadcasting transactions which are no longer
-	// valid is not desirable.
-	if txType := stake.DetermineTxType(msgtx); txType == stake.TxTypeRegular {
+	if txType := stake.DetermineTxType(msgtx); txType != stake.TxTypeSSGen {
 		iv := wire.NewInvVect(wire.InvTypeTx, tx.Hash())
 		s.server.AddRebroadcastInventory(iv, tx)
 	}

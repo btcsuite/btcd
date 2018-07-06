@@ -1101,13 +1101,13 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 			// Retrieve the current previous block hash.
 			curPrevHash := b.chain.BestPrevHash()
 
-			nextStakeDiff, errSDiff :=
+			nextStakeDiff, err :=
 				b.chain.CalcNextRequiredStakeDifficulty()
-			if errSDiff != nil {
+			if err != nil {
 				bmgrLog.Warnf("Failed to get next stake difficulty "+
 					"calculation: %v", err)
 			}
-			if r != nil && errSDiff == nil {
+			if r != nil && err == nil {
 				// Update registered websocket clients on the
 				// current stake difficulty.
 				r.ntfnMgr.NotifyStakeDifficulty(
@@ -2020,6 +2020,9 @@ func (b *blockManager) handleNotifyMsg(notification *blockchain.Notification) {
 				b.server.RemoveRebroadcastInventory(iv)
 			}
 
+			// Filter and update the rebroadcast inventory.
+			b.server.PruneRebroadcastInventory()
+
 			// Notify registered websocket clients of incoming block.
 			r.ntfnMgr.NotifyBlockConnected(block)
 		}
@@ -2102,6 +2105,9 @@ func (b *blockManager) handleNotifyMsg(notification *blockchain.Notification) {
 				b.server.txMemPool.RemoveTransaction(tx, true)
 			}
 		}
+
+		// Filter and update the rebroadcast inventory.
+		b.server.PruneRebroadcastInventory()
 
 		// Notify registered websocket clients.
 		if r := b.server.rpcServer; r != nil {
