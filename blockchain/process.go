@@ -192,6 +192,19 @@ func (b *BlockChain) ProcessBlock(block *btcutil.Block, flags BehaviorFlags) (bo
 		}
 	}
 
+	// Handle orphan blocks.
+	prevHash := &blockHeader.PrevBlock
+	prevHashExists, err := b.blockExists(prevHash)
+	if err != nil {
+		return false, false, err
+	}
+	if !prevHashExists {
+		log.Infof("Adding orphan block %v with parent %v", blockHash, prevHash)
+		b.addOrphanBlock(block)
+
+		return false, true, nil
+	}
+
 	if !fastAdd {
 		// Even though the checks prior to now have already ensured the
 		// proof of work exceeds the claimed amount, the claimed amount
@@ -210,19 +223,6 @@ func (b *BlockChain) ProcessBlock(block *btcutil.Block, flags BehaviorFlags) (bo
 				"checkpoint", currentTarget)
 			return false, false, ruleError(ErrDifficultyTooLow, str)
 		}
-	}
-
-	// Handle orphan blocks.
-	prevHash := &blockHeader.PrevBlock
-	prevHashExists, err := b.blockExists(prevHash)
-	if err != nil {
-		return false, false, err
-	}
-	if !prevHashExists {
-		log.Infof("Adding orphan block %v with parent %v", blockHash, prevHash)
-		b.addOrphanBlock(block)
-
-		return false, true, nil
 	}
 
 	// The block has passed all context independent checks and appears sane
