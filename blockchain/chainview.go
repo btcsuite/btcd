@@ -325,3 +325,85 @@ func (c *chainView) FindFork(node *blockNode) *blockNode {
 	c.mtx.Unlock()
 	return fork
 }
+
+// blockLocator returns a block locator for the passed block node.  The passed
+// node can be nil in which case the block locator for the current tip
+// associated with the view will be returned.  This only differs from the
+// exported version in that it is up to the caller to ensure the lock is held.
+//
+// See the exported BlockLocator function comments for more details.
+//
+// This function MUST be called with the view mutex locked (for reads).
+func (c *chainView) blockLocator(node *blockNode) BlockLocator {
+	// Use the current tip if requested.
+	if node == nil {
+		node = c.tip()
+		if node == nil {
+			return nil
+		}
+	}
+
+	// Calculate the max number of entries that will ultimately be in the
+	// block locator.  See the description of the algorithm for how these
+	// numbers are derived.
+	var maxEntries uint8
+	if node.height <= 12 {
+		maxEntries = uint8(node.height) + 1
+	} else {
+		// Requested hash itself + previous 10 entries + genesis block.
+		// Then floor(log2(height-10)) entries for the skip portion.
+		adjustedHeight := uint32(node.height) - 10
+		maxEntries = 12 + fastLog2Floor(adjustedHeight)
+	}
+	locator := make(BlockLocator, 0, maxEntries)
+
+	step := int64(1)
+	for node != nil {
+		locator = append(locator, &node.hash)
+
+		// Nothing more to add once the genesis block has been added.
+		if node.height == 0 {
+			break
+		}
+
+		// Calculate height of previous node to include ensuring the
+		// final node is the genesis block.
+		height := node.height - step
+		if height < 0 {
+			height = 0
+		}
+
+		// When the node is in the current chain view, all of its
+		// ancestors must be too, so use a much faster O(1) lookup in
+		// that case.  Otherwise, fall back to walking backwards through
+		// the nodes of the other chain to the correct ancestor.
+		if c.contains(node) {
+			node = c.nodes[height]
+		} else {
+			node = node.Ancestor(height)
+		}
+
+		// Once 11 entries have been included, start doubling the
+		// distance between included hashes.
+		if len(locator) > 10 {
+			step *= 2
+		}
+	}
+
+	return locator
+}
+
+// BlockLocator returns a block locator for the passed block node.  The passed
+// node can be nil in which case the block locator for the current tip
+// associated with the view will be returned.
+//
+// See the BlockLocator type for details on the algorithm used to create a block
+// locator.
+//
+// This function is safe for concurrent access.
+func (c *chainView) BlockLocator(node *blockNode) BlockLocator {
+	c.mtx.Lock()
+	locator := c.blockLocator(node)
+	c.mtx.Unlock()
+	return locator
+}
