@@ -44,37 +44,37 @@ func TestStxoSerialization(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		stxo       spentTxOut
+		stxo       SpentTxOut
 		serialized []byte
 	}{
 		// From block 170 in main blockchain.
 		{
 			name: "Spends last output of coinbase",
-			stxo: spentTxOut{
-				amount:     5000000000,
-				pkScript:   hexToBytes("410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac"),
-				isCoinBase: true,
-				height:     9,
+			stxo: SpentTxOut{
+				Amount:     5000000000,
+				PkScript:   hexToBytes("410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac"),
+				IsCoinBase: true,
+				Height:     9,
 			},
 			serialized: hexToBytes("1300320511db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5c"),
 		},
 		// Adapted from block 100025 in main blockchain.
 		{
 			name: "Spends last output of non coinbase",
-			stxo: spentTxOut{
-				amount:     13761000000,
-				pkScript:   hexToBytes("76a914b2fb57eadf61e106a100a7445a8c3f67898841ec88ac"),
-				isCoinBase: false,
-				height:     100024,
+			stxo: SpentTxOut{
+				Amount:     13761000000,
+				PkScript:   hexToBytes("76a914b2fb57eadf61e106a100a7445a8c3f67898841ec88ac"),
+				IsCoinBase: false,
+				Height:     100024,
 			},
 			serialized: hexToBytes("8b99700086c64700b2fb57eadf61e106a100a7445a8c3f67898841ec"),
 		},
 		// Adapted from block 100025 in main blockchain.
 		{
 			name: "Does not spend last output, legacy format",
-			stxo: spentTxOut{
-				amount:   34405000000,
-				pkScript: hexToBytes("76a9146edbc6c4d31bae9f1ccc38538a114bf42de65e8688ac"),
+			stxo: SpentTxOut{
+				Amount:   34405000000,
+				PkScript: hexToBytes("76a9146edbc6c4d31bae9f1ccc38538a114bf42de65e8688ac"),
 			},
 			serialized: hexToBytes("0091f20f006edbc6c4d31bae9f1ccc38538a114bf42de65e86"),
 		},
@@ -85,7 +85,7 @@ func TestStxoSerialization(t *testing.T) {
 		// actually serializing it is calculated properly.
 		gotSize := spentTxOutSerializeSize(&test.stxo)
 		if gotSize != len(test.serialized) {
-			t.Errorf("spentTxOutSerializeSize (%s): did not get "+
+			t.Errorf("SpentTxOutSerializeSize (%s): did not get "+
 				"expected size - got %d, want %d", test.name,
 				gotSize, len(test.serialized))
 			continue
@@ -110,7 +110,7 @@ func TestStxoSerialization(t *testing.T) {
 
 		// Ensure the serialized bytes are decoded back to the expected
 		// stxo.
-		var gotStxo spentTxOut
+		var gotStxo SpentTxOut
 		gotBytesRead, err := decodeSpentTxOut(test.serialized, &gotStxo)
 		if err != nil {
 			t.Errorf("decodeSpentTxOut (%s): unexpected error: %v",
@@ -138,42 +138,42 @@ func TestStxoDecodeErrors(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		stxo       spentTxOut
+		stxo       SpentTxOut
 		serialized []byte
 		bytesRead  int // Expected number of bytes read.
 		errType    error
 	}{
 		{
 			name:       "nothing serialized",
-			stxo:       spentTxOut{},
+			stxo:       SpentTxOut{},
 			serialized: hexToBytes(""),
 			errType:    errDeserialize(""),
 			bytesRead:  0,
 		},
 		{
 			name:       "no data after header code w/o reserved",
-			stxo:       spentTxOut{},
+			stxo:       SpentTxOut{},
 			serialized: hexToBytes("00"),
 			errType:    errDeserialize(""),
 			bytesRead:  1,
 		},
 		{
 			name:       "no data after header code with reserved",
-			stxo:       spentTxOut{},
+			stxo:       SpentTxOut{},
 			serialized: hexToBytes("13"),
 			errType:    errDeserialize(""),
 			bytesRead:  1,
 		},
 		{
 			name:       "no data after reserved",
-			stxo:       spentTxOut{},
+			stxo:       SpentTxOut{},
 			serialized: hexToBytes("1300"),
 			errType:    errDeserialize(""),
 			bytesRead:  2,
 		},
 		{
 			name:       "incomplete compressed txout",
-			stxo:       spentTxOut{},
+			stxo:       SpentTxOut{},
 			serialized: hexToBytes("1332"),
 			errType:    errDeserialize(""),
 			bytesRead:  2,
@@ -208,7 +208,7 @@ func TestSpendJournalSerialization(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		entry      []spentTxOut
+		entry      []SpentTxOut
 		blockTxns  []*wire.MsgTx
 		serialized []byte
 	}{
@@ -222,11 +222,11 @@ func TestSpendJournalSerialization(t *testing.T) {
 		// From block 170 in main blockchain.
 		{
 			name: "One tx with one input spends last output of coinbase",
-			entry: []spentTxOut{{
-				amount:     5000000000,
-				pkScript:   hexToBytes("410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac"),
-				isCoinBase: true,
-				height:     9,
+			entry: []SpentTxOut{{
+				Amount:     5000000000,
+				PkScript:   hexToBytes("410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac"),
+				IsCoinBase: true,
+				Height:     9,
 			}},
 			blockTxns: []*wire.MsgTx{{ // Coinbase omitted.
 				Version: 1,
@@ -252,16 +252,16 @@ func TestSpendJournalSerialization(t *testing.T) {
 		// Adapted from block 100025 in main blockchain.
 		{
 			name: "Two txns when one spends last output, one doesn't",
-			entry: []spentTxOut{{
-				amount:     34405000000,
-				pkScript:   hexToBytes("76a9146edbc6c4d31bae9f1ccc38538a114bf42de65e8688ac"),
-				isCoinBase: false,
-				height:     100024,
+			entry: []SpentTxOut{{
+				Amount:     34405000000,
+				PkScript:   hexToBytes("76a9146edbc6c4d31bae9f1ccc38538a114bf42de65e8688ac"),
+				IsCoinBase: false,
+				Height:     100024,
 			}, {
-				amount:     13761000000,
-				pkScript:   hexToBytes("76a914b2fb57eadf61e106a100a7445a8c3f67898841ec88ac"),
-				isCoinBase: false,
-				height:     100024,
+				Amount:     13761000000,
+				PkScript:   hexToBytes("76a914b2fb57eadf61e106a100a7445a8c3f67898841ec88ac"),
+				IsCoinBase: false,
+				Height:     100024,
 			}},
 			blockTxns: []*wire.MsgTx{{ // Coinbase omitted.
 				Version: 1,

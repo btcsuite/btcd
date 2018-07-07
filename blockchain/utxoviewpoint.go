@@ -216,7 +216,7 @@ func (view *UtxoViewpoint) AddTxOuts(tx *btcutil.Tx, blockHeight int32) {
 // spent.  In addition, when the 'stxos' argument is not nil, it will be updated
 // to append an entry for each spent txout.  An error will be returned if the
 // view does not contain the required utxos.
-func (view *UtxoViewpoint) connectTransaction(tx *btcutil.Tx, blockHeight int32, stxos *[]spentTxOut) error {
+func (view *UtxoViewpoint) connectTransaction(tx *btcutil.Tx, blockHeight int32, stxos *[]SpentTxOut) error {
 	// Coinbase transactions don't have any inputs to spend.
 	if IsCoinBase(tx) {
 		// Add the transaction's outputs as available utxos.
@@ -239,11 +239,11 @@ func (view *UtxoViewpoint) connectTransaction(tx *btcutil.Tx, blockHeight int32,
 		// Only create the stxo details if requested.
 		if stxos != nil {
 			// Populate the stxo details using the utxo entry.
-			var stxo = spentTxOut{
-				amount:     entry.Amount(),
-				pkScript:   entry.PkScript(),
-				height:     entry.BlockHeight(),
-				isCoinBase: entry.IsCoinBase(),
+			var stxo = SpentTxOut{
+				Amount:     entry.Amount(),
+				PkScript:   entry.PkScript(),
+				Height:     entry.BlockHeight(),
+				IsCoinBase: entry.IsCoinBase(),
 			}
 			*stxos = append(*stxos, stxo)
 		}
@@ -264,7 +264,7 @@ func (view *UtxoViewpoint) connectTransaction(tx *btcutil.Tx, blockHeight int32,
 // spend as spent, and setting the best hash for the view to the passed block.
 // In addition, when the 'stxos' argument is not nil, it will be updated to
 // append an entry for each spent txout.
-func (view *UtxoViewpoint) connectTransactions(block *btcutil.Block, stxos *[]spentTxOut) error {
+func (view *UtxoViewpoint) connectTransactions(block *btcutil.Block, stxos *[]SpentTxOut) error {
 	for _, tx := range block.Transactions() {
 		err := view.connectTransaction(tx, block.Height(), stxos)
 		if err != nil {
@@ -308,7 +308,7 @@ func (view *UtxoViewpoint) fetchEntryByHash(db database.DB, hash *chainhash.Hash
 // created by the passed block, restoring all utxos the transactions spent by
 // using the provided spent txo information, and setting the best hash for the
 // view to the block before the passed block.
-func (view *UtxoViewpoint) disconnectTransactions(db database.DB, block *btcutil.Block, stxos []spentTxOut) error {
+func (view *UtxoViewpoint) disconnectTransactions(db database.DB, block *btcutil.Block, stxos []SpentTxOut) error {
 	// Sanity check the correct number of stxos are provided.
 	if len(stxos) != countSpentOutputs(block) {
 		return AssertError("disconnectTransactions called with bad " +
@@ -405,7 +405,7 @@ func (view *UtxoViewpoint) disconnectTransactions(db database.DB, block *btcutil
 			// connected.  In the case of a fresh database that has
 			// only ever run with the new v2 format, this code path
 			// will never run.
-			if stxo.height == 0 {
+			if stxo.Height == 0 {
 				utxo, err := view.fetchEntryByHash(db, txHash)
 				if err != nil {
 					return err
@@ -416,17 +416,17 @@ func (view *UtxoViewpoint) disconnectTransactions(db database.DB, block *btcutil
 						*originOut))
 				}
 
-				stxo.height = utxo.BlockHeight()
-				stxo.isCoinBase = utxo.IsCoinBase()
+				stxo.Height = utxo.BlockHeight()
+				stxo.IsCoinBase = utxo.IsCoinBase()
 			}
 
 			// Restore the utxo using the stxo data from the spend
 			// journal and mark it as modified.
-			entry.amount = stxo.amount
-			entry.pkScript = stxo.pkScript
-			entry.blockHeight = stxo.height
+			entry.amount = stxo.Amount
+			entry.pkScript = stxo.PkScript
+			entry.blockHeight = stxo.Height
 			entry.packedFlags = tfModified
-			if stxo.isCoinBase {
+			if stxo.IsCoinBase {
 				entry.packedFlags |= tfCoinBase
 			}
 		}

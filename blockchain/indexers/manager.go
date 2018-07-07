@@ -68,7 +68,9 @@ func dbFetchIndexerTip(dbTx database.Tx, idxKey []byte) (*chainhash.Hash, int32,
 // given block using the provided indexer and updates the tip of the indexer
 // accordingly.  An error will be returned if the current tip for the indexer is
 // not the previous block for the passed block.
-func dbIndexConnectBlock(dbTx database.Tx, indexer Indexer, block *btcutil.Block, view *blockchain.UtxoViewpoint) error {
+func dbIndexConnectBlock(dbTx database.Tx, indexer Indexer, block *btcutil.Block,
+	stxo []blockchain.SpentTxOut) error {
+
 	// Assert that the block being connected properly connects to the
 	// current tip of the index.
 	idxKey := indexer.Key()
@@ -84,7 +86,7 @@ func dbIndexConnectBlock(dbTx database.Tx, indexer Indexer, block *btcutil.Block
 	}
 
 	// Notify the indexer with the connected block so it can index it.
-	if err := indexer.ConnectBlock(dbTx, block, view); err != nil {
+	if err := indexer.ConnectBlock(dbTx, block, stxo); err != nil {
 		return err
 	}
 
@@ -96,7 +98,9 @@ func dbIndexConnectBlock(dbTx database.Tx, indexer Indexer, block *btcutil.Block
 // given block using the provided indexer and updates the tip of the indexer
 // accordingly.  An error will be returned if the current tip for the indexer is
 // not the passed block.
-func dbIndexDisconnectBlock(dbTx database.Tx, indexer Indexer, block *btcutil.Block, view *blockchain.UtxoViewpoint) error {
+func dbIndexDisconnectBlock(dbTx database.Tx, indexer Indexer, block *btcutil.Block,
+	stxo []blockchain.SpentTxOut) error {
+
 	// Assert that the block being disconnected is the current tip of the
 	// index.
 	idxKey := indexer.Key()
@@ -113,7 +117,7 @@ func dbIndexDisconnectBlock(dbTx database.Tx, indexer Indexer, block *btcutil.Bl
 
 	// Notify the indexer with the disconnected block so it can remove all
 	// of the appropriate entries.
-	if err := indexer.DisconnectBlock(dbTx, block, view); err != nil {
+	if err := indexer.DisconnectBlock(dbTx, block, stxo); err != nil {
 		return err
 	}
 
@@ -299,7 +303,8 @@ func (m *Manager) Init(chain *blockchain.BlockChain, interrupt <-chan struct{}) 
 			// loaded directly since it is no longer in the main
 			// chain and thus the chain.BlockByHash function would
 			// error.
-			err = m.db.Update(func(dbTx database.Tx) error {
+			var block *btcutil.Block
+			err := m.db.View(func(dbTx database.Tx) error {
 				blockBytes, err := dbTx.FetchBlock(hash)
 				if err != nil {
 					return err
@@ -309,24 +314,27 @@ func (m *Manager) Init(chain *blockchain.BlockChain, interrupt <-chan struct{}) 
 					return err
 				}
 				block.SetHeight(height)
+				return err
+			})
+			if err != nil {
+				return err
+			}
 
-				// When the index requires all of the referenced
-				// txouts they need to be retrieved from the
-				// transaction index.
-				var view *blockchain.UtxoViewpoint
-				if indexNeedsInputs(indexer) {
-					var err error
-					view, err = makeUtxoView(dbTx, block,
-						interrupt)
-					if err != nil {
-						return err
-					}
-				}
+			// We'll also grab the set of outputs spent by this
+			// block so we can remove them from the index.
+			spentTxos, err := chain.FetchSpendJournal(block)
+			if err != nil {
+				return err
+			}
 
+			// With the block and stxo set for that block retrieved,
+			// we can now update the index itself.
+			err = m.db.Update(func(dbTx database.Tx) error {
 				// Remove all of the index entries associated
 				// with the block and update the indexer tip.
-				err = dbIndexDisconnectBlock(dbTx, indexer,
-					block, view)
+				err = dbIndexDisconnectBlock(
+					dbTx, indexer, block, spentTxos,
+				)
 				if err != nil {
 					return err
 				}
@@ -407,7 +415,7 @@ func (m *Manager) Init(chain *blockchain.BlockChain, interrupt <-chan struct{}) 
 		}
 
 		// Connect the block for all indexes that need it.
-		var view *blockchain.UtxoViewpoint
+		var spentTxos []blockchain.SpentTxOut
 		for i, indexer := range m.enabledIndexes {
 			// Skip indexes that don't need to be updated with this
 			// block.
@@ -415,21 +423,20 @@ func (m *Manager) Init(chain *blockchain.BlockChain, interrupt <-chan struct{}) 
 				continue
 			}
 
-			err := m.db.Update(func(dbTx database.Tx) error {
-				// When the index requires all of the referenced
-				// txouts and they haven't been loaded yet, they
-				// need to be retrieved from the transaction
-				// index.
-				if view == nil && indexNeedsInputs(indexer) {
-					var err error
-					view, err = makeUtxoView(dbTx, block,
-						interrupt)
-					if err != nil {
-						return err
-					}
+			// When the index requires all of the referenced txouts
+			// and they haven't been loaded yet, they need to be
+			// retrieved from the spend journal.
+			if spentTxos == nil && indexNeedsInputs(indexer) {
+				spentTxos, err = chain.FetchSpendJournal(block)
+				if err != nil {
+					return err
 				}
-				return dbIndexConnectBlock(dbTx, indexer, block,
-					view)
+			}
+
+			err := m.db.Update(func(dbTx database.Tx) error {
+				return dbIndexConnectBlock(
+					dbTx, indexer, block, spentTxos,
+				)
 			})
 			if err != nil {
 				return err
@@ -487,52 +494,18 @@ func dbFetchTx(dbTx database.Tx, hash *chainhash.Hash) (*wire.MsgTx, error) {
 	return &msgTx, nil
 }
 
-// makeUtxoView creates a mock unspent transaction output view by using the
-// transaction index in order to look up all inputs referenced by the
-// transactions in the block.  This is sometimes needed when catching indexes up
-// because many of the txouts could actually already be spent however the
-// associated scripts are still required to index them.
-func makeUtxoView(dbTx database.Tx, block *btcutil.Block, interrupt <-chan struct{}) (*blockchain.UtxoViewpoint, error) {
-	view := blockchain.NewUtxoViewpoint()
-	for txIdx, tx := range block.Transactions() {
-		// Coinbases do not reference any inputs.  Since the block is
-		// required to have already gone through full validation, it has
-		// already been proven on the first transaction in the block is
-		// a coinbase.
-		if txIdx == 0 {
-			continue
-		}
-
-		// Use the transaction index to load all of the referenced
-		// inputs and add their outputs to the view.
-		for _, txIn := range tx.MsgTx().TxIn {
-			originOut := &txIn.PreviousOutPoint
-			originTx, err := dbFetchTx(dbTx, &originOut.Hash)
-			if err != nil {
-				return nil, err
-			}
-
-			view.AddTxOuts(btcutil.NewTx(originTx), 0)
-		}
-
-		if interruptRequested(interrupt) {
-			return nil, errInterruptRequested
-		}
-	}
-
-	return view, nil
-}
-
 // ConnectBlock must be invoked when a block is extending the main chain.  It
 // keeps track of the state of each index it is managing, performs some sanity
 // checks, and invokes each indexer.
 //
 // This is part of the blockchain.IndexManager interface.
-func (m *Manager) ConnectBlock(dbTx database.Tx, block *btcutil.Block, view *blockchain.UtxoViewpoint) error {
+func (m *Manager) ConnectBlock(dbTx database.Tx, block *btcutil.Block,
+	stxos []blockchain.SpentTxOut) error {
+
 	// Call each of the currently active optional indexes with the block
 	// being connected so they can update accordingly.
 	for _, index := range m.enabledIndexes {
-		err := dbIndexConnectBlock(dbTx, index, block, view)
+		err := dbIndexConnectBlock(dbTx, index, block, stxos)
 		if err != nil {
 			return err
 		}
@@ -546,11 +519,13 @@ func (m *Manager) ConnectBlock(dbTx database.Tx, block *btcutil.Block, view *blo
 // the index entries associated with the block.
 //
 // This is part of the blockchain.IndexManager interface.
-func (m *Manager) DisconnectBlock(dbTx database.Tx, block *btcutil.Block, view *blockchain.UtxoViewpoint) error {
+func (m *Manager) DisconnectBlock(dbTx database.Tx, block *btcutil.Block,
+	stxo []blockchain.SpentTxOut) error {
+
 	// Call each of the currently active optional indexes with the block
 	// being disconnected so they can update accordingly.
 	for _, index := range m.enabledIndexes {
-		err := dbIndexDisconnectBlock(dbTx, index, block, view)
+		err := dbIndexDisconnectBlock(dbTx, index, block, stxo)
 		if err != nil {
 			return err
 		}
