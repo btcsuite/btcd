@@ -311,7 +311,7 @@ const FileContents = `[Application Options]
 
 ; Specify the maximum block size in bytes to create.  This value will be limited
 ; to the consensus limit if it is larger than this value.
-; blockmaxsize=750000
+; blockmaxsize=375000
 
 ; Specify the size in bytes of the high-priority/low-fee area when creating a
 ; block.  Transactions which consist of large amounts, old inputs, and small
@@ -319,7 +319,7 @@ const FileContents = `[Application Options]
 ; or free transactions age, they raise in priority thereby making them more
 ; likely to be included in this section of a new block.  This value is limited
 ; by the blockmaxsize option and will be limited as needed.
-; blockprioritysize=50000
+; blockprioritysize=20000
 
 
 ; ------------------------------------------------------------------------------
