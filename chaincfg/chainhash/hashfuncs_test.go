@@ -9,10 +9,9 @@ import (
 	"testing"
 )
 
-// TestHashFuncs ensures the hash functions which perform hash(b) work as
-// expected.
-func TestHashFuncs(t *testing.T) {
-	tests := []struct {
+var (
+	// hashTests provides sample inputs and outputs for hash function tests
+	hashTests = []struct {
 		out string
 		in  string
 	}{
@@ -48,24 +47,39 @@ func TestHashFuncs(t *testing.T) {
 		{"496f7063f8bd479bf54e9d87e9ba53e277839ac7fdaecc5105f2879b58ee562f", "The fugacity of a constituent in a mixture of gases at a given temperature is proportional to its mole fraction.  Lewis-Randall Rule"},
 		{"2e0eff918940b01eea9539a02212f33ee84f77fab201f4287aa6167e4a1ed043", "How can you write a big system without C++?  -Paul Glick"},
 	}
+)
 
-	// Ensure the hash function which returns a byte slice returns the
-	// expected result.
-	for _, test := range tests {
+// TestHashB ensure HashB returns the correct hashed bytes for given bytes
+func TestHashB(t *testing.T) {
+	for _, test := range hashTests {
 		h := fmt.Sprintf("%x", HashB([]byte(test.in)))
 		if h != test.out {
 			t.Errorf("HashB(%q) = %s, want %s", test.in, h, test.out)
 			continue
 		}
 	}
+}
 
-	// Ensure the hash function which returns a Hash returns the expected
-	// result.
-	for _, test := range tests {
+// TestHashH ensure HashH returns a hash with the correct hashed bytes for
+// given bytes
+func TestHashH(t *testing.T) {
+	for _, test := range hashTests {
 		hash := HashH([]byte(test.in))
 		h := fmt.Sprintf("%x", hash[:])
 		if h != test.out {
 			t.Errorf("HashH(%q) = %s, want %s", test.in, h, test.out)
+			continue
+		}
+	}
+}
+
+// TestHashFunc ensure HashFunc returns the correct hashed bytes for given
+// bytes
+func TestHashFunc(t *testing.T) {
+	for _, test := range hashTests {
+		h := fmt.Sprintf("%x", HashFunc([]byte(test.in)))
+		if h != test.out {
+			t.Errorf("HashFunc(%q) = %s, want %s", test.in, h, test.out)
 			continue
 		}
 	}

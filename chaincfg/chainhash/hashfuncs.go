@@ -13,14 +13,9 @@ import (
 // TODO(jcv) Should modify blake256 so it has the same interface as blake2
 // and sha256 so these function can look more like btcsuite.  Then should
 // try to get it to the upstream blake256 repo
-func HashFunc(data []byte) [blake256.Size]byte {
+func HashFunc(b []byte) [blake256.Size]byte {
 	var outB [blake256.Size]byte
-	a := blake256.New()
-	a.Write(data)
-	out := a.Sum(nil)
-	for i, el := range out {
-		outB[i] = el
-	}
+	copy(outB[:], HashB(b))
 
 	return outB
 }
@@ -35,15 +30,7 @@ func HashB(b []byte) []byte {
 
 // HashH calculates hash(b) and returns the resulting bytes as a Hash.
 func HashH(b []byte) Hash {
-	var outB [blake256.Size]byte
-	a := blake256.New()
-	a.Write(b)
-	out := a.Sum(nil)
-	for i, el := range out {
-		outB[i] = el
-	}
-
-	return Hash(outB)
+	return Hash(HashFunc(b))
 }
 
 // HashBlockSize is the block size of the hash algorithm in bytes.
