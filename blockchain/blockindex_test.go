@@ -34,9 +34,10 @@ func TestBlockNodeHeader(t *testing.T) {
 	// values.
 	params := &chaincfg.SimNetParams
 	bc := newFakeChain(params)
+	tip := bc.bestChain.Tip()
 	testHeader := wire.BlockHeader{
 		Version:      1,
-		PrevBlock:    bc.bestNode.hash,
+		PrevBlock:    tip.hash,
 		MerkleRoot:   *mustParseHash("09876543210987654321"),
 		StakeRoot:    *mustParseHash("43210987654321098765"),
 		VoteBits:     0x03,
@@ -54,7 +55,7 @@ func TestBlockNodeHeader(t *testing.T) {
 		ExtraData:    [32]byte{0xbb},
 		StakeVersion: 5,
 	}
-	node := newBlockNode(&testHeader, bc.bestNode)
+	node := newBlockNode(&testHeader, tip)
 	bc.index.AddNode(node)
 
 	// Ensure reconstructing the header for the node produces the same header
@@ -154,11 +155,11 @@ func TestCalcPastMedianTime(t *testing.T) {
 		// Create a synthetic chain with the correct number of nodes and the
 		// timestamps as specified by the test.
 		bc := newFakeChain(params)
-		node := bc.bestNode
+		node := bc.bestChain.Tip()
 		for _, timestamp := range test.timestamps {
 			node = newFakeNode(node, 0, 0, 0, time.Unix(timestamp, 0))
 			bc.index.AddNode(node)
-			bc.bestNode = node
+			bc.bestChain.SetTip(node)
 		}
 
 		// Ensure the median time is the expected value.
@@ -177,7 +178,7 @@ func TestCalcPastMedianTime(t *testing.T) {
 func TestChainTips(t *testing.T) {
 	params := &chaincfg.SimNetParams
 	bc := newFakeChain(params)
-	genesis := bc.bestNode
+	genesis := bc.bestChain.NodeByHeight(0)
 
 	// Construct a synthetic simnet chain consisting of the following structure.
 	// 0 -> 1 -> 2  -> 3  -> 4

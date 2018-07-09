@@ -1458,7 +1458,6 @@ func (b *BlockChain) createChainState() error {
 	header := &genesisBlock.MsgBlock().Header
 	node := newBlockNode(header, nil)
 	node.status = statusDataStored | statusValid
-	node.inMainChain = true
 
 	// Initialize the state related to the best block.  Since it is the
 	// genesis block, use its timestamp for the median time.
@@ -1721,14 +1720,7 @@ func (b *BlockChain) initChainState(interrupt <-chan struct{}) error {
 			return AssertError(fmt.Sprintf("initChainState: cannot find "+
 				"chain tip %s in block index", state.hash))
 		}
-		b.bestNode = tip
-
-		// Mark all of the nodes from the tip back to the genesis block
-		// as part of the main chain and build the by height map.
-		for n := tip; n != nil; n = n.parent {
-			n.inMainChain = true
-			b.mainNodesByHeight[n.height] = n
-		}
+		b.bestChain.SetTip(tip)
 
 		log.Debugf("Block index loaded in %v", time.Since(bidxStart))
 

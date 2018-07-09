@@ -36,13 +36,13 @@ func TestCalcSequenceLock(t *testing.T) {
 	numBlocks := uint32(20)
 	params := &chaincfg.SimNetParams
 	bc := newFakeChain(params)
-	node := bc.bestNode
+	node := bc.bestChain.Tip()
 	blockTime := time.Unix(node.timestamp, 0)
 	for i := uint32(0); i < numBlocks; i++ {
 		blockTime = blockTime.Add(time.Second)
 		node = newFakeNode(node, 1, 1, 0, blockTime)
 		bc.index.AddNode(node)
-		bc.bestNode = node
+		bc.bestChain.SetTip(node)
 	}
 
 	// Create a utxo view with a fake utxo for the inputs used in the

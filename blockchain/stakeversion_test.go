@@ -99,10 +99,10 @@ func TestCalcStakeVersionCorners(t *testing.T) {
 	// Generate enough nodes to reach stake validation height with stake
 	// versions set to 0.
 	bc := newFakeChain(params)
-	node := bc.bestNode
+	node := bc.bestChain.Tip()
 	for i := int64(1); i <= svh; i++ {
 		node = newFakeNode(node, 0, 0, 0, time.Now())
-		bc.bestNode = node
+		bc.bestChain.SetTip(node)
 	}
 	if node.height != svh {
 		t.Fatalf("invalid height got %v expected %v", node.height, svh)
@@ -115,7 +115,7 @@ func TestCalcStakeVersionCorners(t *testing.T) {
 		// Set vote and stake versions.
 		node = newFakeNode(node, 3, sv, 0, time.Now())
 		appendFakeVotes(node, params.TicketsPerBlock, 2, 0)
-		bc.bestNode = node
+		bc.bestChain.SetTip(node)
 	}
 
 	// Versions 0 and 2 should now be considered the majority version, but
@@ -137,7 +137,7 @@ func TestCalcStakeVersionCorners(t *testing.T) {
 		// Set vote and stake versions.
 		node = newFakeNode(node, 3, sv, 0, time.Now())
 		appendFakeVotes(node, params.TicketsPerBlock, 4, 0)
-		bc.bestNode = node
+		bc.bestChain.SetTip(node)
 	}
 
 	// Versions up to and including v4 should now be considered the majority
@@ -160,7 +160,7 @@ func TestCalcStakeVersionCorners(t *testing.T) {
 		// Set vote and stake versions.
 		node = newFakeNode(node, 3, sv, 0, time.Now())
 		appendFakeVotes(node, params.TicketsPerBlock, 2, 0)
-		bc.bestNode = node
+		bc.bestChain.SetTip(node)
 	}
 
 	// Versions up to and including v4 should still be considered the
@@ -185,7 +185,7 @@ func TestCalcStakeVersionCorners(t *testing.T) {
 		// Set vote and stake versions.
 		node = newFakeNode(node, 3, sv, 0, time.Now())
 		appendFakeVotes(node, params.TicketsPerBlock, 5, 0)
-		bc.bestNode = node
+		bc.bestChain.SetTip(node)
 	}
 
 	// Versions up to and including v5 should now be considered the majority
@@ -208,7 +208,7 @@ func TestCalcStakeVersionCorners(t *testing.T) {
 		// Set vote and stake versions.
 		node = newFakeNode(node, 3, sv, 0, time.Now())
 		appendFakeVotes(node, params.TicketsPerBlock, 4, 0)
-		bc.bestNode = node
+		bc.bestChain.SetTip(node)
 
 	}
 
@@ -234,7 +234,7 @@ func TestCalcStakeVersionCorners(t *testing.T) {
 		// Set stake versions.
 		node = newFakeNode(node, 3, sv, 0, time.Now())
 		appendFakeVotes(node, params.TicketsPerBlock, 4, 0)
-		bc.bestNode = node
+		bc.bestChain.SetTip(node)
 
 	}
 
@@ -296,15 +296,15 @@ func TestCalcStakeVersion(t *testing.T) {
 
 	for _, test := range tests {
 		bc := newFakeChain(params)
-		node := bc.bestNode
+		node := bc.bestChain.Tip()
 
 		for i := int64(1); i <= test.numNodes; i++ {
 			node = newFakeNode(node, 1, 0, 0, time.Now())
 			test.set(node)
-			bc.bestNode = node
+			bc.bestChain.SetTip(node)
 		}
 
-		version := bc.calcStakeVersion(bc.bestNode)
+		version := bc.calcStakeVersion(bc.bestChain.Tip())
 		if version != test.expectVersion {
 			t.Fatalf("version mismatch: got %v expected %v",
 				version, test.expectVersion)
@@ -625,7 +625,7 @@ func TestIsStakeMajorityVersion(t *testing.T) {
 	for _, test := range tests {
 		// Create new BlockChain in order to blow away cache.
 		bc := newFakeChain(params)
-		node := bc.bestNode
+		node := bc.bestChain.Tip()
 		node.stakeVersion = test.startStakeVersion
 
 		ticketCount = 0
@@ -642,7 +642,7 @@ func TestIsStakeMajorityVersion(t *testing.T) {
 					test.startStakeVersion, 0)
 			}
 
-			bc.bestNode = node
+			bc.bestChain.SetTip(node)
 		}
 
 		res := bc.isVoterMajorityVersion(test.expectedStakeVersion, node)
@@ -695,7 +695,7 @@ func TestLarge(t *testing.T) {
 	for _, test := range tests {
 		// Create new BlockChain in order to blow away cache.
 		bc := newFakeChain(params)
-		node := bc.bestNode
+		node := bc.bestChain.Tip()
 		node.stakeVersion = test.startStakeVersion
 
 		for i := int64(1); i <= test.numNodes; i++ {
@@ -705,7 +705,7 @@ func TestLarge(t *testing.T) {
 			// Override version.
 			appendFakeVotes(node, params.TicketsPerBlock,
 				test.startStakeVersion, 0)
-			bc.bestNode = node
+			bc.bestChain.SetTip(node)
 		}
 
 		for x := 0; x < numRuns; x++ {

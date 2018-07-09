@@ -150,7 +150,7 @@ func (b *BlockChain) calcSequenceLock(node *blockNode, tx *dcrutil.Tx, view *Utx
 // This function is safe for concurrent access.
 func (b *BlockChain) CalcSequenceLock(tx *dcrutil.Tx, view *UtxoViewpoint) (*SequenceLock, error) {
 	b.chainLock.Lock()
-	seqLock, err := b.calcSequenceLock(b.bestNode, tx, view, true)
+	seqLock, err := b.calcSequenceLock(b.bestChain.Tip(), tx, view, true)
 	b.chainLock.Unlock()
 	return seqLock, err
 }

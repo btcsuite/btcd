@@ -179,7 +179,7 @@ func (b *BlockChain) maybeAcceptBlock(block *dcrutil.Block, flags BehaviorFlags)
 
 	// Fetching a stake node could enable a new DoS vector, so restrict
 	// this only to blocks that are recent in history.
-	if newNode.height < b.bestNode.height-minMemoryNodes {
+	if newNode.height < b.bestChain.Tip().height-minMemoryNodes {
 		newNode.stakeNode, err = b.fetchStakeNode(newNode)
 		if err != nil {
 			return 0, err
@@ -205,7 +205,7 @@ func (b *BlockChain) maybeAcceptBlock(block *dcrutil.Block, flags BehaviorFlags)
 	// Notify the caller that the new block was accepted into the block
 	// chain.  The caller would typically want to react by relaying the
 	// inventory to other peers.
-	bestHeight := b.bestNode.height
+	bestHeight := b.bestChain.Tip().height
 	b.chainLock.Unlock()
 	b.sendNotification(NTBlockAccepted, &BlockAcceptedNtfnsData{
 		BestHeight: bestHeight,

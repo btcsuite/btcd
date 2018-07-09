@@ -115,14 +115,14 @@ func defaultParams(vote chaincfg.Vote) chaincfg.Params {
 func TestNoQuorum(t *testing.T) {
 	params := defaultParams(pedro)
 	bc := newFakeChain(&params)
-	node := bc.bestNode
+	node := bc.bestChain.Tip()
 	node.stakeVersion = posVersion
 
 	// get to svi
 	curTimestamp := time.Now()
 	for i := uint32(0); i < uint32(params.StakeValidationHeight); i++ {
 		node = newFakeNode(node, powVersion, posVersion, 0, curTimestamp)
-		bc.bestNode = node
+		bc.bestChain.SetTip(node)
 		bc.index.AddNode(node)
 		curTimestamp = curTimestamp.Add(time.Second)
 	}
@@ -143,7 +143,7 @@ func TestNoQuorum(t *testing.T) {
 		// Set stake versions and vote bits.
 		node = newFakeNode(node, powVersion, posVersion, 0, curTimestamp)
 		appendFakeVotes(node, params.TicketsPerBlock, posVersion, 0x01)
-		bc.bestNode = node
+		bc.bestChain.SetTip(node)
 		bc.index.AddNode(node)
 		curTimestamp = curTimestamp.Add(time.Second)
 	}
@@ -174,7 +174,7 @@ func TestNoQuorum(t *testing.T) {
 			voteCount++
 		}
 
-		bc.bestNode = node
+		bc.bestChain.SetTip(node)
 		bc.index.AddNode(node)
 		curTimestamp = curTimestamp.Add(time.Second)
 	}
@@ -211,7 +211,7 @@ func TestNoQuorum(t *testing.T) {
 			voteCount++
 		}
 
-		bc.bestNode = node
+		bc.bestChain.SetTip(node)
 		bc.index.AddNode(node)
 		curTimestamp = curTimestamp.Add(time.Second)
 	}
@@ -248,7 +248,7 @@ func TestNoQuorum(t *testing.T) {
 			voteCount++
 		}
 
-		bc.bestNode = node
+		bc.bestChain.SetTip(node)
 		bc.index.AddNode(node)
 		curTimestamp = curTimestamp.Add(time.Second)
 	}
@@ -271,7 +271,7 @@ func TestNoQuorum(t *testing.T) {
 func TestYesQuorum(t *testing.T) {
 	params := defaultParams(pedro)
 	bc := newFakeChain(&params)
-	node := bc.bestNode
+	node := bc.bestChain.Tip()
 	node.stakeVersion = posVersion
 
 	// get to svi
@@ -279,7 +279,7 @@ func TestYesQuorum(t *testing.T) {
 	for i := uint32(0); i < uint32(params.StakeValidationHeight); i++ {
 		node = newFakeNode(node, powVersion, posVersion, 0, curTimestamp)
 
-		bc.bestNode = node
+		bc.bestChain.SetTip(node)
 		bc.index.AddNode(node)
 		curTimestamp = curTimestamp.Add(time.Second)
 	}
@@ -300,7 +300,7 @@ func TestYesQuorum(t *testing.T) {
 		// Set stake versions and vote bits.
 		node = newFakeNode(node, powVersion, posVersion, 0, curTimestamp)
 		appendFakeVotes(node, params.TicketsPerBlock, posVersion, 0x01)
-		bc.bestNode = node
+		bc.bestChain.SetTip(node)
 		bc.index.AddNode(node)
 		curTimestamp = curTimestamp.Add(time.Second)
 	}
@@ -331,7 +331,7 @@ func TestYesQuorum(t *testing.T) {
 			voteCount++
 		}
 
-		bc.bestNode = node
+		bc.bestChain.SetTip(node)
 		bc.index.AddNode(node)
 		curTimestamp = curTimestamp.Add(time.Second)
 	}
@@ -368,7 +368,7 @@ func TestYesQuorum(t *testing.T) {
 			voteCount++
 		}
 
-		bc.bestNode = node
+		bc.bestChain.SetTip(node)
 		bc.index.AddNode(node)
 		curTimestamp = curTimestamp.Add(time.Second)
 	}
@@ -405,7 +405,7 @@ func TestYesQuorum(t *testing.T) {
 			voteCount++
 		}
 
-		bc.bestNode = node
+		bc.bestChain.SetTip(node)
 		bc.index.AddNode(node)
 		curTimestamp = curTimestamp.Add(time.Second)
 	}
@@ -1446,7 +1446,7 @@ func TestVoting(t *testing.T) {
 		params = defaultParams(test.vote)
 		// We have to reset the cache for every test.
 		bc := newFakeChain(&params)
-		node := bc.bestNode
+		node := bc.bestChain.Tip()
 		node.stakeVersion = test.startStakeVersion
 
 		t.Logf("running: %v", test.name)
@@ -1474,7 +1474,7 @@ func TestVoting(t *testing.T) {
 				appendFakeVotes(node, params.TicketsPerBlock,
 					vote.Version, vote.Bits)
 
-				bc.bestNode = node
+				bc.bestChain.SetTip(node)
 				bc.index.AddNode(node)
 				curTimestamp = curTimestamp.Add(time.Second)
 			}
@@ -1627,7 +1627,7 @@ func TestParallelVoting(t *testing.T) {
 		params = defaultParallelParams()
 		// We have to reset the cache for every test.
 		bc := newFakeChain(&params)
-		node := bc.bestNode
+		node := bc.bestChain.Tip()
 		node.stakeVersion = test.startStakeVersion
 
 		curTimestamp := time.Now()
@@ -1640,7 +1640,7 @@ func TestParallelVoting(t *testing.T) {
 				appendFakeVotes(node, params.TicketsPerBlock,
 					vote.Version, vote.Bits)
 
-				bc.bestNode = node
+				bc.bestChain.SetTip(node)
 				bc.index.AddNode(node)
 				curTimestamp = curTimestamp.Add(time.Second)
 			}

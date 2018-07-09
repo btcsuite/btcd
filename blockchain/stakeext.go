@@ -23,8 +23,9 @@ func (b *BlockChain) NextLotteryData() ([]chainhash.Hash, int, [6]byte, error) {
 	b.chainLock.RLock()
 	defer b.chainLock.RUnlock()
 
-	return b.bestNode.stakeNode.Winners(), b.bestNode.stakeNode.PoolSize(),
-		b.bestNode.stakeNode.FinalState(), nil
+	tipStakeNode := b.bestChain.Tip().stakeNode
+	return tipStakeNode.Winners(), tipStakeNode.PoolSize(),
+		tipStakeNode.FinalState(), nil
 }
 
 // lotteryDataForNode is a helper function that returns winning tickets
@@ -41,8 +42,7 @@ func (b *BlockChain) lotteryDataForNode(node *blockNode) ([]chainhash.Hash, int,
 		return []chainhash.Hash{}, 0, [6]byte{}, err
 	}
 
-	return stakeNode.Winners(), b.bestNode.stakeNode.PoolSize(),
-		b.bestNode.stakeNode.FinalState(), nil
+	return stakeNode.Winners(), stakeNode.PoolSize(), stakeNode.FinalState(), nil
 }
 
 // lotteryDataForBlock takes a node block hash and returns the next tickets
@@ -85,7 +85,7 @@ func (b *BlockChain) LotteryDataForBlock(hash *chainhash.Hash) ([]chainhash.Hash
 // This function is NOT safe for concurrent access.
 func (b *BlockChain) LiveTickets() ([]chainhash.Hash, error) {
 	b.chainLock.RLock()
-	sn := b.bestNode.stakeNode
+	sn := b.bestChain.Tip().stakeNode
 	b.chainLock.RUnlock()
 
 	return sn.LiveTickets(), nil
@@ -96,7 +96,7 @@ func (b *BlockChain) LiveTickets() ([]chainhash.Hash, error) {
 // This function is NOT safe for concurrent access.
 func (b *BlockChain) MissedTickets() ([]chainhash.Hash, error) {
 	b.chainLock.RLock()
-	sn := b.bestNode.stakeNode
+	sn := b.bestChain.Tip().stakeNode
 	b.chainLock.RUnlock()
 
 	return sn.MissedTickets(), nil
@@ -108,7 +108,7 @@ func (b *BlockChain) MissedTickets() ([]chainhash.Hash, error) {
 // This function is safe for concurrent access.
 func (b *BlockChain) TicketsWithAddress(address dcrutil.Address) ([]chainhash.Hash, error) {
 	b.chainLock.RLock()
-	sn := b.bestNode.stakeNode
+	sn := b.bestChain.Tip().stakeNode
 	b.chainLock.RUnlock()
 
 	tickets := sn.LiveTickets()
@@ -146,7 +146,7 @@ func (b *BlockChain) TicketsWithAddress(address dcrutil.Address) ([]chainhash.Ha
 // This function is safe for concurrent access.
 func (b *BlockChain) CheckLiveTicket(hash chainhash.Hash) bool {
 	b.chainLock.RLock()
-	sn := b.bestNode.stakeNode
+	sn := b.bestChain.Tip().stakeNode
 	b.chainLock.RUnlock()
 
 	return sn.ExistsLiveTicket(hash)
@@ -158,7 +158,7 @@ func (b *BlockChain) CheckLiveTicket(hash chainhash.Hash) bool {
 // This function is safe for concurrent access.
 func (b *BlockChain) CheckLiveTickets(hashes []chainhash.Hash) []bool {
 	b.chainLock.RLock()
-	sn := b.bestNode.stakeNode
+	sn := b.bestChain.Tip().stakeNode
 	b.chainLock.RUnlock()
 
 	existsSlice := make([]bool, len(hashes))
@@ -175,7 +175,7 @@ func (b *BlockChain) CheckLiveTickets(hashes []chainhash.Hash) []bool {
 // This function is safe for concurrent access.
 func (b *BlockChain) CheckMissedTickets(hashes []chainhash.Hash) []bool {
 	b.chainLock.RLock()
-	sn := b.bestNode.stakeNode
+	sn := b.bestChain.Tip().stakeNode
 	b.chainLock.RUnlock()
 
 	existsSlice := make([]bool, len(hashes))
@@ -191,7 +191,7 @@ func (b *BlockChain) CheckMissedTickets(hashes []chainhash.Hash) []bool {
 // This function is safe for concurrent access.
 func (b *BlockChain) CheckExpiredTicket(hash chainhash.Hash) bool {
 	b.chainLock.RLock()
-	sn := b.bestNode.stakeNode
+	sn := b.bestChain.Tip().stakeNode
 	b.chainLock.RUnlock()
 
 	return sn.ExistsExpiredTicket(hash)
@@ -203,7 +203,7 @@ func (b *BlockChain) CheckExpiredTicket(hash chainhash.Hash) bool {
 // This function is safe for concurrent access.
 func (b *BlockChain) CheckExpiredTickets(hashes []chainhash.Hash) []bool {
 	b.chainLock.RLock()
-	sn := b.bestNode.stakeNode
+	sn := b.bestChain.Tip().stakeNode
 	b.chainLock.RUnlock()
 
 	existsSlice := make([]bool, len(hashes))
@@ -222,7 +222,7 @@ func (b *BlockChain) CheckExpiredTickets(hashes []chainhash.Hash) []bool {
 // the asked for transactions.
 func (b *BlockChain) TicketPoolValue() (dcrutil.Amount, error) {
 	b.chainLock.RLock()
-	sn := b.bestNode.stakeNode
+	sn := b.bestChain.Tip().stakeNode
 	b.chainLock.RUnlock()
 
 	var amt int64

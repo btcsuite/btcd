@@ -108,7 +108,7 @@ func testLNFeaturesDeployment(t *testing.T, params *chaincfg.Params, deploymentV
 
 	curTimestamp := time.Now()
 	bc := newFakeChain(params)
-	node := bc.bestNode
+	node := bc.bestChain.Tip()
 	for _, test := range tests {
 		for i := uint32(0); i < test.numNodes; i++ {
 			node = newFakeNode(node, int32(deploymentVer),
@@ -122,7 +122,7 @@ func testLNFeaturesDeployment(t *testing.T, params *chaincfg.Params, deploymentV
 					Bits:    yesChoice.Bits | 0x01,
 				})
 			}
-			bc.bestNode = node
+			bc.bestChain.SetTip(node)
 			curTimestamp = curTimestamp.Add(time.Second)
 		}
 

@@ -106,7 +106,7 @@ func (b *BlockChain) fetchStakeNode(node *blockNode) (*stake.Node, error) {
 	// always be filled in, so assume it is safe to begin working
 	// backwards from there.
 	detachNodes, attachNodes := b.getReorganizeNodes(node)
-	current := b.bestNode
+	current := b.bestChain.Tip()
 
 	// Move backwards through the main chain, undoing the ticket
 	// treaps for each block.  The database is passed because the

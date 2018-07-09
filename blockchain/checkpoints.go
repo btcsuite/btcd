@@ -118,7 +118,7 @@ func (b *BlockChain) findPreviousCheckpoint() (*blockNode, error) {
 		// that is already available.
 		for i := numCheckpoints - 1; i >= 0; i-- {
 			node := b.index.LookupNode(checkpoints[i].Hash)
-			if node == nil || !node.inMainChain {
+			if node == nil || !b.bestChain.Contains(node) {
 				continue
 			}
 
@@ -149,7 +149,7 @@ func (b *BlockChain) findPreviousCheckpoint() (*blockNode, error) {
 	// When there is a next checkpoint and the height of the current best
 	// chain does not exceed it, the current checkpoint lockin is still
 	// the latest known checkpoint.
-	if b.bestNode.height < b.nextCheckpoint.Height {
+	if b.bestChain.Tip().height < b.nextCheckpoint.Height {
 		return b.checkpointNode, nil
 	}
 
@@ -227,7 +227,7 @@ func (b *BlockChain) IsCheckpointCandidate(block *dcrutil.Block) (bool, error) {
 
 	// A checkpoint must be in the main chain.
 	node := b.index.LookupNode(block.Hash())
-	if node == nil || !node.inMainChain {
+	if node == nil || !b.bestChain.Contains(node) {
 		return false, nil
 	}
 
@@ -242,8 +242,7 @@ func (b *BlockChain) IsCheckpointCandidate(block *dcrutil.Block) (bool, error) {
 
 	// A checkpoint must be at least CheckpointConfirmations blocks before
 	// the end of the main chain.
-	tip := b.bestNode
-	if node.height > (tip.height - CheckpointConfirmations) {
+	if node.height > (b.bestChain.Tip().height - CheckpointConfirmations) {
 		return false, nil
 	}
 
@@ -252,9 +251,7 @@ func (b *BlockChain) IsCheckpointCandidate(block *dcrutil.Block) (bool, error) {
 	// This should always succeed since the check above already made sure it
 	// is CheckpointConfirmations back, but be safe in case the constant
 	// changes.
-	b.heightLock.RLock()
-	nextNode := b.mainNodesByHeight[node.height+1]
-	b.heightLock.RUnlock()
+	nextNode := b.bestChain.Next(node)
 	if nextNode == nil {
 		return false, nil
 	}
@@ -274,8 +271,8 @@ func (b *BlockChain) IsCheckpointCandidate(block *dcrutil.Block) (bool, error) {
 		return false, nil
 	}
 
-	// A checkpoint must have transactions that only contain
-	// standard scripts.
+	// A checkpoint must have transactions that only contain standard
+	// scripts.
 	for _, tx := range block.Transactions() {
 		if isNonstandardTransaction(tx) {
 			return false, nil

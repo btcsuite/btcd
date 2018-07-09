@@ -426,7 +426,7 @@ func (b *BlockChain) CalcNextRequiredDiffFromNode(hash *chainhash.Hash, timestam
 // This function is safe for concurrent access.
 func (b *BlockChain) CalcNextRequiredDifficulty(timestamp time.Time) (uint32, error) {
 	b.chainLock.Lock()
-	difficulty, err := b.calcNextRequiredDifficulty(b.bestNode, timestamp)
+	difficulty, err := b.calcNextRequiredDifficulty(b.bestChain.Tip(), timestamp)
 	b.chainLock.Unlock()
 	return difficulty, err
 }
@@ -936,7 +936,7 @@ func (b *BlockChain) calcNextRequiredStakeDifficulty(curNode *blockNode) (int64,
 // This function is safe for concurrent access.
 func (b *BlockChain) CalcNextRequiredStakeDifficulty() (int64, error) {
 	b.chainLock.Lock()
-	nextDiff, err := b.calcNextRequiredStakeDifficulty(b.bestNode)
+	nextDiff, err := b.calcNextRequiredStakeDifficulty(b.bestChain.Tip())
 	b.chainLock.Unlock()
 	return nextDiff, err
 }
@@ -1423,8 +1423,8 @@ func (b *BlockChain) estimateNextStakeDifficulty(curNode *blockNode, newTickets 
 // This function is safe for concurrent access.
 func (b *BlockChain) EstimateNextStakeDifficulty(newTickets int64, useMaxTickets bool) (int64, error) {
 	b.chainLock.Lock()
-	estimate, err := b.estimateNextStakeDifficulty(b.bestNode, newTickets,
-		useMaxTickets)
+	estimate, err := b.estimateNextStakeDifficulty(b.bestChain.Tip(),
+		newTickets, useMaxTickets)
 	b.chainLock.Unlock()
 	return estimate, err
 }

@@ -523,7 +523,7 @@ func (b *BlockChain) isLNFeaturesAgendaActive(prevNode *blockNode) (bool, error)
 // This function is safe for concurrent access.
 func (b *BlockChain) IsLNFeaturesAgendaActive() (bool, error) {
 	b.chainLock.Lock()
-	isActive, err := b.isLNFeaturesAgendaActive(b.bestNode)
+	isActive, err := b.isLNFeaturesAgendaActive(b.bestChain.Tip())
 	b.chainLock.Unlock()
 	return isActive, err
 }
@@ -593,7 +593,7 @@ func (b *BlockChain) GetVoteCounts(version uint32, deploymentID string) (VoteCou
 		deployment := &b.chainParams.Deployments[version][k]
 		if deployment.Vote.Id == deploymentID {
 			b.chainLock.Lock()
-			counts, err := b.getVoteCounts(b.bestNode, version, deployment)
+			counts, err := b.getVoteCounts(b.bestChain.Tip(), version, deployment)
 			b.chainLock.Unlock()
 			return counts, err
 		}
@@ -608,7 +608,7 @@ func (b *BlockChain) GetVoteCounts(version uint32, deploymentID string) (VoteCou
 func (b *BlockChain) CountVoteVersion(version uint32) (uint32, error) {
 	b.chainLock.Lock()
 	defer b.chainLock.Unlock()
-	countNode := b.bestNode
+	countNode := b.bestChain.Tip()
 
 	// Don't try to count votes before the stake validation height since there
 	// could not possibly have been any.

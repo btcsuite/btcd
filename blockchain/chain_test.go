@@ -643,32 +643,25 @@ func TestLocateInventory(t *testing.T) {
 	// 	                              \-> 16a -> 17a
 	tip := branchTip
 	chain := newFakeChain(&chaincfg.MainNetParams)
-	branch0Nodes := chainedFakeNodes(chain.bestNode, 18)
+	branch0Nodes := chainedFakeNodes(chain.bestChain.Genesis(), 18)
 	branch1Nodes := chainedFakeNodes(branch0Nodes[14], 2)
 	for _, node := range branch0Nodes {
 		chain.index.AddNode(node)
-		node.inMainChain = true
-		chain.mainNodesByHeight[node.height] = node
 	}
 	for _, node := range branch1Nodes {
 		chain.index.AddNode(node)
-		node.inMainChain = false
 	}
-	chain.bestNode = tip(branch0Nodes)
+	chain.bestChain.SetTip(tip(branch0Nodes))
 
-	// NOTE: These tests simulate a local and remote node on different parts of
-	// the chain by treating the branch0Nodes as the local node and the
-	// branch1Nodes as the remote node.
+	// Create chain views for different branches of the overall chain to
+	// simulate a local and remote node on different parts of the chain.
+	localView := newChainView(tip(branch0Nodes))
+	remoteView := newChainView(tip(branch1Nodes))
 
-	// Create a completely unrelated block chain to simulate a remote node on a
-	// totally different chain.
-	unrelatedChain := newFakeChain(&chaincfg.MainNetParams)
-	unrelatedBranchNodes := chainedFakeNodes(unrelatedChain.bestNode, 5)
-	for _, node := range unrelatedBranchNodes {
-		unrelatedChain.index.AddNode(node)
-		node.inMainChain = true
-		unrelatedChain.mainNodesByHeight[node.height] = node
-	}
+	// Create a chain view for a completely unrelated block chain to
+	// simulate a remote node on a totally different chain.
+	unrelatedBranchNodes := chainedFakeNodes(nil, 5)
+	unrelatedView := newChainView(tip(unrelatedBranchNodes))
 
 	tests := []struct {
 		name       string
@@ -711,7 +704,7 @@ func TestLocateInventory(t *testing.T) {
 			// expected result is the blocks after the fork point in
 			// the main chain and the stop hash has no effect.
 			name:     "remote side chain, unknown stop",
-			locator:  blockLocator(tip(branch1Nodes)),
+			locator:  remoteView.BlockLocator(nil),
 			hashStop: chainhash.Hash{0x01},
 			headers:  nodeHeaders(branch0Nodes, 15, 16, 17),
 			hashes:   nodeHashes(branch0Nodes, 15, 16, 17),
@@ -722,7 +715,7 @@ func TestLocateInventory(t *testing.T) {
 			// blocks after the fork point in the main chain and the
 			// stop hash has no effect.
 			name:     "remote side chain, stop in side",
-			locator:  blockLocator(tip(branch1Nodes)),
+			locator:  remoteView.BlockLocator(nil),
 			hashStop: tip(branch1Nodes).hash,
 			headers:  nodeHeaders(branch0Nodes, 15, 16, 17),
 			hashes:   nodeHashes(branch0Nodes, 15, 16, 17),
@@ -733,7 +726,7 @@ func TestLocateInventory(t *testing.T) {
 			// expected result is the blocks after the fork point in
 			// the main chain and the stop hash has no effect.
 			name:     "remote side chain, stop in main before",
-			locator:  blockLocator(tip(branch1Nodes)),
+			locator:  remoteView.BlockLocator(nil),
 			hashStop: branch0Nodes[13].hash,
 			headers:  nodeHeaders(branch0Nodes, 15, 16, 17),
 			hashes:   nodeHashes(branch0Nodes, 15, 16, 17),
@@ -745,7 +738,7 @@ func TestLocateInventory(t *testing.T) {
 			// fork point in the main chain and the stop hash has no
 			// effect.
 			name:     "remote side chain, stop in main exact",
-			locator:  blockLocator(tip(branch1Nodes)),
+			locator:  remoteView.BlockLocator(nil),
 			hashStop: branch0Nodes[14].hash,
 			headers:  nodeHeaders(branch0Nodes, 15, 16, 17),
 			hashes:   nodeHashes(branch0Nodes, 15, 16, 17),
@@ -757,7 +750,7 @@ func TestLocateInventory(t *testing.T) {
 			// point in the main chain up to and including the stop
 			// hash.
 			name:     "remote side chain, stop in main after",
-			locator:  blockLocator(tip(branch1Nodes)),
+			locator:  remoteView.BlockLocator(nil),
 			hashStop: branch0Nodes[15].hash,
 			headers:  nodeHeaders(branch0Nodes, 15),
 			hashes:   nodeHashes(branch0Nodes, 15),
@@ -769,7 +762,7 @@ func TestLocateInventory(t *testing.T) {
 			// fork point in the main chain up to and including the
 			// stop hash.
 			name:     "remote side chain, stop in main after more",
-			locator:  blockLocator(tip(branch1Nodes)),
+			locator:  remoteView.BlockLocator(nil),
 			hashStop: branch0Nodes[16].hash,
 			headers:  nodeHeaders(branch0Nodes, 15, 16),
 			hashes:   nodeHashes(branch0Nodes, 15, 16),
@@ -781,7 +774,7 @@ func TestLocateInventory(t *testing.T) {
 			// point in the main chain and the stop hash has no
 			// effect.
 			name:     "remote main chain past, unknown stop",
-			locator:  blockLocator(branch0Nodes[12]),
+			locator:  localView.BlockLocator(branch0Nodes[12]),
 			hashStop: chainhash.Hash{0x01},
 			headers:  nodeHeaders(branch0Nodes, 13, 14, 15, 16, 17),
 			hashes:   nodeHashes(branch0Nodes, 13, 14, 15, 16, 17),
@@ -792,7 +785,7 @@ func TestLocateInventory(t *testing.T) {
 			// result is the blocks after the known point in the
 			// main chain and the stop hash has no effect.
 			name:     "remote main chain past, stop in side",
-			locator:  blockLocator(branch0Nodes[12]),
+			locator:  localView.BlockLocator(branch0Nodes[12]),
 			hashStop: tip(branch1Nodes).hash,
 			headers:  nodeHeaders(branch0Nodes, 13, 14, 15, 16, 17),
 			hashes:   nodeHashes(branch0Nodes, 13, 14, 15, 16, 17),
@@ -804,7 +797,7 @@ func TestLocateInventory(t *testing.T) {
 			// known point in the main chain and the stop hash has
 			// no effect.
 			name:     "remote main chain past, stop in main before",
-			locator:  blockLocator(branch0Nodes[12]),
+			locator:  localView.BlockLocator(branch0Nodes[12]),
 			hashStop: branch0Nodes[11].hash,
 			headers:  nodeHeaders(branch0Nodes, 13, 14, 15, 16, 17),
 			hashes:   nodeHashes(branch0Nodes, 13, 14, 15, 16, 17),
@@ -816,7 +809,7 @@ func TestLocateInventory(t *testing.T) {
 			// known point in the main chain and the stop hash has
 			// no effect.
 			name:     "remote main chain past, stop in main exact",
-			locator:  blockLocator(branch0Nodes[12]),
+			locator:  localView.BlockLocator(branch0Nodes[12]),
 			hashStop: branch0Nodes[12].hash,
 			headers:  nodeHeaders(branch0Nodes, 13, 14, 15, 16, 17),
 			hashes:   nodeHashes(branch0Nodes, 13, 14, 15, 16, 17),
@@ -828,7 +821,7 @@ func TestLocateInventory(t *testing.T) {
 			// the known point in the main chain and the stop hash
 			// has no effect.
 			name:     "remote main chain past, stop in main after",
-			locator:  blockLocator(branch0Nodes[12]),
+			locator:  localView.BlockLocator(branch0Nodes[12]),
 			hashStop: branch0Nodes[13].hash,
 			headers:  nodeHeaders(branch0Nodes, 13),
 			hashes:   nodeHashes(branch0Nodes, 13),
@@ -840,7 +833,7 @@ func TestLocateInventory(t *testing.T) {
 			// after the known point in the main chain and the stop
 			// hash has no effect.
 			name:     "remote main chain past, stop in main after more",
-			locator:  blockLocator(branch0Nodes[12]),
+			locator:  localView.BlockLocator(branch0Nodes[12]),
 			hashStop: branch0Nodes[15].hash,
 			headers:  nodeHeaders(branch0Nodes, 13, 14, 15),
 			hashes:   nodeHashes(branch0Nodes, 13, 14, 15),
@@ -851,7 +844,7 @@ func TestLocateInventory(t *testing.T) {
 			// doesn't know about.  The expected result is no
 			// located inventory.
 			name:     "remote main chain same, unknown stop",
-			locator:  blockLocator(tip(branch0Nodes)),
+			locator:  localView.BlockLocator(nil),
 			hashStop: chainhash.Hash{0x01},
 			headers:  nil,
 			hashes:   nil,
@@ -862,7 +855,7 @@ func TestLocateInventory(t *testing.T) {
 			// the same point.  The expected result is no located
 			// inventory.
 			name:     "remote main chain same, stop same point",
-			locator:  blockLocator(tip(branch0Nodes)),
+			locator:  localView.BlockLocator(nil),
 			hashStop: tip(branch0Nodes).hash,
 			headers:  nil,
 			hashes:   nil,
@@ -875,7 +868,7 @@ func TestLocateInventory(t *testing.T) {
 			// expected result is the blocks after the genesis
 			// block.
 			name:     "remote unrelated chain",
-			locator:  blockLocator(tip(unrelatedBranchNodes)),
+			locator:  unrelatedView.BlockLocator(nil),
 			hashStop: chainhash.Hash{},
 			headers: nodeHeaders(branch0Nodes, 0, 1, 2, 3, 4, 5, 6,
 				7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17),

@@ -113,11 +113,6 @@ type blockNode struct {
 	// methods on blockIndex once the node has been added to the index.
 	status blockStatus
 
-	// inMainChain denotes whether the block node is currently on the
-	// the main chain or not.  This is used to help find the common
-	// ancestor when switching chains.
-	inMainChain bool
-
 	// stakeNode contains all the consensus information required for the
 	// staking system.  The node also caches information required to add or
 	// remove stake nodes, so that the stake node itself may be pruneable

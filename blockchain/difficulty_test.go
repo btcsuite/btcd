@@ -435,7 +435,8 @@ nextTest:
 		for _, ticketInfo := range test.ticketInfo {
 			// Ensure the test data isn't faking ticket purchases at
 			// an incorrect difficulty.
-			gotDiff, err := bc.calcNextRequiredStakeDifficultyV2(bc.bestNode)
+			tip := bc.bestChain.Tip()
+			gotDiff, err := bc.calcNextRequiredStakeDifficultyV2(tip)
 			if err != nil {
 				t.Errorf("calcNextRequiredStakeDifficultyV2 (%s): "+
 					"unexpected error: %v", test.name, err)
@@ -451,7 +452,7 @@ nextTest:
 
 			for i := uint32(0); i < ticketInfo.numNodes; i++ {
 				// Make up a header.
-				nextHeight := uint32(bc.bestNode.height) + 1
+				nextHeight := uint32(tip.height) + 1
 				header := &wire.BlockHeader{
 					Version:    4,
 					SBits:      ticketInfo.stakeDiff,
@@ -459,7 +460,7 @@ nextTest:
 					FreshStake: ticketInfo.newTickets,
 					PoolSize:   poolSize,
 				}
-				node := newBlockNode(header, bc.bestNode)
+				tip = newBlockNode(header, tip)
 
 				// Update the pool size for the next header.
 				// Notice how tickets that mature for this block
@@ -478,12 +479,12 @@ nextTest:
 
 				// Update the chain to use the new fake node as
 				// the new best node.
-				bc.bestNode = node
+				bc.bestChain.SetTip(tip)
 			}
 		}
 
 		// Ensure the calculated difficulty matches the expected value.
-		gotDiff, err := bc.calcNextRequiredStakeDifficultyV2(bc.bestNode)
+		gotDiff, err := bc.calcNextRequiredStakeDifficultyV2(bc.bestChain.Tip())
 		if err != nil {
 			t.Errorf("calcNextRequiredStakeDifficultyV2 (%s): "+
 				"unexpected error: %v", test.name, err)
@@ -985,7 +986,8 @@ nextTest:
 		for _, ticketInfo := range test.ticketInfo {
 			// Ensure the test data isn't faking ticket purchases at
 			// an incorrect difficulty.
-			reqDiff, err := bc.calcNextRequiredStakeDifficultyV2(bc.bestNode)
+			tip := bc.bestChain.Tip()
+			reqDiff, err := bc.calcNextRequiredStakeDifficultyV2(tip)
 			if err != nil {
 				t.Errorf("calcNextRequiredStakeDifficultyV2 (%s): "+
 					"unexpected error: %v", test.name, err)
@@ -1001,7 +1003,7 @@ nextTest:
 
 			for i := uint32(0); i < ticketInfo.numNodes; i++ {
 				// Make up a header.
-				nextHeight := uint32(bc.bestNode.height) + 1
+				nextHeight := uint32(tip.height) + 1
 				header := &wire.BlockHeader{
 					Version:    4,
 					SBits:      ticketInfo.stakeDiff,
@@ -1009,7 +1011,7 @@ nextTest:
 					FreshStake: ticketInfo.newTickets,
 					PoolSize:   poolSize,
 				}
-				node := newBlockNode(header, bc.bestNode)
+				tip = newBlockNode(header, tip)
 
 				// Update the pool size for the next header.
 				// Notice how tickets that mature for this block
@@ -1028,12 +1030,12 @@ nextTest:
 
 				// Update the chain to use the new fake node as
 				// the new best node.
-				bc.bestNode = node
+				bc.bestChain.SetTip(tip)
 			}
 		}
 
 		// Ensure the calculated difficulty matches the expected value.
-		gotDiff, err := bc.estimateNextStakeDifficultyV2(bc.bestNode,
+		gotDiff, err := bc.estimateNextStakeDifficultyV2(bc.bestChain.Tip(),
 			test.newTickets, test.useMaxTickets)
 		if err != nil {
 			t.Errorf("estimateNextStakeDifficultyV2 (%s): "+

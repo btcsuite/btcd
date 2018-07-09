@@ -2564,7 +2564,7 @@ func (b *BlockChain) CheckConnectBlockTemplate(block *dcrutil.Block) error {
 
 	// The block template must build off the current tip of the main chain
 	// or its parent.
-	tip := b.bestNode
+	tip := b.bestChain.Tip()
 	var prevNode *blockNode
 	parentHash := block.MsgBlock().Header.PrevBlock
 	if parentHash == tip.hash {

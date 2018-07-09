@@ -136,18 +136,14 @@ func newFakeChain(params *chaincfg.Params) *BlockChain {
 	// Create a genesis block node and block index populated with it for use
 	// when creating the fake chain below.
 	node := newBlockNode(&params.GenesisBlock.Header, nil)
-	node.inMainChain = true
 	index := newBlockIndex(nil, params)
 	index.AddNode(node)
-	mainNodesByHeight := make(map[int64]*blockNode)
-	mainNodesByHeight[node.height] = node
 
 	return &BlockChain{
 		chainParams:                   params,
 		deploymentCaches:              newThresholdCaches(params),
-		bestNode:                      node,
 		index:                         index,
-		mainNodesByHeight:             mainNodesByHeight,
+		bestChain:                     newChainView(node),
 		isVoterMajorityVersionCache:   make(map[[stakeMajorityCacheKeySize]byte]bool),
 		isStakeMajorityVersionCache:   make(map[[stakeMajorityCacheKeySize]byte]bool),
 		calcPriorStakeVersionCache:    make(map[[chainhash.HashSize]byte]uint32),
