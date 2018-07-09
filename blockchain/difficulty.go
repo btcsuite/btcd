@@ -179,13 +179,16 @@ func (b *BlockChain) GetNextWorkRequired(header *wire.BlockHeader) (uint32, erro
 // most of the calculation - except for the timestamp of the first and last
 // block. Because timestamps are the least trustworthy information we have as
 // input, this ensures the algorithm is more resistant to malicious inputs.
-func (b *BlockChain) getNextCashWorkRequired(prevBlock *blockNode, header *wire.BlockHeader) (uint32, error) {
+func (b *BlockChain) getNextCashWorkRequired(prevBlock *blockNode,
+	header *wire.BlockHeader) (uint32, error) {
+
 	// Special difficulty rule for testnet:
 	// If the new block's timestamp is more than 2* 10 minutes then allow
 	// mining of a min-difficulty block.
 	if b.chainParams.ReduceMinDifficulty &&
-		(int64(header.Timestamp.Second()) > (prevBlock.timestamp + int64(2*b.chainParams.TargetTimePerBlock))) {
-		return BigToCompact(b.chainParams.PowLimit), nil
+		(int64(header.Timestamp.Unix()) >
+			(prevBlock.timestamp + int64(2*b.chainParams.TargetTimePerBlock.Seconds()))) {
+		return b.chainParams.PowLimitBits, nil
 	}
 
 	// Compute the difficulty based on the full adjustment interval.
@@ -202,7 +205,7 @@ func (b *BlockChain) getNextCashWorkRequired(prevBlock *blockNode, header *wire.
 	// Compute the target based on time and work done during the interval.
 	nextTarget := b.computeTarget(firstNode, lastNode)
 	if nextTarget.Cmp(b.chainParams.PowLimit) > 0 {
-		return BigToCompact(b.chainParams.PowLimit), nil
+		return b.chainParams.PowLimitBits, nil
 	}
 
 	return BigToCompact(nextTarget), nil
@@ -210,7 +213,9 @@ func (b *BlockChain) getNextCashWorkRequired(prevBlock *blockNode, header *wire.
 
 // getNextEDAWorkRequired Compute the next required proof of work using the
 // legacy Bitcoin difficulty adjustment + Emergency Difficulty Adjustment (EDA).
-func (b *BlockChain) getNextEDAWorkRequired(prevBlock *blockNode, header *wire.BlockHeader) (uint32, error) {
+func (b *BlockChain) getNextEDAWorkRequired(prevBlock *blockNode,
+	header *wire.BlockHeader) (uint32, error) {
+
 	// Only change once per difficulty adjustment interval
 	curHeight := prevBlock.height + 1
 	if int64(curHeight)%b.chainParams.DifficultyAdjustmentInterval() == 0 &&
@@ -222,12 +227,13 @@ func (b *BlockChain) getNextEDAWorkRequired(prevBlock *blockNode, header *wire.B
 		return b.calculateNextWorkRequired(prevBlock, firstNode.timestamp)
 	}
 
-	proofOfWorkLimit := BigToCompact(b.chainParams.PowLimit)
+	proofOfWorkLimit := b.chainParams.PowLimitBits
 	if b.chainParams.ReduceMinDifficulty {
 		// Special difficulty rule for testnet:
 		// If the new block's timestamp is more than 2* 10 minutes then allow
 		// mining of a min-difficulty block.
-		if int64(header.Timestamp.Second()) > prevBlock.timestamp+2*int64(b.chainParams.TargetTimePerBlock.Seconds()) {
+		if int64(header.Timestamp.Second()) >
+			prevBlock.timestamp+2*int64(b.chainParams.TargetTimePerBlock.Seconds()) {
 			return proofOfWorkLimit, nil
 		}
 
@@ -275,8 +281,10 @@ func (b *BlockChain) getNextEDAWorkRequired(prevBlock *blockNode, header *wire.B
 	return BigToCompact(pow), nil
 }
 
-func (b *BlockChain) calculateNextWorkRequired(prevNode *blockNode, firstBlockTime int64) (uint32, error) {
-	if b.chainParams.Net == wire.TestNet {
+func (b *BlockChain) calculateNextWorkRequired(prevNode *blockNode,
+	firstBlockTime int64) (uint32, error) {
+
+	if b.chainParams == &chaincfg.RegressionNetParams {
 		return prevNode.bits, nil
 	}
 
@@ -347,6 +355,7 @@ func (b *BlockChain) getSuitableBlock(lastNode *blockNode) *blockNode {
 	nodes := make([]*blockNode, 3)
 	nodes[2] = lastNode
 	nodes[1] = lastNode.parent
+
 	nodes[0] = nodes[1].parent
 
 	// Sorting network.

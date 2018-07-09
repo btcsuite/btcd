@@ -257,7 +257,6 @@ func TestCashDifficulty(t *testing.T) {
 	}
 
 	powLimit := chain.chainParams.PowLimit
-	//powLimitBits := BigToCompact(powLimit)
 	currentPow := new(big.Int).Rsh(powLimit, 4)
 	initialBits := BigToCompact(currentPow)
 
