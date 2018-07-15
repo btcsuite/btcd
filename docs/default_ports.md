@@ -13,3 +13,5 @@ configurations.
 |----|----|
 |Default Bitcoin peer-to-peer port|TCP 8333|
 |Default RPC port|TCP 8334|
+|Default Bitcoin testnet peer-to-peer port|TCP 18333|
+|Default testnet RPC Port| TCP 18334|
