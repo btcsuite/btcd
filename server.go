@@ -1947,6 +1947,7 @@ func newPeerConfig(sp *serverPeer) *peer.Config {
 		Services:          sp.server.services,
 		DisableRelayTx:    cfg.BlocksOnly,
 		ProtocolVersion:   peer.MaxProtocolVersion,
+		TrickleTimeout:    cfg.TrickleTimeout,
 	}
 }
 

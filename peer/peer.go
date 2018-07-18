@@ -64,10 +64,6 @@ const (
 	// stalling.  The deadlines are adjusted for callback running times and
 	// only checked on each stall tick interval.
 	stallResponseTimeout = 30 * time.Second
-
-	// trickleTimeout is the duration of the ticker which trickles down the
-	// inventory to a peer.
-	trickleTimeout = 10 * time.Second
 )
 
 var (
@@ -268,6 +264,10 @@ type Config struct {
 	// Listeners houses callback functions to be invoked on receiving peer
 	// messages.
 	Listeners MessageListeners
+
+	// TrickleTimeout is the duration of the ticker which trickles down the
+	// inventory to a peer.
+	TrickleTimeout time.Duration
 }
 
 // minUint32 is a helper function to return the minimum of two uint32s.
@@ -1693,7 +1693,7 @@ out:
 func (p *Peer) queueHandler() {
 	pendingMsgs := list.New()
 	invSendQueue := list.New()
-	trickleTicker := time.NewTicker(trickleTimeout)
+	trickleTicker := time.NewTicker(p.cfg.TrickleTimeout)
 	defer trickleTicker.Stop()
 
 	// We keep the waiting flag so that we know if we have a message queued
