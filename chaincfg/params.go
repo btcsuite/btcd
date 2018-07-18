@@ -543,35 +543,22 @@ var SimNetParams = Params{
 
 	// Human-readable part for Bech32 encoded segwit addresses, as defined in
 	// BIP 173.
-	//Bech32HRPSegwit: "sb", // always sb for sim net
-	//
-	//// Address encoding magics
-	//PubKeyHashAddrID:        0x3f, // starts with S
-	//ScriptHashAddrID:        0x7b, // starts with s
-	//PrivateKeyID:            0x64, // starts with 4 (uncompressed) or F (compressed)
-	//
-	//// BIP32 hierarchical deterministic extended key magics
-	//HDPrivateKeyID: [4]byte{0x04, 0x20, 0xb9, 0x00}, // starts with sprv
-	//HDPublicKeyID:  [4]byte{0x04, 0x20, 0xbd, 0x3a}, // starts with spub
-	//
-	//CashAddrPrefix: "bchsim",
-
-	Bech32HRPSegwit: "bcrt", // always bcrt for reg test net
+	Bech32HRPSegwit: "sb", // always sb for sim net
 
 	// Address encoding magics
-	PubKeyHashAddrID: 0x6f, // starts with m or n
-	ScriptHashAddrID: 0xc4, // starts with 2
-	PrivateKeyID:     0xef, // starts with 9 (uncompressed) or c (compressed)
+	PubKeyHashAddrID: 0x3f, // starts with S
+	ScriptHashAddrID: 0x7b, // starts with s
+	PrivateKeyID:     0x64, // starts with 4 (uncompressed) or F (compressed)
 
 	// BIP32 hierarchical deterministic extended key magics
-	HDPrivateKeyID: [4]byte{0x04, 0x35, 0x83, 0x94}, // starts with tprv
-	HDPublicKeyID:  [4]byte{0x04, 0x35, 0x87, 0xcf}, // starts with tpub
+	HDPrivateKeyID: [4]byte{0x04, 0x20, 0xb9, 0x00}, // starts with sprv
+	HDPublicKeyID:  [4]byte{0x04, 0x20, 0xbd, 0x3a}, // starts with spub
 
-	CashAddrPrefix: "bchreg",
+	CashAddrPrefix: "bchsim",
 
 	// BIP44 coin type used in the hierarchical deterministic path for
 	// address generation.
-	HDCoinType: 1, // ASCII for s
+	HDCoinType: 115, // ASCII for s
 }
 
 func (param *Params) DifficultyAdjustmentInterval() int64 {
