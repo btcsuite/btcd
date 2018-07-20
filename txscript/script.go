@@ -401,7 +401,12 @@ func CalcSignatureHash(script []byte, amount btcutil.Amount, hashType SigHashTyp
 	if err != nil {
 		return nil, fmt.Errorf("cannot parse output script: %v", err)
 	}
-	return calcSignatureHash(parsedScript, hashType, tx, idx, amount, ScriptEnableSighashForkid), nil
+
+	var flag ScriptFlags
+	if hashType.hasForkID() {
+		flag |= ScriptEnableSighashForkid
+	}
+	return calcSignatureHash(parsedScript, hashType, tx, idx, amount, flag), nil
 }
 
 // calcSignatureHash will, given a script and hash type for the current script

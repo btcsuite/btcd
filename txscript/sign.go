@@ -102,7 +102,8 @@ func signMultiSig(tx *wire.MsgTx, idx int, subScript []byte, amount btcutil.Amou
 }
 
 func sign(chainParams *chaincfg.Params, tx *wire.MsgTx, idx int,
-	subScript []byte, hashType SigHashType, kdb KeyDB, sdb ScriptDB) ([]byte,
+	subScript []byte, hashType SigHashType, amount btcutil.Amount,
+	kdb KeyDB, sdb ScriptDB) ([]byte,
 	ScriptClass, []btcutil.Address, int, error) {
 
 	class, addresses, nrequired, err := ExtractPkScriptAddrs(subScript,
@@ -119,7 +120,7 @@ func sign(chainParams *chaincfg.Params, tx *wire.MsgTx, idx int,
 			return nil, class, nil, 0, err
 		}
 
-		script, err := p2pkSignatureScript(tx, idx, subScript, 0, hashType,
+		script, err := p2pkSignatureScript(tx, idx, subScript, amount, hashType,
 			key)
 		if err != nil {
 			return nil, class, nil, 0, err
@@ -133,7 +134,7 @@ func sign(chainParams *chaincfg.Params, tx *wire.MsgTx, idx int,
 			return nil, class, nil, 0, err
 		}
 
-		script, err := SignatureScript(tx, idx, subScript, 0, hashType,
+		script, err := SignatureScript(tx, idx, subScript, amount, hashType,
 			key, compressed)
 		if err != nil {
 			return nil, class, nil, 0, err
@@ -148,7 +149,7 @@ func sign(chainParams *chaincfg.Params, tx *wire.MsgTx, idx int,
 
 		return script, class, addresses, nrequired, nil
 	case MultiSigTy:
-		script, _ := signMultiSig(tx, idx, subScript, 0, hashType,
+		script, _ := signMultiSig(tx, idx, subScript, amount, hashType,
 			addresses, nrequired, kdb)
 		return script, class, addresses, nrequired, nil
 	case NullDataTy:
@@ -167,7 +168,8 @@ func sign(chainParams *chaincfg.Params, tx *wire.MsgTx, idx int,
 // function with addresses, class and nrequired that do not match pkScript is
 // an error and results in undefined behaviour.
 func mergeScripts(chainParams *chaincfg.Params, tx *wire.MsgTx, idx int,
-	pkScript []byte, class ScriptClass, addresses []btcutil.Address,
+	hashType SigHashType, amount btcutil.Amount, pkScript []byte,
+	class ScriptClass, addresses []btcutil.Address,
 	nRequired int, sigScript, prevScript []byte) []byte {
 
 	// TODO: the scripthash and multisig paths here are overly
@@ -200,8 +202,9 @@ func mergeScripts(chainParams *chaincfg.Params, tx *wire.MsgTx, idx int,
 		prevScript, _ := unparseScript(prevPops)
 
 		// Merge
-		mergedScript := mergeScripts(chainParams, tx, idx, script,
-			class, addresses, nrequired, sigScript, prevScript)
+		mergedScript := mergeScripts(chainParams, tx, idx, hashType,
+			amount, script, class, addresses, nrequired, sigScript,
+			prevScript)
 
 		// Reappend the script and return the result.
 		builder := NewScriptBuilder()
@@ -210,8 +213,8 @@ func mergeScripts(chainParams *chaincfg.Params, tx *wire.MsgTx, idx int,
 		finalScript, _ := builder.Script()
 		return finalScript
 	case MultiSigTy:
-		return mergeMultiSig(tx, idx, addresses, nRequired, pkScript,
-			sigScript, prevScript)
+		return mergeMultiSig(tx, idx, hashType, amount, addresses,
+			nRequired, pkScript, sigScript, prevScript)
 
 	// It doesn't actually make sense to merge anything other than multiig
 	// and scripthash (because it could contain multisig). Everything else
@@ -233,7 +236,8 @@ func mergeScripts(chainParams *chaincfg.Params, tx *wire.MsgTx, idx int,
 // pkScript. Since this function is internal only we assume that the arguments
 // have come from other functions internally and thus are all consistent with
 // each other, behaviour is undefined if this contract is broken.
-func mergeMultiSig(tx *wire.MsgTx, idx int, addresses []btcutil.Address,
+func mergeMultiSig(tx *wire.MsgTx, idx int, hashType SigHashType,
+	amount btcutil.Amount, addresses []btcutil.Address,
 	nRequired int, pkScript, sigScript, prevScript []byte) []byte {
 
 	// This is an internal only function and we already parsed this script
@@ -293,7 +297,11 @@ sigLoop:
 		// however, assume no sigs etc are in the script since that
 		// would make the transaction nonstandard and thus not
 		// MultiSigTy, so we just need to hash the full thing.
-		hash := calcSignatureHash(pkPops, hashType, tx, idx, btcutil.Amount(0), ScriptEnableSighashForkid)
+		var flag ScriptFlags
+		if hashType.hasForkID() {
+			flag |= ScriptEnableSighashForkid
+		}
+		hash := calcSignatureHash(pkPops, hashType, tx, idx, amount, flag)
 
 		for _, addr := range addresses {
 			// All multisig addresses should be pubkey addresses
@@ -379,11 +387,11 @@ func (sc ScriptClosure) GetScript(address btcutil.Address) ([]byte, error) {
 // will be merged in a type-dependent manner with the newly generated.
 // signature script.
 func SignTxOutput(chainParams *chaincfg.Params, tx *wire.MsgTx, idx int,
-	pkScript []byte, hashType SigHashType, kdb KeyDB, sdb ScriptDB,
-	previousScript []byte) ([]byte, error) {
+	pkScript []byte, hashType SigHashType, amount btcutil.Amount, kdb KeyDB,
+	sdb ScriptDB, previousScript []byte) ([]byte, error) {
 
 	sigScript, class, addresses, nrequired, err := sign(chainParams, tx,
-		idx, pkScript, hashType, kdb, sdb)
+		idx, pkScript, hashType, amount, kdb, sdb)
 	if err != nil {
 		return nil, err
 	}
@@ -391,7 +399,7 @@ func SignTxOutput(chainParams *chaincfg.Params, tx *wire.MsgTx, idx int,
 	if class == ScriptHashTy {
 		// TODO keep the sub addressed and pass down to merge.
 		realSigScript, _, _, _, err := sign(chainParams, tx, idx,
-			sigScript, hashType, kdb, sdb)
+			sigScript, hashType, amount, kdb, sdb)
 		if err != nil {
 			return nil, err
 		}
@@ -406,7 +414,7 @@ func SignTxOutput(chainParams *chaincfg.Params, tx *wire.MsgTx, idx int,
 	}
 
 	// Merge scripts. with any previous data, if any.
-	mergedScript := mergeScripts(chainParams, tx, idx, pkScript, class,
-		addresses, nrequired, sigScript, previousScript)
+	mergedScript := mergeScripts(chainParams, tx, idx, hashType, amount,
+		pkScript, class, addresses, nrequired, sigScript, previousScript)
 	return mergedScript, nil
 }

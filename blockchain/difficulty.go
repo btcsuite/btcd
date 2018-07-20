@@ -161,7 +161,8 @@ func (b *BlockChain) GetNextWorkRequired(header *wire.BlockHeader) (uint32, erro
 	}
 
 	// Special rule for regTest: we never retarget.
-	if b.chainParams == &chaincfg.RegressionNetParams {
+	if b.chainParams == &chaincfg.RegressionNetParams ||
+		b.chainParams == &chaincfg.SimNetParams {
 		return prevBlock.bits, nil
 	}
 
@@ -284,7 +285,8 @@ func (b *BlockChain) getNextEDAWorkRequired(prevBlock *blockNode,
 func (b *BlockChain) calculateNextWorkRequired(prevNode *blockNode,
 	firstBlockTime int64) (uint32, error) {
 
-	if b.chainParams == &chaincfg.RegressionNetParams {
+	if b.chainParams == &chaincfg.RegressionNetParams ||
+		b.chainParams == &chaincfg.SimNetParams {
 		return prevNode.bits, nil
 	}
 

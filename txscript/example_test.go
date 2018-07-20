@@ -152,7 +152,8 @@ func ExampleSignTxOutput() {
 	// used.  It must be specified when pay-to-script-hash transactions are
 	// being signed.
 	sigScript, err := txscript.SignTxOutput(&chaincfg.MainNetParams,
-		redeemTx, 0, originTx.TxOut[0].PkScript, txscript.SigHashAll,
+		redeemTx, 0, originTx.TxOut[0].PkScript,
+		txscript.SigHashAll|txscript.SigHashForkID, btcutil.Amount(txOut.Value),
 		txscript.KeyClosure(lookupKey), nil, nil)
 	if err != nil {
 		fmt.Println(err)
@@ -164,9 +165,10 @@ func ExampleSignTxOutput() {
 	// script pair.
 	flags := txscript.ScriptBip16 | txscript.ScriptVerifyDERSignatures |
 		txscript.ScriptStrictMultiSig |
-		txscript.ScriptDiscourageUpgradableNops
+		txscript.ScriptDiscourageUpgradableNops |
+		txscript.ScriptEnableSighashForkid
 	vm, err := txscript.NewEngine(originTx.TxOut[0].PkScript, redeemTx, 0,
-		flags, nil, nil, -1)
+		flags, nil, nil, txOut.Value)
 	if err != nil {
 		fmt.Println(err)
 		return

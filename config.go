@@ -826,7 +826,14 @@ func loadConfig() (*config, []string, error) {
 	// Check mining addresses are valid and saved parsed versions.
 	cfg.miningAddrs = make([]btcutil.Address, 0, len(cfg.MiningAddrs))
 	for _, strAddr := range cfg.MiningAddrs {
-		addr, err := btcutil.DecodeCashAddr(strAddr, activeNetParams.Params)
+		var addr btcutil.Address
+		var err error
+
+		if len(strAddr) >= 42 {
+			addr, err = btcutil.DecodeCashAddr(strAddr, activeNetParams.Params)
+		} else {
+			addr, err = btcutil.DecodeAddress(strAddr, activeNetParams.Params)
+		}
 		if err != nil {
 			str := "%s: mining address '%s' failed to decode: %v"
 			err := fmt.Errorf(str, funcName, strAddr, err)
