@@ -1,3 +1,6 @@
 module github.com/decred/dcrd/wire
 
-require github.com/decred/dcrd/chaincfg/chainhash v1.0.0
+require (
+	github.com/davecgh/go-spew v1.1.0
+	github.com/decred/dcrd/chaincfg/chainhash v1.0.1
+)
