@@ -587,6 +587,19 @@ func TestForceHeadReorg(t *testing.T) {
 	expectTip("b3")
 
 	// Attempt to force tip reorganization to an invalid block that has an
+	// entry in the block index and is already known to be invalid.
+	//
+	//   ... -> b1(0) -> b3(1)
+	//               \-> b2(1)
+	//               \-> b4(1)
+	//               \-> b5(1)
+	//               \-> b2bad0(1)
+	//               \-> b2bad1(1)
+	//               \-> b2bad2(1)
+	rejectForceTipReorg("b3", "b2bad1", ErrKnownInvalidBlock)
+	expectTip("b3")
+
+	// Attempt to force tip reorganization to an invalid block that has an
 	// entry in the block index, but is not already known to be invalid.
 	//
 	//

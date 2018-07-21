@@ -640,7 +640,8 @@ func (b *BlockChain) isMajorityVersion(minVer int32, startNode *blockNode, numRe
 // the fork point (which will be the end of the main chain after detaching the
 // returned list of block nodes) in order to reorganize the chain such that the
 // passed node is the new end of the main chain.  The lists will be empty if the
-// passed node is not on a side chain.
+// passed node is not on a side chain or if the reorganize would involve
+// reorganizing to a known invalid chain.
 //
 // This function MUST be called with the chain state lock held (for reads).
 func (b *BlockChain) getReorganizeNodes(node *blockNode) (*list.List, *list.List) {
@@ -651,7 +652,11 @@ func (b *BlockChain) getReorganizeNodes(node *blockNode) (*list.List, *list.List
 		return detachNodes, attachNodes
 	}
 
-	// Don't allow a reorganize to a descendant of a known invalid block.
+	// Do not allow a reorganize to a known invalid chain.	Note that all
+	// intermediate ancestors other than the direct parent are also checked
+	// below, however, this check allows extra to work to be avoided in the
+	// majority of cases since reorgs across multiple unvalidated blocks are
+	// not very common.
 	if b.index.NodeStatus(node.parent).KnownInvalid() {
 		b.index.SetStatusFlags(node, statusInvalidAncestor)
 		return detachNodes, attachNodes
@@ -661,8 +666,22 @@ func (b *BlockChain) getReorganizeNodes(node *blockNode) (*list.List, *list.List
 	// to attach to the main tree.  Push them onto the list in reverse order
 	// so they are attached in the appropriate order when iterating the list
 	// later.
+	//
+	// In the case a known invalid block is detected while constructing this
+	// list, mark all of its descendants as having an invalid ancestor and
+	// prevent the reorganize by not returning any nodes.
 	forkNode := b.bestChain.FindFork(node)
 	for n := node; n != nil && n != forkNode; n = n.parent {
+		if b.index.NodeStatus(n).KnownInvalid() {
+			for e := attachNodes.Front(); e != nil; e = e.Next() {
+				dn := e.Value.(*blockNode)
+				b.index.SetStatusFlags(dn, statusInvalidAncestor)
+			}
+
+			attachNodes.Init()
+			return detachNodes, attachNodes
+		}
+
 		attachNodes.PushFront(n)
 	}
 
@@ -1201,14 +1220,38 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List) error 
 		// Store the loaded block for later.
 		attachBlocks = append(attachBlocks, block)
 
+		// Skip validation if the block is already known to be valid.
+		// However, the UTXO view still needs to be updated.
+		if b.index.NodeStatus(n).KnownValid() {
+			err = b.connectTransactions(view, block, parent, nil)
+			if err != nil {
+				return err
+			}
+
+			newBest = n
+			continue
+		}
+
 		// Notice the spent txout details are not requested here and
 		// thus will not be generated.  This is done because the state
 		// is not being immediately written to the database, so it is
 		// not needed.
+		//
+		// In the case the block is determined to be invalid due to a
+		// rule violation, mark it as invalid and mark all of its
+		// descendants as having an invalid ancestor.
 		err = b.checkConnectBlock(n, block, parent, view, nil)
 		if err != nil {
+			if _, ok := err.(RuleError); ok {
+				b.index.SetStatusFlags(n, statusValidateFailed)
+				for de := e.Next(); de != nil; de = de.Next() {
+					dn := de.Value.(*blockNode)
+					b.index.SetStatusFlags(dn, statusInvalidAncestor)
+				}
+			}
 			return err
 		}
+		b.index.SetStatusFlags(n, statusValid)
 
 		newBest = n
 	}
@@ -1349,63 +1392,76 @@ func (b *BlockChain) forceHeadReorganization(formerBest chainhash.Hash, newBest 
 			"common parent for forced reorg")
 	}
 
-	newBestBlock, err := b.fetchBlockByNode(newBestNode)
-	if err != nil {
-		return err
+	// Don't allow a reorganize to a known invalid chain.
+	newBestNodeStatus := b.index.NodeStatus(newBestNode)
+	if newBestNodeStatus.KnownInvalid() {
+		return ruleError(ErrKnownInvalidBlock, "block is known to be invalid")
 	}
 
-	// Check to make sure our forced-in node validates correctly.
-	view := NewUtxoViewpoint()
-	view.SetBestHash(&formerBestNode.parent.hash)
-	view.SetStakeViewpoint(ViewpointPrevValidInitial)
+	// Only validate the block if it is not already known valid.
+	if !newBestNodeStatus.KnownValid() {
+		newBestBlock, err := b.fetchBlockByNode(newBestNode)
+		if err != nil {
+			return err
+		}
 
-	formerBestBlock, err := b.fetchBlockByNode(formerBestNode)
-	if err != nil {
-		return err
-	}
-	commonParentBlock, err := b.fetchMainChainBlockByNode(formerBestNode.parent)
-	if err != nil {
-		return err
-	}
-	var stxos []spentTxOut
-	err = b.db.View(func(dbTx database.Tx) error {
-		stxos, err = dbFetchSpendJournalEntry(dbTx, formerBestBlock,
-			commonParentBlock)
-		return err
-	})
-	if err != nil {
-		return err
-	}
+		// Check to make sure our forced-in node validates correctly.
+		view := NewUtxoViewpoint()
+		view.SetBestHash(&formerBestNode.parent.hash)
+		view.SetStakeViewpoint(ViewpointPrevValidInitial)
 
-	// Quick sanity test.
-	if len(stxos) != countSpentOutputs(formerBestBlock, commonParentBlock) {
-		panicf("retrieved %v stxos when trying to disconnect block %v (height "+
-			"%v), yet counted %v many spent utxos when trying to force head "+
-			"reorg", len(stxos), formerBestBlock.Hash(),
-			formerBestBlock.Height(),
-			countSpentOutputs(formerBestBlock, commonParentBlock))
-	}
+		formerBestBlock, err := b.fetchBlockByNode(formerBestNode)
+		if err != nil {
+			return err
+		}
+		commonParentBlock, err := b.fetchMainChainBlockByNode(formerBestNode.parent)
+		if err != nil {
+			return err
+		}
+		var stxos []spentTxOut
+		err = b.db.View(func(dbTx database.Tx) error {
+			stxos, err = dbFetchSpendJournalEntry(dbTx, formerBestBlock,
+				commonParentBlock)
+			return err
+		})
+		if err != nil {
+			return err
+		}
 
-	err = b.disconnectTransactions(view, formerBestBlock, commonParentBlock,
-		stxos)
-	if err != nil {
-		return err
-	}
+		// Quick sanity test.
+		if len(stxos) != countSpentOutputs(formerBestBlock, commonParentBlock) {
+			panicf("retrieved %v stxos when trying to disconnect block %v "+
+				"(height %v), yet counted %v many spent utxos when trying to "+
+				"force head reorg", len(stxos), formerBestBlock.Hash(),
+				formerBestBlock.Height(),
+				countSpentOutputs(formerBestBlock, commonParentBlock))
+		}
 
-	err = checkBlockSanity(newBestBlock, b.timeSource, BFNone, b.chainParams)
-	if err != nil {
-		return err
-	}
+		err = b.disconnectTransactions(view, formerBestBlock, commonParentBlock,
+			stxos)
+		if err != nil {
+			return err
+		}
 
-	err = b.checkBlockContext(newBestBlock, newBestNode.parent, BFNone)
-	if err != nil {
-		return err
-	}
+		err = checkBlockSanity(newBestBlock, b.timeSource, BFNone, b.chainParams)
+		if err != nil {
+			return err
+		}
 
-	err = b.checkConnectBlock(newBestNode, newBestBlock, commonParentBlock,
-		view, nil)
-	if err != nil {
-		return err
+		err = b.checkBlockContext(newBestBlock, newBestNode.parent, BFNone)
+		if err != nil {
+			return err
+		}
+
+		err = b.checkConnectBlock(newBestNode, newBestBlock, commonParentBlock,
+			view, nil)
+		if err != nil {
+			if _, ok := err.(RuleError); ok {
+				b.index.SetStatusFlags(newBestNode, statusValidateFailed)
+			}
+			return err
+		}
+		b.index.SetStatusFlags(newBestNode, statusValid)
 	}
 
 	attach, detach := b.getReorganizeNodes(newBestNode)
@@ -1462,6 +1518,8 @@ func (b *BlockChain) connectBestChain(node *blockNode, block, parent *dcrutil.Bl
 		view.SetStakeViewpoint(ViewpointPrevValidInitial)
 		var stxos []spentTxOut
 		if !fastAdd {
+			// Validate the block and set the applicable status
+			// result in the block index.
 			err := b.checkConnectBlock(node, block, parent, view,
 				&stxos)
 			if err != nil {

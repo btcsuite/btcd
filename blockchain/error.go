@@ -449,6 +449,10 @@ const (
 	// height had a non-zero final state.
 	ErrInvalidEarlyFinalState
 
+	// ErrKnownInvalidBlock indicates that this block has previously failed
+	// validation.
+	ErrKnownInvalidBlock
+
 	// ErrInvalidAncestorBlock indicates that an ancestor of this block has
 	// failed validation.
 	ErrInvalidAncestorBlock
@@ -558,6 +562,7 @@ var errorCodeStrings = map[ErrorCode]string{
 	ErrZeroValueOutputSpend:   "ErrZeroValueOutputSpend",
 	ErrInvalidEarlyVoteBits:   "ErrInvalidEarlyVoteBits",
 	ErrInvalidEarlyFinalState: "ErrInvalidEarlyFinalState",
+	ErrKnownInvalidBlock:      "ErrKnownInvalidBlock",
 	ErrInvalidAncestorBlock:   "ErrInvalidAncestorBlock",
 	ErrInvalidTemplateParent:  "ErrInvalidTemplateParent",
 }
