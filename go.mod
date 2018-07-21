@@ -10,11 +10,21 @@ require (
 	github.com/davecgh/go-spew v1.1.0
 	github.com/dchest/blake256 v1.0.0
 	github.com/decred/base58 v1.0.0
+	github.com/decred/dcrd/addrmgr v1.0.1
+	github.com/decred/dcrd/certgen v1.0.1
+	github.com/decred/dcrd/chaincfg v1.0.1
+	github.com/decred/dcrd/chaincfg/chainhash v1.0.1
+	github.com/decred/dcrd/connmgr v1.0.0
+	github.com/decred/dcrd/dcrec v0.0.0-20180721194032-4a3343f2f124
+	github.com/decred/dcrd/dcrec/secp256k1 v1.0.0
+	github.com/decred/dcrd/dcrutil v1.0.0
+	github.com/decred/dcrd/txscript v1.0.0
+	github.com/decred/dcrd/wire v1.0.1
 	github.com/decred/slog v1.0.0
 	github.com/gorilla/websocket v1.2.0
 	github.com/jessevdk/go-flags v1.4.0
 	github.com/jrick/bitset v1.0.0
 	github.com/jrick/logrotate v1.0.0
-	golang.org/x/crypto v0.0.0-20180515001509-1a580b3eff78
+	golang.org/x/crypto v0.0.0-20180718160520-a2144134853f
 	golang.org/x/sys v0.0.0-20180522224204-88eb85aaee56
 )
