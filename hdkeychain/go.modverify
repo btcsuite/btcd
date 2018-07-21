@@ -1,5 +1,0 @@
-github.com/agl/ed25519 v0.0.0-20170116200512-5312a6153412 h1:w1UutsfOrms1J05zt7ISrnJIXKzwaspym5BTKGx93EI=
-github.com/dchest/blake256 v1.0.0 h1:6gUgI5MHdz9g0TdrgKqXsoDX+Zjxmm1Sc6OsoGru50I=
-github.com/decred/base58 v1.0.0 h1:BVi1FQCThIjZ0ehG+I99NJ51o0xcc9A/fDKhmJxY6+w=
-github.com/decred/dcrd v1.3.0 h1:Y/3k/RY3UU70ELNuu/X8aAG6gaa/sba283/o3iS58E8=
-golang.org/x/crypto v0.0.0-20180515001509-1a580b3eff78 h1:uJIReYEB1ZZLarzi83Pmig1HhZ/cwFCysx05l0PFBIk=
