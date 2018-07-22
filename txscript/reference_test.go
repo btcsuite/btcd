@@ -31,9 +31,8 @@ func scriptTestName(test []interface{}) (string, error) {
 		amountOffset++
 	}
 
-	// In addition to the optional leading witness data, the test must
-	// consist of at least a signature script, public key script, flags,
-	// and expected error.  Finally, it may optionally contain a comment.
+	// \the test must consist of at least a signature script, public key script,
+	// flags, and expected error.  Finally, it may optionally contain a comment.
 	if len(test) < amountOffset+4 || len(test) > amountOffset+5 {
 		return "", fmt.Errorf("invalid test length %d", len(test))
 	}
@@ -269,9 +268,8 @@ func parseExpectedResult(expected string) ([]ErrorCode, error) {
 }
 
 // createSpendTx generates a basic spending transaction given the passed
-// signature, witness and public key scripts.
-func createSpendingTx(sigScript, pkScript []byte,
-	outputValue int64) *wire.MsgTx {
+// signature and public key scripts.
+func createSpendingTx(sigScript, pkScript []byte, outputValue int64) *wire.MsgTx {
 
 	coinbaseTx := wire.NewMsgTx(wire.TxVersion)
 

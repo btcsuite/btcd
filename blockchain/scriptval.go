@@ -204,7 +204,7 @@ func ValidateTransactionScripts(tx *btcutil.Tx, utxoView *UtxoViewpoint,
 			txInIndex: txInIdx,
 			txIn:      txIn,
 			tx:        tx,
-			sigHashes: nil, // todo calculate sigHash in witness logic code
+			sigHashes: nil,
 		}
 		txValItems = append(txValItems, txVI)
 	}
@@ -255,16 +255,7 @@ func checkBlockScripts(block *btcutil.Block, utxoView *UtxoViewpoint,
 
 	log.Tracef("block %v took %v to verify", block.Hash(), elapsed)
 
-	//// If the HashCache is present, once we have validated the block, we no
-	//// longer need the cached hashes for these transactions, so we purge
-	//// them from the cache.
-	//if segwitActive && hashCache != nil {
-	//	for _, tx := range block.Transactions() {
-	//		if tx.MsgTx().HasWitness() {
-	//			hashCache.PurgeSigHashes(tx.Hash())		// todo check whether clear sigcache or not
-	//		}
-	//	}
-	//}
-
+	// todo clean sigCache because completed validating block or not according
+	// the origin logic
 	return nil
 }
