@@ -212,10 +212,6 @@ func NewTxIn(prevOut *OutPoint, signatureScript []byte) *TxIn {
 	}
 }
 
-// TxWitness defines the witness for a TxIn. A witness is to be interpreted as
-// a slice of byte slices, or a stack with one or many elements.
-type TxWitness [][]byte
-
 // TxOut defines a bitcoin transaction output.
 type TxOut struct {
 	Value    int64
