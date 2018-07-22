@@ -810,7 +810,6 @@ func (mp *TxPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit, rejec
 	// the coinbase address itself can contain signature operations, the
 	// maximum allowed signature operations per transaction is less than
 	// the maximum allowed signature operations per block.
-	// TODO(roasbeef): last bool should be conditional on segwit activation
 	sigOpCost := blockchain.GetSigOpCost(tx)
 
 	if sigOpCost > mp.cfg.Policy.MaxSigOpCostPerTx {
@@ -1028,7 +1027,7 @@ func (mp *TxPool) ProcessOrphans(acceptedTx *btcutil.Tx) []*TxDesc {
 //
 // It returns a slice of transactions added to the mempool.  When the
 // error is nil, the list will include the passed transaction itself along
-// with any additional orphan transaactions that were added as a result of
+// with any additional orphan transactions that were added as a result of
 // the passed one being accepted.
 //
 // This function is safe for concurrent access.

@@ -15,7 +15,7 @@ import (
 const (
 	// MaxDataCarrierSize is the maximum number of bytes allowed in pushed
 	// data to be considered a nulldata transaction
-	MaxDataCarrierSize = 80
+	MaxDataCarrierSize = 220
 
 	// StandardVerifyFlags are the script flags which are used when
 	// executing transaction scripts to enforce additional checks which
