@@ -910,20 +910,17 @@ func opcodeNop(op *parsedOpcode, vm *Engine) error {
 }
 
 // popIfBool enforces the "minimal if" policy during script execution if the
-// particular flag is set.  If so, in order to eliminate an additional source
-// of nuisance malleability, post-segwit for version 0 witness programs, we now
-// require the following: for OP_IF and OP_NOT_IF, the top stack item MUST
-// either be an empty byte slice, or [0x01]. Otherwise, the item at the top of
-// the stack will be popped and interpreted as a boolean.
+// particular flag is set.  If so, the item at the top of the stack will be
+// popped and interpreted as a boolean.
 func popIfBool(vm *Engine) (bool, error) {
-	// At this point, a v0 witness program is being executed and the minimal
-	// if flag is set, so enforce additional constraints on the top stack
-	// item.
+	if vm.dstack.Depth() < 1 {
+		return false, scriptError(ErrUnbalancedConditional, "")
+	}
+
 	so, err := vm.dstack.PopByteArray()
 	if err != nil {
 		return false, err
 	}
-
 	if vm.hasFlag(ScriptVerifyMinimalIf) {
 		if len(so) > 1 {
 			return false, scriptError(ErrScriptMinimalIf, "")
@@ -2421,7 +2418,7 @@ func opcodeCheckMultiSigVerify(op *parsedOpcode, vm *Engine) error {
 // Stack transformation:
 // [ ... ele2 ele1 ] -> [ ... ele2+ele1]
 func opcodeCat(op *parsedOpcode, vm *Engine) error {
-	if len(vm.dstack.stk) < 2 {
+	if vm.dstack.Depth() < 2 {
 		str := "not enough data for opcodeCat operation"
 		return scriptError(ErrInvalidStackOperation, str)
 	}
@@ -2453,7 +2450,7 @@ func opcodeCat(op *parsedOpcode, vm *Engine) error {
 // Stack information:
 // [ ... ele2 ele1 ] -> [... sub2 sub1 ]
 func opcodeSplit(p *parsedOpcode, vm *Engine) error {
-	if len(vm.dstack.stk) < 2 {
+	if vm.dstack.Depth() < 2 {
 		str := "not enough data for opcodeCat operation"
 		return scriptError(ErrInvalidStackOperation, str)
 	}
@@ -2492,7 +2489,7 @@ func opcodeSplit(p *parsedOpcode, vm *Engine) error {
 
 func opcodeNum2bin(p *parsedOpcode, vm *Engine) error {
 	// (in size -- out)
-	if len(vm.dstack.stk) < 2 {
+	if vm.dstack.Depth() < 2 {
 		str := "not enough data for opcodeCat operation"
 		return scriptError(ErrInvalidStackOperation, str)
 	}
@@ -2543,7 +2540,7 @@ func opcodeNum2bin(p *parsedOpcode, vm *Engine) error {
 }
 
 func opcodeBin2num(p *parsedOpcode, vm *Engine) error {
-	if len(vm.dstack.stk) < 1 {
+	if vm.dstack.Depth() < 1 {
 		str := "operation not valid with the current stack size"
 		return scriptError(ErrInvalidStackOperation, str)
 	}
@@ -2582,7 +2579,7 @@ func opcodeXor(p *parsedOpcode, vm *Engine) error {
 }
 
 func bytesOperate(p *parsedOpcode, vm *Engine) error {
-	if len(vm.dstack.stk) < 2 {
+	if vm.dstack.Depth() < 2 {
 		str := "operation not valid with the current stack size"
 		return scriptError(ErrInvalidStackOperation, str)
 	}
