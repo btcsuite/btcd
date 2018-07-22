@@ -2053,7 +2053,7 @@ func (p *Peer) Disconnect() {
 func (p *Peer) start() error {
 	log.Tracef("Starting peer %s", p)
 
-	negotiateErr := make(chan error)
+	negotiateErr := make(chan error, 1)
 	go func() {
 		if p.inbound {
 			negotiateErr <- p.negotiateInboundProtocol()
