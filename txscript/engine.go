@@ -121,8 +121,6 @@ type Engine struct {
 	hashCache       *TxSigHashes
 	bip16           bool     // treat execution as pay-to-script-hash
 	savedFirstStack [][]byte // stack from first script for bip16 scripts
-	witnessVersion  int
-	witnessProgram  []byte
 	inputAmount     int64
 }
 
