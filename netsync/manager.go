@@ -321,15 +321,8 @@ func (sm *SyncManager) isSyncCandidate(peer *peerpkg.Peer) bool {
 		}
 	} else {
 		// The peer is not a candidate for sync if it's not a full
-		// node. Additionally, if the segwit soft-fork package has
-		// activated, then the peer must also be upgraded.
-		//segwitActive, err := sm.chain.IsDeploymentActive(chaincfg.DeploymentSegwit)		// todo remove
-		//if err != nil {
-		//	log.Errorf("Unable to query for segwit "+
-		//		"soft-fork state: %v", err)
-		//}
 		nodeServices := peer.Services()
-		if nodeServices&wire.SFNodeNetwork != wire.SFNodeNetwork { // todo have modified
+		if nodeServices&wire.SFNodeNetwork != wire.SFNodeNetwork {
 			return false
 		}
 	}

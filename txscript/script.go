@@ -315,11 +315,7 @@ func removeOpcodeByData(pkscript []parsedOpcode, data []byte) []parsedOpcode {
 }
 
 // calcHashPrevOuts calculates a single hash of all the previous outputs
-// (txid:index) referenced within the passed transaction. This calculated hash
-// can be re-used when validating all inputs spending segwit outputs, with a
-// signature hash type of SigHashAll. This allows validation to re-use previous
-// hashing computation, reducing the complexity of validating SigHashAll inputs
-// from  O(N^2) to O(N).
+// (txid:index) referenced within the passed transaction.
 func calcHashPrevOuts(tx *wire.MsgTx) chainhash.Hash {
 	var b bytes.Buffer
 	for _, in := range tx.TxIn {
@@ -338,11 +334,7 @@ func calcHashPrevOuts(tx *wire.MsgTx) chainhash.Hash {
 }
 
 // calcHashSequence computes an aggregated hash of each of the sequence numbers
-// within the inputs of the passed transaction. This single hash can be re-used
-// when validating all inputs spending segwit outputs, which include signatures
-// using the SigHashAll sighash type. This allows validation to re-use previous
-// hashing computation, reducing the complexity of validating SigHashAll inputs
-// from O(N^2) to O(N).
+// within the inputs of the passed transaction.
 func calcHashSequence(tx *wire.MsgTx) chainhash.Hash {
 	var b bytes.Buffer
 	for _, in := range tx.TxIn {
