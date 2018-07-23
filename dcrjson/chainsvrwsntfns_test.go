@@ -3,7 +3,7 @@
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package dcrjson_test
+package dcrjson
 
 import (
 	"bytes"
@@ -11,8 +11,6 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
-
-	"github.com/decred/dcrd/dcrjson"
 )
 
 // TestChainSvrWsNtfns tests all of the chain server websocket-specific
@@ -32,13 +30,13 @@ func TestChainSvrWsNtfns(t *testing.T) {
 		{
 			name: "blockconnected",
 			newNtfn: func() (interface{}, error) {
-				return dcrjson.NewCmd("blockconnected", "header", []string{"tx0", "tx1"})
+				return NewCmd("blockconnected", "header", []string{"tx0", "tx1"})
 			},
 			staticNtfn: func() interface{} {
-				return dcrjson.NewBlockConnectedNtfn("header", []string{"tx0", "tx1"})
+				return NewBlockConnectedNtfn("header", []string{"tx0", "tx1"})
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"blockconnected","params":["header",["tx0","tx1"]],"id":null}`,
-			unmarshalled: &dcrjson.BlockConnectedNtfn{
+			unmarshalled: &BlockConnectedNtfn{
 				Header:        "header",
 				SubscribedTxs: []string{"tx0", "tx1"},
 			},
@@ -46,39 +44,39 @@ func TestChainSvrWsNtfns(t *testing.T) {
 		{
 			name: "blockdisconnected",
 			newNtfn: func() (interface{}, error) {
-				return dcrjson.NewCmd("blockdisconnected", "header")
+				return NewCmd("blockdisconnected", "header")
 			},
 			staticNtfn: func() interface{} {
-				return dcrjson.NewBlockDisconnectedNtfn("header")
+				return NewBlockDisconnectedNtfn("header")
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"blockdisconnected","params":["header"],"id":null}`,
-			unmarshalled: &dcrjson.BlockDisconnectedNtfn{
+			unmarshalled: &BlockDisconnectedNtfn{
 				Header: "header",
 			},
 		},
 		{
 			name: "relevanttxaccepted",
 			newNtfn: func() (interface{}, error) {
-				return dcrjson.NewCmd("relevanttxaccepted", "001122")
+				return NewCmd("relevanttxaccepted", "001122")
 			},
 			staticNtfn: func() interface{} {
-				return dcrjson.NewRelevantTxAcceptedNtfn("001122")
+				return NewRelevantTxAcceptedNtfn("001122")
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"relevanttxaccepted","params":["001122"],"id":null}`,
-			unmarshalled: &dcrjson.RelevantTxAcceptedNtfn{
+			unmarshalled: &RelevantTxAcceptedNtfn{
 				Transaction: "001122",
 			},
 		},
 		{
 			name: "txaccepted",
 			newNtfn: func() (interface{}, error) {
-				return dcrjson.NewCmd("txaccepted", "123", 1.5)
+				return NewCmd("txaccepted", "123", 1.5)
 			},
 			staticNtfn: func() interface{} {
-				return dcrjson.NewTxAcceptedNtfn("123", 1.5)
+				return NewTxAcceptedNtfn("123", 1.5)
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"txaccepted","params":["123",1.5],"id":null}`,
-			unmarshalled: &dcrjson.TxAcceptedNtfn{
+			unmarshalled: &TxAcceptedNtfn{
 				TxID:   "123",
 				Amount: 1.5,
 			},
@@ -86,10 +84,10 @@ func TestChainSvrWsNtfns(t *testing.T) {
 		{
 			name: "txacceptedverbose",
 			newNtfn: func() (interface{}, error) {
-				return dcrjson.NewCmd("txacceptedverbose", `{"hex":"001122","txid":"123","version":1,"locktime":4294967295,"vin":null,"vout":null,"confirmations":0}`)
+				return NewCmd("txacceptedverbose", `{"hex":"001122","txid":"123","version":1,"locktime":4294967295,"vin":null,"vout":null,"confirmations":0}`)
 			},
 			staticNtfn: func() interface{} {
-				txResult := dcrjson.TxRawResult{
+				txResult := TxRawResult{
 					Hex:           "001122",
 					Txid:          "123",
 					Version:       1,
@@ -98,11 +96,11 @@ func TestChainSvrWsNtfns(t *testing.T) {
 					Vout:          nil,
 					Confirmations: 0,
 				}
-				return dcrjson.NewTxAcceptedVerboseNtfn(txResult)
+				return NewTxAcceptedVerboseNtfn(txResult)
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"txacceptedverbose","params":[{"hex":"001122","txid":"123","version":1,"locktime":4294967295,"expiry":0,"vin":null,"vout":null,"blockheight":0}],"id":null}`,
-			unmarshalled: &dcrjson.TxAcceptedVerboseNtfn{
-				RawTx: dcrjson.TxRawResult{
+			unmarshalled: &TxAcceptedVerboseNtfn{
+				RawTx: TxRawResult{
 					Hex:           "001122",
 					Txid:          "123",
 					Version:       1,
@@ -119,7 +117,7 @@ func TestChainSvrWsNtfns(t *testing.T) {
 	for i, test := range tests {
 		// Marshal the notification as created by the new static
 		// creation function.  The ID is nil for notifications.
-		marshalled, err := dcrjson.MarshalCmd("1.0", nil, test.staticNtfn())
+		marshalled, err := MarshalCmd("1.0", nil, test.staticNtfn())
 		if err != nil {
 			t.Errorf("MarshalCmd #%d (%s) unexpected error: %v", i,
 				test.name, err)
@@ -144,7 +142,7 @@ func TestChainSvrWsNtfns(t *testing.T) {
 		// Marshal the notification as created by the generic new
 		// notification creation function.    The ID is nil for
 		// notifications.
-		marshalled, err = dcrjson.MarshalCmd("1.0", nil, cmd)
+		marshalled, err = MarshalCmd("1.0", nil, cmd)
 		if err != nil {
 			t.Errorf("MarshalCmd #%d (%s) unexpected error: %v", i,
 				test.name, err)
@@ -158,7 +156,7 @@ func TestChainSvrWsNtfns(t *testing.T) {
 			continue
 		}
 
-		var request dcrjson.Request
+		var request Request
 		if err := json.Unmarshal(marshalled, &request); err != nil {
 			t.Errorf("Test #%d (%s) unexpected error while "+
 				"unmarshalling JSON-RPC request: %v", i,
@@ -166,7 +164,7 @@ func TestChainSvrWsNtfns(t *testing.T) {
 			continue
 		}
 
-		cmd, err = dcrjson.UnmarshalCmd(&request)
+		cmd, err = UnmarshalCmd(&request)
 		if err != nil {
 			t.Errorf("UnmarshalCmd #%d (%s) unexpected error: %v", i,
 				test.name, err)

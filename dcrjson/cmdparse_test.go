@@ -3,15 +3,13 @@
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package dcrjson_test
+package dcrjson
 
 import (
 	"encoding/json"
 	"math"
 	"reflect"
 	"testing"
-
-	"github.com/decred/dcrd/dcrjson"
 )
 
 // TestAssignField tests the assignField function handles supported combinations
@@ -169,7 +167,7 @@ func TestAssignField(t *testing.T) {
 	for i, test := range tests {
 		dst := reflect.New(reflect.TypeOf(test.dest)).Elem()
 		src := reflect.ValueOf(test.src)
-		err := dcrjson.TstAssignField(1, "testField", dst, src)
+		err := assignField(1, "testField", dst, src)
 		if err != nil {
 			t.Errorf("Test #%d (%s) unexpected error: %v", i,
 				test.name, err)
@@ -198,133 +196,133 @@ func TestAssignFieldErrors(t *testing.T) {
 		name string
 		dest interface{}
 		src  interface{}
-		err  dcrjson.Error
+		err  Error
 	}{
 		{
 			name: "general incompatible int -> string",
 			dest: string(0),
 			src:  int(0),
-			err:  dcrjson.Error{Code: dcrjson.ErrInvalidType},
+			err:  Error{Code: ErrInvalidType},
 		},
 		{
 			name: "overflow source int -> dest int",
 			dest: int8(0),
 			src:  int(128),
-			err:  dcrjson.Error{Code: dcrjson.ErrInvalidType},
+			err:  Error{Code: ErrInvalidType},
 		},
 		{
 			name: "overflow source int -> dest uint",
 			dest: uint8(0),
 			src:  int(256),
-			err:  dcrjson.Error{Code: dcrjson.ErrInvalidType},
+			err:  Error{Code: ErrInvalidType},
 		},
 		{
 			name: "int -> float",
 			dest: float32(0),
 			src:  int(256),
-			err:  dcrjson.Error{Code: dcrjson.ErrInvalidType},
+			err:  Error{Code: ErrInvalidType},
 		},
 		{
 			name: "overflow source uint64 -> dest int64",
 			dest: int64(0),
 			src:  uint64(1 << 63),
-			err:  dcrjson.Error{Code: dcrjson.ErrInvalidType},
+			err:  Error{Code: ErrInvalidType},
 		},
 		{
 			name: "overflow source uint -> dest int",
 			dest: int8(0),
 			src:  uint(128),
-			err:  dcrjson.Error{Code: dcrjson.ErrInvalidType},
+			err:  Error{Code: ErrInvalidType},
 		},
 		{
 			name: "overflow source uint -> dest uint",
 			dest: uint8(0),
 			src:  uint(256),
-			err:  dcrjson.Error{Code: dcrjson.ErrInvalidType},
+			err:  Error{Code: ErrInvalidType},
 		},
 		{
 			name: "uint -> float",
 			dest: float32(0),
 			src:  uint(256),
-			err:  dcrjson.Error{Code: dcrjson.ErrInvalidType},
+			err:  Error{Code: ErrInvalidType},
 		},
 		{
 			name: "float -> int",
 			dest: int(0),
 			src:  float32(1.0),
-			err:  dcrjson.Error{Code: dcrjson.ErrInvalidType},
+			err:  Error{Code: ErrInvalidType},
 		},
 		{
 			name: "overflow float64 -> float32",
 			dest: float32(0),
 			src:  float64(math.MaxFloat64),
-			err:  dcrjson.Error{Code: dcrjson.ErrInvalidType},
+			err:  Error{Code: ErrInvalidType},
 		},
 		{
 			name: "invalid string -> bool",
 			dest: true,
 			src:  "foo",
-			err:  dcrjson.Error{Code: dcrjson.ErrInvalidType},
+			err:  Error{Code: ErrInvalidType},
 		},
 		{
 			name: "invalid string -> int",
 			dest: int8(0),
 			src:  "foo",
-			err:  dcrjson.Error{Code: dcrjson.ErrInvalidType},
+			err:  Error{Code: ErrInvalidType},
 		},
 		{
 			name: "overflow string -> int",
 			dest: int8(0),
 			src:  "128",
-			err:  dcrjson.Error{Code: dcrjson.ErrInvalidType},
+			err:  Error{Code: ErrInvalidType},
 		},
 		{
 			name: "invalid string -> uint",
 			dest: uint8(0),
 			src:  "foo",
-			err:  dcrjson.Error{Code: dcrjson.ErrInvalidType},
+			err:  Error{Code: ErrInvalidType},
 		},
 		{
 			name: "overflow string -> uint",
 			dest: uint8(0),
 			src:  "256",
-			err:  dcrjson.Error{Code: dcrjson.ErrInvalidType},
+			err:  Error{Code: ErrInvalidType},
 		},
 		{
 			name: "invalid string -> float",
 			dest: float32(0),
 			src:  "foo",
-			err:  dcrjson.Error{Code: dcrjson.ErrInvalidType},
+			err:  Error{Code: ErrInvalidType},
 		},
 		{
 			name: "overflow string -> float",
 			dest: float32(0),
 			src:  "1.7976931348623157e+308",
-			err:  dcrjson.Error{Code: dcrjson.ErrInvalidType},
+			err:  Error{Code: ErrInvalidType},
 		},
 		{
 			name: "invalid string -> array",
 			dest: [3]int{},
 			src:  "foo",
-			err:  dcrjson.Error{Code: dcrjson.ErrInvalidType},
+			err:  Error{Code: ErrInvalidType},
 		},
 		{
 			name: "invalid string -> slice",
 			dest: []int{},
 			src:  "foo",
-			err:  dcrjson.Error{Code: dcrjson.ErrInvalidType},
+			err:  Error{Code: ErrInvalidType},
 		},
 		{
 			name: "invalid string -> struct",
 			dest: struct{ A int }{},
 			src:  "foo",
-			err:  dcrjson.Error{Code: dcrjson.ErrInvalidType},
+			err:  Error{Code: ErrInvalidType},
 		},
 		{
 			name: "invalid string -> map",
 			dest: map[string]int{},
 			src:  "foo",
-			err:  dcrjson.Error{Code: dcrjson.ErrInvalidType},
+			err:  Error{Code: ErrInvalidType},
 		},
 	}
 
@@ -332,13 +330,13 @@ func TestAssignFieldErrors(t *testing.T) {
 	for i, test := range tests {
 		dst := reflect.New(reflect.TypeOf(test.dest)).Elem()
 		src := reflect.ValueOf(test.src)
-		err := dcrjson.TstAssignField(1, "testField", dst, src)
+		err := assignField(1, "testField", dst, src)
 		if reflect.TypeOf(err) != reflect.TypeOf(test.err) {
 			t.Errorf("Test #%d (%s) wrong error - got %T (%[3]v), "+
 				"want %T", i, test.name, err, test.err)
 			continue
 		}
-		gotErrorCode := err.(dcrjson.Error).Code
+		gotErrorCode := err.(Error).Code
 		if gotErrorCode != test.err.Code {
 			t.Errorf("Test #%d (%s) mismatched error code - got "+
 				"%v (%v), want %v", i, test.name, gotErrorCode,
@@ -356,43 +354,43 @@ func TestNewCmdErrors(t *testing.T) {
 		name   string
 		method string
 		args   []interface{}
-		err    dcrjson.Error
+		err    Error
 	}{
 		{
 			name:   "unregistered command",
 			method: "boguscommand",
 			args:   []interface{}{},
-			err:    dcrjson.Error{Code: dcrjson.ErrUnregisteredMethod},
+			err:    Error{Code: ErrUnregisteredMethod},
 		},
 		{
 			name:   "too few parameters to command with required + optional",
 			method: "getblock",
 			args:   []interface{}{},
-			err:    dcrjson.Error{Code: dcrjson.ErrNumParams},
+			err:    Error{Code: ErrNumParams},
 		},
 		{
 			name:   "too many parameters to command with no optional",
 			method: "getblockcount",
 			args:   []interface{}{"123"},
-			err:    dcrjson.Error{Code: dcrjson.ErrNumParams},
+			err:    Error{Code: ErrNumParams},
 		},
 		{
 			name:   "incorrect parameter type",
 			method: "getblock",
 			args:   []interface{}{1},
-			err:    dcrjson.Error{Code: dcrjson.ErrInvalidType},
+			err:    Error{Code: ErrInvalidType},
 		},
 	}
 
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
-		_, err := dcrjson.NewCmd(test.method, test.args...)
+		_, err := NewCmd(test.method, test.args...)
 		if reflect.TypeOf(err) != reflect.TypeOf(test.err) {
 			t.Errorf("Test #%d (%s) wrong error type - got `%T` (%v), want `%T`",
 				i, test.name, err, err, test.err)
 			continue
 		}
-		gotErrorCode := err.(dcrjson.Error).Code
+		gotErrorCode := err.(Error).Code
 		if gotErrorCode != test.err.Code {
 			t.Errorf("Test #%d (%s) mismatched error code - got "+
 				"%v (%v), want %v", i, test.name, gotErrorCode,
@@ -410,37 +408,37 @@ func TestMarshalCmdErrors(t *testing.T) {
 		name string
 		id   interface{}
 		cmd  interface{}
-		err  dcrjson.Error
+		err  Error
 	}{
 		{
 			name: "unregistered type",
 			id:   1,
 			cmd:  (*int)(nil),
-			err:  dcrjson.Error{Code: dcrjson.ErrUnregisteredMethod},
+			err:  Error{Code: ErrUnregisteredMethod},
 		},
 		{
 			name: "nil instance of registered type",
 			id:   1,
-			cmd:  (*dcrjson.GetBlockCmd)(nil),
-			err:  dcrjson.Error{Code: dcrjson.ErrInvalidType},
+			cmd:  (*GetBlockCmd)(nil),
+			err:  Error{Code: ErrInvalidType},
 		},
 		{
 			name: "nil instance of registered type",
 			id:   []int{0, 1},
-			cmd:  &dcrjson.GetBlockCountCmd{},
-			err:  dcrjson.Error{Code: dcrjson.ErrInvalidType},
+			cmd:  &GetBlockCountCmd{},
+			err:  Error{Code: ErrInvalidType},
 		},
 	}
 
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
-		_, err := dcrjson.MarshalCmd("1.0", test.id, test.cmd)
+		_, err := MarshalCmd("1.0", test.id, test.cmd)
 		if reflect.TypeOf(err) != reflect.TypeOf(test.err) {
 			t.Errorf("Test #%d (%s) wrong error type - got `%T` (%v), want `%T`",
 				i, test.name, err, err, test.err)
 			continue
 		}
-		gotErrorCode := err.(dcrjson.Error).Code
+		gotErrorCode := err.(Error).Code
 		if gotErrorCode != test.err.Code {
 			t.Errorf("Test #%d (%s) mismatched error code - got "+
 				"%v (%v), want %v", i, test.name, gotErrorCode,
@@ -456,60 +454,60 @@ func TestUnmarshalCmdErrors(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		request dcrjson.Request
-		err     dcrjson.Error
+		request Request
+		err     Error
 	}{
 		{
 			name: "unregistered type",
-			request: dcrjson.Request{
+			request: Request{
 				Jsonrpc: "1.0",
 				Method:  "bogusmethod",
 				Params:  nil,
 				ID:      nil,
 			},
-			err: dcrjson.Error{Code: dcrjson.ErrUnregisteredMethod},
+			err: Error{Code: ErrUnregisteredMethod},
 		},
 		{
 			name: "incorrect number of params",
-			request: dcrjson.Request{
+			request: Request{
 				Jsonrpc: "1.0",
 				Method:  "getblockcount",
 				Params:  []json.RawMessage{[]byte(`"bogusparam"`)},
 				ID:      nil,
 			},
-			err: dcrjson.Error{Code: dcrjson.ErrNumParams},
+			err: Error{Code: ErrNumParams},
 		},
 		{
 			name: "invalid type for a parameter",
-			request: dcrjson.Request{
+			request: Request{
 				Jsonrpc: "1.0",
 				Method:  "getblock",
 				Params:  []json.RawMessage{[]byte("1")},
 				ID:      nil,
 			},
-			err: dcrjson.Error{Code: dcrjson.ErrInvalidType},
+			err: Error{Code: ErrInvalidType},
 		},
 		{
 			name: "invalid JSON for a parameter",
-			request: dcrjson.Request{
+			request: Request{
 				Jsonrpc: "1.0",
 				Method:  "getblock",
 				Params:  []json.RawMessage{[]byte(`"1`)},
 				ID:      nil,
 			},
-			err: dcrjson.Error{Code: dcrjson.ErrInvalidType},
+			err: Error{Code: ErrInvalidType},
 		},
 	}
 
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
-		_, err := dcrjson.UnmarshalCmd(&test.request)
+		_, err := UnmarshalCmd(&test.request)
 		if reflect.TypeOf(err) != reflect.TypeOf(test.err) {
 			t.Errorf("Test #%d (%s) wrong error type - got `%T` (%v), want `%T`",
 				i, test.name, err, err, test.err)
 			continue
 		}
-		gotErrorCode := err.(dcrjson.Error).Code
+		gotErrorCode := err.(Error).Code
 		if gotErrorCode != test.err.Code {
 			t.Errorf("Test #%d (%s) mismatched error code - got "+
 				"%v (%v), want %v", i, test.name, gotErrorCode,

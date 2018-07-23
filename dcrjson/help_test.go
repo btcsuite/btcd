@@ -3,13 +3,11 @@
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package dcrjson_test
+package dcrjson
 
 import (
 	"reflect"
 	"testing"
-
-	"github.com/decred/dcrd/dcrjson"
 )
 
 // TestHelpReflectInternals ensures the various help functions which deal with
@@ -238,7 +236,7 @@ func TestHelpReflectInternals(t *testing.T) {
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
 		// Ensure the description key is the expected value.
-		key := dcrjson.TstReflectTypeToJSONType(xT, test.reflectType)
+		key := reflectTypeToJSONType(xT, test.reflectType)
 		if key != test.key {
 			t.Errorf("Test #%d (%s) unexpected key - got: %v, "+
 				"want: %v", i, test.name, key, test.key)
@@ -246,7 +244,7 @@ func TestHelpReflectInternals(t *testing.T) {
 		}
 
 		// Ensure the generated example is as expected.
-		examples, isComplex := dcrjson.TstReflectTypeToJSONExample(xT,
+		examples, isComplex := reflectTypeToJSONExample(xT,
 			test.reflectType, test.indentLevel, "fdk")
 		if isComplex != test.isComplex {
 			t.Errorf("Test #%d (%s) unexpected isComplex - got: %v, "+
@@ -270,7 +268,7 @@ func TestHelpReflectInternals(t *testing.T) {
 		}
 
 		// Ensure the generated result type help is as expected.
-		helpText := dcrjson.TstResultTypeHelp(xT, test.reflectType, "fdk")
+		helpText := resultTypeHelp(xT, test.reflectType, "fdk")
 		if helpText != test.help {
 			t.Errorf("Test #%d (%s) unexpected result help - "+
 				"got: %v, want: %v", i, test.name, helpText,
@@ -278,7 +276,7 @@ func TestHelpReflectInternals(t *testing.T) {
 			continue
 		}
 
-		isValid := dcrjson.TstIsValidResultType(test.reflectType.Kind())
+		isValid := isValidResultType(test.reflectType.Kind())
 		if isValid != !test.isInvalid {
 			t.Errorf("Test #%d (%s) unexpected result type validity "+
 				"- got: %v", i, test.name, isValid)
@@ -403,7 +401,7 @@ func TestResultStructHelp(t *testing.T) {
 
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
-		results := dcrjson.TstResultStructHelp(xT, test.reflectType, 0)
+		results := resultStructHelp(xT, test.reflectType, 0)
 		if len(results) != len(test.expected) {
 			t.Errorf("Test #%d (%s) unexpected result length - "+
 				"got: %v, want: %v", i, test.name, len(results),
@@ -556,7 +554,7 @@ func TestHelpArgInternals(t *testing.T) {
 
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
-		help := dcrjson.TstArgHelp(xT, test.reflectType, test.defaults,
+		help := argHelp(xT, test.reflectType, test.defaults,
 			test.method)
 		if help != test.help {
 			t.Errorf("Test #%d (%s) unexpected help - got:\n%v\n"+
@@ -649,8 +647,8 @@ func TestMethodHelp(t *testing.T) {
 
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
-		help := dcrjson.TestMethodHelp(xT, test.reflectType,
-			test.defaults, test.method, test.resultTypes)
+		help := methodHelp(xT, test.reflectType, test.defaults,
+			test.method, test.resultTypes)
 		if help != test.help {
 			t.Errorf("Test #%d (%s) unexpected help - got:\n%v\n"+
 				"want:\n%v", i, test.name, help, test.help)
@@ -668,43 +666,43 @@ func TestGenerateHelpErrors(t *testing.T) {
 		name        string
 		method      string
 		resultTypes []interface{}
-		err         dcrjson.Error
+		err         Error
 	}{
 		{
 			name:   "unregistered command",
 			method: "boguscommand",
-			err:    dcrjson.Error{Code: dcrjson.ErrUnregisteredMethod},
+			err:    Error{Code: ErrUnregisteredMethod},
 		},
 		{
 			name:        "non-pointer result type",
 			method:      "help",
 			resultTypes: []interface{}{0},
-			err:         dcrjson.Error{Code: dcrjson.ErrInvalidType},
+			err:         Error{Code: ErrInvalidType},
 		},
 		{
 			name:        "invalid result type",
 			method:      "help",
 			resultTypes: []interface{}{(*complex64)(nil)},
-			err:         dcrjson.Error{Code: dcrjson.ErrInvalidType},
+			err:         Error{Code: ErrInvalidType},
 		},
 		{
 			name:        "missing description",
 			method:      "help",
 			resultTypes: []interface{}{(*string)(nil), nil},
-			err:         dcrjson.Error{Code: dcrjson.ErrMissingDescription},
+			err:         Error{Code: ErrMissingDescription},
 		},
 	}
 
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
-		_, err := dcrjson.GenerateHelp(test.method, nil,
+		_, err := GenerateHelp(test.method, nil,
 			test.resultTypes...)
 		if reflect.TypeOf(err) != reflect.TypeOf(test.err) {
 			t.Errorf("Test #%d (%s) wrong error type - got `%T` (%v), want `%T`",
 				i, test.name, err, err, test.err)
 			continue
 		}
-		gotErrorCode := err.(dcrjson.Error).Code
+		gotErrorCode := err.(Error).Code
 		if gotErrorCode != test.err.Code {
 			t.Errorf("Test #%d (%s) mismatched error code - got "+
 				"%v (%v), want %v", i, test.name, gotErrorCode,
@@ -724,7 +722,7 @@ func TestGenerateHelp(t *testing.T) {
 		"help--synopsis": "test",
 		"help-command":   "test",
 	}
-	help, err := dcrjson.GenerateHelp("help", descs)
+	help, err := GenerateHelp("help", descs)
 	if err != nil {
 		t.Fatalf("GenerateHelp: unexpected error: %v", err)
 	}

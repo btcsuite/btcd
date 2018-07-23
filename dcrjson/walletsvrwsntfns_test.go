@@ -3,7 +3,7 @@
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package dcrjson_test
+package dcrjson
 
 import (
 	"bytes"
@@ -11,8 +11,6 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
-
-	"github.com/decred/dcrd/dcrjson"
 )
 
 // TestWalletSvrWsNtfns tests all of the chain server websocket-specific
@@ -32,13 +30,13 @@ func TestWalletSvrWsNtfns(t *testing.T) {
 		{
 			name: "accountbalance",
 			newNtfn: func() (interface{}, error) {
-				return dcrjson.NewCmd("accountbalance", "acct", 1.25, true)
+				return NewCmd("accountbalance", "acct", 1.25, true)
 			},
 			staticNtfn: func() interface{} {
-				return dcrjson.NewAccountBalanceNtfn("acct", 1.25, true)
+				return NewAccountBalanceNtfn("acct", 1.25, true)
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"accountbalance","params":["acct",1.25,true],"id":null}`,
-			unmarshalled: &dcrjson.AccountBalanceNtfn{
+			unmarshalled: &AccountBalanceNtfn{
 				Account:   "acct",
 				Balance:   1.25,
 				Confirmed: true,
@@ -47,26 +45,26 @@ func TestWalletSvrWsNtfns(t *testing.T) {
 		{
 			name: "dcrdconnected",
 			newNtfn: func() (interface{}, error) {
-				return dcrjson.NewCmd("dcrdconnected", true)
+				return NewCmd("dcrdconnected", true)
 			},
 			staticNtfn: func() interface{} {
-				return dcrjson.NewDcrdConnectedNtfn(true)
+				return NewDcrdConnectedNtfn(true)
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"dcrdconnected","params":[true],"id":null}`,
-			unmarshalled: &dcrjson.DcrdConnectedNtfn{
+			unmarshalled: &DcrdConnectedNtfn{
 				Connected: true,
 			},
 		},
 		{
 			name: "newtickets",
 			newNtfn: func() (interface{}, error) {
-				return dcrjson.NewCmd("newtickets", "123", 100, 3, []string{"a", "b"})
+				return NewCmd("newtickets", "123", 100, 3, []string{"a", "b"})
 			},
 			staticNtfn: func() interface{} {
-				return dcrjson.NewNewTicketsNtfn("123", 100, 3, []string{"a", "b"})
+				return NewNewTicketsNtfn("123", 100, 3, []string{"a", "b"})
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"newtickets","params":["123",100,3,["a","b"]],"id":null}`,
-			unmarshalled: &dcrjson.NewTicketsNtfn{
+			unmarshalled: &NewTicketsNtfn{
 				Hash:      "123",
 				Height:    100,
 				StakeDiff: 3,
@@ -76,15 +74,15 @@ func TestWalletSvrWsNtfns(t *testing.T) {
 		{
 			name: "newtx",
 			newNtfn: func() (interface{}, error) {
-				return dcrjson.NewCmd("newtx", "acct", `{"account":"acct","address":"1Address","category":"send","amount":1.5,"fee":0.0001,"confirmations":1,"txid":"456","walletconflicts":[],"time":12345678,"timereceived":12345876,"vout":789,"otheraccount":"otheracct"}`)
+				return NewCmd("newtx", "acct", `{"account":"acct","address":"1Address","category":"send","amount":1.5,"fee":0.0001,"confirmations":1,"txid":"456","walletconflicts":[],"time":12345678,"timereceived":12345876,"vout":789,"otheraccount":"otheracct"}`)
 			},
 			staticNtfn: func() interface{} {
-				result := dcrjson.ListTransactionsResult{
+				result := ListTransactionsResult{
 					Account:         "acct",
 					Address:         "1Address",
 					Category:        "send",
 					Amount:          1.5,
-					Fee:             dcrjson.Float64(0.0001),
+					Fee:             Float64(0.0001),
 					Confirmations:   1,
 					TxID:            "456",
 					WalletConflicts: []string{},
@@ -93,17 +91,17 @@ func TestWalletSvrWsNtfns(t *testing.T) {
 					Vout:            789,
 					OtherAccount:    "otheracct",
 				}
-				return dcrjson.NewNewTxNtfn("acct", result)
+				return NewNewTxNtfn("acct", result)
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"newtx","params":["acct",{"account":"acct","address":"1Address","amount":1.5,"category":"send","confirmations":1,"fee":0.0001,"time":12345678,"timereceived":12345876,"txid":"456","vout":789,"walletconflicts":[],"otheraccount":"otheracct"}],"id":null}`,
-			unmarshalled: &dcrjson.NewTxNtfn{
+			unmarshalled: &NewTxNtfn{
 				Account: "acct",
-				Details: dcrjson.ListTransactionsResult{
+				Details: ListTransactionsResult{
 					Account:         "acct",
 					Address:         "1Address",
 					Category:        "send",
 					Amount:          1.5,
-					Fee:             dcrjson.Float64(0.0001),
+					Fee:             Float64(0.0001),
 					Confirmations:   1,
 					TxID:            "456",
 					WalletConflicts: []string{},
@@ -117,13 +115,13 @@ func TestWalletSvrWsNtfns(t *testing.T) {
 		{
 			name: "revocationcreated",
 			newNtfn: func() (interface{}, error) {
-				return dcrjson.NewCmd("revocationcreated", "123", "1234")
+				return NewCmd("revocationcreated", "123", "1234")
 			},
 			staticNtfn: func() interface{} {
-				return dcrjson.NewRevocationCreatedNtfn("123", "1234")
+				return NewRevocationCreatedNtfn("123", "1234")
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"revocationcreated","params":["123","1234"],"id":null}`,
-			unmarshalled: &dcrjson.RevocationCreatedNtfn{
+			unmarshalled: &RevocationCreatedNtfn{
 				TxHash: "123",
 				SStxIn: "1234",
 			},
@@ -131,13 +129,13 @@ func TestWalletSvrWsNtfns(t *testing.T) {
 		{
 			name: "spentandmissedtickets",
 			newNtfn: func() (interface{}, error) {
-				return dcrjson.NewCmd("spentandmissedtickets", "123", 100, 3, map[string]string{"a": "b"})
+				return NewCmd("spentandmissedtickets", "123", 100, 3, map[string]string{"a": "b"})
 			},
 			staticNtfn: func() interface{} {
-				return dcrjson.NewSpentAndMissedTicketsNtfn("123", 100, 3, map[string]string{"a": "b"})
+				return NewSpentAndMissedTicketsNtfn("123", 100, 3, map[string]string{"a": "b"})
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"spentandmissedtickets","params":["123",100,3,{"a":"b"}],"id":null}`,
-			unmarshalled: &dcrjson.SpentAndMissedTicketsNtfn{
+			unmarshalled: &SpentAndMissedTicketsNtfn{
 				Hash:      "123",
 				Height:    100,
 				StakeDiff: 3,
@@ -147,13 +145,13 @@ func TestWalletSvrWsNtfns(t *testing.T) {
 		{
 			name: "ticketpurchase",
 			newNtfn: func() (interface{}, error) {
-				return dcrjson.NewCmd("ticketpurchased", "123", 5)
+				return NewCmd("ticketpurchased", "123", 5)
 			},
 			staticNtfn: func() interface{} {
-				return dcrjson.NewTicketPurchasedNtfn("123", 5)
+				return NewTicketPurchasedNtfn("123", 5)
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"ticketpurchased","params":["123",5],"id":null}`,
-			unmarshalled: &dcrjson.TicketPurchasedNtfn{
+			unmarshalled: &TicketPurchasedNtfn{
 				TxHash: "123",
 				Amount: 5,
 			},
@@ -161,13 +159,13 @@ func TestWalletSvrWsNtfns(t *testing.T) {
 		{
 			name: "votecreated",
 			newNtfn: func() (interface{}, error) {
-				return dcrjson.NewCmd("votecreated", "123", "1234", 100, "12345", 1)
+				return NewCmd("votecreated", "123", "1234", 100, "12345", 1)
 			},
 			staticNtfn: func() interface{} {
-				return dcrjson.NewVoteCreatedNtfn("123", "1234", 100, "12345", 1)
+				return NewVoteCreatedNtfn("123", "1234", 100, "12345", 1)
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"votecreated","params":["123","1234",100,"12345",1],"id":null}`,
-			unmarshalled: &dcrjson.VoteCreatedNtfn{
+			unmarshalled: &VoteCreatedNtfn{
 				TxHash:    "123",
 				BlockHash: "1234",
 				Height:    100,
@@ -178,26 +176,26 @@ func TestWalletSvrWsNtfns(t *testing.T) {
 		{
 			name: "walletlockstate",
 			newNtfn: func() (interface{}, error) {
-				return dcrjson.NewCmd("walletlockstate", true)
+				return NewCmd("walletlockstate", true)
 			},
 			staticNtfn: func() interface{} {
-				return dcrjson.NewWalletLockStateNtfn(true)
+				return NewWalletLockStateNtfn(true)
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"walletlockstate","params":[true],"id":null}`,
-			unmarshalled: &dcrjson.WalletLockStateNtfn{
+			unmarshalled: &WalletLockStateNtfn{
 				Locked: true,
 			},
 		},
 		{
 			name: "winningtickets",
 			newNtfn: func() (interface{}, error) {
-				return dcrjson.NewCmd("winningtickets", "123", 100, map[string]string{"a": "b"})
+				return NewCmd("winningtickets", "123", 100, map[string]string{"a": "b"})
 			},
 			staticNtfn: func() interface{} {
-				return dcrjson.NewWinningTicketsNtfn("123", 100, map[string]string{"a": "b"})
+				return NewWinningTicketsNtfn("123", 100, map[string]string{"a": "b"})
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"winningtickets","params":["123",100,{"a":"b"}],"id":null}`,
-			unmarshalled: &dcrjson.WinningTicketsNtfn{
+			unmarshalled: &WinningTicketsNtfn{
 				BlockHash:   "123",
 				BlockHeight: 100,
 				Tickets:     map[string]string{"a": "b"},
@@ -209,7 +207,7 @@ func TestWalletSvrWsNtfns(t *testing.T) {
 	for i, test := range tests {
 		// Marshal the notification as created by the new static
 		// creation function.  The ID is nil for notifications.
-		marshalled, err := dcrjson.MarshalCmd("1.0", nil, test.staticNtfn())
+		marshalled, err := MarshalCmd("1.0", nil, test.staticNtfn())
 		if err != nil {
 			t.Errorf("MarshalCmd #%d (%s) unexpected error: %v", i,
 				test.name, err)
@@ -234,7 +232,7 @@ func TestWalletSvrWsNtfns(t *testing.T) {
 		// Marshal the notification as created by the generic new
 		// notification creation function.    The ID is nil for
 		// notifications.
-		marshalled, err = dcrjson.MarshalCmd("1.0", nil, cmd)
+		marshalled, err = MarshalCmd("1.0", nil, cmd)
 		if err != nil {
 			t.Errorf("MarshalCmd #%d (%s) unexpected error: %v", i,
 				test.name, err)
@@ -248,7 +246,7 @@ func TestWalletSvrWsNtfns(t *testing.T) {
 			continue
 		}
 
-		var request dcrjson.Request
+		var request Request
 		if err := json.Unmarshal(marshalled, &request); err != nil {
 			t.Errorf("Test #%d (%s) unexpected error while "+
 				"unmarshalling JSON-RPC request: %v", i,
@@ -256,7 +254,7 @@ func TestWalletSvrWsNtfns(t *testing.T) {
 			continue
 		}
 
-		cmd, err = dcrjson.UnmarshalCmd(&request)
+		cmd, err = UnmarshalCmd(&request)
 		if err != nil {
 			t.Errorf("UnmarshalCmd #%d (%s) unexpected error: %v", i,
 				test.name, err)

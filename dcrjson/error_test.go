@@ -3,12 +3,10 @@
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package dcrjson_test
+package dcrjson
 
 import (
 	"testing"
-
-	"github.com/decred/dcrd/dcrjson"
 )
 
 // TestErrorCodeStringer tests the stringized output for the ErrorCode type.
@@ -16,26 +14,26 @@ func TestErrorCodeStringer(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		in   dcrjson.ErrorCode
+		in   ErrorCode
 		want string
 	}{
-		{dcrjson.ErrDuplicateMethod, "ErrDuplicateMethod"},
-		{dcrjson.ErrInvalidUsageFlags, "ErrInvalidUsageFlags"},
-		{dcrjson.ErrInvalidType, "ErrInvalidType"},
-		{dcrjson.ErrEmbeddedType, "ErrEmbeddedType"},
-		{dcrjson.ErrUnexportedField, "ErrUnexportedField"},
-		{dcrjson.ErrUnsupportedFieldType, "ErrUnsupportedFieldType"},
-		{dcrjson.ErrNonOptionalField, "ErrNonOptionalField"},
-		{dcrjson.ErrNonOptionalDefault, "ErrNonOptionalDefault"},
-		{dcrjson.ErrMismatchedDefault, "ErrMismatchedDefault"},
-		{dcrjson.ErrUnregisteredMethod, "ErrUnregisteredMethod"},
-		{dcrjson.ErrNumParams, "ErrNumParams"},
-		{dcrjson.ErrMissingDescription, "ErrMissingDescription"},
+		{ErrDuplicateMethod, "ErrDuplicateMethod"},
+		{ErrInvalidUsageFlags, "ErrInvalidUsageFlags"},
+		{ErrInvalidType, "ErrInvalidType"},
+		{ErrEmbeddedType, "ErrEmbeddedType"},
+		{ErrUnexportedField, "ErrUnexportedField"},
+		{ErrUnsupportedFieldType, "ErrUnsupportedFieldType"},
+		{ErrNonOptionalField, "ErrNonOptionalField"},
+		{ErrNonOptionalDefault, "ErrNonOptionalDefault"},
+		{ErrMismatchedDefault, "ErrMismatchedDefault"},
+		{ErrUnregisteredMethod, "ErrUnregisteredMethod"},
+		{ErrNumParams, "ErrNumParams"},
+		{ErrMissingDescription, "ErrMissingDescription"},
 		{0xffff, "Unknown ErrorCode (65535)"},
 	}
 
 	// Detect additional error codes that don't have the stringer added.
-	if len(tests)-1 != int(dcrjson.TstNumErrorCodes) {
+	if len(tests)-1 != int(numErrorCodes) {
 		t.Errorf("It appears an error code was added without adding an " +
 			"associated stringer test")
 	}
@@ -56,15 +54,15 @@ func TestError(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		in   dcrjson.Error
+		in   Error
 		want string
 	}{
 		{
-			dcrjson.Error{Message: "some error"},
+			Error{Message: "some error"},
 			"some error",
 		},
 		{
-			dcrjson.Error{Message: "human-readable error"},
+			Error{Message: "human-readable error"},
 			"human-readable error",
 		},
 	}

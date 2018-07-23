@@ -3,7 +3,7 @@
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package dcrjson_test
+package dcrjson
 
 import (
 	"bytes"
@@ -11,8 +11,6 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
-
-	"github.com/decred/dcrd/dcrjson"
 )
 
 // TestChainSvrCmds tests all of the chain server commands marshal and unmarshal
@@ -33,173 +31,173 @@ func TestChainSvrCmds(t *testing.T) {
 		{
 			name: "addnode",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("addnode", "127.0.0.1", dcrjson.ANRemove)
+				return NewCmd("addnode", "127.0.0.1", ANRemove)
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewAddNodeCmd("127.0.0.1", dcrjson.ANRemove)
+				return NewAddNodeCmd("127.0.0.1", ANRemove)
 			},
 			marshalled:   `{"jsonrpc":"1.0","method":"addnode","params":["127.0.0.1","remove"],"id":1}`,
-			unmarshalled: &dcrjson.AddNodeCmd{Addr: "127.0.0.1", SubCmd: dcrjson.ANRemove},
+			unmarshalled: &AddNodeCmd{Addr: "127.0.0.1", SubCmd: ANRemove},
 		},
 		{
 			name: "createrawtransaction",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("createrawtransaction", `[{"amount":0.0123,"txid":"123","vout":1}]`,
+				return NewCmd("createrawtransaction", `[{"amount":0.0123,"txid":"123","vout":1}]`,
 					`{"456":0.0123}`)
 			},
 			staticCmd: func() interface{} {
-				txInputs := []dcrjson.TransactionInput{
+				txInputs := []TransactionInput{
 					{Amount: 0.0123, Txid: "123", Vout: 1},
 				}
 				amounts := map[string]float64{"456": .0123}
-				return dcrjson.NewCreateRawTransactionCmd(txInputs, amounts, nil, nil)
+				return NewCreateRawTransactionCmd(txInputs, amounts, nil, nil)
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"createrawtransaction","params":[[{"amount":0.0123,"txid":"123","vout":1,"tree":0}],{"456":0.0123}],"id":1}`,
-			unmarshalled: &dcrjson.CreateRawTransactionCmd{
-				Inputs:  []dcrjson.TransactionInput{{Amount: 0.0123, Txid: "123", Vout: 1}},
+			unmarshalled: &CreateRawTransactionCmd{
+				Inputs:  []TransactionInput{{Amount: 0.0123, Txid: "123", Vout: 1}},
 				Amounts: map[string]float64{"456": .0123},
 			},
 		},
 		{
 			name: "createrawtransaction optional",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("createrawtransaction", `[{"amount":0.0123,"txid":"123","vout":1,"tree":0}]`,
+				return NewCmd("createrawtransaction", `[{"amount":0.0123,"txid":"123","vout":1,"tree":0}]`,
 					`{"456":0.0123}`, int64(12312333333), int64(12312333333))
 			},
 			staticCmd: func() interface{} {
-				txInputs := []dcrjson.TransactionInput{
+				txInputs := []TransactionInput{
 					{Amount: 0.0123, Txid: "123", Vout: 1},
 				}
 				amounts := map[string]float64{"456": .0123}
-				return dcrjson.NewCreateRawTransactionCmd(txInputs, amounts, dcrjson.Int64(12312333333), dcrjson.Int64(12312333333))
+				return NewCreateRawTransactionCmd(txInputs, amounts, Int64(12312333333), Int64(12312333333))
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"createrawtransaction","params":[[{"amount":0.0123,"txid":"123","vout":1,"tree":0}],{"456":0.0123},12312333333,12312333333],"id":1}`,
-			unmarshalled: &dcrjson.CreateRawTransactionCmd{
-				Inputs:   []dcrjson.TransactionInput{{Amount: 0.0123, Txid: "123", Vout: 1}},
+			unmarshalled: &CreateRawTransactionCmd{
+				Inputs:   []TransactionInput{{Amount: 0.0123, Txid: "123", Vout: 1}},
 				Amounts:  map[string]float64{"456": .0123},
-				LockTime: dcrjson.Int64(12312333333),
-				Expiry:   dcrjson.Int64(12312333333),
+				LockTime: Int64(12312333333),
+				Expiry:   Int64(12312333333),
 			},
 		},
 		{
 			name: "debuglevel",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("debuglevel", "trace")
+				return NewCmd("debuglevel", "trace")
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewDebugLevelCmd("trace")
+				return NewDebugLevelCmd("trace")
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"debuglevel","params":["trace"],"id":1}`,
-			unmarshalled: &dcrjson.DebugLevelCmd{
+			unmarshalled: &DebugLevelCmd{
 				LevelSpec: "trace",
 			},
 		},
 		{
 			name: "decoderawtransaction",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("decoderawtransaction", "123")
+				return NewCmd("decoderawtransaction", "123")
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewDecodeRawTransactionCmd("123")
+				return NewDecodeRawTransactionCmd("123")
 			},
 			marshalled:   `{"jsonrpc":"1.0","method":"decoderawtransaction","params":["123"],"id":1}`,
-			unmarshalled: &dcrjson.DecodeRawTransactionCmd{HexTx: "123"},
+			unmarshalled: &DecodeRawTransactionCmd{HexTx: "123"},
 		},
 		{
 			name: "decodescript",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("decodescript", "00")
+				return NewCmd("decodescript", "00")
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewDecodeScriptCmd("00")
+				return NewDecodeScriptCmd("00")
 			},
 			marshalled:   `{"jsonrpc":"1.0","method":"decodescript","params":["00"],"id":1}`,
-			unmarshalled: &dcrjson.DecodeScriptCmd{HexScript: "00"},
+			unmarshalled: &DecodeScriptCmd{HexScript: "00"},
 		},
 		{
 			name: "estimatesmartfee",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("estimatesmartfee", 6, dcrjson.EstimateSmartFeeConservative)
+				return NewCmd("estimatesmartfee", 6, EstimateSmartFeeConservative)
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewEstimateSmartFeeCmd(6, dcrjson.EstimateSmartFeeConservative)
+				return NewEstimateSmartFeeCmd(6, EstimateSmartFeeConservative)
 			},
 			marshalled:   `{"jsonrpc":"1.0","method":"estimatesmartfee","params":[6,"conservative"],"id":1}`,
-			unmarshalled: &dcrjson.EstimateSmartFeeCmd{Confirmations: 6, Mode: dcrjson.EstimateSmartFeeConservative},
+			unmarshalled: &EstimateSmartFeeCmd{Confirmations: 6, Mode: EstimateSmartFeeConservative},
 		},
 		{
 			name: "generate",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("generate", 1)
+				return NewCmd("generate", 1)
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewGenerateCmd(1)
+				return NewGenerateCmd(1)
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"generate","params":[1],"id":1}`,
-			unmarshalled: &dcrjson.GenerateCmd{
+			unmarshalled: &GenerateCmd{
 				NumBlocks: 1,
 			},
 		},
 		{
 			name: "getaddednodeinfo",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("getaddednodeinfo", true)
+				return NewCmd("getaddednodeinfo", true)
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewGetAddedNodeInfoCmd(true, nil)
+				return NewGetAddedNodeInfoCmd(true, nil)
 			},
 			marshalled:   `{"jsonrpc":"1.0","method":"getaddednodeinfo","params":[true],"id":1}`,
-			unmarshalled: &dcrjson.GetAddedNodeInfoCmd{DNS: true, Node: nil},
+			unmarshalled: &GetAddedNodeInfoCmd{DNS: true, Node: nil},
 		},
 		{
 			name: "getaddednodeinfo optional",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("getaddednodeinfo", true, "127.0.0.1")
+				return NewCmd("getaddednodeinfo", true, "127.0.0.1")
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewGetAddedNodeInfoCmd(true, dcrjson.String("127.0.0.1"))
+				return NewGetAddedNodeInfoCmd(true, String("127.0.0.1"))
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"getaddednodeinfo","params":[true,"127.0.0.1"],"id":1}`,
-			unmarshalled: &dcrjson.GetAddedNodeInfoCmd{
+			unmarshalled: &GetAddedNodeInfoCmd{
 				DNS:  true,
-				Node: dcrjson.String("127.0.0.1"),
+				Node: String("127.0.0.1"),
 			},
 		},
 		{
 			name: "getbestblock",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("getbestblock")
+				return NewCmd("getbestblock")
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewGetBestBlockCmd()
+				return NewGetBestBlockCmd()
 			},
 			marshalled:   `{"jsonrpc":"1.0","method":"getbestblock","params":[],"id":1}`,
-			unmarshalled: &dcrjson.GetBestBlockCmd{},
+			unmarshalled: &GetBestBlockCmd{},
 		},
 		{
 			name: "getbestblockhash",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("getbestblockhash")
+				return NewCmd("getbestblockhash")
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewGetBestBlockHashCmd()
+				return NewGetBestBlockHashCmd()
 			},
 			marshalled:   `{"jsonrpc":"1.0","method":"getbestblockhash","params":[],"id":1}`,
-			unmarshalled: &dcrjson.GetBestBlockHashCmd{},
+			unmarshalled: &GetBestBlockHashCmd{},
 		},
 		{
 			name: "getblock",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("getblock", "123")
+				return NewCmd("getblock", "123")
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewGetBlockCmd("123", nil, nil)
+				return NewGetBlockCmd("123", nil, nil)
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"getblock","params":["123"],"id":1}`,
-			unmarshalled: &dcrjson.GetBlockCmd{
+			unmarshalled: &GetBlockCmd{
 				Hash:      "123",
-				Verbose:   dcrjson.Bool(true),
-				VerboseTx: dcrjson.Bool(false),
+				Verbose:   Bool(true),
+				VerboseTx: Bool(false),
 			},
 		},
 		{
@@ -208,91 +206,91 @@ func TestChainSvrCmds(t *testing.T) {
 				// Intentionally use a source param that is
 				// more pointers than the destination to
 				// exercise that path.
-				verbosePtr := dcrjson.Bool(true)
-				return dcrjson.NewCmd("getblock", "123", &verbosePtr)
+				verbosePtr := Bool(true)
+				return NewCmd("getblock", "123", &verbosePtr)
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewGetBlockCmd("123", dcrjson.Bool(true), nil)
+				return NewGetBlockCmd("123", Bool(true), nil)
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"getblock","params":["123",true],"id":1}`,
-			unmarshalled: &dcrjson.GetBlockCmd{
+			unmarshalled: &GetBlockCmd{
 				Hash:      "123",
-				Verbose:   dcrjson.Bool(true),
-				VerboseTx: dcrjson.Bool(false),
+				Verbose:   Bool(true),
+				VerboseTx: Bool(false),
 			},
 		},
 		{
 			name: "getblock required optional2",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("getblock", "123", true, true)
+				return NewCmd("getblock", "123", true, true)
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewGetBlockCmd("123", dcrjson.Bool(true), dcrjson.Bool(true))
+				return NewGetBlockCmd("123", Bool(true), Bool(true))
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"getblock","params":["123",true,true],"id":1}`,
-			unmarshalled: &dcrjson.GetBlockCmd{
+			unmarshalled: &GetBlockCmd{
 				Hash:      "123",
-				Verbose:   dcrjson.Bool(true),
-				VerboseTx: dcrjson.Bool(true),
+				Verbose:   Bool(true),
+				VerboseTx: Bool(true),
 			},
 		},
 		{
 			name: "getblockchaininfo",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("getblockchaininfo")
+				return NewCmd("getblockchaininfo")
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewGetBlockChainInfoCmd()
+				return NewGetBlockChainInfoCmd()
 			},
 			marshalled:   `{"jsonrpc":"1.0","method":"getblockchaininfo","params":[],"id":1}`,
-			unmarshalled: &dcrjson.GetBlockChainInfoCmd{},
+			unmarshalled: &GetBlockChainInfoCmd{},
 		},
 		{
 			name: "getblockcount",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("getblockcount")
+				return NewCmd("getblockcount")
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewGetBlockCountCmd()
+				return NewGetBlockCountCmd()
 			},
 			marshalled:   `{"jsonrpc":"1.0","method":"getblockcount","params":[],"id":1}`,
-			unmarshalled: &dcrjson.GetBlockCountCmd{},
+			unmarshalled: &GetBlockCountCmd{},
 		},
 		{
 			name: "getblockhash",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("getblockhash", 123)
+				return NewCmd("getblockhash", 123)
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewGetBlockHashCmd(123)
+				return NewGetBlockHashCmd(123)
 			},
 			marshalled:   `{"jsonrpc":"1.0","method":"getblockhash","params":[123],"id":1}`,
-			unmarshalled: &dcrjson.GetBlockHashCmd{Index: 123},
+			unmarshalled: &GetBlockHashCmd{Index: 123},
 		},
 		{
 			name: "getblockheader",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("getblockheader", "123")
+				return NewCmd("getblockheader", "123")
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewGetBlockHeaderCmd("123", nil)
+				return NewGetBlockHeaderCmd("123", nil)
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"getblockheader","params":["123"],"id":1}`,
-			unmarshalled: &dcrjson.GetBlockHeaderCmd{
+			unmarshalled: &GetBlockHeaderCmd{
 				Hash:    "123",
-				Verbose: dcrjson.Bool(true),
+				Verbose: Bool(true),
 			},
 		},
 		{
 			name: "getblocksubsidy",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("getblocksubsidy", 123, 256)
+				return NewCmd("getblocksubsidy", 123, 256)
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewGetBlockSubsidyCmd(123, 256)
+				return NewGetBlockSubsidyCmd(123, 256)
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"getblocksubsidy","params":[123,256],"id":1}`,
-			unmarshalled: &dcrjson.GetBlockSubsidyCmd{
+			unmarshalled: &GetBlockSubsidyCmd{
 				Height: 123,
 				Voters: 256,
 			},
@@ -300,29 +298,29 @@ func TestChainSvrCmds(t *testing.T) {
 		{
 			name: "getblocktemplate",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("getblocktemplate")
+				return NewCmd("getblocktemplate")
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewGetBlockTemplateCmd(nil)
+				return NewGetBlockTemplateCmd(nil)
 			},
 			marshalled:   `{"jsonrpc":"1.0","method":"getblocktemplate","params":[],"id":1}`,
-			unmarshalled: &dcrjson.GetBlockTemplateCmd{Request: nil},
+			unmarshalled: &GetBlockTemplateCmd{Request: nil},
 		},
 		{
 			name: "getblocktemplate optional - template request",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("getblocktemplate", `{"mode":"template","capabilities":["longpoll","coinbasetxn"]}`)
+				return NewCmd("getblocktemplate", `{"mode":"template","capabilities":["longpoll","coinbasetxn"]}`)
 			},
 			staticCmd: func() interface{} {
-				template := dcrjson.TemplateRequest{
+				template := TemplateRequest{
 					Mode:         "template",
 					Capabilities: []string{"longpoll", "coinbasetxn"},
 				}
-				return dcrjson.NewGetBlockTemplateCmd(&template)
+				return NewGetBlockTemplateCmd(&template)
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"getblocktemplate","params":[{"mode":"template","capabilities":["longpoll","coinbasetxn"]}],"id":1}`,
-			unmarshalled: &dcrjson.GetBlockTemplateCmd{
-				Request: &dcrjson.TemplateRequest{
+			unmarshalled: &GetBlockTemplateCmd{
+				Request: &TemplateRequest{
 					Mode:         "template",
 					Capabilities: []string{"longpoll", "coinbasetxn"},
 				},
@@ -331,21 +329,21 @@ func TestChainSvrCmds(t *testing.T) {
 		{
 			name: "getblocktemplate optional - template request with tweaks",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("getblocktemplate", `{"mode":"template","capabilities":["longpoll","coinbasetxn"],"sigoplimit":500,"sizelimit":100000000,"maxversion":2}`)
+				return NewCmd("getblocktemplate", `{"mode":"template","capabilities":["longpoll","coinbasetxn"],"sigoplimit":500,"sizelimit":100000000,"maxversion":2}`)
 			},
 			staticCmd: func() interface{} {
-				template := dcrjson.TemplateRequest{
+				template := TemplateRequest{
 					Mode:         "template",
 					Capabilities: []string{"longpoll", "coinbasetxn"},
 					SigOpLimit:   500,
 					SizeLimit:    100000000,
 					MaxVersion:   2,
 				}
-				return dcrjson.NewGetBlockTemplateCmd(&template)
+				return NewGetBlockTemplateCmd(&template)
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"getblocktemplate","params":[{"mode":"template","capabilities":["longpoll","coinbasetxn"],"sigoplimit":500,"sizelimit":100000000,"maxversion":2}],"id":1}`,
-			unmarshalled: &dcrjson.GetBlockTemplateCmd{
-				Request: &dcrjson.TemplateRequest{
+			unmarshalled: &GetBlockTemplateCmd{
+				Request: &TemplateRequest{
 					Mode:         "template",
 					Capabilities: []string{"longpoll", "coinbasetxn"},
 					SigOpLimit:   int64(500),
@@ -357,21 +355,21 @@ func TestChainSvrCmds(t *testing.T) {
 		{
 			name: "getblocktemplate optional - template request with tweaks 2",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("getblocktemplate", `{"mode":"template","capabilities":["longpoll","coinbasetxn"],"sigoplimit":true,"sizelimit":100000000,"maxversion":2}`)
+				return NewCmd("getblocktemplate", `{"mode":"template","capabilities":["longpoll","coinbasetxn"],"sigoplimit":true,"sizelimit":100000000,"maxversion":2}`)
 			},
 			staticCmd: func() interface{} {
-				template := dcrjson.TemplateRequest{
+				template := TemplateRequest{
 					Mode:         "template",
 					Capabilities: []string{"longpoll", "coinbasetxn"},
 					SigOpLimit:   true,
 					SizeLimit:    100000000,
 					MaxVersion:   2,
 				}
-				return dcrjson.NewGetBlockTemplateCmd(&template)
+				return NewGetBlockTemplateCmd(&template)
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"getblocktemplate","params":[{"mode":"template","capabilities":["longpoll","coinbasetxn"],"sigoplimit":true,"sizelimit":100000000,"maxversion":2}],"id":1}`,
-			unmarshalled: &dcrjson.GetBlockTemplateCmd{
-				Request: &dcrjson.TemplateRequest{
+			unmarshalled: &GetBlockTemplateCmd{
+				Request: &TemplateRequest{
 					Mode:         "template",
 					Capabilities: []string{"longpoll", "coinbasetxn"},
 					SigOpLimit:   true,
@@ -383,13 +381,13 @@ func TestChainSvrCmds(t *testing.T) {
 		{
 			name: "getcfilter",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("getcfilter", "123", "extended")
+				return NewCmd("getcfilter", "123", "extended")
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewGetCFilterCmd("123", "extended")
+				return NewGetCFilterCmd("123", "extended")
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"getcfilter","params":["123","extended"],"id":1}`,
-			unmarshalled: &dcrjson.GetCFilterCmd{
+			unmarshalled: &GetCFilterCmd{
 				Hash:       "123",
 				FilterType: "extended",
 			},
@@ -397,13 +395,13 @@ func TestChainSvrCmds(t *testing.T) {
 		{
 			name: "getcfilterheader",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("getcfilterheader", "123", "extended")
+				return NewCmd("getcfilterheader", "123", "extended")
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewGetCFilterHeaderCmd("123", "extended")
+				return NewGetCFilterHeaderCmd("123", "extended")
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"getcfilterheader","params":["123","extended"],"id":1}`,
-			unmarshalled: &dcrjson.GetCFilterHeaderCmd{
+			unmarshalled: &GetCFilterHeaderCmd{
 				Hash:       "123",
 				FilterType: "extended",
 			},
@@ -411,255 +409,255 @@ func TestChainSvrCmds(t *testing.T) {
 		{
 			name: "getchaintips",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("getchaintips")
+				return NewCmd("getchaintips")
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewGetChainTipsCmd()
+				return NewGetChainTipsCmd()
 			},
 			marshalled:   `{"jsonrpc":"1.0","method":"getchaintips","params":[],"id":1}`,
-			unmarshalled: &dcrjson.GetChainTipsCmd{},
+			unmarshalled: &GetChainTipsCmd{},
 		},
 		{
 			name: "getconnectioncount",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("getconnectioncount")
+				return NewCmd("getconnectioncount")
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewGetConnectionCountCmd()
+				return NewGetConnectionCountCmd()
 			},
 			marshalled:   `{"jsonrpc":"1.0","method":"getconnectioncount","params":[],"id":1}`,
-			unmarshalled: &dcrjson.GetConnectionCountCmd{},
+			unmarshalled: &GetConnectionCountCmd{},
 		},
 		{
 			name: "getcurrentnet",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("getcurrentnet")
+				return NewCmd("getcurrentnet")
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewGetCurrentNetCmd()
+				return NewGetCurrentNetCmd()
 			},
 			marshalled:   `{"jsonrpc":"1.0","method":"getcurrentnet","params":[],"id":1}`,
-			unmarshalled: &dcrjson.GetCurrentNetCmd{},
+			unmarshalled: &GetCurrentNetCmd{},
 		},
 		{
 			name: "getdifficulty",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("getdifficulty")
+				return NewCmd("getdifficulty")
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewGetDifficultyCmd()
+				return NewGetDifficultyCmd()
 			},
 			marshalled:   `{"jsonrpc":"1.0","method":"getdifficulty","params":[],"id":1}`,
-			unmarshalled: &dcrjson.GetDifficultyCmd{},
+			unmarshalled: &GetDifficultyCmd{},
 		},
 		{
 			name: "getgenerate",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("getgenerate")
+				return NewCmd("getgenerate")
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewGetGenerateCmd()
+				return NewGetGenerateCmd()
 			},
 			marshalled:   `{"jsonrpc":"1.0","method":"getgenerate","params":[],"id":1}`,
-			unmarshalled: &dcrjson.GetGenerateCmd{},
+			unmarshalled: &GetGenerateCmd{},
 		},
 		{
 			name: "gethashespersec",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("gethashespersec")
+				return NewCmd("gethashespersec")
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewGetHashesPerSecCmd()
+				return NewGetHashesPerSecCmd()
 			},
 			marshalled:   `{"jsonrpc":"1.0","method":"gethashespersec","params":[],"id":1}`,
-			unmarshalled: &dcrjson.GetHashesPerSecCmd{},
+			unmarshalled: &GetHashesPerSecCmd{},
 		},
 		{
 			name: "getinfo",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("getinfo")
+				return NewCmd("getinfo")
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewGetInfoCmd()
+				return NewGetInfoCmd()
 			},
 			marshalled:   `{"jsonrpc":"1.0","method":"getinfo","params":[],"id":1}`,
-			unmarshalled: &dcrjson.GetInfoCmd{},
+			unmarshalled: &GetInfoCmd{},
 		},
 		{
 			name: "getmempoolinfo",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("getmempoolinfo")
+				return NewCmd("getmempoolinfo")
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewGetMempoolInfoCmd()
+				return NewGetMempoolInfoCmd()
 			},
 			marshalled:   `{"jsonrpc":"1.0","method":"getmempoolinfo","params":[],"id":1}`,
-			unmarshalled: &dcrjson.GetMempoolInfoCmd{},
+			unmarshalled: &GetMempoolInfoCmd{},
 		},
 		{
 			name: "getmininginfo",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("getmininginfo")
+				return NewCmd("getmininginfo")
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewGetMiningInfoCmd()
+				return NewGetMiningInfoCmd()
 			},
 			marshalled:   `{"jsonrpc":"1.0","method":"getmininginfo","params":[],"id":1}`,
-			unmarshalled: &dcrjson.GetMiningInfoCmd{},
+			unmarshalled: &GetMiningInfoCmd{},
 		},
 		{
 			name: "getnetworkinfo",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("getnetworkinfo")
+				return NewCmd("getnetworkinfo")
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewGetNetworkInfoCmd()
+				return NewGetNetworkInfoCmd()
 			},
 			marshalled:   `{"jsonrpc":"1.0","method":"getnetworkinfo","params":[],"id":1}`,
-			unmarshalled: &dcrjson.GetNetworkInfoCmd{},
+			unmarshalled: &GetNetworkInfoCmd{},
 		},
 		{
 			name: "getnettotals",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("getnettotals")
+				return NewCmd("getnettotals")
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewGetNetTotalsCmd()
+				return NewGetNetTotalsCmd()
 			},
 			marshalled:   `{"jsonrpc":"1.0","method":"getnettotals","params":[],"id":1}`,
-			unmarshalled: &dcrjson.GetNetTotalsCmd{},
+			unmarshalled: &GetNetTotalsCmd{},
 		},
 		{
 			name: "getnetworkhashps",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("getnetworkhashps")
+				return NewCmd("getnetworkhashps")
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewGetNetworkHashPSCmd(nil, nil)
+				return NewGetNetworkHashPSCmd(nil, nil)
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"getnetworkhashps","params":[],"id":1}`,
-			unmarshalled: &dcrjson.GetNetworkHashPSCmd{
-				Blocks: dcrjson.Int(120),
-				Height: dcrjson.Int(-1),
+			unmarshalled: &GetNetworkHashPSCmd{
+				Blocks: Int(120),
+				Height: Int(-1),
 			},
 		},
 		{
 			name: "getnetworkhashps optional1",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("getnetworkhashps", 200)
+				return NewCmd("getnetworkhashps", 200)
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewGetNetworkHashPSCmd(dcrjson.Int(200), nil)
+				return NewGetNetworkHashPSCmd(Int(200), nil)
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"getnetworkhashps","params":[200],"id":1}`,
-			unmarshalled: &dcrjson.GetNetworkHashPSCmd{
-				Blocks: dcrjson.Int(200),
-				Height: dcrjson.Int(-1),
+			unmarshalled: &GetNetworkHashPSCmd{
+				Blocks: Int(200),
+				Height: Int(-1),
 			},
 		},
 		{
 			name: "getnetworkhashps optional2",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("getnetworkhashps", 200, 123)
+				return NewCmd("getnetworkhashps", 200, 123)
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewGetNetworkHashPSCmd(dcrjson.Int(200), dcrjson.Int(123))
+				return NewGetNetworkHashPSCmd(Int(200), Int(123))
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"getnetworkhashps","params":[200,123],"id":1}`,
-			unmarshalled: &dcrjson.GetNetworkHashPSCmd{
-				Blocks: dcrjson.Int(200),
-				Height: dcrjson.Int(123),
+			unmarshalled: &GetNetworkHashPSCmd{
+				Blocks: Int(200),
+				Height: Int(123),
 			},
 		},
 		{
 			name: "getpeerinfo",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("getpeerinfo")
+				return NewCmd("getpeerinfo")
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewGetPeerInfoCmd()
+				return NewGetPeerInfoCmd()
 			},
 			marshalled:   `{"jsonrpc":"1.0","method":"getpeerinfo","params":[],"id":1}`,
-			unmarshalled: &dcrjson.GetPeerInfoCmd{},
+			unmarshalled: &GetPeerInfoCmd{},
 		},
 		{
 			name: "getrawmempool",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("getrawmempool")
+				return NewCmd("getrawmempool")
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewGetRawMempoolCmd(nil, nil)
+				return NewGetRawMempoolCmd(nil, nil)
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"getrawmempool","params":[],"id":1}`,
-			unmarshalled: &dcrjson.GetRawMempoolCmd{
-				Verbose: dcrjson.Bool(false),
+			unmarshalled: &GetRawMempoolCmd{
+				Verbose: Bool(false),
 			},
 		},
 		{
 			name: "getrawmempool optional",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("getrawmempool", false)
+				return NewCmd("getrawmempool", false)
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewGetRawMempoolCmd(dcrjson.Bool(false), nil)
+				return NewGetRawMempoolCmd(Bool(false), nil)
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"getrawmempool","params":[false],"id":1}`,
-			unmarshalled: &dcrjson.GetRawMempoolCmd{
-				Verbose: dcrjson.Bool(false),
+			unmarshalled: &GetRawMempoolCmd{
+				Verbose: Bool(false),
 			},
 		},
 		{
 			name: "getrawmempool optional 2",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("getrawmempool", false, "all")
+				return NewCmd("getrawmempool", false, "all")
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewGetRawMempoolCmd(dcrjson.Bool(false), dcrjson.String("all"))
+				return NewGetRawMempoolCmd(Bool(false), String("all"))
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"getrawmempool","params":[false,"all"],"id":1}`,
-			unmarshalled: &dcrjson.GetRawMempoolCmd{
-				Verbose: dcrjson.Bool(false),
-				TxType:  dcrjson.String("all"),
+			unmarshalled: &GetRawMempoolCmd{
+				Verbose: Bool(false),
+				TxType:  String("all"),
 			},
 		},
 		{
 			name: "getrawtransaction",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("getrawtransaction", "123")
+				return NewCmd("getrawtransaction", "123")
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewGetRawTransactionCmd("123", nil)
+				return NewGetRawTransactionCmd("123", nil)
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"getrawtransaction","params":["123"],"id":1}`,
-			unmarshalled: &dcrjson.GetRawTransactionCmd{
+			unmarshalled: &GetRawTransactionCmd{
 				Txid:    "123",
-				Verbose: dcrjson.Int(0),
+				Verbose: Int(0),
 			},
 		},
 		{
 			name: "getrawtransaction optional",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("getrawtransaction", "123", 1)
+				return NewCmd("getrawtransaction", "123", 1)
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewGetRawTransactionCmd("123", dcrjson.Int(1))
+				return NewGetRawTransactionCmd("123", Int(1))
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"getrawtransaction","params":["123",1],"id":1}`,
-			unmarshalled: &dcrjson.GetRawTransactionCmd{
+			unmarshalled: &GetRawTransactionCmd{
 				Txid:    "123",
-				Verbose: dcrjson.Int(1),
+				Verbose: Int(1),
 			},
 		},
 		{
 			name: "getstakeversions",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("getstakeversions", "deadbeef", 1)
+				return NewCmd("getstakeversions", "deadbeef", 1)
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewGetStakeVersionsCmd("deadbeef", 1)
+				return NewGetStakeVersionsCmd("deadbeef", 1)
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"getstakeversions","params":["deadbeef",1],"id":1}`,
-			unmarshalled: &dcrjson.GetStakeVersionsCmd{
+			unmarshalled: &GetStakeVersionsCmd{
 				Hash:  "deadbeef",
 				Count: 1,
 			},
@@ -667,381 +665,381 @@ func TestChainSvrCmds(t *testing.T) {
 		{
 			name: "gettxout",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("gettxout", "123", 1)
+				return NewCmd("gettxout", "123", 1)
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewGetTxOutCmd("123", 1, nil)
+				return NewGetTxOutCmd("123", 1, nil)
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"gettxout","params":["123",1],"id":1}`,
-			unmarshalled: &dcrjson.GetTxOutCmd{
+			unmarshalled: &GetTxOutCmd{
 				Txid:           "123",
 				Vout:           1,
-				IncludeMempool: dcrjson.Bool(true),
+				IncludeMempool: Bool(true),
 			},
 		},
 		{
 			name: "gettxout optional",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("gettxout", "123", 1, true)
+				return NewCmd("gettxout", "123", 1, true)
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewGetTxOutCmd("123", 1, dcrjson.Bool(true))
+				return NewGetTxOutCmd("123", 1, Bool(true))
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"gettxout","params":["123",1,true],"id":1}`,
-			unmarshalled: &dcrjson.GetTxOutCmd{
+			unmarshalled: &GetTxOutCmd{
 				Txid:           "123",
 				Vout:           1,
-				IncludeMempool: dcrjson.Bool(true),
+				IncludeMempool: Bool(true),
 			},
 		},
 		{
 			name: "gettxoutsetinfo",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("gettxoutsetinfo")
+				return NewCmd("gettxoutsetinfo")
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewGetTxOutSetInfoCmd()
+				return NewGetTxOutSetInfoCmd()
 			},
 			marshalled:   `{"jsonrpc":"1.0","method":"gettxoutsetinfo","params":[],"id":1}`,
-			unmarshalled: &dcrjson.GetTxOutSetInfoCmd{},
+			unmarshalled: &GetTxOutSetInfoCmd{},
 		},
 		{
 			name: "getvoteinfo",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("getvoteinfo", 1)
+				return NewCmd("getvoteinfo", 1)
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewGetVoteInfoCmd(1)
+				return NewGetVoteInfoCmd(1)
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"getvoteinfo","params":[1],"id":1}`,
-			unmarshalled: &dcrjson.GetVoteInfoCmd{
+			unmarshalled: &GetVoteInfoCmd{
 				Version: 1,
 			},
 		},
 		{
 			name: "getwork",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("getwork")
+				return NewCmd("getwork")
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewGetWorkCmd(nil)
+				return NewGetWorkCmd(nil)
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"getwork","params":[],"id":1}`,
-			unmarshalled: &dcrjson.GetWorkCmd{
+			unmarshalled: &GetWorkCmd{
 				Data: nil,
 			},
 		},
 		{
 			name: "getwork optional",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("getwork", "00112233")
+				return NewCmd("getwork", "00112233")
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewGetWorkCmd(dcrjson.String("00112233"))
+				return NewGetWorkCmd(String("00112233"))
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"getwork","params":["00112233"],"id":1}`,
-			unmarshalled: &dcrjson.GetWorkCmd{
-				Data: dcrjson.String("00112233"),
+			unmarshalled: &GetWorkCmd{
+				Data: String("00112233"),
 			},
 		},
 		{
 			name: "help",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("help")
+				return NewCmd("help")
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewHelpCmd(nil)
+				return NewHelpCmd(nil)
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"help","params":[],"id":1}`,
-			unmarshalled: &dcrjson.HelpCmd{
+			unmarshalled: &HelpCmd{
 				Command: nil,
 			},
 		},
 		{
 			name: "help optional",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("help", "getblock")
+				return NewCmd("help", "getblock")
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewHelpCmd(dcrjson.String("getblock"))
+				return NewHelpCmd(String("getblock"))
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"help","params":["getblock"],"id":1}`,
-			unmarshalled: &dcrjson.HelpCmd{
-				Command: dcrjson.String("getblock"),
+			unmarshalled: &HelpCmd{
+				Command: String("getblock"),
 			},
 		},
 		{
 			name: "node option remove",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("node", dcrjson.NRemove, "1.1.1.1")
+				return NewCmd("node", NRemove, "1.1.1.1")
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewNodeCmd("remove", "1.1.1.1", nil)
+				return NewNodeCmd("remove", "1.1.1.1", nil)
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"node","params":["remove","1.1.1.1"],"id":1}`,
-			unmarshalled: &dcrjson.NodeCmd{
-				SubCmd: dcrjson.NRemove,
+			unmarshalled: &NodeCmd{
+				SubCmd: NRemove,
 				Target: "1.1.1.1",
 			},
 		},
 		{
 			name: "node option disconnect",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("node", dcrjson.NDisconnect, "1.1.1.1")
+				return NewCmd("node", NDisconnect, "1.1.1.1")
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewNodeCmd("disconnect", "1.1.1.1", nil)
+				return NewNodeCmd("disconnect", "1.1.1.1", nil)
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"node","params":["disconnect","1.1.1.1"],"id":1}`,
-			unmarshalled: &dcrjson.NodeCmd{
-				SubCmd: dcrjson.NDisconnect,
+			unmarshalled: &NodeCmd{
+				SubCmd: NDisconnect,
 				Target: "1.1.1.1",
 			},
 		},
 		{
 			name: "node option connect",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("node", dcrjson.NConnect, "1.1.1.1", "perm")
+				return NewCmd("node", NConnect, "1.1.1.1", "perm")
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewNodeCmd("connect", "1.1.1.1", dcrjson.String("perm"))
+				return NewNodeCmd("connect", "1.1.1.1", String("perm"))
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"node","params":["connect","1.1.1.1","perm"],"id":1}`,
-			unmarshalled: &dcrjson.NodeCmd{
-				SubCmd:        dcrjson.NConnect,
+			unmarshalled: &NodeCmd{
+				SubCmd:        NConnect,
 				Target:        "1.1.1.1",
-				ConnectSubCmd: dcrjson.String("perm"),
+				ConnectSubCmd: String("perm"),
 			},
 		},
 		{
 			name: "ping",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("ping")
+				return NewCmd("ping")
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewPingCmd()
+				return NewPingCmd()
 			},
 			marshalled:   `{"jsonrpc":"1.0","method":"ping","params":[],"id":1}`,
-			unmarshalled: &dcrjson.PingCmd{},
+			unmarshalled: &PingCmd{},
 		},
 		{
 			name: "searchrawtransactions",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("searchrawtransactions", "1Address")
+				return NewCmd("searchrawtransactions", "1Address")
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewSearchRawTransactionsCmd("1Address", nil, nil, nil, nil, nil, nil)
+				return NewSearchRawTransactionsCmd("1Address", nil, nil, nil, nil, nil, nil)
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"searchrawtransactions","params":["1Address"],"id":1}`,
-			unmarshalled: &dcrjson.SearchRawTransactionsCmd{
+			unmarshalled: &SearchRawTransactionsCmd{
 				Address:     "1Address",
-				Verbose:     dcrjson.Int(1),
-				Skip:        dcrjson.Int(0),
-				Count:       dcrjson.Int(100),
-				VinExtra:    dcrjson.Int(0),
-				Reverse:     dcrjson.Bool(false),
+				Verbose:     Int(1),
+				Skip:        Int(0),
+				Count:       Int(100),
+				VinExtra:    Int(0),
+				Reverse:     Bool(false),
 				FilterAddrs: nil,
 			},
 		},
 		{
 			name: "searchrawtransactions",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("searchrawtransactions", "1Address", 0)
+				return NewCmd("searchrawtransactions", "1Address", 0)
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewSearchRawTransactionsCmd("1Address",
-					dcrjson.Int(0), nil, nil, nil, nil, nil)
+				return NewSearchRawTransactionsCmd("1Address",
+					Int(0), nil, nil, nil, nil, nil)
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"searchrawtransactions","params":["1Address",0],"id":1}`,
-			unmarshalled: &dcrjson.SearchRawTransactionsCmd{
+			unmarshalled: &SearchRawTransactionsCmd{
 				Address:     "1Address",
-				Verbose:     dcrjson.Int(0),
-				Skip:        dcrjson.Int(0),
-				Count:       dcrjson.Int(100),
-				VinExtra:    dcrjson.Int(0),
-				Reverse:     dcrjson.Bool(false),
+				Verbose:     Int(0),
+				Skip:        Int(0),
+				Count:       Int(100),
+				VinExtra:    Int(0),
+				Reverse:     Bool(false),
 				FilterAddrs: nil,
 			},
 		},
 		{
 			name: "searchrawtransactions",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("searchrawtransactions", "1Address", 0, 5)
+				return NewCmd("searchrawtransactions", "1Address", 0, 5)
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewSearchRawTransactionsCmd("1Address",
-					dcrjson.Int(0), dcrjson.Int(5), nil, nil, nil, nil)
+				return NewSearchRawTransactionsCmd("1Address",
+					Int(0), Int(5), nil, nil, nil, nil)
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"searchrawtransactions","params":["1Address",0,5],"id":1}`,
-			unmarshalled: &dcrjson.SearchRawTransactionsCmd{
+			unmarshalled: &SearchRawTransactionsCmd{
 				Address:     "1Address",
-				Verbose:     dcrjson.Int(0),
-				Skip:        dcrjson.Int(5),
-				Count:       dcrjson.Int(100),
-				VinExtra:    dcrjson.Int(0),
-				Reverse:     dcrjson.Bool(false),
+				Verbose:     Int(0),
+				Skip:        Int(5),
+				Count:       Int(100),
+				VinExtra:    Int(0),
+				Reverse:     Bool(false),
 				FilterAddrs: nil,
 			},
 		},
 		{
 			name: "searchrawtransactions",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("searchrawtransactions", "1Address", 0, 5, 10)
+				return NewCmd("searchrawtransactions", "1Address", 0, 5, 10)
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewSearchRawTransactionsCmd("1Address",
-					dcrjson.Int(0), dcrjson.Int(5), dcrjson.Int(10), nil, nil, nil)
+				return NewSearchRawTransactionsCmd("1Address",
+					Int(0), Int(5), Int(10), nil, nil, nil)
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"searchrawtransactions","params":["1Address",0,5,10],"id":1}`,
-			unmarshalled: &dcrjson.SearchRawTransactionsCmd{
+			unmarshalled: &SearchRawTransactionsCmd{
 				Address:     "1Address",
-				Verbose:     dcrjson.Int(0),
-				Skip:        dcrjson.Int(5),
-				Count:       dcrjson.Int(10),
-				VinExtra:    dcrjson.Int(0),
-				Reverse:     dcrjson.Bool(false),
+				Verbose:     Int(0),
+				Skip:        Int(5),
+				Count:       Int(10),
+				VinExtra:    Int(0),
+				Reverse:     Bool(false),
 				FilterAddrs: nil,
 			},
 		},
 		{
 			name: "searchrawtransactions",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("searchrawtransactions", "1Address", 0, 5, 10, 1)
+				return NewCmd("searchrawtransactions", "1Address", 0, 5, 10, 1)
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewSearchRawTransactionsCmd("1Address",
-					dcrjson.Int(0), dcrjson.Int(5), dcrjson.Int(10), dcrjson.Int(1), nil, nil)
+				return NewSearchRawTransactionsCmd("1Address",
+					Int(0), Int(5), Int(10), Int(1), nil, nil)
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"searchrawtransactions","params":["1Address",0,5,10,1],"id":1}`,
-			unmarshalled: &dcrjson.SearchRawTransactionsCmd{
+			unmarshalled: &SearchRawTransactionsCmd{
 				Address:     "1Address",
-				Verbose:     dcrjson.Int(0),
-				Skip:        dcrjson.Int(5),
-				Count:       dcrjson.Int(10),
-				VinExtra:    dcrjson.Int(1),
-				Reverse:     dcrjson.Bool(false),
+				Verbose:     Int(0),
+				Skip:        Int(5),
+				Count:       Int(10),
+				VinExtra:    Int(1),
+				Reverse:     Bool(false),
 				FilterAddrs: nil,
 			},
 		},
 		{
 			name: "searchrawtransactions",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("searchrawtransactions", "1Address", 0, 5, 10, 1, true)
+				return NewCmd("searchrawtransactions", "1Address", 0, 5, 10, 1, true)
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewSearchRawTransactionsCmd("1Address",
-					dcrjson.Int(0), dcrjson.Int(5), dcrjson.Int(10),
-					dcrjson.Int(1), dcrjson.Bool(true), nil)
+				return NewSearchRawTransactionsCmd("1Address",
+					Int(0), Int(5), Int(10),
+					Int(1), Bool(true), nil)
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"searchrawtransactions","params":["1Address",0,5,10,1,true],"id":1}`,
-			unmarshalled: &dcrjson.SearchRawTransactionsCmd{
+			unmarshalled: &SearchRawTransactionsCmd{
 				Address:     "1Address",
-				Verbose:     dcrjson.Int(0),
-				Skip:        dcrjson.Int(5),
-				Count:       dcrjson.Int(10),
-				VinExtra:    dcrjson.Int(1),
-				Reverse:     dcrjson.Bool(true),
+				Verbose:     Int(0),
+				Skip:        Int(5),
+				Count:       Int(10),
+				VinExtra:    Int(1),
+				Reverse:     Bool(true),
 				FilterAddrs: nil,
 			},
 		},
 		{
 			name: "searchrawtransactions",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("searchrawtransactions", "1Address", 0, 5, 10, 1, true, []string{"1Address"})
+				return NewCmd("searchrawtransactions", "1Address", 0, 5, 10, 1, true, []string{"1Address"})
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewSearchRawTransactionsCmd("1Address",
-					dcrjson.Int(0), dcrjson.Int(5), dcrjson.Int(10),
-					dcrjson.Int(1), dcrjson.Bool(true), &[]string{"1Address"})
+				return NewSearchRawTransactionsCmd("1Address",
+					Int(0), Int(5), Int(10),
+					Int(1), Bool(true), &[]string{"1Address"})
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"searchrawtransactions","params":["1Address",0,5,10,1,true,["1Address"]],"id":1}`,
-			unmarshalled: &dcrjson.SearchRawTransactionsCmd{
+			unmarshalled: &SearchRawTransactionsCmd{
 				Address:     "1Address",
-				Verbose:     dcrjson.Int(0),
-				Skip:        dcrjson.Int(5),
-				Count:       dcrjson.Int(10),
-				VinExtra:    dcrjson.Int(1),
-				Reverse:     dcrjson.Bool(true),
+				Verbose:     Int(0),
+				Skip:        Int(5),
+				Count:       Int(10),
+				VinExtra:    Int(1),
+				Reverse:     Bool(true),
 				FilterAddrs: &[]string{"1Address"},
 			},
 		},
 		{
 			name: "sendrawtransaction",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("sendrawtransaction", "1122")
+				return NewCmd("sendrawtransaction", "1122")
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewSendRawTransactionCmd("1122", nil)
+				return NewSendRawTransactionCmd("1122", nil)
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"sendrawtransaction","params":["1122"],"id":1}`,
-			unmarshalled: &dcrjson.SendRawTransactionCmd{
+			unmarshalled: &SendRawTransactionCmd{
 				HexTx:         "1122",
-				AllowHighFees: dcrjson.Bool(false),
+				AllowHighFees: Bool(false),
 			},
 		},
 		{
 			name: "sendrawtransaction optional",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("sendrawtransaction", "1122", false)
+				return NewCmd("sendrawtransaction", "1122", false)
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewSendRawTransactionCmd("1122", dcrjson.Bool(false))
+				return NewSendRawTransactionCmd("1122", Bool(false))
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"sendrawtransaction","params":["1122",false],"id":1}`,
-			unmarshalled: &dcrjson.SendRawTransactionCmd{
+			unmarshalled: &SendRawTransactionCmd{
 				HexTx:         "1122",
-				AllowHighFees: dcrjson.Bool(false),
+				AllowHighFees: Bool(false),
 			},
 		},
 		{
 			name: "setgenerate",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("setgenerate", true)
+				return NewCmd("setgenerate", true)
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewSetGenerateCmd(true, nil)
+				return NewSetGenerateCmd(true, nil)
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"setgenerate","params":[true],"id":1}`,
-			unmarshalled: &dcrjson.SetGenerateCmd{
+			unmarshalled: &SetGenerateCmd{
 				Generate:     true,
-				GenProcLimit: dcrjson.Int(-1),
+				GenProcLimit: Int(-1),
 			},
 		},
 		{
 			name: "setgenerate optional",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("setgenerate", true, 6)
+				return NewCmd("setgenerate", true, 6)
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewSetGenerateCmd(true, dcrjson.Int(6))
+				return NewSetGenerateCmd(true, Int(6))
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"setgenerate","params":[true,6],"id":1}`,
-			unmarshalled: &dcrjson.SetGenerateCmd{
+			unmarshalled: &SetGenerateCmd{
 				Generate:     true,
-				GenProcLimit: dcrjson.Int(6),
+				GenProcLimit: Int(6),
 			},
 		},
 		{
 			name: "stop",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("stop")
+				return NewCmd("stop")
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewStopCmd()
+				return NewStopCmd()
 			},
 			marshalled:   `{"jsonrpc":"1.0","method":"stop","params":[],"id":1}`,
-			unmarshalled: &dcrjson.StopCmd{},
+			unmarshalled: &StopCmd{},
 		},
 		{
 			name: "submitblock",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("submitblock", "112233")
+				return NewCmd("submitblock", "112233")
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewSubmitBlockCmd("112233", nil)
+				return NewSubmitBlockCmd("112233", nil)
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"submitblock","params":["112233"],"id":1}`,
-			unmarshalled: &dcrjson.SubmitBlockCmd{
+			unmarshalled: &SubmitBlockCmd{
 				HexBlock: "112233",
 				Options:  nil,
 			},
@@ -1049,18 +1047,18 @@ func TestChainSvrCmds(t *testing.T) {
 		{
 			name: "submitblock optional",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("submitblock", "112233", `{"workid":"12345"}`)
+				return NewCmd("submitblock", "112233", `{"workid":"12345"}`)
 			},
 			staticCmd: func() interface{} {
-				options := dcrjson.SubmitBlockOptions{
+				options := SubmitBlockOptions{
 					WorkID: "12345",
 				}
-				return dcrjson.NewSubmitBlockCmd("112233", &options)
+				return NewSubmitBlockCmd("112233", &options)
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"submitblock","params":["112233",{"workid":"12345"}],"id":1}`,
-			unmarshalled: &dcrjson.SubmitBlockCmd{
+			unmarshalled: &SubmitBlockCmd{
 				HexBlock: "112233",
-				Options: &dcrjson.SubmitBlockOptions{
+				Options: &SubmitBlockOptions{
 					WorkID: "12345",
 				},
 			},
@@ -1068,68 +1066,68 @@ func TestChainSvrCmds(t *testing.T) {
 		{
 			name: "validateaddress",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("validateaddress", "1Address")
+				return NewCmd("validateaddress", "1Address")
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewValidateAddressCmd("1Address")
+				return NewValidateAddressCmd("1Address")
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"validateaddress","params":["1Address"],"id":1}`,
-			unmarshalled: &dcrjson.ValidateAddressCmd{
+			unmarshalled: &ValidateAddressCmd{
 				Address: "1Address",
 			},
 		},
 		{
 			name: "verifychain",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("verifychain")
+				return NewCmd("verifychain")
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewVerifyChainCmd(nil, nil)
+				return NewVerifyChainCmd(nil, nil)
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"verifychain","params":[],"id":1}`,
-			unmarshalled: &dcrjson.VerifyChainCmd{
-				CheckLevel: dcrjson.Int64(3),
-				CheckDepth: dcrjson.Int64(288),
+			unmarshalled: &VerifyChainCmd{
+				CheckLevel: Int64(3),
+				CheckDepth: Int64(288),
 			},
 		},
 		{
 			name: "verifychain optional1",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("verifychain", 2)
+				return NewCmd("verifychain", 2)
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewVerifyChainCmd(dcrjson.Int64(2), nil)
+				return NewVerifyChainCmd(Int64(2), nil)
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"verifychain","params":[2],"id":1}`,
-			unmarshalled: &dcrjson.VerifyChainCmd{
-				CheckLevel: dcrjson.Int64(2),
-				CheckDepth: dcrjson.Int64(288),
+			unmarshalled: &VerifyChainCmd{
+				CheckLevel: Int64(2),
+				CheckDepth: Int64(288),
 			},
 		},
 		{
 			name: "verifychain optional2",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("verifychain", 2, 500)
+				return NewCmd("verifychain", 2, 500)
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewVerifyChainCmd(dcrjson.Int64(2), dcrjson.Int64(500))
+				return NewVerifyChainCmd(Int64(2), Int64(500))
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"verifychain","params":[2,500],"id":1}`,
-			unmarshalled: &dcrjson.VerifyChainCmd{
-				CheckLevel: dcrjson.Int64(2),
-				CheckDepth: dcrjson.Int64(500),
+			unmarshalled: &VerifyChainCmd{
+				CheckLevel: Int64(2),
+				CheckDepth: Int64(500),
 			},
 		},
 		{
 			name: "verifymessage",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("verifymessage", "1Address", "301234", "test")
+				return NewCmd("verifymessage", "1Address", "301234", "test")
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewVerifyMessageCmd("1Address", "301234", "test")
+				return NewVerifyMessageCmd("1Address", "301234", "test")
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"verifymessage","params":["1Address","301234","test"],"id":1}`,
-			unmarshalled: &dcrjson.VerifyMessageCmd{
+			unmarshalled: &VerifyMessageCmd{
 				Address:   "1Address",
 				Signature: "301234",
 				Message:   "test",
@@ -1141,7 +1139,7 @@ func TestChainSvrCmds(t *testing.T) {
 	for i, test := range tests {
 		// Marshal the command as created by the new static command
 		// creation function.
-		marshalled, err := dcrjson.MarshalCmd("1.0", testID, test.staticCmd())
+		marshalled, err := MarshalCmd("1.0", testID, test.staticCmd())
 		if err != nil {
 			t.Errorf("MarshalCmd #%d (%s) unexpected error: %v", i,
 				test.name, err)
@@ -1166,7 +1164,7 @@ func TestChainSvrCmds(t *testing.T) {
 
 		// Marshal the command as created by the generic new command
 		// creation function.
-		marshalled, err = dcrjson.MarshalCmd("1.0", testID, cmd)
+		marshalled, err = MarshalCmd("1.0", testID, cmd)
 		if err != nil {
 			t.Errorf("MarshalCmd #%d (%s) unexpected error: %v", i,
 				test.name, err)
@@ -1180,7 +1178,7 @@ func TestChainSvrCmds(t *testing.T) {
 			continue
 		}
 
-		var request dcrjson.Request
+		var request Request
 		if err := json.Unmarshal(marshalled, &request); err != nil {
 			t.Errorf("Test #%d (%s) unexpected error while "+
 				"unmarshalling JSON-RPC request: %v", i,
@@ -1188,7 +1186,7 @@ func TestChainSvrCmds(t *testing.T) {
 			continue
 		}
 
-		cmd, err = dcrjson.UnmarshalCmd(&request)
+		cmd, err = UnmarshalCmd(&request)
 		if err != nil {
 			t.Errorf("UnmarshalCmd #%d (%s) unexpected error: %v", i,
 				test.name, err)
@@ -1218,21 +1216,21 @@ func TestChainSvrCmdErrors(t *testing.T) {
 	}{
 		{
 			name:       "template request with invalid type",
-			result:     &dcrjson.TemplateRequest{},
+			result:     &TemplateRequest{},
 			marshalled: `{"mode":1}`,
 			err:        &json.UnmarshalTypeError{},
 		},
 		{
 			name:       "invalid template request sigoplimit field",
-			result:     &dcrjson.TemplateRequest{},
+			result:     &TemplateRequest{},
 			marshalled: `{"sigoplimit":"invalid"}`,
-			err:        dcrjson.Error{Code: dcrjson.ErrInvalidType},
+			err:        Error{Code: ErrInvalidType},
 		},
 		{
 			name:       "invalid template request sizelimit field",
-			result:     &dcrjson.TemplateRequest{},
+			result:     &TemplateRequest{},
 			marshalled: `{"sizelimit":"invalid"}`,
-			err:        dcrjson.Error{Code: dcrjson.ErrInvalidType},
+			err:        Error{Code: ErrInvalidType},
 		},
 	}
 
@@ -1245,8 +1243,8 @@ func TestChainSvrCmdErrors(t *testing.T) {
 			continue
 		}
 
-		if terr, ok := test.err.(dcrjson.Error); ok {
-			gotErrorCode := err.(dcrjson.Error).Code
+		if terr, ok := test.err.(Error); ok {
+			gotErrorCode := err.(Error).Code
 			if gotErrorCode != terr.Code {
 				t.Errorf("Test #%d (%s) mismatched error code "+
 					"- got %v (%v), want %v", i, test.name,

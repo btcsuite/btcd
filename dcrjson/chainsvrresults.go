@@ -590,7 +590,7 @@ func (v *Vin) IsCoinBase() bool {
 	return len(v.Coinbase) > 0
 }
 
-// IsStakebase returns a bool to show if a Vin is a StakeBase one or not.
+// IsStakeBase returns a bool to show if a Vin is a StakeBase one or not.
 func (v *Vin) IsStakeBase() bool {
 	return len(v.Stakebase) > 0
 }
@@ -679,7 +679,7 @@ func (v *VinPrevOut) IsCoinBase() bool {
 	return len(v.Coinbase) > 0
 }
 
-// IsStakebase returns a bool to show if a Vin is a StakeBase one or not.
+// IsStakeBase returns a bool to show if a Vin is a StakeBase one or not.
 func (v *VinPrevOut) IsStakeBase() bool {
 	return len(v.Stakebase) > 0
 }

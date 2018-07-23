@@ -3,7 +3,7 @@
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package dcrjson_test
+package dcrjson
 
 import (
 	"bytes"
@@ -11,8 +11,6 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
-
-	"github.com/decred/dcrd/dcrjson"
 )
 
 // TestChainSvrWsCmds tests all of the chain server websocket-specific commands
@@ -33,127 +31,127 @@ func TestChainSvrWsCmds(t *testing.T) {
 		{
 			name: "authenticate",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("authenticate", "user", "pass")
+				return NewCmd("authenticate", "user", "pass")
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewAuthenticateCmd("user", "pass")
+				return NewAuthenticateCmd("user", "pass")
 			},
 			marshalled:   `{"jsonrpc":"1.0","method":"authenticate","params":["user","pass"],"id":1}`,
-			unmarshalled: &dcrjson.AuthenticateCmd{Username: "user", Passphrase: "pass"},
+			unmarshalled: &AuthenticateCmd{Username: "user", Passphrase: "pass"},
 		},
 		{
 			name: "notifywinningtickets",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("notifywinningtickets")
+				return NewCmd("notifywinningtickets")
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewNotifyWinningTicketsCmd()
+				return NewNotifyWinningTicketsCmd()
 			},
 			marshalled:   `{"jsonrpc":"1.0","method":"notifywinningtickets","params":[],"id":1}`,
-			unmarshalled: &dcrjson.NotifyWinningTicketsCmd{},
+			unmarshalled: &NotifyWinningTicketsCmd{},
 		},
 		{
 			name: "notifyspentandmissedtickets",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("notifyspentandmissedtickets")
+				return NewCmd("notifyspentandmissedtickets")
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewNotifySpentAndMissedTicketsCmd()
+				return NewNotifySpentAndMissedTicketsCmd()
 			},
 			marshalled:   `{"jsonrpc":"1.0","method":"notifyspentandmissedtickets","params":[],"id":1}`,
-			unmarshalled: &dcrjson.NotifySpentAndMissedTicketsCmd{},
+			unmarshalled: &NotifySpentAndMissedTicketsCmd{},
 		},
 		{
 			name: "notifynewtickets",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("notifynewtickets")
+				return NewCmd("notifynewtickets")
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewNotifyNewTicketsCmd()
+				return NewNotifyNewTicketsCmd()
 			},
 			marshalled:   `{"jsonrpc":"1.0","method":"notifynewtickets","params":[],"id":1}`,
-			unmarshalled: &dcrjson.NotifyNewTicketsCmd{},
+			unmarshalled: &NotifyNewTicketsCmd{},
 		},
 		{
 			name: "notifystakedifficulty",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("notifystakedifficulty")
+				return NewCmd("notifystakedifficulty")
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewNotifyStakeDifficultyCmd()
+				return NewNotifyStakeDifficultyCmd()
 			},
 			marshalled:   `{"jsonrpc":"1.0","method":"notifystakedifficulty","params":[],"id":1}`,
-			unmarshalled: &dcrjson.NotifyStakeDifficultyCmd{},
+			unmarshalled: &NotifyStakeDifficultyCmd{},
 		},
 		{
 			name: "notifyblocks",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("notifyblocks")
+				return NewCmd("notifyblocks")
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewNotifyBlocksCmd()
+				return NewNotifyBlocksCmd()
 			},
 			marshalled:   `{"jsonrpc":"1.0","method":"notifyblocks","params":[],"id":1}`,
-			unmarshalled: &dcrjson.NotifyBlocksCmd{},
+			unmarshalled: &NotifyBlocksCmd{},
 		},
 		{
 			name: "stopnotifyblocks",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("stopnotifyblocks")
+				return NewCmd("stopnotifyblocks")
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewStopNotifyBlocksCmd()
+				return NewStopNotifyBlocksCmd()
 			},
 			marshalled:   `{"jsonrpc":"1.0","method":"stopnotifyblocks","params":[],"id":1}`,
-			unmarshalled: &dcrjson.StopNotifyBlocksCmd{},
+			unmarshalled: &StopNotifyBlocksCmd{},
 		},
 		{
 			name: "notifynewtransactions",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("notifynewtransactions")
+				return NewCmd("notifynewtransactions")
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewNotifyNewTransactionsCmd(nil)
+				return NewNotifyNewTransactionsCmd(nil)
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"notifynewtransactions","params":[],"id":1}`,
-			unmarshalled: &dcrjson.NotifyNewTransactionsCmd{
-				Verbose: dcrjson.Bool(false),
+			unmarshalled: &NotifyNewTransactionsCmd{
+				Verbose: Bool(false),
 			},
 		},
 		{
 			name: "notifynewtransactions optional",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("notifynewtransactions", true)
+				return NewCmd("notifynewtransactions", true)
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewNotifyNewTransactionsCmd(dcrjson.Bool(true))
+				return NewNotifyNewTransactionsCmd(Bool(true))
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"notifynewtransactions","params":[true],"id":1}`,
-			unmarshalled: &dcrjson.NotifyNewTransactionsCmd{
-				Verbose: dcrjson.Bool(true),
+			unmarshalled: &NotifyNewTransactionsCmd{
+				Verbose: Bool(true),
 			},
 		},
 		{
 			name: "stopnotifynewtransactions",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("stopnotifynewtransactions")
+				return NewCmd("stopnotifynewtransactions")
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewStopNotifyNewTransactionsCmd()
+				return NewStopNotifyNewTransactionsCmd()
 			},
 			marshalled:   `{"jsonrpc":"1.0","method":"stopnotifynewtransactions","params":[],"id":1}`,
-			unmarshalled: &dcrjson.StopNotifyNewTransactionsCmd{},
+			unmarshalled: &StopNotifyNewTransactionsCmd{},
 		},
 		{
 			name: "rescan",
 			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("rescan", "0000000000000000000000000000000000000000000000000000000000000123")
+				return NewCmd("rescan", "0000000000000000000000000000000000000000000000000000000000000123")
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewRescanCmd("0000000000000000000000000000000000000000000000000000000000000123")
+				return NewRescanCmd("0000000000000000000000000000000000000000000000000000000000000123")
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"rescan","params":["0000000000000000000000000000000000000000000000000000000000000123"],"id":1}`,
-			unmarshalled: &dcrjson.RescanCmd{
+			unmarshalled: &RescanCmd{
 				BlockHashes: "0000000000000000000000000000000000000000000000000000000000000123",
 			},
 		},
@@ -163,7 +161,7 @@ func TestChainSvrWsCmds(t *testing.T) {
 	for i, test := range tests {
 		// Marshal the command as created by the new static command
 		// creation function.
-		marshalled, err := dcrjson.MarshalCmd("1.0", testID, test.staticCmd())
+		marshalled, err := MarshalCmd("1.0", testID, test.staticCmd())
 		if err != nil {
 			t.Errorf("MarshalCmd #%d (%s) unexpected error: %v", i,
 				test.name, err)
@@ -187,7 +185,7 @@ func TestChainSvrWsCmds(t *testing.T) {
 
 		// Marshal the command as created by the generic new command
 		// creation function.
-		marshalled, err = dcrjson.MarshalCmd("1.0", testID, cmd)
+		marshalled, err = MarshalCmd("1.0", testID, cmd)
 		if err != nil {
 			t.Errorf("MarshalCmd #%d (%s) unexpected error: %v", i,
 				test.name, err)
@@ -201,7 +199,7 @@ func TestChainSvrWsCmds(t *testing.T) {
 			continue
 		}
 
-		var request dcrjson.Request
+		var request Request
 		if err := json.Unmarshal(marshalled, &request); err != nil {
 			t.Errorf("Test #%d (%s) unexpected error while "+
 				"unmarshalling JSON-RPC request: %v", i,
@@ -209,7 +207,7 @@ func TestChainSvrWsCmds(t *testing.T) {
 			continue
 		}
 
-		cmd, err = dcrjson.UnmarshalCmd(&request)
+		cmd, err = UnmarshalCmd(&request)
 		if err != nil {
 			t.Errorf("UnmarshalCmd #%d (%s) unexpected error: %v", i,
 				test.name, err)
