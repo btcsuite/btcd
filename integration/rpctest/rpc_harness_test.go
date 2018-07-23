@@ -206,7 +206,7 @@ func testJoinMempools(r *Harness, t *testing.T) {
 		t.Fatalf("unable to generate pkscript to addr: %v", err)
 	}
 	output := wire.NewTxOut(5e8, addrScript)
-	testTx, err := r.CreateTransaction([]*wire.TxOut{output}, 10)
+	testTx, err := r.CreateTransaction([]*wire.TxOut{output}, 10, true)
 	if err != nil {
 		t.Fatalf("coinbase spend failed: %v", err)
 	}
@@ -340,7 +340,7 @@ func testGenerateAndSubmitBlock(r *Harness, t *testing.T) {
 	const numTxns = 5
 	txns := make([]*btcutil.Tx, 0, numTxns)
 	for i := 0; i < numTxns; i++ {
-		tx, err := r.CreateTransaction([]*wire.TxOut{output}, 10)
+		tx, err := r.CreateTransaction([]*wire.TxOut{output}, 10, true)
 		if err != nil {
 			t.Fatalf("unable to create tx: %v", err)
 		}
@@ -407,7 +407,7 @@ func testGenerateAndSubmitBlockWithCustomCoinbaseOutputs(r *Harness,
 	const numTxns = 5
 	txns := make([]*btcutil.Tx, 0, numTxns)
 	for i := 0; i < numTxns; i++ {
-		tx, err := r.CreateTransaction([]*wire.TxOut{output}, 10)
+		tx, err := r.CreateTransaction([]*wire.TxOut{output}, 10, true)
 		if err != nil {
 			t.Fatalf("unable to create tx: %v", err)
 		}
@@ -522,7 +522,7 @@ func testMemWalletLockedOutputs(r *Harness, t *testing.T) {
 	}
 	outputAmt := btcutil.Amount(50 * btcutil.SatoshiPerBitcoin)
 	output := wire.NewTxOut(int64(outputAmt), pkScript)
-	tx, err := r.CreateTransaction([]*wire.TxOut{output}, 10)
+	tx, err := r.CreateTransaction([]*wire.TxOut{output}, 10, true)
 	if err != nil {
 		t.Fatalf("unable to create transaction: %v", err)
 	}

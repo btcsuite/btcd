@@ -374,12 +374,15 @@ func (m *memWallet) NewAddress() (btcutil.Address, error) {
 }
 
 // fundTx attempts to fund a transaction sending amt bitcoin. The coins are
-// selected such that the final amount spent pays enough fees as dictated by
-// the passed fee rate. The passed fee rate should be expressed in
-// satoshis-per-byte.
+// selected such that the final amount spent pays enough fees as dictated by the
+// passed fee rate. The passed fee rate should be expressed in
+// satoshis-per-byte. The transaction being funded can optionally include a
+// change output indicated by the change boolean.
 //
 // NOTE: The memWallet's mutex must be held when this function is called.
-func (m *memWallet) fundTx(tx *wire.MsgTx, amt btcutil.Amount, feeRate btcutil.Amount) error {
+func (m *memWallet) fundTx(tx *wire.MsgTx, amt btcutil.Amount,
+	feeRate btcutil.Amount, change bool) error {
+
 	const (
 		// spendSize is the largest number of bytes of a sigScript
 		// which spends a p2pkh output: OP_DATA_73 <sig> OP_DATA_33 <pubkey>
@@ -415,10 +418,11 @@ func (m *memWallet) fundTx(tx *wire.MsgTx, amt btcutil.Amount, feeRate btcutil.A
 			continue
 		}
 
-		// If we have any change left over, then add an additional
-		// output to the transaction reserved for change.
+		// If we have any change left over and we should create a change
+		// output, then add an additional output to the transaction
+		// reserved for it.
 		changeVal := amtSelected - amt - reqFee
-		if changeVal > 0 {
+		if changeVal > 0 && change {
 			addr, err := m.newAddress()
 			if err != nil {
 				return err
@@ -448,7 +452,21 @@ func (m *memWallet) fundTx(tx *wire.MsgTx, amt btcutil.Amount, feeRate btcutil.A
 func (m *memWallet) SendOutputs(outputs []*wire.TxOut,
 	feeRate btcutil.Amount) (*chainhash.Hash, error) {
 
-	tx, err := m.CreateTransaction(outputs, feeRate)
+	tx, err := m.CreateTransaction(outputs, feeRate, true)
+	if err != nil {
+		return nil, err
+	}
+
+	return m.rpc.SendRawTransaction(tx, true)
+}
+
+// SendOutputsWithoutChange creates and sends a transaction that pays to the
+// specified outputs while observing the passed fee rate and ignoring a change
+// output. The passed fee rate should be expressed in sat/b.
+func (m *memWallet) SendOutputsWithoutChange(outputs []*wire.TxOut,
+	feeRate btcutil.Amount) (*chainhash.Hash, error) {
+
+	tx, err := m.CreateTransaction(outputs, feeRate, false)
 	if err != nil {
 		return nil, err
 	}
@@ -458,10 +476,13 @@ func (m *memWallet) SendOutputs(outputs []*wire.TxOut,
 
 // CreateTransaction returns a fully signed transaction paying to the specified
 // outputs while observing the desired fee rate. The passed fee rate should be
-// expressed in satoshis-per-byte.
+// expressed in satoshis-per-byte. The transaction being created can optionally
+// include a change output indicated by the change boolean.
 //
 // This function is safe for concurrent access.
-func (m *memWallet) CreateTransaction(outputs []*wire.TxOut, feeRate btcutil.Amount) (*wire.MsgTx, error) {
+func (m *memWallet) CreateTransaction(outputs []*wire.TxOut,
+	feeRate btcutil.Amount, change bool) (*wire.MsgTx, error) {
+
 	m.Lock()
 	defer m.Unlock()
 
@@ -476,7 +497,7 @@ func (m *memWallet) CreateTransaction(outputs []*wire.TxOut, feeRate btcutil.Amo
 	}
 
 	// Attempt to fund the transaction with spendable utxos.
-	if err := m.fundTx(tx, outputAmt, feeRate); err != nil {
+	if err := m.fundTx(tx, outputAmt, feeRate, change); err != nil {
 		return nil, err
 	}
 
