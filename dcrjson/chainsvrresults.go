@@ -395,7 +395,7 @@ type GetTxOutResult struct {
 
 // Choice models an individual choice inside an Agenda.
 type Choice struct {
-	Id          string  `json:"id"`
+	ID          string  `json:"id"`
 	Description string  `json:"description"`
 	Bits        uint16  `json:"bits"`
 	IsAbstain   bool    `json:"isabstain"`
@@ -406,7 +406,7 @@ type Choice struct {
 
 // Agenda models an individual agenda including its choices.
 type Agenda struct {
-	Id             string   `json:"id"`
+	ID             string   `json:"id"`
 	Description    string   `json:"description"`
 	Mask           uint16   `json:"mask"`
 	StartTime      uint64   `json:"starttime"`

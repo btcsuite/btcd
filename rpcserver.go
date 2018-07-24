@@ -3819,7 +3819,7 @@ func handleGetVoteInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 	result.Agendas = make([]dcrjson.Agenda, 0, len(vi.Agendas))
 	for _, agenda := range vi.Agendas {
 		a := dcrjson.Agenda{
-			Id:          agenda.Vote.Id,
+			ID:          agenda.Vote.Id,
 			Description: agenda.Vote.Description,
 			Mask:        agenda.Vote.Mask,
 			Choices: make([]dcrjson.Choice, 0,
@@ -3831,7 +3831,7 @@ func handleGetVoteInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 		// Handle choices.
 		for _, choice := range agenda.Vote.Choices {
 			c := dcrjson.Choice{
-				Id:          choice.Id,
+				ID:          choice.Id,
 				Description: choice.Description,
 				Bits:        choice.Bits,
 				IsAbstain:   choice.IsAbstain,
