@@ -1065,7 +1065,6 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 		// When the block is not an orphan, log information about it and
 		// update the chain state.
 		b.progressLogger.logBlockHeight(bmsg.block)
-		r := b.server.rpcServer
 
 		onMainChain := !isOrphan && forkLen == 0
 		if onMainChain {
@@ -1099,15 +1098,18 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 				bmgrLog.Warnf("Failed to get next stake difficulty "+
 					"calculation: %v", err)
 			}
-			if r != nil && err == nil {
-				// Update registered websocket clients on the
-				// current stake difficulty.
-				r.ntfnMgr.NotifyStakeDifficulty(
-					&StakeDifficultyNtfnData{
-						best.Hash,
-						best.Height,
-						nextStakeDiff,
-					})
+			if err == nil {
+				r := b.server.rpcServer
+				if r != nil {
+					// Update registered websocket clients on the
+					// current stake difficulty.
+					r.ntfnMgr.NotifyStakeDifficulty(
+						&StakeDifficultyNtfnData{
+							best.Hash,
+							best.Height,
+							nextStakeDiff,
+						})
+				}
 				b.server.txMemPool.PruneStakeTx(nextStakeDiff,
 					best.Height)
 				b.server.txMemPool.PruneExpiredTx(best.Height)
@@ -1664,14 +1666,16 @@ out:
 						bmgrLog.Warnf("Failed to get next stake difficulty "+
 							"calculation: %v", err)
 					}
-					r := b.server.rpcServer
-					if r != nil && errSDiff == nil {
-						r.ntfnMgr.NotifyStakeDifficulty(
-							&StakeDifficultyNtfnData{
-								best.Hash,
-								best.Height,
-								nextStakeDiff,
-							})
+					if errSDiff == nil {
+						r := b.server.rpcServer
+						if r != nil {
+							r.ntfnMgr.NotifyStakeDifficulty(
+								&StakeDifficultyNtfnData{
+									best.Hash,
+									best.Height,
+									nextStakeDiff,
+								})
+						}
 						b.server.txMemPool.PruneStakeTx(nextStakeDiff,
 							best.Height)
 						b.server.txMemPool.PruneExpiredTx(best.Height)
@@ -1747,12 +1751,11 @@ out:
 									nextStakeDiff,
 								})
 						}
+						b.server.txMemPool.PruneStakeTx(nextStakeDiff,
+							best.Height)
+						b.server.txMemPool.PruneExpiredTx(
+							best.Height)
 					}
-
-					b.server.txMemPool.PruneStakeTx(nextStakeDiff,
-						best.Height)
-					b.server.txMemPool.PruneExpiredTx(
-						best.Height)
 
 					missedTickets, err := b.chain.MissedTickets()
 					if err != nil {
