@@ -27,7 +27,7 @@ func zipLocators(locators ...BlockLocator) BlockLocator {
 }
 
 // TestChainView ensures all of the exported functionality of chain views works
-// as intended with the expection of some special cases which are handled in
+// as intended with the execption of some special cases which are handled in
 // other tests.
 func TestChainView(t *testing.T) {
 	// Construct a synthetic block index consisting of the following

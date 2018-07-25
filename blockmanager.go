@@ -1112,7 +1112,7 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 				}
 				b.server.txMemPool.PruneStakeTx(nextStakeDiff,
 					best.Height)
-				b.server.txMemPool.PruneExpiredTx(best.Height)
+				b.server.txMemPool.PruneExpiredTx()
 			}
 
 			winningTickets, poolSize, finalState, err :=
@@ -1678,7 +1678,7 @@ out:
 						}
 						b.server.txMemPool.PruneStakeTx(nextStakeDiff,
 							best.Height)
-						b.server.txMemPool.PruneExpiredTx(best.Height)
+						b.server.txMemPool.PruneExpiredTx()
 					}
 
 					missedTickets, err := b.chain.MissedTickets()
@@ -1753,8 +1753,7 @@ out:
 						}
 						b.server.txMemPool.PruneStakeTx(nextStakeDiff,
 							best.Height)
-						b.server.txMemPool.PruneExpiredTx(
-							best.Height)
+						b.server.txMemPool.PruneExpiredTx()
 					}
 
 					missedTickets, err := b.chain.MissedTickets()

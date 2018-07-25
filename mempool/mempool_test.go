@@ -254,7 +254,7 @@ func (p *poolHarness) CreateCoinbaseTx(blockHeight int64, numOutputs uint32) (*d
 // inputs and generates the provided number of outputs by evenly splitting the
 // total input amount.  All outputs will be to the payment script associated
 // with the harness and all inputs are assumed to do the same.
-func (p *poolHarness) CreateSignedTx(inputs []spendableOutput, numOutputs uint32) (*dcrutil.Tx, error) {
+func (p *poolHarness) CreateSignedTx(inputs []spendableOutput, numOutputs uint32, expiry uint32) (*dcrutil.Tx, error) {
 	// Calculate the total input amount and split it amongst the requested
 	// number of outputs.
 	var totalInput dcrutil.Amount
@@ -265,6 +265,7 @@ func (p *poolHarness) CreateSignedTx(inputs []spendableOutput, numOutputs uint32
 	remainder := int64(totalInput) - amountPerOutput*int64(numOutputs)
 
 	tx := wire.NewMsgTx()
+	tx.Expiry = expiry
 	for _, input := range inputs {
 		tx.AddTxIn(&wire.TxIn{
 			PreviousOutPoint: input.outPoint,
@@ -645,6 +646,83 @@ func TestOrphanEviction(t *testing.T) {
 	// Ensure none of the evicted transactions ended up in the transaction
 	// pool.
 	for _, tx := range evictedTxns {
+		testPoolMembership(tc, tx, false, false)
+	}
+}
+
+// TestExpirationPruning ensures that transactions that expire without being
+// mined are removed.
+func TestExpirationPruning(t *testing.T) {
+	harness, outputs, err := newPoolHarness(&chaincfg.MainNetParams)
+	if err != nil {
+		t.Fatalf("unable to create test pool: %v", err)
+	}
+	tc := &testContext{t, harness}
+
+	// Create and add a transaction with several outputs that spends the first
+	// spendable output provided by the harness and ensure it is not the orphan
+	// pool, is in the transaction pool, and is reported as available.
+	//
+	// These outputs will be used as inputs to transactions with expirations.
+	const numTxns = 5
+	multiOutputTx, err := harness.CreateSignedTx([]spendableOutput{outputs[0]},
+		numTxns, wire.NoExpiryValue)
+	if err != nil {
+		t.Fatalf("unable to create signed tx: %v", err)
+	}
+	acceptedTxns, err := harness.txPool.ProcessTransaction(multiOutputTx,
+		true, false, true)
+	if err != nil {
+		t.Fatalf("ProcessTransaction: failed to accept valid tx: %v", err)
+	}
+	if len(acceptedTxns) != 1 {
+		t.Fatalf("ProcessTransaction: reported %d accepted transactions from "+
+			"what should be 1", len(acceptedTxns))
+	}
+	testPoolMembership(tc, multiOutputTx, false, true)
+
+	// Create several transactions such that each transaction has an expiration
+	// one block after the previous and the first one expires in the block after
+	// the next one.
+	nextBlockHeight := harness.chain.BestHeight() + 1
+	expiringTxns := make([]*dcrutil.Tx, 0, numTxns)
+	for i := 0; i < numTxns; i++ {
+		tx, err := harness.CreateSignedTx([]spendableOutput{
+			txOutToSpendableOut(multiOutputTx, uint32(i)),
+		}, 1, uint32(nextBlockHeight+int64(i)+1))
+		if err != nil {
+			t.Fatalf("unable to create signed tx: %v", err)
+		}
+		expiringTxns = append(expiringTxns, tx)
+	}
+
+	// Ensure expiration pruning is working properly by adding each expiring
+	// transaction just before the point at which it will expire and advancing
+	// the chain so that the transaction becomes expired and thus should be
+	// pruned.
+	for _, tx := range expiringTxns {
+		acceptedTxns, err := harness.txPool.ProcessTransaction(tx, true, false,
+			true)
+		if err != nil {
+			t.Fatalf("ProcessTransaction: failed to accept valid tx: %v", err)
+		}
+
+		// Ensure the transaction was reported as accepted, is not in the orphan
+		// pool, is in the transaction pool, and is reported as available.
+		if len(acceptedTxns) != 1 {
+			t.Fatalf("ProcessTransaction: reported %d accepted transactions "+
+				"from what should be 1", len(acceptedTxns))
+		}
+		testPoolMembership(tc, tx, false, true)
+
+		// Simulate processing a new block that did not mine any of the txns.
+		harness.chain.SetHeight(harness.chain.BestHeight() + 1)
+
+		// Prune any transactions that are now expired and ensure that the tx
+		// that was just added was pruned by checking that it is not in the
+		// orphan pool, not in the transaction pool, and not reported as
+		// available.
+		harness.txPool.PruneExpiredTx()
 		testPoolMembership(tc, tx, false, false)
 	}
 }
