@@ -108,6 +108,12 @@ func (b *BlockChain) fetchStakeNode(node *blockNode) (*stake.Node, error) {
 	detachNodes, attachNodes := b.getReorganizeNodes(node)
 	current := b.bestChain.Tip()
 
+	// Flush any potential unsaved changes to the block index due to the
+	// call to get the reorganize nodes.  Since the best state is not being
+	// being modified, it is safe to ignore any errors here as the changes
+	// will be flushed at that point and those errors are not ignored.
+	b.flushBlockIndexWarnOnly()
+
 	// Move backwards through the main chain, undoing the ticket
 	// treaps for each block.  The database is passed because the
 	// undo data and new tickets data for each block may not yet

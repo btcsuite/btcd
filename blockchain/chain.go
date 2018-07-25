@@ -643,6 +643,9 @@ func (b *BlockChain) isMajorityVersion(minVer int32, startNode *blockNode, numRe
 // passed node is not on a side chain or if the reorganize would involve
 // reorganizing to a known invalid chain.
 //
+// This function may modify the validation state of nodes in the block index
+// without flushing.
+//
 // This function MUST be called with the chain state lock held (for reads).
 func (b *BlockChain) getReorganizeNodes(node *blockNode) (*list.List, *list.List) {
 	// Nothing to detach or attach if there is no node.
@@ -738,6 +741,12 @@ func (b *BlockChain) connectBlock(node *blockNode, block, parent *dcrutil.Block,
 			countSpentOutputs(block, parent))
 	}
 
+	// Write any modified block index entries to the database before
+	// updating the best state.
+	if err := b.index.flush(); err != nil {
+		return err
+	}
+
 	// Generate a new best state snapshot that will be used to update the
 	// database and later memory if all database updates are successful.
 	b.stateLock.RLock()
@@ -769,16 +778,6 @@ func (b *BlockChain) connectBlock(node *blockNode, block, parent *dcrutil.Block,
 	err = b.db.Update(func(dbTx database.Tx) error {
 		// Update best block state.
 		err := dbPutBestState(dbTx, state, node.workSum)
-		if err != nil {
-			return err
-		}
-
-		// Add the block to the block index.  Ultimately the block index
-		// should track modified nodes and persist all of them prior
-		// this point as opposed to unconditionally peristing the node
-		// again.  However, this is needed for now in lieu of that to
-		// ensure the updated status is written to the database.
-		err = dbPutBlockNode(dbTx, node)
 		if err != nil {
 			return err
 		}
@@ -910,6 +909,12 @@ func (b *BlockChain) disconnectBlock(node *blockNode, block, parent *dcrutil.Blo
 		panicf("block %v (height %v) is not the end of the best chain "+
 			"(hash %v, height %v)", node.hash, node.height, tip.hash,
 			tip.height)
+	}
+
+	// Write any modified block index entries to the database before
+	// updating the best state.
+	if err := b.index.flush(); err != nil {
+		return err
 	}
 
 	// Generate a new best state snapshot that will be used to update the
@@ -1061,6 +1066,10 @@ func countNumberOfTransactions(block, parent *dcrutil.Block) uint64 {
 // disconnected must be in reverse order (think of popping them off the end of
 // the chain) and nodes the are being attached must be in forwards order
 // (think pushing them onto the end of the chain).
+//
+// This function may modify the validation state of nodes in the block index
+// without flushing in the case the chain is not able to reorganize due to a
+// block failing to connect.
 //
 // This function MUST be called with the chain state lock held (for writes).
 func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List) error {
@@ -1371,6 +1380,9 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List) error 
 // block hash requested, so long as it matches up with the current organization
 // of the best chain.
 //
+// This function may modify the validation state of nodes in the block index
+// without flushing.
+//
 // This function MUST be called with the chain state lock held (for writes).
 func (b *BlockChain) forceHeadReorganization(formerBest chainhash.Hash, newBest chainhash.Hash) error {
 	if formerBest.IsEqual(&newBest) {
@@ -1464,15 +1476,35 @@ func (b *BlockChain) forceHeadReorganization(formerBest chainhash.Hash, newBest 
 		b.index.SetStatusFlags(newBestNode, statusValid)
 	}
 
+	// Reorganize the chain and flush any potential unsaved changes to the
+	// block index to the database.  It is safe to ignore any flushing
+	// errors here as the only time the index will be modified is if the
+	// block failed to connect.
 	attach, detach := b.getReorganizeNodes(newBestNode)
-	return b.reorganizeChain(attach, detach)
+	err := b.reorganizeChain(attach, detach)
+	b.flushBlockIndexWarnOnly()
+	return err
 }
 
 // ForceHeadReorganization is the exported version of forceHeadReorganization.
 func (b *BlockChain) ForceHeadReorganization(formerBest chainhash.Hash, newBest chainhash.Hash) error {
 	b.chainLock.Lock()
-	defer b.chainLock.Unlock()
-	return b.forceHeadReorganization(formerBest, newBest)
+	err := b.forceHeadReorganization(formerBest, newBest)
+	b.chainLock.Unlock()
+	return err
+}
+
+// flushBlockIndexWarnOnly attempts to flush and modified block index nodes to
+// the database and will log a warning if it fails.
+//
+// NOTE: This MUST only be used in the specific circumstances where failure to
+// flush only results in a worst case scenario of requiring one or more blocks
+// to be validated again.  All other cases must directly call the function on
+// the block index and check the error return accordingly.
+func (b *BlockChain) flushBlockIndexWarnOnly() {
+	if err := b.index.flush(); err != nil {
+		log.Warnf("Unable to flush block index changes to db: %v", err)
+	}
 }
 
 // connectBestChain handles connecting the passed block to the chain while
@@ -1518,17 +1550,24 @@ func (b *BlockChain) connectBestChain(node *blockNode, block, parent *dcrutil.Bl
 		view.SetStakeViewpoint(ViewpointPrevValidInitial)
 		var stxos []spentTxOut
 		if !fastAdd {
-			// Validate the block and set the applicable status
-			// result in the block index.
+			// Validate the block, set the applicable status result
+			// in the block index, and flush the status changes to
+			// the database.  It is safe to ignore any errors when
+			// flushing here as the changes will be flushed when a
+			// valid block is connected, and the worst case scenario
+			// if a block a invalid is it would need to be
+			// revalidated after a restart.
 			err := b.checkConnectBlock(node, block, parent, view,
 				&stxos)
 			if err != nil {
 				if _, ok := err.(RuleError); ok {
 					b.index.SetStatusFlags(node, statusValidateFailed)
+					b.flushBlockIndexWarnOnly()
 				}
 				return 0, err
 			}
 			b.index.SetStatusFlags(node, statusValid)
+			b.flushBlockIndexWarnOnly()
 		}
 
 		// In the fast add case the code to check the block connection
@@ -1598,9 +1637,13 @@ func (b *BlockChain) connectBestChain(node *blockNode, block, parent *dcrutil.Bl
 	// common ancenstor (the point where the chain forked).
 	detachNodes, attachNodes := b.getReorganizeNodes(node)
 
-	// Reorganize the chain.
+	// Reorganize the chain and flush any potential unsaved changes to the
+	// block index to the database.  It is safe to ignore any flushing
+	// errors here as the only time the index will be modified is if the
+	// block failed to connect.
 	log.Infof("REORGANIZE: Block %v is causing a reorganize.", node.hash)
 	err := b.reorganizeChain(detachNodes, attachNodes)
+	b.flushBlockIndexWarnOnly()
 	if err != nil {
 		return 0, err
 	}

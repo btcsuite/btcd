@@ -2615,6 +2615,12 @@ func (b *BlockChain) CheckConnectBlockTemplate(block *dcrutil.Block) error {
 	// just before the requested node.
 	detachNodes, attachNodes := b.getReorganizeNodes(prevNode)
 
+	// Flush any potential unsaved changes to the block index due to the
+	// call to get the reorganize nodes.  Since the best state is not being
+	// modified, it is safe to ignore any errors here as the changes will be
+	// flushed at that point and those errors are not ignored.
+	b.flushBlockIndexWarnOnly()
+
 	view := NewUtxoViewpoint()
 	view.SetBestHash(&tip.hash)
 	view.SetStakeViewpoint(ViewpointPrevValidInitial)

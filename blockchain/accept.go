@@ -142,15 +142,6 @@ func (b *BlockChain) maybeAcceptBlock(block *dcrutil.Block, flags BehaviorFlags)
 	// node.
 	b.pruner.pruneChainIfNeeded()
 
-	// Create a new block node for the block and add it to the block index.
-	// The block could either be on a side chain or the main chain, but it
-	// starts off as a side chain regardless.
-	blockHeader := &block.MsgBlock().Header
-	newNode := newBlockNode(blockHeader, prevNode)
-	newNode.populateTicketInfo(stake.FindSpentTicketsInBlock(block.MsgBlock()))
-	newNode.status = statusDataStored
-	b.index.AddNode(newNode)
-
 	// Insert the block into the database if it's not already there.  Even
 	// though it is possible the block will ultimately fail to connect, it
 	// has already passed all proof-of-work and validity tests which means
@@ -160,19 +151,24 @@ func (b *BlockChain) maybeAcceptBlock(block *dcrutil.Block, flags BehaviorFlags)
 	// expensive connection logic.  It also has some other nice properties
 	// such as making blocks that never become part of the main chain or
 	// blocks that fail to connect available for further analysis.
-	//
-	// Also, store the associated block index entry.
 	err = b.db.Update(func(dbTx database.Tx) error {
-		if err := dbMaybeStoreBlock(dbTx, block); err != nil {
-			return err
-		}
-
-		if err := dbPutBlockNode(dbTx, newNode); err != nil {
-			return err
-		}
-
-		return nil
+		return dbMaybeStoreBlock(dbTx, block)
 	})
+	if err != nil {
+		return 0, err
+	}
+
+	// Create a new block node for the block and add it to the block index.
+	// The block could either be on a side chain or the main chain, but it
+	// starts off as a side chain regardless.
+	blockHeader := &block.MsgBlock().Header
+	newNode := newBlockNode(blockHeader, prevNode)
+	newNode.populateTicketInfo(stake.FindSpentTicketsInBlock(block.MsgBlock()))
+	newNode.status = statusDataStored
+	b.index.AddNode(newNode)
+
+	// Ensure the new block index entry is written to the database.
+	err = b.index.flush()
 	if err != nil {
 		return 0, err
 	}

@@ -312,8 +312,18 @@ type blockIndex struct {
 	db          database.DB
 	chainParams *chaincfg.Params
 
+	// These following fields are protected by the embedded mutex.
+	//
+	// index contains an entry for every known block tracked by the block
+	// index.
+	//
+	// modified contains an entry for all nodes that have been modified
+	// since the last time the index was flushed to disk.
+	//
+	// chainTips contains an entry with the tip of all known side chains.
 	sync.RWMutex
 	index     map[chainhash.Hash]*blockNode
+	modified  map[*blockNode]struct{}
 	chainTips map[int64][]*blockNode
 }
 
@@ -325,6 +335,7 @@ func newBlockIndex(db database.DB, chainParams *chaincfg.Params) *blockIndex {
 		db:          db,
 		chainParams: chainParams,
 		index:       make(map[chainhash.Hash]*blockNode),
+		modified:    make(map[*blockNode]struct{}),
 		chainTips:   make(map[int64][]*blockNode),
 	}
 }
@@ -357,13 +368,14 @@ func (bi *blockIndex) addNode(node *blockNode) {
 	}
 }
 
-// AddNode adds the provided node to the block index.  Duplicate entries are not
-// checked so it is up to caller to avoid adding them.
+// AddNode adds the provided node to the block index and marks it as modified.
+// Duplicate entries are not checked so it is up to caller to avoid adding them.
 //
 // This function is safe for concurrent access.
 func (bi *blockIndex) AddNode(node *blockNode) {
 	bi.Lock()
 	bi.addNode(node)
+	bi.modified[node] = struct{}{}
 	bi.Unlock()
 }
 
@@ -433,6 +445,7 @@ func (bi *blockIndex) NodeStatus(node *blockNode) blockStatus {
 func (bi *blockIndex) SetStatusFlags(node *blockNode, flags blockStatus) {
 	bi.Lock()
 	node.status |= flags
+	bi.modified[node] = struct{}{}
 	bi.Unlock()
 }
 
@@ -443,5 +456,37 @@ func (bi *blockIndex) SetStatusFlags(node *blockNode, flags blockStatus) {
 func (bi *blockIndex) UnsetStatusFlags(node *blockNode, flags blockStatus) {
 	bi.Lock()
 	node.status &^= flags
+	bi.modified[node] = struct{}{}
 	bi.Unlock()
+}
+
+// flush writes all of the modified block nodes to the database and clears the
+// set of modified nodes if it succeeds.
+func (bi *blockIndex) flush() error {
+	// Nothing to flush if there are no modified nodes.
+	bi.Lock()
+	if len(bi.modified) == 0 {
+		bi.Unlock()
+		return nil
+	}
+
+	// Write all of the nodes in the set of modified nodes to the database.
+	err := bi.db.Update(func(dbTx database.Tx) error {
+		for node := range bi.modified {
+			err := dbPutBlockNode(dbTx, node)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		bi.Unlock()
+		return err
+	}
+
+	// Clear the set of modified nodes.
+	bi.modified = make(map[*blockNode]struct{})
+	bi.Unlock()
+	return nil
 }
