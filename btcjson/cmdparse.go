@@ -183,7 +183,7 @@ func typesMaybeCompatible(dest reflect.Type, src reflect.Type) bool {
 		return true
 	}
 
-	// When both types are numeric, they are potentially compatibile.
+	// When both types are numeric, they are potentially compatible.
 	srcKind := src.Kind()
 	destKind := dest.Kind()
 	if isNumeric(destKind) && isNumeric(srcKind) {

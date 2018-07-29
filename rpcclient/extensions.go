@@ -422,7 +422,7 @@ func (c *Client) Session() (*btcjson.SessionResult, error) {
 	return c.SessionAsync().Receive()
 }
 
-// FutureVersionResult is a future promise to delivere the result of a version
+// FutureVersionResult is a future promise to deliver the result of a version
 // RPC invocation (or an applicable error).
 //
 // NOTE: This is a btcsuite extension ported from

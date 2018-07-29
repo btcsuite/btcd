@@ -190,10 +190,10 @@ func chainSetup(dbName string, params *chaincfg.Params) (*BlockChain, func(), er
 // loadUtxoView returns a utxo view loaded from a file.
 func loadUtxoView(filename string) (*UtxoViewpoint, error) {
 	// The utxostore file format is:
-	// <tx hash><serialized utxo len><serialized utxo>
+	// <tx hash><output index><serialized utxo len><serialized utxo>
 	//
-	// The serialized utxo len is a little endian uint32 and the serialized
-	// utxo uses the format described in chainio.go.
+	// The output index and serialized utxo len are little endian uint32s
+	// and the serialized utxo uses the format described in chainio.go.
 
 	filename = filepath.Join("testdata", filename)
 	fi, err := os.Open(filename)
@@ -223,7 +223,14 @@ func loadUtxoView(filename string) (*UtxoViewpoint, error) {
 			return nil, err
 		}
 
-		// Num of serialize utxo entry bytes.
+		// Output index of the utxo entry.
+		var index uint32
+		err = binary.Read(r, binary.LittleEndian, &index)
+		if err != nil {
+			return nil, err
+		}
+
+		// Num of serialized utxo entry bytes.
 		var numBytes uint32
 		err = binary.Read(r, binary.LittleEndian, &numBytes)
 		if err != nil {
@@ -238,14 +245,96 @@ func loadUtxoView(filename string) (*UtxoViewpoint, error) {
 		}
 
 		// Deserialize it and add it to the view.
-		utxoEntry, err := deserializeUtxoEntry(serialized)
+		entry, err := deserializeUtxoEntry(serialized)
 		if err != nil {
 			return nil, err
 		}
-		view.Entries()[hash] = utxoEntry
+		view.Entries()[wire.OutPoint{Hash: hash, Index: index}] = entry
 	}
 
 	return view, nil
+}
+
+// convertUtxoStore reads a utxostore from the legacy format and writes it back
+// out using the latest format.  It is only useful for converting utxostore data
+// used in the tests, which has already been done.  However, the code is left
+// available for future reference.
+func convertUtxoStore(r io.Reader, w io.Writer) error {
+	// The old utxostore file format was:
+	// <tx hash><serialized utxo len><serialized utxo>
+	//
+	// The serialized utxo len was a little endian uint32 and the serialized
+	// utxo uses the format described in upgrade.go.
+
+	littleEndian := binary.LittleEndian
+	for {
+		// Hash of the utxo entry.
+		var hash chainhash.Hash
+		_, err := io.ReadAtLeast(r, hash[:], len(hash[:]))
+		if err != nil {
+			// Expected EOF at the right offset.
+			if err == io.EOF {
+				break
+			}
+			return err
+		}
+
+		// Num of serialized utxo entry bytes.
+		var numBytes uint32
+		err = binary.Read(r, littleEndian, &numBytes)
+		if err != nil {
+			return err
+		}
+
+		// Serialized utxo entry.
+		serialized := make([]byte, numBytes)
+		_, err = io.ReadAtLeast(r, serialized, int(numBytes))
+		if err != nil {
+			return err
+		}
+
+		// Deserialize the entry.
+		entries, err := deserializeUtxoEntryV0(serialized)
+		if err != nil {
+			return err
+		}
+
+		// Loop through all of the utxos and write them out in the new
+		// format.
+		for outputIdx, entry := range entries {
+			// Reserialize the entries using the new format.
+			serialized, err := serializeUtxoEntry(entry)
+			if err != nil {
+				return err
+			}
+
+			// Write the hash of the utxo entry.
+			_, err = w.Write(hash[:])
+			if err != nil {
+				return err
+			}
+
+			// Write the output index of the utxo entry.
+			err = binary.Write(w, littleEndian, outputIdx)
+			if err != nil {
+				return err
+			}
+
+			// Write num of serialized utxo entry bytes.
+			err = binary.Write(w, littleEndian, uint32(len(serialized)))
+			if err != nil {
+				return err
+			}
+
+			// Write the serialized utxo.
+			_, err = w.Write(serialized)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }
 
 // TstSetCoinbaseMaturity makes the ability to set the coinbase maturity
@@ -261,7 +350,7 @@ func (b *BlockChain) TstSetCoinbaseMaturity(maturity uint16) {
 func newFakeChain(params *chaincfg.Params) *BlockChain {
 	// Create a genesis block node and block index index populated with it
 	// for use when creating the fake chain below.
-	node := newBlockNode(&params.GenesisBlock.Header, 0)
+	node := newBlockNode(&params.GenesisBlock.Header, nil)
 	index := newBlockIndex(nil, params)
 	index.AddNode(node)
 
@@ -291,8 +380,5 @@ func newFakeNode(parent *blockNode, blockVersion int32, bits uint32, timestamp t
 		Bits:      bits,
 		Timestamp: timestamp,
 	}
-	node := newBlockNode(header, parent.height+1)
-	node.parent = parent
-	node.workSum.Add(parent.workSum, node.workSum)
-	return node
+	return newBlockNode(header, parent)
 }

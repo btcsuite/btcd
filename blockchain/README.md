@@ -63,7 +63,7 @@ is by no means exhaustive:
 
 * [ProcessBlock Example](http://godoc.org/github.com/btcsuite/btcd/blockchain#example-BlockChain-ProcessBlock)  
   Demonstrates how to create a new chain instance and use ProcessBlock to
-  attempt to attempt add a block to the chain.  This example intentionally
+  attempt to add a block to the chain.  This example intentionally
   attempts to insert a duplicate genesis block to illustrate how an invalid
   block is handled.
 
@@ -73,7 +73,7 @@ is by no means exhaustive:
   typical hex notation.
 
 * [BigToCompact Example](http://godoc.org/github.com/btcsuite/btcd/blockchain#example-BigToCompact)  
-  Demonstrates how to convert how to convert a target difficulty into the
+  Demonstrates how to convert a target difficulty into the
   compact "bits" in a block header which represent that target difficulty.
 
 ## GPG Verification Key

@@ -800,3 +800,167 @@ func TestLocateInventory(t *testing.T) {
 		}
 	}
 }
+
+// TestHeightToHashRange ensures that fetching a range of block hashes by start
+// height and end hash works as expected.
+func TestHeightToHashRange(t *testing.T) {
+	// Construct a synthetic block chain with a block index consisting of
+	// the following structure.
+	// 	genesis -> 1 -> 2 -> ... -> 15 -> 16  -> 17  -> 18
+	// 	                              \-> 16a -> 17a -> 18a (unvalidated)
+	tip := tstTip
+	chain := newFakeChain(&chaincfg.MainNetParams)
+	branch0Nodes := chainedNodes(chain.bestChain.Genesis(), 18)
+	branch1Nodes := chainedNodes(branch0Nodes[14], 3)
+	for _, node := range branch0Nodes {
+		chain.index.SetStatusFlags(node, statusValid)
+		chain.index.AddNode(node)
+	}
+	for _, node := range branch1Nodes {
+		if node.height < 18 {
+			chain.index.SetStatusFlags(node, statusValid)
+		}
+		chain.index.AddNode(node)
+	}
+	chain.bestChain.SetTip(tip(branch0Nodes))
+
+	tests := []struct {
+		name        string
+		startHeight int32            // locator for requested inventory
+		endHash     chainhash.Hash   // stop hash for locator
+		maxResults  int              // max to locate, 0 = wire const
+		hashes      []chainhash.Hash // expected located hashes
+		expectError bool
+	}{
+		{
+			name:        "blocks below tip",
+			startHeight: 11,
+			endHash:     branch0Nodes[14].hash,
+			maxResults:  10,
+			hashes:      nodeHashes(branch0Nodes, 10, 11, 12, 13, 14),
+		},
+		{
+			name:        "blocks on main chain",
+			startHeight: 15,
+			endHash:     branch0Nodes[17].hash,
+			maxResults:  10,
+			hashes:      nodeHashes(branch0Nodes, 14, 15, 16, 17),
+		},
+		{
+			name:        "blocks on stale chain",
+			startHeight: 15,
+			endHash:     branch1Nodes[1].hash,
+			maxResults:  10,
+			hashes: append(nodeHashes(branch0Nodes, 14),
+				nodeHashes(branch1Nodes, 0, 1)...),
+		},
+		{
+			name:        "invalid start height",
+			startHeight: 19,
+			endHash:     branch0Nodes[17].hash,
+			maxResults:  10,
+			expectError: true,
+		},
+		{
+			name:        "too many results",
+			startHeight: 1,
+			endHash:     branch0Nodes[17].hash,
+			maxResults:  10,
+			expectError: true,
+		},
+		{
+			name:        "unvalidated block",
+			startHeight: 15,
+			endHash:     branch1Nodes[2].hash,
+			maxResults:  10,
+			expectError: true,
+		},
+	}
+	for _, test := range tests {
+		hashes, err := chain.HeightToHashRange(test.startHeight, &test.endHash,
+			test.maxResults)
+		if err != nil {
+			if !test.expectError {
+				t.Errorf("%s: unexpected error: %v", test.name, err)
+			}
+			continue
+		}
+
+		if !reflect.DeepEqual(hashes, test.hashes) {
+			t.Errorf("%s: unxpected hashes -- got %v, want %v",
+				test.name, hashes, test.hashes)
+		}
+	}
+}
+
+// TestIntervalBlockHashes ensures that fetching block hashes at specified
+// intervals by end hash works as expected.
+func TestIntervalBlockHashes(t *testing.T) {
+	// Construct a synthetic block chain with a block index consisting of
+	// the following structure.
+	// 	genesis -> 1 -> 2 -> ... -> 15 -> 16  -> 17  -> 18
+	// 	                              \-> 16a -> 17a -> 18a (unvalidated)
+	tip := tstTip
+	chain := newFakeChain(&chaincfg.MainNetParams)
+	branch0Nodes := chainedNodes(chain.bestChain.Genesis(), 18)
+	branch1Nodes := chainedNodes(branch0Nodes[14], 3)
+	for _, node := range branch0Nodes {
+		chain.index.SetStatusFlags(node, statusValid)
+		chain.index.AddNode(node)
+	}
+	for _, node := range branch1Nodes {
+		if node.height < 18 {
+			chain.index.SetStatusFlags(node, statusValid)
+		}
+		chain.index.AddNode(node)
+	}
+	chain.bestChain.SetTip(tip(branch0Nodes))
+
+	tests := []struct {
+		name        string
+		endHash     chainhash.Hash
+		interval    int
+		hashes      []chainhash.Hash
+		expectError bool
+	}{
+		{
+			name:     "blocks on main chain",
+			endHash:  branch0Nodes[17].hash,
+			interval: 8,
+			hashes:   nodeHashes(branch0Nodes, 7, 15),
+		},
+		{
+			name:     "blocks on stale chain",
+			endHash:  branch1Nodes[1].hash,
+			interval: 8,
+			hashes: append(nodeHashes(branch0Nodes, 7),
+				nodeHashes(branch1Nodes, 0)...),
+		},
+		{
+			name:     "no results",
+			endHash:  branch0Nodes[17].hash,
+			interval: 20,
+			hashes:   []chainhash.Hash{},
+		},
+		{
+			name:        "unvalidated block",
+			endHash:     branch1Nodes[2].hash,
+			interval:    8,
+			expectError: true,
+		},
+	}
+	for _, test := range tests {
+		hashes, err := chain.IntervalBlockHashes(&test.endHash, test.interval)
+		if err != nil {
+			if !test.expectError {
+				t.Errorf("%s: unexpected error: %v", test.name, err)
+			}
+			continue
+		}
+
+		if !reflect.DeepEqual(hashes, test.hashes) {
+			t.Errorf("%s: unxpected hashes -- got %v, want %v",
+				test.name, hashes, test.hashes)
+		}
+	}
+}

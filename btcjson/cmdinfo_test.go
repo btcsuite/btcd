@@ -183,7 +183,7 @@ func TestMethodUsageText(t *testing.T) {
 			continue
 		}
 
-		// Get the usage again to excerise caching.
+		// Get the usage again to exercise caching.
 		usage, err = btcjson.MethodUsageText(test.method)
 		if err != nil {
 			t.Errorf("Test #%d (%s) unexpected error: %v", i,

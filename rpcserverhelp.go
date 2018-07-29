@@ -115,6 +115,15 @@ var helpDescsEnUS = map[string]string{
 	"decodescript--synopsis": "Returns a JSON object with information about the provided hex-encoded script.",
 	"decodescript-hexscript": "Hex-encoded script",
 
+	// EstimateFeeCmd help.
+	"estimatefee--synopsis": "Estimate the fee per kilobyte in satoshis " +
+		"required for a transaction to be mined before a certain number of " +
+		"blocks have been generated.",
+	"estimatefee-numblocks": "The maximum number of blocks which can be " +
+		"generated before the transaction is mined.",
+	"estimatefee--result0": "Estimated fee per kilobyte in satoshis for a block to " +
+		"be mined in the next NumBlocks blocks.",
+
 	// GenerateCmd help
 	"generate--synopsis": "Generates a set number of blocks (simnet or regtest only) and returns a JSON\n" +
 		" array of their hashes.",
@@ -196,7 +205,7 @@ var helpDescsEnUS = map[string]string{
 	"txrawresult-confirmations": "Number of confirmations of the block",
 	"txrawresult-time":          "Transaction time in seconds since 1 Jan 1970 GMT",
 	"txrawresult-blocktime":     "Block time in seconds since the 1 Jan 1970 GMT",
-	"txrawresult-size":          "The size of the transation in bytes",
+	"txrawresult-size":          "The size of the transaction in bytes",
 	"txrawresult-vsize":         "The virtual size of the transaction in bytes",
 	"txrawresult-hash":          "The wtxid of the transaction",
 
@@ -221,7 +230,7 @@ var helpDescsEnUS = map[string]string{
 	"getblockverboseresult-size":              "The size of the block",
 	"getblockverboseresult-height":            "The height of the block in the block chain",
 	"getblockverboseresult-version":           "The block version",
-	"getblockverboseresult-versionHex":        "The block version in hexidecimal",
+	"getblockverboseresult-versionHex":        "The block version in hexadecimal",
 	"getblockverboseresult-merkleroot":        "Root hash of the merkle tree",
 	"getblockverboseresult-tx":                "The transaction hashes (only when verbosetx=false)",
 	"getblockverboseresult-rawtx":             "The transactions as JSON objects (only when verbosetx=true)",
@@ -256,7 +265,7 @@ var helpDescsEnUS = map[string]string{
 	"getblockheaderverboseresult-confirmations":     "The number of confirmations",
 	"getblockheaderverboseresult-height":            "The height of the block in the block chain",
 	"getblockheaderverboseresult-version":           "The block version",
-	"getblockheaderverboseresult-versionHex":        "The block version in hexidecimal",
+	"getblockheaderverboseresult-versionHex":        "The block version in hexadecimal",
 	"getblockheaderverboseresult-merkleroot":        "Root hash of the merkle tree",
 	"getblockheaderverboseresult-time":              "The block time in seconds since 1 Jan 1970 GMT",
 	"getblockheaderverboseresult-nonce":             "The block nonce",
@@ -322,6 +331,18 @@ var helpDescsEnUS = map[string]string{
 	"getblocktemplate--condition1": "mode=proposal, rejected",
 	"getblocktemplate--condition2": "mode=proposal, accepted",
 	"getblocktemplate--result1":    "An error string which represents why the proposal was rejected or nothing if accepted",
+
+	// GetCFilterCmd help.
+	"getcfilter--synopsis":  "Returns a block's committed filter given its hash.",
+	"getcfilter-filtertype": "The type of filter to return (0=regular)",
+	"getcfilter-hash":       "The hash of the block",
+	"getcfilter--result0":   "The block's committed filter",
+
+	// GetCFilterHeaderCmd help.
+	"getcfilterheader--synopsis":  "Returns a block's compact filter header given its hash.",
+	"getcfilterheader-filtertype": "The type of filter header to return (0=regular)",
+	"getcfilterheader-hash":       "The hash of the block",
+	"getcfilterheader--result0":   "The block's gcs filter header",
 
 	// GetConnectionCountCmd help.
 	"getconnectioncount--synopsis": "Returns the number of active connections to other peers.",
@@ -658,6 +679,7 @@ var rpcResultTypes = map[string][]interface{}{
 	"debuglevel":            {(*string)(nil), (*string)(nil)},
 	"decoderawtransaction":  {(*btcjson.TxRawDecodeResult)(nil)},
 	"decodescript":          {(*btcjson.DecodeScriptResult)(nil)},
+	"estimatefee":           {(*float64)(nil)},
 	"generate":              {(*[]string)(nil)},
 	"getaddednodeinfo":      {(*[]string)(nil), (*[]btcjson.GetAddedNodeInfoResult)(nil)},
 	"getbestblock":          {(*btcjson.GetBestBlockResult)(nil)},
@@ -668,6 +690,8 @@ var rpcResultTypes = map[string][]interface{}{
 	"getblockheader":        {(*string)(nil), (*btcjson.GetBlockHeaderVerboseResult)(nil)},
 	"getblocktemplate":      {(*btcjson.GetBlockTemplateResult)(nil), (*string)(nil), nil},
 	"getblockchaininfo":     {(*btcjson.GetBlockChainInfoResult)(nil)},
+	"getcfilter":            {(*string)(nil)},
+	"getcfilterheader":      {(*string)(nil)},
 	"getconnectioncount":    {(*int32)(nil)},
 	"getcurrentnet":         {(*uint32)(nil)},
 	"getdifficulty":         {(*float64)(nil)},

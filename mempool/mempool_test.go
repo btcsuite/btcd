@@ -23,7 +23,7 @@ import (
 
 // fakeChain is used by the pool harness to provide generated test utxos and
 // a current faked chain height to the pool callbacks.  This, in turn, allows
-// transations to be appear as though they are spending completely valid utxos.
+// transactions to appear as though they are spending completely valid utxos.
 type fakeChain struct {
 	sync.RWMutex
 	utxos          *blockchain.UtxoViewpoint
@@ -31,10 +31,10 @@ type fakeChain struct {
 	medianTimePast time.Time
 }
 
-// FetchUtxoView loads utxo details about the input transactions referenced by
-// the passed transaction from the point of view of the fake chain.
-// It also attempts to fetch the utxo details for the transaction itself so the
-// returned view can be examined for duplicate unspent transaction outputs.
+// FetchUtxoView loads utxo details about the inputs referenced by the passed
+// transaction from the point of view of the fake chain.  It also attempts to
+// fetch the utxos for the outputs of the transaction itself so the returned
+// view can be examined for duplicate transactions.
 //
 // This function is safe for concurrent access however the returned view is NOT.
 func (s *fakeChain) FetchUtxoView(tx *btcutil.Tx) (*blockchain.UtxoViewpoint, error) {
@@ -46,14 +46,17 @@ func (s *fakeChain) FetchUtxoView(tx *btcutil.Tx) (*blockchain.UtxoViewpoint, er
 
 	// Add an entry for the tx itself to the new view.
 	viewpoint := blockchain.NewUtxoViewpoint()
-	entry := s.utxos.LookupEntry(tx.Hash())
-	viewpoint.Entries()[*tx.Hash()] = entry.Clone()
+	prevOut := wire.OutPoint{Hash: *tx.Hash()}
+	for txOutIdx := range tx.MsgTx().TxOut {
+		prevOut.Index = uint32(txOutIdx)
+		entry := s.utxos.LookupEntry(prevOut)
+		viewpoint.Entries()[prevOut] = entry.Clone()
+	}
 
 	// Add entries for all of the inputs to the tx to the new view.
 	for _, txIn := range tx.MsgTx().TxIn {
-		originHash := &txIn.PreviousOutPoint.Hash
-		entry := s.utxos.LookupEntry(originHash)
-		viewpoint.Entries()[*originHash] = entry.Clone()
+		entry := s.utxos.LookupEntry(txIn.PreviousOutPoint)
+		viewpoint.Entries()[txIn.PreviousOutPoint] = entry.Clone()
 	}
 
 	return viewpoint, nil
@@ -793,4 +796,73 @@ func TestMultiInputOrphanDoubleSpend(t *testing.T) {
 	// Ensure the double spending orphan is no longer in the orphan pool and
 	// was not moved to the transaction pool.
 	testPoolMembership(tc, doubleSpendTx, false, false)
+}
+
+// TestCheckSpend tests that CheckSpend returns the expected spends found in
+// the mempool.
+func TestCheckSpend(t *testing.T) {
+	t.Parallel()
+
+	harness, outputs, err := newPoolHarness(&chaincfg.MainNetParams)
+	if err != nil {
+		t.Fatalf("unable to create test pool: %v", err)
+	}
+
+	// The mempool is empty, so none of the spendable outputs should have a
+	// spend there.
+	for _, op := range outputs {
+		spend := harness.txPool.CheckSpend(op.outPoint)
+		if spend != nil {
+			t.Fatalf("Unexpeced spend found in pool: %v", spend)
+		}
+	}
+
+	// Create a chain of transactions rooted with the first spendable
+	// output provided by the harness.
+	const txChainLength = 5
+	chainedTxns, err := harness.CreateTxChain(outputs[0], txChainLength)
+	if err != nil {
+		t.Fatalf("unable to create transaction chain: %v", err)
+	}
+	for _, tx := range chainedTxns {
+		_, err := harness.txPool.ProcessTransaction(tx, true,
+			false, 0)
+		if err != nil {
+			t.Fatalf("ProcessTransaction: failed to accept "+
+				"tx: %v", err)
+		}
+	}
+
+	// The first tx in the chain should be the spend of the spendable
+	// output.
+	op := outputs[0].outPoint
+	spend := harness.txPool.CheckSpend(op)
+	if spend != chainedTxns[0] {
+		t.Fatalf("expected %v to be spent by %v, instead "+
+			"got %v", op, chainedTxns[0], spend)
+	}
+
+	// Now all but the last tx should be spent by the next.
+	for i := 0; i < len(chainedTxns)-1; i++ {
+		op = wire.OutPoint{
+			Hash:  *chainedTxns[i].Hash(),
+			Index: 0,
+		}
+		expSpend := chainedTxns[i+1]
+		spend = harness.txPool.CheckSpend(op)
+		if spend != expSpend {
+			t.Fatalf("expected %v to be spent by %v, instead "+
+				"got %v", op, expSpend, spend)
+		}
+	}
+
+	// The last tx should have no spend.
+	op = wire.OutPoint{
+		Hash:  *chainedTxns[txChainLength-1].Hash(),
+		Index: 0,
+	}
+	spend = harness.txPool.CheckSpend(op)
+	if spend != nil {
+		t.Fatalf("Unexpeced spend found in pool: %v", spend)
+	}
 }

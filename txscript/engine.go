@@ -821,7 +821,7 @@ func NewEngine(scriptPubKey []byte, tx *wire.MsgTx, txIdx int, flags ScriptFlags
 	}
 
 	// The clean stack flag (ScriptVerifyCleanStack) is not allowed without
-	// either the the pay-to-script-hash (P2SH) evaluation (ScriptBip16)
+	// either the pay-to-script-hash (P2SH) evaluation (ScriptBip16)
 	// flag or the Segregated Witness (ScriptVerifyWitness) flag.
 	//
 	// Recall that evaluating a P2SH script without the flag set results in

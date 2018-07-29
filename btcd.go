@@ -135,6 +135,14 @@ func btcdMain(serverChan chan<- *server) error {
 
 		return nil
 	}
+	if cfg.DropCfIndex {
+		if err := indexers.DropCfIndex(db, interrupt); err != nil {
+			btcdLog.Errorf("%v", err)
+			return err
+		}
+
+		return nil
+	}
 
 	// Create server and start it.
 	server, err := newServer(cfg.Listeners, db, activeNetParams.Params,
@@ -202,10 +210,10 @@ func blockDbPath(dbType string) string {
 	return dbPath
 }
 
-// warnMultipeDBs shows a warning if multiple block database types are detected.
+// warnMultipleDBs shows a warning if multiple block database types are detected.
 // This is not a situation most users want.  It is handy for development however
 // to support multiple side-by-side databases.
-func warnMultipeDBs() {
+func warnMultipleDBs() {
 	// This is intentionally not using the known db types which depend
 	// on the database types compiled into the binary since we want to
 	// detect legacy db types as well.
@@ -253,7 +261,7 @@ func loadBlockDB() (database.DB, error) {
 		return db, nil
 	}
 
-	warnMultipeDBs()
+	warnMultipleDBs()
 
 	// The database name is based on the database type.
 	dbPath := blockDbPath(cfg.DbType)

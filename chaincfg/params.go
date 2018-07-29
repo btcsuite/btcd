@@ -87,12 +87,12 @@ const (
 	DeploymentTestDummy = iota
 
 	// DeploymentCSV defines the rule change deployment ID for the CSV
-	// soft-fork package. The CSV package includes the depolyment of BIPS
+	// soft-fork package. The CSV package includes the deployment of BIPS
 	// 68, 112, and 113.
 	DeploymentCSV
 
 	// DeploymentSegwit defines the rule change deployment ID for the
-	// Segragated Witness (segwit) soft-fork package. The segwit package
+	// Segregated Witness (segwit) soft-fork package. The segwit package
 	// includes the deployment of BIPS 141, 142, 144, 145, 147 and 173.
 	DeploymentSegwit
 
@@ -379,7 +379,7 @@ var RegressionNetParams = Params{
 
 	// Human-readable part for Bech32 encoded segwit addresses, as defined in
 	// BIP 173.
-	Bech32HRPSegwit: "tb", // always tb for test net
+	Bech32HRPSegwit: "bcrt", // always bcrt for reg test net
 
 	// Address encoding magics
 	PubKeyHashAddrID: 0x6f, // starts with m or n

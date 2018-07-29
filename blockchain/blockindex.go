@@ -16,6 +16,50 @@ import (
 	"github.com/btcsuite/btcd/wire"
 )
 
+// blockStatus is a bit field representing the validation state of the block.
+type blockStatus byte
+
+const (
+	// statusDataStored indicates that the block's payload is stored on disk.
+	statusDataStored blockStatus = 1 << iota
+
+	// statusValid indicates that the block has been fully validated.
+	statusValid
+
+	// statusValidateFailed indicates that the block has failed validation.
+	statusValidateFailed
+
+	// statusInvalidAncestor indicates that one of the block's ancestors has
+	// has failed validation, thus the block is also invalid.
+	statusInvalidAncestor
+
+	// statusNone indicates that the block has no validation state flags set.
+	//
+	// NOTE: This must be defined last in order to avoid influencing iota.
+	statusNone blockStatus = 0
+)
+
+// HaveData returns whether the full block data is stored in the database. This
+// will return false for a block node where only the header is downloaded or
+// kept.
+func (status blockStatus) HaveData() bool {
+	return status&statusDataStored != 0
+}
+
+// KnownValid returns whether the block is known to be valid. This will return
+// false for a valid block that has not been fully validated yet.
+func (status blockStatus) KnownValid() bool {
+	return status&statusValid != 0
+}
+
+// KnownInvalid returns whether the block is known to be invalid. This may be
+// because the block itself failed validation or any of its ancestors is
+// invalid. This will return false for invalid blocks that have not been proven
+// invalid yet.
+func (status blockStatus) KnownInvalid() bool {
+	return status&(statusValidateFailed|statusInvalidAncestor) != 0
+}
+
 // blockNode represents a block within the block chain and is primarily used to
 // aid in selecting the best chain to be the main chain.  The main chain is
 // stored into the block database.
@@ -49,35 +93,41 @@ type blockNode struct {
 	nonce      uint32
 	timestamp  int64
 	merkleRoot chainhash.Hash
+
+	// status is a bitfield representing the validation state of the block. The
+	// status field, unlike the other fields, may be written to and so should
+	// only be accessed using the concurrent-safe NodeStatus method on
+	// blockIndex once the node has been added to the global index.
+	status blockStatus
 }
 
-// initBlockNode initializes a block node from the given header and height.  The
-// node is completely disconnected from the chain and the workSum value is just
-// the work for the passed block.  The work sum must be updated accordingly when
-// the node is inserted into a chain.
-//
+// initBlockNode initializes a block node from the given header and parent node,
+// calculating the height and workSum from the respective fields on the parent.
 // This function is NOT safe for concurrent access.  It must only be called when
 // initially creating a node.
-func initBlockNode(node *blockNode, blockHeader *wire.BlockHeader, height int32) {
+func initBlockNode(node *blockNode, blockHeader *wire.BlockHeader, parent *blockNode) {
 	*node = blockNode{
 		hash:       blockHeader.BlockHash(),
 		workSum:    CalcWork(blockHeader.Bits),
-		height:     height,
 		version:    blockHeader.Version,
 		bits:       blockHeader.Bits,
 		nonce:      blockHeader.Nonce,
 		timestamp:  blockHeader.Timestamp.Unix(),
 		merkleRoot: blockHeader.MerkleRoot,
 	}
+	if parent != nil {
+		node.parent = parent
+		node.height = parent.height + 1
+		node.workSum = node.workSum.Add(parent.workSum, node.workSum)
+	}
 }
 
-// newBlockNode returns a new block node for the given block header.  It is
-// completely disconnected from the chain and the workSum value is just the work
-// for the passed block.  The work sum must be updated accordingly when the node
-// is inserted into a chain.
-func newBlockNode(blockHeader *wire.BlockHeader, height int32) *blockNode {
+// newBlockNode returns a new block node for the given block header and parent
+// node, calculating the height and workSum from the respective fields on the
+// parent. This function is NOT safe for concurrent access.
+func newBlockNode(blockHeader *wire.BlockHeader, parent *blockNode) *blockNode {
 	var node blockNode
-	initBlockNode(&node, blockHeader, height)
+	initBlockNode(&node, blockHeader, parent)
 	return &node
 }
 
@@ -86,7 +136,7 @@ func newBlockNode(blockHeader *wire.BlockHeader, height int32) *blockNode {
 // This function is safe for concurrent access.
 func (node *blockNode) Header() wire.BlockHeader {
 	// No lock is needed because all accessed fields are immutable.
-	prevHash := zeroHash
+	prevHash := &zeroHash
 	if node.parent != nil {
 		prevHash = &node.parent.hash
 	}
@@ -181,6 +231,7 @@ type blockIndex struct {
 
 	sync.RWMutex
 	index map[chainhash.Hash]*blockNode
+	dirty map[*blockNode]struct{}
 }
 
 // newBlockIndex returns a new empty instance of a block index.  The index will
@@ -191,6 +242,7 @@ func newBlockIndex(db database.DB, chainParams *chaincfg.Params) *blockIndex {
 		db:          db,
 		chainParams: chainParams,
 		index:       make(map[chainhash.Hash]*blockNode),
+		dirty:       make(map[*blockNode]struct{}),
 	}
 }
 
@@ -215,23 +267,82 @@ func (bi *blockIndex) LookupNode(hash *chainhash.Hash) *blockNode {
 	return node
 }
 
-// AddNode adds the provided node to the block index.  Duplicate entries are not
-// checked so it is up to caller to avoid adding them.
+// AddNode adds the provided node to the block index and marks it as dirty.
+// Duplicate entries are not checked so it is up to caller to avoid adding them.
 //
 // This function is safe for concurrent access.
 func (bi *blockIndex) AddNode(node *blockNode) {
 	bi.Lock()
-	bi.index[node.hash] = node
+	bi.addNode(node)
+	bi.dirty[node] = struct{}{}
 	bi.Unlock()
 }
 
-// RemoveNode removes the provided node from the block index.  There is no check
-// whether another node in the index depends on this one, so it is up to caller
-// to avoid that situation.
+// addNode adds the provided node to the block index, but does not mark it as
+// dirty. This can be used while initializing the block index.
+//
+// This function is NOT safe for concurrent access.
+func (bi *blockIndex) addNode(node *blockNode) {
+	bi.index[node.hash] = node
+}
+
+// NodeStatus provides concurrent-safe access to the status field of a node.
 //
 // This function is safe for concurrent access.
-func (bi *blockIndex) RemoveNode(node *blockNode) {
+func (bi *blockIndex) NodeStatus(node *blockNode) blockStatus {
+	bi.RLock()
+	status := node.status
+	bi.RUnlock()
+	return status
+}
+
+// SetStatusFlags flips the provided status flags on the block node to on,
+// regardless of whether they were on or off previously. This does not unset any
+// flags currently on.
+//
+// This function is safe for concurrent access.
+func (bi *blockIndex) SetStatusFlags(node *blockNode, flags blockStatus) {
 	bi.Lock()
-	delete(bi.index, node.hash)
+	node.status |= flags
+	bi.dirty[node] = struct{}{}
 	bi.Unlock()
+}
+
+// UnsetStatusFlags flips the provided status flags on the block node to off,
+// regardless of whether they were on or off previously.
+//
+// This function is safe for concurrent access.
+func (bi *blockIndex) UnsetStatusFlags(node *blockNode, flags blockStatus) {
+	bi.Lock()
+	node.status &^= flags
+	bi.dirty[node] = struct{}{}
+	bi.Unlock()
+}
+
+// flushToDB writes all dirty block nodes to the database. If all writes
+// succeed, this clears the dirty set.
+func (bi *blockIndex) flushToDB() error {
+	bi.Lock()
+	if len(bi.dirty) == 0 {
+		bi.Unlock()
+		return nil
+	}
+
+	err := bi.db.Update(func(dbTx database.Tx) error {
+		for node := range bi.dirty {
+			err := dbStoreBlockNode(dbTx, node)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+
+	// If write was successful, clear the dirty set.
+	if err == nil {
+		bi.dirty = make(map[*blockNode]struct{})
+	}
+
+	bi.Unlock()
+	return err
 }

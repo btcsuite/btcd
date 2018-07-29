@@ -85,7 +85,7 @@ type thresholdConditionChecker interface {
 
 	// Condition returns whether or not the rule change activation condition
 	// has been met.  This typically involves checking whether or not the
-	// bit assocaited with the condition is set, but can be more complex as
+	// bit associated with the condition is set, but can be more complex as
 	// needed.
 	Condition(*blockNode) (bool, error)
 }

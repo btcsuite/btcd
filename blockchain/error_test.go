@@ -16,6 +16,7 @@ func TestErrorCodeStringer(t *testing.T) {
 	}{
 		{ErrDuplicateBlock, "ErrDuplicateBlock"},
 		{ErrBlockTooBig, "ErrBlockTooBig"},
+		{ErrBlockWeightTooHigh, "ErrBlockWeightTooHigh"},
 		{ErrBlockVersionTooOld, "ErrBlockVersionTooOld"},
 		{ErrInvalidTime, "ErrInvalidTime"},
 		{ErrTimeTooOld, "ErrTimeTooOld"},
@@ -28,7 +29,6 @@ func TestErrorCodeStringer(t *testing.T) {
 		{ErrForkTooOld, "ErrForkTooOld"},
 		{ErrCheckpointTimeTooOld, "ErrCheckpointTimeTooOld"},
 		{ErrNoTransactions, "ErrNoTransactions"},
-		{ErrTooManyTransactions, "ErrTooManyTransactions"},
 		{ErrNoTxInputs, "ErrNoTxInputs"},
 		{ErrNoTxOutputs, "ErrNoTxOutputs"},
 		{ErrTxTooBig, "ErrTxTooBig"},
@@ -52,6 +52,12 @@ func TestErrorCodeStringer(t *testing.T) {
 		{ErrBadCoinbaseHeight, "ErrBadCoinbaseHeight"},
 		{ErrScriptMalformed, "ErrScriptMalformed"},
 		{ErrScriptValidation, "ErrScriptValidation"},
+		{ErrUnexpectedWitness, "ErrUnexpectedWitness"},
+		{ErrInvalidWitnessCommitment, "ErrInvalidWitnessCommitment"},
+		{ErrWitnessCommitmentMismatch, "ErrWitnessCommitmentMismatch"},
+		{ErrPreviousBlockUnknown, "ErrPreviousBlockUnknown"},
+		{ErrInvalidAncestorBlock, "ErrInvalidAncestorBlock"},
+		{ErrPrevBlockNotBest, "ErrPrevBlockNotBest"},
 		{0xffff, "Unknown ErrorCode (65535)"},
 	}
 

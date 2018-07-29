@@ -129,9 +129,9 @@ func IsWitnessProgram(script []byte) bool {
 
 // isWitnessProgram returns true if the passed script is a witness program, and
 // false otherwise. A witness program MUST adhere to the following constraints:
-// there must be excatly two pops (program version and the program itself), the
+// there must be exactly two pops (program version and the program itself), the
 // first opcode MUST be a small integer (0-16), the push data MUST be
-// cannonical, and finally the size of the push data must be between 2 and 40
+// canonical, and finally the size of the push data must be between 2 and 40
 // bytes.
 func isWitnessProgram(pops []parsedOpcode) bool {
 	return len(pops) == 2 &&
@@ -580,6 +580,17 @@ func shallowCopyTx(tx *wire.MsgTx) wire.MsgTx {
 		txCopy.TxOut[i] = &txOuts[i]
 	}
 	return txCopy
+}
+
+// CalcSignatureHash will, given a script and hash type for the current script
+// engine instance, calculate the signature hash to be used for signing and
+// verification.
+func CalcSignatureHash(script []byte, hashType SigHashType, tx *wire.MsgTx, idx int) ([]byte, error) {
+	parsedScript, err := parseScript(script)
+	if err != nil {
+		return nil, fmt.Errorf("cannot parse output script: %v", err)
+	}
+	return calcSignatureHash(parsedScript, hashType, tx, idx), nil
 }
 
 // calcSignatureHash will, given a script and hash type for the current script

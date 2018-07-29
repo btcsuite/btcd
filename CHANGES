@@ -570,8 +570,8 @@ Changes in 0.8.0-beta (Sun May 25 2014)
   - btcctl utility changes:
     - Add createencryptedwallet command
     - Add getblockchaininfo command
-    - Add importwallet commmand
-    - Add addmultisigaddress commmand
+    - Add importwallet command
+    - Add addmultisigaddress command
     - Add setgenerate command
     - Accept --testnet and --wallet flags which automatically select
       the appropriate port and TLS certificates needed to communicate

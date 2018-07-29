@@ -40,7 +40,7 @@ var (
 
 // -----------------------------------------------------------------------------
 // The transaction index consists of an entry for every transaction in the main
-// chain.  In order to significanly optimize the space requirements a separate
+// chain.  In order to significantly optimize the space requirements a separate
 // index which provides an internal mapping between each block that has been
 // indexed and a unique ID for use within the hash to location mappings.  The ID
 // is simply a sequentially incremented uint32.  This is useful because it is
@@ -388,7 +388,9 @@ func (idx *TxIndex) Create(dbTx database.Tx) error {
 // for every transaction in the passed block.
 //
 // This is part of the Indexer interface.
-func (idx *TxIndex) ConnectBlock(dbTx database.Tx, block *btcutil.Block, view *blockchain.UtxoViewpoint) error {
+func (idx *TxIndex) ConnectBlock(dbTx database.Tx, block *btcutil.Block,
+	stxos []blockchain.SpentTxOut) error {
+
 	// Increment the internal block ID to use for the block being connected
 	// and add all of the transactions in the block to the index.
 	newBlockID := idx.curBlockID + 1
@@ -411,7 +413,9 @@ func (idx *TxIndex) ConnectBlock(dbTx database.Tx, block *btcutil.Block, view *b
 // hash-to-transaction mapping for every transaction in the block.
 //
 // This is part of the Indexer interface.
-func (idx *TxIndex) DisconnectBlock(dbTx database.Tx, block *btcutil.Block, view *blockchain.UtxoViewpoint) error {
+func (idx *TxIndex) DisconnectBlock(dbTx database.Tx, block *btcutil.Block,
+	stxos []blockchain.SpentTxOut) error {
+
 	// Remove all of the transactions in the block from the index.
 	if err := dbRemoveTxIndexEntries(dbTx, block); err != nil {
 		return err

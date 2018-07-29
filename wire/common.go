@@ -630,8 +630,8 @@ func WriteVarString(w io.Writer, pver uint32, str string) error {
 // ReadVarBytes reads a variable length byte array.  A byte array is encoded
 // as a varInt containing the length of the array followed by the bytes
 // themselves.  An error is returned if the length is greater than the
-// passed maxAllowed parameter which helps protect against memory exhuastion
-// attacks and forced panics thorugh malformed messages.  The fieldName
+// passed maxAllowed parameter which helps protect against memory exhaustion
+// attacks and forced panics through malformed messages.  The fieldName
 // parameter is only used for the error message so it provides more context in
 // the error.
 func ReadVarBytes(r io.Reader, pver uint32, maxAllowed uint32,

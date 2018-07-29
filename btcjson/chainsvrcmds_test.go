@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/btcsuite/btcd/btcjson"
+	"github.com/btcsuite/btcd/wire"
 )
 
 // TestChainSvrCmds tests all of the chain server commands marshal and unmarshal
@@ -315,6 +316,38 @@ func TestChainSvrCmds(t *testing.T) {
 					SizeLimit:    int64(100000000),
 					MaxVersion:   2,
 				},
+			},
+		},
+		{
+			name: "getcfilter",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("getcfilter", "123",
+					wire.GCSFilterRegular)
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewGetCFilterCmd("123",
+					wire.GCSFilterRegular)
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"getcfilter","params":["123",0],"id":1}`,
+			unmarshalled: &btcjson.GetCFilterCmd{
+				Hash:       "123",
+				FilterType: wire.GCSFilterRegular,
+			},
+		},
+		{
+			name: "getcfilterheader",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("getcfilterheader", "123",
+					wire.GCSFilterRegular)
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewGetCFilterHeaderCmd("123",
+					wire.GCSFilterRegular)
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"getcfilterheader","params":["123",0],"id":1}`,
+			unmarshalled: &btcjson.GetCFilterHeaderCmd{
+				Hash:       "123",
+				FilterType: wire.GCSFilterRegular,
 			},
 		},
 		{
@@ -1158,8 +1191,8 @@ func TestChainSvrCmdErrors(t *testing.T) {
 	for i, test := range tests {
 		err := json.Unmarshal([]byte(test.marshalled), &test.result)
 		if reflect.TypeOf(err) != reflect.TypeOf(test.err) {
-			t.Errorf("Test #%d (%s) wrong error - got %T (%[2]v), "+
-				"want %T", i, test.name, err, test.err)
+			t.Errorf("Test #%d (%s) wrong error - got %T (%v), "+
+				"want %T", i, test.name, err, err, test.err)
 			continue
 		}
 

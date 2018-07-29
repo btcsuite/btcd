@@ -27,16 +27,11 @@ func chainedNodes(parent *blockNode, numNodes int) []*blockNode {
 		// This is invalid, but all that is needed is enough to get the
 		// synthetic tests to work.
 		header := wire.BlockHeader{Nonce: testNoncePrng.Uint32()}
-		height := int32(0)
 		if tip != nil {
 			header.PrevBlock = tip.hash
-			height = tip.height + 1
 		}
-		node := newBlockNode(&header, height)
-		node.parent = tip
-		tip = node
-
-		nodes[i] = node
+		nodes[i] = newBlockNode(&header, tip)
+		tip = nodes[i]
 	}
 	return nodes
 }
@@ -74,7 +69,7 @@ func zipLocators(locators ...BlockLocator) BlockLocator {
 }
 
 // TestChainView ensures all of the exported functionality of chain views works
-// as intended with the expection of some special cases which are handled in
+// as intended with the exception of some special cases which are handled in
 // other tests.
 func TestChainView(t *testing.T) {
 	// Construct a synthetic block index consisting of the following
