@@ -1982,16 +1982,16 @@ func (b *blockManager) handleNotifyMsg(notification *blockchain.Notification) {
 		for _, tx := range parentBlock.Transactions()[1:] {
 			b.server.txMemPool.RemoveTransaction(tx, false)
 			b.server.txMemPool.RemoveDoubleSpends(tx)
-			b.server.txMemPool.RemoveOrphan(tx.Hash())
-			acceptedTxs := b.server.txMemPool.ProcessOrphans(tx.Hash())
+			b.server.txMemPool.RemoveOrphan(tx)
+			acceptedTxs := b.server.txMemPool.ProcessOrphans(tx)
 			b.server.AnnounceNewTransactions(acceptedTxs)
 		}
 
 		for _, stx := range block.STransactions()[0:] {
 			b.server.txMemPool.RemoveTransaction(stx, false)
 			b.server.txMemPool.RemoveDoubleSpends(stx)
-			b.server.txMemPool.RemoveOrphan(stx.Hash())
-			acceptedTxs := b.server.txMemPool.ProcessOrphans(stx.Hash())
+			b.server.txMemPool.RemoveOrphan(stx)
+			acceptedTxs := b.server.txMemPool.ProcessOrphans(stx)
 			b.server.AnnounceNewTransactions(acceptedTxs)
 		}
 
@@ -2069,8 +2069,8 @@ func (b *blockManager) handleNotifyMsg(notification *blockchain.Notification) {
 			for _, tx := range parentBlock.Transactions()[1:] {
 				b.server.txMemPool.RemoveTransaction(tx, false)
 				b.server.txMemPool.RemoveDoubleSpends(tx)
-				b.server.txMemPool.RemoveOrphan(tx.Hash())
-				b.server.txMemPool.ProcessOrphans(tx.Hash())
+				b.server.txMemPool.RemoveOrphan(tx)
+				b.server.txMemPool.ProcessOrphans(tx)
 			}
 		}
 
