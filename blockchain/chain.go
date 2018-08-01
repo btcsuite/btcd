@@ -1242,25 +1242,17 @@ func (b *BlockChain) BestSnapshot() *BestState {
 	return snapshot
 }
 
-// FetchHeader returns the block header identified by the given hash or an error
-// if it doesn't exist.
-func (b *BlockChain) FetchHeader(hash *chainhash.Hash) (wire.BlockHeader, error) {
-	// Reconstruct the header from the block index if possible.
-	if node := b.index.LookupNode(hash); node != nil {
-		return node.Header(), nil
-	}
-
-	// Fall back to loading it from the database.
-	var header *wire.BlockHeader
-	err := b.db.View(func(dbTx database.Tx) error {
-		var err error
-		header, err = dbFetchHeaderByHash(dbTx, hash)
-		return err
-	})
-	if err != nil {
+// HeaderByHash returns the block header identified by the given hash or an
+// error if it doesn't exist. Note that this will return headers from both the
+// main and side chains.
+func (b *BlockChain) HeaderByHash(hash *chainhash.Hash) (wire.BlockHeader, error) {
+	node := b.index.LookupNode(hash)
+	if node == nil {
+		err := fmt.Errorf("block %s is not known", hash)
 		return wire.BlockHeader{}, err
 	}
-	return *header, nil
+
+	return node.Header(), nil
 }
 
 // MainChainHasBlock returns whether or not the block with the given hash is in

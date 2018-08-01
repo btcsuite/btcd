@@ -1320,7 +1320,7 @@ func handleGetBlockHeader(s *rpcServer, cmd interface{}, closeChan <-chan struct
 	if err != nil {
 		return nil, rpcDecodeHexError(c.Hash)
 	}
-	blockHeader, err := s.cfg.Chain.FetchHeader(hash)
+	blockHeader, err := s.cfg.Chain.HeaderByHash(hash)
 	if err != nil {
 		return nil, &btcjson.RPCError{
 			Code:    btcjson.ErrRPCBlockNotFound,
@@ -2442,7 +2442,7 @@ func handleGetNetworkHashPS(s *rpcServer, cmd interface{}, closeChan <-chan stru
 		}
 
 		// Fetch the header from chain.
-		header, err := s.cfg.Chain.FetchHeader(hash)
+		header, err := s.cfg.Chain.HeaderByHash(hash)
 		if err != nil {
 			context := "Failed to fetch block header"
 			return nil, internalRPCError(err.Error(), context)
@@ -2634,7 +2634,7 @@ func handleGetRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan str
 	var chainHeight int32
 	if blkHash != nil {
 		// Fetch the header from chain.
-		header, err := s.cfg.Chain.FetchHeader(blkHash)
+		header, err := s.cfg.Chain.HeaderByHash(blkHash)
 		if err != nil {
 			context := "Failed to fetch block header"
 			return nil, internalRPCError(err.Error(), context)
@@ -3262,7 +3262,7 @@ func handleSearchRawTransactions(s *rpcServer, cmd interface{}, closeChan <-chan
 		var blkHeight int32
 		if blkHash := rtx.blkHash; blkHash != nil {
 			// Fetch the header from chain.
-			header, err := s.cfg.Chain.FetchHeader(blkHash)
+			header, err := s.cfg.Chain.HeaderByHash(blkHash)
 			if err != nil {
 				return nil, &btcjson.RPCError{
 					Code:    btcjson.ErrRPCBlockNotFound,
