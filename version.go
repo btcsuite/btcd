@@ -25,7 +25,7 @@ const (
 // versioning 2.0.0 spec (http://semver.org/).
 const (
 	appMajor uint = 1
-	appMinor uint = 2
+	appMinor uint = 3
 	appPatch uint = 0
 )
 
