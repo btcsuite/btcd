@@ -1,4 +1,5 @@
 // Copyright (c) 2016 The btcsuite developers
+// Copyright (c) 2018 The bcext developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -31,7 +32,7 @@ const (
 	// Intentionally defined here rather than using constants from codebase
 	// to ensure consensus changes are detected.
 	maxBlockSigOps       = 20000
-	maxBlockSize         = 1000000
+	maxBlockSize         = 32000000
 	minCoinbaseScriptLen = 2
 	maxCoinbaseScriptLen = 100
 	medianTimeBlocks     = 11
@@ -309,7 +310,7 @@ func calcMerkleRoot(txns []*wire.MsgTx) chainhash.Hash {
 	for _, tx := range txns {
 		utilTxns = append(utilTxns, btcutil.NewTx(tx))
 	}
-	merkles := blockchain.BuildMerkleTreeStore(utilTxns, false)
+	merkles := blockchain.BuildMerkleTreeStore(utilTxns)
 	return *merkles[len(merkles)-1]
 }
 
@@ -635,10 +636,10 @@ func nonCanonicalVarInt(val uint32) []byte {
 // encoding.
 func encodeNonCanonicalBlock(b *wire.MsgBlock) []byte {
 	var buf bytes.Buffer
-	b.Header.BtcEncode(&buf, 0, wire.BaseEncoding)
+	b.Header.BtcEncode(&buf, 0)
 	buf.Write(nonCanonicalVarInt(uint32(len(b.Transactions))))
 	for _, tx := range b.Transactions {
-		tx.BtcEncode(&buf, 0, wire.BaseEncoding)
+		tx.BtcEncode(&buf, 0)
 	}
 	return buf.Bytes()
 }
@@ -937,7 +938,7 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 	// ---------------------------------------------------------------------
 	// The comments below identify the structure of the chain being built.
 	//
-	// The values in parenthesis repesent which outputs are being spent.
+	// The values in parenthesis represent which outputs are being spent.
 	//
 	// For example, b1(0) indicates the first collected spendable output
 	// which, due to the code above to create the correct number of blocks,
@@ -945,7 +946,7 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 	// to the coinbase maturity requirement.
 	// ---------------------------------------------------------------------
 
-	// Start by building a couple of blocks at current tip (value in parens
+	// Start by building a couple of blocks at current tip (value in parents
 	// is which output is spent):
 	//
 	//   ... -> b1(0) -> b2(1)
@@ -1003,7 +1004,7 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 	// Too much proof-of-work coinbase tests.
 	// ---------------------------------------------------------------------
 
-	// Create a block that generates too coinbase.
+	// Create a block that generates too much coinbase.
 	//
 	//   ... -> b1(0) -> b2(1) -> b5(2) -> b6(3)
 	//                                         \-> b9(4)
@@ -1195,7 +1196,7 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 	accepted()
 
 	// ---------------------------------------------------------------------
-	// Multisig[Verify]/ChecksigVerifiy signature operation count tests.
+	// Multisig[Verify]/ChecksigVerify signature operation count tests.
 	// ---------------------------------------------------------------------
 
 	// Create block with max signature operations as OP_CHECKMULTISIG.
@@ -1335,8 +1336,8 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 			// associated p2sh output in b39.
 			spend := makeSpendableOutForTx(b39.Transactions[i+2], 2)
 			tx := createSpendTx(&spend, lowFee)
-			sig, err := txscript.RawTxInSignature(tx, 0,
-				redeemScript, txscript.SigHashAll, g.privKey)
+			sig, err := txscript.RawTxInSignature(tx, 0, redeemScript,
+				spend.amount, txscript.SigHashAll|txscript.SigHashForkID, g.privKey)
 			if err != nil {
 				panic(err)
 			}
@@ -1366,8 +1367,8 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 		for i := 0; i < txnsNeeded; i++ {
 			spend := makeSpendableOutForTx(b39.Transactions[i+2], 2)
 			tx := createSpendTx(&spend, lowFee)
-			sig, err := txscript.RawTxInSignature(tx, 0,
-				redeemScript, txscript.SigHashAll, g.privKey)
+			sig, err := txscript.RawTxInSignature(tx, 0, redeemScript,
+				spend.amount, txscript.SigHashAll|txscript.SigHashForkID, g.privKey)
 			if err != nil {
 				panic(err)
 			}

@@ -1,4 +1,5 @@
 // Copyright (c) 2014-2016 The btcsuite developers
+// Copyright (c) 2018 The bcext developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -41,10 +42,6 @@ const (
 	// maximum allowed size.
 	ErrBlockTooBig
 
-	// ErrBlockWeightTooHigh indicates that the block's computed weight
-	// metric exceeds the maximum allowed value.
-	ErrBlockWeightTooHigh
-
 	// ErrBlockVersionTooOld indicates the block version is too old and is
 	// no longer accepted since the majority of the network has upgraded
 	// to a newer version.
@@ -73,6 +70,9 @@ const (
 	// valued based on difficulty regarted rules or it is out of the valid
 	// range.
 	ErrUnexpectedDifficulty
+
+	// ErrCalcDifficulty indicates any error when calculating difficulty
+	ErrCalcDifficulty
 
 	// ErrHighHash indicates the block does not hash to a value which is
 	// lower than the required target difficultly.
@@ -195,20 +195,6 @@ const (
 	// the stack.
 	ErrScriptValidation
 
-	// ErrUnexpectedWitness indicates that a block includes transactions
-	// with witness data, but doesn't also have a witness commitment within
-	// the coinbase transaction.
-	ErrUnexpectedWitness
-
-	// ErrInvalidWitnessCommitment indicates that a block's witness
-	// commitment is not well formed.
-	ErrInvalidWitnessCommitment
-
-	// ErrWitnessCommitmentMismatch indicates that the witness commitment
-	// included in the block's coinbase transaction doesn't match the
-	// manually computed witness commitment.
-	ErrWitnessCommitmentMismatch
-
 	// ErrPreviousBlockUnknown indicates that the previous block is not known.
 	ErrPreviousBlockUnknown
 
@@ -224,49 +210,46 @@ const (
 
 // Map of ErrorCode values back to their constant names for pretty printing.
 var errorCodeStrings = map[ErrorCode]string{
-	ErrDuplicateBlock:            "ErrDuplicateBlock",
-	ErrBlockTooBig:               "ErrBlockTooBig",
-	ErrBlockVersionTooOld:        "ErrBlockVersionTooOld",
-	ErrBlockWeightTooHigh:        "ErrBlockWeightTooHigh",
-	ErrInvalidTime:               "ErrInvalidTime",
-	ErrTimeTooOld:                "ErrTimeTooOld",
-	ErrTimeTooNew:                "ErrTimeTooNew",
-	ErrDifficultyTooLow:          "ErrDifficultyTooLow",
-	ErrUnexpectedDifficulty:      "ErrUnexpectedDifficulty",
-	ErrHighHash:                  "ErrHighHash",
-	ErrBadMerkleRoot:             "ErrBadMerkleRoot",
-	ErrBadCheckpoint:             "ErrBadCheckpoint",
-	ErrForkTooOld:                "ErrForkTooOld",
-	ErrCheckpointTimeTooOld:      "ErrCheckpointTimeTooOld",
-	ErrNoTransactions:            "ErrNoTransactions",
-	ErrNoTxInputs:                "ErrNoTxInputs",
-	ErrNoTxOutputs:               "ErrNoTxOutputs",
-	ErrTxTooBig:                  "ErrTxTooBig",
-	ErrBadTxOutValue:             "ErrBadTxOutValue",
-	ErrDuplicateTxInputs:         "ErrDuplicateTxInputs",
-	ErrBadTxInput:                "ErrBadTxInput",
-	ErrMissingTxOut:              "ErrMissingTxOut",
-	ErrUnfinalizedTx:             "ErrUnfinalizedTx",
-	ErrDuplicateTx:               "ErrDuplicateTx",
-	ErrOverwriteTx:               "ErrOverwriteTx",
-	ErrImmatureSpend:             "ErrImmatureSpend",
-	ErrSpendTooHigh:              "ErrSpendTooHigh",
-	ErrBadFees:                   "ErrBadFees",
-	ErrTooManySigOps:             "ErrTooManySigOps",
-	ErrFirstTxNotCoinbase:        "ErrFirstTxNotCoinbase",
-	ErrMultipleCoinbases:         "ErrMultipleCoinbases",
-	ErrBadCoinbaseScriptLen:      "ErrBadCoinbaseScriptLen",
-	ErrBadCoinbaseValue:          "ErrBadCoinbaseValue",
-	ErrMissingCoinbaseHeight:     "ErrMissingCoinbaseHeight",
-	ErrBadCoinbaseHeight:         "ErrBadCoinbaseHeight",
-	ErrScriptMalformed:           "ErrScriptMalformed",
-	ErrScriptValidation:          "ErrScriptValidation",
-	ErrUnexpectedWitness:         "ErrUnexpectedWitness",
-	ErrInvalidWitnessCommitment:  "ErrInvalidWitnessCommitment",
-	ErrWitnessCommitmentMismatch: "ErrWitnessCommitmentMismatch",
-	ErrPreviousBlockUnknown:      "ErrPreviousBlockUnknown",
-	ErrInvalidAncestorBlock:      "ErrInvalidAncestorBlock",
-	ErrPrevBlockNotBest:          "ErrPrevBlockNotBest",
+	ErrDuplicateBlock:        "ErrDuplicateBlock",
+	ErrBlockTooBig:           "ErrBlockTooBig",
+	ErrBlockVersionTooOld:    "ErrBlockVersionTooOld",
+	ErrInvalidTime:           "ErrInvalidTime",
+	ErrTimeTooOld:            "ErrTimeTooOld",
+	ErrTimeTooNew:            "ErrTimeTooNew",
+	ErrDifficultyTooLow:      "ErrDifficultyTooLow",
+	ErrUnexpectedDifficulty:  "ErrUnexpectedDifficulty",
+	ErrCalcDifficulty:        "ErrCalcDifficulty",
+	ErrHighHash:              "ErrHighHash",
+	ErrBadMerkleRoot:         "ErrBadMerkleRoot",
+	ErrBadCheckpoint:         "ErrBadCheckpoint",
+	ErrForkTooOld:            "ErrForkTooOld",
+	ErrCheckpointTimeTooOld:  "ErrCheckpointTimeTooOld",
+	ErrNoTransactions:        "ErrNoTransactions",
+	ErrNoTxInputs:            "ErrNoTxInputs",
+	ErrNoTxOutputs:           "ErrNoTxOutputs",
+	ErrTxTooBig:              "ErrTxTooBig",
+	ErrBadTxOutValue:         "ErrBadTxOutValue",
+	ErrDuplicateTxInputs:     "ErrDuplicateTxInputs",
+	ErrBadTxInput:            "ErrBadTxInput",
+	ErrMissingTxOut:          "ErrMissingTxOut",
+	ErrUnfinalizedTx:         "ErrUnfinalizedTx",
+	ErrDuplicateTx:           "ErrDuplicateTx",
+	ErrOverwriteTx:           "ErrOverwriteTx",
+	ErrImmatureSpend:         "ErrImmatureSpend",
+	ErrSpendTooHigh:          "ErrSpendTooHigh",
+	ErrBadFees:               "ErrBadFees",
+	ErrTooManySigOps:         "ErrTooManySigOps",
+	ErrFirstTxNotCoinbase:    "ErrFirstTxNotCoinbase",
+	ErrMultipleCoinbases:     "ErrMultipleCoinbases",
+	ErrBadCoinbaseScriptLen:  "ErrBadCoinbaseScriptLen",
+	ErrBadCoinbaseValue:      "ErrBadCoinbaseValue",
+	ErrMissingCoinbaseHeight: "ErrMissingCoinbaseHeight",
+	ErrBadCoinbaseHeight:     "ErrBadCoinbaseHeight",
+	ErrScriptMalformed:       "ErrScriptMalformed",
+	ErrScriptValidation:      "ErrScriptValidation",
+	ErrPreviousBlockUnknown:  "ErrPreviousBlockUnknown",
+	ErrInvalidAncestorBlock:  "ErrInvalidAncestorBlock",
+	ErrPrevBlockNotBest:      "ErrPrevBlockNotBest",
 }
 
 // String returns the ErrorCode as a human-readable name.

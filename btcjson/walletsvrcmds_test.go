@@ -1,4 +1,5 @@
 // Copyright (c) 2014 The btcsuite developers
+// Copyright (c) 2018 The bcext developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -59,19 +60,6 @@ func TestWalletSvrCmds(t *testing.T) {
 				NRequired: 2,
 				Keys:      []string{"031234", "035678"},
 				Account:   btcjson.String("test"),
-			},
-		},
-		{
-			name: "addwitnessaddress",
-			newCmd: func() (interface{}, error) {
-				return btcjson.NewCmd("addwitnessaddress", "1address")
-			},
-			staticCmd: func() interface{} {
-				return btcjson.NewAddWitnessAddressCmd("1address")
-			},
-			marshalled: `{"jsonrpc":"1.0","method":"addwitnessaddress","params":["1address"],"id":1}`,
-			unmarshalled: &btcjson.AddWitnessAddressCmd{
-				Address: "1address",
 			},
 		},
 		{

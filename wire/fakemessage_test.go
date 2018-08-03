@@ -1,4 +1,5 @@
 // Copyright (c) 2013-2016 The btcsuite developers
+// Copyright (c) 2018 The bcext developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -17,14 +18,14 @@ type fakeMessage struct {
 
 // BtcDecode doesn't do anything.  It just satisfies the wire.Message
 // interface.
-func (msg *fakeMessage) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) error {
+func (msg *fakeMessage) BtcDecode(r io.Reader, pver uint32) error {
 	return nil
 }
 
 // BtcEncode writes the payload field of the fake message or forces an error
 // if the forceEncodeErr flag of the fake message is set.  It also satisfies the
 // wire.Message interface.
-func (msg *fakeMessage) BtcEncode(w io.Writer, pver uint32, enc MessageEncoding) error {
+func (msg *fakeMessage) BtcEncode(w io.Writer, pver uint32) error {
 	if msg.forceEncodeErr {
 		err := &MessageError{
 			Func:        "fakeMessage.BtcEncode",

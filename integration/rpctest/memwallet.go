@@ -1,4 +1,5 @@
 // Copyright (c) 2016-2017 The btcsuite developers
+// Copyright (c) 2018 The bcext developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -403,7 +404,7 @@ func (m *memWallet) fundTx(tx *wire.MsgTx, amt btcutil.Amount, feeRate btcutil.A
 		// Add the selected output to the transaction, updating the
 		// current tx size while accounting for the size of the future
 		// sigScript.
-		tx.AddTxIn(wire.NewTxIn(&outPoint, nil, nil))
+		tx.AddTxIn(wire.NewTxIn(&outPoint, nil))
 		txSize = tx.SerializeSize() + spendSize*len(tx.TxIn)
 
 		// Calculate the fee required for the txn at this point
@@ -498,8 +499,8 @@ func (m *memWallet) CreateTransaction(outputs []*wire.TxOut, feeRate btcutil.Amo
 			return nil, err
 		}
 
-		sigScript, err := txscript.SignatureScript(tx, i, utxo.pkScript,
-			txscript.SigHashAll, privKey, true)
+		sigScript, err := txscript.SignatureScript(tx, i, utxo.pkScript, utxo.value,
+			txscript.SigHashAll|txscript.SigHashForkID, privKey, true)
 		if err != nil {
 			return nil, err
 		}

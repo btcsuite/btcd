@@ -1,4 +1,5 @@
 // Copyright (c) 2014-2017 The btcsuite developers
+// Copyright (c) 2018 The bcext developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -558,6 +559,12 @@ func NewHelpCmd(command *string) *HelpCmd {
 	}
 }
 
+// RmMempoolTransactionCmd defines the rmmempooltransaction JSON-RPC command.
+type RmMempoolTransactionCmd struct {
+	TxID            string
+	RemoveRedeemers *bool `jsonrpcdefault:"true"`
+}
+
 // InvalidateBlockCmd defines the invalidateblock JSON-RPC command.
 type InvalidateBlockCmd struct {
 	BlockHash string
@@ -725,6 +732,12 @@ func NewValidateAddressCmd(address string) *ValidateAddressCmd {
 	}
 }
 
+// ConvCashAddrCmd defines the convCashAddr JSON-RPC command.
+// transform the address form between bitcoin classic address and bitcoin-abc address
+type ConvCashAddrCmd struct {
+	Address string
+}
+
 // VerifyChainCmd defines the verifychain JSON-RPC command.
 type VerifyChainCmd struct {
 	CheckLevel *int32 `jsonrpcdefault:"3"`
@@ -778,6 +791,7 @@ func init() {
 	flags := UsageFlag(0)
 
 	MustRegisterCmd("addnode", (*AddNodeCmd)(nil), flags)
+	MustRegisterCmd("convcashaddr", (*ConvCashAddrCmd)(nil), flags)
 	MustRegisterCmd("createrawtransaction", (*CreateRawTransactionCmd)(nil), flags)
 	MustRegisterCmd("decoderawtransaction", (*DecodeRawTransactionCmd)(nil), flags)
 	MustRegisterCmd("decodescript", (*DecodeScriptCmd)(nil), flags)
@@ -811,6 +825,7 @@ func init() {
 	MustRegisterCmd("gettxoutsetinfo", (*GetTxOutSetInfoCmd)(nil), flags)
 	MustRegisterCmd("getwork", (*GetWorkCmd)(nil), flags)
 	MustRegisterCmd("help", (*HelpCmd)(nil), flags)
+	MustRegisterCmd("rmmempooltransaction", (*RmMempoolTransactionCmd)(nil), flags)
 	MustRegisterCmd("invalidateblock", (*InvalidateBlockCmd)(nil), flags)
 	MustRegisterCmd("ping", (*PingCmd)(nil), flags)
 	MustRegisterCmd("preciousblock", (*PreciousBlockCmd)(nil), flags)

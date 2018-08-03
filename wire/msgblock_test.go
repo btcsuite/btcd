@@ -1,4 +1,5 @@
 // Copyright (c) 2013-2016 The btcsuite developers
+// Copyright (c) 2018 The bcext developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -36,7 +37,7 @@ func TestBlock(t *testing.T) {
 
 	// Ensure max payload is expected value for latest protocol version.
 	// Num addresses (varInt) + max allowed addresses.
-	wantPayload := uint32(4000000)
+	wantPayload := uint32(64000000)
 	maxPayload := msg.MaxPayloadLength(pver)
 	if maxPayload != wantPayload {
 		t.Errorf("MaxPayloadLength: wrong max payload length for "+
@@ -110,12 +111,11 @@ func TestBlockHash(t *testing.T) {
 // of transaction inputs and outputs and protocol versions.
 func TestBlockWire(t *testing.T) {
 	tests := []struct {
-		in     *MsgBlock       // Message to encode
-		out    *MsgBlock       // Expected decoded message
-		buf    []byte          // Wire encoding
-		txLocs []TxLoc         // Expected transaction locations
-		pver   uint32          // Protocol version for wire encoding
-		enc    MessageEncoding // Message encoding format
+		in     *MsgBlock // Message to encode
+		out    *MsgBlock // Expected decoded message
+		buf    []byte    // Wire encoding
+		txLocs []TxLoc   // Expected transaction locations
+		pver   uint32    // Protocol version for wire encoding
 	}{
 		// Latest protocol version.
 		{
@@ -124,7 +124,6 @@ func TestBlockWire(t *testing.T) {
 			blockOneBytes,
 			blockOneTxLocs,
 			ProtocolVersion,
-			BaseEncoding,
 		},
 
 		// Protocol version BIP0035Version.
@@ -134,7 +133,6 @@ func TestBlockWire(t *testing.T) {
 			blockOneBytes,
 			blockOneTxLocs,
 			BIP0035Version,
-			BaseEncoding,
 		},
 
 		// Protocol version BIP0031Version.
@@ -144,7 +142,6 @@ func TestBlockWire(t *testing.T) {
 			blockOneBytes,
 			blockOneTxLocs,
 			BIP0031Version,
-			BaseEncoding,
 		},
 
 		// Protocol version NetAddressTimeVersion.
@@ -154,7 +151,6 @@ func TestBlockWire(t *testing.T) {
 			blockOneBytes,
 			blockOneTxLocs,
 			NetAddressTimeVersion,
-			BaseEncoding,
 		},
 
 		// Protocol version MultipleAddressVersion.
@@ -164,16 +160,14 @@ func TestBlockWire(t *testing.T) {
 			blockOneBytes,
 			blockOneTxLocs,
 			MultipleAddressVersion,
-			BaseEncoding,
 		},
-		// TODO(roasbeef): add case for witnessy block
 	}
 
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
 		// Encode the message to wire format.
 		var buf bytes.Buffer
-		err := test.in.BtcEncode(&buf, test.pver, test.enc)
+		err := test.in.BtcEncode(&buf, test.pver)
 		if err != nil {
 			t.Errorf("BtcEncode #%d error %v", i, err)
 			continue
@@ -187,7 +181,7 @@ func TestBlockWire(t *testing.T) {
 		// Decode the message from wire format.
 		var msg MsgBlock
 		rbuf := bytes.NewReader(test.buf)
-		err = msg.BtcDecode(rbuf, test.pver, test.enc)
+		err = msg.BtcDecode(rbuf, test.pver)
 		if err != nil {
 			t.Errorf("BtcDecode #%d error %v", i, err)
 			continue
@@ -209,37 +203,36 @@ func TestBlockWireErrors(t *testing.T) {
 	pver := uint32(60002)
 
 	tests := []struct {
-		in       *MsgBlock       // Value to encode
-		buf      []byte          // Wire encoding
-		pver     uint32          // Protocol version for wire encoding
-		enc      MessageEncoding // Message encoding format
-		max      int             // Max size of fixed buffer to induce errors
-		writeErr error           // Expected write error
-		readErr  error           // Expected read error
+		in       *MsgBlock // Value to encode
+		buf      []byte    // Wire encoding
+		pver     uint32    // Protocol version for wire encoding
+		max      int       // Max size of fixed buffer to induce errors
+		writeErr error     // Expected write error
+		readErr  error     // Expected read error
 	}{
 		// Force error in version.
-		{&blockOne, blockOneBytes, pver, BaseEncoding, 0, io.ErrShortWrite, io.EOF},
+		{&blockOne, blockOneBytes, pver, 0, io.ErrShortWrite, io.EOF},
 		// Force error in prev block hash.
-		{&blockOne, blockOneBytes, pver, BaseEncoding, 4, io.ErrShortWrite, io.EOF},
+		{&blockOne, blockOneBytes, pver, 4, io.ErrShortWrite, io.EOF},
 		// Force error in merkle root.
-		{&blockOne, blockOneBytes, pver, BaseEncoding, 36, io.ErrShortWrite, io.EOF},
+		{&blockOne, blockOneBytes, pver, 36, io.ErrShortWrite, io.EOF},
 		// Force error in timestamp.
-		{&blockOne, blockOneBytes, pver, BaseEncoding, 68, io.ErrShortWrite, io.EOF},
+		{&blockOne, blockOneBytes, pver, 68, io.ErrShortWrite, io.EOF},
 		// Force error in difficulty bits.
-		{&blockOne, blockOneBytes, pver, BaseEncoding, 72, io.ErrShortWrite, io.EOF},
+		{&blockOne, blockOneBytes, pver, 72, io.ErrShortWrite, io.EOF},
 		// Force error in header nonce.
-		{&blockOne, blockOneBytes, pver, BaseEncoding, 76, io.ErrShortWrite, io.EOF},
+		{&blockOne, blockOneBytes, pver, 76, io.ErrShortWrite, io.EOF},
 		// Force error in transaction count.
-		{&blockOne, blockOneBytes, pver, BaseEncoding, 80, io.ErrShortWrite, io.EOF},
+		{&blockOne, blockOneBytes, pver, 80, io.ErrShortWrite, io.EOF},
 		// Force error in transactions.
-		{&blockOne, blockOneBytes, pver, BaseEncoding, 81, io.ErrShortWrite, io.EOF},
+		{&blockOne, blockOneBytes, pver, 81, io.ErrShortWrite, io.EOF},
 	}
 
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
 		// Encode to wire format.
 		w := newFixedWriter(test.max)
-		err := test.in.BtcEncode(w, test.pver, test.enc)
+		err := test.in.BtcEncode(w, test.pver)
 		if err != test.writeErr {
 			t.Errorf("BtcEncode #%d wrong error got: %v, want: %v",
 				i, err, test.writeErr)
@@ -249,7 +242,7 @@ func TestBlockWireErrors(t *testing.T) {
 		// Decode from wire format.
 		var msg MsgBlock
 		r := newFixedReader(test.max, test.buf)
-		err = msg.BtcDecode(r, test.pver, test.enc)
+		err = msg.BtcDecode(r, test.pver)
 		if err != test.readErr {
 			t.Errorf("BtcDecode #%d wrong error got: %v, want: %v",
 				i, err, test.readErr)
@@ -396,10 +389,9 @@ func TestBlockOverflowErrors(t *testing.T) {
 	pver := uint32(70001)
 
 	tests := []struct {
-		buf  []byte          // Wire encoding
-		pver uint32          // Protocol version for wire encoding
-		enc  MessageEncoding // Message encoding format
-		err  error           // Expected error
+		buf  []byte // Wire encoding
+		pver uint32 // Protocol version for wire encoding
+		err  error  // Expected error
 	}{
 		// Block that claims to have ~uint64(0) transactions.
 		{
@@ -418,7 +410,7 @@ func TestBlockOverflowErrors(t *testing.T) {
 				0x01, 0xe3, 0x62, 0x99, // Nonce
 				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 				0xff, // TxnCount
-			}, pver, BaseEncoding, &MessageError{},
+			}, pver, &MessageError{},
 		},
 	}
 
@@ -427,7 +419,7 @@ func TestBlockOverflowErrors(t *testing.T) {
 		// Decode from wire format.
 		var msg MsgBlock
 		r := bytes.NewReader(test.buf)
-		err := msg.BtcDecode(r, test.pver, test.enc)
+		err := msg.BtcDecode(r, test.pver)
 		if reflect.TypeOf(err) != reflect.TypeOf(test.err) {
 			t.Errorf("BtcDecode #%d wrong error got: %v, want: %v",
 				i, err, reflect.TypeOf(test.err))

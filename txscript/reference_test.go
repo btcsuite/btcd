@@ -1,4 +1,5 @@
 // Copyright (c) 2013-2017 The btcsuite developers
+// Copyright (c) 2018 The bcext developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -11,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"math"
 	"strconv"
 	"strings"
 	"testing"
@@ -23,16 +25,15 @@ import (
 // scriptTestName returns a descriptive test name for the given reference script
 // test data.
 func scriptTestName(test []interface{}) (string, error) {
-	// Account for any optional leading witness data.
-	var witnessOffset int
+	// Account for any optional leading amount data.
+	var amountOffset int
 	if _, ok := test[0].([]interface{}); ok {
-		witnessOffset++
+		amountOffset++
 	}
 
-	// In addition to the optional leading witness data, the test must
-	// consist of at least a signature script, public key script, flags,
-	// and expected error.  Finally, it may optionally contain a comment.
-	if len(test) < witnessOffset+4 || len(test) > witnessOffset+5 {
+	// \the test must consist of at least a signature script, public key script,
+	// flags, and expected error.  Finally, it may optionally contain a comment.
+	if len(test) < amountOffset+4 || len(test) > amountOffset+5 {
 		return "", fmt.Errorf("invalid test length %d", len(test))
 	}
 
@@ -40,11 +41,11 @@ func scriptTestName(test []interface{}) (string, error) {
 	// construct the name based on the signature script, public key script,
 	// and flags.
 	var name string
-	if len(test) == witnessOffset+5 {
-		name = fmt.Sprintf("test (%s)", test[witnessOffset+4])
+	if len(test) == amountOffset+5 {
+		name = fmt.Sprintf("test (%s)", test[amountOffset+4])
 	} else {
-		name = fmt.Sprintf("test ([%s, %s, %s])", test[witnessOffset],
-			test[witnessOffset+1], test[witnessOffset+2])
+		name = fmt.Sprintf("test ([%s, %s, %s])", test[amountOffset],
+			test[amountOffset+1], test[amountOffset+2])
 	}
 	return name, nil
 }
@@ -55,22 +56,6 @@ func parseHex(tok string) ([]byte, error) {
 		return nil, errors.New("not a hex number")
 	}
 	return hex.DecodeString(tok[2:])
-}
-
-// parseWitnessStack parses a json array of witness items encoded as hex into a
-// slice of witness elements.
-func parseWitnessStack(elements []interface{}) ([][]byte, error) {
-	witness := make([][]byte, len(elements))
-	for i, e := range elements {
-		witElement, err := hex.DecodeString(e.(string))
-		if err != nil {
-			return nil, err
-		}
-
-		witness[i] = witElement
-	}
-
-	return witness, nil
 }
 
 // shortFormOps holds a map of opcode names to values for use in short form
@@ -184,14 +169,14 @@ func parseScriptFlags(flagStr string) (ScriptFlags, error) {
 			flags |= ScriptVerifySigPushOnly
 		case "STRICTENC":
 			flags |= ScriptVerifyStrictEncoding
-		case "WITNESS":
-			flags |= ScriptVerifyWitness
-		case "DISCOURAGE_UPGRADABLE_WITNESS_PROGRAM":
-			flags |= ScriptVerifyDiscourageUpgradeableWitnessProgram
 		case "MINIMALIF":
 			flags |= ScriptVerifyMinimalIf
-		case "WITNESS_PUBKEYTYPE":
-			flags |= ScriptVerifyWitnessPubKeyType
+		case "SIGHASH_FORKID":
+			flags |= ScriptEnableSighashForkid
+		case "REPLAY_PROTECTION":
+			flags |= ScriptEnableReplayProtection
+		case "MONOLITH_OPCODES":
+			flags |= ScriptEnableMonolith
 		default:
 			return flags, fmt.Errorf("invalid flag: %s", flag)
 		}
@@ -262,23 +247,20 @@ func parseExpectedResult(expected string) ([]ErrorCode, error) {
 	case "UNSATISFIED_LOCKTIME":
 		return []ErrorCode{ErrUnsatisfiedLockTime}, nil
 	case "MINIMALIF":
-		return []ErrorCode{ErrMinimalIf}, nil
-	case "DISCOURAGE_UPGRADABLE_WITNESS_PROGRAM":
-		return []ErrorCode{ErrDiscourageUpgradableWitnessProgram}, nil
-	case "WITNESS_PROGRAM_WRONG_LENGTH":
-		return []ErrorCode{ErrWitnessProgramWrongLength}, nil
-	case "WITNESS_PROGRAM_WITNESS_EMPTY":
-		return []ErrorCode{ErrWitnessProgramEmpty}, nil
-	case "WITNESS_PROGRAM_MISMATCH":
-		return []ErrorCode{ErrWitnessProgramMismatch}, nil
-	case "WITNESS_MALLEATED":
-		return []ErrorCode{ErrWitnessMalleated}, nil
-	case "WITNESS_MALLEATED_P2SH":
-		return []ErrorCode{ErrWitnessMalleatedP2SH}, nil
-	case "WITNESS_UNEXPECTED":
-		return []ErrorCode{ErrWitnessUnexpected}, nil
-	case "WITNESS_PUBKEYTYPE":
-		return []ErrorCode{ErrWitnessPubKeyType}, nil
+		return []ErrorCode{ErrScriptMinimalIf}, nil
+	case "ILLEGAL_FORKID":
+		return []ErrorCode{ErrScriptIllegalForkId}, nil
+	case "SPLIT_RANGE":
+		return []ErrorCode{ErrInvalidSplitRange}, nil
+	case "INVALID_NUMBER_RANGE":
+		return []ErrorCode{ErrInvalidNumberRange}, nil
+	case "DIV_BY_ZERO":
+		return []ErrorCode{ErrScriptDivByZero}, nil
+	case "MOD_BY_ZERO":
+		return []ErrorCode{ErrScriptModByZero}, nil
+	case "OPERAND_SIZE":
+		return []ErrorCode{ErrInvalidOperandSize}, nil
+
 	}
 
 	return nil, fmt.Errorf("unrecognized expected result in test data: %v",
@@ -286,14 +268,13 @@ func parseExpectedResult(expected string) ([]ErrorCode, error) {
 }
 
 // createSpendTx generates a basic spending transaction given the passed
-// signature, witness and public key scripts.
-func createSpendingTx(witness [][]byte, sigScript, pkScript []byte,
-	outputValue int64) *wire.MsgTx {
+// signature and public key scripts.
+func createSpendingTx(sigScript, pkScript []byte, outputValue int64) *wire.MsgTx {
 
 	coinbaseTx := wire.NewMsgTx(wire.TxVersion)
 
 	outPoint := wire.NewOutPoint(&chainhash.Hash{}, ^uint32(0))
-	txIn := wire.NewTxIn(outPoint, []byte{OP_0, OP_0}, nil)
+	txIn := wire.NewTxIn(outPoint, []byte{OP_0, OP_0})
 	txOut := wire.NewTxOut(outputValue, pkScript)
 	coinbaseTx.AddTxIn(txIn)
 	coinbaseTx.AddTxOut(txOut)
@@ -301,7 +282,7 @@ func createSpendingTx(witness [][]byte, sigScript, pkScript []byte,
 	spendingTx := wire.NewMsgTx(wire.TxVersion)
 	coinbaseTxSha := coinbaseTx.TxHash()
 	outPoint = wire.NewOutPoint(&coinbaseTxSha, 0)
-	txIn = wire.NewTxIn(outPoint, sigScript, witness)
+	txIn = wire.NewTxIn(outPoint, sigScript)
 	txOut = wire.NewTxOut(outputValue, nil)
 
 	spendingTx.AddTxIn(txIn)
@@ -312,7 +293,7 @@ func createSpendingTx(witness [][]byte, sigScript, pkScript []byte,
 
 // scriptWithInputVal wraps a target pkScript with the value of the output in
 // which it is contained. The inputVal is necessary in order to properly
-// validate inputs which spend nested, or native witness programs.
+// validate inputs which spend nested.
 type scriptWithInputVal struct {
 	inputVal int64
 	pkScript []byte
@@ -329,7 +310,7 @@ func testScripts(t *testing.T, tests [][]interface{}, useSigCache bool) {
 	}
 
 	for i, test := range tests {
-		// "Format is: [[wit..., amount]?, scriptSig, scriptPubKey,
+		// "Format is: [[amount]?, scriptSig, scriptPubKey,
 		//    flags, expected_scripterror, ... comments]"
 
 		// Skip single line comments.
@@ -346,38 +327,25 @@ func testScripts(t *testing.T, tests [][]interface{}, useSigCache bool) {
 		}
 
 		var (
-			witness  wire.TxWitness
 			inputAmt btcutil.Amount
 		)
 
 		// When the first field of the test data is a slice it contains
-		// witness data and everything else is offset by 1 as a result.
-		witnessOffset := 0
-		if witnessData, ok := test[0].([]interface{}); ok {
-			witnessOffset++
-
-			// If this is a witness test, then the final element
-			// within the slice is the input amount, so we ignore
-			// all but the last element in order to parse the
-			// witness stack.
-			strWitnesses := witnessData[:len(witnessData)-1]
-			witness, err = parseWitnessStack(strWitnesses)
-			if err != nil {
-				t.Errorf("%s: can't parse witness; %v", name, err)
-				continue
-			}
-
-			inputAmt, err = btcutil.NewAmount(witnessData[len(witnessData)-1].(float64))
+		// amount is offset by 1 as a result.
+		amountOffset := 0
+		if amount, ok := test[0].([]interface{}); ok {
+			amountOffset++
+			var err error
+			inputAmt, err = btcutil.NewAmount(amount[0].(float64))
 			if err != nil {
 				t.Errorf("%s: can't parse input amt: %v",
 					name, err)
 				continue
 			}
-
 		}
 
 		// Extract and parse the signature script from the test fields.
-		scriptSigStr, ok := test[witnessOffset].(string)
+		scriptSigStr, ok := test[amountOffset].(string)
 		if !ok {
 			t.Errorf("%s: signature script is not a string", name)
 			continue
@@ -390,7 +358,7 @@ func testScripts(t *testing.T, tests [][]interface{}, useSigCache bool) {
 		}
 
 		// Extract and parse the public key script from the test fields.
-		scriptPubKeyStr, ok := test[witnessOffset+1].(string)
+		scriptPubKeyStr, ok := test[amountOffset+1].(string)
 		if !ok {
 			t.Errorf("%s: public key script is not a string", name)
 			continue
@@ -403,7 +371,7 @@ func testScripts(t *testing.T, tests [][]interface{}, useSigCache bool) {
 		}
 
 		// Extract and parse the script flags from the test fields.
-		flagsStr, ok := test[witnessOffset+2].(string)
+		flagsStr, ok := test[amountOffset+2].(string)
 		if !ok {
 			t.Errorf("%s: flags field is not a string", name)
 			continue
@@ -413,6 +381,9 @@ func testScripts(t *testing.T, tests [][]interface{}, useSigCache bool) {
 			t.Errorf("%s: %v", name, err)
 			continue
 		}
+		if flags&ScriptVerifyCleanStack != 0 {
+			flags |= ScriptBip16
+		}
 
 		// Extract and parse the expected result from the test fields.
 		//
@@ -421,7 +392,7 @@ func testScripts(t *testing.T, tests [][]interface{}, useSigCache bool) {
 		// fine grained with its errors than the reference test data, so
 		// some of the reference test data errors map to more than one
 		// possibility.
-		resultStr, ok := test[witnessOffset+3].(string)
+		resultStr, ok := test[amountOffset+3].(string)
 		if !ok {
 			t.Errorf("%s: result field is not a string", name)
 			continue
@@ -435,7 +406,7 @@ func testScripts(t *testing.T, tests [][]interface{}, useSigCache bool) {
 		// Generate a transaction pair such that one spends from the
 		// other and the provided signature and public key scripts are
 		// used, then create a new engine to execute the scripts.
-		tx := createSpendingTx(witness, scriptSig, scriptPubKey,
+		tx := createSpendingTx(scriptSig, scriptPubKey,
 			int64(inputAmt))
 		vm, err := NewEngine(scriptPubKey, tx, 0, flags, sigCache, nil,
 			int64(inputAmt))
@@ -476,6 +447,7 @@ func testScripts(t *testing.T, tests [][]interface{}, useSigCache bool) {
 // TestScripts ensures all of the tests in script_tests.json execute with the
 // expected results as defined in the test data.
 func TestScripts(t *testing.T) {
+	//file, err := ioutil.ReadFile("data/script_tests.json")
 	file, err := ioutil.ReadFile("data/script_tests.json")
 	if err != nil {
 		t.Fatalf("TestScripts: %v\n", err)
@@ -489,7 +461,7 @@ func TestScripts(t *testing.T) {
 
 	// Run all script tests with and without the signature cache.
 	testScripts(t, tests, true)
-	testScripts(t, tests, false)
+	//testScripts(t, tests, false)
 }
 
 // testVecF64ToUint32 properly handles conversion of float64s read from the JSON
@@ -563,6 +535,11 @@ testloop:
 		flags, err := parseScriptFlags(verifyFlags)
 		if err != nil {
 			t.Errorf("bad test %d: %v", i, err)
+			continue
+		}
+
+		err = CheckTransactionSanity(tx)
+		if err != nil {
 			continue
 		}
 
@@ -835,7 +812,7 @@ func TestCalcSignatureHash(t *testing.T) {
 			// Skip first line -- contains comments only.
 			continue
 		}
-		if len(test) != 5 {
+		if len(test) != 7 {
 			t.Fatalf("TestCalcSignatureHash: Test #%d has "+
 				"wrong length.", i)
 		}
@@ -857,13 +834,168 @@ func TestCalcSignatureHash(t *testing.T) {
 		}
 
 		hashType := SigHashType(testVecF64ToUint32(test[3].(float64)))
-		hash := calcSignatureHash(parsedScript, hashType, &tx,
-			int(test[2].(float64)))
 
+		// signature_hash (regular)
+		hash := calcSignatureHash(parsedScript, hashType, &tx,
+			int(test[2].(float64)), btcutil.Amount(0),
+			ScriptEnableSighashForkid)
 		expectedHash, _ := chainhash.NewHashFromStr(test[4].(string))
+		if !bytes.Equal(hash, expectedHash[:]) {
+			t.Errorf("TestCalcSignatureHash failed test #%d: "+
+				"Signature hash mismatch.", i)
+		}
+
+		// signature_hash(no forkid)
+		hash = calcSignatureHash(parsedScript, hashType, &tx,
+			int(test[2].(float64)), btcutil.Amount(0), 0)
+
+		expectedHash, _ = chainhash.NewHashFromStr(test[5].(string))
+		if !bytes.Equal(hash, expectedHash[:]) {
+			t.Errorf("TestCalcSignatureHash failed test #%d: "+
+				"Signature hash mismatch.", i)
+		}
+
+		// signature_hash(replay protected)
+		hash = calcSignatureHash(parsedScript, hashType, &tx,
+			int(test[2].(float64)), btcutil.Amount(0),
+			ScriptEnableSighashForkid|ScriptEnableReplayProtection)
+
+		expectedHash, _ = chainhash.NewHashFromStr(test[6].(string))
 		if !bytes.Equal(hash, expectedHash[:]) {
 			t.Errorf("TestCalcSignatureHash failed test #%d: "+
 				"Signature hash mismatch.", i)
 		}
 	}
 }
+
+// CheckTransactionSanity performs some preliminary checks on a transaction to
+// ensure it is sane.  These checks are context free.
+func CheckTransactionSanity(tx *btcutil.Tx) error {
+	// A transaction must have at least one input.
+	msgTx := tx.MsgTx()
+	if len(msgTx.TxIn) == 0 {
+		return errors.New("transaction has no inputs")
+	}
+
+	// A transaction must have at least one output.
+	if len(msgTx.TxOut) == 0 {
+		return errors.New("transaction has no outputs")
+	}
+
+	// A transaction must not exceed the maximum allowed block payload when
+	// serialized.
+	serializedTxSize := tx.MsgTx().SerializeSize()
+	if serializedTxSize > 100000 {
+		str := fmt.Sprintf("serialized transaction is too big - got "+
+			"%d, max %d", serializedTxSize, 100000)
+		return errors.New(str)
+	}
+
+	// Ensure the transaction amounts are in range.  Each transaction
+	// output must not be negative or more than the max allowed per
+	// transaction.  Also, the total of all outputs must abide by the same
+	// restrictions.  All amounts in a transaction are in a unit value known
+	// as a satoshi.  One bitcoin is a quantity of satoshi as defined by the
+	// SatoshiPerBitcoin constant.
+	var totalSatoshi int64
+	for _, txOut := range msgTx.TxOut {
+		satoshi := txOut.Value
+		if satoshi < 0 {
+			str := fmt.Sprintf("transaction output has negative "+
+				"value of %v", satoshi)
+			return errors.New(str)
+		}
+		if satoshi > btcutil.MaxSatoshi {
+			str := fmt.Sprintf("transaction output value of %v is "+
+				"higher than max allowed value of %v", satoshi,
+				btcutil.MaxSatoshi)
+			return errors.New(str)
+		}
+
+		// Two's complement int64 overflow guarantees that any overflow
+		// is detected and reported.  This is impossible for Bitcoin, but
+		// perhaps possible if an alt increases the total money supply.
+		totalSatoshi += satoshi
+		if totalSatoshi < 0 {
+			str := fmt.Sprintf("total value of all transaction "+
+				"outputs exceeds max allowed value of %v",
+				btcutil.MaxSatoshi)
+			return errors.New(str)
+		}
+		if totalSatoshi > btcutil.MaxSatoshi {
+			str := fmt.Sprintf("total value of all transaction "+
+				"outputs is %v which is higher than max "+
+				"allowed value of %v", totalSatoshi,
+				btcutil.MaxSatoshi)
+			return errors.New(str)
+		}
+	}
+
+	// Check for duplicate transaction inputs.
+	existingTxOut := make(map[wire.OutPoint]struct{})
+	for _, txIn := range msgTx.TxIn {
+		if _, exists := existingTxOut[txIn.PreviousOutPoint]; exists {
+			return errors.New("transaction " +
+				"contains duplicate inputs")
+		}
+		existingTxOut[txIn.PreviousOutPoint] = struct{}{}
+	}
+
+	// Coinbase script length must be between min and max length.
+	if IsCoinBaseTx(tx.MsgTx()) {
+		slen := len(msgTx.TxIn[0].SignatureScript)
+		if slen < 2 || slen > 100 {
+			str := fmt.Sprintf("coinbase transaction script length "+
+				"of %d is out of range (min: %d, max: %d)",
+				slen, 2, 100)
+			return errors.New(str)
+		}
+	} else {
+		// Previous transaction outputs referenced by the inputs to this
+		// transaction must not be null.
+		for _, txIn := range msgTx.TxIn {
+			if isNullOutpoint(&txIn.PreviousOutPoint) {
+				return errors.New("transaction " +
+					"input refers to previous output that " +
+					"is null")
+			}
+		}
+	}
+
+	return nil
+}
+
+// IsCoinBaseTx determines whether or not a transaction is a coinbase.  A coinbase
+// is a special transaction created by miners that has no inputs.  This is
+// represented in the block chain by a transaction with a single input that has
+// a previous output transaction index set to the maximum value along with a
+// zero hash.
+//
+// This function only differs from IsCoinBase in that it works with a raw wire
+// transaction as opposed to a higher level util transaction.
+func IsCoinBaseTx(msgTx *wire.MsgTx) bool {
+	// A coin base must only have one transaction input.
+	if len(msgTx.TxIn) != 1 {
+		return false
+	}
+
+	// The previous output of a coin base must have a max value index and
+	// a zero hash.
+	prevOut := &msgTx.TxIn[0].PreviousOutPoint
+	if prevOut.Index != math.MaxUint32 || prevOut.Hash != zeroHash {
+		return false
+	}
+
+	return true
+}
+
+// isNullOutpoint determines whether or not a previous transaction output point
+// is set.
+func isNullOutpoint(outpoint *wire.OutPoint) bool {
+	if outpoint.Index == math.MaxUint32 && outpoint.Hash == zeroHash {
+		return true
+	}
+	return false
+}
+
+var zeroHash chainhash.Hash

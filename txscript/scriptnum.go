@@ -1,4 +1,5 @@
 // Copyright (c) 2015-2017 The btcsuite developers
+// Copyright (c) 2018 The bcext developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -45,7 +46,7 @@ const (
 // interpreting it as an integer, it provides the required behavior.
 type scriptNum int64
 
-// checkMinimalDataEncoding returns whether or not the passed byte array adheres
+// isMinimallyEncoded returns whether or not the passed byte array adheres
 // to the minimal encoding requirements.
 func checkMinimalDataEncoding(v []byte) error {
 	if len(v) == 0 {
@@ -72,6 +73,57 @@ func checkMinimalDataEncoding(v []byte) error {
 	}
 
 	return nil
+}
+
+func minimallyEncode(input *[]byte) bool {
+	v := *input
+	if len(v) == 0 {
+		return false
+	}
+
+	// If the last byte is not 0x00 or 0x80, we are minimally encoded.
+	last := v[len(v)-1]
+	if last&0x7f != 0 {
+		return false
+	}
+
+	// If the script is one byte long, then we have a zero, which encodes as an
+	// empty array.
+	if len(v) == 1 {
+		v = v[:0]
+		*input = v
+		return true
+	}
+
+	// If the next byte has it sign bit set, then we are minimaly encoded.
+	if v[len(v)-2]&0x80 != 0 {
+		return false
+	}
+
+	// We are not minimally encoded, we need to figure out how much to trim.
+	for i := len(v) - 1; i > 0; i-- {
+		// We found a non zero byte, time to encode.
+		if v[i-1] != 0 {
+			if v[i-1]&0x80 != 0 {
+				// We found a byte with it sign bit set so we need one more
+				// byte.
+				v[i] = last
+				i++
+			} else {
+				// the sign bit is clear, we can use it.
+				v[i-1] = v[i-1] | last
+			}
+
+			v = v[:i]
+			*input = v
+			return true
+		}
+	}
+
+	// If we the whole thing is zeros, then we have a zero.
+	v = v[:0]
+	*input = v
+	return true
 }
 
 // Bytes returns the number serialized as a little endian with a sign bit.

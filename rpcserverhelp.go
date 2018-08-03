@@ -1,5 +1,6 @@
 // Copyright (c) 2015-2017 The btcsuite developers
 // Copyright (c) 2015-2017 The Decred developers
+// Copyright (c) 2018 The bcext developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -34,6 +35,13 @@ var helpDescsEnUS = map[string]string{
 	"addnode-addr":      "IP address and port of the peer to operate on",
 	"addnode-subcmd":    "'add' to add a persistent peer, 'remove' to remove a persistent peer, or 'onetry' to try a single connection to a peer",
 
+	// ConvCashAddrCmd help
+	"convcashaddr--synopsis":   "Convert address format between the classic bitcoin address format and bitcoin-abc cashaddr format",
+	"convcashaddr-address":     "The valid address string with the classic bitcoin-address or bitcoin-abc cashaddr format",
+	"convcashaddr--condition0": "Invalid address parameter",
+	"convcashaddr--condition1": "Valid address parameter",
+	"convcashaddr--result1":    "The another bitcoin address format",
+
 	// NodeCmd help.
 	"node--synopsis":     "Attempts to add or remove a peer.",
 	"node-subcmd":        "'disconnect' to remove all matching non-persistent peers, 'remove' to remove a persistent peer, or 'connect' to connect to a peer",
@@ -65,21 +73,19 @@ var helpDescsEnUS = map[string]string{
 	"prevout-value":     "previous output value",
 
 	// VinPrevOut help.
-	"vinprevout-coinbase":    "The hex-encoded bytes of the signature script (coinbase txns only)",
-	"vinprevout-txid":        "The hash of the origin transaction (non-coinbase txns only)",
-	"vinprevout-vout":        "The index of the output being redeemed from the origin transaction (non-coinbase txns only)",
-	"vinprevout-scriptSig":   "The signature script used to redeem the origin transaction as a JSON object (non-coinbase txns only)",
-	"vinprevout-txinwitness": "The witness stack of the passed input, encoded as a JSON string array",
-	"vinprevout-prevOut":     "Data from the origin transaction output with index vout.",
-	"vinprevout-sequence":    "The script sequence number",
+	"vinprevout-coinbase":  "The hex-encoded bytes of the signature script (coinbase txns only)",
+	"vinprevout-txid":      "The hash of the origin transaction (non-coinbase txns only)",
+	"vinprevout-vout":      "The index of the output being redeemed from the origin transaction (non-coinbase txns only)",
+	"vinprevout-scriptSig": "The signature script used to redeem the origin transaction as a JSON object (non-coinbase txns only)",
+	"vinprevout-prevOut":   "Data from the origin transaction output with index vout.",
+	"vinprevout-sequence":  "The script sequence number",
 
 	// Vin help.
-	"vin-coinbase":    "The hex-encoded bytes of the signature script (coinbase txns only)",
-	"vin-txid":        "The hash of the origin transaction (non-coinbase txns only)",
-	"vin-vout":        "The index of the output being redeemed from the origin transaction (non-coinbase txns only)",
-	"vin-scriptSig":   "The signature script used to redeem the origin transaction as a JSON object (non-coinbase txns only)",
-	"vin-txinwitness": "The witness used to redeem the input encoded as a string array of its items",
-	"vin-sequence":    "The script sequence number",
+	"vin-coinbase":  "The hex-encoded bytes of the signature script (coinbase txns only)",
+	"vin-txid":      "The hash of the origin transaction (non-coinbase txns only)",
+	"vin-vout":      "The index of the output being redeemed from the origin transaction (non-coinbase txns only)",
+	"vin-scriptSig": "The signature script used to redeem the origin transaction as a JSON object (non-coinbase txns only)",
+	"vin-sequence":  "The script sequence number",
 
 	// ScriptPubKeyResult help.
 	"scriptpubkeyresult-asm":       "Disassembly of the script",
@@ -206,7 +212,6 @@ var helpDescsEnUS = map[string]string{
 	"txrawresult-time":          "Transaction time in seconds since 1 Jan 1970 GMT",
 	"txrawresult-blocktime":     "Block time in seconds since the 1 Jan 1970 GMT",
 	"txrawresult-size":          "The size of the transaction in bytes",
-	"txrawresult-vsize":         "The virtual size of the transaction in bytes",
 	"txrawresult-hash":          "The wtxid of the transaction",
 
 	// SearchRawTransactionsResult help.
@@ -222,7 +227,6 @@ var helpDescsEnUS = map[string]string{
 	"searchrawtransactionsresult-time":          "Transaction time in seconds since 1 Jan 1970 GMT",
 	"searchrawtransactionsresult-blocktime":     "Block time in seconds since the 1 Jan 1970 GMT",
 	"searchrawtransactionsresult-size":          "The size of the transaction in bytes",
-	"searchrawtransactionsresult-vsize":         "The virtual size of the transaction in bytes",
 
 	// GetBlockVerboseResult help.
 	"getblockverboseresult-hash":              "The hash of the block (same as provided)",
@@ -240,8 +244,6 @@ var helpDescsEnUS = map[string]string{
 	"getblockverboseresult-difficulty":        "The proof-of-work difficulty as a multiple of the minimum difficulty",
 	"getblockverboseresult-previousblockhash": "The hash of the previous block",
 	"getblockverboseresult-nextblockhash":     "The hash of the next block (only if there is one)",
-	"getblockverboseresult-strippedsize":      "The size of the block without witness data",
-	"getblockverboseresult-weight":            "The weight of the block",
 
 	// GetBlockCountCmd help.
 	"getblockcount--synopsis": "Returns the number of blocks in the longest block chain.",
@@ -291,37 +293,34 @@ var helpDescsEnUS = map[string]string{
 	"getblocktemplateresulttx-depends": "Other transactions before this one (by 1-based index in the 'transactions'  list) that must be present in the final block if this one is",
 	"getblocktemplateresulttx-fee":     "Difference in value between transaction inputs and outputs (in Satoshi)",
 	"getblocktemplateresulttx-sigops":  "Total number of signature operations as counted for purposes of block limits",
-	"getblocktemplateresulttx-weight":  "The weight of the transaction",
 
 	// GetBlockTemplateResultAux help.
 	"getblocktemplateresultaux-flags": "Hex-encoded byte-for-byte data to include in the coinbase signature script",
 
 	// GetBlockTemplateResult help.
-	"getblocktemplateresult-bits":                       "Hex-encoded compressed difficulty",
-	"getblocktemplateresult-curtime":                    "Current time as seen by the server (recommended for block time); must fall within mintime/maxtime rules",
-	"getblocktemplateresult-height":                     "Height of the block to be solved",
-	"getblocktemplateresult-previousblockhash":          "Hex-encoded big-endian hash of the previous block",
-	"getblocktemplateresult-sigoplimit":                 "Number of sigops allowed in blocks ",
-	"getblocktemplateresult-sizelimit":                  "Number of bytes allowed in blocks",
-	"getblocktemplateresult-transactions":               "Array of transactions as JSON objects",
-	"getblocktemplateresult-version":                    "The block version",
-	"getblocktemplateresult-coinbaseaux":                "Data that should be included in the coinbase signature script",
-	"getblocktemplateresult-coinbasetxn":                "Information about the coinbase transaction",
-	"getblocktemplateresult-coinbasevalue":              "Total amount available for the coinbase in Satoshi",
-	"getblocktemplateresult-workid":                     "This value must be returned with result if provided (not provided)",
-	"getblocktemplateresult-longpollid":                 "Identifier for long poll request which allows monitoring for expiration",
-	"getblocktemplateresult-longpolluri":                "An alternate URI to use for long poll requests if provided (not provided)",
-	"getblocktemplateresult-submitold":                  "Not applicable",
-	"getblocktemplateresult-target":                     "Hex-encoded big-endian number which valid results must be less than",
-	"getblocktemplateresult-expires":                    "Maximum number of seconds (starting from when the server sent the response) this work is valid for",
-	"getblocktemplateresult-maxtime":                    "Maximum allowed time",
-	"getblocktemplateresult-mintime":                    "Minimum allowed time",
-	"getblocktemplateresult-mutable":                    "List of mutations the server explicitly allows",
-	"getblocktemplateresult-noncerange":                 "Two concatenated hex-encoded big-endian 32-bit integers which represent the valid ranges of nonces the miner may scan",
-	"getblocktemplateresult-capabilities":               "List of server capabilities including 'proposal' to indicate support for block proposals",
-	"getblocktemplateresult-reject-reason":              "Reason the proposal was invalid as-is (only applies to proposal responses)",
-	"getblocktemplateresult-default_witness_commitment": "The witness commitment itself. Will be populated if the block has witness data",
-	"getblocktemplateresult-weightlimit":                "The current limit on the max allowed weight of a block",
+	"getblocktemplateresult-bits":              "Hex-encoded compressed difficulty",
+	"getblocktemplateresult-curtime":           "Current time as seen by the server (recommended for block time); must fall within mintime/maxtime rules",
+	"getblocktemplateresult-height":            "Height of the block to be solved",
+	"getblocktemplateresult-previousblockhash": "Hex-encoded big-endian hash of the previous block",
+	"getblocktemplateresult-sigoplimit":        "Number of sigops allowed in blocks ",
+	"getblocktemplateresult-sizelimit":         "Number of bytes allowed in blocks",
+	"getblocktemplateresult-transactions":      "Array of transactions as JSON objects",
+	"getblocktemplateresult-version":           "The block version",
+	"getblocktemplateresult-coinbaseaux":       "Data that should be included in the coinbase signature script",
+	"getblocktemplateresult-coinbasetxn":       "Information about the coinbase transaction",
+	"getblocktemplateresult-coinbasevalue":     "Total amount available for the coinbase in Satoshi",
+	"getblocktemplateresult-workid":            "This value must be returned with result if provided (not provided)",
+	"getblocktemplateresult-longpollid":        "Identifier for long poll request which allows monitoring for expiration",
+	"getblocktemplateresult-longpolluri":       "An alternate URI to use for long poll requests if provided (not provided)",
+	"getblocktemplateresult-submitold":         "Not applicable",
+	"getblocktemplateresult-target":            "Hex-encoded big-endian number which valid results must be less than",
+	"getblocktemplateresult-expires":           "Maximum number of seconds (starting from when the server sent the response) this work is valid for",
+	"getblocktemplateresult-maxtime":           "Maximum allowed time",
+	"getblocktemplateresult-mintime":           "Minimum allowed time",
+	"getblocktemplateresult-mutable":           "List of mutations the server explicitly allows",
+	"getblocktemplateresult-noncerange":        "Two concatenated hex-encoded big-endian 32-bit integers which represent the valid ranges of nonces the miner may scan",
+	"getblocktemplateresult-capabilities":      "List of server capabilities including 'proposal' to indicate support for block proposals",
+	"getblocktemplateresult-reject-reason":     "Reason the proposal was invalid as-is (only applies to proposal responses)",
 
 	// GetBlockTemplateCmd help.
 	"getblocktemplate--synopsis": "Returns a JSON object with information necessary to construct a block to mine or accepts a proposal to validate.\n" +
@@ -411,18 +410,17 @@ var helpDescsEnUS = map[string]string{
 	"getmempoolinforesult-size":  "Number of transactions in the mempool",
 
 	// GetMiningInfoResult help.
-	"getmininginforesult-blocks":             "Height of the latest best block",
-	"getmininginforesult-currentblocksize":   "Size of the latest best block",
-	"getmininginforesult-currentblockweight": "Weight of the latest best block",
-	"getmininginforesult-currentblocktx":     "Number of transactions in the latest best block",
-	"getmininginforesult-difficulty":         "Current target difficulty",
-	"getmininginforesult-errors":             "Any current errors",
-	"getmininginforesult-generate":           "Whether or not server is set to generate coins",
-	"getmininginforesult-genproclimit":       "Number of processors to use for coin generation (-1 when disabled)",
-	"getmininginforesult-hashespersec":       "Recent hashes per second performance measurement while generating coins",
-	"getmininginforesult-networkhashps":      "Estimated network hashes per second for the most recent blocks",
-	"getmininginforesult-pooledtx":           "Number of transactions in the memory pool",
-	"getmininginforesult-testnet":            "Whether or not server is using testnet",
+	"getmininginforesult-blocks":           "Height of the latest best block",
+	"getmininginforesult-currentblocksize": "Size of the latest best block",
+	"getmininginforesult-currentblocktx":   "Number of transactions in the latest best block",
+	"getmininginforesult-difficulty":       "Current target difficulty",
+	"getmininginforesult-errors":           "Any current errors",
+	"getmininginforesult-generate":         "Whether or not server is set to generate coins",
+	"getmininginforesult-genproclimit":     "Number of processors to use for coin generation (-1 when disabled)",
+	"getmininginforesult-hashespersec":     "Recent hashes per second performance measurement while generating coins",
+	"getmininginforesult-networkhashps":    "Estimated network hashes per second for the most recent blocks",
+	"getmininginforesult-pooledtx":         "Number of transactions in the memory pool",
+	"getmininginforesult-testnet":          "Whether or not server is using testnet",
 
 	// GetMiningInfoCmd help.
 	"getmininginfo--synopsis": "Returns a JSON object containing mining-related information.",
@@ -475,7 +473,6 @@ var helpDescsEnUS = map[string]string{
 	"getrawmempoolverboseresult-startingpriority": "Priority when transaction entered the pool",
 	"getrawmempoolverboseresult-currentpriority":  "Current priority",
 	"getrawmempoolverboseresult-depends":          "Unconfirmed transactions used as inputs for this transaction",
-	"getrawmempoolverboseresult-vsize":            "The virtual size of a transaction",
 
 	// GetRawMempoolCmd help.
 	"getrawmempool--synopsis":   "Returns information about all of the transactions currently in the memory pool.",
@@ -517,6 +514,13 @@ var helpDescsEnUS = map[string]string{
 	// PingCmd help.
 	"ping--synopsis": "Queues a ping to be sent to each connected peer.\n" +
 		"Ping times are provided by getpeerinfo via the pingtime and pingwait fields.",
+
+	// RmMempoolTransactionCmd help.
+	"rmmempooltransaction--synopsis": "Remove the specified transaction from mempool. " +
+		"If 'RemoveRedeemers' is set true, all relative transaction will be removed at the same time.",
+	"rmmempooltransaction-txid":            "The hash of the transaction",
+	"rmmempooltransaction-removeredeemers": "Whether remove transactions relative to the specified transaction or not",
+	"rmmempooltransaction--result0":        "Return true if remove successfully, false otherwise.",
 
 	// SearchRawTransactionsCmd help.
 	"searchrawtransactions--synopsis": "Returns raw data for transactions involving the passed address.\n" +
@@ -675,6 +679,7 @@ var helpDescsEnUS = map[string]string{
 // pointer to the type (or nil to indicate no return value).
 var rpcResultTypes = map[string][]interface{}{
 	"addnode":               nil,
+	"convcashaddr":          {nil, (*string)(nil)},
 	"createrawtransaction":  {(*string)(nil)},
 	"debuglevel":            {(*string)(nil), (*string)(nil)},
 	"decoderawtransaction":  {(*btcjson.TxRawDecodeResult)(nil)},
@@ -710,6 +715,7 @@ var rpcResultTypes = map[string][]interface{}{
 	"node":                  nil,
 	"help":                  {(*string)(nil), (*string)(nil)},
 	"ping":                  nil,
+	"rmmempooltransaction":  {(*bool)(nil)},
 	"searchrawtransactions": {(*string)(nil), (*[]btcjson.SearchRawTransactionsResult)(nil)},
 	"sendrawtransaction":    {(*string)(nil)},
 	"setgenerate":           nil,

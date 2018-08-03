@@ -127,7 +127,7 @@ func TestElementWire(t *testing.T) {
 		},
 		{
 			BitcoinNet(MainNet),
-			[]byte{0xf9, 0xbe, 0xb4, 0xd9},
+			[]byte{0xe3, 0xe1, 0xf3, 0xe8},
 		},
 		// Type not supported by the "fast" path and requires reflection.
 		{

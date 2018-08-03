@@ -1,4 +1,5 @@
 // Copyright (c) 2013-2017 The btcsuite developers
+// Copyright (c) 2018 The bcext developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -6,12 +7,10 @@ package txscript
 
 import (
 	"bytes"
-	"encoding/hex"
 	"reflect"
 	"testing"
 
 	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
 )
 
@@ -381,10 +380,8 @@ func TestCalcScriptInfo(t *testing.T) {
 		name      string
 		sigScript string
 		pkScript  string
-		witness   []string
 
-		bip16  bool
-		segwit bool
+		bip16 bool
 
 		scriptInfo    ScriptInfo
 		scriptInfoErr error
@@ -462,91 +459,14 @@ func TestCalcScriptInfo(t *testing.T) {
 				SigOps:         3,
 			},
 		},
-		{
-			// A v0 p2wkh spend.
-			name:     "p2wkh script",
-			pkScript: "OP_0 DATA_20 0x365ab47888e150ff46f8d51bce36dcd680f1283f",
-			witness: []string{
-				"3045022100ee9fe8f9487afa977" +
-					"6647ebcf0883ce0cd37454d7ce19889d34ba2c9" +
-					"9ce5a9f402200341cb469d0efd3955acb9e46" +
-					"f568d7e2cc10f9084aaff94ced6dc50a59134ad01",
-				"03f0000d0639a22bfaf217e4c9428" +
-					"9c2b0cc7fa1036f7fd5d9f61a9d6ec153100e",
-			},
-			segwit: true,
-			scriptInfo: ScriptInfo{
-				PkScriptClass:  WitnessV0PubKeyHashTy,
-				NumInputs:      2,
-				ExpectedInputs: 2,
-				SigOps:         1,
-			},
-		},
-		{
-			// Nested p2sh v0
-			name: "p2wkh nested inside p2sh",
-			pkScript: "HASH160 DATA_20 " +
-				"0xb3a84b564602a9d68b4c9f19c2ea61458ff7826c EQUAL",
-			sigScript: "DATA_22 0x0014ad0ffa2e387f07e7ead14dc56d5a97dbd6ff5a23",
-			witness: []string{
-				"3045022100cb1c2ac1ff1d57d" +
-					"db98f7bdead905f8bf5bcc8641b029ce8eef25" +
-					"c75a9e22a4702203be621b5c86b771288706be5" +
-					"a7eee1db4fceabf9afb7583c1cc6ee3f8297b21201",
-				"03f0000d0639a22bfaf217e4c9" +
-					"4289c2b0cc7fa1036f7fd5d9f61a9d6ec153100e",
-			},
-			segwit: true,
-			bip16:  true,
-			scriptInfo: ScriptInfo{
-				PkScriptClass:  ScriptHashTy,
-				NumInputs:      3,
-				ExpectedInputs: 3,
-				SigOps:         1,
-			},
-		},
-		{
-			// A v0 p2wsh spend.
-			name: "p2wsh spend of a p2wkh witness script",
-			pkScript: "0 DATA_32 0xe112b88a0cd87ba387f44" +
-				"9d443ee2596eb353beb1f0351ab2cba8909d875db23",
-			witness: []string{
-				"3045022100cb1c2ac1ff1d57d" +
-					"db98f7bdead905f8bf5bcc8641b029ce8eef25" +
-					"c75a9e22a4702203be621b5c86b771288706be5" +
-					"a7eee1db4fceabf9afb7583c1cc6ee3f8297b21201",
-				"03f0000d0639a22bfaf217e4c9" +
-					"4289c2b0cc7fa1036f7fd5d9f61a9d6ec153100e",
-				"76a914064977cb7b4a2e0c9680df0ef696e9e0e296b39988ac",
-			},
-			segwit: true,
-			scriptInfo: ScriptInfo{
-				PkScriptClass:  WitnessV0ScriptHashTy,
-				NumInputs:      3,
-				ExpectedInputs: 3,
-				SigOps:         1,
-			},
-		},
 	}
 
 	for _, test := range tests {
 		sigScript := mustParseShortForm(test.sigScript)
 		pkScript := mustParseShortForm(test.pkScript)
 
-		var witness wire.TxWitness
-
-		for _, witElement := range test.witness {
-			wit, err := hex.DecodeString(witElement)
-			if err != nil {
-				t.Fatalf("unable to decode witness "+
-					"element: %v", err)
-			}
-
-			witness = append(witness, wit)
-		}
-
-		si, err := CalcScriptInfo(sigScript, pkScript, witness,
-			test.bip16, test.segwit)
+		si, err := CalcScriptInfo(sigScript, pkScript,
+			test.bip16)
 		if e := tstCheckScriptError(err, test.scriptInfoErr); e != nil {
 			t.Errorf("scriptinfo test %q: %v", test.name, e)
 			continue
@@ -952,20 +872,34 @@ var scriptClassTests = []struct {
 	{
 		// Nulldata with max allowed data to be considered standard.
 		name: "nulldata max standard push",
-		script: "RETURN PUSHDATA1 0x50 0x046708afdb0fe5548271967f1a67" +
-			"130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef3" +
-			"046708afdb0fe5548271967f1a67130b7105cd6a828e03909a67" +
-			"962e0ea1f61deb649f6bc3f4cef3",
+		script: "RETURN PUSHDATA1 0xdc " +
+			"0x646578784062697477617463682e636f2092c558ed52c56d" +
+			"8dd14ca76226bc936a84820d898443873eb03d8854b21fa3" +
+			"952b99a2981873e74509281730d78a21786d34a38bd1ebab" +
+			"822fad42278f7f4420db6ab1fd2b6826148d4f73bb41ec2d" +
+			"40a6d5793d66e17074a0c56a8a7df21062308f483dd6e38d" +
+			"53609d350038df0a1b2a9ac8332016e0b904f66880dd0108" +
+			"81c4e8074cce8e4ad6c77cb3460e01bf0e7e811b5f945f83" +
+			"732ba6677520a893d75d9a966cb8f85dc301656b1635c631" +
+			"f5d00d4adf73f2dd112ca75cf19754651909becfbe65aed1" +
+			"3afb2ab8",
 		class: NullDataTy,
 	},
 	{
 		// Nulldata with more than max allowed data to be considered
 		// standard (so therefore nonstandard)
 		name: "nulldata exceed max standard push",
-		script: "RETURN PUSHDATA1 0x51 0x046708afdb0fe5548271967f1a67" +
-			"130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef3" +
-			"046708afdb0fe5548271967f1a67130b7105cd6a828e03909a67" +
-			"962e0ea1f61deb649f6bc3f4cef308",
+		script: "RETURN PUSHDATA1 0xdd " +
+			"0x646578784062697477617463682e636f2092c558ed52c56d" +
+			"8dd14ca76226bc936a84820d898443873eb03d8854b21fa3" +
+			"952b99a2981873e74509281730d78a21786d34a38bd1ebab" +
+			"822fad42278f7f4420db6ab1fd2b6826148d4f73bb41ec2d" +
+			"40a6d5793d66e17074a0c56a8a7df21062308f483dd6e38d" +
+			"53609d350038df0a1b2a9ac8332016e0b904f66880dd0108" +
+			"81c4e8074cce8e4ad6c77cb3460e01bf0e7e811b5f945f83" +
+			"732ba6677520a893d75d9a966cb8f85dc301656b1635c631" +
+			"f5d00d4adf73f2dd112ca75cf19754651909becfbe65aed1" +
+			"3afb2ab800",
 		class: NonStandardTy,
 	},
 	{
@@ -1030,20 +964,6 @@ var scriptClassTests = []struct {
 			"3 CHECKMULTISIG",
 		class: NonStandardTy,
 	},
-
-	// New standard segwit script templates.
-	{
-		// A pay to witness pub key hash pk script.
-		name:   "Pay To Witness PubkeyHash",
-		script: "0 DATA_20 0x1d0f172a0ecb48aee1be1f2687d2963ae33f71a1",
-		class:  WitnessV0PubKeyHashTy,
-	},
-	{
-		// A pay to witness scripthash pk script.
-		name:   "Pay To Witness Scripthash",
-		script: "0 DATA_32 0x9f96ade4b41d5433f4eda31e1738ec2b36f6e7d1420d94a6af99801a88f7f7ff",
-		class:  WitnessV0ScriptHashTy,
-	},
 }
 
 // TestScriptClass ensures all the scripts in scriptClassTests have the expected
@@ -1088,19 +1008,9 @@ func TestStringifyClass(t *testing.T) {
 			stringed: "pubkeyhash",
 		},
 		{
-			name:     "witnesspubkeyhash",
-			class:    WitnessV0PubKeyHashTy,
-			stringed: "witness_v0_keyhash",
-		},
-		{
 			name:     "scripthash",
 			class:    ScriptHashTy,
 			stringed: "scripthash",
-		},
-		{
-			name:     "witnessscripthash",
-			class:    WitnessV0ScriptHashTy,
-			stringed: "witness_v0_scripthash",
 		},
 		{
 			name:     "multisigty",
@@ -1176,10 +1086,17 @@ func TestNullDataScript(t *testing.T) {
 		},
 		{
 			name: "too big",
-			data: hexToBytes("000102030405060708090a0b0c0d0e0f101" +
-				"112131415161718191a1b1c1d1e1f202122232425262" +
-				"728292a2b2c2d2e2f303132333435363738393a3b3c3" +
-				"d3e3f404142434445464748494a4b4c4d4e4f50"),
+			data: hexToBytes(
+				"646578784062697477617463682e636f2092c558ed52c56d" +
+					"8dd14ca76226bc936a84820d898443873eb03d8854b21fa3" +
+					"952b99a2981873e74509281730d78a21786d34a38bd1ebab" +
+					"822fad42278f7f4420db6ab1fd2b6826148d4f73bb41ec2d" +
+					"40a6d5793d66e17074a0c56a8a7df21062308f483dd6e38d" +
+					"53609d350038df0a1b2a9ac8332016e0b904f66880dd0108" +
+					"81c4e8074cce8e4ad6c77cb3460e01bf0e7e811b5f945f83" +
+					"732ba6677520a893d75d9a966cb8f85dc301656b1635c631" +
+					"f5d00d4adf73f2dd112ca75cf19754651909becfbe65aed1" +
+					"3afb2ab800"),
 			expected: nil,
 			err:      scriptError(ErrTooMuchNullData, ""),
 			class:    NonStandardTy,

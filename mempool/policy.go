@@ -1,4 +1,5 @@
 // Copyright (c) 2013-2016 The btcsuite developers
+// Copyright (c) 2018 The bcext developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -19,9 +20,8 @@ const (
 	// that are considered standard in a pay-to-script-hash script.
 	maxStandardP2SHSigOps = 15
 
-	// maxStandardTxCost is the max weight permitted by any transaction
-	// according to the current default policy.
-	maxStandardTxWeight = 400000
+	// maxStandardTxSize is the maximum allowed size for a transaction, in bytes
+	maxStandardTxSize = 1000000
 
 	// maxStandardSigScriptSize is the maximum size allowed for a
 	// transaction input signature script to be considered standard.  This
@@ -215,17 +215,6 @@ func isDust(txOut *wire.TxOut, minRelayTxFee btcutil.Amount) bool {
 	//   36 prev outpoint, 1 script len, 73 script [1 OP_DATA_72,
 	//   72 sig], 4 sequence
 	//
-	// Pay-to-witness-pubkey-hash bytes breakdown:
-	//
-	//  Output to witness key hash (31 bytes);
-	//   8 value, 1 script len, 22 script [1 OP_0, 1 OP_DATA_20,
-	//   20 bytes hash160]
-	//
-	//  Input (67 bytes as the 107 witness stack is discounted):
-	//   36 prev outpoint, 1 script len, 0 script (not sigScript), 107
-	//   witness stack bytes [1 element length, 33 compressed pubkey,
-	//   element length 72 sig], 4 sequence
-	//
 	//
 	// Theoretically this could examine the script type of the output script
 	// and use a different size for the typical input script size for
@@ -236,22 +225,8 @@ func isDust(txOut *wire.TxOut, minRelayTxFee btcutil.Amount) bool {
 	//
 	// The most common scripts are pay-to-pubkey-hash, and as per the above
 	// breakdown, the minimum size of a p2pkh input script is 148 bytes.  So
-	// that figure is used. If the output being spent is a witness program,
-	// then we apply the witness discount to the size of the signature.
-	//
-	// The segwit analogue to p2pkh is a p2wkh output. This is the smallest
-	// output possible using the new segwit features. The 107 bytes of
-	// witness data is discounted by a factor of 4, leading to a computed
-	// value of 67 bytes of witness data.
-	//
-	// Both cases share a 41 byte preamble required to reference the input
-	// being spent and the sequence number of the input.
-	totalSize := txOut.SerializeSize() + 41
-	if txscript.IsWitnessProgram(txOut.PkScript) {
-		totalSize += (107 / blockchain.WitnessScaleFactor)
-	} else {
-		totalSize += 107
-	}
+	// that figure is used.
+	totalSize := txOut.SerializeSize() + 41 + 107
 
 	// The output is considered dust if the cost to the network to spend the
 	// coins is more than 1/3 of the minimum free transaction relay fee.
@@ -299,10 +274,10 @@ func checkTransactionStandard(tx *btcutil.Tx, height int32,
 	// almost as much to process as the sender fees, limit the maximum
 	// size of a transaction.  This also helps mitigate CPU exhaustion
 	// attacks.
-	txWeight := blockchain.GetTransactionWeight(tx)
-	if txWeight > maxStandardTxWeight {
-		str := fmt.Sprintf("weight of transaction %v is larger than max "+
-			"allowed weight of %v", txWeight, maxStandardTxWeight)
+	txSize := tx.MsgTx().SerializeSize()
+	if txSize > maxStandardTxSize {
+		str := fmt.Sprintf("size of transaction %v is larger than max "+
+			"allowed size of %v", txSize, maxStandardTxSize)
 		return txRuleError(wire.RejectNonstandard, str)
 	}
 
@@ -366,17 +341,4 @@ func checkTransactionStandard(tx *btcutil.Tx, height int32,
 	}
 
 	return nil
-}
-
-// GetTxVirtualSize computes the virtual size of a given transaction. A
-// transaction's virtual size is based off its weight, creating a discount for
-// any witness data it contains, proportional to the current
-// blockchain.WitnessScaleFactor value.
-func GetTxVirtualSize(tx *btcutil.Tx) int64 {
-	// vSize := (weight(tx) + 3) / 4
-	//       := (((baseSize * 3) + totalSize) + 3) / 4
-	// We add 3 here as a way to compute the ceiling of the prior arithmetic
-	// to 4. The division by 4 creates a discount for wit witness data.
-	return (blockchain.GetTransactionWeight(tx) + (blockchain.WitnessScaleFactor - 1)) /
-		blockchain.WitnessScaleFactor
 }

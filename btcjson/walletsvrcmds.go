@@ -1,4 +1,5 @@
 // Copyright (c) 2014 The btcsuite developers
+// Copyright (c) 2018 The bcext developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -24,19 +25,6 @@ func NewAddMultisigAddressCmd(nRequired int, keys []string, account *string) *Ad
 		NRequired: nRequired,
 		Keys:      keys,
 		Account:   account,
-	}
-}
-
-// AddWitnessAddressCmd defines the addwitnessaddress JSON-RPC command.
-type AddWitnessAddressCmd struct {
-	Address string
-}
-
-// NewAddWitnessAddressCmd returns a new instance which can be used to issue a
-// addwitnessaddress JSON-RPC command.
-func NewAddWitnessAddressCmd(address string) *AddWitnessAddressCmd {
-	return &AddWitnessAddressCmd{
-		Address: address,
 	}
 }
 
@@ -658,7 +646,6 @@ func init() {
 	flags := UFWalletOnly
 
 	MustRegisterCmd("addmultisigaddress", (*AddMultisigAddressCmd)(nil), flags)
-	MustRegisterCmd("addwitnessaddress", (*AddWitnessAddressCmd)(nil), flags)
 	MustRegisterCmd("createmultisig", (*CreateMultisigCmd)(nil), flags)
 	MustRegisterCmd("dumpprivkey", (*DumpPrivKeyCmd)(nil), flags)
 	MustRegisterCmd("encryptwallet", (*EncryptWalletCmd)(nil), flags)

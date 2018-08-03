@@ -1,4 +1,5 @@
 // Copyright (c) 2018 The btcsuite developers
+// Copyright (c) 2018 The bcext developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -41,7 +42,7 @@ func (msg *MsgCFCheckpt) AddCFHeader(header *chainhash.Hash) error {
 
 // BtcDecode decodes r using the bitcoin protocol encoding into the receiver.
 // This is part of the Message interface implementation.
-func (msg *MsgCFCheckpt) BtcDecode(r io.Reader, pver uint32, _ MessageEncoding) error {
+func (msg *MsgCFCheckpt) BtcDecode(r io.Reader, pver uint32) error {
 	// Read filter type
 	err := readElement(r, &msg.FilterType)
 	if err != nil {
@@ -77,7 +78,7 @@ func (msg *MsgCFCheckpt) BtcDecode(r io.Reader, pver uint32, _ MessageEncoding) 
 
 // BtcEncode encodes the receiver to w using the bitcoin protocol encoding.
 // This is part of the Message interface implementation.
-func (msg *MsgCFCheckpt) BtcEncode(w io.Writer, pver uint32, _ MessageEncoding) error {
+func (msg *MsgCFCheckpt) BtcEncode(w io.Writer, pver uint32) error {
 	// Write filter type
 	err := writeElement(w, msg.FilterType)
 	if err != nil {
@@ -120,7 +121,7 @@ func (msg *MsgCFCheckpt) Deserialize(r io.Reader) error {
 	// At the current time, there is no difference between the wire encoding
 	// and the stable long-term storage format.  As a result, make use of
 	// BtcDecode.
-	return msg.BtcDecode(r, 0, BaseEncoding)
+	return msg.BtcDecode(r, 0)
 }
 
 // Command returns the protocol command string for the message.  This is part

@@ -1,5 +1,6 @@
 // Copyright (c) 2013-2018 The btcsuite developers
 // Copyright (c) 2015-2018 The Decred developers
+// Copyright (c) 2018 The bcext developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -59,29 +60,27 @@ type orphanBlock struct {
 // However, the returned snapshot must be treated as immutable since it is
 // shared by all callers.
 type BestState struct {
-	Hash        chainhash.Hash // The hash of the block.
-	Height      int32          // The height of the block.
-	Bits        uint32         // The difficulty bits of the block.
-	BlockSize   uint64         // The size of the block.
-	BlockWeight uint64         // The weight of the block.
-	NumTxns     uint64         // The number of txns in the block.
-	TotalTxns   uint64         // The total number of txns in the chain.
-	MedianTime  time.Time      // Median time as per CalcPastMedianTime.
+	Hash       chainhash.Hash // The hash of the block.
+	Height     int32          // The height of the block.
+	Bits       uint32         // The difficulty bits of the block.
+	BlockSize  uint64         // The size of the block.
+	NumTxns    uint64         // The number of txns in the block.
+	TotalTxns  uint64         // The total number of txns in the chain.
+	MedianTime time.Time      // Median time as per CalcPastMedianTime.
 }
 
 // newBestState returns a new best stats instance for the given parameters.
-func newBestState(node *blockNode, blockSize, blockWeight, numTxns,
+func newBestState(node *blockNode, blockSize, numTxns,
 	totalTxns uint64, medianTime time.Time) *BestState {
 
 	return &BestState{
-		Hash:        node.hash,
-		Height:      node.height,
-		Bits:        node.bits,
-		BlockSize:   blockSize,
-		BlockWeight: blockWeight,
-		NumTxns:     numTxns,
-		TotalTxns:   totalTxns,
-		MedianTime:  medianTime,
+		Hash:       node.hash,
+		Height:     node.height,
+		Bits:       node.bits,
+		BlockSize:  blockSize,
+		NumTxns:    numTxns,
+		TotalTxns:  totalTxns,
+		MedianTime: medianTime,
 	}
 }
 
@@ -603,8 +602,7 @@ func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block,
 	b.stateLock.RUnlock()
 	numTxns := uint64(len(block.MsgBlock().Transactions))
 	blockSize := uint64(block.MsgBlock().SerializeSize())
-	blockWeight := uint64(GetBlockWeight(block))
-	state := newBestState(node, blockSize, blockWeight, numTxns,
+	state := newBestState(node, blockSize, numTxns,
 		curTotalTxns+numTxns, node.CalcPastMedianTime())
 
 	// Atomically insert info into the database.
@@ -715,9 +713,8 @@ func (b *BlockChain) disconnectBlock(node *blockNode, block *btcutil.Block, view
 	b.stateLock.RUnlock()
 	numTxns := uint64(len(prevBlock.MsgBlock().Transactions))
 	blockSize := uint64(prevBlock.MsgBlock().SerializeSize())
-	blockWeight := uint64(GetBlockWeight(prevBlock))
 	newTotalTxns := curTotalTxns - uint64(len(block.MsgBlock().Transactions))
-	state := newBestState(prevNode, blockSize, blockWeight, numTxns,
+	state := newBestState(prevNode, blockSize, numTxns,
 		newTotalTxns, prevNode.CalcPastMedianTime())
 
 	err = b.db.Update(func(dbTx database.Tx) error {

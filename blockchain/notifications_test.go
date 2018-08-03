@@ -1,4 +1,5 @@
 // Copyright (c) 2017 The btcsuite developers
+// Copyright (c) 2018 The bcext developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -12,7 +13,7 @@ import (
 
 // TestNotifications ensures that notification callbacks are fired on events.
 func TestNotifications(t *testing.T) {
-	blocks, err := loadBlocks("blk_0_to_4.dat.bz2")
+	blocks, err := loadBlocks("blk_0_to_4.dat")
 	if err != nil {
 		t.Fatalf("Error loading file: %v\n", err)
 	}

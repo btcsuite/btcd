@@ -1,4 +1,5 @@
 // Copyright (c) 2016 The btcsuite developers
+// Copyright (c) 2018 The bcext developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -220,8 +221,8 @@ func (p *poolHarness) CreateSignedTx(inputs []spendableOutput, numOutputs uint32
 
 	// Sign the new transaction.
 	for i := range tx.TxIn {
-		sigScript, err := txscript.SignatureScript(tx, i, p.payScript,
-			txscript.SigHashAll, p.signKey, true)
+		sigScript, err := txscript.SignatureScript(tx, i, p.payScript, inputs[i].amount,
+			txscript.SigHashAll|txscript.SigHashForkID, p.signKey, true)
 		if err != nil {
 			return nil, err
 		}
@@ -255,8 +256,8 @@ func (p *poolHarness) CreateTxChain(firstOutput spendableOutput, numTxns uint32)
 		})
 
 		// Sign the new transaction.
-		sigScript, err := txscript.SignatureScript(tx, 0, p.payScript,
-			txscript.SigHashAll, p.signKey, true)
+		sigScript, err := txscript.SignatureScript(tx, 0, p.payScript, spendableAmount,
+			txscript.SigHashAll|txscript.SigHashForkID, p.signKey, true)
 		if err != nil {
 			return nil, err
 		}
@@ -313,7 +314,7 @@ func newPoolHarness(chainParams *chaincfg.Params) (*poolHarness, []spendableOutp
 				FreeTxRelayLimit:     15.0,
 				MaxOrphanTxs:         5,
 				MaxOrphanTxSize:      1000,
-				MaxSigOpCostPerTx:    blockchain.MaxBlockSigOpsCost / 4,
+				MaxSigOpCostPerTx:    blockchain.MaxTxSigOpsCount,
 				MinRelayTxFee:        1000, // 1 Satoshi per byte
 				MaxTxVersion:         1,
 			},

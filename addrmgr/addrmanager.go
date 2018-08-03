@@ -1,4 +1,5 @@
 // Copyright (c) 2013-2016 The btcsuite developers
+// Copyright (c) 2018 The bcext developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -1073,7 +1074,7 @@ func (a *AddrManager) GetBestLocalAddress(remoteAddr *wire.NetAddress) *wire.Net
 		} else {
 			ip = net.IPv4zero
 		}
-		services := wire.SFNodeNetwork | wire.SFNodeWitness | wire.SFNodeBloom
+		services := wire.SFNodeNetwork | wire.SFNodeBloom
 		bestAddress = wire.NewNetAddressIPPort(ip, 0, services)
 	}
 

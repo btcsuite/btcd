@@ -1,4 +1,5 @@
 // Copyright (c) 2013-2016 The btcsuite developers
+// Copyright (c) 2018 The bcext developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -23,8 +24,7 @@ const defaultTransactionAlloc = 2048
 const MaxBlocksPerMsg = 500
 
 // MaxBlockPayload is the maximum bytes a block message can be in bytes.
-// After Segregated Witness, the max block payload has been raised to 4MB.
-const MaxBlockPayload = 4000000
+const MaxBlockPayload = 2 * 32000000
 
 // maxTxPerBlock is the maximum number of transactions that could
 // possibly fit into a block.
@@ -61,7 +61,7 @@ func (msg *MsgBlock) ClearTransactions() {
 // This is part of the Message interface implementation.
 // See Deserialize for decoding blocks stored to disk, such as in a database, as
 // opposed to decoding blocks from the wire.
-func (msg *MsgBlock) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) error {
+func (msg *MsgBlock) BtcDecode(r io.Reader, pver uint32) error {
 	err := readBlockHeader(r, pver, &msg.Header)
 	if err != nil {
 		return err
@@ -84,7 +84,7 @@ func (msg *MsgBlock) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) er
 	msg.Transactions = make([]*MsgTx, 0, txCount)
 	for i := uint64(0); i < txCount; i++ {
 		tx := MsgTx{}
-		err := tx.BtcDecode(r, pver, enc)
+		err := tx.BtcDecode(r, pver)
 		if err != nil {
 			return err
 		}
@@ -107,19 +107,7 @@ func (msg *MsgBlock) Deserialize(r io.Reader) error {
 	// At the current time, there is no difference between the wire encoding
 	// at protocol version 0 and the stable long-term storage format.  As
 	// a result, make use of BtcDecode.
-	//
-	// Passing an encoding type of WitnessEncoding to BtcEncode for the
-	// MessageEncoding parameter indicates that the transactions within the
-	// block are expected to be serialized according to the new
-	// serialization structure defined in BIP0141.
-	return msg.BtcDecode(r, 0, WitnessEncoding)
-}
-
-// DeserializeNoWitness decodes a block from r into the receiver similar to
-// Deserialize, however DeserializeWitness strips all (if any) witness data
-// from the transactions within the block before encoding them.
-func (msg *MsgBlock) DeserializeNoWitness(r io.Reader) error {
-	return msg.BtcDecode(r, 0, BaseEncoding)
+	return msg.BtcDecode(r, 0)
 }
 
 // DeserializeTxLoc decodes r in the same manner Deserialize does, but it takes
@@ -173,7 +161,7 @@ func (msg *MsgBlock) DeserializeTxLoc(r *bytes.Buffer) ([]TxLoc, error) {
 // This is part of the Message interface implementation.
 // See Serialize for encoding blocks to be stored to disk, such as in a
 // database, as opposed to encoding blocks for the wire.
-func (msg *MsgBlock) BtcEncode(w io.Writer, pver uint32, enc MessageEncoding) error {
+func (msg *MsgBlock) BtcEncode(w io.Writer, pver uint32) error {
 	err := writeBlockHeader(w, pver, &msg.Header)
 	if err != nil {
 		return err
@@ -185,7 +173,7 @@ func (msg *MsgBlock) BtcEncode(w io.Writer, pver uint32, enc MessageEncoding) er
 	}
 
 	for _, tx := range msg.Transactions {
-		err = tx.BtcEncode(w, pver, enc)
+		err = tx.BtcEncode(w, pver)
 		if err != nil {
 			return err
 		}
@@ -207,24 +195,11 @@ func (msg *MsgBlock) Serialize(w io.Writer) error {
 	// At the current time, there is no difference between the wire encoding
 	// at protocol version 0 and the stable long-term storage format.  As
 	// a result, make use of BtcEncode.
-	//
-	// Passing WitnessEncoding as the encoding type here indicates that
-	// each of the transactions should be serialized using the witness
-	// serialization structure defined in BIP0141.
-	return msg.BtcEncode(w, 0, WitnessEncoding)
-}
-
-// SerializeNoWitness encodes a block to w using an identical format to
-// Serialize, with all (if any) witness data stripped from all transactions.
-// This method is provided in additon to the regular Serialize, in order to
-// allow one to selectively encode transaction witness data to non-upgraded
-// peers which are unaware of the new encoding.
-func (msg *MsgBlock) SerializeNoWitness(w io.Writer) error {
-	return msg.BtcEncode(w, 0, BaseEncoding)
+	return msg.BtcEncode(w, 0)
 }
 
 // SerializeSize returns the number of bytes it would take to serialize the
-// block, factoring in any witness data within transaction.
+// block.
 func (msg *MsgBlock) SerializeSize() int {
 	// Block header bytes + Serialized varint size for the number of
 	// transactions.
@@ -232,20 +207,6 @@ func (msg *MsgBlock) SerializeSize() int {
 
 	for _, tx := range msg.Transactions {
 		n += tx.SerializeSize()
-	}
-
-	return n
-}
-
-// SerializeSizeStripped returns the number of bytes it would take to serialize
-// the block, excluding any witness data (if any).
-func (msg *MsgBlock) SerializeSizeStripped() int {
-	// Block header bytes + Serialized varint size for the number of
-	// transactions.
-	n := blockHeaderLen + VarIntSerializeSize(uint64(len(msg.Transactions)))
-
-	for _, tx := range msg.Transactions {
-		n += tx.SerializeSizeStripped()
 	}
 
 	return n
@@ -261,8 +222,8 @@ func (msg *MsgBlock) Command() string {
 // receiver.  This is part of the Message interface implementation.
 func (msg *MsgBlock) MaxPayloadLength(pver uint32) uint32 {
 	// Block header at 80 bytes + transaction count + max transactions
-	// which can vary up to the MaxBlockPayload (including the block header
-	// and transaction count).
+	//	// which can vary up to the MaxBlockPayload (including the block header
+	//	// and transaction count).
 	return MaxBlockPayload
 }
 

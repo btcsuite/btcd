@@ -1,4 +1,5 @@
 // Copyright (c) 2013-2017 The btcsuite developers
+// Copyright (c) 2018 The bcext developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -83,8 +84,8 @@ func TestCheckConnectBlockTemplate(t *testing.T) {
 	// (genesis block) -> 1 -> 2 -> 3 -> 4
 	//                          \-> 3a
 	testFiles := []string{
-		"blk_0_to_4.dat.bz2",
-		"blk_3A.dat.bz2",
+		"blk_0_to_4.dat",
+		"blk_3A.dat",
 	}
 
 	var blocks []*btcutil.Block
@@ -176,7 +177,7 @@ func TestCheckSerializedHeight(t *testing.T) {
 	// Create an empty coinbase template to be used in the tests below.
 	coinbaseOutpoint := wire.NewOutPoint(&chainhash.Hash{}, math.MaxUint32)
 	coinbaseTx := wire.NewMsgTx(1)
-	coinbaseTx.AddTxIn(wire.NewTxIn(coinbaseOutpoint, nil, nil))
+	coinbaseTx.AddTxIn(wire.NewTxIn(coinbaseOutpoint, nil))
 
 	// Expected rule errors.
 	missingHeightError := RuleError{

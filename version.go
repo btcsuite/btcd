@@ -1,4 +1,5 @@
 // Copyright (c) 2013-2014 The btcsuite developers
+// Copyright (c) 2018 The bcext developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -17,12 +18,11 @@ const semanticAlphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqr
 // versioning 2.0.0 spec (http://semver.org/).
 const (
 	appMajor uint = 0
-	appMinor uint = 12
-	appPatch uint = 0
-
+	appMinor uint = 17
+	appPatch uint = 1
 	// appPreRelease MUST only contain characters from semanticAlphabet
 	// per the semantic versioning spec.
-	appPreRelease = "beta"
+	appPreRelease = "0"
 )
 
 // appBuild is defined as a variable so it can be overridden during the build
@@ -42,7 +42,7 @@ func version() string {
 	// is not appended if it contains invalid characters.
 	preRelease := normalizeVerString(appPreRelease)
 	if preRelease != "" {
-		version = fmt.Sprintf("%s-%s", version, preRelease)
+		version = fmt.Sprintf("%s.%s", version, preRelease)
 	}
 
 	// Append build metadata if there is any.  The plus called for

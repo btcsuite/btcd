@@ -1,4 +1,5 @@
 // Copyright (c) 2016 The btcsuite developers
+// Copyright (c) 2018 The bcext developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -208,7 +209,7 @@ func (ef *FeeEstimator) ObserveTransaction(t *TxDesc) {
 
 	hash := *t.Tx.Hash()
 	if _, ok := ef.observed[hash]; !ok {
-		size := uint32(GetTxVirtualSize(t.Tx))
+		size := uint32(t.Tx.MsgTx().SerializeSize())
 
 		ef.observed[hash] = &observedTransaction{
 			hash:     hash,

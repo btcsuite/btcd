@@ -1,6 +1,10 @@
 # Temp files
 *~
 
+# IDE
+.idea
+.DS_Store
+
 # Databases
 btcd.db
 *-shm

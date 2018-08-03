@@ -1,4 +1,5 @@
 // Copyright (c) 2013-2016 The btcsuite developers
+// Copyright (c) 2018 The bcext developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -12,8 +13,8 @@ import (
 
 // XXX pedro: we will probably need to bump this.
 const (
-	// ProtocolVersion is the latest protocol version this package supports.
-	ProtocolVersion uint32 = 70013
+	// ProtocolVersion is the latest protocol version this package supports. checked
+	ProtocolVersion uint32 = 70015
 
 	// MultipleAddressVersion is the protocol version which added multiple
 	// addresses per message (pver >= MultipleAddressVersion).
@@ -41,15 +42,15 @@ const (
 	RejectVersion uint32 = 70002
 
 	// BIP0111Version is the protocol version which added the SFNodeBloom
-	// service flag.
+	// service flag. checked
 	BIP0111Version uint32 = 70011
 
 	// SendHeadersVersion is the protocol version which added a new
-	// sendheaders message.
+	// sendheaders message. checked
 	SendHeadersVersion uint32 = 70012
 
 	// FeeFilterVersion is the protocol version which added a new
-	// feefilter message.
+	// feefilter message. checked
 	FeeFilterVersion uint32 = 70013
 )
 
@@ -68,24 +69,24 @@ const (
 	// filtering.
 	SFNodeBloom
 
-	// SFNodeWitness is a flag used to indicate a peer supports blocks
-	// and transactions including witness data (BIP0144).
-	SFNodeWitness
-
 	// SFNodeXthin is a flag used to indicate a peer supports xthin blocks.
 	SFNodeXthin
 
-	// SFNodeBit5 is a flag used to indicate a peer supports a service
-	// defined by bit 5.
-	SFNodeBit5
+	// NODE_BITCOIN_CASH means the node supports Bitcoin Cash and the
+	// associated consensus rule changes.
+	// This service bit is intended to be used prior until some time after the
+	// UAHF activation when the Bitcoin Cash network has adequately separated.
+	// TODO: remove (free up) the NODE_BITCOIN_CASH service bit once no longer
+	// needed.
+	SFNodeBitcoinCash
 
-	// SFNodeCF is a flag used to indicate a peer supports committed
-	// filters (CFs).
-	SFNodeCF
-
-	// SFNode2X is a flag used to indicate a peer is running the Segwit2X
-	// software.
-	SFNode2X
+	// Bits 24-31 are reserved for temporary experiments. Just pick a bit that
+	// isn't getting used, or one not being used much, and notify the
+	// bitcoin-development mailing list. Remember that service bits are just
+	// unauthenticated advertisements, so your code must be robust against
+	// collisions and other cases where nodes may be advertising a service they
+	// do not actually support. Other service bits should be allocated via the
+	// BIP process.
 )
 
 // Map of service flags back to their constant names for pretty printing.
@@ -93,11 +94,7 @@ var sfStrings = map[ServiceFlag]string{
 	SFNodeNetwork: "SFNodeNetwork",
 	SFNodeGetUTXO: "SFNodeGetUTXO",
 	SFNodeBloom:   "SFNodeBloom",
-	SFNodeWitness: "SFNodeWitness",
 	SFNodeXthin:   "SFNodeXthin",
-	SFNodeBit5:    "SFNodeBit5",
-	SFNodeCF:      "SFNodeCF",
-	SFNode2X:      "SFNode2X",
 }
 
 // orderedSFStrings is an ordered list of service flags from highest to
@@ -106,11 +103,7 @@ var orderedSFStrings = []ServiceFlag{
 	SFNodeNetwork,
 	SFNodeGetUTXO,
 	SFNodeBloom,
-	SFNodeWitness,
 	SFNodeXthin,
-	SFNodeBit5,
-	SFNodeCF,
-	SFNode2X,
 }
 
 // String returns the ServiceFlag in human-readable form.
@@ -147,13 +140,13 @@ type BitcoinNet uint32
 // better idea to simply disconnect clients that are misbehaving over TCP.
 const (
 	// MainNet represents the main bitcoin network.
-	MainNet BitcoinNet = 0xd9b4bef9
+	MainNet BitcoinNet = 0xe8f3e1e3
 
 	// TestNet represents the regression test network.
-	TestNet BitcoinNet = 0xdab5bffa
+	TestNet BitcoinNet = 0xfabfb5da
 
 	// TestNet3 represents the test network (version 3).
-	TestNet3 BitcoinNet = 0x0709110b
+	TestNet3 BitcoinNet = 0xf4f3e5f4
 
 	// SimNet represents the simulation test network.
 	SimNet BitcoinNet = 0x12141c16

@@ -1,4 +1,5 @@
 // Copyright (c) 2013-2017 The btcsuite developers
+// Copyright (c) 2018 The bcext developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -18,10 +19,7 @@ import (
 func TestOpcodeDisabled(t *testing.T) {
 	t.Parallel()
 
-	tests := []byte{OP_CAT, OP_SUBSTR, OP_LEFT, OP_RIGHT, OP_INVERT,
-		OP_AND, OP_OR, OP_2MUL, OP_2DIV, OP_MUL, OP_DIV, OP_MOD,
-		OP_LSHIFT, OP_RSHIFT,
-	}
+	tests := []byte{OP_INVERT, OP_2MUL, OP_2DIV, OP_MUL, OP_LSHIFT, OP_RSHIFT}
 	for _, opcodeVal := range tests {
 		pop := parsedOpcode{opcode: &opcodeArray[opcodeVal], data: nil}
 		err := opcodeDisabled(&pop, nil)
@@ -57,8 +55,8 @@ func TestOpcodeDisasm(t *testing.T) {
 		0x75: "OP_DROP", 0x76: "OP_DUP", 0x77: "OP_NIP",
 		0x78: "OP_OVER", 0x79: "OP_PICK", 0x7a: "OP_ROLL",
 		0x7b: "OP_ROT", 0x7c: "OP_SWAP", 0x7d: "OP_TUCK",
-		0x7e: "OP_CAT", 0x7f: "OP_SUBSTR", 0x80: "OP_LEFT",
-		0x81: "OP_RIGHT", 0x82: "OP_SIZE", 0x83: "OP_INVERT",
+		0x7e: "OP_CAT", 0x7f: "OP_SPLIT", 0x80: "OP_NUM2BIN",
+		0x81: "OP_BIN2NUM", 0x82: "OP_SIZE", 0x83: "OP_INVERT",
 		0x84: "OP_AND", 0x85: "OP_OR", 0x86: "OP_XOR",
 		0x87: "OP_EQUAL", 0x88: "OP_EQUALVERIFY", 0x89: "OP_RESERVED1",
 		0x8a: "OP_RESERVED2", 0x8b: "OP_1ADD", 0x8c: "OP_1SUB",

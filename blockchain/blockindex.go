@@ -191,7 +191,6 @@ func (node *blockNode) CalcPastMedianTime() time.Time {
 	for i := 0; i < medianTimeBlocks && iterNode != nil; i++ {
 		timestamps[i] = iterNode.timestamp
 		numNodes++
-
 		iterNode = iterNode.parent
 	}
 

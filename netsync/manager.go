@@ -1,4 +1,5 @@
 // Copyright (c) 2013-2017 The btcsuite developers
+// Copyright (c) 2018 The bcext developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -226,24 +227,10 @@ func (sm *SyncManager) startSync() {
 		return
 	}
 
-	// Once the segwit soft-fork package has activated, we only
-	// want to sync from peers which are witness enabled to ensure
-	// that we fully validate all blockchain data.
-	segwitActive, err := sm.chain.IsDeploymentActive(chaincfg.DeploymentSegwit)
-	if err != nil {
-		log.Errorf("Unable to query for segwit soft-fork state: %v", err)
-		return
-	}
-
 	best := sm.chain.BestSnapshot()
 	var bestPeer *peerpkg.Peer
 	for peer, state := range sm.peerStates {
 		if !state.syncCandidate {
-			continue
-		}
-
-		if segwitActive && !peer.IsWitnessEnabled() {
-			log.Debugf("peer %v not witness enabled, skipping", peer)
 			continue
 		}
 
@@ -334,16 +321,8 @@ func (sm *SyncManager) isSyncCandidate(peer *peerpkg.Peer) bool {
 		}
 	} else {
 		// The peer is not a candidate for sync if it's not a full
-		// node. Additionally, if the segwit soft-fork package has
-		// activated, then the peer must also be upgraded.
-		segwitActive, err := sm.chain.IsDeploymentActive(chaincfg.DeploymentSegwit)
-		if err != nil {
-			log.Errorf("Unable to query for segwit "+
-				"soft-fork state: %v", err)
-		}
 		nodeServices := peer.Services()
-		if nodeServices&wire.SFNodeNetwork != wire.SFNodeNetwork ||
-			(segwitActive && !peer.IsWitnessEnabled()) {
+		if nodeServices&wire.SFNodeNetwork != wire.SFNodeNetwork {
 			return false
 		}
 	}
@@ -746,13 +725,6 @@ func (sm *SyncManager) fetchHeaderBlocks() {
 			sm.requestedBlocks[*node.hash] = struct{}{}
 			syncPeerState.requestedBlocks[*node.hash] = struct{}{}
 
-			// If we're fetching from a witness enabled peer
-			// post-fork, then ensure that we receive all the
-			// witness data in the blocks.
-			if sm.syncPeer.IsWitnessEnabled() {
-				iv.Type = wire.InvTypeWitnessBlock
-			}
-
 			gdmsg.AddInvVect(iv)
 			numRequested++
 		}
@@ -881,15 +853,11 @@ func (sm *SyncManager) handleHeadersMsg(hmsg *headersMsg) {
 // are in the memory pool (either the main pool or orphan pool).
 func (sm *SyncManager) haveInventory(invVect *wire.InvVect) (bool, error) {
 	switch invVect.Type {
-	case wire.InvTypeWitnessBlock:
-		fallthrough
 	case wire.InvTypeBlock:
 		// Ask chain if the block is known to it in any form (main
 		// chain, side chain, or orphan).
 		return sm.chain.HaveBlock(&invVect.Hash)
 
-	case wire.InvTypeWitnessTx:
-		fallthrough
 	case wire.InvTypeTx:
 		// Ask the transaction memory pool if the transaction is known
 		// to it in any form (main pool or orphan).
@@ -979,8 +947,6 @@ func (sm *SyncManager) handleInvMsg(imsg *invMsg) {
 		switch iv.Type {
 		case wire.InvTypeBlock:
 		case wire.InvTypeTx:
-		case wire.InvTypeWitnessBlock:
-		case wire.InvTypeWitnessTx:
 		default:
 			continue
 		}
@@ -1009,14 +975,6 @@ func (sm *SyncManager) handleInvMsg(imsg *invMsg) {
 				if _, exists := sm.rejectedTxns[iv.Hash]; exists {
 					continue
 				}
-			}
-
-			// Ignore invs block invs from non-witness enabled
-			// peers, as after segwit activation we only want to
-			// download from peers that can provide us full witness
-			// data for blocks.
-			if !peer.IsWitnessEnabled() && iv.Type == wire.InvTypeBlock {
-				continue
 			}
 
 			// Add it to the request queue.
@@ -1076,8 +1034,6 @@ func (sm *SyncManager) handleInvMsg(imsg *invMsg) {
 		requestQueue = requestQueue[1:]
 
 		switch iv.Type {
-		case wire.InvTypeWitnessBlock:
-			fallthrough
 		case wire.InvTypeBlock:
 			// Request the block if there is not already a pending
 			// request.
@@ -1086,16 +1042,10 @@ func (sm *SyncManager) handleInvMsg(imsg *invMsg) {
 				sm.limitMap(sm.requestedBlocks, maxRequestedBlocks)
 				state.requestedBlocks[iv.Hash] = struct{}{}
 
-				if peer.IsWitnessEnabled() {
-					iv.Type = wire.InvTypeWitnessBlock
-				}
-
 				gdmsg.AddInvVect(iv)
 				numRequested++
 			}
 
-		case wire.InvTypeWitnessTx:
-			fallthrough
 		case wire.InvTypeTx:
 			// Request the transaction if there is not already a
 			// pending request.
@@ -1103,12 +1053,6 @@ func (sm *SyncManager) handleInvMsg(imsg *invMsg) {
 				sm.requestedTxns[iv.Hash] = struct{}{}
 				sm.limitMap(sm.requestedTxns, maxRequestedTxns)
 				state.requestedTxns[iv.Hash] = struct{}{}
-
-				// If the peer is capable, request the txn
-				// including all witness data.
-				if peer.IsWitnessEnabled() {
-					iv.Type = wire.InvTypeWitnessTx
-				}
 
 				gdmsg.AddInvVect(iv)
 				numRequested++

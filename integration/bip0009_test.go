@@ -1,4 +1,5 @@
 // Copyright (c) 2016 The btcsuite developers
+// Copyright (c) 2018 The bcext developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -299,7 +300,6 @@ func TestBIP0009(t *testing.T) {
 	t.Parallel()
 
 	testBIP0009(t, "dummy", chaincfg.DeploymentTestDummy)
-	testBIP0009(t, "segwit", chaincfg.DeploymentSegwit)
 }
 
 // TestBIP0009Mining ensures blocks built via btcd's CPU miner follow the rules

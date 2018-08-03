@@ -1,4 +1,5 @@
 // Copyright (c) 2014-2016 The btcsuite developers
+// Copyright (c) 2018 The bcext developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -21,15 +22,7 @@ const (
 // the generation of block templates.  See the documentation for
 // NewBlockTemplate for more details on each of these parameters are used.
 type Policy struct {
-	// BlockMinWeight is the minimum block weight to be used when
-	// generating a block template.
-	BlockMinWeight uint32
-
-	// BlockMaxWeight is the maximum block weight to be used when
-	// generating a block template.
-	BlockMaxWeight uint32
-
-	// BlockMinWeight is the minimum block size to be used when generating
+	// BlockMinSize is the minimum block size to be used when generating
 	// a block template.
 	BlockMinSize uint32
 

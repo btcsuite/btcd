@@ -1,4 +1,5 @@
 // Copyright (c) 2013-2017 The btcsuite developers
+// Copyright (c) 2018 The bcext developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -29,7 +30,7 @@ import (
 	"github.com/btcsuite/btcd/mempool"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/go-socks/socks"
-	flags "github.com/jessevdk/go-flags"
+	"github.com/jessevdk/go-flags"
 )
 
 const (
@@ -48,13 +49,7 @@ const (
 	defaultDbType                = "ffldb"
 	defaultFreeTxRelayLimit      = 15.0
 	defaultBlockMinSize          = 0
-	defaultBlockMaxSize          = 750000
-	defaultBlockMinWeight        = 0
-	defaultBlockMaxWeight        = 3000000
 	blockMaxSizeMin              = 1000
-	blockMaxSizeMax              = blockchain.MaxBlockBaseSize - 1000
-	blockMaxWeightMin            = 4000
-	blockMaxWeightMax            = blockchain.MaxBlockWeight - 4000
 	defaultGenerate              = false
 	defaultMaxOrphanTransactions = 100
 	defaultMaxOrphanTxSize       = 100000
@@ -145,8 +140,6 @@ type config struct {
 	MiningAddrs          []string      `long:"miningaddr" description:"Add the specified payment address to the list of addresses to use for generated blocks -- At least one address is required if the generate option is set"`
 	BlockMinSize         uint32        `long:"blockminsize" description:"Mininum block size in bytes to be used when creating a block"`
 	BlockMaxSize         uint32        `long:"blockmaxsize" description:"Maximum block size in bytes to be used when creating a block"`
-	BlockMinWeight       uint32        `long:"blockminweight" description:"Mininum block weight to be used when creating a block"`
-	BlockMaxWeight       uint32        `long:"blockmaxweight" description:"Maximum block weight to be used when creating a block"`
 	BlockPrioritySize    uint32        `long:"blockprioritysize" description:"Size in bytes for high-priority/low-fee transactions when creating a block"`
 	UserAgentComments    []string      `long:"uacomment" description:"Comment to add to the user agent -- See BIP 14 for more information."`
 	NoPeerBloomFilters   bool          `long:"nopeerbloomfilters" description:"Disable bloom filtering support"`
@@ -416,9 +409,7 @@ func loadConfig() (*config, []string, error) {
 		MinRelayTxFee:        mempool.DefaultMinRelayTxFee.ToBTC(),
 		FreeTxRelayLimit:     defaultFreeTxRelayLimit,
 		BlockMinSize:         defaultBlockMinSize,
-		BlockMaxSize:         defaultBlockMaxSize,
-		BlockMinWeight:       defaultBlockMinWeight,
-		BlockMaxWeight:       defaultBlockMaxWeight,
+		BlockMaxSize:         blockchain.DefaultMaxBlockSize,
 		BlockPrioritySize:    mempool.DefaultBlockPrioritySize,
 		MaxOrphanTxs:         defaultMaxOrphanTransactions,
 		SigCacheMaxSize:      defaultSigCacheMaxSize,
@@ -759,26 +750,13 @@ func loadConfig() (*config, []string, error) {
 	}
 
 	// Limit the max block size to a sane value.
-	if cfg.BlockMaxSize < blockMaxSizeMin || cfg.BlockMaxSize >
-		blockMaxSizeMax {
+	if cfg.BlockMaxSize < blockMaxSizeMin ||
+		cfg.BlockMaxSize > blockchain.DefaultMaxBlockSize {
 
 		str := "%s: The blockmaxsize option must be in between %d " +
 			"and %d -- parsed [%d]"
 		err := fmt.Errorf(str, funcName, blockMaxSizeMin,
-			blockMaxSizeMax, cfg.BlockMaxSize)
-		fmt.Fprintln(os.Stderr, err)
-		fmt.Fprintln(os.Stderr, usageMessage)
-		return nil, nil, err
-	}
-
-	// Limit the max block weight to a sane value.
-	if cfg.BlockMaxWeight < blockMaxWeightMin ||
-		cfg.BlockMaxWeight > blockMaxWeightMax {
-
-		str := "%s: The blockmaxweight option must be in between %d " +
-			"and %d -- parsed [%d]"
-		err := fmt.Errorf(str, funcName, blockMaxWeightMin,
-			blockMaxWeightMax, cfg.BlockMaxWeight)
+			blockchain.DefaultMaxBlockSize, cfg.BlockMaxSize)
 		fmt.Fprintln(os.Stderr, err)
 		fmt.Fprintln(os.Stderr, usageMessage)
 		return nil, nil, err
@@ -797,23 +775,9 @@ func loadConfig() (*config, []string, error) {
 	// Limit the block priority and minimum block sizes to max block size.
 	cfg.BlockPrioritySize = minUint32(cfg.BlockPrioritySize, cfg.BlockMaxSize)
 	cfg.BlockMinSize = minUint32(cfg.BlockMinSize, cfg.BlockMaxSize)
-	cfg.BlockMinWeight = minUint32(cfg.BlockMinWeight, cfg.BlockMaxWeight)
 
-	switch {
-	// If the max block size isn't set, but the max weight is, then we'll
-	// set the limit for the max block size to a safe limit so weight takes
-	// precedence.
-	case cfg.BlockMaxSize == defaultBlockMaxSize &&
-		cfg.BlockMaxWeight != defaultBlockMaxWeight:
-
-		cfg.BlockMaxSize = blockchain.MaxBlockBaseSize - 1000
-
-	// If the max block weight isn't set, but the block size is, then we'll
-	// scale the set weight accordingly based on the max block size value.
-	case cfg.BlockMaxSize != defaultBlockMaxSize &&
-		cfg.BlockMaxWeight == defaultBlockMaxWeight:
-
-		cfg.BlockMaxWeight = cfg.BlockMaxSize * blockchain.WitnessScaleFactor
+	if cfg.BlockMaxSize >= blockchain.DefaultMaxBlockSize {
+		cfg.BlockMaxSize = blockchain.DefaultMaxBlockSize
 	}
 
 	// Look for illegal characters in the user agent comments.
@@ -863,7 +827,14 @@ func loadConfig() (*config, []string, error) {
 	// Check mining addresses are valid and saved parsed versions.
 	cfg.miningAddrs = make([]btcutil.Address, 0, len(cfg.MiningAddrs))
 	for _, strAddr := range cfg.MiningAddrs {
-		addr, err := btcutil.DecodeAddress(strAddr, activeNetParams.Params)
+		var addr btcutil.Address
+		var err error
+
+		if len(strAddr) >= 42 {
+			addr, err = btcutil.DecodeCashAddr(strAddr, activeNetParams.Params)
+		} else {
+			addr, err = btcutil.DecodeAddress(strAddr, activeNetParams.Params)
+		}
 		if err != nil {
 			str := "%s: mining address '%s' failed to decode: %v"
 			err := fmt.Errorf(str, funcName, strAddr, err)

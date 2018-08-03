@@ -1,4 +1,5 @@
 // Copyright (c) 2013-2016 The btcsuite developers
+// Copyright (c) 2018 The bcext developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -16,12 +17,8 @@ func TestServiceFlagStringer(t *testing.T) {
 		{SFNodeNetwork, "SFNodeNetwork"},
 		{SFNodeGetUTXO, "SFNodeGetUTXO"},
 		{SFNodeBloom, "SFNodeBloom"},
-		{SFNodeWitness, "SFNodeWitness"},
 		{SFNodeXthin, "SFNodeXthin"},
-		{SFNodeBit5, "SFNodeBit5"},
-		{SFNodeCF, "SFNodeCF"},
-		{SFNode2X, "SFNode2X"},
-		{0xffffffff, "SFNodeNetwork|SFNodeGetUTXO|SFNodeBloom|SFNodeWitness|SFNodeXthin|SFNodeBit5|SFNodeCF|SFNode2X|0xffffff00"},
+		{0xffffffff, "SFNodeNetwork|SFNodeGetUTXO|SFNodeBloom|SFNodeXthin|0xfffffff0"},
 	}
 
 	t.Logf("Running %d tests", len(tests))
