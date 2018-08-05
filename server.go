@@ -27,6 +27,8 @@ import (
 	"github.com/btcsuite/btcd/blockchain/indexers"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/claimtrie"
+	claimtrieconfig "github.com/btcsuite/btcd/claimtrie/config"
 	"github.com/btcsuite/btcd/connmgr"
 	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcd/mempool"
@@ -2726,8 +2728,18 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 		checkpoints = mergeCheckpoints(s.chainParams.Checkpoints, cfg.addCheckpoints)
 	}
 
-	// Create a new block chain instance with the appropriate configuration.
 	var err error
+
+	claimTrieCfg := claimtrieconfig.DefaultConfig
+	claimTrieCfg.DataDir = cfg.DataDir
+	claimTrieCfg.Interrupt = interrupt
+
+	ct, err := claimtrie.New(claimTrieCfg)
+	if err != nil {
+		return nil, err
+	}
+
+	// Create a new block chain instance with the appropriate configuration.
 	s.chain, err = blockchain.New(&blockchain.Config{
 		DB:           s.db,
 		Interrupt:    interrupt,
@@ -2737,6 +2749,7 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 		SigCache:     s.sigCache,
 		IndexManager: indexManager,
 		HashCache:    s.hashCache,
+		ClaimTrie:    ct,
 	})
 	if err != nil {
 		return nil, err
