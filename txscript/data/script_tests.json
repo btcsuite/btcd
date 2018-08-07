@@ -387,6 +387,8 @@
 
 ["RESERVED test coverage"],
 ["RESERVED", "RESERVED EQUAL", "NONE", "ERR_RESERVED_OPCODE", "RESERVED is a reserved opcode"], 
+["0", "IF 0x50{255} ENDIF 1", "NONE", "OK", ">255 opcodes, but RESERVED (0x50) doesn't count towards opcode limit"],
+["0 0x01 0x50", "HASH160 0x14 0x77c33ee1f1892b124f2c9aaed62114c23cffe2da EQUAL", "NONE", "ERR_RESERVED_OPCODE", "OP_RESERVED in P2SH should fail"],
 
 ["TRUE test coverage"],
 ["TRUE", "1 EQUAL", "NONE",  "OK"],
@@ -419,6 +421,7 @@
 ["VER test coverage"],
 ["1","VER", "NONE", "ERR_RESERVED_OPCODE", "OP_VER is reserved"],
 ["1", "IF VER ELSE 1 ENDIF", "NONE", "ERR_RESERVED_OPCODE", "VER non-functional"],
+["0 0x01 VER", "HASH160 0x14 0xe682277f7669fe986d315d52b56df3d244da11a0 EQUAL", "NONE", "ERR_RESERVED_OPCODE", "OP_VER in P2SH should fail"],
 
 ["IF test coverage"],
 ["NOP", "IF 1 ENDIF", "NONE", "ERR_INVALID_STACK_OPERATION", "IF requires an item on the stack and NOP must not be treated as one"],
@@ -785,12 +788,13 @@
 ["22 21 20", "0 PICK 20 EQUALVERIFY 2DROP DROP 1", "CLEANSTACK", "OK"],
 ["22 21 20", "1 PICK 21 EQUALVERIFY 2DROP DROP 1", "CLEANSTACK", "OK"],
 ["22 21 20", "2 PICK 22 EQUALVERIFY 2DROP DROP 1", "CLEANSTACK", "OK"],
+["1 0x02 0x0000", "PICK DROP", "NONE", "ERR_MINIMAL_DATA", "PICK must adhere to the numeric minimal encoding rule for its inputs"],
 ["1 1 1 3", "PICK", "NONE", "ERR_INVALID_STACK_OPERATION"],
 
 ["ROLL test coverage"],
-["", "ROLL 1", "NONE", "ERR_INVALID_STACK_OPERATION", "ROLL requires two items on the stack, the stack has no items"],
-["NOP", "0 ROLL", "NONE", "ERR_INVALID_STACK_OPERATION", "ROLL requires two items on the stack and NOP must not be treated as one"],
-["1", "ROLL 1", "NONE", "ERR_INVALID_STACK_OPERATION", "ROLL requires two items on the stack, the stack has one item"],
+["", "ROLL 1", "NONE", "ERR_INVALID_STACK_OPERATION", "ROLL requires at least two items on the stack, the stack has no items"],
+["NOP", "0 ROLL", "NONE", "ERR_INVALID_STACK_OPERATION", "ROLL requires two at least items on the stack and NOP must not be treated as one"],
+["1", "ROLL 1", "NONE", "ERR_INVALID_STACK_OPERATION", "ROLL requires at least two items on the stack, the stack has one item"],
 ["1", "-1 ROLL", "NONE", "ERR_INVALID_STACK_OPERATION", "ROLL index is out of bounds"],
 ["1 0", "ROLL DROP 1", "CLEANSTACK", "OK"],
 ["1 0 0 0 3", "ROLL 2DROP DROP 1", "NONE", "OK"],
@@ -802,6 +806,7 @@
 ["22 21 20", "0 ROLL 20 EQUALVERIFY 2DROP 1", "CLEANSTACK", "OK"],
 ["22 21 20", "1 ROLL 21 EQUALVERIFY 2DROP 1", "CLEANSTACK", "OK"],
 ["22 21 20", "2 ROLL 22 EQUALVERIFY 2DROP 1", "CLEANSTACK", "OK"],
+["1 0x02 0x0000", "ROLL DROP 1", "NONE", "ERR_MINIMAL_DATA", "ROLL must adhere to the numeric minimal encoding rule for its inputs"],
 
 ["ROT test coverage"],
 ["NOP", "ROT 1", "NONE", "ERR_INVALID_STACK_OPERATION", "ROT requires three items on the stack and NOP must not be treated as one"],
@@ -1256,6 +1261,7 @@
 ["-2147483647", "1ADD 1", "NONE", "OK"],
 ["2147483648 1ADD", "1", "NONE", "ERR_OUT_OF_RANGE", "1ADD must fail with stack item >4 bytes"],
 ["2147483647", "1ADD 1SUB 1", "NONE", "ERR_OUT_OF_RANGE", "We cannot do math on 5-byte integers, even if the result is 4-bytes"],
+["0x02 0x0000", "1ADD DROP 1", "NONE", "ERR_MINIMAL_DATA", "1ADD must adhere to the numeric minimal encoding rule for its input"],
 
 ["1SUB test coverage"],
 ["NOP", "1SUB 1", "NONE", "ERR_INVALID_STACK_OPERATION", "1SUB requires one item on the stack and NOP must not be treated as one"],
@@ -1263,6 +1269,7 @@
 ["111 1SUB", "110 EQUAL", "NONE", "OK"],
 ["-1 1SUB", "-2 EQUAL", "NONE", "OK", "1SUB must decrement the provided numeric stack item by one"],
 ["2147483648 1SUB", "1", "NONE", "ERR_OUT_OF_RANGE", "1SUB must fail with stack item >4 bytes"],
+["0x02 0x0000", "1SUB DROP 1", "NONE", "ERR_MINIMAL_DATA",  "1SUB must adhere to the numeric minimal encoding rule for its input"],
 
 ["2MUL test coverage"],
 ["2 2MUL", "4 EQUAL", "NONE", "ERR_EVAL_FALSE", "2MUL is a NOP"],
@@ -1278,6 +1285,7 @@
 ["2", "NEGATE -2 EQUAL", "NONE", "OK"],
 ["-5", "NEGATE 5 EQUAL", "NONE", "OK", "NEGATE must replace the numeric stack item with its negative equivalent"],
 ["2147483648", "NEGATE -2147483648 EQUAL", "NONE", "ERR_OUT_OF_RANGE", "NEGATE must fail with stack item >4 bytes"],
+["0x02 0x0000", "NEGATE DROP 1", "NONE", "ERR_MINIMAL_DATA", "NEGATE must adhere to the numeric minimal encoding rule for its input"],
 
 ["ABS test coverage"],
 ["NOP", "ABS 1", "NONE", "ERR_INVALID_STACK_OPERATION", "ABS requires an item on the stack and NOP must not be treated as one"],
@@ -1286,6 +1294,7 @@
 ["16 ABS", "16 EQUAL", "NONE", "OK"],
 ["-16 ABS", "16 EQUAL", "NONE", "OK", "ABS must replace the numeric stack item with its absolute equivalent"],
 ["2147483648 ABS", "2147483648 EQUAL", "NONE", "ERR_OUT_OF_RANGE", "ABS must fail with stack item >4 bytes"],
+["0x02 0x0000", "ABS DROP 1", "NONE", "ERR_MINIMAL_DATA", "ABS must adhere to the numeric minimal encoding rule for its input"],
 
 ["NOT test coverage"],
 ["", "NOT 0 EQUAL", "NONE", "ERR_INVALID_STACK_OPERATION", "NOT requires an item on the stack, stack has no items"],
@@ -1295,6 +1304,7 @@
 ["11 NOT", "0 EQUAL", "NONE", "OK"],
 ["-11 NOT", "0 EQUAL", "NONE", "OK", "NOT must invert the boolean value of a numeric stack item (negative numeric case)"],
 ["'abcdef' NOT", "0 EQUAL", "NONE", "ERR_OUT_OF_RANGE", "NOT is an arithmetic operand"],
+["0x02 0x0000", "NOT DROP 1", "NONE", "ERR_MINIMAL_DATA", "NOT must adhere to the numeric minimal encoding rule for its input"],
 
 ["0NOTEQUAL test coverage"],
 ["", "0NOTEQUAL 0 EQUAL", "NONE", "ERR_INVALID_STACK_OPERATION", "0NOTEQUAL requires an item on the stack, stack has no items"],
@@ -1304,6 +1314,7 @@
 ["111 0NOTEQUAL", "1 EQUAL", "NONE", "OK"],
 ["-111 0NOTEQUAL", "1 EQUAL", "NONE", "OK"],
 ["2147483648", "0NOTEQUAL 0 EQUAL", "NONE", "ERR_OUT_OF_RANGE", "0NOTEQUAL must fail with stack item >4 bytes"],
+["0x02 0x0000", "0NOTEQUAL DROP 1", "NONE", "ERR_MINIMAL_DATA", "0NOTEQUAL must adhere to the numeric minimal encoding rule for its input"],
 
 ["ADD test coverage"],
 ["NOP", "ADD 0 EQUAL", "NONE", "ERR_INVALID_STACK_OPERATION", "ADD requires two items on the stack and NOP must not be treated as one"],
@@ -1319,6 +1330,8 @@
 ["-2147483648 0 ADD", "NOP", "NONE", "ERR_OUT_OF_RANGE", "Arithmetic operands must be in range [-2^31...2^31] (negative numerica case)"],
 ["2147483648 1", "ADD 2147483649 EQUAL", "NONE", "ERR_OUT_OF_RANGE", "ADD must fail with second operand >4 bytes"],
 ["1 2147483648", "ADD 2147483649 EQUAL", "NONE", "ERR_OUT_OF_RANGE", "ADD must fail with first operand >4 bytes"],
+["0 0x02 0x0000", "ADD DROP 1", "NONE", "ERR_MINIMAL_DATA", "ADD must adhere to the numeric minimal encoding rule for its inputs (first input)"],
+["0x02 0x0000 0", "ADD DROP 1", "NONE", "ERR_MINIMAL_DATA", "ADD must adhere to the numeric minimal encoding rule for its inputs (second input)"],
 
 ["SUB test coverage"],
 ["NOP", "SUB 0 EQUAL", "NONE", "ERR_INVALID_STACK_OPERATION", "SUB requires two items on the stack and NOP must not be treated as one"],
@@ -1330,6 +1343,8 @@
 ["-1 1 SUB", "-2 EQUAL", "NONE", "OK"],
 ["2147483648 1", "SUB 2147483647 EQUAL", "NONE", "ERR_OUT_OF_RANGE", "SUB must fail with second operand >4 bytes"],
 ["1 2147483648", "SUB 2147483647 EQUAL", "NONE", "ERR_OUT_OF_RANGE", "SUB must fail with first operand >4 bytes"],
+["1 0x02 0x0100", "SUB DROP 1", "NONE", "ERR_MINIMAL_DATA", "SUB must adhere to the numeric minimal encoding rule for its inputs (first input)"],
+["0x02 0x0100 1", "SUB DROP 1", "NONE", "ERR_MINIMAL_DATA", "SUB must adhere to the numeric minimal encoding rule for its inputs (second input)"],
 
 ["MUL test coverage"],
 ["NOP", "MUL 0 EQUAL", "NONE", "ERR_INVALID_STACK_OPERATION", "MUL requires two items on the stack and NOP must not be treated as one"],
@@ -1341,6 +1356,8 @@
 ["-12 12 MUL", "-144 EQUAL", "NONE", "OK"],
 ["2147483648 2", "MUL", "NONE", "ERR_OUT_OF_RANGE", "MUL must fail with second operand >4 bytes"],
 ["2 2147483648", "MUL", "NONE", "ERR_OUT_OF_RANGE", "MUL must fail with first operand item >4 bytes"],
+["1 0x02 0x0100", "MUL DROP 1", "NONE", "ERR_MINIMAL_DATA", "MUL must adhere to the numeric minimal encoding rule for its inputs (first input)"],
+["0x02 0x0100 1", "MUL DROP 1", "NONE", "ERR_MINIMAL_DATA", "MUL must adhere to the numeric minimal encoding rule for its inputs (second input)"],
 
 ["DIV test coverage"],
 ["7 3", "DIV 2 EQUAL", "NONE", "OK", "DIV must perform integer division (7 / 3)"],
@@ -1358,6 +1375,8 @@
 ["6 0", "DIV TRUE", "NONE", "ERR_DIVIDE_BY_ZERO", "DIV must fail with zero divisor"],
 ["1 2147483648", "DIV TRUE", "NONE", "ERR_OUT_OF_RANGE", "DIV must fail with divisor >4 bytes"],
 ["2147483648 1073741824", "DIV TRUE", "NONE", "ERR_OUT_OF_RANGE", "DIV must fail with dividend >4 bytes"],
+["1 0x02 0x0100", "DIV DROP 1", "NONE", "ERR_MINIMAL_DATA", "DIV must adhere to the numeric minimal encoding rule for its inputs (first input)"],
+["0x02 0x0100 1", "DIV DROP 1", "NONE", "ERR_MINIMAL_DATA", "DIV must adhere to the numeric minimal encoding rule for its inputs (second input)"],
 
 ["MOD test coverage"],
 ["7 3", "MOD 1 EQUAL", "NONE", "OK", "MOD must produce expected result (7%3)"],
@@ -1374,6 +1393,8 @@
 ["6 0", "MOD TRUE", "NONE", "ERR_DIVIDE_BY_ZERO", "MOD must fail with zero divisor"],
 ["1 2147483648", "MOD TRUE", "NONE", "ERR_OUT_OF_RANGE", "MOD must fail with divisor >4 bytes"],
 ["2147483648 1073741824", "MOD TRUE", "NONE", "ERR_OUT_OF_RANGE", "MOD must fail with dividend >4 bytes"],
+["1 0x02 0x0100", "MOD DROP 1", "NONE", "ERR_MINIMAL_DATA", "MOD must adhere to the numeric minimal encoding rule for its inputs (first input)"],
+["0x02 0x0100 1", "MOD DROP 1", "NONE", "ERR_MINIMAL_DATA", "MOD must adhere to the numeric minimal encoding rule for its inputs (second input)"],
 
 ["LSHIFT test coverage"],
 ["1 1", "LSHIFT 2 EQUAL", "NONE", "OK", "LSHIFT 0x1 << 1"],
@@ -1418,6 +1439,8 @@
 ["1 33", "LSHIFT 0 EQUAL", "NONE", "ERR_OVERFLOW_SHIFT", "LSHIFT must fail with shift count >32"],
 ["2147483648 1", "LSHIFT TRUE", "NONE", "ERR_OUT_OF_RANGE", "LSHIFT must fail with input value >4 bytes"],
 ["1 2147483648", "LSHIFT TRUE", "NONE", "ERR_OUT_OF_RANGE", "LSHIFT must fail with shift count >4 bytes"],
+["1 0x02 0x0000", "LSHIFT DROP 1", "NONE", "ERR_MINIMAL_DATA", "LSHIFT must adhere to the numeric minimal encoding rule for its inputs (first input)"],
+["0x02 0x0000 0", "LSHIFT DROP 1", "NONE", "ERR_MINIMAL_DATA", "RSHIFT must adhere to the numeric minimal encoding rule for its inputs (second input)"],
 
 ["RSHIFT test coverage"],
 ["1073741825 1", "RSHIFT 536870912 EQUAL", "NONE", "OK", "RSHIFT 0x40000001 >> 1"],
@@ -1466,6 +1489,8 @@
 ["1 33", "RSHIFT 0 EQUAL", "NONE", "ERR_OVERFLOW_SHIFT", "RSHIFT must fail with shift count >32"],
 ["2147483648 1", "RSHIFT TRUE", "NONE", "ERR_OUT_OF_RANGE", "RSHIFT must fail with input value >4 bytes"],
 ["1 2147483648", "RSHIFT TRUE", "NONE", "ERR_OUT_OF_RANGE", "RSHIFT must fail with shift count >4 bytes"],
+["0 0x02 0x0000", "RSHIFT DROP 1", "NONE", "ERR_MINIMAL_DATA", "RSHIFT must adhere to the numeric minimal encoding rule for its inputs (first input)"],
+["0x02 0x0000 0", "RSHIFT DROP 1", "NONE", "ERR_MINIMAL_DATA", "RSHIFT must adhere to the numeric minimal encoding rule for its inputs (second input)"],
 
 ["BOOLAND test coverage"],
 ["NOP BOOLAND", "NOT", "NONE", "ERR_INVALID_STACK_OPERATION", "BOOLAND requires two items on the stack and NOP must not be treated as one"],
@@ -1477,6 +1502,8 @@
 ["0 0 BOOLAND", "NOT", "NONE", "OK"],
 ["2147483648 1 BOOLAND", "NOT", "NONE", "ERR_OUT_OF_RANGE", "BOOLAND must fail with second operand >4 bytes"],
 ["1 2147483648 BOOLAND", "NOT", "NONE", "ERR_OUT_OF_RANGE", "BOOLAND must fail with first operand >4 bytes"],
+["0 0x02 0x0000", "BOOLAND DROP 1", "NONE", "ERR_MINIMAL_DATA", "BOOLAND must adhere to the numeric minimal encoding rule for its inputs (first input)"],
+["0x02 0x0000 0", "BOOLAND DROP 1", "NONE", "ERR_MINIMAL_DATA", "BOOLAND must adhere to the numeric minimal encoding rule for its inputs (second input)"],
 
 ["BOOLOR test coverage"],
 ["NOP BOOLOR", "NOT", "NONE", "ERR_INVALID_STACK_OPERATION", "BOOLOR requires two input values and NOP must not be treated as one"],
@@ -1486,8 +1513,10 @@
 ["1 0 BOOLOR", "NOP", "NONE", "OK"],
 ["0 1 BOOLOR", "NOP", "NONE", "OK"],
 ["0 0 BOOLOR", "NOT", "NONE", "OK"],
-["2147483648 1 BOOLOR", "NOT", "NONE", "ERR_OUT_OF_RANGE", "BOOLAND must fail with second operand >4 bytes"],
-["1 2147483648 BOOLOR", "NOT", "NONE", "ERR_OUT_OF_RANGE", "BOOLAND must fail with first operand >4 bytes"],
+["2147483648 1 BOOLOR", "NOT", "NONE", "ERR_OUT_OF_RANGE", "BOOLOR must fail with second operand >4 bytes"],
+["1 2147483648 BOOLOR", "NOT", "NONE", "ERR_OUT_OF_RANGE", "BOOLOR must fail with first operand >4 bytes"],
+["0 0x02 0x0000", "BOOLOR DROP 1", "NONE", "ERR_MINIMAL_DATA", "BOOLOR must adhere to the numeric minimal encoding rule for its inputs (first input)"],
+["0x02 0x0000 0", "BOOLOR DROP 1", "NONE", "ERR_MINIMAL_DATA", "BOOLOR must adhere to the numeric minimal encoding rule for its inputs (second input)"],
 
 ["NUMEQUAL test coverage"],
 ["NOP", "NUMEQUAL", "NONE", "ERR_INVALID_STACK_OPERATION", "NUMEQUAL requires two items on the stack and NOP must not be treated as one"],
@@ -1502,8 +1531,8 @@
 ["0x03 0x100000", "0x04 0x10000000 NUMEQUAL", "NONE", "ERR_MINIMAL_DATA"],
 ["2147483648 1 NUMEQUAL", "NOT", "NONE", "ERR_OUT_OF_RANGE", "NUMEQUAL must fail with second operand >4 bytes"],
 ["1 2147483648 NUMEQUAL", "NOT", "NONE", "ERR_OUT_OF_RANGE", "NUMEQUAL must fail with first operand >4 bytes"],
-
-["Equivalency of different numeric encodings"],
+["0 0x02 0x0000", "NUMEQUAL DROP 1", "NONE", "ERR_MINIMAL_DATA", "NUMEQUAL must adhere to the numeric minimal encoding rule for its inputs (first input)"],
+["0x02 0x0000 1", "NUMEQUAL DROP 1", "NONE", "ERR_MINIMAL_DATA", "NUMEQUAL must adhere to the numeric minimal encoding rule for its inputs (second input)"],
 ["0x02 0x8000", "128 NUMEQUAL", "NONE", "OK", "0x8000 equals 128"],
 ["0", "0x01 0x80 NUMEQUAL", "NONE", "ERR_MINIMAL_DATA", "Zero numerically equals negative zero but rejected by minimal data encoding requirements"],
 ["0", "0x02 0x0080 NUMEQUAL", "NONE", "ERR_MINIMAL_DATA", "Zero numerically equals negative zero with padding but rejected by minimal data encoding requirements"],
@@ -1525,6 +1554,8 @@
 ["-1 -1", "NUMEQUALVERIFY 1", "NONE", "OK"],
 ["2147483648 1", "NUMEQUALVERIFY 1", "NONE", "ERR_OUT_OF_RANGE", "NUMEQUALVERIFY must fail with second operand >4 bytes"],
 ["1 2147483648", "NUMEQUALVERIFY 1", "NONE", "ERR_OUT_OF_RANGE", "NUMEQUALVERIFY must fail with first operand >4 bytes"],
+["0 0x02 0x0000", "NUMEQUALVERIFY 1", "NONE", "ERR_MINIMAL_DATA", "NUMEQUALVERIFY must adhere to the numeric minimal encoding rule for its inputs (first input)"],
+["0x02 0x0000 0", "NUMEQUALVERIFY 1", "NONE", "ERR_MINIMAL_DATA", "NUMEQUALVERIFY must adhere to the numeric minimal encoding rule for its inputs (second input)"],
 
 ["NUMNOTEQUAL test coverage"],
 ["NOP", "NUMNOTEQUAL", "NONE", "ERR_INVALID_STACK_OPERATION", "NUMNOTEQUAL requires two stack items and NOP must not be treated as one"],
@@ -1535,6 +1566,8 @@
 ["1 -1", "NUMNOTEQUAL", "NONE", "OK"],
 ["2147483648 1", "NUMNOTEQUAL", "NONE", "ERR_OUT_OF_RANGE", "NUMNOTEQUAL must fail with second operand >4 bytes"],
 ["1 2147483648", "NUMNOTEQUAL", "NONE", "ERR_OUT_OF_RANGE", "NUMNOTEQUAL must fail with first operand >4 bytes"],
+["0 0x02 0x0000", "NUMNOTEQUAL DROP 1", "NONE", "ERR_MINIMAL_DATA", "NUMNOTEQUAL must adhere to the numeric minimal encoding rule for its inputs (first input)"],
+["0x02 0x0000 0", "NUMNOTEQUAL DROP 1", "NONE", "ERR_MINIMAL_DATA", "NUMNOTEQUAL must adhere to the numeric minimal encoding rule for its inputs (second input)"],
 
 ["LESSTHAN test coverage"],
 ["NOP", "LESSTHAN", "NONE", "ERR_INVALID_STACK_OPERATION", "LESSTHAN requires two items on the stack and NOP must not be treated as one"],
@@ -1547,6 +1580,8 @@
 ["-11 -10", "LESSTHAN", "NONE", "OK"],
 ["2147483648 1", "LESSTHAN", "NONE", "ERR_OUT_OF_RANGE", "LESSTHAN must fail with second operand >4 bytes"],
 ["1 2147483648", "LESSTHAN", "NONE", "ERR_OUT_OF_RANGE", "LESSTHAN must fail with first operand >4 bytes"],
+["0 0x02 0x0000", "LESSTHAN DROP 1", "NONE", "ERR_MINIMAL_DATA", "LESSTHAN must adhere to the numeric minimal encoding rule for its inputs (first input)"],
+["0x02 0x0000 0", "LESSTHAN DROP 1", "NONE", "ERR_MINIMAL_DATA", "LESSTHAN must adhere to the numeric minimal encoding rule for its inputs (second input)"],
 
 ["GREATERTHAN test coverage"],
 ["NOP", "GREATERTHAN", "NONE", "ERR_INVALID_STACK_OPERATION", "GREATERTHAN requires two items on the stack and NOP must not be treated as one"],
@@ -1559,6 +1594,8 @@
 ["-11 -10", "GREATERTHAN NOT", "NONE", "OK"],
 ["2147483648 1", "GREATERTHAN", "NONE", "ERR_OUT_OF_RANGE", "GREATERTHAN must fail with second operand >4 bytes"],
 ["1 2147483648", "GREATERTHAN", "NONE", "ERR_OUT_OF_RANGE", "GREATERTHAN must fail with first operand >4 bytes"],
+["0 0x02 0x0000", "GREATERTHAN DROP 1", "NONE", "ERR_MINIMAL_DATA", "GREATERTHAN must adhere to the numeric minimal encoding rule for its inputs (first input)"],
+["0x02 0x0000 0", "GREATERTHAN DROP 1", "NONE", "ERR_MINIMAL_DATA", "GREATERTHAN must adhere to the numeric minimal encoding rule for its inputs (second input)"],
 
 ["LESSTHANOREQUAL test coverage"],
 ["NOP", "LESSTHANOREQUAL", "NONE", "ERR_INVALID_STACK_OPERATION", "LESSTHANOREQUAL requires two items on the stack and NOP must not be treated as one"],
@@ -1571,6 +1608,8 @@
 ["-11 -10", "LESSTHANOREQUAL", "NONE", "OK"],
 ["2147483648 1", "LESSTHANOREQUAL", "NONE", "ERR_OUT_OF_RANGE", "LESSTHANOREQUAL must fail with second operand item >4 bytes"],
 ["1 2147483648", "LESSTHANOREQUAL", "NONE", "ERR_OUT_OF_RANGE", "LESSTHANOREQUAL must fail with first operand >4 bytes"],
+["0 0x02 0x0000", "LESSTHANOREQUAL DROP 1", "NONE", "ERR_MINIMAL_DATA", "LESSTHANOREQUAL must adhere to the numeric minimal encoding rule for its inputs (first input)"],
+["0x02 0x0000 0", "LESSTHANOREQUAL DROP 1", "NONE", "ERR_MINIMAL_DATA", "LESSTHANOREQUAL must adhere to the numeric minimal encoding rule for its inputs (second input)"],
 
 ["GREATERTHANOREQUAL test coverage"],
 ["NOP", "GREATERTHANOREQUAL", "NONE", "ERR_INVALID_STACK_OPERATION", "GREATERTHANOREQUAL requires two items on the stack and NOP must not be treated as one"],
@@ -1583,6 +1622,8 @@
 ["-11 -10", "GREATERTHANOREQUAL NOT", "NONE", "OK"],
 ["2147483648 1", "GREATERTHANOREQUAL", "NONE", "ERR_OUT_OF_RANGE", "GREATERTHANOREQUAL must fail with second operand >4 bytes"],
 ["1 2147483648", "GREATERTHANOREQUAL", "NONE", "ERR_OUT_OF_RANGE", "GREATERTHANOREQUAL must fail with first operand >4 bytes"],
+["0 0x02 0x0000", "GREATERTHANOREQUAL DROP 1", "NONE", "ERR_MINIMAL_DATA", "GREATERTHANOREQUAL must adhere to the numeric minimal encoding rule for its inputs (first input)"],
+["0x02 0x0000 0", "GREATERTHANOREQUAL DROP 1", "NONE", "ERR_MINIMAL_DATA", "GREATERTHANOREQUAL must adhere to the numeric minimal encoding rule for its inputs (second input)"],
 
 ["MIN test coverage"],
 ["NOP", "MIN", "NONE", "ERR_INVALID_STACK_OPERATION", "MIN requires two items on the stack and NOP must not be treated as one"],
@@ -1594,6 +1635,8 @@
 ["0 -2147483647 MIN", "-2147483647 NUMEQUAL", "NONE", "OK"],
 ["2147483648 1", "MIN", "NONE", "ERR_OUT_OF_RANGE", "MIN must fail with second operand >4 bytes"],
 ["1 2147483648", "MIN", "NONE", "ERR_OUT_OF_RANGE", "MIN must fail with first operand >4 bytes"],
+["0 0x02 0x0000", "MIN DROP 1", "NONE", "ERR_MINIMAL_DATA", "MIN must adhere to the numeric minimal encoding rule for its inputs (first input)"],
+["0x02 0x0000 0", "MIN DROP 1", "NONE", "ERR_MINIMAL_DATA", "MIN must adhere to the numeric minimal encoding rule for its inputs (second input)"],
 
 ["MAX test coverage"],
 ["NOP", "MAX", "NONE", "ERR_INVALID_STACK_OPERATION", "MAX requires two items on the stack and NOP must not be treated as one"],
@@ -1605,6 +1648,8 @@
 ["0 -2147483647 MAX", "0 NUMEQUAL", "NONE", "OK"],
 ["2147483648 1", "MAX", "NONE", "ERR_OUT_OF_RANGE", "MAX must fail with second operand >4 bytes"],
 ["1 2147483648", "MAX", "NONE", "ERR_OUT_OF_RANGE", "MAX must fail with first operand >4 bytes"],
+["0 0x02 0x0000", "MAX DROP 1", "NONE", "ERR_MINIMAL_DATA", "MAX must adhere to the numeric minimal encoding rule for its inputs (first input)"],
+["0x02 0x0000 0", "MAX DROP 1", "NONE", "ERR_MINIMAL_DATA", "MAX must adhere to the numeric minimal encoding rule for its inputs (second input)"],
 
 ["WITHIN test coverage"],
 ["NOP", "WITHIN", "NONE", "ERR_INVALID_STACK_OPERATION", "WITHIN requires three items on the stack and NOP must not be treated as one"],
@@ -1621,60 +1666,9 @@
 ["-2147483648 -2147483648 0", "WITHIN", "NONE", "ERR_OUT_OF_RANGE", "WITHIN must fail with third operand >4 bytes"],
 ["-1 -2147483648 0", "WITHIN", "NONE", "ERR_OUT_OF_RANGE", "WITHIN must fail with second operand >4 bytes"],
 ["1 0 2147483648", "WITHIN", "NONE", "ERR_OUT_OF_RANGE", "WITHIN must fail with first operand >4 bytes"],
-
-["Test every numeric-accepting opcode for correct handling of the numeric minimal encoding rule"],
-["1 0x02 0x0000", "PICK DROP", "NONE", "ERR_MINIMAL_DATA"],
-["1 0x02 0x0000", "ROLL DROP 1", "NONE", "ERR_MINIMAL_DATA"],
-["0x02 0x0000", "1ADD DROP 1", "NONE", "ERR_MINIMAL_DATA"],
-["0x02 0x0000", "1SUB DROP 1", "NONE", "ERR_MINIMAL_DATA"],
-["0x02 0x0000", "NEGATE DROP 1", "NONE", "ERR_MINIMAL_DATA"],
-["0x02 0x0000", "ABS DROP 1", "NONE", "ERR_MINIMAL_DATA"],
-["0x02 0x0000", "NOT DROP 1", "NONE", "ERR_MINIMAL_DATA"],
-["0x02 0x0000", "0NOTEQUAL DROP 1", "NONE", "ERR_MINIMAL_DATA"],
-["0 0x02 0x0000", "ADD DROP 1", "NONE", "ERR_MINIMAL_DATA"],
-["0x02 0x0000 0", "ADD DROP 1", "NONE", "ERR_MINIMAL_DATA"],
-["1 0x02 0x0100", "SUB DROP 1", "NONE", "ERR_MINIMAL_DATA"],
-["0x02 0x0100 1", "SUB DROP 1", "NONE", "ERR_MINIMAL_DATA"],
-["1 0x02 0x0100", "MUL DROP 1", "NONE", "ERR_MINIMAL_DATA"],
-["0x02 0x0100 1", "MUL DROP 1", "NONE", "ERR_MINIMAL_DATA"],
-["1 0x02 0x0100", "DIV DROP 1", "NONE", "ERR_MINIMAL_DATA"],
-["0x02 0x0100 1", "DIV DROP 1", "NONE", "ERR_MINIMAL_DATA"],
-["1 0x02 0x0100", "MOD DROP 1", "NONE", "ERR_MINIMAL_DATA"],
-["0x02 0x0100 1", "MOD DROP 1", "NONE", "ERR_MINIMAL_DATA"],
-["1 0x02 0x0000", "LSHIFT DROP 1", "NONE", "ERR_MINIMAL_DATA"],
-["0x02 0x0000 0", "LSHIFT DROP 1", "NONE", "ERR_MINIMAL_DATA"],
-["0 0x02 0x0000", "RSHIFT DROP 1", "NONE", "ERR_MINIMAL_DATA"],
-["0x02 0x0000 0", "RSHIFT DROP 1", "NONE", "ERR_MINIMAL_DATA"],
-["0 0x02 0x0000", "BOOLAND DROP 1", "NONE", "ERR_MINIMAL_DATA"],
-["0x02 0x0000 0", "BOOLAND DROP 1", "NONE", "ERR_MINIMAL_DATA"],
-["0 0x02 0x0000", "BOOLOR DROP 1", "NONE", "ERR_MINIMAL_DATA"],
-["0x02 0x0000 0", "BOOLOR DROP 1", "NONE", "ERR_MINIMAL_DATA"],
-["0 0x02 0x0000", "NUMEQUAL DROP 1", "NONE", "ERR_MINIMAL_DATA"],
-["0x02 0x0000 1", "NUMEQUAL DROP 1", "NONE", "ERR_MINIMAL_DATA"],
-["0 0x02 0x0000", "NUMEQUALVERIFY 1", "NONE", "ERR_MINIMAL_DATA"],
-["0x02 0x0000 0", "NUMEQUALVERIFY 1", "NONE", "ERR_MINIMAL_DATA"],
-["0 0x02 0x0000", "NUMNOTEQUAL DROP 1", "NONE", "ERR_MINIMAL_DATA"],
-["0x02 0x0000 0", "NUMNOTEQUAL DROP 1", "NONE", "ERR_MINIMAL_DATA"],
-["0 0x02 0x0000", "LESSTHAN DROP 1", "NONE", "ERR_MINIMAL_DATA"],
-["0x02 0x0000 0", "LESSTHAN DROP 1", "NONE", "ERR_MINIMAL_DATA"],
-["0 0x02 0x0000", "GREATERTHAN DROP 1", "NONE", "ERR_MINIMAL_DATA"],
-["0x02 0x0000 0", "GREATERTHAN DROP 1", "NONE", "ERR_MINIMAL_DATA"],
-["0 0x02 0x0000", "LESSTHANOREQUAL DROP 1", "NONE", "ERR_MINIMAL_DATA"],
-["0x02 0x0000 0", "LESSTHANOREQUAL DROP 1", "NONE", "ERR_MINIMAL_DATA"],
-["0 0x02 0x0000", "GREATERTHANOREQUAL DROP 1", "NONE", "ERR_MINIMAL_DATA"],
-["0x02 0x0000 0", "GREATERTHANOREQUAL DROP 1", "NONE", "ERR_MINIMAL_DATA"],
-["0 0x02 0x0000", "MIN DROP 1", "NONE", "ERR_MINIMAL_DATA"],
-["0x02 0x0000 0", "MIN DROP 1", "NONE", "ERR_MINIMAL_DATA"],
-["0 0x02 0x0000", "MAX DROP 1", "NONE", "ERR_MINIMAL_DATA"],
-["0x02 0x0000 0", "MAX DROP 1", "NONE", "ERR_MINIMAL_DATA"],
 ["0x02 0x0000 0 0", "WITHIN DROP 1", "NONE", "ERR_MINIMAL_DATA"],
 ["0 0x02 0x0000 0", "WITHIN DROP 1", "NONE", "ERR_MINIMAL_DATA"],
 ["0 0 0x02 0x0000", "WITHIN DROP 1", "NONE", "ERR_MINIMAL_DATA"],
-["0 0x02 0x0000", "CHECKMULTISIG DROP 1", "NONE", "ERR_MINIMAL_DATA"],
-["0x02 0x0000 0", "CHECKMULTISIG DROP 1", "NONE", "ERR_MINIMAL_DATA"],
-["0x02 0x0000 0 1", "CHECKMULTISIG DROP 1", "NONE", "ERR_MINIMAL_DATA"],
-["0 0x02 0x0000", "CHECKMULTISIGVERIFY 1", "NONE", "ERR_MINIMAL_DATA"],
-["0x02 0x0000 0", "CHECKMULTISIGVERIFY 1", "NONE", "ERR_MINIMAL_DATA"],
 
 ["RIPEMD160 test coverage"],
 ["NOP", "RIPEMD160", "NONE", "ERR_INVALID_STACK_OPERATION", "RIPEMD160 requires an an item on the stack and NOP must not be treated as one"],
@@ -2565,6 +2559,10 @@
     "NONE", "ERR_SIG_TOO_SHORT",
     "2-of-2 CHECKMULTISIG NOT with both pubkeys valid, but first signature invalid"
 ],
+["0 0x02 0x0000", "CHECKMULTISIG DROP 1", "NONE", "ERR_MINIMAL_DATA", "CHECKMULTISIG must adhere to the numeric minimal encoding rule for its inputs (first input)"],
+["0x02 0x0000 0", "CHECKMULTISIG DROP 1", "NONE", "ERR_MINIMAL_DATA", "CHECKMULTISIG must adhere to the numeric minimal encoding rule for its inputs (second input)"],
+["0x02 0x0000 0 1", "CHECKMULTISIG DROP 1", "NONE", "ERR_MINIMAL_DATA", "CHECKMULTISIG must adhere to the numeric minimal encoding rule for its inputs (third input)"],
+
 
 ["While not really correctly DER encoded, the empty signature is allowed by"],
 ["strict encoding to provide a compact way to provide a delibrately invalid signature."],
@@ -2601,6 +2599,8 @@
 ["", "0 <0>{18} 18 CHECKMULTISIGVERIFY DEPTH 0 EQUAL", "NONE", "OK", "CHECKMULTISIGVERIFY must allow 18 pubkeys"],
 ["", "0 <0>{19} 19 CHECKMULTISIGVERIFY DEPTH 0 EQUAL", "NONE", "OK", "CHECKMULTISIGVERIFY must allow 19 pubkeys"],
 ["", "0 <0>{20} 20 CHECKMULTISIGVERIFY DEPTH 0 EQUAL", "NONE", "OK", "CHECKMULTISIGVERIFY must allow 20 pubkeys"],
+["0 0x02 0x0000", "CHECKMULTISIGVERIFY 1", "NONE", "ERR_MINIMAL_DATA", "CHECKMULTISIGVERIFY must adhere to the numeric minimal encoding rule for its inputs (first input)"],
+["0x02 0x0000 0", "CHECKMULTISIGVERIFY 1", "NONE", "ERR_MINIMAL_DATA", "CHECKMULTISIGVERIFY must adhere to the numeric minimal encoding rule for its inputs (second input)"],
 
 ["Reserved opcode tests"],
 
@@ -2786,11 +2786,6 @@
 ["1 1","IF 0xfd ELSE ENDIF", "NONE", "ERR_RESERVED_OPCODE", "Opcode 0xfd is reserved in executed branch"],
 ["1 1","IF 0xfe ELSE ENDIF", "NONE", "ERR_RESERVED_OPCODE", "Opcode 0xfe is reserved in executed branch"],
 ["1 1","IF 0xff ELSE ENDIF", "NONE", "ERR_RESERVED_OPCODE", "Opcode 0xff is reserved in executed branch"],
-
-["0", "IF 0x50{255} ENDIF 1", "NONE", "OK", ">255 opcodes, but RESERVED (0x50) doesn't count towards opcode limit"],
-
-["0 0x01 0x50", "HASH160 0x14 0x77c33ee1f1892b124f2c9aaed62114c23cffe2da EQUAL", "NONE", "ERR_RESERVED_OPCODE", "OP_RESERVED in P2SH should fail"],
-["0 0x01 VER", "HASH160 0x14 0xe682277f7669fe986d315d52b56df3d244da11a0 EQUAL", "NONE", "ERR_RESERVED_OPCODE", "OP_VER in P2SH should fail"],
 
 ["The End"]
 ]
