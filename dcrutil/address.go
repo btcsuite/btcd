@@ -1,5 +1,5 @@
 // Copyright (c) 2013, 2014 The btcsuite developers
-// Copyright (c) 2015-2016 The Decred developers
+// Copyright (c) 2015-2018 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -209,8 +209,8 @@ func detectNetworkForAddress(addr string) (*chaincfg.Params, error) {
 	switch networkChar {
 	case chaincfg.MainNetParams.NetworkAddressPrefix:
 		return &chaincfg.MainNetParams, nil
-	case chaincfg.TestNet2Params.NetworkAddressPrefix:
-		return &chaincfg.TestNet2Params, nil
+	case chaincfg.TestNet3Params.NetworkAddressPrefix:
+		return &chaincfg.TestNet3Params, nil
 	case chaincfg.SimNetParams.NetworkAddressPrefix:
 		return &chaincfg.SimNetParams, nil
 	}

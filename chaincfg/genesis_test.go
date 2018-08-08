@@ -1,5 +1,5 @@
 // Copyright (c) 2014-2016 The btcsuite developers
-// Copyright (c) 2015-2016 The Decred developers
+// Copyright (c) 2015-2018 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -16,7 +16,6 @@ import (
 // TestGenesisBlock tests the genesis block of the main network for validity by
 // checking the encoded bytes and hashes.
 func TestGenesisBlock(t *testing.T) {
-
 	genesisBlockBytes, _ := hex.DecodeString("0100000000000000000000000000" +
 		"000000000000000000000000000000000000000000000dc101dfc3c6a2eb10ca0" +
 		"c5374e10d28feb53f7eabcc850511ceadb99174aa660000000000000000000000" +
@@ -52,29 +51,26 @@ func TestGenesisBlock(t *testing.T) {
 }
 
 // TestTestNetGenesisBlock tests the genesis block of the test network (version
-// 9) for validity by checking the encoded bytes and hashes.
+// 3) for validity by checking the encoded bytes and hashes.
 func TestTestNetGenesisBlock(t *testing.T) {
 	// Encode the genesis block to raw bytes.
 	var buf bytes.Buffer
-	err := TestNet2Params.GenesisBlock.Serialize(&buf)
+	err := TestNet3Params.GenesisBlock.Serialize(&buf)
 	if err != nil {
 		t.Fatalf("TestTestNetGenesisBlock: %v", err)
 	}
 
-	testNetGenesisBlockBytes, _ := hex.DecodeString("0400000000000000000" +
-		"000000000000000000000000000000000000000000000000000000571a3f8bb" +
-		"1903091a18edd3efbc324c79876764af2424071a480d3f04ea16a2000000000" +
-		"000000000000000000000000000000000000000000000000000000000000000" +
-		"000000000000000000000000ffff001e002d310100000000000000000000000" +
-		"040bcc8581aa4ae180000000000000000000000000000000000000000000000" +
-		"000000000000000000000000000101000000010000000000000000000000000" +
-		"000000000000000000000000000000000000000ffffffff00ffffffff010000" +
-		"0000000000000000434104678afdb0fe5548271967f1a67130b7105cd6a828e" +
-		"03909a67962e0ea1f61deb649f6bc3f4cef38c4f35504e51ec112de5c384df7" +
-		"ba0b8d578a4c702b6bf11d5fac0000000000000000010000000000000000000" +
-		"00000000000004d04ffff001d0104455468652054696d65732030332f4a616e" +
-		"2f32303039204368616e63656c6c6f72206f6e206272696e6b206f662073656" +
-		"36f6e64206261696c6f757420666f722062616e6b7300")
+	testNetGenesisBlockBytes, _ := hex.DecodeString("06000000000000000000" +
+		"00000000000000000000000000000000000000000000000000002c0ad603" +
+		"d44a16698ac951fa22aab5e7b30293fa1d0ac72560cdfcc9eabcdfe70000" +
+		"000000000000000000000000000000000000000000000000000000000000" +
+		"00000000000000000000000000000000ffff001e002d3101000000000000" +
+		"000000000000808f675b1aa4ae1800000000000000000000000000000000" +
+		"000000000000000000000000000000000600000001010000000100000000" +
+		"00000000000000000000000000000000000000000000000000000000ffff" +
+		"ffff00ffffffff010000000000000000000020801679e98561ada96caec2" +
+		"949a5d41c4cab3851eb740d951c10ecbcf265c1fd9000000000000000001" +
+		"ffffffffffffffff00000000ffffffff02000000")
 
 	// Ensure the encoded block matches the expected bytes.
 	if !bytes.Equal(buf.Bytes(), testNetGenesisBlockBytes) {
@@ -85,11 +81,11 @@ func TestTestNetGenesisBlock(t *testing.T) {
 	}
 
 	// Check hash of the block against expected hash.
-	hash := TestNet2Params.GenesisBlock.BlockHash()
-	if !TestNet2Params.GenesisHash.IsEqual(&hash) {
+	hash := TestNet3Params.GenesisBlock.BlockHash()
+	if !TestNet3Params.GenesisHash.IsEqual(&hash) {
 		t.Fatalf("TestTestNetGenesisBlock: Genesis block hash does "+
 			"not appear valid - got %v, want %v", spew.Sdump(hash),
-			spew.Sdump(TestNet2Params.GenesisHash))
+			spew.Sdump(TestNet3Params.GenesisHash))
 	}
 }
 

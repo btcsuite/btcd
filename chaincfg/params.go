@@ -653,5 +653,6 @@ func init() {
 	// Register all default networks when the package is initialized.
 	mustRegister(&MainNetParams)
 	mustRegister(&TestNet2Params)
+	mustRegister(&TestNet3Params)
 	mustRegister(&SimNetParams)
 }

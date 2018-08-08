@@ -1,5 +1,5 @@
 // Copyright (c) 2013-2016 The btcsuite developers
-// Copyright (c) 2015-2017 The Decred developers
+// Copyright (c) 2015-2018 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -114,6 +114,9 @@ const (
 	// TestNet2 represents the 2nd test network.
 	TestNet2 CurrencyNet = 0x48e7a065
 
+	// TestNet3 represents the 3rd test network.
+	TestNet3 CurrencyNet = 0xb194aa75
+
 	// SimNet represents the simulation test network.
 	SimNet CurrencyNet = 0x12141c16
 )
@@ -123,6 +126,7 @@ const (
 var bnStrings = map[CurrencyNet]string{
 	MainNet:  "MainNet",
 	TestNet2: "TestNet2",
+	TestNet3: "TestNet3",
 	RegTest:  "RegNet",
 	SimNet:   "SimNet",
 }

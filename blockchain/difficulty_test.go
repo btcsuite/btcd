@@ -519,7 +519,7 @@ func TestEstimateNextStakeDiffV2(t *testing.T) {
 	// ones.  All of the test values will need to be updated if these
 	// parameters change since they are manually calculated based on them.
 	mainNetParams := &chaincfg.MainNetParams
-	testNetParams := &chaincfg.TestNet2Params
+	testNetParams := &chaincfg.TestNet3Params
 	assertStakeDiffParamsMainNet(t, mainNetParams)
 	assertStakeDiffParamsTestNet(t, testNetParams)
 	minStakeDiffMainNet := mainNetParams.MinimumStakeDiff

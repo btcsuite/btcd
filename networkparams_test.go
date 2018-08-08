@@ -74,9 +74,11 @@ func checkGenesisBlockRespectsNetworkPowLimit(
 func TestDecredNetworkSettings(t *testing.T) {
 	checkPowLimitsAreConsistent(t, chaincfg.MainNetParams)
 	checkPowLimitsAreConsistent(t, chaincfg.TestNet2Params)
+	checkPowLimitsAreConsistent(t, chaincfg.TestNet3Params)
 	checkPowLimitsAreConsistent(t, chaincfg.SimNetParams)
 
 	checkGenesisBlockRespectsNetworkPowLimit(t, chaincfg.MainNetParams)
 	checkGenesisBlockRespectsNetworkPowLimit(t, chaincfg.TestNet2Params)
+	checkGenesisBlockRespectsNetworkPowLimit(t, chaincfg.TestNet3Params)
 	checkGenesisBlockRespectsNetworkPowLimit(t, chaincfg.SimNetParams)
 }

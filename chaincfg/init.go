@@ -1,4 +1,4 @@
-// Copyright (c) 2017 The Decred developers
+// Copyright (c) 2017-2018 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -145,19 +145,9 @@ func validateDeployments(deployments []ConsensusDeployment) (int, error) {
 }
 
 func validateAgendas() {
-	for i := 0; i < 3; i++ {
-		var params Params
-		switch i {
-		case 0:
-			params = MainNetParams
-		case 1:
-			params = TestNet2Params
-		case 2:
-			params = SimNetParams
-		default:
-			panic("invalid net")
-		}
-
+	allParams := []*Params{&MainNetParams, &TestNet2Params, &TestNet3Params,
+		&SimNetParams}
+	for _, params := range allParams {
 		for version, deployments := range params.Deployments {
 			index, err := validateDeployments(deployments)
 			if err != nil {

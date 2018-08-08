@@ -38,6 +38,13 @@ var testNet2Params = params{
 	rpcPort: "19109",
 }
 
+// testNet3Params contains parameters specific to the test network (version 3)
+// (wire.TestNet3).
+var testNet3Params = params{
+	Params:  &chaincfg.TestNet3Params,
+	rpcPort: "19109",
+}
+
 // simNetParams contains parameters specific to the simulation test network
 // (wire.SimNet).
 var simNetParams = params{

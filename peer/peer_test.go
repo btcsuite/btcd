@@ -646,7 +646,7 @@ func TestOutboundPeer(t *testing.T) {
 	p1.Disconnect()
 
 	// Test testnet
-	peerCfg.ChainParams = &chaincfg.TestNet2Params
+	peerCfg.ChainParams = &chaincfg.TestNet3Params
 	peerCfg.Services = wire.SFNodeBloom
 	r2, w2 := io.Pipe()
 	c2 := &conn{raddr: "10.0.0.1:8333", Writer: w2, Reader: r2}

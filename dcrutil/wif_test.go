@@ -1,5 +1,5 @@
 // Copyright (c) 2013, 2014 The btcsuite developers
-// Copyright (c) 2015 The Decred developers
+// Copyright (c) 2015-2018 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -69,7 +69,7 @@ func TestEncodeDecodeWIF(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		wif2, err := NewWIF(priv2, &chaincfg.TestNet2Params, suite)
+		wif2, err := NewWIF(priv2, &chaincfg.TestNet3Params, suite)
 		if err != nil {
 			t.Fatal(err)
 		}

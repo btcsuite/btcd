@@ -496,6 +496,13 @@ func (b *BlockChain) ThresholdState(hash *chainhash.Hash, version uint32, deploy
 //
 // This function MUST be called with the chain state lock held (for writes).
 func (b *BlockChain) isLNFeaturesAgendaActive(prevNode *blockNode) (bool, error) {
+	// Consensus voting on LN features is only enabled on mainnet, testnet
+	// v2, and simnet.
+	net := b.chainParams.Net
+	if net != wire.MainNet && net != wire.TestNet2 && net != wire.SimNet {
+		return true, nil
+	}
+
 	// Determine the version for the LN features agenda as defined in
 	// DCP0002 and DCP0003 for the provided network.
 	deploymentVer := uint32(5)

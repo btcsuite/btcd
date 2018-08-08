@@ -80,7 +80,7 @@ func loadConfig() (*config, []string, error) {
 	// while we're at it
 	if cfg.TestNet {
 		numNets++
-		activeNetParams = &chaincfg.TestNet2Params
+		activeNetParams = &chaincfg.TestNet3Params
 	}
 	if cfg.SimNet {
 		numNets++

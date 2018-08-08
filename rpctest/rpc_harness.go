@@ -1,5 +1,5 @@
 // Copyright (c) 2016 The btcsuite developers
-// Copyright (c) 2017 The Decred developers
+// Copyright (c) 2017-2018 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -109,7 +109,7 @@ func New(activeNet *chaincfg.Params, handlers *rpcclient.NotificationHandlers, e
 	switch activeNet.Net {
 	case wire.MainNet:
 		// No extra flags since mainnet is the default
-	case wire.TestNet2:
+	case wire.TestNet3:
 		extraArgs = append(extraArgs, "--testnet")
 	case wire.SimNet:
 		extraArgs = append(extraArgs, "--simnet")

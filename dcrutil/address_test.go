@@ -19,7 +19,7 @@ import (
 )
 
 func TestAddresses(t *testing.T) {
-	testNetParams := &chaincfg.TestNet2Params
+	testNetParams := &chaincfg.TestNet3Params
 	tests := []struct {
 		name    string
 		addr    string

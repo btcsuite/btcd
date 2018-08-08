@@ -40,7 +40,7 @@ func TestRegister(t *testing.T) {
 		err  error
 	}
 
-	testNetParams := &TestNet2Params
+	testNetParams := &TestNet3Params
 	tests := []struct {
 		name        string
 		register    []registerTest

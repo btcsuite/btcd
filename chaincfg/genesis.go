@@ -1,5 +1,5 @@
 // Copyright (c) 2014-2016 The btcsuite developers
-// Copyright (c) 2015-2016 The Decred developers
+// Copyright (c) 2015-2018 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -161,6 +161,28 @@ var testNet2GenesisBlock = wire.MsgBlock{
 // test network.
 var testNet2GenesisHash = testNet2GenesisBlock.BlockHash()
 
+// TestNet3 ------------------------------------------------------------------------
+
+// testNet3GenesisBlock defines the genesis block of the block chain which
+// serves as the public transaction ledger for the test network (version 3).
+var testNet3GenesisBlock = wire.MsgBlock{
+	Header: wire.BlockHeader{
+		Version:      6,
+		PrevBlock:    chainhash.Hash{},
+		MerkleRoot:   genesisCoinbaseTx.TxHash(),
+		Timestamp:    time.Unix(1533513600, 0), // 2018-08-06 00:00:00 +0000 UTC
+		Bits:         0x1e00ffff,               // Difficulty 1 [000000ffff000000000000000000000000000000000000000000000000000000]
+		SBits:        20000000,
+		Nonce:        0x18aea41a,
+		StakeVersion: 6,
+	},
+	Transactions: []*wire.MsgTx{&genesisCoinbaseTx},
+}
+
+// testNet3GenesisHash is the hash of the first block in the block chain for the
+// test network (version 3).
+var testNet3GenesisHash = testNet3GenesisBlock.BlockHash()
+
 // SimNet -------------------------------------------------------------------------
 
 var regTestGenesisCoinbaseTx = wire.MsgTx{
@@ -237,7 +259,7 @@ var simNetGenesisBlock = wire.MsgBlock{
 		Revocations:  0,
 		Timestamp:    time.Unix(1401292357, 0), // 2009-01-08 20:54:25 -0600 CST
 		PoolSize:     0,
-		Bits:         0x207fffff, // 545259519
+		Bits:         0x207fffff, // 545259519 [7fffff0000000000000000000000000000000000000000000000000000000000]
 		SBits:        0,
 		Nonce:        0,
 		StakeVersion: 0,
