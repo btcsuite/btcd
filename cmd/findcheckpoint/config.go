@@ -1,5 +1,5 @@
 // Copyright (c) 2013-2016 The btcsuite developers
-// Copyright (c) 2015-2016 The Decred developers
+// Copyright (c) 2015-2018 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -14,7 +14,6 @@ import (
 	"github.com/decred/dcrd/database"
 	_ "github.com/decred/dcrd/database/ffldb"
 	"github.com/decred/dcrd/dcrutil"
-	"github.com/decred/dcrd/wire"
 	flags "github.com/jessevdk/go-flags"
 )
 
@@ -53,24 +52,6 @@ func validDbType(dbType string) bool {
 	}
 
 	return false
-}
-
-// netName returns the name used when referring to a Decred network.  At the
-// time of writing, dcrd currently places blocks for testnet version 2 in the
-// data and log directory "testnet2", which does not match the Name field of the
-// chaincfg parameters.  This function can be used to override this directory name
-// as "testnet2" when the passed active network matches wire.TestNet2.
-//
-// A proper upgrade to move the data and log directories for this network to
-// "testnet2" is planned for the future, at which point this function can be
-// removed and the network parameter's name used instead.
-func netName(chainParams *chaincfg.Params) string {
-	switch chainParams.Net {
-	case wire.TestNet2:
-		return "testnet2"
-	default:
-		return chainParams.Name
-	}
 }
 
 // loadConfig initializes and parses the config using command line options.
@@ -130,7 +111,7 @@ func loadConfig() (*config, []string, error) {
 	// All data is specific to a network, so namespacing the data directory
 	// means each individual piece of serialized data does not have to
 	// worry about changing names per network and such.
-	cfg.DataDir = filepath.Join(cfg.DataDir, netName(activeNetParams))
+	cfg.DataDir = filepath.Join(cfg.DataDir, activeNetParams.Name)
 
 	// Validate the number of candidates.
 	if cfg.NumCandidates < minCandidates || cfg.NumCandidates > maxCandidates {

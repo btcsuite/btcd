@@ -1,5 +1,5 @@
 // Copyright (c) 2013-2016 The btcsuite developers
-// Copyright (c) 2015-2016 The Decred developers
+// Copyright (c) 2015-2018 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -7,7 +7,6 @@ package main
 
 import (
 	"github.com/decred/dcrd/chaincfg"
-	"github.com/decred/dcrd/wire"
 )
 
 // activeNetParams is a pointer to the parameters specific to the
@@ -44,22 +43,4 @@ var testNet2Params = params{
 var simNetParams = params{
 	Params:  &chaincfg.SimNetParams,
 	rpcPort: "19556",
-}
-
-// netName returns the name used when referring to a Decred network.  At the
-// time of writing, dcrd currently places blocks for testnet version 0 in the
-// data and log directory "testnet", which does not match the Name field of the
-// chaincfg parameters.  This function can be used to override this directory name
-// as "testnet2" when the passed active network matches wire.TestNet2.
-//
-// A proper upgrade to move the data and log directories for this network to
-// "testnet" is planned for the future, at which point this function can be
-// removed and the network parameter's name used instead.
-func netName(chainParams *params) string {
-	switch chainParams.Net {
-	case wire.TestNet2:
-		return "testnet2"
-	default:
-		return chainParams.Name
-	}
 }
