@@ -1,4 +1,4 @@
-// Copyright (c) 2015-2016 The Decred developers
+// Copyright (c) 2015-2018 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -40,6 +40,7 @@ func TestRegister(t *testing.T) {
 		err  error
 	}
 
+	testNetParams := &TestNet2Params
 	tests := []struct {
 		name        string
 		register    []registerTest
@@ -57,7 +58,7 @@ func TestRegister(t *testing.T) {
 				},
 				{
 					name:   "duplicate testnet",
-					params: &TestNet2Params,
+					params: testNetParams,
 					err:    ErrDuplicateNet,
 				},
 				{
@@ -72,7 +73,7 @@ func TestRegister(t *testing.T) {
 					valid: true,
 				},
 				{
-					magic: TestNet2Params.PubKeyHashAddrID,
+					magic: testNetParams.PubKeyHashAddrID,
 					valid: true,
 				},
 				{
@@ -94,7 +95,7 @@ func TestRegister(t *testing.T) {
 					valid: true,
 				},
 				{
-					magic: TestNet2Params.ScriptHashAddrID,
+					magic: testNetParams.ScriptHashAddrID,
 					valid: true,
 				},
 				{
@@ -117,8 +118,8 @@ func TestRegister(t *testing.T) {
 					err:  nil,
 				},
 				{
-					priv: TestNet2Params.HDPrivateKeyID[:],
-					want: TestNet2Params.HDPublicKeyID[:],
+					priv: testNetParams.HDPrivateKeyID[:],
+					want: testNetParams.HDPublicKeyID[:],
 					err:  nil,
 				},
 				{
@@ -155,7 +156,7 @@ func TestRegister(t *testing.T) {
 					valid: true,
 				},
 				{
-					magic: TestNet2Params.PubKeyHashAddrID,
+					magic: testNetParams.PubKeyHashAddrID,
 					valid: true,
 				},
 				{
@@ -177,7 +178,7 @@ func TestRegister(t *testing.T) {
 					valid: true,
 				},
 				{
-					magic: TestNet2Params.ScriptHashAddrID,
+					magic: testNetParams.ScriptHashAddrID,
 					valid: true,
 				},
 				{
@@ -211,7 +212,7 @@ func TestRegister(t *testing.T) {
 				},
 				{
 					name:   "duplicate testnet",
-					params: &TestNet2Params,
+					params: testNetParams,
 					err:    ErrDuplicateNet,
 				},
 				{
@@ -231,7 +232,7 @@ func TestRegister(t *testing.T) {
 					valid: true,
 				},
 				{
-					magic: TestNet2Params.PubKeyHashAddrID,
+					magic: testNetParams.PubKeyHashAddrID,
 					valid: true,
 				},
 				{
@@ -253,7 +254,7 @@ func TestRegister(t *testing.T) {
 					valid: true,
 				},
 				{
-					magic: TestNet2Params.ScriptHashAddrID,
+					magic: testNetParams.ScriptHashAddrID,
 					valid: true,
 				},
 				{
@@ -276,8 +277,8 @@ func TestRegister(t *testing.T) {
 					err:  nil,
 				},
 				{
-					priv: TestNet2Params.HDPrivateKeyID[:],
-					want: TestNet2Params.HDPublicKeyID[:],
+					priv: testNetParams.HDPrivateKeyID[:],
+					want: testNetParams.HDPublicKeyID[:],
 					err:  nil,
 				},
 				{

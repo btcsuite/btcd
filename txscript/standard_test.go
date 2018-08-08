@@ -498,9 +498,10 @@ func (b *bogusAddress) DSA(chainParams *chaincfg.Params) dcrec.SignatureType {
 	return -1
 }
 
-// Net returns &chaincfg.TestNet2Params.
+// Net returns the network for the bogus address.  It exists to satisfy the
+// dcrutil.Address interface.
 func (b *bogusAddress) Net() *chaincfg.Params {
-	return &chaincfg.TestNet2Params
+	return &chaincfg.SimNetParams
 }
 
 // TestPayToAddrScript ensures the PayToAddrScript function generates the

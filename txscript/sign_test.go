@@ -22,7 +22,7 @@ import (
 
 // testingParams defines the chain params to use throughout these tests so it
 // can more easily be changed if desired.
-var testingParams = &chaincfg.TestNet2Params
+var testingParams = &chaincfg.SimNetParams
 
 const testValueIn = 12345
 
