@@ -145,8 +145,7 @@ func validateDeployments(deployments []ConsensusDeployment) (int, error) {
 }
 
 func validateAgendas() {
-	allParams := []*Params{&MainNetParams, &TestNet2Params, &TestNet3Params,
-		&SimNetParams}
+	allParams := []*Params{&MainNetParams, &TestNet3Params, &SimNetParams}
 	for _, params := range allParams {
 		for version, deployments := range params.Deployments {
 			index, err := validateDeployments(deployments)

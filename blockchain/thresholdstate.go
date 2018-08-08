@@ -499,7 +499,7 @@ func (b *BlockChain) isLNFeaturesAgendaActive(prevNode *blockNode) (bool, error)
 	// Consensus voting on LN features is only enabled on mainnet, testnet
 	// v2, and simnet.
 	net := b.chainParams.Net
-	if net != wire.MainNet && net != wire.TestNet2 && net != wire.SimNet {
+	if net != wire.MainNet && net != wire.SimNet {
 		return true, nil
 	}
 

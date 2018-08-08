@@ -3156,18 +3156,6 @@ var BlockOneLedgerMainNet = []*TokenPayout{
 	{"DsZZX6MSkR1RWThuZkmtrcWs5exTHiVUrE3", 282.63795424 * 1e8},
 }
 
-// BlockOneLedgerTestNet is the block one output ledger for the test
-// network.
-var BlockOneLedgerTestNet = []*TokenPayout{
-	{"TsmWaPM77WSyA3aiQ2Q1KnwGDVWvEkhipBc", 100000 * 1e8},
-}
-
-// BlockOneLedgerTestNet2 is the block one output ledger for the 2nd test
-// network.
-var BlockOneLedgerTestNet2 = []*TokenPayout{
-	{"TsT5rhHYqJF7sXouh9jHtwQEn5YJ9KKc5L9", 100000 * 1e8},
-}
-
 // BlockOneLedgerTestNet3 is the block one output ledger for testnet version 3.
 var BlockOneLedgerTestNet3 = []*TokenPayout{
 	{"Tsi6gGYNSMmFwi7JoL5Li39SrERZTTMu6vY", 80000 * 1e8},

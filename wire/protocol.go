@@ -111,9 +111,6 @@ const (
 	// RegTest represents the regression test network.
 	RegTest CurrencyNet = 0xdab500fa
 
-	// TestNet2 represents the 2nd test network.
-	TestNet2 CurrencyNet = 0x48e7a065
-
 	// TestNet3 represents the 3rd test network.
 	TestNet3 CurrencyNet = 0xb194aa75
 
@@ -125,7 +122,6 @@ const (
 // pretty printing.
 var bnStrings = map[CurrencyNet]string{
 	MainNet:  "MainNet",
-	TestNet2: "TestNet2",
 	TestNet3: "TestNet3",
 	RegTest:  "RegNet",
 	SimNet:   "SimNet",

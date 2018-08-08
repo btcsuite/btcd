@@ -1,4 +1,4 @@
-// Copyright (c) 2017 The Decred developers
+// Copyright (c) 2017-2018 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -172,5 +172,5 @@ func testLNFeaturesDeployment(t *testing.T, params *chaincfg.Params, deploymentV
 // activate the expected changes.
 func TestLNFeaturesDeployment(t *testing.T) {
 	testLNFeaturesDeployment(t, &chaincfg.MainNetParams, 5)
-	testLNFeaturesDeployment(t, &chaincfg.TestNet2Params, 6)
+	testLNFeaturesDeployment(t, &chaincfg.SimNetParams, 6)
 }

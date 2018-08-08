@@ -885,7 +885,7 @@ func (b *BlockChain) calcNextRequiredStakeDifficulty(curNode *blockNode) (int64,
 	// Consensus voting on the new stake difficulty algorithm is only
 	// enabled on mainnet, testnet v2, and simnet.
 	net := b.chainParams.Net
-	if net != wire.MainNet && net != wire.TestNet2 && net != wire.SimNet {
+	if net != wire.MainNet && net != wire.SimNet {
 		return b.calcNextRequiredStakeDifficultyV2(curNode)
 	}
 
@@ -1375,7 +1375,7 @@ func (b *BlockChain) estimateNextStakeDifficulty(curNode *blockNode, newTickets 
 	// Consensus voting on the new stake difficulty algorithm is only
 	// enabled on mainnet, testnet v2, and simnet.
 	net := b.chainParams.Net
-	if net != wire.MainNet && net != wire.TestNet2 && net != wire.SimNet {
+	if net != wire.MainNet && net != wire.SimNet {
 		return b.calcNextRequiredStakeDifficultyV2(curNode)
 	}
 

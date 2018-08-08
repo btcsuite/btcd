@@ -31,13 +31,6 @@ var mainNetParams = params{
 	rpcPort: "9109",
 }
 
-// testNet2Params contains parameters specific to the test network (version 2)
-// (wire.TestNet2).
-var testNet2Params = params{
-	Params:  &chaincfg.TestNet2Params,
-	rpcPort: "19109",
-}
-
 // testNet3Params contains parameters specific to the test network (version 3)
 // (wire.TestNet3).
 var testNet3Params = params{
