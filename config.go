@@ -646,6 +646,7 @@ func loadConfig() (*config, []string, error) {
 	cfg.DataDir = cleanAndExpandPath(cfg.DataDir)
 	var oldTestNets []string
 	oldTestNets = append(oldTestNets, filepath.Join(cfg.DataDir, "testnet"))
+	oldTestNets = append(oldTestNets, filepath.Join(cfg.DataDir, "testnet2"))
 	cfg.DataDir = filepath.Join(cfg.DataDir, activeNetParams.Name)
 	logRotator = nil
 	if !cfg.NoFileLogging {
