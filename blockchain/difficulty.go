@@ -232,11 +232,6 @@ func (b *BlockChain) findPrevTestNetDifficulty(startNode *blockNode) uint32 {
 // the exported version uses the current best chain as the previous block node
 // while this function accepts any block node.
 func (b *BlockChain) calcNextRequiredDifficulty(curNode *blockNode, newBlockTime time.Time) (uint32, error) {
-	// Genesis block.
-	if curNode == nil {
-		return b.chainParams.PowLimitBits, nil
-	}
-
 	// Get the old difficulty; if we aren't at a block height where it changes,
 	// just return this.
 	oldDiff := curNode.bits
@@ -253,30 +248,8 @@ func (b *BlockChain) calcNextRequiredDifficulty(curNode *blockNode, newBlockTime
 			reductionTime := int64(b.chainParams.MinDiffReductionTime /
 				time.Second)
 			allowMinTime := curNode.timestamp + reductionTime
-
-			// For every extra target timespan that passes, we halve the
-			// difficulty.
 			if newBlockTime.Unix() > allowMinTime {
-				timePassed := newBlockTime.Unix() - curNode.timestamp
-				timePassed -= reductionTime
-				shifts := uint((timePassed / int64(b.chainParams.TargetTimePerBlock/
-					time.Second)) + 1)
-
-				// Scale the difficulty with time passed.
-				oldTarget := CompactToBig(curNode.bits)
-				newTarget := new(big.Int)
-				if shifts < maxShift {
-					newTarget.Lsh(oldTarget, shifts)
-				} else {
-					newTarget.Set(oneLsh256)
-				}
-
-				// Limit new value to the proof of work limit.
-				if newTarget.Cmp(b.chainParams.PowLimit) > 0 {
-					newTarget.Set(b.chainParams.PowLimit)
-				}
-
-				return BigToCompact(newTarget), nil
+				return b.chainParams.PowLimitBits, nil
 			}
 
 			// The block was mined within the desired timeframe, so
