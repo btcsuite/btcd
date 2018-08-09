@@ -1158,6 +1158,14 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, fla
 			return false, err
 		}
 
+		// If this is fast add, or this block node isn't yet marked as
+		// valid, then we'll update its status and flush the state to
+		// disk again.
+		if fastAdd || !b.index.NodeStatus(node).KnownValid() {
+			b.index.SetStatusFlags(node, statusValid)
+			flushIndexState()
+		}
+
 		return true, nil
 	}
 	if fastAdd {
