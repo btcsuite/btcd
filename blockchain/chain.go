@@ -1085,6 +1085,17 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List) error 
 func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, flags BehaviorFlags) (bool, error) {
 	fastAdd := flags&BFFastAdd == BFFastAdd
 
+	flushIndexState := func() {
+		// Intentionally ignore errors writing updated node status to DB. If
+		// it fails to write, it's not the end of the world. If the block is
+		// valid, we flush in connectBlock and if the block is invalid, the
+		// worst that can happen is we revalidate the block after a restart.
+		if writeErr := b.index.flushToDB(); writeErr != nil {
+			log.Warnf("Error flushing block index changes to disk: %v",
+				writeErr)
+		}
+	}
+
 	// We are extending the main (best) chain with a new block.  This is the
 	// most common case.
 	parentHash := &block.MsgBlock().Header.PrevBlock
@@ -1108,14 +1119,7 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, fla
 				return false, err
 			}
 
-			// Intentionally ignore errors writing updated node status to DB. If
-			// it fails to write, it's not the end of the world. If the block is
-			// valid, we flush in connectBlock and if the block is invalid, the
-			// worst that can happen is we revalidate the block after a restart.
-			if writeErr := b.index.flushToDB(); writeErr != nil {
-				log.Warnf("Error flushing block index changes to disk: %v",
-					writeErr)
-			}
+			flushIndexState()
 
 			if err != nil {
 				return false, err
