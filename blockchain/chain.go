@@ -1144,6 +1144,17 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, fla
 		// Connect the block to the main chain.
 		err := b.connectBlock(node, block, view, stxos)
 		if err != nil {
+			// If we got hit with a rule error, then we'll mark
+			// that status of the block as invalid and flush the
+			// index state to disk before returning with the error.
+			if _, ok := err.(RuleError); ok {
+				b.index.SetStatusFlags(
+					node, statusValidateFailed,
+				)
+			}
+
+			flushIndexState()
+
 			return false, err
 		}
 
