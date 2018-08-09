@@ -1128,7 +1128,7 @@ func (b *BlockChain) initChainState() error {
 	}
 
 	// Attempt to load the chain state from the database.
-	return b.db.View(func(dbTx database.Tx) error {
+	err = b.db.View(func(dbTx database.Tx) error {
 		// Fetch the stored chain state from the database metadata.
 		// When it doesn't exist, it means the database hasn't been
 		// initialized for use with chain yet, so break out now to allow
@@ -1221,6 +1221,25 @@ func (b *BlockChain) initChainState() error {
 			return err
 		}
 
+		// As a final consistency check, we'll run through all the
+		// nodes which are ancestors of the current chain tip, and mark
+		// them as valid if they aren't already marked as such.  This
+		// is a safe assumption as all the block before the current tip
+		// are valid by definition.
+		for iterNode := tip; iterNode != nil; iterNode = iterNode.parent {
+			// If this isn't already marked as valid in the index, then
+			// we'll mark it as valid now to ensure consistency once
+			// we're up and running.
+			if !iterNode.status.KnownValid() {
+				log.Infof("Block %v (height=%v) ancestor of "+
+					"chain tip not marked as valid, "+
+					"upgrading to valid for consistency",
+					iterNode.hash, iterNode.height)
+
+				b.index.SetStatusFlags(iterNode, statusValid)
+			}
+		}
+
 		// Initialize the state related to the best block.
 		blockSize := uint64(len(blockBytes))
 		blockWeight := uint64(GetBlockWeight(btcutil.NewBlock(&block)))
@@ -1230,6 +1249,14 @@ func (b *BlockChain) initChainState() error {
 
 		return nil
 	})
+	if err != nil {
+		return err
+	}
+
+	// As we might have updated the index after it was loaded, we'll
+	// attempt to flush the index to the DB. This will only result in a
+	// write if the elements are dirty, so it'll usually be a noop.
+	return b.index.flushToDB()
 }
 
 // deserializeBlockRow parses a value in the block index bucket into a block
