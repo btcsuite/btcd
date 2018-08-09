@@ -4,6 +4,7 @@ go:
   - "1.10.1"
 sudo: false
 install:
+  - go get -v github.com/mattn/goveralls
   - GLIDE_TAG=v0.12.3
   - GLIDE_DOWNLOAD="https://github.com/Masterminds/glide/releases/download/$GLIDE_TAG/glide-$GLIDE_TAG-linux-amd64.tar.gz"
   - curl -L $GLIDE_DOWNLOAD | tar -xvz
