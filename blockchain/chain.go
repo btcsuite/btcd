@@ -1404,9 +1404,6 @@ func (b *BlockChain) HeightToHashRange(startHeight int32,
 	if endNode == nil {
 		return nil, fmt.Errorf("no known block header with hash %v", endHash)
 	}
-	if !b.index.NodeStatus(endNode).KnownValid() {
-		return nil, fmt.Errorf("block %v is not yet validated", endHash)
-	}
 	endHeight := endNode.height
 
 	if startHeight < 0 {
@@ -1443,9 +1440,6 @@ func (b *BlockChain) IntervalBlockHashes(endHash *chainhash.Hash, interval int,
 	endNode := b.index.LookupNode(endHash)
 	if endNode == nil {
 		return nil, fmt.Errorf("no known block header with hash %v", endHash)
-	}
-	if !b.index.NodeStatus(endNode).KnownValid() {
-		return nil, fmt.Errorf("block %v is not yet validated", endHash)
 	}
 	endHeight := endNode.height
 

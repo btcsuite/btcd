@@ -868,13 +868,6 @@ func TestHeightToHashRange(t *testing.T) {
 			maxResults:  10,
 			expectError: true,
 		},
-		{
-			name:        "unvalidated block",
-			startHeight: 15,
-			endHash:     branch1Nodes[2].hash,
-			maxResults:  10,
-			expectError: true,
-		},
 	}
 	for _, test := range tests {
 		hashes, err := chain.HeightToHashRange(test.startHeight, &test.endHash,
@@ -941,12 +934,6 @@ func TestIntervalBlockHashes(t *testing.T) {
 			endHash:  branch0Nodes[17].hash,
 			interval: 20,
 			hashes:   []chainhash.Hash{},
-		},
-		{
-			name:        "unvalidated block",
-			endHash:     branch1Nodes[2].hash,
-			interval:    8,
-			expectError: true,
 		},
 	}
 	for _, test := range tests {
