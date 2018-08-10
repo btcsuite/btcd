@@ -1540,23 +1540,24 @@ func (b *BlockChain) connectBestChain(node *blockNode, block, parent *dcrutil.Bl
 	if *parentHash == tip.hash {
 		// Skip expensive checks if the block has already been fully
 		// validated.
-		fastAdd = fastAdd || b.index.NodeStatus(node).KnownValid()
+		isKnownValid := b.index.NodeStatus(node).KnownValid()
+		fastAdd = fastAdd || isKnownValid
 
 		// Perform several checks to verify the block can be connected
 		// to the main chain without violating any rules and without
 		// actually connecting the block.
+		//
+		// Also, set the applicable status result in the block index,
+		// and flush the status changes to the database.  It is safe to
+		// ignore any errors when flushing here as the changes will be
+		// flushed when a valid block is connected, and the worst case
+		// scenario if a block a invalid is it would need to be
+		// revalidated after a restart.
 		view := NewUtxoViewpoint()
 		view.SetBestHash(parentHash)
 		view.SetStakeViewpoint(ViewpointPrevValidInitial)
 		var stxos []spentTxOut
 		if !fastAdd {
-			// Validate the block, set the applicable status result
-			// in the block index, and flush the status changes to
-			// the database.  It is safe to ignore any errors when
-			// flushing here as the changes will be flushed when a
-			// valid block is connected, and the worst case scenario
-			// if a block a invalid is it would need to be
-			// revalidated after a restart.
 			err := b.checkConnectBlock(node, block, parent, view,
 				&stxos)
 			if err != nil {
@@ -1566,6 +1567,8 @@ func (b *BlockChain) connectBestChain(node *blockNode, block, parent *dcrutil.Bl
 				}
 				return 0, err
 			}
+		}
+		if !isKnownValid {
 			b.index.SetStatusFlags(node, statusValid)
 			b.flushBlockIndexWarnOnly()
 		}

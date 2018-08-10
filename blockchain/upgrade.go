@@ -536,5 +536,13 @@ func upgradeDB(db database.DB, chainParams *chaincfg.Params, dbInfo *databaseInf
 		}
 	}
 
+	// NOTE: The next time a new database version is needed, the code in
+	// initChainState which marks all ancestors of the current chain tip as
+	// valid should be converted to updgrade all nodes in the database in the
+	// upgrade path here and removed from the chain init.  The version was not
+	// bumped when applying the update since it is possible to perform very
+	// quickly at startup on the block nodes in memory without requiring a
+	// database version bump.
+
 	return nil
 }
