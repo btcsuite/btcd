@@ -1085,6 +1085,17 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List) error 
 func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, flags BehaviorFlags) (bool, error) {
 	fastAdd := flags&BFFastAdd == BFFastAdd
 
+	flushIndexState := func() {
+		// Intentionally ignore errors writing updated node status to DB. If
+		// it fails to write, it's not the end of the world. If the block is
+		// valid, we flush in connectBlock and if the block is invalid, the
+		// worst that can happen is we revalidate the block after a restart.
+		if writeErr := b.index.flushToDB(); writeErr != nil {
+			log.Warnf("Error flushing block index changes to disk: %v",
+				writeErr)
+		}
+	}
+
 	// We are extending the main (best) chain with a new block.  This is the
 	// most common case.
 	parentHash := &block.MsgBlock().Header.PrevBlock
@@ -1108,14 +1119,7 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, fla
 				return false, err
 			}
 
-			// Intentionally ignore errors writing updated node status to DB. If
-			// it fails to write, it's not the end of the world. If the block is
-			// valid, we flush in connectBlock and if the block is invalid, the
-			// worst that can happen is we revalidate the block after a restart.
-			if writeErr := b.index.flushToDB(); writeErr != nil {
-				log.Warnf("Error flushing block index changes to disk: %v",
-					writeErr)
-			}
+			flushIndexState()
 
 			if err != nil {
 				return false, err
@@ -1140,7 +1144,26 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, fla
 		// Connect the block to the main chain.
 		err := b.connectBlock(node, block, view, stxos)
 		if err != nil {
+			// If we got hit with a rule error, then we'll mark
+			// that status of the block as invalid and flush the
+			// index state to disk before returning with the error.
+			if _, ok := err.(RuleError); ok {
+				b.index.SetStatusFlags(
+					node, statusValidateFailed,
+				)
+			}
+
+			flushIndexState()
+
 			return false, err
+		}
+
+		// If this is fast add, or this block node isn't yet marked as
+		// valid, then we'll update its status and flush the state to
+		// disk again.
+		if fastAdd || !b.index.NodeStatus(node).KnownValid() {
+			b.index.SetStatusFlags(node, statusValid)
+			flushIndexState()
 		}
 
 		return true, nil
