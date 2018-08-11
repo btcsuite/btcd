@@ -453,9 +453,9 @@ func (sp *serverPeer) OnVersion(_ *peer.Peer, msg *wire.MsgVersion) *wire.MsgRej
 			return nil
 		}
 
-		// TODO(davec): Only do this if not doing the initial block
-		// download and the local address is routable.
-		if !cfg.DisableListen /* && isCurrent? */ {
+		// Advertise the local address when the server accepts incoming
+		// connections and it believes itself to be close to the best known tip.
+		if !cfg.DisableListen && sp.server.syncManager.IsCurrent() {
 			// Get address that best matches.
 			lna := addrManager.GetBestLocalAddress(sp.NA())
 			if addrmgr.IsRoutable(lna) {
