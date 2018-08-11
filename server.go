@@ -405,8 +405,9 @@ func (sp *serverPeer) OnVersion(_ *peer.Peer, msg *wire.MsgVersion) *wire.MsgRej
 	// NOTE: This is done before rejecting peers that are too old to ensure
 	// it is updated regardless in the case a new minimum protocol version is
 	// enforced and the remote node has not upgraded yet.
+	isInbound := sp.Inbound()
 	addrManager := sp.server.addrManager
-	if !cfg.SimNet && !sp.Inbound() {
+	if !cfg.SimNet && !isInbound {
 		addrManager.SetServices(sp.NA(), msg.Services)
 	}
 
@@ -418,7 +419,7 @@ func (sp *serverPeer) OnVersion(_ *peer.Peer, msg *wire.MsgVersion) *wire.MsgRej
 
 	// Reject outbound peers that are not full nodes.
 	wantServices := wire.SFNodeNetwork
-	if !sp.Inbound() && !hasServices(msg.Services, wantServices) {
+	if !isInbound && !hasServices(msg.Services, wantServices) {
 		missingServices := wantServices & ^msg.Services
 		srvrLog.Debugf("Rejecting peer %s with services %v due to not "+
 			"providing desired services %v", sp.Peer, msg.Services,
@@ -426,6 +427,54 @@ func (sp *serverPeer) OnVersion(_ *peer.Peer, msg *wire.MsgVersion) *wire.MsgRej
 		reason := fmt.Sprintf("required services %#x not offered",
 			uint64(missingServices))
 		return wire.NewMsgReject(msg.Command(), wire.RejectNonstandard, reason)
+	}
+
+	// Update the address manager and request known addresses from the
+	// remote peer for outbound connections.  This is skipped when running
+	// on the simulation test network since it is only intended to connect
+	// to specified peers and actively avoids advertising and connecting to
+	// discovered peers.
+	if !cfg.SimNet && !isInbound {
+		// After soft-fork activation, only make outbound
+		// connection to peers if they flag that they're segwit
+		// enabled.
+		chain := sp.server.chain
+		segwitActive, err := chain.IsDeploymentActive(chaincfg.DeploymentSegwit)
+		if err != nil {
+			peerLog.Errorf("Unable to query for segwit soft-fork state: %v",
+				err)
+			return nil
+		}
+
+		if segwitActive && !sp.IsWitnessEnabled() {
+			peerLog.Infof("Disconnecting non-segwit peer %v, isn't segwit "+
+				"enabled and we need more segwit enabled peers", sp)
+			sp.Disconnect()
+			return nil
+		}
+
+		// TODO(davec): Only do this if not doing the initial block
+		// download and the local address is routable.
+		if !cfg.DisableListen /* && isCurrent? */ {
+			// Get address that best matches.
+			lna := addrManager.GetBestLocalAddress(sp.NA())
+			if addrmgr.IsRoutable(lna) {
+				// Filter addresses the peer already knows about.
+				addresses := []*wire.NetAddress{lna}
+				sp.pushAddrMsg(addresses)
+			}
+		}
+
+		// Request known addresses if the server address manager needs
+		// more and the peer has a protocol version new enough to
+		// include a timestamp with addresses.
+		hasTimestamp := sp.ProtocolVersion() >= wire.NetAddressTimeVersion
+		if addrManager.NeedMoreAddresses() && hasTimestamp {
+			sp.QueueMessage(wire.NewMsgGetAddr(), nil)
+		}
+
+		// Mark the address as a known good address.
+		addrManager.Good(sp.NA())
 	}
 
 	// Add the remote peer time as a sample for creating an offset against
@@ -438,59 +487,6 @@ func (sp *serverPeer) OnVersion(_ *peer.Peer, msg *wire.MsgVersion) *wire.MsgRej
 	// Choose whether or not to relay transactions before a filter command
 	// is received.
 	sp.setDisableRelayTx(msg.DisableRelayTx)
-
-	// Update the address manager and request known addresses from the
-	// remote peer for outbound connections.  This is skipped when running
-	// on the simulation test network since it is only intended to connect
-	// to specified peers and actively avoids advertising and connecting to
-	// discovered peers.
-	if !cfg.SimNet {
-		// Outbound connections.
-		if !sp.Inbound() {
-			// After soft-fork activation, only make outbound
-			// connection to peers if they flag that they're segwit
-			// enabled.
-			chain := sp.server.chain
-			segwitActive, err := chain.IsDeploymentActive(chaincfg.DeploymentSegwit)
-			if err != nil {
-				peerLog.Errorf("Unable to query for segwit "+
-					"soft-fork state: %v", err)
-				return nil
-			}
-
-			if segwitActive && !sp.IsWitnessEnabled() {
-				peerLog.Infof("Disconnecting non-segwit "+
-					"peer %v, isn't segwit enabled and "+
-					"we need more segwit enabled peers", sp)
-				sp.Disconnect()
-				return nil
-			}
-
-			// TODO(davec): Only do this if not doing the initial block
-			// download and the local address is routable.
-			if !cfg.DisableListen /* && isCurrent? */ {
-				// Get address that best matches.
-				lna := addrManager.GetBestLocalAddress(sp.NA())
-				if addrmgr.IsRoutable(lna) {
-					// Filter addresses the peer already knows about.
-					addresses := []*wire.NetAddress{lna}
-					sp.pushAddrMsg(addresses)
-				}
-			}
-
-			// Request known addresses if the server address manager needs
-			// more and the peer has a protocol version new enough to
-			// include a timestamp with addresses.
-			hasTimestamp := sp.ProtocolVersion() >=
-				wire.NetAddressTimeVersion
-			if addrManager.NeedMoreAddresses() && hasTimestamp {
-				sp.QueueMessage(wire.NewMsgGetAddr(), nil)
-			}
-
-			// Mark the address as a known good address.
-			addrManager.Good(sp.NA())
-		}
-	}
 
 	// Add valid peer to the server.
 	sp.server.AddPeer(sp)
