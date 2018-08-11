@@ -432,8 +432,9 @@ func TestPeerListeners(t *testing.T) {
 			OnMerkleBlock: func(p *peer.Peer, msg *wire.MsgMerkleBlock) {
 				ok <- msg
 			},
-			OnVersion: func(p *peer.Peer, msg *wire.MsgVersion) {
+			OnVersion: func(p *peer.Peer, msg *wire.MsgVersion) *wire.MsgReject {
 				ok <- msg
+				return nil
 			},
 			OnVerAck: func(p *peer.Peer, msg *wire.MsgVerAck) {
 				verack <- struct{}{}

@@ -187,7 +187,9 @@ type MessageListeners struct {
 	OnMerkleBlock func(p *Peer, msg *wire.MsgMerkleBlock)
 
 	// OnVersion is invoked when a peer receives a version bitcoin message.
-	OnVersion func(p *Peer, msg *wire.MsgVersion)
+	// The caller may return a reject message in which case the message will
+	// be sent to the peer and the peer will be disconnected.
+	OnVersion func(p *Peer, msg *wire.MsgVersion) *wire.MsgReject
 
 	// OnVerAck is invoked when a peer receives a verack bitcoin message.
 	OnVerAck func(p *Peer, msg *wire.MsgVerAck)
@@ -1944,7 +1946,11 @@ func (p *Peer) readRemoteVersionMsg() error {
 
 	// Invoke the callback if specified.
 	if p.cfg.Listeners.OnVersion != nil {
-		p.cfg.Listeners.OnVersion(p, msg)
+		rejectMsg := p.cfg.Listeners.OnVersion(p, msg)
+		if rejectMsg != nil {
+			_ = p.writeMessage(rejectMsg, wire.LatestEncoding)
+			return errors.New(rejectMsg.Reason)
+		}
 	}
 
 	// Notify and disconnect clients that have a protocol version that is
