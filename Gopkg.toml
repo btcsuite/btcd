@@ -24,6 +24,10 @@
   name = "github.com/dchest/blake256"
 
 [[constraint]]
+  name = "github.com/dchest/siphash"
+  version = "1.2.0"
+
+[[constraint]]
   branch = "master"
   name = "github.com/decred/base58"
 

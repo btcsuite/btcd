@@ -13,8 +13,8 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/aead/siphash"
 	"github.com/dchest/blake256"
+	"github.com/dchest/siphash"
 	"github.com/decred/dcrd/chaincfg/chainhash"
 )
 
@@ -38,7 +38,7 @@ var (
 
 // KeySize is the size of the byte array required for key material for the
 // SipHash keyed hash function.
-const KeySize = siphash.KeySize
+const KeySize = 16
 
 // uint64s implements sort.Interface for *[]uint64
 type uint64s []uint64
@@ -92,8 +92,10 @@ func NewFilter(P uint8, key [KeySize]byte, data [][]byte) (*Filter, error) {
 
 	// Insert the hash (modulo N*P) of each data element into a slice and
 	// sort the slice.
+	k0 := binary.LittleEndian.Uint64(key[0:8])
+	k1 := binary.LittleEndian.Uint64(key[8:16])
 	for _, d := range data {
-		v := siphash.Sum64(d, &key) % f.modulusNP
+		v := siphash.Hash(k0, k1, d) % f.modulusNP
 		values = append(values, v)
 	}
 	sort.Sort((*uint64s)(&values))
@@ -241,7 +243,9 @@ func (f *Filter) Match(key [KeySize]byte, data []byte) bool {
 	b := newBitReader(f.filterNData[4:])
 
 	// Hash our search term with the same parameters as the filter.
-	term := siphash.Sum64(data, &key) % f.modulusNP
+	k0 := binary.LittleEndian.Uint64(key[0:8])
+	k1 := binary.LittleEndian.Uint64(key[8:16])
+	term := siphash.Hash(k0, k1, data) % f.modulusNP
 
 	// Go through the search filter and look for the desired value.
 	var lastValue uint64
@@ -289,8 +293,10 @@ func (f *Filter) MatchAny(key [KeySize]byte, data [][]byte) bool {
 		values = &vs
 	}
 	defer matchPool.Put(values)
+	k0 := binary.LittleEndian.Uint64(key[0:8])
+	k1 := binary.LittleEndian.Uint64(key[8:16])
 	for _, d := range data {
-		v := siphash.Sum64(d, &key) % f.modulusNP
+		v := siphash.Hash(k0, k1, d) % f.modulusNP
 		*values = append(*values, v)
 	}
 	sort.Sort((*uint64s)(values))
