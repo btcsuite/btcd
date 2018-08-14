@@ -3113,16 +3113,20 @@ func handleGetCFilter(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) 
 	case "extended":
 		filterType = wire.GCSFilterExtended
 	default:
-		return nil, rpcMiscError("unknown filter type " + c.FilterType)
+		return nil, rpcInvalidError("Unknown filter type %q",
+			c.FilterType)
 	}
 
 	filterBytes, err := s.server.cfIndex.FilterByBlockHash(hash, filterType)
 	if err != nil {
-		rpcsLog.Debugf("Could not find committed filter for %v: %v",
-			hash, err)
+		context := fmt.Sprintf("Failed to load %v filter for block %v",
+			filterType, hash)
+		return "", rpcInternalError(err.Error(), context)
+	}
+	if len(filterBytes) == 0 {
 		return nil, &dcrjson.RPCError{
 			Code:    dcrjson.ErrRPCBlockNotFound,
-			Message: "Block not found",
+			Message: fmt.Sprintf("Block not found: %v", hash),
 		}
 	}
 
@@ -3152,18 +3156,22 @@ func handleGetCFilterHeader(s *rpcServer, cmd interface{}, closeChan <-chan stru
 	case "extended":
 		filterType = wire.GCSFilterExtended
 	default:
-		return nil, rpcMiscError("unknown filter type " + c.FilterType)
+		return nil, rpcInvalidError("Unknown filter type %q",
+			c.FilterType)
 	}
 
 	headerBytes, err := s.server.cfIndex.FilterHeaderByBlockHash(hash, filterType)
-	if len(headerBytes) > 0 {
-		rpcsLog.Debugf("Found header of committed filter for %v", hash)
-	} else {
-		rpcsLog.Debugf("Could not find header of committed filter for %v: %v",
-			hash, err)
+	if err != nil {
+		context := fmt.Sprintf("Failed to load %v filter header for block %v",
+			filterType, hash)
+		return "", rpcInternalError(err.Error(), context)
+	}
+	if bytes.Equal(headerBytes, zeroHash[:]) && *hash !=
+		*s.server.chainParams.GenesisHash {
+
 		return nil, &dcrjson.RPCError{
 			Code:    dcrjson.ErrRPCBlockNotFound,
-			Message: "Block not found",
+			Message: fmt.Sprintf("Block not found: %v", hash),
 		}
 	}
 
