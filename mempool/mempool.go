@@ -158,7 +158,7 @@ type Policy struct {
 	// of the max signature operations for a block.
 	MaxSigOpsPerTx int
 
-	// MinRelayTxFee defines the minimum transaction fee in BTC/kB to be
+	// MinRelayTxFee defines the minimum transaction fee in DCR/kB to be
 	// considered a non-zero fee.
 	MinRelayTxFee dcrutil.Amount
 
