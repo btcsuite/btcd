@@ -96,20 +96,20 @@ type config struct {
 	ConfigFile     string `short:"C" long:"configfile" description:"Path to configuration file"`
 	ListCommands   bool   `short:"l" long:"listcommands" description:"List all of the supported commands and exit"`
 	NoTLS          bool   `long:"notls" description:"Disable TLS"`
+	TLSSkipVerify  bool   `long:"skipverify" description:"Do not verify tls certificates (not recommended!)"`
 	Proxy          string `long:"proxy" description:"Connect via SOCKS5 proxy (eg. 127.0.0.1:9050)"`
 	ProxyPass      string `long:"proxypass" default-mask:"-" description:"Password for proxy server"`
 	ProxyUser      string `long:"proxyuser" description:"Username for proxy server"`
-	RegressionTest bool   `long:"regtest" description:"Connect to the regression test network"`
 	RPCCert        string `short:"c" long:"rpccert" description:"RPC server certificate chain for validation"`
 	RPCPassword    string `short:"P" long:"rpcpass" default-mask:"-" description:"RPC password"`
 	RPCServer      string `short:"s" long:"rpcserver" description:"RPC server to connect to"`
 	RPCUser        string `short:"u" long:"rpcuser" description:"RPC username"`
-	SimNet         bool   `long:"simnet" description:"Connect to the simulation test network"`
-	TLSSkipVerify  bool   `long:"skipverify" description:"Do not verify tls certificates (not recommended!)"`
-	TestNet3       bool   `long:"testnet" description:"Connect to testnet"`
-	SigNet         bool   `long:"signet" description:"Connect to signet"`
+	TestNet3       bool   `long:"testnet" description:"Connect to testnet (default RPC server: localhost:19245)"`
+	RegressionTest bool   `long:"regtest" description:"Connect to the regression test network (default RPC server: localhost:29245)"`
+	SimNet         bool   `long:"simnet" description:"Connect to the simulation test network (default RPC server: localhost:39245)"`
+	SigNet         bool   `long:"signet" description:"Connect to signet (default RPC server: localhost:49245)"`
+	Wallet         bool   `long:"wallet" description:"Connect to wallet RPC server instead (default: localhost:9244, testnet: localhost:19244, regtest: localhost:29244)"`
 	ShowVersion    bool   `short:"V" long:"version" description:"Display version information and exit"`
-	Wallet         bool   `long:"wallet" description:"Connect to wallet"`
 }
 
 // normalizeAddress returns addr with the passed default port appended if
@@ -121,35 +121,33 @@ func normalizeAddress(addr string, chain *chaincfg.Params, useWallet bool) (stri
 		switch chain {
 		case &chaincfg.TestNet3Params:
 			if useWallet {
-				defaultPort = "18332"
+				defaultPort = "19244"
 			} else {
-				defaultPort = "18334"
-			}
-		case &chaincfg.SimNetParams:
-			if useWallet {
-				defaultPort = "18554"
-			} else {
-				defaultPort = "18556"
+				defaultPort = "19245"
 			}
 		case &chaincfg.RegressionNetParams:
 			if useWallet {
-				// TODO: add port once regtest is supported in btcwallet
-				paramErr := fmt.Errorf("cannot use -wallet with -regtest, btcwallet not yet compatible with regtest")
-				return "", paramErr
+				defaultPort = "29244"
 			} else {
 				defaultPort = "29245"
 			}
+		case &chaincfg.SimNetParams:
+			if useWallet {
+				defaultPort = "39244"
+			} else {
+				defaultPort = "39245"
+			}
 		case &chaincfg.SigNetParams:
 			if useWallet {
-				defaultPort = "38332"
+				defaultPort = "49244"
 			} else {
-				defaultPort = "38332"
+				defaultPort = "49245"
 			}
 		default:
 			if useWallet {
-				defaultPort = "8332"
+				defaultPort = "9244"
 			} else {
-				defaultPort = "8334"
+				defaultPort = "9245"
 			}
 		}
 

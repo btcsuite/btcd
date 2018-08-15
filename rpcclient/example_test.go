@@ -11,7 +11,7 @@ import (
 )
 
 var connCfg = &ConnConfig{
-	Host:         "localhost:8332",
+	Host:         "localhost:9244",
 	User:         "user",
 	Pass:         "pass",
 	HTTPPostMode: true,

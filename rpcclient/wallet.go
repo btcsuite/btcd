@@ -2792,7 +2792,7 @@ func (c *Client) UnloadWalletAsync(walletName *string) FutureUnloadWalletResult 
 }
 
 // UnloadWallet unloads the referenced wallet. If the RPC server URL already
-// contains the name of the wallet, like http://127.0.0.1:8332/wallet/<walletname>,
+// contains the name of the wallet, like http://127.0.0.1:9245/wallet/<walletname>,
 // the parameter must be nil, or it'll return an error.
 func (c *Client) UnloadWallet(walletName *string) error {
 	return c.UnloadWalletAsync(walletName).Receive()

@@ -22,9 +22,9 @@ func TestVersion(t *testing.T) {
 
 	// Create version message data.
 	lastBlock := int32(234234)
-	tcpAddrMe := &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 8333}
+	tcpAddrMe := &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 9246}
 	me := NewNetAddress(tcpAddrMe, SFNodeNetwork)
-	tcpAddrYou := &net.TCPAddr{IP: net.ParseIP("192.168.0.1"), Port: 8333}
+	tcpAddrYou := &net.TCPAddr{IP: net.ParseIP("192.168.0.1"), Port: 9246}
 	you := NewNetAddress(tcpAddrYou, SFNodeNetwork)
 	nonce, err := RandomUint64()
 	if err != nil {
@@ -377,7 +377,7 @@ func TestVersionOptionalFields(t *testing.T) {
 			Timestamp: time.Time{}, // Zero value -- no timestamp in version
 			Services:  SFNodeNetwork,
 			IP:        net.ParseIP("192.168.0.1"),
-			Port:      8333,
+			Port:      9246,
 		},
 	}
 	onlyRequiredVersionEncoded := make([]byte, len(baseVersionEncoded)-55)
@@ -390,7 +390,7 @@ func TestVersionOptionalFields(t *testing.T) {
 		Timestamp: time.Time{}, // Zero value -- no timestamp in version
 		Services:  SFNodeNetwork,
 		IP:        net.ParseIP("127.0.0.1"),
-		Port:      8333,
+		Port:      9246,
 	}
 	addrMeVersionEncoded := make([]byte, len(baseVersionEncoded)-29)
 	copy(addrMeVersionEncoded, baseVersionEncoded)
@@ -480,13 +480,13 @@ var baseVersion = &MsgVersion{
 		Timestamp: time.Time{}, // Zero value -- no timestamp in version
 		Services:  SFNodeNetwork,
 		IP:        net.ParseIP("192.168.0.1"),
-		Port:      8333,
+		Port:      9246,
 	},
 	AddrMe: NetAddress{
 		Timestamp: time.Time{}, // Zero value -- no timestamp in version
 		Services:  SFNodeNetwork,
 		IP:        net.ParseIP("127.0.0.1"),
-		Port:      8333,
+		Port:      9246,
 	},
 	Nonce:     123123, // 0x1e0f3
 	UserAgent: "/btcdtest:0.0.1/",
@@ -503,12 +503,12 @@ var baseVersionEncoded = []byte{
 	0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // SFNodeNetwork
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 	0x00, 0x00, 0xff, 0xff, 0xc0, 0xa8, 0x00, 0x01, // IP 192.168.0.1
-	0x20, 0x8d, // Port 8333 in big-endian
+	0x24, 0x1e, // Port 9246 in big-endian
 	// AddrMe -- No timestamp for NetAddress in version message
 	0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // SFNodeNetwork
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 	0x00, 0x00, 0xff, 0xff, 0x7f, 0x00, 0x00, 0x01, // IP 127.0.0.1
-	0x20, 0x8d, // Port 8333 in big-endian
+	0x24, 0x1e, // Port 9246 in big-endian
 	0xf3, 0xe0, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, // Nonce
 	0x10, // Varint for user agent length
 	0x2f, 0x62, 0x74, 0x63, 0x64, 0x74, 0x65, 0x73,
@@ -526,13 +526,13 @@ var baseVersionBIP0037 = &MsgVersion{
 		Timestamp: time.Time{}, // Zero value -- no timestamp in version
 		Services:  SFNodeNetwork,
 		IP:        net.ParseIP("192.168.0.1"),
-		Port:      8333,
+		Port:      9246,
 	},
 	AddrMe: NetAddress{
 		Timestamp: time.Time{}, // Zero value -- no timestamp in version
 		Services:  SFNodeNetwork,
 		IP:        net.ParseIP("127.0.0.1"),
-		Port:      8333,
+		Port:      9246,
 	},
 	Nonce:     123123, // 0x1e0f3
 	UserAgent: "/btcdtest:0.0.1/",
@@ -549,12 +549,12 @@ var baseVersionBIP0037Encoded = []byte{
 	0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // SFNodeNetwork
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 	0x00, 0x00, 0xff, 0xff, 0xc0, 0xa8, 0x00, 0x01, // IP 192.168.0.1
-	0x20, 0x8d, // Port 8333 in big-endian
+	0x24, 0x1e, // Port 9246 in big-endian
 	// AddrMe -- No timestamp for NetAddress in version message
 	0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // SFNodeNetwork
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 	0x00, 0x00, 0xff, 0xff, 0x7f, 0x00, 0x00, 0x01, // IP 127.0.0.1
-	0x20, 0x8d, // Port 8333 in big-endian
+	0x24, 0x1e, // Port 9246 in big-endian
 	0xf3, 0xe0, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, // Nonce
 	0x10, // Varint for user agent length
 	0x2f, 0x62, 0x74, 0x63, 0x64, 0x74, 0x65, 0x73,

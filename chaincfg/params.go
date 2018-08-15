@@ -62,7 +62,7 @@ var (
 	DefaultSignetDNSSeeds = []DNSSeed{
 		{"178.128.221.177", false},
 		{"2a01:7c8:d005:390::5", false},
-		{"v7ajjeirttkbnt32wpy3c6w3emwnfr3fkla7hpxcfokr3ysd3kqtzmqd.onion:38333", false},
+		{"v7ajjeirttkbnt32wpy3c6w3emwnfr3fkla7hpxcfokr3ysd3kqtzmqd.onion:39246", false},
 	}
 )
 
@@ -522,7 +522,7 @@ var TestNet3Params = Params{
 var SimNetParams = Params{
 	Name:        "simnet",
 	Net:         wire.SimNet,
-	DefaultPort: "18555",
+	DefaultPort: "39246",
 	DNSSeeds:    []DNSSeed{}, // NOTE: There must NOT be any seeds.
 
 	// Chain parameters
@@ -615,7 +615,7 @@ func CustomSignetParams(challenge []byte, dnsSeeds []DNSSeed) Params {
 	return Params{
 		Name:        "signet",
 		Net:         wire.BitcoinNet(net),
-		DefaultPort: "38333",
+		DefaultPort: "39246",
 		DNSSeeds:    dnsSeeds,
 
 		// Chain parameters
