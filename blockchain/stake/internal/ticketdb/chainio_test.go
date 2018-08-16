@@ -7,8 +7,8 @@ package ticketdb
 import (
 	"bytes"
 	"encoding/hex"
+	"io/ioutil"
 	"os"
-	"path/filepath"
 	"reflect"
 	"testing"
 	"time"
@@ -24,9 +24,6 @@ import (
 const (
 	// testDbType is the database backend type to use for the tests.
 	testDbType = "ffldb"
-
-	// testDbRoot is the root directory used to create all test databases.
-	testDbRoot = "testdbs"
 )
 
 // hexToBytes converts a hex string to bytes, without returning any errors.
@@ -423,16 +420,15 @@ func TestTicketHashesDeserializingErrors(t *testing.T) {
 func TestLiveDatabase(t *testing.T) {
 	// Create a new database to store the accepted stake node data into.
 	dbName := "ffldb_ticketdb_test"
-	dbPath := filepath.Join(testDbRoot, dbName)
-	_ = os.RemoveAll(dbPath)
+	dbPath, err := ioutil.TempDir("", dbName)
+	if err != nil {
+		t.Fatalf("unable to create test db path: %v", err)
+	}
+	defer os.RemoveAll(dbPath)
 	testDb, err := database.Create(testDbType, dbPath, chaincfg.SimNetParams.Net)
 	if err != nil {
 		t.Fatalf("error creating db: %v", err)
 	}
-
-	// Setup a teardown.
-	defer os.RemoveAll(dbPath)
-	defer os.RemoveAll(testDbRoot)
 	defer testDb.Close()
 
 	// Initialize the database, then try to read the version.

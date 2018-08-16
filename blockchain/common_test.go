@@ -7,9 +7,9 @@ package blockchain
 
 import (
 	"fmt"
+	"io/ioutil"
 	mrand "math/rand"
 	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/decred/dcrd/blockchain/stake"
@@ -24,9 +24,6 @@ import (
 const (
 	// testDbType is the database backend type to use for the tests.
 	testDbType = "ffldb"
-
-	// testDbRoot is the root directory used to create all test databases.
-	testDbRoot = "testdbs"
 
 	// blockDataNet is the expected network in the test block data.
 	blockDataNet = wire.MainNet
@@ -80,20 +77,18 @@ func chainSetup(dbName string, params *chaincfg.Params) (*BlockChain, func(), er
 			db.Close()
 		}
 	} else {
-		// Create the root directory for test databases.
-		if !fileExists(testDbRoot) {
-			if err := os.MkdirAll(testDbRoot, 0700); err != nil {
-				err := fmt.Errorf("unable to create test db "+
-					"root: %v", err)
-				return nil, nil, err
-			}
+		// Create the directory for test database.
+		dbPath, err := ioutil.TempDir("", dbName)
+		if err != nil {
+			err := fmt.Errorf("unable to create test db path: %v",
+				err)
+			return nil, nil, err
 		}
 
 		// Create a new database to store the accepted blocks into.
-		dbPath := filepath.Join(testDbRoot, dbName)
-		_ = os.RemoveAll(dbPath)
 		ndb, err := database.Create(testDbType, dbPath, blockDataNet)
 		if err != nil {
+			os.RemoveAll(dbPath)
 			return nil, nil, fmt.Errorf("error creating db: %v", err)
 		}
 		db = ndb
@@ -103,7 +98,6 @@ func chainSetup(dbName string, params *chaincfg.Params) (*BlockChain, func(), er
 		teardown = func() {
 			db.Close()
 			os.RemoveAll(dbPath)
-			os.RemoveAll(testDbRoot)
 		}
 	}
 
