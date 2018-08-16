@@ -43,7 +43,7 @@ func TestBlockchainSpendJournal(t *testing.T) {
 	defer teardownFunc()
 
 	// Load up the rest of the blocks up to HEAD.
-	filename := filepath.Join("testdata/", "reorgto179.bz2")
+	filename := filepath.Join("testdata", "reorgto179.bz2")
 	fi, err := os.Open(filename)
 	if err != nil {
 		t.Errorf("Failed to open %s: %v", filename, err)
