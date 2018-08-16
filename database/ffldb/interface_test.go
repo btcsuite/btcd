@@ -37,7 +37,7 @@ var (
 
 	// blockDataFile is the path to a file containing the first 168 blocks
 	// of the simulation network.
-	blockDataFile = filepath.Join("..", "..", "blockchain", "testdata", "blocks0to168.bz2")
+	blockDataFile = filepath.Join("..", "testdata", "blocks0to168.bz2")
 
 	// errSubTestFail is used to signal that a sub test returned false.
 	errSubTestFail = fmt.Errorf("sub test failure")
