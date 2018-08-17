@@ -2,6 +2,7 @@ module github.com/decred/dcrd/rpcclient
 
 require (
 	github.com/btcsuite/go-socks v0.0.0-20170105172521-4720035b7bfd
+	github.com/davecgh/go-spew v1.1.0
 	github.com/decred/dcrd/blockchain v1.0.1
 	github.com/decred/dcrd/blockchain/stake v1.0.1
 	github.com/decred/dcrd/chaincfg/chainhash v1.0.1

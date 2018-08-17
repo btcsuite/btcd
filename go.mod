@@ -11,13 +11,13 @@ require (
 	github.com/dchest/siphash v1.2.0
 	github.com/decred/base58 v1.0.0
 	github.com/decred/dcrd/addrmgr v1.0.2
-	github.com/decred/dcrd/blockchain v1.0.1
-	github.com/decred/dcrd/blockchain/stake v1.0.1
+	github.com/decred/dcrd/blockchain v1.0.2
+	github.com/decred/dcrd/blockchain/stake v1.0.2
 	github.com/decred/dcrd/certgen v1.0.1
 	github.com/decred/dcrd/chaincfg v1.1.1
 	github.com/decred/dcrd/chaincfg/chainhash v1.0.1
 	github.com/decred/dcrd/connmgr v1.0.1
-	github.com/decred/dcrd/database v1.0.1
+	github.com/decred/dcrd/database v1.0.2
 	github.com/decred/dcrd/dcrec v0.0.0-20180801202239-0761de129164
 	github.com/decred/dcrd/dcrec/edwards v0.0.0-20180808153611-f0e65ec62f91 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1 v1.0.0
@@ -37,7 +37,7 @@ require (
 	github.com/jrick/bitset v1.0.0
 	github.com/jrick/logrotate v1.0.0
 	golang.org/x/crypto v0.0.0-20180718160520-a2144134853f
-	golang.org/x/sys v0.0.0-20180522224204-88eb85aaee56
+	golang.org/x/sys v0.0.0-20180816055513-1c9583448a9c
 )
 
 replace (
