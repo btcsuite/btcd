@@ -227,6 +227,12 @@ type Config struct {
 	// form "major.minor.revision" e.g. "2.6.41".
 	UserAgentVersion string
 
+	// UserAgentComments specifies any additional comments to include the in
+	// user agent to advertise.  This is optional, so it may be nil.  If
+	// specified, the comments should only exist of characters from the
+	// semantic alphabet [a-zA-Z0-9-].
+	UserAgentComments []string
+
 	// ChainParams identifies which chain parameters the peer is associated
 	// with.  It is highly recommended to specify this field, however it can
 	// be omitted in which case the test network will be used.
@@ -1869,7 +1875,8 @@ func (p *Peer) localVersionMsg() (*wire.MsgVersion, error) {
 
 	// Version message.
 	msg := wire.NewMsgVersion(ourNA, theirNA, nonce, int32(blockNum))
-	msg.AddUserAgent(p.cfg.UserAgentName, p.cfg.UserAgentVersion)
+	msg.AddUserAgent(p.cfg.UserAgentName, p.cfg.UserAgentVersion,
+		p.cfg.UserAgentComments...)
 
 	// Advertise local services.
 	msg.Services = p.cfg.Services

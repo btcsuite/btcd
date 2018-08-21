@@ -1583,6 +1583,11 @@ func disconnectPeer(peerList map[int32]*serverPeer, compareFunc func(*serverPeer
 
 // newPeerConfig returns the configuration for the given serverPeer.
 func newPeerConfig(sp *serverPeer) *peer.Config {
+	var userAgentComments []string
+	if appPreRelease != "" {
+		userAgentComments = append(userAgentComments, appPreRelease)
+	}
+
 	return &peer.Config{
 		Listeners: peer.MessageListeners{
 			OnVersion:        sp.OnVersion,
@@ -1604,15 +1609,16 @@ func newPeerConfig(sp *serverPeer) *peer.Config {
 			OnRead:           sp.OnRead,
 			OnWrite:          sp.OnWrite,
 		},
-		NewestBlock:      sp.newestBlock,
-		HostToNetAddress: sp.server.addrManager.HostToNetAddress,
-		Proxy:            cfg.Proxy,
-		UserAgentName:    userAgentName,
-		UserAgentVersion: userAgentVersion,
-		ChainParams:      sp.server.chainParams,
-		Services:         sp.server.services,
-		DisableRelayTx:   cfg.BlocksOnly,
-		ProtocolVersion:  maxProtocolVersion,
+		NewestBlock:       sp.newestBlock,
+		HostToNetAddress:  sp.server.addrManager.HostToNetAddress,
+		Proxy:             cfg.Proxy,
+		UserAgentName:     userAgentName,
+		UserAgentVersion:  userAgentVersion,
+		UserAgentComments: userAgentComments,
+		ChainParams:       sp.server.chainParams,
+		Services:          sp.server.services,
+		DisableRelayTx:    cfg.BlocksOnly,
+		ProtocolVersion:   maxProtocolVersion,
 	}
 }
 
