@@ -1464,7 +1464,8 @@ func (b *BlockChain) createChainState() error {
 	numTxns := uint64(len(genesisBlock.MsgBlock().Transactions))
 	blockSize := uint64(genesisBlock.MsgBlock().SerializeSize())
 	stateSnapshot := newBestState(node, blockSize, numTxns, numTxns,
-		time.Unix(node.timestamp, 0), 0)
+		time.Unix(node.timestamp, 0), 0, 0, b.chainParams.MinimumStakeDiff,
+		nil, nil, earlyFinalState)
 
 	// Create the initial the database chain state including creating the
 	// necessary index buckets and inserting the genesis block.
@@ -1770,9 +1771,18 @@ func (b *BlockChain) initChainState(interrupt <-chan struct{}) error {
 		block := utilBlock.MsgBlock()
 		blockSize := uint64(block.SerializeSize())
 		numTxns := uint64(len(block.Transactions))
+
+		// Calculate the next stake difficulty.
+		nextStakeDiff, err := b.calcNextRequiredStakeDifficulty(tip)
+		if err != nil {
+			return err
+		}
+
 		b.stateSnapshot = newBestState(tip, blockSize, numTxns,
 			state.totalTxns, tip.CalcPastMedianTime(),
-			state.totalSubsidy)
+			state.totalSubsidy, uint32(tip.stakeNode.PoolSize()),
+			nextStakeDiff, tip.stakeNode.Winners(),
+			tip.stakeNode.MissedTickets(), tip.stakeNode.FinalState())
 
 		return nil
 	})

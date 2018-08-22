@@ -86,27 +86,46 @@ type orphanBlock struct {
 // However, the returned snapshot must be treated as immutable since it is
 // shared by all callers.
 type BestState struct {
-	Hash         chainhash.Hash // The hash of the block.
-	Height       int64          // The height of the block.
-	Bits         uint32         // The difficulty bits of the block.
-	BlockSize    uint64         // The size of the block.
-	NumTxns      uint64         // The number of txns in the block.
-	TotalTxns    uint64         // The total number of txns in the chain.
-	MedianTime   time.Time      // Median time as per CalcPastMedianTime.
-	TotalSubsidy int64          // The total subsidy for the chain.
+	Hash               chainhash.Hash   // The hash of the block.
+	PrevHash           chainhash.Hash   // The previous block hash.
+	Height             int64            // The height of the block.
+	Bits               uint32           // The difficulty bits of the block.
+	NextPoolSize       uint32           // The ticket pool size.
+	NextStakeDiff      int64            // The next stake difficulty.
+	BlockSize          uint64           // The size of the block.
+	NumTxns            uint64           // The number of txns in the block.
+	TotalTxns          uint64           // The total number of txns in the chain.
+	MedianTime         time.Time        // Median time as per CalcPastMedianTime.
+	TotalSubsidy       int64            // The total subsidy for the chain.
+	NextWinningTickets []chainhash.Hash // The eligible tickets to vote on the next block.
+	MissedTickets      []chainhash.Hash // The missed tickets set to be revoked.
+	NextFinalState     [6]byte          // The calculated state of the lottery for the next block.
 }
 
 // newBestState returns a new best stats instance for the given parameters.
-func newBestState(node *blockNode, blockSize, numTxns, totalTxns uint64, medianTime time.Time, totalSubsidy int64) *BestState {
+func newBestState(node *blockNode, blockSize, numTxns, totalTxns uint64,
+	medianTime time.Time, totalSubsidy int64, nextPoolSize uint32,
+	nextStakeDiff int64, nextWinners, missed []chainhash.Hash,
+	nextFinalState [6]byte) *BestState {
+	prevHash := *zeroHash
+	if node.parent != nil {
+		prevHash = node.parent.hash
+	}
 	return &BestState{
-		Hash:         node.hash,
-		Height:       node.height,
-		Bits:         node.bits,
-		BlockSize:    blockSize,
-		NumTxns:      numTxns,
-		TotalTxns:    totalTxns,
-		MedianTime:   medianTime,
-		TotalSubsidy: totalSubsidy,
+		Hash:               node.hash,
+		PrevHash:           prevHash,
+		Height:             node.height,
+		Bits:               node.bits,
+		NextPoolSize:       nextPoolSize,
+		NextStakeDiff:      nextStakeDiff,
+		BlockSize:          blockSize,
+		NumTxns:            numTxns,
+		TotalTxns:          totalTxns,
+		MedianTime:         medianTime,
+		TotalSubsidy:       totalSubsidy,
+		NextWinningTickets: nextWinners,
+		MissedTickets:      missed,
+		NextFinalState:     nextFinalState,
 	}
 }
 
@@ -747,6 +766,15 @@ func (b *BlockChain) connectBlock(node *blockNode, block, parent *dcrutil.Block,
 		return err
 	}
 
+	// Get the stake node for this node, filling in any data that
+	// may have yet to have been filled in.  In all cases this
+	// should simply give a pointer to data already prepared, but
+	// run this anyway to be safe.
+	stakeNode, err := b.fetchStakeNode(node)
+	if err != nil {
+		return err
+	}
+
 	// Generate a new best state snapshot that will be used to update the
 	// database and later memory if all database updates are successful.
 	b.stateLock.RLock()
@@ -761,18 +789,18 @@ func (b *BlockChain) connectBlock(node *blockNode, block, parent *dcrutil.Block,
 	// Calculate the exact subsidy produced by adding the block.
 	subsidy := CalculateAddedSubsidy(block, parent)
 
-	blockSize := uint64(block.MsgBlock().Header.Size)
-	state := newBestState(node, blockSize, numTxns, curTotalTxns+numTxns,
-		node.CalcPastMedianTime(), curTotalSubsidy+subsidy)
-
-	// Get the stake node for this node, filling in any data that
-	// may have yet to have been filled in.  In all cases this
-	// should simply give a pointer to data already prepared, but
-	// run this anyway to be safe.
-	stakeNode, err := b.fetchStakeNode(node)
+	// Calcultate the next stake difficulty.
+	nextStakeDiff, err := b.calcNextRequiredStakeDifficulty(node)
 	if err != nil {
 		return err
 	}
+
+	blockSize := uint64(block.MsgBlock().Header.Size)
+	state := newBestState(node, blockSize, numTxns, curTotalTxns+numTxns,
+		node.CalcPastMedianTime(), curTotalSubsidy+subsidy,
+		uint32(node.stakeNode.PoolSize()), nextStakeDiff,
+		node.stakeNode.Winners(), node.stakeNode.MissedTickets(),
+		node.stakeNode.FinalState())
 
 	// Atomically insert info into the database.
 	err = b.db.Update(func(dbTx database.Tx) error {
@@ -917,6 +945,17 @@ func (b *BlockChain) disconnectBlock(node *blockNode, block, parent *dcrutil.Blo
 		return err
 	}
 
+	// Prepare the information required to update the stake database
+	// contents.
+	childStakeNode, err := b.fetchStakeNode(node)
+	if err != nil {
+		return err
+	}
+	parentStakeNode, err := b.fetchStakeNode(node.parent)
+	if err != nil {
+		return err
+	}
+
 	// Generate a new best state snapshot that will be used to update the
 	// database and later memory if all database updates are successful.
 	b.stateLock.RLock()
@@ -936,18 +975,10 @@ func (b *BlockChain) disconnectBlock(node *blockNode, block, parent *dcrutil.Blo
 
 	prevNode := node.parent
 	state := newBestState(prevNode, parentBlockSize, numTxns, newTotalTxns,
-		prevNode.CalcPastMedianTime(), newTotalSubsidy)
-
-	// Prepare the information required to update the stake database
-	// contents.
-	childStakeNode, err := b.fetchStakeNode(node)
-	if err != nil {
-		return err
-	}
-	parentStakeNode, err := b.fetchStakeNode(node.parent)
-	if err != nil {
-		return err
-	}
+		prevNode.CalcPastMedianTime(), newTotalSubsidy,
+		uint32(node.stakeNode.PoolSize()), node.sbits,
+		prevNode.stakeNode.Winners(), prevNode.stakeNode.MissedTickets(),
+		prevNode.stakeNode.FinalState())
 
 	err = b.db.Update(func(dbTx database.Tx) error {
 		// Update best block state.
