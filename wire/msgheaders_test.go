@@ -192,17 +192,17 @@ func TestHeadersWireErrors(t *testing.T) {
 	bits := uint32(0x1d00ffff)
 	nonce := uint32(0x9962e301)
 	bh := NewBlockHeader(
-		int32(pver),                                 // Verision
-		&hash,                                       // PrevHash
-		&merkleHash,                                 // MerkleRootHash
-		&merkleHash,                                 // StakeRoot
-		uint16(0x0000),                              // VoteBits
+		int32(pver),    // Verision
+		&hash,          // PrevHash
+		&merkleHash,    // MerkleRootHash
+		&merkleHash,    // StakeRoot
+		uint16(0x0000), // VoteBits
 		[6]byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, // FinalState
-		uint16(0x0000),                              // Voters
-		uint8(0x00),                                 // FreshStake
-		uint8(0x00),                                 // Revocations
-		uint32(0),                                   // Poolsize
-		bits,                                        // Bits
+		uint16(0x0000),            // Voters
+		uint8(0x00),               // FreshStake
+		uint8(0x00),               // Revocations
+		uint32(0),                 // Poolsize
+		bits,                      // Bits
 		int64(0x0000000000000000), // Sbits
 		uint32(1),                 // Height
 		uint32(0),                 // Size
@@ -264,17 +264,17 @@ func TestHeadersWireErrors(t *testing.T) {
 	// Intentionally invalid block header that has a transaction count used
 	// to force errors.
 	bhTrans := NewBlockHeader(
-		int32(0),                                    // Verision
-		&hash,                                       // PrevHash
-		&merkleHash,                                 // MerkleRootHash
-		&merkleHash,                                 // StakeRoot
-		uint16(0x0000),                              // VoteBits
+		int32(0),       // Verision
+		&hash,          // PrevHash
+		&merkleHash,    // MerkleRootHash
+		&merkleHash,    // StakeRoot
+		uint16(0x0000), // VoteBits
 		[6]byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, // FinalState
-		uint16(0x0000),                              // Voters
-		uint8(0x00),                                 // FreshStake
-		uint8(0x00),                                 // Revocations
-		uint32(0),                                   // Poolsize
-		bits,                                        // Bits
+		uint16(0x0000),            // Voters
+		uint8(0x00),               // FreshStake
+		uint8(0x00),               // Revocations
+		uint32(0),                 // Poolsize
+		bits,                      // Bits
 		int64(0x0000000000000000), // Sbits
 		uint32(1),                 // Height
 		uint32(0),                 // Size

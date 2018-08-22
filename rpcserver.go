@@ -6448,7 +6448,7 @@ func newRPCServer(listenAddrs []string, policy *mining.Policy, s *server) (*rpcS
 		gbtWorkState:           newGbtWorkState(s.timeSource),
 		helpCacher:             newHelpCacher(),
 		requestProcessShutdown: make(chan struct{}),
-		quit: make(chan int),
+		quit:                   make(chan int),
 	}
 	if cfg.RPCUser != "" && cfg.RPCPass != "" {
 		login := cfg.RPCUser + ":" + cfg.RPCPass
