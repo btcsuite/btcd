@@ -1,4 +1,5 @@
-// Copyright (c) 2013-2017 The btcsuite developers
+// Copyright (c) 2013-2018 The btcsuite developers
+// Copyright (c) 2015-2018 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -633,119 +634,170 @@ func (vm *Engine) checkSignatureEncoding(sig []byte) error {
 	//   - S is the arbitrary length big-endian encoded number which
 	//     represents the S value of the signature.  The encoding rules are
 	//     identical as those for R.
+	const (
+		asn1SequenceID = 0x30
+		asn1IntegerID  = 0x02
 
-	// Minimum length is when both numbers are 1 byte each.
-	// 0x30 + <1-byte> + 0x02 + 0x01 + <byte> + 0x2 + 0x01 + <byte>
-	if len(sig) < 8 {
-		// Too short
-		str := fmt.Sprintf("malformed signature: too short: %d < 8",
-			len(sig))
-		return scriptError(ErrSigDER, str)
+		// minSigLen is the minimum length of a DER encoded signature and is
+		// when both R and S are 1 byte each.
+		//
+		// 0x30 + <1-byte> + 0x02 + 0x01 + <byte> + 0x2 + 0x01 + <byte>
+		minSigLen = 8
+
+		// maxSigLen is the maximum length of a DER encoded signature and is
+		// when both R and S are 33 bytes each.  It is 33 bytes because a
+		// 256-bit integer requires 32 bytes and an additional leading null byte
+		// might required if the high bit is set in the value.
+		//
+		// 0x30 + <1-byte> + 0x02 + 0x21 + <33 bytes> + 0x2 + 0x21 + <33 bytes>
+		maxSigLen = 72
+
+		// sequenceOffset is the byte offset within the signature of the
+		// expected ASN.1 sequence identifier.
+		sequenceOffset = 0
+
+		// dataLenOffset is the byte offset within the signature of the expected
+		// total length of all remaining data in the signature.
+		dataLenOffset = 1
+
+		// rTypeOffset is the byte offset within the signature of the ASN.1
+		// identifier for R and is expected to indicate an ASN.1 integer.
+		rTypeOffset = 2
+
+		// rLenOffset is the byte offset within the signature of the length of
+		// R.
+		rLenOffset = 3
+
+		// rOffset is the byte offset within the signature of R.
+		rOffset = 4
+	)
+
+	// The signature must adhere to the minimum and maximum allowed length.
+	sigLen := len(sig)
+	if sigLen < minSigLen {
+		str := fmt.Sprintf("malformed signature: too short: %d < %d", sigLen,
+			minSigLen)
+		return scriptError(ErrSigTooShort, str)
+	}
+	if sigLen > maxSigLen {
+		str := fmt.Sprintf("malformed signature: too long: %d > %d", sigLen,
+			maxSigLen)
+		return scriptError(ErrSigTooLong, str)
 	}
 
-	// Maximum length is when both numbers are 33 bytes each.  It is 33
-	// bytes because a 256-bit integer requires 32 bytes and an additional
-	// leading null byte might required if the high bit is set in the value.
-	// 0x30 + <1-byte> + 0x02 + 0x21 + <33 bytes> + 0x2 + 0x21 + <33 bytes>
-	if len(sig) > 72 {
-		// Too long
-		str := fmt.Sprintf("malformed signature: too long: %d > 72",
-			len(sig))
-		return scriptError(ErrSigDER, str)
+	// The signature must start with the ASN.1 sequence identifier.
+	if sig[sequenceOffset] != asn1SequenceID {
+		str := fmt.Sprintf("malformed signature: format has wrong type: %#x",
+			sig[sequenceOffset])
+		return scriptError(ErrSigInvalidSeqID, str)
 	}
-	if sig[0] != 0x30 {
-		// Wrong type
-		str := fmt.Sprintf("malformed signature: format has wrong "+
-			"type: 0x%x", sig[0])
-		return scriptError(ErrSigDER, str)
-	}
-	if int(sig[1]) != len(sig)-2 {
-		// Invalid length
+
+	// The signature must indicate the correct amount of data for all elements
+	// related to R and S.
+	if int(sig[dataLenOffset]) != sigLen-2 {
 		str := fmt.Sprintf("malformed signature: bad length: %d != %d",
-			sig[1], len(sig)-2)
-		return scriptError(ErrSigDER, str)
+			sig[dataLenOffset], sigLen-2)
+		return scriptError(ErrSigInvalidDataLen, str)
 	}
 
-	rLen := int(sig[3])
-
-	// Make sure S is inside the signature.
-	if rLen+5 > len(sig) {
-		return scriptError(ErrSigDER,
-			"malformed signature: S out of bounds")
+	// Calculate the offsets of the elements related to S and ensure S is inside
+	// the signature.
+	//
+	// rLen specifies the length of the big-endian encoded number which
+	// represents the R value of the signature.
+	//
+	// sTypeOffset is the offset of the ASN.1 identifier for S and, like its R
+	// counterpart, is expected to indicate an ASN.1 integer.
+	//
+	// sLenOffset and sOffset are the byte offsets within the signature of the
+	// length of S and S itself, respectively.
+	rLen := int(sig[rLenOffset])
+	sTypeOffset := rOffset + rLen
+	sLenOffset := sTypeOffset + 1
+	if sTypeOffset >= sigLen {
+		str := "malformed signature: S type indicator missing"
+		return scriptError(ErrSigMissingSTypeID, str)
+	}
+	if sLenOffset >= sigLen {
+		str := "malformed signature: S length missing"
+		return scriptError(ErrSigMissingSLen, str)
 	}
 
-	sLen := int(sig[rLen+5])
-
-	// The length of the elements does not match the length of the
-	// signature.
-	if rLen+sLen+6 != len(sig) {
-		return scriptError(ErrSigDER,
-			"malformed signature: invalid R length")
+	// The lengths of R and S must match the overall length of the signature.
+	//
+	// sLen specifies the length of the big-endian encoded number which
+	// represents the S value of the signature.
+	sOffset := sLenOffset + 1
+	sLen := int(sig[sLenOffset])
+	if sOffset+sLen != sigLen {
+		str := "malformed signature: invalid S length"
+		return scriptError(ErrSigInvalidSLen, str)
 	}
 
-	// R elements must be integers.
-	if sig[2] != 0x02 {
-		return scriptError(ErrSigDER,
-			"malformed signature: missing first integer marker")
+	// R elements must be ASN.1 integers.
+	if sig[rTypeOffset] != asn1IntegerID {
+		str := fmt.Sprintf("malformed signature: R integer marker: %#x != %#x",
+			sig[rTypeOffset], asn1IntegerID)
+		return scriptError(ErrSigInvalidRIntID, str)
 	}
 
 	// Zero-length integers are not allowed for R.
 	if rLen == 0 {
-		return scriptError(ErrSigDER,
-			"malformed signature: R length is zero")
+		str := "malformed signature: R length is zero"
+		return scriptError(ErrSigZeroRLen, str)
 	}
 
 	// R must not be negative.
-	if sig[4]&0x80 != 0 {
-		return scriptError(ErrSigDER,
-			"malformed signature: R value is negative")
+	if sig[rOffset]&0x80 != 0 {
+		str := "malformed signature: R is negative"
+		return scriptError(ErrSigNegativeR, str)
 	}
 
-	// Null bytes at the start of R are not allowed, unless R would
-	// otherwise be interpreted as a negative number.
-	if rLen > 1 && sig[4] == 0x00 && sig[5]&0x80 == 0 {
-		return scriptError(ErrSigDER,
-			"malformed signature: invalid R value")
+	// Null bytes at the start of R are not allowed, unless R would otherwise be
+	// interpreted as a negative number.
+	if rLen > 1 && sig[rOffset] == 0x00 && sig[rOffset+1]&0x80 == 0 {
+		str := "malformed signature: R value has too much padding"
+		return scriptError(ErrSigTooMuchRPadding, str)
 	}
 
-	// S elements must be integers.
-	if sig[rLen+4] != 0x02 {
-		return scriptError(ErrSigDER,
-			"malformed signature: missing second integer marker")
+	// S elements must be ASN.1 integers.
+	if sig[sTypeOffset] != asn1IntegerID {
+		str := fmt.Sprintf("malformed signature: S integer marker: %#x != %#x",
+			sig[sTypeOffset], asn1IntegerID)
+		return scriptError(ErrSigInvalidSIntID, str)
 	}
 
 	// Zero-length integers are not allowed for S.
 	if sLen == 0 {
-		return scriptError(ErrSigDER,
-			"malformed signature: S length is zero")
+		str := "malformed signature: S length is zero"
+		return scriptError(ErrSigZeroSLen, str)
 	}
 
 	// S must not be negative.
-	if sig[rLen+6]&0x80 != 0 {
-		return scriptError(ErrSigDER,
-			"malformed signature: S value is negative")
+	if sig[sOffset]&0x80 != 0 {
+		str := "malformed signature: S is negative"
+		return scriptError(ErrSigNegativeS, str)
 	}
 
-	// Null bytes at the start of S are not allowed, unless S would
-	// otherwise be interpreted as a negative number.
-	if sLen > 1 && sig[rLen+6] == 0x00 && sig[rLen+7]&0x80 == 0 {
-		return scriptError(ErrSigDER,
-			"malformed signature: invalid S value")
+	// Null bytes at the start of S are not allowed, unless S would otherwise be
+	// interpreted as a negative number.
+	if sLen > 1 && sig[sOffset] == 0x00 && sig[sOffset+1]&0x80 == 0 {
+		str := "malformed signature: S value has too much padding"
+		return scriptError(ErrSigTooMuchSPadding, str)
 	}
 
-	// Verify the S value is <= half the order of the curve.  This check is
-	// done because when it is higher, the complement modulo the order can
-	// be used instead which is a shorter encoding by 1 byte.  Further,
-	// without enforcing this, it is possible to replace a signature in a
-	// valid transaction with the complement while still being a valid
-	// signature that verifies.  This would result in changing the
-	// transaction hash and thus is source of malleability.
+	// Verify the S value is <= half the order of the curve.  This check is done
+	// because when it is higher, the complement modulo the order can be used
+	// instead which is a shorter encoding by 1 byte.  Further, without
+	// enforcing this, it is possible to replace a signature in a valid
+	// transaction with the complement while still being a valid signature that
+	// verifies.  This would result in changing the transaction hash and thus is
+	// a source of malleability.
 	if vm.hasFlag(ScriptVerifyLowS) {
-		sValue := new(big.Int).SetBytes(sig[rLen+6 : rLen+6+sLen])
+		sValue := new(big.Int).SetBytes(sig[sOffset : sOffset+sLen])
 		if sValue.Cmp(halfOrder) > 0 {
-			return scriptError(ErrSigHighS,
-				"signature is not canonical due to "+
-					"unnecessarily high S value")
+			return scriptError(ErrSigHighS, "signature is not canonical due "+
+				"to unnecessarily high S value")
 		}
 	}
 
