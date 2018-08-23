@@ -1,14 +1,22 @@
 #!/usr/bin/env bash
+
+# usage:
+# ./run_tests.sh                         # local, go 1.11
+# GOVERSION=1.10 ./run_tests.sh          # local, go 1.10 (vgo)
+# ./run_tests.sh docker                  # docker, go 1.11
+# GOVERSION=1.10 ./run_tests.sh docker   # docker, go 1.10 (vgo)
+# ./run_tests.sh podman                  # podman, go 1.11
+# GOVERSION=1.10 ./run_tests.sh podman   # podman, go 1.10 (vgo)
+
 set -ex
 
 # The script does automatic checking on a Go package and its sub-packages,
 # including:
 # 1. gofmt         (http://golang.org/cmd/gofmt/)
-# 2. go vet        (http://golang.org/cmd/vet)
-# 3. gosimple      (https://github.com/dominikh/go-simple)
-# 4. unconvert     (https://github.com/mdempsky/unconvert)
-# 5. ineffassign   (https://github.com/gordonklaus/ineffassign)
-# 6. race detector (http://blog.golang.org/race-detector)
+# 2. gosimple      (https://github.com/dominikh/go-simple)
+# 3. unconvert     (https://github.com/mdempsky/unconvert)
+# 4. ineffassign   (https://github.com/gordonklaus/ineffassign)
+# 5. race detector (http://blog.golang.org/race-detector)
 
 # gometalinter (github.com/alecthomas/gometalinter) is used to run each each
 # static checker.
@@ -18,90 +26,77 @@ set -ex
 # https://github.com/Microsoft/BashOnWindows/issues/1854
 # for more details.
 
-#Default GOVERSION
-GOVERSION=${1:-1.10}
+# Default GOVERSION
+[[ ! "$GOVERSION" ]] && GOVERSION=1.11
 REPO=dcrd
-DOCKER_IMAGE_TAG=decred-golang-builder-$GOVERSION
 
 testrepo () {
-  TMPFILE=$(mktemp)
-
-  # Check lockfile
-  cp Gopkg.lock $TMPFILE && dep ensure && diff Gopkg.lock $TMPFILE >/dev/null
-  if [ $? != 0 ]; then
-    echo 'lockfile must be updated with dep ensure'
-    exit 1
+  GO=go
+  if [[ $GOVERSION == 1.10 ]]; then
+    GO=vgo
   fi
 
-  # Check linters
-  gometalinter --vendor --disable-all --deadline=10m \
-    --enable=gofmt \
-    --enable=vet \
-    --enable=gosimple \
-    --enable=unconvert \
-    --enable=ineffassign \
-    ./...
-  if [ $? != 0 ]; then
-    echo 'gometalinter has some complaints'
-    exit 1
-  fi
+  $GO version
 
-  # Test application install
-  if [ $GOVERSION == "1.10" ]; then
-    go install -i
-  else
-    go install . ./cmd/...
-  fi
-  if [ $? != 0 ]; then
-    echo 'go install failed'
-    exit 1
-  fi
+  # binary needed for RPC tests
+  env CC=gcc $GO build
+  cp "$REPO" "$GOPATH/bin/"
 
-  # Check tests
-  env GORACE='halt_on_error=1' go test -short -race -tags rpctest ./...
-  if [ $? != 0 ]; then
-    echo 'go tests failed'
-    exit 1
+  # run tests on all modules
+  ROOTPATH=$($GO list -m -f {{.Dir}} 2>/dev/null)
+  ROOTPATHPATTERN=$(echo $ROOTPATH | sed 's/\\/\\\\/g' | sed 's/\//\\\//g')
+  MODPATHS=$($GO list -m -f {{.Dir}} all 2>/dev/null | grep "^$ROOTPATHPATTERN"\
+    | sed -e "s/^$ROOTPATHPATTERN//" -e 's/^\\\|\///')
+  MODPATHS=". $MODPATHS"
+  for module in $MODPATHS; do
+    echo "==> ${module}"
+    (cd $module && env GORACE='halt_on_error=1' CC=gcc $GO test -short -race \
+	  -tags rpctest ./...)
+  done
+
+  # check linters
+  if [[ $GOVERSION != 1.10 ]]; then
+    # linters do not work with modules yet
+    go mod vendor
+    unset GO111MODULE
+
+    gometalinter --vendor --disable-all --deadline=10m \
+      --enable=gofmt \
+      --enable=gosimple \
+      --enable=unconvert \
+      --enable=ineffassign \
+      ./...
+    if [ $? != 0 ]; then
+      echo 'gometalinter has some complaints'
+      exit 1
+    fi
   fi
 
   echo "------------------------------------------"
   echo "Tests completed successfully!"
 }
 
-if [ $GOVERSION == "local" ]; then
+DOCKER=
+[[ "$1" == "docker" || "$1" == "podman" ]] && DOCKER=$1
+if [ ! "$DOCKER" ]; then
     testrepo
     exit
 fi
 
+# use Travis cache with docker
+DOCKER_IMAGE_TAG=decred-golang-builder-$GOVERSION
 mkdir -p ~/.cache
-
 if [ -f ~/.cache/$DOCKER_IMAGE_TAG.tar ]; then
-	# load via cache
-	docker load -i ~/.cache/$DOCKER_IMAGE_TAG.tar
-	if [ $? != 0 ]; then
-		echo 'docker load failed'
-		exit 1
-	fi
+  # load via cache
+  $DOCKER load -i ~/.cache/$DOCKER_IMAGE_TAG.tar
 else
-	# pull and save image to cache 
-	docker pull decred/$DOCKER_IMAGE_TAG
-	if [ $? != 0 ]; then
-		echo 'docker pull failed'
-		exit 1
-	fi
-	docker save decred/$DOCKER_IMAGE_TAG > ~/.cache/$DOCKER_IMAGE_TAG.tar
-	if [ $? != 0 ]; then
-		echo 'docker save failed'
-		exit 1
-	fi
+  # pull and save image to cache
+  $DOCKER pull decred/$DOCKER_IMAGE_TAG
+  $DOCKER save decred/$DOCKER_IMAGE_TAG > ~/.cache/$DOCKER_IMAGE_TAG.tar
 fi
 
-docker run --rm -it -v $(pwd):/src decred/$DOCKER_IMAGE_TAG /bin/bash -c "\
+$DOCKER run --rm -it -v $(pwd):/src:Z decred/$DOCKER_IMAGE_TAG /bin/bash -c "\
   rsync -ra --filter=':- .gitignore'  \
   /src/ /go/src/github.com/decred/$REPO/ && \
   cd github.com/decred/$REPO/ && \
-  bash run_tests.sh local"
-if [ $? != 0 ]; then
-	echo 'docker run failed'
-	exit 1
-fi
+  env GOVERSION=$GOVERSION GO111MODULE=on bash run_tests.sh"
