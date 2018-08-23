@@ -356,20 +356,32 @@ func (h *Harness) SendOutputs(targetOutputs []*wire.TxOut,
 	return h.wallet.SendOutputs(targetOutputs, feeRate)
 }
 
+// SendOutputsWithoutChange creates and sends a transaction that pays to the
+// specified outputs while observing the passed fee rate and ignoring a change
+// output. The passed fee rate should be expressed in sat/b.
+//
+// This function is safe for concurrent access.
+func (h *Harness) SendOutputsWithoutChange(targetOutputs []*wire.TxOut,
+	feeRate btcutil.Amount) (*chainhash.Hash, error) {
+
+	return h.wallet.SendOutputsWithoutChange(targetOutputs, feeRate)
+}
+
 // CreateTransaction returns a fully signed transaction paying to the specified
 // outputs while observing the desired fee rate. The passed fee rate should be
-// expressed in satoshis-per-byte. Any unspent outputs selected as inputs for
-// the crafted transaction are marked as unspendable in order to avoid
-// potential double-spends by future calls to this method. If the created
-// transaction is cancelled for any reason then the selected inputs MUST be
-// freed via a call to UnlockOutputs. Otherwise, the locked inputs won't be
+// expressed in satoshis-per-byte. The transaction being created can optionally
+// include a change output indicated by the change boolean. Any unspent outputs
+// selected as inputs for the crafted transaction are marked as unspendable in
+// order to avoid potential double-spends by future calls to this method. If the
+// created transaction is cancelled for any reason then the selected inputs MUST
+// be freed via a call to UnlockOutputs. Otherwise, the locked inputs won't be
 // returned to the pool of spendable outputs.
 //
 // This function is safe for concurrent access.
 func (h *Harness) CreateTransaction(targetOutputs []*wire.TxOut,
-	feeRate btcutil.Amount) (*wire.MsgTx, error) {
+	feeRate btcutil.Amount, change bool) (*wire.MsgTx, error) {
 
-	return h.wallet.CreateTransaction(targetOutputs, feeRate)
+	return h.wallet.CreateTransaction(targetOutputs, feeRate, change)
 }
 
 // UnlockOutputs unlocks any outputs which were previously marked as
