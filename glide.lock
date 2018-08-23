@@ -1,8 +1,8 @@
-hash: 30562f0035d9bb4d4ee531762e4f7f762ede916255e9aa781df58537651f7382
-updated: 2018-07-06T16:07:52.877260592-07:00
+hash: e6f57b384b22282a2cb4e96aea9c46dc455b44336da09e64a9b19d13d877e7a4
+updated: 2018-08-22T19:51:39.57143044-07:00
 imports:
 - name: github.com/aead/siphash
-  version: e404fcfc888570cadd1610538e2dbc89f66af814
+  version: 83563a290f60225eb120d724600b9690c3fb536f
 - name: github.com/btcsuite/btclog
   version: 84c8d2346e9fc8c7b947e243b9c24e6df9fd206a
 - name: github.com/btcsuite/btcutil

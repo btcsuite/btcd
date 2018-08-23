@@ -33,3 +33,5 @@ import:
 - package: github.com/jessevdk/go-flags
   version: 1679536dcc895411a9f5848d9a0250be7856448c
 - package: github.com/jrick/logrotate
+- package: github.com/aead/siphash
+  version: 83563a290f60225eb120d724600b9690c3fb536f
