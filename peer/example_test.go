@@ -23,7 +23,7 @@ func mockRemotePeer() error {
 		UserAgentName:    "peer",  // User agent name to advertise.
 		UserAgentVersion: "1.0.0", // User agent version to advertise.
 		ChainParams:      &chaincfg.SimNetParams,
-		TrickleTimeout:   time.Second * 10,
+		TrickleInterval:  time.Second * 10,
 	}
 
 	// Accept connections on the simnet port.
@@ -70,7 +70,7 @@ func Example_newOutboundPeer() {
 		UserAgentVersion: "1.0.0", // User agent version to advertise.
 		ChainParams:      &chaincfg.SimNetParams,
 		Services:         0,
-		TrickleTimeout:   time.Second * 10,
+		TrickleInterval:  time.Second * 10,
 		Listeners: peer.MessageListeners{
 			OnVersion: func(p *peer.Peer, msg *wire.MsgVersion) {
 				fmt.Println("outbound: received version")

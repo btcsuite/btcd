@@ -30,6 +30,10 @@ const (
 	// MaxProtocolVersion is the max protocol version the peer supports.
 	MaxProtocolVersion = wire.FeeFilterVersion
 
+	// DefaultTrickleInterval is the min time between attempts to send an
+	// inv message to a peer.
+	DefaultTrickleInterval = 10 * time.Second
+
 	// minAcceptableProtocolVersion is the lowest protocol version that a
 	// connected peer may support.
 	minAcceptableProtocolVersion = wire.MultipleAddressVersion
@@ -266,9 +270,9 @@ type Config struct {
 	// messages.
 	Listeners MessageListeners
 
-	// TrickleTimeout is the duration of the ticker which trickles down the
+	// TrickleInterval is the duration of the ticker which trickles down the
 	// inventory to a peer.
-	TrickleTimeout time.Duration
+	TrickleInterval time.Duration
 }
 
 // minUint32 is a helper function to return the minimum of two uint32s.
@@ -1549,7 +1553,7 @@ out:
 func (p *Peer) queueHandler() {
 	pendingMsgs := list.New()
 	invSendQueue := list.New()
-	trickleTicker := time.NewTicker(p.cfg.TrickleTimeout)
+	trickleTicker := time.NewTicker(p.cfg.TrickleInterval)
 	defer trickleTicker.Stop()
 
 	// We keep the waiting flag so that we know if we have a message queued
@@ -2171,6 +2175,11 @@ func newPeerBase(origCfg *Config, inbound bool) *Peer {
 	// Set the chain parameters to testnet if the caller did not specify any.
 	if cfg.ChainParams == nil {
 		cfg.ChainParams = &chaincfg.TestNet3Params
+	}
+
+	// Set the trickle interval if a non-positive value is specified.
+	if cfg.TrickleInterval <= 0 {
+		cfg.TrickleInterval = DefaultTrickleInterval
 	}
 
 	p := Peer{
