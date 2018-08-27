@@ -1074,7 +1074,7 @@ various languages.
 **9.1 Go**
 
 This section provides examples of using the RPC interface using Go and the
-[btcrpcclient](https://github.com/btcsuite/btcrpcclient) package.
+[rpcclient](https://github.com/btcsuite/btcd/tree/master/rpcclient) package.
 
 * [Using getblockcount to Retrieve the Current Block Height](#ExampleGetBlockCount)
 * [Using getblock to Retrieve the Genesis Block](#ExampleGetBlock)
@@ -1086,7 +1086,7 @@ This section provides examples of using the RPC interface using Go and the
 **9.1.1 Using getblockcount to Retrieve the Current Block Height**<br />
 
 The following is an example Go application which uses the
-[btcrpcclient](https://github.com/btcsuite/btcrpcclient) package to connect with
+[rpcclient](https://github.com/btcsuite/btcd/tree/master/rpcclient) package to connect with
 a btcd instance via Websockets, issues [getblockcount](#getblockcount) to
 retrieve the current block height, and displays it.
 
@@ -1094,11 +1094,12 @@ retrieve the current block height, and displays it.
 package main
 
 import (
-	"github.com/btcsuite/btcrpcclient"
-	"github.com/btcsuite/btcutil"
 	"io/ioutil"
 	"log"
 	"path/filepath"
+
+	"github.com/btcsuite/btcd/rpcclient"
+	"github.com/btcsuite/btcutil"
 )
 
 func main() {
@@ -1114,14 +1115,14 @@ func main() {
 	// Create a new RPC client using websockets.  Since this example is
 	// not long-lived, the connection will be closed as soon as the program
 	// exits.
-	connCfg := &btcrpcclient.ConnConfig{
+	connCfg := &rpcclient.ConnConfig{
 		Host:         "localhost:8334",
 		Endpoint:     "ws",
 		User:         "yourrpcuser",
 		Pass:         "yourrpcpass",
 		Certificates: certs,
 	}
-	client, err := btcrpcclient.New(connCfg, nil)
+	client, err := rpcclient.New(connCfg, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -1139,7 +1140,7 @@ func main() {
 Which results in:
 
 ```bash
-Block count: 276978
+2018/08/27 11:17:27 Block count: 536027
 ```
 
 <a name="ExampleGetBlock" />
@@ -1147,7 +1148,7 @@ Block count: 276978
 **9.1.2 Using getblock to Retrieve the Genesis Block**<br />
 
 The following is an example Go application which uses the
-[btcrpcclient](https://github.com/btcsuite/btcrpcclient) package to connect with
+[rpcclient](https://github.com/btcsuite/btcd/tree/master/rpcclient) package to connect with
 a btcd instance via Websockets, issues [getblock](#getblock) to retrieve
 information about the Genesis block, and display a few details about it.
 
@@ -1155,14 +1156,14 @@ information about the Genesis block, and display a few details about it.
 package main
 
 import (
-	"github.com/btcsuite/btcrpcclient"
-	"github.com/btcsuite/btcutil"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/wire"
 	"io/ioutil"
 	"log"
 	"path/filepath"
 	"time"
+
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/rpcclient"
+	"github.com/btcsuite/btcutil"
 )
 
 func main() {
@@ -1178,14 +1179,14 @@ func main() {
 	// Create a new RPC client using websockets.  Since this example is
 	// not long-lived, the connection will be closed as soon as the program
 	// exits.
-	connCfg := &btcrpcclient.ConnConfig{
+	connCfg := &rpcclient.ConnConfig{
 		Host:         "localhost:18334",
 		Endpoint:     "ws",
 		User:         "yourrpcuser",
 		Pass:         "yourrpcpass",
 		Certificates: certs,
 	}
-	client, err := btcrpcclient.New(connCfg, nil)
+	client, err := rpcclient.New(connCfg, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -1199,7 +1200,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	block, err := client.GetBlockVerbose(blockHash, false)
+	block, err := client.GetBlockVerbose(blockHash)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -1225,7 +1226,7 @@ Previous Block: 0000000000000000000000000000000000000000000000000000000000000000
 Next Block: 00000000839a8e6886ab5951d76f411475428afc90947ee320161bbf18eb6048
 Merkle root: 4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b
 Timestamp: 2009-01-03 18:15:05 +0000 UTC
-Confirmations: 277290
+Confirmations: 534323
 Difficulty: 1.000000
 Size (in bytes): 285
 Num transactions: 1
@@ -1237,7 +1238,7 @@ Num transactions: 1
 Notifications (Websocket-specific)**<br />
 
 The following is an example Go application which uses the
-[btcrpcclient](https://github.com/btcsuite/btcrpcclient) package to connect with
+[rpcclient](https://github.com/btcsuite/btcd/tree/master/rpcclient) package to connect with
 a btcd instance via Websockets and registers for
 [blockconnected](#blockconnected) and [blockdisconnected](#blockdisconnected)
 notifications with [notifyblocks](#notifyblocks).  It also sets up handlers for
@@ -1247,25 +1248,25 @@ the notifications.
 package main
 
 import (
-	"github.com/btcsuite/btcrpcclient"
-	"github.com/btcsuite/btcutil"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/wire"
 	"io/ioutil"
 	"log"
 	"path/filepath"
 	"time"
+
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/rpcclient"
+	"github.com/btcsuite/btcutil"
 )
 
 func main() {
 	// Setup handlers for blockconnected and blockdisconnected
 	// notifications.
-	ntfnHandlers := btcrpcclient.NotificationHandlers{
-		OnBlockConnected: func(hash *chainhash.Hash, height int32) {
-			log.Printf("Block connected: %v (%d)", hash, height)
+	ntfnHandlers := rpcclient.NotificationHandlers{
+		OnBlockConnected: func(hash *chainhash.Hash, height int32, t time.Time) {
+			log.Printf("Block connected: %v (%d) %s", hash, height, t)
 		},
-		OnBlockDisconnected: func(hash *chainhash.Hash, height int32) {
-			log.Printf("Block disconnected: %v", hash, height)
+		OnBlockDisconnected: func(hash *chainhash.Hash, height int32, t time.Time) {
+			log.Printf("Block disconnected: %v (%d) %s", hash, height, t)
 		},
 	}
 
@@ -1279,14 +1280,14 @@ func main() {
 	}
 
 	// Create a new RPC client using websockets.
-	connCfg := &btcrpcclient.ConnConfig{
+	connCfg := &rpcclient.ConnConfig{
 		Host:         "localhost:8334",
 		Endpoint:     "ws",
 		User:         "yourrpcuser",
 		Pass:         "yourrpcpass",
 		Certificates: certs,
 	}
-	client, err := btcrpcclient.New(connCfg, &ntfnHandlers)
+	client, err := rpcclient.New(connCfg, &ntfnHandlers)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -1316,10 +1317,14 @@ func main() {
 Example output:
 
 ```
-2014/05/12 20:33:17 Client shutdown in 10 seconds...
-2014/05/12 20:33:19 Block connected: 000000000000000007dff1f95f7b3f5eac2892a4123069517caf34e2c417650d (300461)
-2014/05/12 20:33:27 Client shutting down...
-2014/05/12 20:31:27 Client shutdown complete.
+2018/08/27 10:35:43 Client shutdown in 10 seconds...
+2018/08/27 10:35:44 Block connected: 00000000000000000003321723557df58914658dc6fd963d547292a0a4797454 (534747) 2018-08-02 06:37:52 +0800 CST
+2018/08/27 10:35:47 Block connected: 0000000000000000002e12773b798fc61dffe00ed5c3e89d3c306f8058c51e13 (534748) 2018-08-02 06:39:54 +0800 CST
+2018/08/27 10:35:49 Block connected: 0000000000000000001bb311cd849839ce88499b91a201922f55a1cfafabe267 (534749) 2018-08-02 06:44:22 +0800 CST
+2018/08/27 10:35:50 Block connected: 00000000000000000019d7296c9b5c175369ad337ec44b76bd4728021a09b864 (534750) 2018-08-02 06:55:44 +0800 CST
+2018/08/27 10:35:53 Block connected: 00000000000000000022db98cf47e944ed58ca450c819e8fef8f8c71ca5d9901 (534751) 2018-08-02 06:57:39 +0800 CST
+2018/08/27 10:35:53 Client shutting down...
+2018/08/27 10:35:53 Client shutdown complete.
 ```
 
 <a name="ExampleNodeJsCode" />
