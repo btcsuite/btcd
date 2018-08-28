@@ -1011,7 +1011,7 @@ func (sp *serverPeer) OnGetCFCheckpt(_ *peer.Peer, msg *wire.MsgGetCFCheckpt) {
 	// a re-org has occurred so items in the db are now in the main china
 	// while the cache has been partially invalidated.
 	var forkIdx int
-	for forkIdx = len(checkptCache); forkIdx > 0; forkIdx-- {
+	for forkIdx = len(blockHashes); forkIdx > 0; forkIdx-- {
 		if checkptCache[forkIdx-1].blockHash == blockHashes[forkIdx-1] {
 			break
 		}
