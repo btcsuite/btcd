@@ -960,7 +960,7 @@ func (sp *serverPeer) OnGetCFCheckpt(_ *peer.Peer, msg *wire.MsgGetCFCheckpt) {
 
 	// Fetch the current existing cache so we can decide if we need to
 	// extend it or if its adequate as is.
-	sp.server.cfCheckptCachesMtx.Lock()
+	sp.server.cfCheckptCachesMtx.RLock()
 	checkptCache := sp.server.cfCheckptCaches[msg.FilterType]
 
 	// If the set of block hashes is beyond the current size of the cache,
@@ -969,34 +969,41 @@ func (sp *serverPeer) OnGetCFCheckpt(_ *peer.Peer, msg *wire.MsgGetCFCheckpt) {
 	var updateCache bool
 	if len(blockHashes) > len(checkptCache) {
 		// Now that we know we'll need to modify the size of the cache,
-		// we'll defer the release of the write lock so we don't
-		// forget.
+		// we'll release the read lock and grab the write lock to
+		// possibly expand the cache size.
+		sp.server.cfCheckptCachesMtx.RUnlock()
+
+		sp.server.cfCheckptCachesMtx.Lock()
 		defer sp.server.cfCheckptCachesMtx.Unlock()
 
-		// We'll mark that we need to update the cache for below and
-		// also expand the size of the cache in place.
-		updateCache = true
+		// Now that we have the write lock, we'll check again as it's
+		// possible that the cache has already been expanded.
+		checkptCache = sp.server.cfCheckptCaches[msg.FilterType]
 
-		additionalLength := len(blockHashes) - len(checkptCache)
-		newEntries := make([]cfHeaderKV, additionalLength)
+		// If we still need to expand the cache, then We'll mark that
+		// we need to update the cache for below and also expand the
+		// size of the cache in place.
+		if len(blockHashes) > len(checkptCache) {
+			updateCache = true
 
-		peerLog.Infof("Growing size of checkpoint cache from %v to %v "+
-			"block hashes", len(checkptCache), len(blockHashes))
+			additionalLength := len(blockHashes) - len(checkptCache)
+			newEntries := make([]cfHeaderKV, additionalLength)
 
-		checkptCache = append(
-			sp.server.cfCheckptCaches[msg.FilterType],
-			newEntries...,
-		)
+			peerLog.Infof("Growing size of checkpoint cache from %v to %v "+
+				"block hashes", len(checkptCache), len(blockHashes))
+
+			checkptCache = append(
+				sp.server.cfCheckptCaches[msg.FilterType],
+				newEntries...,
+			)
+		}
 	} else {
-		// Otherwise, we'll release the write lock, then grab the read
-		// lock, as the cache is already properly sized.
-		sp.server.cfCheckptCachesMtx.Unlock()
-		sp.server.cfCheckptCachesMtx.RLock()
+		// Otherwise, we'll hold onto the read lock for the remainder
+		// of this method.
+		defer sp.server.cfCheckptCachesMtx.RUnlock()
 
 		peerLog.Tracef("Serving stale cache of size %v",
 			len(checkptCache))
-
-		defer sp.server.cfCheckptCachesMtx.RUnlock()
 	}
 
 	// Now that we know the cache is of an appropriate size, we'll iterate
@@ -1004,7 +1011,7 @@ func (sp *serverPeer) OnGetCFCheckpt(_ *peer.Peer, msg *wire.MsgGetCFCheckpt) {
 	// a re-org has occurred so items in the db are now in the main china
 	// while the cache has been partially invalidated.
 	var forkIdx int
-	for forkIdx = len(checkptCache); forkIdx > 0; forkIdx-- {
+	for forkIdx = len(blockHashes); forkIdx > 0; forkIdx-- {
 		if checkptCache[forkIdx-1].blockHash == blockHashes[forkIdx-1] {
 			break
 		}
