@@ -1955,21 +1955,6 @@ func (b *blockManager) handleNotifyMsg(notification *blockchain.Notification) {
 		txTreeRegularValid := dcrutil.IsFlagSet16(block.MsgBlock().Header.VoteBits,
 			dcrutil.BlockValid)
 
-		if !txTreeRegularValid {
-			for _, tx := range parentBlock.Transactions()[1:] {
-				_, err := b.server.txMemPool.MaybeAcceptTransaction(tx, false,
-					true)
-				if err != nil {
-					// Remove the transaction and all transactions
-					// that depend on it if it wasn't accepted into
-					// the transaction pool. Probably this will mostly
-					// throw errors, as the majority will already be
-					// in the mempool.
-					b.server.txMemPool.RemoveTransaction(tx, true)
-				}
-			}
-		}
-
 		// Remove all of the regular and stake transactions in the
 		// connected block from the transaction pool.  Also, remove any
 		// transactions which are now double spends as a result of these
@@ -1979,12 +1964,14 @@ func (b *blockManager) handleNotifyMsg(notification *blockchain.Notification) {
 		// valid.  Also, the coinbase of the regular tx tree is skipped
 		// because the memory pool doesn't (and can't) have regular
 		// tree coinbase transactions in it.
-		for _, tx := range parentBlock.Transactions()[1:] {
-			b.server.txMemPool.RemoveTransaction(tx, false)
-			b.server.txMemPool.RemoveDoubleSpends(tx)
-			b.server.txMemPool.RemoveOrphan(tx)
-			acceptedTxs := b.server.txMemPool.ProcessOrphans(tx)
-			b.server.AnnounceNewTransactions(acceptedTxs)
+		if txTreeRegularValid {
+			for _, tx := range parentBlock.Transactions()[1:] {
+				b.server.txMemPool.RemoveTransaction(tx, false)
+				b.server.txMemPool.RemoveDoubleSpends(tx)
+				b.server.txMemPool.RemoveOrphan(tx)
+				acceptedTxs := b.server.txMemPool.ProcessOrphans(tx)
+				b.server.AnnounceNewTransactions(acceptedTxs)
+			}
 		}
 
 		for _, stx := range block.STransactions()[0:] {
