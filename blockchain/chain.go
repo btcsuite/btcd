@@ -976,7 +976,7 @@ func (b *BlockChain) disconnectBlock(node *blockNode, block, parent *dcrutil.Blo
 	prevNode := node.parent
 	state := newBestState(prevNode, parentBlockSize, numTxns, newTotalTxns,
 		prevNode.CalcPastMedianTime(), newTotalSubsidy,
-		uint32(node.stakeNode.PoolSize()), node.sbits,
+		uint32(prevNode.stakeNode.PoolSize()), node.sbits,
 		prevNode.stakeNode.Winners(), prevNode.stakeNode.MissedTickets(),
 		prevNode.stakeNode.FinalState())
 
