@@ -1,4 +1,4 @@
-// Copyright (c) 2015-2016 The Decred developers
+// Copyright (c) 2015-2018 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -15,8 +15,7 @@ var Sha512VersionStringRFC6979 = []byte("Edwards+SHA512  ")
 
 // CombinePubkeys combines a slice of public keys into a single public key
 // by adding them together with point addition.
-func CombinePubkeys(curve *TwistedEdwardsCurve,
-	pks []*PublicKey) *PublicKey {
+func CombinePubkeys(curve *TwistedEdwardsCurve, pks []*PublicKey) *PublicKey {
 	numPubKeys := len(pks)
 
 	// Have to have at least two pubkeys.
@@ -82,8 +81,10 @@ func generateNoncePair(curve *TwistedEdwardsCurve, msg []byte, priv []byte,
 func GenerateNoncePair(curve *TwistedEdwardsCurve, msg []byte,
 	privkey *PrivateKey, extra []byte,
 	version []byte) (*PrivateKey, *PublicKey, error) {
+
 	priv, pubNonce, err := generateNoncePair(curve, msg, privkey.Serialize(),
 		nonceRFC6979, extra, version)
+
 	if err != nil {
 		return nil, nil, err
 	}
@@ -98,6 +99,7 @@ func GenerateNoncePair(curve *TwistedEdwardsCurve, msg []byte,
 func schnorrPartialSign(curve *TwistedEdwardsCurve, msg []byte, priv []byte,
 	groupPublicKey []byte, privNonce []byte, pubNonceSum []byte) (*big.Int,
 	*big.Int, error) {
+
 	// Sanity checks.
 	if len(msg) != PrivScalarSize {
 		str := fmt.Sprintf("wrong size for message (got %v, want %v)",
@@ -182,6 +184,7 @@ func schnorrPartialSign(curve *TwistedEdwardsCurve, msg []byte, priv []byte,
 func SchnorrPartialSign(curve *TwistedEdwardsCurve, msg []byte,
 	priv *PrivateKey, groupPub *PublicKey, privNonce *PrivateKey,
 	pubSum *PublicKey) (*big.Int, *big.Int, error) {
+
 	privBytes := priv.Serialize()
 	defer zeroSlice(privBytes)
 	privNonceBytes := privNonce.Serialize()
@@ -194,8 +197,7 @@ func SchnorrPartialSign(curve *TwistedEdwardsCurve, msg []byte,
 // schnorrCombineSigs combines a list of partial Schnorr signatures s values
 // into a complete signature s for some group public key. This is achieved
 // by simply adding the s values of the partial signatures as scalars.
-func schnorrCombineSigs(curve *TwistedEdwardsCurve, sigss [][]byte) (*big.Int,
-	error) {
+func schnorrCombineSigs(curve *TwistedEdwardsCurve, sigss [][]byte) (*big.Int, error) {
 	combinedSigS := new(big.Int).SetInt64(0)
 	for i, sigs := range sigss {
 		sigsBI := EncodedBytesToBigInt(copyBytes(sigs))

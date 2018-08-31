@@ -1,4 +1,4 @@
-// Copyright (c) 2015-2016 The Decred developers
+// Copyright (c) 2015-2018 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -38,8 +38,7 @@ var (
 // GenerateKey generates a key using a random number generator, returning
 // the private scalar and the corresponding public key points from a
 // random secret.
-func GenerateKey(curve *TwistedEdwardsCurve, rand io.Reader) (priv []byte, x,
-	y *big.Int, err error) {
+func GenerateKey(curve *TwistedEdwardsCurve, rand io.Reader) (priv []byte, x, y *big.Int, err error) {
 	var pub *[PubKeyBytesLen]byte
 	var privArray *[PrivKeyBytesLen]byte
 	pub, privArray, err = ed25519.GenerateKey(rand)
@@ -58,8 +57,7 @@ func GenerateKey(curve *TwistedEdwardsCurve, rand io.Reader) (priv []byte, x,
 
 // SignFromSecret signs a message 'hash' using the given private key priv. It doesn't
 // actually user the random reader (the lib is maybe deterministic???).
-func SignFromSecret(rand io.Reader, priv *PrivateKey, hash []byte) (r, s *big.Int,
-	err error) {
+func SignFromSecret(rand io.Reader, priv *PrivateKey, hash []byte) (r, s *big.Int, err error) {
 	r, s, err = SignFromSecretNoReader(priv, hash)
 
 	return
@@ -67,8 +65,7 @@ func SignFromSecret(rand io.Reader, priv *PrivateKey, hash []byte) (r, s *big.In
 
 // SignFromSecretNoReader signs a message 'hash' using the given private key
 // priv. It doesn't actually user the random reader.
-func SignFromSecretNoReader(priv *PrivateKey, hash []byte) (r, s *big.Int,
-	err error) {
+func SignFromSecretNoReader(priv *PrivateKey, hash []byte) (r, s *big.Int, err error) {
 	privBytes := priv.SerializeSecret()
 	privArray := copyBytes64(privBytes)
 	sig := ed25519.Sign(privArray, hash)
@@ -87,8 +84,7 @@ func SignFromSecretNoReader(priv *PrivateKey, hash []byte) (r, s *big.Int,
 
 // nonceRFC6979 is a local instatiation of deterministic nonce generation
 // by the standards of RFC6979.
-func nonceRFC6979(curve *TwistedEdwardsCurve, privkey []byte, hash []byte,
-	extra []byte, version []byte) []byte {
+func nonceRFC6979(curve *TwistedEdwardsCurve, privkey []byte, hash []byte, extra []byte, version []byte) []byte {
 	pkD := new(big.Int).SetBytes(privkey)
 	defer pkD.SetInt64(0)
 	bigK := NonceRFC6979(curve, pkD, hash, extra, version)
@@ -100,8 +96,7 @@ func nonceRFC6979(curve *TwistedEdwardsCurve, privkey []byte, hash []byte,
 // NonceRFC6979 generates an ECDSA nonce (`k`) deterministically according to
 // RFC 6979. It takes a 32-byte hash as an input and returns 32-byte nonce to
 // be used in ECDSA algorithm.
-func NonceRFC6979(curve *TwistedEdwardsCurve, privkey *big.Int, hash []byte,
-	extra []byte, version []byte) *big.Int {
+func NonceRFC6979(curve *TwistedEdwardsCurve, privkey *big.Int, hash []byte, extra []byte, version []byte) *big.Int {
 	q := curve.Params().N
 	x := privkey
 	alg := sha256.New
@@ -224,8 +219,7 @@ func bits2octets(in []byte, curve *TwistedEdwardsCurve, rolen int) []byte {
 // It uses RFC6979 to generate a deterministic nonce. Considered experimental.
 // r = kG, where k is the RFC6979 nonce
 // s = r + hash512(k || A || M) * a
-func SignFromScalar(curve *TwistedEdwardsCurve, priv *PrivateKey,
-	nonce []byte, hash []byte) (r, s *big.Int, err error) {
+func SignFromScalar(curve *TwistedEdwardsCurve, priv *PrivateKey, nonce []byte, hash []byte) (r, s *big.Int, err error) {
 	publicKey := new([PubKeyBytesLen]byte)
 	var A edwards25519.ExtendedGroupElement
 	privateScalar := copyBytes(priv.Serialize())
@@ -278,9 +272,9 @@ func SignFromScalar(curve *TwistedEdwardsCurve, priv *PrivateKey,
 // the public nonce point with n-1 keys added.
 // r = K_Sum
 // s = r + hash512(k || A || M) * a
-func SignThreshold(curve *TwistedEdwardsCurve, priv *PrivateKey,
-	groupPub *PublicKey, hash []byte, privNonce *PrivateKey,
+func SignThreshold(curve *TwistedEdwardsCurve, priv *PrivateKey, groupPub *PublicKey, hash []byte, privNonce *PrivateKey,
 	pubNonceSum *PublicKey) (r, s *big.Int, err error) {
+
 	if priv == nil || hash == nil || privNonce == nil || pubNonceSum == nil {
 		return nil, nil, fmt.Errorf("nil input")
 	}
@@ -327,8 +321,7 @@ func SignThreshold(curve *TwistedEdwardsCurve, priv *PrivateKey,
 
 // Sign is the generalized and exported version of Ed25519 signing, that
 // handles both standard private secrets and non-standard scalars.
-func Sign(curve *TwistedEdwardsCurve, priv *PrivateKey, hash []byte) (r,
-	s *big.Int, err error) {
+func Sign(curve *TwistedEdwardsCurve, priv *PrivateKey, hash []byte) (r, s *big.Int, err error) {
 	if priv == nil {
 		return nil, nil, fmt.Errorf("private key is nil")
 	}

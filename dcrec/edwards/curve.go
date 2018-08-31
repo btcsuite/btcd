@@ -1,4 +1,4 @@
-// Copyright (c) 2015-2016 The Decred developers
+// Copyright (c) 2015-2018 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -47,8 +47,7 @@ func Unmarshal(curve *TwistedEdwardsCurve, data []byte) (x, y *big.Int) {
 
 // RecoverXBigInt recovers the X value for some Y value, for a coordinate
 // on the Ed25519 curve given as a big integer Y value.
-func (curve *TwistedEdwardsCurve) RecoverXBigInt(xIsNeg bool,
-	y *big.Int) *big.Int {
+func (curve *TwistedEdwardsCurve) RecoverXBigInt(xIsNeg bool, y *big.Int) *big.Int {
 	// (y^2 - 1)
 	l := new(big.Int).Mul(y, y)
 	l.Sub(l, one)
@@ -94,8 +93,7 @@ func (curve *TwistedEdwardsCurve) RecoverXBigInt(xIsNeg bool,
 // RecoverXFieldElement recovers the X value for some Y value, for a coordinate
 // on the Ed25519 curve given as a field element. Y value. Probably the fastest
 // way to get your respective X from Y.
-func (curve *TwistedEdwardsCurve) RecoverXFieldElement(xIsNeg bool,
-	y *edwards25519.FieldElement) *edwards25519.FieldElement {
+func (curve *TwistedEdwardsCurve) RecoverXFieldElement(xIsNeg bool, y *edwards25519.FieldElement) *edwards25519.FieldElement {
 	// (y^2 - 1)
 	l := new(edwards25519.FieldElement)
 	edwards25519.FeSquare(l, y)
@@ -284,8 +282,7 @@ func (curve *TwistedEdwardsCurve) Double(x1, y1 *big.Int) (x, y *big.Int) {
 // ScalarMult returns k*(Bx,By) where k is a number in big-endian form. This
 // uses the repeated doubling method, which is variable time.
 // TODO use a constant time method to prevent side channel attacks.
-func (curve *TwistedEdwardsCurve) ScalarMult(x1, y1 *big.Int,
-	k []byte) (x, y *big.Int) {
+func (curve *TwistedEdwardsCurve) ScalarMult(x1, y1 *big.Int, k []byte) (x, y *big.Int) {
 	// Convert the scalar to a big int.
 	s := new(big.Int).SetBytes(k)
 

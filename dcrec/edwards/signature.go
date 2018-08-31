@@ -1,5 +1,5 @@
 // Copyright (c) 2013-2014 The btcsuite developers
-// Copyright (c) 2015-2016 The Decred developers
+// Copyright (c) 2015-2018 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -40,8 +40,7 @@ func (sig Signature) Serialize() []byte {
 }
 
 // parseSig is the default method of parsing a serialized Ed25519 signature.
-func parseSig(curve *TwistedEdwardsCurve, sigStr []byte, der bool) (*Signature,
-	error) {
+func parseSig(curve *TwistedEdwardsCurve, sigStr []byte, der bool) (*Signature, error) {
 	if der {
 		return nil, fmt.Errorf("DER signatures not allowed in ed25519")
 	}
@@ -73,15 +72,13 @@ func parseSig(curve *TwistedEdwardsCurve, sigStr []byte, der bool) (*Signature,
 
 // ParseSignature parses a signature in BER format for the curve type `curve'
 // into a Signature type, perfoming some basic sanity checks.
-func ParseSignature(curve *TwistedEdwardsCurve, sigStr []byte) (*Signature,
-	error) {
+func ParseSignature(curve *TwistedEdwardsCurve, sigStr []byte) (*Signature, error) {
 	return parseSig(curve, sigStr, false)
 }
 
 // ParseDERSignature offers a legacy function for plugging into Decred, which
 // is based off btcec.
-func ParseDERSignature(curve *TwistedEdwardsCurve, sigStr []byte) (*Signature,
-	error) {
+func ParseDERSignature(curve *TwistedEdwardsCurve, sigStr []byte) (*Signature, error) {
 	return parseSig(curve, sigStr, false)
 }
 

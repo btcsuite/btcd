@@ -1,4 +1,4 @@
-// Copyright (c) 2015-2016 The Decred developers
+// Copyright (c) 2015-2018 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -227,8 +227,7 @@ func (curve *TwistedEdwardsCurve) extendedToBigAffine(xi, yi,
 // EncodedBytesToBigIntPoint converts a 32 byte representation of a point
 // on the elliptical curve into a big integer point. It returns an error
 // if the point does not fall on the curve.
-func (curve *TwistedEdwardsCurve) EncodedBytesToBigIntPoint(s *[32]byte) (*big.Int,
-	*big.Int, error) {
+func (curve *TwistedEdwardsCurve) EncodedBytesToBigIntPoint(s *[32]byte) (*big.Int, *big.Int, error) {
 	sCopy := new([32]byte)
 	for i := 0; i < fieldIntSize; i++ {
 		sCopy[i] = s[i]

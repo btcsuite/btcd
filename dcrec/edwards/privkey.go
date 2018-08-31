@@ -70,8 +70,7 @@ func computeScalar(privateKey *[PrivKeyBytesLen]byte) *[PrivScalarSize]byte {
 
 // PrivKeyFromBytes returns a private and public key for `curve' based on the
 // private key passed as an argument as a byte slice.
-func PrivKeyFromBytes(curve *TwistedEdwardsCurve,
-	pkBytes []byte) (*PrivateKey, *PublicKey) {
+func PrivKeyFromBytes(curve *TwistedEdwardsCurve, pkBytes []byte) (*PrivateKey, *PublicKey) {
 	if len(pkBytes) != PrivKeyBytesLen {
 		return nil, nil
 	}
@@ -101,8 +100,7 @@ func PrivKeyFromBytes(curve *TwistedEdwardsCurve,
 
 // PrivKeyFromSecret returns a private and public key for `curve' based on the
 // 32-byte private key secret passed as an argument as a byte slice.
-func PrivKeyFromSecret(curve *TwistedEdwardsCurve, s []byte) (*PrivateKey,
-	*PublicKey) {
+func PrivKeyFromSecret(curve *TwistedEdwardsCurve, s []byte) (*PrivateKey, *PublicKey) {
 	if len(s) != PrivKeyBytesLen/2 {
 		return nil, nil
 	}
@@ -121,8 +119,7 @@ func PrivKeyFromSecret(curve *TwistedEdwardsCurve, s []byte) (*PrivateKey,
 // PrivKeyFromScalar returns a private and public key for `curve' based on the
 // 32-byte private scalar passed as an argument as a byte slice (encoded big
 // endian int).
-func PrivKeyFromScalar(curve *TwistedEdwardsCurve, p []byte) (*PrivateKey,
-	*PublicKey, error) {
+func PrivKeyFromScalar(curve *TwistedEdwardsCurve, p []byte) (*PrivateKey, *PublicKey, error) {
 	if len(p) != PrivScalarSize {
 		return nil, nil, fmt.Errorf("bad private scalar size")
 	}

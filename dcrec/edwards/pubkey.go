@@ -28,8 +28,11 @@ func NewPublicKey(curve *TwistedEdwardsCurve, x *big.Int, y *big.Int) *PublicKey
 
 // ParsePubKey parses a public key for an edwards curve from a bytestring into a
 // ecdsa.Publickey, verifying that it is valid.
-func ParsePubKey(curve *TwistedEdwardsCurve, pubKeyStr []byte) (key *PublicKey,
-	err error) {
+func ParsePubKey(curve *TwistedEdwardsCurve, pubKeyStr []byte) (key *PublicKey, err error) {
+	if len(pubKeyStr) == 0 {
+		return nil, errors.New("pubkey string is empty")
+	}
+
 	pubkey := PublicKey{}
 	pubkey.Curve = curve
 	x, y, err := curve.EncodedBytesToBigIntPoint(copyBytes(pubKeyStr))
@@ -39,9 +42,6 @@ func ParsePubKey(curve *TwistedEdwardsCurve, pubKeyStr []byte) (key *PublicKey,
 	pubkey.X = x
 	pubkey.Y = y
 
-	if len(pubKeyStr) == 0 {
-		return nil, errors.New("pubkey string is empty")
-	}
 	if pubkey.X.Cmp(pubkey.Curve.Params().P) >= 0 {
 		return nil, fmt.Errorf("pubkey X parameter is >= to P")
 	}

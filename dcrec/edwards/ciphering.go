@@ -1,5 +1,5 @@
 // Copyright (c) 2015 The btcsuite developers
-// Copyright (c) 2015-2016 The Decred developers
+// Copyright (c) 2015-2018 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -64,8 +64,7 @@ func GenerateSharedSecret(privkey *PrivateKey, pubkey *PublicKey) []byte {
 // The primary aim is to ensure byte compatibility with Pyelliptic.
 // Additionally, refer to section 5.8.1 of ANSI X9.63 for rationale on this
 // format.
-func Encrypt(curve *TwistedEdwardsCurve, pubkey *PublicKey, in []byte) ([]byte,
-	error) {
+func Encrypt(curve *TwistedEdwardsCurve, pubkey *PublicKey, in []byte) ([]byte, error) {
 	ephemeral, err := GeneratePrivateKey(curve)
 	if err != nil {
 		return nil, err
@@ -112,8 +111,7 @@ func Encrypt(curve *TwistedEdwardsCurve, pubkey *PublicKey, in []byte) ([]byte,
 }
 
 // Decrypt decrypts data that was encrypted using the Encrypt function.
-func Decrypt(curve *TwistedEdwardsCurve, priv *PrivateKey, in []byte) ([]byte,
-	error) {
+func Decrypt(curve *TwistedEdwardsCurve, priv *PrivateKey, in []byte) ([]byte, error) {
 	// IV + Curve params/X/Y + 1 block + HMAC-256
 	if len(in) < aes.BlockSize+36+aes.BlockSize+sha256.Size {
 		return nil, errInputTooShort
