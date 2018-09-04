@@ -14,6 +14,7 @@ import (
 	"github.com/btcsuite/winsvc/eventlog"
 	"github.com/btcsuite/winsvc/mgr"
 	"github.com/btcsuite/winsvc/svc"
+	"github.com/decred/dcrd/internal/version"
 )
 
 const (
@@ -37,7 +38,7 @@ var elog *eventlog.Log
 // been started to the Windows event log.
 func logServiceStartOfDay(srvr *server) {
 	var message string
-	message += fmt.Sprintf("Version %s\n", version())
+	message += fmt.Sprintf("Version %s\n", version.String())
 	message += fmt.Sprintf("Configuration directory: %s\n", cfg.HomeDir)
 	message += fmt.Sprintf("Configuration file: %s\n", cfg.ConfigFile)
 	message += fmt.Sprintf("Data directory: %s\n", cfg.DataDir)

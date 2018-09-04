@@ -30,6 +30,7 @@ import (
 	"github.com/decred/dcrd/dcrutil"
 	"github.com/decred/dcrd/gcs"
 	"github.com/decred/dcrd/gcs/blockcf"
+	"github.com/decred/dcrd/internal/version"
 	"github.com/decred/dcrd/mempool"
 	"github.com/decred/dcrd/mining"
 	"github.com/decred/dcrd/peer"
@@ -66,7 +67,8 @@ var (
 
 	// userAgentVersion is the user agent version and is used to help
 	// identify ourselves to other peers.
-	userAgentVersion = fmt.Sprintf("%d.%d.%d", appMajor, appMinor, appPatch)
+	userAgentVersion = fmt.Sprintf("%d.%d.%d", version.Major, version.Minor,
+		version.Patch)
 )
 
 // broadcastMsg provides the ability to house a Decred message to be broadcast
@@ -1584,8 +1586,8 @@ func disconnectPeer(peerList map[int32]*serverPeer, compareFunc func(*serverPeer
 // newPeerConfig returns the configuration for the given serverPeer.
 func newPeerConfig(sp *serverPeer) *peer.Config {
 	var userAgentComments []string
-	if appPreRelease != "" {
-		userAgentComments = append(userAgentComments, appPreRelease)
+	if version.PreRelease != "" {
+		userAgentComments = append(userAgentComments, version.PreRelease)
 	}
 
 	return &peer.Config{

@@ -44,6 +44,7 @@ import (
 	"github.com/decred/dcrd/dcrec/secp256k1"
 	"github.com/decred/dcrd/dcrjson"
 	"github.com/decred/dcrd/dcrutil"
+	"github.com/decred/dcrd/internal/version"
 	"github.com/decred/dcrd/mempool"
 	"github.com/decred/dcrd/mining"
 	"github.com/decred/dcrd/txscript"
@@ -3229,8 +3230,8 @@ func handleGetHeaders(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) 
 func handleGetInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	best := s.chain.BestSnapshot()
 	ret := &dcrjson.InfoChainResult{
-		Version: int32(1000000*appMajor + 10000*appMinor +
-			100*appPatch),
+		Version: int32(1000000*version.Major + 10000*version.Minor +
+			100*version.Patch),
 		ProtocolVersion: int32(maxProtocolVersion),
 		Blocks:          best.Height,
 		TimeOffset:      int64(s.server.timeSource.Offset().Seconds()),
@@ -5765,8 +5766,9 @@ func handleVerifyMessage(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 // handleVersion implements the version command.
 func handleVersion(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	runtimeVer := strings.Replace(runtime.Version(), ".", "-", -1)
-	buildMeta := normalizeBuildString(runtimeVer)
-	if build := normalizeBuildString(appBuild); build != "" {
+	buildMeta := version.NormalizeBuildString(runtimeVer)
+	build := version.NormalizeBuildString(version.BuildMetadata)
+	if build != "" {
 		buildMeta = fmt.Sprintf("%s.%s", build, buildMeta)
 	}
 	result := map[string]dcrjson.VersionResult{
@@ -5777,11 +5779,11 @@ func handleVersion(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (in
 			Patch:         jsonrpcSemverPatch,
 		},
 		"dcrd": {
-			VersionString: version(),
-			Major:         uint32(appMajor),
-			Minor:         uint32(appMinor),
-			Patch:         uint32(appPatch),
-			Prerelease:    normalizePreRelString(appPreRelease),
+			VersionString: version.String(),
+			Major:         uint32(version.Major),
+			Minor:         uint32(version.Minor),
+			Patch:         uint32(version.Patch),
+			Prerelease:    version.NormalizePreRelString(version.PreRelease),
 			BuildMetadata: buildMeta,
 		},
 	}
