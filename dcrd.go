@@ -16,8 +16,8 @@ import (
 	"time"
 
 	"github.com/decred/dcrd/blockchain/indexers"
+	"github.com/decred/dcrd/internal/limits"
 	"github.com/decred/dcrd/internal/version"
-	"github.com/decred/dcrd/limits"
 )
 
 var cfg *config

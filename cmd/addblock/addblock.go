@@ -13,7 +13,7 @@ import (
 	"github.com/decred/dcrd/blockchain"
 	"github.com/decred/dcrd/blockchain/indexers"
 	"github.com/decred/dcrd/database"
-	"github.com/decred/dcrd/limits"
+	"github.com/decred/dcrd/internal/limits"
 	"github.com/decred/slog"
 )
 

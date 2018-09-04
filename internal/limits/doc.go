@@ -3,6 +3,6 @@
 // license that can be found in the LICENSE file.
 
 /*
-Package limits allows to raises some process limits.
+Package limits allows some process limits to be raised.
 */
 package limits
