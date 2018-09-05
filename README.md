@@ -66,7 +66,7 @@ recommended that `GOPATH` is set to a directory in your home directory such as
 $ go get -u github.com/Masterminds/glide
 $ git clone https://github.com/btcsuite/btcd $GOPATH/src/github.com/btcsuite/btcd
 $ cd $GOPATH/src/github.com/btcsuite/btcd
-$ glide install
+$ glide install # glide is $GOTPATH/bin/glide, invoke it directly if it isn't in your PATH
 $ go install . ./cmd/...
 ```
 
