@@ -76,17 +76,6 @@ func NewExistsAddrIndex(db database.DB, chainParams *chaincfg.Params) *ExistsAdd
 // Ensure the ExistsAddrIndex type implements the Indexer interface.
 var _ Indexer = (*ExistsAddrIndex)(nil)
 
-// Ensure the ExistsAddrIndex type implements the NeedsInputser interface.
-var _ NeedsInputser = (*ExistsAddrIndex)(nil)
-
-// NeedsInputs signals that the index requires the referenced inputs in order
-// to properly create the index.
-//
-// This implements the NeedsInputser interface.
-func (idx *ExistsAddrIndex) NeedsInputs() bool {
-	return false
-}
-
 // Init is only provided to satisfy the Indexer interface as there is nothing to
 // initialize for this index.
 //
