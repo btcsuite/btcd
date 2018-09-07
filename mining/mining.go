@@ -13,6 +13,12 @@ import (
 	"github.com/decred/dcrd/dcrutil"
 )
 
+const (
+	// MinHighPriority is the minimum priority value that allows a
+	// transaction to be considered high priority.
+	MinHighPriority = dcrutil.AtomsPerCoin * 144.0 / 250
+)
+
 // TxDesc is a descriptor about a transaction in a transaction source along with
 // additional metadata.
 type TxDesc struct {
