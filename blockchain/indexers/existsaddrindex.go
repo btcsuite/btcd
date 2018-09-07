@@ -111,13 +111,13 @@ func (idx *ExistsAddrIndex) Create(dbTx database.Tx) error {
 
 // dbPutExistsAddr uses an existing database transaction to update or add a
 // used address index to the database.
-func dbPutExistsAddr(bucket database.Bucket, addrKey [addrKeySize]byte) error {
+func dbPutExistsAddr(bucket internalBucket, addrKey [addrKeySize]byte) error {
 	return bucket.Put(addrKey[:], nil)
 }
 
 // existsAddress takes a bucket and key for an address and responds with
 // whether or not the key exists in the database.
-func (idx *ExistsAddrIndex) existsAddress(bucket database.Bucket, k [addrKeySize]byte) bool {
+func (idx *ExistsAddrIndex) existsAddress(bucket internalBucket, k [addrKeySize]byte) bool {
 	if bucket.Get(k[:]) != nil {
 		return true
 	}
