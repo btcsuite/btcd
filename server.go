@@ -94,7 +94,7 @@ func (oa *onionAddr) Network() string {
 // Ensure onionAddr implements the net.Addr interface.
 var _ net.Addr = (*onionAddr)(nil)
 
-// onionAddr implements the net.Addr interface with two struct fields
+// simpleAddr implements the net.Addr interface with two struct fields
 type simpleAddr struct {
 	net, addr string
 }
