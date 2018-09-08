@@ -3516,6 +3516,7 @@ func handleGetRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan str
 	var mtx *wire.MsgTx
 	var blkHash *chainhash.Hash
 	var blkHeight int64
+	var blkIndex uint32
 	tx, err := s.server.txMemPool.FetchTransaction(txHash, true)
 	if err != nil {
 		txIndex := s.server.txIndex
@@ -3553,13 +3554,14 @@ func handleGetRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan str
 			return hex.EncodeToString(txBytes), nil
 		}
 
-		// Grab the block height.
+		// Grab the block details.
 		blkHash = blockRegion.Hash
 		blkHeight, err = s.chain.BlockHeightByHash(blkHash)
 		if err != nil {
 			context := "Failed to retrieve block height"
 			return nil, rpcInternalError(err.Error(), context)
 		}
+		blkIndex = wire.NullBlockIndex // TODO: Update txindex to provide.
 
 		// Deserialize the transaction
 		var msgTx wire.MsgTx
@@ -3607,9 +3609,8 @@ func handleGetRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan str
 		confirmations = 1 + s.chain.BestSnapshot().Height - blkHeight
 	}
 
-	rawTxn, err := createTxRawResult(s.server.chainParams, mtx,
-		txHash.String(), 0, blkHeader, blkHashStr, blkHeight,
-		confirmations)
+	rawTxn, err := createTxRawResult(s.server.chainParams, mtx, txHash.String(),
+		blkIndex, blkHeader, blkHashStr, blkHeight, confirmations)
 	if err != nil {
 		return nil, err
 	}
@@ -4528,9 +4529,10 @@ func handleRebroadcastWinners(s *rpcServer, cmd interface{}, closeChan <-chan st
 // This is mainly done for efficiency to avoid extra serialization steps when
 // possible.
 type retrievedTx struct {
-	txBytes []byte
-	blkHash *chainhash.Hash // Only set when transaction is in a block.
-	tx      *dcrutil.Tx
+	txBytes  []byte
+	blkHash  *chainhash.Hash // Only set when transaction is in a block.
+	blkIndex uint32          // Only set when transaction is in a block.
+	tx       *dcrutil.Tx
 }
 
 // fetchInputTxos fetches the outpoints from all transactions referenced by the
@@ -4839,8 +4841,8 @@ func handleSearchRawTransactions(s *rpcServer, cmd interface{}, closeChan <-chan
 	addressTxns := make([]retrievedTx, 0, numRequested)
 	if reverse {
 		// Transactions in the mempool are not in a block header yet,
-		// so the block header field in the retieved transaction struct
-		// is left nil.
+		// so the block header and block index fields in the retrieved
+		// transaction struct are left unset.
 		mpTxns, mpSkipped := fetchMempoolTxnsForAddress(s, addr,
 			uint32(numToSkip), uint32(numRequested))
 		numSkipped += mpSkipped
@@ -4872,10 +4874,13 @@ func handleSearchRawTransactions(s *rpcServer, cmd interface{}, closeChan <-chan
 			// requested non-verbose output and hence there would
 			// be no point in deserializing it just to reserialize
 			// it later.
+			//
+			// TODO: Update txindex to provide block index.
 			for i, serializedTx := range serializedTxns {
 				addressTxns = append(addressTxns, retrievedTx{
-					txBytes: serializedTx,
-					blkHash: regions[i].Hash,
+					txBytes:  serializedTx,
+					blkHash:  regions[i].Hash,
+					blkIndex: wire.NullBlockIndex,
 				})
 			}
 			numSkipped += dbSkipped
@@ -4978,6 +4983,7 @@ func handleSearchRawTransactions(s *rpcServer, cmd interface{}, closeChan <-chan
 		result.Vout = createVoutList(mtx, chainParams, filterAddrMap)
 		result.Version = int32(mtx.Version)
 		result.LockTime = mtx.LockTime
+		result.Expiry = mtx.Expiry
 
 		// Transactions grabbed from the mempool aren't yet in a block,
 		// so conditionally fetch block details here.  This will be
@@ -4986,6 +4992,7 @@ func handleSearchRawTransactions(s *rpcServer, cmd interface{}, closeChan <-chan
 		var blkHeader *wire.BlockHeader
 		var blkHashStr string
 		var blkHeight int64
+		var blkIndex uint32
 		if blkHash := rtx.blkHash; blkHash != nil {
 			// Fetch the header from chain.
 			header, err := s.chain.HeaderByHash(blkHash)
@@ -5006,6 +5013,7 @@ func handleSearchRawTransactions(s *rpcServer, cmd interface{}, closeChan <-chan
 			blkHeader = &header
 			blkHashStr = blkHash.String()
 			blkHeight = height
+			blkIndex = rtx.blkIndex
 		}
 
 		// Add the block information to the result if there is any.
@@ -5015,6 +5023,8 @@ func handleSearchRawTransactions(s *rpcServer, cmd interface{}, closeChan <-chan
 			result.Time = blkHeader.Timestamp.Unix()
 			result.Blocktime = blkHeader.Timestamp.Unix()
 			result.BlockHash = blkHashStr
+			result.BlockHeight = blkHeight
+			result.BlockIndex = blkIndex
 			result.Confirmations = uint64(1 + best.Height - blkHeight)
 		}
 	}

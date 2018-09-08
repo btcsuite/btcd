@@ -326,7 +326,7 @@ type TxRawResult struct {
 	Vin           []Vin  `json:"vin"`
 	Vout          []Vout `json:"vout"`
 	BlockHash     string `json:"blockhash,omitempty"`
-	BlockHeight   int64  `json:"blockheight"`
+	BlockHeight   int64  `json:"blockheight,omitempty"`
 	BlockIndex    uint32 `json:"blockindex,omitempty"`
 	Confirmations int64  `json:"confirmations,omitempty"`
 	Time          int64  `json:"time,omitempty"`
@@ -510,9 +510,12 @@ type SearchRawTransactionsResult struct {
 	Txid          string       `json:"txid"`
 	Version       int32        `json:"version"`
 	LockTime      uint32       `json:"locktime"`
+	Expiry        uint32       `json:"expiry"`
 	Vin           []VinPrevOut `json:"vin"`
 	Vout          []Vout       `json:"vout"`
 	BlockHash     string       `json:"blockhash,omitempty"`
+	BlockHeight   int64        `json:"blockheight,omitempty"`
+	BlockIndex    uint32       `json:"blockindex,omitempty"`
 	Confirmations uint64       `json:"confirmations,omitempty"`
 	Time          int64        `json:"time,omitempty"`
 	Blocktime     int64        `json:"blocktime,omitempty"`

@@ -98,7 +98,7 @@ func TestChainSvrWsNtfns(t *testing.T) {
 				}
 				return NewTxAcceptedVerboseNtfn(txResult)
 			},
-			marshalled: `{"jsonrpc":"1.0","method":"txacceptedverbose","params":[{"hex":"001122","txid":"123","version":1,"locktime":4294967295,"expiry":0,"vin":null,"vout":null,"blockheight":0}],"id":null}`,
+			marshalled: `{"jsonrpc":"1.0","method":"txacceptedverbose","params":[{"hex":"001122","txid":"123","version":1,"locktime":4294967295,"expiry":0,"vin":null,"vout":null}],"id":null}`,
 			unmarshalled: &TxAcceptedVerboseNtfn{
 				RawTx: TxRawResult{
 					Hex:           "001122",
