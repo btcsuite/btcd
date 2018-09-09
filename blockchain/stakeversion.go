@@ -365,7 +365,7 @@ func (b *BlockChain) calcStakeVersionByHash(hash *chainhash.Hash) (uint32, error
 // This function is safe for concurrent access.
 func (b *BlockChain) CalcStakeVersionByHash(hash *chainhash.Hash) (uint32, error) {
 	b.chainLock.Lock()
-	defer b.chainLock.Unlock()
-
-	return b.calcStakeVersionByHash(hash)
+	version, err := b.calcStakeVersionByHash(hash)
+	b.chainLock.Unlock()
+	return version, err
 }

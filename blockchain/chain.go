@@ -250,8 +250,13 @@ type StakeVersions struct {
 // GetStakeVersions returns a cooked array of StakeVersions.  We do this in
 // order to not bloat memory by returning raw blocks.
 func (b *BlockChain) GetStakeVersions(hash *chainhash.Hash, count int32) ([]StakeVersions, error) {
+	// NOTE: The requirement for the node being fully validated here is strictly
+	// stronger than what is actually required.  In reality, all that is needed
+	// is for the block data for the node and all of its ancestors to be
+	// available, but there is not currently any tracking to be able to
+	// efficiently determine that state.
 	startNode := b.index.LookupNode(hash)
-	if startNode == nil {
+	if startNode == nil || !b.index.NodeStatus(startNode).KnownValid() {
 		return nil, fmt.Errorf("block %s is not known", hash)
 	}
 
@@ -1814,7 +1819,7 @@ func (b *BlockChain) HeaderByHeight(height int64) (wire.BlockHeader, error) {
 // This function is safe for concurrent access.
 func (b *BlockChain) BlockByHash(hash *chainhash.Hash) (*dcrutil.Block, error) {
 	node := b.index.LookupNode(hash)
-	if node == nil {
+	if node == nil || !b.index.NodeStatus(node).HaveData() {
 		return nil, fmt.Errorf("block %s is not known", hash)
 	}
 

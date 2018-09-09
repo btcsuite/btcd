@@ -470,8 +470,13 @@ func (b *BlockChain) deploymentState(prevNode *blockNode, version uint32, deploy
 //
 // This function is safe for concurrent access.
 func (b *BlockChain) ThresholdState(hash *chainhash.Hash, version uint32, deploymentID string) (ThresholdStateTuple, error) {
+	// NOTE: The requirement for the node being fully validated here is strictly
+	// stronger than what is actually required.  In reality, all that is needed
+	// is for the block data for the node and all of its ancestors to be
+	// available, but there is not currently any tracking to be able to
+	// efficiently determine that state.
 	node := b.index.LookupNode(hash)
-	if node == nil {
+	if node == nil || !b.index.NodeStatus(node).KnownValid() {
 		invalidState := ThresholdStateTuple{
 			State:  ThresholdInvalid,
 			Choice: invalidChoice,

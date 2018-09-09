@@ -130,6 +130,7 @@ func newFakeChain(params *chaincfg.Params) *BlockChain {
 	// Create a genesis block node and block index populated with it for use
 	// when creating the fake chain below.
 	node := newBlockNode(&params.GenesisBlock.Header, nil)
+	node.status = statusDataStored | statusValid
 	index := newBlockIndex(nil, params)
 	index.AddNode(node)
 
@@ -170,7 +171,9 @@ func newFakeNode(parent *blockNode, blockVersion int32, stakeVersion uint32, bit
 		Nonce:        testNoncePrng.Uint32(),
 		StakeVersion: stakeVersion,
 	}
-	return newBlockNode(header, parent)
+	node := newBlockNode(header, parent)
+	node.status = statusDataStored | statusValid
+	return node
 }
 
 // chainedFakeNodes returns the specified number of nodes constructed such that
