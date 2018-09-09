@@ -592,14 +592,14 @@ func (sm *SyncManager) handleBlockMsg(bmsg *blockMsg) {
 	}
 
 	// Meta-data about the new block this peer is reporting. We use this
-	// below to update this peer's lastest block height and the heights of
+	// below to update this peer's latest block height and the heights of
 	// other peers based on their last announced block hash. This allows us
 	// to dynamically update the block heights of peers, avoiding stale
 	// heights when looking for a new sync peer. Upon acceptance of a block
 	// or recognition of an orphan, we also use this information to update
 	// the block heights over other peers who's invs may have been ignored
 	// if we are actively syncing while the chain is not yet current or
-	// who may have lost the lock announcment race.
+	// who may have lost the lock announcement race.
 	var heightUpdate int32
 	var blkHashUpdate *chainhash.Hash
 
