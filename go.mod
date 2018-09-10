@@ -11,7 +11,7 @@ require (
 	github.com/dchest/siphash v1.2.0
 	github.com/decred/base58 v1.0.0
 	github.com/decred/dcrd/addrmgr v1.0.2
-	github.com/decred/dcrd/blockchain v1.0.2
+	github.com/decred/dcrd/blockchain v1.1.0
 	github.com/decred/dcrd/blockchain/stake v1.0.2
 	github.com/decred/dcrd/certgen v1.0.1
 	github.com/decred/dcrd/chaincfg v1.1.1

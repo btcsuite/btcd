@@ -173,6 +173,25 @@ func (b *BlockChain) maybeAcceptBlock(block *dcrutil.Block, flags BehaviorFlags)
 		return 0, err
 	}
 
+	// Notify the caller when the block intends to extend the main chain,
+	// the chain believes it is current, and the block has passed all of the
+	// sanity and contextual checks, such as having valid proof of work,
+	// valid merkle and stake roots, and only containing allowed votes and
+	// revocations.
+	//
+	// This allows the block to be relayed before doing the more expensive
+	// connection checks, because even though the block might still fail
+	// to connect and becomes the new main chain tip, that is quite rare in
+	// practice since a lot of work was expended to create a block that
+	// satisifies the proof of work requirement.
+	//
+	// Notice that the chain lock is not released before sending the
+	// notification.  This is intentional and must not be changed without
+	// understanding why!
+	if b.isCurrent() && b.bestChain.Tip() == prevNode {
+		b.sendNotification(NTNewTipBlockChecked, block)
+	}
+
 	// Fetching a stake node could enable a new DoS vector, so restrict
 	// this only to blocks that are recent in history.
 	if newNode.height < b.bestChain.Tip().height-minMemoryNodes {
@@ -200,7 +219,8 @@ func (b *BlockChain) maybeAcceptBlock(block *dcrutil.Block, flags BehaviorFlags)
 
 	// Notify the caller that the new block was accepted into the block
 	// chain.  The caller would typically want to react by relaying the
-	// inventory to other peers.
+	// inventory to other peers unless it was already relayed above
+	// via NTNewTipBlockChecked.
 	bestHeight := b.bestChain.Tip().height
 	b.chainLock.Unlock()
 	b.sendNotification(NTBlockAccepted, &BlockAcceptedNtfnsData{

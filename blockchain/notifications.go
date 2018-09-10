@@ -21,10 +21,31 @@ type NotificationCallback func(*Notification)
 
 // Constants for the type of a notification message.
 const (
+	// NTNewTipBlockChecked indicates the associated block intends to extend
+	// the current main chain and has passed all of the sanity and
+	// contextual checks such as having valid proof of work, valid merkle
+	// and stake roots, and only containing allowed votes and revocations.
+	//
+	// It should be noted that the block might still ultimately fail to
+	// become the new main chain tip if it contains invalid scripts, double
+	// spends, etc.  However, this is quite rare in practice because a lot
+	// of work was expended to create a block which satisifies the proof of
+	// work requirement.
+	//
+	// Finally, this notification is only sent if the the chain is believed
+	// to be current and the chain lock is NOT released, so consumers must
+	// take care to avoid calling blockchain functions to avoid potential
+	// deadlock.
+	//
+	// Typically, a caller would want to use this notification to relay the
+	// block to the rest of the network without needing to wait for the more
+	// time consuming full connection to take place.
+	NTNewTipBlockChecked NotificationType = iota
+
 	// NTBlockAccepted indicates the associated block was accepted into
 	// the block chain.  Note that this does not necessarily mean it was
 	// added to the main chain.  For that, use NTBlockConnected.
-	NTBlockAccepted NotificationType = iota
+	NTBlockAccepted
 
 	// NTBlockConnected indicates the associated block was connected to the
 	// main chain.
@@ -50,6 +71,7 @@ const (
 // notificationTypeStrings is a map of notification types back to their constant
 // names for pretty printing.
 var notificationTypeStrings = map[NotificationType]string{
+	NTNewTipBlockChecked:    "NTNewTipBlockChecked",
 	NTBlockAccepted:         "NTBlockAccepted",
 	NTBlockConnected:        "NTBlockConnected",
 	NTBlockDisconnected:     "NTBlockDisconnected",
@@ -111,6 +133,7 @@ type TicketNotificationsData struct {
 // Notification defines notification that is sent to the caller via the callback
 // function provided during the call to New and consists of a notification type
 // as well as associated data that depends on the type as follows:
+// 	- NTNewTipBlockChecked:    *dcrutil.Block
 // 	- NTBlockAccepted:         *BlockAcceptedNtfnsData
 // 	- NTBlockConnected:        []*dcrutil.Block of len 2
 // 	- NTBlockDisconnected:     []*dcrutil.Block of len 2
