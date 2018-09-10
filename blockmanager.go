@@ -1852,8 +1852,26 @@ func (b *blockManager) notifiedWinningTickets(hash *chainhash.Hash) bool {
 // as request orphan block parents and relay accepted blocks to connected peers.
 func (b *blockManager) handleNotifyMsg(notification *blockchain.Notification) {
 	switch notification.Type {
+	// A block that intends to extend the main chain has passed all sanity and
+	// contextual checks and the chain is believed to be current.  Relay it to
+	// other peers.
+	case blockchain.NTNewTipBlockChecked:
+		// WARNING: The chain lock is not released before sending this
+		// notification, so care must be taken to avoid calling chain functions
+		// which could result in a deadlock.
+		block, ok := notification.Data.(*dcrutil.Block)
+		if !ok {
+			bmgrLog.Warnf("New tip block checkedd notification is not a block.")
+			break
+		}
+
+		// Generate the inventory vector and relay it immediately.
+		iv := wire.NewInvVect(wire.InvTypeBlock, block.Hash())
+		b.server.RelayInventory(iv, block.MsgBlock().Header, true)
+
 	// A block has been accepted into the block chain.  Relay it to other peers
-	// and possibly notify RPC clients with the winning tickets.
+	// (will be ignored if already relayed via NTNewTipBlockChecked) and
+	// possibly notify RPC clients with the winning tickets.
 	case blockchain.NTBlockAccepted:
 		// Don't relay or notify RPC clients with winning tickets if we
 		// are not current. Other peers that are current should already
