@@ -1927,9 +1927,9 @@ func (b *blockManager) handleNotifyMsg(notification *blockchain.Notification) {
 			}
 		}
 
-		// Generate the inventory vector and relay it.
+		// Generate the inventory vector and relay it immediately.
 		iv := wire.NewInvVect(wire.InvTypeBlock, blockHash)
-		b.server.RelayInventory(iv, block.MsgBlock().Header)
+		b.server.RelayInventory(iv, block.MsgBlock().Header, true)
 
 	// A block has been connected to the main block chain.
 	case blockchain.NTBlockConnected:

@@ -91,10 +91,13 @@ type broadcastInventoryDel *wire.InvVect
 type broadcastPruneInventory struct{}
 
 // relayMsg packages an inventory vector along with the newly discovered
-// inventory so the relay has access to that information.
+// inventory and a flag that determines if the relay should happen immediately
+// (it will be put into a trickle queue if false) so the relay has access to
+// that information.
 type relayMsg struct {
-	invVect *wire.InvVect
-	data    interface{}
+	invVect   *wire.InvVect
+	data      interface{}
+	immediate bool
 }
 
 // updatePeerHeightsMsg is a message sent from the blockmanager to the server
@@ -1124,7 +1127,7 @@ func (s *server) AnnounceNewTransactions(newTxs []*dcrutil.Tx) {
 	for _, tx := range newTxs {
 		// Generate the inventory vector and relay it.
 		iv := wire.NewInvVect(wire.InvTypeTx, tx.Hash())
-		s.RelayInventory(iv, tx)
+		s.RelayInventory(iv, tx, false)
 
 		if s.rpcServer != nil {
 			// Notify websocket clients about mempool transactions.
@@ -1389,10 +1392,16 @@ func (s *server) handleRelayInvMsg(state *peerState, msg relayMsg) {
 			}
 		}
 
-		// Queue the inventory to be relayed with the next batch.
-		// It will be ignored if the peer is already known to
-		// have the inventory.
-		sp.QueueInventory(msg.invVect)
+		// Either queue the inventory to be relayed immediately or with
+		// the next batch depending on the immediate flag.
+		//
+		// It will be ignored in either case if the peer is already
+		// known to have the inventory.
+		if msg.immediate {
+			sp.QueueInventoryImmediate(msg.invVect)
+		} else {
+			sp.QueueInventory(msg.invVect)
+		}
 	})
 }
 
@@ -1780,8 +1789,8 @@ func (s *server) BanPeer(sp *serverPeer) {
 
 // RelayInventory relays the passed inventory vector to all connected peers
 // that are not already known to have it.
-func (s *server) RelayInventory(invVect *wire.InvVect, data interface{}) {
-	s.relayInv <- relayMsg{invVect: invVect, data: data}
+func (s *server) RelayInventory(invVect *wire.InvVect, data interface{}, immediate bool) {
+	s.relayInv <- relayMsg{invVect: invVect, data: data, immediate: immediate}
 }
 
 // BroadcastMessage sends msg to all peers currently connected to the server
@@ -2008,7 +2017,7 @@ out:
 			// yet. We periodically resubmit them until they have.
 			for iv, data := range pendingInvs {
 				ivCopy := iv
-				s.RelayInventory(&ivCopy, data)
+				s.RelayInventory(&ivCopy, data, false)
 			}
 
 			// Process at a random time up to 30mins (in seconds)
