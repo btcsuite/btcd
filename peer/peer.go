@@ -1724,6 +1724,33 @@ func (p *Peer) QueueInventory(invVect *wire.InvVect) {
 	p.outputInvChan <- invVect
 }
 
+// QueueInventoryImmediate adds the passed inventory to the send queue to be
+// sent immediately.  This should typically only be used for inventory that is
+// time sensitive such as new tip blocks or votes.  Normal inventory should be
+// announced via QueueInventory which instead trickles it to the peer in
+// batches.  Inventory that the peer is already known to have is ignored.
+//
+// This function is safe for concurrent access.
+func (p *Peer) QueueInventoryImmediate(invVect *wire.InvVect) {
+	// Don't announce the inventory if the peer is already known to have it.
+	if p.knownInventory.Exists(invVect) {
+		return
+	}
+
+	// Avoid risk of deadlock if goroutine already exited.  The goroutine
+	// we will be sending to hangs around until it knows for a fact that
+	// it is marked as disconnected and *then* it drains the channels.
+	if !p.Connected() {
+		return
+	}
+
+	// Generate and queue a single inv message with the inventory vector.
+	invMsg := wire.NewMsgInvSizeHint(1)
+	invMsg.AddInvVect(invVect)
+	p.AddKnownInventory(invVect)
+	p.outputQueue <- outMsg{msg: invMsg, doneChan: nil}
+}
+
 // Connected returns whether or not the peer is currently connected.
 //
 // This function is safe for concurrent access.
