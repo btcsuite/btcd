@@ -283,6 +283,8 @@ func parseExpectedResult(expected string) ([]ErrorCode, error) {
 		return []ErrorCode{ErrDisabledOpcode}, nil
 	case "ERR_RESERVED_OPCODE":
 		return []ErrorCode{ErrReservedOpcode}, nil
+	case "ERR_P2SH_STAKE_OPCODES":
+		return []ErrorCode{ErrP2SHStakeOpCodes}, nil
 	case "ERR_MALFORMED_PUSH":
 		return []ErrorCode{ErrMalformedPush}, nil
 	case "ERR_INVALID_STACK_OPERATION", "ERR_INVALID_ALTSTACK_OPERATION":
