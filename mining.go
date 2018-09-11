@@ -1060,7 +1060,6 @@ func NewBlockTemplate(policy *mining.Policy, server *server, payToAddress dcruti
 	var txSource mining.TxSource = server.txMemPool
 	blockManager := server.blockManager
 	timeSource := server.timeSource
-	chainState := &blockManager.chainState
 	subsidyCache := blockManager.chain.FetchSubsidyCache()
 
 	// All transaction scripts are verified using the more strict standarad
@@ -1069,12 +1068,6 @@ func NewBlockTemplate(policy *mining.Policy, server *server, payToAddress dcruti
 	if err != nil {
 		return nil, err
 	}
-
-	// Lock times are relative to the past median time of the block this
-	// template is building on.
-	chainState.Lock()
-	medianTime := chainState.pastMedianTime
-	chainState.Unlock()
 
 	// Extend the most recently known best block.
 	// The most recently known best block is the top block that has the most
@@ -1097,25 +1090,10 @@ func NewBlockTemplate(policy *mining.Policy, server *server, payToAddress dcruti
 	// 8. Select the one with the largest penalty ratio (highest block reward).
 	//    This block is then selected to build upon instead of the others, because
 	//    it yields the greater amount of rewards.
-	chainState.Lock()
-	prevHash := chainState.newestHash
-	nextBlockHeight := chainState.newestHeight + 1
-	poolSize := chainState.nextPoolSize
-	reqStakeDifficulty := chainState.nextStakeDifficulty
-	finalState := chainState.nextFinalState
-	winningTickets := make([]chainhash.Hash, len(chainState.winningTickets))
-	copy(winningTickets, chainState.winningTickets)
-	missedTickets := make([]chainhash.Hash, len(chainState.missedTickets))
-	copy(missedTickets, chainState.missedTickets)
-	chainState.Unlock()
 
-	chainBest := blockManager.chain.BestSnapshot()
-	if *prevHash != chainBest.Hash ||
-		nextBlockHeight-1 != chainBest.Height {
-		return nil, fmt.Errorf("chain state is not syncronized to the "+
-			"blockchain (got %v:%v, want %v,%v",
-			prevHash, nextBlockHeight-1, chainBest.Hash, chainBest.Height)
-	}
+	best := blockManager.chain.BestSnapshot()
+	nextBlockHeight := best.Height + 1
+	prevHash := best.Hash
 
 	// Calculate the stake enabled height.
 	stakeValidationHeight := server.chainParams.StakeValidationHeight
@@ -1130,7 +1108,7 @@ func NewBlockTemplate(policy *mining.Policy, server *server, payToAddress dcruti
 		// Get the list of blocks that we can actually build on top of. If we're
 		// not currently on the block that has the most votes, switch to that
 		// block.
-		eligibleParents := SortParentsByVotes(txSource, *prevHash, children,
+		eligibleParents := SortParentsByVotes(txSource, prevHash, children,
 			blockManager.server.chainParams)
 		if len(eligibleParents) == 0 {
 			minrLog.Debugf("Too few voters found on any HEAD block, " +
@@ -1145,10 +1123,10 @@ func NewBlockTemplate(policy *mining.Policy, server *server, payToAddress dcruti
 
 		// Force a reorganization to the parent with the most votes if we need
 		// to.
-		if eligibleParents[0] != *prevHash {
+		if eligibleParents[0] != prevHash {
 			for i := range eligibleParents {
 				newHead := &eligibleParents[i]
-				err := blockManager.ForceReorganization(*prevHash, *newHead)
+				err := blockManager.ForceReorganization(prevHash, *newHead)
 				if err != nil {
 					minrLog.Errorf("failed to reorganize to new parent: %v", err)
 					continue
@@ -1165,7 +1143,7 @@ func NewBlockTemplate(policy *mining.Policy, server *server, payToAddress dcruti
 				if exist := txSource.HaveAllTransactions(voteHashes); !exist {
 					continue
 				} else {
-					prevHash = newHead
+					prevHash = *newHead
 					break
 				}
 			}
@@ -1214,7 +1192,7 @@ func NewBlockTemplate(policy *mining.Policy, server *server, payToAddress dcruti
 
 	minrLog.Debugf("Considering %d transactions for inclusion to new block",
 		len(sourceTxns))
-	treeKnownInvalid := txSource.IsTxTreeKnownInvalid(prevHash)
+	treeKnownInvalid := txSource.IsTxTreeKnownInvalid(&prevHash)
 
 mempoolLoop:
 	for _, txDesc := range sourceTxns {
@@ -1227,8 +1205,7 @@ mempoolLoop:
 			continue
 		}
 		if !blockchain.IsFinalizedTransaction(tx, nextBlockHeight,
-			medianTime) {
-
+			best.MedianTime) {
 			minrLog.Tracef("Skipping non-finalized tx %s", tx.Hash())
 			continue
 		}
@@ -1238,7 +1215,7 @@ mempoolLoop:
 		isSSGen := txDesc.Type == stake.TxTypeSSGen
 		if isSSGen {
 			blockHash, blockHeight := stake.SSGenBlockVotedOn(msgTx)
-			if !((blockHash == *prevHash) &&
+			if !((blockHash == prevHash) &&
 				(int64(blockHeight) == nextBlockHeight-1)) {
 				minrLog.Tracef("Skipping ssgen tx %s because it does "+
 					"not vote on the correct block", tx.Hash())
@@ -1349,8 +1326,9 @@ mempoolLoop:
 
 	numSStx := 0
 
-	foundWinningTickets := make(map[chainhash.Hash]bool, len(winningTickets))
-	for _, ticketHash := range winningTickets {
+	foundWinningTickets := make(map[chainhash.Hash]bool,
+		len(best.NextWinningTickets))
+	for _, ticketHash := range best.NextWinningTickets {
 		foundWinningTickets[ticketHash] = false
 	}
 
@@ -1384,7 +1362,7 @@ mempoolLoop:
 
 		// Skip if the SStx commit value is below the value required by the
 		// stake diff.
-		if isSStx && (tx.MsgTx().TxOut[0].Value < reqStakeDifficulty) {
+		if isSStx && (tx.MsgTx().TxOut[0].Value < best.NextStakeDiff) {
 			continue
 		}
 
@@ -1392,7 +1370,7 @@ mempoolLoop:
 		if isSSRtx {
 			ticketHash := &tx.MsgTx().TxIn[0].PreviousOutPoint.Hash
 
-			if !hashInSlice(*ticketHash, missedTickets) {
+			if !hashInSlice(*ticketHash, best.MissedTickets) {
 				continue
 			}
 		}
@@ -1448,7 +1426,7 @@ mempoolLoop:
 			}
 			msgTx := tx.MsgTx()
 			isEligible := false
-			for _, sstxHash := range winningTickets {
+			for _, sstxHash := range best.NextWinningTickets {
 				if sstxHash.IsEqual(&msgTx.TxIn[1].PreviousOutPoint.Hash) {
 					isEligible = true
 				}
@@ -1643,7 +1621,7 @@ mempoolLoop:
 
 			// Retrieve the current top block, whose TxTreeRegular was voted
 			// out.
-			topBlock, err := blockManager.chain.BlockByHash(prevHash)
+			topBlock, err := blockManager.chain.BlockByHash(&prevHash)
 			if err != nil {
 				str := fmt.Sprintf("unable to get tip block %s", prevHash)
 				return nil, miningRuleError(ErrGetTopBlock, str)
@@ -1693,7 +1671,7 @@ mempoolLoop:
 			}
 
 			// Quick check for difficulty here.
-			if msgTx.TxOut[0].Value >= reqStakeDifficulty {
+			if msgTx.TxOut[0].Value >= best.NextStakeDiff {
 				txCopy := dcrutil.NewTxDeepTxIns(msgTx)
 				if maybeInsertStakeTx(blockManager, txCopy, !treeKnownInvalid) {
 					blockTxnsStake = append(blockTxnsStake, txCopy)
@@ -1849,7 +1827,7 @@ mempoolLoop:
 	// Calculate the required difficulty for the block.  The timestamp
 	// is potentially adjusted to ensure it comes after the median time of
 	// the last several blocks per the chain consensus rules.
-	ts := medianAdjustedTime(chainBest, timeSource)
+	ts := medianAdjustedTime(best, timeSource)
 	reqDifficulty, err := blockManager.chain.CalcNextRequiredDifficulty(ts)
 	if err != nil {
 		return nil, miningRuleError(ErrGettingDifficulty, err.Error())
@@ -1949,7 +1927,8 @@ mempoolLoop:
 	}
 
 	// Figure out stake version.
-	generatedStakeVersion, err := blockManager.chain.CalcStakeVersionByHash(prevHash)
+	generatedStakeVersion, err := blockManager.chain.
+		CalcStakeVersionByHash(&prevHash)
 	if err != nil {
 		return nil, err
 	}
@@ -1961,17 +1940,17 @@ mempoolLoop:
 	var msgBlock wire.MsgBlock
 	msgBlock.Header = wire.BlockHeader{
 		Version:      blockVersion,
-		PrevBlock:    *prevHash,
+		PrevBlock:    prevHash,
 		MerkleRoot:   *merkles[len(merkles)-1],
 		StakeRoot:    *merklesStake[len(merklesStake)-1],
 		VoteBits:     votebits,
-		FinalState:   finalState,
+		FinalState:   best.NextFinalState,
 		Voters:       uint16(voters),
 		FreshStake:   uint8(freshStake),
 		Revocations:  uint8(revocations),
-		PoolSize:     poolSize,
+		PoolSize:     best.NextPoolSize,
 		Timestamp:    ts,
-		SBits:        reqStakeDifficulty,
+		SBits:        best.NextStakeDiff,
 		Bits:         reqDifficulty,
 		StakeVersion: generatedStakeVersion,
 		Height:       uint32(nextBlockHeight),
