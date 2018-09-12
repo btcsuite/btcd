@@ -306,7 +306,7 @@ out:
 		// Hacks to make dcr work with Decred PoC (simnet only)
 		// TODO Remove before production.
 		if cfg.SimNet {
-			_, curHeight := m.server.blockManager.chainState.Best()
+			curHeight := m.server.blockManager.chain.BestSnapshot().Height
 
 			if curHeight == 1 {
 				time.Sleep(5500 * time.Millisecond) // let wallet reconn

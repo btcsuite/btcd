@@ -494,10 +494,10 @@ func (sp *serverPeer) OnGetMiningState(p *peer.Peer, msg *wire.MsgGetMiningState
 	// Access the block manager and get the list of best blocks to mine on.
 	bm := sp.server.blockManager
 	mp := sp.server.txMemPool
-	newest, height := bm.chainState.Best()
+	best := bm.chain.BestSnapshot()
 
 	// Send out blank mining states if it's early in the blockchain.
-	if height < activeNetParams.StakeValidationHeight-1 {
+	if best.Height < activeNetParams.StakeValidationHeight-1 {
 		err := sp.pushMiningStateMsg(0, nil, nil)
 		if err != nil {
 			peerLog.Warnf("unexpected error while pushing data for "+
@@ -512,7 +512,7 @@ func (sp *serverPeer) OnGetMiningState(p *peer.Peer, msg *wire.MsgGetMiningState
 	children, err := bm.TipGeneration()
 	if err != nil {
 		peerLog.Warnf("failed to access block manager to get the generation "+
-			"for a mining state request (block: %v): %v", newest, err)
+			"for a mining state request (block: %v): %v", best.Hash, err)
 		return
 	}
 
@@ -520,7 +520,7 @@ func (sp *serverPeer) OnGetMiningState(p *peer.Peer, msg *wire.MsgGetMiningState
 	// limit the list to the maximum number of allowed eligible block hashes
 	// per mining state message.  There is nothing to send when there are no
 	// eligible blocks.
-	blockHashes := SortParentsByVotes(mp, *newest, children,
+	blockHashes := SortParentsByVotes(mp, best.Hash, children,
 		bm.server.chainParams)
 	numBlocks := len(blockHashes)
 	if numBlocks == 0 {
@@ -545,7 +545,7 @@ func (sp *serverPeer) OnGetMiningState(p *peer.Peer, msg *wire.MsgGetMiningState
 		voteHashes = append(voteHashes, vhsForBlock...)
 	}
 
-	err = sp.pushMiningStateMsg(uint32(height), blockHashes, voteHashes)
+	err = sp.pushMiningStateMsg(uint32(best.Height), blockHashes, voteHashes)
 	if err != nil {
 		peerLog.Warnf("unexpected error while pushing data for "+
 			"mining state request: %v", err.Error())
@@ -2499,10 +2499,7 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 		},
 		ChainParams: chainParams,
 		NextStakeDifficulty: func() (int64, error) {
-			bm.chainState.Lock()
-			sDiff := bm.chainState.nextStakeDifficulty
-			bm.chainState.Unlock()
-			return sDiff, nil
+			return bm.chain.BestSnapshot().NextStakeDiff, nil
 		},
 		FetchUtxoView:    bm.chain.FetchUtxoView,
 		BlockByHash:      bm.chain.BlockByHash,
@@ -2511,9 +2508,11 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 		CalcSequenceLock: bm.chain.CalcSequenceLock,
 		SubsidyCache:     bm.chain.FetchSubsidyCache(),
 		SigCache:         s.sigCache,
-		PastMedianTime:   func() time.Time { return bm.chain.BestSnapshot().MedianTime },
-		AddrIndex:        s.addrIndex,
-		ExistsAddrIndex:  s.existsAddrIndex,
+		PastMedianTime: func() time.Time {
+			return bm.chain.BestSnapshot().MedianTime
+		},
+		AddrIndex:       s.addrIndex,
+		ExistsAddrIndex: s.existsAddrIndex,
 	}
 	s.txMemPool = mempool.New(&txC)
 
