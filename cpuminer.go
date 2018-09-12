@@ -17,7 +17,6 @@ import (
 	"github.com/decred/dcrd/chaincfg"
 	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/dcrutil"
-	"github.com/decred/dcrd/mining"
 	"github.com/decred/dcrd/wire"
 )
 
@@ -65,8 +64,7 @@ var (
 // system which is typically sufficient.
 type CPUMiner struct {
 	sync.Mutex
-	policy            *mining.Policy
-	txSource          mining.TxSource
+	g                 *BlkTmplGenerator
 	server            *server
 	numWorkers        uint32
 	started           bool
@@ -208,7 +206,7 @@ func (m *CPUMiner) solveBlock(msgBlock *wire.MsgBlock, ticker *time.Ticker, quit
 
 	// Initial state.
 	lastGenerated := time.Now()
-	lastTxUpdate := m.txSource.LastUpdated()
+	lastTxUpdate := m.g.txSource.LastUpdated()
 	hashesCompleted := uint64(0)
 
 	// Note that the entire extra nonce range is iterated and the offset is
@@ -230,15 +228,14 @@ func (m *CPUMiner) solveBlock(msgBlock *wire.MsgBlock, ticker *time.Ticker, quit
 			case <-ticker.C:
 				m.updateHashes <- hashesCompleted
 				hashesCompleted = 0
-
 				// The current block is stale if the memory pool
 				// has been updated since the block template was
 				// generated and it has been at least 3 seconds,
 				// or if it's been one minute.
-				if (lastTxUpdate != m.txSource.LastUpdated() &&
-					time.Now().After(lastGenerated.Add(3*time.Second))) ||
-					time.Now().After(lastGenerated.Add(60*time.Second)) {
-
+				now := time.Now()
+				if (lastTxUpdate != m.g.txSource.LastUpdated() &&
+					now.After(lastGenerated.Add(3*time.Second))) ||
+					now.After(lastGenerated.Add(60*time.Second)) {
 					return false
 				}
 
@@ -324,7 +321,7 @@ out:
 		// Create a new block template using the available transactions
 		// in the memory pool as a source of transactions to potentially
 		// include in the block.
-		template, err := NewBlockTemplate(m.policy, m.server, payToAddr)
+		template, err := m.g.NewBlockTemplate(payToAddr)
 		m.submitBlockLock.Unlock()
 		if err != nil {
 			errStr := fmt.Sprintf("Failed to create new block "+
@@ -603,7 +600,7 @@ func (m *CPUMiner) GenerateNBlocks(n uint32) ([]*chainhash.Hash, error) {
 		// Create a new block template using the available transactions
 		// in the memory pool as a source of transactions to potentially
 		// include in the block.
-		template, err := NewBlockTemplate(m.policy, m.server, payToAddr)
+		template, err := m.g.NewBlockTemplate(payToAddr)
 		m.submitBlockLock.Unlock()
 		if err != nil {
 			errStr := fmt.Sprintf("Failed to create new block "+
@@ -644,10 +641,9 @@ func (m *CPUMiner) GenerateNBlocks(n uint32) ([]*chainhash.Hash, error) {
 // newCPUMiner returns a new instance of a CPU miner for the provided server.
 // Use Start to begin the mining process.  See the documentation for CPUMiner
 // type for more details.
-func newCPUMiner(policy *mining.Policy, s *server) *CPUMiner {
+func newCPUMiner(generator *BlkTmplGenerator, s *server) *CPUMiner {
 	return &CPUMiner{
-		policy:            policy,
-		txSource:          s.txMemPool,
+		g:                 generator,
 		server:            s,
 		numWorkers:        defaultNumWorkers,
 		updateNumWorkers:  make(chan struct{}),

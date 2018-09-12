@@ -46,7 +46,6 @@ import (
 	"github.com/decred/dcrd/dcrutil"
 	"github.com/decred/dcrd/internal/version"
 	"github.com/decred/dcrd/mempool"
-	"github.com/decred/dcrd/mining"
 	"github.com/decred/dcrd/txscript"
 	"github.com/decred/dcrd/wire"
 	"github.com/jrick/bitset"
@@ -2382,7 +2381,7 @@ func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bo
 		// block template doesn't include the coinbase, so the caller
 		// will ultimately create their own coinbase which pays to the
 		// appropriate address(es).
-		blkTemplate, err := NewBlockTemplate(s.policy, s.server, payAddr)
+		blkTemplate, err := s.generator.NewBlockTemplate(payAddr)
 		if err != nil {
 			return rpcInternalError("Failed to create new block "+
 				"template: "+err.Error(), "")
@@ -4077,7 +4076,7 @@ func handleGetWorkRequest(s *rpcServer) (interface{}, error) {
 		// Choose a payment address at random.
 		payToAddr := cfg.miningAddrs[rand.Intn(len(cfg.miningAddrs))]
 
-		template, err := NewBlockTemplate(s.policy, s.server, payToAddr)
+		template, err := s.generator.NewBlockTemplate(payToAddr)
 		if err != nil {
 			context := "Failed to create new block template"
 			return nil, rpcInternalError(err.Error(), context)
@@ -5797,7 +5796,7 @@ func handleVersion(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (in
 type rpcServer struct {
 	started                int32
 	shutdown               int32
-	policy                 *mining.Policy
+	generator              *BlkTmplGenerator
 	server                 *server
 	chain                  *blockchain.BlockChain
 	authsha                [sha256.Size]byte
@@ -6441,10 +6440,10 @@ func genCertPair(certFile, keyFile string) error {
 }
 
 // newRPCServer returns a new instance of the rpcServer struct.
-func newRPCServer(listenAddrs []string, policy *mining.Policy, s *server) (*rpcServer, error) {
+func newRPCServer(listenAddrs []string, generator *BlkTmplGenerator, s *server) (*rpcServer, error) {
 	rpc := rpcServer{
-		policy:                 policy,
 		server:                 s,
+		generator:              generator,
 		chain:                  s.blockManager.chain,
 		statusLines:            make(map[int]string),
 		workState:              newWorkState(),
