@@ -631,28 +631,21 @@ func logSkippedDeps(tx *dcrutil.Tx, deps map[chainhash.Hash]*txPrioItem) {
 // on the end of the current best chain.  In particular, it is one second after
 // the median timestamp of the last several blocks per the chain consensus
 // rules.
-func minimumMedianTime(chainState *chainState) (time.Time, error) {
-	chainState.Lock()
-	defer chainState.Unlock()
-
-	return chainState.pastMedianTime.Add(time.Second), nil
+func minimumMedianTime(best *blockchain.BestState) time.Time {
+	return best.MedianTime.Add(time.Second)
 }
 
 // medianAdjustedTime returns the current time adjusted to ensure it is at least
 // one second after the median timestamp of the last several blocks per the
 // chain consensus rules.
-func medianAdjustedTime(chainState *chainState, timeSource blockchain.MedianTimeSource) (time.Time, error) {
-	chainState.Lock()
-	defer chainState.Unlock()
-
+func medianAdjustedTime(best *blockchain.BestState, timeSource blockchain.MedianTimeSource) time.Time {
 	// The timestamp for the block must not be before the median timestamp
 	// of the last several blocks.  Thus, choose the maximum between the
 	// current time and one second after the past median time.  The current
 	// timestamp is truncated to a second boundary before comparison since a
-	// block timestamp does not supported a precision greater than one
-	// second.
+	// block timestamp does not support a precision greater than one second.
 	newTimestamp := timeSource.AdjustedTime()
-	minTimestamp := chainState.pastMedianTime.Add(time.Second)
+	minTimestamp := minimumMedianTime(best)
 	if newTimestamp.Before(minTimestamp) {
 		newTimestamp = minTimestamp
 	}
@@ -661,7 +654,7 @@ func medianAdjustedTime(chainState *chainState, timeSource blockchain.MedianTime
 	newTimestamp = newTimestamp.Add(
 		time.Duration(-cfg.MiningTimeOffset) * time.Second)
 
-	return newTimestamp, nil
+	return newTimestamp
 }
 
 // maybeInsertStakeTx checks to make sure that a stake tx is
@@ -763,16 +756,15 @@ func deepCopyBlockTemplate(blockTemplate *BlockTemplate) *BlockTemplate {
 // Safe for concurrent access.
 func handleTooFewVoters(subsidyCache *blockchain.SubsidyCache, nextHeight int64, miningAddress dcrutil.Address, bm *blockManager) (*BlockTemplate, error) {
 	timeSource := bm.server.timeSource
-	chainState := &bm.chainState
 	stakeValidationHeight := bm.server.chainParams.StakeValidationHeight
 	curTemplate := bm.GetCurrentTemplate()
 
 	// Check to see if we've fallen off the chain, for example if a
 	// reorganization had recently occurred. If this is the case,
 	// nuke the templates.
-	prevBlockHash := chainState.GetTopPrevHash()
+	best := bm.chain.BestSnapshot()
 	if curTemplate != nil {
-		if !prevBlockHash.IsEqual(
+		if !best.PrevHash.IsEqual(
 			&curTemplate.Block.Header.PrevBlock) {
 			minrLog.Debugf("Cached mining templates are no longer current, " +
 				"resetting")
@@ -789,10 +781,7 @@ func handleTooFewVoters(subsidyCache *blockchain.SubsidyCache, nextHeight int64,
 				cptCopy := deepCopyBlockTemplate(curTemplate)
 
 				// Update the timestamp of the old template.
-				ts, err := medianAdjustedTime(chainState, timeSource)
-				if err != nil {
-					return nil, err
-				}
+				ts := medianAdjustedTime(best, timeSource)
 				cptCopy.Block.Header.Timestamp = ts
 
 				// If we're on testnet, the time since this last block
@@ -814,7 +803,7 @@ func handleTooFewVoters(subsidyCache *blockchain.SubsidyCache, nextHeight int64,
 				// than the previous extra nonce, so we don't remine the
 				// same block and choose the same winners as before.
 				en := cptCopy.extractCoinbaseExtraNonce() + 1
-				err = UpdateExtraNonce(cptCopy.Block, cptCopy.Height, en)
+				err := UpdateExtraNonce(cptCopy.Block, cptCopy.Height, en)
 				if err != nil {
 					return nil, err
 				}
@@ -847,11 +836,10 @@ func handleTooFewVoters(subsidyCache *blockchain.SubsidyCache, nextHeight int64,
 				// and the contents of that stake tree. In the future
 				// we should have the option of readding some
 				// transactions from this block, too.
-				bestHash, _ := chainState.Best()
-				topBlock, err := bm.chain.BlockByHash(bestHash)
+				topBlock, err := bm.chain.BlockByHash(&best.Hash)
 				if err != nil {
 					str := fmt.Sprintf("unable to get tip block %s",
-						prevBlockHash)
+						best.PrevHash)
 					return nil, miningRuleError(ErrGetTopBlock, str)
 				}
 				btMsgBlock := new(wire.MsgBlock)
@@ -887,10 +875,7 @@ func handleTooFewVoters(subsidyCache *blockchain.SubsidyCache, nextHeight int64,
 				btMsgBlock.Header = topBlock.MsgBlock().Header
 
 				// Set a fresh timestamp.
-				ts, err := medianAdjustedTime(chainState, timeSource)
-				if err != nil {
-					return nil, err
-				}
+				ts := medianAdjustedTime(best, timeSource)
 				btMsgBlock.Header.Timestamp = ts
 
 				// If we're on testnet, the time since this last block
@@ -959,7 +944,6 @@ func handleTooFewVoters(subsidyCache *blockchain.SubsidyCache, nextHeight int64,
 // from occurring in case the template is mined on by the CPUminer.
 func handleCreatedBlockTemplate(blockTemplate *BlockTemplate, bm *blockManager) (*BlockTemplate, error) {
 	curTemplate := bm.GetCurrentTemplate()
-
 	nextBlockHeight := blockTemplate.Height
 	stakeValidationHeight := bm.server.chainParams.StakeValidationHeight
 	// This is where we begin storing block templates, when either the
@@ -1865,12 +1849,8 @@ mempoolLoop:
 	// Calculate the required difficulty for the block.  The timestamp
 	// is potentially adjusted to ensure it comes after the median time of
 	// the last several blocks per the chain consensus rules.
-	ts, err := medianAdjustedTime(chainState, timeSource)
-	if err != nil {
-		return nil, miningRuleError(ErrGettingMedianTime, err.Error())
-	}
+	ts := medianAdjustedTime(chainBest, timeSource)
 	reqDifficulty, err := blockManager.chain.CalcNextRequiredDifficulty(ts)
-
 	if err != nil {
 		return nil, miningRuleError(ErrGettingDifficulty, err.Error())
 	}
@@ -2053,11 +2033,8 @@ func UpdateBlockTime(msgBlock *wire.MsgBlock, bManager *blockManager) error {
 	// The new timestamp is potentially adjusted to ensure it comes after
 	// the median time of the last several blocks per the chain consensus
 	// rules.
-	newTimestamp, err := medianAdjustedTime(&bManager.chainState,
+	newTimestamp := medianAdjustedTime(bManager.chain.BestSnapshot(),
 		bManager.server.timeSource)
-	if err != nil {
-		return miningRuleError(ErrGettingMedianTime, err.Error())
-	}
 	msgBlock.Header.Timestamp = newTimestamp
 
 	// If running on a network that requires recalculating the difficulty,

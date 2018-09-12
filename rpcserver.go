@@ -980,10 +980,9 @@ func handleCreateRawSSGenTx(s *rpcServer, cmd interface{}, closeChan <-chan stru
 	ssgenPayTypes, ssgenPkhs, sstxAmts, _, _, _ :=
 		stake.SStxStakeOutputInfo(minimalOutputs)
 
-	// Get the current reward.
-	blockHash, curHeight := s.server.blockManager.chainState.Best()
+	best := s.server.blockManager.chain.BestSnapshot()
 	stakeVoteSubsidy := blockchain.CalcStakeVoteSubsidy(
-		s.chain.FetchSubsidyCache(), curHeight, activeNetParams.Params)
+		s.chain.FetchSubsidyCache(), best.Height, activeNetParams.Params)
 
 	// Calculate the output values from this data.
 	ssgenCalcAmts := stake.CalculateRewards(sstxAmts,
@@ -1034,8 +1033,8 @@ func handleCreateRawSSGenTx(s *rpcServer, cmd interface{}, closeChan <-chan stru
 	// outputs.
 	//
 	// Block reference output.
-	blockRefScript, err := txscript.GenerateSSGenBlockRef(*blockHash,
-		uint32(curHeight))
+	blockRefScript, err := txscript.GenerateSSGenBlockRef(best.Hash,
+		uint32(best.Height))
 	if err != nil {
 		return nil, rpcInvalidError("Could not generate SSGen block "+
 			"reference: %v", err)
@@ -1546,7 +1545,7 @@ func handleEstimateStakeDiff(s *rpcServer, cmd interface{}, closeChan <-chan str
 	// The expected stake difficulty. Average the number of fresh stake
 	// since the last retarget to get the number of tickets per block,
 	// then use that to estimate the next stake difficulty.
-	_, bestHeight := s.server.blockManager.chainState.Best()
+	bestHeight := s.server.blockManager.chain.BestSnapshot().Height
 	lastAdjustment := (bestHeight / activeNetParams.StakeDiffWindowSize) *
 		activeNetParams.StakeDiffWindowSize
 	nextAdjustment := ((bestHeight / activeNetParams.StakeDiffWindowSize) +
@@ -2356,10 +2355,11 @@ func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bo
 	// generated.
 	var msgBlock *wire.MsgBlock
 	var targetDifficulty string
-	latestHash, _ := s.server.blockManager.chainState.Best()
+	best := s.server.blockManager.chain.BestSnapshot()
+	latestHash := best.Hash
 	template := state.template
 	if template == nil || state.prevHash == nil ||
-		!state.prevHash.IsEqual(latestHash) ||
+		!state.prevHash.IsEqual(&best.Hash) ||
 		(state.lastTxUpdate != lastTxUpdate &&
 			time.Now().After(state.lastGenerated.Add(time.Second*
 				gbtRegenerateSeconds))) {
@@ -2400,19 +2400,14 @@ func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bo
 		// Find the minimum allowed timestamp for the block based on the
 		// median timestamp of the last several blocks per the chain
 		// consensus rules.
-		chainState := &s.server.blockManager.chainState
-		minTimestamp, err := minimumMedianTime(chainState)
-		if err != nil {
-			context := "Failed to get minimum median time"
-			return rpcInternalError(err.Error(), context)
-		}
+		minTimestamp := minimumMedianTime(best)
 
 		// Update work state to ensure another block template isn't
 		// generated until needed.
 		state.template = deepCopyBlockTemplate(template)
 		state.lastGenerated = time.Now()
 		state.lastTxUpdate = lastTxUpdate
-		state.prevHash = latestHash
+		state.prevHash = &latestHash
 		state.minTimestamp = minTimestamp
 
 		rpcsLog.Debugf("Generated block template (timestamp %v, "+
@@ -2422,7 +2417,7 @@ func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bo
 
 		// Notify any clients that are long polling about the new
 		// template.
-		state.notifyLongPollers(latestHash, lastTxUpdate)
+		state.notifyLongPollers(&best.Hash, lastTxUpdate)
 	} else {
 		// At this point, there is a saved block template and another
 		// request for a template was made, but either the available
@@ -2848,8 +2843,8 @@ func handleGetBlockTemplateRequest(s *rpcServer, request *dcrjson.TemplateReques
 	}
 
 	// No point in generating or accepting work before the chain is synced.
-	_, currentHeight := s.server.blockManager.chainState.Best()
-	if currentHeight != 0 && !s.server.blockManager.IsCurrent() {
+	bestHeight := s.server.blockManager.chain.BestSnapshot().Height
+	if bestHeight != 0 && !s.server.blockManager.IsCurrent() {
 		return nil, &dcrjson.RPCError{
 			Code:    dcrjson.ErrRPCClientInInitialDownload,
 			Message: "Decred is downloading blocks...",
@@ -2997,7 +2992,7 @@ func handleGetBlockTemplateProposal(s *rpcServer, request *dcrjson.TemplateReque
 	block := dcrutil.NewBlock(&msgBlock)
 
 	// Ensure the block is building from the expected previous block.
-	expectedPrevHash, _ := s.server.blockManager.chainState.Best()
+	expectedPrevHash := &s.server.blockManager.chain.BestSnapshot().Hash
 	prevHash := &block.MsgBlock().Header.PrevBlock
 	if expectedPrevHash == nil || !expectedPrevHash.IsEqual(prevHash) {
 		return "bad-prevblk", nil
@@ -4055,7 +4050,7 @@ func handleGetWorkRequest(s *rpcServer) (interface{}, error) {
 	// it has been at least one minute since the last template was
 	// generated.
 	lastTxUpdate := s.server.txMemPool.LastUpdated()
-	latestHash, latestHeight := s.server.blockManager.chainState.Best()
+	best := s.server.blockManager.chain.BestSnapshot()
 	msgBlock := state.msgBlock
 
 	// The current code pulls down a new template every second, however
@@ -4064,14 +4059,14 @@ func handleGetWorkRequest(s *rpcServer) (interface{}, error) {
 	// based on the votes present every second or so, and then, if needed,
 	// generate a new block template. TODO cj
 	if msgBlock == nil || state.prevHash == nil ||
-		!state.prevHash.IsEqual(latestHash) ||
+		!state.prevHash.IsEqual(&best.Hash) ||
 		(state.lastTxUpdate != lastTxUpdate &&
 			time.Now().After(state.lastGenerated.Add(time.Second))) {
 		// Reset the extra nonce and clear all expired cached template
 		// variations if the best block changed.
-		if state.prevHash != nil && !state.prevHash.IsEqual(latestHash) {
+		if state.prevHash != nil && !state.prevHash.IsEqual(&best.Hash) {
 			state.extraNonce = 0
-			pruneOldBlockTemplates(s, latestHeight)
+			pruneOldBlockTemplates(s, best.Height)
 		}
 
 		// Reset the previous best hash the block template was
@@ -4105,7 +4100,7 @@ func handleGetWorkRequest(s *rpcServer) (interface{}, error) {
 		state.msgBlock = msgBlock
 		state.lastGenerated = time.Now()
 		state.lastTxUpdate = lastTxUpdate
-		state.prevHash = latestHash
+		state.prevHash = &best.Hash
 
 		rpcsLog.Debugf("Generated block template (timestamp %v, extra "+
 			"nonce %d, target %064x, merkle root %s)",
@@ -4146,7 +4141,7 @@ func handleGetWorkRequest(s *rpcServer) (interface{}, error) {
 			// setting the merkle root to the new value.
 			en := extractCoinbaseExtraNonce(msgBlock) + 1
 			state.extraNonce++
-			err := UpdateExtraNonce(msgBlock, latestHeight+1, en)
+			err := UpdateExtraNonce(msgBlock, best.Height+1, en)
 			if err != nil {
 				errStr := fmt.Sprintf("Failed to update extra nonce: "+
 					"%v", err)
@@ -4358,8 +4353,8 @@ func handleGetWork(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (in
 	}
 
 	// No point in generating or accepting work before the chain is synced.
-	_, currentHeight := s.server.blockManager.chainState.Best()
-	if currentHeight != 0 && !s.server.blockManager.IsCurrent() {
+	bestHeight := s.server.blockManager.chain.BestSnapshot().Height
+	if bestHeight != 0 && !s.server.blockManager.IsCurrent() {
 		return nil, &dcrjson.RPCError{
 			Code:    dcrjson.ErrRPCClientInInitialDownload,
 			Message: "Decred is downloading blocks...",
@@ -4467,7 +4462,7 @@ func handlePing(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (inter
 
 // handleRebroadcastMissed implements the rebroadcastmissed command.
 func handleRebroadcastMissed(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
-	hash, height := s.server.blockManager.chainState.Best()
+	best := s.server.blockManager.chain.BestSnapshot()
 	mt, err := s.server.blockManager.chain.MissedTickets()
 	if err != nil {
 		return nil, rpcInternalError("Could not get missed tickets "+
@@ -4481,8 +4476,8 @@ func handleRebroadcastMissed(s *rpcServer, cmd interface{}, closeChan <-chan str
 	}
 
 	missedTicketsNtfn := &blockchain.TicketNotificationsData{
-		Hash:            *hash,
-		Height:          height,
+		Hash:            best.Hash,
+		Height:          best.Height,
 		StakeDifficulty: stakeDiff,
 		TicketsSpent:    []chainhash.Hash{},
 		TicketsMissed:   mt,
@@ -4496,7 +4491,7 @@ func handleRebroadcastMissed(s *rpcServer, cmd interface{}, closeChan <-chan str
 
 // handleRebroadcastWinners implements the rebroadcastwinners command.
 func handleRebroadcastWinners(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
-	_, height := s.server.blockManager.chainState.Best()
+	bestHeight := s.server.blockManager.chain.BestSnapshot().Height
 	blocks, err := s.server.blockManager.TipGeneration()
 	if err != nil {
 		return nil, rpcInternalError("Could not get generation "+
@@ -4512,7 +4507,7 @@ func handleRebroadcastWinners(s *rpcServer, cmd interface{}, closeChan <-chan st
 		}
 		ntfnData := &WinningTicketsNtfnData{
 			BlockHash:   blocks[i],
-			BlockHeight: height,
+			BlockHeight: bestHeight,
 			Tickets:     winningTickets,
 		}
 
@@ -5392,9 +5387,7 @@ func ticketFeeInfoForRange(s *rpcServer, start int64, end int64, txType stake.Tx
 func handleTicketFeeInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	c := cmd.(*dcrjson.TicketFeeInfoCmd)
 
-	s.server.blockManager.chainState.Lock()
-	bestHeight := s.server.blockManager.chainState.newestHeight
-	s.server.blockManager.chainState.Unlock()
+	bestHeight := s.server.blockManager.chain.BestSnapshot().Height
 
 	// Memory pool first.
 	feeInfoMempool := feeInfoForMempool(s, stake.TxTypeSStx)
@@ -5505,7 +5498,7 @@ func handleTicketVWAP(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) 
 
 	// The default VWAP is for the past WorkDiffWindows * WorkDiffWindowSize
 	// many blocks.
-	_, bestHeight := s.server.blockManager.chainState.Best()
+	bestHeight := s.server.blockManager.chain.BestSnapshot().Height
 	var start uint32
 	if c.Start == nil {
 		toEval := activeNetParams.WorkDiffWindows *
@@ -5562,9 +5555,7 @@ func handleTicketVWAP(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) 
 func handleTxFeeInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	c := cmd.(*dcrjson.TxFeeInfoCmd)
 
-	s.server.blockManager.chainState.Lock()
-	bestHeight := s.server.blockManager.chainState.newestHeight
-	s.server.blockManager.chainState.Unlock()
+	bestHeight := s.server.blockManager.chain.BestSnapshot().Height
 
 	// Memory pool first.
 	feeInfoMempool := feeInfoForMempool(s, stake.TxTypeRegular)
