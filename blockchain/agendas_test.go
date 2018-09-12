@@ -5,6 +5,7 @@
 package blockchain
 
 import (
+	"math"
 	"testing"
 	"time"
 
@@ -22,18 +23,24 @@ func testLNFeaturesDeployment(t *testing.T, params *chaincfg.Params, deploymentV
 	const baseConsensusScriptVerifyFlags = txscript.ScriptVerifyCleanStack |
 		txscript.ScriptVerifyCheckLockTimeVerify
 
-	// Find the correct deployment for the LN features agenda.
-	var deployment chaincfg.ConsensusDeployment
+	// Find the correct deployment for the LN features agenda and ensure it
+	// never expires to prevent test failures when the real expiration time
+	// passes.  Also, clone the provided parameters first to avoid mutating
+	// them.
+	params = cloneParams(params)
+	var deployment *chaincfg.ConsensusDeployment
 	deployments := params.Deployments[deploymentVer]
-	for _, depl := range deployments {
+	for deploymentID, depl := range deployments {
 		if depl.Vote.Id == chaincfg.VoteIDLNFeatures {
-			deployment = depl
+			deployment = &deployments[deploymentID]
+			break
 		}
 	}
-	if deployment.Vote.Id != chaincfg.VoteIDLNFeatures {
+	if deployment == nil {
 		t.Fatalf("Unable to find consensus deployement for %s",
 			chaincfg.VoteIDLNFeatures)
 	}
+	deployment.ExpireTime = math.MaxUint64 // Never expires.
 
 	// Find the correct choice for the yes vote.
 	const yesVoteID = "yes"
