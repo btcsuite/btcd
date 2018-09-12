@@ -162,12 +162,16 @@ func NewCreateRawSStxCmd(inputs []SStxInput, amount map[string]int64,
 
 // CreateRawSSGenTxCmd is a type handling custom marshaling and
 // unmarshaling of createrawssgentxcmd JSON RPC commands.
+//
+// DEPRECATED.  This will be removed in the next major version bump of dcrjson.
 type CreateRawSSGenTxCmd struct {
 	Inputs   []TransactionInput
 	VoteBits uint16
 }
 
 // NewCreateRawSSGenTxCmd creates a new CreateRawSSGenTxCmd.
+//
+// DEPRECATED.  This will be removed in the next major version bump of dcrjson.
 func NewCreateRawSSGenTxCmd(inputs []TransactionInput,
 	vb uint16) *CreateRawSSGenTxCmd {
 	return &CreateRawSSGenTxCmd{
@@ -1290,6 +1294,8 @@ func init() {
 	MustRegisterCmd("createmultisig", (*CreateMultisigCmd)(nil), flags)
 	MustRegisterCmd("createnewaccount", (*CreateNewAccountCmd)(nil), flags)
 	MustRegisterCmd("createrawsstx", (*CreateRawSStxCmd)(nil), flags)
+	// DEPRECATED.  createrawssgentx will be removed in the next major version
+	// bump of dcrjson.
 	MustRegisterCmd("createrawssgentx", (*CreateRawSSGenTxCmd)(nil), flags)
 	MustRegisterCmd("createrawssrtx", (*CreateRawSSRtxCmd)(nil), flags)
 	MustRegisterCmd("createvotingaccount", (*CreateVotingAccountCmd)(nil), flags)

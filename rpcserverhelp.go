@@ -67,14 +67,6 @@ var helpDescsEnUS = map[string]string{
 	"sstxcommitout-changeaddr":    "Address for change",
 
 	// CreateRawSSGenTxCmd help.
-	"createrawssgentx--synopsis": "Returns a new transaction spending the provided inputs and sending to the provided addresses.\n" +
-		"The transaction inputs are not signed in the created transaction.\n" +
-		"The signrawtransaction RPC command provided by wallet must be used to sign the resulting transaction.",
-	"createrawssgentx--result0": "Hex-encoded bytes of the serialized transaction",
-	"createrawssgentx-inputs":   "The inputs to the transaction of type sstxinput",
-	"createrawssgentx-votebits": "The inputs to the transaction of type sstxinput",
-
-	// CreateRawSSGenTxCmd help.
 	"createrawssrtx--synopsis": "Returns a new transaction spending the provided inputs and sending to the provided addresses.\n" +
 		"The transaction inputs are not signed in the created transaction.\n" +
 		"The signrawtransaction RPC command provided by wallet must be used to sign the resulting transaction.",
@@ -921,7 +913,6 @@ var helpDescsEnUS = map[string]string{
 var rpcResultTypes = map[string][]interface{}{
 	"addnode":               nil,
 	"createrawsstx":         {(*string)(nil)},
-	"createrawssgentx":      {(*string)(nil)},
 	"createrawssrtx":        {(*string)(nil)},
 	"createrawtransaction":  {(*string)(nil)},
 	"debuglevel":            {(*string)(nil), (*string)(nil)},

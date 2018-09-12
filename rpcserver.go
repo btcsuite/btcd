@@ -53,9 +53,9 @@ import (
 
 // API version constants
 const (
-	jsonrpcSemverString = "3.3.0"
-	jsonrpcSemverMajor  = 3
-	jsonrpcSemverMinor  = 3
+	jsonrpcSemverString = "4.0.0"
+	jsonrpcSemverMajor  = 4
+	jsonrpcSemverMinor  = 0
 	jsonrpcSemverPatch  = 0
 )
 
@@ -171,7 +171,6 @@ var rpcHandlers map[string]commandHandler
 var rpcHandlersBeforeInit = map[string]commandHandler{
 	"addnode":               handleAddNode,
 	"createrawsstx":         handleCreateRawSStx,
-	"createrawssgentx":      handleCreateRawSSGenTx,
 	"createrawssrtx":        handleCreateRawSSRtx,
 	"createrawtransaction":  handleCreateRawTransaction,
 	"debuglevel":            handleDebugLevel,
@@ -933,163 +932,6 @@ func handleCreateRawSStx(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 	if err := stake.CheckSStx(mtx); err != nil {
 		return nil, rpcInternalError(err.Error(),
 			"Invalid SStx")
-	}
-
-	// Return the serialized and hex-encoded transaction.
-	mtxHex, err := messageToHex(mtx)
-	if err != nil {
-		return nil, err
-	}
-	return mtxHex, nil
-}
-
-// handleCreateRawSSGenTx handles createrawssgentx commands.
-func handleCreateRawSSGenTx(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
-	c := cmd.(*dcrjson.CreateRawSSGenTxCmd)
-	// Only a single SStx should be given
-	if len(c.Inputs) != 1 {
-		return nil, rpcInvalidError("SSGen Tx can only have one valid" +
-			" input")
-	}
-
-	// 1. Fetch the SStx, then calculate all the values we'll need later for
-	// the generation of the SSGen tx outputs.
-	//
-	// Convert the provided transaction hash hex to a chainhash.Hash.
-	txHash, err := chainhash.NewHashFromStr(c.Inputs[0].Txid)
-	if err != nil {
-		return nil, &dcrjson.RPCError{
-			Code:    dcrjson.ErrRPCBlockNotFound,
-			Message: fmt.Sprintf("Inputs 0 Txid: %v", err),
-		}
-	}
-
-	// Try to fetch the ticket from the block database.
-	ticketUtx, err := s.chain.FetchUtxoEntry(txHash)
-	if ticketUtx == nil || err != nil {
-		return nil, rpcNoTxInfoError(txHash)
-	}
-	if t := ticketUtx.TransactionType(); t != stake.TxTypeSStx {
-		return nil, rpcDeserializationError("Invalid Tx type: %v", t)
-	}
-
-	// Store the sstx pubkeyhashes and amounts as found in the transaction
-	// outputs.
-	minimalOutputs := blockchain.ConvertUtxosToMinimalOutputs(ticketUtx)
-	ssgenPayTypes, ssgenPkhs, sstxAmts, _, _, _ :=
-		stake.SStxStakeOutputInfo(minimalOutputs)
-
-	best := s.server.blockManager.chain.BestSnapshot()
-	stakeVoteSubsidy := blockchain.CalcStakeVoteSubsidy(
-		s.chain.FetchSubsidyCache(), best.Height, activeNetParams.Params)
-
-	// Calculate the output values from this data.
-	ssgenCalcAmts := stake.CalculateRewards(sstxAmts,
-		minimalOutputs[0].Value,
-		stakeVoteSubsidy)
-
-	// 2. Add all transaction inputs to a new transaction after performing
-	// some validity checks. First, add the stake base, then the OP_SSTX
-	// tagged output.
-	mtx := wire.NewMsgTx()
-
-	stakeBaseOutPoint := wire.NewOutPoint(&chainhash.Hash{},
-		uint32(0xFFFFFFFF), int8(0x01))
-	txInStakeBase := wire.NewTxIn(stakeBaseOutPoint, stakeVoteSubsidy, []byte{})
-	mtx.AddTxIn(txInStakeBase)
-
-	for _, input := range c.Inputs {
-		txHash, err := chainhash.NewHashFromStr(input.Txid)
-		if err != nil {
-			return nil, rpcDecodeHexError(input.Txid)
-		}
-
-		if input.Vout < 0 {
-			return nil, rpcInvalidError("Vout must be positive")
-		}
-
-		if !(input.Tree == wire.TxTreeStake) {
-			return nil, rpcInvalidError("Input tree is not " +
-				"TxTreeStake type")
-		}
-
-		prevOutV := wire.NullValueIn
-		if input.Amount > 0 {
-			amt, err := dcrutil.NewAmount(input.Amount)
-			if err != nil {
-				return nil, rpcInvalidError(err.Error())
-			}
-			prevOutV = int64(amt)
-		}
-
-		prevOut := wire.NewOutPoint(txHash, input.Vout, input.Tree)
-		txIn := wire.NewTxIn(prevOut, prevOutV, []byte{})
-		mtx.AddTxIn(txIn)
-	}
-
-	// 3. Add the OP_RETURN null data pushes of the block header hash, the
-	// block height, and votebits, then add all the OP_SSGEN tagged
-	// outputs.
-	//
-	// Block reference output.
-	blockRefScript, err := txscript.GenerateSSGenBlockRef(best.Hash,
-		uint32(best.Height))
-	if err != nil {
-		return nil, rpcInvalidError("Could not generate SSGen block "+
-			"reference: %v", err)
-	}
-	blockRefOut := wire.NewTxOut(0, blockRefScript)
-	mtx.AddTxOut(blockRefOut)
-
-	// Votebits output.
-	blockVBScript, err := txscript.GenerateSSGenVotes(c.VoteBits)
-	if err != nil {
-		return nil, rpcInvalidError("Could not generate SSGen votes: "+
-			"%v", err)
-	}
-	blockVBOut := wire.NewTxOut(0, blockVBScript)
-	mtx.AddTxOut(blockVBOut)
-
-	// Add all the SSGen-tagged transaction outputs to the transaction
-	// after performing some validity checks.
-	for i, ssgenPkh := range ssgenPkhs {
-		// Ensure amount is in the valid range for monetary amounts.
-		if ssgenCalcAmts[i] <= 0 ||
-			ssgenCalcAmts[i] > dcrutil.MaxAmount {
-			return nil, rpcInvalidError("Invalid SSGen amounts: "+
-				"0 >= %v > %v", ssgenCalcAmts[i],
-				dcrutil.MaxAmount)
-		}
-
-		// Create a new script which pays to the provided address
-		// specified in the original ticket tx.
-		var ssgenOut []byte
-		switch ssgenPayTypes[i] {
-		case false: // P2PKH
-			ssgenOut, err = txscript.PayToSSGenPKHDirect(ssgenPkh)
-			if err != nil {
-				return nil,
-					rpcInvalidError("Could not generate "+
-						"PKH script: %v", err)
-			}
-		case true: // P2SH
-			ssgenOut, err = txscript.PayToSSGenSHDirect(ssgenPkh)
-			if err != nil {
-				return nil,
-					rpcInvalidError("Could not generate "+
-						"SHD script: %v", err)
-			}
-		}
-
-		// Add the txout to our SSGen tx.
-		txOut := wire.NewTxOut(ssgenCalcAmts[i], ssgenOut)
-		mtx.AddTxOut(txOut)
-	}
-
-	// Check to make sure our SSGen was created correctly.
-	err = stake.CheckSSGen(mtx)
-	if err != nil {
-		return nil, rpcInternalError(err.Error(), "Invalid SSGen")
 	}
 
 	// Return the serialized and hex-encoded transaction.
