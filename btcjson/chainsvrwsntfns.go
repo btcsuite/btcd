@@ -12,14 +12,14 @@ const (
 	// BlockConnectedNtfnMethod is the legacy, deprecated method used for
 	// notifications from the chain server that a block has been connected.
 	//
-	// NOTE: Deprecated. Use FilteredBlockConnectedNtfnMethod instead.
+	// Deprecated: Use FilteredBlockConnectedNtfnMethod instead.
 	BlockConnectedNtfnMethod = "blockconnected"
 
 	// BlockDisconnectedNtfnMethod is the legacy, deprecated method used for
 	// notifications from the chain server that a block has been
 	// disconnected.
 	//
-	// NOTE: Deprecated. Use FilteredBlockDisconnectedNtfnMethod instead.
+	// Deprecated: Use FilteredBlockDisconnectedNtfnMethod instead.
 	BlockDisconnectedNtfnMethod = "blockdisconnected"
 
 	// FilteredBlockConnectedNtfnMethod is the new method used for
@@ -35,7 +35,7 @@ const (
 	// notifications from the chain server that a transaction which pays to
 	// a registered address has been processed.
 	//
-	// NOTE: Deprecated. Use RelevantTxAcceptedNtfnMethod and
+	// Deprecated: Use RelevantTxAcceptedNtfnMethod and
 	// FilteredBlockConnectedNtfnMethod instead.
 	RecvTxNtfnMethod = "recvtx"
 
@@ -43,7 +43,7 @@ const (
 	// notifications from the chain server that a transaction which spends a
 	// registered outpoint has been processed.
 	//
-	// NOTE: Deprecated. Use RelevantTxAcceptedNtfnMethod and
+	// Deprecated: Use RelevantTxAcceptedNtfnMethod and
 	// FilteredBlockConnectedNtfnMethod instead.
 	RedeemingTxNtfnMethod = "redeemingtx"
 
@@ -51,14 +51,14 @@ const (
 	// notifications from the chain server that a legacy, deprecated rescan
 	// operation has finished.
 	//
-	// NOTE: Deprecated. Not used with rescanblocks command.
+	// Deprecated: Not used with rescanblocks command.
 	RescanFinishedNtfnMethod = "rescanfinished"
 
 	// RescanProgressNtfnMethod is the legacy, deprecated method used for
 	// notifications from the chain server that a legacy, deprecated rescan
 	// operation this is underway has made progress.
 	//
-	// NOTE: Deprecated. Not used with rescanblocks command.
+	// Deprecated: Not used with rescanblocks command.
 	RescanProgressNtfnMethod = "rescanprogress"
 
 	// TxAcceptedNtfnMethod is the method used for notifications from the
@@ -79,7 +79,7 @@ const (
 
 // BlockConnectedNtfn defines the blockconnected JSON-RPC notification.
 //
-// NOTE: Deprecated. Use FilteredBlockConnectedNtfn instead.
+// Deprecated: Use FilteredBlockConnectedNtfn instead.
 type BlockConnectedNtfn struct {
 	Hash   string
 	Height int32
@@ -89,7 +89,7 @@ type BlockConnectedNtfn struct {
 // NewBlockConnectedNtfn returns a new instance which can be used to issue a
 // blockconnected JSON-RPC notification.
 //
-// NOTE: Deprecated. Use NewFilteredBlockConnectedNtfn instead.
+// Deprecated: Use NewFilteredBlockConnectedNtfn instead.
 func NewBlockConnectedNtfn(hash string, height int32, time int64) *BlockConnectedNtfn {
 	return &BlockConnectedNtfn{
 		Hash:   hash,
@@ -100,7 +100,7 @@ func NewBlockConnectedNtfn(hash string, height int32, time int64) *BlockConnecte
 
 // BlockDisconnectedNtfn defines the blockdisconnected JSON-RPC notification.
 //
-// NOTE: Deprecated. Use FilteredBlockDisconnectedNtfn instead.
+// Deprecated: Use FilteredBlockDisconnectedNtfn instead.
 type BlockDisconnectedNtfn struct {
 	Hash   string
 	Height int32
@@ -110,7 +110,7 @@ type BlockDisconnectedNtfn struct {
 // NewBlockDisconnectedNtfn returns a new instance which can be used to issue a
 // blockdisconnected JSON-RPC notification.
 //
-// NOTE: Deprecated. Use NewFilteredBlockDisconnectedNtfn instead.
+// Deprecated: Use NewFilteredBlockDisconnectedNtfn instead.
 func NewBlockDisconnectedNtfn(hash string, height int32, time int64) *BlockDisconnectedNtfn {
 	return &BlockDisconnectedNtfn{
 		Hash:   hash,
@@ -163,7 +163,7 @@ type BlockDetails struct {
 
 // RecvTxNtfn defines the recvtx JSON-RPC notification.
 //
-// NOTE: Deprecated. Use RelevantTxAcceptedNtfn and FilteredBlockConnectedNtfn
+// Deprecated: Use RelevantTxAcceptedNtfn and FilteredBlockConnectedNtfn
 // instead.
 type RecvTxNtfn struct {
 	HexTx string
@@ -173,7 +173,7 @@ type RecvTxNtfn struct {
 // NewRecvTxNtfn returns a new instance which can be used to issue a recvtx
 // JSON-RPC notification.
 //
-// NOTE: Deprecated. Use NewRelevantTxAcceptedNtfn and
+// Deprecated: Use NewRelevantTxAcceptedNtfn and
 // NewFilteredBlockConnectedNtfn instead.
 func NewRecvTxNtfn(hexTx string, block *BlockDetails) *RecvTxNtfn {
 	return &RecvTxNtfn{
@@ -184,7 +184,7 @@ func NewRecvTxNtfn(hexTx string, block *BlockDetails) *RecvTxNtfn {
 
 // RedeemingTxNtfn defines the redeemingtx JSON-RPC notification.
 //
-// NOTE: Deprecated. Use RelevantTxAcceptedNtfn and FilteredBlockConnectedNtfn
+// Deprecated: Use RelevantTxAcceptedNtfn and FilteredBlockConnectedNtfn
 // instead.
 type RedeemingTxNtfn struct {
 	HexTx string
@@ -194,7 +194,7 @@ type RedeemingTxNtfn struct {
 // NewRedeemingTxNtfn returns a new instance which can be used to issue a
 // redeemingtx JSON-RPC notification.
 //
-// NOTE: Deprecated. Use NewRelevantTxAcceptedNtfn and
+// Deprecated: Use NewRelevantTxAcceptedNtfn and
 // NewFilteredBlockConnectedNtfn instead.
 func NewRedeemingTxNtfn(hexTx string, block *BlockDetails) *RedeemingTxNtfn {
 	return &RedeemingTxNtfn{
@@ -205,7 +205,7 @@ func NewRedeemingTxNtfn(hexTx string, block *BlockDetails) *RedeemingTxNtfn {
 
 // RescanFinishedNtfn defines the rescanfinished JSON-RPC notification.
 //
-// NOTE: Deprecated. Not used with rescanblocks command.
+// Deprecated: Not used with rescanblocks command.
 type RescanFinishedNtfn struct {
 	Hash   string
 	Height int32
@@ -215,7 +215,7 @@ type RescanFinishedNtfn struct {
 // NewRescanFinishedNtfn returns a new instance which can be used to issue a
 // rescanfinished JSON-RPC notification.
 //
-// NOTE: Deprecated. Not used with rescanblocks command.
+// Deprecated: Not used with rescanblocks command.
 func NewRescanFinishedNtfn(hash string, height int32, time int64) *RescanFinishedNtfn {
 	return &RescanFinishedNtfn{
 		Hash:   hash,
@@ -226,7 +226,7 @@ func NewRescanFinishedNtfn(hash string, height int32, time int64) *RescanFinishe
 
 // RescanProgressNtfn defines the rescanprogress JSON-RPC notification.
 //
-// NOTE: Deprecated. Not used with rescanblocks command.
+// Deprecated: Not used with rescanblocks command.
 type RescanProgressNtfn struct {
 	Hash   string
 	Height int32
@@ -236,7 +236,7 @@ type RescanProgressNtfn struct {
 // NewRescanProgressNtfn returns a new instance which can be used to issue a
 // rescanprogress JSON-RPC notification.
 //
-// NOTE: Deprecated. Not used with rescanblocks command.
+// Deprecated: Not used with rescanblocks command.
 func NewRescanProgressNtfn(hash string, height int32, time int64) *RescanProgressNtfn {
 	return &RescanProgressNtfn{
 		Hash:   hash,
