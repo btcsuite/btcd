@@ -95,7 +95,7 @@ type NotificationHandlers struct {
 	// NotifyBlocks has been made to register for the notification and the
 	// function is non-nil.
 	//
-	// NOTE: Deprecated. Use OnFilteredBlockConnected instead.
+	// Deprecated: Use OnFilteredBlockConnected instead.
 	OnBlockConnected func(hash *chainhash.Hash, height int32, t time.Time)
 
 	// OnFilteredBlockConnected is invoked when a block is connected to the
@@ -111,7 +111,7 @@ type NotificationHandlers struct {
 	// NotifyBlocks has been made to register for the notification and the
 	// function is non-nil.
 	//
-	// NOTE: Deprecated. Use OnFilteredBlockDisconnected instead.
+	// Deprecated: Use OnFilteredBlockDisconnected instead.
 	OnBlockDisconnected func(hash *chainhash.Hash, height int32, t time.Time)
 
 	// OnFilteredBlockDisconnected is invoked when a block is disconnected
@@ -127,7 +127,7 @@ type NotificationHandlers struct {
 	// preceding call to NotifyReceived, Rescan, or RescanEndHeight has been
 	// made to register for the notification and the function is non-nil.
 	//
-	// NOTE: Deprecated. Use OnRelevantTxAccepted instead.
+	// Deprecated: Use OnRelevantTxAccepted instead.
 	OnRecvTx func(transaction *btcutil.Tx, details *btcjson.BlockDetails)
 
 	// OnRedeemingTx is invoked when a transaction that spends a registered
@@ -141,7 +141,7 @@ type NotificationHandlers struct {
 	// funds to the registered addresses.  This means it is possible for
 	// this to invoked indirectly as the result of a NotifyReceived call.
 	//
-	// NOTE: Deprecated. Use OnRelevantTxAccepted instead.
+	// Deprecated: Use OnRelevantTxAccepted instead.
 	OnRedeemingTx func(transaction *btcutil.Tx, details *btcjson.BlockDetails)
 
 	// OnRelevantTxAccepted is invoked when an unmined transaction passes
@@ -157,14 +157,14 @@ type NotificationHandlers struct {
 	// result of a rescan request, due to how btcd may send various rescan
 	// notifications after the rescan request has already returned.
 	//
-	// NOTE: Deprecated. Not used with RescanBlocks.
+	// Deprecated: Not used with RescanBlocks.
 	OnRescanFinished func(hash *chainhash.Hash, height int32, blkTime time.Time)
 
 	// OnRescanProgress is invoked periodically when a rescan is underway.
 	// It will only be invoked if a preceding call to Rescan or
 	// RescanEndHeight has been made and the function is non-nil.
 	//
-	// NOTE: Deprecated. Not used with RescanBlocks.
+	// Deprecated: Not used with RescanBlocks.
 	OnRescanProgress func(hash *chainhash.Hash, height int32, blkTime time.Time)
 
 	// OnTxAccepted is invoked when a transaction is accepted into the
@@ -905,7 +905,7 @@ func (c *Client) NotifyBlocks() error {
 // FutureNotifySpentResult is a future promise to deliver the result of a
 // NotifySpentAsync RPC invocation (or an applicable error).
 //
-// NOTE: Deprecated. Use FutureLoadTxFilterResult instead.
+// Deprecated: Use FutureLoadTxFilterResult instead.
 type FutureNotifySpentResult chan *response
 
 // Receive waits for the response promised by the future and returns an error
@@ -951,7 +951,7 @@ func newOutPointFromWire(op *wire.OutPoint) btcjson.OutPoint {
 //
 // NOTE: This is a btcd extension and requires a websocket connection.
 //
-// NOTE: Deprecated. Use LoadTxFilterAsync instead.
+// Deprecated: Use LoadTxFilterAsync instead.
 func (c *Client) NotifySpentAsync(outpoints []*wire.OutPoint) FutureNotifySpentResult {
 	// Not supported in HTTP POST mode.
 	if c.config.HTTPPostMode {
@@ -983,7 +983,7 @@ func (c *Client) NotifySpentAsync(outpoints []*wire.OutPoint) FutureNotifySpentR
 //
 // NOTE: This is a btcd extension and requires a websocket connection.
 //
-// NOTE: Deprecated. Use LoadTxFilter instead.
+// Deprecated: Use LoadTxFilter instead.
 func (c *Client) NotifySpent(outpoints []*wire.OutPoint) error {
 	return c.NotifySpentAsync(outpoints).Receive()
 }
@@ -1040,7 +1040,7 @@ func (c *Client) NotifyNewTransactions(verbose bool) error {
 // FutureNotifyReceivedResult is a future promise to deliver the result of a
 // NotifyReceivedAsync RPC invocation (or an applicable error).
 //
-// NOTE: Deprecated. Use FutureLoadTxFilterResult instead.
+// Deprecated: Use FutureLoadTxFilterResult instead.
 type FutureNotifyReceivedResult chan *response
 
 // Receive waits for the response promised by the future and returns an error
@@ -1078,7 +1078,7 @@ func (c *Client) notifyReceivedInternal(addresses []string) FutureNotifyReceived
 //
 // NOTE: This is a btcd extension and requires a websocket connection.
 //
-// NOTE: Deprecated. Use LoadTxFilterAsync instead.
+// Deprecated: Use LoadTxFilterAsync instead.
 func (c *Client) NotifyReceivedAsync(addresses []btcutil.Address) FutureNotifyReceivedResult {
 	// Not supported in HTTP POST mode.
 	if c.config.HTTPPostMode {
@@ -1118,7 +1118,7 @@ func (c *Client) NotifyReceivedAsync(addresses []btcutil.Address) FutureNotifyRe
 //
 // NOTE: This is a btcd extension and requires a websocket connection.
 //
-// NOTE: Deprecated. Use LoadTxFilter instead.
+// Deprecated: Use LoadTxFilter instead.
 func (c *Client) NotifyReceived(addresses []btcutil.Address) error {
 	return c.NotifyReceivedAsync(addresses).Receive()
 }
@@ -1126,7 +1126,7 @@ func (c *Client) NotifyReceived(addresses []btcutil.Address) error {
 // FutureRescanResult is a future promise to deliver the result of a RescanAsync
 // or RescanEndHeightAsync RPC invocation (or an applicable error).
 //
-// NOTE: Deprecated. Use FutureRescanBlocksResult instead.
+// Deprecated: Use FutureRescanBlocksResult instead.
 type FutureRescanResult chan *response
 
 // Receive waits for the response promised by the future and returns an error
@@ -1150,7 +1150,7 @@ func (r FutureRescanResult) Receive() error {
 //
 // NOTE: This is a btcd extension and requires a websocket connection.
 //
-// NOTE: Deprecated. Use RescanBlocksAsync instead.
+// Deprecated: Use RescanBlocksAsync instead.
 func (c *Client) RescanAsync(startBlock *chainhash.Hash,
 	addresses []btcutil.Address,
 	outpoints []*wire.OutPoint) FutureRescanResult {
@@ -1215,7 +1215,7 @@ func (c *Client) RescanAsync(startBlock *chainhash.Hash,
 //
 // NOTE: This is a btcd extension and requires a websocket connection.
 //
-// NOTE: Deprecated. Use RescanBlocks instead.
+// Deprecated: Use RescanBlocks instead.
 func (c *Client) Rescan(startBlock *chainhash.Hash,
 	addresses []btcutil.Address,
 	outpoints []*wire.OutPoint) error {
@@ -1231,7 +1231,7 @@ func (c *Client) Rescan(startBlock *chainhash.Hash,
 //
 // NOTE: This is a btcd extension and requires a websocket connection.
 //
-// NOTE: Deprecated. Use RescanBlocksAsync instead.
+// Deprecated: Use RescanBlocksAsync instead.
 func (c *Client) RescanEndBlockAsync(startBlock *chainhash.Hash,
 	addresses []btcutil.Address, outpoints []*wire.OutPoint,
 	endBlock *chainhash.Hash) FutureRescanResult {
@@ -1293,7 +1293,7 @@ func (c *Client) RescanEndBlockAsync(startBlock *chainhash.Hash,
 //
 // NOTE: This is a btcd extension and requires a websocket connection.
 //
-// NOTE: Deprecated. Use RescanBlocks instead.
+// Deprecated: Use RescanBlocks instead.
 func (c *Client) RescanEndHeight(startBlock *chainhash.Hash,
 	addresses []btcutil.Address, outpoints []*wire.OutPoint,
 	endBlock *chainhash.Hash) error {
