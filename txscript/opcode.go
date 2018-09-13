@@ -2437,7 +2437,7 @@ func init() {
 	// opcode array.  Also add entries for "OP_FALSE", "OP_TRUE", and
 	// "OP_NOP2" since they are aliases for "OP_0", "OP_1",
 	// and "OP_CHECKLOCKTIMEVERIFY" respectively.
-	for _, op := range opcodeArray {
+	for _, op := range &opcodeArray {
 		OpcodeByName[op.name] = op.value
 	}
 	OpcodeByName["OP_FALSE"] = OP_FALSE
