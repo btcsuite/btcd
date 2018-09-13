@@ -295,10 +295,7 @@ func createDefaultConfigFile(destinationPath, serverConfigPath string) error {
 	}
 
 	// Extract the rpcuser
-	rpcUserRegexp, err := regexp.Compile(`(?m)^\s*rpcuser=([^\s]+)`)
-	if err != nil {
-		return err
-	}
+	rpcUserRegexp := regexp.MustCompile(`(?m)^\s*rpcuser=([^\s]+)`)
 	userSubmatches := rpcUserRegexp.FindSubmatch(content)
 	if userSubmatches == nil {
 		// No user found, nothing to do
@@ -306,10 +303,7 @@ func createDefaultConfigFile(destinationPath, serverConfigPath string) error {
 	}
 
 	// Extract the rpcpass
-	rpcPassRegexp, err := regexp.Compile(`(?m)^\s*rpcpass=([^\s]+)`)
-	if err != nil {
-		return err
-	}
+	rpcPassRegexp := regexp.MustCompile(`(?m)^\s*rpcpass=([^\s]+)`)
 	passSubmatches := rpcPassRegexp.FindSubmatch(content)
 	if passSubmatches == nil {
 		// No password found, nothing to do
@@ -317,10 +311,7 @@ func createDefaultConfigFile(destinationPath, serverConfigPath string) error {
 	}
 
 	// Extract the notls
-	noTLSRegexp, err := regexp.Compile(`(?m)^\s*notls=(0|1)(?:\s|$)`)
-	if err != nil {
-		return err
-	}
+	noTLSRegexp := regexp.MustCompile(`(?m)^\s*notls=(0|1)(?:\s|$)`)
 	noTLSSubmatches := noTLSRegexp.FindSubmatch(content)
 
 	// Create the destination directory if it does not exists
