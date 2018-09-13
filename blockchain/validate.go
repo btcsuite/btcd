@@ -1241,6 +1241,304 @@ func (b *BlockChain) checkDupTxs(txSet []*dcrutil.Tx, view *UtxoViewpoint) error
 	return nil
 }
 
+// checkTicketPurchaseInputs performs a series of checks on the inputs to a
+// ticket purchase transaction.  An example of some of the checks include
+// verifying all inputs exist, ensuring the input type requirements are met,
+// and validating the output commitments coincide with the inputs.
+//
+// NOTE: The caller MUST have already determined that the provided transaction
+// is a ticket purchase.
+func checkTicketPurchaseInputs(msgTx *wire.MsgTx, view *UtxoViewpoint) error {
+	sstxInAmts := make([]int64, len(msgTx.TxIn))
+	for idx, txIn := range msgTx.TxIn {
+		// Ensure the input is available.
+		originTxHash := &txIn.PreviousOutPoint.Hash
+		originTxIndex := txIn.PreviousOutPoint.Index
+		utxoEntry := view.LookupEntry(originTxHash)
+		if utxoEntry == nil || utxoEntry.IsOutputSpent(originTxIndex) {
+			str := fmt.Sprintf("output %v referenced from transaction %s:%d "+
+				"either does not exist or has already been spent",
+				txIn.PreviousOutPoint, msgTx.TxHash(), idx)
+			return ruleError(ErrMissingTxOut, str)
+		}
+
+		// Check and make sure that the input is P2PKH or P2SH.
+		pkVer := utxoEntry.ScriptVersionByIndex(originTxIndex)
+		pkScrpt := utxoEntry.PkScriptByIndex(originTxIndex)
+		class := txscript.GetScriptClass(pkVer, pkScrpt)
+		if txscript.IsStakeOutput(pkScrpt) {
+			class, _ = txscript.GetStakeOutSubclass(pkScrpt)
+		}
+
+		if class != txscript.PubKeyHashTy && class != txscript.ScriptHashTy {
+			errStr := fmt.Sprintf("SStx input using tx %v, txout %v referenced "+
+				"a txout that was not a PubKeyHashTy or ScriptHashTy pkScrpt "+
+				"(class: %v, version %v, script %x)", originTxHash,
+				originTxIndex, class, pkVer, pkScrpt)
+			return ruleError(ErrSStxInScrType, errStr)
+		}
+
+		// Get the value of the input.
+		sstxInAmts[idx] = utxoEntry.AmountByIndex(originTxIndex)
+	}
+
+	_, _, outAmt, chgAmt, _, _ := stake.TxSStxStakeOutputInfo(msgTx)
+	_, outAmtCalc, err := stake.SStxNullOutputAmounts(sstxInAmts, chgAmt,
+		msgTx.TxOut[0].Value)
+	if err != nil {
+		return err
+	}
+
+	err = stake.VerifySStxAmounts(outAmt, outAmtCalc)
+	if err != nil {
+		errStr := fmt.Sprintf("SStx output commitment amounts were not the "+
+			"same as calculated amounts: %v", err)
+		return ruleError(ErrSStxCommitment, errStr)
+	}
+
+	return nil
+}
+
+// checkVoteInputs performs a series of checks on the inputs to a vote
+// transaction.  An example of some of the checks include verifying the
+// referenced ticket exists, the stakebase input commits to correct subsidy,
+// the output amounts adhere to the commitments of the referenced ticket, and
+// the ticket maturity requirements are met.
+//
+// NOTE: The caller MUST have already determined that the provided transaction
+// is a vote.
+func checkVoteInputs(subsidyCache *SubsidyCache, tx *dcrutil.Tx, txHeight int64, view *UtxoViewpoint, params *chaincfg.Params) error {
+	ticketMaturity := int64(params.TicketMaturity)
+	txHash := tx.Hash()
+	msgTx := tx.MsgTx()
+
+	// Grab the input SStx hash from the inputs of the transaction.
+	nullIn := msgTx.TxIn[0]
+	sstxIn := msgTx.TxIn[1] // sstx input
+	sstxHash := sstxIn.PreviousOutPoint.Hash
+
+	// Calculate the theoretical stake vote subsidy by extracting the vote
+	// height.
+	_, heightVotingOn := stake.SSGenBlockVotedOn(msgTx)
+	stakeVoteSubsidy := CalcStakeVoteSubsidy(subsidyCache,
+		int64(heightVotingOn), params)
+
+	// AmountIn for the input should be equal to the stake subsidy.
+	if nullIn.ValueIn != stakeVoteSubsidy {
+		errStr := fmt.Sprintf("bad stake vote subsidy; got %v, expect %v",
+			nullIn.ValueIn, stakeVoteSubsidy)
+		return ruleError(ErrBadStakebaseAmountIn, errStr)
+	}
+
+	// 1. Fetch the input sstx transaction from the view and then check to make
+	//    sure that the reward has been calculated correctly from the subsidy
+	//    and the inputs.
+	//
+	// We also need to make sure that the SSGen outputs that are P2PKH go to the
+	// addresses specified in the original SSTx.
+	// Check that too.
+	utxoEntrySstx := view.LookupEntry(&sstxHash)
+	if utxoEntrySstx == nil {
+		str := fmt.Sprintf("ticket output %v referenced from transaction "+
+			"%s:%d either does not exist or has already been spent",
+			sstxIn.PreviousOutPoint, txHash, 1)
+		return ruleError(ErrMissingTxOut, str)
+	}
+
+	// While we're here, double check to make sure that the input is from an
+	// SStx.  By doing so, you also ensure the first output is OP_SSTX tagged.
+	if utxoEntrySstx.TransactionType() != stake.TxTypeSStx {
+		errStr := fmt.Sprintf("Input transaction %v for SSGen was not an SStx "+
+			"tx (given input: %v)", txHash, sstxHash)
+		return ruleError(ErrInvalidSSGenInput, errStr)
+	}
+
+	// Make sure it's using the 0th output.
+	if sstxIn.PreviousOutPoint.Index != 0 {
+		errStr := fmt.Sprintf("Input transaction %v for SSGen did not "+
+			"reference the first output (given idx %v)", txHash,
+			sstxIn.PreviousOutPoint.Index)
+		return ruleError(ErrInvalidSSGenInput, errStr)
+	}
+
+	minOutsSStx := ConvertUtxosToMinimalOutputs(utxoEntrySstx)
+	if len(minOutsSStx) == 0 {
+		return AssertError("missing stake extra data for ticket used as " +
+			"input for vote")
+	}
+	sstxPayTypes, sstxPkhs, sstxAmts, _, sstxRules, sstxLimits :=
+		stake.SStxStakeOutputInfo(minOutsSStx)
+
+	ssgenPayTypes, ssgenPkhs, ssgenAmts, err := stake.TxSSGenStakeOutputInfo(
+		msgTx, params)
+	if err != nil {
+		errStr := fmt.Sprintf("Could not decode outputs for SSgen %v: %v",
+			txHash, err)
+		return ruleError(ErrSSGenPayeeOuts, errStr)
+	}
+
+	// Quick check to make sure the number of SStx outputs is equal to the
+	// number of SSGen outputs.
+	if len(sstxPayTypes) != len(ssgenPayTypes) ||
+		len(sstxPkhs) != len(ssgenPkhs) ||
+		len(sstxAmts) != len(ssgenAmts) {
+
+		errStr := fmt.Sprintf("Incongruent payee number for SSGen %v and "+
+			"input SStx %v", txHash, sstxHash)
+		return ruleError(ErrSSGenPayeeNum, errStr)
+	}
+
+	// Get what the stake payouts should be after appending the rewards to each
+	// output.
+	ssgenCalcAmts := stake.CalculateRewards(sstxAmts,
+		utxoEntrySstx.AmountByIndex(0), stakeVoteSubsidy)
+
+	// Check that the generated slices for pkhs and amounts are congruent.
+	err = stake.VerifyStakingPkhsAndAmounts(sstxPayTypes, sstxPkhs, ssgenAmts,
+		ssgenPayTypes, ssgenPkhs, ssgenCalcAmts, true /* vote */, sstxRules,
+		sstxLimits)
+	if err != nil {
+		errStr := fmt.Sprintf("Stake reward consensus violation for SStx "+
+			"input %v and SSGen output %v: %v", sstxHash, txHash, err)
+		return ruleError(ErrSSGenPayeeOuts, errStr)
+	}
+
+	// 2. Check to make sure that the second input was an OP_SSTX tagged output
+	//    from the referenced SStx.
+	if txscript.GetScriptClass(utxoEntrySstx.ScriptVersionByIndex(0),
+		utxoEntrySstx.PkScriptByIndex(0)) != txscript.StakeSubmissionTy {
+
+		errStr := fmt.Sprintf("First SStx output in SStx %v referenced by "+
+			"SSGen %v should have been OP_SSTX tagged, but it was not",
+			sstxHash, txHash)
+		return ruleError(ErrInvalidSSGenInput, errStr)
+	}
+
+	// 3. Check to ensure that ticket maturity number of blocks have passed
+	//    between the block the SSGen plans to go into and the block in which
+	//    the SStx was originally found in.
+	originHeight := utxoEntrySstx.BlockHeight()
+	blocksSincePrev := txHeight - originHeight
+
+	// NOTE: You can only spend an OP_SSTX tagged output on the block AFTER the
+	// entire range of ticketMaturity has passed, hence <= instead of <.
+	if blocksSincePrev <= ticketMaturity {
+		errStr := fmt.Sprintf("tried to spend sstx output from transaction %v "+
+			"from height %v at height %v before required ticket maturity of "+
+			"%v+1 blocks", sstxHash, originHeight, txHeight, ticketMaturity)
+		return ruleError(ErrSStxInImmature, errStr)
+	}
+
+	return nil
+}
+
+// checkRevocationInputs performs a series of checks on the inputs to a
+// revocation transaction.  An example of some of the checks include verifying
+// the referenced ticket exists, the output amounts adhere to the commitments of
+// the ticket, and the ticket maturity requirements are met.
+//
+// NOTE: The caller MUST have already determined that the provided transaction
+// is a revocation.
+func checkRevocationInputs(tx *dcrutil.Tx, txHeight int64, view *UtxoViewpoint, params *chaincfg.Params) error {
+	ticketMaturity := int64(params.TicketMaturity)
+	txHash := tx.Hash()
+	msgTx := tx.MsgTx()
+
+	// Grab the input SStx hash from the inputs of the transaction.
+	sstxIn := msgTx.TxIn[0] // sstx input
+	sstxHash := sstxIn.PreviousOutPoint.Hash
+
+	// 1. Fetch the input sstx transaction from the txstore and then check to
+	//    make sure that the reward has been calculated correctly from the
+	//    the subsidy and the inputs.
+	//
+	// We also need to make sure that the SSGen outputs that are P2PKH go to the
+	// addresses specified in the original SSTx.
+	// Check that too.
+	utxoEntrySstx := view.LookupEntry(&sstxHash)
+	if utxoEntrySstx == nil {
+		str := fmt.Sprintf("ticket output %v referenced from transaction "+
+			"%s:%d either does not exist or has already been spent",
+			sstxIn.PreviousOutPoint, txHash, 0)
+		return ruleError(ErrMissingTxOut, str)
+	}
+
+	// While we're here, double check to make sure that the input is from an
+	// SStx.  By doing so, you also ensure the first output is OP_SSTX tagged.
+	if utxoEntrySstx.TransactionType() != stake.TxTypeSStx {
+		errStr := fmt.Sprintf("Input transaction %v for SSRtx %v was not an "+
+			"SStx tx", txHash, sstxHash)
+		return ruleError(ErrInvalidSSRtxInput, errStr)
+	}
+
+	minOutsSStx := ConvertUtxosToMinimalOutputs(utxoEntrySstx)
+	sstxPayTypes, sstxPkhs, sstxAmts, _, sstxRules, sstxLimits :=
+		stake.SStxStakeOutputInfo(minOutsSStx)
+
+	// This should be impossible to hit given the strict bytecode size
+	// restrictions for components of SSRtxs already checked for in IsSSRtx.
+	ssrtxPayTypes, ssrtxPkhs, ssrtxAmts, err := stake.TxSSRtxStakeOutputInfo(
+		msgTx, params)
+	if err != nil {
+		errStr := fmt.Sprintf("Could not decode outputs for SSRtx "+
+			"%v: %v", txHash, err)
+		return ruleError(ErrSSRtxPayees, errStr)
+	}
+
+	// Quick check to make sure the number of SStx outputs is equal to the
+	// number of SSGen outputs.
+	if len(sstxPkhs) != len(ssrtxPkhs) || len(sstxAmts) != len(ssrtxAmts) {
+		errStr := fmt.Sprintf("Incongruent payee number for SSRtx %v and "+
+			"input SStx %v", txHash, sstxHash)
+		return ruleError(ErrSSRtxPayeesMismatch, errStr)
+	}
+
+	// Get what the stake payouts should be after appending the reward to each
+	// output.
+	ssrtxCalcAmts := stake.CalculateRewards(sstxAmts,
+		utxoEntrySstx.AmountByIndex(0), int64(0)) // SSRtx has no subsidy
+
+	// Check that the generated slices for pkhs and amounts are congruent.
+	err = stake.VerifyStakingPkhsAndAmounts(sstxPayTypes, sstxPkhs,
+		ssrtxAmts, ssrtxPayTypes, ssrtxPkhs, ssrtxCalcAmts,
+		false /* revocation */, sstxRules, sstxLimits)
+	if err != nil {
+		errStr := fmt.Sprintf("Stake consensus violation for SStx input %v "+
+			"and SSRtx output %v: %v", sstxHash, txHash, err)
+		return ruleError(ErrSSRtxPayees, errStr)
+	}
+
+	// 2. Check to make sure that the second input was an OP_SSTX tagged output
+	//    from the referenced SStx.
+	if txscript.GetScriptClass(utxoEntrySstx.ScriptVersionByIndex(0),
+		utxoEntrySstx.PkScriptByIndex(0)) != txscript.StakeSubmissionTy {
+
+		errStr := fmt.Sprintf("First SStx output in SStx %v referenced by "+
+			"SSGen %v should have been OP_SSTX tagged, but it was not",
+			sstxHash, txHash)
+		return ruleError(ErrInvalidSSRtxInput, errStr)
+	}
+
+	// 3. Check to ensure that ticket maturity number of blocks have passed
+	//    between the block the SSRtx plans to go into and the block in which
+	//    the SStx was originally found in.
+	originHeight := utxoEntrySstx.BlockHeight()
+	blocksSincePrev := txHeight - originHeight
+
+	// NOTE: You can only spend an OP_SSTX tagged output on the block AFTER the
+	// entire range of ticketMaturity has passed, hence <= instead of <.  Also
+	// note that for OP_SSRTX spending, the ticket needs to have been missed
+	// and this can't possibly happen until reaching ticketMaturity + 2.
+	if blocksSincePrev <= ticketMaturity+1 {
+		errStr := fmt.Sprintf("tried to spend sstx output from transaction %v "+
+			"from height %v at height %v before required ticket maturity of "+
+			"%v+1 blocks", sstxHash, originHeight, txHeight, ticketMaturity)
+		return ruleError(ErrSStxInImmature, errStr)
+	}
+
+	return nil
+}
+
 // CheckTransactionInputs performs a series of checks on the inputs to a
 // transaction to ensure they are valid.  An example of some of the checks
 // include verifying all inputs exist, ensuring the coinbase seasoning
@@ -1253,15 +1551,9 @@ func (b *BlockChain) checkDupTxs(txSet []*dcrutil.Tx, view *UtxoViewpoint) error
 //
 // NOTE: The transaction MUST have already been sanity checked with the
 // CheckTransactionSanity function prior to calling this function.
-func CheckTransactionInputs(subsidyCache *SubsidyCache, tx *dcrutil.Tx, txHeight int64, utxoView *UtxoViewpoint, checkFraudProof bool, chainParams *chaincfg.Params) (int64, error) {
-	msgTx := tx.MsgTx()
-
-	ticketMaturity := int64(chainParams.TicketMaturity)
-	txHash := tx.Hash()
-	var totalAtomIn int64
-
+func CheckTransactionInputs(subsidyCache *SubsidyCache, tx *dcrutil.Tx, txHeight int64, view *UtxoViewpoint, checkFraudProof bool, chainParams *chaincfg.Params) (int64, error) {
 	// Coinbase transactions have no inputs.
-	if IsCoinBaseTx(msgTx) {
+	if IsCoinBase(tx) {
 		return 0, nil
 	}
 
@@ -1269,334 +1561,52 @@ func CheckTransactionInputs(subsidyCache *SubsidyCache, tx *dcrutil.Tx, txHeight
 	// Decred stake transaction testing.
 	// -------------------------------------------------------------------
 
-	// SSTX --------------------------------------------------------------
-	// 1. Check and make sure that the output amounts in the commitments to
-	//    the ticket are correctly calculated.
-
-	// 1. Check and make sure that the output amounts in the commitments to
-	//    the ticket are correctly calculated.
+	// Perform additional checks on ticket purchase transactions such as
+	// ensuring the input type requirements are met and the output commitments
+	// coincide with the inputs.
+	msgTx := tx.MsgTx()
 	isSStx := stake.IsSStx(msgTx)
 	if isSStx {
-		sstxInAmts := make([]int64, len(msgTx.TxIn))
-
-		for idx, txIn := range msgTx.TxIn {
-			// Ensure the input is available.
-			originTxHash := &txIn.PreviousOutPoint.Hash
-			originTxIndex := txIn.PreviousOutPoint.Index
-			utxoEntry := utxoView.LookupEntry(originTxHash)
-			if utxoEntry == nil || utxoEntry.IsOutputSpent(originTxIndex) {
-				str := fmt.Sprintf("output %v referenced from "+
-					"transaction %s:%d either does not exist or "+
-					"has already been spent", txIn.PreviousOutPoint,
-					txHash, idx)
-				return 0, ruleError(ErrMissingTxOut, str)
-			}
-
-			// Check and make sure that the input is P2PKH or P2SH.
-			pkVer := utxoEntry.ScriptVersionByIndex(originTxIndex)
-			pkScrpt := utxoEntry.PkScriptByIndex(originTxIndex)
-			class := txscript.GetScriptClass(pkVer, pkScrpt)
-			if txscript.IsStakeOutput(pkScrpt) {
-				class, _ = txscript.GetStakeOutSubclass(pkScrpt)
-			}
-
-			if !(class == txscript.PubKeyHashTy ||
-				class == txscript.ScriptHashTy) {
-				errStr := fmt.Sprintf("SStx input using tx %v"+
-					", txout %v referenced a txout that "+
-					"was not a PubKeyHashTy or "+
-					"ScriptHashTy pkScrpt (class: %v, "+
-					"version %v, script %x)", originTxHash,
-					originTxIndex, class, pkVer, pkScrpt)
-				return 0, ruleError(ErrSStxInScrType, errStr)
-			}
-
-			// Get the value of the input.
-			sstxInAmts[idx] = utxoEntry.AmountByIndex(originTxIndex)
+		if err := checkTicketPurchaseInputs(msgTx, view); err != nil {
+			return 0, err
 		}
+	}
 
-		_, _, outAmt, chgAmt, _, _ := stake.TxSStxStakeOutputInfo(msgTx)
-		_, outAmtCalc, err := stake.SStxNullOutputAmounts(sstxInAmts,
-			chgAmt, msgTx.TxOut[0].Value)
+	// Perform additional checks on vote transactions such as verying that the
+	// referenced ticket exists, the stakebase input commits to correct subsidy,
+	// the output amounts adhere to the commitments of the referenced ticket,
+	// and the ticket maturity requirements are met.
+	//
+	// Also keep track of whether or not it is a vote since some inputs need
+	// to be skipped later.
+	isSSGen := stake.IsSSGen(msgTx)
+	if isSSGen {
+		err := checkVoteInputs(subsidyCache, tx, txHeight, view, chainParams)
 		if err != nil {
 			return 0, err
 		}
-
-		err = stake.VerifySStxAmounts(outAmt, outAmtCalc)
-		if err != nil {
-			errStr := fmt.Sprintf("SStx output commitment amounts"+
-				" were not the same as calculated amounts: %v",
-				err)
-			return 0, ruleError(ErrSStxCommitment, errStr)
-		}
 	}
 
-	// SSGEN -------------------------------------------------------------
-	// 1. Check SSGen output + rewards to make sure they're in line with
-	//    the consensus code and what the outputs are in the original SStx.
-	//    Also check to ensure that there is congruency for output PKH from
-	//    SStx to SSGen outputs.  Check also that the input transaction was
-	//    an SStx.
-	// 2. Make sure the second input is an SStx tagged output.
-	// 3. Check to make sure that the difference in height between the
-	//    current block and the block the SStx was included in is >
-	//    ticketMaturity.
-
-	// Save whether or not this is an SSGen tx; if it is, we need to skip
-	// the input check of the stakebase later, and another input check for
-	// OP_SSTX tagged output uses.
-	isSSGen := stake.IsSSGen(msgTx)
-	if isSSGen {
-		// Grab the input SStx hash from the inputs of the transaction.
-		nullIn := msgTx.TxIn[0]
-		sstxIn := msgTx.TxIn[1] // sstx input
-		sstxHash := sstxIn.PreviousOutPoint.Hash
-
-		// Calculate the theoretical stake vote subsidy by extracting
-		// the vote height.  Should be impossible because IsSSGen
-		// requires this byte string to be a certain number of bytes.
-		_, heightVotingOn := stake.SSGenBlockVotedOn(msgTx)
-		stakeVoteSubsidy := CalcStakeVoteSubsidy(subsidyCache,
-			int64(heightVotingOn), chainParams)
-
-		// AmountIn for the input should be equal to the stake subsidy.
-		if nullIn.ValueIn != stakeVoteSubsidy {
-			errStr := fmt.Sprintf("bad stake vote subsidy; got %v"+
-				", expect %v", nullIn.ValueIn, stakeVoteSubsidy)
-			return 0, ruleError(ErrBadStakebaseAmountIn, errStr)
-		}
-
-		// 1. Fetch the input sstx transaction from the txstore and
-		//    then check to make sure that the reward has been
-		//    calculated correctly from the subsidy and the inputs.
-		//
-		// We also need to make sure that the SSGen outputs that are
-		// P2PKH go to the addresses specified in the original SSTx.
-		// Check that too.
-		utxoEntrySstx := utxoView.LookupEntry(&sstxHash)
-		if utxoEntrySstx == nil {
-			str := fmt.Sprintf("ticket output %v referenced from "+
-				"transaction %s:%d either does not exist or "+
-				"has already been spent", sstxIn.PreviousOutPoint,
-				txHash, 1)
-			return 0, ruleError(ErrMissingTxOut, str)
-		}
-
-		// While we're here, double check to make sure that the input
-		// is from an SStx.  By doing so, you also ensure the first
-		// output is OP_SSTX tagged.
-		if utxoEntrySstx.TransactionType() != stake.TxTypeSStx {
-			errStr := fmt.Sprintf("Input transaction %v for SSGen"+
-				" was not an SStx tx (given input: %v)", txHash,
-				sstxHash)
-			return 0, ruleError(ErrInvalidSSGenInput, errStr)
-		}
-
-		// Make sure it's using the 0th output.
-		if sstxIn.PreviousOutPoint.Index != 0 {
-			errStr := fmt.Sprintf("Input transaction %v for SSGen"+
-				" did not reference the first output (given "+
-				"idx %v)", txHash,
-				sstxIn.PreviousOutPoint.Index)
-			return 0, ruleError(ErrInvalidSSGenInput, errStr)
-		}
-
-		minOutsSStx := ConvertUtxosToMinimalOutputs(utxoEntrySstx)
-		if len(minOutsSStx) == 0 {
-			return 0, AssertError("missing stake extra data for " +
-				"ticket used as input for vote")
-		}
-		sstxPayTypes, sstxPkhs, sstxAmts, _, sstxRules, sstxLimits :=
-			stake.SStxStakeOutputInfo(minOutsSStx)
-
-		ssgenPayTypes, ssgenPkhs, ssgenAmts, err :=
-			stake.TxSSGenStakeOutputInfo(msgTx, chainParams)
-		if err != nil {
-			errStr := fmt.Sprintf("Could not decode outputs for "+
-				"SSgen %v: %v", txHash, err)
-			return 0, ruleError(ErrSSGenPayeeOuts, errStr)
-		}
-
-		// Quick check to make sure the number of SStx outputs is equal
-		// to the number of SSGen outputs.
-		if (len(sstxPayTypes) != len(ssgenPayTypes)) ||
-			(len(sstxPkhs) != len(ssgenPkhs)) ||
-			(len(sstxAmts) != len(ssgenAmts)) {
-			errStr := fmt.Sprintf("Incongruent payee number for "+
-				"SSGen %v and input SStx %v", txHash, sstxHash)
-			return 0, ruleError(ErrSSGenPayeeNum, errStr)
-		}
-
-		// Get what the stake payouts should be after appending the
-		// reward to each output.
-		ssgenCalcAmts := stake.CalculateRewards(sstxAmts,
-			utxoEntrySstx.AmountByIndex(0), stakeVoteSubsidy)
-
-		// Check that the generated slices for pkhs and amounts are
-		// congruent.
-		err = stake.VerifyStakingPkhsAndAmounts(sstxPayTypes, sstxPkhs,
-			ssgenAmts, ssgenPayTypes, ssgenPkhs, ssgenCalcAmts,
-			true /* vote */, sstxRules, sstxLimits)
-
-		if err != nil {
-			errStr := fmt.Sprintf("Stake reward consensus "+
-				"violation for SStx input %v and SSGen "+
-				"output %v: %v", sstxHash, txHash, err)
-			return 0, ruleError(ErrSSGenPayeeOuts, errStr)
-		}
-
-		// 2. Check to make sure that the second input was an OP_SSTX
-		//    tagged output from the referenced SStx.
-		if txscript.GetScriptClass(utxoEntrySstx.ScriptVersionByIndex(0),
-			utxoEntrySstx.PkScriptByIndex(0)) !=
-			txscript.StakeSubmissionTy {
-			errStr := fmt.Sprintf("First SStx output in SStx %v "+
-				"referenced by SSGen %v should have been "+
-				"OP_SSTX tagged, but it was not", sstxHash,
-				txHash)
-			return 0, ruleError(ErrInvalidSSGenInput, errStr)
-		}
-
-		// 3. Check to ensure that ticket maturity number of blocks
-		//    have passed between the block the SSGen plans to go into
-		//    and the block in which the SStx was originally found in.
-		originHeight := utxoEntrySstx.BlockHeight()
-		blocksSincePrev := txHeight - originHeight
-
-		// NOTE: You can only spend an OP_SSTX tagged output on the
-		// block AFTER the entire range of ticketMaturity has passed,
-		// hence <= instead of <.
-		if blocksSincePrev <= ticketMaturity {
-			errStr := fmt.Sprintf("tried to spend sstx output "+
-				"from transaction %v from height %v at height"+
-				" %v before required ticket maturity of %v+1 "+
-				"blocks", sstxHash, originHeight, txHeight,
-				ticketMaturity)
-			return 0, ruleError(ErrSStxInImmature, errStr)
-		}
-	}
-
-	// SSRTX -------------------------------------------------------------
-	// 1. Ensure the only input present is an OP_SSTX tagged output, and
-	//    that the input transaction is actually an SStx.
-	// 2. Ensure that payouts are to the original SStx NullDataTy outputs
-	//    in the amounts given there, to the public key hashes given then.
-	// 3. Check to make sure that the difference in height between the
-	//    current block and the block the SStx was included in is >
-	//    ticketMaturity.
-
-	// Save whether or not this is an SSRtx tx; if it is, we need to know
-	// this later input check for OP_SSTX outs.
+	// Perform additional checks on revocation transactions such as verifying
+	// the referenced ticket exists, the output amounts adhere to the
+	// commitments of the ticket, and the ticket maturity requirements are met.
+	//
+	// Also keep track of whether or not it is a revocation since some inputs
+	// need to be skipped later.
 	isSSRtx := stake.IsSSRtx(msgTx)
 	if isSSRtx {
-		// Grab the input SStx hash from the inputs of the transaction.
-		sstxIn := msgTx.TxIn[0] // sstx input
-		sstxHash := sstxIn.PreviousOutPoint.Hash
-
-		// 1. Fetch the input sstx transaction from the txstore and
-		//    then check to make sure that the reward has been
-		//    calculated correctly from the subsidy and the inputs.
-		//
-		// We also need to make sure that the SSGen outputs that are
-		// P2PKH go to the addresses specified in the original SSTx.
-		// Check that too.
-		utxoEntrySstx := utxoView.LookupEntry(&sstxHash)
-		if utxoEntrySstx == nil {
-			str := fmt.Sprintf("ticket output %v referenced from "+
-				"transaction %s:%d either does not exist or "+
-				"has already been spent", sstxIn.PreviousOutPoint,
-				txHash, 0)
-			return 0, ruleError(ErrMissingTxOut, str)
-		}
-
-		// While we're here, double check to make sure that the input
-		// is from an SStx.  By doing so, you also ensure the first
-		// output is OP_SSTX tagged.
-		if utxoEntrySstx.TransactionType() != stake.TxTypeSStx {
-			errStr := fmt.Sprintf("Input transaction %v for SSRtx"+
-				" %v was not an SStx tx", txHash, sstxHash)
-			return 0, ruleError(ErrInvalidSSRtxInput, errStr)
-		}
-
-		minOutsSStx := ConvertUtxosToMinimalOutputs(utxoEntrySstx)
-		sstxPayTypes, sstxPkhs, sstxAmts, _, sstxRules, sstxLimits :=
-			stake.SStxStakeOutputInfo(minOutsSStx)
-
-		// This should be impossible to hit given the strict bytecode
-		// size restrictions for components of SSRtxs already checked
-		// for in IsSSRtx.
-		ssrtxPayTypes, ssrtxPkhs, ssrtxAmts, err :=
-			stake.TxSSRtxStakeOutputInfo(msgTx, chainParams)
+		err := checkRevocationInputs(tx, txHeight, view, chainParams)
 		if err != nil {
-			errStr := fmt.Sprintf("Could not decode outputs for "+
-				"SSRtx %v: %v", txHash, err)
-			return 0, ruleError(ErrSSRtxPayees, errStr)
-		}
-
-		// Quick check to make sure the number of SStx outputs is equal
-		// to the number of SSGen outputs.
-		if (len(sstxPkhs) != len(ssrtxPkhs)) ||
-			(len(sstxAmts) != len(ssrtxAmts)) {
-			errStr := fmt.Sprintf("Incongruent payee number for "+
-				"SSRtx %v and input SStx %v", txHash, sstxHash)
-			return 0, ruleError(ErrSSRtxPayeesMismatch, errStr)
-		}
-
-		// Get what the stake payouts should be after appending the
-		// reward to each output.
-		ssrtxCalcAmts := stake.CalculateRewards(sstxAmts,
-			utxoEntrySstx.AmountByIndex(0),
-			int64(0)) // SSRtx has no subsidy
-
-		// Check that the generated slices for pkhs and amounts are
-		// congruent.
-		err = stake.VerifyStakingPkhsAndAmounts(sstxPayTypes, sstxPkhs,
-			ssrtxAmts, ssrtxPayTypes, ssrtxPkhs, ssrtxCalcAmts,
-			false /* revocation */, sstxRules, sstxLimits)
-
-		if err != nil {
-			errStr := fmt.Sprintf("Stake consensus violation for "+
-				"SStx input %v and SSRtx output %v: %v",
-				sstxHash, txHash, err)
-			return 0, ruleError(ErrSSRtxPayees, errStr)
-		}
-
-		// 2. Check to make sure that the second input was an OP_SSTX
-		//    tagged output from the referenced SStx.
-		if txscript.GetScriptClass(utxoEntrySstx.ScriptVersionByIndex(0),
-			utxoEntrySstx.PkScriptByIndex(0)) !=
-			txscript.StakeSubmissionTy {
-			errStr := fmt.Sprintf("First SStx output in SStx %v "+
-				"referenced by SSGen %v should have been "+
-				"OP_SSTX tagged, but it was not", sstxHash,
-				txHash)
-			return 0, ruleError(ErrInvalidSSRtxInput, errStr)
-		}
-
-		// 3. Check to ensure that ticket maturity number of blocks
-		//    have passed between the block the SSRtx plans to go into
-		//    and the block in which the SStx was originally found in.
-		originHeight := utxoEntrySstx.BlockHeight()
-		blocksSincePrev := txHeight - originHeight
-
-		// NOTE: You can only spend an OP_SSTX tagged output on the
-		// block AFTER the entire range of ticketMaturity has passed,
-		// hence <= instead of <.  Also note that for OP_SSRTX
-		// spending, the ticket needs to have been missed, and this
-		// can't possibly happen until reaching ticketMaturity + 2.
-		if blocksSincePrev <= ticketMaturity+1 {
-			errStr := fmt.Sprintf("tried to spend sstx output "+
-				"from transaction %v from height %v at height"+
-				" %v before required ticket maturity of %v+1 "+
-				"blocks", sstxHash, originHeight, txHeight,
-				ticketMaturity)
-			return 0, ruleError(ErrSStxInImmature, errStr)
+			return 0, err
 		}
 	}
 
 	// -------------------------------------------------------------------
 	// Decred general transaction testing (and a few stake exceptions).
 	// -------------------------------------------------------------------
+
+	txHash := tx.Hash()
+	var totalAtomIn int64
 	for idx, txIn := range msgTx.TxIn {
 		// Inputs won't exist for stakebase tx, so ignore them.
 		if isSSGen && idx == 0 {
@@ -1610,7 +1620,7 @@ func CheckTransactionInputs(subsidyCache *SubsidyCache, tx *dcrutil.Tx, txHeight
 
 		txInHash := &txIn.PreviousOutPoint.Hash
 		originTxIndex := txIn.PreviousOutPoint.Index
-		utxoEntry := utxoView.LookupEntry(txInHash)
+		utxoEntry := view.LookupEntry(txInHash)
 		if utxoEntry == nil || utxoEntry.IsOutputSpent(originTxIndex) {
 			str := fmt.Sprintf("output %v referenced from "+
 				"transaction %s:%d either does not exist or "+
@@ -1659,8 +1669,8 @@ func CheckTransactionInputs(subsidyCache *SubsidyCache, tx *dcrutil.Tx, txHeight
 		// Ensure the transaction is not spending coins which have not
 		// yet reached the required coinbase maturity.
 		coinbaseMaturity := int64(chainParams.CoinbaseMaturity)
-		originHeight := utxoEntry.BlockHeight()
 		if utxoEntry.IsCoinBase() {
+			originHeight := utxoEntry.BlockHeight()
 			blocksSincePrev := txHeight - originHeight
 			if blocksSincePrev < coinbaseMaturity {
 				str := fmt.Sprintf("tx %v tried to spend "+
@@ -1846,11 +1856,7 @@ func CheckTransactionInputs(subsidyCache *SubsidyCache, tx *dcrutil.Tx, txHeight
 		return 0, ruleError(ErrSpendTooHigh, str)
 	}
 
-	// NOTE: bitcoind checks if the transaction fees are < 0 here, but that
-	// is an impossible condition because of the check above that ensures
-	// the inputs are >= the outputs.
 	txFeeInAtom := totalAtomIn - totalAtomOut
-
 	return txFeeInAtom, nil
 }
 
