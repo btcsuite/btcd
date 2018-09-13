@@ -620,9 +620,9 @@ func TestVarBytesWire(t *testing.T) {
 			t.Errorf("ReadVarBytes #%d error %v", i, err)
 			continue
 		}
-		if !bytes.Equal(buf.Bytes(), test.buf) {
+		if !bytes.Equal(val, test.in) {
 			t.Errorf("ReadVarBytes #%d\n got: %s want: %s", i,
-				val, test.buf)
+				val, test.in)
 			continue
 		}
 	}
