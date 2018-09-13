@@ -204,7 +204,7 @@ func blockDbPath(dbType string) string {
 	// The database name is based on the database type.
 	dbName := blockDbNamePrefix + "_" + dbType
 	if dbType == "sqlite" {
-		dbName = dbName + ".db"
+		dbName += ".db"
 	}
 	dbPath := filepath.Join(cfg.DataDir, dbName)
 	return dbPath

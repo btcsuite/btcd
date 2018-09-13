@@ -68,7 +68,7 @@ func upgradeDBPathNet(oldDbPath, netName string) error {
 		newDbRoot := filepath.Join(filepath.Dir(cfg.DataDir), netName)
 		newDbName := blockDbNamePrefix + "_" + oldDbType
 		if oldDbType == "sqlite" {
-			newDbName = newDbName + ".db"
+			newDbName += ".db"
 		}
 		newDbPath := filepath.Join(newDbRoot, newDbName)
 
