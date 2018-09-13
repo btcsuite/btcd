@@ -197,57 +197,17 @@ func CheckTransactionSanity(tx *wire.MsgTx, params *chaincfg.Params) error {
 		return ruleError(ErrTxTooBig, str)
 	}
 
-	// Ensure the transaction amounts are in range.  Each transaction
-	// output must not be negative or more than the max allowed per
-	// transaction.  Also, the total of all outputs must abide by the same
-	// restrictions.  All amounts in a transaction are in a unit value
-	// known as an atom.  One Decred is a quantity of atoms as defined by
-	// the AtomsPerCoin constant.
-	var totalAtom int64
-	for _, txOut := range tx.TxOut {
-		atom := txOut.Value
-		if atom < 0 {
-			str := fmt.Sprintf("transaction output has negative "+
-				"value of %v", atom)
-			return ruleError(ErrBadTxOutValue, str)
-		}
-		if atom > dcrutil.MaxAmount {
-			str := fmt.Sprintf("transaction output value of %v is "+
-				"higher than max allowed value of %v", atom,
-				dcrutil.MaxAmount)
-			return ruleError(ErrBadTxOutValue, str)
-		}
-
-		// Two's complement int64 overflow guarantees that any overflow
-		// is detected and reported.  This is impossible for Decred,
-		// but perhaps possible if an alt increases the total money
-		// supply.
-		totalAtom += atom
-		if totalAtom < 0 {
-			str := fmt.Sprintf("total value of all transaction "+
-				"outputs exceeds max allowed value of %v",
-				dcrutil.MaxAmount)
-			return ruleError(ErrBadTxOutValue, str)
-		}
-		if totalAtom > dcrutil.MaxAmount {
-			str := fmt.Sprintf("total value of all transaction "+
-				"outputs is %v which is higher than max "+
-				"allowed value of %v", totalAtom,
-				dcrutil.MaxAmount)
-			return ruleError(ErrBadTxOutValue, str)
-		}
-	}
-
 	// Coinbase script length must be between min and max length.
+	isVote := stake.IsSSGen(tx)
 	if IsCoinBaseTx(tx) {
-		// The referenced outpoint should be null.
+		// The referenced outpoint must be null.
 		if !isNullOutpoint(&tx.TxIn[0].PreviousOutPoint) {
 			str := fmt.Sprintf("coinbase transaction did not use " +
 				"a null outpoint")
 			return ruleError(ErrBadCoinbaseOutpoint, str)
 		}
 
-		// The fraud proof should also be null.
+		// The fraud proof must also be null.
 		if !isNullFraudProof(tx.TxIn[0]) {
 			str := fmt.Sprintf("coinbase transaction fraud proof " +
 				"was non-null")
@@ -262,7 +222,7 @@ func CheckTransactionSanity(tx *wire.MsgTx, params *chaincfg.Params) error {
 				MaxCoinbaseScriptLen)
 			return ruleError(ErrBadCoinbaseScriptLen, str)
 		}
-	} else if stake.IsSSGen(tx) {
+	} else if isVote {
 		// Check script length of stake base signature.
 		slen := len(tx.TxIn[0].SignatureScript)
 		if slen < MinCoinbaseScriptLen || slen > MaxCoinbaseScriptLen {
@@ -293,13 +253,69 @@ func CheckTransactionSanity(tx *wire.MsgTx, params *chaincfg.Params) error {
 	} else {
 		// Previous transaction outputs referenced by the inputs to
 		// this transaction must not be null except in the case of
-		// stake bases for SSGen tx.
+		// stakebases for votes.
 		for _, txIn := range tx.TxIn {
 			prevOut := &txIn.PreviousOutPoint
 			if isNullOutpoint(prevOut) {
 				return ruleError(ErrBadTxInput, "transaction "+
 					"input refers to previous output that "+
 					"is null")
+			}
+		}
+	}
+
+	// Ensure the transaction amounts are in range.  Each transaction output
+	// must not be negative or more than the max allowed per transaction.  Also,
+	// the total of all outputs must abide by the same restrictions.  All
+	// amounts in a transaction are in a unit value known as an atom.  One
+	// Decred is a quantity of atoms as defined by the AtomsPerCoin constant.
+	//
+	// Also ensure that non-stake transaction output scripts do not contain any
+	// stake opcodes.
+	isTicket := !isVote && stake.IsSStx(tx)
+	isRevocation := !isVote && !isTicket && stake.IsSSRtx(tx)
+	isStakeTx := isVote || isTicket || isRevocation
+	var totalAtom int64
+	for txOutIdx, txOut := range tx.TxOut {
+		atom := txOut.Value
+		if atom < 0 {
+			str := fmt.Sprintf("transaction output has negative value of %v",
+				atom)
+			return ruleError(ErrBadTxOutValue, str)
+		}
+		if atom > dcrutil.MaxAmount {
+			str := fmt.Sprintf("transaction output value of %v is higher than "+
+				"max allowed value of %v", atom, dcrutil.MaxAmount)
+			return ruleError(ErrBadTxOutValue, str)
+		}
+
+		// Two's complement int64 overflow guarantees that any overflow is
+		// detected and reported.  This is impossible for Decred, but perhaps
+		// possible if an alt increases the total money supply.
+		totalAtom += atom
+		if totalAtom < 0 {
+			str := fmt.Sprintf("total value of all transaction outputs "+
+				"exceeds max allowed value of %v", dcrutil.MaxAmount)
+			return ruleError(ErrBadTxOutValue, str)
+		}
+		if totalAtom > dcrutil.MaxAmount {
+			str := fmt.Sprintf("total value of all transaction outputs is %v "+
+				"which is higher than max allowed value of %v", totalAtom,
+				dcrutil.MaxAmount)
+			return ruleError(ErrBadTxOutValue, str)
+		}
+
+		// Ensure that non-stake transactions have no outputs with opcodes
+		// OP_SSTX, OP_SSRTX, OP_SSGEN, or OP_SSTX_CHANGE.
+		if !isStakeTx {
+			hasOp, err := txscript.ContainsStakeOpCodes(txOut.PkScript)
+			if err != nil {
+				return ruleError(ErrScriptMalformed, err.Error())
+			}
+			if hasOp {
+				str := fmt.Sprintf("non-stake transaction output %d contains "+
+					"stake opcode", txOutIdx)
+				return ruleError(ErrRegTxCreateStakeOut, str)
 			}
 		}
 	}
@@ -1812,40 +1828,8 @@ func CheckTransactionInputs(subsidyCache *SubsidyCache, tx *dcrutil.Tx, txHeight
 	// to ignore overflow and out of range errors here because those error
 	// conditions would have already been caught by checkTransactionSanity.
 	var totalAtomOut int64
-	for i, txOut := range tx.MsgTx().TxOut {
+	for _, txOut := range tx.MsgTx().TxOut {
 		totalAtomOut += txOut.Value
-
-		// Double check and make sure that, if this is not a stake
-		// transaction, that no outputs have OP code tags OP_SSTX,
-		// OP_SSRTX, OP_SSGEN, or OP_SSTX_CHANGE.
-		if !isSStx && !isSSGen && !isSSRtx {
-			scriptClass := txscript.GetScriptClass(txOut.Version, txOut.PkScript)
-			if (scriptClass == txscript.StakeSubmissionTy) ||
-				(scriptClass == txscript.StakeGenTy) ||
-				(scriptClass == txscript.StakeRevocationTy) ||
-				(scriptClass == txscript.StakeSubChangeTy) {
-				errStr := fmt.Sprintf("Non-stake tx %v "+
-					"included stake output type %v at in "+
-					"txout at position %v", txHash,
-					scriptClass, i)
-				return 0, ruleError(ErrRegTxCreateStakeOut, errStr)
-			}
-
-			// Check to make sure that non-stake transactions also
-			// are not using stake tagging OP codes anywhere else
-			// in their output pkScripts.
-			op, err := txscript.ContainsStakeOpCodes(txOut.PkScript)
-			if err != nil {
-				return 0, ruleError(ErrScriptMalformed,
-					err.Error())
-			}
-			if op {
-				errStr := fmt.Sprintf("Non-stake tx %v "+
-					"included stake OP code in txout at "+
-					"position %v", txHash, i)
-				return 0, ruleError(ErrScriptMalformed, errStr)
-			}
-		}
 	}
 
 	// Ensure the transaction does not spend more than its inputs.
