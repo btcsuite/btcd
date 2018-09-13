@@ -397,7 +397,7 @@ func ReadMessageWithEncodingN(r io.Reader, pver uint32, btcnet BitcoinNet,
 
 	// Test checksum.
 	checksum := chainhash.DoubleHashB(payload)[0:4]
-	if !bytes.Equal(checksum[:], hdr.checksum[:]) {
+	if !bytes.Equal(checksum, hdr.checksum[:]) {
 		str := fmt.Sprintf("payload checksum failed - header "+
 			"indicates %v, but actual checksum is %v.",
 			hdr.checksum, checksum)

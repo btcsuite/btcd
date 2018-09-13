@@ -68,7 +68,7 @@ func (fr *fixedReader) Read(p []byte) (n int, err error) {
 func newFixedReader(max int, buf []byte) io.Reader {
 	b := make([]byte, max)
 	if buf != nil {
-		copy(b[:], buf)
+		copy(b, buf)
 	}
 
 	iobuf := bytes.NewBuffer(b)
