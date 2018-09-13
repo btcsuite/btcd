@@ -195,17 +195,7 @@ func cleanAndExpandPath(path string) string {
 // validLogLevel returns whether or not logLevel is a valid debug log level.
 func validLogLevel(logLevel string) bool {
 	switch logLevel {
-	case "trace":
-		fallthrough
-	case "debug":
-		fallthrough
-	case "info":
-		fallthrough
-	case "warn":
-		fallthrough
-	case "error":
-		fallthrough
-	case "critical":
+	case "trace", "debug", "info", "warn", "error", "critical":
 		return true
 	}
 	return false

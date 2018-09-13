@@ -881,16 +881,12 @@ func (sm *SyncManager) handleHeadersMsg(hmsg *headersMsg) {
 // are in the memory pool (either the main pool or orphan pool).
 func (sm *SyncManager) haveInventory(invVect *wire.InvVect) (bool, error) {
 	switch invVect.Type {
-	case wire.InvTypeWitnessBlock:
-		fallthrough
-	case wire.InvTypeBlock:
+	case wire.InvTypeWitnessBlock, wire.InvTypeBlock:
 		// Ask chain if the block is known to it in any form (main
 		// chain, side chain, or orphan).
 		return sm.chain.HaveBlock(&invVect.Hash)
 
-	case wire.InvTypeWitnessTx:
-		fallthrough
-	case wire.InvTypeTx:
+	case wire.InvTypeWitnessTx, wire.InvTypeTx:
 		// Ask the transaction memory pool if the transaction is known
 		// to it in any form (main pool or orphan).
 		if sm.txMemPool.HaveTransaction(&invVect.Hash) {
@@ -1076,9 +1072,7 @@ func (sm *SyncManager) handleInvMsg(imsg *invMsg) {
 		requestQueue = requestQueue[1:]
 
 		switch iv.Type {
-		case wire.InvTypeWitnessBlock:
-			fallthrough
-		case wire.InvTypeBlock:
+		case wire.InvTypeWitnessBlock, wire.InvTypeBlock:
 			// Request the block if there is not already a pending
 			// request.
 			if _, exists := sm.requestedBlocks[iv.Hash]; !exists {
@@ -1094,9 +1088,7 @@ func (sm *SyncManager) handleInvMsg(imsg *invMsg) {
 				numRequested++
 			}
 
-		case wire.InvTypeWitnessTx:
-			fallthrough
-		case wire.InvTypeTx:
+		case wire.InvTypeWitnessTx, wire.InvTypeTx:
 			// Request the transaction if there is not already a
 			// pending request.
 			if _, exists := sm.requestedTxns[iv.Hash]; !exists {

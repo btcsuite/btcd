@@ -706,13 +706,9 @@ func getSigOpCount(pops []parsedOpcode, precise bool) int {
 	nSigs := 0
 	for i, pop := range pops {
 		switch pop.opcode.value {
-		case OP_CHECKSIG:
-			fallthrough
-		case OP_CHECKSIGVERIFY:
+		case OP_CHECKSIG, OP_CHECKSIGVERIFY:
 			nSigs++
-		case OP_CHECKMULTISIG:
-			fallthrough
-		case OP_CHECKMULTISIGVERIFY:
+		case OP_CHECKMULTISIG, OP_CHECKMULTISIGVERIFY:
 			// If we are being precise then look for familiar
 			// patterns for multisig, for now all we recognize is
 			// OP_1 - OP_16 to signify the number of pubkeys.

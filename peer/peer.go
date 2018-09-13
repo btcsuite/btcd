@@ -1208,13 +1208,7 @@ out:
 				// one of a group of responses, remove
 				// everything in the expected group accordingly.
 				switch msgCmd := msg.message.Command(); msgCmd {
-				case wire.CmdBlock:
-					fallthrough
-				case wire.CmdMerkleBlock:
-					fallthrough
-				case wire.CmdTx:
-					fallthrough
-				case wire.CmdNotFound:
+				case wire.CmdBlock, wire.CmdMerkleBlock, wire.CmdTx, wire.CmdNotFound:
 					delete(pendingResponses, wire.CmdBlock)
 					delete(pendingResponses, wire.CmdMerkleBlock)
 					delete(pendingResponses, wire.CmdTx)
