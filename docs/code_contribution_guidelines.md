@@ -345,7 +345,8 @@ Rejoice as you will now be listed as a [contributor](https://github.com/decred/d
 
 ### 6.1. Contribution Checklist
 
-- [&nbsp;&nbsp;] All changes are Go version 1.3 compliant
+- [&nbsp;&nbsp;] All changes are compliant with the latest version of Go and the
+  one prior to it
 - [&nbsp;&nbsp;] The code being submitted is commented according to the
   [Code Documentation and Commenting](#CodeDocumentation) section
 - [&nbsp;&nbsp;] For new code: Code is accompanied by tests which exercise both
