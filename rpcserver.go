@@ -2300,7 +2300,7 @@ func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bo
 		// Update the time of the block template to the current time
 		// while accounting for the median time of the past several
 		// blocks per the chain consensus rules.
-		err := UpdateBlockTime(msgBlock, s.server.blockManager)
+		err := s.generator.UpdateBlockTime(&msgBlock.Header)
 		if err != nil {
 			context := "Failed to update timestamp"
 			return rpcInternalError(err.Error(), context)
@@ -3970,7 +3970,7 @@ func handleGetWorkRequest(s *rpcServer) (interface{}, error) {
 		// Update the time of the block template to the current time
 		// while accounting for the median time of the past several
 		// blocks per the chain consensus rules.
-		err := UpdateBlockTime(msgBlock, s.server.blockManager)
+		err := s.generator.UpdateBlockTime(&msgBlock.Header)
 		if err != nil {
 			return nil, rpcInternalError(err.Error(),
 				"Failed to update block time")

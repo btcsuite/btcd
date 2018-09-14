@@ -2036,23 +2036,21 @@ mempoolLoop:
 // consensus rules.  Finally, it will update the target difficulty if needed
 // based on the new time for the test networks since their target difficulty can
 // change based upon time.
-func UpdateBlockTime(msgBlock *wire.MsgBlock, bManager *blockManager) error {
+func (g *BlkTmplGenerator) UpdateBlockTime(header *wire.BlockHeader) error {
 	// The new timestamp is potentially adjusted to ensure it comes after
 	// the median time of the last several blocks per the chain consensus
 	// rules.
-	newTimestamp := medianAdjustedTime(bManager.chain.BestSnapshot(),
-		bManager.server.timeSource)
-	msgBlock.Header.Timestamp = newTimestamp
+	newTimestamp := medianAdjustedTime(g.chain.BestSnapshot(), g.timeSource)
+	header.Timestamp = newTimestamp
 
 	// If running on a network that requires recalculating the difficulty,
 	// do so now.
 	if activeNetParams.ReduceMinDifficulty {
-		difficulty, err := bManager.chain.CalcNextRequiredDifficulty(
-			newTimestamp)
+		difficulty, err := g.chain.CalcNextRequiredDifficulty(newTimestamp)
 		if err != nil {
 			return miningRuleError(ErrGettingDifficulty, err.Error())
 		}
-		msgBlock.Header.Bits = difficulty
+		header.Bits = difficulty
 	}
 
 	return nil
