@@ -815,7 +815,7 @@ func TestVoteOrphan(t *testing.T) {
 		t.Fatalf("unable to create ticket purchase transaction: %v", err)
 	}
 
-	harness.chain.SetHeight(harness.chainParams.StakeEnabledHeight)
+	harness.chain.SetHeight(harness.chainParams.StakeValidationHeight)
 
 	vote, err := harness.CreateVote(ticket)
 	if err != nil {
@@ -886,7 +886,7 @@ func TestRevocationOrphan(t *testing.T) {
 		t.Fatalf("unable to create ticket purchase transaction: %v", err)
 	}
 
-	harness.chain.SetHeight(harness.chainParams.StakeEnabledHeight + 1)
+	harness.chain.SetHeight(harness.chainParams.StakeValidationHeight + 1)
 
 	revocation, err := harness.CreateRevocation(ticket)
 	if err != nil {

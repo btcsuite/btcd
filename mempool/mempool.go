@@ -853,6 +853,26 @@ func (mp *TxPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew, rateLimit, allow
 		tx.SetTree(wire.TxTreeStake)
 	}
 
+	// Reject votes before stake validation height.
+	isVote := txType == stake.TxTypeSSGen
+	stakeValidationHeight := mp.cfg.ChainParams.StakeValidationHeight
+	if isVote && nextBlockHeight < stakeValidationHeight {
+		str := fmt.Sprintf("votes are not valid until block height %d (next "+
+			"block height %d)", stakeValidationHeight, nextBlockHeight)
+		return nil, txRuleError(wire.RejectInvalid, str)
+	}
+
+	// Reject revocations before they can possibly be valid.  A vote must be
+	// missed for a revocation to be valid and votes are not allowed until stake
+	// validation height, so, a revocations can't possibly be valid until one
+	// block later.
+	isRevocation := txType == stake.TxTypeSSRtx
+	if isRevocation && nextBlockHeight < stakeValidationHeight+1 {
+		str := fmt.Sprintf("revocations are not valid until block height %d "+
+			"(next block height %d)", stakeValidationHeight+1, nextBlockHeight)
+		return nil, txRuleError(wire.RejectInvalid, str)
+	}
+
 	// Don't allow non-standard transactions if the mempool config forbids
 	// their acceptance and relaying.
 	medianTime := mp.cfg.PastMedianTime()
@@ -876,8 +896,6 @@ func (mp *TxPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew, rateLimit, allow
 
 	// If the transaction is a ticket, ensure that it meets the next
 	// stake difficulty.
-	isVote := txType == stake.TxTypeSSGen
-	isRevocation := txType == stake.TxTypeSSRtx
 	isTicket := txType == stake.TxTypeSStx
 	if isTicket {
 		sDiff, err := mp.cfg.NextStakeDifficulty()

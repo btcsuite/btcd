@@ -1257,7 +1257,6 @@ func CheckTransactionInputs(subsidyCache *SubsidyCache, tx *dcrutil.Tx, txHeight
 	msgTx := tx.MsgTx()
 
 	ticketMaturity := int64(chainParams.TicketMaturity)
-	stakeEnabledHeight := chainParams.StakeEnabledHeight
 	txHash := tx.Hash()
 	var totalAtomIn int64
 
@@ -1348,15 +1347,6 @@ func CheckTransactionInputs(subsidyCache *SubsidyCache, tx *dcrutil.Tx, txHeight
 	// OP_SSTX tagged output uses.
 	isSSGen := stake.IsSSGen(msgTx)
 	if isSSGen {
-		// Cursory check to see if we've even reached stake-enabled
-		// height.
-		if txHeight < stakeEnabledHeight {
-			errStr := fmt.Sprintf("SSGen tx appeared in block "+
-				"height %v before stake enabled height %v",
-				txHeight, stakeEnabledHeight)
-			return 0, ruleError(ErrInvalidEarlyStakeTx, errStr)
-		}
-
 		// Grab the input SStx hash from the inputs of the transaction.
 		nullIn := msgTx.TxIn[0]
 		sstxIn := msgTx.TxIn[1] // sstx input
@@ -1499,16 +1489,6 @@ func CheckTransactionInputs(subsidyCache *SubsidyCache, tx *dcrutil.Tx, txHeight
 	// this later input check for OP_SSTX outs.
 	isSSRtx := stake.IsSSRtx(msgTx)
 	if isSSRtx {
-		// Cursory check to see if we've even reach stake-enabled
-		// height.  Note for an SSRtx to be valid a vote must be
-		// missed, so for SSRtx the height of allowance is +1.
-		if txHeight < stakeEnabledHeight+1 {
-			errStr := fmt.Sprintf("SSRtx tx appeared in block "+
-				"height %v before stake enabled height+1 %v",
-				txHeight, stakeEnabledHeight+1)
-			return 0, ruleError(ErrInvalidEarlyStakeTx, errStr)
-		}
-
 		// Grab the input SStx hash from the inputs of the transaction.
 		sstxIn := msgTx.TxIn[0] // sstx input
 		sstxHash := sstxIn.PreviousOutPoint.Hash
