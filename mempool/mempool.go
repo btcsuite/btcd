@@ -830,16 +830,6 @@ func (mp *TxPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew, rateLimit, allow
 		return nil, txRuleError(wire.RejectInvalid, str)
 	}
 
-	// Don't accept transactions with a lock time after the maximum int32
-	// value for now.  This is an artifact of older bitcoind clients which
-	// treated this field as an int32 and would treat anything larger
-	// incorrectly (as negative).
-	if msgTx.LockTime > math.MaxInt32 {
-		str := fmt.Sprintf("transaction %v has a lock time after "+
-			"2038 which is not accepted yet", txHash)
-		return nil, txRuleError(wire.RejectNonstandard, str)
-	}
-
 	// Get the current height of the main chain.  A standalone transaction
 	// will be mined into the next block at best, so its height is at least
 	// one more than the current height.
