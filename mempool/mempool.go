@@ -44,9 +44,9 @@ const (
 	// DCR/kB, this results in a maximum allowed high fee of 1 DCR/kB.
 	maxRelayFeeMultiplier = 1e4
 
-	// maxSSGensDoubleSpends is the maximum number of SSGen double spends
-	// allowed in the pool.
-	maxSSGensDoubleSpends = 5
+	// maxVoteDoubleSpends is the maximum number of vote double spends allowed
+	// in the pool.
+	maxVoteDoubleSpends = 5
 
 	// heightDiffToPruneTicket is the number of blocks to pass by in terms
 	// of height before old tickets are pruned.
@@ -876,7 +876,10 @@ func (mp *TxPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew, rateLimit, allow
 
 	// If the transaction is a ticket, ensure that it meets the next
 	// stake difficulty.
-	if txType == stake.TxTypeSStx {
+	isVote := txType == stake.TxTypeSSGen
+	isRevocation := txType == stake.TxTypeSSRtx
+	isTicket := txType == stake.TxTypeSStx
+	if isTicket {
 		sDiff, err := mp.cfg.NextStakeDifficulty()
 		if err != nil {
 			// This is an unexpected error so don't turn it into a
@@ -892,60 +895,56 @@ func (mp *TxPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew, rateLimit, allow
 		}
 	}
 
-	// Handle stake transaction double spending exceptions.
-	if (txType == stake.TxTypeSSGen) || (txType == stake.TxTypeSSRtx) {
-		if txType == stake.TxTypeSSGen {
-			ssGenAlreadyFound := 0
-			for _, mpTx := range mp.pool {
-				if mpTx.Type == stake.TxTypeSSGen {
-					if mpTx.Tx.MsgTx().TxIn[1].PreviousOutPoint ==
-						msgTx.TxIn[1].PreviousOutPoint {
-						ssGenAlreadyFound++
-					}
-				}
-				if ssGenAlreadyFound > maxSSGensDoubleSpends {
-					str := fmt.Sprintf("transaction %v in the pool "+
-						"with more than %v ssgens",
-						msgTx.TxIn[1].PreviousOutPoint,
-						maxSSGensDoubleSpends)
-					return nil, txRuleError(wire.RejectDuplicate, str)
-				}
-			}
-		}
-
-		if txType == stake.TxTypeSSRtx {
-			for _, mpTx := range mp.pool {
-				if mpTx.Type == stake.TxTypeSSRtx {
-					if mpTx.Tx.MsgTx().TxIn[0].PreviousOutPoint ==
-						msgTx.TxIn[0].PreviousOutPoint {
-						str := fmt.Sprintf("transaction %v in the pool "+
-							" as a ssrtx. Only one ssrtx allowed.",
-							msgTx.TxIn[0].PreviousOutPoint)
-						return nil, txRuleError(wire.RejectDuplicate, str)
-					}
-				}
-			}
-		}
-	} else {
-		// The transaction may not use any of the same outputs as other
-		// transactions already in the pool as that would ultimately result in a
-		// double spend.  This check is intended to be quick and therefore only
-		// detects double spends within the transaction pool itself.  The
-		// transaction could still be double spending coins from the main chain
-		// at this point.  There is a more in-depth check that happens later
-		// after fetching the referenced transaction inputs from the main chain
-		// which examines the actual spend data and prevents double spends.
+	// Aside from a few exceptions for votes and revocations, the transaction
+	// may not use any of the same outputs as other transactions already in the
+	// pool as that would ultimately result in a double spend.  This check is
+	// intended to be quick and therefore only detects double spends within the
+	// transaction pool itself.  The transaction could still be double spending
+	// coins from the main chain at this point.  There is a more in-depth check
+	// that happens later after fetching the referenced transaction inputs from
+	// the main chain which examines the actual spend data and prevents double
+	// spends.
+	if !isVote && !isRevocation {
 		err = mp.checkPoolDoubleSpend(tx, txType)
 		if err != nil {
 			return nil, err
 		}
+	} else if isVote {
+		voteAlreadyFound := 0
+		for _, mpTx := range mp.pool {
+			if mpTx.Type == stake.TxTypeSSGen {
+				if mpTx.Tx.MsgTx().TxIn[1].PreviousOutPoint ==
+					msgTx.TxIn[1].PreviousOutPoint {
+					voteAlreadyFound++
+				}
+			}
+			if voteAlreadyFound > maxVoteDoubleSpends {
+				str := fmt.Sprintf("transaction %v in the pool with more than "+
+					"%v votes", msgTx.TxIn[1].PreviousOutPoint,
+					maxVoteDoubleSpends)
+				return nil, txRuleError(wire.RejectDuplicate, str)
+			}
+		}
+	} else if isRevocation {
+		for _, mpTx := range mp.pool {
+			if mpTx.Type == stake.TxTypeSSRtx {
+				if mpTx.Tx.MsgTx().TxIn[0].PreviousOutPoint ==
+					msgTx.TxIn[0].PreviousOutPoint {
+					str := fmt.Sprintf("transaction %v in the pool as a "+
+						"revocation. Only one revocation is allowed.",
+						msgTx.TxIn[0].PreviousOutPoint)
+					return nil, txRuleError(wire.RejectDuplicate, str)
+				}
+			}
+		}
 	}
 
 	// Votes that are on too old of blocks are rejected.
-	if txType == stake.TxTypeSSGen {
+	if isVote {
 		_, voteHeight := stake.SSGenBlockVotedOn(msgTx)
 		if (int64(voteHeight) < nextBlockHeight-maximumVoteAgeDelta) &&
 			!mp.cfg.Policy.AllowOldVotes {
+
 			str := fmt.Sprintf("transaction %v votes on old "+
 				"block height of %v which is before the "+
 				"current cutoff height of %v",
@@ -978,7 +977,7 @@ func (mp *TxPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew, rateLimit, allow
 	// Transaction is an orphan if any of the inputs don't exist.
 	var missingParents []*chainhash.Hash
 	for i, txIn := range msgTx.TxIn {
-		if i == 0 && txType == stake.TxTypeSSGen {
+		if i == 0 && isVote {
 			continue
 		}
 
@@ -1076,7 +1075,7 @@ func (mp *TxPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew, rateLimit, allow
 		return nil, err
 	}
 
-	numSigOps += blockchain.CountSigOps(tx, false, (txType == stake.TxTypeSSGen))
+	numSigOps += blockchain.CountSigOps(tx, false, isVote)
 	if numSigOps > mp.cfg.Policy.MaxSigOpsPerTx {
 		str := fmt.Sprintf("transaction %v has too many sigops: %d > %d",
 			txHash, numSigOps, mp.cfg.Policy.MaxSigOpsPerTx)
@@ -1157,7 +1156,7 @@ func (mp *TxPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew, rateLimit, allow
 	// also performed on regular transactions above, but fees lower than the
 	// miniumum may be allowed when there is sufficient priority, and these
 	// checks aren't desired for ticket purchases.
-	if txType == stake.TxTypeSStx {
+	if isTicket {
 		minTicketFee := calcMinRequiredTxRelayFee(serializedSize,
 			mp.cfg.Policy.MinRelayTxFee)
 		if txFee < minTicketFee {
@@ -1200,9 +1199,8 @@ func (mp *TxPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew, rateLimit, allow
 	// Add to transaction pool.
 	mp.addTransaction(utxoView, tx, txType, bestHeight, txFee)
 
-	// If it's an SSGen (vote), insert it into the list of
-	// votes.
-	if txType == stake.TxTypeSSGen {
+	// Keep track of vote separately.
+	if isVote {
 		mp.votesMtx.Lock()
 		err := mp.insertVote(tx)
 		mp.votesMtx.Unlock()
