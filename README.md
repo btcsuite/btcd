@@ -134,7 +134,7 @@ the repo's root directory.  Some notes:
 
 * Replace `go` with `vgo` when using Go 1.10.
 
-* The `dcrwallet` executable will be installed to `$GOPATH/bin`.  `GOPATH`
+* The `dcrd` executable will be installed to `$GOPATH/bin`.  `GOPATH`
   defaults to `$HOME/go` (or `%USERPROFILE%\go` on Windows) if unset.
 
 
