@@ -211,7 +211,13 @@ func parseExpectedResult(expected string) ([]ErrorCode, error) {
 	case "PUBKEYTYPE":
 		return []ErrorCode{ErrPubKeyType}, nil
 	case "SIG_DER":
-		return []ErrorCode{ErrSigDER, ErrInvalidSigHashType}, nil
+		return []ErrorCode{ErrSigTooShort, ErrSigTooLong,
+			ErrSigInvalidSeqID, ErrSigInvalidDataLen, ErrSigMissingSTypeID,
+			ErrSigMissingSLen, ErrSigInvalidSLen,
+			ErrSigInvalidRIntID, ErrSigZeroRLen, ErrSigNegativeR,
+			ErrSigTooMuchRPadding, ErrSigInvalidSIntID,
+			ErrSigZeroSLen, ErrSigNegativeS, ErrSigTooMuchSPadding,
+			ErrInvalidSigHashType}, nil
 	case "EVAL_FALSE":
 		return []ErrorCode{ErrEvalFalse, ErrEmptyStack}, nil
 	case "EQUALVERIFY":
