@@ -117,7 +117,7 @@ func parseSig(sigStr []byte, curve elliptic.Curve, der bool) (*Signature, error)
 	index++
 
 	// siglen should be less than the entire message and greater than
-	// the minimal message of size 8.
+	// the minimal message size.
 	if int(siglen+2) > len(sigStr) || int(siglen+2) < minSigLen {
 		return nil, errors.New("malformed signature: bad length")
 	}
