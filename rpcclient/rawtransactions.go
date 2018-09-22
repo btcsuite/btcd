@@ -13,6 +13,7 @@ import (
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
+	"errors"
 )
 
 // SigHashType enumerates the available signature hashing types that the
@@ -285,8 +286,7 @@ func (r FutureSendRawTransactionResult) Receive() (*chainhash.Hash, error) {
 // the returned instance.
 //
 // See SendRawTransaction for the blocking version and more details.
-func (c *Client) SendRawTransactionAsync(tx *wire.MsgTx, allowHighFees bool) FutureSendRawTransactionResult {
-	txHex := ""
+func (c *Client) SendRawTransactionAsync(tx *wire.MsgTx, txHex string, allowHighFees bool) FutureSendRawTransactionResult {
 	if tx != nil {
 		// Serialize the transaction and convert to hex string.
 		buf := bytes.NewBuffer(make([]byte, 0, tx.SerializeSize()))
@@ -294,6 +294,8 @@ func (c *Client) SendRawTransactionAsync(tx *wire.MsgTx, allowHighFees bool) Fut
 			return newFutureError(err)
 		}
 		txHex = hex.EncodeToString(buf.Bytes())
+	} else if txHex == "" {
+		return newFutureError(errors.New("no transaction data provided, msgTx and txHex are both empty"))
 	}
 
 	cmd := btcjson.NewSendRawTransactionCmd(txHex, &allowHighFees)
@@ -303,7 +305,13 @@ func (c *Client) SendRawTransactionAsync(tx *wire.MsgTx, allowHighFees bool) Fut
 // SendRawTransaction submits the encoded transaction to the server which will
 // then relay it to the network.
 func (c *Client) SendRawTransaction(tx *wire.MsgTx, allowHighFees bool) (*chainhash.Hash, error) {
-	return c.SendRawTransactionAsync(tx, allowHighFees).Receive()
+	return c.SendRawTransactionAsync(tx, "", allowHighFees).Receive()
+}
+
+// SendRawSerializedTransaction submits the pre-serialized transaction to the server which will
+// then relay it to the network.
+func (c *Client) SendRawSerializedTransaction(txHex string, allowHighFees bool) (*chainhash.Hash, error) {
+	return c.SendRawTransactionAsync(nil, txHex, allowHighFees).Receive()
 }
 
 // FutureSignRawTransactionResult is a future promise to deliver the result
