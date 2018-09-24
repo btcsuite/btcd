@@ -7,11 +7,11 @@ package indexers
 import (
 	"errors"
 
-	"github.com/btcsuite/btcd/blockchain"
-	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/database"
-	"github.com/btcsuite/btcd/wire"
+	"github.com/soterium/btcd/blockchain"
+	"github.com/soterium/btcd/chaincfg"
+	"github.com/soterium/btcd/chaincfg/chainhash"
+	"github.com/soterium/btcd/database"
+	"github.com/soterium/btcd/wire"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcutil/gcs"
 	"github.com/btcsuite/btcutil/gcs/builder"

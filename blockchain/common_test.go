@@ -14,12 +14,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/database"
-	_ "github.com/btcsuite/btcd/database/ffldb"
-	"github.com/btcsuite/btcd/txscript"
-	"github.com/btcsuite/btcd/wire"
+	"github.com/soterium/btcd/chaincfg"
+	"github.com/soterium/btcd/chaincfg/chainhash"
+	"github.com/soterium/btcd/database"
+	_ "github.com/soterium/btcd/database/ffldb"
+	"github.com/soterium/btcd/txscript"
+	"github.com/soterium/btcd/wire"
 	"github.com/btcsuite/btcutil"
 )
 

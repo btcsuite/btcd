@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/soterium/btcd/chaincfg/chainhash"
 )
 
 // FilterType is used to represent a filter type.
