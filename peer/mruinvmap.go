@@ -50,8 +50,8 @@ func (m *mruInventoryMap) String() string {
 // This function is safe for concurrent access.
 func (m *mruInventoryMap) Exists(iv *wire.InvVect) bool {
 	m.invMtx.Lock()
+	defer m.invMtx.Unlock()
 	_, exists := m.invMap[*iv]
-	m.invMtx.Unlock()
 
 	return exists
 }
@@ -83,7 +83,12 @@ func (m *mruInventoryMap) Add(iv *wire.InvVect) {
 	// node so a new one doesn't have to be allocated.
 	if uint(len(m.invMap))+1 > m.limit {
 		node := m.invList.Back()
-		lru := node.Value.(*wire.InvVect)
+		lru, ok := node.Value.(*wire.InvVect)
+
+		//Don't panic if assertion failed
+		if !ok {
+			return
+		}
 
 		// Evict least recently used item.
 		delete(m.invMap, *lru)
@@ -106,11 +111,11 @@ func (m *mruInventoryMap) Add(iv *wire.InvVect) {
 // This function is safe for concurrent access.
 func (m *mruInventoryMap) Delete(iv *wire.InvVect) {
 	m.invMtx.Lock()
+	defer m.invMtx.Unlock()
 	if node, exists := m.invMap[*iv]; exists {
 		m.invList.Remove(node)
 		delete(m.invMap, *iv)
 	}
-	m.invMtx.Unlock()
 }
 
 // newMruInventoryMap returns a new inventory map that is limited to the number
