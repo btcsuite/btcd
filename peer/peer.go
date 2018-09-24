@@ -492,10 +492,10 @@ func (p *Peer) String() string {
 // This function is safe for concurrent access.
 func (p *Peer) UpdateLastBlockHeight(newHeight int32) {
 	p.statsMtx.Lock()
+	defer p.statsMtx.Unlock()
 	log.Tracef("Updating last block height of peer %v from %v to %v",
 		p.addr, p.lastBlock, newHeight)
 	p.lastBlock = newHeight
-	p.statsMtx.Unlock()
 }
 
 // UpdateLastAnnouncedBlock updates meta-data about the last block hash this
@@ -506,8 +506,8 @@ func (p *Peer) UpdateLastAnnouncedBlock(blkHash *chainhash.Hash) {
 	log.Tracef("Updating last blk for peer %v, %v", p.addr, blkHash)
 
 	p.statsMtx.Lock()
+	defer p.statsMtx.Unlock()
 	p.lastAnnouncedBlock = blkHash
-	p.statsMtx.Unlock()
 }
 
 // AddKnownInventory adds the passed inventory to the cache of known inventory
@@ -523,14 +523,15 @@ func (p *Peer) AddKnownInventory(invVect *wire.InvVect) {
 // This function is safe for concurrent access.
 func (p *Peer) StatsSnapshot() *StatsSnap {
 	p.statsMtx.RLock()
+	defer p.statsMtx.RUnlock()
 
 	p.flagsMtx.Lock()
+	defer p.flagsMtx.Unlock()
 	id := p.id
 	addr := p.addr
 	userAgent := p.userAgent
 	services := p.services
 	protocolVersion := p.advertisedProtoVer
-	p.flagsMtx.Unlock()
 
 	// Get a copy of all relevant flags and stats.
 	statsSnap := &StatsSnap{
@@ -553,7 +554,6 @@ func (p *Peer) StatsSnapshot() *StatsSnap {
 		LastPingTime:   p.lastPingTime,
 	}
 
-	p.statsMtx.RUnlock()
 	return statsSnap
 }
 
@@ -562,9 +562,9 @@ func (p *Peer) StatsSnapshot() *StatsSnap {
 // This function is safe for concurrent access.
 func (p *Peer) ID() int32 {
 	p.flagsMtx.Lock()
+	defer p.flagsMtx.Unlock()
 	id := p.id
-	p.flagsMtx.Unlock()
-
+	
 	return id
 }
 
@@ -573,9 +573,9 @@ func (p *Peer) ID() int32 {
 // This function is safe for concurrent access.
 func (p *Peer) NA() *wire.NetAddress {
 	p.flagsMtx.Lock()
+	defer p.flagsMtx.Unlock()
 	na := p.na
-	p.flagsMtx.Unlock()
-
+	
 	return na
 }
 
@@ -600,8 +600,8 @@ func (p *Peer) Inbound() bool {
 // This function is safe for concurrent access.
 func (p *Peer) Services() wire.ServiceFlag {
 	p.flagsMtx.Lock()
+	defer p.flagsMtx.Unlock()
 	services := p.services
-	p.flagsMtx.Unlock()
 
 	return services
 }
@@ -611,8 +611,8 @@ func (p *Peer) Services() wire.ServiceFlag {
 // This function is safe for concurrent access.
 func (p *Peer) UserAgent() string {
 	p.flagsMtx.Lock()
+	defer p.flagsMtx.Unlock()
 	userAgent := p.userAgent
-	p.flagsMtx.Unlock()
 
 	return userAgent
 }
@@ -622,8 +622,8 @@ func (p *Peer) UserAgent() string {
 // This function is safe for concurrent access.
 func (p *Peer) LastAnnouncedBlock() *chainhash.Hash {
 	p.statsMtx.RLock()
+	defer p.statsMtx.RUnlock()
 	lastAnnouncedBlock := p.lastAnnouncedBlock
-	p.statsMtx.RUnlock()
 
 	return lastAnnouncedBlock
 }
@@ -633,8 +633,8 @@ func (p *Peer) LastAnnouncedBlock() *chainhash.Hash {
 // This function is safe for concurrent access.
 func (p *Peer) LastPingNonce() uint64 {
 	p.statsMtx.RLock()
+	defer p.statsMtx.RUnlock()
 	lastPingNonce := p.lastPingNonce
-	p.statsMtx.RUnlock()
 
 	return lastPingNonce
 }
@@ -644,8 +644,8 @@ func (p *Peer) LastPingNonce() uint64 {
 // This function is safe for concurrent access.
 func (p *Peer) LastPingTime() time.Time {
 	p.statsMtx.RLock()
+	defer p.statsMtx.RUnlock()
 	lastPingTime := p.lastPingTime
-	p.statsMtx.RUnlock()
 
 	return lastPingTime
 }
@@ -655,8 +655,8 @@ func (p *Peer) LastPingTime() time.Time {
 // This function is safe for concurrent access.
 func (p *Peer) LastPingMicros() int64 {
 	p.statsMtx.RLock()
+	defer p.statsMtx.RUnlock()
 	lastPingMicros := p.lastPingMicros
-	p.statsMtx.RUnlock()
 
 	return lastPingMicros
 }
@@ -667,8 +667,8 @@ func (p *Peer) LastPingMicros() int64 {
 // This function is safe for concurrent access.
 func (p *Peer) VersionKnown() bool {
 	p.flagsMtx.Lock()
+	defer p.flagsMtx.Unlock()
 	versionKnown := p.versionKnown
-	p.flagsMtx.Unlock()
 
 	return versionKnown
 }
@@ -679,8 +679,8 @@ func (p *Peer) VersionKnown() bool {
 // This function is safe for concurrent access.
 func (p *Peer) VerAckReceived() bool {
 	p.flagsMtx.Lock()
+	defer p.flagsMtx.Unlock()
 	verAckReceived := p.verAckReceived
-	p.flagsMtx.Unlock()
 
 	return verAckReceived
 }
@@ -690,8 +690,8 @@ func (p *Peer) VerAckReceived() bool {
 // This function is safe for concurrent access.
 func (p *Peer) ProtocolVersion() uint32 {
 	p.flagsMtx.Lock()
+	defer p.flagsMtx.Unlock()
 	protocolVersion := p.protocolVersion
-	p.flagsMtx.Unlock()
 
 	return protocolVersion
 }
@@ -701,8 +701,8 @@ func (p *Peer) ProtocolVersion() uint32 {
 // This function is safe for concurrent access.
 func (p *Peer) LastBlock() int32 {
 	p.statsMtx.RLock()
+	defer p.statsMtx.RUnlock()
 	lastBlock := p.lastBlock
-	p.statsMtx.RUnlock()
 
 	return lastBlock
 }
@@ -751,8 +751,8 @@ func (p *Peer) BytesReceived() uint64 {
 // This function is safe for concurrent access.
 func (p *Peer) TimeConnected() time.Time {
 	p.statsMtx.RLock()
+	defer p.statsMtx.RUnlock()
 	timeConnected := p.timeConnected
-	p.statsMtx.RUnlock()
 
 	return timeConnected
 }
@@ -764,8 +764,8 @@ func (p *Peer) TimeConnected() time.Time {
 // This function is safe for concurrent access.
 func (p *Peer) TimeOffset() int64 {
 	p.statsMtx.RLock()
+	defer p.statsMtx.RUnlock()
 	timeOffset := p.timeOffset
-	p.statsMtx.RUnlock()
 
 	return timeOffset
 }
@@ -776,8 +776,8 @@ func (p *Peer) TimeOffset() int64 {
 // This function is safe for concurrent access.
 func (p *Peer) StartingHeight() int32 {
 	p.statsMtx.RLock()
+	defer p.statsMtx.RUnlock()
 	startingHeight := p.startingHeight
-	p.statsMtx.RUnlock()
 
 	return startingHeight
 }
@@ -788,8 +788,8 @@ func (p *Peer) StartingHeight() int32 {
 // This function is safe for concurrent access.
 func (p *Peer) WantsHeaders() bool {
 	p.flagsMtx.Lock()
+	defer p.flagsMtx.Unlock()
 	sendHeadersPreferred := p.sendHeadersPreferred
-	p.flagsMtx.Unlock()
 
 	return sendHeadersPreferred
 }
@@ -800,8 +800,8 @@ func (p *Peer) WantsHeaders() bool {
 // This function is safe for concurrent access.
 func (p *Peer) IsWitnessEnabled() bool {
 	p.flagsMtx.Lock()
+	defer p.flagsMtx.Unlock()
 	witnessEnabled := p.witnessEnabled
-	p.flagsMtx.Unlock()
 
 	return witnessEnabled
 }
@@ -856,11 +856,11 @@ func (p *Peer) PushGetBlocksMsg(locator blockchain.BlockLocator, stopHash *chain
 
 	// Filter duplicate getblocks requests.
 	p.prevGetBlocksMtx.Lock()
+	defer p.prevGetBlocksMtx.Unlock()
 	isDuplicate := p.prevGetBlocksStop != nil && p.prevGetBlocksBegin != nil &&
 		beginHash != nil && stopHash.IsEqual(p.prevGetBlocksStop) &&
 		beginHash.IsEqual(p.prevGetBlocksBegin)
-	p.prevGetBlocksMtx.Unlock()
-
+	
 	if isDuplicate {
 		log.Tracef("Filtering duplicate [getblocks] with begin "+
 			"hash %v, stop hash %v", beginHash, stopHash)
@@ -900,10 +900,11 @@ func (p *Peer) PushGetHeadersMsg(locator blockchain.BlockLocator, stopHash *chai
 
 	// Filter duplicate getheaders requests.
 	p.prevGetHdrsMtx.Lock()
+	defer p.prevGetHdrsMtx.Unlock()
 	isDuplicate := p.prevGetHdrsStop != nil && p.prevGetHdrsBegin != nil &&
 		beginHash != nil && stopHash.IsEqual(p.prevGetHdrsStop) &&
 		beginHash.IsEqual(p.prevGetHdrsBegin)
-	p.prevGetHdrsMtx.Unlock()
+	
 
 	if isDuplicate {
 		log.Tracef("Filtering duplicate [getheaders] with begin hash %v",
@@ -993,12 +994,13 @@ func (p *Peer) handlePongMsg(msg *wire.MsgPong) {
 	// enough that if they overlap we would have timed out the peer.
 	if p.ProtocolVersion() > wire.BIP0031Version {
 		p.statsMtx.Lock()
+		defer p.statsMtx.Unlock()
 		if p.lastPingNonce != 0 && msg.Nonce == p.lastPingNonce {
 			p.lastPingMicros = time.Since(p.lastPingTime).Nanoseconds()
 			p.lastPingMicros /= 1000 // convert to usec.
 			p.lastPingNonce = 0
 		}
-		p.statsMtx.Unlock()
+		
 	}
 }
 
@@ -1899,13 +1901,15 @@ func (p *Peer) handleRemoteVersionMsg(msg *wire.MsgVersion) error {
 	// Updating a bunch of stats including block based stats, and the
 	// peer's time offset.
 	p.statsMtx.Lock()
+	defer p.statsMtx.Unlock()
 	p.lastBlock = msg.LastBlock
 	p.startingHeight = msg.LastBlock
 	p.timeOffset = msg.Timestamp.Unix() - time.Now().Unix()
-	p.statsMtx.Unlock()
+	
 
 	// Negotiate the protocol version.
 	p.flagsMtx.Lock()
+	defer p.flagsMtx.Unlock()
 	p.advertisedProtoVer = uint32(msg.ProtocolVersion)
 	p.protocolVersion = minUint32(p.protocolVersion, p.advertisedProtoVer)
 	p.versionKnown = true
@@ -1927,7 +1931,6 @@ func (p *Peer) handleRemoteVersionMsg(msg *wire.MsgVersion) error {
 	if p.services&wire.SFNodeWitness == wire.SFNodeWitness {
 		p.witnessEnabled = true
 	}
-	p.flagsMtx.Unlock()
 
 	// Once the version message has been exchanged, we're able to determine
 	// if this peer knows how to encode witness data over the wire
