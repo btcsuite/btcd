@@ -496,6 +496,7 @@ func (p *Peer) UpdateLastBlockHeight(newHeight int32) {
 	log.Tracef("Updating last block height of peer %v from %v to %v",
 		p.addr, p.lastBlock, newHeight)
 	p.lastBlock = newHeight
+
 }
 
 // UpdateLastAnnouncedBlock updates meta-data about the last block hash this
@@ -508,6 +509,7 @@ func (p *Peer) UpdateLastAnnouncedBlock(blkHash *chainhash.Hash) {
 	p.statsMtx.Lock()
 	defer p.statsMtx.Unlock()
 	p.lastAnnouncedBlock = blkHash
+
 }
 
 // AddKnownInventory adds the passed inventory to the cache of known inventory
@@ -856,10 +858,10 @@ func (p *Peer) PushGetBlocksMsg(locator blockchain.BlockLocator, stopHash *chain
 
 	// Filter duplicate getblocks requests.
 	p.prevGetBlocksMtx.Lock()
-	defer p.prevGetBlocksMtx.Unlock()
 	isDuplicate := p.prevGetBlocksStop != nil && p.prevGetBlocksBegin != nil &&
 		beginHash != nil && stopHash.IsEqual(p.prevGetBlocksStop) &&
 		beginHash.IsEqual(p.prevGetBlocksBegin)
+	p.prevGetBlocksMtx.Unlock()
 
 	if isDuplicate {
 		log.Tracef("Filtering duplicate [getblocks] with begin "+
@@ -900,10 +902,10 @@ func (p *Peer) PushGetHeadersMsg(locator blockchain.BlockLocator, stopHash *chai
 
 	// Filter duplicate getheaders requests.
 	p.prevGetHdrsMtx.Lock()
-	defer p.prevGetHdrsMtx.Unlock()
 	isDuplicate := p.prevGetHdrsStop != nil && p.prevGetHdrsBegin != nil &&
 		beginHash != nil && stopHash.IsEqual(p.prevGetHdrsStop) &&
 		beginHash.IsEqual(p.prevGetHdrsBegin)
+	p.prevGetHdrsMtx.Unlock()
 
 	if isDuplicate {
 		log.Tracef("Filtering duplicate [getheaders] with begin hash %v",
@@ -1900,10 +1902,10 @@ func (p *Peer) handleRemoteVersionMsg(msg *wire.MsgVersion) error {
 	// Updating a bunch of stats including block based stats, and the
 	// peer's time offset.
 	p.statsMtx.Lock()
-	defer p.statsMtx.Unlock()
 	p.lastBlock = msg.LastBlock
 	p.startingHeight = msg.LastBlock
 	p.timeOffset = msg.Timestamp.Unix() - time.Now().Unix()
+	p.statsMtx.Unlock()
 
 	// Negotiate the protocol version.
 	p.flagsMtx.Lock()
