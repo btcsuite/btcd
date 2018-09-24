@@ -564,7 +564,7 @@ func (p *Peer) ID() int32 {
 	p.flagsMtx.Lock()
 	defer p.flagsMtx.Unlock()
 	id := p.id
-	
+
 	return id
 }
 
@@ -575,7 +575,7 @@ func (p *Peer) NA() *wire.NetAddress {
 	p.flagsMtx.Lock()
 	defer p.flagsMtx.Unlock()
 	na := p.na
-	
+
 	return na
 }
 
@@ -860,7 +860,7 @@ func (p *Peer) PushGetBlocksMsg(locator blockchain.BlockLocator, stopHash *chain
 	isDuplicate := p.prevGetBlocksStop != nil && p.prevGetBlocksBegin != nil &&
 		beginHash != nil && stopHash.IsEqual(p.prevGetBlocksStop) &&
 		beginHash.IsEqual(p.prevGetBlocksBegin)
-	
+
 	if isDuplicate {
 		log.Tracef("Filtering duplicate [getblocks] with begin "+
 			"hash %v, stop hash %v", beginHash, stopHash)
@@ -904,7 +904,6 @@ func (p *Peer) PushGetHeadersMsg(locator blockchain.BlockLocator, stopHash *chai
 	isDuplicate := p.prevGetHdrsStop != nil && p.prevGetHdrsBegin != nil &&
 		beginHash != nil && stopHash.IsEqual(p.prevGetHdrsStop) &&
 		beginHash.IsEqual(p.prevGetHdrsBegin)
-	
 
 	if isDuplicate {
 		log.Tracef("Filtering duplicate [getheaders] with begin hash %v",
@@ -1000,7 +999,7 @@ func (p *Peer) handlePongMsg(msg *wire.MsgPong) {
 			p.lastPingMicros /= 1000 // convert to usec.
 			p.lastPingNonce = 0
 		}
-		
+
 	}
 }
 
@@ -1583,8 +1582,8 @@ out:
 		case msg := <-p.outputQueue:
 			waiting = queuePacket(msg, pendingMsgs, waiting)
 
-		// This channel is notified when a message has been sent across
-		// the network socket.
+			// This channel is notified when a message has been sent across
+			// the network socket.
 		case <-p.sendDoneQueue:
 			// No longer waiting if there are no more messages
 			// in the pending messages queue.
@@ -1678,7 +1677,7 @@ cleanup:
 			}
 		case <-p.outputInvChan:
 			// Just drain channel
-		// sendDoneQueue is buffered so doesn't need draining.
+			// sendDoneQueue is buffered so doesn't need draining.
 		default:
 			break cleanup
 		}
@@ -1905,7 +1904,6 @@ func (p *Peer) handleRemoteVersionMsg(msg *wire.MsgVersion) error {
 	p.lastBlock = msg.LastBlock
 	p.startingHeight = msg.LastBlock
 	p.timeOffset = msg.Timestamp.Unix() - time.Now().Unix()
-	
 
 	// Negotiate the protocol version.
 	p.flagsMtx.Lock()
