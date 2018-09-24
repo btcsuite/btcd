@@ -41,7 +41,7 @@ which are both under active development.
 
 #### Windows - MSI Available
 
-https://github.com/btcsuite/btcd/releases
+https://github.com/soterium/btcd/releases
 
 #### Linux/BSD/MacOSX/POSIX - Build from Source
 
@@ -114,12 +114,12 @@ $ ./btcd
 
 ## Issue Tracker
 
-The [integrated github issue tracker](https://github.com/btcsuite/btcd/issues)
+The [integrated github issue tracker](https://github.com/soterium/btcd/issues)
 is used for this project.
 
 ## Documentation
 
-The documentation is a work-in-progress.  It is located in the [docs](https://github.com/btcsuite/btcd/tree/master/docs) folder.
+The documentation is a work-in-progress.  It is located in the [docs](https://github.com/soterium/btcd/tree/master/docs) folder.
 
 ## GPG Verification Key
 
