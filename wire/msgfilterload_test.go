@@ -136,7 +136,7 @@ func TestFilterLoadWireErrors(t *testing.T) {
 	baseFilterLoad := NewMsgFilterLoad(baseFilter, 10, 0, BloomUpdateNone)
 	baseFilterLoadEncoded := append([]byte{0x04}, baseFilter...)
 	baseFilterLoadEncoded = append(baseFilterLoadEncoded,
-		0x00, 0x00, 0x00, 0x0a, // HashFuncs
+		0x0a, 0x00, 0x00, 0x00, // HashFuncs
 		0x00, 0x00, 0x00, 0x00, // Tweak
 		0x00) // Flags
 
