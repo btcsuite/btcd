@@ -4,7 +4,9 @@
 
 package btcjson
 
-import "encoding/json"
+import (
+	"encoding/json"
+)
 
 // GetBlockHeaderVerboseResult models the data from the getblockheader command when
 // the verbose flag is set.  When the verbose flag is not set, getblockheader
@@ -471,7 +473,7 @@ type GetMiningInfoResult struct {
 	Generate           bool    `json:"generate"`
 	GenProcLimit       int32   `json:"genproclimit"`
 	HashesPerSec       int64   `json:"hashespersec"`
-	NetworkHashPS      int64   `json:"networkhashps"`
+	NetworkHashPS      float64  `json:"networkhashps"`
 	PooledTx           uint64  `json:"pooledtx"`
 	TestNet            bool    `json:"testnet"`
 }
