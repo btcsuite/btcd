@@ -1,5 +1,5 @@
 // Copyright (c) 2013-2017 The btcsuite developers
-// Copyright (c) 2015-2017 The Decred developers
+// Copyright (c) 2015-2018 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -385,10 +385,99 @@ func (sp *serverPeer) addBanScore(persistent, transient uint32, reason string) {
 	}
 }
 
+// hasServices returns whether or not the provided advertised service flags have
+// all of the provided desired service flags set.
+func hasServices(advertised, desired wire.ServiceFlag) bool {
+	return advertised&desired == desired
+}
+
 // OnVersion is invoked when a peer receives a version bitcoin message
 // and is used to negotiate the protocol version details as well as kick start
 // the communications.
-func (sp *serverPeer) OnVersion(_ *peer.Peer, msg *wire.MsgVersion) {
+func (sp *serverPeer) OnVersion(_ *peer.Peer, msg *wire.MsgVersion) *wire.MsgReject {
+	// Update the address manager with the advertised services for outbound
+	// connections in case they have changed.  This is not done for inbound
+	// connections to help prevent malicious behavior and is skipped when
+	// running on the simulation test network since it is only intended to
+	// connect to specified peers and actively avoids advertising and
+	// connecting to discovered peers.
+	//
+	// NOTE: This is done before rejecting peers that are too old to ensure
+	// it is updated regardless in the case a new minimum protocol version is
+	// enforced and the remote node has not upgraded yet.
+	isInbound := sp.Inbound()
+	remoteAddr := sp.NA()
+	addrManager := sp.server.addrManager
+	if !cfg.SimNet && !isInbound {
+		addrManager.SetServices(remoteAddr, msg.Services)
+	}
+
+	// Ignore peers that have a protcol version that is too old.  The peer
+	// negotiation logic will disconnect it after this callback returns.
+	if msg.ProtocolVersion < int32(peer.MinAcceptableProtocolVersion) {
+		return nil
+	}
+
+	// Reject outbound peers that are not full nodes.
+	wantServices := wire.SFNodeNetwork
+	if !isInbound && !hasServices(msg.Services, wantServices) {
+		missingServices := wantServices & ^msg.Services
+		srvrLog.Debugf("Rejecting peer %s with services %v due to not "+
+			"providing desired services %v", sp.Peer, msg.Services,
+			missingServices)
+		reason := fmt.Sprintf("required services %#x not offered",
+			uint64(missingServices))
+		return wire.NewMsgReject(msg.Command(), wire.RejectNonstandard, reason)
+	}
+
+	// Update the address manager and request known addresses from the
+	// remote peer for outbound connections.  This is skipped when running
+	// on the simulation test network since it is only intended to connect
+	// to specified peers and actively avoids advertising and connecting to
+	// discovered peers.
+	if !cfg.SimNet && !isInbound {
+		// After soft-fork activation, only make outbound
+		// connection to peers if they flag that they're segwit
+		// enabled.
+		chain := sp.server.chain
+		segwitActive, err := chain.IsDeploymentActive(chaincfg.DeploymentSegwit)
+		if err != nil {
+			peerLog.Errorf("Unable to query for segwit soft-fork state: %v",
+				err)
+			return nil
+		}
+
+		if segwitActive && !sp.IsWitnessEnabled() {
+			peerLog.Infof("Disconnecting non-segwit peer %v, isn't segwit "+
+				"enabled and we need more segwit enabled peers", sp)
+			sp.Disconnect()
+			return nil
+		}
+
+		// Advertise the local address when the server accepts incoming
+		// connections and it believes itself to be close to the best known tip.
+		if !cfg.DisableListen && sp.server.syncManager.IsCurrent() {
+			// Get address that best matches.
+			lna := addrManager.GetBestLocalAddress(remoteAddr)
+			if addrmgr.IsRoutable(lna) {
+				// Filter addresses the peer already knows about.
+				addresses := []*wire.NetAddress{lna}
+				sp.pushAddrMsg(addresses)
+			}
+		}
+
+		// Request known addresses if the server address manager needs
+		// more and the peer has a protocol version new enough to
+		// include a timestamp with addresses.
+		hasTimestamp := sp.ProtocolVersion() >= wire.NetAddressTimeVersion
+		if addrManager.NeedMoreAddresses() && hasTimestamp {
+			sp.QueueMessage(wire.NewMsgGetAddr(), nil)
+		}
+
+		// Mark the address as a known good address.
+		addrManager.Good(remoteAddr)
+	}
+
 	// Add the remote peer time as a sample for creating an offset against
 	// the local clock to keep the network time in sync.
 	sp.server.timeSource.AddTimeSample(sp.Addr(), msg.Timestamp)
@@ -400,63 +489,9 @@ func (sp *serverPeer) OnVersion(_ *peer.Peer, msg *wire.MsgVersion) {
 	// is received.
 	sp.setDisableRelayTx(msg.DisableRelayTx)
 
-	// Update the address manager and request known addresses from the
-	// remote peer for outbound connections.  This is skipped when running
-	// on the simulation test network since it is only intended to connect
-	// to specified peers and actively avoids advertising and connecting to
-	// discovered peers.
-	if !cfg.SimNet {
-		addrManager := sp.server.addrManager
-
-		// Outbound connections.
-		if !sp.Inbound() {
-			// After soft-fork activation, only make outbound
-			// connection to peers if they flag that they're segwit
-			// enabled.
-			chain := sp.server.chain
-			segwitActive, err := chain.IsDeploymentActive(chaincfg.DeploymentSegwit)
-			if err != nil {
-				peerLog.Errorf("Unable to query for segwit "+
-					"soft-fork state: %v", err)
-				return
-			}
-
-			if segwitActive && !sp.IsWitnessEnabled() {
-				peerLog.Infof("Disconnecting non-segwit "+
-					"peer %v, isn't segwit enabled and "+
-					"we need more segwit enabled peers", sp)
-				sp.Disconnect()
-				return
-			}
-
-			// TODO(davec): Only do this if not doing the initial block
-			// download and the local address is routable.
-			if !cfg.DisableListen /* && isCurrent? */ {
-				// Get address that best matches.
-				lna := addrManager.GetBestLocalAddress(sp.NA())
-				if addrmgr.IsRoutable(lna) {
-					// Filter addresses the peer already knows about.
-					addresses := []*wire.NetAddress{lna}
-					sp.pushAddrMsg(addresses)
-				}
-			}
-
-			// Request known addresses if the server address manager needs
-			// more and the peer has a protocol version new enough to
-			// include a timestamp with addresses.
-			hasTimestamp := sp.ProtocolVersion() >=
-				wire.NetAddressTimeVersion
-			if addrManager.NeedMoreAddresses() && hasTimestamp {
-				sp.QueueMessage(wire.NewMsgGetAddr(), nil)
-			}
-
-			// Mark the address as a known good address.
-			addrManager.Good(sp.NA())
-		}
-	}
-
 	// Add valid peer to the server.
 	sp.server.AddPeer(sp)
+	return nil
 }
 
 // OnMemPool is invoked when a peer receives a mempool bitcoin message.
