@@ -970,14 +970,14 @@ func (r FutureAddWitnessAddressResult) Receive() (btcutil.Address, error) {
 // the returned instance.
 //
 // See AddWitnessAddress for the blocking version and more details.
-func (c *Client) AddWitnessAddressAsync(address string) FutureAddWitnessAddressResult {
-	cmd := btcjson.NewAddWitnessAddressCmd(address)
+func (c *Client) AddWitnessAddressAsync(address btcutil.Address) FutureAddWitnessAddressResult {
+	cmd := btcjson.NewAddWitnessAddressCmd(address.EncodeAddress())
 	return c.sendCmd(cmd)
 }
 
 // AddWitnessAddress adds a witness address for a script and returns the new
 // address (P2SH of the witness script).
-func (c *Client) AddWitnessAddress(address string) (btcutil.Address, error) {
+func (c *Client) AddWitnessAddress(address btcutil.Address) (btcutil.Address, error) {
 	return c.AddWitnessAddressAsync(address).Receive()
 }
 
@@ -2077,13 +2077,13 @@ func (r FutureImportAddressResult) Receive() error {
 // returned instance.
 //
 // See ImportAddress for the blocking version and more details.
-func (c *Client) ImportAddressAsync(address string) FutureImportAddressResult {
-	cmd := btcjson.NewImportAddressCmd(address, nil)
+func (c *Client) ImportAddressAsync(address btcutil.Address) FutureImportAddressResult {
+	cmd := btcjson.NewImportAddressCmd(address.EncodeAddress(), nil)
 	return c.sendCmd(cmd)
 }
 
 // ImportAddress imports the passed public address.
-func (c *Client) ImportAddress(address string) error {
+func (c *Client) ImportAddress(address btcutil.Address) error {
 	return c.ImportAddressAsync(address).Receive()
 }
 
@@ -2092,14 +2092,14 @@ func (c *Client) ImportAddress(address string) error {
 // returned instance.
 //
 // See ImportAddress for the blocking version and more details.
-func (c *Client) ImportAddressRescanAsync(address string, rescan bool) FutureImportAddressResult {
-	cmd := btcjson.NewImportAddressCmd(address, &rescan)
+func (c *Client) ImportAddressRescanAsync(address btcutil.Address, rescan bool) FutureImportAddressResult {
+	cmd := btcjson.NewImportAddressCmd(address.EncodeAddress(), &rescan)
 	return c.sendCmd(cmd)
 }
 
 // ImportAddressRescan imports the passed public address. When rescan is true,
 // the block history is scanned for transactions addressed to provided address.
-func (c *Client) ImportAddressRescan(address string, rescan bool) error {
+func (c *Client) ImportAddressRescan(address btcutil.Address, rescan bool) error {
 	return c.ImportAddressRescanAsync(address, rescan).Receive()
 }
 
