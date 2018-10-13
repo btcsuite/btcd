@@ -2078,7 +2078,7 @@ func (r FutureImportAddressResult) Receive() error {
 //
 // See ImportAddress for the blocking version and more details.
 func (c *Client) ImportAddressAsync(address string) FutureImportAddressResult {
-	cmd := btcjson.NewImportAddressCmd(address, nil)
+	cmd := btcjson.NewImportAddressCmd(address, "", nil)
 	return c.sendCmd(cmd)
 }
 
@@ -2092,15 +2092,15 @@ func (c *Client) ImportAddress(address string) error {
 // returned instance.
 //
 // See ImportAddress for the blocking version and more details.
-func (c *Client) ImportAddressRescanAsync(address string, rescan bool) FutureImportAddressResult {
-	cmd := btcjson.NewImportAddressCmd(address, &rescan)
+func (c *Client) ImportAddressRescanAsync(address string, account string, rescan bool) FutureImportAddressResult {
+	cmd := btcjson.NewImportAddressCmd(address, account, &rescan)
 	return c.sendCmd(cmd)
 }
 
 // ImportAddressRescan imports the passed public address. When rescan is true,
 // the block history is scanned for transactions addressed to provided address.
-func (c *Client) ImportAddressRescan(address string, rescan bool) error {
-	return c.ImportAddressRescanAsync(address, rescan).Receive()
+func (c *Client) ImportAddressRescan(address string, account string, rescan bool) error {
+	return c.ImportAddressRescanAsync(address, account, rescan).Receive()
 }
 
 // FutureImportPrivKeyResult is a future promise to deliver the result of an
