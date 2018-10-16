@@ -80,6 +80,20 @@ func TestChainSvrCmds(t *testing.T) {
 				LockTime: btcjson.Int64(12312333333),
 			},
 		},
+		{
+			name: "estimatesmartfee",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("estimatesmartfee", 6, btcjson.ConservativeEstimeMode)
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewEstimateSmartFeeCmd(6, btcjson.ConservativeEstimeMode)
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"estimatesmartfee","params":[6,"CONSERVATIVE"],"id":1}`,
+			unmarshalled: &btcjson.EstimateSmartFeeCmd{
+				ConfTarget:   6,
+				EstimateMode: btcjson.ConservativeEstimeMode,
+			},
+		},
 
 		{
 			name: "decoderawtransaction",

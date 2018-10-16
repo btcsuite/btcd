@@ -15,6 +15,46 @@ import (
 	"github.com/btcsuite/btcd/wire"
 )
 
+// FutureEstimateSmartFeeResult is a promise to deliver the result of a
+// EstimateSmartFeeAsync RPC invocation (or an applicable error).
+type FutureEstimateSmartFeeResult chan *response
+
+// Receive waits for the response promised by the future and returns the fee estimation info
+// result provided by the server.
+func (r FutureEstimateSmartFeeResult) Receive() (*btcjson.EstimateSmartFeeResult, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	var estimateSmartFee btcjson.EstimateSmartFeeResult
+	if err := json.Unmarshal(res, &estimateSmartFee); err != nil {
+		return nil, err
+	}
+	return &estimateSmartFee, nil
+}
+
+// EstimateSmartFeeAsync returns an instance of a type that can be used to get
+// the result of the RPC at some future time by invoking the Receive function on
+// the returned instance.
+//
+// See EstimateSmartFee and EstimateSmartFeeWithMode for the blocking versions and more details.
+func (c *Client) EstimateSmartFeeAsync(confTarget uint32, estimateMode btcjson.EstimateMode) FutureEstimateSmartFeeResult {
+	cmd := btcjson.NewEstimateSmartFeeCmd(confTarget, estimateMode)
+	return c.sendCmd(cmd)
+}
+
+// EstimateSmartFee estimates the approximate fee per kilobyte needed for a transaction
+// using the UNSET mode
+func (c *Client) EstimateSmartFee(confTarget uint32) (*btcjson.EstimateSmartFeeResult, error) {
+	return c.EstimateSmartFeeWithMode(confTarget, btcjson.UnsetEstimeMode)
+}
+
+// EstimateSmartFeeWithMode estimates the approximate fee per kilobyte needed for a transaction
+func (c *Client) EstimateSmartFeeWithMode(confTarget uint32, estimateMode btcjson.EstimateMode) (*btcjson.EstimateSmartFeeResult, error) {
+	return c.EstimateSmartFeeAsync(confTarget, estimateMode).Receive()
+}
+
 // FutureGetBestBlockHashResult is a future promise to deliver the result of a
 // GetBestBlockAsync RPC invocation (or an applicable error).
 type FutureGetBestBlockHashResult chan *response
