@@ -70,6 +70,18 @@ type GetAddedNodeInfoResultAddr struct {
 	Connected string `json:"connected"`
 }
 
+// GetTxOutSetInfoResult models the data returned from the gettxoutsetinfo
+// command.
+type GetTxOutSetInfoResult struct {
+	Height          int32   `json:"height"`
+	BestBlock       string  `json:"bestblock"`
+	Transactions    int32   `json:"transactions"`
+	TxOuts          int32   `json:"txouts"`
+	BytesSerialized int32   `json:"bytes_serialized"`
+	HashSerialized  string  `json:"hash_serialized"`
+	TotalAmount     float64 `json:"total_amount"`
+}
+
 // GetAddedNodeInfoResult models the data from the getaddednodeinfo command.
 type GetAddedNodeInfoResult struct {
 	AddedNode string                        `json:"addednode"`

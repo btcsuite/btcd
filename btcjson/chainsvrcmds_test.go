@@ -581,6 +581,17 @@ func TestChainSvrCmds(t *testing.T) {
 			},
 		},
 		{
+			name: "gettxoutsetinfo",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("gettxoutsetinfo")
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewGetTxOutSetInfoCmd()
+			},
+			marshalled:   `{"jsonrpc":"1.0","method":"gettxoutsetinfo","params":[],"id":1}`,
+			unmarshalled: &btcjson.GetTxOutSetInfoCmd{},
+		},
+		{
 			name: "gettxout",
 			newCmd: func() (interface{}, error) {
 				return btcjson.NewCmd("gettxout", "123", 1)

@@ -317,3 +317,40 @@ func (c *Client) GetNetTotalsAsync() FutureGetNetTotalsResult {
 func (c *Client) GetNetTotals() (*btcjson.GetNetTotalsResult, error) {
 	return c.GetNetTotalsAsync().Receive()
 }
+
+// FutureGetTxOutSetInfoResult is a future promise to deliver the result of a
+// GetTxOutSetInfoAsync RPC invocation (or an applicable error).
+type FutureGetTxOutSetInfoResult chan *response
+
+// Receive waits for the response promised by the future and returns network
+// traffic statistics.
+func (r FutureGetTxOutSetInfoResult) Receive() (*btcjson.GetTxOutSetInfoResult, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal result as a gettxoutsetinfo result object.
+	var txOutSetInfo btcjson.GetTxOutSetInfoResult
+	err = json.Unmarshal(res, &txOutSetInfo)
+	if err != nil {
+		return nil, err
+	}
+
+	return &txOutSetInfo, nil
+}
+
+// GetTxOutSetInfoAsync returns an instance of a type that can be used to get the
+// result of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+//
+// See GetTxOutSetInfo for the blocking version and more details.
+func (c *Client) GetTxOutSetInfoAsync() FutureGetTxOutSetInfoResult {
+	cmd := btcjson.NewGetTxOutSetInfoCmd()
+	return c.sendCmd(cmd)
+}
+
+// GetTxOutSetInfo returns statistics about the database of unspent transaction outputs
+func (c *Client) GetTxOutSetInfo() (*btcjson.GetTxOutSetInfoResult, error) {
+	return c.GetTxOutSetInfoAsync().Receive()
+}
