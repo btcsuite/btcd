@@ -312,6 +312,33 @@ func (c *Client) ListSinceBlockMinConf(blockHash *chainhash.Hash, minConfirms in
 	return c.ListSinceBlockMinConfAsync(blockHash, minConfirms).Receive()
 }
 
+// ListSinceBlockMinConfWatchOnlyAsync returns an instance of a type that can be used to
+// get the result of the RPC at some future time by invoking the Receive
+// function on the returned instance.
+//
+// See ListSinceBlockMinConfWatchOnly for the blocking version and more details.
+func (c *Client) ListSinceBlockMinConfWatchOnlyAsync(blockHash *chainhash.Hash, minConfirms int, watchOnly *bool) FutureListSinceBlockResult {
+	var hash *string
+	if blockHash != nil {
+		hash = btcjson.String(blockHash.String())
+	} else {
+		hash = btcjson.String("")
+	}
+
+	cmd := btcjson.NewListSinceBlockCmd(hash, &minConfirms, watchOnly)
+	return c.sendCmd(cmd)
+}
+
+// ListSinceBlockMinConfWatchOnly returns all transactions added in blocks since the
+// specified block hash, or all transactions if it is nil, using the specified
+// number of minimum confirmations as a filter as well as setting the include_watchonly
+// parameter.
+//
+// See ListSinceBlock to use the default minimum number of confirmations.
+func (c *Client) ListSinceBlockMinConfWatchOnly(blockHash *chainhash.Hash, minConfirms int, watchOnly *bool) (*btcjson.ListSinceBlockResult, error) {
+	return c.ListSinceBlockMinConfWatchOnlyAsync(blockHash, minConfirms, watchOnly).Receive()
+}
+
 // **************************
 // Transaction Send Functions
 // **************************
