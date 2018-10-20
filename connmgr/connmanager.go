@@ -408,6 +408,14 @@ func (cm *ConnManager) Connect(c *ConnReq) {
 	if atomic.LoadInt32(&cm.stop) != 0 {
 		return
 	}
+
+	// During the time we wait for retry there is a chance that
+	// this connection was already cancelled
+	if c.State() == ConnCanceled {
+		log.Debugf("Ignoring connect for canceled connreq=%v", c)
+		return
+	}
+
 	if atomic.LoadUint64(&c.id) == 0 {
 		atomic.StoreUint64(&c.id, atomic.AddUint64(&cm.connReqCount, 1))
 
