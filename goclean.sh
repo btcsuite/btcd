@@ -27,9 +27,13 @@ fi
 
 linter_targets=$(glide novendor)
 
+if [ "$TRAVIS_GO_VERSION" = "1.11.x" ]; then
+    GOMETALINTER_GOFMT='--enable=gofmt'
+fi
+
 # Automatic checks
 test -z "$(gometalinter.v2 -j 4 --disable-all \
---enable=gofmt \
+$GOMETALINTER_GOFMT \
 --enable=golint \
 --enable=vet \
 --enable=gosimple \
