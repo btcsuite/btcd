@@ -271,6 +271,7 @@ func (s *utxoCache) fetchAndCacheEntry(outpoint wire.OutPoint) (*UtxoEntry, erro
 //
 // This method is part of the utxoView interface.
 // This method should be called with the state lock held.
+// The returned entry is NOT safe for concurrent access.
 func (s *utxoCache) getEntry(outpoint wire.OutPoint) (*UtxoEntry, error) {
 	if entry, found := s.cachedEntries[outpoint]; found {
 		return entry, nil
@@ -298,8 +299,7 @@ func (s *utxoCache) FetchEntry(outpoint wire.OutPoint) (*UtxoEntry, error) {
 // allow pruning of spent transaction outputs.  In practice this means the
 // caller must check if the returned entry is nil before invoking methods on it.
 //
-// This function is safe for concurrent access however the returned entry (if
-// any) is NOT.
+// This function is safe for concurrent access.
 func (b *BlockChain) FetchUtxoEntry(outpoint wire.OutPoint) (*UtxoEntry, error) {
 	b.chainLock.RLock()
 	entry, err := b.utxoCache.FetchEntry(outpoint)
@@ -409,8 +409,9 @@ func (s *utxoCache) addEntry(outpoint wire.OutPoint, entry *UtxoEntry, overwrite
 		// Prevent overwriting not-fully-spent entries.  Note that this is not
 		// a consensus check.
 		if cachedEntry != nil && !cachedEntry.IsSpent() {
-			return AssertError("entry overwrites existing entry that is not " +
-				"fully spent")
+			log.Warnf("utxo entry %s attempts to overwrite existing entry that is not "+
+				"fully spent (maybe pre-bip30?)", outpoint)
+			return nil
 		}
 
 		// If we didn't have an entry for the outpoint and the existing entry is
@@ -476,7 +477,7 @@ func (b *BlockChain) FetchUtxoView(tx *btcutil.Tx) (*UtxoViewpoint, error) {
 
 // Commit commits all the entries in the view to the cache.
 //
-// This function is safe for concurrent access.
+// This method should be called with the state lock held.
 func (s *utxoCache) Commit(view *UtxoViewpoint) error {
 	for outpoint, entry := range view.Entries() {
 		// No need to update the database if the entry was not modified or fresh.
@@ -485,7 +486,7 @@ func (s *utxoCache) Commit(view *UtxoViewpoint) error {
 		}
 
 		// We can't use the view entry directly because it can be modified
-		// lateron.
+		// later on.
 		ourEntry := s.cachedEntries[outpoint]
 		if ourEntry == nil {
 			ourEntry = entry.Clone()

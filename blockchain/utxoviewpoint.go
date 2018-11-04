@@ -177,10 +177,9 @@ func (view *UtxoViewpoint) addInputUtxos(source utxoView, block *btcutil.Block) 
 
 			// Add the entry from the source.
 			entry, err := source.getEntry(txIn.PreviousOutPoint)
-			if err != nil {
-				return err
+			if err == nil && entry != nil {
+				view.entries[txIn.PreviousOutPoint] = entry.Clone()
 			}
-			view.entries[txIn.PreviousOutPoint] = entry.Clone()
 		}
 	}
 

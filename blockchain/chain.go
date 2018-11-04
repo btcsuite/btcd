@@ -673,7 +673,11 @@ func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block,
 
 	// Commit all modifications made to the view into the utxo state.  This also
 	// prunes these changes from the view.
-	b.utxoCache.Commit(view)
+	b.stateLock.Lock()
+	if err := b.utxoCache.Commit(view); err != nil {
+		log.Errorf("error committing block %s(%d) to utxo cache: %s", block.Hash(), block.Height(), err.Error())
+	}
+	b.stateLock.Unlock()
 
 	// This node is now the end of the best chain.
 	b.bestChain.SetTip(node)
@@ -696,11 +700,9 @@ func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block,
 
 	// Since we just changed the UTXO cache, we make sure it didn't exceed its
 	// maximum size.
-	if err := b.utxoCache.Flush(FlushIfNeeded, state); err != nil {
-		return err
-	}
-
-	return nil
+	b.stateLock.Lock()
+	defer b.stateLock.Unlock()
+	return b.utxoCache.Flush(FlushIfNeeded, state)
 }
 
 // disconnectBlock handles disconnecting the passed node/block from the end of
@@ -790,7 +792,9 @@ func (b *BlockChain) disconnectBlock(node *blockNode, block *btcutil.Block, view
 
 	// Commit all modifications made to the view into the utxo state.  This also
 	// prunes these changes from the view.
+	b.stateLock.Lock()
 	b.utxoCache.Commit(view)
+	b.stateLock.Unlock()
 
 	// This node's parent is now the end of the best chain.
 	b.bestChain.SetTip(node.parent)
@@ -813,11 +817,9 @@ func (b *BlockChain) disconnectBlock(node *blockNode, block *btcutil.Block, view
 
 	// Since we just changed the UTXO cache, we make sure it didn't exceed its
 	// maximum size.
-	if err := b.utxoCache.Flush(FlushIfNeeded, state); err != nil {
-		return err
-	}
-
-	return nil
+	b.stateLock.Lock()
+	defer b.stateLock.Unlock()
+	return b.utxoCache.Flush(FlushIfNeeded, state)
 }
 
 // countSpentOutputs returns the number of utxos the passed block spends.
