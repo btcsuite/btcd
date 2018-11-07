@@ -1848,7 +1848,6 @@ func (b *BlockChain) CachedStateSize() uint64 {
 // This method is safe for concurrent access.
 func (b *BlockChain) FlushCachedState(mode FlushMode) error {
 	b.chainLock.Lock()
-	err := b.utxoCache.Flush(mode, b.stateSnapshot)
-	b.chainLock.Unlock()
-	return err
+	defer b.chainLock.Unlock()
+	return b.utxoCache.Flush(mode, b.stateSnapshot)
 }
