@@ -5,6 +5,7 @@
 package blockchain
 
 import (
+	"container/list"
 	"fmt"
 	"sync"
 
@@ -690,11 +691,14 @@ func (s *utxoCache) InitConsistentState(tip *blockNode, interrupt <-chan struct{
 	log.Info("Reconstructing UTXO state after unclean shutdown. This may take " +
 		"a long time...")
 
+
 	// Even though this should always be true, make sure the fetched hash is in
 	// the best chain.
 	var statusNode *blockNode
 	var statusNodeNext *blockNode // the first one higher than the statusNode
-	for node := tip; node.height > 0; node = node.parent {
+	attachNodes := list.New()
+	for node := tip; node.height >= 0; node = node.parent {
+		attachNodes.PushFront(node)
 		if node.hash == *statusHash {
 			statusNode = node
 			break
@@ -774,7 +778,10 @@ func (s *utxoCache) InitConsistentState(tip *blockNode, interrupt <-chan struct{
 	// avoid redoing the work when interrupted.
 	rollforwardBatch := func(dbTx database.Tx, node *blockNode) (*blockNode, error) {
 		nbBatchBlocks := 0
-		for ; node.height <= tip.height; node = node.parent {
+		for e := attachNodes.Front(); e != nil; e = e.Next() {
+			node = e.Value.(*blockNode)
+			attachNodes.Remove(e)
+
 			block, err := dbFetchBlockByNode(dbTx, node)
 			if err != nil {
 				return nil, err
@@ -795,7 +802,7 @@ func (s *utxoCache) InitConsistentState(tip *blockNode, interrupt <-chan struct{
 		err := dbPutUtxoStateConsistency(dbTx, ucsConsistent, &node.hash)
 		return node, err
 	}
-	for node := statusNodeNext; node.height <= tip.height; {
+	for node := statusNodeNext; node.height < tip.height; {
 		log.Tracef("Replaying %d more blocks...", tip.height-node.height)
 		err := s.db.Update(func(dbTx database.Tx) error {
 			var err error
