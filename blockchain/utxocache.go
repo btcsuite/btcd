@@ -691,7 +691,6 @@ func (s *utxoCache) InitConsistentState(tip *blockNode, interrupt <-chan struct{
 	log.Info("Reconstructing UTXO state after unclean shutdown. This may take " +
 		"a long time...")
 
-
 	// Even though this should always be true, make sure the fetched hash is in
 	// the best chain.
 	var statusNode *blockNode
@@ -710,63 +709,62 @@ func (s *utxoCache) InitConsistentState(tip *blockNode, interrupt <-chan struct{
 			"hash that is not in best chain: %v", statusHash))
 	}
 
-	// If data was in the middle of a flush, we have to roll back all blocks from
-	// the last best block all the way back to the last consistent block.
-	if statusCode == ucsFlushOngoing {
-		log.Debugf("btcd was shut down during a UTXO cache flush, "+
-			"rolling back %d blocks...", tip.height-statusNode.height)
+	// If data was in the middle of a flush, we have to roll back all
+	// blocks from the last best block all the way back to the last
+	// consistent block.
+	log.Debugf("Rolling back %d blocks to rebuild the UTXO state...",
+		tip.height-statusNode.height)
 
-		// Roll back blocks in batches.
-		rollbackBatch := func(dbTx database.Tx, node *blockNode) (*blockNode, error) {
-			nbBatchBlocks := 0
-			for ; node.height > statusNode.height; node = node.parent {
-				block, err := dbFetchBlockByNode(dbTx, node)
-				if err != nil {
-					return nil, err
-				}
-
-				stxos, err := dbFetchSpendJournalEntry(dbTx, block)
-				if err != nil {
-					return nil, err
-				}
-
-				if err := s.rollBackBlock(block, stxos); err != nil {
-					return nil, err
-				}
-				nbBatchBlocks++
-
-				if nbBatchBlocks >= utxoBatchSizeBlocks {
-					break
-				}
-			}
-			return node, nil
-		}
-		for node := tip; node.height > statusNode.height; {
-			log.Tracef("Rolling back %d more blocks...",
-				node.height-statusNode.height)
-			err := s.db.Update(func(dbTx database.Tx) error {
-				var err error
-				node, err = rollbackBatch(dbTx, node)
-				return err
-			})
+	// Roll back blocks in batches.
+	rollbackBatch := func(dbTx database.Tx, node *blockNode) (*blockNode, error) {
+		nbBatchBlocks := 0
+		for ; node.height > statusNode.height; node = node.parent {
+			block, err := dbFetchBlockByNode(dbTx, node)
 			if err != nil {
-				return err
+				return nil, err
 			}
 
-			if interruptRequested(interrupt) {
-				log.Warn("UTXO state reconstruction interrupted")
-				return errInterruptRequested
+			stxos, err := dbFetchSpendJournalEntry(dbTx, block)
+			if err != nil {
+				return nil, err
+			}
+
+			if err := s.rollBackBlock(block, stxos); err != nil {
+				return nil, err
+			}
+			nbBatchBlocks++
+
+			if nbBatchBlocks >= utxoBatchSizeBlocks {
+				break
 			}
 		}
-
-		// Now we can update the status already to avoid redoing this work when
-		// interrupted.
+		return node, nil
+	}
+	for node := tip; node.height > statusNode.height; {
+		log.Tracef("Rolling back %d more blocks...",
+			node.height-statusNode.height)
 		err := s.db.Update(func(dbTx database.Tx) error {
-			return dbPutUtxoStateConsistency(dbTx, ucsConsistent, statusHash)
+			var err error
+			node, err = rollbackBatch(dbTx, node)
+			return err
 		})
 		if err != nil {
 			return err
 		}
+
+		if interruptRequested(interrupt) {
+			log.Warn("UTXO state reconstruction interrupted")
+			return errInterruptRequested
+		}
+	}
+
+	// Now we can update the status already to avoid redoing this work when
+	// interrupted.
+	err = s.db.Update(func(dbTx database.Tx) error {
+		return dbPutUtxoStateConsistency(dbTx, ucsConsistent, statusHash)
+	})
+	if err != nil {
+		return err
 	}
 
 	log.Debugf("Replaying %d blocks to rebuild UTXO state...",
