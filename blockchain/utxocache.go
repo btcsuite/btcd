@@ -410,8 +410,8 @@ func (s *utxoCache) addEntry(outpoint wire.OutPoint, entry *UtxoEntry, overwrite
 		// Prevent overwriting not-fully-spent entries.  Note that this is not
 		// a consensus check.
 		if cachedEntry != nil && !cachedEntry.IsSpent() {
-			log.Warnf("utxo entry %s attempts to overwrite existing entry that is not "+
-				"fully spent (maybe pre-bip30?)", outpoint)
+			log.Warnf("utxo entry %s attempted to overwrite existing unspent "+
+				"entry (pre-bip30?) ", outpoint)
 			return nil
 		}
 
