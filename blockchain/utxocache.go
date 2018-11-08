@@ -713,7 +713,7 @@ func (s *utxoCache) InitConsistentState(tip *blockNode, interrupt <-chan struct{
 	// blocks from the last best block all the way back to the last
 	// consistent block.
 	log.Debugf("Rolling back %d blocks to rebuild the UTXO state...",
-		tip.height-statusNode.height)
+		tip.height-statusNode.height+1)
 
 	// Roll back blocks in batches.
 	rollbackBatch := func(dbTx database.Tx, node *blockNode) (*blockNode, error) {
@@ -746,7 +746,7 @@ func (s *utxoCache) InitConsistentState(tip *blockNode, interrupt <-chan struct{
 	}
 	for node := tip; node.height >= statusNode.height; {
 		log.Tracef("Rolling back %d more blocks...",
-			node.height-statusNode.height)
+			node.height-statusNode.height+1)
 		err := s.db.Update(func(dbTx database.Tx) error {
 			var err error
 			node, err = rollbackBatch(dbTx, node)
@@ -776,7 +776,7 @@ func (s *utxoCache) InitConsistentState(tip *blockNode, interrupt <-chan struct{
 	}
 
 	log.Debugf("Replaying %d blocks to rebuild UTXO state...",
-		tip.height-statusNodeNext.height)
+		tip.height-statusNodeNext.height+1)
 
 	// Then we replay the blocks from the last consistent state up to the best
 	// state.  Iterate forward from the consistent node to the tip of the best
@@ -808,8 +808,8 @@ func (s *utxoCache) InitConsistentState(tip *blockNode, interrupt <-chan struct{
 		err := dbPutUtxoStateConsistency(dbTx, ucsConsistent, &node.hash)
 		return node, err
 	}
-	for node := statusNodeNext; node.height < tip.height; {
-		log.Tracef("Replaying %d more blocks...", tip.height-node.height)
+	for node := statusNodeNext; node.height <= tip.height; {
+		log.Tracef("Replaying %d more blocks...", tip.height-node.height+1)
 		err := s.db.Update(func(dbTx database.Tx) error {
 			var err error
 			node, err = rollforwardBatch(dbTx, node)
@@ -822,6 +822,10 @@ func (s *utxoCache) InitConsistentState(tip *blockNode, interrupt <-chan struct{
 		if interruptRequested(interrupt) {
 			log.Warn("UTXO state reconstruction interrupted")
 			return errInterruptRequested
+		}
+
+		if node.height == tip.height {
+			break
 		}
 	}
 
