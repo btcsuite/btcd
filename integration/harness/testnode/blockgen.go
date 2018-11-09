@@ -1,8 +1,8 @@
-// Copyright (c) 2016 The btcsuite developers
+// Copyright (c) 2018 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package rpctest
+package testnode
 
 import (
 	"errors"
@@ -198,7 +198,7 @@ func CreateBlock(prevBlock *btcutil.Block, inclusionTxs []*btcutil.Tx,
 
 	found := solveBlock(&block.Header, net.PowLimit)
 	if !found {
-		return nil, errors.New("Unable to solve block")
+		return nil, errors.New("unable to solve block")
 	}
 
 	utilBlock := btcutil.NewBlock(&block)

@@ -1,11 +1,8 @@
-// Copyright (c) 2016 The btcsuite developers
+// Copyright (c) 2018 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-// This file is ignored during the regular tests due to the following build tag.
-// +build rpctest
-
-package integration
+package simpleregtest
 
 import (
 	"fmt"
@@ -16,7 +13,7 @@ import (
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/integration/rpctest"
+	"github.com/btcsuite/btcd/integration/harness"
 )
 
 const (
@@ -32,8 +29,8 @@ const (
 // assertVersionBit gets the passed block hash from the given test harness and
 // ensures its version either has the provided bit set or unset per the set
 // flag.
-func assertVersionBit(r *rpctest.Harness, t *testing.T, hash *chainhash.Hash, bit uint8, set bool) {
-	block, err := r.Node.GetBlock(hash)
+func assertVersionBit(r *harness.Harness, t *testing.T, hash *chainhash.Hash, bit uint8, set bool) {
+	block, err := r.NodeRPCClient().GetBlock(hash)
 	if err != nil {
 		t.Fatalf("failed to retrieve block %v: %v", hash, err)
 	}
@@ -52,8 +49,8 @@ func assertVersionBit(r *rpctest.Harness, t *testing.T, hash *chainhash.Hash, bi
 
 // assertChainHeight retrieves the current chain height from the given test
 // harness and ensures it matches the provided expected height.
-func assertChainHeight(r *rpctest.Harness, t *testing.T, expectedHeight uint32) {
-	height, err := r.Node.GetBlockCount()
+func assertChainHeight(r *harness.Harness, t *testing.T, expectedHeight uint32) {
+	height, err := r.NodeRPCClient().GetBlockCount()
 	if err != nil {
 		t.Fatalf("failed to retrieve block height: %v", err)
 	}
@@ -86,7 +83,7 @@ func thresholdStateToStatus(state blockchain.ThresholdState) (string, error) {
 // assertSoftForkStatus retrieves the current blockchain info from the given
 // test harness and ensures the provided soft fork key is both available and its
 // status is the equivalent of the passed state.
-func assertSoftForkStatus(r *rpctest.Harness, t *testing.T, forkKey string, state blockchain.ThresholdState) {
+func assertSoftForkStatus(r *harness.Harness, t *testing.T, forkKey string, state blockchain.ThresholdState) {
 	// Convert the expected threshold state into the equivalent
 	// getblockchaininfo RPC status string.
 	status, err := thresholdStateToStatus(state)
@@ -96,7 +93,7 @@ func assertSoftForkStatus(r *rpctest.Harness, t *testing.T, forkKey string, stat
 			"threshold state %v to string", line, state)
 	}
 
-	info, err := r.Node.GetBlockChainInfo()
+	info, err := r.NodeRPCClient().GetBlockChainInfo()
 	if err != nil {
 		t.Fatalf("failed to retrieve chain info: %v", err)
 	}
@@ -113,14 +110,14 @@ func assertSoftForkStatus(r *rpctest.Harness, t *testing.T, forkKey string, stat
 	if desc.Status != status {
 		_, _, line, _ := runtime.Caller(1)
 		t.Fatalf("assertion failed at line %d: softfork status for %q "+
-			"is %v instead of expected %v", line, forkKey,
+			"is <%v> instead of expected <%v>", line, forkKey,
 			desc.Status, status)
 	}
 }
 
 // testBIP0009 ensures the BIP0009 soft fork mechanism follows the state
 // transition rules set forth by the BIP for the provided soft fork key.  It
-// uses the regression test network to signal support and advance through the
+// uses the harness test network to signal support and advance through the
 // various threshold states including failure to achieve locked in status.
 //
 // See TestBIP0009 for an overview of what is tested.
@@ -129,15 +126,8 @@ func assertSoftForkStatus(r *rpctest.Harness, t *testing.T, forkKey string, stat
 // specific soft fork deployment to test.
 func testBIP0009(t *testing.T, forkKey string, deploymentID uint32) {
 	// Initialize the primary mining node with only the genesis block.
-	r, err := rpctest.New(&chaincfg.RegressionNetParams, nil, nil)
-	if err != nil {
-		t.Fatalf("unable to create primary harness: %v", err)
-	}
-	if err := r.SetUp(false, 0); err != nil {
-		t.Fatalf("unable to setup test chain: %v", err)
-	}
-	defer r.TearDown()
-
+	r := testSetup.Simnet0.NewInstance("harness-" + forkKey).(*harness.Harness)
+	defer testSetup.Simnet0.Dispose(r)
 	// *** ThresholdDefined ***
 	//
 	// Assert the chain height is the expected value and the soft fork
@@ -159,10 +149,13 @@ func testBIP0009(t *testing.T, forkKey string, deploymentID uint32) {
 	//
 	// Assert the chain height is the expected value and soft fork status is
 	// still defined and did NOT move to started.
-	confirmationWindow := r.ActiveNet.MinerConfirmationWindow
+	confirmationWindow := r.Node.Network().MinerConfirmationWindow
 	for i := uint32(0); i < confirmationWindow-2; i++ {
-		_, err := r.GenerateAndSubmitBlock(nil, vbLegacyBlockVersion,
-			time.Time{})
+		args := harness.GenerateBlockArgs{
+			BlockVersion: vbLegacyBlockVersion,
+			BlockTime:    time.Time{},
+		}
+		_, err := r.Node.GenerateAndSubmitBlock(args)
 		if err != nil {
 			t.Fatalf("failed to generated block %d: %v", i, err)
 		}
@@ -176,7 +169,11 @@ func testBIP0009(t *testing.T, forkKey string, deploymentID uint32) {
 	//
 	// Assert the chain height is the expected value and the soft fork
 	// status is started.
-	_, err = r.GenerateAndSubmitBlock(nil, vbLegacyBlockVersion, time.Time{})
+	args := harness.GenerateBlockArgs{
+		BlockVersion: vbLegacyBlockVersion,
+		BlockTime:    time.Time{},
+	}
+	_, err := r.Node.GenerateAndSubmitBlock(args)
 	if err != nil {
 		t.Fatalf("failed to generated block: %v", err)
 	}
@@ -191,22 +188,29 @@ func testBIP0009(t *testing.T, forkKey string, deploymentID uint32) {
 	//
 	// Assert the chain height is the expected value and the soft fork
 	// status is still started and did NOT move to locked in.
-	if deploymentID > uint32(len(r.ActiveNet.Deployments)) {
+	net := r.Node.Network()
+	if deploymentID > uint32(len(net.Deployments)) {
 		t.Fatalf("deployment ID %d does not exist", deploymentID)
 	}
-	deployment := &r.ActiveNet.Deployments[deploymentID]
-	activationThreshold := r.ActiveNet.RuleChangeActivationThreshold
+	deployment := &net.Deployments[deploymentID]
+	activationThreshold := net.RuleChangeActivationThreshold
 	signalForkVersion := int32(1<<deployment.BitNumber) | vbTopBits
 	for i := uint32(0); i < activationThreshold-1; i++ {
-		_, err := r.GenerateAndSubmitBlock(nil, signalForkVersion,
-			time.Time{})
+		args := harness.GenerateBlockArgs{
+			BlockVersion: signalForkVersion,
+			BlockTime:    time.Time{},
+		}
+		_, err := r.Node.GenerateAndSubmitBlock(args)
 		if err != nil {
 			t.Fatalf("failed to generated block %d: %v", i, err)
 		}
 	}
 	for i := uint32(0); i < confirmationWindow-(activationThreshold-1); i++ {
-		_, err := r.GenerateAndSubmitBlock(nil, vbLegacyBlockVersion,
-			time.Time{})
+		args := harness.GenerateBlockArgs{
+			BlockVersion: vbLegacyBlockVersion,
+			BlockTime:    time.Time{},
+		}
+		_, err := r.Node.GenerateAndSubmitBlock(args)
 		if err != nil {
 			t.Fatalf("failed to generated block %d: %v", i, err)
 		}
@@ -223,15 +227,21 @@ func testBIP0009(t *testing.T, forkKey string, deploymentID uint32) {
 	// Assert the chain height is the expected value and the soft fork
 	// status moved to locked in.
 	for i := uint32(0); i < activationThreshold; i++ {
-		_, err := r.GenerateAndSubmitBlock(nil, signalForkVersion,
-			time.Time{})
+		args := harness.GenerateBlockArgs{
+			BlockVersion: signalForkVersion,
+			BlockTime:    time.Time{},
+		}
+		_, err := r.Node.GenerateAndSubmitBlock(args)
 		if err != nil {
 			t.Fatalf("failed to generated block %d: %v", i, err)
 		}
 	}
 	for i := uint32(0); i < confirmationWindow-activationThreshold; i++ {
-		_, err := r.GenerateAndSubmitBlock(nil, vbLegacyBlockVersion,
-			time.Time{})
+		args := harness.GenerateBlockArgs{
+			BlockVersion: vbLegacyBlockVersion,
+			BlockTime:    time.Time{},
+		}
+		_, err := r.Node.GenerateAndSubmitBlock(args)
 		if err != nil {
 			t.Fatalf("failed to generated block %d: %v", i, err)
 		}
@@ -248,8 +258,11 @@ func testBIP0009(t *testing.T, forkKey string, deploymentID uint32) {
 	// Assert the chain height is the expected value and the soft fork
 	// status is still locked in and did NOT move to active.
 	for i := uint32(0); i < confirmationWindow-1; i++ {
-		_, err := r.GenerateAndSubmitBlock(nil, vbLegacyBlockVersion,
-			time.Time{})
+		args := harness.GenerateBlockArgs{
+			BlockVersion: vbLegacyBlockVersion,
+			BlockTime:    time.Time{},
+		}
+		_, err := r.Node.GenerateAndSubmitBlock(args)
 		if err != nil {
 			t.Fatalf("failed to generated block %d: %v", i, err)
 		}
@@ -264,17 +277,23 @@ func testBIP0009(t *testing.T, forkKey string, deploymentID uint32) {
 	//
 	// Assert the chain height is the expected value and the soft fork
 	// status moved to active.
-	_, err = r.GenerateAndSubmitBlock(nil, vbLegacyBlockVersion, time.Time{})
-	if err != nil {
-		t.Fatalf("failed to generated block: %v", err)
+	{
+		args := harness.GenerateBlockArgs{
+			BlockVersion: vbLegacyBlockVersion,
+			BlockTime:    time.Time{},
+		}
+		_, err := r.Node.GenerateAndSubmitBlock(args)
+		if err != nil {
+			t.Fatalf("failed to generated block: %v", err)
+		}
+		assertChainHeight(r, t, (confirmationWindow*4)-1)
+		assertSoftForkStatus(r, t, forkKey, blockchain.ThresholdActive)
 	}
-	assertChainHeight(r, t, (confirmationWindow*4)-1)
-	assertSoftForkStatus(r, t, forkKey, blockchain.ThresholdActive)
 }
 
 // TestBIP0009 ensures the BIP0009 soft fork mechanism follows the state
 // transition rules set forth by the BIP for all soft forks.  It uses the
-// regression test network to signal support and advance through the various
+// harness test network to signal support and advance through the various
 // threshold states including failure to achieve locked in status.
 //
 // Overview:
@@ -296,7 +315,7 @@ func testBIP0009(t *testing.T, forkKey string, deploymentID uint32) {
 // - Generate 1 more block to reach the next state transition
 //   - Assert chain height is expected and state moved to ThresholdActive
 func TestBIP0009(t *testing.T) {
-	t.Parallel()
+	//t.Parallel()
 
 	testBIP0009(t, "dummy", chaincfg.DeploymentTestDummy)
 	testBIP0009(t, "segwit", chaincfg.DeploymentSegwit)
@@ -317,17 +336,11 @@ func TestBIP0009(t *testing.T) {
 //   - Assert bit is set for block prior to state transition (ThresholdLockedIn)
 //   - Assert bit is NOT set for block at state transition (ThresholdActive)
 func TestBIP0009Mining(t *testing.T) {
-	t.Parallel()
+	//t.Parallel()
 
 	// Initialize the primary mining node with only the genesis block.
-	r, err := rpctest.New(&chaincfg.SimNetParams, nil, nil)
-	if err != nil {
-		t.Fatalf("unable to create primary harness: %v", err)
-	}
-	if err := r.SetUp(true, 0); err != nil {
-		t.Fatalf("unable to setup test chain: %v", err)
-	}
-	defer r.TearDown()
+	r := testSetup.Simnet0.NewInstance(t.Name()).(*harness.Harness)
+	defer testSetup.Simnet0.Dispose(r)
 
 	// Assert the chain only consists of the gensis block.
 	assertChainHeight(r, t, 0)
@@ -337,9 +350,10 @@ func TestBIP0009Mining(t *testing.T) {
 	// Generate a block that extends the genesis block.  It should not have
 	// the test dummy bit set in the version since the first window is
 	// in the defined threshold state.
-	deployment := &r.ActiveNet.Deployments[chaincfg.DeploymentTestDummy]
+	net := r.Node.Network()
+	deployment := &net.Deployments[chaincfg.DeploymentTestDummy]
 	testDummyBitNum := deployment.BitNumber
-	hashes, err := r.Node.Generate(1)
+	hashes, err := r.NodeRPCClient().Generate(1)
 	if err != nil {
 		t.Fatalf("unable to generate blocks: %v", err)
 	}
@@ -356,9 +370,9 @@ func TestBIP0009Mining(t *testing.T) {
 	// The last generated block should now have the test bit set in the
 	// version since the btcd mining code will have recognized the test
 	// dummy deployment as started.
-	confirmationWindow := r.ActiveNet.MinerConfirmationWindow
+	confirmationWindow := net.MinerConfirmationWindow
 	numNeeded := confirmationWindow - 1
-	hashes, err = r.Node.Generate(numNeeded)
+	hashes, err = r.NodeRPCClient().Generate(numNeeded)
 	if err != nil {
 		t.Fatalf("failed to generated %d blocks: %v", numNeeded, err)
 	}
@@ -373,7 +387,7 @@ func TestBIP0009Mining(t *testing.T) {
 	// The last generated block should still have the test bit set in the
 	// version since the btcd mining code will have recognized the test
 	// dummy deployment as locked in.
-	hashes, err = r.Node.Generate(confirmationWindow)
+	hashes, err = r.NodeRPCClient().Generate(confirmationWindow)
 	if err != nil {
 		t.Fatalf("failed to generated %d blocks: %v", confirmationWindow,
 			err)
@@ -392,7 +406,7 @@ func TestBIP0009Mining(t *testing.T) {
 	// version since the btcd mining code will have recognized the test
 	// dummy deployment as activated and thus there is no longer any need
 	// to set the bit.
-	hashes, err = r.Node.Generate(confirmationWindow)
+	hashes, err = r.NodeRPCClient().Generate(confirmationWindow)
 	if err != nil {
 		t.Fatalf("failed to generated %d blocks: %v", confirmationWindow,
 			err)
