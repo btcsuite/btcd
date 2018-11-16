@@ -849,6 +849,10 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List) error 
 		return nil
 	}
 
+	// The rest of the reorg depends on all STXOs already being in the database
+	// so we flush before reorg
+	b.utxoCache.Flush(FlushRequired, b.BestSnapshot())
+
 	// Ensure the provided nodes match the current best chain.
 	tip := b.bestChain.Tip()
 	if detachNodes.Len() != 0 {

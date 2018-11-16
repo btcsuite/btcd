@@ -427,13 +427,10 @@ func TestUtxoCache_Reorg(t *testing.T) {
 	// Spend all spendable outs and confirm with a block.
 	var forkSpendables []*spendableOut
 	b1a, forkSpendables := addBlock(chain, b0, spendableOuts)
-	b2a, forkSpendables := addBlock(chain, b1a, forkSpendables)
+	_, forkSpendables = addBlock(chain, b1a, forkSpendables)
 
-	if err := chain.FlushCachedState(FlushRequired); err != nil {
-		t.Fatalf("unexpected error while flushing cache: %v", err)
-	}
-	assertConsistencyState(t, chain, ucsConsistent, b2a.Hash())
-	assertNbEntriesOnDisk(t, chain, len(forkSpendables))
+	// leave the spent outs in the cache which lets us exercise
+	// un-spending entries both in the db and in the utxocache
 
 	// Build an alternative chain of 3 blocks.
 	b1b, spendable := addBlock(chain, b0, nil)
