@@ -410,40 +410,64 @@ func TestUtxoCache_Reorg(t *testing.T) {
 	defer tearDown()
 	tip := btcutil.NewBlock(params.GenesisBlock)
 
-	// First make two blocks that create spendable outputs.
-	var spendableOuts []*spendableOut
-	tip, spendableOuts = addBlock(chain, tip, spendableOuts)
-	tip, spendableOuts = addBlock(chain, tip, spendableOuts)
-	t.Log(spew.Sdump(spendableOuts))
+	// Create base blocks 1 and 2 that will not be reorged.
+	// Spend the outputs of block 1.
+	var emptySpendableOuts []*spendableOut
+	b1, spendableOuts1 := addBlock(chain, tip, emptySpendableOuts)
+	b2, spendableOuts2 := addBlock(chain, b1, spendableOuts1)
+	t.Log(spew.Sdump(spendableOuts2))
+	//                 db       cache
+	// block 1:                  stxo
+	// block 2:                  utxo
+
+	// Commit the two base blocks to DB
+	if err := chain.FlushCachedState(FlushRequired); err != nil {
+		t.Fatalf("unexpected error while flushing cache: %v", err)
+	}
+	//                 db       cache
+	// block 1:       stxo
+	// block 2:       utxo
+	assertConsistencyState(t, chain, ucsConsistent, b2.Hash())
+	assertNbEntriesOnDisk(t, chain, len(spendableOuts2))
+
+	// Add blocks 3 and 4 that will be orphaned.
+	// Spend the outputs of block 2 and 3a.
+	b3a, spendableOuts3 := addBlock(chain, b2, spendableOuts2)
+	addBlock(chain, b3a, spendableOuts3)
+	//                 db       cache
+	// block 1:       stxo
+	// block 2:       utxo       stxo      << these are left spent without flush
+	// ---
+	// block 3a:                 stxo
+	// block 4a:                 utxo
+
+	// Build an alternative chain of blocks 3 and 4 + new 5th, spending none of the outputs
+	b3b, altSpendableOuts3 := addBlock(chain, b2, nil)
+	b4b, altSpendableOuts4 := addBlock(chain, b3b, nil)
+	b5b, altSpendableOuts5 := addBlock(chain, b4b, nil)
+	totalSpendableOuts := spendableOuts2[:]
+	totalSpendableOuts = append(totalSpendableOuts, altSpendableOuts3...)
+	totalSpendableOuts = append(totalSpendableOuts, altSpendableOuts4...)
+	totalSpendableOuts = append(totalSpendableOuts, altSpendableOuts5...)
+	t.Log(spew.Sdump(totalSpendableOuts))
+	//                 db       cache
+	// block 1:       stxo
+	// block 2:       utxo       utxo     << now they should become utxo
+	// ---
+	// block 3b:                 utxo
+	// block 4b:                 utxo
+	// block 5b:                 utxo
 
 	if err := chain.FlushCachedState(FlushRequired); err != nil {
 		t.Fatalf("unexpected error while flushing cache: %v", err)
 	}
-	assertConsistencyState(t, chain, ucsConsistent, tip.Hash())
-	assertNbEntriesOnDisk(t, chain, len(spendableOuts))
-
-	b0 := tip
-
-	// Spend all spendable outs and confirm with a block.
-	var forkSpendables []*spendableOut
-	b1a, forkSpendables := addBlock(chain, b0, spendableOuts)
-	_, forkSpendables = addBlock(chain, b1a, forkSpendables)
-
-	// leave the spent outs in the cache which lets us exercise
-	// un-spending entries both in the db and in the utxocache
-
-	// Build an alternative chain of 3 blocks.
-	b1b, spendable := addBlock(chain, b0, nil)
-	spendableOuts = append(spendableOuts, spendable...)
-	b2b, spendable := addBlock(chain, b1b, nil)
-	spendableOuts = append(spendableOuts, spendable...)
-	b3b, spendable := addBlock(chain, b2b, nil)
-	spendableOuts = append(spendableOuts, spendable...)
-	t.Log(spew.Sdump(spendableOuts))
-
-	if err := chain.FlushCachedState(FlushRequired); err != nil {
-		t.Fatalf("unexpected error while flushing cache: %v", err)
-	}
-	assertConsistencyState(t, chain, ucsConsistent, b3b.Hash())
-	assertNbEntriesOnDisk(t, chain, len(spendableOuts))
+	//                 db       cache
+	// block 1:       stxo
+	// block 2:       utxo
+	// ---
+	// block 3b:      utxo
+	// block 4b:      utxo
+	// block 5b:      utxo
+	assertConsistencyState(t, chain, ucsConsistent, b5b.Hash())
+	assertNbEntriesOnDisk(t, chain, len(totalSpendableOuts))
 }
