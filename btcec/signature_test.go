@@ -646,7 +646,14 @@ func TestRFC6979(t *testing.T) {
 		hash := sha256.Sum256([]byte(test.msg))
 
 		// Ensure deterministically generated nonce is the expected value.
-		gotNonce := nonceRFC6979(privKey.D, hash[:]).Bytes()
+		var gotNonce []byte
+		callback := func (k *big.Int) bool {
+			// not checking for r and s values
+			// just grab the nonce and return true to stop the internal loop
+			gotNonce = k.Bytes()
+			return true
+		}
+		nonceRFC6979(privKey.D, hash[:], callback)
 		wantNonce := decodeHex(test.nonce)
 		if !bytes.Equal(gotNonce, wantNonce) {
 			t.Errorf("NonceRFC6979 #%d (%s): Nonce is incorrect: "+

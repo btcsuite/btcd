@@ -424,33 +424,47 @@ func signRFC6979(privateKey *PrivateKey, hash []byte) (*Signature, error) {
 	privkey := privateKey.ToECDSA()
 	N := S256().N
 	halfOrder := S256().halfOrder
-	k := nonceRFC6979(privkey.D, hash)
-	inv := new(big.Int).ModInverse(k, N)
-	r, _ := privkey.Curve.ScalarBaseMult(k.Bytes())
-	r.Mod(r, N)
-
-	if r.Sign() == 0 {
-		return nil, errors.New("calculated R is zero")
-	}
 
 	e := hashToInt(hash, privkey.Curve)
-	s := new(big.Int).Mul(privkey.D, r)
-	s.Add(s, e)
-	s.Mul(s, inv)
-	s.Mod(s, N)
 
-	if s.Cmp(halfOrder) == 1 {
-		s.Sub(N, s)
+	var r, s *big.Int
+
+	// using a callback to check (and store) r and s.
+	// When returning true, the loop in step H will stop.
+	callback := func (k *big.Int) bool {
+		r, _ = privkey.Curve.ScalarBaseMult(k.Bytes())
+		r.Mod(r, N)
+
+		if r.Sign() == 0 {
+			return false
+		}
+
+		invK := new(big.Int).ModInverse(k, N)
+		s = new(big.Int).Mul(privkey.D, r)
+		s.Add(s, e)
+		s.Mul(s, invK)
+		s.Mod(s, N)
+
+		if s.Cmp(halfOrder) == 1 {
+			s.Sub(N, s)
+		}
+
+		if s.Sign() == 0 {
+			return false
+		}
+
+		return true
 	}
-	if s.Sign() == 0 {
-		return nil, errors.New("calculated S is zero")
-	}
+	nonceRFC6979(privkey.D, hash, callback)
 	return &Signature{R: r, S: s}, nil
 }
 
 // nonceRFC6979 generates an ECDSA nonce (`k`) deterministically according to RFC 6979.
-// It takes a 32-byte hash as an input and returns 32-byte nonce to be used in ECDSA algorithm.
-func nonceRFC6979(privkey *big.Int, hash []byte) *big.Int {
+// It takes a private key, a 32-byte hash, and a callback func as an input
+// and returns nothing. The 32-byte nonce to be used in ECDSA algorithm is passed
+// to the callback func and the nonce should be checked, r and s gathered, and
+// return true to indicate to this func to end the final loop in Step H.
+func nonceRFC6979(privkey *big.Int, hash []byte, checkNonce func (*big.Int) bool) {
 
 	curve := S256()
 	q := curve.Params().N
@@ -493,8 +507,8 @@ func nonceRFC6979(privkey *big.Int, hash []byte) *big.Int {
 
 		// Step H3
 		secret := hashToInt(t, curve)
-		if secret.Cmp(one) >= 0 && secret.Cmp(q) < 0 {
-			return secret
+		if secret.Cmp(one) >= 0 && secret.Cmp(q) < 0 && checkNonce(secret) {
+			return
 		}
 		k = mac(alg, k, append(v, 0x00))
 		v = mac(alg, k, v)
