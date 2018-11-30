@@ -35,7 +35,7 @@ which are both under active development.
 
 ## Requirements
 
-[Go](http://golang.org) 1.8 or newer.
+[Go](http://golang.org) 1.11 or newer.
 
 ## Installation
 
@@ -63,11 +63,8 @@ recommended that `GOPATH` is set to a directory in your home directory such as
 - Run the following commands to obtain btcd, all dependencies, and install it:
 
 ```bash
-$ go get -u github.com/Masterminds/glide
-$ git clone https://github.com/btcsuite/btcd $GOPATH/src/github.com/btcsuite/btcd
 $ cd $GOPATH/src/github.com/btcsuite/btcd
-$ glide install
-$ go install . ./cmd/...
+$ GO111MODULE=on go install -v . ./cmd/...
 ```
 
 - btcd (and utilities) will now be installed in ```$GOPATH/bin```.  If you did
@@ -86,8 +83,8 @@ Install a newer MSI
 
 ```bash
 $ cd $GOPATH/src/github.com/btcsuite/btcd
-$ git pull && glide install
-$ go install . ./cmd/...
+$ git pull
+$ GO111MODULE=on go install -v . ./cmd/...
 ```
 
 ## Getting Started
