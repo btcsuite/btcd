@@ -1,17 +1,19 @@
 language: go
+cache:
+  directories:
+    - $GOCACHE
+    - $GOPATH
+    - $GOPATH/pkg/mod
+    - $GOPATH/github.com/golang
+    - $GOPATH/gopkg.in/alecthomas
 go:
-  - "1.9.5"
-  - "1.10.1"
+  - "1.11.x"
 sudo: false
 install:
-  - GLIDE_TAG=v0.12.3
-  - GLIDE_DOWNLOAD="https://github.com/Masterminds/glide/releases/download/$GLIDE_TAG/glide-$GLIDE_TAG-linux-amd64.tar.gz"
-  - curl -L $GLIDE_DOWNLOAD | tar -xvz
   - export PATH=$PATH:$PWD/linux-amd64/
-  - glide install
-  - go install . ./cmd/...
-  - go get -u gopkg.in/alecthomas/gometalinter.v2
-  - gometalinter.v2 --install
+  - GO111MODULE=on go install . ./cmd/...
+  - GO111MODULE=off go get -u gopkg.in/alecthomas/gometalinter.v2
+  - GO111MODULE=off gometalinter.v2 --install
 script:
   - export PATH=$PATH:$HOME/gopath/bin
   - ./goclean.sh
