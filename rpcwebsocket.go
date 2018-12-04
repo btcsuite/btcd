@@ -20,8 +20,6 @@ import (
 	"sync"
 	"time"
 
-	"golang.org/x/crypto/ripemd160"
-
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/btcjson"
 	"github.com/btcsuite/btcd/chaincfg"
@@ -31,6 +29,7 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/websocket"
+	"golang.org/x/crypto/ripemd160"
 )
 
 const (
@@ -1978,12 +1977,8 @@ func deserializeOutpoints(serializedOuts []btcjson.OutPoint) ([]*wire.OutPoint, 
 }
 
 type rescanKeys struct {
-	fallbacks           map[string]struct{}
-	pubKeyHashes        map[[ripemd160.Size]byte]struct{}
-	scriptHashes        map[[ripemd160.Size]byte]struct{}
-	compressedPubKeys   map[[33]byte]struct{}
-	uncompressedPubKeys map[[65]byte]struct{}
-	unspent             map[wire.OutPoint]struct{}
+	addrs   map[string]struct{}
+	unspent map[wire.OutPoint]struct{}
 }
 
 // unspentSlice returns a slice of currently-unspent outpoints for the rescan
@@ -2052,57 +2047,8 @@ func rescanBlock(wsc *wsClient, lookups *rescanKeys, blk *btcutil.Block) {
 				txout.PkScript, wsc.server.cfg.ChainParams)
 
 			for _, addr := range addrs {
-				switch a := addr.(type) {
-				case *btcutil.AddressPubKeyHash:
-					if _, ok := lookups.pubKeyHashes[*a.Hash160()]; !ok {
-						continue
-					}
-
-				case *btcutil.AddressScriptHash:
-					if _, ok := lookups.scriptHashes[*a.Hash160()]; !ok {
-						continue
-					}
-
-				case *btcutil.AddressPubKey:
-					found := false
-					switch sa := a.ScriptAddress(); len(sa) {
-					case 33: // Compressed
-						var key [33]byte
-						copy(key[:], sa)
-						if _, ok := lookups.compressedPubKeys[key]; ok {
-							found = true
-						}
-
-					case 65: // Uncompressed
-						var key [65]byte
-						copy(key[:], sa)
-						if _, ok := lookups.uncompressedPubKeys[key]; ok {
-							found = true
-						}
-
-					default:
-						rpcsLog.Warnf("Skipping rescanned pubkey of unknown "+
-							"serialized length %d", len(sa))
-						continue
-					}
-
-					// If the transaction output pays to the pubkey of
-					// a rescanned P2PKH address, include it as well.
-					if !found {
-						pkh := a.AddressPubKeyHash()
-						if _, ok := lookups.pubKeyHashes[*pkh.Hash160()]; !ok {
-							continue
-						}
-					}
-
-				default:
-					// A new address type must have been added.  Encode as a
-					// payment address string and check the fallback map.
-					addrStr := addr.EncodeAddress()
-					_, ok := lookups.fallbacks[addrStr]
-					if !ok {
-						continue
-					}
+				if _, ok := lookups.addrs[addr.String()]; !ok {
+					continue
 				}
 
 				outpoint := wire.OutPoint{
@@ -2353,58 +2299,11 @@ func handleRescan(wsc *wsClient, icmd interface{}) (interface{}, error) {
 
 	// Build lookup maps.
 	lookups := rescanKeys{
-		fallbacks:           map[string]struct{}{},
-		pubKeyHashes:        map[[ripemd160.Size]byte]struct{}{},
-		scriptHashes:        map[[ripemd160.Size]byte]struct{}{},
-		compressedPubKeys:   map[[33]byte]struct{}{},
-		uncompressedPubKeys: map[[65]byte]struct{}{},
-		unspent:             map[wire.OutPoint]struct{}{},
+		addrs:   map[string]struct{}{},
+		unspent: map[wire.OutPoint]struct{}{},
 	}
-	var compressedPubkey [33]byte
-	var uncompressedPubkey [65]byte
-	params := wsc.server.cfg.ChainParams
 	for _, addrStr := range cmd.Addresses {
-		addr, err := btcutil.DecodeAddress(addrStr, params)
-		if err != nil {
-			jsonErr := btcjson.RPCError{
-				Code: btcjson.ErrRPCInvalidAddressOrKey,
-				Message: "Rescan address " + addrStr + ": " +
-					err.Error(),
-			}
-			return nil, &jsonErr
-		}
-		switch a := addr.(type) {
-		case *btcutil.AddressPubKeyHash:
-			lookups.pubKeyHashes[*a.Hash160()] = struct{}{}
-
-		case *btcutil.AddressScriptHash:
-			lookups.scriptHashes[*a.Hash160()] = struct{}{}
-
-		case *btcutil.AddressPubKey:
-			pubkeyBytes := a.ScriptAddress()
-			switch len(pubkeyBytes) {
-			case 33: // Compressed
-				copy(compressedPubkey[:], pubkeyBytes)
-				lookups.compressedPubKeys[compressedPubkey] = struct{}{}
-
-			case 65: // Uncompressed
-				copy(uncompressedPubkey[:], pubkeyBytes)
-				lookups.uncompressedPubKeys[uncompressedPubkey] = struct{}{}
-
-			default:
-				jsonErr := btcjson.RPCError{
-					Code:    btcjson.ErrRPCInvalidAddressOrKey,
-					Message: "Pubkey " + addrStr + " is of unknown length",
-				}
-				return nil, &jsonErr
-			}
-
-		default:
-			// A new address type must have been added.  Use encoded
-			// payment address string as a fallback until a fast path
-			// is added.
-			lookups.fallbacks[addrStr] = struct{}{}
-		}
+		lookups.addrs[addrStr] = struct{}{}
 	}
 	for _, outpoint := range outpoints {
 		lookups.unspent[*outpoint] = struct{}{}
