@@ -2015,7 +2015,28 @@ func rescanBlock(wsc *wsClient, lookups *rescanKeys, blk *btcutil.Block) {
 		spentNotified := false
 		recvNotified := false
 
+		// notifySpend is a closure we'll use when we first detect that
+		// a transactions spends an outpoint/script in our filter list.
+		notifySpend := func() error {
+			if txHex == "" {
+				txHex = txHexString(tx.MsgTx())
+			}
+			marshalledJSON, err := newRedeemingTxNotification(
+				txHex, tx.Index(), blk,
+			)
+			if err != nil {
+				return fmt.Errorf("unable to marshal "+
+					"btcjson.RedeeminTxNtfn: %v", err)
+			}
+
+			return wsc.QueueNotification(marshalledJSON)
+		}
+
+		// We'll start by iterating over the transaction's inputs to
+		// determine if it spends an outpoint/script in our filter list.
 		for _, txin := range tx.MsgTx().TxIn {
+			// If it spends an outpoint, we'll dispatch a spend
+			// notification for the transaction.
 			if _, ok := lookups.unspent[txin.PreviousOutPoint]; ok {
 				delete(lookups.unspent, txin.PreviousOutPoint)
 
@@ -2023,21 +2044,58 @@ func rescanBlock(wsc *wsClient, lookups *rescanKeys, blk *btcutil.Block) {
 					continue
 				}
 
-				if txHex == "" {
-					txHex = txHexString(tx.MsgTx())
-				}
-				marshalledJSON, err := newRedeemingTxNotification(txHex, tx.Index(), blk)
-				if err != nil {
-					rpcsLog.Errorf("Failed to marshal redeemingtx notification: %v", err)
-					continue
-				}
+				err := notifySpend()
 
-				err = wsc.QueueNotification(marshalledJSON)
 				// Stop the rescan early if the websocket client
 				// disconnected.
 				if err == ErrClientQuit {
 					return
 				}
+				if err != nil {
+					rpcsLog.Errorf("Unable to notify "+
+						"redeeming transaction %v: %v",
+						tx.Hash(), err)
+					continue
+				}
+
+				spentNotified = true
+			}
+
+			// We'll also recompute the pkScript the input is
+			// attempting to spend to determine whether it is
+			// relevant to us.
+			pkScript, err := txscript.ComputePkScript(
+				txin.SignatureScript, txin.Witness,
+			)
+			if err != nil {
+				continue
+			}
+			addr, err := pkScript.Address(wsc.server.cfg.ChainParams)
+			if err != nil {
+				continue
+			}
+
+			// If it is, we'll also dispatch a spend notification
+			// for this transaction if we haven't already.
+			if _, ok := lookups.addrs[addr.String()]; ok {
+				if spentNotified {
+					continue
+				}
+
+				err := notifySpend()
+
+				// Stop the rescan early if the websocket client
+				// disconnected.
+				if err == ErrClientQuit {
+					return
+				}
+				if err != nil {
+					rpcsLog.Errorf("Unable to notify "+
+						"redeeming transaction %v: %v",
+						tx.Hash(), err)
+					continue
+				}
+
 				spentNotified = true
 			}
 		}
