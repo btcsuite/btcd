@@ -15,6 +15,14 @@ import (
 	"github.com/btcsuite/btcutil"
 )
 
+// sendmany Estimate mode
+// https://bitcoincore.org/en/doc/0.16.0/rpc/wallet/sendmany/
+const (
+	ESTIMATE_MODE_UNSET        string = "UNSET"
+	ESTIMATE_MODE_ECONOMICAL   string = "ECONOMICAL"
+	ESTIMATE_MODE_CONSERVATIVE string = "CONSERVATIVE"
+)
+
 // *****************************
 // Transaction Listing Functions
 // *****************************
@@ -661,7 +669,7 @@ func (c *Client) SendManyAsync(fromAccount string, amounts map[btcutil.Address]b
 	for addr, amount := range amounts {
 		convertedAmounts[addr.EncodeAddress()] = amount.ToBTC()
 	}
-	cmd := btcjson.NewSendManyCmd(fromAccount, convertedAmounts, nil, nil)
+	cmd := btcjson.NewSendManyCmd(fromAccount, convertedAmounts, nil, nil, nil, nil, nil, nil)
 	return c.sendCmd(cmd)
 }
 
@@ -691,7 +699,7 @@ func (c *Client) SendManyMinConfAsync(fromAccount string,
 		convertedAmounts[addr.EncodeAddress()] = amount.ToBTC()
 	}
 	cmd := btcjson.NewSendManyCmd(fromAccount, convertedAmounts,
-		&minConfirms, nil)
+		&minConfirms, nil, nil, nil, nil, nil)
 	return c.sendCmd(cmd)
 }
 
@@ -725,7 +733,7 @@ func (c *Client) SendManyCommentAsync(fromAccount string,
 		convertedAmounts[addr.EncodeAddress()] = amount.ToBTC()
 	}
 	cmd := btcjson.NewSendManyCmd(fromAccount, convertedAmounts,
-		&minConfirms, &comment)
+		&minConfirms, &comment, nil, nil, nil, nil)
 	return c.sendCmd(cmd)
 }
 
@@ -745,6 +753,81 @@ func (c *Client) SendManyComment(fromAccount string,
 
 	return c.SendManyCommentAsync(fromAccount, amounts, minConfirms,
 		comment).Receive()
+}
+
+// ----------------------------------------------------------------------------
+// https://bitcoincore.org/en/doc/0.16.0/rpc/wallet/sendmany/
+// sendmany "fromaccount" {"address":amount,...} ( minconf "comment" ["address",...] replaceable conf_target "estimate_mode")
+func (c *Client) SendManySubtractFeeFrom(fromAccount string,
+	amounts map[btcutil.Address]btcutil.Amount, minConfirms int,
+	comment string,
+	subtractfeefrom []btcutil.Address) (*chainhash.Hash, error) {
+
+	return c.SendManySubtractFeeFromAsync(fromAccount, amounts, minConfirms,
+		comment, subtractfeefrom).Receive()
+}
+
+// ----------------------------------------------------------------------------
+func (c *Client) SendManySubtractFeeFromAsync(fromAccount string,
+	amounts map[btcutil.Address]btcutil.Amount, minConfirms int,
+	comment string, subtractfeefrom []btcutil.Address) FutureSendManyResult {
+
+	convertedAmounts := make(map[string]float64, len(amounts))
+	for addr, amount := range amounts {
+		convertedAmounts[addr.EncodeAddress()] = amount.ToBTC()
+	}
+
+	sublist := make([]string, len(subtractfeefrom))
+	for _, addr := range subtractfeefrom {
+		sublist = append(sublist, addr.EncodeAddress())
+	}
+
+	cmd := btcjson.NewSendManyCmd(fromAccount, convertedAmounts,
+		&minConfirms, &comment, &sublist, nil, nil, nil)
+
+	return c.sendCmd(cmd)
+}
+
+// ----------------------------------------------------------------------------
+// https://bitcoincore.org/en/doc/0.16.0/rpc/wallet/sendmany/
+// sendmany "fromaccount" {"address":amount,...} ( minconf "comment" ["address",...] replaceable conf_target "estimate_mode")
+func (c *Client) SendMany8Cmd(fromAccount string,
+	amounts map[btcutil.Address]btcutil.Amount, minConfirms int,
+	comment *string,
+	subtractfeefrom *[]btcutil.Address,
+	replaceable *bool,
+	confTarget *int,
+	estimateMode *string) (*chainhash.Hash, error) {
+
+	return c.SendMany8CmdAsync(fromAccount, amounts, minConfirms,
+		comment, subtractfeefrom, replaceable, confTarget, estimateMode).Receive()
+}
+
+// ----------------------------------------------------------------------------
+func (c *Client) SendMany8CmdAsync(fromAccount string,
+	amounts map[btcutil.Address]btcutil.Amount, minConfirms int,
+	comment *string,
+	subtractfeefrom *[]btcutil.Address,
+	replaceable *bool,
+	confTarget *int,
+	estimateMode *string) FutureSendManyResult {
+
+	convertedAmounts := make(map[string]float64, len(amounts))
+	for addr, amount := range amounts {
+		convertedAmounts[addr.EncodeAddress()] = amount.ToBTC()
+	}
+
+	var sublist []string
+	if subtractfeefrom != nil {
+		for _, addr := range *subtractfeefrom {
+			sublist = append(sublist, addr.EncodeAddress())
+		}
+	}
+
+	cmd := btcjson.NewSendManyCmd(fromAccount, convertedAmounts,
+		&minConfirms, comment, &sublist, replaceable, confTarget, estimateMode)
+
+	return c.sendCmd(cmd)
 }
 
 // *************************
