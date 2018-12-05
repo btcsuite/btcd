@@ -984,7 +984,7 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List) error 
 			if err != nil {
 				return err
 			}
-			err = connectTransactions(view, block, nil, false)
+			err = connectTransactions(view, block, nil, true)
 			if err != nil {
 				return err
 			}

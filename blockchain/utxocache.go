@@ -501,6 +501,14 @@ func (s *utxoCache) Commit(view *UtxoViewpoint) error {
 			continue
 		}
 
+		// It's possible if we disconnected this UTXO at some point, removing it from
+		// the UTXO set, only to have a future block add it back. In that case it could
+		// be going from being marked spent to needing to be marked unspent so we handle
+		// that case by overriding here.
+		if ourEntry.IsSpent() && !entry.IsSpent() {
+			ourEntry = entry
+		}
+
 		// Store the entry we don't know.
 		if err := s.addEntry(outpoint, ourEntry, false); err != nil {
 			return err
