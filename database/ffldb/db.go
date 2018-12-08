@@ -1455,12 +1455,15 @@ func (tx *transaction) FetchBlockRegion(region *database.BlockRegion) ([]byte, e
 	}
 	location := deserializeBlockLoc(blockRow)
 
+	// Calculate the actual block size by removing the metadata.
+	blockLen := location.blockLen - blockMetadataSize
+
 	// Ensure the region is within the bounds of the block.
 	endOffset := region.Offset + region.Len
-	if endOffset < region.Offset || endOffset > location.blockLen {
+	if endOffset < region.Offset || endOffset > blockLen {
 		str := fmt.Sprintf("block %s region offset %d, length %d "+
 			"exceeds block length of %d", region.Hash,
-			region.Offset, region.Len, location.blockLen)
+			region.Offset, region.Len, blockLen)
 		return nil, makeDbErr(database.ErrBlockRegionInvalid, str, nil)
 
 	}
@@ -1553,12 +1556,15 @@ func (tx *transaction) FetchBlockRegions(regions []database.BlockRegion) ([][]by
 		}
 		location := deserializeBlockLoc(blockRow)
 
+		// Calculate the actual block size by removing the metadata.
+		blockLen := location.blockLen - blockMetadataSize
+
 		// Ensure the region is within the bounds of the block.
 		endOffset := region.Offset + region.Len
-		if endOffset < region.Offset || endOffset > location.blockLen {
+		if endOffset < region.Offset || endOffset > blockLen {
 			str := fmt.Sprintf("block %s region offset %d, length "+
 				"%d exceeds block length of %d", region.Hash,
-				region.Offset, region.Len, location.blockLen)
+				region.Offset, region.Len, blockLen)
 			return nil, makeDbErr(database.ErrBlockRegionInvalid, str, nil)
 		}
 
