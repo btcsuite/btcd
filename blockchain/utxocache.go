@@ -665,11 +665,13 @@ func (s *utxoCache) InitConsistentState(tip *blockNode, interrupt <-chan struct{
 	err := s.db.View(func(dbTx database.Tx) error {
 		var err error
 		statusCode, statusHash, err = dbFetchUtxoStateConsistency(dbTx)
+
 		return err
 	})
 	if err != nil {
 		return err
 	}
+
 	log.Tracef("UTXO cache consistency status from disk: [%d] hash %v",
 		statusCode, statusHash)
 
@@ -679,7 +681,7 @@ func (s *utxoCache) InitConsistentState(tip *blockNode, interrupt <-chan struct{
 	s.lastFlushHash = tip.hash
 
 	// If no status was found, the database is old and didn't have a cached utxo
-	// state yet.  In that case, we set the status to the best state and write
+	// state yet. In that case, we set the status to the best state and write
 	// this to the database.
 	if statusCode == ucsEmpty {
 		log.Debugf("Database didn't specify UTXO state consistency: consistent "+
@@ -687,12 +689,14 @@ func (s *utxoCache) InitConsistentState(tip *blockNode, interrupt <-chan struct{
 		err := s.db.Update(func(dbTx database.Tx) error {
 			return dbPutUtxoStateConsistency(dbTx, ucsConsistent, &tip.hash)
 		})
+
 		return err
 	}
 
 	// If state is consistent, we are done.
 	if statusCode == ucsConsistent && *statusHash == tip.hash {
 		log.Debugf("UTXO state consistent (%d:%v)", tip.height, tip.hash)
+
 		return nil
 	}
 
@@ -706,12 +710,15 @@ func (s *utxoCache) InitConsistentState(tip *blockNode, interrupt <-chan struct{
 	attachNodes := list.New()
 	for node := tip; node.height >= 0; node = node.parent {
 		attachNodes.PushFront(node)
+
 		if node.hash == *statusHash {
 			statusNode = node
 			break
 		}
+
 		statusNodeNext = node
 	}
+
 	if statusNode == nil {
 		return AssertError(fmt.Sprintf("last utxo consistency status contains "+
 			"hash that is not in best chain: %v", statusHash))
@@ -721,12 +728,12 @@ func (s *utxoCache) InitConsistentState(tip *blockNode, interrupt <-chan struct{
 	// blocks from the last best block all the way back to the last
 	// consistent block.
 	log.Debugf("Rolling back %d blocks to rebuild the UTXO state...",
-		tip.height-statusNode.height+1)
+		tip.height-statusNode.height)
 
 	// Roll back blocks in batches.
 	rollbackBatch := func(dbTx database.Tx, node *blockNode) (*blockNode, error) {
 		nbBatchBlocks := 0
-		for ; node.height >= statusNode.height; node = node.parent {
+		for ; node.height > statusNode.height; node = node.parent {
 			block, err := dbFetchBlockByNode(dbTx, node)
 			if err != nil {
 				return nil, err
@@ -740,24 +747,24 @@ func (s *utxoCache) InitConsistentState(tip *blockNode, interrupt <-chan struct{
 			if err := s.rollBackBlock(block, stxos); err != nil {
 				return nil, err
 			}
+
 			nbBatchBlocks++
 
 			if nbBatchBlocks >= utxoBatchSizeBlocks {
 				break
 			}
-
-			if node.height == statusNode.height {
-				break
-			}
 		}
+
 		return node, nil
 	}
-	for node := tip; node.height >= statusNode.height; {
+
+	for node := tip; node.height > statusNode.height; {
 		log.Tracef("Rolling back %d more blocks...",
-			node.height-statusNode.height+1)
+			node.height-statusNode.height)
 		err := s.db.Update(func(dbTx database.Tx) error {
 			var err error
 			node, err = rollbackBatch(dbTx, node)
+
 			return err
 		})
 		if err != nil {
@@ -766,11 +773,8 @@ func (s *utxoCache) InitConsistentState(tip *blockNode, interrupt <-chan struct{
 
 		if interruptRequested(interrupt) {
 			log.Warn("UTXO state reconstruction interrupted")
-			return errInterruptRequested
-		}
 
-		if node.height == statusNode.height {
-			break
+			return errInterruptRequested
 		}
 	}
 
@@ -784,11 +788,11 @@ func (s *utxoCache) InitConsistentState(tip *blockNode, interrupt <-chan struct{
 	}
 
 	log.Debugf("Replaying %d blocks to rebuild UTXO state...",
-		tip.height-statusNodeNext.height+1)
+		tip.height-statusNodeNext.height)
 
 	// Then we replay the blocks from the last consistent state up to the best
-	// state.  Iterate forward from the consistent node to the tip of the best
-	// chain.  After every batch, we can also update the consistency state to
+	// state. Iterate forward from the consistent node to the tip of the best
+	// chain. After every batch, we can also update the consistency state to
 	// avoid redoing the work when interrupted.
 	rollforwardBatch := func(dbTx database.Tx, node *blockNode) (*blockNode, error) {
 		nbBatchBlocks := 0
@@ -813,14 +817,15 @@ func (s *utxoCache) InitConsistentState(tip *blockNode, interrupt <-chan struct{
 
 		// We can update this after each batch to avoid having to redo the work
 		// when interrupted.
-		err := dbPutUtxoStateConsistency(dbTx, ucsConsistent, &node.hash)
-		return node, err
+		return node, dbPutUtxoStateConsistency(dbTx, ucsConsistent, &node.hash)
 	}
+
 	for node := statusNodeNext; node.height <= tip.height; {
 		log.Tracef("Replaying %d more blocks...", tip.height-node.height+1)
 		err := s.db.Update(func(dbTx database.Tx) error {
 			var err error
 			node, err = rollforwardBatch(dbTx, node)
+
 			return err
 		})
 		if err != nil {
@@ -829,14 +834,12 @@ func (s *utxoCache) InitConsistentState(tip *blockNode, interrupt <-chan struct{
 
 		if interruptRequested(interrupt) {
 			log.Warn("UTXO state reconstruction interrupted")
-			return errInterruptRequested
-		}
 
-		if node.height == tip.height {
-			break
+			return errInterruptRequested
 		}
 	}
 
 	log.Debug("UTXO state reconstruction done")
+
 	return nil
 }
