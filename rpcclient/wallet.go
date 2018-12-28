@@ -141,6 +141,25 @@ func (c *Client) ListTransactionsCountFrom(account string, count, from int) ([]b
 	return c.ListTransactionsCountFromAsync(account, count, from).Receive()
 }
 
+// ListTransactionsCountFromWatchOnlyAsync returns an instance of a type that can be used
+// to get the result of the RPC at some future time by invoking the Receive
+// function on the returned instance.
+//
+// See ListTransactionsCountFrom for the blocking version and more details.
+func (c *Client) ListTransactionsCountFromWatchOnlyAsync(account string, count, from int) FutureListTransactionsResult {
+	watchOnly := true
+	cmd := btcjson.NewListTransactionsCmd(&account, &count, &from, &watchOnly)
+	return c.sendCmd(cmd)
+}
+
+// ListTransactionsCountFromWatchOnly returns a list of the most recent transactions up
+// to the passed count while skipping the first 'from' transactions including transactions from "watch only" wallets.
+//
+// See the ListTransactions and ListTransactionsCount functions to use defaults.
+func (c *Client) ListTransactionsCountFromWatchOnly(account string, count, from int) ([]btcjson.ListTransactionsResult, error) {
+	return c.ListTransactionsCountFromWatchOnlyAsync(account, count, from).Receive()
+}
+
 // FutureListUnspentResult is a future promise to deliver the result of a
 // ListUnspentAsync, ListUnspentMinAsync, ListUnspentMinMaxAsync, or
 // ListUnspentMinMaxAddressesAsync RPC invocation (or an applicable error).
