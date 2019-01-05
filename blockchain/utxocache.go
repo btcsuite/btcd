@@ -709,13 +709,11 @@ func (s *utxoCache) InitConsistentState(tip *blockNode, interrupt <-chan struct{
 	var statusNodeNext *blockNode // the first one higher than the statusNode
 	attachNodes := list.New()
 	for node := tip; node.height >= 0; node = node.parent {
-		attachNodes.PushFront(node)
-
 		if node.hash == *statusHash {
 			statusNode = node
 			break
 		}
-
+		attachNodes.PushFront(node)
 		statusNodeNext = node
 	}
 
@@ -788,7 +786,7 @@ func (s *utxoCache) InitConsistentState(tip *blockNode, interrupt <-chan struct{
 	}
 
 	log.Debugf("Replaying %d blocks to rebuild UTXO state...",
-		tip.height-statusNodeNext.height)
+		tip.height-statusNodeNext.height+1)
 
 	// Then we replay the blocks from the last consistent state up to the best
 	// state. Iterate forward from the consistent node to the tip of the best
@@ -836,6 +834,9 @@ func (s *utxoCache) InitConsistentState(tip *blockNode, interrupt <-chan struct{
 			log.Warn("UTXO state reconstruction interrupted")
 
 			return errInterruptRequested
+		}
+		if node.height == tip.height {
+			break
 		}
 	}
 
