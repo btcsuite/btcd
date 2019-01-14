@@ -18,7 +18,7 @@ const (
 	maxAllowedOffsetSecs = 70 * 60 // 1 hour 10 minutes
 
 	// similarTimeSecs is the number of seconds in either direction from the
-	// local clock that is used to determine that it is likley wrong and
+	// local clock that is used to determine that it is likely wrong and
 	// hence to show a warning.
 	similarTimeSecs = 5 * 60 // 5 minutes
 )
