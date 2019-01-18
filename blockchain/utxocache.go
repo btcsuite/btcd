@@ -31,6 +31,17 @@ const (
 	// utxoFlushPeriodicThreshold is the threshold percentage at which a flush is
 	// performed when the flush mode FlushPeriodic is used.
 	utxoFlushPeriodicThreshold = 90
+
+	// This value is calculated by running the following on a 64-bit system:
+	//   unsafe.Sizeof(UtxoEntry{})
+	baseEntrySize = uint64(40)
+
+	// This value is calculated by running the following on a 64-bit system:
+	//   unsafe.Sizeof(wire.OutPoint{})
+	outpointSize = uint64(36)
+
+	// pubKeyHashLen is the length of a P2PKH script.
+	pubKeyHashLen = 25
 )
 
 // txoFlags is a bitmask defining additional information and state for a
@@ -125,10 +136,6 @@ func (entry *UtxoEntry) memoryUsage() uint64 {
 		return 0
 	}
 
-	// This value is calculated by running the following on a 64-bit system:
-	//   unsafe.Sizeof(UtxoEntry{})
-	baseEntrySize := uint64(40)
-
 	return baseEntrySize + uint64(len(entry.pkScript))
 }
 
@@ -209,11 +216,13 @@ type utxoCache struct {
 // newUtxoCache initiates a new utxo cache instance with its memory usage limited
 // to the given maximum.
 func newUtxoCache(db database.DB, maxTotalMemoryUsage uint64) *utxoCache {
+	avgEntrySize := outpointSize + 8 + baseEntrySize + pubKeyHashLen
+	numMaxElements := maxTotalMemoryUsage / avgEntrySize
+	log.Info("Pre-alloacting for %v entries: ", numMaxElements)
 	return &utxoCache{
 		db:                  db,
 		maxTotalMemoryUsage: maxTotalMemoryUsage,
-
-		cachedEntries: make(map[wire.OutPoint]*UtxoEntry),
+		cachedEntries:       make(map[wire.OutPoint]*UtxoEntry, numMaxElements),
 	}
 }
 
@@ -221,10 +230,6 @@ func newUtxoCache(db database.DB, maxTotalMemoryUsage uint64) *utxoCache {
 //
 // This method should be called with the state lock held.
 func (s *utxoCache) totalMemoryUsage() uint64 {
-	// This value is calculated by running the following on a 64-bit system:
-	//   unsafe.Sizeof(wire.OutPoint{})
-	outpointSize := uint64(36)
-
 	// Total memory is all the keys plus the total memory of all the entries.
 	nbEntries := uint64(len(s.cachedEntries))
 
