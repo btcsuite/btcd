@@ -847,14 +847,10 @@ func getWitnessSigOps(pkScript []byte, witness wire.TxWitness) int {
 	return 0
 }
 
-// IsUnspendable returns whether the passed public key script is unspendable, or
-// guaranteed to fail at execution.  This allows inputs to be pruned instantly
-// when entering the UTXO set.
+// IsUnspendable returns whether the passed public key script is unspendable,
+// or guaranteed to fail at execution.  This allows outputs to be pruned
+// instantly when entering the UTXO set.
 func IsUnspendable(pkScript []byte) bool {
-	pops, err := parseScript(pkScript)
-	if err != nil {
-		return true
-	}
-
-	return len(pops) > 0 && pops[0].opcode.value == OP_RETURN
+	return (len(pkScript) > 0 && pkScript[0] == OP_RETURN) ||
+		(len(pkScript) > MaxScriptSize)
 }
