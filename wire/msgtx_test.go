@@ -181,6 +181,13 @@ func TestTxHash(t *testing.T) {
 		t.Errorf("TxHash: wrong hash - got %v, want %v",
 			spew.Sprint(txHash), spew.Sprint(wantHash))
 	}
+
+	// Compute it again to ensure any cached elements, are valid.
+	txHash = msgTx.TxHash()
+	if !txHash.IsEqual(wantHash) {
+		t.Errorf("TxHash: wrong hash - got %v, want %v",
+			spew.Sprint(txHash), spew.Sprint(wantHash))
+	}
 }
 
 // TestTxSha tests the ability to generate the wtxid, and txid of a transaction
@@ -254,6 +261,18 @@ func TestWTxSha(t *testing.T) {
 			spew.Sprint(txid), spew.Sprint(wantHashTxid))
 	}
 	wtxid := msgTx.WitnessHash()
+	if !wtxid.IsEqual(wantHashWTxid) {
+		t.Errorf("WTxSha: wrong hash - got %v, want %v",
+			spew.Sprint(wtxid), spew.Sprint(wantHashWTxid))
+	}
+
+	// Compute the values again to ensure any cached elements are valid.
+	txid = msgTx.TxHash()
+	if !txid.IsEqual(wantHashTxid) {
+		t.Errorf("TxSha: wrong hash - got %v, want %v",
+			spew.Sprint(txid), spew.Sprint(wantHashTxid))
+	}
+	wtxid = msgTx.WitnessHash()
 	if !wtxid.IsEqual(wantHashWTxid) {
 		t.Errorf("WTxSha: wrong hash - got %v, want %v",
 			spew.Sprint(wtxid), spew.Sprint(wantHashWTxid))
@@ -393,6 +412,23 @@ func TestTxWire(t *testing.T) {
 			t.Errorf("BtcDecode #%d error %v", i, err)
 			continue
 		}
+
+		// If this is the base encoding, then ensure that the cached
+		// serialization properly matches the raw encoding.
+		if test.enc == BaseEncoding {
+			if !bytes.Equal(
+				test.buf, msg.cachedSeralizedNoWitness,
+			) {
+				t.Errorf("BtcdDecode #%d: cached encoding "+
+					"is wrong, expected %x got %x", i,
+					test.buf,
+					msg.cachedSeralizedNoWitness)
+				continue
+			}
+		}
+
+		msg.cachedSeralizedNoWitness = nil
+
 		if !reflect.DeepEqual(&msg, test.out) {
 			t.Errorf("BtcDecode #%d\n got: %s want: %s", i,
 				spew.Sdump(&msg), spew.Sdump(test.out))
@@ -539,6 +575,23 @@ func TestTxSerialize(t *testing.T) {
 			t.Errorf("Deserialize #%d error %v", i, err)
 			continue
 		}
+
+		// Ensure that the raw non-witness encoding matches the cached
+		// non-witness encoding bytes.
+		var b bytes.Buffer
+		if err := tx.SerializeNoWitness(&b); err != nil {
+			t.Errorf("Deserialize #%d: unable to encode: %v", i, err)
+		}
+		if !bytes.Equal(b.Bytes(), tx.cachedSeralizedNoWitness) {
+			t.Errorf("Deserialize #%d: cached encoding "+
+				"is wrong, expected %x got %x", i,
+				b.Bytes(),
+				tx.cachedSeralizedNoWitness)
+			continue
+		}
+
+		tx.cachedSeralizedNoWitness = nil
+
 		if !reflect.DeepEqual(&tx, test.out) {
 			t.Errorf("Deserialize #%d\n got: %s want: %s", i,
 				spew.Sdump(&tx), spew.Sdump(test.out))

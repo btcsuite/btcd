@@ -137,6 +137,18 @@ func TestMessage(t *testing.T) {
 				spew.Sdump(msg))
 			continue
 		}
+
+		// Blank out the cached encoding for transactions to ensure the
+		// deep equality check doesn't fail.
+		if tx, ok := msg.(*MsgTx); ok {
+			tx.cachedSeralizedNoWitness = nil
+		}
+		if block, ok := msg.(*MsgBlock); ok {
+			for _, tx := range block.Transactions {
+				tx.cachedSeralizedNoWitness = nil
+			}
+		}
+
 		if !reflect.DeepEqual(msg, test.out) {
 			t.Errorf("ReadMessage #%d\n got: %v want: %v", i,
 				spew.Sdump(msg), spew.Sdump(test.out))
@@ -170,6 +182,18 @@ func TestMessage(t *testing.T) {
 				spew.Sdump(msg))
 			continue
 		}
+
+		// Blank out the cached encoding for transactions to ensure the
+		// deep equality check doesn't fail.
+		if tx, ok := msg.(*MsgTx); ok {
+			tx.cachedSeralizedNoWitness = nil
+		}
+		if block, ok := msg.(*MsgBlock); ok {
+			for _, tx := range block.Transactions {
+				tx.cachedSeralizedNoWitness = nil
+			}
+		}
+
 		if !reflect.DeepEqual(msg, test.out) {
 			t.Errorf("ReadMessage #%d\n got: %v want: %v", i,
 				spew.Sdump(msg), spew.Sdump(test.out))
