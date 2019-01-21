@@ -272,8 +272,10 @@ func (s *utxoCache) fetchAndCacheEntries(ops map[wire.OutPoint]struct{}) (
 
 	entries := make(map[wire.OutPoint]*UtxoEntry, len(ops))
 	err := s.db.View(func(dbTx database.Tx) error {
+		utxoBucket := dbTx.Metadata().Bucket(utxoSetBucketName)
+
 		for op := range ops {
-			entry, err := dbFetchUtxoEntry(dbTx, op)
+			entry, err := dbFetchUtxoEntry(dbTx, utxoBucket, op)
 			if err != nil {
 				return err
 			}
