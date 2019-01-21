@@ -687,7 +687,6 @@ func deserializeUtxoEntry(serialized []byte) (*UtxoEntry, error) {
 		amount:      int64(amount),
 		pkScript:    pkScript,
 		blockHeight: blockHeight,
-		packedFlags: 0,
 	}
 	if isCoinBase {
 		entry.packedFlags |= tfCoinBase
@@ -786,7 +785,11 @@ func dbPutUtxoEntries(dbTx database.Tx, entries map[wire.OutPoint]*UtxoEntry) er
 			return err
 		}
 		key := outpointKey(outpoint)
-		return utxoBucket.Put(*key, serialized)
+		err = utxoBucket.Put(*key, serialized)
+		if err != nil {
+			return err
+		}
+
 		// NOTE: The key is intentionally not recycled here since the
 		// database interface contract prohibits modifications.  It will
 		// be garbage collected normally when the database is done with
