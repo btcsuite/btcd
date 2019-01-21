@@ -167,13 +167,15 @@ func (entry *UtxoEntry) Clone() *UtxoEntry {
 
 // utxoView is a common interface for structures that implement a UTXO view.
 type utxoView interface {
-	// getEntry tries to get an entry from the view.  If the entry is not in the
-	// view, both the returned entry and the error are nil.
+	// getEntry tries to get an entry from the view.  If the entry is not
+	// in the view, both the returned entry and the error are nil.
 	getEntry(outpoint wire.OutPoint) (*UtxoEntry, error)
 
-	// addEntry adds a new entry to the view.  Set overwrite to true if this
-	// entry should overwrite any existing entry for the same outpoint.
+	// addEntry adds a new entry to the view.  Set overwrite to true if
+	// this entry should overwrite any existing entry for the same
+	// outpoint.
 	addEntry(outpoint wire.OutPoint, entry *UtxoEntry, overwrite bool) error
+
 	// spendEntry marks an entry as spent.
 	spendEntry(outpoint wire.OutPoint, entry *UtxoEntry) error
 }
@@ -186,6 +188,17 @@ type utxoByHashSource interface {
 	// This method exists due to the legacy spend journal database structure.
 	// Its execution is very inefficient, but it's almost never used.
 	getEntryByHash(hash *chainhash.Hash) (*UtxoEntry, error)
+}
+
+// utxoBatcher is an interface that allows a caller to batch fetch UTXOs from
+// an underlying view.
+type utxoBatcher interface {
+	utxoView
+
+	// getEntries attempts to fetch a serise of entries from the UTXO view.
+	// If a single entry is not found within the view, then an error is
+	// returned.
+	getEntries(outpoints map[wire.OutPoint]struct{}) (map[wire.OutPoint]*UtxoEntry, error)
 }
 
 // utxoCache is a cached utxo view in the chainstate of a BlockChain.
@@ -219,6 +232,7 @@ func newUtxoCache(db database.DB, maxTotalMemoryUsage uint64) *utxoCache {
 	avgEntrySize := outpointSize + 8 + baseEntrySize + pubKeyHashLen
 	numMaxElements := maxTotalMemoryUsage / avgEntrySize
 	log.Info("Pre-alloacting for %v entries: ", numMaxElements)
+
 	return &utxoCache{
 		db:                  db,
 		maxTotalMemoryUsage: maxTotalMemoryUsage,
@@ -248,28 +262,43 @@ func (s *utxoCache) TotalMemoryUsage() uint64 {
 	return tmu
 }
 
-// fetchAndCacheEntry tries to fetch an entry from the database.  In none is
-// found, nil is returned.  If an entry is found, it is cached.
+// fetchAndCacheEntries attempts to fetch a series of entries from the
+// database.  In any aren't found, then nil is returned. All entries found are
+// cached in the process.
 //
 // This method should be called with the state lock held.
-func (s *utxoCache) fetchAndCacheEntry(outpoint wire.OutPoint) (*UtxoEntry, error) {
-	var entry *UtxoEntry
+func (s *utxoCache) fetchAndCacheEntries(ops map[wire.OutPoint]struct{}) (
+	map[wire.OutPoint]*UtxoEntry, error) {
+
+	entries := make(map[wire.OutPoint]*UtxoEntry, len(ops))
 	err := s.db.View(func(dbTx database.Tx) error {
-		var err error
-		entry, err = dbFetchUtxoEntry(dbTx, outpoint)
-		return err
+		for op := range ops {
+			entry, err := dbFetchUtxoEntry(dbTx, op)
+			if err != nil {
+				return err
+			}
+
+			entries[op] = entry
+		}
+
+		return nil
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	// Add the entry to the memory cache.
-	// NOTE: When the fetched entry is nil, it is still added to the cache as a
-	// miss; this prevents future lookups to perform the same database fetch.
-	s.cachedEntries[outpoint] = entry
-	s.totalEntryMemory += entry.memoryUsage()
+	// Add each of the entries to the UTXO cache and update their memory
+	// usage.
+	//
+	// NOTE: When the fetched entry is nil, it is still added to the cache
+	// as a miss; this prevents future lookups to perform the same database
+	// fetch.
+	for outpoint, entry := range entries {
+		s.cachedEntries[outpoint] = entry
+		s.totalEntryMemory += entry.memoryUsage()
+	}
 
-	return entry, nil
+	return entries, nil
 }
 
 // getEntry returns the UTXO entry for the given outpoint.  It returns nil if
@@ -279,11 +308,53 @@ func (s *utxoCache) fetchAndCacheEntry(outpoint wire.OutPoint) (*UtxoEntry, erro
 // This method should be called with the state lock held.
 // The returned entry is NOT safe for concurrent access.
 func (s *utxoCache) getEntry(outpoint wire.OutPoint) (*UtxoEntry, error) {
+	// First, we'll check out in-memory cache to see if we already have the
+	// entry.
 	if entry, found := s.cachedEntries[outpoint]; found {
 		return entry, nil
 	}
 
-	return s.fetchAndCacheEntry(outpoint)
+	// If not, then we'll fetch it from the databse.
+	entries, err := s.fetchAndCacheEntries(map[wire.OutPoint]struct{}{
+		outpoint: struct{}{},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return entries[outpoint], nil
+}
+
+// getEntry returns the UTXO entry for the given outpoint.  It returns nil if
+// there is no entry for the outpoint in the UTXO state.
+//
+// This method is part of the utxoView interface.
+// This method should be called with the state lock held.
+// The returned entry is NOT safe for concurrent access.
+func (s *utxoCache) getEntries(outpoints map[wire.OutPoint]struct{}) (
+	map[wire.OutPoint]*UtxoEntry, error) {
+
+	entries := make(map[wire.OutPoint]*UtxoEntry, len(outpoints))
+	missingEntries := make(map[wire.OutPoint]struct{})
+	for op := range outpoints {
+		if entry, ok := s.cachedEntries[op]; ok {
+			entries[op] = entry
+			continue
+		}
+
+		missingEntries[op] = struct{}{}
+	}
+
+	dbEntries, err := s.fetchAndCacheEntries(missingEntries)
+	if err != nil {
+		return nil, err
+	}
+
+	for op, entry := range dbEntries {
+		entries[op] = entry
+	}
+
+	return entries, nil
 }
 
 // FetchEntry returns the UTXO entry for the given outpoint.  It returns nil if
@@ -292,9 +363,18 @@ func (s *utxoCache) getEntry(outpoint wire.OutPoint) (*UtxoEntry, error) {
 // This method is safe for concurrent access.
 func (s *utxoCache) FetchEntry(outpoint wire.OutPoint) (*UtxoEntry, error) {
 	s.mtx.Lock()
-	entry, err := s.getEntry(outpoint)
+	entries, err := s.getEntries(map[wire.OutPoint]struct{}{
+		outpoint: struct{}{},
+	})
+
+	if entry, ok := entries[outpoint]; ok {
+		s.mtx.Unlock()
+		return entry.Clone(), nil
+	}
+
 	s.mtx.Unlock()
-	return entry.Clone(), err
+
+	return nil, err
 }
 
 // FetchUtxoEntry returns the requested unspent transaction output from the point
@@ -443,6 +523,8 @@ func (s *utxoCache) FetchTxView(tx *btcutil.Tx) (*UtxoViewpoint, error) {
 	s.mtx.Lock()
 	defer s.mtx.Unlock()
 
+	// TODO(roasbeef): no need to try to fech outputs
+
 	view := NewUtxoViewpoint()
 	viewEntries := view.Entries()
 	if !IsCoinBase(tx) {
@@ -451,6 +533,7 @@ func (s *utxoCache) FetchTxView(tx *btcutil.Tx) (*UtxoViewpoint, error) {
 			if err != nil {
 				return nil, err
 			}
+
 			viewEntries[txIn.PreviousOutPoint] = entry.Clone()
 		}
 	}
@@ -462,6 +545,7 @@ func (s *utxoCache) FetchTxView(tx *btcutil.Tx) (*UtxoViewpoint, error) {
 		if err != nil {
 			return nil, err
 		}
+
 		viewEntries[prevOut] = entry.Clone()
 	}
 
@@ -515,6 +599,9 @@ func (s *utxoCache) Commit(view *UtxoViewpoint) error {
 		}
 
 		// Store the entry we don't know.
+		//
+		// TODO(roasbeef): should have already added when adding all
+		// inputs?
 		if err := s.addEntry(outpoint, ourEntry, false); err != nil {
 			return err
 		}

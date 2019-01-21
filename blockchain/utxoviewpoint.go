@@ -132,10 +132,10 @@ func (view *UtxoViewpoint) AddTxOuts(tx *btcutil.Tx, blockHeight int32) {
 }
 
 // addInputUtxos adds the unspent transaction outputs for the inputs referenced
-// by the transactions in the given block to the view.  In particular, referenced
-// entries that are earlier in the block are added to the view and entries that
-// are already in the view are not modified.
-func (view *UtxoViewpoint) addInputUtxos(source utxoView, block *btcutil.Block) error {
+// by the transactions in the given block to the view.  In particular,
+// referenced entries that are earlier in the block are added to the view and
+// entries that are already in the view are not modified.
+func (view *UtxoViewpoint) addInputUtxos(source utxoBatcher, block *btcutil.Block) error {
 	// Build a map of in-flight transactions because some of the inputs in
 	// this block could be referencing other transactions earlier in this
 	// block which are not yet in the chain.
@@ -148,6 +148,7 @@ func (view *UtxoViewpoint) addInputUtxos(source utxoView, block *btcutil.Block) 
 	// Loop through all of the transaction inputs (except for the coinbase
 	// which has no inputs) collecting them into sets of what is needed and
 	// what is already known (in-flight).
+	entriesToFetch := make(map[wire.OutPoint]struct{})
 	for i, tx := range transactions[1:] {
 		for _, txIn := range tx.MsgTx().TxIn {
 			// Don't do anything for entries that are already in the view.
@@ -175,12 +176,24 @@ func (view *UtxoViewpoint) addInputUtxos(source utxoView, block *btcutil.Block) 
 				continue
 			}
 
-			// Add the entry from the source.
-			entry, err := source.getEntry(txIn.PreviousOutPoint)
-			if err == nil && entry != nil {
-				view.entries[txIn.PreviousOutPoint] = entry.Clone()
-			}
+			// Now that we know we know need to fetch this entry,
+			// we'll mark it as something we need to retreive from
+			// the UTXO view.
+			entriesToFetch[txIn.PreviousOutPoint] = struct{}{}
 		}
+	}
+
+	// Fetch the set of entries in batch from the inner utxo view so we can
+	// populate this parent view.
+	entries, err := source.getEntries(entriesToFetch)
+	if err != nil {
+		return err
+	}
+
+	// Finally, copy over the entries from the inner view into this main
+	// view.
+	for op, entry := range entries {
+		view.entries[op] = entry.Clone()
 	}
 
 	return nil
@@ -188,21 +201,22 @@ func (view *UtxoViewpoint) addInputUtxos(source utxoView, block *btcutil.Block) 
 
 // connectTransaction updates the view by adding all new utxos created by the
 // passed transaction and marking all utxos that the transactions spend as
-// spent.  In addition, when the 'stxos' argument is not nil, it will be updated
-// to append an entry for each spent txout.  An error will be returned if the
-// view does not contain the required utxos.  Set overwrite to true of new
-// entries should be allowed to overwrite existing not-fully-spent entries.
+// spent.  In addition, when the 'stxos' argument is not nil, it will be
+// updated to append an entry for each spent txout.  An error will be returned
+// if the view does not contain the required utxos.  Set overwrite to true of
+// new entries should be allowed to overwrite existing not-fully-spent entries.
 func connectTransaction(view utxoView, tx *btcutil.Tx, blockHeight int32,
 	stxos *[]SpentTxOut, overwrite bool) error {
 
 	// Skip input processing when tx is coinbase.
 	if !IsCoinBase(tx) {
-		// Spend the referenced utxos by marking them spent in the view and,
-		// if a slice was provided for the spent txout details, append an entry
-		// to it.
+		// Spend the referenced utxos by marking them spent in the view
+		// and, if a slice was provided for the spent txout details,
+		// append an entry to it.
 		for _, txIn := range tx.MsgTx().TxIn {
-			// Ensure the referenced utxo exists in the view.  This should
-			// never happen unless there is a bug is introduced in the code.
+			// Ensure the referenced utxo exists in the view.  This
+			// should never happen unless there is a bug is
+			// introduced in the code.
 			entry, err := view.getEntry(txIn.PreviousOutPoint)
 			if err != nil {
 				return err
@@ -225,7 +239,8 @@ func connectTransaction(view utxoView, tx *btcutil.Tx, blockHeight int32,
 			}
 
 			// Mark the entry as spent.
-			if err := view.spendEntry(txIn.PreviousOutPoint, entry); err != nil {
+			err = view.spendEntry(txIn.PreviousOutPoint, entry)
+			if err != nil {
 				return err
 			}
 		}
@@ -253,9 +268,10 @@ func connectTransaction(view utxoView, tx *btcutil.Tx, blockHeight int32,
 			entry.packedFlags |= tfCoinBase
 		}
 		if !overwrite {
-			// If overwrite is false (i.e. we are not replaying blocks in
-			// recovery mode), this entry is fresh, meaning it can be pruned when
-			// it gets spent before the next flush.
+			// If overwrite is false (i.e. we are not replaying
+			// blocks in recovery mode), this entry is fresh,
+			// meaning it can be pruned when it gets spent before
+			// the next flush.
 			entry.packedFlags |= tfFresh
 		}
 
@@ -264,6 +280,7 @@ func connectTransaction(view utxoView, tx *btcutil.Tx, blockHeight int32,
 			return err
 		}
 	}
+
 	return nil
 }
 
@@ -271,13 +288,15 @@ func connectTransaction(view utxoView, tx *btcutil.Tx, blockHeight int32,
 // of the transactions in the passed block, marking all utxos the transactions
 // spend as spent, and setting the best hash for the view to the passed block.
 // In addition, when the 'stxos' argument is not nil, it will be updated to
-// append an entry for each spent txout.  Set overwrite to true of new
-// entries should be allowed to overwrite existing not-fully-spent entries.
+// append an entry for each spent txout.  Set overwrite to true of new entries
+// should be allowed to overwrite existing not-fully-spent entries.
 func connectTransactions(view utxoView, block *btcutil.Block,
 	stxos *[]SpentTxOut, overwrite bool) error {
 
 	for _, tx := range block.Transactions() {
-		err := connectTransaction(view, tx, block.Height(), stxos, overwrite)
+		err := connectTransaction(
+			view, tx, block.Height(), stxos, overwrite,
+		)
 		if err != nil {
 			return err
 		}
