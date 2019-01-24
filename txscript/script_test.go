@@ -21,8 +21,8 @@ func TestParseOpcode(t *testing.T) {
 		name: "OP_PUSHDATA4", length: -8, opfunc: opcodePushData}
 
 	// This script would be fine if -8 was a valid length.
-	_, err := parseScriptTemplate([]byte{OP_PUSHDATA4, 0x1, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00}, &fakeArray)
+	_, _, err := parseScriptTemplate([]byte{OP_PUSHDATA4, 0x1, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00}, &fakeArray, false, false)
 	if err == nil {
 		t.Errorf("no error with dodgy opcode array!")
 	}

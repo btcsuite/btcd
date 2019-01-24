@@ -194,8 +194,15 @@ func IsPushOnlyScript(script []byte) bool {
 // parseScriptTemplate is the same as parseScript but allows the passing of the
 // template list for testing purposes.  When there are parse errors, it returns
 // the list of parsed opcodes up to the point of failure along with the error.
-func parseScriptTemplate(script []byte, opcodes *[256]opcode) ([]parsedOpcode, error) {
-	retScript := make([]parsedOpcode, 0, len(script))
+func parseScriptTemplate(script []byte, opcodes *[256]opcode,
+	countOnly, precise bool) ([]parsedOpcode, int, error) {
+
+	var (
+		retScript []parsedOpcode
+		nSigs     int
+	)
+
+	var prevPop *parsedOpcode
 	for i := 0; i < len(script); {
 		instr := script[i]
 		op := &opcodes[instr]
@@ -215,12 +222,14 @@ func parseScriptTemplate(script []byte, opcodes *[256]opcode) ([]parsedOpcode, e
 				str := fmt.Sprintf("opcode %s requires %d "+
 					"bytes, but script only has %d remaining",
 					op.name, op.length, len(script[i:]))
-				return retScript, scriptError(ErrMalformedPush,
-					str)
+				return retScript, nSigs,
+					scriptError(ErrMalformedPush, str)
 			}
 
 			// Slice out the data.
-			pop.data = script[i+1 : i+op.length]
+			if !countOnly {
+				pop.data = script[i+1 : i+op.length]
+			}
 			i += op.length
 
 		// Data pushes with parsed lengths -- OP_PUSHDATAP{1,2,4}.
@@ -232,8 +241,8 @@ func parseScriptTemplate(script []byte, opcodes *[256]opcode) ([]parsedOpcode, e
 				str := fmt.Sprintf("opcode %s requires %d "+
 					"bytes, but script only has %d remaining",
 					op.name, -op.length, len(script[off:]))
-				return retScript, scriptError(ErrMalformedPush,
-					str)
+				return retScript, nSigs,
+					scriptError(ErrMalformedPush, str)
 			}
 
 			// Next -length bytes are little endian length of data.
@@ -251,8 +260,8 @@ func parseScriptTemplate(script []byte, opcodes *[256]opcode) ([]parsedOpcode, e
 			default:
 				str := fmt.Sprintf("invalid opcode length %d",
 					op.length)
-				return retScript, scriptError(ErrMalformedPush,
-					str)
+				return retScript, nSigs,
+					scriptError(ErrMalformedPush, str)
 			}
 
 			// Move offset to beginning of the data.
@@ -264,24 +273,33 @@ func parseScriptTemplate(script []byte, opcodes *[256]opcode) ([]parsedOpcode, e
 				str := fmt.Sprintf("opcode %s pushes %d bytes, "+
 					"but script only has %d remaining",
 					op.name, int(l), len(script[off:]))
-				return retScript, scriptError(ErrMalformedPush,
-					str)
+				return retScript, nSigs,
+					scriptError(ErrMalformedPush, str)
 			}
 
-			pop.data = script[off : off+int(l)]
+			if !countOnly {
+				pop.data = script[off : off+int(l)]
+			}
 			i += 1 - op.length + int(l)
 		}
 
-		retScript = append(retScript, pop)
+		if !countOnly {
+			retScript = append(retScript, pop)
+		}
+
+		nSigs += countSigOps(pop, prevPop, precise)
+		prevPop = &pop
 	}
 
-	return retScript, nil
+	return retScript, nSigs, nil
 }
 
 // parseScript preparses the script in bytes into a list of parsedOpcodes while
 // applying a number of sanity checks.
 func parseScript(script []byte) ([]parsedOpcode, error) {
-	return parseScriptTemplate(script, &opcodeArray)
+	pops, _, err := parseScriptTemplate(script, &opcodeArray, false, false)
+	return pops, err
+}
 }
 
 // unparseScript reversed the action of parseScript and returns the
