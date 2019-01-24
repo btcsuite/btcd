@@ -770,6 +770,48 @@ func dbFetchUtxoEntry(dbTx database.Tx, utxoBucket database.Bucket,
 	return entry, nil
 }
 
+// dbSeekUtxoEntry uses an existing database cursor to fetch the specified
+// transaction output from the utxo set.
+//
+// When there is no entry for the provided output, nil will be returned for both
+// the entry and the error.
+func dbSeekUtxoEntry(cursor database.Cursor, op *wire.OutPoint) (*UtxoEntry, error) {
+	key := outpointKey(*op)
+	exists := cursor.Seek(*key)
+	recycleOutpointKey(key)
+
+	if !exists {
+		return nil, nil
+	}
+
+	serializedUtxo := cursor.Value()
+
+	// A non-nil zero-length entry means there is an entry in the database
+	// for a spent transaction output which should never be the case.
+	if len(serializedUtxo) == 0 {
+		return nil, AssertError(fmt.Sprintf("database contains entry "+
+			"for spent tx output %v", op))
+	}
+
+	// Deserialize the utxo entry and return it.
+	entry, err := deserializeUtxoEntry(serializedUtxo)
+	if err != nil {
+		// Ensure any deserialization errors are returned as database
+		// corruption errors.
+		if isDeserializeErr(err) {
+			return nil, database.Error{
+				ErrorCode: database.ErrCorruption,
+				Description: fmt.Sprintf("corrupt utxo entry "+
+					"for %v: %v", op, err),
+			}
+		}
+
+		return nil, err
+	}
+
+	return entry, nil
+}
+
 // dbPutUtxoEntries uses an existing database transaction to update the utxo
 // entries in the database.
 func dbPutUtxoEntries(dbTx database.Tx, entries map[wire.OutPoint]*UtxoEntry) error {

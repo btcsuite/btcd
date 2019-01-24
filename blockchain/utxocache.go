@@ -5,8 +5,10 @@
 package blockchain
 
 import (
+	"bytes"
 	"container/list"
 	"fmt"
+	"sort"
 	"sync"
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
@@ -262,6 +264,53 @@ func (s *utxoCache) TotalMemoryUsage() uint64 {
 	return tmu
 }
 
+// seekAndCacheEntries attempts to fetch a series of entries from the
+// database.  In any aren't found, then nil is returned. All entries found are
+// cached in the process.
+//
+// This method should be called with the state lock held.
+func (s *utxoCache) seekAndCacheEntries(ops ...wire.OutPoint) (
+	map[wire.OutPoint]*UtxoEntry, error) {
+
+	sort.Slice(ops, func(i, j int) bool {
+		return bytes.Compare(ops[i].Hash[:], ops[j].Hash[:]) < 0 &&
+			ops[i].Index < ops[j].Index
+	})
+
+	entries := make(map[wire.OutPoint]*UtxoEntry, len(ops))
+	err := s.db.View(func(dbTx database.Tx) error {
+		utxoBucket := dbTx.Metadata().Bucket(utxoSetBucketName)
+
+		cursor := utxoBucket.Cursor()
+		for _, op := range ops {
+			entry, err := dbSeekUtxoEntry(cursor, &op)
+			if err != nil {
+				return err
+			}
+
+			entries[op] = entry
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	// Add each of the entries to the UTXO cache and update their memory
+	// usage.
+	//
+	// NOTE: When the fetched entry is nil, it is still added to the cache
+	// as a miss; this prevents future lookups to perform the same database
+	// fetch.
+	for outpoint, entry := range entries {
+		s.cachedEntries[outpoint] = entry
+		s.totalEntryMemory += entry.memoryUsage()
+	}
+
+	return entries, nil
+}
+
 // fetchAndCacheEntries attempts to fetch a series of entries from the
 // database.  In any aren't found, then nil is returned. All entries found are
 // cached in the process.
@@ -317,9 +366,7 @@ func (s *utxoCache) getEntry(outpoint wire.OutPoint) (*UtxoEntry, error) {
 	}
 
 	// If not, then we'll fetch it from the databse.
-	entries, err := s.fetchAndCacheEntries(map[wire.OutPoint]struct{}{
-		outpoint: struct{}{},
-	})
+	entries, err := s.seekAndCacheEntries(outpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -337,17 +384,17 @@ func (s *utxoCache) getEntries(outpoints map[wire.OutPoint]struct{}) (
 	map[wire.OutPoint]*UtxoEntry, error) {
 
 	entries := make(map[wire.OutPoint]*UtxoEntry, len(outpoints))
-	missingEntries := make(map[wire.OutPoint]struct{})
+	var missingEntries []wire.OutPoint
 	for op := range outpoints {
 		if entry, ok := s.cachedEntries[op]; ok {
 			entries[op] = entry
 			continue
 		}
 
-		missingEntries[op] = struct{}{}
+		missingEntries = append(missingEntries, op)
 	}
 
-	dbEntries, err := s.fetchAndCacheEntries(missingEntries)
+	dbEntries, err := s.seekAndCacheEntries(missingEntries...)
 	if err != nil {
 		return nil, err
 	}
