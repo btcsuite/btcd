@@ -51,7 +51,7 @@ func isSmallInt(op *opcode) bool {
 	return false
 }
 
-// isScriptHash returns true if the script passed is a pay-to-script-hash
+// isScriptHash returns true if the parseOpcodes passed are a pay-to-script-hash
 // transaction, false otherwise.
 func isScriptHash(pops []parsedOpcode) bool {
 	return len(pops) == 3 &&
@@ -60,14 +60,19 @@ func isScriptHash(pops []parsedOpcode) bool {
 		pops[2].opcode.value == OP_EQUAL
 }
 
+// isScriptHashScript returns true if the script passed is a pay-to-script-hash
+// transaction, false otherwise.
+func isScriptHashScript(script []byte) bool {
+	return len(script) == 23 &&
+		script[0] == OP_HASH160 &&
+		script[1] == OP_DATA_20 &&
+		script[22] == OP_EQUAL
+}
+
 // IsPayToScriptHash returns true if the script is in the standard
 // pay-to-script-hash (P2SH) format, false otherwise.
 func IsPayToScriptHash(script []byte) bool {
-	pops, err := parseScript(script)
-	if err != nil {
-		return false
-	}
-	return isScriptHash(pops)
+	return isScriptHashScript(script)
 }
 
 // isWitnessScriptHash returns true if the passed script is a
