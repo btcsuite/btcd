@@ -703,33 +703,43 @@ func asSmallInt(op *opcode) int {
 // requested then we attempt to count the number of operations for a multisig
 // op. Otherwise we use the maximum.
 func getSigOpCount(pops []parsedOpcode, precise bool) int {
-	nSigs := 0
+	var nSigs int
+	var prevPop *parsedOpcode
 	for i, pop := range pops {
-		switch pop.opcode.value {
-		case OP_CHECKSIG:
-			fallthrough
-		case OP_CHECKSIGVERIFY:
-			nSigs++
-		case OP_CHECKMULTISIG:
-			fallthrough
-		case OP_CHECKMULTISIGVERIFY:
-			// If we are being precise then look for familiar
-			// patterns for multisig, for now all we recognize is
-			// OP_1 - OP_16 to signify the number of pubkeys.
-			// Otherwise, we use the max of 20.
-			if precise && i > 0 &&
-				pops[i-1].opcode.value >= OP_1 &&
-				pops[i-1].opcode.value <= OP_16 {
-				nSigs += asSmallInt(pops[i-1].opcode)
-			} else {
-				nSigs += MaxPubKeysPerMultiSig
-			}
-		default:
-			// Not a sigop.
-		}
+		nSigs += countSigOps(pop, prevPop, precise)
+		prevPop = &pops[i]
 	}
 
 	return nSigs
+}
+
+// countSigOps returns the sigop count for a particular opcode. If pop is not
+// the first opcode in the script, prevPop MUST be populated with a pointer to
+// the previous opcode. If precise mode is requested then we attempt to count
+// the number of operations for a multisig op. Otherwise we use the maximum.
+func countSigOps(pop parsedOpcode, prevPop *parsedOpcode, precise bool) int {
+	switch pop.opcode.value {
+	case OP_CHECKSIG:
+		fallthrough
+	case OP_CHECKSIGVERIFY:
+		return 1
+	case OP_CHECKMULTISIG:
+		fallthrough
+	case OP_CHECKMULTISIGVERIFY:
+		// If we are being precise then look for familiar patterns for
+		// multisig, for now all we recognize is OP_1 - OP_16 to signify
+		// the number of pubkeys.  Otherwise, we use the max of 20.
+		if precise && prevPop != nil &&
+			prevPop.opcode.value >= OP_1 &&
+			prevPop.opcode.value <= OP_16 {
+			return asSmallInt(prevPop.opcode)
+		} else {
+			return MaxPubKeysPerMultiSig
+		}
+	default:
+		// Not a sigop.
+		return 0
+	}
 }
 
 // GetSigOpCount provides a quick count of the number of signature operations
