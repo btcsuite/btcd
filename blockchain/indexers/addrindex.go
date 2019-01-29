@@ -155,7 +155,9 @@ func serializeAddrIndexEntry(blockID uint32, txLoc wire.TxLoc) []byte {
 // provided region struct according to the format described in detail above and
 // uses the passed block hash fetching function in order to conver the block ID
 // to the associated block hash.
-func deserializeAddrIndexEntry(serialized []byte, region *database.BlockRegion, fetchBlockHash fetchBlockHashFunc) error {
+func deserializeAddrIndexEntry(serialized []byte, region *database.BlockRegion,
+	fetchBlockHash fetchBlockHashFunc) error {
+
 	// Ensure there are enough bytes to decode.
 	if len(serialized) < txEntrySize {
 		return errDeserialize("unexpected end of data")
@@ -182,7 +184,9 @@ func keyForLevel(addrKey [addrKeySize]byte, level uint8) [levelKeySize]byte {
 
 // dbPutAddrIndexEntry updates the address index to include the provided entry
 // according to the level-based scheme described in detail above.
-func dbPutAddrIndexEntry(bucket internalBucket, addrKey [addrKeySize]byte, blockID uint32, txLoc wire.TxLoc) error {
+func dbPutAddrIndexEntry(bucket internalBucket, addrKey [addrKeySize]byte,
+	blockID uint32, txLoc wire.TxLoc) error {
+
 	// Start with level 0 and its initial max number of entries.
 	curLevel := uint8(0)
 	maxLevelBytes := level0MaxEntries * txEntrySize
@@ -253,7 +257,10 @@ func dbPutAddrIndexEntry(bucket internalBucket, addrKey [addrKeySize]byte, block
 // the given address key and the number of entries skipped since it could have
 // been less in the case where there are less total entries than the requested
 // number of entries to skip.
-func dbFetchAddrIndexEntries(bucket internalBucket, addrKey [addrKeySize]byte, numToSkip, numRequested uint32, reverse bool, fetchBlockHash fetchBlockHashFunc) ([]database.BlockRegion, uint32, error) {
+func dbFetchAddrIndexEntries(bucket internalBucket, addrKey [addrKeySize]byte,
+	numToSkip, numRequested uint32, reverse bool,
+	fetchBlockHash fetchBlockHashFunc) ([]database.BlockRegion, uint32, error) {
+
 	// When the reverse flag is not set, all levels need to be fetched
 	// because numToSkip and numRequested are counted from the oldest
 	// transactions (highest level) and thus the total count is needed.
@@ -356,7 +363,9 @@ func maxEntriesForLevel(level uint8) int {
 // dbRemoveAddrIndexEntries removes the specified number of entries from from
 // the address index for the provided key.  An assertion error will be returned
 // if the count exceeds the total number of entries in the index.
-func dbRemoveAddrIndexEntries(bucket internalBucket, addrKey [addrKeySize]byte, count int) error {
+func dbRemoveAddrIndexEntries(bucket internalBucket, addrKey [addrKeySize]byte,
+	count int) error {
+
 	// Nothing to do if no entries are being deleted.
 	if count <= 0 {
 		return nil
@@ -796,7 +805,9 @@ func (idx *AddrIndex) DisconnectBlock(dbTx database.Tx, block *btcutil.Block,
 // that involve a given address.
 //
 // This function is safe for concurrent access.
-func (idx *AddrIndex) TxRegionsForAddress(dbTx database.Tx, addr btcutil.Address, numToSkip, numRequested uint32, reverse bool) ([]database.BlockRegion, uint32, error) {
+func (idx *AddrIndex) TxRegionsForAddress(dbTx database.Tx, addr btcutil.Address,
+	numToSkip, numRequested uint32, reverse bool) ([]database.BlockRegion, uint32, error) {
+
 	addrKey, err := addrToKey(addr)
 	if err != nil {
 		return nil, 0, err
