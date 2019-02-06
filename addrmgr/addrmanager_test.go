@@ -262,7 +262,7 @@ func TestNeedMoreAddresses(t *testing.T) {
 	var err error
 	for i := 0; i < addrsToAdd; i++ {
 		s := fmt.Sprintf("%d.%d.173.147:8333", i/128+60, i%128+60)
-		addrs[i], err = n.DeserializeNetAddress(s)
+		addrs[i], err = n.DeserializeNetAddress(s, wire.SFNodeNetwork)
 		if err != nil {
 			t.Errorf("Failed to turn %s into an address: %v", s, err)
 		}
@@ -290,7 +290,7 @@ func TestGood(t *testing.T) {
 	var err error
 	for i := 0; i < addrsToAdd; i++ {
 		s := fmt.Sprintf("%d.173.147.%d:8333", i/64+60, i%64+60)
-		addrs[i], err = n.DeserializeNetAddress(s)
+		addrs[i], err = n.DeserializeNetAddress(s, wire.SFNodeNetwork)
 		if err != nil {
 			t.Errorf("Failed to turn %s into an address: %v", s, err)
 		}

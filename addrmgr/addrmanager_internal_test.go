@@ -117,3 +117,78 @@ func TestAddrManagerSerialization(t *testing.T) {
 	addrMgr.loadPeers()
 	assertAddrs(t, addrMgr, expectedAddrs)
 }
+
+// TestAddrManagerV1ToV2 ensures that we can properly upgrade the serialized
+// version of the address manager from v1 to v2.
+func TestAddrManagerV1ToV2(t *testing.T) {
+	t.Parallel()
+
+	// We'll start by creating our address manager backed by a temporary
+	// directory.
+	tempDir, err := ioutil.TempDir("", "addrmgr")
+	if err != nil {
+		t.Fatalf("unable to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	addrMgr := New(tempDir, nil)
+
+	// As we're interested in testing the upgrade path from v1 to v2, we'll
+	// override the manager's current version.
+	addrMgr.version = 1
+
+	// We'll be adding 5 random addresses to the manager. Since this is v1,
+	// each addresses' services will not be stored.
+	const numAddrs = 5
+
+	expectedAddrs := make(map[string]*wire.NetAddress, numAddrs)
+	for i := 0; i < numAddrs; i++ {
+		addr := randAddr(t)
+		expectedAddrs[NetAddressKey(addr)] = addr
+		addrMgr.AddAddress(addr, randAddr(t))
+	}
+
+	// Then, we'll persist these addresses to disk and restart the address
+	// manager - overriding its version back to v1.
+	addrMgr.savePeers()
+	addrMgr = New(tempDir, nil)
+	addrMgr.version = 1
+
+	// When we read all of the addresses back from disk, we should expect to
+	// find all of them, but their services will be set to a default of
+	// SFNodeNetwork since they were not previously stored. After ensuring
+	// that this default is set, we'll override each addresses' services
+	// with the original value from when they were created.
+	addrMgr.loadPeers()
+	addrs := addrMgr.getAddresses()
+	if len(addrs) != len(expectedAddrs) {
+		t.Fatalf("expected to find %d adddresses, found %d",
+			len(expectedAddrs), len(addrs))
+	}
+	for _, addr := range addrs {
+		addrStr := NetAddressKey(addr)
+		expectedAddr, ok := expectedAddrs[addrStr]
+		if !ok {
+			t.Fatalf("expected to find address %v", addrStr)
+		}
+
+		if addr.Services != wire.SFNodeNetwork {
+			t.Fatalf("expected address services to be %v, got %v",
+				wire.SFNodeNetwork, addr.Services)
+		}
+
+		addrMgr.SetServices(addr, expectedAddr.Services)
+	}
+
+	// We'll also bump up the manager's version to v2, which should signal
+	// that it should include the address services when persisting its
+	// state.
+	addrMgr.version = 2
+	addrMgr.savePeers()
+
+	// Finally, we'll recreate the manager and ensure that the services were
+	// persisted correctly.
+	addrMgr = New(tempDir, nil)
+	addrMgr.loadPeers()
+	assertAddrs(t, addrMgr, expectedAddrs)
+}
