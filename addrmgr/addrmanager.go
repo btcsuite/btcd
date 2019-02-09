@@ -46,6 +46,7 @@ type AddrManager struct {
 	nNew           int
 	lamtx          sync.Mutex
 	localAddresses map[string]*localAddress
+	version        int
 }
 
 type serializedKnownAddress struct {
@@ -55,6 +56,8 @@ type serializedKnownAddress struct {
 	TimeStamp   int64
 	LastAttempt int64
 	LastSuccess int64
+	Services    wire.ServiceFlag
+	SrcServices wire.ServiceFlag
 	// no refcount or tried, that is available from context.
 }
 
@@ -155,7 +158,7 @@ const (
 	getAddrPercent = 23
 
 	// serialisationVersion is the current version of the on-disk format.
-	serialisationVersion = 1
+	serialisationVersion = 2
 )
 
 // updateAddress is a helper function to either update an address already known
@@ -362,7 +365,7 @@ func (a *AddrManager) savePeers() {
 	// First we make a serialisable datastructure so we can encode it to
 	// json.
 	sam := new(serializedAddrManager)
-	sam.Version = serialisationVersion
+	sam.Version = a.version
 	copy(sam.Key[:], a.key[:])
 
 	sam.Addresses = make([]*serializedKnownAddress, len(a.addrIndex))
@@ -375,6 +378,10 @@ func (a *AddrManager) savePeers() {
 		ska.Attempts = v.attempts
 		ska.LastAttempt = v.lastattempt.Unix()
 		ska.LastSuccess = v.lastsuccess.Unix()
+		if a.version > 1 {
+			ska.Services = v.na.Services
+			ska.SrcServices = v.srcAddr.Services
+		}
 		// Tried and refs are implicit in the rest of the structure
 		// and will be worked out from context on unserialisation.
 		sam.Addresses[i] = ska
@@ -451,24 +458,43 @@ func (a *AddrManager) deserializePeers(filePath string) error {
 		return fmt.Errorf("error reading %s: %v", filePath, err)
 	}
 
-	if sam.Version != serialisationVersion {
+	// Since decoding JSON is backwards compatible (i.e., only decodes
+	// fields it understands), we'll only return an error upon seeing a
+	// version past our latest supported version.
+	if sam.Version > serialisationVersion {
 		return fmt.Errorf("unknown version %v in serialized "+
 			"addrmanager", sam.Version)
 	}
+
 	copy(a.key[:], sam.Key[:])
 
 	for _, v := range sam.Addresses {
 		ka := new(KnownAddress)
-		ka.na, err = a.DeserializeNetAddress(v.Addr)
+
+		// The first version of the serialized address manager was not
+		// aware of the service bits associated with this address, so
+		// we'll assign a default of SFNodeNetwork to it.
+		if sam.Version == 1 {
+			v.Services = wire.SFNodeNetwork
+		}
+		ka.na, err = a.DeserializeNetAddress(v.Addr, v.Services)
 		if err != nil {
 			return fmt.Errorf("failed to deserialize netaddress "+
 				"%s: %v", v.Addr, err)
 		}
-		ka.srcAddr, err = a.DeserializeNetAddress(v.Src)
+
+		// The first version of the serialized address manager was not
+		// aware of the service bits associated with the source address,
+		// so we'll assign a default of SFNodeNetwork to it.
+		if sam.Version == 1 {
+			v.SrcServices = wire.SFNodeNetwork
+		}
+		ka.srcAddr, err = a.DeserializeNetAddress(v.Src, v.SrcServices)
 		if err != nil {
 			return fmt.Errorf("failed to deserialize netaddress "+
 				"%s: %v", v.Src, err)
 		}
+
 		ka.attempts = v.Attempts
 		ka.lastattempt = time.Unix(v.LastAttempt, 0)
 		ka.lastsuccess = time.Unix(v.LastSuccess, 0)
@@ -520,8 +546,10 @@ func (a *AddrManager) deserializePeers(filePath string) error {
 	return nil
 }
 
-// DeserializeNetAddress converts a given address string to a *wire.NetAddress
-func (a *AddrManager) DeserializeNetAddress(addr string) (*wire.NetAddress, error) {
+// DeserializeNetAddress converts a given address string to a *wire.NetAddress.
+func (a *AddrManager) DeserializeNetAddress(addr string,
+	services wire.ServiceFlag) (*wire.NetAddress, error) {
+
 	host, portStr, err := net.SplitHostPort(addr)
 	if err != nil {
 		return nil, err
@@ -531,7 +559,7 @@ func (a *AddrManager) DeserializeNetAddress(addr string) (*wire.NetAddress, erro
 		return nil, err
 	}
 
-	return a.HostToNetAddress(host, uint16(port), wire.SFNodeNetwork)
+	return a.HostToNetAddress(host, uint16(port), services)
 }
 
 // Start begins the core address handler which manages a pool of known
@@ -635,21 +663,9 @@ func (a *AddrManager) NeedMoreAddresses() bool {
 // AddressCache returns the current address cache.  It must be treated as
 // read-only (but since it is a copy now, this is not as dangerous).
 func (a *AddrManager) AddressCache() []*wire.NetAddress {
-	a.mtx.Lock()
-	defer a.mtx.Unlock()
+	allAddr := a.getAddresses()
 
-	addrIndexLen := len(a.addrIndex)
-	if addrIndexLen == 0 {
-		return nil
-	}
-
-	allAddr := make([]*wire.NetAddress, 0, addrIndexLen)
-	// Iteration order is undefined here, but we randomise it anyway.
-	for _, v := range a.addrIndex {
-		allAddr = append(allAddr, v.na)
-	}
-
-	numAddresses := addrIndexLen * getAddrPercent / 100
+	numAddresses := len(allAddr) * getAddrPercent / 100
 	if numAddresses > getAddrMax {
 		numAddresses = getAddrMax
 	}
@@ -658,12 +674,31 @@ func (a *AddrManager) AddressCache() []*wire.NetAddress {
 	// `numAddresses' since we are throwing the rest.
 	for i := 0; i < numAddresses; i++ {
 		// pick a number between current index and the end
-		j := rand.Intn(addrIndexLen-i) + i
+		j := rand.Intn(len(allAddr)-i) + i
 		allAddr[i], allAddr[j] = allAddr[j], allAddr[i]
 	}
 
 	// slice off the limit we are willing to share.
 	return allAddr[0:numAddresses]
+}
+
+// getAddresses returns all of the addresses currently found within the
+// manager's address cache.
+func (a *AddrManager) getAddresses() []*wire.NetAddress {
+	a.mtx.Lock()
+	defer a.mtx.Unlock()
+
+	addrIndexLen := len(a.addrIndex)
+	if addrIndexLen == 0 {
+		return nil
+	}
+
+	addrs := make([]*wire.NetAddress, 0, addrIndexLen)
+	for _, v := range a.addrIndex {
+		addrs = append(addrs, v.na)
+	}
+
+	return addrs
 }
 
 // reset resets the address manager by reinitialising the random source
@@ -1109,6 +1144,7 @@ func New(dataDir string, lookupFunc func(string) ([]net.IP, error)) *AddrManager
 		rand:           rand.New(rand.NewSource(time.Now().UnixNano())),
 		quit:           make(chan struct{}),
 		localAddresses: make(map[string]*localAddress),
+		version:        serialisationVersion,
 	}
 	am.reset()
 	return &am
