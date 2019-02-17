@@ -65,7 +65,7 @@ func TestMsgAlert(t *testing.T) {
 	// Test BtcEncode with Payload != nil
 	// note: Payload is an empty Alert but not nil
 	msg.Payload = new(Alert)
-	buf = *new(bytes.Buffer)
+	buf = bytes.Buffer{}
 	err = msg.BtcEncode(&buf, pver, encoding)
 	if err != nil {
 		t.Error(err.Error())
@@ -267,7 +267,7 @@ func TestMsgAlertWireErrors(t *testing.T) {
 	// overflow the max number of elements in SetCancel
 	baseMsgAlert.Payload = new(Alert)
 	baseMsgAlert.Payload.SetCancel = make([]int32, maxCountSetCancel+1)
-	buf := *new(bytes.Buffer)
+	buf := bytes.Buffer{}
 	err = baseMsgAlert.BtcEncode(&buf, pver, encoding)
 	if _, ok := err.(*MessageError); !ok {
 		t.Errorf("MsgAlert.BtcEncode wrong error got: %T, want: %T",
@@ -277,7 +277,7 @@ func TestMsgAlertWireErrors(t *testing.T) {
 	// overflow the max number of elements in SetSubVer
 	baseMsgAlert.Payload = new(Alert)
 	baseMsgAlert.Payload.SetSubVer = make([]string, maxCountSetSubVer+1)
-	buf = *new(bytes.Buffer)
+	buf = bytes.Buffer{}
 	err = baseMsgAlert.BtcEncode(&buf, pver, encoding)
 	if _, ok := err.(*MessageError); !ok {
 		t.Errorf("MsgAlert.BtcEncode wrong error got: %T, want: %T",
