@@ -1299,8 +1299,7 @@ func testFetchBlockIO(tc *testContext, tx database.Tx) bool {
 			return false
 		}
 
-		// Ensure the block header fetched from the database matches the
-		// expected bytes.
+		// Ensure block hash exists as expected.
 		hasBlock, err := tx.HasBlock(blockHash)
 		if err != nil {
 			tc.t.Errorf("HasBlock(%s): unexpected error: %v",
