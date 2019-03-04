@@ -565,7 +565,7 @@ var SimNetParams = Params{
 
 	// BIP44 coin type used in the hierarchical deterministic path for
 	// address generation.
-	HDCoinType: 115, // ASCII for s
+	HDCoinType: 1,
 }
 
 var (
