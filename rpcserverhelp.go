@@ -162,11 +162,13 @@ var helpDescsEnUS = map[string]string{
 	// GetBlockCmd help.
 	"getblock--synopsis":   "Returns information about a block given its hash.",
 	"getblock-hash":        "The hash of the block",
-	"getblock-verbose":     "Specifies the block is returned as a JSON object instead of hex-encoded string",
-	"getblock-verbosetx":   "Specifies that each transaction is returned as a JSON object and only applies if the verbose flag is true (btcd extension)",
-	"getblock--condition0": "verbose=false",
-	"getblock--condition1": "verbose=true",
+	"getblock-verbosity":   "Specifies the block format returns",
+	"getblock--condition0": "verbosity=0",
+	"getblock--condition1": "verbosity=1",
+	"getblock--condition2": "verbosity=2",
 	"getblock--result0":    "Hex-encoded bytes of the serialized block",
+	"getblock--result1":    "JSON object with information about block",
+	"getblock--result2":    "JSON object with information about block and information about each transaction.",
 
 	// GetBlockChainInfoCmd help.
 	"getblockchaininfo--synopsis": "Returns information about the current blockchain state and the status of any active soft-fork deployments.",
