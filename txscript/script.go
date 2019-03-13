@@ -143,65 +143,6 @@ func IsPushOnlyScript(script []byte) bool {
 	return tokenizer.Err() == nil
 }
 
-// parseScriptTemplate is the same as parseScript but allows the passing of the
-// template list for testing purposes.  When there are parse errors, it returns
-// the list of parsed opcodes up to the point of failure along with the error.
-func parseScriptTemplate(script []byte, opcodes *[256]opcode) ([]parsedOpcode, error) {
-	retScript := make([]parsedOpcode, 0, len(script))
-	var err error
-	for i := 0; i < len(script); {
-		instr := script[i]
-		op := &opcodes[instr]
-		pop := parsedOpcode{opcode: op}
-		i, err = pop.checkParseableInScript(script, i)
-		if err != nil {
-			return retScript, err
-		}
-
-		retScript = append(retScript, pop)
-	}
-
-	return retScript, nil
-}
-
-// checkScriptTemplateParseable is the same as parseScriptTemplate but does not
-// return the list of opcodes up until the point of failure so that this can be
-// used in functions which do not necessarily have a need for the failed list of
-// opcodes, such as IsUnspendable.
-//
-// This function returns a pointer to a byte. This byte is nil if the parsing
-// has an error, or if the script length is zero. If the script length is not
-// zero and parsing succeeds, then the first opcode parsed will be returned.
-//
-// Not returning the full opcode list up until failure also has the benefit of
-// reducing GC pressure, as the list would get immediately thrown away.
-func checkScriptTemplateParseable(script []byte, opcodes *[256]opcode) (*byte, error) {
-	var err error
-
-	// A script of length zero is an unspendable script but it is parseable.
-	var firstOpcode byte
-	var numParsedInstr uint = 0
-
-	for i := 0; i < len(script); {
-		instr := script[i]
-		op := &opcodes[instr]
-		pop := parsedOpcode{opcode: op}
-		i, err = pop.checkParseableInScript(script, i)
-		if err != nil {
-			return nil, err
-		}
-
-		// if this is a op_return then it is unspendable so we set the first
-		// parsed instruction in case it's an op_return
-		if numParsedInstr == 0 {
-			firstOpcode = pop.opcode.value
-		}
-		numParsedInstr++
-	}
-
-	return &firstOpcode, nil
-}
-
 // DisasmString formats a disassembled script for one line printing.  When the
 // script fails to parse, the returned string will contain the disassembled
 // script up to the point the failure occurred along with the string '[error]'
