@@ -159,7 +159,7 @@ func ExtractWitnessProgramInfo(script []byte) (int, []byte, error) {
 			"unable to extract version or witness program")
 	}
 
-	witnessVersion := asSmallInt(pops[0].opcode)
+	witnessVersion := asSmallInt(pops[0].opcode.value)
 	witnessProgram := pops[1].data
 
 	return witnessVersion, witnessProgram, nil
@@ -700,12 +700,12 @@ func calcSignatureHash(prevOutScript []parsedOpcode, hashType SigHashType,
 
 // asSmallInt returns the passed opcode, which must be true according to
 // isSmallInt(), as an integer.
-func asSmallInt(op *opcode) int {
-	if op.value == OP_0 {
+func asSmallInt(op byte) int {
+	if op == OP_0 {
 		return 0
 	}
 
-	return int(op.value - (OP_1 - 1))
+	return int(op - (OP_1 - 1))
 }
 
 // getSigOpCount is the implementation function for counting the number of
@@ -730,7 +730,7 @@ func getSigOpCount(pops []parsedOpcode, precise bool) int {
 			if precise && i > 0 &&
 				pops[i-1].opcode.value >= OP_1 &&
 				pops[i-1].opcode.value <= OP_16 {
-				nSigs += asSmallInt(pops[i-1].opcode)
+				nSigs += asSmallInt(pops[i-1].opcode.value)
 			} else {
 				nSigs += MaxPubKeysPerMultiSig
 			}

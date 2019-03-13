@@ -127,7 +127,7 @@ func isMultiSig(pops []parsedOpcode) bool {
 
 	// Verify the number of pubkeys specified matches the actual number
 	// of pubkeys provided.
-	if l-2-1 != asSmallInt(pops[l-2].opcode) {
+	if l-2-1 != asSmallInt(pops[l-2].opcode.value) {
 		return false
 	}
 
@@ -238,7 +238,7 @@ func expectedInputs(pops []parsedOpcode, class ScriptClass) int {
 		// the original bitcoind bug where OP_CHECKMULTISIG pops an
 		// additional item from the stack, add an extra expected input
 		// for the extra push that is required to compensate.
-		return asSmallInt(pops[0].opcode) + 1
+		return asSmallInt(pops[0].opcode.value) + 1
 
 	case NullDataTy:
 		fallthrough
@@ -395,8 +395,8 @@ func CalcMultiSigStats(script []byte) (int, int, error) {
 		return 0, 0, scriptError(ErrNotMultisigScript, str)
 	}
 
-	numSigs := asSmallInt(pops[0].opcode)
-	numPubKeys := asSmallInt(pops[len(pops)-2].opcode)
+	numSigs := asSmallInt(pops[0].opcode.value)
+	numPubKeys := asSmallInt(pops[len(pops)-2].opcode.value)
 	return numPubKeys, numSigs, nil
 }
 
@@ -617,8 +617,8 @@ func ExtractPkScriptAddrs(pkScript []byte, chainParams *chaincfg.Params) (Script
 		// Therefore the number of required signatures is the 1st item
 		// on the stack and the number of public keys is the 2nd to last
 		// item on the stack.
-		requiredSigs = asSmallInt(pops[0].opcode)
-		numPubKeys := asSmallInt(pops[len(pops)-2].opcode)
+		requiredSigs = asSmallInt(pops[0].opcode.value)
+		numPubKeys := asSmallInt(pops[len(pops)-2].opcode.value)
 
 		// Extract the public keys while skipping any that are invalid.
 		addrs = make([]btcutil.Address, 0, numPubKeys)
@@ -706,7 +706,7 @@ func ExtractAtomicSwapDataPushes(version uint16, pkScript []byte) (*AtomicSwapDa
 		}
 		pushes.SecretSize = int64(locktime)
 	} else if op := pops[2].opcode; isSmallInt(op.value) {
-		pushes.SecretSize = int64(asSmallInt(op))
+		pushes.SecretSize = int64(asSmallInt(op.value))
 	} else {
 		return nil, nil
 	}
@@ -717,7 +717,7 @@ func ExtractAtomicSwapDataPushes(version uint16, pkScript []byte) (*AtomicSwapDa
 		}
 		pushes.LockTime = int64(locktime)
 	} else if op := pops[11].opcode; isSmallInt(op.value) {
-		pushes.LockTime = int64(asSmallInt(op))
+		pushes.LockTime = int64(asSmallInt(op.value))
 	} else {
 		return nil, nil
 	}
