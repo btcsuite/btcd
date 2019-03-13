@@ -174,3 +174,48 @@ func BenchmarkIsPayToScriptHash(b *testing.B) {
 		_ = IsPayToScriptHash(script)
 	}
 }
+
+// BenchmarkIsMultisigScriptLarge benchmarks how long it takes IsMultisigScript
+// to analyze a very large script.
+func BenchmarkIsMultisigScriptLarge(b *testing.B) {
+	script, err := genComplexScript()
+	if err != nil {
+		b.Fatalf("failed to create benchmark script: %v", err)
+	}
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		isMultisig, err := IsMultisigScript(script)
+		if err != nil {
+			b.Fatalf("unexpected err: %v", err)
+		}
+		if isMultisig {
+			b.Fatalf("script should NOT be reported as mutisig script")
+		}
+	}
+}
+
+// BenchmarkIsMultisigScript benchmarks how long it takes IsMultisigScript to
+// analyze a 1-of-2 multisig public key script.
+func BenchmarkIsMultisigScript(b *testing.B) {
+	multisigShortForm := "1 " +
+		"DATA_33 " +
+		"0x030478aaaa2be30772f1e69e581610f1840b3cf2fe7228ee0281cd599e5746f81e " +
+		"DATA_33 " +
+		"0x0284f4d078b236a9ff91661f8ffbe012737cd3507566f30fd97d25f2b23539f3cd " +
+		"2 CHECKMULTISIG"
+	pkScript := mustParseShortForm(multisigShortForm)
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		isMultisig, err := IsMultisigScript(pkScript)
+		if err != nil {
+			b.Fatalf("unexpected err: %v", err)
+		}
+		if !isMultisig {
+			b.Fatalf("script should be reported as a mutisig script")
+		}
+	}
+}

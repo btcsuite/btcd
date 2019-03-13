@@ -244,6 +244,27 @@ func isMultiSig(pops []parsedOpcode) bool {
 	return true
 }
 
+// IsMultisigScript returns whether or not the passed script is a standard
+// multisignature script.
+//
+// NOTE: This function is only valid for version 0 scripts.  Since the function
+// does not accept a script version, the results are undefined for other script
+// versions.
+//
+// The error is DEPRECATED and will be removed in the major version bump.
+func IsMultisigScript(script []byte) (bool, error) {
+	if len(script) == 0 || script == nil {
+		return false, nil
+	}
+
+	pops, err := parseScript(script)
+	if err != nil {
+		return false, err
+	}
+
+	return isMultiSig(pops), nil
+}
+
 // isNullData returns true if the passed script is a null data transaction,
 // false otherwise.
 func isNullData(pops []parsedOpcode) bool {
