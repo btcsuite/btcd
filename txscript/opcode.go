@@ -692,23 +692,6 @@ func (pop *parsedOpcode) checkParseableInScript(script []byte, scriptPos int) (i
 	return scriptPos, nil
 }
 
-// isConditional returns whether or not the opcode is a conditional opcode which
-// changes the conditional execution stack when executed.
-func (pop *parsedOpcode) isConditional() bool {
-	switch pop.opcode.value {
-	case OP_IF:
-		return true
-	case OP_NOTIF:
-		return true
-	case OP_ELSE:
-		return true
-	case OP_ENDIF:
-		return true
-	default:
-		return false
-	}
-}
-
 // checkMinimalDataPush returns whether or not the current data push uses the
 // smallest possible opcode to represent it.  For example, the value 15 could
 // be pushed with OP_DATA_1 15 (among other variations); however, OP_15 is a
