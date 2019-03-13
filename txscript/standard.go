@@ -189,15 +189,6 @@ func isScriptHashScript(script []byte) bool {
 	return extractScriptHash(script) != nil
 }
 
-// isPubkey returns true if the script passed is a pay-to-pubkey transaction,
-// false otherwise.
-func isPubkey(pops []parsedOpcode) bool {
-	// Valid pubkeys are either 33 or 65 bytes.
-	return len(pops) == 2 &&
-		(len(pops[0].data) == 33 || len(pops[0].data) == 65) &&
-		pops[1].opcode.value == OP_CHECKSIG
-}
-
 // isPubkeyHash returns true if the script passed is a pay-to-pubkey-hash
 // transaction, false otherwise.
 func isPubkeyHash(pops []parsedOpcode) bool {
