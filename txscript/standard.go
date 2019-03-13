@@ -860,11 +860,27 @@ func ExtractPkScriptAddrs(pkScript []byte, chainParams *chaincfg.Params) (Script
 		return PubKeyTy, addrs, 1, nil
 	}
 
+	// Check for multi-signature script.
+	const scriptVersion = 0
+	details := extractMultisigScriptDetails(scriptVersion, pkScript, true)
+	if details.valid {
+		// Convert the public keys while skipping any that are invalid.
+		addrs := make([]btcutil.Address, 0, len(details.pubKeys))
+		for _, pubkey := range details.pubKeys {
+			addr, err := btcutil.NewAddressPubKey(pubkey, chainParams)
+			if err == nil {
+				addrs = append(addrs, addr)
+			}
+		}
+		return MultiSigTy, addrs, details.requiredSigs, nil
+	}
+
 	// Fall back to slow path.  Ultimately these are intended to be replaced by
 	// faster variants based on the unparsed raw scripts.
 
 	var addrs []btcutil.Address
 	var requiredSigs int
+	var err error
 
 	// No valid addresses or required signatures if the script doesn't
 	// parse.
@@ -873,7 +889,6 @@ func ExtractPkScriptAddrs(pkScript []byte, chainParams *chaincfg.Params) (Script
 		return NonStandardTy, nil, 0, err
 	}
 
-	const scriptVersion = 0
 	scriptClass := typeOfScript(scriptVersion, pkScript)
 
 	switch scriptClass {
@@ -899,25 +914,6 @@ func ExtractPkScriptAddrs(pkScript []byte, chainParams *chaincfg.Params) (Script
 			chainParams)
 		if err == nil {
 			addrs = append(addrs, addr)
-		}
-
-	case MultiSigTy:
-		// A multi-signature script is of the form:
-		//  <numsigs> <pubkey> <pubkey> <pubkey>... <numpubkeys> OP_CHECKMULTISIG
-		// Therefore the number of required signatures is the 1st item
-		// on the stack and the number of public keys is the 2nd to last
-		// item on the stack.
-		requiredSigs = asSmallInt(pops[0].opcode.value)
-		numPubKeys := asSmallInt(pops[len(pops)-2].opcode.value)
-
-		// Extract the public keys while skipping any that are invalid.
-		addrs = make([]btcutil.Address, 0, numPubKeys)
-		for i := 0; i < numPubKeys; i++ {
-			addr, err := btcutil.NewAddressPubKey(pops[i+1].data,
-				chainParams)
-			if err == nil {
-				addrs = append(addrs, addr)
-			}
 		}
 
 	case NullDataTy:
