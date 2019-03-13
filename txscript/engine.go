@@ -208,6 +208,23 @@ func isOpcodeAlwaysIllegal(opcode byte) bool {
 	}
 }
 
+// isOpcodeConditional returns whether or not the opcode is a conditional opcode
+// which changes the conditional execution stack when executed.
+func isOpcodeConditional(opcode byte) bool {
+	switch opcode {
+	case OP_IF:
+		return true
+	case OP_NOTIF:
+		return true
+	case OP_ELSE:
+		return true
+	case OP_ENDIF:
+		return true
+	default:
+		return false
+	}
+}
+
 // executeOpcode peforms execution on the passed opcode.  It takes into account
 // whether or not it is hidden by conditionals, but some rules still must be
 // tested in this case.
@@ -243,7 +260,7 @@ func (vm *Engine) executeOpcode(pop *parsedOpcode) error {
 
 	// Nothing left to do when this is not a conditional opcode and it is
 	// not in an executing branch.
-	if !vm.isBranchExecuting() && !pop.isConditional() {
+	if !vm.isBranchExecuting() && !isOpcodeConditional(pop.opcode.value) {
 		return nil
 	}
 
