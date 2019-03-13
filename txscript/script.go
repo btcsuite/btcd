@@ -56,6 +56,8 @@ func isSmallInt(op byte) bool {
 
 // isScriptHash returns true if the script passed is a pay-to-script-hash
 // transaction, false otherwise.
+//
+// DEPRECATED.  Use isScriptHashScript or extractScriptHash instead.
 func isScriptHash(pops []parsedOpcode) bool {
 	return len(pops) == 3 &&
 		pops[0].opcode.value == OP_HASH160 &&
@@ -77,12 +79,14 @@ func IsPayToPubKeyHash(script []byte) bool {
 
 // IsPayToScriptHash returns true if the script is in the standard
 // pay-to-script-hash (P2SH) format, false otherwise.
+//
+// WARNING: This function always treats the passed script as version 0.  Great
+// care must be taken if introducing a new script version because it is used in
+// consensus which, unfortunately as of the time of this writing, does not check
+// script versions before determining if the script is a P2SH which means nodes
+// on existing rules will analyze new version scripts as if they were version 0.
 func IsPayToScriptHash(script []byte) bool {
-	pops, err := parseScript(script)
-	if err != nil {
-		return false
-	}
-	return isScriptHash(pops)
+	return isScriptHashScript(script)
 }
 
 // isWitnessScriptHash returns true if the passed script is a
