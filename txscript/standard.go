@@ -481,7 +481,11 @@ func NewScriptClass(name string) (*ScriptClass, error) {
 // then -1 is returned. We are an internal function and thus assume that class
 // is the real class of pops (and we can thus assume things that were determined
 // while finding out the type).
-func expectedInputs(pops []parsedOpcode, class ScriptClass) int {
+//
+// NOTE: This function is only valid for version 0 scripts.  Since the function
+// does not accept a script version, the results are undefined for other script
+// versions.
+func expectedInputs(script []byte, class ScriptClass) int {
 	switch class {
 	case PubKeyTy:
 		return 1
@@ -508,7 +512,7 @@ func expectedInputs(pops []parsedOpcode, class ScriptClass) int {
 		// the original bitcoind bug where OP_CHECKMULTISIG pops an
 		// additional item from the stack, add an extra expected input
 		// for the extra push that is required to compensate.
-		return asSmallInt(pops[0].opcode.value) + 1
+		return asSmallInt(script[0]) + 1
 
 	case NullDataTy:
 		fallthrough
@@ -549,52 +553,52 @@ type ScriptInfo struct {
 func CalcScriptInfo(sigScript, pkScript []byte, witness wire.TxWitness,
 	bip16, segwit bool) (*ScriptInfo, error) {
 
+	// Count the number of opcodes in the signature script while also ensuring
+	// that successfully parses.  Since there is a check below to ensure the
+	// script is push only, this equates to the number of inputs to the public
+	// key script.
 	const scriptVersion = 0
-
-	sigPops, err := parseScript(sigScript)
-	if err != nil {
+	var numInputs int
+	tokenizer := MakeScriptTokenizer(scriptVersion, sigScript)
+	for tokenizer.Next() {
+		numInputs++
+	}
+	if err := tokenizer.Err(); err != nil {
 		return nil, err
 	}
 
-	pkPops, err := parseScript(pkScript)
-	if err != nil {
+	if err := checkScriptParses(scriptVersion, pkScript); err != nil {
 		return nil, err
+	}
+
+	// Can't have a signature script that doesn't just push data.
+	if !IsPushOnlyScript(sigScript) {
+		return nil, scriptError(ErrNotPushOnly,
+			"signature script is not push only")
 	}
 
 	si := new(ScriptInfo)
 	si.PkScriptClass = typeOfScript(scriptVersion, pkScript)
 
-	// Can't have a signature script that doesn't just push data.
-	if !isPushOnly(sigPops) {
-		return nil, scriptError(ErrNotPushOnly,
-			"signature script is not push only")
-	}
-
-	si.ExpectedInputs = expectedInputs(pkPops, si.PkScriptClass)
+	si.ExpectedInputs = expectedInputs(pkScript, si.PkScriptClass)
 
 	switch {
 	// Count sigops taking into account pay-to-script-hash.
 	case si.PkScriptClass == ScriptHashTy && bip16 && !segwit:
-		// The pay-to-hash-script is the final data push of the
-		// signature script.
-		script := sigPops[len(sigPops)-1].data
-		shPops, err := parseScript(script)
-		if err != nil {
-			return nil, err
-		}
-
-		redeemClass := typeOfScript(scriptVersion, script)
-		shInputs := expectedInputs(shPops, redeemClass)
-		if shInputs == -1 {
+		// The redeem script is the final data push of the signature script.
+		redeemScript := finalOpcodeData(scriptVersion, sigScript)
+		reedeemClass := typeOfScript(scriptVersion, redeemScript)
+		rsInputs := expectedInputs(redeemScript, reedeemClass)
+		if rsInputs == -1 {
 			si.ExpectedInputs = -1
 		} else {
-			si.ExpectedInputs += shInputs
+			si.ExpectedInputs += rsInputs
 		}
-		si.SigOps = getSigOpCount(shPops, true)
+		si.SigOps = countSigOpsV0(redeemScript, true)
 
 		// All entries pushed to stack (or are OP_RESERVED and exec
 		// will fail).
-		si.NumInputs = len(sigPops)
+		si.NumInputs = numInputs
 
 	// If segwit is active, and this is a regular p2wkh output, then we'll
 	// treat the script as a p2pkh output in essence.
@@ -610,10 +614,8 @@ func CalcScriptInfo(sigScript, pkScript []byte, witness wire.TxWitness,
 
 		// Extract the pushed witness program from the sigScript so we
 		// can determine the number of expected inputs.
-		pkPops, _ := parseScript(sigScript[1:])
-
 		redeemClass := typeOfScript(scriptVersion, sigScript[1:])
-		shInputs := expectedInputs(pkPops, redeemClass)
+		shInputs := expectedInputs(sigScript[1:], redeemClass)
 		if shInputs == -1 {
 			si.ExpectedInputs = -1
 		} else {
@@ -623,18 +625,14 @@ func CalcScriptInfo(sigScript, pkScript []byte, witness wire.TxWitness,
 		si.SigOps = GetWitnessSigOpCount(sigScript, pkScript, witness)
 
 		si.NumInputs = len(witness)
-		si.NumInputs += len(sigPops)
+		si.NumInputs += numInputs
 
 	// If segwit is active, and this is a p2wsh output, then we'll need to
 	// examine the witness script to generate accurate script info.
 	case si.PkScriptClass == WitnessV0ScriptHashTy && segwit:
-		// The witness script is the final element of the witness
-		// stack.
 		witnessScript := witness[len(witness)-1]
-		pops, _ := parseScript(witnessScript)
-
 		redeemClass := typeOfScript(scriptVersion, witnessScript)
-		shInputs := expectedInputs(pops, redeemClass)
+		shInputs := expectedInputs(witnessScript, redeemClass)
 		if shInputs == -1 {
 			si.ExpectedInputs = -1
 		} else {
@@ -645,11 +643,11 @@ func CalcScriptInfo(sigScript, pkScript []byte, witness wire.TxWitness,
 		si.NumInputs = len(witness)
 
 	default:
-		si.SigOps = getSigOpCount(pkPops, true)
+		si.SigOps = countSigOpsV0(pkScript, true)
 
 		// All entries pushed to stack (or are OP_RESERVED and exec
 		// will fail).
-		si.NumInputs = len(sigPops)
+		si.NumInputs = numInputs
 	}
 
 	return si, nil
