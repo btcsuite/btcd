@@ -1,4 +1,5 @@
 // Copyright (c) 2013-2017 The btcsuite developers
+// Copyright (c) 2015-2019 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -45,11 +46,12 @@ const (
 
 // isSmallInt returns whether or not the opcode is considered a small integer,
 // which is an OP_0, or OP_1 through OP_16.
-func isSmallInt(op *opcode) bool {
-	if op.value == OP_0 || (op.value >= OP_1 && op.value <= OP_16) {
-		return true
-	}
-	return false
+//
+// NOTE: This function is only valid for version 0 opcodes.  Since the function
+// does not accept a script version, the results are undefined for other script
+// versions.
+func isSmallInt(op byte) bool {
+	return op == OP_0 || (op >= OP_1 && op <= OP_16)
 }
 
 // isScriptHash returns true if the script passed is a pay-to-script-hash
@@ -136,7 +138,7 @@ func IsWitnessProgram(script []byte) bool {
 // bytes.
 func isWitnessProgram(pops []parsedOpcode) bool {
 	return len(pops) == 2 &&
-		isSmallInt(pops[0].opcode) &&
+		isSmallInt(pops[0].opcode.value) &&
 		canonicalPush(pops[1]) &&
 		(len(pops[1].data) >= 2 && len(pops[1].data) <= 40)
 }

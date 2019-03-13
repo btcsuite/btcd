@@ -115,10 +115,10 @@ func isMultiSig(pops []parsedOpcode) bool {
 	if l < 4 {
 		return false
 	}
-	if !isSmallInt(pops[0].opcode) {
+	if !isSmallInt(pops[0].opcode.value) {
 		return false
 	}
-	if !isSmallInt(pops[l-2].opcode) {
+	if !isSmallInt(pops[l-2].opcode.value) {
 		return false
 	}
 	if pops[l-1].opcode.value != OP_CHECKMULTISIG {
@@ -153,7 +153,7 @@ func isNullData(pops []parsedOpcode) bool {
 
 	return l == 2 &&
 		pops[0].opcode.value == OP_RETURN &&
-		(isSmallInt(pops[1].opcode) || pops[1].opcode.value <=
+		(isSmallInt(pops[1].opcode.value) || pops[1].opcode.value <=
 			OP_PUSHDATA4) &&
 		len(pops[1].data) <= MaxDataCarrierSize
 }
@@ -705,7 +705,7 @@ func ExtractAtomicSwapDataPushes(version uint16, pkScript []byte) (*AtomicSwapDa
 			return nil, nil
 		}
 		pushes.SecretSize = int64(locktime)
-	} else if op := pops[2].opcode; isSmallInt(op) {
+	} else if op := pops[2].opcode; isSmallInt(op.value) {
 		pushes.SecretSize = int64(asSmallInt(op))
 	} else {
 		return nil, nil
@@ -716,7 +716,7 @@ func ExtractAtomicSwapDataPushes(version uint16, pkScript []byte) (*AtomicSwapDa
 			return nil, nil
 		}
 		pushes.LockTime = int64(locktime)
-	} else if op := pops[11].opcode; isSmallInt(op) {
+	} else if op := pops[11].opcode; isSmallInt(op.value) {
 		pushes.LockTime = int64(asSmallInt(op))
 	} else {
 		return nil, nil
