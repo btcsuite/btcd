@@ -385,8 +385,7 @@ func (vm *Engine) executeOpcode(op *opcode, data []byte) error {
 		}
 	}
 
-	pop := parsedOpcode{opcode: op, data: data}
-	return op.opfunc(&pop, vm)
+	return op.opfunc(op, data, vm)
 }
 
 // checkValidPC returns an error if the current script position is not valid for
