@@ -318,7 +318,7 @@ func isCanonicalPush(opcode byte, data []byte) bool {
 	return true
 }
 
-// removeOpcodeByDataRaw will return the script minus any opcodes that perform a
+// removeOpcodeByData will return the script minus any opcodes that perform a
 // canonical push of data that contains the passed data to remove.  This
 // function assumes it is provided a version 0 script as any future version of
 // script should avoid this functionality since it is unncessary due to the
@@ -332,7 +332,7 @@ func isCanonicalPush(opcode byte, data []byte) bool {
 // NOTE: This function is only valid for version 0 scripts.  Since the function
 // does not accept a script version, the results are undefined for other script
 // versions.
-func removeOpcodeByDataRaw(script []byte, dataToRemove []byte) []byte {
+func removeOpcodeByData(script []byte, dataToRemove []byte) []byte {
 	// Avoid work when possible.
 	if len(script) == 0 || len(dataToRemove) == 0 {
 		return script
