@@ -356,3 +356,29 @@ func BenchmarkGetSigOpCount(b *testing.B) {
 		_ = GetSigOpCount(script)
 	}
 }
+
+// BenchmarkGetPreciseSigOpCount benchmarks how long it takes to count the
+// signature operations of a very large script using the more precise counting
+// method.
+func BenchmarkGetPreciseSigOpCount(b *testing.B) {
+	redeemScript, err := genComplexScript()
+	if err != nil {
+		b.Fatalf("failed to create benchmark script: %v", err)
+	}
+
+	// Create a fake pay-to-script-hash to pass the necessary checks and create
+	// the signature script accordingly by pushing the generated "redeem" script
+	// as the final data push so the benchmark will cover the p2sh path.
+	scriptHash := "0x0000000000000000000000000000000000000001"
+	pkScript := mustParseShortForm("HASH160 DATA_20 " + scriptHash + " EQUAL")
+	sigScript, err := NewScriptBuilder().AddFullData(redeemScript).Script()
+	if err != nil {
+		b.Fatalf("failed to create signature script: %v", err)
+	}
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = GetPreciseSigOpCount(sigScript, pkScript, true)
+	}
+}
