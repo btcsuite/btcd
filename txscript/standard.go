@@ -216,6 +216,8 @@ func isPubkeyHash(pops []parsedOpcode) bool {
 
 // isMultiSig returns true if the passed script is a multisig transaction, false
 // otherwise.
+//
+// DEPECATED.  Use isMultisigScript or extractMultisigScriptDetails instead.
 func isMultiSig(pops []parsedOpcode) bool {
 	// The absolute minimum is 1 pubkey:
 	// OP_0/OP_1-16 <pubkey> OP_1 OP_CHECKMULTISIG
@@ -248,6 +250,108 @@ func isMultiSig(pops []parsedOpcode) bool {
 	return true
 }
 
+// multiSigDetails houses details extracted from a standard multisig script.
+type multiSigDetails struct {
+	requiredSigs int
+	numPubKeys   int
+	pubKeys      [][]byte
+	valid        bool
+}
+
+// extractMultisigScriptDetails attempts to extract details from the passed
+// script if it is a standard multisig script.  The returned details struct will
+// have the valid flag set to false otherwise.
+//
+// The extract pubkeys flag indicates whether or not the pubkeys themselves
+// should also be extracted and is provided because extracting them results in
+// an allocation that the caller might wish to avoid.  The pubKeys member of
+// the returned details struct will be nil when the flag is false.
+//
+// NOTE: This function is only valid for version 0 scripts.  The returned
+// details struct will always be empty and have the valid flag set to false for
+// other script versions.
+func extractMultisigScriptDetails(scriptVersion uint16, script []byte, extractPubKeys bool) multiSigDetails {
+	// The only currently supported script version is 0.
+	if scriptVersion != 0 {
+		return multiSigDetails{}
+	}
+
+	// A multi-signature script is of the form:
+	//  NUM_SIGS PUBKEY PUBKEY PUBKEY ... NUM_PUBKEYS OP_CHECKMULTISIG
+
+	// The script can't possibly be a multisig script if it doesn't end with
+	// OP_CHECKMULTISIG or have at least two small integer pushes preceding it.
+	// Fail fast to avoid more work below.
+	if len(script) < 3 || script[len(script)-1] != OP_CHECKMULTISIG {
+		return multiSigDetails{}
+	}
+
+	// The first opcode must be a small integer specifying the number of
+	// signatures required.
+	tokenizer := MakeScriptTokenizer(scriptVersion, script)
+	if !tokenizer.Next() || !isSmallInt(tokenizer.Opcode()) {
+		return multiSigDetails{}
+	}
+	requiredSigs := asSmallInt(tokenizer.Opcode())
+
+	// The next series of opcodes must either push public keys or be a small
+	// integer specifying the number of public keys.
+	var numPubKeys int
+	var pubKeys [][]byte
+	if extractPubKeys {
+		pubKeys = make([][]byte, 0, MaxPubKeysPerMultiSig)
+	}
+	for tokenizer.Next() {
+		if isSmallInt(tokenizer.Opcode()) {
+			break
+		}
+
+		data := tokenizer.Data()
+		numPubKeys++
+		if !isStrictPubKeyEncoding(data) {
+			continue
+		}
+		if extractPubKeys {
+			pubKeys = append(pubKeys, data)
+		}
+	}
+	if tokenizer.Done() {
+		return multiSigDetails{}
+	}
+
+	// The next opcode must be a small integer specifying the number of public
+	// keys required.
+	op := tokenizer.Opcode()
+	if !isSmallInt(op) || asSmallInt(op) != numPubKeys {
+		return multiSigDetails{}
+	}
+
+	// There must only be a single opcode left unparsed which will be
+	// OP_CHECKMULTISIG per the check above.
+	if int32(len(tokenizer.Script()))-tokenizer.ByteIndex() != 1 {
+		return multiSigDetails{}
+	}
+
+	return multiSigDetails{
+		requiredSigs: requiredSigs,
+		numPubKeys:   numPubKeys,
+		pubKeys:      pubKeys,
+		valid:        true,
+	}
+}
+
+// isMultisigScript returns whether or not the passed script is a standard
+// multisig script.
+//
+// NOTE: This function is only valid for version 0 scripts.  It will always
+// return false for other script versions.
+func isMultisigScript(scriptVersion uint16, script []byte) bool {
+	// Since this is only checking the form of the script, don't extract the
+	// public keys to avoid the allocation.
+	details := extractMultisigScriptDetails(scriptVersion, script, false)
+	return details.valid
+}
+
 // IsMultisigScript returns whether or not the passed script is a standard
 // multisignature script.
 //
@@ -257,16 +361,8 @@ func isMultiSig(pops []parsedOpcode) bool {
 //
 // The error is DEPRECATED and will be removed in the major version bump.
 func IsMultisigScript(script []byte) (bool, error) {
-	if len(script) == 0 || script == nil {
-		return false, nil
-	}
-
-	pops, err := parseScript(script)
-	if err != nil {
-		return false, err
-	}
-
-	return isMultiSig(pops), nil
+	const scriptVersion = 0
+	return isMultisigScript(scriptVersion, script), nil
 }
 
 // isNullData returns true if the passed script is a null data transaction,
