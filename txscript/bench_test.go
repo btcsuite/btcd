@@ -219,3 +219,51 @@ func BenchmarkIsMultisigScript(b *testing.B) {
 		}
 	}
 }
+
+// BenchmarkIsMultisigSigScript benchmarks how long it takes IsMultisigSigScript
+// to analyze a very large script.
+func BenchmarkIsMultisigSigScriptLarge(b *testing.B) {
+	script, err := genComplexScript()
+	if err != nil {
+		b.Fatalf("failed to create benchmark script: %v", err)
+	}
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		if IsMultisigSigScript(script) {
+			b.Fatalf("script should NOT be reported as mutisig sig script")
+		}
+	}
+}
+
+// BenchmarkIsMultisigSigScript benchmarks how long it takes IsMultisigSigScript
+// to analyze both a 1-of-2 multisig public key script (which should be false)
+// and a signature script comprised of a pay-to-script-hash 1-of-2 multisig
+// redeem script (which should be true).
+func BenchmarkIsMultisigSigScript(b *testing.B) {
+	multisigShortForm := "1 " +
+		"DATA_33 " +
+		"0x030478aaaa2be30772f1e69e581610f1840b3cf2fe7228ee0281cd599e5746f81e " +
+		"DATA_33 " +
+		"0x0284f4d078b236a9ff91661f8ffbe012737cd3507566f30fd97d25f2b23539f3cd " +
+		"2 CHECKMULTISIG"
+	pkScript := mustParseShortForm(multisigShortForm)
+
+	sigHex := "0x304402205795c3ab6ba11331eeac757bf1fc9c34bef0c7e1a9c8bd5eebb8" +
+		"82f3b79c5838022001e0ab7b4c7662e4522dc5fa479e4b4133fa88c6a53d895dc1d5" +
+		"2eddc7bbcf2801 "
+	sigScript := mustParseShortForm("DATA_71 " + sigHex + "DATA_71 " +
+		multisigShortForm)
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		if IsMultisigSigScript(pkScript) {
+			b.Fatalf("script should NOT be reported as mutisig sig script")
+		}
+		if !IsMultisigSigScript(sigScript) {
+			b.Fatalf("script should be reported as a mutisig sig script")
+		}
+	}
+}
