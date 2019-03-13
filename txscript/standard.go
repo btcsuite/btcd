@@ -858,6 +858,16 @@ func ExtractPkScriptAddrs(pkScript []byte, chainParams *chaincfg.Params) (Script
 		return ScriptHashTy, scriptHashToAddrs(hash, chainParams), 1, nil
 	}
 
+	// Check for pay-to-pubkey script.
+	if data := extractPubKey(pkScript); data != nil {
+		var addrs []btcutil.Address
+		addr, err := btcutil.NewAddressPubKey(data, chainParams)
+		if err == nil {
+			addrs = append(addrs, addr)
+		}
+		return PubKeyTy, addrs, 1, nil
+	}
+
 	// Fall back to slow path.  Ultimately these are intended to be replaced by
 	// faster variants based on the unparsed raw scripts.
 
@@ -883,17 +893,6 @@ func ExtractPkScriptAddrs(pkScript []byte, chainParams *chaincfg.Params) (Script
 		requiredSigs = 1
 		addr, err := btcutil.NewAddressWitnessPubKeyHash(pops[1].data,
 			chainParams)
-		if err == nil {
-			addrs = append(addrs, addr)
-		}
-
-	case PubKeyTy:
-		// A pay-to-pubkey script is of the form:
-		//  <pubkey> OP_CHECKSIG
-		// Therefore the pubkey is the first item on the stack.
-		// Skip the pubkey if it's invalid for some reason.
-		requiredSigs = 1
-		addr, err := btcutil.NewAddressPubKey(pops[0].data, chainParams)
 		if err == nil {
 			addrs = append(addrs, addr)
 		}
