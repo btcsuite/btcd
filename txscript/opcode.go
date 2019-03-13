@@ -692,20 +692,6 @@ func (pop *parsedOpcode) checkParseableInScript(script []byte, scriptPos int) (i
 	return scriptPos, nil
 }
 
-// alwaysIllegal returns whether or not the opcode is always illegal when passed
-// over by the program counter even if in a non-executed branch (it isn't a
-// coincidence that they are conditionals).
-func (pop *parsedOpcode) alwaysIllegal() bool {
-	switch pop.opcode.value {
-	case OP_VERIF:
-		return true
-	case OP_VERNOTIF:
-		return true
-	default:
-		return false
-	}
-}
-
 // isConditional returns whether or not the opcode is a conditional opcode which
 // changes the conditional execution stack when executed.
 func (pop *parsedOpcode) isConditional() bool {
