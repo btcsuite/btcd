@@ -193,18 +193,6 @@ func isScriptHashScript(script []byte) bool {
 	return extractScriptHash(script) != nil
 }
 
-// isPubkeyHash returns true if the script passed is a pay-to-pubkey-hash
-// transaction, false otherwise.
-func isPubkeyHash(pops []parsedOpcode) bool {
-	return len(pops) == 5 &&
-		pops[0].opcode.value == OP_DUP &&
-		pops[1].opcode.value == OP_HASH160 &&
-		pops[2].opcode.value == OP_DATA_20 &&
-		pops[3].opcode.value == OP_EQUALVERIFY &&
-		pops[4].opcode.value == OP_CHECKSIG
-
-}
-
 // multiSigDetails houses details extracted from a standard multisig script.
 type multiSigDetails struct {
 	requiredSigs int
