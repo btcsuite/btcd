@@ -8,7 +8,6 @@ import (
 	"bytes"
 	"crypto/sha1"
 	"crypto/sha256"
-	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"hash"
@@ -738,62 +737,6 @@ func disasmOpcode(buf *strings.Builder, op *opcode, data []byte, compact bool) {
 	}
 
 	buf.WriteString(fmt.Sprintf(" 0x%02x", data))
-}
-
-// bytes returns any data associated with the opcode encoded as it would be in
-// a script.  This is used for unparsing scripts from parsed opcodes.
-func (pop *parsedOpcode) bytes() ([]byte, error) {
-	var retbytes []byte
-	if pop.opcode.length > 0 {
-		retbytes = make([]byte, 1, pop.opcode.length)
-	} else {
-		retbytes = make([]byte, 1, 1+len(pop.data)-
-			pop.opcode.length)
-	}
-
-	retbytes[0] = pop.opcode.value
-	if pop.opcode.length == 1 {
-		if len(pop.data) != 0 {
-			str := fmt.Sprintf("internal consistency error - "+
-				"parsed opcode %s has data length %d when %d "+
-				"was expected", pop.opcode.name, len(pop.data),
-				0)
-			return nil, scriptError(ErrInternal, str)
-		}
-		return retbytes, nil
-	}
-	nbytes := pop.opcode.length
-	if pop.opcode.length < 0 {
-		l := len(pop.data)
-		// tempting just to hardcode to avoid the complexity here.
-		switch pop.opcode.length {
-		case -1:
-			retbytes = append(retbytes, byte(l))
-			nbytes = int(retbytes[1]) + len(retbytes)
-		case -2:
-			retbytes = append(retbytes, byte(l&0xff),
-				byte(l>>8&0xff))
-			nbytes = int(binary.LittleEndian.Uint16(retbytes[1:])) +
-				len(retbytes)
-		case -4:
-			retbytes = append(retbytes, byte(l&0xff),
-				byte((l>>8)&0xff), byte((l>>16)&0xff),
-				byte((l>>24)&0xff))
-			nbytes = int(binary.LittleEndian.Uint32(retbytes[1:])) +
-				len(retbytes)
-		}
-	}
-
-	retbytes = append(retbytes, pop.data...)
-
-	if len(retbytes) != nbytes {
-		str := fmt.Sprintf("internal consistency error - "+
-			"parsed opcode %s has data length %d when %d was "+
-			"expected", pop.opcode.name, len(retbytes), nbytes)
-		return nil, scriptError(ErrInternal, str)
-	}
-
-	return retbytes, nil
 }
 
 // *******************************************
