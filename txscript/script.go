@@ -769,6 +769,25 @@ func GetSigOpCount(script []byte) int {
 	return getSigOpCount(pops, false)
 }
 
+// finalOpcodeData returns the data associated with the final opcode in the
+// script.  It will return nil if the script fails to parse.
+func finalOpcodeData(scriptVersion uint16, script []byte) []byte {
+	// Avoid unnecessary work.
+	if len(script) == 0 {
+		return nil
+	}
+
+	var data []byte
+	tokenizer := MakeScriptTokenizer(scriptVersion, script)
+	for tokenizer.Next() {
+		data = tokenizer.Data()
+	}
+	if tokenizer.Err() != nil {
+		return nil
+	}
+	return data
+}
+
 // GetPreciseSigOpCount returns the number of signature operations in
 // scriptPubKey.  If bip16 is true then scriptSig may be searched for the
 // Pay-To-Script-Hash script in order to find the precise number of signature

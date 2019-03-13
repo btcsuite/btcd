@@ -365,22 +365,39 @@ func IsMultisigScript(script []byte) (bool, error) {
 	return isMultisigScript(scriptVersion, script), nil
 }
 
-// IsMultisigSigScript takes a script, parses it, then returns whether or
-// not it is a multisignature script.
+// IsMultisigSigScript returns whether or not the passed script appears to be a
+// signature script which consists of a pay-to-script-hash multi-signature
+// redeem script.  Determining if a signature script is actually a redemption of
+// pay-to-script-hash requires the associated public key script which is often
+// expensive to obtain.  Therefore, this makes a fast best effort guess that has
+// a high probability of being correct by checking if the signature script ends
+// with a data push and treating that data push as if it were a p2sh redeem
+// script
+//
+// NOTE: This function is only valid for version 0 scripts.  Since the function
+// does not accept a script version, the results are undefined for other script
+// versions.
 func IsMultisigSigScript(script []byte) bool {
-	if len(script) == 0 || script == nil {
-		return false
-	}
-	pops, err := parseScript(script)
-	if err != nil {
-		return false
-	}
-	subPops, err := parseScript(pops[len(pops)-1].data)
-	if err != nil {
+	const scriptVersion = 0
+
+	// The script can't possibly be a multisig signature script if it doesn't
+	// end with OP_CHECKMULTISIG in the redeem script or have at least two small
+	// integers preceding it, and the redeem script itself must be preceded by
+	// at least a data push opcode.  Fail fast to avoid more work below.
+	if len(script) < 4 || script[len(script)-1] != OP_CHECKMULTISIG {
 		return false
 	}
 
-	return isMultiSig(subPops)
+	// Parse through the script to find the last opcode and any data it might
+	// push and treat it as a p2sh redeem script even though it might not
+	// actually be one.
+	possibleRedeemScript := finalOpcodeData(scriptVersion, script)
+	if possibleRedeemScript == nil {
+		return false
+	}
+
+	// Finally, return if that possible redeem script is a multisig script.
+	return isMultisigScript(scriptVersion, possibleRedeemScript)
 }
 
 // isNullData returns true if the passed script is a null data transaction,
