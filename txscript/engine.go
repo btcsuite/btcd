@@ -225,6 +225,55 @@ func isOpcodeConditional(opcode byte) bool {
 	}
 }
 
+// checkMinimalDataPush returns whether or not the provided opcode is the
+// smallest possible way to represent the given data.  For example, the value 15
+// could be pushed with OP_DATA_1 15 (among other variations); however, OP_15 is
+// a single opcode that represents the same value and is only a single byte
+// versus two bytes.
+func checkMinimalDataPush(op *opcode, data []byte) error {
+	opcodeVal := op.value
+	dataLen := len(data)
+	switch {
+	case dataLen == 0 && opcodeVal != OP_0:
+		str := fmt.Sprintf("zero length data push is encoded with opcode %s "+
+			"instead of OP_0", op.name)
+		return scriptError(ErrMinimalData, str)
+	case dataLen == 1 && data[0] >= 1 && data[0] <= 16:
+		if opcodeVal != OP_1+data[0]-1 {
+			// Should have used OP_1 .. OP_16
+			str := fmt.Sprintf("data push of the value %d encoded with opcode "+
+				"%s instead of OP_%d", data[0], op.name, data[0])
+			return scriptError(ErrMinimalData, str)
+		}
+	case dataLen == 1 && data[0] == 0x81:
+		if opcodeVal != OP_1NEGATE {
+			str := fmt.Sprintf("data push of the value -1 encoded with opcode "+
+				"%s instead of OP_1NEGATE", op.name)
+			return scriptError(ErrMinimalData, str)
+		}
+	case dataLen <= 75:
+		if int(opcodeVal) != dataLen {
+			// Should have used a direct push
+			str := fmt.Sprintf("data push of %d bytes encoded with opcode %s "+
+				"instead of OP_DATA_%d", dataLen, op.name, dataLen)
+			return scriptError(ErrMinimalData, str)
+		}
+	case dataLen <= 255:
+		if opcodeVal != OP_PUSHDATA1 {
+			str := fmt.Sprintf("data push of %d bytes encoded with opcode %s "+
+				"instead of OP_PUSHDATA1", dataLen, op.name)
+			return scriptError(ErrMinimalData, str)
+		}
+	case dataLen <= 65535:
+		if opcodeVal != OP_PUSHDATA2 {
+			str := fmt.Sprintf("data push of %d bytes encoded with opcode %s "+
+				"instead of OP_PUSHDATA2", dataLen, op.name)
+			return scriptError(ErrMinimalData, str)
+		}
+	}
+	return nil
+}
+
 // executeOpcode peforms execution on the passed opcode.  It takes into account
 // whether or not it is hidden by conditionals, but some rules still must be
 // tested in this case.
@@ -269,7 +318,7 @@ func (vm *Engine) executeOpcode(pop *parsedOpcode) error {
 	if vm.dstack.verifyMinimalData && vm.isBranchExecuting() &&
 		pop.opcode.value >= 0 && pop.opcode.value <= OP_PUSHDATA4 {
 
-		if err := pop.checkMinimalDataPush(); err != nil {
+		if err := checkMinimalDataPush(pop.opcode, pop.data); err != nil {
 			return err
 		}
 	}
