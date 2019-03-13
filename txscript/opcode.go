@@ -9,8 +9,10 @@ import (
 	"crypto/sha1"
 	"crypto/sha256"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"hash"
+	"strings"
 
 	"golang.org/x/crypto/ripemd160"
 
@@ -815,45 +817,60 @@ func (pop *parsedOpcode) checkMinimalDataPush() error {
 	return nil
 }
 
-// print returns a human-readable string representation of the opcode for use
-// in script disassembly.
-func (pop *parsedOpcode) print(oneline bool) string {
-	// The reference implementation one-line disassembly replaces opcodes
-	// which represent values (e.g. OP_0 through OP_16 and OP_1NEGATE)
-	// with the raw value.  However, when not doing a one-line dissassembly,
-	// we prefer to show the actual opcode names.  Thus, only replace the
-	// opcodes in question when the oneline flag is set.
-	opcodeName := pop.opcode.name
-	if oneline {
+// disasmOpcode writes a human-readable disassembly of the provided opcode and
+// data into the provided buffer.  The compact flag indicates the disassembly
+// should print a more compact representation of data-carrying and small integer
+// opcodes.  For example, OP_0 through OP_16 are replaced with the numeric value
+// and data pushes are printed as only the hex representation of the data as
+// opposed to including the opcode that specifies the amount of data to push as
+// well.
+func disasmOpcode(buf *strings.Builder, op *opcode, data []byte, compact bool) {
+	// Replace opcode which represent values (e.g. OP_0 through OP_16 and
+	// OP_1NEGATE) with the raw value when performing a compact disassembly.
+	opcodeName := op.name
+	if compact {
 		if replName, ok := opcodeOnelineRepls[opcodeName]; ok {
 			opcodeName = replName
 		}
 
-		// Nothing more to do for non-data push opcodes.
-		if pop.opcode.length == 1 {
-			return opcodeName
+		// Either write the human-readable opcode or the parsed data in hex for
+		// data-carrying opcodes.
+		switch {
+		case op.length == 1:
+			buf.WriteString(opcodeName)
+
+		default:
+			buf.WriteString(hex.EncodeToString(data))
 		}
 
-		return fmt.Sprintf("%x", pop.data)
+		return
 	}
 
-	// Nothing more to do for non-data push opcodes.
-	if pop.opcode.length == 1 {
-		return opcodeName
-	}
+	buf.WriteString(opcodeName)
+
+	switch op.length {
+	// Only write the opcode name for non-data push opcodes.
+	case 1:
+		return
 
 	// Add length for the OP_PUSHDATA# opcodes.
-	retString := opcodeName
-	switch pop.opcode.length {
 	case -1:
-		retString += fmt.Sprintf(" 0x%02x", len(pop.data))
+		buf.WriteString(fmt.Sprintf(" 0x%02x", len(data)))
 	case -2:
-		retString += fmt.Sprintf(" 0x%04x", len(pop.data))
+		buf.WriteString(fmt.Sprintf(" 0x%04x", len(data)))
 	case -4:
-		retString += fmt.Sprintf(" 0x%08x", len(pop.data))
+		buf.WriteString(fmt.Sprintf(" 0x%08x", len(data)))
 	}
 
-	return fmt.Sprintf("%s 0x%02x", retString, pop.data)
+	buf.WriteString(fmt.Sprintf(" 0x%02x", data))
+}
+
+// print returns a human-readable string representation of the opcode for use
+// in script disassembly.
+func (pop *parsedOpcode) print(compact bool) string {
+	var buf strings.Builder
+	disasmOpcode(&buf, pop.opcode, pop.data, compact)
+	return buf.String()
 }
 
 // bytes returns any data associated with the opcode encoded as it would be in

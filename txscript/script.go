@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
@@ -275,20 +276,29 @@ func unparseScript(pops []parsedOpcode) ([]byte, error) {
 // script up to the point the failure occurred along with the string '[error]'
 // appended.  In addition, the reason the script failed to parse is returned
 // if the caller wants more information about the failure.
-func DisasmString(buf []byte) (string, error) {
-	var disbuf bytes.Buffer
-	opcodes, err := parseScript(buf)
-	for _, pop := range opcodes {
-		disbuf.WriteString(pop.print(true))
+//
+// NOTE: This function is only valid for version 0 scripts.  Since the function
+// does not accept a script version, the results are undefined for other script
+// versions.
+func DisasmString(script []byte) (string, error) {
+	const scriptVersion = 0
+
+	var disbuf strings.Builder
+	tokenizer := MakeScriptTokenizer(scriptVersion, script)
+	if tokenizer.Next() {
+		disasmOpcode(&disbuf, tokenizer.op, tokenizer.Data(), true)
+	}
+	for tokenizer.Next() {
 		disbuf.WriteByte(' ')
+		disasmOpcode(&disbuf, tokenizer.op, tokenizer.Data(), true)
 	}
-	if disbuf.Len() > 0 {
-		disbuf.Truncate(disbuf.Len() - 1)
-	}
-	if err != nil {
+	if tokenizer.Err() != nil {
+		if tokenizer.ByteIndex() != 0 {
+			disbuf.WriteByte(' ')
+		}
 		disbuf.WriteString("[error]")
 	}
-	return disbuf.String(), err
+	return disbuf.String(), tokenizer.Err()
 }
 
 // removeOpcode will remove any opcode matching ``opcode'' from the opcode
