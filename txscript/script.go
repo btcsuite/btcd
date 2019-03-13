@@ -741,6 +741,8 @@ func asSmallInt(op byte) int {
 // signature operations in the script provided by pops. If precise mode is
 // requested then we attempt to count the number of operations for a multisig
 // op. Otherwise we use the maximum.
+//
+// DEPRECATED.  Use countSigOpsV0 instead.
 func getSigOpCount(pops []parsedOpcode, precise bool) int {
 	nSigs := 0
 	for i, pop := range pops {
@@ -771,15 +773,70 @@ func getSigOpCount(pops []parsedOpcode, precise bool) int {
 	return nSigs
 }
 
+// countSigOpsV0 returns the number of signature operations in the provided
+// script up to the point of the first parse failure or the entire script when
+// there are no parse failures.  The precise flag attempts to accurately count
+// the number of operations for a multisig operation versus using the maximum
+// allowed.
+//
+// WARNING: This function always treats the passed script as version 0.  Great
+// care must be taken if introducing a new script version because it is used in
+// consensus which, unfortunately as of the time of this writing, does not check
+// script versions before counting their signature operations which means nodes
+// on existing rules will count new version scripts as if they were version 0.
+func countSigOpsV0(script []byte, precise bool) int {
+	const scriptVersion = 0
+
+	numSigOps := 0
+	tokenizer := MakeScriptTokenizer(scriptVersion, script)
+	prevOp := byte(OP_INVALIDOPCODE)
+	for tokenizer.Next() {
+		switch tokenizer.Opcode() {
+		case OP_CHECKSIG, OP_CHECKSIGVERIFY:
+			numSigOps++
+
+		case OP_CHECKMULTISIG, OP_CHECKMULTISIGVERIFY:
+			// Note that OP_0 is treated as the max number of sigops here in
+			// precise mode despite it being a valid small integer in order to
+			// highly discourage multisigs with zero pubkeys.
+			//
+			// Also, even though this is referred to as "precise" counting, it's
+			// not really precise at all due to the small int opcodes only
+			// covering 1 through 16 pubkeys, which means this will count any
+			// more than that value (e.g. 17, 18 19) as the maximum number of
+			// allowed pubkeys.  This was inherited from bitcoin and is,
+			// unfortunately, now part of the consensus rules.  This could be
+			// made more correct with a new script version, however, ideally all
+			// multisignaure operations in new script versions should move to
+			// aggregated schemes such as Schnorr instead.
+			if precise && prevOp >= OP_1 && prevOp <= OP_16 {
+				numSigOps += asSmallInt(prevOp)
+			} else {
+				numSigOps += MaxPubKeysPerMultiSig
+			}
+
+		default:
+			// Not a sigop.
+		}
+
+		prevOp = tokenizer.Opcode()
+	}
+
+	return numSigOps
+}
+
 // GetSigOpCount provides a quick count of the number of signature operations
 // in a script. a CHECKSIG operations counts for 1, and a CHECK_MULTISIG for 20.
 // If the script fails to parse, then the count up to the point of failure is
 // returned.
+//
+// WARNING: This function always treats the passed script as version 0.  Great
+// care must be taken if introducing a new script version because it is used in
+// consensus which, unfortunately as of the time of this writing, does not check
+// script versions before counting their signature operations which means nodes
+// on existing rules will count new version scripts as if they were version 0.
 func GetSigOpCount(script []byte) int {
-	// Don't check error since parseScript returns the parsed-up-to-error
-	// list of pops.
-	pops, _ := parseScript(script)
-	return getSigOpCount(pops, false)
+	return countSigOpsV0(script, false)
 }
 
 // finalOpcodeData returns the data associated with the final opcode in the
