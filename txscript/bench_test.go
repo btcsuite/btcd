@@ -96,17 +96,18 @@ func BenchmarkScriptParsing(b *testing.B) {
 		b.Fatalf("failed to create benchmark script: %v", err)
 	}
 
+	const scriptVersion = 0
 	b.ResetTimer()
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		pops, err := parseScript(script)
-		if err != nil {
-			b.Fatalf("failed to parse script: %v", err)
+		tokenizer := MakeScriptTokenizer(scriptVersion, script)
+		for tokenizer.Next() {
+			_ = tokenizer.Opcode()
+			_ = tokenizer.Data()
+			_ = tokenizer.ByteIndex()
 		}
-
-		for _, pop := range pops {
-			_ = pop.opcode
-			_ = pop.data
+		if err := tokenizer.Err(); err != nil {
+			b.Fatalf("failed to parse script: %v", err)
 		}
 	}
 }

@@ -37,6 +37,10 @@ $ go get -u github.com/btcsuite/btcd/txscript
 * [Manually Signing a Transaction Output](https://pkg.go.dev/github.com/btcsuite/btcd/txscript#example-SignTxOutput)  
   Demonstrates manually creating and signing a redeem transaction.
 
+* [Counting Opcodes in Scripts](http://godoc.org/github.com/decred/dcrd/txscript#example-ScriptTokenizer)  
+  Demonstrates creating a script tokenizer instance and using it to count the
+  number of opcodes a script contains.
+
 ## GPG Verification Key
 
 All official release tags are signed by Conformal so users can ensure the code
