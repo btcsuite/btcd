@@ -202,12 +202,6 @@ func checkScriptTemplateParseable(script []byte, opcodes *[256]opcode) (*byte, e
 	return &firstOpcode, nil
 }
 
-// parseScript preparses the script in bytes into a list of parsedOpcodes while
-// applying a number of sanity checks.
-func parseScript(script []byte) ([]parsedOpcode, error) {
-	return parseScriptTemplate(script, &opcodeArray)
-}
-
 // unparseScript reversed the action of parseScript and returns the
 // parsedOpcodes as a list of bytes
 func unparseScript(pops []parsedOpcode) ([]byte, error) {
