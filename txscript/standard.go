@@ -378,24 +378,6 @@ func isWitnessScriptHashScript(script []byte) bool {
 	return extractWitnessScriptHash(script) != nil
 }
 
-// isNullData returns true if the passed script is a null data transaction,
-// false otherwise.
-func isNullData(pops []parsedOpcode) bool {
-	// A nulldata transaction is either a single OP_RETURN or an
-	// OP_RETURN SMALLDATA (where SMALLDATA is a data push up to
-	// MaxDataCarrierSize bytes).
-	l := len(pops)
-	if l == 1 && pops[0].opcode.value == OP_RETURN {
-		return true
-	}
-
-	return l == 2 &&
-		pops[0].opcode.value == OP_RETURN &&
-		(isSmallInt(pops[1].opcode.value) || pops[1].opcode.value <=
-			OP_PUSHDATA4) &&
-		len(pops[1].data) <= MaxDataCarrierSize
-}
-
 // isNullDataScript returns whether or not the passed script is a standard
 // null data script.
 //
