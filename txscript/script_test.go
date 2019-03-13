@@ -4334,16 +4334,3 @@ func TestIsUnspendable(t *testing.T) {
 		}
 	}
 }
-
-// BenchmarkIsUnspendable adds a benchmark to compare the time and allocations
-// necessary for the IsUnspendable function.
-func BenchmarkIsUnspendable(b *testing.B) {
-	pkScriptToUse := []byte{0xa9, 0x14, 0x82, 0x1d, 0xba, 0x94, 0xbc, 0xfb, 0xa2, 0x57, 0x36, 0xa3, 0x9e, 0x5d, 0x14, 0x5d, 0x69, 0x75, 0xba, 0x8c, 0x0b, 0x42, 0x87}
-	var res bool = false
-	for i := 0; i < b.N; i++ {
-		res = IsUnspendable(pkScriptToUse)
-	}
-	if res {
-		b.Fatalf("Benchmark should never have res be %t\n", res)
-	}
-}

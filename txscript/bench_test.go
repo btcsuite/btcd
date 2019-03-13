@@ -327,3 +327,17 @@ func BenchmarkIsNullDataScript(b *testing.B) {
 		_ = IsNullData(script)
 	}
 }
+
+// BenchmarkIsUnspendable benchmarks how long it takes IsUnspendable to analyze
+// a very large script.
+func BenchmarkIsUnspendable(b *testing.B) {
+	script, err := genComplexScript()
+	if err != nil {
+		b.Fatalf("failed to create benchmark script: %v", err)
+	}
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = IsUnspendable(script)
+	}
+}
