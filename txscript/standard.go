@@ -953,7 +953,7 @@ func ExtractAtomicSwapDataPushes(version uint16, pkScript []byte) (*AtomicSwapDa
 	}
 	isAtomicSwap := pops[0].opcode.value == OP_IF &&
 		pops[1].opcode.value == OP_SIZE &&
-		canonicalPush(pops[2]) &&
+		isCanonicalPush(pops[2].opcode.value, pops[2].data) &&
 		pops[3].opcode.value == OP_EQUALVERIFY &&
 		pops[4].opcode.value == OP_SHA256 &&
 		pops[5].opcode.value == OP_DATA_32 &&
@@ -962,7 +962,7 @@ func ExtractAtomicSwapDataPushes(version uint16, pkScript []byte) (*AtomicSwapDa
 		pops[8].opcode.value == OP_HASH160 &&
 		pops[9].opcode.value == OP_DATA_20 &&
 		pops[10].opcode.value == OP_ELSE &&
-		canonicalPush(pops[11]) &&
+		isCanonicalPush(pops[11].opcode.value, pops[11].data) &&
 		pops[12].opcode.value == OP_CHECKLOCKTIMEVERIFY &&
 		pops[13].opcode.value == OP_DROP &&
 		pops[14].opcode.value == OP_DUP &&
