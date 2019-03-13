@@ -813,6 +813,19 @@ func PushedData(script []byte) ([][]byte, error) {
 	return data, nil
 }
 
+// pubKeyHashToAddrs is a convenience function to attempt to convert the
+// passed hash to a pay-to-pubkey-hash address housed within an address
+// slice.  It is used to consolidate common code.
+func pubKeyHashToAddrs(hash []byte, params *chaincfg.Params) []btcutil.Address {
+	// Skip the pubkey hash if it's invalid for some reason.
+	var addrs []btcutil.Address
+	addr, err := btcutil.NewAddressPubKeyHash(hash, params)
+	if err == nil {
+		addrs = append(addrs, addr)
+	}
+	return addrs
+}
+
 // scriptHashToAddrs is a convenience function to attempt to convert the passed
 // hash to a pay-to-script-hash address housed within an address slice.  It is
 // used to consolidate common code.
@@ -834,6 +847,11 @@ func ExtractPkScriptAddrs(pkScript []byte, chainParams *chaincfg.Params) (Script
 
 	// Avoid parsing the script for the cases that already have the able to
 	// work with raw scripts.
+
+	// Check for pay-to-pubkey-hash script.
+	if hash := extractPubKeyHash(pkScript); hash != nil {
+		return PubKeyHashTy, pubKeyHashToAddrs(hash, chainParams), 1, nil
+	}
 
 	// Check for pay-to-script-hash.
 	if hash := extractScriptHash(pkScript); hash != nil {
@@ -857,18 +875,6 @@ func ExtractPkScriptAddrs(pkScript []byte, chainParams *chaincfg.Params) (Script
 	scriptClass := typeOfScript(scriptVersion, pkScript)
 
 	switch scriptClass {
-	case PubKeyHashTy:
-		// A pay-to-pubkey-hash script is of the form:
-		//  OP_DUP OP_HASH160 <hash> OP_EQUALVERIFY OP_CHECKSIG
-		// Therefore the pubkey hash is the 3rd item on the stack.
-		// Skip the pubkey hash if it's invalid for some reason.
-		requiredSigs = 1
-		addr, err := btcutil.NewAddressPubKeyHash(pops[2].data,
-			chainParams)
-		if err == nil {
-			addrs = append(addrs, addr)
-		}
-
 	case WitnessV0PubKeyHashTy:
 		// A pay-to-witness-pubkey-hash script is of thw form:
 		//  OP_0 <20-byte hash>
