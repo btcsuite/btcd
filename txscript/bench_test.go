@@ -423,3 +423,18 @@ func BenchmarkGetWitnessSigOpCountNested(b *testing.B) {
 		_ = GetWitnessSigOpCount(sigScript, pkScript, witness)
 	}
 }
+
+// BenchmarkGetScriptClass benchmarks how long it takes GetScriptClass to
+// analyze a very large script.
+func BenchmarkGetScriptClass(b *testing.B) {
+	script, err := genComplexScript()
+	if err != nil {
+		b.Fatalf("failed to create benchmark script: %v", err)
+	}
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = GetScriptClass(script)
+	}
+}
