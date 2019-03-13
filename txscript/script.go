@@ -698,42 +698,6 @@ func asSmallInt(op byte) int {
 	return int(op - (OP_1 - 1))
 }
 
-// getSigOpCount is the implementation function for counting the number of
-// signature operations in the script provided by pops. If precise mode is
-// requested then we attempt to count the number of operations for a multisig
-// op. Otherwise we use the maximum.
-//
-// DEPRECATED.  Use countSigOpsV0 instead.
-func getSigOpCount(pops []parsedOpcode, precise bool) int {
-	nSigs := 0
-	for i, pop := range pops {
-		switch pop.opcode.value {
-		case OP_CHECKSIG:
-			fallthrough
-		case OP_CHECKSIGVERIFY:
-			nSigs++
-		case OP_CHECKMULTISIG:
-			fallthrough
-		case OP_CHECKMULTISIGVERIFY:
-			// If we are being precise then look for familiar
-			// patterns for multisig, for now all we recognize is
-			// OP_1 - OP_16 to signify the number of pubkeys.
-			// Otherwise, we use the max of 20.
-			if precise && i > 0 &&
-				pops[i-1].opcode.value >= OP_1 &&
-				pops[i-1].opcode.value <= OP_16 {
-				nSigs += asSmallInt(pops[i-1].opcode.value)
-			} else {
-				nSigs += MaxPubKeysPerMultiSig
-			}
-		default:
-			// Not a sigop.
-		}
-	}
-
-	return nSigs
-}
-
 // countSigOpsV0 returns the number of signature operations in the provided
 // script up to the point of the first parse failure or the entire script when
 // there are no parse failures.  The precise flag attempts to accurately count
