@@ -310,6 +310,8 @@ func isCanonicalPush(opcode byte, data []byte) bool {
 
 // removeOpcodeByData will return the script minus any opcodes that would push
 // the passed data to the stack.
+//
+// DEPRECATED.  Use removeOpcodeByDataRaw instead.
 func removeOpcodeByData(pkscript []parsedOpcode, data []byte) []parsedOpcode {
 	retScript := make([]parsedOpcode, 0, len(pkscript))
 	for _, pop := range pkscript {
@@ -321,6 +323,59 @@ func removeOpcodeByData(pkscript []parsedOpcode, data []byte) []parsedOpcode {
 	}
 	return retScript
 
+}
+
+// removeOpcodeByDataRaw will return the script minus any opcodes that perform a
+// canonical push of data that contains the passed data to remove.  This
+// function assumes it is provided a version 0 script as any future version of
+// script should avoid this functionality since it is unncessary due to the
+// signature scripts not being part of the witness-free transaction hash.
+//
+// WARNING: This will return the passed script unmodified unless a modification
+// is necessary in which case the modified script is returned.  This implies
+// callers may NOT rely on being able to safely mutate either the passed or
+// returned script without potentially modifying the same data.
+//
+// NOTE: This function is only valid for version 0 scripts.  Since the function
+// does not accept a script version, the results are undefined for other script
+// versions.
+func removeOpcodeByDataRaw(script []byte, dataToRemove []byte) []byte {
+	// Avoid work when possible.
+	if len(script) == 0 || len(dataToRemove) == 0 {
+		return script
+	}
+
+	// Parse through the script looking for a canonical data push that contains
+	// the data to remove.
+	const scriptVersion = 0
+	var result []byte
+	var prevOffset int32
+	tokenizer := MakeScriptTokenizer(scriptVersion, script)
+	for tokenizer.Next() {
+		// In practice, the script will basically never actually contain the
+		// data since this function is only used during signature verification
+		// to remove the signature itself which would require some incredibly
+		// non-standard code to create.
+		//
+		// Thus, as an optimization, avoid allocating a new script unless there
+		// is actually a match that needs to be removed.
+		op, data := tokenizer.Opcode(), tokenizer.Data()
+		if isCanonicalPush(op, data) && bytes.Contains(data, dataToRemove) {
+			if result == nil {
+				fullPushLen := tokenizer.ByteIndex() - prevOffset
+				result = make([]byte, 0, int32(len(script))-fullPushLen)
+				result = append(result, script[0:prevOffset]...)
+			}
+		} else if result != nil {
+			result = append(result, script[prevOffset:tokenizer.ByteIndex()]...)
+		}
+
+		prevOffset = tokenizer.ByteIndex()
+	}
+	if result == nil {
+		result = script
+	}
+	return result
 }
 
 // calcHashPrevOuts calculates a single hash of all the previous outputs
