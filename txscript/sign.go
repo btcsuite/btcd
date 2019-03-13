@@ -212,73 +212,6 @@ func sign(chainParams *chaincfg.Params, tx *wire.MsgTx, idx int,
 	}
 }
 
-// mergeScripts merges sigScript and prevScript assuming they are both
-// partial solutions for pkScript spending output idx of tx. class, addresses
-// and nrequired are the result of extracting the addresses from pkscript.
-// The return value is the best effort merging of the two scripts. Calling this
-// function with addresses, class and nrequired that do not match pkScript is
-// an error and results in undefined behaviour.
-func mergeScripts(chainParams *chaincfg.Params, tx *wire.MsgTx, idx int,
-	pkScript []byte, class ScriptClass, addresses []btcutil.Address,
-	nRequired int, sigScript, prevScript []byte) []byte {
-
-	// TODO: the scripthash and multisig paths here are overly
-	// inefficient in that they will recompute already known data.
-	// some internal refactoring could probably make this avoid needless
-	// extra calculations.
-	switch class {
-	case ScriptHashTy:
-		// Remove the last push in the script and then recurse.
-		// this could be a lot less inefficient.
-		sigPops, err := parseScript(sigScript)
-		if err != nil || len(sigPops) == 0 {
-			return prevScript
-		}
-		prevPops, err := parseScript(prevScript)
-		if err != nil || len(prevPops) == 0 {
-			return sigScript
-		}
-
-		// assume that script in sigPops is the correct one, we just
-		// made it.
-		script := sigPops[len(sigPops)-1].data
-
-		// We already know this information somewhere up the stack.
-		class, addresses, nrequired, _ :=
-			ExtractPkScriptAddrs(script, chainParams)
-
-		// regenerate scripts.
-		sigScript, _ := unparseScript(sigPops)
-		prevScript, _ := unparseScript(prevPops)
-
-		// Merge
-		mergedScript := mergeScripts(chainParams, tx, idx, script,
-			class, addresses, nrequired, sigScript, prevScript)
-
-		// Reappend the script and return the result.
-		builder := NewScriptBuilder()
-		builder.AddOps(mergedScript)
-		builder.AddData(script)
-		finalScript, _ := builder.Script()
-		return finalScript
-	case MultiSigTy:
-		return mergeMultiSig(tx, idx, addresses, nRequired, pkScript,
-			sigScript, prevScript)
-
-	// It doesn't actually make sense to merge anything other than multiig
-	// and scripthash (because it could contain multisig). Everything else
-	// has either zero signature, can't be spent, or has a single signature
-	// which is either present or not. The other two cases are handled
-	// above. In the conflict case here we just assume the longest is
-	// correct (this matches behaviour of the reference implementation).
-	default:
-		if len(sigScript) > len(prevScript) {
-			return sigScript
-		}
-		return prevScript
-	}
-}
-
 // mergeMultiSig combines the two signature scripts sigScript and prevScript
 // that both provide signatures for pkScript in output idx of tx. addresses
 // and nRequired should be the results from extracting the addresses from
@@ -395,6 +328,74 @@ sigLoop:
 
 	script, _ := builder.Script()
 	return script
+}
+
+// mergeScripts merges sigScript and prevScript assuming they are both
+// partial solutions for pkScript spending output idx of tx. class, addresses
+// and nrequired are the result of extracting the addresses from pkscript.
+// The return value is the best effort merging of the two scripts. Calling this
+// function with addresses, class and nrequired that do not match pkScript is
+// an error and results in undefined behaviour.
+func mergeScripts(chainParams *chaincfg.Params, tx *wire.MsgTx, idx int,
+	pkScript []byte, class ScriptClass, addresses []btcutil.Address,
+	nRequired int, sigScript, prevScript []byte) []byte {
+
+	// TODO(oga) the scripthash and multisig paths here are overly
+	// inefficient in that they will recompute already known data.
+	// some internal refactoring could probably make this avoid needless
+	// extra calculations.
+	switch class {
+	case ScriptHashTy:
+		// Remove the last push in the script and then recurse.
+		// this could be a lot less inefficient.
+		sigPops, err := parseScript(sigScript)
+		if err != nil || len(sigPops) == 0 {
+			return prevScript
+		}
+		prevPops, err := parseScript(prevScript)
+		if err != nil || len(prevPops) == 0 {
+			return sigScript
+		}
+
+		// assume that script in sigPops is the correct one, we just
+		// made it.
+		script := sigPops[len(sigPops)-1].data
+
+		// We already know this information somewhere up the stack,
+		// therefore the error is ignored.
+		class, addresses, nrequired, _ :=
+			ExtractPkScriptAddrs(script, chainParams)
+
+		// regenerate scripts.
+		sigScript, _ := unparseScript(sigPops)
+		prevScript, _ := unparseScript(prevPops)
+
+		// Merge
+		mergedScript := mergeScripts(chainParams, tx, idx, script,
+			class, addresses, nrequired, sigScript, prevScript)
+
+		// Reappend the script and return the result.
+		builder := NewScriptBuilder()
+		builder.AddOps(mergedScript)
+		builder.AddData(script)
+		finalScript, _ := builder.Script()
+		return finalScript
+	case MultiSigTy:
+		return mergeMultiSig(tx, idx, addresses, nRequired, pkScript,
+			sigScript, prevScript)
+
+	// It doesn't actually make sense to merge anything other than multiig
+	// and scripthash (because it could contain multisig). Everything else
+	// has either zero signature, can't be spent, or has a single signature
+	// which is either present or not. The other two cases are handled
+	// above. In the conflict case here we just assume the longest is
+	// correct (this matches behaviour of the reference implementation).
+	default:
+		if len(sigScript) > len(prevScript) {
+			return sigScript
+		}
+		return prevScript
+	}
 }
 
 // KeyDB is an interface type provided to SignTxOutput, it encapsulates
