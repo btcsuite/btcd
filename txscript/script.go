@@ -182,6 +182,8 @@ func ExtractWitnessProgramInfo(script []byte) (int, []byte, error) {
 }
 
 // isPushOnly returns true if the script only pushes data, false otherwise.
+//
+// DEPRECATED.  Use IsPushOnlyScript instead.
 func isPushOnly(pops []parsedOpcode) bool {
 	// NOTE: This function does NOT verify opcodes directly since it is
 	// internal and is only called with parsed opcodes for scripts that did
@@ -199,15 +201,27 @@ func isPushOnly(pops []parsedOpcode) bool {
 	return true
 }
 
-// IsPushOnlyScript returns whether or not the passed script only pushes data.
+// IsPushOnlyScript returns whether or not the passed script only pushes data
+// according to the consensus definition of pushing data.
 //
-// False will be returned when the script does not parse.
+// WARNING: This function always treats the passed script as version 0.  Great
+// care must be taken if introducing a new script version because it is used in
+// consensus which, unfortunately as of the time of this writing, does not check
+// script versions before checking if it is a push only script which means nodes
+// on existing rules will treat new version scripts as if they were version 0.
 func IsPushOnlyScript(script []byte) bool {
-	pops, err := parseScript(script)
-	if err != nil {
-		return false
+	const scriptVersion = 0
+	tokenizer := MakeScriptTokenizer(scriptVersion, script)
+	for tokenizer.Next() {
+		// All opcodes up to OP_16 are data push instructions.
+		// NOTE: This does consider OP_RESERVED to be a data push instruction,
+		// but execution of OP_RESERVED will fail anyway and matches the
+		// behavior required by consensus.
+		if tokenizer.Opcode() > OP_16 {
+			return false
+		}
 	}
-	return isPushOnly(pops)
+	return tokenizer.Err() == nil
 }
 
 // parseScriptTemplate is the same as parseScript but allows the passing of the
