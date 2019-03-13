@@ -341,3 +341,18 @@ func BenchmarkIsUnspendable(b *testing.B) {
 		_ = IsUnspendable(script)
 	}
 }
+
+// BenchmarkGetSigOpCount benchmarks how long it takes to count the signature
+// operations of a very large script.
+func BenchmarkGetSigOpCount(b *testing.B) {
+	script, err := genComplexScript()
+	if err != nil {
+		b.Fatalf("failed to create benchmark script: %v", err)
+	}
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = GetSigOpCount(script)
+	}
+}
