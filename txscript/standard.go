@@ -934,64 +934,102 @@ type AtomicSwapDataPushes struct {
 //
 // This function is only defined in the txscript package due to API limitations
 // which prevent callers using txscript to parse nonstandard scripts.
+//
+// DEPRECATED.  This will be removed in the next major version bump.  The error
+// should also likely be removed if the code is reimplemented by any callers
+// since any errors result in a nil result anyway.
 func ExtractAtomicSwapDataPushes(version uint16, pkScript []byte) (*AtomicSwapDataPushes, error) {
-	pops, err := parseScript(pkScript)
-	if err != nil {
+	// An atomic swap is of the form:
+	//  IF
+	//   SIZE <secret size> EQUALVERIFY SHA256 <32-byte secret> EQUALVERIFY DUP
+	//   HASH160 <20-byte recipient hash>
+	//  ELSE
+	//   <locktime> CHECKLOCKTIMEVERIFY DROP DUP HASH160 <20-byte refund hash>
+	//  ENDIF
+	//  EQUALVERIFY CHECKSIG
+	type templateMatch struct {
+		expectCanonicalInt bool
+		maxIntBytes        int
+		opcode             byte
+		extractedInt       int64
+		extractedData      []byte
+	}
+	var template = [20]templateMatch{
+		{opcode: OP_IF},
+		{opcode: OP_SIZE},
+		{expectCanonicalInt: true, maxIntBytes: maxScriptNumLen},
+		{opcode: OP_EQUALVERIFY},
+		{opcode: OP_SHA256},
+		{opcode: OP_DATA_32},
+		{opcode: OP_EQUALVERIFY},
+		{opcode: OP_DUP},
+		{opcode: OP_HASH160},
+		{opcode: OP_DATA_20},
+		{opcode: OP_ELSE},
+		{expectCanonicalInt: true, maxIntBytes: cltvMaxScriptNumLen},
+		{opcode: OP_CHECKLOCKTIMEVERIFY},
+		{opcode: OP_DROP},
+		{opcode: OP_DUP},
+		{opcode: OP_HASH160},
+		{opcode: OP_DATA_20},
+		{opcode: OP_ENDIF},
+		{opcode: OP_EQUALVERIFY},
+		{opcode: OP_CHECKSIG},
+	}
+
+	var templateOffset int
+	tokenizer := MakeScriptTokenizer(version, pkScript)
+	for tokenizer.Next() {
+		// Not an atomic swap script if it has more opcodes than expected in the
+		// template.
+		if templateOffset >= len(template) {
+			return nil, nil
+		}
+
+		op := tokenizer.Opcode()
+		data := tokenizer.Data()
+		tplEntry := &template[templateOffset]
+		if tplEntry.expectCanonicalInt {
+			switch {
+			case data != nil:
+				val, err := makeScriptNum(data, true, tplEntry.maxIntBytes)
+				if err != nil {
+					return nil, err
+				}
+				tplEntry.extractedInt = int64(val)
+
+			case isSmallInt(op):
+				tplEntry.extractedInt = int64(asSmallInt(op))
+
+			// Not an atomic swap script if the opcode does not push an int.
+			default:
+				return nil, nil
+			}
+		} else {
+			if op != tplEntry.opcode {
+				return nil, nil
+			}
+
+			tplEntry.extractedData = data
+		}
+
+		templateOffset++
+	}
+	if err := tokenizer.Err(); err != nil {
 		return nil, err
 	}
-
-	if len(pops) != 20 {
-		return nil, nil
-	}
-	isAtomicSwap := pops[0].opcode.value == OP_IF &&
-		pops[1].opcode.value == OP_SIZE &&
-		isCanonicalPush(pops[2].opcode.value, pops[2].data) &&
-		pops[3].opcode.value == OP_EQUALVERIFY &&
-		pops[4].opcode.value == OP_SHA256 &&
-		pops[5].opcode.value == OP_DATA_32 &&
-		pops[6].opcode.value == OP_EQUALVERIFY &&
-		pops[7].opcode.value == OP_DUP &&
-		pops[8].opcode.value == OP_HASH160 &&
-		pops[9].opcode.value == OP_DATA_20 &&
-		pops[10].opcode.value == OP_ELSE &&
-		isCanonicalPush(pops[11].opcode.value, pops[11].data) &&
-		pops[12].opcode.value == OP_CHECKLOCKTIMEVERIFY &&
-		pops[13].opcode.value == OP_DROP &&
-		pops[14].opcode.value == OP_DUP &&
-		pops[15].opcode.value == OP_HASH160 &&
-		pops[16].opcode.value == OP_DATA_20 &&
-		pops[17].opcode.value == OP_ENDIF &&
-		pops[18].opcode.value == OP_EQUALVERIFY &&
-		pops[19].opcode.value == OP_CHECKSIG
-	if !isAtomicSwap {
+	if !tokenizer.Done() || templateOffset != len(template) {
 		return nil, nil
 	}
 
-	pushes := new(AtomicSwapDataPushes)
-	copy(pushes.SecretHash[:], pops[5].data)
-	copy(pushes.RecipientHash160[:], pops[9].data)
-	copy(pushes.RefundHash160[:], pops[16].data)
-	if pops[2].data != nil {
-		locktime, err := makeScriptNum(pops[2].data, true, 5)
-		if err != nil {
-			return nil, nil
-		}
-		pushes.SecretSize = int64(locktime)
-	} else if op := pops[2].opcode; isSmallInt(op.value) {
-		pushes.SecretSize = int64(asSmallInt(op.value))
-	} else {
-		return nil, nil
+	// At this point, the script appears to be an atomic swap, so populate and
+	// return the extacted data.
+	pushes := AtomicSwapDataPushes{
+		SecretSize: template[2].extractedInt,
+		LockTime:   template[11].extractedInt,
 	}
-	if pops[11].data != nil {
-		locktime, err := makeScriptNum(pops[11].data, true, 5)
-		if err != nil {
-			return nil, nil
-		}
-		pushes.LockTime = int64(locktime)
-	} else if op := pops[11].opcode; isSmallInt(op.value) {
-		pushes.LockTime = int64(asSmallInt(op.value))
-	} else {
-		return nil, nil
-	}
-	return pushes, nil
+	copy(pushes.SecretHash[:], template[5].extractedData)
+	copy(pushes.RecipientHash160[:], template[9].extractedData)
+	copy(pushes.RefundHash160[:], template[16].extractedData)
+	return &pushes, nil
 }
