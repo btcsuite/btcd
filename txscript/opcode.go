@@ -1981,7 +1981,7 @@ func opcodeHash256(op *parsedOpcode, vm *Engine) error {
 //
 // This opcode does not change the contents of the data stack.
 func opcodeCodeSeparator(op *parsedOpcode, vm *Engine) error {
-	vm.lastCodeSep = vm.scriptOff
+	vm.lastCodeSep = int(vm.tokenizer.ByteIndex())
 	return nil
 }
 
@@ -2055,7 +2055,7 @@ func opcodeCheckSig(op *parsedOpcode, vm *Engine) error {
 			sigHashes = NewTxSigHashes(&vm.tx)
 		}
 
-		hash, err = calcWitnessSignatureHash(subScript, sigHashes, hashType,
+		hash, err = calcWitnessSignatureHashRaw(subScript, sigHashes, hashType,
 			&vm.tx, vm.txIdx, vm.inputAmount)
 		if err != nil {
 			return err
@@ -2063,12 +2063,9 @@ func opcodeCheckSig(op *parsedOpcode, vm *Engine) error {
 	} else {
 		// Remove the signature since there is no way for a signature
 		// to sign itself.
-		subScript = removeOpcodeByData(subScript, fullSigBytes)
+		subScript = removeOpcodeByDataRaw(subScript, fullSigBytes)
 
-		hash, err = calcSignatureHash(subScript, hashType, &vm.tx, vm.txIdx)
-		if err != nil {
-			return err
-		}
+		hash = calcSignatureHashRaw(subScript, hashType, &vm.tx, vm.txIdx)
 	}
 
 	pubKey, err := btcec.ParsePubKey(pkBytes, btcec.S256())
@@ -2239,7 +2236,7 @@ func opcodeCheckMultiSig(op *parsedOpcode, vm *Engine) error {
 	// no way for a signature to sign itself.
 	if !vm.isWitnessVersionActive(0) {
 		for _, sigInfo := range signatures {
-			script = removeOpcodeByData(script, sigInfo.signature)
+			script = removeOpcodeByDataRaw(script, sigInfo.signature)
 		}
 	}
 
@@ -2331,16 +2328,13 @@ func opcodeCheckMultiSig(op *parsedOpcode, vm *Engine) error {
 				sigHashes = NewTxSigHashes(&vm.tx)
 			}
 
-			hash, err = calcWitnessSignatureHash(script, sigHashes, hashType,
+			hash, err = calcWitnessSignatureHashRaw(script, sigHashes, hashType,
 				&vm.tx, vm.txIdx, vm.inputAmount)
 			if err != nil {
 				return err
 			}
 		} else {
-			hash, err = calcSignatureHash(script, hashType, &vm.tx, vm.txIdx)
-			if err != nil {
-				return err
-			}
+			hash = calcSignatureHashRaw(script, hashType, &vm.tx, vm.txIdx)
 		}
 
 		var valid bool

@@ -1,4 +1,5 @@
 // Copyright (c) 2013-2017 The btcsuite developers
+// Copyright (c) 2015-2019 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -11,16 +12,16 @@ import (
 	"github.com/btcsuite/btcd/wire"
 )
 
-// TestBadPC sets the pc to a deliberately bad result then confirms that Step()
+// TestBadPC sets the pc to a deliberately bad result then confirms that Step
 // and Disasm fail correctly.
 func TestBadPC(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		script, off int
+		scriptIdx int
 	}{
-		{script: 2, off: 0},
-		{script: 0, off: 2},
+		{scriptIdx: 2},
+		{scriptIdx: 3},
 	}
 
 	// tx with almost empty scripts.
@@ -59,20 +60,20 @@ func TestBadPC(t *testing.T) {
 			t.Errorf("Failed to create script: %v", err)
 		}
 
-		// set to after all scripts
-		vm.scriptIdx = test.script
-		vm.scriptOff = test.off
+		// Set to after all scripts.
+		vm.scriptIdx = test.scriptIdx
 
+		// Ensure attempting to step fails.
 		_, err = vm.Step()
 		if err == nil {
 			t.Errorf("Step with invalid pc (%v) succeeds!", test)
 			continue
 		}
 
+		// Ensure attempting to disassemble the current program counter fails.
 		_, err = vm.DisasmPC()
 		if err == nil {
-			t.Errorf("DisasmPC with invalid pc (%v) succeeds!",
-				test)
+			t.Errorf("DisasmPC with invalid pc (%v) succeeds!", test)
 		}
 	}
 }
