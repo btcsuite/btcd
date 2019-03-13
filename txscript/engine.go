@@ -194,6 +194,20 @@ func isOpcodeDisabled(opcode byte) bool {
 	}
 }
 
+// isOpcodeAlwaysIllegal returns whether or not the opcode is always illegal
+// when passed over by the program counter even if in a non-executed branch (it
+// isn't a coincidence that they are conditionals).
+func isOpcodeAlwaysIllegal(opcode byte) bool {
+	switch opcode {
+	case OP_VERIF:
+		return true
+	case OP_VERNOTIF:
+		return true
+	default:
+		return false
+	}
+}
+
 // executeOpcode peforms execution on the passed opcode.  It takes into account
 // whether or not it is hidden by conditionals, but some rules still must be
 // tested in this case.
@@ -206,7 +220,7 @@ func (vm *Engine) executeOpcode(pop *parsedOpcode) error {
 	}
 
 	// Always-illegal opcodes are fail on program counter.
-	if pop.alwaysIllegal() {
+	if isOpcodeAlwaysIllegal(pop.opcode.value) {
 		str := fmt.Sprintf("attempt to execute reserved opcode %s",
 			pop.opcode.name)
 		return scriptError(ErrReservedOpcode, str)
