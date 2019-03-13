@@ -341,23 +341,21 @@ func checkMinimalDataPush(op *opcode, data []byte) error {
 // executeOpcode peforms execution on the passed opcode.  It takes into account
 // whether or not it is hidden by conditionals, but some rules still must be
 // tested in this case.
-func (vm *Engine) executeOpcode(pop *parsedOpcode) error {
+func (vm *Engine) executeOpcode(op *opcode, data []byte) error {
 	// Disabled opcodes are fail on program counter.
-	if isOpcodeDisabled(pop.opcode.value) {
-		str := fmt.Sprintf("attempt to execute disabled opcode %s",
-			pop.opcode.name)
+	if isOpcodeDisabled(op.value) {
+		str := fmt.Sprintf("attempt to execute disabled opcode %s", op.name)
 		return scriptError(ErrDisabledOpcode, str)
 	}
 
 	// Always-illegal opcodes are fail on program counter.
-	if isOpcodeAlwaysIllegal(pop.opcode.value) {
-		str := fmt.Sprintf("attempt to execute reserved opcode %s",
-			pop.opcode.name)
+	if isOpcodeAlwaysIllegal(op.value) {
+		str := fmt.Sprintf("attempt to execute reserved opcode %s", op.name)
 		return scriptError(ErrReservedOpcode, str)
 	}
 
 	// Note that this includes OP_RESERVED which counts as a push operation.
-	if pop.opcode.value > OP_16 {
+	if op.value > OP_16 {
 		vm.numOps++
 		if vm.numOps > MaxOpsPerScript {
 			str := fmt.Sprintf("exceeded max operation limit of %d",
@@ -365,29 +363,30 @@ func (vm *Engine) executeOpcode(pop *parsedOpcode) error {
 			return scriptError(ErrTooManyOperations, str)
 		}
 
-	} else if len(pop.data) > MaxScriptElementSize {
+	} else if len(data) > MaxScriptElementSize {
 		str := fmt.Sprintf("element size %d exceeds max allowed size %d",
-			len(pop.data), MaxScriptElementSize)
+			len(data), MaxScriptElementSize)
 		return scriptError(ErrElementTooBig, str)
 	}
 
 	// Nothing left to do when this is not a conditional opcode and it is
 	// not in an executing branch.
-	if !vm.isBranchExecuting() && !isOpcodeConditional(pop.opcode.value) {
+	if !vm.isBranchExecuting() && !isOpcodeConditional(op.value) {
 		return nil
 	}
 
 	// Ensure all executed data push opcodes use the minimal encoding when
 	// the minimal data verification flag is set.
 	if vm.dstack.verifyMinimalData && vm.isBranchExecuting() &&
-		pop.opcode.value >= 0 && pop.opcode.value <= OP_PUSHDATA4 {
+		op.value >= 0 && op.value <= OP_PUSHDATA4 {
 
-		if err := checkMinimalDataPush(pop.opcode, pop.data); err != nil {
+		if err := checkMinimalDataPush(op, data); err != nil {
 			return err
 		}
 	}
 
-	return pop.opcode.opfunc(pop, vm)
+	pop := parsedOpcode{opcode: op, data: data}
+	return op.opfunc(&pop, vm)
 }
 
 // checkValidPC returns an error if the current script position is not valid for
@@ -670,8 +669,7 @@ func (vm *Engine) Step() (done bool, err error) {
 	// Execute the opcode while taking into account several things such as
 	// disabled opcodes, illegal opcodes, maximum allowed operations per script,
 	// maximum script element sizes, and conditionals.
-	pop := parsedOpcode{opcode: vm.tokenizer.op, data: vm.tokenizer.Data()}
-	err = vm.executeOpcode(&pop)
+	err = vm.executeOpcode(vm.tokenizer.op, vm.tokenizer.Data())
 	if err != nil {
 		return true, err
 	}
