@@ -318,23 +318,6 @@ func isCanonicalPush(opcode byte, data []byte) bool {
 	return true
 }
 
-// removeOpcodeByData will return the script minus any opcodes that would push
-// the passed data to the stack.
-//
-// DEPRECATED.  Use removeOpcodeByDataRaw instead.
-func removeOpcodeByData(pkscript []parsedOpcode, data []byte) []parsedOpcode {
-	retScript := make([]parsedOpcode, 0, len(pkscript))
-	for _, pop := range pkscript {
-		if !isCanonicalPush(pop.opcode.value, pop.data) ||
-			!bytes.Contains(pop.data, data) {
-
-			retScript = append(retScript, pop)
-		}
-	}
-	return retScript
-
-}
-
 // removeOpcodeByDataRaw will return the script minus any opcodes that perform a
 // canonical push of data that contains the passed data to remove.  This
 // function assumes it is provided a version 0 script as any future version of
