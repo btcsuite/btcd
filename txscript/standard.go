@@ -210,42 +210,6 @@ func isPubkeyHash(pops []parsedOpcode) bool {
 
 }
 
-// isMultiSig returns true if the passed script is a multisig transaction, false
-// otherwise.
-//
-// DEPECATED.  Use isMultisigScript or extractMultisigScriptDetails instead.
-func isMultiSig(pops []parsedOpcode) bool {
-	// The absolute minimum is 1 pubkey:
-	// OP_0/OP_1-16 <pubkey> OP_1 OP_CHECKMULTISIG
-	l := len(pops)
-	if l < 4 {
-		return false
-	}
-	if !isSmallInt(pops[0].opcode.value) {
-		return false
-	}
-	if !isSmallInt(pops[l-2].opcode.value) {
-		return false
-	}
-	if pops[l-1].opcode.value != OP_CHECKMULTISIG {
-		return false
-	}
-
-	// Verify the number of pubkeys specified matches the actual number
-	// of pubkeys provided.
-	if l-2-1 != asSmallInt(pops[l-2].opcode.value) {
-		return false
-	}
-
-	for _, pop := range pops[1 : l-2] {
-		// Valid pubkeys are either 33 or 65 bytes.
-		if len(pop.data) != 33 && len(pop.data) != 65 {
-			return false
-		}
-	}
-	return true
-}
-
 // multiSigDetails houses details extracted from a standard multisig script.
 type multiSigDetails struct {
 	requiredSigs int
