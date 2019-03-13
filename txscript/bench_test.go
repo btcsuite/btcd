@@ -312,3 +312,18 @@ func BenchmarkIsWitnessScriptHash(b *testing.B) {
 		_ = IsPayToWitnessScriptHash(script)
 	}
 }
+
+// BenchmarkIsNullDataScript benchmarks how long it takes to analyze a very
+// large script to determine if it is a standard nulldata script.
+func BenchmarkIsNullDataScript(b *testing.B) {
+	script, err := genComplexScript()
+	if err != nil {
+		b.Fatalf("failed to create benchmark script: %v", err)
+	}
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = IsNullData(script)
+	}
+}
