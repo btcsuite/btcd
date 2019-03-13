@@ -805,11 +805,36 @@ func PushedData(script []byte) ([][]byte, error) {
 	return data, nil
 }
 
+// scriptHashToAddrs is a convenience function to attempt to convert the passed
+// hash to a pay-to-script-hash address housed within an address slice.  It is
+// used to consolidate common code.
+func scriptHashToAddrs(hash []byte, params *chaincfg.Params) []btcutil.Address {
+	// Skip the hash if it's invalid for some reason.
+	var addrs []btcutil.Address
+	addr, err := btcutil.NewAddressScriptHashFromHash(hash, params)
+	if err == nil {
+		addrs = append(addrs, addr)
+	}
+	return addrs
+}
+
 // ExtractPkScriptAddrs returns the type of script, addresses and required
 // signatures associated with the passed PkScript.  Note that it only works for
 // 'standard' transaction script types.  Any data such as public keys which are
 // invalid are omitted from the results.
 func ExtractPkScriptAddrs(pkScript []byte, chainParams *chaincfg.Params) (ScriptClass, []btcutil.Address, int, error) {
+
+	// Avoid parsing the script for the cases that already have the able to
+	// work with raw scripts.
+
+	// Check for pay-to-script-hash.
+	if hash := extractScriptHash(pkScript); hash != nil {
+		return ScriptHashTy, scriptHashToAddrs(hash, chainParams), 1, nil
+	}
+
+	// Fall back to slow path.  Ultimately these are intended to be replaced by
+	// faster variants based on the unparsed raw scripts.
+
 	var addrs []btcutil.Address
 	var requiredSigs int
 
@@ -855,18 +880,6 @@ func ExtractPkScriptAddrs(pkScript []byte, chainParams *chaincfg.Params) (Script
 		// Skip the pubkey if it's invalid for some reason.
 		requiredSigs = 1
 		addr, err := btcutil.NewAddressPubKey(pops[0].data, chainParams)
-		if err == nil {
-			addrs = append(addrs, addr)
-		}
-
-	case ScriptHashTy:
-		// A pay-to-script-hash script is of the form:
-		//  OP_HASH160 <scripthash> OP_EQUAL
-		// Therefore the script hash is the 2nd item on the stack.
-		// Skip the script hash if it's invalid for some reason.
-		requiredSigs = 1
-		addr, err := btcutil.NewAddressScriptHashFromHash(pops[1].data,
-			chainParams)
 		if err == nil {
 			addrs = append(addrs, addr)
 		}
