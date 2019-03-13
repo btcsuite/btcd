@@ -129,3 +129,18 @@ func BenchmarkDisasmString(b *testing.B) {
 		}
 	}
 }
+
+// BenchmarkIsPubKeyScript benchmarks how long it takes to analyze a very large
+// script to determine if it is a standard pay-to-pubkey script.
+func BenchmarkIsPubKeyScript(b *testing.B) {
+	script, err := genComplexScript()
+	if err != nil {
+		b.Fatalf("failed to create benchmark script: %v", err)
+	}
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = IsPayToPubKey(script)
+	}
+}
