@@ -506,6 +506,11 @@ func typeOfScript(scriptVersion uint16, script []byte) ScriptClass {
 		return NonStandardTy
 	}
 
+	switch {
+	case isScriptHashScript(script):
+		return ScriptHashTy
+	}
+
 	pops, err := parseScript(script)
 	if err != nil {
 		return NonStandardTy
@@ -517,8 +522,6 @@ func typeOfScript(scriptVersion uint16, script []byte) ScriptClass {
 		return PubKeyHashTy
 	} else if isWitnessPubKeyHash(pops) {
 		return WitnessV0PubKeyHashTy
-	} else if isScriptHash(pops) {
-		return ScriptHashTy
 	} else if isWitnessScriptHash(pops) {
 		return WitnessV0ScriptHashTy
 	} else if isMultiSig(pops) {
