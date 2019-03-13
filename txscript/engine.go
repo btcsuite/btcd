@@ -875,6 +875,7 @@ func (vm *Engine) SetAltStack(data [][]byte) {
 // engine according to the description provided by each flag.
 func NewEngine(scriptPubKey []byte, tx *wire.MsgTx, txIdx int, flags ScriptFlags,
 	sigCache *SigCache, hashCache *TxSigHashes, inputAmount int64) (*Engine, error) {
+	const scriptVersion = 0
 
 	// The provided transaction input index must refer to a valid input.
 	if txIdx < 0 || txIdx >= len(tx.TxIn) {
@@ -994,7 +995,9 @@ func NewEngine(scriptPubKey []byte, tx *wire.MsgTx, txIdx int, flags ScriptFlags
 			// data push of the witness program, otherwise we
 			// reintroduce malleability.
 			sigPops := vm.scripts[0]
-			if len(sigPops) == 1 && canonicalPush(sigPops[0]) &&
+			if len(sigPops) == 1 &&
+				isCanonicalPush(sigPops[0].opcode.value,
+					sigPops[0].data) &&
 				IsWitnessProgram(sigPops[0].data) {
 
 				witProgram = sigPops[0].data
