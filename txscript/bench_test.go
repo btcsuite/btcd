@@ -111,3 +111,21 @@ func BenchmarkScriptParsing(b *testing.B) {
 		}
 	}
 }
+
+// BenchmarkDisasmString benchmarks how long it takes to disassemble a very
+// large script.
+func BenchmarkDisasmString(b *testing.B) {
+	script, err := genComplexScript()
+	if err != nil {
+		b.Fatalf("failed to create benchmark script: %v", err)
+	}
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_, err := DisasmString(script)
+		if err != nil {
+			b.Fatalf("failed to disasm script: %v", err)
+		}
+	}
+}
