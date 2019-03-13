@@ -456,3 +456,44 @@ func BenchmarkPushedData(b *testing.B) {
 		}
 	}
 }
+
+// BenchmarkExtractAtomicSwapDataPushesLarge benchmarks how long it takes
+// ExtractAtomicSwapDataPushes to analyze a very large script.
+func BenchmarkExtractAtomicSwapDataPushesLarge(b *testing.B) {
+	script, err := genComplexScript()
+	if err != nil {
+		b.Fatalf("failed to create benchmark script: %v", err)
+	}
+
+	const scriptVersion = 0
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_, err := ExtractAtomicSwapDataPushes(scriptVersion, script)
+		if err != nil {
+			b.Fatalf("unexpected err: %v", err)
+		}
+	}
+}
+
+// BenchmarkExtractAtomicSwapDataPushesLarge benchmarks how long it takes
+// ExtractAtomicSwapDataPushes to analyze a standard atomic swap script.
+func BenchmarkExtractAtomicSwapDataPushes(b *testing.B) {
+	secret := "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+	recipient := "0000000000000000000000000000000000000001"
+	refund := "0000000000000000000000000000000000000002"
+	script := mustParseShortForm(fmt.Sprintf("IF SIZE 32 EQUALVERIFY SHA256 "+
+		"DATA_32 0x%s EQUALVERIFY DUP HASH160 DATA_20 0x%s ELSE 300000 "+
+		"CHECKLOCKTIMEVERIFY DROP DUP HASH160 DATA_20 0x%s ENDIF "+
+		"EQUALVERIFY CHECKSIG", secret, recipient, refund))
+
+	const scriptVersion = 0
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_, err := ExtractAtomicSwapDataPushes(scriptVersion, script)
+		if err != nil {
+			b.Fatalf("unexpected err: %v", err)
+		}
+	}
+}
