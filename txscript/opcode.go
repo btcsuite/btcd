@@ -740,14 +740,6 @@ func disasmOpcode(buf *strings.Builder, op *opcode, data []byte, compact bool) {
 	buf.WriteString(fmt.Sprintf(" 0x%02x", data))
 }
 
-// print returns a human-readable string representation of the opcode for use
-// in script disassembly.
-func (pop *parsedOpcode) print(compact bool) string {
-	var buf strings.Builder
-	disasmOpcode(&buf, pop.opcode, pop.data, compact)
-	return buf.String()
-}
-
 // bytes returns any data associated with the opcode encoded as it would be in
 // a script.  This is used for unparsing scripts from parsed opcodes.
 func (pop *parsedOpcode) bytes() ([]byte, error) {
