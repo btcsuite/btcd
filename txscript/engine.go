@@ -154,12 +154,52 @@ func (vm *Engine) isBranchExecuting() bool {
 	return vm.condStack[len(vm.condStack)-1] == OpCondTrue
 }
 
+// isOpcodeDisabled returns whether or not the opcode is disabled and thus is
+// always bad to see in the instruction stream (even if turned off by a
+// conditional).
+func isOpcodeDisabled(opcode byte) bool {
+	switch opcode {
+	case OP_CAT:
+		return true
+	case OP_SUBSTR:
+		return true
+	case OP_LEFT:
+		return true
+	case OP_RIGHT:
+		return true
+	case OP_INVERT:
+		return true
+	case OP_AND:
+		return true
+	case OP_OR:
+		return true
+	case OP_XOR:
+		return true
+	case OP_2MUL:
+		return true
+	case OP_2DIV:
+		return true
+	case OP_MUL:
+		return true
+	case OP_DIV:
+		return true
+	case OP_MOD:
+		return true
+	case OP_LSHIFT:
+		return true
+	case OP_RSHIFT:
+		return true
+	default:
+		return false
+	}
+}
+
 // executeOpcode peforms execution on the passed opcode.  It takes into account
 // whether or not it is hidden by conditionals, but some rules still must be
 // tested in this case.
 func (vm *Engine) executeOpcode(pop *parsedOpcode) error {
 	// Disabled opcodes are fail on program counter.
-	if pop.isDisabled() {
+	if isOpcodeDisabled(pop.opcode.value) {
 		str := fmt.Sprintf("attempt to execute disabled opcode %s",
 			pop.opcode.name)
 		return scriptError(ErrDisabledOpcode, str)
