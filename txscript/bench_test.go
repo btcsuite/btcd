@@ -70,3 +70,43 @@ func BenchmarkCalcWitnessSigHash(b *testing.B) {
 		}
 	}
 }
+
+// genComplexScript returns a script comprised of half as many opcodes as the
+// maximum allowed followed by as many max size data pushes fit without
+// exceeding the max allowed script size.
+func genComplexScript() ([]byte, error) {
+	var scriptLen int
+	builder := NewScriptBuilder()
+	for i := 0; i < MaxOpsPerScript/2; i++ {
+		builder.AddOp(OP_TRUE)
+		scriptLen++
+	}
+	maxData := bytes.Repeat([]byte{0x02}, MaxScriptElementSize)
+	for i := 0; i < (MaxScriptSize-scriptLen)/(MaxScriptElementSize+3); i++ {
+		builder.AddData(maxData)
+	}
+	return builder.Script()
+}
+
+// BenchmarkScriptParsing benchmarks how long it takes to parse a very large
+// script.
+func BenchmarkScriptParsing(b *testing.B) {
+	script, err := genComplexScript()
+	if err != nil {
+		b.Fatalf("failed to create benchmark script: %v", err)
+	}
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		pops, err := parseScript(script)
+		if err != nil {
+			b.Fatalf("failed to parse script: %v", err)
+		}
+
+		for _, pop := range pops {
+			_ = pop.opcode
+			_ = pop.data
+		}
+	}
+}
