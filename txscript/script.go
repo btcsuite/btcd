@@ -567,12 +567,17 @@ func shallowCopyTx(tx *wire.MsgTx) wire.MsgTx {
 // CalcSignatureHash will, given a script and hash type for the current script
 // engine instance, calculate the signature hash to be used for signing and
 // verification.
+//
+// NOTE: This function is only valid for version 0 scripts. Since the function
+// does not accept a script version, the results are undefined for other script
+// versions.
 func CalcSignatureHash(script []byte, hashType SigHashType, tx *wire.MsgTx, idx int) ([]byte, error) {
-	parsedScript, err := parseScript(script)
-	if err != nil {
-		return nil, fmt.Errorf("cannot parse output script: %v", err)
+	const scriptVersion = 0
+	if err := checkScriptParses(scriptVersion, script); err != nil {
+		return nil, err
 	}
-	return calcSignatureHash(parsedScript, hashType, tx, idx)
+
+	return calcSignatureHashRaw(script, hashType, tx, idx), nil
 }
 
 // calcSignatureHashRaw computes the signature hash for the specified input of
@@ -848,6 +853,15 @@ func getWitnessSigOps(pkScript []byte, witness wire.TxWitness) int {
 	}
 
 	return 0
+}
+
+// checkScriptParses returns an error if the provided script fails to parse.
+func checkScriptParses(scriptVersion uint16, script []byte) error {
+	tokenizer := MakeScriptTokenizer(scriptVersion, script)
+	for tokenizer.Next() {
+		// Nothing to do.
+	}
+	return tokenizer.Err()
 }
 
 // IsUnspendable returns whether the passed public key script is unspendable, or
