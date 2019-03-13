@@ -917,15 +917,22 @@ func checkScriptParses(scriptVersion uint16, script []byte) error {
 // IsUnspendable returns whether the passed public key script is unspendable, or
 // guaranteed to fail at execution.  This allows inputs to be pruned instantly
 // when entering the UTXO set.
+//
+// NOTE: This function is only valid for version 0 scripts.  Since the function
+// does not accept a script version, the results are undefined for other script
+// versions.
 func IsUnspendable(pkScript []byte) bool {
-	// Not provably unspendable
-	if len(pkScript) == 0 {
-		return false
-	}
-	firstOpcode, err := checkScriptTemplateParseable(pkScript, &opcodeArray)
-	if err != nil {
+	// The script is unspendable if starts with OP_RETURN or is guaranteed
+	// to fail at execution due to being larger than the max allowed script
+	// size.
+	switch {
+	case len(pkScript) > 0 && pkScript[0] == OP_RETURN:
+		return true
+	case len(pkScript) > MaxScriptSize:
 		return true
 	}
 
-	return firstOpcode != nil && *firstOpcode == OP_RETURN
+	// The script is unspendable if it is guaranteed to fail at execution.
+	const scriptVersion = 0
+	return checkScriptParses(scriptVersion, pkScript) != nil
 }
