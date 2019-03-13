@@ -10,6 +10,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"math/big"
+	"strings"
 
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcd/wire"
@@ -331,8 +332,10 @@ func (vm *Engine) executeOpcode(pop *parsedOpcode) error {
 // provided position in the script.  It does no error checking and leaves that
 // to the caller to provide a valid offset.
 func (vm *Engine) disasm(scriptIdx int, scriptOff int) string {
-	return fmt.Sprintf("%02x:%04x: %s", scriptIdx, scriptOff,
-		vm.scripts[scriptIdx][scriptOff].print(false))
+	var buf strings.Builder
+	pop := vm.scripts[scriptIdx][scriptOff]
+	disasmOpcode(&buf, pop.opcode, pop.data, false)
+	return fmt.Sprintf("%02x:%04x: %s", scriptIdx, scriptOff, buf.String())
 }
 
 // validPC returns an error if the current script position is valid for
