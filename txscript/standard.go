@@ -835,10 +835,11 @@ func scriptHashToAddrs(hash []byte, params *chaincfg.Params) []btcutil.Address {
 // signatures associated with the passed PkScript.  Note that it only works for
 // 'standard' transaction script types.  Any data such as public keys which are
 // invalid are omitted from the results.
+//
+// NOTE: This function only attempts to identify version 0 scripts.  The return
+// value will indicate a nonstandard script type for other script versions along
+// with an invalid script version error.
 func ExtractPkScriptAddrs(pkScript []byte, chainParams *chaincfg.Params) (ScriptClass, []btcutil.Address, int, error) {
-
-	// Avoid parsing the script for the cases that already have the able to
-	// work with raw scripts.
 
 	// Check for pay-to-pubkey-hash script.
 	if hash := extractPubKeyHash(pkScript); hash != nil {
@@ -873,6 +874,12 @@ func ExtractPkScriptAddrs(pkScript []byte, chainParams *chaincfg.Params) (Script
 			}
 		}
 		return MultiSigTy, addrs, details.requiredSigs, nil
+	}
+
+	// Check for null data script.
+	if isNullDataScript(scriptVersion, pkScript) {
+		// Null data transactions have no addresses or required signatures.
+		return NullDataTy, nil, 0, nil
 	}
 
 	// Fall back to slow path.  Ultimately these are intended to be replaced by
@@ -916,15 +923,13 @@ func ExtractPkScriptAddrs(pkScript []byte, chainParams *chaincfg.Params) (Script
 			addrs = append(addrs, addr)
 		}
 
-	case NullDataTy:
-		// Null data transactions have no addresses or required
-		// signatures.
-
 	case NonStandardTy:
 		// Don't attempt to extract addresses or required signatures for
 		// nonstandard transactions.
 	}
 
+	// Don't attempt to extract addresses or required signatures for nonstandard
+	// transactions.
 	return scriptClass, addrs, requiredSigs, nil
 }
 
