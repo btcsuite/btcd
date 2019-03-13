@@ -54,17 +54,6 @@ func isSmallInt(op byte) bool {
 	return op == OP_0 || (op >= OP_1 && op <= OP_16)
 }
 
-// isScriptHash returns true if the script passed is a pay-to-script-hash
-// transaction, false otherwise.
-//
-// DEPRECATED.  Use isScriptHashScript or extractScriptHash instead.
-func isScriptHash(pops []parsedOpcode) bool {
-	return len(pops) == 3 &&
-		pops[0].opcode.value == OP_HASH160 &&
-		pops[1].opcode.value == OP_DATA_20 &&
-		pops[2].opcode.value == OP_EQUAL
-}
-
 // IsPayToPubKey returns true if the script is in the standard pay-to-pubkey
 // (P2PK) format, false otherwise.
 func IsPayToPubKey(script []byte) bool {
