@@ -832,7 +832,7 @@ func TestCalcMultiSigStats(t *testing.T) {
 			name: "short script",
 			script: "0x046708afdb0fe5548271967f1a67130b7105cd6a828" +
 				"e03909a67962e0ea1f61d",
-			err: scriptError(ErrMalformedPush, ""),
+			err: scriptError(ErrNotMultisigScript, ""),
 		},
 		{
 			name: "stack underflow",
@@ -843,11 +843,7 @@ func TestCalcMultiSigStats(t *testing.T) {
 		},
 		{
 			name: "multisig script",
-			script: "0 DATA_72 0x30450220106a3e4ef0b51b764a2887226" +
-				"2ffef55846514dacbdcbbdd652c849d395b4384022100" +
-				"e03ae554c3cbb40600d31dd46fc33f25e47bf8525b1fe" +
-				"07282e3b6ecb5f3bb2801 CODESEPARATOR 1 DATA_33 " +
-				"0x0232abdc893e7f0631364d7fd01cb33d24da45329a0" +
+			script: "1 DATA_33 0x0232abdc893e7f0631364d7fd01cb33d24da45329a0" +
 				"0357b3a7886211ab414d55a 1 CHECKMULTISIG",
 			err: nil,
 		},

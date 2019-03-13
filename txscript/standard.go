@@ -656,27 +656,21 @@ func CalcScriptInfo(sigScript, pkScript []byte, witness wire.TxWitness,
 // CalcMultiSigStats returns the number of public keys and signatures from
 // a multi-signature transaction script.  The passed script MUST already be
 // known to be a multi-signature script.
+//
+// NOTE: This function is only valid for version 0 scripts.  Since the function
+// does not accept a script version, the results are undefined for other script
+// versions.
 func CalcMultiSigStats(script []byte) (int, int, error) {
-	pops, err := parseScript(script)
-	if err != nil {
-		return 0, 0, err
-	}
-
-	// A multi-signature script is of the pattern:
-	//  NUM_SIGS PUBKEY PUBKEY PUBKEY... NUM_PUBKEYS OP_CHECKMULTISIG
-	// Therefore the number of signatures is the oldest item on the stack
-	// and the number of pubkeys is the 2nd to last.  Also, the absolute
-	// minimum for a multi-signature script is 1 pubkey, so at least 4
-	// items must be on the stack per:
-	//  OP_1 PUBKEY OP_1 OP_CHECKMULTISIG
-	if len(pops) < 4 {
+	// The public keys are not needed here, so pass false to avoid the extra
+	// allocation.
+	const scriptVersion = 0
+	details := extractMultisigScriptDetails(scriptVersion, script, false)
+	if !details.valid {
 		str := fmt.Sprintf("script %x is not a multisig script", script)
 		return 0, 0, scriptError(ErrNotMultisigScript, str)
 	}
 
-	numSigs := asSmallInt(pops[0].opcode.value)
-	numPubKeys := asSmallInt(pops[len(pops)-2].opcode.value)
-	return numPubKeys, numSigs, nil
+	return details.numPubKeys, details.requiredSigs, nil
 }
 
 // payToPubKeyHashScript creates a new script to pay a transaction
