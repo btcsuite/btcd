@@ -2,6 +2,7 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="d900f858-359c-425f-a8f7-a7e4613b6857" name="Default Changelist" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/rpcclient/notify.go" beforeDir="false" afterPath="$PROJECT_DIR$/rpcclient/notify.go" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
@@ -36,8 +37,11 @@
       <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/rpcclient/notify.go">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="-1636">
-              <caret line="88" column="24" selection-start-line="88" selection-start-column="7" selection-end-line="88" selection-end-column="24" />
+            <state relative-caret-position="300">
+              <caret line="20" lean-forward="true" selection-start-line="20" selection-end-line="20" />
+              <folding>
+                <element signature="e#219#444#0" expanded="true" />
+              </folding>
             </state>
           </provider>
         </entry>
@@ -73,10 +77,10 @@
       <find>FutureAddMultisigAddressResult</find>
       <find>Receive</find>
       <find>&amp;chaincfg.MainNetParams</find>
-      <find>new(</find>
       <find>handleNotification</find>
-      <find>ConnConfig</find>
       <find>OnClientConnected</find>
+      <find>new(</find>
+      <find>ConnConfig</find>
     </findStrings>
     <dirStrings>
       <dir>$PROJECT_DIR$/rpcclient/</dir>
@@ -154,7 +158,7 @@
     <editor active="true" />
     <layout>
       <window_info id="Favorites" side_tool="true" />
-      <window_info content_ui="combo" id="Project" order="0" visible="true" weight="0.25" />
+      <window_info active="true" content_ui="combo" id="Project" order="0" visible="true" weight="0.25" />
       <window_info id="Structure" order="1" side_tool="true" weight="0.25" />
       <window_info anchor="bottom" id="Docker" />
       <window_info anchor="bottom" id="Database Changes" />
@@ -162,7 +166,7 @@
       <window_info anchor="bottom" id="Terminal" />
       <window_info anchor="bottom" id="Event Log" side_tool="true" />
       <window_info anchor="bottom" id="Message" order="0" />
-      <window_info active="true" anchor="bottom" id="Find" order="1" visible="true" weight="0.32941177" />
+      <window_info anchor="bottom" id="Find" order="1" visible="true" weight="0.32941177" />
       <window_info anchor="bottom" id="Run" order="2" />
       <window_info anchor="bottom" id="Debug" order="3" weight="0.4" />
       <window_info anchor="bottom" id="Cvs" order="4" weight="0.25" />
@@ -196,16 +200,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/rpcclient/net.go">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="-107">
-          <caret line="52" column="22" selection-start-line="52" selection-start-column="19" selection-end-line="52" selection-end-column="22" />
-          <folding>
-            <element signature="e#170#234#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/rpcclient/examples/bitcoincorehttp/main.go">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="285">
@@ -223,6 +217,16 @@
         </state>
       </provider>
     </entry>
+    <entry file="file://$PROJECT_DIR$/rpcclient/net.go">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="-107">
+          <caret line="52" column="22" selection-start-line="52" selection-start-column="19" selection-end-line="52" selection-end-column="22" />
+          <folding>
+            <element signature="e#170#234#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/rpcclient/infrastructure.go">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="333">
@@ -232,8 +236,11 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/rpcclient/notify.go">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="-1636">
-          <caret line="88" column="24" selection-start-line="88" selection-start-column="7" selection-end-line="88" selection-end-column="24" />
+        <state relative-caret-position="300">
+          <caret line="20" lean-forward="true" selection-start-line="20" selection-end-line="20" />
+          <folding>
+            <element signature="e#219#444#0" expanded="true" />
+          </folding>
         </state>
       </provider>
     </entry>

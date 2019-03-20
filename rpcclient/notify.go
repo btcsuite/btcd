@@ -11,7 +11,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/astaxie/beego/logs"
 	"time"
 
 	"github.com/btcsuite/btcd/btcjson"
@@ -214,7 +213,7 @@ type NotificationHandlers struct {
 func (c *Client) handleNotification(ntfn *rawNotification) {
 	// Ignore the notification if the client is not interested in any
 	// notifications.
-	logs.Error(ntfn)
+
 	if c.ntfnHandlers == nil {
 		return
 	}
