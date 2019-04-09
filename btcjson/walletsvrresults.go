@@ -137,6 +137,14 @@ type SignRawTransactionResult struct {
 	Errors   []SignRawTransactionError `json:"errors,omitempty"`
 }
 
+// SignRawTransactionWithWalletResult models the data from the
+// signrawtransactionwithwallet command.
+type SignRawTransactionWithWalletResult struct {
+	Hex      string                    `json:"hex"`
+	Complete bool                      `json:"complete"`
+	Errors   []SignRawTransactionError `json:"errors,omitempty"`
+}
+
 // ValidateAddressWalletResult models the data returned by the wallet server
 // validateaddress command.
 type ValidateAddressWalletResult struct {
