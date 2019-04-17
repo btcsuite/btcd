@@ -457,7 +457,7 @@ func (m *memWallet) SendOutputs(outputs []*wire.TxOut,
 		return nil, err
 	}
 
-	return m.rpc.SendRawTransaction(tx, true)
+	return m.rpc.SendRawTransaction(tx, 0)
 }
 
 // SendOutputsWithoutChange creates and sends a transaction that pays to the
@@ -471,7 +471,7 @@ func (m *memWallet) SendOutputsWithoutChange(outputs []*wire.TxOut,
 		return nil, err
 	}
 
-	return m.rpc.SendRawTransaction(tx, true)
+	return m.rpc.SendRawTransaction(tx, 0)
 }
 
 // CreateTransaction returns a fully signed transaction paying to the specified
