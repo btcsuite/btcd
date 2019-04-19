@@ -918,6 +918,21 @@ func NewEngine(scriptPubKey []byte, tx *wire.MsgTx, txIdx int, flags ScriptFlags
 			"signature script is not push only")
 	}
 
+	// The signature script must only contain data pushes for PS2H which is
+	// determined based on the form of the public key script.
+	if vm.hasFlag(ScriptBip16) && isScriptHashScript(scriptPubKey) {
+		// Only accept input scripts that push data for P2SH.
+		// Notice that the push only checks have already been done when
+		// the flag to verify signature scripts are push only is set
+		// above, so avoid checking again.
+		alreadyChecked := vm.hasFlag(ScriptVerifySigPushOnly)
+		if !alreadyChecked && !IsPushOnlyScript(scriptSig) {
+			return nil, scriptError(ErrNotPushOnly,
+				"pay to script hash is not push only")
+		}
+		vm.bip16 = true
+	}
+
 	// The engine stores the scripts in parsed form using a slice.  This
 	// allows multiple scripts to be executed in sequence.  For example,
 	// with a pay-to-script-hash transaction, there will be ultimately be
@@ -942,19 +957,6 @@ func NewEngine(scriptPubKey []byte, tx *wire.MsgTx, txIdx int, flags ScriptFlags
 	// case.
 	if len(scripts[0]) == 0 {
 		vm.scriptIdx++
-	}
-
-	if vm.hasFlag(ScriptBip16) && isScriptHashScript(scriptPubKey) {
-		// Only accept input scripts that push data for P2SH.
-		// Notice that the push only checks have already been done when
-		// the flag to verify signature scripts are push only is set
-		// above, so avoid checking again.
-		alreadyChecked := vm.hasFlag(ScriptVerifySigPushOnly)
-		if !alreadyChecked && !IsPushOnlyScript(scriptSig) {
-			return nil, scriptError(ErrNotPushOnly,
-				"pay to script hash is not push only")
-		}
-		vm.bip16 = true
 	}
 	if vm.hasFlag(ScriptVerifyMinimalData) {
 		vm.dstack.verifyMinimalData = true
