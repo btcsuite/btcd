@@ -521,13 +521,12 @@ func calcWitnessSignatureHash(subScript []parsedOpcode, sigHashes *TxSigHashes,
 func CalcWitnessSigHash(script []byte, sigHashes *TxSigHashes, hType SigHashType,
 	tx *wire.MsgTx, idx int, amt int64) ([]byte, error) {
 
-	parsedScript, err := parseScript(script)
-	if err != nil {
-		return nil, fmt.Errorf("cannot parse output script: %v", err)
+	const scriptVersion = 0
+	if err := checkScriptParses(scriptVersion, script); err != nil {
+		return nil, err
 	}
 
-	return calcWitnessSignatureHash(parsedScript, sigHashes, hType, tx, idx,
-		amt)
+	return calcWitnessSignatureHashRaw(script, sigHashes, hType, tx, idx, amt)
 }
 
 // shallowCopyTx creates a shallow copy of the transaction for use when
