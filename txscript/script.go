@@ -269,6 +269,8 @@ func DisasmString(script []byte) (string, error) {
 
 // removeOpcode will remove any opcode matching ``opcode'' from the opcode
 // stream in pkscript
+//
+// DEPRECATED.  Use removeOpcodeRaw instead.
 func removeOpcode(pkscript []parsedOpcode, opcode byte) []parsedOpcode {
 	retScript := make([]parsedOpcode, 0, len(pkscript))
 	for _, pop := range pkscript {
@@ -277,6 +279,43 @@ func removeOpcode(pkscript []parsedOpcode, opcode byte) []parsedOpcode {
 		}
 	}
 	return retScript
+}
+
+// removeOpcodeRaw will return the script after removing any opcodes that match
+// `opcode`. If the opcode does not appear in script, the original script will
+// be returned unmodified. Otherwise, a new script will be allocated to contain
+// the filtered script. This metehod assumes that the script parses
+// successfully.
+//
+// NOTE: This function is only valid for version 0 scripts.  Since the function
+// does not accept a script version, the results are undefined for other script
+// versions.
+func removeOpcodeRaw(script []byte, opcode byte) []byte {
+	// Avoid work when possible.
+	if len(script) == 0 {
+		return script
+	}
+
+	const scriptVersion = 0
+	var result []byte
+	var prevOffset int32
+
+	tokenizer := MakeScriptTokenizer(scriptVersion, script)
+	for tokenizer.Next() {
+		if tokenizer.Opcode() == opcode {
+			if result == nil {
+				result = make([]byte, 0, len(script))
+				result = append(result, script[:prevOffset]...)
+			}
+		} else if result != nil {
+			result = append(result, script[prevOffset:tokenizer.ByteIndex()]...)
+		}
+		prevOffset = tokenizer.ByteIndex()
+	}
+	if result == nil {
+		return script
+	}
+	return result
 }
 
 // isCanonicalPush returns true if the opcode is either not a push instruction
