@@ -441,22 +441,15 @@ func typeOfScript(scriptVersion uint16, script []byte) ScriptClass {
 		return ScriptHashTy
 	case isWitnessPubKeyHashScript(script):
 		return WitnessV0PubKeyHashTy
+	case isWitnessScriptHashScript(script):
+		return WitnessV0ScriptHashTy
 	case isMultisigScript(scriptVersion, script):
 		return MultiSigTy
 	case isNullDataScript(scriptVersion, script):
 		return NullDataTy
-	}
-
-	pops, err := parseScript(script)
-	if err != nil {
+	default:
 		return NonStandardTy
 	}
-
-	if isWitnessScriptHash(pops) {
-		return WitnessV0ScriptHashTy
-	}
-
-	return NonStandardTy
 }
 
 // GetScriptClass returns the class of the script passed.
