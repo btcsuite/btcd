@@ -396,7 +396,7 @@ func calcHashOutputs(tx *wire.MsgTx) chainhash.Hash {
 // being spent, in addition to the final transaction fee. In the case the
 // wallet if fed an invalid input amount, the real sighash will differ causing
 // the produced signature to be invalid.
-func calcWitnessSignatureHash(subScript []parsedOpcode, sigHashes *TxSigHashes,
+func calcWitnessSignatureHashRaw(scriptSig []byte, sigHashes *TxSigHashes,
 	hashType SigHashType, tx *wire.MsgTx, idx int, amt int64) ([]byte, error) {
 
 	// As a sanity check, ensure the passed input index for the transaction
@@ -446,7 +446,7 @@ func calcWitnessSignatureHash(subScript []parsedOpcode, sigHashes *TxSigHashes,
 	binary.LittleEndian.PutUint32(bIndex[:], txIn.PreviousOutPoint.Index)
 	sigHash.Write(bIndex[:])
 
-	if isWitnessPubKeyHash(subScript) {
+	if isWitnessPubKeyHashScript(scriptSig) {
 		// The script code for a p2wkh is a length prefix varint for
 		// the next 25 bytes, followed by a re-creation of the original
 		// p2pkh pk script.
@@ -454,15 +454,14 @@ func calcWitnessSignatureHash(subScript []parsedOpcode, sigHashes *TxSigHashes,
 		sigHash.Write([]byte{OP_DUP})
 		sigHash.Write([]byte{OP_HASH160})
 		sigHash.Write([]byte{OP_DATA_20})
-		sigHash.Write(subScript[1].data)
+		sigHash.Write(extractWitnessPubKeyHash(scriptSig))
 		sigHash.Write([]byte{OP_EQUALVERIFY})
 		sigHash.Write([]byte{OP_CHECKSIG})
 	} else {
 		// For p2wsh outputs, and future outputs, the script code is
 		// the original script, with all code separators removed,
 		// serialized with a var int length prefix.
-		rawScript, _ := unparseScript(subScript)
-		wire.WriteVarBytes(&sigHash, 0, rawScript)
+		wire.WriteVarBytes(&sigHash, 0, scriptSig)
 	}
 
 	// Next, add the input amount, and sequence number of the input being
@@ -499,6 +498,30 @@ func calcWitnessSignatureHash(subScript []parsedOpcode, sigHashes *TxSigHashes,
 	sigHash.Write(bHashType[:])
 
 	return chainhash.DoubleHashB(sigHash.Bytes()), nil
+}
+
+// calcWitnessSignatureHash computes the sighash digest of a transaction's
+// segwit input using the new, optimized digest calculation algorithm defined
+// in BIP0143: https://github.com/bitcoin/bips/blob/master/bip-0143.mediawiki.
+// This function makes use of pre-calculated sighash fragments stored within
+// the passed HashCache to eliminate duplicate hashing computations when
+// calculating the final digest, reducing the complexity from O(N^2) to O(N).
+// Additionally, signatures now cover the input value of the referenced unspent
+// output. This allows offline, or hardware wallets to compute the exact amount
+// being spent, in addition to the final transaction fee. In the case the
+// wallet if fed an invalid input amount, the real sighash will differ causing
+// the produced signature to be invalid.
+//
+// DEPRECATED: Use calcWitnessSignatureHashRaw instead.
+func calcWitnessSignatureHash(subScript []parsedOpcode, sigHashes *TxSigHashes,
+	hashType SigHashType, tx *wire.MsgTx, idx int, amt int64) ([]byte, error) {
+
+	script, err := unparseScript(subScript)
+	if err != nil {
+		return nil, err
+	}
+
+	return calcWitnessSignatureHashRaw(script, sigHashes, hashType, tx, idx, amt)
 }
 
 // CalcWitnessSigHash computes the sighash digest for the specified input of
