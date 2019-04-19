@@ -950,7 +950,7 @@ func NewEngine(scriptPubKey []byte, tx *wire.MsgTx, txIdx int, flags ScriptFlags
 		// the flag to verify signature scripts are push only is set
 		// above, so avoid checking again.
 		alreadyChecked := vm.hasFlag(ScriptVerifySigPushOnly)
-		if !alreadyChecked && !isPushOnly(vm.scripts[0]) {
+		if !alreadyChecked && !IsPushOnlyScript(scriptSig) {
 			return nil, scriptError(ErrNotPushOnly,
 				"pay to script hash is not push only")
 		}
