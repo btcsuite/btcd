@@ -355,6 +355,7 @@ func extractWitnessPubKeyHash(script []byte) []byte {
 
 		return script[2:22]
 	}
+
 	return nil
 }
 
@@ -438,6 +439,8 @@ func typeOfScript(scriptVersion uint16, script []byte) ScriptClass {
 		return PubKeyHashTy
 	case isScriptHashScript(script):
 		return ScriptHashTy
+	case isWitnessPubKeyHashScript(script):
+		return WitnessV0PubKeyHashTy
 	case isMultisigScript(scriptVersion, script):
 		return MultiSigTy
 	case isNullDataScript(scriptVersion, script):
@@ -449,9 +452,7 @@ func typeOfScript(scriptVersion uint16, script []byte) ScriptClass {
 		return NonStandardTy
 	}
 
-	if isWitnessPubKeyHash(pops) {
-		return WitnessV0PubKeyHashTy
-	} else if isWitnessScriptHash(pops) {
+	if isWitnessScriptHash(pops) {
 		return WitnessV0ScriptHashTy
 	}
 
