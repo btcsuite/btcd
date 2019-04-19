@@ -683,24 +683,14 @@ func calcSignatureHashRaw(sigScript []byte, hashType SigHashType, tx *wire.MsgTx
 	}
 
 	// Remove all instances of OP_CODESEPARATOR from the script.
-	filteredScript := make([]byte, 0, len(sigScript))
-	const scriptVersion = 0
-	tokenizer := MakeScriptTokenizer(scriptVersion, sigScript)
-	var prevOffset int32
-	for tokenizer.Next() {
-		if tokenizer.Opcode() != OP_CODESEPARATOR {
-			filteredScript = append(filteredScript,
-				sigScript[prevOffset:tokenizer.ByteIndex()]...)
-		}
-		prevOffset = tokenizer.ByteIndex()
-	}
+	sigScript = removeOpcodeRaw(sigScript, OP_CODESEPARATOR)
 
 	// Make a shallow copy of the transaction, zeroing out the script for
 	// all inputs that are not currently being processed.
 	txCopy := shallowCopyTx(tx)
 	for i := range txCopy.TxIn {
 		if i == idx {
-			txCopy.TxIn[idx].SignatureScript = filteredScript
+			txCopy.TxIn[idx].SignatureScript = sigScript
 		} else {
 			txCopy.TxIn[i].SignatureScript = nil
 		}
