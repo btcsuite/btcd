@@ -946,7 +946,11 @@ func NewEngine(scriptPubKey []byte, tx *wire.MsgTx, txIdx int, flags ScriptFlags
 
 	if vm.hasFlag(ScriptBip16) && isScriptHash(vm.scripts[1]) {
 		// Only accept input scripts that push data for P2SH.
-		if !isPushOnly(vm.scripts[0]) {
+		// Notice that the push only checks have already been done when
+		// the flag to verify signature scripts are push only is set
+		// above, so avoid checking again.
+		alreadyChecked := vm.hasFlag(ScriptVerifySigPushOnly)
+		if !alreadyChecked && !isPushOnly(vm.scripts[0]) {
 			return nil, scriptError(ErrNotPushOnly,
 				"pay to script hash is not push only")
 		}
