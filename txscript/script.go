@@ -572,13 +572,12 @@ func CalcSignatureHash(script []byte, hashType SigHashType, tx *wire.MsgTx, idx 
 	if err != nil {
 		return nil, fmt.Errorf("cannot parse output script: %v", err)
 	}
-	return calcSignatureHash(parsedScript, hashType, tx, idx), nil
+	return calcSignatureHash(parsedScript, hashType, tx, idx)
 }
 
-// calcSignatureHash will, given a script and hash type for the current script
-// engine instance, calculate the signature hash to be used for signing and
-// verification.
-func calcSignatureHash(script []parsedOpcode, hashType SigHashType, tx *wire.MsgTx, idx int) []byte {
+// calcSignatureHashRaw computes the signature hash for the specified input of
+// the target transaction observing the desired signature hash type.
+func calcSignatureHashRaw(sigScript []byte, hashType SigHashType, tx *wire.MsgTx, idx int) []byte {
 	// The SigHashSingle signature type signs only the corresponding input
 	// and output (the output with the same index number as the input).
 	//
@@ -606,17 +605,24 @@ func calcSignatureHash(script []parsedOpcode, hashType SigHashType, tx *wire.Msg
 	}
 
 	// Remove all instances of OP_CODESEPARATOR from the script.
-	script = removeOpcode(script, OP_CODESEPARATOR)
+	filteredScript := make([]byte, 0, len(sigScript))
+	const scriptVersion = 0
+	tokenizer := MakeScriptTokenizer(scriptVersion, sigScript)
+	var prevOffset int32
+	for tokenizer.Next() {
+		if tokenizer.Opcode() != OP_CODESEPARATOR {
+			filteredScript = append(filteredScript,
+				sigScript[prevOffset:tokenizer.ByteIndex()]...)
+		}
+		prevOffset = tokenizer.ByteIndex()
+	}
 
 	// Make a shallow copy of the transaction, zeroing out the script for
 	// all inputs that are not currently being processed.
 	txCopy := shallowCopyTx(tx)
 	for i := range txCopy.TxIn {
 		if i == idx {
-			// UnparseScript cannot fail here because removeOpcode
-			// above only returns a valid script.
-			sigScript, _ := unparseScript(script)
-			txCopy.TxIn[idx].SignatureScript = sigScript
+			txCopy.TxIn[idx].SignatureScript = filteredScript
 		} else {
 			txCopy.TxIn[i].SignatureScript = nil
 		}
@@ -668,6 +674,21 @@ func calcSignatureHash(script []parsedOpcode, hashType SigHashType, tx *wire.Msg
 	txCopy.SerializeNoWitness(wbuf)
 	binary.Write(wbuf, binary.LittleEndian, hashType)
 	return chainhash.DoubleHashB(wbuf.Bytes())
+}
+
+// calcSignatureHash computes the signature hash for the specified input of the
+// target transaction observing the desired signature hash type.
+//
+// DEPRECATED: Use calcSignatureHashRaw instead
+func calcSignatureHash(prevOutScript []parsedOpcode, hashType SigHashType,
+	tx *wire.MsgTx, idx int) ([]byte, error) {
+
+	sigScript, err := unparseScript(prevOutScript)
+	if err != nil {
+		return nil, err
+	}
+
+	return calcSignatureHashRaw(sigScript, hashType, tx, idx), nil
 }
 
 // asSmallInt returns the passed opcode, which must be true according to

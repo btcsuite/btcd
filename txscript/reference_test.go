@@ -863,8 +863,13 @@ func TestCalcSignatureHash(t *testing.T) {
 		}
 
 		hashType := SigHashType(testVecF64ToUint32(test[3].(float64)))
-		hash := calcSignatureHash(parsedScript, hashType, &tx,
+		hash, err := calcSignatureHash(parsedScript, hashType, &tx,
 			int(test[2].(float64)))
+		if err != nil {
+			t.Errorf("TestCalcSignatureHash failed test #%d: "+
+				"Failed to compute sighash: %v", i, err)
+			continue
+		}
 
 		expectedHash, _ := chainhash.NewHashFromStr(test[4].(string))
 		if !bytes.Equal(hash, expectedHash[:]) {

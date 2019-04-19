@@ -2198,7 +2198,10 @@ func opcodeCheckSig(op *parsedOpcode, vm *Engine) error {
 		// to sign itself.
 		subScript = removeOpcodeByData(subScript, fullSigBytes)
 
-		hash = calcSignatureHash(subScript, hashType, &vm.tx, vm.txIdx)
+		hash, err = calcSignatureHash(subScript, hashType, &vm.tx, vm.txIdx)
+		if err != nil {
+			return err
+		}
 	}
 
 	pubKey, err := btcec.ParsePubKey(pkBytes, btcec.S256())
@@ -2467,7 +2470,10 @@ func opcodeCheckMultiSig(op *parsedOpcode, vm *Engine) error {
 				return err
 			}
 		} else {
-			hash = calcSignatureHash(script, hashType, &vm.tx, vm.txIdx)
+			hash, err = calcSignatureHash(script, hashType, &vm.tx, vm.txIdx)
+			if err != nil {
+				return err
+			}
 		}
 
 		var valid bool

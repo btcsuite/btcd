@@ -345,7 +345,10 @@ sigLoop:
 		// however, assume no sigs etc are in the script since that
 		// would make the transaction nonstandard and thus not
 		// MultiSigTy, so we just need to hash the full thing.
-		hash := calcSignatureHash(pkPops, hashType, tx, idx)
+		hash, err := calcSignatureHash(pkPops, hashType, tx, idx)
+		if err != nil {
+			panic(fmt.Sprintf("cannot compute sighash: %v", err))
+		}
 
 		for _, addr := range addresses {
 			// All multisig addresses should be pubkey addresses
