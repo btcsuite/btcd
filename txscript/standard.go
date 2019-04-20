@@ -388,7 +388,7 @@ func isWitnessScriptHashScript(script []byte) bool {
 }
 
 // extractWitnessProgramInfo returns the version and program if the passed
-// script constitutes a valid witness program. The alst return value indicates
+// script constitutes a valid witness program. The last return value indicates
 // whether or not the script is a valid witness program.
 func extractWitnessProgramInfo(script []byte) (int, []byte, bool) {
 	// Skip parsing if we know the program is invalid based on size.
