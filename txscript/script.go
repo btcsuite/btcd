@@ -98,21 +98,6 @@ func IsWitnessProgram(script []byte) bool {
 	return isWitnessProgramScript(script)
 }
 
-// isWitnessProgram returns true if the passed script is a witness program, and
-// false otherwise. A witness program MUST adhere to the following constraints:
-// there must be exactly two pops (program version and the program itself), the
-// first opcode MUST be a small integer (0-16), the push data MUST be
-// canonical, and finally the size of the push data must be between 2 and 40
-// bytes.
-//
-// DEPRECATED: Use isWitnessProgramScript instead.
-func isWitnessProgram(pops []parsedOpcode) bool {
-	return len(pops) == 2 &&
-		isSmallInt(pops[0].opcode.value) &&
-		isCanonicalPush(pops[1].opcode.value, pops[1].data) &&
-		(len(pops[1].data) >= 2 && len(pops[1].data) <= 40)
-}
-
 // IsNullData returns true if the passed script is a null data script, false
 // otherwise.
 func IsNullData(script []byte) bool {
