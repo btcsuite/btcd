@@ -285,7 +285,7 @@ sigLoop:
 		// however, assume no sigs etc are in the script since that
 		// would make the transaction nonstandard and thus not
 		// MultiSigTy, so we just need to hash the full thing.
-		hash := calcSignatureHashRaw(pkScript, hashType, tx, idx)
+		hash := calcSignatureHash(pkScript, hashType, tx, idx)
 
 		for _, addr := range addresses {
 			// All multisig addresses should be pubkey addresses

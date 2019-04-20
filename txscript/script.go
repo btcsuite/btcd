@@ -618,12 +618,12 @@ func CalcSignatureHash(script []byte, hashType SigHashType, tx *wire.MsgTx, idx 
 		return nil, err
 	}
 
-	return calcSignatureHashRaw(script, hashType, tx, idx), nil
+	return calcSignatureHash(script, hashType, tx, idx), nil
 }
 
-// calcSignatureHashRaw computes the signature hash for the specified input of
-// the target transaction observing the desired signature hash type.
-func calcSignatureHashRaw(sigScript []byte, hashType SigHashType, tx *wire.MsgTx, idx int) []byte {
+// calcSignatureHash computes the signature hash for the specified input of the
+// target transaction observing the desired signature hash type.
+func calcSignatureHash(sigScript []byte, hashType SigHashType, tx *wire.MsgTx, idx int) []byte {
 	// The SigHashSingle signature type signs only the corresponding input
 	// and output (the output with the same index number as the input).
 	//
