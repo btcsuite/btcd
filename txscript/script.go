@@ -267,20 +267,6 @@ func DisasmString(script []byte) (string, error) {
 	return disbuf.String(), tokenizer.Err()
 }
 
-// removeOpcode will remove any opcode matching ``opcode'' from the opcode
-// stream in pkscript
-//
-// DEPRECATED.  Use removeOpcodeRaw instead.
-func removeOpcode(pkscript []parsedOpcode, opcode byte) []parsedOpcode {
-	retScript := make([]parsedOpcode, 0, len(pkscript))
-	for _, pop := range pkscript {
-		if pop.opcode.value != opcode {
-			retScript = append(retScript, pop)
-		}
-	}
-	return retScript
-}
-
 // removeOpcodeRaw will return the script after removing any opcodes that match
 // `opcode`. If the opcode does not appear in script, the original script will
 // be returned unmodified. Otherwise, a new script will be allocated to contain
