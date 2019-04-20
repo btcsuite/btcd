@@ -534,30 +534,6 @@ func calcWitnessSignatureHashRaw(scriptSig []byte, sigHashes *TxSigHashes,
 	return chainhash.DoubleHashB(sigHash.Bytes()), nil
 }
 
-// calcWitnessSignatureHash computes the sighash digest of a transaction's
-// segwit input using the new, optimized digest calculation algorithm defined
-// in BIP0143: https://github.com/bitcoin/bips/blob/master/bip-0143.mediawiki.
-// This function makes use of pre-calculated sighash fragments stored within
-// the passed HashCache to eliminate duplicate hashing computations when
-// calculating the final digest, reducing the complexity from O(N^2) to O(N).
-// Additionally, signatures now cover the input value of the referenced unspent
-// output. This allows offline, or hardware wallets to compute the exact amount
-// being spent, in addition to the final transaction fee. In the case the
-// wallet if fed an invalid input amount, the real sighash will differ causing
-// the produced signature to be invalid.
-//
-// DEPRECATED: Use calcWitnessSignatureHashRaw instead.
-func calcWitnessSignatureHash(subScript []parsedOpcode, sigHashes *TxSigHashes,
-	hashType SigHashType, tx *wire.MsgTx, idx int, amt int64) ([]byte, error) {
-
-	script, err := unparseScript(subScript)
-	if err != nil {
-		return nil, err
-	}
-
-	return calcWitnessSignatureHashRaw(script, sigHashes, hashType, tx, idx, amt)
-}
-
 // CalcWitnessSigHash computes the sighash digest for the specified input of
 // the target transaction observing the desired sig hash type.
 func CalcWitnessSigHash(script []byte, sigHashes *TxSigHashes, hType SigHashType,
