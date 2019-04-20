@@ -744,21 +744,6 @@ func calcSignatureHashRaw(sigScript []byte, hashType SigHashType, tx *wire.MsgTx
 	return chainhash.DoubleHashB(wbuf.Bytes())
 }
 
-// calcSignatureHash computes the signature hash for the specified input of the
-// target transaction observing the desired signature hash type.
-//
-// DEPRECATED: Use calcSignatureHashRaw instead
-func calcSignatureHash(prevOutScript []parsedOpcode, hashType SigHashType,
-	tx *wire.MsgTx, idx int) ([]byte, error) {
-
-	sigScript, err := unparseScript(prevOutScript)
-	if err != nil {
-		return nil, err
-	}
-
-	return calcSignatureHashRaw(sigScript, hashType, tx, idx), nil
-}
-
 // asSmallInt returns the passed opcode, which must be true according to
 // isSmallInt(), as an integer.
 func asSmallInt(op byte) int {
