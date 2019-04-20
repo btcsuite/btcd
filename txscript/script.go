@@ -90,14 +90,6 @@ func IsPayToWitnessPubKeyHash(script []byte) bool {
 	return isWitnessPubKeyHashScript(script)
 }
 
-// isWitnessPubKeyHash returns true if the passed script is a
-// pay-to-witness-pubkey-hash, and false otherwise.
-func isWitnessPubKeyHash(pops []parsedOpcode) bool {
-	return len(pops) == 2 &&
-		pops[0].opcode.value == OP_0 &&
-		pops[1].opcode.value == OP_DATA_20
-}
-
 // IsWitnessProgram returns true if the passed script is a valid witness
 // program which is encoded according to the passed witness program version. A
 // witness program must be a small integer (from 0-16), followed by 2-40 bytes
