@@ -387,6 +387,43 @@ func isWitnessScriptHashScript(script []byte) bool {
 	return extractWitnessScriptHash(script) != nil
 }
 
+// extractWitnessProgramInfo returns the version and program if the passed
+// script constitutes a valid witness program. The alst return value indicates
+// whether or not the script is a valid witness program.
+func extractWitnessProgramInfo(script []byte) (int, []byte, bool) {
+	// Skip parsing if we know the program is invalid based on size.
+	if len(script) < 4 || len(script) > 42 {
+		return 0, nil, false
+	}
+
+	const scriptVersion = 0
+	tokenizer := MakeScriptTokenizer(scriptVersion, script)
+
+	// The first opcode must be a small int.
+	if !tokenizer.Next() ||
+		!isSmallInt(tokenizer.Opcode()) {
+
+		return 0, nil, false
+	}
+	version := asSmallInt(tokenizer.Opcode())
+
+	// The second opcode must be a canonical data push, the length of the
+	// data push is bounded to 40 by the initial check on overall script
+	// length.
+	if !tokenizer.Next() ||
+		!isCanonicalPush(tokenizer.Opcode(), tokenizer.Data()) {
+
+		return 0, nil, false
+	}
+	program := tokenizer.Data()
+
+	// The witness program is valid if there are no more opcodes, and we
+	// terminated without a parsing error.
+	valid := tokenizer.Done() && tokenizer.Err() == nil
+
+	return version, program, valid
+}
+
 // isWitnessProgramScript returns true if the passed script is a witness
 // program, and false otherwise. A witness program MUST adhere to the following
 // constraints: there must be exactly two pops (program version and the program
@@ -403,33 +440,8 @@ func isWitnessScriptHashScript(script []byte) bool {
 // does not accept a script version, the results are undefined for other script
 // versions.
 func isWitnessProgramScript(script []byte) bool {
-	// Skip parsing if we know the program is invalid based on size.
-	if len(script) < 4 || len(script) > 42 {
-		return false
-	}
-
-	const scriptVersion = 0
-	tokenizer := MakeScriptTokenizer(scriptVersion, script)
-
-	// The first opcode must be a small int.
-	if !tokenizer.Next() ||
-		!isSmallInt(tokenizer.Opcode()) {
-
-		return false
-	}
-
-	// The second opcode must be a canonical data push, the length of the
-	// data push is bounded to 40 by the initial check on overall script
-	// length.
-	if !tokenizer.Next() ||
-		!isCanonicalPush(tokenizer.Opcode(), tokenizer.Data()) {
-
-		return false
-	}
-
-	// The witness program is valid if there are no more opcodes, and we
-	// terminated without a parsing error.
-	return tokenizer.Done() && tokenizer.Err() == nil
+	_, _, valid := extractWitnessProgramInfo(script)
+	return valid
 }
 
 // isNullDataScript returns whether or not the passed script is a standard
