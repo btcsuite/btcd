@@ -891,35 +891,24 @@ func ExtractPkScriptAddrs(pkScript []byte, chainParams *chaincfg.Params) (Script
 		return WitnessV0PubKeyHashTy, addrs, 1, nil
 	}
 
+	if hash := extractWitnessScriptHash(pkScript); hash != nil {
+		var addrs []btcutil.Address
+		addr, err := btcutil.NewAddressWitnessScriptHash(hash, chainParams)
+		if err == nil {
+			addrs = append(addrs, addr)
+		}
+		return WitnessV0ScriptHashTy, addrs, 1, nil
+	}
+
 	// Fall back to slow path.  Ultimately these are intended to be replaced by
 	// faster variants based on the unparsed raw scripts.
 
 	var addrs []btcutil.Address
 	var requiredSigs int
-	var err error
-
-	// No valid addresses or required signatures if the script doesn't
-	// parse.
-	pops, err := parseScript(pkScript)
-	if err != nil {
-		return NonStandardTy, nil, 0, err
-	}
 
 	scriptClass := typeOfScript(scriptVersion, pkScript)
 
 	switch scriptClass {
-	case WitnessV0ScriptHashTy:
-		// A pay-to-witness-script-hash script is of the form:
-		//  OP_0 <32-byte hash>
-		// Therefore, the script hash is the second item on the stack.
-		// Skip the script hash if it's invalid for some reason.
-		requiredSigs = 1
-		addr, err := btcutil.NewAddressWitnessScriptHash(pops[1].data,
-			chainParams)
-		if err == nil {
-			addrs = append(addrs, addr)
-		}
-
 	case NonStandardTy:
 		// Don't attempt to extract addresses or required signatures for
 		// nonstandard transactions.
