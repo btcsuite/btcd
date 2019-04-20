@@ -900,23 +900,8 @@ func ExtractPkScriptAddrs(pkScript []byte, chainParams *chaincfg.Params) (Script
 		return WitnessV0ScriptHashTy, addrs, 1, nil
 	}
 
-	// Fall back to slow path.  Ultimately these are intended to be replaced by
-	// faster variants based on the unparsed raw scripts.
-
-	var addrs []btcutil.Address
-	var requiredSigs int
-
-	scriptClass := typeOfScript(scriptVersion, pkScript)
-
-	switch scriptClass {
-	case NonStandardTy:
-		// Don't attempt to extract addresses or required signatures for
-		// nonstandard transactions.
-	}
-
-	// Don't attempt to extract addresses or required signatures for nonstandard
-	// transactions.
-	return scriptClass, addrs, requiredSigs, nil
+	// If none of the above passed, then the address must be non-standard.
+	return NonStandardTy, nil, 0, nil
 }
 
 // AtomicSwapDataPushes houses the data pushes found in atomic swap contracts.
