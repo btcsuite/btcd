@@ -131,23 +131,16 @@ func IsNullData(script []byte) bool {
 // ExtractWitnessProgramInfo attempts to extract the witness program version,
 // as well as the witness program itself from the passed script.
 func ExtractWitnessProgramInfo(script []byte) (int, []byte, error) {
-	pops, err := parseScript(script)
-	if err != nil {
-		return 0, nil, err
-	}
-
 	// If at this point, the scripts doesn't resemble a witness program,
 	// then we'll exit early as there isn't a valid version or program to
 	// extract.
-	if !isWitnessProgram(pops) {
+	version, program, valid := extractWitnessProgramInfo(script)
+	if !valid {
 		return 0, nil, fmt.Errorf("script is not a witness program, " +
 			"unable to extract version or witness program")
 	}
 
-	witnessVersion := asSmallInt(pops[0].opcode.value)
-	witnessProgram := pops[1].data
-
-	return witnessVersion, witnessProgram, nil
+	return version, program, nil
 }
 
 // IsPushOnlyScript returns whether or not the passed script only pushes data
