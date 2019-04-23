@@ -15,12 +15,20 @@ import (
 // TestMerkle tests the BuildMerkleTreeStore API.
 func TestMerkle(t *testing.T) {
 	block := btcutil.NewBlock(&Block100000)
-	merkles := BuildMerkleTreeStore(block.Transactions(), false)
-	calculatedMerkleRoot := merkles[len(merkles)-1]
+	calcMerkleRoot := CalcMerkleRoot(block.Transactions(), false)
+	merkleStoreTree := BuildMerkleTreeStore(block.Transactions(), false)
+	merkleStoreRoot := merkleStoreTree[len(merkleStoreTree)-1]
+
+	if calcMerkleRoot != *merkleStoreRoot {
+		t.Fatalf("BuildMerkleTreeStore root does not match "+
+			"CalcMerkleRoot, store: %v calc: %v", merkleStoreRoot,
+			calcMerkleRoot)
+	}
+
 	wantMerkle := &Block100000.Header.MerkleRoot
-	if !wantMerkle.IsEqual(calculatedMerkleRoot) {
+	if !wantMerkle.IsEqual(&calcMerkleRoot) {
 		t.Errorf("BuildMerkleTreeStore: merkle root mismatch - "+
-			"got %v, want %v", calculatedMerkleRoot, wantMerkle)
+			"got %v, want %v", calcMerkleRoot, wantMerkle)
 	}
 }
 
