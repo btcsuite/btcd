@@ -295,8 +295,7 @@ func ValidateWitnessCommitment(blk *btcutil.Block) error {
 	// the extracted witnessCommitment is equal to:
 	// SHA256(witnessMerkleRoot || witnessNonce). Where witnessNonce is the
 	// coinbase transaction's only witness item.
-	witnessMerkleTree := BuildMerkleTreeStore(blk.Transactions(), true)
-	witnessMerkleRoot := witnessMerkleTree[len(witnessMerkleTree)-1]
+	witnessMerkleRoot := CalcMerkleRoot(blk.Transactions(), true)
 
 	var witnessPreimage [chainhash.HashSize * 2]byte
 	copy(witnessPreimage[:], witnessMerkleRoot[:])

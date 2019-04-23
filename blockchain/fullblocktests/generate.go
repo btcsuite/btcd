@@ -309,8 +309,7 @@ func calcMerkleRoot(txns []*wire.MsgTx) chainhash.Hash {
 	for _, tx := range txns {
 		utilTxns = append(utilTxns, btcutil.NewTx(tx))
 	}
-	merkles := blockchain.BuildMerkleTreeStore(utilTxns, false)
-	return *merkles[len(merkles)-1]
+	return blockchain.CalcMerkleRoot(utilTxns, false)
 }
 
 // solveBlock attempts to find a nonce which makes the passed block header hash

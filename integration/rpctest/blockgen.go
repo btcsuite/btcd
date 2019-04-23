@@ -181,12 +181,11 @@ func CreateBlock(prevBlock *btcutil.Block, inclusionTxs []*btcutil.Tx,
 	if inclusionTxs != nil {
 		blockTxns = append(blockTxns, inclusionTxs...)
 	}
-	merkles := blockchain.BuildMerkleTreeStore(blockTxns, false)
 	var block wire.MsgBlock
 	block.Header = wire.BlockHeader{
 		Version:    blockVersion,
 		PrevBlock:  *prevHash,
-		MerkleRoot: *merkles[len(merkles)-1],
+		MerkleRoot: blockchain.CalcMerkleRoot(blockTxns, false),
 		Timestamp:  ts,
 		Bits:       net.PowLimitBits,
 	}
