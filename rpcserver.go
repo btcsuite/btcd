@@ -1651,8 +1651,8 @@ func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bo
 
 			// Update the merkle root.
 			block := btcutil.NewBlock(template.Block)
-			merkles := blockchain.BuildMerkleTreeStore(block.Transactions(), false)
-			template.Block.Header.MerkleRoot = *merkles[len(merkles)-1]
+			merkleRoot := blockchain.CalcMerkleRoot(block.Transactions(), false)
+			template.Block.Header.MerkleRoot = merkleRoot
 		}
 
 		// Set locals for convenience.

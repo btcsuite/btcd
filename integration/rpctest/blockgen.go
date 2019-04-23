@@ -12,12 +12,12 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcd/blockchain"
+	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/mining"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcd/btcutil"
 )
 
 // solveBlock attempts to find a nonce which makes the passed block header hash
@@ -197,12 +197,12 @@ func CreateBlock(prevBlock *btcutil.Block, inclusionTxs []*btcutil.Tx,
 		_ = mining.AddWitnessCommitment(coinbaseTx, blockTxns)
 	}
 
-	merkles := blockchain.BuildMerkleTreeStore(blockTxns, false)
+	merkleRoot := blockchain.CalcMerkleRoot(blockTxns, false)
 	var block wire.MsgBlock
 	block.Header = wire.BlockHeader{
 		Version:    blockVersion,
 		PrevBlock:  *prevHash,
-		MerkleRoot: *merkles[len(merkles)-1],
+		MerkleRoot: merkleRoot,
 		Timestamp:  ts,
 		Bits:       net.PowLimitBits,
 	}
