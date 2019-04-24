@@ -3299,14 +3299,6 @@ func handleSearchRawTransactions(s *rpcServer, cmd interface{}, closeChan <-chan
 // handleSendRawTransaction implements the sendrawtransaction command.
 func handleSendRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	c := cmd.(*btcjson.SendRawTransactionCmd)
-	if s.cfg.TxIndex == nil {
-		return nil, &btcjson.RPCError{
-			Code: btcjson.ErrRPCNoTxInfo,
-			Message: "The transaction index must be " +
-				"enabled to query the blockchain " +
-				"(specify --txindex)",
-		}
-	}
 	// Deserialize and send off to tx relay
 	hexStr := c.HexTx
 	if len(hexStr)%2 != 0 {
@@ -3327,24 +3319,7 @@ func handleSendRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan st
 
 	// Use 0 for the tag to represent local node.
 	tx := btcutil.NewTx(&msgTx)
-
-	var totalSatoshiIn int64
-	inputs, err := fetchInputTxos(s, &msgTx)
-	for _, txIn := range inputs {
-		totalSatoshiIn += txIn.Value
-	}
-	var totalSatoshiOut int64
-	for _, txOut := range tx.MsgTx().TxOut {
-		totalSatoshiOut += txOut.Value
-	}
-	txFee := totalSatoshiIn - totalSatoshiOut
-	if txFee > int64(*c.MaxFeeRate) {
-		return nil, &btcjson.RPCError{
-			Code:    btcjson.ErrRPCDeserialization,
-			Message: "Fee is higher than the max fee allowed",
-		}
-	}
-	acceptedTxs, err := s.cfg.TxMemPool.ProcessTransaction(tx, false, false, 0)
+	acceptedTxs, err := s.cfg.TxMemPool.ProcessTransaction(tx, false, false, 0, c.MaxFeeRate)
 	if err != nil {
 		// When the error is a rule error, it means the transaction was
 		// simply rejected as opposed to something actually going wrong,
