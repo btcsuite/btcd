@@ -6,6 +6,7 @@ package netsync
 
 import (
 	"container/list"
+	"math/rand"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -236,7 +237,7 @@ func (sm *SyncManager) startSync() {
 	}
 
 	best := sm.chain.BestSnapshot()
-	var bestPeer *peerpkg.Peer
+	var higherPeers, equalPeers []*peerpkg.Peer
 	for peer, state := range sm.peerStates {
 		if !state.syncCandidate {
 			continue
@@ -258,9 +259,33 @@ func (sm *SyncManager) startSync() {
 			continue
 		}
 
-		// TODO(davec): Use a better algorithm to choose the best peer.
-		// For now, just pick the first available candidate.
-		bestPeer = peer
+		// If the peer is at the same height as us, we'll add it a set
+		// of backup peers in case we do not find one with a higher
+		// height. If we are synced up with all of our peers, all of
+		// them will be in this set.
+		if peer.LastBlock() == best.Height {
+			equalPeers = append(equalPeers, peer)
+			continue
+		}
+
+		// This peer has a height greater than our own, we'll consider
+		// it in the set of better peers from which we'll randomly
+		// select.
+		higherPeers = append(higherPeers, peer)
+	}
+
+	// Pick randomly from the set of peers greater than our block height,
+	// falling back to a random peer of the same height if none are greater.
+	//
+	// TODO(conner): Use a better algorithm to ranking peers based on
+	// observed metrics and/or sync in parallel.
+	var bestPeer *peerpkg.Peer
+	switch {
+	case len(higherPeers) > 0:
+		bestPeer = higherPeers[rand.Intn(len(higherPeers))]
+
+	case len(equalPeers) > 0:
+		bestPeer = equalPeers[rand.Intn(len(equalPeers))]
 	}
 
 	// Start syncing from the best peer if one was selected.
