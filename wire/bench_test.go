@@ -442,6 +442,32 @@ func BenchmarkReadTxIn(b *testing.B) {
 	}
 }
 
+// BenchmarkReadTxInBuf performs a benchmark on how long it takes to read a
+// transaction input.
+func BenchmarkReadTxInBuf(b *testing.B) {
+	b.ReportAllocs()
+
+	buffer := binarySerializer.Borrow()
+	buf := []byte{
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // Previous output hash
+		0xff, 0xff, 0xff, 0xff, // Previous output index
+		0x07,                                     // Varint for length of signature script
+		0x04, 0xff, 0xff, 0x00, 0x1d, 0x01, 0x04, // Signature script
+		0xff, 0xff, 0xff, 0xff, // Sequence
+	}
+	r := bytes.NewReader(buf)
+	var txIn TxIn
+	for i := 0; i < b.N; i++ {
+		r.Seek(0, 0)
+		readTxInBuf(r, 0, 0, &txIn, buffer)
+		scriptPool.Return(txIn.SignatureScript)
+	}
+	binarySerializer.Return(buffer)
+}
+
 // BenchmarkWriteTxIn performs a benchmark on how long it takes to write
 // a transaction input.
 func BenchmarkWriteTxIn(b *testing.B) {
