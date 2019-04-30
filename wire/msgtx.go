@@ -1037,8 +1037,30 @@ func writeOutPointBuf(w io.Writer, pver uint32, version int32, op *OutPoint,
 // memory exhaustion attacks and forced panics through malformed messages.  The
 // fieldName parameter is only used for the error message so it provides more
 // context in the error.
+//
+// DEPRECATED: Use readScriptBuf instead.
 func readScript(r io.Reader, pver uint32, maxAllowed uint32, fieldName string) ([]byte, error) {
-	count, err := ReadVarInt(r, pver)
+	buf := binarySerializer.Borrow()
+	b, err := readScriptBuf(r, pver, buf, maxAllowed, fieldName)
+	binarySerializer.Return(buf)
+	return b, err
+}
+
+// readScript reads a variable length byte array that represents a transaction
+// script.  It is encoded as a varInt containing the length of the array
+// followed by the bytes themselves.  An error is returned if the length is
+// greater than the passed maxAllowed parameter which helps protect against
+// memory exhaustion attacks and forced panics through malformed messages.  The
+// fieldName parameter is only used for the error message so it provides more
+// context in the error.
+//
+// If b is non-nil, the provided buffer will be used for serializing small
+// values.  Otherwise a buffer will be drawn from the binarySerializer's pool
+// and return when the method finishes.
+//
+// NOTE: b MUST either be nil or at least an 8-byte slice.
+func readScriptBuf(r io.Reader, pver uint32, buf []byte, maxAllowed uint32, fieldName string) ([]byte, error) {
+	count, err := ReadVarIntBuf(r, pver, buf)
 	if err != nil {
 		return nil, err
 	}
