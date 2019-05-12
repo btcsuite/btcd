@@ -76,6 +76,9 @@ const (
 	ErrRPCInvalidTxVout     RPCErrorCode = -5
 	ErrRPCRawTxString       RPCErrorCode = -32602
 	ErrRPCDecodeHexString   RPCErrorCode = -22
+	ErrRPCTxError           RPCErrorCode = -25
+	ErrRPCTxRejected        RPCErrorCode = -26
+	ErrRPCTxAlreadyInChain  RPCErrorCode = -27
 )
 
 // Errors that are specific to btcd.
