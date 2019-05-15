@@ -102,6 +102,17 @@ func ParsePubKey(pubKeyStr []byte, curve *KoblitzCurve) (key *PublicKey, err err
 		if format == pubkeyHybrid && ybit != isOdd(pubkey.Y) {
 			return nil, fmt.Errorf("ybit doesn't match oddness")
 		}
+
+		if pubkey.X.Cmp(pubkey.Curve.Params().P) >= 0 {
+			return nil, fmt.Errorf("pubkey X parameter is >= to P")
+		}
+		if pubkey.Y.Cmp(pubkey.Curve.Params().P) >= 0 {
+			return nil, fmt.Errorf("pubkey Y parameter is >= to P")
+		}
+		if !pubkey.Curve.IsOnCurve(pubkey.X, pubkey.Y) {
+			return nil, fmt.Errorf("pubkey isn't on secp256k1 curve")
+		}
+
 	case PubKeyBytesLenCompressed:
 		// format is 0x2 | solution, <X coordinate>
 		// solution determines which solution of the curve we use.
@@ -115,20 +126,12 @@ func ParsePubKey(pubKeyStr []byte, curve *KoblitzCurve) (key *PublicKey, err err
 		if err != nil {
 			return nil, err
 		}
+
 	default: // wrong!
 		return nil, fmt.Errorf("invalid pub key length %d",
 			len(pubKeyStr))
 	}
 
-	if pubkey.X.Cmp(pubkey.Curve.Params().P) >= 0 {
-		return nil, fmt.Errorf("pubkey X parameter is >= to P")
-	}
-	if pubkey.Y.Cmp(pubkey.Curve.Params().P) >= 0 {
-		return nil, fmt.Errorf("pubkey Y parameter is >= to P")
-	}
-	if !pubkey.Curve.IsOnCurve(pubkey.X, pubkey.Y) {
-		return nil, fmt.Errorf("pubkey isn't on secp256k1 curve")
-	}
 	return &pubkey, nil
 }
 
