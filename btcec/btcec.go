@@ -886,9 +886,19 @@ func (curve *KoblitzCurve) ScalarBaseMult(k []byte) (*big.Int, *big.Int) {
 	return curve.fieldJacobianToBigAffine(qx, qy, qz)
 }
 
-// QPlus1Div4 returns the Q+1/4 constant for the curve for use in calculating
-// square roots via exponention.
+// QPlus1Div4 returns the (P+1)/4 constant for the curve for use in calculating
+// square roots via exponentiation.
+//
+// DEPRECATED: The actual value returned is (P+1)/4, where as the original
+// method name implies that this value is (((P+1)/4)+1)/4. This method is kept
+// to maintain backwards compatibility of the API. Use Q() instead.
 func (curve *KoblitzCurve) QPlus1Div4() *big.Int {
+	return curve.q
+}
+
+// Q returns the (P+1)/4 constant for the curve for use in calculating square
+// roots via exponentiation.
+func (curve *KoblitzCurve) Q() *big.Int {
 	return curve.q
 }
 
