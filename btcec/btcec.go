@@ -36,9 +36,16 @@ var (
 // interface from crypto/elliptic.
 type KoblitzCurve struct {
 	*elliptic.CurveParams
-	q         *big.Int
+
+	// q is the value (P+1)/4 used to compute the square root of field
+	// elements.
+	q *big.Int
+
 	H         int      // cofactor of the curve.
 	halfOrder *big.Int // half the order N
+
+	// fieldB is the constant B of the curve as a fieldVal.
+	fieldB *fieldVal
 
 	// byteSize is simply the bit size / 8 and is provided for convenience
 	// since it is calculated repeatedly.
@@ -917,6 +924,7 @@ func initS256() {
 		big.NewInt(1)), big.NewInt(4))
 	secp256k1.H = 1
 	secp256k1.halfOrder = new(big.Int).Rsh(secp256k1.N, 1)
+	secp256k1.fieldB = new(fieldVal).SetByteSlice(secp256k1.B.Bytes())
 
 	// Provided for convenience since this gets computed repeatedly.
 	secp256k1.byteSize = secp256k1.BitSize / 8
