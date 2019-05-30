@@ -156,28 +156,29 @@ func (s PkScript) String() string {
 	return str
 }
 
-// ComputePkScript computes the pkScript of an transaction output by looking at
-// the transaction input's signature script or witness.
+// ComputePkScript computes the script of an output by looking at the spending
+// input's signature script or witness.
 //
 // NOTE: Only P2PKH, P2SH, P2WSH, and P2WPKH redeem scripts are supported.
 func ComputePkScript(sigScript []byte, witness wire.TxWitness) (PkScript, error) {
-	var pkScript PkScript
-
-	// Ensure that either an input's signature script or a witness was
-	// provided.
-	if len(sigScript) == 0 && len(witness) == 0 {
-		return pkScript, ErrUnsupportedScriptType
-	}
-
-	// We'll start by checking the input's signature script, if provided.
 	switch {
-	case len(sigScript) == 0:
-		break
+	case len(sigScript) > 0:
+		return computeNonWitnessPkScript(sigScript)
+	case len(witness) > 0:
+		return computeWitnessPkScript(witness)
+	default:
+		return PkScript{}, ErrUnsupportedScriptType
+	}
+}
 
+// computeNonWitnessPkScript computes the script of an output by looking at the
+// spending input's signature script.
+func computeNonWitnessPkScript(sigScript []byte) (PkScript, error) {
+	switch {
 	// Since we only support P2PKH and P2SH scripts as the only non-witness
 	// script types, we should expect to see a push only script.
 	case !IsPushOnlyScript(sigScript):
-		return pkScript, ErrUnsupportedScriptType
+		return PkScript{}, ErrUnsupportedScriptType
 
 	// If a signature script is provided with a length long enough to
 	// represent a P2PKH script, then we'll attempt to parse the compressed
@@ -193,10 +194,10 @@ func ComputePkScript(sigScript []byte, witness wire.TxWitness) (PkScript, error)
 			pubKeyHash := hash160(pubKey)
 			script, err := payToPubKeyHashScript(pubKeyHash)
 			if err != nil {
-				return pkScript, err
+				return PkScript{}, err
 			}
 
-			pkScript.class = PubKeyHashTy
+			pkScript := PkScript{class: PubKeyHashTy}
 			copy(pkScript.script[:], script)
 			return pkScript, nil
 		}
@@ -212,25 +213,30 @@ func ComputePkScript(sigScript []byte, witness wire.TxWitness) (PkScript, error)
 		// obtain it.
 		parsedOpcodes, err := parseScript(sigScript)
 		if err != nil {
-			return pkScript, err
+			return PkScript{}, err
 		}
 		redeemScript := parsedOpcodes[len(parsedOpcodes)-1].data
 
 		scriptHash := hash160(redeemScript)
 		script, err := payToScriptHashScript(scriptHash)
 		if err != nil {
-			return pkScript, err
+			return PkScript{}, err
 		}
 
-		pkScript.class = ScriptHashTy
+		pkScript := PkScript{class: ScriptHashTy}
 		copy(pkScript.script[:], script)
 		return pkScript, nil
 	}
+}
 
-	// If a witness was provided instead, we'll use the last item of the
-	// witness stack to determine the proper witness type.
+// computeWitnessPkScript computes the script of an output by looking at the
+// spending input's witness.
+func computeWitnessPkScript(witness wire.TxWitness) (PkScript, error) {
+	// We'll use the last item of the witness stack to determine the proper
+	// witness type.
 	lastWitnessItem := witness[len(witness)-1]
 
+	var pkScript PkScript
 	switch {
 	// If the witness stack has a size of 2 and its last item is a
 	// compressed public key, then this is a P2WPKH witness.
@@ -243,7 +249,6 @@ func ComputePkScript(sigScript []byte, witness wire.TxWitness) (PkScript, error)
 
 		pkScript.class = WitnessV0PubKeyHashTy
 		copy(pkScript.script[:], script)
-		return pkScript, nil
 
 	// For any other witnesses, we'll assume it's a P2WSH witness.
 	default:
@@ -255,8 +260,9 @@ func ComputePkScript(sigScript []byte, witness wire.TxWitness) (PkScript, error)
 
 		pkScript.class = WitnessV0ScriptHashTy
 		copy(pkScript.script[:], script)
-		return pkScript, nil
 	}
+
+	return pkScript, nil
 }
 
 // hash160 returns the RIPEMD160 hash of the SHA-256 HASH of the given data.
