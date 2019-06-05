@@ -85,10 +85,10 @@ func (sig *Signature) IsEqual(otherSig *Signature) bool {
 		sig.S.Cmp(otherSig.S) == 0
 }
 
-// minSigLen is the minimum length of a DER encoded signature and is
-// when both R and S are 1 byte each.
+// MinSigLen is the minimum length of a DER encoded signature and is when both R
+// and S are 1 byte each.
 // 0x30 + <1-byte> + 0x02 + 0x01 + <byte> + 0x2 + 0x01 + <byte>
-const minSigLen = 8
+const MinSigLen = 8
 
 func parseSig(sigStr []byte, curve elliptic.Curve, der bool) (*Signature, error) {
 	// Originally this code used encoding/asn1 in order to parse the
@@ -103,7 +103,7 @@ func parseSig(sigStr []byte, curve elliptic.Curve, der bool) (*Signature, error)
 
 	signature := &Signature{}
 
-	if len(sigStr) < minSigLen {
+	if len(sigStr) < MinSigLen {
 		return nil, errors.New("malformed signature: too short")
 	}
 	// 0x30
@@ -118,7 +118,7 @@ func parseSig(sigStr []byte, curve elliptic.Curve, der bool) (*Signature, error)
 
 	// siglen should be less than the entire message and greater than
 	// the minimal message size.
-	if int(siglen+2) > len(sigStr) || int(siglen+2) < minSigLen {
+	if int(siglen+2) > len(sigStr) || int(siglen+2) < MinSigLen {
 		return nil, errors.New("malformed signature: bad length")
 	}
 	// trim the slice we're working on so we only look at what matters.
