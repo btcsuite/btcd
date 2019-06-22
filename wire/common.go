@@ -238,7 +238,7 @@ func readElement(r io.Reader, element interface{}) error {
 
 	// Unix timestamp encoded as a uint32.
 	case *uint32Time:
-		rv, err := binarySerializer.Uint32(r, binary.LittleEndian)
+		rv, err := binarySerializer.Uint32(r, littleEndian)
 		if err != nil {
 			return err
 		}
@@ -247,7 +247,7 @@ func readElement(r io.Reader, element interface{}) error {
 
 	// Unix timestamp encoded as an int64.
 	case *int64Time:
-		rv, err := binarySerializer.Uint64(r, binary.LittleEndian)
+		rv, err := binarySerializer.Uint64(r, littleEndian)
 		if err != nil {
 			return err
 		}
