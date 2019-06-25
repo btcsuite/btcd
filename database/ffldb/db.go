@@ -950,7 +950,7 @@ type pendingBlock struct {
 }
 
 // transaction represents a database transaction.  It can either be read-only or
-// read-write and implements the database.Bucket interface.  The transaction
+// read-write and implements the database.Tx interface.  The transaction
 // provides a root bucket against which all read and writes occur.
 type transaction struct {
 	managed        bool             // Is the transaction managed?
