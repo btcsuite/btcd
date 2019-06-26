@@ -146,7 +146,8 @@ func testMiningAddrCalls(r *rpctest.Harness, t *testing.T) {
 
 	// Next, remove all the remaining address we generated from btcd's set
 	// of mining addresses.
-	for _, addr := range append(addrs[:2], addrs[3:]...) {
+	addrs = append(addrs[2:], addrs[3:]...)
+	for _, addr := range addrs {
 		if err := r.Node.DelMiningAddr(addr); err != nil {
 			t.Fatalf("unable to delete mining addr: %v", err)
 		}

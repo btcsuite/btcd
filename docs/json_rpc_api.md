@@ -723,7 +723,7 @@ The following is an overview of the RPC methods which are implemented by btcd, b
 |Method|listminingaddrs|
 |Parameters|None|
 |Description|Returns a list of all the currently active generation (coinbase payout) addresses.|
-|Returns|Nothing|
+|Returns|`JSON array`|
 [Return to Overview](#MethodOverview)<br />
 
 ***

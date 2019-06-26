@@ -2573,13 +2573,14 @@ func newMiningAddrStore(numAddrs int) *miningAddrStore {
 //
 // NOTE: This function is safe for concurrent access.
 func (m *miningAddrStore) AddAddr(addr btcutil.Address) error {
+	encodedAddr := addr.EncodeAddress()
 	m.Lock()
 	defer m.Unlock()
 
 	// Scan the current list of mining addresses to ensure that we don't
 	// add any duplicates.
 	for _, miningAddr := range m.miningAddrs {
-		if miningAddr.EncodeAddress() == addr.EncodeAddress() {
+		if miningAddr.EncodeAddress() == encodedAddr {
 			return fmt.Errorf("duplicate address detected")
 		}
 	}
@@ -2882,9 +2883,7 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 		ProcessBlock:           s.syncManager.ProcessBlock,
 		ConnectedCount:         s.ConnectedCount,
 		IsCurrent:              s.syncManager.IsCurrent,
-		GetMiningAddr: func() btcutil.Address {
-			return s.miningAddrs.RandomAddr()
-		},
+		MiningAddr:             s.miningAddrs.RandomAddr,
 	})
 
 	// Only setup a function to return new addresses to connect to when

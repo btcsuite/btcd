@@ -389,8 +389,8 @@ func handleAddMiningAddr(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 	// duplicate is detected, then a non-nil error will be returned.
 	if err := s.server.miningAddrs.AddAddr(addr); err != nil {
 		return nil, &btcjson.RPCError{
-			Code:    btcjson.ErrRPCInternal.Code,
-			Message: "Duplicate mining address detected",
+			Code:    btcjson.ErrRPCInvalidAddressOrKey,
+			Message: fmt.Sprintf("Duplicate mining address detected"),
 		}
 	}
 
@@ -1022,7 +1022,7 @@ func handleGetAddedNodeInfo(s *rpcServer, cmd interface{}, closeChan <-chan stru
 		}
 		if !found {
 			return nil, &btcjson.RPCError{
-				Code:    -24, // TODO: ErrRPCClientNodeNotAdded
+				Code:    btcjson.ErrRPCClientNodeNotAdded,
 				Message: "Node has not been added",
 			}
 		}
@@ -3710,6 +3710,7 @@ func handleVersion(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (in
 type rpcServer struct {
 	started                int32
 	shutdown               int32
+	server                 *server
 	cfg                    rpcserverConfig
 	authsha                [sha256.Size]byte
 	limitauthsha           [sha256.Size]byte

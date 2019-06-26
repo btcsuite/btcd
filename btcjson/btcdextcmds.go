@@ -129,7 +129,7 @@ type AddMiningAddrCmd struct {
 	Address string `json:"address"`
 }
 
-// NewAddMiningAddrCmd returns a new instance which can be used to issue a
+// NewAddMiningAddrCmd returns a new instance which can be used to issue an
 // addminingaddr JSON-RPC command.
 func NewAddMiningAddrCmd(addr string) *AddMiningAddrCmd {
 	return &AddMiningAddrCmd{

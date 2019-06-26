@@ -336,5 +336,4 @@ func main() {
 
 func init() {
 	prand.Seed(time.Now().UnixNano())
-
 }

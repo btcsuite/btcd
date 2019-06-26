@@ -56,9 +56,9 @@ type Config struct {
 	// generate block templates that the miner will attempt to solve.
 	BlockTemplateGenerator *mining.BlkTmplGenerator
 
-	// GetMiningAddr is a function which when called yields an address to
+	// MiningAddr is a function which when called yields an address to
 	// to use as the payment address for generated blocks.
-	GetMiningAddr func() btcutil.Address
+	MiningAddr func() btcutil.Address
 
 	// ProcessBlock defines the function to call with any solved blocks.
 	// It typically must run the provided block through the same set of
@@ -335,7 +335,7 @@ out:
 
 		// Obtain a new payment address selected according to the logic
 		// of the current mining address generation function.
-		payToAddr := m.cfg.GetMiningAddr()
+		payToAddr := m.cfg.MiningAddr()
 
 		// Create a new block template using the available transactions
 		// in the memory pool as a source of transactions to potentially
@@ -589,7 +589,7 @@ func (m *CPUMiner) GenerateNBlocks(n uint32) ([]*chainhash.Hash, error) {
 
 		// Obtain a new payment address selected according to the logic
 		// of the current mining address generation function.
-		payToAddr := m.cfg.GetMiningAddr()
+		payToAddr := m.cfg.MiningAddr()
 
 		// Create a new block template using the available transactions
 		// in the memory pool as a source of transactions to potentially
