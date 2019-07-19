@@ -292,6 +292,11 @@ type GetTxOutResult struct {
 	Coinbase      bool               `json:"coinbase"`
 }
 
+// GetTxOutProofResult models the data from the gettxoutproof command.
+type GetTxOutProofResult struct {
+	Proof string `json:"proof"`
+}
+
 // GetNetTotalsResult models the data returned from the getnettotals command.
 type GetNetTotalsResult struct {
 	TotalBytesRecv uint64 `json:"totalbytesrecv"`

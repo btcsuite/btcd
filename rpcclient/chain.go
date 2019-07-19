@@ -732,6 +732,59 @@ func (c *Client) GetTxOut(txHash *chainhash.Hash, index uint32, mempool bool) (*
 	return c.GetTxOutAsync(txHash, index, mempool).Receive()
 }
 
+// FutureGetTxOutProofResult is a future promise to deliver the result of a
+// GetTxOutProofAsync RPC invocation (or an applicable error).
+type FutureGetTxOutProofResult chan *response
+
+// Receive waits for the response promised by the future and returns a merkle
+// proof for a set of transactions.
+func (r FutureGetTxOutProofResult) Receive() (*btcjson.GetTxOutProofResult, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Take care of the special case where the output has been spent already
+	// it should return the string "null"
+	if string(res) == "null" {
+		return nil, nil
+	}
+
+	// Unmarshal the result as a gettxoutproof result object.
+	var txOutProof *btcjson.GetTxOutProofResult
+	if err := json.Unmarshal(res, &txOutProof); err != nil {
+		return nil, err
+	}
+
+	return txOutProof, nil
+}
+
+// GetTxOutProofAsync returns an instance of a type that can be used to get the
+// result of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+//
+// See GetTxOutProof for the blocking version and more details.
+func (c *Client) GetTxOutProofAsync(blockHash *chainhash.Hash,
+	txHashes ...*chainhash.Hash) FutureGetTxOutProofResult {
+
+	var txids []string
+	for _, txHash := range txHashes {
+		txids = append(txids, txHash.String())
+	}
+	blockHashStr := ""
+	if blockHash != nil {
+		blockHashStr = blockHash.String()
+	}
+
+	return c.sendCmd(btcjson.NewGetTxOutProofCmd(txids, &blockHashStr))
+}
+
+// GetTxOutProof returns a merkle proof for a set of transactions.
+func (c *Client) GetTxOutProof(blockHash *chainhash.Hash,
+	txHashes ...*chainhash.Hash) (*btcjson.GetTxOutProofResult, error) {
+	return c.GetTxOutProofAsync(blockHash, txHashes...).Receive()
+}
+
 // FutureRescanBlocksResult is a future promise to deliver the result of a
 // RescanBlocksAsync RPC invocation (or an applicable error).
 //

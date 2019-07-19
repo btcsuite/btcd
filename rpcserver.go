@@ -41,6 +41,7 @@ import (
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
+	"github.com/btcsuite/btcutil/bloom"
 	"github.com/btcsuite/websocket"
 )
 
@@ -160,6 +161,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"getrawmempool":         handleGetRawMempool,
 	"getrawtransaction":     handleGetRawTransaction,
 	"gettxout":              handleGetTxOut,
+	"gettxoutproof":         handleGetTxOutProof,
 	"help":                  handleHelp,
 	"node":                  handleNode,
 	"ping":                  handlePing,
@@ -272,6 +274,7 @@ var rpcLimited = map[string]struct{}{
 	"getrawmempool":         {},
 	"getrawtransaction":     {},
 	"gettxout":              {},
+	"gettxoutproof":         {},
 	"searchrawtransactions": {},
 	"sendrawtransaction":    {},
 	"submitblock":           {},
@@ -2757,6 +2760,154 @@ func handleGetTxOut(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 		Coinbase: isCoinbase,
 	}
 	return txOutReply, nil
+}
+
+// handleGetTxOutProof handles a request to provide a merkle proof for a list of
+// transactions found within the same block.
+func handleGetTxOutProof(s *rpcServer, cmd interface{},
+	closeChan <-chan struct{}) (interface{}, error) {
+
+	c := cmd.(*btcjson.GetTxOutProofCmd)
+
+	// We'll require at least one transaction hash to be provided.
+	if len(c.TxIDs) == 0 {
+		return nil, &btcjson.RPCError{
+			Code:    btcjson.ErrRPCInvalidParameter,
+			Message: "No transaction hash(es) provided",
+		}
+	}
+
+	// Ensure all the transaction hashes provided are valid and unique.
+	txHashes := make(map[chainhash.Hash]struct{}, len(c.TxIDs))
+	for _, txid := range c.TxIDs {
+		txHash, err := chainhash.NewHashFromStr(txid)
+		if err != nil {
+			return nil, &btcjson.RPCError{
+				Code:    btcjson.ErrRPCInvalidParameter,
+				Message: "Invalid transaction hash",
+			}
+		}
+		if _, ok := txHashes[*txHash]; ok {
+			msg := fmt.Sprintf("Invalid parameter, duplicated "+
+				"txid: %v", txHash)
+			return nil, &btcjson.RPCError{
+				Code:    btcjson.ErrRPCInvalidParameter,
+				Message: msg,
+			}
+		}
+		txHashes[*txHash] = struct{}{}
+	}
+
+	// Retrieve the block in which these transactions are found. If a block
+	// hash is provided, we can just use that.
+	var block *btcutil.Block
+	if c.BlockHash != nil && *c.BlockHash != "" {
+		blockHash, err := chainhash.NewHashFromStr(*c.BlockHash)
+		if err != nil {
+			return nil, &btcjson.RPCError{
+				Code:    btcjson.ErrRPCInvalidParameter,
+				Message: "Invalid block hash",
+			}
+		}
+		block, err = s.cfg.Chain.BlockByHash(blockHash)
+		if err != nil {
+			return nil, &btcjson.RPCError{
+				Code:    btcjson.ErrRPCInvalidAddressOrKey,
+				Message: "Block not found",
+			}
+		}
+	} else {
+		// Otherwise, we'll use the UTXO set and the transaction index
+		// (if available) to determine the block the transactions are
+		// found within.
+		var op wire.OutPoint
+		for txHash := range txHashes {
+			op.Hash = txHash
+			utxo, err := s.cfg.Chain.FetchUtxoEntry(op)
+			if err != nil {
+				msg := "Failed to query UTXO set"
+				return nil, internalRPCError(err.Error(), msg)
+			}
+
+			// The UTXO does not exist or has been spent, so we'll
+			// move on to the next.
+			if utxo == nil {
+				continue
+			}
+
+			block, err = s.cfg.Chain.BlockByHeight(utxo.BlockHeight())
+			if err != nil {
+				msg := "Can't read block from disk"
+				return nil, internalRPCError(err.Error(), msg)
+			}
+			break
+		}
+
+		// If the transaction index is available, we'll query it for a
+		// transaction.
+		if block == nil && s.cfg.TxIndex != nil {
+			blockRegion, err := s.cfg.TxIndex.TxBlockRegion(&op.Hash)
+			if err != nil {
+				msg := "Failed to retrieve transaction location"
+				return nil, internalRPCError(err.Error(), msg)
+			}
+
+			// If the transaction was not found in the index, return
+			// an error indicating so.
+			if blockRegion == nil {
+				return nil, &btcjson.RPCError{
+					Code:    btcjson.ErrRPCInvalidAddressOrKey,
+					Message: "Transaction not yet in block",
+				}
+			}
+
+			block, err = s.cfg.Chain.BlockByHash(blockRegion.Hash)
+			if err != nil {
+				msg := "Transaction index corrupt"
+				return nil, internalRPCError(err.Error(), msg)
+			}
+		} else if block == nil {
+			// Otherwise, we have no information about the block the
+			// transactions could be within, so we'll return an
+			// error.
+			return nil, &btcjson.RPCError{
+				Code:    btcjson.ErrRPCInvalidAddressOrKey,
+				Message: "Transaction not yet in block",
+			}
+		}
+	}
+
+	// Ensure all of the transactions are found within the block.
+	txsFound := 0
+	for _, tx := range block.Transactions() {
+		txHash := tx.Hash()
+		if _, ok := txHashes[*txHash]; ok {
+			txsFound++
+		}
+	}
+	if txsFound != len(txHashes) {
+		msg := "Not all transactions found in specified of retrieved block"
+		return nil, &btcjson.RPCError{
+			Code:    btcjson.ErrRPCInvalidAddressOrKey,
+			Message: msg,
+		}
+	}
+
+	// Compute the proof for the requested transactions and return encoded
+	// as hex.
+	var proof bytes.Buffer
+	merkleBlock, _ := bloom.NewMerkleBlockWithTxs(block, txHashes)
+	err := merkleBlock.BtcEncode(
+		&proof, wire.ProtocolVersion, wire.BaseEncoding,
+	)
+	if err != nil {
+		msg := "Failed to serialize merkle block"
+		return nil, internalRPCError(err.Error(), msg)
+	}
+
+	return &btcjson.GetTxOutProofResult{
+		Proof: hex.EncodeToString(proof.Bytes()),
+	}, nil
 }
 
 // handleHelp implements the help command.

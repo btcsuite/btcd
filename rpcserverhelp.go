@@ -506,6 +506,18 @@ var helpDescsEnUS = map[string]string{
 	"gettxout-vout":           "The index of the output",
 	"gettxout-includemempool": "Include the mempool when true",
 
+	// GetTxOutProofCmd help.
+	"gettxoutproof--synopsis": "Returns a hex-encoded proof that \"txid\" was included in a block.\n" +
+		"\nNOTE: By default this function only works sometimes. This is when there is an\n" +
+		"unspent output in the utxo for this transaction. To make it always work,\n" +
+		"you need to maintain a transaction index, using the -txindex command line option or\n" +
+		"specify the block in which the transaction is included manually (by blockhash).",
+	"gettxoutproof-txids":     "A json array of txids to filter",
+	"gettxoutproof-blockhash": "If specified, looks for txid in the block with this hash",
+
+	// GetTxOutProofResult help.
+	"gettxoutproofresult-proof": "A string that is a serialized, hex-encoded data for the proof",
+
 	// HelpCmd help.
 	"help--synopsis":   "Returns a list of all commands or help for a specified command.",
 	"help-command":     "The command to retrieve help for",
@@ -707,6 +719,7 @@ var rpcResultTypes = map[string][]interface{}{
 	"getrawmempool":         {(*[]string)(nil), (*btcjson.GetRawMempoolVerboseResult)(nil)},
 	"getrawtransaction":     {(*string)(nil), (*btcjson.TxRawResult)(nil)},
 	"gettxout":              {(*btcjson.GetTxOutResult)(nil)},
+	"gettxoutproof":         {(*btcjson.GetTxOutProofResult)(nil)},
 	"node":                  nil,
 	"help":                  {(*string)(nil), (*string)(nil)},
 	"ping":                  nil,
