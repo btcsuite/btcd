@@ -297,6 +297,11 @@ type GetTxOutProofResult struct {
 	Proof string `json:"proof"`
 }
 
+// VerifyTxOutProofResult models the data from the gettxoutproof command.
+type VerifyTxOutProofResult struct {
+	TxIDs []string `json:"txids"`
+}
+
 // GetNetTotalsResult models the data returned from the getnettotals command.
 type GetNetTotalsResult struct {
 	TotalBytesRecv uint64 `json:"totalbytesrecv"`

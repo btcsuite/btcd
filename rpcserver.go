@@ -162,6 +162,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"getrawtransaction":     handleGetRawTransaction,
 	"gettxout":              handleGetTxOut,
 	"gettxoutproof":         handleGetTxOutProof,
+	"verifytxoutproof":      handleVerifyTxOutProof,
 	"help":                  handleHelp,
 	"node":                  handleNode,
 	"ping":                  handlePing,
@@ -275,6 +276,7 @@ var rpcLimited = map[string]struct{}{
 	"getrawtransaction":     {},
 	"gettxout":              {},
 	"gettxoutproof":         {},
+	"verifytxoutproof":      {},
 	"searchrawtransactions": {},
 	"sendrawtransaction":    {},
 	"submitblock":           {},
@@ -2907,6 +2909,63 @@ func handleGetTxOutProof(s *rpcServer, cmd interface{},
 
 	return &btcjson.GetTxOutProofResult{
 		Proof: hex.EncodeToString(proof.Bytes()),
+	}, nil
+}
+
+// handleVerifyTxOutProof verifies that a given merkle proof is valid, and if
+// so, returns the transactions it commits to.
+func handleVerifyTxOutProof(s *rpcServer, cmd interface{},
+	closeChan <-chan struct{}) (interface{}, error) {
+
+	c := cmd.(*btcjson.VerifyTxOutProofCmd)
+
+	// Deserialize the hex-encoded merkle proof.
+	rawProof, err := hex.DecodeString(c.Proof)
+	if err != nil {
+		return nil, &btcjson.RPCError{
+			Code:    btcjson.ErrRPCInvalidParameter,
+			Message: "Invalid hex-encoded merkle proof",
+		}
+	}
+	var merkleBlock wire.MsgMerkleBlock
+	err = merkleBlock.BtcDecode(
+		bytes.NewReader(rawProof), wire.ProtocolVersion,
+		wire.BaseEncoding,
+	)
+	if err != nil {
+		msg := fmt.Sprintf("Invalid merkle proof format: %v", err)
+		return nil, &btcjson.RPCError{
+			Code:    btcjson.ErrRPCDeserialization,
+			Message: msg,
+		}
+	}
+
+	// Verify the merkle proof is for a valid block in the chain.
+	blockHash := merkleBlock.Header.BlockHash()
+	block, err := s.cfg.Chain.BlockByHash(&blockHash)
+	if err != nil {
+		return nil, &btcjson.RPCError{
+			Code:    btcjson.ErrRPCInvalidAddressOrKey,
+			Message: "Block not found in chain",
+		}
+	}
+
+	// The merkle proof is not valid if it doesn't contain the number of
+	// expected transaction within the block.
+	if merkleBlock.Transactions != uint32(len(block.Transactions())) {
+		return nil, nil
+	}
+
+	// Extract the set of transactions the proof committed to. These should
+	// only exist if the proof is valid.
+	txids := bloom.ExtractCommittedTxIDs(&merkleBlock)
+
+	var strTxIDs []string
+	for _, txid := range txids {
+		strTxIDs = append(strTxIDs, txid.String())
+	}
+	return &btcjson.VerifyTxOutProofResult{
+		TxIDs: strTxIDs,
 	}, nil
 }
 

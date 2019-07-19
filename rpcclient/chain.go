@@ -785,6 +785,44 @@ func (c *Client) GetTxOutProof(blockHash *chainhash.Hash,
 	return c.GetTxOutProofAsync(blockHash, txHashes...).Receive()
 }
 
+// FutureVerifyTxOutProofResult is a future promise to deliver the result of a
+// VerifyTxOutProofAync invocation (or an applicable error).
+type FutureVerifyTxOutProofResult chan *response
+
+// Receive waits for the response promised by the future and returns whether or
+// not the chain verified based on the check level and number of blocks to
+// verify specified in the original call.
+func (r FutureVerifyTxOutProofResult) Receive() (*btcjson.VerifyTxOutProofResult, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal the result as a verifytxoutproof result object.
+	var result btcjson.VerifyTxOutProofResult
+	if err := json.Unmarshal(res, &result); err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+}
+
+// VerifyTxOutProofAsync returns an instance of a type that can be used to get
+// the result of the RPC at some future time by invoking the Receive function on
+// the returned instance.
+//
+// See VerifyTxOutProof for the blocking version and more details.
+func (c *Client) VerifyTxOutProofAsync(proof string) FutureVerifyTxOutProofResult {
+	cmd := btcjson.NewVerifyTxOutProofCmd(proof)
+	return c.sendCmd(cmd)
+}
+
+// VerifyTxOutProof requests the server to verify the given merkle proof,
+// returning the transactions it commits to.
+func (c *Client) VerifyTxOutProof(proof string) (*btcjson.VerifyTxOutProofResult, error) {
+	return c.VerifyTxOutProofAsync(proof).Receive()
+}
+
 // FutureRescanBlocksResult is a future promise to deliver the result of a
 // RescanBlocksAsync RPC invocation (or an applicable error).
 //
