@@ -2602,6 +2602,13 @@ func handleRescan(wsc *wsClient, icmd interface{}) (interface{}, error) {
 		if err != nil {
 			return nil, err
 		}
+
+		// If the last block is nil, then this means that the client
+		// disconnected mid-rescan. As a result, we don't need to send
+		// anything back to them.
+		if lastBlock == nil {
+			return nil, nil
+		}
 	} else {
 		rpcsLog.Infof("Skipping rescan as client has no addrs/utxos")
 
