@@ -174,11 +174,7 @@ type BlockChain struct {
 	//
 	// unknownRulesWarned refers to warnings due to unknown rules being
 	// activated.
-	//
-	// unknownVersionsWarned refers to warnings due to unknown versions
-	// being mined.
-	unknownRulesWarned    bool
-	unknownVersionsWarned bool
+	unknownRulesWarned bool
 
 	// The notifications field stores a slice of callbacks to be executed on
 	// certain blockchain events.
@@ -574,18 +570,11 @@ func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block,
 			"spent transaction out information")
 	}
 
-	// No warnings about unknown rules or versions until the chain is
-	// current.
+	// No warnings about unknown rules until the chain is current.
 	if b.isCurrent() {
 		// Warn if any unknown new rules are either about to activate or
 		// have already been activated.
 		if err := b.warnUnknownRuleActivations(node); err != nil {
-			return err
-		}
-
-		// Warn if a high enough percentage of the last blocks have
-		// unexpected versions.
-		if err := b.warnUnknownVersions(node); err != nil {
 			return err
 		}
 	}

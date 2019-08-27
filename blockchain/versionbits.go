@@ -26,15 +26,6 @@ const (
 	// vbNumBits is the total number of bits available for use with the
 	// version bits scheme.
 	vbNumBits = 29
-
-	// unknownVerNumToCheck is the number of previous blocks to consider
-	// when checking for a threshold of unknown block versions for the
-	// purposes of warning the user.
-	unknownVerNumToCheck = 100
-
-	// unknownVerWarnNum is the threshold of previous blocks that have an
-	// unknown version to use for the purposes of warning the user.
-	unknownVerWarnNum = unknownVerNumToCheck / 2
 )
 
 // bitConditionChecker provides a thresholdConditionChecker which can be used to
@@ -260,41 +251,6 @@ func (b *BlockChain) warnUnknownRuleActivations(node *blockNode) error {
 			log.Warnf("Unknown new rules are about to activate in "+
 				"%d blocks (bit %d)", activationHeight, bit)
 		}
-	}
-
-	return nil
-}
-
-// warnUnknownVersions logs a warning if a high enough percentage of the last
-// blocks have unexpected versions.
-//
-// This function MUST be called with the chain state lock held (for writes)
-func (b *BlockChain) warnUnknownVersions(node *blockNode) error {
-	// Nothing to do if already warned.
-	if b.unknownVersionsWarned {
-		return nil
-	}
-
-	// Warn if enough previous blocks have unexpected versions.
-	numUpgraded := uint32(0)
-	for i := uint32(0); i < unknownVerNumToCheck && node != nil; i++ {
-		expectedVersion, err := b.calcNextBlockVersion(node.parent)
-		if err != nil {
-			return err
-		}
-		if expectedVersion > vbLegacyBlockVersion &&
-			(node.version & ^expectedVersion) != 0 {
-
-			numUpgraded++
-		}
-
-		node = node.parent
-	}
-	if numUpgraded > unknownVerWarnNum {
-		log.Warn("Unknown block versions are being mined, so new " +
-			"rules might be in effect.  Are you running the " +
-			"latest version of the software?")
-		b.unknownVersionsWarned = true
 	}
 
 	return nil
