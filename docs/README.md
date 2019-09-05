@@ -20,6 +20,7 @@
     1. [Code Contribution Guidelines](#ContributionGuidelines)
     2. [JSON-RPC Reference](#JSONRPCReference)
     3. [The btcsuite Bitcoin-related Go Packages](#GoPackages)
+6. [Using Docker](#Docker)
 
 <a name="About" />
 
@@ -294,3 +295,11 @@ information.
       specific hash algorithm to be abstracted.
     * [connmgr](https://github.com/btcsuite/btcd/tree/master/connmgr) -
       Package connmgr implements a generic Bitcoin network connection manager.
+
+<a name="Docker" />
+
+### 6. Using Docker
+
+You can run btcd in a Docker container, without the need to compile the source by yourself. Visit the [Using Docker](https://github.com/btcsuite/btcd/tree/master/docs/using_docker.md) page for more inrormation and examples.
+
+* [Using Docker](https://github.com/btcsuite/btcd/tree/master/docs/using_docker.md) details page
