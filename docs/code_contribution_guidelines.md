@@ -1,23 +1,4 @@
-### Table of Contents
-1. [Overview](#Overview)<br />
-2. [Minimum Recommended Skillset](#MinSkillset)<br />
-3. [Required Reading](#ReqReading)<br />
-4. [Development Practices](#DevelopmentPractices)<br />
-4.1. [Share Early, Share Often](#ShareEarly)<br />
-4.2. [Testing](#Testing)<br />
-4.3. [Code Documentation and Commenting](#CodeDocumentation)<br />
-4.4. [Model Git Commit Messages](#ModelGitCommitMessages)<br />
-5. [Code Approval Process](#CodeApproval)<br />
-5.1 [Code Review](#CodeReview)<br />
-5.2 [Rework Code (if needed)](#CodeRework)<br />
-5.3 [Acceptance](#CodeAcceptance)<br />
-6. [Contribution Standards](#Standards)<br />
-6.1. [Contribution Checklist](#Checklist)<br />
-6.2. [Licensing of Contributions](#Licensing)<br />
-
-<a name="Overview" />
-
-### 1. Overview
+# Code contribution guidelines
 
 Developing cryptocurrencies is an exciting endeavor that touches a wide variety
 of areas such as wire protocols, peer-to-peer networking, databases,
@@ -38,9 +19,7 @@ is outlined on this page.
 We highly encourage code contributions, however it is imperative that you adhere
 to the guidelines established on this page.
 
-<a name="MinSkillset" />
-
-### 2. Minimum Recommended Skillset
+## Minimum Recommended Skillset
 
 The following list is a set of core competencies that we recommend you possess
 before you really start attempting to contribute code to the project.  These are
@@ -64,9 +43,7 @@ if you wish to contribute to the cryptography code, you should have a good
 understanding of the various aspects involved with cryptography such as the
 security and performance implications.
 
-<a name="ReqReading" />
-
-### 3. Required Reading
+## Required Reading
 
 - [Effective Go](http://golang.org/doc/effective_go.html) - The entire btcd
   suite follows the guidelines in this document.  For your code to be accepted,
@@ -74,17 +51,13 @@ security and performance implications.
 - [Original Satoshi Whitepaper](http://www.google.com/url?sa=t&rct=j&q=&esrc=s&source=web&cd=1&cad=rja&ved=0CCkQFjAA&url=http%3A%2F%2Fbitcoin.org%2Fbitcoin.pdf&ei=os3VUuH8G4SlsASV74GoAg&usg=AFQjCNEipPLigou_1MfB7DQjXCNdlylrBg&sig2=FaHDuT5z36GMWDEnybDJLg&bvm=bv.59378465,d.b2I) - This is the white paper that started it all.  Having a solid
   foundation to build on will make the code much more comprehensible.
 
-<a name="DevelopmentPractices" />
-
-### 4. Development Practices
+## Development Practices
 
 Developers are expected to work in their own trees and submit pull requests when
 they feel their feature or bug fix is ready for integration into the  master
 branch.
 
-<a name="ShareEarly" />
-
-### 4.1 Share Early, Share Often
+## Share Early, Share Often
 
 We firmly believe in the share early, share often approach.  The basic premise
 of the approach is to announce your plans **before** you start work, and once
@@ -105,9 +78,7 @@ This approach has several benefits:
 - The quicker your changes are merged to master, the less time you will need to
   spend rebasing and otherwise trying to keep up with the main code base
 
-<a name="Testing" />
-
-### 4.2 Testing
+## Testing
 
 One of the major design goals of all core btcd packages is to aim for complete
 test coverage.  This is financial software so bugs and regressions can cost
@@ -126,15 +97,14 @@ checking coverage statistics straight forward.  For more information about the
 test coverage tools, see the [golang cover blog post](http://blog.golang.org/cover).
 
 A quick summary of test practices follows:
+
 - All new code should be accompanied by tests that ensure the code behaves
   correctly when given expected values, and, perhaps even more importantly, that
   it handles errors gracefully
 - When you fix a bug, it should be accompanied by tests which exercise the bug
   to both prove it has been resolved and to prevent future regressions
 
-<a name="CodeDocumentation" />
-
-### 4.3 Code Documentation and Commenting
+## Code Documentation and Commenting
 
 - At a minimum every function must be commented with its intended purpose and
   any assumptions that it makes
@@ -144,16 +114,20 @@ A quick summary of test practices follows:
     variety of automated presentations such as [godoc.org](https://godoc.org)
   - The general rule of thumb is to look at it as if you were completely
     unfamiliar with the code and ask yourself, would this give me enough
-	information to understand what this function does and how I'd probably want
-	to use it?
+    information to understand what this function does and how I'd probably want
+    to use it?
 - Exported functions should also include detailed information the caller of the
-  function will likely need to know and/or understand:<br /><br />
+  function will likely need to know and/or understand:
+
 **WRONG**
+
 ```Go
 // convert a compact uint32 to big.Int
 func CompactToBig(compact uint32) *big.Int {
 ```
+
 **RIGHT**
+
 ```Go
 // CompactToBig converts a compact representation of a whole number N to a
 // big integer.  The representation is similar to IEEE754 floating point
@@ -180,31 +154,35 @@ func CompactToBig(compact uint32) *big.Int {
 // sign bit, but it is implemented here to stay consistent with bitcoind.
 func CompactToBig(compact uint32) *big.Int {
 ```
+
 - Comments in the body of the code are highly encouraged, but they should
   explain the intention of the code as opposed to just calling out the
-  obvious<br /><br />
+  obvious
+  
 **WRONG**
+
 ```Go
 // return err if amt is less than 5460
 if amt < 5460 {
-	return err
+  return err
 }
 ```
+
 **RIGHT**
+
 ```Go
 // Treat transactions with amounts less than the amount which is considered dust
 // as non-standard.
 if amt < 5460 {
-	return err
+  return err
 }
 ```
+
 **NOTE:** The above should really use a constant as opposed to a magic number,
 but it was left as a magic number to show how much of a difference a good
 comment can make.
 
-<a name="ModelGitCommitMessages" />
-
-### 4.4 Model Git Commit Messages
+## Model Git Commit Messages
 
 This project prefers to keep a clean commit history with well-formed commit
 messages.  This section illustrates a model commit message and provides a bit
@@ -214,7 +192,7 @@ being provided here.
 
 Here’s a model Git commit message:
 
-```
+```text
 Short (50 chars or less) summary of changes
 
 More detailed explanatory text, if necessary.  Wrap it to about 72
@@ -255,22 +233,18 @@ a good thing.
   wrap our plain text emails such that there’s room for a few levels of nested
   reply indicators without overflow in an 80 column terminal.
 
-<a name="CodeApproval" />
-
-### 5. Code Approval Process
+## Code Approval Process
 
 This section describes the code approval process that is used for code
 contributions.  This is how to get your changes into btcd.
 
-<a name="CodeReview" />
-
-### 5.1 Code Review
+## Code Review
 
 All code which is submitted will need to be reviewed before inclusion into the
 master branch.  This process is performed by the project maintainers and usually
 other committers who are interested in the area you are working in as well.
 
-##### Code Review Timeframe
+## Code Review Timeframe
 
 The timeframe for a code review will vary greatly depending on factors such as
 the number of other pull requests which need to be reviewed, the size and
@@ -286,7 +260,7 @@ days, while large or far reaching changes may take weeks.  This is a good reason
 to stick with the [Share Early, Share Often](#ShareOften) development practice
 outlined above.
 
-##### What is the review looking for?
+## What is the review looking for?
 
 The review is mainly ensuring the code follows the [Development Practices](#DevelopmentPractices)
 and [Code Contribution Standards](#Standards).  However, there are a few other
@@ -298,9 +272,7 @@ checks which are generally performed as follows:
 - The change is not something which is deemed inappropriate by community
   consensus
 
-<a name="CodeRework" />
-
-### 5.2 Rework Code (if needed)
+## Rework Code (if needed)
 
 After the code review, the change will be accepted immediately if no issues are
 found.  If there are any concerns or questions, you will be provided with
@@ -311,9 +283,7 @@ make the necessary changes.
 
 This process will continue until the code is finally accepted.
 
-<a name="CodeAcceptance" />
-
-### 5.3 Acceptance
+## Acceptance
 
 Once your code is accepted, it will be integrated with the master branch.
 Typically it will be rebased and fast-forward merged to master as we prefer to
@@ -323,13 +293,9 @@ the master branch and the pull request will be closed.
 
 Rejoice as you will now be listed as a [contributor](https://github.com/btcsuite/btcd/graphs/contributors)!
 
-<a name="Standards" />
+## Contribution Standards
 
-### 6. Contribution Standards
-
-<a name="Checklist" />
-
-### 6.1. Contribution Checklist
+## Contribution Checklist
 
 - [&nbsp;&nbsp;] All changes are Go version 1.3 compliant
 - [&nbsp;&nbsp;] The code being submitted is commented according to the
@@ -346,9 +312,7 @@ Rejoice as you will now be listed as a [contributor](https://github.com/btcsuite
 - [&nbsp;&nbsp;] Running [golint](https://github.com/golang/lint) does not
   report any **new** issues that did not already exist
 
-<a name="Licensing" />
-
-### 6.2. Licensing of Contributions
+## Licensing of Contributions
 
 All contributions must be licensed with the
 [ISC license](https://github.com/btcsuite/btcd/blob/master/LICENSE).  This is

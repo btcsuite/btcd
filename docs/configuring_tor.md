@@ -1,25 +1,4 @@
-### Table of Contents
-1. [Overview](#Overview)<br />
-2. [Client-Only](#Client)<br />
-2.1 [Description](#ClientDescription)<br />
-2.2 [Command Line Example](#ClientCLIExample)<br />
-2.3 [Config File Example](#ClientConfigFileExample)<br />
-3. [Client-Server via Tor Hidden Service](#HiddenService)<br />
-3.1 [Description](#HiddenServiceDescription)<br />
-3.2 [Command Line Example](#HiddenServiceCLIExample)<br />
-3.3 [Config File Example](#HiddenServiceConfigFileExample)<br />
-4. [Bridge Mode (Not Anonymous)](#Bridge)<br />
-4.1 [Description](#BridgeDescription)<br />
-4.2 [Command Line Example](#BridgeCLIExample)<br />
-4.3 [Config File Example](#BridgeConfigFileExample)<br />
-5. [Tor Stream Isolation](#TorStreamIsolation)<br />
-5.1 [Description](#TorStreamIsolationDescription)<br />
-5.2 [Command Line Example](#TorStreamIsolationCLIExample)<br />
-5.3 [Config File Example](#TorStreamIsolationFileExample)<br />
-
-<a name="Overview" />
-
-### 1. Overview
+# Configuring TOR
 
 btcd provides full support for anonymous networking via the
 [Tor Project](https://www.torproject.org/), including [client-only](#Client)
@@ -34,13 +13,7 @@ network to run as both a client and a server so others may connect to you to as
 you are connecting to them.  We recommend you take the time to setup a Tor
 hidden service for this reason.
 
-<a name="Client" />
-
-### 2. Client-Only
-
-<a name="ClientDescription" />
-
-**2.1 Description**<br />
+## Client-only
 
 Configuring btcd as a Tor client is straightforward.  The first step is
 obviously to install Tor and ensure it is working. Once that is done, all that
@@ -58,17 +31,13 @@ NOTE: Specifying the `--proxy` flag disables listening by default since you will
 not be reachable for inbound connections unless you also configure a Tor
 [hidden service](#HiddenService).
 
-<a name="ClientCLIExample" />
-
-**2.2 Command Line Example**<br />
+### Command line example
 
 ```bash
-$ ./btcd --proxy=127.0.0.1:9050
+./btcd --proxy=127.0.0.1:9050
 ```
 
-<a name="ClientConfigFileExample" />
-
-**2.3 Config File Example**<br />
+### Config file example
 
 ```text
 [Application Options]
@@ -76,13 +45,7 @@ $ ./btcd --proxy=127.0.0.1:9050
 proxy=127.0.0.1:9050
 ```
 
-<a name="HiddenService" />
-
-### 3. Client-Server via Tor Hidden Service
-
-<a name="HiddenServiceDescription" />
-
-**3.1 Description**<br />
+## Client-server via Tor hidden service
 
 The first step is to configure Tor to provide a hidden service.  Documentation
 for this can be found on the Tor project website
@@ -103,23 +66,20 @@ HiddenServicePort 8333 127.0.0.1:8333
 Once Tor is configured to provide the hidden service and you have obtained your
 generated .onion address, configuring btcd as a Tor hidden service requires
 three flags:
+
 * `--proxy` to identify the Tor (SOCKS 5) proxy to use for outgoing traffic.
   This is typically 127.0.0.1:9050.
 * `--listen` to enable listening for inbound connections since `--proxy`
   disables listening by default
 * `--externalip` to set the .onion address that is advertised to other peers
 
-<a name="HiddenServiceCLIExample" />
-
-**3.2 Command Line Example**<br />
+### Command line example
 
 ```bash
-$ ./btcd --proxy=127.0.0.1:9050 --listen=127.0.0.1 --externalip=fooanon.onion
+./btcd --proxy=127.0.0.1:9050 --listen=127.0.0.1 --externalip=fooanon.onion
 ```
 
-<a name="HiddenServiceConfigFileExample" />
-
-**3.3 Config File Example**<br />
+### Config file example
 
 ```text
 [Application Options]
@@ -129,13 +89,7 @@ listen=127.0.0.1
 externalip=fooanon.onion
 ```
 
-<a name="Bridge" />
-
-### 4. Bridge Mode (Not Anonymous)
-
-<a name="BridgeDescription" />
-
-**4.1 Description**<br />
+## Bridge mode (not anonymous)
 
 btcd provides support for operating as a bridge between regular nodes and hidden
 service nodes.  In particular this means only traffic which is directed to or
@@ -154,17 +108,13 @@ mode, you only need to specify your hidden service's .onion address via the
 `--externalip` flag since traffic to and from .onion addresses are already
 routed via Tor due to the `--onion` flag.
 
-<a name="BridgeCLIExample" />
-
-**4.2 Command Line Example**<br />
+### Command line example
 
 ```bash
-$ ./btcd --onion=127.0.0.1:9050 --externalip=fooanon.onion
+./btcd --onion=127.0.0.1:9050 --externalip=fooanon.onion
 ```
 
-<a name="BridgeConfigFileExample" />
-
-**4.3 Config File Example**<br />
+### Config file example
 
 ```text
 [Application Options]
@@ -173,13 +123,7 @@ onion=127.0.0.1:9050
 externalip=fooanon.onion
 ```
 
-<a name="TorStreamIsolation" />
-
-### 5. Tor Stream Isolation
-
-<a name="TorStreamIsolationDescription" />
-
-**5.1 Description**<br />
+## Tor stream isolation
 
 Tor stream isolation forces Tor to build a new circuit for each connection
 making it harder to correlate connections.
@@ -187,17 +131,13 @@ making it harder to correlate connections.
 btcd provides support for Tor stream isolation by using the `--torisolation`
 flag.  This option requires --proxy or --onionproxy to be set.
 
-<a name="TorStreamIsolationCLIExample" />
-
-**5.2 Command Line Example**<br />
+### Command line example
 
 ```bash
-$ ./btcd --proxy=127.0.0.1:9050 --torisolation
+./btcd --proxy=127.0.0.1:9050 --torisolation
 ```
 
-<a name="TorStreamIsolationFileExample" />
-
-**5.3 Config File Example**<br />
+### Config file example
 
 ```text
 [Application Options]

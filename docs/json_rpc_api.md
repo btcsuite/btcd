@@ -1,4 +1,5 @@
-### Table of Contents
+# JSON RPC API
+
 1. [Overview](#Overview)<br />
 2. [HTTP POST Versus Websockets](#HttpPostVsWebsockets)<br />
 3. [Authentication](#Authentication)<br />
