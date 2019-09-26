@@ -276,7 +276,7 @@ func hashToInt(hash []byte, c elliptic.Curve) *big.Int {
 }
 
 // recoverKeyFromSignature recovers a public key from the signature "sig" on the
-// given message hash "msg". Based on the algorithm found in section 5.1.5 of
+// given message hash "msg". Based on the algorithm found in section 4.1.6 of
 // SEC 1 Ver 2.0, page 47-48 (53 and 54 in the pdf). This performs the details
 // in the inner loop in Step 1. The counter provided is actually the j parameter
 // of the loop * 2 - on the first iteration of j we do the R case, else the -R
