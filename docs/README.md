@@ -47,7 +47,7 @@ transactions based on miner requirements ("standard" transactions).
 
 One key difference between btcd and Bitcoin Core is that btcd does *NOT* include
 wallet functionality and this was a very intentional design decision.  See the
-blog entry [here](https://blog.conformal.com/btcd-not-your-moms-bitcoin-daemon)
+blog entry [here](https://web.archive.org/web/20171125143919/https://blog.conformal.com/btcd-not-your-moms-bitcoin-daemon)
 for more details.  This means you can't actually make or receive payments
 directly with btcd.  That functionality is provided by the
 [btcwallet](https://github.com/btcsuite/btcwallet) and
