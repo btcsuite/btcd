@@ -1171,12 +1171,12 @@ type ConnConfig struct {
 // path is configured; if not, it will be the user-configured username and
 // passphrase.
 func (config *ConnConfig) getAuth() (username, passphrase string, err error) {
-	// If cookie auth isn't in use, just use the supplied
-	// username/passphrase.
-	if config.CookiePath == "" {
+	// Try username+passphrase auth first.
+	if config.Pass != "" {
 		return config.User, config.Pass, nil
 	}
 
+	// If no username or passphrase is set, try cookie auth.
 	return config.retrieveCookie()
 }
 
