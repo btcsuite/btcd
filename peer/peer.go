@@ -2097,7 +2097,7 @@ func (p *Peer) negotiateInboundProtocol() error {
 	return p.readRemoteVerAckMsg()
 }
 
-// negotiateOutoundProtocol performs the negotiation protocol for an outbound
+// negotiateOutboundProtocol performs the negotiation protocol for an outbound
 // peer. The events should occur in the following order, otherwise an error is
 // returned:
 //
