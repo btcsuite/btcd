@@ -19,6 +19,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -1106,9 +1107,11 @@ type ConnConfig struct {
 	// instead of User and Pass if non-empty.
 	CookiePath string
 
-	// retrieveCookie is a function that returns the cookie username and
-	// passphrase.
-	retrieveCookie func() (username, passphrase string, err error)
+	cookieLastCheckTime time.Time
+	cookieLastModTime   time.Time
+	cookieLastUser      string
+	cookieLastPass      string
+	cookieLastErr       error
 
 	// Params is the string representing the network that the server
 	// is running. If there is no parameter set in the config, then
@@ -1174,12 +1177,30 @@ func (config *ConnConfig) getAuth() (username, passphrase string, err error) {
 		return config.User, config.Pass, nil
 	}
 
-	// Initialize the cookie retriever on first run.
-	if config.retrieveCookie == nil {
-		config.retrieveCookie = cookieRetriever(config.CookiePath)
+	return config.retrieveCookie()
+}
+
+// retrieveCookie returns the cookie username and passphrase.
+func (config *ConnConfig) retrieveCookie() (username, passphrase string, err error) {
+	if !config.cookieLastCheckTime.IsZero() && time.Now().Before(config.cookieLastCheckTime.Add(30*time.Second)) {
+		return config.cookieLastUser, config.cookieLastPass, config.cookieLastErr
 	}
 
-	return config.retrieveCookie()
+	config.cookieLastCheckTime = time.Now()
+
+	st, err := os.Stat(config.CookiePath)
+	if err != nil {
+		config.cookieLastErr = err
+		return config.cookieLastUser, config.cookieLastPass, config.cookieLastErr
+	}
+
+	modTime := st.ModTime()
+	if !modTime.Equal(config.cookieLastModTime) {
+		config.cookieLastModTime = modTime
+		config.cookieLastUser, config.cookieLastPass, config.cookieLastErr = readCookieFile(config.CookiePath)
+	}
+
+	return config.cookieLastUser, config.cookieLastPass, config.cookieLastErr
 }
 
 // newHTTPClient returns a new http client that is configured according to the
