@@ -35,7 +35,7 @@ which are both under active development.
 
 ## Requirements
 
-[Go](http://golang.org) 1.11 or newer.
+[Go](http://golang.org) 1.12 or newer.
 
 ## Installation
 
@@ -118,25 +118,12 @@ is used for this project.
 
 The documentation is a work-in-progress.  It is located in the [docs](https://github.com/btcsuite/btcd/tree/master/docs) folder.
 
-## GPG Verification Key
+## Release Verification
 
-All official release tags are signed by Conformal so users can ensure the code
-has not been tampered with and is coming from the btcsuite developers.  To
-verify the signature perform the following:
-
-- Download the Conformal public key:
-  https://raw.githubusercontent.com/btcsuite/btcd/master/release/GIT-GPG-KEY-conformal.txt
-
-- Import the public key into your GPG keyring:
-  ```bash
-  gpg --import GIT-GPG-KEY-conformal.txt
-  ```
-
-- Verify the release tag with the following command where `TAG_NAME` is a
-  placeholder for the specific tag:
-  ```bash
-  git tag -v TAG_NAME
-  ```
+Please see our [documentation on the current build/verification
+process](https://github.com/btcsuite/btcd/tree/master/release) for all our
+releases for information on how to verify the integrity of published releases
+using our reproducible build system.
 
 ## License
 
