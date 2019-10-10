@@ -598,16 +598,18 @@ func (r FutureSearchRawTransactionsVerboseResult) Receive() ([]*btcjson.SearchRa
 //
 // See SearchRawTransactionsVerbose for the blocking version and more details.
 func (c *Client) SearchRawTransactionsVerboseAsync(address btcutil.Address, skip,
-	count int, includePrevOut, reverse bool, filterAddrs *[]string) FutureSearchRawTransactionsVerboseResult {
+	count int, includePrevOut, reverse bool, filterAddrs []string) FutureSearchRawTransactionsVerboseResult {
 
 	addr := address.EncodeAddress()
 	verbose := btcjson.Int(1)
 	var prevOut *int
 	if includePrevOut {
 		prevOut = btcjson.Int(1)
+	} else if reverse || filterAddrs != nil {
+		prevOut = btcjson.Int(0)
 	}
 	cmd := btcjson.NewSearchRawTransactionsCmd(addr, verbose, &skip, &count,
-		prevOut, &reverse, filterAddrs)
+		prevOut, &reverse, &filterAddrs)
 	return c.sendCmd(cmd)
 }
 
@@ -622,7 +624,7 @@ func (c *Client) SearchRawTransactionsVerbose(address btcutil.Address, skip,
 	count int, includePrevOut, reverse bool, filterAddrs []string) ([]*btcjson.SearchRawTransactionsResult, error) {
 
 	return c.SearchRawTransactionsVerboseAsync(address, skip, count,
-		includePrevOut, reverse, &filterAddrs).Receive()
+		includePrevOut, reverse, filterAddrs).Receive()
 }
 
 // FutureDecodeScriptResult is a future promise to deliver the result
