@@ -6,18 +6,27 @@
 package rpcclient
 
 import (
+	"bufio"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"strings"
 )
 
 func readCookieFile(path string) (username, password string, err error) {
-	b, err := ioutil.ReadFile(path)
+	f, err := os.Open(path)
 	if err != nil {
 		return
 	}
+	defer f.Close()
 
-	s := strings.TrimSpace(string(b))
+	scanner := bufio.NewScanner(f)
+	scanner.Scan()
+	err = scanner.Err()
+	if err != nil {
+		return
+	}
+	s := scanner.Text()
+
 	parts := strings.SplitN(s, ":", 2)
 	if len(parts) != 2 {
 		err = fmt.Errorf("malformed cookie file")
