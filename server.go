@@ -2032,7 +2032,6 @@ func (s *server) outboundPeerConnected(c *connmgr.ConnReq, conn net.Conn) {
 	sp.isWhitelisted = isWhitelisted(conn.RemoteAddr())
 	sp.AssociateConnection(conn)
 	go s.peerDoneHandler(sp)
-	s.addrManager.Attempt(sp.NA())
 }
 
 // peerDoneHandler handles peer disconnects by notifiying the server that it's
@@ -2801,6 +2800,9 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 					activeNetParams.DefaultPort {
 					continue
 				}
+
+				// Mark an attempt for the valid address.
+				s.addrManager.Attempt(addr.NetAddress())
 
 				addrString := addrmgr.NetAddressKey(addr.NetAddress())
 				return addrStringToNetAddr(addrString)
