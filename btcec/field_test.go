@@ -6,6 +6,8 @@
 package btcec
 
 import (
+	"crypto/rand"
+	"fmt"
 	"reflect"
 	"testing"
 )
@@ -817,6 +819,149 @@ func TestInverse(t *testing.T) {
 			t.Errorf("fieldVal.Inverse #%d wrong result\n"+
 				"got: %v\nwant: %v", i, result, expected)
 			continue
+		}
+	}
+}
+
+// randFieldVal returns a random, normalized element in the field.
+func randFieldVal(t *testing.T) fieldVal {
+	var b [32]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		t.Fatalf("unable to create random element: %v", err)
+	}
+
+	var x fieldVal
+	return *x.SetBytes(&b).Normalize()
+}
+
+type sqrtTest struct {
+	name     string
+	in       string
+	expected string
+}
+
+// TestSqrt asserts that a fieldVal properly computes the square root modulo the
+// sep256k1 prime.
+func TestSqrt(t *testing.T) {
+	var tests []sqrtTest
+
+	// No valid root exists for the negative of a square.
+	for i := uint(9); i > 0; i-- {
+		var (
+			x fieldVal
+			s fieldVal // x^2 mod p
+			n fieldVal // -x^2 mod p
+		)
+
+		x.SetInt(i)
+		s.SquareVal(&x).Normalize()
+		n.NegateVal(&s, 1).Normalize()
+
+		tests = append(tests, sqrtTest{
+			name: fmt.Sprintf("-%d", i),
+			in:   fmt.Sprintf("%x", *n.Bytes()),
+		})
+	}
+
+	// A root should exist for true squares.
+	for i := uint(0); i < 10; i++ {
+		var (
+			x fieldVal
+			s fieldVal // x^2 mod p
+		)
+
+		x.SetInt(i)
+		s.SquareVal(&x).Normalize()
+
+		tests = append(tests, sqrtTest{
+			name:     fmt.Sprintf("%d", i),
+			in:       fmt.Sprintf("%x", *s.Bytes()),
+			expected: fmt.Sprintf("%x", *x.Bytes()),
+		})
+	}
+
+	// Compute a non-square element, by negating if it has a root.
+	ns := randFieldVal(t)
+	if new(fieldVal).SqrtVal(&ns).Square().Equals(&ns) {
+		ns.Negate(1).Normalize()
+	}
+
+	// For large random field values, test that:
+	//  1) its square has a valid root.
+	//  2) the negative of its square has no root.
+	//  3) the product of its square with a non-square has no root.
+	for i := 0; i < 10; i++ {
+		var (
+			x fieldVal
+			s fieldVal // x^2 mod p
+			n fieldVal // -x^2 mod p
+			m fieldVal // ns*x^2 mod p
+		)
+
+		x = randFieldVal(t)
+		s.SquareVal(&x).Normalize()
+		n.NegateVal(&s, 1).Normalize()
+		m.Mul2(&s, &ns).Normalize()
+
+		// A root should exist for true squares.
+		tests = append(tests, sqrtTest{
+			name:     fmt.Sprintf("%x", *s.Bytes()),
+			in:       fmt.Sprintf("%x", *s.Bytes()),
+			expected: fmt.Sprintf("%x", *x.Bytes()),
+		})
+
+		// No valid root exists for the negative of a square.
+		tests = append(tests, sqrtTest{
+			name: fmt.Sprintf("-%x", *s.Bytes()),
+			in:   fmt.Sprintf("%x", *n.Bytes()),
+		})
+
+		// No root should be computed for product of a square and
+		// non-square.
+		tests = append(tests, sqrtTest{
+			name: fmt.Sprintf("ns*%x", *s.Bytes()),
+			in:   fmt.Sprintf("%x", *m.Bytes()),
+		})
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			testSqrt(t, test)
+		})
+	}
+}
+
+func testSqrt(t *testing.T, test sqrtTest) {
+	var (
+		f       fieldVal
+		root    fieldVal
+		rootNeg fieldVal
+	)
+
+	f.SetHex(test.in).Normalize()
+
+	// Compute sqrt(f) and its negative.
+	root.SqrtVal(&f).Normalize()
+	rootNeg.NegateVal(&root, 1).Normalize()
+
+	switch {
+
+	// If we expect a square root, verify that either the computed square
+	// root is +/- the expected value.
+	case len(test.expected) > 0:
+		var expected fieldVal
+		expected.SetHex(test.expected).Normalize()
+		if !root.Equals(&expected) && !rootNeg.Equals(&expected) {
+			t.Fatalf("fieldVal.Sqrt incorrect root\n"+
+				"got:     %v\ngot_neg: %v\nwant:    %v",
+				root, rootNeg, expected)
+		}
+
+	// Otherwise, we expect this input not to have a square root.
+	default:
+		if root.Square().Equals(&f) || rootNeg.Square().Equals(&f) {
+			t.Fatalf("fieldVal.Sqrt root should not exist\n"+
+				"got:     %v\ngot_neg: %v", root, rootNeg)
 		}
 	}
 }
