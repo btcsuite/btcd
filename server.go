@@ -1671,24 +1671,26 @@ func (s *server) handleDonePeerMsg(state *peerState, sp *serverPeer) {
 	} else {
 		list = state.outboundPeers
 	}
+
+	// Regardless of whether the peer was found in our list, we'll inform
+	// our connection manager about the disconnection. This can happen if we
+	// process a peer's `done` message before its `add`.
+	if !sp.Inbound() {
+		if sp.persistent {
+			s.connManager.Disconnect(sp.connReq.ID())
+		} else {
+			s.connManager.Remove(sp.connReq.ID())
+		}
+	}
+
 	if _, ok := list[sp.ID()]; ok {
 		if !sp.Inbound() && sp.VersionKnown() {
 			state.outboundGroups[addrmgr.GroupKey(sp.NA())]--
-		}
-		if !sp.Inbound() && sp.connReq != nil {
-			s.connManager.Disconnect(sp.connReq.ID())
 		}
 		delete(list, sp.ID())
 		srvrLog.Debugf("Removed peer %s", sp)
 		return
 	}
-
-	if sp.connReq != nil {
-		s.connManager.Disconnect(sp.connReq.ID())
-	}
-
-	// If we get here it means that either we didn't know about the peer
-	// or we purposefully deleted it.
 }
 
 // handleBanPeerMsg deals with banning peers.  It is invoked from the
@@ -2025,7 +2027,12 @@ func (s *server) outboundPeerConnected(c *connmgr.ConnReq, conn net.Conn) {
 	p, err := peer.NewOutboundPeer(newPeerConfig(sp), c.Addr.String())
 	if err != nil {
 		srvrLog.Debugf("Cannot create outbound peer %s: %v", c.Addr, err)
-		s.connManager.Disconnect(c.ID())
+		if c.Permanent {
+			s.connManager.Disconnect(c.ID())
+		} else {
+			s.connManager.Remove(c.ID())
+		}
+		return
 	}
 	sp.Peer = p
 	sp.connReq = c
