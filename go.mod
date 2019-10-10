@@ -17,3 +17,5 @@ require (
 	github.com/onsi/gomega v1.4.3 // indirect
 	golang.org/x/crypto v0.0.0-20170930174604-9419663f5a44
 )
+
+go 1.12
