@@ -1651,6 +1651,12 @@ func (s *server) handleAddPeerMsg(state *peerState, sp *serverPeer) bool {
 		}
 	}
 
+	// Update the address' last seen time if the peer has acknowledged
+	// our version and has sent us its version as well.
+	if sp.VerAckReceived() && sp.VersionKnown() && sp.NA() != nil {
+		s.addrManager.Connected(sp.NA())
+	}
+
 	return true
 }
 
@@ -1679,12 +1685,6 @@ func (s *server) handleDonePeerMsg(state *peerState, sp *serverPeer) {
 
 	if sp.connReq != nil {
 		s.connManager.Disconnect(sp.connReq.ID())
-	}
-
-	// Update the address' last seen time if the peer has acknowledged
-	// our version and has sent us its version as well.
-	if sp.VerAckReceived() && sp.VersionKnown() && sp.NA() != nil {
-		s.addrManager.Connected(sp.NA())
 	}
 
 	// If we get here it means that either we didn't know about the peer
