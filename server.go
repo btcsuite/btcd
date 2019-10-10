@@ -1680,6 +1680,7 @@ func (s *server) handleDonePeerMsg(state *peerState, sp *serverPeer) {
 			s.connManager.Disconnect(sp.connReq.ID())
 		} else {
 			s.connManager.Remove(sp.connReq.ID())
+			go s.connManager.NewConnReq()
 		}
 	}
 
@@ -2031,6 +2032,7 @@ func (s *server) outboundPeerConnected(c *connmgr.ConnReq, conn net.Conn) {
 			s.connManager.Disconnect(c.ID())
 		} else {
 			s.connManager.Remove(c.ID())
+			go s.connManager.NewConnReq()
 		}
 		return
 	}
