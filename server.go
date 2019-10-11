@@ -1563,7 +1563,7 @@ func (s *server) handleUpdatePeerHeights(state *peerState, umsg updatePeerHeight
 // handleAddPeerMsg deals with adding new peers.  It is invoked from the
 // peerHandler goroutine.
 func (s *server) handleAddPeerMsg(state *peerState, sp *serverPeer) bool {
-	if sp == nil {
+	if sp == nil || !sp.Connected() {
 		return false
 	}
 
