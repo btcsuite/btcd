@@ -38,11 +38,10 @@ func decompressPoint(curve *KoblitzCurve, bigX *big.Int, ybit bool) (*big.Int, e
 	// but this was replaced by the algorithms referenced in
 	// https://bitcointalk.org/index.php?topic=162805.msg1712294#msg1712294
 	var y fieldVal
-	y.SqrtVal(&x3)
+	y.SqrtVal(&x3).Normalize()
 	if ybit != y.IsOdd() {
-		y.Negate(1)
+		y.Negate(1).Normalize()
 	}
-	y.Normalize()
 
 	// Check that y is a square root of x^3 + B.
 	var y2 fieldVal
