@@ -490,9 +490,6 @@ func (sp *serverPeer) OnVersion(_ *peer.Peer, msg *wire.MsgVersion) *wire.MsgRej
 	// the local clock to keep the network time in sync.
 	sp.server.timeSource.AddTimeSample(sp.Addr(), msg.Timestamp)
 
-	// Signal the sync manager this peer is a new sync candidate.
-	sp.server.syncManager.NewPeer(sp.Peer)
-
 	// Choose whether or not to relay transactions before a filter command
 	// is received.
 	sp.setDisableRelayTx(msg.DisableRelayTx)
@@ -1656,6 +1653,9 @@ func (s *server) handleAddPeerMsg(state *peerState, sp *serverPeer) bool {
 	if sp.VerAckReceived() && sp.VersionKnown() && sp.NA() != nil {
 		s.addrManager.Connected(sp.NA())
 	}
+
+	// Signal the sync manager this peer is a new sync candidate.
+	s.syncManager.NewPeer(sp.Peer)
 
 	return true
 }
