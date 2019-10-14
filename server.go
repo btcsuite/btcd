@@ -438,11 +438,6 @@ func (sp *serverPeer) OnVersion(_ *peer.Peer, msg *wire.MsgVersion) *wire.MsgRej
 		return wire.NewMsgReject(msg.Command(), wire.RejectNonstandard, reason)
 	}
 
-	// Update the address manager and request known addresses from the
-	// remote peer for outbound connections.  This is skipped when running
-	// on the simulation test network since it is only intended to connect
-	// to specified peers and actively avoids advertising and connecting to
-	// discovered peers.
 	if !cfg.SimNet && !isInbound {
 		// After soft-fork activation, only make outbound
 		// connection to peers if they flag that they're segwit
@@ -461,45 +456,23 @@ func (sp *serverPeer) OnVersion(_ *peer.Peer, msg *wire.MsgVersion) *wire.MsgRej
 			sp.Disconnect()
 			return nil
 		}
-
-		// Advertise the local address when the server accepts incoming
-		// connections and it believes itself to be close to the best known tip.
-		if !cfg.DisableListen && sp.server.syncManager.IsCurrent() {
-			// Get address that best matches.
-			lna := addrManager.GetBestLocalAddress(remoteAddr)
-			if addrmgr.IsRoutable(lna) {
-				// Filter addresses the peer already knows about.
-				addresses := []*wire.NetAddress{lna}
-				sp.pushAddrMsg(addresses)
-			}
-		}
-
-		// Request known addresses if the server address manager needs
-		// more and the peer has a protocol version new enough to
-		// include a timestamp with addresses.
-		hasTimestamp := sp.ProtocolVersion() >= wire.NetAddressTimeVersion
-		if addrManager.NeedMoreAddresses() && hasTimestamp {
-			sp.QueueMessage(wire.NewMsgGetAddr(), nil)
-		}
-
-		// Mark the address as a known good address.
-		addrManager.Good(remoteAddr)
 	}
 
 	// Add the remote peer time as a sample for creating an offset against
 	// the local clock to keep the network time in sync.
 	sp.server.timeSource.AddTimeSample(sp.Addr(), msg.Timestamp)
 
-	// Signal the sync manager this peer is a new sync candidate.
-	sp.server.syncManager.NewPeer(sp.Peer)
-
 	// Choose whether or not to relay transactions before a filter command
 	// is received.
 	sp.setDisableRelayTx(msg.DisableRelayTx)
 
-	// Add valid peer to the server.
-	sp.server.AddPeer(sp)
 	return nil
+}
+
+// OnVerAck is invoked when a peer receives a verack bitcoin message and is used
+// to kick start communication with them.
+func (sp *serverPeer) OnVerAck(_ *peer.Peer, _ *wire.MsgVerAck) {
+	sp.server.AddPeer(sp)
 }
 
 // OnMemPool is invoked when a peer receives a mempool bitcoin message.
@@ -1590,7 +1563,7 @@ func (s *server) handleUpdatePeerHeights(state *peerState, umsg updatePeerHeight
 // handleAddPeerMsg deals with adding new peers.  It is invoked from the
 // peerHandler goroutine.
 func (s *server) handleAddPeerMsg(state *peerState, sp *serverPeer) bool {
-	if sp == nil {
+	if sp == nil || !sp.Connected() {
 		return false
 	}
 
@@ -1655,6 +1628,40 @@ func (s *server) handleAddPeerMsg(state *peerState, sp *serverPeer) bool {
 	// our version and has sent us its version as well.
 	if sp.VerAckReceived() && sp.VersionKnown() && sp.NA() != nil {
 		s.addrManager.Connected(sp.NA())
+	}
+
+	// Signal the sync manager this peer is a new sync candidate.
+	s.syncManager.NewPeer(sp.Peer)
+
+	// Update the address manager and request known addresses from the
+	// remote peer for outbound connections. This is skipped when running on
+	// the simulation test network since it is only intended to connect to
+	// specified peers and actively avoids advertising and connecting to
+	// discovered peers.
+	if !cfg.SimNet && !sp.Inbound() {
+		// Advertise the local address when the server accepts incoming
+		// connections and it believes itself to be close to the best
+		// known tip.
+		if !cfg.DisableListen && s.syncManager.IsCurrent() {
+			// Get address that best matches.
+			lna := s.addrManager.GetBestLocalAddress(sp.NA())
+			if addrmgr.IsRoutable(lna) {
+				// Filter addresses the peer already knows about.
+				addresses := []*wire.NetAddress{lna}
+				sp.pushAddrMsg(addresses)
+			}
+		}
+
+		// Request known addresses if the server address manager needs
+		// more and the peer has a protocol version new enough to
+		// include a timestamp with addresses.
+		hasTimestamp := sp.ProtocolVersion() >= wire.NetAddressTimeVersion
+		if s.addrManager.NeedMoreAddresses() && hasTimestamp {
+			sp.QueueMessage(wire.NewMsgGetAddr(), nil)
+		}
+
+		// Mark the address as a known good address.
+		s.addrManager.Good(sp.NA())
 	}
 
 	return true
@@ -1966,6 +1973,7 @@ func newPeerConfig(sp *serverPeer) *peer.Config {
 	return &peer.Config{
 		Listeners: peer.MessageListeners{
 			OnVersion:      sp.OnVersion,
+			OnVerAck:       sp.OnVerAck,
 			OnMemPool:      sp.OnMemPool,
 			OnTx:           sp.OnTx,
 			OnBlock:        sp.OnBlock,
