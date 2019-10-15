@@ -68,7 +68,6 @@ SYS=${BTCDBUILDSYS:-"
         solaris-amd64
         windows-386
         windows-amd64
-        windows-arm
 "}
 
 # Use the first element of $GOPATH in the case where GOPATH is a list
