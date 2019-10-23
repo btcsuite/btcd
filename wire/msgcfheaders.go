@@ -17,7 +17,7 @@ const (
 	MaxCFHeaderPayload = chainhash.HashSize
 
 	// MaxCFHeadersPerMsg is the maximum number of committed filter headers
-	// that can be in a single bitcoin cfheaders message.
+	// that can be in a single bitcoin cfheaders message according to BIP157.
 	MaxCFHeadersPerMsg = 2000
 )
 

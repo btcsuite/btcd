@@ -10,9 +10,9 @@ import (
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 )
 
-// MaxGetCFiltersReqRange the maximum number of filters that may be requested in
-// a getcfheaders message.
-const MaxGetCFiltersReqRange = 1000
+// MaxGetCFiltersReqRange is the maximum number of filters that may be requested in
+// a getcfilters message according to BIP157.
+const MaxGetCFiltersReqRange = 100
 
 // MsgGetCFilters implements the Message interface and represents a bitcoin
 // getcfilters message. It is used to request committed filters for a range of
