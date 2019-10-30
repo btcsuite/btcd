@@ -90,11 +90,20 @@ type SoftForkDescription struct {
 // Bip9SoftForkDescription describes the current state of a defined BIP0009
 // version bits soft-fork.
 type Bip9SoftForkDescription struct {
-	Status    string `json:"status"`
-	Bit       uint8  `json:"bit"`
-	StartTime int64  `json:"startTime"`
-	Timeout   int64  `json:"timeout"`
-	Since     int32  `json:"since"`
+	Status     string `json:"status"`
+	Bit        uint8  `json:"bit"`
+	StartTime1 int64  `json:"startTime"`
+	StartTime2 int64  `json:"start_time"`
+	Timeout    int64  `json:"timeout"`
+	Since      int32  `json:"since"`
+}
+
+// StartTime returns the starting time of the softfork as a Unix epoch.
+func (d *Bip9SoftForkDescription) StartTime() int64 {
+	if d.StartTime1 != 0 {
+		return d.StartTime1
+	}
+	return d.StartTime2
 }
 
 // SoftForks describes the current softforks enabled by the backend. Softforks
