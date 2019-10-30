@@ -97,21 +97,45 @@ type Bip9SoftForkDescription struct {
 	Since     int32  `json:"since"`
 }
 
+// SoftForks describes the current softforks enabled by the backend. Softforks
+// activated through BIP9 are grouped together separate from any other softforks
+// with different activation types.
+type SoftForks struct {
+	SoftForks     []*SoftForkDescription              `json:"softforks"`
+	Bip9SoftForks map[string]*Bip9SoftForkDescription `json:"bip9_softforks"`
+}
+
+// UnifiedSoftForks describes a softforks in a general manner, irrespective of
+// its activation type. This was a format introduced by bitcoind v0.19.0
+type UnifiedSoftFork struct {
+	Type                    string                   `json:"type"`
+	BIP9SoftForkDescription *Bip9SoftForkDescription `json:"bip9"`
+	Height                  int32                    `json:"height"`
+	Active                  bool                     `json:"active"`
+}
+
+// UnifiedSoftForks describes the current softforks enabled the by the backend
+// in a unified manner, i.e, softforks with different activation types are
+// grouped together. This was a format introduced by bitcoind v0.19.0
+type UnifiedSoftForks struct {
+	SoftForks map[string]*UnifiedSoftFork `json:"softforks"`
+}
+
 // GetBlockChainInfoResult models the data returned from the getblockchaininfo
 // command.
 type GetBlockChainInfoResult struct {
-	Chain                string                              `json:"chain"`
-	Blocks               int32                               `json:"blocks"`
-	Headers              int32                               `json:"headers"`
-	BestBlockHash        string                              `json:"bestblockhash"`
-	Difficulty           float64                             `json:"difficulty"`
-	MedianTime           int64                               `json:"mediantime"`
-	VerificationProgress float64                             `json:"verificationprogress,omitempty"`
-	Pruned               bool                                `json:"pruned"`
-	PruneHeight          int32                               `json:"pruneheight,omitempty"`
-	ChainWork            string                              `json:"chainwork,omitempty"`
-	SoftForks            []*SoftForkDescription              `json:"softforks"`
-	Bip9SoftForks        map[string]*Bip9SoftForkDescription `json:"bip9_softforks"`
+	Chain                string  `json:"chain"`
+	Blocks               int32   `json:"blocks"`
+	Headers              int32   `json:"headers"`
+	BestBlockHash        string  `json:"bestblockhash"`
+	Difficulty           float64 `json:"difficulty"`
+	MedianTime           int64   `json:"mediantime"`
+	VerificationProgress float64 `json:"verificationprogress,omitempty"`
+	Pruned               bool    `json:"pruned"`
+	PruneHeight          int32   `json:"pruneheight,omitempty"`
+	ChainWork            string  `json:"chainwork,omitempty"`
+	*SoftForks
+	*UnifiedSoftForks
 }
 
 // GetBlockTemplateResultTx models the transactions field of the

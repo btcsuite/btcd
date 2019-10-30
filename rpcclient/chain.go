@@ -253,21 +253,73 @@ func (c *Client) GetDifficulty() (float64, error) {
 
 // FutureGetBlockChainInfoResult is a promise to deliver the result of a
 // GetBlockChainInfoAsync RPC invocation (or an applicable error).
-type FutureGetBlockChainInfoResult chan *response
+type FutureGetBlockChainInfoResult struct {
+	client   *Client
+	Response chan *response
+}
 
-// Receive waits for the response promised by the future and returns chain info
-// result provided by the server.
-func (r FutureGetBlockChainInfoResult) Receive() (*btcjson.GetBlockChainInfoResult, error) {
-	res, err := receiveFuture(r)
-	if err != nil {
-		return nil, err
-	}
-
+// unmarshalPartialGetBlockChainInfoResult unmarshals the response into an
+// instance of GetBlockChainInfoResult without populating the SoftForks and
+// UnifiedSoftForks fields.
+func unmarshalPartialGetBlockChainInfoResult(res []byte) (*btcjson.GetBlockChainInfoResult, error) {
 	var chainInfo btcjson.GetBlockChainInfoResult
 	if err := json.Unmarshal(res, &chainInfo); err != nil {
 		return nil, err
 	}
 	return &chainInfo, nil
+}
+
+// unmarshalGetBlockChainInfoResultSoftForks properly unmarshals the softforks
+// related fields into the GetBlockChainInfoResult instance.
+func unmarshalGetBlockChainInfoResultSoftForks(chainInfo *btcjson.GetBlockChainInfoResult,
+	version BackendVersion, res []byte) error {
+
+	switch version {
+	// Versions of bitcoind on or after v0.19.0 use the unified format.
+	case BitcoindPost19:
+		var softForks btcjson.UnifiedSoftForks
+		if err := json.Unmarshal(res, &softForks); err != nil {
+			return err
+		}
+		chainInfo.UnifiedSoftForks = &softForks
+
+	// All other versions use the original format.
+	default:
+		var softForks btcjson.SoftForks
+		if err := json.Unmarshal(res, &softForks); err != nil {
+			return err
+		}
+		chainInfo.SoftForks = &softForks
+	}
+
+	return nil
+}
+
+// Receive waits for the response promised by the future and returns chain info
+// result provided by the server.
+func (r FutureGetBlockChainInfoResult) Receive() (*btcjson.GetBlockChainInfoResult, error) {
+	res, err := receiveFuture(r.Response)
+	if err != nil {
+		return nil, err
+	}
+	chainInfo, err := unmarshalPartialGetBlockChainInfoResult(res)
+	if err != nil {
+		return nil, err
+	}
+
+	// Inspect the version to determine how we'll need to parse the
+	// softforks from the response.
+	version, err := r.client.BackendVersion()
+	if err != nil {
+		return nil, err
+	}
+
+	err = unmarshalGetBlockChainInfoResultSoftForks(chainInfo, version, res)
+	if err != nil {
+		return nil, err
+	}
+
+	return chainInfo, nil
 }
 
 // GetBlockChainInfoAsync returns an instance of a type that can be used to get
@@ -277,7 +329,10 @@ func (r FutureGetBlockChainInfoResult) Receive() (*btcjson.GetBlockChainInfoResu
 // See GetBlockChainInfo for the blocking version and more details.
 func (c *Client) GetBlockChainInfoAsync() FutureGetBlockChainInfoResult {
 	cmd := btcjson.NewGetBlockChainInfoCmd()
-	return c.sendCmd(cmd)
+	return FutureGetBlockChainInfoResult{
+		client:   c,
+		Response: c.sendCmd(cmd),
+	}
 }
 
 // GetBlockChainInfo returns information related to the processing state of
