@@ -172,27 +172,37 @@ var helpDescsEnUS = map[string]string{
 	"getblockchaininfo--synopsis": "Returns information about the current blockchain state and the status of any active soft-fork deployments.",
 
 	// GetBlockChainInfoResult help.
-	"getblockchaininforesult-chain":                 "The name of the chain the daemon is on (testnet, mainnet, etc)",
-	"getblockchaininforesult-blocks":                "The number of blocks in the best known chain",
-	"getblockchaininforesult-headers":               "The number of headers that we've gathered for in the best known chain",
-	"getblockchaininforesult-bestblockhash":         "The block hash for the latest block in the main chain",
-	"getblockchaininforesult-difficulty":            "The current chain difficulty",
-	"getblockchaininforesult-mediantime":            "The median time from the PoV of the best block in the chain",
-	"getblockchaininforesult-verificationprogress":  "An estimate for how much of the best chain we've verified",
-	"getblockchaininforesult-pruned":                "A bool that indicates if the node is pruned or not",
-	"getblockchaininforesult-pruneheight":           "The lowest block retained in the current pruned chain",
-	"getblockchaininforesult-chainwork":             "The total cumulative work in the best chain",
-	"getblockchaininforesult-softforks":             "The status of the super-majority soft-forks",
-	"getblockchaininforesult-bip9_softforks":        "JSON object describing active BIP0009 deployments",
-	"getblockchaininforesult-bip9_softforks--key":   "bip9_softforks",
-	"getblockchaininforesult-bip9_softforks--value": "An object describing a particular BIP009 deployment",
-	"getblockchaininforesult-bip9_softforks--desc":  "The status of any defined BIP0009 soft-fork deployments",
+	"getblockchaininforesult-chain":                "The name of the chain the daemon is on (testnet, mainnet, etc)",
+	"getblockchaininforesult-blocks":               "The number of blocks in the best known chain",
+	"getblockchaininforesult-headers":              "The number of headers that we've gathered for in the best known chain",
+	"getblockchaininforesult-bestblockhash":        "The block hash for the latest block in the main chain",
+	"getblockchaininforesult-difficulty":           "The current chain difficulty",
+	"getblockchaininforesult-mediantime":           "The median time from the PoV of the best block in the chain",
+	"getblockchaininforesult-verificationprogress": "An estimate for how much of the best chain we've verified",
+	"getblockchaininforesult-pruned":               "A bool that indicates if the node is pruned or not",
+	"getblockchaininforesult-pruneheight":          "The lowest block retained in the current pruned chain",
+	"getblockchaininforesult-chainwork":            "The total cumulative work in the best chain",
+	"getblockchaininforesult-softforks":            "The status of the super-majority soft-forks",
+	"getblockchaininforesult-unifiedsoftforks":     "The status of the super-majority soft-forks used by bitcoind on or after v0.19.0",
 
 	// SoftForkDescription help.
 	"softforkdescription-reject":  "The current activation status of the softfork",
 	"softforkdescription-version": "The block version that signals enforcement of this softfork",
 	"softforkdescription-id":      "The string identifier for the soft fork",
 	"-status":                     "A bool which indicates if the soft fork is active",
+
+	// SoftForks help.
+	"softforks-softforks":             "The status of the super-majority soft-forks",
+	"softforks-bip9_softforks":        "JSON object describing active BIP0009 deployments",
+	"softforks-bip9_softforks--key":   "bip9_softforks",
+	"softforks-bip9_softforks--value": "An object describing a particular BIP009 deployment",
+	"softforks-bip9_softforks--desc":  "The status of any defined BIP0009 soft-fork deployments",
+
+	// UnifiedSoftForks help.
+	"unifiedsoftforks-softforks":        "The status of the super-majority soft-forks used by bitcoind on or after v0.19.0",
+	"unifiedsoftforks-softforks--key":   "softforks",
+	"unifiedsoftforks-softforks--value": "An object describing an active softfork deployment used by bitcoind on or after v0.19.0",
+	"unifiedsoftforks-softforks--desc":  "JSON object describing an active softfork deployment used by bitcoind on or after v0.19.0",
 
 	// TxRawResult help.
 	"txrawresult-hex":           "Hex-encoded transaction",
@@ -542,6 +552,7 @@ var helpDescsEnUS = map[string]string{
 	"sendrawtransaction--synopsis":     "Submits the serialized, hex-encoded transaction to the local peer and relays it to the network.",
 	"sendrawtransaction-hextx":         "Serialized, hex-encoded signed transaction",
 	"sendrawtransaction-allowhighfees": "Whether or not to allow insanely high fees (btcd does not yet implement this parameter, so it has no effect)",
+	"sendrawtransaction-maxfeerate":    "Used by bitcoind on or after v0.19.0",
 	"sendrawtransaction--result0":      "The hash of the transaction",
 
 	// SetGenerateCmd help.

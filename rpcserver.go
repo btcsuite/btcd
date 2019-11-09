@@ -1198,14 +1198,16 @@ func handleGetBlockChainInfo(s *rpcServer, cmd interface{}, closeChan <-chan str
 		Difficulty:    getDifficultyRatio(chainSnapshot.Bits, params),
 		MedianTime:    chainSnapshot.MedianTime.Unix(),
 		Pruned:        false,
-		Bip9SoftForks: make(map[string]*btcjson.Bip9SoftForkDescription),
+		SoftForks: &btcjson.SoftForks{
+			Bip9SoftForks: make(map[string]*btcjson.Bip9SoftForkDescription),
+		},
 	}
 
 	// Next, populate the response with information describing the current
 	// status of soft-forks deployed via the super-majority block
 	// signalling mechanism.
 	height := chainSnapshot.Height
-	chainInfo.SoftForks = []*btcjson.SoftForkDescription{
+	chainInfo.SoftForks.SoftForks = []*btcjson.SoftForkDescription{
 		{
 			ID:      "bip34",
 			Version: 2,
@@ -1281,11 +1283,11 @@ func handleGetBlockChainInfo(s *rpcServer, cmd interface{}, closeChan <-chan str
 
 		// Finally, populate the soft-fork description with all the
 		// information gathered above.
-		chainInfo.Bip9SoftForks[forkName] = &btcjson.Bip9SoftForkDescription{
-			Status:    strings.ToLower(statusString),
-			Bit:       deploymentDetails.BitNumber,
-			StartTime: int64(deploymentDetails.StartTime),
-			Timeout:   int64(deploymentDetails.ExpireTime),
+		chainInfo.SoftForks.Bip9SoftForks[forkName] = &btcjson.Bip9SoftForkDescription{
+			Status:     strings.ToLower(statusString),
+			Bit:        deploymentDetails.BitNumber,
+			StartTime2: int64(deploymentDetails.StartTime),
+			Timeout:    int64(deploymentDetails.ExpireTime),
 		}
 	}
 

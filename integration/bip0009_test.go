@@ -102,7 +102,7 @@ func assertSoftForkStatus(r *rpctest.Harness, t *testing.T, forkKey string, stat
 	}
 
 	// Ensure the key is available.
-	desc, ok := info.Bip9SoftForks[forkKey]
+	desc, ok := info.SoftForks.Bip9SoftForks[forkKey]
 	if !ok {
 		_, _, line, _ := runtime.Caller(1)
 		t.Fatalf("assertion failed at line %d: softfork status for %q "+

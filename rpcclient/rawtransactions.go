@@ -15,6 +15,12 @@ import (
 	"github.com/btcsuite/btcutil"
 )
 
+const (
+	// defaultMaxFeeRate is the default maximum fee rate in sat/KB enforced
+	// by bitcoind v0.19.0 or after for transaction broadcast.
+	defaultMaxFeeRate = btcutil.SatoshiPerBitcoin / 10
+)
+
 // SigHashType enumerates the available signature hashing types that the
 // SignRawTransaction function accepts.
 type SigHashType string
@@ -296,7 +302,31 @@ func (c *Client) SendRawTransactionAsync(tx *wire.MsgTx, allowHighFees bool) Fut
 		txHex = hex.EncodeToString(buf.Bytes())
 	}
 
-	cmd := btcjson.NewSendRawTransactionCmd(txHex, &allowHighFees)
+	// Due to differences in the sendrawtransaction API for different
+	// backends, we'll need to inspect our version and construct the
+	// appropriate request.
+	version, err := c.BackendVersion()
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	var cmd *btcjson.SendRawTransactionCmd
+	switch version {
+	// Starting from bitcoind v0.19.0, the MaxFeeRate field should be used.
+	case BitcoindPost19:
+		// Using a 0 MaxFeeRate is interpreted as a maximum fee rate not
+		// being enforced by bitcoind.
+		var maxFeeRate int32
+		if !allowHighFees {
+			maxFeeRate = defaultMaxFeeRate
+		}
+		cmd = btcjson.NewBitcoindSendRawTransactionCmd(txHex, maxFeeRate)
+
+	// Otherwise, use the AllowHighFees field.
+	default:
+		cmd = btcjson.NewSendRawTransactionCmd(txHex, &allowHighFees)
+	}
+
 	return c.sendCmd(cmd)
 }
 
