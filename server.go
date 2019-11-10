@@ -2813,7 +2813,8 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 
 				// only allow recent nodes (10mins) after we failed 30
 				// times
-				if tries < 30 && time.Since(addr.LastAttempt()) < 10*time.Minute {
+				lastTime := s.addrManager.GetLastAttempt(addr.NetAddress())
+				if tries < 30 && time.Since(lastTime) < 10*time.Minute {
 					continue
 				}
 

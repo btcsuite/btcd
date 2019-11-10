@@ -844,6 +844,20 @@ func (a *AddrManager) find(addr *wire.NetAddress) *KnownAddress {
 	return a.addrIndex[NetAddressKey(addr)]
 }
 
+// GetLastAttempt retrieves an address' last attempt time.
+func (a *AddrManager) GetLastAttempt(addr *wire.NetAddress) time.Time {
+	a.mtx.Lock()
+	defer a.mtx.Unlock()
+
+	ka := a.find(addr)
+	if ka == nil {
+		// If not found, return zero time.
+		return time.Time{}
+	}
+
+	return ka.LastAttempt()
+}
+
 // Attempt increases the given address' attempt counter and updates
 // the last attempt time.
 func (a *AddrManager) Attempt(addr *wire.NetAddress) {
