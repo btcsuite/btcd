@@ -309,6 +309,21 @@ func TestNormalize(t *testing.T) {
 			[10]uint32{0x03fffc30, 0x03ffffc0, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x07ffffff, 0x003fffff},
 			[10]uint32{0x00000001, 0x00000001, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000001},
 		},
+		// Number less than P that satisfies two of the three overflow
+		// conditions for a field value of magnitude of 1 with value greater
+		// than P in all but the last word.
+		{
+			[10]uint32{0x148f6, 0x3ffffc0, 0x3ffffff, 0x3ffffff, 0x3ffffff, 0x3ffffff, 0x3ffffff, 0x3ffffff, 0x3ffffff, 0x000007},
+			[10]uint32{0x148f6, 0x3ffffc0, 0x3ffffff, 0x3ffffff, 0x3ffffff, 0x3ffffff, 0x3ffffff, 0x3ffffff, 0x3ffffff, 0x000007},
+		},
+		// A test that would fail without the check t2&t3&t4&t5&t6&t7&t8 == fieldBaseMask before normalization
+		// Number less than P that satisfies two of the three overflow
+		// conditions for a field value of magnitude of 1 with value greater
+		// than P in all but the second to last word.
+		{
+			[10]uint32{0x03fffc30, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03fffff0, 0x003fffff},
+			[10]uint32{0x03fffc30, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03fffff0, 0x003fffff},
+		},
 	}
 
 	t.Logf("Running %d tests", len(tests))

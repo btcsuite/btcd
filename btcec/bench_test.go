@@ -125,6 +125,16 @@ func BenchmarkFieldNormalize(b *testing.B) {
 	}
 }
 
+// BenchmarkFieldNormalizeWithCarry requires the evaluation of more involved logic in
+// field.Normalize(). We should ensure the runtime is the same as in
+// BenchmarkFieldNormalize
+func BenchmarkFieldNormalizeWithCarry(b *testing.B) {
+	f := &fieldVal{n: [10]uint32{0x148f6, 0x3ffffc0, 0x3ffffff, 0x3ffffff, 0x3ffffff, 0x3ffffff, 0x3ffffff, 0x3ffffff, 0x3ffffff, 0x000007}}
+	for i := 0; i < b.N; i++ {
+		f.Normalize()
+	}
+}
+
 // BenchmarkParseCompressedPubKey benchmarks how long it takes to decompress and
 // validate a compressed public key from a byte array.
 func BenchmarkParseCompressedPubKey(b *testing.B) {
