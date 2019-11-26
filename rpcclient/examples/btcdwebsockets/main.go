@@ -5,9 +5,10 @@
 package main
 
 import (
-	"fmt"
+	"context"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/rpcclient"
+	"golang.org/x/sync/errgroup"
 	"log"
 	"time"
 )
@@ -24,28 +25,47 @@ func main() {
 	for i = initialValue; i <= height; i++ {
 		block := GetBlock(i)
 
-		transactions := make([]rpcclient.FutureGetRawTransactionVerboseResult, 0)
+		g, ctx := errgroup.WithContext(context.Background())
+		transactions := make(chan rpcclient.FutureGetRawTransactionVerboseResult)
 
 		hashes := block.Tx
-		for _, hash := range hashes {
-			txHash, err := chainhash.NewHashFromStr(hash)
-			if err != nil {
-				log.Fatal(err)
-			}
 
-			transactions = append(transactions, client.GetRawTransactionVerboseAsync(txHash))
+		g.Go(func() error {
+			defer close(transactions)
+			for _, hash := range hashes {
+				txHash, err := chainhash.NewHashFromStr(hash)
+				if err != nil {
+					log.Fatal(err)
+				}
+				select {
+				case transactions <- client.GetRawTransactionVerboseAsync(txHash):
+				case <-ctx.Done():
+					return ctx.Err()
+				}
+			}
+			return nil
+		})
+
+		for i := 0; i < 10; i++ {
+			g.Go(func() error {
+				for transactionFuture := range transactions {
+					_, err := transactionFuture.Receive()
+					if (err != nil) {
+						log.Fatal(err)
+					}
+					select {
+					default:
+					case <-ctx.Done():
+						return ctx.Err()
+					}
+				}
+				return nil
+			})
 		}
 
-		for transactionFuture := range transactions {
-			_, err := transactions[transactionFuture].Receive()
-			if (err != nil) {
-				log.Fatal(err)
-			}
+		if err := g.Wait(); err != nil {
+			panic(err)
 		}
-		fmt.Println("Testing block ", i)
-	}
-	if err != nil {
-		log.Fatal(err)
 	}
 
 	// Register for block connect and disconnect notifications.

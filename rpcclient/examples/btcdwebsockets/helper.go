@@ -33,6 +33,8 @@ func CreateClient() rpcclient.Client{
 		Endpoint:     "ws",
 		User:         "rpcuser",
 		Pass:         "rpcpassword",
+		DisableTLS:   true,
+		HTTPPostMode: false,
 		Certificates: certs,
 	}
 	client, err := rpcclient.New(connCfg, &ntfnHandlers)

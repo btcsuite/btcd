@@ -16,6 +16,7 @@ require (
 	github.com/onsi/ginkgo v1.7.0 // indirect
 	github.com/onsi/gomega v1.4.3 // indirect
 	golang.org/x/crypto v0.0.0-20170930174604-9419663f5a44
+	golang.org/x/sync v0.0.0-20180314180146-1d60e4601c6f
 )
 
 go 1.12
