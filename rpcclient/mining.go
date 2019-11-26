@@ -61,6 +61,53 @@ func (c *Client) Generate(numBlocks uint32) ([]*chainhash.Hash, error) {
 	return c.GenerateAsync(numBlocks).Receive()
 }
 
+// FutureGenerateToAddressResult is a future promise to deliver the result of a
+// GenerateToAddressResult RPC invocation (or an applicable error).
+type FutureGenerateToAddressResult chan *response
+
+// Receive waits for the response promised by the future and returns the hashes of
+// of the generated blocks.
+func (f FutureGenerateToAddressResult) Receive() ([]*chainhash.Hash, error) {
+	res, err := receiveFuture(f)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal result as a list of strings.
+	var result []string
+	err = json.Unmarshal(res, &result)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert each block hash to a chainhash.Hash and store a pointer to
+	// each.
+	convertedResult := make([]*chainhash.Hash, len(result))
+	for i, hashString := range result {
+		convertedResult[i], err = chainhash.NewHashFromStr(hashString)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return convertedResult, nil
+}
+
+// GenerateToAddressAsync returns an instance of a type that can be used to get
+// the result of the RPC at some future time by invoking the Receive function on
+// the returned instance.
+//
+// See GenerateToAddress for the blocking version and more details.
+func (c *Client) GenerateToAddressAsync(numBlocks int64, address btcutil.Address, maxTries *int64) FutureGenerateToAddressResult {
+	cmd := btcjson.NewGenerateToAddressCmd(numBlocks, address.EncodeAddress(), maxTries)
+	return c.sendCmd(cmd)
+}
+
+// GenerateToAddress generates numBlocks blocks to the given address and returns their hashes.
+func (c *Client) GenerateToAddress(numBlocks int64, address btcutil.Address, maxTries *int64) ([]*chainhash.Hash, error) {
+	return c.GenerateToAddressAsync(numBlocks, address, maxTries).Receive()
+}
+
 // FutureGetGenerateResult is a future promise to deliver the result of a
 // GetGenerateAsync RPC invocation (or an applicable error).
 type FutureGetGenerateResult chan *response
