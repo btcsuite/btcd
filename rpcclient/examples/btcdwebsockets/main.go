@@ -5,46 +5,45 @@
 package main
 
 import (
-	"io/ioutil"
-	"log"
-	"path/filepath"
-	"time"
-
+	"fmt"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/rpcclient"
-	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil"
+	"log"
+	"time"
 )
 
-func main() {
-	// Only override the handlers for notifications you care about.
-	// Also note most of these handlers will only be called if you register
-	// for notifications.  See the documentation of the rpcclient
-	// NotificationHandlers type for more details about each handler.
-	ntfnHandlers := rpcclient.NotificationHandlers{
-		OnFilteredBlockConnected: func(height int32, header *wire.BlockHeader, txns []*btcutil.Tx) {
-			log.Printf("Block connected: %v (%d) %v",
-				header.BlockHash(), height, header.Timestamp)
-		},
-		OnFilteredBlockDisconnected: func(height int32, header *wire.BlockHeader) {
-			log.Printf("Block disconnected: %v (%d) %v",
-				header.BlockHash(), height, header.Timestamp)
-		},
-	}
+var client = CreateClient()
 
-	// Connect to local btcd RPC server using websockets.
-	btcdHomeDir := btcutil.AppDataDir("btcd", false)
-	certs, err := ioutil.ReadFile(filepath.Join(btcdHomeDir, "rpc.cert"))
-	if err != nil {
-		log.Fatal(err)
+// issue happens most around this spot
+const initialValue = 390000
+
+func main() {
+	height, err := client.GetBlockCount()
+
+	var i int64
+	for i = initialValue; i <= height; i++ {
+		block := GetBlock(i)
+
+		transactions := make([]rpcclient.FutureGetRawTransactionVerboseResult, 0)
+
+		hashes := block.Tx
+		for _, hash := range hashes {
+			txHash, err := chainhash.NewHashFromStr(hash)
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			transactions = append(transactions, client.GetRawTransactionVerboseAsync(txHash))
+		}
+
+		for transactionFuture := range transactions {
+			_, err := transactions[transactionFuture].Receive()
+			if (err != nil) {
+				log.Fatal(err)
+			}
+		}
+		fmt.Println("Testing block ", i)
 	}
-	connCfg := &rpcclient.ConnConfig{
-		Host:         "localhost:8334",
-		Endpoint:     "ws",
-		User:         "yourrpcuser",
-		Pass:         "yourrpcpass",
-		Certificates: certs,
-	}
-	client, err := rpcclient.New(connCfg, &ntfnHandlers)
 	if err != nil {
 		log.Fatal(err)
 	}
