@@ -115,6 +115,24 @@ func TestBtcdExtCmds(t *testing.T) {
 			},
 		},
 		{
+			name: "generatetoaddress",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("generatetoaddress", 1, "1Address")
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewGenerateToAddressCmd(1, "1Address", nil)
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"generatetoaddress","params":[1,"1Address"],"id":1}`,
+			unmarshalled: &btcjson.GenerateToAddressCmd{
+				NumBlocks: 1,
+				Address:   "1Address",
+				MaxTries: func() *int64 {
+					var i int64 = 1000000
+					return &i
+				}(),
+			},
+		},
+		{
 			name: "getbestblock",
 			newCmd: func() (interface{}, error) {
 				return btcjson.NewCmd("getbestblock")

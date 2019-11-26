@@ -59,6 +59,23 @@ func NewDebugLevelCmd(levelSpec string) *DebugLevelCmd {
 	}
 }
 
+// GenerateToAddressCmd defines the generatetoaddress JSON-RPC command.
+type GenerateToAddressCmd struct {
+	NumBlocks int64
+	Address   string
+	MaxTries  *int64 `jsonrpcdefault:"1000000"`
+}
+
+// NewGenerateToAddressCmd returns a new instance which can be used to issue a
+// generatetoaddress JSON-RPC command.
+func NewGenerateToAddressCmd(numBlocks int64, address string, maxTries *int64) *GenerateToAddressCmd {
+	return &GenerateToAddressCmd{
+		NumBlocks: numBlocks,
+		Address:   address,
+		MaxTries:  maxTries,
+	}
+}
+
 // GenerateCmd defines the generate JSON-RPC command.
 type GenerateCmd struct {
 	NumBlocks uint32
@@ -131,6 +148,7 @@ func init() {
 	MustRegisterCmd("debuglevel", (*DebugLevelCmd)(nil), flags)
 	MustRegisterCmd("node", (*NodeCmd)(nil), flags)
 	MustRegisterCmd("generate", (*GenerateCmd)(nil), flags)
+	MustRegisterCmd("generatetoaddress", (*GenerateToAddressCmd)(nil), flags)
 	MustRegisterCmd("getbestblock", (*GetBestBlockCmd)(nil), flags)
 	MustRegisterCmd("getcurrentnet", (*GetCurrentNetCmd)(nil), flags)
 	MustRegisterCmd("getheaders", (*GetHeadersCmd)(nil), flags)

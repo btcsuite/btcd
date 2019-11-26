@@ -129,6 +129,34 @@ func TestWalletSvrCmds(t *testing.T) {
 			},
 		},
 		{
+			name: "estimatesmartfee - no mode",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("estimatesmartfee", 6)
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewEstimateSmartFeeCmd(6, nil)
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"estimatesmartfee","params":[6],"id":1}`,
+			unmarshalled: &btcjson.EstimateSmartFeeCmd{
+				ConfTarget:   6,
+				EstimateMode: &btcjson.EstimateModeConservative,
+			},
+		},
+		{
+			name: "estimatesmartfee - economical mode",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("estimatesmartfee", 6, btcjson.EstimateModeEconomical)
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewEstimateSmartFeeCmd(6, &btcjson.EstimateModeEconomical)
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"estimatesmartfee","params":[6,"ECONOMICAL"],"id":1}`,
+			unmarshalled: &btcjson.EstimateSmartFeeCmd{
+				ConfTarget:   6,
+				EstimateMode: &btcjson.EstimateModeEconomical,
+			},
+		},
+		{
 			name: "estimatepriority",
 			newCmd: func() (interface{}, error) {
 				return btcjson.NewCmd("estimatepriority", 6)
