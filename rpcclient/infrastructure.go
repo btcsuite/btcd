@@ -1068,7 +1068,9 @@ type ConnConfig struct {
 	// Pass is the passphrase to use to authenticate to the RPC server.
 	Pass string
 
-	// Params is the string represening the network that the server is running.
+	// Params is the string representing the network that the server
+	// is running. If there is no parameter set in the config, then
+	// mainnet will be used by default.
 	Params string
 
 	// DisableTLS specifies whether transport layer security should be
