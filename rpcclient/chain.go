@@ -982,3 +982,44 @@ func (c *Client) GetCFilterHeader(blockHash *chainhash.Hash,
 	filterType wire.FilterType) (*wire.MsgCFHeaders, error) {
 	return c.GetCFilterHeaderAsync(blockHash, filterType).Receive()
 }
+
+// FutureGetBlockStatsResult is a future promise to deliver the result of a
+// GetBlockStatsAsync RPC invocation (or an applicable error).
+type FutureGetBlockStatsResult chan *response
+
+// Receive waits for the response promised by the future and returns statistics
+// of a block at a certain height.
+func (r FutureGetBlockStatsResult) Receive() (*btcjson.GetBlockStatsResult, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	var blockStats btcjson.GetBlockStatsResult
+	err = json.Unmarshal(res, &blockStats)
+	if err != nil {
+		return nil, err
+	}
+
+	return &blockStats, nil
+}
+
+// GetBlockStatsAsync returns an instance of a type that can be used to get
+// the result of the RPC at some future time by invoking the Receive function on
+// the returned instance.
+//
+// See GetBlockStats or the blocking version and more details.
+func (c *Client) GetBlockStatsAsync(hashOrHeight interface{}, stats *[]string) FutureGetBlockStatsResult {
+	if hash, ok := hashOrHeight.(*chainhash.Hash); ok {
+		hashOrHeight = hash.String()
+	}
+
+	cmd := btcjson.NewGetBlockStatsCmd(btcjson.HashOrHeight{Value: hashOrHeight}, stats)
+	return c.sendCmd(cmd)
+}
+
+// GetBlockStats returns block statistics. First argument specifies height or hash of the target block.
+// Second argument allows to select certain stats to return.
+func (c *Client) GetBlockStats(hashOrHeight interface{}, stats *[]string) (*btcjson.GetBlockStatsResult, error) {
+	return c.GetBlockStatsAsync(hashOrHeight, stats).Receive()
+}

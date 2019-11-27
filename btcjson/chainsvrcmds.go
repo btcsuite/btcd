@@ -193,6 +193,50 @@ func NewGetBlockHeaderCmd(hash string, verbose *bool) *GetBlockHeaderCmd {
 	}
 }
 
+// HashOrHeight defines a type that can be used as hash_or_height value in JSON-RPC commands.
+type HashOrHeight struct {
+	Value interface{}
+}
+
+// MarshalJSON implements the json.Marshaler interface
+func (h HashOrHeight) MarshalJSON() ([]byte, error) {
+	return json.Marshal(h.Value)
+}
+
+// UnmarshalJSON implements the json.Unmarshaler interface
+func (h *HashOrHeight) UnmarshalJSON(data []byte) error {
+	var unmarshalled interface{}
+	if err := json.Unmarshal(data, &unmarshalled); err != nil {
+		return err
+	}
+
+	switch v := unmarshalled.(type) {
+	case float64:
+		h.Value = int(v)
+	case string:
+		h.Value = v
+	default:
+		return fmt.Errorf("invalid hash_or_height value: %v", unmarshalled)
+	}
+
+	return nil
+}
+
+// GetBlockStatsCmd defines the getblockstats JSON-RPC command.
+type GetBlockStatsCmd struct {
+	HashOrHeight HashOrHeight
+	Stats        *[]string
+}
+
+// NewGetBlockStatsCmd returns a new instance which can be used to issue a
+// getblockstats JSON-RPC command. Either height or hash must be specified.
+func NewGetBlockStatsCmd(hashOrHeight HashOrHeight, stats *[]string) *GetBlockStatsCmd {
+	return &GetBlockStatsCmd{
+		HashOrHeight: hashOrHeight,
+		Stats:        stats,
+	}
+}
+
 // TemplateRequest is a request object as defined in BIP22
 // (https://en.bitcoin.it/wiki/BIP_0022), it is optionally provided as an
 // pointer argument to GetBlockTemplateCmd.
@@ -800,6 +844,7 @@ func init() {
 	MustRegisterCmd("getblockcount", (*GetBlockCountCmd)(nil), flags)
 	MustRegisterCmd("getblockhash", (*GetBlockHashCmd)(nil), flags)
 	MustRegisterCmd("getblockheader", (*GetBlockHeaderCmd)(nil), flags)
+	MustRegisterCmd("getblockstats", (*GetBlockStatsCmd)(nil), flags)
 	MustRegisterCmd("getblocktemplate", (*GetBlockTemplateCmd)(nil), flags)
 	MustRegisterCmd("getcfilter", (*GetCFilterCmd)(nil), flags)
 	MustRegisterCmd("getcfilterheader", (*GetCFilterHeaderCmd)(nil), flags)
