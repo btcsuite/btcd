@@ -229,6 +229,60 @@ func TestChainSvrCmds(t *testing.T) {
 			},
 		},
 		{
+			name: "getblockstats height",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("getblockstats", btcjson.HashOrHeight{Value: 123})
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewGetBlockStatsCmd(btcjson.HashOrHeight{Value: 123}, nil)
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"getblockstats","params":[123],"id":1}`,
+			unmarshalled: &btcjson.GetBlockStatsCmd{
+				HashOrHeight: btcjson.HashOrHeight{Value: 123},
+			},
+		},
+		{
+			name: "getblockstats hash",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("getblockstats", btcjson.HashOrHeight{Value: "deadbeef"})
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewGetBlockStatsCmd(btcjson.HashOrHeight{Value: "deadbeef"}, nil)
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"getblockstats","params":["deadbeef"],"id":1}`,
+			unmarshalled: &btcjson.GetBlockStatsCmd{
+				HashOrHeight: btcjson.HashOrHeight{Value: "deadbeef"},
+			},
+		},
+		{
+			name: "getblockstats height optional stats",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("getblockstats", btcjson.HashOrHeight{Value: 123}, []string{"avgfee", "maxfee"})
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewGetBlockStatsCmd(btcjson.HashOrHeight{Value: 123}, &[]string{"avgfee", "maxfee"})
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"getblockstats","params":[123,["avgfee","maxfee"]],"id":1}`,
+			unmarshalled: &btcjson.GetBlockStatsCmd{
+				HashOrHeight: btcjson.HashOrHeight{Value: 123},
+				Stats:        &[]string{"avgfee", "maxfee"},
+			},
+		},
+		{
+			name: "getblockstats hash optional stats",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("getblockstats", btcjson.HashOrHeight{Value: "deadbeef"}, []string{"avgfee", "maxfee"})
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewGetBlockStatsCmd(btcjson.HashOrHeight{Value: "deadbeef"}, &[]string{"avgfee", "maxfee"})
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"getblockstats","params":["deadbeef",["avgfee","maxfee"]],"id":1}`,
+			unmarshalled: &btcjson.GetBlockStatsCmd{
+				HashOrHeight: btcjson.HashOrHeight{Value: "deadbeef"},
+				Stats:        &[]string{"avgfee", "maxfee"},
+			},
+		},
+		{
 			name: "getblocktemplate",
 			newCmd: func() (interface{}, error) {
 				return btcjson.NewCmd("getblocktemplate")

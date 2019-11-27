@@ -24,6 +24,38 @@ type GetBlockHeaderVerboseResult struct {
 	NextHash      string  `json:"nextblockhash,omitempty"`
 }
 
+// GetBlockStatsResult models the data from the getblockstats command.
+type GetBlockStatsResult struct {
+	AverageFee         int64   `json:"avgfee"`
+	AverageFeeRate     int64   `json:"avgfeerate"`
+	AverageTxSize      int64   `json:"avgtxsize"`
+	FeeratePercentiles []int64 `json:"feerate_percentiles"`
+	Hash               string  `json:"blockhash"`
+	Height             int64   `json:"height"`
+	Ins                int64   `json:"ins"`
+	MaxFee             int64   `json:"maxfee"`
+	MaxFeeRate         int64   `json:"maxfeerate"`
+	MaxTxSize          int64   `json:"maxtxsize"`
+	MedianFee          int64   `json:"medianfee"`
+	MedianTime         int64   `json:"mediantime"`
+	MedianTxSize       int64   `json:"mediantxsize"`
+	MinFee             int64   `json:"minfee"`
+	MinFeeRate         int64   `json:"minfeerate"`
+	MinTxSize          int64   `json:"mintxsize"`
+	Outs               int64   `json:"outs"`
+	SegWitTotalSize    int64   `json:"swtotal_size"`
+	SegWitTotalWeight  int64   `json:"swtotal_weight"`
+	SegWitTxs          int64   `json:"swtxs"`
+	Subsidy            int64   `json:"subsidy"`
+	Time               int64   `json:"time"`
+	TotalOut           int64   `json:"total_out"`
+	TotalSize          int64   `json:"total_size"`
+	TotalWeight        int64   `json:"total_weight"`
+	Txs                int64   `json:"txs"`
+	UTXOIncrease       int64   `json:"utxo_increase"`
+	UTXOSizeIncrease   int64   `json:"utxo_size_inc"`
+}
+
 // GetBlockVerboseResult models the data from the getblock command when the
 // verbose flag is set to 1.  When the verbose flag is set to 0, getblock returns a
 // hex-encoded string. When the verbose flag is set to 1, getblock returns an object
