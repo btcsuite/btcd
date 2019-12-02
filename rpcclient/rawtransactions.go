@@ -233,8 +233,13 @@ func (r FutureCreateRawTransactionResult) Receive() (*wire.MsgTx, error) {
 
 	// Deserialize the transaction and return it.
 	var msgTx wire.MsgTx
-	if err := msgTx.Deserialize(bytes.NewReader(serializedTx)); err != nil {
-		return nil, err
+	// we try both the new and old encoding format
+	witnessErr := msgTx.Deserialize(bytes.NewReader(serializedTx))
+	if witnessErr != nil {
+		legacyErr := msgTx.DeserializeNoWitness(bytes.NewReader(serializedTx))
+		if legacyErr != nil {
+			return nil, legacyErr
+		}
 	}
 	return &msgTx, nil
 }
