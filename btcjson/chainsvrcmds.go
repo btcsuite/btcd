@@ -8,6 +8,7 @@
 package btcjson
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 
@@ -76,6 +77,37 @@ func NewCreateRawTransactionCmd(inputs []TransactionInput, amounts map[string]fl
 		Inputs:   inputs,
 		Amounts:  amounts,
 		LockTime: lockTime,
+	}
+}
+
+// FundRawTransactionOpts are the different options that can be passed to rawtransaction
+type FundRawTransactionOpts struct {
+	ChangeAddress          *string               `json:"changeAddress,omitempty"`
+	ChangePosition         *int                  `json:"changePosition,omitempty"`
+	ChangeType             *string               `json:"change_type,omitempty"`
+	IncludeWatching        *bool                 `json:"includeWatching,omitempty"`
+	LockUnspents           *bool                 `json:"lockUnspents,omitempty"`
+	FeeRate                *float64              `json:"feeRate,omitempty"` // BTC/kB
+	SubtractFeeFromOutputs []int                 `json:"subtractFeeFromOutputs,omitempty"`
+	Replaceable            *bool                 `json:"replaceable,omitempty"`
+	ConfTarget             *int                  `json:"conf_target,omitempty"`
+	EstimateMode           *EstimateSmartFeeMode `json:"estimate_mode,omitempty"`
+}
+
+// FundRawTransactionCmd defines the fundrawtransaction JSON-RPC command
+type FundRawTransactionCmd struct {
+	HexTx     string
+	Options   FundRawTransactionOpts
+	IsWitness *bool
+}
+
+// NewFundRawTransactionCmd returns a new instance which can be used to issue
+// a fundrawtransaction JSON-RPC command
+func NewFundRawTransactionCmd(serializedTx []byte, opts FundRawTransactionOpts, isWitness *bool) *FundRawTransactionCmd {
+	return &FundRawTransactionCmd{
+		HexTx:     hex.EncodeToString(serializedTx),
+		Options:   opts,
+		IsWitness: isWitness,
 	}
 }
 
@@ -856,6 +888,7 @@ func init() {
 
 	MustRegisterCmd("addnode", (*AddNodeCmd)(nil), flags)
 	MustRegisterCmd("createrawtransaction", (*CreateRawTransactionCmd)(nil), flags)
+	MustRegisterCmd("fundrawtransaction", (*FundRawTransactionCmd)(nil), flags)
 	MustRegisterCmd("decoderawtransaction", (*DecodeRawTransactionCmd)(nil), flags)
 	MustRegisterCmd("decodescript", (*DecodeScriptCmd)(nil), flags)
 	MustRegisterCmd("getaddednodeinfo", (*GetAddedNodeInfoCmd)(nil), flags)

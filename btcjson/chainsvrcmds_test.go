@@ -6,6 +6,7 @@ package btcjson_test
 
 import (
 	"bytes"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"reflect"
@@ -95,7 +96,108 @@ func TestChainSvrCmds(t *testing.T) {
 				LockTime: btcjson.Int64(12312333333),
 			},
 		},
+		{
+			name: "fundrawtransaction - empty opts",
+			newCmd: func() (i interface{}, e error) {
+				return btcjson.NewCmd("fundrawtransaction", "deadbeef", "{}")
+			},
+			staticCmd: func() interface{} {
+				deadbeef, err := hex.DecodeString("deadbeef")
+				if err != nil {
+					panic(err)
+				}
+				return btcjson.NewFundRawTransactionCmd(deadbeef, btcjson.FundRawTransactionOpts{}, nil)
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"fundrawtransaction","params":["deadbeef",{}],"id":1}`,
+			unmarshalled: &btcjson.FundRawTransactionCmd{
+				HexTx:     "deadbeef",
+				Options:   btcjson.FundRawTransactionOpts{},
+				IsWitness: nil,
+			},
+		},
+		{
+			name: "fundrawtransaction - full opts",
+			newCmd: func() (i interface{}, e error) {
+				return btcjson.NewCmd("fundrawtransaction", "deadbeef", `{"changeAddress":"bcrt1qeeuctq9wutlcl5zatge7rjgx0k45228cxez655","changePosition":1,"change_type":"legacy","includeWatching":true,"lockUnspents":true,"feeRate":0.7,"subtractFeeFromOutputs":[0],"replaceable":true,"conf_target":8,"estimate_mode":"ECONOMICAL"}`)
+			},
+			staticCmd: func() interface{} {
+				deadbeef, err := hex.DecodeString("deadbeef")
+				if err != nil {
+					panic(err)
+				}
+				changeAddress := "bcrt1qeeuctq9wutlcl5zatge7rjgx0k45228cxez655"
+				change := 1
+				changeType := "legacy"
+				watching := true
+				lockUnspents := true
+				feeRate := 0.7
+				replaceable := true
+				confTarget := 8
 
+				return btcjson.NewFundRawTransactionCmd(deadbeef, btcjson.FundRawTransactionOpts{
+					ChangeAddress:          &changeAddress,
+					ChangePosition:         &change,
+					ChangeType:             &changeType,
+					IncludeWatching:        &watching,
+					LockUnspents:           &lockUnspents,
+					FeeRate:                &feeRate,
+					SubtractFeeFromOutputs: []int{0},
+					Replaceable:            &replaceable,
+					ConfTarget:             &confTarget,
+					EstimateMode:           &btcjson.EstimateModeEconomical,
+				}, nil)
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"fundrawtransaction","params":["deadbeef",{"changeAddress":"bcrt1qeeuctq9wutlcl5zatge7rjgx0k45228cxez655","changePosition":1,"change_type":"legacy","includeWatching":true,"lockUnspents":true,"feeRate":0.7,"subtractFeeFromOutputs":[0],"replaceable":true,"conf_target":8,"estimate_mode":"ECONOMICAL"}],"id":1}`,
+			unmarshalled: func() interface{} {
+				changeAddress := "bcrt1qeeuctq9wutlcl5zatge7rjgx0k45228cxez655"
+				change := 1
+				changeType := "legacy"
+				watching := true
+				lockUnspents := true
+				feeRate := 0.7
+				replaceable := true
+				confTarget := 8
+				return &btcjson.FundRawTransactionCmd{
+					HexTx: "deadbeef",
+					Options: btcjson.FundRawTransactionOpts{
+						ChangeAddress:          &changeAddress,
+						ChangePosition:         &change,
+						ChangeType:             &changeType,
+						IncludeWatching:        &watching,
+						LockUnspents:           &lockUnspents,
+						FeeRate:                &feeRate,
+						SubtractFeeFromOutputs: []int{0},
+						Replaceable:            &replaceable,
+						ConfTarget:             &confTarget,
+						EstimateMode:           &btcjson.EstimateModeEconomical,
+					},
+					IsWitness: nil,
+				}
+			}(),
+		},
+		{
+			name: "fundrawtransaction - iswitness",
+			newCmd: func() (i interface{}, e error) {
+				return btcjson.NewCmd("fundrawtransaction", "deadbeef", "{}", true)
+			},
+			staticCmd: func() interface{} {
+				deadbeef, err := hex.DecodeString("deadbeef")
+				if err != nil {
+					panic(err)
+				}
+				t := true
+				return btcjson.NewFundRawTransactionCmd(deadbeef, btcjson.FundRawTransactionOpts{}, &t)
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"fundrawtransaction","params":["deadbeef",{},true],"id":1}`,
+			unmarshalled: &btcjson.FundRawTransactionCmd{
+				HexTx:   "deadbeef",
+				Options: btcjson.FundRawTransactionOpts{},
+				IsWitness: func() *bool {
+					t := true
+					return &t
+				}(),
+			},
+		},
 		{
 			name: "decoderawtransaction",
 			newCmd: func() (interface{}, error) {
