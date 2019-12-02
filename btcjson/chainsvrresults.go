@@ -4,7 +4,14 @@
 
 package btcjson
 
-import "encoding/json"
+import (
+	"bytes"
+	"encoding/hex"
+	"encoding/json"
+
+	"github.com/btcsuite/btcd/wire"
+	"github.com/btcsuite/btcutil"
+)
 
 // GetBlockHeaderVerboseResult models the data from the getblockheader command when
 // the verbose flag is set.  When the verbose flag is not set, getblockheader
@@ -663,4 +670,51 @@ type EstimateSmartFeeResult struct {
 	FeeRate *float64 `json:"feerate,omitempty"`
 	Errors  []string `json:"errors,omitempty"`
 	Blocks  int64    `json:"blocks"`
+}
+
+var _ json.Unmarshaler = &FundRawTransactionResult{}
+
+type rawFundRawTransactionResult struct {
+	Transaction    string  `json:"hex"`
+	Fee            float64 `json:"fee"`
+	ChangePosition int     `json:"changepos"`
+}
+
+// FundRawTransactionResult is the result of the fundrawtransaction JSON-RPC call
+type FundRawTransactionResult struct {
+	Transaction    *wire.MsgTx
+	Fee            btcutil.Amount
+	ChangePosition int // the position of the added change output, or -1
+}
+
+// UnmarshalJSON unmarshals the result of the fundrawtransaction JSON-RPC call
+func (f *FundRawTransactionResult) UnmarshalJSON(data []byte) error {
+	var rawRes rawFundRawTransactionResult
+	if err := json.Unmarshal(data, &rawRes); err != nil {
+		return err
+	}
+
+	txBytes, err := hex.DecodeString(rawRes.Transaction)
+	if err != nil {
+		return err
+	}
+
+	var msgTx wire.MsgTx
+	witnessErr := msgTx.Deserialize(bytes.NewReader(txBytes))
+	if witnessErr != nil {
+		legacyErr := msgTx.DeserializeNoWitness(bytes.NewReader(txBytes))
+		if legacyErr != nil {
+			return legacyErr
+		}
+	}
+
+	fee, err := btcutil.NewAmount(rawRes.Fee)
+	if err != nil {
+		return err
+	}
+
+	f.Transaction = &msgTx
+	f.Fee = fee
+	f.ChangePosition = rawRes.ChangePosition
+	return nil
 }
