@@ -1326,9 +1326,9 @@ out:
 		var batchedRequest bool
 
 		// Determine request type
-		//if bytes.HasPrefix(msg, "batchedRequestPrefix") {
-		//	batchedRequest = true
-		//}
+		if bytes.HasPrefix(msg, batchedRequestPrefix) {
+			batchedRequest = true
+		}
 
 		if !batchedRequest {
 			var req btcjson.Request
