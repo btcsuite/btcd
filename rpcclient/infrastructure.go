@@ -157,6 +157,9 @@ type Client struct {
 	// disconnected indicated whether or not the server is disconnected.
 	disconnected bool
 
+	// wether or not to batch requests, false unless changed by Bulk()
+	batch bool
+
 	// retryCount holds the number of times the client has tried to
 	// reconnect to the RPC server.
 	retryCount int64
@@ -1136,15 +1139,6 @@ type ConnConfig struct {
 	// flag can be set to true to use basic HTTP POST requests instead.
 	HTTPPostMode bool
 
-
-	// Bulk RPC mode instructs the client to chunk requests to the server by
-	// issuing json-rpc requests instead of using btcd websockets
-	// Websockets are generally preferred when using a btcd server as some of the
-	// features of the client such notifications only work with websockets,
-	// however, not all servers support the websocket extensions, so this
-	// flag can be set to true to use basic HTTP POST requests instead.
-	JsonBulkRPC bool
-
 	// EnableBCInfoHacks is an option provided to enable compatibility hacks
 	// when connecting to blockchain.info RPC server
 	EnableBCInfoHacks bool
@@ -1449,4 +1443,8 @@ func (c *Client) BackendVersion() (BackendVersion, error) {
 	c.backendVersion = &version
 
 	return *c.backendVersion, nil
+}
+
+func (c *Client) Bulk() *Client {
+	return c
 }
