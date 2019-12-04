@@ -1136,6 +1136,17 @@ type ConnConfig struct {
 	// flag can be set to true to use basic HTTP POST requests instead.
 	HTTPPostMode bool
 
+
+	// Bulk RPC mode instructs the client to chunk requests to the server by
+	// issuing json-rpc requests instead of using btcd websockets
+	// Websockets are generally preferred when using a btcd server as some of the
+	// features of the client such notifications only work with websockets,
+	// however, not all servers support the websocket extensions, so this
+	// flag can be set to true to use basic HTTP POST requests instead.
+	JsonRPCServer bool
+
+
+
 	// EnableBCInfoHacks is an option provided to enable compatibility hacks
 	// when connecting to blockchain.info RPC server
 	EnableBCInfoHacks bool
