@@ -901,7 +901,7 @@ func (c *Client) sendCmd(cmd interface{}) chan *response {
 
 	// Marshal the command.
 	id := c.NextID()
-	marshalledJSON, err := btcjson.MarshalCmd(id, cmd)
+	marshalledJSON, err := btcjson.MarshalCmd("1.0", id, cmd)
 	if err != nil {
 		return newFutureError(err)
 	}
@@ -1135,6 +1135,15 @@ type ConnConfig struct {
 	// however, not all servers support the websocket extensions, so this
 	// flag can be set to true to use basic HTTP POST requests instead.
 	HTTPPostMode bool
+
+
+	// Bulk RPC mode instructs the client to chunk requests to the server by
+	// issuing json-rpc requests instead of using btcd websockets
+	// Websockets are generally preferred when using a btcd server as some of the
+	// features of the client such notifications only work with websockets,
+	// however, not all servers support the websocket extensions, so this
+	// flag can be set to true to use basic HTTP POST requests instead.
+	JsonBulkRPC bool
 
 	// EnableBCInfoHacks is an option provided to enable compatibility hacks
 	// when connecting to blockchain.info RPC server

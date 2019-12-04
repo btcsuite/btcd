@@ -27,7 +27,7 @@ func ExampleMarshalCmd() {
 	// server.  Typically the client would increment the id here which is
 	// request so the response can be identified.
 	id := 1
-	marshalledBytes, err := btcjson.MarshalCmd(id, gbCmd)
+	marshalledBytes, err := btcjson.MarshalCmd("1.0", id, gbCmd)
 	if err != nil {
 		fmt.Println(err)
 		return
