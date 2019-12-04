@@ -159,6 +159,7 @@ type Client struct {
 
 	// wether or not to batch requests, false unless changed by Bulk()
 	batch bool
+	batchChan        chan *jsonRequest
 
 	// retryCount holds the number of times the client has tried to
 	// reconnect to the RPC server.
@@ -866,7 +867,11 @@ func (c *Client) sendRequest(jReq *jsonRequest) {
 	// POST mode, the command is issued via an HTTP client.  Otherwise,
 	// the command is issued via the asynchronous websocket channels.
 	if c.config.HTTPPostMode {
-		c.sendPost(jReq)
+		if c.batch{
+			c.batchChan <- jReq
+		} else {
+			c.sendPost(jReq)
+		}
 		return
 	}
 
@@ -896,6 +901,10 @@ func (c *Client) sendRequest(jReq *jsonRequest) {
 // future.  It handles both websocket and HTTP POST mode depending on the
 // configuration of the client.
 func (c *Client) sendCmd(cmd interface{}) chan *response {
+	rpcVersion := "1.0"
+	if c.batch {
+		rpcVersion = "2.0"
+	}
 	// Get the method associated with the command.
 	method, err := btcjson.CmdMethod(cmd)
 	if err != nil {
@@ -904,7 +913,7 @@ func (c *Client) sendCmd(cmd interface{}) chan *response {
 
 	// Marshal the command.
 	id := c.NextID()
-	marshalledJSON, err := btcjson.MarshalCmd("1.0", id, cmd)
+	marshalledJSON, err := btcjson.MarshalCmd(rpcVersion, id, cmd)
 	if err != nil {
 		return newFutureError(err)
 	}
@@ -918,6 +927,8 @@ func (c *Client) sendCmd(cmd interface{}) chan *response {
 		marshalledJSON: marshalledJSON,
 		responseChan:   responseChan,
 	}
+
+
 	c.sendRequest(jReq)
 
 	return responseChan
@@ -1284,6 +1295,8 @@ func New(config *ConnConfig, ntfnHandlers *NotificationHandlers) (*Client, error
 		httpClient:      httpClient,
 		requestMap:      make(map[uint64]*list.Element),
 		requestList:     list.New(),
+		batch: 			 false,
+		batchChan: 		 make(chan *jsonRequest),
 		ntfnHandlers:    ntfnHandlers,
 		ntfnState:       newNotificationState(),
 		sendChan:        make(chan []byte, sendBufferSize),
@@ -1445,6 +1458,8 @@ func (c *Client) BackendVersion() (BackendVersion, error) {
 	return *c.backendVersion, nil
 }
 
-func (c *Client) Bulk() *Client {
+// make batch requests
+func (c *Client) Batch()*Client {
+	c.batch = true //copy the client with changed batch setting
 	return c
 }

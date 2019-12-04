@@ -29,7 +29,7 @@ func main() {
 	defer client.Shutdown()
 
 	// Get the current block count.
-	blockCount, err := client.Bulk().GetBlockCount()
+	blockCount, err := client.Batch().GetBlockCount()
 	if err != nil {
 		log.Fatal(err)
 	}

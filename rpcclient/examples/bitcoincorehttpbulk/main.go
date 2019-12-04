@@ -29,7 +29,7 @@ func main() {
 			{"jsonrpc": "2.0", "method": "decodescript", "params": ["ac"]},
 			{"jsonrpc": "2.0", "method": "getbestblockhash", "params": [], "id": "2"},
 			{"foo": "boo"},
-			{"jsonrpc": "2.0", "method": "getblockcount", "id": "9"} 
+			{"jsonrpc": "2.0", "method": "getblockcount", "id": "9"} /**/
 		]`, // should produce invalid request for the `{"foo": "boo"}`.
 	}
 
