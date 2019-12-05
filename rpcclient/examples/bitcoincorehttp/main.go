@@ -5,18 +5,17 @@
 package main
 
 import (
-	"fmt"
-	"github.com/btcsuite/btcd/rpcclient"
 	"log"
+
+	"github.com/btcsuite/btcd/rpcclient"
 )
 
 func main() {
 	// Connect to local bitcoin core RPC server using HTTP POST mode.
 	connCfg := &rpcclient.ConnConfig{
-		Host:         "127.0.0.1:8332",
+		Host:         "localhost:8332",
 		User:         "yourrpcuser",
 		Pass:         "yourrpcpass",
-		DisableConnectOnNew: true,
 		HTTPPostMode: true, // Bitcoin core only supports HTTP POST mode
 		DisableTLS:   true, // Bitcoin core does not provide TLS by default
 	}
@@ -29,20 +28,9 @@ func main() {
 	defer client.Shutdown()
 
 	// Get the current block count.
-	batchClient := client.Batch()
-
-	// batch mode requires async requests
-	blockCount := batchClient.GetBlockCountAsync()
-	block1 := batchClient.GetBlockHashAsync(1)
-	batchClient.GetBlockHashAsync(2)
-	batchClient.GetBlockHashAsync(3)
-	block4  := batchClient.GetBlockHashAsync(4)
-	difficulty := batchClient.GetDifficultyAsync()
-
-	batchClient.Send()
-	//result, err
-	fmt.Println(blockCount.Receive())
-	fmt.Println(block1.Receive())
-	fmt.Println(block4.Receive())
-	fmt.Println(difficulty.Receive())
+	blockCount, err := client.GetBlockCount()
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Printf("Block count: %d", blockCount)
 }

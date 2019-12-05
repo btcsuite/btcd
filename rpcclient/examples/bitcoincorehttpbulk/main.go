@@ -1,65 +1,48 @@
+// Copyright (c) 2014-2017 The btcsuite developers
+// Use of this source code is governed by an ISC
+// license that can be found in the LICENSE file.
+
 package main
 
 import (
-	"bytes"
 	"fmt"
-	"io/ioutil"
-	"net/http"
+	"github.com/btcsuite/btcd/rpcclient"
+	"log"
 )
 
 func main() {
-	const (
-		url     = "http://localhost:8332"
-		rpcUser = "yourrpcuser"
-		rpcPass = "yourrpcpass"
-	)
-
-	// populate request set
-	reqs := []string{
-		`{}`,
-		`[]`,
-		`[1]`,
-		`[1,2,3]`,
-		`{"foo": "boo"}`,                              // should be an invalid request
-		`{"jsonrpc": "1.0", "foo": "boo", "id": "1"}`,
-		`{"jsonrpc": "1.0", "method": "getblockcount", "params": [], "id": "1"}`,
-		`{"jsonrpc": "1.0", "method": "getblockcount", "params": "a", "id": "1"}`, // should be invalid since params is neither an array nor a json object.
-		`[
-			{"jsonrpc": "2.0", "method": "getblockcount", "params": [], "id": "1"},
-			{"jsonrpc": "2.0", "method": "decodescript", "params": ["ac"]},
-			{"jsonrpc": "2.0", "method": "getbestblockhash", "params": [], "id": "2"},
-			{"foo": "boo"},
-			{"jsonrpc": "2.0", "method": "getblockcount", "id": "9"} /**/
-		]`, // should produce invalid request for the `{"foo": "boo"}`.
+	// Connect to local bitcoin core RPC server using HTTP POST mode.
+	connCfg := &rpcclient.ConnConfig{
+		Host:                "localhost:8332",
+		User:                "yourrpcuser",
+		Pass:                "yourrpcpass",
+		DisableConnectOnNew: true,
+		HTTPPostMode:        true, // Bitcoin core only supports HTTP POST mode
+		DisableTLS:          true, // Bitcoin core does not provide TLS by default
 	}
-
-	// Connect to local btcd RPC server using websockets.
-
-	client := http.Client{}
-
-	for _, jsonReq := range reqs {
-		bodyReader := bytes.NewReader([]byte(jsonReq))
-		httpReq, err := http.NewRequest("POST", url, bodyReader)
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-		httpReq.Close = true
-		httpReq.Header.Set("Content-Type", "application/json")
-		httpReq.SetBasicAuth(rpcUser, rpcPass)
-		resp, err := client.Do(httpReq)
-		if err != nil {
-			fmt.Println("request:", jsonReq, "response:", err)
-			return
-		}
-
-		respBytes, err := ioutil.ReadAll(resp.Body)
-		resp.Body.Close()
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-
-		fmt.Println("request:", jsonReq, "response:", string(respBytes))
+	// Notice the notification parameter is nil since notifications are
+	// not supported in HTTP POST mode.
+	client, err := rpcclient.New(connCfg, nil)
+	if err != nil {
+		log.Fatal(err)
 	}
+	defer client.Shutdown()
+
+	// Get the current block count.
+	batchClient := client.Batch()
+
+	// batch mode requires async requests
+	blockCount := batchClient.GetBlockCountAsync()
+	block1 := batchClient.GetBlockHashAsync(1)
+	batchClient.GetBlockHashAsync(2)
+	batchClient.GetBlockHashAsync(3)
+	block4 := batchClient.GetBlockHashAsync(4)
+	difficulty := batchClient.GetDifficultyAsync()
+
+	batchClient.Send()
+	//result, err
+	fmt.Println(blockCount.Receive())
+	fmt.Println(block1.Receive())
+	fmt.Println(block4.Receive())
+	fmt.Println(difficulty.Receive())
 }

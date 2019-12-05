@@ -985,9 +985,9 @@ func (c *Client) GetCFilterHeader(blockHash *chainhash.Hash,
 type FutureGetBulkResult chan *response
 
 type IndividualBulkResult struct {
-	Result        interface{} `json:"result"`
-	Error      string `json:"error"`
-	Id uint64 `json:"id"`
+	Result interface{} `json:"result"`
+	Error  string      `json:"error"`
+	Id     uint64      `json:"id"`
 }
 
 type BulkResult = map[uint64]IndividualBulkResult

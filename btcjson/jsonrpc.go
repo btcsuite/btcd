@@ -166,7 +166,6 @@ type Response struct {
 	ID      *interface{}    `json:"id"`
 }
 
-
 // NewResponse returns a new JSON-RPC response object given the provided rpc
 // version, id, marshalled result, and RPC error.  This function is only
 // provided in case the caller wants to construct raw responses for some reason.
@@ -190,7 +189,6 @@ func NewResponse(rpcVersion string, id interface{}, marshalledResult []byte, rpc
 		ID:      pid,
 	}, nil
 }
-
 
 // MarshalResponse marshals the passed rpc version, id, result, and RPCError to
 // a JSON-RPC response byte slice that is suitable for transmission to a

@@ -3837,7 +3837,6 @@ type parsedRPCCmd struct {
 	err     *btcjson.RPCError
 }
 
-
 // standardCmdResult checks that a parsed command is a standard Bitcoin JSON-RPC
 // command and runs the appropriate handler to reply to the command.  Any
 // commands which are not recognized or not implemented will return an error
@@ -3915,7 +3914,6 @@ func createMarshalledReply(rpcVersion string, id interface{}, result interface{}
 	return btcjson.MarshalResponse(rpcVersion, id, result, jsonErr)
 }
 
-
 // processRequest determines the incoming request type (single or batched),
 // parses it and returns a marshalled response.
 func (s *rpcServer) processRequest(request *btcjson.Request, isAdmin bool, closeChan <-chan struct{}) []byte {
@@ -3924,7 +3922,7 @@ func (s *rpcServer) processRequest(request *btcjson.Request, isAdmin bool, close
 
 	if !isAdmin {
 		if _, ok := rpcLimited[request.Method]; !ok {
-			jsonErr = internalRPCError("limited user not " +
+			jsonErr = internalRPCError("limited user not "+
 				"authorized for this method", "")
 		}
 	}
