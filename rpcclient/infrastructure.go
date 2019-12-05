@@ -159,7 +159,7 @@ type Client struct {
 
 	// wether or not to batch requests, false unless changed by Bulk()
 	batch bool
-	batchChan        chan *jsonRequest
+	batchList *list.List
 
 	// retryCount holds the number of times the client has tried to
 	// reconnect to the RPC server.
@@ -218,8 +218,13 @@ func (c *Client) addRequest(jReq *jsonRequest) error {
 	default:
 	}
 
-	element := c.requestList.PushBack(jReq)
-	c.requestMap[jReq.id] = element
+	if !c.batch {
+		element := c.requestList.PushBack(jReq)
+		c.requestMap[jReq.id] = element
+	} else {
+		element := c.batchList.PushBack(jReq)
+		c.requestMap[jReq.id] = element
+	}
 	return nil
 }
 
@@ -741,7 +746,12 @@ func (c *Client) handleSendPostMessage(details *sendPostDetails) {
 
 	// Try to unmarshal the response as a regular JSON-RPC response.
 	var resp rawResponse
-	err = json.Unmarshal(respBytes, &resp)
+	var batchResponse json.RawMessage
+	if c.batch {
+		err = json.Unmarshal(respBytes, &batchResponse)
+	}else {
+		err = json.Unmarshal(respBytes, &resp)
+	}
 	if err != nil {
 		// When the response itself isn't a valid JSON-RPC response
 		// return an error which includes the HTTP status code and raw
@@ -751,8 +761,14 @@ func (c *Client) handleSendPostMessage(details *sendPostDetails) {
 		jReq.responseChan <- &response{err: err}
 		return
 	}
-
-	res, err := resp.result()
+	var res []byte
+	if c.batch {
+		// errors must be dealt with downstream since a whole request cannot
+		// "error out" other than through the status code error handled above
+		res, err = batchResponse, nil
+	}else {
+		res, err = resp.result()
+	}
 	jReq.responseChan <- &response{result: res, err: err}
 }
 
@@ -868,7 +884,9 @@ func (c *Client) sendRequest(jReq *jsonRequest) {
 	// the command is issued via the asynchronous websocket channels.
 	if c.config.HTTPPostMode {
 		if c.batch{
-			c.batchChan <- jReq
+			if err := c.addRequest(jReq); err != nil {
+				log.Warn(err)
+			}
 		} else {
 			c.sendPost(jReq)
 		}
@@ -1296,7 +1314,7 @@ func New(config *ConnConfig, ntfnHandlers *NotificationHandlers) (*Client, error
 		requestMap:      make(map[uint64]*list.Element),
 		requestList:     list.New(),
 		batch: 			 false,
-		batchChan: 		 make(chan *jsonRequest),
+		batchList: 		 list.New(),
 		ntfnHandlers:    ntfnHandlers,
 		ntfnState:       newNotificationState(),
 		sendChan:        make(chan []byte, sendBufferSize),
@@ -1459,7 +1477,63 @@ func (c *Client) BackendVersion() (BackendVersion, error) {
 }
 
 // make batch requests
-func (c *Client) Batch()*Client {
+func (c *Client) Batch() Client {
 	c.batch = true //copy the client with changed batch setting
-	return c
+	c.start()
+	return *c
+}
+
+
+func (c *Client) sendAsync() FutureGetBulkResult {
+	// convert the array of marshalled json requests to a single request we can send
+	responseChan := make(chan *response, 1)
+	marshalledRequest := []byte("[")
+	for iter := c.batchList.Front(); iter != nil; iter = iter.Next() {
+		request := iter.Value.(*jsonRequest)
+		marshalledRequest = append(marshalledRequest, request.marshalledJSON...)
+		marshalledRequest = append(marshalledRequest, []byte(",")...)
+	}
+	if len(marshalledRequest) > 0 {
+		marshalledRequest = marshalledRequest[:len(marshalledRequest)-1]
+	}
+	marshalledRequest = append(marshalledRequest, []byte("]")...)
+	request := jsonRequest{
+		id:             c.NextID(),
+		method:         "",
+		cmd:            nil,
+		marshalledJSON: marshalledRequest,
+		responseChan:   responseChan,
+	}
+	c.sendPost(&request)
+	return responseChan
+}
+
+// send batch requests
+func (c *Client) Send()  {
+	result, err := c.sendAsync().Receive()
+
+	if err != nil{
+		log.Error(err)
+	}
+
+	for iter := c.batchList.Front(); iter != nil; iter = iter.Next() {
+		var requestError error
+		request := iter.Value.(*jsonRequest)
+		individualResult := result[request.id]
+		fullResult, err := json.Marshal(individualResult.Result)
+		if err != nil {
+			log.Error(err)
+		}
+
+		if individualResult.Error != "" {
+			requestError = errors.New(individualResult.Error)
+		}
+
+		result :=  response{
+			result: fullResult,
+			err:    requestError,
+		}
+		request.responseChan <- &result
+	}
+	c.batchList = list.New()
 }

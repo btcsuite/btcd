@@ -5,9 +5,9 @@
 package main
 
 import (
-	"log"
-
+	"fmt"
 	"github.com/btcsuite/btcd/rpcclient"
+	"log"
 )
 
 func main() {
@@ -29,9 +29,20 @@ func main() {
 	defer client.Shutdown()
 
 	// Get the current block count.
-	blockCount, err := client.Batch().GetBlockCount()
-	if err != nil {
-		log.Fatal(err)
-	}
-	log.Printf("Block count: %d", blockCount)
+	batchClient := client.Batch()
+
+	// batch mode requires async requests
+	blockCount := batchClient.GetBlockCountAsync()
+	block1 := batchClient.GetBlockHashAsync(1)
+	batchClient.GetBlockHashAsync(2)
+	batchClient.GetBlockHashAsync(3)
+	block4  := batchClient.GetBlockHashAsync(4)
+	difficulty := batchClient.GetDifficultyAsync()
+
+	batchClient.Send()
+	//result, err
+	fmt.Println(blockCount.Receive())
+	fmt.Println(block1.Receive())
+	fmt.Println(block4.Receive())
+	fmt.Println(difficulty.Receive())
 }
