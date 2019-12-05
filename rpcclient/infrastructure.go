@@ -1476,10 +1476,10 @@ func (c *Client) BackendVersion() (BackendVersion, error) {
 }
 
 // make batch requests
-func (c *Client) Batch() Client {
+func (c *Client) Batch() *Client {
 	c.batch = true //copy the client with changed batch setting
 	c.start()
-	return *c
+	return c
 }
 
 func (c *Client) sendAsync() FutureGetBulkResult {
