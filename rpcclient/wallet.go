@@ -87,8 +87,8 @@ func (c *Client) GetTransactionWatchOnly(txHash *chainhash.Hash, watchOnly bool)
 }
 
 // FutureListTransactionsResult is a future promise to deliver the result of a
-// ListTransactionsAsync, ListTransactionsCountAsync, or
-// ListTransactionsCountFromAsync RPC invocation (or an applicable error).
+// ListTransactionsAsync, ListTransactionsCountAsync, ListTransactionsCountFromAsync or
+// ListTransactionsCountFromWatchAsync RPC invocation (or an applicable error).
 type FutureListTransactionsResult chan *response
 
 // Receive waits for the response promised by the future and returns a list of
@@ -162,6 +162,25 @@ func (c *Client) ListTransactionsCountFromAsync(account string, count, from int)
 // See the ListTransactions and ListTransactionsCount functions to use defaults.
 func (c *Client) ListTransactionsCountFrom(account string, count, from int) ([]btcjson.ListTransactionsResult, error) {
 	return c.ListTransactionsCountFromAsync(account, count, from).Receive()
+}
+
+// ListTransactionsCountFromWatchAsync returns an instance of a type that can be used
+// to get the result of the RPC at some future time by invoking the Receive
+// function on the returned instance.
+//
+// See ListTransactionsCountFromWatch for the blocking version and more details.
+func (c *Client) ListTransactionsCountFromWatchAsync(account string, count, from int, watch bool) FutureListTransactionsResult {
+	cmd := btcjson.NewListTransactionsCmd(&account, &count, &from, &watch)
+	return c.sendCmd(cmd)
+}
+
+// ListTransactionsCountFrom returns a list of the most recent transactions up
+// to the passed count while skipping the first 'from' transactions, and allow to
+// include watch-only addresses using the 'watch' boolean argument.
+//
+// See the ListTransactions and ListTransactionsCount functions to use defaults.
+func (c *Client) ListTransactionsCountFromWatch(account string, count, from int, watch bool) ([]btcjson.ListTransactionsResult, error) {
+	return c.ListTransactionsCountFromWatchAsync(account, count, from, watch).Receive()
 }
 
 // FutureListUnspentResult is a future promise to deliver the result of a
