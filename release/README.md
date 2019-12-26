@@ -17,7 +17,7 @@ release binaries. However, on Windows, the only way to build the release
 binaries at the moment is by using the Windows Subsystem Linux. One can build
 the release binaries following these steps:
 
-1. `git clone https://github.com/btcsuite/btcd.git
+1. `git clone https://github.com/btcsuite/btcd.git`
 2. `cd btcd`
 3. `./build/release/release.sh <TAG> # <TAG> is the name of the next
    release/tag`
