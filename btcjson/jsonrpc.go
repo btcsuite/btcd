@@ -96,23 +96,21 @@ func (request *Request) UnmarshalJSON(b []byte) error {
 	if !hasParams {
 		// set the request param to an empty array if it is ommited in the request
 		request.Params = []json.RawMessage{}
-	}
-	if hasParams {
 		// assert the request params is an array of data
-		params, paramsOk := paramsValue.([]interface{})
-		if paramsOk {
-			rawParams := make([]json.RawMessage, 0, len(params))
-			for _, param := range params {
-				marshalledParam, err := json.Marshal(param)
-				if err != nil {
-					return err
-				}
-				rawMessage := json.RawMessage(marshalledParam)
-				rawParams = append(rawParams, rawMessage)
+	} else if params, paramsOk := paramsValue.([]interface{}); paramsOk {
+		rawParams := make([]json.RawMessage, 0, len(params))
+		for _, param := range params {
+			marshalledParam, err := json.Marshal(param)
+			if err != nil {
+				return err
 			}
-
-			request.Params = rawParams
+			rawMessage := json.RawMessage(marshalledParam)
+			rawParams = append(rawParams, rawMessage)
 		}
+
+		request.Params = rawParams
+	} else {
+		return Error{Description: "No response received"}
 	}
 
 	return nil
@@ -129,7 +127,8 @@ func (request *Request) UnmarshalJSON(b []byte) error {
 func NewRequest(rpcVersion string, id interface{}, method string, params []interface{}) (*Request, error) {
 	// default to JSON-RPC 1.0 if RPC type is not specified
 	if rpcVersion != "2.0" && rpcVersion != "1.0" {
-		rpcVersion = "1.0"
+		str := fmt.Sprintf("rpcversion '%s' is invalid", rpcVersion)
+		return nil, makeError(ErrInvalidType, str)
 	}
 
 	if !IsValidIDType(id) {
@@ -173,7 +172,8 @@ type Response struct {
 // response to send over the wire with the MarshalResponse function.
 func NewResponse(rpcVersion string, id interface{}, marshalledResult []byte, rpcErr *RPCError) (*Response, error) {
 	if rpcVersion != "2.0" && rpcVersion != "1.0" {
-		rpcVersion = "1.0"
+		str := fmt.Sprintf("rpcversion '%s' is invalid", rpcVersion)
+		return nil, makeError(ErrInvalidType, str)
 	}
 
 	if !IsValidIDType(id) {
@@ -195,7 +195,8 @@ func NewResponse(rpcVersion string, id interface{}, marshalledResult []byte, rpc
 // JSON-RPC client.
 func MarshalResponse(rpcVersion string, id interface{}, result interface{}, rpcErr *RPCError) ([]byte, error) {
 	if rpcVersion != "2.0" && rpcVersion != "1.0" {
-		rpcVersion = "1.0"
+		str := fmt.Sprintf("rpcversion '%s' is invalid", rpcVersion)
+		return nil, makeError(ErrInvalidType, str)
 	}
 
 	marshalledResult, err := json.Marshal(result)

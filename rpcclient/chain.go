@@ -18,8 +18,7 @@ import (
 // GetBestBlockAsync RPC invocation (or an applicable error).
 type FutureGetBestBlockHashResult chan *response
 
-// Receive waits for the response promised by the future and returns the hash of
-// the best block in the longest block chain.
+// Receive waits for the response promised by the future and returns error if present
 func (r FutureGetBestBlockHashResult) Receive() (*chainhash.Hash, error) {
 	res, err := receiveFuture(r)
 	if err != nil {
