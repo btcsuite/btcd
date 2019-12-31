@@ -997,6 +997,9 @@ type BulkResult = map[uint64]IndividualBulkResult
 func (r FutureGetBulkResult) Receive() (BulkResult, error) {
 	m := make(BulkResult)
 	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
 	var arr []IndividualBulkResult
 	err = json.Unmarshal(res, &arr)
 	if err != nil {

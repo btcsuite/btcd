@@ -1356,7 +1356,7 @@ out:
 			if req.Method == "" || req.Params == nil {
 				jsonErr := &btcjson.RPCError{
 					Code:    btcjson.ErrRPCInvalidRequest.Code,
-					Message: fmt.Sprintf("Invalid request: malformed"),
+					Message: "Invalid request: malformed",
 				}
 				reply, err := createMarshalledReply(req.Jsonrpc, req.ID, nil, jsonErr)
 				if err != nil {
@@ -1587,7 +1587,7 @@ out:
 						if req.Method == "" || req.Params == nil {
 							jsonErr := &btcjson.RPCError{
 								Code:    btcjson.ErrRPCInvalidRequest.Code,
-								Message: fmt.Sprintf("Invalid request: malformed"),
+								Message: "Invalid request: malformed",
 							}
 							reply, err := createMarshalledReply(req.Jsonrpc, req.ID, nil, jsonErr)
 							if err != nil {

@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2017 The btcsuite developers
+// Copyright (c) 2014-2019 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -23,10 +23,11 @@ func main() {
 	// Notice the notification parameter is nil since notifications are
 	// not supported in HTTP POST mode.
 	client, err := rpcclient.New(connCfg, nil)
+	defer client.Shutdown()
+
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer client.Shutdown()
 
 	// Get the current block count.
 	batchClient := client.Batch()
@@ -39,8 +40,9 @@ func main() {
 	block4 := batchClient.GetBlockHashAsync(4)
 	difficulty := batchClient.GetDifficultyAsync()
 
+	// sends all queued batch requests
 	batchClient.Send()
-	//result, err
+
 	fmt.Println(blockCount.Receive())
 	fmt.Println(block1.Receive())
 	fmt.Println(block4.Receive())

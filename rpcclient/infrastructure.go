@@ -1475,7 +1475,7 @@ func (c *Client) BackendVersion() (BackendVersion, error) {
 	return *c.backendVersion, nil
 }
 
-// make batch requests
+// Batch makes batch requests
 func (c *Client) Batch() *Client {
 	c.batch = true //copy the client with changed batch setting
 	c.start()
@@ -1506,12 +1506,12 @@ func (c *Client) sendAsync() FutureGetBulkResult {
 	return responseChan
 }
 
-// send batch requests
-func (c *Client) Send() {
+// Send sends batch requests
+func (c *Client) Send() error {
 	result, err := c.sendAsync().Receive()
 
 	if err != nil {
-		log.Error(err)
+		return err
 	}
 
 	for iter := c.batchList.Front(); iter != nil; iter = iter.Next() {
@@ -1520,7 +1520,7 @@ func (c *Client) Send() {
 		individualResult := result[request.id]
 		fullResult, err := json.Marshal(individualResult.Result)
 		if err != nil {
-			log.Error(err)
+			return err
 		}
 
 		if individualResult.Error != "" {
@@ -1534,4 +1534,5 @@ func (c *Client) Send() {
 		request.responseChan <- &result
 	}
 	c.batchList = list.New()
+	return nil
 }
