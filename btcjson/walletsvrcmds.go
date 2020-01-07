@@ -590,6 +590,7 @@ type RawTxInput struct {
 	Vout         uint32 `json:"vout"`
 	ScriptPubKey string `json:"scriptPubKey"`
 	RedeemScript string `json:"redeemScript"`
+	Amount	     float64 `json:"amount"`
 }
 
 // SignRawTransactionCmd defines the signrawtransaction JSON-RPC command.
