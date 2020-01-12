@@ -586,7 +586,7 @@ func (vm *Engine) checkPubKeyEncoding(pubKey []byte) error {
 	if vm.hasFlag(ScriptVerifyWitnessPubKeyType) &&
 		vm.isWitnessVersionActive(0) && !btcec.IsCompressedPubKey(pubKey) {
 
-		str := "only uncompressed keys are accepted post-segwit"
+		str := "only compressed keys are accepted post-segwit"
 		return scriptError(ErrWitnessPubKeyType, str)
 	}
 
