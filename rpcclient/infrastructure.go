@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcd/btcjson"
+	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/go-socks/socks"
 	"github.com/btcsuite/websocket"
 )
@@ -178,6 +179,10 @@ type Client struct {
 	disconnect      chan struct{}
 	shutdown        chan struct{}
 	wg              sync.WaitGroup
+}
+
+func (c *Client) DefaultNet() *chaincfg.Params {
+	return c.config.DefaultNet
 }
 
 // NextID returns the next id to be used when sending a JSON-RPC message.  This
@@ -1139,6 +1144,7 @@ type ConnConfig struct {
 	// EnableBCInfoHacks is an option provided to enable compatibility hacks
 	// when connecting to blockchain.info RPC server
 	EnableBCInfoHacks bool
+	DefaultNet        *chaincfg.Params
 }
 
 // newHTTPClient returns a new http client that is configured according to the
