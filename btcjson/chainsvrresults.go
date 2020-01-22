@@ -206,23 +206,35 @@ type GetBlockTemplateResult struct {
 	RejectReasion string   `json:"reject-reason,omitempty"`
 }
 
+// GetMempoolEntryResult models the data returned from the getmempoolentry's
+// fee field
+
+type MempoolFees struct {
+	Base       float64 `json:"base"`
+	Modified   float64 `json:"base"`
+	Ancestor   float64 `json:"ancestor"`
+	Descendant float64 `json:"descendant"`
+}
+
 // GetMempoolEntryResult models the data returned from the getmempoolentry
 // command.
 type GetMempoolEntryResult struct {
-	Size             int32    `json:"size"`
-	Fee              float64  `json:"fee"`
-	ModifiedFee      float64  `json:"modifiedfee"`
-	Time             int64    `json:"time"`
-	Height           int64    `json:"height"`
-	StartingPriority float64  `json:"startingpriority"`
-	CurrentPriority  float64  `json:"currentpriority"`
-	DescendantCount  int64    `json:"descendantcount"`
-	DescendantSize   int64    `json:"descendantsize"`
-	DescendantFees   float64  `json:"descendantfees"`
-	AncestorCount    int64    `json:"ancestorcount"`
-	AncestorSize     int64    `json:"ancestorsize"`
-	AncestorFees     float64  `json:"ancestorfees"`
-	Depends          []string `json:"depends"`
+	VSize           int32       `json:"vsize"`
+	Size            int32       `json:"size"`
+	Weight          int64       `json:"weight"`
+	Fee             float64     `json:"fee"`
+	ModifiedFee     float64     `json:"modifiedfee"`
+	Time            int64       `json:"time"`
+	Height          int64       `json:"height"`
+	DescendantCount int64       `json:"descendantcount"`
+	DescendantSize  int64       `json:"descendantsize"`
+	DescendantFees  float64     `json:"descendantfees"`
+	AncestorCount   int64       `json:"ancestorcount"`
+	AncestorSize    int64       `json:"ancestorsize"`
+	AncestorFees    float64     `json:"ancestorfees"`
+	WTxId           string      `json:"wtxid"`
+	Fees            MempoolFees `json:"fees"`
+	Depends         []string    `json:"depends"`
 }
 
 // GetMempoolInfoResult models the data returned from the getmempoolinfo
