@@ -222,8 +222,8 @@ type GetMempoolEntryResult struct {
 	VSize           int32       `json:"vsize"`
 	Size            int32       `json:"size"`
 	Weight          int64       `json:"weight"`
-	Fee             float64     `json:"fee"`
-	ModifiedFee     float64     `json:"modifiedfee"`
+	Fee             int64       `json:"fee"`         //satoshis
+	ModifiedFee     int64       `json:"modifiedfee"` //satoshis
 	Time            int64       `json:"time"`
 	Height          int64       `json:"height"`
 	DescendantCount int64       `json:"descendantcount"`

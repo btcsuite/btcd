@@ -813,13 +813,27 @@ func (mp *TxPool) fetchInputUtxos(tx *btcutil.Tx) (*blockchain.UtxoViewpoint, er
 //
 // This function is safe for concurrent access.
 func (mp *TxPool) FetchTransaction(txHash *chainhash.Hash) (*btcutil.Tx, error) {
+	txDesc, err := mp.FetchFullTransaction(txHash)
+	if err != nil {
+		return nil, err
+	}
+	return txDesc.Tx, nil
+}
+
+
+// FetchFullTransaction returns the requested transaction from the transaction pool.
+// This only fetches from the main transaction pool and does not include
+// orphans.
+//
+// This function is safe for concurrent access.
+func (mp *TxPool) FetchFullTransaction(txHash *chainhash.Hash) (*TxDesc, error) {
 	// Protect concurrent access.
 	mp.mtx.RLock()
 	txDesc, exists := mp.pool[*txHash]
 	mp.mtx.RUnlock()
 
 	if exists {
-		return txDesc.Tx, nil
+		return txDesc, nil
 	}
 
 	return nil, fmt.Errorf("transaction is not in the pool")

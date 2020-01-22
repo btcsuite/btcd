@@ -154,6 +154,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"getinfo":               handleGetInfo,
 	"getmempoolinfo":        handleGetMempoolInfo,
 	"getmininginfo":         handleGetMiningInfo,
+	"getmempoolentry":       handleGetMempoolEntry,
 	"getnettotals":          handleGetNetTotals,
 	"getnetworkhashps":      handleGetNetworkHashPS,
 	"getpeerinfo":           handleGetPeerInfo,
@@ -227,7 +228,6 @@ var rpcAskWallet = map[string]struct{}{
 var rpcUnimplemented = map[string]struct{}{
 	"estimatepriority": {},
 	"getchaintips":     {},
-	"getmempoolentry":  {},
 	"getnetworkinfo":   {},
 	"getwork":          {},
 	"invalidateblock":  {},
@@ -2323,6 +2323,54 @@ func handleGetInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (in
 // handleGetMempoolInfo implements the getmempoolinfo command.
 func handleGetMempoolInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	mempoolTxns := s.cfg.TxMemPool.TxDescs()
+
+	var numBytes int64
+	for _, txD := range mempoolTxns {
+		numBytes += int64(txD.Tx.MsgTx().SerializeSize())
+	}
+
+	ret := &btcjson.GetMempoolInfoResult{
+		Size:  int64(len(mempoolTxns)),
+		Bytes: numBytes,
+	}
+
+	return ret, nil
+}
+
+func handleGetMempoolEntry(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	c := cmd.(*btcjson.GetMempoolEntryCmd)
+	rawMempoolTx, err := chainhash.NewHashFromStr(c.TxID)
+	if err != nil {
+		return nil, err
+	}
+
+	mempoolTx, err := s.cfg.TxMemPool.FetchFullTransaction(rawMempoolTx)
+	if err != nil {
+		return nil, err
+	}
+
+	return &btcjson.GetMempoolEntryResult{
+		VSize:           int32(mempoolTx.TxDesc.Tx.MsgTx().SerializeSize()),
+		Size:            int32(mempoolTx.TxDesc.Tx.MsgTx().SerializeSize()),
+		Weight:          blockchain.GetTransactionWeight(mempoolTx.Tx),
+		Fee:             mempoolTx.Fee,
+		ModifiedFee:     0, // TODO
+		Time:            0,
+		Height:          0,
+		DescendantCount: 0,
+		DescendantSize:  0,
+		DescendantFees:  0,
+		AncestorCount:   0,
+		AncestorSize:    0,
+		AncestorFees:    0,
+		WTxId:           "",
+		Fees:            btcjson.MempoolFees{},
+		Depends:         nil, // TODO scan mempool
+	}, nil
+
+	if err != nil {
+		return nil, err
+	}
 
 	var numBytes int64
 	for _, txD := range mempoolTxns {
