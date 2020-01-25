@@ -152,6 +152,114 @@ func BenchmarkReadVarInt9(b *testing.B) {
 	}
 }
 
+// BenchmarkWriteVarIntBuf1 performs a benchmark on how long it takes to write
+// a single byte variable length integer.
+func BenchmarkWriteVarIntBuf1(b *testing.B) {
+	b.ReportAllocs()
+
+	buffer := binarySerializer.Borrow()
+	for i := 0; i < b.N; i++ {
+		WriteVarIntBuf(ioutil.Discard, 0, 1, buffer)
+	}
+	binarySerializer.Return(buffer)
+}
+
+// BenchmarkWriteVarIntBuf3 performs a benchmark on how long it takes to write
+// a three byte variable length integer.
+func BenchmarkWriteVarIntBuf3(b *testing.B) {
+	b.ReportAllocs()
+
+	buffer := binarySerializer.Borrow()
+	for i := 0; i < b.N; i++ {
+		WriteVarIntBuf(ioutil.Discard, 0, 65535, buffer)
+	}
+	binarySerializer.Return(buffer)
+}
+
+// BenchmarkWriteVarIntBuf5 performs a benchmark on how long it takes to write
+// a five byte variable length integer.
+func BenchmarkWriteVarIntBuf5(b *testing.B) {
+	b.ReportAllocs()
+
+	buffer := binarySerializer.Borrow()
+	for i := 0; i < b.N; i++ {
+		WriteVarIntBuf(ioutil.Discard, 0, 4294967295, buffer)
+	}
+	binarySerializer.Return(buffer)
+}
+
+// BenchmarkWriteVarIntBuf9 performs a benchmark on how long it takes to write
+// a nine byte variable length integer.
+func BenchmarkWriteVarIntBuf9(b *testing.B) {
+	b.ReportAllocs()
+
+	buffer := binarySerializer.Borrow()
+	for i := 0; i < b.N; i++ {
+		WriteVarIntBuf(ioutil.Discard, 0, 18446744073709551615, buffer)
+	}
+	binarySerializer.Return(buffer)
+}
+
+// BenchmarkReadVarIntBuf1 performs a benchmark on how long it takes to read
+// a single byte variable length integer.
+func BenchmarkReadVarIntBuf1(b *testing.B) {
+	b.ReportAllocs()
+
+	buffer := binarySerializer.Borrow()
+	buf := []byte{0x01}
+	r := bytes.NewReader(buf)
+	for i := 0; i < b.N; i++ {
+		r.Seek(0, 0)
+		ReadVarIntBuf(r, 0, buffer)
+	}
+	binarySerializer.Return(buffer)
+}
+
+// BenchmarkReadVarIntBuf3 performs a benchmark on how long it takes to read
+// a three byte variable length integer.
+func BenchmarkReadVarIntBuf3(b *testing.B) {
+	b.ReportAllocs()
+
+	buffer := binarySerializer.Borrow()
+	buf := []byte{0x0fd, 0xff, 0xff}
+	r := bytes.NewReader(buf)
+	for i := 0; i < b.N; i++ {
+		r.Seek(0, 0)
+		ReadVarIntBuf(r, 0, buffer)
+	}
+	binarySerializer.Return(buffer)
+}
+
+// BenchmarkReadVarIntBuf5 performs a benchmark on how long it takes to read
+// a five byte variable length integer.
+func BenchmarkReadVarIntBuf5(b *testing.B) {
+	b.ReportAllocs()
+
+	buffer := binarySerializer.Borrow()
+	buf := []byte{0xfe, 0xff, 0xff, 0xff, 0xff}
+	r := bytes.NewReader(buf)
+	for i := 0; i < b.N; i++ {
+		r.Seek(0, 0)
+		ReadVarIntBuf(r, 0, buffer)
+	}
+	binarySerializer.Return(buffer)
+}
+
+// BenchmarkReadVarIntBuf9 performs a benchmark on how long it takes to read
+// a nine byte variable length integer.
+func BenchmarkReadVarIntBuf9(b *testing.B) {
+	b.ReportAllocs()
+
+	buffer := binarySerializer.Borrow()
+	buf := []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff}
+	r := bytes.NewReader(buf)
+	for i := 0; i < b.N; i++ {
+		r.Seek(0, 0)
+		ReadVarIntBuf(r, 0, buffer)
+	}
+	binarySerializer.Return(buffer)
+}
+
 // BenchmarkReadVarStr4 performs a benchmark on how long it takes to read a
 // four byte variable length string.
 func BenchmarkReadVarStr4(b *testing.B) {

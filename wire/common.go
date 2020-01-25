@@ -475,8 +475,17 @@ func writeElements(w io.Writer, elements ...interface{}) error {
 // ReadVarInt reads a variable length integer from r and returns it as a uint64.
 func ReadVarInt(r io.Reader, pver uint32) (uint64, error) {
 	buf := binarySerializer.Borrow()
+	n, err := ReadVarIntBuf(r, pver, buf)
+	binarySerializer.Return(buf)
+	return n, err
+}
+
+// ReadVarIntBuf reads a variable length integer from r using a preallocated
+// scratch buffer and returns it as a uint64.
+//
+// NOTE: buf MUST at least an 8-byte slice.
+func ReadVarIntBuf(r io.Reader, pver uint32, buf []byte) (uint64, error) {
 	if _, err := io.ReadFull(r, buf[:1]); err != nil {
-		binarySerializer.Return(buf)
 		return 0, err
 	}
 	discriminant := buf[0]
@@ -485,11 +494,9 @@ func ReadVarInt(r io.Reader, pver uint32) (uint64, error) {
 	switch discriminant {
 	case 0xff:
 		if _, err := io.ReadFull(r, buf); err != nil {
-			binarySerializer.Return(buf)
 			return 0, err
 		}
 		rv = littleEndian.Uint64(buf)
-		binarySerializer.Return(buf)
 
 		// The encoding is not canonical if the value could have been
 		// encoded using fewer bytes.
@@ -501,11 +508,9 @@ func ReadVarInt(r io.Reader, pver uint32) (uint64, error) {
 
 	case 0xfe:
 		if _, err := io.ReadFull(r, buf[:4]); err != nil {
-			binarySerializer.Return(buf)
 			return 0, err
 		}
 		rv = uint64(littleEndian.Uint32(buf[:4]))
-		binarySerializer.Return(buf)
 
 		// The encoding is not canonical if the value could have been
 		// encoded using fewer bytes.
@@ -517,11 +522,9 @@ func ReadVarInt(r io.Reader, pver uint32) (uint64, error) {
 
 	case 0xfd:
 		if _, err := io.ReadFull(r, buf[:2]); err != nil {
-			binarySerializer.Return(buf)
 			return 0, err
 		}
 		rv = uint64(littleEndian.Uint16(buf[:2]))
-		binarySerializer.Return(buf)
 
 		// The encoding is not canonical if the value could have been
 		// encoded using fewer bytes.
@@ -533,7 +536,6 @@ func ReadVarInt(r io.Reader, pver uint32) (uint64, error) {
 
 	default:
 		rv = uint64(discriminant)
-		binarySerializer.Return(buf)
 	}
 
 	return rv, nil
@@ -543,37 +545,42 @@ func ReadVarInt(r io.Reader, pver uint32) (uint64, error) {
 // on its value.
 func WriteVarInt(w io.Writer, pver uint32, val uint64) error {
 	buf := binarySerializer.Borrow()
+	err := WriteVarIntBuf(w, pver, val, buf)
+	binarySerializer.Return(buf)
+	return err
+}
+
+// WriteVarIntBuf serializes val to w using a variable number of bytes depending
+// on its value using a preallocated scratch buffer.
+//
+// NOTE: buf MUST at least an 8-byte slice.
+func WriteVarIntBuf(w io.Writer, pver uint32, val uint64, buf []byte) error {
 	switch {
 	case val < 0xfd:
 		buf[0] = uint8(val)
 		_, err := w.Write(buf[:1])
-		binarySerializer.Return(buf)
 		return err
 
 	case val <= math.MaxUint16:
 		buf[0] = 0xfd
 		littleEndian.PutUint16(buf[1:3], uint16(val))
 		_, err := w.Write(buf[:3])
-		binarySerializer.Return(buf)
 		return err
 
 	case val <= math.MaxUint32:
 		buf[0] = 0xfe
 		littleEndian.PutUint32(buf[1:5], uint32(val))
 		_, err := w.Write(buf[:5])
-		binarySerializer.Return(buf)
 		return err
 
 	default:
 		buf[0] = 0xff
 		if _, err := w.Write(buf[:1]); err != nil {
-			binarySerializer.Return(buf)
 			return err
 		}
 
 		littleEndian.PutUint64(buf, val)
 		_, err := w.Write(buf)
-		binarySerializer.Return(buf)
 		return err
 	}
 }
