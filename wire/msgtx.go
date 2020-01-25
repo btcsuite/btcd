@@ -558,7 +558,7 @@ func (msg *MsgTx) btcDecode(r io.Reader, pver uint32, enc MessageEncoding,
 		// and needs to be returned to the pool on error.
 		to := &txOuts[i]
 		msg.TxOut[i] = to
-		err = readTxOut(r, pver, msg.Version, to)
+		err = readTxOutBuf(r, pver, msg.Version, to, buf)
 		if err != nil {
 			returnScriptBuffers()
 			return err
