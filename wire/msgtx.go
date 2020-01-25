@@ -623,8 +623,9 @@ func (msg *MsgTx) btcDecode(r io.Reader, pver uint32, enc MessageEncoding,
 			// item itself.
 			txin.Witness = make([][]byte, witCount)
 			for j := uint64(0); j < witCount; j++ {
-				txin.Witness[j], err = readScript(
-					r, pver, maxWitnessItemSize, "script witness item",
+				txin.Witness[j], err = readScriptBuf(
+					r, pver, buf, maxWitnessItemSize,
+					"script witness item",
 				)
 				if err != nil {
 					returnScriptBuffers()
