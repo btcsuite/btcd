@@ -453,6 +453,19 @@ func BenchmarkWriteTxIn(b *testing.B) {
 	}
 }
 
+// BenchmarkWriteTxInBuf performs a benchmark on how long it takes to write
+// a transaction input.
+func BenchmarkWriteTxInBuf(b *testing.B) {
+	b.ReportAllocs()
+
+	buf := binarySerializer.Borrow()
+	txIn := blockOne.Transactions[0].TxIn[0]
+	for i := 0; i < b.N; i++ {
+		writeTxInBuf(ioutil.Discard, 0, 0, txIn, buf)
+	}
+	binarySerializer.Return(buf)
+}
+
 // BenchmarkDeserializeTx performs a benchmark on how long it takes to
 // deserialize a small transaction.
 func BenchmarkDeserializeTxSmall(b *testing.B) {
