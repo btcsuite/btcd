@@ -74,17 +74,6 @@ func NewInvVect(typ InvType, hash *chainhash.Hash) *InvVect {
 	}
 }
 
-// readInvVect reads an encoded InvVect from r depending on the protocol
-// version.
-//
-// DEPRECATED: Use readInvVectBuf instead.
-func readInvVect(r io.Reader, pver uint32, iv *InvVect) error {
-	buf := binarySerializer.Borrow()
-	err := readInvVectBuf(r, pver, iv, buf)
-	binarySerializer.Return(buf)
-	return err
-}
-
 // readInvVectBuf reads an encoded InvVect from r depending on the protocol
 // version.
 //
@@ -100,16 +89,6 @@ func readInvVectBuf(r io.Reader, pver uint32, iv *InvVect, buf []byte) error {
 	iv.Type = InvType(littleEndian.Uint32(buf[:4]))
 
 	_, err := io.ReadFull(r, iv.Hash[:])
-	return err
-}
-
-// writeInvVect serializes an InvVect to w depending on the protocol version.
-//
-// DEPRECATED: Use writeInvVectBuf instead.
-func writeInvVect(w io.Writer, pver uint32, iv *InvVect) error {
-	buf := binarySerializer.Borrow()
-	err := writeInvVectBuf(w, pver, iv, buf)
-	binarySerializer.Return(buf)
 	return err
 }
 
