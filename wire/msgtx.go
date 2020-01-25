@@ -969,16 +969,6 @@ func NewMsgTx(version int32) *MsgTx {
 	}
 }
 
-// readOutPoint reads the next sequence of bytes from r as an OutPoint.
-//
-// DEPRECATED: Use readOutPointBuf instead.
-func readOutPoint(r io.Reader, pver uint32, version int32, op *OutPoint) error {
-	buf := binarySerializer.Borrow()
-	err := readOutPointBuf(r, pver, version, op, buf)
-	binarySerializer.Return(buf)
-	return err
-}
-
 // readOutPointBuf reads the next sequence of bytes from r as an OutPoint.
 //
 // If b is non-nil, the provided buffer will be used for serializing small
