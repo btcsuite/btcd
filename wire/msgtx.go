@@ -94,7 +94,7 @@ const (
 	// scripts per transaction being simultaneously deserialized by 125
 	// peers.  Thus, the peak usage of the free list is 12,500 * 512 =
 	// 6,400,000 bytes.
-	freeListMaxItems = 12500
+	freeListMaxItems = 125
 
 	// maxWitnessItemsPerInput is the maximum number of witness items to
 	// be read for the witness data for a single TxIn. This number is
@@ -147,6 +147,10 @@ const (
 	WitnessFlag TxFlag = 0x01
 )
 
+const scriptSlabSize = 1 << 22
+
+type scriptSlab [scriptSlabSize]byte
+
 // scriptFreeList defines a free list of byte slices (up to the maximum number
 // defined by the freeListMaxItems constant) that have a cap according to the
 // freeListMaxScriptSize constant.  It is used to provide temporary buffers for
@@ -155,7 +159,7 @@ const (
 //
 // The caller can obtain a buffer from the free list by calling the Borrow
 // function and should return it via the Return function when done using it.
-type scriptFreeList chan []byte
+type scriptFreeList chan *scriptSlab
 
 // Borrow returns a byte slice from the free list with a length according the
 // provided size.  A new buffer is allocated if there are any items available.
@@ -164,18 +168,14 @@ type scriptFreeList chan []byte
 // a new buffer of the appropriate size is allocated and returned.  It is safe
 // to attempt to return said buffer via the Return function as it will be
 // ignored and allowed to go the garbage collector.
-func (c scriptFreeList) Borrow(size uint64) []byte {
-	if size > freeListMaxScriptSize {
-		return make([]byte, size)
-	}
-
-	var buf []byte
+func (c scriptFreeList) Borrow() *scriptSlab {
+	var buf *scriptSlab
 	select {
 	case buf = <-c:
 	default:
-		buf = make([]byte, freeListMaxScriptSize)
+		buf = new(scriptSlab)
 	}
-	return buf[:size]
+	return buf
 }
 
 // Return puts the provided byte slice back on the free list when it has a cap
@@ -183,13 +183,7 @@ func (c scriptFreeList) Borrow(size uint64) []byte {
 // the Borrow function.  Any slices that are not of the appropriate size, such
 // as those whose size is greater than the largest allowed free list item size
 // are simply ignored so they can go to the garbage collector.
-func (c scriptFreeList) Return(buf []byte) {
-	// Ignore any buffers returned that aren't the expected size for the
-	// free list.
-	if cap(buf) != freeListMaxScriptSize {
-		return
-	}
-
+func (c scriptFreeList) Return(buf *scriptSlab) {
 	// Return the buffer to the free list when it's not full.  Otherwise let
 	// it be garbage collected.
 	select {
@@ -202,7 +196,7 @@ func (c scriptFreeList) Return(buf []byte) {
 // Create the concurrent safe free list to use for script deserialization.  As
 // previously described, this free list is maintained to significantly reduce
 // the number of allocations.
-var scriptPool scriptFreeList = make(chan []byte, freeListMaxItems)
+var scriptPool = make(scriptFreeList, freeListMaxItems)
 
 // OutPoint defines a bitcoin data type that is used to track previous
 // transaction outputs.
@@ -515,34 +509,8 @@ func (msg *MsgTx) btcDecode(r io.Reader, pver uint32, enc MessageEncoding,
 		return messageError("MsgTx.BtcDecode", str)
 	}
 
-	// returnScriptBuffers is a closure that returns any script buffers that
-	// were borrowed from the pool when there are any deserialization
-	// errors.  This is only valid to call before the final step which
-	// replaces the scripts with the location in a contiguous buffer and
-	// returns them.
-	returnScriptBuffers := func() {
-		for _, txIn := range msg.TxIn {
-			if txIn == nil {
-				continue
-			}
-
-			if txIn.SignatureScript != nil {
-				scriptPool.Return(txIn.SignatureScript)
-			}
-
-			for _, witnessElem := range txIn.Witness {
-				if witnessElem != nil {
-					scriptPool.Return(witnessElem)
-				}
-			}
-		}
-		for _, txOut := range msg.TxOut {
-			if txOut == nil || txOut.PkScript == nil {
-				continue
-			}
-			scriptPool.Return(txOut.PkScript)
-		}
-	}
+	scriptBuf := scriptPool.Borrow()
+	sbuf := scriptBuf[:]
 
 	// Deserialize the inputs.
 	var totalScriptSize uint64
@@ -553,17 +521,18 @@ func (msg *MsgTx) btcDecode(r io.Reader, pver uint32, enc MessageEncoding,
 		// and needs to be returned to the pool on error.
 		ti := &txIns[i]
 		msg.TxIn[i] = ti
-		err = readTxInBuf(r, pver, msg.Version, ti, buf)
+		err = readTxInBuf(r, pver, msg.Version, ti, buf, sbuf)
 		if err != nil {
-			returnScriptBuffers()
+			scriptPool.Return(scriptBuf)
 			return err
 		}
 		totalScriptSize += uint64(len(ti.SignatureScript))
+		sbuf = sbuf[len(ti.SignatureScript):]
 	}
 
 	count, err = ReadVarIntBuf(r, pver, buf)
 	if err != nil {
-		returnScriptBuffers()
+		scriptPool.Return(scriptBuf)
 		return err
 	}
 
@@ -571,7 +540,7 @@ func (msg *MsgTx) btcDecode(r io.Reader, pver uint32, enc MessageEncoding,
 	// message.  It would be possible to cause memory exhaustion and panics
 	// without a sane upper bound on this count.
 	if count > uint64(maxTxOutPerMessage) {
-		returnScriptBuffers()
+		scriptPool.Return(scriptBuf)
 		str := fmt.Sprintf("too many output transactions to fit into "+
 			"max message size [count %d, max %d]", count,
 			maxTxOutPerMessage)
@@ -586,13 +555,13 @@ func (msg *MsgTx) btcDecode(r io.Reader, pver uint32, enc MessageEncoding,
 		// and needs to be returned to the pool on error.
 		to := &txOuts[i]
 		msg.TxOut[i] = to
-
-		err = readTxOutBuf(r, pver, msg.Version, to, buf)
+		err = readTxOutBuf(r, pver, msg.Version, to, buf, sbuf)
 		if err != nil {
-			returnScriptBuffers()
+			scriptPool.Return(scriptBuf)
 			return err
 		}
 		totalScriptSize += uint64(len(to.PkScript))
+		sbuf = sbuf[len(to.PkScript):]
 	}
 
 	// If the transaction's flag byte isn't 0x00 at this point, then one or
@@ -604,14 +573,14 @@ func (msg *MsgTx) btcDecode(r io.Reader, pver uint32, enc MessageEncoding,
 			// varint which encodes the number of stack items.
 			witCount, err := ReadVarIntBuf(r, pver, buf)
 			if err != nil {
-				returnScriptBuffers()
+				scriptPool.Return(scriptBuf)
 				return err
 			}
 
 			// Prevent a possible memory exhaustion attack by
 			// limiting the witCount value to a sane upper bound.
 			if witCount > maxWitnessItemsPerInput {
-				returnScriptBuffers()
+				scriptPool.Return(scriptBuf)
 				str := fmt.Sprintf("too many witness items to fit "+
 					"into max message size [count %d, max %d]",
 					witCount, maxWitnessItemsPerInput)
@@ -624,20 +593,21 @@ func (msg *MsgTx) btcDecode(r io.Reader, pver uint32, enc MessageEncoding,
 			txin.Witness = make([][]byte, witCount)
 			for j := uint64(0); j < witCount; j++ {
 				txin.Witness[j], err = readScriptBuf(
-					r, pver, buf, maxWitnessItemSize,
+					r, pver, buf, sbuf, maxWitnessItemSize,
 					"script witness item",
 				)
 				if err != nil {
-					returnScriptBuffers()
+					scriptPool.Return(scriptBuf)
 					return err
 				}
 				totalScriptSize += uint64(len(txin.Witness[j]))
+				sbuf = sbuf[len(txin.Witness[j]):]
 			}
 		}
 	}
 
 	if _, err := io.ReadFull(r, buf[:4]); err != nil {
-		returnScriptBuffers()
+		scriptPool.Return(scriptBuf)
 		return err
 	}
 	msg.LockTime = littleEndian.Uint32(buf[:4])
@@ -671,9 +641,6 @@ func (msg *MsgTx) btcDecode(r io.Reader, pver uint32, enc MessageEncoding,
 		msg.TxIn[i].SignatureScript = scripts[offset:end:end]
 		offset += scriptSize
 
-		// Return the temporary script buffer to the pool.
-		scriptPool.Return(signatureScript)
-
 		for j := 0; j < len(msg.TxIn[i].Witness); j++ {
 			// Copy each item within the witness stack for this
 			// input into the contiguous buffer at the appropriate
@@ -687,10 +654,6 @@ func (msg *MsgTx) btcDecode(r io.Reader, pver uint32, enc MessageEncoding,
 			end := offset + witnessElemSize
 			msg.TxIn[i].Witness[j] = scripts[offset:end:end]
 			offset += witnessElemSize
-
-			// Return the temporary buffer used for the witness stack
-			// item to the pool.
-			scriptPool.Return(witnessElem)
 		}
 	}
 	for i := 0; i < len(msg.TxOut); i++ {
@@ -705,10 +668,9 @@ func (msg *MsgTx) btcDecode(r io.Reader, pver uint32, enc MessageEncoding,
 		end := offset + scriptSize
 		msg.TxOut[i].PkScript = scripts[offset:end:end]
 		offset += scriptSize
-
-		// Return the temporary script buffer to the pool.
-		scriptPool.Return(pkScript)
 	}
+
+	scriptPool.Return(scriptBuf)
 
 	return nil
 }
@@ -1035,7 +997,9 @@ func writeOutPointBuf(w io.Writer, pver uint32, version int32, op *OutPoint,
 // and return when the method finishes.
 //
 // NOTE: b MUST either be nil or at least an 8-byte slice.
-func readScriptBuf(r io.Reader, pver uint32, buf []byte, maxAllowed uint32, fieldName string) ([]byte, error) {
+func readScriptBuf(r io.Reader, pver uint32, buf, s []byte, maxAllowed uint32,
+	fieldName string) ([]byte, error) {
+
 	count, err := ReadVarIntBuf(r, pver, buf)
 	if err != nil {
 		return nil, err
@@ -1050,13 +1014,11 @@ func readScriptBuf(r io.Reader, pver uint32, buf []byte, maxAllowed uint32, fiel
 		return nil, messageError("readScript", str)
 	}
 
-	b := scriptPool.Borrow(count)
-	_, err = io.ReadFull(r, b)
+	_, err = io.ReadFull(r, s[:count])
 	if err != nil {
-		scriptPool.Return(b)
 		return nil, err
 	}
-	return b, nil
+	return s[:count], nil
 }
 
 // readTxInBuf reads the next sequence of bytes from r as a transaction input
@@ -1068,14 +1030,14 @@ func readScriptBuf(r io.Reader, pver uint32, buf []byte, maxAllowed uint32, fiel
 //
 // NOTE: b MUST either be nil or at least an 8-byte slice.
 func readTxInBuf(r io.Reader, pver uint32, version int32, ti *TxIn,
-	buf []byte) error {
+	buf, s []byte) error {
 
 	err := readOutPointBuf(r, pver, version, &ti.PreviousOutPoint, buf)
 	if err != nil {
 		return err
 	}
 
-	ti.SignatureScript, err = readScriptBuf(r, pver, buf, MaxMessagePayload,
+	ti.SignatureScript, err = readScriptBuf(r, pver, buf, s, MaxMessagePayload,
 		"transaction input signature script")
 	if err != nil {
 		return err
@@ -1116,8 +1078,10 @@ func writeTxInBuf(w io.Writer, pver uint32, version int32, ti *TxIn,
 // ReadTxOut reads the next sequence of bytes from r as a transaction output
 // (TxOut).
 func ReadTxOut(r io.Reader, pver uint32, version int32, to *TxOut) error {
+	var s scriptSlab
+
 	buf := binarySerializer.Borrow()
-	err := readTxOutBuf(r, pver, version, to, buf)
+	err := readTxOutBuf(r, pver, version, to, buf, s[:])
 	binarySerializer.Return(buf)
 	return err
 }
@@ -1127,7 +1091,7 @@ func ReadTxOut(r io.Reader, pver uint32, version int32, to *TxOut) error {
 // small values. Otherwise a buffer will be drawn from the binarySerializer's
 // pool and return when the method finishes.
 func readTxOutBuf(r io.Reader, pver uint32, version int32, to *TxOut,
-	buf []byte) error {
+	buf, s []byte) error {
 
 	_, err := io.ReadFull(r, buf)
 	if err != nil {
@@ -1135,8 +1099,10 @@ func readTxOutBuf(r io.Reader, pver uint32, version int32, to *TxOut,
 	}
 	to.Value = int64(littleEndian.Uint64(buf))
 
-	to.PkScript, err = readScriptBuf(r, pver, buf, MaxMessagePayload,
-		"transaction output public key script")
+	to.PkScript, err = readScriptBuf(
+		r, pver, buf, s, MaxMessagePayload,
+		"transaction output public key script",
+	)
 	return err
 }
 

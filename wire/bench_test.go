@@ -437,7 +437,6 @@ func BenchmarkReadTxOut(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		r.Seek(0, 0)
 		ReadTxOut(r, 0, 0, &txOut)
-		scriptPool.Return(txOut.PkScript)
 	}
 }
 
@@ -446,6 +445,8 @@ func BenchmarkReadTxOut(b *testing.B) {
 func BenchmarkReadTxOutBuf(b *testing.B) {
 	b.ReportAllocs()
 
+	scriptBuffer := scriptPool.Borrow()
+	sbuf := scriptBuffer[:]
 	buffer := binarySerializer.Borrow()
 	buf := []byte{
 		0x00, 0xf2, 0x05, 0x2a, 0x01, 0x00, 0x00, 0x00, // Transaction amount
@@ -466,10 +467,10 @@ func BenchmarkReadTxOutBuf(b *testing.B) {
 	var txOut TxOut
 	for i := 0; i < b.N; i++ {
 		r.Seek(0, 0)
-		readTxOutBuf(r, 0, 0, &txOut, buffer)
-		scriptPool.Return(txOut.PkScript)
+		readTxOutBuf(r, 0, 0, &txOut, buffer, sbuf)
 	}
 	binarySerializer.Return(buffer)
+	scriptPool.Return(scriptBuffer)
 }
 
 // BenchmarkWriteTxOut performs a benchmark on how long it takes to write
@@ -501,6 +502,8 @@ func BenchmarkWriteTxOutBuf(b *testing.B) {
 func BenchmarkReadTxIn(b *testing.B) {
 	b.ReportAllocs()
 
+	scriptBuffer := scriptPool.Borrow()
+	sbuf := scriptBuffer[:]
 	buffer := binarySerializer.Borrow()
 	buf := []byte{
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -516,10 +519,10 @@ func BenchmarkReadTxIn(b *testing.B) {
 	var txIn TxIn
 	for i := 0; i < b.N; i++ {
 		r.Seek(0, 0)
-		readTxInBuf(r, 0, 0, &txIn, buffer)
-		scriptPool.Return(txIn.SignatureScript)
+		readTxInBuf(r, 0, 0, &txIn, buffer, sbuf)
 	}
 	binarySerializer.Return(buffer)
+	scriptPool.Return(scriptBuffer)
 }
 
 // BenchmarkWriteTxIn performs a benchmark on how long it takes to write
