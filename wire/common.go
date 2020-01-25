@@ -659,7 +659,25 @@ func WriteVarString(w io.Writer, pver uint32, str string) error {
 func ReadVarBytes(r io.Reader, pver uint32, maxAllowed uint32,
 	fieldName string) ([]byte, error) {
 
-	count, err := ReadVarInt(r, pver)
+	buf := binarySerializer.Borrow()
+	b, err := ReadVarBytesBuf(r, pver, buf, maxAllowed, fieldName)
+	binarySerializer.Return(buf)
+	return b, err
+}
+
+// ReadVarBytesBuf reads a variable length byte array.  A byte array is encoded
+// as a varInt containing the length of the array followed by the bytes
+// themselves.  An error is returned if the length is greater than the
+// passed maxAllowed parameter which helps protect against memory exhaustion
+// attacks and forced panics through malformed messages.  The fieldName
+// parameter is only used for the error message so it provides more context in
+// the error. If b is non-nil, the provided buffer will be used for serializing
+// small values. Otherwise a buffer will be drawn from the binarySerializer's
+// pool and return when the method finishes.
+func ReadVarBytesBuf(r io.Reader, pver uint32, buf []byte, maxAllowed uint32,
+	fieldName string) ([]byte, error) {
+
+	count, err := ReadVarIntBuf(r, pver, buf)
 	if err != nil {
 		return nil, err
 	}
@@ -673,19 +691,32 @@ func ReadVarBytes(r io.Reader, pver uint32, maxAllowed uint32,
 		return nil, messageError("ReadVarBytes", str)
 	}
 
-	b := make([]byte, count)
-	_, err = io.ReadFull(r, b)
+	bytes := make([]byte, count)
+	_, err = io.ReadFull(r, bytes)
 	if err != nil {
 		return nil, err
 	}
-	return b, nil
+	return bytes, nil
 }
 
 // WriteVarBytes serializes a variable length byte array to w as a varInt
 // containing the number of bytes, followed by the bytes themselves.
 func WriteVarBytes(w io.Writer, pver uint32, bytes []byte) error {
+	buf := binarySerializer.Borrow()
+	err := WriteVarBytesBuf(w, pver, bytes, buf)
+	binarySerializer.Return(buf)
+	return err
+}
+
+// WriteVarBytesBuf serializes a variable length byte array to w as a varInt
+// containing the number of bytes, followed by the bytes themselves. If b is
+// non-nil, the provided buffer will be used for serializing small values.
+// Otherwise a buffer will be drawn from the binarySerializer's pool and return
+// when the method finishes.
+func WriteVarBytesBuf(w io.Writer, pver uint32, bytes, buf []byte) error {
 	slen := uint64(len(bytes))
-	err := WriteVarInt(w, pver, slen)
+
+	err := WriteVarIntBuf(w, pver, slen, buf)
 	if err != nil {
 		return err
 	}
