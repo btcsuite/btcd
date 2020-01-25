@@ -772,7 +772,7 @@ func (msg *MsgTx) btcEncode(w io.Writer, pver uint32, enc MessageEncoding,
 	// within the transaction.
 	if doWitness {
 		for _, ti := range msg.TxIn {
-			err = writeTxWitness(w, pver, msg.Version, ti.Witness)
+			err = writeTxWitnessBuf(w, pver, msg.Version, ti.Witness, buf)
 			if err != nil {
 				return err
 			}
