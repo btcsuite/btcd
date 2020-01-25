@@ -1217,17 +1217,6 @@ func WriteTxOutBuf(w io.Writer, pver uint32, version int32, to *TxOut,
 	return WriteVarBytesBuf(w, pver, to.PkScript, buf)
 }
 
-// writeTxWitness encodes the bitcoin protocol encoding for a transaction
-// input's witness into to w.
-//
-// DEPRECATED: Use writeTxWitnessBuf instead.
-func writeTxWitness(w io.Writer, pver uint32, version int32, wit [][]byte) error {
-	buf := binarySerializer.Borrow()
-	err := writeTxWitnessBuf(w, pver, version, wit, buf)
-	binarySerializer.Return(buf)
-	return err
-}
-
 // writeTxWitnessBuf encodes the bitcoin protocol encoding for a transaction
 // input's witness into to w. If b is non-nil, the provided buffer will be used
 // for serializing small values. Otherwise a buffer will be drawn from the
