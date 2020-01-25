@@ -433,13 +433,22 @@ func (msg *MsgTx) Copy() *MsgTx {
 // See Deserialize for decoding transactions stored to disk, such as in a
 // database, as opposed to decoding transactions from the wire.
 func (msg *MsgTx) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) error {
+	buf := binarySerializer.Borrow()
+	err := msg.btcDecode(r, pver, enc, buf)
+	binarySerializer.Return(buf)
+	return err
+}
+
+func (msg *MsgTx) btcDecode(r io.Reader, pver uint32, enc MessageEncoding,
+	buf []byte) error {
+
 	version, err := binarySerializer.Uint32(r, littleEndian)
 	if err != nil {
 		return err
 	}
 	msg.Version = int32(version)
 
-	count, err := ReadVarInt(r, pver)
+	count, err := ReadVarIntBuf(r, pver, buf)
 	if err != nil {
 		return err
 	}
@@ -463,7 +472,7 @@ func (msg *MsgTx) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) error
 
 		// With the Segregated Witness specific fields decoded, we can
 		// now read in the actual txin count.
-		count, err = ReadVarInt(r, pver)
+		count, err = ReadVarIntBuf(r, pver, buf)
 		if err != nil {
 			return err
 		}
@@ -525,7 +534,7 @@ func (msg *MsgTx) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) error
 		totalScriptSize += uint64(len(ti.SignatureScript))
 	}
 
-	count, err = ReadVarInt(r, pver)
+	count, err = ReadVarIntBuf(r, pver, buf)
 	if err != nil {
 		returnScriptBuffers()
 		return err
@@ -565,7 +574,7 @@ func (msg *MsgTx) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) error
 			// For each input, the witness is encoded as a stack
 			// with one or more items. Therefore, we first read a
 			// varint which encodes the number of stack items.
-			witCount, err := ReadVarInt(r, pver)
+			witCount, err := ReadVarIntBuf(r, pver, buf)
 			if err != nil {
 				returnScriptBuffers()
 				return err
@@ -704,6 +713,15 @@ func (msg *MsgTx) DeserializeNoWitness(r io.Reader) error {
 // See Serialize for encoding transactions to be stored to disk, such as in a
 // database, as opposed to encoding transactions for the wire.
 func (msg *MsgTx) BtcEncode(w io.Writer, pver uint32, enc MessageEncoding) error {
+	buf := binarySerializer.Borrow()
+	err := msg.btcEncode(w, pver, enc, buf)
+	binarySerializer.Return(buf)
+	return err
+}
+
+func (msg *MsgTx) btcEncode(w io.Writer, pver uint32, enc MessageEncoding,
+	buf []byte) error {
+
 	err := binarySerializer.PutUint32(w, littleEndian, uint32(msg.Version))
 	if err != nil {
 		return err
@@ -725,7 +743,7 @@ func (msg *MsgTx) BtcEncode(w io.Writer, pver uint32, enc MessageEncoding) error
 	}
 
 	count := uint64(len(msg.TxIn))
-	err = WriteVarInt(w, pver, count)
+	err = WriteVarIntBuf(w, pver, count, buf)
 	if err != nil {
 		return err
 	}
@@ -738,7 +756,7 @@ func (msg *MsgTx) BtcEncode(w io.Writer, pver uint32, enc MessageEncoding) error
 	}
 
 	count = uint64(len(msg.TxOut))
-	err = WriteVarInt(w, pver, count)
+	err = WriteVarIntBuf(w, pver, count, buf)
 	if err != nil {
 		return err
 	}
@@ -762,7 +780,8 @@ func (msg *MsgTx) BtcEncode(w io.Writer, pver uint32, enc MessageEncoding) error
 		}
 	}
 
-	return binarySerializer.PutUint32(w, littleEndian, msg.LockTime)
+	err = binarySerializer.PutUint32(w, littleEndian, msg.LockTime)
+	return err
 }
 
 // HasWitness returns false if none of the inputs within the transaction
