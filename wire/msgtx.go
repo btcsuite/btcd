@@ -761,7 +761,7 @@ func (msg *MsgTx) btcEncode(w io.Writer, pver uint32, enc MessageEncoding,
 	}
 
 	for _, to := range msg.TxOut {
-		err = WriteTxOut(w, pver, msg.Version, to)
+		err = WriteTxOutBuf(w, pver, msg.Version, to, buf)
 		if err != nil {
 			return err
 		}
