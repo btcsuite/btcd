@@ -63,6 +63,8 @@ var genesisCoinbaseTx = MsgTx{
 // BenchmarkWriteVarInt1 performs a benchmark on how long it takes to write
 // a single byte variable length integer.
 func BenchmarkWriteVarInt1(b *testing.B) {
+	b.ReportAllocs()
+
 	for i := 0; i < b.N; i++ {
 		WriteVarInt(ioutil.Discard, 0, 1)
 	}
@@ -71,6 +73,8 @@ func BenchmarkWriteVarInt1(b *testing.B) {
 // BenchmarkWriteVarInt3 performs a benchmark on how long it takes to write
 // a three byte variable length integer.
 func BenchmarkWriteVarInt3(b *testing.B) {
+	b.ReportAllocs()
+
 	for i := 0; i < b.N; i++ {
 		WriteVarInt(ioutil.Discard, 0, 65535)
 	}
@@ -79,6 +83,8 @@ func BenchmarkWriteVarInt3(b *testing.B) {
 // BenchmarkWriteVarInt5 performs a benchmark on how long it takes to write
 // a five byte variable length integer.
 func BenchmarkWriteVarInt5(b *testing.B) {
+	b.ReportAllocs()
+
 	for i := 0; i < b.N; i++ {
 		WriteVarInt(ioutil.Discard, 0, 4294967295)
 	}
@@ -87,6 +93,8 @@ func BenchmarkWriteVarInt5(b *testing.B) {
 // BenchmarkWriteVarInt9 performs a benchmark on how long it takes to write
 // a nine byte variable length integer.
 func BenchmarkWriteVarInt9(b *testing.B) {
+	b.ReportAllocs()
+
 	for i := 0; i < b.N; i++ {
 		WriteVarInt(ioutil.Discard, 0, 18446744073709551615)
 	}
@@ -95,6 +103,8 @@ func BenchmarkWriteVarInt9(b *testing.B) {
 // BenchmarkReadVarInt1 performs a benchmark on how long it takes to read
 // a single byte variable length integer.
 func BenchmarkReadVarInt1(b *testing.B) {
+	b.ReportAllocs()
+
 	buf := []byte{0x01}
 	r := bytes.NewReader(buf)
 	for i := 0; i < b.N; i++ {
@@ -106,6 +116,8 @@ func BenchmarkReadVarInt1(b *testing.B) {
 // BenchmarkReadVarInt3 performs a benchmark on how long it takes to read
 // a three byte variable length integer.
 func BenchmarkReadVarInt3(b *testing.B) {
+	b.ReportAllocs()
+
 	buf := []byte{0x0fd, 0xff, 0xff}
 	r := bytes.NewReader(buf)
 	for i := 0; i < b.N; i++ {
@@ -117,6 +129,8 @@ func BenchmarkReadVarInt3(b *testing.B) {
 // BenchmarkReadVarInt5 performs a benchmark on how long it takes to read
 // a five byte variable length integer.
 func BenchmarkReadVarInt5(b *testing.B) {
+	b.ReportAllocs()
+
 	buf := []byte{0xfe, 0xff, 0xff, 0xff, 0xff}
 	r := bytes.NewReader(buf)
 	for i := 0; i < b.N; i++ {
@@ -128,6 +142,8 @@ func BenchmarkReadVarInt5(b *testing.B) {
 // BenchmarkReadVarInt9 performs a benchmark on how long it takes to read
 // a nine byte variable length integer.
 func BenchmarkReadVarInt9(b *testing.B) {
+	b.ReportAllocs()
+
 	buf := []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff}
 	r := bytes.NewReader(buf)
 	for i := 0; i < b.N; i++ {
@@ -139,6 +155,8 @@ func BenchmarkReadVarInt9(b *testing.B) {
 // BenchmarkReadVarStr4 performs a benchmark on how long it takes to read a
 // four byte variable length string.
 func BenchmarkReadVarStr4(b *testing.B) {
+	b.ReportAllocs()
+
 	buf := []byte{0x04, 't', 'e', 's', 't'}
 	r := bytes.NewReader(buf)
 	for i := 0; i < b.N; i++ {
@@ -150,6 +168,8 @@ func BenchmarkReadVarStr4(b *testing.B) {
 // BenchmarkReadVarStr10 performs a benchmark on how long it takes to read a
 // ten byte variable length string.
 func BenchmarkReadVarStr10(b *testing.B) {
+	b.ReportAllocs()
+
 	buf := []byte{0x0a, 't', 'e', 's', 't', '0', '1', '2', '3', '4', '5'}
 	r := bytes.NewReader(buf)
 	for i := 0; i < b.N; i++ {
@@ -161,6 +181,8 @@ func BenchmarkReadVarStr10(b *testing.B) {
 // BenchmarkWriteVarStr4 performs a benchmark on how long it takes to write a
 // four byte variable length string.
 func BenchmarkWriteVarStr4(b *testing.B) {
+	b.ReportAllocs()
+
 	for i := 0; i < b.N; i++ {
 		WriteVarString(ioutil.Discard, 0, "test")
 	}
@@ -169,6 +191,8 @@ func BenchmarkWriteVarStr4(b *testing.B) {
 // BenchmarkWriteVarStr10 performs a benchmark on how long it takes to write a
 // ten byte variable length string.
 func BenchmarkWriteVarStr10(b *testing.B) {
+	b.ReportAllocs()
+
 	for i := 0; i < b.N; i++ {
 		WriteVarString(ioutil.Discard, 0, "test012345")
 	}
@@ -177,6 +201,8 @@ func BenchmarkWriteVarStr10(b *testing.B) {
 // BenchmarkReadOutPoint performs a benchmark on how long it takes to read a
 // transaction output point.
 func BenchmarkReadOutPoint(b *testing.B) {
+	b.ReportAllocs()
+
 	buf := []byte{
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -195,6 +221,8 @@ func BenchmarkReadOutPoint(b *testing.B) {
 // BenchmarkWriteOutPoint performs a benchmark on how long it takes to write a
 // transaction output point.
 func BenchmarkWriteOutPoint(b *testing.B) {
+	b.ReportAllocs()
+
 	op := &OutPoint{
 		Hash:  chainhash.Hash{},
 		Index: 0,
@@ -207,6 +235,8 @@ func BenchmarkWriteOutPoint(b *testing.B) {
 // BenchmarkReadTxOut performs a benchmark on how long it takes to read a
 // transaction output.
 func BenchmarkReadTxOut(b *testing.B) {
+	b.ReportAllocs()
+
 	buf := []byte{
 		0x00, 0xf2, 0x05, 0x2a, 0x01, 0x00, 0x00, 0x00, // Transaction amount
 		0x43, // Varint for length of pk script
@@ -234,6 +264,8 @@ func BenchmarkReadTxOut(b *testing.B) {
 // BenchmarkWriteTxOut performs a benchmark on how long it takes to write
 // a transaction output.
 func BenchmarkWriteTxOut(b *testing.B) {
+	b.ReportAllocs()
+
 	txOut := blockOne.Transactions[0].TxOut[0]
 	for i := 0; i < b.N; i++ {
 		WriteTxOut(ioutil.Discard, 0, 0, txOut)
@@ -243,6 +275,8 @@ func BenchmarkWriteTxOut(b *testing.B) {
 // BenchmarkReadTxIn performs a benchmark on how long it takes to read a
 // transaction input.
 func BenchmarkReadTxIn(b *testing.B) {
+	b.ReportAllocs()
+
 	buf := []byte{
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -265,6 +299,8 @@ func BenchmarkReadTxIn(b *testing.B) {
 // BenchmarkWriteTxIn performs a benchmark on how long it takes to write
 // a transaction input.
 func BenchmarkWriteTxIn(b *testing.B) {
+	b.ReportAllocs()
+
 	txIn := blockOne.Transactions[0].TxIn[0]
 	for i := 0; i < b.N; i++ {
 		writeTxIn(ioutil.Discard, 0, 0, txIn)
@@ -302,6 +338,9 @@ func BenchmarkDeserializeTxSmall(b *testing.B) {
 		0x00, 0x00, 0x00, 0x00, // Lock time
 	}
 
+	b.ReportAllocs()
+	b.ResetTimer()
+
 	r := bytes.NewReader(buf)
 	var tx MsgTx
 	for i := 0; i < b.N; i++ {
@@ -313,6 +352,7 @@ func BenchmarkDeserializeTxSmall(b *testing.B) {
 // BenchmarkDeserializeTxLarge performs a benchmark on how long it takes to
 // deserialize a very large transaction.
 func BenchmarkDeserializeTxLarge(b *testing.B) {
+
 	// tx bb41a757f405890fb0f5856228e23b715702d714d59bf2b1feb70d8b2b4e3e08
 	// from the main block chain.
 	fi, err := os.Open("testdata/megatx.bin.bz2")
@@ -325,6 +365,9 @@ func BenchmarkDeserializeTxLarge(b *testing.B) {
 		b.Fatalf("Failed to read transaction data: %v", err)
 	}
 
+	b.ReportAllocs()
+	b.ResetTimer()
+
 	r := bytes.NewReader(buf)
 	var tx MsgTx
 	for i := 0; i < b.N; i++ {
@@ -336,6 +379,8 @@ func BenchmarkDeserializeTxLarge(b *testing.B) {
 // BenchmarkSerializeTx performs a benchmark on how long it takes to serialize
 // a transaction.
 func BenchmarkSerializeTx(b *testing.B) {
+	b.ReportAllocs()
+
 	tx := blockOne.Transactions[0]
 	for i := 0; i < b.N; i++ {
 		tx.Serialize(ioutil.Discard)
@@ -343,9 +388,79 @@ func BenchmarkSerializeTx(b *testing.B) {
 	}
 }
 
+// BenchmarkSerializeTxSmall performs a benchmark on how long it takes to
+// serialize a transaction.
+func BenchmarkSerializeTxSmall(b *testing.B) {
+	buf := []byte{
+		0x01, 0x00, 0x00, 0x00, // Version
+		0x01, // Varint for number of input transactions
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, //  // Previous output hash
+		0xff, 0xff, 0xff, 0xff, // Prevous output index
+		0x07,                                     // Varint for length of signature script
+		0x04, 0xff, 0xff, 0x00, 0x1d, 0x01, 0x04, // Signature script
+		0xff, 0xff, 0xff, 0xff, // Sequence
+		0x01,                                           // Varint for number of output transactions
+		0x00, 0xf2, 0x05, 0x2a, 0x01, 0x00, 0x00, 0x00, // Transaction amount
+		0x43, // Varint for length of pk script
+		0x41, // OP_DATA_65
+		0x04, 0x96, 0xb5, 0x38, 0xe8, 0x53, 0x51, 0x9c,
+		0x72, 0x6a, 0x2c, 0x91, 0xe6, 0x1e, 0xc1, 0x16,
+		0x00, 0xae, 0x13, 0x90, 0x81, 0x3a, 0x62, 0x7c,
+		0x66, 0xfb, 0x8b, 0xe7, 0x94, 0x7b, 0xe6, 0x3c,
+		0x52, 0xda, 0x75, 0x89, 0x37, 0x95, 0x15, 0xd4,
+		0xe0, 0xa6, 0x04, 0xf8, 0x14, 0x17, 0x81, 0xe6,
+		0x22, 0x94, 0x72, 0x11, 0x66, 0xbf, 0x62, 0x1e,
+		0x73, 0xa8, 0x2c, 0xbf, 0x23, 0x42, 0xc8, 0x58,
+		0xee,                   // 65-byte signature
+		0xac,                   // OP_CHECKSIG
+		0x00, 0x00, 0x00, 0x00, // Lock time
+	}
+
+	var tx MsgTx
+	tx.Deserialize(bytes.NewReader(buf))
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		tx.Serialize(ioutil.Discard)
+	}
+}
+
+// BenchmarkSerializeTxLarge performs a benchmark on how long it takes to
+// serialize a transaction.
+func BenchmarkSerializeTxLarge(b *testing.B) {
+	// tx bb41a757f405890fb0f5856228e23b715702d714d59bf2b1feb70d8b2b4e3e08
+	// from the main block chain.
+	fi, err := os.Open("testdata/megatx.bin.bz2")
+	if err != nil {
+		b.Fatalf("Failed to read transaction data: %v", err)
+	}
+	defer fi.Close()
+	buf, err := ioutil.ReadAll(bzip2.NewReader(fi))
+	if err != nil {
+		b.Fatalf("Failed to read transaction data: %v", err)
+	}
+
+	var tx MsgTx
+	tx.Deserialize(bytes.NewReader(buf))
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		tx.Serialize(ioutil.Discard)
+	}
+}
+
 // BenchmarkReadBlockHeader performs a benchmark on how long it takes to
 // deserialize a block header.
 func BenchmarkReadBlockHeader(b *testing.B) {
+	b.ReportAllocs()
+
 	buf := []byte{
 		0x01, 0x00, 0x00, 0x00, // Version 1
 		0x6f, 0xe2, 0x8c, 0x0a, 0xb6, 0xf1, 0xb3, 0x72,
@@ -372,6 +487,8 @@ func BenchmarkReadBlockHeader(b *testing.B) {
 // BenchmarkWriteBlockHeader performs a benchmark on how long it takes to
 // serialize a block header.
 func BenchmarkWriteBlockHeader(b *testing.B) {
+	b.ReportAllocs()
+
 	header := blockOne.Header
 	for i := 0; i < b.N; i++ {
 		writeBlockHeader(ioutil.Discard, 0, &header)
@@ -381,6 +498,8 @@ func BenchmarkWriteBlockHeader(b *testing.B) {
 // BenchmarkDecodeGetHeaders performs a benchmark on how long it takes to
 // decode a getheaders message with the maximum number of block locator hashes.
 func BenchmarkDecodeGetHeaders(b *testing.B) {
+	b.ReportAllocs()
+
 	// Create a message with the maximum number of block locators.
 	pver := ProtocolVersion
 	var m MsgGetHeaders
@@ -411,6 +530,8 @@ func BenchmarkDecodeGetHeaders(b *testing.B) {
 // BenchmarkDecodeHeaders performs a benchmark on how long it takes to
 // decode a headers message with the maximum number of headers.
 func BenchmarkDecodeHeaders(b *testing.B) {
+	b.ReportAllocs()
+
 	// Create a message with the maximum number of headers.
 	pver := ProtocolVersion
 	var m MsgHeaders
@@ -441,6 +562,8 @@ func BenchmarkDecodeHeaders(b *testing.B) {
 // BenchmarkDecodeGetBlocks performs a benchmark on how long it takes to
 // decode a getblocks message with the maximum number of block locator hashes.
 func BenchmarkDecodeGetBlocks(b *testing.B) {
+	b.ReportAllocs()
+
 	// Create a message with the maximum number of block locators.
 	pver := ProtocolVersion
 	var m MsgGetBlocks
@@ -471,6 +594,8 @@ func BenchmarkDecodeGetBlocks(b *testing.B) {
 // BenchmarkDecodeAddr performs a benchmark on how long it takes to decode an
 // addr message with the maximum number of addresses.
 func BenchmarkDecodeAddr(b *testing.B) {
+	b.ReportAllocs()
+
 	// Create a message with the maximum number of addresses.
 	pver := ProtocolVersion
 	ip := net.ParseIP("127.0.0.1")
@@ -516,6 +641,9 @@ func BenchmarkDecodeInv(b *testing.B) {
 	}
 	buf := bb.Bytes()
 
+	b.ReportAllocs()
+	b.ResetTimer()
+
 	r := bytes.NewReader(buf)
 	var msg MsgInv
 	b.ResetTimer()
@@ -528,6 +656,8 @@ func BenchmarkDecodeInv(b *testing.B) {
 // BenchmarkDecodeNotFound performs a benchmark on how long it takes to decode
 // a notfound message with the maximum number of entries.
 func BenchmarkDecodeNotFound(b *testing.B) {
+	b.ReportAllocs()
+
 	// Create a message with the maximum number of entries.
 	pver := ProtocolVersion
 	var m MsgNotFound
@@ -558,6 +688,8 @@ func BenchmarkDecodeNotFound(b *testing.B) {
 // BenchmarkDecodeMerkleBlock performs a benchmark on how long it takes to
 // decode a reasonably sized merkleblock message.
 func BenchmarkDecodeMerkleBlock(b *testing.B) {
+	b.ReportAllocs()
+
 	// Create a message with random data.
 	pver := ProtocolVersion
 	var m MsgMerkleBlock
@@ -596,6 +728,8 @@ func BenchmarkDecodeMerkleBlock(b *testing.B) {
 // BenchmarkTxHash performs a benchmark on how long it takes to hash a
 // transaction.
 func BenchmarkTxHash(b *testing.B) {
+	b.ReportAllocs()
+
 	for i := 0; i < b.N; i++ {
 		genesisCoinbaseTx.TxHash()
 	}
@@ -604,6 +738,8 @@ func BenchmarkTxHash(b *testing.B) {
 // BenchmarkDoubleHashB performs a benchmark on how long it takes to perform a
 // double hash returning a byte slice.
 func BenchmarkDoubleHashB(b *testing.B) {
+	b.ReportAllocs()
+
 	var buf bytes.Buffer
 	if err := genesisCoinbaseTx.Serialize(&buf); err != nil {
 		b.Errorf("Serialize: unexpected error: %v", err)
@@ -620,6 +756,8 @@ func BenchmarkDoubleHashB(b *testing.B) {
 // BenchmarkDoubleHashH performs a benchmark on how long it takes to perform
 // a double hash returning a chainhash.Hash.
 func BenchmarkDoubleHashH(b *testing.B) {
+	b.ReportAllocs()
+
 	var buf bytes.Buffer
 	if err := genesisCoinbaseTx.Serialize(&buf); err != nil {
 		b.Errorf("Serialize: unexpected error: %v", err)
