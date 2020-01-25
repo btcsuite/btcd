@@ -376,6 +376,59 @@ func BenchmarkDeserializeTxLarge(b *testing.B) {
 	}
 }
 
+func BenchmarkDeserializeBlock(b *testing.B) {
+	f, err := os.Open(
+		"testdata/block-00000000000000000021868c2cefc52a480d173c849412fe81c4e5ab806f94ab.blk",
+	)
+	if err != nil {
+		b.Fatalf("Failed to open block file: %v", err)
+	}
+	defer f.Close()
+
+	buf, err := ioutil.ReadAll(f)
+	if err != nil {
+		b.Fatalf("Failed to read block data: %v", err)
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	r := bytes.NewReader(buf)
+	var block MsgBlock
+	for i := 0; i < b.N; i++ {
+		r.Seek(0, 0)
+		block.Deserialize(r)
+	}
+}
+
+func BenchmarkSerializeBlock(b *testing.B) {
+	f, err := os.Open(
+		"testdata/block-00000000000000000021868c2cefc52a480d173c849412fe81c4e5ab806f94ab.blk",
+	)
+	if err != nil {
+		b.Fatalf("Failed to open block file: %v", err)
+	}
+	defer f.Close()
+
+	buf, err := ioutil.ReadAll(f)
+	if err != nil {
+		b.Fatalf("Failed to read block data: %v", err)
+	}
+
+	var block MsgBlock
+	err = block.Deserialize(bytes.NewReader(buf))
+	if err != nil {
+		panic(err.Error())
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		block.Serialize(ioutil.Discard)
+	}
+}
+
 // BenchmarkSerializeTx performs a benchmark on how long it takes to serialize
 // a transaction.
 func BenchmarkSerializeTx(b *testing.B) {
