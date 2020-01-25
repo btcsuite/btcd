@@ -49,22 +49,27 @@ func (msg *MsgMerkleBlock) BtcDecode(r io.Reader, pver uint32, enc MessageEncodi
 		return messageError("MsgMerkleBlock.BtcDecode", str)
 	}
 
-	err := readBlockHeader(r, pver, &msg.Header)
+	buf := binarySerializer.Borrow()
+	err := readBlockHeaderBuf(r, pver, &msg.Header, buf)
 	if err != nil {
+		binarySerializer.Return(buf)
 		return err
 	}
 
-	err = readElement(r, &msg.Transactions)
-	if err != nil {
+	if _, err := io.ReadFull(r, buf[:4]); err != nil {
+		binarySerializer.Return(buf)
 		return err
 	}
+	msg.Transactions = littleEndian.Uint32(buf[:4])
 
 	// Read num block locator hashes and limit to max.
-	count, err := ReadVarInt(r, pver)
+	count, err := ReadVarIntBuf(r, pver, buf)
 	if err != nil {
+		binarySerializer.Return(buf)
 		return err
 	}
 	if count > maxTxPerBlock {
+		binarySerializer.Return(buf)
 		str := fmt.Sprintf("too many transaction hashes for message "+
 			"[count %v, max %v]", count, maxTxPerBlock)
 		return messageError("MsgMerkleBlock.BtcDecode", str)
@@ -76,15 +81,17 @@ func (msg *MsgMerkleBlock) BtcDecode(r io.Reader, pver uint32, enc MessageEncodi
 	msg.Hashes = make([]*chainhash.Hash, 0, count)
 	for i := uint64(0); i < count; i++ {
 		hash := &hashes[i]
-		err := readElement(r, hash)
+		_, err := io.ReadFull(r, hash[:])
 		if err != nil {
+			binarySerializer.Return(buf)
 			return err
 		}
 		msg.AddTxHash(hash)
 	}
 
-	msg.Flags, err = ReadVarBytes(r, pver, maxFlagsPerMerkleBlock,
+	msg.Flags, err = ReadVarBytesBuf(r, pver, buf, maxFlagsPerMerkleBlock,
 		"merkle block flags size")
+	binarySerializer.Return(buf)
 	return err
 }
 
@@ -111,28 +118,36 @@ func (msg *MsgMerkleBlock) BtcEncode(w io.Writer, pver uint32, enc MessageEncodi
 		return messageError("MsgMerkleBlock.BtcDecode", str)
 	}
 
-	err := writeBlockHeader(w, pver, &msg.Header)
+	buf := binarySerializer.Borrow()
+	err := writeBlockHeaderBuf(w, pver, &msg.Header, buf)
 	if err != nil {
+		binarySerializer.Return(buf)
 		return err
 	}
 
-	err = writeElement(w, msg.Transactions)
-	if err != nil {
+	littleEndian.PutUint32(buf[:4], msg.Transactions)
+	if _, err := w.Write(buf[:4]); err != nil {
+		binarySerializer.Return(buf)
 		return err
 	}
 
-	err = WriteVarInt(w, pver, uint64(numHashes))
+	err = WriteVarIntBuf(w, pver, uint64(numHashes), buf)
 	if err != nil {
+		binarySerializer.Return(buf)
 		return err
 	}
 	for _, hash := range msg.Hashes {
-		err = writeElement(w, hash)
+		_, err := w.Write(hash[:])
 		if err != nil {
+			binarySerializer.Return(buf)
 			return err
 		}
 	}
 
-	return WriteVarBytes(w, pver, msg.Flags)
+	err = WriteVarBytesBuf(w, pver, msg.Flags, buf)
+	binarySerializer.Return(buf)
+
+	return err
 }
 
 // Command returns the protocol command string for the message.  This is part
