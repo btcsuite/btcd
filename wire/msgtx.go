@@ -428,13 +428,15 @@ func (msg *MsgTx) Copy() *MsgTx {
 // database, as opposed to decoding transactions from the wire.
 func (msg *MsgTx) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) error {
 	buf := binarySerializer.Borrow()
-	err := msg.btcDecode(r, pver, enc, buf)
+	sbuf := scriptPool.Borrow()
+	err := msg.btcDecode(r, pver, enc, buf, sbuf[:])
+	scriptPool.Return(sbuf)
 	binarySerializer.Return(buf)
 	return err
 }
 
 func (msg *MsgTx) btcDecode(r io.Reader, pver uint32, enc MessageEncoding,
-	buf []byte) error {
+	buf, sbuf []byte) error {
 
 	if _, err := io.ReadFull(r, buf[:4]); err != nil {
 		return err
@@ -481,9 +483,6 @@ func (msg *MsgTx) btcDecode(r io.Reader, pver uint32, enc MessageEncoding,
 		return messageError("MsgTx.BtcDecode", str)
 	}
 
-	scriptBuf := scriptPool.Borrow()
-	sbuf := scriptBuf[:]
-
 	// Deserialize the inputs.
 	var totalScriptSize uint64
 	txIns := make([]TxIn, count)
@@ -495,7 +494,6 @@ func (msg *MsgTx) btcDecode(r io.Reader, pver uint32, enc MessageEncoding,
 		msg.TxIn[i] = ti
 		err = readTxInBuf(r, pver, msg.Version, ti, buf, sbuf)
 		if err != nil {
-			scriptPool.Return(scriptBuf)
 			return err
 		}
 		totalScriptSize += uint64(len(ti.SignatureScript))
@@ -504,7 +502,6 @@ func (msg *MsgTx) btcDecode(r io.Reader, pver uint32, enc MessageEncoding,
 
 	count, err = ReadVarIntBuf(r, pver, buf)
 	if err != nil {
-		scriptPool.Return(scriptBuf)
 		return err
 	}
 
@@ -512,7 +509,6 @@ func (msg *MsgTx) btcDecode(r io.Reader, pver uint32, enc MessageEncoding,
 	// message.  It would be possible to cause memory exhaustion and panics
 	// without a sane upper bound on this count.
 	if count > uint64(maxTxOutPerMessage) {
-		scriptPool.Return(scriptBuf)
 		str := fmt.Sprintf("too many output transactions to fit into "+
 			"max message size [count %d, max %d]", count,
 			maxTxOutPerMessage)
@@ -529,7 +525,6 @@ func (msg *MsgTx) btcDecode(r io.Reader, pver uint32, enc MessageEncoding,
 		msg.TxOut[i] = to
 		err = readTxOutBuf(r, pver, msg.Version, to, buf, sbuf)
 		if err != nil {
-			scriptPool.Return(scriptBuf)
 			return err
 		}
 		totalScriptSize += uint64(len(to.PkScript))
@@ -545,14 +540,12 @@ func (msg *MsgTx) btcDecode(r io.Reader, pver uint32, enc MessageEncoding,
 			// varint which encodes the number of stack items.
 			witCount, err := ReadVarIntBuf(r, pver, buf)
 			if err != nil {
-				scriptPool.Return(scriptBuf)
 				return err
 			}
 
 			// Prevent a possible memory exhaustion attack by
 			// limiting the witCount value to a sane upper bound.
 			if witCount > maxWitnessItemsPerInput {
-				scriptPool.Return(scriptBuf)
 				str := fmt.Sprintf("too many witness items to fit "+
 					"into max message size [count %d, max %d]",
 					witCount, maxWitnessItemsPerInput)
@@ -567,7 +560,6 @@ func (msg *MsgTx) btcDecode(r io.Reader, pver uint32, enc MessageEncoding,
 				txin.Witness[j], err = readScriptBuf(r, pver, buf, sbuf,
 					maxWitnessItemSize, "script witness item")
 				if err != nil {
-					scriptPool.Return(scriptBuf)
 					return err
 				}
 				totalScriptSize += uint64(len(txin.Witness[j]))
@@ -577,7 +569,6 @@ func (msg *MsgTx) btcDecode(r io.Reader, pver uint32, enc MessageEncoding,
 	}
 
 	if _, err := io.ReadFull(r, buf[:4]); err != nil {
-		scriptPool.Return(scriptBuf)
 		return err
 	}
 	msg.LockTime = littleEndian.Uint32(buf[:4])
@@ -639,8 +630,6 @@ func (msg *MsgTx) btcDecode(r io.Reader, pver uint32, enc MessageEncoding,
 		msg.TxOut[i].PkScript = scripts[offset:end:end]
 		offset += scriptSize
 	}
-
-	scriptPool.Return(scriptBuf)
 
 	return nil
 }
