@@ -86,17 +86,19 @@ func (msg *MsgBlock) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) er
 		return messageError("MsgBlock.BtcDecode", str)
 	}
 
+	scriptBuf := scriptPool.Borrow()
 	msg.Transactions = make([]*MsgTx, 0, txCount)
 	for i := uint64(0); i < txCount; i++ {
 		tx := MsgTx{}
-		err := tx.btcDecode(r, pver, enc, buf)
+		err := tx.btcDecode(r, pver, enc, buf, scriptBuf[:])
 		if err != nil {
+			scriptPool.Return(scriptBuf)
 			binarySerializer.Return(buf)
 			return err
 		}
 		msg.Transactions = append(msg.Transactions, &tx)
 	}
-
+	scriptPool.Return(scriptBuf)
 	binarySerializer.Return(buf)
 
 	return nil
@@ -164,6 +166,8 @@ func (msg *MsgBlock) DeserializeTxLoc(r *bytes.Buffer) ([]TxLoc, error) {
 		return nil, messageError("MsgBlock.DeserializeTxLoc", str)
 	}
 
+	scriptBuf := scriptPool.Borrow()
+
 	// Deserialize each transaction while keeping track of its location
 	// within the byte stream.
 	msg.Transactions = make([]*MsgTx, 0, txCount)
@@ -171,15 +175,16 @@ func (msg *MsgBlock) DeserializeTxLoc(r *bytes.Buffer) ([]TxLoc, error) {
 	for i := uint64(0); i < txCount; i++ {
 		txLocs[i].TxStart = fullLen - r.Len()
 		tx := MsgTx{}
-		err := tx.btcDecode(r, 0, WitnessEncoding, buf)
+		err := tx.btcDecode(r, 0, WitnessEncoding, buf, scriptBuf[:])
 		if err != nil {
+			scriptPool.Return(scriptBuf)
 			binarySerializer.Return(buf)
 			return nil, err
 		}
 		msg.Transactions = append(msg.Transactions, &tx)
 		txLocs[i].TxLen = (fullLen - r.Len()) - txLocs[i].TxStart
 	}
-
+	scriptPool.Return(scriptBuf)
 	binarySerializer.Return(buf)
 
 	return txLocs, nil
