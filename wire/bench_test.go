@@ -418,6 +418,19 @@ func BenchmarkWriteTxOut(b *testing.B) {
 	}
 }
 
+// BenchmarkWriteTxOutBuf performs a benchmark on how long it takes to write
+// a transaction output.
+func BenchmarkWriteTxOutBuf(b *testing.B) {
+	b.ReportAllocs()
+
+	buf := binarySerializer.Borrow()
+	txOut := blockOne.Transactions[0].TxOut[0]
+	for i := 0; i < b.N; i++ {
+		WriteTxOutBuf(ioutil.Discard, 0, 0, txOut, buf)
+	}
+	binarySerializer.Return(buf)
+}
+
 // BenchmarkReadTxIn performs a benchmark on how long it takes to read a
 // transaction input.
 func BenchmarkReadTxIn(b *testing.B) {
