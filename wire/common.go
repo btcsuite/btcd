@@ -615,7 +615,26 @@ func VarIntSerializeSize(val uint64) int {
 // maximum block payload size since it helps protect against memory exhaustion
 // attacks and forced panics through malformed messages.
 func ReadVarString(r io.Reader, pver uint32) (string, error) {
-	count, err := ReadVarInt(r, pver)
+	buf := binarySerializer.Borrow()
+	str, err := readVarStringBuf(r, pver, buf)
+	binarySerializer.Return(buf)
+	return str, err
+}
+
+// readVarStringBuf reads a variable length string from r and returns it as a Go
+// string.  A variable length string is encoded as a variable length integer
+// containing the length of the string followed by the bytes that represent the
+// string itself.  An error is returned if the length is greater than the
+// maximum block payload size since it helps protect against memory exhaustion
+// attacks and forced panics through malformed messages.
+//
+// If b is non-nil, the provided buffer will be used for serializing small
+// values.  Otherwise a buffer will be drawn from the binarySerializer's pool
+// and return when the method finishes.
+//
+// NOTE: b MUST either be nil or at least an 8-byte slice.
+func readVarStringBuf(r io.Reader, pver uint32, buf []byte) (string, error) {
+	count, err := ReadVarIntBuf(r, pver, buf)
 	if err != nil {
 		return "", err
 	}
@@ -629,22 +648,39 @@ func ReadVarString(r io.Reader, pver uint32) (string, error) {
 		return "", messageError("ReadVarString", str)
 	}
 
-	buf := make([]byte, count)
-	_, err = io.ReadFull(r, buf)
+	str := make([]byte, count)
+	_, err = io.ReadFull(r, str)
 	if err != nil {
 		return "", err
 	}
-	return string(buf), nil
+	return string(str), nil
 }
 
 // WriteVarString serializes str to w as a variable length integer containing
 // the length of the string followed by the bytes that represent the string
 // itself.
 func WriteVarString(w io.Writer, pver uint32, str string) error {
-	err := WriteVarInt(w, pver, uint64(len(str)))
+	buf := binarySerializer.Borrow()
+	err := writeVarStringBuf(w, pver, str, buf)
+	binarySerializer.Return(buf)
+	return err
+}
+
+// writeVarStringBuf serializes str to w as a variable length integer containing
+// the length of the string followed by the bytes that represent the string
+// itself.
+//
+// If b is non-nil, the provided buffer will be used for serializing small
+// values.  Otherwise a buffer will be drawn from the binarySerializer's pool
+// and return when the method finishes.
+//
+// NOTE: b MUST either be nil or at least an 8-byte slice.
+func writeVarStringBuf(w io.Writer, pver uint32, str string, buf []byte) error {
+	err := WriteVarIntBuf(w, pver, uint64(len(str)), buf)
 	if err != nil {
 		return err
 	}
+
 	_, err = w.Write([]byte(str))
 	return err
 }
