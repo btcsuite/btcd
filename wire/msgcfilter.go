@@ -38,20 +38,24 @@ type MsgCFilter struct {
 // This is part of the Message interface implementation.
 func (msg *MsgCFilter) BtcDecode(r io.Reader, pver uint32, _ MessageEncoding) error {
 	// Read filter type
-	err := readElement(r, &msg.FilterType)
-	if err != nil {
+	buf := binarySerializer.Borrow()
+	if _, err := io.ReadFull(r, buf[:1]); err != nil {
+		binarySerializer.Return(buf)
 		return err
 	}
+	msg.FilterType = FilterType(buf[0])
 
 	// Read the hash of the filter's block
-	err = readElement(r, &msg.BlockHash)
-	if err != nil {
+	if _, err := io.ReadFull(r, msg.BlockHash[:]); err != nil {
+		binarySerializer.Return(buf)
 		return err
 	}
 
 	// Read filter data
-	msg.Data, err = ReadVarBytes(r, pver, MaxCFilterDataSize,
+	var err error
+	msg.Data, err = ReadVarBytesBuf(r, pver, buf, MaxCFilterDataSize,
 		"cfilter data")
+	binarySerializer.Return(buf)
 	return err
 }
 
@@ -65,17 +69,21 @@ func (msg *MsgCFilter) BtcEncode(w io.Writer, pver uint32, _ MessageEncoding) er
 		return messageError("MsgCFilter.BtcEncode", str)
 	}
 
-	err := writeElement(w, msg.FilterType)
-	if err != nil {
+	buf := binarySerializer.Borrow()
+	buf[0] = byte(msg.FilterType)
+	if _, err := w.Write(buf[:1]); err != nil {
+		binarySerializer.Return(buf)
 		return err
 	}
 
-	err = writeElement(w, msg.BlockHash)
-	if err != nil {
+	if _, err := w.Write(msg.BlockHash[:]); err != nil {
+		binarySerializer.Return(buf)
 		return err
 	}
 
-	return WriteVarBytes(w, pver, msg.Data)
+	err := WriteVarBytesBuf(w, pver, msg.Data, buf)
+	binarySerializer.Return(buf)
+	return err
 }
 
 // Deserialize decodes a filter from r into the receiver using a format that is
