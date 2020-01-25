@@ -326,6 +326,28 @@ func BenchmarkReadOutPoint(b *testing.B) {
 	}
 }
 
+// BenchmarkReadOutPointBuf performs a benchmark on how long it takes to read a
+// transaction output point.
+func BenchmarkReadOutPointBuf(b *testing.B) {
+	b.ReportAllocs()
+
+	buffer := binarySerializer.Borrow()
+	buf := []byte{
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // Previous output hash
+		0xff, 0xff, 0xff, 0xff, // Previous output index
+	}
+	r := bytes.NewReader(buf)
+	var op OutPoint
+	for i := 0; i < b.N; i++ {
+		r.Seek(0, 0)
+		readOutPointBuf(r, 0, 0, &op, buffer)
+	}
+	binarySerializer.Return(buffer)
+}
+
 // BenchmarkWriteOutPoint performs a benchmark on how long it takes to write a
 // transaction output point.
 func BenchmarkWriteOutPoint(b *testing.B) {
@@ -338,6 +360,22 @@ func BenchmarkWriteOutPoint(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		writeOutPoint(ioutil.Discard, 0, 0, op)
 	}
+}
+
+// BenchmarkWriteOutPointBuf performs a benchmark on how long it takes to write a
+// transaction output point.
+func BenchmarkWriteOutPointBuf(b *testing.B) {
+	b.ReportAllocs()
+
+	buf := binarySerializer.Borrow()
+	op := &OutPoint{
+		Hash:  chainhash.Hash{},
+		Index: 0,
+	}
+	for i := 0; i < b.N; i++ {
+		writeOutPointBuf(ioutil.Discard, 0, 0, op, buf)
+	}
+	binarySerializer.Return(buf)
 }
 
 // BenchmarkReadTxOut performs a benchmark on how long it takes to read a
