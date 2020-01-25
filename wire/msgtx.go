@@ -1098,15 +1098,6 @@ func readTxInBuf(r io.Reader, pver uint32, version int32, ti *TxIn,
 	return nil
 }
 
-// writeTxIn encodes ti to the bitcoin protocol encoding for a transaction
-// input (TxIn) to w.
-func writeTxIn(w io.Writer, pver uint32, version int32, ti *TxIn) error {
-	buf := binarySerializer.Borrow()
-	err := writeTxInBuf(w, pver, version, ti, buf)
-	binarySerializer.Return(buf)
-	return err
-}
-
 // writeTxInBuf encodes ti to the bitcoin protocol encoding for a transaction
 // input (TxIn) to w. If b is non-nil, the provided buffer will be used for
 // serializing small values. Otherwise a buffer will be drawn from the
