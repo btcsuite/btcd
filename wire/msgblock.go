@@ -137,16 +137,20 @@ func (msg *MsgBlock) DeserializeNoWitness(r io.Reader) error {
 func (msg *MsgBlock) DeserializeTxLoc(r *bytes.Buffer) ([]TxLoc, error) {
 	fullLen := r.Len()
 
+	buf := binarySerializer.Borrow()
+
 	// At the current time, there is no difference between the wire encoding
 	// at protocol version 0 and the stable long-term storage format.  As
 	// a result, make use of existing wire protocol functions.
-	err := readBlockHeader(r, 0, &msg.Header)
+	err := readBlockHeaderBuf(r, 0, &msg.Header, buf)
 	if err != nil {
+		binarySerializer.Return(buf)
 		return nil, err
 	}
 
-	txCount, err := ReadVarInt(r, 0)
+	txCount, err := ReadVarIntBuf(r, 0, buf)
 	if err != nil {
+		binarySerializer.Return(buf)
 		return nil, err
 	}
 
@@ -154,6 +158,7 @@ func (msg *MsgBlock) DeserializeTxLoc(r *bytes.Buffer) ([]TxLoc, error) {
 	// It would be possible to cause memory exhaustion and panics without
 	// a sane upper bound on this count.
 	if txCount > maxTxPerBlock {
+		binarySerializer.Return(buf)
 		str := fmt.Sprintf("too many transactions to fit into a block "+
 			"[count %d, max %d]", txCount, maxTxPerBlock)
 		return nil, messageError("MsgBlock.DeserializeTxLoc", str)
@@ -166,13 +171,16 @@ func (msg *MsgBlock) DeserializeTxLoc(r *bytes.Buffer) ([]TxLoc, error) {
 	for i := uint64(0); i < txCount; i++ {
 		txLocs[i].TxStart = fullLen - r.Len()
 		tx := MsgTx{}
-		err := tx.Deserialize(r)
+		err := tx.btcDecode(r, 0, WitnessEncoding, buf)
 		if err != nil {
+			binarySerializer.Return(buf)
 			return nil, err
 		}
 		msg.Transactions = append(msg.Transactions, &tx)
 		txLocs[i].TxLen = (fullLen - r.Len()) - txLocs[i].TxStart
 	}
+
+	binarySerializer.Return(buf)
 
 	return txLocs, nil
 }
