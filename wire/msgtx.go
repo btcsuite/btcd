@@ -1130,17 +1130,6 @@ func writeTxInBuf(w io.Writer, pver uint32, version int32, ti *TxIn,
 	return err
 }
 
-// readTxOut reads the next sequence of bytes from r as a transaction output
-// (TxOut).
-//
-// DEPRECATED: Use readTxOutBuf instead.
-func readTxOut(r io.Reader, pver uint32, version int32, to *TxOut) error {
-	buf := binarySerializer.Borrow()
-	err := readTxOutBuf(r, pver, version, to, buf)
-	binarySerializer.Return(buf)
-	return err
-}
-
 // readTxOutBuf reads the next sequence of bytes from r as a transaction output
 // (TxOut). If b is non-nil, the provided buffer will be used for serializing
 // small values. Otherwise a buffer will be drawn from the binarySerializer's
