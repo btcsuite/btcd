@@ -442,11 +442,10 @@ func (msg *MsgTx) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) error
 func (msg *MsgTx) btcDecode(r io.Reader, pver uint32, enc MessageEncoding,
 	buf []byte) error {
 
-	version, err := binarySerializer.Uint32(r, littleEndian)
-	if err != nil {
+	if _, err := io.ReadFull(r, buf[:4]); err != nil {
 		return err
 	}
-	msg.Version = int32(version)
+	msg.Version = int32(littleEndian.Uint32(buf[:4]))
 
 	count, err := ReadVarIntBuf(r, pver, buf)
 	if err != nil {
@@ -606,11 +605,11 @@ func (msg *MsgTx) btcDecode(r io.Reader, pver uint32, enc MessageEncoding,
 		}
 	}
 
-	msg.LockTime, err = binarySerializer.Uint32(r, littleEndian)
-	if err != nil {
+	if _, err := io.ReadFull(r, buf[:4]); err != nil {
 		returnScriptBuffers()
 		return err
 	}
+	msg.LockTime = littleEndian.Uint32(buf[:4])
 
 	// Create a single allocation to house all of the scripts and set each
 	// input signature script and output public key script to the
@@ -722,8 +721,8 @@ func (msg *MsgTx) BtcEncode(w io.Writer, pver uint32, enc MessageEncoding) error
 func (msg *MsgTx) btcEncode(w io.Writer, pver uint32, enc MessageEncoding,
 	buf []byte) error {
 
-	err := binarySerializer.PutUint32(w, littleEndian, uint32(msg.Version))
-	if err != nil {
+	littleEndian.PutUint32(buf[:4], uint32(msg.Version))
+	if _, err := w.Write(buf[:4]); err != nil {
 		return err
 	}
 
@@ -743,7 +742,7 @@ func (msg *MsgTx) btcEncode(w io.Writer, pver uint32, enc MessageEncoding,
 	}
 
 	count := uint64(len(msg.TxIn))
-	err = WriteVarIntBuf(w, pver, count, buf)
+	err := WriteVarIntBuf(w, pver, count, buf)
 	if err != nil {
 		return err
 	}
@@ -780,7 +779,8 @@ func (msg *MsgTx) btcEncode(w io.Writer, pver uint32, enc MessageEncoding,
 		}
 	}
 
-	err = binarySerializer.PutUint32(w, littleEndian, msg.LockTime)
+	littleEndian.PutUint32(buf[:4], msg.LockTime)
+	_, err = w.Write(buf[:4])
 	return err
 }
 
