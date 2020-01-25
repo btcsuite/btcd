@@ -62,13 +62,17 @@ func (msg *MsgBlock) ClearTransactions() {
 // See Deserialize for decoding blocks stored to disk, such as in a database, as
 // opposed to decoding blocks from the wire.
 func (msg *MsgBlock) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) error {
-	err := readBlockHeader(r, pver, &msg.Header)
+	buf := binarySerializer.Borrow()
+
+	err := readBlockHeaderBuf(r, pver, &msg.Header, buf)
 	if err != nil {
+		binarySerializer.Return(buf)
 		return err
 	}
 
-	txCount, err := ReadVarInt(r, pver)
+	txCount, err := ReadVarIntBuf(r, pver, buf)
 	if err != nil {
+		binarySerializer.Return(buf)
 		return err
 	}
 
@@ -76,6 +80,7 @@ func (msg *MsgBlock) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) er
 	// It would be possible to cause memory exhaustion and panics without
 	// a sane upper bound on this count.
 	if txCount > maxTxPerBlock {
+		binarySerializer.Return(buf)
 		str := fmt.Sprintf("too many transactions to fit into a block "+
 			"[count %d, max %d]", txCount, maxTxPerBlock)
 		return messageError("MsgBlock.BtcDecode", str)
@@ -84,12 +89,15 @@ func (msg *MsgBlock) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) er
 	msg.Transactions = make([]*MsgTx, 0, txCount)
 	for i := uint64(0); i < txCount; i++ {
 		tx := MsgTx{}
-		err := tx.BtcDecode(r, pver, enc)
+		err := tx.btcDecode(r, pver, enc, buf)
 		if err != nil {
+			binarySerializer.Return(buf)
 			return err
 		}
 		msg.Transactions = append(msg.Transactions, &tx)
 	}
+
+	binarySerializer.Return(buf)
 
 	return nil
 }
@@ -174,22 +182,29 @@ func (msg *MsgBlock) DeserializeTxLoc(r *bytes.Buffer) ([]TxLoc, error) {
 // See Serialize for encoding blocks to be stored to disk, such as in a
 // database, as opposed to encoding blocks for the wire.
 func (msg *MsgBlock) BtcEncode(w io.Writer, pver uint32, enc MessageEncoding) error {
-	err := writeBlockHeader(w, pver, &msg.Header)
+	buf := binarySerializer.Borrow()
+
+	err := writeBlockHeaderBuf(w, pver, &msg.Header, buf)
 	if err != nil {
+		binarySerializer.Return(buf)
 		return err
 	}
 
-	err = WriteVarInt(w, pver, uint64(len(msg.Transactions)))
+	err = WriteVarIntBuf(w, pver, uint64(len(msg.Transactions)), buf)
 	if err != nil {
+		binarySerializer.Return(buf)
 		return err
 	}
 
 	for _, tx := range msg.Transactions {
-		err = tx.BtcEncode(w, pver, enc)
+		err = tx.btcEncode(w, pver, enc, buf)
 		if err != nil {
+			binarySerializer.Return(buf)
 			return err
 		}
 	}
+
+	binarySerializer.Return(buf)
 
 	return nil
 }
