@@ -48,11 +48,13 @@ type InfoWalletResult struct {
 	Proxy           string  `json:"proxy"`
 	Difficulty      float64 `json:"difficulty"`
 	TestNet         bool    `json:"testnet"`
+	MoneySupply     float64 `json:"moneysupply"`
 	KeypoolOldest   int64   `json:"keypoololdest"`
 	KeypoolSize     int32   `json:"keypoolsize"`
 	UnlockedUntil   int64   `json:"unlocked_until"`
 	PaytxFee        float64 `json:"paytxfee"`
 	RelayFee        float64 `json:"relayfee"`
+	StakingStatus   string  `json:"staking status"`
 	Errors          string  `json:"errors"`
 }
 
