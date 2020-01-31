@@ -97,7 +97,7 @@ func (c *Client) GetBlockAsync(blockHash *chainhash.Hash) FutureGetBlockResult {
 		hash = blockHash.String()
 	}
 
-	cmd := btcjson.NewGetBlockCmd(hash, btcjson.Bool(false), nil)
+	cmd := btcjson.NewGetBlockCmd(hash, nil)
 	return c.sendCmd(cmd)
 }
 
@@ -140,8 +140,9 @@ func (c *Client) GetBlockVerboseAsync(blockHash *chainhash.Hash) FutureGetBlockV
 	if blockHash != nil {
 		hash = blockHash.String()
 	}
-
-	cmd := btcjson.NewGetBlockCmd(hash, btcjson.Bool(true), nil)
+	// From the bitcoin-cli getblock documentation:
+	// "If verbosity is 1, returns an Object with information about block ."
+	cmd := btcjson.NewGetBlockCmd(hash, btcjson.Int(1))
 	return c.sendCmd(cmd)
 }
 
@@ -154,18 +155,37 @@ func (c *Client) GetBlockVerbose(blockHash *chainhash.Hash) (*btcjson.GetBlockVe
 	return c.GetBlockVerboseAsync(blockHash).Receive()
 }
 
+type FutureGetBlockVerboseTxResult chan *response
+
+func (r FutureGetBlockVerboseTxResult) Receive() (*btcjson.GetBlockVerboseTxResult, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	var blockResult btcjson.GetBlockVerboseTxResult
+	err = json.Unmarshal(res, &blockResult)
+	if err != nil {
+		return nil, err
+	}
+
+	return &blockResult, nil
+}
+
 // GetBlockVerboseTxAsync returns an instance of a type that can be used to get
 // the result of the RPC at some future time by invoking the Receive function on
 // the returned instance.
 //
 // See GetBlockVerboseTx or the blocking version and more details.
-func (c *Client) GetBlockVerboseTxAsync(blockHash *chainhash.Hash) FutureGetBlockVerboseResult {
+func (c *Client) GetBlockVerboseTxAsync(blockHash *chainhash.Hash) FutureGetBlockVerboseTxResult {
 	hash := ""
 	if blockHash != nil {
 		hash = blockHash.String()
 	}
+	// From the bitcoin-cli getblock documentation:
+	// "If verbosity is 2, returns an Object with information about block  and information about each transaction."
+	cmd := btcjson.NewGetBlockCmd(hash, btcjson.Int(2))
 
-	cmd := btcjson.NewGetBlockCmd(hash, btcjson.Bool(true), btcjson.Bool(true))
 	return c.sendCmd(cmd)
 }
 
@@ -174,7 +194,7 @@ func (c *Client) GetBlockVerboseTxAsync(blockHash *chainhash.Hash) FutureGetBloc
 //
 // See GetBlockVerbose if only transaction hashes are preferred.
 // See GetBlock to retrieve a raw block instead.
-func (c *Client) GetBlockVerboseTx(blockHash *chainhash.Hash) (*btcjson.GetBlockVerboseResult, error) {
+func (c *Client) GetBlockVerboseTx(blockHash *chainhash.Hash) (*btcjson.GetBlockVerboseTxResult, error) {
 	return c.GetBlockVerboseTxAsync(blockHash).Receive()
 }
 
