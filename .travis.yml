@@ -1,7 +1,7 @@
 language: go
 cache:
   directories:
-#    - $GOCACHE
+    - $GOCACHE
     - $GOPATH
     - $GOPATH/pkg/mod
     - $GOPATH/github.com/golang
