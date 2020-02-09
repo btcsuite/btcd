@@ -2,7 +2,6 @@ language: go
 cache:
   directories:
     - $GOCACHE
-    - $GOPATH
     - $GOPATH/pkg/mod
     - $GOPATH/github.com/golang
     - $GOPATH/gopkg.in/alecthomas
