@@ -73,6 +73,11 @@ func TestRegister(t *testing.T) {
 					params: &SimNetParams,
 					err:    ErrDuplicateNet,
 				},
+				{
+					name:   "duplicate signet",
+					params: &SigNetParams,
+					err:    ErrDuplicateNet,
+				},
 			},
 			p2pkhMagics: []magicTest{
 				{
@@ -89,6 +94,10 @@ func TestRegister(t *testing.T) {
 				},
 				{
 					magic: SimNetParams.PubKeyHashAddrID,
+					valid: true,
+				},
+				{
+					magic: SigNetParams.PubKeyHashAddrID,
 					valid: true,
 				},
 				{
@@ -118,6 +127,10 @@ func TestRegister(t *testing.T) {
 					valid: true,
 				},
 				{
+					magic: SigNetParams.ScriptHashAddrID,
+					valid: true,
+				},
+				{
 					magic: mockNetParams.ScriptHashAddrID,
 					valid: false,
 				},
@@ -141,6 +154,10 @@ func TestRegister(t *testing.T) {
 				},
 				{
 					prefix: SimNetParams.Bech32HRPSegwit + "1",
+					valid:  true,
+				},
+				{
+					prefix: SigNetParams.Bech32HRPSegwit + "1",
 					valid:  true,
 				},
 				{
@@ -186,6 +203,11 @@ func TestRegister(t *testing.T) {
 					err:  nil,
 				},
 				{
+					priv: SigNetParams.HDPrivateKeyID[:],
+					want: SigNetParams.HDPublicKeyID[:],
+					err:  nil,
+				},
+				{
 					priv: mockNetParams.HDPrivateKeyID[:],
 					err:  ErrUnknownHDKeyID,
 				},
@@ -226,6 +248,10 @@ func TestRegister(t *testing.T) {
 					valid: true,
 				},
 				{
+					magic: SigNetParams.PubKeyHashAddrID,
+					valid: true,
+				},
+				{
 					magic: mockNetParams.PubKeyHashAddrID,
 					valid: true,
 				},
@@ -252,6 +278,10 @@ func TestRegister(t *testing.T) {
 					valid: true,
 				},
 				{
+					magic: SigNetParams.ScriptHashAddrID,
+					valid: true,
+				},
+				{
 					magic: mockNetParams.ScriptHashAddrID,
 					valid: true,
 				},
@@ -275,6 +305,10 @@ func TestRegister(t *testing.T) {
 				},
 				{
 					prefix: SimNetParams.Bech32HRPSegwit + "1",
+					valid:  true,
+				},
+				{
+					prefix: SigNetParams.Bech32HRPSegwit + "1",
 					valid:  true,
 				},
 				{
@@ -330,6 +364,11 @@ func TestRegister(t *testing.T) {
 					err:    ErrDuplicateNet,
 				},
 				{
+					name:   "duplicate signet",
+					params: &SigNetParams,
+					err:    ErrDuplicateNet,
+				},
+				{
 					name:   "duplicate mocknet",
 					params: &mockNetParams,
 					err:    ErrDuplicateNet,
@@ -350,6 +389,10 @@ func TestRegister(t *testing.T) {
 				},
 				{
 					magic: SimNetParams.PubKeyHashAddrID,
+					valid: true,
+				},
+				{
+					magic: SigNetParams.PubKeyHashAddrID,
 					valid: true,
 				},
 				{
@@ -379,6 +422,10 @@ func TestRegister(t *testing.T) {
 					valid: true,
 				},
 				{
+					magic: SigNetParams.ScriptHashAddrID,
+					valid: true,
+				},
+				{
 					magic: mockNetParams.ScriptHashAddrID,
 					valid: true,
 				},
@@ -402,6 +449,10 @@ func TestRegister(t *testing.T) {
 				},
 				{
 					prefix: SimNetParams.Bech32HRPSegwit + "1",
+					valid:  true,
+				},
+				{
+					prefix: SigNetParams.Bech32HRPSegwit + "1",
 					valid:  true,
 				},
 				{
@@ -444,6 +495,11 @@ func TestRegister(t *testing.T) {
 				{
 					priv: SimNetParams.HDPrivateKeyID[:],
 					want: SimNetParams.HDPublicKeyID[:],
+					err:  nil,
+				},
+				{
+					priv: SigNetParams.HDPrivateKeyID[:],
+					want: SigNetParams.HDPublicKeyID[:],
 					err:  nil,
 				},
 				{

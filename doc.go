@@ -32,7 +32,7 @@ Application Options:
                             or --proxy options are used without also specifying
                             listen interfaces via --listen
       --listen=             Add an interface/port to listen for connections
-                            (default all interfaces port: 8333, testnet: 18333)
+                            (default all interfaces port: 8333, testnet: 18333, signet: 38333)
       --maxpeers=           Max number of inbound and outbound peers (125)
       --nobanning           Disable banning of misbehaving peers
       --banduration=        How long to ban misbehaving peers.  Valid time units
@@ -76,6 +76,7 @@ Application Options:
       --testnet             Use the test network
       --regtest             Use the regression test network
       --simnet              Use the simulation test network
+      --signet              Use the Signet network
       --addcheckpoint=      Add a custom checkpoint.  Format: '<height>:<hash>'
       --nocheckpoints       Disable built-in checkpoints.  Don't do this unless
                             you know what you're doing.

@@ -38,6 +38,10 @@ var (
 	// simNetPowLimit is the highest proof of work value a Bitcoin block
 	// can have for the simulation test network.  It is the value 2^255 - 1.
 	simNetPowLimit = new(big.Int).Sub(new(big.Int).Lsh(bigOne, 255), bigOne)
+
+	// sigNetPowLimit is the highest proof of work value a Bitcoin block
+	// can have for the Signet network.
+	sigNetPowLimit, _ = new(big.Int).SetString("00002adc28cf53b63c82faa55d83e40ac63b5f100aa5d8df62a429192f9e8ce5", 16)
 )
 
 // Checkpoint identifies a known good point in the block chain.  Using
@@ -578,6 +582,75 @@ var SimNetParams = Params{
 	HDCoinType: 115, // ASCII for s
 }
 
+// SigNetParams defines the network parameters for the Signet
+// Bitcoin network. Signet (BIP 0325) is a proposed new test
+// network for the Bitcoin block chain which adds an additional
+// signature requirement to block validation.
+var SigNetParams = Params{
+	Name:        "signet",
+	Net:         wire.SigNet,
+	DefaultPort: "38333",
+	DNSSeeds: []DNSSeed{
+		{"178.128.221.177", false},
+		{"2a01:7c8:d005:390::5", false},
+		{"ntv3mtqw5wt63red.onion:38333", false},
+	},
+
+	// Chain parameters
+	GenesisBlock:             &sigNetGenesisBlock,
+	GenesisHash:              &sigNetGenesisHash,
+	PowLimit:                 sigNetPowLimit,
+	PowLimitBits:             0x1e2adc28,
+	CoinbaseMaturity:         100,
+	BIP0034Height:            1,
+	BIP0065Height:            1,
+	BIP0066Height:            1,
+	SubsidyReductionInterval: 150,
+	TargetTimespan:           time.Hour * 24 * 14, // 14 days
+	TargetTimePerBlock:       time.Minute * 10,    // 10 minutes
+	RetargetAdjustmentFactor: 4,                   // 25% less, 400% more
+	ReduceMinDifficulty:      true,
+	MinDiffReductionTime:     time.Minute * 20, // TargetTimePerBlock * 2
+	GenerateSupported:        true,
+
+	// Checkpoints ordered from oldest to newest.
+	Checkpoints: nil,
+
+	// Consensus rule change deployments.
+	//
+	// The miner confirmation window is defined as:
+	//   target proof of work timespan / target proof of work spacing
+	RuleChangeActivationThreshold: 1916, // 95%  of MinerConfirmationWindow
+	MinerConfirmationWindow:       2016,
+	Deployments: [DefinedDeployments]ConsensusDeployment{
+		DeploymentTestDummy: {
+			BitNumber:  28,
+			StartTime:  1539478800,
+			ExpireTime: math.MaxInt64, // Never expires
+		},
+	},
+
+	// Mempool parameters
+	RelayNonStdTxs: true,
+
+	// Human-readable part for Bech32 encoded segwit addresses, as defined in
+	// BIP 173.
+	Bech32HRPSegwit: "sb",
+
+	// Address encoding magics
+	PubKeyHashAddrID: 0x7d, // starts with m or n
+	ScriptHashAddrID: 0x57, // starts with 2
+	PrivateKeyID:     0xd9, // starts with 9 (uncompressed) or c (compressed)
+
+	// BIP32 hierarchical deterministic extended key magics
+	HDPrivateKeyID: [4]byte{0x04, 0x35, 0x83, 0x94}, // starts with tprv
+	HDPublicKeyID:  [4]byte{0x04, 0x35, 0x87, 0xcf}, // starts with tpub
+
+	// BIP44 coin type used in the hierarchical deterministic path for
+	// address generation.
+	HDCoinType: 1,
+}
+
 var (
 	// ErrDuplicateNet describes an error where the parameters for a Bitcoin
 	// network could not be set due to the network already being a standard
@@ -709,4 +782,5 @@ func init() {
 	mustRegister(&TestNet3Params)
 	mustRegister(&RegressionNetParams)
 	mustRegister(&SimNetParams)
+	mustRegister(&SigNetParams)
 }

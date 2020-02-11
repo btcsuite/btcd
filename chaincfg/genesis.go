@@ -170,3 +170,66 @@ var simNetGenesisBlock = wire.MsgBlock{
 	},
 	Transactions: []*wire.MsgTx{&genesisCoinbaseTx},
 }
+
+// sigNetGenesisCoinbaseTx is the coinbase transaction for the genesis blocks for
+// the Signet network.
+var sigNetGenesisCoinbaseTx = wire.MsgTx{
+	Version: 1,
+	TxIn: []*wire.TxIn{
+		{
+			PreviousOutPoint: wire.OutPoint{
+				Hash:  chainhash.Hash{},
+				Index: 0xffffffff,
+			},
+			SignatureScript: []byte{
+				0x51, 0x21, 0x03, 0xad, 0x5e, 0x0e, 0xda, 0xd1,
+				0x8c, 0xb1, 0xf0, 0xfc, 0x0d, 0x28, 0xa3, 0xd4,
+				0xf1, 0xf3, 0xe4, 0x45, 0x64, 0x03, 0x37, 0x48,
+				0x9a, 0xbb, 0x10, 0x40, 0x4f, 0x2d, 0x1e, 0x08,
+				0x6b, 0xe4, 0x30, 0x51, 0xae,
+			},
+			Sequence: 0xffffffff,
+		},
+	},
+	TxOut: []*wire.TxOut{
+		{
+			Value: 0x12a05f200,
+			PkScript: []byte{
+				0x6a, // OP_RETURN
+			},
+		},
+	},
+	LockTime: 0,
+}
+
+// sigNetGenesisHash is the hash of the first block in the block chain for the
+// Signet network.
+var sigNetGenesisHash = chainhash.Hash([chainhash.HashSize]byte{
+	0xce, 0xbd, 0x8f, 0x6e, 0x69, 0x77, 0x30, 0xb7,
+	0x4c, 0x70, 0x9c, 0xdd, 0x1e, 0x6a, 0xba, 0xaf,
+	0x2a, 0xfc, 0x98, 0xbf, 0x4c, 0xff, 0xb2, 0x39,
+	0xf3, 0xdb, 0x44, 0x27, 0x64, 0x29, 0x00, 0x00,
+})
+
+// sigNetGenesisMerkleRoot is the hash of the first transaction in the genesis
+// block for the Signet network.
+var sigNetGenesisMerkleRoot = chainhash.Hash([chainhash.HashSize]byte{
+	0xc7, 0x88, 0x4d, 0x50, 0x1b, 0xff, 0xd3, 0x47,
+	0x82, 0x6f, 0xd5, 0x39, 0xb1, 0x52, 0x5f, 0x1c,
+	0x93, 0x95, 0x4d, 0x7c, 0x74, 0x05, 0x3d, 0x4a,
+	0x03, 0x63, 0x82, 0xf9, 0x4a, 0x17, 0x91, 0x4b,
+})
+
+// sigNetGenesisBlock defines the genesis block of the block chain which serves
+// as the public transaction ledger for the simulation test network.
+var sigNetGenesisBlock = wire.MsgBlock{
+	Header: wire.BlockHeader{
+		Version:    1,
+		PrevBlock:  chainhash.Hash{},         // 0000000000000000000000000000000000000000000000000000000000000000
+		MerkleRoot: sigNetGenesisMerkleRoot,  // 4b91174af98263034a3d05747c4d95931c5f52b139d56f8247d3ff1b504d88c7
+		Timestamp:  time.Unix(1534313275, 0), // 2018-08-15 06:07:55 +0000 UTC
+		Bits:       0x1e2adc28,               // 506125352
+		Nonce:      621297,
+	},
+	Transactions: []*wire.MsgTx{&sigNetGenesisCoinbaseTx},
+}

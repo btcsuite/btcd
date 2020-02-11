@@ -5,8 +5,8 @@ chaincfg
 [![ISC License](http://img.shields.io/badge/license-ISC-blue.svg)](http://copyfree.org)
 [![GoDoc](https://img.shields.io/badge/godoc-reference-blue.svg)](http://godoc.org/github.com/btcsuite/btcd/chaincfg)
 
-Package chaincfg defines chain configuration parameters for the three standard
-Bitcoin networks and provides the ability for callers to define their own custom
+Package chaincfg defines chain configuration parameters for the standard Bitcoin 
+networks and provides the ability for callers to define their own custom
 Bitcoin networks.
 
 Although this package was primarily written for btcd, it has intentionally been
