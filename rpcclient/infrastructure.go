@@ -1139,6 +1139,10 @@ type ConnConfig struct {
 	// EnableBCInfoHacks is an option provided to enable compatibility hacks
 	// when connecting to blockchain.info RPC server
 	EnableBCInfoHacks bool
+
+	// NetMode specifies that the client should connect to the either the Bitcoin
+	// Mainnet, Testnet or Simnet. The options are: mainnet, testnet, and simnet
+	NetMode string
 }
 
 // newHTTPClient returns a new http client that is configured according to the
