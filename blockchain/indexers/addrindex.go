@@ -254,6 +254,11 @@ func dbPutAddrIndexEntry(bucket internalBucket, addrKey [addrKeySize]byte, block
 // been less in the case where there are less total entries than the requested
 // number of entries to skip.
 func dbFetchAddrIndexEntries(bucket internalBucket, addrKey [addrKeySize]byte, numToSkip, numRequested uint32, reverse bool, fetchBlockHash fetchBlockHashFunc) ([]database.BlockRegion, uint32, error) {
+	// Nothing more to do when there are no requested entries.
+	if numRequested == 0 {
+		return nil, numToSkip, nil
+	}
+
 	// When the reverse flag is not set, all levels need to be fetched
 	// because numToSkip and numRequested are counted from the oldest
 	// transactions (highest level) and thus the total count is needed.
@@ -283,11 +288,6 @@ func dbFetchAddrIndexEntries(bucket internalBucket, addrKey [addrKeySize]byte, n
 	numEntries := uint32(len(serialized) / txEntrySize)
 	if numToSkip >= numEntries {
 		return nil, numEntries, nil
-	}
-
-	// Nothing more to do when there are no requested entries.
-	if numRequested == 0 {
-		return nil, numToSkip, nil
 	}
 
 	// Limit the number to load based on the number of available entries,
