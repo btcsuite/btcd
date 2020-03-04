@@ -6,7 +6,6 @@ package rpctest
 
 import (
 	"fmt"
-	"go/build"
 	"os/exec"
 	"path/filepath"
 	"runtime"
@@ -44,24 +43,14 @@ func btcdExecutablePath() (string, error) {
 		return "", err
 	}
 
-	// Determine import path of this package. Not necessarily btcsuite/btcd if
-	// this is a forked repo.
-	_, rpctestDir, _, ok := runtime.Caller(1)
-	if !ok {
-		return "", fmt.Errorf("Cannot get path to btcd source code")
-	}
-	btcdPkgPath := filepath.Join(rpctestDir, "..", "..", "..")
-	btcdPkg, err := build.ImportDir(btcdPkgPath, build.FindOnly)
-	if err != nil {
-		return "", fmt.Errorf("Failed to build btcd: %v", err)
-	}
-
 	// Build btcd and output an executable in a static temp path.
 	outputPath := filepath.Join(testDir, "btcd")
 	if runtime.GOOS == "windows" {
 		outputPath += ".exe"
 	}
-	cmd := exec.Command("go", "build", "-o", outputPath, btcdPkg.ImportPath)
+	cmd := exec.Command(
+		"go", "build", "-o", outputPath, "github.com/btcsuite/btcd",
+	)
 	err = cmd.Run()
 	if err != nil {
 		return "", fmt.Errorf("Failed to build btcd: %v", err)

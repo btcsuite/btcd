@@ -90,28 +90,61 @@ type SoftForkDescription struct {
 // Bip9SoftForkDescription describes the current state of a defined BIP0009
 // version bits soft-fork.
 type Bip9SoftForkDescription struct {
-	Status    string `json:"status"`
-	Bit       uint8  `json:"bit"`
-	StartTime int64  `json:"startTime"`
-	Timeout   int64  `json:"timeout"`
-	Since     int32  `json:"since"`
+	Status     string `json:"status"`
+	Bit        uint8  `json:"bit"`
+	StartTime1 int64  `json:"startTime"`
+	StartTime2 int64  `json:"start_time"`
+	Timeout    int64  `json:"timeout"`
+	Since      int32  `json:"since"`
+}
+
+// StartTime returns the starting time of the softfork as a Unix epoch.
+func (d *Bip9SoftForkDescription) StartTime() int64 {
+	if d.StartTime1 != 0 {
+		return d.StartTime1
+	}
+	return d.StartTime2
+}
+
+// SoftForks describes the current softforks enabled by the backend. Softforks
+// activated through BIP9 are grouped together separate from any other softforks
+// with different activation types.
+type SoftForks struct {
+	SoftForks     []*SoftForkDescription              `json:"softforks"`
+	Bip9SoftForks map[string]*Bip9SoftForkDescription `json:"bip9_softforks"`
+}
+
+// UnifiedSoftForks describes a softforks in a general manner, irrespective of
+// its activation type. This was a format introduced by bitcoind v0.19.0
+type UnifiedSoftFork struct {
+	Type                    string                   `json:"type"`
+	BIP9SoftForkDescription *Bip9SoftForkDescription `json:"bip9"`
+	Height                  int32                    `json:"height"`
+	Active                  bool                     `json:"active"`
+}
+
+// UnifiedSoftForks describes the current softforks enabled the by the backend
+// in a unified manner, i.e, softforks with different activation types are
+// grouped together. This was a format introduced by bitcoind v0.19.0
+type UnifiedSoftForks struct {
+	SoftForks map[string]*UnifiedSoftFork `json:"softforks"`
 }
 
 // GetBlockChainInfoResult models the data returned from the getblockchaininfo
 // command.
 type GetBlockChainInfoResult struct {
-	Chain                string                              `json:"chain"`
-	Blocks               int32                               `json:"blocks"`
-	Headers              int32                               `json:"headers"`
-	BestBlockHash        string                              `json:"bestblockhash"`
-	Difficulty           float64                             `json:"difficulty"`
-	MedianTime           int64                               `json:"mediantime"`
-	VerificationProgress float64                             `json:"verificationprogress,omitempty"`
-	Pruned               bool                                `json:"pruned"`
-	PruneHeight          int32                               `json:"pruneheight,omitempty"`
-	ChainWork            string                              `json:"chainwork,omitempty"`
-	SoftForks            []*SoftForkDescription              `json:"softforks"`
-	Bip9SoftForks        map[string]*Bip9SoftForkDescription `json:"bip9_softforks"`
+	Chain                string  `json:"chain"`
+	Blocks               int32   `json:"blocks"`
+	Headers              int32   `json:"headers"`
+	BestBlockHash        string  `json:"bestblockhash"`
+	Difficulty           float64 `json:"difficulty"`
+	MedianTime           int64   `json:"mediantime"`
+	VerificationProgress float64 `json:"verificationprogress,omitempty"`
+	Pruned               bool    `json:"pruned"`
+	PruneHeight          int32   `json:"pruneheight,omitempty"`
+	ChainWork            string  `json:"chainwork,omitempty"`
+	*SoftForks
+	*UnifiedSoftForks
 }
 
 // GetBlockTemplateResultTx models the transactions field of the
@@ -265,6 +298,7 @@ type GetPeerInfoResult struct {
 type GetRawMempoolVerboseResult struct {
 	Size             int32    `json:"size"`
 	Vsize            int32    `json:"vsize"`
+	Weight           int32    `json:"weight"`
 	Fee              float64  `json:"fee"`
 	Time             int64    `json:"time"`
 	Height           int64    `json:"height"`
@@ -505,6 +539,7 @@ type TxRawResult struct {
 	Hash          string `json:"hash,omitempty"`
 	Size          int32  `json:"size,omitempty"`
 	Vsize         int32  `json:"vsize,omitempty"`
+	Weight        int32  `json:"weight,omitempty"`
 	Version       int32  `json:"version"`
 	LockTime      uint32 `json:"locktime"`
 	Vin           []Vin  `json:"vin"`
@@ -523,6 +558,7 @@ type SearchRawTransactionsResult struct {
 	Hash          string       `json:"hash"`
 	Size          string       `json:"size"`
 	Vsize         string       `json:"vsize"`
+	Weight        string       `json:"weight"`
 	Version       int32        `json:"version"`
 	LockTime      uint32       `json:"locktime"`
 	Vin           []VinPrevOut `json:"vin"`

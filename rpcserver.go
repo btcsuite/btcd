@@ -756,6 +756,7 @@ func createTxRawResult(chainParams *chaincfg.Params, mtx *wire.MsgTx,
 		Hash:     mtx.WitnessHash().String(),
 		Size:     int32(mtx.SerializeSize()),
 		Vsize:    int32(mempool.GetTxVirtualSize(btcutil.NewTx(mtx))),
+		Weight:   int32(blockchain.GetTransactionWeight(btcutil.NewTx(mtx))),
 		Vin:      createVinList(mtx),
 		Vout:     createVoutList(mtx, chainParams, nil),
 		Version:  mtx.Version,
@@ -1197,14 +1198,16 @@ func handleGetBlockChainInfo(s *rpcServer, cmd interface{}, closeChan <-chan str
 		Difficulty:    getDifficultyRatio(chainSnapshot.Bits, params),
 		MedianTime:    chainSnapshot.MedianTime.Unix(),
 		Pruned:        false,
-		Bip9SoftForks: make(map[string]*btcjson.Bip9SoftForkDescription),
+		SoftForks: &btcjson.SoftForks{
+			Bip9SoftForks: make(map[string]*btcjson.Bip9SoftForkDescription),
+		},
 	}
 
 	// Next, populate the response with information describing the current
 	// status of soft-forks deployed via the super-majority block
 	// signalling mechanism.
 	height := chainSnapshot.Height
-	chainInfo.SoftForks = []*btcjson.SoftForkDescription{
+	chainInfo.SoftForks.SoftForks = []*btcjson.SoftForkDescription{
 		{
 			ID:      "bip34",
 			Version: 2,
@@ -1280,11 +1283,11 @@ func handleGetBlockChainInfo(s *rpcServer, cmd interface{}, closeChan <-chan str
 
 		// Finally, populate the soft-fork description with all the
 		// information gathered above.
-		chainInfo.Bip9SoftForks[forkName] = &btcjson.Bip9SoftForkDescription{
-			Status:    strings.ToLower(statusString),
-			Bit:       deploymentDetails.BitNumber,
-			StartTime: int64(deploymentDetails.StartTime),
-			Timeout:   int64(deploymentDetails.ExpireTime),
+		chainInfo.SoftForks.Bip9SoftForks[forkName] = &btcjson.Bip9SoftForkDescription{
+			Status:     strings.ToLower(statusString),
+			Bit:        deploymentDetails.BitNumber,
+			StartTime2: int64(deploymentDetails.StartTime),
+			Timeout:    int64(deploymentDetails.ExpireTime),
 		}
 	}
 
@@ -3323,19 +3326,44 @@ func handleSendRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan st
 	if err != nil {
 		// When the error is a rule error, it means the transaction was
 		// simply rejected as opposed to something actually going wrong,
-		// so log it as such.  Otherwise, something really did go wrong,
-		// so log it as an actual error.  In both cases, a JSON-RPC
-		// error is returned to the client with the deserialization
-		// error code (to match bitcoind behavior).
-		if _, ok := err.(mempool.RuleError); ok {
-			rpcsLog.Debugf("Rejected transaction %v: %v", tx.Hash(),
-				err)
-		} else {
+		// so log it as such. Otherwise, something really did go wrong,
+		// so log it as an actual error and return.
+		ruleErr, ok := err.(mempool.RuleError)
+		if !ok {
 			rpcsLog.Errorf("Failed to process transaction %v: %v",
 				tx.Hash(), err)
+
+			return nil, &btcjson.RPCError{
+				Code:    btcjson.ErrRPCTxError,
+				Message: "TX rejected: " + err.Error(),
+			}
 		}
+
+		rpcsLog.Debugf("Rejected transaction %v: %v", tx.Hash(), err)
+
+		// We'll then map the rule error to the appropriate RPC error,
+		// matching bitcoind's behavior.
+		code := btcjson.ErrRPCTxError
+		if txRuleErr, ok := ruleErr.Err.(mempool.TxRuleError); ok {
+			errDesc := txRuleErr.Description
+			switch {
+			case strings.Contains(
+				strings.ToLower(errDesc), "orphan transaction",
+			):
+				code = btcjson.ErrRPCTxError
+
+			case strings.Contains(
+				strings.ToLower(errDesc), "transaction already exists",
+			):
+				code = btcjson.ErrRPCTxAlreadyInChain
+
+			default:
+				code = btcjson.ErrRPCTxRejected
+			}
+		}
+
 		return nil, &btcjson.RPCError{
-			Code:    btcjson.ErrRPCDeserialization,
+			Code:    code,
 			Message: "TX rejected: " + err.Error(),
 		}
 	}
@@ -4281,7 +4309,7 @@ func newRPCServer(config *rpcserverConfig) (*rpcServer, error) {
 		gbtWorkState:           newGbtWorkState(config.TimeSource),
 		helpCacher:             newHelpCacher(),
 		requestProcessShutdown: make(chan struct{}),
-		quit: make(chan int),
+		quit:                   make(chan int),
 	}
 	if cfg.RPCUser != "" && cfg.RPCPass != "" {
 		login := cfg.RPCUser + ":" + cfg.RPCPass

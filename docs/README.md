@@ -47,7 +47,7 @@ transactions based on miner requirements ("standard" transactions).
 
 One key difference between btcd and Bitcoin Core is that btcd does *NOT* include
 wallet functionality and this was a very intentional design decision.  See the
-blog entry [here](https://blog.conformal.com/btcd-not-your-moms-bitcoin-daemon)
+blog entry [here](https://web.archive.org/web/20171125143919/https://blog.conformal.com/btcd-not-your-moms-bitcoin-daemon)
 for more details.  This means you can't actually make or receive payments
 directly with btcd.  That functionality is provided by the
 [btcwallet](https://github.com/btcsuite/btcwallet) and
@@ -95,11 +95,9 @@ recommended that `GOPATH` is set to a directory in your home directory such as
 - Run the following commands to obtain btcd, all dependencies, and install it:
 
 ```bash
-$ go get -u github.com/Masterminds/glide
 $ git clone https://github.com/btcsuite/btcd $GOPATH/src/github.com/btcsuite/btcd
 $ cd $GOPATH/src/github.com/btcsuite/btcd
-$ glide install
-$ go install . ./cmd/...
+$ GO111MODULE=on go install -v . ./cmd/...
 ```
 
 - btcd (and utilities) will now be installed in ```$GOPATH/bin```.  If you did
@@ -112,8 +110,7 @@ $ go install . ./cmd/...
 
 ```bash
 $ cd $GOPATH/src/github.com/btcsuite/btcd
-$ git pull && glide install
-$ go install . ./cmd/...
+$ git pull && GO111MODULE=on go install -v . ./cmd/...
 ```
 
 <a name="GentooInstallation" />

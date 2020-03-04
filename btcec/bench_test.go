@@ -4,7 +4,10 @@
 
 package btcec
 
-import "testing"
+import (
+	"encoding/hex"
+	"testing"
+)
 
 // BenchmarkAddJacobian benchmarks the secp256k1 curve addJacobian function with
 // Z values of 1 so that the associated optimizations are used.
@@ -120,4 +123,23 @@ func BenchmarkFieldNormalize(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		f.Normalize()
 	}
+}
+
+// BenchmarkParseCompressedPubKey benchmarks how long it takes to decompress and
+// validate a compressed public key from a byte array.
+func BenchmarkParseCompressedPubKey(b *testing.B) {
+	rawPk, _ := hex.DecodeString("0234f9460f0e4f08393d192b3c5133a6ba099aa0ad9fd54ebccfacdfa239ff49c6")
+
+	var (
+		pk  *PublicKey
+		err error
+	)
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		pk, err = ParsePubKey(rawPk, S256())
+	}
+	_ = pk
+	_ = err
 }

@@ -33,6 +33,11 @@ func (ka *KnownAddress) LastAttempt() time.Time {
 	return ka.lastattempt
 }
 
+// Services returns the services supported by the peer with the known address.
+func (ka *KnownAddress) Services() wire.ServiceFlag {
+	return ka.na.Services
+}
+
 // chance returns the selection probability for a known address.  The priority
 // depends upon how recently the address has been seen, how recently it was last
 // attempted and how often attempts to connect to it have failed.

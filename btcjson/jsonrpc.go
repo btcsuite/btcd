@@ -22,10 +22,10 @@ type RPCError struct {
 	Message string       `json:"message,omitempty"`
 }
 
-// Guarantee RPCError satisifies the builtin error interface.
+// Guarantee RPCError satisfies the builtin error interface.
 var _, _ error = RPCError{}, (*RPCError)(nil)
 
-// Error returns a string describing the RPC error.  This satisifies the
+// Error returns a string describing the RPC error.  This satisfies the
 // builtin error interface.
 func (e RPCError) Error() string {
 	return fmt.Sprintf("%d: %s", e.Code, e.Message)

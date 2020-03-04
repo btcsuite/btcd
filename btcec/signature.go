@@ -85,10 +85,10 @@ func (sig *Signature) IsEqual(otherSig *Signature) bool {
 		sig.S.Cmp(otherSig.S) == 0
 }
 
-// minSigLen is the minimum length of a DER encoded signature and is
-// when both R and S are 1 byte each.
+// MinSigLen is the minimum length of a DER encoded signature and is when both R
+// and S are 1 byte each.
 // 0x30 + <1-byte> + 0x02 + 0x01 + <byte> + 0x2 + 0x01 + <byte>
-const minSigLen = 8
+const MinSigLen = 8
 
 func parseSig(sigStr []byte, curve elliptic.Curve, der bool) (*Signature, error) {
 	// Originally this code used encoding/asn1 in order to parse the
@@ -103,7 +103,7 @@ func parseSig(sigStr []byte, curve elliptic.Curve, der bool) (*Signature, error)
 
 	signature := &Signature{}
 
-	if len(sigStr) < minSigLen {
+	if len(sigStr) < MinSigLen {
 		return nil, errors.New("malformed signature: too short")
 	}
 	// 0x30
@@ -118,7 +118,7 @@ func parseSig(sigStr []byte, curve elliptic.Curve, der bool) (*Signature, error)
 
 	// siglen should be less than the entire message and greater than
 	// the minimal message size.
-	if int(siglen+2) > len(sigStr) || int(siglen+2) < minSigLen {
+	if int(siglen+2) > len(sigStr) || int(siglen+2) < MinSigLen {
 		return nil, errors.New("malformed signature: bad length")
 	}
 	// trim the slice we're working on so we only look at what matters.
@@ -276,7 +276,7 @@ func hashToInt(hash []byte, c elliptic.Curve) *big.Int {
 }
 
 // recoverKeyFromSignature recovers a public key from the signature "sig" on the
-// given message hash "msg". Based on the algorithm found in section 5.1.5 of
+// given message hash "msg". Based on the algorithm found in section 4.1.6 of
 // SEC 1 Ver 2.0, page 47-48 (53 and 54 in the pdf). This performs the details
 // in the inner loop in Step 1. The counter provided is actually the j parameter
 // of the loop * 2 - on the first iteration of j we do the R case, else the -R
@@ -427,9 +427,7 @@ func signRFC6979(privateKey *PrivateKey, hash []byte) (*Signature, error) {
 	k := nonceRFC6979(privkey.D, hash)
 	inv := new(big.Int).ModInverse(k, N)
 	r, _ := privkey.Curve.ScalarBaseMult(k.Bytes())
-	if r.Cmp(N) == 1 {
-		r.Sub(r, N)
-	}
+	r.Mod(r, N)
 
 	if r.Sign() == 0 {
 		return nil, errors.New("calculated R is zero")

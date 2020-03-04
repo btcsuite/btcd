@@ -47,7 +47,7 @@ const (
 
 	bytePerKb = 1000
 
-	btcPerSatoshi = 1E-8
+	btcPerSatoshi = 1e-8
 )
 
 var (
