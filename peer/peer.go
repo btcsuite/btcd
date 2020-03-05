@@ -1618,6 +1618,103 @@ out:
 	log.Tracef("Peer input handler done for %s", p)
 }
 
+// readRemoteVersionMsg waits for the next message to arrive from the remote
+// peer.  If the next message is not a version message or the version is not
+// acceptable then return an error.
+func (p *Peer) readRemoteVersionMsg() error {
+	// Read their version message.
+	remoteMsg, _, err := p.readMessage(wire.LatestEncoding)
+	if err != nil {
+		return err
+	}
+
+	// Notify and disconnect clients if the first message is not a version
+	// message.
+	msg, ok := remoteMsg.(*wire.MsgVersion)
+	if !ok {
+		reason := "a version message must precede all others"
+		rejectMsg := wire.NewMsgReject(msg.Command(), wire.RejectMalformed,
+			reason)
+		_ = p.writeMessage(rejectMsg, wire.LatestEncoding)
+		return errors.New(reason)
+	}
+
+	// Detect self connections.
+	if !allowSelfConns && sentNonces.Exists(msg.Nonce) {
+		return errors.New("disconnecting peer connected to self")
+	}
+
+	// Negotiate the protocol version and set the services to what the remote
+	// peer advertised.
+	p.flagsMtx.Lock()
+	p.advertisedProtoVer = uint32(msg.ProtocolVersion)
+	p.protocolVersion = minUint32(p.protocolVersion, p.advertisedProtoVer)
+	p.versionKnown = true
+	p.services = msg.Services
+	p.flagsMtx.Unlock()
+	log.Debugf("Negotiated protocol version %d for peer %s",
+		p.protocolVersion, p)
+
+	// Updating a bunch of stats including block based stats, and the
+	// peer's time offset.
+	p.statsMtx.Lock()
+	p.lastBlock = msg.LastBlock
+	p.startingHeight = msg.LastBlock
+	p.timeOffset = msg.Timestamp.Unix() - time.Now().Unix()
+	p.statsMtx.Unlock()
+
+	// Set the peer's ID, user agent, and potentially the flag which
+	// specifies the witness support is enabled.
+	p.flagsMtx.Lock()
+	p.id = atomic.AddInt32(&nodeCount, 1)
+	p.userAgent = msg.UserAgent
+
+	// Determine if the peer would like to receive witness data with
+	// transactions, or not.
+	if p.services&wire.SFNodeWitness == wire.SFNodeWitness {
+		p.witnessEnabled = true
+	}
+	p.flagsMtx.Unlock()
+
+	// Once the version message has been exchanged, we're able to determine
+	// if this peer knows how to encode witness data over the wire
+	// protocol. If so, then we'll switch to a decoding mode which is
+	// prepared for the new transaction format introduced as part of
+	// BIP0144.
+	if p.services&wire.SFNodeWitness == wire.SFNodeWitness {
+		p.wireEncoding = wire.WitnessEncoding
+	}
+
+	// Invoke the callback if specified.
+	if p.cfg.Listeners.OnVersion != nil {
+		rejectMsg := p.cfg.Listeners.OnVersion(p, msg)
+		if rejectMsg != nil {
+			_ = p.writeMessage(rejectMsg, wire.LatestEncoding)
+			return errors.New(rejectMsg.Reason)
+		}
+	}
+
+	// Notify and disconnect clients that have a protocol version that is
+	// too old.
+	//
+	// NOTE: If minAcceptableProtocolVersion is raised to be higher than
+	// wire.RejectVersion, this should send a reject packet before
+	// disconnecting.
+	if uint32(msg.ProtocolVersion) < MinAcceptableProtocolVersion {
+		// Send a reject message indicating the protocol version is
+		// obsolete and wait for the message to be sent before
+		// disconnecting.
+		reason := fmt.Sprintf("protocol version must be %d or greater",
+			MinAcceptableProtocolVersion)
+		rejectMsg := wire.NewMsgReject(msg.Command(), wire.RejectObsolete,
+			reason)
+		_ = p.writeMessage(rejectMsg, wire.LatestEncoding)
+		return errors.New(reason)
+	}
+
+	return nil
+}
+
 // queueHandler handles the queuing of outgoing data for the peer. This runs as
 // a muxer for various sources of input so we can ensure that server and peer
 // handlers will not block on us sending a message.  That data is then passed on
@@ -2195,6 +2292,30 @@ func (p *Peer) start() error {
 	return nil
 }
 
+// negotiateOutboundProtocol performs the negotiation protocol for an outbound
+// peer. The events should occur in the following order, otherwise an error is
+// returned:
+//
+//   1. We send our version.
+//   2. Remote peer sends their version.
+//   3. Remote peer sends their verack.
+//   4. We send our verack.
+func (p *Peer) negotiateOutboundProtocol() error {
+	if err := p.writeLocalVersionMsg(); err != nil {
+		return err
+	}
+
+	if err := p.readRemoteVersionMsg(); err != nil {
+		return err
+	}
+
+	if err := p.readRemoteVerAckMsg(); err != nil {
+		return err
+	}
+
+	return p.writeMessage(wire.NewMsgVerAck(), wire.LatestEncoding)
+}
+
 // AssociateConnection associates the given conn to the peer.   Calling this
 // function when the peer is already connected will have no effect.
 func (p *Peer) AssociateConnection(conn net.Conn) {
@@ -2235,127 +2356,6 @@ func (p *Peer) AssociateConnection(conn net.Conn) {
 // Disconnect.
 func (p *Peer) WaitForDisconnect() {
 	<-p.quit
-}
-
-// readRemoteVersionMsg waits for the next message to arrive from the remote
-// peer.  If the next message is not a version message or the version is not
-// acceptable then return an error.
-func (p *Peer) readRemoteVersionMsg() error {
-	// Read their version message.
-	remoteMsg, _, err := p.readMessage(wire.LatestEncoding)
-	if err != nil {
-		return err
-	}
-
-	// Notify and disconnect clients if the first message is not a version
-	// message.
-	msg, ok := remoteMsg.(*wire.MsgVersion)
-	if !ok {
-		reason := "a version message must precede all others"
-		rejectMsg := wire.NewMsgReject(msg.Command(), wire.RejectMalformed,
-			reason)
-		_ = p.writeMessage(rejectMsg, wire.LatestEncoding)
-		return errors.New(reason)
-	}
-
-	// Detect self connections.
-	if !allowSelfConns && sentNonces.Exists(msg.Nonce) {
-		return errors.New("disconnecting peer connected to self")
-	}
-
-	// Negotiate the protocol version and set the services to what the remote
-	// peer advertised.
-	p.flagsMtx.Lock()
-	p.advertisedProtoVer = uint32(msg.ProtocolVersion)
-	p.protocolVersion = minUint32(p.protocolVersion, p.advertisedProtoVer)
-	p.versionKnown = true
-	p.services = msg.Services
-	p.flagsMtx.Unlock()
-	log.Debugf("Negotiated protocol version %d for peer %s",
-		p.protocolVersion, p)
-
-	// Updating a bunch of stats including block based stats, and the
-	// peer's time offset.
-	p.statsMtx.Lock()
-	p.lastBlock = msg.LastBlock
-	p.startingHeight = msg.LastBlock
-	p.timeOffset = msg.Timestamp.Unix() - time.Now().Unix()
-	p.statsMtx.Unlock()
-
-	// Set the peer's ID, user agent, and potentially the flag which
-	// specifies the witness support is enabled.
-	p.flagsMtx.Lock()
-	p.id = atomic.AddInt32(&nodeCount, 1)
-	p.userAgent = msg.UserAgent
-
-	// Determine if the peer would like to receive witness data with
-	// transactions, or not.
-	if p.services&wire.SFNodeWitness == wire.SFNodeWitness {
-		p.witnessEnabled = true
-	}
-	p.flagsMtx.Unlock()
-
-	// Once the version message has been exchanged, we're able to determine
-	// if this peer knows how to encode witness data over the wire
-	// protocol. If so, then we'll switch to a decoding mode which is
-	// prepared for the new transaction format introduced as part of
-	// BIP0144.
-	if p.services&wire.SFNodeWitness == wire.SFNodeWitness {
-		p.wireEncoding = wire.WitnessEncoding
-	}
-
-	// Invoke the callback if specified.
-	if p.cfg.Listeners.OnVersion != nil {
-		rejectMsg := p.cfg.Listeners.OnVersion(p, msg)
-		if rejectMsg != nil {
-			_ = p.writeMessage(rejectMsg, wire.LatestEncoding)
-			return errors.New(rejectMsg.Reason)
-		}
-	}
-
-	// Notify and disconnect clients that have a protocol version that is
-	// too old.
-	//
-	// NOTE: If minAcceptableProtocolVersion is raised to be higher than
-	// wire.RejectVersion, this should send a reject packet before
-	// disconnecting.
-	if uint32(msg.ProtocolVersion) < MinAcceptableProtocolVersion {
-		// Send a reject message indicating the protocol version is
-		// obsolete and wait for the message to be sent before
-		// disconnecting.
-		reason := fmt.Sprintf("protocol version must be %d or greater",
-			MinAcceptableProtocolVersion)
-		rejectMsg := wire.NewMsgReject(msg.Command(), wire.RejectObsolete,
-			reason)
-		_ = p.writeMessage(rejectMsg, wire.LatestEncoding)
-		return errors.New(reason)
-	}
-
-	return nil
-}
-
-// negotiateOutboundProtocol performs the negotiation protocol for an outbound
-// peer. The events should occur in the following order, otherwise an error is
-// returned:
-//
-//   1. We send our version.
-//   2. Remote peer sends their version.
-//   3. Remote peer sends their verack.
-//   4. We send our verack.
-func (p *Peer) negotiateOutboundProtocol() error {
-	if err := p.writeLocalVersionMsg(); err != nil {
-		return err
-	}
-
-	if err := p.readRemoteVersionMsg(); err != nil {
-		return err
-	}
-
-	if err := p.readRemoteVerAckMsg(); err != nil {
-		return err
-	}
-
-	return p.writeMessage(wire.NewMsgVerAck(), wire.LatestEncoding)
 }
 
 // newPeerBase returns a new base bitcoin peer based on the inbound flag.  This
