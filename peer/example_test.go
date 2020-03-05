@@ -104,8 +104,8 @@ func Example_newOutboundPeer() {
 	}
 
 	// Disconnect the peer.
-	p.WaitForDisconnect()
 	p.Disconnect()
+	p.WaitForDisconnect()
 
 	// Output:
 	// outbound: received version

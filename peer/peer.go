@@ -1986,41 +1986,6 @@ func (p *Peer) QueueInventory(invVect *wire.InvVect) {
 	p.outputInvChan <- invVect
 }
 
-
-// Connect uses the given conn to connect to the peer. Calling this function when
-// the peer is already connected  will have no effect.
-func (p *Peer) Connect(conn net.Conn) {
-	// Already connected?
-	if !atomic.CompareAndSwapInt32(&p.connected, 0, 1) {
-		return
-	}
-
-	p.conn = conn
-	p.timeConnected = time.Now()
-
-	if p.inbound {
-		p.addr = p.conn.RemoteAddr().String()
-
-		// Set up a NetAddress for the peer to be used with AddrManager.  We
-		// only do this inbound because outbound set this up at connection time
-		// and no point recomputing.
-		na, err := newNetAddress(p.conn.RemoteAddr(), p.services)
-		if err != nil {
-			log.Errorf("Cannot create remote net address: %v", err)
-			p.Disconnect()
-			return
-		}
-		p.na = na
-	}
-
-	go func() {
-		if err := p.start(); err != nil {
-			log.Warnf("Cannot start peer %v: %v", p, err)
-			p.Disconnect()
-		}
-	}()
-}
-
 // Connected returns whether or not the peer is currently connected.
 //
 // This function is safe for concurrent access.
