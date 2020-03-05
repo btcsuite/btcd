@@ -69,6 +69,10 @@ const (
 	// stalling.  The deadlines are adjusted for callback running times and
 	// only checked on each stall tick interval.
 	stallResponseTimeout = 30 * time.Second
+
+	// trickleTimeout is the duration of the ticker which trickles down the
+	// inventory to a peer.
+	trickleTimeout = 10 * time.Second
 )
 
 var (
@@ -225,6 +229,9 @@ type Config struct {
 	// peers to specify this so their currently best known is accurately
 	// reported.
 	NewestBlock HashFunc
+
+	// BestLocalAddress returns the best local address for a given address.
+	BestLocalAddress AddrFunc
 
 	// HostToNetAddress returns the netaddress for the given host. This can be
 	// nil in  which case the host will be parsed as an IP address.
@@ -445,6 +452,7 @@ type Peer struct {
 	advertisedProtoVer   uint32 // protocol version advertised by remote
 	protocolVersion      uint32 // negotiated protocol version
 	sendHeadersPreferred bool   // peer sent a sendheaders message
+	versionSent          bool
 	verAckReceived       bool
 	witnessEnabled       bool
 
@@ -469,6 +477,13 @@ type Peer struct {
 	lastPingNonce      uint64    // Set to nonce if we have a pending ping.
 	lastPingTime       time.Time // Time we sent last ping.
 	lastPingMicros     int64     // Time for last ping to return.
+
+	pingTickerTimerMtx sync.Mutex
+	pingTickerTimer    *time.Timer
+
+	invVects                chan *wire.InvVect
+	trickleInvVectsTimerMtx sync.Mutex
+	trickleInvVectsTimer    *time.Timer
 
 	stallControl  chan stallControlMsg
 	outputQueue   chan outMsg
@@ -969,6 +984,71 @@ func (p *Peer) PushRejectMsg(command string, code wire.RejectCode, reason string
 	<-doneChan
 }
 
+// handleRemoteVersionMsg is invoked when a version bitcoin message is received
+// from the remote peer.  It will return an error if the remote peer's version
+// is not compatible with ours.
+func (p *Peer) handleRemoteVersionMsg(msg *wire.MsgVersion) error {
+	// Detect self connections.
+	if !allowSelfConns && sentNonces.Exists(msg.Nonce) {
+		return errors.New("disconnecting peer connected to self")
+	}
+
+	// Notify and disconnect clients that have a protocol version that is
+	// too old.
+	if msg.ProtocolVersion < int32(wire.MultipleAddressVersion) {
+		// Send a reject message indicating the protocol version is
+		// obsolete and wait for the message to be sent before
+		// disconnecting.
+		reason := fmt.Sprintf("protocol version must be %d or greater",
+			wire.MultipleAddressVersion)
+		rejectMsg := wire.NewMsgReject(msg.Command(), wire.RejectObsolete,
+			reason)
+		return p.writeMessage(rejectMsg, wire.LatestEncoding)
+	}
+
+	// Updating a bunch of stats.
+	p.statsMtx.Lock()
+	p.lastBlock = msg.LastBlock
+	p.startingHeight = msg.LastBlock
+	// Set the peer's time offset.
+	p.timeOffset = msg.Timestamp.Unix() - time.Now().Unix()
+	p.statsMtx.Unlock()
+
+	// Negotiate the protocol version.
+	p.flagsMtx.Lock()
+	p.protocolVersion = minUint32(p.protocolVersion, uint32(msg.ProtocolVersion))
+	p.versionKnown = true
+	log.Debugf("Negotiated protocol version %d for peer %s",
+		p.protocolVersion, p)
+	// Set the peer's ID.
+	p.id = atomic.AddInt32(&nodeCount, 1)
+	// Set the supported services for the peer to what the remote peer
+	// advertised.
+	p.services = msg.Services
+	// Set the remote peer's user agent.
+	p.userAgent = msg.UserAgent
+	p.flagsMtx.Unlock()
+	return nil
+}
+
+// isValidBIP0111 is a helper function for the bloom filter commands to check
+// BIP0111 compliance.
+func (p *Peer) isValidBIP0111(cmd string) bool {
+	if p.Services()&wire.SFNodeBloom != wire.SFNodeBloom {
+		if p.ProtocolVersion() >= wire.BIP0111Version {
+			log.Debugf("%s sent an unsupported %s "+
+				"request -- disconnecting", p, cmd)
+			p.Disconnect()
+		} else {
+			log.Debugf("Ignoring %s request from %s -- bloom "+
+				"support is disabled", cmd, p)
+		}
+		return false
+	}
+
+	return true
+}
+
 // handlePingMsg is invoked when a peer receives a ping bitcoin message.  For
 // recent clients (protocol version > BIP0031Version), it replies with a pong
 // message.  For older clients, it does nothing and anything other than failure
@@ -1382,7 +1462,6 @@ out:
 				msg.Command(), wire.RejectDuplicate,
 				"duplicate verack message", nil, true,
 			)
-			break out
 
 		case *wire.MsgGetAddr:
 			if p.cfg.Listeners.OnGetAddr != nil {
@@ -1550,14 +1629,6 @@ func (p *Peer) queueHandler() {
 	trickleTicker := time.NewTicker(p.cfg.TrickleInterval)
 	defer trickleTicker.Stop()
 
-	// We keep the waiting flag so that we know if we have a message queued
-	// to the outHandler or not.  We could use the presence of a head of
-	// the list for this but then we have rather racy concerns about whether
-	// it has gotten it at cleanup time - and thus who sends on the
-	// message's done channel.  To avoid such confusion we keep a different
-	// flag and pendingMsgs only contains messages that we have not yet
-	// passed to outHandler.
-	waiting := false
 
 	// To avoid duplication below.
 	queuePacket := func(msg outMsg, list *list.List, waiting bool) bool {
@@ -1569,11 +1640,24 @@ func (p *Peer) queueHandler() {
 		// we are always waiting now.
 		return true
 	}
+	// We keep the waiting flag so that we know if we have a message queued
+	// to the outHandler or not.  We could use the presence of a head of
+	// the list for this but then we have rather racy concerns about whether
+	// it has gotten it at cleanup time - and thus who sends on the
+	// message's done channel.  To avoid such confusion we keep a different
+	// flag and pendingMsgs only contains messages that we have not yet
+	// passed to outHandler.
+	waiting := false
 out:
 	for {
 		select {
 		case msg := <-p.outputQueue:
-			waiting = queuePacket(msg, pendingMsgs, waiting)
+			if waiting {
+				pendingMsgs.PushBack(msg)
+			} else {
+				p.sendQueue <- msg
+			}
+			waiting = true
 
 		// This channel is notified when a message has been sent across
 		// the network socket.
@@ -1668,15 +1752,49 @@ cleanup:
 			if msg.doneChan != nil {
 				msg.doneChan <- struct{}{}
 			}
-		case <-p.outputInvChan:
-			// Just drain channel
-		// sendDoneQueue is buffered so doesn't need draining.
 		default:
 			break cleanup
 		}
 	}
 	close(p.queueQuit)
 	log.Tracef("Peer queue handler done for %s", p)
+}
+
+// trickleInvVects gathers all the pending inventory vectors into one or more
+// inv messages and then queues them to be sent to the remote peer.  This method
+// is called periodically via a timer.
+func (p *Peer) trickleInvVects() {
+
+	// Ensure this trickleInvVects method is called again after trickleTimeout
+	// interval.
+	defer func() {
+		p.trickleInvVectsTimerMtx.Lock()
+		if p.trickleInvVectsTimer != nil {
+			p.trickleInvVectsTimer.Reset(trickleTimeout)
+		}
+		p.trickleInvVectsTimerMtx.Unlock()
+	}()
+
+	invMsg := wire.NewMsgInvSizeHint(uint(len(p.invVects)))
+	for {
+		select {
+		case invVect := <-p.invVects:
+			if p.knownInventory.Exists(invVect) {
+				break
+			}
+			invMsg.AddInvVect(invVect)
+			if len(invMsg.InvList) >= maxInvTrickleSize {
+				p.QueueMessage(invMsg, nil)
+				invMsg = wire.NewMsgInvSizeHint(uint(len(p.invVects)))
+			}
+			p.AddKnownInventory(invVect)
+		default:
+			if len(invMsg.InvList) > 0 {
+				p.QueueMessage(invMsg, nil)
+			}
+			return
+		}
+	}
 }
 
 // shouldLogWriteError returns whether or not the passed error, which is
@@ -1794,11 +1912,38 @@ out:
 	}
 }
 
+// pingTicker is used to periodically send pings to the remote peer.
+func (p *Peer) pingTicker() {
+	if nonce, err := wire.RandomUint64(); err != nil {
+		log.Errorf("Not sending ping to %s: %v", p, err)
+	} else {
+		p.QueueMessage(wire.NewMsgPing(nonce), nil)
+	}
+
+	// Reset the pingTicker to fire again after pingInterval.
+	p.pingTickerTimerMtx.Lock()
+	if p.pingTickerTimer != nil {
+		p.pingTickerTimer.Reset(pingInterval)
+	}
+	p.pingTickerTimerMtx.Unlock()
+}
+
 // QueueMessage adds the passed bitcoin message to the peer send queue.
 //
 // This function is safe for concurrent access.
-func (p *Peer) QueueMessage(msg wire.Message, doneChan chan<- struct{}) {
-	p.QueueMessageWithEncoding(msg, doneChan, wire.BaseEncoding)
+func (p *Peer) QueueMessage(msg wire.Message, doneChan chan struct{}) {
+	// Avoid risk of deadlock if goroutine already exited.  The goroutine
+	// we will be sending to hangs around until it knows for a fact that
+	// it is marked as disconnected and *then* it drains the channels.
+	if !p.Connected() {
+		if doneChan != nil {
+			go func() {
+				doneChan <- struct{}{}
+			}()
+		}
+		return
+	}
+	p.outputQueue <- outMsg{msg: msg, doneChan: doneChan}
 }
 
 // QueueMessageWithEncoding adds the passed bitcoin message to the peer send
@@ -1843,7 +1988,42 @@ func (p *Peer) QueueInventory(invVect *wire.InvVect) {
 		return
 	}
 
-	p.outputInvChan <- invVect
+	p.invVects <- invVect
+}
+
+
+// Connect uses the given conn to connect to the peer. Calling this function when
+// the peer is already connected  will have no effect.
+func (p *Peer) Connect(conn net.Conn) {
+	// Already connected?
+	if !atomic.CompareAndSwapInt32(&p.connected, 0, 1) {
+		return
+	}
+
+	p.conn = conn
+	p.timeConnected = time.Now()
+
+	if p.inbound {
+		p.addr = p.conn.RemoteAddr().String()
+
+		// Set up a NetAddress for the peer to be used with AddrManager.  We
+		// only do this inbound because outbound set this up at connection time
+		// and no point recomputing.
+		na, err := newNetAddress(p.conn.RemoteAddr(), p.services)
+		if err != nil {
+			log.Errorf("Cannot create remote net address: %v", err)
+			p.Disconnect()
+			return
+		}
+		p.na = na
+	}
+
+	go func() {
+		if err := p.start(); err != nil {
+			log.Warnf("Cannot start peer %v: %v", p, err)
+			p.Disconnect()
+		}
+	}()
 }
 
 // Connected returns whether or not the peer is currently connected.
@@ -1866,104 +2046,24 @@ func (p *Peer) Disconnect() {
 	if atomic.LoadInt32(&p.connected) != 0 {
 		p.conn.Close()
 	}
+
+	// It is important to set the ping and invVects timers to nil in order to
+	// prevent a race if the timer functions are concurrently executing.
+	p.pingTickerTimerMtx.Lock()
+	if p.pingTickerTimer != nil {
+		p.pingTickerTimer.Stop()
+		p.pingTickerTimer = nil
+	}
+	p.pingTickerTimerMtx.Unlock()
+
+	p.trickleInvVectsTimerMtx.Lock()
+	if p.trickleInvVectsTimer != nil {
+		p.trickleInvVectsTimer.Stop()
+		p.trickleInvVectsTimer = nil
+	}
+	p.trickleInvVectsTimerMtx.Unlock()
+
 	close(p.quit)
-}
-
-// readRemoteVersionMsg waits for the next message to arrive from the remote
-// peer.  If the next message is not a version message or the version is not
-// acceptable then return an error.
-func (p *Peer) readRemoteVersionMsg() error {
-	// Read their version message.
-	remoteMsg, _, err := p.readMessage(wire.LatestEncoding)
-	if err != nil {
-		return err
-	}
-
-	// Notify and disconnect clients if the first message is not a version
-	// message.
-	msg, ok := remoteMsg.(*wire.MsgVersion)
-	if !ok {
-		reason := "a version message must precede all others"
-		rejectMsg := wire.NewMsgReject(msg.Command(), wire.RejectMalformed,
-			reason)
-		_ = p.writeMessage(rejectMsg, wire.LatestEncoding)
-		return errors.New(reason)
-	}
-
-	// Detect self connections.
-	if !allowSelfConns && sentNonces.Exists(msg.Nonce) {
-		return errors.New("disconnecting peer connected to self")
-	}
-
-	// Negotiate the protocol version and set the services to what the remote
-	// peer advertised.
-	p.flagsMtx.Lock()
-	p.advertisedProtoVer = uint32(msg.ProtocolVersion)
-	p.protocolVersion = minUint32(p.protocolVersion, p.advertisedProtoVer)
-	p.versionKnown = true
-	p.services = msg.Services
-	p.flagsMtx.Unlock()
-	log.Debugf("Negotiated protocol version %d for peer %s",
-		p.protocolVersion, p)
-
-	// Updating a bunch of stats including block based stats, and the
-	// peer's time offset.
-	p.statsMtx.Lock()
-	p.lastBlock = msg.LastBlock
-	p.startingHeight = msg.LastBlock
-	p.timeOffset = msg.Timestamp.Unix() - time.Now().Unix()
-	p.statsMtx.Unlock()
-
-	// Set the peer's ID, user agent, and potentially the flag which
-	// specifies the witness support is enabled.
-	p.flagsMtx.Lock()
-	p.id = atomic.AddInt32(&nodeCount, 1)
-	p.userAgent = msg.UserAgent
-
-	// Determine if the peer would like to receive witness data with
-	// transactions, or not.
-	if p.services&wire.SFNodeWitness == wire.SFNodeWitness {
-		p.witnessEnabled = true
-	}
-	p.flagsMtx.Unlock()
-
-	// Once the version message has been exchanged, we're able to determine
-	// if this peer knows how to encode witness data over the wire
-	// protocol. If so, then we'll switch to a decoding mode which is
-	// prepared for the new transaction format introduced as part of
-	// BIP0144.
-	if p.services&wire.SFNodeWitness == wire.SFNodeWitness {
-		p.wireEncoding = wire.WitnessEncoding
-	}
-
-	// Invoke the callback if specified.
-	if p.cfg.Listeners.OnVersion != nil {
-		rejectMsg := p.cfg.Listeners.OnVersion(p, msg)
-		if rejectMsg != nil {
-			_ = p.writeMessage(rejectMsg, wire.LatestEncoding)
-			return errors.New(rejectMsg.Reason)
-		}
-	}
-
-	// Notify and disconnect clients that have a protocol version that is
-	// too old.
-	//
-	// NOTE: If minAcceptableProtocolVersion is raised to be higher than
-	// wire.RejectVersion, this should send a reject packet before
-	// disconnecting.
-	if uint32(msg.ProtocolVersion) < MinAcceptableProtocolVersion {
-		// Send a reject message indicating the protocol version is
-		// obsolete and wait for the message to be sent before
-		// disconnecting.
-		reason := fmt.Sprintf("protocol version must be %d or greater",
-			MinAcceptableProtocolVersion)
-		rejectMsg := wire.NewMsgReject(msg.Command(), wire.RejectObsolete,
-			reason)
-		_ = p.writeMessage(rejectMsg, wire.LatestEncoding)
-		return errors.New(reason)
-	}
-
-	return nil
 }
 
 // readRemoteVerAckMsg waits for the next message to arrive from the remote
@@ -2097,29 +2197,6 @@ func (p *Peer) negotiateInboundProtocol() error {
 	return p.readRemoteVerAckMsg()
 }
 
-// negotiateOutboundProtocol performs the negotiation protocol for an outbound
-// peer. The events should occur in the following order, otherwise an error is
-// returned:
-//
-//   1. We send our version.
-//   2. Remote peer sends their version.
-//   3. Remote peer sends their verack.
-//   4. We send our verack.
-func (p *Peer) negotiateOutboundProtocol() error {
-	if err := p.writeLocalVersionMsg(); err != nil {
-		return err
-	}
-
-	if err := p.readRemoteVersionMsg(); err != nil {
-		return err
-	}
-
-	if err := p.readRemoteVerAckMsg(); err != nil {
-		return err
-	}
-
-	return p.writeMessage(wire.NewMsgVerAck(), wire.LatestEncoding)
-}
 
 // start begins processing input and output messages.
 func (p *Peer) start() error {
@@ -2200,6 +2277,49 @@ func (p *Peer) WaitForDisconnect() {
 	<-p.quit
 }
 
+// readRemoteVersionMsg waits for the next message to arrive from the remote
+// peer.  If the next message is not a version message or the version is not
+// acceptable then return an error.
+func (p *Peer) readRemoteVersionMsg() error {
+
+	// Read their version message.
+	msg, _, err := p.readMessage(p.wireEncoding)
+	if err != nil {
+		return err
+	}
+
+	remoteVerMsg, ok := msg.(*wire.MsgVersion)
+	if !ok {
+		errStr := "A version message must precede all others"
+		log.Errorf(errStr)
+
+		rejectMsg := wire.NewMsgReject(msg.Command(), wire.RejectMalformed,
+			errStr)
+		return p.writeMessage(rejectMsg, wire.LatestEncoding)
+	}
+
+	if err := p.handleRemoteVersionMsg(remoteVerMsg); err != nil {
+		return err
+	}
+
+	if p.cfg.Listeners.OnVersion != nil {
+		p.cfg.Listeners.OnVersion(p, remoteVerMsg)
+	}
+	return nil
+}
+
+// negotiateOutboundProtocol sends our version message then waits to receive a
+// version message from the peer.  If the events do not occur in that order then
+// it returns an error.
+func (p *Peer) negotiateOutboundProtocol() error {
+
+	if err := p.writeLocalVersionMsg(); err != nil {
+		return err
+	}
+
+	return p.readRemoteVersionMsg()
+}
+
 // newPeerBase returns a new base bitcoin peer based on the inbound flag.  This
 // is used by the NewInboundPeer and NewOutboundPeer functions to perform base
 // setup needed by both types of peers.
@@ -2225,11 +2345,11 @@ func newPeerBase(origCfg *Config, inbound bool) *Peer {
 		inbound:         inbound,
 		wireEncoding:    wire.BaseEncoding,
 		knownInventory:  newMruInventoryMap(maxKnownInventory),
+		invVects:        make(chan *wire.InvVect, outputBufferSize),
 		stallControl:    make(chan stallControlMsg, 1), // nonblocking sync
 		outputQueue:     make(chan outMsg, outputBufferSize),
 		sendQueue:       make(chan outMsg, 1),   // nonblocking sync
 		sendDoneQueue:   make(chan struct{}, 1), // nonblocking sync
-		outputInvChan:   make(chan *wire.InvVect, outputBufferSize),
 		inQuit:          make(chan struct{}),
 		queueQuit:       make(chan struct{}),
 		outQuit:         make(chan struct{}),

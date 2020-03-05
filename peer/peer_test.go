@@ -720,7 +720,6 @@ func TestOutboundPeer(t *testing.T) {
 		return
 	}
 	p2.AssociateConnection(c2)
-
 	// Test PushXXX
 	var addrs []*wire.NetAddress
 	for i := 0; i < 5; i++ {

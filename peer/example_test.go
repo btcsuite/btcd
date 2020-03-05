@@ -104,7 +104,6 @@ func Example_newOutboundPeer() {
 	}
 
 	// Disconnect the peer.
-	p.Disconnect()
 	p.WaitForDisconnect()
 
 	// Output:
