@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcd/btcjson"
+	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/go-socks/socks"
 	"github.com/btcsuite/websocket"
 )
@@ -137,6 +138,10 @@ type Client struct {
 
 	// config holds the connection configuration assoiated with this client.
 	config *ConnConfig
+
+	// chainParams holds the params for the chain that this client is using,
+	// and is used for many wallet methods.
+	chainParams *chaincfg.Params
 
 	// wsConn is the underlying websocket connection when not in HTTP POST
 	// mode.
@@ -283,31 +288,29 @@ func (c *Client) trackRegisteredNtfns(cmd interface{}) {
 	}
 }
 
-type (
-	// inMessage is the first type that an incoming message is unmarshaled
-	// into. It supports both requests (for notification support) and
-	// responses.  The partially-unmarshaled message is a notification if
-	// the embedded ID (from the response) is nil.  Otherwise, it is a
-	// response.
-	inMessage struct {
-		ID *float64 `json:"id"`
-		*rawNotification
-		*rawResponse
-	}
+// inMessage is the first type that an incoming message is unmarshaled
+// into. It supports both requests (for notification support) and
+// responses.  The partially-unmarshaled message is a notification if
+// the embedded ID (from the response) is nil.  Otherwise, it is a
+// response.
+type inMessage struct {
+	ID *float64 `json:"id"`
+	*rawNotification
+	*rawResponse
+}
 
-	// rawNotification is a partially-unmarshaled JSON-RPC notification.
-	rawNotification struct {
-		Method string            `json:"method"`
-		Params []json.RawMessage `json:"params"`
-	}
+// rawNotification is a partially-unmarshaled JSON-RPC notification.
+type rawNotification struct {
+	Method string            `json:"method"`
+	Params []json.RawMessage `json:"params"`
+}
 
-	// rawResponse is a partially-unmarshaled JSON-RPC response.  For this
-	// to be valid (according to JSON-RPC 1.0 spec), ID may not be nil.
-	rawResponse struct {
-		Result json.RawMessage   `json:"result"`
-		Error  *btcjson.RPCError `json:"error"`
-	}
-)
+// rawResponse is a partially-unmarshaled JSON-RPC response.  For this
+// to be valid (according to JSON-RPC 1.0 spec), ID may not be nil.
+type rawResponse struct {
+	Result json.RawMessage   `json:"result"`
+	Error  *btcjson.RPCError `json:"error"`
+}
 
 // response is the raw bytes of a JSON-RPC result, or the error if the response
 // error object was non-null.
@@ -1093,6 +1096,11 @@ type ConnConfig struct {
 	// Pass is the passphrase to use to authenticate to the RPC server.
 	Pass string
 
+	// Params is the string representing the network that the server
+	// is running. If there is no parameter set in the config, then
+	// mainnet will be used by default.
+	Params string
+
 	// DisableTLS specifies whether transport layer security should be
 	// disabled.  It is recommended to always use TLS if the RPC server
 	// supports it as otherwise your username and password is sent across
@@ -1288,6 +1296,23 @@ func New(config *ConnConfig, ntfnHandlers *NotificationHandlers) (*Client, error
 		connEstablished: connEstablished,
 		disconnect:      make(chan struct{}),
 		shutdown:        make(chan struct{}),
+	}
+
+	// Default network is mainnet, no parameters are necessary but if mainnet
+	// is specified it will be the param
+	switch config.Params {
+	case "":
+		fallthrough
+	case chaincfg.MainNetParams.Name:
+		client.chainParams = &chaincfg.MainNetParams
+	case chaincfg.TestNet3Params.Name:
+		client.chainParams = &chaincfg.TestNet3Params
+	case chaincfg.RegressionNetParams.Name:
+		client.chainParams = &chaincfg.RegressionNetParams
+	case chaincfg.SimNetParams.Name:
+		client.chainParams = &chaincfg.SimNetParams
+	default:
+		return nil, fmt.Errorf("rpcclient.New: Unknown chain %s", config.Params)
 	}
 
 	if start {
