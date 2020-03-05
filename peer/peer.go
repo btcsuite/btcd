@@ -481,7 +481,6 @@ type Peer struct {
 	pingTickerTimerMtx sync.Mutex
 	pingTickerTimer    *time.Timer
 
-	invVects                chan *wire.InvVect
 	trickleInvVectsTimerMtx sync.Mutex
 	trickleInvVectsTimer    *time.Timer
 
@@ -1771,17 +1770,17 @@ func (p *Peer) trickleInvVects() {
 		p.trickleInvVectsTimerMtx.Unlock()
 	}()
 
-	invMsg := wire.NewMsgInvSizeHint(uint(len(p.invVects)))
+	invMsg := wire.NewMsgInvSizeHint(uint(len(p.outputInvChan)))
 	for {
 		select {
-		case invVect := <-p.invVects:
+		case invVect := <-p.outputInvChan:
 			if p.knownInventory.Exists(invVect) {
 				break
 			}
 			invMsg.AddInvVect(invVect)
 			if len(invMsg.InvList) >= maxInvTrickleSize {
 				p.QueueMessage(invMsg, nil)
-				invMsg = wire.NewMsgInvSizeHint(uint(len(p.invVects)))
+				invMsg = wire.NewMsgInvSizeHint(uint(len(p.outputInvChan)))
 			}
 			p.AddKnownInventory(invVect)
 		default:
@@ -1984,7 +1983,7 @@ func (p *Peer) QueueInventory(invVect *wire.InvVect) {
 		return
 	}
 
-	p.invVects <- invVect
+	p.outputInvChan <- invVect
 }
 
 
@@ -2043,7 +2042,7 @@ func (p *Peer) Disconnect() {
 		p.conn.Close()
 	}
 
-	// It is important to set the ping and invVects timers to nil in order to
+	// It is important to set the ping and outputInvChan timers to nil in order to
 	// prevent a race if the timer functions are concurrently executing.
 	p.pingTickerTimerMtx.Lock()
 	if p.pingTickerTimer != nil {
@@ -2370,16 +2369,28 @@ func (p *Peer) readRemoteVersionMsg() error {
 	return nil
 }
 
-// negotiateOutboundProtocol sends our version message then waits to receive a
-// version message from the peer.  If the events do not occur in that order then
-// it returns an error.
+// negotiateOutboundProtocol performs the negotiation protocol for an outbound
+// peer. The events should occur in the following order, otherwise an error is
+// returned:
+//
+//   1. We send our version.
+//   2. Remote peer sends their version.
+//   3. Remote peer sends their verack.
+//   4. We send our verack.
 func (p *Peer) negotiateOutboundProtocol() error {
-
 	if err := p.writeLocalVersionMsg(); err != nil {
 		return err
 	}
 
-	return p.readRemoteVersionMsg()
+	if err := p.readRemoteVersionMsg(); err != nil {
+		return err
+	}
+
+	if err := p.readRemoteVerAckMsg(); err != nil {
+		return err
+	}
+
+	return p.writeMessage(wire.NewMsgVerAck(), wire.LatestEncoding)
 }
 
 // newPeerBase returns a new base bitcoin peer based on the inbound flag.  This
@@ -2407,7 +2418,7 @@ func newPeerBase(origCfg *Config, inbound bool) *Peer {
 		inbound:         inbound,
 		wireEncoding:    wire.BaseEncoding,
 		knownInventory:  newMruInventoryMap(maxKnownInventory),
-		invVects:        make(chan *wire.InvVect, outputBufferSize),
+		outputInvChan:        make(chan *wire.InvVect, outputBufferSize),
 		stallControl:    make(chan stallControlMsg, 1), // nonblocking sync
 		outputQueue:     make(chan outMsg, outputBufferSize),
 		sendQueue:       make(chan outMsg, 1),   // nonblocking sync
