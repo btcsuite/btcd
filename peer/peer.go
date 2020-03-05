@@ -1725,7 +1725,6 @@ func (p *Peer) queueHandler() {
 	trickleTicker := time.NewTicker(p.cfg.TrickleInterval)
 	defer trickleTicker.Stop()
 
-
 	// To avoid duplication below.
 	queuePacket := func(msg outMsg, list *list.List, waiting bool) bool {
 		if !waiting {
@@ -2254,7 +2253,6 @@ func (p *Peer) negotiateInboundProtocol() error {
 	return p.readRemoteVerAckMsg()
 }
 
-
 // start begins processing input and output messages.
 func (p *Peer) start() error {
 	log.Tracef("Starting peer %s", p)
@@ -2383,7 +2381,7 @@ func newPeerBase(origCfg *Config, inbound bool) *Peer {
 		inbound:         inbound,
 		wireEncoding:    wire.BaseEncoding,
 		knownInventory:  newMruInventoryMap(maxKnownInventory),
-		outputInvChan:        make(chan *wire.InvVect, outputBufferSize),
+		outputInvChan:   make(chan *wire.InvVect, outputBufferSize),
 		stallControl:    make(chan stallControlMsg, 1), // nonblocking sync
 		outputQueue:     make(chan outMsg, outputBufferSize),
 		sendQueue:       make(chan outMsg, 1),   // nonblocking sync
