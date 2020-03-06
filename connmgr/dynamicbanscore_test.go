@@ -66,3 +66,15 @@ func TestDynamicBanScoreReset(t *testing.T) {
 		t.Errorf("Failed to reset ban score.")
 	}
 }
+
+// TestDynamicBanScoreString
+func TestDynamicBanScoreString(t *testing.T) {
+	var bs DynamicBanScore
+	base := time.Now()
+
+	r := bs.increase(100, 50, base)
+	if r != 150 {
+		t.Errorf("Unexpected result %d after ban score increase.", r)
+	}
+	t.Log(bs.String())
+}
