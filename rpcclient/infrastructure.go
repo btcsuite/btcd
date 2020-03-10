@@ -162,6 +162,10 @@ type Client struct {
 	// disconnected indicated whether or not the server is disconnected.
 	disconnected bool
 
+	// wether or not to batch requests, false unless changed by Bulk()
+	batch     bool
+	batchList *list.List
+
 	// retryCount holds the number of times the client has tried to
 	// reconnect to the RPC server.
 	retryCount int64
@@ -219,8 +223,13 @@ func (c *Client) addRequest(jReq *jsonRequest) error {
 	default:
 	}
 
-	element := c.requestList.PushBack(jReq)
-	c.requestMap[jReq.id] = element
+	if !c.batch {
+		element := c.requestList.PushBack(jReq)
+		c.requestMap[jReq.id] = element
+	} else {
+		element := c.batchList.PushBack(jReq)
+		c.requestMap[jReq.id] = element
+	}
 	return nil
 }
 
@@ -740,7 +749,12 @@ func (c *Client) handleSendPostMessage(details *sendPostDetails) {
 
 	// Try to unmarshal the response as a regular JSON-RPC response.
 	var resp rawResponse
-	err = json.Unmarshal(respBytes, &resp)
+	var batchResponse json.RawMessage
+	if c.batch {
+		err = json.Unmarshal(respBytes, &batchResponse)
+	} else {
+		err = json.Unmarshal(respBytes, &resp)
+	}
 	if err != nil {
 		// When the response itself isn't a valid JSON-RPC response
 		// return an error which includes the HTTP status code and raw
@@ -750,8 +764,14 @@ func (c *Client) handleSendPostMessage(details *sendPostDetails) {
 		jReq.responseChan <- &response{err: err}
 		return
 	}
-
-	res, err := resp.result()
+	var res []byte
+	if c.batch {
+		// errors must be dealt with downstream since a whole request cannot
+		// "error out" other than through the status code error handled above
+		res, err = batchResponse, nil
+	} else {
+		res, err = resp.result()
+	}
 	jReq.responseChan <- &response{result: res, err: err}
 }
 
@@ -866,7 +886,13 @@ func (c *Client) sendRequest(jReq *jsonRequest) {
 	// POST mode, the command is issued via an HTTP client.  Otherwise,
 	// the command is issued via the asynchronous websocket channels.
 	if c.config.HTTPPostMode {
-		c.sendPost(jReq)
+		if c.batch {
+			if err := c.addRequest(jReq); err != nil {
+				log.Warn(err)
+			}
+		} else {
+			c.sendPost(jReq)
+		}
 		return
 	}
 
@@ -896,6 +922,10 @@ func (c *Client) sendRequest(jReq *jsonRequest) {
 // future.  It handles both websocket and HTTP POST mode depending on the
 // configuration of the client.
 func (c *Client) sendCmd(cmd interface{}) chan *response {
+	rpcVersion := "1.0"
+	if c.batch {
+		rpcVersion = "2.0"
+	}
 	// Get the method associated with the command.
 	method, err := btcjson.CmdMethod(cmd)
 	if err != nil {
@@ -904,7 +934,7 @@ func (c *Client) sendCmd(cmd interface{}) chan *response {
 
 	// Marshal the command.
 	id := c.NextID()
-	marshalledJSON, err := btcjson.MarshalCmd(id, cmd)
+	marshalledJSON, err := btcjson.MarshalCmd(rpcVersion, id, cmd)
 	if err != nil {
 		return newFutureError(err)
 	}
@@ -918,6 +948,7 @@ func (c *Client) sendCmd(cmd interface{}) chan *response {
 		marshalledJSON: marshalledJSON,
 		responseChan:   responseChan,
 	}
+
 	c.sendRequest(jReq)
 
 	return responseChan
@@ -1289,6 +1320,8 @@ func New(config *ConnConfig, ntfnHandlers *NotificationHandlers) (*Client, error
 		httpClient:      httpClient,
 		requestMap:      make(map[uint64]*list.Element),
 		requestList:     list.New(),
+		batch:           false,
+		batchList:       list.New(),
 		ntfnHandlers:    ntfnHandlers,
 		ntfnState:       newNotificationState(),
 		sendChan:        make(chan []byte, sendBufferSize),
@@ -1465,4 +1498,66 @@ func (c *Client) BackendVersion() (BackendVersion, error) {
 	c.backendVersion = &version
 
 	return *c.backendVersion, nil
+}
+
+// Batch makes batch requests
+func (c *Client) Batch() *Client {
+	c.batch = true //copy the client with changed batch setting
+	c.start()
+	return c
+}
+
+func (c *Client) sendAsync() FutureGetBulkResult {
+	// convert the array of marshalled json requests to a single request we can send
+	responseChan := make(chan *response, 1)
+	marshalledRequest := []byte("[")
+	for iter := c.batchList.Front(); iter != nil; iter = iter.Next() {
+		request := iter.Value.(*jsonRequest)
+		marshalledRequest = append(marshalledRequest, request.marshalledJSON...)
+		marshalledRequest = append(marshalledRequest, []byte(",")...)
+	}
+	if len(marshalledRequest) > 0 {
+		marshalledRequest = marshalledRequest[:len(marshalledRequest)-1]
+	}
+	marshalledRequest = append(marshalledRequest, []byte("]")...)
+	request := jsonRequest{
+		id:             c.NextID(),
+		method:         "",
+		cmd:            nil,
+		marshalledJSON: marshalledRequest,
+		responseChan:   responseChan,
+	}
+	c.sendPost(&request)
+	return responseChan
+}
+
+// Send sends batch requests
+func (c *Client) Send() error {
+	result, err := c.sendAsync().Receive()
+
+	if err != nil {
+		return err
+	}
+
+	for iter := c.batchList.Front(); iter != nil; iter = iter.Next() {
+		var requestError error
+		request := iter.Value.(*jsonRequest)
+		individualResult := result[request.id]
+		fullResult, err := json.Marshal(individualResult.Result)
+		if err != nil {
+			return err
+		}
+
+		if individualResult.Error != "" {
+			requestError = errors.New(individualResult.Error)
+		}
+
+		result := response{
+			result: fullResult,
+			err:    requestError,
+		}
+		request.responseChan <- &result
+	}
+	c.batchList = list.New()
+	return nil
 }

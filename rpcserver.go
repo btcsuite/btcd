@@ -101,6 +101,9 @@ var (
 	// declared here to avoid the overhead of creating the slice on every
 	// invocation for constant data.
 	gbtCapabilities = []string{"proposal"}
+
+	// JSON 2.0 batched request prefix
+	batchedRequestPrefix = []byte("[")
 )
 
 // Errors
@@ -3827,10 +3830,11 @@ func (s *rpcServer) checkAuth(r *http.Request, require bool) (bool, bool, error)
 // a known concrete command along with any error that might have happened while
 // parsing it.
 type parsedRPCCmd struct {
-	id     interface{}
-	method string
-	cmd    interface{}
-	err    *btcjson.RPCError
+	jsonrpc string
+	id      interface{}
+	method  string
+	cmd     interface{}
+	err     *btcjson.RPCError
 }
 
 // standardCmdResult checks that a parsed command is a standard Bitcoin JSON-RPC
@@ -3863,7 +3867,12 @@ handled:
 // is suitable for use in replies if the command is invalid in some way such as
 // an unregistered command or invalid parameters.
 func parseCmd(request *btcjson.Request) *parsedRPCCmd {
-	var parsedCmd parsedRPCCmd
+	parsedCmd := parsedRPCCmd{
+		jsonrpc: request.Jsonrpc,
+		id:      request.ID,
+		method:  request.Method,
+	}
+
 	parsedCmd.id = request.ID
 	parsedCmd.method = request.Method
 
@@ -3892,7 +3901,7 @@ func parseCmd(request *btcjson.Request) *parsedRPCCmd {
 // createMarshalledReply returns a new marshalled JSON-RPC response given the
 // passed parameters.  It will automatically convert errors that are not of
 // the type *btcjson.RPCError to the appropriate type as needed.
-func createMarshalledReply(id, result interface{}, replyErr error) ([]byte, error) {
+func createMarshalledReply(rpcVersion string, id interface{}, result interface{}, replyErr error) ([]byte, error) {
 	var jsonErr *btcjson.RPCError
 	if replyErr != nil {
 		if jErr, ok := replyErr.(*btcjson.RPCError); ok {
@@ -3902,7 +3911,60 @@ func createMarshalledReply(id, result interface{}, replyErr error) ([]byte, erro
 		}
 	}
 
-	return btcjson.MarshalResponse(id, result, jsonErr)
+	return btcjson.MarshalResponse(rpcVersion, id, result, jsonErr)
+}
+
+// processRequest determines the incoming request type (single or batched),
+// parses it and returns a marshalled response.
+func (s *rpcServer) processRequest(request *btcjson.Request, isAdmin bool, closeChan <-chan struct{}) []byte {
+	var result interface{}
+	var jsonErr *btcjson.RPCError
+
+	if !isAdmin {
+		if _, ok := rpcLimited[request.Method]; !ok {
+			jsonErr = internalRPCError("limited user not "+
+				"authorized for this method", "")
+		}
+	}
+
+	if jsonErr == nil {
+		if request.Method == "" || request.Params == nil {
+			jsonErr = &btcjson.RPCError{
+				Code:    btcjson.ErrRPCInvalidRequest.Code,
+				Message: "Invalid request: malformed",
+			}
+			msg, err := createMarshalledReply(request.Jsonrpc, request.ID, result, jsonErr)
+			if err != nil {
+				rpcsLog.Errorf("Failed to marshal reply: %v", err)
+				return nil
+			}
+			return msg
+		}
+
+		// Valid requests with no ID (notifications) must not have a response
+		// per the JSON-RPC spec.
+		if request.ID == nil {
+			return nil
+		}
+
+		// Attempt to parse the JSON-RPC request into a known
+		// concrete command.
+		parsedCmd := parseCmd(request)
+		if parsedCmd.err != nil {
+			jsonErr = parsedCmd.err
+		} else {
+			result, _ = s.standardCmdResult(parsedCmd,
+				closeChan)
+		}
+	}
+
+	// Marshal the response.
+	msg, err := createMarshalledReply(request.Jsonrpc, request.ID, result, jsonErr)
+	if err != nil {
+		rpcsLog.Errorf("Failed to marshal reply: %v", err)
+		return nil
+	}
+	return msg
 }
 
 // jsonRPCRead handles reading and responding to RPC messages.
@@ -3947,80 +4009,165 @@ func (s *rpcServer) jsonRPCRead(w http.ResponseWriter, r *http.Request, isAdmin 
 	conn.SetReadDeadline(timeZeroVal)
 
 	// Attempt to parse the raw body into a JSON-RPC request.
-	var responseID interface{}
-	var jsonErr error
-	var result interface{}
-	var request btcjson.Request
-	if err := json.Unmarshal(body, &request); err != nil {
-		jsonErr = &btcjson.RPCError{
-			Code:    btcjson.ErrRPCParse.Code,
-			Message: "Failed to parse request: " + err.Error(),
+	// Setup a close notifier.  Since the connection is hijacked,
+	// the CloseNotifer on the ResponseWriter is not available.
+	closeChan := make(chan struct{}, 1)
+	go func() {
+		_, err = conn.Read(make([]byte, 1))
+		if err != nil {
+			close(closeChan)
+		}
+	}()
+
+	var results []json.RawMessage
+	var batchSize int
+	var batchedRequest bool
+
+	// Determine request type
+	if bytes.HasPrefix(body, batchedRequestPrefix) {
+		batchedRequest = true
+	}
+
+	// Process a single request
+	if !batchedRequest {
+		var req btcjson.Request
+		var resp json.RawMessage
+		err = json.Unmarshal(body, &req)
+		if err != nil {
+			jsonErr := &btcjson.RPCError{
+				Code: btcjson.ErrRPCParse.Code,
+				Message: fmt.Sprintf("Failed to parse request: %v",
+					err),
+			}
+			resp, err = btcjson.MarshalResponse("1.0", nil, nil, jsonErr)
+			if err != nil {
+				rpcsLog.Errorf("Failed to create reply: %v", err)
+			}
+		}
+
+		if err == nil {
+			resp = s.processRequest(&req, isAdmin, closeChan)
+		}
+
+		if resp != nil {
+			results = append(results, resp)
 		}
 	}
-	if jsonErr == nil {
-		// The JSON-RPC 1.0 spec defines that notifications must have their "id"
-		// set to null and states that notifications do not have a response.
-		//
-		// A JSON-RPC 2.0 notification is a request with "json-rpc":"2.0", and
-		// without an "id" member. The specification states that notifications
-		// must not be responded to. JSON-RPC 2.0 permits the null value as a
-		// valid request id, therefore such requests are not notifications.
-		//
-		// Bitcoin Core serves requests with "id":null or even an absent "id",
-		// and responds to such requests with "id":null in the response.
-		//
-		// Btcd does not respond to any request without and "id" or "id":null,
-		// regardless the indicated JSON-RPC protocol version unless RPC quirks
-		// are enabled. With RPC quirks enabled, such requests will be responded
-		// to if the reqeust does not indicate JSON-RPC version.
-		//
-		// RPC quirks can be enabled by the user to avoid compatibility issues
-		// with software relying on Core's behavior.
-		if request.ID == nil && !(cfg.RPCQuirks && request.Jsonrpc == "") {
-			return
+
+	// Process a batched request
+	if batchedRequest {
+		var batchedRequests []interface{}
+		var resp json.RawMessage
+		err = json.Unmarshal(body, &batchedRequests)
+		if err != nil {
+			jsonErr := &btcjson.RPCError{
+				Code: btcjson.ErrRPCParse.Code,
+				Message: fmt.Sprintf("Failed to parse request: %v",
+					err),
+			}
+			resp, err = btcjson.MarshalResponse("2.0", nil, nil, jsonErr)
+			if err != nil {
+				rpcsLog.Errorf("Failed to create reply: %v", err)
+			}
+
+			if resp != nil {
+				results = append(results, resp)
+			}
 		}
 
-		// The parse was at least successful enough to have an ID so
-		// set it for the response.
-		responseID = request.ID
+		if err == nil {
+			// Response with an empty batch error if the batch size is zero
+			if len(batchedRequests) == 0 {
+				jsonErr := &btcjson.RPCError{
+					Code:    btcjson.ErrRPCInvalidRequest.Code,
+					Message: fmt.Sprint("Invalid request: empty batch"),
+				}
+				resp, err = btcjson.MarshalResponse("2.0", nil, nil, jsonErr)
+				if err != nil {
+					rpcsLog.Errorf("Failed to marshal reply: %v", err)
+				}
 
-		// Setup a close notifier.  Since the connection is hijacked,
-		// the CloseNotifer on the ResponseWriter is not available.
-		closeChan := make(chan struct{}, 1)
-		go func() {
-			_, err := conn.Read(make([]byte, 1))
-			if err != nil {
-				close(closeChan)
+				if resp != nil {
+					results = append(results, resp)
+				}
 			}
-		}()
 
-		// Check if the user is limited and set error if method unauthorized
-		if !isAdmin {
-			if _, ok := rpcLimited[request.Method]; !ok {
-				jsonErr = &btcjson.RPCError{
-					Code:    btcjson.ErrRPCInvalidParams.Code,
-					Message: "limited user not authorized for this method",
+			// Process each batch entry individually
+			if len(batchedRequests) > 0 {
+				batchSize = len(batchedRequests)
+
+				for _, entry := range batchedRequests {
+					var reqBytes []byte
+					reqBytes, err = json.Marshal(entry)
+					if err != nil {
+						jsonErr := &btcjson.RPCError{
+							Code: btcjson.ErrRPCInvalidRequest.Code,
+							Message: fmt.Sprintf("Invalid request: %v",
+								err),
+						}
+						resp, err = btcjson.MarshalResponse("2.0", nil, nil, jsonErr)
+						if err != nil {
+							rpcsLog.Errorf("Failed to create reply: %v", err)
+						}
+
+						if resp != nil {
+							results = append(results, resp)
+						}
+						continue
+					}
+
+					var req btcjson.Request
+					err := json.Unmarshal(reqBytes, &req)
+					if err != nil {
+						jsonErr := &btcjson.RPCError{
+							Code: btcjson.ErrRPCInvalidRequest.Code,
+							Message: fmt.Sprintf("Invalid request: %v",
+								err),
+						}
+						resp, err = btcjson.MarshalResponse("", nil, nil, jsonErr)
+						if err != nil {
+							rpcsLog.Errorf("Failed to create reply: %v", err)
+						}
+
+						if resp != nil {
+							results = append(results, resp)
+						}
+						continue
+					}
+
+					resp = s.processRequest(&req, isAdmin, closeChan)
+					if resp != nil {
+						results = append(results, resp)
+					}
 				}
 			}
 		}
+	}
 
-		if jsonErr == nil {
-			// Attempt to parse the JSON-RPC request into a known concrete
-			// command.
-			parsedCmd := parseCmd(&request)
-			if parsedCmd.err != nil {
-				jsonErr = parsedCmd.err
-			} else {
-				result, jsonErr = s.standardCmdResult(parsedCmd, closeChan)
+	var msg = []byte{}
+	if batchedRequest && batchSize > 0 {
+		if len(results) > 0 {
+			// Form the batched response json
+			var buffer bytes.Buffer
+			buffer.WriteByte('[')
+			for idx, reply := range results {
+				if idx == len(results)-1 {
+					buffer.Write(reply)
+					buffer.WriteByte(']')
+					break
+				}
+				buffer.Write(reply)
+				buffer.WriteByte(',')
 			}
+			msg = buffer.Bytes()
 		}
 	}
 
-	// Marshal the response.
-	msg, err := createMarshalledReply(responseID, result, jsonErr)
-	if err != nil {
-		rpcsLog.Errorf("Failed to marshal reply: %v", err)
-		return
+	if !batchedRequest || batchSize == 0 {
+		// Respond with the first results entry for single requests
+		if len(results) > 0 {
+			msg = results[0]
+		}
 	}
 
 	// Write the response.
