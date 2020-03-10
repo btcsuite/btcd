@@ -28,4 +28,4 @@ test -z "$(gometalinter.v2 -j 4 --disable-all \
 --enable=gosimple \
 --enable=unconvert \
 --deadline=10m $linter_targets 2>&1 | grep -v 'ALL_CAPS\|OP_' 2>&1 | tee /dev/stderr)"
-GO111MODULE=on go test -count=1 -tags="rpctest" $linter_targets
+GO111MODULE=on go test -tags="rpctest" $linter_targets
