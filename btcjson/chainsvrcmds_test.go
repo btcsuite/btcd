@@ -1460,6 +1460,18 @@ func TestChainSvrCmds(t *testing.T) {
 			marshalled:   `{"jsonrpc":"1.0","method":"getdescriptorinfo","params":["123"],"id":1}`,
 			unmarshalled: &btcjson.GetDescriptorInfoCmd{Descriptor: "123"},
 		},
+		{
+			name: "getzmqnotifications",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("getzmqnotifications")
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewGetZmqNotificationsCmd()
+			},
+
+			marshalled:   `{"jsonrpc":"1.0","method":"getzmqnotifications","params":[],"id":1}`,
+			unmarshalled: &btcjson.GetZmqNotificationsCmd{},
+		},
 	}
 
 	t.Logf("Running %d tests", len(tests))

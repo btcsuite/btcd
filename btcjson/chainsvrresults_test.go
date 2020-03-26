@@ -6,12 +6,13 @@ package btcjson_test
 
 import (
 	"encoding/json"
+	"net/url"
 	"reflect"
 	"testing"
 
 	"github.com/btcsuite/btcd/btcjson"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/btcutil"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/davecgh/go-spew/spew"
 )
 
@@ -71,6 +72,21 @@ func TestChainSvrCustomResults(t *testing.T) {
 				Sequence: 4294967295,
 			},
 			expected: `{"txid":"123","vout":1,"scriptSig":{"asm":"0","hex":"00"},"prevOut":{"addresses":["addr1"],"value":0},"sequence":4294967295}`,
+		},
+		{
+			name: "zmq notification",
+			result: &btcjson.GetZmqNotificationResult{{
+				Type: "pubrawblock",
+				Address: func() *url.URL {
+					u, err := url.Parse("tcp://127.0.0.1:1238")
+					if err != nil {
+						panic(err)
+					}
+					return u
+				}(),
+				HighWaterMark: 1337,
+			}},
+			expected: `[{"address":"tcp://127.0.0.1:1238","hwm":1337,"type":"pubrawblock"}]`,
 		},
 	}
 
