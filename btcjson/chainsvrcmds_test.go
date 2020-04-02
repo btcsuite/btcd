@@ -61,6 +61,21 @@ func TestChainSvrCmds(t *testing.T) {
 			},
 		},
 		{
+			name: "createrawtransaction - no inputs",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("createrawtransaction", `[]`, `{"456":0.0123}`)
+			},
+			staticCmd: func() interface{} {
+				amounts := map[string]float64{"456": .0123}
+				return btcjson.NewCreateRawTransactionCmd(nil, amounts, nil)
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"createrawtransaction","params":[[],{"456":0.0123}],"id":1}`,
+			unmarshalled: &btcjson.CreateRawTransactionCmd{
+				Inputs:  []btcjson.TransactionInput{},
+				Amounts: map[string]float64{"456": .0123},
+			},
+		},
+		{
 			name: "createrawtransaction optional",
 			newCmd: func() (interface{}, error) {
 				return btcjson.NewCmd("createrawtransaction", `[{"txid":"123","vout":1}]`,

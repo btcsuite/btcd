@@ -261,7 +261,8 @@ func (c *Client) CreateRawTransactionAsync(inputs []btcjson.TransactionInput,
 }
 
 // CreateRawTransaction returns a new transaction spending the provided inputs
-// and sending to the provided addresses.
+// and sending to the provided addresses. If the inputs are either nil or an
+// empty slice, it is interpreted as an empty slice.
 func (c *Client) CreateRawTransaction(inputs []btcjson.TransactionInput,
 	amounts map[btcutil.Address]btcutil.Amount, lockTime *int64) (*wire.MsgTx, error) {
 
