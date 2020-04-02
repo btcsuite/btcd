@@ -63,10 +63,15 @@ type CreateRawTransactionCmd struct {
 // NewCreateRawTransactionCmd returns a new instance which can be used to issue
 // a createrawtransaction JSON-RPC command.
 //
-// Amounts are in BTC.
+// Amounts are in BTC. Passing in nil and the empty slice as inputs is equivalent,
+// both gets interpreted as the empty slice.
 func NewCreateRawTransactionCmd(inputs []TransactionInput, amounts map[string]float64,
 	lockTime *int64) *CreateRawTransactionCmd {
-
+	// to make sure we're serializing this to the empty list and not null, we
+	// explicitly initialize the list
+	if inputs == nil {
+		inputs = []TransactionInput{}
+	}
 	return &CreateRawTransactionCmd{
 		Inputs:   inputs,
 		Amounts:  amounts,
