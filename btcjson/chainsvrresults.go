@@ -98,7 +98,7 @@ type GetBlockVerboseTxResult struct {
 	Version       int32         `json:"version"`
 	VersionHex    string        `json:"versionHex"`
 	MerkleRoot    string        `json:"merkleroot"`
-	Tx            []TxRawResult `json:"tx,omitempty"`
+	Tx            []TxRawResult `json:"rawtx,omitempty"`
 	Time          int64         `json:"time"`
 	Nonce         uint32        `json:"nonce"`
 	Bits          string        `json:"bits"`
