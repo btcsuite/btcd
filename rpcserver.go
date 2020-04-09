@@ -1081,14 +1081,12 @@ func handleGetBlock(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 			Message: "Block not found",
 		}
 	}
-
-	// When the verbose flag isn't set, simply return the serialized block
-	// as a hex-encoded string.
+	// If verbosity is 0, return the serialized block as a hex encoded string.
 	if c.Verbosity != nil && *c.Verbosity == 0 {
 		return hex.EncodeToString(blkBytes), nil
 	}
 
-	// The verbose flag is set, so generate the JSON object and return it.
+	// Otherwise, generate the JSON object and return it.
 
 	// Deserialize the block.
 	blk, err := btcutil.NewBlockFromBytes(blkBytes)

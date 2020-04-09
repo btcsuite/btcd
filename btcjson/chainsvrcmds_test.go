@@ -154,6 +154,20 @@ func TestChainSvrCmds(t *testing.T) {
 			},
 		},
 		{
+			name: "getblock default verbosity",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("getblock", "123")
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewGetBlockCmd("123", nil)
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"getblock","params":["123"],"id":1}`,
+			unmarshalled: &btcjson.GetBlockCmd{
+				Hash:      "123",
+				Verbosity: btcjson.Int(1),
+			},
+		},
+		{
 			name: "getblock required optional1",
 			newCmd: func() (interface{}, error) {
 				return btcjson.NewCmd("getblock", "123", btcjson.Int(1))
