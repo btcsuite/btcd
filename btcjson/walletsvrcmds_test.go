@@ -1243,9 +1243,9 @@ func TestWalletSvrCmds(t *testing.T) {
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"signrawtransactionwithwallet","params":["001122"],"id":1}`,
 			unmarshalled: &btcjson.SignRawTransactionWithWalletCmd{
-				RawTx:  "001122",
-				Inputs: nil,
-				Flags:  btcjson.String("ALL"),
+				RawTx:       "001122",
+				Inputs:      nil,
+				SigHashType: btcjson.String("ALL"),
 			},
 		},
 		{
@@ -1280,7 +1280,7 @@ func TestWalletSvrCmds(t *testing.T) {
 						Amount:        btcjson.Float64(1.5),
 					},
 				},
-				Flags: btcjson.String("ALL"),
+				SigHashType: btcjson.String("ALL"),
 			},
 		},
 		{
@@ -1311,7 +1311,7 @@ func TestWalletSvrCmds(t *testing.T) {
 						RedeemScript: btcjson.String("01"),
 					},
 				},
-				Flags: btcjson.String("ALL"),
+				SigHashType: btcjson.String("ALL"),
 			},
 		},
 		{
@@ -1325,9 +1325,9 @@ func TestWalletSvrCmds(t *testing.T) {
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"signrawtransactionwithwallet","params":["001122",[],"ALL"],"id":1}`,
 			unmarshalled: &btcjson.SignRawTransactionWithWalletCmd{
-				RawTx:  "001122",
-				Inputs: &[]btcjson.RawTxWitnessInput{},
-				Flags:  btcjson.String("ALL"),
+				RawTx:       "001122",
+				Inputs:      &[]btcjson.RawTxWitnessInput{},
+				SigHashType: btcjson.String("ALL"),
 			},
 		},
 		{

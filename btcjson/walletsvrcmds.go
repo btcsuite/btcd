@@ -683,9 +683,9 @@ type RawTxWitnessInput struct {
 
 // SignRawTransactionWithWalletCmd defines the signrawtransactionwithwallet JSON-RPC command.
 type SignRawTransactionWithWalletCmd struct {
-	RawTx  string
-	Inputs *[]RawTxWitnessInput
-	Flags  *string `jsonrpcdefault:"\"ALL\""`
+	RawTx       string
+	Inputs      *[]RawTxWitnessInput
+	SigHashType *string `jsonrpcdefault:"\"ALL\""`
 }
 
 // NewSignRawTransactionWithWalletCmd returns a new instance which can be used to issue a
@@ -693,11 +693,11 @@ type SignRawTransactionWithWalletCmd struct {
 //
 // The parameters which are pointers indicate they are optional.  Passing nil
 // for optional parameters will use the default value.
-func NewSignRawTransactionWithWalletCmd(hexEncodedTx string, inputs *[]RawTxWitnessInput, flags *string) *SignRawTransactionWithWalletCmd {
+func NewSignRawTransactionWithWalletCmd(hexEncodedTx string, inputs *[]RawTxWitnessInput, sigHashType *string) *SignRawTransactionWithWalletCmd {
 	return &SignRawTransactionWithWalletCmd{
-		RawTx:  hexEncodedTx,
-		Inputs: inputs,
-		Flags:  flags,
+		RawTx:       hexEncodedTx,
+		Inputs:      inputs,
+		SigHashType: sigHashType,
 	}
 }
 
