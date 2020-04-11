@@ -1234,6 +1234,103 @@ func TestWalletSvrCmds(t *testing.T) {
 			},
 		},
 		{
+			name: "signrawtransactionwithwallet",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("signrawtransactionwithwallet", "001122")
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewSignRawTransactionWithWalletCmd("001122", nil, nil)
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"signrawtransactionwithwallet","params":["001122"],"id":1}`,
+			unmarshalled: &btcjson.SignRawTransactionWithWalletCmd{
+				RawTx:       "001122",
+				Inputs:      nil,
+				SigHashType: btcjson.String("ALL"),
+			},
+		},
+		{
+			name: "signrawtransactionwithwallet optional1",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("signrawtransactionwithwallet", "001122", `[{"txid":"123","vout":1,"scriptPubKey":"00","redeemScript":"01","witnessScript":"02","amount":1.5}]`)
+			},
+			staticCmd: func() interface{} {
+				txInputs := []btcjson.RawTxWitnessInput{
+					{
+						Txid:          "123",
+						Vout:          1,
+						ScriptPubKey:  "00",
+						RedeemScript:  btcjson.String("01"),
+						WitnessScript: btcjson.String("02"),
+						Amount:        btcjson.Float64(1.5),
+					},
+				}
+
+				return btcjson.NewSignRawTransactionWithWalletCmd("001122", &txInputs, nil)
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"signrawtransactionwithwallet","params":["001122",[{"txid":"123","vout":1,"scriptPubKey":"00","redeemScript":"01","witnessScript":"02","amount":1.5}]],"id":1}`,
+			unmarshalled: &btcjson.SignRawTransactionWithWalletCmd{
+				RawTx: "001122",
+				Inputs: &[]btcjson.RawTxWitnessInput{
+					{
+						Txid:          "123",
+						Vout:          1,
+						ScriptPubKey:  "00",
+						RedeemScript:  btcjson.String("01"),
+						WitnessScript: btcjson.String("02"),
+						Amount:        btcjson.Float64(1.5),
+					},
+				},
+				SigHashType: btcjson.String("ALL"),
+			},
+		},
+		{
+			name: "signrawtransactionwithwallet optional1 with blank fields in input",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("signrawtransactionwithwallet", "001122", `[{"txid":"123","vout":1,"scriptPubKey":"00","redeemScript":"01"}]`)
+			},
+			staticCmd: func() interface{} {
+				txInputs := []btcjson.RawTxWitnessInput{
+					{
+						Txid:         "123",
+						Vout:         1,
+						ScriptPubKey: "00",
+						RedeemScript: btcjson.String("01"),
+					},
+				}
+
+				return btcjson.NewSignRawTransactionWithWalletCmd("001122", &txInputs, nil)
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"signrawtransactionwithwallet","params":["001122",[{"txid":"123","vout":1,"scriptPubKey":"00","redeemScript":"01"}]],"id":1}`,
+			unmarshalled: &btcjson.SignRawTransactionWithWalletCmd{
+				RawTx: "001122",
+				Inputs: &[]btcjson.RawTxWitnessInput{
+					{
+						Txid:         "123",
+						Vout:         1,
+						ScriptPubKey: "00",
+						RedeemScript: btcjson.String("01"),
+					},
+				},
+				SigHashType: btcjson.String("ALL"),
+			},
+		},
+		{
+			name: "signrawtransactionwithwallet optional2",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("signrawtransactionwithwallet", "001122", `[]`, "ALL")
+			},
+			staticCmd: func() interface{} {
+				txInputs := []btcjson.RawTxWitnessInput{}
+				return btcjson.NewSignRawTransactionWithWalletCmd("001122", &txInputs, btcjson.String("ALL"))
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"signrawtransactionwithwallet","params":["001122",[],"ALL"],"id":1}`,
+			unmarshalled: &btcjson.SignRawTransactionWithWalletCmd{
+				RawTx:       "001122",
+				Inputs:      &[]btcjson.RawTxWitnessInput{},
+				SigHashType: btcjson.String("ALL"),
+			},
+		},
+		{
 			name: "walletlock",
 			newCmd: func() (interface{}, error) {
 				return btcjson.NewCmd("walletlock")

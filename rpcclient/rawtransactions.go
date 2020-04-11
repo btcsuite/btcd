@@ -555,7 +555,7 @@ func (c *Client) SignRawTransaction4Async(tx *wire.MsgTx,
 	return c.sendCmd(cmd)
 }
 
-// SignRawTransaction4 signs inputs for the passed transaction using the
+// SignRawTransaction4 signs inputs for the passed transaction using
 // the specified signature hash type given the list of information about extra
 // input transactions and a potential list of private keys needed to perform
 // the signing process.  The private keys, if specified, must be in wallet
@@ -580,6 +580,149 @@ func (c *Client) SignRawTransaction4(tx *wire.MsgTx,
 
 	return c.SignRawTransaction4Async(tx, inputs, privKeysWIF,
 		hashType).Receive()
+}
+
+// FutureSignRawTransactionWithWalletResult is a future promise to deliver
+// the result of the SignRawTransactionWithWalletAsync RPC invocation (or
+// an applicable error).
+type FutureSignRawTransactionWithWalletResult chan *response
+
+// Receive waits for the response promised by the future and returns the
+// signed transaction as well as whether or not all inputs are now signed.
+func (r FutureSignRawTransactionWithWalletResult) Receive() (*wire.MsgTx, bool, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, false, err
+	}
+
+	// Unmarshal as a signtransactionwithwallet result.
+	var signRawTxWithWalletResult btcjson.SignRawTransactionWithWalletResult
+	err = json.Unmarshal(res, &signRawTxWithWalletResult)
+	if err != nil {
+		return nil, false, err
+	}
+
+	// Decode the serialized transaction hex to raw bytes.
+	serializedTx, err := hex.DecodeString(signRawTxWithWalletResult.Hex)
+	if err != nil {
+		return nil, false, err
+	}
+
+	// Deserialize the transaction and return it.
+	var msgTx wire.MsgTx
+	if err := msgTx.Deserialize(bytes.NewReader(serializedTx)); err != nil {
+		return nil, false, err
+	}
+
+	return &msgTx, signRawTxWithWalletResult.Complete, nil
+}
+
+// SignRawTransactionWithWalletAsync returns an instance of a type that can be used
+// to get the result of the RPC at some future time by invoking the Receive function
+// on the returned instance.
+//
+// See SignRawTransactionWithWallet for the blocking version and more details.
+func (c *Client) SignRawTransactionWithWalletAsync(tx *wire.MsgTx) FutureSignRawTransactionWithWalletResult {
+	txHex := ""
+	if tx != nil {
+		// Serialize the transaction and convert to hex string.
+		buf := bytes.NewBuffer(make([]byte, 0, tx.SerializeSize()))
+		if err := tx.Serialize(buf); err != nil {
+			return newFutureError(err)
+		}
+		txHex = hex.EncodeToString(buf.Bytes())
+	}
+
+	cmd := btcjson.NewSignRawTransactionWithWalletCmd(txHex, nil, nil)
+	return c.sendCmd(cmd)
+}
+
+// SignRawTransactionWithWallet signs inputs for the passed transaction and returns
+// the signed transaction as well as whether or not all inputs are now signed.
+//
+// This function assumes the RPC server already knows the input transactions for the
+// passed transaction which needs to be signed and uses the default signature hash
+// type.  Use one of the SignRawTransactionWithWallet# variants to specify that
+// information if needed.
+func (c *Client) SignRawTransactionWithWallet(tx *wire.MsgTx) (*wire.MsgTx, bool, error) {
+	return c.SignRawTransactionWithWalletAsync(tx).Receive()
+}
+
+// SignRawTransactionWithWallet2Async returns an instance of a type that can be
+// used to get the result of the RPC at some future time by invoking the Receive
+// function on the returned instance.
+//
+// See SignRawTransactionWithWallet2 for the blocking version and more details.
+func (c *Client) SignRawTransactionWithWallet2Async(tx *wire.MsgTx,
+	inputs []btcjson.RawTxWitnessInput) FutureSignRawTransactionWithWalletResult {
+
+	txHex := ""
+	if tx != nil {
+		// Serialize the transaction and convert to hex string.
+		buf := bytes.NewBuffer(make([]byte, 0, tx.SerializeSize()))
+		if err := tx.Serialize(buf); err != nil {
+			return newFutureError(err)
+		}
+		txHex = hex.EncodeToString(buf.Bytes())
+	}
+
+	cmd := btcjson.NewSignRawTransactionWithWalletCmd(txHex, &inputs, nil)
+	return c.sendCmd(cmd)
+}
+
+// SignRawTransactionWithWallet2 signs inputs for the passed transaction given the
+// list of information about the input transactions needed to perform the signing
+// process.
+//
+// This only input transactions that need to be specified are ones the
+// RPC server does not already know.  Already known input transactions will be
+// merged with the specified transactions.
+//
+// See SignRawTransactionWithWallet if the RPC server already knows the input
+// transactions.
+func (c *Client) SignRawTransactionWithWallet2(tx *wire.MsgTx,
+	inputs []btcjson.RawTxWitnessInput) (*wire.MsgTx, bool, error) {
+
+	return c.SignRawTransactionWithWallet2Async(tx, inputs).Receive()
+}
+
+// SignRawTransactionWithWallet3Async returns an instance of a type that can
+// be used to get the result of the RPC at some future time by invoking the
+// Receive function on the returned instance.
+//
+// See SignRawTransactionWithWallet3 for the blocking version and more details.
+func (c *Client) SignRawTransactionWithWallet3Async(tx *wire.MsgTx,
+	inputs []btcjson.RawTxWitnessInput, hashType SigHashType) FutureSignRawTransactionWithWalletResult {
+
+	txHex := ""
+	if tx != nil {
+		// Serialize the transaction and convert to hex string.
+		buf := bytes.NewBuffer(make([]byte, 0, tx.SerializeSize()))
+		if err := tx.Serialize(buf); err != nil {
+			return newFutureError(err)
+		}
+		txHex = hex.EncodeToString(buf.Bytes())
+	}
+
+	cmd := btcjson.NewSignRawTransactionWithWalletCmd(txHex, &inputs, btcjson.String(string(hashType)))
+	return c.sendCmd(cmd)
+}
+
+// SignRawTransactionWithWallet3 signs inputs for the passed transaction using
+// the specified signature hash type given the list of information about extra
+// input transactions.
+//
+// The only input transactions that need to be specified are ones the RPC server
+// does not already know.  This means the list of transaction inputs can be nil
+// if the RPC server already knows them all.
+//
+// This function should only used if a non-default signature hash type is
+// desired.  Otherwise, see SignRawTransactionWithWallet if the RPC server already
+// knows the input transactions, or SignRawTransactionWihWallet2 if it does not.
+func (c *Client) SignRawTransactionWithWallet3(tx *wire.MsgTx,
+	inputs []btcjson.RawTxWitnessInput, hashType SigHashType) (*wire.MsgTx, bool, error) {
+
+	return c.SignRawTransactionWithWallet3Async(tx, inputs, hashType).Receive()
 }
 
 // FutureSearchRawTransactionsResult is a future promise to deliver the result

@@ -668,6 +668,39 @@ func NewSignRawTransactionCmd(hexEncodedTx string, inputs *[]RawTxInput, privKey
 	}
 }
 
+// RawTxWitnessInput models the data needed for raw transaction input that is used in
+// the SignRawTransactionWithWalletCmd struct. The RedeemScript is required for P2SH inputs,
+// the WitnessScript is required for P2WSH or P2SH-P2WSH witness scripts, and the Amount is
+// required for Segwit inputs. Otherwise, those fields can be left blank.
+type RawTxWitnessInput struct {
+	Txid          string   `json:"txid"`
+	Vout          uint32   `json:"vout"`
+	ScriptPubKey  string   `json:"scriptPubKey"`
+	RedeemScript  *string  `json:"redeemScript,omitempty"`
+	WitnessScript *string  `json:"witnessScript,omitempty"`
+	Amount        *float64 `json:"amount,omitempty"` // In BTC
+}
+
+// SignRawTransactionWithWalletCmd defines the signrawtransactionwithwallet JSON-RPC command.
+type SignRawTransactionWithWalletCmd struct {
+	RawTx       string
+	Inputs      *[]RawTxWitnessInput
+	SigHashType *string `jsonrpcdefault:"\"ALL\""`
+}
+
+// NewSignRawTransactionWithWalletCmd returns a new instance which can be used to issue a
+// signrawtransactionwithwallet JSON-RPC command.
+//
+// The parameters which are pointers indicate they are optional.  Passing nil
+// for optional parameters will use the default value.
+func NewSignRawTransactionWithWalletCmd(hexEncodedTx string, inputs *[]RawTxWitnessInput, sigHashType *string) *SignRawTransactionWithWalletCmd {
+	return &SignRawTransactionWithWalletCmd{
+		RawTx:       hexEncodedTx,
+		Inputs:      inputs,
+		SigHashType: sigHashType,
+	}
+}
+
 // WalletLockCmd defines the walletlock JSON-RPC command.
 type WalletLockCmd struct{}
 
@@ -1035,6 +1068,7 @@ func init() {
 	MustRegisterCmd("settxfee", (*SetTxFeeCmd)(nil), flags)
 	MustRegisterCmd("signmessage", (*SignMessageCmd)(nil), flags)
 	MustRegisterCmd("signrawtransaction", (*SignRawTransactionCmd)(nil), flags)
+	MustRegisterCmd("signrawtransactionwithwallet", (*SignRawTransactionWithWalletCmd)(nil), flags)
 	MustRegisterCmd("walletlock", (*WalletLockCmd)(nil), flags)
 	MustRegisterCmd("walletpassphrase", (*WalletPassphraseCmd)(nil), flags)
 	MustRegisterCmd("walletpassphrasechange", (*WalletPassphraseChangeCmd)(nil), flags)
