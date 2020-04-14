@@ -33,9 +33,9 @@ var (
 type config struct {
 	DataDir        string `short:"b" long:"datadir" description:"Location of the btcd data directory"`
 	DbType         string `long:"dbtype" description:"Database backend to use for the Block Chain"`
-	TestNet3       bool   `long:"testnet" description:"Use the test network"`
 	RegressionTest bool   `long:"regtest" description:"Use the regression test network"`
 	SimNet         bool   `long:"simnet" description:"Use the simulation test network"`
+	TestNet3       bool   `long:"testnet" description:"Use the test network"`
 }
 
 // fileExists reports whether the named file or directory exists.

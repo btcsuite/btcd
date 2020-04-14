@@ -18,10 +18,10 @@ import (
 
 type config struct {
 	Directory    string   `short:"d" long:"directory" description:"Directory to write certificate pair"`
-	Years        int      `short:"y" long:"years" description:"How many years a certificate is valid for"`
-	Organization string   `short:"o" long:"org" description:"Organization in certificate"`
-	ExtraHosts   []string `short:"H" long:"host" description:"Additional hosts/IPs to create certificate for"`
 	Force        bool     `short:"f" long:"force" description:"Force overwriting of any old certs and keys"`
+	ExtraHosts   []string `short:"H" long:"host" description:"Additional hosts/IPs to create certificate for"`
+	Organization string   `short:"o" long:"org" description:"Organization in certificate"`
+	Years        int      `short:"y" long:"years" description:"How many years a certificate is valid for"`
 }
 
 func main() {
