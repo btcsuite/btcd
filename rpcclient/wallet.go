@@ -894,13 +894,28 @@ func (r FutureGetNewAddressResult) Receive() (btcutil.Address, error) {
 //
 // See GetNewAddress for the blocking version and more details.
 func (c *Client) GetNewAddressAsync(account string) FutureGetNewAddressResult {
-	cmd := btcjson.NewGetNewAddressCmd(&account)
+	cmd := btcjson.NewGetNewAddressCmd(&account, nil)
 	return c.sendCmd(cmd)
 }
 
 // GetNewAddress returns a new address.
 func (c *Client) GetNewAddress(account string) (btcutil.Address, error) {
 	return c.GetNewAddressAsync(account).Receive()
+}
+
+// GetNewAddressWithTypeAsync returns an instance of a type that can be used to get the
+// result of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+//
+// See GetNewAddressWithType for the blocking version and more details.
+func (c *Client) GetNewAddressWithTypeAsync(account, addressType string) FutureGetNewAddressResult {
+	cmd := btcjson.NewGetNewAddressCmd(&account, &addressType)
+	return c.sendCmd(cmd)
+}
+
+// GetNewAddressWithType returns a new address with specified type.
+func (c *Client) GetNewAddressWithType(account, addressType string) (btcutil.Address, error) {
+	return c.GetNewAddressWithTypeAsync(account, addressType).Receive()
 }
 
 // FutureGetRawChangeAddressResult is a future promise to deliver the result of

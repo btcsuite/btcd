@@ -166,7 +166,8 @@ func NewGetBalanceCmd(account *string, minConf *int) *GetBalanceCmd {
 
 // GetNewAddressCmd defines the getnewaddress JSON-RPC command.
 type GetNewAddressCmd struct {
-	Account *string
+	Account     *string
+	AddressType *string
 }
 
 // NewGetNewAddressCmd returns a new instance which can be used to issue a
@@ -174,9 +175,10 @@ type GetNewAddressCmd struct {
 //
 // The parameters which are pointers indicate they are optional.  Passing nil
 // for optional parameters will use the default value.
-func NewGetNewAddressCmd(account *string) *GetNewAddressCmd {
+func NewGetNewAddressCmd(account, addressType *string) *GetNewAddressCmd {
 	return &GetNewAddressCmd{
-		Account: account,
+		Account:     account,
+		AddressType: addressType,
 	}
 }
 
