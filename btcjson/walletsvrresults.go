@@ -184,3 +184,18 @@ type ImportMultiResults []struct {
 	Error    *RPCError `json:"error,omitempty"`
 	Warnings *[]string `json:"warnings,omitempty"`
 }
+
+// WalletCreateFundedPsbtResult models the data returned from the
+// walletcreatefundedpsbtresult command.
+type WalletCreateFundedPsbtResult struct {
+	Psbt      string  `json:"psbt"`
+	Fee       float64 `json:"fee"`
+	ChangePos int64   `json:"changepos"`
+}
+
+// WalletProcessPsbtResult models the data returned from the
+// walletprocesspsbtresult command.
+type WalletProcessPsbtResult struct {
+	Psbt     string `json:"psbt"`
+	Complete bool   `json:"complete"`
+}

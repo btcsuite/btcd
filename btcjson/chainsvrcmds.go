@@ -80,11 +80,24 @@ func NewCreateRawTransactionCmd(inputs []TransactionInput, amounts map[string]fl
 	}
 }
 
+// ChangeType defines the different output types to use for the change address
+// of a transaction built by the node.
+type ChangeType string
+
+var (
+	// ChangeTypeLegacy indicates a P2PKH change address type.
+	ChangeTypeLegacy ChangeType = "legacy"
+	// ChangeTypeP2SHSegWit indicates a P2WPKH-in-P2SH change address type.
+	ChangeTypeP2SHSegWit ChangeType = "p2sh-segwit"
+	// ChangeTypeBech32 indicates a P2WPKH change address type.
+	ChangeTypeBech32 ChangeType = "bech32"
+)
+
 // FundRawTransactionOpts are the different options that can be passed to rawtransaction
 type FundRawTransactionOpts struct {
 	ChangeAddress          *string               `json:"changeAddress,omitempty"`
 	ChangePosition         *int                  `json:"changePosition,omitempty"`
-	ChangeType             *string               `json:"change_type,omitempty"`
+	ChangeType             *ChangeType           `json:"change_type,omitempty"`
 	IncludeWatching        *bool                 `json:"includeWatching,omitempty"`
 	LockUnspents           *bool                 `json:"lockUnspents,omitempty"`
 	FeeRate                *float64              `json:"feeRate,omitempty"` // BTC/kB

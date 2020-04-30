@@ -127,7 +127,7 @@ func TestChainSvrCmds(t *testing.T) {
 				}
 				changeAddress := "bcrt1qeeuctq9wutlcl5zatge7rjgx0k45228cxez655"
 				change := 1
-				changeType := "legacy"
+				changeType := btcjson.ChangeTypeLegacy
 				watching := true
 				lockUnspents := true
 				feeRate := 0.7
@@ -151,7 +151,7 @@ func TestChainSvrCmds(t *testing.T) {
 			unmarshalled: func() interface{} {
 				changeAddress := "bcrt1qeeuctq9wutlcl5zatge7rjgx0k45228cxez655"
 				change := 1
-				changeType := "legacy"
+				changeType := btcjson.ChangeTypeLegacy
 				watching := true
 				lockUnspents := true
 				feeRate := 0.7

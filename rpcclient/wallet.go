@@ -2405,6 +2405,95 @@ func (c *Client) GetInfo() (*btcjson.InfoWalletResult, error) {
 	return c.GetInfoAsync().Receive()
 }
 
+// FutureImportPubKeyResult is a future promise to deliver the result of an
+// WalletCreateFundedPsbt RPC invocation (or an applicable error).
+type FutureWalletCreateFundedPsbtResult chan *response
+
+// Receive waits for the response promised by the future and returns the
+// partially signed transaction in PSBT format along with the resulting fee
+// and change output index.
+func (r FutureWalletCreateFundedPsbtResult) Receive() (*btcjson.WalletCreateFundedPsbtResult, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal result as a getinfo result object.
+	var psbtRes btcjson.WalletCreateFundedPsbtResult
+	err = json.Unmarshal(res, &psbtRes)
+	if err != nil {
+		return nil, err
+	}
+
+	return &psbtRes, nil
+}
+
+// WalletCreateFundedPsbtAsync returns an instance of a type that can be used
+// to get the result of the RPC at some future time by invoking the Receive
+// function on the returned instance.
+//
+// See WalletCreateFundedPsbt for the blocking version and more details.
+func (c *Client) WalletCreateFundedPsbtAsync(
+	inputs []btcjson.PsbtInput, outputs []btcjson.PsbtOutput, locktime *uint32,
+	options *btcjson.WalletCreateFundedPsbtOpts, bip32Derivs *bool,
+) FutureWalletCreateFundedPsbtResult {
+	cmd := btcjson.NewWalletCreateFundedPsbtCmd(inputs, outputs, locktime, options, bip32Derivs)
+	return c.sendCmd(cmd)
+}
+
+// WalletCreateFundedPsbt creates and funds a transaction in the Partially
+// Signed Transaction format. Inputs will be added if supplied inputs are not
+// enough.
+func (c *Client) WalletCreateFundedPsbt(
+	inputs []btcjson.PsbtInput, outputs []btcjson.PsbtOutput, locktime *uint32,
+	options *btcjson.WalletCreateFundedPsbtOpts, bip32Derivs *bool,
+) (*btcjson.WalletCreateFundedPsbtResult, error) {
+	return c.WalletCreateFundedPsbtAsync(inputs, outputs, locktime, options, bip32Derivs).Receive()
+}
+
+// FutureWalletProcessPsbtResult is a future promise to deliver the result of a
+// WalletCreateFundedPsb RPC invocation (or an applicable error).
+type FutureWalletProcessPsbtResult chan *response
+
+// Receive waits for the response promised by the future and returns an updated
+// PSBT with signed inputs from the wallet and a boolen indicating if the the
+// transaction has a complete set of signatures.
+func (r FutureWalletProcessPsbtResult) Receive() (*btcjson.WalletProcessPsbtResult, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal result as a getinfo result object.
+	var psbtRes btcjson.WalletProcessPsbtResult
+	err = json.Unmarshal(res, &psbtRes)
+	if err != nil {
+		return nil, err
+	}
+
+	return &psbtRes, nil
+}
+
+// WalletProcessPsbtAsync returns an instance of a type that can be used
+// to get the result of the RPC at some future time by invoking the Receive
+// function on the returned instance.
+//
+// See WalletProcessPsbt for the blocking version and more details.
+func (c *Client) WalletProcessPsbtAsync(
+	psbt string, sign *bool, sighashType SigHashType, bip32Derivs *bool,
+) FutureWalletProcessPsbtResult {
+	cmd := btcjson.NewWalletProcessPsbtCmd(psbt, sign, btcjson.String(sighashType.String()), bip32Derivs)
+	return c.sendCmd(cmd)
+}
+
+// WalletProcessPsbt updates a PSBT with input information from our wallet and
+// then signs inputs.
+func (c *Client) WalletProcessPsbt(
+	psbt string, sign *bool, sighashType SigHashType, bip32Derivs *bool,
+) (*btcjson.WalletProcessPsbtResult, error) {
+	return c.WalletProcessPsbtAsync(psbt, sign, sighashType, bip32Derivs).Receive()
+}
+
 // TODO(davec): Implement
 // backupwallet (NYI in btcwallet)
 // encryptwallet (Won't be supported by btcwallet since it's always encrypted)
