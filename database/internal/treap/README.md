@@ -8,7 +8,7 @@ treap
 Package treap implements a treap data structure that is used to hold ordered
 key/value pairs using a combination of binary search tree and heap semantics.
 It is a self-organizing and randomized data structure that doesn't require
-complex operations to to maintain balance.  Search, insert, and delete
+complex operations to maintain balance.  Search, insert, and delete
 operations are all O(log n).  Both mutable and immutable variants are provided.
 
 The mutable variant is typically faster since it is able to simply update the
