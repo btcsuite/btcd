@@ -363,6 +363,24 @@ func NewGetChainTipsCmd() *GetChainTipsCmd {
 	return &GetChainTipsCmd{}
 }
 
+// GetChainTxStatsCmd defines the getchaintxstats JSON-RPC command.
+type GetChainTxStatsCmd struct {
+	NBlocks   *int32
+	BlockHash *string
+}
+
+// NewGetChainTxStatsCmd returns a new instance which can be used to issue a
+// getchaintxstats JSON-RPC command.
+//
+// The parameters which are pointers indicate they are optional.  Passing nil
+// for optional parameters will use the default value.
+func NewGetChainTxStatsCmd(nBlocks *int32, blockHash *string) *GetChainTxStatsCmd {
+	return &GetChainTxStatsCmd{
+		NBlocks:   nBlocks,
+		BlockHash: blockHash,
+	}
+}
+
 // GetConnectionCountCmd defines the getconnectioncount JSON-RPC command.
 type GetConnectionCountCmd struct{}
 
@@ -847,6 +865,7 @@ func init() {
 	MustRegisterCmd("getcfilter", (*GetCFilterCmd)(nil), flags)
 	MustRegisterCmd("getcfilterheader", (*GetCFilterHeaderCmd)(nil), flags)
 	MustRegisterCmd("getchaintips", (*GetChainTipsCmd)(nil), flags)
+	MustRegisterCmd("getchaintxstats", (*GetChainTxStatsCmd)(nil), flags)
 	MustRegisterCmd("getconnectioncount", (*GetConnectionCountCmd)(nil), flags)
 	MustRegisterCmd("getdifficulty", (*GetDifficultyCmd)(nil), flags)
 	MustRegisterCmd("getgenerate", (*GetGenerateCmd)(nil), flags)
