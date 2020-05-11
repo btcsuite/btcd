@@ -438,6 +438,44 @@ func TestChainSvrCmds(t *testing.T) {
 			unmarshalled: &btcjson.GetChainTipsCmd{},
 		},
 		{
+			name: "getchaintxstats",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("getchaintxstats")
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewGetChainTxStatsCmd(nil, nil)
+			},
+			marshalled:   `{"jsonrpc":"1.0","method":"getchaintxstats","params":[],"id":1}`,
+			unmarshalled: &btcjson.GetChainTxStatsCmd{},
+		},
+		{
+			name: "getchaintxstats optional nblocks",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("getchaintxstats", btcjson.Int32(1000))
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewGetChainTxStatsCmd(btcjson.Int32(1000), nil)
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"getchaintxstats","params":[1000],"id":1}`,
+			unmarshalled: &btcjson.GetChainTxStatsCmd{
+				NBlocks: btcjson.Int32(1000),
+			},
+		},
+		{
+			name: "getchaintxstats optional nblocks and blockhash",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("getchaintxstats", btcjson.Int32(1000), btcjson.String("0000afaf"))
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewGetChainTxStatsCmd(btcjson.Int32(1000), btcjson.String("0000afaf"))
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"getchaintxstats","params":[1000,"0000afaf"],"id":1}`,
+			unmarshalled: &btcjson.GetChainTxStatsCmd{
+				NBlocks:   btcjson.Int32(1000),
+				BlockHash: btcjson.String("0000afaf"),
+			},
+		},
+		{
 			name: "getconnectioncount",
 			newCmd: func() (interface{}, error) {
 				return btcjson.NewCmd("getconnectioncount")

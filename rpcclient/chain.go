@@ -307,6 +307,79 @@ func (c *Client) GetBlockCount() (int64, error) {
 	return c.GetBlockCountAsync().Receive()
 }
 
+// FutureGetChainTxStatsResult is a future promise to deliver the result of a
+// GetChainTxStatsAsync RPC invocation (or an applicable error).
+type FutureGetChainTxStatsResult chan *response
+
+// Receive waits for the response promised by the future and returns transaction statistics
+func (r FutureGetChainTxStatsResult) Receive() (*btcjson.GetChainTxStatsResult, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	var chainTxStats btcjson.GetChainTxStatsResult
+	err = json.Unmarshal(res, &chainTxStats)
+	if err != nil {
+		return nil, err
+	}
+
+	return &chainTxStats, nil
+}
+
+// GetChainTxStatsAsync returns an instance of a type that can be used to get
+// the result of the RPC at some future time by invoking the Receive function on
+// the returned instance.
+//
+// See GetChainTxStats for the blocking version and more details.
+func (c *Client) GetChainTxStatsAsync() FutureGetChainTxStatsResult {
+	cmd := btcjson.NewGetChainTxStatsCmd(nil, nil)
+	return c.sendCmd(cmd)
+}
+
+// GetChainTxStatsNBlocksAsync returns an instance of a type that can be used to get
+// the result of the RPC at some future time by invoking the Receive function on
+// the returned instance.
+//
+// See GetChainTxStatsNBlocks for the blocking version and more details.
+func (c *Client) GetChainTxStatsNBlocksAsync(nBlocks int32) FutureGetChainTxStatsResult {
+	cmd := btcjson.NewGetChainTxStatsCmd(&nBlocks, nil)
+	return c.sendCmd(cmd)
+}
+
+// GetChainTxStatsNBlocksBlockHashAsync returns an instance of a type that can be used to get
+// the result of the RPC at some future time by invoking the Receive function on
+// the returned instance.
+//
+// See GetChainTxStatsNBlocksBlockHash for the blocking version and more details.
+func (c *Client) GetChainTxStatsNBlocksBlockHashAsync(nBlocks int32, blockHash chainhash.Hash) FutureGetChainTxStatsResult {
+	hash := blockHash.String()
+	cmd := btcjson.NewGetChainTxStatsCmd(&nBlocks, &hash)
+	return c.sendCmd(cmd)
+}
+
+// GetChainTxStats returns statistics about the total number and rate of transactions in the chain.
+//
+// Size of the window is one month and it ends at chain tip.
+func (c *Client) GetChainTxStats() (*btcjson.GetChainTxStatsResult, error) {
+	return c.GetChainTxStatsAsync().Receive()
+}
+
+// GetChainTxStatsNBlocks returns statistics about the total number and rate of transactions in the chain.
+//
+// The argument specifies size of the window in number of blocks. The window ends at chain tip.
+func (c *Client) GetChainTxStatsNBlocks(nBlocks int32) (*btcjson.GetChainTxStatsResult, error) {
+	return c.GetChainTxStatsNBlocksAsync(nBlocks).Receive()
+}
+
+// GetChainTxStatsNBlocksBlockHash returns statistics about the total number and rate of transactions in the chain.
+//
+// First argument specifies size of the window in number of blocks.
+// Second argument is the hash of the block that ends the window.
+func (c *Client) GetChainTxStatsNBlocksBlockHash(nBlocks int32, blockHash chainhash.Hash) (*btcjson.GetChainTxStatsResult, error) {
+	return c.GetChainTxStatsNBlocksBlockHashAsync(nBlocks, blockHash).Receive()
+}
+
 // FutureGetDifficultyResult is a future promise to deliver the result of a
 // GetDifficultyAsync RPC invocation (or an applicable error).
 type FutureGetDifficultyResult chan *response
