@@ -271,7 +271,7 @@ type GetBlockTemplateResult struct {
 
 type MempoolFees struct {
 	Base       float64 `json:"base"`
-	Modified   float64 `json:"base"`
+	Modified   float64 `json:"modified"`
 	Ancestor   float64 `json:"ancestor"`
 	Descendant float64 `json:"descendant"`
 }
