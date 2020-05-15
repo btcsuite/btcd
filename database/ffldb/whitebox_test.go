@@ -643,9 +643,9 @@ func TestFailureScenarios(t *testing.T) {
 		// context.
 		maxSize := int64(-1)
 		if maxFileSize, ok := tc.maxFileSizes[fileNum]; ok {
-			maxSize = int64(maxFileSize)
+			maxSize = maxFileSize
 		}
-		file := &mockFile{maxSize: int64(maxSize)}
+		file := &mockFile{maxSize: maxSize}
 		tc.files[fileNum] = &lockableFile{file: file}
 		return file, nil
 	}

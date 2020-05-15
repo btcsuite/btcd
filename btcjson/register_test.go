@@ -256,7 +256,7 @@ func TestRegisteredCmdMethods(t *testing.T) {
 	// Ensure the returned methods are sorted.
 	sortedMethods := make([]string, len(methods))
 	copy(sortedMethods, methods)
-	sort.Sort(sort.StringSlice(sortedMethods))
+	sort.Strings(sortedMethods)
 	if !reflect.DeepEqual(sortedMethods, methods) {
 		t.Fatal("RegisteredCmdMethods: methods are not sorted")
 	}

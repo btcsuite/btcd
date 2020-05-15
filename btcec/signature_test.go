@@ -464,8 +464,7 @@ func TestSignatureSerialize(t *testing.T) {
 
 func testSignCompact(t *testing.T, tag string, curve *KoblitzCurve,
 	data []byte, isCompressed bool) {
-	tmp, _ := NewPrivateKey(curve)
-	priv := (*PrivateKey)(tmp)
+	priv, _ := NewPrivateKey(curve)
 
 	hashed := []byte("testing")
 	sig, err := SignCompact(curve, priv, hashed, isCompressed)

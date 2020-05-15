@@ -232,11 +232,11 @@ func TestPubKeys(t *testing.T) {
 		var pkStr []byte
 		switch test.format {
 		case pubkeyUncompressed:
-			pkStr = (*PublicKey)(pk).SerializeUncompressed()
+			pkStr = pk.SerializeUncompressed()
 		case pubkeyCompressed:
-			pkStr = (*PublicKey)(pk).SerializeCompressed()
+			pkStr = pk.SerializeCompressed()
 		case pubkeyHybrid:
-			pkStr = (*PublicKey)(pk).SerializeHybrid()
+			pkStr = pk.SerializeHybrid()
 		}
 		if !bytes.Equal(test.key, pkStr) {
 			t.Errorf("%s pubkey: serialized keys do not match.",
