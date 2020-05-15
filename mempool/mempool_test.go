@@ -1418,8 +1418,8 @@ func TestAncestorsDescendants(t *testing.T) {
 	// We'll be querying for the ancestors of E. We should expect to see all
 	// of the transactions that it depends on.
 	expectedAncestors := map[chainhash.Hash]struct{}{
-		*a.Hash(): struct{}{}, *b.Hash(): struct{}{},
-		*c.Hash(): struct{}{}, *d.Hash(): struct{}{},
+		*a.Hash(): {}, *b.Hash(): {},
+		*c.Hash(): {}, *d.Hash(): {},
 	}
 	ancestors := ctx.harness.txPool.txAncestors(e, nil)
 	if len(ancestors) != len(expectedAncestors) {
@@ -1436,8 +1436,8 @@ func TestAncestorsDescendants(t *testing.T) {
 	// Then, we'll query for the descendants of A. We should expect to see
 	// all of the transactions that depend on it.
 	expectedDescendants := map[chainhash.Hash]struct{}{
-		*b.Hash(): struct{}{}, *c.Hash(): struct{}{},
-		*d.Hash(): struct{}{}, *e.Hash(): struct{}{},
+		*b.Hash(): {}, *c.Hash(): {},
+		*d.Hash(): {}, *e.Hash(): {},
 	}
 	descendants := ctx.harness.txPool.txDescendants(a, nil)
 	if len(descendants) != len(expectedDescendants) {
