@@ -204,6 +204,28 @@ func TestChainSvrCmds(t *testing.T) {
 			unmarshalled: &btcjson.GetBlockCountCmd{},
 		},
 		{
+			name: "getblockfilter",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("getblockfilter", "0000afaf")
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewGetBlockFilterCmd("0000afaf", nil)
+			},
+			marshalled:   `{"jsonrpc":"1.0","method":"getblockfilter","params":["0000afaf"],"id":1}`,
+			unmarshalled: &btcjson.GetBlockFilterCmd{"0000afaf", nil},
+		},
+		{
+			name: "getblockfilter optional filtertype",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("getblockfilter", "0000afaf", "basic")
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewGetBlockFilterCmd("0000afaf", btcjson.NewFilterTypeName(btcjson.FilterTypeBasic))
+			},
+			marshalled:   `{"jsonrpc":"1.0","method":"getblockfilter","params":["0000afaf","basic"],"id":1}`,
+			unmarshalled: &btcjson.GetBlockFilterCmd{"0000afaf", btcjson.NewFilterTypeName(btcjson.FilterTypeBasic)},
+		},
+		{
 			name: "getblockhash",
 			newCmd: func() (interface{}, error) {
 				return btcjson.NewCmd("getblockhash", 123)

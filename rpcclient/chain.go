@@ -362,6 +362,44 @@ func (c *Client) GetBlockChainInfo() (*btcjson.GetBlockChainInfoResult, error) {
 	return c.GetBlockChainInfoAsync().Receive()
 }
 
+// FutureGetBlockFilterResult is a future promise to deliver the result of a
+// GetBlockFilterAsync RPC invocation (or an applicable error).
+type FutureGetBlockFilterResult chan *response
+
+// Receive waits for the response promised by the future and returns block filter
+// result provided by the server.
+func (r FutureGetBlockFilterResult) Receive() (*btcjson.GetBlockFilterResult, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	var blockFilter btcjson.GetBlockFilterResult
+	err = json.Unmarshal(res, &blockFilter)
+	if err != nil {
+		return nil, err
+	}
+
+	return &blockFilter, nil
+}
+
+// GetBlockFilterAsync returns an instance of a type that can be used to get the
+// result of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+//
+// See GetBlockFilter for the blocking version and more details.
+func (c *Client) GetBlockFilterAsync(blockHash chainhash.Hash, filterType *btcjson.FilterTypeName) FutureGetBlockFilterResult {
+	hash := blockHash.String()
+
+	cmd := btcjson.NewGetBlockFilterCmd(hash, filterType)
+	return c.sendCmd(cmd)
+}
+
+// GetBlockFilter retrieves a BIP0157 content filter for a particular block.
+func (c *Client) GetBlockFilter(blockHash chainhash.Hash, filterType *btcjson.FilterTypeName) (*btcjson.GetBlockFilterResult, error) {
+	return c.GetBlockFilterAsync(blockHash, filterType).Receive()
+}
+
 // FutureGetBlockHashResult is a future promise to deliver the result of a
 // GetBlockHashAsync RPC invocation (or an applicable error).
 type FutureGetBlockHashResult chan *response

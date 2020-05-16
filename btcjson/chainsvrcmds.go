@@ -163,6 +163,33 @@ func NewGetBlockCountCmd() *GetBlockCountCmd {
 	return &GetBlockCountCmd{}
 }
 
+// FilterTypeName defines the type used in the getblockfilter JSON-RPC command for the
+// filter type field.
+type FilterTypeName string
+
+const (
+	// FilterTypeBasic is the basic filter type defined in BIP0158.
+	FilterTypeBasic FilterTypeName = "basic"
+)
+
+// GetBlockFilterCmd defines the getblockfilter JSON-RPC command.
+type GetBlockFilterCmd struct {
+	BlockHash  string          // The hash of the block
+	FilterType *FilterTypeName // The type name of the filter, default=basic
+}
+
+// NewGetBlockFilterCmd returns a new instance which can be used to issue a
+// getblockfilter JSON-RPC command.
+//
+// The parameters which are pointers indicate they are optional.  Passing nil
+// for optional parameters will use the default value.
+func NewGetBlockFilterCmd(blockHash string, filterType *FilterTypeName) *GetBlockFilterCmd {
+	return &GetBlockFilterCmd{
+		BlockHash:  blockHash,
+		FilterType: filterType,
+	}
+}
+
 // GetBlockHashCmd defines the getblockhash JSON-RPC command.
 type GetBlockHashCmd struct {
 	Index int64
@@ -840,6 +867,7 @@ func init() {
 	MustRegisterCmd("getblock", (*GetBlockCmd)(nil), flags)
 	MustRegisterCmd("getblockchaininfo", (*GetBlockChainInfoCmd)(nil), flags)
 	MustRegisterCmd("getblockcount", (*GetBlockCountCmd)(nil), flags)
+	MustRegisterCmd("getblockfilter", (*GetBlockFilterCmd)(nil), flags)
 	MustRegisterCmd("getblockhash", (*GetBlockHashCmd)(nil), flags)
 	MustRegisterCmd("getblockheader", (*GetBlockHeaderCmd)(nil), flags)
 	MustRegisterCmd("getblockstats", (*GetBlockStatsCmd)(nil), flags)

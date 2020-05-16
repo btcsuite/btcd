@@ -75,3 +75,11 @@ func String(v string) *string {
 	*p = v
 	return p
 }
+
+// NewFilterTypeName is a helper routine that allocates a new FilterTypeName value to store v and
+// returns a pointer to it.  This is useful when assigning optional parameters.
+func NewFilterTypeName(v FilterTypeName) *FilterTypeName {
+	p := new(FilterTypeName)
+	*p = v
+	return p
+}
