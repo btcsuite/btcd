@@ -226,6 +226,13 @@ type GetBlockChainInfoResult struct {
 	*UnifiedSoftForks
 }
 
+// GetBlockFilterResult models the data returned from the getblockfilter
+// command.
+type GetBlockFilterResult struct {
+	Filter string `json:"filter"` // the hex-encoded filter data
+	Header string `json:"header"` // the hex-encoded filter header
+}
+
 // GetBlockTemplateResultTx models the transactions field of the
 // getblocktemplate command.
 type GetBlockTemplateResultTx struct {
