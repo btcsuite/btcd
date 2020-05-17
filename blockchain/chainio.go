@@ -1149,18 +1149,9 @@ func (b *BlockChain) initChainState() error {
 
 		blockIndexBucket := dbTx.Metadata().Bucket(blockIndexBucketName)
 
-		// Determine how many blocks will be loaded into the index so we can
-		// allocate the right amount.
-		var blockCount int32
-		cursor := blockIndexBucket.Cursor()
-		for ok := cursor.First(); ok; ok = cursor.Next() {
-			blockCount++
-		}
-		blockNodes := make([]blockNode, blockCount)
-
 		var i int32
 		var lastNode *blockNode
-		cursor = blockIndexBucket.Cursor()
+		cursor := blockIndexBucket.Cursor()
 		for ok := cursor.First(); ok; ok = cursor.Next() {
 			header, status, err := deserializeBlockRow(cursor.Value())
 			if err != nil {
@@ -1193,7 +1184,7 @@ func (b *BlockChain) initChainState() error {
 
 			// Initialize the block node for the block, connect it,
 			// and add it to the block index.
-			node := &blockNodes[i]
+			node := new(blockNode)
 			initBlockNode(node, header, parent)
 			node.status = status
 			b.index.addNode(node)
