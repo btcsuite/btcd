@@ -26,7 +26,7 @@ type FutureDebugLevelResult chan *Response
 // of setting the debug logging level to the passed level specification or the
 // list of of the available subsystems for the special keyword 'show'.
 func (r FutureDebugLevelResult) Receive() (string, error) {
-	res, err := receiveFuture(r)
+	res, err := ReceiveFuture(r)
 	if err != nil {
 		return "", err
 	}
@@ -72,7 +72,7 @@ type FutureCreateEncryptedWalletResult chan *Response
 
 // Receive waits for and returns the error Response promised by the future.
 func (r FutureCreateEncryptedWalletResult) Receive() error {
-	_, err := receiveFuture(r)
+	_, err := ReceiveFuture(r)
 	return err
 }
 
@@ -107,7 +107,7 @@ type FutureListAddressTransactionsResult chan *Response
 // Receive waits for the Response promised by the future and returns information
 // about all transactions associated with the provided addresses.
 func (r FutureListAddressTransactionsResult) Receive() ([]btcjson.ListTransactionsResult, error) {
-	res, err := receiveFuture(r)
+	res, err := ReceiveFuture(r)
 	if err != nil {
 		return nil, err
 	}
@@ -153,7 +153,7 @@ type FutureGetBestBlockResult chan *Response
 // Receive waits for the Response promised by the future and returns the hash
 // and height of the block in the longest (best) chain.
 func (r FutureGetBestBlockResult) Receive() (*chainhash.Hash, int32, error) {
-	res, err := receiveFuture(r)
+	res, err := ReceiveFuture(r)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -201,7 +201,7 @@ type FutureGetCurrentNetResult chan *Response
 // Receive waits for the Response promised by the future and returns the network
 // the server is running on.
 func (r FutureGetCurrentNetResult) Receive() (wire.BitcoinNet, error) {
-	res, err := receiveFuture(r)
+	res, err := ReceiveFuture(r)
 	if err != nil {
 		return 0, err
 	}
@@ -248,7 +248,7 @@ type FutureGetHeadersResult chan *Response
 // NOTE: This is a btcsuite extension ported from
 // github.com/decred/dcrrpcclient.
 func (r FutureGetHeadersResult) Receive() ([]wire.BlockHeader, error) {
-	res, err := receiveFuture(r)
+	res, err := ReceiveFuture(r)
 	if err != nil {
 		return nil, err
 	}
@@ -312,7 +312,7 @@ type FutureExportWatchingWalletResult chan *Response
 // Receive waits for the Response promised by the future and returns the
 // exported wallet.
 func (r FutureExportWatchingWalletResult) Receive() ([]byte, []byte, error) {
-	res, err := receiveFuture(r)
+	res, err := ReceiveFuture(r)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -381,7 +381,7 @@ type FutureSessionResult chan *Response
 // Receive waits for the Response promised by the future and returns the
 // session result.
 func (r FutureSessionResult) Receive() (*btcjson.SessionResult, error) {
-	res, err := receiveFuture(r)
+	res, err := ReceiveFuture(r)
 	if err != nil {
 		return nil, err
 	}
@@ -436,7 +436,7 @@ type FutureVersionResult chan *Response
 // github.com/decred/dcrrpcclient.
 func (r FutureVersionResult) Receive() (map[string]btcjson.VersionResult,
 	error) {
-	res, err := receiveFuture(r)
+	res, err := ReceiveFuture(r)
 	if err != nil {
 		return nil, err
 	}

@@ -22,7 +22,7 @@ type FutureGetBestBlockHashResult chan *Response
 // Receive waits for the Response promised by the future and returns the hash of
 // the best block in the longest block chain.
 func (r FutureGetBestBlockHashResult) Receive() (*chainhash.Hash, error) {
-	res, err := receiveFuture(r)
+	res, err := ReceiveFuture(r)
 	if err != nil {
 		return nil, err
 	}
@@ -81,7 +81,7 @@ func (c *Client) legacyGetBlockRequest(hash string, verbose,
 func (c *Client) waitForGetBlockRes(respChan chan *Response, hash string,
 	verbose, verboseTx bool) ([]byte, error) {
 
-	res, err := receiveFuture(respChan)
+	res, err := ReceiveFuture(respChan)
 
 	// If we receive an invalid parameter error, then we may be
 	// communicating with a btcd node which only understands the legacy
@@ -278,7 +278,7 @@ type FutureGetBlockCountResult chan *Response
 // Receive waits for the Response promised by the future and returns the number
 // of blocks in the longest block chain.
 func (r FutureGetBlockCountResult) Receive() (int64, error) {
-	res, err := receiveFuture(r)
+	res, err := ReceiveFuture(r)
 	if err != nil {
 		return 0, err
 	}
@@ -313,7 +313,7 @@ type FutureGetChainTxStatsResult chan *Response
 
 // Receive waits for the Response promised by the future and returns transaction statistics
 func (r FutureGetChainTxStatsResult) Receive() (*btcjson.GetChainTxStatsResult, error) {
-	res, err := receiveFuture(r)
+	res, err := ReceiveFuture(r)
 	if err != nil {
 		return nil, err
 	}
@@ -387,7 +387,7 @@ type FutureGetDifficultyResult chan *Response
 // Receive waits for the Response promised by the future and returns the
 // proof-of-work difficulty as a multiple of the minimum difficulty.
 func (r FutureGetDifficultyResult) Receive() (float64, error) {
-	res, err := receiveFuture(r)
+	res, err := ReceiveFuture(r)
 	if err != nil {
 		return 0, err
 	}
@@ -464,7 +464,7 @@ func unmarshalGetBlockChainInfoResultSoftForks(chainInfo *btcjson.GetBlockChainI
 // Receive waits for the Response promised by the future and returns chain info
 // result provided by the server.
 func (r FutureGetBlockChainInfoResult) Receive() (*btcjson.GetBlockChainInfoResult, error) {
-	res, err := receiveFuture(r.Response)
+	res, err := ReceiveFuture(r.Response)
 	if err != nil {
 		return nil, err
 	}
@@ -515,7 +515,7 @@ type FutureGetBlockFilterResult chan *Response
 // Receive waits for the Response promised by the future and returns block filter
 // result provided by the server.
 func (r FutureGetBlockFilterResult) Receive() (*btcjson.GetBlockFilterResult, error) {
-	res, err := receiveFuture(r)
+	res, err := ReceiveFuture(r)
 	if err != nil {
 		return nil, err
 	}
@@ -553,7 +553,7 @@ type FutureGetBlockHashResult chan *Response
 // Receive waits for the Response promised by the future and returns the hash of
 // the block in the best block chain at the given height.
 func (r FutureGetBlockHashResult) Receive() (*chainhash.Hash, error) {
-	res, err := receiveFuture(r)
+	res, err := ReceiveFuture(r)
 	if err != nil {
 		return nil, err
 	}
@@ -590,7 +590,7 @@ type FutureGetBlockHeaderResult chan *Response
 // Receive waits for the Response promised by the future and returns the
 // blockheader requested from the server given its hash.
 func (r FutureGetBlockHeaderResult) Receive() (*wire.BlockHeader, error) {
-	res, err := receiveFuture(r)
+	res, err := ReceiveFuture(r)
 	if err != nil {
 		return nil, err
 	}
@@ -647,7 +647,7 @@ type FutureGetBlockHeaderVerboseResult chan *Response
 // Receive waits for the Response promised by the future and returns the
 // data structure of the blockheader requested from the server given its hash.
 func (r FutureGetBlockHeaderVerboseResult) Receive() (*btcjson.GetBlockHeaderVerboseResult, error) {
-	res, err := receiveFuture(r)
+	res, err := ReceiveFuture(r)
 	if err != nil {
 		return nil, err
 	}
@@ -693,7 +693,7 @@ type FutureGetMempoolEntryResult chan *Response
 // structure with information about the transaction in the memory pool given
 // its hash.
 func (r FutureGetMempoolEntryResult) Receive() (*btcjson.GetMempoolEntryResult, error) {
-	res, err := receiveFuture(r)
+	res, err := ReceiveFuture(r)
 	if err != nil {
 		return nil, err
 	}
@@ -731,7 +731,7 @@ type FutureGetRawMempoolResult chan *Response
 // Receive waits for the Response promised by the future and returns the hashes
 // of all transactions in the memory pool.
 func (r FutureGetRawMempoolResult) Receive() ([]*chainhash.Hash, error) {
-	res, err := receiveFuture(r)
+	res, err := ReceiveFuture(r)
 	if err != nil {
 		return nil, err
 	}
@@ -782,7 +782,7 @@ type FutureGetRawMempoolVerboseResult chan *Response
 // transaction hashes to an associated data structure with information about the
 // transaction for all transactions in the memory pool.
 func (r FutureGetRawMempoolVerboseResult) Receive() (map[string]btcjson.GetRawMempoolVerboseResult, error) {
-	res, err := receiveFuture(r)
+	res, err := ReceiveFuture(r)
 	if err != nil {
 		return nil, err
 	}
@@ -823,7 +823,7 @@ type FutureEstimateFeeResult chan *Response
 // Receive waits for the Response promised by the future and returns the info
 // provided by the server.
 func (r FutureEstimateFeeResult) Receive() (float64, error) {
-	res, err := receiveFuture(r)
+	res, err := ReceiveFuture(r)
 	if err != nil {
 		return -1, err
 	}
@@ -860,7 +860,7 @@ type FutureEstimateSmartFeeResult chan *Response
 // Receive waits for the Response promised by the future and returns the
 // estimated fee.
 func (r FutureEstimateSmartFeeResult) Receive() (*btcjson.EstimateSmartFeeResult, error) {
-	res, err := receiveFuture(r)
+	res, err := ReceiveFuture(r)
 	if err != nil {
 		return nil, err
 	}
@@ -897,7 +897,7 @@ type FutureVerifyChainResult chan *Response
 // or not the chain verified based on the check level and number of blocks
 // to verify specified in the original call.
 func (r FutureVerifyChainResult) Receive() (bool, error) {
-	res, err := receiveFuture(r)
+	res, err := ReceiveFuture(r)
 	if err != nil {
 		return false, err
 	}
@@ -984,7 +984,7 @@ type FutureGetTxOutResult chan *Response
 // Receive waits for the Response promised by the future and returns a
 // transaction given its hash.
 func (r FutureGetTxOutResult) Receive() (*btcjson.GetTxOutResult, error) {
-	res, err := receiveFuture(r)
+	res, err := ReceiveFuture(r)
 	if err != nil {
 		return nil, err
 	}
@@ -1033,7 +1033,7 @@ type FutureGetTxOutSetInfoResult chan *Response
 // Receive waits for the Response promised by the future and returns the
 // results of GetTxOutSetInfoAsync RPC invocation.
 func (r FutureGetTxOutSetInfoResult) Receive() (*btcjson.GetTxOutSetInfoResult, error) {
-	res, err := receiveFuture(r)
+	res, err := ReceiveFuture(r)
 	if err != nil {
 		return nil, err
 	}
@@ -1077,7 +1077,7 @@ type FutureRescanBlocksResult chan *Response
 // NOTE: This is a btcsuite extension ported from
 // github.com/decred/dcrrpcclient.
 func (r FutureRescanBlocksResult) Receive() ([]btcjson.RescannedBlock, error) {
-	res, err := receiveFuture(r)
+	res, err := ReceiveFuture(r)
 	if err != nil {
 		return nil, err
 	}
@@ -1126,7 +1126,7 @@ type FutureInvalidateBlockResult chan *Response
 // Receive waits for the Response promised by the future and returns the raw
 // block requested from the server given its hash.
 func (r FutureInvalidateBlockResult) Receive() error {
-	_, err := receiveFuture(r)
+	_, err := ReceiveFuture(r)
 
 	return err
 }
@@ -1158,7 +1158,7 @@ type FutureGetCFilterResult chan *Response
 // Receive waits for the Response promised by the future and returns the raw
 // filter requested from the server given its block hash.
 func (r FutureGetCFilterResult) Receive() (*wire.MsgCFilter, error) {
-	res, err := receiveFuture(r)
+	res, err := ReceiveFuture(r)
 	if err != nil {
 		return nil, err
 	}
@@ -1213,7 +1213,7 @@ type FutureGetCFilterHeaderResult chan *Response
 // Receive waits for the Response promised by the future and returns the raw
 // filter header requested from the server given its block hash.
 func (r FutureGetCFilterHeaderResult) Receive() (*wire.MsgCFHeaders, error) {
-	res, err := receiveFuture(r)
+	res, err := ReceiveFuture(r)
 	if err != nil {
 		return nil, err
 	}
@@ -1267,7 +1267,7 @@ type FutureGetBlockStatsResult chan *Response
 // Receive waits for the Response promised by the future and returns statistics
 // of a block at a certain height.
 func (r FutureGetBlockStatsResult) Receive() (*btcjson.GetBlockStatsResult, error) {
-	res, err := receiveFuture(r)
+	res, err := ReceiveFuture(r)
 	if err != nil {
 		return nil, err
 	}
@@ -1308,7 +1308,7 @@ type FutureDeriveAddressesResult chan *Response
 // Receive waits for the Response promised by the future and derives one or more addresses
 // corresponding to the given output descriptor.
 func (r FutureDeriveAddressesResult) Receive() (*btcjson.DeriveAddressesResult, error) {
-	res, err := receiveFuture(r)
+	res, err := ReceiveFuture(r)
 	if err != nil {
 		return nil, err
 	}
@@ -1347,7 +1347,7 @@ type FutureGetDescriptorInfoResult chan *Response
 // Receive waits for the Response promised by the future and returns the analysed
 // info of the descriptor.
 func (r FutureGetDescriptorInfoResult) Receive() (*btcjson.GetDescriptorInfoResult, error) {
-	res, err := receiveFuture(r)
+	res, err := ReceiveFuture(r)
 	if err != nil {
 		return nil, err
 	}

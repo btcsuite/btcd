@@ -40,7 +40,7 @@ type FutureAddNodeResult chan *Response
 // Receive waits for the Response promised by the future and returns an error if
 // any occurred when performing the specified command.
 func (r FutureAddNodeResult) Receive() error {
-	_, err := receiveFuture(r)
+	_, err := ReceiveFuture(r)
 	return err
 }
 
@@ -70,7 +70,7 @@ type FutureNodeResult chan *Response
 // Receive waits for the Response promised by the future and returns an error if
 // any occurred when performing the specified command.
 func (r FutureNodeResult) Receive() error {
-	_, err := receiveFuture(r)
+	_, err := ReceiveFuture(r)
 	return err
 }
 
@@ -104,7 +104,7 @@ type FutureGetAddedNodeInfoResult chan *Response
 // Receive waits for the Response promised by the future and returns information
 // about manually added (persistent) peers.
 func (r FutureGetAddedNodeInfoResult) Receive() ([]btcjson.GetAddedNodeInfoResult, error) {
-	res, err := receiveFuture(r)
+	res, err := ReceiveFuture(r)
 	if err != nil {
 		return nil, err
 	}
@@ -144,7 +144,7 @@ type FutureGetAddedNodeInfoNoDNSResult chan *Response
 // Receive waits for the Response promised by the future and returns a list of
 // manually added (persistent) peers.
 func (r FutureGetAddedNodeInfoNoDNSResult) Receive() ([]string, error) {
-	res, err := receiveFuture(r)
+	res, err := ReceiveFuture(r)
 	if err != nil {
 		return nil, err
 	}
@@ -185,7 +185,7 @@ type FutureGetConnectionCountResult chan *Response
 // Receive waits for the Response promised by the future and returns the number
 // of active connections to other peers.
 func (r FutureGetConnectionCountResult) Receive() (int64, error) {
-	res, err := receiveFuture(r)
+	res, err := ReceiveFuture(r)
 	if err != nil {
 		return 0, err
 	}
@@ -222,7 +222,7 @@ type FuturePingResult chan *Response
 // Receive waits for the Response promised by the future and returns the result
 // of queueing a ping to be sent to each connected peer.
 func (r FuturePingResult) Receive() error {
-	_, err := receiveFuture(r)
+	_, err := ReceiveFuture(r)
 	return err
 }
 
@@ -251,7 +251,7 @@ type FutureGetNetworkInfoResult chan *Response
 // Receive waits for the Response promised by the future and returns data about
 // the current network.
 func (r FutureGetNetworkInfoResult) Receive() (*btcjson.GetNetworkInfoResult, error) {
-	res, err := receiveFuture(r)
+	res, err := ReceiveFuture(r)
 	if err != nil {
 		return nil, err
 	}
@@ -288,7 +288,7 @@ type FutureGetNodeAddressesResult chan *Response
 // Receive waits for the Response promised by the future and returns data about
 // known node addresses.
 func (r FutureGetNodeAddressesResult) Receive() ([]btcjson.GetNodeAddressesResult, error) {
-	res, err := receiveFuture(r)
+	res, err := ReceiveFuture(r)
 	if err != nil {
 		return nil, err
 	}
@@ -325,7 +325,7 @@ type FutureGetPeerInfoResult chan *Response
 // Receive waits for the Response promised by the future and returns  data about
 // each connected network peer.
 func (r FutureGetPeerInfoResult) Receive() ([]btcjson.GetPeerInfoResult, error) {
-	res, err := receiveFuture(r)
+	res, err := ReceiveFuture(r)
 	if err != nil {
 		return nil, err
 	}
@@ -362,7 +362,7 @@ type FutureGetNetTotalsResult chan *Response
 // Receive waits for the Response promised by the future and returns network
 // traffic statistics.
 func (r FutureGetNetTotalsResult) Receive() (*btcjson.GetNetTotalsResult, error) {
-	res, err := receiveFuture(r)
+	res, err := ReceiveFuture(r)
 	if err != nil {
 		return nil, err
 	}

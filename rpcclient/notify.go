@@ -861,7 +861,7 @@ type FutureNotifyBlocksResult chan *Response
 // Receive waits for the Response promised by the future and returns an error
 // if the registration was not successful.
 func (r FutureNotifyBlocksResult) Receive() error {
-	_, err := receiveFuture(r)
+	_, err := ReceiveFuture(r)
 	return err
 }
 
@@ -911,7 +911,7 @@ type FutureNotifySpentResult chan *Response
 // Receive waits for the Response promised by the future and returns an error
 // if the registration was not successful.
 func (r FutureNotifySpentResult) Receive() error {
-	_, err := receiveFuture(r)
+	_, err := ReceiveFuture(r)
 	return err
 }
 
@@ -995,7 +995,7 @@ type FutureNotifyNewTransactionsResult chan *Response
 // Receive waits for the Response promised by the future and returns an error
 // if the registration was not successful.
 func (r FutureNotifyNewTransactionsResult) Receive() error {
-	_, err := receiveFuture(r)
+	_, err := ReceiveFuture(r)
 	return err
 }
 
@@ -1046,7 +1046,7 @@ type FutureNotifyReceivedResult chan *Response
 // Receive waits for the Response promised by the future and returns an error
 // if the registration was not successful.
 func (r FutureNotifyReceivedResult) Receive() error {
-	_, err := receiveFuture(r)
+	_, err := ReceiveFuture(r)
 	return err
 }
 
@@ -1132,7 +1132,7 @@ type FutureRescanResult chan *Response
 // Receive waits for the Response promised by the future and returns an error
 // if the rescan was not successful.
 func (r FutureRescanResult) Receive() error {
-	_, err := receiveFuture(r)
+	_, err := ReceiveFuture(r)
 	return err
 }
 
@@ -1315,7 +1315,7 @@ type FutureLoadTxFilterResult chan *Response
 // NOTE: This is a btcd extension ported from github.com/decred/dcrrpcclient
 // and requires a websocket connection.
 func (r FutureLoadTxFilterResult) Receive() error {
-	_, err := receiveFuture(r)
+	_, err := ReceiveFuture(r)
 	return err
 }
 

@@ -18,7 +18,7 @@ type FutureRawResult chan *Response
 // Receive waits for the Response promised by the future and returns the raw
 // response, or an error if the request was unsuccessful.
 func (r FutureRawResult) Receive() (json.RawMessage, error) {
-	return receiveFuture(r)
+	return ReceiveFuture(r)
 }
 
 // RawRequestAsync returns an instance of a type that can be used to get the

@@ -306,7 +306,7 @@ type FutureGetBulkResult chan *Response
 // of results by request id
 func (r FutureGetBulkResult) Receive() (BulkResult, error) {
 	m := make(BulkResult)
-	res, err := receiveFuture(r)
+	res, err := ReceiveFuture(r)
 	if err != nil {
 		return nil, err
 	}
@@ -875,11 +875,11 @@ func newFutureError(err error) chan *Response {
 	return responseChan
 }
 
-// receiveFuture receives from the passed futureResult channel to extract a
+// ReceiveFuture receives from the passed futureResult channel to extract a
 // reply or any errors.  The examined errors include an error in the
 // futureResult and the error in the reply from the server.  This will block
 // until the result is available on the passed channel.
-func receiveFuture(f chan *Response) ([]byte, error) {
+func ReceiveFuture(f chan *Response) ([]byte, error) {
 	// Wait for a response on the returned channel.
 	r := <-f
 	return r.result, r.err
@@ -1004,7 +1004,7 @@ func (c *Client) SendCmd(cmd interface{}) chan *Response {
 func (c *Client) sendCmdAndWait(cmd interface{}) (interface{}, error) {
 	// Marshal the command to JSON-RPC, send it to the connected server, and
 	// wait for a response on the returned channel.
-	return receiveFuture(c.SendCmd(cmd))
+	return ReceiveFuture(c.SendCmd(cmd))
 }
 
 // Disconnected returns whether or not the server is disconnected.  If a
