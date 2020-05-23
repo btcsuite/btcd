@@ -127,52 +127,53 @@ type commandHandler func(*rpcServer, interface{}, <-chan struct{}) (interface{},
 // a dependency loop.
 var rpcHandlers map[string]commandHandler
 var rpcHandlersBeforeInit = map[string]commandHandler{
-	"addnode":               handleAddNode,
-	"createrawtransaction":  handleCreateRawTransaction,
-	"debuglevel":            handleDebugLevel,
-	"decoderawtransaction":  handleDecodeRawTransaction,
-	"decodescript":          handleDecodeScript,
-	"estimatefee":           handleEstimateFee,
-	"generate":              handleGenerate,
-	"getaddednodeinfo":      handleGetAddedNodeInfo,
-	"getbestblock":          handleGetBestBlock,
-	"getbestblockhash":      handleGetBestBlockHash,
-	"getblock":              handleGetBlock,
-	"getblockchaininfo":     handleGetBlockChainInfo,
-	"getblockcount":         handleGetBlockCount,
-	"getblockhash":          handleGetBlockHash,
-	"getblockheader":        handleGetBlockHeader,
-	"getblocktemplate":      handleGetBlockTemplate,
-	"getcfilter":            handleGetCFilter,
-	"getcfilterheader":      handleGetCFilterHeader,
-	"getconnectioncount":    handleGetConnectionCount,
-	"getcurrentnet":         handleGetCurrentNet,
-	"getdifficulty":         handleGetDifficulty,
-	"getgenerate":           handleGetGenerate,
-	"gethashespersec":       handleGetHashesPerSec,
-	"getheaders":            handleGetHeaders,
-	"getinfo":               handleGetInfo,
-	"getmempoolinfo":        handleGetMempoolInfo,
-	"getmininginfo":         handleGetMiningInfo,
-	"getnettotals":          handleGetNetTotals,
-	"getnetworkhashps":      handleGetNetworkHashPS,
-	"getpeerinfo":           handleGetPeerInfo,
-	"getrawmempool":         handleGetRawMempool,
-	"getrawtransaction":     handleGetRawTransaction,
-	"gettxout":              handleGetTxOut,
-	"help":                  handleHelp,
-	"node":                  handleNode,
-	"ping":                  handlePing,
-	"searchrawtransactions": handleSearchRawTransactions,
-	"sendrawtransaction":    handleSendRawTransaction,
-	"setgenerate":           handleSetGenerate,
-	"stop":                  handleStop,
-	"submitblock":           handleSubmitBlock,
-	"uptime":                handleUptime,
-	"validateaddress":       handleValidateAddress,
-	"verifychain":           handleVerifyChain,
-	"verifymessage":         handleVerifyMessage,
-	"version":               handleVersion,
+	"addnode":                handleAddNode,
+	"createrawtransaction":   handleCreateRawTransaction,
+	"debuglevel":             handleDebugLevel,
+	"decoderawtransaction":   handleDecodeRawTransaction,
+	"decodescript":           handleDecodeScript,
+	"estimatefee":            handleEstimateFee,
+	"generate":               handleGenerate,
+	"getaddednodeinfo":       handleGetAddedNodeInfo,
+	"getbestblock":           handleGetBestBlock,
+	"getbestblockhash":       handleGetBestBlockHash,
+	"getblock":               handleGetBlock,
+	"getblockchaininfo":      handleGetBlockChainInfo,
+	"getblockcount":          handleGetBlockCount,
+	"getblockhash":           handleGetBlockHash,
+	"getblockheader":         handleGetBlockHeader,
+	"getblocktemplate":       handleGetBlockTemplate,
+	"getcfilter":             handleGetCFilter,
+	"getcfilterheader":       handleGetCFilterHeader,
+	"getconnectioncount":     handleGetConnectionCount,
+	"getcurrentnet":          handleGetCurrentNet,
+	"getdifficulty":          handleGetDifficulty,
+	"getgenerate":            handleGetGenerate,
+	"gethashespersec":        handleGetHashesPerSec,
+	"getheaders":             handleGetHeaders,
+	"getinfo":                handleGetInfo,
+	"getmempoolinfo":         handleGetMempoolInfo,
+	"getmininginfo":          handleGetMiningInfo,
+	"getnettotals":           handleGetNetTotals,
+	"getnetworkhashps":       handleGetNetworkHashPS,
+	"getpeerinfo":            handleGetPeerInfo,
+	"getrawmempool":          handleGetRawMempool,
+	"getrawtransaction":      handleGetRawTransaction,
+	"gettxout":               handleGetTxOut,
+	"help":                   handleHelp,
+	"node":                   handleNode,
+	"ping":                   handlePing,
+	"searchrawtransactions":  handleSearchRawTransactions,
+	"sendrawtransaction":     handleSendRawTransaction,
+	"setgenerate":            handleSetGenerate,
+	"signmessagewithprivkey": handleSignMessageWithPrivKey,
+	"stop":                   handleStop,
+	"submitblock":            handleSubmitBlock,
+	"uptime":                 handleUptime,
+	"validateaddress":        handleValidateAddress,
+	"verifychain":            handleVerifyChain,
+	"verifymessage":          handleVerifyMessage,
+	"version":                handleVersion,
 }
 
 // list of commands that we recognize, but for which btcd has no support because
@@ -3435,6 +3436,52 @@ func handleSetGenerate(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 	return nil, nil
 }
 
+// Text used to signify that a signed message follows and to prevent
+// inadvertently signing a transaction.
+const messageSignatureHeader = "Bitcoin Signed Message:\n"
+
+// handleSignMessageWithPrivKey implements the signmessagewithprivkey command.
+func handleSignMessageWithPrivKey(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	c := cmd.(*btcjson.SignMessageWithPrivKeyCmd)
+
+	wif, err := btcutil.DecodeWIF(c.PrivKey)
+	if err != nil {
+		message := "Invalid private key"
+		switch err {
+		case btcutil.ErrMalformedPrivateKey:
+			message = "Malformed private key"
+		case btcutil.ErrChecksumMismatch:
+			message = "Private key checksum mismatch"
+		}
+		return nil, &btcjson.RPCError{
+			Code:    btcjson.ErrRPCInvalidAddressOrKey,
+			Message: message,
+		}
+	}
+	if !wif.IsForNet(s.cfg.ChainParams) {
+		return nil, &btcjson.RPCError{
+			Code:    btcjson.ErrRPCInvalidAddressOrKey,
+			Message: "Private key for wrong network",
+		}
+	}
+
+	var buf bytes.Buffer
+	wire.WriteVarString(&buf, 0, messageSignatureHeader)
+	wire.WriteVarString(&buf, 0, c.Message)
+	messageHash := chainhash.DoubleHashB(buf.Bytes())
+
+	sig, err := btcec.SignCompact(btcec.S256(), wif.PrivKey,
+		messageHash, wif.CompressPubKey)
+	if err != nil {
+		return nil, &btcjson.RPCError{
+			Code:    btcjson.ErrRPCInvalidAddressOrKey,
+			Message: "Sign failed",
+		}
+	}
+
+	return base64.StdEncoding.EncodeToString(sig), nil
+}
+
 // handleStop implements the stop command.
 func handleStop(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	select {
@@ -3615,7 +3662,7 @@ func handleVerifyMessage(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 	// Validate the signature - this just shows that it was valid at all.
 	// we will compare it with the key next.
 	var buf bytes.Buffer
-	wire.WriteVarString(&buf, 0, "Bitcoin Signed Message:\n")
+	wire.WriteVarString(&buf, 0, messageSignatureHeader)
 	wire.WriteVarString(&buf, 0, c.Message)
 	expectedMessageHash := chainhash.DoubleHashB(buf.Bytes())
 	pk, wasCompressed, err := btcec.RecoverCompact(btcec.S256(), sig,

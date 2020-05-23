@@ -1187,6 +1187,20 @@ func TestChainSvrCmds(t *testing.T) {
 			},
 		},
 		{
+			name: "signmessagewithprivkey",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("signmessagewithprivkey", "5Hue", "Hey")
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewSignMessageWithPrivKey("5Hue", "Hey")
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"signmessagewithprivkey","params":["5Hue","Hey"],"id":1}`,
+			unmarshalled: &btcjson.SignMessageWithPrivKeyCmd{
+				PrivKey: "5Hue",
+				Message: "Hey",
+			},
+		},
+		{
 			name: "stop",
 			newCmd: func() (interface{}, error) {
 				return btcjson.NewCmd("stop")

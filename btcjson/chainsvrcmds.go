@@ -806,6 +806,24 @@ func NewSetGenerateCmd(generate bool, genProcLimit *int) *SetGenerateCmd {
 	}
 }
 
+// SignMessageWithPrivKeyCmd defines the signmessagewithprivkey JSON-RPC command.
+type SignMessageWithPrivKeyCmd struct {
+	PrivKey string // base 58 Wallet Import format private key
+	Message string // Message to sign
+}
+
+// NewSignMessageWithPrivKey returns a new instance which can be used to issue a
+// signmessagewithprivkey JSON-RPC command.
+//
+// The first parameter is a private key in base 58 Wallet Import format.
+// The second parameter is the message to sign.
+func NewSignMessageWithPrivKey(privKey, message string) *SignMessageWithPrivKeyCmd {
+	return &SignMessageWithPrivKeyCmd{
+		PrivKey: privKey,
+		Message: message,
+	}
+}
+
 // StopCmd defines the stop JSON-RPC command.
 type StopCmd struct{}
 
@@ -971,6 +989,7 @@ func init() {
 	MustRegisterCmd("searchrawtransactions", (*SearchRawTransactionsCmd)(nil), flags)
 	MustRegisterCmd("sendrawtransaction", (*SendRawTransactionCmd)(nil), flags)
 	MustRegisterCmd("setgenerate", (*SetGenerateCmd)(nil), flags)
+	MustRegisterCmd("signmessagewithprivkey", (*SignMessageWithPrivKeyCmd)(nil), flags)
 	MustRegisterCmd("stop", (*StopCmd)(nil), flags)
 	MustRegisterCmd("submitblock", (*SubmitBlockCmd)(nil), flags)
 	MustRegisterCmd("uptime", (*UptimeCmd)(nil), flags)
