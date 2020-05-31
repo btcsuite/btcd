@@ -156,6 +156,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"getmininginfo":          handleGetMiningInfo,
 	"getnettotals":           handleGetNetTotals,
 	"getnetworkhashps":       handleGetNetworkHashPS,
+	"getnodeaddresses":       handleGetNodeAddresses,
 	"getpeerinfo":            handleGetPeerInfo,
 	"getrawmempool":          handleGetRawMempool,
 	"getrawtransaction":      handleGetRawTransaction,
@@ -2477,6 +2478,40 @@ func handleGetNetworkHashPS(s *rpcServer, cmd interface{}, closeChan <-chan stru
 	return hashesPerSec.Int64(), nil
 }
 
+// handleGetNodeAddresses implements the getnodeaddresses command.
+func handleGetNodeAddresses(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	c := cmd.(*btcjson.GetNodeAddressesCmd)
+
+	count := int32(1)
+	if c.Count != nil {
+		count = *c.Count
+		if count <= 0 {
+			return nil, &btcjson.RPCError{
+				Code:    btcjson.ErrRPCInvalidParameter,
+				Message: "Address count out of range",
+			}
+		}
+	}
+
+	nodes := s.cfg.ConnMgr.NodeAddresses()
+	if n := int32(len(nodes)); n < count {
+		count = n
+	}
+
+	addresses := make([]*btcjson.GetNodeAddressesResult, 0, count)
+	for _, node := range nodes[:count] {
+		address := &btcjson.GetNodeAddressesResult{
+			Time:     node.Timestamp.Unix(),
+			Services: uint64(node.Services),
+			Address:  node.IP.String(),
+			Port:     node.Port,
+		}
+		addresses = append(addresses, address)
+	}
+
+	return addresses, nil
+}
+
 // handleGetPeerInfo implements the getpeerinfo command.
 func handleGetPeerInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	peers := s.cfg.ConnMgr.ConnectedPeers()
@@ -4298,6 +4333,10 @@ type rpcserverConnManager interface {
 	// RelayTransactions generates and relays inventory vectors for all of
 	// the passed transactions to all connected peers.
 	RelayTransactions(txns []*mempool.TxDesc)
+
+	// NodeAddresses returns an array consisting node addresses which can
+	// potentially be used to find new nodes in the network.
+	NodeAddresses() []*wire.NetAddress
 }
 
 // rpcserverSyncManager represents a sync manager for use with the RPC server.

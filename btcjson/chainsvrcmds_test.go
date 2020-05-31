@@ -754,6 +754,32 @@ func TestChainSvrCmds(t *testing.T) {
 			},
 		},
 		{
+			name: "getnodeaddresses",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("getnodeaddresses")
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewGetNodeAddressesCmd(nil)
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"getnodeaddresses","params":[],"id":1}`,
+			unmarshalled: &btcjson.GetNodeAddressesCmd{
+				Count: btcjson.Int32(1),
+			},
+		},
+		{
+			name: "getnodeaddresses optional",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("getnodeaddresses", 10)
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewGetNodeAddressesCmd(btcjson.Int32(10))
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"getnodeaddresses","params":[10],"id":1}`,
+			unmarshalled: &btcjson.GetNodeAddressesCmd{
+				Count: btcjson.Int32(10),
+			},
+		},
+		{
 			name: "getpeerinfo",
 			newCmd: func() (interface{}, error) {
 				return btcjson.NewCmd("getpeerinfo")

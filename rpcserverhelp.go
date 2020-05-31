@@ -452,6 +452,17 @@ var helpDescsEnUS = map[string]string{
 	"getnettotalsresult-totalbytessent": "Total bytes sent",
 	"getnettotalsresult-timemillis":     "Number of milliseconds since 1 Jan 1970 GMT",
 
+	// GetNodeAddressesResult help.
+	"getnodeaddressesresult-time":     "Timestamp in seconds since epoch (Jan 1 1970 GMT) keeping track of when the node was last seen",
+	"getnodeaddressesresult-services": "The services offered",
+	"getnodeaddressesresult-address":  "The address of the node",
+	"getnodeaddressesresult-port":     "The port of the node",
+
+	// GetNodeAddressesCmd help.
+	"getnodeaddresses--synopsis": "Return known addresses which can potentially be used to find new nodes in the network",
+	"getnodeaddresses-count":     "How many addresses to return. Limited to the smaller of 2500 or 23% of all known addresses",
+	"getnodeaddresses--result0":  "List of node addresses",
+
 	// GetPeerInfoResult help.
 	"getpeerinforesult-id":             "A unique node ID",
 	"getpeerinforesult-addr":           "The ip address and port of the peer",
@@ -726,6 +737,7 @@ var rpcResultTypes = map[string][]interface{}{
 	"getmininginfo":          {(*btcjson.GetMiningInfoResult)(nil)},
 	"getnettotals":           {(*btcjson.GetNetTotalsResult)(nil)},
 	"getnetworkhashps":       {(*int64)(nil)},
+	"getnodeaddresses":       {(*[]btcjson.GetNodeAddressesResult)(nil)},
 	"getpeerinfo":            {(*[]btcjson.GetPeerInfoResult)(nil)},
 	"getrawmempool":          {(*[]string)(nil), (*btcjson.GetRawMempoolVerboseResult)(nil)},
 	"getrawtransaction":      {(*string)(nil), (*btcjson.TxRawResult)(nil)},
