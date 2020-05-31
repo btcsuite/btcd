@@ -557,6 +557,22 @@ func NewGetNetworkHashPSCmd(numBlocks, height *int) *GetNetworkHashPSCmd {
 	}
 }
 
+// GetNodeAddressesCmd defines the getnodeaddresses JSON-RPC command.
+type GetNodeAddressesCmd struct {
+	Count *int32 `jsonrpcdefault:"1"`
+}
+
+// NewGetNodeAddressesCmd returns a new instance which can be used to issue a
+// getnodeaddresses JSON-RPC command.
+//
+// The parameters which are pointers indicate they are optional.  Passing nil
+// for optional parameters will use the default value.
+func NewGetNodeAddressesCmd(count *int32) *GetNodeAddressesCmd {
+	return &GetNodeAddressesCmd{
+		Count: count,
+	}
+}
+
 // GetPeerInfoCmd defines the getpeerinfo JSON-RPC command.
 type GetPeerInfoCmd struct{}
 
@@ -974,6 +990,7 @@ func init() {
 	MustRegisterCmd("getnetworkinfo", (*GetNetworkInfoCmd)(nil), flags)
 	MustRegisterCmd("getnettotals", (*GetNetTotalsCmd)(nil), flags)
 	MustRegisterCmd("getnetworkhashps", (*GetNetworkHashPSCmd)(nil), flags)
+	MustRegisterCmd("getnodeaddresses", (*GetNodeAddressesCmd)(nil), flags)
 	MustRegisterCmd("getpeerinfo", (*GetPeerInfoCmd)(nil), flags)
 	MustRegisterCmd("getrawmempool", (*GetRawMempoolCmd)(nil), flags)
 	MustRegisterCmd("getrawtransaction", (*GetRawTransactionCmd)(nil), flags)

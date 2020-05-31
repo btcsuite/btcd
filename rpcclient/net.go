@@ -281,6 +281,43 @@ func (c *Client) GetNetworkInfo() (*btcjson.GetNetworkInfoResult, error) {
 	return c.GetNetworkInfoAsync().Receive()
 }
 
+// FutureGetNodeAddressesResult is a future promise to deliver the result of a
+// GetNodeAddressesAsync RPC invocation (or an applicable error).
+type FutureGetNodeAddressesResult chan *response
+
+// Receive waits for the response promised by the future and returns data about
+// known node addresses.
+func (r FutureGetNodeAddressesResult) Receive() ([]btcjson.GetNodeAddressesResult, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal result as an array of getnodeaddresses result objects.
+	var nodeAddresses []btcjson.GetNodeAddressesResult
+	err = json.Unmarshal(res, &nodeAddresses)
+	if err != nil {
+		return nil, err
+	}
+
+	return nodeAddresses, nil
+}
+
+// GetNodeAddressesAsync returns an instance of a type that can be used to get the
+// result of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+//
+// See GetNodeAddresses for the blocking version and more details.
+func (c *Client) GetNodeAddressesAsync(count *int32) FutureGetNodeAddressesResult {
+	cmd := btcjson.NewGetNodeAddressesCmd(count)
+	return c.sendCmd(cmd)
+}
+
+// GetNodeAddresses returns data about known node addresses.
+func (c *Client) GetNodeAddresses(count *int32) ([]btcjson.GetNodeAddressesResult, error) {
+	return c.GetNodeAddressesAsync(count).Receive()
+}
+
 // FutureGetPeerInfoResult is a future promise to deliver the result of a
 // GetPeerInfoAsync RPC invocation (or an applicable error).
 type FutureGetPeerInfoResult chan *response
