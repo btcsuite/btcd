@@ -16,19 +16,20 @@ import (
 func makeParams(rt reflect.Type, rv reflect.Value) []interface{} {
 	numFields := rt.NumField()
 	params := make([]interface{}, 0, numFields)
+	lastParam := -1
 	for i := 0; i < numFields; i++ {
 		rtf := rt.Field(i)
 		rvf := rv.Field(i)
+		params = append(params, rvf.Interface())
 		if rtf.Type.Kind() == reflect.Ptr {
 			if rvf.IsNil() {
-				break
+				// Omit optional null params unless a non-null param follows
+				continue
 			}
-			rvf.Elem()
 		}
-		params = append(params, rvf.Interface())
+		lastParam = i
 	}
-
-	return params
+	return params[:lastParam+1]
 }
 
 // MarshalCmd marshals the passed command to a JSON-RPC request byte slice that
@@ -252,6 +253,11 @@ func assignField(paramNum int, fieldName string, dest reflect.Value, src reflect
 			src = src.Elem()
 		}
 		dest.Set(src)
+		return nil
+	}
+
+	// Optional variables can be set null using "null" string
+	if destIndirects > 0 && src.String() == "null" {
 		return nil
 	}
 
