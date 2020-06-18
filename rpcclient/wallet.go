@@ -1547,6 +1547,43 @@ func (c *Client) GetBalanceMinConf(account string, minConfirms int) (btcutil.Amo
 	return c.GetBalanceMinConfAsync(account, minConfirms).Receive()
 }
 
+// FutureGetBalancesResult is a future promise to deliver the result of a
+// GetBalancesAsync RPC invocation (or an applicable error).
+type FutureGetBalancesResult chan *response
+
+// Receive waits for the response promised by the future and returns the
+// available balances from the server.
+func (r FutureGetBalancesResult) Receive() (*btcjson.GetBalancesResult, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal result as a floating point number.
+	var balances btcjson.GetBalancesResult
+	err = json.Unmarshal(res, &balances)
+	if err != nil {
+		return nil, err
+	}
+
+	return &balances, nil
+}
+
+// GetBalancesAsync returns an instance of a type that can be used to get the
+// result of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+//
+// See GetBalances for the blocking version and more details.
+func (c *Client) GetBalancesAsync() FutureGetBalancesResult {
+	cmd := btcjson.NewGetBalancesCmd()
+	return c.sendCmd(cmd)
+}
+
+// GetBalances returns the available balances from the server.
+func (c *Client) GetBalances() (*btcjson.GetBalancesResult, error) {
+	return c.GetBalancesAsync().Receive()
+}
+
 // FutureGetReceivedByAccountResult is a future promise to deliver the result of
 // a GetReceivedByAccountAsync or GetReceivedByAccountMinConfAsync RPC
 // invocation (or an applicable error).

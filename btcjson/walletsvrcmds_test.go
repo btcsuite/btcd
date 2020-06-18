@@ -251,6 +251,17 @@ func TestWalletSvrCmds(t *testing.T) {
 			},
 		},
 		{
+			name: "getbalances",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("getbalances")
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewGetBalancesCmd()
+			},
+			marshalled:   `{"jsonrpc":"1.0","method":"getbalances","params":[],"id":1}`,
+			unmarshalled: &btcjson.GetBalancesCmd{},
+		},
+		{
 			name: "getnewaddress",
 			newCmd: func() (interface{}, error) {
 				return btcjson.NewCmd("getnewaddress")
