@@ -159,3 +159,17 @@ type GetBestBlockResult struct {
 	Hash   string `json:"hash"`
 	Height int32  `json:"height"`
 }
+
+// BalanceDetailsResult models the details data from the `getbalances` command.
+type BalanceDetailsResult struct {
+	Trusted          float64  `json:"trusted"`
+	UntrustedPending float64  `json:"untrusted_pending"`
+	Immature         float64  `json:"immature"`
+	Used             *float64 `json:"used"`
+}
+
+// GetBalancesResult models the data returned from the getbalances command.
+type GetBalancesResult struct {
+	Mine      BalanceDetailsResult  `json:"mine"`
+	WatchOnly *BalanceDetailsResult `json:"watchonly"`
+}
