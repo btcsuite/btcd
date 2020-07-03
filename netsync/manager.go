@@ -147,6 +147,25 @@ type peerSyncState struct {
 	requestedBlocks map[chainhash.Hash]struct{}
 }
 
+// limitAdd is a helper function for maps that require a maximum limit by
+// evicting a random value if adding the new value would cause it to
+// overflow the maximum allowed.
+func limitAdd(m map[chainhash.Hash]struct{}, hash chainhash.Hash, limit int) {
+	if len(m)+1 > limit {
+		// Remove a random entry from the map.  For most compilers, Go's
+		// range statement iterates starting at a random item although
+		// that is not 100% guaranteed by the spec.  The iteration order
+		// is not important here because an adversary would have to be
+		// able to pull off preimage attacks on the hashing function in
+		// order to target eviction of specific entries anyways.
+		for txHash := range m {
+			delete(m, txHash)
+			break
+		}
+	}
+	m[hash] = struct{}{}
+}
+
 // SyncManager is used to communicate block related messages with peers. The
 // SyncManager is started as by executing Start() in a goroutine. Once started,
 // it selects peers to sync from and starts the initial block download. Once the
@@ -579,8 +598,7 @@ func (sm *SyncManager) handleTxMsg(tmsg *txMsg) {
 	if err != nil {
 		// Do not request this transaction again until a new block
 		// has been processed.
-		sm.rejectedTxns[*txHash] = struct{}{}
-		sm.limitMap(sm.rejectedTxns, maxRejectedTxns)
+		limitAdd(sm.rejectedTxns, *txHash, maxRejectedTxns)
 
 		// When the error is a rule error, it means the transaction was
 		// simply rejected as opposed to something actually going wrong,
@@ -1202,9 +1220,8 @@ func (sm *SyncManager) handleInvMsg(imsg *invMsg) {
 			// Request the block if there is not already a pending
 			// request.
 			if _, exists := sm.requestedBlocks[iv.Hash]; !exists {
-				sm.requestedBlocks[iv.Hash] = struct{}{}
-				sm.limitMap(sm.requestedBlocks, maxRequestedBlocks)
-				state.requestedBlocks[iv.Hash] = struct{}{}
+				limitAdd(sm.requestedBlocks, iv.Hash, maxRequestedBlocks)
+				limitAdd(state.requestedBlocks, iv.Hash, maxRequestedBlocks)
 
 				if peer.IsWitnessEnabled() {
 					iv.Type = wire.InvTypeWitnessBlock
@@ -1220,9 +1237,8 @@ func (sm *SyncManager) handleInvMsg(imsg *invMsg) {
 			// Request the transaction if there is not already a
 			// pending request.
 			if _, exists := sm.requestedTxns[iv.Hash]; !exists {
-				sm.requestedTxns[iv.Hash] = struct{}{}
-				sm.limitMap(sm.requestedTxns, maxRequestedTxns)
-				state.requestedTxns[iv.Hash] = struct{}{}
+				limitAdd(sm.requestedTxns, iv.Hash, maxRequestedTxns)
+				limitAdd(state.requestedTxns, iv.Hash, maxRequestedTxns)
 
 				// If the peer is capable, request the txn
 				// including all witness data.
@@ -1242,24 +1258,6 @@ func (sm *SyncManager) handleInvMsg(imsg *invMsg) {
 	state.requestQueue = requestQueue
 	if len(gdmsg.InvList) > 0 {
 		peer.QueueMessage(gdmsg, nil)
-	}
-}
-
-// limitMap is a helper function for maps that require a maximum limit by
-// evicting a random transaction if adding a new value would cause it to
-// overflow the maximum allowed.
-func (sm *SyncManager) limitMap(m map[chainhash.Hash]struct{}, limit int) {
-	if len(m)+1 > limit {
-		// Remove a random entry from the map.  For most compilers, Go's
-		// range statement iterates starting at a random item although
-		// that is not 100% guaranteed by the spec.  The iteration order
-		// is not important here because an adversary would have to be
-		// able to pull off preimage attacks on the hashing function in
-		// order to target eviction of specific entries anyways.
-		for txHash := range m {
-			delete(m, txHash)
-			return
-		}
 	}
 }
 
