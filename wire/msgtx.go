@@ -422,7 +422,7 @@ func (msg *MsgTx) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) error
 
 	// A count of zero (meaning no TxIn's to the uninitiated) indicates
 	// this is a transaction with witness data.
-	var flag [1]byte
+	var flag [2]byte
 	if count == 0 && enc == WitnessEncoding {
 		// Next, we need to read the flag, which is a single byte.
 		if _, err = io.ReadFull(r, flag[:]); err != nil {
