@@ -7,6 +7,7 @@ package btcec
 
 import (
 	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"reflect"
 	"testing"
@@ -964,4 +965,157 @@ func testSqrt(t *testing.T, test sqrtTest) {
 				"got:     %v\ngot_neg: %v", root, rootNeg)
 		}
 	}
+}
+
+// TestFieldSetBytes ensures that setting a field value to a 256-bit big-endian
+// unsigned integer via both the slice and array methods works as expected for
+// edge cases.  Random cases are tested via the various other tests.
+func TestFieldSetBytes(t *testing.T) {
+	tests := []struct {
+		name     string     // test description
+		in       string     // hex encoded test value
+		expected [10]uint32 // expected raw ints
+	}{{
+		name:     "zero",
+		in:       "00",
+		expected: [10]uint32{0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+	}, {
+		name: "field prime",
+		in:   "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f",
+		expected: [10]uint32{
+			0x03fffc2f, 0x03ffffbf, 0x03ffffff, 0x03ffffff, 0x03ffffff,
+			0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x003fffff,
+		},
+	}, {
+		name: "field prime - 1",
+		in:   "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2e",
+		expected: [10]uint32{
+			0x03fffc2e, 0x03ffffbf, 0x03ffffff, 0x03ffffff, 0x03ffffff,
+			0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x003fffff,
+		},
+	}, {
+		name: "field prime + 1 (overflow in word zero)",
+		in:   "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc30",
+		expected: [10]uint32{
+			0x03fffc30, 0x03ffffbf, 0x03ffffff, 0x03ffffff, 0x03ffffff,
+			0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x003fffff,
+		},
+	}, {
+		name: "field prime first 32 bits",
+		in:   "fffffc2f",
+		expected: [10]uint32{
+			0x03fffc2f, 0x00000003f, 0x00000000, 0x00000000, 0x00000000,
+			0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
+		},
+	}, {
+		name: "field prime word zero",
+		in:   "03fffc2f",
+		expected: [10]uint32{
+			0x03fffc2f, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
+			0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
+		},
+	}, {
+		name: "field prime first 64 bits",
+		in:   "fffffffefffffc2f",
+		expected: [10]uint32{
+			0x03fffc2f, 0x03ffffbf, 0x00000fff, 0x00000000, 0x00000000,
+			0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
+		},
+	}, {
+		name: "field prime word zero and one",
+		in:   "0ffffefffffc2f",
+		expected: [10]uint32{
+			0x03fffc2f, 0x03ffffbf, 0x00000000, 0x00000000, 0x00000000,
+			0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
+		},
+	}, {
+		name: "field prime first 96 bits",
+		in:   "fffffffffffffffefffffc2f",
+		expected: [10]uint32{
+			0x03fffc2f, 0x03ffffbf, 0x03ffffff, 0x0003ffff, 0x00000000,
+			0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
+		},
+	}, {
+		name: "field prime word zero, one, and two",
+		in:   "3ffffffffffefffffc2f",
+		expected: [10]uint32{
+			0x03fffc2f, 0x03ffffbf, 0x03ffffff, 0x00000000, 0x00000000,
+			0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
+		},
+	}, {
+		name: "overflow in word one (prime + 1<<26)",
+		in:   "ffffffffffffffffffffffffffffffffffffffffffffffffffffffff03fffc2f",
+		expected: [10]uint32{
+			0x03fffc2f, 0x03ffffc0, 0x03ffffff, 0x03ffffff, 0x03ffffff,
+			0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x003fffff,
+		},
+	}, {
+		name: "(field prime - 1) * 2 NOT mod P, truncated >32 bytes",
+		in:   "01fffffffffffffffffffffffffffffffffffffffffffffffffffffffdfffff85c",
+		expected: [10]uint32{
+			0x01fffff8, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff,
+			0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x00007fff,
+		},
+	}, {
+		name: "2^256 - 1",
+		in:   "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+		expected: [10]uint32{
+			0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff,
+			0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x003fffff,
+		},
+	}, {
+		name: "alternating bits",
+		in:   "a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5",
+		expected: [10]uint32{
+			0x01a5a5a5, 0x01696969, 0x025a5a5a, 0x02969696, 0x01a5a5a5,
+			0x01696969, 0x025a5a5a, 0x02969696, 0x01a5a5a5, 0x00296969,
+		},
+	}, {
+		name: "alternating bits 2",
+		in:   "5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a",
+		expected: [10]uint32{
+			0x025a5a5a, 0x02969696, 0x01a5a5a5, 0x01696969, 0x025a5a5a,
+			0x02969696, 0x01a5a5a5, 0x01696969, 0x025a5a5a, 0x00169696,
+		},
+	}}
+
+	for _, test := range tests {
+		inBytes := hexToBytes(test.in)
+
+		// Ensure setting the bytes via the slice method works as expected.
+		var f fieldVal
+		f.SetByteSlice(inBytes)
+		if !reflect.DeepEqual(f.n, test.expected) {
+			t.Errorf("%s: unexpected result\ngot: %x\nwant: %x", test.name, f.n,
+				test.expected)
+			continue
+		}
+
+		// Ensure setting the bytes via the array method works as expected.
+		var f2 fieldVal
+		var b32 [32]byte
+		truncatedInBytes := inBytes
+		if len(truncatedInBytes) > 32 {
+			truncatedInBytes = truncatedInBytes[:32]
+		}
+		copy(b32[32-len(truncatedInBytes):], truncatedInBytes)
+		f2.SetBytes(&b32)
+		if !reflect.DeepEqual(f2.n, test.expected) {
+			t.Errorf("%s: unexpected result\ngot: %x\nwant: %x", test.name,
+				f2.n, test.expected)
+			continue
+		}
+	}
+}
+
+// hexToBytes converts the passed hex string into bytes and will panic if there
+// is an error.  This is only provided for the hard-coded constants so errors in
+// the source code can be detected. It will only (and must only) be called with
+// hard-coded values.
+func hexToBytes(s string) []byte {
+	b, err := hex.DecodeString(s)
+	if err != nil {
+		panic("invalid hex in source file: " + s)
+	}
+	return b
 }
