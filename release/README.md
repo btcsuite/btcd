@@ -6,7 +6,7 @@ binaries are now reproducible, allowing developers to build the binary on
 distinct machines, and end up with a byte-for-byte identical binary. However,
 this wasn't _fully_ solved in `go1.13`, as the build system still includes the
 directory the binary is built into the binary itself. As a result, our scripts
-utilize a work around needed until `go1.13.2`.  
+utilize a work around needed until `go1.13.2`.
 
 ## Building a New Release
 
@@ -19,8 +19,7 @@ the release binaries following these steps:
 
 1. `git clone https://github.com/btcsuite/btcd.git`
 2. `cd btcd`
-3. `./build/release/release.sh <TAG> # <TAG> is the name of the next
-   release/tag`
+3. `./release/release.sh <TAG> # <TAG> is the name of the next release/tag`
 
 This will then create a directory of the form `btcd-<TAG>` containing archives
 of the release binaries for each supported operating system and architecture,
@@ -64,7 +63,7 @@ and `go` (matching the same version used in the release):
    release with `git checkout <TAG>`.
 7. Proceed to verify the tag with `git verify-tag <TAG>` and compile the
    binaries from source for the intended operating system and architecture with
-   `BTCDBUILDSYS=OS-ARCH ./build/release/release.sh <TAG>`.
+   `BTCDBUILDSYS=OS-ARCH ./release/release.sh <TAG>`.
 8. Extract the archive found in the `btcd-<TAG>` directory created by the
    release script and recompute the `SHA256` hash of the release binaries (btcd
    and btcctl) with `shasum -a 256 <filename>`. These should match __exactly__
