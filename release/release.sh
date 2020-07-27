@@ -1,11 +1,12 @@
 #!/bin/bash
 
+# Copyright (c) 2016 Company 0, LLC.
+# Copyright (c) 2016-2020 The btcsuite developers
+# Use of this source code is governed by an ISC
+# license that can be found in the LICENSE file.
+
 # Simple bash script to build basic btcd tools for all the platforms we support
 # with the golang cross-compiler.
-#
-# Copyright (c) 2016 Company 0, LLC.
-# Use of this source code is governed by the ISC
-# license.
 
 set -e
 
