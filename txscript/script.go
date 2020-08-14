@@ -196,86 +196,58 @@ func IsPushOnlyScript(script []byte) bool {
 // the list of parsed opcodes up to the point of failure along with the error.
 func parseScriptTemplate(script []byte, opcodes *[256]opcode) ([]parsedOpcode, error) {
 	retScript := make([]parsedOpcode, 0, len(script))
+	var err error
 	for i := 0; i < len(script); {
 		instr := script[i]
 		op := &opcodes[instr]
 		pop := parsedOpcode{opcode: op}
-
-		// Parse data out of instruction.
-		switch {
-		// No additional data.  Note that some of the opcodes, notably
-		// OP_1NEGATE, OP_0, and OP_[1-16] represent the data
-		// themselves.
-		case op.length == 1:
-			i++
-
-		// Data pushes of specific lengths -- OP_DATA_[1-75].
-		case op.length > 1:
-			if len(script[i:]) < op.length {
-				str := fmt.Sprintf("opcode %s requires %d "+
-					"bytes, but script only has %d remaining",
-					op.name, op.length, len(script[i:]))
-				return retScript, scriptError(ErrMalformedPush,
-					str)
-			}
-
-			// Slice out the data.
-			pop.data = script[i+1 : i+op.length]
-			i += op.length
-
-		// Data pushes with parsed lengths -- OP_PUSHDATAP{1,2,4}.
-		case op.length < 0:
-			var l uint
-			off := i + 1
-
-			if len(script[off:]) < -op.length {
-				str := fmt.Sprintf("opcode %s requires %d "+
-					"bytes, but script only has %d remaining",
-					op.name, -op.length, len(script[off:]))
-				return retScript, scriptError(ErrMalformedPush,
-					str)
-			}
-
-			// Next -length bytes are little endian length of data.
-			switch op.length {
-			case -1:
-				l = uint(script[off])
-			case -2:
-				l = ((uint(script[off+1]) << 8) |
-					uint(script[off]))
-			case -4:
-				l = ((uint(script[off+3]) << 24) |
-					(uint(script[off+2]) << 16) |
-					(uint(script[off+1]) << 8) |
-					uint(script[off]))
-			default:
-				str := fmt.Sprintf("invalid opcode length %d",
-					op.length)
-				return retScript, scriptError(ErrMalformedPush,
-					str)
-			}
-
-			// Move offset to beginning of the data.
-			off += -op.length
-
-			// Disallow entries that do not fit script or were
-			// sign extended.
-			if int(l) > len(script[off:]) || int(l) < 0 {
-				str := fmt.Sprintf("opcode %s pushes %d bytes, "+
-					"but script only has %d remaining",
-					op.name, int(l), len(script[off:]))
-				return retScript, scriptError(ErrMalformedPush,
-					str)
-			}
-
-			pop.data = script[off : off+int(l)]
-			i += 1 - op.length + int(l)
+		i, err = pop.checkParseableInScript(script, i)
+		if err != nil {
+			return retScript, err
 		}
 
 		retScript = append(retScript, pop)
 	}
 
 	return retScript, nil
+}
+
+// checkScriptTemplateParseable is the same as parseScriptTemplate but does not
+// return the list of opcodes up until the point of failure so that this can be
+// used in functions which do not necessarily have a need for the failed list of
+// opcodes, such as IsUnspendable.
+//
+// This function returns a pointer to a byte. This byte is nil if the parsing
+// has an error, or if the script length is zero. If the script length is not
+// zero and parsing succeeds, then the first opcode parsed will be returned.
+//
+// Not returning the full opcode list up until failure also has the benefit of
+// reducing GC pressure, as the list would get immediately thrown away.
+func checkScriptTemplateParseable(script []byte, opcodes *[256]opcode) (*byte, error) {
+	var err error
+
+	// A script of length zero is an unspendable script but it is parseable.
+	var firstOpcode byte
+	var numParsedInstr uint = 0
+
+	for i := 0; i < len(script); {
+		instr := script[i]
+		op := &opcodes[instr]
+		pop := parsedOpcode{opcode: op}
+		i, err = pop.checkParseableInScript(script, i)
+		if err != nil {
+			return nil, err
+		}
+
+		// if this is a op_return then it is unspendable so we set the first
+		// parsed instruction in case it's an op_return
+		if numParsedInstr == 0 {
+			firstOpcode = pop.opcode.value
+		}
+		numParsedInstr++
+	}
+
+	return &firstOpcode, nil
 }
 
 // parseScript preparses the script in bytes into a list of parsedOpcodes while
@@ -851,10 +823,14 @@ func getWitnessSigOps(pkScript []byte, witness wire.TxWitness) int {
 // guaranteed to fail at execution.  This allows inputs to be pruned instantly
 // when entering the UTXO set.
 func IsUnspendable(pkScript []byte) bool {
-	pops, err := parseScript(pkScript)
+	// Not provably unspendable
+	if len(pkScript) == 0 {
+		return false
+	}
+	firstOpcode, err := checkScriptTemplateParseable(pkScript, &opcodeArray)
 	if err != nil {
 		return true
 	}
 
-	return len(pops) > 0 && pops[0].opcode.value == OP_RETURN
+	return firstOpcode != nil && *firstOpcode == OP_RETURN
 }

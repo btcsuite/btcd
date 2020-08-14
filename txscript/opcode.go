@@ -656,6 +656,79 @@ func (pop *parsedOpcode) isDisabled() bool {
 	}
 }
 
+// checkParseableInScript checks whether or not the current opcode is able to be
+// parsed at a certain position in a script.
+// This returns the position of the next opcode to be parsed in the script.
+func (pop *parsedOpcode) checkParseableInScript(script []byte, scriptPos int) (int, error) {
+	// Parse data out of instruction.
+	switch {
+	// No additional data.  Note that some of the opcodes, notably
+	// OP_1NEGATE, OP_0, and OP_[1-16] represent the data
+	// themselves.
+	case pop.opcode.length == 1:
+		scriptPos++
+
+	// Data pushes of specific lengths -- OP_DATA_[1-75].
+	case pop.opcode.length > 1:
+		if len(script[scriptPos:]) < pop.opcode.length {
+			str := fmt.Sprintf("opcode %s requires %d "+
+				"bytes, but script only has %d remaining",
+				pop.opcode.name, pop.opcode.length, len(script[scriptPos:]))
+			return 0, scriptError(ErrMalformedPush, str)
+		}
+
+		// Slice out the data.
+		pop.data = script[scriptPos+1 : scriptPos+pop.opcode.length]
+		scriptPos += pop.opcode.length
+
+	// Data pushes with parsed lengths -- OP_PUSHDATAP{1,2,4}.
+	case pop.opcode.length < 0:
+		var l uint
+		off := scriptPos + 1
+
+		if len(script[off:]) < -pop.opcode.length {
+			str := fmt.Sprintf("opcode %s requires %d "+
+				"bytes, but script only has %d remaining",
+				pop.opcode.name, -pop.opcode.length, len(script[off:]))
+			return 0, scriptError(ErrMalformedPush, str)
+		}
+
+		// Next -length bytes are little endian length of data.
+		switch pop.opcode.length {
+		case -1:
+			l = uint(script[off])
+		case -2:
+			l = ((uint(script[off+1]) << 8) |
+				uint(script[off]))
+		case -4:
+			l = ((uint(script[off+3]) << 24) |
+				(uint(script[off+2]) << 16) |
+				(uint(script[off+1]) << 8) |
+				uint(script[off]))
+		default:
+			str := fmt.Sprintf("invalid opcode length %d",
+				pop.opcode.length)
+			return 0, scriptError(ErrMalformedPush, str)
+		}
+
+		// Move offset to beginning of the data.
+		off += -pop.opcode.length
+
+		// Disallow entries that do not fit script or were
+		// sign extended.
+		if int(l) > len(script[off:]) || int(l) < 0 {
+			str := fmt.Sprintf("opcode %s pushes %d bytes, "+
+				"but script only has %d remaining",
+				pop.opcode.name, int(l), len(script[off:]))
+			return 0, scriptError(ErrMalformedPush, str)
+		}
+
+		pop.data = script[off : off+int(l)]
+		scriptPos += 1 - pop.opcode.length + int(l)
+	}
+	return scriptPos, nil
+}
+
 // alwaysIllegal returns whether or not the opcode is always illegal when passed
 // over by the program counter even if in a non-executed branch (it isn't a
 // coincidence that they are conditionals).
