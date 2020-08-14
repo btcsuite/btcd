@@ -4301,6 +4301,28 @@ func TestIsUnspendable(t *testing.T) {
 				0xfa, 0x0b, 0x5c, 0x88, 0xac},
 			expected: false,
 		},
+		{
+			// Spendable
+			pkScript: []byte{0xa9, 0x14, 0x82, 0x1d, 0xba, 0x94, 0xbc, 0xfb,
+				0xa2, 0x57, 0x36, 0xa3, 0x9e, 0x5d, 0x14, 0x5d, 0x69, 0x75,
+				0xba, 0x8c, 0x0b, 0x42, 0x87},
+			expected: false,
+		},
+		{
+			// Not Necessarily Unspendable
+			pkScript: []byte{},
+			expected: false,
+		},
+		{
+			// Spendable
+			pkScript: []byte{OP_TRUE},
+			expected: false,
+		},
+		{
+			// Unspendable
+			pkScript: []byte{OP_RETURN},
+			expected: true,
+		},
 	}
 
 	for i, test := range tests {
@@ -4310,5 +4332,18 @@ func TestIsUnspendable(t *testing.T) {
 				i, res, test.expected)
 			continue
 		}
+	}
+}
+
+// BenchmarkIsUnspendable adds a benchmark to compare the time and allocations
+// necessary for the IsUnspendable function.
+func BenchmarkIsUnspendable(b *testing.B) {
+	pkScriptToUse := []byte{0xa9, 0x14, 0x82, 0x1d, 0xba, 0x94, 0xbc, 0xfb, 0xa2, 0x57, 0x36, 0xa3, 0x9e, 0x5d, 0x14, 0x5d, 0x69, 0x75, 0xba, 0x8c, 0x0b, 0x42, 0x87}
+	var res bool = false
+	for i := 0; i < b.N; i++ {
+		res = IsUnspendable(pkScriptToUse)
+	}
+	if res {
+		b.Fatalf("Benchmark should never have res be %t\n", res)
 	}
 }
