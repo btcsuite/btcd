@@ -135,9 +135,8 @@ func normalizeAddress(addr string, chain *chaincfg.Params, useWallet bool) (stri
 				// TODO: add port once regtest is supported in btcwallet
 				paramErr := fmt.Errorf("cannot use -wallet with -regtest, btcwallet not yet compatible with regtest")
 				return "", paramErr
-			} else {
-				defaultPort = "18334"
 			}
+			defaultPort = "18334"
 		default:
 			if useWallet {
 				defaultPort = "8332"
