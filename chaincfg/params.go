@@ -588,6 +588,10 @@ var (
 	// is intended to identify the network for a hierarchical deterministic
 	// private extended key is not registered.
 	ErrUnknownHDKeyID = errors.New("unknown hd private extended key bytes")
+
+	// ErrInvalidHDKeyID describes an error where the provided hierarchical
+	// deterministic version bytes, or hd key id, is malformed.
+	ErrInvalidHDKeyID = errors.New("invalid hd extended key version bytes")
 )
 
 var (
@@ -619,7 +623,11 @@ func Register(params *Params) error {
 	registeredNets[params.Net] = struct{}{}
 	pubKeyHashAddrIDs[params.PubKeyHashAddrID] = struct{}{}
 	scriptHashAddrIDs[params.ScriptHashAddrID] = struct{}{}
-	hdPrivToPubKeyIDs[params.HDPrivateKeyID] = params.HDPublicKeyID[:]
+
+	err := RegisterHDKeyID(params.HDPublicKeyID[:], params.HDPrivateKeyID[:])
+	if err != nil {
+		return err
+	}
 
 	// A valid Bech32 encoded segwit address always has as prefix the
 	// human-readable part for the given net followed by '1'.
@@ -664,6 +672,29 @@ func IsBech32SegwitPrefix(prefix string) bool {
 	prefix = strings.ToLower(prefix)
 	_, ok := bech32SegwitPrefixes[prefix]
 	return ok
+}
+
+// RegisterHDKeyID registers a public and private hierarchical deterministic
+// extended key ID pair.
+//
+// Non-standard HD version bytes, such as the ones documented in SLIP-0132,
+// should be registered using this method for library packages to lookup key
+// IDs (aka HD version bytes). When the provided key IDs are invalid, the
+// ErrInvalidHDKeyID error will be returned.
+//
+// Reference:
+//   SLIP-0132 : Registered HD version bytes for BIP-0032
+//   https://github.com/satoshilabs/slips/blob/master/slip-0132.md
+func RegisterHDKeyID(hdPublicKeyID []byte, hdPrivateKeyID []byte) error {
+	if len(hdPublicKeyID) != 4 || len(hdPrivateKeyID) != 4 {
+		return ErrInvalidHDKeyID
+	}
+
+	var keyID [4]byte
+	copy(keyID[:], hdPrivateKeyID)
+	hdPrivToPubKeyIDs[keyID] = hdPublicKeyID
+
+	return nil
 }
 
 // HDPrivateKeyToPublicKeyID accepts a private hierarchical deterministic
