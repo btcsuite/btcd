@@ -3,6 +3,161 @@ User visible changes for btcd
   A full-node bitcoin implementation written in Go
 ============================================================================
 
+Changes in 0.21.0 (Thu Aug 27 2020)
+  - Network-related changes:
+    - Handle notfound messages from peers in netsync package (#1603)
+  - RPC changes:
+    - Add compatibility for getblock RPC changes in bitcoind 0.15.0 (#1529)
+    - Add new optional Params field to rpcclient.ConnConfig (#1467)
+    - Add new error code ErrRPCInWarmup in btcjson (#1541)
+    - Add compatibility for changes to getmempoolentry response in bitcoind
+      0.19.0 (#1524)
+    - Add rpcclient methods for estimatesmartfee and generatetoaddress
+      commands (#1500)
+    - Add rpcclient method for getblockstats command (#1500)
+    - Parse serialized transaction from createrawtransaction command using
+      both segwit, and legacy format (#1502)
+    - Support cookie-based authentication in rpcclient (#1460)
+    - Add rpcclient method for getchaintxstats command (#1571)
+    - Add rpcclient method for fundrawtransaction command (#1553)
+    - Add rpcclient method for getbalances command (#1595)
+    - Add new method rpcclient.GetTransactionWatchOnly (#1592)
+  - Crypto changes:
+    - Fix panic in fieldVal.SetByteSlice when called with large values, and
+      improve the method to be 35% faster (#1602)
+  - btcctl changes:
+    - Added -regtest mode to btcctl (#1556)
+  - Misc changes:
+    - Fix a bug due to a deadlock in connmgr's dynamic ban scoring (#1509)
+    - Add blockchain.NewUtxoEntry() to directly create entries for
+      UtxoViewpoint (#1588)
+    - Replace LRU cache implementation in peer package with a generic one
+      from decred/dcrd (#1599)
+  - Contributors (alphabetical order):
+    - Anirudha Bose
+    - Antonin Hildebrand
+    - Dan Cline
+    - Daniel McNally
+    - David Hill
+    - Federico Bond
+    - George Tankersley
+    - Henry
+    - Henry Harder
+    - Iskander Sharipov
+    - Ivan Kuznetsov
+    - Jake Sylvestre
+    - Javed Khan
+    - JeremyRand
+    - Jin
+    - John C. Vernaleo
+    - Kulpreet Singh
+    - Mikael Lindlof
+    - Murray Nesbitt
+    - Nisen
+    - Olaoluwa Osuntokun
+    - Oliver Gugger
+    - Steven Roose
+    - Torkel Rogstad
+    - Tyler Chambers
+    - Wilmer Paulino
+    - Yash Bhutwala
+    - adiabat
+    - jalavosus
+    - mohanson
+    - qqjettkgjzhxmwj
+    - qshuai
+    - shuai.qi
+    - tpkeeper
+
+Changes in v0.20.1 (Wed Nov 13 2019)
+  - RPC changes:
+    - Add compatibility for bitcoind v0.19.0 in rpcclient and btcjson
+      packages (#1484)
+  - Contributors (alphabetical order):
+    - Eugene Zeigel
+    - Olaoluwa Osuntokun
+    - Wilmer Paulino
+
+Changes in v0.20.0 (Tue Oct 15 2019)
+  - Significant changes made since 0.12.0. See git log or refer to release
+    notes on GitHub for full details.
+  - Contributors (alphabetical order):
+    - Albert Puigsech Galicia
+    - Alex Akselrod
+    - Alex Bosworth
+    - Alex Manuskin
+    - Alok Menghrajani
+    - Anatoli Babenia
+    - Andy Weidenbaum
+    - Calvin McAnarney
+    - Chris Martin
+    - Chris Pacia
+    - Chris Shepherd
+    - Conner Fromknecht
+    - Craig Sturdy
+    - Cédric Félizard
+    - Daniel Krawisz
+    - Daniel Martí
+    - Daniel McNally
+    - Dario Nieuwenhuis
+    - Dave Collins
+    - David Hill
+    - David de Kloet
+    - GeertJohan
+    - Grace Noah
+    - Gregory Trubetskoy
+    - Hector Jusforgues
+    - Iskander (Alex) Sharipov
+    - Janus Troelsen
+    - Jasper
+    - Javed Khan
+    - Jeremiah Goyette
+    - Jim Posen
+    - Jimmy Song
+    - Johan T. Halseth
+    - John C. Vernaleo
+    - Jonathan Gillham
+    - Josh Rickmar
+    - Jon Underwood
+    - Jonathan Zeppettini
+    - Jouke Hofman
+    - Julian Meyer
+    - Kai
+    - Kamil Slowikowski
+    - Kefkius
+    - Leonardo Lazzaro
+    - Marco Peereboom
+    - Marko Bencun
+    - Mawueli Kofi Adzoe
+    - Michail Kargakis
+    - Mitchell Paull
+    - Nathan Bass
+    - Nicola 'tekNico' Larosa
+    - Olaoluwa Osuntokun
+    - Pedro Martelletto
+    - Ricardo Velhote
+    - Roei Erez
+    - Ruben de Vries
+    - Rune T. Aune
+    - Sad Pencil
+    - Shuai Qi
+    - Steven Roose
+    - Tadge Dryja
+    - Tibor Bősze
+    - Tomás Senart
+    - Tzu-Jung Lee
+    - Vadym Popov
+    - Waldir Pimenta
+    - Wilmer Paulino
+    - benma
+    - danda
+    - dskloet
+    - esemplastic
+    - jadeblaquiere
+    - nakagawa
+    - preminem
+    - qshuai
+
 Changes in 0.12.0 (Fri Nov 20 2015)
   - Protocol and network related changes:
     - Add a new checkpoint at block height 382320 (#555)
