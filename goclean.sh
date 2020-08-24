@@ -4,11 +4,12 @@
 # 3. go vet        (http://golang.org/cmd/vet)
 # 4. gosimple      (https://github.com/dominikh/go-simple)
 # 5. unconvert     (https://github.com/mdempsky/unconvert)
-#
+# 6. race detector (http://blog.golang.org/race-detector)
+# 7. test coverage (http://blog.golang.org/cover)
 
 set -ex
 
-go test -tags="rpctest" ./...
+env GORACE="halt_on_error=1" go test -race -tags="rpctest" -covermode atomic -coverprofile=profile.cov ./...
 
 # Automatic checks
 golangci-lint run --deadline=10m --disable-all \
