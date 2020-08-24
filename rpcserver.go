@@ -3493,6 +3493,37 @@ func handleValidateAddress(s *rpcServer, cmd interface{}, closeChan <-chan struc
 		return result, nil
 	}
 
+	switch addr := addr.(type) {
+	case *btcutil.AddressPubKeyHash:
+		result.IsScript = btcjson.Bool(false)
+		result.IsWitness = btcjson.Bool(false)
+
+	case *btcutil.AddressScriptHash:
+		result.IsScript = btcjson.Bool(true)
+		result.IsWitness = btcjson.Bool(false)
+
+	case *btcutil.AddressPubKey:
+		result.IsScript = btcjson.Bool(false)
+		result.IsWitness = btcjson.Bool(false)
+
+	case *btcutil.AddressWitnessPubKeyHash:
+		result.IsScript = btcjson.Bool(false)
+		result.IsWitness = btcjson.Bool(true)
+		result.WitnessVersion = btcjson.Int32(int32(addr.WitnessVersion()))
+		result.WitnessProgram = btcjson.String(hex.EncodeToString(addr.WitnessProgram()))
+
+	case *btcutil.AddressWitnessScriptHash:
+		result.IsScript = btcjson.Bool(true)
+		result.IsWitness = btcjson.Bool(true)
+		result.WitnessVersion = btcjson.Int32(int32(addr.WitnessVersion()))
+		result.WitnessProgram = btcjson.String(hex.EncodeToString(addr.WitnessProgram()))
+
+	default:
+		// Handle the case when a new Address is supported by btcutil, but none
+		// of the cases were matched in the switch block. The current behaviour
+		// is to do nothing, and only populate the Address and IsValid fields.
+	}
+
 	result.Address = addr.EncodeAddress()
 	result.IsValid = true
 

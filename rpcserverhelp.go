@@ -575,8 +575,12 @@ var helpDescsEnUS = map[string]string{
 	"submitblock--result1":    "The reason the block was rejected",
 
 	// ValidateAddressResult help.
-	"validateaddresschainresult-isvalid": "Whether or not the address is valid",
-	"validateaddresschainresult-address": "The bitcoin address (only when isvalid is true)",
+	"validateaddresschainresult-isvalid":         "Whether or not the address is valid",
+	"validateaddresschainresult-address":         "The bitcoin address (only when isvalid is true)",
+	"validateaddresschainresult-isscript":        "If the key is a script",
+	"validateaddresschainresult-iswitness":       "If the address is a witness address",
+	"validateaddresschainresult-witness_version": "The version number of the witness program",
+	"validateaddresschainresult-witness_program": "The hex value of the witness program",
 
 	// ValidateAddressCmd help.
 	"validateaddress--synopsis": "Verify an address is valid.",

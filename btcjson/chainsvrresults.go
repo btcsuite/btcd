@@ -671,9 +671,17 @@ type TxRawDecodeResult struct {
 
 // ValidateAddressChainResult models the data returned by the chain server
 // validateaddress command.
+//
+// Compared to the Bitcoin Core version, this struct lacks the scriptPubKey
+// field since it requires wallet access, which is outside the scope of btcd.
+// Ref: https://bitcoincore.org/en/doc/0.20.0/rpc/util/validateaddress/
 type ValidateAddressChainResult struct {
-	IsValid bool   `json:"isvalid"`
-	Address string `json:"address,omitempty"`
+	IsValid        bool    `json:"isvalid"`
+	Address        string  `json:"address,omitempty"`
+	IsScript       *bool   `json:"isscript,omitempty"`
+	IsWitness      *bool   `json:"iswitness,omitempty"`
+	WitnessVersion *int32  `json:"witness_version,omitempty"`
+	WitnessProgram *string `json:"witness_program,omitempty"`
 }
 
 // EstimateSmartFeeResult models the data returned buy the chain server
