@@ -1302,6 +1302,17 @@ func TestChainSvrCmds(t *testing.T) {
 				Proof: "test",
 			},
 		},
+		{
+			name: "getdescriptorinfo",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("getdescriptorinfo", "123")
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewGetDescriptorInfoCmd("123")
+			},
+			marshalled:   `{"jsonrpc":"1.0","method":"getdescriptorinfo","params":["123"],"id":1}`,
+			unmarshalled: &btcjson.GetDescriptorInfoCmd{Descriptor: "123"},
+		},
 	}
 
 	t.Logf("Running %d tests", len(tests))

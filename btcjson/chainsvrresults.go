@@ -730,3 +730,12 @@ func (f *FundRawTransactionResult) UnmarshalJSON(data []byte) error {
 	f.ChangePosition = rawRes.ChangePosition
 	return nil
 }
+
+// GetDescriptorInfoResult models the data from the getdescriptorinfo command.
+type GetDescriptorInfoResult struct {
+	Descriptor     string `json:"descriptor"`     // descriptor in canonical form, without private keys
+	Checksum       string `json:"checksum"`       // checksum for the input descriptor
+	IsRange        bool   `json:"isrange"`        // whether the descriptor is ranged
+	IsSolvable     bool   `json:"issolvable"`     // whether the descriptor is solvable
+	HasPrivateKeys bool   `json:"hasprivatekeys"` // whether the descriptor has at least one private key
+}

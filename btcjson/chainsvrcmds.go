@@ -882,6 +882,19 @@ func NewVerifyTxOutProofCmd(proof string) *VerifyTxOutProofCmd {
 	}
 }
 
+// GetDescriptorInfoCmd defines the getdescriptorinfo JSON-RPC command.
+type GetDescriptorInfoCmd struct {
+	Descriptor string
+}
+
+// NewGetDescriptorInfoCmd returns a new instance which can be used to issue a
+// getdescriptorinfo JSON-RPC command.
+func NewGetDescriptorInfoCmd(descriptor string) *GetDescriptorInfoCmd {
+	return &GetDescriptorInfoCmd{
+		Descriptor: descriptor,
+	}
+}
+
 func init() {
 	// No special flags for commands in this file.
 	flags := UsageFlag(0)
@@ -937,4 +950,5 @@ func init() {
 	MustRegisterCmd("verifychain", (*VerifyChainCmd)(nil), flags)
 	MustRegisterCmd("verifymessage", (*VerifyMessageCmd)(nil), flags)
 	MustRegisterCmd("verifytxoutproof", (*VerifyTxOutProofCmd)(nil), flags)
+	MustRegisterCmd("getdescriptorinfo", (*GetDescriptorInfoCmd)(nil), flags)
 }

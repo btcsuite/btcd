@@ -1224,3 +1224,44 @@ func (c *Client) GetBlockStatsAsync(hashOrHeight interface{}, stats *[]string) F
 func (c *Client) GetBlockStats(hashOrHeight interface{}, stats *[]string) (*btcjson.GetBlockStatsResult, error) {
 	return c.GetBlockStatsAsync(hashOrHeight, stats).Receive()
 }
+
+// FutureGetDescriptorInfoResult is a future promise to deliver the result of a
+// GetDescriptorInfoAsync RPC invocation (or an applicable error).
+type FutureGetDescriptorInfoResult chan *response
+
+// Receive waits for the response promised by the future and returns the analysed
+// info of the descriptor.
+func (r FutureGetDescriptorInfoResult) Receive() (*btcjson.GetDescriptorInfoResult, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	var descriptorInfo btcjson.GetDescriptorInfoResult
+	err = json.Unmarshal(res, &descriptorInfo)
+	if err != nil {
+		return nil, err
+	}
+	return &descriptorInfo, nil
+}
+
+// GetDescriptorInfoAsync returns an instance of a type that can be used to get
+// the result of the RPC at some future time by invoking the Receive function on
+// the returned instance.
+//
+// See GetDescriptorInfo for the blocking version and more details.
+func (c *Client) GetDescriptorInfoAsync(descriptor string) FutureGetDescriptorInfoResult {
+	cmd := btcjson.NewGetDescriptorInfoCmd(descriptor)
+	return c.sendCmd(cmd)
+}
+
+// GetDescriptorInfo returns the analysed info of a descriptor string, by invoking the
+// getdescriptorinfo RPC.
+//
+// Use this function to analyse a descriptor string, or compute the checksum
+// for a descriptor without one.
+//
+// See btcjson.GetDescriptorInfoResult for details about the result.
+func (c *Client) GetDescriptorInfo(descriptor string) (*btcjson.GetDescriptorInfoResult, error) {
+	return c.GetDescriptorInfoAsync(descriptor).Receive()
+}
