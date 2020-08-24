@@ -2203,6 +2203,44 @@ func (c *Client) ImportAddressRescan(address string, account string, rescan bool
 	return c.ImportAddressRescanAsync(address, account, rescan).Receive()
 }
 
+// FutureImportMultiResult is a future promise to deliver the result of an
+// ImportMultiAsync RPC invocation (or an applicable error).
+type FutureImportMultiResult chan *response
+
+// Receive waits for the response promised by the future and returns the result
+// of importing multiple addresses/scripts.
+func (r FutureImportMultiResult) Receive() (btcjson.ImportMultiResults, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	var importMultiResults btcjson.ImportMultiResults
+	err = json.Unmarshal(res, &importMultiResults)
+	if err != nil {
+		return nil, err
+	}
+	return importMultiResults, nil
+}
+
+// ImportMultiAsync returns an instance of a type that can be used to get the result
+// of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+//
+// See ImportMulti for the blocking version and more details.
+func (c *Client) ImportMultiAsync(requests []btcjson.ImportMultiRequest, options *btcjson.ImportMultiOptions) FutureImportMultiResult {
+	cmd := btcjson.NewImportMultiCmd(requests, options)
+	return c.sendCmd(cmd)
+}
+
+// ImportMulti imports addresses/scripts, optionally rescanning the blockchain
+// from the earliest creation time of the imported scripts.
+//
+// See btcjson.ImportMultiRequest for details on the requests parameter.
+func (c *Client) ImportMulti(requests []btcjson.ImportMultiRequest, options *btcjson.ImportMultiOptions) (btcjson.ImportMultiResults, error) {
+	return c.ImportMultiAsync(requests, options).Receive()
+}
+
 // FutureImportPrivKeyResult is a future promise to deliver the result of an
 // ImportPrivKeyAsync RPC invocation (or an applicable error).
 type FutureImportPrivKeyResult chan *response

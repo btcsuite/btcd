@@ -173,3 +173,14 @@ type GetBalancesResult struct {
 	Mine      BalanceDetailsResult  `json:"mine"`
 	WatchOnly *BalanceDetailsResult `json:"watchonly"`
 }
+
+// ImportMultiResults is a slice that models the result of the importmulti command.
+//
+// Each item in the slice contains the execution result corresponding to the input
+// requests of type btcjson.ImportMultiRequest, passed to the ImportMulti[Async]
+// function.
+type ImportMultiResults []struct {
+	Success  bool      `json:"success"`
+	Error    *RPCError `json:"error,omitempty"`
+	Warnings *[]string `json:"warnings,omitempty"`
+}

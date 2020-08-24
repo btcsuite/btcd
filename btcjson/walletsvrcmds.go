@@ -7,6 +7,11 @@
 
 package btcjson
 
+import (
+	"encoding/json"
+	"fmt"
+)
+
 // AddMultisigAddressCmd defines the addmutisigaddress JSON-RPC command.
 type AddMultisigAddressCmd struct {
 	NRequired int
@@ -686,6 +691,208 @@ func NewWalletPassphraseChangeCmd(oldPassphrase, newPassphrase string) *WalletPa
 	}
 }
 
+// TimestampOrNow defines a type to represent a timestamp value in seconds,
+// since epoch.
+//
+// The value can either be a integer, or the string "now".
+//
+// NOTE: Interpretation of the timestamp value depends upon the specific
+// JSON-RPC command, where it is used.
+type TimestampOrNow struct {
+	Value interface{}
+}
+
+// MarshalJSON implements the json.Marshaler interface for TimestampOrNow
+func (t TimestampOrNow) MarshalJSON() ([]byte, error) {
+	return json.Marshal(t.Value)
+}
+
+// UnmarshalJSON implements the json.Unmarshaler interface for TimestampOrNow
+func (t *TimestampOrNow) UnmarshalJSON(data []byte) error {
+	var unmarshalled interface{}
+	if err := json.Unmarshal(data, &unmarshalled); err != nil {
+		return err
+	}
+
+	switch v := unmarshalled.(type) {
+	case float64:
+		t.Value = int(v)
+	case string:
+		if v != "now" {
+			return fmt.Errorf("invalid timestamp value: %v", unmarshalled)
+		}
+		t.Value = v
+	default:
+		return fmt.Errorf("invalid timestamp value: %v", unmarshalled)
+	}
+	return nil
+}
+
+// ScriptPubKeyAddress represents an address, to be used in conjunction with
+// ScriptPubKey.
+type ScriptPubKeyAddress struct {
+	Address string `json:"address"`
+}
+
+// ScriptPubKey represents a script (as a string) or an address
+// (as a ScriptPubKeyAddress).
+type ScriptPubKey struct {
+	Value interface{}
+}
+
+// MarshalJSON implements the json.Marshaler interface for ScriptPubKey
+func (s ScriptPubKey) MarshalJSON() ([]byte, error) {
+	return json.Marshal(s.Value)
+}
+
+// UnmarshalJSON implements the json.Unmarshaler interface for ScriptPubKey
+func (s *ScriptPubKey) UnmarshalJSON(data []byte) error {
+	var unmarshalled interface{}
+	if err := json.Unmarshal(data, &unmarshalled); err != nil {
+		return err
+	}
+
+	switch v := unmarshalled.(type) {
+	case string:
+		s.Value = v
+	case map[string]interface{}:
+		s.Value = ScriptPubKeyAddress{Address: v["address"].(string)}
+	default:
+		return fmt.Errorf("invalid scriptPubKey value: %v", unmarshalled)
+	}
+	return nil
+}
+
+// DescriptorRange specifies the limits of a ranged Descriptor.
+//
+// Descriptors are typically ranged when specified in the form of generic HD
+// chain paths.
+//   Example of a ranged descriptor: pkh(tpub.../*)
+//
+// The value can be an int to specify the end of the range, or the range
+// itself, as []int{begin, end}.
+type DescriptorRange struct {
+	Value interface{}
+}
+
+// MarshalJSON implements the json.Marshaler interface for DescriptorRange
+func (r DescriptorRange) MarshalJSON() ([]byte, error) {
+	return json.Marshal(r.Value)
+}
+
+// UnmarshalJSON implements the json.Unmarshaler interface for DescriptorRange
+func (r *DescriptorRange) UnmarshalJSON(data []byte) error {
+	var unmarshalled interface{}
+	if err := json.Unmarshal(data, &unmarshalled); err != nil {
+		return err
+	}
+
+	switch v := unmarshalled.(type) {
+	case float64:
+		r.Value = int(v)
+	case []interface{}:
+		if len(v) != 2 {
+			return fmt.Errorf("expected [begin,end] integer range, got: %v", unmarshalled)
+		}
+		r.Value = []int{
+			int(v[0].(float64)),
+			int(v[1].(float64)),
+		}
+	default:
+		return fmt.Errorf("invalid descriptor range value: %v", unmarshalled)
+	}
+	return nil
+}
+
+// ImportMultiRequest defines the request struct to be passed to the
+// ImportMultiCmd, as an array.
+type ImportMultiRequest struct {
+	// Descriptor to import, in canonical form. If using Descriptor, do not
+	// also provide ScriptPubKey, RedeemScript, WitnessScript, PubKeys, or Keys.
+	Descriptor *string `json:"desc,omitempty"`
+
+	// Script/address to import. Should not be provided if using Descriptor.
+	ScriptPubKey *ScriptPubKey `json:"scriptPubKey,omitempty"`
+
+	// Creation time of the key in seconds since epoch (Jan 1 1970 GMT), or
+	// the string "now" to substitute the current synced blockchain time.
+	//
+	// The timestamp of the oldest key will determine how far back blockchain
+	// rescans need to begin for missing wallet transactions.
+	//
+	// Specifying "now" bypasses scanning. Useful for keys that are known to
+	// never have been used.
+	//
+	// Specifying 0 scans the entire blockchain.
+	Timestamp TimestampOrNow `json:"timestamp"`
+
+	// Allowed only if the ScriptPubKey is a P2SH or P2SH-P2WSH
+	// address/scriptPubKey.
+	RedeemScript *string `json:"redeemscript,omitempty"`
+
+	// Allowed only if the ScriptPubKey is a P2SH-P2WSH or P2WSH
+	// address/scriptPubKey.
+	WitnessScript *string `json:"witnessscript,omitempty"`
+
+	// Array of strings giving pubkeys to import. They must occur in P2PKH or
+	// P2WPKH scripts. They are not required when the private key is also
+	// provided (see Keys).
+	PubKeys *[]string `json:"pubkeys,omitempty"`
+
+	// Array of strings giving private keys to import. The corresponding
+	// public keys must occur in the output or RedeemScript.
+	Keys *[]string `json:"keys,omitempty"`
+
+	// If the provided Descriptor is ranged, this specifies the end
+	// (as an int) or the range (as []int{begin, end}) to import.
+	Range *DescriptorRange `json:"range,omitempty"`
+
+	// States whether matching outputs should be treated as not incoming
+	// payments (also known as change).
+	Internal *bool `json:"internal,omitempty"`
+
+	// States whether matching outputs should be considered watchonly.
+	//
+	// If an address/script is imported without all of the private keys
+	// required to spend from that address, set this field to true.
+	//
+	// If all the private keys are provided and the address/script is
+	// spendable, set this field to false.
+	WatchOnly *bool `json:"watchonly,omitempty"`
+
+	// Label to assign to the address. Only allowed when Internal is false.
+	Label *string `json:"label,omitempty"`
+
+	// States whether imported public keys should be added to the keypool for
+	// when users request new addresses. Only allowed when wallet private keys
+	// are disabled.
+	KeyPool *bool `json:"keypool,omitempty"`
+}
+
+// ImportMultiRequest defines the options struct, provided to the
+// ImportMultiCmd as a pointer argument.
+type ImportMultiOptions struct {
+	Rescan bool `json:"rescan"` // Rescan the blockchain after all imports
+}
+
+// ImportMultiCmd defines the importmulti JSON-RPC command.
+type ImportMultiCmd struct {
+	Requests []ImportMultiRequest
+	Options  *ImportMultiOptions
+}
+
+// NewImportMultiCmd returns a new instance which can be used to issue
+// an importmulti JSON-RPC command.
+//
+// The parameters which are pointers indicate they are optional. Passing nil
+// for optional parameters will use the default value.
+func NewImportMultiCmd(requests []ImportMultiRequest, options *ImportMultiOptions) *ImportMultiCmd {
+	return &ImportMultiCmd{
+		Requests: requests,
+		Options:  options,
+	}
+}
+
 func init() {
 	// The commands in this file are only usable with a wallet server.
 	flags := UFWalletOnly
@@ -709,6 +916,7 @@ func init() {
 	MustRegisterCmd("getreceivedbyaddress", (*GetReceivedByAddressCmd)(nil), flags)
 	MustRegisterCmd("gettransaction", (*GetTransactionCmd)(nil), flags)
 	MustRegisterCmd("getwalletinfo", (*GetWalletInfoCmd)(nil), flags)
+	MustRegisterCmd("importmulti", (*ImportMultiCmd)(nil), flags)
 	MustRegisterCmd("importprivkey", (*ImportPrivKeyCmd)(nil), flags)
 	MustRegisterCmd("keypoolrefill", (*KeyPoolRefillCmd)(nil), flags)
 	MustRegisterCmd("listaccounts", (*ListAccountsCmd)(nil), flags)
