@@ -201,7 +201,7 @@ func TestAssignFieldErrors(t *testing.T) {
 	}{
 		{
 			name: "general incompatible int -> string",
-			dest: string(0),
+			dest: "\x00",
 			src:  int(0),
 			err:  btcjson.Error{ErrorCode: btcjson.ErrInvalidType},
 		},
