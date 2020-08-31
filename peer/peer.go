@@ -22,6 +22,7 @@ import (
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
+	"github.com/btcsuite/btclog"
 	"github.com/btcsuite/go-socks/socks"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/decred/dcrd/lru"
@@ -494,9 +495,12 @@ func (p *Peer) String() string {
 //
 // This function is safe for concurrent access.
 func (p *Peer) UpdateLastBlockHeight(newHeight int32) {
+	if log.Level() <= btclog.LevelTrace {
+		log.Tracef("Updating last block height of peer %v from %v to %v",
+			p.addr, p.lastBlock, newHeight)
+	}
+
 	p.statsMtx.Lock()
-	log.Tracef("Updating last block height of peer %v from %v to %v",
-		p.addr, p.lastBlock, newHeight)
 	p.lastBlock = newHeight
 	p.statsMtx.Unlock()
 }
