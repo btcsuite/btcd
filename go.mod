@@ -1,6 +1,10 @@
 module github.com/btcsuite/btcd
 
 require (
+	github.com/btcsuite/btcd/btcec v0.1.0
+	github.com/btcsuite/btcd/chaincfg v0.1.0
+	github.com/btcsuite/btcd/chaincfg/chainhash v0.1.0
+	github.com/btcsuite/btcd/wire v0.1.0
 	github.com/btcsuite/btclog v0.0.0-20170628155309-84c8d2346e9f
 	github.com/btcsuite/btcutil v1.0.2
 	github.com/btcsuite/go-socks v0.0.0-20170105172521-4720035b7bfd
@@ -12,6 +16,13 @@ require (
 	github.com/jessevdk/go-flags v1.4.0
 	github.com/jrick/logrotate v1.0.0
 	golang.org/x/crypto v0.0.0-20200510223506-06a226fb4e37
+)
+
+replace (
+	github.com/btcsuite/btcd/btcec => ./btcec
+	github.com/btcsuite/btcd/chaincfg => ./chaincfg
+	github.com/btcsuite/btcd/chaincfg/chainhash => ./chaincfg/chainhash
+	github.com/btcsuite/btcd/wire => ./wire
 )
 
 go 1.14
