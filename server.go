@@ -1321,7 +1321,11 @@ func (sp *serverPeer) OnNotFound(p *peer.Peer, msg *wire.MsgNotFound) {
 		switch inv.Type {
 		case wire.InvTypeBlock:
 			numBlocks++
+		case wire.InvTypeWitnessBlock:
+			numBlocks++
 		case wire.InvTypeTx:
+			numTxns++
+		case wire.InvTypeWitnessTx:
 			numTxns++
 		default:
 			peerLog.Debugf("Invalid inv type '%d' in notfound message from %s",
