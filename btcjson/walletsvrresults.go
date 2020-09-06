@@ -64,6 +64,7 @@ type ListTransactionsResult struct {
 	Amount            float64  `json:"amount"`
 	BIP125Replaceable string   `json:"bip125-replaceable,omitempty"`
 	BlockHash         string   `json:"blockhash,omitempty"`
+	BlockHeight       *int32   `json:"blockheight,omitempty"`
 	BlockIndex        *int64   `json:"blockindex,omitempty"`
 	BlockTime         int64    `json:"blocktime,omitempty"`
 	Category          string   `json:"category"`
@@ -71,6 +72,7 @@ type ListTransactionsResult struct {
 	Fee               *float64 `json:"fee,omitempty"`
 	Generated         bool     `json:"generated,omitempty"`
 	InvolvesWatchOnly bool     `json:"involveswatchonly,omitempty"`
+	Label             *string  `json:"label,omitempty"`
 	Time              int64    `json:"time"`
 	TimeReceived      int64    `json:"timereceived"`
 	Trusted           bool     `json:"trusted"`
