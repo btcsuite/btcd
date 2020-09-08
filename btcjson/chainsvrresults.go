@@ -238,6 +238,7 @@ type GetBlockFilterResult struct {
 type GetBlockTemplateResultTx struct {
 	Data    string  `json:"data"`
 	Hash    string  `json:"hash"`
+	TxID    string  `json:"txid"`
 	Depends []int64 `json:"depends"`
 	Fee     int64   `json:"fee"`
 	SigOps  int64   `json:"sigops"`
