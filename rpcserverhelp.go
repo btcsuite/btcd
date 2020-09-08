@@ -295,6 +295,7 @@ var helpDescsEnUS = map[string]string{
 	"templaterequest-target":       "The desired target for the block template (this parameter is ignored)",
 	"templaterequest-data":         "Hex-encoded block data (only for mode=proposal)",
 	"templaterequest-workid":       "The server provided workid if provided in block template (not applicable)",
+	"templaterequest-rules":        "Specific block rules that are to be enforced e.g. '[\"segwit\"]",
 
 	// GetBlockTemplateResultTx help.
 	"getblocktemplateresulttx-data":    "Hex-encoded transaction data (byte-for-byte)",
