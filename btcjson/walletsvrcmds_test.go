@@ -709,6 +709,21 @@ func TestWalletSvrCmds(t *testing.T) {
 			},
 		},
 		{
+			name: "listsinceblock pad null",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("listsinceblock", "null", 1, false)
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewListSinceBlockCmd(nil, btcjson.Int(1), btcjson.Bool(false))
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"listsinceblock","params":[null,1,false],"id":1}`,
+			unmarshalled: &btcjson.ListSinceBlockCmd{
+				BlockHash:           nil,
+				TargetConfirmations: btcjson.Int(1),
+				IncludeWatchOnly:    btcjson.Bool(false),
+			},
+		},
+		{
 			name: "listtransactions",
 			newCmd: func() (interface{}, error) {
 				return btcjson.NewCmd("listtransactions")
