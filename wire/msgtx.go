@@ -109,14 +109,38 @@ const (
 	maxWitnessItemSize = 11000
 )
 
-// witnessMarkerBytes are a pair of bytes specific to the witness encoding. If
-// this sequence is encoutered, then it indicates a transaction has iwtness
-// data. The first byte is an always 0x00 marker byte, which allows decoders to
-// distinguish a serialized transaction with witnesses from a regular (legacy)
-// one. The second byte is the Flag field, which at the moment is always 0x01,
-// but may be extended in the future to accommodate auxiliary non-committed
-// fields.
-var witessMarkerBytes = []byte{0x00, 0x01}
+// TxFlagMarker is the first byte of the FLAG field in a bitcoin tx
+// message. It allows decoders to distinguish a regular serialized
+// transaction from one that would require a different parsing logic.
+//
+// Position of FLAG in a bitcoin tx message:
+//   ┌─────────┬────────────────────┬─────────────┬─────┐
+//   │ VERSION │ FLAG               │ TX-IN-COUNT │ ... │
+//   │ 4 bytes │ 2 bytes (optional) │ varint      │     │
+//   └─────────┴────────────────────┴─────────────┴─────┘
+//
+// Zooming into the FLAG field:
+//   ┌── FLAG ─────────────┬────────┐
+//   │ TxFlagMarker (0x00) │ TxFlag │
+//   │ 1 byte              │ 1 byte │
+//   └─────────────────────┴────────┘
+const TxFlagMarker = 0x00
+
+// TxFlag is the second byte of the FLAG field in a bitcoin tx message.
+// It indicates the decoding logic to use in the transaction parser, if
+// TxFlagMarker is detected in the tx message.
+//
+// As of writing this, only the witness flag (0x01) is supported, but may be
+// extended in the future to accommodate auxiliary non-committed fields.
+type TxFlag = byte
+
+const (
+	// WitnessFlag is a flag specific to witness encoding. If the TxFlagMarker
+	// is encountered followed by the WitnessFlag, then it indicates a
+	// transaction has witness data. This allows decoders to distinguish a
+	// serialized transaction with witnesses from a legacy one.
+	WitnessFlag TxFlag = 0x01
+)
 
 // scriptFreeList defines a free list of byte slices (up to the maximum number
 // defined by the freeListMaxItems constant) that have a cap according to the
@@ -420,18 +444,19 @@ func (msg *MsgTx) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) error
 		return err
 	}
 
-	// A count of zero (meaning no TxIn's to the uninitiated) indicates
-	// this is a transaction with witness data.
-	var flag [1]byte
-	if count == 0 && enc == WitnessEncoding {
-		// Next, we need to read the flag, which is a single byte.
+	// A count of zero (meaning no TxIn's to the uninitiated) means that the
+	// value is a TxFlagMarker, and hence indicates the presence of a flag.
+	var flag [1]TxFlag
+	if count == TxFlagMarker && enc == WitnessEncoding {
+		// The count varint was in fact the flag marker byte. Next, we need to
+		// read the flag value, which is a single byte.
 		if _, err = io.ReadFull(r, flag[:]); err != nil {
 			return err
 		}
 
-		// At the moment, the flag MUST be 0x01. In the future other
-		// flag types may be supported.
-		if flag[0] != 0x01 {
+		// At the moment, the flag MUST be WitnessFlag (0x01). In the future
+		// other flag types may be supported.
+		if flag[0] != WitnessFlag {
 			str := fmt.Sprintf("witness tx but flag byte is %x", flag)
 			return messageError("MsgTx.BtcDecode", str)
 		}
@@ -690,14 +715,11 @@ func (msg *MsgTx) BtcEncode(w io.Writer, pver uint32, enc MessageEncoding) error
 	// defined in BIP0144.
 	doWitness := enc == WitnessEncoding && msg.HasWitness()
 	if doWitness {
-		// After the txn's Version field, we include two additional
-		// bytes specific to the witness encoding. The first byte is an
-		// always 0x00 marker byte, which allows decoders to
-		// distinguish a serialized transaction with witnesses from a
-		// regular (legacy) one. The second byte is the Flag field,
-		// which at the moment is always 0x01, but may be extended in
-		// the future to accommodate auxiliary non-committed fields.
-		if _, err := w.Write(witessMarkerBytes); err != nil {
+		// After the transaction's Version field, we include two additional
+		// bytes specific to the witness encoding. This byte sequence is known
+		// as a flag. The first byte is a marker byte (TxFlagMarker) and the
+		// second one is the flag value to indicate presence of witness data.
+		if _, err := w.Write([]byte{TxFlagMarker, WitnessFlag}); err != nil {
 			return err
 		}
 	}
