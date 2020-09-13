@@ -1263,6 +1263,45 @@ func (c *Client) GetBlockStats(hashOrHeight interface{}, stats *[]string) (*btcj
 	return c.GetBlockStatsAsync(hashOrHeight, stats).Receive()
 }
 
+// FutureDeriveAddressesResult is a future promise to deliver the result of an
+// DeriveAddressesAsync RPC invocation (or an applicable error).
+type FutureDeriveAddressesResult chan *response
+
+// Receive waits for the response promised by the future and derives one or more addresses
+// corresponding to the given output descriptor.
+func (r FutureDeriveAddressesResult) Receive() (*btcjson.DeriveAddressesResult, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	var deriveAddressesResult btcjson.DeriveAddressesResult
+
+	err = json.Unmarshal(res, &deriveAddressesResult)
+	if err != nil {
+		return nil, err
+	}
+
+	return &deriveAddressesResult, nil
+}
+
+// DeriveAddressesAsync returns an instance of a type that can be used to get the result
+// of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+//
+// See DeriveAddresses for the blocking version and more details.
+func (c *Client) DeriveAddressesAsync(descriptor string, descriptorRange *btcjson.DescriptorRange) FutureDeriveAddressesResult {
+	cmd := btcjson.NewDeriveAddressesCmd(descriptor, descriptorRange)
+	return c.sendCmd(cmd)
+}
+
+// DeriveAddresses derives one or more addresses corresponding to an output
+// descriptor. If a ranged descriptor is used, the end or the range
+// (in [begin,end] notation) to derive must be specified.
+func (c *Client) DeriveAddresses(descriptor string, descriptorRange *btcjson.DescriptorRange) (*btcjson.DeriveAddressesResult, error) {
+	return c.DeriveAddressesAsync(descriptor, descriptorRange).Receive()
+}
+
 // FutureGetDescriptorInfoResult is a future promise to deliver the result of a
 // GetDescriptorInfoAsync RPC invocation (or an applicable error).
 type FutureGetDescriptorInfoResult chan *response
@@ -1276,10 +1315,12 @@ func (r FutureGetDescriptorInfoResult) Receive() (*btcjson.GetDescriptorInfoResu
 	}
 
 	var descriptorInfo btcjson.GetDescriptorInfoResult
+
 	err = json.Unmarshal(res, &descriptorInfo)
 	if err != nil {
 		return nil, err
 	}
+
 	return &descriptorInfo, nil
 }
 

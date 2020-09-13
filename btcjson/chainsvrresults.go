@@ -764,3 +764,6 @@ type GetDescriptorInfoResult struct {
 	IsSolvable     bool   `json:"issolvable"`     // whether the descriptor is solvable
 	HasPrivateKeys bool   `json:"hasprivatekeys"` // whether the descriptor has at least one private key
 }
+
+// DeriveAddressesResult models the data from the deriveaddresses command.
+type DeriveAddressesResult []string
