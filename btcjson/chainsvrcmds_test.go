@@ -221,6 +221,51 @@ func TestChainSvrCmds(t *testing.T) {
 			unmarshalled: &btcjson.DecodeScriptCmd{HexScript: "00"},
 		},
 		{
+			name: "deriveaddresses no range",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("deriveaddresses", "00")
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewDeriveAddressesCmd("00", nil)
+			},
+			marshalled:   `{"jsonrpc":"1.0","method":"deriveaddresses","params":["00"],"id":1}`,
+			unmarshalled: &btcjson.DeriveAddressesCmd{Descriptor: "00"},
+		},
+		{
+			name: "deriveaddresses int range",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd(
+					"deriveaddresses", "00", btcjson.DescriptorRange{Value: 2})
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewDeriveAddressesCmd(
+					"00", &btcjson.DescriptorRange{Value: 2})
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"deriveaddresses","params":["00",2],"id":1}`,
+			unmarshalled: &btcjson.DeriveAddressesCmd{
+				Descriptor: "00",
+				Range:      &btcjson.DescriptorRange{Value: 2},
+			},
+		},
+		{
+			name: "deriveaddresses slice range",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd(
+					"deriveaddresses", "00",
+					btcjson.DescriptorRange{Value: []int{0, 2}},
+				)
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewDeriveAddressesCmd(
+					"00", &btcjson.DescriptorRange{Value: []int{0, 2}})
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"deriveaddresses","params":["00",[0,2]],"id":1}`,
+			unmarshalled: &btcjson.DeriveAddressesCmd{
+				Descriptor: "00",
+				Range:      &btcjson.DescriptorRange{Value: []int{0, 2}},
+			},
+		},
+		{
 			name: "getaddednodeinfo",
 			newCmd: func() (interface{}, error) {
 				return btcjson.NewCmd("getaddednodeinfo", true)

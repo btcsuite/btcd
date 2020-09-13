@@ -59,3 +59,21 @@ func ExampleClient_ImportMulti() {
 	fmt.Println(resp[0].Success)
 	// true
 }
+
+func ExampleClient_DeriveAddresses() {
+	client, err := New(connCfg, nil)
+	if err != nil {
+		panic(err)
+	}
+	defer client.Shutdown()
+
+	addrs, err := client.DeriveAddresses(
+		"pkh([f34db33f/44'/0'/0']xpub6Cc939fyHvfB9pPLWd3bSyyQFvgKbwhidca49jGCM5Hz5ypEPGf9JVXB4NBuUfPgoHnMjN6oNgdC9KRqM11RZtL8QLW6rFKziNwHDYhZ6Kx/0/*)#ed7px9nu",
+		&btcjson.DescriptorRange{Value: []int{0, 2}})
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Printf("%+v\n", addrs)
+	// &[14NjenDKkGGq1McUgoSkeUHJpW3rrKLbPW 1Pn6i3cvdGhqbdgNjXHfbaYfiuviPiymXj 181x1NbgGYKLeMXkDdXEAqepG75EgU8XtG]
+}

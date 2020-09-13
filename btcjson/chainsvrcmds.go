@@ -80,6 +80,47 @@ func NewCreateRawTransactionCmd(inputs []TransactionInput, amounts map[string]fl
 	}
 }
 
+// DecodeRawTransactionCmd defines the decoderawtransaction JSON-RPC command.
+type DecodeRawTransactionCmd struct {
+	HexTx string
+}
+
+// NewDecodeRawTransactionCmd returns a new instance which can be used to issue
+// a decoderawtransaction JSON-RPC command.
+func NewDecodeRawTransactionCmd(hexTx string) *DecodeRawTransactionCmd {
+	return &DecodeRawTransactionCmd{
+		HexTx: hexTx,
+	}
+}
+
+// DecodeScriptCmd defines the decodescript JSON-RPC command.
+type DecodeScriptCmd struct {
+	HexScript string
+}
+
+// NewDecodeScriptCmd returns a new instance which can be used to issue a
+// decodescript JSON-RPC command.
+func NewDecodeScriptCmd(hexScript string) *DecodeScriptCmd {
+	return &DecodeScriptCmd{
+		HexScript: hexScript,
+	}
+}
+
+// DeriveAddressesCmd defines the deriveaddresses JSON-RPC command.
+type DeriveAddressesCmd struct {
+	Descriptor string
+	Range      *DescriptorRange
+}
+
+// NewDeriveAddressesCmd returns a new instance which can be used to issue a
+// deriveaddresses JSON-RPC command.
+func NewDeriveAddressesCmd(descriptor string, descriptorRange *DescriptorRange) *DeriveAddressesCmd {
+	return &DeriveAddressesCmd{
+		Descriptor: descriptor,
+		Range:      descriptorRange,
+	}
+}
+
 // ChangeType defines the different output types to use for the change address
 // of a transaction built by the node.
 type ChangeType string
@@ -121,32 +162,6 @@ func NewFundRawTransactionCmd(serializedTx []byte, opts FundRawTransactionOpts, 
 		HexTx:     hex.EncodeToString(serializedTx),
 		Options:   opts,
 		IsWitness: isWitness,
-	}
-}
-
-// DecodeRawTransactionCmd defines the decoderawtransaction JSON-RPC command.
-type DecodeRawTransactionCmd struct {
-	HexTx string
-}
-
-// NewDecodeRawTransactionCmd returns a new instance which can be used to issue
-// a decoderawtransaction JSON-RPC command.
-func NewDecodeRawTransactionCmd(hexTx string) *DecodeRawTransactionCmd {
-	return &DecodeRawTransactionCmd{
-		HexTx: hexTx,
-	}
-}
-
-// DecodeScriptCmd defines the decodescript JSON-RPC command.
-type DecodeScriptCmd struct {
-	HexScript string
-}
-
-// NewDecodeScriptCmd returns a new instance which can be used to issue a
-// decodescript JSON-RPC command.
-func NewDecodeScriptCmd(hexScript string) *DecodeScriptCmd {
-	return &DecodeScriptCmd{
-		HexScript: hexScript,
 	}
 }
 
@@ -465,6 +480,19 @@ type GetConnectionCountCmd struct{}
 // getconnectioncount JSON-RPC command.
 func NewGetConnectionCountCmd() *GetConnectionCountCmd {
 	return &GetConnectionCountCmd{}
+}
+
+// GetDescriptorInfoCmd defines the getdescriptorinfo JSON-RPC command.
+type GetDescriptorInfoCmd struct {
+	Descriptor string
+}
+
+// NewGetDescriptorInfoCmd returns a new instance which can be used to issue a
+// getdescriptorinfo JSON-RPC command.
+func NewGetDescriptorInfoCmd(descriptor string) *GetDescriptorInfoCmd {
+	return &GetDescriptorInfoCmd{
+		Descriptor: descriptor,
+	}
 }
 
 // GetDifficultyCmd defines the getdifficulty JSON-RPC command.
@@ -956,28 +984,16 @@ func NewVerifyTxOutProofCmd(proof string) *VerifyTxOutProofCmd {
 	}
 }
 
-// GetDescriptorInfoCmd defines the getdescriptorinfo JSON-RPC command.
-type GetDescriptorInfoCmd struct {
-	Descriptor string
-}
-
-// NewGetDescriptorInfoCmd returns a new instance which can be used to issue a
-// getdescriptorinfo JSON-RPC command.
-func NewGetDescriptorInfoCmd(descriptor string) *GetDescriptorInfoCmd {
-	return &GetDescriptorInfoCmd{
-		Descriptor: descriptor,
-	}
-}
-
 func init() {
 	// No special flags for commands in this file.
 	flags := UsageFlag(0)
 
 	MustRegisterCmd("addnode", (*AddNodeCmd)(nil), flags)
 	MustRegisterCmd("createrawtransaction", (*CreateRawTransactionCmd)(nil), flags)
-	MustRegisterCmd("fundrawtransaction", (*FundRawTransactionCmd)(nil), flags)
 	MustRegisterCmd("decoderawtransaction", (*DecodeRawTransactionCmd)(nil), flags)
 	MustRegisterCmd("decodescript", (*DecodeScriptCmd)(nil), flags)
+	MustRegisterCmd("deriveaddresses", (*DeriveAddressesCmd)(nil), flags)
+	MustRegisterCmd("fundrawtransaction", (*FundRawTransactionCmd)(nil), flags)
 	MustRegisterCmd("getaddednodeinfo", (*GetAddedNodeInfoCmd)(nil), flags)
 	MustRegisterCmd("getbestblockhash", (*GetBestBlockHashCmd)(nil), flags)
 	MustRegisterCmd("getblock", (*GetBlockCmd)(nil), flags)
@@ -993,6 +1009,7 @@ func init() {
 	MustRegisterCmd("getchaintips", (*GetChainTipsCmd)(nil), flags)
 	MustRegisterCmd("getchaintxstats", (*GetChainTxStatsCmd)(nil), flags)
 	MustRegisterCmd("getconnectioncount", (*GetConnectionCountCmd)(nil), flags)
+	MustRegisterCmd("getdescriptorinfo", (*GetDescriptorInfoCmd)(nil), flags)
 	MustRegisterCmd("getdifficulty", (*GetDifficultyCmd)(nil), flags)
 	MustRegisterCmd("getgenerate", (*GetGenerateCmd)(nil), flags)
 	MustRegisterCmd("gethashespersec", (*GetHashesPerSecCmd)(nil), flags)
@@ -1027,5 +1044,4 @@ func init() {
 	MustRegisterCmd("verifychain", (*VerifyChainCmd)(nil), flags)
 	MustRegisterCmd("verifymessage", (*VerifyMessageCmd)(nil), flags)
 	MustRegisterCmd("verifytxoutproof", (*VerifyTxOutProofCmd)(nil), flags)
-	MustRegisterCmd("getdescriptorinfo", (*GetDescriptorInfoCmd)(nil), flags)
 }
