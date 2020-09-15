@@ -1,8 +1,11 @@
+// Copyright (c) 2020 The btcsuite developers
+// Use of this source code is governed by an ISC
+// license that can be found in the LICENSE file.
+
 package rpcclient
 
 import (
 	"fmt"
-
 	"github.com/btcsuite/btcd/btcjson"
 )
 
@@ -76,4 +79,30 @@ func ExampleClient_DeriveAddresses() {
 
 	fmt.Printf("%+v\n", addrs)
 	// &[14NjenDKkGGq1McUgoSkeUHJpW3rrKLbPW 1Pn6i3cvdGhqbdgNjXHfbaYfiuviPiymXj 181x1NbgGYKLeMXkDdXEAqepG75EgU8XtG]
+}
+
+func ExampleClient_GetAddressInfo() {
+	connCfg = &ConnConfig{
+		Host:         "localhost:18332",
+		User:         "user",
+		Pass:         "pass",
+		HTTPPostMode: true,
+		DisableTLS:   true,
+	}
+
+	client, err := New(connCfg, nil)
+	if err != nil {
+		panic(err)
+	}
+	defer client.Shutdown()
+
+	info, err := client.GetAddressInfo("2NF1FbxtUAsvdU4uW1UC2xkBVatp6cYQuJ3")
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println(info.Address)             // 2NF1FbxtUAsvdU4uW1UC2xkBVatp6cYQuJ3
+	fmt.Println(info.ScriptType.String()) // witness_v0_keyhash
+	fmt.Println(*info.HDKeyPath)          // m/49'/1'/0'/0/4
+	fmt.Println(info.Embedded.Address)    // tb1q3x2h2kh57wzg7jz00jhwn0ycvqtdk2ane37j27
 }

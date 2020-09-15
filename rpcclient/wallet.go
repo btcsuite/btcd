@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2017 The btcsuite developers
+// Copyright (c) 2014-2020 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -937,6 +937,41 @@ func (c *Client) CreateNewAccountAsync(account string) FutureCreateNewAccountRes
 // CreateNewAccount creates a new wallet account.
 func (c *Client) CreateNewAccount(account string) error {
 	return c.CreateNewAccountAsync(account).Receive()
+}
+
+// FutureGetAddressInfoResult is a future promise to deliver the result of an
+// GetAddressInfoAsync RPC invocation (or an applicable error).
+type FutureGetAddressInfoResult chan *response
+
+// Receive waits for the response promised by the future and returns the information
+// about the given bitcoin address.
+func (r FutureGetAddressInfoResult) Receive() (*btcjson.GetAddressInfoResult, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	var getAddressInfoResult btcjson.GetAddressInfoResult
+	err = json.Unmarshal(res, &getAddressInfoResult)
+	if err != nil {
+		return nil, err
+	}
+	return &getAddressInfoResult, nil
+}
+
+// GetAddressInfoAsync returns an instance of a type that can be used to get the result
+// of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+//
+// See GetAddressInfo for the blocking version and more details.
+func (c *Client) GetAddressInfoAsync(address string) FutureGetAddressInfoResult {
+	cmd := btcjson.NewGetAddressInfoCmd(address)
+	return c.sendCmd(cmd)
+}
+
+// GetAddressInfo returns information about the given bitcoin address.
+func (c *Client) GetAddressInfo(address string) (*btcjson.GetAddressInfoResult, error) {
+	return c.GetAddressInfoAsync(address).Receive()
 }
 
 // FutureGetNewAddressResult is a future promise to deliver the result of a
