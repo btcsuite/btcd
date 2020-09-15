@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2017 The btcsuite developers
+// Copyright (c) 2013-2020 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -58,6 +58,7 @@ const (
 	WitnessV0ScriptHashTy                    // Pay to witness script hash.
 	MultiSigTy                               // Multi signature.
 	NullDataTy                               // Empty data-only (provably prunable).
+	WitnessUnknownTy                         // Witness unknown
 )
 
 // scriptClassToName houses the human-readable strings which describe each
@@ -71,6 +72,7 @@ var scriptClassToName = []string{
 	WitnessV0ScriptHashTy: "witness_v0_scripthash",
 	MultiSigTy:            "multisig",
 	NullDataTy:            "nulldata",
+	WitnessUnknownTy:      "witness_unknown",
 }
 
 // String implements the Stringer interface by returning the name of
@@ -186,6 +188,22 @@ func GetScriptClass(script []byte) ScriptClass {
 		return NonStandardTy
 	}
 	return typeOfScript(pops)
+}
+
+// NewScriptClass returns the ScriptClass corresponding to the string name
+// provided as argument. ErrUnsupportedScriptType error is returned if the
+// name doesn't correspond to any known ScriptClass.
+//
+// Not to be confused with GetScriptClass.
+func NewScriptClass(name string) (*ScriptClass, error) {
+	for i, n := range scriptClassToName {
+		if n == name {
+			value := ScriptClass(i)
+			return &value, nil
+		}
+	}
+
+	return nil, fmt.Errorf("%w: %s", ErrUnsupportedScriptType, name)
 }
 
 // expectedInputs returns the number of arguments required by a script.

@@ -1,4 +1,4 @@
-// Copyright (c) 2014 The btcsuite developers
+// Copyright (c) 2014-2020 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -207,6 +207,19 @@ func TestWalletSvrCmds(t *testing.T) {
 			marshalled: `{"jsonrpc":"1.0","method":"getaddressesbyaccount","params":["acct"],"id":1}`,
 			unmarshalled: &btcjson.GetAddressesByAccountCmd{
 				Account: "acct",
+			},
+		},
+		{
+			name: "getaddressinfo",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("getaddressinfo", "1234")
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewGetAddressInfoCmd("1234")
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"getaddressinfo","params":["1234"],"id":1}`,
+			unmarshalled: &btcjson.GetAddressInfoCmd{
+				Address: "1234",
 			},
 		},
 		{

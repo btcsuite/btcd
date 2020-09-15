@@ -1,4 +1,4 @@
-// Copyright (c) 2014 The btcsuite developers
+// Copyright (c) 2014-2020 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -175,6 +175,19 @@ type GetAddressesByAccountCmd struct {
 func NewGetAddressesByAccountCmd(account string) *GetAddressesByAccountCmd {
 	return &GetAddressesByAccountCmd{
 		Account: account,
+	}
+}
+
+// GetAddressInfoCmd defines the getaddressinfo JSON-RPC command.
+type GetAddressInfoCmd struct {
+	Address string
+}
+
+// NewGetAddressInfoCmd returns a new instance which can be used to issue a
+// getaddressinfo JSON-RPC command.
+func NewGetAddressInfoCmd(address string) *GetAddressInfoCmd {
+	return &GetAddressInfoCmd{
+		Address: address,
 	}
 }
 
@@ -993,6 +1006,7 @@ func init() {
 	MustRegisterCmd("getaccount", (*GetAccountCmd)(nil), flags)
 	MustRegisterCmd("getaccountaddress", (*GetAccountAddressCmd)(nil), flags)
 	MustRegisterCmd("getaddressesbyaccount", (*GetAddressesByAccountCmd)(nil), flags)
+	MustRegisterCmd("getaddressinfo", (*GetAddressInfoCmd)(nil), flags)
 	MustRegisterCmd("getbalance", (*GetBalanceCmd)(nil), flags)
 	MustRegisterCmd("getbalances", (*GetBalancesCmd)(nil), flags)
 	MustRegisterCmd("getnewaddress", (*GetNewAddressCmd)(nil), flags)
