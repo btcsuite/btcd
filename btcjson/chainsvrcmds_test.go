@@ -1202,6 +1202,26 @@ func TestChainSvrCmds(t *testing.T) {
 			},
 		},
 		{
+			name: "searchrawtransactions",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("searchrawtransactions", "1Address", 0, 5, 10, "null", true, []string{"1Address"})
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewSearchRawTransactionsCmd("1Address",
+					btcjson.Int(0), btcjson.Int(5), btcjson.Int(10), nil, btcjson.Bool(true), &[]string{"1Address"})
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"searchrawtransactions","params":["1Address",0,5,10,null,true,["1Address"]],"id":1}`,
+			unmarshalled: &btcjson.SearchRawTransactionsCmd{
+				Address:     "1Address",
+				Verbose:     btcjson.Int(0),
+				Skip:        btcjson.Int(5),
+				Count:       btcjson.Int(10),
+				VinExtra:    nil,
+				Reverse:     btcjson.Bool(true),
+				FilterAddrs: &[]string{"1Address"},
+			},
+		},
+		{
 			name: "sendrawtransaction",
 			newCmd: func() (interface{}, error) {
 				return btcjson.NewCmd("sendrawtransaction", "1122")
