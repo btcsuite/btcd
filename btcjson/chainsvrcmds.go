@@ -323,7 +323,8 @@ type TemplateRequest struct {
 	Data   string `json:"data,omitempty"`
 	WorkID string `json:"workid,omitempty"`
 
-	// "rules"
+	// list of supported softfork deployments, by name
+	// Ref: https://en.bitcoin.it/wiki/BIP_0009#getblocktemplate_changes.
 	Rules []string `json:"rules,omitempty"`
 }
 
