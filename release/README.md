@@ -3,10 +3,7 @@
 This package contains the build script that the `btcd` project uses in order to
 build binaries for each new release. As of `go1.13`, with some new build flags,
 binaries are now reproducible, allowing developers to build the binary on
-distinct machines, and end up with a byte-for-byte identical binary. However,
-this wasn't _fully_ solved in `go1.13`, as the build system still includes the
-directory the binary is built into the binary itself. As a result, our scripts
-utilize a work around needed until `go1.13.2`.
+distinct machines, and end up with a byte-for-byte identical binary.
 Every release should note which Go version was used to build the release, so
 that version should be used for verifying the release.
 
