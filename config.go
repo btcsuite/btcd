@@ -109,6 +109,7 @@ type config struct {
 	ConfigFile           string        `short:"C" long:"configfile" description:"Path to configuration file"`
 	ConnectPeers         []string      `long:"connect" description:"Connect only to the specified peers at startup"`
 	CPUProfile           string        `long:"cpuprofile" description:"Write CPU profile to the specified file"`
+	HomeDir              string        `long:"homedir" description:"Creates this directory at startup"`
 	DataDir              string        `short:"b" long:"datadir" description:"Directory to store data"`
 	DbType               string        `long:"dbtype" description:"Database backend to use for the Block Chain"`
 	DebugLevel           string        `short:"d" long:"debuglevel" description:"Logging level for all subsystems {trace, debug, info, warn, error, critical} -- You may also specify <subsystem>=<level>,<subsystem2>=<level>,... to set the log level for individual subsystems -- Use show to list available subsystems"`
@@ -415,6 +416,7 @@ func loadConfig() (*config, []string, error) {
 		RPCMaxClients:        defaultMaxRPCClients,
 		RPCMaxWebsockets:     defaultMaxRPCWebsockets,
 		RPCMaxConcurrentReqs: defaultMaxRPCConcurrentReqs,
+		HomeDir:              defaultHomeDir,
 		DataDir:              defaultDataDir,
 		LogDir:               defaultLogDir,
 		DbType:               defaultDbType,
@@ -514,7 +516,7 @@ func loadConfig() (*config, []string, error) {
 
 	// Create the home directory if it doesn't already exist.
 	funcName := "loadConfig"
-	err = os.MkdirAll(defaultHomeDir, 0700)
+	err = os.MkdirAll(cfg.HomeDir, 0700)
 	if err != nil {
 		// Show a nicer error message if it's because a symlink is
 		// linked to a directory that does not exist (probably because

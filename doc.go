@@ -67,6 +67,7 @@ Application Options:
       --externalip=           Add an ip to the list of local addresses we claim
                               to listen on to peers
       --generate              Generate (mine) bitcoins using the CPU
+      --homedir=              Creates this directory at startup
       --limitfreerelay=       Limit relay of transactions with no transaction
                               fee to the given amount in thousands of bytes per
                               minute (default: 15)
