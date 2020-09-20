@@ -78,3 +78,50 @@ func TestGetAddressInfoResult(t *testing.T) {
 		}
 	}
 }
+
+// TestGetWalletInfoResult ensures that custom unmarshalling of
+// GetWalletInfoResult works as intended.
+func TestGetWalletInfoResult(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		result string
+		want   GetWalletInfoResult
+	}{
+		{
+			name:   "GetWalletInfoResult - not scanning",
+			result: `{"scanning":false}`,
+			want: GetWalletInfoResult{
+				Scanning: ScanningOrFalse{Value: false},
+			},
+		},
+		{
+			name:   "GetWalletInfoResult - scanning",
+			result: `{"scanning":{"duration":10,"progress":1.0}}`,
+			want: GetWalletInfoResult{
+				Scanning: ScanningOrFalse{
+					Value: ScanProgress{Duration: 10, Progress: 1.0},
+				},
+			},
+		},
+	}
+
+	t.Logf("Running %d tests", len(tests))
+	for i, test := range tests {
+		var out GetWalletInfoResult
+		err := json.Unmarshal([]byte(test.result), &out)
+		if err != nil {
+			t.Errorf("Test #%d (%s) unexpected error: %v", i,
+				test.name, err)
+			continue
+		}
+
+		if !reflect.DeepEqual(out, test.want) {
+			t.Errorf("Test #%d (%s) unexpected unmarshalled data - "+
+				"got %v, want %v", i, test.name, spew.Sdump(out),
+				spew.Sdump(test.want))
+			continue
+		}
+	}
+}

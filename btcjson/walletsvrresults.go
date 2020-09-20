@@ -6,6 +6,8 @@ package btcjson
 
 import (
 	"encoding/json"
+	"fmt"
+
 	"github.com/btcsuite/btcd/txscript"
 )
 
@@ -148,6 +150,58 @@ type GetTransactionResult struct {
 	TimeReceived    int64                         `json:"timereceived"`
 	Details         []GetTransactionDetailsResult `json:"details"`
 	Hex             string                        `json:"hex"`
+}
+
+type ScanningOrFalse struct {
+	Value interface{}
+}
+
+type ScanProgress struct {
+	Duration int     `json:"duration"`
+	Progress float64 `json:"progress"`
+}
+
+// MarshalJSON implements the json.Marshaler interface
+func (h ScanningOrFalse) MarshalJSON() ([]byte, error) {
+	return json.Marshal(h.Value)
+}
+
+// UnmarshalJSON implements the json.Unmarshaler interface
+func (h *ScanningOrFalse) UnmarshalJSON(data []byte) error {
+	var unmarshalled interface{}
+	if err := json.Unmarshal(data, &unmarshalled); err != nil {
+		return err
+	}
+
+	switch v := unmarshalled.(type) {
+	case bool:
+		h.Value = v
+	case map[string]interface{}:
+		h.Value = ScanProgress{
+			Duration: int(v["duration"].(float64)),
+			Progress: v["progress"].(float64),
+		}
+	default:
+		return fmt.Errorf("invalid scanning value: %v", unmarshalled)
+	}
+
+	return nil
+}
+
+// GetWalletInfoResult models the result of the getwalletinfo command.
+type GetWalletInfoResult struct {
+	WalletName            string          `json:"walletname"`
+	WalletVersion         int             `json:"walletversion"`
+	TransactionCount      int             `json:"txcount"`
+	KeyPoolOldest         int             `json:"keypoololdest"`
+	KeyPoolSize           int             `json:"keypoolsize"`
+	KeyPoolSizeHDInternal *int            `json:"keypoolsize_hd_internal,omitempty"`
+	UnlockedUntil         *int            `json:"unlocked_until,omitempty"`
+	PayTransactionFee     float64         `json:"paytxfee"`
+	HDSeedID              *string         `json:"hdseedid,omitempty"`
+	PrivateKeysEnabled    bool            `json:"private_keys_enabled"`
+	AvoidReuse            bool            `json:"avoid_reuse"`
+	Scanning              ScanningOrFalse `json:"scanning"`
 }
 
 // InfoWalletResult models the data returned by the wallet server getinfo
