@@ -82,14 +82,6 @@ func ExampleClient_DeriveAddresses() {
 }
 
 func ExampleClient_GetAddressInfo() {
-	connCfg = &ConnConfig{
-		Host:         "localhost:18332",
-		User:         "user",
-		Pass:         "pass",
-		HTTPPostMode: true,
-		DisableTLS:   true,
-	}
-
 	client, err := New(connCfg, nil)
 	if err != nil {
 		panic(err)
@@ -105,4 +97,22 @@ func ExampleClient_GetAddressInfo() {
 	fmt.Println(info.ScriptType.String()) // witness_v0_keyhash
 	fmt.Println(*info.HDKeyPath)          // m/49'/1'/0'/0/4
 	fmt.Println(info.Embedded.Address)    // tb1q3x2h2kh57wzg7jz00jhwn0ycvqtdk2ane37j27
+}
+
+func ExampleClient_GetWalletInfo() {
+	client, err := New(connCfg, nil)
+	if err != nil {
+		panic(err)
+	}
+	defer client.Shutdown()
+
+	info, err := client.GetWalletInfo()
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println(info.WalletVersion)    // 169900
+	fmt.Println(info.TransactionCount) // 22
+	fmt.Println(*info.HDSeedID)        // eb44e4e9b864ef17e7ba947da746375b000f5d94
+	fmt.Println(info.Scanning.Value)   // false
 }

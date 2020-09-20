@@ -2573,10 +2573,44 @@ func (c *Client) WalletProcessPsbt(
 	return c.WalletProcessPsbtAsync(psbt, sign, sighashType, bip32Derivs).Receive()
 }
 
+// FutureGetWalletInfoResult is a future promise to deliver the result of an
+// GetWalletInfoAsync RPC invocation (or an applicable error).
+type FutureGetWalletInfoResult chan *response
+
+// Receive waits for the response promised by the future and returns the result
+// of wallet state info.
+func (r FutureGetWalletInfoResult) Receive() (*btcjson.GetWalletInfoResult, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	var getWalletInfoResult btcjson.GetWalletInfoResult
+	err = json.Unmarshal(res, &getWalletInfoResult)
+	if err != nil {
+		return nil, err
+	}
+	return &getWalletInfoResult, nil
+}
+
+// GetWalletInfoAsync returns an instance of a type that can be used to get the result
+// of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+//
+// See GetWalletInfo for the blocking version and more details.
+func (c *Client) GetWalletInfoAsync() FutureGetWalletInfoResult {
+	cmd := btcjson.NewGetWalletInfoCmd()
+	return c.sendCmd(cmd)
+}
+
+// GetWalletInfo returns various wallet state info.
+func (c *Client) GetWalletInfo() (*btcjson.GetWalletInfoResult, error) {
+	return c.GetWalletInfoAsync().Receive()
+}
+
 // TODO(davec): Implement
 // backupwallet (NYI in btcwallet)
 // encryptwallet (Won't be supported by btcwallet since it's always encrypted)
-// getwalletinfo (NYI in btcwallet or btcjson)
 // listaddressgroupings (NYI in btcwallet)
 // listreceivedbyaccount (NYI in btcwallet)
 
