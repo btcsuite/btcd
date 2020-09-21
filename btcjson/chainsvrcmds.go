@@ -350,6 +350,10 @@ type TemplateRequest struct {
 	// "proposal".
 	Data   string `json:"data,omitempty"`
 	WorkID string `json:"workid,omitempty"`
+
+	// list of supported softfork deployments, by name
+	// Ref: https://en.bitcoin.it/wiki/BIP_0009#getblocktemplate_changes.
+	Rules []string `json:"rules,omitempty"`
 }
 
 // convertTemplateRequestField potentially converts the provided value as

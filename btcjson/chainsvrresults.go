@@ -236,8 +236,10 @@ type GetBlockFilterResult struct {
 // GetBlockTemplateResultTx models the transactions field of the
 // getblocktemplate command.
 type GetBlockTemplateResultTx struct {
-	Data    string  `json:"data"`
-	Hash    string  `json:"hash"`
+	Data string `json:"data"`
+	Hash string `json:"hash"`
+	// TODO: remove omitempty once implemented in rpcserver
+	TxID    string  `json:"txid,omitempty"`
 	Depends []int64 `json:"depends"`
 	Fee     int64   `json:"fee"`
 	SigOps  int64   `json:"sigops"`
