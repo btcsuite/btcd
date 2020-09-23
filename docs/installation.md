@@ -73,4 +73,4 @@ Typically btcd will run and start downloading the block chain with no extra
 configuration necessary, however, there is an optional method to use a
 `bootstrap.dat` file that may speed up the initial block chain download process.
 
-* [Using bootstrap.dat](https://github.com/btcsuite/btcd/tree/master/docs/using_bootstrap_dat.md)
+* [Using bootstrap.dat](https://github.com/btcsuite/btcd/blob/master/docs/configuration.md#using-bootstrapdat)
