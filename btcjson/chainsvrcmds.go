@@ -8,6 +8,7 @@
 package btcjson
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 
@@ -63,10 +64,15 @@ type CreateRawTransactionCmd struct {
 // NewCreateRawTransactionCmd returns a new instance which can be used to issue
 // a createrawtransaction JSON-RPC command.
 //
-// Amounts are in BTC.
+// Amounts are in BTC. Passing in nil and the empty slice as inputs is equivalent,
+// both gets interpreted as the empty slice.
 func NewCreateRawTransactionCmd(inputs []TransactionInput, amounts map[string]float64,
 	lockTime *int64) *CreateRawTransactionCmd {
-
+	// to make sure we're serializing this to the empty list and not null, we
+	// explicitly initialize the list
+	if inputs == nil {
+		inputs = []TransactionInput{}
+	}
 	return &CreateRawTransactionCmd{
 		Inputs:   inputs,
 		Amounts:  amounts,
@@ -97,6 +103,65 @@ type DecodeScriptCmd struct {
 func NewDecodeScriptCmd(hexScript string) *DecodeScriptCmd {
 	return &DecodeScriptCmd{
 		HexScript: hexScript,
+	}
+}
+
+// DeriveAddressesCmd defines the deriveaddresses JSON-RPC command.
+type DeriveAddressesCmd struct {
+	Descriptor string
+	Range      *DescriptorRange
+}
+
+// NewDeriveAddressesCmd returns a new instance which can be used to issue a
+// deriveaddresses JSON-RPC command.
+func NewDeriveAddressesCmd(descriptor string, descriptorRange *DescriptorRange) *DeriveAddressesCmd {
+	return &DeriveAddressesCmd{
+		Descriptor: descriptor,
+		Range:      descriptorRange,
+	}
+}
+
+// ChangeType defines the different output types to use for the change address
+// of a transaction built by the node.
+type ChangeType string
+
+var (
+	// ChangeTypeLegacy indicates a P2PKH change address type.
+	ChangeTypeLegacy ChangeType = "legacy"
+	// ChangeTypeP2SHSegWit indicates a P2WPKH-in-P2SH change address type.
+	ChangeTypeP2SHSegWit ChangeType = "p2sh-segwit"
+	// ChangeTypeBech32 indicates a P2WPKH change address type.
+	ChangeTypeBech32 ChangeType = "bech32"
+)
+
+// FundRawTransactionOpts are the different options that can be passed to rawtransaction
+type FundRawTransactionOpts struct {
+	ChangeAddress          *string               `json:"changeAddress,omitempty"`
+	ChangePosition         *int                  `json:"changePosition,omitempty"`
+	ChangeType             *ChangeType           `json:"change_type,omitempty"`
+	IncludeWatching        *bool                 `json:"includeWatching,omitempty"`
+	LockUnspents           *bool                 `json:"lockUnspents,omitempty"`
+	FeeRate                *float64              `json:"feeRate,omitempty"` // BTC/kB
+	SubtractFeeFromOutputs []int                 `json:"subtractFeeFromOutputs,omitempty"`
+	Replaceable            *bool                 `json:"replaceable,omitempty"`
+	ConfTarget             *int                  `json:"conf_target,omitempty"`
+	EstimateMode           *EstimateSmartFeeMode `json:"estimate_mode,omitempty"`
+}
+
+// FundRawTransactionCmd defines the fundrawtransaction JSON-RPC command
+type FundRawTransactionCmd struct {
+	HexTx     string
+	Options   FundRawTransactionOpts
+	IsWitness *bool
+}
+
+// NewFundRawTransactionCmd returns a new instance which can be used to issue
+// a fundrawtransaction JSON-RPC command
+func NewFundRawTransactionCmd(serializedTx []byte, opts FundRawTransactionOpts, isWitness *bool) *FundRawTransactionCmd {
+	return &FundRawTransactionCmd{
+		HexTx:     hex.EncodeToString(serializedTx),
+		Options:   opts,
+		IsWitness: isWitness,
 	}
 }
 
@@ -161,6 +226,33 @@ type GetBlockCountCmd struct{}
 // getblockcount JSON-RPC command.
 func NewGetBlockCountCmd() *GetBlockCountCmd {
 	return &GetBlockCountCmd{}
+}
+
+// FilterTypeName defines the type used in the getblockfilter JSON-RPC command for the
+// filter type field.
+type FilterTypeName string
+
+const (
+	// FilterTypeBasic is the basic filter type defined in BIP0158.
+	FilterTypeBasic FilterTypeName = "basic"
+)
+
+// GetBlockFilterCmd defines the getblockfilter JSON-RPC command.
+type GetBlockFilterCmd struct {
+	BlockHash  string          // The hash of the block
+	FilterType *FilterTypeName // The type name of the filter, default=basic
+}
+
+// NewGetBlockFilterCmd returns a new instance which can be used to issue a
+// getblockfilter JSON-RPC command.
+//
+// The parameters which are pointers indicate they are optional.  Passing nil
+// for optional parameters will use the default value.
+func NewGetBlockFilterCmd(blockHash string, filterType *FilterTypeName) *GetBlockFilterCmd {
+	return &GetBlockFilterCmd{
+		BlockHash:  blockHash,
+		FilterType: filterType,
+	}
 }
 
 // GetBlockHashCmd defines the getblockhash JSON-RPC command.
@@ -258,6 +350,10 @@ type TemplateRequest struct {
 	// "proposal".
 	Data   string `json:"data,omitempty"`
 	WorkID string `json:"workid,omitempty"`
+
+	// list of supported softfork deployments, by name
+	// Ref: https://en.bitcoin.it/wiki/BIP_0009#getblocktemplate_changes.
+	Rules []string `json:"rules,omitempty"`
 }
 
 // convertTemplateRequestField potentially converts the provided value as
@@ -363,6 +459,24 @@ func NewGetChainTipsCmd() *GetChainTipsCmd {
 	return &GetChainTipsCmd{}
 }
 
+// GetChainTxStatsCmd defines the getchaintxstats JSON-RPC command.
+type GetChainTxStatsCmd struct {
+	NBlocks   *int32
+	BlockHash *string
+}
+
+// NewGetChainTxStatsCmd returns a new instance which can be used to issue a
+// getchaintxstats JSON-RPC command.
+//
+// The parameters which are pointers indicate they are optional.  Passing nil
+// for optional parameters will use the default value.
+func NewGetChainTxStatsCmd(nBlocks *int32, blockHash *string) *GetChainTxStatsCmd {
+	return &GetChainTxStatsCmd{
+		NBlocks:   nBlocks,
+		BlockHash: blockHash,
+	}
+}
+
 // GetConnectionCountCmd defines the getconnectioncount JSON-RPC command.
 type GetConnectionCountCmd struct{}
 
@@ -370,6 +484,19 @@ type GetConnectionCountCmd struct{}
 // getconnectioncount JSON-RPC command.
 func NewGetConnectionCountCmd() *GetConnectionCountCmd {
 	return &GetConnectionCountCmd{}
+}
+
+// GetDescriptorInfoCmd defines the getdescriptorinfo JSON-RPC command.
+type GetDescriptorInfoCmd struct {
+	Descriptor string
+}
+
+// NewGetDescriptorInfoCmd returns a new instance which can be used to issue a
+// getdescriptorinfo JSON-RPC command.
+func NewGetDescriptorInfoCmd(descriptor string) *GetDescriptorInfoCmd {
+	return &GetDescriptorInfoCmd{
+		Descriptor: descriptor,
+	}
 }
 
 // GetDifficultyCmd defines the getdifficulty JSON-RPC command.
@@ -472,6 +599,22 @@ func NewGetNetworkHashPSCmd(numBlocks, height *int) *GetNetworkHashPSCmd {
 	return &GetNetworkHashPSCmd{
 		Blocks: numBlocks,
 		Height: height,
+	}
+}
+
+// GetNodeAddressesCmd defines the getnodeaddresses JSON-RPC command.
+type GetNodeAddressesCmd struct {
+	Count *int32 `jsonrpcdefault:"1"`
+}
+
+// NewGetNodeAddressesCmd returns a new instance which can be used to issue a
+// getnodeaddresses JSON-RPC command.
+//
+// The parameters which are pointers indicate they are optional.  Passing nil
+// for optional parameters will use the default value.
+func NewGetNodeAddressesCmd(count *int32) *GetNodeAddressesCmd {
+	return &GetNodeAddressesCmd{
+		Count: count,
 	}
 }
 
@@ -724,6 +867,24 @@ func NewSetGenerateCmd(generate bool, genProcLimit *int) *SetGenerateCmd {
 	}
 }
 
+// SignMessageWithPrivKeyCmd defines the signmessagewithprivkey JSON-RPC command.
+type SignMessageWithPrivKeyCmd struct {
+	PrivKey string // base 58 Wallet Import format private key
+	Message string // Message to sign
+}
+
+// NewSignMessageWithPrivKey returns a new instance which can be used to issue a
+// signmessagewithprivkey JSON-RPC command.
+//
+// The first parameter is a private key in base 58 Wallet Import format.
+// The second parameter is the message to sign.
+func NewSignMessageWithPrivKey(privKey, message string) *SignMessageWithPrivKeyCmd {
+	return &SignMessageWithPrivKeyCmd{
+		PrivKey: privKey,
+		Message: message,
+	}
+}
+
 // StopCmd defines the stop JSON-RPC command.
 type StopCmd struct{}
 
@@ -835,11 +996,14 @@ func init() {
 	MustRegisterCmd("createrawtransaction", (*CreateRawTransactionCmd)(nil), flags)
 	MustRegisterCmd("decoderawtransaction", (*DecodeRawTransactionCmd)(nil), flags)
 	MustRegisterCmd("decodescript", (*DecodeScriptCmd)(nil), flags)
+	MustRegisterCmd("deriveaddresses", (*DeriveAddressesCmd)(nil), flags)
+	MustRegisterCmd("fundrawtransaction", (*FundRawTransactionCmd)(nil), flags)
 	MustRegisterCmd("getaddednodeinfo", (*GetAddedNodeInfoCmd)(nil), flags)
 	MustRegisterCmd("getbestblockhash", (*GetBestBlockHashCmd)(nil), flags)
 	MustRegisterCmd("getblock", (*GetBlockCmd)(nil), flags)
 	MustRegisterCmd("getblockchaininfo", (*GetBlockChainInfoCmd)(nil), flags)
 	MustRegisterCmd("getblockcount", (*GetBlockCountCmd)(nil), flags)
+	MustRegisterCmd("getblockfilter", (*GetBlockFilterCmd)(nil), flags)
 	MustRegisterCmd("getblockhash", (*GetBlockHashCmd)(nil), flags)
 	MustRegisterCmd("getblockheader", (*GetBlockHeaderCmd)(nil), flags)
 	MustRegisterCmd("getblockstats", (*GetBlockStatsCmd)(nil), flags)
@@ -847,7 +1011,9 @@ func init() {
 	MustRegisterCmd("getcfilter", (*GetCFilterCmd)(nil), flags)
 	MustRegisterCmd("getcfilterheader", (*GetCFilterHeaderCmd)(nil), flags)
 	MustRegisterCmd("getchaintips", (*GetChainTipsCmd)(nil), flags)
+	MustRegisterCmd("getchaintxstats", (*GetChainTxStatsCmd)(nil), flags)
 	MustRegisterCmd("getconnectioncount", (*GetConnectionCountCmd)(nil), flags)
+	MustRegisterCmd("getdescriptorinfo", (*GetDescriptorInfoCmd)(nil), flags)
 	MustRegisterCmd("getdifficulty", (*GetDifficultyCmd)(nil), flags)
 	MustRegisterCmd("getgenerate", (*GetGenerateCmd)(nil), flags)
 	MustRegisterCmd("gethashespersec", (*GetHashesPerSecCmd)(nil), flags)
@@ -858,6 +1024,7 @@ func init() {
 	MustRegisterCmd("getnetworkinfo", (*GetNetworkInfoCmd)(nil), flags)
 	MustRegisterCmd("getnettotals", (*GetNetTotalsCmd)(nil), flags)
 	MustRegisterCmd("getnetworkhashps", (*GetNetworkHashPSCmd)(nil), flags)
+	MustRegisterCmd("getnodeaddresses", (*GetNodeAddressesCmd)(nil), flags)
 	MustRegisterCmd("getpeerinfo", (*GetPeerInfoCmd)(nil), flags)
 	MustRegisterCmd("getrawmempool", (*GetRawMempoolCmd)(nil), flags)
 	MustRegisterCmd("getrawtransaction", (*GetRawTransactionCmd)(nil), flags)
@@ -873,6 +1040,7 @@ func init() {
 	MustRegisterCmd("searchrawtransactions", (*SearchRawTransactionsCmd)(nil), flags)
 	MustRegisterCmd("sendrawtransaction", (*SendRawTransactionCmd)(nil), flags)
 	MustRegisterCmd("setgenerate", (*SetGenerateCmd)(nil), flags)
+	MustRegisterCmd("signmessagewithprivkey", (*SignMessageWithPrivKeyCmd)(nil), flags)
 	MustRegisterCmd("stop", (*StopCmd)(nil), flags)
 	MustRegisterCmd("submitblock", (*SubmitBlockCmd)(nil), flags)
 	MustRegisterCmd("uptime", (*UptimeCmd)(nil), flags)

@@ -1,4 +1,4 @@
-// Copyright (c) 2014 The btcsuite developers
+// Copyright (c) 2014-2020 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/btcsuite/btcd/btcjson"
+	"github.com/btcsuite/btcutil"
 )
 
 // TestWalletSvrCmds tests all of the wallet server commands marshal and
@@ -209,6 +210,19 @@ func TestWalletSvrCmds(t *testing.T) {
 			},
 		},
 		{
+			name: "getaddressinfo",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("getaddressinfo", "1234")
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewGetAddressInfoCmd("1234")
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"getaddressinfo","params":["1234"],"id":1}`,
+			unmarshalled: &btcjson.GetAddressInfoCmd{
+				Address: "1234",
+			},
+		},
+		{
 			name: "getbalance",
 			newCmd: func() (interface{}, error) {
 				return btcjson.NewCmd("getbalance")
@@ -249,6 +263,17 @@ func TestWalletSvrCmds(t *testing.T) {
 				Account: btcjson.String("acct"),
 				MinConf: btcjson.Int(6),
 			},
+		},
+		{
+			name: "getbalances",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("getbalances")
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewGetBalancesCmd()
+			},
+			marshalled:   `{"jsonrpc":"1.0","method":"getbalances","params":[],"id":1}`,
+			unmarshalled: &btcjson.GetBalancesCmd{},
 		},
 		{
 			name: "getnewaddress",
@@ -694,6 +719,21 @@ func TestWalletSvrCmds(t *testing.T) {
 				BlockHash:           btcjson.String("123"),
 				TargetConfirmations: btcjson.Int(6),
 				IncludeWatchOnly:    btcjson.Bool(true),
+			},
+		},
+		{
+			name: "listsinceblock pad null",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("listsinceblock", "null", 1, false)
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewListSinceBlockCmd(nil, btcjson.Int(1), btcjson.Bool(false))
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"listsinceblock","params":[null,1,false],"id":1}`,
+			unmarshalled: &btcjson.ListSinceBlockCmd{
+				BlockHash:           nil,
+				TargetConfirmations: btcjson.Int(1),
+				IncludeWatchOnly:    btcjson.Bool(false),
 			},
 		},
 		{
@@ -1327,6 +1367,333 @@ func TestWalletSvrCmds(t *testing.T) {
 			unmarshalled: &btcjson.WalletPassphraseChangeCmd{
 				OldPassphrase: "old",
 				NewPassphrase: "new",
+			},
+		},
+		{
+			name: "importmulti with descriptor + options",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd(
+					"importmulti",
+					// Cannot use a native string, due to special types like timestamp.
+					[]btcjson.ImportMultiRequest{
+						{Descriptor: btcjson.String("123"), Timestamp: btcjson.TimestampOrNow{Value: 0}},
+					},
+					`{"rescan": true}`,
+				)
+			},
+			staticCmd: func() interface{} {
+				requests := []btcjson.ImportMultiRequest{
+					{Descriptor: btcjson.String("123"), Timestamp: btcjson.TimestampOrNow{Value: 0}},
+				}
+				options := btcjson.ImportMultiOptions{Rescan: true}
+				return btcjson.NewImportMultiCmd(requests, &options)
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"importmulti","params":[[{"desc":"123","timestamp":0}],{"rescan":true}],"id":1}`,
+			unmarshalled: &btcjson.ImportMultiCmd{
+				Requests: []btcjson.ImportMultiRequest{
+					{
+						Descriptor: btcjson.String("123"),
+						Timestamp:  btcjson.TimestampOrNow{Value: 0},
+					},
+				},
+				Options: &btcjson.ImportMultiOptions{Rescan: true},
+			},
+		},
+		{
+			name: "importmulti with descriptor + no options",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd(
+					"importmulti",
+					// Cannot use a native string, due to special types like timestamp.
+					[]btcjson.ImportMultiRequest{
+						{
+							Descriptor: btcjson.String("123"),
+							Timestamp:  btcjson.TimestampOrNow{Value: 0},
+							WatchOnly:  btcjson.Bool(false),
+							Internal:   btcjson.Bool(true),
+							Label:      btcjson.String("aaa"),
+							KeyPool:    btcjson.Bool(false),
+						},
+					},
+				)
+			},
+			staticCmd: func() interface{} {
+				requests := []btcjson.ImportMultiRequest{
+					{
+						Descriptor: btcjson.String("123"),
+						Timestamp:  btcjson.TimestampOrNow{Value: 0},
+						WatchOnly:  btcjson.Bool(false),
+						Internal:   btcjson.Bool(true),
+						Label:      btcjson.String("aaa"),
+						KeyPool:    btcjson.Bool(false),
+					},
+				}
+				return btcjson.NewImportMultiCmd(requests, nil)
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"importmulti","params":[[{"desc":"123","timestamp":0,"internal":true,"watchonly":false,"label":"aaa","keypool":false}]],"id":1}`,
+			unmarshalled: &btcjson.ImportMultiCmd{
+				Requests: []btcjson.ImportMultiRequest{
+					{
+						Descriptor: btcjson.String("123"),
+						Timestamp:  btcjson.TimestampOrNow{Value: 0},
+						WatchOnly:  btcjson.Bool(false),
+						Internal:   btcjson.Bool(true),
+						Label:      btcjson.String("aaa"),
+						KeyPool:    btcjson.Bool(false),
+					},
+				},
+			},
+		},
+		{
+			name: "importmulti with descriptor + string timestamp",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd(
+					"importmulti",
+					// Cannot use a native string, due to special types like timestamp.
+					[]btcjson.ImportMultiRequest{
+						{
+							Descriptor: btcjson.String("123"),
+							Timestamp:  btcjson.TimestampOrNow{Value: "now"},
+						},
+					},
+				)
+			},
+			staticCmd: func() interface{} {
+				requests := []btcjson.ImportMultiRequest{
+					{Descriptor: btcjson.String("123"), Timestamp: btcjson.TimestampOrNow{Value: "now"}},
+				}
+				return btcjson.NewImportMultiCmd(requests, nil)
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"importmulti","params":[[{"desc":"123","timestamp":"now"}]],"id":1}`,
+			unmarshalled: &btcjson.ImportMultiCmd{
+				Requests: []btcjson.ImportMultiRequest{
+					{Descriptor: btcjson.String("123"), Timestamp: btcjson.TimestampOrNow{Value: "now"}},
+				},
+			},
+		},
+		{
+			name: "importmulti with scriptPubKey script",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd(
+					"importmulti",
+					// Cannot use a native string, due to special types like timestamp and scriptPubKey
+					[]btcjson.ImportMultiRequest{
+						{
+							ScriptPubKey: &btcjson.ScriptPubKey{Value: "script"},
+							RedeemScript: btcjson.String("123"),
+							Timestamp:    btcjson.TimestampOrNow{Value: 0},
+							PubKeys:      &[]string{"aaa"},
+						},
+					},
+				)
+			},
+			staticCmd: func() interface{} {
+				requests := []btcjson.ImportMultiRequest{
+					{
+						ScriptPubKey: &btcjson.ScriptPubKey{Value: "script"},
+						RedeemScript: btcjson.String("123"),
+						Timestamp:    btcjson.TimestampOrNow{Value: 0},
+						PubKeys:      &[]string{"aaa"},
+					},
+				}
+				return btcjson.NewImportMultiCmd(requests, nil)
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"importmulti","params":[[{"scriptPubKey":"script","timestamp":0,"redeemscript":"123","pubkeys":["aaa"]}]],"id":1}`,
+			unmarshalled: &btcjson.ImportMultiCmd{
+				Requests: []btcjson.ImportMultiRequest{
+					{
+						ScriptPubKey: &btcjson.ScriptPubKey{Value: "script"},
+						RedeemScript: btcjson.String("123"),
+						Timestamp:    btcjson.TimestampOrNow{Value: 0},
+						PubKeys:      &[]string{"aaa"},
+					},
+				},
+			},
+		},
+		{
+			name: "importmulti with scriptPubKey address",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd(
+					"importmulti",
+					// Cannot use a native string, due to special types like timestamp and scriptPubKey
+					[]btcjson.ImportMultiRequest{
+						{
+							ScriptPubKey:  &btcjson.ScriptPubKey{Value: btcjson.ScriptPubKeyAddress{Address: "addr"}},
+							WitnessScript: btcjson.String("123"),
+							Timestamp:     btcjson.TimestampOrNow{Value: 0},
+							Keys:          &[]string{"aaa"},
+						},
+					},
+				)
+			},
+			staticCmd: func() interface{} {
+				requests := []btcjson.ImportMultiRequest{
+					{
+						ScriptPubKey:  &btcjson.ScriptPubKey{Value: btcjson.ScriptPubKeyAddress{Address: "addr"}},
+						WitnessScript: btcjson.String("123"),
+						Timestamp:     btcjson.TimestampOrNow{Value: 0},
+						Keys:          &[]string{"aaa"},
+					},
+				}
+				return btcjson.NewImportMultiCmd(requests, nil)
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"importmulti","params":[[{"scriptPubKey":{"address":"addr"},"timestamp":0,"witnessscript":"123","keys":["aaa"]}]],"id":1}`,
+			unmarshalled: &btcjson.ImportMultiCmd{
+				Requests: []btcjson.ImportMultiRequest{
+					{
+						ScriptPubKey:  &btcjson.ScriptPubKey{Value: btcjson.ScriptPubKeyAddress{Address: "addr"}},
+						WitnessScript: btcjson.String("123"),
+						Timestamp:     btcjson.TimestampOrNow{Value: 0},
+						Keys:          &[]string{"aaa"},
+					},
+				},
+			},
+		},
+		{
+			name: "importmulti with ranged (int) descriptor",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd(
+					"importmulti",
+					// Cannot use a native string, due to special types like timestamp.
+					[]btcjson.ImportMultiRequest{
+						{
+							Descriptor: btcjson.String("123"),
+							Timestamp:  btcjson.TimestampOrNow{Value: 0},
+							Range:      &btcjson.DescriptorRange{Value: 7},
+						},
+					},
+				)
+			},
+			staticCmd: func() interface{} {
+				requests := []btcjson.ImportMultiRequest{
+					{
+						Descriptor: btcjson.String("123"),
+						Timestamp:  btcjson.TimestampOrNow{Value: 0},
+						Range:      &btcjson.DescriptorRange{Value: 7},
+					},
+				}
+				return btcjson.NewImportMultiCmd(requests, nil)
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"importmulti","params":[[{"desc":"123","timestamp":0,"range":7}]],"id":1}`,
+			unmarshalled: &btcjson.ImportMultiCmd{
+				Requests: []btcjson.ImportMultiRequest{
+					{
+						Descriptor: btcjson.String("123"),
+						Timestamp:  btcjson.TimestampOrNow{Value: 0},
+						Range:      &btcjson.DescriptorRange{Value: 7},
+					},
+				},
+			},
+		},
+		{
+			name: "importmulti with ranged (slice) descriptor",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd(
+					"importmulti",
+					// Cannot use a native string, due to special types like timestamp.
+					[]btcjson.ImportMultiRequest{
+						{
+							Descriptor: btcjson.String("123"),
+							Timestamp:  btcjson.TimestampOrNow{Value: 0},
+							Range:      &btcjson.DescriptorRange{Value: []int{1, 7}},
+						},
+					},
+				)
+			},
+			staticCmd: func() interface{} {
+				requests := []btcjson.ImportMultiRequest{
+					{
+						Descriptor: btcjson.String("123"),
+						Timestamp:  btcjson.TimestampOrNow{Value: 0},
+						Range:      &btcjson.DescriptorRange{Value: []int{1, 7}},
+					},
+				}
+				return btcjson.NewImportMultiCmd(requests, nil)
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"importmulti","params":[[{"desc":"123","timestamp":0,"range":[1,7]}]],"id":1}`,
+			unmarshalled: &btcjson.ImportMultiCmd{
+				Requests: []btcjson.ImportMultiRequest{
+					{
+						Descriptor: btcjson.String("123"),
+						Timestamp:  btcjson.TimestampOrNow{Value: 0},
+						Range:      &btcjson.DescriptorRange{Value: []int{1, 7}},
+					},
+				},
+			},
+		},
+		{
+			name: "walletcreatefundedpsbt",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd(
+					"walletcreatefundedpsbt",
+					[]btcjson.PsbtInput{
+						{
+							Txid:     "1234",
+							Vout:     0,
+							Sequence: 0,
+						},
+					},
+					[]btcjson.PsbtOutput{
+						btcjson.NewPsbtOutput("1234", btcutil.Amount(1234)),
+						btcjson.NewPsbtDataOutput([]byte{1, 2, 3, 4}),
+					},
+					btcjson.Uint32(1),
+					btcjson.WalletCreateFundedPsbtOpts{},
+					btcjson.Bool(true),
+				)
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewWalletCreateFundedPsbtCmd(
+					[]btcjson.PsbtInput{
+						{
+							Txid:     "1234",
+							Vout:     0,
+							Sequence: 0,
+						},
+					},
+					[]btcjson.PsbtOutput{
+						btcjson.NewPsbtOutput("1234", btcutil.Amount(1234)),
+						btcjson.NewPsbtDataOutput([]byte{1, 2, 3, 4}),
+					},
+					btcjson.Uint32(1),
+					&btcjson.WalletCreateFundedPsbtOpts{},
+					btcjson.Bool(true),
+				)
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"walletcreatefundedpsbt","params":[[{"txid":"1234","vout":0,"sequence":0}],[{"1234":0.00001234},{"data":"01020304"}],1,{},true],"id":1}`,
+			unmarshalled: &btcjson.WalletCreateFundedPsbtCmd{
+				Inputs: []btcjson.PsbtInput{
+					{
+						Txid:     "1234",
+						Vout:     0,
+						Sequence: 0,
+					},
+				},
+				Outputs: []btcjson.PsbtOutput{
+					btcjson.NewPsbtOutput("1234", btcutil.Amount(1234)),
+					btcjson.NewPsbtDataOutput([]byte{1, 2, 3, 4}),
+				},
+				Locktime:    btcjson.Uint32(1),
+				Options:     &btcjson.WalletCreateFundedPsbtOpts{},
+				Bip32Derivs: btcjson.Bool(true),
+			},
+		},
+		{
+			name: "walletprocesspsbt",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd(
+					"walletprocesspsbt", "1234", btcjson.Bool(true), btcjson.String("ALL"), btcjson.Bool(true))
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewWalletProcessPsbtCmd(
+					"1234", btcjson.Bool(true), btcjson.String("ALL"), btcjson.Bool(true))
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"walletprocesspsbt","params":["1234",true,"ALL",true],"id":1}`,
+			unmarshalled: &btcjson.WalletProcessPsbtCmd{
+				Psbt:        "1234",
+				Sign:        btcjson.Bool(true),
+				SighashType: btcjson.String("ALL"),
+				Bip32Derivs: btcjson.Bool(true),
 			},
 		},
 	}

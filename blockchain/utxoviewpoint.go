@@ -111,6 +111,22 @@ func (entry *UtxoEntry) Clone() *UtxoEntry {
 	}
 }
 
+// NewUtxoEntry returns a new UtxoEntry built from the arguments.
+func NewUtxoEntry(
+	txOut *wire.TxOut, blockHeight int32, isCoinbase bool) *UtxoEntry {
+	var cbFlag txoFlags
+	if isCoinbase {
+		cbFlag |= tfCoinBase
+	}
+
+	return &UtxoEntry{
+		amount:      txOut.Value,
+		pkScript:    txOut.PkScript,
+		blockHeight: blockHeight,
+		packedFlags: cbFlag,
+	}
+}
+
 // UtxoViewpoint represents a view into the set of unspent transaction outputs
 // from a specific point of view in the chain.  For example, it could be for
 // the end of the main chain, some point in the history of the main chain, or

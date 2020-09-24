@@ -127,52 +127,54 @@ type commandHandler func(*rpcServer, interface{}, <-chan struct{}) (interface{},
 // a dependency loop.
 var rpcHandlers map[string]commandHandler
 var rpcHandlersBeforeInit = map[string]commandHandler{
-	"addnode":               handleAddNode,
-	"createrawtransaction":  handleCreateRawTransaction,
-	"debuglevel":            handleDebugLevel,
-	"decoderawtransaction":  handleDecodeRawTransaction,
-	"decodescript":          handleDecodeScript,
-	"estimatefee":           handleEstimateFee,
-	"generate":              handleGenerate,
-	"getaddednodeinfo":      handleGetAddedNodeInfo,
-	"getbestblock":          handleGetBestBlock,
-	"getbestblockhash":      handleGetBestBlockHash,
-	"getblock":              handleGetBlock,
-	"getblockchaininfo":     handleGetBlockChainInfo,
-	"getblockcount":         handleGetBlockCount,
-	"getblockhash":          handleGetBlockHash,
-	"getblockheader":        handleGetBlockHeader,
-	"getblocktemplate":      handleGetBlockTemplate,
-	"getcfilter":            handleGetCFilter,
-	"getcfilterheader":      handleGetCFilterHeader,
-	"getconnectioncount":    handleGetConnectionCount,
-	"getcurrentnet":         handleGetCurrentNet,
-	"getdifficulty":         handleGetDifficulty,
-	"getgenerate":           handleGetGenerate,
-	"gethashespersec":       handleGetHashesPerSec,
-	"getheaders":            handleGetHeaders,
-	"getinfo":               handleGetInfo,
-	"getmempoolinfo":        handleGetMempoolInfo,
-	"getmininginfo":         handleGetMiningInfo,
-	"getnettotals":          handleGetNetTotals,
-	"getnetworkhashps":      handleGetNetworkHashPS,
-	"getpeerinfo":           handleGetPeerInfo,
-	"getrawmempool":         handleGetRawMempool,
-	"getrawtransaction":     handleGetRawTransaction,
-	"gettxout":              handleGetTxOut,
-	"help":                  handleHelp,
-	"node":                  handleNode,
-	"ping":                  handlePing,
-	"searchrawtransactions": handleSearchRawTransactions,
-	"sendrawtransaction":    handleSendRawTransaction,
-	"setgenerate":           handleSetGenerate,
-	"stop":                  handleStop,
-	"submitblock":           handleSubmitBlock,
-	"uptime":                handleUptime,
-	"validateaddress":       handleValidateAddress,
-	"verifychain":           handleVerifyChain,
-	"verifymessage":         handleVerifyMessage,
-	"version":               handleVersion,
+	"addnode":                handleAddNode,
+	"createrawtransaction":   handleCreateRawTransaction,
+	"debuglevel":             handleDebugLevel,
+	"decoderawtransaction":   handleDecodeRawTransaction,
+	"decodescript":           handleDecodeScript,
+	"estimatefee":            handleEstimateFee,
+	"generate":               handleGenerate,
+	"getaddednodeinfo":       handleGetAddedNodeInfo,
+	"getbestblock":           handleGetBestBlock,
+	"getbestblockhash":       handleGetBestBlockHash,
+	"getblock":               handleGetBlock,
+	"getblockchaininfo":      handleGetBlockChainInfo,
+	"getblockcount":          handleGetBlockCount,
+	"getblockhash":           handleGetBlockHash,
+	"getblockheader":         handleGetBlockHeader,
+	"getblocktemplate":       handleGetBlockTemplate,
+	"getcfilter":             handleGetCFilter,
+	"getcfilterheader":       handleGetCFilterHeader,
+	"getconnectioncount":     handleGetConnectionCount,
+	"getcurrentnet":          handleGetCurrentNet,
+	"getdifficulty":          handleGetDifficulty,
+	"getgenerate":            handleGetGenerate,
+	"gethashespersec":        handleGetHashesPerSec,
+	"getheaders":             handleGetHeaders,
+	"getinfo":                handleGetInfo,
+	"getmempoolinfo":         handleGetMempoolInfo,
+	"getmininginfo":          handleGetMiningInfo,
+	"getnettotals":           handleGetNetTotals,
+	"getnetworkhashps":       handleGetNetworkHashPS,
+	"getnodeaddresses":       handleGetNodeAddresses,
+	"getpeerinfo":            handleGetPeerInfo,
+	"getrawmempool":          handleGetRawMempool,
+	"getrawtransaction":      handleGetRawTransaction,
+	"gettxout":               handleGetTxOut,
+	"help":                   handleHelp,
+	"node":                   handleNode,
+	"ping":                   handlePing,
+	"searchrawtransactions":  handleSearchRawTransactions,
+	"sendrawtransaction":     handleSendRawTransaction,
+	"setgenerate":            handleSetGenerate,
+	"signmessagewithprivkey": handleSignMessageWithPrivKey,
+	"stop":                   handleStop,
+	"submitblock":            handleSubmitBlock,
+	"uptime":                 handleUptime,
+	"validateaddress":        handleValidateAddress,
+	"verifychain":            handleVerifyChain,
+	"verifymessage":          handleVerifyMessage,
+	"version":                handleVersion,
 }
 
 // list of commands that we recognize, but for which btcd has no support because
@@ -543,7 +545,7 @@ func handleCreateRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan 
 	params := s.cfg.ChainParams
 	for encodedAddr, amount := range c.Amounts {
 		// Ensure amount is in the valid range for monetary amounts.
-		if amount <= 0 || amount > btcutil.MaxSatoshi {
+		if amount <= 0 || amount*btcutil.SatoshiPerBitcoin > btcutil.MaxSatoshi {
 			return nil, &btcjson.RPCError{
 				Code:    btcjson.ErrRPCType,
 				Message: "Invalid amount",
@@ -2476,6 +2478,40 @@ func handleGetNetworkHashPS(s *rpcServer, cmd interface{}, closeChan <-chan stru
 	return hashesPerSec.Int64(), nil
 }
 
+// handleGetNodeAddresses implements the getnodeaddresses command.
+func handleGetNodeAddresses(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	c := cmd.(*btcjson.GetNodeAddressesCmd)
+
+	count := int32(1)
+	if c.Count != nil {
+		count = *c.Count
+		if count <= 0 {
+			return nil, &btcjson.RPCError{
+				Code:    btcjson.ErrRPCInvalidParameter,
+				Message: "Address count out of range",
+			}
+		}
+	}
+
+	nodes := s.cfg.ConnMgr.NodeAddresses()
+	if n := int32(len(nodes)); n < count {
+		count = n
+	}
+
+	addresses := make([]*btcjson.GetNodeAddressesResult, 0, count)
+	for _, node := range nodes[:count] {
+		address := &btcjson.GetNodeAddressesResult{
+			Time:     node.Timestamp.Unix(),
+			Services: uint64(node.Services),
+			Address:  node.IP.String(),
+			Port:     node.Port,
+		}
+		addresses = append(addresses, address)
+	}
+
+	return addresses, nil
+}
+
 // handleGetPeerInfo implements the getpeerinfo command.
 func handleGetPeerInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	peers := s.cfg.ConnMgr.ConnectedPeers()
@@ -3435,6 +3471,52 @@ func handleSetGenerate(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 	return nil, nil
 }
 
+// Text used to signify that a signed message follows and to prevent
+// inadvertently signing a transaction.
+const messageSignatureHeader = "Bitcoin Signed Message:\n"
+
+// handleSignMessageWithPrivKey implements the signmessagewithprivkey command.
+func handleSignMessageWithPrivKey(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	c := cmd.(*btcjson.SignMessageWithPrivKeyCmd)
+
+	wif, err := btcutil.DecodeWIF(c.PrivKey)
+	if err != nil {
+		message := "Invalid private key"
+		switch err {
+		case btcutil.ErrMalformedPrivateKey:
+			message = "Malformed private key"
+		case btcutil.ErrChecksumMismatch:
+			message = "Private key checksum mismatch"
+		}
+		return nil, &btcjson.RPCError{
+			Code:    btcjson.ErrRPCInvalidAddressOrKey,
+			Message: message,
+		}
+	}
+	if !wif.IsForNet(s.cfg.ChainParams) {
+		return nil, &btcjson.RPCError{
+			Code:    btcjson.ErrRPCInvalidAddressOrKey,
+			Message: "Private key for wrong network",
+		}
+	}
+
+	var buf bytes.Buffer
+	wire.WriteVarString(&buf, 0, messageSignatureHeader)
+	wire.WriteVarString(&buf, 0, c.Message)
+	messageHash := chainhash.DoubleHashB(buf.Bytes())
+
+	sig, err := btcec.SignCompact(btcec.S256(), wif.PrivKey,
+		messageHash, wif.CompressPubKey)
+	if err != nil {
+		return nil, &btcjson.RPCError{
+			Code:    btcjson.ErrRPCInvalidAddressOrKey,
+			Message: "Sign failed",
+		}
+	}
+
+	return base64.StdEncoding.EncodeToString(sig), nil
+}
+
 // handleStop implements the stop command.
 func handleStop(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	select {
@@ -3491,6 +3573,37 @@ func handleValidateAddress(s *rpcServer, cmd interface{}, closeChan <-chan struc
 	if err != nil {
 		// Return the default value (false) for IsValid.
 		return result, nil
+	}
+
+	switch addr := addr.(type) {
+	case *btcutil.AddressPubKeyHash:
+		result.IsScript = btcjson.Bool(false)
+		result.IsWitness = btcjson.Bool(false)
+
+	case *btcutil.AddressScriptHash:
+		result.IsScript = btcjson.Bool(true)
+		result.IsWitness = btcjson.Bool(false)
+
+	case *btcutil.AddressPubKey:
+		result.IsScript = btcjson.Bool(false)
+		result.IsWitness = btcjson.Bool(false)
+
+	case *btcutil.AddressWitnessPubKeyHash:
+		result.IsScript = btcjson.Bool(false)
+		result.IsWitness = btcjson.Bool(true)
+		result.WitnessVersion = btcjson.Int32(int32(addr.WitnessVersion()))
+		result.WitnessProgram = btcjson.String(hex.EncodeToString(addr.WitnessProgram()))
+
+	case *btcutil.AddressWitnessScriptHash:
+		result.IsScript = btcjson.Bool(true)
+		result.IsWitness = btcjson.Bool(true)
+		result.WitnessVersion = btcjson.Int32(int32(addr.WitnessVersion()))
+		result.WitnessProgram = btcjson.String(hex.EncodeToString(addr.WitnessProgram()))
+
+	default:
+		// Handle the case when a new Address is supported by btcutil, but none
+		// of the cases were matched in the switch block. The current behaviour
+		// is to do nothing, and only populate the Address and IsValid fields.
 	}
 
 	result.Address = addr.EncodeAddress()
@@ -3584,7 +3697,7 @@ func handleVerifyMessage(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 	// Validate the signature - this just shows that it was valid at all.
 	// we will compare it with the key next.
 	var buf bytes.Buffer
-	wire.WriteVarString(&buf, 0, "Bitcoin Signed Message:\n")
+	wire.WriteVarString(&buf, 0, messageSignatureHeader)
 	wire.WriteVarString(&buf, 0, c.Message)
 	expectedMessageHash := chainhash.DoubleHashB(buf.Bytes())
 	pk, wasCompressed, err := btcec.RecoverCompact(btcec.S256(), sig,
@@ -4220,6 +4333,10 @@ type rpcserverConnManager interface {
 	// RelayTransactions generates and relays inventory vectors for all of
 	// the passed transactions to all connected peers.
 	RelayTransactions(txns []*mempool.TxDesc)
+
+	// NodeAddresses returns an array consisting node addresses which can
+	// potentially be used to find new nodes in the network.
+	NodeAddresses() []*wire.NetAddress
 }
 
 // rpcserverSyncManager represents a sync manager for use with the RPC server.

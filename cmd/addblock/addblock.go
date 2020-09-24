@@ -7,7 +7,6 @@ package main
 import (
 	"os"
 	"path/filepath"
-	"runtime"
 
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/blockchain/indexers"
@@ -119,8 +118,7 @@ func realMain() error {
 }
 
 func main() {
-	// Use all processor cores and up some limits.
-	runtime.GOMAXPROCS(runtime.NumCPU())
+	// up some limits.
 	if err := limits.SetLimits(); err != nil {
 		os.Exit(1)
 	}

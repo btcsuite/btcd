@@ -7,7 +7,6 @@ package main
 import (
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 
 	"github.com/btcsuite/btcd/database"
@@ -106,9 +105,6 @@ func realMain() error {
 }
 
 func main() {
-	// Use all processor cores.
-	runtime.GOMAXPROCS(runtime.NumCPU())
-
 	// Work around defer not working after os.Exit()
 	if err := realMain(); err != nil {
 		os.Exit(1)

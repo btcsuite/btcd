@@ -310,7 +310,7 @@ func (b *BlockChain) deploymentState(prevNode *blockNode, deploymentID uint32) (
 
 // initThresholdCaches initializes the threshold state caches for each warning
 // bit and defined deployment and provides warnings if the chain is current per
-// the warnUnknownVersions and warnUnknownRuleActivations functions.
+// the warnUnknownRuleActivations function.
 func (b *BlockChain) initThresholdCaches() error {
 	// Initialize the warning and deployment caches by calculating the
 	// threshold state for each of them.  This will ensure the caches are
@@ -335,15 +335,9 @@ func (b *BlockChain) initThresholdCaches() error {
 		}
 	}
 
-	// No warnings about unknown rules or versions until the chain is
-	// current.
+	// No warnings about unknown rules until the chain is current.
 	if b.isCurrent() {
-		// Warn if a high enough percentage of the last blocks have
-		// unexpected versions.
 		bestNode := b.bestChain.Tip()
-		if err := b.warnUnknownVersions(bestNode); err != nil {
-			return err
-		}
 
 		// Warn if any unknown new rules are either about to activate or
 		// have already been activated.

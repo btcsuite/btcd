@@ -19,6 +19,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -851,7 +852,12 @@ func (c *Client) sendPost(jReq *jsonRequest) {
 	httpReq.Header.Set("Content-Type", "application/json")
 
 	// Configure basic access authorization.
-	httpReq.SetBasicAuth(c.config.User, c.config.Pass)
+	user, pass, err := c.config.getAuth()
+	if err != nil {
+		jReq.responseChan <- &response{result: nil, err: err}
+		return
+	}
+	httpReq.SetBasicAuth(user, pass)
 
 	log.Tracef("Sending command [%s] with id %d", jReq.method, jReq.id)
 	c.sendPostRequest(httpReq, jReq)
@@ -1096,6 +1102,17 @@ type ConnConfig struct {
 	// Pass is the passphrase to use to authenticate to the RPC server.
 	Pass string
 
+	// CookiePath is the path to a cookie file containing the username and
+	// passphrase to use to authenticate to the RPC server.  It is used
+	// instead of User and Pass if non-empty.
+	CookiePath string
+
+	cookieLastCheckTime time.Time
+	cookieLastModTime   time.Time
+	cookieLastUser      string
+	cookieLastPass      string
+	cookieLastErr       error
+
 	// Params is the string representing the network that the server
 	// is running. If there is no parameter set in the config, then
 	// mainnet will be used by default.
@@ -1147,6 +1164,43 @@ type ConnConfig struct {
 	// EnableBCInfoHacks is an option provided to enable compatibility hacks
 	// when connecting to blockchain.info RPC server
 	EnableBCInfoHacks bool
+}
+
+// getAuth returns the username and passphrase that will actually be used for
+// this connection.  This will be the result of checking the cookie if a cookie
+// path is configured; if not, it will be the user-configured username and
+// passphrase.
+func (config *ConnConfig) getAuth() (username, passphrase string, err error) {
+	// Try username+passphrase auth first.
+	if config.Pass != "" {
+		return config.User, config.Pass, nil
+	}
+
+	// If no username or passphrase is set, try cookie auth.
+	return config.retrieveCookie()
+}
+
+// retrieveCookie returns the cookie username and passphrase.
+func (config *ConnConfig) retrieveCookie() (username, passphrase string, err error) {
+	if !config.cookieLastCheckTime.IsZero() && time.Now().Before(config.cookieLastCheckTime.Add(30*time.Second)) {
+		return config.cookieLastUser, config.cookieLastPass, config.cookieLastErr
+	}
+
+	config.cookieLastCheckTime = time.Now()
+
+	st, err := os.Stat(config.CookiePath)
+	if err != nil {
+		config.cookieLastErr = err
+		return config.cookieLastUser, config.cookieLastPass, config.cookieLastErr
+	}
+
+	modTime := st.ModTime()
+	if !modTime.Equal(config.cookieLastModTime) {
+		config.cookieLastModTime = modTime
+		config.cookieLastUser, config.cookieLastPass, config.cookieLastErr = readCookieFile(config.CookiePath)
+	}
+
+	return config.cookieLastUser, config.cookieLastPass, config.cookieLastErr
 }
 
 // newHTTPClient returns a new http client that is configured according to the
@@ -1218,7 +1272,11 @@ func dial(config *ConnConfig) (*websocket.Conn, error) {
 
 	// The RPC server requires basic authorization, so create a custom
 	// request header with the Authorization header set.
-	login := config.User + ":" + config.Pass
+	user, pass, err := config.getAuth()
+	if err != nil {
+		return nil, err
+	}
+	login := user + ":" + pass
 	auth := "Basic " + base64.StdEncoding.EncodeToString([]byte(login))
 	requestHeader := make(http.Header)
 	requestHeader.Add("Authorization", auth)

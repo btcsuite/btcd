@@ -917,6 +917,72 @@ func TestDuplicateVersionMsg(t *testing.T) {
 	}
 }
 
+// TestUpdateLastBlockHeight ensures the last block height is set properly
+// during the initial version negotiation and is only allowed to advance to
+// higher values via the associated update function.
+func TestUpdateLastBlockHeight(t *testing.T) {
+	// Create a pair of peers that are connected to each other using a fake
+	// connection and the remote peer starting at height 100.
+	const remotePeerHeight = 100
+	verack := make(chan struct{})
+	peerCfg := peer.Config{
+		Listeners: peer.MessageListeners{
+			OnVerAck: func(p *peer.Peer, msg *wire.MsgVerAck) {
+				verack <- struct{}{}
+			},
+		},
+		UserAgentName:    "peer",
+		UserAgentVersion: "1.0",
+		ChainParams:      &chaincfg.MainNetParams,
+		Services:         0,
+	}
+	remotePeerCfg := peerCfg
+	remotePeerCfg.NewestBlock = func() (*chainhash.Hash, int32, error) {
+		return &chainhash.Hash{}, remotePeerHeight, nil
+	}
+	inConn, outConn := pipe(
+		&conn{laddr: "10.0.0.1:9108", raddr: "10.0.0.2:9108"},
+		&conn{laddr: "10.0.0.2:9108", raddr: "10.0.0.1:9108"},
+	)
+	localPeer, err := peer.NewOutboundPeer(&peerCfg, inConn.laddr)
+	if err != nil {
+		t.Fatalf("NewOutboundPeer: unexpected err: %v\n", err)
+	}
+	localPeer.AssociateConnection(outConn)
+	inPeer := peer.NewInboundPeer(&remotePeerCfg)
+	inPeer.AssociateConnection(inConn)
+
+	// Wait for the veracks from the initial protocol version negotiation.
+	for i := 0; i < 2; i++ {
+		select {
+		case <-verack:
+		case <-time.After(time.Second):
+			t.Fatal("verack timeout")
+		}
+	}
+
+	// Ensure the latest block height starts at the value reported by the remote
+	// peer via its version message.
+	if height := localPeer.LastBlock(); height != remotePeerHeight {
+		t.Fatalf("wrong starting height - got %d, want %d", height,
+			remotePeerHeight)
+	}
+
+	// Ensure the latest block height is not allowed to go backwards.
+	localPeer.UpdateLastBlockHeight(remotePeerHeight - 1)
+	if height := localPeer.LastBlock(); height != remotePeerHeight {
+		t.Fatalf("height allowed to go backwards - got %d, want %d", height,
+			remotePeerHeight)
+	}
+
+	// Ensure the latest block height is allowed to advance.
+	localPeer.UpdateLastBlockHeight(remotePeerHeight + 1)
+	if height := localPeer.LastBlock(); height != remotePeerHeight+1 {
+		t.Fatalf("height not allowed to advance - got %d, want %d", height,
+			remotePeerHeight+1)
+	}
+}
+
 func init() {
 	// Allow self connection when running the tests.
 	peer.TstAllowSelfConns()

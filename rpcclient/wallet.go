@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2017 The btcsuite developers
+// Copyright (c) 2014-2020 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -20,7 +20,8 @@ import (
 // *****************************
 
 // FutureGetTransactionResult is a future promise to deliver the result
-// of a GetTransactionAsync RPC invocation (or an applicable error).
+// of a GetTransactionAsync or GetTransactionWatchOnlyAsync RPC invocation
+// (or an applicable error).
 type FutureGetTransactionResult chan *response
 
 // Receive waits for the response promised by the future and returns detailed
@@ -61,6 +62,28 @@ func (c *Client) GetTransactionAsync(txHash *chainhash.Hash) FutureGetTransactio
 // See GetRawTransaction to return the raw transaction instead.
 func (c *Client) GetTransaction(txHash *chainhash.Hash) (*btcjson.GetTransactionResult, error) {
 	return c.GetTransactionAsync(txHash).Receive()
+}
+
+// GetTransactionWatchOnlyAsync returns an instance of a type that can be used
+// to get the result of the RPC at some future time by invoking the Receive function on
+// the returned instance.
+//
+// See GetTransactionWatchOnly for the blocking version and more details.
+func (c *Client) GetTransactionWatchOnlyAsync(txHash *chainhash.Hash, watchOnly bool) FutureGetTransactionResult {
+	hash := ""
+	if txHash != nil {
+		hash = txHash.String()
+	}
+
+	cmd := btcjson.NewGetTransactionCmd(hash, &watchOnly)
+	return c.sendCmd(cmd)
+}
+
+// GetTransactionWatchOnly returns detailed information about a wallet
+// transaction, and allow including watch-only addresses in balance
+// calculation and details.
+func (c *Client) GetTransactionWatchOnly(txHash *chainhash.Hash, watchOnly bool) (*btcjson.GetTransactionResult, error) {
+	return c.GetTransactionWatchOnlyAsync(txHash, watchOnly).Receive()
 }
 
 // FutureListTransactionsResult is a future promise to deliver the result of a
@@ -139,6 +162,25 @@ func (c *Client) ListTransactionsCountFromAsync(account string, count, from int)
 // See the ListTransactions and ListTransactionsCount functions to use defaults.
 func (c *Client) ListTransactionsCountFrom(account string, count, from int) ([]btcjson.ListTransactionsResult, error) {
 	return c.ListTransactionsCountFromAsync(account, count, from).Receive()
+}
+
+// ListTransactionsCountFromWatchOnlyAsync returns an instance of a type that can be used
+// to get the result of the RPC at some future time by invoking the Receive
+// function on the returned instance.
+//
+// See ListTransactionsCountFromWatchOnly for the blocking version and more details.
+func (c *Client) ListTransactionsCountFromWatchOnlyAsync(account string, count, from int, watchOnly bool) FutureListTransactionsResult {
+	cmd := btcjson.NewListTransactionsCmd(&account, &count, &from, &watchOnly)
+	return c.sendCmd(cmd)
+}
+
+// ListTransactionsCountFromWatchOnly returns a list of the most recent transactions up
+// to the passed count while skipping the first 'from' transactions. It will include or
+// exclude transactions from watch-only addresses based on the passed value for the watchOnly parameter
+//
+// See the ListTransactions and ListTransactionsCount functions to use defaults.
+func (c *Client) ListTransactionsCountFromWatchOnly(account string, count, from int, watchOnly bool) ([]btcjson.ListTransactionsResult, error) {
+	return c.ListTransactionsCountFromWatchOnlyAsync(account, count, from, watchOnly).Receive()
 }
 
 // FutureListUnspentResult is a future promise to deliver the result of a
@@ -284,6 +326,7 @@ func (c *Client) ListSinceBlockAsync(blockHash *chainhash.Hash) FutureListSinceB
 // minimum confirmations as a filter.
 //
 // See ListSinceBlockMinConf to override the minimum number of confirmations.
+// See ListSinceBlockMinConfWatchOnly to override the minimum number of confirmations and watch only parameter.
 func (c *Client) ListSinceBlock(blockHash *chainhash.Hash) (*btcjson.ListSinceBlockResult, error) {
 	return c.ListSinceBlockAsync(blockHash).Receive()
 }
@@ -310,6 +353,30 @@ func (c *Client) ListSinceBlockMinConfAsync(blockHash *chainhash.Hash, minConfir
 // See ListSinceBlock to use the default minimum number of confirmations.
 func (c *Client) ListSinceBlockMinConf(blockHash *chainhash.Hash, minConfirms int) (*btcjson.ListSinceBlockResult, error) {
 	return c.ListSinceBlockMinConfAsync(blockHash, minConfirms).Receive()
+}
+
+// ListSinceBlockMinConfWatchOnlyAsync returns an instance of a type that can be used to
+// get the result of the RPC at some future time by invoking the Receive
+// function on the returned instance.
+//
+// See ListSinceBlockMinConfWatchOnly for the blocking version and more details.
+func (c *Client) ListSinceBlockMinConfWatchOnlyAsync(blockHash *chainhash.Hash, minConfirms int, watchOnly bool) FutureListSinceBlockResult {
+	var hash *string
+	if blockHash != nil {
+		hash = btcjson.String(blockHash.String())
+	}
+
+	cmd := btcjson.NewListSinceBlockCmd(hash, &minConfirms, &watchOnly)
+	return c.sendCmd(cmd)
+}
+
+// ListSinceBlockMinConfWatchOnly returns all transactions added in blocks since the
+// specified block hash, or all transactions if it is nil, using the specified
+// number of minimum confirmations as a filter.
+//
+// See ListSinceBlock to use the default minimum number of confirmations and default watch only paremeter.
+func (c *Client) ListSinceBlockMinConfWatchOnly(blockHash *chainhash.Hash, minConfirms int, watchOnly bool) (*btcjson.ListSinceBlockResult, error) {
+	return c.ListSinceBlockMinConfWatchOnlyAsync(blockHash, minConfirms, watchOnly).Receive()
 }
 
 // **************************
@@ -870,6 +937,41 @@ func (c *Client) CreateNewAccountAsync(account string) FutureCreateNewAccountRes
 // CreateNewAccount creates a new wallet account.
 func (c *Client) CreateNewAccount(account string) error {
 	return c.CreateNewAccountAsync(account).Receive()
+}
+
+// FutureGetAddressInfoResult is a future promise to deliver the result of an
+// GetAddressInfoAsync RPC invocation (or an applicable error).
+type FutureGetAddressInfoResult chan *response
+
+// Receive waits for the response promised by the future and returns the information
+// about the given bitcoin address.
+func (r FutureGetAddressInfoResult) Receive() (*btcjson.GetAddressInfoResult, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	var getAddressInfoResult btcjson.GetAddressInfoResult
+	err = json.Unmarshal(res, &getAddressInfoResult)
+	if err != nil {
+		return nil, err
+	}
+	return &getAddressInfoResult, nil
+}
+
+// GetAddressInfoAsync returns an instance of a type that can be used to get the result
+// of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+//
+// See GetAddressInfo for the blocking version and more details.
+func (c *Client) GetAddressInfoAsync(address string) FutureGetAddressInfoResult {
+	cmd := btcjson.NewGetAddressInfoCmd(address)
+	return c.sendCmd(cmd)
+}
+
+// GetAddressInfo returns information about the given bitcoin address.
+func (c *Client) GetAddressInfo(address string) (*btcjson.GetAddressInfoResult, error) {
+	return c.GetAddressInfoAsync(address).Receive()
 }
 
 // FutureGetNewAddressResult is a future promise to deliver the result of a
@@ -1547,6 +1649,43 @@ func (c *Client) GetBalanceMinConf(account string, minConfirms int) (btcutil.Amo
 	return c.GetBalanceMinConfAsync(account, minConfirms).Receive()
 }
 
+// FutureGetBalancesResult is a future promise to deliver the result of a
+// GetBalancesAsync RPC invocation (or an applicable error).
+type FutureGetBalancesResult chan *response
+
+// Receive waits for the response promised by the future and returns the
+// available balances from the server.
+func (r FutureGetBalancesResult) Receive() (*btcjson.GetBalancesResult, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal result as a floating point number.
+	var balances btcjson.GetBalancesResult
+	err = json.Unmarshal(res, &balances)
+	if err != nil {
+		return nil, err
+	}
+
+	return &balances, nil
+}
+
+// GetBalancesAsync returns an instance of a type that can be used to get the
+// result of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+//
+// See GetBalances for the blocking version and more details.
+func (c *Client) GetBalancesAsync() FutureGetBalancesResult {
+	cmd := btcjson.NewGetBalancesCmd()
+	return c.sendCmd(cmd)
+}
+
+// GetBalances returns the available balances from the server.
+func (c *Client) GetBalances() (*btcjson.GetBalancesResult, error) {
+	return c.GetBalancesAsync().Receive()
+}
+
 // FutureGetReceivedByAccountResult is a future promise to deliver the result of
 // a GetReceivedByAccountAsync or GetReceivedByAccountMinConfAsync RPC
 // invocation (or an applicable error).
@@ -2143,6 +2282,44 @@ func (c *Client) ImportAddressRescan(address string, account string, rescan bool
 	return c.ImportAddressRescanAsync(address, account, rescan).Receive()
 }
 
+// FutureImportMultiResult is a future promise to deliver the result of an
+// ImportMultiAsync RPC invocation (or an applicable error).
+type FutureImportMultiResult chan *response
+
+// Receive waits for the response promised by the future and returns the result
+// of importing multiple addresses/scripts.
+func (r FutureImportMultiResult) Receive() (btcjson.ImportMultiResults, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	var importMultiResults btcjson.ImportMultiResults
+	err = json.Unmarshal(res, &importMultiResults)
+	if err != nil {
+		return nil, err
+	}
+	return importMultiResults, nil
+}
+
+// ImportMultiAsync returns an instance of a type that can be used to get the result
+// of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+//
+// See ImportMulti for the blocking version and more details.
+func (c *Client) ImportMultiAsync(requests []btcjson.ImportMultiRequest, options *btcjson.ImportMultiOptions) FutureImportMultiResult {
+	cmd := btcjson.NewImportMultiCmd(requests, options)
+	return c.sendCmd(cmd)
+}
+
+// ImportMulti imports addresses/scripts, optionally rescanning the blockchain
+// from the earliest creation time of the imported scripts.
+//
+// See btcjson.ImportMultiRequest for details on the requests parameter.
+func (c *Client) ImportMulti(requests []btcjson.ImportMultiRequest, options *btcjson.ImportMultiOptions) (btcjson.ImportMultiResults, error) {
+	return c.ImportMultiAsync(requests, options).Receive()
+}
+
 // FutureImportPrivKeyResult is a future promise to deliver the result of an
 // ImportPrivKeyAsync RPC invocation (or an applicable error).
 type FutureImportPrivKeyResult chan *response
@@ -2305,6 +2482,95 @@ func (c *Client) GetInfoAsync() FutureGetInfoResult {
 // not include wallet functionality.
 func (c *Client) GetInfo() (*btcjson.InfoWalletResult, error) {
 	return c.GetInfoAsync().Receive()
+}
+
+// FutureImportPubKeyResult is a future promise to deliver the result of an
+// WalletCreateFundedPsbt RPC invocation (or an applicable error).
+type FutureWalletCreateFundedPsbtResult chan *response
+
+// Receive waits for the response promised by the future and returns the
+// partially signed transaction in PSBT format along with the resulting fee
+// and change output index.
+func (r FutureWalletCreateFundedPsbtResult) Receive() (*btcjson.WalletCreateFundedPsbtResult, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal result as a getinfo result object.
+	var psbtRes btcjson.WalletCreateFundedPsbtResult
+	err = json.Unmarshal(res, &psbtRes)
+	if err != nil {
+		return nil, err
+	}
+
+	return &psbtRes, nil
+}
+
+// WalletCreateFundedPsbtAsync returns an instance of a type that can be used
+// to get the result of the RPC at some future time by invoking the Receive
+// function on the returned instance.
+//
+// See WalletCreateFundedPsbt for the blocking version and more details.
+func (c *Client) WalletCreateFundedPsbtAsync(
+	inputs []btcjson.PsbtInput, outputs []btcjson.PsbtOutput, locktime *uint32,
+	options *btcjson.WalletCreateFundedPsbtOpts, bip32Derivs *bool,
+) FutureWalletCreateFundedPsbtResult {
+	cmd := btcjson.NewWalletCreateFundedPsbtCmd(inputs, outputs, locktime, options, bip32Derivs)
+	return c.sendCmd(cmd)
+}
+
+// WalletCreateFundedPsbt creates and funds a transaction in the Partially
+// Signed Transaction format. Inputs will be added if supplied inputs are not
+// enough.
+func (c *Client) WalletCreateFundedPsbt(
+	inputs []btcjson.PsbtInput, outputs []btcjson.PsbtOutput, locktime *uint32,
+	options *btcjson.WalletCreateFundedPsbtOpts, bip32Derivs *bool,
+) (*btcjson.WalletCreateFundedPsbtResult, error) {
+	return c.WalletCreateFundedPsbtAsync(inputs, outputs, locktime, options, bip32Derivs).Receive()
+}
+
+// FutureWalletProcessPsbtResult is a future promise to deliver the result of a
+// WalletCreateFundedPsb RPC invocation (or an applicable error).
+type FutureWalletProcessPsbtResult chan *response
+
+// Receive waits for the response promised by the future and returns an updated
+// PSBT with signed inputs from the wallet and a boolen indicating if the the
+// transaction has a complete set of signatures.
+func (r FutureWalletProcessPsbtResult) Receive() (*btcjson.WalletProcessPsbtResult, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal result as a getinfo result object.
+	var psbtRes btcjson.WalletProcessPsbtResult
+	err = json.Unmarshal(res, &psbtRes)
+	if err != nil {
+		return nil, err
+	}
+
+	return &psbtRes, nil
+}
+
+// WalletProcessPsbtAsync returns an instance of a type that can be used
+// to get the result of the RPC at some future time by invoking the Receive
+// function on the returned instance.
+//
+// See WalletProcessPsbt for the blocking version and more details.
+func (c *Client) WalletProcessPsbtAsync(
+	psbt string, sign *bool, sighashType SigHashType, bip32Derivs *bool,
+) FutureWalletProcessPsbtResult {
+	cmd := btcjson.NewWalletProcessPsbtCmd(psbt, sign, btcjson.String(sighashType.String()), bip32Derivs)
+	return c.sendCmd(cmd)
+}
+
+// WalletProcessPsbt updates a PSBT with input information from our wallet and
+// then signs inputs.
+func (c *Client) WalletProcessPsbt(
+	psbt string, sign *bool, sighashType SigHashType, bip32Derivs *bool,
+) (*btcjson.WalletProcessPsbtResult, error) {
+	return c.WalletProcessPsbtAsync(psbt, sign, sighashType, bip32Derivs).Receive()
 }
 
 // TODO(davec): Implement

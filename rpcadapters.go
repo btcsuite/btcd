@@ -223,6 +223,15 @@ func (cm *rpcConnManager) RelayTransactions(txns []*mempool.TxDesc) {
 	cm.server.relayTransactions(txns)
 }
 
+// NodeAddresses returns an array consisting node addresses which can
+// potentially be used to find new nodes in the network.
+//
+// This function is safe for concurrent access and is part of the
+// rpcserverConnManager interface implementation.
+func (cm *rpcConnManager) NodeAddresses() []*wire.NetAddress {
+	return cm.server.addrManager.AddressCache()
+}
+
 // rpcSyncMgr provides a block manager for use with the RPC server and
 // implements the rpcserverSyncManager interface.
 type rpcSyncMgr struct {

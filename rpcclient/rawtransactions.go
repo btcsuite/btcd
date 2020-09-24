@@ -205,6 +205,47 @@ func (c *Client) DecodeRawTransaction(serializedTx []byte) (*btcjson.TxRawResult
 	return c.DecodeRawTransactionAsync(serializedTx).Receive()
 }
 
+// FutureFundRawTransactionResult is a future promise to deliver the result
+// of a FutureFundRawTransactionAsync RPC invocation (or an applicable error).
+type FutureFundRawTransactionResult chan *response
+
+// Receive waits for the response promised by the future and returns information
+// about a funding attempt
+func (r FutureFundRawTransactionResult) Receive() (*btcjson.FundRawTransactionResult, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	var marshalled btcjson.FundRawTransactionResult
+	if err := json.Unmarshal(res, &marshalled); err != nil {
+		return nil, err
+	}
+
+	return &marshalled, nil
+}
+
+// FundRawTransactionAsync returns an instance of a type that can be used to
+// get the result of the RPC at some future time by invoking the Receive
+// function on the returned instance.
+//
+// See FundRawTransaction for the blocking version and more details.
+func (c *Client) FundRawTransactionAsync(tx *wire.MsgTx, opts btcjson.FundRawTransactionOpts, isWitness *bool) FutureFundRawTransactionResult {
+	var txBuf bytes.Buffer
+	if err := tx.Serialize(&txBuf); err != nil {
+		return newFutureError(err)
+	}
+
+	cmd := btcjson.NewFundRawTransactionCmd(txBuf.Bytes(), opts, isWitness)
+	return c.sendCmd(cmd)
+}
+
+// FundRawTransaction returns the result of trying to fund the given transaction with
+// funds from the node wallet
+func (c *Client) FundRawTransaction(tx *wire.MsgTx, opts btcjson.FundRawTransactionOpts, isWitness *bool) (*btcjson.FundRawTransactionResult, error) {
+	return c.FundRawTransactionAsync(tx, opts, isWitness).Receive()
+}
+
 // FutureCreateRawTransactionResult is a future promise to deliver the result
 // of a CreateRawTransactionAsync RPC invocation (or an applicable error).
 type FutureCreateRawTransactionResult chan *response
@@ -261,7 +302,8 @@ func (c *Client) CreateRawTransactionAsync(inputs []btcjson.TransactionInput,
 }
 
 // CreateRawTransaction returns a new transaction spending the provided inputs
-// and sending to the provided addresses.
+// and sending to the provided addresses. If the inputs are either nil or an
+// empty slice, it is interpreted as an empty slice.
 func (c *Client) CreateRawTransaction(inputs []btcjson.TransactionInput,
 	amounts map[btcutil.Address]btcutil.Amount, lockTime *int64) (*wire.MsgTx, error) {
 
