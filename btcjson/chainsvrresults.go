@@ -9,6 +9,8 @@ import (
 	"encoding/hex"
 	"encoding/json"
 
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
+
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
 )
@@ -433,6 +435,64 @@ type GetTxOutResult struct {
 	Value         float64            `json:"value"`
 	ScriptPubKey  ScriptPubKeyResult `json:"scriptPubKey"`
 	Coinbase      bool               `json:"coinbase"`
+}
+
+// GetTxOutSetInfoResult models the data from the gettxoutsetinfo command.
+type GetTxOutSetInfoResult struct {
+	Height         int64          `json:"height"`
+	BestBlock      chainhash.Hash `json:"bestblock"`
+	Transactions   int64          `json:"transactions"`
+	TxOuts         int64          `json:"txouts"`
+	BogoSize       int64          `json:"bogosize"`
+	HashSerialized chainhash.Hash `json:"hash_serialized_2"`
+	DiskSize       int64          `json:"disk_size"`
+	TotalAmount    btcutil.Amount `json:"total_amount"`
+}
+
+// UnmarshalJSON unmarshals the result of the gettxoutsetinfo JSON-RPC call
+func (g *GetTxOutSetInfoResult) UnmarshalJSON(data []byte) error {
+	// Step 1: Create type aliases of the original struct.
+	type Alias GetTxOutSetInfoResult
+
+	// Step 2: Create an anonymous struct with raw replacements for the special
+	// fields.
+	aux := &struct {
+		BestBlock      string  `json:"bestblock"`
+		HashSerialized string  `json:"hash_serialized_2"`
+		TotalAmount    float64 `json:"total_amount"`
+		*Alias
+	}{
+		Alias: (*Alias)(g),
+	}
+
+	// Step 3: Unmarshal the data into the anonymous struct.
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+
+	// Step 4: Convert the raw fields to the desired types
+	blockHash, err := chainhash.NewHashFromStr(aux.BestBlock)
+	if err != nil {
+		return err
+	}
+
+	g.BestBlock = *blockHash
+
+	serializedHash, err := chainhash.NewHashFromStr(aux.HashSerialized)
+	if err != nil {
+		return err
+	}
+
+	g.HashSerialized = *serializedHash
+
+	amount, err := btcutil.NewAmount(aux.TotalAmount)
+	if err != nil {
+		return err
+	}
+
+	g.TotalAmount = amount
+
+	return nil
 }
 
 // GetNetTotalsResult models the data returned from the getnettotals command.

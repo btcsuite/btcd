@@ -1026,6 +1026,44 @@ func (c *Client) GetTxOut(txHash *chainhash.Hash, index uint32, mempool bool) (*
 	return c.GetTxOutAsync(txHash, index, mempool).Receive()
 }
 
+// FutureGetTxOutSetInfoResult is a future promise to deliver the result of a
+// GetTxOutSetInfoAsync RPC invocation (or an applicable error).
+type FutureGetTxOutSetInfoResult chan *response
+
+// Receive waits for the response promised by the future and returns the
+// results of GetTxOutSetInfoAsync RPC invocation.
+func (r FutureGetTxOutSetInfoResult) Receive() (*btcjson.GetTxOutSetInfoResult, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal result as an gettxoutsetinfo result object.
+	var txOutSetInfo *btcjson.GetTxOutSetInfoResult
+	err = json.Unmarshal(res, &txOutSetInfo)
+	if err != nil {
+		return nil, err
+	}
+
+	return txOutSetInfo, nil
+}
+
+// GetTxOutSetInfoAsync returns an instance of a type that can be used to get
+// the result of the RPC at some future time by invoking the Receive function on
+// the returned instance.
+//
+// See GetTxOutSetInfo for the blocking version and more details.
+func (c *Client) GetTxOutSetInfoAsync() FutureGetTxOutSetInfoResult {
+	cmd := btcjson.NewGetTxOutSetInfoCmd()
+	return c.sendCmd(cmd)
+}
+
+// GetTxOutSetInfo returns the statistics about the unspent transaction output
+// set.
+func (c *Client) GetTxOutSetInfo() (*btcjson.GetTxOutSetInfoResult, error) {
+	return c.GetTxOutSetInfoAsync().Receive()
+}
+
 // FutureRescanBlocksResult is a future promise to deliver the result of a
 // RescanBlocksAsync RPC invocation (or an applicable error).
 //

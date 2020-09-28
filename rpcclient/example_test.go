@@ -116,3 +116,22 @@ func ExampleClient_GetWalletInfo() {
 	fmt.Println(*info.HDSeedID)        // eb44e4e9b864ef17e7ba947da746375b000f5d94
 	fmt.Println(info.Scanning.Value)   // false
 }
+
+func ExampleClient_GetTxOutSetInfo() {
+	client, err := New(connCfg, nil)
+	if err != nil {
+		panic(err)
+	}
+	defer client.Shutdown()
+
+	r, err := client.GetTxOutSetInfo()
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println(r.TotalAmount.String()) // 20947654.56996054 BTC
+	fmt.Println(r.BestBlock.String())   // 000000000000005f94116250e2407310463c0a7cf950f1af9ebe935b1c0687ab
+	fmt.Println(r.TxOuts)               // 24280607
+	fmt.Println(r.Transactions)         // 9285603
+	fmt.Println(r.DiskSize)             // 1320871611
+}
