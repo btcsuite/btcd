@@ -39,7 +39,6 @@ cd $MAINDIR
 # If BTCDBUILDSYS is set the default list is ignored. Useful to release
 # for a subset of systems/architectures.
 SYS=${BTCDBUILDSYS:-"
-        darwin-386
         darwin-amd64
         dragonfly-amd64
         freebsd-386
