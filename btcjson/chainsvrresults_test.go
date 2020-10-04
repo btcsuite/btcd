@@ -9,11 +9,10 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/btcsuite/btcd/btcjson"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcutil"
 	"github.com/davecgh/go-spew/spew"
-
-	"github.com/btcsuite/btcd/btcjson"
 )
 
 // TestChainSvrCustomResults ensures any results that have custom marshalling
@@ -153,6 +152,49 @@ func TestGetTxOutSetInfoResult(t *testing.T) {
 			t.Errorf("Test #%d (%s) unexpected unmarshalled data - "+
 				"got %v, want %v", i, test.name, spew.Sdump(out),
 				spew.Sdump(test.want))
+			continue
+		}
+	}
+}
+
+// TestChainSvrMiningInfoResults ensures GetMiningInfoResults are unmarshalled correctly
+func TestChainSvrMiningInfoResults(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		result   string
+		expected btcjson.GetMiningInfoResult
+	}{
+		{
+			name:   "mining info with integer networkhashps",
+			result: `{"networkhashps": 89790618491361}`,
+			expected: btcjson.GetMiningInfoResult{
+				NetworkHashPS: 89790618491361,
+			},
+		},
+		{
+			name:   "mining info with scientific notation networkhashps",
+			result: `{"networkhashps": 8.9790618491361e+13}`,
+			expected: btcjson.GetMiningInfoResult{
+				NetworkHashPS: 89790618491361,
+			},
+		},
+	}
+
+	t.Logf("Running %d tests", len(tests))
+	for i, test := range tests {
+		var miningInfoResult btcjson.GetMiningInfoResult
+		err := json.Unmarshal([]byte(test.result), &miningInfoResult)
+		if err != nil {
+			t.Errorf("Test #%d (%s) unexpected error: %v", i,
+				test.name, err)
+			continue
+		}
+		if miningInfoResult != test.expected {
+			t.Errorf("Test #%d (%s) unexpected marhsalled data - "+
+				"got %+v, want %+v", i, test.name, miningInfoResult,
+				test.expected)
 			continue
 		}
 	}
