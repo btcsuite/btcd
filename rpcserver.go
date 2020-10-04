@@ -2366,8 +2366,8 @@ func handleGetMiningInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 		Difficulty:         getDifficultyRatio(best.Bits, s.cfg.ChainParams),
 		Generate:           s.cfg.CPUMiner.IsMining(),
 		GenProcLimit:       s.cfg.CPUMiner.NumWorkers(),
-		HashesPerSec:       int64(s.cfg.CPUMiner.HashesPerSecond()),
-		NetworkHashPS:      networkHashesPerSec,
+		HashesPerSec:       s.cfg.CPUMiner.HashesPerSecond(),
+		NetworkHashPS:      float64(networkHashesPerSec),
 		PooledTx:           uint64(s.cfg.TxMemPool.Count()),
 		TestNet:            cfg.TestNet3,
 	}
