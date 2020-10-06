@@ -828,3 +828,14 @@ type GetDescriptorInfoResult struct {
 
 // DeriveAddressesResult models the data from the deriveaddresses command.
 type DeriveAddressesResult []string
+
+// LoadWalletResult models the data from the loadwallet command
+type LoadWalletResult struct {
+	Name    string `json:"name"`
+	Warning string `json:"warning"`
+}
+
+// DumpWalletResult models the data from the dumpwallet command
+type DumpWalletResult struct {
+	Filename string `json:"filename"`
+}
