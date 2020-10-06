@@ -313,6 +313,39 @@ func NewGetWalletInfoCmd() *GetWalletInfoCmd {
 	return &GetWalletInfoCmd{}
 }
 
+// BackupWalletCmd defines the backupwallet JSON-RPC command
+type BackupWalletCmd struct {
+	Destination string
+}
+
+// NewBackupWalletCmd returns a new instance which can be used to issue a
+// backupwallet JSON-RPC command
+func NewBackupWalletCmd(destination string) *BackupWalletCmd {
+	return &BackupWalletCmd{Destination: destination}
+}
+
+// UnloadWalletCmd defines the unloadwallet JSON-RPC command
+type UnloadWalletCmd struct {
+	WalletName *string
+}
+
+// NewUnloadWalletCmd returns a new instance which can be used to issue a
+// unloadwallet JSON-RPC command.
+func NewUnloadWalletCmd(walletName *string) *UnloadWalletCmd {
+	return &UnloadWalletCmd{WalletName: walletName}
+}
+
+// LoadWalletCmd defines the loadwallet JSON-RPC command
+type LoadWalletCmd struct {
+	WalletName string
+}
+
+// NewLoadWalletCmd returns a new instance which can be used to issue a
+// loadwallet JSON-RPC command
+func NewLoadWalletCmd(walletName string) *LoadWalletCmd {
+	return &LoadWalletCmd{WalletName: walletName}
+}
+
 // ImportPrivKeyCmd defines the importprivkey JSON-RPC command.
 type ImportPrivKeyCmd struct {
 	PrivKey string
@@ -1030,6 +1063,7 @@ func init() {
 
 	MustRegisterCmd("addmultisigaddress", (*AddMultisigAddressCmd)(nil), flags)
 	MustRegisterCmd("addwitnessaddress", (*AddWitnessAddressCmd)(nil), flags)
+	MustRegisterCmd("backupwallet", (*BackupWalletCmd)(nil), flags)
 	MustRegisterCmd("createmultisig", (*CreateMultisigCmd)(nil), flags)
 	MustRegisterCmd("dumpprivkey", (*DumpPrivKeyCmd)(nil), flags)
 	MustRegisterCmd("encryptwallet", (*EncryptWalletCmd)(nil), flags)
@@ -1059,6 +1093,7 @@ func init() {
 	MustRegisterCmd("listsinceblock", (*ListSinceBlockCmd)(nil), flags)
 	MustRegisterCmd("listtransactions", (*ListTransactionsCmd)(nil), flags)
 	MustRegisterCmd("listunspent", (*ListUnspentCmd)(nil), flags)
+	MustRegisterCmd("loadwallet", (*LoadWalletCmd)(nil), flags)
 	MustRegisterCmd("lockunspent", (*LockUnspentCmd)(nil), flags)
 	MustRegisterCmd("move", (*MoveCmd)(nil), flags)
 	MustRegisterCmd("sendfrom", (*SendFromCmd)(nil), flags)
@@ -1069,6 +1104,7 @@ func init() {
 	MustRegisterCmd("signmessage", (*SignMessageCmd)(nil), flags)
 	MustRegisterCmd("signrawtransaction", (*SignRawTransactionCmd)(nil), flags)
 	MustRegisterCmd("signrawtransactionwithwallet", (*SignRawTransactionWithWalletCmd)(nil), flags)
+	MustRegisterCmd("unloadwallet", (*UnloadWalletCmd)(nil), flags)
 	MustRegisterCmd("walletlock", (*WalletLockCmd)(nil), flags)
 	MustRegisterCmd("walletpassphrase", (*WalletPassphraseCmd)(nil), flags)
 	MustRegisterCmd("walletpassphrasechange", (*WalletPassphraseChangeCmd)(nil), flags)

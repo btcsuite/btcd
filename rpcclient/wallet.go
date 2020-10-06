@@ -2608,12 +2608,141 @@ func (c *Client) GetWalletInfo() (*btcjson.GetWalletInfoResult, error) {
 	return c.GetWalletInfoAsync().Receive()
 }
 
+// FutureBackupWalletResult is a future promise to deliver the result of an
+// BackupWalletAsync RPC invocation (or an applicable error)
+type FutureBackupWalletResult chan *response
+
+// Receive waits for the response promised by the future
+func (r FutureBackupWalletResult) Receive() error {
+	_, err := receiveFuture(r)
+	return err
+}
+
+// BackupWalletAsync returns an instance of a type that can be used to get the result
+// of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+//
+// See BackupWallet for the blocking version and more details.
+func (c *Client) BackupWalletAsync(destination string) FutureBackupWalletResult {
+	return c.sendCmd(btcjson.NewBackupWalletCmd(destination))
+}
+
+// BackupWallet safely copies current wallet file to destination, which can
+// be a directory or a path with filename
+func (c *Client) BackupWallet(destination string) error {
+	return c.BackupWalletAsync(destination).Receive()
+}
+
+// FutureDumpWalletResult is a future promise to deliver the result of an
+// DumpWallet RPC invocation (or an applicable error)
+type FutureDumpWalletResult chan *response
+
+// Receive waits for the response promised by the future
+func (r FutureDumpWalletResult) Receive() (*btcjson.DumpWalletResult, error) {
+	bytes, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	var res btcjson.DumpWalletResult
+	err = json.Unmarshal(bytes, &res)
+	return &res, err
+}
+
+// DumpWalletAsync returns an instance of a type that can be used to get the result
+// of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+//
+// See DumpWalletAsync for the blocking version and more details.
+func (c *Client) DumpWalletAsync(destination string) FutureDumpWalletResult {
+	return c.sendCmd(btcjson.NewDumpWalletCmd(destination))
+}
+
+// DumpWallet dumps all wallet keys in a human-readable format to a server-side file.
+func (c *Client) DumpWallet(destination string) (*btcjson.DumpWalletResult, error) {
+	return c.DumpWalletAsync(destination).Receive()
+}
+
+// FutureImportWalletResult is a future promise to deliver the result of an
+// ImportWalletAsync RPC invocation (or an applicable error)
+type FutureImportWalletResult chan *response
+
+// Receive waits for the response promised by the future
+func (r FutureImportWalletResult) Receive() error {
+	_, err := receiveFuture(r)
+	return err
+}
+
+// ImportWalletAsync returns an instance of a type that can be used to get the result
+// of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+//
+// See ImportWallet for the blocking version and more details.
+func (c *Client) ImportWalletAsync(filename string) FutureImportWalletResult {
+	return c.sendCmd(btcjson.NewImportWalletCmd(filename))
+}
+
+// ImportWallet imports keys from a wallet dump file (see DumpWallet).
+func (c *Client) ImportWallet(filename string) error {
+	return c.ImportWalletAsync(filename).Receive()
+}
+
+// FutureUnloadWalletResult is a future promise to deliver the result of an
+// UnloadWalletAsync RPC invocation (or an applicable error)
+type FutureUnloadWalletResult chan *response
+
+// Receive waits for the response promised by the future
+func (r FutureUnloadWalletResult) Receive() error {
+	_, err := receiveFuture(r)
+	return err
+}
+
+// UnloadWalletAsync returns an instance of a type that can be used to get the result
+// of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+//
+// See UnloadWallet for the blocking version and more details.
+func (c *Client) UnloadWalletAsync(walletName *string) FutureUnloadWalletResult {
+	return c.sendCmd(btcjson.NewUnloadWalletCmd(walletName))
+}
+
+// UnloadWallet unloads the referenced wallet. If the RPC server URL already
+// contains the name of the wallet, like http://127.0.0.1:8332/wallet/<walletname>,
+// the parameter must be nil, or it'll return an error.
+func (c *Client) UnloadWallet(walletName *string) error {
+	return c.UnloadWalletAsync(walletName).Receive()
+}
+
+// FutureLoadWalletResult is a future promise to deliver the result of an
+// LoadWalletAsync RPC invocation (or an applicable error)
+type FutureLoadWalletResult chan *response
+
+// Receive waits for the response promised by the future
+func (r FutureLoadWalletResult) Receive() (*btcjson.LoadWalletResult, error) {
+	bytes, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+	var result btcjson.LoadWalletResult
+	err = json.Unmarshal(bytes, &result)
+	return &result, err
+}
+
+// LoadWalletAsync returns an instance of a type that can be used to get the result
+// of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+//
+// See LoadWallet for the blocking version and more details.
+func (c *Client) LoadWalletAsync(walletName string) FutureLoadWalletResult {
+	return c.sendCmd(btcjson.NewLoadWalletCmd(walletName))
+}
+
+// LoadWallet loads a wallet from a wallet file or directory.
+func (c *Client) LoadWallet(walletName string) (*btcjson.LoadWalletResult, error) {
+	return c.LoadWalletAsync(walletName).Receive()
+}
+
 // TODO(davec): Implement
-// backupwallet (NYI in btcwallet)
 // encryptwallet (Won't be supported by btcwallet since it's always encrypted)
 // listaddressgroupings (NYI in btcwallet)
 // listreceivedbyaccount (NYI in btcwallet)
-
-// DUMP
-// importwallet (NYI in btcwallet)
-// dumpwallet (NYI in btcwallet)
