@@ -30,36 +30,133 @@ var (
 
 // General application defined JSON errors.
 const (
-	ErrRPCMisc                RPCErrorCode = -1
+	// ErrRPCMisc indicates an exception thrown during command handling.
+	ErrRPCMisc RPCErrorCode = -1
+
+	// ErrRPCForbiddenBySafeMode indicates that server is in safe mode, and
+	// command is not allowed in safe mode.
 	ErrRPCForbiddenBySafeMode RPCErrorCode = -2
-	ErrRPCType                RPCErrorCode = -3
+
+	// ErrRPCType indicates that an unexpected type was passed as parameter.
+	ErrRPCType RPCErrorCode = -3
+
+	// ErrRPCInvalidAddressOrKey indicates an invalid address or key.
 	ErrRPCInvalidAddressOrKey RPCErrorCode = -5
-	ErrRPCOutOfMemory         RPCErrorCode = -7
-	ErrRPCInvalidParameter    RPCErrorCode = -8
-	ErrRPCDatabase            RPCErrorCode = -20
-	ErrRPCDeserialization     RPCErrorCode = -22
-	ErrRPCVerify              RPCErrorCode = -25
-	ErrRPCInWarmup            RPCErrorCode = -28
+
+	// ErrRPCOutOfMemory indicates that the server ran out of memory during
+	// operation.
+	ErrRPCOutOfMemory RPCErrorCode = -7
+
+	// ErrRPCInvalidParameter indicates an invalid, missing, or duplicate
+	// parameter.
+	ErrRPCInvalidParameter RPCErrorCode = -8
+
+	// ErrRPCDatabase indicates a database error.
+	ErrRPCDatabase RPCErrorCode = -20
+
+	// ErrRPCDeserialization indicates an error parsing or validating structure
+	// in raw format.
+	ErrRPCDeserialization RPCErrorCode = -22
+
+	// ErrRPCVerify indicates a general error during transaction or block
+	// submission.
+	ErrRPCVerify RPCErrorCode = -25
+
+	// ErrRPCVerifyRejected indicates that transaction or block was rejected by
+	// network rules.
+	ErrRPCVerifyRejected RPCErrorCode = -26
+
+	// ErrRPCVerifyAlreadyInChain indicates that submitted transaction is
+	// already in chain.
+	ErrRPCVerifyAlreadyInChain RPCErrorCode = -27
+
+	// ErrRPCInWarmup indicates that client is still warming up.
+	ErrRPCInWarmup RPCErrorCode = -28
+
+	// ErrRPCInWarmup indicates that the RPC error is deprecated.
+	ErrRPCMethodDeprecated RPCErrorCode = -32
 )
 
 // Peer-to-peer client errors.
 const (
-	ErrRPCClientNotConnected      RPCErrorCode = -9
+	// ErrRPCClientNotConnected indicates that Bitcoin is not connected.
+	ErrRPCClientNotConnected RPCErrorCode = -9
+
+	// ErrRPCClientInInitialDownload indicates that client is still downloading
+	// initial blocks.
 	ErrRPCClientInInitialDownload RPCErrorCode = -10
-	ErrRPCClientNodeNotAdded      RPCErrorCode = -24
+
+	// ErrRPCClientNodeAlreadyAdded indicates that node is already added.
+	ErrRPCClientNodeAlreadyAdded RPCErrorCode = -23
+
+	// ErrRPCClientNodeNotAdded indicates that node has not been added before.
+	ErrRPCClientNodeNotAdded RPCErrorCode = -24
+
+	// ErrRPCClientNodeNotConnected indicates that node to disconnect was not
+	// found in connected nodes.
+	ErrRPCClientNodeNotConnected RPCErrorCode = -29
+
+	// ErrRPCClientInvalidIPOrSubnet indicates an invalid IP/Subnet.
+	ErrRPCClientInvalidIPOrSubnet RPCErrorCode = -30
+
+	// ErrRPCClientP2PDisabled indicates that no valid connection manager
+	// instance was found.
+	ErrRPCClientP2PDisabled RPCErrorCode = -31
+)
+
+// Chain errors
+const (
+	// ErrRPCClientMempoolDisabled indicates that no mempool instance was
+	// found.
+	ErrRPCClientMempoolDisabled RPCErrorCode = -33
 )
 
 // Wallet JSON errors
 const (
-	ErrRPCWallet                    RPCErrorCode = -4
-	ErrRPCWalletInsufficientFunds   RPCErrorCode = -6
-	ErrRPCWalletInvalidAccountName  RPCErrorCode = -11
-	ErrRPCWalletKeypoolRanOut       RPCErrorCode = -12
-	ErrRPCWalletUnlockNeeded        RPCErrorCode = -13
+	// ErrRPCWallet indicates an unspecified problem with wallet, for
+	// example, key not found, etc.
+	ErrRPCWallet RPCErrorCode = -4
+
+	// ErrRPCWalletInsufficientFunds indicates that there are not enough
+	// funds in wallet or account.
+	ErrRPCWalletInsufficientFunds RPCErrorCode = -6
+
+	// ErrRPCWalletInvalidAccountName indicates an invalid label name.
+	ErrRPCWalletInvalidAccountName RPCErrorCode = -11
+
+	// ErrRPCWalletKeypoolRanOut indicates that the keypool ran out, and that
+	// keypoolrefill must be called first.
+	ErrRPCWalletKeypoolRanOut RPCErrorCode = -12
+
+	// ErrRPCWalletUnlockNeeded indicates that the wallet passphrase must be
+	// entered first with the walletpassphrase RPC.
+	ErrRPCWalletUnlockNeeded RPCErrorCode = -13
+
+	// ErrRPCWalletPassphraseIncorrect indicates that the wallet passphrase
+	// that was entered was incorrect.
 	ErrRPCWalletPassphraseIncorrect RPCErrorCode = -14
-	ErrRPCWalletWrongEncState       RPCErrorCode = -15
-	ErrRPCWalletEncryptionFailed    RPCErrorCode = -16
-	ErrRPCWalletAlreadyUnlocked     RPCErrorCode = -17
+
+	// ErrRPCWalletWrongEncState indicates that a command was given in wrong
+	// wallet encryption state, for example, encrypting an encrypted wallet.
+	ErrRPCWalletWrongEncState RPCErrorCode = -15
+
+	// ErrRPCWalletEncryptionFailed indicates a failure to encrypt the wallet.
+	ErrRPCWalletEncryptionFailed RPCErrorCode = -16
+
+	// ErrRPCWalletAlreadyUnlocked indicates an attempt to unlock a wallet
+	// that was already unlocked.
+	ErrRPCWalletAlreadyUnlocked RPCErrorCode = -17
+
+	// ErrRPCWalletNotFound indicates that an invalid wallet was specified,
+	// which does not exist. It can also indicate an attempt to unload a
+	// wallet that was not previously loaded.
+	//
+	// Not to be confused with ErrRPCNoWallet, which is specific to btcd.
+	ErrRPCWalletNotFound RPCErrorCode = -18
+
+	// ErrRPCWalletNotSpecified indicates that no wallet was specified, for
+	// example, when there are multiple wallets loaded.
+	ErrRPCWalletNotSpecified RPCErrorCode = -19
 )
 
 // Specific Errors related to commands.  These are the ones a user of the RPC
