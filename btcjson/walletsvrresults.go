@@ -11,6 +11,12 @@ import (
 	"github.com/btcsuite/btcd/txscript"
 )
 
+// CreateWalletResult models the result of the createwallet command.
+type CreateWalletResult struct {
+	Name    string `json:"name"`
+	Warning string `json:"warning"`
+}
+
 // embeddedAddressInfo includes all getaddressinfo output fields, excluding
 // metadata and relation to the wallet.
 //

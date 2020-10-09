@@ -63,6 +63,28 @@ func NewCreateMultisigCmd(nRequired int, keys []string) *CreateMultisigCmd {
 	}
 }
 
+// CreateWalletCmd defines the createwallet JSON-RPC command.
+type CreateWalletCmd struct {
+	WalletName         string
+	DisablePrivateKeys *bool   `jsonrpcdefault:"false"`
+	Blank              *bool   `jsonrpcdefault:"false"`
+	Passphrase         *string `jsonrpcdefault:"\"\""`
+	AvoidReuse         *bool   `jsonrpcdefault:"false"`
+}
+
+// NewCreateWalletCmd returns a new instance which can be used to issue a
+// createwallet JSON-RPC command.
+func NewCreateWalletCmd(walletName string, disablePrivateKeys *bool,
+	blank *bool, passphrase *string, avoidReuse *bool) *CreateWalletCmd {
+	return &CreateWalletCmd{
+		WalletName:         walletName,
+		DisablePrivateKeys: disablePrivateKeys,
+		Blank:              blank,
+		Passphrase:         passphrase,
+		AvoidReuse:         avoidReuse,
+	}
+}
+
 // DumpPrivKeyCmd defines the dumpprivkey JSON-RPC command.
 type DumpPrivKeyCmd struct {
 	Address string
@@ -1065,6 +1087,7 @@ func init() {
 	MustRegisterCmd("addwitnessaddress", (*AddWitnessAddressCmd)(nil), flags)
 	MustRegisterCmd("backupwallet", (*BackupWalletCmd)(nil), flags)
 	MustRegisterCmd("createmultisig", (*CreateMultisigCmd)(nil), flags)
+	MustRegisterCmd("createwallet", (*CreateWalletCmd)(nil), flags)
 	MustRegisterCmd("dumpprivkey", (*DumpPrivKeyCmd)(nil), flags)
 	MustRegisterCmd("encryptwallet", (*EncryptWalletCmd)(nil), flags)
 	MustRegisterCmd("estimatesmartfee", (*EstimateSmartFeeCmd)(nil), flags)

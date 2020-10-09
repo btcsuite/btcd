@@ -939,6 +939,91 @@ func (c *Client) CreateNewAccount(account string) error {
 	return c.CreateNewAccountAsync(account).Receive()
 }
 
+// FutureCreateWalletResult is a future promise to deliver the result of a
+// CreateWalletAsync RPC invocation (or an applicable error).
+type FutureCreateWalletResult chan *response
+
+// Receive waits for the response promised by the future and returns the
+// result of creating a new wallet.
+func (r FutureCreateWalletResult) Receive() (*btcjson.CreateWalletResult, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	var createWalletResult btcjson.CreateWalletResult
+	err = json.Unmarshal(res, &createWalletResult)
+	if err != nil {
+		return nil, err
+	}
+	return &createWalletResult, nil
+}
+
+// CreateWalletOpt defines a functional-option to be used with CreateWallet
+// method.
+type CreateWalletOpt func(*btcjson.CreateWalletCmd)
+
+// WithCreateWalletDisablePrivateKeys disables the possibility of private keys
+// to be used with a wallet created using the CreateWallet method. Using this
+// option will make the wallet watch-only.
+func WithCreateWalletDisablePrivateKeys() CreateWalletOpt {
+	return func(c *btcjson.CreateWalletCmd) {
+		c.DisablePrivateKeys = btcjson.Bool(true)
+	}
+}
+
+// WithCreateWalletBlank specifies creation of a blank wallet.
+func WithCreateWalletBlank() CreateWalletOpt {
+	return func(c *btcjson.CreateWalletCmd) {
+		c.Blank = btcjson.Bool(true)
+	}
+}
+
+// WithCreateWalletPassphrase specifies a passphrase to encrypt the wallet
+// with.
+func WithCreateWalletPassphrase(value string) CreateWalletOpt {
+	return func(c *btcjson.CreateWalletCmd) {
+		c.Passphrase = btcjson.String(value)
+	}
+}
+
+// WithCreateWalletAvoidReuse specifies keeping track of coin reuse, and
+// treat dirty and clean coins differently with privacy considerations in mind.
+func WithCreateWalletAvoidReuse() CreateWalletOpt {
+	return func(c *btcjson.CreateWalletCmd) {
+		c.AvoidReuse = btcjson.Bool(true)
+	}
+}
+
+// CreateWalletAsync returns an instance of a type that can be used to get the
+// result of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+//
+// See CreateWallet for the blocking version and more details.
+func (c *Client) CreateWalletAsync(name string, opts ...CreateWalletOpt) FutureCreateWalletResult {
+	cmd := btcjson.NewCreateWalletCmd(name, nil, nil, nil, nil)
+
+	// Apply each specified option to mutate the default command.
+	for _, opt := range opts {
+		opt(cmd)
+	}
+
+	return c.sendCmd(cmd)
+}
+
+// CreateWallet creates a new wallet account, with the possibility to use
+// private keys.
+//
+// Optional parameters can be specified using functional-options pattern. The
+// following functions are available:
+//   * WithCreateWalletDisablePrivateKeys
+//   * WithCreateWalletBlank
+//   * WithCreateWalletPassphrase
+//   * WithCreateWalletAvoidReuse
+func (c *Client) CreateWallet(name string, opts ...CreateWalletOpt) (*btcjson.CreateWalletResult, error) {
+	return c.CreateWalletAsync(name, opts...).Receive()
+}
+
 // FutureGetAddressInfoResult is a future promise to deliver the result of an
 // GetAddressInfoAsync RPC invocation (or an applicable error).
 type FutureGetAddressInfoResult chan *response
