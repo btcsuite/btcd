@@ -182,7 +182,7 @@ func (r FutureGetBlockVerboseResult) Receive() (*btcjson.GetBlockVerboseResult, 
 	if err != nil {
 		return nil, err
 	}
-	switch tx := blockResult.Txi.(type) {
+	switch tx := blockResult.TxValue.(type) {
 	case []string:
 		blockResult.Tx = tx
 	case []btcjson.TxRawResult:
