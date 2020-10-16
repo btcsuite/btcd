@@ -1157,7 +1157,7 @@ func handleGetBlock(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 			}
 			rawTxns[i] = *rawTxn
 		}
-		blockReply.RawTx = rawTxns
+		blockReply.Tx = rawTxns
 	}
 
 	return blockReply, nil
