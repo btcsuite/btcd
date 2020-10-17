@@ -1119,7 +1119,7 @@ func handleGetBlock(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 
 	params := s.cfg.ChainParams
 	blockHeader := &blk.MsgBlock().Header
-	blockReply := btcjson.GetBlockVerboseResult{
+	blockReply := btcjson.GetBlockVerboseResultReply{
 		Hash:          c.Hash,
 		Version:       blockHeader.Version,
 		VersionHex:    fmt.Sprintf("%08x", blockHeader.Version),
@@ -1144,7 +1144,7 @@ func handleGetBlock(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 			txNames[i] = tx.Hash().String()
 		}
 
-		blockReply.TxValue = txNames
+		blockReply.Tx = txNames
 	} else {
 		txns := blk.Transactions()
 		rawTxns := make([]btcjson.TxRawResult, len(txns))
@@ -1157,7 +1157,7 @@ func handleGetBlock(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 			}
 			rawTxns[i] = *rawTxn
 		}
-		blockReply.TxValue = rawTxns
+		blockReply.Tx = rawTxns
 	}
 
 	return blockReply, nil
