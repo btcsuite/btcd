@@ -182,7 +182,6 @@ func (r FutureGetBlockVerboseResult) Receive() (*btcjson.GetBlockVerboseResult, 
 	if err != nil {
 		return nil, err
 	}
-
 	return &blockResult, nil
 }
 
