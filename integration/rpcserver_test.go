@@ -13,7 +13,9 @@ import (
 	"fmt"
 	"os"
 	"runtime/debug"
+	"sort"
 	"testing"
+	"time"
 
 	"github.com/lbryio/lbcd/chaincfg"
 	"github.com/lbryio/lbcd/chaincfg/chainhash"
@@ -133,13 +135,278 @@ func testBulkClient(r *rpctest.Harness, t *testing.T) {
 			t.Fatalf("expected hash %s  to be in generated hash list", blockHash)
 		}
 	}
+}
 
+func testGetBlockStats(r *rpctest.Harness, t *testing.T) {
+	t.Parallel()
+
+	baseFeeRate := int64(10)
+	txValue := int64(50000000)
+	txQuantity := 10
+	txs := make([]*btcutil.Tx, txQuantity)
+	fees := make([]int64, txQuantity)
+	sizes := make([]int64, txQuantity)
+	feeRates := make([]int64, txQuantity)
+	var outputCount int
+
+	// Generate test sample.
+	for i := 0; i < txQuantity; i++ {
+		address, err := r.NewAddress()
+		if err != nil {
+			t.Fatalf("Unable to generate address: %v", err)
+		}
+
+		pkScript, err := txscript.PayToAddrScript(address)
+		if err != nil {
+			t.Fatalf("Unable to generate PKScript: %v", err)
+		}
+
+		// This feerate is not the actual feerate. See comment below.
+		feeRate := baseFeeRate * int64(i)
+
+		tx, err := r.CreateTransaction([]*wire.TxOut{wire.NewTxOut(txValue, pkScript)}, btcutil.Amount(feeRate), true)
+		if err != nil {
+			t.Fatalf("Unable to generate segwit transaction: %v", err)
+		}
+
+		txs[i] = btcutil.NewTx(tx)
+		sizes[i] = int64(tx.SerializeSize())
+
+		// memWallet.fundTx makes some assumptions when calculating fees.
+		// For instance, it assumes the signature script has exactly 108 bytes
+		// and it does not account for the size of the change output.
+		// This needs to be taken into account when getting the true feerate.
+		scriptSigOffset := 108 - len(tx.TxIn[0].SignatureScript)
+		changeOutputSize := tx.TxOut[len(tx.TxOut)-1].SerializeSize()
+		fees[i] = (sizes[i] + int64(scriptSigOffset) - int64(changeOutputSize)) * feeRate
+		feeRates[i] = fees[i] / sizes[i]
+
+		outputCount += len(tx.TxOut)
+	}
+
+	stats := func(slice []int64) (int64, int64, int64, int64, int64) {
+		var total, average, min, max, median int64
+		min = slice[0]
+		length := len(slice)
+		for _, item := range slice {
+			if min > item {
+				min = item
+			}
+			if max < item {
+				max = item
+			}
+			total += item
+		}
+		average = total / int64(length)
+		sort.Slice(slice, func(i, j int) bool { return slice[i] < slice[j] })
+		if length == 0 {
+			median = 0
+		} else if length%2 == 0 {
+			median = (slice[length/2-1] + slice[length/2]) / 2
+		} else {
+			median = slice[length/2]
+		}
+		return total, average, min, max, median
+	}
+
+	totalFee, avgFee, minFee, maxFee, medianFee := stats(fees)
+	totalSize, avgSize, minSize, maxSize, medianSize := stats(sizes)
+	_, avgFeeRate, minFeeRate, maxFeeRate, _ := stats(feeRates)
+
+	tests := []struct {
+		name            string
+		txs             []*btcutil.Tx
+		stats           []string
+		expectedResults map[string]interface{}
+	}{
+		{
+			name:  "empty block",
+			txs:   []*btcutil.Tx{},
+			stats: []string{},
+			expectedResults: map[string]interface{}{
+				"avgfee":              int64(0),
+				"avgfeerate":          int64(0),
+				"avgtxsize":           int64(0),
+				"feerate_percentiles": []int64{0, 0, 0, 0, 0},
+				"ins":                 int64(0),
+				"maxfee":              int64(0),
+				"maxfeerate":          int64(0),
+				"maxtxsize":           int64(0),
+				"medianfee":           int64(0),
+				"mediantxsize":        int64(0),
+				"minfee":              int64(0),
+				"mintxsize":           int64(0),
+				"outs":                int64(1),
+				"swtotal_size":        int64(0),
+				"swtotal_weight":      int64(0),
+				"swtxs":               int64(0),
+				"total_out":           int64(0),
+				"total_size":          int64(0),
+				"total_weight":        int64(0),
+				"txs":                 int64(1),
+				"utxo_increase":       int64(1),
+			},
+		},
+		{
+			name: "block with 10 transactions + coinbase",
+			txs:  txs,
+			stats: []string{"avgfee", "avgfeerate", "avgtxsize", "feerate_percentiles",
+				"ins", "maxfee", "maxfeerate", "maxtxsize", "medianfee", "mediantxsize",
+				"minfee", "minfeerate", "mintxsize", "outs", "subsidy", "swtxs",
+				"total_size", "total_weight", "totalfee", "txs", "utxo_increase"},
+			expectedResults: map[string]interface{}{
+				"avgfee":     avgFee,
+				"avgfeerate": avgFeeRate,
+				"avgtxsize":  avgSize,
+				"feerate_percentiles": []int64{feeRates[0], feeRates[2],
+					feeRates[4], feeRates[7], feeRates[8]},
+				"ins":            int64(txQuantity),
+				"maxfee":         maxFee,
+				"maxfeerate":     maxFeeRate,
+				"maxtxsize":      maxSize,
+				"medianfee":      medianFee,
+				"mediantxsize":   medianSize,
+				"minfee":         minFee,
+				"minfeerate":     minFeeRate,
+				"mintxsize":      minSize,
+				"outs":           int64(outputCount + 1), // Coinbase output also counts.
+				"subsidy":        int64(5000000000),
+				"swtotal_weight": nil, // This stat was not selected, so it should be nil.
+				"swtxs":          int64(0),
+				"total_size":     totalSize,
+				"total_weight":   totalSize * 4,
+				"totalfee":       totalFee,
+				"txs":            int64(txQuantity + 1), // Coinbase transaction also counts.
+				"utxo_increase":  int64(outputCount + 1 - txQuantity),
+				"utxo_size_inc":  nil,
+			},
+		},
+	}
+	for _, test := range tests {
+		// Submit a new block with the provided transactions.
+		block, err := r.GenerateAndSubmitBlock(test.txs, -1, time.Time{})
+		if err != nil {
+			t.Fatalf("Unable to generate block: %v from test %s", err, test.name)
+		}
+
+		blockStats, err := r.Node.GetBlockStats(block.Hash(), &test.stats)
+		if err != nil {
+			t.Fatalf("Call to `getblockstats` on test %s failed: %v", test.name, err)
+		}
+
+		if blockStats.Height != (*int64)(nil) && *blockStats.Height != int64(block.Height()) {
+			t.Fatalf("Unexpected result in test %s, stat: %v, expected: %v, got: %v", test.name, "height", block.Height(), *blockStats.Height)
+		}
+
+		for stat, value := range test.expectedResults {
+			var result interface{}
+			switch stat {
+			case "avgfee":
+				result = blockStats.AverageFee
+			case "avgfeerate":
+				result = blockStats.AverageFeeRate
+			case "avgtxsize":
+				result = blockStats.AverageTxSize
+			case "feerate_percentiles":
+				result = blockStats.FeeratePercentiles
+			case "blockhash":
+				result = blockStats.Hash
+			case "height":
+				result = blockStats.Height
+			case "ins":
+				result = blockStats.Ins
+			case "maxfee":
+				result = blockStats.MaxFee
+			case "maxfeerate":
+				result = blockStats.MaxFeeRate
+			case "maxtxsize":
+				result = blockStats.MaxTxSize
+			case "medianfee":
+				result = blockStats.MedianFee
+			case "mediantime":
+				result = blockStats.MedianTime
+			case "mediantxsize":
+				result = blockStats.MedianTxSize
+			case "minfee":
+				result = blockStats.MinFee
+			case "minfeerate":
+				result = blockStats.MinFeeRate
+			case "mintxsize":
+				result = blockStats.MinTxSize
+			case "outs":
+				result = blockStats.Outs
+			case "swtotal_size":
+				result = blockStats.SegWitTotalSize
+			case "swtotal_weight":
+				result = blockStats.SegWitTotalWeight
+			case "swtxs":
+				result = blockStats.SegWitTxs
+			case "subsidy":
+				result = blockStats.Subsidy
+			case "time":
+				result = blockStats.Time
+			case "total_out":
+				result = blockStats.TotalOut
+			case "total_size":
+				result = blockStats.TotalSize
+			case "total_weight":
+				result = blockStats.TotalWeight
+			case "totalfee":
+				result = blockStats.TotalFee
+			case "txs":
+				result = blockStats.Txs
+			case "utxo_increase":
+				result = blockStats.UTXOIncrease
+			case "utxo_size_inc":
+				result = blockStats.UTXOSizeIncrease
+			}
+
+			var equality bool
+
+			// Check for nil equality.
+			if value == nil && result == (*int64)(nil) {
+				equality = true
+				break
+			} else if result == nil || value == nil {
+				equality = false
+			}
+
+			var resultValue interface{}
+			switch v := value.(type) {
+			case int64:
+				resultValue = *result.(*int64)
+				equality = v == resultValue
+			case string:
+				resultValue = *result.(*string)
+				equality = v == resultValue
+			case []int64:
+				resultValue = *result.(*[]int64)
+				resultSlice := resultValue.([]int64)
+				equality = true
+				for i, item := range resultSlice {
+					if item != v[i] {
+						equality = false
+						break
+					}
+				}
+			}
+			if !equality {
+				if result != nil {
+					t.Fatalf("Unexpected result in test %s, stat: %v, expected: %v, got: %v", test.name, stat, value, resultValue)
+				} else {
+					t.Fatalf("Unexpected result in test %s, stat: %v, expected: %v, got: %v", test.name, stat, value, "<nil>")
+				}
+			}
+
+		}
+	}
 }
 
 var rpcTestCases = []rpctest.HarnessTestCase{
 	testGetBestBlock,
 	testGetBlockCount,
 	testGetBlockHash,
+	testGetBlockStats,
 	testBulkClient,
 }
 
@@ -151,7 +418,8 @@ func TestMain(m *testing.M) {
 	// In order to properly test scenarios on as if we were on mainnet,
 	// ensure that non-standard transactions aren't accepted into the
 	// mempool or relayed.
-	btcdCfg := []string{"--rejectnonstd"}
+	// Enable transaction index to be able to fully test GetBlockStats
+	btcdCfg := []string{"--rejectnonstd", "--txindex"}
 	primaryHarness, err = rpctest.New(
 		&chaincfg.SimNetParams, nil, btcdCfg, "",
 	)

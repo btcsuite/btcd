@@ -21,6 +21,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -151,6 +152,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"getblockcount":          handleGetBlockCount,
 	"getblockhash":           handleGetBlockHash,
 	"getblockheader":         handleGetBlockHeader,
+	"getblockstats":          handleGetBlockStats,
 	"getblocktemplate":       handleGetBlockTemplate,
 	"getcfilter":             handleGetCFilter,
 	"getcfilterheader":       handleGetCFilterHeader,
@@ -1576,6 +1578,402 @@ func handleGetChainTips(s *rpcServer, cmd interface{}, closeChan <-chan struct{}
 		results = append(results, btcjson.GetChainTipsResult(tip))
 	}
 	return results, nil
+}
+
+// handleGetBlockStats implements the getblockstats command.
+func handleGetBlockStats(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	c := cmd.(*btcjson.GetBlockStatsCmd)
+
+	// Check whether a block height or hash was provided.
+	blockHeight, ok := c.HashOrHeight.Value.(int)
+	var hash *chainhash.Hash
+	var err error
+	if ok {
+		// Block height was provided.
+		hash, err = s.cfg.Chain.BlockHashByHeight(int32(blockHeight))
+		if err != nil {
+			return nil, &btcjson.RPCError{
+				Code:    btcjson.ErrRPCOutOfRange,
+				Message: "Block number out of range",
+			}
+		}
+	} else {
+		// Block hash was provided.
+		hashString := c.HashOrHeight.Value.(string)
+		hash, err = chainhash.NewHashFromStr(hashString)
+		if err != nil {
+			return nil, rpcDecodeHexError(hashString)
+		}
+
+		// Get the block height from chain.
+		blockHeightByHash, err := s.cfg.Chain.BlockHeightByHash(hash)
+		if err != nil {
+			context := "Failed to obtain block height"
+			return nil, internalRPCError(err.Error(), context)
+		}
+		blockHeight = int(blockHeightByHash)
+	}
+
+	// Load block bytes from the database.
+	var blkBytes []byte
+	err = s.cfg.DB.View(func(dbTx database.Tx) error {
+		var err error
+		blkBytes, err = dbTx.FetchBlock(hash)
+		return err
+	})
+	if err != nil {
+		return nil, &btcjson.RPCError{
+			Code:    btcjson.ErrRPCBlockNotFound,
+			Message: "Block not found",
+		}
+	}
+
+	// Deserialize the block.
+	blk, err := btcutil.NewBlockFromBytes(blkBytes)
+	if err != nil {
+		context := "Failed to deserialize block"
+		return nil, internalRPCError(err.Error(), context)
+	}
+
+	selectedStats := c.Stats
+
+	// Create a set of selected stats to facilitate queries.
+	statsSet := make(map[string]bool)
+	for _, value := range *selectedStats {
+		statsSet[value] = true
+	}
+
+	// Return all stats if an empty array was provided.
+	allStats := len(*selectedStats) == 0
+	calcFees := statsSet["avgfee"] || statsSet["avgfeerate"] || statsSet["maxfee"] || statsSet["maxfeerate"] ||
+		statsSet["medianfee"] || statsSet["totalfee"] || statsSet["feerate_percentiles"]
+
+	if calcFees && s.cfg.TxIndex == nil {
+		return nil, &btcjson.RPCError{
+			Code: btcjson.ErrRPCNoTxInfo,
+			Message: "The transaction index must be " +
+				"enabled to obtain fee statistics " +
+				"(specify --txindex)",
+		}
+	}
+
+	txs := blk.Transactions()
+	txCount := len(txs)
+	var inputCount, outputCount int
+	var totalOutputValue int64
+
+	// Create a map of transaction statistics.
+	txStats := make([]map[string]interface{}, txCount)
+	for i, tx := range txs {
+		size := tx.MsgTx().SerializeSize()
+		witnessSize := size - tx.MsgTx().SerializeSizeStripped()
+		weight := int64(tx.MsgTx().SerializeSizeStripped()*4 + witnessSize)
+
+		var fee, feeRate int64
+		if (calcFees || allStats) && s.cfg.TxIndex != nil && !blockchain.IsCoinBaseTx(tx.MsgTx()) {
+			fee, err = calculateFee(tx, s.cfg.TxIndex, s.cfg.DB)
+			if err != nil {
+				context := "Failed to calculate fees"
+				return nil, internalRPCError(err.Error(), context)
+			}
+			if weight != 0 {
+				feeRate = fee * 4 / weight
+			}
+		}
+		segwit := tx.HasWitness()
+		txStats[i] = map[string]interface{}{"tx": tx, "fee": fee, "size": int64(size),
+			"feeRate": feeRate, "weight": weight, "segwit": segwit}
+		inputCount += len(tx.MsgTx().TxIn)
+		outputCount += len(tx.MsgTx().TxOut)
+
+		// Coinbase is excluded from the total output.
+		if !blockchain.IsCoinBase(tx) {
+			for _, txOut := range tx.MsgTx().TxOut {
+				totalOutputValue += txOut.Value
+			}
+		}
+	}
+
+	var totalFees, minFee, maxFee, minFeeRate, maxFeeRate, segwitCount,
+		segwitWeight, totalWeight, totalSize, minSize, maxSize, segwitSize int64
+	if txCount > 1 {
+		minFee = txStats[1]["fee"].(int64)
+		minFeeRate = txStats[1]["feeRate"].(int64)
+	}
+	for i := 0; i < len(txStats); i++ {
+		var fee, feeRate int64
+		tx := txStats[i]["tx"].(*btcutil.Tx)
+		if !blockchain.IsCoinBaseTx(tx.MsgTx()) {
+			// Fee statistics.
+			fee = txStats[i]["fee"].(int64)
+			feeRate = txStats[i]["feeRate"].(int64)
+			if minFee > fee {
+				minFee = fee
+			}
+			if maxFee < fee {
+				maxFee = fee
+			}
+			if minFeeRate > feeRate {
+				minFeeRate = feeRate
+			}
+			if maxFeeRate < feeRate {
+				maxFeeRate = feeRate
+			}
+			totalFees += txStats[i]["fee"].(int64)
+
+			// Segwit statistics.
+			if txStats[i]["segwit"].(bool) {
+				segwitCount++
+				segwitSize += txStats[i]["size"].(int64)
+				segwitWeight += txStats[i]["weight"].(int64)
+			}
+
+			// Size statistics.
+			size := txStats[i]["size"].(int64)
+			if minSize == 0 {
+				minSize = size
+			}
+			if maxSize < size {
+				maxSize = size
+			} else if minSize > size {
+				minSize = size
+			}
+			totalSize += txStats[i]["size"].(int64)
+
+			totalWeight += txStats[i]["weight"].(int64)
+		}
+	}
+
+	var avgFee, avgFeeRate, avgSize int64
+	if txCount > 1 {
+		avgFee = totalFees / int64(txCount-1)
+	}
+	if totalWeight != 0 {
+		avgFeeRate = totalFees * 4 / totalWeight
+	}
+	if txCount > 1 {
+		avgSize = totalSize / int64(txCount-1)
+	}
+
+	subsidy := blockchain.CalcBlockSubsidy(int32(blockHeight), s.cfg.ChainParams)
+
+	medianStat := func(stat string) int64 {
+		size := len(txStats) - 1
+		if size == 0 {
+			return 0
+		}
+		statArray := make([]int64, size)
+		// Start with the second element to ignore entry associated with coinbase.
+		for i, stats := range txStats[1:] {
+			statArray[i] = stats[stat].(int64)
+		}
+		sort.Slice(statArray, func(i, j int) bool {
+			return statArray[i] < statArray[j]
+		})
+		if size%2 == 0 {
+			return (statArray[size/2-1] + statArray[size/2]) / 2
+		}
+		return statArray[size/2]
+	}
+
+	var medianFee int64
+	if totalFees > 0 {
+		medianFee = medianStat("fee")
+	} else {
+		medianFee = 0
+	}
+	medianSize := medianStat("size")
+
+	// Calculate feerate percentiles.
+	var feeratePercentiles []int64
+	if allStats || calcFees {
+
+		// Sort by feerate.
+		sort.Slice(txStats, func(i, j int) bool {
+			return txStats[i]["feeRate"].(int64) < txStats[j]["feeRate"].(int64)
+		})
+		totalWeight := float64(totalWeight)
+
+		// Find 10th, 25th, 50th, 75th and 90th percentile weight units.
+		weights := []float64{
+			totalWeight / 10, totalWeight / 4, totalWeight / 2,
+			(totalWeight * 3) / 4, (totalWeight * 9) / 10}
+		var cumulativeWeight int64
+		feeratePercentiles = make([]int64, len(weights))
+		nextPercentileIndex := 0
+		for i := 0; i < len(txStats); i++ {
+			cumulativeWeight += txStats[i]["weight"].(int64)
+			for nextPercentileIndex < len(weights) && float64(cumulativeWeight) >= weights[nextPercentileIndex] {
+				feeratePercentiles[nextPercentileIndex] = txStats[i]["feeRate"].(int64)
+				nextPercentileIndex++
+			}
+		}
+
+		// Fill any remaining percentiles with the last value.
+		for i := nextPercentileIndex; i < len(weights); i++ {
+			feeratePercentiles[i] = txStats[len(txStats)-1]["feeRate"].(int64)
+		}
+	}
+
+	var blockHash string
+	if allStats || statsSet["blockhash"] {
+		blockHash = blk.Hash().String()
+	}
+
+	medianTime, err := medianBlockTime(blk.Hash(), s.cfg.Chain)
+	if err != nil {
+		context := "Failed to obtain block median time"
+		return nil, internalRPCError(err.Error(), context)
+	}
+
+	resultMap := map[string]int64{
+		"avgfee":         avgFee,
+		"avgfeerate":     avgFeeRate,
+		"avgtxsize":      avgSize,
+		"height":         int64(blockHeight),
+		"ins":            int64(inputCount - 1), // Coinbase input is not included.
+		"maxfee":         maxFee,
+		"maxfeerate":     maxFeeRate,
+		"maxtxsize":      maxSize,
+		"medianfee":      medianFee,
+		"mediantime":     medianTime.Unix(),
+		"mediantxsize":   medianSize,
+		"minfee":         minFee,
+		"minfeerate":     minFeeRate,
+		"mintxsize":      minSize,
+		"outs":           int64(outputCount),
+		"swtotal_size":   segwitSize,
+		"swtotal_weight": segwitWeight,
+		"swtxs":          segwitCount,
+		"subsidy":        subsidy,
+		"time":           blk.MsgBlock().Header.Timestamp.Unix(),
+		"total_out":      totalOutputValue,
+		"total_size":     totalSize,
+		"total_weight":   totalWeight,
+		"totalfee":       totalFees,
+		"txs":            int64(len(txs)),
+		"utxo_increase":  int64(outputCount - (inputCount - 1)),
+	}
+
+	// This function determines whether a statistic goes into the
+	// final result, except for blockhash and feerate_percentiles
+	// which are handled separately.
+	resultFilter := func(stat string) *int64 {
+		if allStats && s.cfg.TxIndex == nil {
+			// There are no fee statistics to send.
+			excludedStats := []string{"avgfee", "avgfeerate", "maxfee", "maxfeerate", "medianfee", "minfee", "minfeerate"}
+			for _, excluded := range excludedStats {
+				if stat == excluded {
+					return nil
+				}
+			}
+		}
+		if allStats || statsSet[stat] {
+			if value, ok := resultMap[stat]; ok {
+				return &value
+			}
+		}
+		return nil
+	}
+
+	result := &btcjson.GetBlockStatsResult{
+		AverageFee:         resultFilter("avgfee"),
+		AverageFeeRate:     resultFilter("avgfeerate"),
+		AverageTxSize:      resultFilter("avgtxsize"),
+		FeeratePercentiles: &feeratePercentiles,
+		Hash:               &blockHash,
+		Height:             resultFilter("height"),
+		Ins:                resultFilter("ins"),
+		MaxFee:             resultFilter("maxfee"),
+		MaxFeeRate:         resultFilter("maxfeerate"),
+		MaxTxSize:          resultFilter("maxtxsize"),
+		MedianFee:          resultFilter("medianfee"),
+		MedianTime:         resultFilter("mediantime"),
+		MedianTxSize:       resultFilter("mediantxsize"),
+		MinFee:             resultFilter("minfee"),
+		MinFeeRate:         resultFilter("minfeerate"),
+		MinTxSize:          resultFilter("mintxsize"),
+		Outs:               resultFilter("outs"),
+		SegWitTotalSize:    resultFilter("swtotal_size"),
+		SegWitTotalWeight:  resultFilter("swtotal_weight"),
+		SegWitTxs:          resultFilter("swtxs"),
+		Subsidy:            resultFilter("subsidy"),
+		Time:               resultFilter("time"),
+		TotalOut:           resultFilter("total_out"),
+		TotalSize:          resultFilter("total_size"),
+		TotalWeight:        resultFilter("total_weight"),
+		TotalFee:           resultFilter("totalfee"),
+		Txs:                resultFilter("txs"),
+		UTXOIncrease:       resultFilter("utxo_increase"),
+		UTXOSizeIncrease:   resultFilter("utxo_size_inc"),
+	}
+	return result, nil
+}
+
+// calculateFee returns the fee of a transaction.
+func calculateFee(tx *btcutil.Tx, txIndex *indexers.TxIndex, db database.DB) (int64, error) {
+	var inValue, outValue int64
+	for _, input := range tx.MsgTx().TxIn {
+		prevTxHash := input.PreviousOutPoint.Hash
+		// Look up the location of the previous transaction in the index.
+		blockRegion, err := txIndex.TxBlockRegion(&prevTxHash)
+		if err != nil {
+			context := "Failed to retrieve transaction location"
+			return 0, internalRPCError(err.Error(), context)
+		}
+		if blockRegion == nil {
+			return 0, rpcNoTxInfoError(&prevTxHash)
+		}
+
+		// Load the raw transaction bytes from the database.
+		var txBytes []byte
+		err = db.View(func(dbTx database.Tx) error {
+			var err error
+			txBytes, err = dbTx.FetchBlockRegion(blockRegion)
+			return err
+		})
+		if err != nil {
+			return 0, rpcNoTxInfoError(&prevTxHash)
+		}
+
+		var msgTx wire.MsgTx
+		err = msgTx.Deserialize(bytes.NewReader(txBytes))
+		if err != nil {
+			context := "Failed to deserialize transaction"
+			return 0, internalRPCError(err.Error(), context)
+		}
+		prevOutValue := msgTx.TxOut[input.PreviousOutPoint.Index].Value
+		inValue += prevOutValue
+	}
+	for _, output := range tx.MsgTx().TxOut {
+		outValue += output.Value
+	}
+	fee := inValue - outValue
+	return fee, nil
+}
+
+// medianBlockTime returns the median time of a block and its 10 previous blocks
+// as per BIP113.
+func medianBlockTime(blockHash *chainhash.Hash, chain *blockchain.BlockChain) (*time.Time, error) {
+	blockTimes := make([]time.Time, 0)
+	currentHash := blockHash
+	for i := 0; i < 11; i++ {
+		header, err := chain.HeaderByHash(currentHash)
+		if err != nil {
+			return nil, err
+		}
+		blockTimes = append(blockTimes, header.Timestamp)
+		genesisPrevBlock, _ := chainhash.NewHashFromStr("0000000000000000000000000000000000000000000000000000000000000000")
+		if header.PrevBlock.IsEqual(genesisPrevBlock) {
+			// This is the genesis block so there's no need to iterate further.
+			break
+		}
+		currentHash = &header.PrevBlock
+	}
+	sort.Slice(blockTimes, func(i, j int) bool {
+		return blockTimes[i].Before(blockTimes[j])
+	})
+	return &blockTimes[len(blockTimes)/2], nil
 }
 
 // encodeTemplateID encodes the passed details into an ID that can be used to

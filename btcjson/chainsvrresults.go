@@ -35,35 +35,37 @@ type GetBlockHeaderVerboseResult struct {
 }
 
 // GetBlockStatsResult models the data from the getblockstats command.
+// Pointers are used instead of values to allow for optional fields.
 type GetBlockStatsResult struct {
-	AverageFee         int64   `json:"avgfee"`
-	AverageFeeRate     int64   `json:"avgfeerate"`
-	AverageTxSize      int64   `json:"avgtxsize"`
-	FeeratePercentiles []int64 `json:"feerate_percentiles"`
-	Hash               string  `json:"blockhash"`
-	Height             int64   `json:"height"`
-	Ins                int64   `json:"ins"`
-	MaxFee             int64   `json:"maxfee"`
-	MaxFeeRate         int64   `json:"maxfeerate"`
-	MaxTxSize          int64   `json:"maxtxsize"`
-	MedianFee          int64   `json:"medianfee"`
-	MedianTime         int64   `json:"mediantime"`
-	MedianTxSize       int64   `json:"mediantxsize"`
-	MinFee             int64   `json:"minfee"`
-	MinFeeRate         int64   `json:"minfeerate"`
-	MinTxSize          int64   `json:"mintxsize"`
-	Outs               int64   `json:"outs"`
-	SegWitTotalSize    int64   `json:"swtotal_size"`
-	SegWitTotalWeight  int64   `json:"swtotal_weight"`
-	SegWitTxs          int64   `json:"swtxs"`
-	Subsidy            int64   `json:"subsidy"`
-	Time               int64   `json:"time"`
-	TotalOut           int64   `json:"total_out"`
-	TotalSize          int64   `json:"total_size"`
-	TotalWeight        int64   `json:"total_weight"`
-	Txs                int64   `json:"txs"`
-	UTXOIncrease       int64   `json:"utxo_increase"`
-	UTXOSizeIncrease   int64   `json:"utxo_size_inc"`
+	AverageFee         *int64   `json:"avgfee,omitempty"`
+	AverageFeeRate     *int64   `json:"avgfeerate,omitempty"`
+	AverageTxSize      *int64   `json:"avgtxsize,omitempty"`
+	FeeratePercentiles *[]int64 `json:"feerate_percentiles,omitempty"`
+	Hash               *string  `json:"blockhash,omitempty"`
+	Height             *int64   `json:"height,omitempty"`
+	Ins                *int64   `json:"ins,omitempty"`
+	MaxFee             *int64   `json:"maxfee,omitempty"`
+	MaxFeeRate         *int64   `json:"maxfeerate,omitempty"`
+	MaxTxSize          *int64   `json:"maxtxsize,omitempty"`
+	MedianFee          *int64   `json:"medianfee,omitempty"`
+	MedianTime         *int64   `json:"mediantime,omitempty"`
+	MedianTxSize       *int64   `json:"mediantxsize,omitempty"`
+	MinFee             *int64   `json:"minfee,omitempty"`
+	MinFeeRate         *int64   `json:"minfeerate,omitempty"`
+	MinTxSize          *int64   `json:"mintxsize,omitempty"`
+	Outs               *int64   `json:"outs,omitempty"`
+	SegWitTotalSize    *int64   `json:"swtotal_size,omitempty"`
+	SegWitTotalWeight  *int64   `json:"swtotal_weight,omitempty"`
+	SegWitTxs          *int64   `json:"swtxs,omitempty"`
+	Subsidy            *int64   `json:"subsidy,omitempty"`
+	Time               *int64   `json:"time,omitempty"`
+	TotalOut           *int64   `json:"total_out,omitempty"`
+	TotalSize          *int64   `json:"total_size,omitempty"`
+	TotalWeight        *int64   `json:"total_weight,omitempty"`
+	TotalFee           *int64   `json:"totalfee,omitempty"`
+	Txs                *int64   `json:"txs,omitempty"`
+	UTXOIncrease       *int64   `json:"utxo_increase,omitempty"`
+	UTXOSizeIncrease   *int64   `json:"utxo_size_inc,omitempty"`
 }
 
 type GetBlockVerboseResultBase struct {
