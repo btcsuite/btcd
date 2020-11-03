@@ -262,8 +262,8 @@ func (c *Client) ListUnspent() ([]btcjson.ListUnspentResult, error) {
 }
 
 // ListUnspentMin returns all unspent transaction outputs known to a wallet,
-// using the specified number of minimum conformations and default number of
-// maximum confiramtions (999999) as a filter.
+// using the specified number of minimum confirmations and default number of
+// maximum confirmations (999999) as a filter.
 func (c *Client) ListUnspentMin(minConf int) ([]btcjson.ListUnspentResult, error) {
 	return c.ListUnspentMinAsync(minConf).Receive()
 }
@@ -374,7 +374,7 @@ func (c *Client) ListSinceBlockMinConfWatchOnlyAsync(blockHash *chainhash.Hash, 
 // specified block hash, or all transactions if it is nil, using the specified
 // number of minimum confirmations as a filter.
 //
-// See ListSinceBlock to use the default minimum number of confirmations and default watch only paremeter.
+// See ListSinceBlock to use the default minimum number of confirmations and default watch only parameter.
 func (c *Client) ListSinceBlockMinConfWatchOnly(blockHash *chainhash.Hash, minConfirms int, watchOnly bool) (*btcjson.ListSinceBlockResult, error) {
 	return c.ListSinceBlockMinConfWatchOnlyAsync(blockHash, minConfirms, watchOnly).Receive()
 }
@@ -572,7 +572,7 @@ func (c *Client) SendToAddressCommentAsync(address btcutil.Address,
 // SendToAddressComment sends the passed amount to the given address and stores
 // the provided comment and comment to in the wallet.  The comment parameter is
 // intended to be used for the purpose of the transaction while the commentTo
-// parameter is indended to be used for who the transaction is being sent to.
+// parameter is intended to be used for who the transaction is being sent to.
 //
 // The comments are not part of the transaction and are only internal
 // to the wallet.
@@ -678,7 +678,7 @@ func (c *Client) SendFromCommentAsync(fromAccount string,
 // SendFromComment sends the passed amount to the given address using the
 // provided account as a source of funds and stores the provided comment and
 // comment to in the wallet.  The comment parameter is intended to be used for
-// the purpose of the transaction while the commentTo parameter is indended to
+// the purpose of the transaction while the commentTo parameter is intended to
 // be used for who the transaction is being sent to.  Only funds with the passed
 // number of minimum confirmations will be used.
 //
