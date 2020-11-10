@@ -177,6 +177,7 @@ func (b *BlockChain) ProcessBlock(block *btcutil.Block, flags BehaviorFlags) (bo
 	// used to eat memory, and ensuring expected (versus claimed) proof of
 	// work requirements since the previous checkpoint are met.
 	blockHeader := &block.MsgBlock().Header
+
 	checkpointNode, err := b.findPreviousCheckpoint()
 	if err != nil {
 		return false, false, err
@@ -237,6 +238,9 @@ func (b *BlockChain) ProcessBlock(block *btcutil.Block, flags BehaviorFlags) (bo
 	if err != nil {
 		return false, false, err
 	}
+
+	fmt.Printf("XXXXX BlockHash: %v PrevBlock: %v Timestamp: %v\n",
+		blockHash, blockHeader.PrevBlock, blockHeader.Timestamp)
 
 	log.Debugf("Accepted block %v", blockHash)
 
