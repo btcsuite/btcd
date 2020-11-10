@@ -7,6 +7,7 @@ package rpctest
 import (
 	"fmt"
 	"io/ioutil"
+	"math/rand"
 	"net"
 	"os"
 	"path/filepath"
@@ -39,16 +40,6 @@ const (
 var (
 	// current number of active test nodes.
 	numTestInstances = 0
-
-	// processID is the process ID of the current running process.  It is
-	// used to calculate ports based upon it when launching an rpc
-	// harnesses.  The intent is to allow multiple process to run in
-	// parallel without port collisions.
-	//
-	// It should be noted however that there is still some small probability
-	// that there will be port collisions either due to other processes
-	// running or simply due to the stars aligning on the process IDs.
-	processID = os.Getpid()
 
 	// testInstances is a private package-level slice used to keep track of
 	// all active test harnesses. This global can be used to perform
@@ -477,13 +468,14 @@ func (h *Harness) GenerateAndSubmitBlockWithCustomCoinbaseOutputs(
 // addresses designated for the current rpc test. If there haven't been any
 // test instances created, the default ports are used. Otherwise, in order to
 // support multiple test nodes running at once, the p2p and rpc port are
-// incremented after each initialization.
+// picked at random between {min/max}PeerPort and {min/max}RPCPort respectively.
 func generateListeningAddresses() (string, string) {
 	localhost := "127.0.0.1"
 
+	rand.Seed(time.Now().UnixNano())
+
 	portString := func(minPort, maxPort int) string {
-		port := minPort + numTestInstances + ((20 * processID) %
-			(maxPort - minPort))
+		port := minPort + rand.Intn(maxPort-minPort)
 		return strconv.Itoa(port)
 	}
 
