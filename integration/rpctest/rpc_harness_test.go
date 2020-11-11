@@ -105,7 +105,7 @@ func assertConnectedTo(t *testing.T, nodeA *Harness, nodeB *Harness) {
 
 func testConnectNode(r *Harness, t *testing.T) {
 	// Create a fresh test harness.
-	harness, err := New(&chaincfg.SimNetParams, nil, nil)
+	harness, err := New(&chaincfg.SimNetParams, nil, nil, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -153,7 +153,7 @@ func testActiveHarnesses(r *Harness, t *testing.T) {
 	numInitialHarnesses := len(ActiveHarnesses())
 
 	// Create a single test harness.
-	harness1, err := New(&chaincfg.SimNetParams, nil, nil)
+	harness1, err := New(&chaincfg.SimNetParams, nil, nil, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -181,7 +181,7 @@ func testJoinMempools(r *Harness, t *testing.T) {
 	// Create a local test harness with only the genesis block.  The nodes
 	// will be synced below so the same transaction can be sent to both
 	// nodes without it being an orphan.
-	harness, err := New(&chaincfg.SimNetParams, nil, nil)
+	harness, err := New(&chaincfg.SimNetParams, nil, nil, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -281,7 +281,7 @@ func testJoinMempools(r *Harness, t *testing.T) {
 func testJoinBlocks(r *Harness, t *testing.T) {
 	// Create a second harness with only the genesis block so it is behind
 	// the main harness.
-	harness, err := New(&chaincfg.SimNetParams, nil, nil)
+	harness, err := New(&chaincfg.SimNetParams, nil, nil, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -469,7 +469,7 @@ func testGenerateAndSubmitBlockWithCustomCoinbaseOutputs(r *Harness,
 func testMemWalletReorg(r *Harness, t *testing.T) {
 	// Create a fresh harness, we'll be using the main harness to force a
 	// re-org on this local harness.
-	harness, err := New(&chaincfg.SimNetParams, nil, nil)
+	harness, err := New(&chaincfg.SimNetParams, nil, nil, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -566,7 +566,7 @@ const (
 
 func TestMain(m *testing.M) {
 	var err error
-	mainHarness, err = New(&chaincfg.SimNetParams, nil, nil)
+	mainHarness, err = New(&chaincfg.SimNetParams, nil, nil, "")
 	if err != nil {
 		fmt.Println("unable to create main harness: ", err)
 		os.Exit(1)

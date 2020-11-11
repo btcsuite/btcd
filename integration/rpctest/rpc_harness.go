@@ -94,11 +94,12 @@ type Harness struct {
 // New creates and initializes new instance of the rpc test harness.
 // Optionally, websocket handlers and a specified configuration may be passed.
 // In the case that a nil config is passed, a default configuration will be
-// used.
+// used. If a custom btcd executable is specified, it will be used to start the
+// harness node. Otherwise a new binary is built on demand.
 //
 // NOTE: This function is safe for concurrent access.
 func New(activeNet *chaincfg.Params, handlers *rpcclient.NotificationHandlers,
-	extraArgs []string) (*Harness, error) {
+	extraArgs []string, customExePath string) (*Harness, error) {
 
 	harnessStateMtx.Lock()
 	defer harnessStateMtx.Unlock()
@@ -144,7 +145,9 @@ func New(activeNet *chaincfg.Params, handlers *rpcclient.NotificationHandlers,
 	miningAddr := fmt.Sprintf("--miningaddr=%s", wallet.coinbaseAddr)
 	extraArgs = append(extraArgs, miningAddr)
 
-	config, err := newConfig("rpctest", certFile, keyFile, extraArgs)
+	config, err := newConfig(
+		"rpctest", certFile, keyFile, extraArgs, customExePath,
+	)
 	if err != nil {
 		return nil, err
 	}

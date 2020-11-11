@@ -41,10 +41,18 @@ type nodeConfig struct {
 }
 
 // newConfig returns a newConfig with all default values.
-func newConfig(prefix, certFile, keyFile string, extra []string) (*nodeConfig, error) {
-	btcdPath, err := btcdExecutablePath()
-	if err != nil {
-		btcdPath = "btcd"
+func newConfig(prefix, certFile, keyFile string, extra []string,
+	customExePath string) (*nodeConfig, error) {
+
+	var btcdPath string
+	if customExePath != "" {
+		btcdPath = customExePath
+	} else {
+		var err error
+		btcdPath, err = btcdExecutablePath()
+		if err != nil {
+			btcdPath = "btcd"
+		}
 	}
 
 	a := &nodeConfig{
