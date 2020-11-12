@@ -11,6 +11,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"reflect"
 
 	"github.com/btcsuite/btcd/wire"
 )
@@ -819,11 +820,60 @@ func NewSearchRawTransactionsCmd(address string, verbose, skip, count *int, vinE
 	}
 }
 
+// AllowHighFeesOrMaxFeeRate defines a type that can either be the legacy
+// allowhighfees boolean field or the new maxfeerate int field.
+type AllowHighFeesOrMaxFeeRate struct {
+	Value interface{}
+}
+
+// String returns the string representation of this struct, used for printing
+// the marshaled default value in the help text.
+func (a AllowHighFeesOrMaxFeeRate) String() string {
+	b, _ := a.MarshalJSON()
+	return string(b)
+}
+
+// MarshalJSON implements the json.Marshaler interface
+func (a AllowHighFeesOrMaxFeeRate) MarshalJSON() ([]byte, error) {
+	// The default value is false which only works with the legacy versions.
+	if a.Value == nil ||
+		(reflect.ValueOf(a.Value).Kind() == reflect.Ptr &&
+			reflect.ValueOf(a.Value).IsNil()) {
+
+		return json.Marshal(false)
+	}
+
+	return json.Marshal(a.Value)
+}
+
+// UnmarshalJSON implements the json.Unmarshaler interface
+func (a *AllowHighFeesOrMaxFeeRate) UnmarshalJSON(data []byte) error {
+	if len(data) == 0 {
+		return nil
+	}
+
+	var unmarshalled interface{}
+	if err := json.Unmarshal(data, &unmarshalled); err != nil {
+		return err
+	}
+
+	switch v := unmarshalled.(type) {
+	case bool:
+		a.Value = Bool(v)
+	case float64:
+		a.Value = Int32(int32(v))
+	default:
+		return fmt.Errorf("invalid allowhighfees or maxfeerate value: "+
+			"%v", unmarshalled)
+	}
+
+	return nil
+}
+
 // SendRawTransactionCmd defines the sendrawtransaction JSON-RPC command.
 type SendRawTransactionCmd struct {
-	HexTx         string
-	AllowHighFees *bool `jsonrpcdefault:"false"`
-	MaxFeeRate    *int32
+	HexTx      string
+	FeeSetting *AllowHighFeesOrMaxFeeRate `jsonrpcdefault:"false"`
 }
 
 // NewSendRawTransactionCmd returns a new instance which can be used to issue a
@@ -833,8 +883,10 @@ type SendRawTransactionCmd struct {
 // for optional parameters will use the default value.
 func NewSendRawTransactionCmd(hexTx string, allowHighFees *bool) *SendRawTransactionCmd {
 	return &SendRawTransactionCmd{
-		HexTx:         hexTx,
-		AllowHighFees: allowHighFees,
+		HexTx: hexTx,
+		FeeSetting: &AllowHighFeesOrMaxFeeRate{
+			Value: allowHighFees,
+		},
 	}
 }
 
@@ -844,8 +896,10 @@ func NewSendRawTransactionCmd(hexTx string, allowHighFees *bool) *SendRawTransac
 // A 0 maxFeeRate indicates that a maximum fee rate won't be enforced.
 func NewBitcoindSendRawTransactionCmd(hexTx string, maxFeeRate int32) *SendRawTransactionCmd {
 	return &SendRawTransactionCmd{
-		HexTx:      hexTx,
-		MaxFeeRate: &maxFeeRate,
+		HexTx: hexTx,
+		FeeSetting: &AllowHighFeesOrMaxFeeRate{
+			Value: &maxFeeRate,
+		},
 	}
 }
 
