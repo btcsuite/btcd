@@ -5,6 +5,7 @@ import (
 	"github.com/btcsuite/btcutil"
 	"testing"
 )
+
 // TestReorganization loads a set of test blocks which force a chain
 // reorganization to test the block chain handling code.
 // The test blocks were originally from a post on the bitcoin talk forums:
