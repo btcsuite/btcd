@@ -29,8 +29,19 @@ type Signature struct {
 }
 
 var (
+
+	zero = big.NewInt(0)
+
 	// Used in RFC6979 implementation when testing the nonce for correctness
 	one = big.NewInt(1)
+
+	two = big.NewInt(2)
+
+	three = big.NewInt(3)
+
+	four = big.NewInt(4)
+
+	seven = big.NewInt(7)
 
 	// oneInitializer is used to fill a byte slice with byte 0x01.  It is provided
 	// here to avoid the need to create it multiple times.
