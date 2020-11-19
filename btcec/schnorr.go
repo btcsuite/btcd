@@ -5,26 +5,72 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-
 	"math/big"
 )
 
 const (
 	schnorrPublicKeyLen = 32
-	schnorrMessageLen = 32
+	schnorrMessageLen   = 32
 	schnorrSignatureLen = 64
-	schnorrAuxLen = 32
+	schnorrAuxLen       = 32
 
-	// sha256("BIP0340/challenge")
+	// BIP340Challenge is sha256("BIP0340/challenge")
 	BIP340Challenge = "7bb52d7a9fef58323eb1bf7a407db382d2f3f2d81bb1224f49fe518f6d48d37ctag"
 
-	// sha256("BIP0340/aux")
+	// BIP340Aux is sha256("BIP0340/aux")
 	BIP340Aux = "f1ef4e5ec063cada6d94cafa9d987ea069265839ecc11f972d77a52ed8c1cc90tag"
 
-	// sha256("BIP0340/nonce")
+	// BIP340Nonce is sha256("BIP0340/nonce")
 	BIP340Nonce = "07497734a79bcb355b9b8c7d034f121cf434d73ef72dda19870061fb52bfeb2ftag"
 )
 
+// SchnorrPublicKey is the x-coordinate of a public key that can be used with schnorr.
+type SchnorrPublicKey struct{ x *big.Int }
+
+// Serialize returns x(P) in a 32 byte slice.
+func (p *SchnorrPublicKey) Serialize() []byte {
+	return p.x.Bytes()
+}
+
+// ParseSchnorrPubKey parses a public key, verifies it is valid, and returns the schnorr key.
+func ParseSchnorrPubKey(pubKeyStr []byte) (*SchnorrPublicKey, error) {
+	if len(pubKeyStr) == 0 {
+		return nil, errors.New("pubkey string is empty")
+	}
+
+	switch len(pubKeyStr) {
+	// If key is 33 bytes, check if it using the compressed encoding.
+	// If so, then it is safe to drop the first byte.
+	case PubKeyBytesLenCompressed:
+		format := pubKeyStr[0]
+		format &= ^byte(0x1)
+
+		if format != pubkeyCompressed {
+			return nil, fmt.Errorf("invalid magic in compressed "+
+				"pubkey string: %d", pubKeyStr[0])
+		}
+
+		// Drop first byte.
+		pubKeyStr = pubKeyStr[1:]
+	case schnorrPublicKeyLen:
+	default:
+		return nil, fmt.Errorf("pubkey length invalid : got %d want %d", len(pubKeyStr), schnorrPublicKeyLen)
+	}
+
+	x := new(big.Int)
+	x.SetBytes(pubKeyStr)
+
+	Px, Py, err := liftX(pubKeyStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid pubkey")
+	}
+
+	if !S256().IsOnCurve(Px, Py) {
+		return nil, fmt.Errorf("pubkey is not on curve")
+	}
+
+	return &SchnorrPublicKey{x: x}, nil
+}
 
 // SchnorrSign signs a message using the schnorr signature algorithm scheme outlined in BIP340.
 // Message must be 32 bytes.
@@ -35,7 +81,7 @@ func (p *PrivateKey) SchnorrSign(message, aux []byte) ([64]byte, error) {
 
 // SchnorrVerify verifies a schnorr signature.
 // Message, public key, and signature must be 32 bytes.
-func SchnorrVerify(msg, publicKey, signature []byte) (bool, error){
+func SchnorrVerify(msg, publicKey, signature []byte) (bool, error) {
 	return schnorrVerify(msg, publicKey, signature)
 }
 
@@ -51,7 +97,7 @@ func hasEvenY(Py *big.Int) bool {
 }
 
 // schnorrSign implements BIP340's default signing algorithm.
-func schnorrSign(privKey, msg []byte, a []byte) (sig [64]byte, err error){
+func schnorrSign(privKey, msg []byte, a []byte) (sig [64]byte, err error) {
 	// Message must be 32 bytes.
 	if l := len(msg); l != schnorrMessageLen {
 		return sig, fmt.Errorf("message is not 32 bytes : got %d, want %d", l, schnorrMessageLen)
@@ -128,8 +174,8 @@ func schnorrSign(privKey, msg []byte, a []byte) (sig [64]byte, err error){
 		copy(m[:32], Rx.Bytes())
 		copy(m[32:64], Px.Bytes())
 		copy(m[64:], msg)
-		e.SetBytes(taggedHash(BIP340Challenge,m))
-		e.Mod(e,n)
+		e.SetBytes(taggedHash(BIP340Challenge, m))
+		e.Mod(e, n)
 	}
 
 	// (k + ed) mod n
@@ -161,9 +207,9 @@ func liftX(key []byte) (*big.Int, *big.Int, error) {
 
 	// c = x^3 + 7 mod P.
 	c := new(big.Int)
-	c.Exp(x,three, p)
+	c.Exp(x, three, p)
 	c.Add(c, seven)
-	c.Mod(c,p)
+	c.Mod(c, p)
 
 	// y = c^((p+1)/4) mod P.
 	y := new(big.Int)
@@ -178,7 +224,7 @@ func liftX(key []byte) (*big.Int, *big.Int, error) {
 	return x, y, nil
 }
 
-func schnorrVerify(msg, publicKey, signature []byte) (bool, error){
+func schnorrVerify(msg, publicKey, signature []byte) (bool, error) {
 	if l := len(msg); l != schnorrMessageLen {
 		return false, fmt.Errorf("message is not 32 bytes : got %d, want %d", l, schnorrMessageLen)
 	}
@@ -218,7 +264,7 @@ func schnorrVerify(msg, publicKey, signature []byte) (bool, error){
 	s.SetBytes(signature[32:])
 
 	// Fail if s >= n
-	if s.Cmp(n) >= 0  {
+	if s.Cmp(n) >= 0 {
 		return false, nil
 	}
 
@@ -264,13 +310,13 @@ func schnorrVerify(msg, publicKey, signature []byte) (bool, error){
 	return true, nil
 }
 
-func taggedHash(tag string, msg []byte)  []byte {
+func taggedHash(tag string, msg []byte) []byte {
 	tagHash, _ := hex.DecodeString(tag)
 
 	tagLen := len(tagHash)
 	msgLen := len(msg)
 
-	m := make([]byte, tagLen*2 + msgLen)
+	m := make([]byte, tagLen*2+msgLen)
 	copy(m[:tagLen], tagHash)
 	copy(m[tagLen:tagLen*2], tagHash)
 	copy(m[tagLen*2:], msg)

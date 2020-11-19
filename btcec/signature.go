@@ -29,7 +29,6 @@ type Signature struct {
 }
 
 var (
-
 	zero = big.NewInt(0)
 
 	// Used in RFC6979 implementation when testing the nonce for correctness

@@ -49,6 +49,12 @@ func (p *PrivateKey) PubKey() *PublicKey {
 	return (*PublicKey)(&p.PublicKey)
 }
 
+// SchnorrPubKey returns the PublicKey corresponding to this private key.
+// Unlike the ecdsa.PublicKey, the schnorr public key has a different 32 byte format.
+func (p *PrivateKey) SchnorrPubKey() *SchnorrPublicKey {
+	return &SchnorrPublicKey{x: p.X}
+}
+
 // ToECDSA returns the private key as a *ecdsa.PrivateKey.
 func (p *PrivateKey) ToECDSA() *ecdsa.PrivateKey {
 	return (*ecdsa.PrivateKey)(p)
