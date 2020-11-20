@@ -850,6 +850,9 @@ func (c *Client) sendPost(jReq *jsonRequest) {
 	}
 	httpReq.Close = true
 	httpReq.Header.Set("Content-Type", "application/json")
+	for key, value := range c.config.ExtraHeaders {
+		httpReq.Header.Set(key, value)
+	}
 
 	// Configure basic access authorization.
 	user, pass, err := c.config.getAuth()
@@ -1161,6 +1164,10 @@ type ConnConfig struct {
 	// flag can be set to true to use basic HTTP POST requests instead.
 	HTTPPostMode bool
 
+	// ExtraHeaders specifies the extra headers when perform request. It's
+	// useful when RPC provider need customized headers.
+	ExtraHeaders map[string]string
+
 	// EnableBCInfoHacks is an option provided to enable compatibility hacks
 	// when connecting to blockchain.info RPC server
 	EnableBCInfoHacks bool
@@ -1280,6 +1287,9 @@ func dial(config *ConnConfig) (*websocket.Conn, error) {
 	auth := "Basic " + base64.StdEncoding.EncodeToString([]byte(login))
 	requestHeader := make(http.Header)
 	requestHeader.Add("Authorization", auth)
+	for key, value := range config.ExtraHeaders {
+		requestHeader.Add(key, value)
+	}
 
 	// Dial the connection.
 	url := fmt.Sprintf("%s://%s/%s", scheme, config.Host, config.Endpoint)
