@@ -531,6 +531,19 @@ var helpDescsEnUS = map[string]string{
 	"gettxout-vout":           "The index of the output",
 	"gettxout-includemempool": "Include the mempool when true",
 
+	// GetTxOutSetResult help.
+	"gettxoutsetinforesult-height":            "Height of the best block",
+	"gettxoutsetinforesult-bestblock":         "Hex-encoded bytes of the best block hash",
+	"gettxoutsetinforesult-transactions":      "The number of transactions with unspent outputs",
+	"gettxoutsetinforesult-txouts":            "The number of unspent transaction outputs",
+	"gettxoutsetinforesult-bogosize":          "A meaningless metric for the UTXO set size",
+	"gettxoutsetinforesult-hash_serialized_2": "The hash of the serialized UTXO set",
+	"gettxoutsetinforesult-disk_size":         "The estimated size of the UTXO set on disk",
+	"gettxoutsetinforesult-total_amount":      "The total amount in BTC",
+
+	// GetTxOutSetInfoCmd help.
+	"gettxoutsetinfo--synopsis": "Returns statistics about the unspent transaction output. This call may take awhile.",
+
 	// HelpCmd help.
 	"help--synopsis":   "Returns a list of all commands or help for a specified command.",
 	"help-command":     "The command to retrieve help for",
@@ -744,6 +757,7 @@ var rpcResultTypes = map[string][]interface{}{
 	"getrawmempool":          {(*[]string)(nil), (*btcjson.GetRawMempoolVerboseResult)(nil)},
 	"getrawtransaction":      {(*string)(nil), (*btcjson.TxRawResult)(nil)},
 	"gettxout":               {(*btcjson.GetTxOutResult)(nil)},
+	"gettxoutsetinfo":        {(*btcjson.GetTxOutSetInfoResult)(nil)},
 	"node":                   nil,
 	"help":                   {(*string)(nil), (*string)(nil)},
 	"ping":                   nil,

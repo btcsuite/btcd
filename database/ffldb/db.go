@@ -942,6 +942,23 @@ func (b *bucket) Delete(key []byte) error {
 	return nil
 }
 
+// DiskSize returns the approximate size of the bucket on disk.
+// Recently written data may not be included.
+//
+// This function is part of the database.Bucket interface implementation.
+func (b *bucket) DiskSize() (int64, error) {
+	keyRange := util.BytesPrefix(b.id[:])
+
+	sizes, err := b.tx.db.cache.ldb.SizeOf([]util.Range{*keyRange})
+	if err != nil {
+		return 0, fmt.Errorf("could not estimate size of bucket: %w", err)
+	}
+
+	size := sizes[0]
+
+	return size, nil
+}
+
 // pendingBlock houses a block that will be written to disk when the database
 // transaction is committed.
 type pendingBlock struct {

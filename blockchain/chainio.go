@@ -6,6 +6,7 @@ package blockchain
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
 	"math/big"
@@ -690,6 +691,93 @@ func deserializeUtxoEntry(serialized []byte) (*UtxoEntry, error) {
 	}
 
 	return entry, nil
+}
+
+// UtxoSetInfo represents statistical information about
+// the unspent transaction output set.
+type UtxoSetInfo struct {
+	Transactions   int64
+	TxOuts         int64
+	BogoSize       int64
+	HashSerialized chainhash.Hash
+	TotalAmount    btcutil.Amount
+	DiskSize       int64
+}
+
+// FetchUtxoSetInfo fetches information about the entire UTXO set.
+// This may take awhile.
+func (b *BlockChain) FetchUtxoSetInfo() (*UtxoSetInfo, error) {
+	b.chainLock.Lock()
+	defer b.chainLock.Unlock()
+
+	var totalAmount, bogoSize, numUtxos, diskSize int64
+
+	// A set to keep track of unique transactions.
+	txSet := make(map[chainhash.Hash]bool)
+
+	hasher := sha256.New()
+
+	err := b.db.View(func(dbTx database.Tx) error {
+		var err error
+		utxoBucket := dbTx.Metadata().Bucket(utxoSetBucketName)
+
+		diskSize, err = utxoBucket.DiskSize()
+		if err != nil {
+			return err
+		}
+
+		cursor := utxoBucket.Cursor()
+
+		for ok := cursor.First(); ok; ok = cursor.Next() {
+			key := cursor.Key()
+			value := cursor.Value()
+
+			hasher.Write(key)
+			hasher.Write(value)
+
+			// Transaction hash is in the first 32 bytes of key.
+			txHash, err := chainhash.NewHash(key[:chainhash.HashSize])
+			if err != nil {
+				return err
+			}
+
+			txSet[*txHash] = true
+
+			utxoEntry, err := deserializeUtxoEntry(value)
+			if err != nil {
+				return err
+			}
+
+			totalAmount += utxoEntry.amount
+			numUtxos++
+
+			// Bitcoin Core sets the bogosize as the length of
+			// scriptPubKey + a fixed 50 bytes for each utxo:
+			// 32 bytes for the transaction hash
+			// 4 bytes for txout index
+			// 4 bytes for height + coinbase
+			// 8 bytes for amount
+			bogoSize += 50 + int64(len(utxoEntry.pkScript))
+		}
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	hashSerialized, err := chainhash.NewHash(hasher.Sum(nil))
+	if err != nil {
+		return nil, fmt.Errorf("could not obtain hash of the serialized utxo set: %w", err)
+	}
+
+	return &UtxoSetInfo{
+		Transactions:   int64(len(txSet)),
+		TxOuts:         numUtxos,
+		BogoSize:       bogoSize,
+		HashSerialized: *hashSerialized,
+		TotalAmount:    btcutil.Amount(totalAmount),
+		DiskSize:       diskSize,
+	}, nil
 }
 
 // dbFetchUtxoEntryByHash attempts to find and fetch a utxo for the given hash.

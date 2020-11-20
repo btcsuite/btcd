@@ -13,10 +13,115 @@ import (
 	"os"
 	"runtime/debug"
 	"testing"
+	"time"
 
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/integration/rpctest"
+	"github.com/btcsuite/btcd/txscript"
+	"github.com/btcsuite/btcd/wire"
+	"github.com/btcsuite/btcutil"
 )
+
+func testGetTxOutSetInfo(r *rpctest.Harness, t *testing.T) {
+
+	p2pkhScript := func() []byte {
+		address, err := r.NewAddress()
+		if err != nil {
+			t.Fatalf("Unable to generate address: %v", err)
+		}
+
+		script, err := txscript.PayToAddrScript(address)
+
+		if err != nil {
+			t.Fatalf("Unable to generate PKScript: %v", err)
+		}
+
+		return script
+	}
+
+	const txQuantity int = 20
+	testTxs := make([]*btcutil.Tx, txQuantity)
+
+	// Generate transaction outputs to be added to the utxo.
+	for i := 0; i < txQuantity; i++ {
+		// Each transaction has 2 outputs + change.
+		txOuts := []*wire.TxOut{
+			{
+				Value:    int64(2000000000),
+				PkScript: p2pkhScript(),
+			},
+			{
+				Value:    int64(2000000000),
+				PkScript: p2pkhScript(),
+			},
+		}
+
+		tx, err := r.CreateTransaction(txOuts, 0, true)
+		if err != nil {
+			fmt.Println(i)
+			t.Fatalf("Unable to generate transaction: %v", err)
+		}
+		testTxs[i] = btcutil.NewTx(tx)
+	}
+
+	tests := []struct {
+		name         string
+		txs          []*btcutil.Tx
+		height       int64
+		transactions int64
+		txOuts       int64
+		bogoSize     int64
+		totalAmount  int64
+	}{
+		{
+			name:         "starting utxo set",
+			txs:          []*btcutil.Tx{},
+			height:       126, // The harness starts with 125 blocks. The test adds 1 more.
+			transactions: 126,
+			txOuts:       126,
+			bogoSize:     126 * (50 + 25), // Each p2pkh script has 25 bytes in length.
+			totalAmount:  126 * 5000000000,
+		},
+		{
+			name:         "add 40 utxos",
+			txs:          testTxs,
+			height:       127,
+			transactions: 127,
+			txOuts:       167,
+			bogoSize:     167 * (50 + 25),
+			totalAmount:  127 * 5000000000,
+		},
+	}
+	for _, test := range tests {
+		block, err := r.GenerateAndSubmitBlock(test.txs, -1, time.Time{})
+		if err != nil {
+			t.Fatalf("Unable to generate block: %v", err)
+		}
+
+		txOutSetInfo, err := r.Node.GetTxOutSetInfo()
+		if err != nil {
+			t.Fatalf("Call to `gettxoutsetinfo` failed in test %v", test.name)
+		}
+		if txOutSetInfo.Height != test.height {
+			t.Errorf("Unexpected block height in test %v, got: %v want %v", test.name, txOutSetInfo.Height, test.height)
+		}
+		if txOutSetInfo.BestBlock != *block.Hash() {
+			t.Errorf("Unexpected block hash in test %v, got: %v want %v", test.name, txOutSetInfo.BestBlock, *block.Hash())
+		}
+		if txOutSetInfo.Transactions != test.transactions {
+			t.Errorf("Unexpected transactions in test %v, got: %v want %v", test.name, txOutSetInfo.Transactions, test.transactions)
+		}
+		if txOutSetInfo.TxOuts != test.txOuts {
+			t.Errorf("Unexpected transaction outputs in test %v, got: %v want %v", test.name, txOutSetInfo.TxOuts, test.txOuts)
+		}
+		if txOutSetInfo.BogoSize != test.bogoSize {
+			t.Errorf("Unexpected bogosize in test %v, got: %v want %v", test.name, txOutSetInfo.BogoSize, test.bogoSize)
+		}
+		if int64(txOutSetInfo.TotalAmount) != test.totalAmount {
+			t.Errorf("Unexpected total amount in test %v, got: %v want %v", test.name, txOutSetInfo.TotalAmount, test.totalAmount)
+		}
+	}
+}
 
 func testGetBestBlock(r *rpctest.Harness, t *testing.T) {
 	_, prevbestHeight, err := r.Node.GetBestBlock()
@@ -95,6 +200,7 @@ func testGetBlockHash(r *rpctest.Harness, t *testing.T) {
 }
 
 var rpcTestCases = []rpctest.HarnessTestCase{
+	testGetTxOutSetInfo, // This test must be run first, otherwise the utxo set may change.
 	testGetBestBlock,
 	testGetBlockCount,
 	testGetBlockHash,

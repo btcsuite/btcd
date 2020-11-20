@@ -161,6 +161,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"getrawmempool":          handleGetRawMempool,
 	"getrawtransaction":      handleGetRawTransaction,
 	"gettxout":               handleGetTxOut,
+	"gettxoutsetinfo":        handleGetTxOutSetInfo,
 	"help":                   handleHelp,
 	"node":                   handleNode,
 	"ping":                   handlePing,
@@ -197,7 +198,6 @@ var rpcAskWallet = map[string]struct{}{
 	"getreceivedbyaccount":   {},
 	"getreceivedbyaddress":   {},
 	"gettransaction":         {},
-	"gettxoutsetinfo":        {},
 	"getunconfirmedbalance":  {},
 	"getwalletinfo":          {},
 	"importprivkey":          {},
@@ -2795,6 +2795,28 @@ func handleGetTxOut(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 		Coinbase: isCoinbase,
 	}
 	return txOutReply, nil
+}
+
+// handleGetTxOutSetInfo implements the gettxoutsetinfo command
+func handleGetTxOutSetInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	utxoSetInfo, err := s.cfg.Chain.FetchUtxoSetInfo()
+	if err != nil {
+		context := "Failed to fetch utxo set info"
+		return nil, internalRPCError(err.Error(), context)
+	}
+
+	best := s.cfg.Chain.BestSnapshot()
+	result := &btcjson.GetTxOutSetInfoResult{
+		Height:         int64(best.Height),
+		BestBlock:      best.Hash,
+		Transactions:   utxoSetInfo.Transactions,
+		TxOuts:         utxoSetInfo.TxOuts,
+		BogoSize:       utxoSetInfo.BogoSize,
+		HashSerialized: utxoSetInfo.HashSerialized,
+		DiskSize:       utxoSetInfo.DiskSize,
+		TotalAmount:    utxoSetInfo.TotalAmount,
+	}
+	return result, nil
 }
 
 // handleHelp implements the help command.
