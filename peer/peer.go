@@ -14,6 +14,7 @@ import (
 	"math/rand"
 	"net"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -1344,6 +1345,13 @@ out:
 			// error is one of the allowed errors.
 			if p.isAllowedReadError(err) {
 				log.Errorf("Allowed test error from %s: %v", p, err)
+				idleTimer.Reset(idleTimeout)
+				continue
+			}
+
+			// Ignore unknown messages to ease future extensibility.
+			// Check if the error originated from wire/message.go:makeEmptyMessage().
+			if strings.Contains(err.Error(), "unhandled command") {
 				idleTimer.Reset(idleTimeout)
 				continue
 			}
