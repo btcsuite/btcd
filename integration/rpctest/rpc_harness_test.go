@@ -43,7 +43,7 @@ func testSendOutputs(r *Harness, t *testing.T) {
 	}
 
 	assertTxMined := func(txid *chainhash.Hash, blockHash *chainhash.Hash) {
-		block, err := r.Node.GetBlock(blockHash)
+		block, err := r.Client.GetBlock(blockHash)
 		if err != nil {
 			t.Fatalf("unable to get block: %v", err)
 		}
@@ -67,7 +67,7 @@ func testSendOutputs(r *Harness, t *testing.T) {
 
 	// Generate a single block, the transaction the wallet created should
 	// be found in this block.
-	blockHashes, err := r.Node.Generate(1)
+	blockHashes, err := r.Client.Generate(1)
 	if err != nil {
 		t.Fatalf("unable to generate single block: %v", err)
 	}
@@ -76,7 +76,7 @@ func testSendOutputs(r *Harness, t *testing.T) {
 	// Next, generate a spend much greater than the block reward. This
 	// transaction should also have been mined properly.
 	txid = genSpend(btcutil.Amount(500 * btcutil.SatoshiPerBitcoin))
-	blockHashes, err = r.Node.Generate(1)
+	blockHashes, err = r.Client.Generate(1)
 	if err != nil {
 		t.Fatalf("unable to generate single block: %v", err)
 	}
@@ -84,7 +84,7 @@ func testSendOutputs(r *Harness, t *testing.T) {
 }
 
 func assertConnectedTo(t *testing.T, nodeA *Harness, nodeB *Harness) {
-	nodeAPeers, err := nodeA.Node.GetPeerInfo()
+	nodeAPeers, err := nodeA.Client.GetPeerInfo()
 	if err != nil {
 		t.Fatalf("unable to get nodeA's peer info")
 	}
@@ -170,7 +170,7 @@ func testActiveHarnesses(r *Harness, t *testing.T) {
 
 func testJoinMempools(r *Harness, t *testing.T) {
 	// Assert main test harness has no transactions in its mempool.
-	pooledHashes, err := r.Node.GetRawMempool()
+	pooledHashes, err := r.Client.GetRawMempool()
 	if err != nil {
 		t.Fatalf("unable to get mempool for main test harness: %v", err)
 	}
@@ -210,7 +210,7 @@ func testJoinMempools(r *Harness, t *testing.T) {
 	if err != nil {
 		t.Fatalf("coinbase spend failed: %v", err)
 	}
-	if _, err := r.Node.SendRawTransaction(testTx, true); err != nil {
+	if _, err := r.Client.SendRawTransaction(testTx, true); err != nil {
 		t.Fatalf("send transaction failed: %v", err)
 	}
 
@@ -219,7 +219,7 @@ func testJoinMempools(r *Harness, t *testing.T) {
 	harnessSynced := make(chan struct{})
 	go func() {
 		for {
-			poolHashes, err := r.Node.GetRawMempool()
+			poolHashes, err := r.Client.GetRawMempool()
 			if err != nil {
 				t.Fatalf("failed to retrieve harness mempool: %v", err)
 			}
@@ -262,7 +262,7 @@ func testJoinMempools(r *Harness, t *testing.T) {
 
 	// Send the transaction to the local harness which will result in synced
 	// mempools.
-	if _, err := harness.Node.SendRawTransaction(testTx, true); err != nil {
+	if _, err := harness.Client.SendRawTransaction(testTx, true); err != nil {
 		t.Fatalf("send transaction failed: %v", err)
 	}
 
@@ -612,7 +612,7 @@ func TestHarness(t *testing.T) {
 
 	// Current tip should be at a height of numMatureOutputs plus the
 	// required number of blocks for coinbase maturity.
-	nodeInfo, err := mainHarness.Node.GetInfo()
+	nodeInfo, err := mainHarness.Client.GetInfo()
 	if err != nil {
 		t.Fatalf("unable to execute getinfo on node: %v", err)
 	}
