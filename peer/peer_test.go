@@ -20,6 +20,33 @@ import (
 	"github.com/btcsuite/go-socks/socks"
 )
 
+// this allows us to test an unknown message
+type UnknownMessage struct{}
+
+// BtcDecode decodes r using the bitcoin protocol encoding into the receiver.
+// This is part of the Message interface implementation.
+func (msg *UnknownMessage) BtcDecode(r io.Reader, pver uint32, enc wire.MessageEncoding) error {
+	return nil
+}
+
+// BtcEncode encodes the receiver to w using the bitcoin protocol encoding.
+// This is part of the Message interface implementation.
+func (msg *UnknownMessage) BtcEncode(w io.Writer, pver uint32, enc wire.MessageEncoding) error {
+	return nil
+}
+
+// Command returns the protocol command string for the message.  This is part
+// of the Message interface implementation.
+func (msg *UnknownMessage) Command() string {
+	return "not handled" // must be less than 13 characters
+}
+
+// MaxPayloadLength returns the maximum length the payload can be for the
+// receiver.  This is part of the Message interface implementation.
+func (msg *UnknownMessage) MaxPayloadLength(pver uint32) uint32 {
+	return 0
+}
+
 // conn mocks a network connection by implementing the net.Conn interface.  It
 // is used to test peer connection without actually opening a network
 // connection.
@@ -479,6 +506,11 @@ func TestPeerListeners(t *testing.T) {
 			t.Errorf("TestPeerListeners: verack timeout\n")
 			return
 		}
+	}
+
+	outPeer.QueueMessage(&UnknownMessage{}, nil)
+	if !outPeer.Connected() {
+		t.Errorf("outpeer disconnected on an unknown message")
 	}
 
 	tests := []struct {
