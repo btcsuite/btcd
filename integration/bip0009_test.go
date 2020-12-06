@@ -33,7 +33,7 @@ const (
 // ensures its version either has the provided bit set or unset per the set
 // flag.
 func assertVersionBit(r *rpctest.Harness, t *testing.T, hash *chainhash.Hash, bit uint8, set bool) {
-	block, err := r.Node.GetBlock(hash)
+	block, err := r.Client.GetBlock(hash)
 	if err != nil {
 		t.Fatalf("failed to retrieve block %v: %v", hash, err)
 	}
@@ -53,7 +53,7 @@ func assertVersionBit(r *rpctest.Harness, t *testing.T, hash *chainhash.Hash, bi
 // assertChainHeight retrieves the current chain height from the given test
 // harness and ensures it matches the provided expected height.
 func assertChainHeight(r *rpctest.Harness, t *testing.T, expectedHeight uint32) {
-	height, err := r.Node.GetBlockCount()
+	height, err := r.Client.GetBlockCount()
 	if err != nil {
 		t.Fatalf("failed to retrieve block height: %v", err)
 	}
@@ -96,7 +96,7 @@ func assertSoftForkStatus(r *rpctest.Harness, t *testing.T, forkKey string, stat
 			"threshold state %v to string", line, state)
 	}
 
-	info, err := r.Node.GetBlockChainInfo()
+	info, err := r.Client.GetBlockChainInfo()
 	if err != nil {
 		t.Fatalf("failed to retrieve chain info: %v", err)
 	}
@@ -339,7 +339,7 @@ func TestBIP0009Mining(t *testing.T) {
 	// in the defined threshold state.
 	deployment := &r.ActiveNet.Deployments[chaincfg.DeploymentTestDummy]
 	testDummyBitNum := deployment.BitNumber
-	hashes, err := r.Node.Generate(1)
+	hashes, err := r.Client.Generate(1)
 	if err != nil {
 		t.Fatalf("unable to generate blocks: %v", err)
 	}
@@ -358,7 +358,7 @@ func TestBIP0009Mining(t *testing.T) {
 	// dummy deployment as started.
 	confirmationWindow := r.ActiveNet.MinerConfirmationWindow
 	numNeeded := confirmationWindow - 1
-	hashes, err = r.Node.Generate(numNeeded)
+	hashes, err = r.Client.Generate(numNeeded)
 	if err != nil {
 		t.Fatalf("failed to generated %d blocks: %v", numNeeded, err)
 	}
@@ -373,7 +373,7 @@ func TestBIP0009Mining(t *testing.T) {
 	// The last generated block should still have the test bit set in the
 	// version since the btcd mining code will have recognized the test
 	// dummy deployment as locked in.
-	hashes, err = r.Node.Generate(confirmationWindow)
+	hashes, err = r.Client.Generate(confirmationWindow)
 	if err != nil {
 		t.Fatalf("failed to generated %d blocks: %v", confirmationWindow,
 			err)
@@ -392,7 +392,7 @@ func TestBIP0009Mining(t *testing.T) {
 	// version since the btcd mining code will have recognized the test
 	// dummy deployment as activated and thus there is no longer any need
 	// to set the bit.
-	hashes, err = r.Node.Generate(confirmationWindow)
+	hashes, err = r.Client.Generate(confirmationWindow)
 	if err != nil {
 		t.Fatalf("failed to generated %d blocks: %v", confirmationWindow,
 			err)

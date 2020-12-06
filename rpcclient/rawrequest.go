@@ -44,7 +44,7 @@ func (c *Client) RawRequestAsync(method string, params []json.RawMessage) Future
 	// than custom commands.
 	id := c.NextID()
 	rawRequest := &btcjson.Request{
-		Jsonrpc: "1.0",
+		Jsonrpc: btcjson.RpcVersion1,
 		ID:      id,
 		Method:  method,
 		Params:  params,

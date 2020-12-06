@@ -27,7 +27,7 @@ func ExampleMarshalCmd() {
 	// server.  Typically the client would increment the id here which is
 	// request so the response can be identified.
 	id := 1
-	marshalledBytes, err := btcjson.MarshalCmd(id, gbCmd)
+	marshalledBytes, err := btcjson.MarshalCmd(btcjson.RpcVersion1, id, gbCmd)
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -95,7 +95,7 @@ func ExampleUnmarshalCmd() {
 func ExampleMarshalResponse() {
 	// Marshal a new JSON-RPC response.  For example, this is a response
 	// to a getblockheight request.
-	marshalledBytes, err := btcjson.MarshalResponse(1, 350001, nil)
+	marshalledBytes, err := btcjson.MarshalResponse(btcjson.RpcVersion1, 1, 350001, nil)
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -107,7 +107,7 @@ func ExampleMarshalResponse() {
 	fmt.Printf("%s\n", marshalledBytes)
 
 	// Output:
-	// {"result":350001,"error":null,"id":1}
+	// {"jsonrpc":"1.0","result":350001,"error":null,"id":1}
 }
 
 // This example demonstrates how to unmarshal a JSON-RPC response and then
@@ -116,7 +116,7 @@ func Example_unmarshalResponse() {
 	// Ordinarily this would be read from the wire, but for this example,
 	// it is hard coded here for clarity.  This is an example response to a
 	// getblockheight request.
-	data := []byte(`{"result":350001,"error":null,"id":1}`)
+	data := []byte(`{"jsonrpc":"1.0","result":350001,"error":null,"id":1}`)
 
 	// Unmarshal the raw bytes from the wire into a JSON-RPC response.
 	var response btcjson.Response
