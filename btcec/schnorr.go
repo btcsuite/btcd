@@ -144,9 +144,9 @@ func schnorrSign(privKey, msg []byte, a []byte) (sig [64]byte, err error) {
 	// Get a deterministic nonce k.
 	{
 		m := make([]byte, 96)
-		copy(m[:32], t.Bytes())
-		copy(m[32:64], Px.Bytes())
-		copy(m[64:], msg)
+		copy(m[:32], intToBytes(32, t))
+		copy(m[32:64], intToBytes(32, Px))
+		copy(m[64:96], msg)
 
 		// rand = sha256(BIP0340/nonce || (t || P || m))
 		k.SetBytes(taggedHash(BIP340Nonce, m))
@@ -171,9 +171,9 @@ func schnorrSign(privKey, msg []byte, a []byte) (sig [64]byte, err error) {
 	// e = int(hashBIP0340/challenge(R || P || m)) mod n
 	{
 		m := make([]byte, 96)
-		copy(m[:32], Rx.Bytes())
-		copy(m[32:64], Px.Bytes())
-		copy(m[64:], msg)
+		copy(m[:32], intToBytes(32, Rx))
+		copy(m[32:64], intToBytes(32, Px))
+		copy(m[64:96], msg)
 		e.SetBytes(taggedHash(BIP340Challenge, m))
 		e.Mod(e, n)
 	}
@@ -184,12 +184,12 @@ func schnorrSign(privKey, msg []byte, a []byte) (sig [64]byte, err error) {
 	s.Mod(s, n)
 
 	// Signature is (x(R), s).
-	copy(sig[:32], Rx.Bytes())
-	copy(sig[32:], s.Bytes())
+	copy(sig[:32], intToBytes(32, Rx))
+	copy(sig[32:], intToBytes(32, s))
 
 	// Verify signature before returning.
-	if verify, err := schnorrVerify(msg, Px.Bytes(), sig[:]); !verify || err != nil {
-		return sig, errors.New("cannot create signature")
+	if verify, err := schnorrVerify(msg, intToBytes(32, Px), sig[:]); !verify || err != nil {
+		return sig, fmt.Errorf("cannot create signature: %w", err)
 	}
 
 	return sig, nil
@@ -257,7 +257,7 @@ func schnorrVerify(msg, publicKey, signature []byte) (bool, error) {
 
 	// Check that P is on the curve.
 	if !curve.IsOnCurve(Px, Py) {
-		return false, errors.New("public key is not on the curve")
+		return false, errors.New("point P is not on the curve")
 	}
 
 	r.SetBytes(signature[:32])
@@ -265,19 +265,19 @@ func schnorrVerify(msg, publicKey, signature []byte) (bool, error) {
 
 	// Fail if s >= n
 	if s.Cmp(n) >= 0 {
-		return false, nil
+		return false, errors.New("s is greater than curve order")
 	}
 
 	// Fail if r >= p
 	if r.Cmp(p) >= 0 {
-		return false, nil
+		return false, errors.New("r is greater than p")
 	}
 
 	// e = sha256(hashBIP0340/challenge || r || P || m) mod n.
 	{
 		m := make([]byte, 96)
 		copy(m[:32], signature[:32])
-		copy(m[32:64], publicKey)
+		copy(m[32:64], publicKey[:])
 		copy(m[64:], msg)
 		e.SetBytes(taggedHash(BIP340Challenge, m))
 		e.Mod(e, n)
@@ -294,17 +294,17 @@ func schnorrVerify(msg, publicKey, signature []byte) (bool, error) {
 
 	// Fail if R is at infinity.
 	if Rx.Cmp(zero) == 0 || Ry.Cmp(zero) == 0 {
-		return false, nil
+		return false, errors.New("point R is at infinity")
 	}
 
 	// Fail if y(R) is not even
 	if !hasEvenY(Ry) {
-		return false, nil
+		return false, errors.New("coordinate R(y) is not even")
 	}
 
 	// Fail if x(R) != r
 	if Rx.Cmp(r) != 0 {
-		return false, nil
+		return false, errors.New("coordinate R(x) != r")
 	}
 
 	return true, nil
@@ -322,4 +322,12 @@ func taggedHash(tag string, msg []byte) []byte {
 	copy(m[tagLen*2:], msg)
 	h := sha256.Sum256(m)
 	return h[:]
+}
+
+// intToBytes accepts an integer and converts it to a byte slice.
+// Zeros are prepended to the byte slice to have a slice len of a given size.
+func intToBytes(size int, src *big.Int) []byte {
+	ret := make([]byte, size)
+	copy(ret[size-len(src.Bytes()):], src.Bytes())
+	return ret
 }
