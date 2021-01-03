@@ -181,6 +181,8 @@ var helpDescsEnUS = map[string]string{
 	"getblockchaininforesult-pruned":               "A bool that indicates if the node is pruned or not",
 	"getblockchaininforesult-pruneheight":          "The lowest block retained in the current pruned chain",
 	"getblockchaininforesult-chainwork":            "The total cumulative work in the best chain",
+	"getblockchaininforesult-size_on_disk":         "The estimated size of the block and undo files on disk",
+	"getblockchaininforesult-initialblockdownload": "Estimate of whether this node is in Initial Block Download mode",
 	"getblockchaininforesult-softforks":            "The status of the super-majority soft-forks",
 	"getblockchaininforesult-unifiedsoftforks":     "The status of the super-majority soft-forks used by bitcoind on or after v0.19.0",
 
