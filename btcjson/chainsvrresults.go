@@ -108,6 +108,7 @@ type GetBlockVerboseTxResult struct {
 	VersionHex    string        `json:"versionHex"`
 	MerkleRoot    string        `json:"merkleroot"`
 	Tx            []TxRawResult `json:"tx,omitempty"`
+	RawTx         []TxRawResult `json:"rawtx,omitempty"` // Deprecated: removed in Bitcoin Core
 	Time          int64         `json:"time"`
 	Nonce         uint32        `json:"nonce"`
 	Bits          string        `json:"bits"`
