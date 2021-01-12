@@ -34,7 +34,7 @@ which are both under active development.
 
 ## Documentation
 
-Documentation is a work-in-progress. It is available at [btcd.readthedocs.io](https://btcd.readthedocs.io/en/docu/).
+Documentation is a work-in-progress. It is available at [btcd.readthedocs.io](https://btcd.readthedocs.io).
 
 ## Contents
 
