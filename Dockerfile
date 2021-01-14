@@ -25,6 +25,7 @@ ADD . /app
 WORKDIR /app
 RUN set -ex \
   && if [ "${ARCH}" = "amd64" ]; then export GOARCH=amd64; fi \
+  && if [ "${ARCH}" = "arm32v7" ]; then export GOARCH=arm; fi \
   && if [ "${ARCH}" = "arm64v8" ]; then export GOARCH=arm64; fi \
   && echo "Compiling for $GOARCH" \
   && go install -v . ./cmd/...
