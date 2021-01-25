@@ -2,7 +2,7 @@ module github.com/btcsuite/btcd
 
 require (
 	github.com/btcsuite/btclog v0.0.0-20170628155309-84c8d2346e9f
-	github.com/btcsuite/btcutil v1.0.2
+	github.com/btcsuite/btcutil v1.0.3-0.20201208143702-a53e38424cce
 	github.com/btcsuite/go-socks v0.0.0-20170105172521-4720035b7bfd
 	github.com/btcsuite/goleveldb v1.0.0
 	github.com/btcsuite/websocket v0.0.0-20150119174127-31079b680792
