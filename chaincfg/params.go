@@ -178,6 +178,10 @@ type Params struct {
 	// GenerateSupported specifies whether or not CPU mining is allowed.
 	GenerateSupported bool
 
+	// AssumeValid specifies all blocks before this will not have the signatures
+	// checked
+	AssumeValid *chainhash.Hash
+
 	// Checkpoints ordered from oldest to newest.
 	Checkpoints []Checkpoint
 
@@ -251,6 +255,8 @@ var MainNetParams = Params{
 	ReduceMinDifficulty:      false,
 	MinDiffReductionTime:     0,
 	GenerateSupported:        false,
+
+	AssumeValid: newHashFromStr("0000000000000000000b9d2ec5a352ecba0592946514a92f14319dc2b367fc72"), // 654683
 
 	// Checkpoints ordered from oldest to newest.
 	Checkpoints: []Checkpoint{
@@ -432,6 +438,8 @@ var TestNet3Params = Params{
 	ReduceMinDifficulty:      true,
 	MinDiffReductionTime:     time.Minute * 20, // TargetTimePerBlock * 2
 	GenerateSupported:        false,
+
+	AssumeValid: newHashFromStr("000000000000006433d1efec504c53ca332b64963c425395515b01977bd7b3b0"), // 1864000
 
 	// Checkpoints ordered from oldest to newest.
 	Checkpoints: []Checkpoint{

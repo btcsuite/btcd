@@ -1152,6 +1152,24 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block, vi
 		runScripts = false
 	}
 
+	// If we're at a checkpoint, then ignore all assumeValid params
+	if checkpoint != nil {
+		// Check if we're at the assumeValidHash. If assumeValidHash isn't nil
+		// don't check signatures. This mimicks the behavior of the reference
+		// client
+		if b.assumeValidHash != nil && node.hash.IsEqual(b.assumeValidHash) {
+			runScripts = true
+
+			// set to nil so that the scripts will be checked after this block
+			b.assumeValidHash = nil
+
+			log.Infof("Processed assumeValidHash at block %v"+
+				"Checking signatures from this block on", node.hash)
+		} else {
+			runScripts = false
+		}
+	}
+
 	// Blocks created after the BIP0016 activation time need to have the
 	// pay-to-script-hash checks enabled.
 	var scriptFlags txscript.ScriptFlags
