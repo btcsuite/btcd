@@ -15,6 +15,34 @@ const (
 	// defaultScriptNumLen is the default number of bytes
 	// data being interpreted as an integer may be.
 	defaultScriptNumLen = 4
+
+	// MathOpCodeMaxScriptNumLen is the maximum number of bytes data being
+	// interpreted as an integer may be for the majority of op codes.
+	MathOpCodeMaxScriptNumLen = 4
+
+	// CltvMaxScriptNumLen is the maximum number of bytes data being interpreted
+	// as an integer may be for by-time and by-height locks as interpreted by
+	// CHECKLOCKTIMEVERIFY.
+	//
+	// The value comes from the fact that the current transaction locktime
+	// is a uint32 resulting in a maximum locktime of 2^32-1 (the year
+	// 2106).  However, script numbers are signed and therefore a standard
+	// 4-byte ScriptNum would only support up to a maximum of 2^31-1 (the
+	// year 2038).  Thus, a 5-byte ScriptNum is needed since it will support
+	// up to 2^39-1 which allows dates beyond the current locktime limit.
+	CltvMaxScriptNumLen = 5
+
+	// csvMaxScriptNumLen is the maximum number of bytes data being interpreted
+	// as an integer may be for by-time and by-height locks as interpreted by
+	// CHECKSEQUENCEVERIFY.
+	//
+	// The value comes from the fact that the current transaction sequence
+	// is a uint32 resulting in a maximum sequence of 2^32-1.  However,
+	// ScriptNums are signed and therefore a standard 4-byte ScriptNum would
+	// only support up to a maximum of 2^31-1.  Thus, a 5-byte ScriptNum is
+	// needed since it will support up to 2^39-1 which allows sequences
+	// beyond the current sequence limit.
+	csvMaxScriptNumLen = 5
 )
 
 // scriptNum represents a numeric value used in the scripting engine with
