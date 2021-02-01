@@ -11,7 +11,10 @@ require (
 	github.com/decred/dcrd/lru v1.0.0
 	github.com/jessevdk/go-flags v1.4.0
 	github.com/jrick/logrotate v1.0.0
-	golang.org/x/crypto v0.0.0-20200510223506-06a226fb4e37
+	github.com/mit-dci/utreexo v0.0.0-20210113220559-fe368b8feff3
+	golang.org/x/crypto v0.0.0-20200604202706-70a84ac30bf9
 )
 
-go 1.14
+go 1.15
+
+replace github.com/btcsuite/btcutil => github.com/mit-dci/utcutil v1.0.3-0.20210201144513-fb3ce8742498

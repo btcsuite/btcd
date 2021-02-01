@@ -789,6 +789,7 @@ func (b *BlockChain) checkBlockContext(block *btcutil.Block, prevNode *blockNode
 		// If segwit is active, then we'll need to fully validate the
 		// new witness commitment for adherence to the rules.
 		if segwitState == ThresholdActive {
+			//fmt.Println("CHECKING SEGWIT")
 			// Validate the witness commitment (if any) within the
 			// block.  This involves asserting that if the coinbase
 			// contains the special commitment output, then this
@@ -1094,6 +1095,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block, vi
 	// still relatively cheap as compared to running the scripts) checks
 	// against all the inputs when the signature operations are out of
 	// bounds.
+	inskip, _ := block.DedupeBlock()
 	var totalFees int64
 	for _, tx := range transactions {
 		txFee, err := CheckTransactionInputs(tx, node.height, view,
@@ -1115,7 +1117,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block, vi
 		// provably unspendable as available utxos.  Also, the passed
 		// spent txos slice is updated to contain an entry for each
 		// spent txout in the order each transaction spends them.
-		err = view.connectTransaction(tx, node.height, stxos)
+		err = view.connectTransaction(tx, node.height, inskip, stxos)
 		if err != nil {
 			return err
 		}
@@ -1148,6 +1150,21 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block, vi
 	checkpoint := b.LatestCheckpoint()
 	runScripts := true
 	if checkpoint != nil && node.height <= checkpoint.Height {
+		runScripts = false
+	}
+
+	// Check if we're at the assumeValidHash. If assumeValidHash isn't nil
+	// don't check signatures. This mimicks the behavior of the reference
+	// client
+	if b.assumeValidHash != nil && node.hash.IsEqual(b.assumeValidHash) {
+		runScripts = true
+
+		// set to nil so that the scripts will be checked after this block
+		b.assumeValidHash = nil
+
+		log.Infof("Processed assumeValidHash at block %v"+
+			"Checking signatures from this block on", node.hash)
+	} else {
 		runScripts = false
 	}
 
@@ -1223,6 +1240,257 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block, vi
 	// prevent CPU exhaustion attacks.
 	if runScripts {
 		err := checkBlockScripts(block, view, scriptFlags, b.sigCache,
+			b.hashCache)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Update the best hash for view to include this block since all of its
+	// transactions have been connected.
+	view.SetBestHash(&node.hash)
+
+	return nil
+}
+
+// checkConnectUBlock performs several checks to confirm connecting the passed
+// block to the chain represented by the passed view does not violate any rules.
+//
+// The passed ublock will have its proof checked and ensure that the utreexo proofs
+// are for the correct UTXOs and that the proof checks out with our stored
+// UtreexoViewpoint.
+//
+// An example of some of the checks performed are ensuring connecting the block
+// would not cause any duplicate transaction hashes for old transactions that
+// aren't already fully spent, double spends, exceeding the maximum allowed
+// signature operations per block, invalid values in relation to the expected
+// block subsidy, or fail transaction script validation.
+//
+// NOTE: There are no BIP30 checks
+//
+// This function MUST be called with the chain state lock held (for writes).
+func (b *BlockChain) checkConnectUBlock(node *blockNode, ublock *btcutil.UBlock, view *UtxoViewpoint) error {
+	// If the side chain blocks end up in the database, a call to
+	// CheckBlockSanity should be done here in case a previous version
+	// allowed a block that is no longer valid.  However, since the
+	// implementation only currently uses memory for the side chain blocks,
+	// it isn't currently necessary.
+
+	// The coinbase for the Genesis block is not spendable, so just return
+	// an error now.
+	if node.hash.IsEqual(b.chainParams.GenesisHash) {
+		str := "the coinbase for the genesis block is not spendable"
+		return ruleError(ErrMissingTxOut, str)
+	}
+
+	// Ensure the view is for the node being checked.
+	parentHash := &ublock.MsgUBlock().MsgBlock.Header.PrevBlock
+	if !view.BestHash().IsEqual(parentHash) {
+		return AssertError(fmt.Sprintf("inconsistent view when "+
+			"checking block connection: best hash is %v instead "+
+			"of expected %v", view.BestHash(), parentHash))
+	}
+
+	// Check that the ublock txOuts are valid
+	err := b.utreexoViewpoint.Modify(ublock)
+	if err != nil {
+		return err
+	}
+
+	// convert to utxoview for backwards compat
+	// TODO: using the ublock directly would be better instead of this conversion
+	view.UBlockToUtxoView(*ublock)
+
+	// BIP0016 describes a pay-to-script-hash type that is considered a
+	// "standard" type.  The rules for this BIP only apply to transactions
+	// after the timestamp defined by txscript.Bip16Activation.  See
+	// https://en.bitcoin.it/wiki/BIP_0016 for more details.
+	enforceBIP0016 := node.timestamp >= txscript.Bip16Activation.Unix()
+
+	// Query for the Version Bits state for the segwit soft-fork
+	// deployment. If segwit is active, we'll switch over to enforcing all
+	// the new rules.
+	segwitState, err := b.deploymentState(node.parent, chaincfg.DeploymentSegwit)
+	if err != nil {
+		return err
+	}
+	enforceSegWit := segwitState == ThresholdActive
+
+	// The number of signature operations must be less than the maximum
+	// allowed per block.  Note that the preliminary sanity checks on a
+	// block also include a check similar to this one, but this check
+	// expands the count to include a precise count of pay-to-script-hash
+	// signature operations in each of the input transaction public key
+	// scripts.
+	transactions := ublock.Block().Transactions()
+	totalSigOpCost := 0
+	for i, tx := range transactions {
+		// Since the first (and only the first) transaction has
+		// already been verified to be a coinbase transaction,
+		// use i == 0 as an optimization for the flag to
+		// countP2SHSigOps for whether or not the transaction is
+		// a coinbase transaction rather than having to do a
+		// full coinbase check again.
+		sigOpCost, err := GetSigOpCost(tx, i == 0, view, enforceBIP0016,
+			enforceSegWit)
+		if err != nil {
+			return err
+		}
+
+		// Check for overflow or going over the limits.  We have to do
+		// this on every loop iteration to avoid overflow.
+		lastSigOpCost := totalSigOpCost
+		totalSigOpCost += sigOpCost
+		if totalSigOpCost < lastSigOpCost || totalSigOpCost > MaxBlockSigOpsCost {
+			str := fmt.Sprintf("block contains too many "+
+				"signature operations - got %v, max %v",
+				totalSigOpCost, MaxBlockSigOpsCost)
+			return ruleError(ErrTooManySigOps, str)
+		}
+	}
+
+	// Perform several checks on the inputs for each transaction.  Also
+	// accumulate the total fees.  This could technically be combined with
+	// the loop above instead of running another loop over the transactions,
+	// but by separating it we can avoid running the more expensive (though
+	// still relatively cheap as compared to running the scripts) checks
+	// against all the inputs when the signature operations are out of
+	// bounds.
+	var totalFees int64
+	for _, tx := range transactions {
+		txFee, err := CheckTransactionInputs(tx, node.height, view,
+			b.chainParams)
+		if err != nil {
+			return err
+		}
+
+		// Sum the total fees and ensure we don't overflow the
+		// accumulator.
+		lastTotalFees := totalFees
+		totalFees += txFee
+		if totalFees < lastTotalFees {
+			return ruleError(ErrBadFees, "total fees for block "+
+				"overflows accumulator")
+		}
+	}
+
+	// The total output values of the coinbase transaction must not exceed
+	// the expected subsidy value plus total transaction fees gained from
+	// mining the block.  It is safe to ignore overflow and out of range
+	// errors here because those error conditions would have already been
+	// caught by checkTransactionSanity.
+	var totalSatoshiOut int64
+	for _, txOut := range transactions[0].MsgTx().TxOut {
+		totalSatoshiOut += txOut.Value
+	}
+	expectedSatoshiOut := CalcBlockSubsidy(node.height, b.chainParams) +
+		totalFees
+	if totalSatoshiOut > expectedSatoshiOut {
+		str := fmt.Sprintf("coinbase transaction for block pays %v "+
+			"which is more than expected value of %v",
+			totalSatoshiOut, expectedSatoshiOut)
+		return ruleError(ErrBadCoinbaseValue, str)
+	}
+
+	// Don't run scripts if this node is before the latest known good
+	// checkpoint since the validity is verified via the checkpoints (all
+	// transactions are included in the merkle root hash and any changes
+	// will therefore be detected by the next checkpoint).  This is a huge
+	// optimization because running the scripts is the most time consuming
+	// portion of block handling.
+	checkpoint := b.LatestCheckpoint()
+	runScripts := true
+	if checkpoint != nil && node.height <= checkpoint.Height {
+		runScripts = false
+	}
+
+	// Check if we're at the assumeValidHash. If assumeValidHash isn't nil
+	// don't check signatures. This mimicks the behavior of the reference
+	// client
+	if b.assumeValidHash != nil && node.hash.IsEqual(b.assumeValidHash) {
+		runScripts = true
+
+		// set to nil so that the scripts will be checked after this block
+		b.assumeValidHash = nil
+
+		log.Infof("Processed assumeValidHash at block %v"+
+			"Checking signatures from this block on", node.hash)
+	} else {
+		runScripts = false
+	}
+
+	// Blocks created after the BIP0016 activation time need to have the
+	// pay-to-script-hash checks enabled.
+	var scriptFlags txscript.ScriptFlags
+	if enforceBIP0016 {
+		scriptFlags |= txscript.ScriptBip16
+	}
+
+	// Enforce DER signatures for block versions 3+ once the historical
+	// activation threshold has been reached.  This is part of BIP0066.
+	blockHeader := &ublock.MsgUBlock().MsgBlock.Header
+	if blockHeader.Version >= 3 && node.height >= b.chainParams.BIP0066Height {
+		scriptFlags |= txscript.ScriptVerifyDERSignatures
+	}
+
+	// Enforce CHECKLOCKTIMEVERIFY for block versions 4+ once the historical
+	// activation threshold has been reached.  This is part of BIP0065.
+	if blockHeader.Version >= 4 && node.height >= b.chainParams.BIP0065Height {
+		scriptFlags |= txscript.ScriptVerifyCheckLockTimeVerify
+	}
+
+	// Enforce CHECKSEQUENCEVERIFY during all block validation checks once
+	// the soft-fork deployment is fully active.
+	csvState, err := b.deploymentState(node.parent, chaincfg.DeploymentCSV)
+	if err != nil {
+		return err
+	}
+	if csvState == ThresholdActive {
+		// If the CSV soft-fork is now active, then modify the
+		// scriptFlags to ensure that the CSV op code is properly
+		// validated during the script checks bleow.
+		scriptFlags |= txscript.ScriptVerifyCheckSequenceVerify
+
+		// We obtain the MTP of the *previous* block in order to
+		// determine if transactions in the current block are final.
+		medianTime := node.parent.CalcPastMedianTime()
+
+		// Additionally, if the CSV soft-fork package is now active,
+		// then we also enforce the relative sequence number based
+		// lock-times within the inputs of all transactions in this
+		// candidate block.
+		for _, tx := range ublock.Block().Transactions() {
+			// A transaction can only be included within a block
+			// once the sequence locks of *all* its inputs are
+			// active.
+			sequenceLock, err := b.calcSequenceLock(node, tx, view,
+				false)
+			if err != nil {
+				return err
+			}
+			if !SequenceLockActive(sequenceLock, node.height,
+				medianTime) {
+				str := fmt.Sprintf("block contains " +
+					"transaction whose input sequence " +
+					"locks are not met")
+				return ruleError(ErrUnfinalizedTx, str)
+			}
+		}
+	}
+
+	// Enforce the segwit soft-fork package once the soft-fork has shifted
+	// into the "active" version bits state.
+	if enforceSegWit {
+		scriptFlags |= txscript.ScriptVerifyWitness
+		scriptFlags |= txscript.ScriptStrictMultiSig
+	}
+
+	// Now that the inexpensive checks are done and have passed, verify the
+	// transactions are actually allowed to spend the coins by running the
+	// expensive ECDSA signature check scripts.  Doing this last helps
+	// prevent CPU exhaustion attacks.
+	if runScripts {
+		err := checkBlockScripts(ublock.Block(), view, scriptFlags, b.sigCache,
 			b.hashCache)
 		if err != nil {
 			return err

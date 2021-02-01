@@ -31,6 +31,7 @@ func chainedNodes(parent *blockNode, numNodes int) []*blockNode {
 			header.PrevBlock = tip.hash
 		}
 		nodes[i] = newBlockNode(&header, tip)
+		nodes[i].BuildAncestor()
 		tip = nodes[i]
 	}
 	return nodes

@@ -208,6 +208,11 @@ func ValidateWitnessCommitment(blk *btcutil.Block) error {
 
 	witnessCommitment, witnessFound := ExtractWitnessCommitment(coinbaseTx)
 
+	//fmt.Printf("witnessFound?: %v, witness:%v, block height:%v, hash:%v\n",
+	//	witnessFound, witnessCommitment, blk.Height(), blk.Hash())
+	//for _, in := range coinbaseTx.MsgTx().TxIn {
+	//	fmt.Printf("outpoint:%v, witness:%v\n", in.PreviousOutPoint.String(), in.Witness)
+	//}
 	// If we can't find a witness commitment in any of the coinbase's
 	// outputs, then the block MUST NOT contain any transactions with
 	// witness data.
@@ -228,6 +233,8 @@ func ValidateWitnessCommitment(blk *btcutil.Block) error {
 	// its witness data and that element must be exactly
 	// CoinbaseWitnessDataLen bytes.
 	coinbaseWitness := coinbaseTx.MsgTx().TxIn[0].Witness
+	//fmt.Printf("%x\n", coinbaseWitness)
+	//fmt.Printf("%x\n", coinbaseTx.MsgTx().TxIn[0].SignatureScript)
 	if len(coinbaseWitness) != 1 {
 		str := fmt.Sprintf("the coinbase transaction has %d items in "+
 			"its witness stack when only one is allowed",

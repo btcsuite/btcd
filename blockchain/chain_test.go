@@ -132,6 +132,7 @@ func TestCalcSequenceLock(t *testing.T) {
 	for i := uint32(0); i < numBlocksToActivate; i++ {
 		blockTime = blockTime.Add(time.Second)
 		node = newFakeNode(node, blockVersion, 0, blockTime)
+		node.BuildAncestor()
 		chain.index.AddNode(node)
 		chain.bestChain.SetTip(node)
 	}
@@ -145,6 +146,7 @@ func TestCalcSequenceLock(t *testing.T) {
 			Value:    10,
 		}},
 	})
+
 	utxoView := NewUtxoViewpoint()
 	utxoView.AddTxOuts(targetTx, int32(numBlocksToActivate)-4)
 	utxoView.SetBestHash(&node.hash)
@@ -906,9 +908,11 @@ func TestIntervalBlockHashes(t *testing.T) {
 	branch1Nodes := chainedNodes(branch0Nodes[14], 3)
 	for _, node := range branch0Nodes {
 		chain.index.SetStatusFlags(node, statusValid)
+		node.BuildAncestor()
 		chain.index.AddNode(node)
 	}
 	for _, node := range branch1Nodes {
+		node.BuildAncestor()
 		if node.height < 18 {
 			chain.index.SetStatusFlags(node, statusValid)
 		}

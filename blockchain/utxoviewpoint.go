@@ -30,6 +30,8 @@ const (
 	tfModified
 )
 
+const SSTxoIndexNA = -2
+
 // UtxoEntry houses details about an individual transaction output in a utxo
 // view such as whether or not it was contained in a coinbase tx, the height of
 // the block that contains the tx, whether or not it is spent, its public key
@@ -44,6 +46,7 @@ type UtxoEntry struct {
 	amount      int64
 	pkScript    []byte // The public key script for the output.
 	blockHeight int32  // Height of block containing tx.
+	index       int16  // index of "spendable and not a same block spend" stxos
 
 	// packedFlags contains additional info about output such as whether it
 	// is a coinbase, whether it is spent, and whether it has been modified
@@ -73,6 +76,12 @@ func (entry *UtxoEntry) BlockHeight() int32 {
 // current state of the unspent transaction output view it was obtained from.
 func (entry *UtxoEntry) IsSpent() bool {
 	return entry.packedFlags&tfSpent == tfSpent
+}
+
+// IsSpent returns whether or not the output has been spent based upon the
+// current state of the unspent transaction output view it was obtained from.
+func (entry *UtxoEntry) Index() int16 {
+	return entry.index
 }
 
 // Spend marks the output as spent.  Spending an output that is already spent
@@ -107,6 +116,7 @@ func (entry *UtxoEntry) Clone() *UtxoEntry {
 		amount:      entry.amount,
 		pkScript:    entry.pkScript,
 		blockHeight: entry.blockHeight,
+		index:       entry.index,
 		packedFlags: entry.packedFlags,
 	}
 }
@@ -123,6 +133,7 @@ func NewUtxoEntry(
 		amount:      txOut.Value,
 		pkScript:    txOut.PkScript,
 		blockHeight: blockHeight,
+		index:       SSTxoIndexNA,
 		packedFlags: cbFlag,
 	}
 }
@@ -163,9 +174,9 @@ func (view *UtxoViewpoint) LookupEntry(outpoint wire.OutPoint) *UtxoEntry {
 // unspendable.  When the view already has an entry for the output, it will be
 // marked unspent.  All fields will be updated for existing entries since it's
 // possible it has changed during a reorg.
-func (view *UtxoViewpoint) addTxOut(outpoint wire.OutPoint, txOut *wire.TxOut, isCoinBase bool, blockHeight int32) {
+func (view *UtxoViewpoint) addTxOut(outpoint wire.OutPoint, txOut *btcutil.Txo, isCoinBase bool, blockHeight int32) {
 	// Don't add provably unspendable outputs.
-	if txscript.IsUnspendable(txOut.PkScript) {
+	if txscript.IsUnspendable(txOut.MsgTxo().PkScript) {
 		return
 	}
 
@@ -179,9 +190,10 @@ func (view *UtxoViewpoint) addTxOut(outpoint wire.OutPoint, txOut *wire.TxOut, i
 		view.entries[outpoint] = entry
 	}
 
-	entry.amount = txOut.Value
-	entry.pkScript = txOut.PkScript
+	entry.amount = txOut.MsgTxo().Value
+	entry.pkScript = txOut.MsgTxo().PkScript
 	entry.blockHeight = blockHeight
+	entry.index = txOut.SIndex()
 	entry.packedFlags = tfModified
 	if isCoinBase {
 		entry.packedFlags |= tfCoinBase
@@ -203,7 +215,8 @@ func (view *UtxoViewpoint) AddTxOut(tx *btcutil.Tx, txOutIdx uint32, blockHeight
 	// being replaced by a different transaction with the same hash.  This
 	// is allowed so long as the previous transaction is fully spent.
 	prevOut := wire.OutPoint{Hash: *tx.Hash(), Index: txOutIdx}
-	txOut := tx.MsgTx().TxOut[txOutIdx]
+	//txOut := tx.MsgTx().TxOut[txOutIdx]
+	txOut := tx.Txos()[txOutIdx]
 	view.addTxOut(prevOut, txOut, IsCoinBase(tx), blockHeight)
 }
 
@@ -216,13 +229,16 @@ func (view *UtxoViewpoint) AddTxOuts(tx *btcutil.Tx, blockHeight int32) {
 	// provably unspendable.
 	isCoinBase := IsCoinBase(tx)
 	prevOut := wire.OutPoint{Hash: *tx.Hash()}
-	for txOutIdx, txOut := range tx.MsgTx().TxOut {
+
+	//for txOutIdx, txOut := range tx.MsgTx().TxOut {
+	for txOutIdx, txOut := range tx.Txos() {
 		// Update existing entries.  All fields are updated because it's
 		// possible (although extremely unlikely) that the existing
 		// entry is being replaced by a different transaction with the
 		// same hash.  This is allowed so long as the previous
 		// transaction is fully spent.
 		prevOut.Index = uint32(txOutIdx)
+		//fmt.Printf("prevout hash:%v sstxoindex:%v\n", prevOut.Hash, txOut.SIndex())
 		view.addTxOut(prevOut, txOut, isCoinBase, blockHeight)
 	}
 }
@@ -232,7 +248,7 @@ func (view *UtxoViewpoint) AddTxOuts(tx *btcutil.Tx, blockHeight int32) {
 // spent.  In addition, when the 'stxos' argument is not nil, it will be updated
 // to append an entry for each spent txout.  An error will be returned if the
 // view does not contain the required utxos.
-func (view *UtxoViewpoint) connectTransaction(tx *btcutil.Tx, blockHeight int32, stxos *[]SpentTxOut) error {
+func (view *UtxoViewpoint) connectTransaction(tx *btcutil.Tx, blockHeight int32, inskip []uint32, stxos *[]SpentTxOut) error {
 	// Coinbase transactions don't have any inputs to spend.
 	if IsCoinBase(tx) {
 		// Add the transaction's outputs as available utxos.
@@ -240,6 +256,7 @@ func (view *UtxoViewpoint) connectTransaction(tx *btcutil.Tx, blockHeight int32,
 		return nil
 	}
 
+	var sstxoIndex uint32
 	// Spend the referenced utxos by marking them spent in the view and,
 	// if a slice was provided for the spent txout details, append an entry
 	// to it.
@@ -254,20 +271,42 @@ func (view *UtxoViewpoint) connectTransaction(tx *btcutil.Tx, blockHeight int32,
 
 		// Only create the stxo details if requested.
 		if stxos != nil {
+			var indexToPut int16
+			if len(inskip) > 0 && sstxoIndex == inskip[0] {
+				inskip = inskip[1:]
+				indexToPut = SSTxoIndexNA
+			}
+			if txscript.IsUnspendable(entry.PkScript()) {
+				indexToPut = SSTxoIndexNA
+			}
+			if indexToPut != SSTxoIndexNA {
+				indexToPut = entry.Index()
+			}
 			// Populate the stxo details using the utxo entry.
 			var stxo = SpentTxOut{
 				Amount:     entry.Amount(),
 				PkScript:   entry.PkScript(),
 				Height:     entry.BlockHeight(),
+				Index:      indexToPut,
+				TTL:        blockHeight - entry.BlockHeight(),
 				IsCoinBase: entry.IsCoinBase(),
 			}
 			*stxos = append(*stxos, stxo)
+			if stxo.TTL != 0 {
+				//fmt.Printf("txid:%v, vout:%v, createHeight:%v, spentHeight:%v, indexWithinBlock:%v ttl:%v\n",
+				//txIn.PreviousOutPoint.Hash, txIn.PreviousOutPoint.Index, entry.BlockHeight(), blockHeight, stxo.Index, stxo.TTL)
+
+				//fmt.Printf("txid: %v, vout: %v, ttl: %v\n", txIn.PreviousOutPoint.Hash,
+				//	txIn.PreviousOutPoint.Index, blockHeight-entry.BlockHeight())
+			}
+			sstxoIndex++
 		}
 
 		// Mark the entry as spent.  This is not done until after the
 		// relevant details have been accessed since spending it might
 		// clear the fields from memory in the future.
 		entry.Spend()
+
 	}
 
 	// Add the transaction's outputs as available utxos.
@@ -281,8 +320,9 @@ func (view *UtxoViewpoint) connectTransaction(tx *btcutil.Tx, blockHeight int32,
 // In addition, when the 'stxos' argument is not nil, it will be updated to
 // append an entry for each spent txout.
 func (view *UtxoViewpoint) connectTransactions(block *btcutil.Block, stxos *[]SpentTxOut) error {
+	inskip, _ := block.DedupeBlock()
 	for _, tx := range block.Transactions() {
-		err := view.connectTransaction(tx, block.Height(), stxos)
+		err := view.connectTransaction(tx, block.Height(), inskip, stxos)
 		if err != nil {
 			return err
 		}
@@ -590,6 +630,61 @@ func (view *UtxoViewpoint) fetchInputUtxos(db database.DB, block *btcutil.Block)
 
 	// Request the input utxos from the database.
 	return view.fetchUtxosMain(db, neededSet)
+}
+
+// UBlockToUtxoView converts a UData into a btcd blockchain.UtxoViewpoint
+// all the data is there, just a bit different format.
+// Note that this needs blockchain.NewUtxoEntry() in btcd
+func (view *UtxoViewpoint) UBlockToUtxoView(ub btcutil.UBlock) error {
+	m := view.Entries()
+	// loop through leafDatas and convert them into UtxoEntries (pretty much the
+	// same thing
+	for _, ld := range ub.MsgUBlock().UtreexoData.Stxos {
+		txo := wire.NewTxOut(ld.Amt, ld.PkScript)
+		utxo := NewUtxoEntry(txo, ld.Height, ld.Coinbase)
+		op := wire.OutPoint{
+			Hash:  chainhash.Hash(ld.TxHash),
+			Index: ld.Index,
+		}
+		m[op] = utxo
+	}
+
+	_, outskip := ub.Block().DedupeBlock()
+
+	//shouldadd := len(outskip)
+
+	var txonum uint32
+	//var added int
+	for coinbaseif0, tx := range ub.Block().Transactions() {
+		for idx, txOut := range tx.MsgTx().TxOut {
+			// Skip all the OP_RETURNs
+			if isUnspendable(txOut) {
+				txonum++
+				continue
+			}
+			// only add txouts for the same block spends
+			if len(outskip) > 0 && outskip[0] == txonum {
+				utxo := NewUtxoEntry(
+					txOut, ub.Block().Height(), coinbaseif0 == 0)
+				op := wire.OutPoint{
+					Index: uint32(idx),
+					Hash:  *tx.Hash(),
+				}
+				m[op] = utxo
+				outskip = outskip[1:]
+				txonum++
+				//added++
+				continue
+			}
+			txonum++
+		}
+	}
+	//if added != shouldadd {
+	//	s := fmt.Errorf("should add %v but only added %v. txonum final:%v", shouldadd, added, txonum)
+	//	panic(s)
+	//}
+
+	return nil
 }
 
 // NewUtxoViewpoint returns a new empty unspent transaction output view.

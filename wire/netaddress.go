@@ -113,6 +113,12 @@ func readNetAddress(r io.Reader, pver uint32, na *NetAddress, ts bool) error {
 		return err
 	}
 
+	//buf := make([]byte, 2)
+	//if _, err := io.ReadFull(r, buf); err != nil {
+	//	return err
+	//}
+	//port := binary.BigEndian.Uint16(buf)
+
 	*na = NetAddress{
 		Timestamp: na.Timestamp,
 		Services:  na.Services,

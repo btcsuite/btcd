@@ -33,10 +33,12 @@ const (
 	CmdGetAddr      = "getaddr"
 	CmdAddr         = "addr"
 	CmdGetBlocks    = "getblocks"
+	CmdGetUBlocks   = "getublocks"
 	CmdInv          = "inv"
 	CmdGetData      = "getdata"
 	CmdNotFound     = "notfound"
 	CmdBlock        = "block"
+	CmdUBlock       = "ublock"
 	CmdTx           = "tx"
 	CmdGetHeaders   = "getheaders"
 	CmdHeaders      = "headers"
@@ -57,7 +59,6 @@ const (
 	CmdCFilter      = "cfilter"
 	CmdCFHeaders    = "cfheaders"
 	CmdCFCheckpt    = "cfcheckpt"
-	CmdSendAddrV2   = "sendaddrv2"
 )
 
 // MessageEncoding represents the wire message encoding format to be used.
@@ -100,9 +101,6 @@ func makeEmptyMessage(command string) (Message, error) {
 	case CmdVerAck:
 		msg = &MsgVerAck{}
 
-	case CmdSendAddrV2:
-		msg = &MsgSendAddrV2{}
-
 	case CmdGetAddr:
 		msg = &MsgGetAddr{}
 
@@ -112,8 +110,14 @@ func makeEmptyMessage(command string) (Message, error) {
 	case CmdGetBlocks:
 		msg = &MsgGetBlocks{}
 
+	case CmdGetUBlocks:
+		msg = &MsgGetUBlocks{}
+
 	case CmdBlock:
 		msg = &MsgBlock{}
+
+	case CmdUBlock:
+		msg = &MsgUBlock{}
 
 	case CmdInv:
 		msg = &MsgInv{}
@@ -351,6 +355,7 @@ func ReadMessageWithEncodingN(r io.Reader, pver uint32, btcnet BitcoinNet,
 		return totalBytes, nil, nil, err
 	}
 
+	//fmt.Println("PAYLOAD: ", hdr.length)
 	// Enforce maximum message payload.
 	if hdr.length > MaxMessagePayload {
 		str := fmt.Sprintf("message payload is too large - header "+

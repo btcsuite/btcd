@@ -127,40 +127,41 @@ type commandHandler func(*rpcServer, interface{}, <-chan struct{}) (interface{},
 // a dependency loop.
 var rpcHandlers map[string]commandHandler
 var rpcHandlersBeforeInit = map[string]commandHandler{
-	"addnode":                handleAddNode,
-	"createrawtransaction":   handleCreateRawTransaction,
-	"debuglevel":             handleDebugLevel,
-	"decoderawtransaction":   handleDecodeRawTransaction,
-	"decodescript":           handleDecodeScript,
-	"estimatefee":            handleEstimateFee,
-	"generate":               handleGenerate,
-	"getaddednodeinfo":       handleGetAddedNodeInfo,
-	"getbestblock":           handleGetBestBlock,
-	"getbestblockhash":       handleGetBestBlockHash,
-	"getblock":               handleGetBlock,
-	"getblockchaininfo":      handleGetBlockChainInfo,
-	"getblockcount":          handleGetBlockCount,
-	"getblockhash":           handleGetBlockHash,
-	"getblockheader":         handleGetBlockHeader,
-	"getblocktemplate":       handleGetBlockTemplate,
-	"getcfilter":             handleGetCFilter,
-	"getcfilterheader":       handleGetCFilterHeader,
-	"getconnectioncount":     handleGetConnectionCount,
-	"getcurrentnet":          handleGetCurrentNet,
-	"getdifficulty":          handleGetDifficulty,
-	"getgenerate":            handleGetGenerate,
-	"gethashespersec":        handleGetHashesPerSec,
-	"getheaders":             handleGetHeaders,
-	"getinfo":                handleGetInfo,
-	"getmempoolinfo":         handleGetMempoolInfo,
-	"getmininginfo":          handleGetMiningInfo,
-	"getnettotals":           handleGetNetTotals,
-	"getnetworkhashps":       handleGetNetworkHashPS,
-	"getnodeaddresses":       handleGetNodeAddresses,
-	"getpeerinfo":            handleGetPeerInfo,
-	"getrawmempool":          handleGetRawMempool,
-	"getrawtransaction":      handleGetRawTransaction,
-	"gettxout":               handleGetTxOut,
+	"addnode":              handleAddNode,
+	"createrawtransaction": handleCreateRawTransaction,
+	"debuglevel":           handleDebugLevel,
+	"decoderawtransaction": handleDecodeRawTransaction,
+	"decodescript":         handleDecodeScript,
+	"estimatefee":          handleEstimateFee,
+	"generate":             handleGenerate,
+	"getaddednodeinfo":     handleGetAddedNodeInfo,
+	"getbestblock":         handleGetBestBlock,
+	"getbestblockhash":     handleGetBestBlockHash,
+	"getblock":             handleGetBlock,
+	"getblockchaininfo":    handleGetBlockChainInfo,
+	"getblockcount":        handleGetBlockCount,
+	"getblockhash":         handleGetBlockHash,
+	"getblockheader":       handleGetBlockHeader,
+	"getblocktemplate":     handleGetBlockTemplate,
+	"getcfilter":           handleGetCFilter,
+	"getcfilterheader":     handleGetCFilterHeader,
+	"getconnectioncount":   handleGetConnectionCount,
+	"getcurrentnet":        handleGetCurrentNet,
+	"getdifficulty":        handleGetDifficulty,
+	"getgenerate":          handleGetGenerate,
+	"gethashespersec":      handleGetHashesPerSec,
+	"getheaders":           handleGetHeaders,
+	"getinfo":              handleGetInfo,
+	"getmempoolinfo":       handleGetMempoolInfo,
+	"getmininginfo":        handleGetMiningInfo,
+	"getnettotals":         handleGetNetTotals,
+	"getnetworkhashps":     handleGetNetworkHashPS,
+	"getnodeaddresses":     handleGetNodeAddresses,
+	"getpeerinfo":          handleGetPeerInfo,
+	"getrawmempool":        handleGetRawMempool,
+	"getrawtransaction":    handleGetRawTransaction,
+	"gettxout":             handleGetTxOut,
+	//"getttl":                 handleGetTTL,
 	"help":                   handleHelp,
 	"node":                   handleNode,
 	"ping":                   handlePing,
@@ -3742,6 +3743,11 @@ func handleVersion(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (in
 	return result, nil
 }
 
+//// handleGetTTL implements the getttl command.
+//func handleGetTTL(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+//	return nil, nil
+//}
+
 // rpcServer provides a concurrent safe RPC server to a chain server.
 type rpcServer struct {
 	started                int32
@@ -3758,6 +3764,7 @@ type rpcServer struct {
 	helpCacher             *helpCacher
 	requestProcessShutdown chan struct{}
 	quit                   chan int
+	utreexoCSN             bool
 }
 
 // httpStatusLine returns a response Status-Line (RFC 2616 Section 6.1)
@@ -4415,6 +4422,8 @@ type rpcserverConfig struct {
 	// The fee estimator keeps track of how long transactions are left in
 	// the mempool before they are mined into blocks.
 	FeeEstimator *mempool.FeeEstimator
+
+	UtreexoCSN bool
 }
 
 // newRPCServer returns a new instance of the rpcServer struct.
@@ -4426,6 +4435,7 @@ func newRPCServer(config *rpcserverConfig) (*rpcServer, error) {
 		helpCacher:             newHelpCacher(),
 		requestProcessShutdown: make(chan struct{}),
 		quit:                   make(chan int),
+		utreexoCSN:             config.UtreexoCSN,
 	}
 	if cfg.RPCUser != "" && cfg.RPCPass != "" {
 		login := cfg.RPCUser + ":" + cfg.RPCPass
@@ -4460,7 +4470,18 @@ func (s *rpcServer) handleBlockchainNotification(notification *blockchain.Notifi
 		s.gbtWorkState.NotifyBlockConnected(block.Hash())
 
 	case blockchain.NTBlockConnected:
-		block, ok := notification.Data.(*btcutil.Block)
+		var ok bool
+		var block *btcutil.Block
+
+		if s.utreexoCSN {
+			var ublock *btcutil.UBlock
+			ublock, ok = notification.Data.(*btcutil.UBlock)
+			block = ublock.Block()
+		} else {
+			block, ok = notification.Data.(*btcutil.Block)
+		}
+
+		//block, ok := notification.Data.(*btcutil.Block)
 		if !ok {
 			rpcsLog.Warnf("Chain connected notification is not a block.")
 			break

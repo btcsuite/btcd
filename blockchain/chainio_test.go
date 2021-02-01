@@ -37,9 +37,9 @@ func TestErrNotInMainChain(t *testing.T) {
 	}
 }
 
-// TestStxoSerialization ensures serializing and deserializing spent transaction
+// testStxoSerialization ensures serializing and deserializing spent transaction
 // output entries works as expected.
-func TestStxoSerialization(t *testing.T) {
+func testStxoSerialization(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -203,7 +203,7 @@ func TestStxoDecodeErrors(t *testing.T) {
 
 // TestSpendJournalSerialization ensures serializing and deserializing spend
 // journal entries works as expected.
-func TestSpendJournalSerialization(t *testing.T) {
+func testSpendJournalSerialization(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -336,7 +336,7 @@ func TestSpendJournalSerialization(t *testing.T) {
 
 // TestSpendJournalErrors performs negative tests against deserializing spend
 // journal entries to ensure error paths work as expected.
-func TestSpendJournalErrors(t *testing.T) {
+func testSpendJournalErrors(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -404,7 +404,7 @@ func TestSpendJournalErrors(t *testing.T) {
 
 // TestUtxoSerialization ensures serializing and deserializing unspent
 // trasaction output entries works as expected.
-func TestUtxoSerialization(t *testing.T) {
+func testUtxoSerialization(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {

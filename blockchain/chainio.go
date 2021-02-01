@@ -9,6 +9,8 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math/big"
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -16,6 +18,7 @@ import (
 	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
+	"github.com/mit-dci/utreexo/btcacc"
 )
 
 const (
@@ -66,6 +69,14 @@ var (
 	// utxoSetBucketName is the name of the db bucket used to house the
 	// unspent transaction output set.
 	utxoSetBucketName = []byte("utxosetv2")
+
+	// utreexoBucketName is the name of the db bucket used to house the
+	// utreexo compact state accumulator state
+	utreexoCSBucketName = []byte("utreexocs")
+
+	// utxoTTLBucketName is the name of the db bucket used to house the
+	// time-to-live values for each txo
+	txoTTLBucketName = []byte("txottl")
 
 	// byteOrder is the preferred byte order used for serializing numeric
 	// fields for storage in the database.
@@ -148,6 +159,80 @@ func dbFetchOrCreateVersion(dbTx database.Tx, key []byte, defaultVersion uint32)
 	}
 
 	return version, nil
+}
+
+func serializeUtreexoView(uView *UtreexoViewpoint) ([]byte, error) {
+	serializedAcc, err := uView.accumulator.Serialize()
+	if err != nil {
+		return nil, err
+	}
+
+	//serializedAcc = append(serializedAcc, uView.bestHash[:]...)
+
+	return serializedAcc, nil
+}
+
+func deserializeUtreexoView(uView *UtreexoViewpoint, serializedUView []byte) error {
+	//bestHash := serializedUView[len(serializedUView)-chainhash.HashSize:]
+
+	//if len(bestHash) != chainhash.HashSize {
+	//	return errDeserialize(fmt.Sprintf("deserialized bestHash less than 32 bytes"+"bestHash: %v", bestHash))
+	//}
+	//copy(uView.bestHash[:], bestHash)
+
+	err := uView.accumulator.Deserialize(serializedUView)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func dbPutUtreexoView(dbTx database.Tx, uView *UtreexoViewpoint, blockHash chainhash.Hash) (int32, error) {
+	utreexoBucket := dbTx.Metadata().Bucket(utreexoCSBucketName)
+	serialized, err := serializeUtreexoView(uView)
+	if err != nil {
+		return 0, err
+	}
+
+	utreexoSize := int32(len(serialized))
+
+	err = utreexoBucket.Put([]byte(blockHash[:]), serialized)
+	if err != nil {
+		return 0, err
+	}
+
+	return utreexoSize, nil
+}
+
+func dbFetchUtreexoView(dbTx database.Tx, blockHash chainhash.Hash) (*UtreexoViewpoint, error) {
+	utreexoBucket := dbTx.Metadata().Bucket(utreexoCSBucketName)
+	serializedUtreexoView := utreexoBucket.Get([]byte(blockHash[:]))
+	if serializedUtreexoView == nil {
+		return nil, nil
+	}
+
+	uView := NewUtreexoViewpoint()
+	err := deserializeUtreexoView(uView, serializedUtreexoView)
+	if err != nil {
+		// Ensure any deserialization errors are returned as database
+		// corruption errors.
+		if isDeserializeErr(err) {
+			return nil, database.Error{
+				ErrorCode: database.ErrCorruption,
+				Description: fmt.Sprintf("corrupt utreexo entry "+
+					"for %v: %v", blockHash, err),
+			}
+		}
+		return nil, err
+	}
+
+	return uView, err
+}
+
+func dbRemoveUtreexoView(dbTx database.Tx, blockHash chainhash.Hash) error {
+	utreexoBucket := dbTx.Metadata().Bucket(utreexoCSBucketName)
+	return utreexoBucket.Delete([]byte(blockHash[:]))
 }
 
 // -----------------------------------------------------------------------------
@@ -249,6 +334,12 @@ type SpentTxOut struct {
 	// Height is the height of the the block containing the creating tx.
 	Height int32
 
+	// index of "spendable and not a same block spend" stxos
+	Index int16
+
+	// time-to-live value for this particular stxo
+	TTL int32
+
 	// Denotes if the creating tx is a coinbase.
 	IsCoinBase bool
 }
@@ -301,6 +392,8 @@ func spentTxOutSerializeSize(stxo *SpentTxOut) int {
 		// so this is required for backwards compat.
 		size += serializeSizeVLQ(0)
 	}
+	size += serializeSizeVLQ(uint64(stxo.Index))
+	size += serializeSizeVLQ(uint64(stxo.TTL))
 	return size + compressedTxOutSize(uint64(stxo.Amount), stxo.PkScript)
 }
 
@@ -317,6 +410,10 @@ func putSpentTxOut(target []byte, stxo *SpentTxOut) int {
 		// so this is required for backwards compat.
 		offset += putVLQ(target[offset:], 0)
 	}
+
+	offset += putVLQ(target[offset:], uint64(stxo.Index))
+	offset += putVLQ(target[offset:], uint64(stxo.TTL))
+
 	return offset + putCompressedTxOut(target[offset:], uint64(stxo.Amount),
 		stxo.PkScript)
 }
@@ -354,6 +451,11 @@ func decodeSpentTxOut(serialized []byte, stxo *SpentTxOut) (int, error) {
 				"after reserved")
 		}
 	}
+
+	index, bytesRead := deserializeVLQ(serialized[offset:])
+	stxo.Index = int16(index) // NOTE Since the original value is uint16, this should be fine
+	stxo.TTL = int32(index)
+	offset += bytesRead
 
 	// Decode the compressed txout.
 	amount, pkScript, bytesRead, err := decodeCompressedTxOut(
@@ -642,13 +744,15 @@ func serializeUtxoEntry(entry *UtxoEntry) ([]byte, error) {
 	}
 
 	// Calculate the size needed to serialize the entry.
-	size := serializeSizeVLQ(headerCode) +
+	size := serializeSizeVLQ(uint64(entry.Index()))
+	size += serializeSizeVLQ(headerCode) +
 		compressedTxOutSize(uint64(entry.Amount()), entry.PkScript())
 
 	// Serialize the header code followed by the compressed unspent
 	// transaction output.
 	serialized := make([]byte, size)
 	offset := putVLQ(serialized, headerCode)
+	offset += putVLQ(serialized[offset:], uint64(entry.Index()))
 	offset += putCompressedTxOut(serialized[offset:], uint64(entry.Amount()),
 		entry.PkScript())
 
@@ -672,8 +776,12 @@ func deserializeUtxoEntry(serialized []byte) (*UtxoEntry, error) {
 	isCoinBase := code&0x01 != 0
 	blockHeight := int32(code >> 1)
 
+	index, bytesRead := deserializeVLQ(serialized[offset:])
+	offset += bytesRead
+
 	// Decode the compressed unspent transaction output.
 	amount, pkScript, _, err := decodeCompressedTxOut(serialized[offset:])
+
 	if err != nil {
 		return nil, errDeserialize(fmt.Sprintf("unable to decode "+
 			"utxo: %v", err))
@@ -683,6 +791,7 @@ func deserializeUtxoEntry(serialized []byte) (*UtxoEntry, error) {
 		amount:      int64(amount),
 		pkScript:    pkScript,
 		blockHeight: blockHeight,
+		index:       int16(index),
 		packedFlags: 0,
 	}
 	if isCoinBase {
@@ -999,6 +1108,36 @@ func dbPutBestState(dbTx database.Tx, snapshot *BestState, workSum *big.Int) err
 	return dbTx.Metadata().Put(chainStateKeyName, serializedData)
 }
 
+func serializeBestState(snapshot *BestState) ([]byte, error) {
+	timeBytes, err := snapshot.MedianTime.GobEncode()
+	if err != nil {
+		return nil, err
+	}
+
+	// sha256 hash, int32, uint32, then all uint64
+	size := chainhash.HashSize + 4 + 4 + 8 + 8 + 8 + 8 + len(timeBytes)
+
+	serialized := make([]byte, size)
+
+	copy(serialized[0:chainhash.HashSize], snapshot.Hash[:])
+	offset := uint32(chainhash.HashSize)
+	byteOrder.PutUint32(serialized[offset:], uint32(snapshot.Height))
+	offset += 4
+	byteOrder.PutUint32(serialized[offset:], snapshot.Bits)
+	offset += 4
+	byteOrder.PutUint64(serialized[offset:], snapshot.BlockSize)
+	offset += 8
+	byteOrder.PutUint64(serialized[offset:], snapshot.BlockWeight)
+	offset += 8
+	byteOrder.PutUint64(serialized[offset:], snapshot.NumTxns)
+	offset += 8
+	byteOrder.PutUint64(serialized[offset:], snapshot.TotalTxns)
+	offset += 8
+	copy(serialized[offset:], timeBytes[:])
+
+	return serialized, nil
+}
+
 // createChainState initializes both the database and the chain state to the
 // genesis block.  This includes creating the necessary buckets and inserting
 // the genesis block, so it must only be called on an uninitialized database.
@@ -1092,6 +1231,36 @@ func (b *BlockChain) createChainState() error {
 			return err
 		}
 
+		// There are some extra data that needs to be created for utreexo CSNs
+		if b.utreexoCSN {
+			b.utreexoViewpoint = NewUtreexoViewpoint()
+			_, err = meta.CreateBucket(utreexoCSBucketName)
+			if err != nil {
+				return err
+			}
+
+			_, err = dbPutUtreexoView(dbTx, b.utreexoViewpoint, node.hash)
+			if err != nil {
+				return err
+			}
+			if b.utreexoCSN {
+				b.memBlock = &memBlockStore{}
+				b.memBestState = &memBestState{}
+			}
+		}
+
+		// There are some extra data that needs to be created for utreexo bridge
+		// nodes.
+		if b.utreexo {
+			b.UtreexoBS = NewUtreexoBridgeState()
+			b.proofFileState = NewProofFileState()
+			b.proofFileState.InitProofFileState(filepath.Join(b.dataDir, "proof"))
+			_, err = meta.CreateBucket(txoTTLBucketName)
+			if err != nil {
+				return err
+			}
+		}
+
 		// Store the genesis block into the database.
 		return dbStoreBlock(dbTx, genesisBlock)
 	})
@@ -1125,6 +1294,15 @@ func (b *BlockChain) initChainState() error {
 		if err != nil {
 			return nil
 		}
+	}
+
+	if b.utreexo {
+		b.UtreexoBS, err = RestoreUtreexoBridgeState(b.utreexoBSPath)
+		if err != nil {
+			return err
+		}
+		b.proofFileState = NewProofFileState()
+		b.proofFileState.InitProofFileState(filepath.Join(b.dataDir, "proof"))
 	}
 
 	// Attempt to load the chain state from the database.
@@ -1186,6 +1364,7 @@ func (b *BlockChain) initChainState() error {
 			// and add it to the block index.
 			node := new(blockNode)
 			initBlockNode(node, header, parent)
+			node.BuildAncestor()
 			node.status = status
 			b.index.addNode(node)
 
@@ -1210,6 +1389,14 @@ func (b *BlockChain) initChainState() error {
 		err = block.Deserialize(bytes.NewReader(blockBytes))
 		if err != nil {
 			return err
+		}
+
+		if b.utreexoCSN {
+			b.utreexoViewpoint, err = dbFetchUtreexoView(dbTx, state.hash)
+			if err != nil {
+				return err
+			}
+
 		}
 
 		// As a final consistency check, we'll run through all the
@@ -1238,6 +1425,15 @@ func (b *BlockChain) initChainState() error {
 		b.stateSnapshot = newBestState(tip, blockSize, blockWeight,
 			numTxns, state.totalTxns, tip.CalcPastMedianTime())
 
+		if b.utreexoCSN {
+			newBlock := btcutil.NewBlock(&block)
+			newBlock.SetHeight(tip.height)
+			b.memBlock = &memBlockStore{
+				block: newBlock,
+			}
+
+			b.memBestState = &memBestState{}
+		}
 		return nil
 	})
 	if err != nil {
@@ -1352,6 +1548,345 @@ func dbStoreBlock(dbTx database.Tx, block *btcutil.Block) error {
 	return dbTx.StoreBlock(block)
 }
 
+// memBestState is the best state kept in memory. This should only be used for Utreexo
+// CSNs.
+type memBestState struct {
+	state   *BestState
+	workSum *big.Int
+}
+
+// FlushMemBestState stores the best state kept in memory during shutdown.
+func (b *BlockChain) FlushMemBestState() error {
+	err := b.db.Update(func(dbTx database.Tx) error {
+		// Update best block state.
+		err := dbPutBestState(dbTx,
+			b.memBestState.state, b.memBestState.workSum)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// memBlockStore is a single block kept in memory for pow and other consensus checking.
+// This should only be used for the Utreexo CSNs
+type memBlockStore struct {
+	block *btcutil.Block
+}
+
+// StoreBlock replaces the old block that was kept in memory with the new block passed
+// in.
+func (mbs *memBlockStore) StoreBlock(block *btcutil.Block) {
+	mbs.block = block
+}
+
+// FetchBlock returns the block thats stored in memory. Returns nil if the block
+// isn't there
+func (mbs *memBlockStore) FetchBlock(hash *chainhash.Hash) *btcutil.Block {
+	if mbs.block.Hash() == hash {
+		return mbs.block
+	}
+
+	return nil
+}
+
+// FlushMemBlockStore stores the block index and the single block that was kept in
+// memory during the shutdown.
+func (b *BlockChain) FlushMemBlockStore() error {
+	b.chainLock.Lock()
+	defer b.chainLock.Unlock()
+
+	b.utreexoQuit = true
+
+	err := b.index.flushToDB()
+	if err != nil {
+		return err
+	}
+	err = b.db.Update(func(dbTx database.Tx) error {
+		log.Infof("Flushing block %v", b.memBlock.block.Hash())
+		err := dbTx.StoreBlock(b.memBlock.block)
+		if err != nil {
+			return err
+		}
+		err = dbPutBlockIndex(dbTx, b.memBlock.block.Hash(),
+			b.memBlock.block.Height())
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// PutUtreexoView stores the utreexoViewpoint into the database and prints the size
+// of the chainstate in bytes. This function is meant to be called when the node is
+// shutting down.
+func (b *BlockChain) PutUtreexoView() error {
+	b.chainLock.Lock()
+	defer b.chainLock.Unlock()
+
+	// utreexoQuit tells the chain to stop processing more blocks
+	b.utreexoQuit = true
+
+	err := b.db.Update(func(dbTx database.Tx) error {
+		size, err := dbPutUtreexoView(dbTx, b.utreexoViewpoint, *b.memBlock.block.Hash())
+		log.Infof("Storing Utreexo roots at block %v. Utreexo roots/chainstate is %v bytes",
+			*b.memBlock.block.Hash(), size)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// ProofFileState is all the utreexo proofs for the entire chain.
+type ProofFileState struct {
+	basePath      string
+	currentOffset int64
+	proofState    proofFiler
+	offsetState   offsetFiler
+}
+
+// proofFiler is just the prooffile with a rw lock. Mimics the filer
+// found in database/
+type proofFiler struct {
+	rwMutex sync.RWMutex
+	file    *os.File
+}
+
+// offsetFiler is just the offsetfile with a rw lock. Mimics the filer
+// found in database/
+type offsetFiler struct {
+	rwMutex sync.RWMutex
+	file    *os.File
+}
+
+// NewProofFileState returns a empty ProofFileState
+func NewProofFileState() *ProofFileState {
+	return &ProofFileState{}
+}
+
+// InitProofFileState attempts to load and initialize the proof file from
+// the disk. When the proof files don't yet exist, it creates it and initializes
+// to the gensis block.
+func (pf *ProofFileState) InitProofFileState(path string) error {
+	// Check and make directory if it doesn't exist
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return pf.createFlatFileState(path)
+	}
+
+	pf.basePath = path
+
+	proofFilePath := filepath.Join(path, "proof.dat")
+	proofFile, err := os.OpenFile(proofFilePath, os.O_RDWR|os.O_CREATE, os.ModePerm)
+	if err != nil {
+		return err
+	}
+	pf.proofState = proofFiler{
+		file:    proofFile,
+		rwMutex: sync.RWMutex{},
+	}
+
+	offsetFilePath := filepath.Join(path, "offset.dat")
+	offsetFile, err := os.OpenFile(offsetFilePath, os.O_RDWR|os.O_CREATE, os.ModePerm)
+	if err != nil {
+		return err
+	}
+	pf.offsetState = offsetFiler{
+		file:    offsetFile,
+		rwMutex: sync.RWMutex{},
+	}
+
+	pf.currentOffset, err = proofFile.Seek(0, 2)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// createFlatFileState creates the prooffile and the offsetfile on disk
+// Meant to be called when a node is freshly started
+func (pf *ProofFileState) createFlatFileState(path string) error {
+	os.MkdirAll(path, 0700)
+	pf.basePath = path
+
+	proofFilePath := filepath.Join(path, "proof.dat")
+	proofFile, err := os.OpenFile(proofFilePath, os.O_RDWR|os.O_CREATE, os.ModePerm)
+	if err != nil {
+		return err
+	}
+	pf.proofState = proofFiler{
+		file:    proofFile,
+		rwMutex: sync.RWMutex{},
+	}
+
+	offsetFilePath := filepath.Join(path, "offset.dat")
+	offsetFile, err := os.OpenFile(offsetFilePath, os.O_RDWR|os.O_CREATE, os.ModePerm)
+	if err != nil {
+		return err
+	}
+	pf.offsetState = offsetFiler{
+		file:    offsetFile,
+		rwMutex: sync.RWMutex{},
+	}
+	// write 0s for the genesis block
+	_, err = pf.offsetState.file.Write(make([]byte, 8))
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// flatFileStoreAccProof takes a UData, and stores it in the flat file.
+// the offset for which is proof exists in the flat file is stored in the
+// offsetfile.
+//
+// This function MUST be called with the chain state lock held (for writes).
+func (pf *ProofFileState) flatFileStoreAccProof(ud btcacc.UData) error {
+	// pre-allocated the needed buffer
+	udSize := ud.SerializeSize()
+	buf := make([]byte, udSize)
+
+	// write write the offset of the current proof to the offset file
+	pf.offsetState.rwMutex.Lock()
+	buf = buf[:8]
+	binary.BigEndian.PutUint64(buf, uint64(pf.currentOffset))
+	_, err := pf.offsetState.file.WriteAt(buf, int64(8*ud.Height))
+	if err != nil {
+		return err
+	}
+	pf.offsetState.rwMutex.Unlock()
+
+	// write to proof file
+	pf.proofState.rwMutex.Lock()
+	_, err = pf.proofState.file.WriteAt([]byte{0xaa, 0xff, 0xaa, 0xff}, pf.currentOffset)
+	if err != nil {
+		return err
+	}
+
+	// prefix with size
+	buf = buf[:4]
+	binary.BigEndian.PutUint32(buf, uint32(udSize))
+	// +4 to account for the 4 magic bytes
+	_, err = pf.proofState.file.WriteAt(buf, pf.currentOffset+4)
+	if err != nil {
+		return err
+	}
+
+	// Serialize proof
+	buf = buf[:0]
+	bytesBuf := bytes.NewBuffer(buf)
+	err = ud.Serialize(bytesBuf)
+	if err != nil {
+		return err
+	}
+
+	// Write to the file
+	// +4 +4 to account for the 4 magic bytes and the 4 size bytes
+	_, err = pf.proofState.file.WriteAt(bytesBuf.Bytes(), pf.currentOffset+4+4)
+	if err != nil {
+		return err
+	}
+
+	pf.proofState.rwMutex.Unlock()
+
+	// 4B magic & 4B size comes first
+	pf.currentOffset += int64(udSize + 8)
+
+	return nil
+}
+
+// FetchProof, given a block hash, will return the udata associated with that block
+//
+// This function is safe for concurrent access.
+func (b *BlockChain) FetchProof(hash *chainhash.Hash) (*btcacc.UData, error) {
+	var height int32
+	err := b.db.View(func(dbTx database.Tx) error {
+		var err error
+		height, err = dbFetchHeightByHash(dbTx, hash)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	// pre-allocate buf
+	buf := make([]byte, 8)
+
+	// First read the offset of where the proof is in the offsetfile
+	b.proofFileState.offsetState.rwMutex.RLock()
+	_, err = b.proofFileState.offsetState.file.ReadAt(buf, int64(8*height))
+	if err != nil {
+		return nil, err
+	}
+	b.proofFileState.offsetState.rwMutex.RUnlock()
+
+	offset := binary.BigEndian.Uint64(buf)
+	if err != nil {
+		return nil, err
+	}
+
+	// Then read the actual proof from the prooffile and deserialize
+	b.proofFileState.proofState.rwMutex.RLock()
+	buf = buf[:4]
+	_, err = b.proofFileState.proofState.file.ReadAt(buf, int64(offset))
+	if err != nil {
+		return nil, err
+	}
+
+	if !bytes.Equal(buf, []byte{0xaa, 0xff, 0xaa, 0xff}) {
+		return nil, fmt.Errorf("wrong magic")
+	}
+	offset += 4
+
+	_, err = b.proofFileState.proofState.file.ReadAt(buf, int64(offset))
+	if err != nil {
+		return nil, err
+	}
+
+	size := binary.BigEndian.Uint32(buf)
+
+	if size > 1<<24 {
+		return nil, fmt.Errorf("size at offest %d says %d which is too big", offset, size)
+	}
+
+	offset += 4
+	udBytes := make([]byte, size)
+	_, err = b.proofFileState.proofState.file.ReadAt(udBytes, int64(offset))
+	if err != nil {
+		return nil, err
+	}
+
+	udReader := bytes.NewReader(udBytes)
+	ud := btcacc.UData{}
+	err = ud.Deserialize(udReader)
+	if err != nil {
+		return nil, err
+	}
+	b.proofFileState.proofState.rwMutex.RUnlock()
+
+	return &ud, nil
+}
+
 // blockIndexKey generates the binary key for an entry in the block index
 // bucket. The key is composed of the block height encoded as a big-endian
 // 32-bit unsigned int followed by the 32 byte block hash.
@@ -1404,4 +1939,139 @@ func (b *BlockChain) BlockByHash(hash *chainhash.Hash) (*btcutil.Block, error) {
 		return err
 	})
 	return block, err
+}
+
+// dbStoreTTLForBlock goes through all the stxos and stores the// spent output's ttl in the bucket
+func dbStoreTTLForBlock(dbTx database.Tx, hash *chainhash.Hash, block *btcutil.Block, stxos []SpentTxOut) error {
+	count := countDedupedStxos(block)
+	err := dbPutTTLCountForBlock(dbTx, *hash, int32(count))
+	if err != nil {
+		return err
+	}
+
+	for i := 0; i < count-1; i++ {
+		// If it's an OP_RETURN or a same block spend, skip
+		if stxos[i].TTL == 0 || stxos[i].Index == SSTxoIndexNA {
+			continue
+		}
+
+		err = dbPutTTL(dbTx, TTL{
+			Height: stxos[i].Height,
+			Index:  stxos[i].Index,
+			TTL:    stxos[i].TTL,
+		})
+		if err != nil {
+			return err
+		}
+
+	}
+
+	return nil
+}
+
+// TTL is a time-to-live value for a stxo. For a given stxo, how long does it
+// take in blocks for it to be spent? Ex: A stxo created at block 5 and spent
+// at block 21 will have a ttl of 16.
+type TTL struct {
+	Height int32 // height of the block that created the tx
+	Index  int16 // index of "spendable and not a same block spend" stxos
+	TTL    int32 // time-to-live value
+}
+
+// FetchTTL returns the TTL struct given the block hash and height
+func FetchTTL(dbTx database.Tx, height int32, hash *chainhash.Hash) []*TTL {
+	ttlBucket := dbTx.Metadata().Bucket(txoTTLBucketName)
+	serializedCount := ttlBucket.Get(hash[:])
+
+	count := byteOrder.Uint32(serializedCount[:])
+	ttls := make([]*TTL, count)
+
+	var key [6]byte
+	byteOrder.PutUint32(key[:4], uint32(height))
+
+	for i := uint32(0); i < count; i++ {
+		byteOrder.PutUint16(key[4:], uint16(i))
+		serialized := ttlBucket.Get(key[:])
+		if serialized == nil {
+			continue
+		}
+
+		ttl := TTL{
+			Height: int32(height),
+			Index:  int16(i),
+			TTL:    int32(byteOrder.Uint32(serialized)),
+		}
+		ttls[i] = &ttl
+	}
+
+	return ttls
+}
+
+// FetchOnlyTTL only fetches the slice of int32 without other data
+func FetchOnlyTTL(dbTx database.Tx, hash *chainhash.Hash) ([]int32, error) {
+	height, err := dbFetchHeightByHash(dbTx, hash)
+	if err != nil {
+		return nil, err
+	}
+	ttlBucket := dbTx.Metadata().Bucket(txoTTLBucketName)
+	serializedCount := ttlBucket.Get(hash[:])
+
+	count := byteOrder.Uint32(serializedCount[:])
+	ttls := make([]int32, count)
+
+	var key [6]byte
+	byteOrder.PutUint32(key[:4], uint32(height))
+
+	for i := uint32(0); i < count; i++ {
+		byteOrder.PutUint16(key[4:], uint16(i))
+		serialized := ttlBucket.Get(key[:])
+		if serialized == nil {
+			continue
+		}
+
+		ttls[i] = int32(byteOrder.Uint32(serialized))
+	}
+
+	return ttls, nil
+}
+
+// dbPutTTLCountForBlock stores how many ttls there are for a given block. This data
+// is used during ttl fetches for a block.
+func dbPutTTLCountForBlock(dbTx database.Tx, hash chainhash.Hash, count int32) error {
+	ttlBucket := dbTx.Metadata().Bucket(txoTTLBucketName)
+	var value [4]byte
+	byteOrder.PutUint32(value[:], uint32(count))
+
+	return ttlBucket.Put(hash[:], value[:])
+}
+
+// dbRemoveTTLCountForBlock removes the ttl count for a block
+func dbRemoveTTLCountForBlock(dbTx database.Tx, hash chainhash.Hash) error {
+	ttlBucket := dbTx.Metadata().Bucket(txoTTLBucketName)
+	return ttlBucket.Delete(hash[:])
+}
+
+// dbPutTTL stores the TTL in the database.
+func dbPutTTL(dbTx database.Tx, ttl TTL) error {
+	var key [6]byte
+
+	byteOrder.PutUint32(key[:4], uint32(ttl.Height))
+	byteOrder.PutUint16(key[4:], uint16(ttl.Index))
+
+	var value [4]byte
+	byteOrder.PutUint32(value[:], uint32(ttl.TTL))
+
+	ttlBucket := dbTx.Metadata().Bucket(txoTTLBucketName)
+	return ttlBucket.Put(key[:], value[:])
+}
+
+// dbRemoveTTL removes a TTL from the database.
+func dbRemoveTTL(dbTx database.Tx, height int32, index int16) error {
+	var serialized [6]byte
+
+	byteOrder.PutUint32(serialized[:4], uint32(height))
+	byteOrder.PutUint16(serialized[4:], uint16(index))
+
+	ttlBucket := dbTx.Metadata().Bucket(txoTTLBucketName)
+	return ttlBucket.Delete(serialized[:])
 }

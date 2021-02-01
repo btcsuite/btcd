@@ -18,6 +18,7 @@ import (
 	"github.com/btcsuite/btcd/peer"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/go-socks/socks"
+	"github.com/mit-dci/utreexo/btcacc"
 )
 
 // conn mocks a network connection by implementing the net.Conn interface.  It
@@ -248,6 +249,15 @@ func TestPeerConnection(t *testing.T) {
 		Services:          wire.SFNodeNetwork | wire.SFNodeWitness,
 		TrickleInterval:   time.Second * 10,
 	}
+	//peer3Cfg := &peer.Config{
+	//	Listeners:         peer1Cfg.Listeners,
+	//	UserAgentName:     "peer",
+	//	UserAgentVersion:  "1.0",
+	//	UserAgentComments: []string{"comment"},
+	//	ChainParams:       &chaincfg.MainNetParams,
+	//	Services:          wire.SFNodeNetwork | wire.SFNodeWitness | wire.SFNodeUtreexo,
+	//	TrickleInterval:   time.Second * 10,
+	//}
 
 	wantStats1 := peerStats{
 		wantUserAgent:       wire.DefaultUserAgent + "peer:1.0(comment)/",
@@ -279,6 +289,22 @@ func TestPeerConnection(t *testing.T) {
 		wantBytesReceived:   167,
 		wantWitnessEnabled:  true,
 	}
+
+	//wantStats3 := peerStats{
+	//	wantUserAgent:       wire.DefaultUserAgent + "peer:1.0(comment)/",
+	//	wantServices:        wire.SFNodeNetwork | wire.SFNodeWitness | wire.SFNodeUtreexo,
+	//	wantProtocolVersion: wire.RejectVersion,
+	//	wantConnected:       true,
+	//	wantVersionKnown:    true,
+	//	wantVerAckReceived:  true,
+	//	wantLastPingTime:    time.Time{},
+	//	wantLastPingNonce:   uint64(0),
+	//	wantLastPingMicros:  int64(0),
+	//	wantTimeOffset:      int64(0),
+	//	wantBytesSent:       167, // 143 version + 24 verack
+	//	wantBytesReceived:   167,
+	//	wantWitnessEnabled:  true,
+	//}
 
 	tests := []struct {
 		name  string
@@ -344,6 +370,7 @@ func TestPeerConnection(t *testing.T) {
 			t.Errorf("TestPeerConnection setup #%d: unexpected err %v", i, err)
 			return
 		}
+		//testPeer(t, inPeer, wantStats3)
 		testPeer(t, inPeer, wantStats2)
 		testPeer(t, outPeer, wantStats1)
 
@@ -382,6 +409,9 @@ func TestPeerListeners(t *testing.T) {
 				ok <- msg
 			},
 			OnBlock: func(p *peer.Peer, msg *wire.MsgBlock, buf []byte) {
+				ok <- msg
+			},
+			OnUBlock: func(p *peer.Peer, msg *wire.MsgUBlock, buf []byte) {
 				ok <- msg
 			},
 			OnInv: func(p *peer.Peer, msg *wire.MsgInv) {
@@ -517,6 +547,10 @@ func TestPeerListeners(t *testing.T) {
 			"OnBlock",
 			wire.NewMsgBlock(wire.NewBlockHeader(1,
 				&chainhash.Hash{}, &chainhash.Hash{}, 1, 1)),
+		},
+		{
+			"OnUBlock",
+			wire.NewMsgUBlock(wire.MsgBlock{}, btcacc.UData{}),
 		},
 		{
 			"OnInv",

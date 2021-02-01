@@ -74,6 +74,9 @@ type blockNode struct {
 	// parent is the parent block for this node.
 	parent *blockNode
 
+	// ancestor is a block that is more than one block back from this node
+	ancestor *blockNode
+
 	// hash is the double sha 256 of the block.
 	hash chainhash.Hash
 
@@ -150,6 +153,27 @@ func (node *blockNode) Header() wire.BlockHeader {
 	}
 }
 
+// Turn the lowest '1' bit in the binary representation of a number into a '0'
+func invertLowestOne(n int32) int32 {
+	return n & (n - 1)
+}
+
+// Compute what height to jump back to during blocknode.Ancestor()
+func getSkipHeight(height int32) int32 {
+	if height < 2 {
+		return 0
+	}
+
+	// Determine which height to jump back to. Any number strictly lower than height is acceptable,
+	// but the following expression seems to perform well in simulations (max 110 steps to go back
+	// up to 2**18 blocks).
+	if (height & 1) == 1 {
+		return invertLowestOne(invertLowestOne(height-1)) + 1
+	} else {
+		return invertLowestOne(height)
+	}
+}
+
 // Ancestor returns the ancestor block node at the provided height by following
 // the chain backwards from this node.  The returned block will be nil when a
 // height is requested that is after the height of the passed node or is less
@@ -161,12 +185,35 @@ func (node *blockNode) Ancestor(height int32) *blockNode {
 		return nil
 	}
 
-	n := node
-	for ; n != nil && n.height != height; n = n.parent {
-		// Intentionally left blank
+	indexWalk := node
+	heightWalk := node.height
+
+	for heightWalk > height {
+		heightSkip := getSkipHeight(heightWalk)
+		heightSkipPrev := getSkipHeight(heightWalk - 1)
+
+		if indexWalk.ancestor != nil &&
+			heightSkip == height ||
+			heightSkip > height && !(heightSkipPrev < heightSkip-2 &&
+				heightSkipPrev >= height) {
+
+			// Only follow ancestor if ancestor isn't better than parent.
+			indexWalk = indexWalk.ancestor
+			heightWalk = heightSkip
+		} else {
+			indexWalk = indexWalk.parent
+			heightWalk--
+		}
 	}
 
-	return n
+	return indexWalk
+}
+
+func (node *blockNode) BuildAncestor() {
+	if node.parent != nil {
+		node.ancestor = node.parent.Ancestor(
+			getSkipHeight(node.height))
+	}
 }
 
 // RelativeAncestor returns the ancestor block node a relative 'distance' blocks
@@ -328,6 +375,8 @@ func (bi *blockIndex) flushToDB() error {
 		return nil
 	}
 
+	// NOTE utcd: we don't care about the index since we're not saving any blocks
+	//var err error
 	err := bi.db.Update(func(dbTx database.Tx) error {
 		for node := range bi.dirty {
 			err := dbStoreBlockNode(dbTx, node)

@@ -728,6 +728,17 @@ func NewGetWorkCmd(data *string) *GetWorkCmd {
 	}
 }
 
+// GetTTLCmd defines the getttl JSON-RPC command.
+type GetTTLCmd struct {
+	Data *string
+}
+
+func NewGetTTLCmd(Data *string) *GetTTLCmd {
+	return &GetTTLCmd{
+		Data: Data,
+	}
+}
+
 // HelpCmd defines the help JSON-RPC command.
 type HelpCmd struct {
 	Command *string
@@ -1086,6 +1097,7 @@ func init() {
 	MustRegisterCmd("gettxoutproof", (*GetTxOutProofCmd)(nil), flags)
 	MustRegisterCmd("gettxoutsetinfo", (*GetTxOutSetInfoCmd)(nil), flags)
 	MustRegisterCmd("getwork", (*GetWorkCmd)(nil), flags)
+	MustRegisterCmd("getttl", (*GetTTLCmd)(nil), flags)
 	MustRegisterCmd("help", (*HelpCmd)(nil), flags)
 	MustRegisterCmd("invalidateblock", (*InvalidateBlockCmd)(nil), flags)
 	MustRegisterCmd("ping", (*PingCmd)(nil), flags)

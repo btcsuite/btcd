@@ -76,6 +76,11 @@ var (
 	defaultLogDir      = filepath.Join(defaultHomeDir, defaultLogDirname)
 )
 
+// change this to false test out the utreexo binary
+// otherwise it'll only enable utreexocsn and connect to the
+// designated nodes
+var release bool = false
+
 // runServiceCommand is only set to a real function on Windows.  It is used
 // to parse and execute service commands specified via the -s flag.
 var runServiceCommand func(string) error
@@ -160,8 +165,13 @@ type config struct {
 	SigCacheMaxSize      uint          `long:"sigcachemaxsize" description:"The maximum number of entries in the signature verification cache"`
 	SimNet               bool          `long:"simnet" description:"Use the simulation test network"`
 	TestNet3             bool          `long:"testnet" description:"Use the test network"`
+	Utreexo              bool          `long:"utreexo" description:"Serve Utreexo Proofs"`
+	UtreexoBSPath        string        `long:"utreexobspath" description:"Path for saving the Utreexo BridgeNode State"`
+	UtreexoCSN           bool          `long:"utreexocsn" description:"Enable Utreexo pruning"`
+	UtreexoLookAhead     int           `long:"utreexolookahead" description:"How many blocks ahead to cache for Utreexo"`
 	TorIsolation         bool          `long:"torisolation" description:"Enable Tor stream isolation by randomizing user credentials for each connection."`
 	TrickleInterval      time.Duration `long:"trickleinterval" description:"Minimum time between attempts to send new inventory to a connected peer"`
+	TTL                  bool          `long:"ttl" description:"Enable indexing of the time-to-live values for txos"`
 	TxIndex              bool          `long:"txindex" description:"Maintain a full hash-based transaction index which makes all transactions available via the getrawtransaction RPC"`
 	UserAgentComments    []string      `long:"uacomment" description:"Comment to add to the user agent -- See BIP 14 for more information."`
 	Upnp                 bool          `long:"upnp" description:"Use UPnP to map our listening port outside of NAT"`
@@ -532,6 +542,25 @@ func loadConfig() (*config, []string, error) {
 		return nil, nil, err
 	}
 
+	// Multiple utreexo modes can't be selected simultaneously.
+	numUtreexo := 0
+
+	if cfg.Utreexo {
+		numUtreexo++
+	}
+	if cfg.UtreexoCSN {
+		numUtreexo++
+	}
+
+	if numUtreexo > 1 {
+		str := "%s: The utreexo and utreexocsn params " +
+			"can't be used together -- choose one of the two"
+		err := fmt.Errorf(str, funcName)
+		fmt.Fprintln(os.Stderr, err)
+		fmt.Fprintln(os.Stderr, usageMessage)
+		return nil, nil, err
+	}
+
 	// Multiple networks can't be selected simultaneously.
 	numNets := 0
 	// Count number of network flags passed; assign active network params
@@ -598,6 +627,8 @@ func loadConfig() (*config, []string, error) {
 		fmt.Println("Supported subsystems", supportedSubsystems())
 		os.Exit(0)
 	}
+
+	cfg.UtreexoBSPath = filepath.Join(cfg.DataDir, "bridge_data")
 
 	// Initialize log rotation.  After log rotation has been initialized, the
 	// logger variables may be used.
@@ -671,6 +702,45 @@ func loadConfig() (*config, []string, error) {
 				}
 			}
 			cfg.whitelists = append(cfg.whitelists, ipnet)
+		}
+	}
+
+	// NOTE: this is here for the utcd csn release
+	if release {
+		if !cfg.UtreexoCSN {
+			err := fmt.Errorf("%s: this binary only supports utreexoCSN mode."+
+				"Please run again with the flag --utreexocsn",
+				funcName)
+			fmt.Fprintln(os.Stderr, err)
+			return nil, nil, err
+		}
+
+		if cfg.UtreexoCSN {
+			fmt.Printf("%s: In utreexoCSN mode.\n"+
+				"setting flag --connect to the designated nodes\n",
+				funcName)
+			if cfg.TestNet3 {
+				cfg.ConnectPeers = []string{
+					"34.105.121.136", // mit-dci midwest-US
+					"35.188.186.244", // mit-dci midwest-US
+					"35.204.135.228", // mit-dci Europe
+				}
+			} else {
+				err := fmt.Errorf("%s: this binary only supports testnet3."+
+					"Please run again with the flag --testnet",
+					funcName)
+				fmt.Fprintln(os.Stderr, err)
+				return nil, nil, err
+			}
+
+			if cfg.RegressionTest || cfg.SimNet {
+				err := fmt.Errorf("%s: this binary only supports utreexoCSN mode in"+
+					"testnet or mainnet. For regtest or simnet, please"+
+					"modify&build from the source code",
+					funcName)
+				fmt.Fprintln(os.Stderr, err)
+				return nil, nil, err
+			}
 		}
 	}
 
@@ -834,6 +904,46 @@ func loadConfig() (*config, []string, error) {
 			fmt.Fprintln(os.Stderr, usageMessage)
 			return nil, nil, err
 		}
+	}
+
+	if cfg.TxIndex {
+		err := fmt.Errorf("%s: the --txindex"+
+			"not supported for this utreexo release",
+			funcName)
+		fmt.Fprintln(os.Stderr, err)
+		return nil, nil, err
+	}
+
+	if cfg.AddrIndex {
+		err := fmt.Errorf("%s: the --addrindex"+
+			"not supported for this utreexo release",
+			funcName)
+		fmt.Fprintln(os.Stderr, err)
+		return nil, nil, err
+	}
+
+	if cfg.DropTxIndex {
+		err := fmt.Errorf("%s: the --DropTxIndex"+
+			"not supported for this utreexo release",
+			funcName)
+		fmt.Fprintln(os.Stderr, err)
+		return nil, nil, err
+	}
+
+	if cfg.DropAddrIndex {
+		err := fmt.Errorf("%s: the --DropAddrIndex"+
+			"not supported for this utreexo release",
+			funcName)
+		fmt.Fprintln(os.Stderr, err)
+		return nil, nil, err
+	}
+
+	if cfg.DropCfIndex {
+		err := fmt.Errorf("%s: the --DropCfIndex"+
+			"not supported for this utreexo release",
+			funcName)
+		fmt.Fprintln(os.Stderr, err)
+		return nil, nil, err
 	}
 
 	// --txindex and --droptxindex do not mix.

@@ -49,6 +49,14 @@ type orphanBlock struct {
 	expiration time.Time
 }
 
+// orphanUBlock represents a block that we don't yet have the parent for.  It
+// is a normal ublock plus an expiration time to prevent caching the orphan
+// forever.
+type orphanUBlock struct {
+	ublock     *btcutil.UBlock
+	expiration time.Time
+}
+
 // BestState houses information about the current best block and other info
 // related to the state of the main chain as it exists from the point of view of
 // the current best block.
@@ -95,12 +103,32 @@ type BlockChain struct {
 	// separate mutex.
 	checkpoints         []chaincfg.Checkpoint
 	checkpointsByHeight map[int32]*chaincfg.Checkpoint
+	assumeValidHash     *chainhash.Hash
 	db                  database.DB
 	chainParams         *chaincfg.Params
 	timeSource          MedianTimeSource
 	sigCache            *txscript.SigCache
 	indexManager        IndexManager
 	hashCache           *txscript.HashCache
+
+	// These fields are utreexo specific. Some fields are compact-state-node only
+	// and some are shared by both the
+	// bridgenode and the csn
+	utreexo       bool                // enable utreexo bridgenode
+	UtreexoBS     *UtreexoBridgeState // state for bridgenodes
+	utreexoBSPath string              // path for utreexo
+
+	// utreexoQuit this tells the chain to throw away any existing blocks it
+	// may have on memory to verify.
+	utreexoQuit      bool
+	dataDir          string            // where all the data is stored
+	utreexoCSN       bool              // enable utreexo compact-state-node
+	ttl              bool              // enable time-to-live tracking for txos
+	utreexoLookAhead int               // set a value for the ttl
+	memBlock         *memBlockStore    // one block stored in memory
+	memBestState     *memBestState     // best state stored in memory
+	proofFileState   *ProofFileState   // All the utreexo proofs
+	utreexoViewpoint *UtreexoViewpoint // compact state of the utxo set
 
 	// The following fields are calculated based upon the provided chain
 	// parameters.  They are also set when the instance is created and
@@ -132,6 +160,13 @@ type BlockChain struct {
 	orphans      map[chainhash.Hash]*orphanBlock
 	prevOrphans  map[chainhash.Hash][]*orphanBlock
 	oldestOrphan *orphanBlock
+
+	// These fields are related to handling of orphan ublocks.  They are
+	// protected by a combination of the chain lock and the orphan lock.
+	uOrphanLock   sync.RWMutex
+	uOrphans      map[chainhash.Hash]*orphanUBlock
+	prevUOrphans  map[chainhash.Hash][]*orphanUBlock
+	oldestUOrphan *orphanUBlock
 
 	// These fields are related to checkpoint handling.  They are protected
 	// by the chain lock.
@@ -192,7 +227,20 @@ func (b *BlockChain) HaveBlock(hash *chainhash.Hash) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return exists || b.IsKnownOrphan(hash), nil
+	return exists || b.IsKnownOrphan(hash, false), nil
+}
+
+// HaveUBlock returns whether or not the chain instance has the block represented
+// by the passed hash.  This includes checking the various places a block can
+// be like part of the main chain, on a side chain, or in the orphan pool.
+//
+// This function is safe for concurrent access.
+func (b *BlockChain) HaveUBlock(hash *chainhash.Hash) (bool, error) {
+	exists, err := b.blockExists(hash)
+	if err != nil {
+		return false, err
+	}
+	return exists || b.IsKnownOrphan(hash, true), nil
 }
 
 // IsKnownOrphan returns whether the passed hash is currently a known orphan.
@@ -205,13 +253,22 @@ func (b *BlockChain) HaveBlock(hash *chainhash.Hash) (bool, error) {
 // duplicate orphans and react accordingly.
 //
 // This function is safe for concurrent access.
-func (b *BlockChain) IsKnownOrphan(hash *chainhash.Hash) bool {
-	// Protect concurrent access.  Using a read lock only so multiple
-	// readers can query without blocking each other.
-	b.orphanLock.RLock()
-	_, exists := b.orphans[*hash]
-	b.orphanLock.RUnlock()
+func (b *BlockChain) IsKnownOrphan(hash *chainhash.Hash, utreexoCSN bool) bool {
+	var exists bool
+	if utreexoCSN {
+		// Protect concurrent access.  Using a read lock only so multiple
+		// readers can query without blocking each other.
+		b.uOrphanLock.RLock()
+		_, exists = b.uOrphans[*hash]
+		b.uOrphanLock.RUnlock()
+	} else {
+		// Protect concurrent access.  Using a read lock only so multiple
+		// readers can query without blocking each other.
+		b.orphanLock.RLock()
+		_, exists = b.orphans[*hash]
+		b.orphanLock.RUnlock()
 
+	}
 	return exists
 }
 
@@ -219,23 +276,44 @@ func (b *BlockChain) IsKnownOrphan(hash *chainhash.Hash) bool {
 // map of orphan blocks.
 //
 // This function is safe for concurrent access.
-func (b *BlockChain) GetOrphanRoot(hash *chainhash.Hash) *chainhash.Hash {
-	// Protect concurrent access.  Using a read lock only so multiple
-	// readers can query without blocking each other.
-	b.orphanLock.RLock()
-	defer b.orphanLock.RUnlock()
+func (b *BlockChain) GetOrphanRoot(hash *chainhash.Hash, utreexoCSN bool) *chainhash.Hash {
+	var orphanRoot *chainhash.Hash
+	if utreexoCSN {
+		// Protect concurrent access.  Using a read lock only so multiple
+		// readers can query without blocking each other.
+		b.uOrphanLock.RLock()
+		defer b.uOrphanLock.RUnlock()
 
-	// Keep looping while the parent of each orphaned block is
-	// known and is an orphan itself.
-	orphanRoot := hash
-	prevHash := hash
-	for {
-		orphan, exists := b.orphans[*prevHash]
-		if !exists {
-			break
+		// Keep looping while the parent of each orphaned block is
+		// known and is an orphan itself.
+		orphanRoot = hash
+		prevHash := hash
+		for {
+			orphan, exists := b.uOrphans[*prevHash]
+			if !exists {
+				break
+			}
+			orphanRoot = prevHash
+			prevHash = &orphan.ublock.MsgUBlock().MsgBlock.Header.PrevBlock
 		}
-		orphanRoot = prevHash
-		prevHash = &orphan.block.MsgBlock().Header.PrevBlock
+	} else {
+		// Protect concurrent access.  Using a read lock only so multiple
+		// readers can query without blocking each other.
+		b.orphanLock.RLock()
+		defer b.orphanLock.RUnlock()
+
+		// Keep looping while the parent of each orphaned block is
+		// known and is an orphan itself.
+		orphanRoot = hash
+		prevHash := hash
+		for {
+			orphan, exists := b.orphans[*prevHash]
+			if !exists {
+				break
+			}
+			orphanRoot = prevHash
+			prevHash = &orphan.block.MsgBlock().Header.PrevBlock
+		}
 	}
 
 	return orphanRoot
@@ -322,6 +400,89 @@ func (b *BlockChain) addOrphanBlock(block *btcutil.Block) {
 	// Add to previous hash lookup index for faster dependency lookups.
 	prevHash := &block.MsgBlock().Header.PrevBlock
 	b.prevOrphans[*prevHash] = append(b.prevOrphans[*prevHash], oBlock)
+}
+
+// removeOrphanUBlock removes the passed orphan ublock from the orphan pool and
+// previous orphan index.
+func (b *BlockChain) removeOrphanUBlock(orphan *orphanUBlock) {
+	// Protect concurrent access.
+	b.uOrphanLock.Lock()
+	defer b.uOrphanLock.Unlock()
+
+	// Remove the orphan block from the orphan pool.
+	orphanHash := orphan.ublock.Hash()
+	delete(b.uOrphans, *orphanHash)
+
+	// Remove the reference from the previous orphan index too.  An indexing
+	// for loop is intentionally used over a range here as range does not
+	// reevaluate the slice on each iteration nor does it adjust the index
+	// for the modified slice.
+	prevHash := &orphan.ublock.MsgUBlock().MsgBlock.Header.PrevBlock
+	orphans := b.prevUOrphans[*prevHash]
+	for i := 0; i < len(orphans); i++ {
+		hash := orphans[i].ublock.Hash()
+		if hash.IsEqual(orphanHash) {
+			copy(orphans[i:], orphans[i+1:])
+			orphans[len(orphans)-1] = nil
+			orphans = orphans[:len(orphans)-1]
+			i--
+		}
+	}
+	b.prevUOrphans[*prevHash] = orphans
+
+	// Remove the map entry altogether if there are no longer any orphans
+	// which depend on the parent hash.
+	if len(b.prevUOrphans[*prevHash]) == 0 {
+		delete(b.prevUOrphans, *prevHash)
+	}
+}
+
+// addOrphanUBlock adds the passed block (which is already determined to be
+// an orphan prior calling this function) to the orphan pool.  It lazily cleans
+// up any expired blocks so a separate cleanup poller doesn't need to be run.
+// It also imposes a maximum limit on the number of outstanding orphan
+// blocks and will remove the oldest received orphan ublock if the limit is
+// exceeded.
+func (b *BlockChain) addOrphanUBlock(ublock *btcutil.UBlock) {
+	// Remove expired orphan blocks.
+	for _, uoBlock := range b.uOrphans {
+		if time.Now().After(uoBlock.expiration) {
+			b.removeOrphanUBlock(uoBlock)
+			continue
+		}
+
+		// Update the oldest orphan block pointer so it can be discarded
+		// in case the orphan pool fills up.
+		if b.oldestUOrphan == nil || uoBlock.expiration.Before(b.oldestUOrphan.expiration) {
+			b.oldestUOrphan = uoBlock
+		}
+	}
+
+	// Limit orphan blocks to prevent memory exhaustion.
+	if len(b.uOrphans)+1 > maxOrphanBlocks {
+		// Remove the oldest orphan to make room for the new one.
+		b.removeOrphanUBlock(b.oldestUOrphan)
+		b.oldestUOrphan = nil
+	}
+
+	// Protect concurrent access.  This is intentionally done here instead
+	// of near the top since removeOrphanBlock does its own locking and
+	// the range iterator is not invalidated by removing map entries.
+	b.uOrphanLock.Lock()
+	defer b.uOrphanLock.Unlock()
+
+	// Insert the block into the orphan map with an expiration time
+	// 1 hour from now.
+	expiration := time.Now().Add(time.Hour)
+	uoBlock := &orphanUBlock{
+		ublock:     ublock,
+		expiration: expiration,
+	}
+	b.uOrphans[*ublock.Hash()] = uoBlock
+
+	// Add to previous hash lookup index for faster dependency lookups.
+	prevHash := &ublock.MsgUBlock().MsgBlock.Header.PrevBlock
+	b.prevUOrphans[*prevHash] = append(b.prevUOrphans[*prevHash], uoBlock)
 }
 
 // SequenceLock represents the converted relative lock-time in seconds, and
@@ -556,7 +717,6 @@ func (b *BlockChain) getReorganizeNodes(node *blockNode) (*list.List, *list.List
 // This function MUST be called with the chain state lock held (for writes).
 func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block,
 	view *UtxoViewpoint, stxos []SpentTxOut) error {
-
 	// Make sure it's extending the end of the best chain.
 	prevHash := &block.MsgBlock().Header.PrevBlock
 	if !prevHash.IsEqual(&b.bestChain.Tip().hash) {
@@ -626,6 +786,27 @@ func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block,
 			return err
 		}
 
+		// If the node is a utreexo bridge node, also save the proofs
+		if b.utreexo {
+			err = dbStoreTTLForBlock(dbTx, block.Hash(), block, stxos)
+			if err != nil {
+				return err
+			}
+
+			// update the utreexo forest and create a utreexo accumulator
+			// proof for this block
+			ud, err := b.UpdateUtreexoBS(block, stxos)
+			if err != nil {
+				return err
+			}
+
+			// store the created utreexo accumulator proof in the flat file
+			err = b.proofFileState.flatFileStoreAccProof(*ud)
+			if err != nil {
+				return err
+			}
+		}
+
 		// Allow the index manager to call each of the currently active
 		// optional indexes with the block being connected so they can
 		// update themselves accordingly.
@@ -665,6 +846,64 @@ func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block,
 	b.sendNotification(NTBlockConnected, block)
 	b.chainLock.Lock()
 
+	return nil
+}
+
+// connectUBlock handles connecting the passed ublock to the end of the main
+// (best) chain.
+//
+// This function MUST be called with the chain state lock held (for writes).
+func (b *BlockChain) connectUBlock(node *blockNode, ublock *btcutil.UBlock) error {
+	// Make sure it's extending the end of the best chain.
+	prevHash := &ublock.MsgUBlock().MsgBlock.Header.PrevBlock
+	if !prevHash.IsEqual(&b.bestChain.Tip().hash) {
+		return AssertError("connectUBlock must be called with a ublock " +
+			"that extends the main chain")
+	}
+
+	// No warnings about unknown rules until the chain is current.
+	if b.isCurrent() {
+		// Warn if any unknown new rules are either about to activate or
+		// have already been activated.
+		if err := b.warnUnknownRuleActivations(node); err != nil {
+			return err
+		}
+	}
+
+	// Generate a new best state snapshot that will be used to update the
+	// database and later memory if all database updates are successful.
+	b.stateLock.RLock()
+	curTotalTxns := b.stateSnapshot.TotalTxns
+	b.stateLock.RUnlock()
+	numTxns := uint64(len(ublock.MsgUBlock().MsgBlock.Transactions))
+	blockSize := uint64(ublock.MsgUBlock().MsgBlock.SerializeSize())
+	blockWeight := uint64(GetBlockWeight(ublock.Block()))
+	state := newBestState(node, blockSize, blockWeight, numTxns,
+		curTotalTxns+numTxns, node.CalcPastMedianTime())
+
+	// Store the new state of the chain in memory
+	b.memBestState.state = state
+	b.memBestState.workSum = node.workSum
+	b.memBlock.StoreBlock(ublock.Block())
+
+	// This node is now the end of the best chain.
+	b.bestChain.SetTip(node)
+
+	// Update the state for the best block.  Notice how this replaces the
+	// entire struct instead of updating the existing one.  This effectively
+	// allows the old version to act as a snapshot which callers can use
+	// freely without needing to hold a lock for the duration.  See the
+	// comments on the state variable for more details.
+	b.stateLock.Lock()
+	b.stateSnapshot = state
+	b.stateLock.Unlock()
+
+	// Notify the caller that the block was connected to the main chain.
+	// The caller would typically want to react with actions such as
+	// updating wallets.
+	b.chainLock.Unlock()
+	b.sendNotification(NTBlockConnected, ublock)
+	b.chainLock.Lock()
 	return nil
 }
 
@@ -795,6 +1034,32 @@ func countSpentOutputs(block *btcutil.Block) int {
 		numSpent += len(tx.MsgTx().TxIn)
 	}
 	return numSpent
+}
+
+func countDedupedStxos(block *btcutil.Block) int {
+	var txInForBlock int //, txInForBlock int
+	inskip, _ := block.DedupeBlock()
+
+	// iterate through the transactions in a block
+	for txIdx, tx := range block.Transactions() {
+		// for all the txins, throw that into the work as well; just a bunch of
+		// outpoints
+		for i := 0; i < len(tx.MsgTx().TxIn); i++ { // bit of a tounge twister
+			if txIdx == 0 {
+				txInForBlock += len(tx.MsgTx().TxIn)
+				break // skip coinbase input
+			}
+			if len(inskip) > 0 && txInForBlock == int(inskip[0]) {
+				// skip inputs in the txin skiplist
+				inskip = inskip[1:]
+				continue
+			}
+
+			txInForBlock++
+		}
+	}
+
+	return txInForBlock
 }
 
 // reorganizeChain reorganizes the block chain by disconnecting the nodes in the
@@ -1091,7 +1356,6 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, fla
 	if parentHash.IsEqual(&b.bestChain.Tip().hash) {
 		// Skip checks if node has already been fully validated.
 		fastAdd = fastAdd || b.index.NodeStatus(node).KnownValid()
-
 		// Perform several checks to verify the block can be connected
 		// to the main chain without violating any rules and without
 		// actually connecting the block.
@@ -1160,6 +1424,130 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, fla
 	if fastAdd {
 		log.Warnf("fastAdd set in the side chain case? %v\n",
 			block.Hash())
+	}
+
+	// We're extending (or creating) a side chain, but the cumulative
+	// work for this new side chain is not enough to make it the new chain.
+	if node.workSum.Cmp(b.bestChain.Tip().workSum) <= 0 {
+		// Log information about how the block is forking the chain.
+		fork := b.bestChain.FindFork(node)
+		if fork.hash.IsEqual(parentHash) {
+			log.Infof("FORK: Block %v forks the chain at height %d"+
+				"/block %v, but does not cause a reorganize",
+				node.hash, fork.height, fork.hash)
+		} else {
+			log.Infof("EXTEND FORK: Block %v extends a side chain "+
+				"which forks the chain at height %d/block %v",
+				node.hash, fork.height, fork.hash)
+		}
+
+		return false, nil
+	}
+
+	// We're extending (or creating) a side chain and the cumulative work
+	// for this new side chain is more than the old best chain, so this side
+	// chain needs to become the main chain.  In order to accomplish that,
+	// find the common ancestor of both sides of the fork, disconnect the
+	// blocks that form the (now) old fork from the main chain, and attach
+	// the blocks that form the new chain to the main chain starting at the
+	// common ancenstor (the point where the chain forked).
+	detachNodes, attachNodes := b.getReorganizeNodes(node)
+
+	// Reorganize the chain.
+	log.Infof("REORGANIZE: Block %v is causing a reorganize.", node.hash)
+	err := b.reorganizeChain(detachNodes, attachNodes)
+
+	// Either getReorganizeNodes or reorganizeChain could have made unsaved
+	// changes to the block index, so flush regardless of whether there was an
+	// error. The index would only be dirty if the block failed to connect, so
+	// we can ignore any errors writing.
+	if writeErr := b.index.flushToDB(); writeErr != nil {
+		log.Warnf("Error flushing block index changes to disk: %v", writeErr)
+	}
+
+	return err == nil, err
+}
+
+// connectBestChainUBlock handles connecting the passed ublock to the chain while
+// respecting proper chain selection according to the chain with the most
+// proof of work.
+//
+// NOTE: Reorganiziations are not yet implemented.
+//
+// The flags modify the behavior of this function as follows:
+//  - BFFastAdd: Avoids several expensive transaction validation operations.
+//    This is useful when using checkpoints.
+//
+// This function MUST be called with the chain state lock held (for writes).
+func (b *BlockChain) connectBestChainUBlock(node *blockNode, ublock *btcutil.UBlock, flags BehaviorFlags) (bool, error) {
+	fastAdd := flags&BFFastAdd == BFFastAdd
+
+	// We are extending the main (best) chain with a new block.  This is the
+	// most common case.
+	parentHash := &ublock.MsgUBlock().MsgBlock.Header.PrevBlock
+	if parentHash.IsEqual(&b.bestChain.Tip().hash) {
+		// Skip checks if node has already been fully validated.
+		fastAdd = fastAdd || b.index.NodeStatus(node).KnownValid()
+		// Perform several checks to verify the block can be connected
+		// to the main chain without violating any rules and without
+		// actually connecting the block.
+		view := NewUtxoViewpoint()
+		view.SetBestHash(parentHash)
+
+		if !fastAdd {
+			err := b.checkConnectUBlock(node, ublock, view)
+			if err == nil {
+				b.index.SetStatusFlags(node, statusValid)
+			} else if _, ok := err.(RuleError); ok {
+				b.index.SetStatusFlags(node, statusValidateFailed)
+			} else {
+				return false, err
+			}
+
+			if err != nil {
+				return false, err
+			}
+		}
+
+		// In the fast add case the code to check the block connection
+		// was skipped, so the utxo view needs to load the referenced
+		// utxos, spend them, and add the new utxos being created by
+		// this block.
+		if fastAdd {
+			// Check that the ublock txOuts are valid
+			err := b.utreexoViewpoint.Modify(ublock)
+			if err != nil {
+				return false, err
+			}
+
+			view.UBlockToUtxoView(*ublock)
+		}
+
+		// Connect the block to the main chain.
+		err := b.connectUBlock(node, ublock)
+		if err != nil {
+			// If we got hit with a rule error, then we'll mark
+			// that status of the block as invalid and flush the
+			// index state to disk before returning with the error.
+			if _, ok := err.(RuleError); ok {
+				b.index.SetStatusFlags(node, statusValidateFailed)
+			}
+
+			return false, err
+		}
+
+		// If this is fast add, or this block node isn't yet marked as
+		// valid, then we'll update its status and flush the state to
+		// disk again.
+		if fastAdd || !b.index.NodeStatus(node).KnownValid() {
+			b.index.SetStatusFlags(node, statusValid)
+		}
+
+		return true, nil
+	}
+	if fastAdd {
+		log.Warnf("fastAdd set in the side chain case? %v\n",
+			ublock.Hash())
 	}
 
 	// We're extending (or creating) a side chain, but the cumulative
@@ -1700,6 +2088,18 @@ type Config struct {
 	// This field can be nil if the caller is not interested in using a
 	// signature cache.
 	HashCache *txscript.HashCache
+
+	Utreexo bool
+
+	UtreexoBSPath string
+
+	UtreexoCSN bool
+
+	UtreexoLookAhead int
+
+	DataDir string
+
+	TTL bool
 }
 
 // New returns a BlockChain instance using the provided configuration details.
@@ -1738,6 +2138,7 @@ func New(config *Config) (*BlockChain, error) {
 	targetTimePerBlock := int64(params.TargetTimePerBlock / time.Second)
 	adjustmentFactor := params.RetargetAdjustmentFactor
 	b := BlockChain{
+		assumeValidHash:     params.AssumeValid,
 		checkpoints:         config.Checkpoints,
 		checkpointsByHeight: checkpointsByHeight,
 		db:                  config.DB,
@@ -1755,6 +2156,16 @@ func New(config *Config) (*BlockChain, error) {
 		prevOrphans:         make(map[chainhash.Hash][]*orphanBlock),
 		warningCaches:       newThresholdCaches(vbNumBits),
 		deploymentCaches:    newThresholdCaches(chaincfg.DefinedDeployments),
+		utreexo:             config.Utreexo,
+		utreexoBSPath:       config.UtreexoBSPath,
+		utreexoCSN:          config.UtreexoCSN,
+		utreexoLookAhead:    config.UtreexoLookAhead,
+		dataDir:             config.DataDir,
+	}
+
+	if config.UtreexoCSN {
+		b.utreexoLookAhead = config.UtreexoLookAhead
+		b.utreexoCSN = config.UtreexoCSN
 	}
 
 	// Initialize the chain state from the passed database.  When the db
@@ -1764,9 +2175,12 @@ func New(config *Config) (*BlockChain, error) {
 		return nil, err
 	}
 
-	// Perform any upgrades to the various chain-specific buckets as needed.
-	if err := b.maybeUpgradeDbBuckets(config.Interrupt); err != nil {
-		return nil, err
+	// don't check for csns
+	if !b.utreexoCSN {
+		// Perform any upgrades to the various chain-specific buckets as needed.
+		if err := b.maybeUpgradeDbBuckets(config.Interrupt); err != nil {
+			return nil, err
+		}
 	}
 
 	// Initialize and catch up all of the currently active optional indexes

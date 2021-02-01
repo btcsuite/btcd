@@ -153,6 +153,8 @@ type MessageListeners struct {
 	// message.
 	OnGetBlocks func(p *Peer, msg *wire.MsgGetBlocks)
 
+	OnGetUBlocks func(p *Peer, msg *wire.MsgGetUBlocks)
+
 	// OnGetHeaders is invoked when a peer receives a getheaders bitcoin
 	// message.
 	OnGetHeaders func(p *Peer, msg *wire.MsgGetHeaders)
@@ -186,6 +188,10 @@ type MessageListeners struct {
 	// OnMerkleBlock  is invoked when a peer receives a merkleblock bitcoin
 	// message.
 	OnMerkleBlock func(p *Peer, msg *wire.MsgMerkleBlock)
+
+	// OnUBlock  is invoked when a peer receives a Utreexo block
+	// message.
+	OnUBlock func(p *Peer, msg *wire.MsgUBlock, buf []byte)
 
 	// OnVersion is invoked when a peer receives a version bitcoin message.
 	// The caller may return a reject message in which case the message will
@@ -893,6 +899,50 @@ func (p *Peer) PushGetBlocksMsg(locator blockchain.BlockLocator, stopHash *chain
 	return nil
 }
 
+// PushGetUBlocksMsg sends a getblocks message for the provided block locator
+// and stop hash.  It will ignore back-to-back duplicate requests.
+//
+// This function is safe for concurrent access.
+func (p *Peer) PushGetUBlocksMsg(locator blockchain.BlockLocator, stopHash *chainhash.Hash) error {
+	// Extract the begin hash from the block locator, if one was specified,
+	// to use for filtering duplicate getblocks requests.
+	var beginHash *chainhash.Hash
+	if len(locator) > 0 {
+		beginHash = locator[0]
+	}
+
+	// Filter duplicate getblocks requests.
+	p.prevGetBlocksMtx.Lock()
+	isDuplicate := p.prevGetBlocksStop != nil && p.prevGetBlocksBegin != nil &&
+		beginHash != nil && stopHash.IsEqual(p.prevGetBlocksStop) &&
+		beginHash.IsEqual(p.prevGetBlocksBegin)
+	p.prevGetBlocksMtx.Unlock()
+
+	if isDuplicate {
+		log.Tracef("Filtering duplicate [getublocks] with begin "+
+			"hash %v, stop hash %v", beginHash, stopHash)
+		return nil
+	}
+
+	// Construct the getblocks request and queue it to be sent.
+	msg := wire.NewMsgGetUBlocks(stopHash)
+	for _, hash := range locator {
+		err := msg.AddBlockLocatorHash(hash)
+		if err != nil {
+			return err
+		}
+	}
+	p.QueueMessage(msg, nil)
+
+	// Update the previous getblocks request information for filtering
+	// duplicates.
+	p.prevGetBlocksMtx.Lock()
+	p.prevGetBlocksBegin = beginHash
+	p.prevGetBlocksStop = stopHash
+	p.prevGetBlocksMtx.Unlock()
+	return nil
+}
+
 // PushGetHeadersMsg sends a getblocks message for the provided block locator
 // and stop hash.  It will ignore back-to-back duplicate requests.
 //
@@ -1157,9 +1207,14 @@ func (p *Peer) maybeAddDeadline(pendingResponses map[string]time.Time, msgCmd st
 		// Expects an inv message.
 		pendingResponses[wire.CmdInv] = deadline
 
+	case wire.CmdGetUBlocks:
+		// Expects an inv message.
+		pendingResponses[wire.CmdInv] = deadline
+
 	case wire.CmdGetData:
 		// Expects a block, merkleblock, tx, or notfound message.
 		pendingResponses[wire.CmdBlock] = deadline
+		pendingResponses[wire.CmdUBlock] = deadline
 		pendingResponses[wire.CmdMerkleBlock] = deadline
 		pendingResponses[wire.CmdTx] = deadline
 		pendingResponses[wire.CmdNotFound] = deadline
@@ -1217,12 +1272,15 @@ out:
 				switch msgCmd := msg.message.Command(); msgCmd {
 				case wire.CmdBlock:
 					fallthrough
+				case wire.CmdUBlock:
+					fallthrough
 				case wire.CmdMerkleBlock:
 					fallthrough
 				case wire.CmdTx:
 					fallthrough
 				case wire.CmdNotFound:
 					delete(pendingResponses, wire.CmdBlock)
+					delete(pendingResponses, wire.CmdUBlock)
 					delete(pendingResponses, wire.CmdMerkleBlock)
 					delete(pendingResponses, wire.CmdTx)
 					delete(pendingResponses, wire.CmdNotFound)
@@ -1431,6 +1489,11 @@ out:
 				p.cfg.Listeners.OnBlock(p, msg, buf)
 			}
 
+		case *wire.MsgUBlock:
+			if p.cfg.Listeners.OnUBlock != nil {
+				p.cfg.Listeners.OnUBlock(p, msg, buf)
+			}
+
 		case *wire.MsgInv:
 			if p.cfg.Listeners.OnInv != nil {
 				p.cfg.Listeners.OnInv(p, msg)
@@ -1454,6 +1517,11 @@ out:
 		case *wire.MsgGetBlocks:
 			if p.cfg.Listeners.OnGetBlocks != nil {
 				p.cfg.Listeners.OnGetBlocks(p, msg)
+			}
+
+		case *wire.MsgGetUBlocks:
+			if p.cfg.Listeners.OnGetBlocks != nil {
+				p.cfg.Listeners.OnGetUBlocks(p, msg)
 			}
 
 		case *wire.MsgGetHeaders:
@@ -1609,6 +1677,13 @@ out:
 					invMsg.AddInvVect(iv)
 					waiting = queuePacket(outMsg{msg: invMsg},
 						pendingMsgs, waiting)
+				} else if iv.Type == wire.InvTypeUBlock ||
+					iv.Type == wire.InvTypeWitnessUBlock {
+					invMsg := wire.NewMsgInvSizeHint(1)
+					invMsg.AddInvVect(iv)
+					waiting = queuePacket(outMsg{msg: invMsg},
+						pendingMsgs, waiting)
+
 				} else {
 					invSendQueue.PushBack(iv)
 				}
@@ -1814,7 +1889,6 @@ func (p *Peer) QueueMessage(msg wire.Message, doneChan chan<- struct{}) {
 // This function is safe for concurrent access.
 func (p *Peer) QueueMessageWithEncoding(msg wire.Message, doneChan chan<- struct{},
 	encoding wire.MessageEncoding) {
-
 	// Avoid risk of deadlock if goroutine already exited.  The goroutine
 	// we will be sending to hangs around until it knows for a fact that
 	// it is marked as disconnected and *then* it drains the channels.
