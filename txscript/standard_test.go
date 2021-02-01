@@ -21,7 +21,21 @@ import (
 // tests as a helper since the only way it can fail is if there is an error in
 // the test source code.
 func mustParseShortForm(script string) []byte {
-	s, err := parseShortForm(script)
+	s, err := parseShortFormToken(script)
+	if err != nil {
+		panic("invalid short form script in test source: err " +
+			err.Error() + ", script: " + script)
+	}
+
+	return s
+}
+
+// mustParseShortFormToken parses the passed short form script and returns the
+// resulting bytes.  It panics if an error occurs.  This is only used in the
+// tests as a helper since the only way it can fail is if there is an error in
+// the test source code.
+func mustParseShortFormToken(script string) []byte {
+	s, err := parseShortFormToken(script)
 	if err != nil {
 		panic("invalid short form script in test source: err " +
 			err.Error() + ", script: " + script)
@@ -832,7 +846,7 @@ func TestCalcMultiSigStats(t *testing.T) {
 			name: "short script",
 			script: "0x046708afdb0fe5548271967f1a67130b7105cd6a828" +
 				"e03909a67962e0ea1f61d",
-			err: scriptError(ErrMalformedPush, ""),
+			err: scriptError(ErrNotMultisigScript, ""),
 		},
 		{
 			name: "stack underflow",

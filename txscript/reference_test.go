@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"regexp"
 	"strconv"
 	"strings"
 	"testing"
@@ -18,6 +19,26 @@ import (
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
+)
+
+var (
+	// tokenRE is a regular expression used to parse tokens from short form
+	// scripts.  It splits on repeated tokens and spaces.  Repeated tokens are
+	// denoted by being wrapped in angular brackets followed by a suffix which
+	// consists of a number inside braces.
+	tokenRE = regexp.MustCompile(`\<.+?\>\{[0-9]+\}|[^\s]+`)
+
+	// repTokenRE is a regular expression used to parse short form scripts
+	// for a series of tokens repeated a specified number of times.
+	repTokenRE = regexp.MustCompile(`^\<(.+)\>\{([0-9]+)\}$`)
+
+	// repRawRE is a regular expression used to parse short form scripts
+	// for raw data that is to be repeated a specified number of times.
+	repRawRE = regexp.MustCompile(`^(0[xX][0-9a-fA-F]+)\{([0-9]+)\}$`)
+
+	// repQuoteRE is a regular expression used to parse short form scripts for
+	// quoted data that is to be repeated a specified number of times.
+	repQuoteRE = regexp.MustCompile(`^'(.*)'\{([0-9]+)\}$`)
 )
 
 // scriptTestName returns a descriptive test name for the given reference script
@@ -76,6 +97,136 @@ func parseWitnessStack(elements []interface{}) ([][]byte, error) {
 // shortFormOps holds a map of opcode names to values for use in short form
 // parsing.  It is declared here so it only needs to be created once.
 var shortFormOps map[string]byte
+
+// parseShortFormToken parses a string as as used in the Bitcoin Core reference tests
+// into the script it came from.
+//
+// The format used for these tests is pretty simple if ad-hoc:
+//   - Opcodes other than the push opcodes and unknown are present as
+//     either OP_NAME or just NAME
+//   - Plain numbers are made into push operations
+//   - Numbers beginning with 0x are inserted into the []byte as-is (so
+//     0x14 is OP_DATA_20)
+//   - Single quoted strings are pushed as data
+//   - Anything else is an error
+func parseShortFormToken(script string) ([]byte, error) {
+	// Only create the short form opcode map once.
+	if shortFormOps == nil {
+		ops := make(map[string]byte)
+		for opcodeName, opcodeValue := range OpcodeByName {
+			if strings.Contains(opcodeName, "OP_UNKNOWN") {
+				continue
+			}
+			ops[opcodeName] = opcodeValue
+
+			// The opcodes named OP_# can't have the OP_ prefix
+			// stripped or they would conflict with the plain
+			// numbers.  Also, since OP_FALSE and OP_TRUE are
+			// aliases for the OP_0, and OP_1, respectively, they
+			// have the same value, so detect those by name and
+			// allow them.
+			if (opcodeName == "OP_FALSE" || opcodeName == "OP_TRUE") ||
+				(opcodeValue != OP_0 && (opcodeValue < OP_1 ||
+					opcodeValue > OP_16)) {
+
+				ops[strings.TrimPrefix(opcodeName, "OP_")] = opcodeValue
+			}
+		}
+		shortFormOps = ops
+	}
+
+	builder := NewScriptBuilder()
+
+	var handleToken func(tok string) error
+	handleToken = func(tok string) error {
+		// Multiple repeated tokens.
+		if m := repTokenRE.FindStringSubmatch(tok); m != nil {
+			count, err := strconv.ParseInt(m[2], 10, 32)
+			if err != nil {
+				return fmt.Errorf("bad token %q", tok)
+			}
+			tokens := tokenRE.FindAllStringSubmatch(m[1], -1)
+			for i := 0; i < int(count); i++ {
+				for _, t := range tokens {
+					if err := handleToken(t[0]); err != nil {
+						return err
+					}
+				}
+			}
+			return nil
+		}
+
+		// Plain number.
+		if num, err := strconv.ParseInt(tok, 10, 64); err == nil {
+			builder.AddInt64(num)
+			return nil
+		}
+
+		// Raw data.
+		if bts, err := parseHex(tok); err == nil {
+			// Concatenate the bytes manually since the test code
+			// intentionally creates scripts that are too large and
+			// would cause the builder to error otherwise.
+			if builder.err == nil {
+				builder.script = append(builder.script, bts...)
+			}
+			return nil
+		}
+
+		// Repeated raw bytes.
+		if m := repRawRE.FindStringSubmatch(tok); m != nil {
+			bts, err := parseHex(m[1])
+			if err != nil {
+				return fmt.Errorf("bad token %q", tok)
+			}
+			count, err := strconv.ParseInt(m[2], 10, 32)
+			if err != nil {
+				return fmt.Errorf("bad token %q", tok)
+			}
+
+			// Concatenate the bytes manually since the test code
+			// intentionally creates scripts that are too large and
+			// would cause the builder to error otherwise.
+			bts = bytes.Repeat(bts, int(count))
+			if builder.err == nil {
+				builder.script = append(builder.script, bts...)
+			}
+			return nil
+		}
+
+		// Quoted data.
+		if len(tok) >= 2 && tok[0] == '\'' && tok[len(tok)-1] == '\'' {
+			builder.AddFullData([]byte(tok[1 : len(tok)-1]))
+			return nil
+		}
+
+		// Repeated quoted data.
+		if m := repQuoteRE.FindStringSubmatch(tok); m != nil {
+			count, err := strconv.ParseInt(m[2], 10, 32)
+			if err != nil {
+				return fmt.Errorf("bad token %q", tok)
+			}
+			data := strings.Repeat(m[1], int(count))
+			builder.AddFullData([]byte(data))
+			return nil
+		}
+
+		// Named opcode.
+		if opcode, ok := shortFormOps[tok]; ok {
+			builder.AddOp(opcode)
+			return nil
+		}
+
+		return fmt.Errorf("bad token %q", tok)
+	}
+
+	for _, tokens := range tokenRE.FindAllStringSubmatch(script, -1) {
+		if err := handleToken(tokens[0]); err != nil {
+			return nil, err
+		}
+	}
+	return builder.Script()
+}
 
 // parseShortForm parses a string as as used in the Bitcoin Core reference tests
 // into the script it came from.
@@ -820,6 +971,18 @@ testloop:
 	}
 }
 
+// parseSigHashExpectedResult parses the provided expected result string into
+// allowed error kinds.  An error is returned if the expected result string is
+// not supported.
+func parseSigHashExpectedResult(expected string) (error, error) {
+	switch expected {
+	case "OK":
+		return nil, nil
+	}
+
+	return nil, fmt.Errorf("unrecognized expected result in test data: %v", expected)
+}
+
 // TestCalcSignatureHash runs the Bitcoin Core signature hash calculation tests
 // in sighash.json.
 // https://github.com/bitcoin/bitcoin/blob/master/src/test/data/sighash.json
@@ -855,15 +1018,8 @@ func TestCalcSignatureHash(t *testing.T) {
 		}
 
 		subScript, _ := hex.DecodeString(test[1].(string))
-		parsedScript, err := parseScript(subScript)
-		if err != nil {
-			t.Errorf("TestCalcSignatureHash failed test #%d: "+
-				"Failed to parse sub-script: %v", i, err)
-			continue
-		}
-
 		hashType := SigHashType(testVecF64ToUint32(test[3].(float64)))
-		hash := calcSignatureHash(parsedScript, hashType, &tx,
+		hash := calcSignatureHash(subScript, hashType, &tx,
 			int(test[2].(float64)))
 
 		expectedHash, _ := chainhash.NewHashFromStr(test[4].(string))
