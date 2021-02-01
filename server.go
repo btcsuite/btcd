@@ -64,7 +64,7 @@ const (
 var (
 	// userAgentName is the user agent name and is used to help identify
 	// ourselves to other bitcoin peers.
-	userAgentName = "btcd/utreexo"
+	userAgentName = "utreexo"
 
 	// userAgentVersion is the user agent version and is used to help
 	// identify ourselves to other bitcoin peers.
@@ -2858,6 +2858,8 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 	// Don't serve cfilters by default for utreexo
 	// NOTE remove for PR
 	services &^= wire.SFNodeCF
+	services &^= wire.SFNodeBloom
+	services &^= wire.SFNodeNetwork
 
 	if cfg.Utreexo {
 		indxLog.Info("set utreexo bridge service")
