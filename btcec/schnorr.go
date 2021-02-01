@@ -24,6 +24,15 @@ const (
 	BIP340Nonce = "07497734a79bcb355b9b8c7d034f121cf434d73ef72dda19870061fb52bfeb2ftag"
 )
 
+var (
+	errCurveOrder       = errors.New("greater than or equal to curve order")
+	errFieldOrder       = errors.New("greater than or equal to field order")
+	errPubKeyNotOnCurve = errors.New("public key is not on the curve")
+	errRyNotEven        = errors.New("coordinate R(y) is not even")
+	errCoordinateAtInf  = errors.New("coordinate at infinity")
+	errRxNotEqual       = errors.New("coordinate R(x) != r")
+)
+
 // SchnorrPublicKey is the x-coordinate of a public key that can be used with schnorr.
 type SchnorrPublicKey struct{ x *big.Int }
 
@@ -202,7 +211,7 @@ func liftX(key []byte) (*big.Int, *big.Int, error) {
 	p := S256().P
 
 	if x.Cmp(p) >= 0 {
-		return nil, nil, errors.New("inf")
+		return nil, nil, errCoordinateAtInf
 	}
 
 	// c = x^3 + 7 mod P.
@@ -242,6 +251,7 @@ func schnorrVerify(msg, publicKey, signature []byte) (bool, error) {
 	// n is the curve order.
 	n := curve.N
 
+	// p is the field order.
 	p := curve.P
 
 	r := new(big.Int)
@@ -257,7 +267,7 @@ func schnorrVerify(msg, publicKey, signature []byte) (bool, error) {
 
 	// Check that P is on the curve.
 	if !curve.IsOnCurve(Px, Py) {
-		return false, errors.New("point P is not on the curve")
+		return false, errPubKeyNotOnCurve
 	}
 
 	r.SetBytes(signature[:32])
@@ -265,12 +275,12 @@ func schnorrVerify(msg, publicKey, signature []byte) (bool, error) {
 
 	// Fail if s >= n
 	if s.Cmp(n) >= 0 {
-		return false, errors.New("s is greater than curve order")
+		return false, errCurveOrder
 	}
 
 	// Fail if r >= p
 	if r.Cmp(p) >= 0 {
-		return false, errors.New("r is greater than p")
+		return false, errFieldOrder
 	}
 
 	// e = sha256(hashBIP0340/challenge || r || P || m) mod n.
@@ -294,17 +304,17 @@ func schnorrVerify(msg, publicKey, signature []byte) (bool, error) {
 
 	// Fail if R is at infinity.
 	if Rx.Cmp(zero) == 0 || Ry.Cmp(zero) == 0 {
-		return false, errors.New("point R is at infinity")
+		return false, errCoordinateAtInf
 	}
 
 	// Fail if y(R) is not even
 	if !hasEvenY(Ry) {
-		return false, errors.New("coordinate R(y) is not even")
+		return false, errRyNotEven
 	}
 
 	// Fail if x(R) != r
 	if Rx.Cmp(r) != 0 {
-		return false, errors.New("coordinate R(x) != r")
+		return false, errRxNotEqual
 	}
 
 	return true, nil

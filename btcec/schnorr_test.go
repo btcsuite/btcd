@@ -15,6 +15,7 @@ type bip340Test struct {
 	signature    string
 	verifyResult bool
 	validPubKey  bool
+	expectErr    error
 }
 
 var bip340TestVectors = []bip340Test{
@@ -67,6 +68,7 @@ var bip340TestVectors = []bip340Test{
 		signature:    "6CFF5C3BA86C69EA4B7376F31A9BCB4F74C1976089B2D9963DA2E5543E17776969E89B4C5564D00349106B8497785DD7D1D713A8AE82B32FA79D5F7FC407D39B",
 		verifyResult: false,
 		validPubKey:  false,
+		expectErr:    errPubKeyNotOnCurve,
 	},
 	{
 		publicKey:    "DFF1D77F2A671C5F36183726DB2341BE58FEAE1DA2DECED843240F7B502BA659",
@@ -74,6 +76,7 @@ var bip340TestVectors = []bip340Test{
 		signature:    "FFF97BD5755EEEA420453A14355235D382F6472F8568A18B2F057A14602975563CC27944640AC607CD107AE10923D9EF7A73C643E166BE5EBEAFA34B1AC553E2",
 		verifyResult: false,
 		validPubKey:  true,
+		expectErr:    errRyNotEven,
 	},
 	{
 		publicKey:    "DFF1D77F2A671C5F36183726DB2341BE58FEAE1DA2DECED843240F7B502BA659",
@@ -81,6 +84,7 @@ var bip340TestVectors = []bip340Test{
 		signature:    "1FA62E331EDBC21C394792D2AB1100A7B432B013DF3F6FF4F99FCB33E0E1515F28890B3EDB6E7189B630448B515CE4F8622A954CFE545735AAEA5134FCCDB2BD",
 		verifyResult: false,
 		validPubKey:  true,
+		expectErr:    errRyNotEven,
 	},
 	{
 		publicKey:    "DFF1D77F2A671C5F36183726DB2341BE58FEAE1DA2DECED843240F7B502BA659",
@@ -88,6 +92,7 @@ var bip340TestVectors = []bip340Test{
 		signature:    "6CFF5C3BA86C69EA4B7376F31A9BCB4F74C1976089B2D9963DA2E5543E177769961764B3AA9B2FFCB6EF947B6887A226E8D7C93E00C5ED0C1834FF0D0C2E6DA6",
 		verifyResult: false,
 		validPubKey:  true,
+		expectErr:    errRxNotEqual,
 	},
 	{
 		publicKey:    "DFF1D77F2A671C5F36183726DB2341BE58FEAE1DA2DECED843240F7B502BA659",
@@ -95,6 +100,7 @@ var bip340TestVectors = []bip340Test{
 		signature:    "0000000000000000000000000000000000000000000000000000000000000000123DDA8328AF9C23A94C1FEECFD123BA4FB73476F0D594DCB65C6425BD186051",
 		verifyResult: false,
 		validPubKey:  true,
+		expectErr:    errCoordinateAtInf,
 	},
 	{
 		publicKey:    "DFF1D77F2A671C5F36183726DB2341BE58FEAE1DA2DECED843240F7B502BA659",
@@ -102,6 +108,7 @@ var bip340TestVectors = []bip340Test{
 		signature:    "00000000000000000000000000000000000000000000000000000000000000017615FBAF5AE28864013C099742DEADB4DBA87F11AC6754F93780D5A1837CF197",
 		verifyResult: false,
 		validPubKey:  true,
+		expectErr:    errCoordinateAtInf,
 	},
 	{
 		publicKey:    "DFF1D77F2A671C5F36183726DB2341BE58FEAE1DA2DECED843240F7B502BA659",
@@ -109,6 +116,7 @@ var bip340TestVectors = []bip340Test{
 		signature:    "4A298DACAE57395A15D0795DDBFD1DCB564DA82B0F269BC70A74F8220429BA1D69E89B4C5564D00349106B8497785DD7D1D713A8AE82B32FA79D5F7FC407D39B",
 		verifyResult: false,
 		validPubKey:  true,
+		expectErr:    errRxNotEqual,
 	},
 	{
 		publicKey:    "DFF1D77F2A671C5F36183726DB2341BE58FEAE1DA2DECED843240F7B502BA659",
@@ -116,6 +124,7 @@ var bip340TestVectors = []bip340Test{
 		signature:    "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F69E89B4C5564D00349106B8497785DD7D1D713A8AE82B32FA79D5F7FC407D39B",
 		verifyResult: false,
 		validPubKey:  true,
+		expectErr:    errFieldOrder,
 	},
 	{
 		publicKey:    "DFF1D77F2A671C5F36183726DB2341BE58FEAE1DA2DECED843240F7B502BA659",
@@ -123,6 +132,7 @@ var bip340TestVectors = []bip340Test{
 		signature:    "6CFF5C3BA86C69EA4B7376F31A9BCB4F74C1976089B2D9963DA2E5543E177769FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141",
 		verifyResult: false,
 		validPubKey:  true,
+		expectErr:    errCurveOrder,
 	},
 	{
 		publicKey:    "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC30",
@@ -130,6 +140,7 @@ var bip340TestVectors = []bip340Test{
 		signature:    "6CFF5C3BA86C69EA4B7376F31A9BCB4F74C1976089B2D9963DA2E5543E17776969E89B4C5564D00349106B8497785DD7D1D713A8AE82B32FA79D5F7FC407D39B",
 		verifyResult: false,
 		validPubKey:  false,
+		expectErr:    errCoordinateAtInf,
 	},
 }
 
@@ -148,7 +159,7 @@ func TestSchnorrSign(t *testing.T) {
 			}
 
 			if strings.ToUpper(hex.EncodeToString(sig[:])) != test.signature {
-				t.Fail()
+				t.Fatalf("got signature %x : want %s", sig[:], test.signature)
 			}
 
 			pubKey := decodeHex(test.publicKey)
@@ -180,6 +191,12 @@ func TestSchnorrVerify(t *testing.T) {
 
 		if test.verifyResult != verify {
 			t.Fail()
+		}
+
+		if !test.verifyResult && test.expectErr != nil {
+			if err != test.expectErr {
+				t.Fatalf("expect error %v : got %v", test.expectErr, err)
+			}
 		}
 	}
 }
