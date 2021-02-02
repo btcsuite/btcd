@@ -18,7 +18,7 @@ func genTestTx() (*wire.MsgTx, error) {
 	tx := wire.NewMsgTx(2)
 	tx.Version = rand.Int31()
 
-	numTxins := rand.Intn(11)
+	numTxins := 1 + rand.Intn(11)
 	for i := 0; i < numTxins; i++ {
 		randTxIn := wire.TxIn{
 			PreviousOutPoint: wire.OutPoint{
@@ -34,7 +34,7 @@ func genTestTx() (*wire.MsgTx, error) {
 		tx.TxIn = append(tx.TxIn, &randTxIn)
 	}
 
-	numTxouts := rand.Intn(11)
+	numTxouts := 1 + rand.Intn(11)
 	for i := 0; i < numTxouts; i++ {
 		randTxOut := wire.TxOut{
 			Value:    rand.Int63(),
