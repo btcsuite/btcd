@@ -66,11 +66,7 @@ func isScriptHash(pops []parsedOpcode) bool {
 // IsPayToPubKey returns true if the script is in the standard pay-to-pubkey
 // (P2PK) format, false otherwise.
 func IsPayToPubKey(script []byte) bool {
-	pops, err := parseScript(script)
-	if err != nil {
-		return false
-	}
-	return isPubkey(pops)
+	return isPubKeyScript(script)
 }
 
 // IsPayToScriptHash returns true if the script is in the standard
