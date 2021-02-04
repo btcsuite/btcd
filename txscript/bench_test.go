@@ -382,3 +382,44 @@ func BenchmarkGetPreciseSigOpCount(b *testing.B) {
 		_ = GetPreciseSigOpCount(sigScript, pkScript, true)
 	}
 }
+
+// BenchmarkGetWitnessSigOpCount benchmarks how long it takes to count the
+// witness signature operations of a very large script.
+func BenchmarkGetWitnessSigOpCountP2WKH(b *testing.B) {
+	pkScript := mustParseShortForm("OP_0 DATA_20 0x0000000000000000000000000000000000000000")
+	redeemScript, err := genComplexScript()
+	if err != nil {
+		b.Fatalf("failed to create benchmark script: %v", err)
+	}
+
+	witness := wire.TxWitness{
+		redeemScript,
+	}
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = GetWitnessSigOpCount(nil, pkScript, witness)
+	}
+}
+
+// BenchmarkGetWitnessSigOpCount benchmarks how long it takes to count the
+// witness signature operations of a very large script.
+func BenchmarkGetWitnessSigOpCountNested(b *testing.B) {
+	pkScript := mustParseShortForm("HASH160 DATA_20 0x0000000000000000000000000000000000000000 OP_EQUAL")
+	sigScript := mustParseShortForm("DATA_22 0x001600000000000000000000000000000000000000000000")
+	redeemScript, err := genComplexScript()
+	if err != nil {
+		b.Fatalf("failed to create benchmark script: %v", err)
+	}
+
+	witness := wire.TxWitness{
+		redeemScript,
+	}
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = GetWitnessSigOpCount(sigScript, pkScript, witness)
+	}
+}
