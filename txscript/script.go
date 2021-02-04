@@ -154,11 +154,8 @@ func isWitnessProgram(pops []parsedOpcode) bool {
 // IsNullData returns true if the passed script is a null data script, false
 // otherwise.
 func IsNullData(script []byte) bool {
-	pops, err := parseScript(script)
-	if err != nil {
-		return false
-	}
-	return isNullData(pops)
+	const scriptVersion = 0
+	return isNullDataScript(scriptVersion, script)
 }
 
 // ExtractWitnessProgramInfo attempts to extract the witness program version,
