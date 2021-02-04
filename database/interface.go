@@ -193,6 +193,9 @@ type Bucket interface {
 	//   - ErrTxNotWritable if attempted against a read-only transaction
 	//   - ErrTxClosed if the transaction has already been closed
 	Delete(key []byte) error
+
+	// DiskSize returns the approximate size of the bucket on disk.
+	DiskSize() (int64, error)
 }
 
 // BlockRegion specifies a particular region of a block identified by the

@@ -452,6 +452,26 @@ type GetTxOutSetInfoResult struct {
 	TotalAmount    btcutil.Amount `json:"total_amount"`
 }
 
+// MarshalJSON marshals the response of the gettxoutsetinfo JSON-RPC call
+func (g *GetTxOutSetInfoResult) MarshalJSON() ([]byte, error) {
+
+	type Alias GetTxOutSetInfoResult
+
+	aux := struct {
+		BestBlock      string  `json:"bestblock"`
+		HashSerialized string  `json:"hash_serialized_2"`
+		TotalAmount    float64 `json:"total_amount"`
+		*Alias
+	}{
+		BestBlock:      g.BestBlock.String(),
+		HashSerialized: g.HashSerialized.String(),
+		TotalAmount:    g.TotalAmount.ToBTC(),
+		Alias:          (*Alias)(g),
+	}
+
+	return json.Marshal(aux)
+}
+
 // UnmarshalJSON unmarshals the result of the gettxoutsetinfo JSON-RPC call
 func (g *GetTxOutSetInfoResult) UnmarshalJSON(data []byte) error {
 	// Step 1: Create type aliases of the original struct.
