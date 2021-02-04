@@ -415,6 +415,26 @@ func isWitnessPubKeyHashScript(script []byte) bool {
 	return extractWitnessPubKeyHash(script) != nil
 }
 
+// extractWitnessScriptHash extracts the witness script hash from the passed
+// script if it is standard witness-script-hash script. It will return nil
+// otherwise.
+func extractWitnessScriptHash(script []byte) []byte {
+	if len(script) == 34 &&
+		script[0] == OP_0 &&
+		script[1] == OP_DATA_32 {
+
+		return script[2:34]
+	}
+
+	return nil
+}
+
+// isWitnessScriptHashScript returns whether or not the passed script is a
+// standard witness-script-hash script.
+func isWitnessScriptHashScript(script []byte) bool {
+	return extractWitnessScriptHash(script) != nil
+}
+
 // isNullData returns true if the passed script is a null data transaction,
 // false otherwise.
 func isNullData(pops []parsedOpcode) bool {
