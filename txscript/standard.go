@@ -143,6 +143,30 @@ func isPubKeyScript(script []byte) bool {
 	return extractPubKey(script) != nil
 }
 
+// extractPubKeyHash extracts the public key hash from the passed script if it
+// is a standard pay-to-pubkey-hash script.  It will return nil otherwise.
+func extractPubKeyHash(script []byte) []byte {
+	// A pay-to-pubkey-hash script is of the form:
+	//  OP_DUP OP_HASH160 <20-byte hash> OP_EQUALVERIFY OP_CHECKSIG
+	if len(script) == 25 &&
+		script[0] == OP_DUP &&
+		script[1] == OP_HASH160 &&
+		script[2] == OP_DATA_20 &&
+		script[23] == OP_EQUALVERIFY &&
+		script[24] == OP_CHECKSIG {
+
+		return script[3:23]
+	}
+
+	return nil
+}
+
+// isPubKeyHashScript returns whether or not the passed script is a standard
+// pay-to-pubkey-hash script.
+func isPubKeyHashScript(script []byte) bool {
+	return extractPubKeyHash(script) != nil
+}
+
 // isPubkey returns true if the script passed is a pay-to-pubkey transaction,
 // false otherwise.
 func isPubkey(pops []parsedOpcode) bool {
