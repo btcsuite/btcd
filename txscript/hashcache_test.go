@@ -13,12 +13,16 @@ import (
 	"github.com/davecgh/go-spew/spew"
 )
 
+func init() {
+	rand.Seed(time.Now().Unix())
+}
+
 // genTestTx creates a random transaction for uses within test cases.
 func genTestTx() (*wire.MsgTx, error) {
 	tx := wire.NewMsgTx(2)
 	tx.Version = rand.Int31()
 
-	numTxins := rand.Intn(11)
+	numTxins := 1 + rand.Intn(11)
 	for i := 0; i < numTxins; i++ {
 		randTxIn := wire.TxIn{
 			PreviousOutPoint: wire.OutPoint{
@@ -34,7 +38,7 @@ func genTestTx() (*wire.MsgTx, error) {
 		tx.TxIn = append(tx.TxIn, &randTxIn)
 	}
 
-	numTxouts := rand.Intn(11)
+	numTxouts := 1 + rand.Intn(11)
 	for i := 0; i < numTxouts; i++ {
 		randTxOut := wire.TxOut{
 			Value:    rand.Int63(),
@@ -55,8 +59,6 @@ func genTestTx() (*wire.MsgTx, error) {
 // _not_ in the hash cache.
 func TestHashCacheAddContainsHashes(t *testing.T) {
 	t.Parallel()
-
-	rand.Seed(time.Now().Unix())
 
 	cache := NewHashCache(10)
 
@@ -109,8 +111,6 @@ func TestHashCacheAddContainsHashes(t *testing.T) {
 func TestHashCacheAddGet(t *testing.T) {
 	t.Parallel()
 
-	rand.Seed(time.Now().Unix())
-
 	cache := NewHashCache(10)
 
 	// To start, we'll generate a random transaction and compute the set of
@@ -143,8 +143,6 @@ func TestHashCacheAddGet(t *testing.T) {
 // hash cache.
 func TestHashCachePurge(t *testing.T) {
 	t.Parallel()
-
-	rand.Seed(time.Now().Unix())
 
 	cache := NewHashCache(10)
 
