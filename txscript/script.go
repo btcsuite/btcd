@@ -100,11 +100,7 @@ func isWitnessScriptHash(pops []parsedOpcode) bool {
 // IsPayToWitnessScriptHash returns true if the is in the standard
 // pay-to-witness-script-hash (P2WSH) format, false otherwise.
 func IsPayToWitnessScriptHash(script []byte) bool {
-	pops, err := parseScript(script)
-	if err != nil {
-		return false
-	}
-	return isWitnessScriptHash(pops)
+	return isWitnessScriptHashScript(script)
 }
 
 // IsPayToWitnessPubKeyHash returns true if the is in the standard
