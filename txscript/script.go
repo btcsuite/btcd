@@ -831,15 +831,15 @@ func GetPreciseSigOpCount(scriptSig, scriptPubKey []byte, _ bool) int {
 func GetWitnessSigOpCount(sigScript, pkScript []byte, witness wire.TxWitness) int {
 	// If this is a regular witness program, then we can proceed directly
 	// to counting its signature operations without any further processing.
-	if IsWitnessProgram(pkScript) {
+	if isWitnessProgramScript(pkScript) {
 		return getWitnessSigOps(pkScript, witness)
 	}
 
 	// Next, we'll check the sigScript to see if this is a nested p2sh
 	// witness program. This is a case wherein the sigScript is actually a
 	// datapush of a p2wsh witness program.
-	if IsPayToScriptHash(pkScript) && IsPushOnlyScript(sigScript) &&
-		IsWitnessProgram(sigScript[1:]) {
+	if isScriptHashScript(pkScript) && IsPushOnlyScript(sigScript) &&
+		len(sigScript) > 0 && isWitnessProgramScript(sigScript[1:]) {
 		return getWitnessSigOps(sigScript[1:], witness)
 	}
 
