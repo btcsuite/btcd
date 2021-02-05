@@ -50,3 +50,23 @@ func BenchmarkCalcSigHash(b *testing.B) {
 		}
 	}
 }
+
+// BenchmarkCalcWitnessSigHash benchmarks how long it takes to calculate the
+// witness signature hashes for all inputs of a transaction with many inputs.
+func BenchmarkCalcWitnessSigHash(b *testing.B) {
+	sigHashes := NewTxSigHashes(&manyInputsBenchTx)
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		for j := 0; j < len(manyInputsBenchTx.TxIn); j++ {
+			_, err := CalcWitnessSigHash(
+				prevOutScript, sigHashes, SigHashAll,
+				&manyInputsBenchTx, j, 5,
+			)
+			if err != nil {
+				b.Fatalf("failed to calc signature hash: %v", err)
+			}
+		}
+	}
+}
