@@ -17,44 +17,43 @@ const (
 
 	// QuorumInfo indicates the specified peer should be removed.
 	QuorumInfo QuorumCmdSubCmd = "info"
-
 )
 
 type LLMQType int
 
 const (
-	LLMQType_50_60 LLMQType = 1 //every 24 blocks
-	LLMQType_400_60 = 2 //288 blocks
-	LLMQType_400_85 = 3 //576 blocks
-	LLMQType_100_67 = 4 //every 24 blocks
-	LLMQType_5_60 = 100 //24 blocks
+	LLMQType_50_60  LLMQType = 1   //every 24 blocks
+	LLMQType_400_60          = 2   //288 blocks
+	LLMQType_400_85          = 3   //576 blocks
+	LLMQType_100_67          = 4   //every 24 blocks
+	LLMQType_5_60            = 100 //24 blocks
 )
 
 // QuorumCmd defines the quorum JSON-RPC command.
 type QuorumSignCmd struct {
-	LLMQType   LLMQType
-	RequestId string
+	LLMQType    LLMQType
+	RequestId   string
 	MessageHash string
-	QuorumHash string
-	Submit bool
+	QuorumHash  string
+	Submit      bool
 }
 
 // NewQuorumCmd returns a new instance which can be used to issue a quorum
 // JSON-RPC command.
 func NewQuorumSignCmd(quorumType LLMQType, requestId string, messageHash string, quorumHash string, submit bool) *QuorumSignCmd {
 	return &QuorumSignCmd{
-		LLMQType:   quorumType,
-		RequestId: requestId,
+		LLMQType:    quorumType,
+		RequestId:   requestId,
 		MessageHash: messageHash,
-		QuorumHash: quorumHash,
-		Submit: submit,
+		QuorumHash:  quorumHash,
+		Submit:      submit,
 	}
 }
 
 // QuorumCmd defines the quorum JSON-RPC command.
 type QuorumInfoCmd struct {
-	LLMQType   LLMQType
-	QuorumHash string
+	LLMQType       LLMQType
+	QuorumHash     string
 	IncludeSkShare bool
 }
 
@@ -62,8 +61,8 @@ type QuorumInfoCmd struct {
 // JSON-RPC command.
 func NewQuorumInfoCmd(quorumType LLMQType, quorumHash string, includeSkShare bool) *QuorumInfoCmd {
 	return &QuorumInfoCmd{
-		LLMQType:   quorumType,
-		QuorumHash: quorumHash,
+		LLMQType:       quorumType,
+		QuorumHash:     quorumHash,
 		IncludeSkShare: includeSkShare,
 	}
 }

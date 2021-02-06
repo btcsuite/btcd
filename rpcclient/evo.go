@@ -7,19 +7,19 @@ package rpcclient
 
 import (
 	"encoding/json"
-	"github.com/dashevo/dashd-go/btcjson"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/dashevo/dashd-go/btcjson"
 )
 
 // FutureGetQuorumSignResult is a future promise to deliver the result of a
 // QuorumSignAsync RPC invocation (or an applicable error).
 type FutureGetQuorumSignResult struct {
-	client   *Client
-	quorumType btcjson.LLMQType
-	messageHash     string
-	requestId string
-	quorumHash string
-	Response chan *response
+	client      *Client
+	quorumType  btcjson.LLMQType
+	messageHash string
+	requestId   string
+	quorumHash  string
+	Response    chan *response
 }
 
 // Receive waits for the response promised by the future and returns the member signature for the quorum.
@@ -64,12 +64,12 @@ func (c *Client) QuorumSignAsync(quorumType btcjson.LLMQType, requestId *chainha
 	cmd := btcjson.NewQuorumSignCmd(quorumType, requestIdString, messageHashString, quorumHashString, submit)
 
 	return FutureGetQuorumSignResult{
-		client:   c,
-		quorumType: quorumType,
+		client:      c,
+		quorumType:  quorumType,
 		messageHash: messageHashString,
-		requestId: requestIdString,
-		quorumHash: quorumHashString,
-		Response: c.sendCmd(cmd),
+		requestId:   requestIdString,
+		quorumHash:  quorumHashString,
+		Response:    c.sendCmd(cmd),
 	}
 }
 

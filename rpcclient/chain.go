@@ -10,9 +10,9 @@ import (
 	"encoding/hex"
 	"encoding/json"
 
-	"github.com/dashevo/dashd-go/btcjson"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
+	"github.com/dashevo/dashd-go/btcjson"
 )
 
 // FutureGetBestBlockHashResult is a future promise to deliver the result of a

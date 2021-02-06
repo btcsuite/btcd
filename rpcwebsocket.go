@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcd/blockchain"
-	"github.com/dashevo/dashd-go/btcjson"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/database"
@@ -29,6 +28,7 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/websocket"
+	"github.com/dashevo/dashd-go/btcjson"
 	"golang.org/x/crypto/ripemd160"
 )
 

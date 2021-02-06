@@ -46,13 +46,13 @@ func TestDashEvoCmds(t *testing.T) {
 					"6f1018f54507606069303fd16257434073c6f374729b0090bb9dbbe629241236",
 					false)
 			},
-			marshalled:   `{"jsonrpc":"1.0","method":"quorum sign","params":[4,"0067c4fd779a195a95b267e263c631f71f83f8d5e6191091289d114012b373a1","ce490ca26cad6f1749ff9b977fe0fe4ece4391166f69be75c4619bc94b184dbc","6f1018f54507606069303fd16257434073c6f374729b0090bb9dbbe629241236",false],"id":1}`,
+			marshalled: `{"jsonrpc":"1.0","method":"quorum sign","params":[4,"0067c4fd779a195a95b267e263c631f71f83f8d5e6191091289d114012b373a1","ce490ca26cad6f1749ff9b977fe0fe4ece4391166f69be75c4619bc94b184dbc","6f1018f54507606069303fd16257434073c6f374729b0090bb9dbbe629241236",false],"id":1}`,
 			unmarshalled: &btcjson.QuorumSignCmd{
-				LLMQType: btcjson.LLMQType_100_67,
-				RequestId: "0067c4fd779a195a95b267e263c631f71f83f8d5e6191091289d114012b373a1",
+				LLMQType:    btcjson.LLMQType_100_67,
+				RequestId:   "0067c4fd779a195a95b267e263c631f71f83f8d5e6191091289d114012b373a1",
 				MessageHash: "ce490ca26cad6f1749ff9b977fe0fe4ece4391166f69be75c4619bc94b184dbc",
-				QuorumHash: "6f1018f54507606069303fd16257434073c6f374729b0090bb9dbbe629241236",
-				Submit: false,
+				QuorumHash:  "6f1018f54507606069303fd16257434073c6f374729b0090bb9dbbe629241236",
+				Submit:      false,
 			},
 		},
 		{
@@ -67,10 +67,10 @@ func TestDashEvoCmds(t *testing.T) {
 					"0067c4fd779a195a95b267e263c631f71f83f8d5e6191091289d114012b373a1",
 					false)
 			},
-			marshalled:   `{"jsonrpc":"1.0","method":"quorum info","params":[4,"0067c4fd779a195a95b267e263c631f71f83f8d5e6191091289d114012b373a1",false],"id":1}`,
+			marshalled: `{"jsonrpc":"1.0","method":"quorum info","params":[4,"0067c4fd779a195a95b267e263c631f71f83f8d5e6191091289d114012b373a1",false],"id":1}`,
 			unmarshalled: &btcjson.QuorumInfoCmd{
-				LLMQType: btcjson.LLMQType_100_67,
-				QuorumHash: "0067c4fd779a195a95b267e263c631f71f83f8d5e6191091289d114012b373a1",
+				LLMQType:       btcjson.LLMQType_100_67,
+				QuorumHash:     "0067c4fd779a195a95b267e263c631f71f83f8d5e6191091289d114012b373a1",
 				IncludeSkShare: false,
 			},
 		},
