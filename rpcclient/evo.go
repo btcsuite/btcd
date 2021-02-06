@@ -7,7 +7,7 @@ package rpcclient
 
 import (
 	"encoding/json"
-	"github.com/btcsuite/btcd/btcjson"
+	"github.com/dashevo/dashd-go/btcjson"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 )
 

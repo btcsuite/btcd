@@ -32,7 +32,7 @@ const (
 
 // QuorumCmd defines the quorum JSON-RPC command.
 type QuorumSignCmd struct {
-	Type   LLMQType
+	LLMQType   LLMQType
 	RequestId string
 	MessageHash string
 	QuorumHash string
@@ -43,11 +43,28 @@ type QuorumSignCmd struct {
 // JSON-RPC command.
 func NewQuorumSignCmd(quorumType LLMQType, requestId string, messageHash string, quorumHash string, submit bool) *QuorumSignCmd {
 	return &QuorumSignCmd{
-		Type:   quorumType,
+		LLMQType:   quorumType,
 		RequestId: requestId,
 		MessageHash: messageHash,
 		QuorumHash: quorumHash,
 		Submit: submit,
+	}
+}
+
+// QuorumCmd defines the quorum JSON-RPC command.
+type QuorumInfoCmd struct {
+	LLMQType   LLMQType
+	QuorumHash string
+	IncludeSkShare bool
+}
+
+// NewQuorumCmd returns a new instance which can be used to issue a quorum
+// JSON-RPC command.
+func NewQuorumInfoCmd(quorumType LLMQType, quorumHash string, includeSkShare bool) *QuorumInfoCmd {
+	return &QuorumInfoCmd{
+		LLMQType:   quorumType,
+		QuorumHash: quorumHash,
+		IncludeSkShare: includeSkShare,
 	}
 }
 
@@ -56,4 +73,5 @@ func init() {
 	flags := UsageFlag(0)
 
 	MustRegisterCmd("quorum sign", (*QuorumSignCmd)(nil), flags)
+	MustRegisterCmd("quorum info", (*QuorumInfoCmd)(nil), flags)
 }

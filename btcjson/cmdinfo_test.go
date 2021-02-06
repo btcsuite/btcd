@@ -8,10 +8,10 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/btcsuite/btcd/btcjson"
+	"github.com/dashevo/dashd-go/btcjson"
 )
 
-// TestCmdMethod tests the CmdMethod function to ensure it retunrs the expected
+// TestCmdMethod tests the CmdMethod function to ensure it returns the expected
 // methods and errors.
 func TestCmdMethod(t *testing.T) {
 	t.Parallel()

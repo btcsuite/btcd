@@ -7,11 +7,10 @@ package btcjson_test
 
 import (
 	"encoding/json"
+	"github.com/dashevo/dashd-go/btcjson"
 	"math"
 	"reflect"
 	"testing"
-
-	"github.com/btcsuite/btcd/btcjson"
 )
 
 // TestAssignField tests the assignField function handles supported combinations
