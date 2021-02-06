@@ -19,15 +19,15 @@ implement and the API is not stable yet.
 ## Documentation
 
 * [API Reference](http://godoc.org/github.com/dashevo/dashd-go/rpcclient)
-* [dashd-go Websockets Example](https://github.com/dashevo/dashd-go/tree/master/rpcclient/examples/btcdwebsockets)
+* [dashd-go Websockets Example](https://github.com/dashevo/dashd-go/tree/master/rpcclient/examples/dashdwebsockets)
   Connects to a dashd-go RPC server using TLS-secured websockets, registers for
   block connected and block disconnected notifications, and gets the current
   block count
-* [dashwallet-go Websockets Example](https://github.com/dashevo/dashd-go/tree/master/rpcclient/examples/btcwalletwebsockets)
+* [dashwallet-go Websockets Example](https://github.com/dashevo/dashd-go/tree/master/rpcclient/examples/dashwalletwebsockets)
   Connects to a dashwallet-go RPC server using TLS-secured websockets, registers for
   notifications about changes to account balances, and gets a list of unspent
   transaction outputs (utxos) the wallet can sign
-* [Dash Core HTTP POST Example](https://github.com/dashevo/dashd-go/tree/master/rpcclient/examples/bitcoincorehttp)
+* [Dash Core HTTP POST Example](https://github.com/dashevo/dashd-go/tree/master/rpcclient/examples/dashcorehttp)
   Connects to a dash core RPC server using HTTP POST mode with TLS disabled
   and gets the current block count
 
