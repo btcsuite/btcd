@@ -1,9 +1,9 @@
 wire
 ====
 
-[![Build Status](http://img.shields.io/travis/btcsuite/btcd.svg)](https://travis-ci.org/btcsuite/btcd)
+[![Build Status](http://img.shields.io/travis/dashevo/dashd-go.svg)](https://travis-ci.org/dashevo/dashd-go)
 [![ISC License](http://img.shields.io/badge/license-ISC-blue.svg)](http://copyfree.org)
-[![GoDoc](https://img.shields.io/badge/godoc-reference-blue.svg)](http://godoc.org/github.com/btcsuite/btcd/wire)
+[![GoDoc](https://img.shields.io/badge/godoc-reference-blue.svg)](http://godoc.org/github.com/dashevo/dashd-go/wire)
 =======
 
 Package wire implements the bitcoin wire protocol.  A comprehensive suite of
@@ -19,7 +19,7 @@ protocol level.
 ## Installation and Updating
 
 ```bash
-$ go get -u github.com/btcsuite/btcd/wire
+$ go get -u github.com/dashevo/dashd-go/wire
 ```
 
 ## Bitcoin Message Overview

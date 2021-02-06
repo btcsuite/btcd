@@ -1,4 +1,5 @@
 // Copyright (c) 2014 The btcsuite developers
+// Copyright (c) 2021 Dash Core Group
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -7,7 +8,7 @@ package btcjson_test
 import (
 	"testing"
 
-	"github.com/btcsuite/btcd/btcjson"
+	"github.com/dashevo/dashd-go/btcjson"
 )
 
 // TestErrorCodeStringer tests the stringized output for the ErrorCode type.

@@ -7,8 +7,8 @@ package rpcclient
 
 import (
 	"encoding/json"
-	"github.com/btcsuite/btcd/btcjson"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/dashevo/dashd-go/btcjson"
+	"github.com/dashevo/dashd-go/chaincfg/chainhash"
 )
 
 // FutureGetQuorumSignResult is a future promise to deliver the result of a

@@ -1,4 +1,4 @@
-module github.com/btcsuite/btcd
+module github.com/dashevo/dashd-go
 
 require (
 	github.com/btcsuite/btclog v0.0.0-20170628155309-84c8d2346e9f
@@ -13,5 +13,7 @@ require (
 	github.com/jrick/logrotate v1.0.0
 	golang.org/x/crypto v0.0.0-20200510223506-06a226fb4e37
 )
+
+replace github.com/dashevo/dashd-go => ./
 
 go 1.14

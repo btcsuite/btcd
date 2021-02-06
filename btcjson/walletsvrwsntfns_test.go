@@ -1,4 +1,5 @@
 // Copyright (c) 2014 The btcsuite developers
+// Copyright (c) 2021 Dash Core Group
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -11,7 +12,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/btcsuite/btcd/btcjson"
+	"github.com/dashevo/dashd-go/btcjson"
 )
 
 // TestWalletSvrWsNtfns tests all of the chain server websocket-specific

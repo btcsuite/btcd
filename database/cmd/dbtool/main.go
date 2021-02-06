@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/btcsuite/btcd/database"
+	"github.com/dashevo/dashd-go/database"
 	"github.com/btcsuite/btclog"
 	flags "github.com/jessevdk/go-flags"
 )

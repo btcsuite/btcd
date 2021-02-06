@@ -1,9 +1,9 @@
 blockchain
 ==========
 
-[![Build Status](http://img.shields.io/travis/btcsuite/btcd.svg)](https://travis-ci.org/btcsuite/btcd)
+[![Build Status](http://img.shields.io/travis/dashevo/dashd-go.svg)](https://travis-ci.org/dashevo/dashd-go)
 [![ISC License](http://img.shields.io/badge/license-ISC-blue.svg)](http://copyfree.org)
-[![GoDoc](https://img.shields.io/badge/godoc-reference-blue.svg)](http://godoc.org/github.com/btcsuite/btcd/blockchain)
+[![GoDoc](https://img.shields.io/badge/godoc-reference-blue.svg)](http://godoc.org/github.com/dashevo/dashd-go/blockchain)
 
 Package blockchain implements bitcoin block handling and chain selection rules.
 The test coverage is currently only around 60%, but will be increasing over
@@ -21,7 +21,7 @@ block chain.
 ## Installation and Updating
 
 ```bash
-$ go get -u github.com/btcsuite/btcd/blockchain
+$ go get -u github.com/dashevo/dashd-go/blockchain
 ```
 
 ## Bitcoin Chain Processing Overview
@@ -61,18 +61,18 @@ is by no means exhaustive:
 
 ## Examples
 
-* [ProcessBlock Example](http://godoc.org/github.com/btcsuite/btcd/blockchain#example-BlockChain-ProcessBlock)  
+* [ProcessBlock Example](http://godoc.org/github.com/dashevo/dashd-go/blockchain#example-BlockChain-ProcessBlock)  
   Demonstrates how to create a new chain instance and use ProcessBlock to
   attempt to add a block to the chain.  This example intentionally
   attempts to insert a duplicate genesis block to illustrate how an invalid
   block is handled.
 
-* [CompactToBig Example](http://godoc.org/github.com/btcsuite/btcd/blockchain#example-CompactToBig)  
+* [CompactToBig Example](http://godoc.org/github.com/dashevo/dashd-go/blockchain#example-CompactToBig)  
   Demonstrates how to convert the compact "bits" in a block header which
   represent the target difficulty to a big integer and display it using the
   typical hex notation.
 
-* [BigToCompact Example](http://godoc.org/github.com/btcsuite/btcd/blockchain#example-BigToCompact)  
+* [BigToCompact Example](http://godoc.org/github.com/dashevo/dashd-go/blockchain#example-BigToCompact)  
   Demonstrates how to convert a target difficulty into the
   compact "bits" in a block header which represent that target difficulty.
 

@@ -7,8 +7,8 @@ package txscript
 import (
 	"testing"
 
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/wire"
+	"github.com/dashevo/dashd-go/chaincfg/chainhash"
+	"github.com/dashevo/dashd-go/wire"
 )
 
 // TestBadPC sets the pc to a deliberately bad result then confirms that Step()

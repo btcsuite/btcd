@@ -12,14 +12,14 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/btcsuite/btcd/blockchain"
-	"github.com/btcsuite/btcd/blockchain/fullblocktests"
-	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/database"
-	_ "github.com/btcsuite/btcd/database/ffldb"
-	"github.com/btcsuite/btcd/txscript"
-	"github.com/btcsuite/btcd/wire"
+	"github.com/dashevo/dashd-go/blockchain"
+	"github.com/dashevo/dashd-go/blockchain/fullblocktests"
+	"github.com/dashevo/dashd-go/chaincfg"
+	"github.com/dashevo/dashd-go/chaincfg/chainhash"
+	"github.com/dashevo/dashd-go/database"
+	_ "github.com/dashevo/dashd-go/database/ffldb"
+	"github.com/dashevo/dashd-go/txscript"
+	"github.com/dashevo/dashd-go/wire"
 	"github.com/btcsuite/btcutil"
 )
 

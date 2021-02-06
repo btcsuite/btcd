@@ -7,8 +7,8 @@ package txscript
 import (
 	"fmt"
 
-	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/wire"
+	"github.com/dashevo/dashd-go/chaincfg"
+	"github.com/dashevo/dashd-go/wire"
 	"github.com/btcsuite/btcutil"
 )
 

@@ -1,4 +1,5 @@
 // Copyright (c) 2014 The btcsuite developers
+// Copyright (c) 2021 Dash Core Group
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -8,7 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/btcsuite/btcd/btcjson"
+	"github.com/dashevo/dashd-go/btcjson"
 )
 
 // This example demonstrates how to create and marshal a command into a JSON-RPC

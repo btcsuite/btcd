@@ -8,7 +8,7 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/dashevo/dashd-go/chaincfg/chainhash"
 )
 
 var (

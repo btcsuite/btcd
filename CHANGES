@@ -419,7 +419,7 @@ Changes in 0.10.0 (Sun Mar 01 2015)
       for version 3 blocks which are compatible with BIP0066
     - Allow getblocktemplate to serve blocks when the current time is
       less than the minimum allowed time for a generated block template
-      (https://github.com/btcsuite/btcd/issues/209)
+      (https://github.com/dashevo/dashd-go/issues/209)
   - Crypto changes:
     - Optimize scalar multiplication by the base point by using a
       pre-computed table which results in approximately a 35% speedup
@@ -434,29 +434,29 @@ Changes in 0.10.0 (Sun Mar 01 2015)
     - Add a new parameter --addrindex which will enable the creation of an
       address index which can be queried to determine all transactions which
       involve a given address
-      (https://github.com/btcsuite/btcd/issues/190)
+      (https://github.com/dashevo/dashd-go/issues/190)
     - Add a new logging subsystem for address index related operations
     - Support new searchrawtransactions RPC
-      (https://github.com/btcsuite/btcd/issues/185)
+      (https://github.com/dashevo/dashd-go/issues/185)
   - RPC changes:
     - Require TLS version 1.2 as the minimum version for all TLS connections
     - Provide support for disabling TLS when only listening on localhost
-      (https://github.com/btcsuite/btcd/pull/192)
+      (https://github.com/dashevo/dashd-go/pull/192)
     - Modify help output for all commands to provide much more consistent
       and detailed information
     - Correct case in getrawtransaction which would refuse to serve certain
       transactions with invalid scripts
-      (https://github.com/btcsuite/btcd/issues/210)
+      (https://github.com/dashevo/dashd-go/issues/210)
     - Correct error handling in the getrawtransaction RPC which could lead
       to a crash in rare cases
-      (https://github.com/btcsuite/btcd/issues/196)
+      (https://github.com/dashevo/dashd-go/issues/196)
     - Update getinfo RPC to include the appropriate 'timeoffset' calculated
       from the median network time
     - Modify listreceivedbyaddress result type to include txids field so it
       is compatible
     - Add 'iswatchonly' field to validateaddress result
     - Add 'startingpriority' and 'currentpriority' fields to getrawmempool
-      (https://github.com/btcsuite/btcd/issues/178)
+      (https://github.com/dashevo/dashd-go/issues/178)
     - Don't omit the 'confirmations' field from getrawtransaction when it is
       zero
   - Websocket changes:
@@ -472,7 +472,7 @@ Changes in 0.10.0 (Sun Mar 01 2015)
       dumping all of the commands
     - Make the usage syntax much more consistent and correct a few cases of
       misnamed fields
-      (https://github.com/btcsuite/btcd/issues/305)
+      (https://github.com/dashevo/dashd-go/issues/305)
     - Improve usage errors to show the specific parameter number, reason,
       and error code
     - Only show the usage for specific command is shown when a valid command
@@ -491,7 +491,7 @@ Changes in 0.10.0 (Sun Mar 01 2015)
     - Remove utility in favor of the RPC getblock method
   - Notable developer-related package changes:
     - Many of the core packages have been relocated into the btcd repository
-      (https://github.com/btcsuite/btcd/issues/214)
+      (https://github.com/dashevo/dashd-go/issues/214)
     - A new version of the btcjson package that has been completely
       redesigned from the ground up based based upon how the project has
       evolved and lessons learned while using it since it was first written
@@ -508,21 +508,21 @@ Changes in 0.10.0 (Sun Mar 01 2015)
       and using that data to calculate an offset against the local time
   - Misc changes:
     - Fix a slow memory leak due to tickers not being stopped
-      (https://github.com/btcsuite/btcd/issues/189)
+      (https://github.com/dashevo/dashd-go/issues/189)
     - Fix an issue where a mix of orphans and SPV clients could trigger a
       condition where peers would no longer be served
-      (https://github.com/btcsuite/btcd/issues/231)
+      (https://github.com/dashevo/dashd-go/issues/231)
     - The RPC username and password can now contain symbols which previously
       conflicted with special symbols used in URLs
     - Improve handling of obtaining random nonces to prevent cases where it
       could error when not enough entropy was available
     - Improve handling of home directory creation errors such as in the case
-      of unmounted symlinks (https://github.com/btcsuite/btcd/issues/193)
+      of unmounted symlinks (https://github.com/dashevo/dashd-go/issues/193)
     - Improve the error reporting for rejected transactions to include the
       inputs which are missing and/or being double spent
     - Update sample config file with new options and correct a comment
       regarding the fact the RPC server only listens on localhost by default
-      (https://github.com/btcsuite/btcd/issues/218)
+      (https://github.com/dashevo/dashd-go/issues/218)
     - Update the continuous integration builds to run several tools which
       help keep code quality high
     - Significant amount of internal code cleanup and improvements

@@ -11,5 +11,5 @@
 
 ## Issue Tracker
 
-The [integrated github issue tracker](https://github.com/btcsuite/btcd/issues)
+The [integrated github issue tracker](https://github.com/dashevo/dashd-go/issues)
 is used for this project.

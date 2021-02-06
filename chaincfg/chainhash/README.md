@@ -1,9 +1,9 @@
 chainhash
 =========
 
-[![Build Status](http://img.shields.io/travis/btcsuite/btcd.svg)](https://travis-ci.org/btcsuite/btcd)
+[![Build Status](http://img.shields.io/travis/dashevo/dashd-go.svg)](https://travis-ci.org/dashevo/dashd-go)
 [![ISC License](http://img.shields.io/badge/license-ISC-blue.svg)](http://copyfree.org)
-[![GoDoc](https://img.shields.io/badge/godoc-reference-blue.svg)](http://godoc.org/github.com/btcsuite/btcd/chaincfg/chainhash)
+[![GoDoc](https://img.shields.io/badge/godoc-reference-blue.svg)](http://godoc.org/github.com/dashevo/dashd-go/chaincfg/chainhash)
 =======
 
 chainhash provides a generic hash type and associated functions that allows the
@@ -12,7 +12,7 @@ specific hash algorithm to be abstracted.
 ## Installation and Updating
 
 ```bash
-$ go get -u github.com/btcsuite/btcd/chaincfg/chainhash
+$ go get -u github.com/dashevo/dashd-go/chaincfg/chainhash
 ```
 
 ## GPG Verification Key

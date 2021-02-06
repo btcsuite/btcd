@@ -9,7 +9,7 @@
 # docker build . -t yourregistry/btcd --build-arg ARCH=arm64v8
 #
 # For more information how to use this docker image visit:
-# https://github.com/btcsuite/btcd/tree/master/docs
+# https://github.com/dashevo/dashd-go/tree/master/docs
 #
 # 8333  Mainnet Bitcoin peer-to-peer port
 # 8334  Mainet RPC port
