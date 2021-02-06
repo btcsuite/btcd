@@ -7,7 +7,7 @@ package addrmgr
 import (
 	"time"
 
-	"github.com/dashevo/dashd-go/wire"
+	"github.com/btcsuite/btcd/wire"
 )
 
 // KnownAddress tracks information about a known network address that is used

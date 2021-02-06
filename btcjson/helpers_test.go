@@ -9,7 +9,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/dashevo/dashd-go/btcjson"
+	"github.com/btcsuite/btcd/btcjson"
 )
 
 // TestHelpers tests the various helper functions which create pointers to

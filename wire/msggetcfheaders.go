@@ -7,7 +7,7 @@ package wire
 import (
 	"io"
 
-	"github.com/dashevo/dashd-go/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 )
 
 // MsgGetCFHeaders is a message similar to MsgGetHeaders, but for committed

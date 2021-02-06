@@ -11,8 +11,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/dashevo/dashd-go/chaincfg"
-	"github.com/dashevo/dashd-go/wire"
+	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/btcsuite/btcd/wire"
 )
 
 const (

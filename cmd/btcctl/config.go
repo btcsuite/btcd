@@ -13,8 +13,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/dashevo/dashd-go/btcjson"
-	"github.com/dashevo/dashd-go/chaincfg"
+	"github.com/btcsuite/btcd/btcjson"
+	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcutil"
 	flags "github.com/jessevdk/go-flags"
 )

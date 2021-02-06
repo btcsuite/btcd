@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/dashevo/dashd-go/database"
-	_ "github.com/dashevo/dashd-go/database/ffldb"
+	"github.com/btcsuite/btcd/database"
+	_ "github.com/btcsuite/btcd/database/ffldb"
 )
 
 var (

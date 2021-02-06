@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/dashevo/dashd-go/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 )
 
 const (

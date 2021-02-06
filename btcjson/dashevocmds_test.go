@@ -12,7 +12,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/dashevo/dashd-go/btcjson"
+	"github.com/btcsuite/btcd/btcjson"
 )
 
 // TestDashEvoCmds tests all of the dash evo commands marshal and unmarshal

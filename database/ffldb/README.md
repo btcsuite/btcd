@@ -3,7 +3,7 @@ ffldb
 
 [![Build Status](https://travis-ci.org/dashevo/dashd-go.png?branch=master)](https://travis-ci.org/dashevo/dashd-go)
 [![ISC License](http://img.shields.io/badge/license-ISC-blue.svg)](http://copyfree.org)
-[![GoDoc](https://godoc.org/github.com/dashevo/dashd-go/database/ffldb?status.png)](http://godoc.org/github.com/dashevo/dashd-go/database/ffldb)
+[![GoDoc](https://godoc.org/github.com/btcsuite/btcd/database/ffldb?status.png)](http://godoc.org/github.com/btcsuite/btcd/database/ffldb)
 =======
 
 Package ffldb implements a driver for the database package that uses leveldb for

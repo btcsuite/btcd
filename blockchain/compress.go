@@ -5,8 +5,8 @@
 package blockchain
 
 import (
-	"github.com/dashevo/dashd-go/btcec"
-	"github.com/dashevo/dashd-go/txscript"
+	"github.com/btcsuite/btcd/btcec"
+	"github.com/btcsuite/btcd/txscript"
 )
 
 // -----------------------------------------------------------------------------

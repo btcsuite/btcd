@@ -7,8 +7,8 @@ package main
 import (
 	"time"
 
-	"github.com/dashevo/dashd-go/chaincfg/chainhash"
-	"github.com/dashevo/dashd-go/database"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/database"
 )
 
 // headersCmd defines the configuration options for the loadheaders command.

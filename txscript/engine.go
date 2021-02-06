@@ -11,8 +11,8 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/dashevo/dashd-go/btcec"
-	"github.com/dashevo/dashd-go/wire"
+	"github.com/btcsuite/btcd/btcec"
+	"github.com/btcsuite/btcd/wire"
 )
 
 // ScriptFlags is a bitmask defining additional operations or tests that will be

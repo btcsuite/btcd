@@ -17,7 +17,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/dashevo/dashd-go/btcec"
+	"github.com/btcsuite/btcd/btcec"
 )
 
 func main() {

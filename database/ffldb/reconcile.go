@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"hash/crc32"
 
-	"github.com/dashevo/dashd-go/database"
+	"github.com/btcsuite/btcd/database"
 )
 
 // The serialized write cursor location format is:

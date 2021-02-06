@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/dashevo/dashd-go/chaincfg/chainhash"
-	"github.com/dashevo/dashd-go/database"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcutil"
 )
 

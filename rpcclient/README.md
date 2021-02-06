@@ -3,7 +3,7 @@ rpcclient
 
 [![Build Status](http://img.shields.io/travis/dashevo/dashd-go.svg)](https://travis-ci.org/dashevo/dashd-go)
 [![ISC License](http://img.shields.io/badge/license-ISC-blue.svg)](http://copyfree.org)
-[![GoDoc](https://img.shields.io/badge/godoc-reference-blue.svg)](http://godoc.org/github.com/dashevo/dashd-go/rpcclient)
+[![GoDoc](https://img.shields.io/badge/godoc-reference-blue.svg)](http://godoc.org/github.com/btcsuite/btcd/rpcclient)
 
 rpcclient implements a Websocket-enabled Dash JSON-RPC client package written
 in [Go](http://golang.org/).  It provides a robust and easy to use client for
@@ -18,16 +18,16 @@ implement and the API is not stable yet.
 
 ## Documentation
 
-* [API Reference](http://godoc.org/github.com/dashevo/dashd-go/rpcclient)
-* [dashd-go Websockets Example](https://github.com/dashevo/dashd-go/tree/master/rpcclient/examples/dashdwebsockets)
+* [API Reference](http://godoc.org/github.com/btcsuite/btcd/rpcclient)
+* [dashd-go Websockets Example](https://github.com/btcsuite/btcd/tree/master/rpcclient/examples/dashdwebsockets)
   Connects to a dashd-go RPC server using TLS-secured websockets, registers for
   block connected and block disconnected notifications, and gets the current
   block count
-* [dashwallet-go Websockets Example](https://github.com/dashevo/dashd-go/tree/master/rpcclient/examples/dashwalletwebsockets)
+* [dashwallet-go Websockets Example](https://github.com/btcsuite/btcd/tree/master/rpcclient/examples/dashwalletwebsockets)
   Connects to a dashwallet-go RPC server using TLS-secured websockets, registers for
   notifications about changes to account balances, and gets a list of unspent
   transaction outputs (utxos) the wallet can sign
-* [Dash Core HTTP POST Example](https://github.com/dashevo/dashd-go/tree/master/rpcclient/examples/dashcorehttp)
+* [Dash Core HTTP POST Example](https://github.com/btcsuite/btcd/tree/master/rpcclient/examples/dashcorehttp)
   Connects to a dash core RPC server using HTTP POST mode with TLS disabled
   and gets the current block count
 
@@ -47,7 +47,7 @@ implement and the API is not stable yet.
 ## Installation
 
 ```bash
-$ go get -u github.com/dashevo/dashd-go/rpcclient
+$ go get -u github.com/btcsuite/btcd/rpcclient
 ```
 
 ## License
