@@ -163,14 +163,14 @@ Example Usage
 
 The following full-blown client examples are in the examples directory:
 
- - bitcoincorehttp
+ - dashcorehttp
    Connects to a bitcoin core RPC server using HTTP POST mode with TLS disabled
    and gets the current block count
- - btcdwebsockets
+ - dashdwebsockets
    Connects to a btcd RPC server using TLS-secured websockets, registers for
    block connected and block disconnected notifications, and gets the current
    block count
- - btcwalletwebsockets
+ - dashwalletwebsockets
    Connects to a btcwallet RPC server using TLS-secured websockets, registers
    for notifications about changes to account balances, and gets a list of
    unspent transaction outputs (utxos) the wallet can sign
