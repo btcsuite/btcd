@@ -81,10 +81,10 @@ func (c *Client) QuorumSign(quorumType btcjson.LLMQType, requestId *chainhash.Ha
 // FutureGetQuorumInfoResult is a future promise to deliver the result of a
 // QuorumInfoAsync RPC invocation (or an applicable error).
 type FutureGetQuorumInfoResult struct {
-	client      *Client
-	quorumType  btcjson.LLMQType
-	quorumHash  string
-	Response    chan *response
+	client     *Client
+	quorumType btcjson.LLMQType
+	quorumHash string
+	Response   chan *response
 }
 
 // Receive waits for the response promised by the future and returns the member signature for the quorum.
@@ -118,10 +118,10 @@ func (c *Client) QuorumInfoAsync(quorumType btcjson.LLMQType, quorumHash *chainh
 	cmd := btcjson.NewQuorumInfoCmd(quorumType, quorumHashString, includeSkShare)
 
 	return FutureGetQuorumInfoResult{
-		client:      c,
-		quorumType:  quorumType,
-		quorumHash:  quorumHashString,
-		Response:    c.sendCmd(cmd),
+		client:     c,
+		quorumType: quorumType,
+		quorumHash: quorumHashString,
+		Response:   c.sendCmd(cmd),
 	}
 }
 
@@ -129,4 +129,3 @@ func (c *Client) QuorumInfoAsync(quorumType btcjson.LLMQType, quorumHash *chainh
 func (c *Client) QuorumInfo(quorumType btcjson.LLMQType, quorumHash *chainhash.Hash, includeSkShare bool) (*btcjson.QuorumInfoResult, error) {
 	return c.QuorumInfoAsync(quorumType, quorumHash, includeSkShare).Receive()
 }
-
