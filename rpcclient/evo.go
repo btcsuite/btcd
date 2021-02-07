@@ -1,5 +1,6 @@
 // Copyright (c) 2014-2017 The btcsuite developers
 // Copyright (c) 2015-2017 The Decred developers
+// Copyright (c) 2021 Dash Core Group
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -23,27 +24,26 @@ type FutureGetQuorumSignResult struct {
 }
 
 // Receive waits for the response promised by the future and returns the member signature for the quorum.
-func (r FutureGetQuorumSignResult) Receive() (*chainhash.Hash, error) {
+func (r FutureGetQuorumSignResult) Receive() (*btcjson.QuorumSignResult, error) {
 	res, err := receiveFuture(r.Response)
 	if err != nil {
 		return nil, err
 	}
 
-	// Unmarshal as an array of getaddednodeinfo result objects.
-	var quorumSignResultHash chainhash.Hash
-	err = json.Unmarshal(res, &quorumSignResultHash)
+	// Unmarshal as a Quorum Info Result
+	var quorumSignResult btcjson.QuorumSignResult
+	err = json.Unmarshal(res, &quorumSignResult)
 	if err != nil {
 		return nil, err
 	}
 
-	return &quorumSignResultHash, nil
+	return &quorumSignResult, nil
 }
 
 // QuorumSignAsync returns an instance of a type that can be used to get
 // the result of the RPC at some future time by invoking the Receive function on
 // the returned instance.
 //
-// See GetBestBlockHash for the blocking version and more details.
 func (c *Client) QuorumSignAsync(quorumType btcjson.LLMQType, requestId *chainhash.Hash, messageHash *chainhash.Hash, quorumHash *chainhash.Hash, submit bool) FutureGetQuorumSignResult {
 
 	messageHashString := ""
@@ -73,8 +73,60 @@ func (c *Client) QuorumSignAsync(quorumType btcjson.LLMQType, requestId *chainha
 	}
 }
 
-// GetBestBlockHash returns the hash of the best block in the longest block
-// chain.
-func (c *Client) QuorumSign(quorumType btcjson.LLMQType, requestId *chainhash.Hash, messageHash *chainhash.Hash, quorumHash *chainhash.Hash, submit bool) (*chainhash.Hash, error) {
+// QuorumSign returns a quorum sign result containing a signature signed by the quorum in question.
+func (c *Client) QuorumSign(quorumType btcjson.LLMQType, requestId *chainhash.Hash, messageHash *chainhash.Hash, quorumHash *chainhash.Hash, submit bool) (*btcjson.QuorumSignResult, error) {
 	return c.QuorumSignAsync(quorumType, requestId, messageHash, quorumHash, submit).Receive()
 }
+
+// FutureGetQuorumInfoResult is a future promise to deliver the result of a
+// QuorumInfoAsync RPC invocation (or an applicable error).
+type FutureGetQuorumInfoResult struct {
+	client      *Client
+	quorumType  btcjson.LLMQType
+	quorumHash  string
+	Response    chan *response
+}
+
+// Receive waits for the response promised by the future and returns the member signature for the quorum.
+func (r FutureGetQuorumInfoResult) Receive() (*btcjson.QuorumInfoResult, error) {
+	res, err := receiveFuture(r.Response)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal as a Quorum Info Result
+	var quorumInfoResult btcjson.QuorumInfoResult
+	err = json.Unmarshal(res, &quorumInfoResult)
+	if err != nil {
+		return nil, err
+	}
+
+	return &quorumInfoResult, nil
+}
+
+// QuorumInfoAsync returns an instance of a type that can be used to get
+// the result of the RPC at some future time by invoking the Receive function on
+// the returned instance.
+//
+func (c *Client) QuorumInfoAsync(quorumType btcjson.LLMQType, quorumHash *chainhash.Hash, includeSkShare bool) FutureGetQuorumInfoResult {
+
+	quorumHashString := ""
+	if quorumHash != nil {
+		quorumHashString = quorumHash.String()
+	}
+
+	cmd := btcjson.NewQuorumInfoCmd(quorumType, quorumHashString, includeSkShare)
+
+	return FutureGetQuorumInfoResult{
+		client:      c,
+		quorumType:  quorumType,
+		quorumHash:  quorumHashString,
+		Response:    c.sendCmd(cmd),
+	}
+}
+
+// QuorumSign returns a quorum sign result containing a signature signed by the quorum in question.
+func (c *Client) QuorumInfo(quorumType btcjson.LLMQType, quorumHash *chainhash.Hash, includeSkShare bool) (*btcjson.QuorumInfoResult, error) {
+	return c.QuorumInfoAsync(quorumType, quorumHash, includeSkShare).Receive()
+}
+
