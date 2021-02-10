@@ -343,6 +343,8 @@ func IsMultisigSigScript(script []byte) bool {
 // script if it is a standard pay-to-witness-pubkey-hash script. It will return
 // nil otherwise.
 func extractWitnessPubKeyHash(script []byte) []byte {
+	// A pay-to-witness-pubkey-hash script is of the form:
+	//   OP_0 OP_DATA_20 <20-byte-hash>
 	if len(script) == 22 &&
 		script[0] == OP_0 &&
 		script[1] == OP_DATA_20 {
