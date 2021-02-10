@@ -90,7 +90,7 @@ func (t ScriptClass) String() string {
 // will return nil otherwise.
 func extractCompressedPubKey(script []byte) []byte {
 	// A pay-to-compressed-pubkey script is of the form:
-	//  OP_DATA_33 <33-byte compresed pubkey> OP_CHECKSIG
+	//  OP_DATA_33 <33-byte compressed pubkey> OP_CHECKSIG
 
 	// All compressed secp256k1 public keys must start with 0x02 or 0x03.
 	if len(script) == 35 &&
