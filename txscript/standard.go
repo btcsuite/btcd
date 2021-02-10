@@ -340,7 +340,7 @@ func IsMultisigSigScript(script []byte) bool {
 }
 
 // extractWitnessPubKeyHash extracts the witness public key hash from the passed
-// script if it is a standard witness-pay-to-pubkey-hash script. It will return
+// script if it is a standard pay-to-witness-pubkey-hash script. It will return
 // nil otherwise.
 func extractWitnessPubKeyHash(script []byte) []byte {
 	if len(script) == 22 &&
@@ -354,7 +354,7 @@ func extractWitnessPubKeyHash(script []byte) []byte {
 }
 
 // isWitnessPubKeyHashScript returns whether or not the passed script is a
-// standard witness-pay-to-pubkey-hash script.
+// standard pay-to-witness-pubkey-hash script.
 func isWitnessPubKeyHashScript(script []byte) bool {
 	return extractWitnessPubKeyHash(script) != nil
 }
