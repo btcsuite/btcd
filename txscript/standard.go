@@ -360,8 +360,8 @@ func isWitnessPubKeyHashScript(script []byte) bool {
 }
 
 // extractWitnessScriptHash extracts the witness script hash from the passed
-// script if it is standard witness-script-hash script. It will return nil
-// otherwise.
+// script if it is standard pay-to-witness-script-hash script. It will return
+// nil otherwise.
 func extractWitnessScriptHash(script []byte) []byte {
 	if len(script) == 34 &&
 		script[0] == OP_0 &&
@@ -374,7 +374,7 @@ func extractWitnessScriptHash(script []byte) []byte {
 }
 
 // isWitnessScriptHashScript returns whether or not the passed script is a
-// standard witness-script-hash script.
+// standard pay-to-witness-script-hash script.
 func isWitnessScriptHashScript(script []byte) bool {
 	return extractWitnessScriptHash(script) != nil
 }
