@@ -365,6 +365,8 @@ func isWitnessPubKeyHashScript(script []byte) bool {
 // script if it is standard pay-to-witness-script-hash script. It will return
 // nil otherwise.
 func extractWitnessScriptHash(script []byte) []byte {
+	// A pay-to-witness-script-hash script is of the form:
+	//   OP_0 OP_DATA_32 <32-byte-hash>
 	if len(script) == 34 &&
 		script[0] == OP_0 &&
 		script[1] == OP_DATA_32 {
