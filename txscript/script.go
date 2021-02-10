@@ -650,10 +650,11 @@ func countSigOpsV0(script []byte, precise bool) int {
 			// not really precise at all due to the small int opcodes only
 			// covering 1 through 16 pubkeys, which means this will count any
 			// more than that value (e.g. 17, 18 19) as the maximum number of
-			// allowed pubkeys.  This was inherited from bitcoin and is,
-			// unfortunately, now part of the consensus rules.  This could be
-			// made more correct with a new script version, however, ideally all
-			// multisignaure operations in new script versions should move to
+			// allowed pubkeys. This is, unfortunately, now part of
+			// the Bitcion consensus rules, due to historical
+			// reasons. This could be made more correct with a new
+			// script version, however, ideally all multisignaure
+			// operations in new script versions should move to
 			// aggregated schemes such as Schnorr instead.
 			if precise && prevOp >= OP_1 && prevOp <= OP_16 {
 				numSigOps += asSmallInt(prevOp)
