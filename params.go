@@ -55,6 +55,13 @@ var simNetParams = params{
 	rpcPort: "18556",
 }
 
+// sigNetParams contains parameters specific to the Signet network
+// (wire.SigNet).
+var sigNetParams = params{
+	Params:  &chaincfg.SigNetParams,
+	rpcPort: "38332",
+}
+
 // netName returns the name used when referring to a bitcoin network.  At the
 // time of writing, btcd currently places blocks for testnet version 3 in the
 // data and log directory "testnet", which does not match the Name field of the
