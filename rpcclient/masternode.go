@@ -8,6 +8,7 @@ package rpcclient
 
 import (
 	"encoding/json"
+
 	"github.com/dashevo/dashd-go/btcjson"
 )
 
@@ -25,7 +26,6 @@ func (r FutureGetMasternodeStatusResult) Receive() (*btcjson.MasternodeStatusRes
 		return nil, err
 	}
 
-	// Unmarshal as a Quorum Info Result
 	var masternodeStatusResult btcjson.MasternodeStatusResult
 	err = json.Unmarshal(res, &masternodeStatusResult)
 	if err != nil {
@@ -35,13 +35,12 @@ func (r FutureGetMasternodeStatusResult) Receive() (*btcjson.MasternodeStatusRes
 	return &masternodeStatusResult, nil
 }
 
-// QuorumSignAsync returns an instance of a type that can be used to get
+// MasternodeStatusAsync returns an instance of a type that can be used to get
 // the result of the RPC at some future time by invoking the Receive function on
 // the returned instance.
 //
 func (c *Client) MasternodeStatusAsync() FutureGetMasternodeStatusResult {
-
-	cmd := btcjson.NewMasternodeStatusCmd()
+	cmd := btcjson.NewMasternodeCmd(btcjson.MasternodeStatus)
 
 	return FutureGetMasternodeStatusResult{
 		client:   c,
@@ -52,4 +51,46 @@ func (c *Client) MasternodeStatusAsync() FutureGetMasternodeStatusResult {
 // MasternodeStatus returns the masternode status.
 func (c *Client) MasternodeStatus() (*btcjson.MasternodeStatusResult, error) {
 	return c.MasternodeStatusAsync().Receive()
+}
+
+// ----------------- masternode count ---------------------
+
+// FutureGetMasternodeCountResult is a future promise to deliver the result of a
+// MasternodeStatusAsync RPC invocation (or an applicable error).
+type FutureGetMasternodeCountResult struct {
+	client   *Client
+	Response chan *response
+}
+
+// Receive waits for the response promised by the future and returns the member signature for the quorum.
+func (r FutureGetMasternodeCountResult) Receive() (*btcjson.MasternodeCountResult, error) {
+	res, err := receiveFuture(r.Response)
+	if err != nil {
+		return nil, err
+	}
+
+	var result btcjson.MasternodeCountResult
+	err = json.Unmarshal(res, &result)
+	if err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+}
+
+// MasternodeCountAsync returns an instance of a type that can be used to get
+// the result of the RPC at some future time by invoking the Receive function on
+// the returned instance.
+func (c *Client) MasternodeCountAsync() FutureGetMasternodeCountResult {
+	cmd := btcjson.NewMasternodeCmd(btcjson.MasternodeCount)
+
+	return FutureGetMasternodeCountResult{
+		client:   c,
+		Response: c.sendCmd(cmd),
+	}
+}
+
+// MasternodeCount returns the masternode count.
+func (c *Client) MasternodeCount() (*btcjson.MasternodeCountResult, error) {
+	return c.MasternodeCountAsync().Receive()
 }

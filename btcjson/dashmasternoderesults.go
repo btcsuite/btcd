@@ -13,6 +13,14 @@ type MasternodeStatusResult struct {
 	Status          string   `json:"status"`
 }
 
+// MasternodeCountResult models the data from the masternode count command.
+// https://dashcore.readme.io/docs/core-api-ref-remote-procedure-calls-dash#masternode-count
+type MasternodeCountResult struct {
+	Total   int `json:"total"`
+	Enabled int `json:"enabled"`
+}
+
+// DMNState is used in masternode status
 type DMNState struct {
 	Service           string `json:"service"`
 	RegisteredHeight  int    `json:"registeredHeight"`
