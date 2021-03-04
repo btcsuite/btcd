@@ -111,7 +111,7 @@ A quick summary of test practices follows:
   - Function comments must always begin with the name of the function per
     [Effective Go](http://golang.org/doc/effective_go.html)
   - Function comments should be complete sentences since they allow a wide
-    variety of automated presentations such as [godoc.org](https://godoc.org)
+    variety of automated presentations such as [go.dev](https://go.dev)
   - The general rule of thumb is to look at it as if you were completely
     unfamiliar with the code and ask yourself, would this give me enough
     information to understand what this function does and how I'd probably want

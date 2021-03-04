@@ -1,9 +1,9 @@
 ffldb
 =====
 
-[![Build Status](https://travis-ci.org/btcsuite/btcd.png?branch=master)](https://travis-ci.org/btcsuite/btcd)
+[![Build Status](https://github.com/btcsuite/btcd/workflows/Build%20and%20Test/badge.svg)](https://github.com/btcsuite/btcd/actions)
 [![ISC License](http://img.shields.io/badge/license-ISC-blue.svg)](http://copyfree.org)
-[![GoDoc](https://godoc.org/github.com/btcsuite/btcd/database/ffldb?status.png)](http://godoc.org/github.com/btcsuite/btcd/database/ffldb)
+[![GoDoc](https://pkg.go.dev/github.com/btcsuite/btcd/database/ffldb?status.png)](https://pkg.go.dev/github.com/btcsuite/btcd/database/ffldb)
 =======
 
 Package ffldb implements a driver for the database package that uses leveldb for
