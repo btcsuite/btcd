@@ -30,7 +30,7 @@ import (
 // AddrManager provides a concurrency safe address manager for caching potential
 // peers on the bitcoin network.
 type AddrManager struct {
-	mtx            sync.Mutex
+	mtx            sync.RWMutex
 	peersFile      string
 	lookupFunc     func(string) ([]net.IP, error)
 	rand           *rand.Rand
@@ -645,8 +645,8 @@ func (a *AddrManager) numAddresses() int {
 
 // NumAddresses returns the number of addresses known to the address manager.
 func (a *AddrManager) NumAddresses() int {
-	a.mtx.Lock()
-	defer a.mtx.Unlock()
+	a.mtx.RLock()
+	defer a.mtx.RUnlock()
 
 	return a.numAddresses()
 }
@@ -654,8 +654,8 @@ func (a *AddrManager) NumAddresses() int {
 // NeedMoreAddresses returns whether or not the address manager needs more
 // addresses.
 func (a *AddrManager) NeedMoreAddresses() bool {
-	a.mtx.Lock()
-	defer a.mtx.Unlock()
+	a.mtx.RLock()
+	defer a.mtx.RUnlock()
 
 	return a.numAddresses() < needAddressThreshold
 }
@@ -685,8 +685,8 @@ func (a *AddrManager) AddressCache() []*wire.NetAddress {
 // getAddresses returns all of the addresses currently found within the
 // manager's address cache.
 func (a *AddrManager) getAddresses() []*wire.NetAddress {
-	a.mtx.Lock()
-	defer a.mtx.Unlock()
+	a.mtx.RLock()
+	defer a.mtx.RUnlock()
 
 	addrIndexLen := len(a.addrIndex)
 	if addrIndexLen == 0 {
