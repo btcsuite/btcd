@@ -4066,9 +4066,13 @@ func (s *rpcServer) processRequest(request *btcjson.Request, isAdmin bool, close
 			result, err = s.standardCmdResult(parsedCmd,
 				closeChan)
 			if err != nil {
-				jsonErr = &btcjson.RPCError{
-					Code:    btcjson.ErrRPCInvalidRequest.Code,
-					Message: "Invalid request: malformed",
+				if rpcErr, ok := err.(*btcjson.RPCError); ok {
+					jsonErr = rpcErr
+				} else {
+					jsonErr = &btcjson.RPCError{
+						Code:    btcjson.ErrRPCInvalidRequest.Code,
+						Message: "Invalid request: malformed",
+					}
 				}
 			}
 		}
