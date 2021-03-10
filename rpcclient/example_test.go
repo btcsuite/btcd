@@ -6,13 +6,14 @@ package rpcclient
 
 import (
 	"fmt"
+
 	"github.com/dashevo/dashd-go/btcjson"
 )
 
 var connCfg = &ConnConfig{
-	Host:         "localhost:8332",
-	User:         "user",
-	Pass:         "pass",
+	Host:         "localhost:19998",
+	User:         "dashrpc",
+	Pass:         "rpcpassword",
 	HTTPPostMode: true,
 	DisableTLS:   true,
 }

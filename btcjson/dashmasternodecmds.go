@@ -8,28 +8,31 @@
 
 package btcjson
 
-// MasternodeCmdSubCmd defines the sub command used in the quorum JSON-RPC command.
-type MasternodeCmdSubCmd string
+// MasternodeSubCmd defines the sub command used in the quorum JSON-RPC command.
+type MasternodeSubCmd string
 
+// Masternode subcommands
 const (
-	// MasternodeStatus indicates the specified host should be added as a persistent
-	// peer.
-	MasternodeStatus MasternodeCmdSubCmd = "status"
+	MasternodeStatus MasternodeSubCmd = "status"
+	MasternodeCount  MasternodeSubCmd = "count"
 )
 
-// MasternodeStatusCmd defines the quorum JSON-RPC command.
-type MasternodeStatusCmd struct {
+// MasternodeCmd defines the quorum JSON-RPC command.
+type MasternodeCmd struct {
+	SubCmd MasternodeSubCmd `jsonrpcusage:"\"status|count\""`
 }
 
-// NewMasternodeStatusCmd returns a new instance which can be used to issue a quorum
+// NewMasternodeCmd returns a new instance which can be used to issue a quorum
 // JSON-RPC command.
-func NewMasternodeStatusCmd() *MasternodeStatusCmd {
-	return &MasternodeStatusCmd{}
+func NewMasternodeCmd(sub MasternodeSubCmd) *MasternodeCmd {
+	return &MasternodeCmd{
+		SubCmd: sub,
+	}
 }
 
 func init() {
 	// No special flags for commands in this file.
 	flags := UsageFlag(0)
 
-	MustRegisterCmd("masternode status", (*MasternodeStatusCmd)(nil), flags)
+	MustRegisterCmd("masternode", (*MasternodeCmd)(nil), flags)
 }

@@ -50,14 +50,14 @@ func NewQuorumSignCmd(quorumType LLMQType, requestId string, messageHash string,
 	}
 }
 
-// QuorumCmd defines the quorum JSON-RPC command.
+// QuorumInfoCmd defines the quorum info JSON-RPC command.
 type QuorumInfoCmd struct {
 	LLMQType       LLMQType
 	QuorumHash     string
 	IncludeSkShare bool
 }
 
-// NewQuorumCmd returns a new instance which can be used to issue a quorum
+// NewQuorumInfoCmd returns a new instance which can be used to issue a quorum
 // JSON-RPC command.
 func NewQuorumInfoCmd(quorumType LLMQType, quorumHash string, includeSkShare bool) *QuorumInfoCmd {
 	return &QuorumInfoCmd{

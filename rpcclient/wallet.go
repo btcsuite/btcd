@@ -2569,7 +2569,7 @@ func (c *Client) GetInfo() (*btcjson.InfoWalletResult, error) {
 	return c.GetInfoAsync().Receive()
 }
 
-// FutureImportPubKeyResult is a future promise to deliver the result of an
+// FutureWalletCreateFundedPsbtResult is a future promise to deliver the result of an
 // WalletCreateFundedPsbt RPC invocation (or an applicable error).
 type FutureWalletCreateFundedPsbtResult chan *response
 
