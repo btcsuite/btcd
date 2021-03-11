@@ -17,20 +17,35 @@ import (
 func makeParams(rt reflect.Type, rv reflect.Value) []interface{} {
 	numFields := rt.NumField()
 	params := make([]interface{}, 0, numFields)
-	lastParam := -1
+	var omitted []interface{}
+
 	for i := 0; i < numFields; i++ {
 		rtf := rt.Field(i)
 		rvf := rv.Field(i)
-		params = append(params, rvf.Interface())
+
 		if rtf.Type.Kind() == reflect.Ptr {
 			if rvf.IsNil() {
+				if v, ok := rtf.Tag.Lookup("json"); ok {
+					if strings.HasSuffix(v, "omitempty") {
+						// Omit if json omitempty tag
+						continue
+					}
+				}
+
 				// Omit optional null params unless a non-null param follows
+				omitted = append(omitted, rvf.Interface())
 				continue
 			}
 		}
-		lastParam = i
+
+		if len(omitted) != 0 {
+			params = append(params, omitted...)
+			omitted = nil
+		}
+		params = append(params, rvf.Interface())
+
 	}
-	return params[:lastParam+1]
+	return params
 }
 
 // MarshalCmd marshals the passed command to a JSON-RPC request byte slice that

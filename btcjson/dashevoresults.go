@@ -30,3 +30,11 @@ type QuorumInfoResult struct {
 	QuorumPublicKey string         `json:"quorumPublicKey"`
 	SecretKeyShare  string         `json:"secretKeyShare"`
 }
+
+// QuorumListResult models the data from the quorum list command.
+type QuorumListResult struct {
+	Llmq50_60  []string `json:"llmq_50_60"`
+	Llmq400_60 []string `json:"llmq_400_60"`
+	Llmq400_85 []string `json:"llmq_400_85"`
+	Llmq100_67 []string `json:"llmq_100_67"`
+}
