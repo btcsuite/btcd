@@ -15,12 +15,8 @@ import (
 // FutureGetQuorumSignResult is a future promise to deliver the result of a
 // QuorumSignAsync RPC invocation (or an applicable error).
 type FutureGetQuorumSignResult struct {
-	client      *Client
-	quorumType  btcjson.LLMQType
-	messageHash string
-	requestId   string
-	quorumHash  string
-	Response    chan *response
+	client   *Client
+	Response chan *response
 }
 
 // Receive waits for the response promised by the future and returns the member signature for the quorum.
@@ -30,7 +26,6 @@ func (r FutureGetQuorumSignResult) Receive() (*btcjson.QuorumSignResult, error) 
 		return nil, err
 	}
 
-	// Unmarshal as a Quorum Info Result
 	var quorumSignResult btcjson.QuorumSignResult
 	err = json.Unmarshal(res, &quorumSignResult)
 	if err != nil {

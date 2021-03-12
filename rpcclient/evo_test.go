@@ -2,6 +2,7 @@ package rpcclient
 
 import (
 	"fmt"
+	"strconv"
 	"testing"
 
 	"github.com/dashevo/dashd-go/btcjson"
@@ -55,8 +56,8 @@ func TestQuorumSign(t *testing.T) {
 	quorumType := btcjson.LLMQType_400_60
 	requestID := "abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234"
 	messageHash := "51c11d287dfa85aef3eebb5420834c8e443e01d15c0b0a8e397d67e2e51aa239"
-	quorumHash := "000000dc07d722238a994116c3395c334211d9864ff5b37c3be51d5fdda66223"
-	submit := false
+	quorumHash := ""
+	submit := true
 
 	client, err := New(connCfg, nil)
 	if err != nil {
@@ -69,6 +70,6 @@ func TestQuorumSign(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cli := &btcjson.MasternodeStatusResult{}
-	compareWithCliCommand(t, result, cli, "quorum", "status")
+	cli := &btcjson.QuorumSignResult{}
+	compareWithCliCommand(t, result, cli, "quorum", "sign", fmt.Sprint(quorumType), requestID, messageHash, quorumHash, strconv.FormatBool(submit))
 }

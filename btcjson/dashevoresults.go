@@ -1,15 +1,35 @@
 package btcjson
 
+import (
+	"encoding/json"
+	"strconv"
+)
+
 // QuorumSignResult models the data from the quorum sign command.
 // returns a hex-encoded string.
 type QuorumSignResult struct {
-	LLMQType     int    `json:"llmqType"`
-	QuorumHash   string `json:"quorumHash"`
-	QuorumMember int    `json:"quorumMember"`
-	ID           string `json:"id"`
-	MsgHash      string `json:"msgHash"`
-	SignHash     string `json:"signHash"`
-	Signature    string `json:"signature"`
+	LLMQType     int    `json:"llmqType,omitempty"`
+	QuorumHash   string `json:"quorumHash,omitempty"`
+	QuorumMember int    `json:"quorumMember,omitempty"`
+	ID           string `json:"id,omitempty"`
+	MsgHash      string `json:"msgHash,omitempty"`
+	SignHash     string `json:"signHash,omitempty"`
+	Signature    string `json:"signature,omitempty"`
+
+	// Result is the output if submit was true
+	Result bool `json:"result,omitempty"`
+}
+
+// UnmarshalJSON is a custom unmarshal because the result can be just a boolean
+func (qsr *QuorumSignResult) UnmarshalJSON(data []byte) error {
+	if bl, err := strconv.ParseBool(string(data)); err == nil {
+		qsr.Result = bl
+		return nil
+	}
+	if err := json.Unmarshal(data, qsr); err != nil {
+		return err
+	}
+	return nil
 }
 
 type QuorumMember struct {

@@ -53,14 +53,20 @@ type QuorumCmd struct {
 // NewQuorumSignCmd returns a new instance which can be used to issue a quorum
 // JSON-RPC command.
 func NewQuorumSignCmd(quorumType LLMQType, requestID, messageHash, quorumHash string, submit bool) *QuorumCmd {
-	return &QuorumCmd{
+	cmd := &QuorumCmd{
 		SubCmd:          QuorumSign,
 		SignLLMQType:    &quorumType,
 		SignRequestID:   &requestID,
 		SignMessageHash: &messageHash,
-		SignQuorumHash:  &quorumHash,
-		SignSubmit:      &submit,
 	}
+	if quorumHash != "" {
+		cmd.SignQuorumHash = &quorumHash
+	}
+	if !submit {
+		cmd.SignSubmit = &submit
+	}
+	return cmd
+
 }
 
 // NewQuorumInfoCmd returns a new instance which can be used to issue a quorum
