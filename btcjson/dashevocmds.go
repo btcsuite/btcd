@@ -10,6 +10,7 @@ package btcjson
 // QuorumCmdSubCmd defines the sub command used in the quorum JSON-RPC command.
 type QuorumCmdSubCmd string
 
+// Quorum commands https://dashcore.readme.io/docs/core-api-ref-remote-procedure-calls-evo#quorum
 const (
 	// QuorumSign indicates the specified host should be added as a persistent
 	// peer.
@@ -20,6 +21,20 @@ const (
 
 	// QuorumList lists all quorums
 	QuorumList QuorumCmdSubCmd = "list"
+
+	QuorumSelectQuorum QuorumCmdSubCmd = "selectquorum"
+	QuorumDKGStatus    QuorumCmdSubCmd = "dkgstatus"
+	QuorumMemberOf     QuorumCmdSubCmd = "memberof"
+)
+
+// DetailLevel is the level of detail used in dkgstatus
+type DetailLevel int
+
+// Detail Levels for dkgstatsu
+const (
+	DetailLevelCounts             DetailLevel = 0
+	DetailLevelIndexes            DetailLevel = 1
+	DetailLevelMembersProTxHashes DetailLevel = 2
 )
 
 // LLMQType is the type of quorum
@@ -39,15 +54,20 @@ const (
 type QuorumCmd struct {
 	SubCmd QuorumCmdSubCmd `jsonrpcusage:"\"info|list|sign\""`
 
-	SignLLMQType    *LLMQType `json:",omitempty"`
-	SignRequestID   *string   `json:",omitempty"`
-	SignMessageHash *string   `json:",omitempty"`
-	SignQuorumHash  *string   `json:",omitempty"`
-	SignSubmit      *bool     `json:",omitempty"`
+	LLMQType  *LLMQType `json:",omitempty"`
+	RequestID *string   `json:",omitempty"`
 
-	InfoLLMQType       *LLMQType `json:",omitempty"`
-	InfoQuorumHash     *string   `json:",omitempty"`
-	InfoIncludeSkShare *bool     `json:",omitempty"`
+	SignMessageHash *string `json:",omitempty"`
+	SignQuorumHash  *string `json:",omitempty"`
+	SignSubmit      *bool   `json:",omitempty"`
+
+	InfoQuorumHash     *string `json:",omitempty"`
+	InfoIncludeSkShare *bool   `json:",omitempty"`
+
+	DKGStatusDetailLevel *DetailLevel `json:",omitempty"`
+
+	ProTxHash        *string `json:",omitempty"`
+	ScanQuorumsCount *int    `json:",omitempty"`
 }
 
 // NewQuorumSignCmd returns a new instance which can be used to issue a quorum
@@ -55,8 +75,8 @@ type QuorumCmd struct {
 func NewQuorumSignCmd(quorumType LLMQType, requestID, messageHash, quorumHash string, submit bool) *QuorumCmd {
 	cmd := &QuorumCmd{
 		SubCmd:          QuorumSign,
-		SignLLMQType:    &quorumType,
-		SignRequestID:   &requestID,
+		LLMQType:        &quorumType,
+		RequestID:       &requestID,
 		SignMessageHash: &messageHash,
 	}
 	if quorumHash != "" {
@@ -74,7 +94,7 @@ func NewQuorumSignCmd(quorumType LLMQType, requestID, messageHash, quorumHash st
 func NewQuorumInfoCmd(quorumType LLMQType, quorumHash string, includeSkShare bool) *QuorumCmd {
 	return &QuorumCmd{
 		SubCmd:             QuorumInfo,
-		InfoLLMQType:       &quorumType,
+		LLMQType:           &quorumType,
 		InfoQuorumHash:     &quorumHash,
 		InfoIncludeSkShare: &includeSkShare,
 	}
@@ -86,6 +106,35 @@ func NewQuorumListCmd() *QuorumCmd {
 	return &QuorumCmd{
 		SubCmd: QuorumList,
 	}
+}
+
+// NewQuorumSelectQuorumCmd returns the selected quorum
+func NewQuorumSelectQuorumCmd(quorumType LLMQType, requestID string) *QuorumCmd {
+	return &QuorumCmd{
+		SubCmd:    QuorumSelectQuorum,
+		LLMQType:  &quorumType,
+		RequestID: &requestID,
+	}
+}
+
+// NewQuorumDKGStatusCmd returns the result from quorum dkgstatus
+func NewQuorumDKGStatusCmd(detailLevel DetailLevel) *QuorumCmd {
+	return &QuorumCmd{
+		SubCmd:               QuorumDKGStatus,
+		DKGStatusDetailLevel: &detailLevel,
+	}
+}
+
+// NewQuorumMemberOfCmd returns the result from quorum memberof
+func NewQuorumMemberOfCmd(proTxHash string, scanQuorumsCount int) *QuorumCmd {
+	cmd := &QuorumCmd{
+		SubCmd:    QuorumMemberOf,
+		ProTxHash: &proTxHash,
+	}
+	if scanQuorumsCount != 0 {
+		cmd.ScanQuorumsCount = &scanQuorumsCount
+	}
+	return cmd
 }
 
 func init() {
