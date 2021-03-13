@@ -132,7 +132,7 @@ type DKGSessionMemeber struct {
 // MinableCommitment are the minableCommitments from dkgstatus
 type MinableCommitment struct {
 	Version           int    `json:"version"`
-	LlmqType          int    `json:"llmqType"`
+	LLMQType          int    `json:"llmqType"`
 	QuorumHash        string `json:"quorumHash"`
 	SignersCount      int    `json:"signersCount"`
 	ValidMembersCount int    `json:"validMembersCount"`
@@ -150,7 +150,7 @@ type QuorumConnection struct {
 // DKGSessionShared are the parts that are shared between the default and
 
 type DKGSessionShared struct {
-	LlmqType                int    `json:"llmqType"`
+	LLMQType                int    `json:"llmqType"`
 	QuorumHash              string `json:"quorumHash"`
 	QuorumHeight            int    `json:"quorumHeight"`
 	Phase                   int    `json:"phase"`

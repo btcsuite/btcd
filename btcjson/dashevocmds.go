@@ -52,7 +52,7 @@ const (
 
 // QuorumCmd defines the quorum JSON-RPC command.
 type QuorumCmd struct {
-	SubCmd QuorumCmdSubCmd `jsonrpcusage:"\"info|list|sign\""`
+	SubCmd QuorumCmdSubCmd `jsonrpcusage:"\"info|list|sign|selectquorum|dkgstatus|memberof\""`
 
 	LLMQType  *LLMQType `json:",omitempty"`
 	RequestID *string   `json:",omitempty"`
