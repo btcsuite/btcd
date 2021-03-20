@@ -6,8 +6,10 @@ package blockchain
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/wire"
 )
 
 // ThresholdState define the various threshold states used when voting on
@@ -66,14 +68,13 @@ func (t ThresholdState) String() string {
 // thresholdConditionChecker provides a generic interface that is invoked to
 // determine when a consensus rule change threshold should be changed.
 type thresholdConditionChecker interface {
-	// BeginTime returns the unix timestamp for the median block time after
-	// which voting on a rule change starts (at the next window).
-	BeginTime() uint64
+	// HasStarted returns true if based on the passed block blockNode the
+	// consensus is eligible for deployment.
+	HasStarted(*blockNode) bool
 
-	// EndTime returns the unix timestamp for the median block time after
-	// which an attempted rule change fails if it has not already been
-	// locked in or activated.
-	EndTime() uint64
+	// HasEnded returns true if the target consensus rule change has expired
+	// or timed out.
+	HasEnded(*blockNode) bool
 
 	// RuleChangeActivationThreshold is the number of blocks for which the
 	// condition must be true in order to lock in a rule change.
@@ -121,6 +122,27 @@ func newThresholdCaches(numCaches uint32) []thresholdStateCache {
 	return caches
 }
 
+// PastMedianTime returns the past median time from the PoV of the passed block
+// header. The past median time is the median time of the 11 blocks prior to
+// the passed block header.
+//
+// NOTE: This is part of the chainfg.BlockClock interface
+func (b *BlockChain) PastMedianTime(blockHeader *wire.BlockHeader) (time.Time, error) {
+	prevHash := blockHeader.PrevBlock
+	prevNode := b.index.LookupNode(&prevHash)
+
+	// If we can't find the previous node, then we can't compute the block
+	// time since it requires us to walk backwards from this node.
+	if prevNode == nil {
+		return time.Time{}, fmt.Errorf("blockHeader(%v) has no "+
+			"previous node", blockHeader.BlockHash())
+	}
+
+	blockNode := newBlockNode(blockHeader, prevNode)
+
+	return blockNode.CalcPastMedianTime(), nil
+}
+
 // thresholdState returns the current rule change threshold state for the block
 // AFTER the given node and deployment ID.  The cache is used to ensure the
 // threshold states for previous windows are only calculated once.
@@ -150,13 +172,9 @@ func (b *BlockChain) thresholdState(prevNode *blockNode, checker thresholdCondit
 			break
 		}
 
-		// The start and expiration times are based on the median block
-		// time, so calculate it now.
-		medianTime := prevNode.CalcPastMedianTime()
-
 		// The state is simply defined if the start time hasn't been
 		// been reached yet.
-		if uint64(medianTime.Unix()) < checker.BeginTime() {
+		if !checker.HasStarted(prevNode) {
 			cache.Update(&prevNode.hash, ThresholdDefined)
 			break
 		}
@@ -192,9 +210,7 @@ func (b *BlockChain) thresholdState(prevNode *blockNode, checker thresholdCondit
 		case ThresholdDefined:
 			// The deployment of the rule change fails if it expires
 			// before it is accepted and locked in.
-			medianTime := prevNode.CalcPastMedianTime()
-			medianTimeUnix := uint64(medianTime.Unix())
-			if medianTimeUnix >= checker.EndTime() {
+			if checker.HasEnded(prevNode) {
 				state = ThresholdFailed
 				break
 			}
@@ -202,15 +218,14 @@ func (b *BlockChain) thresholdState(prevNode *blockNode, checker thresholdCondit
 			// The state for the rule moves to the started state
 			// once its start time has been reached (and it hasn't
 			// already expired per the above).
-			if medianTimeUnix >= checker.BeginTime() {
+			if checker.HasStarted(prevNode) {
 				state = ThresholdStarted
 			}
 
 		case ThresholdStarted:
 			// The deployment of the rule change fails if it expires
 			// before it is accepted and locked in.
-			medianTime := prevNode.CalcPastMedianTime()
-			if uint64(medianTime.Unix()) >= checker.EndTime() {
+			if checker.HasEnded(prevNode) {
 				state = ThresholdFailed
 				break
 			}

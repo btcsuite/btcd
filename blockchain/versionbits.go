@@ -5,8 +5,6 @@
 package blockchain
 
 import (
-	"math"
-
 	"github.com/btcsuite/btcd/chaincfg"
 )
 
@@ -42,27 +40,26 @@ type bitConditionChecker struct {
 // interface.
 var _ thresholdConditionChecker = bitConditionChecker{}
 
-// BeginTime returns the unix timestamp for the median block time after which
-// voting on a rule change starts (at the next window).
+// HasStarted returns true if based on the passed block blockNode the consensus
+// is eligible for deployment.
 //
-// Since this implementation checks for unknown rules, it returns 0 so the rule
+// Since this implementation checks for unknown rules, it returns true so
 // is always treated as active.
 //
 // This is part of the thresholdConditionChecker interface implementation.
-func (c bitConditionChecker) BeginTime() uint64 {
-	return 0
+func (c bitConditionChecker) HasStarted(_ *blockNode) bool {
+	return true
 }
 
-// EndTime returns the unix timestamp for the median block time after which an
-// attempted rule change fails if it has not already been locked in or
-// activated.
+// HasStarted returns true if based on the passed block blockNode the consensus
+// is eligible for deployment.
 //
-// Since this implementation checks for unknown rules, it returns the maximum
-// possible timestamp so the rule is always treated as active.
+// Since this implementation checks for unknown rules, it returns false so the
+// rule is always treated as active.
 //
 // This is part of the thresholdConditionChecker interface implementation.
-func (c bitConditionChecker) EndTime() uint64 {
-	return math.MaxUint64
+func (c bitConditionChecker) HasEnded(_ *blockNode) bool {
+	return false
 }
 
 // RuleChangeActivationThreshold is the number of blocks for which the condition
@@ -123,27 +120,36 @@ type deploymentChecker struct {
 // interface.
 var _ thresholdConditionChecker = deploymentChecker{}
 
-// BeginTime returns the unix timestamp for the median block time after which
-// voting on a rule change starts (at the next window).
+// HasEnded returns true if the target consensus rule change has expired
+// or timed out (at the next window).
 //
 // This implementation returns the value defined by the specific deployment the
 // checker is associated with.
 //
 // This is part of the thresholdConditionChecker interface implementation.
-func (c deploymentChecker) BeginTime() uint64 {
-	return c.deployment.StartTime
+func (c deploymentChecker) HasStarted(blkNode *blockNode) bool {
+	// Can't fail as we make sure to set the clock above when we
+	// instantiate *BlockChain.
+	header := blkNode.Header()
+	started, _ := c.deployment.DeploymentStarter.HasStarted(&header)
+
+	return started
 }
 
-// EndTime returns the unix timestamp for the median block time after which an
-// attempted rule change fails if it has not already been locked in or
-// activated.
+// HasEnded returns true if the target consensus rule change has expired
+// or timed out.
 //
 // This implementation returns the value defined by the specific deployment the
 // checker is associated with.
 //
 // This is part of the thresholdConditionChecker interface implementation.
-func (c deploymentChecker) EndTime() uint64 {
-	return c.deployment.ExpireTime
+func (c deploymentChecker) HasEnded(blkNode *blockNode) bool {
+	// Can't fail as we make sure to set the clock above when we
+	// instantiate *BlockChain.
+	header := blkNode.Header()
+	ended, _ := c.deployment.DeploymentEnder.HasEnded(&header)
+
+	return ended
 }
 
 // RuleChangeActivationThreshold is the number of blocks for which the condition
