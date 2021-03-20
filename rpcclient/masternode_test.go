@@ -79,6 +79,30 @@ func TestMasternodeCount(t *testing.T) {
 	compareWithCliCommand(t, result, cli, "masternode", "count")
 }
 
+func TestMasternodelist(t *testing.T) {
+	client, err := New(connCfg, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Shutdown()
+
+	result, err := client.Masternodelist("addr", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cli := &map[string]string{}
+	compareWithCliCommand(t, result, cli, "masternodelist", "addr")
+
+	resultJSON, err := client.MasternodelistJSON("")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cliJSON := &map[string]btcjson.MasternodelistResultJSON{}
+	compareWithCliCommand(t, &resultJSON, cliJSON, "masternodelist", "json")
+}
+
 func compareWithCliCommand(t *testing.T, rpc, cli interface{}, cmds ...string) {
 	cmd := append([]string{"-testnet"}, cmds...)
 	out, err := exec.Command("dash-cli", cmd...).Output()

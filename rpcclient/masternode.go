@@ -94,3 +94,64 @@ func (c *Client) MasternodeCountAsync() FutureGetMasternodeCountResult {
 func (c *Client) MasternodeCount() (*btcjson.MasternodeCountResult, error) {
 	return c.MasternodeCountAsync().Receive()
 }
+
+// ----------------- masternodelist ---------------------
+
+// FutureGetMasternodelistResult is a future promise to deliver the result of a
+// MasternodeStatusAsync RPC invocation (or an applicable error).
+type FutureGetMasternodelistResult struct {
+	client   *Client
+	Response chan *response
+	Mode     string
+}
+
+// Receive waits for the response promised by the future and returns the member signature for the quorum.
+func (r FutureGetMasternodelistResult) Receive() (interface{}, error) {
+	res, err := receiveFuture(r.Response)
+	if err != nil {
+		return nil, err
+	}
+
+	if r.Mode == "" || r.Mode == "json" {
+		var result map[string]btcjson.MasternodelistResultJSON
+		err = json.Unmarshal(res, &result)
+		if err != nil {
+			return nil, err
+		}
+		return result, nil
+	}
+
+	var result map[string]string
+	err = json.Unmarshal(res, &result)
+	if err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+}
+
+// MasternodeCountAsync returns an instance of a type that can be used to get
+// the result of the RPC at some future time by invoking the Receive function on
+// the returned instance.
+func (c *Client) MasternodelistAsync(mode, filter string) FutureGetMasternodelistResult {
+	cmd := btcjson.NewMasternodelistCmd(mode, filter)
+
+	return FutureGetMasternodelistResult{
+		client:   c,
+		Response: c.sendCmd(cmd),
+		Mode:     mode,
+	}
+}
+
+// MasternodeCount returns the masternode count.
+func (c *Client) Masternodelist(mode, filter string) (interface{}, error) {
+	return c.MasternodelistAsync(mode, filter).Receive()
+}
+
+func (c *Client) MasternodelistJSON(filter string) (map[string]btcjson.MasternodelistResultJSON, error) {
+	r, err := c.MasternodelistAsync("json", filter).Receive()
+	if err != nil {
+		return nil, err
+	}
+	return r.(map[string]btcjson.MasternodelistResultJSON), nil
+}

@@ -30,9 +30,25 @@ func NewMasternodeCmd(sub MasternodeSubCmd) *MasternodeCmd {
 	}
 }
 
+// MasternodelistCmd defines the quorum JSON-RPC command.
+type MasternodelistCmd struct {
+	Mode   string
+	Filter string
+}
+
+// NewMasternodelistCmd returns a new instance which can be used to issue a quorum
+// JSON-RPC command.
+func NewMasternodelistCmd(mode, filter string) *MasternodelistCmd {
+	return &MasternodelistCmd{
+		Mode:   mode,
+		Filter: filter,
+	}
+}
+
 func init() {
 	// No special flags for commands in this file.
 	flags := UsageFlag(0)
 
 	MustRegisterCmd("masternode", (*MasternodeCmd)(nil), flags)
+	MustRegisterCmd("masternodelist", (*MasternodelistCmd)(nil), flags)
 }
