@@ -120,8 +120,8 @@ func TestQuorumMemberOf(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cli := &btcjson.QuorumMemberOfResult{}
-	compareWithCliCommand(t, result, cli, "quorum", "memberof", proTxHash)
+	cli := []btcjson.QuorumMemberOfResult{}
+	compareWithCliCommand(t, &result, &cli, "quorum", "memberof", proTxHash)
 }
 
 var llmqTypes = map[string]btcjson.LLMQType{

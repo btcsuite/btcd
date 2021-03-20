@@ -47,3 +47,11 @@ type MasternodelistResultJSON struct {
 	Status            string `json:"status"`
 	Votingaddress     string `json:"votingaddress"`
 }
+
+type MasternodeResult struct {
+	Height    int    `json:"height"`
+	IPPort    string `json:"IP:port"`
+	ProTxHash string `json:"proTxHash"`
+	Outpoint  string `json:"outpoint"`
+	Payee     string `json:"payee"`
+}

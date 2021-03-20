@@ -79,14 +79,99 @@ func TestMasternodeCount(t *testing.T) {
 	compareWithCliCommand(t, result, cli, "masternode", "count")
 }
 
-func TestMasternodelist(t *testing.T) {
+func TestMasternodeCurrent(t *testing.T) {
 	client, err := New(connCfg, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer client.Shutdown()
 
-	result, err := client.Masternodelist("addr", "")
+	result, err := client.MasternodeCurrent()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cli := &btcjson.MasternodeResult{}
+	compareWithCliCommand(t, result, cli, "masternode", "current")
+}
+
+func TestMasternodeOutputs(t *testing.T) {
+	t.Skip("error: -32601: Method not found (wallet method is disabled because no wallet is loaded)")
+
+	client, err := New(connCfg, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Shutdown()
+
+	result, err := client.MasternodeOutputs()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cli := &map[string]string{}
+	compareWithCliCommand(t, &result, cli, "masternode", "outputs")
+}
+
+func TestMasternodeWinner(t *testing.T) {
+	client, err := New(connCfg, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Shutdown()
+
+	result, err := client.MasternodeWinner()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cli := &btcjson.MasternodeResult{}
+	compareWithCliCommand(t, result, cli, "masternode", "winner")
+}
+
+func TestMasternodeWinners(t *testing.T) {
+	client, err := New(connCfg, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Shutdown()
+
+	t.Run("no params", func(t *testing.T) {
+		result, err := client.MasternodeWinners(0, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		cli := &map[string]string{}
+		compareWithCliCommand(t, &result, cli, "masternode", "winners")
+	})
+
+	t.Run("just count", func(t *testing.T) {
+		result, err := client.MasternodeWinners(20, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		cli := &map[string]string{}
+		compareWithCliCommand(t, &result, cli, "masternode", "winners", "20")
+	})
+
+	t.Run("count and filter", func(t *testing.T) {
+		result, err := client.MasternodeWinners(30, "yP8A3")
+		if err != nil {
+			t.Fatal(err)
+		}
+		cli := &map[string]string{}
+		compareWithCliCommand(t, &result, cli, "masternode", "winners", "30", "yP8A3")
+	})
+}
+
+func TestMasternodeList(t *testing.T) {
+	client, err := New(connCfg, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Shutdown()
+
+	result, err := client.MasternodeList("addr", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -94,7 +179,7 @@ func TestMasternodelist(t *testing.T) {
 	cli := &map[string]string{}
 	compareWithCliCommand(t, result, cli, "masternodelist", "addr")
 
-	resultJSON, err := client.MasternodelistJSON("")
+	resultJSON, err := client.MasternodeListJSON("")
 	if err != nil {
 		t.Fatal(err)
 	}
