@@ -8,7 +8,6 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"errors"
-	"math"
 	"math/big"
 	"strings"
 	"time"
@@ -95,13 +94,13 @@ type ConsensusDeployment struct {
 	// this particular soft-fork deployment refers to.
 	BitNumber uint8
 
-	// StartTime is the median block time after which voting on the
-	// deployment starts.
-	StartTime uint64
+	// DeploymentStarter is used to determine if the given
+	// ConsensusDeployment has started or not.
+	DeploymentStarter ConsensusDeploymentStarter
 
-	// ExpireTime is the median block time after which the attempted
-	// deployment expires.
-	ExpireTime uint64
+	// DeploymentEnder is used to determine if the given
+	// ConsensusDeployment has ended or not.
+	DeploymentEnder ConsensusDeploymentEnder
 }
 
 // Constants that define the deployment offset in the deployments field of the
@@ -320,19 +319,31 @@ var MainNetParams = Params{
 	MinerConfirmationWindow:       2016, //
 	Deployments: [DefinedDeployments]ConsensusDeployment{
 		DeploymentTestDummy: {
-			BitNumber:  28,
-			StartTime:  1199145601, // January 1, 2008 UTC
-			ExpireTime: 1230767999, // December 31, 2008 UTC
+			BitNumber: 28,
+			DeploymentStarter: NewMedianTimeDeploymentStarter(
+				time.Unix(11991456010, 0), // January 1, 2008 UTC
+			),
+			DeploymentEnder: NewMedianTimeDeploymentEnder(
+				time.Unix(1230767999, 0), // December 31, 2008 UTC
+			),
 		},
 		DeploymentCSV: {
-			BitNumber:  0,
-			StartTime:  1462060800, // May 1st, 2016
-			ExpireTime: 1493596800, // May 1st, 2017
+			BitNumber: 0,
+			DeploymentStarter: NewMedianTimeDeploymentStarter(
+				time.Unix(1462060800, 0), // May 1st, 2016
+			),
+			DeploymentEnder: NewMedianTimeDeploymentEnder(
+				time.Unix(1493596800, 0), // May 1st, 2017
+			),
 		},
 		DeploymentSegwit: {
-			BitNumber:  1,
-			StartTime:  1479168000, // November 15, 2016 UTC
-			ExpireTime: 1510704000, // November 15, 2017 UTC.
+			BitNumber: 1,
+			DeploymentStarter: NewMedianTimeDeploymentStarter(
+				time.Unix(1479168000, 0), // November 15, 2016 UTC
+			),
+			DeploymentEnder: NewMedianTimeDeploymentEnder(
+				time.Unix(1510704000, 0), // November 15, 2017 UTC.
+			),
 		},
 	},
 
@@ -396,19 +407,31 @@ var RegressionNetParams = Params{
 	MinerConfirmationWindow:       144,
 	Deployments: [DefinedDeployments]ConsensusDeployment{
 		DeploymentTestDummy: {
-			BitNumber:  28,
-			StartTime:  0,             // Always available for vote
-			ExpireTime: math.MaxInt64, // Never expires
+			BitNumber: 28,
+			DeploymentStarter: NewMedianTimeDeploymentStarter(
+				time.Time{}, // Always available for vote
+			),
+			DeploymentEnder: NewMedianTimeDeploymentEnder(
+				time.Time{}, // Never expires
+			),
 		},
 		DeploymentCSV: {
-			BitNumber:  0,
-			StartTime:  0,             // Always available for vote
-			ExpireTime: math.MaxInt64, // Never expires
+			BitNumber: 0,
+			DeploymentStarter: NewMedianTimeDeploymentStarter(
+				time.Time{}, // Always available for vote
+			),
+			DeploymentEnder: NewMedianTimeDeploymentEnder(
+				time.Time{}, // Never expires
+			),
 		},
 		DeploymentSegwit: {
-			BitNumber:  1,
-			StartTime:  0,             // Always available for vote
-			ExpireTime: math.MaxInt64, // Never expires.
+			BitNumber: 1,
+			DeploymentStarter: NewMedianTimeDeploymentStarter(
+				time.Time{}, // Always available for vote
+			),
+			DeploymentEnder: NewMedianTimeDeploymentEnder(
+				time.Time{}, // Never expires.
+			),
 		},
 	},
 
@@ -490,19 +513,31 @@ var TestNet3Params = Params{
 	MinerConfirmationWindow:       2016,
 	Deployments: [DefinedDeployments]ConsensusDeployment{
 		DeploymentTestDummy: {
-			BitNumber:  28,
-			StartTime:  1199145601, // January 1, 2008 UTC
-			ExpireTime: 1230767999, // December 31, 2008 UTC
+			BitNumber: 28,
+			DeploymentStarter: NewMedianTimeDeploymentStarter(
+				time.Unix(1199145601, 0), // January 1, 2008 UTC
+			),
+			DeploymentEnder: NewMedianTimeDeploymentEnder(
+				time.Unix(1230767999, 0), // December 31, 2008 UTC
+			),
 		},
 		DeploymentCSV: {
-			BitNumber:  0,
-			StartTime:  1456790400, // March 1st, 2016
-			ExpireTime: 1493596800, // May 1st, 2017
+			BitNumber: 0,
+			DeploymentStarter: NewMedianTimeDeploymentStarter(
+				time.Unix(1456790400, 0), // March 1st, 2016
+			),
+			DeploymentEnder: NewMedianTimeDeploymentEnder(
+				time.Unix(1493596800, 0), // May 1st, 2017
+			),
 		},
 		DeploymentSegwit: {
-			BitNumber:  1,
-			StartTime:  1462060800, // May 1, 2016 UTC
-			ExpireTime: 1493596800, // May 1, 2017 UTC.
+			BitNumber: 1,
+			DeploymentStarter: NewMedianTimeDeploymentStarter(
+				time.Unix(1462060800, 0), // May 1, 2016 UTC
+			),
+			DeploymentEnder: NewMedianTimeDeploymentEnder(
+				time.Unix(1493596800, 0), // May 1, 2017 UTC.
+			),
 		},
 	},
 
@@ -570,19 +605,31 @@ var SimNetParams = Params{
 	MinerConfirmationWindow:       100,
 	Deployments: [DefinedDeployments]ConsensusDeployment{
 		DeploymentTestDummy: {
-			BitNumber:  28,
-			StartTime:  0,             // Always available for vote
-			ExpireTime: math.MaxInt64, // Never expires
+			BitNumber: 28,
+			DeploymentStarter: NewMedianTimeDeploymentStarter(
+				time.Time{}, // Always available for vote
+			),
+			DeploymentEnder: NewMedianTimeDeploymentEnder(
+				time.Time{}, // Never expires
+			),
 		},
 		DeploymentCSV: {
-			BitNumber:  0,
-			StartTime:  0,             // Always available for vote
-			ExpireTime: math.MaxInt64, // Never expires
+			BitNumber: 0,
+			DeploymentStarter: NewMedianTimeDeploymentStarter(
+				time.Time{}, // Always available for vote
+			),
+			DeploymentEnder: NewMedianTimeDeploymentEnder(
+				time.Time{}, // Never expires
+			),
 		},
 		DeploymentSegwit: {
-			BitNumber:  1,
-			StartTime:  0,             // Always available for vote
-			ExpireTime: math.MaxInt64, // Never expires.
+			BitNumber: 1,
+			DeploymentStarter: NewMedianTimeDeploymentStarter(
+				time.Time{}, // Always available for vote
+			),
+			DeploymentEnder: NewMedianTimeDeploymentEnder(
+				time.Time{}, // Never expires.
+			),
 		},
 	},
 
@@ -665,24 +712,40 @@ func CustomSignetParams(challenge []byte, dnsSeeds []DNSSeed) Params {
 		MinerConfirmationWindow:       2016,
 		Deployments: [DefinedDeployments]ConsensusDeployment{
 			DeploymentTestDummy: {
-				BitNumber:  28,
-				StartTime:  1199145601, // January 1, 2008 UTC
-				ExpireTime: 1230767999, // December 31, 2008 UTC
+				BitNumber: 28,
+				DeploymentStarter: NewMedianTimeDeploymentStarter(
+					time.Unix(1199145601, 0), // January 1, 2008 UTC
+				),
+				DeploymentEnder: NewMedianTimeDeploymentEnder(
+					time.Unix(1230767999, 0), // December 31, 2008 UTC
+				),
 			},
 			DeploymentCSV: {
-				BitNumber:  29,
-				StartTime:  0,             // Always available for vote
-				ExpireTime: math.MaxInt64, // Never expires
+				BitNumber: 29,
+				DeploymentStarter: NewMedianTimeDeploymentStarter(
+					time.Time{}, // Always available for vote
+				),
+				DeploymentEnder: NewMedianTimeDeploymentEnder(
+					time.Time{}, // Never expires
+				),
 			},
 			DeploymentSegwit: {
-				BitNumber:  29,
-				StartTime:  0,             // Always available for vote
-				ExpireTime: math.MaxInt64, // Never expires.
+				BitNumber: 29,
+				DeploymentStarter: NewMedianTimeDeploymentStarter(
+					time.Time{}, // Always available for vote
+				),
+				DeploymentEnder: NewMedianTimeDeploymentEnder(
+					time.Time{}, // Never expires
+				),
 			},
 			DeploymentTaproot: {
-				BitNumber:  29,
-				StartTime:  0,             // Always available for vote
-				ExpireTime: math.MaxInt64, // Never expires.
+				BitNumber: 29,
+				DeploymentStarter: NewMedianTimeDeploymentStarter(
+					time.Time{}, // Always available for vote
+				),
+				DeploymentEnder: NewMedianTimeDeploymentEnder(
+					time.Time{}, // Never expires
+				),
 			},
 		},
 

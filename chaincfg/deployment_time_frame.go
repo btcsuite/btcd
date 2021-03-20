@@ -80,7 +80,9 @@ type MedianTimeDeploymentStarter struct {
 }
 
 // NewMedianTimeDeploymentStarter returns a new instance of a
-// MedianTimeDeploymentStarter for a given start time.
+// MedianTimeDeploymentStarter for a given start time. Using a time.Time
+// instance where IsZero() is true, indicates that a deployment should be
+// considered to always have been started.
 func NewMedianTimeDeploymentStarter(startTime time.Time) *MedianTimeDeploymentStarter {
 	return &MedianTimeDeploymentStarter{
 		startTime: startTime,
@@ -134,7 +136,9 @@ type MedianTimeDeploymentEnder struct {
 }
 
 // NewMedianTimeDeploymentEnder returns a new instance of the
-// MedianTimeDeploymentEnder anchored around the passed endTime.
+// MedianTimeDeploymentEnder anchored around the passed endTime.  Using a
+// time.Time instance where IsZero() is true, indicates that a deployment
+// should be considered to never end.
 func NewMedianTimeDeploymentEnder(endTime time.Time) *MedianTimeDeploymentEnder {
 	return &MedianTimeDeploymentEnder{
 		endTime: endTime,
