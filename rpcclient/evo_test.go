@@ -8,6 +8,34 @@ import (
 	"github.com/dashevo/dashd-go/btcjson"
 )
 
+func TestBLS(t *testing.T) {
+	client, err := New(connCfg, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Shutdown()
+
+	gen, err := client.BLSGenerate()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	fs, err := client.BLSFromSecret(gen.Secret)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if gen.Public != fs.Public {
+		t.Fatal("public generated did not match fromsecret")
+	}
+	if gen.Secret != fs.Secret {
+		t.Fatal("secret generated did not match fromsecret")
+	}
+
+	cli := &btcjson.BLSResult{}
+	compareWithCliCommand(t, fs, cli, "bls", "fromsecret", gen.Secret)
+}
+
 func TestQuorumList(t *testing.T) {
 	client, err := New(connCfg, nil)
 	if err != nil {
@@ -163,7 +191,7 @@ func TestQuorumSign(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cli := &btcjson.QuorumSignResult{}
+	cli := &btcjson.QuorumSignResultWithBool{}
 	compareWithCliCommand(t, result, cli, "quorum", "sign", fmt.Sprint(quorumType), requestID, messageHash, quorumHash, strconv.FormatBool(submit))
 
 	bl, err := client.QuorumSignSubmit(quorumType, requestID, messageHash, quorumHash)
@@ -172,4 +200,72 @@ func TestQuorumSign(t *testing.T) {
 	}
 	t.Log("bool response:", bl)
 
+}
+
+func TestQuorumGetRecSig(t *testing.T) {
+	client, err := New(connCfg, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Shutdown()
+
+	quorumType := btcjson.LLMQType_400_60
+	requestID := "abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234"
+	messageHash := "51c11d287dfa85aef3eebb5420834c8e443e01d15c0b0a8e397d67e2e51aa239"
+
+	result, err := client.QuorumGetRecSig(quorumType, requestID, messageHash)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cli := []btcjson.QuorumSignResult{}
+	compareWithCliCommand(t, result, cli, "quorum", "getrecsig", fmt.Sprint(quorumType), requestID, messageHash)
+}
+
+func TestQuorumHasRecSig(t *testing.T) {
+	client, err := New(connCfg, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Shutdown()
+
+	quorumType := btcjson.LLMQType_400_60
+	requestID := "abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234"
+	messageHash := "51c11d287dfa85aef3eebb5420834c8e443e01d15c0b0a8e397d67e2e51aa239"
+
+	result, err := client.QuorumHasRecSig(quorumType, requestID, messageHash)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !result {
+		t.Fatal("returned false")
+	}
+
+	var cli bool
+	compareWithCliCommand(t, result, cli, "quorum", "hasrecsig", fmt.Sprint(quorumType), requestID, messageHash)
+}
+
+func TestQuorumsConflicting(t *testing.T) {
+	client, err := New(connCfg, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Shutdown()
+
+	quorumType := btcjson.LLMQType_400_60
+	requestID := "abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234"
+	messageHash := "51c11d287dfa85aef3eebb5420834c8e443e01d15c0b0a8e397d67e2e51aa239"
+
+	result, err := client.QuorumIsConflicting(quorumType, requestID, messageHash)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !result {
+		t.Fatal("returned false")
+	}
+
+	var cli bool
+	compareWithCliCommand(t, result, cli, "quorum", "isconflicting", fmt.Sprint(quorumType), requestID, messageHash)
 }

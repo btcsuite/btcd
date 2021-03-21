@@ -7,6 +7,18 @@
 
 package btcjson
 
+type BLSSubCmd string
+
+const (
+	BLSGenerate   BLSSubCmd = "generate"
+	BLSFromSecret BLSSubCmd = "fromsecret"
+)
+
+type BLSCmd struct {
+	SubCmd BLSSubCmd `jsonrpcusage:"\"generate|fromsecret\""`
+	Secret *string   `json:",omitempty"`
+}
+
 // QuorumCmdSubCmd defines the sub command used in the quorum JSON-RPC command.
 type QuorumCmdSubCmd string
 
@@ -22,9 +34,12 @@ const (
 	// QuorumList lists all quorums
 	QuorumList QuorumCmdSubCmd = "list"
 
-	QuorumSelectQuorum QuorumCmdSubCmd = "selectquorum"
-	QuorumDKGStatus    QuorumCmdSubCmd = "dkgstatus"
-	QuorumMemberOf     QuorumCmdSubCmd = "memberof"
+	QuorumSelectQuorum  QuorumCmdSubCmd = "selectquorum"
+	QuorumDKGStatus     QuorumCmdSubCmd = "dkgstatus"
+	QuorumMemberOf      QuorumCmdSubCmd = "memberof"
+	QuorumGetRecSig     QuorumCmdSubCmd = "getrecsig"
+	QuorumHasRecSig     QuorumCmdSubCmd = "hasrecsig"
+	QuorumIsConflicting QuorumCmdSubCmd = "isconflicting"
 )
 
 // DetailLevel is the level of detail used in dkgstatus
@@ -52,38 +67,34 @@ const (
 
 // QuorumCmd defines the quorum JSON-RPC command.
 type QuorumCmd struct {
-	SubCmd QuorumCmdSubCmd `jsonrpcusage:"\"info|list|sign|selectquorum|dkgstatus|memberof\""`
+	SubCmd QuorumCmdSubCmd `jsonrpcusage:"\"list|info|dkgstatus|sign|getrecsig|hasrecsig|isconflicting|memberof|selectquorum\""`
 
-	LLMQType  *LLMQType `json:",omitempty"`
-	RequestID *string   `json:",omitempty"`
+	LLMQType    *LLMQType `json:",omitempty"`
+	RequestID   *string   `json:",omitempty"`
+	MessageHash *string   `json:",omitempty"`
+	QuorumHash  *string   `json:",omitempty"`
 
-	SignMessageHash *string `json:",omitempty"`
-	SignQuorumHash  *string `json:",omitempty"`
-	SignSubmit      *bool   `json:",omitempty"`
-
-	InfoQuorumHash     *string `json:",omitempty"`
-	InfoIncludeSkShare *bool   `json:",omitempty"`
-
+	Submit               *bool        `json:",omitempty"`
+	IncludeSkShare       *bool        `json:",omitempty"`
 	DKGStatusDetailLevel *DetailLevel `json:",omitempty"`
-
-	ProTxHash        *string `json:",omitempty"`
-	ScanQuorumsCount *int    `json:",omitempty"`
+	ProTxHash            *string      `json:",omitempty"`
+	ScanQuorumsCount     *int         `json:",omitempty"`
 }
 
 // NewQuorumSignCmd returns a new instance which can be used to issue a quorum
 // JSON-RPC command.
 func NewQuorumSignCmd(quorumType LLMQType, requestID, messageHash, quorumHash string, submit bool) *QuorumCmd {
 	cmd := &QuorumCmd{
-		SubCmd:          QuorumSign,
-		LLMQType:        &quorumType,
-		RequestID:       &requestID,
-		SignMessageHash: &messageHash,
+		SubCmd:      QuorumSign,
+		LLMQType:    &quorumType,
+		RequestID:   &requestID,
+		MessageHash: &messageHash,
 	}
 	if quorumHash != "" {
-		cmd.SignQuorumHash = &quorumHash
+		cmd.QuorumHash = &quorumHash
 	}
 	if !submit {
-		cmd.SignSubmit = &submit
+		cmd.Submit = &submit
 	}
 	return cmd
 
@@ -93,10 +104,10 @@ func NewQuorumSignCmd(quorumType LLMQType, requestID, messageHash, quorumHash st
 // JSON-RPC command.
 func NewQuorumInfoCmd(quorumType LLMQType, quorumHash string, includeSkShare bool) *QuorumCmd {
 	return &QuorumCmd{
-		SubCmd:             QuorumInfo,
-		LLMQType:           &quorumType,
-		InfoQuorumHash:     &quorumHash,
-		InfoIncludeSkShare: &includeSkShare,
+		SubCmd:         QuorumInfo,
+		LLMQType:       &quorumType,
+		QuorumHash:     &quorumHash,
+		IncludeSkShare: &includeSkShare,
 	}
 }
 
@@ -137,9 +148,51 @@ func NewQuorumMemberOfCmd(proTxHash string, scanQuorumsCount int) *QuorumCmd {
 	return cmd
 }
 
+// NewQuorumGetRecSig returns the result from quorum getrecsig
+func NewQuorumGetRecSig(quorumType LLMQType, requestID, messageHash string) *QuorumCmd {
+	return &QuorumCmd{
+		SubCmd:      QuorumGetRecSig,
+		LLMQType:    &quorumType,
+		RequestID:   &requestID,
+		MessageHash: &messageHash,
+	}
+}
+
+// NewQuorumHasRecSig returns the result from quorum hasrecsig
+func NewQuorumHasRecSig(quorumType LLMQType, requestID, messageHash string) *QuorumCmd {
+	return &QuorumCmd{
+		SubCmd:      QuorumHasRecSig,
+		LLMQType:    &quorumType,
+		RequestID:   &requestID,
+		MessageHash: &messageHash,
+	}
+}
+
+// NewQuorumIsConflicting returns the result from quorum isconflicting
+func NewQuorumIsConflicting(quorumType LLMQType, requestID, messageHash string) *QuorumCmd {
+	return &QuorumCmd{
+		SubCmd:      QuorumIsConflicting,
+		LLMQType:    &quorumType,
+		RequestID:   &requestID,
+		MessageHash: &messageHash,
+	}
+}
+
+func NewBLSGenerate() *BLSCmd {
+	return &BLSCmd{SubCmd: BLSGenerate}
+}
+
+func NewBLSFromSecret(secret string) *BLSCmd {
+	return &BLSCmd{
+		SubCmd: BLSFromSecret,
+		Secret: &secret,
+	}
+}
+
 func init() {
 	// No special flags for commands in this file.
 	flags := UsageFlag(0)
 
 	MustRegisterCmd("quorum", (*QuorumCmd)(nil), flags)
+	MustRegisterCmd("bls", (*BLSCmd)(nil), flags)
 }

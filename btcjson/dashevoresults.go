@@ -15,26 +15,29 @@ type QuorumSignResult struct {
 	MsgHash      string `json:"msgHash,omitempty"`
 	SignHash     string `json:"signHash,omitempty"`
 	Signature    string `json:"signature,omitempty"`
+}
 
+type QuorumSignResultWithBool struct {
+	QuorumSignResult
 	// Result is the output if submit was true
 	Result bool `json:"result,omitempty"`
 }
 
 // UnmarshalJSON is a custom unmarshal because the result can be just a boolean
-func (qsr *QuorumSignResult) UnmarshalJSON(data []byte) error {
+func (qsr *QuorumSignResultWithBool) UnmarshalJSON(data []byte) error {
 	if bl, err := strconv.ParseBool(string(data)); err == nil {
 		qsr.Result = bl
 		return nil
 	}
 
-	type avoidInititeLoop QuorumSignResult
+	type avoidInititeLoop QuorumSignResultWithBool
 	var ail avoidInititeLoop
 	err := json.Unmarshal(data, &ail)
 	if err != nil {
 		return err
 	}
 	// Cast the new type instance to the original type and assign.
-	*qsr = QuorumSignResult(ail)
+	*qsr = QuorumSignResultWithBool(ail)
 	return nil
 }
 
@@ -204,4 +207,9 @@ type QuorumMemberOfResult struct {
 	QuorumPublicKey string `json:"quorumPublicKey"`
 	IsValidMember   bool   `json:"isValidMember"`
 	MemberIndex     int    `json:"memberIndex"`
+}
+
+type BLSResult struct {
+	Secret string `json:"secret"`
+	Public string `json:"public"`
 }
