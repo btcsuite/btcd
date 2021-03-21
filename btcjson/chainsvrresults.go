@@ -712,7 +712,7 @@ type TxRawResult struct {
 	Size          int32  `json:"size,omitempty"`
 	Vsize         int32  `json:"vsize,omitempty"`
 	Weight        int32  `json:"weight,omitempty"`
-	Version       int32  `json:"version"`
+	Version       uint32 `json:"version"`
 	LockTime      uint32 `json:"locktime"`
 	Vin           []Vin  `json:"vin"`
 	Vout          []Vout `json:"vout"`
