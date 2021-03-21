@@ -764,7 +764,7 @@ func createTxRawResult(chainParams *chaincfg.Params, mtx *wire.MsgTx,
 		Weight:   int32(blockchain.GetTransactionWeight(btcutil.NewTx(mtx))),
 		Vin:      createVinList(mtx),
 		Vout:     createVoutList(mtx, chainParams, nil),
-		Version:  mtx.Version,
+		Version:  uint32(mtx.Version),
 		LockTime: mtx.LockTime,
 	}
 
