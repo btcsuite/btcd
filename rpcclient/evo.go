@@ -128,7 +128,7 @@ func (c *Client) QuorumSignSubmit(quorumType btcjson.LLMQType, requestID, messag
 	return r.Result, nil
 }
 
-// ----------------------------- quorum list -----------------------------
+// ----------------------------- quorum info -----------------------------
 
 // FutureGetQuorumInfoResult is a future promise to deliver the result of a
 // QuorumInfoAsync RPC invocation (or an applicable error).
@@ -475,4 +475,42 @@ func (c *Client) QuorumIsConflictingAsync(quorumType btcjson.LLMQType, requestID
 // QuorumHasRecSig returns a quorum MemberOf result
 func (c *Client) QuorumIsConflicting(quorumType btcjson.LLMQType, requestID, messageHash string) (bool, error) {
 	return c.QuorumIsConflictingAsync(quorumType, requestID, messageHash).Receive()
+}
+
+// ----------------------------- protx info -----------------------------
+
+// FutureGetProTxInfoResult is a future promise to deliver the result of a
+// ProTxInfoAsync RPC invocation (or an applicable error).
+type FutureGetProTxInfoResult struct {
+	client   *Client
+	Response chan *response
+}
+
+// Receive waits for the response promised by the future
+func (r FutureGetProTxInfoResult) Receive() (*btcjson.ProTxInfoResult, error) {
+	res, err := receiveFuture(r.Response)
+	if err != nil {
+		return nil, err
+	}
+
+	var result btcjson.ProTxInfoResult
+	err = json.Unmarshal(res, &result)
+	if err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+}
+
+// ProTxInfoAsync returns an instance of a type that can be used to get
+// the result of the RPC at some future time by invoking the Receive function on
+// the returned instance.
+func (c *Client) ProTxInfoAsync(proTxHash string) FutureGetProTxInfoResult {
+	cmd := btcjson.NewProTxInfoCmd(proTxHash)
+	return FutureGetProTxInfoResult{client: c, Response: c.sendCmd(cmd)}
+}
+
+// ProTxInfo returns a protx info result
+func (c *Client) ProTxInfo(proTxHash string) (*btcjson.ProTxInfoResult, error) {
+	return c.ProTxInfoAsync(proTxHash).Receive()
 }

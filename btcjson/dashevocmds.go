@@ -19,6 +19,27 @@ type BLSCmd struct {
 	Secret *string   `json:",omitempty"`
 }
 
+type ProTxSubCmd string
+
+const (
+	ProTxRegister        ProTxSubCmd = "register"
+	ProTxRegisterFund    ProTxSubCmd = "register_fund"
+	ProTxRegisterPrepare ProTxSubCmd = "register_prepare"
+	ProTxRegisterSubmit  ProTxSubCmd = "register_submit"
+	ProTxList            ProTxSubCmd = "list"
+	ProTxInfo            ProTxSubCmd = "info"
+	ProTxUpdateService   ProTxSubCmd = "update_service"
+	ProTxUpdateRegistrar ProTxSubCmd = "update_registrar"
+	ProTxRevoke          ProTxSubCmd = "revoke"
+	ProTxDiff            ProTxSubCmd = "diff"
+)
+
+type ProTxCmd struct {
+	SubCmd ProTxSubCmd `jsonrpcusage:"\"register|register_fund|register_prepare|register_submit|list|info|update_service|update_registrar|revoke|diff\""`
+
+	ProTxHash *string `json:",omitempty"`
+}
+
 // QuorumCmdSubCmd defines the sub command used in the quorum JSON-RPC command.
 type QuorumCmdSubCmd string
 
@@ -189,10 +210,20 @@ func NewBLSFromSecret(secret string) *BLSCmd {
 	}
 }
 
+// NewProTxInfoCmd returns a new instance which can be used to issue a protx
+// JSON-RPC command.
+func NewProTxInfoCmd(proTxHash string) *ProTxCmd {
+	return &ProTxCmd{
+		SubCmd:    ProTxInfo,
+		ProTxHash: &proTxHash,
+	}
+}
+
 func init() {
 	// No special flags for commands in this file.
 	flags := UsageFlag(0)
 
 	MustRegisterCmd("quorum", (*QuorumCmd)(nil), flags)
 	MustRegisterCmd("bls", (*BLSCmd)(nil), flags)
+	MustRegisterCmd("protx", (*ProTxCmd)(nil), flags)
 }

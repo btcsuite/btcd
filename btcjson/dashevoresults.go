@@ -213,3 +213,48 @@ type BLSResult struct {
 	Secret string `json:"secret"`
 	Public string `json:"public"`
 }
+
+// ProTxInfoResult models the data from the protx info command.
+type ProTxInfoResult struct {
+	ProTxHash         string        `json:"proTxHash"`
+	CollateralHash    string        `json:"collateralHash"`
+	CollateralIndex   int           `json:"collateralIndex"`
+	CollateralAddress string        `json:"collateralAddress"`
+	OperatorReward    int           `json:"operatorReward"`
+	State             ProTxState    `json:"state"`
+	Confirmations     int           `json:"confirmations"`
+	Wallet            ProTxWallet   `json:"wallet"`
+	MetaInfo          ProTxMetaInfo `json:"metaInfo"`
+}
+
+type ProTxState struct {
+	Service           string `json:"service"`
+	RegisteredHeight  int    `json:"registeredHeight"`
+	LastPaidHeight    int    `json:"lastPaidHeight"`
+	PoSePenalty       int    `json:"PoSePenalty"`
+	PoSeRevivedHeight int    `json:"PoSeRevivedHeight"`
+	PoSeBanHeight     int    `json:"PoSeBanHeight"`
+	RevocationReason  int    `json:"revocationReason"`
+	OwnerAddress      string `json:"ownerAddress"`
+	VotingAddress     string `json:"votingAddress"`
+	PayoutAddress     string `json:"payoutAddress"`
+	PubKeyOperator    string `json:"pubKeyOperator"`
+}
+
+type ProTxWallet struct {
+	HasOwnerKey              bool `json:"hasOwnerKey"`
+	HasOperatorKey           bool `json:"hasOperatorKey"`
+	HasVotingKey             bool `json:"hasVotingKey"`
+	OwnsCollateral           bool `json:"ownsCollateral"`
+	OwnsPayeeScript          bool `json:"ownsPayeeScript"`
+	OwnsOperatorRewardScript bool `json:"ownsOperatorRewardScript"`
+}
+
+type ProTxMetaInfo struct {
+	LastDSQ                    int `json:"lastDSQ"`
+	MixingTxCount              int `json:"mixingTxCount"`
+	LastOutboundAttempt        int `json:"lastOutboundAttempt"`
+	LastOutboundAttemptElapsed int `json:"lastOutboundAttemptElapsed"`
+	LastOutboundSuccess        int `json:"lastOutboundSuccess"`
+	LastOutboundSuccessElapsed int `json:"lastOutboundSuccessElapsed"`
+}

@@ -269,3 +269,29 @@ func TestQuorumsConflicting(t *testing.T) {
 	var cli bool
 	compareWithCliCommand(t, result, cli, "quorum", "isconflicting", fmt.Sprint(quorumType), requestID, messageHash)
 }
+
+func TestProTxInfo(t *testing.T) {
+	client, err := New(connCfg, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Shutdown()
+
+	proTxHash := "ec21749595a34d868cc366c0feefbd1cfaeb659c6acbc1e2e96fd1e714affa56"
+
+	result, err := client.ProTxInfo(proTxHash)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	modify := func(i interface{}) {
+		r, ok := i.(*btcjson.ProTxInfoResult)
+		if !ok {
+			t.Fatalf("cleanup function could not type cast from %T", i)
+		}
+		r.MetaInfo.LastOutboundAttemptElapsed = 0
+	}
+
+	var cli btcjson.ProTxInfoResult
+	modifyThenCompareWithCliCommand(t, modify, result, &cli, "protx", "info", proTxHash)
+}

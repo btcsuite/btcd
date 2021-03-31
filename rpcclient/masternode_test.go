@@ -189,6 +189,10 @@ func TestMasternodeList(t *testing.T) {
 }
 
 func compareWithCliCommand(t *testing.T, rpc, cli interface{}, cmds ...string) {
+	modifyThenCompareWithCliCommand(t, nil, rpc, cli, cmds...)
+}
+
+func modifyThenCompareWithCliCommand(t *testing.T, modify func(interface{}), rpc, cli interface{}, cmds ...string) {
 	cmd := append([]string{"-testnet"}, cmds...)
 	out, err := exec.Command("dash-cli", cmd...).Output()
 	if err != nil {
@@ -198,6 +202,11 @@ func compareWithCliCommand(t *testing.T, rpc, cli interface{}, cmds ...string) {
 	if err := json.Unmarshal(out, &cli); err != nil {
 		t.Log(string(out))
 		t.Fatal("Could not marshal dash-cli output", err)
+	}
+
+	if modify != nil {
+		modify(rpc)
+		modify(cli)
 	}
 
 	if !reflect.DeepEqual(rpc, cli) {
