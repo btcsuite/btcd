@@ -220,7 +220,7 @@ type ProTxInfoResult struct {
 	CollateralHash    string        `json:"collateralHash"`
 	CollateralIndex   int           `json:"collateralIndex"`
 	CollateralAddress string        `json:"collateralAddress"`
-	OperatorReward    int           `json:"operatorReward"`
+	OperatorReward    float64       `json:"operatorReward"`
 	State             ProTxState    `json:"state"`
 	Confirmations     int           `json:"confirmations"`
 	Wallet            ProTxWallet   `json:"wallet"`
@@ -228,17 +228,18 @@ type ProTxInfoResult struct {
 }
 
 type ProTxState struct {
-	Service           string `json:"service"`
-	RegisteredHeight  int    `json:"registeredHeight"`
-	LastPaidHeight    int    `json:"lastPaidHeight"`
-	PoSePenalty       int    `json:"PoSePenalty"`
-	PoSeRevivedHeight int    `json:"PoSeRevivedHeight"`
-	PoSeBanHeight     int    `json:"PoSeBanHeight"`
-	RevocationReason  int    `json:"revocationReason"`
-	OwnerAddress      string `json:"ownerAddress"`
-	VotingAddress     string `json:"votingAddress"`
-	PayoutAddress     string `json:"payoutAddress"`
-	PubKeyOperator    string `json:"pubKeyOperator"`
+	Service               string `json:"service"`
+	RegisteredHeight      int    `json:"registeredHeight"`
+	LastPaidHeight        int    `json:"lastPaidHeight"`
+	PoSePenalty           int    `json:"PoSePenalty"`
+	PoSeRevivedHeight     int    `json:"PoSeRevivedHeight"`
+	PoSeBanHeight         int    `json:"PoSeBanHeight"`
+	RevocationReason      int    `json:"revocationReason"`
+	OwnerAddress          string `json:"ownerAddress"`
+	VotingAddress         string `json:"votingAddress"`
+	PayoutAddress         string `json:"payoutAddress"`
+	PubKeyOperator        string `json:"pubKeyOperator"`
+	OperatorPayoutAddress string `json:"operatorPayoutAddress"`
 }
 
 type ProTxWallet struct {
@@ -257,4 +258,49 @@ type ProTxMetaInfo struct {
 	LastOutboundAttemptElapsed int `json:"lastOutboundAttemptElapsed"`
 	LastOutboundSuccess        int `json:"lastOutboundSuccess"`
 	LastOutboundSuccessElapsed int `json:"lastOutboundSuccessElapsed"`
+}
+
+type ProTxDiffResult struct {
+	BaseBlockHash    string                   `json:"baseBlockHash"`
+	BlockHash        string                   `json:"blockHash"`
+	CbTxMerkleTree   string                   `json:"cbTxMerkleTree"`
+	CbTx             string                   `json:"cbTx"`
+	DeletedMNs       []string                 `json:"deletedMNs"`
+	MnList           []ProTxDiffMN            `json:"mnList"`
+	DeletedQuorums   []ProTxDiffDeletedQuorum `json:"deletedQuorums"`
+	NewQuorums       []ProTxDiffNewQuorum     `json:"newQuorums"`
+	MerkleRootMNList string                   `json:"merkleRootMNList"`
+}
+
+type ProTxDiffMN struct {
+	ProRegTxHash   string `json:"proRegTxHash"`
+	ConfirmedHash  string `json:"confirmedHash"`
+	Service        string `json:"service"`
+	PubKeyOperator string `json:"pubKeyOperator"`
+	VotingAddress  string `json:"votingAddress"`
+	IsValid        bool   `json:"isValid"`
+}
+
+type ProTxDiffDeletedQuorum struct {
+	LlmqType   int    `json:"llmqType"`
+	QuorumHash string `json:"quorumHash"`
+}
+type ProTxDiffNewQuorum struct {
+	Version           int    `json:"version"`
+	LlmqType          int    `json:"llmqType"`
+	QuorumHash        string `json:"quorumHash"`
+	SignersCount      int    `json:"signersCount"`
+	Signers           string `json:"signers"`
+	ValidMembersCount int    `json:"validMembersCount"`
+	ValidMembers      string `json:"validMembers"`
+	QuorumPublicKey   string `json:"quorumPublicKey"`
+	QuorumVvecHash    string `json:"quorumVvecHash"`
+	QuorumSig         string `json:"quorumSig"`
+	MembersSig        string `json:"membersSig"`
+}
+
+type ProTxRegisterPrepareResult struct {
+	Tx                string `json:"tx"`
+	CollateralAddress string `json:"collateralAddress"`
+	SignMessage       string `json:"signMessage"`
 }

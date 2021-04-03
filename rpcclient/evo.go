@@ -15,8 +15,8 @@ import (
 
 // ----------------------------- bls generate -----------------------------
 
-// FutureGetQuorumInfoResult is a future promise to deliver the result of a
-// QuorumInfoAsync RPC invocation (or an applicable error).
+// FutureGetBLSResult is a future promise to deliver the result of a
+// BLSGenerateAsync RPC invocation (or an applicable error).
 type FutureGetBLSResult struct {
 	client   *Client
 	Response chan *response
@@ -58,10 +58,9 @@ func (c *Client) BLSGenerate() (*btcjson.BLSResult, error) {
 
 // ----------------------------- bls fromsecret -----------------------------
 
-// BLSGenerateAsync returns an instance of a type that can be used to get
+// BLSFromSecretAsync returns an instance of a type that can be used to get
 // the result of the RPC at some future time by invoking the Receive function on
 // the returned instance.
-//
 func (c *Client) BLSFromSecretAsync(secret string) FutureGetBLSResult {
 	cmd := btcjson.NewBLSFromSecret(secret)
 
@@ -71,7 +70,7 @@ func (c *Client) BLSFromSecretAsync(secret string) FutureGetBLSResult {
 	}
 }
 
-// BLSGenerate returns a bls generate result
+// BLSFromSecret returns a bls generate result
 func (c *Client) BLSFromSecret(secret string) (*btcjson.BLSResult, error) {
 	return c.BLSFromSecretAsync(secret).Receive()
 }
@@ -459,10 +458,9 @@ func (c *Client) QuorumHasRecSig(quorumType btcjson.LLMQType, requestID, message
 
 // ----------------------------- quorum isconflicting -----------------------------
 
-// QuorumHasRecSigAsync returns an instance of a type that can be used to get
+// QuorumIsConflictingAsync returns an instance of a type that can be used to get
 // the result of the RPC at some future time by invoking the Receive function on
 // the returned instance.
-//
 func (c *Client) QuorumIsConflictingAsync(quorumType btcjson.LLMQType, requestID, messageHash string) FutureGetQuorumGetBoolResult {
 	cmd := btcjson.NewQuorumIsConflicting(quorumType, requestID, messageHash)
 
@@ -472,9 +470,161 @@ func (c *Client) QuorumIsConflictingAsync(quorumType btcjson.LLMQType, requestID
 	}
 }
 
-// QuorumHasRecSig returns a quorum MemberOf result
+// QuorumIsConflicting returns a quorum isconflicting result
 func (c *Client) QuorumIsConflicting(quorumType btcjson.LLMQType, requestID, messageHash string) (bool, error) {
 	return c.QuorumIsConflictingAsync(quorumType, requestID, messageHash).Receive()
+}
+
+// ----------------------------- protx register -----------------------------
+
+// FutureGetProTxStringResult is a future promise to deliver the result of a
+// string RPC invocation (or an applicable error).
+type FutureGetProTxStringResult struct {
+	client   *Client
+	Response chan *response
+}
+
+// Receive waits for the response promised by the future
+func (r FutureGetProTxStringResult) Receive() (string, error) {
+	res, err := receiveFuture(r.Response)
+	if err != nil {
+		return "", err
+	}
+	return string(res), nil
+}
+
+// ProTxRegisterAsync returns an instance of a type that can be used to get
+// the result of the RPC at some future time by invoking the Receive function on
+// the returned instance.
+func (c *Client) ProTxRegisterAsync(collateralHash string, collateralIndex int, ipAndPort, ownerAddress, operatorPubKey, votingAddress string, operatorReward float64, payoutAddress, feeSourceAddress string, submit bool) FutureGetProTxStringResult {
+	cmd := btcjson.NewProTxRegisterCmd(collateralHash, collateralIndex, ipAndPort, ownerAddress, operatorPubKey, votingAddress, operatorReward, payoutAddress, feeSourceAddress, submit)
+	return FutureGetProTxStringResult{client: c, Response: c.sendCmd(cmd)}
+}
+
+// ProTxRegister returns a protx register
+func (c *Client) ProTxRegister(collateralHash string, collateralIndex int, ipAndPort, ownerAddress, operatorPubKey, votingAddress string, operatorReward float64, payoutAddress, feeSourceAddress string, submit bool) (string, error) {
+	if operatorReward < 0 || operatorReward > 100 {
+		return "", fmt.Errorf("operatorReward must be between 0.00 and 100.00")
+	}
+	return c.ProTxRegisterAsync(collateralHash, collateralIndex, ipAndPort, ownerAddress, operatorPubKey, votingAddress, operatorReward, payoutAddress, feeSourceAddress, submit).Receive()
+}
+
+// ----------------------------- protx register_fund -----------------------------
+
+// ProTxRegisterFundAsync returns an instance of a type that can be used to get
+// the result of the RPC at some future time by invoking the Receive function on
+// the returned instance.
+func (c *Client) ProTxRegisterFundAsync(collateralAddress, ipAndPort, ownerAddress, operatorPubKey, votingAddress string, operatorReward float64, payoutAddress, fundAddress string, submit bool) FutureGetProTxStringResult {
+	cmd := btcjson.NewProTxRegisterFundCmd(collateralAddress, ipAndPort, ownerAddress, operatorPubKey, votingAddress, operatorReward, payoutAddress, fundAddress, submit)
+	return FutureGetProTxStringResult{client: c, Response: c.sendCmd(cmd)}
+}
+
+// ProTxRegisterFund returns a protx register_fund
+func (c *Client) ProTxRegisterFund(collateralAddress, ipAndPort, ownerAddress, operatorPubKey, votingAddress string, operatorReward float64, payoutAddress, fundAddress string, submit bool) (string, error) {
+	if operatorReward < 0 || operatorReward > 100 {
+		return "", fmt.Errorf("operatorReward must be between 0.00 and 100.00")
+	}
+	return c.ProTxRegisterFundAsync(collateralAddress, ipAndPort, ownerAddress, operatorPubKey, votingAddress, operatorReward, payoutAddress, fundAddress, submit).Receive()
+}
+
+// ----------------------------- protx register_prepare -----------------------------
+
+// FutureGetProTxRegisterPrepareResult is a future promise to deliver the result of a
+// ProTxInfoAsync RPC invocation (or an applicable error).
+type FutureGetProTxRegisterPrepareResult struct {
+	client   *Client
+	Response chan *response
+}
+
+// Receive waits for the response promised by the future
+func (r FutureGetProTxRegisterPrepareResult) Receive() (*btcjson.ProTxRegisterPrepareResult, error) {
+	res, err := receiveFuture(r.Response)
+	if err != nil {
+		return nil, err
+	}
+
+	var result btcjson.ProTxRegisterPrepareResult
+	err = json.Unmarshal(res, &result)
+	if err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+}
+
+// ProTxRegisterPrepareAsync returns an instance of a type that can be used to get
+// the result of the RPC at some future time by invoking the Receive function on
+// the returned instance.
+func (c *Client) ProTxRegisterPrepareAsync(collateralHash string, collateralIndex int, ipAndPort, ownerAddress, operatorPubKey, votingAddress string, operatorReward float64, payoutAddress, feeSourceAddress string) FutureGetProTxRegisterPrepareResult {
+	cmd := btcjson.NewProTxRegisterPrepareCmd(collateralHash, collateralIndex, ipAndPort, ownerAddress, operatorPubKey, votingAddress, operatorReward, payoutAddress, feeSourceAddress)
+	return FutureGetProTxRegisterPrepareResult{client: c, Response: c.sendCmd(cmd)}
+}
+
+// ProTxRegisterPrepare returns a protx register_prepare
+func (c *Client) ProTxRegisterPrepare(collateralHash string, collateralIndex int, ipAndPort, ownerAddress, operatorPubKey, votingAddress string, operatorReward float64, payoutAddress, feeSourceAddress string) (*btcjson.ProTxRegisterPrepareResult, error) {
+	return c.ProTxRegisterPrepareAsync(collateralHash, collateralIndex, ipAndPort, ownerAddress, operatorPubKey, votingAddress, operatorReward, payoutAddress, feeSourceAddress).Receive()
+}
+
+// ----------------------------- protx register_submit -----------------------------
+
+// ProTxRegisterSubmitAsync returns an instance of a type that can be used to get
+// the result of the RPC at some future time by invoking the Receive function on
+// the returned instance.
+func (c *Client) ProTxRegisterSubmitAsync(tx, sig string) FutureGetProTxStringResult {
+	cmd := btcjson.NewProTxRegisterSubmitCmd(tx, sig)
+	return FutureGetProTxStringResult{client: c, Response: c.sendCmd(cmd)}
+}
+
+// ProTxRegisterSubmit returns a protx register_submit
+func (c *Client) ProTxRegisterSubmit(tx, sig string) (string, error) {
+	return c.ProTxRegisterSubmitAsync(tx, sig).Receive()
+}
+
+// ----------------------------- protx list -----------------------------
+
+// FutureGetProTxListResult is a future promise to deliver the result of a
+// ProTxListAsync RPC invocation (or an applicable error).
+type FutureGetProTxListResult struct {
+	client   *Client
+	Response chan *response
+	detailed bool
+}
+
+// Receive waits for the response promised by the future
+func (r FutureGetProTxListResult) Receive() (interface{}, error) {
+	res, err := receiveFuture(r.Response)
+	if err != nil {
+		return nil, err
+	}
+
+	if r.detailed {
+		var result []btcjson.ProTxInfoResult
+		err = json.Unmarshal(res, &result)
+		if err != nil {
+			return nil, err
+		}
+		return result, nil
+	}
+
+	var result []string
+	err = json.Unmarshal(res, &result)
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// ProTxListAsync returns an instance of a type that can be used to get
+// the result of the RPC at some future time by invoking the Receive function on
+// the returned instance.
+func (c *Client) ProTxListAsync(cmdType btcjson.ProTxListType, detailed bool, height int) FutureGetProTxListResult {
+	cmd := btcjson.NewProTxListCmd(cmdType, detailed, height)
+	return FutureGetProTxListResult{client: c, Response: c.sendCmd(cmd), detailed: detailed}
+}
+
+// ProTxList returns a protx list result
+func (c *Client) ProTxList(cmdType btcjson.ProTxListType, detailed bool, height int) (interface{}, error) {
+	return c.ProTxListAsync(cmdType, detailed, height).Receive()
 }
 
 // ----------------------------- protx info -----------------------------
@@ -513,4 +663,86 @@ func (c *Client) ProTxInfoAsync(proTxHash string) FutureGetProTxInfoResult {
 // ProTxInfo returns a protx info result
 func (c *Client) ProTxInfo(proTxHash string) (*btcjson.ProTxInfoResult, error) {
 	return c.ProTxInfoAsync(proTxHash).Receive()
+}
+
+// ----------------------------- protx update_service -----------------------------
+
+// ProTxUpdateServiceAsync returns an instance of a type that can be used to get
+// the result of the RPC at some future time by invoking the Receive function on
+// the returned instance.
+func (c *Client) ProTxUpdateServiceAsync(proTxHash, ipAndPort, operatorPubKey, operatorPayoutAddress, feeSourceAddress string) FutureGetProTxStringResult {
+	cmd := btcjson.NewProTxUpdateServiceCmd(proTxHash, ipAndPort, operatorPubKey, operatorPayoutAddress, feeSourceAddress)
+	return FutureGetProTxStringResult{client: c, Response: c.sendCmd(cmd)}
+}
+
+// ProTxUpdateService returns a protx update_service result
+func (c *Client) ProTxUpdateService(proTxHash, ipAndPort, operatorPubKey, operatorPayoutAddress, feeSourceAddress string) (string, error) {
+	return c.ProTxUpdateServiceAsync(proTxHash, ipAndPort, operatorPubKey, operatorPayoutAddress, feeSourceAddress).Receive()
+}
+
+// ----------------------------- protx update_registrar -----------------------------
+
+// ProTxUpdateRegistrarAsync returns an instance of a type that can be used to get
+// the result of the RPC at some future time by invoking the Receive function on
+// the returned instance.
+func (c *Client) ProTxUpdateRegistrarAsync(proTxHash, operatorPubKey, votingAddress, payoutAddress, feeSourceAddress string) FutureGetProTxStringResult {
+	cmd := btcjson.NewProTxUpdateRegistrarCmd(proTxHash, operatorPubKey, votingAddress, payoutAddress, feeSourceAddress)
+	return FutureGetProTxStringResult{client: c, Response: c.sendCmd(cmd)}
+}
+
+// ProTxUpdateRegistrar returns a protx update_registrar result
+func (c *Client) ProTxUpdateRegistrar(proTxHash, operatorPubKey, votingAddress, payoutAddress, feeSourceAddress string) (string, error) {
+	return c.ProTxUpdateRegistrarAsync(proTxHash, operatorPubKey, votingAddress, payoutAddress, feeSourceAddress).Receive()
+}
+
+// ----------------------------- protx revoke -----------------------------
+
+// ProTxRevokeAsync returns an instance of a type that can be used to get
+// the result of the RPC at some future time by invoking the Receive function on
+// the returned instance.
+func (c *Client) ProTxRevokeAsync(proTxHash, operatorPrivateKey string, reason int, feeSourceAddress string) FutureGetProTxStringResult {
+	cmd := btcjson.NewProTxRevokeCmd(proTxHash, operatorPrivateKey, reason, feeSourceAddress)
+	return FutureGetProTxStringResult{client: c, Response: c.sendCmd(cmd)}
+}
+
+// ProTxRevoke returns a protx register_submit
+func (c *Client) ProTxRevoke(proTxHash, operatorPrivateKey string, reason int, feeSourceAddress string) (string, error) {
+	return c.ProTxRevokeAsync(proTxHash, operatorPrivateKey, reason, feeSourceAddress).Receive()
+}
+
+// ----------------------------- protx diff -----------------------------
+
+// FutureGetProTxDiffResult is a future promise to deliver the result of a
+// ProTxDiffAsync RPC invocation (or an applicable error).
+type FutureGetProTxDiffResult struct {
+	client   *Client
+	Response chan *response
+}
+
+// Receive waits for the response promised by the future
+func (r FutureGetProTxDiffResult) Receive() (*btcjson.ProTxDiffResult, error) {
+	res, err := receiveFuture(r.Response)
+	if err != nil {
+		return nil, err
+	}
+	var result btcjson.ProTxDiffResult
+	err = json.Unmarshal(res, &result)
+	if err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+}
+
+// ProTxDiffAsync returns an instance of a type that can be used to get
+// the result of the RPC at some future time by invoking the Receive function on
+// the returned instance.
+func (c *Client) ProTxDiffAsync(baseBlock, block int) FutureGetProTxDiffResult {
+	cmd := btcjson.NewProTxDiffCmd(baseBlock, block)
+	return FutureGetProTxDiffResult{client: c, Response: c.sendCmd(cmd)}
+}
+
+// ProTxDiff returns a protx diff result
+func (c *Client) ProTxDiff(baseBlock, block int) (*btcjson.ProTxDiffResult, error) {
+	return c.ProTxDiffAsync(baseBlock, block).Receive()
 }

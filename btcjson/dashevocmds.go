@@ -38,7 +38,41 @@ type ProTxCmd struct {
 	SubCmd ProTxSubCmd `jsonrpcusage:"\"register|register_fund|register_prepare|register_submit|list|info|update_service|update_registrar|revoke|diff\""`
 
 	ProTxHash *string `json:",omitempty"`
+
+	Type     *ProTxListType `json:",omitempty"`
+	Detailed *bool          `json:",omitempty"`
+	Height   *int           `json:",omitempty"`
+
+	BaseBlock *int `json:",omitempty"`
+	Block     *int `json:",omitempty"`
+
+	CollateralHash        *string  `json:",omitempty"`
+	CollateralIndex       *int     `json:",omitempty"`
+	CollateralAddress     *string  `json:",omitempty"`
+	IPAndPort             *string  `json:",omitempty"`
+	OwnerAddress          *string  `json:",omitempty"`
+	OperatorPubKey        *string  `json:",omitempty"`
+	OperatorPrivateKey    *string  `json:",omitempty"`
+	OperatorPayoutAddress *string  `json:",omitempty"`
+	VotingAddress         *string  `json:",omitempty"`
+	OperatorReward        *float64 `json:",omitempty"`
+	PayoutAddress         *string  `json:",omitempty"`
+	FundAddress           *string  `json:",omitempty"`
+	Reason                *int     `json:",omitempty"`
+	FeeSourceAddress      *string  `json:",omitempty"`
+	Submit                *bool    `json:",omitempty"`
+
+	Tx  *string `json:",omitempty"`
+	Sig *string `json:",omitempty"`
 }
+
+type ProTxListType string
+
+const (
+	ProTxListTypeRegistered ProTxListType = "registered"
+	ProTxListTypeValid      ProTxListType = "valid"
+	ProTxListTypeWallet     ProTxListType = "wallet"
+)
 
 // QuorumCmdSubCmd defines the sub command used in the quorum JSON-RPC command.
 type QuorumCmdSubCmd string
@@ -111,12 +145,11 @@ func NewQuorumSignCmd(quorumType LLMQType, requestID, messageHash, quorumHash st
 		RequestID:   &requestID,
 		MessageHash: &messageHash,
 	}
-	if quorumHash != "" {
-		cmd.QuorumHash = &quorumHash
+	if quorumHash == "" {
+		return cmd
 	}
-	if !submit {
-		cmd.Submit = &submit
-	}
+	cmd.QuorumHash = &quorumHash
+	cmd.Submit = &submit
 	return cmd
 
 }
@@ -210,13 +243,172 @@ func NewBLSFromSecret(secret string) *BLSCmd {
 	}
 }
 
-// NewProTxInfoCmd returns a new instance which can be used to issue a protx
+// NewProTxRegisterCmd returns a new instance which can be used to issue a protx register
+// JSON-RPC command.
+func NewProTxRegisterCmd(collateralHash string, collateralIndex int, ipAndPort, ownerAddress, operatorPubKey, votingAddress string, operatorReward float64, payoutAddress, feeSourceAddress string, submit bool) *ProTxCmd {
+	r := &ProTxCmd{
+		SubCmd:          ProTxRegister,
+		CollateralHash:  &collateralHash,
+		CollateralIndex: &collateralIndex,
+		IPAndPort:       &ipAndPort,
+		OwnerAddress:    &ownerAddress,
+		OperatorPubKey:  &operatorPubKey,
+		VotingAddress:   &votingAddress,
+		OperatorReward:  &operatorReward,
+		PayoutAddress:   &payoutAddress,
+	}
+	if feeSourceAddress == "" {
+		return r
+	}
+	r.FeeSourceAddress = &feeSourceAddress
+	r.Submit = &submit
+	return r
+}
+
+// NewProTxRegisterFundCmd returns a new instance which can be used to issue a protx register_fund
+// JSON-RPC command.
+func NewProTxRegisterFundCmd(collateralAddress, ipAndPort, ownerAddress, operatorPubKey, votingAddress string, operatorReward float64, payoutAddress, fundAddress string, submit bool) *ProTxCmd {
+	r := &ProTxCmd{
+		SubCmd:            ProTxRegisterFund,
+		CollateralAddress: &collateralAddress,
+		IPAndPort:         &ipAndPort,
+		OwnerAddress:      &ownerAddress,
+		OperatorPubKey:    &operatorPubKey,
+		VotingAddress:     &votingAddress,
+		OperatorReward:    &operatorReward,
+		PayoutAddress:     &payoutAddress,
+	}
+	if fundAddress == "" {
+		return r
+	}
+	r.FundAddress = &fundAddress
+	r.Submit = &submit
+	return r
+}
+
+// NewProTxRegisterPrepareCmd returns a new instance which can be used to issue a protx register_prepare
+// JSON-RPC command.
+func NewProTxRegisterPrepareCmd(collateralHash string, collateralIndex int, ipAndPort, ownerAddress, operatorPubKey, votingAddress string, operatorReward float64, payoutAddress, feeSourceAddress string) *ProTxCmd {
+	r := &ProTxCmd{
+		SubCmd:          ProTxRegisterPrepare,
+		CollateralHash:  &collateralHash,
+		CollateralIndex: &collateralIndex,
+		IPAndPort:       &ipAndPort,
+		OwnerAddress:    &ownerAddress,
+		OperatorPubKey:  &operatorPubKey,
+		VotingAddress:   &votingAddress,
+		OperatorReward:  &operatorReward,
+		PayoutAddress:   &payoutAddress,
+	}
+	if feeSourceAddress == "" {
+		return r
+	}
+	r.FeeSourceAddress = &feeSourceAddress
+	return r
+}
+
+// NewProTxInfoCmd returns a new instance which can be used to issue a protx info
 // JSON-RPC command.
 func NewProTxInfoCmd(proTxHash string) *ProTxCmd {
 	return &ProTxCmd{
 		SubCmd:    ProTxInfo,
 		ProTxHash: &proTxHash,
 	}
+}
+
+// NewProTxListCmd returns a new instance which can be used to issue a protx list
+// JSON-RPC command.
+func NewProTxListCmd(cmdType ProTxListType, detailed bool, height int) *ProTxCmd {
+	r := &ProTxCmd{
+		SubCmd: ProTxList,
+	}
+	if cmdType == "" {
+		return r
+	}
+	r.Type = &cmdType
+	r.Detailed = &detailed
+	if height == 0 {
+		return r
+	}
+	r.Height = &height
+	return r
+}
+
+// NewProTxRegisterSubmitCmd returns a new instance which can be used to issue a protx register_submit
+// JSON-RPC command.
+func NewProTxRegisterSubmitCmd(tx, sig string) *ProTxCmd {
+	return &ProTxCmd{
+		SubCmd: ProTxRegisterSubmit,
+		Tx:     &tx,
+		Sig:    &sig,
+	}
+}
+
+// NewProTxDiffCmd returns a new instance which can be used to issue a protx diff
+// JSON-RPC command.
+func NewProTxDiffCmd(baseBlock, block int) *ProTxCmd {
+	return &ProTxCmd{
+		SubCmd:    ProTxDiff,
+		BaseBlock: &baseBlock,
+		Block:     &block,
+	}
+}
+
+// NewProTxUpdateServiceCmd returns a new instance which can be used to issue a protx update_service
+// JSON-RPC command.
+func NewProTxUpdateServiceCmd(proTxHash, ipAndPort, operatorPubKey, operatorPayoutAddress, feeSourceAddress string) *ProTxCmd {
+	r := &ProTxCmd{
+		SubCmd:         ProTxUpdateService,
+		ProTxHash:      &proTxHash,
+		IPAndPort:      &ipAndPort,
+		OperatorPubKey: &operatorPubKey,
+	}
+	if operatorPayoutAddress == "" {
+		return r
+	}
+	r.OperatorPayoutAddress = &operatorPayoutAddress
+	if feeSourceAddress == "" {
+		return r
+	}
+	r.FeeSourceAddress = &feeSourceAddress
+	return r
+}
+
+// NewProTxUpdateRegistrarCmd returns a new instance which can be used to issue a protx update_registrar
+// JSON-RPC command.
+func NewProTxUpdateRegistrarCmd(proTxHash, operatorPubKey, votingAddress, payoutAddress, feeSourceAddress string) *ProTxCmd {
+	r := &ProTxCmd{
+		SubCmd:         ProTxUpdateRegistrar,
+		ProTxHash:      &proTxHash,
+		OperatorPubKey: &operatorPubKey,
+		VotingAddress:  &votingAddress,
+		PayoutAddress:  &payoutAddress,
+	}
+	if feeSourceAddress == "" {
+		return r
+	}
+	r.FeeSourceAddress = &feeSourceAddress
+	return r
+}
+
+// NewProTxRevokeCmd returns a new instance which can be used to issue a protx revoke
+// JSON-RPC command.
+func NewProTxRevokeCmd(proTxHash, operatorPrivateKey string, reason int, feeSourceAddress string) *ProTxCmd {
+	r := &ProTxCmd{
+		SubCmd:             ProTxRevoke,
+		ProTxHash:          &proTxHash,
+		OperatorPrivateKey: &operatorPrivateKey,
+	}
+	if reason == 0 {
+		return r
+	}
+	r.Reason = &reason
+
+	if feeSourceAddress == "" {
+		return r
+	}
+	r.FeeSourceAddress = &feeSourceAddress
+	return r
 }
 
 func init() {

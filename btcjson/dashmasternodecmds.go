@@ -39,19 +39,22 @@ func NewMasternodeCmd(sub MasternodeSubCmd) *MasternodeCmd {
 	}
 }
 
-// NewMasternodeCmd returns a new instance which can be used to issue a quorum
+// NewMasternodeWinnersCmd returns a new instance which can be used to issue a quorum
 // JSON-RPC command.
 func NewMasternodeWinnersCmd(count int, filter string) *MasternodeCmd {
 	r := &MasternodeCmd{
 		SubCmd: MasternodeWinners,
 	}
-	if count != 0 {
-		c := strconv.Itoa(count)
-		r.Count = &c
+	if count == 0 {
+		return r
 	}
-	if filter != "" {
-		r.Filter = &filter
+	c := strconv.Itoa(count)
+	r.Count = &c
+
+	if filter == "" {
+		return r
 	}
+	r.Filter = &filter
 	return r
 }
 
