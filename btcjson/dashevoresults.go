@@ -15,26 +15,29 @@ type QuorumSignResult struct {
 	MsgHash      string `json:"msgHash,omitempty"`
 	SignHash     string `json:"signHash,omitempty"`
 	Signature    string `json:"signature,omitempty"`
+}
 
+type QuorumSignResultWithBool struct {
+	QuorumSignResult
 	// Result is the output if submit was true
 	Result bool `json:"result,omitempty"`
 }
 
 // UnmarshalJSON is a custom unmarshal because the result can be just a boolean
-func (qsr *QuorumSignResult) UnmarshalJSON(data []byte) error {
+func (qsr *QuorumSignResultWithBool) UnmarshalJSON(data []byte) error {
 	if bl, err := strconv.ParseBool(string(data)); err == nil {
 		qsr.Result = bl
 		return nil
 	}
 
-	type avoidInititeLoop QuorumSignResult
+	type avoidInititeLoop QuorumSignResultWithBool
 	var ail avoidInititeLoop
 	err := json.Unmarshal(data, &ail)
 	if err != nil {
 		return err
 	}
 	// Cast the new type instance to the original type and assign.
-	*qsr = QuorumSignResult(ail)
+	*qsr = QuorumSignResultWithBool(ail)
 	return nil
 }
 
@@ -204,4 +207,100 @@ type QuorumMemberOfResult struct {
 	QuorumPublicKey string `json:"quorumPublicKey"`
 	IsValidMember   bool   `json:"isValidMember"`
 	MemberIndex     int    `json:"memberIndex"`
+}
+
+type BLSResult struct {
+	Secret string `json:"secret"`
+	Public string `json:"public"`
+}
+
+// ProTxInfoResult models the data from the protx info command.
+type ProTxInfoResult struct {
+	ProTxHash         string        `json:"proTxHash"`
+	CollateralHash    string        `json:"collateralHash"`
+	CollateralIndex   int           `json:"collateralIndex"`
+	CollateralAddress string        `json:"collateralAddress"`
+	OperatorReward    float64       `json:"operatorReward"`
+	State             ProTxState    `json:"state"`
+	Confirmations     int           `json:"confirmations"`
+	Wallet            ProTxWallet   `json:"wallet"`
+	MetaInfo          ProTxMetaInfo `json:"metaInfo"`
+}
+
+type ProTxState struct {
+	Service               string `json:"service"`
+	RegisteredHeight      int    `json:"registeredHeight"`
+	LastPaidHeight        int    `json:"lastPaidHeight"`
+	PoSePenalty           int    `json:"PoSePenalty"`
+	PoSeRevivedHeight     int    `json:"PoSeRevivedHeight"`
+	PoSeBanHeight         int    `json:"PoSeBanHeight"`
+	RevocationReason      int    `json:"revocationReason"`
+	OwnerAddress          string `json:"ownerAddress"`
+	VotingAddress         string `json:"votingAddress"`
+	PayoutAddress         string `json:"payoutAddress"`
+	PubKeyOperator        string `json:"pubKeyOperator"`
+	OperatorPayoutAddress string `json:"operatorPayoutAddress"`
+}
+
+type ProTxWallet struct {
+	HasOwnerKey              bool `json:"hasOwnerKey"`
+	HasOperatorKey           bool `json:"hasOperatorKey"`
+	HasVotingKey             bool `json:"hasVotingKey"`
+	OwnsCollateral           bool `json:"ownsCollateral"`
+	OwnsPayeeScript          bool `json:"ownsPayeeScript"`
+	OwnsOperatorRewardScript bool `json:"ownsOperatorRewardScript"`
+}
+
+type ProTxMetaInfo struct {
+	LastDSQ                    int `json:"lastDSQ"`
+	MixingTxCount              int `json:"mixingTxCount"`
+	LastOutboundAttempt        int `json:"lastOutboundAttempt"`
+	LastOutboundAttemptElapsed int `json:"lastOutboundAttemptElapsed"`
+	LastOutboundSuccess        int `json:"lastOutboundSuccess"`
+	LastOutboundSuccessElapsed int `json:"lastOutboundSuccessElapsed"`
+}
+
+type ProTxDiffResult struct {
+	BaseBlockHash    string                   `json:"baseBlockHash"`
+	BlockHash        string                   `json:"blockHash"`
+	CbTxMerkleTree   string                   `json:"cbTxMerkleTree"`
+	CbTx             string                   `json:"cbTx"`
+	DeletedMNs       []string                 `json:"deletedMNs"`
+	MnList           []ProTxDiffMN            `json:"mnList"`
+	DeletedQuorums   []ProTxDiffDeletedQuorum `json:"deletedQuorums"`
+	NewQuorums       []ProTxDiffNewQuorum     `json:"newQuorums"`
+	MerkleRootMNList string                   `json:"merkleRootMNList"`
+}
+
+type ProTxDiffMN struct {
+	ProRegTxHash   string `json:"proRegTxHash"`
+	ConfirmedHash  string `json:"confirmedHash"`
+	Service        string `json:"service"`
+	PubKeyOperator string `json:"pubKeyOperator"`
+	VotingAddress  string `json:"votingAddress"`
+	IsValid        bool   `json:"isValid"`
+}
+
+type ProTxDiffDeletedQuorum struct {
+	LlmqType   int    `json:"llmqType"`
+	QuorumHash string `json:"quorumHash"`
+}
+type ProTxDiffNewQuorum struct {
+	Version           int    `json:"version"`
+	LlmqType          int    `json:"llmqType"`
+	QuorumHash        string `json:"quorumHash"`
+	SignersCount      int    `json:"signersCount"`
+	Signers           string `json:"signers"`
+	ValidMembersCount int    `json:"validMembersCount"`
+	ValidMembers      string `json:"validMembers"`
+	QuorumPublicKey   string `json:"quorumPublicKey"`
+	QuorumVvecHash    string `json:"quorumVvecHash"`
+	QuorumSig         string `json:"quorumSig"`
+	MembersSig        string `json:"membersSig"`
+}
+
+type ProTxRegisterPrepareResult struct {
+	Tx                string `json:"tx"`
+	CollateralAddress string `json:"collateralAddress"`
+	SignMessage       string `json:"signMessage"`
 }

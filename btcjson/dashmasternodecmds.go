@@ -8,18 +8,27 @@
 
 package btcjson
 
+import "strconv"
+
 // MasternodeSubCmd defines the sub command used in the quorum JSON-RPC command.
 type MasternodeSubCmd string
 
 // Masternode subcommands
 const (
-	MasternodeStatus MasternodeSubCmd = "status"
-	MasternodeCount  MasternodeSubCmd = "count"
+	MasternodeCount   MasternodeSubCmd = "count"
+	MasternodeCurrent MasternodeSubCmd = "current"
+	MasternodeOutputs MasternodeSubCmd = "outputs"
+	MasternodeStatus  MasternodeSubCmd = "status"
+	// MasternodeList    MasternodeSubCmd = "list" // same as masternodelist
+	MasternodeWinner  MasternodeSubCmd = "winner"
+	MasternodeWinners MasternodeSubCmd = "winners"
 )
 
 // MasternodeCmd defines the quorum JSON-RPC command.
 type MasternodeCmd struct {
-	SubCmd MasternodeSubCmd `jsonrpcusage:"\"status|count\""`
+	SubCmd MasternodeSubCmd `jsonrpcusage:"\"count|current|outputs|status|winner|winners\""`
+	Count  *string          `json:",omitempty"`
+	Filter *string          `json:",omitempty"`
 }
 
 // NewMasternodeCmd returns a new instance which can be used to issue a quorum
@@ -30,9 +39,44 @@ func NewMasternodeCmd(sub MasternodeSubCmd) *MasternodeCmd {
 	}
 }
 
+// NewMasternodeWinnersCmd returns a new instance which can be used to issue a quorum
+// JSON-RPC command.
+func NewMasternodeWinnersCmd(count int, filter string) *MasternodeCmd {
+	r := &MasternodeCmd{
+		SubCmd: MasternodeWinners,
+	}
+	if count == 0 {
+		return r
+	}
+	c := strconv.Itoa(count)
+	r.Count = &c
+
+	if filter == "" {
+		return r
+	}
+	r.Filter = &filter
+	return r
+}
+
+// MasternodelistCmd defines the quorum JSON-RPC command.
+type MasternodelistCmd struct {
+	Mode   string
+	Filter string
+}
+
+// NewMasternodeListCmd returns a new instance which can be used to issue a quorum
+// JSON-RPC command.
+func NewMasternodeListCmd(mode, filter string) *MasternodelistCmd {
+	return &MasternodelistCmd{
+		Mode:   mode,
+		Filter: filter,
+	}
+}
+
 func init() {
 	// No special flags for commands in this file.
 	flags := UsageFlag(0)
 
 	MustRegisterCmd("masternode", (*MasternodeCmd)(nil), flags)
+	MustRegisterCmd("masternodelist", (*MasternodelistCmd)(nil), flags)
 }

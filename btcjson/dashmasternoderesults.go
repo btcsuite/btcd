@@ -34,3 +34,24 @@ type DMNState struct {
 	PayoutAddress     string `json:"payoutAddress"`
 	PubKeyOperator    string `json:"pubKeyOperator"`
 }
+
+type MasternodelistResultJSON struct {
+	Address           string `json:"address"`
+	Collateraladdress string `json:"collateraladdress"`
+	Lastpaidblock     int    `json:"lastpaidblock"`
+	Lastpaidtime      int    `json:"lastpaidtime"`
+	Owneraddress      string `json:"owneraddress"`
+	Payee             string `json:"payee"`
+	ProTxHash         string `json:"proTxHash"`
+	Pubkeyoperator    string `json:"pubkeyoperator"`
+	Status            string `json:"status"`
+	Votingaddress     string `json:"votingaddress"`
+}
+
+type MasternodeResult struct {
+	Height    int    `json:"height"`
+	IPPort    string `json:"IP:port"`
+	ProTxHash string `json:"proTxHash"`
+	Outpoint  string `json:"outpoint"`
+	Payee     string `json:"payee"`
+}
