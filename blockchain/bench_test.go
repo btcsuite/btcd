@@ -7,7 +7,7 @@ package blockchain
 import (
 	"testing"
 
-	"github.com/giangnamnabka/btcutil"
+	"github.com/btcsuite/btcutil"
 )
 
 // BenchmarkIsCoinBase performs a simple benchmark against the IsCoinBase

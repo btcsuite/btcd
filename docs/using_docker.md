@@ -12,7 +12,7 @@
 
 ## Introduction
 
-With Docker you can easily set up *btcd* to run your Bitcoin full node. You can find the official *btcd* Docker images on Docker Hub [giangnamnabka/btcd](https://hub.docker.com/r/giangnamnabka/btcd). The Docker source file of this image is located at [Dockerfile](https://github.com/giangnamnabka/btcd/blob/master/Dockerfile).
+With Docker you can easily set up *btcd* to run your Bitcoin full node. You can find the official *btcd* Docker images on Docker Hub [btcsuite/btcd](https://hub.docker.com/r/btcsuite/btcd). The Docker source file of this image is located at [Dockerfile](https://github.com/btcsuite/btcd/blob/master/Dockerfile).
 
 This documentation focuses on running Docker container with *docker-compose.yml* files. These files are better to read and you can use them as a template for your own use. For more information about Docker and Docker compose visit the official [Docker documentation](https://docs.docker.com/).
 
@@ -93,7 +93,7 @@ services:
   btcd:
     container_name: btcd
     hostname: btcd
-    image: giangnamnabka/btcd:latest
+    image: btcsuite/btcd:latest
     restart: unless-stopped
     volumes:
       - btcd-data:/root/.btcd
@@ -115,7 +115,7 @@ services:
   btcd:
     container_name: btcd
     hostname: btcd
-    image: giangnamnabka/btcd:latest
+    image: btcsuite/btcd:latest
     restart: unless-stopped
     volumes:
       - btcd-data:/root/.btcd
@@ -142,7 +142,7 @@ services:
   btcd:
     container_name: btcd
     hostname: btcd
-    image: giangnamnabka/btcd:latest
+    image: btcsuite/btcd:latest
     restart: unless-stopped
     volumes:
       - btcd-data:/root/.btcd

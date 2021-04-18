@@ -7,7 +7,7 @@ package wire
 import (
 	"io"
 
-	"github.com/giangnamnabka/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 )
 
 // MsgGetCFHeaders is a message similar to MsgGetHeaders, but for committed

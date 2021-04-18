@@ -1,9 +1,9 @@
 netsync
 =======
 
-[![Build Status](https://github.com/giangnamnabka/btcd/workflows/Build%20and%20Test/badge.svg)](https://github.com/giangnamnabka/btcd/actions)
+[![Build Status](https://github.com/btcsuite/btcd/workflows/Build%20and%20Test/badge.svg)](https://github.com/btcsuite/btcd/actions)
 [![ISC License](http://img.shields.io/badge/license-ISC-blue.svg)](http://copyfree.org)
-[![GoDoc](https://img.shields.io/badge/godoc-reference-blue.svg)](https://pkg.go.dev/github.com/giangnamnabka/btcd/netsync)
+[![GoDoc](https://img.shields.io/badge/godoc-reference-blue.svg)](https://pkg.go.dev/github.com/btcsuite/btcd/netsync)
 
 ## Overview
 
@@ -17,7 +17,7 @@ longest chain the sync peer is aware of.
 ## Installation and Updating
 
 ```bash
-$ go get -u github.com/giangnamnabka/btcd/netsync
+$ go get -u github.com/btcsuite/btcd/netsync
 ```
 
 ## License

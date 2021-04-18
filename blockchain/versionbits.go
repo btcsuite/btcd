@@ -7,7 +7,7 @@ package blockchain
 import (
 	"math"
 
-	"github.com/giangnamnabka/btcd/chaincfg"
+	"github.com/btcsuite/btcd/chaincfg"
 )
 
 const (
