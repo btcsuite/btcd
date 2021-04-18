@@ -47,7 +47,7 @@ should be created.
 
 The tagged commit should be a commit that bumps version numbers in `version.go`
 and `cmd/btcctl/version.go`.
-For example (taken from [f3ec130](https://github.com/btcsuite/btcd/commit/f3ec13030e4e828869954472cbc51ac36bee5c1d)):
+For example (taken from [f3ec130](https://github.com/giangnamnabka/btcd/commit/f3ec13030e4e828869954472cbc51ac36bee5c1d)):
 ```diff
 diff --git a/cmd/btcctl/version.go b/cmd/btcctl/version.go
 index 2195175c71..f65cacef7e 100644
@@ -88,7 +88,7 @@ release binaries. However, on Windows, the only way to build the release
 binaries at the moment is by using the Windows Subsystem Linux. One can build
 the release binaries following these steps:
 
-1. `git clone https://github.com/btcsuite/btcd.git`
+1. `git clone https://github.com/giangnamnabka/btcd.git`
 2. `cd btcd`
 3. `./release/release.sh <TAG> # <TAG> is the name of the next release/tag`
 
@@ -118,7 +118,7 @@ Now that we've double-checked everything and have all of the necessary files,
 it's time to publish release files on GitHub.
 Follow [this documentation](https://docs.github.com/en/github/administering-a-repository/managing-releases-in-a-repository)
 to create a release using the GitHub UI, and make sure to write release notes
-which roughly follow the format of [previous release notes](https://github.com/btcsuite/btcd/releases/tag/v0.20.1-beta).
+which roughly follow the format of [previous release notes](https://github.com/giangnamnabka/btcd/releases/tag/v0.20.1-beta).
 This is different from the [CHANGES](../CHANGES) file, which should be before the
 tagged commit in the git history.
 Much of the information in the release notes will be the same as the CHANGES
@@ -170,7 +170,7 @@ and `go` (matching the same version used in the release):
 5. Ensure `go` is installed, matching the same version as noted in the release
    notes. 
 6. Obtain a copy of `btcd`'s source code with `git clone
-   https://github.com/btcsuite/btcd` and checkout the source code of the
+   https://github.com/giangnamnabka/btcd` and checkout the source code of the
    release with `git checkout <TAG>`.
 7. Proceed to verify the tag with `git verify-tag <TAG>` and compile the
    binaries from source for the intended operating system and architecture with

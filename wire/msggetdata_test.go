@@ -10,8 +10,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/giangnamnabka/btcd/chaincfg/chainhash"
 )
 
 // TestGetData tests the MsgGetData API.

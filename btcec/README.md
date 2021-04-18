@@ -1,9 +1,9 @@
 btcec
 =====
 
-[![Build Status](https://github.com/btcsuite/btcd/workflows/Build%20and%20Test/badge.svg)](https://github.com/btcsuite/btcd/actions)
+[![Build Status](https://github.com/giangnamnabka/btcd/workflows/Build%20and%20Test/badge.svg)](https://github.com/giangnamnabka/btcd/actions)
 [![ISC License](http://img.shields.io/badge/license-ISC-blue.svg)](http://copyfree.org)
-[![GoDoc](https://pkg.go.dev/github.com/btcsuite/btcd/btcec?status.png)](https://pkg.go.dev/github.com/btcsuite/btcd/btcec)
+[![GoDoc](https://pkg.go.dev/github.com/giangnamnabka/btcd/btcec?status.png)](https://pkg.go.dev/github.com/giangnamnabka/btcd/btcec)
 
 Package btcec implements elliptic curve cryptography needed for working with
 Bitcoin (secp256k1 only for now). It is designed so that it may be used with the
@@ -20,24 +20,24 @@ use secp256k1 elliptic curve cryptography.
 ## Installation and Updating
 
 ```bash
-$ go get -u github.com/btcsuite/btcd/btcec
+$ go get -u github.com/giangnamnabka/btcd/btcec
 ```
 
 ## Examples
 
-* [Sign Message](https://pkg.go.dev/github.com/btcsuite/btcd/btcec#example-package--SignMessage)  
+* [Sign Message](https://pkg.go.dev/github.com/giangnamnabka/btcd/btcec#example-package--SignMessage)  
   Demonstrates signing a message with a secp256k1 private key that is first
   parsed form raw bytes and serializing the generated signature.
 
-* [Verify Signature](https://pkg.go.dev/github.com/btcsuite/btcd/btcec#example-package--VerifySignature)  
+* [Verify Signature](https://pkg.go.dev/github.com/giangnamnabka/btcd/btcec#example-package--VerifySignature)  
   Demonstrates verifying a secp256k1 signature against a public key that is
   first parsed from raw bytes.  The signature is also parsed from raw bytes.
 
-* [Encryption](https://pkg.go.dev/github.com/btcsuite/btcd/btcec#example-package--EncryptMessage)
+* [Encryption](https://pkg.go.dev/github.com/giangnamnabka/btcd/btcec#example-package--EncryptMessage)
   Demonstrates encrypting a message for a public key that is first parsed from
   raw bytes, then decrypting it using the corresponding private key.
 
-* [Decryption](https://pkg.go.dev/github.com/btcsuite/btcd/btcec#example-package--DecryptMessage)
+* [Decryption](https://pkg.go.dev/github.com/giangnamnabka/btcd/btcec#example-package--DecryptMessage)
   Demonstrates decrypting a message using a private key that is first parsed
   from raw bytes.
 
