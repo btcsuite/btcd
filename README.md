@@ -40,8 +40,6 @@ which are both under active development.
 
 ## Installation
 
-#### Windows - MSI Available
-
 https://github.com/btcsuite/btcd/releases
 
 #### Linux/BSD/MacOSX/POSIX - Build from Source
@@ -74,10 +72,6 @@ $ GO111MODULE=on go install -v . ./cmd/...
 
 ## Updating
 
-#### Windows
-
-Install a newer MSI
-
 #### Linux/BSD/MacOSX/POSIX - Build from Source
 
 - Run the following commands to update btcd, all dependencies, and install it:
@@ -93,10 +87,6 @@ $ GO111MODULE=on go install -v . ./cmd/...
 btcd has several configuration options available to tweak how it runs, but all
 of the basic operations described in the intro section work with zero
 configuration.
-
-#### Windows (Installed from MSI)
-
-Launch btcd from your Start menu.
 
 #### Linux/BSD/POSIX/Source
 
