@@ -803,40 +803,7 @@ mempoolLoop:
 	// OP_RETURN output within the coinbase transaction.
 	var witnessCommitment []byte
 	if witnessIncluded {
-		// The witness of the coinbase transaction MUST be exactly 32-bytes
-		// of all zeroes.
-		var witnessNonce [blockchain.CoinbaseWitnessDataLen]byte
-		coinbaseTx.MsgTx().TxIn[0].Witness = wire.TxWitness{witnessNonce[:]}
-
-		// Next, obtain the merkle root of a tree which consists of the
-		// wtxid of all transactions in the block. The coinbase
-		// transaction will have a special wtxid of all zeroes.
-		witnessMerkleTree := blockchain.BuildMerkleTreeStore(blockTxns,
-			true)
-		witnessMerkleRoot := witnessMerkleTree[len(witnessMerkleTree)-1]
-
-		// The preimage to the witness commitment is:
-		// witnessRoot || coinbaseWitness
-		var witnessPreimage [64]byte
-		copy(witnessPreimage[:32], witnessMerkleRoot[:])
-		copy(witnessPreimage[32:], witnessNonce[:])
-
-		// The witness commitment itself is the double-sha256 of the
-		// witness preimage generated above. With the commitment
-		// generated, the witness script for the output is: OP_RETURN
-		// OP_DATA_36 {0xaa21a9ed || witnessCommitment}. The leading
-		// prefix is referred to as the "witness magic bytes".
-		witnessCommitment = chainhash.DoubleHashB(witnessPreimage[:])
-		witnessScript := append(blockchain.WitnessMagicBytes, witnessCommitment...)
-
-		// Finally, create the OP_RETURN carrying witness commitment
-		// output as an additional output within the coinbase.
-		commitmentOutput := &wire.TxOut{
-			Value:    0,
-			PkScript: witnessScript,
-		}
-		coinbaseTx.MsgTx().TxOut = append(coinbaseTx.MsgTx().TxOut,
-			commitmentOutput)
+		witnessCommitment = AddWitnessCommitment(coinbaseTx, blockTxns)
 	}
 
 	// Calculate the required difficulty for the block.  The timestamp
@@ -893,6 +860,49 @@ mempoolLoop:
 		ValidPayAddress:   payToAddress != nil,
 		WitnessCommitment: witnessCommitment,
 	}, nil
+}
+
+// AddWitnessCommitment adds the witness commitment as an OP_RETURN outpout
+// within the coinbase tx.  The raw commitment is returned.
+func AddWitnessCommitment(coinbaseTx *btcutil.Tx,
+	blockTxns []*btcutil.Tx) []byte {
+
+	// The witness of the coinbase transaction MUST be exactly 32-bytes
+	// of all zeroes.
+	var witnessNonce [blockchain.CoinbaseWitnessDataLen]byte
+	coinbaseTx.MsgTx().TxIn[0].Witness = wire.TxWitness{witnessNonce[:]}
+
+	// Next, obtain the merkle root of a tree which consists of the
+	// wtxid of all transactions in the block. The coinbase
+	// transaction will have a special wtxid of all zeroes.
+	witnessMerkleTree := blockchain.BuildMerkleTreeStore(blockTxns,
+		true)
+	witnessMerkleRoot := witnessMerkleTree[len(witnessMerkleTree)-1]
+
+	// The preimage to the witness commitment is:
+	// witnessRoot || coinbaseWitness
+	var witnessPreimage [64]byte
+	copy(witnessPreimage[:32], witnessMerkleRoot[:])
+	copy(witnessPreimage[32:], witnessNonce[:])
+
+	// The witness commitment itself is the double-sha256 of the
+	// witness preimage generated above. With the commitment
+	// generated, the witness script for the output is: OP_RETURN
+	// OP_DATA_36 {0xaa21a9ed || witnessCommitment}. The leading
+	// prefix is referred to as the "witness magic bytes".
+	witnessCommitment := chainhash.DoubleHashB(witnessPreimage[:])
+	witnessScript := append(blockchain.WitnessMagicBytes, witnessCommitment...)
+
+	// Finally, create the OP_RETURN carrying witness commitment
+	// output as an additional output within the coinbase.
+	commitmentOutput := &wire.TxOut{
+		Value:    0,
+		PkScript: witnessScript,
+	}
+	coinbaseTx.MsgTx().TxOut = append(coinbaseTx.MsgTx().TxOut,
+		commitmentOutput)
+
+	return witnessCommitment
 }
 
 // UpdateBlockTime updates the timestamp in the header of the passed block to
