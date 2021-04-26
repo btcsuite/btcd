@@ -72,7 +72,7 @@ Application Options:
                               minute (default: 15)
       --listen=               Add an interface/port to listen for connections
                               (default all interfaces port: 8333, testnet:
-                              18333)
+                              18333, signet: 38333)
       --logdir=               Directory to log output
       --maxorphantx=          Max number of orphan transactions to keep in
                               memory (default: 100)
