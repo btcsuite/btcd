@@ -670,17 +670,17 @@ func CustomSignetParams(challenge []byte, dnsSeeds []DNSSeed) Params {
 				ExpireTime: 1230767999, // December 31, 2008 UTC
 			},
 			DeploymentCSV: {
-				BitNumber:  0,
+				BitNumber:  29,
 				StartTime:  0,             // Always available for vote
 				ExpireTime: math.MaxInt64, // Never expires
 			},
 			DeploymentSegwit: {
-				BitNumber:  1,
+				BitNumber:  29,
 				StartTime:  0,             // Always available for vote
 				ExpireTime: math.MaxInt64, // Never expires.
 			},
 			DeploymentTaproot: {
-				BitNumber:  2,
+				BitNumber:  29,
 				StartTime:  0,             // Always available for vote
 				ExpireTime: math.MaxInt64, // Never expires.
 			},
