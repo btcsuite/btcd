@@ -1749,6 +1749,47 @@ func TestRBF(t *testing.T) {
 			},
 			err: "",
 		},
+		{
+			// A transaction that doesn't signal replacement, can
+			// be replaced if the parent signals replacement.
+			name: "inherited replacement",
+			setup: func(ctx *testContext) (*btcutil.Tx, []*btcutil.Tx) {
+				coinbase := ctx.addCoinbaseTx(1)
+
+				// Create an initial parent transaction that
+				// marks replacement, we won't be replacing
+				// this directly however.
+				coinbaseOut := txOutToSpendableOut(coinbase, 0)
+				outs := []spendableOutput{coinbaseOut}
+				parent := ctx.addSignedTx(
+					outs, 1, defaultFee, true, false,
+				)
+
+				// Now create a transaction that spends that
+				// parent transaction, which is marked as NOT
+				// being RBF-able.
+				parentOut := txOutToSpendableOut(parent, 0)
+				parentOuts := []spendableOutput{parentOut}
+				childNoReplace := ctx.addSignedTx(
+					parentOuts, 1, defaultFee, false, false,
+				)
+
+				// Now we'll create another transaction that
+				// replaces the *child* only. This should work
+				// as the parent has been marked for RBF, even
+				// though the child hasn't.
+				respendOuts := []spendableOutput{parentOut}
+				childReplace, err := ctx.harness.CreateSignedTx(
+					respendOuts, 1, defaultFee*3, false,
+				)
+				if err != nil {
+					ctx.t.Fatalf("unable to create child tx: %v", err)
+				}
+
+				return childReplace, []*btcutil.Tx{childNoReplace}
+			},
+			err: "",
+		},
 	}
 
 	for _, testCase := range testCases {
