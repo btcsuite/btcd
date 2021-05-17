@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/btcsuite/btcd/wire"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/haiheipijuan/btcd/wire"
 )
 
 // genTestTx creates a random transaction for uses within test cases.

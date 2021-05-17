@@ -8,12 +8,12 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"github.com/btcsuite/btcd/btcec"
-	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/txscript"
-	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
+	"github.com/haiheipijuan/btcd/btcec"
+	"github.com/haiheipijuan/btcd/chaincfg"
+	"github.com/haiheipijuan/btcd/chaincfg/chainhash"
+	"github.com/haiheipijuan/btcd/txscript"
+	"github.com/haiheipijuan/btcd/wire"
 )
 
 // This example demonstrates creating a script which pays to a bitcoin address.

@@ -15,9 +15,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
+	"github.com/haiheipijuan/btcd/chaincfg/chainhash"
+	"github.com/haiheipijuan/btcd/wire"
 )
 
 // scriptTestName returns a descriptive test name for the given reference script

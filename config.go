@@ -20,15 +20,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/btcsuite/btcd/blockchain"
-	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/connmgr"
-	"github.com/btcsuite/btcd/database"
-	_ "github.com/btcsuite/btcd/database/ffldb"
-	"github.com/btcsuite/btcd/mempool"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/go-socks/socks"
+	"github.com/haiheipijuan/btcd/blockchain"
+	"github.com/haiheipijuan/btcd/chaincfg"
+	"github.com/haiheipijuan/btcd/chaincfg/chainhash"
+	"github.com/haiheipijuan/btcd/connmgr"
+	"github.com/haiheipijuan/btcd/database"
+	_ "github.com/haiheipijuan/btcd/database/ffldb"
+	"github.com/haiheipijuan/btcd/mempool"
 	flags "github.com/jessevdk/go-flags"
 )
 
