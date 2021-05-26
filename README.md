@@ -96,9 +96,9 @@ $ ./btcd
 
 ## IRC
 
-- irc.freenode.net
+- irc.libera.chat
 - channel #btcd
-- [webchat](https://webchat.freenode.net/?channels=btcd)
+- [webchat](https://web.libera.chat/gamja/?channels=btcd)
 
 ## Issue Tracker
 
