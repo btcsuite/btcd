@@ -3,7 +3,7 @@ User visible changes for btcd
   A full-node bitcoin implementation written in Go
 ============================================================================
 
-Changes in 0.22.0 (Thu May 27 2021)
+Changes in 0.22.0 (Tue Jun 01 2021)
   - Protocol and network-related changes:
     - Add support for witness tx and block in notfound msg (#1625)
     - Add support for receiving sendaddrv2 messages from a peer (#1670)
