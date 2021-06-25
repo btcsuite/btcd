@@ -1029,7 +1029,7 @@ type WalletCreateFundedPsbtOpts struct {
 	ChangeType             *ChangeType `json:"change_type,omitempty"`
 	IncludeWatching        *bool       `json:"includeWatching,omitempty"`
 	LockUnspents           *bool       `json:"lockUnspents,omitempty"`
-	FeeRate                *int64      `json:"feeRate,omitempty"`
+	FeeRate                *float64    `json:"feeRate,omitempty"`
 	SubtractFeeFromOutputs *[]int64    `json:"subtractFeeFromOutputs,omitempty"`
 	Replaceable            *bool       `json:"replaceable,omitempty"`
 	ConfTarget             *int64      `json:"conf_target,omitempty"`
