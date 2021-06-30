@@ -79,12 +79,9 @@ type QuorumCmdSubCmd string
 
 // Quorum commands https://dashcore.readme.io/docs/core-api-ref-remote-procedure-calls-evo#quorum
 const (
-	// QuorumSign indicates the specified host should be added as a persistent
-	// peer.
-	QuorumSign QuorumCmdSubCmd = "sign"
-
-	// QuorumInfo indicates the specified peer should be removed.
-	QuorumInfo QuorumCmdSubCmd = "info"
+	QuorumSign   QuorumCmdSubCmd = "sign"
+	QuorumVerify QuorumCmdSubCmd = "verify"
+	QuorumInfo   QuorumCmdSubCmd = "info"
 
 	// QuorumList lists all quorums
 	QuorumList QuorumCmdSubCmd = "list"
@@ -128,6 +125,7 @@ type QuorumCmd struct {
 	RequestID   *string   `json:",omitempty"`
 	MessageHash *string   `json:",omitempty"`
 	QuorumHash  *string   `json:",omitempty"`
+	Signature   *string   `json:",omitempty"`
 
 	Submit               *bool        `json:",omitempty"`
 	IncludeSkShare       *bool        `json:",omitempty"`
@@ -151,7 +149,20 @@ func NewQuorumSignCmd(quorumType LLMQType, requestID, messageHash, quorumHash st
 	cmd.QuorumHash = &quorumHash
 	cmd.Submit = &submit
 	return cmd
+}
 
+// NewQuorumVerifyCmd returns a new instance which can be used to issue a quorum
+// JSON-RPC command.
+func NewQuorumVerifyCmd(quorumType LLMQType, requestID string, messageHash string, signature string, quorumHash string) *QuorumCmd {
+	cmd := &QuorumCmd{
+		SubCmd:      QuorumVerify,
+		LLMQType:    &quorumType,
+		RequestID:   &requestID,
+		MessageHash: &messageHash,
+		Signature:   &signature,
+		QuorumHash:  &quorumHash,
+	}
+	return cmd
 }
 
 // NewQuorumInfoCmd returns a new instance which can be used to issue a quorum
