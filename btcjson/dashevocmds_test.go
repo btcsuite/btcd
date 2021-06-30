@@ -117,7 +117,7 @@ func TestDashEvoCmds(t *testing.T) {
 			continue
 		}
 
-		if !bytes.Equalo(marshalled, []byte(test.marshalled)) {
+		if !bytes.Equal(marshalled, []byte(test.marshalled)) {
 			t.Errorf("Test #%d (%s) unexpected marshalled data - "+
 				"got %s, want %s", i, test.name, marshalled,
 				test.marshalled)
