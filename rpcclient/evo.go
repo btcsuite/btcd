@@ -127,6 +127,53 @@ func (c *Client) QuorumSignSubmit(quorumType btcjson.LLMQType, requestID, messag
 	return r.Result, nil
 }
 
+// ----------------------------- quorum verify -----------------------------
+
+// FutureGetQuorumVerifyResult is a future promise to deliver the result of a
+// QuorumVerifyAsync RPC invocation (or an applicable error).
+type FutureGetQuorumVerifyResult struct {
+	client   *Client
+	Response chan *response
+}
+
+// Receive waits for the response promised by the future and returns the member signature for the quorum.
+func (r FutureGetQuorumVerifyResult) Receive() (*btcjson.QuorumVerifyResult, error) {
+	res, err := receiveFuture(r.Response)
+	if err != nil {
+		return nil, err
+	}
+
+	var quorumVerifyResult btcjson.QuorumVerifyResult
+	err = json.Unmarshal(res, &quorumVerifyResult)
+	if err != nil {
+		return nil, err
+	}
+
+	return &quorumVerifyResult, nil
+}
+
+// QuorumVerifyAsync returns an instance of a type that can be used to get
+// the result of the RPC at some future time by invoking the Receive function on
+// the returned instance.
+//
+func (c *Client) QuorumVerifyAsync(quorumType btcjson.LLMQType, requestID string, messageHash string, signature string, quorumHash string) FutureGetQuorumVerifyResult {
+	cmd := btcjson.NewQuorumVerifyCmd(quorumType, requestID, messageHash, signature, quorumHash)
+
+	return FutureGetQuorumVerifyResult{
+		client:   c,
+		Response: c.sendCmd(cmd),
+	}
+}
+
+// QuorumVerify returns a true if the signature is valid and false if not
+func (c *Client) QuorumVerify(quorumType btcjson.LLMQType, requestID string, messageHash string, signature string, quorumHash string) (bool, error) {
+	r, err := c.QuorumVerifyAsync(quorumType, requestID, messageHash, signature, quorumHash).Receive()
+	if err != nil {
+		return false, err
+	}
+	return r.Result, nil
+}
+
 // ----------------------------- quorum info -----------------------------
 
 // FutureGetQuorumInfoResult is a future promise to deliver the result of a

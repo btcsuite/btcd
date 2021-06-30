@@ -23,6 +23,13 @@ type QuorumSignResultWithBool struct {
 	Result bool `json:"result,omitempty"`
 }
 
+// QuorumVerifyResult models the data from the quorum verify command.
+// returns a boolean.
+type QuorumVerifyResult struct {
+	// Result is the output if submit was true
+	Result bool `json:"result,omitempty"`
+}
+
 // UnmarshalJSON is a custom unmarshal because the result can be just a boolean
 func (qsr *QuorumSignResultWithBool) UnmarshalJSON(data []byte) error {
 	if bl, err := strconv.ParseBool(string(data)); err == nil {

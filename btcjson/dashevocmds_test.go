@@ -78,6 +78,32 @@ func TestDashEvoCmds(t *testing.T) {
 				IncludeSkShare: pBool(false),
 			},
 		},
+		{
+			name: "quorum verify",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("quorum verify",
+					btcjson.LLMQType_100_67,
+					"0067c4fd779a195a95b267e263c631f71f83f8d5e6191091289d114012b373a1",
+					"ce490ca26cad6f1749ff9b977fe0fe4ece4391166f69be75c4619bc94b184dbc",
+					"6f1018f54507606069303fd16257434073c6f374729b0090bb9dbbe629241236",
+					false)
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewQuorumVerifyCmd(btcjson.LLMQType_100_67,
+					"0067c4fd779a195a95b267e263c631f71f83f8d5e6191091289d114012b373a1",
+					"ce490ca26cad6f1749ff9b977fe0fe4ece4391166f69be75c4619bc94b184dbc",
+					"5f1018f54507606069303fd16257434073c6f374729b0090bb9dbbe629241235",
+					"6f1018f54507606069303fd16257434073c6f374729b0090bb9dbbe629241236")
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"quorum sign","params":[4,"0067c4fd779a195a95b267e263c631f71f83f8d5e6191091289d114012b373a1","ce490ca26cad6f1749ff9b977fe0fe4ece4391166f69be75c4619bc94b184dbc","5f1018f54507606069303fd16257434073c6f374729b0090bb9dbbe629241235","6f1018f54507606069303fd16257434073c6f374729b0090bb9dbbe629241236",],"id":1}`,
+			unmarshalled: &btcjson.QuorumCmd{
+				LLMQType:    pLLMQType(btcjson.LLMQType_100_67),
+				RequestID:   pString("0067c4fd779a195a95b267e263c631f71f83f8d5e6191091289d114012b373a1"),
+				MessageHash: pString("ce490ca26cad6f1749ff9b977fe0fe4ece4391166f69be75c4619bc94b184dbc"),
+				Signature:   pString("5f1018f54507606069303fd16257434073c6f374729b0090bb9dbbe629241235"),
+				QuorumHash:  pString("6f1018f54507606069303fd16257434073c6f374729b0090bb9dbbe629241236"),
+			},
+		},
 	}
 
 	t.Logf("Running %d tests", len(tests))
