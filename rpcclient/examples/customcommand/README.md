@@ -1,5 +1,5 @@
-Namecoin Core Custom Command Example
-====================================
+Custom Command Example
+======================
 
 This example shows how to use custom commands with the rpcclient package, by
 implementing the `name_show` command from Namecoin Core.
