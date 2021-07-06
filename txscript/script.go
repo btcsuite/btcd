@@ -419,7 +419,7 @@ func calcWitnessSignatureHash(subScript []parsedOpcode, sigHashes *TxSigHashes,
 
 	// We'll utilize this buffer throughout to incrementally calculate
 	// the signature hash for this transaction.
-	var sigHash bytes.Buffer
+	sigHash := sha256.New()
 
 	// First write out, then encode the transaction's version number.
 	var bVersion [4]byte
@@ -474,7 +474,7 @@ func calcWitnessSignatureHash(subScript []parsedOpcode, sigHashes *TxSigHashes,
 		// the original script, with all code separators removed,
 		// serialized with a var int length prefix.
 		rawScript, _ := unparseScript(subScript)
-		wire.WriteVarBytes(&sigHash, 0, rawScript)
+		wire.WriteVarBytes(sigHash, 0, rawScript)
 	}
 
 	// Next, add the input amount, and sequence number of the input being
@@ -510,7 +510,7 @@ func calcWitnessSignatureHash(subScript []parsedOpcode, sigHashes *TxSigHashes,
 	binary.LittleEndian.PutUint32(bHashType[:], uint32(hashType))
 	sigHash.Write(bHashType[:])
 
-	return chainhash.DoubleHashB(sigHash.Bytes()), nil
+	return chainhash.DoubleHashBRaw(sigHash), nil
 }
 
 // CalcWitnessSigHash computes the sighash digest for the specified input of
