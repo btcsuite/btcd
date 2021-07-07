@@ -18,6 +18,8 @@ import (
 	"github.com/btcsuite/btcd/blockchain/indexers"
 	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcd/limits"
+
+	"github.com/felixge/fgprof"
 )
 
 const (
@@ -65,6 +67,7 @@ func btcdMain(serverChan chan<- *server) error {
 
 	// Enable http profiling server if requested.
 	if cfg.Profile != "" {
+		http.DefaultServeMux.Handle("/debug/fgprof", fgprof.Handler())
 		go func() {
 			listenAddr := net.JoinHostPort("", cfg.Profile)
 			btcdLog.Infof("Profile server listening on %s", listenAddr)
