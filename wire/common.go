@@ -18,10 +18,6 @@ import (
 const (
 	// MaxVarIntPayload is the maximum payload size for a variable length integer.
 	MaxVarIntPayload = 9
-
-	// binaryFreeListMaxItems is the number of buffers to keep in the free
-	// list to use for binary serialization and deserialization.
-	binaryFreeListMaxItems = 1024
 )
 
 var (
@@ -47,38 +43,14 @@ var (
 // io.Writer, and return the buffer to the free list.
 type binaryFreeList chan []byte
 
-// Borrow returns a byte slice from the free list with a length of 8.  A new
-// buffer is allocated if there are not any available on the free list.
-func (l binaryFreeList) Borrow() []byte {
-	var buf []byte
-	select {
-	case buf = <-l:
-	default:
-		buf = make([]byte, 8)
-	}
-	return buf[:8]
-}
-
-// Return puts the provided byte slice back on the free list.  The buffer MUST
-// have been obtained via the Borrow function and therefore have a cap of 8.
-func (l binaryFreeList) Return(buf []byte) {
-	select {
-	case l <- buf:
-	default:
-		// Let it go to the garbage collector.
-	}
-}
-
 // Uint8 reads a single byte from the provided reader using a buffer from the
 // free list and returns it as a uint8.
 func (l binaryFreeList) Uint8(r io.Reader) (uint8, error) {
-	buf := l.Borrow()[:1]
+	buf := make([]byte, 1) // should be allocated on the stack
 	if _, err := io.ReadFull(r, buf); err != nil {
-		l.Return(buf)
 		return 0, err
 	}
 	rv := buf[0]
-	l.Return(buf)
 	return rv, nil
 }
 
@@ -86,13 +58,11 @@ func (l binaryFreeList) Uint8(r io.Reader) (uint8, error) {
 // free list, converts it to a number using the provided byte order, and returns
 // the resulting uint16.
 func (l binaryFreeList) Uint16(r io.Reader, byteOrder binary.ByteOrder) (uint16, error) {
-	buf := l.Borrow()[:2]
+	buf := make([]byte, 2) // should be allocated on the stack
 	if _, err := io.ReadFull(r, buf); err != nil {
-		l.Return(buf)
 		return 0, err
 	}
 	rv := byteOrder.Uint16(buf)
-	l.Return(buf)
 	return rv, nil
 }
 
@@ -100,13 +70,11 @@ func (l binaryFreeList) Uint16(r io.Reader, byteOrder binary.ByteOrder) (uint16,
 // free list, converts it to a number using the provided byte order, and returns
 // the resulting uint32.
 func (l binaryFreeList) Uint32(r io.Reader, byteOrder binary.ByteOrder) (uint32, error) {
-	buf := l.Borrow()[:4]
+	buf := make([]byte, 4) // should be allocated on the stack
 	if _, err := io.ReadFull(r, buf); err != nil {
-		l.Return(buf)
 		return 0, err
 	}
 	rv := byteOrder.Uint32(buf)
-	l.Return(buf)
 	return rv, nil
 }
 
@@ -114,23 +82,20 @@ func (l binaryFreeList) Uint32(r io.Reader, byteOrder binary.ByteOrder) (uint32,
 // free list, converts it to a number using the provided byte order, and returns
 // the resulting uint64.
 func (l binaryFreeList) Uint64(r io.Reader, byteOrder binary.ByteOrder) (uint64, error) {
-	buf := l.Borrow()[:8]
+	buf := make([]byte, 8) // should be allocated on the stack
 	if _, err := io.ReadFull(r, buf); err != nil {
-		l.Return(buf)
 		return 0, err
 	}
 	rv := byteOrder.Uint64(buf)
-	l.Return(buf)
 	return rv, nil
 }
 
 // PutUint8 copies the provided uint8 into a buffer from the free list and
 // writes the resulting byte to the given writer.
 func (l binaryFreeList) PutUint8(w io.Writer, val uint8) error {
-	buf := l.Borrow()[:1]
+	buf := make([]byte, 1) // should be allocated on the stack
 	buf[0] = val
 	_, err := w.Write(buf)
-	l.Return(buf)
 	return err
 }
 
@@ -138,10 +103,9 @@ func (l binaryFreeList) PutUint8(w io.Writer, val uint8) error {
 // buffer from the free list and writes the resulting two bytes to the given
 // writer.
 func (l binaryFreeList) PutUint16(w io.Writer, byteOrder binary.ByteOrder, val uint16) error {
-	buf := l.Borrow()[:2]
+	buf := make([]byte, 2) // should be allocated on the stack
 	byteOrder.PutUint16(buf, val)
 	_, err := w.Write(buf)
-	l.Return(buf)
 	return err
 }
 
@@ -149,10 +113,9 @@ func (l binaryFreeList) PutUint16(w io.Writer, byteOrder binary.ByteOrder, val u
 // buffer from the free list and writes the resulting four bytes to the given
 // writer.
 func (l binaryFreeList) PutUint32(w io.Writer, byteOrder binary.ByteOrder, val uint32) error {
-	buf := l.Borrow()[:4]
+	buf := make([]byte, 4) // should be allocated on the stack
 	byteOrder.PutUint32(buf, val)
 	_, err := w.Write(buf)
-	l.Return(buf)
 	return err
 }
 
@@ -160,16 +123,15 @@ func (l binaryFreeList) PutUint32(w io.Writer, byteOrder binary.ByteOrder, val u
 // buffer from the free list and writes the resulting eight bytes to the given
 // writer.
 func (l binaryFreeList) PutUint64(w io.Writer, byteOrder binary.ByteOrder, val uint64) error {
-	buf := l.Borrow()[:8]
+	buf := make([]byte, 8) // should be allocated on the stack
 	byteOrder.PutUint64(buf, val)
 	_, err := w.Write(buf)
-	l.Return(buf)
 	return err
 }
 
 // binarySerializer provides a free list of buffers to use for serializing and
 // deserializing primitive integer values to and from io.Readers and io.Writers.
-var binarySerializer binaryFreeList = make(chan []byte, binaryFreeListMaxItems)
+var binarySerializer binaryFreeList = make(chan []byte)
 
 // errNonCanonicalVarInt is the common format string used for non-canonically
 // encoded variable length integer errors.
