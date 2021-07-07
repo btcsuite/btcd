@@ -13,6 +13,7 @@ import (
 	"github.com/btcsuite/btcd/addrmgr"
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/blockchain/indexers"
+	"github.com/btcsuite/btcd/claimtrie/node"
 	"github.com/btcsuite/btcd/connmgr"
 	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcd/mempool"
@@ -58,8 +59,9 @@ var (
 	amgrLog = backendLog.Logger("AMGR")
 	cmgrLog = backendLog.Logger("CMGR")
 	bcdbLog = backendLog.Logger("BCDB")
-	btcdLog = backendLog.Logger("BTCD")
+	btcdLog = backendLog.Logger("MAIN")
 	chanLog = backendLog.Logger("CHAN")
+	lbryLog = backendLog.Logger("LBRY")
 	discLog = backendLog.Logger("DISC")
 	indxLog = backendLog.Logger("INDX")
 	minrLog = backendLog.Logger("MINR")
@@ -77,6 +79,7 @@ func init() {
 	connmgr.UseLogger(cmgrLog)
 	database.UseLogger(bcdbLog)
 	blockchain.UseLogger(chanLog)
+	node.UseLogger(lbryLog)
 	indexers.UseLogger(indxLog)
 	mining.UseLogger(minrLog)
 	cpuminer.UseLogger(minrLog)
@@ -92,8 +95,9 @@ var subsystemLoggers = map[string]btclog.Logger{
 	"AMGR": amgrLog,
 	"CMGR": cmgrLog,
 	"BCDB": bcdbLog,
-	"BTCD": btcdLog,
+	"MAIN": btcdLog,
 	"CHAN": chanLog,
+	"LBRY": lbryLog,
 	"DISC": discLog,
 	"INDX": indxLog,
 	"MINR": minrLog,
@@ -115,7 +119,7 @@ func initLogRotator(logFile string) {
 		fmt.Fprintf(os.Stderr, "failed to create log directory: %v\n", err)
 		os.Exit(1)
 	}
-	r, err := rotator.New(logFile, 10*1024, false, 3)
+	r, err := rotator.New(logFile, 40*1024, false, 3)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to create file rotator: %v\n", err)
 		os.Exit(1)
