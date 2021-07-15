@@ -528,7 +528,7 @@ var helpDescsEnUS = map[string]string{
 	"gettxoutresult-coinbase":      "Whether or not the transaction is a coinbase",
 
 	// GetTxOutCmd help.
-	"gettxout--synopsis":      "Returns information about an unspent transaction output..",
+	"gettxout--synopsis":      "Returns information about an unspent transaction output.",
 	"gettxout-txid":           "The hash of the transaction",
 	"gettxout-vout":           "The index of the output",
 	"gettxout-includemempool": "Include the mempool when true",
