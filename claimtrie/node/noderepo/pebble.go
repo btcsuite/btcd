@@ -2,7 +2,9 @@ package noderepo
 
 import (
 	"bytes"
+	"io"
 	"sort"
+	"sync"
 
 	"github.com/cockroachdb/pebble"
 	"github.com/lbryio/lbcd/claimtrie/change"
@@ -13,9 +15,69 @@ type Pebble struct {
 	db *pebble.DB
 }
 
+type pooledMerger struct {
+	values [][]byte
+	index  []int
+	pool   *sync.Pool
+	buffer []byte
+}
+
+func (a *pooledMerger) Len() int           { return len(a.index) }
+func (a *pooledMerger) Less(i, j int) bool { return a.index[i] < a.index[j] }
+func (a *pooledMerger) Swap(i, j int) {
+	a.index[i], a.index[j] = a.index[j], a.index[i]
+	a.values[i], a.values[j] = a.values[j], a.values[i]
+}
+
+func (a *pooledMerger) MergeNewer(value []byte) error {
+	a.values = append(a.values, value)
+	a.index = append(a.index, len(a.values))
+	return nil
+}
+
+func (a *pooledMerger) MergeOlder(value []byte) error {
+	a.values = append(a.values, value)
+	a.index = append(a.index, -len(a.values))
+	return nil
+}
+
+func (a *pooledMerger) Finish(includesBase bool) ([]byte, io.Closer, error) {
+	sort.Sort(a)
+
+	a.buffer = a.pool.Get().([]byte)[:0]
+	for i := range a.values {
+		a.buffer = append(a.buffer, a.values[i]...)
+	}
+
+	return a.buffer, a, nil
+}
+
+func (a *pooledMerger) Close() error {
+	a.pool.Put(a.buffer)
+	return nil
+}
+
 func NewPebble(path string) (*Pebble, error) {
 
-	db, err := pebble.Open(path, &pebble.Options{Cache: pebble.NewCache(64 << 20), BytesPerSync: 8 << 20, MaxOpenFiles: 2000})
+	mp := &sync.Pool{
+		New: func() interface{} {
+			return make([]byte, 0, 256)
+		},
+	}
+
+	db, err := pebble.Open(path, &pebble.Options{
+		Merger: &pebble.Merger{
+			Merge: func(key, value []byte) (pebble.ValueMerger, error) {
+				p := &pooledMerger{pool: mp}
+				return p, p.MergeNewer(value)
+			},
+			Name: pebble.DefaultMerger.Name, // yes, it's a lie
+		},
+		Cache:        pebble.NewCache(64 << 20),
+		BytesPerSync: 8 << 20,
+		MaxOpenFiles: 2000,
+	})
+
 	repo := &Pebble{db: db}
 
 	return repo, errors.Wrapf(err, "unable to open %s", path)
