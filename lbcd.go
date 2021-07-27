@@ -150,6 +150,8 @@ func btcdMain(serverChan chan<- *server) error {
 
 	param.SetNetwork(activeNetParams.Params.Net) // prep the claimtrie params
 
+	go logMemoryUsage()
+
 	// Create server and start it.
 	server, err := newServer(cfg.Listeners, cfg.AgentBlacklist,
 		cfg.AgentWhitelist, db, activeNetParams.Params, interrupt)
