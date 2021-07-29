@@ -195,6 +195,12 @@ func (b *BlockChain) calcNextBlockVersion(prevNode *blockNode) (int32, error) {
 	expectedVersion := uint32(vbTopBits)
 	for id := 0; id < len(b.chainParams.Deployments); id++ {
 		deployment := &b.chainParams.Deployments[id]
+
+		// added to mimic LBRYcrd:
+		if deployment.ForceActiveAt > 0 && prevNode != nil && prevNode.height+1 >= deployment.ForceActiveAt {
+			continue
+		}
+
 		cache := &b.deploymentCaches[id]
 		checker := deploymentChecker{deployment: deployment, chain: b}
 		state, err := b.thresholdState(prevNode, checker, cache)

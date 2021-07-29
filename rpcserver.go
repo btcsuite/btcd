@@ -1294,6 +1294,7 @@ func handleGetBlockChainInfo(s *rpcServer, cmd interface{}, closeChan <-chan str
 			Bit:        deploymentDetails.BitNumber,
 			StartTime2: int64(deploymentDetails.StartTime),
 			Timeout:    int64(deploymentDetails.ExpireTime),
+			Since:      deploymentDetails.ForceActiveAt,
 		}
 	}
 

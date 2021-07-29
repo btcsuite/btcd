@@ -302,6 +302,12 @@ func (b *BlockChain) deploymentState(prevNode *blockNode, deploymentID uint32) (
 	}
 
 	deployment := &b.chainParams.Deployments[deploymentID]
+
+	// added to mimic LBRYcrd:
+	if deployment.ForceActiveAt > 0 && prevNode != nil && prevNode.height+1 >= deployment.ForceActiveAt {
+		return ThresholdActive, nil
+	}
+
 	checker := deploymentChecker{deployment: deployment, chain: b}
 	cache := &b.deploymentCaches[deploymentID]
 
