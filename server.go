@@ -3035,11 +3035,16 @@ func initListeners(amgr *addrmgr.AddrManager, listenAddrs []string, services wir
 			}
 		}
 	} else {
-		if cfg.Upnp {
+		if cfg.Upnp && !cfg.RegressionTest && !cfg.SimNet {
 			var err error
 			nat, err = Discover()
 			if err != nil {
-				srvrLog.Warnf("Can't discover upnp: %v", err)
+				srvrLog.Infof("Can't discover UPnP-enabled device: %v", err)
+			} else {
+				address, err := nat.GetExternalAddress()
+				if err == nil && address != nil {
+					srvrLog.Infof("UPnP successfully registered on %s", address.String())
+				}
 			}
 			// nil nat here is fine, just means no upnp on network.
 		}

@@ -66,6 +66,7 @@ const (
 	sampleConfigFilename         = "sample-lbcd.conf"
 	defaultTxIndex               = false
 	defaultAddrIndex             = false
+	defaultUpnp                  = true
 )
 
 var (
@@ -439,6 +440,7 @@ func loadConfig() (*config, []string, error) {
 		Generate:             defaultGenerate,
 		TxIndex:              defaultTxIndex,
 		AddrIndex:            defaultAddrIndex,
+		Upnp:                 defaultUpnp,
 	}
 
 	// Service options which are only added on Windows.
