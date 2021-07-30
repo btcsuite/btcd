@@ -547,6 +547,12 @@ func GenerateHelp(method string, descs map[string]string, resultTypes ...interfa
 			return desc
 		}
 
+		if strings.Contains(key, "base-") {
+			if desc, ok := descs[strings.ReplaceAll(key, "base-", "-")]; ok {
+				return desc
+			}
+		}
+
 		missingKey = key
 		return key
 	}

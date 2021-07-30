@@ -226,8 +226,12 @@ func NewResponse(rpcVersion RPCVersion, id interface{}, marshalledResult []byte,
 // JSON-RPC client.
 func MarshalResponse(rpcVersion RPCVersion, id interface{}, result interface{}, rpcErr *RPCError) ([]byte, error) {
 	if !rpcVersion.IsValid() {
-		str := fmt.Sprintf("rpcversion '%s' is invalid", rpcVersion)
-		return nil, makeError(ErrInvalidType, str)
+		if rpcVersion == "" {
+			rpcVersion = RpcVersion1
+		} else {
+			str := fmt.Sprintf("rpcversion '%s' is unsupported", rpcVersion)
+			return nil, makeError(ErrInvalidType, str)
+		}
 	}
 
 	marshalledResult, err := json.Marshal(result)
