@@ -300,6 +300,8 @@ type GetBlockTemplateResult struct {
 	RejectReasion string   `json:"reject-reason,omitempty"`
 
 	ClaimTrieHash string `json:"claimtrie"`
+
+	Rules []string `json:"rules,omitempty"`
 }
 
 // GetMempoolEntryResult models the data returned from the getmempoolentry's
