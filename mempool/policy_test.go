@@ -204,7 +204,7 @@ func TestCheckPkScriptStandard(t *testing.T) {
 	}
 }
 
-// TestDust tests the isDust API.
+// TestDust tests the IsDust API.
 func TestDust(t *testing.T) {
 	pkScript := []byte{0x76, 0xa9, 0x21, 0x03, 0x2f, 0x7e, 0x43,
 		0x0a, 0xa4, 0xc9, 0xd1, 0x59, 0x43, 0x7e, 0x84, 0xb9,
@@ -268,7 +268,7 @@ func TestDust(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		res := isDust(&test.txOut, test.relayFee)
+		res := IsDust(&test.txOut, test.relayFee)
 		if res != test.isDust {
 			t.Fatalf("Dust test '%s' failed: want %v got %v",
 				test.name, test.isDust, res)
