@@ -1208,7 +1208,7 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, fla
 // factors are used to guess, but the key factors that allow the chain to
 // believe it is current are:
 //  - Latest block height is after the latest checkpoint (if enabled)
-//  - Latest block has a timestamp newer than 24 hours ago
+//  - Latest block has a timestamp newer than ~6 hours ago (as LBRY block time is one fourth of bitcoin)
 //
 // This function MUST be called with the chain state lock held (for reads).
 func (b *BlockChain) isCurrent() bool {
@@ -1219,13 +1219,13 @@ func (b *BlockChain) isCurrent() bool {
 		return false
 	}
 
-	// Not current if the latest best block has a timestamp before 24 hours
+	// Not current if the latest best block has a timestamp before 7 hours
 	// ago.
 	//
 	// The chain appears to be current if none of the checks reported
 	// otherwise.
-	minus24Hours := b.timeSource.AdjustedTime().Add(-24 * time.Hour).Unix()
-	return b.bestChain.Tip().timestamp >= minus24Hours
+	hours := b.timeSource.AdjustedTime().Add(-7 * time.Hour).Unix()
+	return b.bestChain.Tip().timestamp >= hours
 }
 
 // IsCurrent returns whether or not the chain believes it is current.  Several
