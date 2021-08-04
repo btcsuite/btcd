@@ -230,8 +230,8 @@ func ValidateWitnessCommitment(blk *btcutil.Block) error {
 	coinbaseWitness := coinbaseTx.MsgTx().TxIn[0].Witness
 	if len(coinbaseWitness) != 1 {
 		str := fmt.Sprintf("the coinbase transaction has %d items in "+
-			"its witness stack when only one is allowed",
-			len(coinbaseWitness))
+			"its witness stack when only one is allowed. Height: %d",
+			len(coinbaseWitness), blk.Height())
 		return ruleError(ErrInvalidWitnessCommitment, str)
 	}
 	witnessNonce := coinbaseWitness[0]

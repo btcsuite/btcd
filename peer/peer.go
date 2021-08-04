@@ -2241,9 +2241,15 @@ func newPeerBase(origCfg *Config, inbound bool) *Peer {
 		cfg.TrickleInterval = DefaultTrickleInterval
 	}
 
+	encoding := wire.BaseEncoding
+	// we think this gets overwritten downstream. If not:
+	// if cfg.Services&wire.SFNodeWitness > 0 {
+	//	encoding = wire.WitnessEncoding
+	//}
+
 	p := Peer{
 		inbound:         inbound,
-		wireEncoding:    wire.BaseEncoding,
+		wireEncoding:    encoding,
 		knownInventory:  lru.NewCache(maxKnownInventory),
 		stallControl:    make(chan stallControlMsg, 1), // nonblocking sync
 		outputQueue:     make(chan outMsg, outputBufferSize),
