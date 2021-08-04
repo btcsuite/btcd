@@ -1122,12 +1122,17 @@ func handleGetBlock(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 
 	params := s.cfg.ChainParams
 	blockHeader := &blk.MsgBlock().Header
-	blockReply := btcjson.GetBlockVerboseResult{
+	var prevHashString string
+	if blockHeight > 0 {
+		prevHashString = blockHeader.PrevBlock.String()
+	}
+
+	base := btcjson.GetBlockVerboseResultBase{
 		Hash:          c.Hash,
 		Version:       blockHeader.Version,
 		VersionHex:    fmt.Sprintf("%08x", blockHeader.Version),
 		MerkleRoot:    blockHeader.MerkleRoot.String(),
-		PreviousHash:  blockHeader.PrevBlock.String(),
+		PreviousHash:  prevHashString,
 		Nonce:         blockHeader.Nonce,
 		Time:          blockHeader.Timestamp.Unix(),
 		Confirmations: int64(1 + best.Height - blockHeight),
@@ -1138,6 +1143,7 @@ func handleGetBlock(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 		Bits:          strconv.FormatInt(int64(blockHeader.Bits), 16),
 		Difficulty:    getDifficultyRatio(blockHeader.Bits, params),
 		NextHash:      nextHashString,
+		ClaimTrie:     blockHeader.ClaimTrie.String(),
 	}
 
 	if *c.Verbosity == 1 {
@@ -1147,20 +1153,29 @@ func handleGetBlock(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 			txNames[i] = tx.Hash().String()
 		}
 
-		blockReply.Tx = txNames
-	} else {
-		txns := blk.Transactions()
-		rawTxns := make([]btcjson.TxRawResult, len(txns))
-		for i, tx := range txns {
-			rawTxn, err := createTxRawResult(params, tx.MsgTx(),
-				tx.Hash().String(), blockHeader, hash.String(),
-				blockHeight, best.Height)
-			if err != nil {
-				return nil, err
-			}
-			rawTxns[i] = *rawTxn
+		base.TxCount = len(txNames)
+		blockReply := btcjson.GetBlockVerboseResult{
+			GetBlockVerboseResultBase: base,
+			Tx:                        txNames,
 		}
-		blockReply.RawTx = rawTxns
+		return blockReply, nil
+	}
+
+	txns := blk.Transactions()
+	rawTxns := make([]btcjson.TxRawResult, len(txns))
+	for i, tx := range txns {
+		rawTxn, err := createTxRawResult(params, tx.MsgTx(),
+			tx.Hash().String(), blockHeader, hash.String(),
+			blockHeight, best.Height)
+		if err != nil {
+			return nil, err
+		}
+		rawTxns[i] = *rawTxn
+	}
+	base.TxCount = len(rawTxns)
+	blockReply := btcjson.GetBlockVerboseTxResult{
+		GetBlockVerboseResultBase: base,
+		Tx:                        rawTxns,
 	}
 
 	return blockReply, nil

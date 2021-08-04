@@ -25,7 +25,7 @@ type GetBlockHeaderVerboseResult struct {
 	Version       int32   `json:"version"`
 	VersionHex    string  `json:"versionHex"`
 	MerkleRoot    string  `json:"merkleroot"`
-	ClaimTrie     string  `json:"claimtrie"`
+	ClaimTrie     string  `json:"nameclaimroot,omitempty"`
 	Time          int64   `json:"time"`
 	Nonce         uint64  `json:"nonce"`
 	Bits          string  `json:"bits"`
@@ -66,6 +66,27 @@ type GetBlockStatsResult struct {
 	UTXOSizeIncrease   int64   `json:"utxo_size_inc"`
 }
 
+type GetBlockVerboseResultBase struct {
+	Hash          string  `json:"hash"`
+	Confirmations int64   `json:"confirmations"`
+	StrippedSize  int32   `json:"strippedsize"`
+	Size          int32   `json:"size"`
+	Weight        int32   `json:"weight"`
+	Height        int64   `json:"height"`
+	Version       int32   `json:"version"`
+	VersionHex    string  `json:"versionHex"`
+	MerkleRoot    string  `json:"merkleroot"`
+	Time          int64   `json:"time"`
+	Nonce         uint32  `json:"nonce"`
+	Bits          string  `json:"bits"`
+	Difficulty    float64 `json:"difficulty"`
+	PreviousHash  string  `json:"previousblockhash,omitempty"`
+	NextHash      string  `json:"nextblockhash,omitempty"`
+
+	ClaimTrie string `json:"nameclaimroot,omitempty"`
+	TxCount   int    `json:"nTx"` // For backwards compatibility only
+}
+
 // GetBlockVerboseResult models the data from the getblock command when the
 // verbose flag is set to 1.  When the verbose flag is set to 0, getblock returns a
 // hex-encoded string. When the verbose flag is set to 1, getblock returns an object
@@ -73,24 +94,8 @@ type GetBlockStatsResult struct {
 // getblock returns an object whose tx field is an array of raw transactions.
 // Use GetBlockVerboseTxResult to unmarshal data received from passing verbose=2 to getblock.
 type GetBlockVerboseResult struct {
-	Hash          string        `json:"hash"`
-	Confirmations int64         `json:"confirmations"`
-	StrippedSize  int32         `json:"strippedsize"`
-	Size          int32         `json:"size"`
-	Weight        int32         `json:"weight"`
-	Height        int64         `json:"height"`
-	Version       int32         `json:"version"`
-	VersionHex    string        `json:"versionHex"`
-	MerkleRoot    string        `json:"merkleroot"`
-	ClaimTrie     string        `json:"claimTrie"`
-	Tx            []string      `json:"tx,omitempty"`
-	RawTx         []TxRawResult `json:"rawtx,omitempty"` // Note: this field is always empty when verbose != 2.
-	Time          int64         `json:"time"`
-	Nonce         uint32        `json:"nonce"`
-	Bits          string        `json:"bits"`
-	Difficulty    float64       `json:"difficulty"`
-	PreviousHash  string        `json:"previousblockhash"`
-	NextHash      string        `json:"nextblockhash,omitempty"`
+	GetBlockVerboseResultBase
+	Tx []string `json:"tx"`
 }
 
 // GetBlockVerboseTxResult models the data from the getblock command when the
@@ -100,23 +105,8 @@ type GetBlockVerboseResult struct {
 // getblock returns an object whose tx field is an array of raw transactions.
 // Use GetBlockVerboseResult to unmarshal data received from passing verbose=1 to getblock.
 type GetBlockVerboseTxResult struct {
-	Hash          string        `json:"hash"`
-	Confirmations int64         `json:"confirmations"`
-	StrippedSize  int32         `json:"strippedsize"`
-	Size          int32         `json:"size"`
-	Weight        int32         `json:"weight"`
-	Height        int64         `json:"height"`
-	Version       int32         `json:"version"`
-	VersionHex    string        `json:"versionHex"`
-	MerkleRoot    string        `json:"merkleroot"`
-	Tx            []TxRawResult `json:"tx,omitempty"`
-	RawTx         []TxRawResult `json:"rawtx,omitempty"` // Deprecated: removed in Bitcoin Core
-	Time          int64         `json:"time"`
-	Nonce         uint32        `json:"nonce"`
-	Bits          string        `json:"bits"`
-	Difficulty    float64       `json:"difficulty"`
-	PreviousHash  string        `json:"previousblockhash"`
-	NextHash      string        `json:"nextblockhash,omitempty"`
+	GetBlockVerboseResultBase
+	Tx []TxRawResult `json:"tx"`
 }
 
 // GetChainTxStatsResult models the data from the getchaintxstats command.

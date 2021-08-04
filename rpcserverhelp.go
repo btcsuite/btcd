@@ -249,7 +249,7 @@ var helpDescsEnUS = map[string]string{
 	"getblockverboseresult-merkleroot":        "Root hash of the merkle tree",
 	"getblockverboseresult-nameclaimroot":     "Root hash of the claim trie",
 	"getblockverboseresult-tx":                "The transaction hashes (only when verbosity=1)",
-	"getblockverboseresult-rawtx":             "The transactions as JSON objects (only when verbosity=2)",
+	"getblockverboseresult-nTx":               "The number of transactions (aka, count of TX)",
 	"getblockverboseresult-time":              "The block time in seconds since 1 Jan 1970 GMT",
 	"getblockverboseresult-nonce":             "The block nonce",
 	"getblockverboseresult-bits":              "The bits which represent the block difficulty",
