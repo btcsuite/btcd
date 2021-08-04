@@ -1748,23 +1748,24 @@ func (state *gbtWorkState) blockTemplateResult(useCoinbaseValue bool, submitOld 
 	targetDifficulty := fmt.Sprintf("%064x", blockchain.CompactToBig(header.Bits))
 	templateID := encodeTemplateID(state.prevHash, state.lastGenerated)
 	reply := btcjson.GetBlockTemplateResult{
-		Bits:         strconv.FormatInt(int64(header.Bits), 16),
-		CurTime:      header.Timestamp.Unix(),
-		Height:       int64(template.Height),
-		PreviousHash: header.PrevBlock.String(),
-		WeightLimit:  blockchain.MaxBlockWeight,
-		SigOpLimit:   blockchain.MaxBlockSigOpsCost,
-		SizeLimit:    wire.MaxBlockPayload,
-		Transactions: transactions,
-		Version:      header.Version,
-		LongPollID:   templateID,
-		SubmitOld:    submitOld,
-		Target:       targetDifficulty,
-		MinTime:      state.minTimestamp.Unix(),
-		MaxTime:      maxTime.Unix(),
-		Mutable:      gbtMutableFields,
-		NonceRange:   gbtNonceRange,
-		Capabilities: gbtCapabilities,
+		Bits:          strconv.FormatInt(int64(header.Bits), 16),
+		CurTime:       header.Timestamp.Unix(),
+		Height:        int64(template.Height),
+		PreviousHash:  header.PrevBlock.String(),
+		WeightLimit:   blockchain.MaxBlockWeight,
+		SigOpLimit:    blockchain.MaxBlockSigOpsCost,
+		SizeLimit:     wire.MaxBlockPayload,
+		Transactions:  transactions,
+		Version:       header.Version,
+		LongPollID:    templateID,
+		SubmitOld:     submitOld,
+		Target:        targetDifficulty,
+		MinTime:       state.minTimestamp.Unix(),
+		MaxTime:       maxTime.Unix(),
+		Mutable:       gbtMutableFields,
+		NonceRange:    gbtNonceRange,
+		Capabilities:  gbtCapabilities,
+		ClaimTrieHash: header.ClaimTrie.String(),
 	}
 	// If the generated block template includes transactions with witness
 	// data, then include the witness commitment in the GBT result.
@@ -4663,5 +4664,8 @@ func (s *rpcServer) handleBlockchainNotification(notification *blockchain.Notifi
 
 func init() {
 	rpcHandlers = rpcHandlersBeforeInit
+	for key := range claimtrieHandlers {
+		rpcHandlers[key] = claimtrieHandlers[key]
+	}
 	rand.Seed(time.Now().UnixNano())
 }
