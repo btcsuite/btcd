@@ -18,7 +18,7 @@ import (
 const (
 	// defaultMaxFeeRate is the default maximum fee rate in sat/KB enforced
 	// by bitcoind v0.19.0 or after for transaction broadcast.
-	defaultMaxFeeRate = btcutil.SatoshiPerBitcoin / 10
+	defaultMaxFeeRate = btcutil.SatoshiPerBitcoin / 2
 )
 
 // SigHashType enumerates the available signature hashing types that the
