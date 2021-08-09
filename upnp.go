@@ -39,7 +39,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"os"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -126,8 +126,9 @@ func Discover() (nat NAT, err error) {
 		if err != nil {
 			return
 		}
+		var serviceIP string = getServiceIP(serviceURL)
 		var ourIP string
-		ourIP, err = getOurIP()
+		ourIP, err = getOurIP(serviceIP)
 		if err != nil {
 			return
 		}
@@ -212,13 +213,22 @@ func getChildService(d *device, serviceType string) *service {
 	return nil
 }
 
-// getOurIP returns a best guess at what the local IP is.
-func getOurIP() (ip string, err error) {
-	hostname, err := os.Hostname()
-	if err != nil {
-		return
+func getServiceIP(serviceURL string) (routerIP string) {
+	url, _ := url.Parse(serviceURL)
+	return url.Hostname()
+}
+
+// getOurIP returns the local IP that is on the same subnet as the serviceIP.
+func getOurIP(serviceIP string) (ip string, err error) {
+	_, serviceNet, _ := net.ParseCIDR(serviceIP + "/24")
+	addrs, err := net.InterfaceAddrs()
+	for _, addr := range addrs {
+		ip, _, _ := net.ParseCIDR(addr.String())
+		if serviceNet.Contains(ip) {
+			return ip.String(), nil
+		}
 	}
-	return net.LookupCNAME(hostname)
+	return
 }
 
 // getServiceURL parses the xml description at the given root url to find the
