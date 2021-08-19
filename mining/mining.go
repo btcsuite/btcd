@@ -843,6 +843,11 @@ mempoolLoop:
 	// chain with no issues.
 	block := btcutil.NewBlock(&msgBlock)
 	block.SetHeight(nextBlockHeight)
+
+	if err := g.chain.SetClaimtrieHeader(block, blockUtxos); err != nil {
+		return nil, err
+	}
+
 	if err := g.chain.CheckConnectBlockTemplate(block); err != nil {
 		return nil, err
 	}
