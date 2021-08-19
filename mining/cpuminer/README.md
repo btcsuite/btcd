@@ -1,9 +1,9 @@
 cpuminer
 ========
 
-[![Build Status](https://github.com/btcsuite/btcd/workflows/Build%20and%20Test/badge.svg)](https://github.com/btcsuite/btcd/actions)
+[![Build Status](https://github.com/lbryio/lbcd/workflows/Build%20and%20Test/badge.svg)](https://github.com/lbryio/lbcd/actions)
 [![ISC License](http://img.shields.io/badge/license-ISC-blue.svg)](http://copyfree.org)
-[![GoDoc](https://img.shields.io/badge/godoc-reference-blue.svg)](https://pkg.go.dev/github.com/btcsuite/btcd/mining/cpuminer)
+[![GoDoc](https://img.shields.io/badge/godoc-reference-blue.svg)](https://pkg.go.dev/github.com/lbryio/lbcd/mining/cpuminer)
 =======
 
 ## Overview
@@ -16,7 +16,7 @@ now.
 ## Installation and Updating
 
 ```bash
-$ go get -u github.com/btcsuite/btcd/mining/cpuminer
+$ go get -u github.com/lbryio/lbcd/mining/cpuminer
 ```
 
 ## License

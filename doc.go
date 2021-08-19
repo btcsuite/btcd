@@ -71,8 +71,8 @@ Application Options:
                               fee to the given amount in thousands of bytes per
                               minute (default: 15)
       --listen=               Add an interface/port to listen for connections
-                              (default all interfaces port: 8333, testnet:
-                              18333, signet: 38333)
+                              (default all interfaces port: 9246, testnet:
+                              19246, regtest: 29246, signet: 39246)
       --logdir=               Directory to log output
       --maxorphantx=          Max number of orphan transactions to keep in
                               memory (default: 100)
@@ -123,7 +123,7 @@ Application Options:
       --rpclimitpass=         Password for limited RPC connections
       --rpclimituser=         Username for limited RPC connections
       --rpclisten=            Add an interface/port to listen for RPC
-                              connections (default port: 8334, testnet: 18334)
+                              connections (default port: 9245, testnet: 19245, regtest: 29245)
       --rpcmaxclients=        Max number of RPC clients for standard
                               connections (default: 10)
       --rpcmaxconcurrentreqs= Max number of concurrent RPC requests that may be

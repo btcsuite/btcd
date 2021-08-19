@@ -1,15 +1,10 @@
 peer
 ====
 
-[![Build Status](https://github.com/btcsuite/btcd/workflows/Build%20and%20Test/badge.svg)](https://github.com/btcsuite/btcd/actions)
 [![ISC License](http://img.shields.io/badge/license-ISC-blue.svg)](http://copyfree.org)
-[![GoDoc](https://img.shields.io/badge/godoc-reference-blue.svg)](https://pkg.go.dev/github.com/btcsuite/btcd/peer)
 
 Package peer provides a common base for creating and managing bitcoin network
 peers.
-
-This package has intentionally been designed so it can be used as a standalone
-package for any projects needing a full featured bitcoin peer base to build on.
 
 ## Overview
 
@@ -54,20 +49,4 @@ A quick overview of the major features peer provides are as follows:
      filtering and address randomization
  - Ability to wait for shutdown/disconnect
  - Comprehensive test coverage
-
-## Installation and Updating
-
-```bash
-$ go get -u github.com/btcsuite/btcd/peer
-```
-
-## Examples
-
-* [New Outbound Peer Example](https://pkg.go.dev/github.com/btcsuite/btcd/peer#example-package--NewOutboundPeer)  
-  Demonstrates the basic process for initializing and creating an outbound peer.
-  Peers negotiate by exchanging version and verack messages.  For demonstration,
-  a simple handler for the version message is attached to the peer.
-
-## License
-
-Package peer is licensed under the [copyfree](http://copyfree.org) ISC License.
+ 

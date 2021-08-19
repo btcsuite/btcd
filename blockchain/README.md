@@ -1,30 +1,9 @@
 blockchain
 ==========
 
-[![Build Status](https://github.com/btcsuite/btcd/workflows/Build%20and%20Test/badge.svg)](https://github.com/btcsuite/btcd/actions)
 [![ISC License](http://img.shields.io/badge/license-ISC-blue.svg)](http://copyfree.org)
-[![GoDoc](https://img.shields.io/badge/godoc-reference-blue.svg)](https://pkg.go.dev/github.com/btcsuite/btcd/blockchain)
 
-Package blockchain implements bitcoin block handling and chain selection rules.
-The test coverage is currently only around 60%, but will be increasing over
-time. See `test_coverage.txt` for the gocov coverage report.  Alternatively, if
-you are running a POSIX OS, you can run the `cov_report.sh` script for a
-real-time report.  Package blockchain is licensed under the liberal ISC license.
-
-There is an associated blog post about the release of this package
-[here](https://blog.conformal.com/btcchain-the-bitcoin-chain-package-from-bctd/).
-
-This package has intentionally been designed so it can be used as a standalone
-package for any projects needing to handle processing of blocks into the bitcoin
-block chain.
-
-## Installation and Updating
-
-```bash
-$ go get -u github.com/btcsuite/btcd/blockchain
-```
-
-## Bitcoin Chain Processing Overview
+### Bitcoin Chain Processing Overview
 
 Before a block is allowed into the block chain, it must go through an intensive
 series of validation rules.  The following list serves as a general outline of
@@ -58,46 +37,3 @@ is by no means exhaustive:
  - Run the transaction scripts to verify the spender is allowed to spend the
    coins
  - Insert the block into the block database
-
-## Examples
-
-* [ProcessBlock Example](https://pkg.go.dev/github.com/btcsuite/btcd/blockchain#example-BlockChain-ProcessBlock)  
-  Demonstrates how to create a new chain instance and use ProcessBlock to
-  attempt to add a block to the chain.  This example intentionally
-  attempts to insert a duplicate genesis block to illustrate how an invalid
-  block is handled.
-
-* [CompactToBig Example](https://pkg.go.dev/github.com/btcsuite/btcd/blockchain#example-CompactToBig)  
-  Demonstrates how to convert the compact "bits" in a block header which
-  represent the target difficulty to a big integer and display it using the
-  typical hex notation.
-
-* [BigToCompact Example](https://pkg.go.dev/github.com/btcsuite/btcd/blockchain#example-BigToCompact)  
-  Demonstrates how to convert a target difficulty into the
-  compact "bits" in a block header which represent that target difficulty.
-
-## GPG Verification Key
-
-All official release tags are signed by Conformal so users can ensure the code
-has not been tampered with and is coming from the btcsuite developers.  To
-verify the signature perform the following:
-
-- Download the public key from the Conformal website at
-  https://opensource.conformal.com/GIT-GPG-KEY-conformal.txt
-
-- Import the public key into your GPG keyring:
-  ```bash
-  gpg --import GIT-GPG-KEY-conformal.txt
-  ```
-
-- Verify the release tag with the following command where `TAG_NAME` is a
-  placeholder for the specific tag:
-  ```bash
-  git tag -v TAG_NAME
-  ```
-
-## License
-
-
-Package blockchain is licensed under the [copyfree](http://copyfree.org) ISC
-License.

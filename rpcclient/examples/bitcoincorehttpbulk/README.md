@@ -8,7 +8,7 @@ This example shows how to use the rpclient package to connect to a Bitcoin Core 
 The first step is to use `go get` to download and install the rpcclient package:
 
 ```bash
-$ go get github.com/btcsuite/btcd/rpcclient
+$ go get github.com/lbryio/lbcd/rpcclient
 ```
 
 Next, modify the `main.go` source to specify the correct RPC username and
@@ -22,7 +22,7 @@ password for the RPC server:
 Finally, navigate to the example's directory and run it with:
 
 ```bash
-$ cd $GOPATH/src/github.com/btcsuite/btcd/rpcclient/examples/bitcoincorehttp
+$ cd $GOPATH/src/github.com/lbryio/lbcd/rpcclient/examples/bitcoincorehttp
 $ go run *.go
 ```
 

@@ -1,9 +1,7 @@
 mempool
 =======
 
-[![Build Status](https://github.com/btcsuite/btcd/workflows/Build%20and%20Test/badge.svg)](https://github.com/btcsuite/btcd/actions)
 [![ISC License](http://img.shields.io/badge/license-ISC-blue.svg)](http://copyfree.org)
-[![GoDoc](https://img.shields.io/badge/godoc-reference-blue.svg)](https://pkg.go.dev/github.com/btcsuite/btcd/mempool)
 
 Package mempool provides a policy-enforced pool of unmined bitcoin transactions.
 
@@ -32,11 +30,6 @@ accepted which gives the caller a high level of flexibility in how they want to
 proceed.  Typically, this will involve things such as relaying the transactions
 to other peers on the network and notifying the mining process that new
 transactions are available.
-
-This package has intentionally been designed so it can be used as a standalone
-package for any projects needing the ability create an in-memory pool of bitcoin
-transactions that are not only valid by consensus rules, but also adhere to a
-configurable policy.
 
 ## Feature Overview
 
@@ -70,14 +63,3 @@ be an exhaustive list.
   - The starting priority for the transaction
 - Manual control of transaction removal
   - Recursive removal of all dependent transactions
-
-## Installation and Updating
-
-```bash
-$ go get -u github.com/btcsuite/btcd/mempool
-```
-
-## License
-
-Package mempool is licensed under the [copyfree](http://copyfree.org) ISC
-License.
