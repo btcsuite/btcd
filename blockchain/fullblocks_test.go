@@ -139,7 +139,7 @@ func TestFullBlocks(t *testing.T) {
 
 	// Create a new database and chain instance to run tests against.
 	chain, teardownFunc, err := chainSetup("fullblocktest",
-		&chaincfg.RegressionNetParams)
+		fullblocktests.FbRegressionNetParams)
 	if err != nil {
 		t.Errorf("Failed to setup chain instance: %v", err)
 		return

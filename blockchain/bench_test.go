@@ -6,14 +6,12 @@ package blockchain
 
 import (
 	"testing"
-
-	"github.com/btcsuite/btcutil"
 )
 
 // BenchmarkIsCoinBase performs a simple benchmark against the IsCoinBase
 // function.
 func BenchmarkIsCoinBase(b *testing.B) {
-	tx, _ := btcutil.NewBlock(&Block100000).Tx(1)
+	tx, _ := GetBlock100000().Tx(1)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		IsCoinBase(tx)
@@ -23,9 +21,9 @@ func BenchmarkIsCoinBase(b *testing.B) {
 // BenchmarkIsCoinBaseTx performs a simple benchmark against the IsCoinBaseTx
 // function.
 func BenchmarkIsCoinBaseTx(b *testing.B) {
-	tx := Block100000.Transactions[1]
+	tx, _ := GetBlock100000().Tx(1)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		IsCoinBaseTx(tx)
+		IsCoinBaseTx(tx.MsgTx())
 	}
 }

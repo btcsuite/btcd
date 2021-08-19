@@ -256,11 +256,11 @@ func (h *Harness) SetUp(createTestChain bool, numMatureOutputs uint32) error {
 		return err
 	}
 
+	numToGenerate := uint32(0)
 	// Create a test chain with the desired number of mature coinbase
 	// outputs.
 	if createTestChain && numMatureOutputs != 0 {
-		numToGenerate := (uint32(h.ActiveNet.CoinbaseMaturity) +
-			numMatureOutputs)
+		numToGenerate = uint32(h.ActiveNet.CoinbaseMaturity) + numMatureOutputs
 		_, err := h.Client.Generate(numToGenerate)
 		if err != nil {
 			return err
@@ -272,6 +272,9 @@ func (h *Harness) SetUp(createTestChain bool, numMatureOutputs uint32) error {
 	_, height, err := h.Client.GetBestBlock()
 	if err != nil {
 		return err
+	}
+	if numToGenerate > 0 && uint32(height) < numToGenerate {
+		return fmt.Errorf("failed to generate this many blocks: %d", numToGenerate)
 	}
 	ticker := time.NewTicker(time.Millisecond * 100)
 	for range ticker.C {

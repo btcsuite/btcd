@@ -176,6 +176,8 @@ func checkPkScriptStandard(pkScript []byte, scriptClass txscript.ScriptClass) er
 // GetDustThreshold calculates the dust limit for a *wire.TxOut by taking the
 // size of a typical spending transaction and multiplying it by 3 to account
 // for the minimum dust relay fee of 3000sat/kvb.
+const dustCap = math.MaxInt64 / 1001
+
 func GetDustThreshold(txOut *wire.TxOut) int64 {
 	// The total serialized size consists of the output and the associated
 	// input script to redeem it.  Since there is no input script
@@ -273,6 +275,9 @@ func IsDust(txOut *wire.TxOut, minRelayTxFee btcutil.Amount) bool {
 	//
 	// The following is equivalent to (value/totalSize) * (1/3) * 1000
 	// without needing to do floating point math.
+	if txOut.Value > dustCap {
+		return false
+	}
 	return txOut.Value*1000/GetDustThreshold(txOut) < int64(minRelayTxFee)
 }
 

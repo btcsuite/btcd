@@ -1457,7 +1457,7 @@ func TestAncestorsDescendants(t *testing.T) {
 func TestRBF(t *testing.T) {
 	t.Parallel()
 
-	const defaultFee = btcutil.SatoshiPerBitcoin
+	const defaultFee = btcutil.SatoshiPerBitcoin / 50
 
 	testCases := []struct {
 		name  string

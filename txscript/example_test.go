@@ -25,7 +25,7 @@ func ExamplePayToAddrScript() {
 	// which is useful to ensure the accuracy of the address and determine
 	// the address type.  It is also required for the upcoming call to
 	// PayToAddrScript.
-	addressStr := "12gpXQVcCL2qhTNQgyLVdCFG2Qs2px98nV"
+	addressStr := "bHW58d37s1hBjj3wPBkn5zpCX3F8ZW3uWf"
 	address, err := btcutil.DecodeAddress(addressStr, &chaincfg.MainNetParams)
 	if err != nil {
 		fmt.Println(err)
@@ -48,8 +48,8 @@ func ExamplePayToAddrScript() {
 	fmt.Println("Script Disassembly:", disasm)
 
 	// Output:
-	// Script Hex: 76a914128004ff2fcaf13b2b91eb654b1dc2b674f7ec6188ac
-	// Script Disassembly: OP_DUP OP_HASH160 128004ff2fcaf13b2b91eb654b1dc2b674f7ec61 OP_EQUALVERIFY OP_CHECKSIG
+	// Script Hex: 76a914345991dbf57bfb014b87006acdfafbfc5fe8292f88ac
+	// Script Disassembly: OP_DUP OP_HASH160 345991dbf57bfb014b87006acdfafbfc5fe8292f OP_EQUALVERIFY OP_CHECKSIG
 }
 
 // This example demonstrates extracting information from a standard public key
@@ -76,7 +76,7 @@ func ExampleExtractPkScriptAddrs() {
 
 	// Output:
 	// Script Class: pubkeyhash
-	// Addresses: [12gpXQVcCL2qhTNQgyLVdCFG2Qs2px98nV]
+	// Addresses: [bER6Ddq6YfRKDJDmmdeaqrP8XHmDJcYSJQ]
 	// Required Signatures: 1
 }
 

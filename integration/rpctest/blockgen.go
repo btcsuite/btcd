@@ -44,7 +44,7 @@ func solveBlock(header *wire.BlockHeader, targetDifficulty *big.Int) bool {
 				return
 			default:
 				hdr.Nonce = i
-				hash := hdr.BlockHash()
+				hash := hdr.BlockPoWHash()
 				if blockchain.HashToBig(&hash).Cmp(targetDifficulty) <= 0 {
 					select {
 					case results <- sbResult{true, i}:
@@ -205,6 +205,7 @@ func CreateBlock(prevBlock *btcutil.Block, inclusionTxs []*btcutil.Tx,
 		MerkleRoot: *merkles[len(merkles)-1],
 		Timestamp:  ts,
 		Bits:       net.PowLimitBits,
+		ClaimTrie:  chainhash.Hash{1}, // EmptyTrieHash
 	}
 	for _, tx := range blockTxns {
 		if err := block.AddTransaction(tx.MsgTx()); err != nil {

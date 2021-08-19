@@ -54,6 +54,7 @@ var (
 			Version:    1,
 			PrevBlock:  *newHashFromStr("0000000000000000000000000000000000000000000000000000000000000000"),
 			MerkleRoot: *newHashFromStr("4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b"),
+			ClaimTrie:  chainhash.Hash{1},        // EmptyTrieHash
 			Timestamp:  time.Unix(1296688602, 0), // 2011-02-02 23:16:42 +0000 UTC
 			Bits:       0x207fffff,               // 545259519 [7fffff0000000000000000000000000000000000000000000000000000000000]
 			Nonce:      2,
@@ -83,23 +84,25 @@ var (
 			LockTime: 0,
 		}},
 	}
+
+	regTestGenesisBlockHash = regTestGenesisBlock.BlockHash()
 )
 
-// regressionNetParams defines the network parameters for the regression test
+// FbRegressionNetParams defines the network parameters for the regression test
 // network.
 //
 // NOTE: The test generator intentionally does not use the existing definitions
 // in the chaincfg package since the intent is to be able to generate known
 // good tests which exercise that code.  Using the chaincfg parameters would
 // allow them to change out from under the tests potentially invalidating them.
-var regressionNetParams = &chaincfg.Params{
+var FbRegressionNetParams = &chaincfg.Params{
 	Name:        "regtest",
 	Net:         wire.TestNet,
 	DefaultPort: "18444",
 
 	// Chain parameters
 	GenesisBlock:             &regTestGenesisBlock,
-	GenesisHash:              newHashFromStr("5bec7567af40504e0994db3b573c186fffcc4edefe096ff2e58d00523bd7e8a6"),
+	GenesisHash:              &regTestGenesisBlockHash,
 	PowLimit:                 regressionPowLimit,
 	PowLimitBits:             0x207fffff,
 	CoinbaseMaturity:         100,
@@ -113,6 +116,7 @@ var regressionNetParams = &chaincfg.Params{
 	ReduceMinDifficulty:      true,
 	MinDiffReductionTime:     time.Minute * 20, // TargetTimePerBlock * 2
 	GenerateSupported:        true,
+	MinerConfirmationWindow:  1,
 
 	// Checkpoints ordered from oldest to newest.
 	Checkpoints: nil,

@@ -245,10 +245,11 @@ func (b *BlockChain) calcNextRequiredDifficulty(lastNode *blockNode, newBlockTim
 
 	// Get the block node at the previous retarget (targetTimespan days
 	// worth of blocks).
-	firstNode := lastNode.RelativeAncestor(b.blocksPerRetarget)
-	if lastNode.height == 0 {
-		firstNode = lastNode
+	blocksBack := b.blocksPerRetarget
+	if blocksBack > lastNode.height {
+		blocksBack = lastNode.height
 	}
+	firstNode := lastNode.RelativeAncestor(blocksBack)
 	if firstNode == nil {
 		return 0, AssertError("unable to obtain previous retarget block")
 	}

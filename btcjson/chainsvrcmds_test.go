@@ -388,7 +388,7 @@ func TestChainSvrCmds(t *testing.T) {
 				return btcjson.NewGetBlockFilterCmd("0000afaf", nil)
 			},
 			marshalled:   `{"jsonrpc":"1.0","method":"getblockfilter","params":["0000afaf"],"id":1}`,
-			unmarshalled: &btcjson.GetBlockFilterCmd{"0000afaf", nil},
+			unmarshalled: &btcjson.GetBlockFilterCmd{BlockHash: "0000afaf", FilterType: nil},
 		},
 		{
 			name: "getblockfilter optional filtertype",
@@ -399,7 +399,7 @@ func TestChainSvrCmds(t *testing.T) {
 				return btcjson.NewGetBlockFilterCmd("0000afaf", btcjson.NewFilterTypeName(btcjson.FilterTypeBasic))
 			},
 			marshalled:   `{"jsonrpc":"1.0","method":"getblockfilter","params":["0000afaf","basic"],"id":1}`,
-			unmarshalled: &btcjson.GetBlockFilterCmd{"0000afaf", btcjson.NewFilterTypeName(btcjson.FilterTypeBasic)},
+			unmarshalled: &btcjson.GetBlockFilterCmd{BlockHash: "0000afaf", FilterType: btcjson.NewFilterTypeName(btcjson.FilterTypeBasic)},
 		},
 		{
 			name: "getblockhash",

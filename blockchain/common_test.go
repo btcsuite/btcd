@@ -5,6 +5,7 @@
 package blockchain
 
 import (
+	"bytes"
 	"compress/bzip2"
 	"encoding/binary"
 	"fmt"
@@ -63,13 +64,13 @@ func isSupportedDbType(dbType string) bool {
 func loadBlocks(filename string) (blocks []*btcutil.Block, err error) {
 	filename = filepath.Join("testdata/", filename)
 
-	var network = wire.MainNet
+	var network = 0xd9b4bef9 // bitcoin's network ID
 	var dr io.Reader
 	var fi io.ReadCloser
 
 	fi, err = os.Open(filename)
 	if err != nil {
-		return
+		return blocks, err
 	}
 
 	if strings.HasSuffix(filename, ".bz2") {
@@ -95,7 +96,7 @@ func loadBlocks(filename string) (blocks []*btcutil.Block, err error) {
 			break
 		}
 		if rintbuf != uint32(network) {
-			break
+			continue
 		}
 		err = binary.Read(dr, binary.LittleEndian, &rintbuf)
 		blocklen := rintbuf
@@ -105,14 +106,20 @@ func loadBlocks(filename string) (blocks []*btcutil.Block, err error) {
 		// read block
 		dr.Read(rbytes)
 
+		// inject claimtrie:
+		tail := make([]byte, len(rbytes)-68)
+		copy(tail, rbytes[68:])
+		rbytes = append(rbytes[:68], bytes.Repeat([]byte{23}, chainhash.HashSize)...)
+		rbytes = append(rbytes, tail...)
+
 		block, err = btcutil.NewBlockFromBytes(rbytes)
 		if err != nil {
-			return
+			return blocks, err
 		}
 		blocks = append(blocks, block)
 	}
 
-	return
+	return blocks, err
 }
 
 // chainSetup is used to create a new db and chain instance with the genesis

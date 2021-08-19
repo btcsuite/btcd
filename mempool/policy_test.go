@@ -48,7 +48,7 @@ func TestCalcMinRequiredTxRelayFee(t *testing.T) {
 		{
 			"max standard tx size with max satoshi relay fee",
 			maxStandardTxWeight / 4,
-			btcutil.MaxSatoshi,
+			btcutil.MaxSatoshi / 100, // overflow on purpose
 			btcutil.MaxSatoshi,
 		},
 		{
@@ -252,11 +252,11 @@ func TestDust(t *testing.T) {
 			false,
 		},
 		{
-			// Maximum int64 value causes overflow.
+			// Maximum int64 value causes overflow if we're not careful
 			"maximum int64 value",
 			wire.TxOut{Value: 1<<63 - 1, PkScript: pkScript},
 			1<<63 - 1,
-			true,
+			false,
 		},
 		{
 			// Unspendable pkScript due to an invalid public key

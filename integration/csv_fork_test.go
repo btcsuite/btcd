@@ -3,6 +3,7 @@
 // license that can be found in the LICENSE file.
 
 // This file is ignored during the regular tests due to the following build tag.
+//go:build rpctest
 // +build rpctest
 
 package integration
@@ -113,13 +114,13 @@ func TestBIP0113Activation(t *testing.T) {
 	if err != nil {
 		t.Fatal("unable to create primary harness: ", err)
 	}
-	if err := r.SetUp(true, 1); err != nil {
+	if err := r.SetUp(true, 10); err != nil {
 		t.Fatalf("unable to setup test chain: %v", err)
 	}
 	defer r.TearDown()
 
 	// Create a fresh output for usage within the test below.
-	const outputValue = btcutil.SatoshiPerBitcoin
+	const outputValue = btcutil.SatoshiPerBitcoin / 50
 	outputKey, testOutput, testPkScript, err := makeTestOutput(r, t,
 		outputValue)
 	if err != nil {
@@ -189,7 +190,7 @@ func TestBIP0113Activation(t *testing.T) {
 	// to create a single mature output, then an additional block to create
 	// a new output, and then mined a single block above to include our
 	// transaction.
-	assertChainHeight(r, t, 103)
+	assertChainHeight(r, t, 112)
 
 	// Next, mine enough blocks to ensure that the soft-fork becomes
 	// activated. Assert that the block version of the second-to-last block
@@ -205,7 +206,7 @@ func TestBIP0113Activation(t *testing.T) {
 		t.Fatalf("unable to generate blocks: %v", err)
 	}
 
-	assertChainHeight(r, t, 299)
+	assertChainHeight(r, t, 308)
 	assertSoftForkStatus(r, t, csvKey, blockchain.ThresholdActive)
 
 	// The timeLockDeltas slice represents a series of deviations from the
@@ -426,7 +427,7 @@ func TestBIP0068AndBIP0112Activation(t *testing.T) {
 	}
 
 	const (
-		outputAmt         = btcutil.SatoshiPerBitcoin
+		outputAmt         = btcutil.SatoshiPerBitcoin / 50
 		relativeBlockLock = 10
 	)
 

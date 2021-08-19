@@ -86,15 +86,6 @@ var genesisBlock = wire.MsgBlock{
 	Transactions: []*wire.MsgTx{&genesisCoinbaseTx},
 }
 
-// regTestGenesisHash is the hash of the first block in the block chain for the
-// regression test network (genesis block).
-var regTestGenesisHash = chainhash.Hash([chainhash.HashSize]byte{ // Make go vet happy.
-	0x56, 0x75, 0x68, 0x69, 0x76, 0x67, 0x4f, 0x50,
-	0xa0, 0xa1, 0x95, 0x3d, 0x17, 0x2e, 0x9e, 0xcf,
-	0x4a, 0x4a, 0x62, 0x1d, 0xc9, 0xa4, 0xc3, 0x79,
-	0x5d, 0xec, 0xd4, 0x99, 0x12, 0xcf, 0x3f, 0x6e,
-})
-
 // regTestGenesisMerkleRoot is the hash of the first transaction in the genesis
 // block for the regression test network.  It is the same as the merkle root for
 // the main network.
@@ -115,14 +106,9 @@ var regTestGenesisBlock = wire.MsgBlock{
 	Transactions: []*wire.MsgTx{&genesisCoinbaseTx},
 }
 
-// testNet3GenesisHash is the hash of the first block in the block chain for the
-// test network (version 3).
-var testNet3GenesisHash = chainhash.Hash([chainhash.HashSize]byte{ // Make go vet happy.
-	0x43, 0x49, 0x7f, 0xd7, 0xf8, 0x26, 0x95, 0x71,
-	0x08, 0xf4, 0xa3, 0x0f, 0xd9, 0xce, 0xc3, 0xae,
-	0xba, 0x79, 0x97, 0x20, 0x84, 0xe9, 0x0e, 0xad,
-	0x01, 0xea, 0x33, 0x09, 0x00, 0x00, 0x00, 0x00,
-})
+// regTestGenesisHash is the hash of the first block in the block chain for the
+// regression test network (genesis block).
+var regTestGenesisHash = regTestGenesisBlock.BlockHash()
 
 // testNet3GenesisMerkleRoot is the hash of the first transaction in the genesis
 // block for the test network (version 3).  It is the same as the merkle root
@@ -144,14 +130,9 @@ var testNet3GenesisBlock = wire.MsgBlock{
 	Transactions: []*wire.MsgTx{&genesisCoinbaseTx},
 }
 
-// simNetGenesisHash is the hash of the first block in the block chain for the
-// simulation test network.
-var simNetGenesisHash = chainhash.Hash([chainhash.HashSize]byte{ // Make go vet happy.
-	0xf6, 0x7a, 0xd7, 0x69, 0x5d, 0x9b, 0x66, 0x2a,
-	0x72, 0xff, 0x3d, 0x8e, 0xdb, 0xbb, 0x2d, 0xe0,
-	0xbf, 0xa6, 0x7b, 0x13, 0x97, 0x4b, 0xb9, 0x91,
-	0x0d, 0x11, 0x6d, 0x5c, 0xbd, 0x86, 0x3e, 0x68,
-})
+// testNet3GenesisHash is the hash of the first block in the block chain for the
+// test network (version 3).
+var testNet3GenesisHash = testNet3GenesisBlock.BlockHash()
 
 // simNetGenesisMerkleRoot is the hash of the first transaction in the genesis
 // block for the simulation test network.  It is the same as the merkle root for
@@ -172,14 +153,9 @@ var simNetGenesisBlock = wire.MsgBlock{
 	Transactions: []*wire.MsgTx{&genesisCoinbaseTx},
 }
 
-// sigNetGenesisHash is the hash of the first block in the block chain for the
-// signet test network.
-var sigNetGenesisHash = chainhash.Hash{
-	0xf6, 0x1e, 0xee, 0x3b, 0x63, 0xa3, 0x80, 0xa4,
-	0x77, 0xa0, 0x63, 0xaf, 0x32, 0xb2, 0xbb, 0xc9,
-	0x7c, 0x9f, 0xf9, 0xf0, 0x1f, 0x2c, 0x42, 0x25,
-	0xe9, 0x73, 0x98, 0x81, 0x08, 0x00, 0x00, 0x00,
-}
+// simNetGenesisHash is the hash of the first block in the block chain for the
+// simulation test network.
+var simNetGenesisHash = simNetGenesisBlock.BlockHash()
 
 // sigNetGenesisMerkleRoot is the hash of the first transaction in the genesis
 // block for the signet test network. It is the same as the merkle root for
@@ -199,3 +175,7 @@ var sigNetGenesisBlock = wire.MsgBlock{
 	},
 	Transactions: []*wire.MsgTx{&genesisCoinbaseTx},
 }
+
+// sigNetGenesisHash is the hash of the first block in the block chain for the
+// signet test network.
+var sigNetGenesisHash = sigNetGenesisBlock.BlockHash()

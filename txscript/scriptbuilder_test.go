@@ -220,18 +220,9 @@ func TestScriptBuilderAddData(t *testing.T) {
 			expected: append([]byte{OP_PUSHDATA2, 0, 1}, bytes.Repeat([]byte{0x49}, 256)...),
 		},
 		{
-			name:     "push data len 520",
+			name:     "push data len 520", // bitcoin has a 520 byte cap, but lbry is 20k
 			data:     bytes.Repeat([]byte{0x49}, 520),
 			expected: append([]byte{OP_PUSHDATA2, 0x08, 0x02}, bytes.Repeat([]byte{0x49}, 520)...),
-		},
-
-		// BIP0062: OP_PUSHDATA4 can never be used, as pushes over 520
-		// bytes are not allowed, and those below can be done using
-		// other operators.
-		{
-			name:     "push data len 521",
-			data:     bytes.Repeat([]byte{0x49}, 521),
-			expected: nil,
 		},
 		{
 			name:     "push data len 32767 (canonical)",
