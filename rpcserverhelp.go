@@ -842,6 +842,7 @@ var rpcResultTypes = map[string][]interface{}{
 	"decodescript":           {(*btcjson.DecodeScriptResult)(nil)},
 	"estimatefee":            {(*float64)(nil)},
 	"generate":               {(*[]string)(nil)},
+	"generatetoaddress":      {(*[]string)(nil)},
 	"getaddednodeinfo":       {(*[]string)(nil), (*[]btcjson.GetAddedNodeInfoResult)(nil)},
 	"getbestblock":           {(*btcjson.GetBestBlockResult)(nil)},
 	"getbestblockhash":       {(*string)(nil)},

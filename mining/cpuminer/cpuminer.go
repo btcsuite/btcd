@@ -274,7 +274,7 @@ func (m *CPUMiner) solveBlock(msgBlock *wire.MsgBlock, blockHeight int32,
 			// increment the number of hashes completed for each
 			// attempt accordingly.
 			header.Nonce = i
-			hash := header.BlockHash()
+			hash := header.BlockPoWHash()
 			hashesCompleted += 2
 
 			// The block is solved when the new block hash is less
@@ -544,7 +544,7 @@ func (m *CPUMiner) NumWorkers() int32 {
 // detecting when it is performing stale work and reacting accordingly by
 // generating a new block template.  When a block is solved, it is submitted.
 // The function returns a list of the hashes of generated blocks.
-func (m *CPUMiner) GenerateNBlocks(n uint32) ([]*chainhash.Hash, error) {
+func (m *CPUMiner) GenerateNBlocks(n uint32, payToAddr btcutil.Address) ([]*chainhash.Hash, error) {
 	m.Lock()
 
 	// Respond with an error if server is already mining.
@@ -590,8 +590,9 @@ func (m *CPUMiner) GenerateNBlocks(n uint32) ([]*chainhash.Hash, error) {
 
 		// Choose a payment address at random.
 		rand.Seed(time.Now().UnixNano())
-		payToAddr := m.cfg.MiningAddrs[rand.Intn(len(m.cfg.MiningAddrs))]
-
+		if payToAddr == nil {
+			payToAddr = m.cfg.MiningAddrs[rand.Intn(len(m.cfg.MiningAddrs))]
+		}
 		// Create a new block template using the available transactions
 		// in the memory pool as a source of transactions to potentially
 		// include in the block.
