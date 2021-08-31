@@ -392,6 +392,17 @@ func (h *Harness) SendOutputs(targetOutputs []*wire.TxOut,
 	return h.wallet.SendOutputs(targetOutputs, feeRate)
 }
 
+// SendOutputs creates, signs, and finally broadcasts a transaction spending
+// the harness' available mature coinbase outputs creating new outputs
+// according to targetOutputs.
+//
+// This function is safe for concurrent access.
+func (h *Harness) SendOutputsSpecifyInputs(targetOutputs []*wire.TxOut, inputs []*wire.TxIn,
+	feeRate btcutil.Amount) (*chainhash.Hash, error) {
+
+	return h.wallet.SendOutputsSpecifyInputs(targetOutputs, inputs, feeRate)
+}
+
 // SendOutputsWithoutChange creates and sends a transaction that pays to the
 // specified outputs while observing the passed fee rate and ignoring a change
 // output. The passed fee rate should be expressed in sat/b.

@@ -381,7 +381,7 @@ func (m *memWallet) NewAddress() (btcutil.Address, error) {
 //
 // NOTE: The memWallet's mutex must be held when this function is called.
 func (m *memWallet) fundTx(tx *wire.MsgTx, amt btcutil.Amount,
-	feeRate btcutil.Amount, change bool) error {
+	feeRate btcutil.Amount, change bool, utxos map[wire.OutPoint]*utxo) error {
 
 	const (
 		// spendSize is the largest number of bytes of a sigScript
@@ -394,7 +394,12 @@ func (m *memWallet) fundTx(tx *wire.MsgTx, amt btcutil.Amount,
 		txSize      int
 	)
 
-	for outPoint, utxo := range m.utxos {
+	// If we didn't select any utxos use the existing map
+	if utxos == nil {
+		utxos = m.utxos
+	}
+
+	for outPoint, utxo := range utxos {
 		// Skip any outputs that are still currently immature or are
 		// currently locked.
 		if !utxo.isMature(m.currentHeight) || utxo.isLocked {
@@ -460,6 +465,29 @@ func (m *memWallet) SendOutputs(outputs []*wire.TxOut,
 	return m.rpc.SendRawTransaction(tx, true)
 }
 
+// SendOutputs creates, then sends a transaction paying to the specified output
+// while observing the passed fee rate. The passed fee rate should be expressed
+// in satoshis-per-byte.
+func (m *memWallet) SendOutputsSpecifyInputs(outputs []*wire.TxOut, inputs []*wire.TxIn,
+	feeRate btcutil.Amount) (*chainhash.Hash, error) {
+
+	var utxos = make(map[wire.OutPoint]*utxo)
+	for _, input := range inputs {
+		utxo, ok := m.utxos[input.PreviousOutPoint]
+		if !ok || utxo == nil {
+			return nil, fmt.Errorf("no information on outpoint of passed input")
+		}
+		utxos[input.PreviousOutPoint] = utxo
+	}
+
+	tx, err := m.createTransactionSpecifyInputs(outputs, utxos, feeRate, true)
+	if err != nil {
+		return nil, err
+	}
+
+	return m.rpc.SendRawTransaction(tx, true)
+}
+
 // SendOutputsWithoutChange creates and sends a transaction that pays to the
 // specified outputs while observing the passed fee rate and ignoring a change
 // output. The passed fee rate should be expressed in sat/b.
@@ -480,7 +508,7 @@ func (m *memWallet) SendOutputsWithoutChange(outputs []*wire.TxOut,
 // include a change output indicated by the change boolean.
 //
 // This function is safe for concurrent access.
-func (m *memWallet) CreateTransaction(outputs []*wire.TxOut,
+func (m *memWallet) createTransactionSpecifyInputs(outputs []*wire.TxOut, utxos map[wire.OutPoint]*utxo,
 	feeRate btcutil.Amount, change bool) (*wire.MsgTx, error) {
 
 	m.Lock()
@@ -497,7 +525,7 @@ func (m *memWallet) CreateTransaction(outputs []*wire.TxOut,
 	}
 
 	// Attempt to fund the transaction with spendable utxos.
-	if err := m.fundTx(tx, outputAmt, feeRate, change); err != nil {
+	if err := m.fundTx(tx, outputAmt, feeRate, change, utxos); err != nil {
 		return nil, err
 	}
 
@@ -539,6 +567,22 @@ func (m *memWallet) CreateTransaction(outputs []*wire.TxOut,
 	}
 
 	return tx, nil
+}
+
+// CreateTransaction returns a fully signed transaction paying to the specified
+// outputs while observing the desired fee rate. The passed fee rate should be
+// expressed in satoshis-per-byte. The transaction being created can optionally
+// include a change output indicated by the change boolean.
+//
+// This function is safe for concurrent access.
+func (m *memWallet) CreateTransaction(outputs []*wire.TxOut,
+	feeRate btcutil.Amount, change bool) (*wire.MsgTx, error) {
+
+	var utxos map[wire.OutPoint]*utxo
+	// Don't specify any utxos letting wallet select from the mem wallet
+	utxos = nil
+
+	return m.createTransactionSpecifyInputs(outputs, utxos, feeRate, change)
 }
 
 // UnlockOutputs unlocks any outputs which were previously locked due to
