@@ -35,12 +35,12 @@ func (cmd AddNodeCommand) String() string {
 
 // FutureAddNodeResult is a future promise to deliver the result of an
 // AddNodeAsync RPC invocation (or an applicable error).
-type FutureAddNodeResult chan *response
+type FutureAddNodeResult chan *Response
 
-// Receive waits for the response promised by the future and returns an error if
+// Receive waits for the Response promised by the future and returns an error if
 // any occurred when performing the specified command.
 func (r FutureAddNodeResult) Receive() error {
-	_, err := receiveFuture(r)
+	_, err := ReceiveFuture(r)
 	return err
 }
 
@@ -51,7 +51,7 @@ func (r FutureAddNodeResult) Receive() error {
 // See AddNode for the blocking version and more details.
 func (c *Client) AddNodeAsync(host string, command AddNodeCommand) FutureAddNodeResult {
 	cmd := btcjson.NewAddNodeCmd(host, btcjson.AddNodeSubCmd(command))
-	return c.sendCmd(cmd)
+	return c.SendCmd(cmd)
 }
 
 // AddNode attempts to perform the passed command on the passed persistent peer.
@@ -65,12 +65,12 @@ func (c *Client) AddNode(host string, command AddNodeCommand) error {
 
 // FutureNodeResult is a future promise to deliver the result of a NodeAsync
 // RPC invocation (or an applicable error).
-type FutureNodeResult chan *response
+type FutureNodeResult chan *Response
 
-// Receive waits for the response promised by the future and returns an error if
+// Receive waits for the Response promised by the future and returns an error if
 // any occurred when performing the specified command.
 func (r FutureNodeResult) Receive() error {
-	_, err := receiveFuture(r)
+	_, err := ReceiveFuture(r)
 	return err
 }
 
@@ -82,7 +82,7 @@ func (r FutureNodeResult) Receive() error {
 func (c *Client) NodeAsync(command btcjson.NodeSubCmd, host string,
 	connectSubCmd *string) FutureNodeResult {
 	cmd := btcjson.NewNodeCmd(command, host, connectSubCmd)
-	return c.sendCmd(cmd)
+	return c.SendCmd(cmd)
 }
 
 // Node attempts to perform the passed node command on the host.
@@ -99,12 +99,12 @@ func (c *Client) Node(command btcjson.NodeSubCmd, host string,
 
 // FutureGetAddedNodeInfoResult is a future promise to deliver the result of a
 // GetAddedNodeInfoAsync RPC invocation (or an applicable error).
-type FutureGetAddedNodeInfoResult chan *response
+type FutureGetAddedNodeInfoResult chan *Response
 
-// Receive waits for the response promised by the future and returns information
+// Receive waits for the Response promised by the future and returns information
 // about manually added (persistent) peers.
 func (r FutureGetAddedNodeInfoResult) Receive() ([]btcjson.GetAddedNodeInfoResult, error) {
-	res, err := receiveFuture(r)
+	res, err := ReceiveFuture(r)
 	if err != nil {
 		return nil, err
 	}
@@ -126,7 +126,7 @@ func (r FutureGetAddedNodeInfoResult) Receive() ([]btcjson.GetAddedNodeInfoResul
 // See GetAddedNodeInfo for the blocking version and more details.
 func (c *Client) GetAddedNodeInfoAsync(peer string) FutureGetAddedNodeInfoResult {
 	cmd := btcjson.NewGetAddedNodeInfoCmd(true, &peer)
-	return c.sendCmd(cmd)
+	return c.SendCmd(cmd)
 }
 
 // GetAddedNodeInfo returns information about manually added (persistent) peers.
@@ -139,12 +139,12 @@ func (c *Client) GetAddedNodeInfo(peer string) ([]btcjson.GetAddedNodeInfoResult
 
 // FutureGetAddedNodeInfoNoDNSResult is a future promise to deliver the result
 // of a GetAddedNodeInfoNoDNSAsync RPC invocation (or an applicable error).
-type FutureGetAddedNodeInfoNoDNSResult chan *response
+type FutureGetAddedNodeInfoNoDNSResult chan *Response
 
-// Receive waits for the response promised by the future and returns a list of
+// Receive waits for the Response promised by the future and returns a list of
 // manually added (persistent) peers.
 func (r FutureGetAddedNodeInfoNoDNSResult) Receive() ([]string, error) {
-	res, err := receiveFuture(r)
+	res, err := ReceiveFuture(r)
 	if err != nil {
 		return nil, err
 	}
@@ -166,7 +166,7 @@ func (r FutureGetAddedNodeInfoNoDNSResult) Receive() ([]string, error) {
 // See GetAddedNodeInfoNoDNS for the blocking version and more details.
 func (c *Client) GetAddedNodeInfoNoDNSAsync(peer string) FutureGetAddedNodeInfoNoDNSResult {
 	cmd := btcjson.NewGetAddedNodeInfoCmd(false, &peer)
-	return c.sendCmd(cmd)
+	return c.SendCmd(cmd)
 }
 
 // GetAddedNodeInfoNoDNS returns a list of manually added (persistent) peers.
@@ -180,12 +180,12 @@ func (c *Client) GetAddedNodeInfoNoDNS(peer string) ([]string, error) {
 
 // FutureGetConnectionCountResult is a future promise to deliver the result
 // of a GetConnectionCountAsync RPC invocation (or an applicable error).
-type FutureGetConnectionCountResult chan *response
+type FutureGetConnectionCountResult chan *Response
 
-// Receive waits for the response promised by the future and returns the number
+// Receive waits for the Response promised by the future and returns the number
 // of active connections to other peers.
 func (r FutureGetConnectionCountResult) Receive() (int64, error) {
-	res, err := receiveFuture(r)
+	res, err := ReceiveFuture(r)
 	if err != nil {
 		return 0, err
 	}
@@ -207,7 +207,7 @@ func (r FutureGetConnectionCountResult) Receive() (int64, error) {
 // See GetConnectionCount for the blocking version and more details.
 func (c *Client) GetConnectionCountAsync() FutureGetConnectionCountResult {
 	cmd := btcjson.NewGetConnectionCountCmd()
-	return c.sendCmd(cmd)
+	return c.SendCmd(cmd)
 }
 
 // GetConnectionCount returns the number of active connections to other peers.
@@ -217,12 +217,12 @@ func (c *Client) GetConnectionCount() (int64, error) {
 
 // FuturePingResult is a future promise to deliver the result of a PingAsync RPC
 // invocation (or an applicable error).
-type FuturePingResult chan *response
+type FuturePingResult chan *Response
 
-// Receive waits for the response promised by the future and returns the result
+// Receive waits for the Response promised by the future and returns the result
 // of queueing a ping to be sent to each connected peer.
 func (r FuturePingResult) Receive() error {
-	_, err := receiveFuture(r)
+	_, err := ReceiveFuture(r)
 	return err
 }
 
@@ -233,7 +233,7 @@ func (r FuturePingResult) Receive() error {
 // See Ping for the blocking version and more details.
 func (c *Client) PingAsync() FuturePingResult {
 	cmd := btcjson.NewPingCmd()
-	return c.sendCmd(cmd)
+	return c.SendCmd(cmd)
 }
 
 // Ping queues a ping to be sent to each connected peer.
@@ -246,12 +246,12 @@ func (c *Client) Ping() error {
 
 // FutureGetNetworkInfoResult is a future promise to deliver the result of a
 // GetNetworkInfoAsync RPC invocation (or an applicable error).
-type FutureGetNetworkInfoResult chan *response
+type FutureGetNetworkInfoResult chan *Response
 
-// Receive waits for the response promised by the future and returns data about
+// Receive waits for the Response promised by the future and returns data about
 // the current network.
 func (r FutureGetNetworkInfoResult) Receive() (*btcjson.GetNetworkInfoResult, error) {
-	res, err := receiveFuture(r)
+	res, err := ReceiveFuture(r)
 	if err != nil {
 		return nil, err
 	}
@@ -273,7 +273,7 @@ func (r FutureGetNetworkInfoResult) Receive() (*btcjson.GetNetworkInfoResult, er
 // See GetNetworkInfo for the blocking version and more details.
 func (c *Client) GetNetworkInfoAsync() FutureGetNetworkInfoResult {
 	cmd := btcjson.NewGetNetworkInfoCmd()
-	return c.sendCmd(cmd)
+	return c.SendCmd(cmd)
 }
 
 // GetNetworkInfo returns data about the current network.
@@ -283,12 +283,12 @@ func (c *Client) GetNetworkInfo() (*btcjson.GetNetworkInfoResult, error) {
 
 // FutureGetNodeAddressesResult is a future promise to deliver the result of a
 // GetNodeAddressesAsync RPC invocation (or an applicable error).
-type FutureGetNodeAddressesResult chan *response
+type FutureGetNodeAddressesResult chan *Response
 
-// Receive waits for the response promised by the future and returns data about
+// Receive waits for the Response promised by the future and returns data about
 // known node addresses.
 func (r FutureGetNodeAddressesResult) Receive() ([]btcjson.GetNodeAddressesResult, error) {
-	res, err := receiveFuture(r)
+	res, err := ReceiveFuture(r)
 	if err != nil {
 		return nil, err
 	}
@@ -310,7 +310,7 @@ func (r FutureGetNodeAddressesResult) Receive() ([]btcjson.GetNodeAddressesResul
 // See GetNodeAddresses for the blocking version and more details.
 func (c *Client) GetNodeAddressesAsync(count *int32) FutureGetNodeAddressesResult {
 	cmd := btcjson.NewGetNodeAddressesCmd(count)
-	return c.sendCmd(cmd)
+	return c.SendCmd(cmd)
 }
 
 // GetNodeAddresses returns data about known node addresses.
@@ -320,12 +320,12 @@ func (c *Client) GetNodeAddresses(count *int32) ([]btcjson.GetNodeAddressesResul
 
 // FutureGetPeerInfoResult is a future promise to deliver the result of a
 // GetPeerInfoAsync RPC invocation (or an applicable error).
-type FutureGetPeerInfoResult chan *response
+type FutureGetPeerInfoResult chan *Response
 
-// Receive waits for the response promised by the future and returns  data about
+// Receive waits for the Response promised by the future and returns  data about
 // each connected network peer.
 func (r FutureGetPeerInfoResult) Receive() ([]btcjson.GetPeerInfoResult, error) {
-	res, err := receiveFuture(r)
+	res, err := ReceiveFuture(r)
 	if err != nil {
 		return nil, err
 	}
@@ -347,7 +347,7 @@ func (r FutureGetPeerInfoResult) Receive() ([]btcjson.GetPeerInfoResult, error) 
 // See GetPeerInfo for the blocking version and more details.
 func (c *Client) GetPeerInfoAsync() FutureGetPeerInfoResult {
 	cmd := btcjson.NewGetPeerInfoCmd()
-	return c.sendCmd(cmd)
+	return c.SendCmd(cmd)
 }
 
 // GetPeerInfo returns data about each connected network peer.
@@ -357,12 +357,12 @@ func (c *Client) GetPeerInfo() ([]btcjson.GetPeerInfoResult, error) {
 
 // FutureGetNetTotalsResult is a future promise to deliver the result of a
 // GetNetTotalsAsync RPC invocation (or an applicable error).
-type FutureGetNetTotalsResult chan *response
+type FutureGetNetTotalsResult chan *Response
 
-// Receive waits for the response promised by the future and returns network
+// Receive waits for the Response promised by the future and returns network
 // traffic statistics.
 func (r FutureGetNetTotalsResult) Receive() (*btcjson.GetNetTotalsResult, error) {
-	res, err := receiveFuture(r)
+	res, err := ReceiveFuture(r)
 	if err != nil {
 		return nil, err
 	}
@@ -384,7 +384,7 @@ func (r FutureGetNetTotalsResult) Receive() (*btcjson.GetNetTotalsResult, error)
 // See GetNetTotals for the blocking version and more details.
 func (c *Client) GetNetTotalsAsync() FutureGetNetTotalsResult {
 	cmd := btcjson.NewGetNetTotalsCmd()
-	return c.sendCmd(cmd)
+	return c.SendCmd(cmd)
 }
 
 // GetNetTotals returns network traffic statistics.

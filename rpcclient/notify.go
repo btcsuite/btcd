@@ -69,9 +69,9 @@ func newNotificationState() *notificationState {
 // result waiting on the channel with the reply set to nil.  This is useful
 // to ignore things such as notifications when the caller didn't specify any
 // notification handlers.
-func newNilFutureResult() chan *response {
-	responseChan := make(chan *response, 1)
-	responseChan <- &response{result: nil, err: nil}
+func newNilFutureResult() chan *Response {
+	responseChan := make(chan *Response, 1)
+	responseChan <- &Response{result: nil, err: nil}
 	return responseChan
 }
 
@@ -856,12 +856,12 @@ func parseWalletLockStateNtfnParams(params []json.RawMessage) (account string,
 
 // FutureNotifyBlocksResult is a future promise to deliver the result of a
 // NotifyBlocksAsync RPC invocation (or an applicable error).
-type FutureNotifyBlocksResult chan *response
+type FutureNotifyBlocksResult chan *Response
 
-// Receive waits for the response promised by the future and returns an error
+// Receive waits for the Response promised by the future and returns an error
 // if the registration was not successful.
 func (r FutureNotifyBlocksResult) Receive() error {
-	_, err := receiveFuture(r)
+	_, err := ReceiveFuture(r)
 	return err
 }
 
@@ -885,7 +885,7 @@ func (c *Client) NotifyBlocksAsync() FutureNotifyBlocksResult {
 	}
 
 	cmd := btcjson.NewNotifyBlocksCmd()
-	return c.sendCmd(cmd)
+	return c.SendCmd(cmd)
 }
 
 // NotifyBlocks registers the client to receive notifications when blocks are
@@ -906,12 +906,12 @@ func (c *Client) NotifyBlocks() error {
 // NotifySpentAsync RPC invocation (or an applicable error).
 //
 // Deprecated: Use FutureLoadTxFilterResult instead.
-type FutureNotifySpentResult chan *response
+type FutureNotifySpentResult chan *Response
 
-// Receive waits for the response promised by the future and returns an error
+// Receive waits for the Response promised by the future and returns an error
 // if the registration was not successful.
 func (r FutureNotifySpentResult) Receive() error {
-	_, err := receiveFuture(r)
+	_, err := ReceiveFuture(r)
 	return err
 }
 
@@ -931,7 +931,7 @@ func (c *Client) notifySpentInternal(outpoints []btcjson.OutPoint) FutureNotifyS
 	}
 
 	cmd := btcjson.NewNotifySpentCmd(outpoints)
-	return c.sendCmd(cmd)
+	return c.SendCmd(cmd)
 }
 
 // newOutPointFromWire constructs the btcjson representation of a transaction
@@ -969,7 +969,7 @@ func (c *Client) NotifySpentAsync(outpoints []*wire.OutPoint) FutureNotifySpentR
 		ops = append(ops, newOutPointFromWire(outpoint))
 	}
 	cmd := btcjson.NewNotifySpentCmd(ops)
-	return c.sendCmd(cmd)
+	return c.SendCmd(cmd)
 }
 
 // NotifySpent registers the client to receive notifications when the passed
@@ -990,12 +990,12 @@ func (c *Client) NotifySpent(outpoints []*wire.OutPoint) error {
 
 // FutureNotifyNewTransactionsResult is a future promise to deliver the result
 // of a NotifyNewTransactionsAsync RPC invocation (or an applicable error).
-type FutureNotifyNewTransactionsResult chan *response
+type FutureNotifyNewTransactionsResult chan *Response
 
-// Receive waits for the response promised by the future and returns an error
+// Receive waits for the Response promised by the future and returns an error
 // if the registration was not successful.
 func (r FutureNotifyNewTransactionsResult) Receive() error {
-	_, err := receiveFuture(r)
+	_, err := ReceiveFuture(r)
 	return err
 }
 
@@ -1019,7 +1019,7 @@ func (c *Client) NotifyNewTransactionsAsync(verbose bool) FutureNotifyNewTransac
 	}
 
 	cmd := btcjson.NewNotifyNewTransactionsCmd(&verbose)
-	return c.sendCmd(cmd)
+	return c.SendCmd(cmd)
 }
 
 // NotifyNewTransactions registers the client to receive notifications every
@@ -1041,12 +1041,12 @@ func (c *Client) NotifyNewTransactions(verbose bool) error {
 // NotifyReceivedAsync RPC invocation (or an applicable error).
 //
 // Deprecated: Use FutureLoadTxFilterResult instead.
-type FutureNotifyReceivedResult chan *response
+type FutureNotifyReceivedResult chan *Response
 
-// Receive waits for the response promised by the future and returns an error
+// Receive waits for the Response promised by the future and returns an error
 // if the registration was not successful.
 func (r FutureNotifyReceivedResult) Receive() error {
-	_, err := receiveFuture(r)
+	_, err := ReceiveFuture(r)
 	return err
 }
 
@@ -1067,7 +1067,7 @@ func (c *Client) notifyReceivedInternal(addresses []string) FutureNotifyReceived
 
 	// Convert addresses to strings.
 	cmd := btcjson.NewNotifyReceivedCmd(addresses)
-	return c.sendCmd(cmd)
+	return c.SendCmd(cmd)
 }
 
 // NotifyReceivedAsync returns an instance of a type that can be used to get the
@@ -1097,7 +1097,7 @@ func (c *Client) NotifyReceivedAsync(addresses []btcutil.Address) FutureNotifyRe
 		addrs = append(addrs, addr.String())
 	}
 	cmd := btcjson.NewNotifyReceivedCmd(addrs)
-	return c.sendCmd(cmd)
+	return c.SendCmd(cmd)
 }
 
 // NotifyReceived registers the client to receive notifications every time a
@@ -1127,12 +1127,12 @@ func (c *Client) NotifyReceived(addresses []btcutil.Address) error {
 // or RescanEndHeightAsync RPC invocation (or an applicable error).
 //
 // Deprecated: Use FutureRescanBlocksResult instead.
-type FutureRescanResult chan *response
+type FutureRescanResult chan *Response
 
-// Receive waits for the response promised by the future and returns an error
+// Receive waits for the Response promised by the future and returns an error
 // if the rescan was not successful.
 func (r FutureRescanResult) Receive() error {
-	_, err := receiveFuture(r)
+	_, err := ReceiveFuture(r)
 	return err
 }
 
@@ -1185,7 +1185,7 @@ func (c *Client) RescanAsync(startBlock *chainhash.Hash,
 	}
 
 	cmd := btcjson.NewRescanCmd(startBlockHashStr, addrs, ops, nil)
-	return c.sendCmd(cmd)
+	return c.SendCmd(cmd)
 }
 
 // Rescan rescans the block chain starting from the provided starting block to
@@ -1270,7 +1270,7 @@ func (c *Client) RescanEndBlockAsync(startBlock *chainhash.Hash,
 
 	cmd := btcjson.NewRescanCmd(startBlockHashStr, addrs, ops,
 		&endBlockHashStr)
-	return c.sendCmd(cmd)
+	return c.SendCmd(cmd)
 }
 
 // RescanEndHeight rescans the block chain starting from the provided starting
@@ -1307,15 +1307,15 @@ func (c *Client) RescanEndHeight(startBlock *chainhash.Hash,
 //
 // NOTE: This is a btcd extension ported from github.com/decred/dcrrpcclient
 // and requires a websocket connection.
-type FutureLoadTxFilterResult chan *response
+type FutureLoadTxFilterResult chan *Response
 
-// Receive waits for the response promised by the future and returns an error
+// Receive waits for the Response promised by the future and returns an error
 // if the registration was not successful.
 //
 // NOTE: This is a btcd extension ported from github.com/decred/dcrrpcclient
 // and requires a websocket connection.
 func (r FutureLoadTxFilterResult) Receive() error {
-	_, err := receiveFuture(r)
+	_, err := ReceiveFuture(r)
 	return err
 }
 
@@ -1343,7 +1343,7 @@ func (c *Client) LoadTxFilterAsync(reload bool, addresses []btcutil.Address,
 	}
 
 	cmd := btcjson.NewLoadTxFilterCmd(reload, addrStrs, outPointObjects)
-	return c.sendCmd(cmd)
+	return c.SendCmd(cmd)
 }
 
 // LoadTxFilter loads, reloads, or adds data to a websocket client's transaction
