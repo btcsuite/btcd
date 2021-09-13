@@ -550,6 +550,12 @@ var recoveryTests = []struct {
 		err: fmt.Errorf("invalid square root"),
 	},
 	{
+		// Point at infinity recovered
+		msg: "6b8d2c81b11b2d699528dde488dbdf2f94293d0d33c32e347f255fa4a6c1f0a9",
+		sig: "0079be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f817986b8d2c81b11b2d699528dde488dbdf2f94293d0d33c32e347f255fa4a6c1f0a9",
+		err: fmt.Errorf("point (Qx, Qy) equals the point at infinity"),
+	},
+	{
 		// Low R and S values.
 		msg: "ba09edc1275a285fb27bfe82c4eea240a907a0dbaf9e55764b8f318c37d5974f",
 		sig: "00000000000000000000000000000000000000000000000000000000000000002c0000000000000000000000000000000000000000000000000000000000000004",
