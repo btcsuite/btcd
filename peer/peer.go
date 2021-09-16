@@ -276,6 +276,13 @@ type Config struct {
 	// connection detecting and disconnect logic since they intentionally
 	// do so for testing purposes.
 	AllowSelfConns bool
+
+	// DisableStallHandler if true, then the stall handler that attempts to
+	// disconnect from peers that appear to be taking too long to respond
+	// to requests won't be activated. This can be useful in certain simnet
+	// scenarios where the stall behavior isn't important to the system
+	// under test.
+	DisableStallHandler bool
 }
 
 // minUint32 is a helper function to return the minimum of two uint32s.
@@ -1202,6 +1209,10 @@ out:
 	for {
 		select {
 		case msg := <-p.stallControl:
+			if p.cfg.DisableStallHandler {
+				continue
+			}
+
 			switch msg.command {
 			case sccSendMessage:
 				// Add a deadline for the expected response
@@ -1264,6 +1275,10 @@ out:
 			}
 
 		case <-stallTicker.C:
+			if p.cfg.DisableStallHandler {
+				continue
+			}
+
 			// Calculate the offset to apply to the deadline based
 			// on how long the handlers have taken to execute since
 			// the last tick.
