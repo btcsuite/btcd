@@ -2,6 +2,9 @@ name: Build and Test
 on: [push, pull_request]
 jobs:
   build:
+    # https://github.blog/changelog/2021-04-20-github-actions-control-permissions-for-github_token/
+    permissions:
+      contents: read
     name: Go CI
     runs-on: ubuntu-latest
     strategy:
