@@ -37,7 +37,7 @@ const (
 	// maxOpenFiles is the max number of open files to maintain in the
 	// open blocks cache.  Note that this does not include the current
 	// write file, so there will typically be one more than this value open.
-	maxOpenFiles = 25
+	maxOpenFiles = 40
 
 	// maxBlockFileSize is the maximum size for each file used to store
 	// blocks.

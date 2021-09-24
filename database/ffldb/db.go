@@ -2001,10 +2001,11 @@ func openDB(dbPath string, network wire.BitcoinNet, create bool) (database.DB, e
 
 	// Open the metadata database (will create it if needed).
 	opts := opt.Options{
-		ErrorIfExist: create,
-		Strict:       opt.DefaultStrict,
-		Compression:  opt.NoCompression,
-		Filter:       filter.NewBloomFilter(10),
+		ErrorIfExist:           create,
+		Strict:                 opt.DefaultStrict,
+		Compression:            opt.NoCompression,
+		Filter:                 filter.NewBloomFilter(10),
+		OpenFilesCacheCapacity: 2000,
 	}
 	ldb, err := leveldb.OpenFile(metadataDbPath, &opts)
 	if err != nil {

@@ -23,7 +23,7 @@ const (
 	// defaultFlushSecs is the default number of seconds to use as a
 	// threshold in between database cache flushes when the cache size has
 	// not been exceeded.
-	defaultFlushSecs = 300 // 5 minutes
+	defaultFlushSecs = 120 // 2 minutes
 
 	// ldbBatchHeaderSize is the size of a leveldb batch header which
 	// includes the sequence header and record counter.
@@ -499,10 +499,12 @@ func (c *dbCache) flush() error {
 	// Since the cached keys to be added and removed use an immutable treap,
 	// a snapshot is simply obtaining the root of the tree under the lock
 	// which is used to atomically swap the root.
-	c.cacheLock.RLock()
+	c.cacheLock.Lock()
 	cachedKeys := c.cachedKeys
 	cachedRemove := c.cachedRemove
-	c.cacheLock.RUnlock()
+	c.cachedKeys = treap.NewImmutable()
+	c.cachedRemove = treap.NewImmutable()
+	c.cacheLock.Unlock()
 
 	// Nothing to do if there is no data to flush.
 	if cachedKeys.Len() == 0 && cachedRemove.Len() == 0 {
@@ -513,12 +515,6 @@ func (c *dbCache) flush() error {
 	if err := c.commitTreaps(cachedKeys, cachedRemove); err != nil {
 		return err
 	}
-
-	// Clear the cache since it has been flushed.
-	c.cacheLock.Lock()
-	c.cachedKeys = treap.NewImmutable()
-	c.cachedRemove = treap.NewImmutable()
-	c.cacheLock.Unlock()
 
 	return nil
 }
