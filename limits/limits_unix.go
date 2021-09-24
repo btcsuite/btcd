@@ -12,8 +12,8 @@ import (
 )
 
 const (
-	fileLimitWant = 2048
-	fileLimitMin  = 1024
+	fileLimitWant = 2048 * 12
+	fileLimitMin  = 2048 * 8
 )
 
 // SetLimits raises some process limits to values which allow btcd and
