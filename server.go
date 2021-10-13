@@ -2843,8 +2843,8 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 	if !cfg.SimNet && len(cfg.ConnectPeers) == 0 {
 		newAddressFunc = func() (net.Addr, error) {
 			for tries := 0; tries < 100; tries++ {
-				addr := s.addrManager.GetAddress()
-				if addr == nil {
+				netAddr, lastAttempt := s.addrManager.GetNetAddress()
+				if netAddr == nil {
 					break
 				}
 
@@ -2854,27 +2854,27 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 				// in the same group so that we are not connecting
 				// to the same network segment at the expense of
 				// others.
-				key := addrmgr.GroupKey(addr.NetAddress())
+				key := addrmgr.GroupKey(netAddr)
 				if s.OutboundGroupCount(key) != 0 {
 					continue
 				}
 
 				// only allow recent nodes (10mins) after we failed 30
 				// times
-				if tries < 30 && time.Since(addr.LastAttempt()) < 10*time.Minute {
+				if tries < 30 && time.Since(lastAttempt) < 10*time.Minute {
 					continue
 				}
 
 				// allow nondefault ports after 50 failed tries.
-				if tries < 50 && fmt.Sprintf("%d", addr.NetAddress().Port) !=
+				if tries < 50 && fmt.Sprintf("%d", netAddr.Port) !=
 					activeNetParams.DefaultPort {
 					continue
 				}
 
 				// Mark an attempt for the valid address.
-				s.addrManager.Attempt(addr.NetAddress())
+				s.addrManager.Attempt(netAddr)
 
-				addrString := addrmgr.NetAddressKey(addr.NetAddress())
+				addrString := addrmgr.NetAddressKey(netAddr)
 				return addrStringToNetAddr(addrString)
 			}
 

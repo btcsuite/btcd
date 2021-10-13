@@ -176,7 +176,7 @@ func (a *AddrManager) updateAddress(netAddr, srcAddr *wire.NetAddress) {
 		// TODO: only update addresses periodically.
 		// Update the last seen time and services.
 		// note that to prevent causing excess garbage on getaddr
-		// messages the netaddresses in addrmaanger are *immutable*,
+		// messages the netaddresses in addrmanager are *immutable*,
 		// if we need to change them then we replace the pointer with a
 		// new copy so that we don't have to copy every na for getaddr.
 		if netAddr.Timestamp.After(ka.na.Timestamp) ||
@@ -186,7 +186,7 @@ func (a *AddrManager) updateAddress(netAddr, srcAddr *wire.NetAddress) {
 			naCopy := *ka.na
 			naCopy.Timestamp = netAddr.Timestamp
 			naCopy.AddService(netAddr.Services)
-			ka.na = &naCopy
+			ka.na = &naCopy // warning: na field of KnownAddress is mutable
 		}
 
 		// If already in tried, we have nothing to do here.
@@ -773,11 +773,50 @@ func NetAddressKey(na *wire.NetAddress) string {
 // random one from the possible addresses with preference given to ones that
 // have not been used recently and should not pick 'close' addresses
 // consecutively.
+//
+// NOTE: The KnownAddress returned by GetAddress is not safely usable while the
+// AddrManager is in use by another goroutine since the fields of KnownAddress
+// are mutable. Is this method practical outside of tests that use a toy
+// AddrManager?
 func (a *AddrManager) GetAddress() *KnownAddress {
-	// Protect concurrent access.
 	a.mtx.Lock()
 	defer a.mtx.Unlock()
+	return a.getAddress()
+}
 
+// GetAddressCopy is like GetAddress, except that this returns a copy of a
+// stored KnownAddress, so is safe for concurrent access.
+func (a *AddrManager) GetAddressCopy() *KnownAddress {
+	a.mtx.Lock()
+	defer a.mtx.Unlock()
+	ka := a.getAddress()
+	if ka == nil {
+		return nil
+	}
+	// While the NetAddress in ka.na is immutable, the na field of KnownAddress
+	// is not, so we access it under the address manager's lock. See
+	// updateAddress, SetServices, Connected, and Good, where various
+	// KnownAddress fields are modified that are also accessible by KnownAddress
+	// methods without a synchronization mechanism.
+	kaCopy := *ka
+	return &kaCopy
+}
+
+// GetNetAddress returns a single address that should be routable and its last
+// connection attempt time. It picks a random one from the possible addresses
+// with preference given to ones that have not been used recently and should not
+// pick 'close' addresses consecutively.
+func (a *AddrManager) GetNetAddress() (*wire.NetAddress, time.Time) {
+	a.mtx.Lock()
+	defer a.mtx.Unlock()
+	ka := a.getAddress()
+	if ka == nil {
+		return nil, time.Time{}
+	}
+	return ka.na, ka.lastattempt
+}
+
+func (a *AddrManager) getAddress() *KnownAddress {
 	if a.numAddresses() == 0 {
 		return nil
 	}
