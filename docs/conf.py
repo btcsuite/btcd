@@ -18,9 +18,9 @@ from recommonmark.transform import AutoStructify
 
 # -- Project information -----------------------------------------------------
 
-project = 'btcd'
-copyright = '2020, btcd'
-author = 'btcsuite developers'
+project = 'lbcd'
+copyright = '2021, lbcd'
+author = 'LBRY developers'
 
 # The full version, including alpha/beta/rc tags
 release = 'beta'
@@ -65,9 +65,11 @@ html_theme = 'sphinx_rtd_theme'
 html_static_path = ['_static']
 
 # app setup hook
+
+
 def setup(app):
     app.add_config_value('recommonmark_config', {
-        #'url_resolver': lambda url: github_doc_root + url,
+        # 'url_resolver': lambda url: github_doc_root + url,
         'auto_toc_tree_section': 'Contents',
         'enable_math': False,
         'enable_inline_math': False,

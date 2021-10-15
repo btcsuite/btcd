@@ -22,24 +22,24 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/btcsuite/btcd/addrmgr"
-	"github.com/btcsuite/btcd/blockchain"
-	"github.com/btcsuite/btcd/blockchain/indexers"
-	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/claimtrie"
-	claimtrieconfig "github.com/btcsuite/btcd/claimtrie/config"
-	"github.com/btcsuite/btcd/connmgr"
-	"github.com/btcsuite/btcd/database"
-	"github.com/btcsuite/btcd/mempool"
-	"github.com/btcsuite/btcd/mining"
-	"github.com/btcsuite/btcd/mining/cpuminer"
-	"github.com/btcsuite/btcd/netsync"
-	"github.com/btcsuite/btcd/peer"
-	"github.com/btcsuite/btcd/txscript"
-	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil"
-	"github.com/btcsuite/btcutil/bloom"
+	"github.com/lbryio/lbcd/addrmgr"
+	"github.com/lbryio/lbcd/blockchain"
+	"github.com/lbryio/lbcd/blockchain/indexers"
+	"github.com/lbryio/lbcd/chaincfg"
+	"github.com/lbryio/lbcd/chaincfg/chainhash"
+	"github.com/lbryio/lbcd/claimtrie"
+	claimtrieconfig "github.com/lbryio/lbcd/claimtrie/config"
+	"github.com/lbryio/lbcd/connmgr"
+	"github.com/lbryio/lbcd/database"
+	"github.com/lbryio/lbcd/mempool"
+	"github.com/lbryio/lbcd/mining"
+	"github.com/lbryio/lbcd/mining/cpuminer"
+	"github.com/lbryio/lbcd/netsync"
+	"github.com/lbryio/lbcd/peer"
+	"github.com/lbryio/lbcd/txscript"
+	"github.com/lbryio/lbcd/wire"
+	btcutil "github.com/lbryio/lbcutil"
+	"github.com/lbryio/lbcutil/bloom"
 )
 
 const (
@@ -2535,7 +2535,7 @@ out:
 			// listen port?
 			// XXX this assumes timeout is in seconds.
 			listenPort, err := s.nat.AddPortMapping("tcp", int(lport), int(lport),
-				"btcd listen port", 20*60)
+				"lbcd listen port", 20*60)
 			if err != nil {
 				srvrLog.Warnf("can't add UPnP port mapping: %v", err)
 			}

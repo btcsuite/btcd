@@ -183,7 +183,7 @@ func (m *medianTime) AddTimeSample(sourceID string, timeVal time.Time) {
 			// Warn if none of the time samples are close.
 			if !remoteHasCloseTime {
 				log.Warnf("Please check your date and time " +
-					"are correct!  btcd will not work " +
+					"are correct!  lbcd will not work " +
 					"properly with an invalid time")
 			}
 		}
