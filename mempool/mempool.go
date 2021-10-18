@@ -1032,8 +1032,8 @@ func (mp *TxPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit, rejec
 		return nil, nil, err
 	}
 
-	// Don't allow the transaction if it exists in the main chain and is not
-	// not already fully spent.
+	// Don't allow the transaction if it exists in the main chain and is
+	// already fully spent.
 	prevOut := wire.OutPoint{Hash: *txHash}
 	for txOutIdx := range tx.MsgTx().TxOut {
 		prevOut.Index = uint32(txOutIdx)
