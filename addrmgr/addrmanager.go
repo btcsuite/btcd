@@ -176,7 +176,7 @@ func (a *AddrManager) updateAddress(netAddr, srcAddr *wire.NetAddress) {
 		// TODO: only update addresses periodically.
 		// Update the last seen time and services.
 		// note that to prevent causing excess garbage on getaddr
-		// messages the netaddresses in addrmaanger are *immutable*,
+		// messages the netaddresses in addrmanager are *immutable*,
 		// if we need to change them then we replace the pointer with a
 		// new copy so that we don't have to copy every na for getaddr.
 		if netAddr.Timestamp.After(ka.na.Timestamp) ||
@@ -186,7 +186,9 @@ func (a *AddrManager) updateAddress(netAddr, srcAddr *wire.NetAddress) {
 			naCopy := *ka.na
 			naCopy.Timestamp = netAddr.Timestamp
 			naCopy.AddService(netAddr.Services)
+			ka.mtx.Lock()
 			ka.na = &naCopy
+			ka.mtx.Unlock()
 		}
 
 		// If already in tried, we have nothing to do here.
@@ -857,8 +859,11 @@ func (a *AddrManager) Attempt(addr *wire.NetAddress) {
 		return
 	}
 	// set last tried time to now
+	now := time.Now()
+	ka.mtx.Lock()
 	ka.attempts++
-	ka.lastattempt = time.Now()
+	ka.lastattempt = now
+	ka.mtx.Unlock()
 }
 
 // Connected Marks the given address as currently connected and working at the
@@ -880,7 +885,9 @@ func (a *AddrManager) Connected(addr *wire.NetAddress) {
 		// ka.na is immutable, so replace it.
 		naCopy := *ka.na
 		naCopy.Timestamp = time.Now()
+		ka.mtx.Lock()
 		ka.na = &naCopy
+		ka.mtx.Unlock()
 	}
 }
 
@@ -899,11 +906,13 @@ func (a *AddrManager) Good(addr *wire.NetAddress) {
 	// ka.Timestamp is not updated here to avoid leaking information
 	// about currently connected peers.
 	now := time.Now()
+	ka.mtx.Lock()
 	ka.lastsuccess = now
 	ka.lastattempt = now
 	ka.attempts = 0
+	ka.mtx.Unlock() // tried and refs synchronized via a.mtx
 
-	// move to tried set, optionally evicting other addresses if neeed.
+	// move to tried set, optionally evicting other addresses if need.
 	if ka.tried {
 		return
 	}
@@ -988,7 +997,9 @@ func (a *AddrManager) SetServices(addr *wire.NetAddress, services wire.ServiceFl
 		// ka.na is immutable, so replace it.
 		naCopy := *ka.na
 		naCopy.Services = services
+		ka.mtx.Lock()
 		ka.na = &naCopy
+		ka.mtx.Unlock()
 	}
 }
 
