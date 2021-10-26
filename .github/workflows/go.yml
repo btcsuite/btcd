@@ -12,11 +12,11 @@ jobs:
         go: [1.16.8, 1.17.1]
     steps:
       - name: Set up Go
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@331ce1d993939866bb63c32c6cbbfd48fa76fc57 #v2.0.0 and the same v2.1.4
         with:
           go-version: ${{ matrix.go }}
       - name: Check out source
-        uses: actions/checkout@v2
+        uses: actions/checkout@722adc63f1aa60a57ec37892e133b1d319cae598 # v2.3.4
       - name: Install Linters
         run: "curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | sh -s -- -b $(go env GOPATH)/bin v1.26.0"
       - name: Build
@@ -30,6 +30,6 @@ jobs:
           sh ./goclean.sh
 
       - name: Send coverage
-        uses: shogo82148/actions-goveralls@v1
+        uses: shogo82148/actions-goveralls@5e3c8e6f7ec292a898719fb5d8e0762de47cb526 #v1.0.0
         with:
           path-to-profile: profile.cov
