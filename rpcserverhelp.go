@@ -568,9 +568,17 @@ var helpDescsEnUS = map[string]string{
 	"help--result0":    "List of commands",
 	"help--result1":    "Help for specified command",
 
+	// InvalidateBlockCmd
+	"invalidateblock--synopsis": "Invalidate a block.",
+	"invalidateblock-blockhash": "Hash of the block you want to invalidate",
+
 	// PingCmd help.
 	"ping--synopsis": "Queues a ping to be sent to each connected peer.\n" +
 		"Ping times are provided by getpeerinfo via the pingtime and pingwait fields.",
+
+	// ReconsiderBlockCmd
+	"reconsiderblock--synopsis": "Reconsider a block for validation.",
+	"reconsiderblock-blockhash": "Hash of the block you want to reconsider",
 
 	// SearchRawTransactionsCmd help.
 	"searchrawtransactions--synopsis": "Returns raw data for transactions involving the passed address.\n" +
@@ -848,7 +856,9 @@ var rpcResultTypes = map[string][]interface{}{
 	"gettxout":               {(*btcjson.GetTxOutResult)(nil)},
 	"node":                   nil,
 	"help":                   {(*string)(nil), (*string)(nil)},
+	"invalidateblock":        nil,
 	"ping":                   nil,
+	"reconsiderblock":        nil,
 	"searchrawtransactions":  {(*string)(nil), (*[]btcjson.SearchRawTransactionsResult)(nil)},
 	"sendrawtransaction":     {(*string)(nil)},
 	"setgenerate":            nil,

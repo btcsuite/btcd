@@ -168,8 +168,10 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"getrawtransaction":      handleGetRawTransaction,
 	"gettxout":               handleGetTxOut,
 	"help":                   handleHelp,
+	"invalidateblock":        handleInvalidateBlock,
 	"node":                   handleNode,
 	"ping":                   handlePing,
+	"reconsiderblock":        handleReconsiderBlock,
 	"searchrawtransactions":  handleSearchRawTransactions,
 	"sendrawtransaction":     handleSendRawTransaction,
 	"setgenerate":            handleSetGenerate,
@@ -237,9 +239,7 @@ var rpcUnimplemented = map[string]struct{}{
 	"getchaintips":     {},
 	"getmempoolentry":  {},
 	"getwork":          {},
-	"invalidateblock":  {},
 	"preciousblock":    {},
-	"reconsiderblock":  {},
 }
 
 // Commands that are available to a limited user
@@ -2975,6 +2975,30 @@ func handleGetTxOut(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 	}
 
 	return txOutReply, nil
+}
+
+// handleInvalidateBlock implements the invalidateblock command
+func handleInvalidateBlock(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	c := cmd.(*btcjson.InvalidateBlockCmd)
+
+	hash, err := chainhash.NewHashFromStr(c.BlockHash)
+	if err != nil {
+		return nil, err
+	}
+
+	return nil, s.cfg.Chain.InvalidateBlock(hash)
+}
+
+// handleReconsiderBlock implements the reconsiderblock command
+func handleReconsiderBlock(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	c := cmd.(*btcjson.ReconsiderBlockCmd)
+
+	hash, err := chainhash.NewHashFromStr(c.BlockHash)
+	if err != nil {
+		return nil, err
+	}
+
+	return nil, s.cfg.Chain.ReconsiderBlock(hash)
 }
 
 // handleHelp implements the help command.

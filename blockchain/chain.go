@@ -1642,6 +1642,115 @@ func (b *BlockChain) LocateHeaders(locator BlockLocator, hashStop *chainhash.Has
 	return headers
 }
 
+// InvalidateBlock takes a block hash and invalidates it.
+//
+// This function is safe for concurrent access.
+func (b *BlockChain) InvalidateBlock(hash *chainhash.Hash) error {
+	return b.invalidateBlock(hash)
+}
+
+// invalidateBlock takes a block hash and invalidates it.
+func (b *BlockChain) invalidateBlock(hash *chainhash.Hash) error {
+	node := b.index.LookupNode(hash)
+	if node == nil {
+		err := fmt.Errorf("block %s is not known", hash)
+		return err
+	}
+
+	// No need to invalidate if its already invalid.
+	if node.status.KnownInvalid() {
+		err := fmt.Errorf("block %s is already invalid", hash)
+		return err
+	}
+
+	if node.parent == nil {
+		err := fmt.Errorf("block %s has no parent", hash)
+		return err
+	}
+
+	b.index.SetStatusFlags(node, statusValidateFailed)
+	b.index.UnsetStatusFlags(node, statusValid)
+
+	b.chainLock.Lock()
+	defer b.chainLock.Unlock()
+	detachNodes, attachNodes := b.getReorganizeNodes(node.parent)
+
+	err := b.reorganizeChain(detachNodes, attachNodes)
+	if err != nil {
+		return err
+	}
+
+	for i, e := 0, detachNodes.Front(); e != nil; i, e = i+1, e.Next() {
+		n := e.Value.(*blockNode)
+
+		b.index.SetStatusFlags(n, statusInvalidAncestor)
+		b.index.UnsetStatusFlags(n, statusValid)
+	}
+
+	if writeErr := b.index.flushToDB(); writeErr != nil {
+		log.Warnf("Error flushing block index changes to disk: %v", writeErr)
+	}
+
+	return nil
+}
+
+// ReconsiderBlock takes a block hash and allows it to be revalidated.
+//
+// This function is safe for concurrent access.
+func (b *BlockChain) ReconsiderBlock(hash *chainhash.Hash) error {
+	return b.reconsiderBlock(hash)
+}
+
+// reconsiderBlock takes a block hash and allows it to be revalidated.
+func (b *BlockChain) reconsiderBlock(hash *chainhash.Hash) error {
+	node := b.index.LookupNode(hash)
+	if node == nil {
+		err := fmt.Errorf("block %s is not known", hash)
+		return err
+	}
+
+	// No need to reconsider, it is already valid.
+	if node.status.KnownValid() {
+		err := fmt.Errorf("block %s is already valid", hash)
+		return err
+	}
+
+	// Keep a reference to the first node in the chain of invalid
+	// blocks so we can reprocess after status flags are updated.
+	firstNode := node
+
+	// Find previous node to the point where the blocks are valid again.
+	for n := node; n.status.KnownInvalid(); n = n.parent {
+		b.index.UnsetStatusFlags(n, statusInvalidAncestor)
+		b.index.UnsetStatusFlags(n, statusValidateFailed)
+
+		firstNode = n
+	}
+
+	var blk *btcutil.Block
+	err := b.db.View(func(dbTx database.Tx) error {
+		var err error
+		blk, err = dbFetchBlockByNode(dbTx, firstNode)
+		return err
+	})
+	if err != nil {
+		return err
+	}
+
+	// Process it all again. This will take care of the
+	// orphans as well.
+	_, _, err = b.ProcessBlock(blk, BFNoDupBlockCheck)
+	if err != nil {
+		return err
+	}
+
+	if writeErr := b.index.flushToDB(); writeErr != nil {
+		log.Warnf("Error flushing block index changes to disk: %v", writeErr)
+	}
+
+	return nil
+}
+
 // ClaimTrie returns the claimTrie associated wit hthe chain.
 func (b *BlockChain) ClaimTrie() *claimtrie.ClaimTrie {
 	return b.claimTrie
