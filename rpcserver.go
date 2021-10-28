@@ -27,21 +27,22 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/btcsuite/btcd/blockchain"
-	"github.com/btcsuite/btcd/blockchain/indexers"
-	"github.com/btcsuite/btcd/btcec"
-	"github.com/btcsuite/btcd/btcjson"
-	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/database"
-	"github.com/btcsuite/btcd/mempool"
-	"github.com/btcsuite/btcd/mining"
-	"github.com/btcsuite/btcd/mining/cpuminer"
-	"github.com/btcsuite/btcd/peer"
-	"github.com/btcsuite/btcd/txscript"
-	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/websocket"
+	"github.com/lbryio/lbcd/addrmgr"
+	"github.com/lbryio/lbcd/blockchain"
+	"github.com/lbryio/lbcd/blockchain/indexers"
+	"github.com/lbryio/lbcd/btcec"
+	"github.com/lbryio/lbcd/btcjson"
+	"github.com/lbryio/lbcd/chaincfg"
+	"github.com/lbryio/lbcd/chaincfg/chainhash"
+	"github.com/lbryio/lbcd/database"
+	"github.com/lbryio/lbcd/mempool"
+	"github.com/lbryio/lbcd/mining"
+	"github.com/lbryio/lbcd/mining/cpuminer"
+	"github.com/lbryio/lbcd/peer"
+	"github.com/lbryio/lbcd/txscript"
+	"github.com/lbryio/lbcd/wire"
+	btcutil "github.com/lbryio/lbcutil"
 )
 
 // API version constants
@@ -137,6 +138,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"decodescript":           handleDecodeScript,
 	"estimatefee":            handleEstimateFee,
 	"generate":               handleGenerate,
+	"generatetoaddress":      handleGenerateToAddress,
 	"getaddednodeinfo":       handleGetAddedNodeInfo,
 	"getbestblock":           handleGetBestBlock,
 	"getbestblockhash":       handleGetBestBlockHash,
@@ -159,6 +161,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"getmininginfo":          handleGetMiningInfo,
 	"getnettotals":           handleGetNetTotals,
 	"getnetworkhashps":       handleGetNetworkHashPS,
+	"getnetworkinfo":         handleGetNetworkInfo,
 	"getnodeaddresses":       handleGetNodeAddresses,
 	"getpeerinfo":            handleGetPeerInfo,
 	"getrawmempool":          handleGetRawMempool,
@@ -233,7 +236,6 @@ var rpcUnimplemented = map[string]struct{}{
 	"estimatepriority": {},
 	"getchaintips":     {},
 	"getmempoolentry":  {},
-	"getnetworkinfo":   {},
 	"getwork":          {},
 	"invalidateblock":  {},
 	"preciousblock":    {},
@@ -573,7 +575,7 @@ func handleCreateRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan 
 		default:
 			return nil, &btcjson.RPCError{
 				Code:    btcjson.ErrRPCInvalidAddressOrKey,
-				Message: "Invalid address or key",
+				Message: "Invalid address or key: " + addr.String(),
 			}
 		}
 		if !addr.IsForNet(params) {
@@ -701,11 +703,12 @@ func createVoutList(mtx *wire.MsgTx, chainParams *chaincfg.Params, filterAddrMap
 		// script doesn't fully parse, so ignore the error here.
 		disbuf, _ := txscript.DisasmString(v.PkScript)
 
+		script := txscript.StripClaimScriptPrefix(v.PkScript)
+
 		// Ignore the error here since an error means the script
 		// couldn't parse and there is no additional information about
 		// it anyways.
-		scriptClass, addrs, reqSigs, _ := txscript.ExtractPkScriptAddrs(
-			v.PkScript, chainParams)
+		scriptClass, addrs, reqSigs, _ := txscript.ExtractPkScriptAddrs(script, chainParams)
 
 		// Encode the addresses while checking if the address passes the
 		// filter when needed.
@@ -735,8 +738,18 @@ func createVoutList(mtx *wire.MsgTx, chainParams *chaincfg.Params, filterAddrMap
 		vout.ScriptPubKey.Addresses = encodedAddrs
 		vout.ScriptPubKey.Asm = disbuf
 		vout.ScriptPubKey.Hex = hex.EncodeToString(v.PkScript)
-		vout.ScriptPubKey.Type = scriptClass.String()
 		vout.ScriptPubKey.ReqSigs = int32(reqSigs)
+
+		if len(script) < len(v.PkScript) {
+			vout.ScriptPubKey.IsClaim = v.PkScript[0] == txscript.OP_CLAIMNAME || v.PkScript[0] == txscript.OP_UPDATECLAIM
+			vout.ScriptPubKey.IsSupport = v.PkScript[0] == txscript.OP_SUPPORTCLAIM
+			vout.ScriptPubKey.SubType = scriptClass.String()
+			vout.ScriptPubKey.Type = txscript.ScriptClass.String(0)
+		} else {
+			vout.ScriptPubKey.Type = scriptClass.String()
+		}
+
+		// TODO here: isclaim, issupport, subtype,
 
 		voutList = append(voutList, vout)
 	}
@@ -882,7 +895,6 @@ func handleEstimateFee(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 	return float64(feeRate), nil
 }
 
-// handleGenerate handles generate commands.
 func handleGenerate(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	// Respond with an error if there are no addresses to pay the
 	// created blocks to.
@@ -919,7 +931,62 @@ func handleGenerate(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 	// Create a reply
 	reply := make([]string, c.NumBlocks)
 
-	blockHashes, err := s.cfg.CPUMiner.GenerateNBlocks(c.NumBlocks)
+	blockHashes, err := s.cfg.CPUMiner.GenerateNBlocks(c.NumBlocks, nil)
+	if err != nil {
+		return nil, &btcjson.RPCError{
+			Code:    btcjson.ErrRPCInternal.Code,
+			Message: err.Error(),
+		}
+	}
+
+	// Mine the correct number of blocks, assigning the hex representation of the
+	// hash of each one to its place in the reply.
+	for i, hash := range blockHashes {
+		reply[i] = hash.String()
+	}
+
+	return reply, nil
+}
+
+// handleGenerateToAddress handles generate commands.
+func handleGenerateToAddress(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	c := cmd.(*btcjson.GenerateToAddressCmd)
+	payToAddr, err := btcutil.DecodeAddress(c.Address, s.cfg.ChainParams)
+
+	// Respond with an error if there are no addresses to pay the
+	// created blocks to.
+	if err != nil {
+		return nil, &btcjson.RPCError{
+			Code:    btcjson.ErrRPCInvalidParameter,
+			Message: "No payment addresses specified ",
+		}
+	}
+	// cfg.miningAddrs = append(cfg.miningAddrs, maddr)
+
+	// Respond with an error if there's virtually 0 chance of mining a block
+	// with the CPU.
+	if !s.cfg.ChainParams.GenerateSupported {
+		return nil, &btcjson.RPCError{
+			Code: btcjson.ErrRPCDifficulty,
+			Message: fmt.Sprintf("No support for `generatetoaddress` on "+
+				"the current network, %s, as it's unlikely to "+
+				"be possible to mine a block with the CPU.",
+				s.cfg.ChainParams.Net),
+		}
+	}
+
+	// Respond with an error if the client is requesting 0 blocks to be generated.
+	if c.NumBlocks == 0 {
+		return nil, &btcjson.RPCError{
+			Code:    btcjson.ErrRPCInternal.Code,
+			Message: "Please request a nonzero number of blocks to generate.",
+		}
+	}
+
+	// Create a reply
+	reply := make([]string, c.NumBlocks)
+
+	blockHashes, err := s.cfg.CPUMiner.GenerateNBlocks(uint32(c.NumBlocks), payToAddr)
 	if err != nil {
 		return nil, &btcjson.RPCError{
 			Code:    btcjson.ErrRPCInternal.Code,
@@ -2537,6 +2604,84 @@ func handleGetNodeAddresses(s *rpcServer, cmd interface{}, closeChan <-chan stru
 	return addresses, nil
 }
 
+// handleGetNetworkInfo implements the getnetworkinfo command.
+func handleGetNetworkInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	ver := wire.MsgVersion{}
+	_ = ver.AddUserAgent(userAgentName, userAgentVersion, cfg.UserAgentComments...)
+
+	var localAddrs []btcjson.LocalAddressesResult
+	var ipv4Reachable, ipv6Reachable bool
+	for _, addr := range s.cfg.AddrMgr.LocalAddresses() {
+		localAddrs = append(localAddrs, btcjson.LocalAddressesResult{
+			Address: addr.NA.IP.String(),
+			Port:    addr.NA.Port,
+			Score:   int32(addr.Score),
+		})
+		if addr.NA.IP.To4() != nil {
+			ipv4Reachable = true
+		} else {
+			ipv6Reachable = true
+		}
+	}
+
+	onionProxy := cfg.Proxy
+	if cfg.OnionProxy != "" {
+		onionProxy = cfg.OnionProxy
+	}
+
+	var warnings string
+	unknownRulesWarned := s.cfg.Chain.GetWarnings()
+	if unknownRulesWarned {
+		warnings = "Warning: Unknown new rules activated! "
+	}
+
+	var timeOffset int64
+	if !s.cfg.SyncMgr.IsCurrent() {
+		ss := s.cfg.Chain.BestSnapshot()
+		bestHeader, err := s.cfg.Chain.HeaderByHash(&ss.Hash)
+		if err != nil {
+			return nil, err
+		}
+		timeOffset = int64(time.Since(bestHeader.Timestamp).Seconds())
+	}
+
+	reply := &btcjson.GetNetworkInfoResult{
+		ProtocolVersion: int32(wire.ProtocolVersion),
+		Version:         versionNumeric(),
+		Connections:     s.cfg.ConnMgr.ConnectedCount(),
+		IncrementalFee:  cfg.MinRelayTxFee,
+		LocalAddresses:  localAddrs,
+		LocalRelay:      !cfg.BlocksOnly,
+		LocalServices:   s.cfg.Services.String(),
+		NetworkActive:   true,
+		Networks: []btcjson.NetworksResult{
+			{
+				Name:      "ipv4",
+				Reachable: ipv4Reachable,
+				Proxy:     cfg.Proxy,
+			},
+			{
+				Name:      "ipv6",
+				Reachable: ipv6Reachable,
+				Proxy:     cfg.Proxy,
+			},
+			{
+				Name: "onion",
+
+				ProxyRandomizeCredentials: cfg.TorIsolation,
+
+				Proxy:     onionProxy,
+				Reachable: cfg.Proxy != "" || cfg.OnionProxy != "",
+			},
+		},
+		RelayFee:   cfg.MinRelayTxFee,
+		SubVersion: ver.UserAgent,
+		TimeOffset: timeOffset,
+		Warnings:   warnings,
+	}
+	return reply, nil
+}
+
 // handleGetPeerInfo implements the getpeerinfo command.
 func handleGetPeerInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	peers := s.cfg.ConnMgr.ConnectedPeers()
@@ -2795,10 +2940,12 @@ func handleGetTxOut(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 	// doesn't fully parse, so ignore the error here.
 	disbuf, _ := txscript.DisasmString(pkScript)
 
+	script := txscript.StripClaimScriptPrefix(pkScript)
+
 	// Get further info about the script.
 	// Ignore the error here since an error means the script couldn't parse
 	// and there is no additional information about it anyways.
-	scriptClass, addrs, reqSigs, _ := txscript.ExtractPkScriptAddrs(pkScript,
+	scriptClass, addrs, reqSigs, _ := txscript.ExtractPkScriptAddrs(script,
 		s.cfg.ChainParams)
 	addresses := make([]string, len(addrs))
 	for i, addr := range addrs {
@@ -2813,11 +2960,20 @@ func handleGetTxOut(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 			Asm:       disbuf,
 			Hex:       hex.EncodeToString(pkScript),
 			ReqSigs:   int32(reqSigs),
-			Type:      scriptClass.String(),
 			Addresses: addresses,
 		},
 		Coinbase: isCoinbase,
 	}
+
+	if len(script) < len(pkScript) {
+		txOutReply.ScriptPubKey.IsClaim = pkScript[0] == txscript.OP_CLAIMNAME || pkScript[0] == txscript.OP_UPDATECLAIM
+		txOutReply.ScriptPubKey.IsSupport = pkScript[0] == txscript.OP_SUPPORTCLAIM
+		txOutReply.ScriptPubKey.SubType = scriptClass.String()
+		txOutReply.ScriptPubKey.Type = txscript.ScriptClass.String(0)
+	} else {
+		txOutReply.ScriptPubKey.Type = scriptClass.String()
+	}
+
 	return txOutReply, nil
 }
 
@@ -3066,6 +3222,8 @@ func createVinListPrevOut(s *rpcServer, mtx *wire.MsgTx, chainParams *chaincfg.P
 			vinListEntry.PrevOut = &btcjson.PrevOut{
 				Addresses: encodedAddrs,
 				Value:     btcutil.Amount(originTxOut.Value).ToBTC(),
+				IsClaim:   originTxOut.PkScript[0] == txscript.OP_CLAIMNAME || originTxOut.PkScript[0] == txscript.OP_UPDATECLAIM,
+				IsSupport: originTxOut.PkScript[0] == txscript.OP_SUPPORTCLAIM,
 			}
 		}
 	}
@@ -3548,7 +3706,7 @@ func handleStop(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (inter
 	case s.requestProcessShutdown <- struct{}{}:
 	default:
 	}
-	return "btcd stopping.", nil
+	return "lbcd stopping.", nil
 }
 
 // handleSubmitBlock implements the submitblock command.
@@ -3756,7 +3914,7 @@ func handleVerifyMessage(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 // NOTE: This is a btcsuite extension ported from github.com/decred/dcrd.
 func handleVersion(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	result := map[string]btcjson.VersionResult{
-		"btcdjsonrpcapi": {
+		"lbcdjsonrpcapi": {
 			VersionString: jsonrpcSemverString,
 			Major:         jsonrpcSemverMajor,
 			Minor:         jsonrpcSemverMinor,
@@ -4350,7 +4508,7 @@ func (s *rpcServer) jsonRPCRead(w http.ResponseWriter, r *http.Request, isAdmin 
 
 // jsonAuthFail sends a message back to the client if the http auth is rejected.
 func jsonAuthFail(w http.ResponseWriter) {
-	w.Header().Add("WWW-Authenticate", `Basic realm="btcd RPC"`)
+	w.Header().Add("WWW-Authenticate", `Basic realm="lbcd RPC"`)
 	http.Error(w, "401 Unauthorized.", http.StatusUnauthorized)
 }
 
@@ -4431,7 +4589,7 @@ func (s *rpcServer) Start() {
 func genCertPair(certFile, keyFile string) error {
 	rpcsLog.Infof("Generating TLS certificates...")
 
-	org := "btcd autogenerated cert"
+	org := "lbcd autogenerated cert"
 	validUntil := time.Now().Add(10 * 365 * 24 * time.Hour)
 	cert, key, err := btcutil.NewTLSCertPair(org, validUntil, nil)
 	if err != nil {
@@ -4582,6 +4740,9 @@ type rpcserverConfig struct {
 	// connection-related data and tasks.
 	ConnMgr rpcserverConnManager
 
+	// AddrMgr is the server's instance of the AddressManager.
+	AddrMgr *addrmgr.AddrManager
+
 	// SyncMgr defines the sync manager for the RPC server to use.
 	SyncMgr rpcserverSyncManager
 
@@ -4612,6 +4773,9 @@ type rpcserverConfig struct {
 	// The fee estimator keeps track of how long transactions are left in
 	// the mempool before they are mined into blocks.
 	FeeEstimator *mempool.FeeEstimator
+
+	// Services represents the services supported by this node.
+	Services wire.ServiceFlag
 }
 
 // newRPCServer returns a new instance of the rpcServer struct.

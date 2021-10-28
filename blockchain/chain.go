@@ -199,6 +199,15 @@ func (b *BlockChain) HaveBlock(hash *chainhash.Hash) (bool, error) {
 	return exists || b.IsKnownOrphan(hash), nil
 }
 
+// GetWarnings returns a bool for whether unknownRules
+// has been warned.
+func (b *BlockChain) GetWarnings() bool {
+	b.chainLock.RLock()
+	defer b.chainLock.RUnlock()
+
+	return b.unknownRulesWarned
+}
+
 // IsKnownOrphan returns whether the passed hash is currently a known orphan.
 // Keep in mind that only a limited number of orphans are held onto for a
 // limited amount of time, so this function must not be used as an absolute

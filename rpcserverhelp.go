@@ -454,6 +454,27 @@ var helpDescsEnUS = map[string]string{
 	"getnetworkhashps-height":    "Perform estimate ending with this height or -1 for current best chain block height",
 	"getnetworkhashps--result0":  "Estimated hashes per second",
 
+	// GetNetworkInfo help.
+	"getnetworkinfo--synopsis":       "Returns an object containing various state info regarding P2P networking.",
+	"getnetworkinfo--result0--desc":  "GetNetworkInfo object",
+	"getnetworkinfo--result0--key":   "Field name",
+	"getnetworkinfo--result0--value": "Object containing the network info",
+
+	// GetNetworkInfoResult help.
+	"getnetworkinforesult-version":         "The server version",
+	"getnetworkinforesult-subversion":      "The server subversion string",
+	"getnetworkinforesult-protocolversion": "The protocol version",
+	"getnetworkinforesult-localservices":   "The services we offer to the network",
+	"getnetworkinforesult-localrelay":      "True if transaction relay is requested from peers",
+	"getnetworkinforesult-timeoffset":      "The time offset",
+	"getnetworkinforesult-connections":     "The number of connections",
+	"getnetworkinforesult-networkactive":   "Whether p2p networking is enabled",
+	"getnetworkinforesult-networks":        "Information per network",
+	"getnetworkinforesult-relayfee":        "Minimum relay fee for transactions in BTC/kB",
+	"getnetworkinforesult-incrementalfee":  "Minimum fee increment for mempool limiting or BIP 125 replacement in BTC/kB",
+	"getnetworkinforesult-localaddresses":  "List of local addresses",
+	"getnetworkinforesult-warnings":        "Any network and blockchain warnings",
+
 	// GetNetTotalsCmd help.
 	"getnettotals--synopsis": "Returns a JSON object containing network traffic statistics.",
 
@@ -819,6 +840,7 @@ var rpcResultTypes = map[string][]interface{}{
 	"getmininginfo":          {(*btcjson.GetMiningInfoResult)(nil)},
 	"getnettotals":           {(*btcjson.GetNetTotalsResult)(nil)},
 	"getnetworkhashps":       {(*int64)(nil)},
+	"getnetworkinfo":         {(*map[string]btcjson.GetNetworkInfoResult)(nil)},
 	"getnodeaddresses":       {(*[]btcjson.GetNodeAddressesResult)(nil)},
 	"getpeerinfo":            {(*[]btcjson.GetPeerInfoResult)(nil)},
 	"getrawmempool":          {(*[]string)(nil), (*btcjson.GetRawMempoolVerboseResult)(nil)},

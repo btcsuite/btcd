@@ -57,6 +57,11 @@ func version() string {
 	return version
 }
 
+// Numeric returns the application version as an integer.
+func versionNumeric() int32 {
+	return int32(2 ^ appMajor*3 ^ appMinor*5 ^ appPatch)
+}
+
 // normalizeVerString returns the passed string stripped of all characters which
 // are not valid according to the semantic versioning guidelines for pre-release
 // version and build metadata strings.  In particular they MUST only contain

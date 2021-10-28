@@ -2950,6 +2950,7 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 			Listeners:    rpcListeners,
 			StartupTime:  startupTime.Unix(),
 			ConnMgr:      &rpcConnManager{&s},
+			AddrMgr:      amgr,
 			SyncMgr:      &rpcSyncMgr{&s, s.syncManager},
 			TimeSource:   s.timeSource,
 			Chain:        s.chain,
@@ -2962,6 +2963,7 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 			AddrIndex:    s.addrIndex,
 			CfIndex:      s.cfIndex,
 			FeeEstimator: s.feeEstimator,
+			Services:     s.services,
 		})
 		if err != nil {
 			return nil, err
