@@ -325,6 +325,14 @@ type GetMempoolEntryResult struct {
 	Depends         []string    `json:"depends"`
 }
 
+// GetChainTipsResult models the data returns from the getchaintips command.
+type GetChainTipsResult struct {
+	Height    int64  `json:"height"`
+	Hash      string `json:"hash"`
+	BranchLen int64  `json:"branchlen"`
+	Status    string `json:"status"`
+}
+
 // GetMempoolInfoResult models the data returned from the getmempoolinfo
 // command.
 type GetMempoolInfoResult struct {

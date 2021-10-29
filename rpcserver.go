@@ -147,6 +147,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"getblockcount":          handleGetBlockCount,
 	"getblockhash":           handleGetBlockHash,
 	"getblockheader":         handleGetBlockHeader,
+	"getchaintips":           handleGetChainTips,
 	"getblocktemplate":       handleGetBlockTemplate,
 	"getcfilter":             handleGetCFilter,
 	"getcfilterheader":       handleGetCFilterHeader,
@@ -1469,6 +1470,16 @@ func handleGetBlockHeader(s *rpcServer, cmd interface{}, closeChan <-chan struct
 		Difficulty:    getDifficultyRatio(blockHeader.Bits, params),
 	}
 	return blockHeaderReply, nil
+}
+
+// handleGetChainTips implements the getchaintips command.
+func handleGetChainTips(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	tips := s.cfg.Chain.ChainTips()
+	results := make([]btcjson.GetChainTipsResult, 0, len(tips))
+	for _, tip := range tips {
+		results = append(results, btcjson.GetChainTipsResult(tip))
+	}
+	return results, nil
 }
 
 // encodeTemplateID encodes the passed details into an ID that can be used to

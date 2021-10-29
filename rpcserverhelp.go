@@ -353,6 +353,22 @@ var helpDescsEnUS = map[string]string{
 	"getblocktemplate--condition2": "mode=proposal, accepted",
 	"getblocktemplate--result1":    "An error string which represents why the proposal was rejected or nothing if accepted",
 
+	// GetChainTips help.
+	"getchaintips--synopsis": "Returns information about all known chain tips the in the block tree.\n\n" +
+		"The statuses in the result have the following meanings:\n" +
+		"active: The current best chain tip.\n" +
+		"invalid: The block or one of its ancestors is invalid.\n" +
+		"headers-only: The block or one of its ancestors does not have the full block data available which also means the block can't be validated or connected.\n" +
+		"valid-fork: The block is fully validated which implies it was probably part of the main chain at one point and was reorganized.\n" +
+		"valid-headers: The full block data is available and the header is valid, but the block was never validated which implies it was probably never part of the main chain.",
+
+	// GetChainTipsResult help.
+	"getchaintipsresult-height":    "The height of the chain tip",
+	"getchaintipsresult-hash":      "The block hash of the chain tip",
+	"getchaintipsresult-branchlen": "The length of the branch that connects the tip to the main chain (0 for the main chain tip)",
+	"getchaintipsresult-status":    "The status of the chain (active, invalid, headers-only, valid-fork, valid-headers)",
+	"getchaintipsresults--result0": "test",
+
 	// GetCFilterCmd help.
 	"getcfilter--synopsis":  "Returns a block's committed filter given its hash.",
 	"getcfilter-filtertype": "The type of filter to return (0=regular)",
@@ -837,6 +853,7 @@ var rpcResultTypes = map[string][]interface{}{
 	"getblockchaininfo":      {(*btcjson.GetBlockChainInfoResult)(nil)},
 	"getcfilter":             {(*string)(nil)},
 	"getcfilterheader":       {(*string)(nil)},
+	"getchaintips":           {(*[]btcjson.GetChainTipsResult)(nil)},
 	"getconnectioncount":     {(*int32)(nil)},
 	"getcurrentnet":          {(*uint32)(nil)},
 	"getdifficulty":          {(*float64)(nil)},
