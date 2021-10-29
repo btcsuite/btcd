@@ -203,7 +203,6 @@ type server struct {
 	started       int32
 	shutdown      int32
 	shutdownSched int32
-	startupTime   int64
 
 	chainParams          *chaincfg.Params
 	addrManager          *addrmgr.AddrManager
@@ -2371,9 +2370,6 @@ func (s *server) Start() {
 
 	srvrLog.Trace("Starting server")
 
-	// Server startup time. Used for the uptime command for uptime calculation.
-	s.startupTime = time.Now().Unix()
-
 	// Start the peer handler which in turn starts the address and block
 	// managers.
 	s.wg.Add(1)
@@ -2630,6 +2626,8 @@ func setupRPCListeners() ([]net.Listener, error) {
 func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 	db database.DB, chainParams *chaincfg.Params,
 	interrupt <-chan struct{}) (*server, error) {
+
+	startupTime := time.Now()
 
 	services := defaultServices
 	if cfg.NoPeerBloomFilters {
@@ -2937,7 +2935,7 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 
 		s.rpcServer, err = newRPCServer(&rpcserverConfig{
 			Listeners:    rpcListeners,
-			StartupTime:  s.startupTime,
+			StartupTime:  startupTime.Unix(),
 			ConnMgr:      &rpcConnManager{&s},
 			SyncMgr:      &rpcSyncMgr{&s, s.syncManager},
 			TimeSource:   s.timeSource,
