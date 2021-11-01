@@ -651,7 +651,7 @@ func countSigOpsV0(script []byte, precise bool) int {
 			// covering 1 through 16 pubkeys, which means this will count any
 			// more than that value (e.g. 17, 18 19) as the maximum number of
 			// allowed pubkeys. This is, unfortunately, now part of
-			// the Bitcion consensus rules, due to historical
+			// the Bitcoin consensus rules, due to historical
 			// reasons. This could be made more correct with a new
 			// script version, however, ideally all multisignaure
 			// operations in new script versions should move to
@@ -799,6 +799,9 @@ func getWitnessSigOps(pkScript []byte, witness wire.TxWitness) int {
 			witnessScript := witness[len(witness)-1]
 			return countSigOpsV0(witnessScript, true)
 		}
+	case 1:
+		// https://github.com/bitcoin/bitcoin/blob/368831371d97a642beb54b5c4eb6eb0fedaa16b4/src/script/interpreter.cpp#L2090
+		return 0
 	}
 
 	return 0

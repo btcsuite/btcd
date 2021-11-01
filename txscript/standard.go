@@ -7,9 +7,9 @@ package txscript
 import (
 	"fmt"
 
+	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcd/btcutil"
 )
 
 const (
@@ -58,6 +58,7 @@ const (
 	WitnessV0ScriptHashTy                    // Pay to witness script hash.
 	MultiSigTy                               // Multi signature.
 	NullDataTy                               // Empty data-only (provably prunable).
+	WitnessV1TaprootTy                       // Taproot output
 	WitnessUnknownTy                         // Witness unknown
 )
 
@@ -72,6 +73,7 @@ var scriptClassToName = []string{
 	WitnessV0ScriptHashTy: "witness_v0_scripthash",
 	MultiSigTy:            "multisig",
 	NullDataTy:            "nulldata",
+	WitnessV1TaprootTy:    "witness_v1_taproot",
 	WitnessUnknownTy:      "witness_unknown",
 }
 
@@ -349,11 +351,11 @@ func IsMultisigSigScript(script []byte) bool {
 func extractWitnessPubKeyHash(script []byte) []byte {
 	// A pay-to-witness-pubkey-hash script is of the form:
 	//   OP_0 OP_DATA_20 <20-byte-hash>
-	if len(script) == 22 &&
+	if len(script) == witnessV0PubKeyHashLen &&
 		script[0] == OP_0 &&
 		script[1] == OP_DATA_20 {
 
-		return script[2:22]
+		return script[2:witnessV0PubKeyHashLen]
 	}
 
 	return nil
@@ -365,14 +367,30 @@ func isWitnessPubKeyHashScript(script []byte) bool {
 	return extractWitnessPubKeyHash(script) != nil
 }
 
-// extractWitnessScriptHash extracts the witness script hash from the passed
+// extractWitnessV0ScriptHash extracts the witness script hash from the passed
 // script if it is standard pay-to-witness-script-hash script. It will return
 // nil otherwise.
-func extractWitnessScriptHash(script []byte) []byte {
+func extractWitnessV0ScriptHash(script []byte) []byte {
 	// A pay-to-witness-script-hash script is of the form:
 	//   OP_0 OP_DATA_32 <32-byte-hash>
-	if len(script) == 34 &&
+	if len(script) == witnessV0ScriptHashLen &&
 		script[0] == OP_0 &&
+		script[1] == OP_DATA_32 {
+
+		return script[2:34]
+	}
+
+	return nil
+}
+
+// extractWitnessV1ScriptHash extracts the witness script hash from the passed
+// script if it is standard pay-to-witness-script-hash script. It will return
+// nil otherwise.
+func extractWitnessV1ScriptHash(script []byte) []byte {
+	// A pay-to-witness-script-hash script is of the form:
+	//   OP_1 OP_DATA_32 <32-byte-hash>
+	if len(script) == witnessV1TaprootLen &&
+		script[0] == OP_1 &&
 		script[1] == OP_DATA_32 {
 
 		return script[2:34]
@@ -384,7 +402,7 @@ func extractWitnessScriptHash(script []byte) []byte {
 // isWitnessScriptHashScript returns whether or not the passed script is a
 // standard pay-to-witness-script-hash script.
 func isWitnessScriptHashScript(script []byte) bool {
-	return extractWitnessScriptHash(script) != nil
+	return extractWitnessV0ScriptHash(script) != nil
 }
 
 // extractWitnessProgramInfo returns the version and program if the passed
@@ -435,13 +453,26 @@ func extractWitnessProgramInfo(script []byte) (int, []byte, bool) {
 // smallest program is the witness version, followed by a data push of
 // 2 bytes.  The largest allowed witness program has a data push of
 // 40-bytes.
-//
-// NOTE: This function is only valid for version 0 scripts.  Since the function
-// does not accept a script version, the results are undefined for other script
-// versions.
 func isWitnessProgramScript(script []byte) bool {
 	_, _, valid := extractWitnessProgramInfo(script)
 	return valid
+}
+
+// isWitnessTaprootScript returns true if the passed script is for a
+// pay-to-witness-taproot output, false otherwise.
+func isWitnessTaprootScript(script []byte) bool {
+	return extractWitnessV1ScriptHash(script) != nil
+}
+
+// isAnnexedWitness returns true if the passed witness has a final push
+// that is a witness annex.
+func isAnnexedWitness(witness [][]byte) bool {
+	const OP_ANNEX = 0x50
+	if len(witness) < 2 {
+		return false
+	}
+	lastElement := witness[len(witness)-1]
+	return len(lastElement) > 0 && lastElement[0] == OP_ANNEX
 }
 
 // isNullDataScript returns whether or not the passed script is a standard
@@ -480,41 +511,49 @@ func isNullDataScript(scriptVersion uint16, script []byte) bool {
 }
 
 // scriptType returns the type of the script being inspected from the known
-// standard types.
-//
-// NOTE:  All scripts that are not version 0 are currently considered non
-// standard.
+// standard types. The version version should be 0 if the script is segwit v0
+// or prior, and 1 for segwit v1 (taproot) scripts.
 func typeOfScript(scriptVersion uint16, script []byte) ScriptClass {
-	if scriptVersion != 0 {
-		return NonStandardTy
+	switch scriptVersion {
+	case 0:
+		switch {
+		case isPubKeyScript(script):
+			return PubKeyTy
+		case isPubKeyHashScript(script):
+			return PubKeyHashTy
+		case isScriptHashScript(script):
+			return ScriptHashTy
+		case isWitnessPubKeyHashScript(script):
+			return WitnessV0PubKeyHashTy
+		case isWitnessScriptHashScript(script):
+			return WitnessV0ScriptHashTy
+		case isMultisigScript(scriptVersion, script):
+			return MultiSigTy
+		case isNullDataScript(scriptVersion, script):
+			return NullDataTy
+		}
+	case 1:
+		switch {
+		case isWitnessTaprootScript(script):
+			return WitnessV1TaprootTy
+		}
 	}
-
-	switch {
-	case isPubKeyScript(script):
-		return PubKeyTy
-	case isPubKeyHashScript(script):
-		return PubKeyHashTy
-	case isScriptHashScript(script):
-		return ScriptHashTy
-	case isWitnessPubKeyHashScript(script):
-		return WitnessV0PubKeyHashTy
-	case isWitnessScriptHashScript(script):
-		return WitnessV0ScriptHashTy
-	case isMultisigScript(scriptVersion, script):
-		return MultiSigTy
-	case isNullDataScript(scriptVersion, script):
-		return NullDataTy
-	default:
-		return NonStandardTy
-	}
+	return NonStandardTy
 }
 
 // GetScriptClass returns the class of the script passed.
 //
 // NonStandardTy will be returned when the script does not parse.
 func GetScriptClass(script []byte) ScriptClass {
-	const scriptVersion = 0
-	return typeOfScript(scriptVersion, script)
+	const scriptVersionSegWit = 0
+	classSegWit := typeOfScript(scriptVersionSegWit, script)
+
+	if classSegWit != NonStandardTy {
+		return classSegWit
+	}
+
+	const scriptVersionTaproot = 1
+	return typeOfScript(scriptVersionTaproot, script)
 }
 
 // NewScriptClass returns the ScriptClass corresponding to the string name
@@ -558,6 +597,10 @@ func expectedInputs(script []byte, class ScriptClass) int {
 		return 1
 
 	case WitnessV0ScriptHashTy:
+		// Not including script.  That is handled by the caller.
+		return 1
+
+	case WitnessV1TaprootTy:
 		// Not including script.  That is handled by the caller.
 		return 1
 
@@ -848,10 +891,6 @@ func MultiSigScript(pubkeys []*btcutil.AddressPubKey, nrequired int) ([]byte, er
 
 // PushedData returns an array of byte slices containing any pushed data found
 // in the passed script.  This includes OP_0, but not OP_1 - OP_16.
-//
-// NOTE: This function is only valid for version 0 scripts.  Since the function
-// does not accept a script version, the results are undefined for other script
-// versions.
 func PushedData(script []byte) ([][]byte, error) {
 	const scriptVersion = 0
 
@@ -900,11 +939,8 @@ func scriptHashToAddrs(hash []byte, params *chaincfg.Params) []btcutil.Address {
 // signatures associated with the passed PkScript.  Note that it only works for
 // 'standard' transaction script types.  Any data such as public keys which are
 // invalid are omitted from the results.
-//
-// NOTE: This function only attempts to identify version 0 scripts.  The return
-// value will indicate a nonstandard script type for other script versions along
-// with an invalid script version error.
-func ExtractPkScriptAddrs(pkScript []byte, chainParams *chaincfg.Params) (ScriptClass, []btcutil.Address, int, error) {
+func ExtractPkScriptAddrs(pkScript []byte,
+	chainParams *chaincfg.Params) (ScriptClass, []btcutil.Address, int, error) {
 
 	// Check for pay-to-pubkey-hash script.
 	if hash := extractPubKeyHash(pkScript); hash != nil {
@@ -956,7 +992,7 @@ func ExtractPkScriptAddrs(pkScript []byte, chainParams *chaincfg.Params) (Script
 		return WitnessV0PubKeyHashTy, addrs, 1, nil
 	}
 
-	if hash := extractWitnessScriptHash(pkScript); hash != nil {
+	if hash := extractWitnessV0ScriptHash(pkScript); hash != nil {
 		var addrs []btcutil.Address
 		addr, err := btcutil.NewAddressWitnessScriptHash(hash, chainParams)
 		if err == nil {
