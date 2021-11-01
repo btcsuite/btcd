@@ -334,7 +334,7 @@ func TestComputePkScript(t *testing.T) {
 			pkScript:  nil,
 		},
 		{
-			name:      "P2WSH witness",
+			name:      "witness unknown",
 			sigScript: nil,
 			witness: [][]byte{
 				{},
@@ -348,20 +348,14 @@ func TestComputePkScript(t *testing.T) {
 					0x42, 0x59, 0x90, 0xac, 0xac,
 				},
 			},
-			class: WitnessV0ScriptHashTy,
-			pkScript: []byte{
-				// OP_0
-				0x00,
-				// OP_DATA_32
-				0x20,
-				// <32-byte script hash>
-				0x01, 0xd5, 0xd9, 0x2e, 0xff, 0xa6, 0xff, 0xba,
-				0x3e, 0xfa, 0x37, 0x9f, 0x98, 0x30, 0xd0, 0xf7,
-				0x56, 0x18, 0xb1, 0x33, 0x93, 0x82, 0x71, 0x52,
-				0xd2, 0x6e, 0x43, 0x09, 0x00, 0x0e, 0x88, 0xb1,
-			},
+			// We can't say for sure what kind of pubkey script this is. Before
+			// taproot, it would have been p2sh
+			class: WitnessUnknownTy,
 		},
 		{
+			// Before taproot, we could tell this script type based on its
+			// structure. But now this particular structure matches rules for
+			// both witness_v0_keyhash and witness_v1_taproot.
 			name:      "P2WPKH witness",
 			sigScript: nil,
 			witness: [][]byte{
@@ -378,17 +372,7 @@ func TestComputePkScript(t *testing.T) {
 					0x59, 0x90, 0xac,
 				},
 			},
-			class: WitnessV0PubKeyHashTy,
-			pkScript: []byte{
-				// OP_0
-				0x00,
-				// OP_DATA_20
-				0x14,
-				// <20-byte pubkey hash>
-				0x1d, 0x7c, 0xd6, 0xc7, 0x5c, 0x2e, 0x86, 0xf4,
-				0xcb, 0xf9, 0x8e, 0xae, 0xd2, 0x21, 0xb3, 0x0b,
-				0xd9, 0xa0, 0xb9, 0x28,
-			},
+			class: WitnessUnknownTy,
 		},
 		// Invalid v0 P2WPKH - same as above but missing a byte on the
 		// public key.
@@ -429,12 +413,12 @@ func TestComputePkScript(t *testing.T) {
 			}
 
 			if pkScript.Class() != test.class {
-				t.Fatalf("expected pkScript of type %v, got %v",
-					test.class, pkScript.Class())
+				t.Fatalf("%s: expected pkScript of type %v, got %v",
+					test.name, test.class, pkScript.Class())
 			}
 			if !bytes.Equal(pkScript.Script(), test.pkScript) {
-				t.Fatalf("expected pkScript=%x, got pkScript=%x",
-					test.pkScript, pkScript.Script())
+				t.Fatalf("%s: expected pkScript=%x, got pkScript=%x",
+					test.name, test.pkScript, pkScript.Script())
 			}
 		})
 	}

@@ -47,6 +47,9 @@ const (
 	// witnessV0ScriptHashLen is the length of a P2WSH script.
 	witnessV0ScriptHashLen = 34
 
+	// witnessV1TaprootLen is the length of a P2TR script.
+	witnessV1TaprootLen = 34
+
 	// maxLen is the maximum script length supported by ParsePkScript.
 	maxLen = witnessV0ScriptHashLen
 )
@@ -99,7 +102,7 @@ func ParsePkScript(pkScript []byte) (PkScript, error) {
 func isSupportedScriptType(class ScriptClass) bool {
 	switch class {
 	case PubKeyHashTy, WitnessV0PubKeyHashTy, ScriptHashTy,
-		WitnessV0ScriptHashTy:
+		WitnessV0ScriptHashTy, WitnessV1TaprootTy:
 		return true
 	default:
 		return false
@@ -131,6 +134,10 @@ func (s PkScript) Script() []byte {
 	case WitnessV0ScriptHashTy:
 		script = make([]byte, witnessV0ScriptHashLen)
 		copy(script, s.script[:witnessV0ScriptHashLen])
+
+	case WitnessV1TaprootTy:
+		script = make([]byte, witnessV1TaprootLen)
+		copy(script, s.script[:witnessV1TaprootLen])
 
 	default:
 		// Unsupported script type.
@@ -232,35 +239,24 @@ func computeNonWitnessPkScript(sigScript []byte) (PkScript, error) {
 
 // computeWitnessPkScript computes the script of an output by looking at the
 // spending input's witness.
+// IMPORTANT: With the addition of taproot, we can no longer say for certain
+// what kind of script the witness is in most cases. The only case in which we
+// can say for sure is when the witness data has an annex as the last push. In
+// that case, we can identify the script type, but we lack the ability to
+// reconstruct the script itself.
 func computeWitnessPkScript(witness wire.TxWitness) (PkScript, error) {
-	// We'll use the last item of the witness stack to determine the proper
-	// witness type.
-	lastWitnessItem := witness[len(witness)-1]
-
 	var pkScript PkScript
 	switch {
-	// If the witness stack has a size of 2 and its last item is a
-	// compressed public key, then this is a P2WPKH witness.
-	case len(witness) == 2 && len(lastWitnessItem) == compressedPubKeyLen:
-		pubKeyHash := hash160(lastWitnessItem)
-		script, err := payToWitnessPubKeyHashScript(pubKeyHash)
-		if err != nil {
-			return pkScript, err
-		}
+	// If the last push starts with the annex flag, this is a taproot spend.
+	// We can set the script class, but we can't say what the pubkey script
+	// looks like with just the witness data.
+	case isAnnexedWitness(witness):
+		pkScript.class = WitnessV1TaprootTy
 
-		pkScript.class = WitnessV0PubKeyHashTy
-		copy(pkScript.script[:], script)
-
-	// For any other witnesses, we'll assume it's a P2WSH witness.
+	// For any other witnesses, we can't say for certain what type it is or what
+	// the pubkey script will be.
 	default:
-		scriptHash := sha256.Sum256(lastWitnessItem)
-		script, err := payToWitnessScriptHashScript(scriptHash[:])
-		if err != nil {
-			return pkScript, err
-		}
-
-		pkScript.class = WitnessV0ScriptHashTy
-		copy(pkScript.script[:], script)
+		pkScript.class = WitnessUnknownTy
 	}
 
 	return pkScript, nil

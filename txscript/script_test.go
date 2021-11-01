@@ -173,6 +173,7 @@ func TestGetPreciseSigOps(t *testing.T) {
 // nested p2sh, and invalid variants are counted properly.
 func TestGetWitnessSigOpCount(t *testing.T) {
 	t.Parallel()
+	const OP_ANNEX = 0x50
 	tests := []struct {
 		name string
 
@@ -182,7 +183,7 @@ func TestGetWitnessSigOpCount(t *testing.T) {
 
 		numSigOps int
 	}{
-		// A regualr p2wkh witness program. The output being spent
+		// A regular p2wkh witness program. The output being spent
 		// should only have a single sig-op counted.
 		{
 			name: "p2wkh",
@@ -242,6 +243,36 @@ func TestGetWitnessSigOpCount(t *testing.T) {
 				mustParseShortForm("DUP HASH160 " +
 					"'17VZNX1SN5NtKa8UQFxwQbFeFc3iqRYhem'" +
 					" EQUALVERIFY CHECKSIG DATA_20 0x91"),
+			},
+		},
+
+		{
+			name:      "taproot key-path spend",
+			numSigOps: 0, // DRAFT NOTE: verify these should really be zero.
+			pkScript:  hexToBytes("512058ce9d16c3384731a1727e512530620d031ee7b12f42aade70c9f976a905a74b"),
+			witness: wire.TxWitness{
+				hexToBytes("DCBA"),
+			},
+		},
+		{
+			name:      "taproot script-path spend without annex",
+			numSigOps: 0,
+			pkScript:  hexToBytes("512058ce9d16c3384731a1727e512530620d031ee7b12f42aade70c9f976a905a74b"),
+			witness: wire.TxWitness{
+				[]byte("signature"),
+				mustParseShortForm("CHECKSIG CHECKSIG"),
+				[]byte("control block"),
+			},
+		},
+		{
+			name:      "taproot script-path spend with annex",
+			numSigOps: 0,
+			pkScript:  hexToBytes("512058ce9d16c3384731a1727e512530620d031ee7b12f42aade70c9f976a905a74b"),
+			witness: wire.TxWitness{
+				[]byte("stuff"),
+				mustParseShortForm("CHECKSIG"),
+				[]byte("control block"),
+				[]byte{OP_ANNEX},
 			},
 		},
 	}
