@@ -71,6 +71,20 @@ func newAddressScriptHash(scriptHash []byte) btcutil.Address {
 	return addr
 }
 
+// newAddressTaproot returns a new btcutil.AddressTaproot from the
+// provided hash.  It panics if an error occurs.  This is only used in the tests
+// as a helper since the only way it can fail is if there is an error in the
+// test source code.
+func newAddressTaproot(scriptHash []byte) btcutil.Address {
+	addr, err := btcutil.NewAddressTaproot(scriptHash,
+		&chaincfg.MainNetParams)
+	if err != nil {
+		panic("invalid script hash in test source")
+	}
+
+	return addr
+}
+
 // TestExtractPkScriptAddrs ensures that extracting the type, addresses, and
 // number of required signatures from PkScripts works as intended.
 func TestExtractPkScriptAddrs(t *testing.T) {
@@ -311,8 +325,15 @@ func TestExtractPkScriptAddrs(t *testing.T) {
 			reqSigs: 1,
 			class:   MultiSigTy,
 		},
-		// from real tx: 691dd277dc0e90a462a3d652a1171686de49cf19067cd33c7df0392833fb986a, vout 44
-		// invalid public keys
+		{
+			name: "v1 p2tr witness-script-hash",
+			script: hexToBytes("51201a82f7457a9ba6ab1074e9f50" +
+				"053eefc637f8b046e389b636766bdc7d1f676f8"),
+			addrs: []btcutil.Address{newAddressTaproot(
+				hexToBytes("1a82f7457a9ba6ab1074e9f50053eefc637f8b046e389b636766bdc7d1f676f8"))},
+			reqSigs: 1,
+			class:   WitnessV1TaprootTy,
+		},
 		{
 			name: "1 of 3 multisig with invalid pubkeys 2",
 			script: hexToBytes("514134633365633235396337346461636" +

@@ -239,26 +239,11 @@ func computeNonWitnessPkScript(sigScript []byte) (PkScript, error) {
 
 // computeWitnessPkScript computes the script of an output by looking at the
 // spending input's witness.
-// IMPORTANT: With the addition of taproot, we can no longer say for certain
-// what kind of script the witness is in most cases. The only case in which we
-// can say for sure is when the witness data has an annex as the last push. In
-// that case, we can identify the script type, but we lack the ability to
-// reconstruct the script itself.
+// IMPORTANT: With the addition of taproot, we can not say for certain
+// what kind of script the witness is.
 func computeWitnessPkScript(witness wire.TxWitness) (PkScript, error) {
 	var pkScript PkScript
-	switch {
-	// If the last push starts with the annex flag, this is a taproot spend.
-	// We can set the script class, but we can't say what the pubkey script
-	// looks like with just the witness data.
-	case isAnnexedWitness(witness):
-		pkScript.class = WitnessV1TaprootTy
-
-	// For any other witnesses, we can't say for certain what type it is or what
-	// the pubkey script will be.
-	default:
-		pkScript.class = WitnessUnknownTy
-	}
-
+	pkScript.class = WitnessUnknownTy
 	return pkScript, nil
 }
 

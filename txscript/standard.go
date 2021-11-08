@@ -1007,6 +1007,15 @@ func ExtractPkScriptAddrs(pkScript []byte, chainParams *chaincfg.Params) (Script
 		return WitnessV0ScriptHashTy, addrs, 1, nil
 	}
 
+	if hash := extractWitnessV1ScriptHash(pkScript); hash != nil {
+		var addrs []btcutil.Address
+		addr, err := btcutil.NewAddressTaproot(hash, chainParams)
+		if err == nil {
+			addrs = append(addrs, addr)
+		}
+		return WitnessV1TaprootTy, addrs, 1, nil
+	}
+
 	// case WitnessV1TaprootTy:
 	// 	requiredSigs = 1
 	// 	addr, err := btcutil.NewAddressTaproot(pops[1].data,
