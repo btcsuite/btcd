@@ -1001,6 +1001,15 @@ func ExtractPkScriptAddrs(pkScript []byte,
 		return WitnessV0ScriptHashTy, addrs, 1, nil
 	}
 
+	if hash := extractWitnessV1ScriptHash(pkScript); hash != nil {
+		var addrs []btcutil.Address
+		addr, err := btcutil.NewAddressTaproot(hash, chainParams)
+		if err == nil {
+			addrs = append(addrs, addr)
+		}
+		return WitnessV1TaprootTy, addrs, 1, nil
+	}
+
 	// If none of the above passed, then the address must be non-standard.
 	return NonStandardTy, nil, 0, nil
 }
