@@ -123,8 +123,17 @@ var helpDescsEnUS = map[string]string{
 		"blocks have been generated.",
 	"estimatefee-numblocks": "The maximum number of blocks which can be " +
 		"generated before the transaction is mined.",
-	"estimatefee--result0": "Estimated fee per kilobyte in satoshis for a block to " +
+	"estimatefee--result0": "Estimated fee per kilobyte in satoshis necessary for a block to " +
 		"be mined in the next NumBlocks blocks.",
+
+	"estimatesmartfee--synopsis": "Estimate the fee per kilobyte in satoshis " +
+		"required for a transaction to be mined before a certain number of " +
+		"blocks have been generated. Same as estimatefee presently.",
+	"estimatesmartfee-conftarget": "The maximum number of blocks which can be " +
+		"generated before the transaction is mined.",
+	"estimatesmartfee-estimatemode": "Unused at present.",
+	"estimatesmartfee--result0": "Estimated fee per kilobyte in satoshis necessary for a block to " +
+		"be mined in the next ConfTarget blocks.",
 
 	// GenerateCmd help
 	"generate--synopsis": "Generates a set number of blocks (simnet or regtest only) and returns a JSON\n" +
@@ -841,6 +850,7 @@ var rpcResultTypes = map[string][]interface{}{
 	"decoderawtransaction":   {(*btcjson.TxRawDecodeResult)(nil)},
 	"decodescript":           {(*btcjson.DecodeScriptResult)(nil)},
 	"estimatefee":            {(*float64)(nil)},
+	"estimatesmartfee":       {(*float64)(nil)},
 	"generate":               {(*[]string)(nil)},
 	"generatetoaddress":      {(*[]string)(nil)},
 	"getaddednodeinfo":       {(*[]string)(nil), (*[]btcjson.GetAddedNodeInfoResult)(nil)},

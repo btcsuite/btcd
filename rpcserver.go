@@ -137,6 +137,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"decoderawtransaction":   handleDecodeRawTransaction,
 	"decodescript":           handleDecodeScript,
 	"estimatefee":            handleEstimateFee,
+	"estimatesmartfee":       handleEstimateSmartFee,
 	"generate":               handleGenerate,
 	"generatetoaddress":      handleGenerateToAddress,
 	"getaddednodeinfo":       handleGetAddedNodeInfo,
@@ -879,21 +880,38 @@ func handleEstimateFee(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 	c := cmd.(*btcjson.EstimateFeeCmd)
 
 	if s.cfg.FeeEstimator == nil {
-		return nil, errors.New("Fee estimation disabled")
+		return nil, &btcjson.RPCError{
+			Code:    btcjson.ErrRPCInternal.Code,
+			Message: "Fee estimation disabled",
+		}
 	}
 
 	if c.NumBlocks <= 0 {
-		return -1.0, errors.New("Parameter NumBlocks must be positive")
+		return nil, &btcjson.RPCError{
+			Code:    btcjson.ErrRPCInvalidParameter,
+			Message: "Parameter NumBlocks must be positive",
+		}
 	}
 
 	feeRate, err := s.cfg.FeeEstimator.EstimateFee(uint32(c.NumBlocks))
 
 	if err != nil {
-		return -1.0, err
+		return nil, &btcjson.RPCError{
+			Code:    btcjson.ErrRPCInvalidParameter,
+			Message: err.Error(),
+		}
 	}
 
 	// Convert to satoshis per kb.
 	return float64(feeRate), nil
+}
+
+func handleEstimateSmartFee(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	c := cmd.(*btcjson.EstimateSmartFeeCmd)
+
+	rpcsLog.Debugf("EstimateSmartFee is not implemented; falling back to EstimateFee. Requested mode: %s", c.EstimateMode)
+
+	return handleEstimateFee(s, &btcjson.EstimateFeeCmd{NumBlocks: c.ConfTarget}, closeChan)
 }
 
 func handleGenerate(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
