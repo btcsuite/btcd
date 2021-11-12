@@ -242,7 +242,8 @@ func NewGetBalancesCmd() *GetBalancesCmd {
 
 // GetNewAddressCmd defines the getnewaddress JSON-RPC command.
 type GetNewAddressCmd struct {
-	Account *string
+	Account     *string
+	AddressType *string // must be one of legacy / p2pkh or p2sh-p2wkh / p2sh-segwit, or p2wkh / bech32
 }
 
 // NewGetNewAddressCmd returns a new instance which can be used to issue a
