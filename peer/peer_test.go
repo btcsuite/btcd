@@ -358,8 +358,9 @@ func TestPeerConnection(t *testing.T) {
 
 // TestPeerListeners tests that the peer listeners are called as expected.
 func TestPeerListeners(t *testing.T) {
-	verack := make(chan struct{}, 1)
-	ok := make(chan wire.Message, 20)
+	verack := make(chan struct{}, 2)
+	version := make(chan struct{}, 2)
+	ok := make(chan wire.Message)
 	peerCfg := &peer.Config{
 		Listeners: peer.MessageListeners{
 			OnGetAddr: func(p *peer.Peer, msg *wire.MsgGetAddr) {
@@ -435,7 +436,7 @@ func TestPeerListeners(t *testing.T) {
 				ok <- msg
 			},
 			OnVersion: func(p *peer.Peer, msg *wire.MsgVersion) *wire.MsgReject {
-				ok <- msg
+				version <- struct{}{}
 				return nil
 			},
 			OnVerAck: func(p *peer.Peer, msg *wire.MsgVerAck) {
@@ -464,6 +465,10 @@ func TestPeerListeners(t *testing.T) {
 	inPeer.AssociateConnection(inConn)
 
 	peerCfg.Listeners = peer.MessageListeners{
+		OnVersion: func(p *peer.Peer, msg *wire.MsgVersion) *wire.MsgReject {
+			version <- struct{}{}
+			return nil
+		},
 		OnVerAck: func(p *peer.Peer, msg *wire.MsgVerAck) {
 			verack <- struct{}{}
 		},
@@ -480,6 +485,15 @@ func TestPeerListeners(t *testing.T) {
 		case <-verack:
 		case <-time.After(time.Second * 1):
 			t.Errorf("TestPeerListeners: verack timeout\n")
+			return
+		}
+	}
+
+	for i := 0; i < 2; i++ {
+		select {
+		case <-version:
+		case <-time.After(time.Second * 1):
+			t.Errorf("TestPeerListeners: version timeout\n")
 			return
 		}
 	}
