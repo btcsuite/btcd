@@ -11,7 +11,8 @@ require (
 	github.com/decred/dcrd/lru v1.0.0
 	github.com/jessevdk/go-flags v1.4.0
 	github.com/jrick/logrotate v1.0.0
-	golang.org/x/crypto v0.0.0-20200510223506-06a226fb4e37
+	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7 // indirect
+	golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9
 )
 
 go 1.16
