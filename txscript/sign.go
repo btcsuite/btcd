@@ -22,12 +22,7 @@ func RawTxInWitnessSignature(tx *wire.MsgTx, sigHashes *TxSigHashes, idx int,
 	amt int64, subScript []byte, hashType SigHashType,
 	key *btcec.PrivateKey) ([]byte, error) {
 
-	parsedScript, err := parseScript(subScript)
-	if err != nil {
-		return nil, fmt.Errorf("cannot parse output script: %v", err)
-	}
-
-	hash, err := calcWitnessSignatureHash(parsedScript, sigHashes, hashType, tx,
+	hash, err := calcWitnessSignatureHashRaw(subScript, sigHashes, hashType, tx,
 		idx, amt)
 	if err != nil {
 		return nil, err
@@ -212,110 +207,50 @@ func sign(chainParams *chaincfg.Params, tx *wire.MsgTx, idx int,
 	}
 }
 
-// mergeScripts merges sigScript and prevScript assuming they are both
-// partial solutions for pkScript spending output idx of tx. class, addresses
-// and nrequired are the result of extracting the addresses from pkscript.
-// The return value is the best effort merging of the two scripts. Calling this
-// function with addresses, class and nrequired that do not match pkScript is
-// an error and results in undefined behaviour.
-func mergeScripts(chainParams *chaincfg.Params, tx *wire.MsgTx, idx int,
-	pkScript []byte, class ScriptClass, addresses []btcutil.Address,
-	nRequired int, sigScript, prevScript []byte) []byte {
-
-	// TODO: the scripthash and multisig paths here are overly
-	// inefficient in that they will recompute already known data.
-	// some internal refactoring could probably make this avoid needless
-	// extra calculations.
-	switch class {
-	case ScriptHashTy:
-		// Remove the last push in the script and then recurse.
-		// this could be a lot less inefficient.
-		sigPops, err := parseScript(sigScript)
-		if err != nil || len(sigPops) == 0 {
-			return prevScript
-		}
-		prevPops, err := parseScript(prevScript)
-		if err != nil || len(prevPops) == 0 {
-			return sigScript
-		}
-
-		// assume that script in sigPops is the correct one, we just
-		// made it.
-		script := sigPops[len(sigPops)-1].data
-
-		// We already know this information somewhere up the stack.
-		class, addresses, nrequired, _ :=
-			ExtractPkScriptAddrs(script, chainParams)
-
-		// regenerate scripts.
-		sigScript, _ := unparseScript(sigPops)
-		prevScript, _ := unparseScript(prevPops)
-
-		// Merge
-		mergedScript := mergeScripts(chainParams, tx, idx, script,
-			class, addresses, nrequired, sigScript, prevScript)
-
-		// Reappend the script and return the result.
-		builder := NewScriptBuilder()
-		builder.AddOps(mergedScript)
-		builder.AddData(script)
-		finalScript, _ := builder.Script()
-		return finalScript
-	case MultiSigTy:
-		return mergeMultiSig(tx, idx, addresses, nRequired, pkScript,
-			sigScript, prevScript)
-
-	// It doesn't actually make sense to merge anything other than multiig
-	// and scripthash (because it could contain multisig). Everything else
-	// has either zero signature, can't be spent, or has a single signature
-	// which is either present or not. The other two cases are handled
-	// above. In the conflict case here we just assume the longest is
-	// correct (this matches behaviour of the reference implementation).
-	default:
-		if len(sigScript) > len(prevScript) {
-			return sigScript
-		}
-		return prevScript
-	}
-}
-
 // mergeMultiSig combines the two signature scripts sigScript and prevScript
 // that both provide signatures for pkScript in output idx of tx. addresses
 // and nRequired should be the results from extracting the addresses from
 // pkScript. Since this function is internal only we assume that the arguments
 // have come from other functions internally and thus are all consistent with
 // each other, behaviour is undefined if this contract is broken.
+//
+// NOTE: This function is only valid for version 0 scripts.  Since the function
+// does not accept a script version, the results are undefined for other script
+// versions.
 func mergeMultiSig(tx *wire.MsgTx, idx int, addresses []btcutil.Address,
 	nRequired int, pkScript, sigScript, prevScript []byte) []byte {
 
-	// This is an internal only function and we already parsed this script
-	// as ok for multisig (this is how we got here), so if this fails then
-	// all assumptions are broken and who knows which way is up?
-	pkPops, _ := parseScript(pkScript)
-
-	sigPops, err := parseScript(sigScript)
-	if err != nil || len(sigPops) == 0 {
+	// Nothing to merge if either the new or previous signature scripts are
+	// empty.
+	if len(sigScript) == 0 {
 		return prevScript
 	}
-
-	prevPops, err := parseScript(prevScript)
-	if err != nil || len(prevPops) == 0 {
+	if len(prevScript) == 0 {
 		return sigScript
 	}
 
 	// Convenience function to avoid duplication.
-	extractSigs := func(pops []parsedOpcode, sigs [][]byte) [][]byte {
-		for _, pop := range pops {
-			if len(pop.data) != 0 {
-				sigs = append(sigs, pop.data)
+	var possibleSigs [][]byte
+	extractSigs := func(script []byte) error {
+		const scriptVersion = 0
+		tokenizer := MakeScriptTokenizer(scriptVersion, script)
+		for tokenizer.Next() {
+			if data := tokenizer.Data(); len(data) != 0 {
+				possibleSigs = append(possibleSigs, data)
 			}
 		}
-		return sigs
+		return tokenizer.Err()
 	}
 
-	possibleSigs := make([][]byte, 0, len(sigPops)+len(prevPops))
-	possibleSigs = extractSigs(sigPops, possibleSigs)
-	possibleSigs = extractSigs(prevPops, possibleSigs)
+	// Attempt to extract signatures from the two scripts.  Return the other
+	// script that is intended to be merged in the case signature extraction
+	// fails for some reason.
+	if err := extractSigs(sigScript); err != nil {
+		return prevScript
+	}
+	if err := extractSigs(prevScript); err != nil {
+		return sigScript
+	}
 
 	// Now we need to match the signatures to pubkeys, the only real way to
 	// do that is to try to verify them all and match it to the pubkey
@@ -345,7 +280,7 @@ sigLoop:
 		// however, assume no sigs etc are in the script since that
 		// would make the transaction nonstandard and thus not
 		// MultiSigTy, so we just need to hash the full thing.
-		hash := calcSignatureHash(pkPops, hashType, tx, idx)
+		hash := calcSignatureHash(pkScript, hashType, tx, idx)
 
 		for _, addr := range addresses {
 			// All multisig addresses should be pubkey addresses
@@ -394,6 +329,81 @@ sigLoop:
 	return script
 }
 
+// mergeScripts merges sigScript and prevScript assuming they are both
+// partial solutions for pkScript spending output idx of tx. class, addresses
+// and nrequired are the result of extracting the addresses from pkscript.
+// The return value is the best effort merging of the two scripts. Calling this
+// function with addresses, class and nrequired that do not match pkScript is
+// an error and results in undefined behaviour.
+//
+// NOTE: This function is only valid for version 0 scripts.  Since the function
+// does not accept a script version, the results are undefined for other script
+// versions.
+func mergeScripts(chainParams *chaincfg.Params, tx *wire.MsgTx, idx int,
+	pkScript []byte, class ScriptClass, addresses []btcutil.Address,
+	nRequired int, sigScript, prevScript []byte) []byte {
+
+	// TODO(oga) the scripthash and multisig paths here are overly
+	// inefficient in that they will recompute already known data.
+	// some internal refactoring could probably make this avoid needless
+	// extra calculations.
+	const scriptVersion = 0
+	switch class {
+	case ScriptHashTy:
+		// Nothing to merge if either the new or previous signature
+		// scripts are empty or fail to parse.
+		if len(sigScript) == 0 ||
+			checkScriptParses(scriptVersion, sigScript) != nil {
+
+			return prevScript
+		}
+		if len(prevScript) == 0 ||
+			checkScriptParses(scriptVersion, prevScript) != nil {
+
+			return sigScript
+		}
+
+		// Remove the last push in the script and then recurse.
+		// this could be a lot less inefficient.
+		//
+		// Assume that final script is the correct one since it was just
+		// made and it is a pay-to-script-hash.
+		script := finalOpcodeData(scriptVersion, sigScript)
+
+		// We already know this information somewhere up the stack,
+		// therefore the error is ignored.
+		class, addresses, nrequired, _ :=
+			ExtractPkScriptAddrs(script, chainParams)
+
+		// Merge
+		mergedScript := mergeScripts(chainParams, tx, idx, script,
+			class, addresses, nrequired, sigScript, prevScript)
+
+		// Reappend the script and return the result.
+		builder := NewScriptBuilder()
+		builder.AddOps(mergedScript)
+		builder.AddData(script)
+		finalScript, _ := builder.Script()
+		return finalScript
+
+	case MultiSigTy:
+		return mergeMultiSig(tx, idx, addresses, nRequired, pkScript,
+			sigScript, prevScript)
+
+	// It doesn't actually make sense to merge anything other than multiig
+	// and scripthash (because it could contain multisig). Everything else
+	// has either zero signature, can't be spent, or has a single signature
+	// which is either present or not. The other two cases are handled
+	// above. In the conflict case here we just assume the longest is
+	// correct (this matches behaviour of the reference implementation).
+	default:
+		if len(sigScript) > len(prevScript) {
+			return sigScript
+		}
+		return prevScript
+	}
+}
+
 // KeyDB is an interface type provided to SignTxOutput, it encapsulates
 // any user state required to get the private keys for an address.
 type KeyDB interface {
@@ -404,8 +414,7 @@ type KeyDB interface {
 type KeyClosure func(btcutil.Address) (*btcec.PrivateKey, bool, error)
 
 // GetKey implements KeyDB by returning the result of calling the closure.
-func (kc KeyClosure) GetKey(address btcutil.Address) (*btcec.PrivateKey,
-	bool, error) {
+func (kc KeyClosure) GetKey(address btcutil.Address) (*btcec.PrivateKey, bool, error) {
 	return kc(address)
 }
 
@@ -430,6 +439,10 @@ func (sc ScriptClosure) GetScript(address btcutil.Address) ([]byte, error) {
 // getScript. If previousScript is provided then the results in previousScript
 // will be merged in a type-dependent manner with the newly generated.
 // signature script.
+//
+// NOTE: This function is only valid for version 0 scripts.  Since the function
+// does not accept a script version, the results are undefined for other script
+// versions.
 func SignTxOutput(chainParams *chaincfg.Params, tx *wire.MsgTx, idx int,
 	pkScript []byte, hashType SigHashType, kdb KeyDB, sdb ScriptDB,
 	previousScript []byte) ([]byte, error) {

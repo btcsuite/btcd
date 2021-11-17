@@ -12,9 +12,21 @@ const (
 	maxInt32 = 1<<31 - 1
 	minInt32 = -1 << 31
 
-	// defaultScriptNumLen is the default number of bytes
-	// data being interpreted as an integer may be.
-	defaultScriptNumLen = 4
+	// maxScriptNumLen is the maximum number of bytes data being interpreted
+	// as an integer may be for the majority of op codes.
+	maxScriptNumLen = 4
+
+	// cltvMaxScriptNumLen is the maximum number of bytes data being interpreted
+	// as an integer may be for by-time and by-height locks as interpreted by
+	// CHECKLOCKTIMEVERIFY.
+	//
+	// The value comes from the fact that the current transaction locktime
+	// is a uint32 resulting in a maximum locktime of 2^32-1 (the year
+	// 2106).  However, scriptNums are signed and therefore a standard
+	// 4-byte scriptNum would only support up to a maximum of 2^31-1 (the
+	// year 2038).  Thus, a 5-byte scriptNum is needed since it will support
+	// up to 2^39-1 which allows dates beyond the current locktime limit.
+	cltvMaxScriptNumLen = 5
 )
 
 // scriptNum represents a numeric value used in the scripting engine with
@@ -178,7 +190,7 @@ func (n scriptNum) Int32() int32 {
 // before an ErrStackNumberTooBig is returned.  This effectively limits the
 // range of allowed values.
 // WARNING:  Great care should be taken if passing a value larger than
-// defaultScriptNumLen, which could lead to addition and multiplication
+// maxScriptNumLen, which could lead to addition and multiplication
 // overflows.
 //
 // See the Bytes function documentation for example encodings.
