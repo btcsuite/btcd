@@ -930,9 +930,9 @@ func readOutPoint(r io.Reader, pver uint32, version int32, op *OutPoint) error {
 	return err
 }
 
-// writeOutPoint encodes op to the bitcoin protocol encoding for an OutPoint
+// WriteOutPoint encodes op to the bitcoin protocol encoding for an OutPoint
 // to w.
-func writeOutPoint(w io.Writer, pver uint32, version int32, op *OutPoint) error {
+func WriteOutPoint(w io.Writer, pver uint32, version int32, op *OutPoint) error {
 	_, err := w.Write(op.Hash[:])
 	if err != nil {
 		return err
@@ -992,7 +992,7 @@ func readTxIn(r io.Reader, pver uint32, version int32, ti *TxIn) error {
 // writeTxIn encodes ti to the bitcoin protocol encoding for a transaction
 // input (TxIn) to w.
 func writeTxIn(w io.Writer, pver uint32, version int32, ti *TxIn) error {
-	err := writeOutPoint(w, pver, version, &ti.PreviousOutPoint)
+	err := WriteOutPoint(w, pver, version, &ti.PreviousOutPoint)
 	if err != nil {
 		return err
 	}

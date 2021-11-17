@@ -5,7 +5,10 @@
 
 package chainhash
 
-import "crypto/sha256"
+import (
+	"crypto/sha256"
+	"hash"
+)
 
 // HashB calculates hash(b) and returns the resulting bytes.
 func HashB(b []byte) []byte {
@@ -30,4 +33,12 @@ func DoubleHashB(b []byte) []byte {
 func DoubleHashH(b []byte) Hash {
 	first := sha256.Sum256(b)
 	return Hash(sha256.Sum256(first[:]))
+}
+
+// DoubleHashBRaw calculates hash(hash(h)) and returns the resulting bytes.
+func DoubleHashBRaw(h hash.Hash) []byte {
+	first := h.Sum(nil)
+	h.Reset()
+	h.Write(first)
+	return h.Sum(nil)
 }

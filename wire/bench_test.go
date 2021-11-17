@@ -200,7 +200,7 @@ func BenchmarkWriteOutPoint(b *testing.B) {
 		Index: 0,
 	}
 	for i := 0; i < b.N; i++ {
-		writeOutPoint(ioutil.Discard, 0, 0, op)
+		WriteOutPoint(ioutil.Discard, 0, 0, op)
 	}
 }
 

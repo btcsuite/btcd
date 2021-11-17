@@ -6,6 +6,7 @@ package txscript
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
 	"time"
@@ -418,7 +419,7 @@ func calcWitnessSignatureHash(subScript []parsedOpcode, sigHashes *TxSigHashes,
 
 	// We'll utilize this buffer throughout to incrementally calculate
 	// the signature hash for this transaction.
-	var sigHash bytes.Buffer
+	sigHash := sha256.New()
 
 	// First write out, then encode the transaction's version number.
 	var bVersion [4]byte
@@ -473,7 +474,7 @@ func calcWitnessSignatureHash(subScript []parsedOpcode, sigHashes *TxSigHashes,
 		// the original script, with all code separators removed,
 		// serialized with a var int length prefix.
 		rawScript, _ := unparseScript(subScript)
-		wire.WriteVarBytes(&sigHash, 0, rawScript)
+		wire.WriteVarBytes(sigHash, 0, rawScript)
 	}
 
 	// Next, add the input amount, and sequence number of the input being
@@ -509,7 +510,7 @@ func calcWitnessSignatureHash(subScript []parsedOpcode, sigHashes *TxSigHashes,
 	binary.LittleEndian.PutUint32(bHashType[:], uint32(hashType))
 	sigHash.Write(bHashType[:])
 
-	return chainhash.DoubleHashB(sigHash.Bytes()), nil
+	return chainhash.DoubleHashBRaw(sigHash), nil
 }
 
 // CalcWitnessSigHash computes the sighash digest for the specified input of
@@ -598,66 +599,84 @@ func calcSignatureHash(script []parsedOpcode, hashType SigHashType, tx *wire.Msg
 	// Remove all instances of OP_CODESEPARATOR from the script.
 	script = removeOpcode(script, OP_CODESEPARATOR)
 
-	// Make a shallow copy of the transaction, zeroing out the script for
-	// all inputs that are not currently being processed.
-	txCopy := shallowCopyTx(tx)
-	for i := range txCopy.TxIn {
-		if i == idx {
-			// UnparseScript cannot fail here because removeOpcode
-			// above only returns a valid script.
-			sigScript, _ := unparseScript(script)
-			txCopy.TxIn[idx].SignatureScript = sigScript
-		} else {
-			txCopy.TxIn[i].SignatureScript = nil
-		}
-	}
+	// The calculated checksum here will be the sigHash. We'll be adding necessary
+	// data in for different types of signature hash types.
+	sigHash := sha256.New()
+	binary.Write(sigHash, binary.LittleEndian, uint32(tx.Version))
 
-	switch hashType & sigHashMask {
-	case SigHashNone:
-		txCopy.TxOut = txCopy.TxOut[0:0] // Empty slice.
-		for i := range txCopy.TxIn {
-			if i != idx {
-				txCopy.TxIn[i].Sequence = 0
+	// Add inputs to the hash.
+	if (hashType & SigHashAnyOneCanPay) == 0 {
+		txInCount := uint64(len(tx.TxIn))
+		wire.WriteVarInt(sigHash, 0, txInCount)
+		for i := range tx.TxIn {
+			sigHash.Write(tx.TxIn[i].PreviousOutPoint.Hash[:])
+			binary.Write(sigHash, binary.LittleEndian, tx.TxIn[i].PreviousOutPoint.Index)
+
+			// If the txIn is the specified idx, write the actual sigScript and the sequence.
+			if i == idx {
+				rawScript, _ := unparseScript(script)
+				wire.WriteVarBytes(sigHash, 0, rawScript)
+				binary.Write(sigHash, binary.LittleEndian, tx.TxIn[i].Sequence)
+			} else {
+				wire.WriteVarBytes(sigHash, 0, nil)
+				// For SigHashNone and SigHashSingle, don't write the actual sequence and
+				// just write 0.
+				if hashType&sigHashMask == SigHashNone || hashType&sigHashMask == SigHashSingle {
+					binary.Write(sigHash, binary.LittleEndian, uint32(0))
+				} else {
+					binary.Write(sigHash, binary.LittleEndian, tx.TxIn[i].Sequence)
+				}
 			}
 		}
+	} else {
+		// Write count of 1
+		wire.WriteVarInt(sigHash, 0, uint64(1))
+		wire.WriteOutPoint(sigHash, 0, 0, &tx.TxIn[idx].PreviousOutPoint)
+		rawScript, _ := unparseScript(script)
+		wire.WriteVarBytes(sigHash, 0, rawScript)
+		binary.Write(sigHash, binary.LittleEndian, tx.TxIn[idx].Sequence)
+	}
 
-	case SigHashSingle:
-		// Resize output array to up to and including requested index.
-		txCopy.TxOut = txCopy.TxOut[:idx+1]
+	// Add outputs to the hash.
+	if hashType&sigHashMask == SigHashNone {
+		// Write count of 0 for SigHashNone
+		wire.WriteVarInt(sigHash, 0, uint64(0))
+	} else if hashType&sigHashMask == SigHashSingle {
+		// Write count of all txOuts. We count all txOuts up til the idx specified.
+		wire.WriteVarInt(sigHash, 0, uint64(idx+1))
 
-		// All but current output get zeroed out.
+		// Make empty txOut that'll be used for all txOuts except for the
+		// specified idx.
+		to := wire.TxOut{
+			Value:    -1,
+			PkScript: nil,
+		}
+
+		// For all txOuts before the specified idx, write empty txOuts.
 		for i := 0; i < idx; i++ {
-			txCopy.TxOut[i].Value = -1
-			txCopy.TxOut[i].PkScript = nil
+			wire.WriteTxOut(sigHash, 0, 0, &to)
 		}
 
-		// Sequence on all other inputs is 0, too.
-		for i := range txCopy.TxIn {
-			if i != idx {
-				txCopy.TxIn[i].Sequence = 0
-			}
+		// Finally write the value and the pkscript.
+		binary.Write(sigHash, binary.LittleEndian, uint64(tx.TxOut[idx].Value))
+		wire.WriteVarBytes(sigHash, 0, tx.TxOut[idx].PkScript)
+	} else {
+		txOutCount := uint64(len(tx.TxOut))
+		wire.WriteVarInt(sigHash, 0, txOutCount)
+		for i := range tx.TxOut {
+			binary.Write(sigHash, binary.LittleEndian, uint64(tx.TxOut[i].Value))
+			wire.WriteVarBytes(sigHash, 0, tx.TxOut[i].PkScript)
 		}
-
-	default:
-		// Consensus treats undefined hashtypes like normal SigHashAll
-		// for purposes of hash generation.
-		fallthrough
-	case SigHashOld:
-		fallthrough
-	case SigHashAll:
-		// Nothing special here.
-	}
-	if hashType&SigHashAnyOneCanPay != 0 {
-		txCopy.TxIn = txCopy.TxIn[idx : idx+1]
 	}
 
-	// The final hash is the double sha256 of both the serialized modified
-	// transaction and the hash type (encoded as a 4-byte little-endian
-	// value) appended.
-	wbuf := bytes.NewBuffer(make([]byte, 0, txCopy.SerializeSizeStripped()+4))
-	txCopy.SerializeNoWitness(wbuf)
-	binary.Write(wbuf, binary.LittleEndian, hashType)
-	return chainhash.DoubleHashB(wbuf.Bytes())
+	// Finally, write out the transaction's locktime, and the sig hash type.
+	var bLockTime [4]byte
+	binary.LittleEndian.PutUint32(bLockTime[:], tx.LockTime)
+	sigHash.Write(bLockTime[:])
+	var bHashType [4]byte
+	binary.LittleEndian.PutUint32(bHashType[:], uint32(hashType))
+	sigHash.Write(bHashType[:])
+	return chainhash.DoubleHashBRaw(sigHash)
 }
 
 // asSmallInt returns the passed opcode, which must be true according to
