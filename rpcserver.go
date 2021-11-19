@@ -29,7 +29,7 @@ import (
 
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/blockchain/indexers"
-	"github.com/btcsuite/btcd/btcec"
+	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcjson"
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
@@ -3520,7 +3520,7 @@ func handleSignMessageWithPrivKey(s *rpcServer, cmd interface{}, closeChan <-cha
 	wire.WriteVarString(&buf, 0, c.Message)
 	messageHash := chainhash.DoubleHashB(buf.Bytes())
 
-	sig, err := btcec.SignCompact(btcec.S256(), wif.PrivKey,
+	sig, err := btcec.SignCompact(wif.PrivKey,
 		messageHash, wif.CompressPubKey)
 	if err != nil {
 		return nil, &btcjson.RPCError{
@@ -3715,7 +3715,7 @@ func handleVerifyMessage(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 	wire.WriteVarString(&buf, 0, messageSignatureHeader)
 	wire.WriteVarString(&buf, 0, c.Message)
 	expectedMessageHash := chainhash.DoubleHashB(buf.Bytes())
-	pk, wasCompressed, err := btcec.RecoverCompact(btcec.S256(), sig,
+	pk, wasCompressed, err := btcec.RecoverCompact(sig,
 		expectedMessageHash)
 	if err != nil {
 		// Mirror Bitcoin Core behavior, which treats error in

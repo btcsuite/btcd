@@ -8,10 +8,10 @@ import (
 	"bytes"
 	"errors"
 
-	"github.com/btcsuite/btcd/btcec"
+	"github.com/btcsuite/btcd/btcec/v2"
+	"github.com/btcsuite/btcd/btcutil/base58"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/btcutil/base58"
 )
 
 // ErrMalformedPrivateKey describes an error where a WIF-encoded private
@@ -117,7 +117,7 @@ func DecodeWIF(wif string) (*WIF, error) {
 
 	netID := decoded[0]
 	privKeyBytes := decoded[1 : 1+btcec.PrivKeyBytesLen]
-	privKey, _ := btcec.PrivKeyFromBytes(btcec.S256(), privKeyBytes)
+	privKey, _ := btcec.PrivKeyFromBytes(privKeyBytes)
 	return &WIF{privKey, compress, netID}, nil
 }
 
@@ -136,9 +136,7 @@ func (w *WIF) String() string {
 
 	a := make([]byte, 0, encodeLen)
 	a = append(a, w.netID)
-	// Pad and append bytes manually, instead of using Serialize, to
-	// avoid another call to make.
-	a = paddedAppend(btcec.PrivKeyBytesLen, a, w.PrivKey.D.Bytes())
+	a = append(a, w.PrivKey.Serialize()...)
 	if w.CompressPubKey {
 		a = append(a, compressMagic)
 	}
@@ -151,19 +149,9 @@ func (w *WIF) String() string {
 // exported private key in either a compressed or uncompressed format.  The
 // serialization format chosen depends on the value of w.CompressPubKey.
 func (w *WIF) SerializePubKey() []byte {
-	pk := (*btcec.PublicKey)(&w.PrivKey.PublicKey)
+	pk := w.PrivKey.PubKey()
 	if w.CompressPubKey {
 		return pk.SerializeCompressed()
 	}
 	return pk.SerializeUncompressed()
-}
-
-// paddedAppend appends the src byte slice to dst, returning the new slice.
-// If the length of the source is smaller than the passed size, leading zero
-// bytes are appended to the dst slice before appending src.
-func paddedAppend(size uint, dst, src []byte) []byte {
-	for i := 0; i < int(size)-len(src); i++ {
-		dst = append(dst, 0)
-	}
-	return append(dst, src...)
 }

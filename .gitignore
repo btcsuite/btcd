@@ -36,3 +36,7 @@ _testmain.go
 # Code coverage files
 profile.tmp
 profile.cov
+coverage.txt
+btcec/coverage.txt
+btcutil/coverage.txt
+btcutil/psbt/coverage.txt

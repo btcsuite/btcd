@@ -11,10 +11,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/btcsuite/btcd/btcec"
-	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcutil/base58"
 	"github.com/btcsuite/btcd/btcutil/bech32"
+	"github.com/btcsuite/btcd/chaincfg"
 	"golang.org/x/crypto/ripemd160"
 )
 
@@ -417,10 +417,6 @@ const (
 	// PKFCompressed indicates the pay-to-pubkey address format is a
 	// compressed public key.
 	PKFCompressed
-
-	// PKFHybrid indicates the pay-to-pubkey address format is a hybrid
-	// public key.
-	PKFHybrid
 )
 
 // AddressPubKey is an Address for a pay-to-pubkey transaction.
@@ -434,7 +430,7 @@ type AddressPubKey struct {
 // address.  The serializedPubKey parameter must be a valid pubkey and can be
 // uncompressed, compressed, or hybrid.
 func NewAddressPubKey(serializedPubKey []byte, net *chaincfg.Params) (*AddressPubKey, error) {
-	pubKey, err := btcec.ParsePubKey(serializedPubKey, btcec.S256())
+	pubKey, err := btcec.ParsePubKey(serializedPubKey)
 	if err != nil {
 		return nil, err
 	}
@@ -447,8 +443,6 @@ func NewAddressPubKey(serializedPubKey []byte, net *chaincfg.Params) (*AddressPu
 	switch serializedPubKey[0] {
 	case 0x02, 0x03:
 		pkFormat = PKFCompressed
-	case 0x06, 0x07:
-		pkFormat = PKFHybrid
 	}
 
 	return &AddressPubKey{
@@ -469,9 +463,6 @@ func (a *AddressPubKey) serialize() []byte {
 
 	case PKFCompressed:
 		return a.pubKey.SerializeCompressed()
-
-	case PKFHybrid:
-		return a.pubKey.SerializeHybrid()
 	}
 }
 

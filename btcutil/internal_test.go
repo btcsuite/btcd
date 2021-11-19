@@ -12,7 +12,7 @@ interface. The functions are only exported while the tests are being run.
 package btcutil
 
 import (
-	"github.com/btcsuite/btcd/btcec"
+	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcutil/base58"
 	"github.com/btcsuite/btcd/btcutil/bech32"
 	"golang.org/x/crypto/ripemd160"
@@ -99,7 +99,7 @@ func TstAddressTaproot(version byte, program [32]byte,
 func TstAddressPubKey(serializedPubKey []byte, pubKeyFormat PubKeyFormat,
 	netID byte) *AddressPubKey {
 
-	pubKey, _ := btcec.ParsePubKey(serializedPubKey, btcec.S256())
+	pubKey, _ := btcec.ParsePubKey(serializedPubKey)
 	return &AddressPubKey{
 		pubKeyFormat: pubKeyFormat,
 		pubKey:       pubKey,

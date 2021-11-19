@@ -43,6 +43,11 @@ jobs:
         with:
           path-to-profile: coverage.txt
 
+      - name: Send btcec
+        uses: shogo82148/actions-goveralls@v1
+        with:
+          path-to-profile: btcec/coverage.txt
+
       - name: Send btcutil coverage
         uses: shogo82148/actions-goveralls@v1
         with:

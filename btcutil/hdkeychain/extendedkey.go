@@ -18,11 +18,11 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/btcsuite/btcd/btcec"
-	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/btcutil/base58"
+	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 )
 
 const (
@@ -154,8 +154,7 @@ func (k *ExtendedKey) pubKeyBytes() []byte {
 	// This is a private extended key, so calculate and memoize the public
 	// key if needed.
 	if len(k.pubKey) == 0 {
-		pkx, pky := btcec.S256().ScalarBaseMult(k.key)
-		pubKey := btcec.PublicKey{Curve: btcec.S256(), X: pkx, Y: pky}
+		_, pubKey := btcec.PrivKeyFromBytes(k.key)
 		k.pubKey = pubKey.SerializeCompressed()
 	}
 
@@ -292,8 +291,8 @@ func (k *ExtendedKey) Derive(i uint32) (*ExtendedKey, error) {
 	// chance (< 1 in 2^127) this condition will not hold, and in that case,
 	// a child extended key can't be created for this index and the caller
 	// should simply increment to the next index.
-	ilNum := new(big.Int).SetBytes(il)
-	if ilNum.Cmp(btcec.S256().N) >= 0 || ilNum.Sign() == 0 {
+	var ilNum btcec.ModNScalar
+	if overflow := ilNum.SetByteSlice(il); overflow {
 		return nil, ErrInvalidChild
 	}
 
@@ -313,35 +312,66 @@ func (k *ExtendedKey) Derive(i uint32) (*ExtendedKey, error) {
 		// derive the final child key.
 		//
 		// childKey = parse256(Il) + parenKey
-		keyNum := new(big.Int).SetBytes(k.key)
-		ilNum.Add(ilNum, keyNum)
-		ilNum.Mod(ilNum, btcec.S256().N)
-		childKey = ilNum.Bytes()
+		var keyNum btcec.ModNScalar
+		if overflow := keyNum.SetByteSlice(k.key); overflow {
+			return nil, ErrInvalidChild
+		}
+
+		childKeyBytes := ilNum.Add(&keyNum).Bytes()
+		childKey = childKeyBytes[:]
+
+		// Strip leading zeroes from childKey, to match the expectation
+		// as the old big.Int usage in this area of the codebase.
+		for len(childKey) > 0 && childKey[0] == 0x00 {
+			childKey = childKey[1:]
+		}
+
 		isPrivate = true
 	} else {
 		// Case #3.
-		// Calculate the corresponding intermediate public key for
-		// intermediate private key.
-		ilx, ily := btcec.S256().ScalarBaseMult(il)
-		if ilx.Sign() == 0 || ily.Sign() == 0 {
+		// Calculate the corresponding intermediate public key for thek
+		// intermediate private key: ilJ = ilScalar*G
+		var (
+			ilScalar btcec.ModNScalar
+			ilJ      btcec.JacobianPoint
+		)
+		if overflow := ilScalar.SetByteSlice(il); overflow {
+			return nil, ErrInvalidChild
+		}
+		btcec.ScalarBaseMultNonConst(&ilScalar, &ilJ)
+
+		if (ilJ.X.IsZero() && ilJ.Y.IsZero()) || ilJ.Z.IsZero() {
 			return nil, ErrInvalidChild
 		}
 
 		// Convert the serialized compressed parent public key into X
 		// and Y coordinates so it can be added to the intermediate
 		// public key.
-		pubKey, err := btcec.ParsePubKey(k.key, btcec.S256())
+		pubKey, err := btcec.ParsePubKey(k.key)
 		if err != nil {
 			return nil, err
 		}
+
+		// Convert the public key to jacobian coordinates, as that's
+		// what our main add/double methods use.
+		var pubKeyJ btcec.JacobianPoint
+		pubKey.AsJacobian(&pubKeyJ)
 
 		// Add the intermediate public key to the parent public key to
 		// derive the final child key.
 		//
 		// childKey = serP(point(parse256(Il)) + parentKey)
-		childX, childY := btcec.S256().Add(ilx, ily, pubKey.X, pubKey.Y)
-		pk := btcec.PublicKey{Curve: btcec.S256(), X: childX, Y: childY}
-		childKey = pk.SerializeCompressed()
+		var childKeyPubJ btcec.JacobianPoint
+		btcec.AddNonConst(&ilJ, &pubKeyJ, &childKeyPubJ)
+
+		// Convert the new child public key back to affine coordinates
+		// so we can serialize it in compressed format.
+		childKeyPubJ.ToAffine()
+		childKeyPub := btcec.NewPublicKey(
+			&childKeyPubJ.X, &childKeyPubJ.Y,
+		)
+
+		childKey = childKeyPub.SerializeCompressed()
 	}
 
 	// The fingerprint of the parent for the derived child is the first 4
@@ -400,19 +430,36 @@ func (k *ExtendedKey) DeriveNonStandard(i uint32) (*ExtendedKey, error) {
 		childKey = ilNum.Bytes()
 		isPrivate = true
 	} else {
-		ilx, ily := btcec.S256().ScalarBaseMult(il)
-		if ilx.Sign() == 0 || ily.Sign() == 0 {
+		var (
+			ilScalar btcec.ModNScalar
+			ilJ      btcec.JacobianPoint
+		)
+		if overflow := ilScalar.SetByteSlice(il); overflow {
+			return nil, ErrInvalidChild
+		}
+		btcec.ScalarBaseMultNonConst(&ilScalar, &ilJ)
+
+		if (ilJ.X.IsZero() && ilJ.Y.IsZero()) || ilJ.Z.IsZero() {
 			return nil, ErrInvalidChild
 		}
 
-		pubKey, err := btcec.ParsePubKey(k.key, btcec.S256())
+		pubKey, err := btcec.ParsePubKey(k.key)
 		if err != nil {
 			return nil, err
 		}
 
-		childX, childY := btcec.S256().Add(ilx, ily, pubKey.X, pubKey.Y)
-		pk := btcec.PublicKey{Curve: btcec.S256(), X: childX, Y: childY}
-		childKey = pk.SerializeCompressed()
+		var pubKeyJ btcec.JacobianPoint
+		pubKey.AsJacobian(&pubKeyJ)
+
+		var childKeyPubJ btcec.JacobianPoint
+		btcec.AddNonConst(&ilJ, &pubKeyJ, &childKeyPubJ)
+
+		childKeyPubJ.ToAffine()
+		childKeyPub := btcec.NewPublicKey(
+			&childKeyPubJ.X, &childKeyPubJ.Y,
+		)
+
+		childKey = childKeyPub.SerializeCompressed()
 	}
 
 	parentFP := btcutil.Hash160(k.pubKeyBytes())[:4]
@@ -488,7 +535,7 @@ func (k *ExtendedKey) CloneWithVersion(version []byte) (*ExtendedKey, error) {
 
 // ECPubKey converts the extended key to a btcec public key and returns it.
 func (k *ExtendedKey) ECPubKey() (*btcec.PublicKey, error) {
-	return btcec.ParsePubKey(k.pubKeyBytes(), btcec.S256())
+	return btcec.ParsePubKey(k.pubKeyBytes())
 }
 
 // ECPrivKey converts the extended key to a btcec private key and returns it.
@@ -500,7 +547,7 @@ func (k *ExtendedKey) ECPrivKey() (*btcec.PrivateKey, error) {
 		return nil, ErrNotPrivExtKey
 	}
 
-	privKey, _ := btcec.PrivKeyFromBytes(btcec.S256(), k.key)
+	privKey, _ := btcec.PrivKeyFromBytes(k.key)
 	return privKey, nil
 }
 
@@ -674,7 +721,7 @@ func NewKeyFromString(key string) (*ExtendedKey, error) {
 	} else {
 		// Ensure the public key parses correctly and is actually on the
 		// secp256k1 curve.
-		_, err := btcec.ParsePubKey(keyData, btcec.S256())
+		_, err := btcec.ParsePubKey(keyData)
 		if err != nil {
 			return nil, err
 		}

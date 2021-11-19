@@ -79,19 +79,22 @@ check: unit
 
 unit:
 	@$(call print, "Running unit tests.")
-	$(GOTEST_DEV) ./... -test.timeout=20m
+	$(GOTEST) ./... -test.timeout=20m
+	cd btcec; $(GOTEST_DEV) ./... -test.timeout=20m
 	cd btcutil; $(GOTEST_DEV) ./... -test.timeout=20m
 	cd btcutil/psbt; $(GOTEST_DEV) ./... -test.timeout=20m
 
 unit-cover: $(GOACC_BIN)
 	@$(call print, "Running unit coverage tests.")
 	$(GOACC_BIN) ./...
+	cd btcec; $(GOACC_BIN) ./...
 	cd btcutil; $(GOACC_BIN) ./...
 	cd btcutil/psbt; $(GOACC_BIN) ./...
 
 unit-race:
 	@$(call print, "Running unit race tests.")
 	env CGO_ENABLED=1 GORACE="history_size=7 halt_on_errors=1" $(GOTEST) -race -test.timeout=20m ./...
+	cd btcec; env CGO_ENABLED=1 GORACE="history_size=7 halt_on_errors=1" $(GOTEST) -race -test.timeout=20m ./...
 	cd btcutil; env CGO_ENABLED=1 GORACE="history_size=7 halt_on_errors=1" $(GOTEST) -race -test.timeout=20m ./...
 	cd btcutil/psbt; env CGO_ENABLED=1 GORACE="history_size=7 halt_on_errors=1" $(GOTEST) -race -test.timeout=20m ./...
 
@@ -111,7 +114,7 @@ lint: $(LINT_BIN)
 
 clean:
 	@$(call print, "Cleaning source.$(NC)")
-	$(RM) coverage.txt btcutil/coverage.txt btcutil/psbt/coverage.txt
+	$(RM) coverage.txt btcec/coverage.txt btcutil/coverage.txt btcutil/psbt/coverage.txt
 
 .PHONY: all \
 	default \

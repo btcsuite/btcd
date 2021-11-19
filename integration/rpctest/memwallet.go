@@ -11,14 +11,14 @@ import (
 	"sync"
 
 	"github.com/btcsuite/btcd/blockchain"
-	"github.com/btcsuite/btcd/btcec"
+	"github.com/btcsuite/btcd/btcec/v2"
+	"github.com/btcsuite/btcd/btcutil"
+	"github.com/btcsuite/btcd/btcutil/hdkeychain"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/rpcclient"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcd/btcutil"
-	"github.com/btcsuite/btcd/btcutil/hdkeychain"
 )
 
 var (
@@ -133,6 +133,7 @@ func newMemWallet(net *chaincfg.Params, harnessID uint32) (*memWallet, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	coinbaseAddr, err := keyToAddr(coinbaseKey, net)
 	if err != nil {
 		return nil, err
@@ -514,10 +515,12 @@ func (m *memWallet) CreateTransaction(outputs []*wire.TxOut,
 			return nil, err
 		}
 
-		privKey, err := extendedKey.ECPrivKey()
+		privKeyOld, err := extendedKey.ECPrivKey()
 		if err != nil {
 			return nil, err
 		}
+
+		privKey, _ := btcec.PrivKeyFromBytes(privKeyOld.Serialize())
 
 		sigScript, err := txscript.SignatureScript(tx, i, utxo.pkScript,
 			txscript.SigHashAll, privKey, true)
