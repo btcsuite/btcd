@@ -10,7 +10,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"math/big"
 	"reflect"
 	"testing"
 )
@@ -337,9 +336,9 @@ func TestSignatures(t *testing.T) {
 	for _, test := range signatureTests {
 		var err error
 		if test.der {
-			_, err = ParseDERSignature(test.sig, S256())
+			_, err = ParseDERSignature(test.sig)
 		} else {
-			_, err = ParseSignature(test.sig, S256())
+			_, err = ParseSignature(test.sig)
 		}
 		if err != nil {
 			if test.isValid {
@@ -368,10 +367,10 @@ func TestSignatureSerialize(t *testing.T) {
 		// 0437cd7f8525ceed2324359c2d0ba26006d92d85
 		{
 			"valid 1 - r and s most significant bits are zero",
-			&Signature{
-				R: fromHex("4e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd41"),
-				S: fromHex("181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d09"),
-			},
+			NewSignature(
+				hexToModNScalar("4e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd41"),
+				hexToModNScalar("181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d09"),
+			),
 			[]byte{
 				0x30, 0x44, 0x02, 0x20, 0x4e, 0x45, 0xe1, 0x69,
 				0x32, 0xb8, 0xaf, 0x51, 0x49, 0x61, 0xa1, 0xd3,
@@ -388,51 +387,51 @@ func TestSignatureSerialize(t *testing.T) {
 		// cb00f8a0573b18faa8c4f467b049f5d202bf1101d9ef2633bc611be70376a4b4
 		{
 			"valid 2 - r most significant bit is one",
-			&Signature{
-				R: fromHex("0082235e21a2300022738dabb8e1bbd9d19cfb1e7ab8c30a23b0afbb8d178abcf3"),
-				S: fromHex("24bf68e256c534ddfaf966bf908deb944305596f7bdcc38d69acad7f9c868724"),
-			},
+			NewSignature(
+				hexToModNScalar("0082235e21a2300022738dabb8e1bbd9d19cfb1e7ab8c30a23b0afbb8d178abcf3"),
+				hexToModNScalar("24bf68e256c534ddfaf966bf908deb944305596f7bdcc38d69acad7f9c868724"),
+			),
 			[]byte{
-				0x30, 0x45, 0x02, 0x21, 0x00, 0x82, 0x23, 0x5e,
+				0x30, 0x44, 0x02, 0x20, 0x00, 0x82, 0x23, 0x5e,
 				0x21, 0xa2, 0x30, 0x00, 0x22, 0x73, 0x8d, 0xab,
 				0xb8, 0xe1, 0xbb, 0xd9, 0xd1, 0x9c, 0xfb, 0x1e,
 				0x7a, 0xb8, 0xc3, 0x0a, 0x23, 0xb0, 0xaf, 0xbb,
-				0x8d, 0x17, 0x8a, 0xbc, 0xf3, 0x02, 0x20, 0x24,
-				0xbf, 0x68, 0xe2, 0x56, 0xc5, 0x34, 0xdd, 0xfa,
-				0xf9, 0x66, 0xbf, 0x90, 0x8d, 0xeb, 0x94, 0x43,
-				0x05, 0x59, 0x6f, 0x7b, 0xdc, 0xc3, 0x8d, 0x69,
-				0xac, 0xad, 0x7f, 0x9c, 0x86, 0x87, 0x24,
+				0x8d, 0x17, 0x8a, 0xbc, 0x02, 0x20, 0x24, 0xbf,
+				0x68, 0xe2, 0x56, 0xc5, 0x34, 0xdd, 0xfa, 0xf9,
+				0x66, 0xbf, 0x90, 0x8d, 0xeb, 0x94, 0x43, 0x05,
+				0x59, 0x6f, 0x7b, 0xdc, 0xc3, 0x8d, 0x69, 0xac,
+				0xad, 0x7f, 0x9c, 0x86, 0x87, 0x24,
 			},
 		},
 		// signature from bitcoin blockchain tx
 		// fda204502a3345e08afd6af27377c052e77f1fefeaeb31bdd45f1e1237ca5470
 		{
 			"valid 3 - s most significant bit is one",
-			&Signature{
-				R: fromHex("1cadddc2838598fee7dc35a12b340c6bde8b389f7bfd19a1252a17c4b5ed2d71"),
-				S: new(big.Int).Add(fromHex("00c1a251bbecb14b058a8bd77f65de87e51c47e95904f4c0e9d52eddc21c1415ac"), S256().N),
-			},
+			NewSignature(
+				hexToModNScalar("1cadddc2838598fee7dc35a12b340c6bde8b389f7bfd19a1252a17c4b5ed2d71"),
+				hexToModNScalar("c1a251bbecb14b058a8bd77f65de87e51c47e95904f4c0e9d52eddc21c1415ac"),
+			),
 			[]byte{
-				0x30, 0x45, 0x02, 0x20, 0x1c, 0xad, 0xdd, 0xc2,
+				0x30, 0x44, 0x2, 0x20, 0x1c, 0xad, 0xdd, 0xc2,
 				0x83, 0x85, 0x98, 0xfe, 0xe7, 0xdc, 0x35, 0xa1,
-				0x2b, 0x34, 0x0c, 0x6b, 0xde, 0x8b, 0x38, 0x9f,
+				0x2b, 0x34, 0xc, 0x6b, 0xde, 0x8b, 0x38, 0x9f,
 				0x7b, 0xfd, 0x19, 0xa1, 0x25, 0x2a, 0x17, 0xc4,
-				0xb5, 0xed, 0x2d, 0x71, 0x02, 0x21, 0x00, 0xc1,
-				0xa2, 0x51, 0xbb, 0xec, 0xb1, 0x4b, 0x05, 0x8a,
-				0x8b, 0xd7, 0x7f, 0x65, 0xde, 0x87, 0xe5, 0x1c,
-				0x47, 0xe9, 0x59, 0x04, 0xf4, 0xc0, 0xe9, 0xd5,
-				0x2e, 0xdd, 0xc2, 0x1c, 0x14, 0x15, 0xac,
+				0xb5, 0xed, 0x2d, 0x71, 0x2, 0x20, 0x3e, 0x5d,
+				0xae, 0x44, 0x13, 0x4e, 0xb4, 0xfa, 0x75, 0x74,
+				0x28, 0x80, 0x9a, 0x21, 0x78, 0x19, 0x9e, 0x66,
+				0xf3, 0x8d, 0xaa, 0x53, 0xdf, 0x51, 0xea, 0xa3,
+				0x80, 0xca, 0xb4, 0x22, 0x2b, 0x95,
 			},
 		},
 		{
 			"valid 4 - s is bigger than half order",
-			&Signature{
-				R: fromHex("a196ed0e7ebcbe7b63fe1d8eecbdbde03a67ceba4fc8f6482bdcb9606a911404"),
-				S: fromHex("971729c7fa944b465b35250c6570a2f31acbb14b13d1565fab7330dcb2b3dfb1"),
-			},
+			NewSignature(
+				hexToModNScalar("a196ed0e7ebcbe7b63fe1d8eecbdbde03a67ceba4fc8f6482bdcb9606a911404"),
+				hexToModNScalar("971729c7fa944b465b35250c6570a2f31acbb14b13d1565fab7330dcb2b3dfb1"),
+			),
 			[]byte{
 				0x30, 0x45, 0x02, 0x21, 0x00, 0xa1, 0x96, 0xed,
-				0x0e, 0x7e, 0xbc, 0xbe, 0x7b, 0x63, 0xfe, 0x1d,
+				0xe, 0x7e, 0xbc, 0xbe, 0x7b, 0x63, 0xfe, 0x1d,
 				0x8e, 0xec, 0xbd, 0xbd, 0xe0, 0x3a, 0x67, 0xce,
 				0xba, 0x4f, 0xc8, 0xf6, 0x48, 0x2b, 0xdc, 0xb9,
 				0x60, 0x6a, 0x91, 0x14, 0x04, 0x02, 0x20, 0x68,
@@ -444,10 +443,7 @@ func TestSignatureSerialize(t *testing.T) {
 		},
 		{
 			"zero signature",
-			&Signature{
-				R: big.NewInt(0),
-				S: big.NewInt(0),
-			},
+			NewSignature(&ModNScalar{}, &ModNScalar{}),
 			[]byte{0x30, 0x06, 0x02, 0x01, 0x00, 0x02, 0x01, 0x00},
 		},
 	}
@@ -464,23 +460,24 @@ func TestSignatureSerialize(t *testing.T) {
 
 func testSignCompact(t *testing.T, tag string, curve *KoblitzCurve,
 	data []byte, isCompressed bool) {
-	priv, _ := NewPrivateKey(curve)
+	priv, _ := NewPrivateKey()
 
 	hashed := []byte("testing")
-	sig, err := SignCompact(curve, priv, hashed, isCompressed)
+	sig, err := SignCompact(priv, hashed, isCompressed)
 	if err != nil {
 		t.Errorf("%s: error signing: %s", tag, err)
 		return
 	}
 
-	pk, wasCompressed, err := RecoverCompact(curve, sig, hashed)
+	pk, wasCompressed, err := RecoverCompact(sig, hashed)
 	if err != nil {
 		t.Errorf("%s: error recovering: %s", tag, err)
 		return
 	}
-	if pk.X.Cmp(priv.X) != 0 || pk.Y.Cmp(priv.Y) != 0 {
+	if pk.X().Cmp(priv.PubKey().X()) != 0 || pk.Y().Cmp(priv.PubKey().Y()) != 0 {
 		t.Errorf("%s: recovered pubkey doesn't match original "+
-			"(%v,%v) vs (%v,%v) ", tag, pk.X, pk.Y, priv.X, priv.Y)
+			"(%v,%v) vs (%v,%v) ", tag, pk.X(), pk.Y(),
+			priv.PubKey().X(), priv.PubKey().Y())
 		return
 	}
 	if wasCompressed != isCompressed {
@@ -497,14 +494,15 @@ func testSignCompact(t *testing.T, tag string, curve *KoblitzCurve,
 		sig[0] += 4
 	}
 
-	pk, wasCompressed, err = RecoverCompact(curve, sig, hashed)
+	pk, wasCompressed, err = RecoverCompact(sig, hashed)
 	if err != nil {
 		t.Errorf("%s: error recovering (2): %s", tag, err)
 		return
 	}
-	if pk.X.Cmp(priv.X) != 0 || pk.Y.Cmp(priv.Y) != 0 {
+	if pk.X().Cmp(priv.PubKey().X()) != 0 || pk.Y().Cmp(priv.PubKey().Y()) != 0 {
 		t.Errorf("%s: recovered pubkey (2) doesn't match original "+
-			"(%v,%v) vs (%v,%v) ", tag, pk.X, pk.Y, priv.X, priv.Y)
+			"(%v,%v) vs (%v,%v) ", tag, pk.X(), pk.Y(),
+			priv.PubKey().X(), priv.PubKey().Y())
 		return
 	}
 	if wasCompressed == isCompressed {
@@ -547,13 +545,13 @@ var recoveryTests = []struct {
 		// Invalid curve point recovered.
 		msg: "00c547e4f7b0f325ad1e56f57e26c745b09a3e503d86e00e5255ff7f715d3d1c",
 		sig: "0100b1693892219d736caba55bdb67216e485557ea6b6af75f37096c9aa6a5a75f00b940b1d03b21e36b0e47e79769f095fe2ab855bd91e3a38756b7d75a9c4549",
-		err: fmt.Errorf("invalid square root"),
+		err: fmt.Errorf("signature is not for a valid curve point"),
 	},
 	{
 		// Point at infinity recovered
 		msg: "6b8d2c81b11b2d699528dde488dbdf2f94293d0d33c32e347f255fa4a6c1f0a9",
 		sig: "0079be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f817986b8d2c81b11b2d699528dde488dbdf2f94293d0d33c32e347f255fa4a6c1f0a9",
-		err: fmt.Errorf("point (Qx, Qy) equals the point at infinity"),
+		err: fmt.Errorf("recovered pubkey is the point at infinity"),
 	},
 	{
 		// Low R and S values.
@@ -567,7 +565,7 @@ var recoveryTests = []struct {
 		// Test case contributed by Ethereum Swarm: GH-1651
 		msg: "3060d2c77c1e192d62ad712fb400e04e6f779914a6876328ff3b213fa85d2012",
 		sig: "65000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000037a3",
-		err: fmt.Errorf("signature R is 0"),
+		err: fmt.Errorf("invalid compact signature recovery code"),
 	},
 	{
 		// Zero R value
@@ -581,7 +579,7 @@ var recoveryTests = []struct {
 		// R = N (curve order of secp256k1)
 		msg: "2bcebac60d8a78e520ae81c2ad586792df495ed429bd730dcd897b301932d054",
 		sig: "65fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd036414100000000000000000000000000000000000000000000000000000000000037a3",
-		err: fmt.Errorf("signature R is >= curve order"),
+		err: fmt.Errorf("invalid compact signature recovery code"),
 	},
 	{
 		// Zero S value
@@ -605,7 +603,7 @@ func TestRecoverCompact(t *testing.T) {
 		// Magic DER constant.
 		sig[0] += 27
 
-		pub, _, err := RecoverCompact(S256(), sig, msg)
+		pub, _, err := RecoverCompact(sig, msg)
 
 		// Verify that returned error matches as expected.
 		if !reflect.DeepEqual(test.err, err) {
@@ -622,7 +620,7 @@ func TestRecoverCompact(t *testing.T) {
 		}
 
 		// Otherwise, ensure the correct public key was recovered.
-		exPub, _ := ParsePubKey(decodeHex(test.pub), S256())
+		exPub, _ := ParsePubKey(decodeHex(test.pub))
 		if !exPub.IsEqual(pub) {
 			t.Errorf("unexpected recovered public key #%d: "+
 				"want %v, got %v", i, exPub, pub)
@@ -681,13 +679,13 @@ func TestRFC6979(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		privKey, _ := PrivKeyFromBytes(S256(), decodeHex(test.key))
+		privKey, _ := PrivKeyFromBytes(decodeHex(test.key))
 		hash := sha256.Sum256([]byte(test.msg))
 
 		// Ensure deterministically generated nonce is the expected value.
-		gotNonce := nonceRFC6979(privKey.D, hash[:]).Bytes()
+		gotNonce := NonceRFC6979(privKey.Serialize(), hash[:], nil, nil, 0).Bytes()
 		wantNonce := decodeHex(test.nonce)
-		if !bytes.Equal(gotNonce, wantNonce) {
+		if !bytes.Equal(gotNonce[:], wantNonce) {
 			t.Errorf("NonceRFC6979 #%d (%s): Nonce is incorrect: "+
 				"%x (expected %x)", i, test.msg, gotNonce,
 				wantNonce)
@@ -695,12 +693,8 @@ func TestRFC6979(t *testing.T) {
 		}
 
 		// Ensure deterministically generated signature is the expected value.
-		gotSig, err := privKey.Sign(hash[:])
-		if err != nil {
-			t.Errorf("Sign #%d (%s): unexpected error: %v", i,
-				test.msg, err)
-			continue
-		}
+		gotSig := Sign(privKey, hash[:])
+
 		gotSigBytes := gotSig.Serialize()
 		wantSigBytes := decodeHex(test.signature)
 		if !bytes.Equal(gotSigBytes, wantSigBytes) {
@@ -713,14 +707,14 @@ func TestRFC6979(t *testing.T) {
 }
 
 func TestSignatureIsEqual(t *testing.T) {
-	sig1 := &Signature{
-		R: fromHex("0082235e21a2300022738dabb8e1bbd9d19cfb1e7ab8c30a23b0afbb8d178abcf3"),
-		S: fromHex("24bf68e256c534ddfaf966bf908deb944305596f7bdcc38d69acad7f9c868724"),
-	}
-	sig2 := &Signature{
-		R: fromHex("4e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd41"),
-		S: fromHex("181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d09"),
-	}
+	sig1 := NewSignature(
+		hexToModNScalar("0082235e21a2300022738dabb8e1bbd9d19cfb1e7ab8c30a23b0afbb8d178abcf3"),
+		hexToModNScalar("24bf68e256c534ddfaf966bf908deb944305596f7bdcc38d69acad7f9c868724"),
+	)
+	sig2 := NewSignature(
+		hexToModNScalar("4e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd41"),
+		hexToModNScalar("181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d09"),
+	)
 
 	if !sig1.IsEqual(sig1) {
 		t.Fatalf("value of IsEqual is incorrect, %v is "+
