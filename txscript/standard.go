@@ -1016,14 +1016,6 @@ func ExtractPkScriptAddrs(pkScript []byte, chainParams *chaincfg.Params) (Script
 		return WitnessV1TaprootTy, addrs, 1, nil
 	}
 
-	// case WitnessV1TaprootTy:
-	// 	requiredSigs = 1
-	// 	addr, err := btcutil.NewAddressTaproot(pops[1].data,
-	// 		chainParams)
-	// 	if err == nil {
-	// 		addrs = append(addrs, addr)
-	// 	}
-
 	// If none of the above passed, then the address must be non-standard.
 	return NonStandardTy, nil, 0, nil
 }

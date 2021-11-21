@@ -334,6 +334,8 @@ func TestExtractPkScriptAddrs(t *testing.T) {
 			reqSigs: 1,
 			class:   WitnessV1TaprootTy,
 		},
+		// from real tx: 691dd277dc0e90a462a3d652a1171686de49cf19067cd33c7df0392833fb986a, vout 44
+		// invalid public keys
 		{
 			name: "1 of 3 multisig with invalid pubkeys 2",
 			script: hexToBytes("514134633365633235396337346461636" +
