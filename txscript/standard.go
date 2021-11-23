@@ -801,6 +801,12 @@ func payToWitnessScriptHashScript(scriptHash []byte) ([]byte, error) {
 	return NewScriptBuilder().AddOp(OP_0).AddData(scriptHash).Script()
 }
 
+// payToWitnessTaprootScript creates a new script to pay to a version 1
+// (taproot) witness program. The passed hash is expected to be valid.
+func payToWitnessTaprootScript(scriptHash []byte) ([]byte, error) {
+	return NewScriptBuilder().AddOp(OP_1).AddData(scriptHash).Script()
+}
+
 // payToPubkeyScript creates a new script to pay a transaction output to a
 // public key. It is expected that the input is a valid pubkey.
 func payToPubKeyScript(serializedPubKey []byte) ([]byte, error) {
@@ -847,6 +853,12 @@ func PayToAddrScript(addr btcutil.Address) ([]byte, error) {
 				nilAddrErrStr)
 		}
 		return payToWitnessScriptHashScript(addr.ScriptAddress())
+	case *btcutil.AddressTaproot:
+		if addr == nil {
+			return nil, scriptError(ErrUnsupportedAddress,
+				nilAddrErrStr)
+		}
+		return payToWitnessTaprootScript(addr.ScriptAddress())
 	}
 
 	str := fmt.Sprintf("unable to generate payment script for unsupported "+
