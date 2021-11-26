@@ -116,6 +116,12 @@ type BlockChain struct {
 	// fields in this struct below this point.
 	chainLock sync.RWMutex
 
+	// notificationSendLock helps us only process one block at a time.
+	// It's definitely a hack. DCRD has much better structure in this regard.
+	// Without this you will get an error if you invalidate a block and then generate more right after.
+	// Taken from https://github.com/gcash/bchd/pull/308
+	notificationSendLock sync.Mutex
+
 	// These fields are related to the memory block index.  They both have
 	// their own locks, however they are often also protected by the chain
 	// lock to help prevent logic races when blocks are being processed.
@@ -683,9 +689,11 @@ func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block,
 	// Notify the caller that the block was connected to the main chain.
 	// The caller would typically want to react with actions such as
 	// updating wallets.
+	b.notificationSendLock.Lock()
+	defer b.notificationSendLock.Unlock()
 	b.chainLock.Unlock()
+	defer b.chainLock.Lock()
 	b.sendNotification(NTBlockConnected, block)
-	b.chainLock.Lock()
 
 	return nil
 }
@@ -808,9 +816,11 @@ func (b *BlockChain) disconnectBlock(node *blockNode, block *btcutil.Block, view
 	// Notify the caller that the block was disconnected from the main
 	// chain.  The caller would typically want to react with actions such as
 	// updating wallets.
+	b.notificationSendLock.Lock()
+	defer b.notificationSendLock.Unlock()
 	b.chainLock.Unlock()
+	defer b.chainLock.Lock()
 	b.sendNotification(NTBlockDisconnected, block)
-	b.chainLock.Lock()
 
 	return nil
 }
@@ -1646,6 +1656,8 @@ func (b *BlockChain) LocateHeaders(locator BlockLocator, hashStop *chainhash.Has
 //
 // This function is safe for concurrent access.
 func (b *BlockChain) InvalidateBlock(hash *chainhash.Hash) error {
+	b.chainLock.Lock()
+	defer b.chainLock.Unlock()
 	return b.invalidateBlock(hash)
 }
 
@@ -1671,8 +1683,6 @@ func (b *BlockChain) invalidateBlock(hash *chainhash.Hash) error {
 	b.index.SetStatusFlags(node, statusValidateFailed)
 	b.index.UnsetStatusFlags(node, statusValid)
 
-	b.chainLock.Lock()
-	defer b.chainLock.Unlock()
 	detachNodes, attachNodes := b.getReorganizeNodes(node.parent)
 
 	err := b.reorganizeChain(detachNodes, attachNodes)
@@ -1727,6 +1737,7 @@ func (b *BlockChain) reconsiderBlock(hash *chainhash.Hash) error {
 		firstNode = n
 	}
 
+	// do we need an rlock on chainstate for this section?
 	var blk *btcutil.Block
 	err := b.db.View(func(dbTx database.Tx) error {
 		var err error
