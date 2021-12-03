@@ -16,6 +16,7 @@ import (
 	"golang.org/x/crypto/ripemd160"
 
 	"github.com/btcsuite/btcd/btcec/v2"
+	"github.com/btcsuite/btcd/btcec/v2/ecdsa"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 )
@@ -1935,13 +1936,13 @@ func opcodeCheckSig(op *opcode, data []byte, vm *Engine) error {
 		return nil
 	}
 
-	var signature *btcec.Signature
+	var signature *ecdsa.Signature
 	if vm.hasFlag(ScriptVerifyStrictEncoding) ||
 		vm.hasFlag(ScriptVerifyDERSignatures) {
 
-		signature, err = btcec.ParseDERSignature(sigBytes)
+		signature, err = ecdsa.ParseDERSignature(sigBytes)
 	} else {
-		signature, err = btcec.ParseSignature(sigBytes)
+		signature, err = ecdsa.ParseSignature(sigBytes)
 	}
 	if err != nil {
 		vm.dstack.PushBool(false)
@@ -1989,7 +1990,7 @@ func opcodeCheckSigVerify(op *opcode, data []byte, vm *Engine) error {
 // the same signature multiple times when verifying a multisig.
 type parsedSigInfo struct {
 	signature       []byte
-	parsedSignature *btcec.Signature
+	parsedSignature *ecdsa.Signature
 	parsed          bool
 }
 
@@ -2134,7 +2135,7 @@ func opcodeCheckMultiSig(op *opcode, data []byte, vm *Engine) error {
 		signature := rawSig[:len(rawSig)-1]
 
 		// Only parse and check the signature encoding once.
-		var parsedSig *btcec.Signature
+		var parsedSig *ecdsa.Signature
 		if !sigInfo.parsed {
 			if err := vm.checkHashTypeEncoding(hashType); err != nil {
 				return err
@@ -2148,9 +2149,9 @@ func opcodeCheckMultiSig(op *opcode, data []byte, vm *Engine) error {
 			if vm.hasFlag(ScriptVerifyStrictEncoding) ||
 				vm.hasFlag(ScriptVerifyDERSignatures) {
 
-				parsedSig, err = btcec.ParseDERSignature(signature)
+				parsedSig, err = ecdsa.ParseDERSignature(signature)
 			} else {
-				parsedSig, err = btcec.ParseSignature(signature)
+				parsedSig, err = ecdsa.ParseSignature(signature)
 			}
 			sigInfo.parsed = true
 			if err != nil {

@@ -164,35 +164,6 @@ func hexToModNScalar(s string) *ModNScalar {
 	return &scalar
 }
 
-// BenchmarkSigVerify benchmarks how long it takes the secp256k1 curve to
-// verify signatures.
-func BenchmarkSigVerify(b *testing.B) {
-	b.StopTimer()
-	// Randomly generated keypair.
-	// Private key: 9e0699c91ca1e3b7e3c9ba71eb71c89890872be97576010fe593fbf3fd57e66d
-	pubKey := NewPublicKey(
-		hexToFieldVal("d2e670a19c6d753d1a6d8b20bd045df8a08fb162cf508956c31268c6d81ffdab"),
-		hexToFieldVal("ab65528eefbb8057aa85d597258a3fbd481a24633bc9b47a9aa045c91371de52"),
-	)
-
-	// Double sha256 of []byte{0x01, 0x02, 0x03, 0x04}
-	msgHash := fromHex("8de472e2399610baaa7f84840547cd409434e31f5d3bd71e4d947f283874f9c0")
-	sig := NewSignature(
-		hexToModNScalar("fef45d2892953aa5bbcdb057b5e98b208f1617a7498af7eb765574e29b5d9c2c"),
-		hexToModNScalar("d47563f52aac6b04b55de236b7c515eb9311757db01e02cff079c3ca6efb063f"),
-	)
-
-	if !sig.Verify(msgHash.Bytes(), pubKey) {
-		b.Errorf("Signature failed to verify")
-		return
-	}
-	b.StartTimer()
-
-	for i := 0; i < b.N; i++ {
-		sig.Verify(msgHash.Bytes(), pubKey)
-	}
-}
-
 // BenchmarkFieldNormalize benchmarks how long it takes the internal field
 // to perform normalization (which includes modular reduction).
 func BenchmarkFieldNormalize(b *testing.B) {

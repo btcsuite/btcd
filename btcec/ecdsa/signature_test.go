@@ -1,8 +1,9 @@
 // Copyright (c) 2013-2017 The btcsuite developers
+// Copyright (c) 2015-2021 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package btcec
+package ecdsa
 
 import (
 	"bytes"
@@ -12,6 +13,8 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
+
+	"github.com/btcsuite/btcd/btcec/v2"
 )
 
 type signatureTest struct {
@@ -344,9 +347,7 @@ func TestSignatures(t *testing.T) {
 			if test.isValid {
 				t.Errorf("%s signature failed when shouldn't %v",
 					test.name, err)
-			} /* else {
-				t.Errorf("%s got error %v", test.name, err)
-			} */
+			}
 			continue
 		}
 		if !test.isValid {
@@ -443,7 +444,7 @@ func TestSignatureSerialize(t *testing.T) {
 		},
 		{
 			"zero signature",
-			NewSignature(&ModNScalar{}, &ModNScalar{}),
+			NewSignature(&btcec.ModNScalar{}, &btcec.ModNScalar{}),
 			[]byte{0x30, 0x06, 0x02, 0x01, 0x00, 0x02, 0x01, 0x00},
 		},
 	}
@@ -458,9 +459,9 @@ func TestSignatureSerialize(t *testing.T) {
 	}
 }
 
-func testSignCompact(t *testing.T, tag string, curve *KoblitzCurve,
+func testSignCompact(t *testing.T, tag string, curve *btcec.KoblitzCurve,
 	data []byte, isCompressed bool) {
-	priv, _ := NewPrivateKey()
+	priv, _ := btcec.NewPrivateKey()
 
 	hashed := []byte("testing")
 	sig, err := SignCompact(priv, hashed, isCompressed)
@@ -523,7 +524,7 @@ func TestSignCompact(t *testing.T) {
 			continue
 		}
 		compressed := i%2 != 0
-		testSignCompact(t, name, S256(), data, compressed)
+		testSignCompact(t, name, btcec.S256(), data, compressed)
 	}
 }
 
@@ -620,7 +621,7 @@ func TestRecoverCompact(t *testing.T) {
 		}
 
 		// Otherwise, ensure the correct public key was recovered.
-		exPub, _ := ParsePubKey(decodeHex(test.pub))
+		exPub, _ := btcec.ParsePubKey(decodeHex(test.pub))
 		if !exPub.IsEqual(pub) {
 			t.Errorf("unexpected recovered public key #%d: "+
 				"want %v, got %v", i, exPub, pub)
@@ -679,11 +680,11 @@ func TestRFC6979(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		privKey, _ := PrivKeyFromBytes(decodeHex(test.key))
+		privKey, _ := btcec.PrivKeyFromBytes(decodeHex(test.key))
 		hash := sha256.Sum256([]byte(test.msg))
 
 		// Ensure deterministically generated nonce is the expected value.
-		gotNonce := NonceRFC6979(privKey.Serialize(), hash[:], nil, nil, 0).Bytes()
+		gotNonce := btcec.NonceRFC6979(privKey.Serialize(), hash[:], nil, nil, 0).Bytes()
 		wantNonce := decodeHex(test.nonce)
 		if !bytes.Equal(gotNonce[:], wantNonce) {
 			t.Errorf("NonceRFC6979 #%d (%s): Nonce is incorrect: "+
@@ -724,5 +725,67 @@ func TestSignatureIsEqual(t *testing.T) {
 	if sig1.IsEqual(sig2) {
 		t.Fatalf("value of IsEqual is incorrect, %v is not "+
 			"equal to %v", sig1, sig2)
+	}
+}
+
+func testSignAndVerify(t *testing.T, c *btcec.KoblitzCurve, tag string) {
+	priv, _ := btcec.NewPrivateKey()
+	pub := priv.PubKey()
+
+	hashed := []byte("testing")
+	sig := Sign(priv, hashed)
+
+	if !sig.Verify(hashed, pub) {
+		t.Errorf("%s: Verify failed", tag)
+	}
+
+	hashed[0] ^= 0xff
+	if sig.Verify(hashed, pub) {
+		t.Errorf("%s: Verify always works!", tag)
+	}
+}
+
+func TestSignAndVerify(t *testing.T) {
+	testSignAndVerify(t, btcec.S256(), "S256")
+}
+
+func TestPrivKeys(t *testing.T) {
+	tests := []struct {
+		name string
+		key  []byte
+	}{
+		{
+			name: "check curve",
+			key: []byte{
+				0xea, 0xf0, 0x2c, 0xa3, 0x48, 0xc5, 0x24, 0xe6,
+				0x39, 0x26, 0x55, 0xba, 0x4d, 0x29, 0x60, 0x3c,
+				0xd1, 0xa7, 0x34, 0x7d, 0x9d, 0x65, 0xcf, 0xe9,
+				0x3c, 0xe1, 0xeb, 0xff, 0xdc, 0xa2, 0x26, 0x94,
+			},
+		},
+	}
+
+	for _, test := range tests {
+		priv, pub := btcec.PrivKeyFromBytes(test.key)
+
+		_, err := btcec.ParsePubKey(pub.SerializeUncompressed())
+		if err != nil {
+			t.Errorf("%s privkey: %v", test.name, err)
+			continue
+		}
+
+		hash := []byte{0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8, 0x9}
+		sig := Sign(priv, hash)
+
+		if !sig.Verify(hash, pub) {
+			t.Errorf("%s could not verify: %v", test.name, err)
+			continue
+		}
+
+		serializedKey := priv.Serialize()
+		if !bytes.Equal(serializedKey, test.key) {
+			t.Errorf("%s unexpected serialized bytes - got: %x, "+
+				"want: %x", test.name, serializedKey, test.key)
+		}
 	}
 }

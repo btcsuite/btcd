@@ -1,14 +1,16 @@
 // Copyright (c) 2013-2017 The btcsuite developers
+// Copyright (c) 2015-2021 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package btcec
+package ecdsa
 
 import (
 	"errors"
 	"fmt"
 	"math/big"
 
+	"github.com/btcsuite/btcd/btcec/v2"
 	secp_ecdsa "github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
 )
 
@@ -22,7 +24,7 @@ var (
 type Signature = secp_ecdsa.Signature
 
 // NewSignature instantiates a new signature given some r and s values.
-func NewSignature(r, s *ModNScalar) *Signature {
+func NewSignature(r, s *btcec.ModNScalar) *Signature {
 	return secp_ecdsa.NewSignature(r, s)
 }
 
@@ -122,7 +124,7 @@ func parseSig(sigStr []byte, der bool) (*Signature, error) {
 	// R must be in the range [1, N-1].  Notice the check for the maximum number
 	// of bytes is required because SetByteSlice truncates as noted in its
 	// comment so it could otherwise fail to detect the overflow.
-	var r ModNScalar
+	var r btcec.ModNScalar
 	if len(rBytes) > 32 {
 		str := "invalid signature: R is larger than 256 bits"
 		return nil, errors.New(str)
@@ -169,7 +171,7 @@ func parseSig(sigStr []byte, der bool) (*Signature, error) {
 	// S must be in the range [1, N-1].  Notice the check for the maximum number
 	// of bytes is required because SetByteSlice truncates as noted in its
 	// comment so it could otherwise fail to detect the overflow.
-	var s ModNScalar
+	var s btcec.ModNScalar
 	if len(sBytes) > 32 {
 		str := "invalid signature: S is larger than 256 bits"
 		return nil, errors.New(str)
@@ -214,7 +216,7 @@ func ParseDERSignature(sigStr []byte) (*Signature, error) {
 // returned in the format:
 // <(byte of 27+public key solution)+4 if compressed >< padded bytes for signature R><padded bytes for signature S>
 // where the R and S parameters are padde up to the bitlengh of the curve.
-func SignCompact(key *PrivateKey, hash []byte,
+func SignCompact(key *btcec.PrivateKey, hash []byte,
 	isCompressedKey bool) ([]byte, error) {
 
 	return secp_ecdsa.SignCompact(key, hash, isCompressedKey), nil
@@ -224,7 +226,7 @@ func SignCompact(key *PrivateKey, hash []byte,
 // Koblitz curve in "curve". If the signature matches then the recovered public
 // key will be returned as well as a boolean if the original key was compressed
 // or not, else an error will be returned.
-func RecoverCompact(signature, hash []byte) (*PublicKey, bool, error) {
+func RecoverCompact(signature, hash []byte) (*btcec.PublicKey, bool, error) {
 	return secp_ecdsa.RecoverCompact(signature, hash)
 }
 
@@ -233,6 +235,6 @@ func RecoverCompact(signature, hash []byte) (*PublicKey, bool, error) {
 // given private key. The produced signature is deterministic (same message and
 // same key yield the same signature) and canonical in accordance with RFC6979
 // and BIP0062.
-func Sign(key *PrivateKey, hash []byte) *Signature {
+func Sign(key *btcec.PrivateKey, hash []byte) *Signature {
 	return secp_ecdsa.Sign(key, hash)
 }

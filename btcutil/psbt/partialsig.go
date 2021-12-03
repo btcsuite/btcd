@@ -4,6 +4,7 @@ import (
 	"bytes"
 
 	"github.com/btcsuite/btcd/btcec/v2"
+	"github.com/btcsuite/btcd/btcec/v2/ecdsa"
 )
 
 // PartialSig encapsulate a (BTC public key, ECDSA signature)
@@ -38,7 +39,7 @@ func validatePubkey(pubKey []byte) bool {
 // ECDSA signature, including the sighash flag.  It does *not* of course
 // validate the signature against any message or public key.
 func validateSignature(sig []byte) bool {
-	_, err := btcec.ParseDERSignature(sig)
+	_, err := ecdsa.ParseDERSignature(sig)
 	return err == nil
 }
 
