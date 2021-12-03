@@ -117,6 +117,9 @@ const (
 	// example, key not found, etc.
 	ErrRPCWallet RPCErrorCode = -4
 
+	// ErrRPCWalletInvalidAddressType indicates an invalid address type.
+	ErrRPCWalletInvalidAddressType RPCErrorCode = -5
+
 	// ErrRPCWalletInsufficientFunds indicates that there are not enough
 	// funds in wallet or account.
 	ErrRPCWalletInsufficientFunds RPCErrorCode = -6
