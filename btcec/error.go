@@ -1,3 +1,6 @@
+// Copyright (c) 2013-2021 The btcsuite developers
+// Copyright (c) 2015-2021 The Decred developers
+
 package btcec
 
 import (
