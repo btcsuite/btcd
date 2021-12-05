@@ -6,6 +6,7 @@
 package chainhash
 
 import (
+	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 )
@@ -78,6 +79,32 @@ func NewHash(newHash []byte) (*Hash, error) {
 		return nil, err
 	}
 	return &sh, err
+}
+
+// TaggedHash implements the tagged hash scheme described in BIP-340. We use
+// sha-256 to bind a message hash to a specific context using a tag:
+// sha256(sha256(tag) || sha256(tag) || msg).
+//
+// TODO(roasbeef): add fast paths for common known tags
+func TaggedHash(tag []byte, msgs ...[]byte) *Hash {
+	shaTag := sha256.Sum256(tag)
+
+	// h = sha256(sha256(tag) || sha256(tag) || msg)
+	h := sha256.New()
+	h.Write(shaTag[:])
+	h.Write(shaTag[:])
+
+	for _, msg := range msgs {
+		h.Write(msg)
+	}
+
+	taggedHash := h.Sum(nil)
+
+	// The function can't error out since the above hash is guaranteed to
+	// be 32 bytes.
+	hash, _ := NewHash(taggedHash)
+
+	return hash
 }
 
 // NewHashFromStr creates a Hash from a hash string.  The string should be
