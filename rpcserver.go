@@ -2355,11 +2355,11 @@ func handleGetMiningInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 	if err != nil {
 		return nil, err
 	}
-	networkHashesPerSec, ok := networkHashesPerSecIface.(int64)
+	networkHashesPerSec, ok := networkHashesPerSecIface.(float64)
 	if !ok {
 		return nil, &btcjson.RPCError{
 			Code:    btcjson.ErrRPCInternal.Code,
-			Message: "networkHashesPerSec is not an int64",
+			Message: "networkHashesPerSec is not a float64",
 		}
 	}
 
@@ -2373,7 +2373,7 @@ func handleGetMiningInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 		Generate:           s.cfg.CPUMiner.IsMining(),
 		GenProcLimit:       s.cfg.CPUMiner.NumWorkers(),
 		HashesPerSec:       s.cfg.CPUMiner.HashesPerSecond(),
-		NetworkHashPS:      float64(networkHashesPerSec),
+		NetworkHashPS:      networkHashesPerSec,
 		PooledTx:           uint64(s.cfg.TxMemPool.Count()),
 		TestNet:            cfg.TestNet3,
 	}
@@ -2393,8 +2393,8 @@ func handleGetNetTotals(s *rpcServer, cmd interface{}, closeChan <-chan struct{}
 
 // handleGetNetworkHashPS implements the getnetworkhashps command.
 func handleGetNetworkHashPS(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
-	// Note: All valid error return paths should return an int64.
-	// Literal zeros are inferred as int, and won't coerce to int64
+	// Note: All valid error return paths should return a float64.
+	// Literal zeros are inferred as int, and won't coerce to float64
 	// because the return value is an interface{}.
 
 	c := cmd.(*btcjson.GetNetworkHashPSCmd)
@@ -2409,7 +2409,7 @@ func handleGetNetworkHashPS(s *rpcServer, cmd interface{}, closeChan <-chan stru
 		endHeight = int32(*c.Height)
 	}
 	if endHeight > best.Height || endHeight == 0 {
-		return int64(0), nil
+		return float64(0), nil
 	}
 	if endHeight < 0 {
 		endHeight = best.Height
@@ -2476,13 +2476,13 @@ func handleGetNetworkHashPS(s *rpcServer, cmd interface{}, closeChan <-chan stru
 	// Calculate the difference in seconds between the min and max block
 	// timestamps and avoid division by zero in the case where there is no
 	// time difference.
-	timeDiff := int64(maxTimestamp.Sub(minTimestamp) / time.Second)
+	timeDiff := maxTimestamp.Sub(minTimestamp).Seconds()
 	if timeDiff == 0 {
-		return int64(0), nil
+		return timeDiff, nil
 	}
 
-	hashesPerSec := new(big.Int).Div(totalWork, big.NewInt(timeDiff))
-	return hashesPerSec.Int64(), nil
+	hashesPerSec, _ := new(big.Float).Quo(new(big.Float).SetInt(totalWork), new(big.Float).SetFloat64(timeDiff)).Float64()
+	return hashesPerSec, nil
 }
 
 // handleGetNodeAddresses implements the getnodeaddresses command.

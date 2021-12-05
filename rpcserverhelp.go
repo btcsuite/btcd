@@ -740,7 +740,7 @@ var rpcResultTypes = map[string][]interface{}{
 	"getmempoolinfo":         {(*btcjson.GetMempoolInfoResult)(nil)},
 	"getmininginfo":          {(*btcjson.GetMiningInfoResult)(nil)},
 	"getnettotals":           {(*btcjson.GetNetTotalsResult)(nil)},
-	"getnetworkhashps":       {(*int64)(nil)},
+	"getnetworkhashps":       {(*float64)(nil)},
 	"getnodeaddresses":       {(*[]btcjson.GetNodeAddressesResult)(nil)},
 	"getpeerinfo":            {(*[]btcjson.GetPeerInfoResult)(nil)},
 	"getrawmempool":          {(*[]string)(nil), (*btcjson.GetRawMempoolVerboseResult)(nil)},
