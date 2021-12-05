@@ -13,7 +13,9 @@ import (
 	"os"
 	"runtime/debug"
 	"testing"
+	"time"
 
+	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/integration/rpctest"
@@ -135,11 +137,165 @@ func testBulkClient(r *rpctest.Harness, t *testing.T) {
 
 }
 
+func calculateHashesPerSecBetweenBlockHeights(r *rpctest.Harness, t *testing.T, startHeight, endHeight int64) float64 {
+	var totalWork int64 = 0
+	var minTimestamp, maxTimestamp time.Time
+
+	for curHeight := startHeight; curHeight <= endHeight; curHeight++ {
+		hash, err := r.Client.GetBlockHash(curHeight)
+
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		blockHeader, err := r.Client.GetBlockHeader(hash)
+
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if curHeight == startHeight {
+			minTimestamp = blockHeader.Timestamp
+			continue
+		}
+
+		totalWork += blockchain.CalcWork(blockHeader.Bits).Int64()
+
+		if curHeight == endHeight {
+			maxTimestamp = blockHeader.Timestamp
+		}
+	}
+
+	timeDiff := maxTimestamp.Sub(minTimestamp).Seconds()
+
+	if timeDiff == 0 {
+		return 0
+	}
+
+	return float64(totalWork) / timeDiff
+}
+
+func testGetNetworkHashPS(r *rpctest.Harness, t *testing.T) {
+	networkHashPS, err := r.Client.GetNetworkHashPS()
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	expectedNetworkHashPS := calculateHashesPerSecBetweenBlockHeights(r, t, 28, 148)
+
+	if networkHashPS != expectedNetworkHashPS {
+		t.Fatalf("Network hashes per second should be %f but received: %f", expectedNetworkHashPS, networkHashPS)
+	}
+}
+
+func testGetNetworkHashPS2(r *rpctest.Harness, t *testing.T) {
+	networkHashPS2BlockTests := []struct {
+		blocks              int
+		expectedStartHeight int64
+		expectedEndHeight   int64
+	}{
+		// Test receiving command for negative blocks
+		{blocks: -200, expectedStartHeight: 0, expectedEndHeight: 148},
+		// Test receiving command for 0 blocks
+		{blocks: 0, expectedStartHeight: 0, expectedEndHeight: 148},
+		// Test receiving command for less than total blocks -> expectedStartHeight = 148 - 100 = 48
+		{blocks: 100, expectedStartHeight: 48, expectedEndHeight: 148},
+		// Test receiving command for exact total blocks -> expectedStartHeight = 148 - 148 = 0
+		{blocks: 148, expectedStartHeight: 0, expectedEndHeight: 148},
+		// Test receiving command for greater than total blocks
+		{blocks: 200, expectedStartHeight: 0, expectedEndHeight: 148},
+	}
+
+	for _, networkHashPS2BlockTest := range networkHashPS2BlockTests {
+		blocks := networkHashPS2BlockTest.blocks
+		expectedStartHeight := networkHashPS2BlockTest.expectedStartHeight
+		expectedEndHeight := networkHashPS2BlockTest.expectedEndHeight
+
+		networkHashPS, err := r.Client.GetNetworkHashPS2(blocks)
+
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		expectedNetworkHashPS := calculateHashesPerSecBetweenBlockHeights(r, t, expectedStartHeight, expectedEndHeight)
+
+		if networkHashPS != expectedNetworkHashPS {
+			t.Fatalf("Network hashes per second should be %f but received: %f", expectedNetworkHashPS, networkHashPS)
+		}
+	}
+}
+
+func testGetNetworkHashPS3(r *rpctest.Harness, t *testing.T) {
+	networkHashPS3BlockTests := []struct {
+		height              int
+		blocks              int
+		expectedStartHeight int64
+		expectedEndHeight   int64
+	}{
+		// Test receiving command for negative height -> expectedEndHeight force to 148
+		// - And negative blocks -> expectedStartHeight = 148 - ((148 % 2016) + 1) =  -1 -> forced to 0
+		{height: -200, blocks: -120, expectedStartHeight: 0, expectedEndHeight: 148},
+		// - And zero blocks -> expectedStartHeight = 148 - ((148 % 2016) + 1) = -1 -> forced to 0
+		{height: -200, blocks: 0, expectedStartHeight: 0, expectedEndHeight: 148},
+		// - And positive blocks less than total blocks -> expectedStartHeight = 148 - 100 = 48
+		{height: -200, blocks: 100, expectedStartHeight: 48, expectedEndHeight: 148},
+		// - And positive blocks equal to total blocks
+		{height: -200, blocks: 148, expectedStartHeight: 0, expectedEndHeight: 148},
+		// - And positive blocks greater than total blocks
+		{height: -200, blocks: 250, expectedStartHeight: 0, expectedEndHeight: 148},
+
+		// Test receiving command for zero height
+		// - Should return 0 similar to expected start height and expected end height both being 0
+		// (blocks is irrelevant to output)
+		{height: 0, blocks: 120, expectedStartHeight: 0, expectedEndHeight: 0},
+
+		// Tests for valid block height -> expectedEndHeight set as height
+		// - And negative blocks -> expectedStartHeight = 148 - ((148 % 2016) + 1) = -1 -> forced to 0
+		{height: 100, blocks: -120, expectedStartHeight: 0, expectedEndHeight: 100},
+		// - And zero blocks -> expectedStartHeight = 148 - ((148 % 2016) + 1) = -1 -> forced to 0
+		{height: 100, blocks: 0, expectedStartHeight: 0, expectedEndHeight: 100},
+		// - And positive blocks less than command blocks -> expectedStartHeight = 100 - 70 = 30
+		{height: 100, blocks: 70, expectedStartHeight: 30, expectedEndHeight: 100},
+		// - And positive blocks equal to command blocks -> expectedStartHeight = 100 - 100 = 0
+		{height: 100, blocks: 100, expectedStartHeight: 0, expectedEndHeight: 100},
+		// - And positive blocks greater than command blocks -> expectedStartHeight = 100 - 200 = -100 -> forced to 0
+		{height: 100, blocks: 200, expectedStartHeight: 0, expectedEndHeight: 100},
+
+		// Test receiving command for height greater than block height
+		// - Should return 0 similar to expected start height and expected end height both being 0
+		// (blocks is irrelevant to output)
+		{height: 200, blocks: 120, expectedStartHeight: 0, expectedEndHeight: 0},
+	}
+
+	for _, networkHashPS3BlockTest := range networkHashPS3BlockTests {
+		blocks := networkHashPS3BlockTest.blocks
+		height := networkHashPS3BlockTest.height
+		expectedStartHeight := networkHashPS3BlockTest.expectedStartHeight
+		expectedEndHeight := networkHashPS3BlockTest.expectedEndHeight
+
+		networkHashPS, err := r.Client.GetNetworkHashPS3(blocks, height)
+
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		expectedNetworkHashPS := calculateHashesPerSecBetweenBlockHeights(r, t, expectedStartHeight, expectedEndHeight)
+
+		if networkHashPS != expectedNetworkHashPS {
+			t.Fatalf("Network hashes per second should be %f but received: %f", expectedNetworkHashPS, networkHashPS)
+		}
+	}
+}
+
 var rpcTestCases = []rpctest.HarnessTestCase{
 	testGetBestBlock,
 	testGetBlockCount,
 	testGetBlockHash,
 	testBulkClient,
+	testGetNetworkHashPS,
+	testGetNetworkHashPS2,
+	testGetNetworkHashPS3,
 }
 
 var primaryHarness *rpctest.Harness
