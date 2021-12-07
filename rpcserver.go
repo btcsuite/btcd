@@ -833,11 +833,11 @@ func handleDecodeScript(s *rpcServer, cmd interface{}, closeChan <-chan struct{}
 	// Get information about the script.
 	// Ignore the error here since an error means the script couldn't parse
 	// and there is no additinal information about it anyways.
-	scriptClass, addrs, reqSigs, _ := txscript.ExtractPkScriptAddrs(script,
+	scriptClass, addrs, _, _ := txscript.ExtractPkScriptAddrs(script,
 		s.cfg.ChainParams)
-	addresses := make([]string, len(addrs))
-	for i, addr := range addrs {
-		addresses[i] = addr.EncodeAddress()
+	var address string
+	if len(addrs) > 0 {
+		address = addrs[0].EncodeAddress()
 	}
 
 	// Convert the script itself to a pay-to-script-hash address.
@@ -849,10 +849,9 @@ func handleDecodeScript(s *rpcServer, cmd interface{}, closeChan <-chan struct{}
 
 	// Generate and return the reply.
 	reply := btcjson.DecodeScriptResult{
-		Asm:       disbuf,
-		ReqSigs:   int32(reqSigs),
-		Type:      scriptClass.String(),
-		Addresses: addresses,
+		Asm:     disbuf,
+		Type:    scriptClass.String(),
+		Address: address,
 	}
 	if scriptClass != txscript.ScriptHashTy {
 		reply.P2sh = p2sh.EncodeAddress()
@@ -2780,11 +2779,11 @@ func handleGetTxOut(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 	// Get further info about the script.
 	// Ignore the error here since an error means the script couldn't parse
 	// and there is no additional information about it anyways.
-	scriptClass, addrs, reqSigs, _ := txscript.ExtractPkScriptAddrs(pkScript,
+	scriptClass, addrs, _, _ := txscript.ExtractPkScriptAddrs(pkScript,
 		s.cfg.ChainParams)
-	addresses := make([]string, len(addrs))
-	for i, addr := range addrs {
-		addresses[i] = addr.EncodeAddress()
+	var address string
+	if len(addrs) > 0 {
+		address = addrs[0].EncodeAddress()
 	}
 
 	txOutReply := &btcjson.GetTxOutResult{
@@ -2792,11 +2791,10 @@ func handleGetTxOut(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 		Confirmations: int64(confirmations),
 		Value:         btcutil.Amount(value).ToBTC(),
 		ScriptPubKey: btcjson.ScriptPubKeyResult{
-			Asm:       disbuf,
-			Hex:       hex.EncodeToString(pkScript),
-			ReqSigs:   int32(reqSigs),
-			Type:      scriptClass.String(),
-			Addresses: addresses,
+			Asm:     disbuf,
+			Hex:     hex.EncodeToString(pkScript),
+			Type:    scriptClass.String(),
+			Address: address,
 		},
 		Coinbase: isCoinbase,
 	}
