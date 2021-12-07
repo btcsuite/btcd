@@ -704,7 +704,7 @@ func createVoutList(mtx *wire.MsgTx, chainParams *chaincfg.Params, filterAddrMap
 		// Ignore the error here since an error means the script
 		// couldn't parse and there is no additional information about
 		// it anyways.
-		scriptClass, addrs, reqSigs, _ := txscript.ExtractPkScriptAddrs(
+		scriptClass, addrs, _, _ := txscript.ExtractPkScriptAddrs(
 			v.PkScript, chainParams)
 
 		// Encode the addresses while checking if the address passes the
@@ -729,14 +729,18 @@ func createVoutList(mtx *wire.MsgTx, chainParams *chaincfg.Params, filterAddrMap
 			continue
 		}
 
+		var encodedAddr string
+		if len(encodedAddrs) > 0 {
+			encodedAddr = encodedAddrs[0]
+		}
+
 		var vout btcjson.Vout
 		vout.N = uint32(i)
 		vout.Value = btcutil.Amount(v.Value).ToBTC()
-		vout.ScriptPubKey.Addresses = encodedAddrs
+		vout.ScriptPubKey.Address = encodedAddr
 		vout.ScriptPubKey.Asm = disbuf
 		vout.ScriptPubKey.Hex = hex.EncodeToString(v.PkScript)
 		vout.ScriptPubKey.Type = scriptClass.String()
-		vout.ScriptPubKey.ReqSigs = int32(reqSigs)
 
 		voutList = append(voutList, vout)
 	}
