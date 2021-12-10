@@ -1,0 +1,19 @@
+version: "3"
+
+volumes:
+  lbcd:
+    external: true
+
+services:
+  lbcd:
+    image: lbry/lbcd:linode_deployment
+    container_name: lbcd
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - lbcd:/root/.lbcd:rw
+    ports:
+      - "REPLACE_ME:9245:9245"
+      - "9246:9246"
