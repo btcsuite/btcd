@@ -25,7 +25,6 @@ type CreateWalletResult struct {
 type embeddedAddressInfo struct {
 	Address             string                `json:"address"`
 	ScriptPubKey        string                `json:"scriptPubKey"`
-	Solvable            bool                  `json:"solvable"`
 	Descriptor          *string               `json:"desc,omitempty"`
 	IsScript            bool                  `json:"isscript"`
 	IsChange            bool                  `json:"ischange"`
@@ -229,6 +228,7 @@ type InfoWalletResult struct {
 	PaytxFee        float64 `json:"paytxfee"`
 	RelayFee        float64 `json:"relayfee"`
 	Errors          string  `json:"errors"`
+	Staked          float64 `json:"staked"`
 }
 
 // ListTransactionsResult models the data from the listtransactions command.
@@ -293,7 +293,9 @@ type ListUnspentResult struct {
 	RedeemScript  string  `json:"redeemScript,omitempty"`
 	Amount        float64 `json:"amount"`
 	Confirmations int64   `json:"confirmations"`
+	Solvable      bool    `json:"solvable"`
 	Spendable     bool    `json:"spendable"`
+	IsStake       bool    `json:"isstake"`
 }
 
 // SignRawTransactionError models the data that contains script verification
