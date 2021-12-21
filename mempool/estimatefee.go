@@ -275,7 +275,16 @@ func (ef *FeeEstimator) RegisterBlock(block *btcutil.Block) error {
 
 		// This shouldn't happen but check just in case to avoid
 		// an out-of-bounds array index later.
-		if blocksToConfirm >= estimateFeeDepth {
+		//
+		// Also check that blocksToConfirm is not negative as this causes
+		// the node to crash on reorgs.  A tx that was observed at height X
+		// might be included in heights less than X because of chain reorgs.
+		// Refer to github.com/btcsuite/btcd/issues/1660 for more information.
+		//
+		// TODO(kcalvinalvin) a better design that doesn't just skip over the
+		// transaction would result in a more accurate fee estimator.  Properly
+		// implement this later.
+		if blocksToConfirm >= estimateFeeDepth || blocksToConfirm < 0 {
 			continue
 		}
 
