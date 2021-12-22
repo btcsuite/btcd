@@ -260,7 +260,8 @@ func NewGetNewAddressCmd(account, addrType *string) *GetNewAddressCmd {
 
 // GetRawChangeAddressCmd defines the getrawchangeaddress JSON-RPC command.
 type GetRawChangeAddressCmd struct {
-	Account *string
+	Account     *string
+	AddressType *string
 }
 
 // NewGetRawChangeAddressCmd returns a new instance which can be used to issue a
@@ -268,9 +269,10 @@ type GetRawChangeAddressCmd struct {
 //
 // The parameters which are pointers indicate they are optional.  Passing nil
 // for optional parameters will use the default value.
-func NewGetRawChangeAddressCmd(account *string) *GetRawChangeAddressCmd {
+func NewGetRawChangeAddressCmd(account, addrType *string) *GetRawChangeAddressCmd {
 	return &GetRawChangeAddressCmd{
-		Account: account,
+		Account:     account,
+		AddressType: addrType,
 	}
 }
 
