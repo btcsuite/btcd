@@ -1135,8 +1135,8 @@ func (r FutureGetRawChangeAddressResult) Receive() (btcutil.Address, error) {
 // function on the returned instance.
 //
 // See GetRawChangeAddress for the blocking version and more details.
-func (c *Client) GetRawChangeAddressAsync(account string) FutureGetRawChangeAddressResult {
-	cmd := btcjson.NewGetRawChangeAddressCmd(&account)
+func (c *Client) GetRawChangeAddressAsync(account, addrType string) FutureGetRawChangeAddressResult {
+	cmd := btcjson.NewGetRawChangeAddressCmd(&account, &addrType)
 	result := FutureGetRawChangeAddressResult{
 		network:         c.chainParams,
 		responseChannel: c.SendCmd(cmd),
@@ -1147,8 +1147,8 @@ func (c *Client) GetRawChangeAddressAsync(account string) FutureGetRawChangeAddr
 // GetRawChangeAddress returns a new address for receiving change that will be
 // associated with the provided account.  Note that this is only for raw
 // transactions and NOT for normal use.
-func (c *Client) GetRawChangeAddress(account string) (btcutil.Address, error) {
-	return c.GetRawChangeAddressAsync(account).Receive()
+func (c *Client) GetRawChangeAddress(account, addrType string) (btcutil.Address, error) {
+	return c.GetRawChangeAddressAsync(account, addrType).Receive()
 }
 
 // FutureAddWitnessAddressResult is a future promise to deliver the result of
