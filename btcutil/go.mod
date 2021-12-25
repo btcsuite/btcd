@@ -9,5 +9,3 @@ require (
 	github.com/kkdai/bstream v0.0.0-20161212061736-f391b8402d23
 	golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9
 )
-
-replace github.com/btcsuite/btcd => ../
