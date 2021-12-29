@@ -3012,10 +3012,20 @@ func handleInvalidateBlock(s *rpcServer, cmd interface{}, closeChan <-chan struc
 
 	hash, err := chainhash.NewHashFromStr(c.BlockHash)
 	if err != nil {
-		return nil, err
+		return nil, &btcjson.RPCError{
+			Code:    btcjson.ErrRPCInvalidParameter,
+			Message: "Unable to parse hash: " + err.Error(),
+		}
 	}
 
-	return nil, s.cfg.Chain.InvalidateBlock(hash)
+	err = s.cfg.Chain.InvalidateBlock(hash)
+	if err != nil {
+		return nil, &btcjson.RPCError{
+			Code:    btcjson.ErrRPCInternal.Code,
+			Message: "Unable to invalidate block: " + err.Error(),
+		}
+	}
+	return nil, nil
 }
 
 // handleReconsiderBlock implements the reconsiderblock command
@@ -3024,10 +3034,20 @@ func handleReconsiderBlock(s *rpcServer, cmd interface{}, closeChan <-chan struc
 
 	hash, err := chainhash.NewHashFromStr(c.BlockHash)
 	if err != nil {
-		return nil, err
+		return nil, &btcjson.RPCError{
+			Code:    btcjson.ErrRPCInvalidParameter,
+			Message: "Unable to parse hash: " + err.Error(),
+		}
 	}
 
-	return nil, s.cfg.Chain.ReconsiderBlock(hash)
+	err = s.cfg.Chain.ReconsiderBlock(hash)
+	if err != nil {
+		return nil, &btcjson.RPCError{
+			Code:    btcjson.ErrRPCInternal.Code,
+			Message: "Unable to reconsider block: " + err.Error(),
+		}
+	}
+	return nil, nil
 }
 
 // handleHelp implements the help command.
@@ -4303,7 +4323,7 @@ func (s *rpcServer) processRequest(request *btcjson.Request, isAdmin bool, close
 				} else {
 					jsonErr = &btcjson.RPCError{
 						Code:    btcjson.ErrRPCInvalidRequest.Code,
-						Message: "Invalid request: malformed",
+						Message: "Invalid request: " + err.Error(),
 					}
 				}
 			}
