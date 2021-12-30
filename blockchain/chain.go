@@ -1004,6 +1004,7 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List) error 
 		err = b.checkConnectBlock(n, block, view, nil)
 		if err != nil {
 			if _, ok := err.(RuleError); ok {
+				b.index.UnsetStatusFlags(n, statusValid)
 				b.index.SetStatusFlags(n, statusValidateFailed)
 				for de := e.Next(); de != nil; de = de.Next() {
 					dn := de.Value.(*blockNode)
@@ -1141,6 +1142,7 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, fla
 			if err == nil {
 				b.index.SetStatusFlags(node, statusValid)
 			} else if _, ok := err.(RuleError); ok {
+				b.index.UnsetStatusFlags(node, statusValid)
 				b.index.SetStatusFlags(node, statusValidateFailed)
 			} else {
 				return false, err
@@ -1175,6 +1177,7 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, fla
 			// that status of the block as invalid and flush the
 			// index state to disk before returning with the error.
 			if _, ok := err.(RuleError); ok {
+				b.index.UnsetStatusFlags(node, statusValid)
 				b.index.SetStatusFlags(
 					node, statusValidateFailed,
 				)
@@ -1720,7 +1723,7 @@ func (b *BlockChain) reconsiderBlock(hash *chainhash.Hash) error {
 	}
 
 	// No need to reconsider, it is already valid.
-	if node.status.KnownValid() {
+	if node.status.KnownValid() && !node.status.KnownInvalid() { // second clause works around old bug
 		err := fmt.Errorf("block %s is already valid", hash)
 		return err
 	}
