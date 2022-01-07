@@ -522,3 +522,21 @@ func IsUnspendable(pkScript []byte) bool {
 	const scriptVersion = 0
 	return checkScriptParses(scriptVersion, pkScript) != nil
 }
+
+// ScriptHasOpSuccess returns true if any op codes in the script contain an
+// OP_SUCCESS op code.
+func ScriptHasOpSuccess(witnessScript []byte) bool {
+	// First, create a new script tokenizer so we can run through all the
+	// elements.
+	tokenizer := MakeScriptTokenizer(0, witnessScript)
+
+	// Run through all the op codes, returning true if we find anything
+	// that is marked as a new op success.
+	for tokenizer.Next() {
+		if _, ok := successOpcodes[tokenizer.Opcode()]; ok {
+			return true
+		}
+	}
+
+	return false
+}

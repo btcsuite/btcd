@@ -613,6 +613,99 @@ var opcodeOnelineRepls = map[string]string{
 	"OP_16":      "16",
 }
 
+// successOpcodes tracks the set of op codes that are to be interpreted as op
+// codes that cause execution to automatically succeed. This map is used to
+// quickly look up the op codes during script pre-processing.
+var successOpcodes = map[byte]struct{}{
+	OP_RESERVED:     {}, // 80
+	OP_VER:          {}, // 98
+	OP_CAT:          {}, // 126
+	OP_SUBSTR:       {}, // 127
+	OP_LEFT:         {}, // 128
+	OP_RIGHT:        {}, // 129
+	OP_INVERT:       {}, // 131
+	OP_AND:          {}, // 132
+	OP_OR:           {}, // 133
+	OP_XOR:          {}, // 134
+	OP_RESERVED1:    {}, // 137
+	OP_RESERVED2:    {}, // 138
+	OP_2MUL:         {}, // 141
+	OP_2DIV:         {}, // 142
+	OP_MUL:          {}, // 149
+	OP_DIV:          {}, // 150
+	OP_MOD:          {}, // 151
+	OP_LSHIFT:       {}, // 152
+	OP_RSHIFT:       {}, // 153
+	OP_UNKNOWN187:   {}, // 187
+	OP_UNKNOWN188:   {}, // 188
+	OP_UNKNOWN189:   {}, // 189
+	OP_UNKNOWN190:   {}, // 190
+	OP_UNKNOWN191:   {}, // 191
+	OP_UNKNOWN192:   {}, // 192
+	OP_UNKNOWN193:   {}, // 193
+	OP_UNKNOWN194:   {}, // 194
+	OP_UNKNOWN195:   {}, // 195
+	OP_UNKNOWN196:   {}, // 196
+	OP_UNKNOWN197:   {}, // 197
+	OP_UNKNOWN198:   {}, // 198
+	OP_UNKNOWN199:   {}, // 199
+	OP_UNKNOWN200:   {}, // 200
+	OP_UNKNOWN201:   {}, // 201
+	OP_UNKNOWN202:   {}, // 202
+	OP_UNKNOWN203:   {}, // 203
+	OP_UNKNOWN204:   {}, // 204
+	OP_UNKNOWN205:   {}, // 205
+	OP_UNKNOWN206:   {}, // 206
+	OP_UNKNOWN207:   {}, // 207
+	OP_UNKNOWN208:   {}, // 208
+	OP_UNKNOWN209:   {}, // 209
+	OP_UNKNOWN210:   {}, // 210
+	OP_UNKNOWN211:   {}, // 211
+	OP_UNKNOWN212:   {}, // 212
+	OP_UNKNOWN213:   {}, // 213
+	OP_UNKNOWN214:   {}, // 214
+	OP_UNKNOWN215:   {}, // 215
+	OP_UNKNOWN216:   {}, // 216
+	OP_UNKNOWN217:   {}, // 217
+	OP_UNKNOWN218:   {}, // 218
+	OP_UNKNOWN219:   {}, // 219
+	OP_UNKNOWN220:   {}, // 220
+	OP_UNKNOWN221:   {}, // 221
+	OP_UNKNOWN222:   {}, // 222
+	OP_UNKNOWN223:   {}, // 223
+	OP_UNKNOWN224:   {}, // 224
+	OP_UNKNOWN225:   {}, // 225
+	OP_UNKNOWN226:   {}, // 226
+	OP_UNKNOWN227:   {}, // 227
+	OP_UNKNOWN228:   {}, // 228
+	OP_UNKNOWN229:   {}, // 229
+	OP_UNKNOWN230:   {}, // 230
+	OP_UNKNOWN231:   {}, // 231
+	OP_UNKNOWN232:   {}, // 232
+	OP_UNKNOWN233:   {}, // 233
+	OP_UNKNOWN234:   {}, // 234
+	OP_UNKNOWN235:   {}, // 235
+	OP_UNKNOWN236:   {}, // 236
+	OP_UNKNOWN237:   {}, // 237
+	OP_UNKNOWN238:   {}, // 238
+	OP_UNKNOWN239:   {}, // 239
+	OP_UNKNOWN240:   {}, // 240
+	OP_UNKNOWN241:   {}, // 241
+	OP_UNKNOWN242:   {}, // 242
+	OP_UNKNOWN243:   {}, // 243
+	OP_UNKNOWN244:   {}, // 244
+	OP_UNKNOWN245:   {}, // 245
+	OP_UNKNOWN246:   {}, // 246
+	OP_UNKNOWN247:   {}, // 247
+	OP_UNKNOWN248:   {}, // 248
+	OP_UNKNOWN249:   {}, // 249
+	OP_SMALLINTEGER: {}, // 250
+	OP_PUBKEYS:      {}, // 251
+	OP_UNKNOWN252:   {}, // 252
+	OP_PUBKEYHASH:   {}, // 253
+	OP_PUBKEY:       {}, // 254
+}
+
 // disasmOpcode writes a human-readable disassembly of the provided opcode and
 // data into the provided buffer.  The compact flag indicates the disassembly
 // should print a more compact representation of data-carrying and small integer
