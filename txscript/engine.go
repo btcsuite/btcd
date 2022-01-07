@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/btcsuite/btcd/btcec/v2"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 )
 
@@ -117,6 +118,46 @@ const (
 // halforder is used to tame ECDSA malleability (see BIP0062).
 var halfOrder = new(big.Int).Rsh(btcec.S256().N, 1)
 
+// taprootExecutionCtx houses the special context-specific information we need
+// to validate a taproot script spend. This includes the annex, the running sig
+// op count tally, and other relevant information.
+type taprootExecutionCtx struct {
+	annex []byte
+
+	codeSepPos uint32
+
+	tapLeafHash chainhash.Hash
+
+	sigOpsBudget uint32
+}
+
+// sigOpsDelta is both the starting budget for sig ops for tapscript
+// verification, as well as the decrease in the total budget when we encounter
+// a signature.
+const sigOpsDelta = 50
+
+// tallysigOp attempts to decrease the current sig ops budget by sigOpsDelta.
+// An error is returned if after subtracting the delta, the budget is below
+// zero.
+func (t *taprootExecutionCtx) tallysigOp() error {
+	t.sigOpsBudget -= sigOpsDelta
+
+	if t.sigOpsBudget == 0 {
+		return fmt.Errorf("max sig ops exceeded")
+	}
+
+	return nil
+}
+
+// newTaprootExecutionCtx returns a fresh instance of the taproot execution
+// context.
+func newTaprootExecutionCtx(inputWitnessSize uint32) *taprootExecutionCtx {
+	return &taprootExecutionCtx{
+		codeSepPos:   blankCodeSepValue,
+		sigOpsBudget: sigOpsDelta + inputWitnessSize,
+	}
+}
+
 // Engine is the virtual machine that executes scripts.
 type Engine struct {
 	// The following fields are set when the engine is created and must not be
@@ -201,6 +242,7 @@ type Engine struct {
 	witnessVersion  int
 	witnessProgram  []byte
 	inputAmount     int64
+	taprootCtx      *taprootExecutionCtx
 }
 
 // hasFlag returns whether the script engine instance has the passed flag set.
