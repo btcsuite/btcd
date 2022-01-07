@@ -343,6 +343,30 @@ const (
 	// serialized in a compressed format.
 	ErrWitnessPubKeyType
 
+	// ----------------------------
+	// Failures related to taproot.
+	// ----------------------------
+
+	// ErrDiscourageOpSuccess is returned if
+	// ScriptVerifyDiscourageOpSuccess is active, and a OP_SUCCESS op code
+	// is encountered during tapscript validation.
+	ErrDiscourageOpSuccess
+
+	// ErrDiscourageUpgradeableTaprootVersion is returned if
+	// ScriptVerifyDiscourageUpgradeableTaprootVersion is active and a leaf
+	// version encountered isn't the base leaf version.
+	ErrDiscourageUpgradeableTaprootVersion
+
+	// ErrTapscriptCheckMultisig is returned if a script attempts to use
+	// OP_CHECKMULTISIGVERIFY or OP_CHECKMULTISIG during tapscript
+	// execution.
+	ErrTapscriptCheckMultisig
+
+	// ErrDiscourageUpgradeableTaprootVersion is returned if during
+	// tapscript execution, we encoutner a public key that isn't 0 or 32
+	// bytes.
+	ErrDiscourageUpgradeablePubKeyType
+
 	// numErrorCodes is the maximum error code number used in tests.  This
 	// entry MUST be the last entry in the enum.
 	numErrorCodes
@@ -350,71 +374,75 @@ const (
 
 // Map of ErrorCode values back to their constant names for pretty printing.
 var errorCodeStrings = map[ErrorCode]string{
-	ErrInternal:                           "ErrInternal",
-	ErrInvalidFlags:                       "ErrInvalidFlags",
-	ErrInvalidIndex:                       "ErrInvalidIndex",
-	ErrUnsupportedAddress:                 "ErrUnsupportedAddress",
-	ErrNotMultisigScript:                  "ErrNotMultisigScript",
-	ErrTooManyRequiredSigs:                "ErrTooManyRequiredSigs",
-	ErrTooMuchNullData:                    "ErrTooMuchNullData",
-	ErrUnsupportedScriptVersion:           "ErrUnsupportedScriptVersion",
-	ErrEarlyReturn:                        "ErrEarlyReturn",
-	ErrEmptyStack:                         "ErrEmptyStack",
-	ErrEvalFalse:                          "ErrEvalFalse",
-	ErrScriptUnfinished:                   "ErrScriptUnfinished",
-	ErrInvalidProgramCounter:              "ErrInvalidProgramCounter",
-	ErrScriptTooBig:                       "ErrScriptTooBig",
-	ErrElementTooBig:                      "ErrElementTooBig",
-	ErrTooManyOperations:                  "ErrTooManyOperations",
-	ErrStackOverflow:                      "ErrStackOverflow",
-	ErrInvalidPubKeyCount:                 "ErrInvalidPubKeyCount",
-	ErrInvalidSignatureCount:              "ErrInvalidSignatureCount",
-	ErrNumberTooBig:                       "ErrNumberTooBig",
-	ErrVerify:                             "ErrVerify",
-	ErrEqualVerify:                        "ErrEqualVerify",
-	ErrNumEqualVerify:                     "ErrNumEqualVerify",
-	ErrCheckSigVerify:                     "ErrCheckSigVerify",
-	ErrCheckMultiSigVerify:                "ErrCheckMultiSigVerify",
-	ErrDisabledOpcode:                     "ErrDisabledOpcode",
-	ErrReservedOpcode:                     "ErrReservedOpcode",
-	ErrMalformedPush:                      "ErrMalformedPush",
-	ErrInvalidStackOperation:              "ErrInvalidStackOperation",
-	ErrUnbalancedConditional:              "ErrUnbalancedConditional",
-	ErrMinimalData:                        "ErrMinimalData",
-	ErrInvalidSigHashType:                 "ErrInvalidSigHashType",
-	ErrSigTooShort:                        "ErrSigTooShort",
-	ErrSigTooLong:                         "ErrSigTooLong",
-	ErrSigInvalidSeqID:                    "ErrSigInvalidSeqID",
-	ErrSigInvalidDataLen:                  "ErrSigInvalidDataLen",
-	ErrSigMissingSTypeID:                  "ErrSigMissingSTypeID",
-	ErrSigMissingSLen:                     "ErrSigMissingSLen",
-	ErrSigInvalidSLen:                     "ErrSigInvalidSLen",
-	ErrSigInvalidRIntID:                   "ErrSigInvalidRIntID",
-	ErrSigZeroRLen:                        "ErrSigZeroRLen",
-	ErrSigNegativeR:                       "ErrSigNegativeR",
-	ErrSigTooMuchRPadding:                 "ErrSigTooMuchRPadding",
-	ErrSigInvalidSIntID:                   "ErrSigInvalidSIntID",
-	ErrSigZeroSLen:                        "ErrSigZeroSLen",
-	ErrSigNegativeS:                       "ErrSigNegativeS",
-	ErrSigTooMuchSPadding:                 "ErrSigTooMuchSPadding",
-	ErrSigHighS:                           "ErrSigHighS",
-	ErrNotPushOnly:                        "ErrNotPushOnly",
-	ErrSigNullDummy:                       "ErrSigNullDummy",
-	ErrPubKeyType:                         "ErrPubKeyType",
-	ErrCleanStack:                         "ErrCleanStack",
-	ErrNullFail:                           "ErrNullFail",
-	ErrDiscourageUpgradableNOPs:           "ErrDiscourageUpgradableNOPs",
-	ErrNegativeLockTime:                   "ErrNegativeLockTime",
-	ErrUnsatisfiedLockTime:                "ErrUnsatisfiedLockTime",
-	ErrWitnessProgramEmpty:                "ErrWitnessProgramEmpty",
-	ErrWitnessProgramMismatch:             "ErrWitnessProgramMismatch",
-	ErrWitnessProgramWrongLength:          "ErrWitnessProgramWrongLength",
-	ErrWitnessMalleated:                   "ErrWitnessMalleated",
-	ErrWitnessMalleatedP2SH:               "ErrWitnessMalleatedP2SH",
-	ErrWitnessUnexpected:                  "ErrWitnessUnexpected",
-	ErrMinimalIf:                          "ErrMinimalIf",
-	ErrWitnessPubKeyType:                  "ErrWitnessPubKeyType",
-	ErrDiscourageUpgradableWitnessProgram: "ErrDiscourageUpgradableWitnessProgram",
+	ErrInternal:                            "ErrInternal",
+	ErrInvalidFlags:                        "ErrInvalidFlags",
+	ErrInvalidIndex:                        "ErrInvalidIndex",
+	ErrUnsupportedAddress:                  "ErrUnsupportedAddress",
+	ErrNotMultisigScript:                   "ErrNotMultisigScript",
+	ErrTooManyRequiredSigs:                 "ErrTooManyRequiredSigs",
+	ErrTooMuchNullData:                     "ErrTooMuchNullData",
+	ErrUnsupportedScriptVersion:            "ErrUnsupportedScriptVersion",
+	ErrEarlyReturn:                         "ErrEarlyReturn",
+	ErrEmptyStack:                          "ErrEmptyStack",
+	ErrEvalFalse:                           "ErrEvalFalse",
+	ErrScriptUnfinished:                    "ErrScriptUnfinished",
+	ErrInvalidProgramCounter:               "ErrInvalidProgramCounter",
+	ErrScriptTooBig:                        "ErrScriptTooBig",
+	ErrElementTooBig:                       "ErrElementTooBig",
+	ErrTooManyOperations:                   "ErrTooManyOperations",
+	ErrStackOverflow:                       "ErrStackOverflow",
+	ErrInvalidPubKeyCount:                  "ErrInvalidPubKeyCount",
+	ErrInvalidSignatureCount:               "ErrInvalidSignatureCount",
+	ErrNumberTooBig:                        "ErrNumberTooBig",
+	ErrVerify:                              "ErrVerify",
+	ErrEqualVerify:                         "ErrEqualVerify",
+	ErrNumEqualVerify:                      "ErrNumEqualVerify",
+	ErrCheckSigVerify:                      "ErrCheckSigVerify",
+	ErrCheckMultiSigVerify:                 "ErrCheckMultiSigVerify",
+	ErrDisabledOpcode:                      "ErrDisabledOpcode",
+	ErrReservedOpcode:                      "ErrReservedOpcode",
+	ErrMalformedPush:                       "ErrMalformedPush",
+	ErrInvalidStackOperation:               "ErrInvalidStackOperation",
+	ErrUnbalancedConditional:               "ErrUnbalancedConditional",
+	ErrMinimalData:                         "ErrMinimalData",
+	ErrInvalidSigHashType:                  "ErrInvalidSigHashType",
+	ErrSigTooShort:                         "ErrSigTooShort",
+	ErrSigTooLong:                          "ErrSigTooLong",
+	ErrSigInvalidSeqID:                     "ErrSigInvalidSeqID",
+	ErrSigInvalidDataLen:                   "ErrSigInvalidDataLen",
+	ErrSigMissingSTypeID:                   "ErrSigMissingSTypeID",
+	ErrSigMissingSLen:                      "ErrSigMissingSLen",
+	ErrSigInvalidSLen:                      "ErrSigInvalidSLen",
+	ErrSigInvalidRIntID:                    "ErrSigInvalidRIntID",
+	ErrSigZeroRLen:                         "ErrSigZeroRLen",
+	ErrSigNegativeR:                        "ErrSigNegativeR",
+	ErrSigTooMuchRPadding:                  "ErrSigTooMuchRPadding",
+	ErrSigInvalidSIntID:                    "ErrSigInvalidSIntID",
+	ErrSigZeroSLen:                         "ErrSigZeroSLen",
+	ErrSigNegativeS:                        "ErrSigNegativeS",
+	ErrSigTooMuchSPadding:                  "ErrSigTooMuchSPadding",
+	ErrSigHighS:                            "ErrSigHighS",
+	ErrNotPushOnly:                         "ErrNotPushOnly",
+	ErrSigNullDummy:                        "ErrSigNullDummy",
+	ErrPubKeyType:                          "ErrPubKeyType",
+	ErrCleanStack:                          "ErrCleanStack",
+	ErrNullFail:                            "ErrNullFail",
+	ErrDiscourageUpgradableNOPs:            "ErrDiscourageUpgradableNOPs",
+	ErrNegativeLockTime:                    "ErrNegativeLockTime",
+	ErrUnsatisfiedLockTime:                 "ErrUnsatisfiedLockTime",
+	ErrWitnessProgramEmpty:                 "ErrWitnessProgramEmpty",
+	ErrWitnessProgramMismatch:              "ErrWitnessProgramMismatch",
+	ErrWitnessProgramWrongLength:           "ErrWitnessProgramWrongLength",
+	ErrWitnessMalleated:                    "ErrWitnessMalleated",
+	ErrWitnessMalleatedP2SH:                "ErrWitnessMalleatedP2SH",
+	ErrWitnessUnexpected:                   "ErrWitnessUnexpected",
+	ErrMinimalIf:                           "ErrMinimalIf",
+	ErrWitnessPubKeyType:                   "ErrWitnessPubKeyType",
+	ErrDiscourageUpgradableWitnessProgram:  "ErrDiscourageUpgradableWitnessProgram",
+	ErrDiscourageOpSuccess:                 "ErrDiscourageOpSuccess",
+	ErrDiscourageUpgradeableTaprootVersion: "ErrDiscourageUpgradeableTaprootVersion",
+	ErrTapscriptCheckMultisig:              "ErrTapscriptCheckMultisig",
+	ErrDiscourageUpgradeablePubKeyType:     "ErrDiscourageUpgradeablePubKeyType",
 }
 
 // String returns the ErrorCode as a human-readable name.
