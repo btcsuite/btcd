@@ -474,7 +474,7 @@ func getWitnessSigOps(pkScript []byte, witness wire.TxWitness) int {
 	}
 
 	switch witnessVersion {
-	case 0:
+	case BaseSegwitWitnessVersion:
 		switch {
 		case len(witnessProgram) == payToWitnessPubKeyHashDataSize:
 			return 1
@@ -484,8 +484,10 @@ func getWitnessSigOps(pkScript []byte, witness wire.TxWitness) int {
 			witnessScript := witness[len(witness)-1]
 			return countSigOpsV0(witnessScript, true)
 		}
-	case 1:
-		// https://github.com/bitcoin/bitcoin/blob/368831371d97a642beb54b5c4eb6eb0fedaa16b4/src/script/interpreter.cpp#L2090
+
+	// Taproot signature operations don't count towards the block-wide sig
+	// op limit, instead a distinct weight-based accounting method is used.
+	case TaprootWitnessVersion:
 		return 0
 	}
 

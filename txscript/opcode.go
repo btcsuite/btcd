@@ -1986,7 +1986,10 @@ func opcodeCheckSig(op *opcode, data []byte, vm *Engine) error {
 	// The signature actually needs needs to be longer than this, but at
 	// least 1 byte is needed for the hash type below.  The full length is
 	// checked depending on the script flags and upon parsing the signature.
-	if len(fullSigBytes) < 1 {
+	//
+	// This only applies if tapscript verification isn't active, as this
+	// check is done within the sighash itself.
+	if vm.taprootCtx == nil && len(fullSigBytes) < 1 {
 		vm.dstack.PushBool(false)
 		return nil
 	}
@@ -2024,14 +2027,60 @@ func opcodeCheckSig(op *opcode, data []byte, vm *Engine) error {
 			vm.dstack.PushBool(false)
 			return nil
 		}
+
+	// Otherwise, this is routine tapscript execution.
+	case vm.taprootCtx != nil:
+		// Account for changes in the sig ops budget after this
+		// execution, but only for non-empty signatures.
+		if len(fullSigBytes) > 0 {
+			if err := vm.taprootCtx.tallysigOp(); err != nil {
+				return err
+			}
+		}
+
+		// Empty public keys immeidately cause execution to fail.
+		if len(pkBytes) == 0 {
+			return fmt.Errorf("nil pub key")
+		}
+
+		// If this is tapscript execution, and the signature was
+		// actually an empty vector, then we push on an empty vector
+		// and continue execution from ther, but only if the pubkey
+		// isn't empty.
+		if len(fullSigBytes) == 0 {
+			vm.dstack.PushByteArray([]byte{})
+			return nil
+		}
+
+		// If the constructor fails immediately, then it's because
+		// the public key size is zero, so we'll fail all script
+		// execution.
+		sigVerifier, err = newBaseTapscriptSigVerifier(
+			pkBytes, fullSigBytes, vm,
+		)
+		if err != nil {
+			return err
+		}
+
+	default:
+		// We skip segwit v1 in isolation here, as the v1 rules aren't
+		// used in script execution (for sig verification) and are only
+		// part of the top-level key-spend verification which we
+		// already skipped.
+		//
+		// In other words, this path shouldn't ever be reached
+		//
+		// TODO(roasbeef): return an error?
 	}
 
-	// TODO(roasbeef): verify NULLFAIL semantics as relates to constructors
-	// above and empty sig vectors
 	valid := sigVerifier.Verify()
 
 	switch {
-	case !valid && vm.hasFlag(ScriptVerifyNullFail) && len(fullSigBytes[1:]) > 0:
+	// For tapscript, and prior execution with null fail active, if the
+	// signature is invalid, then this MUST be an empty signature.
+	case !valid && vm.taprootCtx != nil && len(fullSigBytes) != 0:
+		fallthrough
+	case !valid && vm.hasFlag(ScriptVerifyNullFail) && len(fullSigBytes) > 0:
 		str := "signature not empty on failed checksig"
 		return scriptError(ErrNullFail, str)
 	}
