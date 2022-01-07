@@ -383,10 +383,9 @@ func extractWitnessV0ScriptHash(script []byte) []byte {
 	return nil
 }
 
-// extractWitnessV1ScriptHash extracts the witness script hash from the passed
-// script if it is standard pay-to-witness-script-hash script. It will return
-// nil otherwise.
-func extractWitnessV1ScriptHash(script []byte) []byte {
+// extractWitnessV1KeyBytes extracts the raw public key bytes script if it is
+// standard pay-to-witness-script-hash v1 script. It will return nil otherwise.
+func extractWitnessV1KeyBytes(script []byte) []byte {
 	// A pay-to-witness-script-hash script is of the form:
 	//   OP_1 OP_DATA_32 <32-byte-hash>
 	if len(script) == witnessV1TaprootLen &&
@@ -461,7 +460,7 @@ func isWitnessProgramScript(script []byte) bool {
 // isWitnessTaprootScript returns true if the passed script is for a
 // pay-to-witness-taproot output, false otherwise.
 func isWitnessTaprootScript(script []byte) bool {
-	return extractWitnessV1ScriptHash(script) != nil
+	return extractWitnessV1KeyBytes(script) != nil
 }
 
 // isAnnexedWitness returns true if the passed witness has a final push
@@ -504,7 +503,7 @@ func isNullDataScript(scriptVersion uint16, script []byte) bool {
 	// Thus, it can either be a single OP_RETURN or an OP_RETURN followed by a
 	// data push up to MaxDataCarrierSize bytes.
 
-	// The script can't possibly be a a null data script if it doesn't start
+	// The script can't possibly be a null data script if it doesn't start
 	// with OP_RETURN.  Fail fast to avoid more work below.
 	if len(script) < 1 || script[0] != OP_RETURN {
 		return false
@@ -527,7 +526,7 @@ func isNullDataScript(scriptVersion uint16, script []byte) bool {
 // or prior, and 1 for segwit v1 (taproot) scripts.
 func typeOfScript(scriptVersion uint16, script []byte) ScriptClass {
 	switch scriptVersion {
-	case 0:
+	case BaseSegwitWitnessVersion:
 		switch {
 		case isPubKeyScript(script):
 			return PubKeyTy
@@ -544,12 +543,13 @@ func typeOfScript(scriptVersion uint16, script []byte) ScriptClass {
 		case isNullDataScript(scriptVersion, script):
 			return NullDataTy
 		}
-	case 1:
+	case TaprootWitnessVersion:
 		switch {
 		case isWitnessTaprootScript(script):
 			return WitnessV1TaprootTy
 		}
 	}
+
 	return NonStandardTy
 }
 
@@ -815,8 +815,8 @@ func payToWitnessScriptHashScript(scriptHash []byte) ([]byte, error) {
 
 // payToWitnessTaprootScript creates a new script to pay to a version 1
 // (taproot) witness program. The passed hash is expected to be valid.
-func payToWitnessTaprootScript(scriptHash []byte) ([]byte, error) {
-	return NewScriptBuilder().AddOp(OP_1).AddData(scriptHash).Script()
+func payToWitnessTaprootScript(rawKey []byte) ([]byte, error) {
+	return NewScriptBuilder().AddOp(OP_1).AddData(rawKey).Script()
 }
 
 // payToPubkeyScript creates a new script to pay a transaction output to a
@@ -1025,9 +1025,9 @@ func ExtractPkScriptAddrs(pkScript []byte,
 		return WitnessV0ScriptHashTy, addrs, 1, nil
 	}
 
-	if hash := extractWitnessV1ScriptHash(pkScript); hash != nil {
+	if rawKey := extractWitnessV1KeyBytes(pkScript); rawKey != nil {
 		var addrs []btcutil.Address
-		addr, err := btcutil.NewAddressTaproot(hash, chainParams)
+		addr, err := btcutil.NewAddressTaproot(rawKey, chainParams)
 		if err == nil {
 			addrs = append(addrs, addr)
 		}
