@@ -96,6 +96,9 @@ func VerifyTaprootKeySpend(witnessProgram []byte, rawSig []byte, tx *wire.MsgTx,
 // ControlBlock houses the structured witness input for a taproot spend. This
 // includes the internal taproot key, the leaf version, and finally a nearly
 // complete merkle inclusion proof for the main taproot commitment.
+//
+// TODO(roasbeef): method to serialize control block that commits to even
+// y-bit, which pops up everywhere even tho 32 byte keys
 type ControlBlock struct {
 	// InternalKey is the internal public key in the taproot commitment.
 	InternalKey *secp.PublicKey
@@ -270,6 +273,54 @@ func ComputeTaprootOutputKey(pubKey *btcec.PublicKey,
 	taprootKey.ToAffine()
 
 	return btcec.NewPublicKey(&taprootKey.X, &taprootKey.Y)
+}
+
+// ComputeTaprootKeyNoScript calculates the top-level taproot output key given
+// an internal key, and a desire that the only way an output can be spent is
+// with the keyspend path. This is useful for normal wallet operations that
+// don't need any other additional spending conditions.
+func ComputeTaprootKeyNoScript(internalKey *btcec.PublicKey) *btcec.PublicKey {
+	// We'll compute a custom tap tweak hash that just commits to the key,
+	// rather than an actual root hash.
+	fakeScriptroot := []byte{}
+
+	return ComputeTaprootOutputKey(internalKey, fakeScriptroot)
+}
+
+// TweakTaprootPrivKey applies the same operation as ComputeTaprootOutputKey,
+// but on the private key instead. The final key is derived as: privKey +
+// h_tapTweak(internalKey || merkleRoot) % N, where N is the order of the
+// secp256k1 curve, and merkleRoot is the root hash of the tapscript tree.
+func TweakTaprootPrivKey(privKey *btcec.PrivateKey,
+	scriptRoot []byte) *btcec.PrivateKey {
+
+	// If the corresponding public key has an odd y coordinate, then we'll
+	// negate the private key as specified in BIP 341.
+	privKeyScalar := &privKey.Key
+	pubKeyBytes := privKey.PubKey().SerializeCompressed()
+	if pubKeyBytes[0] == btcec.PubKeyFormatCompressedOdd {
+		privKeyScalar.Negate()
+	}
+
+	// Next, we'll compute the tap tweak hash that commits to the internal
+	// key and the merkle script root. We'll snip off the extra parity byte
+	// from the compressed serialization and use that directly.
+	schnorrKeyBytes := pubKeyBytes[1:]
+	tapTweakHash := chainhash.TaggedHash(
+		chainhash.TagTapTweak, schnorrKeyBytes, scriptRoot,
+	)
+
+	// Map the private key to a ModNScalar which is needed to perform
+	// operation mod the curve order.
+	var tweakScalar btcec.ModNScalar
+	tweakScalar.SetBytes((*[32]byte)(tapTweakHash))
+
+	// Now that we have the private key in its may negated form, we'll add
+	// the script root as a tweak. As we're using a ModNScalar all
+	// operations are already normalized mod the curve order.
+	privTweak := privKeyScalar.Add(&tweakScalar)
+
+	return btcec.PrivKeyFromScalar(privTweak)
 }
 
 // VerifyTaprootLeafCommitment attempts to verify a taproot commitment of the

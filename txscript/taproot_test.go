@@ -8,13 +8,40 @@ import (
 	"bytes"
 	"encoding/hex"
 	"testing"
+	"testing/quick"
 
+	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
+	"github.com/btcsuite/btcd/btcutil"
+	"github.com/btcsuite/btcd/btcutil/hdkeychain"
+	"github.com/btcsuite/btcd/chaincfg"
 	secp "github.com/decred/dcrd/dcrec/secp256k1/v4"
+	"github.com/stretchr/testify/require"
 )
 
 var (
-	testPubBytes, _ = hex.DecodeString("F9308A019258C31049344F85F89D5229B531C845836F99B08601F113BCE036F9")
+	testPubBytes, _ = hex.DecodeString("F9308A019258C31049344F85F89D5229B" +
+		"531C845836F99B08601F113BCE036F9")
+
+	// rootKey is the test root key defined in the test vectors:
+	// https://github.com/bitcoin/bips/blob/master/bip-0086.mediawiki
+	rootKey, _ = hdkeychain.NewKeyFromString(
+		"xprv9s21ZrQH143K3GJpoapnV8SFfukcVBSfeCficPSGfubmSFDxo1kuHnLi" +
+			"sriDvSnRRuL2Qrg5ggqHKNVpxR86QEC8w35uxmGoggxtQTPvfUu",
+	)
+
+	// accountPath is the base path for BIP86 (m/86'/0'/0').
+	accountPath = []uint32{
+		86 + hdkeychain.HardenedKeyStart, hdkeychain.HardenedKeyStart,
+		hdkeychain.HardenedKeyStart,
+	}
+	expectedExternalAddresses = []string{
+		"bc1p5cyxnuxmeuwuvkwfem96lqzszd02n6xdcjrs20cac6yqjjwudpxqkedrcr",
+		"bc1p4qhjn9zdvkux4e44uhx8tc55attvtyu358kutcqkudyccelu0was9fqzwh",
+	}
+	expectedInternalAddresses = []string{
+		"bc1p3qkhfews2uk44qtvauqyr2ttdsw7svhkl9nkm9s9c3x4ax5h60wqwruhk7",
+	}
 )
 
 // TestControlBlockParsing tests that we're able to generate and parse a valid
@@ -130,4 +157,91 @@ func TestControlBlockParsing(t *testing.T) {
 				"got %x", i, ctrlBlockBytes, ctrlBytes)
 		}
 	}
+}
+
+// TestTaprootScriptSpendTweak tests that for any 32-byte hypothetical script
+// root, the resulting tweaked public key is the same as tweaking the private
+// key, then generating a public key from that. This test a quickcheck test to
+// assert the following invariant:
+//
+// * taproot_tweak_pubkey(pubkey_gen(seckey), h)[1] ==
+//   pubkey_gen(taproot_tweak_seckey(seckey, h))
+func TestTaprootScriptSpendTweak(t *testing.T) {
+	t.Parallel()
+
+	// Assert that if we use this x value as the hash of the script root,
+	// then if we generate a tweaked public key, it's the same key as if we
+	// used that key to generate the tweaked
+	// private key, and then generated the public key from that.
+	f := func(x [32]byte) bool {
+		privKey, err := btcec.NewPrivateKey()
+		if err != nil {
+			return false
+		}
+
+		// Generate the tweaked public key using the x value as the
+		// script root.
+		tweakedPub := ComputeTaprootOutputKey(privKey.PubKey(), x[:])
+
+		// Now we'll generate the corresponding tweaked private key.
+		tweakedPriv := TweakTaprootPrivKey(privKey, x[:])
+
+		// The public key for this private key should be the same as
+		// the tweaked public key we generate above.
+		return tweakedPub.IsEqual(tweakedPriv.PubKey()) &&
+			bytes.Equal(
+				schnorr.SerializePubKey(tweakedPub),
+				schnorr.SerializePubKey(tweakedPriv.PubKey()),
+			)
+	}
+
+	if err := quick.Check(f, nil); err != nil {
+		t.Fatalf("tweaked public/private key mapping is "+
+			"incorrect: %v", err)
+	}
+
+}
+
+// TestTaprootConstructKeyPath tests the key spend only taproot construction.
+func TestTaprootConstructKeyPath(t *testing.T) {
+	checkPath := func(branch uint32, expectedAddresses []string) {
+		path, err := derivePath(rootKey, append(accountPath, branch))
+		require.NoError(t, err)
+
+		for index, expectedAddr := range expectedAddresses {
+			extendedKey, err := path.Derive(uint32(index))
+			require.NoError(t, err)
+
+			pubKey, err := extendedKey.ECPubKey()
+			require.NoError(t, err)
+
+			tapKey := ComputeTaprootKeyNoScript(pubKey)
+
+			addr, err := btcutil.NewAddressTaproot(
+				schnorr.SerializePubKey(tapKey),
+				&chaincfg.MainNetParams,
+			)
+			require.NoError(t, err)
+
+			require.Equal(t, expectedAddr, addr.String())
+		}
+	}
+	checkPath(0, expectedExternalAddresses)
+	checkPath(1, expectedInternalAddresses)
+}
+
+func derivePath(key *hdkeychain.ExtendedKey, path []uint32) (
+	*hdkeychain.ExtendedKey, error) {
+
+	var (
+		currentKey = key
+		err        error
+	)
+	for _, pathPart := range path {
+		currentKey, err = currentKey.Derive(pathPart)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return currentKey, nil
 }
