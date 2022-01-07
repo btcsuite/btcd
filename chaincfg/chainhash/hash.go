@@ -27,12 +27,17 @@ var (
 	// TagBIP0340Nonce is the BIP-0340 tag for nonces.
 	TagBIP0340Nonce = []byte("BIP0340/nonce")
 
+	// TagTapSighash is the tag used by BIP 341 to generate the sighash
+	// flags.
+	TagTapSighash = []byte("TapSighash")
+
 	// precomputedTags is a map containing the SHA-256 hash of the BIP-0340
 	// tags.
 	precomputedTags = map[string]Hash{
 		string(TagBIP0340Challenge): sha256.Sum256(TagBIP0340Challenge),
 		string(TagBIP0340Aux):       sha256.Sum256(TagBIP0340Aux),
 		string(TagBIP0340Nonce):     sha256.Sum256(TagBIP0340Nonce),
+		string(TagTapSighash):       sha256.Sum256(TagTapSighash),
 	}
 )
 

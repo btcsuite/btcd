@@ -1914,7 +1914,7 @@ func opcodeCheckSig(op *opcode, data []byte, vm *Engine) error {
 		if vm.hashCache != nil {
 			sigHashes = vm.hashCache
 		} else {
-			sigHashes = NewTxSigHashes(&vm.tx)
+			sigHashes = NewTxSigHashes(&vm.tx, vm.prevOutFetcher)
 		}
 
 		hash, err = calcWitnessSignatureHashRaw(subScript, sigHashes, hashType,
@@ -2185,7 +2185,7 @@ func opcodeCheckMultiSig(op *opcode, data []byte, vm *Engine) error {
 			if vm.hashCache != nil {
 				sigHashes = vm.hashCache
 			} else {
-				sigHashes = NewTxSigHashes(&vm.tx)
+				sigHashes = NewTxSigHashes(&vm.tx, vm.prevOutFetcher)
 			}
 
 			hash, err = calcWitnessSignatureHashRaw(script, sigHashes, hashType,

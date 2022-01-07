@@ -19,20 +19,17 @@ import (
 // This timestamp corresponds to Sun Apr 1 00:00:00 UTC 2012.
 var Bip16Activation = time.Unix(1333238400, 0)
 
-// SigHashType represents hash type bits at the end of a signature.
-type SigHashType uint32
-
-// Hash type bits from the end of a signature.
 const (
-	SigHashOld          SigHashType = 0x0
-	SigHashAll          SigHashType = 0x1
-	SigHashNone         SigHashType = 0x2
-	SigHashSingle       SigHashType = 0x3
-	SigHashAnyOneCanPay SigHashType = 0x80
+	// TaprootAnnexTag is the tag for an annex. This value is used to
+	// identify the annex during tapscript spends. If there're at least two
+	// elements in the taproot witness stack, and the first byte of the
+	// last element matches this tag, then we'll extract this as a distinct
+	// item.
+	TaprootAnnexTag = 0x50
 
-	// sigHashMask defines the number of bits of the hash type which is used
-	// to identify which outputs are signed.
-	sigHashMask = 0x1f
+	// TaprootLeafMask is the mask applied to the control block to extract
+	// the leaf versions of the taproot script leaf being spent.
+	TaprootLeafMask = 0xfe
 )
 
 // These are the constants specified for maximums in individual scripts.

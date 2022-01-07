@@ -18,9 +18,11 @@ func init() {
 }
 
 // genTestTx creates a random transaction for uses within test cases.
-func genTestTx() (*wire.MsgTx, error) {
+func genTestTx() (*wire.MsgTx, *MultiPrevOutFetcher, error) {
 	tx := wire.NewMsgTx(2)
 	tx.Version = rand.Int31()
+
+	prevOuts := NewMultiPrevOutFetcher(nil)
 
 	numTxins := 1 + rand.Intn(11)
 	for i := 0; i < numTxins; i++ {
@@ -32,10 +34,14 @@ func genTestTx() (*wire.MsgTx, error) {
 		}
 		_, err := rand.Read(randTxIn.PreviousOutPoint.Hash[:])
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		tx.TxIn = append(tx.TxIn, &randTxIn)
+
+		prevOuts.AddPrevOut(
+			randTxIn.PreviousOutPoint, &wire.TxOut{},
+		)
 	}
 
 	numTxouts := 1 + rand.Intn(11)
@@ -45,12 +51,12 @@ func genTestTx() (*wire.MsgTx, error) {
 			PkScript: make([]byte, rand.Intn(30)),
 		}
 		if _, err := rand.Read(randTxOut.PkScript); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		tx.TxOut = append(tx.TxOut, &randTxOut)
 	}
 
-	return tx, nil
+	return tx, prevOuts, nil
 }
 
 // TestHashCacheAddContainsHashes tests that after items have been added to the
@@ -62,23 +68,29 @@ func TestHashCacheAddContainsHashes(t *testing.T) {
 
 	cache := NewHashCache(10)
 
-	var err error
+	var (
+		err          error
+		randPrevOuts *MultiPrevOutFetcher
+	)
+	prevOuts := NewMultiPrevOutFetcher(nil)
 
 	// First, we'll generate 10 random transactions for use within our
 	// tests.
 	const numTxns = 10
 	txns := make([]*wire.MsgTx, numTxns)
 	for i := 0; i < numTxns; i++ {
-		txns[i], err = genTestTx()
+		txns[i], randPrevOuts, err = genTestTx()
 		if err != nil {
 			t.Fatalf("unable to generate test tx: %v", err)
 		}
+
+		prevOuts.Merge(randPrevOuts)
 	}
 
 	// With the transactions generated, we'll add each of them to the hash
 	// cache.
 	for _, tx := range txns {
-		cache.AddSigHashes(tx)
+		cache.AddSigHashes(tx, prevOuts)
 	}
 
 	// Next, we'll ensure that each of the transactions inserted into the
@@ -91,7 +103,7 @@ func TestHashCacheAddContainsHashes(t *testing.T) {
 		}
 	}
 
-	randTx, err := genTestTx()
+	randTx, _, err := genTestTx()
 	if err != nil {
 		t.Fatalf("unable to generate tx: %v", err)
 	}
@@ -115,14 +127,14 @@ func TestHashCacheAddGet(t *testing.T) {
 
 	// To start, we'll generate a random transaction and compute the set of
 	// sighashes for the transaction.
-	randTx, err := genTestTx()
+	randTx, prevOuts, err := genTestTx()
 	if err != nil {
 		t.Fatalf("unable to generate tx: %v", err)
 	}
-	sigHashes := NewTxSigHashes(randTx)
+	sigHashes := NewTxSigHashes(randTx, prevOuts)
 
 	// Next, add the transaction to the hash cache.
-	cache.AddSigHashes(randTx)
+	cache.AddSigHashes(randTx, prevOuts)
 
 	// The transaction inserted into the cache above should be found.
 	txid := randTx.TxHash()
@@ -146,19 +158,25 @@ func TestHashCachePurge(t *testing.T) {
 
 	cache := NewHashCache(10)
 
-	var err error
+	var (
+		err          error
+		randPrevOuts *MultiPrevOutFetcher
+	)
+	prevOuts := NewMultiPrevOutFetcher(nil)
 
 	// First we'll start by inserting numTxns transactions into the hash cache.
 	const numTxns = 10
 	txns := make([]*wire.MsgTx, numTxns)
 	for i := 0; i < numTxns; i++ {
-		txns[i], err = genTestTx()
+		txns[i], randPrevOuts, err = genTestTx()
 		if err != nil {
 			t.Fatalf("unable to generate test tx: %v", err)
 		}
+
+		prevOuts.Merge(randPrevOuts)
 	}
 	for _, tx := range txns {
-		cache.AddSigHashes(tx)
+		cache.AddSigHashes(tx, prevOuts)
 	}
 
 	// Once all the transactions have been inserted, we'll purge them from

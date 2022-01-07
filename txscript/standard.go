@@ -466,13 +466,25 @@ func isWitnessTaprootScript(script []byte) bool {
 
 // isAnnexedWitness returns true if the passed witness has a final push
 // that is a witness annex.
-func isAnnexedWitness(witness [][]byte) bool {
-	const OP_ANNEX = 0x50
+func isAnnexedWitness(witness wire.TxWitness) bool {
 	if len(witness) < 2 {
 		return false
 	}
+
 	lastElement := witness[len(witness)-1]
-	return len(lastElement) > 0 && lastElement[0] == OP_ANNEX
+	return len(lastElement) > 0 && lastElement[0] == TaprootAnnexTag
+}
+
+// extractAnnex attempts to extract the annex from the passed witness. If the
+// witness doesn't contain an annex, then an error is returned.
+func extractAnnex(witness [][]byte) ([]byte, error) {
+	if !isAnnexedWitness(witness) {
+		// TODO(roasbeef): make into actual type
+		return nil, fmt.Errorf("no witness annex")
+	}
+
+	lastElement := witness[len(witness)-1]
+	return lastElement, nil
 }
 
 // isNullDataScript returns whether or not the passed script is a standard

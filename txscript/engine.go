@@ -145,13 +145,14 @@ type Engine struct {
 	// since transaction scripts are often executed more than once from various
 	// contexts (e.g. new block templates, when transactions are first seen
 	// prior to being mined, part of full block verification, etc).
-	flags     ScriptFlags
-	tx        wire.MsgTx
-	txIdx     int
-	version   uint16
-	bip16     bool
-	sigCache  *SigCache
-	hashCache *TxSigHashes
+	flags          ScriptFlags
+	tx             wire.MsgTx
+	txIdx          int
+	version        uint16
+	bip16          bool
+	sigCache       *SigCache
+	hashCache      *TxSigHashes
+	prevOutFetcher PrevOutputFetcher
 
 	// The following fields handle keeping track of the current execution state
 	// of the engine.
@@ -1117,7 +1118,9 @@ func (vm *Engine) SetAltStack(data [][]byte) {
 // transaction, and input index.  The flags modify the behavior of the script
 // engine according to the description provided by each flag.
 func NewEngine(scriptPubKey []byte, tx *wire.MsgTx, txIdx int, flags ScriptFlags,
-	sigCache *SigCache, hashCache *TxSigHashes, inputAmount int64) (*Engine, error) {
+	sigCache *SigCache, hashCache *TxSigHashes, inputAmount int64,
+	prevOuts PrevOutputFetcher) (*Engine, error) {
+
 	const scriptVersion = 0
 
 	// The provided transaction input index must refer to a valid input.
@@ -1147,8 +1150,13 @@ func NewEngine(scriptPubKey []byte, tx *wire.MsgTx, txIdx int, flags ScriptFlags
 	// it possible to have a situation where P2SH would not be a soft fork
 	// when it should be. The same goes for segwit which will pull in
 	// additional scripts for execution from the witness stack.
-	vm := Engine{flags: flags, sigCache: sigCache, hashCache: hashCache,
-		inputAmount: inputAmount}
+	vm := Engine{
+		flags:          flags,
+		sigCache:       sigCache,
+		hashCache:      hashCache,
+		inputAmount:    inputAmount,
+		prevOutFetcher: prevOuts,
+	}
 	if vm.hasFlag(ScriptVerifyCleanStack) && (!vm.hasFlag(ScriptBip16) &&
 		!vm.hasFlag(ScriptVerifyWitness)) {
 		return nil, scriptError(ErrInvalidFlags,

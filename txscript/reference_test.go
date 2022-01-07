@@ -15,9 +15,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcd/btcutil"
 )
 
 // scriptTestName returns a descriptive test name for the given reference script
@@ -441,10 +441,14 @@ func testScripts(t *testing.T, tests [][]interface{}, useSigCache bool) {
 		// Generate a transaction pair such that one spends from the
 		// other and the provided signature and public key scripts are
 		// used, then create a new engine to execute the scripts.
-		tx := createSpendingTx(witness, scriptSig, scriptPubKey,
-			int64(inputAmt))
-		vm, err := NewEngine(scriptPubKey, tx, 0, flags, sigCache, nil,
-			int64(inputAmt))
+		tx := createSpendingTx(
+			witness, scriptSig, scriptPubKey, int64(inputAmt),
+		)
+		prevOuts := NewCannedPrevOutputFetcher(scriptPubKey, int64(inputAmt))
+		vm, err := NewEngine(
+			scriptPubKey, tx, 0, flags, sigCache, nil,
+			int64(inputAmt), prevOuts,
+		)
 		if err == nil {
 			err = vm.Execute()
 		}
@@ -572,7 +576,7 @@ testloop:
 			continue
 		}
 
-		prevOuts := make(map[wire.OutPoint]scriptWithInputVal)
+		prevOutFetcher := NewMultiPrevOutFetcher(nil)
 		for j, iinput := range inputs {
 			input, ok := iinput.([]interface{})
 			if !ok {
@@ -633,16 +637,18 @@ testloop:
 				}
 			}
 
-			v := scriptWithInputVal{
-				inputVal: int64(inputValue),
-				pkScript: script,
-			}
-			prevOuts[*wire.NewOutPoint(prevhash, idx)] = v
+			op := wire.NewOutPoint(prevhash, idx)
+			prevOutFetcher.AddPrevOut(*op, &wire.TxOut{
+				Value:    int64(inputValue),
+				PkScript: script,
+			})
 		}
 
 		for k, txin := range tx.MsgTx().TxIn {
-			prevOut, ok := prevOuts[txin.PreviousOutPoint]
-			if !ok {
+			prevOut := prevOutFetcher.FetchPrevOutput(
+				txin.PreviousOutPoint,
+			)
+			if prevOut == nil {
 				t.Errorf("bad test (missing %dth input) %d:%v",
 					k, i, test)
 				continue testloop
@@ -650,8 +656,8 @@ testloop:
 			// These are meant to fail, so as soon as the first
 			// input fails the transaction has failed. (some of the
 			// test txns have good inputs, too..
-			vm, err := NewEngine(prevOut.pkScript, tx.MsgTx(), k,
-				flags, nil, nil, prevOut.inputVal)
+			vm, err := NewEngine(prevOut.PkScript, tx.MsgTx(), k,
+				flags, nil, nil, prevOut.Value, prevOutFetcher)
 			if err != nil {
 				continue testloop
 			}
@@ -727,7 +733,7 @@ testloop:
 			continue
 		}
 
-		prevOuts := make(map[wire.OutPoint]scriptWithInputVal)
+		prevOutFetcher := NewMultiPrevOutFetcher(nil)
 		for j, iinput := range inputs {
 			input, ok := iinput.([]interface{})
 			if !ok {
@@ -788,22 +794,24 @@ testloop:
 				}
 			}
 
-			v := scriptWithInputVal{
-				inputVal: int64(inputValue),
-				pkScript: script,
-			}
-			prevOuts[*wire.NewOutPoint(prevhash, idx)] = v
+			op := wire.NewOutPoint(prevhash, idx)
+			prevOutFetcher.AddPrevOut(*op, &wire.TxOut{
+				Value:    int64(inputValue),
+				PkScript: script,
+			})
 		}
 
 		for k, txin := range tx.MsgTx().TxIn {
-			prevOut, ok := prevOuts[txin.PreviousOutPoint]
-			if !ok {
+			prevOut := prevOutFetcher.FetchPrevOutput(
+				txin.PreviousOutPoint,
+			)
+			if prevOut == nil {
 				t.Errorf("bad test (missing %dth input) %d:%v",
 					k, i, test)
 				continue testloop
 			}
-			vm, err := NewEngine(prevOut.pkScript, tx.MsgTx(), k,
-				flags, nil, nil, prevOut.inputVal)
+			vm, err := NewEngine(prevOut.PkScript, tx.MsgTx(), k,
+				flags, nil, nil, prevOut.Value, prevOutFetcher)
 			if err != nil {
 				t.Errorf("test (%d:%v:%d) failed to create "+
 					"script: %v", i, test, k, err)

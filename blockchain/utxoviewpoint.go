@@ -7,11 +7,11 @@ package blockchain
 import (
 	"fmt"
 
+	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcd/btcutil"
 )
 
 // txoFlags is a bitmask defining additional information and state for a
@@ -157,6 +157,23 @@ func (view *UtxoViewpoint) SetBestHash(hash *chainhash.Hash) {
 // disconnected during a reorg.
 func (view *UtxoViewpoint) LookupEntry(outpoint wire.OutPoint) *UtxoEntry {
 	return view.entries[outpoint]
+}
+
+// FetchPrevOutput fetches the previous output referenced by the passed
+// outpoint. This is identical to the LookupEntry method, but it returns a
+// wire.TxOut instead.
+//
+// NOTE: This is an implementation of the txscript.PrevOutputFetcher interface.
+func (view *UtxoViewpoint) FetchPrevOutput(op wire.OutPoint) *wire.TxOut {
+	prevOut := view.entries[op]
+	if prevOut == nil {
+		return nil
+	}
+
+	return &wire.TxOut{
+		Value:    prevOut.amount,
+		PkScript: prevOut.PkScript(),
+	}
 }
 
 // addTxOut adds the specified output to the view if it is not provably
