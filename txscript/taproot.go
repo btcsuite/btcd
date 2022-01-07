@@ -9,10 +9,10 @@ import (
 	"fmt"
 
 	"github.com/btcsuite/btcd/btcec/v2"
-	secp "github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
+	secp "github.com/decred/dcrd/dcrec/secp256k1/v4"
 )
 
 // TapscriptLeafVersion represents the various possible versions of a tapscript
@@ -101,7 +101,7 @@ func VerifyTaprootKeySpend(witnessProgram []byte, rawSig []byte, tx *wire.MsgTx,
 // y-bit, which pops up everywhere even tho 32 byte keys
 type ControlBlock struct {
 	// InternalKey is the internal public key in the taproot commitment.
-	InternalKey *secp.PublicKey
+	InternalKey *btcec.PublicKey
 
 	// OutputKeyYIsOdd denotes if the y coordinate of the output key (the
 	// key placed in the actual taproot output is odd.
@@ -298,7 +298,7 @@ func TweakTaprootPrivKey(privKey *btcec.PrivateKey,
 	// negate the private key as specified in BIP 341.
 	privKeyScalar := &privKey.Key
 	pubKeyBytes := privKey.PubKey().SerializeCompressed()
-	if pubKeyBytes[0] == btcec.PubKeyFormatCompressedOdd {
+	if pubKeyBytes[0] == secp.PubKeyFormatCompressedOdd {
 		privKeyScalar.Negate()
 	}
 
@@ -347,6 +347,14 @@ func VerifyTaprootLeafCommitment(controlBlock *ControlBlock,
 	// program passed in.
 	expectedWitnessProgram := schnorr.SerializePubKey(taprootKey)
 	if !bytes.Equal(expectedWitnessProgram, taprootWitnessProgram) {
+		return fmt.Errorf("invalid witness commitment")
+	}
+
+	// Finally, we'll verify that the parity of the y coordinate of the
+	// public key we've derived matches the control block.
+	derivedYIsOdd := (taprootKey.SerializeCompressed()[0] ==
+		secp.PubKeyFormatCompressedOdd)
+	if controlBlock.OutputKeyYIsOdd != derivedYIsOdd {
 		return fmt.Errorf("invalid witness commitment")
 	}
 
@@ -415,6 +423,9 @@ func NewTapLeaf(leafVersion TapscriptLeafVersion, script []byte) TapLeaf {
 // digest is computed as: h_tapleaf(leafVersion || compactSizeof(script) ||
 // script).
 func (t TapLeaf) TapHash() chainhash.Hash {
+	// TODO(roasbeef): cache these and the branch due to the recursive
+	// call, so memoize
+
 	// The leaf encoding is: leafVersion || compactSizeof(script) ||
 	// script, where compactSizeof returns the compact size needed to
 	// encode the value.
@@ -469,8 +480,7 @@ func (t TapBranch) TapHash() chainhash.Hash {
 // hashes them into a branch. See The TapBranch method for the specifics.
 func tapBranchHash(l, r []byte) chainhash.Hash {
 	if bytes.Compare(l[:], r[:]) > 0 {
-		l = r
-		r = l
+		l, r = r, l
 	}
 
 	return *chainhash.TaggedHash(
@@ -484,6 +494,10 @@ type TapscriptProof struct {
 	// TapLeaf is the leaf that we want to prove inclusion for.
 	TapLeaf
 
+	// RootNode is the root of the tapscript tree, this will be used to
+	// compute what the final output key looks like.
+	RootNode TapNode
+
 	// InclusionProof is the tail end of the control block that contains
 	// the series of hashes (the sibling hashes up the tree), that when
 	// hashed together allow us to re-derive the top level taproot output.
@@ -493,9 +507,261 @@ type TapscriptProof struct {
 // ToControlBlock maps the tapscript proof into a fully valid control block
 // that can be used as a witness item for a tapscript spend.
 func (t *TapscriptProof) ToControlBlock(internalKey *btcec.PublicKey) ControlBlock {
-	return ControlBlock{
-		InternalKey:    internalKey,
-		LeafVersion:    t.TapLeaf.LeafVersion,
-		InclusionProof: t.InclusionProof,
+	// Compute the total level output commitment based on the populated
+	// root node.
+	rootHash := t.RootNode.TapHash()
+	taprootKey := ComputeTaprootOutputKey(
+		internalKey, rootHash[:],
+	)
+
+	// With the commitment computed we can obtain the bit that denotes if
+	// the resulting key has an odd y coordinate or not.
+	var outputKeyYIsOdd bool
+	if taprootKey.SerializeCompressed()[0] ==
+		secp.PubKeyFormatCompressedOdd {
+
+		outputKeyYIsOdd = true
 	}
+
+	return ControlBlock{
+		InternalKey:     internalKey,
+		OutputKeyYIsOdd: outputKeyYIsOdd,
+		LeafVersion:     t.TapLeaf.LeafVersion,
+		InclusionProof:  t.InclusionProof,
+	}
+}
+
+// IndexedTapScriptTree reprints a fully contracted tapscript tree. The
+// RootNode can be used to traverse down the full tree. In addition, complete
+// inclusion proofs for each leaf are included as well, with an index into the
+// slice of proof based on the tap leaf hash of a given leaf.
+type IndexedTapScriptTree struct {
+	// RootNode is the root of the tapscript tree. RootNode.TapHash() can
+	// be used to extract the hash needed to derive the taptweak committed
+	// to in the taproot output.
+	RootNode TapNode
+
+	// LeafMerkleProofs is a slice that houses the series of merkle
+	// inclusion proofs for each leaf based on the input order of the
+	// leaves.
+	LeafMerkleProofs []TapscriptProof
+
+	// LeafProofIndex maps the TapHash() of a given leaf node to the index
+	// within the LeafMerkleProofs array above. This can be used to
+	// retrieve the inclusion proof for a given script when constructing
+	// the witness stack and control block for spending a tapscript path.
+	LeafProofIndex map[chainhash.Hash]int
+}
+
+// NewIndexedTapScriptTree creates a new empty tapscript tree that has enough
+// space to hold information for the specified amount of leaves.
+func NewIndexedTapScriptTree(numLeaves int) *IndexedTapScriptTree {
+	return &IndexedTapScriptTree{
+		LeafMerkleProofs: make([]TapscriptProof, numLeaves),
+		LeafProofIndex:   make(map[chainhash.Hash]int, numLeaves),
+	}
+}
+
+// hashTapNodes takes a left and right now, and returns the left and right tap
+// hashes, along with the new combined node. If both nodes are nil, nil
+// pointers are returned. If the right now is nil, then the left node is passed
+// in, which effectively will "lift" the node up in the tree as long as it
+// doesn't have any siblings.
+func hashTapNodes(left, right TapNode) (*chainhash.Hash, *chainhash.Hash, TapNode) {
+	switch {
+	// If there's no left child, then this is a "nil" portion of the array
+	// tree, so well thread thru nil.
+	case left == nil:
+		return nil, nil, nil
+
+	// If there's no right child, then this is a single node that'll be
+	// passed all the way up the tree as it has no children.
+	case right == nil:
+		return nil, nil, left
+	}
+
+	// The result of hashing two nodes will always be a branch, so we start
+	// with that.
+	leftHash := left.TapHash()
+	rightHash := right.TapHash()
+
+	return &leftHash, &rightHash, NewTapBranch(left, right)
+}
+
+// leafDescendants is a recursive algorithm that returns all the leaf nodes
+// that are a decedents of this tree. This is used to collect the series of
+// nodes we need to extend the inclusion proof of each time we go up in the
+// tree.
+func leafDescendants(node TapNode) []TapNode {
+	// A leaf node has no decedents, so we just return it directly.
+	if node.Left() == nil && node.Right() == nil {
+		return []TapNode{node}
+	}
+
+	// Otherwise, get the descendants of the left and right sub-trees to
+	// return.
+	leftLeaves := leafDescendants(node.Left())
+	rightLeaves := leafDescendants(node.Right())
+
+	return append(leftLeaves, rightLeaves...)
+}
+
+// AssembleTaprootScriptTree constructs a new fully indexed tapscript tree
+// given a series of leaf nodes. A combination of a recursive data structure,
+// and an array-based representation are used to both generate the tree and
+// also accumulate all the necessary inclusion proofs in the same path. See the
+// comment of blockchain.BuildMerkleTreeStore for further details.
+func AssembleTaprootScriptTree(leaves ...TapLeaf) *IndexedTapScriptTree {
+	// If there's only a single leaf, then that becomes our root.
+	if len(leaves) == 1 {
+		// A lone leaf has no additional inclusion proof, as a verifier
+		// will just hash the leaf as the sole branch.
+		leaf := leaves[0]
+		return &IndexedTapScriptTree{
+			RootNode: leaf,
+			LeafProofIndex: map[chainhash.Hash]int{
+				leaf.TapHash(): 0,
+			},
+			LeafMerkleProofs: []TapscriptProof{
+				{
+					TapLeaf:        leaf,
+					RootNode:       leaf,
+					InclusionProof: nil,
+				},
+			},
+		}
+	}
+
+	// We'll start out by populating the leaf index which maps a leave's
+	// taphash to its index within the tree.
+	scriptTree := NewIndexedTapScriptTree(len(leaves))
+	for i, leaf := range leaves {
+		leafHash := leaf.TapHash()
+		scriptTree.LeafProofIndex[leafHash] = i
+	}
+
+	var branches []TapBranch
+	for i := 0; i < len(leaves); i += 2 {
+		// If there's only a single leaf left, then we'll merge this
+		// with the last branch we have.
+		if i == len(leaves)-1 {
+			branchToMerge := branches[len(branches)-1]
+			leaf := leaves[i]
+			newBranch := NewTapBranch(branchToMerge, leaf)
+
+			branches[len(branches)-1] = newBranch
+
+			// The leaf includes the existing branch within its
+			// inclusion proof.
+			branchHash := branchToMerge.TapHash()
+
+			scriptTree.LeafMerkleProofs[i].TapLeaf = leaf
+			scriptTree.LeafMerkleProofs[i].InclusionProof = append(
+				scriptTree.LeafMerkleProofs[i].InclusionProof,
+				branchHash[:]...,
+			)
+
+			// We'll also add this right hash to the inclusion of
+			// the left and right nodes of the branch.
+			lastLeafHash := leaf.TapHash()
+
+			leftLeafHash := branchToMerge.Left().TapHash()
+			leftLeafIndex := scriptTree.LeafProofIndex[leftLeafHash]
+			scriptTree.LeafMerkleProofs[leftLeafIndex].InclusionProof = append(
+				scriptTree.LeafMerkleProofs[leftLeafIndex].InclusionProof,
+				lastLeafHash[:]...,
+			)
+
+			rightLeafHash := branchToMerge.Right().TapHash()
+			rightLeafIndex := scriptTree.LeafProofIndex[rightLeafHash]
+			scriptTree.LeafMerkleProofs[rightLeafIndex].InclusionProof = append(
+				scriptTree.LeafMerkleProofs[rightLeafIndex].InclusionProof,
+				lastLeafHash[:]...,
+			)
+
+			continue
+		}
+
+		// While we still have leaves left, we'll combine two of them
+		// into a new branch node.
+		left, right := leaves[i], leaves[i+1]
+		nextBranch := NewTapBranch(left, right)
+		branches = append(branches, nextBranch)
+
+		// The left node will use the right node as part of its
+		// inclusion proof, and vice versa.
+		leftHash := left.TapHash()
+		rightHash := right.TapHash()
+
+		scriptTree.LeafMerkleProofs[i].TapLeaf = left
+		scriptTree.LeafMerkleProofs[i].InclusionProof = append(
+			scriptTree.LeafMerkleProofs[i].InclusionProof,
+			rightHash[:]...,
+		)
+
+		scriptTree.LeafMerkleProofs[i+1].TapLeaf = right
+		scriptTree.LeafMerkleProofs[i+1].InclusionProof = append(
+			scriptTree.LeafMerkleProofs[i+1].InclusionProof,
+			leftHash[:]...,
+		)
+	}
+
+	// In this second phase, we'll merge all the leaf branches we have one
+	// by one until we have our final root.
+	var rootNode TapNode
+	for len(branches) != 0 {
+		// When we only have a single branch left, then that becomes
+		// our root.
+		if len(branches) == 1 {
+			rootNode = branches[0]
+			break
+		}
+
+		left, right := branches[0], branches[1]
+
+		newBranch := NewTapBranch(left, right)
+
+		branches = branches[2:]
+
+		branches = append(branches, newBranch)
+
+		// Accumulate the sibling hash of this new branch for all the
+		// leaves that are its children.
+		leftLeafDescendants := leafDescendants(left)
+		rightLeafDescendants := leafDescendants(right)
+
+		leftHash, rightHash := left.TapHash(), right.TapHash()
+
+		// For each left hash that's a leaf descendants, well add the
+		// right sibling as that sibling is needed to construct the new
+		// internal branch we just created. We also do the same for the
+		// siblings of the right node.
+		for _, leftLeaf := range leftLeafDescendants {
+			leafHash := leftLeaf.TapHash()
+			leafIndex := scriptTree.LeafProofIndex[leafHash]
+
+			scriptTree.LeafMerkleProofs[leafIndex].InclusionProof = append(
+				scriptTree.LeafMerkleProofs[leafIndex].InclusionProof,
+				rightHash[:]...,
+			)
+		}
+		for _, rightLeaf := range rightLeafDescendants {
+			leafHash := rightLeaf.TapHash()
+			leafIndex := scriptTree.LeafProofIndex[leafHash]
+
+			scriptTree.LeafMerkleProofs[leafIndex].InclusionProof = append(
+				scriptTree.LeafMerkleProofs[leafIndex].InclusionProof,
+				leftHash[:]...,
+			)
+		}
+	}
+
+	// Populate the top level root node pointer, as well as the pointer in
+	// each proof.
+	scriptTree.RootNode = rootNode
+	for i := range scriptTree.LeafMerkleProofs {
+		scriptTree.LeafMerkleProofs[i].RootNode = rootNode
+	}
+
+	return scriptTree
 }

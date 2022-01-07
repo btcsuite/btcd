@@ -7,6 +7,8 @@ package txscript
 import (
 	"bytes"
 	"encoding/hex"
+	"fmt"
+	prand "math/rand"
 	"testing"
 	"testing/quick"
 
@@ -244,4 +246,118 @@ func derivePath(key *hdkeychain.ExtendedKey, path []uint32) (
 		}
 	}
 	return currentKey, nil
+}
+
+// TestTapscriptCommitmentVerification that given a valid control block, proof
+// we're able to both generate and validate validate script tree leaf inclusion
+// proofs.
+func TestTapscriptCommitmentVerification(t *testing.T) {
+	t.Parallel()
+
+	// make from 0 to 1 leaf
+	// ensure verifies properly
+	testCases := []struct {
+		numLeaves int
+
+		valid bool
+
+		treeMutateFunc func(*IndexedTapScriptTree)
+
+		ctrlBlockMutateFunc func(*ControlBlock)
+	}{
+		// A valid merkle proof of a single leaf.
+		{
+			numLeaves: 1,
+			valid:     true,
+		},
+
+		// A valid series of merkle proofs with an odd number of leaves.
+		{
+			numLeaves: 3,
+			valid:     true,
+		},
+
+		// A valid series of merkle proofs with an even number of leaves.
+		{
+			numLeaves: 4,
+			valid:     true,
+		},
+
+		// An invalid merkle proof, we modify the last byte of one of
+		// the leaves.
+		{
+			numLeaves: 4,
+			valid:     false,
+			treeMutateFunc: func(t *IndexedTapScriptTree) {
+				for _, leafProof := range t.LeafMerkleProofs {
+					leafProof.InclusionProof[0] ^= 1
+				}
+			},
+		},
+
+		{
+			// An invalid series of proofs, we modify the control
+			// block to not match the parity of the final output
+			// key commitment.
+			numLeaves: 2,
+			valid:     false,
+			ctrlBlockMutateFunc: func(c *ControlBlock) {
+				c.OutputKeyYIsOdd = !c.OutputKeyYIsOdd
+			},
+		},
+	}
+	for _, testCase := range testCases {
+		testName := fmt.Sprintf("num_leaves=%v, valid=%v, treeMutate=%v, "+
+			"ctrlBlockMutate=%v", testCase.numLeaves, testCase.valid,
+			testCase.treeMutateFunc == nil, testCase.ctrlBlockMutateFunc == nil)
+
+		t.Run(testName, func(t *testing.T) {
+			tapScriptLeaves := make([]TapLeaf, testCase.numLeaves)
+			for i := 0; i < len(tapScriptLeaves); i++ {
+				numLeafBytes := prand.Intn(1000)
+				scriptBytes := make([]byte, numLeafBytes)
+				if _, err := prand.Read(scriptBytes[:]); err != nil {
+					t.Fatalf("unable to read rand bytes: %v", err)
+				}
+				tapScriptLeaves[i] = NewBaseTapLeaf(scriptBytes)
+			}
+
+			scriptTree := AssembleTaprootScriptTree(tapScriptLeaves...)
+
+			if testCase.treeMutateFunc != nil {
+				testCase.treeMutateFunc(scriptTree)
+			}
+
+			internalKey, _ := btcec.NewPrivateKey()
+
+			rootHash := scriptTree.RootNode.TapHash()
+			outputKey := ComputeTaprootOutputKey(
+				internalKey.PubKey(), rootHash[:],
+			)
+
+			for _, leafProof := range scriptTree.LeafMerkleProofs {
+				ctrlBlock := leafProof.ToControlBlock(
+					internalKey.PubKey(),
+				)
+
+				if testCase.ctrlBlockMutateFunc != nil {
+					testCase.ctrlBlockMutateFunc(&ctrlBlock)
+				}
+
+				err := VerifyTaprootLeafCommitment(
+					&ctrlBlock, schnorr.SerializePubKey(outputKey),
+					leafProof.TapLeaf.Script,
+				)
+				valid := err == nil
+
+				if valid != testCase.valid {
+					t.Fatalf("test case mismatch: expected "+
+						"valid=%v, got valid=%v", testCase.valid,
+						valid)
+				}
+			}
+
+			// TODO(roasbeef): index correctness
+		})
+	}
 }
