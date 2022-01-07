@@ -77,7 +77,7 @@ func TestOpcodeDisasm(t *testing.T) {
 		0xae: "OP_CHECKMULTISIG", 0xaf: "OP_CHECKMULTISIGVERIFY",
 		0xfa: "OP_SMALLINTEGER", 0xfb: "OP_PUBKEYS",
 		0xfd: "OP_PUBKEYHASH", 0xfe: "OP_PUBKEY",
-		0xff: "OP_INVALIDOPCODE",
+		0xff: "OP_INVALIDOPCODE", 0xba: "OP_CHECKSIGADD",
 	}
 	for opcodeVal, expectedStr := range expectedStrings {
 		var data []byte
@@ -123,7 +123,7 @@ func TestOpcodeDisasm(t *testing.T) {
 			}
 
 		// OP_UNKNOWN#.
-		case opcodeVal >= 0xba && opcodeVal <= 0xf9 || opcodeVal == 0xfc:
+		case opcodeVal >= 0xbb && opcodeVal <= 0xf9 || opcodeVal == 0xfc:
 			expectedStr = "OP_UNKNOWN" + strconv.Itoa(opcodeVal)
 		}
 
@@ -191,7 +191,13 @@ func TestOpcodeDisasm(t *testing.T) {
 
 		// OP_UNKNOWN#.
 		case opcodeVal >= 0xba && opcodeVal <= 0xf9 || opcodeVal == 0xfc:
-			expectedStr = "OP_UNKNOWN" + strconv.Itoa(opcodeVal)
+			switch opcodeVal {
+			// OP_UNKNOWN186 a.k.a 0xba is now OP_CHECKSIGADD.
+			case 0xba:
+				expectedStr = "OP_CHECKSIGADD"
+			default:
+				expectedStr = "OP_UNKNOWN" + strconv.Itoa(opcodeVal)
+			}
 		}
 
 		var buf strings.Builder

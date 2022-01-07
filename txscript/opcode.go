@@ -227,7 +227,7 @@ const (
 	OP_NOP8                = 0xb7 // 183
 	OP_NOP9                = 0xb8 // 184
 	OP_NOP10               = 0xb9 // 185
-	OP_UNKNOWN186          = 0xba // 186
+	OP_CHECKSIGADD         = 0xba // 186
 	OP_UNKNOWN187          = 0xbb // 187
 	OP_UNKNOWN188          = 0xbc // 188
 	OP_UNKNOWN189          = 0xbd // 189
@@ -501,6 +501,7 @@ var opcodeArray = [256]opcode{
 	OP_CHECKSIGVERIFY:      {OP_CHECKSIGVERIFY, "OP_CHECKSIGVERIFY", 1, opcodeCheckSigVerify},
 	OP_CHECKMULTISIG:       {OP_CHECKMULTISIG, "OP_CHECKMULTISIG", 1, opcodeCheckMultiSig},
 	OP_CHECKMULTISIGVERIFY: {OP_CHECKMULTISIGVERIFY, "OP_CHECKMULTISIGVERIFY", 1, opcodeCheckMultiSigVerify},
+	OP_CHECKSIGADD:         {OP_CHECKSIGADD, "OP_CHECKSIGADD", 1, opcodeCheckSigAdd},
 
 	// Reserved opcodes.
 	OP_NOP1:  {OP_NOP1, "OP_NOP1", 1, opcodeNop},
@@ -513,7 +514,6 @@ var opcodeArray = [256]opcode{
 	OP_NOP10: {OP_NOP10, "OP_NOP10", 1, opcodeNop},
 
 	// Undefined opcodes.
-	OP_UNKNOWN186: {OP_UNKNOWN186, "OP_UNKNOWN186", 1, opcodeInvalid},
 	OP_UNKNOWN187: {OP_UNKNOWN187, "OP_UNKNOWN187", 1, opcodeInvalid},
 	OP_UNKNOWN188: {OP_UNKNOWN188, "OP_UNKNOWN188", 1, opcodeInvalid},
 	OP_UNKNOWN189: {OP_UNKNOWN189, "OP_UNKNOWN189", 1, opcodeInvalid},
@@ -2100,6 +2100,86 @@ func opcodeCheckSigVerify(op *opcode, data []byte, vm *Engine) error {
 		err = abstractVerify(op, vm, ErrCheckSigVerify)
 	}
 	return err
+}
+
+// opcodeCheckSigAdd implements the OP_CHECKSIGADD operation defined in BIP
+// 342. This is a replacement for OP_CHECKMULTISIGVERIFY and OP_CHECKMULTISIG
+// that lends better to batch sig validation, as well as a possible future of
+// signature aggregation across inputs.
+//
+// The op code takes a public key, an integer (N) and a signature, and returns
+// N if the signature was the empty vector, and n+1 otherwise.
+//
+// Stack transformation: [... pubkey n signature] -> [... n | n+1 ] -> [...]
+func opcodeCheckSigAdd(op *opcode, data []byte, vm *Engine) error {
+	// This op code can only be used if tapsript execution is active.
+	// Before the soft fork, this opcode was marked as an invalid reserved
+	// op code.
+	if vm.taprootCtx == nil {
+		str := fmt.Sprintf("attempt to execute invalid opcode %s", op.name)
+		return scriptError(ErrReservedOpcode, str)
+	}
+
+	// Pop the signature, integer n, and public key off the stack.
+	pubKeyBytes, err := vm.dstack.PopByteArray()
+	if err != nil {
+		return err
+	}
+	accumulatorInt, err := vm.dstack.PopInt()
+	if err != nil {
+		return err
+	}
+	sigBytes, err := vm.dstack.PopByteArray()
+	if err != nil {
+		return err
+	}
+
+	// Only non-empty signatures count towards the total tapscript sig op
+	// limit.
+	if len(sigBytes) != 0 {
+		// Account for changes in the sig ops budget after this execution.
+		if err := vm.taprootCtx.tallysigOp(); err != nil {
+			return err
+		}
+	}
+
+	// Empty public keys immeidately cause execution to fail.
+	if len(pubKeyBytes) == 0 {
+		return fmt.Errorf("nil pubkey")
+	}
+
+	// If the signature is empty, then we'll just push the value N back
+	// onto the stack and continue from here.
+	if len(sigBytes) == 0 {
+		vm.dstack.PushInt(accumulatorInt)
+		return nil
+	}
+
+	// Otherwise, we'll attempt to validate the signature as normal.
+	//
+	// If the constructor fails immediately, then it's because the public
+	// key size is zero, so we'll fail all script execution.
+	sigVerifier, err := newBaseTapscriptSigVerifier(
+		pubKeyBytes, sigBytes, vm,
+	)
+	if err != nil {
+		return err
+	}
+
+	valid := sigVerifier.Verify()
+
+	// If the signature is invalid, this we fail execution, as it should
+	// have been an empty signature.
+	if !valid {
+		str := "signature not empty on failed checksig"
+		return scriptError(ErrNullFail, str)
+	}
+
+	// Otherwise, we increment the accumulatorInt by one, and push that
+	// back onto the stack.
+	vm.dstack.PushInt(accumulatorInt + 1)
+
+	return nil
 }
 
 // parsedSigInfo houses a raw signature along with its parsed form and a flag
