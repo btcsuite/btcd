@@ -8,8 +8,10 @@ import (
 	"bytes"
 	"fmt"
 
+	"github.com/btcsuite/btcd/btcec/v2"
 	secp "github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 )
 
@@ -146,6 +148,33 @@ func (c *ControlBlock) ToBytes() ([]byte, error) {
 	return b.Bytes(), nil
 }
 
+// RootHash calculates the root hash of a tapscript given the revealed script.
+func (c *ControlBlock) RootHash(revealedScript []byte) []byte {
+	// We'll start by creating a new tapleaf from the revealed script,
+	// this'll serve as the initial hash we'll use to incrementally
+	// reconstruct the merkle root using the control block elements.
+	merkleAccumulator := NewTapLeaf(c.LeafVersion, revealedScript).TapHash()
+
+	// Now that we have our initial hash, we'll parse the control block one
+	// node at a time to build up our merkle accumulator into the taproot
+	// commitment.
+	//
+	// The control block is a series of nodes that serve as an inclusion
+	// proof as we can start hashing with our leaf, with each internal
+	// branch, until we reach the root.
+	numNodes := len(c.InclusionProof) / ControlBlockNodeSize
+	for nodeOffset := 0; nodeOffset < numNodes; nodeOffset++ {
+		// Extract the new node using our index to serve as a 32-byte
+		// offset.
+		leafOffset := 32 * nodeOffset
+		nextNode := c.InclusionProof[leafOffset : leafOffset+32]
+
+		merkleAccumulator = tapBranchHash(merkleAccumulator[:], nextNode)
+	}
+
+	return merkleAccumulator[:]
+}
+
 // ParseControlBlock attempts to parse the raw bytes of a control block. An
 // error is returned if the control block isn't well formed, or can't be
 // parsed.
@@ -199,4 +228,223 @@ func ParseControlBlock(ctrlBlock []byte) (*ControlBlock, error) {
 		LeafVersion:     leafVersion,
 		InclusionProof:  proofBytes,
 	}, nil
+}
+
+// ComputeTaprootOutputKey calculates a top-level taproot output key given an
+// internal key, and tapscript merkle root. The final key is derived as:
+// taprootKey = internalKey + (h_tapTweak(internalKey || merkleRoot)*G).
+func ComputeTaprootOutputKey(pubKey *btcec.PublicKey,
+	scriptRoot []byte) *btcec.PublicKey {
+
+	// This routine only operates on x-only public keys where the public
+	// key always has an even y coordinate, so we'll re-parse it as such.
+	internalKey, _ := schnorr.ParsePubKey(schnorr.SerializePubKey(pubKey))
+
+	// First, we'll compute the tap tweak hash that commits to the internal
+	// key and the merkle script root.
+	tapTweakHash := chainhash.TaggedHash(
+		chainhash.TagTapTweak, schnorr.SerializePubKey(internalKey),
+		scriptRoot,
+	)
+
+	// With the tap tweek computed,  we'll need to convert the merkle root
+	// into something in the domain we can manipulate: a scalar value mod
+	// N.
+	var tweakScalar btcec.ModNScalar
+	tweakScalar.SetBytes((*[32]byte)(tapTweakHash))
+
+	// Next, we'll need to convert the internal key to jacobian coordinates
+	// as the routines we need only operate on this type.
+	var internalPoint btcec.JacobianPoint
+	internalKey.AsJacobian(&internalPoint)
+
+	// With our intermediate data obtained, we'll now compute:
+	//
+	// taprootKey = internalPoint + (tapTweak*G).
+	var tPoint, taprootKey btcec.JacobianPoint
+	btcec.ScalarBaseMultNonConst(&tweakScalar, &tPoint)
+	btcec.AddNonConst(&internalPoint, &tPoint, &taprootKey)
+
+	// Finally, we'll convert the key back to affine coordinates so we can
+	// return the format of public key we usually use.
+	taprootKey.ToAffine()
+
+	return btcec.NewPublicKey(&taprootKey.X, &taprootKey.Y)
+}
+
+// VerifyTaprootLeafCommitment attempts to verify a taproot commitment of the
+// revealed script within the taprootWitnessProgram (a schnorr public key)
+// given the required information included in the control block. An error is
+// returned if the reconstructed taproot commitment (a function of the merkle
+// root and the internal key) doesn't match the passed witness program.
+func VerifyTaprootLeafCommitment(controlBlock *ControlBlock,
+	taprootWitnessProgram []byte, revealedScript []byte) error {
+
+	// First, we'll calculate the root hash from the given proof and
+	// revealed script.
+	rootHash := controlBlock.RootHash(revealedScript)
+
+	// Next, we'll construct the final commitment (creating the external or
+	// taproot output key) as a function of this commitment and the
+	// included internal key: taprootKey = internalKey + (tPoint*G).
+	taprootKey := ComputeTaprootOutputKey(
+		controlBlock.InternalKey, rootHash,
+	)
+
+	// If we convert the taproot key to a witness program (we just need to
+	// serialize the public key), then it should exactly match the witness
+	// program passed in.
+	expectedWitnessProgram := schnorr.SerializePubKey(taprootKey)
+	if !bytes.Equal(expectedWitnessProgram, taprootWitnessProgram) {
+		return fmt.Errorf("invalid witness commitment")
+	}
+
+	// Otherwise, if we reach here, the commitment opening is valid and
+	// execution can continue.
+	return nil
+}
+
+// TapNode represents an abstract node in a tapscript merkle tree. A node is
+// either a branch or a leaf.
+type TapNode interface {
+	// TapHash returns the hash of the node. This will either be a tagged
+	// hash derived from a branch, or a leaf.
+	TapHash() chainhash.Hash
+
+	// Left returns the left node. If this is a leaf node, this may be nil.
+	Left() TapNode
+
+	// Right returns the right node. If this is a leaf node, this may be
+	// nil.
+	Right() TapNode
+}
+
+// TapLeaf represents a leaf in a tapscript tree. A leaf has two components:
+// the leaf version, and the script associated with that leaf version.
+type TapLeaf struct {
+	// LeafVersion is the leaf version of this leaf.
+	LeafVersion TapscriptLeafVersion
+
+	// Script is the script to be validated based on the specified leaf
+	// version.
+	Script []byte
+}
+
+// Left rights the left node for this leaf. As this is a leaf the left node is
+// nil.
+func (t TapLeaf) Left() TapNode {
+	return nil
+}
+
+// Right rights the right node for this leaf. As this is a leaf the right node
+// is nil.
+func (t TapLeaf) Right() TapNode {
+	return nil
+}
+
+// NewBaseTapLeaf returns a new TapLeaf for the specified script, using the
+// current base leaf version (BIP 342).
+func NewBaseTapLeaf(script []byte) TapLeaf {
+	return TapLeaf{
+		Script:      script,
+		LeafVersion: BaseLeafVersion,
+	}
+}
+
+// NewTapLeaf returns a new TapLeaf with the given leaf version and script to
+// be committed to.
+func NewTapLeaf(leafVersion TapscriptLeafVersion, script []byte) TapLeaf {
+	return TapLeaf{
+		LeafVersion: leafVersion,
+		Script:      script,
+	}
+}
+
+// TapHash returns the hash digest of the target taproot script leaf. The
+// digest is computed as: h_tapleaf(leafVersion || compactSizeof(script) ||
+// script).
+func (t TapLeaf) TapHash() chainhash.Hash {
+	// The leaf encoding is: leafVersion || compactSizeof(script) ||
+	// script, where compactSizeof returns the compact size needed to
+	// encode the value.
+	var leafEncoding bytes.Buffer
+
+	_ = leafEncoding.WriteByte(byte(t.LeafVersion))
+	_ = wire.WriteVarBytes(&leafEncoding, 0, t.Script)
+
+	return *chainhash.TaggedHash(chainhash.TagTapLeaf, leafEncoding.Bytes())
+}
+
+// TapBranch represents an internal branch in the tapscript tree. The left or
+// right nodes may either be another branch, leaves, or a combination of both.
+type TapBranch struct {
+	// leftNode is the left node, this cannot be nil.
+	leftNode TapNode
+
+	// rightNode is the right node, this cannot be nil.
+	rightNode TapNode
+}
+
+// NewTapBranch creates a new internal branch from a left and right node.
+func NewTapBranch(l, r TapNode) TapBranch {
+
+	return TapBranch{
+		leftNode:  l,
+		rightNode: r,
+	}
+}
+
+// Left is the left node of the branch, this might be a leaf or another
+// branch.
+func (t TapBranch) Left() TapNode {
+	return t.leftNode
+}
+
+// Right is the right node of a branch, this might be a leaf or another branch.
+func (t TapBranch) Right() TapNode {
+	return t.rightNode
+}
+
+// TapHash returns the hash digest of the taproot internal branch given a left
+// and right node. The final hash digest is: h_tapbranch(leftNode ||
+// rightNode), where leftNode is the lexicographically smaller of the two nodes.
+func (t TapBranch) TapHash() chainhash.Hash {
+	leftHash := t.leftNode.TapHash()
+	rightHash := t.rightNode.TapHash()
+	return tapBranchHash(leftHash[:], rightHash[:])
+}
+
+// tapBranchHash takes the raw tap hashes of the right and left nodes and
+// hashes them into a branch. See The TapBranch method for the specifics.
+func tapBranchHash(l, r []byte) chainhash.Hash {
+	if bytes.Compare(l[:], r[:]) > 0 {
+		l = r
+		r = l
+	}
+
+	return *chainhash.TaggedHash(
+		chainhash.TagTapBranch, l[:], r[:],
+	)
+}
+
+// TapscriptProof is a proof of inclusion that a given leaf (a script and leaf
+// version) is included within a top-level taproot output commitment.
+type TapscriptProof struct {
+	// TapLeaf is the leaf that we want to prove inclusion for.
+	TapLeaf
+
+	// InclusionProof is the tail end of the control block that contains
+	// the series of hashes (the sibling hashes up the tree), that when
+	// hashed together allow us to re-derive the top level taproot output.
+	InclusionProof []byte
+}
+
+// ToControlBlock maps the tapscript proof into a fully valid control block
+// that can be used as a witness item for a tapscript spend.
+func (t *TapscriptProof) ToControlBlock(internalKey *btcec.PublicKey) ControlBlock {
+	return ControlBlock{
+		InternalKey:    internalKey,
+		LeafVersion:    t.TapLeaf.LeafVersion,
+		InclusionProof: t.InclusionProof,
+	}
 }

@@ -31,6 +31,19 @@ var (
 	// flags.
 	TagTapSighash = []byte("TapSighash")
 
+	// TagTagTapLeaf is the message tag prefix used to compute the hash
+	// digest of a tapscript leaf.
+	TagTapLeaf = []byte("TapLeaf")
+
+	// TagTapBranch is the message tag prefix used to compute the
+	// hash digest of two tap leaves into a taproot branch node.
+	TagTapBranch = []byte("TapBranch")
+
+	// TagTapTweak is the message tag prefix used to compute the hash tweak
+	// used to enable a public key to commit to the taproot branch root
+	// for the witness program.
+	TagTapTweak = []byte("TapTweak")
+
 	// precomputedTags is a map containing the SHA-256 hash of the BIP-0340
 	// tags.
 	precomputedTags = map[string]Hash{
@@ -38,6 +51,9 @@ var (
 		string(TagBIP0340Aux):       sha256.Sum256(TagBIP0340Aux),
 		string(TagBIP0340Nonce):     sha256.Sum256(TagBIP0340Nonce),
 		string(TagTapSighash):       sha256.Sum256(TagTapSighash),
+		string(TagTapLeaf):          sha256.Sum256(TagTapLeaf),
+		string(TagTapBranch):        sha256.Sum256(TagTapBranch),
+		string(TagTapTweak):         sha256.Sum256(TagTapTweak),
 	}
 )
 
