@@ -28,7 +28,8 @@ const (
 	TaprootAnnexTag = 0x50
 
 	// TaprootLeafMask is the mask applied to the control block to extract
-	// the leaf versions of the taproot script leaf being spent.
+	// the leaf version and parity of the y-coordinate of the output key if
+	// the taproot script leaf being spent.
 	TaprootLeafMask = 0xfe
 )
 
