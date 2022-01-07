@@ -1950,6 +1950,11 @@ func opcodeHash256(op *opcode, data []byte, vm *Engine) error {
 // This opcode does not change the contents of the data stack.
 func opcodeCodeSeparator(op *opcode, data []byte, vm *Engine) error {
 	vm.lastCodeSep = int(vm.tokenizer.ByteIndex())
+
+	if vm.taprootCtx != nil {
+		vm.taprootCtx.codeSepPos = uint32(vm.tokenizer.OpcodePosition())
+	}
+
 	return nil
 }
 
