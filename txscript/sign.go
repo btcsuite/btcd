@@ -7,10 +7,11 @@ package txscript
 import (
 	"errors"
 
-	"github.com/btcsuite/btcd/btcec/v2/ecdsa"
-
 	"github.com/btcsuite/btcd/btcec/v2"
+	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/btcsuite/btcd/btcutil"
+
+	"github.com/btcsuite/btcd/btcec/v2/ecdsa"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/wire"
 )
@@ -60,6 +61,57 @@ func WitnessSignature(tx *wire.MsgTx, sigHashes *TxSigHashes, idx int, amt int64
 	// A witness script is actually a stack, so we return an array of byte
 	// slices here, rather than a single byte slice.
 	return wire.TxWitness{sig, pkData}, nil
+}
+
+// RawTxInWitnessSignature returns a valid schnorr signature required to
+// perform a taproot key-spend of the specified input. An explicit sighash is
+// always attached, which can be removed by a caller if they wish to
+// implicitly use the "default" sighash with a 64-byte signature.
+//
+// TODO(roasbeef): also need a tapscript version of this as well
+func RawTxInTaprootSignature(tx *wire.MsgTx, sigHashes *TxSigHashes, idx int,
+	amt int64, pkScript []byte, hashType SigHashType,
+	key *btcec.PrivateKey) ([]byte, error) {
+
+	// First, we'll start by compute the top-level taproot sighash.
+	sigHash, err := calcTaprootSignatureHashRaw(
+		sigHashes, hashType, tx, idx,
+		NewCannedPrevOutputFetcher(pkScript, amt),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	// With the sighash constructed, we can sign it with the specified
+	// private key.
+	signature, err := schnorr.Sign(key, sigHash)
+	if err != nil {
+		return nil, err
+	}
+
+	// Finally, append the sighash type to the final sig.
+	return append(signature.Serialize(), byte(hashType)), nil
+}
+
+// TaprootWitnessSignature returns a valid witness stack that can be used to
+// spend the key-spend path of a taproot input as specified in BIP 342.
+//
+// TODO(roasbeef): add support for annex even tho it's non-standard?
+func TaprootWitnessSignature(tx *wire.MsgTx, sigHashes *TxSigHashes, idx int,
+	amt int64, pkScript []byte, hashType SigHashType,
+	key *btcec.PrivateKey) (wire.TxWitness, error) {
+
+	sig, err := RawTxInTaprootSignature(
+		tx, sigHashes, idx, amt, pkScript, hashType, key,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	// The witness script to spend a taproot input using the key-spend path
+	// is just the signature itself, given the public key is
+	// embedded in the previous output script.
+	return wire.TxWitness{sig}, nil
 }
 
 // RawTxInSignature returns the serialized ECDSA signature for the input idx of
