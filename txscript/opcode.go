@@ -2065,6 +2065,14 @@ type parsedSigInfo struct {
 // Stack transformation:
 // [... dummy [sig ...] numsigs [pubkey ...] numpubkeys] -> [... bool]
 func opcodeCheckMultiSig(op *opcode, data []byte, vm *Engine) error {
+	// If we're doing tapscript execution, then this op code is disabled.
+	if vm.taprootCtx != nil {
+		str := fmt.Sprintf("OP_CHECKMULTISIG and " +
+			"OP_CHECKMULTISIGVERIFY are disabled during " +
+			"tapscript execution")
+		return scriptError(ErrTapscriptCheckMultisig, str)
+	}
+
 	numKeys, err := vm.dstack.PopInt()
 	if err != nil {
 		return err
@@ -2236,7 +2244,9 @@ func opcodeCheckMultiSig(op *opcode, data []byte, vm *Engine) error {
 			if vm.hashCache != nil {
 				sigHashes = vm.hashCache
 			} else {
-				sigHashes = NewTxSigHashes(&vm.tx, vm.prevOutFetcher)
+				sigHashes = NewTxSigHashes(
+					&vm.tx, vm.prevOutFetcher,
+				)
 			}
 
 			hash, err = calcWitnessSignatureHashRaw(script, sigHashes, hashType,
