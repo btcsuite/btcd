@@ -90,6 +90,12 @@ func IsPayToWitnessPubKeyHash(script []byte) bool {
 	return isWitnessPubKeyHashScript(script)
 }
 
+// IsPayToTaproot returns true if if the passed script is a standard
+// pay-to-taproot (PTTR) scripts, and false otherwise.
+func IsPayToTaproot(script []byte) bool {
+	return isWitnessTaprootScript(script)
+}
+
 // IsWitnessProgram returns true if the passed script is a valid witness
 // program which is encoded according to the passed witness program version. A
 // witness program must be a small integer (from 0-16), followed by 2-40 bytes
