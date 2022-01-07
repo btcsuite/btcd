@@ -839,15 +839,27 @@ func opcodeNop(op *opcode, data []byte, vm *Engine) error {
 // the stack will be popped and interpreted as a boolean.
 func popIfBool(vm *Engine) (bool, error) {
 	// When not in witness execution mode, not executing a v0 witness
-	// program, or the minimal if flag isn't set pop the top stack item as
-	// a normal bool.
-	if !vm.isWitnessVersionActive(0) || !vm.hasFlag(ScriptVerifyMinimalIf) {
+	// program, or not doing tapscript execution, or the minimal if flag
+	// isn't set pop the top stack item as a normal bool.
+	switch {
+	// Minimal if is always on for taproot execution.
+	case vm.isWitnessVersionActive(TaprootWitnessVersion):
+		break
+
+	// If this isn't the base segwit version, then we'll coerce the stack
+	// element as a bool as normal.
+	case !vm.isWitnessVersionActive(BaseSegwitWitnessVersion):
+		fallthrough
+
+	// If the minimal if flag isn't set, then we don't need any extra
+	// checks here.
+	case !vm.hasFlag(ScriptVerifyMinimalIf):
 		return vm.dstack.PopBool()
 	}
 
-	// At this point, a v0 witness program is being executed and the minimal
-	// if flag is set, so enforce additional constraints on the top stack
-	// item.
+	// At this point, a v0 or v1 witness program is being executed and the
+	// minimal if flag is set, so enforce additional constraints on the top
+	// stack item.
 	so, err := vm.dstack.PopByteArray()
 	if err != nil {
 		return false, err
