@@ -9,6 +9,7 @@ import (
 	"crypto/sha1"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"hash"
 	"strings"
@@ -1880,90 +1881,47 @@ func opcodeCheckSig(op *opcode, data []byte, vm *Engine) error {
 		return nil
 	}
 
-	// Trim off hashtype from the signature string and check if the
-	// signature and pubkey conform to the strict encoding requirements
-	// depending on the flags.
-	//
-	// NOTE: When the strict encoding flags are set, any errors in the
-	// signature or public encoding here result in an immediate script error
-	// (and thus no result bool is pushed to the data stack).  This differs
-	// from the logic below where any errors in parsing the signature is
-	// treated as the signature failure resulting in false being pushed to
-	// the data stack.  This is required because the more general script
-	// validation consensus rules do not have the new strict encoding
-	// requirements enabled by the flags.
-	hashType := SigHashType(fullSigBytes[len(fullSigBytes)-1])
-	sigBytes := fullSigBytes[:len(fullSigBytes)-1]
-	if err := vm.checkHashTypeEncoding(hashType); err != nil {
-		return err
-	}
-	if err := vm.checkSignatureEncoding(sigBytes); err != nil {
-		return err
-	}
-	if err := vm.checkPubKeyEncoding(pkBytes); err != nil {
-		return err
-	}
-
-	// Get script starting from the most recent OP_CODESEPARATOR.
-	subScript := vm.subScript()
-
-	// Generate the signature hash based on the signature hash type.
-	var hash []byte
-	if vm.isWitnessVersionActive(0) {
-		var sigHashes *TxSigHashes
-		if vm.hashCache != nil {
-			sigHashes = vm.hashCache
-		} else {
-			sigHashes = NewTxSigHashes(&vm.tx, vm.prevOutFetcher)
-		}
-
-		hash, err = calcWitnessSignatureHashRaw(subScript, sigHashes, hashType,
-			&vm.tx, vm.txIdx, vm.inputAmount)
+	var sigVerifier signatureVerifier
+	switch {
+	// If no witness program is active, then we're verifying under the
+	// base consensus rules.
+	case vm.witnessProgram == nil:
+		sigVerifier, err = newBaseSigVerifier(
+			pkBytes, fullSigBytes, vm,
+		)
 		if err != nil {
-			return err
+			var scriptErr Error
+			if errors.As(err, &scriptErr) {
+				return err
+			}
+
+			vm.dstack.PushBool(false)
+			return nil
 		}
-	} else {
-		// Remove the signature since there is no way for a signature
-		// to sign itself.
-		subScript = removeOpcodeByData(subScript, fullSigBytes)
 
-		hash = calcSignatureHash(subScript, hashType, &vm.tx, vm.txIdx)
-	}
+	// If the base segwit version is active, then we'll create the verifier
+	// that factors in those new consensus rules.
+	case vm.isWitnessVersionActive(BaseSegwitWitnessVersion):
+		sigVerifier, err = newBaseSegwitSigVerifier(
+			pkBytes, fullSigBytes, vm,
+		)
+		if err != nil {
+			var scriptErr Error
+			if errors.As(err, &scriptErr) {
+				return err
+			}
 
-	pubKey, err := btcec.ParsePubKey(pkBytes)
-	if err != nil {
-		vm.dstack.PushBool(false)
-		return nil
-	}
-
-	var signature *ecdsa.Signature
-	if vm.hasFlag(ScriptVerifyStrictEncoding) ||
-		vm.hasFlag(ScriptVerifyDERSignatures) {
-
-		signature, err = ecdsa.ParseDERSignature(sigBytes)
-	} else {
-		signature, err = ecdsa.ParseSignature(sigBytes)
-	}
-	if err != nil {
-		vm.dstack.PushBool(false)
-		return nil
-	}
-
-	var valid bool
-	if vm.sigCache != nil {
-		var sigHash chainhash.Hash
-		copy(sigHash[:], hash)
-
-		valid = vm.sigCache.Exists(sigHash, sigBytes, pkBytes)
-		if !valid && signature.Verify(hash, pubKey) {
-			vm.sigCache.Add(sigHash, sigBytes, pkBytes)
-			valid = true
+			vm.dstack.PushBool(false)
+			return nil
 		}
-	} else {
-		valid = signature.Verify(hash, pubKey)
 	}
 
-	if !valid && vm.hasFlag(ScriptVerifyNullFail) && len(sigBytes) > 0 {
+	// TODO(roasbeef): verify NULLFAIL semantics as relates to constructors
+	// above and empty sig vectors
+	valid := sigVerifier.Verify()
+
+	switch {
+	case !valid && vm.hasFlag(ScriptVerifyNullFail) && len(fullSigBytes[1:]) > 0:
 		str := "signature not empty on failed checksig"
 		return scriptError(ErrNullFail, str)
 	}

@@ -427,7 +427,7 @@ func newBaseTapscriptSigVerifier(pkBytes, rawSig []byte,
 		// However, if the flag preventing usage of unknown key types
 		// is active, then we'll return that error.
 		if vm.hasFlag(ScriptVerifyDiscourageUpgradeablePubkeyType) {
-			str := fmt.Sprintf("puybkey of length %v was used",
+			str := fmt.Sprintf("pubkey of length %v was used",
 				len(pkBytes))
 			return nil, scriptError(
 				ErrDiscourageUpgradeablePubKeyType, str,
