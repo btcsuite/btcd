@@ -1,35 +1,69 @@
 name: Build and Test
 on: [push, pull_request]
+
+env:
+  # go needs absolute directories, using the $HOME variable doesn't work here.
+  GOCACHE: /home/runner/work/go/pkg/build
+  GOPATH: /home/runner/work/go
+  GO_VERSION: 1.17.5
+
 jobs:
   build:
-    # https://github.blog/changelog/2021-04-20-github-actions-control-permissions-for-github_token/
-    permissions:
-      contents: read
-    name: Go CI
+    name: Build
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        go: [1.16.8, 1.17.1]
     steps:
       - name: Set up Go
         uses: actions/setup-go@v2
         with:
-          go-version: ${{ matrix.go }}
+          go-version: ${{ env.GO_VERSION }}
+
       - name: Check out source
         uses: actions/checkout@v2
-      - name: Install Linters
-        run: "curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | sh -s -- -b $(go env GOPATH)/bin v1.26.0"
-      - name: Build
-        env:
-          GO111MODULE: "on"
-        run: go build ./...
-      - name: Test
-        env:
-          GO111MODULE: "on"
-        run: |
-          sh ./goclean.sh
 
-      - name: Send coverage
+      - name: Build
+        run: make build
+
+  test-cover:
+    name: Unit coverage
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Check out source
+        uses: actions/checkout@v2
+
+      - name: Test
+        run: make unit-cover
+
+      - name: Send top-level coverage
         uses: shogo82148/actions-goveralls@v1
         with:
-          path-to-profile: profile.cov
+          path-to-profile: coverage.txt
+
+      - name: Send btcutil coverage
+        uses: shogo82148/actions-goveralls@v1
+        with:
+          path-to-profile: btcutil/coverage.txt
+
+      - name: Send btcutil coverage for psbt package
+        uses: shogo82148/actions-goveralls@v1
+        with:
+          path-to-profile: btcutil/psbt/coverage.txt
+
+  test-race:
+    name: Unit race
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Check out source
+        uses: actions/checkout@v2
+
+      - name: Test
+        run: make unit-race
