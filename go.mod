@@ -18,12 +18,6 @@ require (
 	github.com/aead/siphash v1.0.1 // indirect
 	github.com/btcsuite/snappy-go v1.0.0 // indirect
 	github.com/kkdai/bstream v0.0.0-20161212061736-f391b8402d23 // indirect
-	github.com/onsi/ginkgo v1.14.0 // indirect
-	github.com/onsi/gomega v1.10.1 // indirect
-	golang.org/x/net v0.0.0-20200813134508-3edf25e44fcc // indirect
-	golang.org/x/sys v0.0.0-20200814200057-3d37ad5750ed // indirect
-	golang.org/x/text v0.3.3 // indirect
-	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
 )
 
 replace github.com/btcsuite/btcd/btcutil => ./btcutil
