@@ -79,7 +79,7 @@ check: unit
 
 unit:
 	@$(call print, "Running unit tests.")
-	$(GOTEST) ./... -test.timeout=20m
+	$(GOTEST_DEV) ./... -test.timeout=20m
 	cd btcec; $(GOTEST_DEV) ./... -test.timeout=20m
 	cd btcutil; $(GOTEST_DEV) ./... -test.timeout=20m
 	cd btcutil/psbt; $(GOTEST_DEV) ./... -test.timeout=20m
