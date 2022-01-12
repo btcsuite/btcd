@@ -15,7 +15,8 @@ DEPGET := cd /tmp && GO111MODULE=on go get -v
 GOBUILD := GO111MODULE=on go build -v
 GOINSTALL := GO111MODULE=on go install -v 
 DEV_TAGS := rpctest
-GOTEST := GO111MODULE=on go test -v -tags=$(DEV_TAGS)
+GOTEST_DEV = GO111MODULE=on go test -v -tags=$(DEV_TAGS)
+GOTEST := GO111MODULE=on go test -v
 
 GOFILES_NOVENDOR = $(shell find . -type f -name '*.go' -not -path "./vendor/*")
 
@@ -78,9 +79,9 @@ check: unit
 
 unit:
 	@$(call print, "Running unit tests.")
-	$(GOTEST) ./... -test.timeout=20m
-	cd btcutil; $(GOTEST) ./... -test.timeout=20m
-	cd btcutil/psbt; $(GOTEST) ./... -test.timeout=20m
+	$(GOTEST_DEV) ./... -test.timeout=20m
+	cd btcutil; $(GOTEST_DEV) ./... -test.timeout=20m
+	cd btcutil/psbt; $(GOTEST_DEV) ./... -test.timeout=20m
 
 unit-cover: $(GOACC_BIN)
 	@$(call print, "Running unit coverage tests.")
