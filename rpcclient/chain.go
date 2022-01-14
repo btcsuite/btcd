@@ -380,6 +380,49 @@ func (c *Client) GetChainTxStatsNBlocksBlockHash(nBlocks int32, blockHash chainh
 	return c.GetChainTxStatsNBlocksBlockHashAsync(nBlocks, blockHash).Receive()
 }
 
+// FutureGetChainTipsResult is a future promise to deliver the result of a
+// GetChainTipsAsync RPC invocation (or an applicable error).
+type FutureGetChainTipsResult chan *Response
+
+// Receive waits for the Response promised by the future and returns transaction statistics
+func (r FutureGetChainTipsResult) Receive() ([]btcjson.GetChainTipsResult, error) {
+	res, err := ReceiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	var chainTips []btcjson.GetChainTipsResult
+	err = json.Unmarshal(res, &chainTips)
+	if err != nil {
+		return nil, err
+	}
+
+	return chainTips, nil
+}
+
+// GetChainTipsAsync returns an instance of a type that can be used to get
+// the result of the RPC at some future time by invoking the Receive function on
+// the returned instance.
+//
+// See GetChainTips for the blocking version and more details.
+func (c *Client) GetChainTipsAsync() FutureGetChainTipsResult {
+	cmd := btcjson.NewGetChainTipsCmd()
+	return c.SendCmd(cmd)
+}
+
+// GetChainTips returns information about all known tips in the block tree,
+// including the main chain as well as orphaned branches.
+//
+// Possible values for status:
+// "invalid"         This branch contains at least one invalid block
+// "headers-only"    Not all blocks for this branch are available, but the headers are valid
+// "valid-headers"   All blocks are available for this branch, but they were never fully validated
+// "valid-fork"      This branch is not part of the active chain, but is fully validated
+// "active"          This is the tip of the active main chain, which is certainly valid
+func (c *Client) GetChainTips() ([]btcjson.GetChainTipsResult, error) {
+	return c.GetChainTipsAsync().Receive()
+}
+
 // FutureGetDifficultyResult is a future promise to deliver the result of a
 // GetDifficultyAsync RPC invocation (or an applicable error).
 type FutureGetDifficultyResult chan *Response
