@@ -1250,14 +1250,14 @@ func handleGetBlockChainInfo(s *rpcServer, cmd interface{}, closeChan <-chan str
 		case chaincfg.DeploymentTestDummy:
 			forkName = "dummy"
 
+		case chaincfg.DeploymentTestDummyMinActivation:
+			forkName = "dummy-min-activation"
+
 		case chaincfg.DeploymentCSV:
 			forkName = "csv"
 
 		case chaincfg.DeploymentSegwit:
 			forkName = "segwit"
-
-		case chaincfg.DeploymentTaproot:
-			forkName = "taproot"
 
 		default:
 			return nil, &btcjson.RPCError{

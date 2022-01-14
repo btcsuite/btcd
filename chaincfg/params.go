@@ -94,6 +94,19 @@ type ConsensusDeployment struct {
 	// this particular soft-fork deployment refers to.
 	BitNumber uint8
 
+	// MinActivationHeight is an optional field that when set (default
+	// value being zero), modifies the traditional BIP 9 state machine by
+	// only transitioning from LockedIn to Active once the block height is
+	// greater than (or equal to) thus specified height.
+	MinActivationHeight uint32
+
+	// CustomActivationThreshold if set (non-zero), will _override_ the
+	// existing RuleChangeActivationThreshold value set at the
+	// network/chain level. This value divided by the active
+	// MinerConfirmationWindow denotes the threshold required for
+	// activation. A value of 1815 block denotes a 90% threshold.
+	CustomActivationThreshold uint32
+
 	// DeploymentStarter is used to determine if the given
 	// ConsensusDeployment has started or not.
 	DeploymentStarter ConsensusDeploymentStarter
@@ -111,6 +124,12 @@ const (
 	// purposes.
 	DeploymentTestDummy = iota
 
+	// DeploymentTestDummyMinActivation defines the rule change deployment
+	// ID for testing purposes. This differs from the DeploymentTestDummy
+	// in that it specifies the newer params the taproot fork used for
+	// activation: a custom threshold and a min activation height.
+	DeploymentTestDummyMinActivation
+
 	// DeploymentCSV defines the rule change deployment ID for the CSV
 	// soft-fork package. The CSV package includes the deployment of BIPS
 	// 68, 112, and 113.
@@ -120,11 +139,6 @@ const (
 	// Segregated Witness (segwit) soft-fork package. The segwit package
 	// includes the deployment of BIPS 141, 142, 144, 145, 147 and 173.
 	DeploymentSegwit
-
-	// DeploymentTaproot defines the rule change deployment ID for the
-	// Taproot (+Schnorr) soft-fork package. The taproot package includes
-	// the deployment of BIPS 340, 341 and 342.
-	DeploymentTaproot
 
 	// NOTE: DefinedDeployments must always come last since it is used to
 	// determine how many defined deployments there currently are.
@@ -327,6 +341,17 @@ var MainNetParams = Params{
 				time.Unix(1230767999, 0), // December 31, 2008 UTC
 			),
 		},
+		DeploymentTestDummyMinActivation: {
+			BitNumber:                 22,
+			CustomActivationThreshold: 1815,    // Only needs 90% hash rate.
+			MinActivationHeight:       10_0000, // Can only activate after height 10k.
+			DeploymentStarter: NewMedianTimeDeploymentStarter(
+				time.Time{}, // Always available for vote
+			),
+			DeploymentEnder: NewMedianTimeDeploymentEnder(
+				time.Time{}, // Never expires
+			),
+		},
 		DeploymentCSV: {
 			BitNumber: 0,
 			DeploymentStarter: NewMedianTimeDeploymentStarter(
@@ -408,6 +433,17 @@ var RegressionNetParams = Params{
 	Deployments: [DefinedDeployments]ConsensusDeployment{
 		DeploymentTestDummy: {
 			BitNumber: 28,
+			DeploymentStarter: NewMedianTimeDeploymentStarter(
+				time.Time{}, // Always available for vote
+			),
+			DeploymentEnder: NewMedianTimeDeploymentEnder(
+				time.Time{}, // Never expires
+			),
+		},
+		DeploymentTestDummyMinActivation: {
+			BitNumber:                 22,
+			CustomActivationThreshold: 72,  // Only needs 50% hash rate.
+			MinActivationHeight:       600, // Can only activate after height 600.
 			DeploymentStarter: NewMedianTimeDeploymentStarter(
 				time.Time{}, // Always available for vote
 			),
@@ -521,6 +557,17 @@ var TestNet3Params = Params{
 				time.Unix(1230767999, 0), // December 31, 2008 UTC
 			),
 		},
+		DeploymentTestDummyMinActivation: {
+			BitNumber:                 22,
+			CustomActivationThreshold: 1815,    // Only needs 90% hash rate.
+			MinActivationHeight:       10_0000, // Can only activate after height 10k.
+			DeploymentStarter: NewMedianTimeDeploymentStarter(
+				time.Time{}, // Always available for vote
+			),
+			DeploymentEnder: NewMedianTimeDeploymentEnder(
+				time.Time{}, // Never expires
+			),
+		},
 		DeploymentCSV: {
 			BitNumber: 0,
 			DeploymentStarter: NewMedianTimeDeploymentStarter(
@@ -606,6 +653,17 @@ var SimNetParams = Params{
 	Deployments: [DefinedDeployments]ConsensusDeployment{
 		DeploymentTestDummy: {
 			BitNumber: 28,
+			DeploymentStarter: NewMedianTimeDeploymentStarter(
+				time.Time{}, // Always available for vote
+			),
+			DeploymentEnder: NewMedianTimeDeploymentEnder(
+				time.Time{}, // Never expires
+			),
+		},
+		DeploymentTestDummyMinActivation: {
+			BitNumber:                 22,
+			CustomActivationThreshold: 50,  // Only needs 50% hash rate.
+			MinActivationHeight:       600, // Can only activate after height 600.
 			DeploymentStarter: NewMedianTimeDeploymentStarter(
 				time.Time{}, // Always available for vote
 			),
@@ -720,6 +778,17 @@ func CustomSignetParams(challenge []byte, dnsSeeds []DNSSeed) Params {
 					time.Unix(1230767999, 0), // December 31, 2008 UTC
 				),
 			},
+			DeploymentTestDummyMinActivation: {
+				BitNumber:                 22,
+				CustomActivationThreshold: 1815,    // Only needs 90% hash rate.
+				MinActivationHeight:       10_0000, // Can only activate after height 10k.
+				DeploymentStarter: NewMedianTimeDeploymentStarter(
+					time.Time{}, // Always available for vote
+				),
+				DeploymentEnder: NewMedianTimeDeploymentEnder(
+					time.Time{}, // Never expires
+				),
+			},
 			DeploymentCSV: {
 				BitNumber: 29,
 				DeploymentStarter: NewMedianTimeDeploymentStarter(
@@ -730,15 +799,6 @@ func CustomSignetParams(challenge []byte, dnsSeeds []DNSSeed) Params {
 				),
 			},
 			DeploymentSegwit: {
-				BitNumber: 29,
-				DeploymentStarter: NewMedianTimeDeploymentStarter(
-					time.Time{}, // Always available for vote
-				),
-				DeploymentEnder: NewMedianTimeDeploymentEnder(
-					time.Time{}, // Never expires
-				),
-			},
-			DeploymentTaproot: {
 				BitNumber: 29,
 				DeploymentStarter: NewMedianTimeDeploymentStarter(
 					time.Time{}, // Always available for vote
