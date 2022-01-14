@@ -108,6 +108,32 @@ func (c bitConditionChecker) Condition(node *blockNode) (bool, error) {
 	return uint32(expectedVersion)&conditionMask == 0, nil
 }
 
+// EligibleToActivate returns true if a custom deployment can transition from
+// the LockedIn to the Active state. For normal deployments, this always
+// returns true. However, some deployments add extra rules like a minimum
+// activation height, which can be abstracted into a generic arbitrary check at
+// the final state via this method.
+//
+// This implementation always returns true, as it's used to warn about other
+// unknown deployments.
+//
+// This is part of the thresholdConditionChecker interface implementation.
+func (c bitConditionChecker) EligibleToActivate(blkNode *blockNode) bool {
+	return true
+}
+
+// IsSpeedy returns true if this is to be a "speedy" deployment. A speedy
+// deployment differs from a regular one in that only after a miner block
+// confirmation window can the deployment expire.
+//
+// This implementation returns false, as we want to always be warned if
+// something is about to activate.
+//
+// This is part of the thresholdConditionChecker interface implementation.
+func (c bitConditionChecker) IsSpeedy() bool {
+	return false
+}
+
 // deploymentChecker provides a thresholdConditionChecker which can be used to
 // test a specific deployment rule.  This is required for properly detecting
 // and activating consensus rule changes.
@@ -160,6 +186,12 @@ func (c deploymentChecker) HasEnded(blkNode *blockNode) bool {
 //
 // This is part of the thresholdConditionChecker interface implementation.
 func (c deploymentChecker) RuleChangeActivationThreshold() uint32 {
+	// Some deployments like taproot used a custom activation threshold
+	// that ovverides the network level threshold.
+	if c.deployment.CustomActivationThreshold != 0 {
+		return c.deployment.CustomActivationThreshold
+	}
+
 	return c.chain.chainParams.RuleChangeActivationThreshold
 }
 
@@ -172,6 +204,37 @@ func (c deploymentChecker) RuleChangeActivationThreshold() uint32 {
 // This is part of the thresholdConditionChecker interface implementation.
 func (c deploymentChecker) MinerConfirmationWindow() uint32 {
 	return c.chain.chainParams.MinerConfirmationWindow
+}
+
+// EligibleToActivate returns true if a custom deployment can transition from
+// the LockedIn to the Active state. For normal deployments, this always
+// returns true. However, some deployments add extra rules like a minimum
+// activation height, which can be abstracted into a generic arbitrary check at
+// the final state via this method.
+//
+// This implementation always returns true, unless a minimum activation height
+// is specified.
+//
+// This is part of the thresholdConditionChecker interface implementation.
+func (c deploymentChecker) EligibleToActivate(blkNode *blockNode) bool {
+	// No activation height, so it's always ready to go.
+	if c.deployment.MinActivationHeight == 0 {
+		return true
+	}
+
+	// If the _next_ block (as this is the prior block to the one being
+	// connected is the min height or beyond, then this can activate.
+	return uint32(blkNode.height)+1 >= c.deployment.MinActivationHeight
+}
+
+// IsSpeedy returns true if this is to be a "speedy" deployment. A speedy
+// deployment differs from a regular one in that only after a miner block
+// confirmation window can the deployment expire.  This implementation returns
+// true if a min activation height is set.
+//
+// This is part of the thresholdConditionChecker interface implementation.
+func (c deploymentChecker) IsSpeedy() bool {
+	return c.deployment.MinActivationHeight != 0
 }
 
 // Condition returns true when the specific bit defined by the deployment

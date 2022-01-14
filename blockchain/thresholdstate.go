@@ -72,8 +72,8 @@ type thresholdConditionChecker interface {
 	// consensus is eligible for deployment.
 	HasStarted(*blockNode) bool
 
-	// HasEnded returns true if the target consensus rule change has expired
-	// or timed out.
+	// HasEnded returns true if the target consensus rule change has
+	// expired or timed out.
 	HasEnded(*blockNode) bool
 
 	// RuleChangeActivationThreshold is the number of blocks for which the
@@ -84,10 +84,23 @@ type thresholdConditionChecker interface {
 	// state retarget window.
 	MinerConfirmationWindow() uint32
 
-	// Condition returns whether or not the rule change activation condition
-	// has been met.  This typically involves checking whether or not the
-	// bit associated with the condition is set, but can be more complex as
-	// needed.
+	// EligibleToActivate returns true if a custom deployment can
+	// transition from the LockedIn to the Active state. For normal
+	// deployments, this always returns true. However, some deployments add
+	// extra rules like a minimum activation height, which can be
+	// abstracted into a generic arbitrary check at the final state via
+	// this method.
+	EligibleToActivate(*blockNode) bool
+
+	// IsSpeedy returns true if this is to be a "speedy" deployment. A
+	// speedy deployment differs from a regular one in that only after a
+	// miner block confirmation window can the deployment expire.
+	IsSpeedy() bool
+
+	// Condition returns whether or not the rule change activation
+	// condition has been met.  This typically involves checking whether or
+	// not the bit associated with the condition is set, but can be more
+	// complex as needed.
 	Condition(*blockNode) (bool, error)
 }
 
@@ -208,9 +221,11 @@ func (b *BlockChain) thresholdState(prevNode *blockNode, checker thresholdCondit
 
 		switch state {
 		case ThresholdDefined:
-			// The deployment of the rule change fails if it expires
-			// before it is accepted and locked in.
-			if checker.HasEnded(prevNode) {
+			// The deployment of the rule change fails if it
+			// expires before it is accepted and locked in. However
+			// speed deployments can only transition to failed
+			// after a confirmation window.
+			if !checker.IsSpeedy() && checker.HasEnded(prevNode) {
 				state = ThresholdFailed
 				break
 			}
@@ -223,9 +238,10 @@ func (b *BlockChain) thresholdState(prevNode *blockNode, checker thresholdCondit
 			}
 
 		case ThresholdStarted:
-			// The deployment of the rule change fails if it expires
-			// before it is accepted and locked in.
-			if checker.HasEnded(prevNode) {
+			// The deployment of the rule change fails if it
+			// expires before it is accepted and locked in, but
+			// only if this deployment isn't speedy.
+			if !checker.IsSpeedy() && checker.HasEnded(prevNode) {
 				state = ThresholdFailed
 				break
 			}
@@ -248,17 +264,37 @@ func (b *BlockChain) thresholdState(prevNode *blockNode, checker thresholdCondit
 				countNode = countNode.parent
 			}
 
+			switch {
 			// The state is locked in if the number of blocks in the
 			// period that voted for the rule change meets the
 			// activation threshold.
-			if count >= checker.RuleChangeActivationThreshold() {
+			case count >= checker.RuleChangeActivationThreshold():
 				state = ThresholdLockedIn
+
+			// If this is a speedy deployment, we didn't meet the
+			// threshold above, and the deployment has expired, then
+			// we transition to failed.
+			case checker.IsSpeedy() && checker.HasEnded(prevNode):
+				state = ThresholdFailed
 			}
 
 		case ThresholdLockedIn:
-			// The new rule becomes active when its previous state
-			// was locked in.
-			state = ThresholdActive
+			// At this point, we'll consult the deployment see if a
+			// custom deployment has any other arbitrary conditions
+			// that need to pass before execution. This might be a
+			// minimum activation height or another policy.
+			//
+			// If we aren't eligible to active yet, then we'll just
+			// stay in the locked in position.
+			if !checker.EligibleToActivate(prevNode) {
+				state = ThresholdLockedIn
+
+			} else {
+				// The new rule becomes active when its
+				// previous state was locked in assuming it's
+				// now eligible to activate.
+				state = ThresholdActive
+			}
 
 		// Nothing to do if the previous state is active or failed since
 		// they are both terminal states.
