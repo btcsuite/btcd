@@ -113,7 +113,7 @@ type Harness struct {
 //
 // NOTE: This function is safe for concurrent access.
 func New(activeNet *chaincfg.Params, handlers *rpcclient.NotificationHandlers,
-	extraArgs []string, customExePath string) (*Harness, error) {
+	extraArgs []string, customExePath string, notls bool) (*Harness, error) {
 
 	harnessStateMtx.Lock()
 	defer harnessStateMtx.Unlock()
@@ -145,10 +145,12 @@ func New(activeNet *chaincfg.Params, handlers *rpcclient.NotificationHandlers,
 		return nil, err
 	}
 
-	certFile := filepath.Join(nodeTestData, "rpc.cert")
-	keyFile := filepath.Join(nodeTestData, "rpc.key")
-	if err := genCertPair(certFile, keyFile); err != nil {
-		return nil, err
+	if !notls {
+		certFile := filepath.Join(nodeTestData, "rpc.cert")
+		keyFile := filepath.Join(nodeTestData, "rpc.key")
+		if err := genCertPair(certFile, keyFile); err != nil {
+			return nil, err
+		}
 	}
 
 	wallet, err := newMemWallet(activeNet, uint32(numTestInstances))
@@ -158,9 +160,13 @@ func New(activeNet *chaincfg.Params, handlers *rpcclient.NotificationHandlers,
 
 	miningAddr := fmt.Sprintf("--miningaddr=%s", wallet.coinbaseAddr)
 	extraArgs = append(extraArgs, miningAddr)
+	// If we want to disable TLS, disable it on server side.
+	if notls {
+		extraArgs = append(extraArgs, "--notls")
+	}
 
 	config, err := newConfig(
-		"rpctest", certFile, keyFile, extraArgs, customExePath,
+		"rpctest", "", "", extraArgs, customExePath, notls,
 	)
 	if err != nil {
 		return nil, err

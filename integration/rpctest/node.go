@@ -38,11 +38,12 @@ type nodeConfig struct {
 	certFile     string
 	keyFile      string
 	certificates []byte
+	notls        bool
 }
 
 // newConfig returns a newConfig with all default values.
 func newConfig(prefix, certFile, keyFile string, extra []string,
-	customExePath string) (*nodeConfig, error) {
+	customExePath string, notls bool) (*nodeConfig, error) {
 
 	var btcdPath string
 	if customExePath != "" {
@@ -66,10 +67,12 @@ func newConfig(prefix, certFile, keyFile string, extra []string,
 		endpoint:  "ws",
 		certFile:  certFile,
 		keyFile:   keyFile,
+		notls:     notls,
 	}
 	if err := a.setDefaults(); err != nil {
 		return nil, err
 	}
+
 	return a, nil
 }
 
@@ -87,11 +90,13 @@ func (n *nodeConfig) setDefaults() error {
 		return err
 	}
 	n.logDir = logdir
-	cert, err := ioutil.ReadFile(n.certFile)
-	if err != nil {
-		return err
+	if !n.notls {
+		cert, err := ioutil.ReadFile(n.certFile)
+		if err != nil {
+			return err
+		}
+		n.certificates = cert
 	}
-	n.certificates = cert
 	return nil
 }
 
@@ -115,14 +120,16 @@ func (n *nodeConfig) arguments() []string {
 		// --rpclisten
 		args = append(args, fmt.Sprintf("--rpclisten=%s", n.rpcListen))
 	}
-	if n.rpcConnect != "" {
+	if n.rpcConnect != "" && !n.notls {
 		// --rpcconnect
 		args = append(args, fmt.Sprintf("--rpcconnect=%s", n.rpcConnect))
 	}
-	// --rpccert
-	args = append(args, fmt.Sprintf("--rpccert=%s", n.certFile))
-	// --rpckey
-	args = append(args, fmt.Sprintf("--rpckey=%s", n.keyFile))
+	if !n.notls {
+		// --rpccert
+		args = append(args, fmt.Sprintf("--rpccert=%s", n.certFile))
+		// --rpckey
+		args = append(args, fmt.Sprintf("--rpckey=%s", n.keyFile))
+	}
 	if n.dataDir != "" {
 		// --datadir
 		args = append(args, fmt.Sprintf("--datadir=%s", n.dataDir))
@@ -157,6 +164,7 @@ func (n *nodeConfig) rpcConnConfig() rpc.ConnConfig {
 		User:                 n.rpcUser,
 		Pass:                 n.rpcPass,
 		Certificates:         n.certificates,
+		DisableTLS:           n.notls,
 		DisableAutoReconnect: true,
 	}
 }
