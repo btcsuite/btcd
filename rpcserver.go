@@ -2782,7 +2782,7 @@ func handleGetRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan str
 
 	verbose := false
 	if c.Verbose != nil {
-		verbose = *c.Verbose != 0
+		verbose = *c.Verbose
 	}
 
 	// Try to fetch the transaction from the memory pool and if that fails,

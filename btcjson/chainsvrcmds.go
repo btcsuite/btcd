@@ -650,7 +650,7 @@ func NewGetRawMempoolCmd(verbose *bool) *GetRawMempoolCmd {
 // Core even though it really should be a bool.
 type GetRawTransactionCmd struct {
 	Txid    string
-	Verbose *int `jsonrpcdefault:"0"`
+	Verbose *bool `jsonrpcdefault:"false"`
 }
 
 // NewGetRawTransactionCmd returns a new instance which can be used to issue a
@@ -658,7 +658,7 @@ type GetRawTransactionCmd struct {
 //
 // The parameters which are pointers indicate they are optional.  Passing nil
 // for optional parameters will use the default value.
-func NewGetRawTransactionCmd(txHash string, verbose *int) *GetRawTransactionCmd {
+func NewGetRawTransactionCmd(txHash string, verbose *bool) *GetRawTransactionCmd {
 	return &GetRawTransactionCmd{
 		Txid:    txHash,
 		Verbose: verbose,

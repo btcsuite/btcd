@@ -872,21 +872,21 @@ func TestChainSvrCmds(t *testing.T) {
 			marshalled: `{"jsonrpc":"1.0","method":"getrawtransaction","params":["123"],"id":1}`,
 			unmarshalled: &btcjson.GetRawTransactionCmd{
 				Txid:    "123",
-				Verbose: btcjson.Int(0),
+				Verbose: btcjson.Bool(false),
 			},
 		},
 		{
 			name: "getrawtransaction optional",
 			newCmd: func() (interface{}, error) {
-				return btcjson.NewCmd("getrawtransaction", "123", 1)
+				return btcjson.NewCmd("getrawtransaction", "123", true)
 			},
 			staticCmd: func() interface{} {
-				return btcjson.NewGetRawTransactionCmd("123", btcjson.Int(1))
+				return btcjson.NewGetRawTransactionCmd("123", btcjson.Bool(true))
 			},
-			marshalled: `{"jsonrpc":"1.0","method":"getrawtransaction","params":["123",1],"id":1}`,
+			marshalled: `{"jsonrpc":"1.0","method":"getrawtransaction","params":["123",true],"id":1}`,
 			unmarshalled: &btcjson.GetRawTransactionCmd{
 				Txid:    "123",
-				Verbose: btcjson.Int(1),
+				Verbose: btcjson.Bool(true),
 			},
 		},
 		{
