@@ -162,8 +162,25 @@ func TestCipheringErrors(t *testing.T) {
 	tests2 := []struct {
 		in []byte // input data
 	}{
-		{bytes.Repeat([]byte{0x11}, 17)},
-		{bytes.Repeat([]byte{0x07}, 15)},
+		{bytes.Repeat([]byte{0x11}, 17)}, //too long
+		{bytes.Repeat([]byte{0x07}, 15)}, //too short
+		{append(bytes.Repeat([]byte{0x07}, 15),
+			bytes.Repeat([]byte{0x04}, 1)...)}, //invalid padding
+		{append(bytes.Repeat([]byte{0x07}, 9),
+			[]byte{0x01, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07}...)}, //invalid padding
+		{append(bytes.Repeat([]byte{0x07}, 9),
+			[]byte{0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0xfe, 0x10,
+				0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x10}...)}, //invalid padding
+		{append(bytes.Repeat([]byte{0x07}, 9),
+			[]byte{0x01, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07}...)}, //invalid padding
+		{append(bytes.Repeat([]byte{0x07}, 9),
+			[]byte{0x01, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07}...)}, //invalid padding
+		{append(bytes.Repeat([]byte{0x07}, 15),
+			bytes.Repeat([]byte{0x11}, 1)...)}, //invalid padding length
+		{append(bytes.Repeat([]byte{0x07}, 15),
+			bytes.Repeat([]byte{0x00}, 1)...)}, //invalid padding length
+		{append(bytes.Repeat([]byte{0x07}, 15),
+			bytes.Repeat([]byte{0xff}, 1)...)}, //invalid padding length
 	}
 	for i, test := range tests2 {
 		_, err = removePKCSPadding(test.in)
