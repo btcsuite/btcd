@@ -132,3 +132,187 @@ nextTest:
 		}
 	}
 }
+
+type customDeploymentChecker struct {
+	started bool
+	ended   bool
+
+	eligible bool
+
+	isSpeedy bool
+
+	conditionTrue bool
+
+	activationThreshold uint32
+	minerWindow         uint32
+}
+
+func (c customDeploymentChecker) HasStarted(_ *blockNode) bool {
+	return c.started
+}
+
+func (c customDeploymentChecker) HasEnded(_ *blockNode) bool {
+	return c.ended
+}
+
+func (c customDeploymentChecker) RuleChangeActivationThreshold() uint32 {
+	return c.activationThreshold
+}
+
+func (c customDeploymentChecker) MinerConfirmationWindow() uint32 {
+	return c.minerWindow
+}
+
+func (c customDeploymentChecker) EligibleToActivate(_ *blockNode) bool {
+	return c.eligible
+}
+
+func (c customDeploymentChecker) IsSpeedy() bool {
+	return c.isSpeedy
+}
+
+func (c customDeploymentChecker) Condition(_ *blockNode) (bool, error) {
+	return c.conditionTrue, nil
+}
+
+// TestThresholdStateTransition tests that the thresholdStateTransition
+// properly implements the BIP 009 state machine, along with the speedy trial
+// augments.
+func TestThresholdStateTransition(t *testing.T) {
+	t.Parallel()
+
+	// Prev node always points back to itself, effectively creating an
+	// infinite chain for the purposes of this test.
+	prevNode := &blockNode{}
+	prevNode.parent = prevNode
+
+	window := int32(2016)
+
+	testCases := []struct {
+		currentState ThresholdState
+		nextState    ThresholdState
+
+		checker thresholdConditionChecker
+	}{
+		// From defined, we stay there if we haven't started the
+		// window, and the window hasn't ended.
+		{
+			currentState: ThresholdDefined,
+			nextState:    ThresholdDefined,
+
+			checker: &customDeploymentChecker{},
+		},
+
+		// From defined, we go to failed if the window has ended, and
+		// this isn't a speedy trial.
+		{
+			currentState: ThresholdDefined,
+			nextState:    ThresholdFailed,
+
+			checker: &customDeploymentChecker{
+				ended: true,
+			},
+		},
+
+		// From defined, even if the window has ended, we go to started
+		// if this isn't a speedy trial.
+		{
+			currentState: ThresholdDefined,
+			nextState:    ThresholdStarted,
+
+			checker: &customDeploymentChecker{
+				started: true,
+			},
+		},
+
+		// From started, we go to failed if this isn't speed, and the
+		// deployment has ended.
+		{
+			currentState: ThresholdStarted,
+			nextState:    ThresholdFailed,
+
+			checker: &customDeploymentChecker{
+				ended: true,
+			},
+		},
+
+		// From started, we go to locked in if the window passed the
+		// condition.
+		{
+			currentState: ThresholdStarted,
+			nextState:    ThresholdLockedIn,
+
+			checker: &customDeploymentChecker{
+				started:       true,
+				conditionTrue: true,
+			},
+		},
+
+		// From started, we go to failed if this is a speedy trial, and
+		// the condition wasn't met in the window.
+		{
+			currentState: ThresholdStarted,
+			nextState:    ThresholdFailed,
+
+			checker: &customDeploymentChecker{
+				started:             true,
+				ended:               true,
+				isSpeedy:            true,
+				conditionTrue:       false,
+				activationThreshold: 1815,
+			},
+		},
+
+		// From locked in, we go straight to active is this isn't a
+		// speedy trial.
+		{
+			currentState: ThresholdLockedIn,
+			nextState:    ThresholdActive,
+
+			checker: &customDeploymentChecker{
+				eligible: true,
+			},
+		},
+
+		// From locked in, we remain in locked in if we're not yet
+		// eligible to activate.
+		{
+			currentState: ThresholdLockedIn,
+			nextState:    ThresholdLockedIn,
+
+			checker: &customDeploymentChecker{},
+		},
+
+		// From active, we always stay here.
+		{
+			currentState: ThresholdActive,
+			nextState:    ThresholdActive,
+
+			checker: &customDeploymentChecker{},
+		},
+
+		// From failed, we always stay here.
+		{
+			currentState: ThresholdFailed,
+			nextState:    ThresholdFailed,
+
+			checker: &customDeploymentChecker{},
+		},
+	}
+	for i, testCase := range testCases {
+		nextState, err := thresholdStateTransition(
+			testCase.currentState, prevNode, testCase.checker,
+			window,
+		)
+		if err != nil {
+			t.Fatalf("#%v: unable to transition to next "+
+				"state: %v", i, err)
+		}
+
+		if nextState != testCase.nextState {
+			t.Fatalf("#%v: incorrect state transition: "+
+				"expected %v got %v", i, testCase.nextState,
+				nextState)
+		}
+	}
+}

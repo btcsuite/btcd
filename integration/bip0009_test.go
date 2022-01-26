@@ -3,6 +3,7 @@
 // license that can be found in the LICENSE file.
 
 // This file is ignored during the regular tests due to the following build tag.
+//go:build rpctest
 // +build rpctest
 
 package integration
@@ -196,6 +197,9 @@ func testBIP0009(t *testing.T, forkKey string, deploymentID uint32) {
 	}
 	deployment := &r.ActiveNet.Deployments[deploymentID]
 	activationThreshold := r.ActiveNet.RuleChangeActivationThreshold
+	if deployment.CustomActivationThreshold != 0 {
+		activationThreshold = deployment.CustomActivationThreshold
+	}
 	signalForkVersion := int32(1<<deployment.BitNumber) | vbTopBits
 	for i := uint32(0); i < activationThreshold-1; i++ {
 		_, err := r.GenerateAndSubmitBlock(nil, signalForkVersion,
@@ -268,7 +272,42 @@ func testBIP0009(t *testing.T, forkKey string, deploymentID uint32) {
 	if err != nil {
 		t.Fatalf("failed to generated block: %v", err)
 	}
-	assertChainHeight(r, t, (confirmationWindow*4)-1)
+	expectedChainHeight := (confirmationWindow * 4) - 1
+	assertChainHeight(r, t, expectedChainHeight)
+
+	// If this isn't a fork that has a min activation height set, then it
+	// should be active at this point.
+	if deployment.MinActivationHeight == 0 {
+		assertSoftForkStatus(r, t, forkKey, blockchain.ThresholdActive)
+		return
+	}
+
+	// Otherwise, we'll need to mine additional blocks to pass the min
+	// activation height and ensure the rule set applies. For regtest the
+	// deployment can only activate after height 600, and at this point
+	// we've mined 4*144 blocks, so another confirmation window will put us
+	// over.
+	numBlocksLeft := confirmationWindow
+	for i := uint32(0); i < numBlocksLeft; i++ {
+		// Ensure that we're always in the locked in state right up
+		// until after we mine the very last block.
+		if i < numBlocksLeft {
+			assertSoftForkStatus(
+				r, t, forkKey, blockchain.ThresholdLockedIn,
+			)
+		}
+
+		_, err := r.GenerateAndSubmitBlock(
+			nil, signalForkVersion, time.Time{},
+		)
+		if err != nil {
+			t.Fatalf("failed to generated block %d: %v", i, err)
+		}
+	}
+
+	// At this point, the soft fork should now be shown as active.
+	expectedChainHeight = (confirmationWindow * 5) - 1
+	assertChainHeight(r, t, expectedChainHeight)
 	assertSoftForkStatus(r, t, forkKey, blockchain.ThresholdActive)
 }
 
@@ -299,6 +338,7 @@ func TestBIP0009(t *testing.T) {
 	t.Parallel()
 
 	testBIP0009(t, "dummy", chaincfg.DeploymentTestDummy)
+	testBIP0009(t, "dummy-min-activation", chaincfg.DeploymentTestDummyMinActivation)
 	testBIP0009(t, "segwit", chaincfg.DeploymentSegwit)
 }
 
@@ -329,7 +369,7 @@ func TestBIP0009Mining(t *testing.T) {
 	}
 	defer r.TearDown()
 
-	// Assert the chain only consists of the gensis block.
+	// Assert the chain only consists of the genesis block.
 	assertChainHeight(r, t, 0)
 
 	// *** ThresholdDefined ***

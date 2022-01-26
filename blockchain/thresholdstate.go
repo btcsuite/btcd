@@ -6,8 +6,10 @@ package blockchain
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/wire"
 )
 
 // ThresholdState define the various threshold states used when voting on
@@ -66,14 +68,13 @@ func (t ThresholdState) String() string {
 // thresholdConditionChecker provides a generic interface that is invoked to
 // determine when a consensus rule change threshold should be changed.
 type thresholdConditionChecker interface {
-	// BeginTime returns the unix timestamp for the median block time after
-	// which voting on a rule change starts (at the next window).
-	BeginTime() uint64
+	// HasStarted returns true if based on the passed block blockNode the
+	// consensus is eligible for deployment.
+	HasStarted(*blockNode) bool
 
-	// EndTime returns the unix timestamp for the median block time after
-	// which an attempted rule change fails if it has not already been
-	// locked in or activated.
-	EndTime() uint64
+	// HasEnded returns true if the target consensus rule change has
+	// expired or timed out.
+	HasEnded(*blockNode) bool
 
 	// RuleChangeActivationThreshold is the number of blocks for which the
 	// condition must be true in order to lock in a rule change.
@@ -83,10 +84,23 @@ type thresholdConditionChecker interface {
 	// state retarget window.
 	MinerConfirmationWindow() uint32
 
-	// Condition returns whether or not the rule change activation condition
-	// has been met.  This typically involves checking whether or not the
-	// bit associated with the condition is set, but can be more complex as
-	// needed.
+	// EligibleToActivate returns true if a custom deployment can
+	// transition from the LockedIn to the Active state. For normal
+	// deployments, this always returns true. However, some deployments add
+	// extra rules like a minimum activation height, which can be
+	// abstracted into a generic arbitrary check at the final state via
+	// this method.
+	EligibleToActivate(*blockNode) bool
+
+	// IsSpeedy returns true if this is to be a "speedy" deployment. A
+	// speedy deployment differs from a regular one in that only after a
+	// miner block confirmation window can the deployment expire.
+	IsSpeedy() bool
+
+	// Condition returns whether or not the rule change activation
+	// condition has been met.  This typically involves checking whether or
+	// not the bit associated with the condition is set, but can be more
+	// complex as needed.
 	Condition(*blockNode) (bool, error)
 }
 
@@ -121,6 +135,120 @@ func newThresholdCaches(numCaches uint32) []thresholdStateCache {
 	return caches
 }
 
+// PastMedianTime returns the past median time from the PoV of the passed block
+// header. The past median time is the median time of the 11 blocks prior to
+// the passed block header.
+//
+// NOTE: This is part of the chainfg.BlockClock interface
+func (b *BlockChain) PastMedianTime(blockHeader *wire.BlockHeader) (time.Time, error) {
+	prevHash := blockHeader.PrevBlock
+	prevNode := b.index.LookupNode(&prevHash)
+
+	// If we can't find the previous node, then we can't compute the block
+	// time since it requires us to walk backwards from this node.
+	if prevNode == nil {
+		return time.Time{}, fmt.Errorf("blockHeader(%v) has no "+
+			"previous node", blockHeader.BlockHash())
+	}
+
+	blockNode := newBlockNode(blockHeader, prevNode)
+
+	return blockNode.CalcPastMedianTime(), nil
+}
+
+// thresholdStateTransition given a state, a previous node, and a toeholds
+// checker, this function transitions to the next state as defined by BIP 009.
+// This state transition function is also aware of the "speedy trial"
+// modifications made to BIP 0009 as part of the taproot softfork activation.
+func thresholdStateTransition(state ThresholdState, prevNode *blockNode,
+	checker thresholdConditionChecker,
+	confirmationWindow int32) (ThresholdState, error) {
+
+	switch state {
+	case ThresholdDefined:
+		// The deployment of the rule change fails if it
+		// expires before it is accepted and locked in. However
+		// speed deployments can only transition to failed
+		// after a confirmation window.
+		if !checker.IsSpeedy() && checker.HasEnded(prevNode) {
+			state = ThresholdFailed
+			break
+		}
+
+		// The state for the rule moves to the started state
+		// once its start time has been reached (and it hasn't
+		// already expired per the above).
+		if checker.HasStarted(prevNode) {
+			state = ThresholdStarted
+		}
+
+	case ThresholdStarted:
+		// The deployment of the rule change fails if it
+		// expires before it is accepted and locked in, but
+		// only if this deployment isn't speedy.
+		if !checker.IsSpeedy() && checker.HasEnded(prevNode) {
+			state = ThresholdFailed
+			break
+		}
+
+		// At this point, the rule change is still being voted
+		// on by the miners, so iterate backwards through the
+		// confirmation window to count all of the votes in it.
+		var count uint32
+		countNode := prevNode
+		for i := int32(0); i < confirmationWindow; i++ {
+			condition, err := checker.Condition(countNode)
+			if err != nil {
+				return ThresholdFailed, err
+			}
+			if condition {
+				count++
+			}
+
+			// Get the previous block node.
+			countNode = countNode.parent
+		}
+
+		switch {
+		// The state is locked in if the number of blocks in the
+		// period that voted for the rule change meets the
+		// activation threshold.
+		case count >= checker.RuleChangeActivationThreshold():
+			state = ThresholdLockedIn
+
+		// If this is a speedy deployment, we didn't meet the
+		// threshold above, and the deployment has expired, then
+		// we transition to failed.
+		case checker.IsSpeedy() && checker.HasEnded(prevNode):
+			state = ThresholdFailed
+		}
+
+	case ThresholdLockedIn:
+		// At this point, we'll consult the deployment see if a
+		// custom deployment has any other arbitrary conditions
+		// that need to pass before execution. This might be a
+		// minimum activation height or another policy.
+		//
+		// If we aren't eligible to active yet, then we'll just
+		// stay in the locked in position.
+		if !checker.EligibleToActivate(prevNode) {
+			state = ThresholdLockedIn
+		} else {
+			// The new rule becomes active when its
+			// previous state was locked in assuming it's
+			// now eligible to activate.
+			state = ThresholdActive
+		}
+
+	// Nothing to do if the previous state is active or failed since
+	// they are both terminal states.
+	case ThresholdActive:
+	case ThresholdFailed:
+	}
+
+	return state, nil
+}
+
 // thresholdState returns the current rule change threshold state for the block
 // AFTER the given node and deployment ID.  The cache is used to ensure the
 // threshold states for previous windows are only calculated once.
@@ -150,13 +278,9 @@ func (b *BlockChain) thresholdState(prevNode *blockNode, checker thresholdCondit
 			break
 		}
 
-		// The start and expiration times are based on the median block
-		// time, so calculate it now.
-		medianTime := prevNode.CalcPastMedianTime()
-
 		// The state is simply defined if the start time hasn't been
 		// been reached yet.
-		if uint64(medianTime.Unix()) < checker.BeginTime() {
+		if !checker.HasStarted(prevNode) {
 			cache.Update(&prevNode.hash, ThresholdDefined)
 			break
 		}
@@ -185,70 +309,17 @@ func (b *BlockChain) thresholdState(prevNode *blockNode, checker thresholdCondit
 
 	// Since each threshold state depends on the state of the previous
 	// window, iterate starting from the oldest unknown window.
+	var err error
 	for neededNum := len(neededStates) - 1; neededNum >= 0; neededNum-- {
 		prevNode := neededStates[neededNum]
 
-		switch state {
-		case ThresholdDefined:
-			// The deployment of the rule change fails if it expires
-			// before it is accepted and locked in.
-			medianTime := prevNode.CalcPastMedianTime()
-			medianTimeUnix := uint64(medianTime.Unix())
-			if medianTimeUnix >= checker.EndTime() {
-				state = ThresholdFailed
-				break
-			}
-
-			// The state for the rule moves to the started state
-			// once its start time has been reached (and it hasn't
-			// already expired per the above).
-			if medianTimeUnix >= checker.BeginTime() {
-				state = ThresholdStarted
-			}
-
-		case ThresholdStarted:
-			// The deployment of the rule change fails if it expires
-			// before it is accepted and locked in.
-			medianTime := prevNode.CalcPastMedianTime()
-			if uint64(medianTime.Unix()) >= checker.EndTime() {
-				state = ThresholdFailed
-				break
-			}
-
-			// At this point, the rule change is still being voted
-			// on by the miners, so iterate backwards through the
-			// confirmation window to count all of the votes in it.
-			var count uint32
-			countNode := prevNode
-			for i := int32(0); i < confirmationWindow; i++ {
-				condition, err := checker.Condition(countNode)
-				if err != nil {
-					return ThresholdFailed, err
-				}
-				if condition {
-					count++
-				}
-
-				// Get the previous block node.
-				countNode = countNode.parent
-			}
-
-			// The state is locked in if the number of blocks in the
-			// period that voted for the rule change meets the
-			// activation threshold.
-			if count >= checker.RuleChangeActivationThreshold() {
-				state = ThresholdLockedIn
-			}
-
-		case ThresholdLockedIn:
-			// The new rule becomes active when its previous state
-			// was locked in.
-			state = ThresholdActive
-
-		// Nothing to do if the previous state is active or failed since
-		// they are both terminal states.
-		case ThresholdActive:
-		case ThresholdFailed:
+		// Based on the current state, the previous node, and the
+		// condition checker, transition to the next threshold state.
+		state, err = thresholdStateTransition(
+			state, prevNode, checker, confirmationWindow,
+		)
+		if err != nil {
+			return state, err
 		}
 
 		// Update the cache to avoid recalculating the state in the
