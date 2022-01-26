@@ -137,7 +137,7 @@ func sanitizeString(str string, maxLength uint) string {
 	// Limit the string to the max allowed length.
 	if maxLength > 0 && uint(len(str)) > maxLength {
 		str = str[:maxLength]
-		str = str + "..."
+		str += "..."
 	}
 	return str
 }

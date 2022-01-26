@@ -103,7 +103,7 @@ func subArrayUsage(arrayType reflect.Type, fieldName string) string {
 	singularFieldName := fieldName
 	if strings.HasSuffix(fieldName, "ies") {
 		singularFieldName = strings.TrimSuffix(fieldName, "ies")
-		singularFieldName = singularFieldName + "y"
+		singularFieldName += "y"
 	} else if strings.HasSuffix(fieldName, "es") {
 		singularFieldName = strings.TrimSuffix(fieldName, "es")
 	} else if strings.HasSuffix(fieldName, "s") {
