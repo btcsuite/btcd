@@ -18,6 +18,7 @@ import (
 	"testing"
 
 	"github.com/btcsuite/btcd/chaincfg"
+	secp_ecdsa "github.com/decred/dcrd/dcrec/secp256k1/v4"
 )
 
 // TestBIP0032Vectors tests the vectors provided by [BIP32] to ensure the
@@ -878,7 +879,7 @@ func TestErrors(t *testing.T) {
 		{
 			name: "pubkey not on curve",
 			key:  "xpub661MyMwAqRbcFtXgS5sYJABqqG9YLmC4Q1Rdap9gSE8NqtwybGhePY2gZ1hr9Rwbk95YadvBkQXxzHBSngB8ndpW6QH7zhhsXZ2jHyZqPjk",
-			err:  errors.New("invalid square root"),
+			err:  secp_ecdsa.ErrPubKeyNotOnCurve,
 		},
 		{
 			name:      "unsupported version",
@@ -891,7 +892,7 @@ func TestErrors(t *testing.T) {
 
 	for i, test := range tests {
 		extKey, err := NewKeyFromString(test.key)
-		if !reflect.DeepEqual(err, test.err) {
+		if !errors.Is(err, test.err) {
 			t.Errorf("NewKeyFromString #%d (%s): mismatched error "+
 				"-- got: %v, want: %v", i, test.name, err,
 				test.err)
@@ -900,7 +901,7 @@ func TestErrors(t *testing.T) {
 
 		if test.neuter {
 			_, err := extKey.Neuter()
-			if !reflect.DeepEqual(err, test.neuterErr) {
+			if !errors.Is(err, test.neuterErr) {
 				t.Errorf("Neuter #%d (%s): mismatched error "+
 					"-- got: %v, want: %v", i, test.name,
 					err, test.neuterErr)
@@ -972,9 +973,9 @@ func TestZero(t *testing.T) {
 			return false
 		}
 
-		wantErr = errors.New("pubkey string is empty")
+		wantErr = secp_ecdsa.ErrPubKeyInvalidLen
 		_, err = key.ECPubKey()
-		if !reflect.DeepEqual(err, wantErr) {
+		if !errors.Is(err, wantErr) {
 			t.Errorf("ECPubKey #%d (%s): mismatched error: want "+
 				"%v, got %v", i, testName, wantErr, err)
 			return false

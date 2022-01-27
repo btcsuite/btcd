@@ -15,7 +15,7 @@ import (
 
 	"golang.org/x/crypto/ripemd160"
 
-	"github.com/btcsuite/btcd/btcec"
+	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 )
@@ -1929,7 +1929,7 @@ func opcodeCheckSig(op *opcode, data []byte, vm *Engine) error {
 		hash = calcSignatureHash(subScript, hashType, &vm.tx, vm.txIdx)
 	}
 
-	pubKey, err := btcec.ParsePubKey(pkBytes, btcec.S256())
+	pubKey, err := btcec.ParsePubKey(pkBytes)
 	if err != nil {
 		vm.dstack.PushBool(false)
 		return nil
@@ -1939,9 +1939,9 @@ func opcodeCheckSig(op *opcode, data []byte, vm *Engine) error {
 	if vm.hasFlag(ScriptVerifyStrictEncoding) ||
 		vm.hasFlag(ScriptVerifyDERSignatures) {
 
-		signature, err = btcec.ParseDERSignature(sigBytes, btcec.S256())
+		signature, err = btcec.ParseDERSignature(sigBytes)
 	} else {
-		signature, err = btcec.ParseSignature(sigBytes, btcec.S256())
+		signature, err = btcec.ParseSignature(sigBytes)
 	}
 	if err != nil {
 		vm.dstack.PushBool(false)
@@ -2148,11 +2148,9 @@ func opcodeCheckMultiSig(op *opcode, data []byte, vm *Engine) error {
 			if vm.hasFlag(ScriptVerifyStrictEncoding) ||
 				vm.hasFlag(ScriptVerifyDERSignatures) {
 
-				parsedSig, err = btcec.ParseDERSignature(signature,
-					btcec.S256())
+				parsedSig, err = btcec.ParseDERSignature(signature)
 			} else {
-				parsedSig, err = btcec.ParseSignature(signature,
-					btcec.S256())
+				parsedSig, err = btcec.ParseSignature(signature)
 			}
 			sigInfo.parsed = true
 			if err != nil {
@@ -2174,7 +2172,7 @@ func opcodeCheckMultiSig(op *opcode, data []byte, vm *Engine) error {
 		}
 
 		// Parse the pubkey.
-		parsedPubKey, err := btcec.ParsePubKey(pubKey, btcec.S256())
+		parsedPubKey, err := btcec.ParsePubKey(pubKey)
 		if err != nil {
 			continue
 		}

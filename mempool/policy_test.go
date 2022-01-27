@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/btcsuite/btcd/btcec"
+	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/txscript"
@@ -98,7 +98,7 @@ func TestCalcMinRequiredTxRelayFee(t *testing.T) {
 func TestCheckPkScriptStandard(t *testing.T) {
 	var pubKeys [][]byte
 	for i := 0; i < 4; i++ {
-		pk, err := btcec.NewPrivateKey(btcec.S256())
+		pk, err := btcec.NewPrivateKey()
 		if err != nil {
 			t.Fatalf("TestCheckPkScriptStandard NewPrivateKey failed: %v",
 				err)

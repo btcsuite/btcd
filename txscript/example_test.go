@@ -9,7 +9,7 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"github.com/btcsuite/btcd/btcec"
+	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/txscript"
@@ -90,7 +90,7 @@ func ExampleSignTxOutput() {
 		fmt.Println(err)
 		return
 	}
-	privKey, pubKey := btcec.PrivKeyFromBytes(btcec.S256(), privKeyBytes)
+	privKey, pubKey := btcec.PrivKeyFromBytes(privKeyBytes)
 	pubKeyHash := btcutil.Hash160(pubKey.SerializeCompressed())
 	addr, err := btcutil.NewAddressPubKeyHash(pubKeyHash,
 		&chaincfg.MainNetParams)

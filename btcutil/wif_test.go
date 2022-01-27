@@ -9,9 +9,9 @@ import (
 	"encoding/hex"
 	"testing"
 
-	"github.com/btcsuite/btcd/btcec"
-	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/btcsuite/btcd/btcec/v2"
 	. "github.com/btcsuite/btcd/btcutil"
+	"github.com/btcsuite/btcd/chaincfg"
 )
 
 func TestEncodeDecodeWIF(t *testing.T) {
@@ -67,7 +67,7 @@ func TestEncodeDecodeWIF(t *testing.T) {
 		validCase := validCase
 
 		t.Run(validCase.name, func(t *testing.T) {
-			priv, _ := btcec.PrivKeyFromBytes(btcec.S256(), validCase.privateKey)
+			priv, _ := btcec.PrivKeyFromBytes(validCase.privateKey)
 			wif, err := NewWIF(priv, validCase.net, validCase.compress)
 			if err != nil {
 				t.Fatalf("NewWIF failed: expected no error, got '%v'", err)
@@ -145,7 +145,7 @@ func TestEncodeDecodeWIF(t *testing.T) {
 			0x60, 0x0b, 0x2f, 0xe5, 0x0b, 0x7c, 0xae, 0x11,
 			0xec, 0x86, 0xd3, 0xbf, 0x1f, 0xbe, 0x47, 0x1b,
 			0xe8, 0x98, 0x27, 0xe1, 0x9d, 0x72, 0xaa, 0x1d}
-		priv, _ := btcec.PrivKeyFromBytes(btcec.S256(), privateKey)
+		priv, _ := btcec.PrivKeyFromBytes(privateKey)
 
 		wif, err := NewWIF(priv, nil, true)
 
