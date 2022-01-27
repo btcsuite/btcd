@@ -13,9 +13,8 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/decred/dcrd/blockchain/stake/v4"
-	"github.com/decred/dcrd/chaincfg/chainhash"
-	"github.com/decred/dcrd/dcrutil/v4"
+	"github.com/lbryio/lbcd/chaincfg/chainhash"
+	"github.com/lbryio/lbcutil"
 	"github.com/syndtr/goleveldb/leveldb"
 	ldbutil "github.com/syndtr/goleveldb/leveldb/util"
 )
@@ -27,11 +26,11 @@ const (
 
 	// DefaultMaxConfirmations is the default number of confirmation ranges to
 	// track in the estimator.
-	DefaultMaxConfirmations uint32 = 32
+	DefaultMaxConfirmations uint32 = 42
 
 	// DefaultFeeRateStep is the default multiplier between two consecutive fee
 	// rate buckets.
-	DefaultFeeRateStep float64 = 1.1
+	DefaultFeeRateStep float64 = 1.05
 
 	// defaultDecay is the default value used to decay old transactions from the
 	// estimator.
@@ -102,13 +101,13 @@ type EstimatorConfig struct {
 
 	// MinBucketFee is the value of the fee rate of the lowest bucket for which
 	// estimation is tracked.
-	MinBucketFee dcrutil.Amount
+	MinBucketFee lbcutil.Amount
 
 	// MaxBucketFee is the value of the fee for the highest bucket for which
 	// estimation is tracked.
 	//
 	// It MUST be higher than MinBucketFee.
-	MaxBucketFee dcrutil.Amount
+	MaxBucketFee lbcutil.Amount
 
 	// ExtraBucketFee is an additional bucket fee rate to include in the
 	// database for tracking transactions. Specifying this can be useful when
@@ -118,7 +117,7 @@ type EstimatorConfig struct {
 	//
 	// It MUST have a value between MinBucketFee and MaxBucketFee, otherwise
 	// it's ignored.
-	ExtraBucketFee dcrutil.Amount
+	ExtraBucketFee lbcutil.Amount
 
 	// FeeRateStep is the multiplier to generate the fee rate buckets (each
 	// bucket is higher than the previous one by this factor).
@@ -138,7 +137,7 @@ type EstimatorConfig struct {
 
 // memPoolTxDesc is an aux structure used to track the local estimator mempool.
 type memPoolTxDesc struct {
-	addedHeight int64
+	addedHeight int32
 	bucketIndex int32
 	fees        feeRate
 }
@@ -161,7 +160,7 @@ type Estimator struct {
 
 	maxConfirms int32
 	decay       float64
-	bestHeight  int64
+	bestHeight  int32
 	db          *leveldb.DB
 	lock        sync.RWMutex
 }
@@ -324,7 +323,7 @@ func (stats *Estimator) loadFromDatabase(replaceBuckets bool) error {
 		dbByteOrder.PutUint64(bestHeightBytes[:], uint64(stats.bestHeight))
 		batch.Put(dbKeyBestHeight, bestHeightBytes[:])
 
-		err := binary.Write(b, dbByteOrder, stats.bucketFeeBounds)
+		err = binary.Write(b, dbByteOrder, stats.bucketFeeBounds)
 		if err != nil {
 			return fmt.Errorf("error writing bucket fees to db: %v", err)
 		}
@@ -534,7 +533,7 @@ func (stats *Estimator) confirmRange(blocksToConfirm int32) int32 {
 // statistics and increases the confirmation ranges for mempool txs. This is
 // meant to be called when a new block is mined, so that we discount older
 // information.
-func (stats *Estimator) updateMovingAverages(newHeight int64) {
+func (stats *Estimator) updateMovingAverages(newHeight int32) {
 	log.Debugf("Updated moving averages into block %d", newHeight)
 
 	// decay the existing stats so that, over time, we rely on more up to date
@@ -718,7 +717,7 @@ func (stats *Estimator) estimateMedianFee(targetConfs int32, successPct float64)
 //
 // This function is safe to be called from multiple goroutines but might block
 // until concurrent modifications to the internal database state are complete.
-func (stats *Estimator) EstimateFee(targetConfs int32) (dcrutil.Amount, error) {
+func (stats *Estimator) EstimateFee(targetConfs int32) (lbcutil.Amount, error) {
 	stats.lock.RLock()
 	rate, err := stats.estimateMedianFee(targetConfs, 0.95)
 	stats.lock.RUnlock()
@@ -734,13 +733,13 @@ func (stats *Estimator) EstimateFee(targetConfs int32) (dcrutil.Amount, error) {
 		rate = stats.bucketFeeBounds[0]
 	}
 
-	return dcrutil.Amount(rate), nil
+	return lbcutil.Amount(rate), nil
 }
 
 // Enable establishes the current best height of the blockchain after
 // initializing the chain. All new mempool transactions will be added at this
 // block height.
-func (stats *Estimator) Enable(bestHeight int64) {
+func (stats *Estimator) Enable(bestHeight int32) {
 	log.Debugf("Setting best height as %d", bestHeight)
 	stats.lock.Lock()
 	stats.bestHeight = bestHeight
@@ -762,7 +761,7 @@ func (stats *Estimator) IsEnabled() bool {
 // total fee amount (in atoms) and with the provided size (in bytes).
 //
 // This is safe to be called from multiple goroutines.
-func (stats *Estimator) AddMemPoolTransaction(txHash *chainhash.Hash, fee, size int64, txType stake.TxType) {
+func (stats *Estimator) AddMemPoolTransaction(txHash *chainhash.Hash, fee, size int64) {
 	stats.lock.Lock()
 	defer stats.lock.Unlock()
 
@@ -772,13 +771,6 @@ func (stats *Estimator) AddMemPoolTransaction(txHash *chainhash.Hash, fee, size 
 
 	if _, exists := stats.memPoolTxs[*txHash]; exists {
 		// we should not double count transactions
-		return
-	}
-
-	// Ignore tspends for the purposes of fee estimation, since they remain
-	// in the mempool for a long time and have special rules about when
-	// they can be included in blocks.
-	if txType == stake.TxTypeTSpend {
 		return
 	}
 
@@ -828,7 +820,7 @@ func (stats *Estimator) RemoveMemPoolTransaction(txHash *chainhash.Hash) {
 
 	log.Debugf("Removing tx %s from mempool", txHash)
 
-	stats.removeFromMemPool(int32(stats.bestHeight-desc.addedHeight), desc.fees)
+	stats.removeFromMemPool(stats.bestHeight-desc.addedHeight, desc.fees)
 	delete(stats.memPoolTxs, *txHash)
 }
 
@@ -836,7 +828,7 @@ func (stats *Estimator) RemoveMemPoolTransaction(txHash *chainhash.Hash) {
 // tracked mempool into a mined state.
 //
 // This function is *not* safe to be called from multiple goroutines.
-func (stats *Estimator) processMinedTransaction(blockHeight int64, txh *chainhash.Hash) {
+func (stats *Estimator) processMinedTransaction(blockHeight int32, txh *chainhash.Hash) {
 	desc, exists := stats.memPoolTxs[*txh]
 	if !exists {
 		// We cannot use transactions that we didn't know about to estimate
@@ -850,7 +842,7 @@ func (stats *Estimator) processMinedTransaction(blockHeight int64, txh *chainhas
 		return
 	}
 
-	stats.removeFromMemPool(int32(blockHeight-desc.addedHeight), desc.fees)
+	stats.removeFromMemPool(blockHeight-desc.addedHeight, desc.fees)
 	delete(stats.memPoolTxs, *txh)
 
 	if blockHeight <= desc.addedHeight {
@@ -863,7 +855,7 @@ func (stats *Estimator) processMinedTransaction(blockHeight int64, txh *chainhas
 		return
 	}
 
-	mineDelay := int32(blockHeight - desc.addedHeight)
+	mineDelay := blockHeight - desc.addedHeight
 	log.Debugf("Processing mined tx %s (rate %.8f, delay %d)", txh,
 		desc.fees/1e8, mineDelay)
 	stats.newMinedTx(mineDelay, desc.fees)
@@ -872,7 +864,7 @@ func (stats *Estimator) processMinedTransaction(blockHeight int64, txh *chainhas
 // ProcessBlock processes all mined transactions in the provided block.
 //
 // This function is safe to be called from multiple goroutines.
-func (stats *Estimator) ProcessBlock(block *dcrutil.Block) error {
+func (stats *Estimator) ProcessBlock(block *lbcutil.Block) error {
 	stats.lock.Lock()
 	defer stats.lock.Unlock()
 
@@ -892,10 +884,6 @@ func (stats *Estimator) ProcessBlock(block *dcrutil.Block) error {
 	stats.updateMovingAverages(blockHeight)
 
 	for _, tx := range block.Transactions() {
-		stats.processMinedTransaction(blockHeight, tx.Hash())
-	}
-
-	for _, tx := range block.STransactions() {
 		stats.processMinedTransaction(blockHeight, tx.Hash())
 	}
 

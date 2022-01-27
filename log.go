@@ -16,6 +16,7 @@ import (
 	"github.com/lbryio/lbcd/claimtrie/node"
 	"github.com/lbryio/lbcd/connmgr"
 	"github.com/lbryio/lbcd/database"
+	"github.com/lbryio/lbcd/fees"
 	"github.com/lbryio/lbcd/mempool"
 	"github.com/lbryio/lbcd/mining"
 	"github.com/lbryio/lbcd/mining/cpuminer"
@@ -57,13 +58,14 @@ var (
 
 	adxrLog = backendLog.Logger("ADXR")
 	amgrLog = backendLog.Logger("AMGR")
-	cmgrLog = backendLog.Logger("CMGR")
 	bcdbLog = backendLog.Logger("BCDB")
 	btcdLog = backendLog.Logger("MAIN")
 	chanLog = backendLog.Logger("CHAN")
-	lbryLog = backendLog.Logger("LBRY")
+	cmgrLog = backendLog.Logger("CMGR")
 	discLog = backendLog.Logger("DISC")
+	feesLog = backendLog.Logger("FEES")
 	indxLog = backendLog.Logger("INDX")
+	lbryLog = backendLog.Logger("LBRY")
 	minrLog = backendLog.Logger("MINR")
 	peerLog = backendLog.Logger("PEER")
 	rpcsLog = backendLog.Logger("RPCS")
@@ -76,30 +78,31 @@ var (
 // Initialize package-global logger variables.
 func init() {
 	addrmgr.UseLogger(amgrLog)
-	connmgr.UseLogger(cmgrLog)
-	database.UseLogger(bcdbLog)
 	blockchain.UseLogger(chanLog)
-	node.UseLogger(lbryLog)
-	indexers.UseLogger(indxLog)
-	mining.UseLogger(minrLog)
+	connmgr.UseLogger(cmgrLog)
 	cpuminer.UseLogger(minrLog)
+	database.UseLogger(bcdbLog)
+	fees.UseLogger(feesLog)
+	indexers.UseLogger(indxLog)
+	mempool.UseLogger(txmpLog)
+	mining.UseLogger(minrLog)
+	netsync.UseLogger(syncLog)
+	node.UseLogger(lbryLog)
 	peer.UseLogger(peerLog)
 	txscript.UseLogger(scrpLog)
-	netsync.UseLogger(syncLog)
-	mempool.UseLogger(txmpLog)
 }
 
 // subsystemLoggers maps each subsystem identifier to its associated logger.
 var subsystemLoggers = map[string]btclog.Logger{
 	"ADXR": adxrLog,
 	"AMGR": amgrLog,
-	"CMGR": cmgrLog,
 	"BCDB": bcdbLog,
-	"MAIN": btcdLog,
 	"CHAN": chanLog,
-	"LBRY": lbryLog,
+	"CMGR": cmgrLog,
 	"DISC": discLog,
 	"INDX": indxLog,
+	"LBRY": lbryLog,
+	"MAIN": btcdLog,
 	"MINR": minrLog,
 	"PEER": peerLog,
 	"RPCS": rpcsLog,
