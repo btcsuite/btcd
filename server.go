@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"math"
 	"net"
+	"path"
 	"runtime"
 	"sort"
 	"strconv"
@@ -31,6 +32,7 @@ import (
 	claimtrieconfig "github.com/lbryio/lbcd/claimtrie/config"
 	"github.com/lbryio/lbcd/connmgr"
 	"github.com/lbryio/lbcd/database"
+	"github.com/lbryio/lbcd/fees"
 	"github.com/lbryio/lbcd/mempool"
 	"github.com/lbryio/lbcd/mining"
 	"github.com/lbryio/lbcd/mining/cpuminer"
@@ -38,6 +40,7 @@ import (
 	"github.com/lbryio/lbcd/peer"
 	"github.com/lbryio/lbcd/txscript"
 	"github.com/lbryio/lbcd/wire"
+	"github.com/lbryio/lbcutil"
 	btcutil "github.com/lbryio/lbcutil"
 	"github.com/lbryio/lbcutil/bloom"
 )
@@ -241,7 +244,7 @@ type server struct {
 
 	// The fee estimator keeps track of how long transactions are left in
 	// the mempool before they are mined into blocks.
-	feeEstimator *mempool.FeeEstimator
+	feeEstimator *fees.Estimator
 
 	// cfCheckptCaches stores a cached slice of filter headers for cfcheckpt
 	// messages for each filter type.
@@ -2417,13 +2420,7 @@ func (s *server) Stop() error {
 		s.rpcServer.Stop()
 	}
 
-	// Save fee estimator state in the database.
-	s.db.Update(func(tx database.Tx) error {
-		metadata := tx.Metadata()
-		metadata.Put(mempool.EstimateFeeDatabaseKey, s.feeEstimator.Save())
-
-		return nil
-	})
+	s.feeEstimator.Close()
 
 	// Signal the remaining goroutines to quit.
 	close(s.quit)
@@ -2755,35 +2752,25 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 		return nil, err
 	}
 
-	// Search for a FeeEstimator state in the database. If none can be found
-	// or if it cannot be loaded, create a new one.
-	db.Update(func(tx database.Tx) error {
-		metadata := tx.Metadata()
-		feeEstimationData := metadata.Get(mempool.EstimateFeeDatabaseKey)
-		if feeEstimationData != nil {
-			// delete it from the database so that we don't try to restore the
-			// same thing again somehow.
-			metadata.Delete(mempool.EstimateFeeDatabaseKey)
+	feC := fees.EstimatorConfig{
+		MinBucketFee: cfg.minRelayTxFee,
+		MaxBucketFee: lbcutil.Amount(fees.DefaultMaxBucketFeeMultiplier) * cfg.minRelayTxFee,
+		MaxConfirms:  fees.DefaultMaxConfirmations,
+		FeeRateStep:  fees.DefaultFeeRateStep,
+		DatabaseFile: path.Join(cfg.DataDir, "feesdb"),
 
-			// If there is an error, log it and make a new fee estimator.
-			var err error
-			s.feeEstimator, err = mempool.RestoreFeeEstimator(feeEstimationData)
-
-			if err != nil {
-				peerLog.Errorf("Failed to restore fee estimator %v", err)
-			}
-		}
-
-		return nil
-	})
-
-	// If no feeEstimator has been found, or if the one that has been found
-	// is behind somehow, create a new one and start over.
-	if s.feeEstimator == nil || s.feeEstimator.LastKnownHeight() != s.chain.BestSnapshot().Height {
-		s.feeEstimator = mempool.NewFeeEstimator(
-			mempool.DefaultEstimateFeeMaxRollback,
-			mempool.DefaultEstimateFeeMinRegisteredBlocks)
+		// 1e5 is the previous (up to 1.1.0) mempool.DefaultMinRelayTxFee that
+		// un-upgraded wallets will be using, so track this particular rate
+		// explicitly. Note that bumping this value will cause the existing fees
+		// database to become invalid and will force nodes to explicitly delete
+		// it.
+		ExtraBucketFee: 1e5,
 	}
+	fe, err := fees.NewEstimator(&feC)
+	if err != nil {
+		return nil, err
+	}
+	s.feeEstimator = fe
 
 	txC := mempool.Config{
 		Policy: mempool.Policy{
@@ -2804,11 +2791,12 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 		CalcSequenceLock: func(tx *btcutil.Tx, view *blockchain.UtxoViewpoint) (*blockchain.SequenceLock, error) {
 			return s.chain.CalcSequenceLock(tx, view, true)
 		},
-		IsDeploymentActive: s.chain.IsDeploymentActive,
-		SigCache:           s.sigCache,
-		HashCache:          s.hashCache,
-		AddrIndex:          s.addrIndex,
-		FeeEstimator:       s.feeEstimator,
+		IsDeploymentActive:        s.chain.IsDeploymentActive,
+		SigCache:                  s.sigCache,
+		HashCache:                 s.hashCache,
+		AddrIndex:                 s.addrIndex,
+		AddTxToFeeEstimation:      s.feeEstimator.AddMemPoolTransaction,
+		RemoveTxFromFeeEstimation: s.feeEstimator.RemoveMemPoolTransaction,
 	}
 	s.txMemPool = mempool.New(&txC)
 

@@ -8,6 +8,7 @@ import (
 	"github.com/lbryio/lbcd/blockchain"
 	"github.com/lbryio/lbcd/chaincfg"
 	"github.com/lbryio/lbcd/chaincfg/chainhash"
+	"github.com/lbryio/lbcd/fees"
 	"github.com/lbryio/lbcd/mempool"
 	"github.com/lbryio/lbcd/peer"
 	"github.com/lbryio/lbcd/wire"
@@ -37,5 +38,5 @@ type Config struct {
 	DisableCheckpoints bool
 	MaxPeers           int
 
-	FeeEstimator *mempool.FeeEstimator
+	FeeEstimator *fees.Estimator
 }

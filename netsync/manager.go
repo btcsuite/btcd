@@ -16,6 +16,7 @@ import (
 	"github.com/lbryio/lbcd/chaincfg"
 	"github.com/lbryio/lbcd/chaincfg/chainhash"
 	"github.com/lbryio/lbcd/database"
+	"github.com/lbryio/lbcd/fees"
 	"github.com/lbryio/lbcd/mempool"
 	peerpkg "github.com/lbryio/lbcd/peer"
 	"github.com/lbryio/lbcd/wire"
@@ -205,7 +206,7 @@ type SyncManager struct {
 	nextCheckpoint   *chaincfg.Checkpoint
 
 	// An optional fee estimator.
-	feeEstimator *mempool.FeeEstimator
+	feeEstimator *fees.Estimator
 }
 
 // resetHeaderState sets the headers-first mode state to values appropriate for
@@ -1414,6 +1415,13 @@ func (sm *SyncManager) handleBlockchainNotification(notification *blockchain.Not
 		iv := wire.NewInvVect(wire.InvTypeBlock, block.Hash())
 		sm.peerNotifier.RelayInventory(iv, block.MsgBlock().Header)
 
+		if !sm.feeEstimator.IsEnabled() {
+			// fee estimation can only start after we have performed an initial
+			// sync, otherwise we'll start adding mempool transactions at the
+			// wrong height.
+			sm.feeEstimator.Enable(block.Height())
+		}
+
 	// A block has been connected to the main block chain.
 	case blockchain.NTBlockConnected:
 		block, ok := notification.Data.(*btcutil.Block)
@@ -1421,6 +1429,12 @@ func (sm *SyncManager) handleBlockchainNotification(notification *blockchain.Not
 			log.Warnf("Chain connected notification is not a block.")
 			break
 		}
+
+		// Account for transactions mined in the newly connected block for fee
+		// estimation. This must be done before attempting to remove
+		// transactions from the mempool because the mempool will alert the
+		// estimator of the txs that are leaving
+		sm.feeEstimator.ProcessBlock(block)
 
 		// Remove all of the transactions (except the coinbase) in the
 		// connected block from the transaction pool.  Secondly, remove any
@@ -1436,20 +1450,6 @@ func (sm *SyncManager) handleBlockchainNotification(notification *blockchain.Not
 			sm.peerNotifier.TransactionConfirmed(tx)
 			acceptedTxs := sm.txMemPool.ProcessOrphans(tx)
 			sm.peerNotifier.AnnounceNewTransactions(acceptedTxs)
-		}
-
-		// Register block with the fee estimator, if it exists.
-		if sm.feeEstimator != nil {
-			err := sm.feeEstimator.RegisterBlock(block)
-
-			// If an error is somehow generated then the fee estimator
-			// has entered an invalid state. Since it doesn't know how
-			// to recover, create a new one.
-			if err != nil {
-				sm.feeEstimator = mempool.NewFeeEstimator(
-					mempool.DefaultEstimateFeeMaxRollback,
-					mempool.DefaultEstimateFeeMinRegisteredBlocks)
-			}
 		}
 
 	// A block has been disconnected from the main block chain.
@@ -1473,10 +1473,6 @@ func (sm *SyncManager) handleBlockchainNotification(notification *blockchain.Not
 			}
 		}
 
-		// Rollback previous block recorded by the fee estimator.
-		if sm.feeEstimator != nil {
-			sm.feeEstimator.Rollback(block.Hash())
-		}
 	}
 }
 

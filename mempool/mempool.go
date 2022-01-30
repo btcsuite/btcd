@@ -100,9 +100,15 @@ type Config struct {
 	// This can be nil if the address index is not enabled.
 	AddrIndex *indexers.AddrIndex
 
-	// FeeEstimatator provides a feeEstimator. If it is not nil, the mempool
-	// records all new transactions it observes into the feeEstimator.
-	FeeEstimator *FeeEstimator
+	// AddTxToFeeEstimation defines an optional function to be called whenever a
+	// new transaction is added to the mempool, which can be used to track fees
+	// for the purposes of smart fee estimation.
+	AddTxToFeeEstimation func(txHash *chainhash.Hash, fee, size int64)
+
+	// RemoveTxFromFeeEstimation defines an optional function to be called
+	// whenever a transaction is removed from the mempool in order to track fee
+	// estimation.
+	RemoveTxFromFeeEstimation func(txHash *chainhash.Hash)
 }
 
 // Policy houses the policy (configuration parameters) which is used to
@@ -491,6 +497,13 @@ func (mp *TxPool) removeTransaction(tx *btcutil.Tx, removeRedeemers bool) {
 			delete(mp.outpoints, txIn.PreviousOutPoint)
 		}
 		delete(mp.pool, *txHash)
+
+		// Inform associated fee estimator that the transaction has been removed
+		// from the mempool
+		if mp.cfg.RemoveTxFromFeeEstimation != nil {
+			mp.cfg.RemoveTxFromFeeEstimation(txHash)
+		}
+
 		atomic.StoreInt64(&mp.lastUpdated, time.Now().Unix())
 	}
 }
@@ -559,9 +572,11 @@ func (mp *TxPool) addTransaction(utxoView *blockchain.UtxoViewpoint, tx *btcutil
 		mp.cfg.AddrIndex.AddUnconfirmedTx(tx, utxoView)
 	}
 
-	// Record this tx for fee estimation if enabled.
-	if mp.cfg.FeeEstimator != nil {
-		mp.cfg.FeeEstimator.ObserveTransaction(txD)
+	// Inform the associated fee estimator that a new transaction has been added
+	// to the mempool.
+	size := GetTxVirtualSize(txD.Tx)
+	if mp.cfg.AddTxToFeeEstimation != nil {
+		mp.cfg.AddTxToFeeEstimation(txD.Tx.Hash(), txD.Fee, size)
 	}
 
 	return txD
