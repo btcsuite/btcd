@@ -43,6 +43,7 @@ var invalidStringTests = []struct {
 	{"4kl8", ""},
 	{"0OIl", ""},
 	{"!@#$%^&*()-_=+~`", ""},
+	{"\xdc", ""},
 }
 
 var hexTests = []struct {
