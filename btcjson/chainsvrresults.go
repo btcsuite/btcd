@@ -364,6 +364,8 @@ type GetNetworkInfoResult struct {
 	LocalRelay      bool                   `json:"localrelay"`
 	TimeOffset      int64                  `json:"timeoffset"`
 	Connections     int32                  `json:"connections"`
+	ConnectionsIn   int32                  `json:"connections_in"`
+	ConnectionsOut  int32                  `json:"connections_out"`
 	NetworkActive   bool                   `json:"networkactive"`
 	Networks        []NetworksResult       `json:"networks"`
 	RelayFee        float64                `json:"relayfee"`
