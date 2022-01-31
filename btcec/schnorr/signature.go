@@ -23,14 +23,6 @@ const (
 )
 
 var (
-	tagHashAux = []byte("BIP0340/aux")
-
-	tagHashNonce = []byte("BIP0340/nonce")
-
-	tagHashChallenge = []byte("BIP0340/challenge")
-)
-
-var (
 	// rfc6979ExtraDataV0 is the extra data to feed to RFC6979 when
 	// generating the deterministic nonce for the BIP-340 scheme.  This
 	// ensures the same nonce is not generated for the same message and key
@@ -183,7 +175,7 @@ func schnorrVerify(sig *Signature, hash []byte, pubKeyBytes []byte) error {
 	pBytes := SerializePubKey(pubKey)
 
 	commitment := chainhash.TaggedHash(
-		tagHashChallenge, rBytes[:], pBytes, hash,
+		chainhash.TagBIP0340Challenge, rBytes[:], pBytes, hash,
 	)
 
 	var e btcec.ModNScalar
@@ -325,7 +317,7 @@ func schnorrSign(privKey, nonce *btcec.ModNScalar, pubKey *btcec.PublicKey, hash
 	pBytes := SerializePubKey(pubKey)
 
 	commitment := chainhash.TaggedHash(
-		tagHashChallenge, rBytes[:], pBytes, hash,
+		chainhash.TagBIP0340Challenge, rBytes[:], pBytes, hash,
 	)
 
 	var e btcec.ModNScalar
@@ -492,7 +484,9 @@ func Sign(privKey *btcec.PrivateKey, hash []byte,
 		//
 		// t = bytes(d) xor tagged_hash("BIP0340/aux", a)
 		privBytes := privKeyScalar.Bytes()
-		t := chainhash.TaggedHash(tagHashAux, (*opts.authNonce)[:])
+		t := chainhash.TaggedHash(
+			chainhash.TagBIP0340Aux, (*opts.authNonce)[:],
+		)
 		for i := 0; i < len(t); i++ {
 			t[i] ^= privBytes[i]
 		}
@@ -504,7 +498,7 @@ func Sign(privKey *btcec.PrivateKey, hash []byte,
 		// We snip off the first byte of the serialized pubkey, as we
 		// only need the x coordinate and not the market byte.
 		rand := chainhash.TaggedHash(
-			tagHashNonce, t[:], pubKeyBytes[1:], hash,
+			chainhash.TagBIP0340Nonce, t[:], pubKeyBytes[1:], hash,
 		)
 
 		// Step 8.

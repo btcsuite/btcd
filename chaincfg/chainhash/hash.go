@@ -17,6 +17,25 @@ const HashSize = 32
 // MaxHashStringSize is the maximum length of a Hash hash string.
 const MaxHashStringSize = HashSize * 2
 
+var (
+	// TagBIP0340Challenge is the BIP-0340 tag for challenges.
+	TagBIP0340Challenge = []byte("BIP0340/challenge")
+
+	// TagBIP0340Aux is the BIP-0340 tag for aux data.
+	TagBIP0340Aux = []byte("BIP0340/aux")
+
+	// TagBIP0340Nonce is the BIP-0340 tag for nonces.
+	TagBIP0340Nonce = []byte("BIP0340/nonce")
+
+	// precomputedTags is a map containing the SHA-256 hash of the BIP-0340
+	// tags.
+	precomputedTags = map[string]Hash{
+		string(TagBIP0340Challenge): sha256.Sum256(TagBIP0340Challenge),
+		string(TagBIP0340Aux):       sha256.Sum256(TagBIP0340Aux),
+		string(TagBIP0340Nonce):     sha256.Sum256(TagBIP0340Nonce),
+	}
+)
+
 // ErrHashStrSize describes an error that indicates the caller specified a hash
 // string that has too many characters.
 var ErrHashStrSize = fmt.Errorf("max hash string length is %v bytes", MaxHashStringSize)
@@ -84,10 +103,13 @@ func NewHash(newHash []byte) (*Hash, error) {
 // TaggedHash implements the tagged hash scheme described in BIP-340. We use
 // sha-256 to bind a message hash to a specific context using a tag:
 // sha256(sha256(tag) || sha256(tag) || msg).
-//
-// TODO(roasbeef): add fast paths for common known tags
 func TaggedHash(tag []byte, msgs ...[]byte) *Hash {
-	shaTag := sha256.Sum256(tag)
+	// Check to see if we've already pre-computed the hash of the tag. If
+	// so then this'll save us an extra sha256 hash.
+	shaTag, ok := precomputedTags[string(tag)]
+	if !ok {
+		shaTag = sha256.Sum256(tag)
+	}
 
 	// h = sha256(sha256(tag) || sha256(tag) || msg)
 	h := sha256.New()
