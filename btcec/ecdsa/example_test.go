@@ -2,13 +2,14 @@
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package btcec_test
+package ecdsa_test
 
 import (
 	"encoding/hex"
 	"fmt"
 
 	"github.com/btcsuite/btcd/btcec/v2"
+	"github.com/btcsuite/btcd/btcec/v2/ecdsa"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 )
 
@@ -27,7 +28,7 @@ func Example_signMessage() {
 	// Sign a message using the private key.
 	message := "test message"
 	messageHash := chainhash.DoubleHashB([]byte(message))
-	signature := btcec.Sign(privKey, messageHash)
+	signature := ecdsa.Sign(privKey, messageHash)
 
 	// Serialize and display the signature.
 	fmt.Printf("Serialized Signature: %x\n", signature.Serialize())
@@ -67,7 +68,7 @@ func Example_verifySignature() {
 		fmt.Println(err)
 		return
 	}
-	signature, err := btcec.ParseSignature(sigBytes)
+	signature, err := ecdsa.ParseSignature(sigBytes)
 	if err != nil {
 		fmt.Println(err)
 		return

@@ -9,13 +9,14 @@ import (
 	"testing"
 
 	"github.com/btcsuite/btcd/btcec/v2"
+	"github.com/btcsuite/btcd/btcec/v2/ecdsa"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 )
 
 // genRandomSig returns a random message, a signature of the message under the
 // public key and the public key. This function is used to generate randomized
 // test data.
-func genRandomSig() (*chainhash.Hash, *btcec.Signature, *btcec.PublicKey, error) {
+func genRandomSig() (*chainhash.Hash, *ecdsa.Signature, *btcec.PublicKey, error) {
 	privKey, err := btcec.NewPrivateKey()
 	if err != nil {
 		return nil, nil, nil, err
@@ -26,7 +27,7 @@ func genRandomSig() (*chainhash.Hash, *btcec.Signature, *btcec.PublicKey, error)
 		return nil, nil, nil, err
 	}
 
-	sig := btcec.Sign(privKey, msgHash[:])
+	sig := ecdsa.Sign(privKey, msgHash[:])
 
 	return &msgHash, sig, privKey.PubKey(), nil
 }
@@ -46,7 +47,7 @@ func TestSigCacheAddExists(t *testing.T) {
 	sigCache.Add(*msg1, sig1, key1)
 
 	// The previously added triplet should now be found within the sigcache.
-	sig1Copy, _ := btcec.ParseSignature(sig1.Serialize())
+	sig1Copy, _ := ecdsa.ParseSignature(sig1.Serialize())
 	key1Copy, _ := btcec.ParsePubKey(key1.SerializeCompressed())
 	if !sigCache.Exists(*msg1, sig1Copy, key1Copy) {
 		t.Errorf("previously added item not found in signature cache")
@@ -70,7 +71,7 @@ func TestSigCacheAddEvictEntry(t *testing.T) {
 
 		sigCache.Add(*msg, sig, key)
 
-		sigCopy, err := btcec.ParseSignature(sig.Serialize())
+		sigCopy, err := ecdsa.ParseSignature(sig.Serialize())
 		if err != nil {
 			t.Fatalf("unable to parse sig: %v", err)
 		}
@@ -105,7 +106,7 @@ func TestSigCacheAddEvictEntry(t *testing.T) {
 	}
 
 	// The entry added above should be found within the sigcache.
-	sigNewCopy, _ := btcec.ParseSignature(sigNew.Serialize())
+	sigNewCopy, _ := ecdsa.ParseSignature(sigNew.Serialize())
 	keyNewCopy, _ := btcec.ParsePubKey(keyNew.SerializeCompressed())
 	if !sigCache.Exists(*msgNew, sigNewCopy, keyNewCopy) {
 		t.Fatalf("previously added item not found in signature cache")
@@ -128,7 +129,7 @@ func TestSigCacheAddMaxEntriesZeroOrNegative(t *testing.T) {
 	sigCache.Add(*msg1, sig1, key1)
 
 	// The generated triplet should not be found.
-	sig1Copy, _ := btcec.ParseSignature(sig1.Serialize())
+	sig1Copy, _ := ecdsa.ParseSignature(sig1.Serialize())
 	key1Copy, _ := btcec.ParsePubKey(key1.SerializeCompressed())
 	if sigCache.Exists(*msg1, sig1Copy, key1Copy) {
 		t.Errorf("previously added signature found in sigcache, but" +

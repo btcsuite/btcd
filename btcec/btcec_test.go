@@ -851,27 +851,6 @@ func TestKeyGeneration(t *testing.T) {
 	testKeyGeneration(t, S256(), "S256")
 }
 
-func testSignAndVerify(t *testing.T, c *KoblitzCurve, tag string) {
-	priv, _ := NewPrivateKey()
-	pub := priv.PubKey()
-
-	hashed := []byte("testing")
-	sig := Sign(priv, hashed)
-
-	if !sig.Verify(hashed, pub) {
-		t.Errorf("%s: Verify failed", tag)
-	}
-
-	hashed[0] ^= 0xff
-	if sig.Verify(hashed, pub) {
-		t.Errorf("%s: Verify always works!", tag)
-	}
-}
-
-func TestSignAndVerify(t *testing.T) {
-	testSignAndVerify(t, S256(), "S256")
-}
-
 // checkNAFEncoding returns an error if the provided positive and negative
 // portions of an overall NAF encoding do not adhere to the requirements or they
 // do not sum back to the provided original value.

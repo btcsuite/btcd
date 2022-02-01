@@ -7,6 +7,8 @@ package txscript
 import (
 	"errors"
 
+	"github.com/btcsuite/btcd/btcec/v2/ecdsa"
+
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
@@ -27,7 +29,7 @@ func RawTxInWitnessSignature(tx *wire.MsgTx, sigHashes *TxSigHashes, idx int,
 		return nil, err
 	}
 
-	signature := btcec.Sign(key, hash)
+	signature := ecdsa.Sign(key, hash)
 
 	return append(signature.Serialize(), byte(hashType)), nil
 }
@@ -69,7 +71,7 @@ func RawTxInSignature(tx *wire.MsgTx, idx int, subScript []byte,
 	if err != nil {
 		return nil, err
 	}
-	signature := btcec.Sign(key, hash)
+	signature := ecdsa.Sign(key, hash)
 
 	return append(signature.Serialize(), byte(hashType)), nil
 }
@@ -263,7 +265,7 @@ sigLoop:
 		tSig := sig[:len(sig)-1]
 		hashType := SigHashType(sig[len(sig)-1])
 
-		pSig, err := btcec.ParseDERSignature(tSig)
+		pSig, err := ecdsa.ParseDERSignature(tSig)
 		if err != nil {
 			continue
 		}
