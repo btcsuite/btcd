@@ -24,7 +24,7 @@ const (
 
 // OnSeed is the signature of the callback function which is invoked when DNS
 // seeding is succesfull.
-type OnSeed func(addrs []*wire.NetAddress)
+type OnSeed func(addrs []*wire.NetAddressV2)
 
 // LookupFunc is the signature of the DNS lookup function.
 type LookupFunc func(string) ([]net.IP, error)
@@ -56,11 +56,11 @@ func SeedFromDNS(chainParams *chaincfg.Params, reqServices wire.ServiceFlag,
 			if numPeers == 0 {
 				return
 			}
-			addresses := make([]*wire.NetAddress, len(seedpeers))
+			addresses := make([]*wire.NetAddressV2, len(seedpeers))
 			// if this errors then we have *real* problems
 			intPort, _ := strconv.Atoi(chainParams.DefaultPort)
 			for i, peer := range seedpeers {
-				addresses[i] = wire.NewNetAddressTimestamp(
+				addresses[i] = wire.NetAddressV2FromBytes(
 					// bitcoind seeds with addresses from
 					// a time randomly selected between 3
 					// and 7 days ago.

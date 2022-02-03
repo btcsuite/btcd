@@ -228,7 +228,7 @@ func (cm *rpcConnManager) RelayTransactions(txns []*mempool.TxDesc) {
 //
 // This function is safe for concurrent access and is part of the
 // rpcserverConnManager interface implementation.
-func (cm *rpcConnManager) NodeAddresses() []*wire.NetAddress {
+func (cm *rpcConnManager) NodeAddresses() []*wire.NetAddressV2 {
 	return cm.server.addrManager.AddressCache()
 }
 

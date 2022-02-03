@@ -21,27 +21,27 @@ func TestChance(t *testing.T) {
 	}{
 		{
 			//Test normal case
-			addrmgr.TstNewKnownAddress(&wire.NetAddress{Timestamp: now.Add(-35 * time.Second)},
+			addrmgr.TstNewKnownAddress(&wire.NetAddressV2{Timestamp: now.Add(-35 * time.Second)},
 				0, time.Now().Add(-30*time.Minute), time.Now(), false, 0),
 			1.0,
 		}, {
 			//Test case in which lastseen < 0
-			addrmgr.TstNewKnownAddress(&wire.NetAddress{Timestamp: now.Add(20 * time.Second)},
+			addrmgr.TstNewKnownAddress(&wire.NetAddressV2{Timestamp: now.Add(20 * time.Second)},
 				0, time.Now().Add(-30*time.Minute), time.Now(), false, 0),
 			1.0,
 		}, {
 			//Test case in which lastattempt < 0
-			addrmgr.TstNewKnownAddress(&wire.NetAddress{Timestamp: now.Add(-35 * time.Second)},
+			addrmgr.TstNewKnownAddress(&wire.NetAddressV2{Timestamp: now.Add(-35 * time.Second)},
 				0, time.Now().Add(30*time.Minute), time.Now(), false, 0),
 			1.0 * .01,
 		}, {
 			//Test case in which lastattempt < ten minutes
-			addrmgr.TstNewKnownAddress(&wire.NetAddress{Timestamp: now.Add(-35 * time.Second)},
+			addrmgr.TstNewKnownAddress(&wire.NetAddressV2{Timestamp: now.Add(-35 * time.Second)},
 				0, time.Now().Add(-5*time.Minute), time.Now(), false, 0),
 			1.0 * .01,
 		}, {
 			//Test case with several failed attempts.
-			addrmgr.TstNewKnownAddress(&wire.NetAddress{Timestamp: now.Add(-35 * time.Second)},
+			addrmgr.TstNewKnownAddress(&wire.NetAddressV2{Timestamp: now.Add(-35 * time.Second)},
 				2, time.Now().Add(-30*time.Minute), time.Now(), false, 0),
 			1 / 1.5 / 1.5,
 		},
@@ -65,10 +65,10 @@ func TestIsBad(t *testing.T) {
 	hoursOld := now.Add(-5 * time.Hour)
 	zeroTime := time.Time{}
 
-	futureNa := &wire.NetAddress{Timestamp: future}
-	minutesOldNa := &wire.NetAddress{Timestamp: minutesOld}
-	monthOldNa := &wire.NetAddress{Timestamp: monthOld}
-	currentNa := &wire.NetAddress{Timestamp: secondsOld}
+	futureNa := &wire.NetAddressV2{Timestamp: future}
+	minutesOldNa := &wire.NetAddressV2{Timestamp: minutesOld}
+	monthOldNa := &wire.NetAddressV2{Timestamp: monthOld}
+	currentNa := &wire.NetAddressV2{Timestamp: secondsOld}
 
 	//Test addresses that have been tried in the last minute.
 	if addrmgr.TstKnownAddressIsBad(addrmgr.TstNewKnownAddress(futureNa, 3, secondsOld, zeroTime, false, 0)) {

@@ -6,12 +6,14 @@ import (
 	"net"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/btcsuite/btcd/wire"
 )
 
-// randAddr generates a *wire.NetAddress backed by a random IPv4/IPv6 address.
-func randAddr(t *testing.T) *wire.NetAddress {
+// randAddr generates a *wire.NetAddressV2 backed by a random IPv4/IPv6
+// address.
+func randAddr(t *testing.T) *wire.NetAddressV2 {
 	t.Helper()
 
 	ipv4 := rand.Intn(2) == 0
@@ -30,22 +32,26 @@ func randAddr(t *testing.T) *wire.NetAddress {
 		ip = b[:]
 	}
 
-	return &wire.NetAddress{
-		Services: wire.ServiceFlag(rand.Uint64()),
-		IP:       ip,
-		Port:     uint16(rand.Uint32()),
-	}
+	services := wire.ServiceFlag(rand.Uint64())
+	port := uint16(rand.Uint32())
+
+	return wire.NetAddressV2FromBytes(
+		time.Now(), services, ip, port,
+	)
 }
 
 // assertAddr ensures that the two addresses match. The timestamp is not
 // checked as it does not affect uniquely identifying a specific address.
-func assertAddr(t *testing.T, got, expected *wire.NetAddress) {
+func assertAddr(t *testing.T, got, expected *wire.NetAddressV2) {
 	if got.Services != expected.Services {
 		t.Fatalf("expected address services %v, got %v",
 			expected.Services, got.Services)
 	}
-	if !got.IP.Equal(expected.IP) {
-		t.Fatalf("expected address IP %v, got %v", expected.IP, got.IP)
+	gotAddr := got.Addr.String()
+	expectedAddr := expected.Addr.String()
+	if gotAddr != expectedAddr {
+		t.Fatalf("expected address IP %v, got %v", expectedAddr,
+			gotAddr)
 	}
 	if got.Port != expected.Port {
 		t.Fatalf("expected address port %d, got %d", expected.Port,
@@ -56,7 +62,7 @@ func assertAddr(t *testing.T, got, expected *wire.NetAddress) {
 // assertAddrs ensures that the manager's address cache matches the given
 // expected addresses.
 func assertAddrs(t *testing.T, addrMgr *AddrManager,
-	expectedAddrs map[string]*wire.NetAddress) {
+	expectedAddrs map[string]*wire.NetAddressV2) {
 
 	t.Helper()
 
@@ -96,7 +102,7 @@ func TestAddrManagerSerialization(t *testing.T) {
 	// We'll be adding 5 random addresses to the manager.
 	const numAddrs = 5
 
-	expectedAddrs := make(map[string]*wire.NetAddress, numAddrs)
+	expectedAddrs := make(map[string]*wire.NetAddressV2, numAddrs)
 	for i := 0; i < numAddrs; i++ {
 		addr := randAddr(t)
 		expectedAddrs[NetAddressKey(addr)] = addr
@@ -141,7 +147,7 @@ func TestAddrManagerV1ToV2(t *testing.T) {
 	// each addresses' services will not be stored.
 	const numAddrs = 5
 
-	expectedAddrs := make(map[string]*wire.NetAddress, numAddrs)
+	expectedAddrs := make(map[string]*wire.NetAddressV2, numAddrs)
 	for i := 0; i < numAddrs; i++ {
 		addr := randAddr(t)
 		expectedAddrs[NetAddressKey(addr)] = addr

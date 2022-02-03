@@ -222,11 +222,20 @@ func IsValid(na *wire.NetAddress) bool {
 // IsRoutable returns whether or not the passed address is routable over
 // the public internet.  This is true as long as the address is valid and is not
 // in any reserved ranges.
-func IsRoutable(na *wire.NetAddress) bool {
-	return IsValid(na) && !(IsRFC1918(na) || IsRFC2544(na) ||
-		IsRFC3927(na) || IsRFC4862(na) || IsRFC3849(na) ||
-		IsRFC4843(na) || IsRFC5737(na) || IsRFC6598(na) ||
-		IsLocal(na) || (IsRFC4193(na) && !IsOnionCatTor(na)))
+func IsRoutable(na *wire.NetAddressV2) bool {
+	if na.IsTorV3() {
+		// na is a torv3 address, return true.
+		return true
+	}
+
+	// Else na can be represented as a legacy NetAddress since i2p and
+	// cjdns are unsupported.
+	lna := na.ToLegacy()
+	return IsValid(lna) && !(IsRFC1918(lna) || IsRFC2544(lna) ||
+		IsRFC3927(lna) || IsRFC4862(lna) || IsRFC3849(lna) ||
+		IsRFC4843(lna) || IsRFC5737(lna) || IsRFC6598(lna) ||
+		IsLocal(lna) || (IsRFC4193(lna) &&
+		!IsOnionCatTor(lna)))
 }
 
 // GroupKey returns a string representing the network group an address is part
@@ -234,48 +243,56 @@ func IsRoutable(na *wire.NetAddress) bool {
 // "local" for a local address, the string "tor:key" where key is the /4 of the
 // onion address for Tor address, and the string "unroutable" for an unroutable
 // address.
-func GroupKey(na *wire.NetAddress) string {
-	if IsLocal(na) {
+func GroupKey(na *wire.NetAddressV2) string {
+	if na.IsTorV3() {
+		// na is a torv3 address. Use the same network group keying as
+		// for torv2.
+		return fmt.Sprintf("tor:%d", na.TorV3Key()&((1<<4)-1))
+	}
+
+	lna := na.ToLegacy()
+
+	if IsLocal(lna) {
 		return "local"
 	}
 	if !IsRoutable(na) {
 		return "unroutable"
 	}
-	if IsIPv4(na) {
-		return na.IP.Mask(net.CIDRMask(16, 32)).String()
+	if IsIPv4(lna) {
+		return lna.IP.Mask(net.CIDRMask(16, 32)).String()
 	}
-	if IsRFC6145(na) || IsRFC6052(na) {
+	if IsRFC6145(lna) || IsRFC6052(lna) {
 		// last four bytes are the ip address
-		ip := na.IP[12:16]
+		ip := lna.IP[12:16]
 		return ip.Mask(net.CIDRMask(16, 32)).String()
 	}
 
-	if IsRFC3964(na) {
-		ip := na.IP[2:6]
+	if IsRFC3964(lna) {
+		ip := lna.IP[2:6]
 		return ip.Mask(net.CIDRMask(16, 32)).String()
 
 	}
-	if IsRFC4380(na) {
+	if IsRFC4380(lna) {
 		// teredo tunnels have the last 4 bytes as the v4 address XOR
 		// 0xff.
 		ip := net.IP(make([]byte, 4))
-		for i, byte := range na.IP[12:16] {
+		for i, byte := range lna.IP[12:16] {
 			ip[i] = byte ^ 0xff
 		}
 		return ip.Mask(net.CIDRMask(16, 32)).String()
 	}
-	if IsOnionCatTor(na) {
+	if IsOnionCatTor(lna) {
 		// group is keyed off the first 4 bits of the actual onion key.
-		return fmt.Sprintf("tor:%d", na.IP[6]&((1<<4)-1))
+		return fmt.Sprintf("tor:%d", lna.IP[6]&((1<<4)-1))
 	}
 
 	// OK, so now we know ourselves to be a IPv6 address.
 	// bitcoind uses /32 for everything, except for Hurricane Electric's
 	// (he.net) IP range, which it uses /36 for.
 	bits := 32
-	if heNet.Contains(na.IP) {
+	if heNet.Contains(lna.IP) {
 		bits = 36
 	}
 
-	return na.IP.Mask(net.CIDRMask(bits, 128)).String()
+	return lna.IP.Mask(net.CIDRMask(bits, 128)).String()
 }
