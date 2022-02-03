@@ -32,6 +32,7 @@ const (
 	CmdVerAck       = "verack"
 	CmdGetAddr      = "getaddr"
 	CmdAddr         = "addr"
+	CmdAddrV2       = "addrv2"
 	CmdGetBlocks    = "getblocks"
 	CmdInv          = "inv"
 	CmdGetData      = "getdata"
@@ -78,6 +79,13 @@ const (
 // protocol.
 var LatestEncoding = WitnessEncoding
 
+// ErrUnknownMessage is the error returned when decoding an unknown message.
+var ErrUnknownMessage = fmt.Errorf("received unknown message")
+
+// ErrInvalidHandshake is the error returned when a peer sends us a known
+// message that does not belong in the version-verack handshake.
+var ErrInvalidHandshake = fmt.Errorf("invalid message during handshake")
+
 // Message is an interface that describes a bitcoin message.  A type that
 // implements Message has complete control over the representation of its data
 // and may therefore contain additional or fewer fields than those which
@@ -108,6 +116,9 @@ func makeEmptyMessage(command string) (Message, error) {
 
 	case CmdAddr:
 		msg = &MsgAddr{}
+
+	case CmdAddrV2:
+		msg = &MsgAddrV2{}
 
 	case CmdGetBlocks:
 		msg = &MsgGetBlocks{}
@@ -185,7 +196,7 @@ func makeEmptyMessage(command string) (Message, error) {
 		msg = &MsgCFCheckpt{}
 
 	default:
-		return nil, fmt.Errorf("unhandled command [%s]", command)
+		return nil, ErrUnknownMessage
 	}
 	return msg, nil
 }
@@ -378,9 +389,10 @@ func ReadMessageWithEncodingN(r io.Reader, pver uint32, btcnet BitcoinNet,
 	// Create struct of appropriate message type based on the command.
 	msg, err := makeEmptyMessage(command)
 	if err != nil {
+		// makeEmptyMessage can only return ErrUnknownMessage and it is
+		// important that we bubble it up to the caller.
 		discardInput(r, hdr.length)
-		return totalBytes, nil, nil, messageError("ReadMessage",
-			err.Error())
+		return totalBytes, nil, nil, err
 	}
 
 	// Check for maximum length based on the message type as a malicious client

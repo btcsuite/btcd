@@ -295,7 +295,7 @@ func TestReadMessageWireErrors(t *testing.T) {
 			pver,
 			btcnet,
 			len(unsupportedCommandBytes),
-			&MessageError{},
+			ErrUnknownMessage,
 			24,
 		},
 
@@ -345,7 +345,7 @@ func TestReadMessageWireErrors(t *testing.T) {
 			pver,
 			btcnet,
 			len(discardBytes),
-			&MessageError{},
+			ErrUnknownMessage,
 			24,
 		},
 	}

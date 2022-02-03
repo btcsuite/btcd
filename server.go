@@ -344,6 +344,34 @@ func (sp *serverPeer) relayTxDisabled() bool {
 // pushAddrMsg sends a legacy addr message to the connected peer using the
 // provided addresses.
 func (sp *serverPeer) pushAddrMsg(addresses []*wire.NetAddressV2) {
+	if sp.WantsAddrV2() {
+		// If the peer supports addrv2, we'll be pushing an addrv2
+		// message instead. The logic is otherwise identical to the
+		// addr case below.
+		addrs := make([]*wire.NetAddressV2, 0, len(addresses))
+		for _, addr := range addresses {
+			// Filter addresses already known to the peer.
+			if sp.addressKnown(addr) {
+				continue
+			}
+
+			addrs = append(addrs, addr)
+		}
+
+		known, err := sp.PushAddrV2Msg(addrs)
+		if err != nil {
+			peerLog.Errorf("Can't push addrv2 message to %s: %v",
+				sp.Peer, err)
+			sp.Disconnect()
+			return
+		}
+
+		// Add the final set of addresses sent to the set the peer
+		// knows of.
+		sp.addKnownAddresses(known)
+		return
+	}
+
 	addrs := make([]*wire.NetAddress, 0, len(addresses))
 	for _, addr := range addresses {
 		// Filter addresses already known to the peer.
@@ -1328,6 +1356,45 @@ func (sp *serverPeer) OnAddr(_ *peer.Peer, msg *wire.MsgAddr) {
 	sp.server.addrManager.AddAddresses(addrs, sp.NA())
 }
 
+// OnAddrV2 is invoked when a peer receives an addrv2 bitcoin message and is
+// used to notify the server about advertised addresses.
+func (sp *serverPeer) OnAddrV2(_ *peer.Peer, msg *wire.MsgAddrV2) {
+	// Ignore if simnet for the same reasons as the regular addr message.
+	if cfg.SimNet {
+		return
+	}
+
+	// An empty AddrV2 message is invalid.
+	if len(msg.AddrList) == 0 {
+		peerLog.Errorf("Command [%s] from %s does not contain any "+
+			"addresses", msg.Command(), sp.Peer)
+		sp.Disconnect()
+		return
+	}
+
+	for _, na := range msg.AddrList {
+		// Don't add more to the set of known addresses if we're
+		// disconnecting.
+		if !sp.Connected() {
+			return
+		}
+
+		// Set the timestamp to 5 days ago if the timestamp received is
+		// more than 10 minutes in the future so this address is one of
+		// the first to be removed.
+		now := time.Now()
+		if na.Timestamp.After(now.Add(time.Minute * 10)) {
+			na.Timestamp = now.Add(-1 * time.Hour * 24 * 5)
+		}
+
+		// Add to the set of known addresses.
+		sp.addKnownAddresses([]*wire.NetAddressV2{na})
+	}
+
+	// Add the addresses to the addrmanager.
+	sp.server.addrManager.AddAddresses(msg.AddrList, sp.NA())
+}
+
 // OnRead is invoked when a peer receives a message and it is used to update
 // the bytes received by the server.
 func (sp *serverPeer) OnRead(_ *peer.Peer, bytesRead int, msg wire.Message, err error) {
@@ -2074,6 +2141,7 @@ func newPeerConfig(sp *serverPeer) *peer.Config {
 			OnFilterLoad:   sp.OnFilterLoad,
 			OnGetAddr:      sp.OnGetAddr,
 			OnAddr:         sp.OnAddr,
+			OnAddrV2:       sp.OnAddrV2,
 			OnRead:         sp.OnRead,
 			OnWrite:        sp.OnWrite,
 			OnNotFound:     sp.OnNotFound,
