@@ -76,7 +76,7 @@ func TorLookupIP(host, proxy string) ([]net.IP, error) {
 		return nil, ErrTorUnrecognizedAuthMethod
 	}
 
-	buf = make([]byte, 6+len(host))
+	buf = make([]byte, 7+len(host))
 	buf[0] = 5      // protocol version
 	buf[1] = '\xF0' // Tor Resolve
 	buf[2] = 0      // reserved
