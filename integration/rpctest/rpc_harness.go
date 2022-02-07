@@ -7,20 +7,20 @@ package rpctest
 import (
 	"fmt"
 	"io/ioutil"
-	"math/rand"
 	"net"
 	"os"
 	"path/filepath"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/rpcclient"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcd/btcutil"
 )
 
 const (
@@ -64,6 +64,19 @@ var (
 	// default behavior which isn't very concurrency safe (just selecting
 	// a random port can produce collisions and therefore flakes).
 	ListenAddressGenerator = generateListeningAddresses
+
+	// defaultNodePort is the start of the range for listening ports of
+	// harness nodes. Ports are monotonically increasing starting from this
+	// number and are determined by the results of nextAvailablePort().
+	defaultNodePort uint32 = 8333
+
+	// ListenerFormat is the format string that is used to generate local
+	// listener addresses.
+	ListenerFormat = "127.0.0.1:%d"
+
+	// lastPort is the last port determined to be free for use by a new
+	// node. It should be used atomically.
+	lastPort uint32 = defaultNodePort
 )
 
 // HarnessTestCase represents a test-case which utilizes an instance of the
@@ -509,24 +522,40 @@ func (h *Harness) GenerateAndSubmitBlockWithCustomCoinbaseOutputs(
 	return newBlock, nil
 }
 
-// generateListeningAddresses returns two strings representing listening
-// addresses designated for the current rpc test. If there haven't been any
-// test instances created, the default ports are used. Otherwise, in order to
-// support multiple test nodes running at once, the p2p and rpc port are
-// picked at random between {min/max}PeerPort and {min/max}RPCPort respectively.
+// generateListeningAddresses is a function that returns two listener
+// addresses with unique ports and should be used to overwrite rpctest's
+// default generator which is prone to use colliding ports.
 func generateListeningAddresses() (string, string) {
-	localhost := "127.0.0.1"
+	return fmt.Sprintf(ListenerFormat, NextAvailablePort()),
+		fmt.Sprintf(ListenerFormat, NextAvailablePort())
+}
 
-	rand.Seed(time.Now().UnixNano())
-
-	portString := func(minPort, maxPort int) string {
-		port := minPort + rand.Intn(maxPort-minPort)
-		return strconv.Itoa(port)
+// NextAvailablePort returns the first port that is available for listening by
+// a new node. It panics if no port is found and the maximum available TCP port
+// is reached.
+func NextAvailablePort() int {
+	port := atomic.AddUint32(&lastPort, 1)
+	for port < 65535 {
+		// If there are no errors while attempting to listen on this
+		// port, close the socket and return it as available. While it
+		// could be the case that some other process picks up this port
+		// between the time the socket is closed and it's reopened in
+		// the harness node, in practice in CI servers this seems much
+		// less likely than simply some other process already being
+		// bound at the start of the tests.
+		addr := fmt.Sprintf(ListenerFormat, port)
+		l, err := net.Listen("tcp4", addr)
+		if err == nil {
+			err := l.Close()
+			if err == nil {
+				return int(port)
+			}
+		}
+		port = atomic.AddUint32(&lastPort, 1)
 	}
 
-	p2p := net.JoinHostPort(localhost, portString(minPeerPort, maxPeerPort))
-	rpc := net.JoinHostPort(localhost, portString(minRPCPort, maxRPCPort))
-	return p2p, rpc
+	// No ports available? Must be a mistake.
+	panic("no ports available for listening")
 }
 
 // baseDir is the directory path of the temp directory for all rpctest files.
