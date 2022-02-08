@@ -863,7 +863,7 @@ mempoolLoop:
 }
 
 // AddWitnessCommitment adds the witness commitment as an OP_RETURN outpout
-// within the coinbase tx.  The raw commitment is returned.
+// within the coinbase tx.  The witness script is returned.
 func AddWitnessCommitment(coinbaseTx *btcutil.Tx,
 	blockTxns []*btcutil.Tx) []byte {
 
@@ -902,7 +902,7 @@ func AddWitnessCommitment(coinbaseTx *btcutil.Tx,
 	coinbaseTx.MsgTx().TxOut = append(coinbaseTx.MsgTx().TxOut,
 		commitmentOutput)
 
-	return witnessCommitment
+	return witnessScript
 }
 
 // UpdateBlockTime updates the timestamp in the header of the passed block to
