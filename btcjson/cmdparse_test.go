@@ -557,7 +557,7 @@ func TestUnmarshalCmdErrors(t *testing.T) {
 			request: btcjson.Request{
 				Jsonrpc: btcjson.RpcVersion1,
 				Method:  "getblock",
-				Params:  []json.RawMessage{[]byte("1")},
+				Params:  []json.RawMessage{[]byte("1.0")},
 				ID:      nil,
 			},
 			err: btcjson.Error{ErrorCode: btcjson.ErrInvalidType},
@@ -589,5 +589,86 @@ func TestUnmarshalCmdErrors(t *testing.T) {
 				err, test.err.ErrorCode)
 			continue
 		}
+	}
+}
+
+// TestUnmarshalCmdBoolParams tests the parsing of boolean paramers of the UnmarshalCmd function.
+func TestUnmarshalCmdBoolParams(t *testing.T) {
+	t.Parallel()
+
+	txid := []byte(`"ab91c149aff2b37a4a1856e9935ea623c973f47886d032ed7511ad8ca37855bb"`)
+	tests := []struct {
+		name    string
+		request btcjson.Request
+		expect  bool
+	}{
+		{
+			name: "parse true",
+			request: btcjson.Request{
+				Jsonrpc: btcjson.RpcVersion1,
+				Method:  "getrawtransaction",
+				Params:  []json.RawMessage{txid, []byte("true")},
+				ID:      nil,
+			},
+			expect: true,
+		},
+		{
+			name: "parse false",
+			request: btcjson.Request{
+				Jsonrpc: btcjson.RpcVersion1,
+				Method:  "getrawtransaction",
+				Params:  []json.RawMessage{txid, []byte("false")},
+				ID:      nil,
+			},
+			expect: false,
+		},
+		{
+			name: "parse integer 0 to false",
+			request: btcjson.Request{
+				Jsonrpc: btcjson.RpcVersion1,
+				Method:  "getrawtransaction",
+				Params:  []json.RawMessage{txid, []byte("0")},
+				ID:      nil,
+			},
+			expect: false,
+		},
+		{
+			name: "parse integer 1 to true",
+			request: btcjson.Request{
+				Jsonrpc: btcjson.RpcVersion1,
+				Method:  "getrawtransaction",
+				Params:  []json.RawMessage{txid, []byte("1")},
+				ID:      nil,
+			},
+			expect: true,
+		},
+		{
+			name: "parse integer 100 to true",
+			request: btcjson.Request{
+				Jsonrpc: btcjson.RpcVersion1,
+				Method:  "getrawtransaction",
+				Params:  []json.RawMessage{txid, []byte("100")},
+				ID:      nil,
+			},
+			expect: true,
+		},
+	}
+
+	t.Logf("Running %d tests", len(tests))
+	for i, test := range tests {
+		cmd, err := btcjson.UnmarshalCmd(&test.request)
+		if err != nil {
+			t.Errorf("Test #%d (%s) error - got %T (%v)", i, test.name,
+				err, err)
+			continue
+		}
+		cc := cmd.(*btcjson.GetRawTransactionCmd)
+		verbose := *cc.Verbose
+		if verbose != test.expect {
+			t.Errorf("Test #%d (%s) got %t, want %v", i, test.name,
+				verbose, test.expect)
+			continue
+		}
+
 	}
 }

@@ -134,6 +134,16 @@ func UnmarshalCmd(r *Request) (interface{}, error) {
 		// Unmarshal the parameter into the struct field.
 		concreteVal := rvf.Addr().Interface()
 		if err := json.Unmarshal(r.Params[i], &concreteVal); err != nil {
+			// Parse Integer into Bool for compatibility with lbrycrd.
+			if rvf.Kind() == reflect.Ptr &&
+				rvf.Elem().Type().Kind() == reflect.Bool {
+				boolInt, errBoolInt := strconv.Atoi(string(r.Params[i]))
+				if errBoolInt == nil {
+					rvf.Elem().SetBool(boolInt != 0)
+					continue
+				}
+			}
+
 			// The most common error is the wrong type, so
 			// explicitly detect that error and make it nicer.
 			fieldName := strings.ToLower(rt.Field(i).Name)
