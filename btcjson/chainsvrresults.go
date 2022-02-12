@@ -138,11 +138,10 @@ type CreateMultiSigResult struct {
 
 // DecodeScriptResult models the data returned from the decodescript command.
 type DecodeScriptResult struct {
-	Asm       string   `json:"asm"`
-	ReqSigs   int32    `json:"reqSigs,omitempty"`
-	Type      string   `json:"type"`
-	Addresses []string `json:"addresses,omitempty"`
-	P2sh      string   `json:"p2sh,omitempty"`
+	Asm     string `json:"asm"`
+	Type    string `json:"type"`
+	Address string `json:"address,omitempty"`
+	P2sh    string `json:"p2sh,omitempty"`
 }
 
 // GetAddedNodeInfoResultAddr models the data of the addresses portion of the
@@ -425,11 +424,10 @@ type GetRawMempoolVerboseResult struct {
 // ScriptPubKeyResult models the scriptPubKey data of a tx script.  It is
 // defined separately since it is used by multiple commands.
 type ScriptPubKeyResult struct {
-	Asm       string   `json:"asm"`
-	Hex       string   `json:"hex,omitempty"`
-	ReqSigs   int32    `json:"reqSigs,omitempty"`
-	Type      string   `json:"type"`
-	Addresses []string `json:"addresses,omitempty"`
+	Asm     string `json:"asm"`
+	Hex     string `json:"hex,omitempty"`
+	Type    string `json:"type"`
+	Address string `json:"address,omitempty"`
 }
 
 // GetTxOutResult models the data from the gettxout command.

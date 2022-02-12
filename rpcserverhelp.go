@@ -82,11 +82,10 @@ var helpDescsEnUS = map[string]string{
 	"vin-sequence":    "The script sequence number",
 
 	// ScriptPubKeyResult help.
-	"scriptpubkeyresult-asm":       "Disassembly of the script",
-	"scriptpubkeyresult-hex":       "Hex-encoded bytes of the script",
-	"scriptpubkeyresult-reqSigs":   "The number of required signatures",
-	"scriptpubkeyresult-type":      "The type of the script (e.g. 'pubkeyhash')",
-	"scriptpubkeyresult-addresses": "The bitcoin addresses associated with this script",
+	"scriptpubkeyresult-asm":     "Disassembly of the script",
+	"scriptpubkeyresult-hex":     "Hex-encoded bytes of the script",
+	"scriptpubkeyresult-type":    "The type of the script (e.g. 'pubkeyhash')",
+	"scriptpubkeyresult-address": "The bitcoin address associated with this script",
 
 	// Vout help.
 	"vout-value":        "The amount in BTC",
@@ -105,11 +104,10 @@ var helpDescsEnUS = map[string]string{
 	"decoderawtransaction-hextx":     "Serialized, hex-encoded transaction",
 
 	// DecodeScriptResult help.
-	"decodescriptresult-asm":       "Disassembly of the script",
-	"decodescriptresult-reqSigs":   "The number of required signatures",
-	"decodescriptresult-type":      "The type of the script (e.g. 'pubkeyhash')",
-	"decodescriptresult-addresses": "The bitcoin addresses associated with this script",
-	"decodescriptresult-p2sh":      "The script hash for use in pay-to-script-hash transactions (only present if the provided redeem script is not already a pay-to-script-hash script)",
+	"decodescriptresult-asm":     "Disassembly of the script",
+	"decodescriptresult-type":    "The type of the script (e.g. 'pubkeyhash')",
+	"decodescriptresult-address": "The bitcoin address associated with this script",
+	"decodescriptresult-p2sh":    "The script hash for use in pay-to-script-hash transactions (only present if the provided redeem script is not already a pay-to-script-hash script)",
 
 	// DecodeScriptCmd help.
 	"decodescript--synopsis": "Returns a JSON object with information about the provided hex-encoded script.",
