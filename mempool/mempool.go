@@ -1507,36 +1507,42 @@ func (mp *TxPool) MiningDescs() []*mining.TxDesc {
 // populated btcjson result.
 //
 // This function is safe for concurrent access.
-func (mp *TxPool) RawMempoolVerbose() map[string]*btcjson.GetRawMempoolVerboseResult {
+func (mp *TxPool) RawMempoolVerbose() map[string]*btcjson.GetMempoolEntryResult {
 	mp.mtx.RLock()
 	defer mp.mtx.RUnlock()
 
-	result := make(map[string]*btcjson.GetRawMempoolVerboseResult,
+	result := make(map[string]*btcjson.GetMempoolEntryResult,
 		len(mp.pool))
-	bestHeight := mp.cfg.BestHeight()
 
 	for _, desc := range mp.pool {
 		// Calculate the current priority based on the inputs to
 		// the transaction.  Use zero if one or more of the
 		// input transactions can't be found for some reason.
 		tx := desc.Tx
-		var currentPriority float64
-		utxos, err := mp.fetchInputUtxos(tx)
-		if err == nil {
-			currentPriority = mining.CalcPriority(tx.MsgTx(), utxos,
-				bestHeight+1)
-		}
 
-		mpd := &btcjson.GetRawMempoolVerboseResult{
-			Size:             int32(tx.MsgTx().SerializeSize()),
-			Vsize:            int32(GetTxVirtualSize(tx)),
-			Weight:           int32(blockchain.GetTransactionWeight(tx)),
-			Fee:              btcutil.Amount(desc.Fee).ToBTC(),
-			Time:             desc.Added.Unix(),
-			Height:           int64(desc.Height),
-			StartingPriority: desc.StartingPriority,
-			CurrentPriority:  currentPriority,
-			Depends:          make([]string, 0),
+		mpd := &btcjson.GetMempoolEntryResult{
+			VSize:           int32(GetTxVirtualSize(tx)),
+			Size:            int32(tx.MsgTx().SerializeSize()),
+			Weight:          blockchain.GetTransactionWeight(tx),
+			Fee:             btcutil.Amount(desc.Fee).ToBTC(),
+			ModifiedFee:     btcutil.Amount(desc.Fee).ToBTC(), // TODO, Deprecated
+			Time:            desc.Added.Unix(),
+			Height:          int64(desc.Height),
+			DescendantCount: 1,                                // TODO
+			DescendantSize:  GetTxVirtualSize(tx),             // TODO
+			DescendantFees:  btcutil.Amount(desc.Fee).ToBTC(), // TODO, Deprecated
+			AncestorCount:   1,                                // TODO
+			AncestorSize:    GetTxVirtualSize(tx),             // TODO
+			AncestorFees:    btcutil.Amount(desc.Fee).ToBTC(), // TODO, Deprecated
+			WTxId:           desc.Tx.WitnessHash().String(),
+			Fees: btcjson.MempoolFees{
+				Base:       btcutil.Amount(desc.Fee).ToBTC(),
+				Modified:   btcutil.Amount(desc.Fee).ToBTC(), // TODO
+				Ancestor:   btcutil.Amount(desc.Fee).ToBTC(), // TODO
+				Descendant: btcutil.Amount(desc.Fee).ToBTC(), // TODO
+			},
+			Depends: make([]string, 0), // TODO
+			SpentBy: make([]string, 0), // TODO
 		}
 		for _, txIn := range tx.MsgTx().TxIn {
 			hash := &txIn.PreviousOutPoint.Hash

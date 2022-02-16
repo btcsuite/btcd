@@ -560,7 +560,7 @@ func TestOrphanReject(t *testing.T) {
 
 		// Ensure no transactions were reported as accepted.
 		if len(acceptedTxns) != 0 {
-			t.Fatal("ProcessTransaction: reported %d accepted "+
+			t.Fatalf("ProcessTransaction: reported %d accepted "+
 				"transactions from failed orphan attempt",
 				len(acceptedTxns))
 		}

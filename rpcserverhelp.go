@@ -470,6 +470,34 @@ var helpDescsEnUS = map[string]string{
 	"getmininginforesult-pooledtx":           "Number of transactions in the memory pool",
 	"getmininginforesult-testnet":            "Whether or not server is using testnet",
 
+	"mempoolfees-base":       "Transaction fee in LBC",
+	"mempoolfees-modified":   "Transaction fee with fee deltas used for mining priority in LBC",
+	"mempoolfees-ancestor":   "Modified fees (see above) of in-mempool ancestors (including this one) in LBC",
+	"mempoolfees-descendant": "modified fees (see above) of in-mempool descendants (including this one) in LBC",
+
+	// GetMempoolEntryCmd help.
+	"getmempoolentry--synopsis": "Returns mempool data for given transaction.",
+	"getmempoolentry-txid":      "The hash of the transaction",
+
+	// GetMempoolEntryResult help.
+	"getmempoolentryresult-vsize":           "Virtual transaction size as defined in BIP 141. This is different from actual serialized size for witness transactions as witness data is discounted.",
+	"getmempoolentryresult-size":            "(DEPRECATED) same as vsize. ",
+	"getmempoolentryresult-weight":          "Transaction weight as defined in BIP 141.",
+	"getmempoolentryresult-fee":             "(DEPRECATED)Transaction fee in LBC",
+	"getmempoolentryresult-modifiedfee":     "(DEPRECATED)Transaction fee with fee deltas used for mining priority",
+	"getmempoolentryresult-time":            "Local time transaction entered pool in seconds since 1 Jan 1970 GMT",
+	"getmempoolentryresult-height":          "Block height when transaction entered pool",
+	"getmempoolentryresult-descendantcount": "Number of in-mempool descendant transactions (including this one)",
+	"getmempoolentryresult-descendantsize":  "Virtual transaction size of in-mempool descendants (including this one)",
+	"getmempoolentryresult-descendantfees":  "(DEPRECATED)Modified fees (see above) of in-mempool descendants (including this one)",
+	"getmempoolentryresult-ancestorcount":   "Number of in-mempool ancestor transactions (including this one)",
+	"getmempoolentryresult-ancestorsize":    "Virtual transaction size of in-mempool ancestors (including this one)",
+	"getmempoolentryresult-ancestorfees":    "(DEPRECATED)Modified fees (see above) of in-mempool ancestors (including this one)",
+	"getmempoolentryresult-wtxid":           "hash of serialized transaction, including witness data",
+	"getmempoolentryresult-fees":            "(json object)",
+	"getmempoolentryresult-depends":         "Unconfirmed transactions used as inputs for this transaction",
+	"getmempoolentryresult-spentby":         "Unconfirmed transactions spending outputs from this transaction",
+
 	// GetMiningInfoCmd help.
 	"getmininginfo--synopsis": "Returns a JSON object containing mining-related information.",
 
@@ -872,6 +900,7 @@ var rpcResultTypes = map[string][]interface{}{
 	"gethashespersec":        {(*float64)(nil)},
 	"getheaders":             {(*[]string)(nil)},
 	"getinfo":                {(*btcjson.InfoChainResult)(nil)},
+	"getmempoolentry":        {(*btcjson.GetMempoolEntryResult)(nil)},
 	"getmempoolinfo":         {(*btcjson.GetMempoolInfoResult)(nil)},
 	"getmininginfo":          {(*btcjson.GetMiningInfoResult)(nil)},
 	"getnettotals":           {(*btcjson.GetNetTotalsResult)(nil)},

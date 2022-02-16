@@ -161,6 +161,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"getheaders":             handleGetHeaders,
 	"getinfo":                handleGetInfo,
 	"getmempoolinfo":         handleGetMempoolInfo,
+	"getmempoolentry":        handleGetMempoolEntry,
 	"getmininginfo":          handleGetMiningInfo,
 	"getnettotals":           handleGetNetTotals,
 	"getnetworkhashps":       handleGetNetworkHashPS,
@@ -239,8 +240,6 @@ var rpcAskWallet = map[string]struct{}{
 // Commands that are currently unimplemented, but should ultimately be.
 var rpcUnimplemented = map[string]struct{}{
 	"estimatepriority": {},
-	"getchaintips":     {},
-	"getmempoolentry":  {},
 	"getwork":          {},
 	"preciousblock":    {},
 }
@@ -2481,6 +2480,56 @@ func handleGetMempoolInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct
 	}
 
 	return ret, nil
+}
+
+// handleGetMempoolEntry implements the getmempoolentry command.
+func handleGetMempoolEntry(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+
+	c := cmd.(*btcjson.GetMempoolEntryCmd)
+	txHash, err := chainhash.NewHashFromStr(c.TxID)
+	if err != nil {
+		if err != nil {
+			return nil, rpcDecodeHexError(c.TxID)
+		}
+	}
+
+	mp := s.cfg.TxMemPool
+	for _, desc := range mp.TxDescs() {
+		tx := desc.Tx
+		if tx.Hash().IsEqual(txHash) {
+			continue
+		}
+		desc.Tx.WitnessHash()
+
+		ret := &btcjson.GetMempoolEntryResult{
+			VSize:           int32(mempool.GetTxVirtualSize(tx)),
+			Size:            int32(tx.MsgTx().SerializeSize()),
+			Weight:          blockchain.GetTransactionWeight(tx),
+			Fee:             btcutil.Amount(desc.Fee).ToBTC(),
+			ModifiedFee:     btcutil.Amount(desc.Fee).ToBTC(), // TODO, Deprecated
+			Time:            desc.Added.Unix(),
+			Height:          int64(desc.Height),
+			DescendantCount: 1,                                // TODO
+			DescendantSize:  mempool.GetTxVirtualSize(tx),     // TODO
+			DescendantFees:  btcutil.Amount(desc.Fee).ToBTC(), // TODO, Deprecated
+			AncestorCount:   1,                                // TODO
+			AncestorSize:    mempool.GetTxVirtualSize(tx),     // TODO
+			AncestorFees:    btcutil.Amount(desc.Fee).ToBTC(), // TODO, Deprecated
+			WTxId:           desc.Tx.WitnessHash().String(),
+			Fees: btcjson.MempoolFees{
+				Base:       btcutil.Amount(desc.Fee).ToBTC(),
+				Modified:   btcutil.Amount(desc.Fee).ToBTC(), // TODO
+				Ancestor:   btcutil.Amount(desc.Fee).ToBTC(), // TODO
+				Descendant: btcutil.Amount(desc.Fee).ToBTC(), // TODO
+			},
+			Depends: make([]string, 0), // TODO
+			SpentBy: make([]string, 0), // TODO
+		}
+
+		return ret, nil
+	}
+
+	return nil, rpcNoTxInfoError(txHash)
 }
 
 // handleGetMiningInfo implements the getmininginfo command. We only return the

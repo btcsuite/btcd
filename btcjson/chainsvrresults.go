@@ -323,6 +323,7 @@ type GetMempoolEntryResult struct {
 	WTxId           string      `json:"wtxid"`
 	Fees            MempoolFees `json:"fees"`
 	Depends         []string    `json:"depends"`
+	SpentBy         []string    `json:"spentby"`
 }
 
 // GetChainTipsResult models the data returns from the getchaintips command.
