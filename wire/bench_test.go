@@ -226,7 +226,7 @@ func BenchmarkReadTxOut(b *testing.B) {
 	var txOut TxOut
 	for i := 0; i < b.N; i++ {
 		r.Seek(0, 0)
-		readTxOut(r, 0, 0, &txOut)
+		ReadTxOut(r, 0, 0, &txOut)
 		scriptPool.Return(txOut.PkScript)
 	}
 }

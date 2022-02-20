@@ -10,7 +10,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"io/ioutil"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -192,6 +194,8 @@ func parseScriptFlags(flagStr string) (ScriptFlags, error) {
 			flags |= ScriptVerifyMinimalIf
 		case "WITNESS_PUBKEYTYPE":
 			flags |= ScriptVerifyWitnessPubKeyType
+		case "TAPROOT":
+			flags |= ScriptVerifyTaproot
 		default:
 			return flags, fmt.Errorf("invalid flag: %s", flag)
 		}
@@ -884,5 +888,191 @@ func TestCalcSignatureHash(t *testing.T) {
 			t.Errorf("TestCalcSignatureHash failed test #%d: "+
 				"Signature hash mismatch.", i)
 		}
+	}
+}
+
+type inputWitness struct {
+	ScriptSig string   `json:"scriptSig"`
+	Witness   []string `json:"witness"`
+}
+
+type taprootJsonTest struct {
+	Tx       string   `json:"tx"`
+	Prevouts []string `json:"prevouts"`
+	Index    int      `json:"index"`
+	Flags    string   `json:"flags"`
+
+	Comment string `json:"comment"`
+
+	Success *inputWitness `json:"success"`
+
+	Failure *inputWitness `json:"failure"`
+}
+
+func executeTaprootRefTest(t *testing.T, testCase taprootJsonTest) {
+	t.Helper()
+
+	txHex, err := hex.DecodeString(testCase.Tx)
+	if err != nil {
+		t.Fatalf("unable to decode hex: %v", err)
+	}
+	tx, err := btcutil.NewTxFromBytes(txHex)
+	if err != nil {
+		t.Fatalf("unable to decode hex: %v", err)
+	}
+
+	var prevOut wire.TxOut
+
+	prevOutFetcher := NewMultiPrevOutFetcher(nil)
+	for i, prevOutString := range testCase.Prevouts {
+		prevOutBytes, err := hex.DecodeString(prevOutString)
+		if err != nil {
+			t.Fatalf("unable to decode hex: %v", err)
+		}
+
+		var txOut wire.TxOut
+		err = wire.ReadTxOut(
+			bytes.NewReader(prevOutBytes), 0, 0, &txOut,
+		)
+		if err != nil {
+			t.Fatalf("unable to read utxo: %v", err)
+		}
+
+		prevOutFetcher.AddPrevOut(
+			tx.MsgTx().TxIn[i].PreviousOutPoint, &txOut,
+		)
+
+		if i == testCase.Index {
+			prevOut = txOut
+		}
+	}
+
+	flags, err := parseScriptFlags(testCase.Flags)
+	if err != nil {
+		t.Fatalf("unable to parse flags: %v", err)
+	}
+
+	makeVM := func() *Engine {
+		hashCache := NewTxSigHashes(tx.MsgTx(), prevOutFetcher)
+
+		vm, err := NewEngine(
+			prevOut.PkScript, tx.MsgTx(), testCase.Index,
+			flags, nil, hashCache, prevOut.Value, prevOutFetcher,
+		)
+		if err != nil {
+			t.Fatalf("unable to create vm: %v", err)
+		}
+
+		return vm
+	}
+
+	if testCase.Success != nil {
+		tx.MsgTx().TxIn[testCase.Index].SignatureScript, err = hex.DecodeString(
+			testCase.Success.ScriptSig,
+		)
+		if err != nil {
+			t.Fatalf("unable to parse sig script: %v", err)
+		}
+
+		var witness [][]byte
+		for _, witnessStr := range testCase.Success.Witness {
+			witElem, err := hex.DecodeString(witnessStr)
+			if err != nil {
+				t.Fatalf("unable to parse witness stack: %v", err)
+			}
+
+			witness = append(witness, witElem)
+		}
+
+		tx.MsgTx().TxIn[testCase.Index].Witness = witness
+
+		vm := makeVM()
+
+		err = vm.Execute()
+		if err != nil {
+			t.Fatalf("test (%v) failed to execute: "+
+				"%v", testCase.Comment, err)
+		}
+	}
+
+	if testCase.Failure != nil {
+		tx.MsgTx().TxIn[testCase.Index].SignatureScript, err = hex.DecodeString(
+			testCase.Failure.ScriptSig,
+		)
+		if err != nil {
+			t.Fatalf("unable to parse sig script: %v", err)
+		}
+
+		var witness [][]byte
+		for _, witnessStr := range testCase.Failure.Witness {
+			witElem, err := hex.DecodeString(witnessStr)
+			if err != nil {
+				t.Fatalf("unable to parse witness stack: %v", err)
+			}
+
+			witness = append(witness, witElem)
+		}
+
+		tx.MsgTx().TxIn[testCase.Index].Witness = witness
+
+		vm := makeVM()
+
+		err = vm.Execute()
+		if err == nil {
+			t.Fatalf("test (%v) succeeded, should fail: "+
+				"%v", testCase.Comment, err)
+		}
+	}
+}
+
+// TestTaprootReferenceTests test that we're able to properly validate (success
+// and failure paths for each test) the set of functional generative tests
+// created by the bitcoind project for taproot at:
+// https://github.com/bitcoin/bitcoin/blob/master/test/functional/feature_taproot.py.
+func TestTaprootReferenceTests(t *testing.T) {
+	t.Parallel()
+
+	filePath := "data/taproot-ref"
+
+	testFunc := func(path string, info fs.FileInfo, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+
+		if info.IsDir() {
+			t.Logf("skipping dir: %v", info.Name())
+			return nil
+		}
+
+		testJson, err := ioutil.ReadFile(path)
+		if err != nil {
+			return fmt.Errorf("unable to read file: %v", err)
+		}
+
+		// All the JSON files have a trailing comma and a new line
+		// character, so we'll remove that here before attempting to
+		// parse it.
+		testJson = bytes.TrimSuffix(testJson, []byte(",\n"))
+
+		var testCase taprootJsonTest
+		if err := json.Unmarshal(testJson, &testCase); err != nil {
+			return fmt.Errorf("unable to decode json: %v", err)
+		}
+
+		testName := fmt.Sprintf(
+			"%v:%v", testCase.Comment, filepath.Base(path),
+		)
+		_ = t.Run(testName, func(t *testing.T) {
+			t.Parallel()
+
+			executeTaprootRefTest(t, testCase)
+		})
+
+		return nil
+	}
+
+	err := filepath.Walk(filePath, testFunc)
+	if err != nil {
+		t.Fatalf("unable to execute taproot test vectors: %v", err)
 	}
 }

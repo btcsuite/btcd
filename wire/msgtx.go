@@ -550,7 +550,7 @@ func (msg *MsgTx) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) error
 		// and needs to be returned to the pool on error.
 		to := &txOuts[i]
 		msg.TxOut[i] = to
-		err = readTxOut(r, pver, msg.Version, to)
+		err = ReadTxOut(r, pver, msg.Version, to)
 		if err != nil {
 			returnScriptBuffers()
 			return err
@@ -1005,9 +1005,9 @@ func writeTxIn(w io.Writer, pver uint32, version int32, ti *TxIn) error {
 	return binarySerializer.PutUint32(w, littleEndian, ti.Sequence)
 }
 
-// readTxOut reads the next sequence of bytes from r as a transaction output
+// ReadTxOut reads the next sequence of bytes from r as a transaction output
 // (TxOut).
-func readTxOut(r io.Reader, pver uint32, version int32, to *TxOut) error {
+func ReadTxOut(r io.Reader, pver uint32, version int32, to *TxOut) error {
 	err := readElement(r, &to.Value)
 	if err != nil {
 		return err
