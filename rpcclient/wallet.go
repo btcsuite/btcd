@@ -2161,7 +2161,7 @@ func (c *Client) WalletLock() error {
 // (in seconds).
 func (c *Client) WalletPassphrase(passphrase string, timeoutSecs int64) error {
 	cmd := btcjson.NewWalletPassphraseCmd(passphrase, timeoutSecs)
-	_, err := c.sendCmdAndWait(cmd)
+	_, err := c.SendCmdAndWait(cmd)
 	return err
 }
 
