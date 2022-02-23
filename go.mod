@@ -1,6 +1,7 @@
 module github.com/dashevo/dashd-go
 
 require (
+	github.com/btcsuite/btcd v0.22.0-beta.0.20220111032746-97732e52810c
 	github.com/btcsuite/btcd/btcec/v2 v2.1.0
 	github.com/btcsuite/btcd/btcutil v1.1.0
 	github.com/btcsuite/btclog v0.0.0-20170628155309-84c8d2346e9f
@@ -19,8 +20,13 @@ require (
 	github.com/aead/siphash v1.0.1 // indirect
 	github.com/btcsuite/snappy-go v1.0.0 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.0.1 // indirect
+	github.com/hpcloud/tail v1.0.0 // indirect
 	github.com/kkdai/bstream v0.0.0-20161212061736-f391b8402d23 // indirect
+	gopkg.in/fsnotify.v1 v1.4.7 // indirect
+	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
 )
+
+replace github.com/btcsuite/btcd => ./
 
 replace github.com/btcsuite/btcd/btcutil => ./btcutil
 
@@ -57,7 +63,5 @@ retract (
 	v0.13.0-beta2
 	v0.13.0-beta
 )
-
-replace github.com/btcsuite/btcd => ./
 
 go 1.17

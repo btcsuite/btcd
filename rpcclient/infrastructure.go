@@ -997,10 +997,10 @@ func (c *Client) SendCmd(cmd interface{}) chan *Response {
 	return responseChan
 }
 
-// sendCmdAndWait sends the passed command to the associated server, waits
+// SendCmdAndWait sends the passed command to the associated server, waits
 // for the reply, and returns the result from it.  It will return the error
 // field in the reply if there is one.
-func (c *Client) sendCmdAndWait(cmd interface{}) (interface{}, error) {
+func (c *Client) SendCmdAndWait(cmd interface{}) (interface{}, error) {
 	// Marshal the command to JSON-RPC, send it to the connected server, and
 	// wait for a response on the returned channel.
 	return ReceiveFuture(c.SendCmd(cmd))

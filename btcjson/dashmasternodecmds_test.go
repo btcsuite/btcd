@@ -54,7 +54,7 @@ func TestDashMasternodeCmds(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			// Marshal the command as created by the new static command
 			// creation function.
-			marshalled, err := btcjson.MarshalCmd(testID, test.staticCmd())
+			marshalled, err := btcjson.MarshalCmd(btcjson.RpcVersion1, testID, test.staticCmd())
 			if err != nil {
 				t.Fatalf("MarshalCmd unexpected error: %v", err)
 			}
@@ -73,7 +73,7 @@ func TestDashMasternodeCmds(t *testing.T) {
 
 			// Marshal the command as created by the generic new command
 			// creation function.
-			marshalled, err = btcjson.MarshalCmd(testID, cmd)
+			marshalled, err = btcjson.MarshalCmd(btcjson.RpcVersion1, testID, cmd)
 			if err != nil {
 				t.Fatalf("MarshalCmd unexpected error: %v", err)
 			}
