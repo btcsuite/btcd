@@ -768,13 +768,20 @@ func (c *Client) handleSendPostMessage(jReq *jsonRequest) {
 	}
 	url := protocol + "://" + c.config.Host
 
-	var err error
+	// Configure basic access authorization.
+	user, pass, err := c.config.getAuth()
+	if err != nil {
+		jReq.responseChan <- &Response{result: nil, err: err}
+		return
+	}
+
 	var backoff time.Duration
 	var httpResponse *http.Response
+	var httpReq *http.Request
 	tries := 10
-	for i := 0; tries == 0 || i < tries; i++ {
+	for i := 0; i < tries; i++ {
 		bodyReader := bytes.NewReader(jReq.marshalledJSON)
-		httpReq, err := http.NewRequest("POST", url, bodyReader)
+		httpReq, err = http.NewRequest("POST", url, bodyReader)
 		if err != nil {
 			jReq.responseChan <- &Response{result: nil, err: err}
 			return
@@ -785,14 +792,7 @@ func (c *Client) handleSendPostMessage(jReq *jsonRequest) {
 			httpReq.Header.Set(key, value)
 		}
 
-		// Configure basic access authorization.
-		user, pass, err := c.config.getAuth()
-		if err != nil {
-			jReq.responseChan <- &Response{result: nil, err: err}
-			return
-		}
 		httpReq.SetBasicAuth(user, pass)
-
 		httpResponse, err = c.httpClient.Do(httpReq)
 		if err != nil {
 			backoff = requestRetryInterval * time.Duration(i+1)
