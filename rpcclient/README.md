@@ -1,9 +1,9 @@
 rpcclient
 =========
 
-[![Build Status](http://img.shields.io/travis/dashevo/dashd-go.svg)](https://travis-ci.org/dashevo/dashd-go)
+[![Build Status](https://github.com/dashevo/dashd-go/workflows/Build%20and%20Test/badge.svg)](https://github.com/btcsuite/btcd/actions)
 [![ISC License](http://img.shields.io/badge/license-ISC-blue.svg)](http://copyfree.org)
-[![GoDoc](https://img.shields.io/badge/godoc-reference-blue.svg)](http://godoc.org/github.com/btcsuite/btcd/rpcclient)
+[![GoDoc](https://img.shields.io/badge/godoc-reference-blue.svg)](https://pkg.go.dev/github.com/btcsuite/btcd/rpcclient)
 
 rpcclient implements a Websocket-enabled Dash JSON-RPC client package written
 in [Go](http://golang.org/).  It provides a robust and easy to use client for
@@ -18,8 +18,8 @@ implement and the API is not stable yet.
 
 ## Documentation
 
-* [API Reference](http://godoc.org/github.com/btcsuite/btcd/rpcclient)
-* [dashd-go Websockets Example](https://github.com/btcsuite/btcd/tree/master/rpcclient/examples/dashdwebsockets)
+* [API Reference](https://pkg.go.dev/github.com/btcsuite/btcd/rpcclient)
+* [dashd-go Websockets Example](https://github.com/btcsuite/btcd/tree/master/rpcclient/examples/btcdwebsockets)
   Connects to a dashd-go RPC server using TLS-secured websockets, registers for
   block connected and block disconnected notifications, and gets the current
   block count

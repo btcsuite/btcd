@@ -1,9 +1,9 @@
 indexers
 ========
 
-[![Build Status](https://travis-ci.org/dashevo/dashd-go.png?branch=master)](https://travis-ci.org/dashevo/dashd-go)
+[![Build Status](https://github.com/dashevo/dashd-go/workflows/Build%20and%20Test/badge.svg)](https://github.com/btcsuite/btcd/actions)
 [![ISC License](http://img.shields.io/badge/license-ISC-blue.svg)](http://copyfree.org)
-[![GoDoc](https://godoc.org/github.com/btcsuite/btcd/blockchain/indexers?status.png)](http://godoc.org/github.com/btcsuite/btcd/blockchain/indexers)
+[![GoDoc](https://pkg.go.dev/github.com/btcsuite/btcd/blockchain/indexers?status.png)](https://pkg.go.dev/github.com/btcsuite/btcd/blockchain/indexers)
 
 Package indexers implements optional block chain indexes.
 

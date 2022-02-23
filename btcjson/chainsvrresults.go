@@ -11,8 +11,8 @@ import (
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 
+	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil"
 )
 
 // GetBlockHeaderVerboseResult models the data from the getblockheader command when
@@ -172,12 +172,13 @@ type SoftForkDescription struct {
 // Bip9SoftForkDescription describes the current state of a defined BIP0009
 // version bits soft-fork.
 type Bip9SoftForkDescription struct {
-	Status     string `json:"status"`
-	Bit        uint8  `json:"bit"`
-	StartTime1 int64  `json:"startTime"`
-	StartTime2 int64  `json:"start_time"`
-	Timeout    int64  `json:"timeout"`
-	Since      int32  `json:"since"`
+	Status              string `json:"status"`
+	Bit                 uint8  `json:"bit"`
+	StartTime1          int64  `json:"startTime"`
+	StartTime2          int64  `json:"start_time"`
+	Timeout             int64  `json:"timeout"`
+	Since               int32  `json:"since"`
+	MinActivationHeight int32  `json:"min_activation_height"`
 }
 
 // StartTime returns the starting time of the softfork as a Unix epoch.
@@ -712,7 +713,7 @@ type TxRawResult struct {
 	Size          int32  `json:"size,omitempty"`
 	Vsize         int32  `json:"vsize,omitempty"`
 	Weight        int32  `json:"weight,omitempty"`
-	Version       int32  `json:"version"`
+	Version       uint32 `json:"version"`
 	LockTime      uint32 `json:"locktime"`
 	Vin           []Vin  `json:"vin"`
 	Vout          []Vout `json:"vout"`

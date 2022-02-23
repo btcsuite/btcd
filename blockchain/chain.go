@@ -11,12 +11,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil"
 )
 
 const (
@@ -1755,6 +1755,20 @@ func New(config *Config) (*BlockChain, error) {
 		prevOrphans:         make(map[chainhash.Hash][]*orphanBlock),
 		warningCaches:       newThresholdCaches(vbNumBits),
 		deploymentCaches:    newThresholdCaches(chaincfg.DefinedDeployments),
+	}
+
+	// Ensure all the deployments are synchronized with our clock if
+	// needed.
+	for _, deployment := range b.chainParams.Deployments {
+		deploymentStarter := deployment.DeploymentStarter
+		if clockStarter, ok := deploymentStarter.(chaincfg.ClockConsensusDeploymentStarter); ok {
+			clockStarter.SynchronizeClock(&b)
+		}
+
+		deploymentEnder := deployment.DeploymentEnder
+		if clockEnder, ok := deploymentEnder.(chaincfg.ClockConsensusDeploymentEnder); ok {
+			clockEnder.SynchronizeClock(&b)
+		}
 	}
 
 	// Initialize the chain state from the passed database.  When the db

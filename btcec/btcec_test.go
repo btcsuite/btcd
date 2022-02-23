@@ -15,17 +15,17 @@ import (
 
 // isJacobianOnS256Curve returns boolean if the point (x,y,z) is on the
 // secp256k1 curve.
-func isJacobianOnS256Curve(x, y, z *fieldVal) bool {
+func isJacobianOnS256Curve(point *JacobianPoint) bool {
 	// Elliptic curve equation for secp256k1 is: y^2 = x^3 + 7
 	// In Jacobian coordinates, Y = y/z^3 and X = x/z^2
 	// Thus:
 	// (y/z^3)^2 = (x/z^2)^3 + 7
 	// y^2/z^6 = x^3/z^6 + 7
 	// y^2 = x^3 + 7*z^6
-	var y2, z2, x3, result fieldVal
-	y2.SquareVal(y).Normalize()
-	z2.SquareVal(z)
-	x3.SquareVal(x).Mul(x)
+	var y2, z2, x3, result FieldVal
+	y2.SquareVal(&point.Y).Normalize()
+	z2.SquareVal(&point.Z)
+	x3.SquareVal(&point.X).Mul(&point.X)
 	result.SquareVal(&z2).Mul(&z2).MulInt(7).Add(&x3).Normalize()
 	return y2.Equals(&result)
 }
@@ -222,43 +222,37 @@ func TestAddJacobian(t *testing.T) {
 
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
-		// Convert hex to field values.
-		x1 := new(fieldVal).SetHex(test.x1)
-		y1 := new(fieldVal).SetHex(test.y1)
-		z1 := new(fieldVal).SetHex(test.z1)
-		x2 := new(fieldVal).SetHex(test.x2)
-		y2 := new(fieldVal).SetHex(test.y2)
-		z2 := new(fieldVal).SetHex(test.z2)
-		x3 := new(fieldVal).SetHex(test.x3)
-		y3 := new(fieldVal).SetHex(test.y3)
-		z3 := new(fieldVal).SetHex(test.z3)
+		// Convert hex to Jacobian points.
+		p1 := jacobianPointFromHex(test.x1, test.y1, test.z1)
+		p2 := jacobianPointFromHex(test.x2, test.y2, test.z2)
+		want := jacobianPointFromHex(test.x3, test.y3, test.z3)
 
 		// Ensure the test data is using points that are actually on
 		// the curve (or the point at infinity).
-		if !z1.IsZero() && !isJacobianOnS256Curve(x1, y1, z1) {
+		if !p1.Z.IsZero() && !isJacobianOnS256Curve(&p1) {
 			t.Errorf("#%d first point is not on the curve -- "+
 				"invalid test data", i)
 			continue
 		}
-		if !z2.IsZero() && !isJacobianOnS256Curve(x2, y2, z2) {
+		if !p2.Z.IsZero() && !isJacobianOnS256Curve(&p2) {
 			t.Errorf("#%d second point is not on the curve -- "+
 				"invalid test data", i)
 			continue
 		}
-		if !z3.IsZero() && !isJacobianOnS256Curve(x3, y3, z3) {
+		if !want.Z.IsZero() && !isJacobianOnS256Curve(&want) {
 			t.Errorf("#%d expected point is not on the curve -- "+
 				"invalid test data", i)
 			continue
 		}
 
 		// Add the two points.
-		rx, ry, rz := new(fieldVal), new(fieldVal), new(fieldVal)
-		S256().addJacobian(x1, y1, z1, x2, y2, z2, rx, ry, rz)
+		var r JacobianPoint
+		AddNonConst(&p1, &p2, &r)
 
 		// Ensure result matches expected.
-		if !rx.Equals(x3) || !ry.Equals(y3) || !rz.Equals(z3) {
+		if !r.X.Equals(&want.X) || !r.Y.Equals(&want.Y) || !r.Z.Equals(&want.Z) {
 			t.Errorf("#%d wrong result\ngot: (%v, %v, %v)\n"+
-				"want: (%v, %v, %v)", i, rx, ry, rz, x3, y3, z3)
+				"want: (%v, %v, %v)", i, r.X, r.Y, r.Z, want.X, want.Y, want.Z)
 			continue
 		}
 	}
@@ -360,6 +354,15 @@ func TestAddAffine(t *testing.T) {
 	}
 }
 
+// isStrictlyEqual returns whether or not the two Jacobian points are strictly
+// equal for use in the tests.  Recall that several Jacobian points can be
+// equal in affine coordinates, while not having the same coordinates in
+// projective space, so the two points not being equal doesn't necessarily mean
+// they aren't actually the same affine point.
+func isStrictlyEqual(p, other *JacobianPoint) bool {
+	return p.X.Equals(&other.X) && p.Y.Equals(&other.Y) && p.Z.Equals(&other.Z)
+}
+
 // TestDoubleJacobian tests doubling of points projected in Jacobian
 // coordinates.
 func TestDoubleJacobian(t *testing.T) {
@@ -408,34 +411,31 @@ func TestDoubleJacobian(t *testing.T) {
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
 		// Convert hex to field values.
-		x1 := new(fieldVal).SetHex(test.x1)
-		y1 := new(fieldVal).SetHex(test.y1)
-		z1 := new(fieldVal).SetHex(test.z1)
-		x3 := new(fieldVal).SetHex(test.x3)
-		y3 := new(fieldVal).SetHex(test.y3)
-		z3 := new(fieldVal).SetHex(test.z3)
+		p1 := jacobianPointFromHex(test.x1, test.y1, test.z1)
+		want := jacobianPointFromHex(test.x3, test.y3, test.z3)
 
 		// Ensure the test data is using points that are actually on
 		// the curve (or the point at infinity).
-		if !z1.IsZero() && !isJacobianOnS256Curve(x1, y1, z1) {
+		if !p1.Z.IsZero() && !isJacobianOnS256Curve(&p1) {
 			t.Errorf("#%d first point is not on the curve -- "+
 				"invalid test data", i)
 			continue
 		}
-		if !z3.IsZero() && !isJacobianOnS256Curve(x3, y3, z3) {
+		if !want.Z.IsZero() && !isJacobianOnS256Curve(&want) {
 			t.Errorf("#%d expected point is not on the curve -- "+
 				"invalid test data", i)
 			continue
 		}
 
 		// Double the point.
-		rx, ry, rz := new(fieldVal), new(fieldVal), new(fieldVal)
-		S256().doubleJacobian(x1, y1, z1, rx, ry, rz)
+		var result JacobianPoint
+		DoubleNonConst(&p1, &result)
 
 		// Ensure result matches expected.
-		if !rx.Equals(x3) || !ry.Equals(y3) || !rz.Equals(z3) {
+		if !isStrictlyEqual(&result, &want) {
 			t.Errorf("#%d wrong result\ngot: (%v, %v, %v)\n"+
-				"want: (%v, %v, %v)", i, rx, ry, rz, x3, y3, z3)
+				"want: (%v, %v, %v)", i, result.X, result.Y, result.Z,
+				want.X, want.Y, want.Z)
 			continue
 		}
 	}
@@ -663,6 +663,64 @@ func TestScalarMultRand(t *testing.T) {
 	}
 }
 
+var (
+	// Next 6 constants are from Hal Finney's bitcointalk.org post:
+	// https://bitcointalk.org/index.php?topic=3238.msg45565#msg45565
+	// May he rest in peace.
+	//
+	// They have also been independently derived from the code in the
+	// EndomorphismVectors function in genstatics.go.
+	endomorphismLambda = fromHex("5363ad4cc05c30e0a5261c028812645a122e22ea20816678df02967c1b23bd72")
+	endomorphismBeta   = hexToFieldVal("7ae96a2b657c07106e64479eac3434e99cf0497512f58995c1396c28719501ee")
+	endomorphismA1     = fromHex("3086d221a7d46bcde86c90e49284eb15")
+	endomorphismB1     = fromHex("-e4437ed6010e88286f547fa90abfe4c3")
+	endomorphismA2     = fromHex("114ca50f7a8e2f3f657c1108d9d44cfd8")
+	endomorphismB2     = fromHex("3086d221a7d46bcde86c90e49284eb15")
+)
+
+// splitK returns a balanced length-two representation of k and their signs.
+// This is algorithm 3.74 from [GECC].
+//
+// One thing of note about this algorithm is that no matter what c1 and c2 are,
+// the final equation of k = k1 + k2 * lambda (mod n) will hold.  This is
+// provable mathematically due to how a1/b1/a2/b2 are computed.
+//
+// c1 and c2 are chosen to minimize the max(k1,k2).
+func splitK(k []byte) ([]byte, []byte, int, int) {
+	// All math here is done with big.Int, which is slow.
+	// At some point, it might be useful to write something similar to
+	// FieldVal but for N instead of P as the prime field if this ends up
+	// being a bottleneck.
+	bigIntK := new(big.Int)
+	c1, c2 := new(big.Int), new(big.Int)
+	tmp1, tmp2 := new(big.Int), new(big.Int)
+	k1, k2 := new(big.Int), new(big.Int)
+
+	bigIntK.SetBytes(k)
+	// c1 = round(b2 * k / n) from step 4.
+	// Rounding isn't really necessary and costs too much, hence skipped
+	c1.Mul(endomorphismB2, bigIntK)
+	c1.Div(c1, Params().N)
+	// c2 = round(b1 * k / n) from step 4 (sign reversed to optimize one step)
+	// Rounding isn't really necessary and costs too much, hence skipped
+	c2.Mul(endomorphismB1, bigIntK)
+	c2.Div(c2, Params().N)
+	// k1 = k - c1 * a1 - c2 * a2 from step 5 (note c2's sign is reversed)
+	tmp1.Mul(c1, endomorphismA1)
+	tmp2.Mul(c2, endomorphismA2)
+	k1.Sub(bigIntK, tmp1)
+	k1.Add(k1, tmp2)
+	// k2 = - c1 * b1 - c2 * b2 from step 5 (note c2's sign is reversed)
+	tmp1.Mul(c1, endomorphismB1)
+	tmp2.Mul(c2, endomorphismB2)
+	k2.Sub(tmp2, tmp1)
+
+	// Note Bytes() throws out the sign of k1 and k2. This matters
+	// since k1 and/or k2 can be negative. Hence, we pass that
+	// back separately.
+	return k1.Bytes(), k2.Bytes(), k1.Sign(), k2.Sign()
+}
+
 func TestSplitK(t *testing.T) {
 	tests := []struct {
 		k      string
@@ -719,7 +777,7 @@ func TestSplitK(t *testing.T) {
 		if !ok {
 			t.Errorf("%d: bad value for k: %s", i, test.k)
 		}
-		k1, k2, k1Sign, k2Sign := s256.splitK(k.Bytes())
+		k1, k2, k1Sign, k2Sign := splitK(k.Bytes())
 		k1str := fmt.Sprintf("%064x", k1)
 		if test.k1 != k1str {
 			t.Errorf("%d: bad k1: got %v, want %v", i, k1str, test.k1)
@@ -740,7 +798,7 @@ func TestSplitK(t *testing.T) {
 		k2Int := new(big.Int).SetBytes(k2)
 		k2SignInt := new(big.Int).SetInt64(int64(k2Sign))
 		k2Int.Mul(k2Int, k2SignInt)
-		gotK := new(big.Int).Mul(k2Int, s256.lambda)
+		gotK := new(big.Int).Mul(k2Int, endomorphismLambda)
 		gotK.Add(k1Int, gotK)
 		gotK.Mod(gotK, s256.N)
 		if k.Cmp(gotK) != 0 {
@@ -759,14 +817,14 @@ func TestSplitKRand(t *testing.T) {
 			break
 		}
 		k := new(big.Int).SetBytes(bytesK)
-		k1, k2, k1Sign, k2Sign := s256.splitK(bytesK)
+		k1, k2, k1Sign, k2Sign := splitK(bytesK)
 		k1Int := new(big.Int).SetBytes(k1)
 		k1SignInt := new(big.Int).SetInt64(int64(k1Sign))
 		k1Int.Mul(k1Int, k1SignInt)
 		k2Int := new(big.Int).SetBytes(k2)
 		k2SignInt := new(big.Int).SetInt64(int64(k2Sign))
 		k2Int.Mul(k2Int, k2SignInt)
-		gotK := new(big.Int).Mul(k2Int, s256.lambda)
+		gotK := new(big.Int).Mul(k2Int, endomorphismLambda)
 		gotK.Add(k1Int, gotK)
 		gotK.Mod(gotK, s256.N)
 		if k.Cmp(gotK) != 0 {
@@ -778,12 +836,13 @@ func TestSplitKRand(t *testing.T) {
 // Test this curve's usage with the ecdsa package.
 
 func testKeyGeneration(t *testing.T, c *KoblitzCurve, tag string) {
-	priv, err := NewPrivateKey(c)
+	priv, err := NewPrivateKey()
 	if err != nil {
 		t.Errorf("%s: error: %s", tag, err)
 		return
 	}
-	if !c.IsOnCurve(priv.PublicKey.X, priv.PublicKey.Y) {
+	pub := priv.PubKey()
+	if !c.IsOnCurve(pub.X(), pub.Y()) {
 		t.Errorf("%s: public key invalid: %s", tag, err)
 	}
 }
@@ -792,98 +851,41 @@ func TestKeyGeneration(t *testing.T) {
 	testKeyGeneration(t, S256(), "S256")
 }
 
-func testSignAndVerify(t *testing.T, c *KoblitzCurve, tag string) {
-	priv, _ := NewPrivateKey(c)
-	pub := priv.PubKey()
-
-	hashed := []byte("testing")
-	sig, err := priv.Sign(hashed)
-	if err != nil {
-		t.Errorf("%s: error signing: %s", tag, err)
-		return
+// checkNAFEncoding returns an error if the provided positive and negative
+// portions of an overall NAF encoding do not adhere to the requirements or they
+// do not sum back to the provided original value.
+func checkNAFEncoding(pos, neg []byte, origValue *big.Int) error {
+	// NAF must not have a leading zero byte and the number of negative
+	// bytes must not exceed the positive portion.
+	if len(pos) > 0 && pos[0] == 0 {
+		return fmt.Errorf("positive has leading zero -- got %x", pos)
+	}
+	if len(neg) > len(pos) {
+		return fmt.Errorf("negative has len %d > pos len %d", len(neg),
+			len(pos))
 	}
 
-	if !sig.Verify(hashed, pub) {
-		t.Errorf("%s: Verify failed", tag)
-	}
-
-	hashed[0] ^= 0xff
-	if sig.Verify(hashed, pub) {
-		t.Errorf("%s: Verify always works!", tag)
-	}
-}
-
-func TestSignAndVerify(t *testing.T) {
-	testSignAndVerify(t, S256(), "S256")
-}
-
-func TestNAF(t *testing.T) {
-	tests := []string{
-		"6df2b5d30854069ccdec40ae022f5c948936324a4e9ebed8eb82cfd5a6b6d766",
-		"b776e53fb55f6b006a270d42d64ec2b1",
-		"d6cc32c857f1174b604eefc544f0c7f7",
-		"45c53aa1bb56fcd68c011e2dad6758e4",
-		"a2e79d200f27f2360fba57619936159b",
-	}
-	negOne := big.NewInt(-1)
-	one := big.NewInt(1)
-	two := big.NewInt(2)
-	for i, test := range tests {
-		want, _ := new(big.Int).SetString(test, 16)
-		nafPos, nafNeg := NAF(want.Bytes())
-		got := big.NewInt(0)
-		// Check that the NAF representation comes up with the right number
-		for i := 0; i < len(nafPos); i++ {
-			bytePos := nafPos[i]
-			byteNeg := nafNeg[i]
-			for j := 7; j >= 0; j-- {
-				got.Mul(got, two)
-				if bytePos&0x80 == 0x80 {
-					got.Add(got, one)
-				} else if byteNeg&0x80 == 0x80 {
-					got.Add(got, negOne)
-				}
-				bytePos <<= 1
-				byteNeg <<= 1
-			}
+	// Ensure the result doesn't have any adjacent non-zero digits.
+	gotPos := new(big.Int).SetBytes(pos)
+	gotNeg := new(big.Int).SetBytes(neg)
+	posOrNeg := new(big.Int).Or(gotPos, gotNeg)
+	prevBit := posOrNeg.Bit(0)
+	for bit := 1; bit < posOrNeg.BitLen(); bit++ {
+		thisBit := posOrNeg.Bit(bit)
+		if prevBit == 1 && thisBit == 1 {
+			return fmt.Errorf("adjacent non-zero digits found at bit pos %d",
+				bit-1)
 		}
-		if got.Cmp(want) != 0 {
-			t.Errorf("%d: Failed NAF got %X want %X", i, got, want)
-		}
+		prevBit = thisBit
 	}
-}
 
-func TestNAFRand(t *testing.T) {
-	negOne := big.NewInt(-1)
-	one := big.NewInt(1)
-	two := big.NewInt(2)
-	for i := 0; i < 1024; i++ {
-		data := make([]byte, 32)
-		_, err := rand.Read(data)
-		if err != nil {
-			t.Fatalf("failed to read random data at %d", i)
-			break
-		}
-		nafPos, nafNeg := NAF(data)
-		want := new(big.Int).SetBytes(data)
-		got := big.NewInt(0)
-		// Check that the NAF representation comes up with the right number
-		for i := 0; i < len(nafPos); i++ {
-			bytePos := nafPos[i]
-			byteNeg := nafNeg[i]
-			for j := 7; j >= 0; j-- {
-				got.Mul(got, two)
-				if bytePos&0x80 == 0x80 {
-					got.Add(got, one)
-				} else if byteNeg&0x80 == 0x80 {
-					got.Add(got, negOne)
-				}
-				bytePos <<= 1
-				byteNeg <<= 1
-			}
-		}
-		if got.Cmp(want) != 0 {
-			t.Errorf("%d: Failed NAF got %X want %X", i, got, want)
-		}
+	// Ensure the resulting positive and negative portions of the overall
+	// NAF representation sum back to the original value.
+	gotValue := new(big.Int).Sub(gotPos, gotNeg)
+	if origValue.Cmp(gotValue) != 0 {
+		return fmt.Errorf("pos-neg is not original value: got %x, want %x",
+			gotValue, origValue)
 	}
+
+	return nil
 }

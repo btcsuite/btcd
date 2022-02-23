@@ -11,7 +11,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/btcsuite/btcutil"
+	"github.com/btcsuite/btcd/btcjson"
+	"github.com/btcsuite/btcd/btcutil"
 	"github.com/dashevo/dashd-go/btcjson"
 )
 
@@ -1800,7 +1801,7 @@ func TestWalletSvrCmds(t *testing.T) {
 	for i, test := range tests {
 		// Marshal the command as created by the new static command
 		// creation function.
-		marshalled, err := btcjson.MarshalCmd(testID, test.staticCmd())
+		marshalled, err := btcjson.MarshalCmd(btcjson.RpcVersion1, testID, test.staticCmd())
 		if err != nil {
 			t.Errorf("MarshalCmd #%d (%s) unexpected error: %v", i,
 				test.name, err)
@@ -1824,7 +1825,7 @@ func TestWalletSvrCmds(t *testing.T) {
 
 		// Marshal the command as created by the generic new command
 		// creation function.
-		marshalled, err = btcjson.MarshalCmd(testID, cmd)
+		marshalled, err = btcjson.MarshalCmd(btcjson.RpcVersion1, testID, cmd)
 		if err != nil {
 			t.Errorf("MarshalCmd #%d (%s) unexpected error: %v", i,
 				test.name, err)

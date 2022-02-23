@@ -30,7 +30,7 @@ import (
 // AddrManager provides a concurrency safe address manager for caching potential
 // peers on the bitcoin network.
 type AddrManager struct {
-	mtx            sync.Mutex
+	mtx            sync.RWMutex
 	peersFile      string
 	lookupFunc     func(string) ([]net.IP, error)
 	rand           *rand.Rand
@@ -176,7 +176,7 @@ func (a *AddrManager) updateAddress(netAddr, srcAddr *wire.NetAddress) {
 		// TODO: only update addresses periodically.
 		// Update the last seen time and services.
 		// note that to prevent causing excess garbage on getaddr
-		// messages the netaddresses in addrmaanger are *immutable*,
+		// messages the netaddresses in addrmanager are *immutable*,
 		// if we need to change them then we replace the pointer with a
 		// new copy so that we don't have to copy every na for getaddr.
 		if netAddr.Timestamp.After(ka.na.Timestamp) ||
@@ -186,7 +186,9 @@ func (a *AddrManager) updateAddress(netAddr, srcAddr *wire.NetAddress) {
 			naCopy := *ka.na
 			naCopy.Timestamp = netAddr.Timestamp
 			naCopy.AddService(netAddr.Services)
+			ka.mtx.Lock()
 			ka.na = &naCopy
+			ka.mtx.Unlock()
 		}
 
 		// If already in tried, we have nothing to do here.
@@ -645,8 +647,8 @@ func (a *AddrManager) numAddresses() int {
 
 // NumAddresses returns the number of addresses known to the address manager.
 func (a *AddrManager) NumAddresses() int {
-	a.mtx.Lock()
-	defer a.mtx.Unlock()
+	a.mtx.RLock()
+	defer a.mtx.RUnlock()
 
 	return a.numAddresses()
 }
@@ -654,8 +656,8 @@ func (a *AddrManager) NumAddresses() int {
 // NeedMoreAddresses returns whether or not the address manager needs more
 // addresses.
 func (a *AddrManager) NeedMoreAddresses() bool {
-	a.mtx.Lock()
-	defer a.mtx.Unlock()
+	a.mtx.RLock()
+	defer a.mtx.RUnlock()
 
 	return a.numAddresses() < needAddressThreshold
 }
@@ -685,8 +687,8 @@ func (a *AddrManager) AddressCache() []*wire.NetAddress {
 // getAddresses returns all of the addresses currently found within the
 // manager's address cache.
 func (a *AddrManager) getAddresses() []*wire.NetAddress {
-	a.mtx.Lock()
-	defer a.mtx.Unlock()
+	a.mtx.RLock()
+	defer a.mtx.RUnlock()
 
 	addrIndexLen := len(a.addrIndex)
 	if addrIndexLen == 0 {
@@ -857,8 +859,11 @@ func (a *AddrManager) Attempt(addr *wire.NetAddress) {
 		return
 	}
 	// set last tried time to now
+	now := time.Now()
+	ka.mtx.Lock()
 	ka.attempts++
-	ka.lastattempt = time.Now()
+	ka.lastattempt = now
+	ka.mtx.Unlock()
 }
 
 // Connected Marks the given address as currently connected and working at the
@@ -880,7 +885,9 @@ func (a *AddrManager) Connected(addr *wire.NetAddress) {
 		// ka.na is immutable, so replace it.
 		naCopy := *ka.na
 		naCopy.Timestamp = time.Now()
+		ka.mtx.Lock()
 		ka.na = &naCopy
+		ka.mtx.Unlock()
 	}
 }
 
@@ -899,11 +906,13 @@ func (a *AddrManager) Good(addr *wire.NetAddress) {
 	// ka.Timestamp is not updated here to avoid leaking information
 	// about currently connected peers.
 	now := time.Now()
+	ka.mtx.Lock()
 	ka.lastsuccess = now
 	ka.lastattempt = now
 	ka.attempts = 0
+	ka.mtx.Unlock() // tried and refs synchronized via a.mtx
 
-	// move to tried set, optionally evicting other addresses if neeed.
+	// move to tried set, optionally evicting other addresses if need.
 	if ka.tried {
 		return
 	}
@@ -988,7 +997,9 @@ func (a *AddrManager) SetServices(addr *wire.NetAddress, services wire.ServiceFl
 		// ka.na is immutable, so replace it.
 		naCopy := *ka.na
 		naCopy.Services = services
+		ka.mtx.Lock()
 		ka.na = &naCopy
+		ka.mtx.Unlock()
 	}
 }
 

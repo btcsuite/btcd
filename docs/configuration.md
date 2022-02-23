@@ -1,6 +1,6 @@
 # Configuration
 
-btcd has a number of [configuration](http://godoc.org/github.com/btcsuite/btcd)
+btcd has a number of [configuration](https://pkg.go.dev/github.com/btcsuite/btcd)
 options, which can be viewed by running: `$ btcd --help`.
 
 ## Peer server listen interface

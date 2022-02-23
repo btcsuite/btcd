@@ -2,7 +2,7 @@
 
 ## IRC
 
-* [irc.freenode.net](irc://irc.freenode.net), channel `#btcd`
+* [irc.libera.chat](irc://irc.libera.chat), channel `#btcd`
 
 ## Mailing Lists
 

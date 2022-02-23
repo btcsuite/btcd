@@ -460,7 +460,7 @@ func TestMarshalCmd(t *testing.T) {
 
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
-		bytes, err := btcjson.MarshalCmd(test.id, test.cmd)
+		bytes, err := btcjson.MarshalCmd(btcjson.RpcVersion1, test.id, test.cmd)
 		if err != nil {
 			t.Errorf("Test #%d (%s) wrong error - got %T (%v)",
 				i, test.name, err, err)
@@ -507,7 +507,7 @@ func TestMarshalCmdErrors(t *testing.T) {
 
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
-		_, err := btcjson.MarshalCmd(test.id, test.cmd)
+		_, err := btcjson.MarshalCmd(btcjson.RpcVersion1, test.id, test.cmd)
 		if reflect.TypeOf(err) != reflect.TypeOf(test.err) {
 			t.Errorf("Test #%d (%s) wrong error - got %T (%v), "+
 				"want %T", i, test.name, err, err, test.err)
@@ -535,7 +535,7 @@ func TestUnmarshalCmdErrors(t *testing.T) {
 		{
 			name: "unregistered type",
 			request: btcjson.Request{
-				Jsonrpc: "1.0",
+				Jsonrpc: btcjson.RpcVersion1,
 				Method:  "bogusmethod",
 				Params:  nil,
 				ID:      nil,
@@ -545,7 +545,7 @@ func TestUnmarshalCmdErrors(t *testing.T) {
 		{
 			name: "incorrect number of params",
 			request: btcjson.Request{
-				Jsonrpc: "1.0",
+				Jsonrpc: btcjson.RpcVersion1,
 				Method:  "getblockcount",
 				Params:  []json.RawMessage{[]byte(`"bogusparam"`)},
 				ID:      nil,
@@ -555,7 +555,7 @@ func TestUnmarshalCmdErrors(t *testing.T) {
 		{
 			name: "invalid type for a parameter",
 			request: btcjson.Request{
-				Jsonrpc: "1.0",
+				Jsonrpc: btcjson.RpcVersion1,
 				Method:  "getblock",
 				Params:  []json.RawMessage{[]byte("1")},
 				ID:      nil,
@@ -565,7 +565,7 @@ func TestUnmarshalCmdErrors(t *testing.T) {
 		{
 			name: "invalid JSON for a parameter",
 			request: btcjson.Request{
-				Jsonrpc: "1.0",
+				Jsonrpc: btcjson.RpcVersion1,
 				Method:  "getblock",
 				Params:  []json.RawMessage{[]byte(`"1`)},
 				ID:      nil,

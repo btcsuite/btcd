@@ -1,4 +1,5 @@
 // Copyright (c) 2013-2017 The btcsuite developers
+// Copyright (c) 2015-2019 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -46,6 +47,10 @@ const (
 	// ErrTooMuchNullData is returned from NullDataScript when the length of
 	// the provided data exceeds MaxDataCarrierSize.
 	ErrTooMuchNullData
+
+	// ErrUnsupportedScriptVersion is returned when an unsupported script
+	// version is passed to a function which deals with script analysis.
+	ErrUnsupportedScriptVersion
 
 	// ------------------------------------------
 	// Failures related to final execution state.
@@ -352,6 +357,7 @@ var errorCodeStrings = map[ErrorCode]string{
 	ErrNotMultisigScript:                  "ErrNotMultisigScript",
 	ErrTooManyRequiredSigs:                "ErrTooManyRequiredSigs",
 	ErrTooMuchNullData:                    "ErrTooMuchNullData",
+	ErrUnsupportedScriptVersion:           "ErrUnsupportedScriptVersion",
 	ErrEarlyReturn:                        "ErrEarlyReturn",
 	ErrEmptyStack:                         "ErrEmptyStack",
 	ErrEvalFalse:                          "ErrEvalFalse",

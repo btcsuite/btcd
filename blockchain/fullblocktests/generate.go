@@ -19,12 +19,12 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcd/blockchain"
-	"github.com/btcsuite/btcd/btcec"
+	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil"
+	"github.com/btcsuite/btcd/btcutil"
 )
 
 const (
@@ -198,7 +198,7 @@ type testGenerator struct {
 // makeTestGenerator returns a test generator instance initialized with the
 // genesis block as the tip.
 func makeTestGenerator(params *chaincfg.Params) (testGenerator, error) {
-	privKey, _ := btcec.PrivKeyFromBytes(btcec.S256(), []byte{0x01})
+	privKey, _ := btcec.PrivKeyFromBytes([]byte{0x01})
 	genesis := params.GenesisBlock
 	genesisHash := genesis.BlockHash()
 	return testGenerator{

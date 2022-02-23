@@ -5,8 +5,6 @@
 package blockchain
 
 import (
-	"math"
-
 	"github.com/btcsuite/btcd/chaincfg"
 )
 
@@ -42,27 +40,26 @@ type bitConditionChecker struct {
 // interface.
 var _ thresholdConditionChecker = bitConditionChecker{}
 
-// BeginTime returns the unix timestamp for the median block time after which
-// voting on a rule change starts (at the next window).
+// HasStarted returns true if based on the passed block blockNode the consensus
+// is eligible for deployment.
 //
-// Since this implementation checks for unknown rules, it returns 0 so the rule
+// Since this implementation checks for unknown rules, it returns true so
 // is always treated as active.
 //
 // This is part of the thresholdConditionChecker interface implementation.
-func (c bitConditionChecker) BeginTime() uint64 {
-	return 0
+func (c bitConditionChecker) HasStarted(_ *blockNode) bool {
+	return true
 }
 
-// EndTime returns the unix timestamp for the median block time after which an
-// attempted rule change fails if it has not already been locked in or
-// activated.
+// HasStarted returns true if based on the passed block blockNode the consensus
+// is eligible for deployment.
 //
-// Since this implementation checks for unknown rules, it returns the maximum
-// possible timestamp so the rule is always treated as active.
+// Since this implementation checks for unknown rules, it returns false so the
+// rule is always treated as active.
 //
 // This is part of the thresholdConditionChecker interface implementation.
-func (c bitConditionChecker) EndTime() uint64 {
-	return math.MaxUint64
+func (c bitConditionChecker) HasEnded(_ *blockNode) bool {
+	return false
 }
 
 // RuleChangeActivationThreshold is the number of blocks for which the condition
@@ -111,6 +108,32 @@ func (c bitConditionChecker) Condition(node *blockNode) (bool, error) {
 	return uint32(expectedVersion)&conditionMask == 0, nil
 }
 
+// EligibleToActivate returns true if a custom deployment can transition from
+// the LockedIn to the Active state. For normal deployments, this always
+// returns true. However, some deployments add extra rules like a minimum
+// activation height, which can be abstracted into a generic arbitrary check at
+// the final state via this method.
+//
+// This implementation always returns true, as it's used to warn about other
+// unknown deployments.
+//
+// This is part of the thresholdConditionChecker interface implementation.
+func (c bitConditionChecker) EligibleToActivate(blkNode *blockNode) bool {
+	return true
+}
+
+// IsSpeedy returns true if this is to be a "speedy" deployment. A speedy
+// deployment differs from a regular one in that only after a miner block
+// confirmation window can the deployment expire.
+//
+// This implementation returns false, as we want to always be warned if
+// something is about to activate.
+//
+// This is part of the thresholdConditionChecker interface implementation.
+func (c bitConditionChecker) IsSpeedy() bool {
+	return false
+}
+
 // deploymentChecker provides a thresholdConditionChecker which can be used to
 // test a specific deployment rule.  This is required for properly detecting
 // and activating consensus rule changes.
@@ -123,27 +146,36 @@ type deploymentChecker struct {
 // interface.
 var _ thresholdConditionChecker = deploymentChecker{}
 
-// BeginTime returns the unix timestamp for the median block time after which
-// voting on a rule change starts (at the next window).
+// HasEnded returns true if the target consensus rule change has expired
+// or timed out (at the next window).
 //
 // This implementation returns the value defined by the specific deployment the
 // checker is associated with.
 //
 // This is part of the thresholdConditionChecker interface implementation.
-func (c deploymentChecker) BeginTime() uint64 {
-	return c.deployment.StartTime
+func (c deploymentChecker) HasStarted(blkNode *blockNode) bool {
+	// Can't fail as we make sure to set the clock above when we
+	// instantiate *BlockChain.
+	header := blkNode.Header()
+	started, _ := c.deployment.DeploymentStarter.HasStarted(&header)
+
+	return started
 }
 
-// EndTime returns the unix timestamp for the median block time after which an
-// attempted rule change fails if it has not already been locked in or
-// activated.
+// HasEnded returns true if the target consensus rule change has expired
+// or timed out.
 //
 // This implementation returns the value defined by the specific deployment the
 // checker is associated with.
 //
 // This is part of the thresholdConditionChecker interface implementation.
-func (c deploymentChecker) EndTime() uint64 {
-	return c.deployment.ExpireTime
+func (c deploymentChecker) HasEnded(blkNode *blockNode) bool {
+	// Can't fail as we make sure to set the clock above when we
+	// instantiate *BlockChain.
+	header := blkNode.Header()
+	ended, _ := c.deployment.DeploymentEnder.HasEnded(&header)
+
+	return ended
 }
 
 // RuleChangeActivationThreshold is the number of blocks for which the condition
@@ -154,6 +186,12 @@ func (c deploymentChecker) EndTime() uint64 {
 //
 // This is part of the thresholdConditionChecker interface implementation.
 func (c deploymentChecker) RuleChangeActivationThreshold() uint32 {
+	// Some deployments like taproot used a custom activation threshold
+	// that ovverides the network level threshold.
+	if c.deployment.CustomActivationThreshold != 0 {
+		return c.deployment.CustomActivationThreshold
+	}
+
 	return c.chain.chainParams.RuleChangeActivationThreshold
 }
 
@@ -166,6 +204,37 @@ func (c deploymentChecker) RuleChangeActivationThreshold() uint32 {
 // This is part of the thresholdConditionChecker interface implementation.
 func (c deploymentChecker) MinerConfirmationWindow() uint32 {
 	return c.chain.chainParams.MinerConfirmationWindow
+}
+
+// EligibleToActivate returns true if a custom deployment can transition from
+// the LockedIn to the Active state. For normal deployments, this always
+// returns true. However, some deployments add extra rules like a minimum
+// activation height, which can be abstracted into a generic arbitrary check at
+// the final state via this method.
+//
+// This implementation always returns true, unless a minimum activation height
+// is specified.
+//
+// This is part of the thresholdConditionChecker interface implementation.
+func (c deploymentChecker) EligibleToActivate(blkNode *blockNode) bool {
+	// No activation height, so it's always ready to go.
+	if c.deployment.MinActivationHeight == 0 {
+		return true
+	}
+
+	// If the _next_ block (as this is the prior block to the one being
+	// connected is the min height or beyond, then this can activate.
+	return uint32(blkNode.height)+1 >= c.deployment.MinActivationHeight
+}
+
+// IsSpeedy returns true if this is to be a "speedy" deployment. A speedy
+// deployment differs from a regular one in that only after a miner block
+// confirmation window can the deployment expire.  This implementation returns
+// true if a min activation height is set.
+//
+// This is part of the thresholdConditionChecker interface implementation.
+func (c deploymentChecker) IsSpeedy() bool {
+	return c.deployment.MinActivationHeight != 0
 }
 
 // Condition returns true when the specific bit defined by the deployment
