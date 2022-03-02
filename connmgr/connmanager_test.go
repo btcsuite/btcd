@@ -464,7 +464,7 @@ func TestRemovePendingConnection(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 
 	// Now examine the status of the connection request, it should read a
-	// status of failed.
+	// status of ConnCanceled.
 	if cr.State() != ConnCanceled {
 		t.Fatalf("request wasn't canceled, status is: %v", cr.State())
 	}

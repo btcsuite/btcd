@@ -528,7 +528,7 @@ var helpDescsEnUS = map[string]string{
 	"gettxoutresult-coinbase":      "Whether or not the transaction is a coinbase",
 
 	// GetTxOutCmd help.
-	"gettxout--synopsis":      "Returns information about an unspent transaction output..",
+	"gettxout--synopsis":      "Returns information about an unspent transaction output.",
 	"gettxout-txid":           "The hash of the transaction",
 	"gettxout-vout":           "The index of the output",
 	"gettxout-includemempool": "Include the mempool when true",
@@ -740,7 +740,7 @@ var rpcResultTypes = map[string][]interface{}{
 	"getmempoolinfo":         {(*btcjson.GetMempoolInfoResult)(nil)},
 	"getmininginfo":          {(*btcjson.GetMiningInfoResult)(nil)},
 	"getnettotals":           {(*btcjson.GetNetTotalsResult)(nil)},
-	"getnetworkhashps":       {(*int64)(nil)},
+	"getnetworkhashps":       {(*float64)(nil)},
 	"getnodeaddresses":       {(*[]btcjson.GetNodeAddressesResult)(nil)},
 	"getpeerinfo":            {(*[]btcjson.GetPeerInfoResult)(nil)},
 	"getrawmempool":          {(*[]string)(nil), (*btcjson.GetRawMempoolVerboseResult)(nil)},

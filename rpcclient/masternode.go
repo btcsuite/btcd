@@ -16,12 +16,12 @@ import (
 // MasternodeStatusAsync RPC invocation (or an applicable error).
 type FutureGetMasternodeStatusResult struct {
 	client   *Client
-	Response chan *response
+	Response chan *Response
 }
 
 // Receive waits for the response promised by the future and returns the member signature for the quorum.
 func (r FutureGetMasternodeStatusResult) Receive() (*btcjson.MasternodeStatusResult, error) {
-	res, err := receiveFuture(r.Response)
+	res, err := ReceiveFuture(r.Response)
 	if err != nil {
 		return nil, err
 	}
@@ -44,7 +44,7 @@ func (c *Client) MasternodeStatusAsync() FutureGetMasternodeStatusResult {
 
 	return FutureGetMasternodeStatusResult{
 		client:   c,
-		Response: c.sendCmd(cmd),
+		Response: c.SendCmd(cmd),
 	}
 }
 
@@ -59,12 +59,12 @@ func (c *Client) MasternodeStatus() (*btcjson.MasternodeStatusResult, error) {
 // MasternodeStatusAsync RPC invocation (or an applicable error).
 type FutureGetMasternodeCountResult struct {
 	client   *Client
-	Response chan *response
+	Response chan *Response
 }
 
 // Receive waits for the response promised by the future and returns the member signature for the quorum.
 func (r FutureGetMasternodeCountResult) Receive() (*btcjson.MasternodeCountResult, error) {
-	res, err := receiveFuture(r.Response)
+	res, err := ReceiveFuture(r.Response)
 	if err != nil {
 		return nil, err
 	}
@@ -86,7 +86,7 @@ func (c *Client) MasternodeCountAsync() FutureGetMasternodeCountResult {
 
 	return FutureGetMasternodeCountResult{
 		client:   c,
-		Response: c.sendCmd(cmd),
+		Response: c.SendCmd(cmd),
 	}
 }
 
@@ -101,12 +101,12 @@ func (c *Client) MasternodeCount() (*btcjson.MasternodeCountResult, error) {
 // MasternodeResultAsync RPC invocation (or an applicable error).
 type FutureGetMasternodeResult struct {
 	client   *Client
-	Response chan *response
+	Response chan *Response
 }
 
 // Receive waits for the response promised by the future and returns the member signature for the quorum.
 func (r FutureGetMasternodeResult) Receive() (*btcjson.MasternodeResult, error) {
-	res, err := receiveFuture(r.Response)
+	res, err := ReceiveFuture(r.Response)
 	if err != nil {
 		return nil, err
 	}
@@ -128,7 +128,7 @@ func (c *Client) MasternodeCurrentAsync() FutureGetMasternodeResult {
 
 	return FutureGetMasternodeResult{
 		client:   c,
-		Response: c.sendCmd(cmd),
+		Response: c.SendCmd(cmd),
 	}
 }
 
@@ -143,12 +143,12 @@ func (c *Client) MasternodeCurrent() (*btcjson.MasternodeResult, error) {
 // MasternodeStatusAsync RPC invocation (or an applicable error).
 type FutureGetMasternodeOutputsResult struct {
 	client   *Client
-	Response chan *response
+	Response chan *Response
 }
 
 // Receive waits for the response promised by the future and returns the member signature for the quorum.
 func (r FutureGetMasternodeOutputsResult) Receive() (map[string]string, error) {
-	res, err := receiveFuture(r.Response)
+	res, err := ReceiveFuture(r.Response)
 	if err != nil {
 		return nil, err
 	}
@@ -170,7 +170,7 @@ func (c *Client) MasternodeOutputsAsync() FutureGetMasternodeOutputsResult {
 
 	return FutureGetMasternodeOutputsResult{
 		client:   c,
-		Response: c.sendCmd(cmd),
+		Response: c.SendCmd(cmd),
 	}
 }
 
@@ -189,7 +189,7 @@ func (c *Client) MasternodeWinnerAsync() FutureGetMasternodeResult {
 
 	return FutureGetMasternodeResult{
 		client:   c,
-		Response: c.sendCmd(cmd),
+		Response: c.SendCmd(cmd),
 	}
 }
 
@@ -204,12 +204,12 @@ func (c *Client) MasternodeWinner() (*btcjson.MasternodeResult, error) {
 // MasternodeWinnersAsync RPC invocation (or an applicable error).
 type FutureGetMasternodeWinnersResult struct {
 	client   *Client
-	Response chan *response
+	Response chan *Response
 }
 
 // Receive waits for the response promised by the future and returns masternode winners result
 func (r FutureGetMasternodeWinnersResult) Receive() (map[string]string, error) {
-	res, err := receiveFuture(r.Response)
+	res, err := ReceiveFuture(r.Response)
 	if err != nil {
 		return nil, err
 	}
@@ -231,7 +231,7 @@ func (c *Client) MasternodeWinnersAsync(count int, filter string) FutureGetMaste
 
 	return FutureGetMasternodeWinnersResult{
 		client:   c,
-		Response: c.sendCmd(cmd),
+		Response: c.SendCmd(cmd),
 	}
 }
 
@@ -246,13 +246,13 @@ func (c *Client) MasternodeWinners(count int, filter string) (map[string]string,
 // MasternodeListAsync RPC invocation (or an applicable error).
 type FutureGetMasternodeListResult struct {
 	client   *Client
-	Response chan *response
+	Response chan *Response
 	Mode     string
 }
 
 // Receive waits for the response promised by the future and returns the member signature for the quorum.
 func (r FutureGetMasternodeListResult) Receive() (interface{}, error) {
-	res, err := receiveFuture(r.Response)
+	res, err := ReceiveFuture(r.Response)
 	if err != nil {
 		return nil, err
 	}
@@ -283,7 +283,7 @@ func (c *Client) MasternodeListAsync(mode, filter string) FutureGetMasternodeLis
 
 	return FutureGetMasternodeListResult{
 		client:   c,
-		Response: c.sendCmd(cmd),
+		Response: c.SendCmd(cmd),
 		Mode:     mode,
 	}
 }

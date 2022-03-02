@@ -6,70 +6,30 @@
 package btcec
 
 import (
-	"crypto/rand"
+	"math/rand"
+
 	"encoding/hex"
-	"fmt"
-	"reflect"
 	"testing"
 )
 
-// TestSetInt ensures that setting a field value to various native integers
-// works as expected.
-func TestSetInt(t *testing.T) {
-	tests := []struct {
-		in  uint
-		raw [10]uint32
-	}{
-		{5, [10]uint32{5, 0, 0, 0, 0, 0, 0, 0, 0, 0}},
-		// 2^26
-		{67108864, [10]uint32{67108864, 0, 0, 0, 0, 0, 0, 0, 0, 0}},
-		// 2^26 + 1
-		{67108865, [10]uint32{67108865, 0, 0, 0, 0, 0, 0, 0, 0, 0}},
-		// 2^32 - 1
-		{4294967295, [10]uint32{4294967295, 0, 0, 0, 0, 0, 0, 0, 0, 0}},
-	}
-
-	t.Logf("Running %d tests", len(tests))
-	for i, test := range tests {
-		f := new(fieldVal).SetInt(test.in)
-		if !reflect.DeepEqual(f.n, test.raw) {
-			t.Errorf("fieldVal.Set #%d wrong result\ngot: %v\n"+
-				"want: %v", i, f.n, test.raw)
-			continue
-		}
-	}
-}
-
-// TestZero ensures that zeroing a field value zero works as expected.
-func TestZero(t *testing.T) {
-	f := new(fieldVal).SetInt(2)
-	f.Zero()
-	for idx, rawInt := range f.n {
-		if rawInt != 0 {
-			t.Errorf("internal field integer at index #%d is not "+
-				"zero - got %d", idx, rawInt)
-		}
-	}
-}
-
 // TestIsZero ensures that checking if a field IsZero works as expected.
 func TestIsZero(t *testing.T) {
-	f := new(fieldVal)
+	f := new(FieldVal)
 	if !f.IsZero() {
 		t.Errorf("new field value is not zero - got %v (rawints %x)", f,
-			f.n)
+			f.String())
 	}
 
 	f.SetInt(1)
 	if f.IsZero() {
 		t.Errorf("field claims it's zero when it's not - got %v "+
-			"(raw rawints %x)", f, f.n)
+			"(raw rawints %x)", f, f.String())
 	}
 
 	f.Zero()
 	if !f.IsZero() {
 		t.Errorf("field claims it's not zero when it is - got %v "+
-			"(raw rawints %x)", f, f.n)
+			"(raw rawints %x)", f, f.String())
 	}
 }
 
@@ -147,10 +107,10 @@ func TestStringer(t *testing.T) {
 
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
-		f := new(fieldVal).SetHex(test.in)
+		f := setHex(test.in)
 		result := f.String()
 		if result != test.expected {
-			t.Errorf("fieldVal.String #%d wrong result\ngot: %v\n"+
+			t.Errorf("FieldVal.String #%d wrong result\ngot: %v\n"+
 				"want: %v", i, result, test.expected)
 			continue
 		}
@@ -313,15 +273,16 @@ func TestNormalize(t *testing.T) {
 	}
 
 	t.Logf("Running %d tests", len(tests))
-	for i, test := range tests {
-		f := new(fieldVal)
+	for range tests {
+		// TODO(roasbeef): can't access internal state
+		/*f := new(FieldVal)
 		f.n = test.raw
 		f.Normalize()
 		if !reflect.DeepEqual(f.n, test.normalized) {
-			t.Errorf("fieldVal.Normalize #%d wrong result\n"+
+			t.Errorf("FieldVal.Normalize #%d wrong result\n"+
 				"got: %x\nwant: %x", i, f.n, test.normalized)
 			continue
-		}
+		}*/
 	}
 }
 
@@ -344,10 +305,10 @@ func TestIsOdd(t *testing.T) {
 
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
-		f := new(fieldVal).SetHex(test.in)
+		f := setHex(test.in)
 		result := f.IsOdd()
 		if result != test.expected {
-			t.Errorf("fieldVal.IsOdd #%d wrong result\n"+
+			t.Errorf("FieldVal.IsOdd #%d wrong result\n"+
 				"got: %v\nwant: %v", i, result, test.expected)
 			continue
 		}
@@ -377,11 +338,11 @@ func TestEquals(t *testing.T) {
 
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
-		f := new(fieldVal).SetHex(test.in1).Normalize()
-		f2 := new(fieldVal).SetHex(test.in2).Normalize()
+		f := setHex(test.in1).Normalize()
+		f2 := setHex(test.in2).Normalize()
 		result := f.Equals(f2)
 		if result != test.expected {
-			t.Errorf("fieldVal.Equals #%d wrong result\n"+
+			t.Errorf("FieldVal.Equals #%d wrong result\n"+
 				"got: %v\nwant: %v", i, result, test.expected)
 			continue
 		}
@@ -425,347 +386,419 @@ func TestNegate(t *testing.T) {
 
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
-		f := new(fieldVal).SetHex(test.in).Normalize()
-		expected := new(fieldVal).SetHex(test.expected).Normalize()
+		f := setHex(test.in).Normalize()
+		expected := setHex(test.expected).Normalize()
 		result := f.Negate(1).Normalize()
 		if !result.Equals(expected) {
-			t.Errorf("fieldVal.Negate #%d wrong result\n"+
+			t.Errorf("FieldVal.Negate #%d wrong result\n"+
 				"got: %v\nwant: %v", i, result, expected)
 			continue
 		}
 	}
 }
 
-// TestAddInt ensures that adding an integer to field values via AddInt works as
-// expected.
-func TestAddInt(t *testing.T) {
+// TestFieldAddInt ensures that adding an integer to field values via AddInt
+// works as expected.
+func TestFieldAddInt(t *testing.T) {
 	tests := []struct {
+		name     string // test description
 		in1      string // hex encoded value
-		in2      uint   // unsigned integer to add to the value above
+		in2      uint16 // unsigned integer to add to the value above
 		expected string // expected hex encoded value
-	}{
-		{"0", 1, "1"},
-		{"1", 0, "1"},
-		{"1", 1, "2"},
-		// secp256k1 prime-1 + 1
-		{"fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2e", 1, "0"},
-		// secp256k1 prime + 1
-		{"fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f", 1, "1"},
-		// Random samples.
-		{
-			"ff95ad9315aff04ab4af0ce673620c7145dc85d03bab5ba4b09ca2c4dec2d6c1",
-			0x10f,
-			"ff95ad9315aff04ab4af0ce673620c7145dc85d03bab5ba4b09ca2c4dec2d7d0",
-		},
-		{
-			"44bdae6b772e7987941f1ba314e6a5b7804a4c12c00961b57d20f41deea9cecf",
-			0x2cf11d41,
-			"44bdae6b772e7987941f1ba314e6a5b7804a4c12c00961b57d20f41e1b9aec10",
-		},
-		{
-			"88c3ecae67b591935fb1f6a9499c35315ffad766adca665c50b55f7105122c9c",
-			0x4829aa2d,
-			"88c3ecae67b591935fb1f6a9499c35315ffad766adca665c50b55f714d3bd6c9",
-		},
-		{
-			"8523e9edf360ca32a95aae4e57fcde5a542b471d08a974d94ea0ee09a015e2a6",
-			0xa21265a5,
-			"8523e9edf360ca32a95aae4e57fcde5a542b471d08a974d94ea0ee0a4228484b",
-		},
-	}
+	}{{
+		name:     "zero + one",
+		in1:      "0",
+		in2:      1,
+		expected: "1",
+	}, {
+		name:     "one + zero",
+		in1:      "1",
+		in2:      0,
+		expected: "1",
+	}, {
+		name:     "one + one",
+		in1:      "1",
+		in2:      1,
+		expected: "2",
+	}, {
+		name:     "secp256k1 prime-1 + 1",
+		in1:      "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2e",
+		in2:      1,
+		expected: "0",
+	}, {
+		name:     "secp256k1 prime + 1",
+		in1:      "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f",
+		in2:      1,
+		expected: "1",
+	}, {
+		name:     "random sampling #1",
+		in1:      "ff95ad9315aff04ab4af0ce673620c7145dc85d03bab5ba4b09ca2c4dec2d6c1",
+		in2:      0x10f,
+		expected: "ff95ad9315aff04ab4af0ce673620c7145dc85d03bab5ba4b09ca2c4dec2d7d0",
+	}, {
+		name:     "random sampling #2",
+		in1:      "44bdae6b772e7987941f1ba314e6a5b7804a4c12c00961b57d20f41deea9cecf",
+		in2:      0x3196,
+		expected: "44bdae6b772e7987941f1ba314e6a5b7804a4c12c00961b57d20f41deeaa0065",
+	}, {
+		name:     "random sampling #3",
+		in1:      "88c3ecae67b591935fb1f6a9499c35315ffad766adca665c50b55f7105122c9c",
+		in2:      0x966f,
+		expected: "88c3ecae67b591935fb1f6a9499c35315ffad766adca665c50b55f710512c30b",
+	}, {
+		name:     "random sampling #4",
+		in1:      "8523e9edf360ca32a95aae4e57fcde5a542b471d08a974d94ea0ee09a015e2a6",
+		in2:      0xc54,
+		expected: "8523e9edf360ca32a95aae4e57fcde5a542b471d08a974d94ea0ee09a015eefa",
+	}}
 
-	t.Logf("Running %d tests", len(tests))
-	for i, test := range tests {
-		f := new(fieldVal).SetHex(test.in1).Normalize()
-		expected := new(fieldVal).SetHex(test.expected).Normalize()
+	for _, test := range tests {
+		f := setHex(test.in1).Normalize()
+		expected := setHex(test.expected).Normalize()
 		result := f.AddInt(test.in2).Normalize()
 		if !result.Equals(expected) {
-			t.Errorf("fieldVal.AddInt #%d wrong result\n"+
-				"got: %v\nwant: %v", i, result, expected)
+			t.Errorf("%s: wrong result -- got: %v -- want: %v", test.name,
+				result, expected)
 			continue
 		}
 	}
 }
 
-// TestAdd ensures that adding two field values together via Add works as
-// expected.
-func TestAdd(t *testing.T) {
+// TestFieldAdd ensures that adding two field values together via Add and Add2
+// works as expected.
+func TestFieldAdd(t *testing.T) {
 	tests := []struct {
+		name     string // test description
 		in1      string // first hex encoded value
 		in2      string // second hex encoded value to add
 		expected string // expected hex encoded value
-	}{
-		{"0", "1", "1"},
-		{"1", "0", "1"},
-		{"1", "1", "2"},
-		// secp256k1 prime-1 + 1
-		{"fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2e", "1", "0"},
-		// secp256k1 prime + 1
-		{"fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f", "1", "1"},
-		// Random samples.
-		{
-			"2b2012f975404e5065b4292fb8bed0a5d315eacf24c74d8b27e73bcc5430edcc",
-			"2c3cefa4e4753e8aeec6ac4c12d99da4d78accefda3b7885d4c6bab46c86db92",
-			"575d029e59b58cdb547ad57bcb986e4aaaa0b7beff02c610fcadf680c0b7c95e",
-		},
-		{
-			"8131e8722fe59bb189692b96c9f38de92885730f1dd39ab025daffb94c97f79c",
-			"ff5454b765f0aab5f0977dcc629becc84cabeb9def48e79c6aadb2622c490fa9",
-			"80863d2995d646677a00a9632c8f7ab175315ead0d1c824c9088b21c78e10b16",
-		},
-		{
-			"c7c95e93d0892b2b2cdd77e80eb646ea61be7a30ac7e097e9f843af73fad5c22",
-			"3afe6f91a74dfc1c7f15c34907ee981656c37236d946767dd53ccad9190e437c",
-			"02c7ce2577d72747abf33b3116a4df00b881ec6785c47ffc74c105d158bba36f",
-		},
-		{
-			"fd1c26f6a23381e5d785ba889494ec059369b888ad8431cd67d8c934b580dbe1",
-			"a475aa5a31dcca90ef5b53c097d9133d6b7117474b41e7877bb199590fc0489c",
-			"a191d150d4104c76c6e10e492c6dff42fedacfcff8c61954e38a628ec541284e",
-		},
-	}
+	}{{
+		name:     "zero + one",
+		in1:      "0",
+		in2:      "1",
+		expected: "1",
+	}, {
+		name:     "one + zero",
+		in1:      "1",
+		in2:      "0",
+		expected: "1",
+	}, {
+		name:     "secp256k1 prime-1 + 1",
+		in1:      "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2e",
+		in2:      "1",
+		expected: "0",
+	}, {
+		name:     "secp256k1 prime + 1",
+		in1:      "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f",
+		in2:      "1",
+		expected: "1",
+	}, {
+		name:     "random sampling #1",
+		in1:      "2b2012f975404e5065b4292fb8bed0a5d315eacf24c74d8b27e73bcc5430edcc",
+		in2:      "2c3cefa4e4753e8aeec6ac4c12d99da4d78accefda3b7885d4c6bab46c86db92",
+		expected: "575d029e59b58cdb547ad57bcb986e4aaaa0b7beff02c610fcadf680c0b7c95e",
+	}, {
+		name:     "random sampling #2",
+		in1:      "8131e8722fe59bb189692b96c9f38de92885730f1dd39ab025daffb94c97f79c",
+		in2:      "ff5454b765f0aab5f0977dcc629becc84cabeb9def48e79c6aadb2622c490fa9",
+		expected: "80863d2995d646677a00a9632c8f7ab175315ead0d1c824c9088b21c78e10b16",
+	}, {
+		name:     "random sampling #3",
+		in1:      "c7c95e93d0892b2b2cdd77e80eb646ea61be7a30ac7e097e9f843af73fad5c22",
+		in2:      "3afe6f91a74dfc1c7f15c34907ee981656c37236d946767dd53ccad9190e437c",
+		expected: "2c7ce2577d72747abf33b3116a4df00b881ec6785c47ffc74c105d158bba36f",
+	}, {
+		name:     "random sampling #4",
+		in1:      "fd1c26f6a23381e5d785ba889494ec059369b888ad8431cd67d8c934b580dbe1",
+		in2:      "a475aa5a31dcca90ef5b53c097d9133d6b7117474b41e7877bb199590fc0489c",
+		expected: "a191d150d4104c76c6e10e492c6dff42fedacfcff8c61954e38a628ec541284e",
+	}, {
+		name:     "random sampling #5",
+		in1:      "ad82b8d1cc136e23e9fd77fe2c7db1fe5a2ecbfcbde59ab3529758334f862d28",
+		in2:      "4d6a4e95d6d61f4f46b528bebe152d408fd741157a28f415639347a84f6f574b",
+		expected: "faed0767a2e98d7330b2a0bcea92df3eea060d12380e8ec8b62a9fdb9ef58473",
+	}, {
+		name:     "random sampling #6",
+		in1:      "f3f43a2540054a86e1df98547ec1c0e157b193e5350fb4a3c3ea214b228ac5e7",
+		in2:      "25706572592690ea3ddc951a1b48b504a4c83dc253756e1b96d56fdfb3199522",
+		expected: "19649f97992bdb711fbc2d6e9a0a75e5fc79d1a7888522bf5abf912bd5a45eda",
+	}, {
+		name:     "random sampling #7",
+		in1:      "6915bb94eef13ff1bb9b2633d997e13b9b1157c713363cc0e891416d6734f5b8",
+		in2:      "11f90d6ac6fe1c4e8900b1c85fb575c251ec31b9bc34b35ada0aea1c21eded22",
+		expected: "7b0ec8ffb5ef5c40449bd7fc394d56fdecfd8980cf6af01bc29c2b898922e2da",
+	}, {
+		name:     "random sampling #8",
+		in1:      "48b0c9eae622eed9335b747968544eb3e75cb2dc8128388f948aa30f88cabde4",
+		in2:      "0989882b52f85f9d524a3a3061a0e01f46d597839d2ba637320f4b9510c8d2d5",
+		expected: "523a5216391b4e7685a5aea9c9f52ed32e324a601e53dec6c699eea4999390b9",
+	}}
 
-	t.Logf("Running %d tests", len(tests))
-	for i, test := range tests {
-		f := new(fieldVal).SetHex(test.in1).Normalize()
-		f2 := new(fieldVal).SetHex(test.in2).Normalize()
-		expected := new(fieldVal).SetHex(test.expected).Normalize()
-		result := f.Add(f2).Normalize()
+	for _, test := range tests {
+		// Parse test hex.
+		f1 := setHex(test.in1).Normalize()
+		f2 := setHex(test.in2).Normalize()
+		expected := setHex(test.expected).Normalize()
+
+		// Ensure adding the two values with the result going to another
+		// variable produces the expected result.
+		result := new(FieldVal).Add2(f1, f2).Normalize()
 		if !result.Equals(expected) {
-			t.Errorf("fieldVal.Add #%d wrong result\n"+
-				"got: %v\nwant: %v", i, result, expected)
+			t.Errorf("%s: unexpected result\ngot: %v\nwant: %v", test.name,
+				result, expected)
+			continue
+		}
+
+		// Ensure adding the value to an existing field value produces the
+		// expected result.
+		f1.Add(f2).Normalize()
+		if !f1.Equals(expected) {
+			t.Errorf("%s: unexpected result\ngot: %v\nwant: %v", test.name,
+				f1, expected)
 			continue
 		}
 	}
 }
 
-// TestAdd2 ensures that adding two field values together via Add2 works as
-// expected.
-func TestAdd2(t *testing.T) {
+// TestFieldMulInt ensures that multiplying an integer to field values via
+// MulInt works as expected.
+func TestFieldMulInt(t *testing.T) {
 	tests := []struct {
-		in1      string // first hex encoded value
-		in2      string // second hex encoded value to add
-		expected string // expected hex encoded value
-	}{
-		{"0", "1", "1"},
-		{"1", "0", "1"},
-		{"1", "1", "2"},
-		// secp256k1 prime-1 + 1
-		{"fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2e", "1", "0"},
-		// secp256k1 prime + 1
-		{"fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f", "1", "1"},
-		// close but over the secp256k1 prime
-		{"fffffffffffffffffffffffffffffffffffffffffffffffffffffff000000000", "f1ffff000", "1ffff3d1"},
-		// Random samples.
-		{
-			"ad82b8d1cc136e23e9fd77fe2c7db1fe5a2ecbfcbde59ab3529758334f862d28",
-			"4d6a4e95d6d61f4f46b528bebe152d408fd741157a28f415639347a84f6f574b",
-			"faed0767a2e98d7330b2a0bcea92df3eea060d12380e8ec8b62a9fdb9ef58473",
-		},
-		{
-			"f3f43a2540054a86e1df98547ec1c0e157b193e5350fb4a3c3ea214b228ac5e7",
-			"25706572592690ea3ddc951a1b48b504a4c83dc253756e1b96d56fdfb3199522",
-			"19649f97992bdb711fbc2d6e9a0a75e5fc79d1a7888522bf5abf912bd5a45eda",
-		},
-		{
-			"6915bb94eef13ff1bb9b2633d997e13b9b1157c713363cc0e891416d6734f5b8",
-			"11f90d6ac6fe1c4e8900b1c85fb575c251ec31b9bc34b35ada0aea1c21eded22",
-			"7b0ec8ffb5ef5c40449bd7fc394d56fdecfd8980cf6af01bc29c2b898922e2da",
-		},
-		{
-			"48b0c9eae622eed9335b747968544eb3e75cb2dc8128388f948aa30f88cabde4",
-			"0989882b52f85f9d524a3a3061a0e01f46d597839d2ba637320f4b9510c8d2d5",
-			"523a5216391b4e7685a5aea9c9f52ed32e324a601e53dec6c699eea4999390b9",
-		},
-	}
-
-	t.Logf("Running %d tests", len(tests))
-	for i, test := range tests {
-		f := new(fieldVal).SetHex(test.in1).Normalize()
-		f2 := new(fieldVal).SetHex(test.in2).Normalize()
-		expected := new(fieldVal).SetHex(test.expected).Normalize()
-		result := f.Add2(f, f2).Normalize()
-		if !result.Equals(expected) {
-			t.Errorf("fieldVal.Add2 #%d wrong result\n"+
-				"got: %v\nwant: %v", i, result, expected)
-			continue
-		}
-	}
-}
-
-// TestMulInt ensures that adding an integer to field values via MulInt works as
-// expected.
-func TestMulInt(t *testing.T) {
-	tests := []struct {
+		name     string // test description
 		in1      string // hex encoded value
-		in2      uint   // unsigned integer to multiply with value above
+		in2      uint8  // unsigned integer to multiply with value above
 		expected string // expected hex encoded value
-	}{
-		{"0", 0, "0"},
-		{"1", 0, "0"},
-		{"0", 1, "0"},
-		{"1", 1, "1"},
-		// secp256k1 prime-1 * 2
-		{
-			"fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2e",
-			2,
-			"fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2d",
-		},
-		// secp256k1 prime * 3
-		{"fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f", 3, "0"},
-		// secp256k1 prime-1 * 8
-		{
-			"fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2e",
-			8,
-			"fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc27",
-		},
+	}{{
+		name:     "zero * zero",
+		in1:      "0",
+		in2:      0,
+		expected: "0",
+	}, {
+		name:     "one * zero",
+		in1:      "1",
+		in2:      0,
+		expected: "0",
+	}, {
+		name:     "zero * one",
+		in1:      "0",
+		in2:      1,
+		expected: "0",
+	}, {
+		name:     "one * one",
+		in1:      "1",
+		in2:      1,
+		expected: "1",
+	}, {
+		name:     "secp256k1 prime-1 * 2",
+		in1:      "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2e",
+		in2:      2,
+		expected: "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2d",
+	}, {
+		name:     "secp256k1 prime * 3",
+		in1:      "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f",
+		in2:      3,
+		expected: "0",
+	}, {
+		name:     "secp256k1 prime-1 * 8",
+		in1:      "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2e",
+		in2:      8,
+		expected: "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc27",
+	}, {
 		// Random samples for first value.  The second value is limited
 		// to 8 since that is the maximum int used in the elliptic curve
 		// calculations.
-		{
-			"b75674dc9180d306c692163ac5e089f7cef166af99645c0c23568ab6d967288a",
-			6,
-			"4c06bd2b6904f228a76c8560a3433bced9a8681d985a2848d407404d186b0280",
-		},
-		{
-			"54873298ac2b5ba8591c125ae54931f5ea72040aee07b208d6135476fb5b9c0e",
-			3,
-			"fd9597ca048212f90b543710afdb95e1bf560c20ca17161a8239fd64f212d42a",
-		},
-		{
-			"7c30fbd363a74c17e1198f56b090b59bbb6c8755a74927a6cba7a54843506401",
-			5,
-			"6cf4eb20f2447c77657fccb172d38c0aa91ea4ac446dc641fa463a6b5091fba7",
-		},
-		{
-			"fb4529be3e027a3d1587d8a500b72f2d312e3577340ef5175f96d113be4c2ceb",
-			8,
-			"da294df1f013d1e8ac3ec52805b979698971abb9a077a8bafcb688a4f261820f",
-		},
-	}
+		name:     "random sampling #1",
+		in1:      "b75674dc9180d306c692163ac5e089f7cef166af99645c0c23568ab6d967288a",
+		in2:      6,
+		expected: "4c06bd2b6904f228a76c8560a3433bced9a8681d985a2848d407404d186b0280",
+	}, {
+		name:     "random sampling #2",
+		in1:      "54873298ac2b5ba8591c125ae54931f5ea72040aee07b208d6135476fb5b9c0e",
+		in2:      3,
+		expected: "fd9597ca048212f90b543710afdb95e1bf560c20ca17161a8239fd64f212d42a",
+	}, {
+		name:     "random sampling #3",
+		in1:      "7c30fbd363a74c17e1198f56b090b59bbb6c8755a74927a6cba7a54843506401",
+		in2:      5,
+		expected: "6cf4eb20f2447c77657fccb172d38c0aa91ea4ac446dc641fa463a6b5091fba7",
+	}, {
+		name:     "random sampling #3",
+		in1:      "fb4529be3e027a3d1587d8a500b72f2d312e3577340ef5175f96d113be4c2ceb",
+		in2:      8,
+		expected: "da294df1f013d1e8ac3ec52805b979698971abb9a077a8bafcb688a4f261820f",
+	}}
 
-	t.Logf("Running %d tests", len(tests))
-	for i, test := range tests {
-		f := new(fieldVal).SetHex(test.in1).Normalize()
-		expected := new(fieldVal).SetHex(test.expected).Normalize()
+	for _, test := range tests {
+		f := setHex(test.in1).Normalize()
+		expected := setHex(test.expected).Normalize()
 		result := f.MulInt(test.in2).Normalize()
 		if !result.Equals(expected) {
-			t.Errorf("fieldVal.MulInt #%d wrong result\n"+
-				"got: %v\nwant: %v", i, result, expected)
+			t.Errorf("%s: wrong result -- got: %v -- want: %v", test.name,
+				result, expected)
 			continue
 		}
 	}
 }
 
-// TestMul ensures that multiplying two field valuess via Mul works as expected.
-func TestMul(t *testing.T) {
+// TestFieldMul ensures that multiplying two field values via Mul and Mul2 works
+// as expected.
+func TestFieldMul(t *testing.T) {
 	tests := []struct {
+		name     string // test description
 		in1      string // first hex encoded value
 		in2      string // second hex encoded value to multiply with
 		expected string // expected hex encoded value
-	}{
-		{"0", "0", "0"},
-		{"1", "0", "0"},
-		{"0", "1", "0"},
-		{"1", "1", "1"},
-		// slightly over prime
-		{
-			"ffffffffffffffffffffffffffffffffffffffffffffffffffffffff1ffff",
-			"1000",
-			"1ffff3d1",
-		},
-		// secp256k1 prime-1 * 2
-		{
-			"fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2e",
-			"2",
-			"fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2d",
-		},
-		// secp256k1 prime * 3
-		{"fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f", "3", "0"},
-		// secp256k1 prime-1 * 8
-		{
-			"fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2e",
-			"8",
-			"fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc27",
-		},
-		// Random samples.
-		{
-			"cfb81753d5ef499a98ecc04c62cb7768c2e4f1740032946db1c12e405248137e",
-			"58f355ad27b4d75fb7db0442452e732c436c1f7c5a7c4e214fa9cc031426a7d3",
-			"1018cd2d7c2535235b71e18db9cd98027386328d2fa6a14b36ec663c4c87282b",
-		},
-		{
-			"26e9d61d1cdf3920e9928e85fa3df3e7556ef9ab1d14ec56d8b4fc8ed37235bf",
-			"2dfc4bbe537afee979c644f8c97b31e58be5296d6dbc460091eae630c98511cf",
-			"da85f48da2dc371e223a1ae63bd30b7e7ee45ae9b189ac43ff357e9ef8cf107a",
-		},
-		{
-			"5db64ed5afb71646c8b231585d5b2bf7e628590154e0854c4c29920b999ff351",
-			"279cfae5eea5d09ade8e6a7409182f9de40981bc31c84c3d3dfe1d933f152e9a",
-			"2c78fbae91792dd0b157abe3054920049b1879a7cc9d98cfda927d83be411b37",
-		},
-		{
-			"b66dfc1f96820b07d2bdbd559c19319a3a73c97ceb7b3d662f4fe75ecb6819e6",
-			"bf774aba43e3e49eb63a6e18037d1118152568f1a3ac4ec8b89aeb6ff8008ae1",
-			"c4f016558ca8e950c21c3f7fc15f640293a979c7b01754ee7f8b3340d4902ebb",
-		},
-	}
+	}{{
+		name:     "zero * zero",
+		in1:      "0",
+		in2:      "0",
+		expected: "0",
+	}, {
+		name:     "one * zero",
+		in1:      "1",
+		in2:      "0",
+		expected: "0",
+	}, {
+		name:     "zero * one",
+		in1:      "0",
+		in2:      "1",
+		expected: "0",
+	}, {
+		name:     "one * one",
+		in1:      "1",
+		in2:      "1",
+		expected: "1",
+	}, {
+		name:     "slightly over prime",
+		in1:      "ffffffffffffffffffffffffffffffffffffffffffffffffffffffff1ffff",
+		in2:      "1000",
+		expected: "1ffff3d1",
+	}, {
+		name:     "secp256k1 prime-1 * 2",
+		in1:      "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2e",
+		in2:      "2",
+		expected: "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2d",
+	}, {
+		name:     "secp256k1 prime * 3",
+		in1:      "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f",
+		in2:      "3",
+		expected: "0",
+	}, {
+		name:     "secp256k1 prime * 3",
+		in1:      "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2e",
+		in2:      "8",
+		expected: "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc27",
+	}, {
+		name:     "random sampling #1",
+		in1:      "cfb81753d5ef499a98ecc04c62cb7768c2e4f1740032946db1c12e405248137e",
+		in2:      "58f355ad27b4d75fb7db0442452e732c436c1f7c5a7c4e214fa9cc031426a7d3",
+		expected: "1018cd2d7c2535235b71e18db9cd98027386328d2fa6a14b36ec663c4c87282b",
+	}, {
+		name:     "random sampling #2",
+		in1:      "26e9d61d1cdf3920e9928e85fa3df3e7556ef9ab1d14ec56d8b4fc8ed37235bf",
+		in2:      "2dfc4bbe537afee979c644f8c97b31e58be5296d6dbc460091eae630c98511cf",
+		expected: "da85f48da2dc371e223a1ae63bd30b7e7ee45ae9b189ac43ff357e9ef8cf107a",
+	}, {
+		name:     "random sampling #3",
+		in1:      "5db64ed5afb71646c8b231585d5b2bf7e628590154e0854c4c29920b999ff351",
+		in2:      "279cfae5eea5d09ade8e6a7409182f9de40981bc31c84c3d3dfe1d933f152e9a",
+		expected: "2c78fbae91792dd0b157abe3054920049b1879a7cc9d98cfda927d83be411b37",
+	}, {
+		name:     "random sampling #4",
+		in1:      "b66dfc1f96820b07d2bdbd559c19319a3a73c97ceb7b3d662f4fe75ecb6819e6",
+		in2:      "bf774aba43e3e49eb63a6e18037d1118152568f1a3ac4ec8b89aeb6ff8008ae1",
+		expected: "c4f016558ca8e950c21c3f7fc15f640293a979c7b01754ee7f8b3340d4902ebb",
+	}}
 
-	t.Logf("Running %d tests", len(tests))
-	for i, test := range tests {
-		f := new(fieldVal).SetHex(test.in1).Normalize()
-		f2 := new(fieldVal).SetHex(test.in2).Normalize()
-		expected := new(fieldVal).SetHex(test.expected).Normalize()
-		result := f.Mul(f2).Normalize()
+	for _, test := range tests {
+		f1 := setHex(test.in1).Normalize()
+		f2 := setHex(test.in2).Normalize()
+		expected := setHex(test.expected).Normalize()
+
+		// Ensure multiplying the two values with the result going to another
+		// variable produces the expected result.
+		result := new(FieldVal).Mul2(f1, f2).Normalize()
 		if !result.Equals(expected) {
-			t.Errorf("fieldVal.Mul #%d wrong result\n"+
-				"got: %v\nwant: %v", i, result, expected)
+			t.Errorf("%s: unexpected result\ngot: %v\nwant: %v", test.name,
+				result, expected)
+			continue
+		}
+
+		// Ensure multiplying the value to an existing field value produces the
+		// expected result.
+		f1.Mul(f2).Normalize()
+		if !f1.Equals(expected) {
+			t.Errorf("%s: unexpected result\ngot: %v\nwant: %v", test.name,
+				f1, expected)
 			continue
 		}
 	}
 }
 
-// TestSquare ensures that squaring field values via Square works as expected.
-func TestSquare(t *testing.T) {
+// TestFieldSquare ensures that squaring field values via Square and SqualVal
+// works as expected.
+func TestFieldSquare(t *testing.T) {
 	tests := []struct {
+		name     string // test description
 		in       string // hex encoded value
 		expected string // expected hex encoded value
-	}{
-		// secp256k1 prime (aka 0)
-		{"0", "0"},
-		{"fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f", "0"},
-		{"0", "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f"},
-		// secp256k1 prime-1
-		{"fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2e", "1"},
-		// secp256k1 prime-2
-		{"fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2d", "4"},
-		// Random sampling
-		{
-			"b0ba920360ea8436a216128047aab9766d8faf468895eb5090fc8241ec758896",
-			"133896b0b69fda8ce9f648b9a3af38f345290c9eea3cbd35bafcadf7c34653d3",
-		},
-		{
-			"c55d0d730b1d0285a1599995938b042a756e6e8857d390165ffab480af61cbd5",
-			"cd81758b3f5877cbe7e5b0a10cebfa73bcbf0957ca6453e63ee8954ab7780bee",
-		},
-		{
-			"e89c1f9a70d93651a1ba4bca5b78658f00de65a66014a25544d3365b0ab82324",
-			"39ffc7a43e5dbef78fd5d0354fb82c6d34f5a08735e34df29da14665b43aa1f",
-		},
-		{
-			"7dc26186079d22bcbe1614aa20ae627e62d72f9be7ad1e99cac0feb438956f05",
-			"bf86bcfc4edb3d81f916853adfda80c07c57745b008b60f560b1912f95bce8ae",
-		},
-	}
+	}{{
+		name:     "zero",
+		in:       "0",
+		expected: "0",
+	}, {
+		name:     "secp256k1 prime (direct val in with 0 out)",
+		in:       "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f",
+		expected: "0",
+	}, {
+		name:     "secp256k1 prime (0 in with direct val out)",
+		in:       "0",
+		expected: "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f",
+	}, {
+		name:     "secp256k1 prime - 1",
+		in:       "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2e",
+		expected: "1",
+	}, {
+		name:     "secp256k1 prime - 2",
+		in:       "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2d",
+		expected: "4",
+	}, {
+		name:     "random sampling #1",
+		in:       "b0ba920360ea8436a216128047aab9766d8faf468895eb5090fc8241ec758896",
+		expected: "133896b0b69fda8ce9f648b9a3af38f345290c9eea3cbd35bafcadf7c34653d3",
+	}, {
+		name:     "random sampling #2",
+		in:       "c55d0d730b1d0285a1599995938b042a756e6e8857d390165ffab480af61cbd5",
+		expected: "cd81758b3f5877cbe7e5b0a10cebfa73bcbf0957ca6453e63ee8954ab7780bee",
+	}, {
+		name:     "random sampling #3",
+		in:       "e89c1f9a70d93651a1ba4bca5b78658f00de65a66014a25544d3365b0ab82324",
+		expected: "39ffc7a43e5dbef78fd5d0354fb82c6d34f5a08735e34df29da14665b43aa1f",
+	}, {
+		name:     "random sampling #4",
+		in:       "7dc26186079d22bcbe1614aa20ae627e62d72f9be7ad1e99cac0feb438956f05",
+		expected: "bf86bcfc4edb3d81f916853adfda80c07c57745b008b60f560b1912f95bce8ae",
+	}}
 
-	t.Logf("Running %d tests", len(tests))
-	for i, test := range tests {
-		f := new(fieldVal).SetHex(test.in).Normalize()
-		expected := new(fieldVal).SetHex(test.expected).Normalize()
-		result := f.Square().Normalize()
+	for _, test := range tests {
+		f := setHex(test.in).Normalize()
+		expected := setHex(test.expected).Normalize()
+
+		// Ensure squaring the value with the result going to another variable
+		// produces the expected result.
+		result := new(FieldVal).SquareVal(f).Normalize()
 		if !result.Equals(expected) {
-			t.Errorf("fieldVal.Square #%d wrong result\n"+
-				"got: %v\nwant: %v", i, result, expected)
+			t.Errorf("%s: unexpected result\ngot: %v\nwant: %v", test.name,
+				result, expected)
+			continue
+		}
+
+		// Ensure self squaring an existing field value produces the expected
+		// result.
+		f.Square().Normalize()
+		if !f.Equals(expected) {
+			t.Errorf("%s: unexpected result\ngot: %v\nwant: %v", test.name,
+				f, expected)
 			continue
 		}
 	}
@@ -813,296 +846,127 @@ func TestInverse(t *testing.T) {
 
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
-		f := new(fieldVal).SetHex(test.in).Normalize()
-		expected := new(fieldVal).SetHex(test.expected).Normalize()
+		f := setHex(test.in).Normalize()
+		expected := setHex(test.expected).Normalize()
 		result := f.Inverse().Normalize()
 		if !result.Equals(expected) {
-			t.Errorf("fieldVal.Inverse #%d wrong result\n"+
+			t.Errorf("FieldVal.Inverse #%d wrong result\n"+
 				"got: %v\nwant: %v", i, result, expected)
 			continue
 		}
 	}
 }
 
-// randFieldVal returns a random, normalized element in the field.
-func randFieldVal(t *testing.T) fieldVal {
-	var b [32]byte
-	if _, err := rand.Read(b[:]); err != nil {
-		t.Fatalf("unable to create random element: %v", err)
+// randFieldVal returns a field value created from a random value generated by
+// the passed rng.
+func randFieldVal(t *testing.T, rng *rand.Rand) *FieldVal {
+	t.Helper()
+
+	var buf [32]byte
+	if _, err := rng.Read(buf[:]); err != nil {
+		t.Fatalf("failed to read random: %v", err)
 	}
 
-	var x fieldVal
-	return *x.SetBytes(&b).Normalize()
+	// Create and return both a big integer and a field value.
+	var fv FieldVal
+	fv.SetBytes(&buf)
+	return &fv
 }
 
-type sqrtTest struct {
-	name     string
-	in       string
-	expected string
-}
-
-// TestSqrt asserts that a fieldVal properly computes the square root modulo the
-// sep256k1 prime.
-func TestSqrt(t *testing.T) {
-	var tests []sqrtTest
-
-	// No valid root exists for the negative of a square.
-	for i := uint(9); i > 0; i-- {
-		var (
-			x fieldVal
-			s fieldVal // x^2 mod p
-			n fieldVal // -x^2 mod p
-		)
-
-		x.SetInt(i)
-		s.SquareVal(&x).Normalize()
-		n.NegateVal(&s, 1).Normalize()
-
-		tests = append(tests, sqrtTest{
-			name: fmt.Sprintf("-%d", i),
-			in:   fmt.Sprintf("%x", *n.Bytes()),
-		})
-	}
-
-	// A root should exist for true squares.
-	for i := uint(0); i < 10; i++ {
-		var (
-			x fieldVal
-			s fieldVal // x^2 mod p
-		)
-
-		x.SetInt(i)
-		s.SquareVal(&x).Normalize()
-
-		tests = append(tests, sqrtTest{
-			name:     fmt.Sprintf("%d", i),
-			in:       fmt.Sprintf("%x", *s.Bytes()),
-			expected: fmt.Sprintf("%x", *x.Bytes()),
-		})
-	}
-
-	// Compute a non-square element, by negating if it has a root.
-	ns := randFieldVal(t)
-	if new(fieldVal).SqrtVal(&ns).Square().Equals(&ns) {
-		ns.Negate(1).Normalize()
-	}
-
-	// For large random field values, test that:
-	//  1) its square has a valid root.
-	//  2) the negative of its square has no root.
-	//  3) the product of its square with a non-square has no root.
-	for i := 0; i < 10; i++ {
-		var (
-			x fieldVal
-			s fieldVal // x^2 mod p
-			n fieldVal // -x^2 mod p
-			m fieldVal // ns*x^2 mod p
-		)
-
-		x = randFieldVal(t)
-		s.SquareVal(&x).Normalize()
-		n.NegateVal(&s, 1).Normalize()
-		m.Mul2(&s, &ns).Normalize()
-
-		// A root should exist for true squares.
-		tests = append(tests, sqrtTest{
-			name:     fmt.Sprintf("%x", *s.Bytes()),
-			in:       fmt.Sprintf("%x", *s.Bytes()),
-			expected: fmt.Sprintf("%x", *x.Bytes()),
-		})
-
-		// No valid root exists for the negative of a square.
-		tests = append(tests, sqrtTest{
-			name: fmt.Sprintf("-%x", *s.Bytes()),
-			in:   fmt.Sprintf("%x", *n.Bytes()),
-		})
-
-		// No root should be computed for product of a square and
-		// non-square.
-		tests = append(tests, sqrtTest{
-			name: fmt.Sprintf("ns*%x", *s.Bytes()),
-			in:   fmt.Sprintf("%x", *m.Bytes()),
-		})
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			testSqrt(t, test)
-		})
-	}
-}
-
-func testSqrt(t *testing.T, test sqrtTest) {
-	var (
-		f       fieldVal
-		root    fieldVal
-		rootNeg fieldVal
-	)
-
-	f.SetHex(test.in).Normalize()
-
-	// Compute sqrt(f) and its negative.
-	root.SqrtVal(&f).Normalize()
-	rootNeg.NegateVal(&root, 1).Normalize()
-
-	switch {
-
-	// If we expect a square root, verify that either the computed square
-	// root is +/- the expected value.
-	case len(test.expected) > 0:
-		var expected fieldVal
-		expected.SetHex(test.expected).Normalize()
-		if !root.Equals(&expected) && !rootNeg.Equals(&expected) {
-			t.Fatalf("fieldVal.Sqrt incorrect root\n"+
-				"got:     %v\ngot_neg: %v\nwant:    %v",
-				root, rootNeg, expected)
-		}
-
-	// Otherwise, we expect this input not to have a square root.
-	default:
-		if root.Square().Equals(&f) || rootNeg.Square().Equals(&f) {
-			t.Fatalf("fieldVal.Sqrt root should not exist\n"+
-				"got:     %v\ngot_neg: %v", root, rootNeg)
-		}
-	}
-}
-
-// TestFieldSetBytes ensures that setting a field value to a 256-bit big-endian
-// unsigned integer via both the slice and array methods works as expected for
-// edge cases.  Random cases are tested via the various other tests.
-func TestFieldSetBytes(t *testing.T) {
+// TestFieldSquareRoot ensures that calculating the square root of field values
+// via SquareRootVal works as expected for edge cases.
+func TestFieldSquareRoot(t *testing.T) {
 	tests := []struct {
-		name     string     // test description
-		in       string     // hex encoded test value
-		expected [10]uint32 // expected raw ints
+		name  string // test description
+		in    string // hex encoded value
+		valid bool   // whether or not the value has a square root
+		want  string // expected hex encoded value
 	}{{
-		name:     "zero",
-		in:       "00",
-		expected: [10]uint32{0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		name:  "secp256k1 prime (as 0 in and out)",
+		in:    "0",
+		valid: true,
+		want:  "0",
 	}, {
-		name: "field prime",
-		in:   "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f",
-		expected: [10]uint32{
-			0x03fffc2f, 0x03ffffbf, 0x03ffffff, 0x03ffffff, 0x03ffffff,
-			0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x003fffff,
-		},
+		name:  "secp256k1 prime (direct val with 0 out)",
+		in:    "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f",
+		valid: true,
+		want:  "0",
 	}, {
-		name: "field prime - 1",
-		in:   "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2e",
-		expected: [10]uint32{
-			0x03fffc2e, 0x03ffffbf, 0x03ffffff, 0x03ffffff, 0x03ffffff,
-			0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x003fffff,
-		},
+		name:  "secp256k1 prime (as 0 in direct val out)",
+		in:    "0",
+		valid: true,
+		want:  "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f",
 	}, {
-		name: "field prime + 1 (overflow in word zero)",
-		in:   "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc30",
-		expected: [10]uint32{
-			0x03fffc30, 0x03ffffbf, 0x03ffffff, 0x03ffffff, 0x03ffffff,
-			0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x003fffff,
-		},
+		name:  "secp256k1 prime-1",
+		in:    "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2e",
+		valid: false,
+		want:  "0000000000000000000000000000000000000000000000000000000000000001",
 	}, {
-		name: "field prime first 32 bits",
-		in:   "fffffc2f",
-		expected: [10]uint32{
-			0x03fffc2f, 0x00000003f, 0x00000000, 0x00000000, 0x00000000,
-			0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
-		},
+		name:  "secp256k1 prime-2",
+		in:    "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2d",
+		valid: false,
+		want:  "210c790573632359b1edb4302c117d8a132654692c3feeb7de3a86ac3f3b53f7",
 	}, {
-		name: "field prime word zero",
-		in:   "03fffc2f",
-		expected: [10]uint32{
-			0x03fffc2f, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
-			0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
-		},
+		name:  "(secp256k1 prime-2)^2",
+		in:    "0000000000000000000000000000000000000000000000000000000000000004",
+		valid: true,
+		want:  "0000000000000000000000000000000000000000000000000000000000000002",
 	}, {
-		name: "field prime first 64 bits",
-		in:   "fffffffefffffc2f",
-		expected: [10]uint32{
-			0x03fffc2f, 0x03ffffbf, 0x00000fff, 0x00000000, 0x00000000,
-			0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
-		},
+		name:  "value 1",
+		in:    "0000000000000000000000000000000000000000000000000000000000000001",
+		valid: true,
+		want:  "0000000000000000000000000000000000000000000000000000000000000001",
 	}, {
-		name: "field prime word zero and one",
-		in:   "0ffffefffffc2f",
-		expected: [10]uint32{
-			0x03fffc2f, 0x03ffffbf, 0x00000000, 0x00000000, 0x00000000,
-			0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
-		},
+		name:  "value 2",
+		in:    "0000000000000000000000000000000000000000000000000000000000000002",
+		valid: true,
+		want:  "210c790573632359b1edb4302c117d8a132654692c3feeb7de3a86ac3f3b53f7",
 	}, {
-		name: "field prime first 96 bits",
-		in:   "fffffffffffffffefffffc2f",
-		expected: [10]uint32{
-			0x03fffc2f, 0x03ffffbf, 0x03ffffff, 0x0003ffff, 0x00000000,
-			0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
-		},
+		name:  "random sampling 1",
+		in:    "16fb970147a9acc73654d4be233cc48b875ce20a2122d24f073d29bd28805aca",
+		valid: false,
+		want:  "6a27dcfca440cf7930a967be533b9620e397f122787c53958aaa7da7ad3d89a4",
 	}, {
-		name: "field prime word zero, one, and two",
-		in:   "3ffffffffffefffffc2f",
-		expected: [10]uint32{
-			0x03fffc2f, 0x03ffffbf, 0x03ffffff, 0x00000000, 0x00000000,
-			0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
-		},
+		name:  "square of random sampling 1",
+		in:    "f4a8c3738ace0a1c3abf77737ae737f07687b5e24c07a643398298bd96893a18",
+		valid: true,
+		want:  "e90468feb8565338c9ab2b41dcc33b7478a31df5dedd2db0f8c2d641d77fa165",
 	}, {
-		name: "overflow in word one (prime + 1<<26)",
-		in:   "ffffffffffffffffffffffffffffffffffffffffffffffffffffffff03fffc2f",
-		expected: [10]uint32{
-			0x03fffc2f, 0x03ffffc0, 0x03ffffff, 0x03ffffff, 0x03ffffff,
-			0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x003fffff,
-		},
+		name:  "random sampling 2",
+		in:    "69d1323ce9f1f7b3bd3c7320b0d6311408e30281e273e39a0d8c7ee1c8257919",
+		valid: true,
+		want:  "61f4a7348274a52d75dfe176b8e3aaff61c1c833b6678260ba73def0fb2ad148",
 	}, {
-		name: "(field prime - 1) * 2 NOT mod P, truncated >32 bytes",
-		in:   "01fffffffffffffffffffffffffffffffffffffffffffffffffffffffdfffff85c",
-		expected: [10]uint32{
-			0x01fffff8, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff,
-			0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x00007fff,
-		},
+		name:  "random sampling 3",
+		in:    "e0debf988ae098ecda07d0b57713e97c6d213db19753e8c95aa12a2fc1cc5272",
+		valid: false,
+		want:  "6e1cc9c311d33d901670135244f994b1ea39501f38002269b34ce231750cfbac",
 	}, {
-		name: "2^256 - 1",
-		in:   "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
-		expected: [10]uint32{
-			0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff,
-			0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x003fffff,
-		},
-	}, {
-		name: "alternating bits",
-		in:   "a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5",
-		expected: [10]uint32{
-			0x01a5a5a5, 0x01696969, 0x025a5a5a, 0x02969696, 0x01a5a5a5,
-			0x01696969, 0x025a5a5a, 0x02969696, 0x01a5a5a5, 0x00296969,
-		},
-	}, {
-		name: "alternating bits 2",
-		in:   "5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a",
-		expected: [10]uint32{
-			0x025a5a5a, 0x02969696, 0x01a5a5a5, 0x01696969, 0x025a5a5a,
-			0x02969696, 0x01a5a5a5, 0x01696969, 0x025a5a5a, 0x00169696,
-		},
+		name:  "random sampling 4",
+		in:    "dcd394f91f74c2ba16aad74a22bb0ed47fe857774b8f2d6c09e28bfb14642878",
+		valid: true,
+		want:  "72b22fe6f173f8bcb21898806142ed4c05428601256eafce5d36c1b08fb82bab",
 	}}
 
 	for _, test := range tests {
-		inBytes := hexToBytes(test.in)
+		input := setHex(test.in).Normalize()
+		want := setHex(test.want).Normalize()
 
-		// Ensure setting the bytes via the slice method works as expected.
-		var f fieldVal
-		f.SetByteSlice(inBytes)
-		if !reflect.DeepEqual(f.n, test.expected) {
-			t.Errorf("%s: unexpected result\ngot: %x\nwant: %x", test.name, f.n,
-				test.expected)
+		// Calculate the square root and enusre the validity flag matches the
+		// expected value.
+		var result FieldVal
+		isValid := result.SquareRootVal(input)
+		if isValid != test.valid {
+			t.Errorf("%s: mismatched validity -- got %v, want %v", test.name,
+				isValid, test.valid)
 			continue
 		}
 
-		// Ensure setting the bytes via the array method works as expected.
-		var f2 fieldVal
-		var b32 [32]byte
-		truncatedInBytes := inBytes
-		if len(truncatedInBytes) > 32 {
-			truncatedInBytes = truncatedInBytes[:32]
-		}
-		copy(b32[32-len(truncatedInBytes):], truncatedInBytes)
-		f2.SetBytes(&b32)
-		if !reflect.DeepEqual(f2.n, test.expected) {
-			t.Errorf("%s: unexpected result\ngot: %x\nwant: %x", test.name,
-				f2.n, test.expected)
+		// Ensure the calculated result matches the expected value.
+		result.Normalize()
+		if !result.Equals(want) {
+			t.Errorf("%s: d wrong result\ngot: %v\nwant: %v", test.name, result,
+				want)
 			continue
 		}
 	}

@@ -5,10 +5,11 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/btcsuite/btcd/btcec"
-	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil"
+	"github.com/dashevo/dashd-go/btcec/v2"
+	"github.com/dashevo/dashd-go/btcec/v2/ecdsa"
+	"github.com/dashevo/dashd-go/btcutil"
+	"github.com/dashevo/dashd-go/chaincfg"
+	"github.com/dashevo/dashd-go/wire"
 	"golang.org/x/crypto/ripemd160"
 )
 
@@ -20,7 +21,7 @@ const (
 	//   Signature hash type (1 byte)
 	//   Public key length (1 byte)
 	//   Public key (33 byte)
-	minPubKeyHashSigScriptLen = 1 + btcec.MinSigLen + 1 + 1 + 33
+	minPubKeyHashSigScriptLen = 1 + ecdsa.MinSigLen + 1 + 1 + 33
 
 	// maxPubKeyHashSigScriptLen is the maximum length of a signature script
 	// that spends a P2PKH output. The length is composed of the following:
@@ -211,11 +212,12 @@ func computeNonWitnessPkScript(sigScript []byte) (PkScript, error) {
 		// The redeem script will always be the last data push of the
 		// signature script, so we'll parse the script into opcodes to
 		// obtain it.
-		parsedOpcodes, err := parseScript(sigScript)
+		const scriptVersion = 0
+		err := checkScriptParses(scriptVersion, sigScript)
 		if err != nil {
 			return PkScript{}, err
 		}
-		redeemScript := parsedOpcodes[len(parsedOpcodes)-1].data
+		redeemScript := finalOpcodeData(scriptVersion, sigScript)
 
 		scriptHash := hash160(redeemScript)
 		script, err := payToScriptHashScript(scriptHash)

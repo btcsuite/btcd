@@ -4,7 +4,7 @@ dashd-go (in development - not working)
 [![Build Status](https://github.com/btcsuite/btcd/workflows/Build%20and%20Test/badge.svg)](https://github.com/btcsuite/btcd/actions)
 [![Coverage Status](https://coveralls.io/repos/github/dashevo/dashd-go/badge.svg?branch=master)](https://coveralls.io/github/dashevo/dashd-go?branch=master)
 [![ISC License](https://img.shields.io/badge/license-ISC-blue.svg)](http://copyfree.org)
-[![GoDoc](https://img.shields.io/badge/godoc-reference-blue.svg)](https://godoc.org/github.com/btcsuite/btcd)
+[![GoDoc](https://img.shields.io/badge/godoc-reference-blue.svg)](https://pkg.go.dev/github.com/btcsuite/btcd)
 
 dashd-go is an alternative full node dash implementation written in Go (golang).
 
@@ -33,11 +33,9 @@ directly with dashd-go.
 
 ## Requirements
 
-[Go](http://golang.org) 1.14 or newer.
+[Go](http://golang.org) 1.16 or newer.
 
 ## Installation
-
-#### Windows - MSI Available
 
 https://github.com/btcsuite/btcd/releases
 
@@ -71,10 +69,6 @@ $ GO111MODULE=on go install -v . ./cmd/...
 
 ## Updating
 
-#### Windows
-
-Install a newer MSI
-
 #### Linux/BSD/MacOSX/POSIX - Build from Source
 
 - Run the following commands to update btcd, all dependencies, and install it:
@@ -91,10 +85,6 @@ btcd has several configuration options available to tweak how it runs, but all
 of the basic operations described in the intro section work with zero
 configuration.
 
-#### Windows (Installed from MSI)
-
-Launch btcd from your Start menu.
-
 #### Linux/BSD/POSIX/Source
 
 ```bash
@@ -103,9 +93,9 @@ $ ./btcd
 
 ## IRC
 
-- irc.freenode.net
+- irc.libera.chat
 - channel #btcd
-- [webchat](https://webchat.freenode.net/?channels=btcd)
+- [webchat](https://web.libera.chat/gamja/?channels=btcd)
 
 ## Issue Tracker
 

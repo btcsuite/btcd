@@ -16,9 +16,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/mining"
-	"github.com/btcsuite/btcutil"
+	"github.com/dashevo/dashd-go/btcutil"
+	"github.com/dashevo/dashd-go/chaincfg/chainhash"
+	"github.com/dashevo/dashd-go/mining"
 )
 
 // TODO incorporate Alex Morcos' modifications to Gavin's initial model
@@ -563,7 +563,7 @@ func (ef *FeeEstimator) EstimateFee(numBlocks uint32) (BtcPerKilobyte, error) {
 	if numBlocks > estimateFeeDepth {
 		return -1, fmt.Errorf(
 			"can only estimate fees for up to %d blocks from now",
-			estimateFeeBinSize)
+			estimateFeeDepth)
 	}
 
 	// If there are no cached results, generate them.

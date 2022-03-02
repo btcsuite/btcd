@@ -1,8 +1,8 @@
 # btcd
 
-[![Build Status](https://travis-ci.org/dashevo/dashd-go.png?branch=master)](https://travis-ci.org/dashevo/dashd-go)
+[![Build Status](https://travis-ci.org/dashevo/dashd-go.png?branch=master)](https://github.com/dashevo/dashd-go/actions)
 [![ISC License](http://img.shields.io/badge/license-ISC-blue.svg)](http://copyfree.org)
-[![GoDoc](https://img.shields.io/badge/godoc-reference-blue.svg)](http://godoc.org/github.com/btcsuite/btcd)
+[![GoDoc](https://img.shields.io/badge/godoc-reference-blue.svg)](https://pkg.go.dev/github.com/btcsuite/btcd)
 
 btcd is an alternative full node bitcoin implementation written in Go (golang).
 

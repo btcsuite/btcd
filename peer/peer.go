@@ -18,11 +18,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/btcsuite/btcd/blockchain"
-	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/go-socks/socks"
+	"github.com/dashevo/dashd-go/blockchain"
+	"github.com/dashevo/dashd-go/chaincfg"
+	"github.com/dashevo/dashd-go/chaincfg/chainhash"
+	"github.com/dashevo/dashd-go/wire"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/decred/dcrd/lru"
 )
@@ -84,11 +84,6 @@ var (
 	// sentNonces houses the unique nonces that are generated when pushing
 	// version messages that are used to detect self connections.
 	sentNonces = lru.NewCache(50)
-
-	// allowSelfConns is only used to allow the tests to bypass the self
-	// connection detecting and disconnect logic since they intentionally
-	// do so for testing purposes.
-	allowSelfConns bool
 )
 
 // MessageListeners defines callback function pointers to invoke with message
@@ -276,6 +271,18 @@ type Config struct {
 	// TrickleInterval is the duration of the ticker which trickles down the
 	// inventory to a peer.
 	TrickleInterval time.Duration
+
+	// AllowSelfConns is only used to allow the tests to bypass the self
+	// connection detecting and disconnect logic since they intentionally
+	// do so for testing purposes.
+	AllowSelfConns bool
+
+	// DisableStallHandler if true, then the stall handler that attempts to
+	// disconnect from peers that appear to be taking too long to respond
+	// to requests won't be activated. This can be useful in certain simnet
+	// scenarios where the stall behavior isn't important to the system
+	// under test.
+	DisableStallHandler bool
 }
 
 // minUint32 is a helper function to return the minimum of two uint32s.
@@ -1202,6 +1209,10 @@ out:
 	for {
 		select {
 		case msg := <-p.stallControl:
+			if p.cfg.DisableStallHandler {
+				continue
+			}
+
 			switch msg.command {
 			case sccSendMessage:
 				// Add a deadline for the expected response
@@ -1264,6 +1275,10 @@ out:
 			}
 
 		case <-stallTicker.C:
+			if p.cfg.DisableStallHandler {
+				continue
+			}
+
 			// Calculate the offset to apply to the deadline based
 			// on how long the handlers have taken to execute since
 			// the last tick.
@@ -1896,7 +1911,7 @@ func (p *Peer) readRemoteVersionMsg() error {
 	}
 
 	// Detect self connections.
-	if !allowSelfConns && sentNonces.Contains(msg.Nonce) {
+	if !p.cfg.AllowSelfConns && sentNonces.Contains(msg.Nonce) {
 		return errors.New("disconnecting peer connected to self")
 	}
 

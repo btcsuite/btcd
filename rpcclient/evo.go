@@ -19,12 +19,12 @@ import (
 // BLSGenerateAsync RPC invocation (or an applicable error).
 type FutureGetBLSResult struct {
 	client   *Client
-	Response chan *response
+	Response chan *Response
 }
 
 // Receive waits for the response promised by the future and returns the member signature for the quorum.
 func (r FutureGetBLSResult) Receive() (*btcjson.BLSResult, error) {
-	res, err := receiveFuture(r.Response)
+	res, err := ReceiveFuture(r.Response)
 	if err != nil {
 		return nil, err
 	}
@@ -47,7 +47,7 @@ func (c *Client) BLSGenerateAsync() FutureGetBLSResult {
 
 	return FutureGetBLSResult{
 		client:   c,
-		Response: c.sendCmd(cmd),
+		Response: c.SendCmd(cmd),
 	}
 }
 
@@ -66,7 +66,7 @@ func (c *Client) BLSFromSecretAsync(secret string) FutureGetBLSResult {
 
 	return FutureGetBLSResult{
 		client:   c,
-		Response: c.sendCmd(cmd),
+		Response: c.SendCmd(cmd),
 	}
 }
 
@@ -81,12 +81,12 @@ func (c *Client) BLSFromSecret(secret string) (*btcjson.BLSResult, error) {
 // QuorumSignAsync RPC invocation (or an applicable error).
 type FutureGetQuorumSignResult struct {
 	client   *Client
-	Response chan *response
+	Response chan *Response
 }
 
 // Receive waits for the response promised by the future and returns the member signature for the quorum.
 func (r FutureGetQuorumSignResult) Receive() (*btcjson.QuorumSignResultWithBool, error) {
-	res, err := receiveFuture(r.Response)
+	res, err := ReceiveFuture(r.Response)
 	if err != nil {
 		return nil, err
 	}
@@ -109,7 +109,7 @@ func (c *Client) QuorumSignAsync(quorumType btcjson.LLMQType, requestID, message
 
 	return FutureGetQuorumSignResult{
 		client:   c,
-		Response: c.sendCmd(cmd),
+		Response: c.SendCmd(cmd),
 	}
 }
 
@@ -133,12 +133,12 @@ func (c *Client) QuorumSignSubmit(quorumType btcjson.LLMQType, requestID, messag
 // QuorumVerifyAsync RPC invocation (or an applicable error).
 type FutureGetQuorumVerifyResult struct {
 	client   *Client
-	Response chan *response
+	Response chan *Response
 }
 
 // Receive waits for the response promised by the future and returns the member signature for the quorum.
 func (r FutureGetQuorumVerifyResult) Receive() (*btcjson.QuorumVerifyResult, error) {
-	res, err := receiveFuture(r.Response)
+	res, err := ReceiveFuture(r.Response)
 	if err != nil {
 		return nil, err
 	}
@@ -161,7 +161,7 @@ func (c *Client) QuorumVerifyAsync(quorumType btcjson.LLMQType, requestID string
 
 	return FutureGetQuorumVerifyResult{
 		client:   c,
-		Response: c.sendCmd(cmd),
+		Response: c.SendCmd(cmd),
 	}
 }
 
@@ -180,12 +180,12 @@ func (c *Client) QuorumVerify(quorumType btcjson.LLMQType, requestID string, mes
 // QuorumInfoAsync RPC invocation (or an applicable error).
 type FutureGetQuorumInfoResult struct {
 	client   *Client
-	Response chan *response
+	Response chan *Response
 }
 
 // Receive waits for the response promised by the future and returns the member signature for the quorum.
 func (r FutureGetQuorumInfoResult) Receive() (*btcjson.QuorumInfoResult, error) {
-	res, err := receiveFuture(r.Response)
+	res, err := ReceiveFuture(r.Response)
 	if err != nil {
 		return nil, err
 	}
@@ -209,7 +209,7 @@ func (c *Client) QuorumInfoAsync(quorumType btcjson.LLMQType, quorumHash string,
 
 	return FutureGetQuorumInfoResult{
 		client:   c,
-		Response: c.sendCmd(cmd),
+		Response: c.SendCmd(cmd),
 	}
 }
 
@@ -224,12 +224,12 @@ func (c *Client) QuorumInfo(quorumType btcjson.LLMQType, quorumHash string, incl
 // QuorumListAsync RPC invocation (or an applicable error).
 type FutureGetQuorumListResult struct {
 	client   *Client
-	Response chan *response
+	Response chan *Response
 }
 
 // Receive waits for the response promised by the future and returns the member signature for the quorum.
 func (r FutureGetQuorumListResult) Receive() (*btcjson.QuorumListResult, error) {
-	res, err := receiveFuture(r.Response)
+	res, err := ReceiveFuture(r.Response)
 	if err != nil {
 		return nil, err
 	}
@@ -251,7 +251,7 @@ func (c *Client) QuorumListAsync() FutureGetQuorumListResult {
 
 	return FutureGetQuorumListResult{
 		client:   c,
-		Response: c.sendCmd(cmd),
+		Response: c.SendCmd(cmd),
 	}
 }
 
@@ -266,12 +266,12 @@ func (c *Client) QuorumList() (*btcjson.QuorumListResult, error) {
 // QuorumSelectQuorumtAsync RPC invocation (or an applicable error).
 type FutureGetQuorumSelectQuorumResult struct {
 	client   *Client
-	Response chan *response
+	Response chan *Response
 }
 
 // Receive waits for the response promised by the future and returns the member signature for the quorum.
 func (r FutureGetQuorumSelectQuorumResult) Receive() (*btcjson.QuorumSelectQuorumResult, error) {
-	res, err := receiveFuture(r.Response)
+	res, err := ReceiveFuture(r.Response)
 	if err != nil {
 		return nil, err
 	}
@@ -293,7 +293,7 @@ func (c *Client) QuorumSelectQuorumAsync(quorumType btcjson.LLMQType, requestID 
 
 	return FutureGetQuorumSelectQuorumResult{
 		client:   c,
-		Response: c.sendCmd(cmd),
+		Response: c.SendCmd(cmd),
 	}
 }
 
@@ -308,13 +308,13 @@ func (c *Client) QuorumSelectQuorum(quorumType btcjson.LLMQType, requestID strin
 // QuorumDKGStatusAsync RPC invocation (or an applicable error).
 type FutureGetQuorumDKGStatusResult struct {
 	client      *Client
-	Response    chan *response
+	Response    chan *Response
 	detailLevel btcjson.DetailLevel
 }
 
 // Receive waits for the response promised by the future and returns the member signature for the quorum.
 func (r FutureGetQuorumDKGStatusResult) Receive() (interface{}, error) {
-	res, err := receiveFuture(r.Response)
+	res, err := ReceiveFuture(r.Response)
 	if err != nil {
 		return nil, err
 	}
@@ -354,7 +354,7 @@ func (c *Client) QuorumDKGStatusAsync(detailLevel btcjson.DetailLevel) FutureGet
 
 	return FutureGetQuorumDKGStatusResult{
 		client:      c,
-		Response:    c.sendCmd(cmd),
+		Response:    c.SendCmd(cmd),
 		detailLevel: detailLevel,
 	}
 }
@@ -379,12 +379,12 @@ func (c *Client) QuorumDKGStatusCounts() (*btcjson.QuorumDKGStatusCountsResult, 
 // QuorumMemberOfAsync RPC invocation (or an applicable error).
 type FutureGetQuorumMemberOfResult struct {
 	client   *Client
-	Response chan *response
+	Response chan *Response
 }
 
 // Receive waits for the response promised by the future and returns the member signature for the quorum.
 func (r FutureGetQuorumMemberOfResult) Receive() ([]btcjson.QuorumMemberOfResult, error) {
-	res, err := receiveFuture(r.Response)
+	res, err := ReceiveFuture(r.Response)
 	if err != nil {
 		return nil, err
 	}
@@ -408,7 +408,7 @@ func (c *Client) QuorumMemberOfAsync(proTxHash string, scanQuorumsCount int) Fut
 
 	return FutureGetQuorumMemberOfResult{
 		client:   c,
-		Response: c.sendCmd(cmd),
+		Response: c.SendCmd(cmd),
 	}
 }
 
@@ -423,12 +423,12 @@ func (c *Client) QuorumMemberOf(proTxHash string, scanQuorumsCount int) ([]btcjs
 // QuorumMemberOfAsync RPC invocation (or an applicable error).
 type FutureGetQuorumGetRecSigResult struct {
 	client   *Client
-	Response chan *response
+	Response chan *Response
 }
 
 // Receive waits for the response promised by the future and returns the member signature for the quorum.
 func (r FutureGetQuorumGetRecSigResult) Receive() ([]btcjson.QuorumSignResult, error) {
-	res, err := receiveFuture(r.Response)
+	res, err := ReceiveFuture(r.Response)
 	if err != nil {
 		return nil, err
 	}
@@ -451,7 +451,7 @@ func (c *Client) QuorumGetRecSigAsync(quorumType btcjson.LLMQType, requestID, me
 
 	return FutureGetQuorumGetRecSigResult{
 		client:   c,
-		Response: c.sendCmd(cmd),
+		Response: c.SendCmd(cmd),
 	}
 }
 
@@ -466,12 +466,12 @@ func (c *Client) QuorumGetRecSig(quorumType btcjson.LLMQType, requestID, message
 // QuorumMemberOfAsync RPC invocation (or an applicable error).
 type FutureGetQuorumGetBoolResult struct {
 	client   *Client
-	Response chan *response
+	Response chan *Response
 }
 
 // Receive waits for the response promised by the future and returns the member signature for the quorum.
 func (r FutureGetQuorumGetBoolResult) Receive() (bool, error) {
-	res, err := receiveFuture(r.Response)
+	res, err := ReceiveFuture(r.Response)
 	if err != nil {
 		return false, err
 	}
@@ -494,7 +494,7 @@ func (c *Client) QuorumHasRecSigAsync(quorumType btcjson.LLMQType, requestID, me
 
 	return FutureGetQuorumGetBoolResult{
 		client:   c,
-		Response: c.sendCmd(cmd),
+		Response: c.SendCmd(cmd),
 	}
 }
 
@@ -513,7 +513,7 @@ func (c *Client) QuorumIsConflictingAsync(quorumType btcjson.LLMQType, requestID
 
 	return FutureGetQuorumGetBoolResult{
 		client:   c,
-		Response: c.sendCmd(cmd),
+		Response: c.SendCmd(cmd),
 	}
 }
 
@@ -528,16 +528,21 @@ func (c *Client) QuorumIsConflicting(quorumType btcjson.LLMQType, requestID, mes
 // string RPC invocation (or an applicable error).
 type FutureGetProTxStringResult struct {
 	client   *Client
-	Response chan *response
+	Response chan *Response
 }
 
 // Receive waits for the response promised by the future
 func (r FutureGetProTxStringResult) Receive() (string, error) {
-	res, err := receiveFuture(r.Response)
+	data, err := ReceiveFuture(r.Response)
 	if err != nil {
 		return "", err
 	}
-	return string(res), nil
+	var res string
+	err = json.Unmarshal(data, &res)
+	if err != nil {
+		return "", err
+	}
+	return res, nil
 }
 
 // ProTxRegisterAsync returns an instance of a type that can be used to get
@@ -545,7 +550,7 @@ func (r FutureGetProTxStringResult) Receive() (string, error) {
 // the returned instance.
 func (c *Client) ProTxRegisterAsync(collateralHash string, collateralIndex int, ipAndPort, ownerAddress, operatorPubKey, votingAddress string, operatorReward float64, payoutAddress, feeSourceAddress string, submit bool) FutureGetProTxStringResult {
 	cmd := btcjson.NewProTxRegisterCmd(collateralHash, collateralIndex, ipAndPort, ownerAddress, operatorPubKey, votingAddress, operatorReward, payoutAddress, feeSourceAddress, submit)
-	return FutureGetProTxStringResult{client: c, Response: c.sendCmd(cmd)}
+	return FutureGetProTxStringResult{client: c, Response: c.SendCmd(cmd)}
 }
 
 // ProTxRegister returns a protx register
@@ -563,7 +568,7 @@ func (c *Client) ProTxRegister(collateralHash string, collateralIndex int, ipAnd
 // the returned instance.
 func (c *Client) ProTxRegisterFundAsync(collateralAddress, ipAndPort, ownerAddress, operatorPubKey, votingAddress string, operatorReward float64, payoutAddress, fundAddress string, submit bool) FutureGetProTxStringResult {
 	cmd := btcjson.NewProTxRegisterFundCmd(collateralAddress, ipAndPort, ownerAddress, operatorPubKey, votingAddress, operatorReward, payoutAddress, fundAddress, submit)
-	return FutureGetProTxStringResult{client: c, Response: c.sendCmd(cmd)}
+	return FutureGetProTxStringResult{client: c, Response: c.SendCmd(cmd)}
 }
 
 // ProTxRegisterFund returns a protx register_fund
@@ -580,12 +585,12 @@ func (c *Client) ProTxRegisterFund(collateralAddress, ipAndPort, ownerAddress, o
 // ProTxInfoAsync RPC invocation (or an applicable error).
 type FutureGetProTxRegisterPrepareResult struct {
 	client   *Client
-	Response chan *response
+	Response chan *Response
 }
 
 // Receive waits for the response promised by the future
 func (r FutureGetProTxRegisterPrepareResult) Receive() (*btcjson.ProTxRegisterPrepareResult, error) {
-	res, err := receiveFuture(r.Response)
+	res, err := ReceiveFuture(r.Response)
 	if err != nil {
 		return nil, err
 	}
@@ -604,7 +609,7 @@ func (r FutureGetProTxRegisterPrepareResult) Receive() (*btcjson.ProTxRegisterPr
 // the returned instance.
 func (c *Client) ProTxRegisterPrepareAsync(collateralHash string, collateralIndex int, ipAndPort, ownerAddress, operatorPubKey, votingAddress string, operatorReward float64, payoutAddress, feeSourceAddress string) FutureGetProTxRegisterPrepareResult {
 	cmd := btcjson.NewProTxRegisterPrepareCmd(collateralHash, collateralIndex, ipAndPort, ownerAddress, operatorPubKey, votingAddress, operatorReward, payoutAddress, feeSourceAddress)
-	return FutureGetProTxRegisterPrepareResult{client: c, Response: c.sendCmd(cmd)}
+	return FutureGetProTxRegisterPrepareResult{client: c, Response: c.SendCmd(cmd)}
 }
 
 // ProTxRegisterPrepare returns a protx register_prepare
@@ -619,7 +624,7 @@ func (c *Client) ProTxRegisterPrepare(collateralHash string, collateralIndex int
 // the returned instance.
 func (c *Client) ProTxRegisterSubmitAsync(tx, sig string) FutureGetProTxStringResult {
 	cmd := btcjson.NewProTxRegisterSubmitCmd(tx, sig)
-	return FutureGetProTxStringResult{client: c, Response: c.sendCmd(cmd)}
+	return FutureGetProTxStringResult{client: c, Response: c.SendCmd(cmd)}
 }
 
 // ProTxRegisterSubmit returns a protx register_submit
@@ -633,13 +638,13 @@ func (c *Client) ProTxRegisterSubmit(tx, sig string) (string, error) {
 // ProTxListAsync RPC invocation (or an applicable error).
 type FutureGetProTxListResult struct {
 	client   *Client
-	Response chan *response
+	Response chan *Response
 	detailed bool
 }
 
 // Receive waits for the response promised by the future
 func (r FutureGetProTxListResult) Receive() (interface{}, error) {
-	res, err := receiveFuture(r.Response)
+	res, err := ReceiveFuture(r.Response)
 	if err != nil {
 		return nil, err
 	}
@@ -666,7 +671,7 @@ func (r FutureGetProTxListResult) Receive() (interface{}, error) {
 // the returned instance.
 func (c *Client) ProTxListAsync(cmdType btcjson.ProTxListType, detailed bool, height int) FutureGetProTxListResult {
 	cmd := btcjson.NewProTxListCmd(cmdType, detailed, height)
-	return FutureGetProTxListResult{client: c, Response: c.sendCmd(cmd), detailed: detailed}
+	return FutureGetProTxListResult{client: c, Response: c.SendCmd(cmd), detailed: detailed}
 }
 
 // ProTxList returns a protx list result
@@ -680,12 +685,12 @@ func (c *Client) ProTxList(cmdType btcjson.ProTxListType, detailed bool, height 
 // ProTxInfoAsync RPC invocation (or an applicable error).
 type FutureGetProTxInfoResult struct {
 	client   *Client
-	Response chan *response
+	Response chan *Response
 }
 
 // Receive waits for the response promised by the future
 func (r FutureGetProTxInfoResult) Receive() (*btcjson.ProTxInfoResult, error) {
-	res, err := receiveFuture(r.Response)
+	res, err := ReceiveFuture(r.Response)
 	if err != nil {
 		return nil, err
 	}
@@ -704,7 +709,7 @@ func (r FutureGetProTxInfoResult) Receive() (*btcjson.ProTxInfoResult, error) {
 // the returned instance.
 func (c *Client) ProTxInfoAsync(proTxHash string) FutureGetProTxInfoResult {
 	cmd := btcjson.NewProTxInfoCmd(proTxHash)
-	return FutureGetProTxInfoResult{client: c, Response: c.sendCmd(cmd)}
+	return FutureGetProTxInfoResult{client: c, Response: c.SendCmd(cmd)}
 }
 
 // ProTxInfo returns a protx info result
@@ -719,7 +724,7 @@ func (c *Client) ProTxInfo(proTxHash string) (*btcjson.ProTxInfoResult, error) {
 // the returned instance.
 func (c *Client) ProTxUpdateServiceAsync(proTxHash, ipAndPort, operatorPubKey, operatorPayoutAddress, feeSourceAddress string) FutureGetProTxStringResult {
 	cmd := btcjson.NewProTxUpdateServiceCmd(proTxHash, ipAndPort, operatorPubKey, operatorPayoutAddress, feeSourceAddress)
-	return FutureGetProTxStringResult{client: c, Response: c.sendCmd(cmd)}
+	return FutureGetProTxStringResult{client: c, Response: c.SendCmd(cmd)}
 }
 
 // ProTxUpdateService returns a protx update_service result
@@ -734,7 +739,7 @@ func (c *Client) ProTxUpdateService(proTxHash, ipAndPort, operatorPubKey, operat
 // the returned instance.
 func (c *Client) ProTxUpdateRegistrarAsync(proTxHash, operatorPubKey, votingAddress, payoutAddress, feeSourceAddress string) FutureGetProTxStringResult {
 	cmd := btcjson.NewProTxUpdateRegistrarCmd(proTxHash, operatorPubKey, votingAddress, payoutAddress, feeSourceAddress)
-	return FutureGetProTxStringResult{client: c, Response: c.sendCmd(cmd)}
+	return FutureGetProTxStringResult{client: c, Response: c.SendCmd(cmd)}
 }
 
 // ProTxUpdateRegistrar returns a protx update_registrar result
@@ -749,7 +754,7 @@ func (c *Client) ProTxUpdateRegistrar(proTxHash, operatorPubKey, votingAddress, 
 // the returned instance.
 func (c *Client) ProTxRevokeAsync(proTxHash, operatorPrivateKey string, reason int, feeSourceAddress string) FutureGetProTxStringResult {
 	cmd := btcjson.NewProTxRevokeCmd(proTxHash, operatorPrivateKey, reason, feeSourceAddress)
-	return FutureGetProTxStringResult{client: c, Response: c.sendCmd(cmd)}
+	return FutureGetProTxStringResult{client: c, Response: c.SendCmd(cmd)}
 }
 
 // ProTxRevoke returns a protx register_submit
@@ -763,12 +768,12 @@ func (c *Client) ProTxRevoke(proTxHash, operatorPrivateKey string, reason int, f
 // ProTxDiffAsync RPC invocation (or an applicable error).
 type FutureGetProTxDiffResult struct {
 	client   *Client
-	Response chan *response
+	Response chan *Response
 }
 
 // Receive waits for the response promised by the future
 func (r FutureGetProTxDiffResult) Receive() (*btcjson.ProTxDiffResult, error) {
-	res, err := receiveFuture(r.Response)
+	res, err := ReceiveFuture(r.Response)
 	if err != nil {
 		return nil, err
 	}
@@ -786,7 +791,7 @@ func (r FutureGetProTxDiffResult) Receive() (*btcjson.ProTxDiffResult, error) {
 // the returned instance.
 func (c *Client) ProTxDiffAsync(baseBlock, block int) FutureGetProTxDiffResult {
 	cmd := btcjson.NewProTxDiffCmd(baseBlock, block)
-	return FutureGetProTxDiffResult{client: c, Response: c.sendCmd(cmd)}
+	return FutureGetProTxDiffResult{client: c, Response: c.SendCmd(cmd)}
 }
 
 // ProTxDiff returns a protx diff result

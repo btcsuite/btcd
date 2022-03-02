@@ -231,7 +231,7 @@ func TestChainSvrWsNtfns(t *testing.T) {
 	for i, test := range tests {
 		// Marshal the notification as created by the new static
 		// creation function.  The ID is nil for notifications.
-		marshalled, err := btcjson.MarshalCmd(nil, test.staticNtfn())
+		marshalled, err := btcjson.MarshalCmd(btcjson.RpcVersion1, nil, test.staticNtfn())
 		if err != nil {
 			t.Errorf("MarshalCmd #%d (%s) unexpected error: %v", i,
 				test.name, err)
@@ -256,7 +256,7 @@ func TestChainSvrWsNtfns(t *testing.T) {
 		// Marshal the notification as created by the generic new
 		// notification creation function.    The ID is nil for
 		// notifications.
-		marshalled, err = btcjson.MarshalCmd(nil, cmd)
+		marshalled, err = btcjson.MarshalCmd(btcjson.RpcVersion1, nil, cmd)
 		if err != nil {
 			t.Errorf("MarshalCmd #%d (%s) unexpected error: %v", i,
 				test.name, err)

@@ -13,11 +13,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/peer"
-	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/go-socks/socks"
+	"github.com/dashevo/dashd-go/chaincfg"
+	"github.com/dashevo/dashd-go/chaincfg/chainhash"
+	"github.com/dashevo/dashd-go/peer"
+	"github.com/dashevo/dashd-go/wire"
 )
 
 // conn mocks a network connection by implementing the net.Conn interface.  It
@@ -238,6 +238,7 @@ func TestPeerConnection(t *testing.T) {
 		ProtocolVersion:   wire.RejectVersion, // Configure with older version
 		Services:          0,
 		TrickleInterval:   time.Second * 10,
+		AllowSelfConns:    true,
 	}
 	peer2Cfg := &peer.Config{
 		Listeners:         peer1Cfg.Listeners,
@@ -247,6 +248,7 @@ func TestPeerConnection(t *testing.T) {
 		ChainParams:       &chaincfg.MainNetParams,
 		Services:          wire.SFNodeNetwork | wire.SFNodeWitness,
 		TrickleInterval:   time.Second * 10,
+		AllowSelfConns:    true,
 	}
 
 	wantStats1 := peerStats{
@@ -452,6 +454,7 @@ func TestPeerListeners(t *testing.T) {
 		ChainParams:       &chaincfg.MainNetParams,
 		Services:          wire.SFNodeBloom,
 		TrickleInterval:   time.Second * 10,
+		AllowSelfConns:    true,
 	}
 	inConn, outConn := pipe(
 		&conn{raddr: "10.0.0.1:8333"},
@@ -623,6 +626,7 @@ func TestOutboundPeer(t *testing.T) {
 		ChainParams:       &chaincfg.MainNetParams,
 		Services:          0,
 		TrickleInterval:   time.Second * 10,
+		AllowSelfConns:    true,
 	}
 
 	r, w := io.Pipe()
@@ -764,6 +768,7 @@ func TestUnsupportedVersionPeer(t *testing.T) {
 		ChainParams:       &chaincfg.MainNetParams,
 		Services:          0,
 		TrickleInterval:   time.Second * 10,
+		AllowSelfConns:    true,
 	}
 
 	localNA := wire.NewNetAddressIPPort(
@@ -874,6 +879,7 @@ func TestDuplicateVersionMsg(t *testing.T) {
 		UserAgentVersion: "1.0",
 		ChainParams:      &chaincfg.MainNetParams,
 		Services:         0,
+		AllowSelfConns:   true,
 	}
 	inConn, outConn := pipe(
 		&conn{laddr: "10.0.0.1:9108", raddr: "10.0.0.2:9108"},
@@ -935,6 +941,7 @@ func TestUpdateLastBlockHeight(t *testing.T) {
 		UserAgentVersion: "1.0",
 		ChainParams:      &chaincfg.MainNetParams,
 		Services:         0,
+		AllowSelfConns:   true,
 	}
 	remotePeerCfg := peerCfg
 	remotePeerCfg.NewestBlock = func() (*chainhash.Hash, int32, error) {
@@ -981,9 +988,4 @@ func TestUpdateLastBlockHeight(t *testing.T) {
 		t.Fatalf("height not allowed to advance - got %d, want %d", height,
 			remotePeerHeight+1)
 	}
-}
-
-func init() {
-	// Allow self connection when running the tests.
-	peer.TstAllowSelfConns()
 }
