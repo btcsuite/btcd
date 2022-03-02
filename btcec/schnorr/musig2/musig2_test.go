@@ -250,3 +250,79 @@ func (s signerSet) pubNonces() [][PubNonceSize]byte {
 func (s signerSet) combinedKey() *btcec.PublicKey {
 	return AggregateKeys(s.keys(), false)
 }
+
+// TestMuSigMultiParty tests that for a given set of 100 signers, we're able to
+// properly generate valid sub signatures, which ultimately can be combined
+// into a single valid signature.
+func TestMuSigMultiParty(t *testing.T) {
+	t.Parallel()
+
+	// First generate the private key, public key, and nonce for each
+	// signer.
+	numSigners := 100
+	signers := make(signerSet, 0, numSigners)
+	for i := 0; i < numSigners; i++ {
+		privKey, err := btcec.NewPrivateKey()
+		if err != nil {
+			t.Fatalf("unable to gen priv key: %v", err)
+		}
+
+		pubKey, err := schnorr.ParsePubKey(
+			schnorr.SerializePubKey(privKey.PubKey()),
+		)
+		if err != nil {
+			t.Fatalf("unable to gen key: %v", err)
+		}
+
+		nonces, err := GenNonces()
+		if err != nil {
+			t.Fatalf("unable to gen nonces: %v", err)
+		}
+
+		signers = append(signers, signer{
+			privKey: privKey,
+			pubKey:  pubKey,
+			nonces:  nonces,
+		})
+	}
+
+	msg := sha256.Sum256([]byte("let's get taprooty"))
+
+	// With the set of nonces generated, we can now generate our aggregate
+	// nonce.
+	combinedNonce, err := AggregateNonces(signers.pubNonces())
+	if err != nil {
+		t.Fatalf("unable to gen nonces: %v", err)
+	}
+
+	signerKeys := signers.keys()
+	combinedKey := signers.combinedKey()
+
+	// Now for the signing phase: each signer will generate their partial
+	// signature and stash that away. We'll also store the final nonce as
+	// well, since we'll need that to validate the signature.
+	var finalNonce *btcec.PublicKey
+	for i := range signers {
+		signer := signers[i]
+		partialSig, err := Sign(
+			signer.nonces.SecNonce, signer.privKey, combinedNonce,
+			signerKeys, msg,
+		)
+		if err != nil {
+			t.Fatalf("unable to generate partial sig: %v", err)
+		}
+
+		signers[i].partialSig = partialSig
+
+		if finalNonce == nil {
+			finalNonce = partialSig.R
+		}
+	}
+
+	// Finally we'll combined all the nonces, and ensure that it validates
+	// as a single schnorr signature.
+	finalSig := CombineSigs(finalNonce, signers.partialSigs())
+	if !finalSig.Verify(msg[:], combinedKey) {
+		t.Fatalf("final sig is invalid!")
+	}
+}
