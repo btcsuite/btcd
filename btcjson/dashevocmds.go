@@ -7,6 +7,17 @@
 
 package btcjson
 
+import "errors"
+
+func init() {
+	// No special flags for commands in this file.
+	flags := UsageFlag(0)
+
+	MustRegisterCmd("quorum", (*QuorumCmd)(nil), flags)
+	MustRegisterCmd("bls", (*BLSCmd)(nil), flags)
+	MustRegisterCmd("protx", (*ProTxCmd)(nil), flags)
+}
+
 type BLSSubCmd string
 
 const (
@@ -115,6 +126,11 @@ const (
 	LLMQType_400_85 LLMQType = 3   //576 blocks
 	LLMQType_100_67 LLMQType = 4   //every 24 blocks
 	LLMQType_5_60   LLMQType = 100 //24 blocks
+)
+
+var (
+	errWrongSizeOfArgs           = errors.New("wrong size of arguments")
+	errQuorumUnmarshalerNotFound = errors.New("quorum unmarshaler not found")
 )
 
 // QuorumCmd defines the quorum JSON-RPC command.
@@ -422,11 +438,93 @@ func NewProTxRevokeCmd(proTxHash, operatorPrivateKey string, reason int, feeSour
 	return r
 }
 
-func init() {
-	// No special flags for commands in this file.
-	flags := UsageFlag(0)
+// UnmarshalArgs maps a list of arguments to quorum struct
+func (q *QuorumCmd) UnmarshalArgs(args []interface{}) error {
+	if len(args) == 0 {
+		return errWrongSizeOfArgs
+	}
+	subCmd := args[0].(string)
+	q.SubCmd = QuorumCmdSubCmd(subCmd)
+	unmarshaler, ok := quorumCmdUnmarshalers[string(q.SubCmd)]
+	if !ok {
+		return errQuorumUnmarshalerNotFound
+	}
+	return unmarshaler(q, args[1:])
+}
 
-	MustRegisterCmd("quorum", (*QuorumCmd)(nil), flags)
-	MustRegisterCmd("bls", (*BLSCmd)(nil), flags)
-	MustRegisterCmd("protx", (*ProTxCmd)(nil), flags)
+type unmarshalQuorumCmdFunc func(*QuorumCmd, []interface{}) error
+
+var quorumCmdUnmarshalers = map[string]unmarshalQuorumCmdFunc{
+	"info":   withQuorumUnmarshaler(quorumInfoUnmarshaler, validateQuorumArgs(3), unmarshalQuorumLLMQType),
+	"sign":   withQuorumUnmarshaler(quorumSignUnmarshaler, validateQuorumArgs(5), unmarshalQuorumLLMQType),
+	"verify": withQuorumUnmarshaler(quorumVerifyUnmarshaler, validateQuorumArgs(5), unmarshalQuorumLLMQType),
+}
+
+func unmarshalLLMQType(val interface{}) (LLMQType, error) {
+	var vInt int
+	switch tv := val.(type) {
+	case float64:
+		vInt = int(tv)
+	case float32:
+		vInt = int(tv)
+	case int:
+		vInt = tv
+	case LLMQType:
+		return tv, nil
+	}
+	return LLMQType(vInt), nil
+}
+
+func quorumInfoUnmarshaler(q *QuorumCmd, args []interface{}) error {
+	q.QuorumHash = strPtr(args[1].(string))
+	q.IncludeSkShare = boolPtr(args[2].(bool))
+	return nil
+}
+
+func quorumSignUnmarshaler(q *QuorumCmd, args []interface{}) error {
+	q.RequestID = strPtr(args[1].(string))
+	q.MessageHash = strPtr(args[2].(string))
+	q.QuorumHash = strPtr(args[3].(string))
+	q.Submit = boolPtr(args[4].(bool))
+	return nil
+}
+
+func unmarshalQuorumLLMQType(next unmarshalQuorumCmdFunc) unmarshalQuorumCmdFunc {
+	return func(q *QuorumCmd, args []interface{}) error {
+		val, err := unmarshalLLMQType(args[0])
+		if err != nil {
+			return err
+		}
+		q.LLMQType = llmqTypePtr(val)
+		return next(q, args)
+	}
+}
+
+func quorumVerifyUnmarshaler(q *QuorumCmd, args []interface{}) error {
+	q.RequestID = strPtr(args[1].(string))
+	q.MessageHash = strPtr(args[2].(string))
+	q.QuorumHash = strPtr(args[3].(string))
+	q.Signature = strPtr(args[4].(string))
+	return nil
+}
+
+func validateQuorumArgs(n int) func(unmarshalQuorumCmdFunc) unmarshalQuorumCmdFunc {
+	return func(next unmarshalQuorumCmdFunc) unmarshalQuorumCmdFunc {
+		return func(q *QuorumCmd, args []interface{}) error {
+			if n > len(args) {
+				return errWrongSizeOfArgs
+			}
+			return next(q, args)
+		}
+	}
+}
+
+func withQuorumUnmarshaler(
+	unmarshaler unmarshalQuorumCmdFunc,
+	fns ...func(unmarshalQuorumCmdFunc) unmarshalQuorumCmdFunc,
+) unmarshalQuorumCmdFunc {
+	for _, fn := range fns {
+		unmarshaler = fn(unmarshaler)
+	}
+	return unmarshaler
 }

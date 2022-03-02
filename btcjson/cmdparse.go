@@ -143,6 +143,19 @@ func UnmarshalCmd(r *Request) (interface{}, error) {
 		return nil, err
 	}
 
+	cmd := rvp.Interface()
+	unmarshaler, ok := cmd.(Unmarshaler)
+	if ok {
+		// unmarshal every parameter item from json.RawMessage into a go type value
+		// result of this operation will be a slice of the interfaces
+		args, err := unmarshalArgItems(r.Params)
+		if err != nil {
+			return nil, err
+		}
+		err = unmarshaler.UnmarshalArgs(args)
+		return unmarshaler, err
+	}
+
 	// Loop through each of the struct fields and unmarshal the associated
 	// parameter into them.
 	for i := 0; i < numParams; i++ {
@@ -555,6 +568,13 @@ func NewCmd(method string, args ...interface{}) (interface{}, error) {
 	rv := rvp.Elem()
 	rt := rtp.Elem()
 
+	cmd := rvp.Interface()
+	unmarshaler, ok := cmd.(Unmarshaler)
+	if ok {
+		err := unmarshaler.UnmarshalArgs(args)
+		return unmarshaler, err
+	}
+
 	// Loop through each of the struct fields and assign the associated
 	// parameter into them after checking its type validity.
 	for i := 0; i < numParams; i++ {
@@ -568,5 +588,21 @@ func NewCmd(method string, args ...interface{}) (interface{}, error) {
 		}
 	}
 
-	return rvp.Interface(), nil
+	return cmd, nil
+}
+
+// Unmarshaler is an interface for a specific unmarshal function of arguments
+type Unmarshaler interface {
+	UnmarshalArgs(args []interface{}) error
+}
+
+func unmarshalArgItems(params []json.RawMessage) ([]interface{}, error) {
+	args := make([]interface{}, len(params))
+	for i, val := range params {
+		err := json.Unmarshal(val, &args[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return args, nil
 }

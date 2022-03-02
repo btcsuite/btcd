@@ -26,7 +26,7 @@ func pLLMQType(l btcjson.LLMQType) *btcjson.LLMQType { return &l }
 func TestDashEvoCmds(t *testing.T) {
 	t.Parallel()
 
-	testID := int(1)
+	testID := 1
 	tests := []struct {
 		name         string
 		newCmd       func() (interface{}, error)
@@ -37,7 +37,7 @@ func TestDashEvoCmds(t *testing.T) {
 		{
 			name: "quorum sign",
 			newCmd: func() (interface{}, error) {
-				return btcjson.NewCmd("quorum sign", btcjson.LLMQType_100_67,
+				return btcjson.NewCmd("quorum", "sign", btcjson.LLMQType_100_67,
 					"0067c4fd779a195a95b267e263c631f71f83f8d5e6191091289d114012b373a1",
 					"ce490ca26cad6f1749ff9b977fe0fe4ece4391166f69be75c4619bc94b184dbc",
 					"6f1018f54507606069303fd16257434073c6f374729b0090bb9dbbe629241236",
@@ -50,8 +50,9 @@ func TestDashEvoCmds(t *testing.T) {
 					"6f1018f54507606069303fd16257434073c6f374729b0090bb9dbbe629241236",
 					false)
 			},
-			marshalled: `{"jsonrpc":"1.0","method":"quorum sign","params":[4,"0067c4fd779a195a95b267e263c631f71f83f8d5e6191091289d114012b373a1","ce490ca26cad6f1749ff9b977fe0fe4ece4391166f69be75c4619bc94b184dbc","6f1018f54507606069303fd16257434073c6f374729b0090bb9dbbe629241236",false],"id":1}`,
+			marshalled: `{"jsonrpc":"1.0","method":"quorum","params":["sign",4,"0067c4fd779a195a95b267e263c631f71f83f8d5e6191091289d114012b373a1","ce490ca26cad6f1749ff9b977fe0fe4ece4391166f69be75c4619bc94b184dbc","6f1018f54507606069303fd16257434073c6f374729b0090bb9dbbe629241236",false],"id":1}`,
 			unmarshalled: &btcjson.QuorumCmd{
+				SubCmd:      "sign",
 				LLMQType:    pLLMQType(btcjson.LLMQType_100_67),
 				RequestID:   pString("0067c4fd779a195a95b267e263c631f71f83f8d5e6191091289d114012b373a1"),
 				MessageHash: pString("ce490ca26cad6f1749ff9b977fe0fe4ece4391166f69be75c4619bc94b184dbc"),
@@ -62,7 +63,7 @@ func TestDashEvoCmds(t *testing.T) {
 		{
 			name: "quorum info",
 			newCmd: func() (interface{}, error) {
-				return btcjson.NewCmd("quorum info", btcjson.LLMQType_100_67,
+				return btcjson.NewCmd("quorum", "info", btcjson.LLMQType_100_67,
 					"0067c4fd779a195a95b267e263c631f71f83f8d5e6191091289d114012b373a1",
 					false)
 			},
@@ -71,22 +72,24 @@ func TestDashEvoCmds(t *testing.T) {
 					"0067c4fd779a195a95b267e263c631f71f83f8d5e6191091289d114012b373a1",
 					false)
 			},
-			marshalled: `{"jsonrpc":"1.0","method":"quorum info","params":[4,"0067c4fd779a195a95b267e263c631f71f83f8d5e6191091289d114012b373a1",false],"id":1}`,
+			marshalled: `{"jsonrpc":"1.0","method":"quorum","params":["info",4,"0067c4fd779a195a95b267e263c631f71f83f8d5e6191091289d114012b373a1",false],"id":1}`,
 			unmarshalled: &btcjson.QuorumCmd{
+				SubCmd:         "info",
 				LLMQType:       pLLMQType(btcjson.LLMQType_100_67),
 				QuorumHash:     pString("0067c4fd779a195a95b267e263c631f71f83f8d5e6191091289d114012b373a1"),
 				IncludeSkShare: pBool(false),
 			},
 		},
 		{
-			name: "quorum verify",
+			name: "quorum",
 			newCmd: func() (interface{}, error) {
-				return btcjson.NewCmd("quorum verify",
+				return btcjson.NewCmd("quorum",
+					"verify",
 					btcjson.LLMQType_100_67,
 					"0067c4fd779a195a95b267e263c631f71f83f8d5e6191091289d114012b373a1",
 					"ce490ca26cad6f1749ff9b977fe0fe4ece4391166f69be75c4619bc94b184dbc",
 					"6f1018f54507606069303fd16257434073c6f374729b0090bb9dbbe629241236",
-					false)
+					"5f1018f54507606069303fd16257434073c6f374729b0090bb9dbbe629241235")
 			},
 			staticCmd: func() interface{} {
 				return btcjson.NewQuorumVerifyCmd(btcjson.LLMQType_100_67,
@@ -95,8 +98,9 @@ func TestDashEvoCmds(t *testing.T) {
 					"5f1018f54507606069303fd16257434073c6f374729b0090bb9dbbe629241235",
 					"6f1018f54507606069303fd16257434073c6f374729b0090bb9dbbe629241236")
 			},
-			marshalled: `{"jsonrpc":"1.0","method":"quorum sign","params":[4,"0067c4fd779a195a95b267e263c631f71f83f8d5e6191091289d114012b373a1","ce490ca26cad6f1749ff9b977fe0fe4ece4391166f69be75c4619bc94b184dbc","5f1018f54507606069303fd16257434073c6f374729b0090bb9dbbe629241235","6f1018f54507606069303fd16257434073c6f374729b0090bb9dbbe629241236",],"id":1}`,
+			marshalled: `{"jsonrpc":"1.0","method":"quorum","params":["verify",4,"0067c4fd779a195a95b267e263c631f71f83f8d5e6191091289d114012b373a1","ce490ca26cad6f1749ff9b977fe0fe4ece4391166f69be75c4619bc94b184dbc","6f1018f54507606069303fd16257434073c6f374729b0090bb9dbbe629241236","5f1018f54507606069303fd16257434073c6f374729b0090bb9dbbe629241235"],"id":1}`,
 			unmarshalled: &btcjson.QuorumCmd{
+				SubCmd:      "verify",
 				LLMQType:    pLLMQType(btcjson.LLMQType_100_67),
 				RequestID:   pString("0067c4fd779a195a95b267e263c631f71f83f8d5e6191091289d114012b373a1"),
 				MessageHash: pString("ce490ca26cad6f1749ff9b977fe0fe4ece4391166f69be75c4619bc94b184dbc"),
