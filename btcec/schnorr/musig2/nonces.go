@@ -117,7 +117,7 @@ func GenNonces(options ...NonceGenOption) (*Nonces, error) {
 	// Next, we'll generate R_1 = k_1*G and R_2 = k_2*G. Along the way we
 	// need to map our nonce values into mod n scalars so we can work with
 	// the btcec API.
-	nonces.PubNonce = secNonceToPubNonce(nonces.SecNonce)
+	nonces.PubNonce = secNonceToPubNonce(&nonces.SecNonce)
 
 	return &nonces, nil
 }
