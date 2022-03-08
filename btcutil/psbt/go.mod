@@ -16,6 +16,7 @@ require (
 	golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9 // indirect
 )
 
+// TODO(guggero): Remove this as soon as we have a tagged version of btcec/v2.
 replace github.com/btcsuite/btcd/btcec/v2 => ../../btcec
 
 replace github.com/btcsuite/btcd/btcutil => ../

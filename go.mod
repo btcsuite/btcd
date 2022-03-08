@@ -25,6 +25,7 @@ require (
 
 replace github.com/btcsuite/btcd/btcutil => ./btcutil
 
+// TODO(guggero): Remove this as soon as we have a tagged version of btcec/v2.
 replace github.com/btcsuite/btcd/btcec/v2 => ./btcec
 
 // We depend on chainhash as is, so we need to replace to use the version of
