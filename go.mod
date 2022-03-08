@@ -1,7 +1,7 @@
 module github.com/btcsuite/btcd
 
 require (
-	github.com/btcsuite/btcd/btcec/v2 v2.1.0
+	github.com/btcsuite/btcd/btcec/v2 v2.1.1
 	github.com/btcsuite/btcd/btcutil v1.1.0
 	github.com/btcsuite/btcd/chaincfg/chainhash v1.0.0
 	github.com/btcsuite/btclog v0.0.0-20170628155309-84c8d2346e9f
