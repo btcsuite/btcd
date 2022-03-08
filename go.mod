@@ -27,6 +27,11 @@ replace github.com/btcsuite/btcd/btcutil => ./btcutil
 
 replace github.com/btcsuite/btcd/btcec/v2 => ./btcec
 
+// We depend on chainhash as is, so we need to replace to use the version of
+// chainhash included in the version of btcd we're building in.
+// TODO(guggero): Remove this as soon as we have a tagged version of chainhash.
+replace github.com/btcsuite/btcd/chaincfg/chainhash => ./chaincfg/chainhash
+
 // The retract statements below fixes an accidental push of the tags of a btcd
 // fork.
 retract (

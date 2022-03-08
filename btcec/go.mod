@@ -9,3 +9,8 @@ require (
 )
 
 require github.com/decred/dcrd/crypto/blake256 v1.0.0 // indirect
+
+// We depend on chainhash as is, so we need to replace to use the version of
+// chainhash included in the version of btcd we're building in.
+// TODO(guggero): Remove this as soon as we have a tagged version of chainhash.
+replace github.com/btcsuite/btcd/chaincfg/chainhash => ../chaincfg/chainhash
