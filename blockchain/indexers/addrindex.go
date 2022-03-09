@@ -10,12 +10,12 @@ import (
 	"sync"
 
 	"github.com/btcsuite/btcd/blockchain"
+	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcd/btcutil"
 )
 
 const (
@@ -62,6 +62,11 @@ const (
 	// as p2wsh are distinct from p2sh addresses since they use a new
 	// script template, as well as a 32-byte data push.
 	addrKeyTypeWitnessScriptHash = 3
+
+	// addrKeyTypeTaprootPubKey is the address type in an address key that
+	// represnts a pay-to-taproot adress. We use this to denote addresses
+	// related to the segwit v1 that are encoded in the bech32m format.
+	addrKeyTypeTaprootPubKey = 4
 
 	// Size of a transaction entry.  It consists of 4 bytes block id + 4
 	// bytes offset + 4 bytes length.
@@ -572,6 +577,16 @@ func addrToKey(addr btcutil.Address) ([addrKeySize]byte, error) {
 		var result [addrKeySize]byte
 		result[0] = addrKeyTypeWitnessPubKeyHash
 		copy(result[1:], addr.Hash160()[:])
+		return result, nil
+
+	case *btcutil.AddressTaproot:
+		var result [addrKeySize]byte
+		result[0] = addrKeyTypeTaprootPubKey
+
+		// Taproot outputs are actually just the 32-byte public key.
+		// Similar to the P2WSH outputs, we'll map these to 20-bytes
+		// via the hash160.
+		copy(result[1:], btcutil.Hash160(addr.ScriptAddress()))
 		return result, nil
 	}
 
