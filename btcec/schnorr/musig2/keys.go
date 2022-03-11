@@ -28,6 +28,7 @@ type sortableKeys []*btcec.PublicKey
 // Less reports whether the element with index i must sort before the element
 // with index j.
 func (s sortableKeys) Less(i, j int) bool {
+	// TODO(roasbeef): more efficient way to compare...
 	keyIBytes := schnorr.SerializePubKey(s[i])
 	keyJBytes := schnorr.SerializePubKey(s[j])
 
@@ -62,12 +63,14 @@ func sortKeys(keys []*btcec.PublicKey) []*btcec.PublicKey {
 // for each key. The final computation is:
 //   * H(tag=KeyAgg list, pk1 || pk2..)
 func keyHashFingerprint(keys []*btcec.PublicKey, sort bool) []byte {
-	var keyBytes bytes.Buffer
-
 	if sort {
 		keys = sortKeys(keys)
 	}
 
+	// We'll create a single buffer and slice into that so the bytes buffer
+	// doesn't continually need to grow the underlying buffer.
+	keyAggBuf := make([]byte, 32*len(keys))
+	keyBytes := bytes.NewBuffer(keyAggBuf[0:0])
 	for _, key := range keys {
 		keyBytes.Write(schnorr.SerializePubKey(key))
 	}
@@ -76,67 +79,126 @@ func keyHashFingerprint(keys []*btcec.PublicKey, sort bool) []byte {
 	return h[:]
 }
 
-// isSecondKey returns true if the passed public key is the second key in the
-// (sorted) keySet passed.
-func isSecondKey(keySet []*btcec.PublicKey, targetKey *btcec.PublicKey) bool {
-	// For this comparison, we want to compare the raw serialized version
-	// instead of the full pubkey, as it's possible we're dealing with a
-	// pubkey that _actually_ has an odd y coordinate.
-	equalBytes := func(a, b *btcec.PublicKey) bool {
-		return bytes.Equal(
-			schnorr.SerializePubKey(a),
-			schnorr.SerializePubKey(b),
-		)
-	}
-
-	for i := range keySet {
-		if !equalBytes(keySet[i], keySet[0]) {
-			return equalBytes(keySet[i], targetKey)
-		}
-	}
-
-	return false
+// keyBytesEqual returns true if two keys are the same from the PoV of BIP
+// 340's 32-byte x-only public keys.
+func keyBytesEqual(a, b *btcec.PublicKey) bool {
+	return bytes.Equal(
+		schnorr.SerializePubKey(a),
+		schnorr.SerializePubKey(b),
+	)
 }
 
 // aggregationCoefficient computes the key aggregation coefficient for the
 // specified target key. The coefficient is computed as:
 //  * H(tag=KeyAgg coefficient, keyHashFingerprint(pks) || pk)
 func aggregationCoefficient(keySet []*btcec.PublicKey,
-	targetKey *btcec.PublicKey, sort bool) *btcec.ModNScalar {
+	targetKey *btcec.PublicKey, keysHash []byte,
+	secondKeyIdx int) *btcec.ModNScalar {
 
 	var mu btcec.ModNScalar
 
 	// If this is the second key, then this coefficient is just one.
-	//
-	// TODO(roasbeef): use intermediate cache to keep track of the second
-	// key, can just store an index, otherwise this is O(n^2)
-	if isSecondKey(keySet, targetKey) {
+	if secondKeyIdx != -1 && keyBytesEqual(keySet[secondKeyIdx], targetKey) {
 		return mu.SetInt(1)
 	}
 
 	// Otherwise, we'll compute the full finger print hash for this given
 	// key and then use that to compute the coefficient tagged hash:
 	//  * H(tag=KeyAgg coefficient, keyHashFingerprint(pks, pk) || pk)
-	var coefficientBytes bytes.Buffer
-	coefficientBytes.Write(keyHashFingerprint(keySet, sort))
-	coefficientBytes.Write(schnorr.SerializePubKey(targetKey))
+	var coefficientBytes [64]byte
+	copy(coefficientBytes[:], keysHash[:])
+	copy(coefficientBytes[32:], schnorr.SerializePubKey(targetKey))
 
-	muHash := chainhash.TaggedHash(KeyAggTagCoeff, coefficientBytes.Bytes())
+	muHash := chainhash.TaggedHash(KeyAggTagCoeff, coefficientBytes[:])
 
 	mu.SetByteSlice(muHash[:])
 
 	return &mu
 }
 
-// TODO(roasbeef): make proper IsEven func
+// secondUniqueKeyIndex returns the index of the second unique key. If all keys
+// are the same, then a value of -1 is returned.
+func secondUniqueKeyIndex(keySet []*btcec.PublicKey) int {
+	// Find the first key that isn't the same as the very first key (second
+	// unique key).
+	for i := range keySet {
+		if !keyBytesEqual(keySet[i], keySet[0]) {
+			return i
+		}
+	}
+
+	// A value of negative one is used to indicate that all the keys in the
+	// sign set are actually equal, which in practice actually makes musig2
+	// useless, but we need a value to distinguish this case.
+	return -1
+}
+
+// KeyAggOption is a functional option argument that allows callers to specify
+// more or less information that has been pre-computed to the main routine.
+type KeyAggOption func(*keyAggOption)
+
+// keyAggOption houses the set of functional options that modify key
+// aggregation.
+type keyAggOption struct {
+	// keyHash is the output of keyHashFingerprint for a given set of keys.
+	keyHash []byte
+
+	// uniqueKeyIndex is the pre-computed index of the second unique key.
+	uniqueKeyIndex *int
+}
+
+// WithKeysHash allows key aggregation to be optimize, by allowing the caller
+// to specify the hash of all the keys.
+func WithKeysHash(keyHash []byte) KeyAggOption {
+	return func(o *keyAggOption) {
+		o.keyHash = keyHash
+	}
+}
+
+// WithUniqueKeyIndex allows the caller to specify the index of the second
+// unique key.
+func WithUniqueKeyIndex(idx int) KeyAggOption {
+	return func(o *keyAggOption) {
+		i := idx
+		o.uniqueKeyIndex = &i
+	}
+}
+
+// defaultKeyAggOptions returns the set of default arguments for key
+// aggregation.
+func defaultKeyAggOptions() *keyAggOption {
+	return &keyAggOption{}
+}
 
 // AggregateKeys takes a list of possibly unsorted keys and returns a single
-// aggregated key as specified by the musig2 key aggregation algorithm.
-func AggregateKeys(keys []*btcec.PublicKey, sort bool) *btcec.PublicKey {
+// aggregated key as specified by the musig2 key aggregation algorithm. A nil
+// value can be passed for keyHash, which causes this function to re-derive it.
+func AggregateKeys(keys []*btcec.PublicKey, sort bool,
+	keyOpts ...KeyAggOption) *btcec.PublicKey {
+
+	// First, parse the set of optional signing options.
+	opts := defaultKeyAggOptions()
+	for _, option := range keyOpts {
+		option(opts)
+	}
+
 	// Sort the set of public key so we know we're working with them in
 	// sorted order for all the routines below.
 	if sort {
 		keys = sortKeys(keys)
+	}
+
+	// The caller may provide the hash of all the keys as an optimization
+	// during signing, as it already needs to be computed.
+	if opts.keyHash == nil {
+		opts.keyHash = keyHashFingerprint(keys, sort)
+	}
+
+	// A caller may also specify the unique key index themselves so we
+	// don't need to re-compute it.
+	if opts.uniqueKeyIndex == nil {
+		idx := secondUniqueKeyIndex(keys)
+		opts.uniqueKeyIndex = &idx
 	}
 
 	// For each key, we'll compute the intermediate blinded key: a_i*P_i,
@@ -153,7 +215,9 @@ func AggregateKeys(keys []*btcec.PublicKey, sort bool) *btcec.PublicKey {
 		// Compute the aggregation coefficient for the key, then
 		// multiply it by the key itself: P_i' = a_i*P_i.
 		var tweakedKeyJ btcec.JacobianPoint
-		a := aggregationCoefficient(keys, key, sort)
+		a := aggregationCoefficient(
+			keys, key, opts.keyHash, *opts.uniqueKeyIndex,
+		)
 		btcec.ScalarMultNonConst(a, &keyJ, &tweakedKeyJ)
 
 		// Finally accumulate this into the final key in an incremental

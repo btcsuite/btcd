@@ -85,7 +85,10 @@ func TestMuSig2KeyAggTestVectors(t *testing.T) {
 				keys = append(keys, pub)
 			}
 
-			combinedKey := AggregateKeys(keys, false)
+			uniqueKeyIndex := secondUniqueKeyIndex(keys)
+			combinedKey := AggregateKeys(
+				keys, false, WithUniqueKeyIndex(uniqueKeyIndex),
+			)
 			combinedKeyBytes := schnorr.SerializePubKey(combinedKey)
 			if !bytes.Equal(combinedKeyBytes, testCase.expectedKey) {
 				t.Fatalf("case: #%v, invalid aggregation: "+
@@ -248,7 +251,10 @@ func (s signerSet) pubNonces() [][PubNonceSize]byte {
 }
 
 func (s signerSet) combinedKey() *btcec.PublicKey {
-	return AggregateKeys(s.keys(), false)
+	uniqueKeyIndex := secondUniqueKeyIndex(s.keys())
+	return AggregateKeys(
+		s.keys(), false, WithUniqueKeyIndex(uniqueKeyIndex),
+	)
 }
 
 // TestMuSigMultiParty tests that for a given set of 100 signers, we're able to

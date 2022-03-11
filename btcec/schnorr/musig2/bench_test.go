@@ -301,11 +301,16 @@ func BenchmarkAggregateKeys(b *testing.B) {
 			name := fmt.Sprintf("num_signers=%v/sort_keys=%v",
 				numSigners, sortKeys)
 
+			uniqueKeyIndex := secondUniqueKeyIndex(signerKeys)
+
 			b.Run(name, func(b *testing.B) {
 				b.ResetTimer()
 				b.ReportAllocs()
 
-				aggKey := AggregateKeys(signerKeys, sortKeys)
+				aggKey := AggregateKeys(
+					signerKeys, sortKeys,
+					WithUniqueKeyIndex(uniqueKeyIndex),
+				)
 
 				testKey = aggKey
 			})

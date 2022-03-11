@@ -130,9 +130,17 @@ func Sign(secNonce [SecNonceSize]byte, privKey *btcec.PrivateKey,
 		return nil, err
 	}
 
+	// Compute the hash of all the keys here as we'll need it do aggregrate
+	// the keys and also at the final step of signing.
+	keysHash := keyHashFingerprint(pubKeys, opts.sortKeys)
+
 	// Next we'll construct the aggregated public key based on the set of
 	// signers.
-	combinedKey := AggregateKeys(pubKeys, opts.sortKeys)
+	uniqueKeyIndex := secondUniqueKeyIndex(pubKeys)
+	combinedKey := AggregateKeys(
+		pubKeys, opts.sortKeys, WithKeysHash(keysHash),
+		WithUniqueKeyIndex(uniqueKeyIndex),
+	)
 
 	// Next we'll compute the value b, that blinds our second public
 	// nonce:
@@ -220,7 +228,7 @@ func Sign(secNonce [SecNonceSize]byte, privKey *btcec.PrivateKey,
 
 	// Next, we'll compute mu, our aggregation coefficient for the key that
 	// we're signing with.
-	mu := aggregationCoefficient(pubKeys, pubKey, opts.sortKeys)
+	mu := aggregationCoefficient(pubKeys, pubKey, keysHash, uniqueKeyIndex)
 
 	// With mu constructed, we can finally generate our partial signature
 	// as: s = (k1_1 + b*k_2 + e*mu*d) mod n.
@@ -291,9 +299,18 @@ func verifyPartialSig(partialSig *PartialSignature, pubNonce [PubNonceSize]byte,
 		return err
 	}
 
+	// Compute the hash of all the keys here as we'll need it do aggregrate
+	// the keys and also at the final step of verification.
+	keysHash := keyHashFingerprint(keySet, opts.sortKeys)
+
+	uniqueKeyIndex := secondUniqueKeyIndex(keySet)
+
 	// Next we'll construct the aggregated public key based on the set of
 	// signers.
-	combinedKey := AggregateKeys(keySet, opts.sortKeys)
+	combinedKey := AggregateKeys(
+		keySet, opts.sortKeys,
+		WithKeysHash(keysHash), WithUniqueKeyIndex(uniqueKeyIndex),
+	)
 
 	// Next we'll compute the value b, that blinds our second public
 	// nonce:
@@ -345,8 +362,6 @@ func verifyPartialSig(partialSig *PartialSignature, pubNonce [PubNonceSize]byte,
 
 	// If the combined nonce used in the challenge hash has an odd y
 	// coordinate, then we'll negate our final public nonce.
-	//
-	// TODO(roasbeef): make into func
 	if nonce.Y.IsOdd() {
 		pubNonceJ.ToAffine()
 		pubNonceJ.Y.Negate(1)
@@ -375,7 +390,7 @@ func verifyPartialSig(partialSig *PartialSignature, pubNonce [PubNonceSize]byte,
 
 	// Next, we'll compute mu, our aggregation coefficient for the key that
 	// we're signing with.
-	mu := aggregationCoefficient(keySet, signingKey, opts.sortKeys)
+	mu := aggregationCoefficient(keySet, signingKey, keysHash, uniqueKeyIndex)
 
 	// If the combined key has an odd y coordinate, then we'll negate the
 	// signer key.
