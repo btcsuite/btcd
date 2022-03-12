@@ -1,7 +1,4 @@
-// Copyright 2013-2016 The btcsuite developers
-// Copyright (c) 2015-2021 The Decred developers
-// Use of this source code is governed by an ISC
-// license that can be found in the LICENSE file.
+// Copyright 2013-2022 The btcsuite developers
 
 package musig2
 
@@ -10,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"sync"
 	"testing"
 
 	"github.com/btcsuite/btcd/btcec/v2"
@@ -85,7 +83,7 @@ func TestMuSig2KeyAggTestVectors(t *testing.T) {
 				keys = append(keys, pub)
 			}
 
-			uniqueKeyIndex := secondUniqueKeyIndex(keys)
+			uniqueKeyIndex := secondUniqueKeyIndex(keys, false)
 			combinedKey := AggregateKeys(
 				keys, false, WithUniqueKeyIndex(uniqueKeyIndex),
 			)
@@ -194,7 +192,8 @@ func TestMuSig2SigningTestVectors(t *testing.T) {
 			}
 
 			partialSig, err := Sign(
-				secNonce, signSetPrivKey, aggregatedNonce, keySet, msg,
+				secNonce, signSetPrivKey, aggregatedNonce,
+				keySet, msg,
 			)
 			if err != nil {
 				t.Fatalf("unable to generate partial sig: %v", err)
@@ -251,7 +250,7 @@ func (s signerSet) pubNonces() [][PubNonceSize]byte {
 }
 
 func (s signerSet) combinedKey() *btcec.PublicKey {
-	uniqueKeyIndex := secondUniqueKeyIndex(s.keys())
+	uniqueKeyIndex := secondUniqueKeyIndex(s.keys(), false)
 	return AggregateKeys(
 		s.keys(), false, WithUniqueKeyIndex(uniqueKeyIndex),
 	)
@@ -263,10 +262,11 @@ func (s signerSet) combinedKey() *btcec.PublicKey {
 func TestMuSigMultiParty(t *testing.T) {
 	t.Parallel()
 
-	// First generate the private key, public key, and nonce for each
-	// signer.
-	numSigners := 100
-	signers := make(signerSet, 0, numSigners)
+	const numSigners = 100
+
+	// First generate the set of signers along with their public keys.
+	signerKeys := make([]*btcec.PrivateKey, numSigners)
+	signSet := make([]*btcec.PublicKey, numSigners)
 	for i := 0; i < numSigners; i++ {
 		privKey, err := btcec.NewPrivateKey()
 		if err != nil {
@@ -280,55 +280,105 @@ func TestMuSigMultiParty(t *testing.T) {
 			t.Fatalf("unable to gen key: %v", err)
 		}
 
-		nonces, err := GenNonces()
+		signerKeys[i] = privKey
+		signSet[i] = pubKey
+	}
+
+	var combinedKey *btcec.PublicKey
+
+	// Now that we have all the signers, we'll make a new context, then
+	// generate a new session for each of them(which handles nonce
+	// generation).
+	signers := make([]*Session, numSigners)
+	for i, signerKey := range signerKeys {
+		signCtx, err := NewContext(signerKey, signSet, false)
 		if err != nil {
-			t.Fatalf("unable to gen nonces: %v", err)
+			t.Fatalf("unable to generate context: %v", err)
 		}
 
-		signers = append(signers, signer{
-			privKey: privKey,
-			pubKey:  pubKey,
-			nonces:  nonces,
-		})
+		if combinedKey == nil {
+			k := signCtx.CombinedKey()
+			combinedKey = &k
+		}
+
+		session, err := signCtx.NewSession()
+		if err != nil {
+			t.Fatalf("unable to generate new session: %v", err)
+		}
+		signers[i] = session
 	}
+
+	// Next, in the pre-signing phase, we'll send all the nonces to each
+	// signer.
+	var wg sync.WaitGroup
+	for i, signCtx := range signers {
+		signCtx := signCtx
+
+		wg.Add(1)
+		go func(idx int, signer *Session) {
+			defer wg.Done()
+
+			for j, otherCtx := range signers {
+				if idx == j {
+					continue
+				}
+
+				nonce := otherCtx.PublicNonce()
+				haveAll, err := signer.RegisterPubNonce(nonce)
+				if err != nil {
+					t.Fatalf("unable to add public nonce")
+				}
+
+				if j == len(signers)-1 && !haveAll {
+					t.Fatalf("all public nonces should have been detected")
+				}
+			}
+		}(i, signCtx)
+	}
+
+	wg.Wait()
 
 	msg := sha256.Sum256([]byte("let's get taprooty"))
 
-	// With the set of nonces generated, we can now generate our aggregate
-	// nonce.
-	combinedNonce, err := AggregateNonces(signers.pubNonces())
-	if err != nil {
-		t.Fatalf("unable to gen nonces: %v", err)
-	}
-
-	signerKeys := signers.keys()
-	combinedKey := signers.combinedKey()
-
-	// Now for the signing phase: each signer will generate their partial
-	// signature and stash that away. We'll also store the final nonce as
-	// well, since we'll need that to validate the signature.
-	var finalNonce *btcec.PublicKey
+	// In the final step, we'll use the first signer as our combiner, and
+	// generate a signature for each signer, and then accumulate that with
+	// the combiner.
+	combiner := signers[0]
 	for i := range signers {
 		signer := signers[i]
-		partialSig, err := Sign(
-			signer.nonces.SecNonce, signer.privKey, combinedNonce,
-			signerKeys, msg,
-		)
+		partialSig, err := signer.Sign(msg)
 		if err != nil {
 			t.Fatalf("unable to generate partial sig: %v", err)
 		}
 
-		signers[i].partialSig = partialSig
+		// We don't need to combine the signature for the very first
+		// signer, as it already has that partial signature.
+		if i != 0 {
+			haveAll, err := combiner.CombineSig(partialSig)
+			if err != nil {
+				t.Fatalf("unable to combine sigs: %v", err)
+			}
 
-		if finalNonce == nil {
-			finalNonce = partialSig.R
+			if i == len(signers)-1 && !haveAll {
+				t.Fatalf("final sig wasn't reconstructed")
+			}
 		}
 	}
 
 	// Finally we'll combined all the nonces, and ensure that it validates
 	// as a single schnorr signature.
-	finalSig := CombineSigs(finalNonce, signers.partialSigs())
+	finalSig := combiner.FinalSig()
 	if !finalSig.Verify(msg[:], combinedKey) {
 		t.Fatalf("final sig is invalid!")
+	}
+
+	// Verify that if we try to sign again with any of the existing
+	// signers, then we'll get an error as the nonces have already been
+	// used.
+	for _, signer := range signers {
+		_, err := signer.Sign(msg)
+		if err != ErrSigningContextReuse {
+			t.Fatalf("expected to get signing context reuse")
+		}
 	}
 }

@@ -118,7 +118,11 @@ func aggregationCoefficient(keySet []*btcec.PublicKey,
 
 // secondUniqueKeyIndex returns the index of the second unique key. If all keys
 // are the same, then a value of -1 is returned.
-func secondUniqueKeyIndex(keySet []*btcec.PublicKey) int {
+func secondUniqueKeyIndex(keySet []*btcec.PublicKey, sort bool) int {
+	if sort {
+		keySet = sortKeys(keySet)
+	}
+
 	// Find the first key that isn't the same as the very first key (second
 	// unique key).
 	for i := range keySet {
@@ -197,7 +201,7 @@ func AggregateKeys(keys []*btcec.PublicKey, sort bool,
 	// A caller may also specify the unique key index themselves so we
 	// don't need to re-compute it.
 	if opts.uniqueKeyIndex == nil {
-		idx := secondUniqueKeyIndex(keys)
+		idx := secondUniqueKeyIndex(keys, sort)
 		opts.uniqueKeyIndex = &idx
 	}
 

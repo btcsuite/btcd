@@ -1,4 +1,4 @@
-// Copyright 2013-2016 The btcsuite developers
+// Copyright 2013-2022 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -11,7 +11,6 @@ import (
 
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
-	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 )
 
 var (
@@ -74,18 +73,11 @@ var (
 // signature factoring in if the keys are sorted and also if we're in fast sign
 // mode.
 func BenchmarkPartialSign(b *testing.B) {
-	privKey := secp256k1.NewPrivateKey(testPrivBytes)
-
 	for _, numSigners := range []int{10, 100} {
 		for _, fastSign := range []bool{true, false} {
 			for _, sortKeys := range []bool{true, false} {
 				name := fmt.Sprintf("num_signers=%v/fast_sign=%v/sort=%v",
 					numSigners, fastSign, sortKeys)
-
-				nonces, err := GenNonces()
-				if err != nil {
-					b.Fatalf("unable to generate nonces: %v", err)
-				}
 
 				signers := make(signerSet, numSigners)
 				for i := 0; i < numSigners; i++ {
@@ -118,9 +110,12 @@ func BenchmarkPartialSign(b *testing.B) {
 
 					for i := 0; i < b.N; i++ {
 						sig, err = Sign(
-							nonces.SecNonce, privKey, combinedNonce,
-							keys, msg, signOpts...,
+							signers[0].nonces.SecNonce, signers[0].privKey,
+							combinedNonce, keys, msg, signOpts...,
 						)
+						if err != nil {
+							b.Fatalf("unable to generate sig: %v", err)
+						}
 					}
 
 					testSig = sig
@@ -138,17 +133,10 @@ var sigOk bool
 // BenchmarkPartialVerify benchmarks how long it takes to verify a partial
 // signature.
 func BenchmarkPartialVerify(b *testing.B) {
-	privKey := secp256k1.NewPrivateKey(testPrivBytes)
-
 	for _, numSigners := range []int{10, 100} {
 		for _, sortKeys := range []bool{true, false} {
 			name := fmt.Sprintf("sort_keys=%v/num_signers=%v",
 				sortKeys, numSigners)
-
-			nonces, err := GenNonces()
-			if err != nil {
-				b.Fatalf("unable to generate nonces: %v", err)
-			}
 
 			signers := make(signerSet, numSigners)
 			for i := 0; i < numSigners; i++ {
@@ -172,12 +160,15 @@ func BenchmarkPartialVerify(b *testing.B) {
 			b.ResetTimer()
 
 			sig, err = Sign(
-				nonces.SecNonce, privKey, combinedNonce,
-				signers.keys(), msg, WithFastSign(),
+				signers[0].nonces.SecNonce, signers[0].privKey,
+				combinedNonce, signers.keys(), msg,
 			)
+			if err != nil {
+				b.Fatalf("unable to generate sig: %v", err)
+			}
 
 			keys := signers.keys()
-			pubKey := privKey.PubKey()
+			pubKey := signers[0].pubKey
 
 			b.Run(name, func(b *testing.B) {
 				var signOpts []SignOption
@@ -193,9 +184,12 @@ func BenchmarkPartialVerify(b *testing.B) {
 				var ok bool
 				for i := 0; i < b.N; i++ {
 					ok = sig.Verify(
-						nonces.PubNonce, combinedNonce,
+						signers[0].nonces.PubNonce, combinedNonce,
 						keys, pubKey, msg,
 					)
+					if !ok {
+						b.Fatalf("generated invalid sig!")
+					}
 				}
 				sigOk = ok
 			})
@@ -301,7 +295,7 @@ func BenchmarkAggregateKeys(b *testing.B) {
 			name := fmt.Sprintf("num_signers=%v/sort_keys=%v",
 				numSigners, sortKeys)
 
-			uniqueKeyIndex := secondUniqueKeyIndex(signerKeys)
+			uniqueKeyIndex := secondUniqueKeyIndex(signerKeys, false)
 
 			b.Run(name, func(b *testing.B) {
 				b.ResetTimer()

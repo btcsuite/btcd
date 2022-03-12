@@ -1,7 +1,4 @@
-// Copyright 2013-2016 The btcsuite developers
-// Copyright (c) 2015-2021 The Decred developers
-// Use of this source code is governed by an ISC
-// license that can be found in the LICENSE file.
+// Copyright 2013-2022 The btcsuite developers
 
 package musig2
 
@@ -22,6 +19,10 @@ const (
 	SecNonceSize = 64
 )
 
+// zeroSecNonce is a secret nonce that's all zeroes. This is used to check that
+// we're not attempting to re-use a nonce, and also protect callers from it.
+var zeroSecNonce [SecNonceSize]byte
+
 // Nonces holds the public and secret nonces required for musig2.
 //
 // TODO(roasbeef): methods on this to help w/ parsing, etc?
@@ -37,7 +38,7 @@ type Nonces struct {
 
 // secNonceToPubNonce takes our two secrete nonces, and produces their two
 // corresponding EC points, serialized in compressed format.
-func secNonceToPubNonce(secNonce *[SecNonceSize]byte) [PubNonceSize]byte {
+func secNonceToPubNonce(secNonce [SecNonceSize]byte) [PubNonceSize]byte {
 	var k1Mod, k2Mod btcec.ModNScalar
 	k1Mod.SetByteSlice(secNonce[:btcec.PrivKeyBytesLen])
 	k2Mod.SetByteSlice(secNonce[btcec.PrivKeyBytesLen:])
@@ -117,7 +118,7 @@ func GenNonces(options ...NonceGenOption) (*Nonces, error) {
 	// Next, we'll generate R_1 = k_1*G and R_2 = k_2*G. Along the way we
 	// need to map our nonce values into mod n scalars so we can work with
 	// the btcec API.
-	nonces.PubNonce = secNonceToPubNonce(&nonces.SecNonce)
+	nonces.PubNonce = secNonceToPubNonce(nonces.SecNonce)
 
 	return &nonces, nil
 }
