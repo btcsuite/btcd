@@ -65,7 +65,7 @@ goimports:
 
 build:
 	@$(call print, "Building all binaries")
-	$(GOBUILD) $(PKG)
+	$(GOBUILD) -o btcd $(PKG)
 	$(GOBUILD) $(PKG)/cmd/btcctl
 	$(GOBUILD) $(PKG)/cmd/gencerts
 	$(GOBUILD) $(PKG)/cmd/findcheckpoint
