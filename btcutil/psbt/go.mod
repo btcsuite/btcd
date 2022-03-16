@@ -20,3 +20,7 @@ require (
 replace github.com/btcsuite/btcd/btcutil => ../
 
 replace github.com/btcsuite/btcd => ../..
+
+replace github.com/btcsuite/btcd/chaincfg/chainhash => ../../chaincfg/chainhash
+
+replace github.com/btcsuite/btcd/btcec/v2 => ../../btcec
