@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/btcsuite/btcd/btcec/v2"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 )
 
@@ -95,6 +96,24 @@ const (
 	// operation whose public key isn't serialized in a compressed format
 	// non-standard.
 	ScriptVerifyWitnessPubKeyType
+
+	// ScriptVerifyTaproot defines whether or not to verify a transaction
+	// output using the new taproot validation rules.
+	ScriptVerifyTaproot
+
+	// ScriptVerifyDiscourageUpgradeableWitnessProgram defines whether or
+	// not to consider any new/unknown taproot leaf versions as
+	// non-standard.
+	ScriptVerifyDiscourageUpgradeableTaprootVersion
+
+	// ScriptVerifyDiscourageOpSuccess defines whether or not to consider
+	// usage of OP_SUCCESS op codes during tapscript execution as
+	// non-standard.
+	ScriptVerifyDiscourageOpSuccess
+
+	// ScriptVerifyDiscourageUpgradeablePubkeyType defines if unknown
+	// public key versions (during tapscript execution) is non-standard.
+	ScriptVerifyDiscourageUpgradeablePubkeyType
 )
 
 const (
@@ -112,10 +131,67 @@ const (
 	// payToWitnessScriptHashDataSize is the size of the witness program's
 	// data push for a pay-to-witness-script-hash output.
 	payToWitnessScriptHashDataSize = 32
+
+	// payToTaprootDataSize is the size of the witness program push for
+	// taproot spends. This will be the serialized x-coordinate of the
+	// top-level taproot output public key.
+	payToTaprootDataSize = 32
+)
+
+const (
+	// BaseSegwitWitnessVersion is the original witness version that defines
+	// the initial set of segwit validation logic.
+	BaseSegwitWitnessVersion = 0
+
+	// TaprootWitnessVersion is the witness version that defines the new
+	// taproot verification logic.
+	TaprootWitnessVersion = 1
 )
 
 // halforder is used to tame ECDSA malleability (see BIP0062).
 var halfOrder = new(big.Int).Rsh(btcec.S256().N, 1)
+
+// taprootExecutionCtx houses the special context-specific information we need
+// to validate a taproot script spend. This includes the annex, the running sig
+// op count tally, and other relevant information.
+type taprootExecutionCtx struct {
+	annex []byte
+
+	codeSepPos uint32
+
+	tapLeafHash chainhash.Hash
+
+	sigOpsBudget int32
+
+	mustSucceed bool
+}
+
+// sigOpsDelta is both the starting budget for sig ops for tapscript
+// verification, as well as the decrease in the total budget when we encounter
+// a signature.
+const sigOpsDelta = 50
+
+// tallysigOp attempts to decrease the current sig ops budget by sigOpsDelta.
+// An error is returned if after subtracting the delta, the budget is below
+// zero.
+func (t *taprootExecutionCtx) tallysigOp() error {
+	t.sigOpsBudget -= sigOpsDelta
+
+	if t.sigOpsBudget < 0 {
+		return scriptError(ErrTaprootMaxSigOps, "")
+	}
+
+	return nil
+}
+
+// newTaprootExecutionCtx returns a fresh instance of the taproot execution
+// context.
+func newTaprootExecutionCtx(inputWitnessSize int32) *taprootExecutionCtx {
+	return &taprootExecutionCtx{
+		codeSepPos:   blankCodeSepValue,
+		sigOpsBudget: sigOpsDelta + inputWitnessSize,
+	}
+}
 
 // Engine is the virtual machine that executes scripts.
 type Engine struct {
@@ -145,13 +221,21 @@ type Engine struct {
 	// since transaction scripts are often executed more than once from various
 	// contexts (e.g. new block templates, when transactions are first seen
 	// prior to being mined, part of full block verification, etc).
-	flags     ScriptFlags
-	tx        wire.MsgTx
-	txIdx     int
-	version   uint16
-	bip16     bool
-	sigCache  *SigCache
-	hashCache *TxSigHashes
+	//
+	// hashCache caches the midstate of segwit v0 and v1 sighashes to
+	// optimize worst-case hashing complexity.
+	//
+	// prevOutFetcher is used to look up all the previous output of
+	// taproot transactions, as that information is hashed into the
+	// sighash digest for such inputs.
+	flags          ScriptFlags
+	tx             wire.MsgTx
+	txIdx          int
+	version        uint16
+	bip16          bool
+	sigCache       *SigCache
+	hashCache      *TxSigHashes
+	prevOutFetcher PrevOutputFetcher
 
 	// The following fields handle keeping track of the current execution state
 	// of the engine.
@@ -200,6 +284,7 @@ type Engine struct {
 	witnessVersion  int
 	witnessProgram  []byte
 	inputAmount     int64
+	taprootCtx      *taprootExecutionCtx
 }
 
 // hasFlag returns whether the script engine instance has the passed flag set.
@@ -355,7 +440,7 @@ func (vm *Engine) executeOpcode(op *opcode, data []byte) error {
 	}
 
 	// Note that this includes OP_RESERVED which counts as a push operation.
-	if op.value > OP_16 {
+	if vm.taprootCtx == nil && op.value > OP_16 {
 		vm.numOps++
 		if vm.numOps > MaxOpsPerScript {
 			str := fmt.Sprintf("exceeded max operation limit of %d",
@@ -408,8 +493,12 @@ func (vm *Engine) isWitnessVersionActive(version uint) bool {
 
 // verifyWitnessProgram validates the stored witness program using the passed
 // witness as input.
-func (vm *Engine) verifyWitnessProgram(witness [][]byte) error {
-	if vm.isWitnessVersionActive(0) {
+func (vm *Engine) verifyWitnessProgram(witness wire.TxWitness) error {
+	switch {
+
+	// We're attempting to verify a base (witness version 0) segwit output,
+	// so we'll be looking for either a p2wsh or a p2wkh spend.
+	case vm.isWitnessVersionActive(BaseSegwitWitnessVersion):
 		switch len(vm.witnessProgram) {
 		case payToWitnessPubKeyHashDataSize: // P2WKH
 			// The witness stack should consist of exactly two
@@ -488,11 +577,164 @@ func (vm *Engine) verifyWitnessProgram(witness [][]byte) error {
 				len(vm.witnessProgram))
 			return scriptError(ErrWitnessProgramWrongLength, errStr)
 		}
-	} else if vm.hasFlag(ScriptVerifyDiscourageUpgradeableWitnessProgram) {
+
+	// We're attempting to to verify a taproot input, and the witness
+	// program data push is of the expected size, so we'll be looking for a
+	// normal key-path spend, or a merkle proof for a tapscript with
+	// execution afterwards.
+	case vm.isWitnessVersionActive(TaprootWitnessVersion) &&
+		len(vm.witnessProgram) == payToTaprootDataSize && !vm.bip16:
+
+		// If taproot isn't currently active, then we'll return a
+		// success here in place as we don't apply the new rules unless
+		// the flag flips, as governed by the version bits deployment.
+		if !vm.hasFlag(ScriptVerifyTaproot) {
+			return nil
+		}
+
+		// If there're no stack elements at all, then this is an
+		// invalid spend.
+		if len(witness) == 0 {
+			return scriptError(ErrWitnessProgramEmpty, "witness "+
+				"program empty passed empty witness")
+		}
+
+		// At this point, we know taproot is active, so we'll populate
+		// the taproot execution context.
+		vm.taprootCtx = newTaprootExecutionCtx(
+			int32(witness.SerializeSize()),
+		)
+
+		// If we can detect the annex, then drop that off the stack,
+		// we'll only need it to compute the sighash later.
+		if isAnnexedWitness(witness) {
+			vm.taprootCtx.annex, _ = extractAnnex(witness)
+
+			// Snip the annex off the end of the witness stack.
+			witness = witness[:len(witness)-1]
+		}
+
+		// From here, we'll either be validating a normal key spend, or
+		// a spend from the tap script leaf using a committed leaf.
+		switch {
+		// If there's only a single element left on the stack (the
+		// signature), then we'll apply the normal top-level schnorr
+		// signature verification.
+		case len(witness) == 1:
+			// As we only have a single element left (after maybe
+			// removing the annex), we'll do normal taproot
+			// keyspend validation.
+			rawSig := witness[0]
+			err := VerifyTaprootKeySpend(
+				vm.witnessProgram, rawSig, &vm.tx, vm.txIdx,
+				vm.prevOutFetcher, vm.hashCache, vm.sigCache,
+			)
+			if err != nil {
+				// TODO(roasbeef): proper error
+				return err
+			}
+
+			// TODO(roasbeef): or remove the other items from the stack?
+			vm.taprootCtx.mustSucceed = true
+			return nil
+
+		// Otherwise, we need to attempt full tapscript leaf
+		// verification in place.
+		default:
+			// First, attempt to parse the control block, if this
+			// isn't formatted properly, then we'll end execution
+			// right here.
+			controlBlock, err := ParseControlBlock(
+				witness[len(witness)-1],
+			)
+			if err != nil {
+				return err
+			}
+
+			// Now that we know the control block is valid, we'll
+			// verify the top-level taproot commitment, which
+			// proves that the specified script was committed to in
+			// the merkle tree.
+			witnessScript := witness[len(witness)-2]
+			err = VerifyTaprootLeafCommitment(
+				controlBlock, vm.witnessProgram, witnessScript,
+			)
+			if err != nil {
+				return err
+			}
+
+			// Now that we know the commitment is valid, we'll
+			// check to see if OP_SUCCESS op codes are found in the
+			// script. If so, then we'll return here early as we
+			// skip proper validation.
+			if ScriptHasOpSuccess(witnessScript) {
+				// An op success op code has been found, however if
+				// the policy flag forbidding them is active, then
+				// we'll return an error.
+				if vm.hasFlag(ScriptVerifyDiscourageOpSuccess) {
+					errStr := fmt.Sprintf("script contains " +
+						"OP_SUCCESS op code")
+					return scriptError(ErrDiscourageOpSuccess, errStr)
+				}
+
+				// Otherwise, the script passes scott free.
+				vm.taprootCtx.mustSucceed = true
+				return nil
+			}
+
+			// Before we proceed with normal execution, check the
+			// leaf version of the script, as if the policy flag is
+			// active, then we should only allow the base leaf
+			// version.
+			if controlBlock.LeafVersion != BaseLeafVersion {
+				switch {
+				case vm.hasFlag(ScriptVerifyDiscourageUpgradeableTaprootVersion):
+					errStr := fmt.Sprintf("tapscript is attempting "+
+						"to use version: %v", controlBlock.LeafVersion)
+					return scriptError(
+						ErrDiscourageUpgradeableTaprootVersion, errStr,
+					)
+				default:
+					// If the policy flag isn't active,
+					// then execution succeeds here as we
+					// don't know the rules of the future
+					// leaf versions.
+					vm.taprootCtx.mustSucceed = true
+					return nil
+				}
+			}
+
+			// Now that we know we don't have any op success
+			// fields, ensure that the script parses properly.
+			//
+			// TODO(roasbeef): combine w/ the above?
+			err = checkScriptParses(vm.version, witnessScript)
+			if err != nil {
+				return err
+			}
+
+			// Now that we know the script parses, and we have a
+			// valid leaf version, we'll save the tapscript hash of
+			// the leaf, as we need that for signature validation
+			// later.
+			vm.taprootCtx.tapLeafHash = NewBaseTapLeaf(
+				witnessScript,
+			).TapHash()
+
+			// Otherwise, we'll now "recurse" one level deeper, and
+			// set the remaining witness (leaving off the annex and
+			// the witness script) as the execution stack, and
+			// enter further execution.
+			vm.scripts = append(vm.scripts, witnessScript)
+			vm.SetStack(witness[:len(witness)-2])
+		}
+
+	case vm.hasFlag(ScriptVerifyDiscourageUpgradeableWitnessProgram):
 		errStr := fmt.Sprintf("new witness program versions "+
 			"invalid: %v", vm.witnessProgram)
+
 		return scriptError(ErrDiscourageUpgradableWitnessProgram, errStr)
-	} else {
+	default:
 		// If we encounter an unknown witness program version and we
 		// aren't discouraging future unknown witness based soft-forks,
 		// then we de-activate the segwit behavior within the VM for
@@ -500,7 +742,20 @@ func (vm *Engine) verifyWitnessProgram(witness [][]byte) error {
 		vm.witnessProgram = nil
 	}
 
-	if vm.isWitnessVersionActive(0) {
+	// TODO(roasbeef): other sanity checks here
+	switch {
+
+	// In addition to the normal script element size limits, taproot also
+	// enforces a limit on the max _starting_ stack size.
+	case vm.isWitnessVersionActive(TaprootWitnessVersion):
+		if vm.dstack.Depth() > MaxStackSize {
+			str := fmt.Sprintf("tapscript stack size %d > max allowed %d",
+				vm.dstack.Depth(), MaxStackSize)
+			return scriptError(ErrStackOverflow, str)
+		}
+
+		fallthrough
+	case vm.isWitnessVersionActive(BaseSegwitWitnessVersion):
 		// All elements within the witness stack must not be greater
 		// than the maximum bytes which are allowed to be pushed onto
 		// the stack.
@@ -512,6 +767,8 @@ func (vm *Engine) verifyWitnessProgram(witness [][]byte) error {
 				return scriptError(ErrElementTooBig, str)
 			}
 		}
+
+		return nil
 	}
 
 	return nil
@@ -586,6 +843,10 @@ func (vm *Engine) DisasmScript(idx int) (string, error) {
 // successful, leaving a a true boolean on the stack.  An error otherwise,
 // including if the script has not finished.
 func (vm *Engine) CheckErrorCondition(finalScript bool) error {
+	if vm.taprootCtx != nil && vm.taprootCtx.mustSucceed {
+		return nil
+	}
+
 	// Check execution is actually done by ensuring the script index is after
 	// the final script in the array script.
 	if vm.scriptIdx < len(vm.scripts) {
@@ -596,7 +857,8 @@ func (vm *Engine) CheckErrorCondition(finalScript bool) error {
 	// If we're in version zero witness execution mode, and this was the
 	// final script, then the stack MUST be clean in order to maintain
 	// compatibility with BIP16.
-	if finalScript && vm.isWitnessVersionActive(0) && vm.dstack.Depth() != 1 {
+	if finalScript && vm.isWitnessVersionActive(BaseSegwitWitnessVersion) &&
+		vm.dstack.Depth() != 1 {
 		return scriptError(ErrEvalFalse, "witness program must "+
 			"have clean stack")
 	}
@@ -604,8 +866,8 @@ func (vm *Engine) CheckErrorCondition(finalScript bool) error {
 	// The final script must end with exactly one data stack item when the
 	// verify clean stack flag is set.  Otherwise, there must be at least one
 	// data stack item in order to interpret it as a boolean.
-	if finalScript && vm.hasFlag(ScriptVerifyCleanStack) &&
-		vm.dstack.Depth() != 1 {
+	cleanStackActive := vm.hasFlag(ScriptVerifyCleanStack) || vm.taprootCtx != nil
+	if finalScript && cleanStackActive && vm.dstack.Depth() != 1 {
 
 		str := fmt.Sprintf("stack must contain exactly one item (contains %d)",
 			vm.dstack.Depth())
@@ -848,7 +1110,8 @@ func isStrictPubKeyEncoding(pubKey []byte) bool {
 // the strict encoding requirements if enabled.
 func (vm *Engine) checkPubKeyEncoding(pubKey []byte) error {
 	if vm.hasFlag(ScriptVerifyWitnessPubKeyType) &&
-		vm.isWitnessVersionActive(0) && !btcec.IsCompressedPubKey(pubKey) {
+		vm.isWitnessVersionActive(BaseSegwitWitnessVersion) &&
+		!btcec.IsCompressedPubKey(pubKey) {
 
 		str := "only compressed keys are accepted post-segwit"
 		return scriptError(ErrWitnessPubKeyType, str)
@@ -1117,7 +1380,9 @@ func (vm *Engine) SetAltStack(data [][]byte) {
 // transaction, and input index.  The flags modify the behavior of the script
 // engine according to the description provided by each flag.
 func NewEngine(scriptPubKey []byte, tx *wire.MsgTx, txIdx int, flags ScriptFlags,
-	sigCache *SigCache, hashCache *TxSigHashes, inputAmount int64) (*Engine, error) {
+	sigCache *SigCache, hashCache *TxSigHashes, inputAmount int64,
+	prevOutFetcher PrevOutputFetcher) (*Engine, error) {
+
 	const scriptVersion = 0
 
 	// The provided transaction input index must refer to a valid input.
@@ -1147,8 +1412,13 @@ func NewEngine(scriptPubKey []byte, tx *wire.MsgTx, txIdx int, flags ScriptFlags
 	// it possible to have a situation where P2SH would not be a soft fork
 	// when it should be. The same goes for segwit which will pull in
 	// additional scripts for execution from the witness stack.
-	vm := Engine{flags: flags, sigCache: sigCache, hashCache: hashCache,
-		inputAmount: inputAmount}
+	vm := Engine{
+		flags:          flags,
+		sigCache:       sigCache,
+		hashCache:      hashCache,
+		inputAmount:    inputAmount,
+		prevOutFetcher: prevOutFetcher,
+	}
 	if vm.hasFlag(ScriptVerifyCleanStack) && (!vm.hasFlag(ScriptBip16) &&
 		!vm.hasFlag(ScriptVerifyWitness)) {
 		return nil, scriptError(ErrInvalidFlags,
@@ -1251,7 +1521,9 @@ func NewEngine(scriptPubKey []byte, tx *wire.MsgTx, txIdx int, flags ScriptFlags
 
 		if witProgram != nil {
 			var err error
-			vm.witnessVersion, vm.witnessProgram, err = ExtractWitnessProgramInfo(witProgram)
+			vm.witnessVersion, vm.witnessProgram, err = ExtractWitnessProgramInfo(
+				witProgram,
+			)
 			if err != nil {
 				return nil, err
 			}

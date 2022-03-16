@@ -27,5 +27,11 @@ func NewPrivateKey() (*PrivateKey, error) {
 	return secp.GeneratePrivateKey()
 }
 
+// PrivKeyFromScalar instantiates a new private key from a scalar encoded as a
+// big integer.
+func PrivKeyFromScalar(key *ModNScalar) *PrivateKey {
+	return &PrivateKey{Key: *key}
+}
+
 // PrivKeyBytesLen defines the length in bytes of a serialized private key.
 const PrivKeyBytesLen = 32

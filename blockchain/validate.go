@@ -11,11 +11,11 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcd/btcutil"
 )
 
 const (
@@ -1216,6 +1216,18 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block, vi
 	if enforceSegWit {
 		scriptFlags |= txscript.ScriptVerifyWitness
 		scriptFlags |= txscript.ScriptStrictMultiSig
+	}
+
+	// Before we execute the main scripts, we'll also check to see if
+	// taproot is active or not.
+	taprootState, err := b.deploymentState(
+		node.parent, chaincfg.DeploymentTaproot,
+	)
+	if err != nil {
+		return err
+	}
+	if taprootState == ThresholdActive {
+		scriptFlags |= txscript.ScriptVerifyTaproot
 	}
 
 	// Now that the inexpensive checks are done and have passed, verify the

@@ -171,6 +171,9 @@ func thresholdStateTransition(state ThresholdState, prevNode *blockNode,
 		// speed deployments can only transition to failed
 		// after a confirmation window.
 		if !checker.IsSpeedy() && checker.HasEnded(prevNode) {
+			log.Infof("Moving from state=%v, to state=%v", state,
+				ThresholdFailed)
+
 			state = ThresholdFailed
 			break
 		}
@@ -179,6 +182,9 @@ func thresholdStateTransition(state ThresholdState, prevNode *blockNode,
 		// once its start time has been reached (and it hasn't
 		// already expired per the above).
 		if checker.HasStarted(prevNode) {
+			log.Infof("Moving from state=%v, to state=%v", state,
+				ThresholdStarted)
+
 			state = ThresholdStarted
 		}
 
@@ -187,6 +193,9 @@ func thresholdStateTransition(state ThresholdState, prevNode *blockNode,
 		// expires before it is accepted and locked in, but
 		// only if this deployment isn't speedy.
 		if !checker.IsSpeedy() && checker.HasEnded(prevNode) {
+			log.Infof("Moving from state=%v, to state=%v", state,
+				ThresholdFailed)
+
 			state = ThresholdFailed
 			break
 		}
@@ -214,13 +223,23 @@ func thresholdStateTransition(state ThresholdState, prevNode *blockNode,
 		// period that voted for the rule change meets the
 		// activation threshold.
 		case count >= checker.RuleChangeActivationThreshold():
+			log.Infof("Moving from state=%v, to state=%v", state,
+				ThresholdLockedIn)
+
 			state = ThresholdLockedIn
 
 		// If this is a speedy deployment, we didn't meet the
 		// threshold above, and the deployment has expired, then
 		// we transition to failed.
 		case checker.IsSpeedy() && checker.HasEnded(prevNode):
+			log.Infof("Moving from state=%v, to state=%v", state,
+				ThresholdFailed)
+
 			state = ThresholdFailed
+
+		default:
+			log.Infof("Still at state=%v, threshold=%v", state,
+				float64(count)/float64(checker.RuleChangeActivationThreshold()))
 		}
 
 	case ThresholdLockedIn:
@@ -232,8 +251,14 @@ func thresholdStateTransition(state ThresholdState, prevNode *blockNode,
 		// If we aren't eligible to active yet, then we'll just
 		// stay in the locked in position.
 		if !checker.EligibleToActivate(prevNode) {
+			log.Infof("Moving from state=%v, to state=%v", state,
+				ThresholdLockedIn)
+
 			state = ThresholdLockedIn
 		} else {
+			log.Infof("Moving from state=%v, to state=%v", state,
+				ThresholdActive)
+
 			// The new rule becomes active when its
 			// previous state was locked in assuming it's
 			// now eligible to activate.

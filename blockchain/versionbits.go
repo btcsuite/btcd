@@ -187,7 +187,7 @@ func (c deploymentChecker) HasEnded(blkNode *blockNode) bool {
 // This is part of the thresholdConditionChecker interface implementation.
 func (c deploymentChecker) RuleChangeActivationThreshold() uint32 {
 	// Some deployments like taproot used a custom activation threshold
-	// that ovverides the network level threshold.
+	// that overrides the network level threshold.
 	if c.deployment.CustomActivationThreshold != 0 {
 		return c.deployment.CustomActivationThreshold
 	}
@@ -234,7 +234,8 @@ func (c deploymentChecker) EligibleToActivate(blkNode *blockNode) bool {
 //
 // This is part of the thresholdConditionChecker interface implementation.
 func (c deploymentChecker) IsSpeedy() bool {
-	return c.deployment.MinActivationHeight != 0
+	return (c.deployment.MinActivationHeight != 0 ||
+		c.deployment.CustomActivationThreshold != 0)
 }
 
 // Condition returns true when the specific bit defined by the deployment

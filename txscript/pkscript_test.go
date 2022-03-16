@@ -429,12 +429,12 @@ func TestComputePkScript(t *testing.T) {
 			}
 
 			if pkScript.Class() != test.class {
-				t.Fatalf("expected pkScript of type %v, got %v",
-					test.class, pkScript.Class())
+				t.Fatalf("%s: expected pkScript of type %v, got %v",
+					test.name, test.class, pkScript.Class())
 			}
 			if !bytes.Equal(pkScript.Script(), test.pkScript) {
-				t.Fatalf("expected pkScript=%x, got pkScript=%x",
-					test.pkScript, pkScript.Script())
+				t.Fatalf("%s: expected pkScript=%x, got pkScript=%x",
+					test.name, test.pkScript, pkScript.Script())
 			}
 		})
 	}

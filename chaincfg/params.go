@@ -140,6 +140,11 @@ const (
 	// includes the deployment of BIPS 141, 142, 144, 145, 147 and 173.
 	DeploymentSegwit
 
+	// DeploymentTaproot defines the rule change deployment ID for the
+	// Taproot (+Schnorr) soft-fork package. The taproot package includes
+	// the deployment of BIPS 340, 341 and 342.
+	DeploymentTaproot
+
 	// NOTE: DefinedDeployments must always come last since it is used to
 	// determine how many defined deployments there currently are.
 
@@ -370,6 +375,17 @@ var MainNetParams = Params{
 				time.Unix(1510704000, 0), // November 15, 2017 UTC.
 			),
 		},
+		DeploymentTaproot: {
+			BitNumber: 2,
+			DeploymentStarter: NewMedianTimeDeploymentStarter(
+				time.Unix(1619222400, 0), // April 24th, 2021 UTC.
+			),
+			DeploymentEnder: NewMedianTimeDeploymentEnder(
+				time.Unix(1628640000, 0), // August 11th, 2021 UTC.
+			),
+			CustomActivationThreshold: 1815, // 90%
+			MinActivationHeight:       709_632,
+		},
 	},
 
 	// Mempool parameters
@@ -468,6 +484,16 @@ var RegressionNetParams = Params{
 			DeploymentEnder: NewMedianTimeDeploymentEnder(
 				time.Time{}, // Never expires.
 			),
+		},
+		DeploymentTaproot: {
+			BitNumber: 2,
+			DeploymentStarter: NewMedianTimeDeploymentStarter(
+				time.Time{}, // Always available for vote
+			),
+			DeploymentEnder: NewMedianTimeDeploymentEnder(
+				time.Time{}, // Never expires.
+			),
+			CustomActivationThreshold: 1512, // 75%
 		},
 	},
 
@@ -586,6 +612,16 @@ var TestNet3Params = Params{
 				time.Unix(1493596800, 0), // May 1, 2017 UTC.
 			),
 		},
+		DeploymentTaproot: {
+			BitNumber: 2,
+			DeploymentStarter: NewMedianTimeDeploymentStarter(
+				time.Unix(1619222400, 0), // April 24th, 2021 UTC.
+			),
+			DeploymentEnder: NewMedianTimeDeploymentEnder(
+				time.Unix(1628640000, 0), // August 11th, 2021 UTC
+			),
+			CustomActivationThreshold: 1512, // 75%
+		},
 	},
 
 	// Mempool parameters
@@ -688,6 +724,16 @@ var SimNetParams = Params{
 			DeploymentEnder: NewMedianTimeDeploymentEnder(
 				time.Time{}, // Never expires.
 			),
+		},
+		DeploymentTaproot: {
+			BitNumber: 2,
+			DeploymentStarter: NewMedianTimeDeploymentStarter(
+				time.Time{}, // Always available for vote
+			),
+			DeploymentEnder: NewMedianTimeDeploymentEnder(
+				time.Time{}, // Never expires.
+			),
+			CustomActivationThreshold: 1815, // 90%
 		},
 	},
 
@@ -799,6 +845,15 @@ func CustomSignetParams(challenge []byte, dnsSeeds []DNSSeed) Params {
 				),
 			},
 			DeploymentSegwit: {
+				BitNumber: 29,
+				DeploymentStarter: NewMedianTimeDeploymentStarter(
+					time.Time{}, // Always available for vote
+				),
+				DeploymentEnder: NewMedianTimeDeploymentEnder(
+					time.Time{}, // Never expires
+				),
+			},
+			DeploymentTaproot: {
 				BitNumber: 29,
 				DeploymentStarter: NewMedianTimeDeploymentStarter(
 					time.Time{}, // Always available for vote

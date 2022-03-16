@@ -55,7 +55,7 @@ func TestBadPC(t *testing.T) {
 	pkScript := mustParseShortForm("NOP")
 
 	for _, test := range tests {
-		vm, err := NewEngine(pkScript, tx, 0, 0, nil, nil, -1)
+		vm, err := NewEngine(pkScript, tx, 0, 0, nil, nil, -1, nil)
 		if err != nil {
 			t.Errorf("Failed to create script: %v", err)
 		}
@@ -112,7 +112,7 @@ func TestCheckErrorCondition(t *testing.T) {
 	pkScript := mustParseShortForm("NOP NOP NOP NOP NOP NOP NOP NOP NOP" +
 		" NOP TRUE")
 
-	vm, err := NewEngine(pkScript, tx, 0, 0, nil, nil, 0)
+	vm, err := NewEngine(pkScript, tx, 0, 0, nil, nil, 0, nil)
 	if err != nil {
 		t.Errorf("failed to create script: %v", err)
 	}
@@ -188,7 +188,7 @@ func TestInvalidFlagCombinations(t *testing.T) {
 	pkScript := []byte{OP_NOP}
 
 	for i, test := range tests {
-		_, err := NewEngine(pkScript, tx, 0, test, nil, nil, -1)
+		_, err := NewEngine(pkScript, tx, 0, test, nil, nil, -1, nil)
 		if !IsErrorCode(err, ErrInvalidFlags) {
 			t.Fatalf("TestInvalidFlagCombinations #%d unexpected "+
 				"error: %v", i, err)

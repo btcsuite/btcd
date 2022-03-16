@@ -7,10 +7,11 @@ package txscript
 import (
 	"errors"
 
-	"github.com/btcsuite/btcd/btcec/v2/ecdsa"
-
 	"github.com/btcsuite/btcd/btcec/v2"
+	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/btcsuite/btcd/btcutil"
+
+	"github.com/btcsuite/btcd/btcec/v2/ecdsa"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/wire"
 )
@@ -60,6 +61,115 @@ func WitnessSignature(tx *wire.MsgTx, sigHashes *TxSigHashes, idx int, amt int64
 	// A witness script is actually a stack, so we return an array of byte
 	// slices here, rather than a single byte slice.
 	return wire.TxWitness{sig, pkData}, nil
+}
+
+// RawTxInTaprootSignature returns a valid schnorr signature required to
+// perform a taproot key-spend of the specified input. If SigHashDefault was
+// specified, then the returned signature is 64-byte in length, as it omits the
+// additional byte to denote the sighash type.
+func RawTxInTaprootSignature(tx *wire.MsgTx, sigHashes *TxSigHashes, idx int,
+	amt int64, pkScript []byte, tapScriptRootHash []byte, hashType SigHashType,
+	key *btcec.PrivateKey) ([]byte, error) {
+
+	// First, we'll start by compute the top-level taproot sighash.
+	sigHash, err := calcTaprootSignatureHashRaw(
+		sigHashes, hashType, tx, idx,
+		NewCannedPrevOutputFetcher(pkScript, amt),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	// Before we sign the sighash, we'll need to apply the taptweak to the
+	// private key based on the tapScriptRootHash.
+	privKeyTweak := TweakTaprootPrivKey(key, tapScriptRootHash)
+
+	// With the sighash constructed, we can sign it with the specified
+	// private key.
+	signature, err := schnorr.Sign(privKeyTweak, sigHash)
+	if err != nil {
+		return nil, err
+	}
+
+	sig := signature.Serialize()
+
+	// If this is sighash default, then we can just return the signature
+	// directly.
+	if hashType&SigHashDefault == SigHashDefault {
+		return sig, nil
+	}
+
+	// Otherwise, append the sighash type to the final sig.
+	return append(sig, byte(hashType)), nil
+}
+
+// TaprootWitnessSignature returns a valid witness stack that can be used to
+// spend the key-spend path of a taproot input as specified in BIP 342 and BIP
+// 86. This method assumes that the public key included in pkScript was
+// generated using ComputeTaprootKeyNoScript that commits to a fake root
+// tapscript hash. If not, then RawTxInTaprootSignature should be used with the
+// actual committed contents.
+//
+// TODO(roasbeef): add support for annex even tho it's non-standard?
+func TaprootWitnessSignature(tx *wire.MsgTx, sigHashes *TxSigHashes, idx int,
+	amt int64, pkScript []byte, hashType SigHashType,
+	key *btcec.PrivateKey) (wire.TxWitness, error) {
+
+	// As we're assuming this was a BIP 86 key, we use an empty root hash
+	// which means output key commits to just the public key.
+	fakeTapscriptRootHash := []byte{}
+
+	sig, err := RawTxInTaprootSignature(
+		tx, sigHashes, idx, amt, pkScript, fakeTapscriptRootHash,
+		hashType, key,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	// The witness script to spend a taproot input using the key-spend path
+	// is just the signature itself, given the public key is
+	// embedded in the previous output script.
+	return wire.TxWitness{sig}, nil
+}
+
+// RawTxInTapscriptSignature computes a raw schnorr signature for a signature
+// generated from a tapscript leaf. This differs from the
+// RawTxInTaprootSignature which is used to generate signatures for top-level
+// taproot key spends.
+//
+// TODO(roasbeef): actually add code-sep to interface? not really used
+// anywhere....
+func RawTxInTapscriptSignature(tx *wire.MsgTx, sigHashes *TxSigHashes, idx int,
+	amt int64, pkScript []byte, tapLeaf TapLeaf, hashType SigHashType,
+	privKey *btcec.PrivateKey) ([]byte, error) {
+
+	// First, we'll start by compute the top-level taproot sighash.
+	tapLeafHash := tapLeaf.TapHash()
+	sigHash, err := calcTaprootSignatureHashRaw(
+		sigHashes, hashType, tx, idx,
+		NewCannedPrevOutputFetcher(pkScript, amt),
+		WithBaseTapscriptVersion(blankCodeSepValue, tapLeafHash[:]),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	// With the sighash constructed, we can sign it with the specified
+	// private key.
+	signature, err := schnorr.Sign(privKey, sigHash)
+	if err != nil {
+		return nil, err
+	}
+
+	// Finally, append the sighash type to the final sig if it's not the
+	// default sighash value (in which case appending it is disallowed).
+	if hashType != SigHashDefault {
+		return append(signature.Serialize(), byte(hashType)), nil
+	}
+
+	// The default sighash case where we'll return _just_ the signature.
+	return signature.Serialize(), nil
 }
 
 // RawTxInSignature returns the serialized ECDSA signature for the input idx of

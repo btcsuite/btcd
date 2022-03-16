@@ -173,6 +173,7 @@ func TestGetPreciseSigOps(t *testing.T) {
 // nested p2sh, and invalid variants are counted properly.
 func TestGetWitnessSigOpCount(t *testing.T) {
 	t.Parallel()
+
 	tests := []struct {
 		name string
 
@@ -182,7 +183,7 @@ func TestGetWitnessSigOpCount(t *testing.T) {
 
 		numSigOps int
 	}{
-		// A regualr p2wkh witness program. The output being spent
+		// A regular p2wkh witness program. The output being spent
 		// should only have a single sig-op counted.
 		{
 			name: "p2wkh",

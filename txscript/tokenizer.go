@@ -29,12 +29,13 @@ func init() {
 // The ByteIndex function may be used to obtain the tokenizer's current offset
 // into the raw script.
 type ScriptTokenizer struct {
-	script  []byte
-	version uint16
-	offset  int32
-	op      *opcode
-	data    []byte
-	err     error
+	script    []byte
+	version   uint16
+	offset    int32
+	opcodePos int32
+	op        *opcode
+	data      []byte
+	err       error
 }
 
 // Done returns true when either all opcodes have been exhausted or a parse
@@ -63,6 +64,12 @@ func (t *ScriptTokenizer) Next() bool {
 	if t.Done() {
 		return false
 	}
+
+	// Increment the op code position each time we attempt to parse the
+	// next op code. Note that since the starting value is -1 (no op codes
+	// parsed), by incrementing here, we start at 0, then 1, and so on for
+	// the other op codes.
+	t.opcodePos++
 
 	op := &opcodeArrayRef[t.script[t.offset]]
 	switch {
@@ -152,6 +159,16 @@ func (t *ScriptTokenizer) ByteIndex() int32 {
 	return t.offset
 }
 
+// OpcodePosition returns the current op code counter. Unlike the ByteIndex
+// above (referred to as the program counter or pc at times), this is
+// incremented with each node op code, and isn't incremented more than once for
+// push datas.
+//
+// NOTE: If no op codes have been parsed, this returns -1.
+func (t *ScriptTokenizer) OpcodePosition() int32 {
+	return t.opcodePos
+}
+
 // Opcode returns the current opcode associated with the tokenizer.
 func (t *ScriptTokenizer) Opcode() byte {
 	return t.op.value
@@ -182,5 +199,11 @@ func MakeScriptTokenizer(scriptVersion uint16, script []byte) ScriptTokenizer {
 		err = scriptError(ErrUnsupportedScriptVersion, str)
 
 	}
-	return ScriptTokenizer{version: scriptVersion, script: script, err: err}
+	return ScriptTokenizer{
+		version: scriptVersion,
+		script:  script,
+		err:     err,
+		// We use a value of negative 1 here so the first op code has a value of 0.
+		opcodePos: -1,
+	}
 }
