@@ -291,8 +291,8 @@ func parseTaprootSigAndPubKey(pkBytes, rawSig []byte,
 
 	// Otherwise, this is an invalid signature, so we need to bail out.
 	default:
-		// TODO(roasbeef): do proper error here
-		return nil, nil, 0, fmt.Errorf("invalid sig len: %v", len(rawSig))
+		str := fmt.Sprintf("invalid sig len: %v", len(rawSig))
+		return nil, nil, 0, scriptError(ErrInvalidTaprootSigLen, str)
 	}
 
 	return pubKey, sig, sigHashType, nil
@@ -402,8 +402,7 @@ func newBaseTapscriptSigVerifier(pkBytes, rawSig []byte,
 	// If the public key is zero bytes, then this is invalid, and will fail
 	// immediately.
 	case 0:
-		// TODO(roasbeef): better erro
-		return nil, fmt.Errorf("pubkey is zero bytes")
+		return nil, scriptError(ErrTaprootPubkeyIsEmpty, "")
 
 	// If the public key is 32 byte as we expect, then we'll parse things
 	// as normal.

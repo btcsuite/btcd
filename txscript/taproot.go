@@ -89,8 +89,7 @@ func VerifyTaprootKeySpend(witnessProgram []byte, rawSig []byte, tx *wire.MsgTx,
 		return nil
 	}
 
-	// TODO(roasbeef): add proper error
-	return fmt.Errorf("invalid sig")
+	return scriptError(ErrTaprootSigInvalid, "")
 }
 
 // ControlBlock houses the structured witness input for a taproot spend. This
@@ -189,18 +188,24 @@ func ParseControlBlock(ctrlBlock []byte) (*ControlBlock, error) {
 	// The control block must minimally have 33 bytes for the internal
 	// public key and script leaf version.
 	case len(ctrlBlock) < ControlBlockBaseSize:
-		return nil, fmt.Errorf("invalid control block size")
+		str := fmt.Sprintf("min size is %v bytes, control block "+
+			"is %v bytes", ControlBlockBaseSize, len(ctrlBlock))
+		return nil, scriptError(ErrControlBlockTooSmall, str)
 
 	// The control block can't be larger than a proof for the largest
 	// possible tapscript merkle tree with 2^128 leaves.
 	case len(ctrlBlock) > ControlBlockMaxSize:
-		return nil, fmt.Errorf("invalid max block size")
+		str := fmt.Sprintf("max size is %v, control block is %v bytes",
+			ControlBlockMaxSize, len(ctrlBlock))
+		return nil, scriptError(ErrControlBlockTooLarge, str)
 
 	// Ignoring the fixed sized portion, we expect the total number of
 	// remaining bytes to be a multiple of the node size, which is 32
 	// bytes.
 	case (len(ctrlBlock)-ControlBlockBaseSize)%ControlBlockNodeSize != 0:
-		return nil, fmt.Errorf("invalid max block size")
+		str := fmt.Sprintf("control block proof is not a multiple "+
+			"of 32: %v", len(ctrlBlock)-ControlBlockBaseSize)
+		return nil, scriptError(ErrControlBlockInvalidLength, str)
 	}
 
 	// With the basic sanity checking complete, we can now parse the
@@ -347,7 +352,8 @@ func VerifyTaprootLeafCommitment(controlBlock *ControlBlock,
 	// program passed in.
 	expectedWitnessProgram := schnorr.SerializePubKey(taprootKey)
 	if !bytes.Equal(expectedWitnessProgram, taprootWitnessProgram) {
-		return fmt.Errorf("invalid witness commitment")
+
+		return scriptError(ErrTaprootMerkleProofInvalid, "")
 	}
 
 	// Finally, we'll verify that the parity of the y coordinate of the
@@ -355,7 +361,10 @@ func VerifyTaprootLeafCommitment(controlBlock *ControlBlock,
 	derivedYIsOdd := (taprootKey.SerializeCompressed()[0] ==
 		secp.PubKeyFormatCompressedOdd)
 	if controlBlock.OutputKeyYIsOdd != derivedYIsOdd {
-		return fmt.Errorf("invalid witness commitment")
+		str := fmt.Sprintf("control block y is odd: %v, derived "+
+			"parity is odd: %v", controlBlock.OutputKeyYIsOdd,
+			derivedYIsOdd)
+		return scriptError(ErrTaprootOutputKeyParityMismatch, str)
 	}
 
 	// Otherwise, if we reach here, the commitment opening is valid and

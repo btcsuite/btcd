@@ -2038,14 +2038,14 @@ func opcodeCheckSig(op *opcode, data []byte, vm *Engine) error {
 			}
 		}
 
-		// Empty public keys immeidately cause execution to fail.
+		// Empty public keys immediately cause execution to fail.
 		if len(pkBytes) == 0 {
-			return fmt.Errorf("nil pub key")
+			return scriptError(ErrTaprootPubkeyIsEmpty, "")
 		}
 
 		// If this is tapscript execution, and the signature was
 		// actually an empty vector, then we push on an empty vector
-		// and continue execution from ther, but only if the pubkey
+		// and continue execution from there, but only if the pubkey
 		// isn't empty.
 		if len(fullSigBytes) == 0 {
 			vm.dstack.PushByteArray([]byte{})
@@ -2143,9 +2143,9 @@ func opcodeCheckSigAdd(op *opcode, data []byte, vm *Engine) error {
 		}
 	}
 
-	// Empty public keys immeidately cause execution to fail.
+	// Empty public keys immediately cause execution to fail.
 	if len(pubKeyBytes) == 0 {
-		return fmt.Errorf("nil pubkey")
+		return scriptError(ErrTaprootPubkeyIsEmpty, "")
 	}
 
 	// If the signature is empty, then we'll just push the value N back

@@ -178,7 +178,7 @@ func (t *taprootExecutionCtx) tallysigOp() error {
 	t.sigOpsBudget -= sigOpsDelta
 
 	if t.sigOpsBudget < 0 {
-		return fmt.Errorf("max sig ops exceeded")
+		return scriptError(ErrTaprootMaxSigOps, "")
 	}
 
 	return nil

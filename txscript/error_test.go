@@ -86,6 +86,16 @@ func TestErrorCodeStringer(t *testing.T) {
 		{ErrTapscriptCheckMultisig, "ErrTapscriptCheckMultisig"},
 		{ErrDiscourageUpgradableWitnessProgram, "ErrDiscourageUpgradableWitnessProgram"},
 		{ErrDiscourageUpgradeablePubKeyType, "ErrDiscourageUpgradeablePubKeyType"},
+		{ErrTaprootSigInvalid, "ErrTaprootSigInvalid"},
+		{ErrTaprootMerkleProofInvalid, "ErrTaprootMerkleProofInvalid"},
+		{ErrTaprootOutputKeyParityMismatch, "ErrTaprootOutputKeyParityMismatch"},
+		{ErrControlBlockTooSmall, "ErrControlBlockTooSmall"},
+		{ErrControlBlockTooLarge, "ErrControlBlockTooLarge"},
+		{ErrControlBlockInvalidLength, "ErrControlBlockInvalidLength"},
+		{ErrWitnessHasNoAnnex, "ErrWitnessHasNoAnnex"},
+		{ErrInvalidTaprootSigLen, "ErrInvalidTaprootSigLen"},
+		{ErrTaprootPubkeyIsEmpty, "ErrTaprootPubkeyIsEmpty"},
+		{ErrTaprootMaxSigOps, "ErrTaprootMaxSigOps"},
 		{0xffff, "Unknown ErrorCode (65535)"},
 	}
 

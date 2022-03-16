@@ -367,6 +367,47 @@ const (
 	// bytes.
 	ErrDiscourageUpgradeablePubKeyType
 
+	// ErrTaprootSigInvalid is returned when an invalid taproot key spend
+	// signature is encountered.
+	ErrTaprootSigInvalid
+
+	// ErrTaprootMerkleProofInvalid is returned when the revealed script
+	// merkle proof for a taproot spend is found to be invalid.
+	ErrTaprootMerkleProofInvalid
+
+	// ErrTaprootOutputKeyParityMismatch is returned when the control block
+	// proof is valid, but the parity of the y-coordinate of the derived
+	// key doesn't match the value encoded in the control block.
+	ErrTaprootOutputKeyParityMismatch
+
+	// ErrControlBlockTooSmall is returned when a parsed control block is
+	// less than 33 bytes.
+	ErrControlBlockTooSmall
+
+	// ErrControlBlockTooLarge is returned when the control block is larger
+	// than the largest possible proof for a merkle script tree.
+	ErrControlBlockTooLarge
+
+	// ErrControlBlockInvalidLength is returned when the control block,
+	// without the public key isn't a multiple of 32.
+	ErrControlBlockInvalidLength
+
+	// ErrWitnessHasNoAnnex is returned when a caller attempts to extract
+	// an annex, but the witness has no annex present.
+	ErrWitnessHasNoAnnex
+
+	// ErrInvalidTaprootSigLen is returned when taproot signature isn't 64
+	// or 65 bytes.
+	ErrInvalidTaprootSigLen
+
+	// ErrTaprootPubkeyIsEmpty is returned when a signature checking op
+	// code encounters an empty public key.
+	ErrTaprootPubkeyIsEmpty
+
+	// ErrTaprootMaxSigOps is returned when the number of allotted sig ops
+	// is exceeded during taproot execution.
+	ErrTaprootMaxSigOps
+
 	// numErrorCodes is the maximum error code number used in tests.  This
 	// entry MUST be the last entry in the enum.
 	numErrorCodes
@@ -443,6 +484,16 @@ var errorCodeStrings = map[ErrorCode]string{
 	ErrDiscourageUpgradeableTaprootVersion: "ErrDiscourageUpgradeableTaprootVersion",
 	ErrTapscriptCheckMultisig:              "ErrTapscriptCheckMultisig",
 	ErrDiscourageUpgradeablePubKeyType:     "ErrDiscourageUpgradeablePubKeyType",
+	ErrTaprootSigInvalid:                   "ErrTaprootSigInvalid",
+	ErrTaprootMerkleProofInvalid:           "ErrTaprootMerkleProofInvalid",
+	ErrTaprootOutputKeyParityMismatch:      "ErrTaprootOutputKeyParityMismatch",
+	ErrControlBlockTooSmall:                "ErrControlBlockTooSmall",
+	ErrControlBlockTooLarge:                "ErrControlBlockTooLarge",
+	ErrControlBlockInvalidLength:           "ErrControlBlockInvalidLength",
+	ErrWitnessHasNoAnnex:                   "ErrWitnessHasNoAnnex",
+	ErrInvalidTaprootSigLen:                "ErrInvalidTaprootSigLen",
+	ErrTaprootPubkeyIsEmpty:                "ErrTaprootPubkeyIsEmpty",
+	ErrTaprootMaxSigOps:                    "ErrTaprootMaxSigOps",
 }
 
 // String returns the ErrorCode as a human-readable name.

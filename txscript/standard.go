@@ -482,8 +482,7 @@ func isAnnexedWitness(witness wire.TxWitness) bool {
 // witness doesn't contain an annex, then an error is returned.
 func extractAnnex(witness [][]byte) ([]byte, error) {
 	if !isAnnexedWitness(witness) {
-		// TODO(roasbeef): make into actual type
-		return nil, fmt.Errorf("no witness annex")
+		return nil, scriptError(ErrWitnessHasNoAnnex, "")
 	}
 
 	lastElement := witness[len(witness)-1]
