@@ -5,8 +5,8 @@ go 1.16
 require (
 	github.com/aead/siphash v1.0.1
 	github.com/btcsuite/btcd v0.22.0-beta.0.20220111032746-97732e52810c
-	github.com/btcsuite/btcd/btcec/v2 v2.1.1
-	github.com/btcsuite/btcd/chaincfg/chainhash v1.0.0
+	github.com/btcsuite/btcd/btcec/v2 v2.1.3
+	github.com/btcsuite/btcd/chaincfg/chainhash v1.0.1
 	github.com/davecgh/go-spew v1.1.1
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.0.1
 	github.com/kkdai/bstream v0.0.0-20161212061736-f391b8402d23
@@ -14,7 +14,3 @@ require (
 )
 
 replace github.com/btcsuite/btcd => ../
-
-replace github.com/btcsuite/btcd/chaincfg/chainhash => ../chaincfg/chainhash
-
-replace github.com/btcsuite/btcd/btcec/v2 => ../btcec
