@@ -171,7 +171,7 @@ func thresholdStateTransition(state ThresholdState, prevNode *blockNode,
 		// speed deployments can only transition to failed
 		// after a confirmation window.
 		if !checker.IsSpeedy() && checker.HasEnded(prevNode) {
-			log.Infof("Moving from state=%v, to state=%v", state,
+			log.Debugf("Moving from state=%v, to state=%v", state,
 				ThresholdFailed)
 
 			state = ThresholdFailed
@@ -182,7 +182,7 @@ func thresholdStateTransition(state ThresholdState, prevNode *blockNode,
 		// once its start time has been reached (and it hasn't
 		// already expired per the above).
 		if checker.HasStarted(prevNode) {
-			log.Infof("Moving from state=%v, to state=%v", state,
+			log.Debugf("Moving from state=%v, to state=%v", state,
 				ThresholdStarted)
 
 			state = ThresholdStarted
@@ -193,7 +193,7 @@ func thresholdStateTransition(state ThresholdState, prevNode *blockNode,
 		// expires before it is accepted and locked in, but
 		// only if this deployment isn't speedy.
 		if !checker.IsSpeedy() && checker.HasEnded(prevNode) {
-			log.Infof("Moving from state=%v, to state=%v", state,
+			log.Debugf("Moving from state=%v, to state=%v", state,
 				ThresholdFailed)
 
 			state = ThresholdFailed
@@ -223,7 +223,7 @@ func thresholdStateTransition(state ThresholdState, prevNode *blockNode,
 		// period that voted for the rule change meets the
 		// activation threshold.
 		case count >= checker.RuleChangeActivationThreshold():
-			log.Infof("Moving from state=%v, to state=%v", state,
+			log.Debugf("Moving from state=%v, to state=%v", state,
 				ThresholdLockedIn)
 
 			state = ThresholdLockedIn
@@ -232,13 +232,13 @@ func thresholdStateTransition(state ThresholdState, prevNode *blockNode,
 		// threshold above, and the deployment has expired, then
 		// we transition to failed.
 		case checker.IsSpeedy() && checker.HasEnded(prevNode):
-			log.Infof("Moving from state=%v, to state=%v", state,
+			log.Debugf("Moving from state=%v, to state=%v", state,
 				ThresholdFailed)
 
 			state = ThresholdFailed
 
 		default:
-			log.Infof("Still at state=%v, threshold=%v", state,
+			log.Tracef("Still at state=%v, threshold=%v", state,
 				float64(count)/float64(checker.RuleChangeActivationThreshold()))
 		}
 
@@ -251,12 +251,12 @@ func thresholdStateTransition(state ThresholdState, prevNode *blockNode,
 		// If we aren't eligible to active yet, then we'll just
 		// stay in the locked in position.
 		if !checker.EligibleToActivate(prevNode) {
-			log.Infof("Moving from state=%v, to state=%v", state,
+			log.Debugf("Moving from state=%v, to state=%v", state,
 				ThresholdLockedIn)
 
 			state = ThresholdLockedIn
 		} else {
-			log.Infof("Moving from state=%v, to state=%v", state,
+			log.Debugf("Moving from state=%v, to state=%v", state,
 				ThresholdActive)
 
 			// The new rule becomes active when its
