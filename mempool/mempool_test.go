@@ -14,11 +14,11 @@ import (
 
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/btcec/v2"
+	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcd/btcutil"
 )
 
 // fakeChain is used by the pool harness to provide generated test utxos and
@@ -560,7 +560,7 @@ func TestOrphanReject(t *testing.T) {
 
 		// Ensure no transactions were reported as accepted.
 		if len(acceptedTxns) != 0 {
-			t.Fatal("ProcessTransaction: reported %d accepted "+
+			t.Fatalf("ProcessTransaction: reported %d accepted "+
 				"transactions from failed orphan attempt",
 				len(acceptedTxns))
 		}
