@@ -40,8 +40,11 @@ func (s Bip32Sorter) Less(i, j int) bool {
 // little endian encodings of uint32 values, the first of which is the
 // masterkeyfingerprint and the remainder of which are the derivation path.
 func readBip32Derivation(path []byte) (uint32, []uint32, error) {
-
-	if len(path)%4 != 0 || len(path)/4-1 < 1 {
+	// BIP-0174 defines the derivation path being encoded as
+	//   "<32-bit uint> <32-bit uint>*"
+	// with the asterisk meaning 0 to n times. Which in turn means that an
+	// empty path is valid, only the key fingerprint is mandatory.
+	if len(path)%4 != 0 {
 		return 0, nil, ErrInvalidPsbtFormat
 	}
 
