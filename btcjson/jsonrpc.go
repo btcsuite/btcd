@@ -157,6 +157,9 @@ func (request *Request) UnmarshalJSON(b []byte) error {
 // request.
 func NewRequest(rpcVersion RPCVersion, id interface{}, method string, params []interface{}) (*Request, error) {
 	// default to JSON-RPC 1.0 if RPC type is not specified
+	if rpcVersion == "" {
+		rpcVersion = RpcVersion1
+	}
 	if !rpcVersion.IsValid() {
 		str := fmt.Sprintf("rpcversion '%s' is invalid", rpcVersion)
 		return nil, makeError(ErrInvalidType, str)
