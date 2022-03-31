@@ -59,9 +59,36 @@ type Context struct {
 	// keysHash is the hash of all the keys as defined in musig2.
 	keysHash []byte
 
+	// tweaks is a set of optional tweak values that affect the final
+	// combined public key.
+	tweaks []KeyTweakDesc
+
 	// shouldSort keeps track of if the public keys should be sorted before
 	// any operations.
 	shouldSort bool
+}
+
+// ContextOption is a functional option argument that allows callers to modify
+// the musig2 signing is done within a context.
+type ContextOption func(*contextOptions)
+
+// contextOptions houses the set of functional options that can be used to
+// musig2 signing protocol.
+type contextOptions struct {
+	tweaks []KeyTweakDesc
+}
+
+// defaultContextOptions returns the default context options.
+func defaultContextOptions() *contextOptions {
+	return &contextOptions{}
+}
+
+// WithTweakedContext specifies that within the context, the aggregated public
+// key should be tweaked with the specified tweaks.
+func WithTweakedContext(tweaks []KeyTweakDesc) ContextOption {
+	return func(o *contextOptions) {
+		o.tweaks = tweaks
+	}
 }
 
 // NewContext creates a new signing context with the passed singing key and set
@@ -69,7 +96,14 @@ type Context struct {
 //
 // NOTE: This struct should be used over the raw Sign API whenever possible.
 func NewContext(signingKey *btcec.PrivateKey,
-	signers []*btcec.PublicKey, shouldSort bool) (*Context, error) {
+	signers []*btcec.PublicKey, shouldSort bool,
+	ctxOpts ...ContextOption) (*Context, error) {
+
+	// First, parse the set of optional context options.
+	opts := defaultContextOptions()
+	for _, option := range ctxOpts {
+		option(opts)
+	}
 
 	// As a sanity check, make sure the signing key is actually amongst the sit
 	// of signers.
@@ -101,10 +135,14 @@ func NewContext(signingKey *btcec.PrivateKey,
 
 	// Next, we'll use this information to compute the aggregated public
 	// key that'll be used for signing in practice.
-	combinedKey := AggregateKeys(
+	combinedKey, _, _, err := AggregateKeys(
 		signers, shouldSort, WithKeysHash(keysHash),
 		WithUniqueKeyIndex(uniqueKeyIndex),
+		WithKeyTweaks(opts.tweaks...),
 	)
+	if err != nil {
+		return nil, err
+	}
 
 	return &Context{
 		signingKey:     signingKey,
@@ -113,6 +151,7 @@ func NewContext(signingKey *btcec.PrivateKey,
 		combinedKey:    combinedKey,
 		uniqueKeyIndex: uniqueKeyIndex,
 		keysHash:       keysHash,
+		tweaks:         opts.tweaks,
 		shouldSort:     shouldSort,
 	}, nil
 }
@@ -159,6 +198,8 @@ type Session struct {
 
 	finalSig *schnorr.Signature
 }
+
+// TODO(roasbeef): optional arg to allow parsing in pre-generated nonces
 
 // NewSession creates a new musig2 signing session.
 func (c *Context) NewSession() (*Session, error) {
@@ -242,6 +283,10 @@ func (s *Session) Sign(msg [32]byte,
 		return nil, ErrCombinedNonceUnavailable
 	}
 
+	if len(s.ctx.tweaks) != 0 {
+		signOpts = append(signOpts, WithTweaks(s.ctx.tweaks...))
+	}
+
 	partialSig, err := Sign(
 		s.localNonces.SecNonce, s.ctx.signingKey, *s.combinedNonce,
 		s.ctx.keySet, msg, signOpts...,
@@ -283,7 +328,17 @@ func (s *Session) CombineSig(sig *PartialSignature) (bool, error) {
 	// If we have all the signatures, then we can combine them all into the
 	// final signature.
 	if haveAllSigs {
-		finalSig := CombineSigs(s.ourSig.R, s.sigs)
+		var combineOpts []CombineOption
+		if len(s.ctx.tweaks) != 0 {
+			combineOpts = append(
+				combineOpts, WithTweakedCombine(
+					s.msg, s.ctx.keySet, s.ctx.tweaks,
+					s.ctx.shouldSort,
+				),
+			)
+		}
+
+		finalSig := CombineSigs(s.ourSig.R, s.sigs, combineOpts...)
 
 		// We'll also verify the signature at this point to ensure it's
 		// valid.

@@ -104,6 +104,11 @@ type signOptions struct {
 	// sortKeys determines if the set of keys should be sorted before doing
 	// key aggregation.
 	sortKeys bool
+
+	// tweaks specifies a series of tweaks to be applied to the aggregated
+	// public key, which also partially carries over into the signing
+	// process.
+	tweaks []KeyTweakDesc
 }
 
 // defaultSignOptions returns the default set of signing operations.
@@ -125,6 +130,14 @@ func WithFastSign() SignOption {
 func WithSortedKeys() SignOption {
 	return func(o *signOptions) {
 		o.sortKeys = true
+	}
+}
+
+// WithTweaks determines if the aggregated public key used should apply a
+// series of tweaks before key aggregation.
+func WithTweaks(tweaks ...KeyTweakDesc) SignOption {
+	return func(o *signOptions) {
+		o.tweaks = tweaks
 	}
 }
 
@@ -163,10 +176,14 @@ func Sign(secNonce [SecNonceSize]byte, privKey *btcec.PrivateKey,
 	// Next we'll construct the aggregated public key based on the set of
 	// signers.
 	uniqueKeyIndex := secondUniqueKeyIndex(pubKeys, opts.sortKeys)
-	combinedKey := AggregateKeys(
+	combinedKey, parityAcc, _, err := AggregateKeys(
 		pubKeys, opts.sortKeys, WithKeysHash(keysHash),
 		WithUniqueKeyIndex(uniqueKeyIndex),
+		WithKeyTweaks(opts.tweaks...),
 	)
+	if err != nil {
+		return nil, err
+	}
 
 	// Next we'll compute the value b, that blinds our second public
 	// nonce:
@@ -224,8 +241,6 @@ func Sign(secNonce [SecNonceSize]byte, privKey *btcec.PrivateKey,
 		return nil, ErrPrivKeyZero
 	}
 
-	// If the y coordinate of the public key is odd xor the y coordinate of
-	// the combined public key is odd, then we'll negate the private key.
 	pubKey := privKey.PubKey()
 	pubKeyYIsOdd := func() bool {
 		pubKeyBytes := pubKey.SerializeCompressed()
@@ -235,13 +250,27 @@ func Sign(secNonce [SecNonceSize]byte, privKey *btcec.PrivateKey,
 		combinedKeyBytes := combinedKey.SerializeCompressed()
 		return combinedKeyBytes[0] == secp.PubKeyFormatCompressedOdd
 	}()
-	if pubKeyYIsOdd != combinedKeyYIsOdd {
-		privKeyScalar.Negate()
+
+	// Next we'll compute our two parity factors for Q the combined public
+	// key, and P, the public key we're signing with. If the keys are odd,
+	// then we'll negate them.
+	parityCombinedKey := new(btcec.ModNScalar).SetInt(1)
+	paritySignKey := new(btcec.ModNScalar).SetInt(1)
+	if combinedKeyYIsOdd {
+		parityCombinedKey.Negate()
+	}
+	if pubKeyYIsOdd {
+		paritySignKey.Negate()
 	}
 
+	// Before we sign below, we'll multiply by our various parity factors
+	// to ensure that the signing key is properly negated (if necessary):
+	//  * d = gv⋅gaccv⋅gp⋅d'
+	privKeyScalar.Mul(parityCombinedKey).Mul(paritySignKey).Mul(parityAcc)
+
 	// Next we'll create the challenge hash that commits to the combined
-	// nonce, combined public key and also the message: * e =
-	// H(tag=ChallengeHashTag, R || Q || m) mod n
+	// nonce, combined public key and also the message:
+	// * e = H(tag=ChallengeHashTag, R || Q || m) mod n
 	var challengeMsg bytes.Buffer
 	challengeMsg.Write(schnorr.SerializePubKey(nonceKey))
 	challengeMsg.Write(schnorr.SerializePubKey(combinedKey))
@@ -252,14 +281,14 @@ func Sign(secNonce [SecNonceSize]byte, privKey *btcec.PrivateKey,
 	var e btcec.ModNScalar
 	e.SetByteSlice(challengeBytes[:])
 
-	// Next, we'll compute mu, our aggregation coefficient for the key that
+	// Next, we'll compute a, our aggregation coefficient for the key that
 	// we're signing with.
-	mu := aggregationCoefficient(pubKeys, pubKey, keysHash, uniqueKeyIndex)
+	a := aggregationCoefficient(pubKeys, pubKey, keysHash, uniqueKeyIndex)
 
 	// With mu constructed, we can finally generate our partial signature
-	// as: s = (k1_1 + b*k_2 + e*mu*d) mod n.
+	// as: s = (k1_1 + b*k_2 + e*a*d) mod n.
 	s := new(btcec.ModNScalar)
-	s.Add(&k1).Add(k2.Mul(&nonceBlinder)).Add(e.Mul(mu).Mul(&privKeyScalar))
+	s.Add(&k1).Add(k2.Mul(&nonceBlinder)).Add(e.Mul(a).Mul(&privKeyScalar))
 
 	sig := NewPartialSignature(s, nonceKey)
 
@@ -332,10 +361,14 @@ func verifyPartialSig(partialSig *PartialSignature, pubNonce [PubNonceSize]byte,
 
 	// Next we'll construct the aggregated public key based on the set of
 	// signers.
-	combinedKey := AggregateKeys(
+	combinedKey, parityAcc, _, err := AggregateKeys(
 		keySet, opts.sortKeys,
 		WithKeysHash(keysHash), WithUniqueKeyIndex(uniqueKeyIndex),
+		WithKeyTweaks(opts.tweaks...),
 	)
+	if err != nil {
+		return err
+	}
 
 	// Next we'll compute the value b, that blinds our second public
 	// nonce:
@@ -413,25 +446,33 @@ func verifyPartialSig(partialSig *PartialSignature, pubNonce [PubNonceSize]byte,
 		return err
 	}
 
-	// Next, we'll compute mu, our aggregation coefficient for the key that
+	// Next, we'll compute a, our aggregation coefficient for the key that
 	// we're signing with.
-	mu := aggregationCoefficient(keySet, signingKey, keysHash, uniqueKeyIndex)
+	a := aggregationCoefficient(keySet, signingKey, keysHash, uniqueKeyIndex)
 
-	// If the combined key has an odd y coordinate, then we'll negate the
-	// signer key.
-	var signKeyJ btcec.JacobianPoint
-	signingKey.AsJacobian(&signKeyJ)
+	// If the combined key has an odd y coordinate, then we'll negate
+	// parity factor for the signing key.
+	paritySignKey := new(btcec.ModNScalar).SetInt(1)
 	combinedKeyBytes := combinedKey.SerializeCompressed()
 	if combinedKeyBytes[0] == secp.PubKeyFormatCompressedOdd {
-		signKeyJ.ToAffine()
-		signKeyJ.Y.Negate(1)
-		signKeyJ.Y.Normalize()
+		paritySignKey.Negate()
 	}
 
-	// In the final set, we'll check that: s*G == R' + e*mu*P.
+	// Next, we'll construct the final parity factor by multiplying the
+	// sign key parity factor with the accumulated parity factor for all
+	// the keys.
+	finalParityFactor := paritySignKey.Mul(parityAcc)
+
+	// Now we'll multiply the parity factor by our signing key, which'll
+	// take care of the amount of negation needed.
+	var signKeyJ btcec.JacobianPoint
+	signingKey.AsJacobian(&signKeyJ)
+	btcec.ScalarMultNonConst(finalParityFactor, &signKeyJ, &signKeyJ)
+
+	// In the final set, we'll check that: s*G == R' + e*a*P.
 	var sG, rP btcec.JacobianPoint
 	btcec.ScalarBaseMultNonConst(s, &sG)
-	btcec.ScalarMultNonConst(e.Mul(mu), &signKeyJ, &rP)
+	btcec.ScalarMultNonConst(e.Mul(a), &signKeyJ, &rP)
 	btcec.AddNonConst(&rP, &pubNonceJ, &rP)
 
 	sG.ToAffine()
@@ -444,14 +485,96 @@ func verifyPartialSig(partialSig *PartialSignature, pubNonce [PubNonceSize]byte,
 	return nil
 }
 
+// CombineOption is a functional option argument that allows callers to modify the
+// way we combine musig2 schnorr signatures.
+type CombineOption func(*combineOptions)
+
+// combineOptions houses the set of functional options that can be used to
+// modify the method used to combine the musig2 partial signatures.
+type combineOptions struct {
+	msg [32]byte
+
+	combinedKey *btcec.PublicKey
+
+	tweakAcc *btcec.ModNScalar
+}
+
+// defaultCombineOptions returns the default set of signing operations.
+func defaultCombineOptions() *combineOptions {
+	return &combineOptions{}
+}
+
+// WithTweakedCombine is a functional option that allows callers to specify
+// that the signature was produced using a tweaked aggregated public key. In
+// order to properly aggregate the partial signatures, the caller must specify
+// enough information to reconstruct the challenge, and also the final
+// accumulated tweak value.
+func WithTweakedCombine(msg [32]byte, keys []*btcec.PublicKey,
+	tweaks []KeyTweakDesc, sort bool) CombineOption {
+
+	return func(o *combineOptions) {
+		combinedKey, _, tweakAcc, _ := AggregateKeys(
+			keys, sort, WithKeyTweaks(tweaks...),
+		)
+
+		o.msg = msg
+		o.combinedKey = combinedKey
+		o.tweakAcc = tweakAcc
+	}
+}
+
 // CombineSigs combines the set of public keys given the final aggregated
 // nonce, and the series of partial signatures for each nonce.
 func CombineSigs(combinedNonce *btcec.PublicKey,
-	partialSigs []*PartialSignature) *schnorr.Signature {
+	partialSigs []*PartialSignature,
+	combineOpts ...CombineOption) *schnorr.Signature {
 
+	// First, parse the set of optional combine options.
+	opts := defaultCombineOptions()
+	for _, option := range combineOpts {
+		option(opts)
+	}
+
+	// If signer keys and tweaks are specified, then we need to carry out
+	// some intermediate steps before we can combine the signature.
+	var tweakProduct *btcec.ModNScalar
+	if opts.combinedKey != nil && opts.tweakAcc != nil {
+		// Next, we'll construct the parity factor of the combined key,
+		// negating it if the combined key has an even y coordinate.
+		parityFactor := new(btcec.ModNScalar).SetInt(1)
+		combinedKeyBytes := opts.combinedKey.SerializeCompressed()
+		if combinedKeyBytes[0] == secp.PubKeyFormatCompressedOdd {
+			parityFactor.Negate()
+		}
+
+		// Next we'll reconstruct e the challenge has based on the
+		// nonce and combined public key.
+		//  * e = H(tag=ChallengeHashTag, R || Q || m) mod n
+		var challengeMsg bytes.Buffer
+		challengeMsg.Write(schnorr.SerializePubKey(combinedNonce))
+		challengeMsg.Write(schnorr.SerializePubKey(opts.combinedKey))
+		challengeMsg.Write(opts.msg[:])
+		challengeBytes := chainhash.TaggedHash(
+			ChallengeHashTag, challengeMsg.Bytes(),
+		)
+		var e btcec.ModNScalar
+		e.SetByteSlice(challengeBytes[:])
+
+		tweakProduct = new(btcec.ModNScalar).Set(&e)
+		tweakProduct.Mul(opts.tweakAcc).Mul(parityFactor)
+	}
+
+	// Finally, the tweak factor also needs to be re-computed as well.
 	var combinedSig btcec.ModNScalar
 	for _, partialSig := range partialSigs {
 		combinedSig.Add(partialSig.S)
+	}
+
+	// If the tweak product was set above, then we'll need to add the value
+	// at the very end in order to produce a valid signature under the
+	// final tweaked key.
+	if tweakProduct != nil {
+		combinedSig.Add(tweakProduct)
 	}
 
 	// TODO(roasbeef): less verbose way to get the x coord...

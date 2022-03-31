@@ -4,7 +4,10 @@ package musig2
 
 import (
 	"bytes"
+	"fmt"
 	"sort"
+
+	secp "github.com/decred/dcrd/dcrec/secp256k1/v4"
 
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
@@ -19,6 +22,10 @@ var (
 	// KeyAggTagCoeff is the tagged hash tag used to compute the key
 	// aggregation coefficient for each key.
 	KeyAggTagCoeff = []byte("KeyAgg coefficient")
+
+	// ErrTweakedKeyIsInfinity is returned if while tweaking a key, we end
+	// up with the point at infinity.
+	ErrTweakedKeyIsInfinity = fmt.Errorf("tweaked key is infinity point")
 )
 
 // sortableKeys defines a type of slice of public keys that implements the sort
@@ -137,6 +144,18 @@ func secondUniqueKeyIndex(keySet []*btcec.PublicKey, sort bool) int {
 	return -1
 }
 
+// KeyTweakDesc describes a tweak to be applied to the aggregated public key
+// generation and signing process. The IsXOnly specifies if the target key
+// should be converted to an x-only public key before tweaking.
+type KeyTweakDesc struct {
+	// Tweak is the 32-byte value that will modify the public key.
+	Tweak [32]byte
+
+	// IsXOnly if true, then the public key will be mapped to an x-only key
+	// before the tweaking operation is applied.
+	IsXOnly bool
+}
+
 // KeyAggOption is a functional option argument that allows callers to specify
 // more or less information that has been pre-computed to the main routine.
 type KeyAggOption func(*keyAggOption)
@@ -149,6 +168,10 @@ type keyAggOption struct {
 
 	// uniqueKeyIndex is the pre-computed index of the second unique key.
 	uniqueKeyIndex *int
+
+	// tweaks specifies a series of tweaks to be applied to the aggregated
+	// public key>
+	tweaks []KeyTweakDesc
 }
 
 // WithKeysHash allows key aggregation to be optimize, by allowing the caller
@@ -168,17 +191,92 @@ func WithUniqueKeyIndex(idx int) KeyAggOption {
 	}
 }
 
+// WithKeyTweaks allows a caller to specify a series of 32-byte tweaks that
+// should be applied to the final aggregated public key.
+func WithKeyTweaks(tweaks ...KeyTweakDesc) KeyAggOption {
+	return func(o *keyAggOption) {
+		o.tweaks = tweaks
+	}
+}
+
 // defaultKeyAggOptions returns the set of default arguments for key
 // aggregation.
 func defaultKeyAggOptions() *keyAggOption {
 	return &keyAggOption{}
 }
 
+// hasEvenY returns true if the affine representation of the passed jacobian
+// point has an even y coordinate.
+//
+// TODO(roasbeef): double check, can just check the y coord even not jacobian?
+func hasEvenY(pJ btcec.JacobianPoint) bool {
+	pJ.ToAffine()
+	p := btcec.NewPublicKey(&pJ.X, &pJ.Y)
+	keyBytes := p.SerializeCompressed()
+	return keyBytes[0] == secp.PubKeyFormatCompressedEven
+}
+
+// tweakKey applies a tweaks to the passed public key using the specified
+// tweak. The parityAcc and tweakAcc are returned (in that order) which
+// includes the accumulate ration of the parity factor and the tweak multiplied
+// by the parity factor. The xOnly bool specifies if this is to be an x-only
+// tweak or not.
+func tweakKey(keyJ btcec.JacobianPoint, parityAcc btcec.ModNScalar, tweak [32]byte,
+	tweakAcc btcec.ModNScalar,
+	xOnly bool) (btcec.JacobianPoint, btcec.ModNScalar, btcec.ModNScalar, error) {
+
+	// First we'll compute the new parity factor for this key. If the key has
+	// an odd y coordinate (not even), then we'll need to negate it (multiply
+	// by -1 mod n, in this case).
+	var parityFactor btcec.ModNScalar
+	if xOnly && !hasEvenY(keyJ) {
+		parityFactor.SetInt(1).Negate()
+	} else {
+		parityFactor.SetInt(1)
+	}
+
+	// Next, map the tweak into a mod n integer so we can use it for
+	// manipulations below.
+	tweakInt := new(btcec.ModNScalar)
+	tweakInt.SetBytes(&tweak)
+
+	// Next, we'll compute: Q_i = g*Q + t*G, where g is our parityFactor and t
+	// is the tweakInt above. We'll space things out a bit to make it easier to
+	// follow.
+	//
+	// First compute t*G:
+	var tweakedGenerator btcec.JacobianPoint
+	btcec.ScalarBaseMultNonConst(tweakInt, &tweakedGenerator)
+
+	// Next compute g*Q:
+	btcec.ScalarMultNonConst(&parityFactor, &keyJ, &keyJ)
+
+	// Finally add both of them together to get our final
+	// tweaked point.
+	btcec.AddNonConst(&tweakedGenerator, &keyJ, &keyJ)
+
+	// As a sanity check, make sure that we didn't just end up with the
+	// point at infinity.
+	if keyJ == infinityPoint {
+		return keyJ, parityAcc, tweakAcc, ErrTweakedKeyIsInfinity
+	}
+
+	// As a final wrap up step, we'll accumulate the parity
+	// factor and also this tweak into the final set of accumulators.
+	parityAcc.Mul(&parityFactor)
+	tweakAcc.Mul(&parityFactor).Add(tweakInt)
+
+	return keyJ, parityAcc, tweakAcc, nil
+}
+
 // AggregateKeys takes a list of possibly unsorted keys and returns a single
 // aggregated key as specified by the musig2 key aggregation algorithm. A nil
 // value can be passed for keyHash, which causes this function to re-derive it.
+// In addition to the combined public key, the parity accumulator and the tweak
+// accumulator are returned as well.
 func AggregateKeys(keys []*btcec.PublicKey, sort bool,
-	keyOpts ...KeyAggOption) *btcec.PublicKey {
+	keyOpts ...KeyAggOption) (
+	*btcec.PublicKey, *btcec.ModNScalar, *btcec.ModNScalar, error) {
 
 	// First, parse the set of optional signing options.
 	opts := defaultKeyAggOptions()
@@ -229,6 +327,27 @@ func AggregateKeys(keys []*btcec.PublicKey, sort bool,
 		btcec.AddNonConst(&finalKeyJ, &tweakedKeyJ, &finalKeyJ)
 	}
 
+	var (
+		err       error
+		tweakAcc  btcec.ModNScalar
+		parityAcc btcec.ModNScalar
+	)
+	parityAcc.SetInt(1)
+
+	// In this case we have a set of tweaks, so we'll incrementally apply
+	// each one, until we have our final tweaked key, and the related
+	// accumulators.
+	for i := 1; i <= len(opts.tweaks); i++ {
+		finalKeyJ, parityAcc, tweakAcc, err = tweakKey(
+			finalKeyJ, parityAcc, opts.tweaks[i-1].Tweak, tweakAcc,
+			opts.tweaks[i-1].IsXOnly,
+		)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+	}
+
 	finalKeyJ.ToAffine()
-	return btcec.NewPublicKey(&finalKeyJ.X, &finalKeyJ.Y)
+	key := btcec.NewPublicKey(&finalKeyJ.X, &finalKeyJ.Y)
+	return key, &parityAcc, &tweakAcc, nil
 }

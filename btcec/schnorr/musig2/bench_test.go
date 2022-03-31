@@ -301,7 +301,7 @@ func BenchmarkAggregateKeys(b *testing.B) {
 				b.ResetTimer()
 				b.ReportAllocs()
 
-				aggKey := AggregateKeys(
+				aggKey, _, _, _ := AggregateKeys(
 					signerKeys, sortKeys,
 					WithUniqueKeyIndex(uniqueKeyIndex),
 				)

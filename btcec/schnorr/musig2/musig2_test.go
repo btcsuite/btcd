@@ -84,7 +84,7 @@ func TestMuSig2KeyAggTestVectors(t *testing.T) {
 			}
 
 			uniqueKeyIndex := secondUniqueKeyIndex(keys, false)
-			combinedKey := AggregateKeys(
+			combinedKey, _, _, _ := AggregateKeys(
 				keys, false, WithUniqueKeyIndex(uniqueKeyIndex),
 			)
 			combinedKeyBytes := schnorr.SerializePubKey(combinedKey)
@@ -164,6 +164,7 @@ func TestMuSig2SigningTestVectors(t *testing.T) {
 	testCases := []struct {
 		keyOrder           []int
 		expectedPartialSig []byte
+		tweak              *KeyTweakDesc
 	}{
 		{
 			keyOrder:           []int{0, 1, 2},
@@ -173,10 +174,35 @@ func TestMuSig2SigningTestVectors(t *testing.T) {
 			keyOrder:           []int{1, 0, 2},
 			expectedPartialSig: mustParseHex("2DF67BFFF18E3DE797E13C6475C963048138DAEC5CB20A357CECA7C8424295EA"),
 		},
-
 		{
 			keyOrder:           []int{1, 2, 0},
 			expectedPartialSig: mustParseHex("0D5B651E6DE34A29A12DE7A8B4183B4AE6A7F7FBE15CDCAFA4A3D1BCAABC7517"),
+		},
+		{
+			keyOrder:           []int{1, 2, 0},
+			expectedPartialSig: mustParseHex("5e24c7496b565debc3b9639e6f1304a21597f9603d3ab05b4913641775e1375b"),
+			tweak: &KeyTweakDesc{
+				Tweak: [32]byte{
+					0xE8, 0xF7, 0x91, 0xFF, 0x92, 0x25, 0xA2, 0xAF,
+					0x01, 0x02, 0xAF, 0xFF, 0x4A, 0x9A, 0x72, 0x3D,
+					0x96, 0x12, 0xA6, 0x82, 0xA2, 0x5E, 0xBE, 0x79,
+					0x80, 0x2B, 0x26, 0x3C, 0xDF, 0xCD, 0x83, 0xBB,
+				},
+				IsXOnly: true,
+			},
+		},
+		{
+			keyOrder:           []int{1, 2, 0},
+			expectedPartialSig: mustParseHex("78408ddcab4813d1394c97d493ef1084195c1d4b52e63ecd7bc5991644e44ddd"),
+			tweak: &KeyTweakDesc{
+				Tweak: [32]byte{
+					0xE8, 0xF7, 0x91, 0xFF, 0x92, 0x25, 0xA2, 0xAF,
+					0x01, 0x02, 0xAF, 0xFF, 0x4A, 0x9A, 0x72, 0x3D,
+					0x96, 0x12, 0xA6, 0x82, 0xA2, 0x5E, 0xBE, 0x79,
+					0x80, 0x2B, 0x26, 0x3C, 0xDF, 0xCD, 0x83, 0xBB,
+				},
+				IsXOnly: false,
+			},
 		},
 	}
 
@@ -184,16 +210,27 @@ func TestMuSig2SigningTestVectors(t *testing.T) {
 	copy(msg[:], signTestMsg)
 
 	for _, testCase := range testCases {
-		testName := fmt.Sprintf("%v", testCase.keyOrder)
+		testName := fmt.Sprintf("%v/tweak=%v", testCase.keyOrder, testCase.tweak != nil)
+		if testCase.tweak != nil {
+			testName += fmt.Sprintf("/x_only=%v", testCase.tweak.IsXOnly)
+		}
+
 		t.Run(testName, func(t *testing.T) {
 			keySet := make([]*btcec.PublicKey, 0, len(testCase.keyOrder))
 			for _, keyIndex := range testCase.keyOrder {
 				keySet = append(keySet, signSetKeys[keyIndex])
 			}
 
+			var opts []SignOption
+			if testCase.tweak != nil {
+				opts = append(
+					opts, WithTweaks(*testCase.tweak),
+				)
+			}
+
 			partialSig, err := Sign(
 				secNonce, signSetPrivKey, aggregatedNonce,
-				keySet, msg,
+				keySet, msg, opts...,
 			)
 			if err != nil {
 				t.Fatalf("unable to generate partial sig: %v", err)
@@ -251,17 +288,14 @@ func (s signerSet) pubNonces() [][PubNonceSize]byte {
 
 func (s signerSet) combinedKey() *btcec.PublicKey {
 	uniqueKeyIndex := secondUniqueKeyIndex(s.keys(), false)
-	return AggregateKeys(
+	key, _, _, _ := AggregateKeys(
 		s.keys(), false, WithUniqueKeyIndex(uniqueKeyIndex),
 	)
+	return key
 }
 
-// TestMuSigMultiParty tests that for a given set of 100 signers, we're able to
-// properly generate valid sub signatures, which ultimately can be combined
-// into a single valid signature.
-func TestMuSigMultiParty(t *testing.T) {
-	t.Parallel()
-
+// testMultiPartySign executes a multi-party signing context w/ 100 signers.
+func testMultiPartySign(t *testing.T, tweaks ...KeyTweakDesc) {
 	const numSigners = 100
 
 	// First generate the set of signers along with their public keys.
@@ -286,12 +320,19 @@ func TestMuSigMultiParty(t *testing.T) {
 
 	var combinedKey *btcec.PublicKey
 
+	var ctxOpts []ContextOption
+	if len(tweaks) != 0 {
+		ctxOpts = append(ctxOpts, WithTweakedContext(tweaks))
+	}
+
 	// Now that we have all the signers, we'll make a new context, then
 	// generate a new session for each of them(which handles nonce
 	// generation).
 	signers := make([]*Session, numSigners)
 	for i, signerKey := range signerKeys {
-		signCtx, err := NewContext(signerKey, signSet, false)
+		signCtx, err := NewContext(
+			signerKey, signSet, false, ctxOpts...,
+		)
 		if err != nil {
 			t.Fatalf("unable to generate context: %v", err)
 		}
@@ -381,4 +422,41 @@ func TestMuSigMultiParty(t *testing.T) {
 			t.Fatalf("expected to get signing context reuse")
 		}
 	}
+}
+
+// TestMuSigMultiParty tests that for a given set of 100 signers, we're able to
+// properly generate valid sub signatures, which ultimately can be combined
+// into a single valid signature.
+func TestMuSigMultiParty(t *testing.T) {
+	t.Parallel()
+
+	testTweak := [32]byte{
+		0xE8, 0xF7, 0x91, 0xFF, 0x92, 0x25, 0xA2, 0xAF,
+		0x01, 0x02, 0xAF, 0xFF, 0x4A, 0x9A, 0x72, 0x3D,
+		0x96, 0x12, 0xA6, 0x82, 0xA2, 0x5E, 0xBE, 0x79,
+		0x80, 0x2B, 0x26, 0x3C, 0xDF, 0xCD, 0x83, 0xBB,
+	}
+
+	t.Run("no_tweak", func(t *testing.T) {
+		t.Parallel()
+
+		testMultiPartySign(t)
+	})
+
+	t.Run("tweaked", func(t *testing.T) {
+		t.Parallel()
+
+		testMultiPartySign(t, KeyTweakDesc{
+			Tweak: testTweak,
+		})
+	})
+
+	t.Run("tweaked_x_only", func(t *testing.T) {
+		t.Parallel()
+
+		testMultiPartySign(t, KeyTweakDesc{
+			Tweak:   testTweak,
+			IsXOnly: true,
+		})
+	})
 }
