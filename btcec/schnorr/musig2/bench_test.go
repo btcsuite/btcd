@@ -306,7 +306,7 @@ func BenchmarkAggregateKeys(b *testing.B) {
 					WithUniqueKeyIndex(uniqueKeyIndex),
 				)
 
-				testKey = aggKey
+				testKey = aggKey.FinalKey
 			})
 		}
 	}

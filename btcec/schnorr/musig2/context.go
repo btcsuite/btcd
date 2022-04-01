@@ -35,6 +35,10 @@ var (
 	// sign a partial signature, without first having collected all the
 	// required combined nonces.
 	ErrCombinedNonceUnavailable = fmt.Errorf("missing combined nonce")
+
+	// ErrTaprootInternalKeyUnavailable is returned when a user attempts to
+	// obtain the
+	ErrTaprootInternalKeyUnavailable = fmt.Errorf("taproot tweak not used")
 )
 
 // Context is a managed signing context for musig2. It takes care of things
@@ -50,7 +54,7 @@ type Context struct {
 	keySet []*btcec.PublicKey
 
 	// combinedKey is the aggregated public key.
-	combinedKey *btcec.PublicKey
+	combinedKey *AggregateKey
 
 	// uniqueKeyIndex is the index of the second unique key in the keySet.
 	// This is used to speed up signing and verification computations.
@@ -59,9 +63,8 @@ type Context struct {
 	// keysHash is the hash of all the keys as defined in musig2.
 	keysHash []byte
 
-	// tweaks is a set of optional tweak values that affect the final
-	// combined public key.
-	tweaks []KeyTweakDesc
+	// opts is the set of options for the context.
+	opts *contextOptions
 
 	// shouldSort keeps track of if the public keys should be sorted before
 	// any operations.
@@ -75,7 +78,18 @@ type ContextOption func(*contextOptions)
 // contextOptions houses the set of functional options that can be used to
 // musig2 signing protocol.
 type contextOptions struct {
+	// tweaks is the set of optinoal tweaks to apply to the combined public
+	// key.
 	tweaks []KeyTweakDesc
+
+	// taprootTweak specifies the taproot tweak. If specified, then we'll
+	// use this as the script root for the BIP 341 taproot (x-only) tweak.
+	// Normally we'd just apply the raw 32 byte tweak, but for taproot, we
+	// first need to compute the aggregated key before tweaking, and then
+	// use it as the internal key. This is required as the taproot tweak
+	// also commits to the public key, which in this case is the aggregated
+	// key before the tweak.
+	taprootTweak []byte
 }
 
 // defaultContextOptions returns the default context options.
@@ -85,9 +99,19 @@ func defaultContextOptions() *contextOptions {
 
 // WithTweakedContext specifies that within the context, the aggregated public
 // key should be tweaked with the specified tweaks.
-func WithTweakedContext(tweaks []KeyTweakDesc) ContextOption {
+func WithTweakedContext(tweaks ...KeyTweakDesc) ContextOption {
 	return func(o *contextOptions) {
 		o.tweaks = tweaks
+	}
+}
+
+// WithTaprootTweakCtx specifies that within this context, the final key should
+// use the taproot tweak as defined in BIP 341: outputKey = internalKey +
+// h_tapTweak(internalKey || scriptRoot). In this case, the aggreaged key
+// before the tweak will be used as the internal key.
+func WithTaprootTweakCtx(scriptRoot []byte) ContextOption {
+	return func(o *contextOptions) {
+		o.taprootTweak = scriptRoot
 	}
 }
 
@@ -133,12 +157,21 @@ func NewContext(signingKey *btcec.PrivateKey,
 	keysHash := keyHashFingerprint(signers, shouldSort)
 	uniqueKeyIndex := secondUniqueKeyIndex(signers, shouldSort)
 
+	keyAggOpts := []KeyAggOption{
+		WithKeysHash(keysHash), WithUniqueKeyIndex(uniqueKeyIndex),
+	}
+	if opts.taprootTweak != nil {
+		keyAggOpts = append(
+			keyAggOpts, WithTaprootKeyTweak(opts.taprootTweak),
+		)
+	} else if len(opts.tweaks) != 0 {
+		keyAggOpts = append(keyAggOpts, WithKeyTweaks(opts.tweaks...))
+	}
+
 	// Next, we'll use this information to compute the aggregated public
 	// key that'll be used for signing in practice.
 	combinedKey, _, _, err := AggregateKeys(
-		signers, shouldSort, WithKeysHash(keysHash),
-		WithUniqueKeyIndex(uniqueKeyIndex),
-		WithKeyTweaks(opts.tweaks...),
+		signers, shouldSort, keyAggOpts...,
 	)
 	if err != nil {
 		return nil, err
@@ -151,15 +184,15 @@ func NewContext(signingKey *btcec.PrivateKey,
 		combinedKey:    combinedKey,
 		uniqueKeyIndex: uniqueKeyIndex,
 		keysHash:       keysHash,
-		tweaks:         opts.tweaks,
+		opts:           opts,
 		shouldSort:     shouldSort,
 	}, nil
 }
 
 // CombinedKey returns the combined public key that will be used to generate
 // multi-signatures  against.
-func (c *Context) CombinedKey() btcec.PublicKey {
-	return *c.combinedKey
+func (c *Context) CombinedKey() *btcec.PublicKey {
+	return c.combinedKey.FinalKey
 }
 
 // PubKey returns the public key of the signer of this session.
@@ -173,6 +206,19 @@ func (c *Context) SigningKeys() []*btcec.PublicKey {
 	copy(keys, c.keySet)
 
 	return keys
+}
+
+// TaprootInternalKey returns the internal taproot key, which is the aggregated
+// key _before_ the tweak is applied. If a taproot tweak was specified, then
+// CombinedKey() will return the fully tweaked output key, with this method
+// returning the internal key. If a taproot tweak wasn't speciifed, then this
+// method will return an error.
+func (c *Context) TaprootInternalKey() (*btcec.PublicKey, error) {
+	if c.opts.taprootTweak == nil {
+		return nil, ErrTaprootInternalKeyUnavailable
+	}
+
+	return c.combinedKey.PreTweakedKey, nil
 }
 
 // Session represents a musig2 signing session. A new instance should be
@@ -241,7 +287,7 @@ func (s *Session) RegisterPubNonce(nonce [PubNonceSize]byte) (bool, error) {
 	// times.
 	haveAllNonces := len(s.pubNonces) == len(s.ctx.keySet)
 	if haveAllNonces {
-		return false, nil
+		return false, ErrAlredyHaveAllNonces
 	}
 
 	// Add this nonce and check again if we already have tall the nonces we
@@ -283,8 +329,12 @@ func (s *Session) Sign(msg [32]byte,
 		return nil, ErrCombinedNonceUnavailable
 	}
 
-	if len(s.ctx.tweaks) != 0 {
-		signOpts = append(signOpts, WithTweaks(s.ctx.tweaks...))
+	if s.ctx.opts.taprootTweak != nil {
+		signOpts = append(
+			signOpts, WithTaprootSignTweak(s.ctx.opts.taprootTweak),
+		)
+	} else if len(s.ctx.opts.tweaks) != 0 {
+		signOpts = append(signOpts, WithTweaks(s.ctx.opts.tweaks...))
 	}
 
 	partialSig, err := Sign(
@@ -306,7 +356,7 @@ func (s *Session) Sign(msg [32]byte,
 	return partialSig, nil
 }
 
-// CombineSigs buffers a partial signature received from a signing party. The
+// CombineSig buffers a partial signature received from a signing party. The
 // method returns true once all the signatures are available, and can be
 // combined into the final signature.
 func (s *Session) CombineSig(sig *PartialSignature) (bool, error) {
@@ -329,10 +379,17 @@ func (s *Session) CombineSig(sig *PartialSignature) (bool, error) {
 	// final signature.
 	if haveAllSigs {
 		var combineOpts []CombineOption
-		if len(s.ctx.tweaks) != 0 {
+		if s.ctx.opts.taprootTweak != nil {
+			combineOpts = append(
+				combineOpts, WithTaprootTweakedCombine(
+					s.msg, s.ctx.keySet, s.ctx.opts.taprootTweak,
+					s.ctx.shouldSort,
+				),
+			)
+		} else if len(s.ctx.opts.tweaks) != 0 {
 			combineOpts = append(
 				combineOpts, WithTweakedCombine(
-					s.msg, s.ctx.keySet, s.ctx.tweaks,
+					s.msg, s.ctx.keySet, s.ctx.opts.tweaks,
 					s.ctx.shouldSort,
 				),
 			)
@@ -344,7 +401,7 @@ func (s *Session) CombineSig(sig *PartialSignature) (bool, error) {
 		// valid.
 		//
 		// TODO(roasbef): allow skipping?
-		if !finalSig.Verify(s.msg[:], s.ctx.combinedKey) {
+		if !finalSig.Verify(s.msg[:], s.ctx.combinedKey.FinalKey) {
 			return false, ErrFinalSigInvalid
 		}
 

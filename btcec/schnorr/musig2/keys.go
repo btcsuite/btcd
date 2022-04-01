@@ -170,8 +170,12 @@ type keyAggOption struct {
 	uniqueKeyIndex *int
 
 	// tweaks specifies a series of tweaks to be applied to the aggregated
-	// public key>
+	// public key.
 	tweaks []KeyTweakDesc
+
+	// taprootTweak controls if the tweaks above should be applied in a BIP
+	// 340 style.
+	taprootTweak bool
 }
 
 // WithKeysHash allows key aggregation to be optimize, by allowing the caller
@@ -196,6 +200,29 @@ func WithUniqueKeyIndex(idx int) KeyAggOption {
 func WithKeyTweaks(tweaks ...KeyTweakDesc) KeyAggOption {
 	return func(o *keyAggOption) {
 		o.tweaks = tweaks
+	}
+}
+
+// WithTaprootKeyTweak specifies that within this context, the final key should
+// use the taproot tweak as defined in BIP 341: outputKey = internalKey +
+// h_tapTweak(internalKey || scriptRoot). In this case, the aggregated key
+// before the tweak will be used as the internal key.
+//
+// This option should be used instead of WithKeyTweaks when the aggregated key
+// is intended to be used as a taproot output key that commits to a script
+// root.
+func WithTaprootKeyTweak(scriptRoot []byte) KeyAggOption {
+	return func(o *keyAggOption) {
+		var tweak [32]byte
+		copy(tweak[:], scriptRoot[:])
+
+		o.tweaks = []KeyTweakDesc{
+			{
+				Tweak:   tweak,
+				IsXOnly: true,
+			},
+		}
+		o.taprootTweak = true
 	}
 }
 
@@ -269,6 +296,19 @@ func tweakKey(keyJ btcec.JacobianPoint, parityAcc btcec.ModNScalar, tweak [32]by
 	return keyJ, parityAcc, tweakAcc, nil
 }
 
+// AggregateKey is a final aggregated key along with a possible version of the
+// key without any tweaks applied.
+type AggregateKey struct {
+	// FinalKey is the final aggregated key which may include one or more
+	// tweaks applied to it.
+	FinalKey *btcec.PublicKey
+
+	// PreTweakedKey is the aggregated *before* any tweaks have been
+	// applied.  This should be used as the internal key in taproot
+	// contexts.
+	PreTweakedKey *btcec.PublicKey
+}
+
 // AggregateKeys takes a list of possibly unsorted keys and returns a single
 // aggregated key as specified by the musig2 key aggregation algorithm. A nil
 // value can be passed for keyHash, which causes this function to re-derive it.
@@ -276,7 +316,7 @@ func tweakKey(keyJ btcec.JacobianPoint, parityAcc btcec.ModNScalar, tweak [32]by
 // accumulator are returned as well.
 func AggregateKeys(keys []*btcec.PublicKey, sort bool,
 	keyOpts ...KeyAggOption) (
-	*btcec.PublicKey, *btcec.ModNScalar, *btcec.ModNScalar, error) {
+	*AggregateKey, *btcec.ModNScalar, *btcec.ModNScalar, error) {
 
 	// First, parse the set of optional signing options.
 	opts := defaultKeyAggOptions()
@@ -327,6 +367,25 @@ func AggregateKeys(keys []*btcec.PublicKey, sort bool,
 		btcec.AddNonConst(&finalKeyJ, &tweakedKeyJ, &finalKeyJ)
 	}
 
+	// We'll copy over the key at this point, since this represents the
+	// aggregated key before any tweaks have been applied. This'll be used
+	// as the internal key for script path proofs.
+	combinedKey := btcec.NewPublicKey(&finalKeyJ.X, &finalKeyJ.Y)
+
+	// At this point, if this is a taproot tweak, then we'll modify the
+	// base tweak value to use the BIP 341 tweak value.
+	if opts.taprootTweak {
+		// Compute the taproot key tagged hash of:
+		// h_tapTweak(internalKey || scriptRoot). We only do this for
+		// the first one, as you can only specify a single tweak when
+		// using the taproot mode with this API.
+		tapTweakHash := chainhash.TaggedHash(
+			chainhash.TagTapTweak, schnorr.SerializePubKey(combinedKey),
+			opts.tweaks[0].Tweak[:],
+		)
+		opts.tweaks[0].Tweak = *tapTweakHash
+	}
+
 	var (
 		err       error
 		tweakAcc  btcec.ModNScalar
@@ -348,6 +407,10 @@ func AggregateKeys(keys []*btcec.PublicKey, sort bool,
 	}
 
 	finalKeyJ.ToAffine()
-	key := btcec.NewPublicKey(&finalKeyJ.X, &finalKeyJ.Y)
-	return key, &parityAcc, &tweakAcc, nil
+	finalKey := btcec.NewPublicKey(&finalKeyJ.X, &finalKeyJ.Y)
+
+	return &AggregateKey{
+		PreTweakedKey: combinedKey,
+		FinalKey:      finalKey,
+	}, &parityAcc, &tweakAcc, nil
 }

@@ -87,7 +87,7 @@ func TestMuSig2KeyAggTestVectors(t *testing.T) {
 			combinedKey, _, _, _ := AggregateKeys(
 				keys, false, WithUniqueKeyIndex(uniqueKeyIndex),
 			)
-			combinedKeyBytes := schnorr.SerializePubKey(combinedKey)
+			combinedKeyBytes := schnorr.SerializePubKey(combinedKey.FinalKey)
 			if !bytes.Equal(combinedKeyBytes, testCase.expectedKey) {
 				t.Fatalf("case: #%v, invalid aggregation: "+
 					"expected %x, got %x", i, testCase.expectedKey,
@@ -291,11 +291,13 @@ func (s signerSet) combinedKey() *btcec.PublicKey {
 	key, _, _, _ := AggregateKeys(
 		s.keys(), false, WithUniqueKeyIndex(uniqueKeyIndex),
 	)
-	return key
+	return key.FinalKey
 }
 
 // testMultiPartySign executes a multi-party signing context w/ 100 signers.
-func testMultiPartySign(t *testing.T, tweaks ...KeyTweakDesc) {
+func testMultiPartySign(t *testing.T, taprootTweak []byte,
+	tweaks ...KeyTweakDesc) {
+
 	const numSigners = 100
 
 	// First generate the set of signers along with their public keys.
@@ -321,8 +323,11 @@ func testMultiPartySign(t *testing.T, tweaks ...KeyTweakDesc) {
 	var combinedKey *btcec.PublicKey
 
 	var ctxOpts []ContextOption
-	if len(tweaks) != 0 {
-		ctxOpts = append(ctxOpts, WithTweakedContext(tweaks))
+	switch {
+	case taprootTweak != nil:
+		ctxOpts = append(ctxOpts, WithTaprootTweakCtx(taprootTweak))
+	case len(tweaks) != 0:
+		ctxOpts = append(ctxOpts, WithTweakedContext(tweaks...))
 	}
 
 	// Now that we have all the signers, we'll make a new context, then
@@ -338,8 +343,7 @@ func testMultiPartySign(t *testing.T, tweaks ...KeyTweakDesc) {
 		}
 
 		if combinedKey == nil {
-			k := signCtx.CombinedKey()
-			combinedKey = &k
+			combinedKey = signCtx.CombinedKey()
 		}
 
 		session, err := signCtx.NewSession()
@@ -440,13 +444,13 @@ func TestMuSigMultiParty(t *testing.T) {
 	t.Run("no_tweak", func(t *testing.T) {
 		t.Parallel()
 
-		testMultiPartySign(t)
+		testMultiPartySign(t, nil)
 	})
 
 	t.Run("tweaked", func(t *testing.T) {
 		t.Parallel()
 
-		testMultiPartySign(t, KeyTweakDesc{
+		testMultiPartySign(t, nil, KeyTweakDesc{
 			Tweak: testTweak,
 		})
 	})
@@ -454,9 +458,15 @@ func TestMuSigMultiParty(t *testing.T) {
 	t.Run("tweaked_x_only", func(t *testing.T) {
 		t.Parallel()
 
-		testMultiPartySign(t, KeyTweakDesc{
+		testMultiPartySign(t, nil, KeyTweakDesc{
 			Tweak:   testTweak,
 			IsXOnly: true,
 		})
+	})
+
+	t.Run("taproot_tweaked_x_only", func(t *testing.T) {
+		t.Parallel()
+
+		testMultiPartySign(t, testTweak[:])
 	})
 }
