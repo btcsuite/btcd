@@ -90,6 +90,10 @@ type contextOptions struct {
 	// also commits to the public key, which in this case is the aggregated
 	// key before the tweak.
 	taprootTweak []byte
+
+	// bip86Tweak if true, then the weak will just be
+	// h_tapTweak(internalKey) as there is no true script root.
+	bip86Tweak bool
 }
 
 // defaultContextOptions returns the default context options.
@@ -112,6 +116,16 @@ func WithTweakedContext(tweaks ...KeyTweakDesc) ContextOption {
 func WithTaprootTweakCtx(scriptRoot []byte) ContextOption {
 	return func(o *contextOptions) {
 		o.taprootTweak = scriptRoot
+	}
+}
+
+// WithBip86TweakCtx specifies that within this context, the final key should
+// use the taproot tweak as defined in BIP 341, with the BIP 86 modification:
+// outputKey = internalKey + h_tapTweak(internalKey)*G. In this case, the
+// aggreaged key before the tweak will be used as the internal key.
+func WithBip86TweakCtx() ContextOption {
+	return func(o *contextOptions) {
+		o.bip86Tweak = true
 	}
 }
 
@@ -160,11 +174,16 @@ func NewContext(signingKey *btcec.PrivateKey,
 	keyAggOpts := []KeyAggOption{
 		WithKeysHash(keysHash), WithUniqueKeyIndex(uniqueKeyIndex),
 	}
-	if opts.taprootTweak != nil {
+	switch {
+	case opts.bip86Tweak:
+		keyAggOpts = append(
+			keyAggOpts, WithBIP86KeyTweak(),
+		)
+	case opts.taprootTweak != nil:
 		keyAggOpts = append(
 			keyAggOpts, WithTaprootKeyTweak(opts.taprootTweak),
 		)
-	} else if len(opts.tweaks) != 0 {
+	case len(opts.tweaks) != 0:
 		keyAggOpts = append(keyAggOpts, WithKeyTweaks(opts.tweaks...))
 	}
 
@@ -214,7 +233,7 @@ func (c *Context) SigningKeys() []*btcec.PublicKey {
 // returning the internal key. If a taproot tweak wasn't speciifed, then this
 // method will return an error.
 func (c *Context) TaprootInternalKey() (*btcec.PublicKey, error) {
-	if c.opts.taprootTweak == nil {
+	if c.opts.taprootTweak == nil && !c.opts.bip86Tweak {
 		return nil, ErrTaprootInternalKeyUnavailable
 	}
 
@@ -329,11 +348,16 @@ func (s *Session) Sign(msg [32]byte,
 		return nil, ErrCombinedNonceUnavailable
 	}
 
-	if s.ctx.opts.taprootTweak != nil {
+	switch {
+	case s.ctx.opts.bip86Tweak:
+		signOpts = append(
+			signOpts, WithBip86SignTweak(),
+		)
+	case s.ctx.opts.taprootTweak != nil:
 		signOpts = append(
 			signOpts, WithTaprootSignTweak(s.ctx.opts.taprootTweak),
 		)
-	} else if len(s.ctx.opts.tweaks) != 0 {
+	case len(s.ctx.opts.tweaks) != 0:
 		signOpts = append(signOpts, WithTweaks(s.ctx.opts.tweaks...))
 	}
 
@@ -379,14 +403,21 @@ func (s *Session) CombineSig(sig *PartialSignature) (bool, error) {
 	// final signature.
 	if haveAllSigs {
 		var combineOpts []CombineOption
-		if s.ctx.opts.taprootTweak != nil {
+		switch {
+		case s.ctx.opts.bip86Tweak:
+			combineOpts = append(
+				combineOpts, WithBip86TweakedCombine(
+					s.msg, s.ctx.keySet, s.ctx.shouldSort,
+				),
+			)
+		case s.ctx.opts.taprootTweak != nil:
 			combineOpts = append(
 				combineOpts, WithTaprootTweakedCombine(
 					s.msg, s.ctx.keySet, s.ctx.opts.taprootTweak,
 					s.ctx.shouldSort,
 				),
 			)
-		} else if len(s.ctx.opts.tweaks) != 0 {
+		case len(s.ctx.opts.tweaks) != 0:
 			combineOpts = append(
 				combineOpts, WithTweakedCombine(
 					s.msg, s.ctx.keySet, s.ctx.opts.tweaks,

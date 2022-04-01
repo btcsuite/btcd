@@ -324,6 +324,8 @@ func testMultiPartySign(t *testing.T, taprootTweak []byte,
 
 	var ctxOpts []ContextOption
 	switch {
+	case len(taprootTweak) == 0:
+		ctxOpts = append(ctxOpts, WithBip86TweakCtx())
 	case taprootTweak != nil:
 		ctxOpts = append(ctxOpts, WithTaprootTweakCtx(taprootTweak))
 	case len(tweaks) != 0:
@@ -468,5 +470,11 @@ func TestMuSigMultiParty(t *testing.T) {
 		t.Parallel()
 
 		testMultiPartySign(t, testTweak[:])
+	})
+
+	t.Run("taproot_bip_86", func(t *testing.T) {
+		t.Parallel()
+
+		testMultiPartySign(t, []byte{})
 	})
 }

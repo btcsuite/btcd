@@ -117,6 +117,11 @@ type signOptions struct {
 	// the taproot tweak also commits to the public key, which in this case
 	// is the aggregated key before the tweak.
 	taprootTweak []byte
+
+	// bip86Tweak specifies that the taproot tweak should be done in a BIP
+	// 86 style, where we don't expect an actual tweak and instead just
+	// commit to the public key itself.
+	bip86Tweak bool
 }
 
 // defaultSignOptions returns the default set of signing operations.
@@ -164,6 +169,20 @@ func WithTaprootSignTweak(scriptRoot []byte) SignOption {
 	}
 }
 
+// WithBip86SignTweak allows a caller to specify a tweak that should be used in
+// a bip 340 manner when signing, factoring in BIP 86 as well. This differs
+// from WithTaprootSignTweak as no true script root will be committed to,
+// instead we just commit to the internal key.
+//
+// This option should be used in the taproot context to create a valid
+// signature for the keypath spend for taproot, when the output key was
+// generated using BIP 86.
+func WithBip86SignTweak() SignOption {
+	return func(o *signOptions) {
+		o.bip86Tweak = true
+	}
+}
+
 // Sign generates a musig2 partial signature given the passed key set, secret
 // nonce, public nonce, and private keys. This method returns an error if the
 // generated nonces are either too large, or end up mapping to the point at
@@ -200,11 +219,16 @@ func Sign(secNonce [SecNonceSize]byte, privKey *btcec.PrivateKey,
 	keyAggOpts := []KeyAggOption{
 		WithKeysHash(keysHash), WithUniqueKeyIndex(uniqueKeyIndex),
 	}
-	if opts.taprootTweak != nil {
+	switch {
+	case opts.bip86Tweak:
+		keyAggOpts = append(
+			keyAggOpts, WithBIP86KeyTweak(),
+		)
+	case opts.taprootTweak != nil:
 		keyAggOpts = append(
 			keyAggOpts, WithTaprootKeyTweak(opts.taprootTweak),
 		)
-	} else {
+	case len(opts.tweaks) != 0:
 		keyAggOpts = append(keyAggOpts, WithKeyTweaks(opts.tweaks...))
 	}
 
@@ -394,11 +418,16 @@ func verifyPartialSig(partialSig *PartialSignature, pubNonce [PubNonceSize]byte,
 	keyAggOpts := []KeyAggOption{
 		WithKeysHash(keysHash), WithUniqueKeyIndex(uniqueKeyIndex),
 	}
-	if opts.taprootTweak != nil {
+	switch {
+	case opts.bip86Tweak:
+		keyAggOpts = append(
+			keyAggOpts, WithBIP86KeyTweak(),
+		)
+	case opts.taprootTweak != nil:
 		keyAggOpts = append(
 			keyAggOpts, WithTaprootKeyTweak(opts.taprootTweak),
 		)
-	} else {
+	case len(opts.tweaks) != 0:
 		keyAggOpts = append(keyAggOpts, WithKeyTweaks(opts.tweaks...))
 	}
 
@@ -569,7 +598,7 @@ func WithTweakedCombine(msg [32]byte, keys []*btcec.PublicKey,
 // output key, where the internal key is the aggregated key pre-tweak.
 //
 // This option should be used over WithTweakedCombine when attempting to
-// aggregate signatures for a top-level taproot keysepnd, where the output key
+// aggregate signatures for a top-level taproot keyspend, where the output key
 // commits to a script root.
 func WithTaprootTweakedCombine(msg [32]byte, keys []*btcec.PublicKey,
 	scriptRoot []byte, sort bool) CombineOption {
@@ -577,6 +606,28 @@ func WithTaprootTweakedCombine(msg [32]byte, keys []*btcec.PublicKey,
 	return func(o *combineOptions) {
 		combinedKey, _, tweakAcc, _ := AggregateKeys(
 			keys, sort, WithTaprootKeyTweak(scriptRoot),
+		)
+
+		o.msg = msg
+		o.combinedKey = combinedKey.FinalKey
+		o.tweakAcc = tweakAcc
+	}
+}
+
+// WithBip86TweakedCombine is similar to the WithTaprootTweakedCombine option,
+// but assumes a BIP 341 + BIP 86 context where the final tweaked key is to be
+// used as the output key, where the internal key is the aggregated key
+// pre-tweak.
+//
+// This option should be used over WithTaprootTweakedCombine when attempting to
+// aggregate signatures for a top-level taproot keyspend, where the output key
+// was generated using BIP 86.
+func WithBip86TweakedCombine(msg [32]byte, keys []*btcec.PublicKey,
+	sort bool) CombineOption {
+
+	return func(o *combineOptions) {
+		combinedKey, _, tweakAcc, _ := AggregateKeys(
+			keys, sort, WithBIP86KeyTweak(),
 		)
 
 		o.msg = msg
