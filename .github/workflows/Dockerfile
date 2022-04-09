@@ -5,7 +5,7 @@
 ###########################
 # Build binaries stage
 ###########################
-FROM --platform=$BUILDPLATFORM golang:1.16.15-alpine3.15 AS build
+FROM --platform=$BUILDPLATFORM golang:1.17.8-alpine3.15 AS build
 ADD . /app
 WORKDIR /app
 # Arguments required to build binaries targetting the correct OS and CPU architectures
