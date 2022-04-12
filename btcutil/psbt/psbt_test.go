@@ -64,6 +64,7 @@ var validPsbtHex = map[int]string{
 	4: "70736274ff0100550200000001279a2323a5dfb51fc45f220fa58b0fc13e1e3342792a85d7e36cd6333b5cbc390000000000ffffffff01a05aea0b000000001976a914ffe9c0061097cc3b636f2cb0460fa4fc427d2b4588ac0000000000010120955eea0b0000000017a9146345200f68d189e1adc0df1c4d16ea8f14c0dbeb87220203b1341ccba7683b6af4f1238cd6e97e7167d569fac47f1e48d47541844355bd4646304302200424b58effaaa694e1559ea5c93bbfd4a89064224055cdf070b6771469442d07021f5c8eb0fea6516d60b8acb33ad64ede60e8785bfb3aa94b99bdf86151db9a9a010104220020771fd18ad459666dd49f3d564e3dbc42f4c84774e360ada16816a8ed488d5681010547522103b1341ccba7683b6af4f1238cd6e97e7167d569fac47f1e48d47541844355bd462103de55d1e1dac805e3f8a58c1fbf9b94c02f3dbaafe127fefca4995f26f82083bd52ae220603b1341ccba7683b6af4f1238cd6e97e7167d569fac47f1e48d47541844355bd4610b4a6ba67000000800000008004000080220603de55d1e1dac805e3f8a58c1fbf9b94c02f3dbaafe127fefca4995f26f82083bd10b4a6ba670000008000000080050000800000",
 	5: "70736274ff01003f0200000001ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0000000000ffffffff010000000000000000036a010000000000000a0f0102030405060708090f0102030405060708090a0b0c0d0e0f0000",
 	6: "70736274ff01003f0200000001ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0000000000ffffffff010000000000000000036a010000000000002206030d097466b7f59162ac4d90bf65f2a31a8bad82fcd22e98138dcf279401939bd104ffffffff0a0f0102030405060708090f0102030405060708090a0b0c0d0e0f0000",
+	7: "70736274ff01002001000000000100000000000000000d6a0b68656c6c6f20776f726c64000000000000",
 }
 
 // These are all invalid PSBTs for the indicated
@@ -115,7 +116,7 @@ var invalidPsbtHex = map[int]string{
 // This tests that valid PSBT serializations can be parsed
 // into Psbt structs.
 func TestReadValidPsbtAndReserialize(t *testing.T) {
-	for _, v := range validPsbtHex {
+	for key, v := range validPsbtHex {
 		PsbtBytes, err := hex.DecodeString(v)
 		if err != nil {
 			t.Fatalf("Unable to decode hex: %v", err)
@@ -128,8 +129,8 @@ func TestReadValidPsbtAndReserialize(t *testing.T) {
 			t.Fatalf("unable to parse psbt: %v", err)
 		}
 
-		t.Logf("Successfully parsed test, got transaction: %v",
-			spew.Sdump(testPsbt.UnsignedTx))
+		t.Logf("Successfully parsed test %d, got transaction: %v",
+			key, spew.Sdump(testPsbt.UnsignedTx))
 
 		var b bytes.Buffer
 		err = testPsbt.Serialize(&b)
