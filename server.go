@@ -25,6 +25,8 @@ import (
 	"github.com/btcsuite/btcd/addrmgr"
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/blockchain/indexers"
+	"github.com/btcsuite/btcd/btcutil"
+	"github.com/btcsuite/btcd/btcutil/bloom"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/connmgr"
@@ -36,8 +38,7 @@ import (
 	"github.com/btcsuite/btcd/peer"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcd/btcutil"
-	"github.com/btcsuite/btcd/btcutil/bloom"
+	"github.com/decred/dcrd/lru"
 )
 
 const (
@@ -274,7 +275,7 @@ type serverPeer struct {
 	isWhitelisted  bool
 	filter         *bloom.Filter
 	addressesMtx   sync.RWMutex
-	knownAddresses map[string]struct{}
+	knownAddresses lru.Cache
 	banScore       connmgr.DynamicBanScore
 	quit           chan struct{}
 	// The following chans are used to sync blockmanager and server.
@@ -289,7 +290,7 @@ func newServerPeer(s *server, isPersistent bool) *serverPeer {
 		server:         s,
 		persistent:     isPersistent,
 		filter:         bloom.LoadFilter(nil),
-		knownAddresses: make(map[string]struct{}),
+		knownAddresses: lru.NewCache(5000),
 		quit:           make(chan struct{}),
 		txProcessed:    make(chan struct{}, 1),
 		blockProcessed: make(chan struct{}, 1),
@@ -305,18 +306,18 @@ func (sp *serverPeer) newestBlock() (*chainhash.Hash, int32, error) {
 
 // addKnownAddresses adds the given addresses to the set of known addresses to
 // the peer to prevent sending duplicate addresses.
-func (sp *serverPeer) addKnownAddresses(addresses []*wire.NetAddress) {
+func (sp *serverPeer) addKnownAddresses(addresses []*wire.NetAddressV2) {
 	sp.addressesMtx.Lock()
 	for _, na := range addresses {
-		sp.knownAddresses[addrmgr.NetAddressKey(na)] = struct{}{}
+		sp.knownAddresses.Add(addrmgr.NetAddressKey(na))
 	}
 	sp.addressesMtx.Unlock()
 }
 
 // addressKnown true if the given address is already known to the peer.
-func (sp *serverPeer) addressKnown(na *wire.NetAddress) bool {
+func (sp *serverPeer) addressKnown(na *wire.NetAddressV2) bool {
 	sp.addressesMtx.RLock()
-	_, exists := sp.knownAddresses[addrmgr.NetAddressKey(na)]
+	exists := sp.knownAddresses.Contains(addrmgr.NetAddressKey(na))
 	sp.addressesMtx.RUnlock()
 	return exists
 }
@@ -340,23 +341,73 @@ func (sp *serverPeer) relayTxDisabled() bool {
 	return isDisabled
 }
 
-// pushAddrMsg sends an addr message to the connected peer using the provided
-// addresses.
-func (sp *serverPeer) pushAddrMsg(addresses []*wire.NetAddress) {
-	// Filter addresses already known to the peer.
-	addrs := make([]*wire.NetAddress, 0, len(addresses))
-	for _, addr := range addresses {
-		if !sp.addressKnown(addr) {
+// pushAddrMsg sends a legacy addr message to the connected peer using the
+// provided addresses.
+func (sp *serverPeer) pushAddrMsg(addresses []*wire.NetAddressV2) {
+	if sp.WantsAddrV2() {
+		// If the peer supports addrv2, we'll be pushing an addrv2
+		// message instead. The logic is otherwise identical to the
+		// addr case below.
+		addrs := make([]*wire.NetAddressV2, 0, len(addresses))
+		for _, addr := range addresses {
+			// Filter addresses already known to the peer.
+			if sp.addressKnown(addr) {
+				continue
+			}
+
 			addrs = append(addrs, addr)
 		}
+
+		known, err := sp.PushAddrV2Msg(addrs)
+		if err != nil {
+			peerLog.Errorf("Can't push addrv2 message to %s: %v",
+				sp.Peer, err)
+			sp.Disconnect()
+			return
+		}
+
+		// Add the final set of addresses sent to the set the peer
+		// knows of.
+		sp.addKnownAddresses(known)
+		return
 	}
+
+	addrs := make([]*wire.NetAddress, 0, len(addresses))
+	for _, addr := range addresses {
+		// Filter addresses already known to the peer.
+		if sp.addressKnown(addr) {
+			continue
+		}
+
+		// Must skip the V3 addresses for legacy ADDR messages.
+		if addr.IsTorV3() {
+			continue
+		}
+
+		// Convert the NetAddressV2 to a legacy address.
+		addrs = append(addrs, addr.ToLegacy())
+	}
+
 	known, err := sp.PushAddrMsg(addrs)
 	if err != nil {
-		peerLog.Errorf("Can't push address message to %s: %v", sp.Peer, err)
+		peerLog.Errorf(
+			"Can't push address message to %s: %v", sp.Peer, err,
+		)
 		sp.Disconnect()
 		return
 	}
-	sp.addKnownAddresses(known)
+
+	// Convert all of the known addresses to NetAddressV2 to add them to
+	// the set of known addresses.
+	knownAddrs := make([]*wire.NetAddressV2, 0, len(known))
+	for _, knownAddr := range known {
+		currentKna := wire.NetAddressV2FromBytes(
+			knownAddr.Timestamp, knownAddr.Services,
+			knownAddr.IP, knownAddr.Port,
+		)
+		knownAddrs = append(knownAddrs, currentKna)
+	}
+	sp.addKnownAddresses(knownAddrs)
 }
 
 // addBanScore increases the persistent and decaying ban score fields by the
@@ -1272,6 +1323,7 @@ func (sp *serverPeer) OnAddr(_ *peer.Peer, msg *wire.MsgAddr) {
 		return
 	}
 
+	addrs := make([]*wire.NetAddressV2, 0, len(msg.AddrList))
 	for _, na := range msg.AddrList {
 		// Don't add more address if we're disconnecting.
 		if !sp.Connected() {
@@ -1286,8 +1338,14 @@ func (sp *serverPeer) OnAddr(_ *peer.Peer, msg *wire.MsgAddr) {
 			na.Timestamp = now.Add(-1 * time.Hour * 24 * 5)
 		}
 
-		// Add address to known addresses for this peer.
-		sp.addKnownAddresses([]*wire.NetAddress{na})
+		// Add address to known addresses for this peer. This is
+		// converted to NetAddressV2 since that's what the address
+		// manager uses.
+		currentNa := wire.NetAddressV2FromBytes(
+			na.Timestamp, na.Services, na.IP, na.Port,
+		)
+		addrs = append(addrs, currentNa)
+		sp.addKnownAddresses([]*wire.NetAddressV2{currentNa})
 	}
 
 	// Add addresses to server address manager.  The address manager handles
@@ -1295,6 +1353,45 @@ func (sp *serverPeer) OnAddr(_ *peer.Peer, msg *wire.MsgAddr) {
 	// addresses, and last seen updates.
 	// XXX bitcoind gives a 2 hour time penalty here, do we want to do the
 	// same?
+	sp.server.addrManager.AddAddresses(addrs, sp.NA())
+}
+
+// OnAddrV2 is invoked when a peer receives an addrv2 bitcoin message and is
+// used to notify the server about advertised addresses.
+func (sp *serverPeer) OnAddrV2(_ *peer.Peer, msg *wire.MsgAddrV2) {
+	// Ignore if simnet for the same reasons as the regular addr message.
+	if cfg.SimNet {
+		return
+	}
+
+	// An empty AddrV2 message is invalid.
+	if len(msg.AddrList) == 0 {
+		peerLog.Errorf("Command [%s] from %s does not contain any "+
+			"addresses", msg.Command(), sp.Peer)
+		sp.Disconnect()
+		return
+	}
+
+	for _, na := range msg.AddrList {
+		// Don't add more to the set of known addresses if we're
+		// disconnecting.
+		if !sp.Connected() {
+			return
+		}
+
+		// Set the timestamp to 5 days ago if the timestamp received is
+		// more than 10 minutes in the future so this address is one of
+		// the first to be removed.
+		now := time.Now()
+		if na.Timestamp.After(now.Add(time.Minute * 10)) {
+			na.Timestamp = now.Add(-1 * time.Hour * 24 * 5)
+		}
+
+		// Add to the set of known addresses.
+		sp.addKnownAddresses([]*wire.NetAddressV2{na})
+	}
+
+	// Add the addresses to the addrmanager.
 	sp.server.addrManager.AddAddresses(msg.AddrList, sp.NA())
 }
 
@@ -1700,7 +1797,7 @@ func (s *server) handleAddPeerMsg(state *peerState, sp *serverPeer) bool {
 			lna := s.addrManager.GetBestLocalAddress(sp.NA())
 			if addrmgr.IsRoutable(lna) {
 				// Filter addresses the peer already knows about.
-				addresses := []*wire.NetAddress{lna}
+				addresses := []*wire.NetAddressV2{lna}
 				sp.pushAddrMsg(addresses)
 			}
 		}
@@ -2044,6 +2141,7 @@ func newPeerConfig(sp *serverPeer) *peer.Config {
 			OnFilterLoad:   sp.OnFilterLoad,
 			OnGetAddr:      sp.OnGetAddr,
 			OnAddr:         sp.OnAddr,
+			OnAddrV2:       sp.OnAddrV2,
 			OnRead:         sp.OnRead,
 			OnWrite:        sp.OnWrite,
 			OnNotFound:     sp.OnNotFound,
@@ -2152,7 +2250,7 @@ func (s *server) peerHandler() {
 	if !cfg.DisableDNSSeed {
 		// Add peers discovered through DNS to the address manager.
 		connmgr.SeedFromDNS(activeNetParams.Params, defaultRequiredServices,
-			btcdLookup, func(addrs []*wire.NetAddress) {
+			btcdLookup, func(addrs []*wire.NetAddressV2) {
 				// Bitcoind uses a lookup of the dns seeder here. This
 				// is rather strange since the values looked up by the
 				// DNS seed lookups will vary quite a lot.
@@ -2543,8 +2641,8 @@ out:
 					srvrLog.Warnf("UPnP can't get external address: %v", err)
 					continue out
 				}
-				na := wire.NewNetAddressIPPort(externalip, uint16(listenPort),
-					s.services)
+				na := wire.NetAddressV2FromBytes(time.Now(), s.services,
+					externalip, uint16(listenPort))
 				err = s.addrManager.AddLocalAddress(na, addrmgr.UpnpPrio)
 				if err != nil {
 					// XXX DeletePortMapping?
@@ -3117,7 +3215,9 @@ func addLocalAddress(addrMgr *addrmgr.AddrManager, addr string, services wire.Se
 				continue
 			}
 
-			netAddr := wire.NewNetAddressIPPort(ifaceIP, uint16(port), services)
+			netAddr := wire.NetAddressV2FromBytes(
+				time.Now(), services, ifaceIP, uint16(port),
+			)
 			addrMgr.AddLocalAddress(netAddr, addrmgr.BoundPrio)
 		}
 	} else {

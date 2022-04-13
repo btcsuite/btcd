@@ -13,7 +13,7 @@ import (
 // XXX pedro: we will probably need to bump this.
 const (
 	// ProtocolVersion is the latest protocol version this package supports.
-	ProtocolVersion uint32 = 70013
+	ProtocolVersion uint32 = 70016
 
 	// MultipleAddressVersion is the protocol version which added multiple
 	// addresses per message (pver >= MultipleAddressVersion).
@@ -51,6 +51,13 @@ const (
 	// FeeFilterVersion is the protocol version which added a new
 	// feefilter message.
 	FeeFilterVersion uint32 = 70013
+
+	// AddrV2Version is the protocol version which added two new messages.
+	// sendaddrv2 is sent during the version-verack handshake and signals
+	// support for sending and receiving the addrv2 message. In the future,
+	// new messages that occur during the version-verack handshake will not
+	// come with a protocol version bump.
+	AddrV2Version uint32 = 70016
 )
 
 // ServiceFlag identifies services supported by a bitcoin peer.
