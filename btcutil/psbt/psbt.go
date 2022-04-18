@@ -214,22 +214,12 @@ func NewFromRawBytes(r io.Reader, b64 bool) (*Packet, error) {
 		return nil, err
 	}
 	msgTx := wire.NewMsgTx(2)
-	err = msgTx.Deserialize(bytes.NewReader(value))
-	if err != nil {
-		// If there are no inputs in this yet incomplete transaction,
-		// the wire package still incorrectly assumes it's encoded in
-		// the witness format. We can fix this by just trying the non-
-		// witness encoding too. If that also fails, it's probably an
-		// invalid transaction.
-		msgTx = wire.NewMsgTx(2)
-		err2 := msgTx.DeserializeNoWitness(bytes.NewReader(value))
 
-		// If the second attempt also failed, something else is wrong
-		// and it probably makes more sense to return the original
-		// error instead of the error from the workaround.
-		if err2 != nil {
-			return nil, err
-		}
+	// BIP-0174 states: "The transaction must be in the old serialization
+	// format (without witnesses)."
+	err = msgTx.DeserializeNoWitness(bytes.NewReader(value))
+	if err != nil {
+		return nil, err
 	}
 	if !validateUnsignedTX(msgTx) {
 		return nil, ErrInvalidRawTxSigned
@@ -320,7 +310,7 @@ func (p *Packet) Serialize(w io.Writer) error {
 	serializedTx := bytes.NewBuffer(
 		make([]byte, 0, p.UnsignedTx.SerializeSize()),
 	)
-	if err := p.UnsignedTx.Serialize(serializedTx); err != nil {
+	if err := p.UnsignedTx.SerializeNoWitness(serializedTx); err != nil {
 		return err
 	}
 
