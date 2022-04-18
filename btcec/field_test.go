@@ -6,9 +6,8 @@
 package btcec
 
 import (
-	"math/rand"
-
 	"encoding/hex"
+	"math/rand"
 	"testing"
 )
 

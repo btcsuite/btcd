@@ -6,10 +6,10 @@
 package schnorr
 
 import (
+	"crypto/sha256"
 	"fmt"
 
 	"github.com/btcsuite/btcd/btcec/v2"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	secp "github.com/decred/dcrd/dcrec/secp256k1/v4"
 	ecdsa_schnorr "github.com/decred/dcrd/dcrec/secp256k1/v4/schnorr"
 )
@@ -35,7 +35,72 @@ var (
 		0x68, 0x6d, 0x71, 0xe8, 0x7f, 0x39, 0x4f, 0x79,
 		0x9c, 0x00, 0xa5, 0x21, 0x03, 0xcb, 0x4e, 0x17,
 	}
+
+	// tagBIP0340Challenge is the BIP-0340 tag for challenges.
+	tagBIP0340Challenge = []byte("BIP0340/challenge")
+
+	// tagBIP0340Aux is the BIP-0340 tag for aux data.
+	tagBIP0340Aux = []byte("BIP0340/aux")
+
+	// tagBIP0340Nonce is the BIP-0340 tag for nonces.
+	tagBIP0340Nonce = []byte("BIP0340/nonce")
+
+	// tagTapSighash is the tag used by BIP 341 to generate the sighash
+	// flags.
+	tagTapSighash = []byte("TapSighash")
+
+	// tagTagTapLeaf is the message tag prefix used to compute the hash
+	// digest of a tapscript leaf.
+	tagTapLeaf = []byte("TapLeaf")
+
+	// tagTapBranch is the message tag prefix used to compute the
+	// hash digest of two tap leaves into a taproot branch node.
+	tagTapBranch = []byte("TapBranch")
+
+	// tagTapTweak is the message tag prefix used to compute the hash tweak
+	// used to enable a public key to commit to the taproot branch root
+	// for the witness program.
+	tagTapTweak = []byte("TapTweak")
+
+	// precomputedTags is a map containing the SHA-256 hash of the BIP-0340
+	// tags.
+	precomputedTags = map[string][32]byte{
+		string(tagBIP0340Challenge): sha256.Sum256(tagBIP0340Challenge),
+		string(tagBIP0340Aux):       sha256.Sum256(tagBIP0340Aux),
+		string(tagBIP0340Nonce):     sha256.Sum256(tagBIP0340Nonce),
+		string(tagTapSighash):       sha256.Sum256(tagTapSighash),
+		string(tagTapLeaf):          sha256.Sum256(tagTapLeaf),
+		string(tagTapBranch):        sha256.Sum256(tagTapBranch),
+		string(tagTapTweak):         sha256.Sum256(tagTapTweak),
+	}
 )
+
+// taggedHash implements the tagged hash scheme described in BIP-340. We use
+// sha-256 to bind a message hash to a specific context using a tag:
+// sha256(sha256(tag) || sha256(tag) || msg).
+func taggedHash(tag []byte, msgs ...[]byte) [32]byte {
+	// Check to see if we've already pre-computed the hash of the tag. If
+	// so then this'll save us an extra sha256 hash.
+	shaTag, ok := precomputedTags[string(tag)]
+	if !ok {
+		shaTag = sha256.Sum256(tag)
+	}
+
+	// h = sha256(sha256(tag) || sha256(tag) || msg)
+	h := sha256.New()
+	h.Write(shaTag[:])
+	h.Write(shaTag[:])
+
+	for _, msg := range msgs {
+		h.Write(msg)
+	}
+
+	taggedHash := h.Sum(nil)
+	var hash [32]byte
+	copy(hash[:], taggedHash)
+
+	return hash
+}
 
 // Signature is a type representing a Schnorr signature.
 type Signature struct {
@@ -129,7 +194,7 @@ func schnorrVerify(sig *Signature, hash []byte, pubKeyBytes []byte) error {
 	// 7. Fail if is_infinite(R)
 	// 8. Fail if not hash_even_y(R)
 	// 9. Fail is x(R) != r.
-	// 10. Return success iff not failure occured before reachign this
+	// 10. Return success iff not failure occurred before reaching this
 	// point.
 
 	// Step 1.
@@ -174,12 +239,12 @@ func schnorrVerify(sig *Signature, hash []byte, pubKeyBytes []byte) error {
 	sig.r.PutBytesUnchecked(rBytes[:])
 	pBytes := SerializePubKey(pubKey)
 
-	commitment := chainhash.TaggedHash(
-		chainhash.TagBIP0340Challenge, rBytes[:], pBytes, hash,
+	commitment := taggedHash(
+		tagBIP0340Challenge, rBytes[:], pBytes, hash,
 	)
 
 	var e btcec.ModNScalar
-	if overflow := e.SetBytes((*[32]byte)(commitment)); overflow != 0 {
+	if overflow := e.SetBytes(&commitment); overflow != 0 {
 		str := "hash of (r || P || m) too big"
 		return signatureError(ecdsa_schnorr.ErrSchnorrHashValue, str)
 	}
@@ -228,7 +293,7 @@ func schnorrVerify(sig *Signature, hash []byte, pubKeyBytes []byte) error {
 
 	// Step 10.
 	//
-	// Return success iff not failure occured before reachign this
+	// Return success iff not failure occurred before reaching this
 	return nil
 }
 
@@ -264,7 +329,7 @@ func schnorrSign(privKey, nonce *btcec.ModNScalar, pubKey *btcec.PublicKey, hash
 	// n = curve order
 	// d = private key
 	// m = message
-	// a = input randmoness
+	// a = input randomness
 	// r, s = signature
 	//
 	// 1. d' = int(d)
@@ -316,12 +381,12 @@ func schnorrSign(privKey, nonce *btcec.ModNScalar, pubKey *btcec.PublicKey, hash
 	r.PutBytesUnchecked(rBytes[:])
 	pBytes := SerializePubKey(pubKey)
 
-	commitment := chainhash.TaggedHash(
-		chainhash.TagBIP0340Challenge, rBytes[:], pBytes, hash,
+	commitment := taggedHash(
+		tagBIP0340Challenge, rBytes[:], pBytes, hash,
 	)
 
 	var e btcec.ModNScalar
-	if overflow := e.SetBytes((*[32]byte)(commitment)); overflow != 0 {
+	if overflow := e.SetBytes(&commitment); overflow != 0 {
 		k.Zero()
 		str := "hash of (r || P || m) too big"
 		return nil, signatureError(ecdsa_schnorr.ErrSchnorrHashValue, str)
@@ -350,8 +415,8 @@ func schnorrSign(privKey, nonce *btcec.ModNScalar, pubKey *btcec.PublicKey, hash
 	return sig, nil
 }
 
-// SignOption is a functional option arguemnt that allows callers to modify the
-// way we generate BIP-340 schnorr signatues.
+// SignOption is a functional option argument that allows callers to modify the
+// way we generate BIP-340 schnorr signatures.
 type SignOption func(*signOptions)
 
 // signOptions houses the set of functional options that can be used to modify
@@ -372,7 +437,7 @@ func defaultSignOptions() *signOptions {
 }
 
 // FastSign forces signing to skip the extra verification step at the end.
-// Peformance sensitive applications may opt to use this option to speed up the
+// Performance sensitive applications may opt to use this option to speed up the
 // signing operation.
 func FastSign() SignOption {
 	return func(o *signOptions) {
@@ -417,7 +482,7 @@ func Sign(privKey *btcec.PrivateKey, hash []byte,
 	// n = curve order
 	// d = private key
 	// m = message
-	// a = input randmoness
+	// a = input randomness
 	// r, s = signature
 	//
 	// 1. d' = int(d)
@@ -478,14 +543,14 @@ func Sign(privKey *btcec.PrivateKey, hash []byte,
 
 	// At this point, we check to see if a CustomNonce has been passed in,
 	// and if so, then we'll deviate from the main routine here by
-	// generating the nonce value as specifid by BIP-0340.
+	// generating the nonce value as specified by BIP-0340.
 	if opts.authNonce != nil {
 		// Step 6.
 		//
 		// t = bytes(d) xor tagged_hash("BIP0340/aux", a)
 		privBytes := privKeyScalar.Bytes()
-		t := chainhash.TaggedHash(
-			chainhash.TagBIP0340Aux, (*opts.authNonce)[:],
+		t := taggedHash(
+			tagBIP0340Aux, (*opts.authNonce)[:],
 		)
 		for i := 0; i < len(t); i++ {
 			t[i] ^= privBytes[i]
@@ -497,15 +562,15 @@ func Sign(privKey *btcec.PrivateKey, hash []byte,
 		//
 		// We snip off the first byte of the serialized pubkey, as we
 		// only need the x coordinate and not the market byte.
-		rand := chainhash.TaggedHash(
-			chainhash.TagBIP0340Nonce, t[:], pubKeyBytes[1:], hash,
+		rand := taggedHash(
+			tagBIP0340Nonce, t[:], pubKeyBytes[1:], hash,
 		)
 
 		// Step 8.
 		//
 		// k'= int(rand) mod n
 		var kPrime btcec.ModNScalar
-		kPrime.SetBytes((*[32]byte)(rand))
+		kPrime.SetBytes(&rand)
 
 		// Step 9.
 		//
