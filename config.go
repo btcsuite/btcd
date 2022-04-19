@@ -7,6 +7,7 @@ package main
 import (
 	"bufio"
 	"crypto/rand"
+	_ "embed"
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
@@ -78,6 +79,9 @@ var (
 	defaultRPCCertFile = filepath.Join(defaultHomeDir, "rpc.cert")
 	defaultLogDir      = filepath.Join(defaultHomeDir, defaultLogDirname)
 )
+
+//go:embed sample-lbcd.conf
+var sampleConfig string
 
 // runServiceCommand is only set to a real function on Windows.  It is used
 // to parse and execute service commands specified via the -s flag.
@@ -1178,11 +1182,15 @@ func createDefaultConfigFile(destinationPath string) error {
 	}
 	generatedRPCPass := base64.StdEncoding.EncodeToString(randomBytes)
 
+	var reader *bufio.Reader
 	src, err := os.Open(sampleConfigPath)
 	if err != nil {
-		return err
+		// Fall back to sample config embedded at build time.
+		reader = bufio.NewReader(strings.NewReader(sampleConfig))
+	} else {
+		reader = bufio.NewReader(src)
+		defer src.Close()
 	}
-	defer src.Close()
 
 	dest, err := os.OpenFile(destinationPath,
 		os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
@@ -1193,7 +1201,6 @@ func createDefaultConfigFile(destinationPath string) error {
 
 	// We copy every line from the sample config file to the destination,
 	// only replacing the two lines for rpcuser and rpcpass
-	reader := bufio.NewReader(src)
 	for err != io.EOF {
 		var line string
 		line, err = reader.ReadString('\n')
