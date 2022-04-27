@@ -10,6 +10,12 @@ import (
 )
 
 var (
+	// ErrSignersNotSpecified is returned when a caller attempts to create
+	// a context without specifying either the total number of signers, or
+	// the complete set of singers.
+	ErrSignersNotSpecified = fmt.Errorf("total number of signers or all " +
+		"signers must be known")
+
 	// ErrSignerNotInKeySet is returned when a the private key for a signer
 	// isn't included in the set of signing public keys.
 	ErrSignerNotInKeySet = fmt.Errorf("signing key is not found in key" +
@@ -18,6 +24,16 @@ var (
 	// ErrAlredyHaveAllNonces is called when RegisterPubNonce is called too
 	// many times for a given signing session.
 	ErrAlredyHaveAllNonces = fmt.Errorf("already have all nonces")
+
+	// ErrNotEnoughSigners is returned when a caller attempts to create a
+	// session from a context, but before all the required signers are
+	// known.
+	ErrNotEnoughSigners = fmt.Errorf("not enough signers")
+
+	// ErrAlredyHaveAllNonces is returned when a caller attempts to
+	// register a signer, once we already have the total set of known
+	// signers.
+	ErrAlreadyHaveAllSigners = fmt.Errorf("all signers registered")
 
 	// ErrAlredyHaveAllSigs is called when CombineSig is called too many
 	// times for a given signing session.
@@ -39,6 +55,10 @@ var (
 	// ErrTaprootInternalKeyUnavailable is returned when a user attempts to
 	// obtain the
 	ErrTaprootInternalKeyUnavailable = fmt.Errorf("taproot tweak not used")
+
+	// ErrNotEnoughSigners is returned if a caller attempts to obtain an
+	// early nonce when it wasn't specified
+	ErrNoEarlyNonce = fmt.Errorf("no early nonce available")
 )
 
 // Context is a managed signing context for musig2. It takes care of things
@@ -49,9 +69,6 @@ type Context struct {
 
 	// pubKey is our even-y coordinate public  key.
 	pubKey *btcec.PublicKey
-
-	// keySet is the set of all signers.
-	keySet []*btcec.PublicKey
 
 	// combinedKey is the aggregated public key.
 	combinedKey *AggregateKey
@@ -69,6 +86,10 @@ type Context struct {
 	// shouldSort keeps track of if the public keys should be sorted before
 	// any operations.
 	shouldSort bool
+
+	// sessionNonce will be populated if the earlyNonce option is true.
+	// After the first session is created, this nonce will be blanked out.
+	sessionNonce *Nonces
 }
 
 // ContextOption is a functional option argument that allows callers to modify
@@ -94,6 +115,17 @@ type contextOptions struct {
 	// bip86Tweak if true, then the weak will just be
 	// h_tapTweak(internalKey) as there is no true script root.
 	bip86Tweak bool
+
+	// keySet is the complete set of signers for this context.
+	keySet []*btcec.PublicKey
+
+	// numSigners is the total number of signers that will eventually be a
+	// part of the context.
+	numSigners int
+
+	// earlyNonce determines if a nonce should be generated during context
+	// creation, to be automatically passed to the created session.
+	earlyNonce bool
 }
 
 // defaultContextOptions returns the default context options.
@@ -129,12 +161,43 @@ func WithBip86TweakCtx() ContextOption {
 	}
 }
 
+// WithKnownSigners is an optional parameter that should be used if a session
+// can be created as soon as all the singers are known.
+func WithKnownSigners(signers []*btcec.PublicKey) ContextOption {
+	return func(o *contextOptions) {
+		o.keySet = signers
+		o.numSigners = len(signers)
+	}
+}
+
+// WithNumSigners is a functional option used to specify that a context should
+// be created without knowing all the signers. Instead the total number of
+// signers is specified to ensure that a session can only be created once all
+// the signers are known.
+//
+// NOTE: Either WithKnownSigners or WithNumSigners MUST be specified.
+func WithNumSigners(n int) ContextOption {
+	return func(o *contextOptions) {
+		o.numSigners = n
+	}
+}
+
+// WithEarlyNonceGen allow a caller to specify that a nonce should be generated
+// early, before the session is created. This should be used in protocols that
+// require some partial nonce exchange before all the signers are known.
+//
+// NOTE: This option must only be specified with the WithNumSigners option.
+func WithEarlyNonceGen() ContextOption {
+	return func(o *contextOptions) {
+		o.earlyNonce = true
+	}
+}
+
 // NewContext creates a new signing context with the passed singing key and set
 // of public keys for each of the other signers.
 //
 // NOTE: This struct should be used over the raw Sign API whenever possible.
-func NewContext(signingKey *btcec.PrivateKey,
-	signers []*btcec.PublicKey, shouldSort bool,
+func NewContext(signingKey *btcec.PrivateKey, shouldSort bool,
 	ctxOpts ...ContextOption) (*Context, error) {
 
 	// First, parse the set of optional context options.
@@ -143,10 +206,6 @@ func NewContext(signingKey *btcec.PrivateKey,
 		option(opts)
 	}
 
-	// As a sanity check, make sure the signing key is actually amongst the sit
-	// of signers.
-	//
-	// TODO(roasbeef): instead have pass all the _other_ signers?
 	pubKey, err := schnorr.ParsePubKey(
 		schnorr.SerializePubKey(signingKey.PubKey()),
 	)
@@ -154,64 +213,156 @@ func NewContext(signingKey *btcec.PrivateKey,
 		return nil, err
 	}
 
+	ctx := &Context{
+		signingKey: signingKey,
+		pubKey:     pubKey,
+		opts:       opts,
+		shouldSort: shouldSort,
+	}
+
+	switch {
+
+	// We know all the signers, so we can compute the aggregated key, along
+	// with all the other intermediate state we need to do signing and
+	// verification.
+	case opts.keySet != nil:
+		if err := ctx.combineSignerKeys(); err != nil {
+			return nil, err
+		}
+
+	// The total signers are known, so we add ourselves, and skip key
+	// aggregation.
+	case opts.numSigners != 0:
+		// Otherwise, we'll add ourselves as the only known signer, and
+		// await further calls to RegisterSigner before a session can
+		// be created.
+		opts.keySet = make([]*btcec.PublicKey, 0, opts.numSigners)
+		opts.keySet = append(opts.keySet, pubKey)
+
+		// If early nonce generation is specified, then we'll generate
+		// the nonce now to pass in to the session once all the callers
+		// are known.
+		if opts.earlyNonce {
+			ctx.sessionNonce, err = GenNonces()
+			if err != nil {
+				return nil, err
+			}
+		}
+
+	default:
+		return nil, ErrSignersNotSpecified
+	}
+
+	return ctx, nil
+}
+
+// combineSignerKeys is used to compute the aggregated signer key once all the
+// signers are known.
+func (c *Context) combineSignerKeys() error {
+	// As a sanity check, make sure the signing key is actually
+	// amongst the sit of signers.
 	var keyFound bool
-	for _, key := range signers {
-		if key.IsEqual(pubKey) {
+	for _, key := range c.opts.keySet {
+		if key.IsEqual(c.pubKey) {
 			keyFound = true
 			break
 		}
 	}
 	if !keyFound {
-		return nil, ErrSignerNotInKeySet
+		return ErrSignerNotInKeySet
 	}
 
-	// Now that we know that we're actually a signer, we'll generate the
-	// key hash finger print and second unique key index so we can speed up
-	// signing later.
-	keysHash := keyHashFingerprint(signers, shouldSort)
-	uniqueKeyIndex := secondUniqueKeyIndex(signers, shouldSort)
+	// Now that we know that we're actually a signer, we'll
+	// generate the key hash finger print and second unique key
+	// index so we can speed up signing later.
+	c.keysHash = keyHashFingerprint(c.opts.keySet, c.shouldSort)
+	c.uniqueKeyIndex = secondUniqueKeyIndex(
+		c.opts.keySet, c.shouldSort,
+	)
 
 	keyAggOpts := []KeyAggOption{
-		WithKeysHash(keysHash), WithUniqueKeyIndex(uniqueKeyIndex),
+		WithKeysHash(c.keysHash),
+		WithUniqueKeyIndex(c.uniqueKeyIndex),
 	}
 	switch {
-	case opts.bip86Tweak:
+	case c.opts.bip86Tweak:
 		keyAggOpts = append(
 			keyAggOpts, WithBIP86KeyTweak(),
 		)
-	case opts.taprootTweak != nil:
+	case c.opts.taprootTweak != nil:
 		keyAggOpts = append(
-			keyAggOpts, WithTaprootKeyTweak(opts.taprootTweak),
+			keyAggOpts, WithTaprootKeyTweak(c.opts.taprootTweak),
 		)
-	case len(opts.tweaks) != 0:
-		keyAggOpts = append(keyAggOpts, WithKeyTweaks(opts.tweaks...))
+	case len(c.opts.tweaks) != 0:
+		keyAggOpts = append(keyAggOpts, WithKeyTweaks(c.opts.tweaks...))
 	}
 
-	// Next, we'll use this information to compute the aggregated public
-	// key that'll be used for signing in practice.
-	combinedKey, _, _, err := AggregateKeys(
-		signers, shouldSort, keyAggOpts...,
+	// Next, we'll use this information to compute the aggregated
+	// public key that'll be used for signing in practice.
+	var err error
+	c.combinedKey, _, _, err = AggregateKeys(
+		c.opts.keySet, c.shouldSort, keyAggOpts...,
 	)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return &Context{
-		signingKey:     signingKey,
-		pubKey:         pubKey,
-		keySet:         signers,
-		combinedKey:    combinedKey,
-		uniqueKeyIndex: uniqueKeyIndex,
-		keysHash:       keysHash,
-		opts:           opts,
-		shouldSort:     shouldSort,
-	}, nil
+	return nil
+}
+
+// EarlySessionNonce returns the early session nonce, if available.
+func (c *Context) EarlySessionNonce() (*Nonces, error) {
+	if c.sessionNonce == nil {
+		return nil, ErrNoEarlyNonce
+	}
+
+	return c.sessionNonce, nil
+}
+
+// RegisterSigner allows a caller to register a signer after the context has
+// been created. This will be used in scenarios where the total number of
+// signers is known, but nonce exchange needs to happen before all the signers
+// are known.
+//
+// A bool is returned which indicates if all the signers have been registered.
+//
+// NOTE: If the set of keys are not to be sorted during signing, then the
+// ordering each key is registered with MUST match the desired ordering.
+func (c *Context) RegisterSigner(pub *btcec.PublicKey) (bool, error) {
+	haveAllSigners := len(c.opts.keySet) == c.opts.numSigners
+	if haveAllSigners {
+		return false, ErrAlreadyHaveAllSigners
+	}
+
+	c.opts.keySet = append(c.opts.keySet, pub)
+
+	// If we have the expected number of signers at this point, then we can
+	// generate the aggregated key and other necessary information.
+	haveAllSigners = len(c.opts.keySet) == c.opts.numSigners
+	if haveAllSigners {
+		if err := c.combineSignerKeys(); err != nil {
+			return false, err
+		}
+	}
+
+	return haveAllSigners, nil
+}
+
+// NumRegisteredSigners returns the total number of registered signers.
+func (c *Context) NumRegisteredSigners() int {
+	return len(c.opts.keySet)
 }
 
 // CombinedKey returns the combined public key that will be used to generate
 // multi-signatures  against.
-func (c *Context) CombinedKey() *btcec.PublicKey {
-	return c.combinedKey.FinalKey
+func (c *Context) CombinedKey() (*btcec.PublicKey, error) {
+	// If the caller hasn't registered all the signers at this point, then
+	// the combined key won't be available.
+	if c.combinedKey == nil {
+		return nil, ErrNotEnoughSigners
+	}
+
+	return c.combinedKey.FinalKey, nil
 }
 
 // PubKey returns the public key of the signer of this session.
@@ -221,8 +372,8 @@ func (c *Context) PubKey() btcec.PublicKey {
 
 // SigningKeys returns the set of keys used for signing.
 func (c *Context) SigningKeys() []*btcec.PublicKey {
-	keys := make([]*btcec.PublicKey, len(c.keySet))
-	copy(keys, c.keySet)
+	keys := make([]*btcec.PublicKey, len(c.opts.keySet))
+	copy(keys, c.opts.keySet)
 
 	return keys
 }
@@ -230,14 +381,44 @@ func (c *Context) SigningKeys() []*btcec.PublicKey {
 // TaprootInternalKey returns the internal taproot key, which is the aggregated
 // key _before_ the tweak is applied. If a taproot tweak was specified, then
 // CombinedKey() will return the fully tweaked output key, with this method
-// returning the internal key. If a taproot tweak wasn't speciifed, then this
+// returning the internal key. If a taproot tweak wasn't specified, then this
 // method will return an error.
 func (c *Context) TaprootInternalKey() (*btcec.PublicKey, error) {
+	// If the caller hasn't registered all the signers at this point, then
+	// the combined key won't be available.
+	if c.combinedKey == nil {
+		return nil, ErrNotEnoughSigners
+	}
+
 	if c.opts.taprootTweak == nil && !c.opts.bip86Tweak {
 		return nil, ErrTaprootInternalKeyUnavailable
 	}
 
 	return c.combinedKey.PreTweakedKey, nil
+}
+
+// SessionOption is a functional option argument that allows callers to modify
+// the musig2 signing is done within a session.
+type SessionOption func(*sessionOptions)
+
+// sessionOptions houses the set of functional options that can be used to
+// modify the musig2 signing protocol.
+type sessionOptions struct {
+	externalNonce *Nonces
+}
+
+// defaultSessionOptions returns the default session options.
+func defaultSessionOptions() *sessionOptions {
+	return &sessionOptions{}
+}
+
+// WithPreGeneratedNonce allows a caller to start a session using a nonce
+// they've generated themselves. This may be useful in protocols where all the
+// signer keys may not be known before nonce exchange needs to occur.
+func WithPreGeneratedNonce(nonce *Nonces) SessionOption {
+	return func(o *sessionOptions) {
+		o.externalNonce = nonce
+	}
 }
 
 // Session represents a musig2 signing session. A new instance should be
@@ -248,6 +429,8 @@ func (c *Context) TaprootInternalKey() (*btcec.PublicKey, error) {
 //
 // NOTE: This struct should be used over the raw Sign API whenever possible.
 type Session struct {
+	opts *sessionOptions
+
 	ctx *Context
 
 	localNonces *Nonces
@@ -264,20 +447,52 @@ type Session struct {
 	finalSig *schnorr.Signature
 }
 
-// TODO(roasbeef): optional arg to allow parsing in pre-generated nonces
-
 // NewSession creates a new musig2 signing session.
-func (c *Context) NewSession() (*Session, error) {
-	localNonces, err := GenNonces()
-	if err != nil {
-		return nil, err
+func (c *Context) NewSession(options ...SessionOption) (*Session, error) {
+	opts := defaultSessionOptions()
+	for _, opt := range options {
+		opt(opts)
+	}
+
+	// At this point we verify that we know of all the signers, as
+	// otherwise we can't proceed with the session. This check is intended
+	// to catch misuse of the API wherein a caller forgets to register the
+	// remaining signers if they're doing nonce generation ahead of time.
+	if len(c.opts.keySet) != c.opts.numSigners {
+		return nil, ErrNotEnoughSigners
+	}
+
+	// If an early nonce was specified, then we'll automatically add the
+	// corresponding session option for the caller.
+	var localNonces *Nonces
+	if c.sessionNonce != nil {
+		// Apply the early nonce to the session, and also blank out the
+		// session nonce on the context to ensure it isn't ever re-used
+		// for another session.
+		localNonces = c.sessionNonce
+		c.sessionNonce = nil
+	} else if opts.externalNonce != nil {
+		// Otherwise if there's a custom nonce passed in via the
+		// session options, then use that instead.
+		localNonces = opts.externalNonce
+	}
+
+	// Now that we know we have enough signers, we'll either use the caller
+	// specified nonce, or generate a fresh set.
+	var err error
+	if localNonces == nil {
+		localNonces, err = GenNonces()
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	s := &Session{
+		opts:        opts,
 		ctx:         c,
 		localNonces: localNonces,
-		pubNonces:   make([][PubNonceSize]byte, 0, len(c.keySet)),
-		sigs:        make([]*PartialSignature, 0, len(c.keySet)),
+		pubNonces:   make([][PubNonceSize]byte, 0, c.opts.numSigners),
+		sigs:        make([]*PartialSignature, 0, c.opts.numSigners),
 	}
 
 	s.pubNonces = append(s.pubNonces, localNonces.PubNonce)
@@ -302,9 +517,9 @@ func (s *Session) NumRegisteredNonces() int {
 // signers. This method returns true once all the public nonces have been
 // accounted for.
 func (s *Session) RegisterPubNonce(nonce [PubNonceSize]byte) (bool, error) {
-	// If we already have all the nonces, then this method was called too many
-	// times.
-	haveAllNonces := len(s.pubNonces) == len(s.ctx.keySet)
+	// If we already have all the nonces, then this method was called too
+	// many times.
+	haveAllNonces := len(s.pubNonces) == s.ctx.opts.numSigners
 	if haveAllNonces {
 		return false, ErrAlredyHaveAllNonces
 	}
@@ -312,7 +527,7 @@ func (s *Session) RegisterPubNonce(nonce [PubNonceSize]byte) (bool, error) {
 	// Add this nonce and check again if we already have tall the nonces we
 	// need.
 	s.pubNonces = append(s.pubNonces, nonce)
-	haveAllNonces = len(s.pubNonces) == len(s.ctx.keySet)
+	haveAllNonces = len(s.pubNonces) == s.ctx.opts.numSigners
 
 	// If we have all the nonces, then we can go ahead and combine them
 	// now.
@@ -333,8 +548,6 @@ func (s *Session) RegisterPubNonce(nonce [PubNonceSize]byte) (bool, error) {
 // is returned, as that means a nonce was re-used.
 func (s *Session) Sign(msg [32]byte,
 	signOpts ...SignOption) (*PartialSignature, error) {
-
-	s.msg = msg
 
 	switch {
 	// If no local nonce is present, then this means we already signed, so
@@ -363,7 +576,7 @@ func (s *Session) Sign(msg [32]byte,
 
 	partialSig, err := Sign(
 		s.localNonces.SecNonce, s.ctx.signingKey, *s.combinedNonce,
-		s.ctx.keySet, msg, signOpts...,
+		s.ctx.opts.keySet, msg, signOpts...,
 	)
 
 	// Now that we've generated our signature, we'll make sure to blank out
@@ -373,6 +586,8 @@ func (s *Session) Sign(msg [32]byte,
 	if err != nil {
 		return nil, err
 	}
+
+	s.msg = msg
 
 	s.ourSig = partialSig
 	s.sigs = append(s.sigs, partialSig)
@@ -386,7 +601,7 @@ func (s *Session) Sign(msg [32]byte,
 func (s *Session) CombineSig(sig *PartialSignature) (bool, error) {
 	// First check if we already have all the signatures we need. We
 	// already accumulated our own signature when we generated the sig.
-	haveAllSigs := len(s.sigs) == len(s.ctx.keySet)
+	haveAllSigs := len(s.sigs) == len(s.ctx.opts.keySet)
 	if haveAllSigs {
 		return false, ErrAlredyHaveAllSigs
 	}
@@ -397,7 +612,7 @@ func (s *Session) CombineSig(sig *PartialSignature) (bool, error) {
 	// Accumulate this sig, and check again if we have all the sigs we
 	// need.
 	s.sigs = append(s.sigs, sig)
-	haveAllSigs = len(s.sigs) == len(s.ctx.keySet)
+	haveAllSigs = len(s.sigs) == len(s.ctx.opts.keySet)
 
 	// If we have all the signatures, then we can combine them all into the
 	// final signature.
@@ -407,21 +622,22 @@ func (s *Session) CombineSig(sig *PartialSignature) (bool, error) {
 		case s.ctx.opts.bip86Tweak:
 			combineOpts = append(
 				combineOpts, WithBip86TweakedCombine(
-					s.msg, s.ctx.keySet, s.ctx.shouldSort,
+					s.msg, s.ctx.opts.keySet,
+					s.ctx.shouldSort,
 				),
 			)
 		case s.ctx.opts.taprootTweak != nil:
 			combineOpts = append(
 				combineOpts, WithTaprootTweakedCombine(
-					s.msg, s.ctx.keySet, s.ctx.opts.taprootTweak,
-					s.ctx.shouldSort,
+					s.msg, s.ctx.opts.keySet,
+					s.ctx.opts.taprootTweak, s.ctx.shouldSort,
 				),
 			)
 		case len(s.ctx.opts.tweaks) != 0:
 			combineOpts = append(
 				combineOpts, WithTweakedCombine(
-					s.msg, s.ctx.keySet, s.ctx.opts.tweaks,
-					s.ctx.shouldSort,
+					s.msg, s.ctx.opts.keySet,
+					s.ctx.opts.tweaks, s.ctx.shouldSort,
 				),
 			)
 		}

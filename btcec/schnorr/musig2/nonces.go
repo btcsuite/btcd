@@ -185,7 +185,7 @@ func uint8Writer(w io.Writer, b []byte) error {
 	return binary.Write(w, byteOrder, uint8(len(b)))
 }
 
-// uint8Writer is an implementation of lengthWriter that writes the length of
+// uint32Writer is an implementation of lengthWriter that writes the length of
 // the byte slice using 4 bytes.
 func uint32Writer(w io.Writer, b []byte) error {
 	return binary.Write(w, byteOrder, uint32(len(b)))
