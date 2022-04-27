@@ -10,8 +10,8 @@ GOACC_BIN := $(GO_BIN)/go-acc
 
 LINT_COMMIT := v1.18.0
 GOACC_COMMIT := 80342ae2e0fcf265e99e76bcc4efd022c7c3811b
+GOIMPORTS_COMMIT := v0.1.10
 
-DEPGET := cd /tmp && GO111MODULE=on go get -v
 GOBUILD := GO111MODULE=on go build -v
 GOINSTALL := GO111MODULE=on go install -v 
 DEV_TAGS := rpctest
@@ -49,15 +49,15 @@ all: build check
 
 $(LINT_BIN):
 	@$(call print, "Fetching linter")
-	$(DEPGET) $(LINT_PKG)@$(LINT_COMMIT)
+	$(GOINSTALL) $(LINT_PKG)@$(LINT_COMMIT)
 
 $(GOACC_BIN):
 	@$(call print, "Fetching go-acc")
-	$(DEPGET) $(GOACC_PKG)@$(GOACC_COMMIT)
+	$(GOINSTALL) $(GOACC_PKG)@$(GOACC_COMMIT)
 
 goimports:
 	@$(call print, "Installing goimports.")
-	$(DEPGET) $(GOIMPORTS_PKG)
+	$(GOINSTALL) $(GOIMPORTS_PKG)@${GOIMPORTS_COMMIT}
 
 # ============
 # INSTALLATION
