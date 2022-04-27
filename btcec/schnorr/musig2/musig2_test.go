@@ -142,6 +142,23 @@ var (
 	signSetKeys = []*btcec.PublicKey{signSetPubKey, signSetKey2, signSetKey3}
 )
 
+func formatTweakParity(tweaks []KeyTweakDesc) string {
+	var s string
+	for _, tweak := range tweaks {
+		s += fmt.Sprintf("%v/", tweak.IsXOnly)
+	}
+
+	// Snip off that last '/'.
+	s = s[:len(s)-1]
+
+	return s
+}
+
+func genTweakParity(tweak KeyTweakDesc, isXOnly bool) KeyTweakDesc {
+	tweak.IsXOnly = isXOnly
+	return tweak
+}
+
 // TestMuSig2SigningTestVectors tests that the musig2 implementation produces
 // the same set of signatures.
 func TestMuSig2SigningTestVectors(t *testing.T) {
@@ -161,10 +178,43 @@ func TestMuSig2SigningTestVectors(t *testing.T) {
 	copy(secNonce[:], mustParseHex("508B81A611F100A6B2B6B29656590898AF488BCF2E1F55CF22E5CFB84421FE61"))
 	copy(secNonce[32:], mustParseHex("FA27FD49B1D50085B481285E1CA205D55C82CC1B31FF5CD54A489829355901F7"))
 
+	tweak1 := KeyTweakDesc{
+		Tweak: [32]byte{
+			0xE8, 0xF7, 0x91, 0xFF, 0x92, 0x25, 0xA2, 0xAF,
+			0x01, 0x02, 0xAF, 0xFF, 0x4A, 0x9A, 0x72, 0x3D,
+			0x96, 0x12, 0xA6, 0x82, 0xA2, 0x5E, 0xBE, 0x79,
+			0x80, 0x2B, 0x26, 0x3C, 0xDF, 0xCD, 0x83, 0xBB,
+		},
+	}
+	tweak2 := KeyTweakDesc{
+		Tweak: [32]byte{
+			0xae, 0x2e, 0xa7, 0x97, 0xcc, 0xf, 0xe7, 0x2a,
+			0xc5, 0xb9, 0x7b, 0x97, 0xf3, 0xc6, 0x95, 0x7d,
+			0x7e, 0x41, 0x99, 0xa1, 0x67, 0xa5, 0x8e, 0xb0,
+			0x8b, 0xca, 0xff, 0xda, 0x70, 0xac, 0x4, 0x55,
+		},
+	}
+	tweak3 := KeyTweakDesc{
+		Tweak: [32]byte{
+			0xf5, 0x2e, 0xcb, 0xc5, 0x65, 0xb3, 0xd8, 0xbe,
+			0xa2, 0xdf, 0xd5, 0xb7, 0x5a, 0x4f, 0x45, 0x7e,
+			0x54, 0x36, 0x98, 0x9, 0x32, 0x2e, 0x41, 0x20,
+			0x83, 0x16, 0x26, 0xf2, 0x90, 0xfa, 0x87, 0xe0,
+		},
+	}
+	tweak4 := KeyTweakDesc{
+		Tweak: [32]byte{
+			0x19, 0x69, 0xad, 0x73, 0xcc, 0x17, 0x7f, 0xa0,
+			0xb4, 0xfc, 0xed, 0x6d, 0xf1, 0xf7, 0xbf, 0x99,
+			0x7, 0xe6, 0x65, 0xfd, 0xe9, 0xba, 0x19, 0x6a,
+			0x74, 0xfe, 0xd0, 0xa3, 0xcf, 0x5a, 0xef, 0x9d,
+		},
+	}
+
 	testCases := []struct {
 		keyOrder           []int
 		expectedPartialSig []byte
-		tweak              *KeyTweakDesc
+		tweaks             []KeyTweakDesc
 	}{
 		{
 			keyOrder:           []int{0, 1, 2},
@@ -178,30 +228,40 @@ func TestMuSig2SigningTestVectors(t *testing.T) {
 			keyOrder:           []int{1, 2, 0},
 			expectedPartialSig: mustParseHex("0D5B651E6DE34A29A12DE7A8B4183B4AE6A7F7FBE15CDCAFA4A3D1BCAABC7517"),
 		},
+
+		// A single x-only tweak.
 		{
 			keyOrder:           []int{1, 2, 0},
 			expectedPartialSig: mustParseHex("5e24c7496b565debc3b9639e6f1304a21597f9603d3ab05b4913641775e1375b"),
-			tweak: &KeyTweakDesc{
-				Tweak: [32]byte{
-					0xE8, 0xF7, 0x91, 0xFF, 0x92, 0x25, 0xA2, 0xAF,
-					0x01, 0x02, 0xAF, 0xFF, 0x4A, 0x9A, 0x72, 0x3D,
-					0x96, 0x12, 0xA6, 0x82, 0xA2, 0x5E, 0xBE, 0x79,
-					0x80, 0x2B, 0x26, 0x3C, 0xDF, 0xCD, 0x83, 0xBB,
-				},
-				IsXOnly: true,
-			},
+			tweaks:             []KeyTweakDesc{genTweakParity(tweak1, true)},
 		},
+
+		// A single ordinary tweak.
 		{
 			keyOrder:           []int{1, 2, 0},
 			expectedPartialSig: mustParseHex("78408ddcab4813d1394c97d493ef1084195c1d4b52e63ecd7bc5991644e44ddd"),
-			tweak: &KeyTweakDesc{
-				Tweak: [32]byte{
-					0xE8, 0xF7, 0x91, 0xFF, 0x92, 0x25, 0xA2, 0xAF,
-					0x01, 0x02, 0xAF, 0xFF, 0x4A, 0x9A, 0x72, 0x3D,
-					0x96, 0x12, 0xA6, 0x82, 0xA2, 0x5E, 0xBE, 0x79,
-					0x80, 0x2B, 0x26, 0x3C, 0xDF, 0xCD, 0x83, 0xBB,
-				},
-				IsXOnly: false,
+			tweaks:             []KeyTweakDesc{genTweakParity(tweak1, false)},
+		},
+
+		// An ordinary tweak then an x-only tweak.
+		{
+			keyOrder:           []int{1, 2, 0},
+			expectedPartialSig: mustParseHex("C3A829A81480E36EC3AB052964509A94EBF34210403D16B226A6F16EC85B7357"),
+			tweaks: []KeyTweakDesc{
+				genTweakParity(tweak1, false),
+				genTweakParity(tweak2, true),
+			},
+		},
+
+		// Four tweaks, in the order: x-only, ordinary, x-only, ordinary.
+		{
+			keyOrder:           []int{1, 2, 0},
+			expectedPartialSig: mustParseHex("8C4473C6A382BD3C4AD7BE59818DA5ED7CF8CEC4BC21996CFDA08BB4316B8BC7"),
+			tweaks: []KeyTweakDesc{
+				genTweakParity(tweak1, true),
+				genTweakParity(tweak2, false),
+				genTweakParity(tweak3, true),
+				genTweakParity(tweak4, false),
 			},
 		},
 	}
@@ -210,9 +270,9 @@ func TestMuSig2SigningTestVectors(t *testing.T) {
 	copy(msg[:], signTestMsg)
 
 	for _, testCase := range testCases {
-		testName := fmt.Sprintf("%v/tweak=%v", testCase.keyOrder, testCase.tweak != nil)
-		if testCase.tweak != nil {
-			testName += fmt.Sprintf("/x_only=%v", testCase.tweak.IsXOnly)
+		testName := fmt.Sprintf("%v/tweak=%v", testCase.keyOrder, len(testCase.tweaks) != 0)
+		if len(testCase.tweaks) != 0 {
+			testName += fmt.Sprintf("/x_only=%v", formatTweakParity(testCase.tweaks))
 		}
 
 		t.Run(testName, func(t *testing.T) {
@@ -222,9 +282,9 @@ func TestMuSig2SigningTestVectors(t *testing.T) {
 			}
 
 			var opts []SignOption
-			if testCase.tweak != nil {
+			if len(testCase.tweaks) != 0 {
 				opts = append(
-					opts, WithTweaks(*testCase.tweak),
+					opts, WithTweaks(testCase.tweaks...),
 				)
 			}
 
