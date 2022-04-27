@@ -481,7 +481,13 @@ func (c *Context) NewSession(options ...SessionOption) (*Session, error) {
 	// specified nonce, or generate a fresh set.
 	var err error
 	if localNonces == nil {
-		localNonces, err = GenNonces()
+		// At this point we need to generate a fresh nonce. We'll pass
+		// in some auxiliary information to strengthen the nonce
+		// generated.
+		localNonces, err = GenNonces(
+			WithNonceSecretKeyAux(c.signingKey),
+			WithNonceCombinedKeyAux(c.combinedKey.FinalKey),
+		)
 		if err != nil {
 			return nil, err
 		}
