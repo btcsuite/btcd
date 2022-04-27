@@ -3,9 +3,14 @@
 package musig2
 
 import (
+	"bytes"
 	"crypto/rand"
+	"encoding/binary"
+	"io"
 
 	"github.com/btcsuite/btcd/btcec/v2"
+	"github.com/btcsuite/btcd/btcec/v2/schnorr"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 )
 
 const (
@@ -17,6 +22,18 @@ const (
 	// SecNonceSize is the size of the secret nonces for musig2. The secret
 	// nonces are the corresponding private keys to the public nonce points.
 	SecNonceSize = 64
+)
+
+var (
+	// NonceAuxTag is the tag used to optionally mix in the secret key with
+	// the set of aux randomness.
+	NonceAuxTag = []byte("MuSig/aux")
+
+	// NonceGenTag is used to generate the value (from a set of required an
+	// optional field) that will be used as the part of the secret nonce.
+	NonceGenTag = []byte("Musig/nonce")
+
+	byteOrder = binary.BigEndian
 )
 
 // zeroSecNonce is a secret nonce that's all zeroes. This is used to check that
@@ -71,19 +88,171 @@ func secNonceToPubNonce(secNonce [SecNonceSize]byte) [PubNonceSize]byte {
 // generation happens.
 type NonceGenOption func(*nonceGenOpts)
 
-// nonceGenOpts is the set of options that control how nonce generation happens.
+// nonceGenOpts is the set of options that control how nonce generation
+// happens.
 type nonceGenOpts struct {
-	randReader func(b []byte) (int, error)
+	// randReader is what we'll use to generate a set of random bytes. If
+	// unspecified, then the normal crypto/rand rand.Read method will be
+	// used in place.
+	randReader io.Reader
+
+	// secretKey is an optional argument that's used to further augment the
+	// generated nonce by xor'ing it with this secret key.
+	secretKey []byte
+
+	// combinedKey is an optional argument that if specified, will be
+	// combined along with the nonce generation.
+	combinedKey []byte
+
+	// msg is an optional argument that will be mixed into the nonce
+	// derivation algorithm.
+	msg []byte
+
+	// auxInput is an optional argument that will be mixed into the nonce
+	// derivation algorithm.
+	auxInput []byte
+}
+
+// cryptoRandAdapter is an adapter struct that allows us to pass in the package
+// level Read function from crypto/rand into a context that accepts an
+// io.Reader.
+type cryptoRandAdapter struct {
+}
+
+// Read implements the io.Reader interface for the crypto/rand package.  By
+// default, we always use the crypto/rand reader, but the caller is able to
+// specify their own generation, which can be useful for deterministic tests.
+func (c *cryptoRandAdapter) Read(p []byte) (n int, err error) {
+	return rand.Read(p)
 }
 
 // defaultNonceGenOpts returns the default set of nonce generation options.
 func defaultNonceGenOpts() *nonceGenOpts {
 	return &nonceGenOpts{
-		// By default, we always use the crypto/rand reader, but the
-		// caller is able to specify their own generation, which can be
-		// useful for deterministic tests.
-		randReader: rand.Read,
+		randReader: &cryptoRandAdapter{},
 	}
+}
+
+// WithCustomRand allows a caller to use a custom random number generator in
+// place for crypto/rand. This should only really be used to generate
+// determinstic tests.
+func WithCustomRand(r io.Reader) NonceGenOption {
+	return func(o *nonceGenOpts) {
+		o.randReader = r
+	}
+}
+
+// WithNonceSecretKeyAux allows a caller to optionally specify a secret key
+// that should be used to augment the randomness used to generate the nonces.
+func WithNonceSecretKeyAux(secKey *btcec.PrivateKey) NonceGenOption {
+	return func(o *nonceGenOpts) {
+		o.secretKey = secKey.Serialize()
+	}
+}
+
+// WithNonceCombinedKeyAux allows a caller to optionally specify the combined
+// key used in this signing session to further augment the randomness used to
+// generate nonces.
+func WithNonceCombinedKeyAux(combinedKey *btcec.PublicKey) NonceGenOption {
+	return func(o *nonceGenOpts) {
+		o.combinedKey = schnorr.SerializePubKey(combinedKey)
+	}
+}
+
+// WithNonceMessageAux allows a caller to optionally specify a message to be
+// mixed into the randomness generated to create the nonce.
+func WithNonceMessageAux(msg [32]byte) NonceGenOption {
+	return func(o *nonceGenOpts) {
+		o.msg = msg[:]
+	}
+}
+
+// WithNonceAuxInput is a set of auxiliary randomness, similar to BIP 340 that
+// can be used to further augment the nonce generation process.
+func WithNonceAuxInput(aux []byte) NonceGenOption {
+	return func(o *nonceGenOpts) {
+		o.auxInput = aux
+	}
+}
+
+// lengthWriter is a function closure that allows a caller to control how the
+// length prefix of a byte slice is written.
+type lengthWriter func(w io.Writer, b []byte) error
+
+// uint8Writer is an implementation of lengthWriter that writes the length of
+// the byte slice using 1 byte.
+func uint8Writer(w io.Writer, b []byte) error {
+	return binary.Write(w, byteOrder, uint8(len(b)))
+}
+
+// uint8Writer is an implementation of lengthWriter that writes the length of
+// the byte slice using 4 bytes.
+func uint32Writer(w io.Writer, b []byte) error {
+	return binary.Write(w, byteOrder, uint32(len(b)))
+}
+
+// writeBytesPrefix is used to write out: len(b) || b, to the passed io.Writer.
+// The lengthWriter function closure is used to allow the caller to specify the
+// precise byte packing of the length.
+func writeBytesPrefix(w io.Writer, b []byte, lenWriter lengthWriter) error {
+	// Write out the length of the byte first, followed by the set of bytes
+	// itself.
+	if err := lenWriter(w, b); err != nil {
+		return err
+	}
+
+	if _, err := w.Write(b); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// genNonceAuxBytes writes out the full byte string used to derive a secret
+// nonce based on some initial randomness as well as the series of optional
+// fields. The byte string used for derivation is:
+//  * tagged_hash("MuSig/nonce", rand || len(aggpk) || aggpk || len(m)
+//                              || m || len(in) || in || i).
+//
+// where i is the ith secret nonce being generated.
+func genNonceAuxBytes(rand []byte, i int,
+	opts *nonceGenOpts) (*chainhash.Hash, error) {
+
+	var w bytes.Buffer
+
+	// First, write out the randomness generated in the prior step.
+	if _, err := w.Write(rand); err != nil {
+		return nil, err
+	}
+
+	// Next, we'll write out: len(aggpk) || aggpk.
+	err := writeBytesPrefix(&w, opts.combinedKey, uint8Writer)
+	if err != nil {
+		return nil, err
+	}
+
+	// Next, we'll write out the length prefixed message.
+	err = writeBytesPrefix(&w, opts.msg, uint8Writer)
+	if err != nil {
+		return nil, err
+	}
+
+	// Finally we'll write out the auxiliary input.
+	err = writeBytesPrefix(&w, opts.auxInput, uint32Writer)
+	if err != nil {
+		return nil, err
+	}
+
+	// Next we'll write out the interaction/index number which will
+	// uniquely generate two nonces given the rest of the possibly static
+	// parameters.
+	if err := binary.Write(&w, byteOrder, uint8(i)); err != nil {
+		return nil, err
+	}
+
+	// With the message buffer complete, we'll now derive the tagged hash
+	// using our set of params.
+	return chainhash.TaggedHash(NonceGenTag, w.Bytes()), nil
 }
 
 // GenNonces generates the secret nonces, as well as the public nonces which
@@ -94,24 +263,31 @@ func GenNonces(options ...NonceGenOption) (*Nonces, error) {
 		opt(opts)
 	}
 
-	// Generate two 32-byte random values that'll be the private keys to
-	// the public nonces.
-	var k1, k2 [32]byte
-	if _, err := opts.randReader(k1[:]); err != nil {
-		return nil, err
-	}
-	if _, err := opts.randReader(k2[:]); err != nil {
+	// First, we'll start out by generating 32 random bytes drawn from our
+	// CSPRNG.
+	var randBytes [32]byte
+	if _, err := opts.randReader.Read(randBytes[:]); err != nil {
 		return nil, err
 	}
 
-	var nonces Nonces
+	// Using our randomness and the set of optional params, generate our
+	// two secret nonces: k1 and k2.
+	k1, err := genNonceAuxBytes(randBytes[:], 1, opts)
+	if err != nil {
+		return nil, err
+	}
+	k2, err := genNonceAuxBytes(randBytes[:], 2, opts)
+	if err != nil {
+		return nil, err
+	}
 
 	var k1Mod, k2Mod btcec.ModNScalar
-	k1Mod.SetBytes(&k1)
-	k2Mod.SetBytes(&k2)
+	k1Mod.SetBytes((*[32]byte)(k1))
+	k2Mod.SetBytes((*[32]byte)(k2))
 
 	// The secret nonces are serialized as the concatenation of the two 32
 	// byte secret nonce values.
+	var nonces Nonces
 	k1Mod.PutBytesUnchecked(nonces.SecNonce[:])
 	k2Mod.PutBytesUnchecked(nonces.SecNonce[btcec.PrivKeyBytesLen:])
 
