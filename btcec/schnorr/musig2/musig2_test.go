@@ -6,20 +6,17 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
+	"flag"
 	"fmt"
+	"io/ioutil"
 	"sync"
 	"testing"
 
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 )
-
-// TestMuSig2SgnTestVectors tests that this implementation of musig2 matches
-// the secp256k1-zkp test vectors.
-func TestMuSig2SignTestVectors(t *testing.T) {
-	t.Parallel()
-}
 
 var (
 	key1Bytes, _ = hex.DecodeString("F9308A019258C31049344F85F89D5229B53" +
@@ -37,10 +34,26 @@ var (
 	keyCombo4, _ = hex.DecodeString("2EB18851887E7BDC5E830E89B19DDBC28078F1FA88AAD0AD01CA06FE4F80210B")
 )
 
+const (
+	keyAggTestVectorName = "key_agg_vectors.json"
+
+	signTestVectorName = "sign_vectors.json"
+)
+
+var dumpJson = flag.Bool("dumpjson", false, "if true, a JSON version of the "+
+	"test vectors will be written to the cwd")
+
+type jsonKeyAggTestCase struct {
+	Keys        []string `json:"keys"`
+	ExpectedKey string   `json:"expected_key"`
+}
+
 // TestMuSig2KeyAggTestVectors tests that this implementation of musig2 key
 // aggregation lines up with the secp256k1-zkp test vectors.
 func TestMuSig2KeyAggTestVectors(t *testing.T) {
 	t.Parallel()
+
+	var jsonCases []jsonKeyAggTestCase
 
 	testCases := []struct {
 		keyOrder    []int
@@ -73,7 +86,10 @@ func TestMuSig2KeyAggTestVectors(t *testing.T) {
 	for i, testCase := range testCases {
 		testName := fmt.Sprintf("%v", testCase.keyOrder)
 		t.Run(testName, func(t *testing.T) {
-			var keys []*btcec.PublicKey
+			var (
+				keys    []*btcec.PublicKey
+				strKeys []string
+			)
 			for _, keyIndex := range testCase.keyOrder {
 				keyBytes := testKeys[keyIndex]
 				pub, err := schnorr.ParsePubKey(keyBytes)
@@ -82,7 +98,13 @@ func TestMuSig2KeyAggTestVectors(t *testing.T) {
 				}
 
 				keys = append(keys, pub)
+				strKeys = append(strKeys, hex.EncodeToString(keyBytes))
 			}
+
+			jsonCases = append(jsonCases, jsonKeyAggTestCase{
+				Keys:        strKeys,
+				ExpectedKey: hex.EncodeToString(testCase.expectedKey),
+			})
 
 			uniqueKeyIndex := secondUniqueKeyIndex(keys, false)
 			combinedKey, _, _, _ := AggregateKeys(
@@ -95,6 +117,22 @@ func TestMuSig2KeyAggTestVectors(t *testing.T) {
 					combinedKeyBytes)
 			}
 		})
+	}
+
+	if *dumpJson {
+		jsonBytes, err := json.Marshal(jsonCases)
+		if err != nil {
+			t.Fatalf("unable to encode json: %v", err)
+		}
+
+		var formattedJson bytes.Buffer
+		json.Indent(&formattedJson, jsonBytes, "", "\t")
+		err = ioutil.WriteFile(
+			keyAggTestVectorName, formattedJson.Bytes(), 0644,
+		)
+		if err != nil {
+			t.Fatalf("unable to write file: %v", err)
+		}
 	}
 }
 
@@ -160,10 +198,36 @@ func genTweakParity(tweak KeyTweakDesc, isXOnly bool) KeyTweakDesc {
 	return tweak
 }
 
+type jsonTweak struct {
+	Tweak string `json:"tweak"`
+	XOnly bool   `json:"x_only"`
+}
+
+type tweakSignCase struct {
+	Keys   []string    `json:"keys"`
+	Tweaks []jsonTweak `json:"tweaks,omitempty"`
+
+	ExpectedSig string `json:"expected_sig"`
+}
+
+type jsonSignTestCase struct {
+	SecNonce   string `json:"secret_nonce"`
+	AggNonce   string `json:"agg_nonce"`
+	SigningKey string `json:"signing_key"`
+	Msg        string `json:"msg"`
+
+	TestCases []tweakSignCase `json:"test_cases"`
+}
+
 // TestMuSig2SigningTestVectors tests that the musig2 implementation produces
 // the same set of signatures.
 func TestMuSig2SigningTestVectors(t *testing.T) {
 	t.Parallel()
+
+	var jsonCases jsonSignTestCase
+
+	jsonCases.SigningKey = hex.EncodeToString(signSetPrivKey.Serialize())
+	jsonCases.Msg = hex.EncodeToString(signTestMsg)
 
 	var aggregatedNonce [PubNonceSize]byte
 	copy(
@@ -175,9 +239,13 @@ func TestMuSig2SigningTestVectors(t *testing.T) {
 		mustParseHex("037496A3CC86926D452CAFCFD55D25972CA1675D549310DE296BFF42F72EEEA8C9"),
 	)
 
+	jsonCases.AggNonce = hex.EncodeToString(aggregatedNonce[:])
+
 	var secNonce [SecNonceSize]byte
 	copy(secNonce[:], mustParseHex("508B81A611F100A6B2B6B29656590898AF488BCF2E1F55CF22E5CFB84421FE61"))
 	copy(secNonce[32:], mustParseHex("FA27FD49B1D50085B481285E1CA205D55C82CC1B31FF5CD54A489829355901F7"))
+
+	jsonCases.SecNonce = hex.EncodeToString(secNonce[:])
 
 	tweak1 := KeyTweakDesc{
 		Tweak: [32]byte{
@@ -277,9 +345,15 @@ func TestMuSig2SigningTestVectors(t *testing.T) {
 		}
 
 		t.Run(testName, func(t *testing.T) {
+			var strKeys []string
 			keySet := make([]*btcec.PublicKey, 0, len(testCase.keyOrder))
 			for _, keyIndex := range testCase.keyOrder {
 				keySet = append(keySet, signSetKeys[keyIndex])
+				strKeys = append(
+					strKeys, hex.EncodeToString(
+						schnorr.SerializePubKey(signSetKeys[keyIndex]),
+					),
+				)
 			}
 
 			var opts []SignOption
@@ -287,6 +361,14 @@ func TestMuSig2SigningTestVectors(t *testing.T) {
 				opts = append(
 					opts, WithTweaks(testCase.tweaks...),
 				)
+			}
+
+			var jsonTweaks []jsonTweak
+			for _, tweak := range testCase.tweaks {
+				jsonTweaks = append(jsonTweaks, jsonTweak{
+					Tweak: hex.EncodeToString(tweak.Tweak[:]),
+					XOnly: tweak.IsXOnly,
+				})
 			}
 
 			partialSig, err := Sign(
@@ -305,7 +387,29 @@ func TestMuSig2SigningTestVectors(t *testing.T) {
 					testCase.expectedPartialSig, partialSigBytes,
 				)
 			}
+
+			jsonCases.TestCases = append(jsonCases.TestCases, tweakSignCase{
+				Keys:        strKeys,
+				Tweaks:      jsonTweaks,
+				ExpectedSig: hex.EncodeToString(testCase.expectedPartialSig),
+			})
 		})
+	}
+
+	if *dumpJson {
+		jsonBytes, err := json.Marshal(jsonCases)
+		if err != nil {
+			t.Fatalf("unable to encode json: %v", err)
+		}
+
+		var formattedJson bytes.Buffer
+		json.Indent(&formattedJson, jsonBytes, "", "\t")
+		err = ioutil.WriteFile(
+			signTestVectorName, formattedJson.Bytes(), 0644,
+		)
+		if err != nil {
+			t.Fatalf("unable to write file: %v", err)
+		}
 	}
 }
 
