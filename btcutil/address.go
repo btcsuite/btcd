@@ -52,6 +52,10 @@ var (
 	// than assuming or defaulting to one or the other, this error is
 	// returned and the caller must decide how to decode the address.
 	ErrAddressCollision = errors.New("address collision")
+
+	// ErrIncorrect describes an error where an address could be decoded, but
+	// it was not for the expected network.
+	ErrIncorrectNet = errors.New("address is for incorrect net")
 )
 
 // encodeAddress returns a human-readable payment address given a ripemd160 hash
@@ -221,6 +225,26 @@ func DecodeAddress(addr string, defaultNet *chaincfg.Params) (Address, error) {
 	default:
 		return nil, errors.New("decoded address is of unknown size")
 	}
+}
+
+// DecodeAddressForNet decodes the string encoding of an address and returns
+// the Address if addr is a valid encoding for a known address type and the
+// given network.
+//
+// This method differs from DecodeAddress in that DecodeAddress tolerates
+// differing networks, in case the network parameter isn't needed to decode
+// the address.
+func DecodeAddressForNet(addr string, net *chaincfg.Params) (Address, error) {
+	decoded, err := DecodeAddress(addr, net)
+	if err != nil {
+		return nil, err
+	}
+
+	if !decoded.IsForNet(net) {
+		return nil, ErrIncorrectNet
+	}
+
+	return decoded, nil
 }
 
 // decodeSegWitAddress parses a bech32 encoded segwit address string and
