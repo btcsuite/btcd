@@ -114,6 +114,43 @@ const (
 	// scripts necessary for the input to pass validation.
 	FinalScriptWitnessType InputType = 8
 
+	// TaprootKeySpendSignatureType is an empty key ({0x13}). The value is
+	// a 64-byte Schnorr signature or a 65-byte Schnorr signature with the
+	// one byte sighash type appended to it.
+	TaprootKeySpendSignatureType InputType = 0x13
+
+	// TaprootScriptSpendSignatureType is a type that carries the
+	// x-only pubkey and leaf hash along with the key
+	// ({0x14}|{xonlypubkey}|{leafhash}).
+	//
+	// The value is a 64-byte Schnorr signature or a 65-byte Schnorr
+	// signature with the one byte sighash type appended to it.
+	TaprootScriptSpendSignatureType InputType = 0x14
+
+	// TaprootLeafScriptType is a type that carries the control block along
+	// with the key ({0x15}|{control block}).
+	//
+	// The value is a script followed by a one byte unsigned integer that
+	// represents the leaf version.
+	TaprootLeafScriptType InputType = 0x15
+
+	// TaprootBip32DerivationInputType is a type that carries the x-only
+	// pubkey along with the key ({0x16}|{xonlypubkey}).
+	//
+	// The value is a compact integer denoting the number of hashes,
+	// followed by said number of 32-byte leaf hashes. The rest of the value
+	// is then identical to the Bip32DerivationInputType value.
+	TaprootBip32DerivationInputType InputType = 0x16
+
+	// TaprootInternalKeyInputType is an empty key ({0x17}). The value is
+	// an x-only pubkey denoting the internal public key used for
+	// constructing a taproot key.
+	TaprootInternalKeyInputType InputType = 0x17
+
+	// TaprootMerkleRootType is an empty key ({0x18}). The value is a
+	// 32-byte hash denoting the root hash of a merkle tree of scripts.
+	TaprootMerkleRootType InputType = 0x18
+
 	// ProprietaryInputType is a custom type for use by devs.
 	//
 	// The key ({0xFC}|<prefix>|{subtype}|{key data}), is a Variable length
@@ -146,4 +183,21 @@ const (
 	// little endian unsigned integer indexes concatenated with each other.
 	// Public keys are those needed to spend this output.
 	Bip32DerivationOutputType OutputType = 2
+
+	// TaprootInternalKeyOutputType is an empty key ({0x05}). The value is
+	// an x-only pubkey denoting the internal public key used for
+	// constructing a taproot key.
+	TaprootInternalKeyOutputType OutputType = 5
+
+	// TaprootTapTreeType is an empty key ({0x06}). The value is a
+	// serialized taproot tree.
+	TaprootTapTreeType OutputType = 6
+
+	// TaprootBip32DerivationOutputType is a type that carries the x-only
+	// pubkey along with the key ({0x07}|{xonlypubkey}).
+	//
+	// The value is a compact integer denoting the number of hashes,
+	// followed by said number of 32-byte leaf hashes. The rest of the value
+	// is then identical to the Bip32DerivationInputType value.
+	TaprootBip32DerivationOutputType OutputType = 7
 )
