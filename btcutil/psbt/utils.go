@@ -35,9 +35,14 @@ func WriteTxWitness(w io.Writer, wit [][]byte) error {
 
 // writePKHWitness writes a witness for a p2wkh spending input
 func writePKHWitness(sig []byte, pub []byte) ([]byte, error) {
+	return writeWitness(sig, pub)
+}
+
+// writeWitness serializes a witness stack from the given items.
+func writeWitness(stackElements ...[]byte) ([]byte, error) {
 	var (
 		buf          bytes.Buffer
-		witnessItems = [][]byte{sig, pub}
+		witnessItems = append([][]byte{}, stackElements...)
 	)
 
 	if err := WriteTxWitness(&buf, witnessItems); err != nil {
@@ -419,4 +424,24 @@ func NewFromSignedTx(tx *wire.MsgTx) (*Packet, [][]byte,
 		return nil, nil, nil, err
 	}
 	return unsignedPsbt, scriptSigs, witnesses, nil
+}
+
+// FindLeafScript attempts to locate the leaf script of a given target Tap Leaf
+// hash in the list of leaf scripts of the given input.
+func FindLeafScript(pInput *PInput,
+	targetLeafHash []byte) (*TaprootTapLeafScript, error) {
+
+	for _, leaf := range pInput.TaprootLeafScript {
+		leafHash := txscript.TapLeaf{
+			LeafVersion: leaf.LeafVersion,
+			Script:      leaf.Script,
+		}.TapHash()
+
+		if bytes.Equal(targetLeafHash, leafHash[:]) {
+			return leaf, nil
+		}
+	}
+
+	return nil, fmt.Errorf("leaf script for target leaf hash %x not "+
+		"found in input", targetLeafHash)
 }
