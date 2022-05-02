@@ -138,7 +138,7 @@ const (
 	// The value is the witness script of this input, if it has one.
 	WitnessScriptOutputType OutputType = 1
 
-	j // Bip32DerivationOutputType is used to communicate derivation information
+	// Bip32DerivationOutputType is used to communicate derivation information
 	// needed to spend this output. The key is ({0x02}|{public key}).
 	//
 	// The value is master key fingerprint concatenated with the derivation
