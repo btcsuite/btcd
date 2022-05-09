@@ -776,8 +776,10 @@ func (c *Client) handleSendPostMessage(jReq *jsonRequest) {
 
 	tries := 10
 	for i := 0; i < tries; i++ {
+		var httpReq *http.Request
+
 		bodyReader := bytes.NewReader(jReq.marshalledJSON)
-		httpReq, err := http.NewRequest("POST", url, bodyReader)
+		httpReq, err = http.NewRequest("POST", url, bodyReader)
 		if err != nil {
 			jReq.responseChan <- &Response{result: nil, err: err}
 			return
@@ -813,6 +815,15 @@ func (c *Client) handleSendPostMessage(jReq *jsonRequest) {
 	if err != nil {
 		jReq.responseChan <- &Response{err: err}
 		return
+	}
+
+	// We still want to return an error if for any reason the respone
+	// remains empty.
+	if httpResponse == nil {
+		jReq.responseChan <- &Response{
+			err: fmt.Errorf("invalid http POST response (nil), "+
+				"method: %s, id: %d", jReq.method, jReq.id),
+		}
 	}
 
 	// Read the raw bytes and close the response.
