@@ -761,7 +761,9 @@ out:
 // handleSendPostMessage handles performing the passed HTTP request, reading the
 // result, unmarshalling it, and delivering the unmarshalled result to the
 // provided response channel.
-func (c *Client) handleSendPostMessage(jReq *jsonRequest) {
+func (c *Client) handleSendPostMessage(jReq *jsonRequest,
+	shutdown chan struct{}) {
+
 	protocol := "http"
 	if !c.config.DisableTLS {
 		protocol = "https"
@@ -799,18 +801,27 @@ func (c *Client) handleSendPostMessage(jReq *jsonRequest) {
 		httpReq.SetBasicAuth(user, pass)
 
 		httpResponse, err = c.httpClient.Do(httpReq)
-		if err != nil {
-			backoff = requestRetryInterval * time.Duration(i+1)
-			if backoff > time.Minute {
-				backoff = time.Minute
-			}
-			log.Debugf("Failed command [%s] with id %d attempt %d."+
-				" Retrying in %v... \n", jReq.method, jReq.id,
-				i, backoff)
-			time.Sleep(backoff)
-			continue
+
+		// Quit the retry loop on success or if we can't retry anymore.
+		if err == nil || i == tries-1 {
+			break
 		}
-		break
+
+		// Backoff sleep otherwise.
+		backoff = requestRetryInterval * time.Duration(i+1)
+		if backoff > time.Minute {
+			backoff = time.Minute
+		}
+		log.Debugf("Failed command [%s] with id %d attempt %d."+
+			" Retrying in %v... \n", jReq.method, jReq.id,
+			i, backoff)
+
+		select {
+		case <-time.After(backoff):
+
+		case <-shutdown:
+			return
+		}
 	}
 	if err != nil {
 		jReq.responseChan <- &Response{err: err}
@@ -874,7 +885,7 @@ out:
 		// is closed.
 		select {
 		case jReq := <-c.sendPostChan:
-			c.handleSendPostMessage(jReq)
+			c.handleSendPostMessage(jReq, c.shutdown)
 
 		case <-c.shutdown:
 			break out
