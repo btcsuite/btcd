@@ -768,11 +768,14 @@ func (c *Client) handleSendPostMessage(jReq *jsonRequest) {
 	}
 	url := protocol + "://" + c.config.Host
 
-	var err error
-	var backoff time.Duration
-	var httpResponse *http.Response
+	var (
+		err          error
+		backoff      time.Duration
+		httpResponse *http.Response
+	)
+
 	tries := 10
-	for i := 0; tries == 0 || i < tries; i++ {
+	for i := 0; i < tries; i++ {
 		bodyReader := bytes.NewReader(jReq.marshalledJSON)
 		httpReq, err := http.NewRequest("POST", url, bodyReader)
 		if err != nil {
@@ -799,7 +802,9 @@ func (c *Client) handleSendPostMessage(jReq *jsonRequest) {
 			if backoff > time.Minute {
 				backoff = time.Minute
 			}
-			log.Debugf("Failed command [%s] with id %d attempt %d. Retrying in %v... \n", jReq.method, jReq.id, i, backoff)
+			log.Debugf("Failed command [%s] with id %d attempt %d."+
+				" Retrying in %v... \n", jReq.method, jReq.id,
+				i, backoff)
 			time.Sleep(backoff)
 			continue
 		}
