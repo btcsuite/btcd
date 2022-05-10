@@ -2,7 +2,6 @@ package psbt
 
 import (
 	"bytes"
-
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/ecdsa"
 )
@@ -43,11 +42,8 @@ func validateSignature(sig []byte) bool {
 	return err == nil
 }
 
-// checkValid checks that both the pbukey and sig are valid. See the methods
+// checkValid checks that both the pubkey and sig are valid. See the methods
 // (PartialSig, validatePubkey, validateSignature) for more details.
-//
-// TODO(waxwing): update for Schnorr will be needed here if/when that
-// activates.
 func (ps *PartialSig) checkValid() bool {
 	return validatePubkey(ps.PubKey) && validateSignature(ps.Signature)
 }
