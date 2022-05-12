@@ -771,7 +771,7 @@ func (c *Client) handleSendPostMessage(jReq *jsonRequest,
 	url := protocol + "://" + c.config.Host
 
 	var (
-		err          error
+		err, lastErr error
 		backoff      time.Duration
 		httpResponse *http.Response
 	)
@@ -807,6 +807,12 @@ func (c *Client) handleSendPostMessage(jReq *jsonRequest,
 			break
 		}
 
+		// Save the last error for the case where we backoff further,
+		// retry and get an invalid response but no error. If this
+		// happens the saved last error will be used to enrich the error
+		// message that we pass back to the caller.
+		lastErr = err
+
 		// Backoff sleep otherwise.
 		backoff = requestRetryInterval * time.Duration(i+1)
 		if backoff > time.Minute {
@@ -833,7 +839,8 @@ func (c *Client) handleSendPostMessage(jReq *jsonRequest,
 	if httpResponse == nil {
 		jReq.responseChan <- &Response{
 			err: fmt.Errorf("invalid http POST response (nil), "+
-				"method: %s, id: %d", jReq.method, jReq.id),
+				"method: %s, id: %d, last error=%v",
+				jReq.method, jReq.id, lastErr),
 		}
 	}
 
