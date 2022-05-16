@@ -1192,6 +1192,9 @@ type ConnConfig struct {
 	// the wire in cleartext.
 	DisableTLS bool
 
+	// SkipVerify instruct the client to skip verifying TLS certificate.
+	SkipVerify bool
+
 	// Certificates are the bytes for a PEM-encoded certificate chain used
 	// for the TLS connection.  It has no effect if the DisableTLS parameter
 	// is true.
@@ -1295,7 +1298,8 @@ func newHTTPClient(config *ConnConfig) (*http.Client, error) {
 			pool := x509.NewCertPool()
 			pool.AppendCertsFromPEM(config.Certificates)
 			tlsConfig = &tls.Config{
-				RootCAs: pool,
+				RootCAs:            pool,
+				InsecureSkipVerify: config.SkipVerify,
 			}
 		}
 	}
@@ -1318,7 +1322,8 @@ func dial(config *ConnConfig) (*websocket.Conn, error) {
 	var scheme = "ws"
 	if !config.DisableTLS {
 		tlsConfig = &tls.Config{
-			MinVersion: tls.VersionTLS12,
+			MinVersion:         tls.VersionTLS12,
+			InsecureSkipVerify: config.SkipVerify,
 		}
 		if len(config.Certificates) > 0 {
 			pool := x509.NewCertPool()
