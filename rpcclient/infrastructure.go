@@ -761,20 +761,27 @@ out:
 // handleSendPostMessage handles performing the passed HTTP request, reading the
 // result, unmarshalling it, and delivering the unmarshalled result to the
 // provided response channel.
-func (c *Client) handleSendPostMessage(jReq *jsonRequest) {
+func (c *Client) handleSendPostMessage(jReq *jsonRequest,
+	shutdown chan struct{}) {
+
 	protocol := "http"
 	if !c.config.DisableTLS {
 		protocol = "https"
 	}
 	url := protocol + "://" + c.config.Host
 
-	var err error
-	var backoff time.Duration
-	var httpResponse *http.Response
+	var (
+		err, lastErr error
+		backoff      time.Duration
+		httpResponse *http.Response
+	)
+
 	tries := 10
-	for i := 0; tries == 0 || i < tries; i++ {
+	for i := 0; i < tries; i++ {
+		var httpReq *http.Request
+
 		bodyReader := bytes.NewReader(jReq.marshalledJSON)
-		httpReq, err := http.NewRequest("POST", url, bodyReader)
+		httpReq, err = http.NewRequest("POST", url, bodyReader)
 		if err != nil {
 			jReq.responseChan <- &Response{result: nil, err: err}
 			return
@@ -794,20 +801,47 @@ func (c *Client) handleSendPostMessage(jReq *jsonRequest) {
 		httpReq.SetBasicAuth(user, pass)
 
 		httpResponse, err = c.httpClient.Do(httpReq)
-		if err != nil {
-			backoff = requestRetryInterval * time.Duration(i+1)
-			if backoff > time.Minute {
-				backoff = time.Minute
-			}
-			log.Debugf("Failed command [%s] with id %d attempt %d. Retrying in %v... \n", jReq.method, jReq.id, i, backoff)
-			time.Sleep(backoff)
-			continue
+
+		// Quit the retry loop on success or if we can't retry anymore.
+		if err == nil || i == tries-1 {
+			break
 		}
-		break
+
+		// Save the last error for the case where we backoff further,
+		// retry and get an invalid response but no error. If this
+		// happens the saved last error will be used to enrich the error
+		// message that we pass back to the caller.
+		lastErr = err
+
+		// Backoff sleep otherwise.
+		backoff = requestRetryInterval * time.Duration(i+1)
+		if backoff > time.Minute {
+			backoff = time.Minute
+		}
+		log.Debugf("Failed command [%s] with id %d attempt %d."+
+			" Retrying in %v... \n", jReq.method, jReq.id,
+			i, backoff)
+
+		select {
+		case <-time.After(backoff):
+
+		case <-shutdown:
+			return
+		}
 	}
 	if err != nil {
 		jReq.responseChan <- &Response{err: err}
 		return
+	}
+
+	// We still want to return an error if for any reason the respone
+	// remains empty.
+	if httpResponse == nil {
+		jReq.responseChan <- &Response{
+			err: fmt.Errorf("invalid http POST response (nil), "+
+				"method: %s, id: %d, last error=%v",
+				jReq.method, jReq.id, lastErr),
+		}
 	}
 
 	// Read the raw bytes and close the response.
@@ -858,7 +892,7 @@ out:
 		// is closed.
 		select {
 		case jReq := <-c.sendPostChan:
-			c.handleSendPostMessage(jReq)
+			c.handleSendPostMessage(jReq, c.shutdown)
 
 		case <-c.shutdown:
 			break out
