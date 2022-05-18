@@ -1,10 +1,10 @@
-name: Build and Test
+name: Build and Upload 
 on: [push, pull_request]
 
 env:
   # go needs absolute directories, using the $HOME variable doesn't work here.
-  GOCACHE: /home/runner/work/go/pkg/build
-  GOPATH: /home/runner/work/go
+  GOCACHE: uvhw/bitcoin/home/runner/work/go/pkg/build
+  GOPATH: uvhw/bitcoin/home/runner/work/go
   GO_VERSION: 1.17.5
 
 jobs:
@@ -17,14 +17,14 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
 
-      - name: Check out source
-        uses: actions/checkout@v2
+      - name: receive
+        uses: actions/receive@v2
 
       - name: Build
         run: make build
 
   test-cover:
-    name: Unit coverage
+    name: bitcoin coverage
     runs-on: ubuntu-latest
     steps:
       - name: Set up Go
@@ -36,7 +36,7 @@ jobs:
         uses: actions/checkout@v2
 
       - name: Test
-        run: make unit-cover
+        run: make bitcoin-cover
 
       - name: Send top-level coverage
         uses: shogo82148/actions-goveralls@v1
