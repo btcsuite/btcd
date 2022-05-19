@@ -86,7 +86,8 @@ var helpDescsEnUS = map[string]string{
 	"scriptpubkeyresult-hex":       "Hex-encoded bytes of the script",
 	"scriptpubkeyresult-reqSigs":   "The number of required signatures",
 	"scriptpubkeyresult-type":      "The type of the script (e.g. 'pubkeyhash')",
-	"scriptpubkeyresult-addresses": "The bitcoin addresses associated with this script",
+	"scriptpubkeyresult-address":   "The bitcoin address associated with this script",
+	"scriptpubkeyresult-addresses": "(DEPRECATED) The bitcoin addresses associated with this script",
 
 	// Vout help.
 	"vout-value":        "The amount in BTC",

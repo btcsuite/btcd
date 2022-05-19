@@ -732,6 +732,9 @@ func createVoutList(mtx *wire.MsgTx, chainParams *chaincfg.Params, filterAddrMap
 		var vout btcjson.Vout
 		vout.N = uint32(i)
 		vout.Value = btcutil.Amount(v.Value).ToBTC()
+		if len(encodedAddrs) > 0 {
+			vout.ScriptPubKey.Address = &encodedAddrs[0]
+		}
 		vout.ScriptPubKey.Addresses = encodedAddrs
 		vout.ScriptPubKey.Asm = disbuf
 		vout.ScriptPubKey.Hex = hex.EncodeToString(v.PkScript)
@@ -2725,6 +2728,7 @@ func handleGetTxOut(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 	var value int64
 	var pkScript []byte
 	var isCoinbase bool
+	var address *string
 	includeMempool := true
 	if c.IncludeMempool != nil {
 		includeMempool = *c.IncludeMempool
@@ -2797,6 +2801,9 @@ func handleGetTxOut(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 	for i, addr := range addrs {
 		addresses[i] = addr.EncodeAddress()
 	}
+	if len(addresses) > 0 {
+		address = &addresses[0]
+	}
 
 	txOutReply := &btcjson.GetTxOutResult{
 		BestBlock:     bestBlockHash,
@@ -2807,10 +2814,12 @@ func handleGetTxOut(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 			Hex:       hex.EncodeToString(pkScript),
 			ReqSigs:   int32(reqSigs),
 			Type:      scriptClass.String(),
+			Address:   address,
 			Addresses: addresses,
 		},
 		Coinbase: isCoinbase,
 	}
+
 	return txOutReply, nil
 }
 

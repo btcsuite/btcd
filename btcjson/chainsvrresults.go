@@ -431,7 +431,8 @@ type ScriptPubKeyResult struct {
 	Hex       string   `json:"hex,omitempty"`
 	ReqSigs   int32    `json:"reqSigs,omitempty"`
 	Type      string   `json:"type"`
-	Addresses []string `json:"addresses,omitempty"`
+	Address   *string  `json:"address,omitempty"`
+	Addresses []string `json:"addresses,omitempty"` // Deprecated: removed in Bitcoin Core
 }
 
 // GetTxOutResult models the data from the gettxout command.
