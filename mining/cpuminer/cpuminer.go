@@ -638,6 +638,6 @@ func New(cfg *Config) *CPUMiner {
 		numWorkers:        defaultNumWorkers,
 		updateNumWorkers:  make(chan struct{}),
 		queryHashesPerSec: make(chan float64),
-		updateHashes:      make(chan uint64),
+		updateHashes:      make(chan uint64, 512),
 	}
 }
