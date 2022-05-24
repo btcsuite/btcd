@@ -803,6 +803,7 @@ func (c *Client) handleSendPostMessage(jReq *jsonRequest) {
 			time.Sleep(backoff)
 			continue
 		}
+		defer httpResponse.Body.Close()
 		break
 	}
 	if err != nil {
@@ -810,9 +811,8 @@ func (c *Client) handleSendPostMessage(jReq *jsonRequest) {
 		return
 	}
 
-	// Read the raw bytes and close the response.
+	// Read the raw bytes from the response.
 	respBytes, err := ioutil.ReadAll(httpResponse.Body)
-	httpResponse.Body.Close()
 	if err != nil {
 		err = fmt.Errorf("error reading json reply: %v", err)
 		jReq.responseChan <- &Response{err: err}
@@ -1386,6 +1386,7 @@ func dial(config *ConnConfig) (*websocket.Conn, error) {
 		// cases above apply.
 		return nil, errors.New(resp.Status)
 	}
+	resp.Body.Close()
 	return wsConn, nil
 }
 
