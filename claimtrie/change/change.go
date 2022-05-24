@@ -78,9 +78,10 @@ func (c *Change) Marshal(enc *bytes.Buffer) error {
 		binary.BigEndian.PutUint32(temp[:4], uint32(len(c.SpentChildren)))
 		enc.Write(temp[:4])
 		for key := range c.SpentChildren {
-			binary.BigEndian.PutUint16(temp[:2], uint16(len(key))) // technically limited to 255; not sure we trust it
+			keySize := uint16(len(key))
+			binary.BigEndian.PutUint16(temp[:2], keySize) // technically limited to 255; not sure we trust it
 			enc.Write(temp[:2])
-			enc.WriteString(key)
+			enc.WriteString(key[:keySize])
 		}
 	} else {
 		binary.BigEndian.PutUint32(temp[:4], 0)
