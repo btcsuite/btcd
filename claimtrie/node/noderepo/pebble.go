@@ -30,13 +30,17 @@ func (a *pooledMerger) Swap(i, j int) {
 }
 
 func (a *pooledMerger) MergeNewer(value []byte) error {
-	a.values = append(a.values, value)
+	vc := a.pool.Get().([]byte)[:0]
+	vc = append(vc, value...)
+	a.values = append(a.values, vc)
 	a.index = append(a.index, len(a.values))
 	return nil
 }
 
 func (a *pooledMerger) MergeOlder(value []byte) error {
-	a.values = append(a.values, value)
+	vc := a.pool.Get().([]byte)[:0]
+	vc = append(vc, value...)
+	a.values = append(a.values, vc)
 	a.index = append(a.index, -len(a.values))
 	return nil
 }
@@ -53,6 +57,9 @@ func (a *pooledMerger) Finish(includesBase bool) ([]byte, io.Closer, error) {
 }
 
 func (a *pooledMerger) Close() error {
+	for i := range a.values {
+		a.pool.Put(a.values[i])
+	}
 	a.pool.Put(a.buffer)
 	return nil
 }
