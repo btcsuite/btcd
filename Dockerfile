@@ -1,30 +1,24 @@
-# This Dockerfile builds btcd from source and creates a small (55 MB) docker container based on alpine linux.
+# This Dockerfile builds lbcd from source and creates a small (55 MB) docker container based on alpine linux.
 #
-# Clone this repository and run the following command to build and tag a fresh btcd amd64 container:
+# Clone this repository and run the following command to build and tag a fresh lbcd amd64 container:
 #
-# docker build . -t yourregistry/btcd
+# docker build . -t yourregistry/lbcd
 #
 # You can use the following command to buid an arm64v8 container:
 #
-# docker build . -t yourregistry/btcd --build-arg ARCH=arm64v8
+# docker build . -t yourregistry/lbcd --build-arg ARCH=arm64v8
 #
 # For more information how to use this docker image visit:
-# https://github.com/btcsuite/btcd/tree/master/docs
+# https://github.com/lbryio/lbcd/tree/master/docs
 #
-# 9246  Mainnet Bitcoin peer-to-peer port
+# 9246  Mainnet LBRY peer-to-peer port
 # 9245  Mainet RPC port
 
 ARG ARCH=amd64
-# using the SHA256 instead of tags
-# https://github.com/opencontainers/image-spec/blob/main/descriptor.md#digests
-# https://cloud.google.com/architecture/using-container-images
-# https://github.com/google/go-containerregistry/blob/main/cmd/crane/README.md
-# ➜  ~ crane digest golang:1.16-alpine3.12
-# sha256:db2475a1dbb2149508e5db31d7d77a75e6600d54be645f37681f03f2762169ba
-FROM golang@sha256:db2475a1dbb2149508e5db31d7d77a75e6600d54be645f37681f03f2762169ba AS build-container
+
+FROM golang:1.18.2 AS build-container
 
 ARG ARCH
-ENV GO111MODULE=on
 
 ADD . /app
 WORKDIR /app
@@ -35,12 +29,12 @@ RUN set -ex \
   && echo "Compiling for $GOARCH" \
   && go install -v . ./cmd/...
 
-FROM $ARCH/alpine:3.12
+FROM $ARCH/debian:bullseye-20220418-slim
 
 COPY --from=build-container /go/bin /bin
 
-VOLUME ["/root/.btcd"]
+VOLUME ["/root/.lbcd"]
 
-EXPOSE 8333 8334
+EXPOSE 9245 9246
 
-ENTRYPOINT ["btcd"]
+ENTRYPOINT ["lbcd"]
