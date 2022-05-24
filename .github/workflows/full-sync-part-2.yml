@@ -1,0 +1,37 @@
+name: Full Sync From 814k
+
+on:
+  workflow_dispatch:
+    inputs:
+      note:
+        description: 'Note'
+        required: false
+        default: ''
+
+jobs:
+  build:
+    name: Go CI
+    runs-on: self-hosted
+    strategy:
+      matrix:
+        go: [1.18.2]
+    steps:
+      - run: |
+          echo "Note ${{ github.event.inputs.note }}!"
+      - name: Setup Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ matrix.go }}
+      - name: Checkout source
+        uses: actions/checkout@v2
+      - name: Build lbcd
+        run: go build .
+      - name: Create datadir
+        run: echo "TEMP_DATA_DIR=$(mktemp -d)" >> $GITHUB_ENV
+      - name: Copy initial data
+        run: cp -r /home/lbry/lbcd_814k/* ${{env.TEMP_DATA_DIR}}
+      - name: Run lbcd
+        run: ./lbcd --datadir=${{env.TEMP_DATA_DIR}}/data --logdir=${{env.TEMP_DATA_DIR}}/logs --nolisten --norpc
+      - name: Remove datadir
+        if: always()
+        run: rm -rf ${{env.TEMP_DATA_DIR}}

@@ -1,0 +1,57 @@
+name: golangci-lint
+
+env:
+  # go needs absolute directories, using the $HOME variable doesn't work here.
+  GOCACHE: /home/runner/work/go/pkg/build
+  GOPATH: /home/runner/work/go
+  GO_VERSION: '^1.18.2'
+
+on:
+  push:
+    tags:
+      - v*
+    branches:
+      - "*"
+  pull_request:
+    branches:
+      - "*"
+
+jobs:
+  golangci:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: setup go ${{ env.GO_VERSION }}
+        uses: actions/setup-go@v2
+        with:
+          go-version: '${{ env.GO_VERSION }}'
+
+      - name: checkout source
+        uses: actions/checkout@v2
+
+      - name: compile code
+        run: go install -v ./...
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v2
+        with:
+          # Optional: version of golangci-lint to use in form of v1.2 or v1.2.3 or `latest` to use the latest version
+          version: latest
+
+          # Optional: working directory, useful for monorepos
+          # working-directory: somedir
+
+          # Optional: golangci-lint command line arguments.
+          # args: --issues-exit-code=0
+
+          # Optional: show only new issues if it's a pull request. The default value is `false`.
+          # only-new-issues: true
+
+          # Optional: if set to true then the action will use pre-installed Go.
+          skip-go-installation: true
+
+          # Optional: if set to true then the action don't cache or restore ~/go/pkg.
+          # skip-pkg-cache: true
+
+          # Optional: if set to true then the action don't cache or restore ~/.cache/go-build.
+          # skip-build-cache: true
