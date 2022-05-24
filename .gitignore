@@ -3,6 +3,7 @@
 
 # Databases
 btcd.db
+lbcd.db
 *-shm
 *-wal
 
@@ -33,6 +34,22 @@ _testmain.go
 
 *.exe
 
+.DS_Store
+
 # Code coverage files
 profile.tmp
 profile.cov
+
+# IDE
+.idea
+.vscode
+
+# Binaries
+btcd
+btcctl
+lbcd
+lbcctl
+
+# CI artifacts
+dist
+debug
