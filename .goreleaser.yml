@@ -1,0 +1,66 @@
+# This is an example .goreleaser.yml file with some sensible defaults.
+# Make sure to check the documentation at https://goreleaser.com
+before:
+  hooks:
+    # You may remove this if you don't use go modules.
+    - go mod tidy
+    # you may remove this if you don't need go generate
+    - go generate ./...
+builds:
+  -
+    main: .
+    id: "lbcd"
+    binary: "lbcd"
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+      - -X github.com/lbryio/lbcd/version.appTag={{ .Tag }}
+    targets:
+      - linux_amd64
+      - linux_arm64
+      - darwin_amd64
+      - darwin_arm64
+      - windows_amd64
+    mod_timestamp: '{{ .CommitTimestamp }}'
+  -
+    main: ./cmd/lbcctl
+    id: "lbcctl"
+    binary: "lbcctl"
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+      - -X github.com/lbryio/lbcd/version.appTag={{ .Tag }}
+    env:
+      - CGO_ENABLED=0
+    targets:
+      - linux_amd64
+      - linux_arm64
+      - darwin_amd64
+      - darwin_arm64
+      - windows_amd64
+    mod_timestamp: '{{ .CommitTimestamp }}'
+checksum:
+  name_template: 'checksums.txt'
+snapshot:
+  name_template: "{{ .Version }}+{{ .Commit }}"
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+
+dockers:
+  - use: buildx
+    dockerfile: Dockerfile.goreleaser
+    image_templates:
+    - "docker.io/lbry/lbcd:{{ .Tag }}"
+    - "docker.io/lbry/lbcd:latest"
+
+release:
+  draft: true
+  prerelease: auto

@@ -1,0 +1,9 @@
+FROM debian:bullseye-20220418-slim
+
+COPY lbcd lbcctl /bin/
+
+VOLUME ["/root/.lbcd"]
+
+EXPOSE 9245 9246
+
+ENTRYPOINT ["lbcd"]
