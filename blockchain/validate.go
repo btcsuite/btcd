@@ -224,10 +224,7 @@ func withinLevelBounds(reduction int64, lv int64) bool {
 		return false
 	}
 	reduction++
-	if ((reduction*reduction + reduction) >> 1) <= lv {
-		return false
-	}
-	return true
+	return ((reduction*reduction + reduction) >> 1) > lv
 }
 
 // CheckTransactionSanity performs some preliminary checks on a transaction to

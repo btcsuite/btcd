@@ -136,7 +136,7 @@ func Discover() (nat NAT, err error) {
 		return
 	}
 	err = errors.New("UPnP port discovery failed")
-	return
+	return nat, err
 }
 
 // service represents the Service type in an UPnP xml description.
@@ -269,7 +269,7 @@ func getServiceURL(rootURL string) (url string, err error) {
 		return
 	}
 	url = combineURL(rootURL, d.ControlURL)
-	return
+	return url, err
 }
 
 // combineURL appends subURL onto rootURL.

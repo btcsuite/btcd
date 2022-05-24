@@ -4,6 +4,7 @@
 
 // This file is ignored during the regular build due to the following build tag.
 // This build tag is set during go generate.
+//go:build gensecp256k1
 // +build gensecp256k1
 
 package btcec
