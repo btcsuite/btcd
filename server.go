@@ -39,6 +39,7 @@ import (
 	"github.com/lbryio/lbcd/netsync"
 	"github.com/lbryio/lbcd/peer"
 	"github.com/lbryio/lbcd/txscript"
+	"github.com/lbryio/lbcd/version"
 	"github.com/lbryio/lbcd/wire"
 	"github.com/lbryio/lbcutil"
 	btcutil "github.com/lbryio/lbcutil"
@@ -71,7 +72,7 @@ var (
 
 	// userAgentVersion is the user agent version and is used to help
 	// identify ourselves to other bitcoin peers.
-	userAgentVersion = fmt.Sprintf("%d.%d.%d", appMajor, appMinor, appPatch)
+	userAgentVersion = version.Full()
 )
 
 // zeroHash is the zero value hash (all zeros).  It is defined as a convenience.

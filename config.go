@@ -32,6 +32,7 @@ import (
 	_ "github.com/lbryio/lbcd/database/ffldb"
 	"github.com/lbryio/lbcd/mempool"
 	"github.com/lbryio/lbcd/peer"
+	"github.com/lbryio/lbcd/version"
 	"github.com/lbryio/lbcd/wire"
 	btcutil "github.com/lbryio/lbcutil"
 )
@@ -469,7 +470,7 @@ func loadConfig() (*config, []string, error) {
 	appName = strings.TrimSuffix(appName, filepath.Ext(appName))
 	usageMessage := fmt.Sprintf("Use %s -h to show usage", appName)
 	if preCfg.ShowVersion {
-		fmt.Println(appName, "version", version())
+		fmt.Println(appName, "version", version.Full())
 		os.Exit(0)
 	}
 

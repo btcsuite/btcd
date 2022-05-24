@@ -42,6 +42,7 @@ import (
 	"github.com/lbryio/lbcd/mining/cpuminer"
 	"github.com/lbryio/lbcd/peer"
 	"github.com/lbryio/lbcd/txscript"
+	"github.com/lbryio/lbcd/version"
 	"github.com/lbryio/lbcd/wire"
 	btcutil "github.com/lbryio/lbcutil"
 )
@@ -2451,7 +2452,7 @@ func handleGetHeaders(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) 
 func handleGetInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	best := s.cfg.Chain.BestSnapshot()
 	ret := &btcjson.InfoChainResult{
-		Version:         int32(1000000*appMajor + 10000*appMinor + 100*appPatch),
+		Version:         version.Numeric(),
 		ProtocolVersion: int32(maxProtocolVersion),
 		Blocks:          best.Height,
 		TimeOffset:      int64(s.cfg.TimeSource.Offset().Seconds()),
@@ -2750,7 +2751,7 @@ func handleGetNetworkInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct
 
 	reply := &btcjson.GetNetworkInfoResult{
 		ProtocolVersion: int32(wire.ProtocolVersion),
-		Version:         versionNumeric(),
+		Version:         version.Numeric(),
 		Connections:     s.cfg.ConnMgr.ConnectedCount(),
 		IncrementalFee:  cfg.MinRelayTxFee,
 		LocalAddresses:  localAddrs,

@@ -19,6 +19,7 @@ import (
 	"github.com/lbryio/lbcd/claimtrie/param"
 	"github.com/lbryio/lbcd/database"
 	"github.com/lbryio/lbcd/limits"
+	"github.com/lbryio/lbcd/version"
 
 	"github.com/felixge/fgprof"
 )
@@ -64,7 +65,7 @@ func btcdMain(serverChan chan<- *server) error {
 	defer btcdLog.Info("Shutdown complete")
 
 	// Show version at startup.
-	btcdLog.Infof("Version %s", version())
+	btcdLog.Infof("Version %s", version.Full())
 
 	// Enable http profiling server if requested.
 	if cfg.Profile != "" {
