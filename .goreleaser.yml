@@ -17,6 +17,7 @@ builds:
       - -trimpath
     ldflags:
       - -s -w
+      - -buildid=
       - -X github.com/lbryio/lbcd/version.appTag={{ .Tag }}
     targets:
       - linux_amd64
@@ -33,6 +34,7 @@ builds:
       - -trimpath
     ldflags:
       - -s -w
+      - -buildid=
       - -X github.com/lbryio/lbcd/version.appTag={{ .Tag }}
     env:
       - CGO_ENABLED=0
