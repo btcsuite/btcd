@@ -903,7 +903,7 @@ func (sm *SyncManager) fetchHeaderBlocks() {
 			numRequested++
 		}
 		sm.startHeader = e.Next()
-		if numRequested >= wire.MaxInvPerMsg {
+		if numRequested >= wire.MaxInvPerMsg/99 {
 			break
 		}
 	}
