@@ -15,7 +15,7 @@ import (
 func loadBlocksDB() (database.DB, error) {
 
 	dbPath := filepath.Join(dataDir, netName, "blocks_ffldb")
-	log.Infof("Loading blocks database: %s", dbPath)
+	log.Debugf("Loading blocks database: %s", dbPath)
 	db, err := database.Open("ffldb", dbPath, chainPramas().Net)
 	if err != nil {
 		return nil, errors.Wrapf(err, "open blocks database")
@@ -27,7 +27,7 @@ func loadBlocksDB() (database.DB, error) {
 func loadChain(db database.DB) (*blockchain.BlockChain, error) {
 	paramsCopy := chaincfg.MainNetParams
 
-	log.Infof("Loading chain from database")
+	log.Debugf("Loading chain from database")
 
 	startTime := time.Now()
 	chain, err := blockchain.New(&blockchain.Config{
@@ -40,7 +40,7 @@ func loadChain(db database.DB) (*blockchain.BlockChain, error) {
 		return nil, errors.Wrapf(err, "create blockchain")
 	}
 
-	log.Infof("Loaded chain from database (%s)", time.Since(startTime))
+	log.Debugf("Loaded chain from database (%s)", time.Since(startTime))
 
 	return chain, err
 

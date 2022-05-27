@@ -8,11 +8,10 @@ import (
 )
 
 var DefaultConfig = Config{
-	Params: param.MainNet,
-
-	RamTrie: true, // as it stands the other trie uses more RAM, more time, and 40GB+ of disk space
-
-	DataDir: filepath.Join(btcutil.AppDataDir("chain", false), "data"),
+	Params:     param.MainNet,
+	RamTrie:    true, // as it stands the other trie uses more RAM, more time, and 40GB+ of disk space
+	DebugLevel: "info",
+	DataDir:    filepath.Join(btcutil.AppDataDir("lbcd", false), "data"),
 
 	BlockRepoPebble: pebbleConfig{
 		Path: "blocks_pebble_db",
@@ -30,11 +29,10 @@ var DefaultConfig = Config{
 
 // Config is the container of all configurations.
 type Config struct {
-	Params param.ClaimTrieParams
-
-	RamTrie bool
-
-	DataDir string
+	Params     param.ClaimTrieParams
+	RamTrie    bool
+	DataDir    string
+	DebugLevel string
 
 	BlockRepoPebble      pebbleConfig
 	NodeRepoPebble       pebbleConfig
