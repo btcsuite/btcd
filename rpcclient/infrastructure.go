@@ -842,6 +842,7 @@ func (c *Client) handleSendPostMessage(jReq *jsonRequest,
 				"method: %s, id: %d, last error=%v",
 				jReq.method, jReq.id, lastErr),
 		}
+		return
 	}
 
 	// Read the raw bytes and close the response.
