@@ -78,6 +78,7 @@ Application Options:
                               memory (default: 100)
       --maxpeers=             Max number of inbound and outbound peers
                               (default: 125)
+      --memprofile=           Write memory profile to the specified file
       --miningaddr=           Add the specified payment address to the list of
                               addresses to use for generated blocks -- At least
                               one address is required if the generate option is

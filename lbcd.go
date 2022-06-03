@@ -92,6 +92,25 @@ func btcdMain(serverChan chan<- *server) error {
 		defer pprof.StopCPUProfile()
 	}
 
+	// Write memory profile if requested.
+	if cfg.MemProfile != "" {
+		f, err := os.Create(cfg.MemProfile + ".heap")
+		if err != nil {
+			btcdLog.Errorf("Unable to create mem profile: %v", err)
+			return err
+		}
+		defer f.Close()
+		defer pprof.Lookup("heap").WriteTo(f, 0)
+
+		f, err = os.Create(cfg.MemProfile + ".allocs")
+		if err != nil {
+			btcdLog.Errorf("Unable to create mem profile: %v", err)
+			return err
+		}
+		defer f.Close()
+		defer pprof.Lookup("allocs").WriteTo(f, 0)
+	}
+
 	// Perform upgrades to btcd as new versions require it.
 	if err := doUpgrades(); err != nil {
 		btcdLog.Errorf("%v", err)
