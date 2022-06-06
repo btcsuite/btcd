@@ -449,7 +449,7 @@ func (ct *ClaimTrie) makeNameHashNext(names [][]byte, all bool, interrupt <-chan
 		wg.Done()
 	}
 
-	threads := int(0.8 * float32(runtime.NumCPU()))
+	threads := int(0.8 * float32(runtime.GOMAXPROCS(0)))
 	if threads < 1 {
 		threads = 1
 	}
