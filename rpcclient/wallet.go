@@ -9,10 +9,10 @@ import (
 	"strconv"
 
 	"github.com/btcsuite/btcd/btcjson"
+	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcd/btcutil"
 )
 
 // *****************************
@@ -1089,8 +1089,8 @@ func (r FutureGetNewAddressResult) Receive() (btcutil.Address, error) {
 // returned instance.
 //
 // See GetNewAddress for the blocking version and more details.
-func (c *Client) GetNewAddressAsync(account, addrType string) FutureGetNewAddressResult {
-	cmd := btcjson.NewGetNewAddressCmd(&account, &addrType)
+func (c *Client) GetNewAddressAsync(account string) FutureGetNewAddressResult {
+	cmd := btcjson.NewGetNewAddressCmd(&account, nil)
 	result := FutureGetNewAddressResult{
 		network:         c.chainParams,
 		responseChannel: c.SendCmd(cmd),
@@ -1100,8 +1100,28 @@ func (c *Client) GetNewAddressAsync(account, addrType string) FutureGetNewAddres
 
 // GetNewAddress returns a new address, and decodes based on the client's
 // chain params.
-func (c *Client) GetNewAddress(account, addrType string) (btcutil.Address, error) {
-	return c.GetNewAddressAsync(account, addrType).Receive()
+func (c *Client) GetNewAddress(account string) (btcutil.Address, error) {
+	return c.GetNewAddressAsync(account).Receive()
+}
+
+// GetNewAddressTypeAsync returns an instance of a type that can be used to get
+// the result of the RPC at some future time by invoking the Receive function on
+// the returned instance.
+//
+// See GetNewAddressType for the blocking version and more details.
+func (c *Client) GetNewAddressTypeAsync(account, addrType string) FutureGetNewAddressResult {
+	cmd := btcjson.NewGetNewAddressCmd(&account, &addrType)
+	result := FutureGetNewAddressResult{
+		network:         c.chainParams,
+		responseChannel: c.SendCmd(cmd),
+	}
+	return result
+}
+
+// GetNewAddressType returns a new address, and decodes based on the client's
+// chain params.
+func (c *Client) GetNewAddressType(account, addrType string) (btcutil.Address, error) {
+	return c.GetNewAddressTypeAsync(account, addrType).Receive()
 }
 
 // FutureGetRawChangeAddressResult is a future promise to deliver the result of
@@ -1135,8 +1155,8 @@ func (r FutureGetRawChangeAddressResult) Receive() (btcutil.Address, error) {
 // function on the returned instance.
 //
 // See GetRawChangeAddress for the blocking version and more details.
-func (c *Client) GetRawChangeAddressAsync(account, addrType string) FutureGetRawChangeAddressResult {
-	cmd := btcjson.NewGetRawChangeAddressCmd(&account, &addrType)
+func (c *Client) GetRawChangeAddressAsync(account string) FutureGetRawChangeAddressResult {
+	cmd := btcjson.NewGetRawChangeAddressCmd(&account, nil)
 	result := FutureGetRawChangeAddressResult{
 		network:         c.chainParams,
 		responseChannel: c.SendCmd(cmd),
@@ -1147,8 +1167,29 @@ func (c *Client) GetRawChangeAddressAsync(account, addrType string) FutureGetRaw
 // GetRawChangeAddress returns a new address for receiving change that will be
 // associated with the provided account.  Note that this is only for raw
 // transactions and NOT for normal use.
-func (c *Client) GetRawChangeAddress(account, addrType string) (btcutil.Address, error) {
-	return c.GetRawChangeAddressAsync(account, addrType).Receive()
+func (c *Client) GetRawChangeAddress(account string) (btcutil.Address, error) {
+	return c.GetRawChangeAddressAsync(account).Receive()
+}
+
+// GetRawChangeAddressTypeAsync returns an instance of a type that can be used
+// to get the result of the RPC at some future time by invoking the Receive
+// function on the returned instance.
+//
+// See GetRawChangeAddressType for the blocking version and more details.
+func (c *Client) GetRawChangeAddressTypeAsync(account, addrType string) FutureGetRawChangeAddressResult {
+	cmd := btcjson.NewGetRawChangeAddressCmd(&account, &addrType)
+	result := FutureGetRawChangeAddressResult{
+		network:         c.chainParams,
+		responseChannel: c.SendCmd(cmd),
+	}
+	return result
+}
+
+// GetRawChangeAddressType returns a new address for receiving change that will
+// be associated with the provided account.  Note that this is only for raw
+// transactions and NOT for normal use.
+func (c *Client) GetRawChangeAddressType(account, addrType string) (btcutil.Address, error) {
+	return c.GetRawChangeAddressTypeAsync(account, addrType).Receive()
 }
 
 // FutureAddWitnessAddressResult is a future promise to deliver the result of
