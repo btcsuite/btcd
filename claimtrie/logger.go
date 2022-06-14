@@ -2,53 +2,51 @@
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package netsync
+package claimtrie
 
 import (
 	"sync"
 	"time"
 
 	"github.com/btcsuite/btclog"
-	btcutil "github.com/lbryio/lbcutil"
 )
 
-// blockProgressLogger provides periodic logging for other services in order
+// nameProgressLogger provides periodic logging for other services in order
 // to show users progress of certain "actions" involving some or all current
-// blocks. Ex: syncing to best chain, indexing all blocks, etc.
-type blockProgressLogger struct {
-	receivedLogBlocks int64
-	receivedLogTx     int64
-	lastBlockLogTime  time.Time
+// claim names. Ex: rebuilding claimtrie.
+type nameProgressLogger struct {
+	totalLogName    int64
+	recentLogName   int64
+	lastLogNameTime time.Time
 
 	subsystemLogger btclog.Logger
 	progressAction  string
 	sync.Mutex
 }
 
-// newBlockProgressLogger returns a new block progress logger.
+// newNameProgressLogger returns a new name progress logger.
 // The progress message is templated as follows:
-//  {progressAction} {numProcessed} {blocks|block} in the last {timePeriod}
-//  ({numTxs}, height {lastBlockHeight}, {lastBlockTimeStamp})
-func newBlockProgressLogger(progressMessage string, logger btclog.Logger) *blockProgressLogger {
-	return &blockProgressLogger{
-		lastBlockLogTime: time.Now(),
-		progressAction:   progressMessage,
-		subsystemLogger:  logger,
+//  {progressAction} {numProcessed} {names|name} in the last {timePeriod} (total {totalProcessed})
+func newNameProgressLogger(progressMessage string, logger btclog.Logger) *nameProgressLogger {
+	return &nameProgressLogger{
+		lastLogNameTime: time.Now(),
+		progressAction:  progressMessage,
+		subsystemLogger: logger,
 	}
 }
 
-// LogBlockHeight logs a new block height as an information message to show
-// progress to the user. In order to prevent spam, it limits logging to one
+// LogName logs a new name as an information message to show progress
+// to the user. In order to prevent spam, it limits logging to one
 // message every 10 seconds with duration and totals included.
-func (b *blockProgressLogger) LogBlockHeight(block *btcutil.Block) {
-	b.Lock()
-	defer b.Unlock()
+func (n *nameProgressLogger) LogName(name []byte) {
+	n.Lock()
+	defer n.Unlock()
 
-	b.receivedLogBlocks++
-	b.receivedLogTx += int64(len(block.MsgBlock().Transactions))
+	n.totalLogName++
+	n.recentLogName++
 
 	now := time.Now()
-	duration := now.Sub(b.lastBlockLogTime)
+	duration := now.Sub(n.lastLogNameTime)
 	if duration < time.Second*10 {
 		return
 	}
@@ -57,24 +55,18 @@ func (b *blockProgressLogger) LogBlockHeight(block *btcutil.Block) {
 	durationMillis := int64(duration / time.Millisecond)
 	tDuration := 10 * time.Millisecond * time.Duration(durationMillis/10)
 
-	// Log information about new block height.
-	blockStr := "blocks"
-	if b.receivedLogBlocks == 1 {
-		blockStr = "block"
+	// Log information about progress.
+	nameStr := "names"
+	if n.recentLogName == 1 {
+		nameStr = "name"
 	}
-	txStr := "transactions"
-	if b.receivedLogTx == 1 {
-		txStr = "transaction"
-	}
-	b.subsystemLogger.Infof("%s %d %s in the last %s (%d %s, height %d, %s)",
-		b.progressAction, b.receivedLogBlocks, blockStr, tDuration, b.receivedLogTx,
-		txStr, block.Height(), block.MsgBlock().Header.Timestamp)
+	n.subsystemLogger.Infof("%s %d %s in the last %s (total %d)",
+		n.progressAction, n.recentLogName, nameStr, tDuration, n.totalLogName)
 
-	b.receivedLogBlocks = 0
-	b.receivedLogTx = 0
-	b.lastBlockLogTime = now
+	n.recentLogName = 0
+	n.lastLogNameTime = now
 }
 
-func (b *blockProgressLogger) SetLastLogTime(time time.Time) {
-	b.lastBlockLogTime = time
+func (n *nameProgressLogger) SetLastLogTime(time time.Time) {
+	n.lastLogNameTime = time
 }

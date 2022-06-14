@@ -29,6 +29,10 @@ func UseLogger(logger btclog.Logger) {
 	log = logger
 }
 
+func GetLogger() btclog.Logger {
+	return log
+}
+
 var loggedStrings = map[string]bool{} // is this gonna get too large?
 var loggedStringsMutex sync.Mutex
 
@@ -39,6 +43,10 @@ func LogOnce(s string) {
 		return
 	}
 	loggedStrings[s] = true
+	log.Info(s)
+}
+
+func Log(s string) {
 	log.Info(s)
 }
 
