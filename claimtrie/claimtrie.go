@@ -50,8 +50,8 @@ type ClaimTrie struct {
 	// Registrered cleanup functions which are invoked in the Close() in reverse order.
 	cleanups []func() error
 
-	// nameLogger communicates progress of claimtrie rebuild.
-	nameLogger *nameProgressLogger
+	// claimLogger communicates progress of claimtrie rebuild.
+	claimLogger *claimProgressLogger
 }
 
 func New(cfg config.Config) (*ClaimTrie, error) {
@@ -349,17 +349,17 @@ func (ct *ClaimTrie) runFullTrieRebuild(names [][]byte, interrupt <-chan struct{
 	var nhns chan NameHashNext
 	if names == nil {
 		node.Log("Building the entire claim trie in RAM...")
-		ct.nameLogger = newNameProgressLogger("Processed", node.GetLogger())
+		ct.claimLogger = newClaimProgressLogger("Processed", node.GetLogger())
 		nhns = ct.makeNameHashNext(nil, true, interrupt)
 	} else {
-		ct.nameLogger = nil
+		ct.claimLogger = nil
 		nhns = ct.makeNameHashNext(names, false, interrupt)
 	}
 
 	for nhn := range nhns {
 		ct.merkleTrie.Update(nhn.Name, nhn.Hash, false)
-		if ct.nameLogger != nil {
-			ct.nameLogger.LogName(nhn.Name)
+		if ct.claimLogger != nil {
+			ct.claimLogger.LogName(nhn.Name)
 		}
 	}
 }
