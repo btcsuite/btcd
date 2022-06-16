@@ -6,6 +6,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"crypto/rand"
 	"crypto/tls"
@@ -14,6 +15,8 @@ import (
 	"fmt"
 	"math"
 	"net"
+	"os"
+	"path"
 	"runtime"
 	"sort"
 	"strconv"
@@ -3088,6 +3091,28 @@ func initListeners(amgr *addrmgr.AddrManager, listenAddrs []string, services wir
 		}
 
 		for _, sip := range cfg.ExternalIPs {
+
+			// If sip looks like a file path try and read the content and use it
+			// as an external IP
+			if strings.Contains(sip, "/") {
+				path := path.Clean(sip)
+				file, err := os.Open(path)
+				if err != nil {
+					srvrLog.Warnf("Can not open file %s: %s", path, err)
+				} else {
+
+					// Init a scanner and read the first line only
+					scanner := bufio.NewScanner(file)
+					scanner.Scan()
+
+					if err := scanner.Err(); err != nil {
+						srvrLog.Warnf("Can not read file %s: %s", path, err)
+					} else {
+						sip = scanner.Text()
+					}
+				}
+			}
+
 			eport := uint16(defaultPort)
 			host, portstr, err := net.SplitHostPort(sip)
 			if err != nil {
@@ -3111,6 +3136,8 @@ func initListeners(amgr *addrmgr.AddrManager, listenAddrs []string, services wir
 			err = amgr.AddLocalAddress(na, addrmgr.ManualPrio)
 			if err != nil {
 				amgrLog.Warnf("Skipping specified external IP: %v", err)
+			} else {
+				srvrLog.Infof("Adding %s to the advatise list", na.Addr)
 			}
 		}
 	} else {
