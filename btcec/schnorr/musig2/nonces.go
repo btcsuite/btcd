@@ -31,7 +31,7 @@ var (
 
 	// NonceGenTag is used to generate the value (from a set of required an
 	// optional field) that will be used as the part of the secret nonce.
-	NonceGenTag = []byte("Musig/nonce")
+	NonceGenTag = []byte("MuSig/nonce")
 
 	byteOrder = binary.BigEndian
 )
@@ -268,6 +268,16 @@ func GenNonces(options ...NonceGenOption) (*Nonces, error) {
 	var randBytes [32]byte
 	if _, err := opts.randReader.Read(randBytes[:]); err != nil {
 		return nil, err
+	}
+
+	// If the options contain a secret key, we XOR it with with the tagged
+	// random bytes.
+	if len(opts.secretKey) == 32 {
+		taggedHash := chainhash.TaggedHash(NonceAuxTag, randBytes[:])
+
+		for i := 0; i < chainhash.HashSize; i++ {
+			randBytes[i] = opts.secretKey[i] ^ taggedHash[i]
+		}
 	}
 
 	// Using our randomness and the set of optional params, generate our
