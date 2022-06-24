@@ -282,11 +282,11 @@ func GenNonces(options ...NonceGenOption) (*Nonces, error) {
 
 	// Using our randomness and the set of optional params, generate our
 	// two secret nonces: k1 and k2.
-	k1, err := genNonceAuxBytes(randBytes[:], 1, opts)
+	k1, err := genNonceAuxBytes(randBytes[:], 0, opts)
 	if err != nil {
 		return nil, err
 	}
-	k2, err := genNonceAuxBytes(randBytes[:], 2, opts)
+	k2, err := genNonceAuxBytes(randBytes[:], 1, opts)
 	if err != nil {
 		return nil, err
 	}
