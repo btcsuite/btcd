@@ -1461,7 +1461,7 @@ func TestMusig2AggregateNoncesTestVectors(t *testing.T) {
 			},
 			expectedNonce: append(
 				append([]byte{}, expectedNonce[0:33]...),
-				getGBytes()...,
+				getInfinityBytes()...,
 			),
 		},
 	}
@@ -1827,6 +1827,10 @@ func getNegGBytes() []byte {
 	pk[0] = 0x3
 
 	return pk
+}
+
+func getInfinityBytes() []byte {
+	return make([]byte, 33)
 }
 
 func mustParseHex32(str string) [32]byte {

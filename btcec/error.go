@@ -17,3 +17,8 @@ type Error = secp.Error
 // errors.As, so the caller can directly check against an error kind when
 // determining the reason for an error.
 type ErrorKind = secp.ErrorKind
+
+// makeError creates an secp.Error given a set of arguments.
+func makeError(kind ErrorKind, desc string) Error {
+	return Error{Err: kind, Description: desc}
+}
