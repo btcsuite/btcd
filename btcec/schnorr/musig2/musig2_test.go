@@ -316,6 +316,9 @@ var (
 	signExpected3 = mustParseHex("0D5B651E6DE34A29A12DE7A8B4183B4AE6A7F7F" +
 		"BE15CDCAFA4A3D1BCAABC7517")
 
+	signExpected4 = mustParseHex("8D5E0407FB4756EEBCD86264C32D792EE36EEB6" +
+		"9E952BBB30B8E41BEBC4D22FA")
+
 	signSetKeys = [][]byte{signSetPubKey, signSetKey2, signSetKey3, invalidPk1}
 
 	aggregatedNonce = toPubNonceSlice(mustParseHex("028465FCF0BBDBCF443AA" +
@@ -330,6 +333,9 @@ var (
 	verifyPnonce3 = mustParsePubNonce("032DE2662628C90B03F5E720284EB52FF7" +
 		"D71F4284F627B68A853D78C78E1FFE9303E4C5524E83FFE1493B9077CF1C" +
 		"A6BEB2090C93D930321071AD40B2F44E599046")
+	verifyPnonce4 = mustParsePubNonce("0237C87821AFD50A8644D820A8F3E02E49" +
+		"9C931865C2360FB43D0A0D20DAFE07EA0387BF891D2A6DEAEBADC909352A" +
+		"A9405D1428C15F4B75F04DAE642A95C2548480")
 
 	tweak1 = KeyTweakDesc{
 		Tweak: [32]byte{
@@ -449,15 +455,21 @@ func TestMuSig2SigningTestVectors(t *testing.T) {
 			aggNonce:           aggregatedNonce,
 			expectedPartialSig: signExpected3,
 		},
+		// Vector 4 Both halves of aggregate nonce correspond to point at infinity
+		{
+			keyOrder:           []int{0, 1},
+			aggNonce:           mustNonceAgg([][66]byte{verifyPnonce1, verifyPnonce4}),
+			expectedPartialSig: signExpected4,
+		},
 
-		// Vector 4: Signer 2 provided an invalid public key
+		// Vector 5: Signer 2 provided an invalid public key
 		{
 			keyOrder:      []int{1, 0, 3},
 			aggNonce:      aggregatedNonce,
 			expectedError: secp256k1.ErrPubKeyNotOnCurve,
 		},
 
-		// Vector 5: Aggregate nonce is invalid due wrong tag, 0x04,
+		// Vector 6: Aggregate nonce is invalid due wrong tag, 0x04,
 		// in the first half.
 		{
 
@@ -470,7 +482,7 @@ func TestMuSig2SigningTestVectors(t *testing.T) {
 			expectedError: secp256k1.ErrPubKeyInvalidFormat,
 		},
 
-		// Vector 6: Aggregate nonce is invalid because the second half
+		// Vector 7: Aggregate nonce is invalid because the second half
 		// does not correspond to an X coordinate.
 		{
 
@@ -483,7 +495,7 @@ func TestMuSig2SigningTestVectors(t *testing.T) {
 			expectedError: secp256k1.ErrPubKeyNotOnCurve,
 		},
 
-		// Vector 7: Aggregate nonce is invalid because the second half
+		// Vector 8: Aggregate nonce is invalid because the second half
 		// exceeds field size.
 		{
 
@@ -725,7 +737,7 @@ func TestMusig2PartialSigVerifyTestVectors(t *testing.T) {
 				genTweakParity(tweak4, false),
 			},
 		},
-		// Vector 8.
+		// Vector 9.
 		{
 
 			partialSig:    signExpected1,
@@ -737,7 +749,7 @@ func TestMusig2PartialSigVerifyTestVectors(t *testing.T) {
 				verifyPnonce3,
 			},
 		},
-		// Vector 9.
+		// Vector 10.
 		{
 
 			partialSig:    signExpected2,
@@ -749,7 +761,7 @@ func TestMusig2PartialSigVerifyTestVectors(t *testing.T) {
 				verifyPnonce3,
 			},
 		},
-		// Vector 10.
+		// Vector 11.
 		{
 
 			partialSig:    signExpected3,
@@ -761,7 +773,19 @@ func TestMusig2PartialSigVerifyTestVectors(t *testing.T) {
 				verifyPnonce1,
 			},
 		},
-		// Vector 11: Wrong signature (which is equal to the negation
+		// Vector 12: Both halves of aggregate nonce correspond to
+		// point at infinity.
+		{
+
+			partialSig:    signExpected4,
+			pubnonceIndex: 0,
+			keyOrder:      []int{0, 1},
+			nonces: [][66]byte{
+				verifyPnonce1,
+				verifyPnonce4,
+			},
+		},
+		// Vector 13: Wrong signature (which is equal to the negation
 		// of valid signature expected[0]).
 		{
 
@@ -1794,6 +1818,14 @@ func aggNonceToPubkey(combinedNonce [66]byte, combinedKey *AggregateKey,
 		&nonce.X, &nonce.Y,
 	), nil
 
+}
+
+func mustNonceAgg(nonces [][66]byte) [66]byte {
+	aggNonce, err := AggregateNonces(nonces)
+	if err != nil {
+		panic("can't aggregate nonces")
+	}
+	return aggNonce
 }
 
 func memsetLoop(a []byte, v uint8) {
