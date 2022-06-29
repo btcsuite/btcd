@@ -85,7 +85,10 @@ func (p *PartialSignature) Decode(r io.Reader) error {
 		return nil
 	}
 
-	p.S.SetBytes(&sBytes)
+	overflows := p.S.SetBytes(&sBytes)
+	if overflows == 1 {
+		return ErrPartialSigInvalid
+	}
 
 	return nil
 }
