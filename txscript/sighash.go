@@ -626,3 +626,20 @@ func CalcTapscriptSignaturehash(sigHashes *TxSigHashes, hType SigHashType,
 		sigHashes, hType, tx, idx, prevOutFetcher, opts...,
 	)
 }
+
+// SigHashTypeForScript returns the sighash flag for the given UTXO's pkScript.
+func SigHashTypeForScript(script []byte) (SigHashType, error) {
+	switch {
+	case IsPayToTaproot(script):
+		return SigHashDefault, nil
+
+	case IsPayToPubKey(script) || IsPayToPubKeyHash(script) ||
+		IsPayToScriptHash(script) || IsPayToWitnessPubKeyHash(script) ||
+		IsPayToWitnessScriptHash(script):
+
+		return SigHashAll, nil
+
+	default:
+		return 0, fmt.Errorf("unknown script type")
+	}
+}
