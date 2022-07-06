@@ -37,10 +37,8 @@ func TestGetAddressInfoResult(t *testing.T) {
 			name:   "GetAddressInfoResult - ScriptType",
 			result: `{"script":"nonstandard","address":"1abc"}`,
 			want: GetAddressInfoResult{
-				embeddedAddressInfo: embeddedAddressInfo{
-					Address:    "1abc",
-					ScriptType: nonStandard,
-				},
+				Address:    "1abc",
+				ScriptType: nonStandard,
 			},
 		},
 		{

@@ -53,7 +53,26 @@ type embeddedAddressInfo struct {
 //   3. Information about the embedded address in case of P2SH or P2WSH.
 //      Same structure as (1).
 type GetAddressInfoResult struct {
-	embeddedAddressInfo
+	// The following fields are identical to embeddedAddressInfo.
+	// However, the utility to generate RPC help message can't handle
+	// embedded field properly. So, spell out the attributes individually.
+	Address             string                `json:"address"`
+	ScriptPubKey        string                `json:"scriptPubKey"`
+	Descriptor          *string               `json:"desc,omitempty"`
+	IsScript            bool                  `json:"isscript"`
+	IsChange            bool                  `json:"ischange"`
+	IsWitness           bool                  `json:"iswitness"`
+	WitnessVersion      int                   `json:"witness_version,omitempty"`
+	WitnessProgram      *string               `json:"witness_program,omitempty"`
+	ScriptType          *txscript.ScriptClass `json:"script,omitempty"`
+	Hex                 *string               `json:"hex,omitempty"`
+	PubKeys             *[]string             `json:"pubkeys,omitempty"`
+	SignaturesRequired  *int                  `json:"sigsrequired,omitempty"`
+	PubKey              *string               `json:"pubkey,omitempty"`
+	IsCompressed        *bool                 `json:"iscompressed,omitempty"`
+	HDMasterFingerprint *string               `json:"hdmasterfingerprint,omitempty"`
+	Labels              []string              `json:"labels"`
+
 	IsMine      bool                 `json:"ismine"`
 	IsWatchOnly bool                 `json:"iswatchonly"`
 	Timestamp   *int                 `json:"timestamp,omitempty"`
