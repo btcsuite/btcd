@@ -139,7 +139,10 @@ func (v parsedVersion) buildmeta() string {
 }
 
 func (v parsedVersion) full() string {
-	return fmt.Sprintf("%s-%s+%s", v.version, v.prerelease, v.buildmeta())
+	if len(v.prerelease) > 0 {
+		return fmt.Sprintf("%s-%s+%s", v.version, v.prerelease, v.buildmeta())
+	}
+	return fmt.Sprintf("%s+%s", v.version, v.buildmeta())
 }
 
 func parseTag(tag string) (version string, prerelease string, err error) {
@@ -148,7 +151,13 @@ func parseTag(tag string) (version string, prerelease string, err error) {
 		return "", "", fmt.Errorf("tag must be prefixed with v; %s", tag)
 	}
 
-	strs := strings.Split(tag[1:], "-")
+	tag = tag[1:]
+
+	if !strings.Contains(tag, "-") {
+		return tag, "", nil
+	}
+
+	strs := strings.Split(tag, "-")
 
 	if len(strs) != 2 {
 		return "", "", fmt.Errorf("tag must be in the form of Version.Revision; %s", tag)
