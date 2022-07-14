@@ -8,7 +8,11 @@ import (
 	"reflect"
 )
 
-func dynamicMemUsage(v reflect.Value, debug bool, level int) uintptr {
+func dynamicMemUsage(v reflect.Value) uintptr {
+	return _dynamicMemUsage(v, false, 0)
+}
+
+func _dynamicMemUsage(v reflect.Value, debug bool, level int) uintptr {
 	t := v.Type()
 	bytes := t.Size()
 	if debug {
@@ -19,7 +23,7 @@ func dynamicMemUsage(v reflect.Value, debug bool, level int) uintptr {
 	switch t.Kind() {
 	case reflect.Pointer, reflect.Interface:
 		if !v.IsNil() {
-			bytes += dynamicMemUsage(v.Elem(), debug, level+1)
+			bytes += _dynamicMemUsage(v.Elem(), debug, level+1)
 		}
 	case reflect.Array, reflect.Slice:
 		for j := 0; j < v.Len(); j++ {
@@ -31,10 +35,10 @@ func dynamicMemUsage(v reflect.Value, debug bool, level int) uintptr {
 			elemB := uintptr(0)
 			if t.Kind() == reflect.Array {
 				if (k == reflect.Pointer || k == reflect.Interface) && !vi.IsNil() {
-					elemB += dynamicMemUsage(vi.Elem(), debug, level+1)
+					elemB += _dynamicMemUsage(vi.Elem(), debug, level+1)
 				}
 			} else { // slice
-				elemB += dynamicMemUsage(vi, debug, level+1)
+				elemB += _dynamicMemUsage(vi, debug, level+1)
 			}
 			if k == reflect.Uint8 {
 				// short circuit for byte slice/array
@@ -54,11 +58,11 @@ func dynamicMemUsage(v reflect.Value, debug bool, level int) uintptr {
 			if debug {
 				println("[", level, "] key:", vk.Type().Kind().String())
 			}
-			bytes += dynamicMemUsage(vk, debug, level+1)
+			bytes += _dynamicMemUsage(vk, debug, level+1)
 			if debug {
 				println("[", level, "] value:", vv.Type().Kind().String())
 			}
-			bytes += dynamicMemUsage(vv, debug, level+1)
+			bytes += _dynamicMemUsage(vv, debug, level+1)
 			if debug {
 				println("...", v.Len(), "map elements")
 			}
@@ -72,10 +76,10 @@ func dynamicMemUsage(v reflect.Value, debug bool, level int) uintptr {
 				println("[", level, "] field:", f.Name, "kind:", k.String())
 			}
 			if (k == reflect.Pointer || k == reflect.Interface) && !vf.IsNil() {
-				bytes += dynamicMemUsage(vf.Elem(), debug, level+1)
+				bytes += _dynamicMemUsage(vf.Elem(), debug, level+1)
 			} else if k == reflect.Array || k == reflect.Slice {
 				bytes -= vf.Type().Size()
-				bytes += dynamicMemUsage(vf, debug, level+1)
+				bytes += _dynamicMemUsage(vf, debug, level+1)
 			}
 		}
 	}

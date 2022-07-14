@@ -179,14 +179,14 @@ type TxDesc struct {
 func (txD *TxDesc) incr(info *aggregateInfo) {
 	info.totalCount += 1
 	info.totalBytes += int64(txD.Tx.MsgTx().SerializeSize())
-	info.totalMem += int64(dynamicMemUsage(reflect.ValueOf(txD), false, 0))
+	info.totalMem += int64(dynamicMemUsage(reflect.ValueOf(txD)))
 	info.totalFee += txD.Fee
 }
 
 func (txD *TxDesc) decr(info *aggregateInfo) {
 	info.totalCount -= 1
 	info.totalBytes -= int64(txD.Tx.MsgTx().SerializeSize())
-	info.totalMem -= int64(dynamicMemUsage(reflect.ValueOf(txD), false, 0))
+	info.totalMem -= int64(dynamicMemUsage(reflect.ValueOf(txD)))
 	info.totalFee -= txD.Fee
 }
 
@@ -202,13 +202,13 @@ type orphanTx struct {
 func (otx *orphanTx) incr(info *aggregateInfo) {
 	info.totalCount += 1
 	info.totalBytes += int64(otx.tx.MsgTx().SerializeSize())
-	info.totalMem += int64(dynamicMemUsage(reflect.ValueOf(otx), true, 0))
+	info.totalMem += int64(dynamicMemUsage(reflect.ValueOf(otx)))
 }
 
 func (otx *orphanTx) decr(info *aggregateInfo) {
 	info.totalCount -= 1
 	info.totalBytes -= int64(otx.tx.MsgTx().SerializeSize())
-	info.totalMem -= int64(dynamicMemUsage(reflect.ValueOf(otx), false, 0))
+	info.totalMem -= int64(dynamicMemUsage(reflect.ValueOf(otx)))
 }
 
 // TxPool is used as a source of transactions that need to be mined into blocks
