@@ -459,6 +459,7 @@ var helpDescsEnUS = map[string]string{
 	"getmempoolinforesult-total_fee":        "Total fees for the mempool in LBC, ignoring modified fees through prioritizetransaction",
 	"getmempoolinforesult-mempoolminfee":    "Minimum fee rate in LBC/kvB for tx to be accepted. Is the maximum of minrelaytxfee and minimum mempool fee",
 	"getmempoolinforesult-minrelaytxfee":    "Current minimum relay fee for transactions",
+	"getmempoolinforesult-unbroadcastcount": "Current number of transactions that haven't passed initial broadcast yet",
 
 	// GetMiningInfoResult help.
 	"getmininginforesult-blocks":             "Height of the latest best block",

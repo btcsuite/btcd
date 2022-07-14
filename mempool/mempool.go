@@ -235,6 +235,9 @@ type TxPool struct {
 
 	// stats are aggregated over pool, orphans, etc.
 	stats aggregateInfo
+
+	// unbroadcast is a set of transactions yet to be broadcast.
+	unbroadcast map[chainhash.Hash]bool
 }
 
 // Ensure the TxPool type implements the mining.TxSource interface.
@@ -1555,10 +1558,23 @@ func (mp *TxPool) MiningDescs() []*mining.TxDesc {
 	return descs
 }
 
+func (mp *TxPool) AddUnbroadcastTx(hash *chainhash.Hash) {
+	mp.mtx.Lock()
+	mp.unbroadcast[*hash] = true
+	mp.mtx.Unlock()
+}
+
+func (mp *TxPool) RemoveUnbroadcastTx(hash *chainhash.Hash) {
+	mp.mtx.Lock()
+	delete(mp.unbroadcast, *hash)
+	mp.mtx.Unlock()
+}
+
 func (mp *TxPool) MempoolInfo() *btcjson.GetMempoolInfoResult {
 	mp.mtx.RLock()
 	policy := mp.cfg.Policy
 	stats := mp.stats
+	unbroadcastCount := int64(len(mp.unbroadcast))
 	mp.mtx.RUnlock()
 
 	ret := &btcjson.GetMempoolInfoResult{
@@ -1568,6 +1584,7 @@ func (mp *TxPool) MempoolInfo() *btcjson.GetMempoolInfoResult {
 		TotalFee:         btcutil.Amount(stats.totalFee).ToBTC(),
 		MemPoolMinFee:    btcutil.Amount(calcMinRequiredTxRelayFee(1000, policy.MinRelayTxFee)).ToBTC(),
 		MinRelayTxFee:    policy.MinRelayTxFee.ToBTC(),
+		UnbroadcastCount: unbroadcastCount,
 	}
 
 	return ret
@@ -1646,5 +1663,6 @@ func New(cfg *Config) *TxPool {
 		orphansByPrev:  make(map[wire.OutPoint]map[chainhash.Hash]*btcutil.Tx),
 		nextExpireScan: time.Now().Add(orphanExpireScanInterval),
 		outpoints:      make(map[wire.OutPoint]*btcutil.Tx),
+		unbroadcast:    make(map[chainhash.Hash]bool),
 	}
 }

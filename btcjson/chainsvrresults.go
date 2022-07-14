@@ -343,6 +343,7 @@ type GetMempoolInfoResult struct {
 	TotalFee         float64 `json:"total_fee"`        // Total fees for the mempool in BTC, ignoring modified fees through prioritizetransaction
 	MemPoolMinFee    float64 `json:"mempoolminfee"`    // Minimum fee rate in BTC/kvB for tx to be accepted. Is the maximum of minrelaytxfee and minimum mempool fee
 	MinRelayTxFee    float64 `json:"minrelaytxfee"`    // Current minimum relay fee for transactions
+	UnbroadcastCount int64   `json:"unbroadcastcount"` // Current number of transactions that haven't passed initial broadcast yet
 }
 
 // NetworksResult models the networks data from the getnetworkinfo command.

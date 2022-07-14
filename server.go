@@ -699,6 +699,11 @@ func (sp *serverPeer) OnGetData(_ *peer.Peer, msg *wire.MsgGetData) {
 			if i == len(msg.InvList)-1 && c != nil {
 				<-c
 			}
+		} else if iv.Type == wire.InvTypeWitnessTx || iv.Type == wire.InvTypeTx {
+			// We interpret fulfilling a GETDATA for a transaction as a
+			// successful initial broadcast and remove it from our
+			// unbroadcast set.
+			sp.server.txMemPool.RemoveUnbroadcastTx(&iv.Hash)
 		}
 		numAdded++
 		waitChan = c
