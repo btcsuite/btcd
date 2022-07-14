@@ -997,57 +997,6 @@ func TestWalletSvrCmds(t *testing.T) {
 			},
 		},
 		{
-			name: "move",
-			newCmd: func() (interface{}, error) {
-				return btcjson.NewCmd("move", "from", "to", 0.5)
-			},
-			staticCmd: func() interface{} {
-				return btcjson.NewMoveCmd("from", "to", 0.5, nil, nil)
-			},
-			marshalled: `{"jsonrpc":"1.0","method":"move","params":["from","to",0.5],"id":1}`,
-			unmarshalled: &btcjson.MoveCmd{
-				FromAccount: "from",
-				ToAccount:   "to",
-				Amount:      0.5,
-				MinConf:     btcjson.Int(1),
-				Comment:     nil,
-			},
-		},
-		{
-			name: "move optional1",
-			newCmd: func() (interface{}, error) {
-				return btcjson.NewCmd("move", "from", "to", 0.5, 6)
-			},
-			staticCmd: func() interface{} {
-				return btcjson.NewMoveCmd("from", "to", 0.5, btcjson.Int(6), nil)
-			},
-			marshalled: `{"jsonrpc":"1.0","method":"move","params":["from","to",0.5,6],"id":1}`,
-			unmarshalled: &btcjson.MoveCmd{
-				FromAccount: "from",
-				ToAccount:   "to",
-				Amount:      0.5,
-				MinConf:     btcjson.Int(6),
-				Comment:     nil,
-			},
-		},
-		{
-			name: "move optional2",
-			newCmd: func() (interface{}, error) {
-				return btcjson.NewCmd("move", "from", "to", 0.5, 6, "comment")
-			},
-			staticCmd: func() interface{} {
-				return btcjson.NewMoveCmd("from", "to", 0.5, btcjson.Int(6), btcjson.String("comment"))
-			},
-			marshalled: `{"jsonrpc":"1.0","method":"move","params":["from","to",0.5,6,"comment"],"id":1}`,
-			unmarshalled: &btcjson.MoveCmd{
-				FromAccount: "from",
-				ToAccount:   "to",
-				Amount:      0.5,
-				MinConf:     btcjson.Int(6),
-				Comment:     btcjson.String("comment"),
-			},
-		},
-		{
 			name: "sendfrom",
 			newCmd: func() (interface{}, error) {
 				return btcjson.NewCmd("sendfrom", "from", "1Address", 0.5)

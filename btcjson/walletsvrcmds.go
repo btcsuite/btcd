@@ -556,30 +556,6 @@ func NewLockUnspentCmd(unlock bool, transactions []TransactionInput) *LockUnspen
 	}
 }
 
-// MoveCmd defines the move JSON-RPC command.
-type MoveCmd struct {
-	FromAccount string
-	ToAccount   string
-	Amount      float64 // In BTC
-	MinConf     *int    `jsonrpcdefault:"1"`
-	Comment     *string
-}
-
-// NewMoveCmd returns a new instance which can be used to issue a move JSON-RPC
-// command.
-//
-// The parameters which are pointers indicate they are optional.  Passing nil
-// for optional parameters will use the default value.
-func NewMoveCmd(fromAccount, toAccount string, amount float64, minConf *int, comment *string) *MoveCmd {
-	return &MoveCmd{
-		FromAccount: fromAccount,
-		ToAccount:   toAccount,
-		Amount:      amount,
-		MinConf:     minConf,
-		Comment:     comment,
-	}
-}
-
 // SendFromCmd defines the sendfrom JSON-RPC command.
 type SendFromCmd struct {
 	FromAccount string
@@ -1104,7 +1080,6 @@ func init() {
 	MustRegisterCmd("listunspent", (*ListUnspentCmd)(nil), flags)
 	MustRegisterCmd("loadwallet", (*LoadWalletCmd)(nil), flags)
 	MustRegisterCmd("lockunspent", (*LockUnspentCmd)(nil), flags)
-	MustRegisterCmd("move", (*MoveCmd)(nil), flags)
 	MustRegisterCmd("sendfrom", (*SendFromCmd)(nil), flags)
 	MustRegisterCmd("sendmany", (*SendManyCmd)(nil), flags)
 	MustRegisterCmd("sendtoaddress", (*SendToAddressCmd)(nil), flags)
