@@ -8,6 +8,7 @@ import (
 	"container/list"
 	"fmt"
 	"math"
+	"reflect"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -156,6 +157,15 @@ type Policy struct {
 	RejectReplacement bool
 }
 
+// aggregateInfo tracks aggregated serialized size, memory usage, and fees
+// for TxDesc in the mempool.
+type aggregateInfo struct {
+	totalCount int64
+	totalBytes int64
+	totalMem   int64
+	totalFee   int64
+}
+
 // TxDesc is a descriptor containing a transaction in the mempool along with
 // additional metadata.
 type TxDesc struct {
@@ -166,6 +176,20 @@ type TxDesc struct {
 	StartingPriority float64
 }
 
+func (txD *TxDesc) incr(info *aggregateInfo) {
+	info.totalCount += 1
+	info.totalBytes += int64(txD.Tx.MsgTx().SerializeSize())
+	info.totalMem += int64(dynamicMemUsage(reflect.ValueOf(txD), false, 0))
+	info.totalFee += txD.Fee
+}
+
+func (txD *TxDesc) decr(info *aggregateInfo) {
+	info.totalCount -= 1
+	info.totalBytes -= int64(txD.Tx.MsgTx().SerializeSize())
+	info.totalMem -= int64(dynamicMemUsage(reflect.ValueOf(txD), false, 0))
+	info.totalFee -= txD.Fee
+}
+
 // orphanTx is normal transaction that references an ancestor transaction
 // that is not yet available.  It also contains additional information related
 // to it such as an expiration time to help prevent caching the orphan forever.
@@ -173,6 +197,18 @@ type orphanTx struct {
 	tx         *btcutil.Tx
 	tag        Tag
 	expiration time.Time
+}
+
+func (otx *orphanTx) incr(info *aggregateInfo) {
+	info.totalCount += 1
+	info.totalBytes += int64(otx.tx.MsgTx().SerializeSize())
+	info.totalMem += int64(dynamicMemUsage(reflect.ValueOf(otx), true, 0))
+}
+
+func (otx *orphanTx) decr(info *aggregateInfo) {
+	info.totalCount -= 1
+	info.totalBytes -= int64(otx.tx.MsgTx().SerializeSize())
+	info.totalMem -= int64(dynamicMemUsage(reflect.ValueOf(otx), false, 0))
 }
 
 // TxPool is used as a source of transactions that need to be mined into blocks
@@ -196,6 +232,9 @@ type TxPool struct {
 	// the scan will only run when an orphan is added to the pool as opposed
 	// to on an unconditional timer.
 	nextExpireScan time.Time
+
+	// stats are aggregated over pool, orphans, etc.
+	stats aggregateInfo
 }
 
 // Ensure the TxPool type implements the mining.TxSource interface.
@@ -240,6 +279,9 @@ func (mp *TxPool) removeOrphan(tx *btcutil.Tx, removeRedeemers bool) {
 
 	// Remove the transaction from the orphan pool.
 	delete(mp.orphans, *txHash)
+
+	// Update stats.
+	otx.decr(&mp.stats)
 }
 
 // RemoveOrphan removes the passed orphan transaction from the orphan pool and
@@ -336,11 +378,12 @@ func (mp *TxPool) addOrphan(tx *btcutil.Tx, tag Tag) {
 	// orphan if space is still needed.
 	mp.limitNumOrphans()
 
-	mp.orphans[*tx.Hash()] = &orphanTx{
+	otx := &orphanTx{
 		tx:         tx,
 		tag:        tag,
 		expiration: time.Now().Add(orphanTTL),
 	}
+	mp.orphans[*tx.Hash()] = otx
 	for _, txIn := range tx.MsgTx().TxIn {
 		if _, exists := mp.orphansByPrev[txIn.PreviousOutPoint]; !exists {
 			mp.orphansByPrev[txIn.PreviousOutPoint] =
@@ -348,6 +391,9 @@ func (mp *TxPool) addOrphan(tx *btcutil.Tx, tag Tag) {
 		}
 		mp.orphansByPrev[txIn.PreviousOutPoint][*tx.Hash()] = tx
 	}
+
+	// Update stats.
+	otx.incr(&mp.stats)
 
 	log.Debugf("Stored orphan transaction %v (total: %d)", tx.Hash(),
 		len(mp.orphans))
@@ -498,6 +544,9 @@ func (mp *TxPool) removeTransaction(tx *btcutil.Tx, removeRedeemers bool) {
 		}
 		delete(mp.pool, *txHash)
 
+		// Update stats.
+		txDesc.decr(&mp.stats)
+
 		// Inform associated fee estimator that the transaction has been removed
 		// from the mempool
 		if mp.cfg.RemoveTxFromFeeEstimation != nil {
@@ -578,6 +627,9 @@ func (mp *TxPool) addTransaction(utxoView *blockchain.UtxoViewpoint, tx *btcutil
 	if mp.cfg.AddTxToFeeEstimation != nil {
 		mp.cfg.AddTxToFeeEstimation(txD.Tx.Hash(), txD.Fee, size)
 	}
+
+	// Update stats.
+	txD.incr(&mp.stats)
 
 	return txD
 }
@@ -1501,6 +1553,24 @@ func (mp *TxPool) MiningDescs() []*mining.TxDesc {
 	mp.mtx.RUnlock()
 
 	return descs
+}
+
+func (mp *TxPool) MempoolInfo() *btcjson.GetMempoolInfoResult {
+	mp.mtx.RLock()
+	policy := mp.cfg.Policy
+	stats := mp.stats
+	mp.mtx.RUnlock()
+
+	ret := &btcjson.GetMempoolInfoResult{
+		Size:             stats.totalCount,
+		Usage:            stats.totalMem,
+		Bytes:            stats.totalBytes,
+		TotalFee:         btcutil.Amount(stats.totalFee).ToBTC(),
+		MemPoolMinFee:    btcutil.Amount(calcMinRequiredTxRelayFee(1000, policy.MinRelayTxFee)).ToBTC(),
+		MinRelayTxFee:    policy.MinRelayTxFee.ToBTC(),
+	}
+
+	return ret
 }
 
 // RawMempoolVerbose returns all the entries in the mempool as a fully

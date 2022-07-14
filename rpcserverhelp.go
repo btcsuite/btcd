@@ -453,8 +453,12 @@ var helpDescsEnUS = map[string]string{
 	"getmempoolinfo--synopsis": "Returns memory pool information",
 
 	// GetMempoolInfoResult help.
-	"getmempoolinforesult-bytes": "Size in bytes of the mempool",
-	"getmempoolinforesult-size":  "Number of transactions in the mempool",
+	"getmempoolinforesult-bytes":            "Size in bytes of the mempool",
+	"getmempoolinforesult-size":             "Number of transactions in the mempool",
+	"getmempoolinforesult-usage":            "Total memory usage for the mempool",
+	"getmempoolinforesult-total_fee":        "Total fees for the mempool in LBC, ignoring modified fees through prioritizetransaction",
+	"getmempoolinforesult-mempoolminfee":    "Minimum fee rate in LBC/kvB for tx to be accepted. Is the maximum of minrelaytxfee and minimum mempool fee",
+	"getmempoolinforesult-minrelaytxfee":    "Current minimum relay fee for transactions",
 
 	// GetMiningInfoResult help.
 	"getmininginforesult-blocks":             "Height of the latest best block",

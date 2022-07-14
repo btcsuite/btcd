@@ -337,8 +337,12 @@ type GetChainTipsResult struct {
 // GetMempoolInfoResult models the data returned from the getmempoolinfo
 // command.
 type GetMempoolInfoResult struct {
-	Size  int64 `json:"size"`
-	Bytes int64 `json:"bytes"`
+	Size             int64   `json:"size"`             // Current tx count
+	Bytes            int64   `json:"bytes"`            // Sum of all virtual transaction sizes as defined in BIP 141. Differs from actual serialized size because witness data is discounted
+	Usage            int64   `json:"usage"`            // Total memory usage for the mempool
+	TotalFee         float64 `json:"total_fee"`        // Total fees for the mempool in BTC, ignoring modified fees through prioritizetransaction
+	MemPoolMinFee    float64 `json:"mempoolminfee"`    // Minimum fee rate in BTC/kvB for tx to be accepted. Is the maximum of minrelaytxfee and minimum mempool fee
+	MinRelayTxFee    float64 `json:"minrelaytxfee"`    // Current minimum relay fee for transactions
 }
 
 // NetworksResult models the networks data from the getnetworkinfo command.

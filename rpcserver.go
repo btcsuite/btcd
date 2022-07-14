@@ -2466,19 +2466,7 @@ func handleGetInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (in
 
 // handleGetMempoolInfo implements the getmempoolinfo command.
 func handleGetMempoolInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
-	mempoolTxns := s.cfg.TxMemPool.TxDescs()
-
-	var numBytes int64
-	for _, txD := range mempoolTxns {
-		numBytes += int64(txD.Tx.MsgTx().SerializeSize())
-	}
-
-	ret := &btcjson.GetMempoolInfoResult{
-		Size:  int64(len(mempoolTxns)),
-		Bytes: numBytes,
-	}
-
-	return ret, nil
+	return s.cfg.TxMemPool.MempoolInfo(), nil
 }
 
 // handleGetMempoolEntry implements the getmempoolentry command.
