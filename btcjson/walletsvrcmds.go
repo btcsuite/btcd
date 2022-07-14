@@ -650,21 +650,6 @@ func NewSendToAddressCmd(address string, amount float64, comment, commentTo *str
 	}
 }
 
-// SetAccountCmd defines the setaccount JSON-RPC command.
-type SetAccountCmd struct {
-	Address string
-	Account string
-}
-
-// NewSetAccountCmd returns a new instance which can be used to issue a
-// setaccount JSON-RPC command.
-func NewSetAccountCmd(address, account string) *SetAccountCmd {
-	return &SetAccountCmd{
-		Address: address,
-		Account: account,
-	}
-}
-
 // SetTxFeeCmd defines the settxfee JSON-RPC command.
 type SetTxFeeCmd struct {
 	Amount float64 // In BTC
@@ -1123,7 +1108,6 @@ func init() {
 	MustRegisterCmd("sendfrom", (*SendFromCmd)(nil), flags)
 	MustRegisterCmd("sendmany", (*SendManyCmd)(nil), flags)
 	MustRegisterCmd("sendtoaddress", (*SendToAddressCmd)(nil), flags)
-	MustRegisterCmd("setaccount", (*SetAccountCmd)(nil), flags)
 	MustRegisterCmd("settxfee", (*SetTxFeeCmd)(nil), flags)
 	MustRegisterCmd("signmessage", (*SignMessageCmd)(nil), flags)
 	MustRegisterCmd("signrawtransaction", (*SignRawTransactionCmd)(nil), flags)
