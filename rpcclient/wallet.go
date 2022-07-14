@@ -1320,33 +1320,6 @@ func (c *Client) GetAccount(address btcutil.Address) (string, error) {
 	return c.GetAccountAsync(address).Receive()
 }
 
-// FutureSetAccountResult is a future promise to deliver the result of a
-// SetAccountAsync RPC invocation (or an applicable error).
-type FutureSetAccountResult chan *Response
-
-// Receive waits for the Response promised by the future and returns the result
-// of setting the account to be associated with the passed address.
-func (r FutureSetAccountResult) Receive() error {
-	_, err := ReceiveFuture(r)
-	return err
-}
-
-// SetAccountAsync returns an instance of a type that can be used to get the
-// result of the RPC at some future time by invoking the Receive function on the
-// returned instance.
-//
-// See SetAccount for the blocking version and more details.
-func (c *Client) SetAccountAsync(address btcutil.Address, account string) FutureSetAccountResult {
-	addr := address.EncodeAddress()
-	cmd := btcjson.NewSetAccountCmd(addr, account)
-	return c.SendCmd(cmd)
-}
-
-// SetAccount sets the account associated with the passed address.
-func (c *Client) SetAccount(address btcutil.Address, account string) error {
-	return c.SetAccountAsync(address, account).Receive()
-}
-
 // FutureGetAddressesByAccountResult is a future promise to deliver the result
 // of a GetAddressesByAccountAsync RPC invocation (or an applicable error).
 type FutureGetAddressesByAccountResult struct {
