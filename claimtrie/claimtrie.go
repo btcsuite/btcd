@@ -333,13 +333,23 @@ func (ct *ClaimTrie) ResetHeight(height int32) error {
 	if passedHashFork {
 		names = nil // force them to reconsider all names
 	}
+
+	var fullRebuildRequired bool
+
 	err = ct.merkleTrie.SetRoot(hash)
 	if err == merkletrie.ErrFullRebuildRequired {
+		fullRebuildRequired = true
+	} else if err != nil {
+		return errors.Wrapf(err, "setRoot")
+	}
+
+	if fullRebuildRequired {
 		ct.runFullTrieRebuild(names, nil)
 	}
 
 	if !ct.MerkleHash().IsEqual(hash) {
-		return errors.Errorf("unable to restore the hash at height %d", height)
+		return errors.Errorf("unable to restore the hash at height %d"+
+			" (fullTriedRebuilt: %t)", height, fullRebuildRequired)
 	}
 
 	return errors.WithStack(ct.blockRepo.Delete(height+1, oldHeight))
