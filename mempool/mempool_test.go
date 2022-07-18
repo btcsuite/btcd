@@ -21,6 +21,12 @@ import (
 	btcutil "github.com/lbryio/lbcutil"
 )
 
+func init() {
+	// Toggle assert & debug messages when running tests.
+	dynamicMemUsageAssert = true
+	dynamicMemUsageDebug = false
+}
+
 // fakeChain is used by the pool harness to provide generated test utxos and
 // a current faked chain height to the pool callbacks.  This, in turn, allows
 // transactions to appear as though they are spending completely valid utxos.
