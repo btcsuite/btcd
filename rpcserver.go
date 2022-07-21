@@ -1209,31 +1209,23 @@ func handleGetBlock(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 		return nil, internalRPCError(err.Error(), context)
 	}
 
-	// Get the block height from chain.
-	blockHeight, err := s.cfg.Chain.BlockHeightByHash(hash)
-	if err != nil {
-		context := "Failed to obtain block height"
-		return nil, internalRPCError(err.Error(), context)
-	}
-	blk.SetHeight(blockHeight)
-	best := s.cfg.Chain.BestSnapshot()
-
-	// Get next block hash unless there are none.
-	var nextHashString string
-	if blockHeight < best.Height {
-		nextHash, err := s.cfg.Chain.BlockHashByHeight(blockHeight + 1)
-		if err != nil {
-			context := "No next block"
-			return nil, internalRPCError(err.Error(), context)
-		}
-		nextHashString = nextHash.String()
-	}
-
 	params := s.cfg.ChainParams
 	blockHeader := &blk.MsgBlock().Header
+
+	// Get further details (height, confirmations, nexthash, mediantime, etc.) from chain.
+	attrs, best, err := s.cfg.Chain.BlockAttributesByHash(hash, &blockHeader.PrevBlock)
+	if err != nil {
+		context := "Failed to obtain block details"
+		return nil, internalRPCError(err.Error(), context)
+	}
+
 	var prevHashString string
-	if blockHeight > 0 {
-		prevHashString = blockHeader.PrevBlock.String()
+	if attrs.PrevHash != nil {
+		prevHashString = attrs.PrevHash.String()
+	}
+	var nextHashString string
+	if attrs.NextHash != nil {
+		nextHashString = attrs.NextHash.String()
 	}
 
 	base := btcjson.GetBlockVerboseResultBase{
@@ -1244,13 +1236,15 @@ func handleGetBlock(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 		PreviousHash:  prevHashString,
 		Nonce:         blockHeader.Nonce,
 		Time:          blockHeader.Timestamp.Unix(),
-		Confirmations: int64(1 + best.Height - blockHeight),
-		Height:        int64(blockHeight),
+		MedianTime:    attrs.MedianTime.Unix(),
+		Confirmations: int64(attrs.Confirmations),
+		Height:        int64(attrs.Height),
 		Size:          int32(len(blkBytes)),
 		StrippedSize:  int32(blk.MsgBlock().SerializeSizeStripped()),
 		Weight:        int32(blockchain.GetBlockWeight(blk)),
 		Bits:          strconv.FormatInt(int64(blockHeader.Bits), 16),
 		Difficulty:    getDifficultyRatio(blockHeader.Bits, params),
+		ChainWork:     attrs.ChainWork.Text(16),
 		NextHash:      nextHashString,
 		ClaimTrie:     blockHeader.ClaimTrie.String(),
 	}
@@ -1275,7 +1269,7 @@ func handleGetBlock(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 	for i, tx := range txns {
 		rawTxn, err := createTxRawResult(params, tx.MsgTx(),
 			tx.Hash().String(), blockHeader, hash.String(),
-			blockHeight, best.Height)
+			attrs.Height, best.Height)
 		if err != nil {
 			return nil, err
 		}

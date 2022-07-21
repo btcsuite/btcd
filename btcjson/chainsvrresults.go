@@ -77,9 +77,11 @@ type GetBlockVerboseResultBase struct {
 	VersionHex    string  `json:"versionHex"`
 	MerkleRoot    string  `json:"merkleroot"`
 	Time          int64   `json:"time"`
+	MedianTime    int64   `json:"mediantime"`
 	Nonce         uint32  `json:"nonce"`
 	Bits          string  `json:"bits"`
 	Difficulty    float64 `json:"difficulty"`
+	ChainWork     string  `json:"chainwork"`
 	PreviousHash  string  `json:"previousblockhash,omitempty"`
 	NextHash      string  `json:"nextblockhash,omitempty"`
 

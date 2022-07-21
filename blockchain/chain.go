@@ -8,6 +8,7 @@ package blockchain
 import (
 	"container/list"
 	"fmt"
+	"math/big"
 	"sync"
 	"time"
 
@@ -1371,6 +1372,54 @@ func (b *BlockChain) BlockHashByHeight(blockHeight int32) (*chainhash.Hash, erro
 	}
 
 	return &node.hash, nil
+}
+
+// BlockAttributes desribes a Block in relation to others on the main chain.
+type BlockAttributes struct {
+	Height        int32
+	Confirmations int32
+	MedianTime    time.Time
+	ChainWork     *big.Int
+	PrevHash      *chainhash.Hash
+	NextHash      *chainhash.Hash
+}
+
+// BlockAttributesByHash returns BlockAttributes for the block with the given hash
+// relative to other blocks in the main chain. A BestState snapshot describing
+// the main chain is also returned for convenience.
+//
+// This function is safe for concurrent access.
+func (b *BlockChain) BlockAttributesByHash(hash *chainhash.Hash, prevHash *chainhash.Hash) (
+	attrs *BlockAttributes, best *BestState, err error) {
+	best = b.BestSnapshot()
+	node := b.index.LookupNode(hash)
+	if node == nil || !b.bestChain.Contains(node) {
+		str := fmt.Sprintf("block %s is not in the main chain", hash)
+		return nil, best, errNotInMainChain(str)
+	}
+
+	attrs = &BlockAttributes{
+		Height:        node.height,
+		Confirmations: 1 + best.Height - node.height,
+		MedianTime:    node.CalcPastMedianTime(),
+		ChainWork:     node.workSum,
+	}
+
+	// Populate prev block hash if there is one.
+	if node.height > 0 {
+		attrs.PrevHash = prevHash
+	}
+
+	// Populate next block hash if there is one.
+	if node.height < best.Height {
+		nextHash, err := b.BlockHashByHeight(node.height + 1)
+		if err != nil {
+			return nil, best, err
+		}
+		attrs.NextHash = nextHash
+	}
+
+	return attrs, best, nil
 }
 
 // HeightRange returns a range of block hashes for the given start and end
