@@ -29,7 +29,7 @@ func send(stratum, stratumPass, coinid, blockHash string) error {
 	}
 	defer conn.Close()
 
-	msg := fmt.Sprintf(`{"id":1,"method":"mining.update_block","params":[%q,%q,%q]}`,
+	msg := fmt.Sprintf(`{"id":1,"method":"mining.update_block","params":[%q,%s,%q]}`,
 		stratumPass, coinid, blockHash)
 
 	_, err = conn.Write([]byte(msg))
