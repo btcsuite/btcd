@@ -175,6 +175,20 @@ func WithNonceAuxInput(aux []byte) NonceGenOption {
 	}
 }
 
+// withCustomOptions allows a caller to pass a complete set of custom
+// nonceGenOpts, without needing to create custom and checked structs such as
+// *btcec.PrivateKey. This is mainly used to match the testcases provided by
+// the MuSig2 BIP.
+func withCustomOptions(customOpts nonceGenOpts) NonceGenOption {
+	return func(o *nonceGenOpts) {
+		o.randReader = customOpts.randReader
+		o.secretKey = customOpts.secretKey
+		o.combinedKey = customOpts.combinedKey
+		o.msg = customOpts.msg
+		o.auxInput = customOpts.auxInput
+	}
+}
+
 // lengthWriter is a function closure that allows a caller to control how the
 // length prefix of a byte slice is written.
 type lengthWriter func(w io.Writer, b []byte) error

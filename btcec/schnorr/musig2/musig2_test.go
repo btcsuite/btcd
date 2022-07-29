@@ -825,3 +825,88 @@ func TestMuSigEarlyNonce(t *testing.T) {
 		t.Fatalf("final sig is invalid!")
 	}
 }
+
+// TestMusig2NonceGenTestVectors tests the nonce generation function with
+// the testvectors defined in the Musig2 BIP.
+func TestMusig2NonceGenTestVectors(t *testing.T) {
+	t.Parallel()
+
+	msg := bytes.Repeat([]byte{0x01}, 32)
+	sk := bytes.Repeat([]byte{0x02}, 32)
+	aggpk := bytes.Repeat([]byte{0x07}, 32)
+	extra_in := bytes.Repeat([]byte{0x08}, 32)
+
+	testCases := []struct {
+		opts          nonceGenOpts
+		expectedNonce string
+	}{
+		{
+			opts: nonceGenOpts{
+				randReader:  &memsetRandReader{i: 0},
+				secretKey:   sk[:],
+				combinedKey: aggpk[:],
+				auxInput:    extra_in[:],
+				msg:         msg[:],
+			},
+			expectedNonce: "E8F2E103D86800F19A4E97338D371CB885DB2" +
+				"F19D08C0BD205BBA9B906C971D0D786A17718AAFAD6D" +
+				"E025DDDD99DC823E2DFC1AE1DDFE920888AD53FFF423FC4",
+		},
+		{
+			opts: nonceGenOpts{
+				randReader:  &memsetRandReader{i: 0},
+				secretKey:   sk[:],
+				combinedKey: aggpk[:],
+				auxInput:    extra_in[:],
+				msg:         nil,
+			},
+			expectedNonce: "8A633F5EECBDB690A6BE4921426F41BE78D50" +
+				"9DC1CE894C1215844C0E4C6DE7ABC9A5BE0A3BF3FE31" +
+				"2CCB7E4817D2CB17A7CEA8382B73A99A583E323387B3C32",
+		},
+		{
+			opts: nonceGenOpts{
+				randReader:  &memsetRandReader{i: 0},
+				secretKey:   nil,
+				combinedKey: nil,
+				auxInput:    nil,
+				msg:         nil,
+			},
+			expectedNonce: "7B3B5A002356471AF0E961DE2549C121BD0D4" +
+				"8ABCEEDC6E034BDDF86AD3E0A187ECEE674CEF7364B0" +
+				"BC4BEEFB8B66CAD89F98DE2F8C5A5EAD5D1D1E4BD7D04CD",
+		},
+	}
+
+	for _, testCase := range testCases {
+		nonce, err := GenNonces(withCustomOptions(testCase.opts))
+		if err != nil {
+			t.Fatalf("err gen nonce aux bytes %v", err)
+		}
+
+		expectedBytes, _ := hex.DecodeString(testCase.expectedNonce)
+		if !bytes.Equal(nonce.SecNonce[:], expectedBytes) {
+
+			t.Fatalf("nonces don't match: expected %x, got %x",
+				expectedBytes, nonce.SecNonce[:])
+		}
+	}
+
+}
+
+type memsetRandReader struct {
+	i int
+}
+
+func (mr *memsetRandReader) Read(buf []byte) (n int, err error) {
+	for i := range buf {
+		buf[i] = byte(mr.i)
+	}
+	return len(buf), nil
+}
+
+func memsetLoop(a []byte, v uint8) {
+	for i := range a {
+		a[i] = byte(v)
+	}
+}
