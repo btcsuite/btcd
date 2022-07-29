@@ -74,6 +74,8 @@ func getInfinityTweak() KeyTweakDesc {
 const (
 	keyAggTestVectorName = "key_agg_vectors.json"
 
+	nonceAggTestVectorName = "nonce_agg_vectors.json"
+
 	signTestVectorName = "sign_vectors.json"
 )
 
@@ -1020,6 +1022,142 @@ func TestMusig2NonceGenTestVectors(t *testing.T) {
 
 }
 
+var (
+	pNonce1, _ = hex.DecodeString("020151C80F435648DF67A22B749CD798CE54E0321D034B92B709B567D60A42E666" +
+		"03BA47FBC1834437B3212E89A84D8425E7BF12E0245D98262268EBDCB385D50641")
+	pNonce2, _ = hex.DecodeString("03FF406FFD8ADB9CD29877E4985014F66A59F6CD01C0E88CAA8E5F3166B1F676A6" +
+		"0248C264CDD57D3C24D79990B0F865674EB62A0F9018277A95011B41BFC193B833")
+
+	expectedNonce, _ = hex.DecodeString("035FE1873B4F2967F52FEA4A06AD5A8ECCBE9D0FD73068012C894E2E87CCB5804B" +
+		"024725377345BDE0E9C33AF3C43C0A29A9249F2F2956FA8CFEB55C8573D0262DC8")
+
+	invalidNonce1, _ = hex.DecodeString("04FF406FFD8ADB9CD29877E4985014F66A59F6CD01C0E88CAA8E5F3166B1F676A6" + "0248C264CDD57D3C24D79990B0F865674EB62A0F9018277A95011B41BFC193B833")
+	invalidNonce2, _ = hex.DecodeString("03FF406FFD8ADB9CD29877E4985014F66A59F6CD01C0E88CAA8E5F3166B1F676A6" + "0248C264CDD57D3C24D79990B0F865674EB62A0F9018277A95011B41BFC193B831")
+	invalidNonce3, _ = hex.DecodeString("03FF406FFD8ADB9CD29877E4985014F66A59F6CD01C0E88CAA8E5F3166B1F676A6" + "02FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC30")
+)
+
+type jsonNonceAggTestCase struct {
+	Nonces        []string `json:"nonces"`
+	ExpectedNonce string   `json:"expected_key"`
+	ExpectedError string   `json:"expected_error"`
+}
+
+func TestMusig2AggregateNoncesTestVectors(t *testing.T) {
+	t.Parallel()
+
+	var jsonCases []jsonNonceAggTestCase
+
+	testCases := []struct {
+		nonces        [][]byte
+		expectedNonce []byte
+		expectedError error
+	}{
+		// Vector 1: Valid.
+		{
+			nonces:        [][]byte{pNonce1, pNonce2},
+			expectedNonce: expectedNonce,
+		},
+
+		// Vector 2: Public nonce from signer 1 is invalid due wrong
+		// tag, 0x04, inthe first half.
+		{
+			nonces:        [][]byte{pNonce1, invalidNonce1},
+			expectedError: secp256k1.ErrPubKeyInvalidFormat,
+		},
+
+		// Vector 3: Public nonce from signer 0 is invalid because the
+		// second half does not correspond to an X coordinate.
+		{
+			nonces:        [][]byte{invalidNonce2, pNonce2},
+			expectedError: secp256k1.ErrPubKeyNotOnCurve,
+		},
+
+		// Vector 4: Public nonce from signer 0 is invalid because
+		// second half exceeds field size.
+		{
+			nonces:        [][]byte{invalidNonce3, pNonce2},
+			expectedError: secp256k1.ErrPubKeyXTooBig,
+		},
+
+		// Vector 5: Sum of second points encoded in the nonces would
+		// be point at infinity, therefore set sum to base point G.
+		{
+			nonces: [][]byte{
+				append(
+					append([]byte{}, pNonce1[0:33]...),
+					getGBytes()...,
+				),
+				append(
+					append([]byte{}, pNonce2[0:33]...),
+					getNegGBytes()...,
+				),
+			},
+			expectedNonce: append(
+				append([]byte{}, expectedNonce[0:33]...),
+				getGBytes()...,
+			),
+		},
+	}
+	for i, testCase := range testCases {
+		testName := fmt.Sprintf("Vector %v", i+1)
+		t.Run(testName, func(t *testing.T) {
+			var (
+				nonces    [][66]byte
+				strNonces []string
+				jsonError string
+			)
+			for _, nonce := range testCase.nonces {
+				nonces = append(nonces, toPubNonceSlice(nonce))
+				strNonces = append(strNonces, hex.EncodeToString(nonce))
+			}
+
+			if testCase.expectedError != nil {
+				jsonError = testCase.expectedError.Error()
+			}
+
+			jsonCases = append(jsonCases, jsonNonceAggTestCase{
+				Nonces:        strNonces,
+				ExpectedNonce: hex.EncodeToString(expectedNonce),
+				ExpectedError: jsonError,
+			})
+
+			aggregatedNonce, err := AggregateNonces(nonces)
+
+			switch {
+			case testCase.expectedError != nil &&
+				errors.Is(err, testCase.expectedError):
+
+				return
+			case err != nil:
+				t.Fatalf("aggregating nonce error: %v", err)
+			}
+
+			if !bytes.Equal(testCase.expectedNonce, aggregatedNonce[:]) {
+				t.Fatalf("case: #%v, invalid nonce aggregation: "+
+					"expected %x, got %x", i, testCase.expectedNonce,
+					aggregatedNonce)
+			}
+
+		})
+	}
+
+	if *dumpJson {
+		jsonBytes, err := json.Marshal(jsonCases)
+		if err != nil {
+			t.Fatalf("unable to encode json: %v", err)
+		}
+
+		var formattedJson bytes.Buffer
+		json.Indent(&formattedJson, jsonBytes, "", "\t")
+		err = ioutil.WriteFile(
+			nonceAggTestVectorName, formattedJson.Bytes(), 0644,
+		)
+		if err != nil {
+			t.Fatalf("unable to write file: %v", err)
+		}
+	}
+}
+
 type memsetRandReader struct {
 	i int
 }
@@ -1044,4 +1182,22 @@ func to32ByteSlice(input []byte) [32]byte {
 	var output [32]byte
 	copy(output[:], input)
 	return output
+}
+
+func toPubNonceSlice(input []byte) [PubNonceSize]byte {
+	var output [PubNonceSize]byte
+	copy(output[:], input)
+
+	return output
+}
+
+func getGBytes() []byte {
+	return btcec.Generator().SerializeCompressed()
+}
+
+func getNegGBytes() []byte {
+	pk := getGBytes()
+	pk[0] = 0x3
+
+	return pk
 }
