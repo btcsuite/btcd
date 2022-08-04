@@ -308,11 +308,60 @@ var (
 	invalidSetKey1 = mustParseHex("00000000000000000000000000000000" +
 		"00000000000000000000000000000007")
 
+	signExpected1 = mustParseHex("68537CC5234E505BD14061F8DA9E90C220A1818" +
+		"55FD8BDB7F127BB12403B4D3B")
+	signExpected2 = mustParseHex("2DF67BFFF18E3DE797E13C6475C963048138DAE" +
+		"C5CB20A357CECA7C8424295EA")
+	signExpected3 = mustParseHex("0D5B651E6DE34A29A12DE7A8B4183B4AE6A7F7F" +
+		"BE15CDCAFA4A3D1BCAABC7517")
+
 	signSetKeys = [][]byte{signSetPubKey, signSetKey2, signSetKey3, invalidPk1}
 
 	aggregatedNonce = toPubNonceSlice(mustParseHex("028465FCF0BBDBCF443AA" +
 		"BCCE533D42B4B5A10966AC09A49655E8C42DAAB8FCD61037496A3CC86926" +
 		"D452CAFCFD55D25972CA1675D549310DE296BFF42F72EEEA8C9"))
+	verifyPnonce1 = mustParsePubNonce("0337C87821AFD50A8644D820A8F3E02E49" +
+		"9C931865C2360FB43D0A0D20DAFE07EA0287BF891D2A6DEAEBADC909352A" +
+		"A9405D1428C15F4B75F04DAE642A95C2548480")
+	verifyPnonce2 = mustParsePubNonce("0279BE667EF9DCBBAC55A06295CE870B07" +
+		"029BFCDB2DCE28D959F2815B16F817980279BE667EF9DCBBAC55A06295CE" +
+		"870B07029BFCDB2DCE28D959F2815B16F81798")
+	verifyPnonce3 = mustParsePubNonce("032DE2662628C90B03F5E720284EB52FF7" +
+		"D71F4284F627B68A853D78C78E1FFE9303E4C5524E83FFE1493B9077CF1C" +
+		"A6BEB2090C93D930321071AD40B2F44E599046")
+
+	tweak1 = KeyTweakDesc{
+		Tweak: [32]byte{
+			0xE8, 0xF7, 0x91, 0xFF, 0x92, 0x25, 0xA2, 0xAF,
+			0x01, 0x02, 0xAF, 0xFF, 0x4A, 0x9A, 0x72, 0x3D,
+			0x96, 0x12, 0xA6, 0x82, 0xA2, 0x5E, 0xBE, 0x79,
+			0x80, 0x2B, 0x26, 0x3C, 0xDF, 0xCD, 0x83, 0xBB,
+		},
+	}
+	tweak2 = KeyTweakDesc{
+		Tweak: [32]byte{
+			0xae, 0x2e, 0xa7, 0x97, 0xcc, 0xf, 0xe7, 0x2a,
+			0xc5, 0xb9, 0x7b, 0x97, 0xf3, 0xc6, 0x95, 0x7d,
+			0x7e, 0x41, 0x99, 0xa1, 0x67, 0xa5, 0x8e, 0xb0,
+			0x8b, 0xca, 0xff, 0xda, 0x70, 0xac, 0x4, 0x55,
+		},
+	}
+	tweak3 = KeyTweakDesc{
+		Tweak: [32]byte{
+			0xf5, 0x2e, 0xcb, 0xc5, 0x65, 0xb3, 0xd8, 0xbe,
+			0xa2, 0xdf, 0xd5, 0xb7, 0x5a, 0x4f, 0x45, 0x7e,
+			0x54, 0x36, 0x98, 0x9, 0x32, 0x2e, 0x41, 0x20,
+			0x83, 0x16, 0x26, 0xf2, 0x90, 0xfa, 0x87, 0xe0,
+		},
+	}
+	tweak4 = KeyTweakDesc{
+		Tweak: [32]byte{
+			0x19, 0x69, 0xad, 0x73, 0xcc, 0x17, 0x7f, 0xa0,
+			0xb4, 0xfc, 0xed, 0x6d, 0xf1, 0xf7, 0xbf, 0x99,
+			0x7, 0xe6, 0x65, 0xfd, 0xe9, 0xba, 0x19, 0x6a,
+			0x74, 0xfe, 0xd0, 0xa3, 0xcf, 0x5a, 0xef, 0x9d,
+		},
+	}
 )
 
 func formatTweakParity(tweaks []KeyTweakDesc) string {
@@ -372,39 +421,6 @@ func TestMuSig2SigningTestVectors(t *testing.T) {
 
 	jsonCases.SecNonce = hex.EncodeToString(secNonce[:])
 
-	tweak1 := KeyTweakDesc{
-		Tweak: [32]byte{
-			0xE8, 0xF7, 0x91, 0xFF, 0x92, 0x25, 0xA2, 0xAF,
-			0x01, 0x02, 0xAF, 0xFF, 0x4A, 0x9A, 0x72, 0x3D,
-			0x96, 0x12, 0xA6, 0x82, 0xA2, 0x5E, 0xBE, 0x79,
-			0x80, 0x2B, 0x26, 0x3C, 0xDF, 0xCD, 0x83, 0xBB,
-		},
-	}
-	tweak2 := KeyTweakDesc{
-		Tweak: [32]byte{
-			0xae, 0x2e, 0xa7, 0x97, 0xcc, 0xf, 0xe7, 0x2a,
-			0xc5, 0xb9, 0x7b, 0x97, 0xf3, 0xc6, 0x95, 0x7d,
-			0x7e, 0x41, 0x99, 0xa1, 0x67, 0xa5, 0x8e, 0xb0,
-			0x8b, 0xca, 0xff, 0xda, 0x70, 0xac, 0x4, 0x55,
-		},
-	}
-	tweak3 := KeyTweakDesc{
-		Tweak: [32]byte{
-			0xf5, 0x2e, 0xcb, 0xc5, 0x65, 0xb3, 0xd8, 0xbe,
-			0xa2, 0xdf, 0xd5, 0xb7, 0x5a, 0x4f, 0x45, 0x7e,
-			0x54, 0x36, 0x98, 0x9, 0x32, 0x2e, 0x41, 0x20,
-			0x83, 0x16, 0x26, 0xf2, 0x90, 0xfa, 0x87, 0xe0,
-		},
-	}
-	tweak4 := KeyTweakDesc{
-		Tweak: [32]byte{
-			0x19, 0x69, 0xad, 0x73, 0xcc, 0x17, 0x7f, 0xa0,
-			0xb4, 0xfc, 0xed, 0x6d, 0xf1, 0xf7, 0xbf, 0x99,
-			0x7, 0xe6, 0x65, 0xfd, 0xe9, 0xba, 0x19, 0x6a,
-			0x74, 0xfe, 0xd0, 0xa3, 0xcf, 0x5a, 0xef, 0x9d,
-		},
-	}
-
 	testCases := []struct {
 		keyOrder           []int
 		aggNonce           [66]byte
@@ -414,26 +430,23 @@ func TestMuSig2SigningTestVectors(t *testing.T) {
 	}{
 		// Vector 1
 		{
-			keyOrder: []int{0, 1, 2},
-			aggNonce: aggregatedNonce,
-			expectedPartialSig: mustParseHex("68537CC5234E505BD14" +
-				"061F8DA9E90C220A181855FD8BDB7F127BB12403B4D3B"),
+			keyOrder:           []int{0, 1, 2},
+			aggNonce:           aggregatedNonce,
+			expectedPartialSig: signExpected1,
 		},
 
 		// Vector 2
 		{
-			keyOrder: []int{1, 0, 2},
-			aggNonce: aggregatedNonce,
-			expectedPartialSig: mustParseHex("2DF67BFFF18E3DE797E" +
-				"13C6475C963048138DAEC5CB20A357CECA7C8424295EA"),
+			keyOrder:           []int{1, 0, 2},
+			aggNonce:           aggregatedNonce,
+			expectedPartialSig: signExpected2,
 		},
 
 		// Vector 3
 		{
-			keyOrder: []int{1, 2, 0},
-			aggNonce: aggregatedNonce,
-			expectedPartialSig: mustParseHex("0D5B651E6DE34A29A12" +
-				"DE7A8B4183B4AE6A7F7FBE15CDCAFA4A3D1BCAABC7517"),
+			keyOrder:           []int{1, 2, 0},
+			aggNonce:           aggregatedNonce,
+			expectedPartialSig: signExpected3,
 		},
 
 		// Vector 4: Signer 2 provided an invalid public key
@@ -636,6 +649,261 @@ func TestMuSig2SigningTestVectors(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unable to write file: %v", err)
 		}
+	}
+}
+
+func TestMusig2PartialSigVerifyTestVectors(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		partialSig    []byte
+		nonces        [][66]byte
+		pubnonceIndex int
+		keyOrder      []int
+		tweaks        []KeyTweakDesc
+		expectedError error
+	}{
+		// A single x-only tweak.
+		{
+			keyOrder: []int{1, 2, 0},
+			nonces: [][66]byte{
+				verifyPnonce2,
+				verifyPnonce3,
+				verifyPnonce1,
+			},
+			pubnonceIndex: 2,
+			partialSig: mustParseHex("5e24c7496b565debc3b9639e" +
+				"6f1304a21597f9603d3ab05b4913641775e1375b"),
+			tweaks: []KeyTweakDesc{genTweakParity(tweak1, true)},
+		},
+		// A single ordinary tweak.
+		{
+			keyOrder: []int{1, 2, 0},
+			nonces: [][66]byte{
+				verifyPnonce2,
+				verifyPnonce3,
+				verifyPnonce1,
+			},
+			pubnonceIndex: 2,
+			partialSig: mustParseHex("78408ddcab4813d1394c97d4" +
+				"93ef1084195c1d4b52e63ecd7bc5991644e44ddd"),
+			tweaks: []KeyTweakDesc{genTweakParity(tweak1, false)},
+		},
+		// An ordinary tweak then an x-only tweak.
+		{
+			keyOrder: []int{1, 2, 0},
+			nonces: [][66]byte{
+				verifyPnonce2,
+				verifyPnonce3,
+				verifyPnonce1,
+			},
+			pubnonceIndex: 2,
+			partialSig: mustParseHex("C3A829A81480E36EC3AB0529" +
+				"64509A94EBF34210403D16B226A6F16EC85B7357"),
+			tweaks: []KeyTweakDesc{
+				genTweakParity(tweak1, false),
+				genTweakParity(tweak2, true),
+			},
+		},
+
+		// Four tweaks, in the order: x-only, ordinary, x-only, ordinary.
+		{
+			keyOrder: []int{1, 2, 0},
+			nonces: [][66]byte{
+				verifyPnonce2,
+				verifyPnonce3,
+				verifyPnonce1,
+			},
+			pubnonceIndex: 2,
+			partialSig: mustParseHex("8C4473C6A382BD3C4AD7BE5" +
+				"9818DA5ED7CF8CEC4BC21996CFDA08BB4316B8BC7"),
+			tweaks: []KeyTweakDesc{
+				genTweakParity(tweak1, true),
+				genTweakParity(tweak2, false),
+				genTweakParity(tweak3, true),
+				genTweakParity(tweak4, false),
+			},
+		},
+		// Vector 8.
+		{
+
+			partialSig:    signExpected1,
+			pubnonceIndex: 0,
+			keyOrder:      []int{0, 1, 2},
+			nonces: [][66]byte{
+				verifyPnonce1,
+				verifyPnonce2,
+				verifyPnonce3,
+			},
+		},
+		// Vector 9.
+		{
+
+			partialSig:    signExpected2,
+			pubnonceIndex: 1,
+			keyOrder:      []int{1, 0, 2},
+			nonces: [][66]byte{
+				verifyPnonce2,
+				verifyPnonce1,
+				verifyPnonce3,
+			},
+		},
+		// Vector 10.
+		{
+
+			partialSig:    signExpected3,
+			pubnonceIndex: 2,
+			keyOrder:      []int{1, 2, 0},
+			nonces: [][66]byte{
+				verifyPnonce2,
+				verifyPnonce3,
+				verifyPnonce1,
+			},
+		},
+		// Vector 11: Wrong signature (which is equal to the negation
+		// of valid signature expected[0]).
+		{
+
+			partialSig: mustParseHex("97AC833ADCB1AFA42EBF9E0" +
+				"725616F3C9A0D5B614F6FE283CEAAA37A8FFAF406"),
+			pubnonceIndex: 0,
+			keyOrder:      []int{0, 1, 2},
+			nonces: [][66]byte{
+				verifyPnonce1,
+				verifyPnonce2,
+				verifyPnonce3,
+			},
+			expectedError: ErrPartialSigInvalid,
+		},
+		// Vector 12: Wrong signer.
+		{
+
+			partialSig:    signExpected1,
+			pubnonceIndex: 1,
+			keyOrder:      []int{0, 1, 2},
+			nonces: [][66]byte{
+				verifyPnonce1,
+				verifyPnonce2,
+				verifyPnonce3,
+			},
+			expectedError: ErrPartialSigInvalid,
+		},
+		// Vector 13: Signature exceeds group size.
+		{
+
+			partialSig: mustParseHex("FFFFFFFFFFFFFFFFFFFFFFFF" +
+				"FFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141"),
+			pubnonceIndex: 0,
+			keyOrder:      []int{0, 1, 2},
+			nonces: [][66]byte{
+				verifyPnonce1,
+				verifyPnonce2,
+				verifyPnonce3,
+			},
+			expectedError: ErrPartialSigInvalid,
+		},
+		// Vector 14: Invalid pubnonce.
+		{
+
+			partialSig:    signExpected1,
+			pubnonceIndex: 0,
+			keyOrder:      []int{0, 1, 2},
+			nonces: [][66]byte{
+				canParsePubNonce("020000000000000000000000000" +
+					"000000000000000000000000000000000000009"),
+				verifyPnonce2,
+				verifyPnonce3,
+			},
+			expectedError: secp256k1.ErrPubKeyNotOnCurve,
+		},
+		// Vector 15: Invalid public key.
+		{
+
+			partialSig:    signExpected1,
+			pubnonceIndex: 0,
+			keyOrder:      []int{3, 1, 2},
+			nonces: [][66]byte{
+				verifyPnonce1,
+				verifyPnonce2,
+				verifyPnonce3,
+			},
+			expectedError: secp256k1.ErrPubKeyNotOnCurve,
+		},
+	}
+
+	for _, testCase := range testCases {
+
+		// todo find name
+		testName := fmt.Sprintf("%v/tweak=%v", testCase.pubnonceIndex, testCase.keyOrder)
+
+		t.Run(testName, func(t *testing.T) {
+
+			combinedNonce, err := AggregateNonces(testCase.nonces)
+
+			switch {
+			case testCase.expectedError != nil &&
+				errors.Is(err, testCase.expectedError):
+
+				return
+			case err != nil:
+				t.Fatalf("unable to aggregate nonces %v", err)
+			}
+
+			keySet := make([]*btcec.PublicKey, 0, len(testCase.keyOrder))
+			for _, keyIndex := range testCase.keyOrder {
+				keyBytes := signSetKeys[keyIndex]
+				pub, err := schnorr.ParsePubKey(keyBytes)
+
+				switch {
+				case testCase.expectedError != nil &&
+					errors.Is(err, testCase.expectedError):
+
+					return
+				case err != nil:
+					t.Fatalf("unable to parse pubkeys: %v", err)
+				}
+
+				keySet = append(keySet, pub)
+			}
+
+			ps := &PartialSignature{}
+			err = ps.Decode(bytes.NewBuffer(testCase.partialSig))
+
+			switch {
+			case testCase.expectedError != nil &&
+				errors.Is(err, testCase.expectedError):
+
+				return
+			case err != nil:
+				t.Fatal(err)
+			}
+
+			var opts []SignOption
+			if len(testCase.tweaks) != 0 {
+				opts = append(
+					opts, WithTweaks(testCase.tweaks...),
+				)
+			}
+
+			err = verifyPartialSig(
+				ps,
+				testCase.nonces[testCase.pubnonceIndex],
+				combinedNonce,
+				keySet,
+				signSetKeys[testCase.keyOrder[testCase.pubnonceIndex]],
+				to32ByteSlice(signTestMsg),
+				opts...,
+			)
+
+			switch {
+			case testCase.expectedError != nil &&
+				errors.Is(err, testCase.expectedError):
+
+				return
+			case err != nil:
+				t.Fatalf("unable to aggregate nonces %v", err)
+			}
+		})
 	}
 }
 
@@ -1298,4 +1566,23 @@ func getNegGBytes() []byte {
 	pk[0] = 0x3
 
 	return pk
+}
+
+func mustParsePubNonce(str string) [PubNonceSize]byte {
+	b, err := hex.DecodeString(str)
+	if err != nil {
+		panic(fmt.Errorf("unable to parse hex: %v", err))
+	}
+	if len(b) != PubNonceSize {
+		panic(fmt.Errorf("not a public nonce: %v", err))
+	}
+	return toPubNonceSlice(b)
+}
+
+func canParsePubNonce(str string) [PubNonceSize]byte {
+	b, err := hex.DecodeString(str)
+	if err != nil {
+		panic(fmt.Errorf("unable to parse hex: %v", err))
+	}
+	return toPubNonceSlice(b)
 }
