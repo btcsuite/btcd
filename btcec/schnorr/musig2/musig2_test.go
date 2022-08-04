@@ -16,6 +16,7 @@ import (
 
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 )
 
@@ -1535,6 +1536,266 @@ func (mr *memsetRandReader) Read(buf []byte) (n int, err error) {
 	return len(buf), nil
 }
 
+var (
+	combineSigKey0 = mustParseHex("487D1B83B41B4CBBD07A111F1BBC7BDC8864CF" +
+		"EF5DBF96E46E51C68399B0BEF6")
+	combineSigKey1 = mustParseHex("4795C22501BF534BC478FF619407A7EC9E8D88" +
+		"83646D69BD43A0728944EA802F")
+	combineSigKey2 = mustParseHex("0F5BE837F3AB7E7FEFF1FAA44D673C2017206A" +
+		"E836D2C7893CDE4ACB7D55EDEB")
+	combineSigKey3 = mustParseHex("0FD453223E444FCA91FB5310990AE8A0C5DAA1" +
+		"4D2A4C8944E1C0BC80C30DF682")
+
+	combineSigKeys = [][]byte{combineSigKey0, combineSigKey1,
+		combineSigKey2, combineSigKey3}
+
+	combineSigAggNonce0 = mustParsePubNonce("024FA51009A56F0D6DF737131CE1" +
+		"FBBD833797AF3B4FE6BF0D68F4D49F68B0947E0248FB3BB9191F0CFF1380" +
+		"6A3A2F1429C23012654FCE4E41F7EC9169EAA6056B21")
+	combineSigAggNonce1 = mustParsePubNonce("023B11E63E2460E5E0F1561BB700" +
+		"FEA95B991DD9CA2CBBE92A3960641FA7469F6702CA4CD38375FE8BEB857C" +
+		"770807225BFC7D712F42BA896B83FC71138E56409B21")
+	combineSigAggNonce2 = mustParsePubNonce("03F98BEAA32B8A38FE3797C4E813" +
+		"DC9CE05ADBE32200035FB37EB0A030B735E9B6030E6118EC98EA2BA7A358" +
+		"C2E38E7E13E63681EEB683E067061BF7D52DCF08E615")
+	combineSigAggNonce3 = mustParsePubNonce("026491FBCFD47148043A0F7310E6" +
+		"2EF898C10F2D0376EE6B232EAAD36F3C2E29E303020CB17D168908E2904D" +
+		"E2EB571CD232CA805A6981D0F86CDBBD2F12BD91F6D0")
+
+	psig0 = mustParseHex("E5C1CBD6E7E89FE9EE30D5F3B6D06B9C218846E4A1DEF4E" +
+		"E851410D51ABBD850")
+	psig1 = mustParseHex("9BC470F7F1C9BC848BDF179B0023282FFEF40908E0EF884" +
+		"59784A4355FC86D0C")
+	psig2 = mustParseHex("D5D8A09929BA264B2F5DF15ACA1CF2DEFA47C048DF0C323" +
+		"2E965FFE2F2831B1D")
+	psig3 = mustParseHex("A915197503C1051EA77DC91F01C3A0E60BFD64473BD536C" +
+		"B613F9645BD61C843")
+	psig4 = mustParseHex("99A144D7076A128022134E036B8BDF33811F7EAED9A1E48" +
+		"549B46D8A63D64DC9")
+	psig5 = mustParseHex("716A72A0C1E531EBB4555C8E29FD35C796F4F231C3B0391" +
+		"93D7E8D7AEFBDF5F7")
+	psig6 = mustParseHex("06B6DD04BC0F1EF740916730AD7DAC794255B1612217197" +
+		"65BDE9686A26633DC")
+	psig7 = mustParseHex("BF6D85D4930062726EBC6EBB184AFD68DBB3FED159C5019" +
+		"89690A62600D6FBAB")
+
+	combineSigExpected0 = mustParseHex("4006D4D069F3B51E968762FF8074153E2" +
+		"78E5BCD221AABE0743CA001B77E79F581863CCED9B25C6E7A0FED8EB6F39" +
+		"3CD65CD7306D385DCF85CC6567DAA4E041B")
+	combineSigExpected1 = mustParseHex("98BCD40DFD94B47A3DA37D7B78EB6CCE8" +
+		"ABEACA23C3ADE6F4678902410EB35C67EEDBA0E2D7B2B69D6DBBA79CBE09" +
+		"3C64B9647A96B98C8C28AD3379BDFAEA21F")
+	combineSigExpected2 = mustParseHex("3741FEDCCDD7508B58DCB9A780FF5D974" +
+		"52EC8C0448D8C97004EA7175C14F2007A54D1DE356EBA6719278436EF111" +
+		"DFA8F1B832368371B9B7A25001709039679")
+	combineSigExpected3 = mustParseHex("F4B3DA3CF0D0F7CF5C1840593BF1A1A41" +
+		"5DA341619AE848F2210696DC8C7512540962C84EF7F0CEC491065F2D5772" +
+		"13CF10E8A63D153297361B3B172BE27B61F")
+
+	combineSigTweak0 = mustParseHex32("B511DA492182A91B0FFB9A98020D55F260" +
+		"AE86D7ECBD0399C7383D59A5F2AF7C")
+	combineSigTweak1 = mustParseHex32("A815FE049EE3C5AAB66310477FBC8BCCCA" +
+		"C2F3395F59F921C364ACD78A2F48DC")
+	combineSigTweak2 = mustParseHex32("75448A87274B056468B977BE06EB1E9F65" +
+		"7577B7320B0A3376EA51FD420D18A8")
+	tweak0False = KeyTweakDesc{
+		Tweak:   combineSigTweak0,
+		IsXOnly: false,
+	}
+	tweak0True = KeyTweakDesc{
+		Tweak:   combineSigTweak0,
+		IsXOnly: true,
+	}
+	tweak1False = KeyTweakDesc{
+		Tweak:   combineSigTweak1,
+		IsXOnly: false,
+	}
+	tweak2True = KeyTweakDesc{
+		Tweak:   combineSigTweak2,
+		IsXOnly: true,
+	}
+	combineSigsMsg = mustParseHex32("599C67EA410D005B9DA90817CF03ED3B1C86" +
+		"8E4DA4EDF00A5880B0082C237869")
+)
+
+func TestMusig2CombineSigsTestVectors(t *testing.T) {
+
+	testCases := []struct {
+		partialSigs   [][]byte
+		aggNonce      [66]byte
+		keyOrder      []int
+		expected      []byte
+		tweaks        []KeyTweakDesc
+		expectedError error
+	}{
+		// Vector 1
+		{
+			partialSigs: [][]byte{psig0, psig1},
+			aggNonce:    combineSigAggNonce0,
+			keyOrder:    []int{0, 1},
+			expected:    combineSigExpected0,
+		},
+		// Vector 2
+		{
+			partialSigs: [][]byte{psig2, psig3},
+			aggNonce:    combineSigAggNonce1,
+			keyOrder:    []int{0, 2},
+			expected:    combineSigExpected1,
+		},
+		// Vector 3
+		{
+			partialSigs: [][]byte{psig4, psig5},
+			aggNonce:    combineSigAggNonce2,
+			keyOrder:    []int{0, 2},
+			expected:    combineSigExpected2,
+			tweaks:      []KeyTweakDesc{tweak0False},
+		},
+		// Vector 4
+		{
+			partialSigs: [][]byte{psig6, psig7},
+			aggNonce:    combineSigAggNonce3,
+			keyOrder:    []int{0, 3},
+			expected:    combineSigExpected3,
+			tweaks: []KeyTweakDesc{
+				tweak0True,
+				tweak1False,
+				tweak2True,
+			},
+		},
+		// Vector 5: Partial signature is invalid because it exceeds group size
+		{
+			partialSigs: [][]byte{
+				psig7,
+				mustParseHex("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF" +
+					"EBAAEDCE6AF48A03BBFD25E8CD0364141"),
+			},
+			aggNonce:      combineSigAggNonce3,
+			expectedError: ErrPartialSigInvalid,
+		},
+	}
+
+	for _, testCase := range testCases {
+		var pSigs []*PartialSignature
+		for _, partialSig := range testCase.partialSigs {
+			pSig := &PartialSignature{}
+			err := pSig.Decode(bytes.NewReader(partialSig))
+
+			switch {
+			case testCase.expectedError != nil &&
+				errors.Is(err, testCase.expectedError):
+
+				return
+			case err != nil:
+				t.Fatal(err)
+			}
+
+			pSigs = append(pSigs, pSig)
+		}
+
+		keySet := make([]*btcec.PublicKey, 0, len(testCase.keyOrder))
+		for _, keyIndex := range testCase.keyOrder {
+			keyBytes := combineSigKeys[keyIndex]
+			pub, err := schnorr.ParsePubKey(keyBytes)
+			if err != nil {
+				t.Fatalf("unable to parse pubkeys: %v", err)
+			}
+			keySet = append(keySet, pub)
+		}
+
+		uniqueKeyIndex := secondUniqueKeyIndex(keySet, false)
+		aggOpts := []KeyAggOption{
+			WithUniqueKeyIndex(uniqueKeyIndex),
+		}
+		if len(testCase.tweaks) > 0 {
+			aggOpts = append(aggOpts, WithKeyTweaks(testCase.tweaks...))
+		}
+
+		combinedKey, _, _, err := AggregateKeys(
+			keySet, false, aggOpts...,
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		aggPubkey, err := aggNonceToPubkey(
+			testCase.aggNonce, combinedKey, combineSigsMsg,
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		var opts []CombineOption
+		if len(testCase.tweaks) > 0 {
+			opts = append(opts, WithTweakedCombine(
+				combineSigsMsg, keySet, testCase.tweaks, false,
+			))
+		}
+
+		sig := CombineSigs(aggPubkey, pSigs, opts...)
+		expectedSig, err := schnorr.ParseSignature(testCase.expected)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if !bytes.Equal(sig.Serialize(), expectedSig.Serialize()) {
+			t.Fatalf("sigs not expected %x \n got %x", expectedSig.Serialize(), sig.Serialize())
+		}
+
+		if !sig.Verify(combineSigsMsg[:], combinedKey.FinalKey) {
+			t.Fatal("sig not valid for m")
+		}
+	}
+}
+
+// aggNonceToPubkey gets a nonce as a public key for the TestMusig2CombineSigsTestVectors
+// test.
+// TODO(sputn1ck): build into intermediate routine.
+func aggNonceToPubkey(combinedNonce [66]byte, combinedKey *AggregateKey,
+	msg [32]byte) (*btcec.PublicKey, error) {
+
+	// b = int_from_bytes(tagged_hash('MuSig/noncecoef', aggnonce + bytes_from_point(Q) + msg)) % n
+	var (
+		nonceMsgBuf  bytes.Buffer
+		nonceBlinder btcec.ModNScalar
+	)
+	nonceMsgBuf.Write(combinedNonce[:])
+	nonceMsgBuf.Write(schnorr.SerializePubKey(combinedKey.FinalKey))
+	nonceMsgBuf.Write(msg[:])
+	nonceBlindHash := chainhash.TaggedHash(NonceBlindTag, nonceMsgBuf.Bytes())
+	nonceBlinder.SetByteSlice(nonceBlindHash[:])
+
+	r1, err := btcec.ParsePubKey(
+		combinedNonce[:btcec.PubKeyBytesLenCompressed],
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	r2, err := btcec.ParsePubKey(
+		combinedNonce[btcec.PubKeyBytesLenCompressed:],
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	var nonce, r1J, r2J btcec.JacobianPoint
+	r1.AsJacobian(&r1J)
+	r2.AsJacobian(&r2J)
+
+	// With our nonce blinding value, we'll now combine both the public
+	// nonces, using the blinding factor to tweak the second nonce:
+	//  * R = R_1 + b*R_2
+	btcec.ScalarMultNonConst(&nonceBlinder, &r2J, &r2J)
+	btcec.AddNonConst(&r1J, &r2J, &nonce)
+
+	nonce.ToAffine()
+
+	return btcec.NewPublicKey(
+		&nonce.X, &nonce.Y,
+	), nil
+
+}
+
 func memsetLoop(a []byte, v uint8) {
 	for i := range a {
 		a[i] = byte(v)
@@ -1566,6 +1827,18 @@ func getNegGBytes() []byte {
 	pk[0] = 0x3
 
 	return pk
+}
+
+func mustParseHex32(str string) [32]byte {
+	b, err := hex.DecodeString(str)
+	if err != nil {
+		panic(fmt.Errorf("unable to parse hex: %v", err))
+	}
+	if len(b) != 32 {
+		panic(fmt.Errorf("not a 32 byte slice: %v", err))
+	}
+
+	return to32ByteSlice(b)
 }
 
 func mustParsePubNonce(str string) [PubNonceSize]byte {
