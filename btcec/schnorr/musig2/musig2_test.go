@@ -291,22 +291,28 @@ func parseKey(xHex string) *btcec.PublicKey {
 
 var (
 	signSetPrivKey, _ = btcec.PrivKeyFromBytes(
-		mustParseHex("7FB9E0E687ADA1EEBF7ECFE2F21E73EBDB51A7D450948DFE8D76D7F2D1007671"),
+		mustParseHex("7FB9E0E687ADA1EEBF7ECFE2F21E73EBDB51A7D450948DF" +
+			"E8D76D7F2D1007671"),
 	)
-	signSetPubKey, _ = schnorr.ParsePubKey(schnorr.SerializePubKey(signSetPrivKey.PubKey()))
+	signSetPubKey = schnorr.SerializePubKey(signSetPrivKey.PubKey())
 
-	signTestMsg = mustParseHex("F95466D086770E689964664219266FE5ED215C92AE20BAB5C9D79ADDDDF3C0CF")
+	signTestMsg = mustParseHex("F95466D086770E689964664219266FE5ED215C92A" +
+		"E20BAB5C9D79ADDDDF3C0CF")
 
-	signSetKey2, _ = schnorr.ParsePubKey(
-		mustParseHex("F9308A019258C31049344F85F89D5229B531C845836F99B086" +
-			"01F113BCE036F9"),
-	)
-	signSetKey3, _ = schnorr.ParsePubKey(
-		mustParseHex("DFF1D77F2A671C5F36183726DB2341BE58FEAE1DA2DECED843" +
-			"240F7B502BA659"),
-	)
+	signSetKey2 = mustParseHex("F9308A019258C31049344F85F89D5229B531C8458" +
+		"36F99B08601F113BCE036F9")
 
-	signSetKeys = []*btcec.PublicKey{signSetPubKey, signSetKey2, signSetKey3}
+	signSetKey3 = mustParseHex("DFF1D77F2A671C5F36183726DB2341BE58FEAE1DA" +
+		"2DECED843240F7B502BA659")
+
+	invalidSetKey1 = mustParseHex("00000000000000000000000000000000" +
+		"00000000000000000000000000000007")
+
+	signSetKeys = [][]byte{signSetPubKey, signSetKey2, signSetKey3, invalidPk1}
+
+	aggregatedNonce = toPubNonceSlice(mustParseHex("028465FCF0BBDBCF443AA" +
+		"BCCE533D42B4B5A10966AC09A49655E8C42DAAB8FCD61037496A3CC86926" +
+		"D452CAFCFD55D25972CA1675D549310DE296BFF42F72EEEA8C9"))
 )
 
 func formatTweakParity(tweaks []KeyTweakDesc) string {
@@ -331,20 +337,21 @@ type jsonTweak struct {
 	XOnly bool   `json:"x_only"`
 }
 
-type tweakSignCase struct {
-	Keys   []string    `json:"keys"`
-	Tweaks []jsonTweak `json:"tweaks,omitempty"`
+type jsonTweakSignCase struct {
+	Keys     []string    `json:"keys"`
+	Tweaks   []jsonTweak `json:"tweaks,omitempty"`
+	AggNonce string      `json:"agg_nonce"`
 
-	ExpectedSig string `json:"expected_sig"`
+	ExpectedSig   string `json:"expected_sig"`
+	ExpectedError string `json:"expected_error`
 }
 
 type jsonSignTestCase struct {
 	SecNonce   string `json:"secret_nonce"`
-	AggNonce   string `json:"agg_nonce"`
 	SigningKey string `json:"signing_key"`
 	Msg        string `json:"msg"`
 
-	TestCases []tweakSignCase `json:"test_cases"`
+	TestCases []jsonTweakSignCase `json:"test_cases"`
 }
 
 // TestMuSig2SigningTestVectors tests that the musig2 implementation produces
@@ -357,21 +364,11 @@ func TestMuSig2SigningTestVectors(t *testing.T) {
 	jsonCases.SigningKey = hex.EncodeToString(signSetPrivKey.Serialize())
 	jsonCases.Msg = hex.EncodeToString(signTestMsg)
 
-	var aggregatedNonce [PubNonceSize]byte
-	copy(
-		aggregatedNonce[:],
-		mustParseHex("028465FCF0BBDBCF443AABCCE533D42B4B5A10966AC09A49655E8C42DAAB8FCD61"),
-	)
-	copy(
-		aggregatedNonce[33:],
-		mustParseHex("037496A3CC86926D452CAFCFD55D25972CA1675D549310DE296BFF42F72EEEA8C9"),
-	)
-
-	jsonCases.AggNonce = hex.EncodeToString(aggregatedNonce[:])
-
 	var secNonce [SecNonceSize]byte
-	copy(secNonce[:], mustParseHex("508B81A611F100A6B2B6B29656590898AF488BCF2E1F55CF22E5CFB84421FE61"))
-	copy(secNonce[32:], mustParseHex("FA27FD49B1D50085B481285E1CA205D55C82CC1B31FF5CD54A489829355901F7"))
+	copy(secNonce[:], mustParseHex("508B81A611F100A6B2B6B29656590898AF488B"+
+		"CF2E1F55CF22E5CFB84421FE61"))
+	copy(secNonce[32:], mustParseHex("FA27FD49B1D50085B481285E1CA205D55C82"+
+		"CC1B31FF5CD54A489829355901F7"))
 
 	jsonCases.SecNonce = hex.EncodeToString(secNonce[:])
 
@@ -410,40 +407,105 @@ func TestMuSig2SigningTestVectors(t *testing.T) {
 
 	testCases := []struct {
 		keyOrder           []int
+		aggNonce           [66]byte
 		expectedPartialSig []byte
 		tweaks             []KeyTweakDesc
+		expectedError      error
 	}{
+		// Vector 1
 		{
-			keyOrder:           []int{0, 1, 2},
-			expectedPartialSig: mustParseHex("68537CC5234E505BD14061F8DA9E90C220A181855FD8BDB7F127BB12403B4D3B"),
+			keyOrder: []int{0, 1, 2},
+			aggNonce: aggregatedNonce,
+			expectedPartialSig: mustParseHex("68537CC5234E505BD14" +
+				"061F8DA9E90C220A181855FD8BDB7F127BB12403B4D3B"),
 		},
+
+		// Vector 2
 		{
-			keyOrder:           []int{1, 0, 2},
-			expectedPartialSig: mustParseHex("2DF67BFFF18E3DE797E13C6475C963048138DAEC5CB20A357CECA7C8424295EA"),
+			keyOrder: []int{1, 0, 2},
+			aggNonce: aggregatedNonce,
+			expectedPartialSig: mustParseHex("2DF67BFFF18E3DE797E" +
+				"13C6475C963048138DAEC5CB20A357CECA7C8424295EA"),
 		},
+
+		// Vector 3
 		{
-			keyOrder:           []int{1, 2, 0},
-			expectedPartialSig: mustParseHex("0D5B651E6DE34A29A12DE7A8B4183B4AE6A7F7FBE15CDCAFA4A3D1BCAABC7517"),
+			keyOrder: []int{1, 2, 0},
+			aggNonce: aggregatedNonce,
+			expectedPartialSig: mustParseHex("0D5B651E6DE34A29A12" +
+				"DE7A8B4183B4AE6A7F7FBE15CDCAFA4A3D1BCAABC7517"),
+		},
+
+		// Vector 4: Signer 2 provided an invalid public key
+		{
+			keyOrder:      []int{1, 0, 3},
+			aggNonce:      aggregatedNonce,
+			expectedError: secp256k1.ErrPubKeyNotOnCurve,
+		},
+
+		// Vector 5: Aggregate nonce is invalid due wrong tag, 0x04,
+		// in the first half.
+		{
+
+			keyOrder: []int{1, 2, 0},
+			aggNonce: toPubNonceSlice(
+				mustParseHex("048465FCF0BBDBCF443AABCCE533D42" +
+					"B4B5A10966AC09A49655E8C42DAAB8FCD610" +
+					"37496A3CC86926D452CAFCFD55D25972CA16" +
+					"75D549310DE296BFF42F72EEEA8C9")),
+			expectedError: secp256k1.ErrPubKeyInvalidFormat,
+		},
+
+		// Vector 6: Aggregate nonce is invalid because the second half
+		// does not correspond to an X coordinate.
+		{
+
+			keyOrder: []int{1, 2, 0},
+			aggNonce: toPubNonceSlice(
+				mustParseHex("028465FCF0BBDBCF443AABCCE533D42" +
+					"B4B5A10966AC09A49655E8C42DAAB8FCD610" +
+					"200000000000000000000000000000000000" +
+					"00000000000000000000000000009")),
+			expectedError: secp256k1.ErrPubKeyNotOnCurve,
+		},
+
+		// Vector 7: Aggregate nonce is invalid because the second half
+		// exceeds field size.
+		{
+
+			keyOrder: []int{1, 2, 0},
+			aggNonce: toPubNonceSlice(
+				mustParseHex("028465FCF0BBDBCF443AABCCE533D42" +
+					"B4B5A10966AC09A49655E8C42DAAB8FCD610" +
+					"2FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF" +
+					"FFFFFFFFFFFFFFFFFFFFEFFFFFC30")),
+			expectedError: secp256k1.ErrPubKeyXTooBig,
 		},
 
 		// A single x-only tweak.
 		{
-			keyOrder:           []int{1, 2, 0},
-			expectedPartialSig: mustParseHex("5e24c7496b565debc3b9639e6f1304a21597f9603d3ab05b4913641775e1375b"),
-			tweaks:             []KeyTweakDesc{genTweakParity(tweak1, true)},
+			keyOrder: []int{1, 2, 0},
+			aggNonce: aggregatedNonce,
+			expectedPartialSig: mustParseHex("5e24c7496b565debc3b" +
+				"9639e6f1304a21597f9603d3ab05b4913641775e1375b"),
+			tweaks: []KeyTweakDesc{genTweakParity(tweak1, true)},
 		},
 
 		// A single ordinary tweak.
 		{
-			keyOrder:           []int{1, 2, 0},
-			expectedPartialSig: mustParseHex("78408ddcab4813d1394c97d493ef1084195c1d4b52e63ecd7bc5991644e44ddd"),
-			tweaks:             []KeyTweakDesc{genTweakParity(tweak1, false)},
+			keyOrder: []int{1, 2, 0},
+			aggNonce: aggregatedNonce,
+			expectedPartialSig: mustParseHex("78408ddcab4813d1394c" +
+				"97d493ef1084195c1d4b52e63ecd7bc5991644e44ddd"),
+			tweaks: []KeyTweakDesc{genTweakParity(tweak1, false)},
 		},
 
 		// An ordinary tweak then an x-only tweak.
 		{
-			keyOrder:           []int{1, 2, 0},
-			expectedPartialSig: mustParseHex("C3A829A81480E36EC3AB052964509A94EBF34210403D16B226A6F16EC85B7357"),
+			keyOrder: []int{1, 2, 0},
+			aggNonce: aggregatedNonce,
+			expectedPartialSig: mustParseHex("C3A829A81480E36EC3A" +
+				"B052964509A94EBF34210403D16B226A6F16EC85B7357"),
 			tweaks: []KeyTweakDesc{
 				genTweakParity(tweak1, false),
 				genTweakParity(tweak2, true),
@@ -452,8 +514,10 @@ func TestMuSig2SigningTestVectors(t *testing.T) {
 
 		// Four tweaks, in the order: x-only, ordinary, x-only, ordinary.
 		{
-			keyOrder:           []int{1, 2, 0},
-			expectedPartialSig: mustParseHex("8C4473C6A382BD3C4AD7BE59818DA5ED7CF8CEC4BC21996CFDA08BB4316B8BC7"),
+			keyOrder: []int{1, 2, 0},
+			aggNonce: aggregatedNonce,
+			expectedPartialSig: mustParseHex("8C4473C6A382BD3C4AD" +
+				"7BE59818DA5ED7CF8CEC4BC21996CFDA08BB4316B8BC7"),
 			tweaks: []KeyTweakDesc{
 				genTweakParity(tweak1, true),
 				genTweakParity(tweak2, false),
@@ -471,17 +535,22 @@ func TestMuSig2SigningTestVectors(t *testing.T) {
 		if len(testCase.tweaks) != 0 {
 			testName += fmt.Sprintf("/x_only=%v", formatTweakParity(testCase.tweaks))
 		}
-
 		t.Run(testName, func(t *testing.T) {
-			var strKeys []string
 			keySet := make([]*btcec.PublicKey, 0, len(testCase.keyOrder))
 			for _, keyIndex := range testCase.keyOrder {
-				keySet = append(keySet, signSetKeys[keyIndex])
-				strKeys = append(
-					strKeys, hex.EncodeToString(
-						schnorr.SerializePubKey(signSetKeys[keyIndex]),
-					),
-				)
+				keyBytes := signSetKeys[keyIndex]
+				pub, err := schnorr.ParsePubKey(keyBytes)
+
+				switch {
+				case testCase.expectedError != nil &&
+					errors.Is(err, testCase.expectedError):
+
+					return
+				case err != nil:
+					t.Fatalf("unable to parse pubkeys: %v", err)
+				}
+
+				keySet = append(keySet, pub)
 			}
 
 			var opts []SignOption
@@ -491,19 +560,17 @@ func TestMuSig2SigningTestVectors(t *testing.T) {
 				)
 			}
 
-			var jsonTweaks []jsonTweak
-			for _, tweak := range testCase.tweaks {
-				jsonTweaks = append(jsonTweaks, jsonTweak{
-					Tweak: hex.EncodeToString(tweak.Tweak[:]),
-					XOnly: tweak.IsXOnly,
-				})
-			}
-
 			partialSig, err := Sign(
-				secNonce, signSetPrivKey, aggregatedNonce,
+				secNonce, signSetPrivKey, testCase.aggNonce,
 				keySet, msg, opts...,
 			)
-			if err != nil {
+
+			switch {
+			case testCase.expectedError != nil &&
+				errors.Is(err, testCase.expectedError):
+
+				return
+			case err != nil:
 				t.Fatalf("unable to generate partial sig: %v", err)
 			}
 
@@ -516,12 +583,43 @@ func TestMuSig2SigningTestVectors(t *testing.T) {
 				)
 			}
 
-			jsonCases.TestCases = append(jsonCases.TestCases, tweakSignCase{
-				Keys:        strKeys,
-				Tweaks:      jsonTweaks,
-				ExpectedSig: hex.EncodeToString(testCase.expectedPartialSig),
-			})
 		})
+
+		if *dumpJson {
+			var (
+				strKeys   []string
+				jsonError string
+			)
+
+			for _, keyIndex := range testCase.keyOrder {
+				keyBytes := signSetKeys[keyIndex]
+				strKeys = append(strKeys, hex.EncodeToString(keyBytes))
+			}
+
+			if testCase.expectedError != nil {
+				jsonError = testCase.expectedError.Error()
+			}
+
+			tweakSignCase := jsonTweakSignCase{
+				Keys:          strKeys,
+				ExpectedSig:   hex.EncodeToString(testCase.expectedPartialSig),
+				AggNonce:      hex.EncodeToString(testCase.aggNonce[:]),
+				ExpectedError: jsonError,
+			}
+
+			var jsonTweaks []jsonTweak
+			for _, tweak := range testCase.tweaks {
+				jsonTweaks = append(
+					jsonTweaks,
+					jsonTweak{
+						Tweak: hex.EncodeToString(tweak.Tweak[:]),
+						XOnly: tweak.IsXOnly,
+					})
+			}
+			tweakSignCase.Tweaks = jsonTweaks
+
+			jsonCases.TestCases = append(jsonCases.TestCases, tweakSignCase)
+		}
 	}
 
 	if *dumpJson {
