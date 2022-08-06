@@ -1900,6 +1900,8 @@ func (state *gbtWorkState) blockTemplateResult(useCoinbaseValue bool, submitOld 
 	if template.WitnessCommitment != nil {
 		reply.DefaultWitnessCommitment = hex.EncodeToString(template.WitnessCommitment)
 		reply.Rules = append(reply.Rules, "!segwit")
+	} else {
+		reply.Rules = append(reply.Rules, "segwit")
 	}
 
 	if useCoinbaseValue {
