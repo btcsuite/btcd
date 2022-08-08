@@ -47,11 +47,11 @@ type embeddedAddressInfo struct {
 // Reference: https://bitcoincore.org/en/doc/0.20.0/rpc/wallet/getaddressinfo
 //
 // The GetAddressInfoResult has three segments:
-//   1. General information about the address.
-//   2. Metadata (Timestamp, HDKeyPath, HDSeedID) and wallet fields
-//      (IsMine, IsWatchOnly).
-//   3. Information about the embedded address in case of P2SH or P2WSH.
-//      Same structure as (1).
+//  1. General information about the address.
+//  2. Metadata (Timestamp, HDKeyPath, HDSeedID) and wallet fields
+//     (IsMine, IsWatchOnly).
+//  3. Information about the embedded address in case of P2SH or P2WSH.
+//     Same structure as (1).
 type GetAddressInfoResult struct {
 	// The following fields are identical to embeddedAddressInfo.
 	// However, the utility to generate RPC help message can't handle

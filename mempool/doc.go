@@ -31,40 +31,40 @@ proceed.  Typically, this will involve things such as relaying the transactions
 to other peers on the network and notifying the mining process that new
 transactions are available.
 
-Feature Overview
+# Feature Overview
 
 The following is a quick overview of the major features.  It is not intended to
 be an exhaustive list.
 
- - Maintain a pool of fully validated transactions
-   - Reject non-fully-spent duplicate transactions
-   - Reject coinbase transactions
-   - Reject double spends (both from the chain and other transactions in pool)
-   - Reject invalid transactions according to the network consensus rules
-   - Full script execution and validation with signature cache support
-   - Individual transaction query support
- - Orphan transaction support (transactions that spend from unknown outputs)
-   - Configurable limits (see transaction acceptance policy)
-   - Automatic addition of orphan transactions that are no longer orphans as new
-     transactions are added to the pool
-   - Individual orphan transaction query support
- - Configurable transaction acceptance policy
-   - Option to accept or reject standard transactions
-   - Option to accept or reject transactions based on priority calculations
-   - Rate limiting of low-fee and free transactions
-   - Non-zero fee threshold
-   - Max signature operations per transaction
-   - Max orphan transaction size
-   - Max number of orphan transactions allowed
- - Additional metadata tracking for each transaction
-   - Timestamp when the transaction was added to the pool
-   - Most recent block height when the transaction was added to the pool
-   - The fee the transaction pays
-   - The starting priority for the transaction
- - Manual control of transaction removal
-   - Recursive removal of all dependent transactions
+  - Maintain a pool of fully validated transactions
+  - Reject non-fully-spent duplicate transactions
+  - Reject coinbase transactions
+  - Reject double spends (both from the chain and other transactions in pool)
+  - Reject invalid transactions according to the network consensus rules
+  - Full script execution and validation with signature cache support
+  - Individual transaction query support
+  - Orphan transaction support (transactions that spend from unknown outputs)
+  - Configurable limits (see transaction acceptance policy)
+  - Automatic addition of orphan transactions that are no longer orphans as new
+    transactions are added to the pool
+  - Individual orphan transaction query support
+  - Configurable transaction acceptance policy
+  - Option to accept or reject standard transactions
+  - Option to accept or reject transactions based on priority calculations
+  - Rate limiting of low-fee and free transactions
+  - Non-zero fee threshold
+  - Max signature operations per transaction
+  - Max orphan transaction size
+  - Max number of orphan transactions allowed
+  - Additional metadata tracking for each transaction
+  - Timestamp when the transaction was added to the pool
+  - Most recent block height when the transaction was added to the pool
+  - The fee the transaction pays
+  - The starting priority for the transaction
+  - Manual control of transaction removal
+  - Recursive removal of all dependent transactions
 
-Errors
+# Errors
 
 Errors returned by this package are either the raw errors provided by underlying
 calls or of type mempool.RuleError.  Since there are two classes of rules

@@ -125,27 +125,30 @@ var (
 // the arithmetic needed for elliptic curve operations.
 //
 // The following depicts the internal representation:
-// 	 -----------------------------------------------------------------
-// 	|        n[9]       |        n[8]       | ... |        n[0]       |
-// 	| 32 bits available | 32 bits available | ... | 32 bits available |
-// 	| 22 bits for value | 26 bits for value | ... | 26 bits for value |
-// 	| 10 bits overflow  |  6 bits overflow  | ... |  6 bits overflow  |
-// 	| Mult: 2^(26*9)    | Mult: 2^(26*8)    | ... | Mult: 2^(26*0)    |
-// 	 -----------------------------------------------------------------
+//
+//	 -----------------------------------------------------------------
+//	|        n[9]       |        n[8]       | ... |        n[0]       |
+//	| 32 bits available | 32 bits available | ... | 32 bits available |
+//	| 22 bits for value | 26 bits for value | ... | 26 bits for value |
+//	| 10 bits overflow  |  6 bits overflow  | ... |  6 bits overflow  |
+//	| Mult: 2^(26*9)    | Mult: 2^(26*8)    | ... | Mult: 2^(26*0)    |
+//	 -----------------------------------------------------------------
 //
 // For example, consider the number 2^49 + 1.  It would be represented as:
-// 	n[0] = 1
-// 	n[1] = 2^23
-// 	n[2..9] = 0
+//
+//	n[0] = 1
+//	n[1] = 2^23
+//	n[2..9] = 0
 //
 // The full 256-bit value is then calculated by looping i from 9..0 and
 // doing sum(n[i] * 2^(26i)) like so:
-// 	n[9] * 2^(26*9) = 0    * 2^234 = 0
-// 	n[8] * 2^(26*8) = 0    * 2^208 = 0
-// 	...
-// 	n[1] * 2^(26*1) = 2^23 * 2^26  = 2^49
-// 	n[0] * 2^(26*0) = 1    * 2^0   = 1
-// 	Sum: 0 + 0 + ... + 2^49 + 1 = 2^49 + 1
+//
+//	n[9] * 2^(26*9) = 0    * 2^234 = 0
+//	n[8] * 2^(26*8) = 0    * 2^208 = 0
+//	...
+//	n[1] * 2^(26*1) = 2^23 * 2^26  = 2^49
+//	n[0] * 2^(26*0) = 1    * 2^0   = 1
+//	Sum: 0 + 0 + ... + 2^49 + 1 = 2^49 + 1
 type fieldVal struct {
 	n [10]uint32
 }

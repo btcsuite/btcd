@@ -39,11 +39,11 @@ func DoubleHashH(b []byte) Hash {
 
 // LbryPoWHashH calculates returns the PoW Hash.
 //
-//   doubled  := SHA256(SHA256(b))
-//   expanded := SHA512(doubled)
-//   left     := RIPEMD160(expanded[0:32])
-//   right    := RIPEMD160(expanded[32:64])
-//   result   := SHA256(SHA256(left||right))
+//	doubled  := SHA256(SHA256(b))
+//	expanded := SHA512(doubled)
+//	left     := RIPEMD160(expanded[0:32])
+//	right    := RIPEMD160(expanded[32:64])
+//	result   := SHA256(SHA256(left||right))
 func LbryPoWHashH(b []byte) Hash {
 	doubled := DoubleHashB(b)
 	expanded := sha512.Sum512(doubled)

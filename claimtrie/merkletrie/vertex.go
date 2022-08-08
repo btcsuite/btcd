@@ -17,10 +17,11 @@ func newVertex(hash *chainhash.Hash) *vertex {
 // TODO: more professional to use msgpack here?
 
 // nbuf decodes the on-disk format of a node, which has the following form:
-//   ch(1B) hash(32B)
-//   ...
-//   ch(1B) hash(32B)
-//   vhash(32B)
+//
+//	ch(1B) hash(32B)
+//	...
+//	ch(1B) hash(32B)
+//	vhash(32B)
 type nbuf []byte
 
 func (nb nbuf) entries() int {

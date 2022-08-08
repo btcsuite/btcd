@@ -26,7 +26,8 @@ type claimProgressLogger struct {
 
 // newClaimProgressLogger returns a new name progress logger.
 // The progress message is templated as follows:
-//  {progressAction} {numProcessed} {names|name} in the last {timePeriod} (total {totalProcessed})
+//
+//	{progressAction} {numProcessed} {names|name} in the last {timePeriod} (total {totalProcessed})
 func newClaimProgressLogger(progressMessage string, logger btclog.Logger) *claimProgressLogger {
 	return &claimProgressLogger{
 		lastLogNameTime: time.Now(),

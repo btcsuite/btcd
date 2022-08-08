@@ -5,7 +5,7 @@
 /*
 Package btcjson provides primitives for working with the bitcoin JSON-RPC API.
 
-Overview
+# Overview
 
 When communicating via the JSON-RPC protocol, all of the commands need to be
 marshalled to and from the the wire in the appropriate format.  This package
@@ -14,7 +14,7 @@ provides data structures and primitives to ease this process.
 In addition, it also provides some additional features such as custom command
 registration, command categorization, and reflection-based help generation.
 
-JSON-RPC Protocol Overview
+# JSON-RPC Protocol Overview
 
 This information is not necessary in order to use this package, but it does
 provide some intuition into what the marshalling and unmarshalling that is
@@ -47,39 +47,39 @@ with it) doesn't always follow the spec and will sometimes return an error
 string in the result field with a null error for certain commands.  However,
 for the most part, the error field will be set as described on failure.
 
-Marshalling and Unmarshalling
+# Marshalling and Unmarshalling
 
 Based upon the discussion above, it should be easy to see how the types of this
 package map into the required parts of the protocol
 
   - Request Objects (type Request)
-    - Commands (type <Foo>Cmd)
-    - Notifications (type <Foo>Ntfn)
+  - Commands (type <Foo>Cmd)
+  - Notifications (type <Foo>Ntfn)
   - Response Objects (type Response)
-    - Result (type <Foo>Result)
+  - Result (type <Foo>Result)
 
 To simplify the marshalling of the requests and responses, the MarshalCmd and
 MarshalResponse functions are provided.  They return the raw bytes ready to be
 sent across the wire.
 
 Unmarshalling a received Request object is a two step process:
-  1) Unmarshal the raw bytes into a Request struct instance via json.Unmarshal
-  2) Use UnmarshalCmd on the Result field of the unmarshalled Request to create
-     a concrete command or notification instance with all struct fields set
-     accordingly
+ 1. Unmarshal the raw bytes into a Request struct instance via json.Unmarshal
+ 2. Use UnmarshalCmd on the Result field of the unmarshalled Request to create
+    a concrete command or notification instance with all struct fields set
+    accordingly
 
 This approach is used since it provides the caller with access to the additional
 fields in the request that are not part of the command such as the ID.
 
 Unmarshalling a received Response object is also a two step process:
-  1) Unmarhsal the raw bytes into a Response struct instance via json.Unmarshal
-  2) Depending on the ID, unmarshal the Result field of the unmarshalled
-     Response to create a concrete type instance
+ 1. Unmarhsal the raw bytes into a Response struct instance via json.Unmarshal
+ 2. Depending on the ID, unmarshal the Result field of the unmarshalled
+    Response to create a concrete type instance
 
 As above, this approach is used since it provides the caller with access to the
 fields in the response such as the ID and Error.
 
-Command Creation
+# Command Creation
 
 This package provides two approaches for creating a new command.  This first,
 and preferred, method is to use one of the New<Foo>Cmd functions.  This allows
@@ -93,7 +93,7 @@ obviously, run-time which means any mistakes won't be found until the code is
 actually executed.  However, it is quite useful for user-supplied commands
 that are intentionally dynamic.
 
-Custom Command Registration
+# Custom Command Registration
 
 The command handling of this package is built around the concept of registered
 commands.  This is true for the wide variety of commands already provided by the
@@ -104,7 +104,7 @@ function for this purpose.
 A list of all registered methods can be obtained with the RegisteredCmdMethods
 function.
 
-Command Inspection
+# Command Inspection
 
 All registered commands are registered with flags that identify information such
 as whether the command applies to a chain server, wallet server, or is a
@@ -112,7 +112,7 @@ notification along with the method name to use.  These flags can be obtained
 with the MethodUsageFlags flags, and the method can be obtained with the
 CmdMethod function.
 
-Help Generation
+# Help Generation
 
 To facilitate providing consistent help to users of the RPC server, this package
 exposes the GenerateHelp and function which uses reflection on registered
@@ -122,7 +122,7 @@ generate the final help text.
 In addition, the MethodUsageText function is provided to generate consistent
 one-line usage for registered commands and notifications using reflection.
 
-Errors
+# Errors
 
 There are 2 distinct type of errors supported by this package:
 

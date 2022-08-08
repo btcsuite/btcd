@@ -20,7 +20,6 @@ var (
 // parameters which are command-line only. These fields are copied line-by-line
 // from "config" struct in "config.go", and the field names, types, and tags must
 // match for the test to work.
-//
 type configCmdLineOnly struct {
 	ConfigFile          string   `short:"C" long:"configfile" description:"Path to configuration file"`
 	DbType              string   `long:"dbtype" description:"Database backend to use for the Block Chain"`
