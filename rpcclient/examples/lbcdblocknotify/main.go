@@ -5,19 +5,69 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"net"
+	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/lbryio/lbcd/rpcclient"
 	"github.com/lbryio/lbcd/wire"
 	"github.com/lbryio/lbcutil"
 )
 
-func send(stratum, stratumPass, coinid, blockHash string) error {
+var (
+	coinid      = flag.String("coinid", "1425", "Coin ID")
+	stratum     = flag.String("stratum", "", "Stratum server")
+	stratumPass = flag.String("stratumpass", "", "Stratum server password")
+	rpcserver   = flag.String("rpcserver", "localhost:9245", "LBCD RPC server")
+	rpcuser     = flag.String("rpcuser", "rpcuser", "LBCD RPC username")
+	rpcpass     = flag.String("rpcpass", "rpcpass", "LBCD RPC password")
+	notls       = flag.Bool("notls", false, "Connect to LBCD with TLS disabled")
+	run         = flag.String("run", "", "Run custom shell command")
+)
+
+func onFilteredBlockConnected(height int32, header *wire.BlockHeader, txns []*lbcutil.Tx) {
+
+	blockHash := header.BlockHash().String()
+
+	log.Printf("Block connected: %v (%d) %v", blockHash, height, header.Timestamp)
+
+	if cmd := *run; len(cmd) != 0 {
+		cmd = strings.ReplaceAll(cmd, "%s", blockHash)
+		err := execCustomCommand(cmd)
+		if err != nil {
+			log.Printf("ERROR: execCustomCommand: %s", err)
+		}
+	}
+
+	if len(*stratum) > 0 && len(*stratumPass) > 0 {
+		err := stratumUpdateBlock(*stratum, *stratumPass, *coinid, blockHash)
+		if err != nil {
+			log.Printf("ERROR: stratumUpdateBlock: %s", err)
+		}
+	}
+}
+func execCustomCommand(cmd string) error {
+	strs := strings.Split(cmd, " ")
+	path, err := exec.LookPath(strs[0])
+	if errors.Is(err, exec.ErrDot) {
+		err = nil
+	}
+	if err != nil {
+		return err
+	}
+	c := exec.Command(path, strs[1:]...)
+	c.Stdout = os.Stdout
+	return c.Run()
+}
+
+func stratumUpdateBlock(stratum, stratumPass, coinid, blockHash string) error {
 	addr, err := net.ResolveTCPAddr("tcp", stratum)
 	if err != nil {
 		return fmt.Errorf("can't resolve addr: %w", err)
@@ -39,32 +89,12 @@ func send(stratum, stratumPass, coinid, blockHash string) error {
 
 	return nil
 }
-
 func main() {
-
-	var (
-		coinid      = flag.String("coinid", "1425", "Coin ID")
-		stratum     = flag.String("stratum", "lbrypool.net:3334", "Stratum server")
-		stratumPass = flag.String("stratumpass", "password", "Stratum server password")
-		rpcserver   = flag.String("rpcserver", "localhost:9245", "LBCD RPC server")
-		rpcuser     = flag.String("rpcuser", "rpcuser", "LBCD RPC username")
-		rpcpass     = flag.String("rpcpass", "rpcpass", "LBCD RPC password")
-		notls       = flag.Bool("notls", false, "Connect to LBCD with TLS disabled")
-	)
 
 	flag.Parse()
 
 	ntfnHandlers := rpcclient.NotificationHandlers{
-		OnFilteredBlockConnected: func(height int32, header *wire.BlockHeader, txns []*lbcutil.Tx) {
-
-			blockHash := header.BlockHash().String()
-
-			log.Printf("Block connected: %v (%d) %v", blockHash, height, header.Timestamp)
-
-			if err := send(*stratum, *stratumPass, *coinid, blockHash); err != nil {
-				log.Printf("ERROR: failed to notify stratum: %s", err)
-			}
-		},
+		OnFilteredBlockConnected: onFilteredBlockConnected,
 	}
 
 	// Connect to local lbcd RPC server using websockets.
