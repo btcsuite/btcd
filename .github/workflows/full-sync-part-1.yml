@@ -14,7 +14,7 @@ jobs:
     runs-on: self-hosted
     strategy:
       matrix:
-        go: [1.18.2]
+        go: [1.19]
     steps:
       - run: |
           echo "Note ${{ github.event.inputs.note }}!"

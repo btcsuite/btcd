@@ -26,7 +26,7 @@ Using a fast NVMe disk is recommended.
 
 Acquire binary files from [releases](https://github.com/lbryio/lbcd/releases)
 
-For compilation, [Go](http://golang.org) 1.18 or newer is required.
+For compilation, [Go](http://golang.org) 1.19 or newer is required.
 Install Go according to its [installation instructions](http://golang.org/doc/install).
 
 ``` sh

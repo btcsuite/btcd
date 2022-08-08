@@ -16,7 +16,7 @@
 
 ARG ARCH=amd64
 
-FROM golang:1.18.2 AS build-container
+FROM golang:1.19 AS build-container
 
 ARG ARCH
 
