@@ -11,6 +11,7 @@ import (
 
 	"github.com/lbryio/lbcd/chaincfg/chainhash"
 	"github.com/lbryio/lbcd/txscript"
+	"github.com/lbryio/lbcd/wire"
 	btcutil "github.com/lbryio/lbcutil"
 )
 
@@ -227,6 +228,20 @@ func ValidateWitnessCommitment(blk *btcutil.Block) error {
 	// coinbase transaction MUST have exactly one witness element within
 	// its witness data and that element must be exactly
 	// CoinbaseWitnessDataLen bytes.
+	//
+	// Some popular pool software, for example yiimp, uses pre-BIP0141
+	// coinbase struture. In this case, we don't just accept it, but also
+	// turn it into post-BIP0141 format.
+	if len(coinbaseTx.MsgTx().TxIn[0].Witness) == 0 {
+		log.Infof("pre-BIP0141 coinbase transaction detected. Height: %d", blk.Height())
+
+		var witnessNonce [CoinbaseWitnessDataLen]byte
+		coinbaseTx.MsgTx().TxIn[0].Witness = wire.TxWitness{witnessNonce[:]}
+		blk.MsgBlock().Transactions[0].TxIn[0].Witness = wire.TxWitness{witnessNonce[:]}
+
+		// Clear cached serialized block.
+		blk.SetBytes(nil)
+	}
 	coinbaseWitness := coinbaseTx.MsgTx().TxIn[0].Witness
 	if len(coinbaseWitness) != 1 {
 		str := fmt.Sprintf("the coinbase transaction has %d items in "+
