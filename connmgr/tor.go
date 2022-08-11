@@ -106,24 +106,39 @@ func TorLookupIP(host, proxy string) ([]net.IP, error) {
 		}
 		return nil, ErrTorInvalidProxyResponse
 	}
-	if buf[3] != 1 {
+
+	addr := make([]net.IP, 1)
+
+	switch buf[3] {
+	case 1:
+		buf = make([]byte, 4)
+		bytes, err := conn.Read(buf)
+		if err != nil {
+			return nil, err
+		}
+		if bytes != 4 {
+			return nil, ErrTorInvalidAddressResponse
+		}
+
+		r := binary.BigEndian.Uint32(buf)
+		addr[0] = net.IPv4(byte(r>>24), byte(r>>16), byte(r>>8), byte(r))
+
+	case 4:
+		buf = make([]byte, 16)
+		bytes, err := conn.Read(buf)
+		if err != nil {
+			return nil, err
+		}
+		if bytes != 16 {
+			return nil, ErrTorInvalidAddressResponse
+		}
+
+		addr[0] = net.IP(buf)
+	default:
+		// Not IPv4 or IPv6.
 		err := torStatusErrors[torGeneralError]
 		return nil, err
 	}
-
-	buf = make([]byte, 4)
-	bytes, err := conn.Read(buf)
-	if err != nil {
-		return nil, err
-	}
-	if bytes != 4 {
-		return nil, ErrTorInvalidAddressResponse
-	}
-
-	r := binary.BigEndian.Uint32(buf)
-
-	addr := make([]net.IP, 1)
-	addr[0] = net.IPv4(byte(r>>24), byte(r>>16), byte(r>>8), byte(r))
 
 	return addr, nil
 }
