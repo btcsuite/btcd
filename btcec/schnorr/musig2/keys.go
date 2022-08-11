@@ -26,6 +26,10 @@ var (
 	// ErrTweakedKeyIsInfinity is returned if while tweaking a key, we end
 	// up with the point at infinity.
 	ErrTweakedKeyIsInfinity = fmt.Errorf("tweaked key is infinity point")
+
+	// ErrTweakedKeyOverflows is returned if a tweaking key is larger than
+	// 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141.
+	ErrTweakedKeyOverflows = fmt.Errorf("tweaked key is to large")
 )
 
 // sortableKeys defines a type of slice of public keys that implements the sort
@@ -286,7 +290,10 @@ func tweakKey(keyJ btcec.JacobianPoint, parityAcc btcec.ModNScalar, tweak [32]by
 	// Next, map the tweak into a mod n integer so we can use it for
 	// manipulations below.
 	tweakInt := new(btcec.ModNScalar)
-	tweakInt.SetBytes(&tweak)
+	overflows := tweakInt.SetBytes(&tweak)
+	if overflows == 1 {
+		return keyJ, parityAcc, tweakAcc, ErrTweakedKeyOverflows
+	}
 
 	// Next, we'll compute: Q_i = g*Q + t*G, where g is our parityFactor and t
 	// is the tweakInt above. We'll space things out a bit to make it easier to

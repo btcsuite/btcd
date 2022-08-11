@@ -4,12 +4,17 @@
 package btcec
 
 import (
+	"fmt"
+
 	secp "github.com/decred/dcrd/dcrec/secp256k1/v4"
 )
 
 // JacobianPoint is an element of the group formed by the secp256k1 curve in
 // Jacobian projective coordinates and thus represents a point on the curve.
 type JacobianPoint = secp.JacobianPoint
+
+// infinityPoint is the jacobian representation of the point at infinity.
+var infinityPoint JacobianPoint
 
 // MakeJacobianPoint returns a Jacobian point with the provided X, Y, and Z
 // coordinates.
@@ -60,4 +65,51 @@ func ScalarBaseMultNonConst(k *ModNScalar, result *JacobianPoint) {
 // result. The resulting point will be normalized.
 func ScalarMultNonConst(k *ModNScalar, point, result *JacobianPoint) {
 	secp.ScalarMultNonConst(k, point, result)
+}
+
+// ParseJacobian parses a byte slice point as a secp.Publickey and returns the
+// pubkey as a JacobianPoint. If the nonce is a zero slice, the infinityPoint
+// is returned.
+func ParseJacobian(point []byte) (JacobianPoint, error) {
+	var result JacobianPoint
+
+	if len(point) != 33 {
+		str := fmt.Sprintf("invalid nonce: invalid length: %v",
+			len(point))
+		return JacobianPoint{}, makeError(secp.ErrPubKeyInvalidLen, str)
+	}
+
+	if point[0] == 0x00 {
+		return infinityPoint, nil
+	}
+
+	noncePk, err := secp.ParsePubKey(point)
+	if err != nil {
+		return JacobianPoint{}, err
+	}
+	noncePk.AsJacobian(&result)
+
+	return result, nil
+}
+
+// JacobianToByteSlice converts the passed JacobianPoint to a Pubkey
+// and serializes that to a byte slice. If the JacobianPoint is the infinity
+// point, a zero slice is returned.
+func JacobianToByteSlice(point JacobianPoint) []byte {
+	if point.X == infinityPoint.X && point.Y == infinityPoint.Y {
+		return make([]byte, 33)
+	}
+
+	point.ToAffine()
+
+	return NewPublicKey(
+		&point.X, &point.Y,
+	).SerializeCompressed()
+}
+
+// GeneratorJacobian sets the passed JacobianPoint to the Generator Point.
+func GeneratorJacobian(jacobian *JacobianPoint) {
+	var k ModNScalar
+	k.SetInt(1)
+	ScalarBaseMultNonConst(&k, jacobian)
 }

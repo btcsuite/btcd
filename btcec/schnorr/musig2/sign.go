@@ -85,7 +85,10 @@ func (p *PartialSignature) Decode(r io.Reader) error {
 		return nil
 	}
 
-	p.S.SetBytes(&sBytes)
+	overflows := p.S.SetBytes(&sBytes)
+	if overflows == 1 {
+		return ErrPartialSigInvalid
+	}
 
 	return nil
 }
@@ -197,20 +200,6 @@ func Sign(secNonce [SecNonceSize]byte, privKey *btcec.PrivateKey,
 		option(opts)
 	}
 
-	// Next, we'll parse the public nonces into R1 and R2.
-	r1, err := btcec.ParsePubKey(
-		combinedNonce[:btcec.PubKeyBytesLenCompressed],
-	)
-	if err != nil {
-		return nil, err
-	}
-	r2, err := btcec.ParsePubKey(
-		combinedNonce[btcec.PubKeyBytesLenCompressed:],
-	)
-	if err != nil {
-		return nil, err
-	}
-
 	// Compute the hash of all the keys here as we'll need it do aggregate
 	// the keys and also at the final step of signing.
 	keysHash := keyHashFingerprint(pubKeys, opts.sortKeys)
@@ -256,19 +245,31 @@ func Sign(secNonce [SecNonceSize]byte, privKey *btcec.PrivateKey,
 	)
 	nonceBlinder.SetByteSlice(nonceBlindHash[:])
 
-	var nonce, r1J, r2J btcec.JacobianPoint
-	r1.AsJacobian(&r1J)
-	r2.AsJacobian(&r2J)
+	// Next, we'll parse the public nonces into R1 and R2.
+	r1J, err := btcec.ParseJacobian(
+		combinedNonce[:btcec.PubKeyBytesLenCompressed],
+	)
+	if err != nil {
+		return nil, err
+	}
+	r2J, err := btcec.ParseJacobian(
+		combinedNonce[btcec.PubKeyBytesLenCompressed:],
+	)
+	if err != nil {
+		return nil, err
+	}
 
 	// With our nonce blinding value, we'll now combine both the public
 	// nonces, using the blinding factor to tweak the second nonce:
 	//  * R = R_1 + b*R_2
+	var nonce btcec.JacobianPoint
 	btcec.ScalarMultNonConst(&nonceBlinder, &r2J, &r2J)
 	btcec.AddNonConst(&r1J, &r2J, &nonce)
 
 	// If the combined nonce it eh point at infinity, then we'll bail out.
 	if nonce == infinityPoint {
-		return nil, ErrNoncePointAtInfinity
+		G := btcec.Generator()
+		G.AsJacobian(&nonce)
 	}
 
 	// Next we'll parse out our two secret nonces, which we'll be using in
@@ -372,6 +373,7 @@ func (p *PartialSignature) Verify(pubNonce [PubNonceSize]byte,
 	signingKey *btcec.PublicKey, msg [32]byte, signOpts ...SignOption) bool {
 
 	pubKey := schnorr.SerializePubKey(signingKey)
+
 	return verifyPartialSig(
 		p, pubNonce, combinedNonce, keySet, pubKey, msg, signOpts...,
 	) == nil
@@ -396,19 +398,6 @@ func verifyPartialSig(partialSig *PartialSignature, pubNonce [PubNonceSize]byte,
 	// Next we'll parse out the two public nonces into something we can
 	// use.
 	//
-	// TODO(roasbeef): consolidate, new method
-	r1, err := btcec.ParsePubKey(
-		combinedNonce[:btcec.PubKeyBytesLenCompressed],
-	)
-	if err != nil {
-		return err
-	}
-	r2, err := btcec.ParsePubKey(
-		combinedNonce[btcec.PubKeyBytesLenCompressed:],
-	)
-	if err != nil {
-		return err
-	}
 
 	// Compute the hash of all the keys here as we'll need it do aggregate
 	// the keys and also at the final step of verification.
@@ -453,45 +442,61 @@ func verifyPartialSig(partialSig *PartialSignature, pubNonce [PubNonceSize]byte,
 	nonceBlindHash := chainhash.TaggedHash(NonceBlindTag, nonceMsgBuf.Bytes())
 	nonceBlinder.SetByteSlice(nonceBlindHash[:])
 
-	var nonce, r1J, r2J btcec.JacobianPoint
-	r1.AsJacobian(&r1J)
-	r2.AsJacobian(&r2J)
+	r1J, err := btcec.ParseJacobian(
+		combinedNonce[:btcec.PubKeyBytesLenCompressed],
+	)
+	if err != nil {
+		return err
+	}
+	r2J, err := btcec.ParseJacobian(
+		combinedNonce[btcec.PubKeyBytesLenCompressed:],
+	)
+	if err != nil {
+		return err
+	}
 
 	// With our nonce blinding value, we'll now combine both the public
 	// nonces, using the blinding factor to tweak the second nonce:
 	//  * R = R_1 + b*R_2
+
+	var nonce btcec.JacobianPoint
 	btcec.ScalarMultNonConst(&nonceBlinder, &r2J, &r2J)
 	btcec.AddNonConst(&r1J, &r2J, &nonce)
 
 	// Next, we'll parse out the set of public nonces this signer used to
 	// generate the signature.
-	pubNonce1, err := btcec.ParsePubKey(
+	pubNonce1J, err := btcec.ParseJacobian(
 		pubNonce[:btcec.PubKeyBytesLenCompressed],
 	)
 	if err != nil {
 		return err
 	}
-	pubNonce2, err := btcec.ParsePubKey(
+	pubNonce2J, err := btcec.ParseJacobian(
 		pubNonce[btcec.PubKeyBytesLenCompressed:],
 	)
 	if err != nil {
 		return err
 	}
 
+	// If the nonce is the infinity point we set it to the Generator.
+	if nonce == infinityPoint {
+		btcec.GeneratorJacobian(&nonce)
+	} else {
+		nonce.ToAffine()
+	}
+
 	// We'll perform a similar aggregation and blinding operator as we did
 	// above for the combined nonces: R' = R_1' + b*R_2'.
-	var pubNonceJ, pubNonce1J, pubNonce2J btcec.JacobianPoint
-	pubNonce1.AsJacobian(&pubNonce1J)
-	pubNonce2.AsJacobian(&pubNonce2J)
+	var pubNonceJ btcec.JacobianPoint
+
 	btcec.ScalarMultNonConst(&nonceBlinder, &pubNonce2J, &pubNonce2J)
 	btcec.AddNonConst(&pubNonce1J, &pubNonce2J, &pubNonceJ)
 
-	nonce.ToAffine()
+	pubNonceJ.ToAffine()
 
 	// If the combined nonce used in the challenge hash has an odd y
 	// coordinate, then we'll negate our final public nonce.
 	if nonce.Y.IsOdd() {
-		pubNonceJ.ToAffine()
 		pubNonceJ.Y.Negate(1)
 		pubNonceJ.Y.Normalize()
 	}

@@ -31,7 +31,7 @@ var (
 
 	// NonceGenTag is used to generate the value (from a set of required an
 	// optional field) that will be used as the part of the secret nonce.
-	NonceGenTag = []byte("Musig/nonce")
+	NonceGenTag = []byte("MuSig/nonce")
 
 	byteOrder = binary.BigEndian
 )
@@ -175,6 +175,20 @@ func WithNonceAuxInput(aux []byte) NonceGenOption {
 	}
 }
 
+// withCustomOptions allows a caller to pass a complete set of custom
+// nonceGenOpts, without needing to create custom and checked structs such as
+// *btcec.PrivateKey. This is mainly used to match the testcases provided by
+// the MuSig2 BIP.
+func withCustomOptions(customOpts nonceGenOpts) NonceGenOption {
+	return func(o *nonceGenOpts) {
+		o.randReader = customOpts.randReader
+		o.secretKey = customOpts.secretKey
+		o.combinedKey = customOpts.combinedKey
+		o.msg = customOpts.msg
+		o.auxInput = customOpts.auxInput
+	}
+}
+
 // lengthWriter is a function closure that allows a caller to control how the
 // length prefix of a byte slice is written.
 type lengthWriter func(w io.Writer, b []byte) error
@@ -270,13 +284,23 @@ func GenNonces(options ...NonceGenOption) (*Nonces, error) {
 		return nil, err
 	}
 
+	// If the options contain a secret key, we XOR it with with the tagged
+	// random bytes.
+	if len(opts.secretKey) == 32 {
+		taggedHash := chainhash.TaggedHash(NonceAuxTag, randBytes[:])
+
+		for i := 0; i < chainhash.HashSize; i++ {
+			randBytes[i] = opts.secretKey[i] ^ taggedHash[i]
+		}
+	}
+
 	// Using our randomness and the set of optional params, generate our
 	// two secret nonces: k1 and k2.
-	k1, err := genNonceAuxBytes(randBytes[:], 1, opts)
+	k1, err := genNonceAuxBytes(randBytes[:], 0, opts)
 	if err != nil {
 		return nil, err
 	}
-	k2, err := genNonceAuxBytes(randBytes[:], 2, opts)
+	k2, err := genNonceAuxBytes(randBytes[:], 1, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -307,7 +331,7 @@ func AggregateNonces(pubNonces [][PubNonceSize]byte) ([PubNonceSize]byte, error)
 	// function to extra 33 bytes at a time from the packed 2x public
 	// nonces.
 	type nonceSlicer func([PubNonceSize]byte) []byte
-	combineNonces := func(slicer nonceSlicer) (*btcec.PublicKey, error) {
+	combineNonces := func(slicer nonceSlicer) (btcec.JacobianPoint, error) {
 		// Convert the set of nonces into jacobian coordinates we can
 		// use to accumulate them all into each other.
 		pubNonceJs := make([]*btcec.JacobianPoint, len(pubNonces))
@@ -315,14 +339,12 @@ func AggregateNonces(pubNonces [][PubNonceSize]byte) ([PubNonceSize]byte, error)
 			// Using the slicer, extract just the bytes we need to
 			// decode.
 			var nonceJ btcec.JacobianPoint
-			pubNonce, err := btcec.ParsePubKey(
-				slicer(pubNonceBytes),
-			)
+
+			nonceJ, err := btcec.ParseJacobian(slicer(pubNonceBytes))
 			if err != nil {
-				return nil, err
+				return btcec.JacobianPoint{}, err
 			}
 
-			pubNonce.AsJacobian(&nonceJ)
 			pubNonceJs[i] = &nonceJ
 		}
 
@@ -335,27 +357,8 @@ func AggregateNonces(pubNonces [][PubNonceSize]byte) ([PubNonceSize]byte, error)
 			)
 		}
 
-		// Now that we've aggregated all the points, we need to check
-		// if this point is the point at infinity, if so, then we'll
-		// just return the generator. At a later step, the malicious
-		// party will be detected.
-		if aggregateNonce == infinityPoint {
-			// TODO(roasbeef): better way to get the generator w/
-			// the new API? -- via old curve params instead?
-			var generator btcec.JacobianPoint
-			one := new(btcec.ModNScalar).SetInt(1)
-			btcec.ScalarBaseMultNonConst(one, &generator)
-
-			generator.ToAffine()
-			return btcec.NewPublicKey(
-				&generator.X, &generator.Y,
-			), nil
-		}
-
 		aggregateNonce.ToAffine()
-		return btcec.NewPublicKey(
-			&aggregateNonce.X, &aggregateNonce.Y,
-		), nil
+		return aggregateNonce, nil
 	}
 
 	// The final nonce public nonce is actually two nonces, one that
@@ -368,6 +371,7 @@ func AggregateNonces(pubNonces [][PubNonceSize]byte) ([PubNonceSize]byte, error)
 	if err != nil {
 		return finalNonce, err
 	}
+
 	combinedNonce2, err := combineNonces(func(n [PubNonceSize]byte) []byte {
 		return n[btcec.PubKeyBytesLenCompressed:]
 	})
@@ -375,10 +379,10 @@ func AggregateNonces(pubNonces [][PubNonceSize]byte) ([PubNonceSize]byte, error)
 		return finalNonce, err
 	}
 
-	copy(finalNonce[:], combinedNonce1.SerializeCompressed())
+	copy(finalNonce[:], btcec.JacobianToByteSlice(combinedNonce1))
 	copy(
 		finalNonce[btcec.PubKeyBytesLenCompressed:],
-		combinedNonce2.SerializeCompressed(),
+		btcec.JacobianToByteSlice(combinedNonce2),
 	)
 
 	return finalNonce, nil

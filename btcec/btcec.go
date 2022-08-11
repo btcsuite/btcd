@@ -39,3 +39,18 @@ type CurveParams = secp.CurveParams
 func Params() *CurveParams {
 	return secp.Params()
 }
+
+// Generator returns the public key at the Generator Point.
+func Generator() *PublicKey {
+	var (
+		result JacobianPoint
+		k      secp.ModNScalar
+	)
+
+	k.SetInt(1)
+	ScalarBaseMultNonConst(&k, &result)
+
+	result.ToAffine()
+
+	return NewPublicKey(&result.X, &result.Y)
+}
