@@ -56,7 +56,7 @@ If no config is found, it creates a [default one](sample-lbcd.conf), which inclu
 
 ### RPC server
 
-RPC credentials (`rpcuser` and `rpcpass`) is required to enable RPC server. It can be specify in the `"${LBCDIR}/lbcd.conf"`, using command line options:
+RPC credentials (`rpcuser` and `rpcpass`) is required to enable RPC server. It can be specify in the `"${LBCDDIR}/lbcd.conf"`, using command line options:
 
 ``` sh
 ./lbcd --rpcuser=rpcuser --rpcpass=rpcpass
@@ -138,7 +138,7 @@ Download the snapshot, and uncompress it:
 
 ``` sh
 time curl -O https://snapshots.lbry.com/blockchain/lbcd_snapshot_1199527_v0.22.105_2022-07-27.tar.zst
-zstd -d lbcd_snapshot_1199527_v0.22.105_2022-07-27.tar.zst | tar xf - -C "${LBCDIR}"
+zstd -d --stdout lbcd_snapshot_1199527_v0.22.105_2022-07-27.tar.zst | tar xf - -C "${LBCDDIR}"
 ```
 
 If preferred, a user can download and uncompress the snapshot on the fly:
@@ -147,7 +147,7 @@ By the time the download is finished, the snapshots should be almost uncompresse
 ``` sh
 mkdir -p "${LBCDDIR}"
 
-time curl https://snapshots.lbry.com/blockchain/lbcd_snapshot_1199527_v0.22.105_2022-07-27.tar.zst | zstd -d | tar xf - -C "${LBCDIR}"
+time curl https://snapshots.lbry.com/blockchain/lbcd_snapshot_1199527_v0.22.105_2022-07-27.tar.zst | zstd -d --stdout | tar xf - -C "${LBCDDIR}"
 
 #  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
 #                                 Dload  Upload   Total   Spent    Left  Speed
