@@ -355,6 +355,75 @@ func (c *Client) GetPeerInfo() ([]btcjson.GetPeerInfoResult, error) {
 	return c.GetPeerInfoAsync().Receive()
 }
 
+// FutureListBannedResult is a future promise to deliver the result of a
+// ListBannedAsync RPC invocation (or an applicable error).
+type FutureListBannedResult chan *Response
+
+// Receive waits for the Response promised by the future and returns  data about
+// each connected network peer.
+func (r FutureListBannedResult) Receive() ([]btcjson.ListBannedResult, error) {
+	res, err := ReceiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal result as an array of ListBanned result objects.
+	var bannedPeers []btcjson.ListBannedResult
+	err = json.Unmarshal(res, &bannedPeers)
+	if err != nil {
+		return nil, err
+	}
+
+	return bannedPeers, nil
+}
+
+// SetBanCommand enumerates the available commands that the SetBanCommand function
+// accepts.
+type SetBanCommand string
+
+// Constants used to indicate the command for the SetBanCommand function.
+const (
+	// SBAdd indicates the specified host should be added as a banned
+	// peer.
+	SBAdd SetBanCommand = "add"
+
+	// SBRemove indicates the specified peer should be removed.
+	SBRemove SetBanCommand = "remove"
+)
+
+// String returns the SetBanCommand in human-readable form.
+func (cmd SetBanCommand) String() string {
+	return string(cmd)
+}
+
+// FutureSetBanResult is a future promise to deliver the result of an
+// SetBanAsync RPC invocation (or an applicable error).
+type FutureSetBanResult chan *Response
+
+// Receive waits for the Response promised by the future and returns an error if
+// any occurred when performing the specified command.
+func (r FutureSetBanResult) Receive() error {
+	_, err := ReceiveFuture(r)
+	return err
+}
+
+// SetBanAsync returns an instance of a type that can be used to get the result
+// of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+func (c *Client) SetBanAsync(addr string, command string, banTime *int,
+	absolute *bool) FutureSetBanResult {
+	cmd := btcjson.NewSetBanCmd(addr, btcjson.SetBanSubCmd(command), banTime,
+		absolute)
+	return c.SendCmd(cmd)
+}
+
+// SetBan attempts to perform the passed command on the passed persistent peer.
+// For example, it can be used to add or a remove a banned peer.
+func (c *Client) SetBan(addr string, command string, banTime *int,
+	absolute *bool) error {
+	return c.SetBanAsync(addr, command, banTime, absolute).Receive()
+}
+
 // FutureGetNetTotalsResult is a future promise to deliver the result of a
 // GetNetTotalsAsync RPC invocation (or an applicable error).
 type FutureGetNetTotalsResult chan *Response

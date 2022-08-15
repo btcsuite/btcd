@@ -56,6 +56,9 @@ var helpDescsEnUS = map[string]string{
 	"createrawtransaction-locktime":       "Locktime value; a non-zero value will also locktime-activate the inputs",
 	"createrawtransaction--result0":       "Hex-encoded bytes of the serialized transaction",
 
+	// ClearBannedCmd help.
+	"clearbanned--synopsis": "Clear all banned IPs.",
+
 	// ScriptSig help.
 	"scriptsig-asm": "Disassembly of the script",
 	"scriptsig-hex": "Hex-encoded bytes of the script",
@@ -636,6 +639,16 @@ var helpDescsEnUS = map[string]string{
 	"ping--synopsis": "Queues a ping to be sent to each connected peer.\n" +
 		"Ping times are provided by getpeerinfo via the pingtime and pingwait fields.",
 
+	// ListBannedCmd help.
+	"listbanned--synopsis": "List all banned IPs.",
+
+	// ListBannedResult help.
+	"listbannedresult-address":        "The IP of the banned node.",
+	"listbannedresult-ban_created":    "The UNIX epoch time the ban was created.",
+	"listbannedresult-banned_until":   "The UNIX epoch time the ban expires.",
+	"listbannedresult-ban_duration":   "The duration of the ban, in seconds.",
+	"listbannedresult-time_remaining": "The time remaining on the ban, in seconds",
+
 	// ReconsiderBlockCmd
 	"reconsiderblock--synopsis": "Reconsider a block for validation.",
 	"reconsiderblock-blockhash": "Hash of the block you want to reconsider",
@@ -663,6 +676,13 @@ var helpDescsEnUS = map[string]string{
 	"sendrawtransaction-feesetting":   "Whether or not to allow insanely high fees in bitcoind < v0.19.0 or the max fee rate for bitcoind v0.19.0 and later (lbcd does not yet implement this parameter, so it has no effect)",
 	"sendrawtransaction--result0":     "The hash of the transaction",
 	"allowhighfeesormaxfeerate-value": "Either the boolean value for the allowhighfees parameter in bitcoind < v0.19.0 or the numerical value for the maxfeerate field in bitcoind v0.19.0 and later",
+
+	// SetBanCmd help.
+	"setban--synopsis": "Add or remove an IP from the banned list. (Currently, subnet is not supported.)",
+	"setban-addr":      "The IP to ban. (Currently, subnet is not supported.)",
+	"setban-subcmd":    "'add' to add an IP to the list, 'remove' to remove an IP from the list",
+	"setban-bantime":   "Time in seconds the IP is banned (0 or empty means using the default time of 24h which can also be overwritten by the -bantime startup argument)",
+	"setban-absolute":  "If set, the bantime must be an absolute timestamp expressed in UNIX epoch time; default to false.",
 
 	// SetGenerateCmd help.
 	"setgenerate--synopsis":    "Set the server to generate coins (mine) or not.",
@@ -880,6 +900,7 @@ var helpDescsEnUS = map[string]string{
 // pointer to the type (or nil to indicate no return value).
 var rpcResultTypes = map[string][]interface{}{
 	"addnode":                nil,
+	"clearbanned":            nil,
 	"createrawtransaction":   {(*string)(nil)},
 	"debuglevel":             {(*string)(nil), (*string)(nil)},
 	"decoderawtransaction":   {(*btcjson.TxRawDecodeResult)(nil)},
@@ -892,11 +913,11 @@ var rpcResultTypes = map[string][]interface{}{
 	"getbestblock":           {(*btcjson.GetBestBlockResult)(nil)},
 	"getbestblockhash":       {(*string)(nil)},
 	"getblock":               {(*string)(nil), (*btcjson.GetBlockVerboseResult)(nil)},
+	"getblockchaininfo":      {(*btcjson.GetBlockChainInfoResult)(nil)},
 	"getblockcount":          {(*int64)(nil)},
 	"getblockhash":           {(*string)(nil)},
 	"getblockheader":         {(*string)(nil), (*btcjson.GetBlockHeaderVerboseResult)(nil)},
 	"getblocktemplate":       {(*btcjson.GetBlockTemplateResult)(nil), (*string)(nil), nil},
-	"getblockchaininfo":      {(*btcjson.GetBlockChainInfoResult)(nil)},
 	"getcfilter":             {(*string)(nil)},
 	"getcfilterheader":       {(*string)(nil)},
 	"getchaintips":           {(*[]btcjson.GetChainTipsResult)(nil)},
@@ -918,13 +939,15 @@ var rpcResultTypes = map[string][]interface{}{
 	"getrawmempool":          {(*[]string)(nil), (*btcjson.GetRawMempoolVerboseResult)(nil)},
 	"getrawtransaction":      {(*string)(nil), (*btcjson.TxRawResult)(nil)},
 	"gettxout":               {(*btcjson.GetTxOutResult)(nil)},
-	"node":                   nil,
 	"help":                   {(*string)(nil), (*string)(nil)},
 	"invalidateblock":        nil,
+	"listbanned":             {(*[]btcjson.ListBannedResult)(nil)},
+	"node":                   nil,
 	"ping":                   nil,
 	"reconsiderblock":        nil,
 	"searchrawtransactions":  {(*string)(nil), (*[]btcjson.SearchRawTransactionsResult)(nil)},
 	"sendrawtransaction":     {(*string)(nil)},
+	"setban":                 nil,
 	"setgenerate":            nil,
 	"signmessagewithprivkey": {(*string)(nil)},
 	"stop":                   {(*string)(nil)},

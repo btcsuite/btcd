@@ -721,6 +721,15 @@ type InfoChainResult struct {
 	Errors          string  `json:"errors"`
 }
 
+// ListBannedResult models the data returned from the listbanned command.
+type ListBannedResult struct {
+	Address       string `json:"address"`
+	BanCreated    int64  `json:"ban_created"`
+	BannedUntil   int64  `json:"banned_until"`
+	BanDuration   int64  `json:"ban_duration"`
+	TimeRemaining int64  `json:"time_remaining"`
+}
+
 // TxRawResult models the data from the getrawtransaction command.
 type TxRawResult struct {
 	Hex           string `json:"hex"`

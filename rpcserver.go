@@ -134,6 +134,7 @@ type commandHandler func(*rpcServer, interface{}, <-chan struct{}) (interface{},
 var rpcHandlers map[string]commandHandler
 var rpcHandlersBeforeInit = map[string]commandHandler{
 	"addnode":                handleAddNode,
+	"clearbanned":            handleClearBanned,
 	"createrawtransaction":   handleCreateRawTransaction,
 	"debuglevel":             handleDebugLevel,
 	"decoderawtransaction":   handleDecodeRawTransaction,
@@ -150,10 +151,10 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"getblockcount":          handleGetBlockCount,
 	"getblockhash":           handleGetBlockHash,
 	"getblockheader":         handleGetBlockHeader,
-	"getchaintips":           handleGetChainTips,
 	"getblocktemplate":       handleGetBlockTemplate,
 	"getcfilter":             handleGetCFilter,
 	"getcfilterheader":       handleGetCFilterHeader,
+	"getchaintips":           handleGetChainTips,
 	"getconnectioncount":     handleGetConnectionCount,
 	"getcurrentnet":          handleGetCurrentNet,
 	"getdifficulty":          handleGetDifficulty,
@@ -161,8 +162,8 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"gethashespersec":        handleGetHashesPerSec,
 	"getheaders":             handleGetHeaders,
 	"getinfo":                handleGetInfo,
-	"getmempoolinfo":         handleGetMempoolInfo,
 	"getmempoolentry":        handleGetMempoolEntry,
+	"getmempoolinfo":         handleGetMempoolInfo,
 	"getmininginfo":          handleGetMiningInfo,
 	"getnettotals":           handleGetNetTotals,
 	"getnetworkhashps":       handleGetNetworkHashPS,
@@ -174,11 +175,13 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"gettxout":               handleGetTxOut,
 	"help":                   handleHelp,
 	"invalidateblock":        handleInvalidateBlock,
+	"listbanned":             handleListBanned,
 	"node":                   handleNode,
 	"ping":                   handlePing,
 	"reconsiderblock":        handleReconsiderBlock,
 	"searchrawtransactions":  handleSearchRawTransactions,
 	"sendrawtransaction":     handleSendRawTransaction,
+	"setban":                 handleSetBan,
 	"setgenerate":            handleSetGenerate,
 	"signmessagewithprivkey": handleSignMessageWithPrivKey,
 	"stop":                   handleStop,
@@ -387,6 +390,21 @@ func handleAddNode(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (in
 		}
 	}
 
+	if err != nil {
+		return nil, &btcjson.RPCError{
+			Code:    btcjson.ErrRPCInvalidParameter,
+			Message: err.Error(),
+		}
+	}
+
+	// no data returned unless an error.
+	return nil, nil
+}
+
+// handleClearBanned handles clearbanned commands.
+func handleClearBanned(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+
+	err := s.cfg.ConnMgr.ClearBanned()
 	if err != nil {
 		return nil, &btcjson.RPCError{
 			Code:    btcjson.ErrRPCInvalidParameter,
@@ -3146,6 +3164,24 @@ func handleHelp(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (inter
 	return help, nil
 }
 
+// handleListBanned handles the listbanned command.
+func handleListBanned(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	banned := s.cfg.ConnMgr.BannedPeers()
+	reply := make([]*btcjson.ListBannedResult, 0, len(banned))
+	for address, period := range banned {
+		since, until := period.since, period.until
+		r := btcjson.ListBannedResult{
+			Address:       address,
+			BanCreated:    since.Unix(),
+			BannedUntil:   until.Unix(),
+			BanDuration:   int64(until.Sub(since).Seconds()),
+			TimeRemaining: int64(time.Until(until).Seconds()),
+		}
+		reply = append(reply, &r)
+	}
+	return reply, nil
+}
+
 // handlePing implements the ping command.
 func handlePing(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	// Ask server to ping \o_
@@ -3747,6 +3783,59 @@ func handleSendRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan st
 	s.cfg.ConnMgr.AddRebroadcastInventory(iv, txD)
 
 	return tx.Hash().String(), nil
+}
+
+// handleSetBan handles the setban command.
+func handleSetBan(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	c := cmd.(*btcjson.SetBanCmd)
+
+	addr := net.ParseIP(c.Addr)
+	if addr == nil {
+		return nil, &btcjson.RPCError{
+			Code:    btcjson.ErrRPCInvalidParameter,
+			Message: "invalid addr for setban",
+		}
+	}
+
+	since := time.Now()
+	until := since.Add(time.Second * time.Duration(*c.BanTime))
+	if *c.BanTime == 0 {
+		until = since.Add(defaultBanDuration)
+	}
+	if *c.Absolute {
+		until = time.Unix(int64(*c.BanTime), 0)
+	}
+
+	var err error
+	switch c.SubCmd {
+	case "add":
+		err = s.cfg.ConnMgr.SetBan(addr.String(), since, until)
+		addr := addr.String()
+		peers := s.cfg.ConnMgr.ConnectedPeers()
+		for _, peer := range peers {
+			p := peer.ToPeer()
+			if p.NA().IP.String() == addr {
+				p.Disconnect()
+			}
+		}
+	case "remove":
+		err = s.cfg.ConnMgr.RemoveBan(addr.String())
+	default:
+		return nil, &btcjson.RPCError{
+			Code:    btcjson.ErrRPCInvalidParameter,
+			Message: "invalid subcommand for setban",
+		}
+	}
+
+	if err != nil {
+		return nil, &btcjson.RPCError{
+			Code:    btcjson.ErrRPCInvalidParameter,
+			Message: err.Error(),
+		}
+	}
+
+	// no data returned unless an error.
+	return nil, nil
 }
 
 // handleSetGenerate implements the setgenerate command.
@@ -4805,6 +4894,18 @@ type rpcserverConnManager interface {
 
 	// ConnectedPeers returns an array consisting of all connected peers.
 	ConnectedPeers() []rpcserverPeer
+
+	// BannedPeers returns an array consisting of all Banned peers.
+	BannedPeers() map[string]bannedPeriod
+
+	// SetBan add the addr to the ban list.
+	SetBan(addr string, since time.Time, until time.Time) error
+
+	// RemoveBan remove the subnet from the ban list.
+	RemoveBan(subnet string) error
+
+	// ClearBanned removes all banned IPs.
+	ClearBanned() error
 
 	// PersistentPeers returns an array consisting of all the persistent
 	// peers.

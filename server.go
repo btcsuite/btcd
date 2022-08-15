@@ -156,13 +156,18 @@ type updatePeerHeightsMsg struct {
 	originPeer *peer.Peer
 }
 
+type bannedPeriod struct {
+	since time.Time
+	until time.Time
+}
+
 // peerState maintains state of inbound, persistent, outbound peers as well
 // as banned peers and outbound groups.
 type peerState struct {
 	inboundPeers    map[int32]*serverPeer
 	outboundPeers   map[int32]*serverPeer
 	persistentPeers map[int32]*serverPeer
-	banned          map[string]time.Time
+	banned          map[string]bannedPeriod
 	outboundGroups  map[string]int
 }
 
@@ -1656,10 +1661,10 @@ func (s *server) handleAddPeerMsg(state *peerState, sp *serverPeer) bool {
 		sp.Disconnect()
 		return false
 	}
-	if banEnd, ok := state.banned[host]; ok {
-		if time.Now().Before(banEnd) {
-			srvrLog.Debugf("Peer %s is banned for another %v - disconnecting",
-				host, time.Until(banEnd))
+	if ban, ok := state.banned[host]; ok {
+		if time.Now().Before(ban.until) {
+			srvrLog.Infof("Peer %s is banned for another %v - disconnecting",
+				host, time.Until(ban.until))
 			sp.Disconnect()
 			return false
 		}
@@ -1781,7 +1786,12 @@ func (s *server) handleBanPeerMsg(state *peerState, sp *serverPeer) {
 	direction := directionString(sp.Inbound())
 	srvrLog.Infof("Banned peer %s (%s) for %v", host, direction,
 		cfg.BanDuration)
-	state.banned[host] = time.Now().Add(cfg.BanDuration)
+
+	since := time.Now()
+	state.banned[host] = bannedPeriod{
+		since: since,
+		until: since.Add(cfg.BanDuration),
+	}
 }
 
 // handleRelayInvMsg deals with relaying inventory to peers that are not already
@@ -1876,6 +1886,25 @@ type getPeersMsg struct {
 	reply chan []*serverPeer
 }
 
+type listBannedPeersMsg struct {
+	reply chan map[string]bannedPeriod
+}
+
+type setBanMsg struct {
+	addr  string
+	since time.Time
+	until time.Time
+	reply chan error
+}
+
+type removeBanMsg struct {
+	addr  string
+	reply chan error
+}
+
+type clearBannedMsg struct {
+	reply chan error
+}
 type getOutboundGroup struct {
 	key   string
 	reply chan int
@@ -1923,6 +1952,29 @@ func (s *server) handleQuery(state *peerState, querymsg interface{}) {
 			peers = append(peers, sp)
 		})
 		msg.reply <- peers
+
+	case listBannedPeersMsg:
+		banned := map[string]bannedPeriod{}
+		for host, ban := range state.banned {
+			banned[host] = ban
+		}
+		msg.reply <- banned
+
+	case setBanMsg:
+		ban := bannedPeriod{
+			since: msg.since,
+			until: msg.until,
+		}
+		state.banned[msg.addr] = ban
+		msg.reply <- nil
+
+	case removeBanMsg:
+		delete(state.banned, msg.addr)
+		msg.reply <- nil
+
+	case clearBannedMsg:
+		state.banned = map[string]bannedPeriod{}
+		msg.reply <- nil
 
 	case connectNodeMsg:
 		// TODO: duplicate oneshots?
@@ -2161,7 +2213,7 @@ func (s *server) peerHandler() {
 		inboundPeers:    make(map[int32]*serverPeer),
 		persistentPeers: make(map[int32]*serverPeer),
 		outboundPeers:   make(map[int32]*serverPeer),
-		banned:          make(map[string]time.Time),
+		banned:          make(map[string]bannedPeriod),
 		outboundGroups:  make(map[string]int),
 	}
 

@@ -6,6 +6,7 @@ package main
 
 import (
 	"sync/atomic"
+	"time"
 
 	"github.com/lbryio/lbcd/blockchain"
 	"github.com/lbryio/lbcd/chaincfg/chainhash"
@@ -179,6 +180,57 @@ func (cm *rpcConnManager) ConnectedPeers() []rpcserverPeer {
 		peers = append(peers, (*rpcPeer)(sp))
 	}
 	return peers
+}
+
+// BannedPeers returns a map consisting of all banned host with banned period.
+//
+// This function is safe for concurrent access and is part of the
+// rpcserverConnManager interface implementation.
+func (cm *rpcConnManager) BannedPeers() map[string]bannedPeriod {
+	replyChan := make(chan map[string]bannedPeriod)
+	cm.server.query <- listBannedPeersMsg{reply: replyChan}
+	return <-replyChan
+}
+
+// SetBan removes the peer associated with the provided address from the
+// list of persistent peers.
+//
+// This function is safe for concurrent access and is part of the
+// rpcserverConnManager interface implementation.
+func (cm *rpcConnManager) SetBan(addr string, since, until time.Time) error {
+	replyChan := make(chan error)
+	cm.server.query <- setBanMsg{
+		addr:  addr,
+		since: since,
+		until: until,
+		reply: replyChan,
+	}
+	return <-replyChan
+}
+
+// RemoveBan removes a host from banned list.
+//
+// This function is safe for concurrent access and is part of the
+// rpcserverConnManager interface implementation.
+func (cm *rpcConnManager) RemoveBan(addr string) error {
+	replyChan := make(chan error)
+	cm.server.query <- removeBanMsg{
+		addr:  addr,
+		reply: replyChan,
+	}
+	return <-replyChan
+}
+
+// ClearBanned removes all banned host with banned period.
+//
+// This function is safe for concurrent access and is part of the
+// rpcserverConnManager interface implementation.
+func (cm *rpcConnManager) ClearBanned() error {
+	replyChan := make(chan error)
+	cm.server.query <- clearBannedMsg{
+		reply: replyChan,
+	}
+	return <-replyChan
 }
 
 // PersistentPeers returns an array consisting of all the added persistent

@@ -48,6 +48,15 @@ func NewAddNodeCmd(addr string, subCmd AddNodeSubCmd) *AddNodeCmd {
 	}
 }
 
+// ClearBannedCmd defines the clearbanned JSON-RPC command.
+type ClearBannedCmd struct{}
+
+// NewClearBannedCmd returns a new instance which can be used to issue an clearbanned
+// JSON-RPC command.
+func NewClearBannedCmd() *ClearBannedCmd {
+	return &ClearBannedCmd{}
+}
+
 // TransactionInput represents the inputs to a transaction.  Specifically a
 // transaction hash and output number pair.
 type TransactionInput struct {
@@ -757,6 +766,15 @@ func NewInvalidateBlockCmd(blockHash string) *InvalidateBlockCmd {
 	}
 }
 
+// ListBannedCmd defines the listbanned JSON-RPC command.
+type ListBannedCmd struct{}
+
+// NewListBannedCmd returns a new instance which can be used to issue a listbanned
+// JSON-RPC command.
+func NewListBannedCmd() *ListBannedCmd {
+	return &ListBannedCmd{}
+}
+
 // PingCmd defines the ping JSON-RPC command.
 type PingCmd struct{}
 
@@ -900,6 +918,39 @@ func NewBitcoindSendRawTransactionCmd(hexTx string, maxFeeRate int32) *SendRawTr
 		FeeSetting: &AllowHighFeesOrMaxFeeRate{
 			Value: &maxFeeRate,
 		},
+	}
+}
+
+// SetBanSubCmd defines the type used in the setban JSON-RPC command for the
+// sub command field.
+type SetBanSubCmd string
+
+const (
+	// SBAdd indicates the specified host should be added as a persistent
+	// peer.
+	SBAdd SetBanSubCmd = "add"
+
+	// SBRemove indicates the specified peer should be removed.
+	SBRemove SetBanSubCmd = "remove"
+)
+
+// SetBanCmd defines the setban JSON-RPC command.
+type SetBanCmd struct {
+	Addr     string
+	SubCmd   SetBanSubCmd `jsonrpcusage:"\"add|remove\""`
+	BanTime  *int         `jsonrpcdefault:"0"`
+	Absolute *bool        `jsonrpcdefault:"false"`
+}
+
+// NewSetBanCmd returns a new instance which can be used to issue an setban
+// JSON-RPC command.
+func NewSetBanCmd(addr string, subCmd SetBanSubCmd, banTime *int,
+	absolute *bool) *SetBanCmd {
+	return &SetBanCmd{
+		Addr:     addr,
+		SubCmd:   subCmd,
+		BanTime:  banTime,
+		Absolute: absolute,
 	}
 }
 
@@ -1080,6 +1131,9 @@ func init() {
 	MustRegisterCmd("getnetworkhashps", (*GetNetworkHashPSCmd)(nil), flags)
 	MustRegisterCmd("getnodeaddresses", (*GetNodeAddressesCmd)(nil), flags)
 	MustRegisterCmd("getpeerinfo", (*GetPeerInfoCmd)(nil), flags)
+	MustRegisterCmd("listbanned", (*ListBannedCmd)(nil), flags)
+	MustRegisterCmd("setban", (*SetBanCmd)(nil), flags)
+	MustRegisterCmd("clearbanned", (*ClearBannedCmd)(nil), flags)
 	MustRegisterCmd("getrawmempool", (*GetRawMempoolCmd)(nil), flags)
 	MustRegisterCmd("getrawtransaction", (*GetRawTransactionCmd)(nil), flags)
 	MustRegisterCmd("gettxout", (*GetTxOutCmd)(nil), flags)
