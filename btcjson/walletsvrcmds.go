@@ -960,6 +960,24 @@ func NewImportMultiCmd(requests []ImportMultiRequest, options *ImportMultiOption
 	}
 }
 
+// RescanBlockchainCmd defines the RescanBlockchain JSON-RPC command.
+type RescanBlockchainCmd struct {
+	StartHeight *int64 `jsonrpcdefault:"0"`
+	StopHeight  *int64 `jsonrpcdefault:"0"`
+}
+
+// NewRescanBlockchainCmd returns a new instance which can be used to issue
+// an RescanBlockchain JSON-RPC command.
+//
+// The parameters which are pointers indicate they are optional. Passing nil
+// for optional parameters will use the default value.
+func NewRescanBlockchainCmd(startHeight *int64, stopHeight *int64) *RescanBlockchainCmd {
+	return &RescanBlockchainCmd{
+		StartHeight: startHeight,
+		StopHeight:  stopHeight,
+	}
+}
+
 // PsbtInput represents an input to include in the PSBT created by the
 // WalletCreateFundedPsbtCmd command.
 type PsbtInput struct {
@@ -1081,6 +1099,7 @@ func init() {
 	MustRegisterCmd("listunspent", (*ListUnspentCmd)(nil), flags)
 	MustRegisterCmd("loadwallet", (*LoadWalletCmd)(nil), flags)
 	MustRegisterCmd("lockunspent", (*LockUnspentCmd)(nil), flags)
+	MustRegisterCmd("rescanblockchain", (*RescanBlockchainCmd)(nil), flags)
 	MustRegisterCmd("sendfrom", (*SendFromCmd)(nil), flags)
 	MustRegisterCmd("sendmany", (*SendManyCmd)(nil), flags)
 	MustRegisterCmd("sendtoaddress", (*SendToAddressCmd)(nil), flags)

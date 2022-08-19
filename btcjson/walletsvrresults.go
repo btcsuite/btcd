@@ -317,6 +317,12 @@ type ListUnspentResult struct {
 	IsStake       bool    `json:"isstake"`
 }
 
+// RescanBlockchainResult models the data returned from the rescanblockchain command.
+type RescanBlockchainResult struct {
+	StartHeight int64 `json:"start_height"`
+	StoptHeight int64 `json:"stop_height"`
+}
+
 // SignRawTransactionError models the data that contains script verification
 // errors from the signrawtransaction request.
 type SignRawTransactionError struct {

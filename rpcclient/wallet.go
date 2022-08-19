@@ -2027,6 +2027,44 @@ func (c *Client) ListReceivedByAddressIncludeEmpty(minConfirms int, includeEmpty
 		includeEmpty).Receive()
 }
 
+// FutureRescanBlockchainResult is a future promise to deliver the error result of a
+// RescanBlockchainAsync RPC invocation.
+type FutureRescanBlockchainResult chan *Response
+
+// Receive waits for the Response promised by the future and returns the result
+// of locking or unlocking the unspent output(s).
+func (r FutureRescanBlockchainResult) Receive() (*btcjson.RescanBlockchainResult, error) {
+	res, err := ReceiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal as an array of listreceivedbyaddress result objects.
+	var received btcjson.RescanBlockchainResult
+	err = json.Unmarshal(res, &received)
+	if err != nil {
+		return nil, err
+	}
+
+	return &received, nil
+}
+
+// RescanBlockchainAsync returns an instance of a type that can be used to get the
+// result of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+//
+// See RescanBlockchain for the blocking version and more details.
+func (c *Client) RescanBlockchainAsync(startHeight *int64, stopHeight *int64) FutureRescanBlockchainResult {
+	cmd := btcjson.NewRescanBlockchainCmd(startHeight, stopHeight)
+	return c.SendCmd(cmd)
+}
+
+// RescanBlockchain rescans the local blockchain for wallet related
+// transactions from the startHeight to the the inclusive stopHeight.
+func (c *Client) RescanBlockchain(startHeight *int64, stopHeight *int64) (*btcjson.RescanBlockchainResult, error) {
+	return c.RescanBlockchainAsync(startHeight, stopHeight).Receive()
+}
+
 // ************************
 // Wallet Locking Functions
 // ************************
