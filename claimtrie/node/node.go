@@ -110,7 +110,7 @@ func (n *Node) ApplyChange(chg change.Change, delay int32) error {
 }
 
 // AdjustTo activates claims and computes takeovers until it reaches the specified height.
-func (n *Node) AdjustTo(height, maxHeight int32, name []byte) *Node {
+func (n *Node) AdjustTo(height, maxHeight int32, name []byte) {
 	changed := n.handleExpiredAndActivated(height) > 0
 	n.updateTakeoverHeight(height, name, changed)
 	if maxHeight > height {
@@ -120,7 +120,6 @@ func (n *Node) AdjustTo(height, maxHeight int32, name []byte) *Node {
 			height = h
 		}
 	}
-	return n
 }
 
 func (n *Node) updateTakeoverHeight(height int32, name []byte, refindBest bool) {
@@ -339,4 +338,29 @@ func (n *Node) SortClaimsByBid() {
 		}
 		return OutPointLess(n.Claims[j].OutPoint, n.Claims[i].OutPoint)
 	})
+}
+
+func (n *Node) Clone() *Node {
+	clone := New()
+	if n.SupportSums != nil {
+		clone.SupportSums = map[string]int64{}
+		for key, value := range n.SupportSums {
+			clone.SupportSums[key] = value
+		}
+	}
+	clone.Supports = make(ClaimList, len(n.Supports))
+	for i, support := range n.Supports {
+		clone.Supports[i] = &Claim{}
+		*clone.Supports[i] = *support
+	}
+	clone.Claims = make(ClaimList, len(n.Claims))
+	for i, claim := range n.Claims {
+		clone.Claims[i] = &Claim{}
+		*clone.Claims[i] = *claim
+	}
+	clone.TakenOverAt = n.TakenOverAt
+	if n.BestClaim != nil {
+		clone.BestClaim = clone.Claims.find(byID(n.BestClaim.ClaimID))
+	}
+	return clone
 }

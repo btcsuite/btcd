@@ -21,6 +21,7 @@ type Manager interface {
 	IterateNames(predicate func(name []byte) bool)
 	Hash(name []byte) (*chainhash.Hash, int32)
 	Flush() error
+	ClearCache()
 }
 
 type BaseManager struct {
@@ -30,31 +31,62 @@ type BaseManager struct {
 	changes []change.Change
 
 	tempChanges map[string][]change.Change
+
+	cache *Cache
 }
 
 func NewBaseManager(repo Repo) (*BaseManager, error) {
 
 	nm := &BaseManager{
-		repo: repo,
+		repo:  repo,
+		cache: NewCache(10000), // TODO: how many should we cache?
 	}
 
 	return nm, nil
 }
 
+func (nm *BaseManager) ClearCache() {
+	nm.cache.clear()
+}
+
 func (nm *BaseManager) NodeAt(height int32, name []byte) (*Node, error) {
 
-	changes, err := nm.repo.LoadChanges(name)
-	if err != nil {
-		return nil, errors.Wrap(err, "in load changes")
-	}
+	n, changes, oldHeight := nm.cache.fetch(name, height)
+	if n == nil {
+		changes, err := nm.repo.LoadChanges(name)
+		if err != nil {
+			return nil, errors.Wrap(err, "in load changes")
+		}
 
-	if nm.tempChanges != nil { // making an assumption that we only ever have tempChanges for a single block
-		changes = append(changes, nm.tempChanges[string(name)]...)
-	}
+		if nm.tempChanges != nil { // making an assumption that we only ever have tempChanges for a single block
+			changes = append(changes, nm.tempChanges[string(name)]...)
+		}
 
-	n, err := nm.newNodeFromChanges(changes, height)
-	if err != nil {
-		return nil, errors.Wrap(err, "in new node")
+		n, err = nm.newNodeFromChanges(changes, height)
+		if err != nil {
+			return nil, errors.Wrap(err, "in new node")
+		}
+		// TODO: how can we tell what needs to be cached?
+		if nm.tempChanges == nil && height == nm.height && n != nil && (len(changes) > 4 || len(name) < 12) {
+			nm.cache.insert(name, n, height)
+		}
+	} else {
+		if nm.tempChanges != nil { // making an assumption that we only ever have tempChanges for a single block
+			changes = append(changes, nm.tempChanges[string(name)]...)
+			n = n.Clone()
+		} else if height != nm.height {
+			n = n.Clone()
+		}
+		updated, err := nm.updateFromChanges(n, changes, height)
+		if err != nil {
+			return nil, errors.Wrap(err, "in update from changes")
+		}
+		if !updated {
+			n.AdjustTo(oldHeight, height, name)
+		}
+		if nm.tempChanges == nil && height == nm.height {
+			nm.cache.insert(name, n, height)
+		}
 	}
 
 	return n, nil
@@ -66,17 +98,13 @@ func (nm *BaseManager) node(name []byte) (*Node, error) {
 	return nm.NodeAt(nm.height, name)
 }
 
-// newNodeFromChanges returns a new Node constructed from the changes.
-// The changes must preserve their order received.
-func (nm *BaseManager) newNodeFromChanges(changes []change.Change, height int32) (*Node, error) {
+func (nm *BaseManager) updateFromChanges(n *Node, changes []change.Change, height int32) (bool, error) {
 
-	if len(changes) == 0 {
-		return nil, nil
-	}
-
-	n := New()
-	previous := changes[0].Height
 	count := len(changes)
+	if count == 0 {
+		return false, nil
+	}
+	previous := changes[0].Height
 
 	for i, chg := range changes {
 		if chg.Height < previous {
@@ -95,15 +123,37 @@ func (nm *BaseManager) newNodeFromChanges(changes []change.Change, height int32)
 		delay := nm.getDelayForName(n, chg)
 		err := n.ApplyChange(chg, delay)
 		if err != nil {
-			return nil, errors.Wrap(err, "in apply change")
+			return false, errors.Wrap(err, "in apply change")
 		}
 	}
 
 	if count <= 0 {
-		return nil, nil
+		// we applied no changes, which means we shouldn't exist if we had all the changes
+		// or might mean nothing significant if we are applying a partial changeset
+		return false, nil
 	}
 	lastChange := changes[count-1]
-	return n.AdjustTo(lastChange.Height, height, lastChange.Name), nil
+	n.AdjustTo(lastChange.Height, height, lastChange.Name)
+	return true, nil
+}
+
+// newNodeFromChanges returns a new Node constructed from the changes.
+// The changes must preserve their order received.
+func (nm *BaseManager) newNodeFromChanges(changes []change.Change, height int32) (*Node, error) {
+
+	if len(changes) == 0 {
+		return nil, nil
+	}
+
+	n := New()
+	updated, err := nm.updateFromChanges(n, changes, height)
+	if err != nil {
+		return nil, errors.Wrap(err, "in update from changes")
+	}
+	if updated {
+		return n, nil
+	}
+	return nil, nil
 }
 
 func (nm *BaseManager) AppendChange(chg change.Change) {
@@ -220,6 +270,7 @@ func (nm *BaseManager) IncrementHeightTo(height int32, temporary bool) ([][]byte
 	}
 
 	if !temporary {
+		nm.cache.addChanges(nm.changes, height)
 		if err := nm.repo.AppendChanges(nm.changes); err != nil { // destroys names
 			return nil, errors.Wrap(err, "in append changes")
 		}
@@ -255,6 +306,8 @@ func (nm *BaseManager) DecrementHeightTo(affectedNames [][]byte, height int32) (
 				return affectedNames, errors.Wrap(err, "in drop changes")
 			}
 		}
+
+		nm.cache.drop(affectedNames)
 	}
 	nm.height = height
 

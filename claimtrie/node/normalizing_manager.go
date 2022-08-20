@@ -34,6 +34,7 @@ func (nm *NormalizingManager) IncrementHeightTo(height int32, temporary bool) ([
 func (nm *NormalizingManager) DecrementHeightTo(affectedNames [][]byte, height int32) ([][]byte, error) {
 	if nm.normalizedAt > height {
 		nm.normalizedAt = -1
+		nm.ClearCache()
 	}
 	return nm.Manager.DecrementHeightTo(affectedNames, height)
 }
@@ -110,5 +111,7 @@ func (nm *NormalizingManager) addNormalizationForkChangesIfNecessary(height int3
 
 		return true
 	}
+
+	nm.Manager.ClearCache()
 	nm.Manager.IterateNames(predicate)
 }

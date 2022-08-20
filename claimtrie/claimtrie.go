@@ -4,9 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"path/filepath"
-	"runtime"
 	"sort"
-	"sync"
 
 	"github.com/pkg/errors"
 
@@ -249,17 +247,17 @@ func (ct *ClaimTrie) AppendBlock(temporary bool) error {
 	names = append(names, expirations...)
 	names = removeDuplicates(names)
 
-	nhns := ct.makeNameHashNext(names, false, nil)
-	for nhn := range nhns {
+	for _, name := range names {
 
-		ct.merkleTrie.Update(nhn.Name, nhn.Hash, true)
-		if nhn.Next <= 0 {
+		hash, next := ct.nodeManager.Hash(name)
+		ct.merkleTrie.Update(name, hash, true)
+		if next <= 0 {
 			continue
 		}
 
-		newName := normalization.NormalizeIfNecessary(nhn.Name, nhn.Next)
+		newName := normalization.NormalizeIfNecessary(name, next)
 		updateNames = append(updateNames, newName)
-		updateHeights = append(updateHeights, nhn.Next)
+		updateHeights = append(updateHeights, next)
 	}
 	if !temporary && len(updateNames) > 0 {
 		err = ct.temporalRepo.SetNodesAt(updateNames, updateHeights)
@@ -356,22 +354,29 @@ func (ct *ClaimTrie) ResetHeight(height int32) error {
 }
 
 func (ct *ClaimTrie) runFullTrieRebuild(names [][]byte, interrupt <-chan struct{}) {
-	var nhns chan NameHashNext
 	if names == nil {
 		node.Log("Building the entire claim trie in RAM...")
 		ct.claimLogger = newClaimProgressLogger("Processed", node.GetLogger())
-		nhns = ct.makeNameHashNext(nil, true, interrupt)
-	} else {
-		ct.claimLogger = nil
-		nhns = ct.makeNameHashNext(names, false, interrupt)
-	}
 
-	for nhn := range nhns {
-		ct.merkleTrie.Update(nhn.Name, nhn.Hash, false)
-		if ct.claimLogger != nil {
-			ct.claimLogger.LogName(nhn.Name)
+		ct.nodeManager.IterateNames(func(name []byte) bool {
+			if interruptRequested(interrupt) {
+				return false
+			}
+			clone := make([]byte, len(name))
+			copy(clone, name)
+			hash, _ := ct.nodeManager.Hash(clone)
+			ct.merkleTrie.Update(clone, hash, false)
+			ct.claimLogger.LogName(name)
+			return true
+		})
+
+	} else {
+		for _, name := range names {
+			hash, _ := ct.nodeManager.Hash(name)
+			ct.merkleTrie.Update(name, hash, false)
 		}
 	}
+
 }
 
 // MerkleHash returns the Merkle Hash of the claimTrie.
@@ -437,12 +442,6 @@ func (ct *ClaimTrie) FlushToDisk() {
 	}
 }
 
-type NameHashNext struct {
-	Name []byte
-	Hash *chainhash.Hash
-	Next int32
-}
-
 func interruptRequested(interrupted <-chan struct{}) bool {
 	select {
 	case <-interrupted: // should never block on nil
@@ -451,54 +450,4 @@ func interruptRequested(interrupted <-chan struct{}) bool {
 	}
 
 	return false
-}
-
-func (ct *ClaimTrie) makeNameHashNext(names [][]byte, all bool, interrupt <-chan struct{}) chan NameHashNext {
-	inputs := make(chan []byte, 512)
-	outputs := make(chan NameHashNext, 512)
-
-	var wg sync.WaitGroup
-	hashComputationWorker := func() {
-		for name := range inputs {
-			hash, next := ct.nodeManager.Hash(name)
-			outputs <- NameHashNext{name, hash, next}
-		}
-		wg.Done()
-	}
-
-	threads := int(0.8 * float32(runtime.GOMAXPROCS(0)))
-	if threads < 1 {
-		threads = 1
-	}
-	for threads > 0 {
-		threads--
-		wg.Add(1)
-		go hashComputationWorker()
-	}
-	go func() {
-		if all {
-			ct.nodeManager.IterateNames(func(name []byte) bool {
-				if interruptRequested(interrupt) {
-					return false
-				}
-				clone := make([]byte, len(name))
-				copy(clone, name) // iteration name buffer is reused on future loops
-				inputs <- clone
-				return true
-			})
-		} else {
-			for _, name := range names {
-				if interruptRequested(interrupt) {
-					break
-				}
-				inputs <- name
-			}
-		}
-		close(inputs)
-	}()
-	go func() {
-		wg.Wait()
-		close(outputs)
-	}()
-	return outputs
 }
