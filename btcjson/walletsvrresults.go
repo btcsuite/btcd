@@ -174,6 +174,7 @@ type GetTransactionResult struct {
 	TimeReceived    int64                         `json:"timereceived"`
 	Details         []GetTransactionDetailsResult `json:"details"`
 	Hex             string                        `json:"hex"`
+	Generated       bool                          `json:"generated"`
 }
 
 type ScanningOrFalse struct {
@@ -288,7 +289,6 @@ type ListReceivedByAccountResult struct {
 // ListReceivedByAddressResult models the data from the listreceivedbyaddress
 // command.
 type ListReceivedByAddressResult struct {
-	Account           string   `json:"account"`
 	Address           string   `json:"address"`
 	Amount            float64  `json:"amount"`
 	Confirmations     uint64   `json:"confirmations"`

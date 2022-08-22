@@ -176,12 +176,13 @@ func NewGetAccountCmd(address string) *GetAccountCmd {
 
 // GetAccountAddressCmd defines the getaccountaddress JSON-RPC command.
 type GetAccountAddressCmd struct {
-	Account string
+	Account     *string `jsonrpcdefault:"\"default\""`
+	AddressType *string `jsonrpcdefault:"\"legacy\""`
 }
 
 // NewGetAccountAddressCmd returns a new instance which can be used to issue a
 // getaccountaddress JSON-RPC command.
-func NewGetAccountAddressCmd(account string) *GetAccountAddressCmd {
+func NewGetAccountAddressCmd(account *string) *GetAccountAddressCmd {
 	return &GetAccountAddressCmd{
 		Account: account,
 	}
@@ -189,12 +190,13 @@ func NewGetAccountAddressCmd(account string) *GetAccountAddressCmd {
 
 // GetAddressesByAccountCmd defines the getaddressesbyaccount JSON-RPC command.
 type GetAddressesByAccountCmd struct {
-	Account string
+	Account     *string `jsonrpcdefault:"\"default\""`
+	AddressType *string `jsonrpcdefault:"\"*\""`
 }
 
 // NewGetAddressesByAccountCmd returns a new instance which can be used to issue
 // a getaddressesbyaccount JSON-RPC command.
-func NewGetAddressesByAccountCmd(account string) *GetAddressesByAccountCmd {
+func NewGetAddressesByAccountCmd(account *string) *GetAddressesByAccountCmd {
 	return &GetAddressesByAccountCmd{
 		Account: account,
 	}
@@ -215,8 +217,9 @@ func NewGetAddressInfoCmd(address string) *GetAddressInfoCmd {
 
 // GetBalanceCmd defines the getbalance JSON-RPC command.
 type GetBalanceCmd struct {
-	Account *string
-	MinConf *int `jsonrpcdefault:"1"`
+	Account     *string `jsonrpcdefault:"\"default\""`
+	MinConf     *int    `jsonrpcdefault:"1"`
+	AddressType *string `jsonrpcdefault:"\"*\""`
 }
 
 // NewGetBalanceCmd returns a new instance which can be used to issue a
@@ -242,8 +245,8 @@ func NewGetBalancesCmd() *GetBalancesCmd {
 
 // GetNewAddressCmd defines the getnewaddress JSON-RPC command.
 type GetNewAddressCmd struct {
-	Account     *string
-	AddressType *string // must be one of legacy / p2pkh or p2sh-p2wkh / p2sh-segwit, or p2wkh / bech32
+	Account     *string `jsonrpcdefault:"\"default\""`
+	AddressType *string `jsonrpcdefault:"\"legacy\""`
 }
 
 // NewGetNewAddressCmd returns a new instance which can be used to issue a
@@ -259,7 +262,8 @@ func NewGetNewAddressCmd(account *string) *GetNewAddressCmd {
 
 // GetRawChangeAddressCmd defines the getrawchangeaddress JSON-RPC command.
 type GetRawChangeAddressCmd struct {
-	Account *string
+	Account     *string `jsonrpcdefault:"\"default\""`
+	AddressType *string `jsonrpcdefault:"\"legacy\""`
 }
 
 // NewGetRawChangeAddressCmd returns a new instance which can be used to issue a
@@ -275,8 +279,8 @@ func NewGetRawChangeAddressCmd(account *string) *GetRawChangeAddressCmd {
 
 // GetReceivedByAccountCmd defines the getreceivedbyaccount JSON-RPC command.
 type GetReceivedByAccountCmd struct {
-	Account string
-	MinConf *int `jsonrpcdefault:"1"`
+	Account *string `jsonrpcdefault:"\"default\""`
+	MinConf *int    `jsonrpcdefault:"1"`
 }
 
 // NewGetReceivedByAccountCmd returns a new instance which can be used to issue
@@ -284,7 +288,7 @@ type GetReceivedByAccountCmd struct {
 //
 // The parameters which are pointers indicate they are optional.  Passing nil
 // for optional parameters will use the default value.
-func NewGetReceivedByAccountCmd(account string, minConf *int) *GetReceivedByAccountCmd {
+func NewGetReceivedByAccountCmd(account *string, minConf *int) *GetReceivedByAccountCmd {
 	return &GetReceivedByAccountCmd{
 		Account: account,
 		MinConf: minConf,
@@ -407,7 +411,8 @@ func NewKeyPoolRefillCmd(newSize *uint) *KeyPoolRefillCmd {
 
 // ListAccountsCmd defines the listaccounts JSON-RPC command.
 type ListAccountsCmd struct {
-	MinConf *int `jsonrpcdefault:"1"`
+	MinConf     *int    `jsonrpcdefault:"1"`
+	AddressType *string `jsonrpcdefault:"\"*\""`
 }
 
 // NewListAccountsCmd returns a new instance which can be used to issue a
@@ -501,10 +506,10 @@ func NewListSinceBlockCmd(blockHash *string, targetConfirms *int, includeWatchOn
 
 // ListTransactionsCmd defines the listtransactions JSON-RPC command.
 type ListTransactionsCmd struct {
-	Account          *string
-	Count            *int  `jsonrpcdefault:"10"`
-	From             *int  `jsonrpcdefault:"0"`
-	IncludeWatchOnly *bool `jsonrpcdefault:"false"`
+	Account          *string `jsonrpcdefault:"\"default\""`
+	Count            *int    `jsonrpcdefault:"10"`
+	From             *int    `jsonrpcdefault:"0"`
+	IncludeWatchOnly *bool   `jsonrpcdefault:"false"`
 }
 
 // NewListTransactionsCmd returns a new instance which can be used to issue a
@@ -562,6 +567,7 @@ type SendFromCmd struct {
 	ToAddress   string
 	Amount      float64 // In BTC
 	MinConf     *int    `jsonrpcdefault:"1"`
+	AddressType *string `jsonrpcdefault:"\"*\""`
 	Comment     *string
 	CommentTo   *string
 }
@@ -571,12 +577,15 @@ type SendFromCmd struct {
 //
 // The parameters which are pointers indicate they are optional.  Passing nil
 // for optional parameters will use the default value.
-func NewSendFromCmd(fromAccount, toAddress string, amount float64, minConf *int, comment, commentTo *string) *SendFromCmd {
+func NewSendFromCmd(fromAccount, toAddress string, amount float64,
+	minConf *int, addrType *string, comment, commentTo *string) *SendFromCmd {
+
 	return &SendFromCmd{
 		FromAccount: fromAccount,
 		ToAddress:   toAddress,
 		Amount:      amount,
 		MinConf:     minConf,
+		AddressType: addrType,
 		Comment:     comment,
 		CommentTo:   commentTo,
 	}
@@ -587,6 +596,7 @@ type SendManyCmd struct {
 	FromAccount string
 	Amounts     map[string]float64 `jsonrpcusage:"{\"address\":amount,...}"` // In BTC
 	MinConf     *int               `jsonrpcdefault:"1"`
+	AddressType *string            `jsonrpcdefault:"\"*\""`
 	Comment     *string
 }
 
@@ -595,21 +605,24 @@ type SendManyCmd struct {
 //
 // The parameters which are pointers indicate they are optional.  Passing nil
 // for optional parameters will use the default value.
-func NewSendManyCmd(fromAccount string, amounts map[string]float64, minConf *int, comment *string) *SendManyCmd {
+func NewSendManyCmd(fromAccount string, amounts map[string]float64,
+	minConf *int, addrType *string, comment *string) *SendManyCmd {
 	return &SendManyCmd{
 		FromAccount: fromAccount,
 		Amounts:     amounts,
 		MinConf:     minConf,
+		AddressType: addrType,
 		Comment:     comment,
 	}
 }
 
 // SendToAddressCmd defines the sendtoaddress JSON-RPC command.
 type SendToAddressCmd struct {
-	Address   string
-	Amount    float64
-	Comment   *string
-	CommentTo *string
+	Address     string
+	Amount      float64
+	AddressType *string `jsonrpcdefault:"\"*\""`
+	Comment     *string
+	CommentTo   *string
 }
 
 // NewSendToAddressCmd returns a new instance which can be used to issue a
@@ -617,12 +630,14 @@ type SendToAddressCmd struct {
 //
 // The parameters which are pointers indicate they are optional.  Passing nil
 // for optional parameters will use the default value.
-func NewSendToAddressCmd(address string, amount float64, comment, commentTo *string) *SendToAddressCmd {
+func NewSendToAddressCmd(address string, amount float64, addrType *string,
+	comment, commentTo *string) *SendToAddressCmd {
 	return &SendToAddressCmd{
-		Address:   address,
-		Amount:    amount,
-		Comment:   comment,
-		CommentTo: commentTo,
+		Address:     address,
+		Amount:      amount,
+		AddressType: addrType,
+		Comment:     comment,
+		CommentTo:   commentTo,
 	}
 }
 

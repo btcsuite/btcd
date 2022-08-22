@@ -40,7 +40,7 @@ func NewExportWatchingWalletCmd(account *string, download *bool) *ExportWatching
 
 // GetUnconfirmedBalanceCmd defines the getunconfirmedbalance JSON-RPC command.
 type GetUnconfirmedBalanceCmd struct {
-	Account *string
+	Account *string `jsonrpcdefault:"\"default\""`
 }
 
 // NewGetUnconfirmedBalanceCmd returns a new instance which can be used to issue
@@ -58,7 +58,7 @@ func NewGetUnconfirmedBalanceCmd(account *string) *GetUnconfirmedBalanceCmd {
 // command.
 type ListAddressTransactionsCmd struct {
 	Addresses []string
-	Account   *string
+	Account   *string `jsonrpcdefault:"\"default\""`
 }
 
 // NewListAddressTransactionsCmd returns a new instance which can be used to
@@ -75,7 +75,7 @@ func NewListAddressTransactionsCmd(addresses []string, account *string) *ListAdd
 
 // ListAllTransactionsCmd defines the listalltransactions JSON-RPC command.
 type ListAllTransactionsCmd struct {
-	Account *string
+	Account *string `jsonrpcdefault:"\"default\""`
 }
 
 // NewListAllTransactionsCmd returns a new instance which can be used to issue a
