@@ -33,6 +33,9 @@ const (
 
 	// ErrInvalidClaimUpdateScript is returned a claim update script does not conform to the format.
 	ErrInvalidClaimUpdateScript
+
+	// ErrInvalidClaimName is returned when the claim name is invalid.
+	ErrInvalidClaimName
 )
 
 func claimScriptError(c ErrorCode, desc string) Error {
@@ -98,11 +101,15 @@ func ExtractClaimScript(script []byte) (*ClaimScript, error) {
 
 		if !tokenizer.Next() || tokenizer.Opcode() != OP_2DROP ||
 			!tokenizer.Next() || tokenizer.Opcode() != OP_DROP {
-			str := fmt.Sprintf("expect OP_2DROP OP_DROP")
-			return nil, claimScriptError(ErrInvalidClaimNameScript, str)
+			return nil, claimScriptError(ErrInvalidClaimNameScript, "expect OP_2DROP OP_DROP")
 		}
 
 		cs.Size = int(tokenizer.ByteIndex())
+		if cs.Size > MaxClaimScriptSize {
+			str := fmt.Sprintf("script size %d exceeds limit %d", cs.Size, MaxClaimScriptSize)
+			return nil, claimScriptError(ErrInvalidClaimNameScript, str)
+		}
+
 		return &cs, nil
 
 	case OP_SUPPORTCLAIM:
@@ -128,8 +135,7 @@ func ExtractClaimScript(script []byte) (*ClaimScript, error) {
 		case tokenizer.Opcode() == OP_2DROP:
 			// Case 1: OP_SUPPORTCLAIM <Name> <ClaimID> OP_2DROP OP_DROP <P2PKH>
 			if !tokenizer.Next() || tokenizer.Opcode() != OP_DROP {
-				str := fmt.Sprintf("expect OP_2DROP OP_DROP")
-				return nil, claimScriptError(ErrInvalidClaimSupportScript, str)
+				return nil, claimScriptError(ErrInvalidClaimSupportScript, "expect OP_2DROP OP_DROP")
 			}
 
 		case len(tokenizer.Data()) != 0:
@@ -138,19 +144,21 @@ func ExtractClaimScript(script []byte) (*ClaimScript, error) {
 			cs.Value = tokenizer.Data()
 			if !tokenizer.Next() || tokenizer.Opcode() != OP_2DROP ||
 				!tokenizer.Next() || tokenizer.Opcode() != OP_2DROP {
-				str := fmt.Sprintf("expect OP_2DROP OP_2DROP")
-				return nil, claimScriptError(ErrInvalidClaimSupportScript, str)
+				return nil, claimScriptError(ErrInvalidClaimSupportScript, "expect OP_2DROP OP_2DROP")
 			}
 		default:
-			str := fmt.Sprintf("expect OP_2DROP OP_DROP")
-			return nil, claimScriptError(ErrInvalidClaimSupportScript, str)
+			return nil, claimScriptError(ErrInvalidClaimSupportScript, "expect OP_2DROP OP_DROP")
 		}
 
 		cs.Size = int(tokenizer.ByteIndex())
+		if cs.Size > MaxClaimScriptSize {
+			str := fmt.Sprintf("script size %d exceeds limit %d", cs.Size, MaxClaimScriptSize)
+			return nil, claimScriptError(ErrInvalidClaimSupportScript, str)
+		}
+
 		return &cs, nil
 
 	case OP_UPDATECLAIM:
-
 		// OP_UPDATECLAIM <Name> <ClaimID> <Value> OP_2DROP OP_2DROP <P2PKH>
 		if !tokenizer.Next() || len(tokenizer.Data()) > MaxClaimNameSize {
 			str := fmt.Sprintf("name size %d exceeds limit %d", len(tokenizer.data), MaxClaimNameSize)
@@ -177,6 +185,11 @@ func ExtractClaimScript(script []byte) (*ClaimScript, error) {
 		}
 
 		cs.Size = int(tokenizer.ByteIndex())
+		if cs.Size > MaxClaimScriptSize {
+			str := fmt.Sprintf("script size %d exceeds limit %d", cs.Size, MaxClaimScriptSize)
+			return nil, claimScriptError(ErrInvalidClaimUpdateScript, str)
+		}
+
 		return &cs, nil
 
 	default:
@@ -205,10 +218,11 @@ func AllClaimsAreSane(script []byte, enforceSoftFork bool) error {
 	}
 	if enforceSoftFork {
 		if !utf8.Valid(cs.Name) {
-			return fmt.Errorf("claim name is not valid UTF-8")
+			return claimScriptError(ErrInvalidClaimName, "claim name is not valid UTF-8")
 		}
 		if bytes.ContainsAny(cs.Name, illegalChars) {
-			return fmt.Errorf("claim name has illegal chars; it should not contain any of these: %s", illegalChars)
+			str := fmt.Sprintf("claim name has illegal chars; it should not contain any of these: %s", illegalChars)
+			return claimScriptError(ErrInvalidClaimName, str)
 		}
 	}
 
