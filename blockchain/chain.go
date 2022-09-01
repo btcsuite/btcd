@@ -1394,8 +1394,8 @@ func (b *BlockChain) BlockAttributesByHash(hash *chainhash.Hash, prevHash *chain
 	attrs *BlockAttributes, best *BestState, err error) {
 	best = b.BestSnapshot()
 	node := b.index.LookupNode(hash)
-	if node == nil || !b.bestChain.Contains(node) {
-		str := fmt.Sprintf("block %s is not in the main chain", hash)
+	if node == nil {
+		str := fmt.Sprintf("block %s not found", hash)
 		return nil, best, errNotInMainChain(str)
 	}
 
@@ -1404,6 +1404,9 @@ func (b *BlockChain) BlockAttributesByHash(hash *chainhash.Hash, prevHash *chain
 		Confirmations: 1 + best.Height - node.height,
 		MedianTime:    node.CalcPastMedianTime(),
 		ChainWork:     node.workSum,
+	}
+	if !b.bestChain.Contains(node) {
+		attrs.Confirmations = -1
 	}
 
 	// Populate prev block hash if there is one.

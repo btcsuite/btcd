@@ -1211,7 +1211,7 @@ func handleGetBlock(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 	if err != nil {
 		return nil, &btcjson.RPCError{
 			Code:    btcjson.ErrRPCBlockNotFound,
-			Message: "Block not found",
+			Message: "Block not found: " + err.Error(),
 		}
 	}
 	// If verbosity is 0, return the serialized block as a hex encoded string.
