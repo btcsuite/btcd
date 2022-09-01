@@ -233,14 +233,14 @@ func TestDust(t *testing.T) {
 			true,
 		},
 		{
-			"38 byte public key script with value 584",
-			wire.TxOut{Value: 584, PkScript: pkScript},
+			"38 byte public key script with value 194",
+			wire.TxOut{Value: 194, PkScript: pkScript},
 			1000,
 			true,
 		},
 		{
-			"38 byte public key script with value 585",
-			wire.TxOut{Value: 585, PkScript: pkScript},
+			"38 byte public key script with value 195",
+			wire.TxOut{Value: 195, PkScript: pkScript},
 			1000,
 			false,
 		},

@@ -249,7 +249,7 @@ func GetDustThreshold(txOut *wire.TxOut) int64 {
 		totalSize += 107
 	}
 
-	return 3 * int64(totalSize)
+	return int64(totalSize)
 }
 
 // IsDust returns whether or not the passed transaction output amount is
@@ -264,7 +264,7 @@ func IsDust(txOut *wire.TxOut, minRelayTxFee btcutil.Amount) bool {
 	}
 
 	// The output is considered dust if the cost to the network to spend the
-	// coins is more than 1/3 of the minimum free transaction relay fee.
+	// coins is more than the minimum free transaction relay fee.
 	// minFreeTxRelayFee is in Satoshi/KB, so multiply by 1000 to
 	// convert to bytes.
 	//
@@ -273,7 +273,7 @@ func IsDust(txOut *wire.TxOut, minRelayTxFee btcutil.Amount) bool {
 	// fee of 1000, this equates to values less than 546 satoshi being
 	// considered dust.
 	//
-	// The following is equivalent to (value/totalSize) * (1/3) * 1000
+	// The following is equivalent to (value/totalSize) * 1000
 	// without needing to do floating point math.
 	if txOut.Value > dustCap {
 		return false
