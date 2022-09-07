@@ -49,7 +49,7 @@ proxy=127.0.0.1:9050
 
 The first step is to configure Tor to provide a hidden service.  Documentation
 for this can be found on the Tor project website
-[here](https://www.torproject.org/docs/tor-hidden-service.html.en).  However,
+[here](https://community.torproject.org/onion-services/setup/).  However,
 there is no need to install a web server locally as the linked instructions
 discuss since btcd will act as the server.
 
