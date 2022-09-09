@@ -78,6 +78,7 @@ var testOk bool
 
 // BenchmarkSigVerify benchmarks how long it takes the secp256k1 curve to
 // verify signatures.
+// Mind that this benchmark is not considering the hashing of the message.
 func BenchmarkSigVerify(b *testing.B) {
 	// Randomly generated keypair.
 	d := hexToModNScalar("9e0699c91ca1e3b7e3c9ba71eb71c89890872be97576010fe593fbf3fd57e66d")
