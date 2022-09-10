@@ -760,6 +760,28 @@ func NewSignRawTransactionWithWalletCmd(hexEncodedTx string, inputs *[]RawTxWitn
 	}
 }
 
+// SignRawTransactionWithKeyCmd defines the signrawtransactionwithkey JSON-RPC command.
+type SignRawTransactionWithKeyCmd struct {
+	RawTx       string
+	PrivKeys    *[]string
+	Inputs      *[]RawTxWitnessInput
+	SigHashType *string `jsonrpcdefault:"\"ALL\""`
+}
+
+// NewSignRawTransactionWithKeyCmd returns a new instance which can be used to issue a
+// signrawtransactionwithkey JSON-RPC command.
+//
+// The parameters which are pointers indicate they are optional.  Passing nil
+// for optional parameters will use the default value.
+func NewSignRawTransactionWithKeyCmd(hexEncodedTx string, privKeys []string, inputs *[]RawTxWitnessInput, sigHashType *string) *SignRawTransactionWithKeyCmd {
+	return &SignRawTransactionWithKeyCmd{
+		RawTx:       hexEncodedTx,
+		PrivKeys:    &privKeys,
+		Inputs:      inputs,
+		SigHashType: sigHashType,
+	}
+}
+
 // WalletLockCmd defines the walletlock JSON-RPC command.
 type WalletLockCmd struct{}
 
@@ -1131,6 +1153,7 @@ func init() {
 	MustRegisterCmd("signmessage", (*SignMessageCmd)(nil), flags)
 	MustRegisterCmd("signrawtransaction", (*SignRawTransactionCmd)(nil), flags)
 	MustRegisterCmd("signrawtransactionwithwallet", (*SignRawTransactionWithWalletCmd)(nil), flags)
+	MustRegisterCmd("signrawtransactionwithkey", (*SignRawTransactionWithKeyCmd)(nil), flags)
 	MustRegisterCmd("unloadwallet", (*UnloadWalletCmd)(nil), flags)
 	MustRegisterCmd("walletlock", (*WalletLockCmd)(nil), flags)
 	MustRegisterCmd("walletpassphrase", (*WalletPassphraseCmd)(nil), flags)
