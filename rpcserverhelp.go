@@ -49,10 +49,10 @@ var helpDescsEnUS = map[string]string{
 		"The transaction inputs are not signed in the created transaction.\n" +
 		"The signrawtransaction RPC command provided by wallet must be used to sign the resulting transaction.",
 	"createrawtransaction-inputs":         "The inputs to the transaction",
-	"createrawtransaction-amounts":        "JSON object with the destination addresses as keys and amounts as values",
-	"createrawtransaction-amounts--key":   "address",
-	"createrawtransaction-amounts--value": "n.nnn",
-	"createrawtransaction-amounts--desc":  "The destination address as the key and the amount in LBC as the value",
+	"createrawtransaction-outputs":        "JSON object with the destination addresses as keys and amounts as values",
+	"createrawtransaction-outputs--key":   "address or \"data\"",
+	"createrawtransaction-outputs--value": "value in BTC as floating point number or hex-encoded data for \"data\"",
+	"createrawtransaction-outputs--desc":  "The destination address as the key and the amount in LBC as the value",
 	"createrawtransaction-locktime":       "Locktime value; a non-zero value will also locktime-activate the inputs",
 	"createrawtransaction--result0":       "Hex-encoded bytes of the serialized transaction",
 

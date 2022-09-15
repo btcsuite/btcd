@@ -327,6 +327,15 @@ func rpcDecodeHexError(gotHex string) *btcjson.RPCError {
 			gotHex))
 }
 
+// rpcInvalidAddressOrKey is a convenience function for returning a nicely
+// formatted RPC error which indicates the address or key is invalid.
+func rpcInvalidAddressOrKeyError(addr string, msg string) *btcjson.RPCError {
+	return &btcjson.RPCError{
+		Code:    btcjson.ErrRPCInvalidAddressOrKey,
+		Message: msg,
+	}
+}
+
 // rpcNoTxInfoError is a convenience function for returning a nicely formatted
 // RPC error which indicates there is no information available for the provided
 // transaction hash.
@@ -568,59 +577,92 @@ func handleCreateRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan 
 	// Add all transaction outputs to the transaction after performing
 	// some validity checks.
 	params := s.cfg.ChainParams
-	for encodedAddr, amount := range c.Amounts {
-		// Ensure amount is in the valid range for monetary amounts.
-		if amount <= 0 || amount*btcutil.SatoshiPerBitcoin > btcutil.MaxSatoshi {
+
+	// Ensure amount is in the valid range for monetary amounts.
+	// Decode the provided address.
+	// Ensure the address is one of the supported types and that
+	// the network encoded with the address matches the network the
+	// server is currently on.
+	// Create a new script which pays to the provided address.
+	// Convert the amount to satoshi.
+	handleAmountFn := func(amount float64, encodedAddr string) (*wire.TxOut,
+		error) {
+
+		if amount <= 0 ||
+			amount*btcutil.SatoshiPerBitcoin > btcutil.MaxSatoshi {
 			return nil, &btcjson.RPCError{
 				Code:    btcjson.ErrRPCType,
-				Message: "Invalid amount",
+				Message: "invalid amount",
 			}
 		}
 
-		// Decode the provided address.
 		addr, err := btcutil.DecodeAddress(encodedAddr, params)
 		if err != nil {
-			return nil, &btcjson.RPCError{
-				Code:    btcjson.ErrRPCInvalidAddressOrKey,
-				Message: "Invalid address or key: " + err.Error(),
-			}
+			return nil, rpcInvalidAddressOrKeyError(encodedAddr,
+				"invalid address or key")
 		}
 
-		// Ensure the address is one of the supported types and that
-		// the network encoded with the address matches the network the
-		// server is currently on.
 		switch addr.(type) {
 		case *btcutil.AddressPubKeyHash:
 		case *btcutil.AddressScriptHash:
 		default:
-			return nil, &btcjson.RPCError{
-				Code:    btcjson.ErrRPCInvalidAddressOrKey,
-				Message: "Invalid address or key: " + addr.String(),
-			}
+			return nil, rpcInvalidAddressOrKeyError(addr.String(),
+				"invalid address or key")
 		}
 		if !addr.IsForNet(params) {
-			return nil, &btcjson.RPCError{
-				Code: btcjson.ErrRPCInvalidAddressOrKey,
-				Message: "Invalid address: " + encodedAddr +
-					" is for the wrong network",
-			}
+			return nil, rpcInvalidAddressOrKeyError(addr.String(),
+				"wrong network")
 		}
 
-		// Create a new script which pays to the provided address.
 		pkScript, err := txscript.PayToAddrScript(addr)
 		if err != nil {
-			context := "Failed to generate pay-to-address script"
+			context := "failed to generate pay-to-address script"
 			return nil, internalRPCError(err.Error(), context)
 		}
 
-		// Convert the amount to satoshi.
 		satoshi, err := btcutil.NewAmount(amount)
 		if err != nil {
-			context := "Failed to convert amount"
+			context := "failed to convert amount"
 			return nil, internalRPCError(err.Error(), context)
 		}
 
-		txOut := wire.NewTxOut(int64(satoshi), pkScript)
+		return wire.NewTxOut(int64(satoshi), pkScript), nil
+	}
+
+	handleDataFn := func(key string, value string) (*wire.TxOut, error) {
+		if key != "data" {
+			context := "output key must be an address or \"data\""
+			return nil, &btcjson.RPCError{
+				Code:    btcjson.ErrRPCInvalidParameter,
+				Message: context,
+			}
+		}
+		var data []byte
+		data, err := hex.DecodeString(value)
+		if err != nil {
+			return nil, rpcDecodeHexError(value)
+		}
+		return wire.NewTxOut(0, data), nil
+	}
+
+	for key, value := range c.Outputs {
+		var err error
+		var txOut *wire.TxOut
+		switch value := value.(type) {
+		case float64:
+			txOut, err = handleAmountFn(value, key)
+		case string:
+			txOut, err = handleDataFn(key, value)
+		default:
+			context := "output value must be a string or float"
+			return nil, &btcjson.RPCError{
+				Code:    btcjson.ErrRPCType,
+				Message: context,
+			}
+		}
+		if err != nil {
+			return nil, err
+		}
 		mtx.AddTxOut(txOut)
 	}
 
