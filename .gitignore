@@ -40,3 +40,7 @@ coverage.txt
 btcec/coverage.txt
 btcutil/coverage.txt
 btcutil/psbt/coverage.txt
+/.idea/.gitignore
+/.idea/btcd.iml
+/.idea/modules.xml
+/.idea/vcs.xml

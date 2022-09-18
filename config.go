@@ -16,12 +16,14 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"runtime/debug"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/btcsuite/btcd/blockchain"
+	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/connmgr"
@@ -30,7 +32,6 @@ import (
 	"github.com/btcsuite/btcd/mempool"
 	"github.com/btcsuite/btcd/peer"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/go-socks/socks"
 	flags "github.com/jessevdk/go-flags"
 )
@@ -66,6 +67,7 @@ const (
 	sampleConfigFilename         = "sample-btcd.conf"
 	defaultTxIndex               = false
 	defaultAddrIndex             = false
+	defaultGOGC                  = 300
 )
 
 var (
@@ -76,6 +78,7 @@ var (
 	defaultRPCKeyFile  = filepath.Join(defaultHomeDir, "rpc.key")
 	defaultRPCCertFile = filepath.Join(defaultHomeDir, "rpc.cert")
 	defaultLogDir      = filepath.Join(defaultHomeDir, defaultLogDirname)
+	defaultGOMAXPROCS  = runtime.NumCPU() * 3
 )
 
 // runServiceCommand is only set to a real function on Windows.  It is used
@@ -119,6 +122,8 @@ type config struct {
 	DropTxIndex          bool          `long:"droptxindex" description:"Deletes the hash-based transaction index from the database on start up and then exits."`
 	ExternalIPs          []string      `long:"externalip" description:"Add an ip to the list of local addresses we claim to listen on to peers"`
 	Generate             bool          `long:"generate" description:"Generate (mine) bitcoins using the CPU"`
+	GoGC                 int           `long:"gogc" description:"configures the ratio of the garbage collector (GOGC) - higher values will lead to greater memory usage but decrease time spent by Go runtime collecting garbage"`
+	GoMaxProcs           int           `long:"gomaxprocs" description:"sets the maximum number of goroutines to allow to run concurrently (GOMAXPROCS). Goroutines are not processor threads, they are better when greater than processor threads"`
 	FreeTxRelayLimit     float64       `long:"limitfreerelay" description:"Limit relay of transactions with no transaction fee to the given amount in thousands of bytes per minute"`
 	Listeners            []string      `long:"listen" description:"Add an interface/port to listen for connections (default all interfaces port: 8333, testnet: 18333)"`
 	LogDir               string        `long:"logdir" description:"Directory to log output."`
@@ -439,6 +444,8 @@ func loadConfig() (*config, []string, error) {
 		Generate:             defaultGenerate,
 		TxIndex:              defaultTxIndex,
 		AddrIndex:            defaultAddrIndex,
+		GoMaxProcs:           defaultGOMAXPROCS,
+		GoGC:                 defaultGOGC,
 	}
 
 	// Service options which are only added on Windows.
@@ -1135,6 +1142,28 @@ func loadConfig() (*config, []string, error) {
 			return nil, errors.New("tor has been disabled")
 		}
 	}
+
+	// Clamp GOMAXPROCS between 1 and 10x number of CPU threads
+	if cfg.GoMaxProcs < 1 {
+		cfg.GoMaxProcs = 1
+	}
+	if cfg.GoMaxProcs > runtime.NumCPU()*10 {
+		cfg.GoMaxProcs = runtime.NumCPU() * 10
+	}
+
+	// Set the configured value on the runtime.
+	runtime.GOMAXPROCS(cfg.GoMaxProcs)
+
+	// Clamp GOGC between 1 and 1000
+	if cfg.GoGC < 1 {
+		cfg.GoGC = 1
+	}
+	if cfg.GoGC > 1000 {
+		cfg.GoGC = 1000
+	}
+
+	// Set the configured value on the runtime.
+	debug.SetGCPercent(cfg.GoGC)
 
 	// Warn about missing config file only after all other configuration is
 	// done.  This prevents the warning on help messages and invalid
