@@ -1440,7 +1440,7 @@ func (sp *serverPeer) OnNotFound(p *peer.Peer, msg *wire.MsgNotFound) {
 	}
 	if numTxns > 0 {
 		txStr := pickNoun(uint64(numTxns), "transaction", "transactions")
-		reason := fmt.Sprintf("%d %v not found", numBlocks, txStr)
+		reason := fmt.Sprintf("%d %v not found", numTxns, txStr)
 		if sp.addBanScore(0, 10*numTxns, reason) {
 			return
 		}
