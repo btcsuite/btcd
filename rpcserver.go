@@ -1635,16 +1635,19 @@ func handleGetBlockStats(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 		return nil, internalRPCError(err.Error(), context)
 	}
 
-	selectedStats := c.Stats
+	var selectedStats []string
+	if c.Stats != nil {
+		selectedStats = *c.Stats
+	}
 
 	// Create a set of selected stats to facilitate queries.
 	statsSet := make(map[string]bool)
-	for _, value := range *selectedStats {
+	for _, value := range selectedStats {
 		statsSet[value] = true
 	}
 
 	// Return all stats if an empty array was provided.
-	allStats := len(*selectedStats) == 0
+	allStats := len(selectedStats) == 0
 	calcFees := statsSet["avgfee"] || statsSet["avgfeerate"] || statsSet["maxfee"] || statsSet["maxfeerate"] ||
 		statsSet["medianfee"] || statsSet["totalfee"] || statsSet["feerate_percentiles"]
 

@@ -21,6 +21,9 @@ import (
 	"github.com/lbryio/lbcd/chaincfg/chainhash"
 	"github.com/lbryio/lbcd/integration/rpctest"
 	"github.com/lbryio/lbcd/rpcclient"
+	"github.com/lbryio/lbcd/txscript"
+	"github.com/lbryio/lbcd/wire"
+	"github.com/lbryio/lbcutil"
 )
 
 func testGetBestBlock(r *rpctest.Harness, t *testing.T) {
@@ -143,7 +146,7 @@ func testGetBlockStats(r *rpctest.Harness, t *testing.T) {
 	baseFeeRate := int64(10)
 	txValue := int64(50000000)
 	txQuantity := 10
-	txs := make([]*btcutil.Tx, txQuantity)
+	txs := make([]*lbcutil.Tx, txQuantity)
 	fees := make([]int64, txQuantity)
 	sizes := make([]int64, txQuantity)
 	feeRates := make([]int64, txQuantity)
@@ -164,12 +167,12 @@ func testGetBlockStats(r *rpctest.Harness, t *testing.T) {
 		// This feerate is not the actual feerate. See comment below.
 		feeRate := baseFeeRate * int64(i)
 
-		tx, err := r.CreateTransaction([]*wire.TxOut{wire.NewTxOut(txValue, pkScript)}, btcutil.Amount(feeRate), true)
+		tx, err := r.CreateTransaction([]*wire.TxOut{wire.NewTxOut(txValue, pkScript)}, lbcutil.Amount(feeRate), true)
 		if err != nil {
 			t.Fatalf("Unable to generate segwit transaction: %v", err)
 		}
 
-		txs[i] = btcutil.NewTx(tx)
+		txs[i] = lbcutil.NewTx(tx)
 		sizes[i] = int64(tx.SerializeSize())
 
 		// memWallet.fundTx makes some assumptions when calculating fees.
@@ -215,13 +218,13 @@ func testGetBlockStats(r *rpctest.Harness, t *testing.T) {
 
 	tests := []struct {
 		name            string
-		txs             []*btcutil.Tx
+		txs             []*lbcutil.Tx
 		stats           []string
 		expectedResults map[string]interface{}
 	}{
 		{
 			name:  "empty block",
-			txs:   []*btcutil.Tx{},
+			txs:   []*lbcutil.Tx{},
 			stats: []string{},
 			expectedResults: map[string]interface{}{
 				"avgfee":              int64(0),
@@ -270,7 +273,7 @@ func testGetBlockStats(r *rpctest.Harness, t *testing.T) {
 				"minfeerate":     minFeeRate,
 				"mintxsize":      minSize,
 				"outs":           int64(outputCount + 1), // Coinbase output also counts.
-				"subsidy":        int64(5000000000),
+				"subsidy":        int64(100000000),
 				"swtotal_weight": nil, // This stat was not selected, so it should be nil.
 				"swtxs":          int64(0),
 				"total_size":     totalSize,
@@ -289,7 +292,7 @@ func testGetBlockStats(r *rpctest.Harness, t *testing.T) {
 			t.Fatalf("Unable to generate block: %v from test %s", err, test.name)
 		}
 
-		blockStats, err := r.Node.GetBlockStats(block.Hash(), &test.stats)
+		blockStats, err := r.GetBlockStats(block.Hash(), &test.stats)
 		if err != nil {
 			t.Fatalf("Call to `getblockstats` on test %s failed: %v", test.name, err)
 		}

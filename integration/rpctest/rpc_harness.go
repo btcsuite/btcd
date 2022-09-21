@@ -16,6 +16,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/lbryio/lbcd/btcjson"
 	"github.com/lbryio/lbcd/chaincfg"
 	"github.com/lbryio/lbcd/chaincfg/chainhash"
 	"github.com/lbryio/lbcd/rpcclient"
@@ -510,6 +511,18 @@ func (h *Harness) GenerateAndSubmitBlockWithCustomCoinbaseOutputs(
 	}
 
 	return newBlock, nil
+}
+
+// GetBlockStats returns block statistics. First argument specifies height or
+// hash of the target block. Second argument allows to select certain stats to
+// return. If second argument is empty, all stats are returned.
+func (h *Harness) GetBlockStats(hashOrHeight interface{}, stats *[]string) (
+	*btcjson.GetBlockStatsResult, error) {
+
+	h.Lock()
+	defer h.Unlock()
+
+	return h.Client.GetBlockStats(hashOrHeight, stats)
 }
 
 // generateListeningAddresses returns two strings representing listening
