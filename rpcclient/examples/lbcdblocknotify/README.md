@@ -29,6 +29,8 @@ $ go run . -h
         Stratum server (default "lbrypool.net:3334")
   -stratumpass string
         Stratum server password (default "password")
+  -quiet
+        Do not print logs
 ```
 
 Start the program:

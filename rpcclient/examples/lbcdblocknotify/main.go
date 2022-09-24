@@ -30,13 +30,16 @@ var (
 	rpcpass     = flag.String("rpcpass", "rpcpass", "LBCD RPC password")
 	notls       = flag.Bool("notls", false, "Connect to LBCD with TLS disabled")
 	run         = flag.String("run", "", "Run custom shell command")
+	quiet       = flag.Bool("quiet", false, "Do not print logs")
 )
 
 func onFilteredBlockConnected(height int32, header *wire.BlockHeader, txns []*lbcutil.Tx) {
 
 	blockHash := header.BlockHash().String()
 
-	log.Printf("Block connected: %v (%d) %v", blockHash, height, header.Timestamp)
+	if !*quiet {
+		log.Printf("Block connected: %v (%d) %v", blockHash, height, header.Timestamp)
+	}
 
 	if cmd := *run; len(cmd) != 0 {
 		cmd = strings.ReplaceAll(cmd, "%s", blockHash)
