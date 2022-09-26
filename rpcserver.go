@@ -2368,7 +2368,6 @@ func (state *gbtWorkState) blockTemplateResult(useCoinbaseValue bool, submitOld 
 
 	if useCoinbaseValue {
 		reply.CoinbaseAux = gbtCoinbaseAux
-		reply.CoinbaseValue = &msgBlock.Transactions[0].TxOut[0].Value
 	} else {
 		// Ensure the template has a valid payment address associated
 		// with it when a full coinbase is requested.
@@ -2400,6 +2399,9 @@ func (state *gbtWorkState) blockTemplateResult(useCoinbaseValue bool, submitOld 
 
 		reply.CoinbaseTxn = &resultTx
 	}
+
+	// Return coinbasevalue anyway as lbrycrd and bitcoind do.
+	reply.CoinbaseValue = &msgBlock.Transactions[0].TxOut[0].Value
 
 	return &reply, nil
 }
