@@ -63,7 +63,7 @@ recommended that `GOPATH` is set to a directory in your home directory such as
 
 ```bash
 $ cd $GOPATH/src/github.com/btcsuite/btcd
-$ GO111MODULE=on go install -v . ./cmd/...
+$ go install -v . ./cmd/...
 ```
 
 - btcd (and utilities) will now be installed in ```$GOPATH/bin```.  If you did
@@ -79,7 +79,7 @@ $ GO111MODULE=on go install -v . ./cmd/...
 ```bash
 $ cd $GOPATH/src/github.com/btcsuite/btcd
 $ git pull
-$ GO111MODULE=on go install -v . ./cmd/...
+$ go install -v . ./cmd/...
 ```
 
 ## Getting Started

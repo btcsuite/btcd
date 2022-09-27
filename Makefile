@@ -11,12 +11,12 @@ GOACC_BIN := $(GO_BIN)/go-acc
 LINT_COMMIT := v1.18.0
 GOACC_COMMIT := 80342ae2e0fcf265e99e76bcc4efd022c7c3811b
 
-DEPGET := cd /tmp && GO111MODULE=on go get -v
-GOBUILD := GO111MODULE=on go build -v
-GOINSTALL := GO111MODULE=on go install -v 
+DEPGET := cd /tmp && go get -v
+GOBUILD := go build -v
+GOINSTALL := go install -v 
 DEV_TAGS := rpctest
-GOTEST_DEV = GO111MODULE=on go test -v -tags=$(DEV_TAGS)
-GOTEST := GO111MODULE=on go test -v
+GOTEST_DEV = go test -v -tags=$(DEV_TAGS)
+GOTEST := go test -v
 
 GOFILES_NOVENDOR = $(shell find . -type f -name '*.go' -not -path "./vendor/*")
 
