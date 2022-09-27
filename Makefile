@@ -71,6 +71,19 @@ build:
 	$(GOBUILD) $(PKG)/cmd/findcheckpoint
 	$(GOBUILD) $(PKG)/cmd/addblock
 
+install:
+	@$(call print, "Installing all binaries")
+	$(GOINSTALL) $(PKG)
+	$(GOINSTALL) $(PKG)/cmd/btcctl
+	$(GOINSTALL) $(PKG)/cmd/gencerts
+	$(GOINSTALL) $(PKG)/cmd/findcheckpoint
+	$(GOINSTALL) $(PKG)/cmd/addblock
+
+release-install:
+	@$(call print, "Installing btcd and btcctl release binaries")
+	env CGO_ENABLED=0 $(GOINSTALL) -trimpath -ldflags="-s -w -buildid=" $(PKG)
+	env CGO_ENABLED=0 $(GOINSTALL) -trimpath -ldflags="-s -w -buildid=" $(PKG)/cmd/btcctl
+
 # =======
 # TESTING
 # =======
