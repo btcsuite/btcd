@@ -43,3 +43,10 @@ btcutil/psbt/coverage.txt
 
 # vim
 *.swp
+
+# Binaries produced by "make build"
+/addblock
+/btcctl
+/btcd
+/findcheckpoint
+/gencerts
