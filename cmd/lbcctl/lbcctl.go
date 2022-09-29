@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/lbryio/lbcd/btcjson"
 )
@@ -133,12 +134,24 @@ func main() {
 		os.Exit(1)
 	}
 
+	started := time.Now()
+
 	// Send the JSON-RPC request to the server using the user-specified
 	// connection configuration.
 	result, err := sendPostRequest(marshalledJSON, cfg)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
+	}
+
+	if cfg.Timed {
+		elapsed := time.Since(started)
+		defer fmt.Fprintf(os.Stderr, "%s\n", elapsed)
+	}
+
+	var output io.Writer = os.Stdout
+	if cfg.Quiet {
+		output = io.Discard
 	}
 
 	// Choose how to display the result based on its type.
@@ -150,7 +163,7 @@ func main() {
 				err)
 			os.Exit(1)
 		}
-		fmt.Println(dst.String())
+		fmt.Fprintln(output, dst.String())
 
 	} else if strings.HasPrefix(strResult, `"`) {
 		var str string
@@ -159,9 +172,9 @@ func main() {
 				err)
 			os.Exit(1)
 		}
-		fmt.Println(str)
+		fmt.Fprintln(output, str)
 
 	} else if strResult != "null" {
-		fmt.Println(strResult)
+		fmt.Fprintln(output, strResult)
 	}
 }

@@ -111,6 +111,8 @@ type config struct {
 	SigNet         bool   `long:"signet" description:"Connect to signet (default RPC server: localhost:49245)"`
 	Wallet         bool   `long:"wallet" description:"Connect to wallet RPC server instead (default: localhost:9244, testnet: localhost:19244, regtest: localhost:29244)"`
 	ShowVersion    bool   `short:"V" long:"version" description:"Display version information and exit"`
+	Timed          bool   `short:"t" long:"timed" description:"Display RPC response time"`
+	Quiet          bool   `short:"q" long:"quiet" description:"Do not output results to stdout"`
 }
 
 // normalizeAddress returns addr with the passed default port appended if
