@@ -993,12 +993,7 @@ func testMultiPartySign(t *testing.T, taprootTweak []byte,
 			t.Fatalf("unable to gen priv key: %v", err)
 		}
 
-		pubKey, err := schnorr.ParsePubKey(
-			schnorr.SerializePubKey(privKey.PubKey()),
-		)
-		if err != nil {
-			t.Fatalf("unable to gen key: %v", err)
-		}
+		pubKey := privKey.PubKey()
 
 		signerKeys[i] = privKey
 		signSet[i] = pubKey

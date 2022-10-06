@@ -184,8 +184,8 @@ func withCustomOptions(customOpts nonceGenOpts) NonceGenOption {
 		o.randReader = customOpts.randReader
 		o.secretKey = customOpts.secretKey
 		o.combinedKey = customOpts.combinedKey
-		o.msg = customOpts.msg
 		o.auxInput = customOpts.auxInput
+		o.msg = customOpts.msg
 	}
 }
 
