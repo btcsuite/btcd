@@ -353,6 +353,10 @@ func recoverKeyFromSignature(curve *KoblitzCurve, sig *Signature, msg []byte,
 	// step to prevent the jacobian conversion back and forth.
 	Qx, Qy := curve.Add(sRx, sRy, minuseGx, minuseGy)
 
+	if Qx.Sign() == 0 && Qy.Sign() == 0 {
+		return nil, errors.New("point (Qx, Qy) equals the point at infinity")
+	}
+
 	return &PublicKey{
 		Curve: curve,
 		X:     Qx,
