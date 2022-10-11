@@ -255,10 +255,10 @@ func genNonceAuxBytes(rand []byte, i int,
 		return nil, err
 	}
 
-	switch len(opts.msg) {
+	switch {
 	// If the message isn't present, then we'll just write out a single
 	// uint8 of a zero byte: m_prefixed = bytes(1, 0).
-	case 0:
+	case opts.msg == nil:
 		if _, err := w.Write([]byte{0x00}); err != nil {
 			return nil, err
 		}
@@ -266,6 +266,8 @@ func genNonceAuxBytes(rand []byte, i int,
 	// Otherwise, we'll write a single byte of 0x01 with a 1 byte length
 	// prefix, followed by the message itself with an 8 byte length prefix:
 	// m_prefixed = bytes(1, 1) || bytes(8, len(m)) || m.
+	case len(opts.msg) == 0:
+		fallthrough
 	default:
 		if _, err := w.Write([]byte{0x01}); err != nil {
 			return nil, err
