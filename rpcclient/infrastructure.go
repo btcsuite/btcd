@@ -774,7 +774,8 @@ func (c *Client) handleSendPostMessage(jReq *jsonRequest) {
 	tries := 10
 	for i := 0; tries == 0 || i < tries; i++ {
 		bodyReader := bytes.NewReader(jReq.marshalledJSON)
-		httpReq, err := http.NewRequest("POST", url, bodyReader)
+		var httpReq *http.Request
+		httpReq, err = http.NewRequest("POST", url, bodyReader)
 		if err != nil {
 			jReq.responseChan <- &Response{result: nil, err: err}
 			return
@@ -786,7 +787,8 @@ func (c *Client) handleSendPostMessage(jReq *jsonRequest) {
 		}
 
 		// Configure basic access authorization.
-		user, pass, err := c.config.getAuth()
+		var user, pass string
+		user, pass, err = c.config.getAuth()
 		if err != nil {
 			jReq.responseChan <- &Response{result: nil, err: err}
 			return
