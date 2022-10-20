@@ -3,6 +3,7 @@
 package musig2
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -20,6 +21,8 @@ const (
 	keySortTestVectorFileName = "key_sort_vectors.json"
 
 	keyAggTestVectorFileName = "key_agg_vectors.json"
+
+	keyTweakTestVectorFileName = "tweak_vectors.json"
 )
 
 type keySortTestVector struct {
@@ -114,7 +117,7 @@ func keysFromIndices(t *testing.T, indices []int,
 }
 
 func tweaksFromIndices(t *testing.T, indices []int,
-	tweaks []string, isXonly bool) []KeyTweakDesc {
+	tweaks []string, isXonly []bool) []KeyTweakDesc {
 
 	t.Helper()
 
@@ -125,7 +128,7 @@ func tweaksFromIndices(t *testing.T, indices []int,
 
 		testTweaks[i] = KeyTweakDesc{
 			Tweak:   rawTweak,
-			IsXOnly: isXonly,
+			IsXOnly: isXonly[i],
 		}
 	}
 
@@ -252,6 +255,138 @@ func TestMuSig2KeyAggTestVectors(t *testing.T) {
 			default:
 				t.Fatalf("uncaught err: %v", err)
 			}
+		})
+	}
+}
+
+type keyTweakInvalidTest struct {
+	Indices []int `json:"key_indices"`
+
+	NonceIndices []int `json:"nonce_indices"`
+
+	TweakIndices []int `json:"tweak_indices"`
+
+	IsXOnly []bool `json:"is_only"`
+
+	SignerIndex int `json:"signer_index"`
+
+	Comment string `json:"comment"`
+}
+
+type keyTweakValidTest struct {
+	Indices []int `json:"key_indices"`
+
+	NonceIndices []int `json:"nonce_indices"`
+
+	TweakIndices []int `json:"tweak_indices"`
+
+	IsXOnly []bool `json:"is_xonly"`
+
+	SignerIndex int `json:"signer_index"`
+
+	Expected string `json:"expected"`
+
+	Comment string `json:"comment"`
+}
+
+type keyTweakVector struct {
+	PrivKey string `json:"sk"`
+
+	PubKeys []string `json:"pubkeys"`
+
+	PrivNonce string `json:"secnonce"`
+
+	PubNonces []string `json:"pnonces"`
+
+	AggNnoce string `json:"aggnonce"`
+
+	Tweaks []string `json:"tweaks"`
+
+	Msg string `json:"msg"`
+
+	ValidCases []keyTweakValidTest `json:"valid_test_cases"`
+
+	InvalidCases []keyTweakInvalidTest `json:"error_test_cases"`
+}
+
+func pubNoncesFromIndices(t *testing.T, nonceIndices []int, pubNonces []string) [][PubNonceSize]byte {
+
+	nonces := make([][PubNonceSize]byte, len(nonceIndices))
+
+	for i, idx := range nonceIndices {
+		var pubNonce [PubNonceSize]byte
+		copy(pubNonce[:], mustParseHex(pubNonces[idx]))
+
+		nonces[i] = pubNonce
+	}
+
+	return nonces
+}
+
+// TestMuSig2TweakTestVectors tests that we properly handle the various edge
+// cases related to tweaking public keys.
+func TestMuSig2TweakTestVectors(t *testing.T) {
+	t.Parallel()
+
+	testVectorPath := path.Join(
+		testVectorBaseDir, keyTweakTestVectorFileName,
+	)
+	testVectorBytes, err := os.ReadFile(testVectorPath)
+	require.NoError(t, err)
+
+	var testCases keyTweakVector
+	require.NoError(t, json.Unmarshal(testVectorBytes, &testCases))
+
+	privKey, _ := btcec.PrivKeyFromBytes(mustParseHex(testCases.PrivKey))
+
+	var msg [32]byte
+	copy(msg[:], mustParseHex(testCases.Msg))
+
+	var secNonce [SecNonceSize]byte
+	copy(secNonce[:], mustParseHex(testCases.PrivNonce))
+
+	for _, testCase := range testCases.ValidCases {
+		testName := fmt.Sprintf("valid_%v",
+			strings.ToLower(testCase.Comment))
+		t.Run(testName, func(t *testing.T) {
+			pubKeys, err := keysFromIndices(
+				t, testCase.Indices, testCases.PubKeys,
+			)
+			require.NoError(t, err)
+
+			var tweaks []KeyTweakDesc
+			if len(testCase.TweakIndices) != 0 {
+				tweaks = tweaksFromIndices(
+					t, testCase.TweakIndices,
+					testCases.Tweaks, testCase.IsXOnly,
+				)
+			}
+
+			pubNonces := pubNoncesFromIndices(
+				t, testCase.NonceIndices, testCases.PubNonces,
+			)
+
+			combinedNonce, err := AggregateNonces(pubNonces)
+			require.NoError(t, err)
+
+			var opts []SignOption
+			if len(tweaks) != 0 {
+				opts = append(opts, WithTweaks(tweaks...))
+			}
+
+			partialSig, err := Sign(
+				secNonce, privKey, combinedNonce, pubKeys,
+				msg, opts...,
+			)
+
+			var partialSigBytes [32]byte
+			partialSig.S.PutBytesUnchecked(partialSigBytes[:])
+
+			require.Equal(
+				t, hex.EncodeToString(partialSigBytes[:]),
+				hex.EncodeToString(mustParseHex(testCase.Expected)),
+			)
+
 		})
 	}
 }

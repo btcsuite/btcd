@@ -29,7 +29,7 @@ var (
 
 	// ErrTweakedKeyOverflows is returned if a tweaking key is larger than
 	// 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141.
-	ErrTweakedKeyOverflows = fmt.Errorf("tweaked key is to large")
+	ErrTweakedKeyOverflows = fmt.Errorf("tweaked key is too large")
 )
 
 // sortableKeys defines a type of slice of public keys that implements the sort
