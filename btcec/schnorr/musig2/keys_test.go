@@ -346,6 +346,8 @@ func TestMuSig2TweakTestVectors(t *testing.T) {
 	copy(secNonce[:], mustParseHex(testCases.PrivNonce))
 
 	for _, testCase := range testCases.ValidCases {
+		testCase := testCase
+
 		testName := fmt.Sprintf("valid_%v",
 			strings.ToLower(testCase.Comment))
 		t.Run(testName, func(t *testing.T) {
