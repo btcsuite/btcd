@@ -19,6 +19,8 @@ import (
 
 const (
 	signVerifyTestVectorFileName = "sign_verify_vectors.json"
+
+	sigCombineTestVectorFileName = "sig_agg_vectors.json"
 )
 
 type signVerifyValidCase struct {
@@ -264,4 +266,126 @@ func TestMusig2SignVerify(t *testing.T) {
 		})
 	}
 
+}
+
+type sigCombineValidCase struct {
+	AggNonce string `json:"aggnonce"`
+
+	NonceIndices []int `json:"nonce_indices"`
+
+	Indices []int `json:"key_indices"`
+
+	TweakIndices []int `json:"tweak_indices"`
+
+	IsXOnly []bool `json:"is_xonly"`
+
+	PSigIndices []int `json:"psig_indices"`
+
+	Expected string `json:"expected"`
+}
+
+type sigCombineTestVectors struct {
+	PubKeys []string `json:"pubkeys"`
+
+	PubNonces []string `json:"pnonces"`
+
+	Tweaks []string `json:"tweaks"`
+
+	Psigs []string `json:"psigs"`
+
+	Msg string `json:"msg"`
+
+	ValidCases []sigCombineValidCase `json:"valid_test_cases"`
+}
+
+func pSigsFromIndicies(t *testing.T, sigs []string, indices []int) []*PartialSignature {
+	pSigs := make([]*PartialSignature, len(indices))
+	for i, idx := range indices {
+		var pSig PartialSignature
+		err := pSig.Decode(bytes.NewReader(mustParseHex(sigs[idx])))
+		require.NoError(t, err)
+
+		pSigs[i] = &pSig
+	}
+
+	return pSigs
+}
+
+// TestMusig2SignCombine tests that we pass the musig2 sig combination tests.
+func TestMusig2SignCombine(t *testing.T) {
+	t.Parallel()
+
+	testVectorPath := path.Join(
+		testVectorBaseDir, sigCombineTestVectorFileName,
+	)
+	testVectorBytes, err := os.ReadFile(testVectorPath)
+	require.NoError(t, err)
+
+	var testCases sigCombineTestVectors
+	require.NoError(t, json.Unmarshal(testVectorBytes, &testCases))
+
+	var msg [32]byte
+	copy(msg[:], mustParseHex(testCases.Msg))
+
+	for i, testCase := range testCases.ValidCases {
+		testCase := testCase
+
+		testName := fmt.Sprintf("valid_case_%v", i)
+		t.Run(testName, func(t *testing.T) {
+			pubKeys, err := keysFromIndices(
+				t, testCase.Indices, testCases.PubKeys,
+			)
+			require.NoError(t, err)
+
+			pubNonces := pubNoncesFromIndices(
+				t, testCase.NonceIndices, testCases.PubNonces,
+			)
+
+			partialSigs := pSigsFromIndicies(
+				t, testCases.Psigs, testCase.PSigIndices,
+			)
+
+			var (
+				combineOpts []CombineOption
+				keyOpts     []KeyAggOption
+			)
+			if len(testCase.TweakIndices) > 0 {
+				tweaks := tweaksFromIndices(
+					t, testCase.TweakIndices,
+					testCases.Tweaks, testCase.IsXOnly,
+				)
+
+				combineOpts = append(combineOpts, WithTweakedCombine(
+					msg, pubKeys, tweaks, false,
+				))
+
+				keyOpts = append(keyOpts, WithKeyTweaks(tweaks...))
+			}
+
+			combinedKey, _, _, err := AggregateKeys(
+				pubKeys, false, keyOpts...,
+			)
+			require.NoError(t, err)
+
+			combinedNonce, err := AggregateNonces(pubNonces)
+			require.NoError(t, err)
+
+			finalNonceJ, _, err := computeSigningNonce(
+				combinedNonce, combinedKey.FinalKey, msg,
+			)
+
+			finalNonceJ.ToAffine()
+			finalNonce := btcec.NewPublicKey(
+				&finalNonceJ.X, &finalNonceJ.Y,
+			)
+
+			combinedSig := CombineSigs(
+				finalNonce, partialSigs, combineOpts...,
+			)
+			require.Equal(t,
+				strings.ToLower(testCase.Expected),
+				hex.EncodeToString(combinedSig.Serialize()),
+			)
+		})
+	}
 }
