@@ -239,7 +239,9 @@ func NewContext(signingKey *btcec.PrivateKey, shouldSort bool,
 		// are known.
 		if opts.earlyNonce {
 			var err error
-			ctx.sessionNonce, err = GenNonces()
+			ctx.sessionNonce, err = GenNonces(
+				WithNonceSecretKeyAux(signingKey),
+			)
 			if err != nil {
 				return nil, err
 			}
