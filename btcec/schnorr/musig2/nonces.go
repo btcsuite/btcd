@@ -184,13 +184,15 @@ func withCustomOptions(customOpts nonceGenOpts) NonceGenOption {
 		o.randReader = customOpts.randReader
 		o.secretKey = customOpts.secretKey
 		o.combinedKey = customOpts.combinedKey
-		o.msg = customOpts.msg
 		o.auxInput = customOpts.auxInput
+		o.msg = customOpts.msg
 	}
 }
 
 // lengthWriter is a function closure that allows a caller to control how the
 // length prefix of a byte slice is written.
+//
+// TODO(roasbeef): use type params once we bump repo version
 type lengthWriter func(w io.Writer, b []byte) error
 
 // uint8Writer is an implementation of lengthWriter that writes the length of
@@ -203,6 +205,12 @@ func uint8Writer(w io.Writer, b []byte) error {
 // the byte slice using 4 bytes.
 func uint32Writer(w io.Writer, b []byte) error {
 	return binary.Write(w, byteOrder, uint32(len(b)))
+}
+
+// uint32Writer is an implementation of lengthWriter that writes the length of
+// the byte slice using 8 bytes.
+func uint64Writer(w io.Writer, b []byte) error {
+	return binary.Write(w, byteOrder, uint64(len(b)))
 }
 
 // writeBytesPrefix is used to write out: len(b) || b, to the passed io.Writer.
@@ -225,10 +233,12 @@ func writeBytesPrefix(w io.Writer, b []byte, lenWriter lengthWriter) error {
 // genNonceAuxBytes writes out the full byte string used to derive a secret
 // nonce based on some initial randomness as well as the series of optional
 // fields. The byte string used for derivation is:
-//  * tagged_hash("MuSig/nonce", rand || len(aggpk) || aggpk || len(m)
-//                              || m || len(in) || in || i).
+//   - tagged_hash("MuSig/nonce", rand || len(aggpk) || aggpk || m_prefixed
+//     || len(in) || in || i).
 //
-// where i is the ith secret nonce being generated.
+// where i is the ith secret nonce being generated and m_prefixed is:
+//   - bytes(1, 0) if the message is blank
+//   - bytes(1, 1) || bytes(8, len(m)) || m if the message is present.
 func genNonceAuxBytes(rand []byte, i int,
 	opts *nonceGenOpts) (*chainhash.Hash, error) {
 
@@ -245,10 +255,28 @@ func genNonceAuxBytes(rand []byte, i int,
 		return nil, err
 	}
 
-	// Next, we'll write out the length prefixed message.
-	err = writeBytesPrefix(&w, opts.msg, uint8Writer)
-	if err != nil {
-		return nil, err
+	switch {
+	// If the message isn't present, then we'll just write out a single
+	// uint8 of a zero byte: m_prefixed = bytes(1, 0).
+	case opts.msg == nil:
+		if _, err := w.Write([]byte{0x00}); err != nil {
+			return nil, err
+		}
+
+	// Otherwise, we'll write a single byte of 0x01 with a 1 byte length
+	// prefix, followed by the message itself with an 8 byte length prefix:
+	// m_prefixed = bytes(1, 1) || bytes(8, len(m)) || m.
+	case len(opts.msg) == 0:
+		fallthrough
+	default:
+		if _, err := w.Write([]byte{0x01}); err != nil {
+			return nil, err
+		}
+
+		err = writeBytesPrefix(&w, opts.msg, uint64Writer)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// Finally we'll write out the auxiliary input.

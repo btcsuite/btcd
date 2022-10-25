@@ -29,7 +29,7 @@ var (
 
 	// ErrTweakedKeyOverflows is returned if a tweaking key is larger than
 	// 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141.
-	ErrTweakedKeyOverflows = fmt.Errorf("tweaked key is to large")
+	ErrTweakedKeyOverflows = fmt.Errorf("tweaked key is too large")
 )
 
 // sortableKeys defines a type of slice of public keys that implements the sort
@@ -40,8 +40,8 @@ type sortableKeys []*btcec.PublicKey
 // with index j.
 func (s sortableKeys) Less(i, j int) bool {
 	// TODO(roasbeef): more efficient way to compare...
-	keyIBytes := schnorr.SerializePubKey(s[i])
-	keyJBytes := schnorr.SerializePubKey(s[j])
+	keyIBytes := s[i].SerializeCompressed()
+	keyJBytes := s[j].SerializeCompressed()
 
 	return bytes.Compare(keyIBytes, keyJBytes) == -1
 }
@@ -56,9 +56,9 @@ func (s sortableKeys) Len() int {
 	return len(s)
 }
 
-// sortKeys takes a set of schnorr public keys and returns a new slice that is
-// a copy of the keys sorted in lexicographical order bytes on the x-only
-// pubkey serialization.
+// sortKeys takes a set of public keys and returns a new slice that is a copy
+// of the keys sorted in lexicographical order bytes on the x-only pubkey
+// serialization.
 func sortKeys(keys []*btcec.PublicKey) []*btcec.PublicKey {
 	keySet := sortableKeys(keys)
 	if sort.IsSorted(keySet) {
@@ -72,7 +72,7 @@ func sortKeys(keys []*btcec.PublicKey) []*btcec.PublicKey {
 // keyHashFingerprint computes the tagged hash of the series of (sorted) public
 // keys passed as input. This is used to compute the aggregation coefficient
 // for each key. The final computation is:
-//   * H(tag=KeyAgg list, pk1 || pk2..)
+//   - H(tag=KeyAgg list, pk1 || pk2..)
 func keyHashFingerprint(keys []*btcec.PublicKey, sort bool) []byte {
 	if sort {
 		keys = sortKeys(keys)
@@ -80,28 +80,25 @@ func keyHashFingerprint(keys []*btcec.PublicKey, sort bool) []byte {
 
 	// We'll create a single buffer and slice into that so the bytes buffer
 	// doesn't continually need to grow the underlying buffer.
-	keyAggBuf := make([]byte, 32*len(keys))
+	keyAggBuf := make([]byte, 33*len(keys))
 	keyBytes := bytes.NewBuffer(keyAggBuf[0:0])
 	for _, key := range keys {
-		keyBytes.Write(schnorr.SerializePubKey(key))
+		keyBytes.Write(key.SerializeCompressed())
 	}
 
 	h := chainhash.TaggedHash(KeyAggTagList, keyBytes.Bytes())
 	return h[:]
 }
 
-// keyBytesEqual returns true if two keys are the same from the PoV of BIP
-// 340's 32-byte x-only public keys.
+// keyBytesEqual returns true if two keys are the same based on the compressed
+// serialization of each key.
 func keyBytesEqual(a, b *btcec.PublicKey) bool {
-	return bytes.Equal(
-		schnorr.SerializePubKey(a),
-		schnorr.SerializePubKey(b),
-	)
+	return bytes.Equal(a.SerializeCompressed(), b.SerializeCompressed())
 }
 
 // aggregationCoefficient computes the key aggregation coefficient for the
 // specified target key. The coefficient is computed as:
-//  * H(tag=KeyAgg coefficient, keyHashFingerprint(pks) || pk)
+//   - H(tag=KeyAgg coefficient, keyHashFingerprint(pks) || pk)
 func aggregationCoefficient(keySet []*btcec.PublicKey,
 	targetKey *btcec.PublicKey, keysHash []byte,
 	secondKeyIdx int) *btcec.ModNScalar {
@@ -116,9 +113,9 @@ func aggregationCoefficient(keySet []*btcec.PublicKey,
 	// Otherwise, we'll compute the full finger print hash for this given
 	// key and then use that to compute the coefficient tagged hash:
 	//  * H(tag=KeyAgg coefficient, keyHashFingerprint(pks, pk) || pk)
-	var coefficientBytes [64]byte
+	var coefficientBytes [65]byte
 	copy(coefficientBytes[:], keysHash[:])
-	copy(coefficientBytes[32:], schnorr.SerializePubKey(targetKey))
+	copy(coefficientBytes[32:], targetKey.SerializeCompressed())
 
 	muHash := chainhash.TaggedHash(KeyAggTagCoeff, coefficientBytes[:])
 
