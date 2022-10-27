@@ -296,12 +296,12 @@ func ComputeTaprootKeyNoScript(internalKey *btcec.PublicKey) *btcec.PublicKey {
 // but on the private key instead. The final key is derived as: privKey +
 // h_tapTweak(internalKey || merkleRoot) % N, where N is the order of the
 // secp256k1 curve, and merkleRoot is the root hash of the tapscript tree.
-func TweakTaprootPrivKey(privKey *btcec.PrivateKey,
+func TweakTaprootPrivKey(privKey btcec.PrivateKey,
 	scriptRoot []byte) *btcec.PrivateKey {
 
 	// If the corresponding public key has an odd y coordinate, then we'll
 	// negate the private key as specified in BIP 341.
-	privKeyScalar := &privKey.Key
+	privKeyScalar := privKey.Key
 	pubKeyBytes := privKey.PubKey().SerializeCompressed()
 	if pubKeyBytes[0] == secp.PubKeyFormatCompressedOdd {
 		privKeyScalar.Negate()
