@@ -96,11 +96,13 @@ const (
 
 	// maxWitnessItemsPerInput is the maximum number of witness items to
 	// be read for the witness data for a single TxIn. This number is
-	// derived using a possble lower bound for the encoding of a witness
+	// derived using a possible lower bound for the encoding of a witness
 	// item: 1 byte for length + 1 byte for the witness item itself, or two
 	// bytes. This value is then divided by the currently allowed maximum
-	// "cost" for a transaction.
-	maxWitnessItemsPerInput = 500000
+	// "cost" for a transaction. We use this for an upper bound for the
+	// buffer and consensus makes sure that the weight of a transaction
+	// cannot be more than 4000000.
+	maxWitnessItemsPerInput = 4_000_000
 
 	// maxWitnessItemSize is the maximum allowed size for an item within
 	// an input's witness data. This value is bounded by the largest
