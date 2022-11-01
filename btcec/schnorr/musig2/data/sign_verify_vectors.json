@@ -66,6 +66,17 @@
     ],
     "sign_error_test_cases": [
         {
+            "key_indices": [1, 2],
+            "aggnonce_index": 0,
+            "msg_index": 0,
+            "secnonce_index": 0,
+            "error": {
+                "type": "value",
+                "message": "The signer's pubkey must be included in the list of pubkeys."
+            },
+            "comment": "The signers pubkey is not in the list of pubkeys"
+        },
+        {
             "key_indices": [1, 0, 3],
             "aggnonce_index": 0,
             "msg_index": 0,

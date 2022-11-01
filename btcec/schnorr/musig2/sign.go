@@ -42,6 +42,11 @@ var (
 	// ErrSecNoncePubkey is returned when the signing key does not match the
 	// sec nonce pubkey
 	ErrSecNoncePubkey = fmt.Errorf("public key does not match secnonce")
+
+	// ErrPubkeyNotIncluded is returned when the signers pubkey is not included
+	// in the list of pubkeys.
+	ErrPubkeyNotIncluded = fmt.Errorf("signer's pubkey must be included" +
+		" in the list of pubkeys")
 )
 
 // infinityPoint is the jacobian representation of the point at infinity.
@@ -261,6 +266,18 @@ func Sign(secNonce [SecNonceSize]byte, privKey *btcec.PrivateKey,
 		privKey.PubKey().SerializeCompressed()) {
 
 		return nil, ErrSecNoncePubkey
+	}
+
+	// Check that the key set contains the public key to our private key.
+	var containsPrivKey bool
+	for _, pk := range pubKeys {
+		if privKey.PubKey().IsEqual(pk) {
+			containsPrivKey = true
+		}
+	}
+
+	if !containsPrivKey {
+		return nil, ErrPubkeyNotIncluded
 	}
 
 	// Compute the hash of all the keys here as we'll need it do aggregate
