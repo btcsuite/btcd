@@ -240,6 +240,7 @@ func NewContext(signingKey *btcec.PrivateKey, shouldSort bool,
 		if opts.earlyNonce {
 			var err error
 			ctx.sessionNonce, err = GenNonces(
+				WithPublicKey(ctx.pubKey),
 				WithNonceSecretKeyAux(signingKey),
 			)
 			if err != nil {
@@ -483,6 +484,7 @@ func (c *Context) NewSession(options ...SessionOption) (*Session, error) {
 		// in some auxiliary information to strengthen the nonce
 		// generated.
 		localNonces, err = GenNonces(
+			WithPublicKey(c.pubKey),
 			WithNonceSecretKeyAux(c.signingKey),
 			WithNonceCombinedKeyAux(c.combinedKey.FinalKey),
 		)

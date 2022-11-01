@@ -20,6 +20,7 @@ type nonceGenTestCase struct {
 	AggPk   string  `json:"aggpk"`
 	Msg     *string `json:"msg"`
 	ExtraIn string  `json:"extra_in"`
+	Pk      string  `json:"pk"`
 
 	Expected string `json:"expected"`
 }
@@ -55,6 +56,7 @@ func TestMusig2NonceGenTestVectors(t *testing.T) {
 			secretKey:   mustParseHex(testCase.Sk),
 			combinedKey: mustParseHex(testCase.AggPk),
 			auxInput:    mustParseHex(testCase.ExtraIn),
+			publicKey:   mustParseHex(testCase.Pk),
 		}
 		if testCase.Msg != nil {
 			customOpts.msg = mustParseHex(*testCase.Msg)
