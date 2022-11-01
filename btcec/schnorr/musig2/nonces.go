@@ -22,7 +22,7 @@ const (
 
 	// SecNonceSize is the size of the secret nonces for musig2. The secret
 	// nonces are the corresponding private keys to the public nonce points.
-	SecNonceSize = 64
+	SecNonceSize = 97
 )
 
 var (
@@ -367,10 +367,11 @@ func GenNonces(options ...NonceGenOption) (*Nonces, error) {
 	k2Mod.SetBytes((*[32]byte)(k2))
 
 	// The secret nonces are serialized as the concatenation of the two 32
-	// byte secret nonce values.
+	// byte secret nonce values and the pubkey.
 	var nonces Nonces
 	k1Mod.PutBytesUnchecked(nonces.SecNonce[:])
 	k2Mod.PutBytesUnchecked(nonces.SecNonce[btcec.PrivKeyBytesLen:])
+	copy(nonces.SecNonce[btcec.PrivKeyBytesLen*2:], opts.publicKey)
 
 	// Next, we'll generate R_1 = k_1*G and R_2 = k_2*G. Along the way we
 	// need to map our nonce values into mod n scalars so we can work with

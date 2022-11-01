@@ -38,6 +38,10 @@ var (
 	// ErrSecretNonceZero is returned when a secret nonce is passed in a
 	// zero.
 	ErrSecretNonceZero = fmt.Errorf("secret nonce is blank")
+
+	// ErrSecNoncePubkey is returned when the signing key does not match the
+	// sec nonce pubkey
+	ErrSecNoncePubkey = fmt.Errorf("public key does not match secnonce")
 )
 
 // infinityPoint is the jacobian representation of the point at infinity.
@@ -250,6 +254,13 @@ func Sign(secNonce [SecNonceSize]byte, privKey *btcec.PrivateKey,
 	opts := defaultSignOptions()
 	for _, option := range signOpts {
 		option(opts)
+	}
+
+	// Check that our signing key belongs to the secNonce
+	if !bytes.Equal(secNonce[btcec.PrivKeyBytesLen*2:],
+		privKey.PubKey().SerializeCompressed()) {
+
+		return nil, ErrSecNoncePubkey
 	}
 
 	// Compute the hash of all the keys here as we'll need it do aggregate
