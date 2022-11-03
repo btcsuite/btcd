@@ -11,9 +11,9 @@ import (
 	"bytes"
 	"encoding/base64"
 	"errors"
-
 	"io"
 
+	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/wire"
 )
 
@@ -30,7 +30,7 @@ var (
 
 // MaxPsbtValueLength is the size of the largest transaction serialization
 // that could be passed in a NonWitnessUtxo field. This is definitely
-//less than 4M.
+// less than 4M.
 const MaxPsbtValueLength = 4000000
 
 // MaxPsbtKeyLength is the length of the largest key that we'll successfully
@@ -394,4 +394,21 @@ func (p *Packet) SanityCheck() error {
 	}
 
 	return nil
+}
+
+// GetTxFee returns the transaction fee.  An error is returned if a transaction
+// input does not contain any UTXO information.
+func (p *Packet) GetTxFee() (btcutil.Amount, error) {
+	sumInputs, err := SumUtxoInputValues(p)
+	if err != nil {
+		return 0, err
+	}
+
+	var sumOutputs int64
+	for _, txOut := range p.UnsignedTx.TxOut {
+		sumOutputs += txOut.Value
+	}
+
+	fee := sumInputs - sumOutputs
+	return btcutil.Amount(fee), nil
 }
