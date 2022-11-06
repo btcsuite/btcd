@@ -377,6 +377,44 @@ func (bi *blockIndex) UnsetStatusFlags(node *blockNode, flags blockStatus) {
 	bi.Unlock()
 }
 
+// InactiveTips returns all the block nodes that aren't in the best chain.
+//
+// This function is safe for concurrent access.
+func (bi *blockIndex) InactiveTips(bestChain *chainView) []*blockNode {
+	bi.RLock()
+	defer bi.RUnlock()
+
+	// Look through the entire blockindex and look for nodes that aren't in
+	// the best chain. We're gonna keep track of all the orphans and the parents
+	// of the orphans.
+	orphans := make(map[chainhash.Hash]*blockNode)
+	orphanParent := make(map[chainhash.Hash]*blockNode)
+	for hash, node := range bi.index {
+		found := bestChain.Contains(node)
+		if !found {
+			orphans[hash] = node
+			orphanParent[node.parent.hash] = node.parent
+		}
+	}
+
+	// If an orphan isn't pointed to by another orphan, it is a chain tip.
+	//
+	// We can check this by looking for the orphan in the orphan parent map.
+	// If the orphan exists in the orphan parent map, it means that another
+	// orphan is pointing to it.
+	tips := make([]*blockNode, 0, len(orphans))
+	for hash, orphan := range orphans {
+		_, found := orphanParent[hash]
+		if !found {
+			tips = append(tips, orphan)
+		}
+
+		delete(orphanParent, hash)
+	}
+
+	return tips
+}
+
 // flushToDB writes all dirty block nodes to the database. If all writes
 // succeed, this clears the dirty set.
 func (bi *blockIndex) flushToDB() error {
