@@ -282,7 +282,8 @@ func TestTxWire(t *testing.T) {
 		// Latest protocol version with no transactions.
 		{
 			noTx,
-			noTx, noTxEncoded,
+			noTx,
+			noTxEncoded,
 			ProtocolVersion,
 			BaseEncoding,
 		},
