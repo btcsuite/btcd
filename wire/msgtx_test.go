@@ -779,6 +779,91 @@ func TestTxWitnessSize(t *testing.T) {
 	}
 }
 
+// TestTxWitnessLimits performs negative tests to ensure decoding
+// serialized transactions with witness data triggers proper error paths.
+func TestTxWitnessLimits(t *testing.T) {
+	// Use protocol version 70001 and transaction version 1 specifically
+	// here instead of the latest values because the test data is using
+	// bytes encoded with those versions.
+	pver := uint32(70001)
+	txVer := uint32(1)
+
+	var createTxnWithManyWitnessItems = func() []byte {
+		var encodedTxnBuffer []byte
+
+		txnBeforeWitnessEncoded := []byte{
+			0x1, 0x0, 0x0, 0x0, // Version
+			TxFlagMarker, // Marker byte indicating 0 inputs, or a segwit encoded tx
+			WitnessFlag,  // Flag byte
+			0x1,          // Varint for number of inputs
+			0xa5, 0x33, 0x52, 0xd5, 0x13, 0x57, 0x66, 0xf0,
+			0x30, 0x76, 0x59, 0x74, 0x18, 0x26, 0x3d, 0xa2,
+			0xd9, 0xc9, 0x58, 0x31, 0x59, 0x68, 0xfe, 0xa8,
+			0x23, 0x52, 0x94, 0x67, 0x48, 0x1f, 0xf9, 0xcd, // Previous output hash
+			0x13, 0x0, 0x0, 0x0, // Little endian previous output index
+			0x0,                    // No sig script (this is a witness input)
+			0xff, 0xff, 0xff, 0xff, // Sequence
+			0x1,                                    // Varint for number of outputs
+			0xb, 0x7, 0x6, 0x0, 0x0, 0x0, 0x0, 0x0, // Output amount
+			0x16, // Varint for length of pk script
+			0x0,  // Version 0 witness program
+			0x14, // OP_DATA_20
+			0x9d, 0xda, 0xc6, 0xf3, 0x9d, 0x51, 0xe0, 0x39,
+			0x8e, 0x53, 0x2a, 0x22, 0xc4, 0x1b, 0xa1, 0x89,
+			0x40, 0x6a, 0x85, 0x23, // 20-byte pub key hash
+		}
+		witnessItemCountEncoded := []byte{
+			0xfe, 0x01, 0x09, 0x3d, 0x00, // 4,000,001 items on the witness stack
+		}
+		encodedTxnBuffer = append(txnBeforeWitnessEncoded, witnessItemCountEncoded...)
+		// Add 4,000,001 witness items of 1-byte each
+		for i := uint(0); i < 4_000_001; i++ {
+			// First add the size of the witness item (1-byte)
+			encodedTxnBuffer = append(encodedTxnBuffer, "1"...)
+			// Then add the witness item itself (1-byte)
+			encodedTxnBuffer = append(encodedTxnBuffer, "0"...)
+		}
+		var locktimeEncoded = []byte{
+			0x0, 0x0, 0x0, 0x0, // Lock time
+		}
+		encodedTxnBuffer = append(encodedTxnBuffer, locktimeEncoded...)
+
+		return encodedTxnBuffer
+	}
+
+	encodedTxnWithManyWitnessItems := createTxnWithManyWitnessItems()
+
+	tests := []struct {
+		buf     []byte          // Wire encoding
+		pver    uint32          // Protocol version for wire encoding
+		enc     MessageEncoding // Message encoding format
+		version uint32          // Transaction version
+		err     error           // Expected error
+	}{
+		// Transaction with 1 input and 4,000,001 items in the witness stack
+		{
+			encodedTxnWithManyWitnessItems,
+			pver,
+			WitnessEncoding,
+			txVer,
+			&MessageError{},
+		},
+	}
+
+	t.Logf("Running %d tests", len(tests))
+	for i, test := range tests {
+		// Decode from wire format.
+		var msg MsgTx
+		r := bytes.NewReader(test.buf)
+		err := msg.BtcDecode(r, test.pver, test.enc)
+		if reflect.TypeOf(err) != reflect.TypeOf(test.err) {
+			t.Errorf("BtcDecode #%d wrong error got: %v, want: %v",
+				i, err, reflect.TypeOf(test.err))
+			continue
+		}
+	}
+}
+
 // multiTx is a MsgTx with an input and output and used in various tests.
 var multiTx = &MsgTx{
 	Version: 1,
