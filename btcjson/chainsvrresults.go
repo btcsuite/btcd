@@ -117,6 +117,14 @@ type GetBlockVerboseTxResult struct {
 	NextHash      string        `json:"nextblockhash,omitempty"`
 }
 
+// GetChainTipsResult models the data from the getchaintips command.
+type GetChainTipsResult struct {
+	Height    int32  `json:"height"`
+	Hash      string `json:"hash"`
+	BranchLen int32  `json:"branchlen"`
+	Status    string `json:"status"`
+}
+
 // GetChainTxStatsResult models the data from the getchaintxstats command.
 type GetChainTxStatsResult struct {
 	Time                   int64   `json:"time"`
