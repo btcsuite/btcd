@@ -5,6 +5,7 @@
 package blockchain
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -961,6 +962,196 @@ func TestIntervalBlockHashes(t *testing.T) {
 		if !reflect.DeepEqual(hashes, test.hashes) {
 			t.Errorf("%s: unxpected hashes -- got %v, want %v",
 				test.name, hashes, test.hashes)
+		}
+	}
+}
+
+func TestChainTips(t *testing.T) {
+	tests := []struct {
+		name        string
+		chainTipGen func() (*BlockChain, map[chainhash.Hash]ChainTip)
+	}{
+		{
+			name: "one active chain tip",
+			chainTipGen: func() (*BlockChain, map[chainhash.Hash]ChainTip) {
+				// Construct a synthetic block chain with a block index consisting of
+				// the following structure.
+				// 	genesis -> 1 -> 2 -> 3
+				tip := tstTip
+				chain := newFakeChain(&chaincfg.MainNetParams)
+				branch0Nodes := chainedNodes(chain.bestChain.Genesis(), 3)
+				for _, node := range branch0Nodes {
+					chain.index.SetStatusFlags(node, statusDataStored)
+					chain.index.SetStatusFlags(node, statusValid)
+					chain.index.AddNode(node)
+				}
+				chain.bestChain.SetTip(tip(branch0Nodes))
+
+				activeTip := ChainTip{
+					Height:    3,
+					BlockHash: (tip(branch0Nodes)).hash,
+					BranchLen: 0,
+					Status:    StatusActive,
+				}
+				chainTips := make(map[chainhash.Hash]ChainTip)
+				chainTips[activeTip.BlockHash] = activeTip
+
+				return chain, chainTips
+			},
+		},
+		{
+			name: "one active chain tip, one unknown chain tip",
+			chainTipGen: func() (*BlockChain, map[chainhash.Hash]ChainTip) {
+				// Construct a synthetic block chain with a block index consisting of
+				// the following structure.
+				// 	genesis -> 1 -> 2 -> 3 ... -> 10 -> 11  -> 12  -> 13 (active)
+				//                                      \-> 11a -> 12a (unknown)
+				tip := tstTip
+				chain := newFakeChain(&chaincfg.MainNetParams)
+				branch0Nodes := chainedNodes(chain.bestChain.Genesis(), 13)
+				for _, node := range branch0Nodes {
+					chain.index.SetStatusFlags(node, statusDataStored)
+					chain.index.SetStatusFlags(node, statusValid)
+					chain.index.AddNode(node)
+				}
+				chain.bestChain.SetTip(tip(branch0Nodes))
+
+				branch1Nodes := chainedNodes(branch0Nodes[9], 2)
+				for _, node := range branch1Nodes {
+					chain.index.AddNode(node)
+				}
+
+				activeTip := ChainTip{
+					Height:    13,
+					BlockHash: (tip(branch0Nodes)).hash,
+					BranchLen: 0,
+					Status:    StatusActive,
+				}
+				unknownTip := ChainTip{
+					Height:    12,
+					BlockHash: (tip(branch1Nodes)).hash,
+					BranchLen: 2,
+					Status:    StatusUnknown,
+				}
+				chainTips := make(map[chainhash.Hash]ChainTip)
+				chainTips[activeTip.BlockHash] = activeTip
+				chainTips[unknownTip.BlockHash] = unknownTip
+
+				return chain, chainTips
+			},
+		},
+		{
+			name: "1 inactive tip, 1 invalid tip, 1 active tip",
+			chainTipGen: func() (*BlockChain, map[chainhash.Hash]ChainTip) {
+				// Construct a synthetic block chain with a block index consisting of
+				// the following structure.
+				// 	genesis -> 1  -> 2  -> 3 (active)
+				//            \ -> 1a (valid-fork)
+				//            \ -> 1b (invalid)
+				tip := tstTip
+				chain := newFakeChain(&chaincfg.MainNetParams)
+				branch0Nodes := chainedNodes(chain.bestChain.Genesis(), 3)
+				for _, node := range branch0Nodes {
+					chain.index.SetStatusFlags(node, statusDataStored)
+					chain.index.SetStatusFlags(node, statusValid)
+					chain.index.AddNode(node)
+				}
+				chain.bestChain.SetTip(tip(branch0Nodes))
+
+				branch1Nodes := chainedNodes(chain.bestChain.Genesis(), 1)
+				for _, node := range branch1Nodes {
+					chain.index.SetStatusFlags(node, statusDataStored)
+					chain.index.SetStatusFlags(node, statusValid)
+					chain.index.AddNode(node)
+				}
+
+				branch2Nodes := chainedNodes(chain.bestChain.Genesis(), 1)
+				for _, node := range branch2Nodes {
+					chain.index.SetStatusFlags(node, statusDataStored)
+					chain.index.SetStatusFlags(node, statusValidateFailed)
+					chain.index.AddNode(node)
+				}
+
+				activeTip := ChainTip{
+					Height:    tip(branch0Nodes).height,
+					BlockHash: (tip(branch0Nodes)).hash,
+					BranchLen: 0,
+					Status:    StatusActive,
+				}
+
+				inactiveTip := ChainTip{
+					Height:    tip(branch1Nodes).height,
+					BlockHash: (tip(branch1Nodes)).hash,
+					BranchLen: 1,
+					Status:    StatusValidFork,
+				}
+
+				invalidTip := ChainTip{
+					Height:    tip(branch2Nodes).height,
+					BlockHash: (tip(branch2Nodes)).hash,
+					BranchLen: 1,
+					Status:    StatusInvalid,
+				}
+
+				chainTips := make(map[chainhash.Hash]ChainTip)
+				chainTips[activeTip.BlockHash] = activeTip
+				chainTips[inactiveTip.BlockHash] = inactiveTip
+				chainTips[invalidTip.BlockHash] = invalidTip
+
+				return chain, chainTips
+			},
+		},
+	}
+
+	for _, test := range tests {
+		chain, expectedChainTips := test.chainTipGen()
+		gotChainTips := chain.ChainTips()
+		if len(gotChainTips) != len(expectedChainTips) {
+			t.Errorf("TestChainTips Failed test %s. Expected %d "+
+				"chain tips, got %d", test.name, len(expectedChainTips), len(gotChainTips))
+		}
+
+		for _, gotChainTip := range gotChainTips {
+			testChainTip, found := expectedChainTips[gotChainTip.BlockHash]
+			if !found {
+				t.Errorf("TestChainTips Failed test %s. Couldn't find an expected "+
+					"chain tip with height %d, hash %s, branchlen %d, status \"%s\"",
+					test.name, testChainTip.Height, testChainTip.BlockHash.String(),
+					testChainTip.BranchLen, testChainTip.Status.String())
+			}
+
+			if !reflect.DeepEqual(testChainTip, gotChainTip) {
+				t.Errorf("TestChainTips Failed test %s. Expected chain tip with "+
+					"height %d, hash %s, branchlen %d, status \"%s\" but got "+
+					"height %d, hash %s, branchlen %d, status \"%s\"", test.name,
+					testChainTip.Height, testChainTip.BlockHash.String(),
+					testChainTip.BranchLen, testChainTip.Status.String(),
+					gotChainTip.Height, gotChainTip.BlockHash.String(),
+					gotChainTip.BranchLen, gotChainTip.Status.String())
+			}
+
+			switch testChainTip.Status {
+			case StatusActive:
+				if testChainTip.Status.String() != "active" {
+					t.Errorf("TestChainTips Fail: Expected string of \"active\", got \"%s\"",
+						testChainTip.Status.String())
+				}
+			case StatusInvalid:
+				if testChainTip.Status.String() != "invalid" {
+					t.Errorf("TestChainTips Fail: Expected string of \"invalid\", got \"%s\"",
+						testChainTip.Status.String())
+				}
+			case StatusValidFork:
+				if testChainTip.Status.String() != "valid-fork" {
+					t.Errorf("TestChainTips Fail: Expected string of \"valid-fork\", got \"%s\"",
+						testChainTip.Status.String())
+				}
+			case StatusUnknown:
+				if testChainTip.Status.String() != fmt.Sprintf("unknown: %b", testChainTip.Status) {
+					t.Errorf("TestChainTips Fail: Expected string of \"unknown\", got \"%s\"",
+						testChainTip.Status.String())
+				}
+			}
 		}
 	}
 }
