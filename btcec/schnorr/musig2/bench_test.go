@@ -45,12 +45,7 @@ func genSigner(t *testing.B) signer {
 		t.Fatalf("unable to gen priv key: %v", err)
 	}
 
-	pubKey, err := schnorr.ParsePubKey(
-		schnorr.SerializePubKey(privKey.PubKey()),
-	)
-	if err != nil {
-		t.Fatalf("unable to gen key: %v", err)
-	}
+	pubKey := privKey.PubKey()
 
 	nonces, err := GenNonces(WithPublicKey(pubKey))
 	if err != nil {
