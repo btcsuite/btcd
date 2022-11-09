@@ -51,8 +51,9 @@ func NewSignature(r *btcec.FieldVal, s *btcec.ModNScalar) *Signature {
 // Serialize returns the Schnorr signature in the more strict format.
 //
 // The signatures are encoded as
-//   sig[0:32]  x coordinate of the point R, encoded as a big-endian uint256
-//   sig[32:64] s, encoded also as big-endian uint256
+//
+//	sig[0:32]  x coordinate of the point R, encoded as a big-endian uint256
+//	sig[32:64] s, encoded also as big-endian uint256
 func (sig Signature) Serialize() []byte {
 	// Total length of returned signature is the length of r and s.
 	var b [SignatureSize]byte
@@ -441,7 +442,8 @@ func Sign(privKey *btcec.PrivateKey, hash []byte,
 	// Step 1.
 	//
 	// d' = int(d)
-	privKeyScalar := &privKey.Key
+	var privKeyScalar btcec.ModNScalar
+	privKeyScalar.Set(&privKey.Key)
 
 	// Step 2.
 	//
@@ -512,7 +514,7 @@ func Sign(privKey *btcec.PrivateKey, hash []byte,
 			return nil, signatureError(ecdsa_schnorr.ErrSchnorrHashValue, str)
 		}
 
-		sig, err := schnorrSign(privKeyScalar, &kPrime, pub, hash, opts)
+		sig, err := schnorrSign(&privKeyScalar, &kPrime, pub, hash, opts)
 		kPrime.Zero()
 		if err != nil {
 			return nil, err
@@ -535,7 +537,7 @@ func Sign(privKey *btcec.PrivateKey, hash []byte,
 		)
 
 		// Steps 10-15.
-		sig, err := schnorrSign(privKeyScalar, k, pub, hash, opts)
+		sig, err := schnorrSign(&privKeyScalar, k, pub, hash, opts)
 		k.Zero()
 		if err != nil {
 			// Try again with a new nonce.
