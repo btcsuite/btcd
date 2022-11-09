@@ -52,7 +52,7 @@ func genSigner(t *testing.B) signer {
 		t.Fatalf("unable to gen key: %v", err)
 	}
 
-	nonces, err := GenNonces()
+	nonces, err := GenNonces(WithPublicKey(pubKey))
 	if err != nil {
 		t.Fatalf("unable to gen nonces: %v", err)
 	}
@@ -185,7 +185,7 @@ func BenchmarkPartialVerify(b *testing.B) {
 				for i := 0; i < b.N; i++ {
 					ok = sig.Verify(
 						signers[0].nonces.PubNonce, combinedNonce,
-						keys, pubKey, msg,
+						keys, pubKey, msg, signOpts...,
 					)
 					if !ok {
 						b.Fatalf("generated invalid sig!")

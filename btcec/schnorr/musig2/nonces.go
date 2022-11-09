@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"crypto/rand"
 	"encoding/binary"
+	"errors"
 	"io"
 
 	"github.com/btcsuite/btcd/btcec/v2"
@@ -21,7 +22,7 @@ const (
 
 	// SecNonceSize is the size of the secret nonces for musig2. The secret
 	// nonces are the corresponding private keys to the public nonce points.
-	SecNonceSize = 64
+	SecNonceSize = 97
 )
 
 var (
@@ -34,6 +35,10 @@ var (
 	NonceGenTag = []byte("MuSig/nonce")
 
 	byteOrder = binary.BigEndian
+
+	// ErrPubkeyInvalid is returned when the pubkey of the WithPublicKey
+	// option is not passed or of invalid length.
+	ErrPubkeyInvalid = errors.New("nonce generation requires a valid pubkey")
 )
 
 // zeroSecNonce is a secret nonce that's all zeroes. This is used to check that
@@ -96,6 +101,10 @@ type nonceGenOpts struct {
 	// used in place.
 	randReader io.Reader
 
+	// publicKey is the mandatory public key that will be mixed into the nonce
+	// generation.
+	publicKey []byte
+
 	// secretKey is an optional argument that's used to further augment the
 	// generated nonce by xor'ing it with this secret key.
 	secretKey []byte
@@ -139,6 +148,14 @@ func defaultNonceGenOpts() *nonceGenOpts {
 func WithCustomRand(r io.Reader) NonceGenOption {
 	return func(o *nonceGenOpts) {
 		o.randReader = r
+	}
+}
+
+// WithPublicKey is the mandatory public key that will be mixed into the nonce
+// generation.
+func WithPublicKey(pubKey *btcec.PublicKey) NonceGenOption {
+	return func(o *nonceGenOpts) {
+		o.publicKey = pubKey.SerializeCompressed()
 	}
 }
 
@@ -186,6 +203,7 @@ func withCustomOptions(customOpts nonceGenOpts) NonceGenOption {
 		o.combinedKey = customOpts.combinedKey
 		o.auxInput = customOpts.auxInput
 		o.msg = customOpts.msg
+		o.publicKey = customOpts.publicKey
 	}
 }
 
@@ -233,13 +251,13 @@ func writeBytesPrefix(w io.Writer, b []byte, lenWriter lengthWriter) error {
 // genNonceAuxBytes writes out the full byte string used to derive a secret
 // nonce based on some initial randomness as well as the series of optional
 // fields. The byte string used for derivation is:
-//   - tagged_hash("MuSig/nonce", rand || len(aggpk) || aggpk || m_prefixed
-//     || len(in) || in || i).
+//   - tagged_hash("MuSig/nonce", rand || len(pk) || pk ||
+//     len(aggpk) || aggpk || m_prefixed || len(in) || in || i).
 //
 // where i is the ith secret nonce being generated and m_prefixed is:
 //   - bytes(1, 0) if the message is blank
 //   - bytes(1, 1) || bytes(8, len(m)) || m if the message is present.
-func genNonceAuxBytes(rand []byte, i int,
+func genNonceAuxBytes(rand []byte, pubkey []byte, i int,
 	opts *nonceGenOpts) (*chainhash.Hash, error) {
 
 	var w bytes.Buffer
@@ -249,8 +267,14 @@ func genNonceAuxBytes(rand []byte, i int,
 		return nil, err
 	}
 
+	// Next, we'll write out: len(pk) || pk
+	err := writeBytesPrefix(&w, pubkey, uint8Writer)
+	if err != nil {
+		return nil, err
+	}
+
 	// Next, we'll write out: len(aggpk) || aggpk.
-	err := writeBytesPrefix(&w, opts.combinedKey, uint8Writer)
+	err = writeBytesPrefix(&w, opts.combinedKey, uint8Writer)
 	if err != nil {
 		return nil, err
 	}
@@ -305,6 +329,11 @@ func GenNonces(options ...NonceGenOption) (*Nonces, error) {
 		opt(opts)
 	}
 
+	// We require the pubkey option.
+	if opts.publicKey == nil || len(opts.publicKey) != 33 {
+		return nil, ErrPubkeyInvalid
+	}
+
 	// First, we'll start out by generating 32 random bytes drawn from our
 	// CSPRNG.
 	var randBytes [32]byte
@@ -322,13 +351,13 @@ func GenNonces(options ...NonceGenOption) (*Nonces, error) {
 		}
 	}
 
-	// Using our randomness and the set of optional params, generate our
+	// Using our randomness, pubkey and the set of optional params, generate our
 	// two secret nonces: k1 and k2.
-	k1, err := genNonceAuxBytes(randBytes[:], 0, opts)
+	k1, err := genNonceAuxBytes(randBytes[:], opts.publicKey, 0, opts)
 	if err != nil {
 		return nil, err
 	}
-	k2, err := genNonceAuxBytes(randBytes[:], 1, opts)
+	k2, err := genNonceAuxBytes(randBytes[:], opts.publicKey, 1, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -338,10 +367,11 @@ func GenNonces(options ...NonceGenOption) (*Nonces, error) {
 	k2Mod.SetBytes((*[32]byte)(k2))
 
 	// The secret nonces are serialized as the concatenation of the two 32
-	// byte secret nonce values.
+	// byte secret nonce values and the pubkey.
 	var nonces Nonces
 	k1Mod.PutBytesUnchecked(nonces.SecNonce[:])
 	k2Mod.PutBytesUnchecked(nonces.SecNonce[btcec.PrivKeyBytesLen:])
+	copy(nonces.SecNonce[btcec.PrivKeyBytesLen*2:], opts.publicKey)
 
 	// Next, we'll generate R_1 = k_1*G and R_2 = k_2*G. Along the way we
 	// need to map our nonce values into mod n scalars so we can work with
