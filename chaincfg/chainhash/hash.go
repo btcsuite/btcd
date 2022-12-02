@@ -8,6 +8,7 @@ package chainhash
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 )
 
@@ -108,6 +109,11 @@ func (hash *Hash) IsEqual(target *Hash) bool {
 		return false
 	}
 	return *hash == *target
+}
+
+// MarshalJSON serialises the hash as a JSON appropriate string value.
+func (hash Hash) MarshalJSON() ([]byte, error) {
+	return json.Marshal(hash.String())
 }
 
 // NewHash returns a new Hash from a byte slice.  An error is returned if
