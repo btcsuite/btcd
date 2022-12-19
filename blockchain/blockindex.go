@@ -274,6 +274,28 @@ func (node *blockNode) RelativeAncestorCtx(distance int32) HeaderCtx {
 	return ancestor
 }
 
+// IsAncestor returns if the other node is an ancestor of this block node.
+func (node *blockNode) IsAncestor(otherNode *blockNode) bool {
+	// Return early as false if the otherNode is nil.
+	if otherNode == nil {
+		return false
+	}
+
+	ancestor := node.Ancestor(otherNode.height)
+	if ancestor == nil {
+		return false
+	}
+
+	// If the otherNode has the same height as me, then the returned
+	// ancestor will be me.  Return false since I'm not an ancestor of me.
+	if node.height == ancestor.height {
+		return false
+	}
+
+	// Return true if the fetched ancestor is other node.
+	return ancestor.Equals(otherNode)
+}
+
 // RelativeAncestor returns the ancestor block node a relative 'distance' blocks
 // before this node.  This is equivalent to calling Ancestor with the node's
 // height minus provided distance.
