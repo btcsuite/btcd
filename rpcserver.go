@@ -170,8 +170,10 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"getrawtransaction":      handleGetRawTransaction,
 	"gettxout":               handleGetTxOut,
 	"help":                   handleHelp,
+	"invalidateblock":        handleInvalidateBlock,
 	"node":                   handleNode,
 	"ping":                   handlePing,
+	"reconsiderblock":        handleReconsiderBlock,
 	"searchrawtransactions":  handleSearchRawTransactions,
 	"sendrawtransaction":     handleSendRawTransaction,
 	"setgenerate":            handleSetGenerate,
@@ -241,9 +243,7 @@ var rpcUnimplemented = map[string]struct{}{
 	"getmempoolentry":  {},
 	"getnetworkinfo":   {},
 	"getwork":          {},
-	"invalidateblock":  {},
 	"preciousblock":    {},
-	"reconsiderblock":  {},
 }
 
 // Commands that are available to a limited user
@@ -284,6 +284,8 @@ var rpcLimited = map[string]struct{}{
 	"getrawmempool":         {},
 	"getrawtransaction":     {},
 	"gettxout":              {},
+	"invalidateblock":       {},
+	"reconsiderblock":       {},
 	"searchrawtransactions": {},
 	"sendrawtransaction":    {},
 	"submitblock":           {},
@@ -2850,6 +2852,23 @@ func handleGetTxOut(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 	return txOutReply, nil
 }
 
+// handleInvalidateBlock implements the invalidateblock command.
+func handleInvalidateBlock(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	c := cmd.(*btcjson.InvalidateBlockCmd)
+
+	invalidateHash, err := chainhash.NewHashFromStr(c.BlockHash)
+	if err != nil {
+		return nil, &btcjson.RPCError{
+			Code: btcjson.ErrRPCDeserialization,
+			Message: fmt.Sprintf("Failed to deserialize blockhash from string of %s",
+				invalidateHash),
+		}
+	}
+
+	err = s.cfg.Chain.InvalidateBlock(invalidateHash)
+	return nil, err
+}
+
 // handleHelp implements the help command.
 func handleHelp(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	c := cmd.(*btcjson.HelpCmd)
@@ -3121,6 +3140,23 @@ func fetchMempoolTxnsForAddress(s *rpcServer, addr btcutil.Address, numToSkip, n
 		rangeEnd = numAvailable
 	}
 	return mpTxns[numToSkip:rangeEnd], numToSkip
+}
+
+// handleReconsiderBlock implements the reconsiderblock command.
+func handleReconsiderBlock(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	c := cmd.(*btcjson.ReconsiderBlockCmd)
+
+	reconsiderHash, err := chainhash.NewHashFromStr(c.BlockHash)
+	if err != nil {
+		return nil, &btcjson.RPCError{
+			Code: btcjson.ErrRPCDeserialization,
+			Message: fmt.Sprintf("Failed to deserialize blockhash from string of %s",
+				reconsiderHash),
+		}
+	}
+
+	err = s.cfg.Chain.ReconsiderBlock(reconsiderHash)
+	return nil, err
 }
 
 // handleSearchRawTransactions implements the searchrawtransactions command.

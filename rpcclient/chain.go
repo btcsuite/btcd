@@ -1419,3 +1419,38 @@ func (c *Client) GetDescriptorInfoAsync(descriptor string) FutureGetDescriptorIn
 func (c *Client) GetDescriptorInfo(descriptor string) (*btcjson.GetDescriptorInfoResult, error) {
 	return c.GetDescriptorInfoAsync(descriptor).Receive()
 }
+
+// FutureReconsiderBlockResult is a future promise to deliver the result of a
+// ReconsiderBlockAsync RPC invocation (or an applicable error).
+type FutureReconsiderBlockResult chan *Response
+
+// Receive waits for the Response promised by the future and returns the raw
+// block requested from the server given its hash.
+func (r FutureReconsiderBlockResult) Receive() error {
+	_, err := ReceiveFuture(r)
+	return err
+}
+
+// ReconsiderBlockAsync returns an instance of a type that can be used to get the
+// result of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+//
+// See ReconsiderBlock for the blocking version and more details.
+func (c *Client) ReconsiderBlockAsync(
+	blockHash *chainhash.Hash) FutureReconsiderBlockResult {
+
+	hash := ""
+	if blockHash != nil {
+		hash = blockHash.String()
+	}
+
+	cmd := btcjson.NewReconsiderBlockCmd(hash)
+	return c.SendCmd(cmd)
+}
+
+// ReconsiderBlock reconsiders an verifies a specific block and the branch that
+// the block is included in.  If the block is valid on reconsideration, the chain
+// will reorg to that block if it has more PoW than the current tip.
+func (c *Client) ReconsiderBlock(blockHash *chainhash.Hash) error {
+	return c.ReconsiderBlockAsync(blockHash).Receive()
+}
