@@ -544,6 +544,10 @@ var helpDescsEnUS = map[string]string{
 	"gettxout-vout":           "The index of the output",
 	"gettxout-includemempool": "Include the mempool when true",
 
+	// InvalidateBlockCmd help.
+	"invalidateblock--synopsis": "Invalidates the block of the given block hash. To re-validate the invalidated block, use the reconsiderblock rpc",
+	"invalidateblock-blockhash": "The block hash of the block to invalidate",
+
 	// HelpCmd help.
 	"help--synopsis":   "Returns a list of all commands or help for a specified command.",
 	"help-command":     "The command to retrieve help for",
@@ -681,6 +685,10 @@ var helpDescsEnUS = map[string]string{
 	"loadtxfilter-addresses": "Array of addresses to add to the transaction filter",
 	"loadtxfilter-outpoints": "Array of outpoints to add to the transaction filter",
 
+	// ReconsiderBlockCmd help.
+	"reconsiderblock--synopsis": "Reconsiders the block of the given block hash. Can be used to re-validate blocks invalidated with invalidateblock",
+	"reconsiderblock-blockhash": "The block hash of the block to reconsider",
+
 	// Rescan help.
 	"rescan--synopsis": "Rescan block chain for transactions to addresses.\n" +
 		"When the endblock parameter is omitted, the rescan continues through the best block in the main chain.\n" +
@@ -788,7 +796,9 @@ var rpcResultTypes = map[string][]interface{}{
 	"gettxout":               {(*btcjson.GetTxOutResult)(nil)},
 	"node":                   nil,
 	"help":                   {(*string)(nil), (*string)(nil)},
+	"invalidateblock":        nil,
 	"ping":                   nil,
+	"reconsiderblock":        nil,
 	"searchrawtransactions":  {(*string)(nil), (*[]btcjson.SearchRawTransactionsResult)(nil)},
 	"sendrawtransaction":     {(*string)(nil)},
 	"setgenerate":            nil,
