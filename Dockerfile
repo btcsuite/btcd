@@ -35,7 +35,7 @@ RUN set -ex \
   && echo "Compiling for $GOARCH" \
   && go install -v . ./cmd/...
 
-FROM $ARCH/alpine:3.12
+FROM $ARCH/alpine:3.16
 
 COPY --from=build-container /go/bin /bin
 
