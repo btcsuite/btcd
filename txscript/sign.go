@@ -95,7 +95,7 @@ func RawTxInTaprootSignature(tx *wire.MsgTx, sigHashes *TxSigHashes, idx int,
 
 	// If this is sighash default, then we can just return the signature
 	// directly.
-	if hashType&SigHashDefault == SigHashDefault {
+	if hashType == SigHashDefault {
 		return sig, nil
 	}
 
