@@ -2016,7 +2016,10 @@ func openDB(dbPath string, network wire.BitcoinNet, create bool) (database.DB, e
 	// according to the data that is actually on disk.  Also create the
 	// database cache which wraps the underlying leveldb database to provide
 	// write caching.
-	store := newBlockStore(dbPath, network)
+	store, err := newBlockStore(dbPath, network)
+	if err != nil {
+		return nil, convertErr(err.Error(), err)
+	}
 	cache := newDbCache(ldb, store, defaultCacheSize, defaultFlushSecs)
 	pdb := &db{store: store, cache: cache}
 
