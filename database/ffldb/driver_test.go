@@ -5,6 +5,7 @@
 package ffldb_test
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcd/database/ffldb"
 )
@@ -251,6 +253,135 @@ func TestPersistence(t *testing.T) {
 		t.Errorf("View: unexpected error: %v", err)
 		return
 	}
+}
+
+// TestPrune tests that the older .fdb files are deleted with a call to prune.
+func TestPrune(t *testing.T) {
+	t.Parallel()
+
+	// Create a new database to run tests against.
+	dbPath := t.TempDir()
+	db, err := database.Create(dbType, dbPath, blockDataNet)
+	if err != nil {
+		t.Errorf("Failed to create test database (%s) %v", dbType, err)
+		return
+	}
+	defer db.Close()
+
+	blockFileSize := uint64(2048)
+
+	testfn := func(t *testing.T, db database.DB) {
+		// Load the test blocks and save in the test context for use throughout
+		// the tests.
+		blocks, err := loadBlocks(t, blockDataFile, blockDataNet)
+		if err != nil {
+			t.Errorf("loadBlocks: Unexpected error: %v", err)
+			return
+		}
+		err = db.Update(func(tx database.Tx) error {
+			for i, block := range blocks {
+				err := tx.StoreBlock(block)
+				if err != nil {
+					return fmt.Errorf("StoreBlock #%d: unexpected error: "+
+						"%v", i, err)
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		blockHashMap := make(map[chainhash.Hash][]byte, len(blocks))
+		for _, block := range blocks {
+			bytes, err := block.Bytes()
+			if err != nil {
+				t.Fatal(err)
+			}
+			blockHashMap[*block.Hash()] = bytes
+		}
+
+		err = db.Update(func(tx database.Tx) error {
+			_, err := tx.PruneBlocks(1024)
+			if err == nil {
+				return fmt.Errorf("Expected an error when attempting to prune" +
+					"below the maxFileSize")
+			}
+
+			_, err = tx.PruneBlocks(0)
+			if err == nil {
+				return fmt.Errorf("Expected an error when attempting to prune" +
+					"below the maxFileSize")
+			}
+
+			return nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		var deletedBlocks []chainhash.Hash
+
+		// This should leave 3 files on disk.
+		err = db.Update(func(tx database.Tx) error {
+			deletedBlocks, err = tx.PruneBlocks(blockFileSize * 3)
+			return err
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// The only error we can get is a bad pattern error.  Since we're hardcoding
+		// the pattern, we should not have an error at runtime.
+		files, _ := filepath.Glob(filepath.Join(dbPath, "*.fdb"))
+		if len(files) != 3 {
+			t.Fatalf("Expected to find %d files but got %d",
+				3, len(files))
+		}
+
+		// Check that all the blocks that say were deleted are deleted from the
+		// block index bucket as well.
+		err = db.View(func(tx database.Tx) error {
+			for _, deletedBlock := range deletedBlocks {
+				_, err := tx.FetchBlock(&deletedBlock)
+				if dbErr, ok := err.(database.Error); !ok ||
+					dbErr.ErrorCode != database.ErrBlockNotFound {
+
+					return fmt.Errorf("Expected ErrBlockNotFound "+
+						"but got %v", dbErr)
+				}
+			}
+
+			return nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Check that the not deleted blocks are present.
+		for _, deletedBlock := range deletedBlocks {
+			delete(blockHashMap, deletedBlock)
+		}
+		err = db.View(func(tx database.Tx) error {
+			for hash, wantBytes := range blockHashMap {
+				gotBytes, err := tx.FetchBlock(&hash)
+				if err != nil {
+					return err
+				}
+				if !bytes.Equal(gotBytes, wantBytes) {
+					return fmt.Errorf("got bytes %x, want bytes %x",
+						gotBytes, wantBytes)
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	ffldb.TstRunWithMaxBlockFileSize(db, uint32(blockFileSize), func() {
+		testfn(t, db)
+	})
 }
 
 // TestInterface performs all interfaces tests for this database driver.

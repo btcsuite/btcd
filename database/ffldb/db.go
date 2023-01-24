@@ -1669,6 +1669,101 @@ func (tx *transaction) writePendingAndCommit() error {
 	return tx.db.cache.commitTx(tx)
 }
 
+// PruneBlocks deletes the block files until it reaches the target size
+// (specified in bytes).  Throws an error if the target size is below
+// the maximum size of a single block file.
+//
+// This function is part of the database.Tx interface implementation.
+func (tx *transaction) PruneBlocks(targetSize uint64) ([]chainhash.Hash, error) {
+	// Ensure transaction state is valid.
+	if err := tx.checkClosed(); err != nil {
+		return nil, err
+	}
+
+	// Ensure the transaction is writable.
+	if !tx.writable {
+		str := "prune blocks requires a writable database transaction"
+		return nil, makeDbErr(database.ErrTxNotWritable, str, nil)
+	}
+
+	// Make a local alias for the maxBlockFileSize.
+	maxSize := uint64(tx.db.store.maxBlockFileSize)
+	if targetSize < maxSize {
+		return nil, fmt.Errorf("got target size of %d but it must be greater "+
+			"than %d, the max size of a single block file",
+			targetSize, maxSize)
+	}
+
+	first, last, lastFileSize, err := scanBlockFiles(tx.db.store.basePath)
+	if err != nil {
+		return nil, err
+	}
+
+	// If we have no files on disk or just a single file on disk, return early.
+	if first == last {
+		return nil, nil
+	}
+
+	// Last file number minus the first file number gives us the count of files
+	// on disk minus 1.  We don't want to count the last file since we can't assume
+	// that it is of max size.
+	maxSizeFileCount := last - first
+
+	// If the total size of block files are under the target, return early and
+	// don't prune.
+	totalSize := uint64(lastFileSize) + (maxSize * uint64(maxSizeFileCount))
+	if totalSize <= targetSize {
+		return nil, nil
+	}
+
+	log.Tracef("Using %d more bytes than the target of %d MiB. Pruning files...",
+		totalSize-targetSize,
+		targetSize/(1024*1024))
+
+	deletedFiles := make(map[uint32]struct{})
+
+	// We use < not <= so that the last file is never deleted.  There are other checks in place
+	// but setting it to < here doesn't hurt.
+	for i := uint32(first); i < uint32(last); i++ {
+		err = tx.db.store.deleteFileFunc(i)
+		if err != nil {
+			return nil, fmt.Errorf("PruneBlocks: Failed to delete block file "+
+				"number %d: %v", i, err)
+		}
+
+		// Add the file index to the deleted files map so that we can later
+		// delete the block location index.
+		deletedFiles[i] = struct{}{}
+
+		// If we're already at or below the target usage, break and don't
+		// try to delete more files.
+		totalSize -= maxSize
+		if totalSize <= targetSize {
+			break
+		}
+	}
+
+	// Delete the indexed block locations for the files that we've just deleted.
+	var deletedBlockHashes []chainhash.Hash
+	cursor := tx.blockIdxBucket.Cursor()
+	for ok := cursor.First(); ok; ok = cursor.Next() {
+		loc := deserializeBlockLoc(cursor.Value())
+
+		_, found := deletedFiles[loc.blockFileNum]
+		if found {
+			deletedBlockHashes = append(deletedBlockHashes, *(*chainhash.Hash)(cursor.Key()))
+			err := cursor.Delete()
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	log.Tracef("Finished pruning. Database now at %d bytes", totalSize)
+
+	return deletedBlockHashes, nil
+}
+
 // Commit commits all changes that have been made to the root metadata bucket
 // and all of its sub-buckets to the database cache which is periodically synced
 // to persistent storage.  In addition, it commits all new blocks directly to
