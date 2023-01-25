@@ -774,3 +774,11 @@ func AssembleTaprootScriptTree(leaves ...TapLeaf) *IndexedTapScriptTree {
 
 	return scriptTree
 }
+
+// PayToTaprootScript creates a pk script for a pay-to-taproot output key.
+func PayToTaprootScript(taprootKey *btcec.PublicKey) ([]byte, error) {
+	return NewScriptBuilder().
+		AddOp(OP_1).
+		AddData(schnorr.SerializePubKey(taprootKey)).
+		Script()
+}
