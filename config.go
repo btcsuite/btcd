@@ -66,6 +66,7 @@ const (
 	sampleConfigFilename         = "sample-btcd.conf"
 	defaultTxIndex               = false
 	defaultAddrIndex             = false
+	pruneMinSize                 = 1536
 )
 
 var (
@@ -146,6 +147,7 @@ type config struct {
 	Proxy                string        `long:"proxy" description:"Connect via SOCKS5 proxy (eg. 127.0.0.1:9050)"`
 	ProxyPass            string        `long:"proxypass" default-mask:"-" description:"Password for proxy server"`
 	ProxyUser            string        `long:"proxyuser" description:"Username for proxy server"`
+	Prune                uint64        `long:"prune" description:"Prune already validated blocks from the database. Must specify a target size in MiB (minimum value of 1536, default value of 0 will disable pruning)"`
 	RegressionTest       bool          `long:"regtest" description:"Use the regression test network"`
 	RejectNonStd         bool          `long:"rejectnonstd" description:"Reject non-standard transactions regardless of the default settings for the active network."`
 	RejectReplacement    bool          `long:"rejectreplacement" description:"Reject transactions that attempt to replace existing transactions within the mempool through the Replace-By-Fee (RBF) signaling policy."`
@@ -1135,6 +1137,14 @@ func loadConfig() (*config, []string, error) {
 		cfg.oniondial = func(a, b string, t time.Duration) (net.Conn, error) {
 			return nil, errors.New("tor has been disabled")
 		}
+	}
+
+	if cfg.Prune != 0 && cfg.Prune < pruneMinSize {
+		err := fmt.Errorf("%s: the minimum value for --prune is %d. Got %d",
+			funcName, pruneMinSize, cfg.Prune)
+		fmt.Fprintln(os.Stderr, err)
+		fmt.Fprintln(os.Stderr, usageMessage)
+		return nil, nil, err
 	}
 
 	// Warn about missing config file only after all other configuration is
