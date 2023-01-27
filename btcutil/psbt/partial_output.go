@@ -74,7 +74,9 @@ func (po *POutput) deserialize(r io.Reader) error {
 			if !validatePubkey(keydata) {
 				return ErrInvalidKeydata
 			}
-			master, derivationPath, err := readBip32Derivation(value)
+			master, derivationPath, err := ReadBip32Derivation(
+				value,
+			)
 			if err != nil {
 				return err
 			}
@@ -123,7 +125,7 @@ func (po *POutput) deserialize(r io.Reader) error {
 				return ErrInvalidKeydata
 			}
 
-			taprootDerivation, err := readTaprootBip32Derivation(
+			taprootDerivation, err := ReadTaprootBip32Derivation(
 				keydata, value,
 			)
 			if err != nil {
@@ -211,7 +213,7 @@ func (po *POutput) serialize(w io.Writer) error {
 		)
 	})
 	for _, derivation := range po.TaprootBip32Derivation {
-		value, err := serializeTaprootBip32Derivation(
+		value, err := SerializeTaprootBip32Derivation(
 			derivation,
 		)
 		if err != nil {

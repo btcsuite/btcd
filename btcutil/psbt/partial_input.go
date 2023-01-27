@@ -174,7 +174,9 @@ func (pi *PInput) deserialize(r io.Reader) error {
 			if !validatePubkey(keydata) {
 				return ErrInvalidPsbtFormat
 			}
-			master, derivationPath, err := readBip32Derivation(value)
+			master, derivationPath, err := ReadBip32Derivation(
+				value,
+			)
 			if err != nil {
 				return err
 			}
@@ -322,7 +324,7 @@ func (pi *PInput) deserialize(r io.Reader) error {
 				return ErrInvalidKeydata
 			}
 
-			taprootDerivation, err := readTaprootBip32Derivation(
+			taprootDerivation, err := ReadTaprootBip32Derivation(
 				keydata, value,
 			)
 			if err != nil {
@@ -538,7 +540,7 @@ func (pi *PInput) serialize(w io.Writer) error {
 			)
 		})
 		for _, derivation := range pi.TaprootBip32Derivation {
-			value, err := serializeTaprootBip32Derivation(
+			value, err := SerializeTaprootBip32Derivation(
 				derivation,
 			)
 			if err != nil {
