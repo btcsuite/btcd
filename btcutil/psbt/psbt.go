@@ -113,7 +113,7 @@ type Unknown struct {
 	Value []byte
 }
 
-// Packet is the actual psbt repreesntation. It is a is a set of 1 + N + M
+// Packet is the actual psbt representation. It is a set of 1 + N + M
 // key-value pair lists, 1 global, defining the unsigned transaction structure
 // with N inputs and M outputs.  These key-value pairs can contain scripts,
 // signatures, key derivations and other transaction-defining data.
@@ -130,7 +130,7 @@ type Packet struct {
 	Outputs []POutput
 
 	// Unknowns are the set of custom types (global only) within this PSBT.
-	Unknowns []Unknown
+	Unknowns []*Unknown
 }
 
 // validateUnsignedTx returns true if the transaction is unsigned.  Note that
@@ -155,7 +155,7 @@ func NewFromUnsignedTx(tx *wire.MsgTx) (*Packet, error) {
 
 	inSlice := make([]PInput, len(tx.TxIn))
 	outSlice := make([]POutput, len(tx.TxOut))
-	unknownSlice := make([]Unknown, 0)
+	unknownSlice := make([]*Unknown, 0)
 
 	return &Packet{
 		UnsignedTx: tx,
@@ -224,7 +224,7 @@ func NewFromRawBytes(r io.Reader, b64 bool) (*Packet, error) {
 
 	// Next we parse any unknowns that may be present, making sure that we
 	// break at the separator.
-	var unknownSlice []Unknown
+	var unknownSlice []*Unknown
 	for {
 		keyint, keydata, err := getKey(r)
 		if err != nil {
@@ -244,7 +244,7 @@ func NewFromRawBytes(r io.Reader, b64 bool) (*Packet, error) {
 		keyintanddata := []byte{byte(keyint)}
 		keyintanddata = append(keyintanddata, keydata...)
 
-		newUnknown := Unknown{
+		newUnknown := &Unknown{
 			Key:   keyintanddata,
 			Value: value,
 		}
