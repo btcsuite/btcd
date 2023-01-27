@@ -17,6 +17,7 @@ type POutput struct {
 	TaprootInternalKey     []byte
 	TaprootTapTree         []byte
 	TaprootBip32Derivation []*TaprootBip32Derivation
+	Unknowns               []*Unknown
 }
 
 // NewPsbtOutput creates an instance of PsbtOutput; the three parameters
@@ -144,8 +145,25 @@ func (po *POutput) deserialize(r io.Reader) error {
 			)
 
 		default:
-			// Unknown type is allowed for inputs but not outputs.
-			return ErrInvalidPsbtFormat
+			// A fall through case for any proprietary types.
+			keyCodeAndData := append(
+				[]byte{byte(keyCode)}, keyData...,
+			)
+			newUnknown := &Unknown{
+				Key:   keyCodeAndData,
+				Value: value,
+			}
+
+			// Duplicate key+keyData are not allowed.
+			for _, x := range po.Unknowns {
+				if bytes.Equal(x.Key, newUnknown.Key) &&
+					bytes.Equal(x.Value, newUnknown.Value) {
+
+					return ErrDuplicateKey
+				}
+			}
+
+			po.Unknowns = append(po.Unknowns, newUnknown)
 		}
 	}
 
@@ -223,6 +241,15 @@ func (po *POutput) serialize(w io.Writer) error {
 			w, uint8(TaprootBip32DerivationOutputType),
 			derivation.XOnlyPubKey, value,
 		)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Unknown is a special case; we don't have a key type, only a key and
+	// a value field
+	for _, kv := range po.Unknowns {
+		err := serializeKVpair(w, kv.Key, kv.Value)
 		if err != nil {
 			return err
 		}
