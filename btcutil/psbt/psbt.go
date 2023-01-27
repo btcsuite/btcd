@@ -319,6 +319,15 @@ func (p *Packet) Serialize(w io.Writer) error {
 		return err
 	}
 
+	// Unknown is a special case; we don't have a key type, only a key and
+	// a value field
+	for _, kv := range p.Unknowns {
+		err := serializeKVpair(w, kv.Key, kv.Value)
+		if err != nil {
+			return err
+		}
+	}
+
 	// With that our global section is done, so we'll write out the
 	// separator.
 	separator := []byte{0x00}
