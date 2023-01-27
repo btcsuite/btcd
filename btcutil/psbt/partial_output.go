@@ -34,12 +34,12 @@ func NewPsbtOutput(redeemScript []byte, witnessScript []byte,
 // deserialize attempts to recode a new POutput from the passed io.Reader.
 func (po *POutput) deserialize(r io.Reader) error {
 	for {
-		keyint, keydata, err := getKey(r)
+		keyCode, keyData, err := getKey(r)
 		if err != nil {
 			return err
 		}
-		if keyint == -1 {
-			// Reached separator byte
+		if keyCode == -1 {
+			// Reached separator byte, this section is done.
 			break
 		}
 
@@ -50,14 +50,14 @@ func (po *POutput) deserialize(r io.Reader) error {
 			return err
 		}
 
-		switch OutputType(keyint) {
+		switch OutputType(keyCode) {
 
 		case RedeemScriptOutputType:
 			if po.RedeemScript != nil {
 				return ErrDuplicateKey
 			}
-			if keydata != nil {
-				return ErrInvalidKeydata
+			if keyData != nil {
+				return ErrInvalidKeyData
 			}
 			po.RedeemScript = value
 
@@ -65,14 +65,14 @@ func (po *POutput) deserialize(r io.Reader) error {
 			if po.WitnessScript != nil {
 				return ErrDuplicateKey
 			}
-			if keydata != nil {
-				return ErrInvalidKeydata
+			if keyData != nil {
+				return ErrInvalidKeyData
 			}
 			po.WitnessScript = value
 
 		case Bip32DerivationOutputType:
-			if !validatePubkey(keydata) {
-				return ErrInvalidKeydata
+			if !validatePubkey(keyData) {
+				return ErrInvalidKeyData
 			}
 			master, derivationPath, err := ReadBip32Derivation(
 				value,
@@ -81,16 +81,16 @@ func (po *POutput) deserialize(r io.Reader) error {
 				return err
 			}
 
-			// Duplicate keys are not allowed
+			// Duplicate keys are not allowed.
 			for _, x := range po.Bip32Derivation {
-				if bytes.Equal(x.PubKey, keydata) {
+				if bytes.Equal(x.PubKey, keyData) {
 					return ErrDuplicateKey
 				}
 			}
 
 			po.Bip32Derivation = append(po.Bip32Derivation,
 				&Bip32Derivation{
-					PubKey:               keydata,
+					PubKey:               keyData,
 					MasterKeyFingerprint: master,
 					Bip32Path:            derivationPath,
 				},
@@ -100,12 +100,12 @@ func (po *POutput) deserialize(r io.Reader) error {
 			if po.TaprootInternalKey != nil {
 				return ErrDuplicateKey
 			}
-			if keydata != nil {
-				return ErrInvalidKeydata
+			if keyData != nil {
+				return ErrInvalidKeyData
 			}
 
 			if !validateXOnlyPubkey(value) {
-				return ErrInvalidKeydata
+				return ErrInvalidKeyData
 			}
 
 			po.TaprootInternalKey = value
@@ -114,19 +114,19 @@ func (po *POutput) deserialize(r io.Reader) error {
 			if po.TaprootTapTree != nil {
 				return ErrDuplicateKey
 			}
-			if keydata != nil {
-				return ErrInvalidKeydata
+			if keyData != nil {
+				return ErrInvalidKeyData
 			}
 
 			po.TaprootTapTree = value
 
 		case TaprootBip32DerivationOutputType:
-			if !validateXOnlyPubkey(keydata) {
-				return ErrInvalidKeydata
+			if !validateXOnlyPubkey(keyData) {
+				return ErrInvalidKeyData
 			}
 
 			taprootDerivation, err := ReadTaprootBip32Derivation(
-				keydata, value,
+				keyData, value,
 			)
 			if err != nil {
 				return err
@@ -134,7 +134,7 @@ func (po *POutput) deserialize(r io.Reader) error {
 
 			// Duplicate keys are not allowed.
 			for _, x := range po.TaprootBip32Derivation {
-				if bytes.Equal(x.XOnlyPubKey, keydata) {
+				if bytes.Equal(x.XOnlyPubKey, keyData) {
 					return ErrDuplicateKey
 				}
 			}

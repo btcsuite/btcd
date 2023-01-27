@@ -22,12 +22,12 @@ const (
 	// attached.
 	SignSuccesful = 0
 
-	// SignFinalized  indicates that this input is already finalized, so the provided
-	// signature was *not* attached
+	// SignFinalized  indicates that this input is already finalized, so the
+	// provided signature was *not* attached
 	SignFinalized = 1
 
-	// SignInvalid indicates that the provided signature data was not valid. In this case
-	// an error will also be returned.
+	// SignInvalid indicates that the provided signature data was not valid.
+	// In this case an error will also be returned.
 	SignInvalid = -1
 )
 
@@ -73,9 +73,10 @@ func (u *Updater) Sign(inIndex int, sig []byte, pubKey []byte,
 	//
 	// Case 1: if witnessScript is present, it must be of type witness;
 	// if not, signature insertion will of course fail.
+	pInput := u.Upsbt.Inputs[inIndex]
 	switch {
-	case u.Upsbt.Inputs[inIndex].WitnessScript != nil:
-		if u.Upsbt.Inputs[inIndex].WitnessUtxo == nil {
+	case pInput.WitnessScript != nil:
+		if pInput.WitnessUtxo == nil {
 			err := nonWitnessToWitness(u.Upsbt, inIndex)
 			if err != nil {
 				return SignInvalid, err
@@ -89,12 +90,12 @@ func (u *Updater) Sign(inIndex int, sig []byte, pubKey []byte,
 
 	// Case 2: no witness script, only redeem script; can be legacy p2sh or
 	// p2sh-wrapped p2wkh.
-	case u.Upsbt.Inputs[inIndex].RedeemScript != nil:
+	case pInput.RedeemScript != nil:
 		// We only need to decide if the input is witness, and we don't
 		// rely on the witnessutxo/nonwitnessutxo in the PSBT, instead
 		// we check the redeemScript content.
 		if txscript.IsWitnessProgram(redeemScript) {
-			if u.Upsbt.Inputs[inIndex].WitnessUtxo == nil {
+			if pInput.WitnessUtxo == nil {
 				err := nonWitnessToWitness(u.Upsbt, inIndex)
 				if err != nil {
 					return SignInvalid, err
@@ -113,9 +114,10 @@ func (u *Updater) Sign(inIndex int, sig []byte, pubKey []byte,
 	// non-p2sh. To check if it's segwit, check the scriptPubKey of the
 	// output.
 	default:
-		if u.Upsbt.Inputs[inIndex].WitnessUtxo == nil {
-			outIndex := u.Upsbt.UnsignedTx.TxIn[inIndex].PreviousOutPoint.Index
-			script := u.Upsbt.Inputs[inIndex].NonWitnessUtxo.TxOut[outIndex].PkScript
+		if pInput.WitnessUtxo == nil {
+			txIn := u.Upsbt.UnsignedTx.TxIn[inIndex]
+			outIndex := txIn.PreviousOutPoint.Index
+			script := pInput.NonWitnessUtxo.TxOut[outIndex].PkScript
 
 			if txscript.IsWitnessProgram(script) {
 				err := nonWitnessToWitness(u.Upsbt, inIndex)

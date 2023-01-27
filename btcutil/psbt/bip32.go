@@ -13,7 +13,7 @@ type Bip32Derivation struct {
 	// PubKey is the raw pubkey serialized in compressed format.
 	PubKey []byte
 
-	// MasterKeyFingerprint is the finger print of the master pubkey.
+	// MasterKeyFingerprint is the fingerprint of the master pubkey.
 	MasterKeyFingerprint uint32
 
 	// Bip32Path is the BIP 32 path with child index as a distinct integer.

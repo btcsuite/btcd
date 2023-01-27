@@ -245,7 +245,7 @@ func getKey(r io.Reader) (int, []byte, error) {
 
 	// Check that we don't attempt to decode a dangerously large key.
 	if count > MaxPsbtKeyLength {
-		return -1, nil, ErrInvalidKeydata
+		return -1, nil, ErrInvalidKeyData
 	}
 
 	// Next, we ready out the designated number of bytes, which may include
