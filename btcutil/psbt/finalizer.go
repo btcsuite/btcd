@@ -14,6 +14,7 @@ package psbt
 import (
 	"bytes"
 	"fmt"
+
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 )
@@ -462,7 +463,9 @@ func finalizeWitnessInput(p *Packet, inIndex int) error {
 				return ErrNotFinalizable
 			}
 
-			serializedWitness, err = writePKHWitness(sigs[0], pubKeys[0])
+			serializedWitness, err = writePKHWitness(
+				sigs[0], pubKeys[0],
+			)
 			if err != nil {
 				return err
 			}

@@ -22,7 +22,7 @@ import (
 const psbtMagicLength = 5
 
 var (
-	// psbtMagic is the separator
+	// psbtMagic is the separator.
 	psbtMagic = [psbtMagicLength]byte{0x70,
 		0x73, 0x62, 0x74, 0xff, // = "psbt" + 0xff sep
 	}
@@ -34,7 +34,7 @@ var (
 const MaxPsbtValueLength = 4000000
 
 // MaxPsbtKeyLength is the length of the largest key that we'll successfully
-// deserialize from the wire. Anything more will return ErrInvalidKeydata.
+// deserialize from the wire. Anything more will return ErrInvalidKeyData.
 const MaxPsbtKeyLength = 10000
 
 var (
@@ -47,40 +47,41 @@ var (
 	// due to having the same key repeated in the same key-value pair.
 	ErrDuplicateKey = errors.New("Invalid Psbt due to duplicate key")
 
-	// ErrInvalidKeydata indicates that a key-value pair in the PSBT
+	// ErrInvalidKeyData indicates that a key-value pair in the PSBT
 	// serialization contains data in the key which is not valid.
-	ErrInvalidKeydata = errors.New("Invalid key data")
+	ErrInvalidKeyData = errors.New("Invalid key data")
 
-	// ErrInvalidMagicBytes indicates that a passed Psbt serialization is invalid
-	// due to having incorrect magic bytes.
-	ErrInvalidMagicBytes = errors.New("Invalid Psbt due to incorrect magic bytes")
+	// ErrInvalidMagicBytes indicates that a passed Psbt serialization is
+	// invalid due to having incorrect magic bytes.
+	ErrInvalidMagicBytes = errors.New("Invalid Psbt due to incorrect " +
+		"magic bytes")
 
-	// ErrInvalidRawTxSigned indicates that the raw serialized transaction in the
-	// global section of the passed Psbt serialization is invalid because it
-	// contains scriptSigs/witnesses (i.e. is fully or partially signed), which
-	// is not allowed by BIP174.
-	ErrInvalidRawTxSigned = errors.New("Invalid Psbt, raw transaction must " +
-		"be unsigned.")
+	// ErrInvalidRawTxSigned indicates that the raw serialized transaction
+	// in the global section of the passed Psbt serialization is invalid
+	// because it contains scriptSigs/witnesses (i.e. is fully or partially
+	// signed), which is not allowed by BIP174.
+	ErrInvalidRawTxSigned = errors.New("Invalid Psbt, raw transaction " +
+		"must be unsigned.")
 
 	// ErrInvalidPrevOutNonWitnessTransaction indicates that the transaction
 	// hash (i.e. SHA256^2) of the fully serialized previous transaction
-	// provided in the NonWitnessUtxo key-value field doesn't match the prevout
-	// hash in the UnsignedTx field in the PSBT itself.
-	ErrInvalidPrevOutNonWitnessTransaction = errors.New("Prevout hash does " +
-		"not match the provided non-witness utxo serialization")
+	// provided in the NonWitnessUtxo key-value field doesn't match the
+	// prevout hash in the UnsignedTx field in the PSBT itself.
+	ErrInvalidPrevOutNonWitnessTransaction = errors.New("Prevout hash " +
+		"does not match the provided non-witness utxo serialization")
 
 	// ErrInvalidSignatureForInput indicates that the signature the user is
 	// trying to append to the PSBT is invalid, either because it does
 	// not correspond to the previous transaction hash, or redeem script,
 	// or witness script.
 	// NOTE this does not include ECDSA signature checking.
-	ErrInvalidSignatureForInput = errors.New("Signature does not correspond " +
-		"to this input")
+	ErrInvalidSignatureForInput = errors.New("Signature does not " +
+		"correspond to this input")
 
-	// ErrInputAlreadyFinalized indicates that the PSBT passed to a Finalizer
-	// already contains the finalized scriptSig or witness.
-	ErrInputAlreadyFinalized = errors.New("Cannot finalize PSBT, finalized " +
-		"scriptSig or scriptWitnes already exists")
+	// ErrInputAlreadyFinalized indicates that the PSBT passed to a
+	// Finalizer already contains the finalized scriptSig or witness.
+	ErrInputAlreadyFinalized = errors.New("Cannot finalize PSBT, " +
+		"finalized scriptSig or scriptWitnes already exists")
 
 	// ErrIncompletePSBT indicates that the Extractor object
 	// was unable to successfully extract the passed Psbt struct because
@@ -99,8 +100,8 @@ var (
 	ErrInvalidSigHashFlags = errors.New("Invalid Sighash Flags")
 
 	// ErrUnsupportedScriptType indicates that the redeem script or
-	// scriptwitness given is not supported by this codebase, or is otherwise
-	// not valid.
+	// script witness given is not supported by this codebase, or is
+	// otherwise not valid.
 	ErrUnsupportedScriptType = errors.New("Unsupported script type")
 )
 
@@ -112,7 +113,7 @@ type Unknown struct {
 	Value []byte
 }
 
-// Packet is the actual psbt repreesntation. It is a is a set of 1 + N + M
+// Packet is the actual psbt representation. It is a set of 1 + N + M
 // key-value pair lists, 1 global, defining the unsigned transaction structure
 // with N inputs and M outputs.  These key-value pairs can contain scripts,
 // signatures, key derivations and other transaction-defining data.
@@ -129,7 +130,7 @@ type Packet struct {
 	Outputs []POutput
 
 	// Unknowns are the set of custom types (global only) within this PSBT.
-	Unknowns []Unknown
+	Unknowns []*Unknown
 }
 
 // validateUnsignedTx returns true if the transaction is unsigned.  Note that
@@ -148,23 +149,20 @@ func validateUnsignedTX(tx *wire.MsgTx) bool {
 // NewFromUnsignedTx creates a new Psbt struct, without any signatures (i.e.
 // only the global section is non-empty) using the passed unsigned transaction.
 func NewFromUnsignedTx(tx *wire.MsgTx) (*Packet, error) {
-
 	if !validateUnsignedTX(tx) {
 		return nil, ErrInvalidRawTxSigned
 	}
 
 	inSlice := make([]PInput, len(tx.TxIn))
 	outSlice := make([]POutput, len(tx.TxOut))
-	unknownSlice := make([]Unknown, 0)
+	unknownSlice := make([]*Unknown, 0)
 
-	retPsbt := Packet{
+	return &Packet{
 		UnsignedTx: tx,
 		Inputs:     inSlice,
 		Outputs:    outSlice,
 		Unknowns:   unknownSlice,
-	}
-
-	return &retPsbt, nil
+	}, nil
 }
 
 // NewFromRawBytes returns a new instance of a Packet struct created by reading
@@ -175,7 +173,6 @@ func NewFromUnsignedTx(tx *wire.MsgTx) (*Packet, error) {
 // NOTE: To create a Packet from one's own data, rather than reading in a
 // serialization from a counterparty, one should use a psbt.New.
 func NewFromRawBytes(r io.Reader, b64 bool) (*Packet, error) {
-
 	// If the PSBT is encoded in bas64, then we'll create a new wrapper
 	// reader that'll allow us to incrementally decode the contents of the
 	// io.Reader.
@@ -197,11 +194,11 @@ func NewFromRawBytes(r io.Reader, b64 bool) (*Packet, error) {
 	// Next we parse the GLOBAL section.  There is currently only 1 known
 	// key type, UnsignedTx.  We insist this exists first; unknowns are
 	// allowed, but only after.
-	keyint, keydata, err := getKey(r)
+	keyCode, keyData, err := getKey(r)
 	if err != nil {
 		return nil, err
 	}
-	if GlobalType(keyint) != UnsignedTxType || keydata != nil {
+	if GlobalType(keyCode) != UnsignedTxType || keyData != nil {
 		return nil, ErrInvalidPsbtFormat
 	}
 
@@ -227,7 +224,7 @@ func NewFromRawBytes(r io.Reader, b64 bool) (*Packet, error) {
 
 	// Next we parse any unknowns that may be present, making sure that we
 	// break at the separator.
-	var unknownSlice []Unknown
+	var unknownSlice []*Unknown
 	for {
 		keyint, keydata, err := getKey(r)
 		if err != nil {
@@ -247,7 +244,7 @@ func NewFromRawBytes(r io.Reader, b64 bool) (*Packet, error) {
 		keyintanddata := []byte{byte(keyint)}
 		keyintanddata = append(keyintanddata, keydata...)
 
-		newUnknown := Unknown{
+		newUnknown := &Unknown{
 			Key:   keyintanddata,
 			Value: value,
 		}
@@ -278,7 +275,7 @@ func NewFromRawBytes(r io.Reader, b64 bool) (*Packet, error) {
 		outSlice[i] = output
 	}
 
-	// Populate the new Packet object
+	// Populate the new Packet object.
 	newPsbt := Packet{
 		UnsignedTx: msgTx,
 		Inputs:     inSlice,
@@ -298,7 +295,6 @@ func NewFromRawBytes(r io.Reader, b64 bool) (*Packet, error) {
 // Serialize creates a binary serialization of the referenced Packet struct
 // with lexicographical ordering (by key) of the subsections.
 func (p *Packet) Serialize(w io.Writer) error {
-
 	// First we write out the precise set of magic bytes that identify a
 	// valid PSBT transaction.
 	if _, err := w.Write(psbtMagic[:]); err != nil {
@@ -321,6 +317,15 @@ func (p *Packet) Serialize(w io.Writer) error {
 	)
 	if err != nil {
 		return err
+	}
+
+	// Unknown is a special case; we don't have a key type, only a key and
+	// a value field
+	for _, kv := range p.Unknowns {
+		err := serializeKVpair(w, kv.Key, kv.Value)
+		if err != nil {
+			return err
+		}
 	}
 
 	// With that our global section is done, so we'll write out the
@@ -382,7 +387,6 @@ func (p *Packet) IsComplete() bool {
 // SanityCheck checks conditions on a PSBT to ensure that it obeys the
 // rules of BIP174, and returns true if so, false if not.
 func (p *Packet) SanityCheck() error {
-
 	if !validateUnsignedTX(p.UnsignedTx) {
 		return ErrInvalidRawTxSigned
 	}
