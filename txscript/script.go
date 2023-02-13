@@ -504,7 +504,7 @@ func checkScriptParses(scriptVersion uint16, script []byte) error {
 }
 
 // IsUnspendable returns whether the passed public key script is unspendable, or
-// guaranteed to fail at execution.  This allows inputs to be pruned instantly
+// guaranteed to fail at execution.  This allows outputs to be pruned instantly
 // when entering the UTXO set.
 //
 // NOTE: This function is only valid for version 0 scripts.  Since the function
