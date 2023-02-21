@@ -116,6 +116,21 @@ func (hash Hash) MarshalJSON() ([]byte, error) {
 	return json.Marshal(hash.String())
 }
 
+// UnmarshalJSON parses the hash with JSON appropriate string value.
+func (hash *Hash) UnmarshalJSON(input []byte) error {
+	var sh string
+	err := json.Unmarshal(input, &sh)
+	if err != nil {
+		return err
+	}
+	newHash, err := NewHashFromStr(sh)
+	if err != nil {
+		return err
+	}
+
+	return hash.SetBytes(newHash[:])
+}
+
 // NewHash returns a new Hash from a byte slice.  An error is returned if
 // the number of bytes passed in is not HashSize.
 func NewHash(newHash []byte) (*Hash, error) {
