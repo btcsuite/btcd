@@ -7,6 +7,7 @@ package chainhash
 import (
 	"bytes"
 	"encoding/hex"
+	"encoding/json"
 	"testing"
 )
 
@@ -192,5 +193,30 @@ func TestNewHashFromStr(t *testing.T) {
 			t.Errorf(unexpectedResultStr, i, result, &test.want)
 			continue
 		}
+	}
+}
+
+// TestHashJsonMarshal tests json marshal and unmarshal.
+func TestHashJsonMarshal(t *testing.T) {
+	hashStr := "000000000003ba27aa200b1cecaad478d2b00432346c3f1f3986da1afd33e506"
+
+	hash, err := NewHashFromStr(hashStr)
+	if err != nil {
+		t.Errorf("NewHashFromStr error:%v, hashStr:%s", err, hashStr)
+	}
+
+	hashBytes, err := json.Marshal(hash)
+	if err != nil {
+		t.Errorf("Marshal json error:%v, hash:%v", err, hashBytes)
+	}
+
+	var newHash Hash
+	err = json.Unmarshal(hashBytes, &newHash)
+	if err != nil {
+		t.Errorf("Unmarshal json error:%v, hash:%v", err, hashBytes)
+	}
+
+	if !hash.IsEqual(&newHash) {
+		t.Errorf("String: wrong hash string - got %v, want %v", newHash.String(), hashStr)
 	}
 }
