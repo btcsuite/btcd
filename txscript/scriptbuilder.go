@@ -13,10 +13,40 @@ const (
 	// defaultScriptAlloc is the default size used for the backing array
 	// for a script being built by the ScriptBuilder.  The array will
 	// dynamically grow as needed, but this figure is intended to provide
-	// enough space for vast majority of scripts without needing to grow the
-	// backing array multiple times.
+	// enough space for the vast majority of scripts without needing to grow
+	// the backing array multiple times. Can be overwritten with the
+	// WithScriptAllocSize functional option where expected script sizes are
+	// known.
 	defaultScriptAlloc = 500
 )
+
+// scriptBuilderConfig is a configuration struct that can be used to modify the
+// initialization of a ScriptBuilder.
+type scriptBuilderConfig struct {
+	// allocSize specifies the initial size of the backing array for the
+	// script builder.
+	allocSize int
+}
+
+// defaultScriptBuilderConfig returns a new scriptBuilderConfig with the
+// default values set.
+func defaultScriptBuilderConfig() *scriptBuilderConfig {
+	return &scriptBuilderConfig{
+		allocSize: defaultScriptAlloc,
+	}
+}
+
+// ScriptBuilderOpt is a functional option type which is used to modify the
+// initialization of a ScriptBuilder.
+type ScriptBuilderOpt func(*scriptBuilderConfig)
+
+// WithScriptAllocSize specifies the initial size of the backing array for the
+// script builder.
+func WithScriptAllocSize(size int) ScriptBuilderOpt {
+	return func(cfg *scriptBuilderConfig) {
+		cfg.allocSize = size
+	}
+}
 
 // ErrScriptNotCanonical identifies a non-canonical script.  The caller can use
 // a type assertion to detect this error type.
@@ -37,16 +67,17 @@ func (e ErrScriptNotCanonical) Error() string {
 // For example, the following would build a 2-of-3 multisig script for usage in
 // a pay-to-script-hash (although in this situation MultiSigScript() would be a
 // better choice to generate the script):
-// 	builder := txscript.NewScriptBuilder()
-// 	builder.AddOp(txscript.OP_2).AddData(pubKey1).AddData(pubKey2)
-// 	builder.AddData(pubKey3).AddOp(txscript.OP_3)
-// 	builder.AddOp(txscript.OP_CHECKMULTISIG)
-// 	script, err := builder.Script()
-// 	if err != nil {
-// 		// Handle the error.
-// 		return
-// 	}
-// 	fmt.Printf("Final multi-sig script: %x\n", script)
+//
+//	builder := txscript.NewScriptBuilder()
+//	builder.AddOp(txscript.OP_2).AddData(pubKey1).AddData(pubKey2)
+//	builder.AddData(pubKey3).AddOp(txscript.OP_3)
+//	builder.AddOp(txscript.OP_CHECKMULTISIG)
+//	script, err := builder.Script()
+//	if err != nil {
+//		// Handle the error.
+//		return
+//	}
+//	fmt.Printf("Final multi-sig script: %x\n", script)
 type ScriptBuilder struct {
 	script []byte
 	err    error
@@ -267,8 +298,13 @@ func (b *ScriptBuilder) Script() ([]byte, error) {
 
 // NewScriptBuilder returns a new instance of a script builder.  See
 // ScriptBuilder for details.
-func NewScriptBuilder() *ScriptBuilder {
+func NewScriptBuilder(opts ...ScriptBuilderOpt) *ScriptBuilder {
+	cfg := defaultScriptBuilderConfig()
+	for _, opt := range opts {
+		opt(cfg)
+	}
+
 	return &ScriptBuilder{
-		script: make([]byte, 0, defaultScriptAlloc),
+		script: make([]byte, 0, cfg.allocSize),
 	}
 }
