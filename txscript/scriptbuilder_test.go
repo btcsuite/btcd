@@ -7,7 +7,37 @@ package txscript
 import (
 	"bytes"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
+
+// TestScriptBuilderAlloc tests that the pre-allocation for a script via the
+// NewScriptBuilder function works as expected.
+func TestScriptBuilderAlloc(t *testing.T) {
+	// Using the default value, we should get a script with a capacity of
+	// 500 bytes, which is quite large for most scripts.
+	defaultBuilder := NewScriptBuilder()
+	require.EqualValues(t, defaultScriptAlloc, cap(defaultBuilder.script))
+
+	const allocSize = 23
+	builder := NewScriptBuilder(WithScriptAllocSize(allocSize))
+
+	// The initial capacity of the script should be set to the explicit
+	// value.
+	require.EqualValues(t, allocSize, cap(builder.script))
+
+	builder.AddOp(OP_HASH160)
+	builder.AddData(make([]byte, 20))
+	builder.AddOp(OP_EQUAL)
+	script, err := builder.Script()
+	require.NoError(t, err)
+
+	require.Len(t, script, allocSize)
+
+	// The capacity shouldn't have changed, as the script should've fit just
+	// fine.
+	require.EqualValues(t, allocSize, cap(builder.script))
+}
 
 // TestScriptBuilderAddOp tests that pushing opcodes to a script via the
 // ScriptBuilder API works as expected.
