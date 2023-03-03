@@ -238,10 +238,10 @@ func extractMultisigScriptDetails(scriptVersion uint16, script []byte, extractPu
 	// The first opcode must be a small integer specifying the number of
 	// signatures required.
 	tokenizer := MakeScriptTokenizer(scriptVersion, script)
-	if !tokenizer.Next() || !isSmallInt(tokenizer.Opcode()) {
+	if !tokenizer.Next() || !IsSmallInt(tokenizer.Opcode()) {
 		return multiSigDetails{}
 	}
-	requiredSigs := asSmallInt(tokenizer.Opcode())
+	requiredSigs := AsSmallInt(tokenizer.Opcode())
 
 	// The next series of opcodes must either push public keys or be a small
 	// integer specifying the number of public keys.
@@ -251,7 +251,7 @@ func extractMultisigScriptDetails(scriptVersion uint16, script []byte, extractPu
 		pubKeys = make([][]byte, 0, MaxPubKeysPerMultiSig)
 	}
 	for tokenizer.Next() {
-		if isSmallInt(tokenizer.Opcode()) {
+		if IsSmallInt(tokenizer.Opcode()) {
 			break
 		}
 
@@ -271,7 +271,7 @@ func extractMultisigScriptDetails(scriptVersion uint16, script []byte, extractPu
 	// The next opcode must be a small integer specifying the number of public
 	// keys required.
 	op := tokenizer.Opcode()
-	if !isSmallInt(op) || asSmallInt(op) != numPubKeys {
+	if !IsSmallInt(op) || AsSmallInt(op) != numPubKeys {
 		return multiSigDetails{}
 	}
 
@@ -422,11 +422,11 @@ func extractWitnessProgramInfo(script []byte) (int, []byte, bool) {
 
 	// The first opcode must be a small int.
 	if !tokenizer.Next() ||
-		!isSmallInt(tokenizer.Opcode()) {
+		!IsSmallInt(tokenizer.Opcode()) {
 
 		return 0, nil, false
 	}
-	version := asSmallInt(tokenizer.Opcode())
+	version := AsSmallInt(tokenizer.Opcode())
 
 	// The second opcode must be a canonical data push, the length of the
 	// data push is bounded to 40 by the initial check on overall script
@@ -520,7 +520,7 @@ func isNullDataScript(scriptVersion uint16, script []byte) bool {
 	// OP_RETURN followed by data push up to MaxDataCarrierSize bytes.
 	tokenizer := MakeScriptTokenizer(scriptVersion, script[1:])
 	return tokenizer.Next() && tokenizer.Done() &&
-		(isSmallInt(tokenizer.Opcode()) || tokenizer.Opcode() <= OP_PUSHDATA4) &&
+		(IsSmallInt(tokenizer.Opcode()) || tokenizer.Opcode() <= OP_PUSHDATA4) &&
 		len(tokenizer.Data()) <= MaxDataCarrierSize
 }
 
@@ -627,7 +627,7 @@ func expectedInputs(script []byte, class ScriptClass) int {
 		// the original bitcoind bug where OP_CHECKMULTISIG pops an
 		// additional item from the stack, add an extra expected input
 		// for the extra push that is required to compensate.
-		return asSmallInt(script[0]) + 1
+		return AsSmallInt(script[0]) + 1
 
 	case NullDataTy:
 		fallthrough
@@ -1119,14 +1119,14 @@ func ExtractAtomicSwapDataPushes(version uint16, pkScript []byte) (*AtomicSwapDa
 		if tplEntry.expectCanonicalInt {
 			switch {
 			case data != nil:
-				val, err := makeScriptNum(data, true, tplEntry.maxIntBytes)
+				val, err := MakeScriptNum(data, true, tplEntry.maxIntBytes)
 				if err != nil {
 					return nil, err
 				}
 				tplEntry.extractedInt = int64(val)
 
-			case isSmallInt(op):
-				tplEntry.extractedInt = int64(asSmallInt(op))
+			case IsSmallInt(op):
+				tplEntry.extractedInt = int64(AsSmallInt(op))
 
 			// Not an atomic swap script if the opcode does not push an int.
 			default:
