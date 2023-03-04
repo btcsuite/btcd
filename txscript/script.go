@@ -74,19 +74,19 @@ func IsPayToScriptHash(script []byte) bool {
 	return isScriptHashScript(script)
 }
 
-// IsPayToWitnessScriptHash returns true if the is in the standard
+// IsPayToWitnessScriptHash returns true if the script is in the standard
 // pay-to-witness-script-hash (P2WSH) format, false otherwise.
 func IsPayToWitnessScriptHash(script []byte) bool {
 	return isWitnessScriptHashScript(script)
 }
 
-// IsPayToWitnessPubKeyHash returns true if the is in the standard
+// IsPayToWitnessPubKeyHash returns true if the script is in the standard
 // pay-to-witness-pubkey-hash (P2WKH) format, false otherwise.
 func IsPayToWitnessPubKeyHash(script []byte) bool {
 	return isWitnessPubKeyHashScript(script)
 }
 
-// IsPayToTaproot returns true if if the passed script is a standard
+// IsPayToTaproot returns true if the passed script is a standard
 // pay-to-taproot (PTTR) scripts, and false otherwise.
 func IsPayToTaproot(script []byte) bool {
 	return isWitnessTaprootScript(script)
