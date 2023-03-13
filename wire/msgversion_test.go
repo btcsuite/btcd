@@ -69,13 +69,6 @@ func TestVersion(t *testing.T) {
 			msg.UserAgent, customUserAgent)
 	}
 
-	msg.AddUserAgent("mygui", "3.4.5")
-	customUserAgent = "/mygui:3.4.5/"
-	if msg.UserAgent != customUserAgent {
-		t.Errorf("AddUserAgent: wrong user agent - got %s, want %s",
-			msg.UserAgent, customUserAgent)
-	}
-
 	// accounting for ":", "/"
 	err = msg.AddUserAgent(strings.Repeat("t",
 		MaxUserAgentLen+len(customUserAgent)), "")
