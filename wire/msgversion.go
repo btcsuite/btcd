@@ -232,7 +232,6 @@ func NewMsgVersion(me *NetAddress, you *NetAddress, nonce uint64,
 		AddrYou:         *you,
 		AddrMe:          *me,
 		Nonce:           nonce,
-		UserAgent:       DefaultUserAgent,
 		LastBlock:       lastBlock,
 		DisableRelayTx:  false,
 	}
@@ -259,7 +258,7 @@ func (msg *MsgVersion) AddUserAgent(name string, version string,
 		newUserAgent = fmt.Sprintf("%s(%s)", newUserAgent,
 			strings.Join(comments, "; "))
 	}
-	newUserAgent = fmt.Sprintf("%s%s/", msg.UserAgent, newUserAgent)
+	newUserAgent = fmt.Sprintf("%s/", newUserAgent)
 	err := validateUserAgent(newUserAgent)
 	if err != nil {
 		return err
