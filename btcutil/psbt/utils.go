@@ -398,6 +398,30 @@ func VerifyInputOutputLen(packet *Packet, needInputs, needOutputs bool) error {
 	return nil
 }
 
+// InputsReadyToSign makes sure that all input data have the previous output
+// specified meaning that either nonwitness UTXO or the witness UTXO data is
+// specified in the psbt package. This check is necessary because of 2 reasons.
+// The sighash calculation is now different for witnessV0 and witnessV1 inputs
+// this means we need to check the previous output pkScript for the specific
+// type and the second reason is that the sighash calculation for taproot inputs
+// include the previous output pkscripts.
+func InputsReadyToSign(packet *Packet) error {
+	err := VerifyInputOutputLen(packet, true, true)
+	if err != nil {
+		return err
+	}
+
+	for i := range packet.UnsignedTx.TxIn {
+		input := packet.Inputs[i]
+		if input.NonWitnessUtxo == nil && input.WitnessUtxo == nil {
+			return fmt.Errorf("invalid PSBT, input with index %d "+
+				"missing utxo information", i)
+		}
+	}
+
+	return nil
+}
+
 // NewFromSignedTx is a utility function to create a packet from an
 // already-signed transaction. Returned are: an unsigned transaction
 // serialization, a list of scriptSigs, one per input, and a list of witnesses,
