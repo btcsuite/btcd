@@ -779,6 +779,46 @@ func createTxRawResult(chainParams *chaincfg.Params, mtx *wire.MsgTx,
 	return txReply, nil
 }
 
+// createTxRawResultV2 converts the passed transaction and associated parameters
+// to a raw transaction JSON object.
+func createTxRawResultV2(s *rpcServer, chainParams *chaincfg.Params, mtx *wire.MsgTx,
+	txHash string, blkHeader *wire.BlockHeader, blkHash string,
+	blkHeight int32, chainHeight int32) (*btcjson.TxRawResultV2, error) {
+
+	mtxHex, err := messageToHex(mtx)
+	if err != nil {
+		return nil, err
+	}
+
+	vinPrevOut, err := createVinListPrevOut(s, mtx, chainParams, true, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	txReply := &btcjson.TxRawResultV2{
+		Hex:      mtxHex,
+		Txid:     txHash,
+		Hash:     mtx.WitnessHash().String(),
+		Size:     int32(mtx.SerializeSize()),
+		Vsize:    int32(mempool.GetTxVirtualSize(btcutil.NewTx(mtx))),
+		Weight:   int32(blockchain.GetTransactionWeight(btcutil.NewTx(mtx))),
+		Vin:      vinPrevOut,
+		Vout:     createVoutList(mtx, chainParams, nil),
+		Version:  uint32(mtx.Version),
+		LockTime: mtx.LockTime,
+	}
+
+	if blkHeader != nil {
+		// This is not a typo, they are identical in bitcoind as well.
+		txReply.Time = blkHeader.Timestamp.Unix()
+		txReply.Blocktime = blkHeader.Timestamp.Unix()
+		txReply.BlockHash = blkHash
+		txReply.Confirmations = uint64(1 + chainHeight - blkHeight)
+	}
+
+	return txReply, nil
+}
+
 // handleDecodeRawTransaction handles decoderawtransaction commands.
 func handleDecodeRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	c := cmd.(*btcjson.DecodeRawTransactionCmd)
@@ -1122,7 +1162,8 @@ func handleGetBlock(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 
 	params := s.cfg.ChainParams
 	blockHeader := &blk.MsgBlock().Header
-	blockReply := btcjson.GetBlockVerboseResult{
+
+	blockReply := btcjson.GetBlockVerboseResultV2{
 		Hash:          c.Hash,
 		Version:       blockHeader.Version,
 		VersionHex:    fmt.Sprintf("%08x", blockHeader.Version),
@@ -1150,9 +1191,9 @@ func handleGetBlock(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 		blockReply.Tx = txNames
 	} else {
 		txns := blk.Transactions()
-		rawTxns := make([]btcjson.TxRawResult, len(txns))
+		rawTxns := make([]btcjson.TxRawResultV2, len(txns))
 		for i, tx := range txns {
-			rawTxn, err := createTxRawResult(params, tx.MsgTx(),
+			rawTxn, err := createTxRawResultV2(s, params, tx.MsgTx(),
 				tx.Hash().String(), blockHeader, hash.String(),
 				blockHeight, best.Height)
 			if err != nil {

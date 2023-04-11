@@ -722,7 +722,7 @@ var rpcResultTypes = map[string][]interface{}{
 	"getaddednodeinfo":       {(*[]string)(nil), (*[]btcjson.GetAddedNodeInfoResult)(nil)},
 	"getbestblock":           {(*btcjson.GetBestBlockResult)(nil)},
 	"getbestblockhash":       {(*string)(nil)},
-	"getblock":               {(*string)(nil), (*btcjson.GetBlockVerboseResult)(nil)},
+	"getblock":               {(*string)(nil), (*btcjson.GetBlockVerboseResultV2)(nil)},
 	"getblockcount":          {(*int64)(nil)},
 	"getblockhash":           {(*string)(nil)},
 	"getblockheader":         {(*string)(nil), (*btcjson.GetBlockHeaderVerboseResult)(nil)},

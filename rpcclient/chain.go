@@ -185,6 +185,31 @@ func (r FutureGetBlockVerboseResult) Receive() (*btcjson.GetBlockVerboseResult, 
 	return &blockResult, nil
 }
 
+// FutureGetBlockVerboseResultV2 is a future promise to deliver the result of a
+// GetBlockVerboseAsync RPC invocation (or an applicable error).
+type FutureGetBlockVerboseResultV2 struct {
+	client   *Client
+	hash     string
+	Response chan *Response
+}
+
+// Receive waits for the Response promised by the future and returns the data
+// structure from the server with information about the requested block.
+func (r FutureGetBlockVerboseResultV2) Receive() (*btcjson.GetBlockVerboseResultV2, error) {
+	res, err := r.client.waitForGetBlockRes(r.Response, r.hash, true, true)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal the raw result into a BlockResult.
+	var blockResult btcjson.GetBlockVerboseResultV2
+	err = json.Unmarshal(res, &blockResult)
+	if err != nil {
+		return nil, err
+	}
+	return &blockResult, nil
+}
+
 // GetBlockVerboseAsync returns an instance of a type that can be used to get
 // the result of the RPC at some future time by invoking the Receive function on
 // the returned instance.
@@ -239,6 +264,31 @@ func (r FutureGetBlockVerboseTxResult) Receive() (*btcjson.GetBlockVerboseTxResu
 	return &blockResult, nil
 }
 
+// FutureGetBlockVerboseTxResultV2 is a future promise to deliver the result of a
+// GetBlockVerboseTxResult RPC invocation (or an applicable error).
+type FutureGetBlockVerboseTxResultV2 struct {
+	client   *Client
+	hash     string
+	Response chan *Response
+}
+
+// Receive waits for the Response promised by the future and returns a verbose
+// version of the block including detailed information about its transactions.
+func (r FutureGetBlockVerboseTxResultV2) Receive() (*btcjson.GetBlockVerboseTxResultV2, error) {
+	res, err := r.client.waitForGetBlockRes(r.Response, r.hash, true, true)
+	if err != nil {
+		return nil, err
+	}
+
+	var blockResult btcjson.GetBlockVerboseTxResultV2
+	err = json.Unmarshal(res, &blockResult)
+	if err != nil {
+		return nil, err
+	}
+
+	return &blockResult, nil
+}
+
 // GetBlockVerboseTxAsync returns an instance of a type that can be used to get
 // the result of the RPC at some future time by invoking the Receive function on
 // the returned instance.
@@ -269,6 +319,38 @@ func (c *Client) GetBlockVerboseTxAsync(blockHash *chainhash.Hash) FutureGetBloc
 // See GetBlock to retrieve a raw block instead.
 func (c *Client) GetBlockVerboseTx(blockHash *chainhash.Hash) (*btcjson.GetBlockVerboseTxResult, error) {
 	return c.GetBlockVerboseTxAsync(blockHash).Receive()
+}
+
+// GetBlockVerboseTxV2Async returns an instance of a type that can be used to get
+// the result of the RPC at some future time by invoking the Receive function on
+// the returned instance.
+//
+// See GetBlockVerboseTx or the blocking version and more details.
+func (c *Client) GetBlockVerboseTxV2Async(blockHash *chainhash.Hash) FutureGetBlockVerboseTxResultV2 {
+	hash := ""
+	if blockHash != nil {
+		hash = blockHash.String()
+	}
+
+	// From the bitcoin-cli getblock documentation:
+	//
+	// If verbosity is 2, returns an Object with information about block
+	// and information about each transaction.
+	cmd := btcjson.NewGetBlockCmd(hash, btcjson.Int(2))
+	return FutureGetBlockVerboseTxResultV2{
+		client:   c,
+		hash:     hash,
+		Response: c.SendCmd(cmd),
+	}
+}
+
+// GetBlockVerboseTxV2 returns a data structure from the server with information
+// about a block and its transactions given its hash.
+//
+// See GetBlockVerbose if only transaction hashes are preferred.
+// See GetBlock to retrieve a raw block instead.
+func (c *Client) GetBlockVerboseTxV2(blockHash *chainhash.Hash) (*btcjson.GetBlockVerboseTxResultV2, error) {
+	return c.GetBlockVerboseTxV2Async(blockHash).Receive()
 }
 
 // FutureGetBlockCountResult is a future promise to deliver the result of a

@@ -91,6 +91,28 @@ type GetBlockVerboseResult struct {
 	NextHash      string        `json:"nextblockhash,omitempty"`
 }
 
+// GetBlockVerboseResultV2 models the data from the getblock command when the
+// verbose flag is set to 2.
+type GetBlockVerboseResultV2 struct {
+	Hash          string          `json:"hash"`
+	Confirmations int64           `json:"confirmations"`
+	StrippedSize  int32           `json:"strippedsize"`
+	Size          int32           `json:"size"`
+	Weight        int32           `json:"weight"`
+	Height        int64           `json:"height"`
+	Version       int32           `json:"version"`
+	VersionHex    string          `json:"versionHex"`
+	MerkleRoot    string          `json:"merkleroot"`
+	Tx            []string        `json:"tx,omitempty"`
+	RawTx         []TxRawResultV2 `json:"rawtx,omitempty"` // Note: this field is always empty when verbose != 2.
+	Time          int64           `json:"time"`
+	Nonce         uint32          `json:"nonce"`
+	Bits          string          `json:"bits"`
+	Difficulty    float64         `json:"difficulty"`
+	PreviousHash  string          `json:"previousblockhash"`
+	NextHash      string          `json:"nextblockhash,omitempty"`
+}
+
 // GetBlockVerboseTxResult models the data from the getblock command when the
 // verbose flag is set to 2.  When the verbose flag is set to 0, getblock returns a
 // hex-encoded string. When the verbose flag is set to 1, getblock returns an object
@@ -115,6 +137,32 @@ type GetBlockVerboseTxResult struct {
 	Difficulty    float64       `json:"difficulty"`
 	PreviousHash  string        `json:"previousblockhash"`
 	NextHash      string        `json:"nextblockhash,omitempty"`
+}
+
+// GetBlockVerboseTxResultV2 models the data from the getblock command when the
+// verbose flag is set to 2.  When the verbose flag is set to 0, getblock returns a
+// hex-encoded string. When the verbose flag is set to 1, getblock returns an object
+// whose tx field is an array of transaction hashes. When the verbose flag is set to 2,
+// getblock returns an object whose tx field is an array of raw transactions.
+// Use GetBlockVerboseResult to unmarshal data received from passing verbose=1 to getblock.
+type GetBlockVerboseTxResultV2 struct {
+	Hash          string          `json:"hash"`
+	Confirmations int64           `json:"confirmations"`
+	StrippedSize  int32           `json:"strippedsize"`
+	Size          int32           `json:"size"`
+	Weight        int32           `json:"weight"`
+	Height        int64           `json:"height"`
+	Version       int32           `json:"version"`
+	VersionHex    string          `json:"versionHex"`
+	MerkleRoot    string          `json:"merkleroot"`
+	Tx            []TxRawResultV2 `json:"tx,omitempty"`
+	RawTx         []TxRawResultV2 `json:"rawtx,omitempty"` // Deprecated: removed in Bitcoin Core
+	Time          int64           `json:"time"`
+	Nonce         uint32          `json:"nonce"`
+	Bits          string          `json:"bits"`
+	Difficulty    float64         `json:"difficulty"`
+	PreviousHash  string          `json:"previousblockhash"`
+	NextHash      string          `json:"nextblockhash,omitempty"`
 }
 
 // GetChainTxStatsResult models the data from the getchaintxstats command.
@@ -723,6 +771,24 @@ type TxRawResult struct {
 	Confirmations uint64 `json:"confirmations,omitempty"`
 	Time          int64  `json:"time,omitempty"`
 	Blocktime     int64  `json:"blocktime,omitempty"`
+}
+
+// TxRawResultV2 models the data from the getrawtransaction command.
+type TxRawResultV2 struct {
+	Hex           string       `json:"hex"`
+	Txid          string       `json:"txid"`
+	Hash          string       `json:"hash,omitempty"`
+	Size          int32        `json:"size,omitempty"`
+	Vsize         int32        `json:"vsize,omitempty"`
+	Weight        int32        `json:"weight,omitempty"`
+	Version       uint32       `json:"version"`
+	LockTime      uint32       `json:"locktime"`
+	Vin           []VinPrevOut `json:"vin"`
+	Vout          []Vout       `json:"vout"`
+	BlockHash     string       `json:"blockhash,omitempty"`
+	Confirmations uint64       `json:"confirmations,omitempty"`
+	Time          int64        `json:"time,omitempty"`
+	Blocktime     int64        `json:"blocktime,omitempty"`
 }
 
 // SearchRawTransactionsResult models the data from the searchrawtransaction
