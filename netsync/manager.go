@@ -1617,6 +1617,10 @@ func (sm *SyncManager) Pause() chan<- struct{} {
 // New constructs a new SyncManager. Use Start to begin processing asynchronous
 // block, tx, and inv updates.
 func New(config *Config) (*SyncManager, error) {
+	progressLogger, err := newBlockProgressLogger("Processed", log, config.Chain)
+	if err != nil {
+		return nil, err
+	}
 	sm := SyncManager{
 		peerNotifier:    config.PeerNotifier,
 		chain:           config.Chain,
@@ -1626,7 +1630,7 @@ func New(config *Config) (*SyncManager, error) {
 		requestedTxns:   make(map[chainhash.Hash]struct{}),
 		requestedBlocks: make(map[chainhash.Hash]struct{}),
 		peerStates:      make(map[*peerpkg.Peer]*peerSyncState),
-		progressLogger:  newBlockProgressLogger("Processed", log),
+		progressLogger:  progressLogger,
 		msgChan:         make(chan interface{}, config.MaxPeers*3),
 		headerList:      list.New(),
 		quit:            make(chan struct{}),

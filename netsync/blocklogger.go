@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btclog"
 	"github.com/btcsuite/btcd/btcutil"
 )
@@ -19,6 +20,7 @@ type blockProgressLogger struct {
 	receivedLogBlocks int64
 	receivedLogTx     int64
 	lastBlockLogTime  time.Time
+	firstBlockTime    time.Time
 
 	subsystemLogger btclog.Logger
 	progressAction  string
@@ -29,12 +31,18 @@ type blockProgressLogger struct {
 // The progress message is templated as follows:
 //  {progressAction} {numProcessed} {blocks|block} in the last {timePeriod}
 //  ({numTxs}, height {lastBlockHeight}, {lastBlockTimeStamp})
-func newBlockProgressLogger(progressMessage string, logger btclog.Logger) *blockProgressLogger {
+func newBlockProgressLogger(progressMessage string, logger btclog.Logger, chain *blockchain.BlockChain) (*blockProgressLogger, error) {
+	firstBlock, err := chain.BlockByHeight(0)
+	if err != nil {
+		return nil, err
+	}
+
 	return &blockProgressLogger{
 		lastBlockLogTime: time.Now(),
+		firstBlockTime:   firstBlock.MsgBlock().Header.Timestamp,
 		progressAction:   progressMessage,
 		subsystemLogger:  logger,
-	}
+	}, nil
 }
 
 // LogBlockHeight logs a new block height as an information message to show
@@ -66,9 +74,13 @@ func (b *blockProgressLogger) LogBlockHeight(block *btcutil.Block) {
 	if b.receivedLogTx == 1 {
 		txStr = "transaction"
 	}
-	b.subsystemLogger.Infof("%s %d %s in the last %s (%d %s, height %d, %s)",
+
+	lastBlockTime := block.MsgBlock().Header.Timestamp
+	progress := 100 - (float64(now.Sub(lastBlockTime)) / float64(now.Sub(b.firstBlockTime)) * 100)
+
+	b.subsystemLogger.Infof("%s %d %s in the last %s (%d %s, height %d, progress %.2f%%, %s)",
 		b.progressAction, b.receivedLogBlocks, blockStr, tDuration, b.receivedLogTx,
-		txStr, block.Height(), block.MsgBlock().Header.Timestamp)
+		txStr, block.Height(), progress, lastBlockTime)
 
 	b.receivedLogBlocks = 0
 	b.receivedLogTx = 0
