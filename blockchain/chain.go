@@ -115,6 +115,10 @@ type BlockChain struct {
 	// fields in this struct below this point.
 	chainLock sync.RWMutex
 
+	// pruneTarget is the size in bytes the database targets for when the node
+	// is pruned.
+	pruneTarget uint64
+
 	// These fields are related to the memory block index.  They both have
 	// their own locks, however they are often also protected by the chain
 	// lock to help prevent logic races when blocks are being processed.
@@ -600,6 +604,26 @@ func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block,
 
 	// Atomically insert info into the database.
 	err = b.db.Update(func(dbTx database.Tx) error {
+		// If the pruneTarget isn't 0, we should attempt to delete older blocks
+		// from the database.
+		if b.pruneTarget != 0 {
+			// When the total block size is under the prune target, prune blocks is
+			// a no-op and the deleted hashes are nil.
+			deletedHashes, err := dbTx.PruneBlocks(b.pruneTarget)
+			if err != nil {
+				return err
+			}
+
+			// Only attempt to delete if we have any deleted blocks.
+			if len(deletedHashes) != 0 {
+				// Delete the spend journals of the pruned blocks.
+				err = dbPruneSpendJournalEntry(dbTx, deletedHashes)
+				if err != nil {
+					return err
+				}
+			}
+		}
+
 		// Update best block state.
 		err := dbPutBestState(dbTx, state, node.workSum)
 		if err != nil {
@@ -1702,6 +1726,11 @@ type Config struct {
 	// This field can be nil if the caller is not interested in using a
 	// signature cache.
 	HashCache *txscript.HashCache
+
+	// Prune specifies the target database usage (in bytes) the database
+	// will target for with block files.  Prune at 0 specifies that no
+	// blocks will be deleted.
+	Prune uint64
 }
 
 // New returns a BlockChain instance using the provided configuration details.
@@ -1757,6 +1786,7 @@ func New(config *Config) (*BlockChain, error) {
 		prevOrphans:         make(map[chainhash.Hash][]*orphanBlock),
 		warningCaches:       newThresholdCaches(vbNumBits),
 		deploymentCaches:    newThresholdCaches(chaincfg.DefinedDeployments),
+		pruneTarget:         config.Prune,
 	}
 
 	// Ensure all the deployments are synchronized with our clock if
