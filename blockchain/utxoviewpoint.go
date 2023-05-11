@@ -503,7 +503,7 @@ func (view *UtxoViewpoint) commit() {
 // Upon completion of this function, the view will contain an entry for each
 // requested outpoint.  Spent outputs, or those which otherwise don't exist,
 // will result in a nil entry in the view.
-func (view *UtxoViewpoint) fetchUtxosMain(db database.DB, outpoints map[wire.OutPoint]struct{}) error {
+func (view *UtxoViewpoint) fetchUtxosMain(db database.DB, outpoints []wire.OutPoint) error {
 	// Nothing to do if there are no requested outputs.
 	if len(outpoints) == 0 {
 		return nil
@@ -517,13 +517,13 @@ func (view *UtxoViewpoint) fetchUtxosMain(db database.DB, outpoints map[wire.Out
 	// so other code can use the presence of an entry in the store as a way
 	// to unnecessarily avoid attempting to reload it from the database.
 	return db.View(func(dbTx database.Tx) error {
-		for outpoint := range outpoints {
-			entry, err := dbFetchUtxoEntry(dbTx, outpoint)
+		for i := range outpoints {
+			entry, err := dbFetchUtxoEntry(dbTx, outpoints[i])
 			if err != nil {
 				return err
 			}
 
-			view.entries[outpoint] = entry
+			view.entries[outpoints[i]] = entry
 		}
 
 		return nil
@@ -533,25 +533,25 @@ func (view *UtxoViewpoint) fetchUtxosMain(db database.DB, outpoints map[wire.Out
 // fetchUtxos loads the unspent transaction outputs for the provided set of
 // outputs into the view from the database as needed unless they already exist
 // in the view in which case they are ignored.
-func (view *UtxoViewpoint) fetchUtxos(db database.DB, outpoints map[wire.OutPoint]struct{}) error {
+func (view *UtxoViewpoint) fetchUtxos(db database.DB, outpoints []wire.OutPoint) error {
 	// Nothing to do if there are no requested outputs.
 	if len(outpoints) == 0 {
 		return nil
 	}
 
 	// Filter entries that are already in the view.
-	neededSet := make(map[wire.OutPoint]struct{})
-	for outpoint := range outpoints {
+	needed := make([]wire.OutPoint, 0, len(outpoints))
+	for i := range outpoints {
 		// Already loaded into the current view.
-		if _, ok := view.entries[outpoint]; ok {
+		if _, ok := view.entries[outpoints[i]]; ok {
 			continue
 		}
 
-		neededSet[outpoint] = struct{}{}
+		needed = append(needed, outpoints[i])
 	}
 
 	// Request the input utxos from the database.
-	return view.fetchUtxosMain(db, neededSet)
+	return view.fetchUtxosMain(db, needed)
 }
 
 // fetchInputUtxos loads the unspent transaction outputs for the inputs
@@ -572,7 +572,7 @@ func (view *UtxoViewpoint) fetchInputUtxos(db database.DB, block *btcutil.Block)
 	// Loop through all of the transaction inputs (except for the coinbase
 	// which has no inputs) collecting them into sets of what is needed and
 	// what is already known (in-flight).
-	neededSet := make(map[wire.OutPoint]struct{})
+	needed := make([]wire.OutPoint, 0, len(transactions))
 	for i, tx := range transactions[1:] {
 		for _, txIn := range tx.MsgTx().TxIn {
 			// It is acceptable for a transaction input to reference
@@ -601,12 +601,12 @@ func (view *UtxoViewpoint) fetchInputUtxos(db database.DB, block *btcutil.Block)
 				continue
 			}
 
-			neededSet[txIn.PreviousOutPoint] = struct{}{}
+			needed = append(needed, txIn.PreviousOutPoint)
 		}
 	}
 
 	// Request the input utxos from the database.
-	return view.fetchUtxosMain(db, neededSet)
+	return view.fetchUtxosMain(db, needed)
 }
 
 // NewUtxoViewpoint returns a new empty unspent transaction output view.
@@ -626,15 +626,19 @@ func (b *BlockChain) FetchUtxoView(tx *btcutil.Tx) (*UtxoViewpoint, error) {
 	// Create a set of needed outputs based on those referenced by the
 	// inputs of the passed transaction and the outputs of the transaction
 	// itself.
-	neededSet := make(map[wire.OutPoint]struct{})
+	neededLen := len(tx.MsgTx().TxOut)
+	if !IsCoinBase(tx) {
+		neededLen += len(tx.MsgTx().TxIn)
+	}
+	needed := make([]wire.OutPoint, 0, neededLen)
 	prevOut := wire.OutPoint{Hash: *tx.Hash()}
 	for txOutIdx := range tx.MsgTx().TxOut {
 		prevOut.Index = uint32(txOutIdx)
-		neededSet[prevOut] = struct{}{}
+		needed = append(needed, prevOut)
 	}
 	if !IsCoinBase(tx) {
 		for _, txIn := range tx.MsgTx().TxIn {
-			neededSet[txIn.PreviousOutPoint] = struct{}{}
+			needed = append(needed, txIn.PreviousOutPoint)
 		}
 	}
 
@@ -642,7 +646,7 @@ func (b *BlockChain) FetchUtxoView(tx *btcutil.Tx) (*UtxoViewpoint, error) {
 	// chain.
 	view := NewUtxoViewpoint()
 	b.chainLock.RLock()
-	err := view.fetchUtxosMain(b.db, neededSet)
+	err := view.fetchUtxosMain(b.db, needed)
 	b.chainLock.RUnlock()
 	return view, err
 }
