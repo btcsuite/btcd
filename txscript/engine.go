@@ -335,8 +335,6 @@ func (vm *Engine) isBranchExecuting() bool {
 // conditional).
 func isOpcodeDisabled(opcode byte) bool {
 	switch opcode {
-	case OP_CAT:
-		return true
 	case OP_SUBSTR:
 		return true
 	case OP_LEFT:
@@ -698,6 +696,7 @@ func (vm *Engine) verifyWitnessProgram(witness wire.TxWitness) error {
 				// An op success op code has been found, however if
 				// the policy flag forbidding them is active, then
 				// we'll return an error.
+				// TODO: add flag for discourage OP_CAT.
 				if vm.hasFlag(ScriptVerifyDiscourageOpSuccess) {
 					errStr := fmt.Sprintf("script contains " +
 						"OP_SUCCESS op code")

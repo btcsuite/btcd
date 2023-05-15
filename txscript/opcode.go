@@ -445,7 +445,7 @@ var opcodeArray = [256]opcode{
 	OP_TUCK:         {OP_TUCK, "OP_TUCK", 1, opcodeTuck},
 
 	// Splice opcodes.
-	OP_CAT:    {OP_CAT, "OP_CAT", 1, opcodeDisabled},
+	OP_CAT:    {OP_CAT, "OP_CAT", 1, opcodeCat},
 	OP_SUBSTR: {OP_SUBSTR, "OP_SUBSTR", 1, opcodeDisabled},
 	OP_LEFT:   {OP_LEFT, "OP_LEFT", 1, opcodeDisabled},
 	OP_RIGHT:  {OP_RIGHT, "OP_RIGHT", 1, opcodeDisabled},
@@ -619,7 +619,6 @@ var opcodeOnelineRepls = map[string]string{
 var successOpcodes = map[byte]struct{}{
 	OP_RESERVED:     {}, // 80
 	OP_VER:          {}, // 98
-	OP_CAT:          {}, // 126
 	OP_SUBSTR:       {}, // 127
 	OP_LEFT:         {}, // 128
 	OP_RIGHT:        {}, // 129
@@ -1941,6 +1940,44 @@ func opcodeHash256(op *opcode, data []byte, vm *Engine) error {
 	}
 
 	vm.dstack.PushByteArray(chainhash.DoubleHashB(buf))
+	return nil
+}
+
+// opcodeCat concatenates the top two stack items, leaving the result on the
+// stack.
+//
+// Stack transformation: [...x1 x2] -> [... x1|x2]
+func opcodeCat(op *opcode, data []byte, vm *Engine) error {
+	// This op code can only be used if tapsript execution is active.
+	// Before the soft fork, this opcode was disabled.
+	if vm.taprootCtx == nil {
+		return opcodeDisabled(op, data, vm)
+	}
+
+	x2, err := vm.dstack.PopByteArray()
+	if err != nil {
+		return err
+	}
+
+	x1, err := vm.dstack.PopByteArray()
+	if err != nil {
+		return err
+	}
+
+	var buf bytes.Buffer
+	buf.Write(x1)
+	buf.Write(x2)
+
+	c := buf.Bytes()
+
+	// Ensure result is within the max allowed size.
+	if len(c) > MaxScriptElementSize {
+		str := fmt.Sprintf("element size %d exceeds max allowed size %d",
+			len(c), MaxScriptElementSize)
+		return scriptError(ErrElementTooBig, str)
+	}
+
+	vm.dstack.PushByteArray(c)
 	return nil
 }
 
