@@ -540,8 +540,9 @@ func (view *UtxoViewpoint) fetchUtxosMain(db database.DB, outpoints []wire.OutPo
 	// so other code can use the presence of an entry in the store as a way
 	// to unnecessarily avoid attempting to reload it from the database.
 	return db.View(func(dbTx database.Tx) error {
+		utxoBucket := dbTx.Metadata().Bucket(utxoSetBucketName)
 		for i := range outpoints {
-			entry, err := dbFetchUtxoEntry(dbTx, outpoints[i])
+			entry, err := dbFetchUtxoEntry(dbTx, utxoBucket, outpoints[i])
 			if err != nil {
 				return err
 			}
@@ -691,7 +692,8 @@ func (b *BlockChain) FetchUtxoEntry(outpoint wire.OutPoint) (*UtxoEntry, error) 
 	var entry *UtxoEntry
 	err := b.db.View(func(dbTx database.Tx) error {
 		var err error
-		entry, err = dbFetchUtxoEntry(dbTx, outpoint)
+		utxoBucket := dbTx.Metadata().Bucket(utxoSetBucketName)
+		entry, err = dbFetchUtxoEntry(dbTx, utxoBucket, outpoint)
 		return err
 	})
 	if err != nil {
