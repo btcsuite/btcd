@@ -6,10 +6,16 @@ package blockchain
 import (
 	"crypto/sha256"
 	"encoding/binary"
+	"fmt"
 	"reflect"
 	"sync"
 	"testing"
+	"time"
 
+	"github.com/btcsuite/btcd/btcutil"
+	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcd/wire"
 )
 
@@ -303,5 +309,281 @@ func TestUtxoCacheEntrySize(t *testing.T) {
 			t.Errorf("Failed test %s. Expected size of %d, got %d",
 				test.name, test.expectedSize, s.totalEntryMemory)
 		}
+	}
+}
+
+// assertConsistencyState asserts the utxo consistency states of the blockchain.
+func assertConsistencyState(chain *BlockChain, hash *chainhash.Hash) error {
+	var bytes []byte
+	err := chain.db.View(func(dbTx database.Tx) (err error) {
+		bytes = dbFetchUtxoStateConsistency(dbTx)
+		return
+	})
+	if err != nil {
+		return fmt.Errorf("Error fetching utxo state consistency: %v", err)
+	}
+	actualHash, err := chainhash.NewHash(bytes)
+	if err != nil {
+		return err
+	}
+	if !actualHash.IsEqual(hash) {
+		return fmt.Errorf("Unexpected consistency hash: %v instead of %v",
+			actualHash, hash)
+	}
+
+	return nil
+}
+
+// assertNbEntriesOnDisk asserts that the total number of utxo entries on the
+// disk is equal to the given expected number.
+func assertNbEntriesOnDisk(chain *BlockChain, expectedNumber int) error {
+	var nb int
+	err := chain.db.View(func(dbTx database.Tx) error {
+		cursor := dbTx.Metadata().Bucket(utxoSetBucketName).Cursor()
+		nb = 0
+		for b := cursor.First(); b; b = cursor.Next() {
+			nb++
+			_, err := deserializeUtxoEntry(cursor.Value())
+			if err != nil {
+				return fmt.Errorf("Failed to deserialize entry: %v", err)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("Error fetching utxo entries: %v", err)
+	}
+	if nb != expectedNumber {
+		return fmt.Errorf("Expected %d elements in the UTXO set, but found %d",
+			expectedNumber, nb)
+	}
+
+	return nil
+}
+
+// utxoCacheTestChain creates a test BlockChain to be used for utxo cache tests.
+// It uses the regression test parameters, a coin matutiry of 1 block and sets
+// the cache size limit to 10 MiB.
+func utxoCacheTestChain(testName string) (*BlockChain, *chaincfg.Params, func()) {
+	params := chaincfg.RegressionNetParams
+	chain, tearDown, err := chainSetup(testName, &params)
+	if err != nil {
+		panic(fmt.Sprintf("error loading blockchain with database: %v", err))
+	}
+
+	chain.TstSetCoinbaseMaturity(1)
+	chain.utxoCache.maxTotalMemoryUsage = 10 * 1024 * 1024
+	chain.utxoCache.cachedEntries.maxTotalMemoryUsage = chain.utxoCache.maxTotalMemoryUsage
+
+	return chain, &params, tearDown
+}
+
+func TestUtxoCacheFlush(t *testing.T) {
+	chain, params, tearDown := utxoCacheTestChain("TestUtxoCacheFlush")
+	defer tearDown()
+	cache := chain.utxoCache
+	tip := btcutil.NewBlock(params.GenesisBlock)
+
+	// The chainSetup init triggers the consistency status write.
+	err := assertConsistencyState(chain, params.GenesisHash)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = assertNbEntriesOnDisk(chain, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// LastFlushHash starts with genesis.
+	if cache.lastFlushHash != *params.GenesisHash {
+		t.Fatalf("lastFlushHash before first flush expected to be "+
+			"genesis block hash, instead was %v", cache.lastFlushHash)
+	}
+
+	// First, add 10 utxos without flushing.
+	outPoints := make([]wire.OutPoint, 10)
+	for i := range outPoints {
+		op := outpointFromInt(i)
+		outPoints[i] = op
+
+		// Add the txout.
+		txOut := wire.TxOut{Value: 10000, PkScript: getValidP2PKHScript()}
+		cache.addTxOut(op, &txOut, true, int32(i))
+	}
+
+	if cache.cachedEntries.length() != len(outPoints) {
+		t.Fatalf("Expected 10 entries, has %d instead", cache.cachedEntries.length())
+	}
+
+	// All entries should be fresh and modified.
+	for _, m := range cache.cachedEntries.maps {
+		for outpoint, entry := range m {
+			if entry == nil {
+				t.Fatalf("Unexpected nil entry found for %v", outpoint)
+			}
+			if !entry.isModified() {
+				t.Fatal("Entry should be marked mofified")
+			}
+			if !entry.isFresh() {
+				t.Fatal("Entry should be marked fresh")
+			}
+		}
+	}
+
+	// Spend the last outpoint and pop it off from the outpoints slice.
+	var spendOp wire.OutPoint
+	spendOp, outPoints = outPoints[len(outPoints)-1], outPoints[:len(outPoints)-1]
+	cache.addTxIn(&wire.TxIn{PreviousOutPoint: spendOp}, nil)
+
+	if cache.cachedEntries.length() != len(outPoints) {
+		t.Fatalf("Expected %d entries, has %d instead",
+			len(outPoints), cache.cachedEntries.length())
+	}
+
+	// Not flushed yet.
+	err = assertConsistencyState(chain, params.GenesisHash)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = assertNbEntriesOnDisk(chain, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Flush.
+	err = chain.db.Update(func(dbTx database.Tx) error {
+		return cache.flush(dbTx, FlushRequired, chain.stateSnapshot)
+	})
+	if err != nil {
+		t.Fatalf("unexpected error while flushing cache: %v", err)
+	}
+	if cache.cachedEntries.length() != 0 {
+		t.Fatalf("Expected 0 entries, has %d instead", cache.cachedEntries.length())
+	}
+
+	err = assertConsistencyState(chain, tip.Hash())
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = assertNbEntriesOnDisk(chain, len(outPoints))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Fetch the flushed utxos.
+	entries, err := cache.fetchEntries(outPoints)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Check that the returned entries are not marked fresh and modified.
+	for _, entry := range entries {
+		if entry.isFresh() {
+			t.Fatal("Entry should not be marked fresh")
+		}
+		if entry.isModified() {
+			t.Fatal("Entry should not be marked modified")
+		}
+	}
+
+	// Check that the fetched entries in the cache are not marked fresh and modified.
+	for _, m := range cache.cachedEntries.maps {
+		for outpoint, elem := range m {
+			if elem == nil {
+				t.Fatalf("Unexpected nil entry found for %v", outpoint)
+			}
+			if elem.isFresh() {
+				t.Fatal("Entry should not be marked fresh")
+			}
+			if elem.isModified() {
+				t.Fatal("Entry should not be marked modified")
+			}
+		}
+	}
+
+	// Spend 5 utxos.
+	prevLen := len(outPoints)
+	for i := 0; i < 5; i++ {
+		spendOp, outPoints = outPoints[len(outPoints)-1], outPoints[:len(outPoints)-1]
+		cache.addTxIn(&wire.TxIn{PreviousOutPoint: spendOp}, nil)
+	}
+
+	// Should still have the entries in cache so they can be flushed to disk.
+	if cache.cachedEntries.length() != prevLen {
+		t.Fatalf("Expected 10 entries, has %d instead", cache.cachedEntries.length())
+	}
+
+	// Flush.
+	err = chain.db.Update(func(dbTx database.Tx) error {
+		return cache.flush(dbTx, FlushRequired, chain.stateSnapshot)
+	})
+	if err != nil {
+		t.Fatalf("unexpected error while flushing cache: %v", err)
+	}
+	if cache.cachedEntries.length() != 0 {
+		t.Fatalf("Expected 0 entries, has %d instead", cache.cachedEntries.length())
+	}
+
+	err = assertConsistencyState(chain, tip.Hash())
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = assertNbEntriesOnDisk(chain, len(outPoints))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Add 5 utxos without flushing and test for periodic flushes.
+	outPoints1 := make([]wire.OutPoint, 5)
+	for i := range outPoints1 {
+		// i + prevLen here to avoid collision since we're just hashing
+		// the int.
+		op := outpointFromInt(i + prevLen)
+		outPoints1[i] = op
+
+		// Add the txout.
+		txOut := wire.TxOut{Value: 10000, PkScript: getValidP2PKHScript()}
+		cache.addTxOut(op, &txOut, true, int32(i+prevLen))
+	}
+	if cache.cachedEntries.length() != len(outPoints1) {
+		t.Fatalf("Expected %d entries, has %d instead",
+			len(outPoints1), cache.cachedEntries.length())
+	}
+
+	// Attempt to flush with flush periodic.  Shouldn't flush.
+	err = chain.db.Update(func(dbTx database.Tx) error {
+		return cache.flush(dbTx, FlushPeriodic, chain.stateSnapshot)
+	})
+	if err != nil {
+		t.Fatalf("unexpected error while flushing cache: %v", err)
+	}
+	if cache.cachedEntries.length() == 0 {
+		t.Fatalf("Expected %d entries, has %d instead",
+			len(outPoints1), cache.cachedEntries.length())
+	}
+
+	// Arbitrarily set the last flush time to 6 minutes ago.
+	cache.lastFlushTime = time.Now().Add(-time.Minute * 6)
+
+	// Attempt to flush with flush periodic.  Should flush now.
+	err = chain.db.Update(func(dbTx database.Tx) error {
+		return cache.flush(dbTx, FlushPeriodic, chain.stateSnapshot)
+	})
+	if err != nil {
+		t.Fatalf("unexpected error while flushing cache: %v", err)
+	}
+	if cache.cachedEntries.length() != 0 {
+		t.Fatalf("Expected 0 entries, has %d instead", cache.cachedEntries.length())
+	}
+
+	err = assertConsistencyState(chain, tip.Hash())
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = assertNbEntriesOnDisk(chain, len(outPoints)+len(outPoints1))
+	if err != nil {
+		t.Fatal(err)
 	}
 }

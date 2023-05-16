@@ -554,10 +554,43 @@ func (view *UtxoViewpoint) fetchUtxosMain(db database.DB, outpoints []wire.OutPo
 	})
 }
 
+// fetchUtxosFromCache fetches unspent transaction output data about the provided
+// set of outpoints from the point of view of the end of the main chain at the
+// time of the call.  It attempts to fetch them from the cache and whatever entries
+// that were not in the cache will be attempted to be fetched from the database and
+// it'll be cached.
+//
+// Upon completion of this function, the view will contain an entry for each
+// requested outpoint.  Spent outputs, or those which otherwise don't exist,
+// will result in a nil entry in the view.
+func (view *UtxoViewpoint) fetchUtxosFromCache(cache *utxoCache, outpoints []wire.OutPoint) error {
+	// Nothing to do if there are no requested outputs.
+	if len(outpoints) == 0 {
+		return nil
+	}
+
+	// Load the requested set of unspent transaction outputs from the point
+	// of view of the end of the main chain.  Any missing entries will be
+	// fetched from the database and be cached.
+	//
+	// NOTE: Missing entries are not considered an error here and instead
+	// will result in nil entries in the view.  This is intentionally done
+	// so other code can use the presence of an entry in the store as a way
+	// to unnecessarily avoid attempting to reload it from the database.
+	entries, err := cache.fetchEntries(outpoints)
+	if err != nil {
+		return err
+	}
+	for i, entry := range entries {
+		view.entries[outpoints[i]] = entry.Clone()
+	}
+	return nil
+}
+
 // fetchUtxos loads the unspent transaction outputs for the provided set of
 // outputs into the view from the database as needed unless they already exist
 // in the view in which case they are ignored.
-func (view *UtxoViewpoint) fetchUtxos(db database.DB, outpoints []wire.OutPoint) error {
+func (view *UtxoViewpoint) fetchUtxos(cache *utxoCache, outpoints []wire.OutPoint) error {
 	// Nothing to do if there are no requested outputs.
 	if len(outpoints) == 0 {
 		return nil
@@ -575,7 +608,7 @@ func (view *UtxoViewpoint) fetchUtxos(db database.DB, outpoints []wire.OutPoint)
 	}
 
 	// Request the input utxos from the database.
-	return view.fetchUtxosMain(db, needed)
+	return view.fetchUtxosFromCache(cache, needed)
 }
 
 // findInputsToFetch goes through all the blocks and returns all the outpoints of
@@ -633,10 +666,13 @@ func (view *UtxoViewpoint) findInputsToFetch(block *btcutil.Block) []wire.OutPoi
 
 // fetchInputUtxos loads the unspent transaction outputs for the inputs
 // referenced by the transactions in the given block into the view from the
-// database as needed.  In particular, referenced entries that are earlier in
-// the block are added to the view and entries that are already in the view are
-// not modified.
-func (view *UtxoViewpoint) fetchInputUtxos(db database.DB, block *btcutil.Block) error {
+// database or the cache as needed.  In particular, referenced entries that
+// are earlier in the block are added to the view and entries that are already
+// in the view are not modified.
+func (view *UtxoViewpoint) fetchInputUtxos(db database.DB, cache *utxoCache, block *btcutil.Block) error {
+	if cache != nil {
+		return view.fetchUtxosFromCache(cache, view.findInputsToFetch(block))
+	}
 	// Request the input utxos from the cache.
 	return view.fetchUtxosMain(db, view.findInputsToFetch(block))
 }
@@ -678,7 +714,7 @@ func (b *BlockChain) FetchUtxoView(tx *btcutil.Tx) (*UtxoViewpoint, error) {
 	// chain.
 	view := NewUtxoViewpoint()
 	b.chainLock.RLock()
-	err := view.fetchUtxosMain(b.db, needed)
+	err := view.fetchUtxosFromCache(b.utxoCache, needed)
 	b.chainLock.RUnlock()
 	return view, err
 }
@@ -697,16 +733,10 @@ func (b *BlockChain) FetchUtxoEntry(outpoint wire.OutPoint) (*UtxoEntry, error) 
 	b.chainLock.RLock()
 	defer b.chainLock.RUnlock()
 
-	var entry *UtxoEntry
-	err := b.db.View(func(dbTx database.Tx) error {
-		var err error
-		utxoBucket := dbTx.Metadata().Bucket(utxoSetBucketName)
-		entry, err = dbFetchUtxoEntry(dbTx, utxoBucket, outpoint)
-		return err
-	})
+	entries, err := b.utxoCache.fetchEntries([]wire.OutPoint{outpoint})
 	if err != nil {
 		return nil, err
 	}
 
-	return entry, nil
+	return entries[0], nil
 }

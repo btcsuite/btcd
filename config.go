@@ -63,6 +63,7 @@ const (
 	defaultMaxOrphanTransactions = 100
 	defaultMaxOrphanTxSize       = 100000
 	defaultSigCacheMaxSize       = 100000
+	defaultUtxoCacheMaxSizeMiB   = 250
 	sampleConfigFilename         = "sample-btcd.conf"
 	defaultTxIndex               = false
 	defaultAddrIndex             = false
@@ -171,6 +172,7 @@ type config struct {
 	TestNet3             bool          `long:"testnet" description:"Use the test network"`
 	TorIsolation         bool          `long:"torisolation" description:"Enable Tor stream isolation by randomizing user credentials for each connection."`
 	TrickleInterval      time.Duration `long:"trickleinterval" description:"Minimum time between attempts to send new inventory to a connected peer"`
+	UtxoCacheMaxSizeMiB  uint          `long:"utxocachemaxsize" description:"The maximum size in MiB of the UTXO cache"`
 	TxIndex              bool          `long:"txindex" description:"Maintain a full hash-based transaction index which makes all transactions available via the getrawtransaction RPC"`
 	UserAgentComments    []string      `long:"uacomment" description:"Comment to add to the user agent -- See BIP 14 for more information."`
 	Upnp                 bool          `long:"upnp" description:"Use UPnP to map our listening port outside of NAT"`
@@ -439,6 +441,7 @@ func loadConfig() (*config, []string, error) {
 		BlockPrioritySize:    mempool.DefaultBlockPrioritySize,
 		MaxOrphanTxs:         defaultMaxOrphanTransactions,
 		SigCacheMaxSize:      defaultSigCacheMaxSize,
+		UtxoCacheMaxSizeMiB:  defaultUtxoCacheMaxSizeMiB,
 		Generate:             defaultGenerate,
 		TxIndex:              defaultTxIndex,
 		AddrIndex:            defaultAddrIndex,

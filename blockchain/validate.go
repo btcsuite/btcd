@@ -889,7 +889,7 @@ func (b *BlockChain) checkBIP0030(node *blockNode, block *btcutil.Block, view *U
 			fetch = append(fetch, prevOut)
 		}
 	}
-	err := view.fetchUtxos(b.db, fetch)
+	err := view.fetchUtxos(b.utxoCache, fetch)
 	if err != nil {
 		return err
 	}
@@ -1080,11 +1080,11 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block, vi
 	}
 
 	// Load all of the utxos referenced by the inputs for all transactions
-	// in the block don't already exist in the utxo view from the database.
+	// in the block don't already exist in the utxo view from the cache.
 	//
 	// These utxo entries are needed for verification of things such as
 	// transaction inputs, counting pay-to-script-hashes, and scripts.
-	err := view.fetchInputUtxos(b.db, block)
+	err := view.fetchInputUtxos(nil, b.utxoCache, block)
 	if err != nil {
 		return err
 	}

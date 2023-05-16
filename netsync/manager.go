@@ -816,7 +816,7 @@ func (sm *SyncManager) handleBlockMsg(bmsg *blockMsg) {
 
 		// When the block is not an orphan, log information about it and
 		// update the chain state.
-		sm.progressLogger.LogBlockHeight(bmsg.block)
+		sm.progressLogger.LogBlockHeight(bmsg.block, sm.chain)
 
 		// Update this peer's latest block height, for future
 		// potential sync node candidacy.
@@ -840,8 +840,13 @@ func (sm *SyncManager) handleBlockMsg(bmsg *blockMsg) {
 		}
 	}
 
-	// Nothing more to do if we aren't in headers-first mode.
+	// If we are not in headers first mode, it's a good time to periodically
+	// flush the blockchain cache because we don't expect new blocks immediately.
+	// After that, there is nothing more to do.
 	if !sm.headersFirstMode {
+		if err := sm.chain.FlushUtxoCache(blockchain.FlushPeriodic); err != nil {
+			log.Errorf("Error while flushing the blockchain cache: %v", err)
+		}
 		return
 	}
 
@@ -1412,6 +1417,11 @@ out:
 		case <-sm.quit:
 			break out
 		}
+	}
+
+	log.Debug("Block handler shutting down: flushing blockchain caches...")
+	if err := sm.chain.FlushUtxoCache(blockchain.FlushRequired); err != nil {
+		log.Errorf("Error while flushing blockchain caches: %v", err)
 	}
 
 	sm.wg.Done()
