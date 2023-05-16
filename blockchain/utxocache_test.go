@@ -165,3 +165,143 @@ func TestMapsliceConcurrency(t *testing.T) {
 		wg.Wait()
 	}
 }
+
+// getValidP2PKHScript returns a valid P2PKH script.  Useful as unspendables cannot be
+// added to the cache.
+func getValidP2PKHScript() []byte {
+	validP2PKHScript := []byte{
+		// OP_DUP
+		0x76,
+		// OP_HASH160
+		0xa9,
+		// OP_DATA_20
+		0x14,
+		// <20-byte pubkey hash>
+		0xf0, 0x7a, 0xb8, 0xce, 0x72, 0xda, 0x4e, 0x76,
+		0x0b, 0x74, 0x7d, 0x48, 0xd6, 0x65, 0xec, 0x96,
+		0xad, 0xf0, 0x24, 0xf5,
+		// OP_EQUALVERIFY
+		0x88,
+		// OP_CHECKSIG
+		0xac,
+	}
+	return validP2PKHScript
+}
+
+// outpointFromInt generates an outpoint from an int by hashing the int and making
+// the given int the index.
+func outpointFromInt(i int) wire.OutPoint {
+	// Boilerplate to create an outpoint.
+	var buf [4]byte
+	binary.BigEndian.PutUint32(buf[:], uint32(i))
+	hash := sha256.Sum256(buf[:])
+	return wire.OutPoint{Hash: hash, Index: uint32(i)}
+}
+
+func TestUtxoCacheEntrySize(t *testing.T) {
+	type block struct {
+		txOuts []*wire.TxOut
+		outOps []wire.OutPoint
+		txIns  []*wire.TxIn
+	}
+	tests := []struct {
+		name         string
+		blocks       []block
+		expectedSize uint64
+	}{
+		{
+			name: "one entry",
+			blocks: func() []block {
+				return []block{
+					{
+						txOuts: []*wire.TxOut{
+							{Value: 10000, PkScript: getValidP2PKHScript()},
+						},
+						outOps: []wire.OutPoint{
+							outpointFromInt(0),
+						},
+					},
+				}
+			}(),
+			expectedSize: pubKeyHashLen + baseEntrySize,
+		},
+		{
+			name: "10 entries, 4 spend",
+			blocks: func() []block {
+				blocks := make([]block, 0, 10)
+				for i := 0; i < 10; i++ {
+					op := outpointFromInt(i)
+
+					block := block{
+						txOuts: []*wire.TxOut{
+							{Value: 10000, PkScript: getValidP2PKHScript()},
+						},
+						outOps: []wire.OutPoint{
+							op,
+						},
+					}
+
+					// Spend all outs in blocks less than 4.
+					if i < 4 {
+						block.txIns = []*wire.TxIn{
+							{PreviousOutPoint: op},
+						}
+					}
+
+					blocks = append(blocks, block)
+				}
+				return blocks
+			}(),
+			// Multipled by 6 since we'll have 6 entries left.
+			expectedSize: (pubKeyHashLen + baseEntrySize) * 6,
+		},
+		{
+			name: "spend everything",
+			blocks: func() []block {
+				blocks := make([]block, 0, 500)
+				for i := 0; i < 500; i++ {
+					op := outpointFromInt(i)
+
+					block := block{
+						txOuts: []*wire.TxOut{
+							{Value: 1000, PkScript: getValidP2PKHScript()},
+						},
+						outOps: []wire.OutPoint{
+							op,
+						},
+					}
+
+					// Spend all outs in blocks less than 4.
+					block.txIns = []*wire.TxIn{
+						{PreviousOutPoint: op},
+					}
+
+					blocks = append(blocks, block)
+				}
+				return blocks
+			}(),
+			expectedSize: 0,
+		},
+	}
+
+	for _, test := range tests {
+		// Size is just something big enough so that the mapslice doesn't
+		// run out of memory.
+		s := newUtxoCache(nil, 1*1024*1024)
+
+		for height, block := range test.blocks {
+			for i, out := range block.txOuts {
+				s.addTxOut(block.outOps[i], out, true, int32(height))
+			}
+
+			for _, in := range block.txIns {
+				s.addTxIn(in, nil)
+			}
+		}
+
+		if s.totalEntryMemory != test.expectedSize {
+			t.Errorf("Failed test %s. Expected size of %d, got %d",
+				test.name, test.expectedSize, s.totalEntryMemory)
+		}
+	}
+}
