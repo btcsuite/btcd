@@ -2206,14 +2206,14 @@ func (p *Peer) waitToFinishNegotiation(pver uint32) error {
 // peer. The events should occur in the following order, otherwise an error is
 // returned:
 //
-//   1. Remote peer sends their version.
-//   2. We send our version.
-//   3. We send sendaddrv2 if their version is >= 70016.
-//   4. We send our verack.
-//   5. Wait until sendaddrv2 or verack is received. Unknown messages are
-//      skipped as it could be wtxidrelay or a different message in the future
-//      that btcd does not implement but bitcoind does.
-//   6. If remote peer sent sendaddrv2 above, wait until receipt of verack.
+//  1. Remote peer sends their version.
+//  2. We send our version.
+//  3. We send sendaddrv2 if their version is >= 70016.
+//  4. We send our verack.
+//  5. Wait until sendaddrv2 or verack is received. Unknown messages are
+//     skipped as it could be wtxidrelay or a different message in the future
+//     that btcd does not implement but bitcoind does.
+//  6. If remote peer sent sendaddrv2 above, wait until receipt of verack.
 func (p *Peer) negotiateInboundProtocol() error {
 	if err := p.readRemoteVersionMsg(); err != nil {
 		return err
@@ -2245,13 +2245,13 @@ func (p *Peer) negotiateInboundProtocol() error {
 // peer. The events should occur in the following order, otherwise an error is
 // returned:
 //
-//   1. We send our version.
-//   2. Remote peer sends their version.
-//   3. We send sendaddrv2 if their version is >= 70016.
-//   4. We send our verack.
-//   5. We wait to receive sendaddrv2 or verack, skipping unknown messages as
-//      in the inbound case.
-//   6. If sendaddrv2 was received, wait for receipt of verack.
+//  1. We send our version.
+//  2. Remote peer sends their version.
+//  3. We send sendaddrv2 if their version is >= 70016.
+//  4. We send our verack.
+//  5. We wait to receive sendaddrv2 or verack, skipping unknown messages as
+//     in the inbound case.
+//  6. If sendaddrv2 was received, wait for receipt of verack.
 func (p *Peer) negotiateOutboundProtocol() error {
 	if err := p.writeLocalVersionMsg(); err != nil {
 		return err

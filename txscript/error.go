@@ -506,10 +506,10 @@ func (e ErrorCode) String() string {
 
 // Error identifies a script-related error.  It is used to indicate three
 // classes of errors:
-// 1) Script execution failures due to violating one of the many requirements
-//    imposed by the script engine or evaluating to false
-// 2) Improper API usage by callers
-// 3) Internal consistency check failures
+//  1. Script execution failures due to violating one of the many requirements
+//     imposed by the script engine or evaluating to false
+//  2. Improper API usage by callers
+//  3. Internal consistency check failures
 //
 // The caller can use type assertions on the returned errors to access the
 // ErrorCode field to ascertain the specific reason for the error.  As an
