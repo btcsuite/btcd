@@ -28,6 +28,13 @@ const (
 	// tfModified indicates that a txout has been modified since it was
 	// loaded.
 	tfModified
+
+	// tfFresh indicates that the entry is fresh.  This means that the parent
+	// view never saw this entry.  Note that tfFresh is a performance
+	// optimization with which we can erase entries that are fully spent if we
+	// know we do not need to commit them.  It is always safe to not mark
+	// tfFresh if that condition is not guaranteed.
+	tfFresh
 )
 
 // UtxoEntry houses details about an individual transaction output in a utxo
@@ -56,6 +63,12 @@ type UtxoEntry struct {
 // loaded.
 func (entry *UtxoEntry) isModified() bool {
 	return entry.packedFlags&tfModified == tfModified
+}
+
+// isFresh returns whether or not it's certain the output has never previously
+// been stored in the database.
+func (entry *UtxoEntry) isFresh() bool {
+	return entry.packedFlags&tfFresh == tfFresh
 }
 
 // IsCoinBase returns whether or not the output was contained in a coinbase
@@ -199,7 +212,7 @@ func (view *UtxoViewpoint) addTxOut(outpoint wire.OutPoint, txOut *wire.TxOut, i
 	entry.amount = txOut.Value
 	entry.pkScript = txOut.PkScript
 	entry.blockHeight = blockHeight
-	entry.packedFlags = tfModified
+	entry.packedFlags = tfFresh | tfModified
 	if isCoinBase {
 		entry.packedFlags |= tfCoinBase
 	}
