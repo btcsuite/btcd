@@ -71,6 +71,16 @@ func (entry *UtxoEntry) isFresh() bool {
 	return entry.packedFlags&tfFresh == tfFresh
 }
 
+// memoryUsage returns the memory usage in bytes of for the utxo entry.
+// It returns 0 for a nil entry.
+func (entry *UtxoEntry) memoryUsage() uint64 {
+	if entry == nil {
+		return 0
+	}
+
+	return baseEntrySize + uint64(cap(entry.pkScript))
+}
+
 // IsCoinBase returns whether or not the output was contained in a coinbase
 // transaction.
 func (entry *UtxoEntry) IsCoinBase() bool {
