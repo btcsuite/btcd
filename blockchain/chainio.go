@@ -51,6 +51,10 @@ var (
 	// chain state.
 	chainStateKeyName = []byte("chainstate")
 
+	// utxoStateConsistencyKeyName is the name of the db key used to store the
+	// consistency status of the utxo state.
+	utxoStateConsistencyKeyName = []byte("utxostateconsistency")
+
 	// spendJournalVersionKeyName is the name of the db key used to store
 	// the version of the spend journal currently in the database.
 	spendJournalVersionKeyName = []byte("spendjournalversion")
@@ -1012,6 +1016,21 @@ func dbPutBestState(dbTx database.Tx, snapshot *BestState, workSum *big.Int) err
 
 	// Store the current best chain state into the database.
 	return dbTx.Metadata().Put(chainStateKeyName, serializedData)
+}
+
+// dbPutUtxoStateConsistency uses an existing database transaction to
+// update the utxo state consistency status with the given parameters.
+func dbPutUtxoStateConsistency(dbTx database.Tx, hash *chainhash.Hash) error {
+	// Store the utxo state consistency status into the database.
+	return dbTx.Metadata().Put(utxoStateConsistencyKeyName, hash[:])
+}
+
+// dbFetchUtxoStateConsistency uses an existing database transaction to retrieve
+// the utxo state consistency status from the database.  The code is 0 when
+// nothing was found.
+func dbFetchUtxoStateConsistency(dbTx database.Tx) []byte {
+	// Fetch the serialized data from the database.
+	return dbTx.Metadata().Get(utxoStateConsistencyKeyName)
 }
 
 // createChainState initializes both the database and the chain state to the
