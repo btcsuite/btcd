@@ -578,12 +578,11 @@ func (view *UtxoViewpoint) fetchUtxos(db database.DB, outpoints []wire.OutPoint)
 	return view.fetchUtxosMain(db, needed)
 }
 
-// fetchInputUtxos loads the unspent transaction outputs for the inputs
-// referenced by the transactions in the given block into the view from the
-// database as needed.  In particular, referenced entries that are earlier in
-// the block are added to the view and entries that are already in the view are
-// not modified.
-func (view *UtxoViewpoint) fetchInputUtxos(db database.DB, block *btcutil.Block) error {
+// findInputsToFetch goes through all the blocks and returns all the outpoints of
+// the entries that need to be fetched in order to validate the block.  Outpoints
+// for the entries that are already in the block are not included in the returned
+// outpoints.
+func (view *UtxoViewpoint) findInputsToFetch(block *btcutil.Block) []wire.OutPoint {
 	// Build a map of in-flight transactions because some of the inputs in
 	// this block could be referencing other transactions earlier in this
 	// block which are not yet in the chain.
@@ -629,8 +628,17 @@ func (view *UtxoViewpoint) fetchInputUtxos(db database.DB, block *btcutil.Block)
 		}
 	}
 
-	// Request the input utxos from the database.
-	return view.fetchUtxosMain(db, needed)
+	return needed
+}
+
+// fetchInputUtxos loads the unspent transaction outputs for the inputs
+// referenced by the transactions in the given block into the view from the
+// database as needed.  In particular, referenced entries that are earlier in
+// the block are added to the view and entries that are already in the view are
+// not modified.
+func (view *UtxoViewpoint) fetchInputUtxos(db database.DB, block *btcutil.Block) error {
+	// Request the input utxos from the cache.
+	return view.fetchUtxosMain(db, view.findInputsToFetch(block))
 }
 
 // NewUtxoViewpoint returns a new empty unspent transaction output view.
