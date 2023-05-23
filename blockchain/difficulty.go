@@ -219,7 +219,15 @@ func (b *BlockChain) findPrevTestNetDifficulty(startNode *blockNode) uint32 {
 // This function differs from the exported CalcNextRequiredDifficulty in that
 // the exported version uses the current best chain as the previous block node
 // while this function accepts any block node.
-func (b *BlockChain) calcNextRequiredDifficulty(lastNode *blockNode, newBlockTime time.Time) (uint32, error) {
+func (b *BlockChain) calcNextRequiredDifficulty(lastNode *blockNode,
+	newBlockTime time.Time) (uint32, error) {
+
+	// Emulate the same behavior as Bitcoin Core that for regtest there is
+	// no difficulty retargeting.
+	if b.chainParams.PoWNoRetargeting {
+		return b.chainParams.PowLimitBits, nil
+	}
+
 	// Genesis block.
 	if lastNode == nil {
 		return b.chainParams.PowLimitBits, nil
