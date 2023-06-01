@@ -30,7 +30,7 @@ type txValidator struct {
 	validateChan chan *txValidateItem
 	quitChan     chan struct{}
 	resultChan   chan error
-	utxoView     *UtxoViewpoint
+	utxoView     txscript.PrevOutputFetcher
 	flags        txscript.ScriptFlags
 	sigCache     *txscript.SigCache
 	hashCache    *txscript.HashCache
@@ -57,7 +57,7 @@ out:
 		case txVI := <-v.validateChan:
 			// Ensure the referenced input utxo is available.
 			txIn := txVI.txIn
-			utxo := v.utxoView.LookupEntry(txIn.PreviousOutPoint)
+			utxo := v.utxoView.FetchPrevOutput(txIn.PreviousOutPoint)
 			if utxo == nil {
 				str := fmt.Sprintf("unable to find unspent "+
 					"output %v referenced from "+
@@ -72,8 +72,8 @@ out:
 			// Create a new script engine for the script pair.
 			sigScript := txIn.SignatureScript
 			witness := txIn.Witness
-			pkScript := utxo.PkScript()
-			inputAmount := utxo.Amount()
+			pkScript := utxo.PkScript
+			inputAmount := utxo.Value
 			vm, err := txscript.NewEngine(
 				pkScript, txVI.tx.MsgTx(), txVI.txInIndex,
 				v.flags, v.sigCache, txVI.sigHashes,
@@ -175,7 +175,7 @@ func (v *txValidator) Validate(items []*txValidateItem) error {
 
 // newTxValidator returns a new instance of txValidator to be used for
 // validating transaction scripts asynchronously.
-func newTxValidator(utxoView *UtxoViewpoint, flags txscript.ScriptFlags,
+func newTxValidator(utxoView txscript.PrevOutputFetcher, flags txscript.ScriptFlags,
 	sigCache *txscript.SigCache, hashCache *txscript.HashCache) *txValidator {
 	return &txValidator{
 		validateChan: make(chan *txValidateItem),
@@ -190,7 +190,7 @@ func newTxValidator(utxoView *UtxoViewpoint, flags txscript.ScriptFlags,
 
 // ValidateTransactionScripts validates the scripts for the passed transaction
 // using multiple goroutines.
-func ValidateTransactionScripts(tx *btcutil.Tx, utxoView *UtxoViewpoint,
+func ValidateTransactionScripts(tx *btcutil.Tx, utxoView txscript.PrevOutputFetcher,
 	flags txscript.ScriptFlags, sigCache *txscript.SigCache,
 	hashCache *txscript.HashCache) error {
 
