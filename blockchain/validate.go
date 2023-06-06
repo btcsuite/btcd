@@ -5,6 +5,7 @@
 package blockchain
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"math"
@@ -41,6 +42,10 @@ const (
 	// baseSubsidy is the starting subsidy amount for mined blocks.  This
 	// value is halved every SubsidyHalvingInterval blocks.
 	baseSubsidy = 50 * btcutil.SatoshiPerBitcoin
+
+	// coinbaseHeightAllocSize is the amount of bytes that the
+	// ScriptBuilder will allocate when validating the coinbase height.
+	coinbaseHeightAllocSize = 5
 )
 
 var (
@@ -610,16 +615,25 @@ func ExtractCoinbaseHeight(coinbaseTx *btcutil.Tx) (int32, error) {
 		return 0, ruleError(ErrMissingCoinbaseHeight, str)
 	}
 
-	serializedHeightBytes := make([]byte, 8)
-	copy(serializedHeightBytes, sigScript[1:serializedLen+1])
-	serializedHeight := binary.LittleEndian.Uint64(serializedHeightBytes)
+	// We use 4 bytes here since it saves us allocations. We use a stack
+	// allocation rather than a heap allocation here.
+	var serializedHeightBytes [4]byte
+	copy(serializedHeightBytes[:], sigScript[1:serializedLen+1])
 
-	return int32(serializedHeight), nil
+	serializedHeight := int32(
+		binary.LittleEndian.Uint32(serializedHeightBytes[:]),
+	)
+
+	if err := compareScript(serializedHeight, sigScript); err != nil {
+		return 0, err
+	}
+
+	return serializedHeight, nil
 }
 
-// checkSerializedHeight checks if the signature script in the passed
+// CheckSerializedHeight checks if the signature script in the passed
 // transaction starts with the serialized block height of wantHeight.
-func checkSerializedHeight(coinbaseTx *btcutil.Tx, wantHeight int32) error {
+func CheckSerializedHeight(coinbaseTx *btcutil.Tx, wantHeight int32) error {
 	serializedHeight, err := ExtractCoinbaseHeight(coinbaseTx)
 	if err != nil {
 		return err
@@ -631,6 +645,26 @@ func checkSerializedHeight(coinbaseTx *btcutil.Tx, wantHeight int32) error {
 			serializedHeight, wantHeight)
 		return ruleError(ErrBadCoinbaseHeight, str)
 	}
+	return nil
+}
+
+func compareScript(height int32, script []byte) error {
+	scriptBuilder := txscript.NewScriptBuilder(
+		txscript.WithScriptAllocSize(coinbaseHeightAllocSize),
+	)
+	scriptHeight, err := scriptBuilder.AddInt64(
+		int64(height),
+	).Script()
+	if err != nil {
+		return err
+	}
+
+	if !bytes.HasPrefix(script, scriptHeight) {
+		str := fmt.Sprintf("the coinbase signature script does not "+
+			"minimally encode the height %d", height)
+		return ruleError(ErrBadCoinbaseHeight, str)
+	}
+
 	return nil
 }
 
@@ -787,7 +821,7 @@ func (b *BlockChain) checkBlockContext(block *btcutil.Block, prevNode *blockNode
 			blockHeight >= b.chainParams.BIP0034Height {
 
 			coinbaseTx := block.Transactions()[0]
-			err := checkSerializedHeight(coinbaseTx, blockHeight)
+			err := CheckSerializedHeight(coinbaseTx, blockHeight)
 			if err != nil {
 				return err
 			}
