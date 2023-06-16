@@ -1,4 +1,5 @@
 // Copyright (c) 2017 The btcsuite developers
+// Copyright (c) 2015-2019 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -22,6 +23,7 @@ func TestErrorCodeStringer(t *testing.T) {
 		{ErrUnsupportedAddress, "ErrUnsupportedAddress"},
 		{ErrTooManyRequiredSigs, "ErrTooManyRequiredSigs"},
 		{ErrTooMuchNullData, "ErrTooMuchNullData"},
+		{ErrUnsupportedScriptVersion, "ErrUnsupportedScriptVersion"},
 		{ErrNotMultisigScript, "ErrNotMultisigScript"},
 		{ErrEarlyReturn, "ErrEarlyReturn"},
 		{ErrEmptyStack, "ErrEmptyStack"},
@@ -79,7 +81,21 @@ func TestErrorCodeStringer(t *testing.T) {
 		{ErrWitnessUnexpected, "ErrWitnessUnexpected"},
 		{ErrMinimalIf, "ErrMinimalIf"},
 		{ErrWitnessPubKeyType, "ErrWitnessPubKeyType"},
+		{ErrDiscourageOpSuccess, "ErrDiscourageOpSuccess"},
+		{ErrDiscourageUpgradeableTaprootVersion, "ErrDiscourageUpgradeableTaprootVersion"},
+		{ErrTapscriptCheckMultisig, "ErrTapscriptCheckMultisig"},
 		{ErrDiscourageUpgradableWitnessProgram, "ErrDiscourageUpgradableWitnessProgram"},
+		{ErrDiscourageUpgradeablePubKeyType, "ErrDiscourageUpgradeablePubKeyType"},
+		{ErrTaprootSigInvalid, "ErrTaprootSigInvalid"},
+		{ErrTaprootMerkleProofInvalid, "ErrTaprootMerkleProofInvalid"},
+		{ErrTaprootOutputKeyParityMismatch, "ErrTaprootOutputKeyParityMismatch"},
+		{ErrControlBlockTooSmall, "ErrControlBlockTooSmall"},
+		{ErrControlBlockTooLarge, "ErrControlBlockTooLarge"},
+		{ErrControlBlockInvalidLength, "ErrControlBlockInvalidLength"},
+		{ErrWitnessHasNoAnnex, "ErrWitnessHasNoAnnex"},
+		{ErrInvalidTaprootSigLen, "ErrInvalidTaprootSigLen"},
+		{ErrTaprootPubkeyIsEmpty, "ErrTaprootPubkeyIsEmpty"},
+		{ErrTaprootMaxSigOps, "ErrTaprootMaxSigOps"},
 		{0xffff, "Unknown ErrorCode (65535)"},
 	}
 

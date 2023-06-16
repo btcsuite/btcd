@@ -1,9 +1,10 @@
 btcd
 ====
 
-[![Build Status](https://travis-ci.org/btcsuite/btcd.png?branch=master)](https://travis-ci.org/btcsuite/btcd)
-[![ISC License](http://img.shields.io/badge/license-ISC-blue.svg)](http://copyfree.org)
-[![GoDoc](https://img.shields.io/badge/godoc-reference-blue.svg)](http://godoc.org/github.com/btcsuite/btcd)
+[![Build Status](https://github.com/btcsuite/btcd/workflows/Build%20and%20Test/badge.svg)](https://github.com/btcsuite/btcd/actions)
+[![Coverage Status](https://coveralls.io/repos/github/btcsuite/btcd/badge.svg?branch=master)](https://coveralls.io/github/btcsuite/btcd?branch=master)
+[![ISC License](https://img.shields.io/badge/license-ISC-blue.svg)](http://copyfree.org)
+[![GoDoc](https://img.shields.io/badge/godoc-reference-blue.svg)](https://pkg.go.dev/github.com/btcsuite/btcd)
 
 btcd is an alternative full node bitcoin implementation written in Go (golang).
 
@@ -26,7 +27,7 @@ transactions based on miner requirements ("standard" transactions).
 
 One key difference between btcd and Bitcoin Core is that btcd does *NOT* include
 wallet functionality and this was a very intentional design decision.  See the
-blog entry [here](https://blog.conformal.com/btcd-not-your-moms-bitcoin-daemon)
+blog entry [here](https://web.archive.org/web/20171125143919/https://blog.conformal.com/btcd-not-your-moms-bitcoin-daemon)
 for more details.  This means you can't actually make or receive payments
 directly with btcd.  That functionality is provided by the
 [btcwallet](https://github.com/btcsuite/btcwallet) and
@@ -35,11 +36,9 @@ which are both under active development.
 
 ## Requirements
 
-[Go](http://golang.org) 1.12 or newer.
+[Go](http://golang.org) 1.16 or newer.
 
 ## Installation
-
-#### Windows - MSI Available
 
 https://github.com/btcsuite/btcd/releases
 
@@ -73,10 +72,6 @@ $ GO111MODULE=on go install -v . ./cmd/...
 
 ## Updating
 
-#### Windows
-
-Install a newer MSI
-
 #### Linux/BSD/MacOSX/POSIX - Build from Source
 
 - Run the following commands to update btcd, all dependencies, and install it:
@@ -93,10 +88,6 @@ btcd has several configuration options available to tweak how it runs, but all
 of the basic operations described in the intro section work with zero
 configuration.
 
-#### Windows (Installed from MSI)
-
-Launch btcd from your Start menu.
-
 #### Linux/BSD/POSIX/Source
 
 ```bash
@@ -105,9 +96,9 @@ $ ./btcd
 
 ## IRC
 
-- irc.freenode.net
+- irc.libera.chat
 - channel #btcd
-- [webchat](https://webchat.freenode.net/?channels=btcd)
+- [webchat](https://web.libera.chat/gamja/?channels=btcd)
 
 ## Issue Tracker
 

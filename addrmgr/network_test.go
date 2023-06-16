@@ -7,6 +7,7 @@ package addrmgr_test
 import (
 	"net"
 	"testing"
+	"time"
 
 	"github.com/btcsuite/btcd/addrmgr"
 	"github.com/btcsuite/btcd/wire"
@@ -136,7 +137,10 @@ func TestIPTypes(t *testing.T) {
 			t.Errorf("IsValid %s\n got: %v want: %v", test.in.IP, rv, test.valid)
 		}
 
-		if rv := addrmgr.IsRoutable(&test.in); rv != test.routable {
+		currentNa := wire.NetAddressV2FromBytes(
+			time.Now(), test.in.Services, test.in.IP, test.in.Port,
+		)
+		if rv := addrmgr.IsRoutable(currentNa); rv != test.routable {
 			t.Errorf("IsRoutable %s\n got: %v want: %v", test.in.IP, rv, test.routable)
 		}
 	}
@@ -192,8 +196,10 @@ func TestGroupKey(t *testing.T) {
 
 	for i, test := range tests {
 		nip := net.ParseIP(test.ip)
-		na := *wire.NewNetAddressIPPort(nip, 8333, wire.SFNodeNetwork)
-		if key := addrmgr.GroupKey(&na); key != test.expected {
+		na := wire.NetAddressV2FromBytes(
+			time.Now(), wire.SFNodeNetwork, nip, 8333,
+		)
+		if key := addrmgr.GroupKey(na); key != test.expected {
 			t.Errorf("TestGroupKey #%d (%s): unexpected group key "+
 				"- got '%s', want '%s'", i, test.name,
 				key, test.expected)

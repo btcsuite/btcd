@@ -15,7 +15,7 @@ import (
 	"time"
 
 	rpc "github.com/btcsuite/btcd/rpcclient"
-	"github.com/btcsuite/btcutil"
+	"github.com/btcsuite/btcd/btcutil"
 )
 
 // nodeConfig contains all the args, and data required to launch a btcd process
@@ -41,10 +41,18 @@ type nodeConfig struct {
 }
 
 // newConfig returns a newConfig with all default values.
-func newConfig(prefix, certFile, keyFile string, extra []string) (*nodeConfig, error) {
-	btcdPath, err := btcdExecutablePath()
-	if err != nil {
-		btcdPath = "btcd"
+func newConfig(prefix, certFile, keyFile string, extra []string,
+	customExePath string) (*nodeConfig, error) {
+
+	var btcdPath string
+	if customExePath != "" {
+		btcdPath = customExePath
+	} else {
+		var err error
+		btcdPath, err = btcdExecutablePath()
+		if err != nil {
+			btcdPath = "btcd"
+		}
 	}
 
 	a := &nodeConfig{

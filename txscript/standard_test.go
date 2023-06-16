@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2017 The btcsuite developers
+// Copyright (c) 2013-2020 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -7,12 +7,13 @@ package txscript
 import (
 	"bytes"
 	"encoding/hex"
+	"errors"
 	"reflect"
 	"testing"
 
+	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil"
 )
 
 // mustParseShortForm parses the passed short form script and returns the
@@ -62,6 +63,20 @@ func newAddressPubKeyHash(pkHash []byte) btcutil.Address {
 // test source code.
 func newAddressScriptHash(scriptHash []byte) btcutil.Address {
 	addr, err := btcutil.NewAddressScriptHashFromHash(scriptHash,
+		&chaincfg.MainNetParams)
+	if err != nil {
+		panic("invalid script hash in test source")
+	}
+
+	return addr
+}
+
+// newAddressTaproot returns a new btcutil.AddressTaproot from the
+// provided hash.  It panics if an error occurs.  This is only used in the tests
+// as a helper since the only way it can fail is if there is an error in the
+// test source code.
+func newAddressTaproot(scriptHash []byte) btcutil.Address {
+	addr, err := btcutil.NewAddressTaproot(scriptHash,
 		&chaincfg.MainNetParams)
 	if err != nil {
 		panic("invalid script hash in test source")
@@ -310,8 +325,16 @@ func TestExtractPkScriptAddrs(t *testing.T) {
 			reqSigs: 1,
 			class:   MultiSigTy,
 		},
-		// from real tx: 691dd277dc0e90a462a3d652a1171686de49cf19067cd33c7df0392833fb986a, vout 44
-		// invalid public keys
+		{
+			name: "v1 p2tr witness-script-hash",
+			script: hexToBytes("51201a82f7457a9ba6ab1074e9f50" +
+				"053eefc637f8b046e389b636766bdc7d1f676f8"),
+			addrs: []btcutil.Address{newAddressTaproot(
+				hexToBytes("1a82f7457a9ba6ab1074e9f50053eefc6" +
+					"37f8b046e389b636766bdc7d1f676f8"))},
+			reqSigs: 1,
+			class:   WitnessV1TaprootTy,
+		},
 		{
 			name: "1 of 3 multisig with invalid pubkeys 2",
 			script: hexToBytes("514134633365633235396337346461636" +
@@ -636,6 +659,27 @@ func TestPayToAddrScript(t *testing.T) {
 			err)
 	}
 
+	p2wsh, err := btcutil.NewAddressWitnessScriptHash(hexToBytes("e981bd992a43650657"+
+		"d705ef7a30b2adc75a927ed42a4cf6b3da0f865a475fb4"), &chaincfg.MainNetParams)
+	if err != nil {
+		t.Fatalf("Unable to create p2wsh address: %v",
+			err)
+	}
+
+	p2tr, err := btcutil.NewAddressTaproot(hexToBytes("3a8e170b546c3b122ab9c175e"+
+		"ff36fb344db2684fe96497eb51b440e75232709"), &chaincfg.MainNetParams)
+	if err != nil {
+		t.Fatalf("Unable to create p2tr address: %v",
+			err)
+	}
+
+	p2wpkh, err := btcutil.NewAddressWitnessPubKeyHash(hexToBytes("748e50366adb8"+
+		"ae4b0255e406a28f99d24b73cbc"), &chaincfg.MainNetParams)
+	if err != nil {
+		t.Fatalf("Unable to create p2wpkh address: %v",
+			err)
+	}
+
 	// Errors used in the tests below defined here for convenience and to
 	// keep the horizontal test size shorter.
 	errUnsupportedAddress := scriptError(ErrUnsupportedAddress, "")
@@ -682,11 +726,34 @@ func TestPayToAddrScript(t *testing.T) {
 				"CHECKSIG",
 			nil,
 		},
+		// pay-to-witness-script-hash address on mainnet.
+		{
+			p2wsh,
+			"OP_0 DATA_32 0xe981bd992a43650657d705ef7a30b2adc75a927ed" +
+				"42a4cf6b3da0f865a475fb4",
+			nil,
+		},
+		// pay-to-taproot address on mainnet.
+		{
+			p2tr,
+			"OP_1 DATA_32 0x3a8e170b546c3b122ab9c175eff36fb344db2684" +
+				"fe96497eb51b440e75232709",
+			nil,
+		},
+		// pay-to-witness-pubkey-hash address on mainnet.
+		{
+			p2wpkh,
+			"OP_0 DATA_20 0x748e50366adb8ae4b0255e406a28f99d24b73cbc",
+			nil,
+		},
 
 		// Supported address types with nil pointers.
 		{(*btcutil.AddressPubKeyHash)(nil), "", errUnsupportedAddress},
 		{(*btcutil.AddressScriptHash)(nil), "", errUnsupportedAddress},
 		{(*btcutil.AddressPubKey)(nil), "", errUnsupportedAddress},
+		{(*btcutil.AddressWitnessPubKeyHash)(nil), "", errUnsupportedAddress},
+		{(*btcutil.AddressWitnessScriptHash)(nil), "", errUnsupportedAddress},
+		{(*btcutil.AddressTaproot)(nil), "", errUnsupportedAddress},
 
 		// Unsupported address type.
 		{&bogusAddress{}, "", errUnsupportedAddress},
@@ -831,7 +898,7 @@ func TestCalcMultiSigStats(t *testing.T) {
 			name: "short script",
 			script: "0x046708afdb0fe5548271967f1a67130b7105cd6a828" +
 				"e03909a67962e0ea1f61d",
-			err: scriptError(ErrMalformedPush, ""),
+			err: scriptError(ErrNotMultisigScript, ""),
 		},
 		{
 			name: "stack underflow",
@@ -842,11 +909,7 @@ func TestCalcMultiSigStats(t *testing.T) {
 		},
 		{
 			name: "multisig script",
-			script: "0 DATA_72 0x30450220106a3e4ef0b51b764a2887226" +
-				"2ffef55846514dacbdcbbdd652c849d395b4384022100" +
-				"e03ae554c3cbb40600d31dd46fc33f25e47bf8525b1fe" +
-				"07282e3b6ecb5f3bb2801 CODESEPARATOR 1 DATA_33 " +
-				"0x0232abdc893e7f0631364d7fd01cb33d24da45329a0" +
+			script: "1 DATA_33 0x0232abdc893e7f0631364d7fd01cb33d24da45329a0" +
 				"0357b3a7886211ab414d55a 1 CHECKMULTISIG",
 			err: nil,
 		},
@@ -1211,5 +1274,42 @@ func TestNullDataScript(t *testing.T) {
 				test.class)
 			continue
 		}
+	}
+}
+
+// TestNewScriptClass tests whether NewScriptClass returns a valid ScriptClass.
+func TestNewScriptClass(t *testing.T) {
+	tests := []struct {
+		name       string
+		scriptName string
+		want       *ScriptClass
+		wantErr    error
+	}{
+		{
+			name:       "NewScriptClass - ok",
+			scriptName: NullDataTy.String(),
+			want: func() *ScriptClass {
+				s := NullDataTy
+				return &s
+			}(),
+		},
+		{
+			name:       "NewScriptClass - invalid",
+			scriptName: "foo",
+			wantErr:    ErrUnsupportedScriptType,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := NewScriptClass(tt.scriptName)
+			if err != nil && !errors.Is(err, tt.wantErr) {
+				t.Errorf("NewScriptClass() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("NewScriptClass() got = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }

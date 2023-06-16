@@ -15,12 +15,12 @@ import (
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/blockchain/indexers"
 	"github.com/btcsuite/btcd/btcjson"
+	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/mining"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil"
 )
 
 const (
@@ -927,7 +927,7 @@ func (mp *TxPool) validateReplacement(tx *btcutil.Tx,
 func (mp *TxPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit, rejectDupOrphans bool) ([]*chainhash.Hash, *TxDesc, error) {
 	txHash := tx.Hash()
 
-	// If a transaction has iwtness data, and segwit isn't active yet, If
+	// If a transaction has witness data, and segwit isn't active yet, If
 	// segwit isn't active yet, then we won't accept it into the mempool as
 	// it can't be mined yet.
 	if tx.MsgTx().HasWitness() {
@@ -937,8 +937,14 @@ func (mp *TxPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit, rejec
 		}
 
 		if !segwitActive {
+			simnetHint := ""
+			if mp.cfg.ChainParams.Net == wire.SimNet {
+				bestHeight := mp.cfg.BestHeight()
+				simnetHint = fmt.Sprintf(" (The threshold for segwit activation is 300 blocks on simnet, "+
+					"current best height is %d)", bestHeight)
+			}
 			str := fmt.Sprintf("transaction %v has witness data, "+
-				"but segwit isn't active yet", txHash)
+				"but segwit isn't active yet%s", txHash, simnetHint)
 			return nil, nil, txRuleError(wire.RejectNonstandard, str)
 		}
 	}
@@ -983,7 +989,7 @@ func (mp *TxPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit, rejec
 	// Don't allow non-standard transactions if the network parameters
 	// forbid their acceptance.
 	if !mp.cfg.Policy.AcceptNonStd {
-		err = checkTransactionStandard(tx, nextBlockHeight,
+		err = CheckTransactionStandard(tx, nextBlockHeight,
 			medianTimePast, mp.cfg.Policy.MinRelayTxFee,
 			mp.cfg.Policy.MaxTxVersion)
 		if err != nil {
@@ -1026,8 +1032,8 @@ func (mp *TxPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit, rejec
 		return nil, nil, err
 	}
 
-	// Don't allow the transaction if it exists in the main chain and is not
-	// not already fully spent.
+	// Don't allow the transaction if it exists in the main chain and is
+	// already fully spent.
 	prevOut := wire.OutPoint{Hash: *txHash}
 	for txOutIdx := range tx.MsgTx().TxOut {
 		prevOut.Index = uint32(txOutIdx)
@@ -1048,7 +1054,7 @@ func (mp *TxPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit, rejec
 		if entry == nil || entry.IsSpent() {
 			// Must make a copy of the hash here since the iterator
 			// is replaced and taking its address directly would
-			// result in all of the entries pointing to the same
+			// result in all the entries pointing to the same
 			// memory location and thus all be the final hash.
 			hashCopy := outpoint.Hash
 			missingParents = append(missingParents, &hashCopy)
@@ -1094,7 +1100,7 @@ func (mp *TxPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit, rejec
 		if err != nil {
 			// Attempt to extract a reject code from the error so
 			// it can be retained.  When not possible, fall back to
-			// a non standard error.
+			// a non-standard error.
 			rejectCode, found := extractRejectCode(err)
 			if !found {
 				rejectCode = wire.RejectNonstandard
@@ -1137,7 +1143,7 @@ func (mp *TxPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit, rejec
 	// calculated below on its own would encourage several small
 	// transactions to avoid fees rather than one single larger transaction
 	// which is more desirable.  Therefore, as long as the size of the
-	// transaction does not exceeed 1000 less than the reserved space for
+	// transaction does not exceed 1000 less than the reserved space for
 	// high-priority transactions, don't require a fee for it.
 	serializedSize := GetTxVirtualSize(tx)
 	minFee := calcMinRequiredTxRelayFee(serializedSize,
@@ -1188,7 +1194,7 @@ func (mp *TxPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit, rejec
 			mp.cfg.Policy.FreeTxRelayLimit*10*1000)
 	}
 
-	// If the transaction has any conflicts and we've made it this far, then
+	// If the transaction has any conflicts, and we've made it this far, then
 	// we're processing a potential replacement.
 	var conflicts map[chainhash.Hash]*btcutil.Tx
 	if isReplacement {
@@ -1360,7 +1366,7 @@ func (mp *TxPool) ProcessOrphans(acceptedTx *btcutil.Tx) []*TxDesc {
 //
 // It returns a slice of transactions added to the mempool.  When the
 // error is nil, the list will include the passed transaction itself along
-// with any additional orphan transaactions that were added as a result of
+// with any additional orphan transactions that were added as a result of
 // the passed one being accepted.
 //
 // This function is safe for concurrent access.
@@ -1429,7 +1435,7 @@ func (mp *TxPool) Count() int {
 	return count
 }
 
-// TxHashes returns a slice of hashes for all of the transactions in the memory
+// TxHashes returns a slice of hashes for all the transactions in the memory
 // pool.
 //
 // This function is safe for concurrent access.
@@ -1482,7 +1488,7 @@ func (mp *TxPool) MiningDescs() []*mining.TxDesc {
 	return descs
 }
 
-// RawMempoolVerbose returns all of the entries in the mempool as a fully
+// RawMempoolVerbose returns all the entries in the mempool as a fully
 // populated btcjson result.
 //
 // This function is safe for concurrent access.

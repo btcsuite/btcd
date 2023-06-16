@@ -275,6 +275,22 @@ func performServiceCommand(command string) error {
 // returned to the caller so the application can determine whether to exit (when
 // running as a service) or launch in normal interactive mode.
 func serviceMain() (bool, error) {
+	// Don't run as a service if the user explicitly requested it. This is
+	// needed to run btcd on Windows in CI environments like Travis.
+	// We can't use the config struct to access the value because that's not
+	// parsed yet. But we add the flag to the struct anyway so the parser
+	// won't complain about it later.
+	noService := false
+	for _, arg := range os.Args {
+		if arg == "--nowinservice" {
+			noService = true
+			break
+		}
+	}
+	if noService {
+		return false, nil
+	}
+
 	// Don't run as a service if we're running interactively (or that can't
 	// be determined due to an error).
 	isInteractive, err := svc.IsAnInteractiveSession()

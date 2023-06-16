@@ -49,7 +49,7 @@ func syncMempools(nodes []*Harness) error {
 
 retry:
 	for !poolsMatch {
-		firstPool, err := nodes[0].Node.GetRawMempool()
+		firstPool, err := nodes[0].Client.GetRawMempool()
 		if err != nil {
 			return err
 		}
@@ -58,7 +58,7 @@ retry:
 		// first node, then we're done. Otherwise, drop back to the top
 		// of the loop and retry after a short wait period.
 		for _, node := range nodes[1:] {
-			nodePool, err := node.Node.GetRawMempool()
+			nodePool, err := node.Client.GetRawMempool()
 			if err != nil {
 				return err
 			}
@@ -84,7 +84,7 @@ retry:
 		var prevHash *chainhash.Hash
 		var prevHeight int32
 		for _, node := range nodes {
-			blockHash, blockHeight, err := node.Node.GetBestBlock()
+			blockHash, blockHeight, err := node.Client.GetBestBlock()
 			if err != nil {
 				return err
 			}
@@ -108,24 +108,24 @@ retry:
 // therefore in the case of disconnects, "from" will attempt to reestablish a
 // connection to the "to" harness.
 func ConnectNode(from *Harness, to *Harness) error {
-	peerInfo, err := from.Node.GetPeerInfo()
+	peerInfo, err := from.Client.GetPeerInfo()
 	if err != nil {
 		return err
 	}
 	numPeers := len(peerInfo)
 
 	targetAddr := to.node.config.listen
-	if err := from.Node.AddNode(targetAddr, rpcclient.ANAdd); err != nil {
+	if err := from.Client.AddNode(targetAddr, rpcclient.ANAdd); err != nil {
 		return err
 	}
 
 	// Block until a new connection has been established.
-	peerInfo, err = from.Node.GetPeerInfo()
+	peerInfo, err = from.Client.GetPeerInfo()
 	if err != nil {
 		return err
 	}
 	for len(peerInfo) <= numPeers {
-		peerInfo, err = from.Node.GetPeerInfo()
+		peerInfo, err = from.Client.GetPeerInfo()
 		if err != nil {
 			return err
 		}

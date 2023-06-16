@@ -13,12 +13,12 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcd/blockchain"
-	"github.com/btcsuite/btcd/btcec"
+	"github.com/btcsuite/btcd/btcec/v2"
+	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil"
 )
 
 // fakeChain is used by the pool harness to provide generated test utxos and
@@ -291,7 +291,7 @@ func newPoolHarness(chainParams *chaincfg.Params) (*poolHarness, []spendableOutp
 	if err != nil {
 		return nil, nil, err
 	}
-	signKey, signPub := btcec.PrivKeyFromBytes(btcec.S256(), keyBytes)
+	signKey, signPub := btcec.PrivKeyFromBytes(keyBytes)
 
 	// Generate associated pay-to-script-hash address and resulting payment
 	// script.
@@ -560,7 +560,7 @@ func TestOrphanReject(t *testing.T) {
 
 		// Ensure no transactions were reported as accepted.
 		if len(acceptedTxns) != 0 {
-			t.Fatal("ProcessTransaction: reported %d accepted "+
+			t.Fatalf("ProcessTransaction: reported %d accepted "+
 				"transactions from failed orphan attempt",
 				len(acceptedTxns))
 		}
@@ -1418,8 +1418,8 @@ func TestAncestorsDescendants(t *testing.T) {
 	// We'll be querying for the ancestors of E. We should expect to see all
 	// of the transactions that it depends on.
 	expectedAncestors := map[chainhash.Hash]struct{}{
-		*a.Hash(): struct{}{}, *b.Hash(): struct{}{},
-		*c.Hash(): struct{}{}, *d.Hash(): struct{}{},
+		*a.Hash(): {}, *b.Hash(): {},
+		*c.Hash(): {}, *d.Hash(): {},
 	}
 	ancestors := ctx.harness.txPool.txAncestors(e, nil)
 	if len(ancestors) != len(expectedAncestors) {
@@ -1436,8 +1436,8 @@ func TestAncestorsDescendants(t *testing.T) {
 	// Then, we'll query for the descendants of A. We should expect to see
 	// all of the transactions that depend on it.
 	expectedDescendants := map[chainhash.Hash]struct{}{
-		*b.Hash(): struct{}{}, *c.Hash(): struct{}{},
-		*d.Hash(): struct{}{}, *e.Hash(): struct{}{},
+		*b.Hash(): {}, *c.Hash(): {},
+		*d.Hash(): {}, *e.Hash(): {},
 	}
 	descendants := ctx.harness.txPool.txDescendants(a, nil)
 	if len(descendants) != len(expectedDescendants) {
@@ -1746,6 +1746,47 @@ func TestRBF(t *testing.T) {
 				}
 
 				return tx, []*btcutil.Tx{parent, child}
+			},
+			err: "",
+		},
+		{
+			// A transaction that doesn't signal replacement, can
+			// be replaced if the parent signals replacement.
+			name: "inherited replacement",
+			setup: func(ctx *testContext) (*btcutil.Tx, []*btcutil.Tx) {
+				coinbase := ctx.addCoinbaseTx(1)
+
+				// Create an initial parent transaction that
+				// marks replacement, we won't be replacing
+				// this directly however.
+				coinbaseOut := txOutToSpendableOut(coinbase, 0)
+				outs := []spendableOutput{coinbaseOut}
+				parent := ctx.addSignedTx(
+					outs, 1, defaultFee, true, false,
+				)
+
+				// Now create a transaction that spends that
+				// parent transaction, which is marked as NOT
+				// being RBF-able.
+				parentOut := txOutToSpendableOut(parent, 0)
+				parentOuts := []spendableOutput{parentOut}
+				childNoReplace := ctx.addSignedTx(
+					parentOuts, 1, defaultFee, false, false,
+				)
+
+				// Now we'll create another transaction that
+				// replaces the *child* only. This should work
+				// as the parent has been marked for RBF, even
+				// though the child hasn't.
+				respendOuts := []spendableOutput{parentOut}
+				childReplace, err := ctx.harness.CreateSignedTx(
+					respendOuts, 1, defaultFee*3, false,
+				)
+				if err != nil {
+					ctx.t.Fatalf("unable to create child tx: %v", err)
+				}
+
+				return childReplace, []*btcutil.Tx{childNoReplace}
 			},
 			err: "",
 		},

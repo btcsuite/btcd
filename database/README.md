@@ -1,9 +1,9 @@
 database
 ========
 
-[![Build Status](http://img.shields.io/travis/btcsuite/btcd.svg)](https://travis-ci.org/btcsuite/btcd)
+[![Build Status](https://github.com/btcsuite/btcd/workflows/Build%20and%20Test/badge.svg)](https://github.com/btcsuite/btcd/actions)
 [![ISC License](http://img.shields.io/badge/license-ISC-blue.svg)](http://copyfree.org)
-[![GoDoc](https://img.shields.io/badge/godoc-reference-blue.svg)](http://godoc.org/github.com/btcsuite/btcd/database)
+[![GoDoc](https://img.shields.io/badge/godoc-reference-blue.svg)](https://pkg.go.dev/github.com/btcsuite/btcd/database)
 
 Package database provides a block and metadata storage database.
 
@@ -42,11 +42,11 @@ $ go get -u github.com/btcsuite/btcd/database
 
 ## Examples
 
-* [Basic Usage Example](http://godoc.org/github.com/btcsuite/btcd/database#example-package--BasicUsage)  
+* [Basic Usage Example](https://pkg.go.dev/github.com/btcsuite/btcd/database#example-package--BasicUsage)  
   Demonstrates creating a new database and using a managed read-write
   transaction to store and retrieve metadata.
 
-* [Block Storage and Retrieval Example](http://godoc.org/github.com/btcsuite/btcd/database#example-package--BlockStorageAndRetrieval)  
+* [Block Storage and Retrieval Example](https://pkg.go.dev/github.com/btcsuite/btcd/database#example-package--BlockStorageAndRetrieval)  
   Demonstrates creating a new database, using a managed read-write transaction
   to store a block, and then using a managed read-only transaction to fetch the
   block.

@@ -5,9 +5,9 @@
 package txscript
 
 import (
+	"bytes"
 	"sync"
 
-	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 )
 
@@ -18,20 +18,23 @@ import (
 // match. In the occasion that two sigHashes collide, the newer sigHash will
 // simply overwrite the existing entry.
 type sigCacheEntry struct {
-	sig    *btcec.Signature
-	pubKey *btcec.PublicKey
+	sig    []byte
+	pubKey []byte
 }
 
-// SigCache implements an ECDSA signature verification cache with a randomized
-// entry eviction policy. Only valid signatures will be added to the cache. The
-// benefits of SigCache are two fold. Firstly, usage of SigCache mitigates a DoS
-// attack wherein an attack causes a victim's client to hang due to worst-case
-// behavior triggered while processing attacker crafted invalid transactions. A
-// detailed description of the mitigated DoS attack can be found here:
+// SigCache implements an Schnorr+ECDSA signature verification cache with a
+// randomized entry eviction policy. Only valid signatures will be added to the
+// cache. The benefits of SigCache are two fold. Firstly, usage of SigCache
+// mitigates a DoS attack wherein an attack causes a victim's client to hang
+// due to worst-case behavior triggered while processing attacker crafted
+// invalid transactions. A detailed description of the mitigated DoS attack can
+// be found here:
 // https://bitslog.wordpress.com/2013/01/23/fixed-bitcoin-vulnerability-explanation-why-the-signature-cache-is-a-dos-protection/.
 // Secondly, usage of the SigCache introduces a signature verification
 // optimization which speeds up the validation of transactions within a block,
 // if they've already been seen and verified within the mempool.
+//
+// TODO(roasbeef): use type params here after Go 1.18
 type SigCache struct {
 	sync.RWMutex
 	validSigs  map[chainhash.Hash]sigCacheEntry
@@ -55,12 +58,12 @@ func NewSigCache(maxEntries uint) *SigCache {
 //
 // NOTE: This function is safe for concurrent access. Readers won't be blocked
 // unless there exists a writer, adding an entry to the SigCache.
-func (s *SigCache) Exists(sigHash chainhash.Hash, sig *btcec.Signature, pubKey *btcec.PublicKey) bool {
+func (s *SigCache) Exists(sigHash chainhash.Hash, sig []byte, pubKey []byte) bool {
 	s.RLock()
 	entry, ok := s.validSigs[sigHash]
 	s.RUnlock()
 
-	return ok && entry.pubKey.IsEqual(pubKey) && entry.sig.IsEqual(sig)
+	return ok && bytes.Equal(entry.pubKey, pubKey) && bytes.Equal(entry.sig, sig)
 }
 
 // Add adds an entry for a signature over 'sigHash' under public key 'pubKey'
@@ -70,7 +73,7 @@ func (s *SigCache) Exists(sigHash chainhash.Hash, sig *btcec.Signature, pubKey *
 //
 // NOTE: This function is safe for concurrent access. Writers will block
 // simultaneous readers until function execution has concluded.
-func (s *SigCache) Add(sigHash chainhash.Hash, sig *btcec.Signature, pubKey *btcec.PublicKey) {
+func (s *SigCache) Add(sigHash chainhash.Hash, sig []byte, pubKey []byte) {
 	s.Lock()
 	defer s.Unlock()
 

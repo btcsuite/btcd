@@ -18,7 +18,7 @@ import (
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/mining"
-	"github.com/btcsuite/btcutil"
+	"github.com/btcsuite/btcd/btcutil"
 )
 
 // TODO incorporate Alex Morcos' modifications to Gavin's initial model
@@ -47,7 +47,7 @@ const (
 
 	bytePerKb = 1000
 
-	btcPerSatoshi = 1E-8
+	btcPerSatoshi = 1e-8
 )
 
 var (
@@ -275,7 +275,16 @@ func (ef *FeeEstimator) RegisterBlock(block *btcutil.Block) error {
 
 		// This shouldn't happen but check just in case to avoid
 		// an out-of-bounds array index later.
-		if blocksToConfirm >= estimateFeeDepth {
+		//
+		// Also check that blocksToConfirm is not negative as this causes
+		// the node to crash on reorgs.  A tx that was observed at height X
+		// might be included in heights less than X because of chain reorgs.
+		// Refer to github.com/btcsuite/btcd/issues/1660 for more information.
+		//
+		// TODO(kcalvinalvin) a better design that doesn't just skip over the
+		// transaction would result in a more accurate fee estimator.  Properly
+		// implement this later.
+		if blocksToConfirm >= estimateFeeDepth || blocksToConfirm < 0 {
 			continue
 		}
 
@@ -563,7 +572,7 @@ func (ef *FeeEstimator) EstimateFee(numBlocks uint32) (BtcPerKilobyte, error) {
 	if numBlocks > estimateFeeDepth {
 		return -1, fmt.Errorf(
 			"can only estimate fees for up to %d blocks from now",
-			estimateFeeBinSize)
+			estimateFeeDepth)
 	}
 
 	// If there are no cached results, generate them.

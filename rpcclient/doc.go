@@ -106,7 +106,7 @@ Some of the commands are extensions specific to a particular RPC server.  For
 example, the DebugLevel call is an extension only provided by btcd (and
 btcwallet passthrough).  Therefore if you call one of these commands against
 an RPC server that doesn't provide them, you will get an unimplemented error
-from the server.  An effort has been made to call out which commmands are
+from the server.  An effort has been made to call out which commands are
 extensions in their documentation.
 
 Also, it is important to realize that btcd intentionally separates the wallet

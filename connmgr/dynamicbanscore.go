@@ -71,7 +71,7 @@ type DynamicBanScore struct {
 func (s *DynamicBanScore) String() string {
 	s.mtx.Lock()
 	r := fmt.Sprintf("persistent %v + transient %v at %v = %v as of now",
-		s.persistent, s.transient, s.lastUnix, s.Int())
+		s.persistent, s.transient, s.lastUnix, s.int(time.Now()))
 	s.mtx.Unlock()
 	return r
 }

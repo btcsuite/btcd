@@ -12,14 +12,15 @@ import (
 	"path/filepath"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/rpcclient"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil"
 )
 
 const (
@@ -34,21 +35,19 @@ const (
 	// BlockVersion is the default block version used when generating
 	// blocks.
 	BlockVersion = 4
+
+	// DefaultMaxConnectionRetries is the default number of times we re-try
+	// to connect to the node after starting it.
+	DefaultMaxConnectionRetries = 20
+
+	// DefaultConnectionRetryTimeout is the default duration we wait between
+	// two connection attempts.
+	DefaultConnectionRetryTimeout = 50 * time.Millisecond
 )
 
 var (
 	// current number of active test nodes.
 	numTestInstances = 0
-
-	// processID is the process ID of the current running process.  It is
-	// used to calculate ports based upon it when launching an rpc
-	// harnesses.  The intent is to allow multiple process to run in
-	// parallel without port collisions.
-	//
-	// It should be noted however that there is still some small probability
-	// that there will be port collisions either due to other processes
-	// running or simply due to the stars aligning on the process IDs.
-	processID = os.Getpid()
 
 	// testInstances is a private package-level slice used to keep track of
 	// all active test harnesses. This global can be used to perform
@@ -58,6 +57,26 @@ var (
 
 	// Used to protest concurrent access to above declared variables.
 	harnessStateMtx sync.RWMutex
+
+	// ListenAddressGenerator is a function that is used to generate two
+	// listen addresses (host:port), one for the P2P listener and one for
+	// the RPC listener. This is exported to allow overwriting of the
+	// default behavior which isn't very concurrency safe (just selecting
+	// a random port can produce collisions and therefore flakes).
+	ListenAddressGenerator = generateListeningAddresses
+
+	// defaultNodePort is the start of the range for listening ports of
+	// harness nodes. Ports are monotonically increasing starting from this
+	// number and are determined by the results of nextAvailablePort().
+	defaultNodePort uint32 = 8333
+
+	// ListenerFormat is the format string that is used to generate local
+	// listener addresses.
+	ListenerFormat = "127.0.0.1:%d"
+
+	// lastPort is the last port determined to be free for use by a new
+	// node. It should be used atomically.
+	lastPort uint32 = defaultNodePort
 )
 
 // HarnessTestCase represents a test-case which utilizes an instance of the
@@ -78,15 +97,23 @@ type Harness struct {
 	// to.
 	ActiveNet *chaincfg.Params
 
-	Node     *rpcclient.Client
-	node     *node
-	handlers *rpcclient.NotificationHandlers
+	// MaxConnRetries is the maximum number of times we re-try to connect to
+	// the node after starting it.
+	MaxConnRetries int
+
+	// ConnectionRetryTimeout is the duration we wait between two connection
+	// attempts.
+	ConnectionRetryTimeout time.Duration
+
+	Client      *rpcclient.Client
+	BatchClient *rpcclient.Client
+	node        *node
+	handlers    *rpcclient.NotificationHandlers
 
 	wallet *memWallet
 
-	testNodeDir    string
-	maxConnRetries int
-	nodeNum        int
+	testNodeDir string
+	nodeNum     int
 
 	sync.Mutex
 }
@@ -94,11 +121,12 @@ type Harness struct {
 // New creates and initializes new instance of the rpc test harness.
 // Optionally, websocket handlers and a specified configuration may be passed.
 // In the case that a nil config is passed, a default configuration will be
-// used.
+// used. If a custom btcd executable is specified, it will be used to start the
+// harness node. Otherwise a new binary is built on demand.
 //
 // NOTE: This function is safe for concurrent access.
 func New(activeNet *chaincfg.Params, handlers *rpcclient.NotificationHandlers,
-	extraArgs []string) (*Harness, error) {
+	extraArgs []string, customExePath string) (*Harness, error) {
 
 	harnessStateMtx.Lock()
 	defer harnessStateMtx.Unlock()
@@ -144,13 +172,15 @@ func New(activeNet *chaincfg.Params, handlers *rpcclient.NotificationHandlers,
 	miningAddr := fmt.Sprintf("--miningaddr=%s", wallet.coinbaseAddr)
 	extraArgs = append(extraArgs, miningAddr)
 
-	config, err := newConfig("rpctest", certFile, keyFile, extraArgs)
+	config, err := newConfig(
+		"rpctest", certFile, keyFile, extraArgs, customExePath,
+	)
 	if err != nil {
 		return nil, err
 	}
 
 	// Generate p2p+rpc listening addresses.
-	config.listen, config.rpcListen = generateListeningAddresses()
+	config.listen, config.rpcListen = ListenAddressGenerator()
 
 	// Create the testing node bounded to the simnet.
 	node, err := newNode(config, nodeTestData)
@@ -190,13 +220,14 @@ func New(activeNet *chaincfg.Params, handlers *rpcclient.NotificationHandlers,
 	}
 
 	h := &Harness{
-		handlers:       handlers,
-		node:           node,
-		maxConnRetries: 20,
-		testNodeDir:    nodeTestData,
-		ActiveNet:      activeNet,
-		nodeNum:        nodeNum,
-		wallet:         wallet,
+		handlers:               handlers,
+		node:                   node,
+		MaxConnRetries:         DefaultMaxConnectionRetries,
+		ConnectionRetryTimeout: DefaultConnectionRetryTimeout,
+		testNodeDir:            nodeTestData,
+		ActiveNet:              activeNet,
+		nodeNum:                nodeNum,
+		wallet:                 wallet,
 	}
 
 	// Track this newly created test instance within the package level
@@ -228,13 +259,13 @@ func (h *Harness) SetUp(createTestChain bool, numMatureOutputs uint32) error {
 	// Filter transactions that pay to the coinbase associated with the
 	// wallet.
 	filterAddrs := []btcutil.Address{h.wallet.coinbaseAddr}
-	if err := h.Node.LoadTxFilter(true, filterAddrs, nil); err != nil {
+	if err := h.Client.LoadTxFilter(true, filterAddrs, nil); err != nil {
 		return err
 	}
 
 	// Ensure btcd properly dispatches our registered call-back for each new
 	// block. Otherwise, the memWallet won't function properly.
-	if err := h.Node.NotifyBlocks(); err != nil {
+	if err := h.Client.NotifyBlocks(); err != nil {
 		return err
 	}
 
@@ -243,7 +274,7 @@ func (h *Harness) SetUp(createTestChain bool, numMatureOutputs uint32) error {
 	if createTestChain && numMatureOutputs != 0 {
 		numToGenerate := (uint32(h.ActiveNet.CoinbaseMaturity) +
 			numMatureOutputs)
-		_, err := h.Node.Generate(numToGenerate)
+		_, err := h.Client.Generate(numToGenerate)
 		if err != nil {
 			return err
 		}
@@ -251,7 +282,7 @@ func (h *Harness) SetUp(createTestChain bool, numMatureOutputs uint32) error {
 
 	// Block until the wallet has fully synced up to the tip of the main
 	// chain.
-	_, height, err := h.Node.GetBestBlock()
+	_, height, err := h.Client.GetBestBlock()
 	if err != nil {
 		return err
 	}
@@ -272,8 +303,12 @@ func (h *Harness) SetUp(createTestChain bool, numMatureOutputs uint32) error {
 //
 // This function MUST be called with the harness state mutex held (for writes).
 func (h *Harness) tearDown() error {
-	if h.Node != nil {
-		h.Node.Shutdown()
+	if h.Client != nil {
+		h.Client.Shutdown()
+	}
+
+	if h.BatchClient != nil {
+		h.BatchClient.Shutdown()
 	}
 
 	if err := h.node.shutdown(); err != nil {
@@ -308,24 +343,38 @@ func (h *Harness) TearDown() error {
 // we're not able to establish a connection, this function returns with an
 // error.
 func (h *Harness) connectRPCClient() error {
-	var client *rpcclient.Client
+	var client, batchClient *rpcclient.Client
 	var err error
 
 	rpcConf := h.node.config.rpcConnConfig()
-	for i := 0; i < h.maxConnRetries; i++ {
-		if client, err = rpcclient.New(&rpcConf, h.handlers); err != nil {
-			time.Sleep(time.Duration(i) * 50 * time.Millisecond)
-			continue
+	batchConf := h.node.config.rpcConnConfig()
+	batchConf.HTTPPostMode = true
+	for i := 0; i < h.MaxConnRetries; i++ {
+		fail := false
+		if client == nil {
+			if client, err = rpcclient.New(&rpcConf, h.handlers); err != nil {
+				time.Sleep(time.Duration(i) * h.ConnectionRetryTimeout)
+				fail = true
+			}
 		}
-		break
+		if batchClient == nil {
+			if batchClient, err = rpcclient.NewBatch(&batchConf); err != nil {
+				time.Sleep(time.Duration(i) * h.ConnectionRetryTimeout)
+				fail = true
+			}
+		}
+		if !fail {
+			break
+		}
 	}
 
-	if client == nil {
+	if client == nil || batchClient == nil {
 		return fmt.Errorf("connection timeout")
 	}
 
-	h.Node = client
+	h.Client = client
 	h.wallet.SetRPCClient(client)
+	h.BatchClient = batchClient
 	return nil
 }
 
@@ -447,11 +496,11 @@ func (h *Harness) GenerateAndSubmitBlockWithCustomCoinbaseOutputs(
 		blockVersion = BlockVersion
 	}
 
-	prevBlockHash, prevBlockHeight, err := h.Node.GetBestBlock()
+	prevBlockHash, prevBlockHeight, err := h.Client.GetBestBlock()
 	if err != nil {
 		return nil, err
 	}
-	mBlock, err := h.Node.GetBlock(prevBlockHash)
+	mBlock, err := h.Client.GetBlock(prevBlockHash)
 	if err != nil {
 		return nil, err
 	}
@@ -466,30 +515,47 @@ func (h *Harness) GenerateAndSubmitBlockWithCustomCoinbaseOutputs(
 	}
 
 	// Submit the block to the simnet node.
-	if err := h.Node.SubmitBlock(newBlock, nil); err != nil {
+	if err := h.Client.SubmitBlock(newBlock, nil); err != nil {
 		return nil, err
 	}
 
 	return newBlock, nil
 }
 
-// generateListeningAddresses returns two strings representing listening
-// addresses designated for the current rpc test. If there haven't been any
-// test instances created, the default ports are used. Otherwise, in order to
-// support multiple test nodes running at once, the p2p and rpc port are
-// incremented after each initialization.
+// generateListeningAddresses is a function that returns two listener
+// addresses with unique ports and should be used to overwrite rpctest's
+// default generator which is prone to use colliding ports.
 func generateListeningAddresses() (string, string) {
-	localhost := "127.0.0.1"
+	return fmt.Sprintf(ListenerFormat, NextAvailablePort()),
+		fmt.Sprintf(ListenerFormat, NextAvailablePort())
+}
 
-	portString := func(minPort, maxPort int) string {
-		port := minPort + numTestInstances + ((20 * processID) %
-			(maxPort - minPort))
-		return strconv.Itoa(port)
+// NextAvailablePort returns the first port that is available for listening by
+// a new node. It panics if no port is found and the maximum available TCP port
+// is reached.
+func NextAvailablePort() int {
+	port := atomic.AddUint32(&lastPort, 1)
+	for port < 65535 {
+		// If there are no errors while attempting to listen on this
+		// port, close the socket and return it as available. While it
+		// could be the case that some other process picks up this port
+		// between the time the socket is closed and it's reopened in
+		// the harness node, in practice in CI servers this seems much
+		// less likely than simply some other process already being
+		// bound at the start of the tests.
+		addr := fmt.Sprintf(ListenerFormat, port)
+		l, err := net.Listen("tcp4", addr)
+		if err == nil {
+			err := l.Close()
+			if err == nil {
+				return int(port)
+			}
+		}
+		port = atomic.AddUint32(&lastPort, 1)
 	}
 
-	p2p := net.JoinHostPort(localhost, portString(minPeerPort, maxPeerPort))
-	rpc := net.JoinHostPort(localhost, portString(minRPCPort, maxRPCPort))
-	return p2p, rpc
+	// No ports available? Must be a mistake.
+	panic("no ports available for listening")
 }
 
 // baseDir is the directory path of the temp directory for all rpctest files.

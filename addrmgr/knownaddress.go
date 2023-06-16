@@ -5,6 +5,7 @@
 package addrmgr
 
 import (
+	"sync"
 	"time"
 
 	"github.com/btcsuite/btcd/wire"
@@ -13,8 +14,9 @@ import (
 // KnownAddress tracks information about a known network address that is used
 // to determine how viable an address is.
 type KnownAddress struct {
-	na          *wire.NetAddress
-	srcAddr     *wire.NetAddress
+	mtx         sync.RWMutex // na and lastattempt
+	na          *wire.NetAddressV2
+	srcAddr     *wire.NetAddressV2
 	attempts    int
 	lastattempt time.Time
 	lastsuccess time.Time
@@ -22,21 +24,30 @@ type KnownAddress struct {
 	refs        int // reference count of new buckets
 }
 
-// NetAddress returns the underlying wire.NetAddress associated with the
+// NetAddress returns the underlying wire.NetAddressV2 associated with the
 // known address.
-func (ka *KnownAddress) NetAddress() *wire.NetAddress {
+func (ka *KnownAddress) NetAddress() *wire.NetAddressV2 {
+	ka.mtx.RLock()
+	defer ka.mtx.RUnlock()
 	return ka.na
 }
 
 // LastAttempt returns the last time the known address was attempted.
 func (ka *KnownAddress) LastAttempt() time.Time {
+	ka.mtx.RLock()
+	defer ka.mtx.RUnlock()
 	return ka.lastattempt
 }
 
 // Services returns the services supported by the peer with the known address.
 func (ka *KnownAddress) Services() wire.ServiceFlag {
+	ka.mtx.RLock()
+	defer ka.mtx.RUnlock()
 	return ka.na.Services
 }
+
+// The unexported methods, chance and isBad, are used from within AddrManager
+// where KnownAddress field access is synchronized via it's own Mutex.
 
 // chance returns the selection probability for a known address.  The priority
 // depends upon how recently the address has been seen, how recently it was last

@@ -5,10 +5,11 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/btcsuite/btcd/btcec"
+	"github.com/btcsuite/btcd/btcec/v2"
+	"github.com/btcsuite/btcd/btcec/v2/ecdsa"
+	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil"
 	"golang.org/x/crypto/ripemd160"
 )
 
@@ -20,7 +21,7 @@ const (
 	//   Signature hash type (1 byte)
 	//   Public key length (1 byte)
 	//   Public key (33 byte)
-	minPubKeyHashSigScriptLen = 1 + btcec.MinSigLen + 1 + 1 + 33
+	minPubKeyHashSigScriptLen = 1 + ecdsa.MinSigLen + 1 + 1 + 33
 
 	// maxPubKeyHashSigScriptLen is the maximum length of a signature script
 	// that spends a P2PKH output. The length is composed of the following:
@@ -46,6 +47,9 @@ const (
 
 	// witnessV0ScriptHashLen is the length of a P2WSH script.
 	witnessV0ScriptHashLen = 34
+
+	// witnessV1TaprootLen is the length of a P2TR script.
+	witnessV1TaprootLen = 34
 
 	// maxLen is the maximum script length supported by ParsePkScript.
 	maxLen = witnessV0ScriptHashLen
@@ -99,7 +103,7 @@ func ParsePkScript(pkScript []byte) (PkScript, error) {
 func isSupportedScriptType(class ScriptClass) bool {
 	switch class {
 	case PubKeyHashTy, WitnessV0PubKeyHashTy, ScriptHashTy,
-		WitnessV0ScriptHashTy:
+		WitnessV0ScriptHashTy, WitnessV1TaprootTy:
 		return true
 	default:
 		return false
@@ -131,6 +135,10 @@ func (s PkScript) Script() []byte {
 	case WitnessV0ScriptHashTy:
 		script = make([]byte, witnessV0ScriptHashLen)
 		copy(script, s.script[:witnessV0ScriptHashLen])
+
+	case WitnessV1TaprootTy:
+		script = make([]byte, witnessV1TaprootLen)
+		copy(script, s.script[:witnessV1TaprootLen])
 
 	default:
 		// Unsupported script type.
@@ -211,11 +219,12 @@ func computeNonWitnessPkScript(sigScript []byte) (PkScript, error) {
 		// The redeem script will always be the last data push of the
 		// signature script, so we'll parse the script into opcodes to
 		// obtain it.
-		parsedOpcodes, err := parseScript(sigScript)
+		const scriptVersion = 0
+		err := checkScriptParses(scriptVersion, sigScript)
 		if err != nil {
 			return PkScript{}, err
 		}
-		redeemScript := parsedOpcodes[len(parsedOpcodes)-1].data
+		redeemScript := finalOpcodeData(scriptVersion, sigScript)
 
 		scriptHash := hash160(redeemScript)
 		script, err := payToScriptHashScript(scriptHash)

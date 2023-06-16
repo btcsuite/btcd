@@ -162,10 +162,9 @@ var helpDescsEnUS = map[string]string{
 	// GetBlockCmd help.
 	"getblock--synopsis":   "Returns information about a block given its hash.",
 	"getblock-hash":        "The hash of the block",
-	"getblock-verbose":     "Specifies the block is returned as a JSON object instead of hex-encoded string",
-	"getblock-verbosetx":   "Specifies that each transaction is returned as a JSON object and only applies if the verbose flag is true (btcd extension)",
-	"getblock--condition0": "verbose=false",
-	"getblock--condition1": "verbose=true",
+	"getblock-verbosity":   "Specifies whether the block data should be returned as a hex-encoded string (0), as parsed data with a slice of TXIDs (1), or as parsed data with parsed transaction data (2) ",
+	"getblock--condition0": "verbosity=0",
+	"getblock--condition1": "verbosity=1",
 	"getblock--result0":    "Hex-encoded bytes of the serialized block",
 
 	// GetBlockChainInfoCmd help.
@@ -182,6 +181,8 @@ var helpDescsEnUS = map[string]string{
 	"getblockchaininforesult-pruned":               "A bool that indicates if the node is pruned or not",
 	"getblockchaininforesult-pruneheight":          "The lowest block retained in the current pruned chain",
 	"getblockchaininforesult-chainwork":            "The total cumulative work in the best chain",
+	"getblockchaininforesult-size_on_disk":         "The estimated size of the block and undo files on disk",
+	"getblockchaininforesult-initialblockdownload": "Estimate of whether this node is in Initial Block Download mode",
 	"getblockchaininforesult-softforks":            "The status of the super-majority soft-forks",
 	"getblockchaininforesult-unifiedsoftforks":     "The status of the super-majority soft-forks used by bitcoind on or after v0.19.0",
 
@@ -244,8 +245,8 @@ var helpDescsEnUS = map[string]string{
 	"getblockverboseresult-version":           "The block version",
 	"getblockverboseresult-versionHex":        "The block version in hexadecimal",
 	"getblockverboseresult-merkleroot":        "Root hash of the merkle tree",
-	"getblockverboseresult-tx":                "The transaction hashes (only when verbosetx=false)",
-	"getblockverboseresult-rawtx":             "The transactions as JSON objects (only when verbosetx=true)",
+	"getblockverboseresult-tx":                "The transaction hashes (only when verbosity=1)",
+	"getblockverboseresult-rawtx":             "The transactions as JSON objects (only when verbosity=2)",
 	"getblockverboseresult-time":              "The block time in seconds since 1 Jan 1970 GMT",
 	"getblockverboseresult-nonce":             "The block nonce",
 	"getblockverboseresult-bits":              "The bits which represent the block difficulty",
@@ -296,6 +297,7 @@ var helpDescsEnUS = map[string]string{
 	"templaterequest-target":       "The desired target for the block template (this parameter is ignored)",
 	"templaterequest-data":         "Hex-encoded block data (only for mode=proposal)",
 	"templaterequest-workid":       "The server provided workid if provided in block template (not applicable)",
+	"templaterequest-rules":        "Specific block rules that are to be enforced e.g. '[\"segwit\"]",
 
 	// GetBlockTemplateResultTx help.
 	"getblocktemplateresulttx-data":    "Hex-encoded transaction data (byte-for-byte)",
@@ -303,6 +305,7 @@ var helpDescsEnUS = map[string]string{
 	"getblocktemplateresulttx-depends": "Other transactions before this one (by 1-based index in the 'transactions'  list) that must be present in the final block if this one is",
 	"getblocktemplateresulttx-fee":     "Difference in value between transaction inputs and outputs (in Satoshi)",
 	"getblocktemplateresulttx-sigops":  "Total number of signature operations as counted for purposes of block limits",
+	"getblocktemplateresulttx-txid":    "The transaction id, can be different from hash.",
 	"getblocktemplateresulttx-weight":  "The weight of the transaction",
 
 	// GetBlockTemplateResultAux help.
@@ -453,6 +456,17 @@ var helpDescsEnUS = map[string]string{
 	"getnettotalsresult-totalbytessent": "Total bytes sent",
 	"getnettotalsresult-timemillis":     "Number of milliseconds since 1 Jan 1970 GMT",
 
+	// GetNodeAddressesResult help.
+	"getnodeaddressesresult-time":     "Timestamp in seconds since epoch (Jan 1 1970 GMT) keeping track of when the node was last seen",
+	"getnodeaddressesresult-services": "The services offered",
+	"getnodeaddressesresult-address":  "The address of the node",
+	"getnodeaddressesresult-port":     "The port of the node",
+
+	// GetNodeAddressesCmd help.
+	"getnodeaddresses--synopsis": "Return known addresses which can potentially be used to find new nodes in the network",
+	"getnodeaddresses-count":     "How many addresses to return. Limited to the smaller of 2500 or 23% of all known addresses",
+	"getnodeaddresses--result0":  "List of node addresses",
+
 	// GetPeerInfoResult help.
 	"getpeerinforesult-id":             "A unique node ID",
 	"getpeerinforesult-addr":           "The ip address and port of the peer",
@@ -514,7 +528,7 @@ var helpDescsEnUS = map[string]string{
 	"gettxoutresult-coinbase":      "Whether or not the transaction is a coinbase",
 
 	// GetTxOutCmd help.
-	"gettxout--synopsis":      "Returns information about an unspent transaction output..",
+	"gettxout--synopsis":      "Returns information about an unspent transaction output.",
 	"gettxout-txid":           "The hash of the transaction",
 	"gettxout-vout":           "The index of the output",
 	"gettxout-includemempool": "Include the mempool when true",
@@ -549,16 +563,22 @@ var helpDescsEnUS = map[string]string{
 	"searchrawtransactions--result0":    "Hex-encoded serialized transaction",
 
 	// SendRawTransactionCmd help.
-	"sendrawtransaction--synopsis":     "Submits the serialized, hex-encoded transaction to the local peer and relays it to the network.",
-	"sendrawtransaction-hextx":         "Serialized, hex-encoded signed transaction",
-	"sendrawtransaction-allowhighfees": "Whether or not to allow insanely high fees (btcd does not yet implement this parameter, so it has no effect)",
-	"sendrawtransaction-maxfeerate":    "Used by bitcoind on or after v0.19.0",
-	"sendrawtransaction--result0":      "The hash of the transaction",
+	"sendrawtransaction--synopsis":    "Submits the serialized, hex-encoded transaction to the local peer and relays it to the network.",
+	"sendrawtransaction-hextx":        "Serialized, hex-encoded signed transaction",
+	"sendrawtransaction-feesetting":   "Whether or not to allow insanely high fees in bitcoind < v0.19.0 or the max fee rate for bitcoind v0.19.0 and later (btcd does not yet implement this parameter, so it has no effect)",
+	"sendrawtransaction--result0":     "The hash of the transaction",
+	"allowhighfeesormaxfeerate-value": "Either the boolean value for the allowhighfees parameter in bitcoind < v0.19.0 or the numerical value for the maxfeerate field in bitcoind v0.19.0 and later",
 
 	// SetGenerateCmd help.
 	"setgenerate--synopsis":    "Set the server to generate coins (mine) or not.",
 	"setgenerate-generate":     "Use true to enable generation, false to disable it",
 	"setgenerate-genproclimit": "The number of processors (cores) to limit generation to or -1 for default",
+
+	// SignMessageWithPrivKeyCmd help.
+	"signmessagewithprivkey--synopsis": "Sign a message with the private key of an address",
+	"signmessagewithprivkey-privkey":   "The private key to sign the message with",
+	"signmessagewithprivkey-message":   "The message to create a signature of",
+	"signmessagewithprivkey--result0":  "The signature of the message encoded in base 64",
 
 	// StopCmd help.
 	"stop--synopsis": "Shutdown btcd.",
@@ -576,8 +596,12 @@ var helpDescsEnUS = map[string]string{
 	"submitblock--result1":    "The reason the block was rejected",
 
 	// ValidateAddressResult help.
-	"validateaddresschainresult-isvalid": "Whether or not the address is valid",
-	"validateaddresschainresult-address": "The bitcoin address (only when isvalid is true)",
+	"validateaddresschainresult-isvalid":         "Whether or not the address is valid",
+	"validateaddresschainresult-address":         "The bitcoin address (only when isvalid is true)",
+	"validateaddresschainresult-isscript":        "If the key is a script",
+	"validateaddresschainresult-iswitness":       "If the address is a witness address",
+	"validateaddresschainresult-witness_version": "The version number of the witness program",
+	"validateaddresschainresult-witness_program": "The hex value of the witness program",
 
 	// ValidateAddressCmd help.
 	"validateaddress--synopsis": "Verify an address is valid.",
@@ -688,52 +712,54 @@ var helpDescsEnUS = map[string]string{
 // This information is used to generate the help.  Each result type must be a
 // pointer to the type (or nil to indicate no return value).
 var rpcResultTypes = map[string][]interface{}{
-	"addnode":               nil,
-	"createrawtransaction":  {(*string)(nil)},
-	"debuglevel":            {(*string)(nil), (*string)(nil)},
-	"decoderawtransaction":  {(*btcjson.TxRawDecodeResult)(nil)},
-	"decodescript":          {(*btcjson.DecodeScriptResult)(nil)},
-	"estimatefee":           {(*float64)(nil)},
-	"generate":              {(*[]string)(nil)},
-	"getaddednodeinfo":      {(*[]string)(nil), (*[]btcjson.GetAddedNodeInfoResult)(nil)},
-	"getbestblock":          {(*btcjson.GetBestBlockResult)(nil)},
-	"getbestblockhash":      {(*string)(nil)},
-	"getblock":              {(*string)(nil), (*btcjson.GetBlockVerboseResult)(nil)},
-	"getblockcount":         {(*int64)(nil)},
-	"getblockhash":          {(*string)(nil)},
-	"getblockheader":        {(*string)(nil), (*btcjson.GetBlockHeaderVerboseResult)(nil)},
-	"getblocktemplate":      {(*btcjson.GetBlockTemplateResult)(nil), (*string)(nil), nil},
-	"getblockchaininfo":     {(*btcjson.GetBlockChainInfoResult)(nil)},
-	"getcfilter":            {(*string)(nil)},
-	"getcfilterheader":      {(*string)(nil)},
-	"getconnectioncount":    {(*int32)(nil)},
-	"getcurrentnet":         {(*uint32)(nil)},
-	"getdifficulty":         {(*float64)(nil)},
-	"getgenerate":           {(*bool)(nil)},
-	"gethashespersec":       {(*float64)(nil)},
-	"getheaders":            {(*[]string)(nil)},
-	"getinfo":               {(*btcjson.InfoChainResult)(nil)},
-	"getmempoolinfo":        {(*btcjson.GetMempoolInfoResult)(nil)},
-	"getmininginfo":         {(*btcjson.GetMiningInfoResult)(nil)},
-	"getnettotals":          {(*btcjson.GetNetTotalsResult)(nil)},
-	"getnetworkhashps":      {(*int64)(nil)},
-	"getpeerinfo":           {(*[]btcjson.GetPeerInfoResult)(nil)},
-	"getrawmempool":         {(*[]string)(nil), (*btcjson.GetRawMempoolVerboseResult)(nil)},
-	"getrawtransaction":     {(*string)(nil), (*btcjson.TxRawResult)(nil)},
-	"gettxout":              {(*btcjson.GetTxOutResult)(nil)},
-	"node":                  nil,
-	"help":                  {(*string)(nil), (*string)(nil)},
-	"ping":                  nil,
-	"searchrawtransactions": {(*string)(nil), (*[]btcjson.SearchRawTransactionsResult)(nil)},
-	"sendrawtransaction":    {(*string)(nil)},
-	"setgenerate":           nil,
-	"stop":                  {(*string)(nil)},
-	"submitblock":           {nil, (*string)(nil)},
-	"uptime":                {(*int64)(nil)},
-	"validateaddress":       {(*btcjson.ValidateAddressChainResult)(nil)},
-	"verifychain":           {(*bool)(nil)},
-	"verifymessage":         {(*bool)(nil)},
-	"version":               {(*map[string]btcjson.VersionResult)(nil)},
+	"addnode":                nil,
+	"createrawtransaction":   {(*string)(nil)},
+	"debuglevel":             {(*string)(nil), (*string)(nil)},
+	"decoderawtransaction":   {(*btcjson.TxRawDecodeResult)(nil)},
+	"decodescript":           {(*btcjson.DecodeScriptResult)(nil)},
+	"estimatefee":            {(*float64)(nil)},
+	"generate":               {(*[]string)(nil)},
+	"getaddednodeinfo":       {(*[]string)(nil), (*[]btcjson.GetAddedNodeInfoResult)(nil)},
+	"getbestblock":           {(*btcjson.GetBestBlockResult)(nil)},
+	"getbestblockhash":       {(*string)(nil)},
+	"getblock":               {(*string)(nil), (*btcjson.GetBlockVerboseResult)(nil)},
+	"getblockcount":          {(*int64)(nil)},
+	"getblockhash":           {(*string)(nil)},
+	"getblockheader":         {(*string)(nil), (*btcjson.GetBlockHeaderVerboseResult)(nil)},
+	"getblocktemplate":       {(*btcjson.GetBlockTemplateResult)(nil), (*string)(nil), nil},
+	"getblockchaininfo":      {(*btcjson.GetBlockChainInfoResult)(nil)},
+	"getcfilter":             {(*string)(nil)},
+	"getcfilterheader":       {(*string)(nil)},
+	"getconnectioncount":     {(*int32)(nil)},
+	"getcurrentnet":          {(*uint32)(nil)},
+	"getdifficulty":          {(*float64)(nil)},
+	"getgenerate":            {(*bool)(nil)},
+	"gethashespersec":        {(*float64)(nil)},
+	"getheaders":             {(*[]string)(nil)},
+	"getinfo":                {(*btcjson.InfoChainResult)(nil)},
+	"getmempoolinfo":         {(*btcjson.GetMempoolInfoResult)(nil)},
+	"getmininginfo":          {(*btcjson.GetMiningInfoResult)(nil)},
+	"getnettotals":           {(*btcjson.GetNetTotalsResult)(nil)},
+	"getnetworkhashps":       {(*float64)(nil)},
+	"getnodeaddresses":       {(*[]btcjson.GetNodeAddressesResult)(nil)},
+	"getpeerinfo":            {(*[]btcjson.GetPeerInfoResult)(nil)},
+	"getrawmempool":          {(*[]string)(nil), (*btcjson.GetRawMempoolVerboseResult)(nil)},
+	"getrawtransaction":      {(*string)(nil), (*btcjson.TxRawResult)(nil)},
+	"gettxout":               {(*btcjson.GetTxOutResult)(nil)},
+	"node":                   nil,
+	"help":                   {(*string)(nil), (*string)(nil)},
+	"ping":                   nil,
+	"searchrawtransactions":  {(*string)(nil), (*[]btcjson.SearchRawTransactionsResult)(nil)},
+	"sendrawtransaction":     {(*string)(nil)},
+	"setgenerate":            nil,
+	"signmessagewithprivkey": {(*string)(nil)},
+	"stop":                   {(*string)(nil)},
+	"submitblock":            {nil, (*string)(nil)},
+	"uptime":                 {(*int64)(nil)},
+	"validateaddress":        {(*btcjson.ValidateAddressChainResult)(nil)},
+	"verifychain":            {(*bool)(nil)},
+	"verifymessage":          {(*bool)(nil)},
+	"version":                {(*map[string]btcjson.VersionResult)(nil)},
 
 	// Websocket commands.
 	"loadtxfilter":              nil,
@@ -819,7 +845,7 @@ func (c *helpCacher) rpcUsage(includeWebsockets bool) (string, error) {
 		}
 	}
 
-	sort.Sort(sort.StringSlice(usageTexts))
+	sort.Strings(usageTexts)
 	c.usage = strings.Join(usageTexts, "\n")
 	return c.usage, nil
 }

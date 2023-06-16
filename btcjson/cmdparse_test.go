@@ -162,6 +162,18 @@ func TestAssignField(t *testing.T) {
 			src:      `{"1Address":1.5}`,
 			expected: map[string]float64{"1Address": 1.5},
 		},
+		{
+			name:     `null optional field - "null" -> *int32`,
+			dest:     btcjson.Int32(0),
+			src:      "null",
+			expected: nil,
+		},
+		{
+			name:     `null optional field - "null" -> *string`,
+			dest:     btcjson.String(""),
+			src:      "null",
+			expected: nil,
+		},
 	}
 
 	t.Logf("Running %d tests", len(tests))
@@ -172,6 +184,15 @@ func TestAssignField(t *testing.T) {
 		if err != nil {
 			t.Errorf("Test #%d (%s) unexpected error: %v", i,
 				test.name, err)
+			continue
+		}
+
+		// Check case where null string is used on optional field
+		if dst.Kind() == reflect.Ptr && test.src == "null" {
+			if !dst.IsNil() {
+				t.Errorf("Test #%d (%s) unexpected value - got %v, "+
+					"want nil", i, test.name, dst.Interface())
+			}
 			continue
 		}
 
@@ -201,7 +222,7 @@ func TestAssignFieldErrors(t *testing.T) {
 	}{
 		{
 			name: "general incompatible int -> string",
-			dest: string(0),
+			dest: "\x00",
 			src:  int(0),
 			err:  btcjson.Error{ErrorCode: btcjson.ErrInvalidType},
 		},
@@ -401,6 +422,59 @@ func TestNewCmdErrors(t *testing.T) {
 	}
 }
 
+// TestMarshalCmd tests the MarshalCmd function.
+func TestMarshalCmd(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		id       interface{}
+		cmd      interface{}
+		expected string
+	}{
+		{
+			name:     "include all parameters",
+			id:       1,
+			cmd:      btcjson.NewGetNetworkHashPSCmd(btcjson.Int(100), btcjson.Int(2000)),
+			expected: `{"jsonrpc":"1.0","method":"getnetworkhashps","params":[100,2000],"id":1}`,
+		},
+		{
+			name:     "include padding null parameter",
+			id:       1,
+			cmd:      btcjson.NewGetNetworkHashPSCmd(nil, btcjson.Int(2000)),
+			expected: `{"jsonrpc":"1.0","method":"getnetworkhashps","params":[null,2000],"id":1}`,
+		},
+		{
+			name:     "omit single unnecessary null parameter",
+			id:       1,
+			cmd:      btcjson.NewGetNetworkHashPSCmd(btcjson.Int(100), nil),
+			expected: `{"jsonrpc":"1.0","method":"getnetworkhashps","params":[100],"id":1}`,
+		},
+		{
+			name:     "omit unnecessary null parameters",
+			id:       1,
+			cmd:      btcjson.NewGetNetworkHashPSCmd(nil, nil),
+			expected: `{"jsonrpc":"1.0","method":"getnetworkhashps","params":[],"id":1}`,
+		},
+	}
+
+	t.Logf("Running %d tests", len(tests))
+	for i, test := range tests {
+		bytes, err := btcjson.MarshalCmd(btcjson.RpcVersion1, test.id, test.cmd)
+		if err != nil {
+			t.Errorf("Test #%d (%s) wrong error - got %T (%v)",
+				i, test.name, err, err)
+			continue
+		}
+		marshalled := string(bytes)
+		if marshalled != test.expected {
+			t.Errorf("Test #%d (%s) mismatched marshall result - got "+
+				"%v, want %v", i, test.name, marshalled, test.expected)
+			continue
+		}
+	}
+}
+
 // TestMarshalCmdErrors  tests the error paths of the MarshalCmd function.
 func TestMarshalCmdErrors(t *testing.T) {
 	t.Parallel()
@@ -433,7 +507,7 @@ func TestMarshalCmdErrors(t *testing.T) {
 
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
-		_, err := btcjson.MarshalCmd(test.id, test.cmd)
+		_, err := btcjson.MarshalCmd(btcjson.RpcVersion1, test.id, test.cmd)
 		if reflect.TypeOf(err) != reflect.TypeOf(test.err) {
 			t.Errorf("Test #%d (%s) wrong error - got %T (%v), "+
 				"want %T", i, test.name, err, err, test.err)
@@ -461,7 +535,7 @@ func TestUnmarshalCmdErrors(t *testing.T) {
 		{
 			name: "unregistered type",
 			request: btcjson.Request{
-				Jsonrpc: "1.0",
+				Jsonrpc: btcjson.RpcVersion1,
 				Method:  "bogusmethod",
 				Params:  nil,
 				ID:      nil,
@@ -471,7 +545,7 @@ func TestUnmarshalCmdErrors(t *testing.T) {
 		{
 			name: "incorrect number of params",
 			request: btcjson.Request{
-				Jsonrpc: "1.0",
+				Jsonrpc: btcjson.RpcVersion1,
 				Method:  "getblockcount",
 				Params:  []json.RawMessage{[]byte(`"bogusparam"`)},
 				ID:      nil,
@@ -481,7 +555,7 @@ func TestUnmarshalCmdErrors(t *testing.T) {
 		{
 			name: "invalid type for a parameter",
 			request: btcjson.Request{
-				Jsonrpc: "1.0",
+				Jsonrpc: btcjson.RpcVersion1,
 				Method:  "getblock",
 				Params:  []json.RawMessage{[]byte("1")},
 				ID:      nil,
@@ -491,7 +565,7 @@ func TestUnmarshalCmdErrors(t *testing.T) {
 		{
 			name: "invalid JSON for a parameter",
 			request: btcjson.Request{
-				Jsonrpc: "1.0",
+				Jsonrpc: btcjson.RpcVersion1,
 				Method:  "getblock",
 				Params:  []json.RawMessage{[]byte(`"1`)},
 				ID:      nil,

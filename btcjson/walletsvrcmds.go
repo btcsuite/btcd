@@ -1,4 +1,4 @@
-// Copyright (c) 2014 The btcsuite developers
+// Copyright (c) 2014-2020 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -6,6 +6,14 @@
 // a wallet server.
 
 package btcjson
+
+import (
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+
+	"github.com/btcsuite/btcd/btcutil"
+)
 
 // AddMultisigAddressCmd defines the addmutisigaddress JSON-RPC command.
 type AddMultisigAddressCmd struct {
@@ -55,6 +63,28 @@ func NewCreateMultisigCmd(nRequired int, keys []string) *CreateMultisigCmd {
 	}
 }
 
+// CreateWalletCmd defines the createwallet JSON-RPC command.
+type CreateWalletCmd struct {
+	WalletName         string
+	DisablePrivateKeys *bool   `jsonrpcdefault:"false"`
+	Blank              *bool   `jsonrpcdefault:"false"`
+	Passphrase         *string `jsonrpcdefault:"\"\""`
+	AvoidReuse         *bool   `jsonrpcdefault:"false"`
+}
+
+// NewCreateWalletCmd returns a new instance which can be used to issue a
+// createwallet JSON-RPC command.
+func NewCreateWalletCmd(walletName string, disablePrivateKeys *bool,
+	blank *bool, passphrase *string, avoidReuse *bool) *CreateWalletCmd {
+	return &CreateWalletCmd{
+		WalletName:         walletName,
+		DisablePrivateKeys: disablePrivateKeys,
+		Blank:              blank,
+		Passphrase:         passphrase,
+		AvoidReuse:         avoidReuse,
+	}
+}
+
 // DumpPrivKeyCmd defines the dumpprivkey JSON-RPC command.
 type DumpPrivKeyCmd struct {
 	Address string
@@ -78,6 +108,30 @@ type EncryptWalletCmd struct {
 func NewEncryptWalletCmd(passphrase string) *EncryptWalletCmd {
 	return &EncryptWalletCmd{
 		Passphrase: passphrase,
+	}
+}
+
+// EstimateSmartFeeMode defines the different fee estimation modes available
+// for the estimatesmartfee JSON-RPC command.
+type EstimateSmartFeeMode string
+
+var (
+	EstimateModeUnset        EstimateSmartFeeMode = "UNSET"
+	EstimateModeEconomical   EstimateSmartFeeMode = "ECONOMICAL"
+	EstimateModeConservative EstimateSmartFeeMode = "CONSERVATIVE"
+)
+
+// EstimateSmartFeeCmd defines the estimatesmartfee JSON-RPC command.
+type EstimateSmartFeeCmd struct {
+	ConfTarget   int64
+	EstimateMode *EstimateSmartFeeMode `jsonrpcdefault:"\"CONSERVATIVE\""`
+}
+
+// NewEstimateSmartFeeCmd returns a new instance which can be used to issue a
+// estimatesmartfee JSON-RPC command.
+func NewEstimateSmartFeeCmd(confTarget int64, mode *EstimateSmartFeeMode) *EstimateSmartFeeCmd {
+	return &EstimateSmartFeeCmd{
+		ConfTarget: confTarget, EstimateMode: mode,
 	}
 }
 
@@ -146,6 +200,19 @@ func NewGetAddressesByAccountCmd(account string) *GetAddressesByAccountCmd {
 	}
 }
 
+// GetAddressInfoCmd defines the getaddressinfo JSON-RPC command.
+type GetAddressInfoCmd struct {
+	Address string
+}
+
+// NewGetAddressInfoCmd returns a new instance which can be used to issue a
+// getaddressinfo JSON-RPC command.
+func NewGetAddressInfoCmd(address string) *GetAddressInfoCmd {
+	return &GetAddressInfoCmd{
+		Address: address,
+	}
+}
+
 // GetBalanceCmd defines the getbalance JSON-RPC command.
 type GetBalanceCmd struct {
 	Account *string
@@ -164,9 +231,19 @@ func NewGetBalanceCmd(account *string, minConf *int) *GetBalanceCmd {
 	}
 }
 
+// GetBalancesCmd defines the getbalances JSON-RPC command.
+type GetBalancesCmd struct{}
+
+// NewGetBalancesCmd returns a new instance which can be used to issue a
+// getbalances JSON-RPC command.
+func NewGetBalancesCmd() *GetBalancesCmd {
+	return &GetBalancesCmd{}
+}
+
 // GetNewAddressCmd defines the getnewaddress JSON-RPC command.
 type GetNewAddressCmd struct {
-	Account *string
+	Account     *string
+	AddressType *string
 }
 
 // NewGetNewAddressCmd returns a new instance which can be used to issue a
@@ -174,15 +251,17 @@ type GetNewAddressCmd struct {
 //
 // The parameters which are pointers indicate they are optional.  Passing nil
 // for optional parameters will use the default value.
-func NewGetNewAddressCmd(account *string) *GetNewAddressCmd {
+func NewGetNewAddressCmd(account, addrType *string) *GetNewAddressCmd {
 	return &GetNewAddressCmd{
-		Account: account,
+		Account:     account,
+		AddressType: addrType,
 	}
 }
 
 // GetRawChangeAddressCmd defines the getrawchangeaddress JSON-RPC command.
 type GetRawChangeAddressCmd struct {
-	Account *string
+	Account     *string
+	AddressType *string
 }
 
 // NewGetRawChangeAddressCmd returns a new instance which can be used to issue a
@@ -190,9 +269,10 @@ type GetRawChangeAddressCmd struct {
 //
 // The parameters which are pointers indicate they are optional.  Passing nil
 // for optional parameters will use the default value.
-func NewGetRawChangeAddressCmd(account *string) *GetRawChangeAddressCmd {
+func NewGetRawChangeAddressCmd(account, addrType *string) *GetRawChangeAddressCmd {
 	return &GetRawChangeAddressCmd{
-		Account: account,
+		Account:     account,
+		AddressType: addrType,
 	}
 }
 
@@ -257,6 +337,39 @@ type GetWalletInfoCmd struct{}
 // getwalletinfo JSON-RPC command.
 func NewGetWalletInfoCmd() *GetWalletInfoCmd {
 	return &GetWalletInfoCmd{}
+}
+
+// BackupWalletCmd defines the backupwallet JSON-RPC command
+type BackupWalletCmd struct {
+	Destination string
+}
+
+// NewBackupWalletCmd returns a new instance which can be used to issue a
+// backupwallet JSON-RPC command
+func NewBackupWalletCmd(destination string) *BackupWalletCmd {
+	return &BackupWalletCmd{Destination: destination}
+}
+
+// UnloadWalletCmd defines the unloadwallet JSON-RPC command
+type UnloadWalletCmd struct {
+	WalletName *string
+}
+
+// NewUnloadWalletCmd returns a new instance which can be used to issue a
+// unloadwallet JSON-RPC command.
+func NewUnloadWalletCmd(walletName *string) *UnloadWalletCmd {
+	return &UnloadWalletCmd{WalletName: walletName}
+}
+
+// LoadWalletCmd defines the loadwallet JSON-RPC command
+type LoadWalletCmd struct {
+	WalletName string
+}
+
+// NewLoadWalletCmd returns a new instance which can be used to issue a
+// loadwallet JSON-RPC command
+func NewLoadWalletCmd(walletName string) *LoadWalletCmd {
+	return &LoadWalletCmd{WalletName: walletName}
 }
 
 // ImportPrivKeyCmd defines the importprivkey JSON-RPC command.
@@ -614,6 +727,39 @@ func NewSignRawTransactionCmd(hexEncodedTx string, inputs *[]RawTxInput, privKey
 	}
 }
 
+// RawTxWitnessInput models the data needed for raw transaction input that is used in
+// the SignRawTransactionWithWalletCmd struct. The RedeemScript is required for P2SH inputs,
+// the WitnessScript is required for P2WSH or P2SH-P2WSH witness scripts, and the Amount is
+// required for Segwit inputs. Otherwise, those fields can be left blank.
+type RawTxWitnessInput struct {
+	Txid          string   `json:"txid"`
+	Vout          uint32   `json:"vout"`
+	ScriptPubKey  string   `json:"scriptPubKey"`
+	RedeemScript  *string  `json:"redeemScript,omitempty"`
+	WitnessScript *string  `json:"witnessScript,omitempty"`
+	Amount        *float64 `json:"amount,omitempty"` // In BTC
+}
+
+// SignRawTransactionWithWalletCmd defines the signrawtransactionwithwallet JSON-RPC command.
+type SignRawTransactionWithWalletCmd struct {
+	RawTx       string
+	Inputs      *[]RawTxWitnessInput
+	SigHashType *string `jsonrpcdefault:"\"ALL\""`
+}
+
+// NewSignRawTransactionWithWalletCmd returns a new instance which can be used to issue a
+// signrawtransactionwithwallet JSON-RPC command.
+//
+// The parameters which are pointers indicate they are optional.  Passing nil
+// for optional parameters will use the default value.
+func NewSignRawTransactionWithWalletCmd(hexEncodedTx string, inputs *[]RawTxWitnessInput, sigHashType *string) *SignRawTransactionWithWalletCmd {
+	return &SignRawTransactionWithWalletCmd{
+		RawTx:       hexEncodedTx,
+		Inputs:      inputs,
+		SigHashType: sigHashType,
+	}
+}
+
 // WalletLockCmd defines the walletlock JSON-RPC command.
 type WalletLockCmd struct{}
 
@@ -653,27 +799,317 @@ func NewWalletPassphraseChangeCmd(oldPassphrase, newPassphrase string) *WalletPa
 	}
 }
 
+// TimestampOrNow defines a type to represent a timestamp value in seconds,
+// since epoch.
+//
+// The value can either be a integer, or the string "now".
+//
+// NOTE: Interpretation of the timestamp value depends upon the specific
+// JSON-RPC command, where it is used.
+type TimestampOrNow struct {
+	Value interface{}
+}
+
+// MarshalJSON implements the json.Marshaler interface for TimestampOrNow
+func (t TimestampOrNow) MarshalJSON() ([]byte, error) {
+	return json.Marshal(t.Value)
+}
+
+// UnmarshalJSON implements the json.Unmarshaler interface for TimestampOrNow
+func (t *TimestampOrNow) UnmarshalJSON(data []byte) error {
+	var unmarshalled interface{}
+	if err := json.Unmarshal(data, &unmarshalled); err != nil {
+		return err
+	}
+
+	switch v := unmarshalled.(type) {
+	case float64:
+		t.Value = int(v)
+	case string:
+		if v != "now" {
+			return fmt.Errorf("invalid timestamp value: %v", unmarshalled)
+		}
+		t.Value = v
+	default:
+		return fmt.Errorf("invalid timestamp value: %v", unmarshalled)
+	}
+	return nil
+}
+
+// ScriptPubKeyAddress represents an address, to be used in conjunction with
+// ScriptPubKey.
+type ScriptPubKeyAddress struct {
+	Address string `json:"address"`
+}
+
+// ScriptPubKey represents a script (as a string) or an address
+// (as a ScriptPubKeyAddress).
+type ScriptPubKey struct {
+	Value interface{}
+}
+
+// MarshalJSON implements the json.Marshaler interface for ScriptPubKey
+func (s ScriptPubKey) MarshalJSON() ([]byte, error) {
+	return json.Marshal(s.Value)
+}
+
+// UnmarshalJSON implements the json.Unmarshaler interface for ScriptPubKey
+func (s *ScriptPubKey) UnmarshalJSON(data []byte) error {
+	var unmarshalled interface{}
+	if err := json.Unmarshal(data, &unmarshalled); err != nil {
+		return err
+	}
+
+	switch v := unmarshalled.(type) {
+	case string:
+		s.Value = v
+	case map[string]interface{}:
+		s.Value = ScriptPubKeyAddress{Address: v["address"].(string)}
+	default:
+		return fmt.Errorf("invalid scriptPubKey value: %v", unmarshalled)
+	}
+	return nil
+}
+
+// DescriptorRange specifies the limits of a ranged Descriptor.
+//
+// Descriptors are typically ranged when specified in the form of generic HD
+// chain paths.
+//   Example of a ranged descriptor: pkh(tpub.../*)
+//
+// The value can be an int to specify the end of the range, or the range
+// itself, as []int{begin, end}.
+type DescriptorRange struct {
+	Value interface{}
+}
+
+// MarshalJSON implements the json.Marshaler interface for DescriptorRange
+func (r DescriptorRange) MarshalJSON() ([]byte, error) {
+	return json.Marshal(r.Value)
+}
+
+// UnmarshalJSON implements the json.Unmarshaler interface for DescriptorRange
+func (r *DescriptorRange) UnmarshalJSON(data []byte) error {
+	var unmarshalled interface{}
+	if err := json.Unmarshal(data, &unmarshalled); err != nil {
+		return err
+	}
+
+	switch v := unmarshalled.(type) {
+	case float64:
+		r.Value = int(v)
+	case []interface{}:
+		if len(v) != 2 {
+			return fmt.Errorf("expected [begin,end] integer range, got: %v", unmarshalled)
+		}
+		r.Value = []int{
+			int(v[0].(float64)),
+			int(v[1].(float64)),
+		}
+	default:
+		return fmt.Errorf("invalid descriptor range value: %v", unmarshalled)
+	}
+	return nil
+}
+
+// ImportMultiRequest defines the request struct to be passed to the
+// ImportMultiCmd, as an array.
+type ImportMultiRequest struct {
+	// Descriptor to import, in canonical form. If using Descriptor, do not
+	// also provide ScriptPubKey, RedeemScript, WitnessScript, PubKeys, or Keys.
+	Descriptor *string `json:"desc,omitempty"`
+
+	// Script/address to import. Should not be provided if using Descriptor.
+	ScriptPubKey *ScriptPubKey `json:"scriptPubKey,omitempty"`
+
+	// Creation time of the key in seconds since epoch (Jan 1 1970 GMT), or
+	// the string "now" to substitute the current synced blockchain time.
+	//
+	// The timestamp of the oldest key will determine how far back blockchain
+	// rescans need to begin for missing wallet transactions.
+	//
+	// Specifying "now" bypasses scanning. Useful for keys that are known to
+	// never have been used.
+	//
+	// Specifying 0 scans the entire blockchain.
+	Timestamp TimestampOrNow `json:"timestamp"`
+
+	// Allowed only if the ScriptPubKey is a P2SH or P2SH-P2WSH
+	// address/scriptPubKey.
+	RedeemScript *string `json:"redeemscript,omitempty"`
+
+	// Allowed only if the ScriptPubKey is a P2SH-P2WSH or P2WSH
+	// address/scriptPubKey.
+	WitnessScript *string `json:"witnessscript,omitempty"`
+
+	// Array of strings giving pubkeys to import. They must occur in P2PKH or
+	// P2WPKH scripts. They are not required when the private key is also
+	// provided (see Keys).
+	PubKeys *[]string `json:"pubkeys,omitempty"`
+
+	// Array of strings giving private keys to import. The corresponding
+	// public keys must occur in the output or RedeemScript.
+	Keys *[]string `json:"keys,omitempty"`
+
+	// If the provided Descriptor is ranged, this specifies the end
+	// (as an int) or the range (as []int{begin, end}) to import.
+	Range *DescriptorRange `json:"range,omitempty"`
+
+	// States whether matching outputs should be treated as not incoming
+	// payments (also known as change).
+	Internal *bool `json:"internal,omitempty"`
+
+	// States whether matching outputs should be considered watchonly.
+	//
+	// If an address/script is imported without all of the private keys
+	// required to spend from that address, set this field to true.
+	//
+	// If all the private keys are provided and the address/script is
+	// spendable, set this field to false.
+	WatchOnly *bool `json:"watchonly,omitempty"`
+
+	// Label to assign to the address. Only allowed when Internal is false.
+	Label *string `json:"label,omitempty"`
+
+	// States whether imported public keys should be added to the keypool for
+	// when users request new addresses. Only allowed when wallet private keys
+	// are disabled.
+	KeyPool *bool `json:"keypool,omitempty"`
+}
+
+// ImportMultiRequest defines the options struct, provided to the
+// ImportMultiCmd as a pointer argument.
+type ImportMultiOptions struct {
+	Rescan bool `json:"rescan"` // Rescan the blockchain after all imports
+}
+
+// ImportMultiCmd defines the importmulti JSON-RPC command.
+type ImportMultiCmd struct {
+	Requests []ImportMultiRequest
+	Options  *ImportMultiOptions
+}
+
+// NewImportMultiCmd returns a new instance which can be used to issue
+// an importmulti JSON-RPC command.
+//
+// The parameters which are pointers indicate they are optional. Passing nil
+// for optional parameters will use the default value.
+func NewImportMultiCmd(requests []ImportMultiRequest, options *ImportMultiOptions) *ImportMultiCmd {
+	return &ImportMultiCmd{
+		Requests: requests,
+		Options:  options,
+	}
+}
+
+// PsbtInput represents an input to include in the PSBT created by the
+// WalletCreateFundedPsbtCmd command.
+type PsbtInput struct {
+	Txid     string `json:"txid"`
+	Vout     uint32 `json:"vout"`
+	Sequence uint32 `json:"sequence"`
+}
+
+// PsbtOutput represents an output to include in the PSBT created by the
+// WalletCreateFundedPsbtCmd command.
+type PsbtOutput map[string]interface{}
+
+// NewPsbtOutput returns a new instance of a PSBT output to use with the
+// WalletCreateFundedPsbtCmd command.
+func NewPsbtOutput(address string, amount btcutil.Amount) PsbtOutput {
+	return PsbtOutput{address: amount.ToBTC()}
+}
+
+// NewPsbtDataOutput returns a new instance of a PSBT data output to use with
+// the WalletCreateFundedPsbtCmd command.
+func NewPsbtDataOutput(data []byte) PsbtOutput {
+	return PsbtOutput{"data": hex.EncodeToString(data)}
+}
+
+// WalletCreateFundedPsbtOpts represents the optional options struct provided
+// with a WalletCreateFundedPsbtCmd command.
+type WalletCreateFundedPsbtOpts struct {
+	ChangeAddress          *string     `json:"changeAddress,omitempty"`
+	ChangePosition         *int64      `json:"changePosition,omitempty"`
+	ChangeType             *ChangeType `json:"change_type,omitempty"`
+	IncludeWatching        *bool       `json:"includeWatching,omitempty"`
+	LockUnspents           *bool       `json:"lockUnspents,omitempty"`
+	FeeRate                *float64    `json:"feeRate,omitempty"`
+	SubtractFeeFromOutputs *[]int64    `json:"subtractFeeFromOutputs,omitempty"`
+	Replaceable            *bool       `json:"replaceable,omitempty"`
+	ConfTarget             *int64      `json:"conf_target,omitempty"`
+	EstimateMode           *string     `json:"estimate_mode,omitempty"`
+}
+
+// WalletCreateFundedPsbtCmd defines the walletcreatefundedpsbt JSON-RPC command.
+type WalletCreateFundedPsbtCmd struct {
+	Inputs      []PsbtInput
+	Outputs     []PsbtOutput
+	Locktime    *uint32
+	Options     *WalletCreateFundedPsbtOpts
+	Bip32Derivs *bool
+}
+
+// NewWalletCreateFundedPsbtCmd returns a new instance which can be used to issue a
+// walletcreatefundedpsbt JSON-RPC command.
+func NewWalletCreateFundedPsbtCmd(
+	inputs []PsbtInput, outputs []PsbtOutput, locktime *uint32,
+	options *WalletCreateFundedPsbtOpts, bip32Derivs *bool,
+) *WalletCreateFundedPsbtCmd {
+	return &WalletCreateFundedPsbtCmd{
+		Inputs:      inputs,
+		Outputs:     outputs,
+		Locktime:    locktime,
+		Options:     options,
+		Bip32Derivs: bip32Derivs,
+	}
+}
+
+// WalletProcessPsbtCmd defines the walletprocesspsbt JSON-RPC command.
+type WalletProcessPsbtCmd struct {
+	Psbt        string
+	Sign        *bool   `jsonrpcdefault:"true"`
+	SighashType *string `jsonrpcdefault:"\"ALL\""`
+	Bip32Derivs *bool
+}
+
+// NewWalletProcessPsbtCmd returns a new instance which can be used to issue a
+// walletprocesspsbt JSON-RPC command.
+func NewWalletProcessPsbtCmd(psbt string, sign *bool, sighashType *string, bip32Derivs *bool) *WalletProcessPsbtCmd {
+	return &WalletProcessPsbtCmd{
+		Psbt:        psbt,
+		Sign:        sign,
+		SighashType: sighashType,
+		Bip32Derivs: bip32Derivs,
+	}
+}
+
 func init() {
 	// The commands in this file are only usable with a wallet server.
 	flags := UFWalletOnly
 
 	MustRegisterCmd("addmultisigaddress", (*AddMultisigAddressCmd)(nil), flags)
 	MustRegisterCmd("addwitnessaddress", (*AddWitnessAddressCmd)(nil), flags)
+	MustRegisterCmd("backupwallet", (*BackupWalletCmd)(nil), flags)
 	MustRegisterCmd("createmultisig", (*CreateMultisigCmd)(nil), flags)
+	MustRegisterCmd("createwallet", (*CreateWalletCmd)(nil), flags)
 	MustRegisterCmd("dumpprivkey", (*DumpPrivKeyCmd)(nil), flags)
 	MustRegisterCmd("encryptwallet", (*EncryptWalletCmd)(nil), flags)
+	MustRegisterCmd("estimatesmartfee", (*EstimateSmartFeeCmd)(nil), flags)
 	MustRegisterCmd("estimatefee", (*EstimateFeeCmd)(nil), flags)
 	MustRegisterCmd("estimatepriority", (*EstimatePriorityCmd)(nil), flags)
 	MustRegisterCmd("getaccount", (*GetAccountCmd)(nil), flags)
 	MustRegisterCmd("getaccountaddress", (*GetAccountAddressCmd)(nil), flags)
 	MustRegisterCmd("getaddressesbyaccount", (*GetAddressesByAccountCmd)(nil), flags)
+	MustRegisterCmd("getaddressinfo", (*GetAddressInfoCmd)(nil), flags)
 	MustRegisterCmd("getbalance", (*GetBalanceCmd)(nil), flags)
+	MustRegisterCmd("getbalances", (*GetBalancesCmd)(nil), flags)
 	MustRegisterCmd("getnewaddress", (*GetNewAddressCmd)(nil), flags)
 	MustRegisterCmd("getrawchangeaddress", (*GetRawChangeAddressCmd)(nil), flags)
 	MustRegisterCmd("getreceivedbyaccount", (*GetReceivedByAccountCmd)(nil), flags)
 	MustRegisterCmd("getreceivedbyaddress", (*GetReceivedByAddressCmd)(nil), flags)
 	MustRegisterCmd("gettransaction", (*GetTransactionCmd)(nil), flags)
 	MustRegisterCmd("getwalletinfo", (*GetWalletInfoCmd)(nil), flags)
+	MustRegisterCmd("importmulti", (*ImportMultiCmd)(nil), flags)
 	MustRegisterCmd("importprivkey", (*ImportPrivKeyCmd)(nil), flags)
 	MustRegisterCmd("keypoolrefill", (*KeyPoolRefillCmd)(nil), flags)
 	MustRegisterCmd("listaccounts", (*ListAccountsCmd)(nil), flags)
@@ -684,6 +1120,7 @@ func init() {
 	MustRegisterCmd("listsinceblock", (*ListSinceBlockCmd)(nil), flags)
 	MustRegisterCmd("listtransactions", (*ListTransactionsCmd)(nil), flags)
 	MustRegisterCmd("listunspent", (*ListUnspentCmd)(nil), flags)
+	MustRegisterCmd("loadwallet", (*LoadWalletCmd)(nil), flags)
 	MustRegisterCmd("lockunspent", (*LockUnspentCmd)(nil), flags)
 	MustRegisterCmd("move", (*MoveCmd)(nil), flags)
 	MustRegisterCmd("sendfrom", (*SendFromCmd)(nil), flags)
@@ -693,7 +1130,11 @@ func init() {
 	MustRegisterCmd("settxfee", (*SetTxFeeCmd)(nil), flags)
 	MustRegisterCmd("signmessage", (*SignMessageCmd)(nil), flags)
 	MustRegisterCmd("signrawtransaction", (*SignRawTransactionCmd)(nil), flags)
+	MustRegisterCmd("signrawtransactionwithwallet", (*SignRawTransactionWithWalletCmd)(nil), flags)
+	MustRegisterCmd("unloadwallet", (*UnloadWalletCmd)(nil), flags)
 	MustRegisterCmd("walletlock", (*WalletLockCmd)(nil), flags)
 	MustRegisterCmd("walletpassphrase", (*WalletPassphraseCmd)(nil), flags)
 	MustRegisterCmd("walletpassphrasechange", (*WalletPassphraseChangeCmd)(nil), flags)
+	MustRegisterCmd("walletcreatefundedpsbt", (*WalletCreateFundedPsbtCmd)(nil), flags)
+	MustRegisterCmd("walletprocesspsbt", (*WalletProcessPsbtCmd)(nil), flags)
 }

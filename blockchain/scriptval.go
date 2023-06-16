@@ -10,9 +10,9 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil"
 )
 
 // txValidateItem holds a transaction along with which input to validate.
@@ -74,9 +74,11 @@ out:
 			witness := txIn.Witness
 			pkScript := utxo.PkScript()
 			inputAmount := utxo.Amount()
-			vm, err := txscript.NewEngine(pkScript, txVI.tx.MsgTx(),
-				txVI.txInIndex, v.flags, v.sigCache, txVI.sigHashes,
-				inputAmount)
+			vm, err := txscript.NewEngine(
+				pkScript, txVI.tx.MsgTx(), txVI.txInIndex,
+				v.flags, v.sigCache, txVI.sigHashes,
+				inputAmount, v.utxoView,
+			)
 			if err != nil {
 				str := fmt.Sprintf("failed to parse input "+
 					"%s:%d which references output %v - "+
@@ -201,7 +203,7 @@ func ValidateTransactionScripts(tx *btcutil.Tx, utxoView *UtxoViewpoint,
 	// amongst all worker validation goroutines.
 	if segwitActive && tx.MsgTx().HasWitness() &&
 		!hashCache.ContainsHashes(tx.Hash()) {
-		hashCache.AddSigHashes(tx.MsgTx())
+		hashCache.AddSigHashes(tx.MsgTx(), utxoView)
 	}
 
 	var cachedHashes *txscript.TxSigHashes
@@ -266,7 +268,7 @@ func checkBlockScripts(block *btcutil.Block, utxoView *UtxoViewpoint,
 		if segwitActive && tx.HasWitness() && hashCache != nil &&
 			!hashCache.ContainsHashes(hash) {
 
-			hashCache.AddSigHashes(tx.MsgTx())
+			hashCache.AddSigHashes(tx.MsgTx(), utxoView)
 		}
 
 		var cachedHashes *txscript.TxSigHashes
@@ -274,7 +276,9 @@ func checkBlockScripts(block *btcutil.Block, utxoView *UtxoViewpoint,
 			if hashCache != nil {
 				cachedHashes, _ = hashCache.GetSigHashes(hash)
 			} else {
-				cachedHashes = txscript.NewTxSigHashes(tx.MsgTx())
+				cachedHashes = txscript.NewTxSigHashes(
+					tx.MsgTx(), utxoView,
+				)
 			}
 		}
 

@@ -15,7 +15,7 @@ import (
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil"
+	"github.com/btcsuite/btcd/btcutil"
 )
 
 const (
@@ -120,7 +120,7 @@ func dbFetchVersion(dbTx database.Tx, key []byte) uint32 {
 		return 0
 	}
 
-	return byteOrder.Uint32(serialized[:])
+	return byteOrder.Uint32(serialized)
 }
 
 // dbPutVersion uses an existing database transaction to update the provided
@@ -943,7 +943,7 @@ func serializeBestChainState(state bestChainState) []byte {
 	byteOrder.PutUint32(serializedData[offset:], workSumBytesLen)
 	offset += 4
 	copy(serializedData[offset:], workSumBytes)
-	return serializedData[:]
+	return serializedData
 }
 
 // deserializeBestChainState deserializes the passed serialized best chain
@@ -1149,18 +1149,9 @@ func (b *BlockChain) initChainState() error {
 
 		blockIndexBucket := dbTx.Metadata().Bucket(blockIndexBucketName)
 
-		// Determine how many blocks will be loaded into the index so we can
-		// allocate the right amount.
-		var blockCount int32
-		cursor := blockIndexBucket.Cursor()
-		for ok := cursor.First(); ok; ok = cursor.Next() {
-			blockCount++
-		}
-		blockNodes := make([]blockNode, blockCount)
-
 		var i int32
 		var lastNode *blockNode
-		cursor = blockIndexBucket.Cursor()
+		cursor := blockIndexBucket.Cursor()
 		for ok := cursor.First(); ok; ok = cursor.Next() {
 			header, status, err := deserializeBlockRow(cursor.Value())
 			if err != nil {
@@ -1193,7 +1184,7 @@ func (b *BlockChain) initChainState() error {
 
 			// Initialize the block node for the block, connect it,
 			// and add it to the block index.
-			node := &blockNodes[i]
+			node := new(blockNode)
 			initBlockNode(node, header, parent)
 			node.status = status
 			b.index.addNode(node)

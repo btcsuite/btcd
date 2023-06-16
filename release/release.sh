@@ -1,11 +1,12 @@
 #!/bin/bash
 
+# Copyright (c) 2016 Company 0, LLC.
+# Copyright (c) 2016-2020 The btcsuite developers
+# Use of this source code is governed by an ISC
+# license that can be found in the LICENSE file.
+
 # Simple bash script to build basic btcd tools for all the platforms we support
 # with the golang cross-compiler.
-#
-# Copyright (c) 2016 Company 0, LLC.
-# Use of this source code is governed by the ISC
-# license.
 
 set -e
 
@@ -38,7 +39,6 @@ cd $MAINDIR
 # If BTCDBUILDSYS is set the default list is ignored. Useful to release
 # for a subset of systems/architectures.
 SYS=${BTCDBUILDSYS:-"
-        darwin-386
         darwin-amd64
         dragonfly-amd64
         freebsd-386

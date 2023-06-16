@@ -23,8 +23,8 @@ func TestOpcodeDisabled(t *testing.T) {
 		OP_LSHIFT, OP_RSHIFT,
 	}
 	for _, opcodeVal := range tests {
-		pop := parsedOpcode{opcode: &opcodeArray[opcodeVal], data: nil}
-		err := opcodeDisabled(&pop, nil)
+		op := &opcodeArray[opcodeVal]
+		err := opcodeDisabled(op, nil, nil)
 		if !IsErrorCode(err, ErrDisabledOpcode) {
 			t.Errorf("opcodeDisabled: unexpected error - got %v, "+
 				"want %v", err, ErrDisabledOpcode)
@@ -77,7 +77,7 @@ func TestOpcodeDisasm(t *testing.T) {
 		0xae: "OP_CHECKMULTISIG", 0xaf: "OP_CHECKMULTISIGVERIFY",
 		0xfa: "OP_SMALLINTEGER", 0xfb: "OP_PUBKEYS",
 		0xfd: "OP_PUBKEYHASH", 0xfe: "OP_PUBKEY",
-		0xff: "OP_INVALIDOPCODE",
+		0xff: "OP_INVALIDOPCODE", 0xba: "OP_CHECKSIGADD",
 	}
 	for opcodeVal, expectedStr := range expectedStrings {
 		var data []byte
@@ -123,12 +123,13 @@ func TestOpcodeDisasm(t *testing.T) {
 			}
 
 		// OP_UNKNOWN#.
-		case opcodeVal >= 0xba && opcodeVal <= 0xf9 || opcodeVal == 0xfc:
-			expectedStr = "OP_UNKNOWN" + strconv.Itoa(int(opcodeVal))
+		case opcodeVal >= 0xbb && opcodeVal <= 0xf9 || opcodeVal == 0xfc:
+			expectedStr = "OP_UNKNOWN" + strconv.Itoa(opcodeVal)
 		}
 
-		pop := parsedOpcode{opcode: &opcodeArray[opcodeVal], data: data}
-		gotStr := pop.print(true)
+		var buf strings.Builder
+		disasmOpcode(&buf, &opcodeArray[opcodeVal], data, true)
+		gotStr := buf.String()
 		if gotStr != expectedStr {
 			t.Errorf("pop.print (opcode %x): Unexpected disasm "+
 				"string - got %v, want %v", opcodeVal, gotStr,
@@ -190,11 +191,18 @@ func TestOpcodeDisasm(t *testing.T) {
 
 		// OP_UNKNOWN#.
 		case opcodeVal >= 0xba && opcodeVal <= 0xf9 || opcodeVal == 0xfc:
-			expectedStr = "OP_UNKNOWN" + strconv.Itoa(int(opcodeVal))
+			switch opcodeVal {
+			// OP_UNKNOWN186 a.k.a 0xba is now OP_CHECKSIGADD.
+			case 0xba:
+				expectedStr = "OP_CHECKSIGADD"
+			default:
+				expectedStr = "OP_UNKNOWN" + strconv.Itoa(opcodeVal)
+			}
 		}
 
-		pop := parsedOpcode{opcode: &opcodeArray[opcodeVal], data: data}
-		gotStr := pop.print(false)
+		var buf strings.Builder
+		disasmOpcode(&buf, &opcodeArray[opcodeVal], data, false)
+		gotStr := buf.String()
 		if gotStr != expectedStr {
 			t.Errorf("pop.print (opcode %x): Unexpected disasm "+
 				"string - got %v, want %v", opcodeVal, gotStr,

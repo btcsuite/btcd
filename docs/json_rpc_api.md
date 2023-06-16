@@ -1,4 +1,5 @@
-### Table of Contents
+# JSON RPC API
+
 1. [Overview](#Overview)<br />
 2. [HTTP POST Versus Websockets](#HttpPostVsWebsockets)<br />
 3. [Authentication](#Authentication)<br />
@@ -271,13 +272,13 @@ the method name for further details such as parameter and return information.
 |   |   |
 |---|---|
 |Method|getblock|
-|Parameters|1. block hash (string, required) - the hash of the block<br />2. verbose (boolean, optional, default=true) - specifies the block is returned as a JSON object instead of hex-encoded string<br />3. verbosetx (boolean, optional, default=false) - specifies that each transaction is returned as a JSON object and only applies if the `verbose` flag is true.<font color="orange">**This parameter is a btcd extension**</font>|
+|Parameters|1. block hash (string, required) - the hash of the block<br />2. verbosity (int, optional, default=1) - Specifies whether the block data should be returned as a hex-encoded string (0), as parsed data with a slice of TXIDs (1), or as parsed data with parsed transaction data (2).
 |Description|Returns information about a block given its hash.|
-|Returns (verbose=false)|`"data" (string) hex-encoded bytes of the serialized block`|
-|Returns (verbose=true, verbosetx=false)|`{ (json object)`<br />&nbsp;&nbsp;`"hash": "blockhash",  (string) the hash of the block (same as provided)`<br />&nbsp;&nbsp;`"confirmations": n,  (numeric) the number of confirmations`<br />&nbsp;&nbsp;`"strippedsize", n (numeric) the size of the block without witness data`<br />&nbsp;&nbsp;`"size": n,  (numeric) the size of the block`<br />&nbsp;&nbsp;`"weight": n, (numeric) value of the weight metric`<br />&nbsp;&nbsp;`"height": n,  (numeric) the height of the block in the block chain`<br />&nbsp;&nbsp;`"version": n,  (numeric) the block version`<br />&nbsp;&nbsp;`"merkleroot": "hash",  (string) root hash of the merkle tree`<br />&nbsp;&nbsp;`"tx": [ (json array of string) the transaction hashes`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"transactionhash",  (string) hash of the parent transaction`<br />&nbsp;&nbsp;&nbsp;&nbsp;`...`<br />&nbsp;&nbsp;`]`<br />&nbsp;&nbsp;`"time": n,  (numeric) the block time in seconds since 1 Jan 1970 GMT`<br />&nbsp;&nbsp;`"nonce": n,  (numeric) the block nonce`<br />&nbsp;&nbsp;`"bits", n,  (numeric) the bits which represent the block difficulty`<br />&nbsp;&nbsp;`difficulty: n.nn,  (numeric) the proof-of-work difficulty as a multiple of the minimum difficulty`<br />&nbsp;&nbsp;`"previousblockhash": "hash",  (string) the hash of the previous block`<br />&nbsp;&nbsp;`"nextblockhash": "hash",  (string) the hash of the next block (only if there is one)`<br />`}`|
-|Returns (verbose=true, verbosetx=true)|`{ (json object)`<br />&nbsp;&nbsp;`"hash": "blockhash",  (string) the hash of the block (same as provided)`<br />&nbsp;&nbsp;`"confirmations": n,  (numeric) the number of confirmations`<br />&nbsp;&nbsp;`"strippedsize", n (numeric) the size of the block without witness data`<br />&nbsp;&nbsp;`"size": n,  (numeric) the size of the block`<br />&nbsp;&nbsp;`"weight": n, (numeric) value of the weight metric`<br />&nbsp;&nbsp;`"height": n,  (numeric) the height of the block in the block chain`<br />&nbsp;&nbsp;`"version": n,  (numeric) the block version`<br />&nbsp;&nbsp;`"merkleroot": "hash",  (string) root hash of the merkle tree`<br />&nbsp;&nbsp;`"rawtx": [ (array of json objects) the transactions as json objects`<br />&nbsp;&nbsp;&nbsp;&nbsp;`(see getrawtransaction json object details)`<br />&nbsp;&nbsp;`]`<br />&nbsp;&nbsp;`"time": n,  (numeric) the block time in seconds since 1 Jan 1970 GMT`<br />&nbsp;&nbsp;`"nonce": n,  (numeric) the block nonce`<br />&nbsp;&nbsp;`"bits", n,  (numeric) the bits which represent the block difficulty`<br />&nbsp;&nbsp;`difficulty: n.nn,  (numeric) the proof-of-work difficulty as a multiple of the minimum difficulty`<br />&nbsp;&nbsp;`"previousblockhash": "hash",  (string) the hash of the previous block`<br />&nbsp;&nbsp;`"nextblockhash": "hash",  (string) the hash of the next block`<br />`}`|
-|Example Return (verbose=false)|`"010000000000000000000000000000000000000000000000000000000000000000000000`<br />`3ba3edfd7a7b12b27ac72c3e67768f617fc81bc3888a51323a9fb8aa4b1e5e4a29ab5f49`<br />`ffff001d1dac2b7c01010000000100000000000000000000000000000000000000000000`<br />`00000000000000000000ffffffff4d04ffff001d0104455468652054696d65732030332f`<br />`4a616e2f32303039204368616e63656c6c6f72206f6e206272696e6b206f66207365636f`<br />`6e64206261696c6f757420666f722062616e6b73ffffffff0100f2052a01000000434104`<br />`678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f`<br />`4cef38c4f35504e51ec112de5c384df7ba0b8d578a4c702b6bf11d5fac00000000"`<br /><font color="orange">**Newlines added for display purposes.  The actual return does not contain newlines.**</font>|
-|Example Return (verbose=true, verbosetx=false)|`{`<br />&nbsp;&nbsp;`"hash": "000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f",`<br />&nbsp;&nbsp;`"confirmations": 277113,`<br />&nbsp;&nbsp;`"size": 285,`<br />&nbsp;&nbsp;`"height": 0,`<br />&nbsp;&nbsp;`"version": 1,`<br />&nbsp;&nbsp;`"merkleroot": "4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b",`<br />&nbsp;&nbsp;`"tx": [`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b"`<br />&nbsp;&nbsp;`],`<br />&nbsp;&nbsp;`"time": 1231006505,`<br />&nbsp;&nbsp;`"nonce": 2083236893,`<br />&nbsp;&nbsp;`"bits": "1d00ffff",`<br />&nbsp;&nbsp;`"difficulty": 1,`<br />&nbsp;&nbsp;`"previousblockhash": "0000000000000000000000000000000000000000000000000000000000000000",`<br />&nbsp;&nbsp;`"nextblockhash": "00000000839a8e6886ab5951d76f411475428afc90947ee320161bbf18eb6048"`<br />`}`|
+|Returns (verbosity=0)|`"data" (string) hex-encoded bytes of the serialized block`|
+|Returns (verbosity=1)|`{ (json object)`<br />&nbsp;&nbsp;`"hash": "blockhash",  (string) the hash of the block (same as provided)`<br />&nbsp;&nbsp;`"confirmations": n,  (numeric) the number of confirmations`<br />&nbsp;&nbsp;`"strippedsize", n (numeric) the size of the block without witness data`<br />&nbsp;&nbsp;`"size": n,  (numeric) the size of the block`<br />&nbsp;&nbsp;`"weight": n, (numeric) value of the weight metric`<br />&nbsp;&nbsp;`"height": n,  (numeric) the height of the block in the block chain`<br />&nbsp;&nbsp;`"version": n,  (numeric) the block version`<br />&nbsp;&nbsp;`"merkleroot": "hash",  (string) root hash of the merkle tree`<br />&nbsp;&nbsp;`"tx": [ (json array of string) the transaction hashes`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"transactionhash",  (string) hash of the parent transaction`<br />&nbsp;&nbsp;&nbsp;&nbsp;`...`<br />&nbsp;&nbsp;`]`<br />&nbsp;&nbsp;`"time": n,  (numeric) the block time in seconds since 1 Jan 1970 GMT`<br />&nbsp;&nbsp;`"nonce": n,  (numeric) the block nonce`<br />&nbsp;&nbsp;`"bits", n,  (numeric) the bits which represent the block difficulty`<br />&nbsp;&nbsp;`difficulty: n.nn,  (numeric) the proof-of-work difficulty as a multiple of the minimum difficulty`<br />&nbsp;&nbsp;`"previousblockhash": "hash",  (string) the hash of the previous block`<br />&nbsp;&nbsp;`"nextblockhash": "hash",  (string) the hash of the next block (only if there is one)`<br />`}`|
+|Returns (verbosity=2)|`{ (json object)`<br />&nbsp;&nbsp;`"hash": "blockhash",  (string) the hash of the block (same as provided)`<br />&nbsp;&nbsp;`"confirmations": n,  (numeric) the number of confirmations`<br />&nbsp;&nbsp;`"strippedsize", n (numeric) the size of the block without witness data`<br />&nbsp;&nbsp;`"size": n,  (numeric) the size of the block`<br />&nbsp;&nbsp;`"weight": n, (numeric) value of the weight metric`<br />&nbsp;&nbsp;`"height": n,  (numeric) the height of the block in the block chain`<br />&nbsp;&nbsp;`"version": n,  (numeric) the block version`<br />&nbsp;&nbsp;`"merkleroot": "hash",  (string) root hash of the merkle tree`<br />&nbsp;&nbsp;`"rawtx": [ (array of json objects) the transactions as json objects`<br />&nbsp;&nbsp;&nbsp;&nbsp;`(see getrawtransaction json object details)`<br />&nbsp;&nbsp;`]`<br />&nbsp;&nbsp;`"time": n,  (numeric) the block time in seconds since 1 Jan 1970 GMT`<br />&nbsp;&nbsp;`"nonce": n,  (numeric) the block nonce`<br />&nbsp;&nbsp;`"bits", n,  (numeric) the bits which represent the block difficulty`<br />&nbsp;&nbsp;`difficulty: n.nn,  (numeric) the proof-of-work difficulty as a multiple of the minimum difficulty`<br />&nbsp;&nbsp;`"previousblockhash": "hash",  (string) the hash of the previous block`<br />&nbsp;&nbsp;`"nextblockhash": "hash",  (string) the hash of the next block`<br />`}`|
+|Example Return (verbosity=0)|`"010000000000000000000000000000000000000000000000000000000000000000000000`<br />`3ba3edfd7a7b12b27ac72c3e67768f617fc81bc3888a51323a9fb8aa4b1e5e4a29ab5f49`<br />`ffff001d1dac2b7c01010000000100000000000000000000000000000000000000000000`<br />`00000000000000000000ffffffff4d04ffff001d0104455468652054696d65732030332f`<br />`4a616e2f32303039204368616e63656c6c6f72206f6e206272696e6b206f66207365636f`<br />`6e64206261696c6f757420666f722062616e6b73ffffffff0100f2052a01000000434104`<br />`678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f`<br />`4cef38c4f35504e51ec112de5c384df7ba0b8d578a4c702b6bf11d5fac00000000"`<br /><font color="orange">**Newlines added for display purposes.  The actual return does not contain newlines.**</font>|
+|Example Return (verbosity=1)|`{`<br />&nbsp;&nbsp;`"hash": "000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f",`<br />&nbsp;&nbsp;`"confirmations": 277113,`<br />&nbsp;&nbsp;`"size": 285,`<br />&nbsp;&nbsp;`"height": 0,`<br />&nbsp;&nbsp;`"version": 1,`<br />&nbsp;&nbsp;`"merkleroot": "4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b",`<br />&nbsp;&nbsp;`"tx": [`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b"`<br />&nbsp;&nbsp;`],`<br />&nbsp;&nbsp;`"time": 1231006505,`<br />&nbsp;&nbsp;`"nonce": 2083236893,`<br />&nbsp;&nbsp;`"bits": "1d00ffff",`<br />&nbsp;&nbsp;`"difficulty": 1,`<br />&nbsp;&nbsp;`"previousblockhash": "0000000000000000000000000000000000000000000000000000000000000000",`<br />&nbsp;&nbsp;`"nextblockhash": "00000000839a8e6886ab5951d76f411475428afc90947ee320161bbf18eb6048"`<br />`}`|
 [Return to Overview](#MethodOverview)<br />
 
 ***
@@ -1074,7 +1075,7 @@ various languages.
 **9.1 Go**
 
 This section provides examples of using the RPC interface using Go and the
-[btcrpcclient](https://github.com/btcsuite/btcrpcclient) package.
+[rpcclient](https://github.com/btcsuite/btcd/tree/master/rpcclient) package.
 
 * [Using getblockcount to Retrieve the Current Block Height](#ExampleGetBlockCount)
 * [Using getblock to Retrieve the Genesis Block](#ExampleGetBlock)
@@ -1086,7 +1087,7 @@ This section provides examples of using the RPC interface using Go and the
 **9.1.1 Using getblockcount to Retrieve the Current Block Height**<br />
 
 The following is an example Go application which uses the
-[btcrpcclient](https://github.com/btcsuite/btcrpcclient) package to connect with
+[rpcclient](https://github.com/btcsuite/btcd/tree/master/rpcclient) package to connect with
 a btcd instance via Websockets, issues [getblockcount](#getblockcount) to
 retrieve the current block height, and displays it.
 
@@ -1094,11 +1095,12 @@ retrieve the current block height, and displays it.
 package main
 
 import (
-	"github.com/btcsuite/btcrpcclient"
-	"github.com/btcsuite/btcutil"
 	"io/ioutil"
 	"log"
 	"path/filepath"
+
+	"github.com/btcsuite/btcd/rpcclient"
+	"github.com/btcsuite/btcd/btcutil"
 )
 
 func main() {
@@ -1114,14 +1116,14 @@ func main() {
 	// Create a new RPC client using websockets.  Since this example is
 	// not long-lived, the connection will be closed as soon as the program
 	// exits.
-	connCfg := &btcrpcclient.ConnConfig{
+	connCfg := &rpcclient.ConnConfig{
 		Host:         "localhost:8334",
 		Endpoint:     "ws",
 		User:         "yourrpcuser",
 		Pass:         "yourrpcpass",
 		Certificates: certs,
 	}
-	client, err := btcrpcclient.New(connCfg, nil)
+	client, err := rpcclient.New(connCfg, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -1139,7 +1141,7 @@ func main() {
 Which results in:
 
 ```bash
-Block count: 276978
+2018/08/27 11:17:27 Block count: 536027
 ```
 
 <a name="ExampleGetBlock" />
@@ -1147,7 +1149,7 @@ Block count: 276978
 **9.1.2 Using getblock to Retrieve the Genesis Block**<br />
 
 The following is an example Go application which uses the
-[btcrpcclient](https://github.com/btcsuite/btcrpcclient) package to connect with
+[rpcclient](https://github.com/btcsuite/btcd/tree/master/rpcclient) package to connect with
 a btcd instance via Websockets, issues [getblock](#getblock) to retrieve
 information about the Genesis block, and display a few details about it.
 
@@ -1155,14 +1157,14 @@ information about the Genesis block, and display a few details about it.
 package main
 
 import (
-	"github.com/btcsuite/btcrpcclient"
-	"github.com/btcsuite/btcutil"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/wire"
 	"io/ioutil"
 	"log"
 	"path/filepath"
 	"time"
+
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/rpcclient"
+	"github.com/btcsuite/btcd/btcutil"
 )
 
 func main() {
@@ -1178,14 +1180,14 @@ func main() {
 	// Create a new RPC client using websockets.  Since this example is
 	// not long-lived, the connection will be closed as soon as the program
 	// exits.
-	connCfg := &btcrpcclient.ConnConfig{
+	connCfg := &rpcclient.ConnConfig{
 		Host:         "localhost:18334",
 		Endpoint:     "ws",
 		User:         "yourrpcuser",
 		Pass:         "yourrpcpass",
 		Certificates: certs,
 	}
-	client, err := btcrpcclient.New(connCfg, nil)
+	client, err := rpcclient.New(connCfg, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -1199,7 +1201,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	block, err := client.GetBlockVerbose(blockHash, false)
+	block, err := client.GetBlockVerbose(blockHash)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -1225,7 +1227,7 @@ Previous Block: 0000000000000000000000000000000000000000000000000000000000000000
 Next Block: 00000000839a8e6886ab5951d76f411475428afc90947ee320161bbf18eb6048
 Merkle root: 4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b
 Timestamp: 2009-01-03 18:15:05 +0000 UTC
-Confirmations: 277290
+Confirmations: 534323
 Difficulty: 1.000000
 Size (in bytes): 285
 Num transactions: 1
@@ -1237,7 +1239,7 @@ Num transactions: 1
 Notifications (Websocket-specific)**<br />
 
 The following is an example Go application which uses the
-[btcrpcclient](https://github.com/btcsuite/btcrpcclient) package to connect with
+[rpcclient](https://github.com/btcsuite/btcd/tree/master/rpcclient) package to connect with
 a btcd instance via Websockets and registers for
 [blockconnected](#blockconnected) and [blockdisconnected](#blockdisconnected)
 notifications with [notifyblocks](#notifyblocks).  It also sets up handlers for
@@ -1247,25 +1249,25 @@ the notifications.
 package main
 
 import (
-	"github.com/btcsuite/btcrpcclient"
-	"github.com/btcsuite/btcutil"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/wire"
 	"io/ioutil"
 	"log"
 	"path/filepath"
 	"time"
+
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/rpcclient"
+	"github.com/btcsuite/btcd/btcutil"
 )
 
 func main() {
 	// Setup handlers for blockconnected and blockdisconnected
 	// notifications.
-	ntfnHandlers := btcrpcclient.NotificationHandlers{
-		OnBlockConnected: func(hash *chainhash.Hash, height int32) {
-			log.Printf("Block connected: %v (%d)", hash, height)
+	ntfnHandlers := rpcclient.NotificationHandlers{
+		OnBlockConnected: func(hash *chainhash.Hash, height int32, t time.Time) {
+			log.Printf("Block connected: %v (%d) %s", hash, height, t)
 		},
-		OnBlockDisconnected: func(hash *chainhash.Hash, height int32) {
-			log.Printf("Block disconnected: %v", hash, height)
+		OnBlockDisconnected: func(hash *chainhash.Hash, height int32, t time.Time) {
+			log.Printf("Block disconnected: %v (%d) %s", hash, height, t)
 		},
 	}
 
@@ -1279,14 +1281,14 @@ func main() {
 	}
 
 	// Create a new RPC client using websockets.
-	connCfg := &btcrpcclient.ConnConfig{
+	connCfg := &rpcclient.ConnConfig{
 		Host:         "localhost:8334",
 		Endpoint:     "ws",
 		User:         "yourrpcuser",
 		Pass:         "yourrpcpass",
 		Certificates: certs,
 	}
-	client, err := btcrpcclient.New(connCfg, &ntfnHandlers)
+	client, err := rpcclient.New(connCfg, &ntfnHandlers)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -1316,10 +1318,14 @@ func main() {
 Example output:
 
 ```
-2014/05/12 20:33:17 Client shutdown in 10 seconds...
-2014/05/12 20:33:19 Block connected: 000000000000000007dff1f95f7b3f5eac2892a4123069517caf34e2c417650d (300461)
-2014/05/12 20:33:27 Client shutting down...
-2014/05/12 20:31:27 Client shutdown complete.
+2018/08/27 10:35:43 Client shutdown in 10 seconds...
+2018/08/27 10:35:44 Block connected: 00000000000000000003321723557df58914658dc6fd963d547292a0a4797454 (534747) 2018-08-02 06:37:52 +0800 CST
+2018/08/27 10:35:47 Block connected: 0000000000000000002e12773b798fc61dffe00ed5c3e89d3c306f8058c51e13 (534748) 2018-08-02 06:39:54 +0800 CST
+2018/08/27 10:35:49 Block connected: 0000000000000000001bb311cd849839ce88499b91a201922f55a1cfafabe267 (534749) 2018-08-02 06:44:22 +0800 CST
+2018/08/27 10:35:50 Block connected: 00000000000000000019d7296c9b5c175369ad337ec44b76bd4728021a09b864 (534750) 2018-08-02 06:55:44 +0800 CST
+2018/08/27 10:35:53 Block connected: 00000000000000000022db98cf47e944ed58ca450c819e8fef8f8c71ca5d9901 (534751) 2018-08-02 06:57:39 +0800 CST
+2018/08/27 10:35:53 Client shutting down...
+2018/08/27 10:35:53 Client shutdown complete.
 ```
 
 <a name="ExampleNodeJsCode" />

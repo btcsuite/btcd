@@ -1,0 +1,87 @@
+name: Build and Test
+on: [push, pull_request]
+
+env:
+  # go needs absolute directories, using the $HOME variable doesn't work here.
+  GOCACHE: /home/runner/work/go/pkg/build
+  GOPATH: /home/runner/work/go
+  GO_VERSION: 1.17.5
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Check out source
+        uses: actions/checkout@v2
+
+      - name: Build
+        run: make build
+
+  test-cover:
+    name: Unit coverage
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Check out source
+        uses: actions/checkout@v2
+
+      - name: Test
+        run: make unit-cover
+
+      - name: Send top-level coverage
+        uses: shogo82148/actions-goveralls@v1
+        with:
+          path-to-profile: coverage.txt
+          flag-name: btcd
+          parallel: true
+
+      - name: Send btcec
+        uses: shogo82148/actions-goveralls@v1
+        with:
+          path-to-profile: btcec/coverage.txt
+          flag-name: btcec
+          parallel: true
+
+      - name: Send btcutil coverage
+        uses: shogo82148/actions-goveralls@v1
+        with:
+          path-to-profile: btcutil/coverage.txt
+          flag-name: btcutil
+          parallel: true
+
+      - name: Send btcutil coverage for psbt package
+        uses: shogo82148/actions-goveralls@v1
+        with:
+          path-to-profile: btcutil/psbt/coverage.txt
+          flag-name: btcutilpsbt
+          parallel: true
+      
+      - name: Notify coveralls all reports sent
+        uses: shogo82148/actions-goveralls@v1
+        with:
+          parallel-finished: true
+
+  test-race:
+    name: Unit race
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Check out source
+        uses: actions/checkout@v2
+
+      - name: Test
+        run: make unit-race

@@ -14,13 +14,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/database"
 	_ "github.com/btcsuite/btcd/database/ffldb"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil"
 )
 
 const (
@@ -357,7 +357,7 @@ func newFakeChain(params *chaincfg.Params) *BlockChain {
 	targetTimespan := int64(params.TargetTimespan / time.Second)
 	targetTimePerBlock := int64(params.TargetTimePerBlock / time.Second)
 	adjustmentFactor := params.RetargetAdjustmentFactor
-	return &BlockChain{
+	b := &BlockChain{
 		chainParams:         params,
 		timeSource:          NewMedianTime(),
 		minRetargetTimespan: targetTimespan / adjustmentFactor,
@@ -368,6 +368,20 @@ func newFakeChain(params *chaincfg.Params) *BlockChain {
 		warningCaches:       newThresholdCaches(vbNumBits),
 		deploymentCaches:    newThresholdCaches(chaincfg.DefinedDeployments),
 	}
+
+	for _, deployment := range params.Deployments {
+		deploymentStarter := deployment.DeploymentStarter
+		if clockStarter, ok := deploymentStarter.(chaincfg.ClockConsensusDeploymentStarter); ok {
+			clockStarter.SynchronizeClock(b)
+		}
+
+		deploymentEnder := deployment.DeploymentEnder
+		if clockEnder, ok := deploymentEnder.(chaincfg.ClockConsensusDeploymentEnder); ok {
+			clockEnder.SynchronizeClock(b)
+		}
+	}
+
+	return b
 }
 
 // newFakeNode creates a block node connected to the passed parent with the

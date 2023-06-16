@@ -9,12 +9,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/btcsuite/btcd/btcec"
+	"github.com/btcsuite/btcd/btcec/v2"
+	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil"
 )
 
 // TestCalcMinRequiredTxRelayFee tests the calcMinRequiredTxRelayFee API.
@@ -98,7 +98,7 @@ func TestCalcMinRequiredTxRelayFee(t *testing.T) {
 func TestCheckPkScriptStandard(t *testing.T) {
 	var pubKeys [][]byte
 	for i := 0; i < 4; i++ {
-		pk, err := btcec.NewPrivateKey(btcec.S256())
+		pk, err := btcec.NewPrivateKey()
 		if err != nil {
 			t.Fatalf("TestCheckPkScriptStandard NewPrivateKey failed: %v",
 				err)
@@ -204,7 +204,7 @@ func TestCheckPkScriptStandard(t *testing.T) {
 	}
 }
 
-// TestDust tests the isDust API.
+// TestDust tests the IsDust API.
 func TestDust(t *testing.T) {
 	pkScript := []byte{0x76, 0xa9, 0x21, 0x03, 0x2f, 0x7e, 0x43,
 		0x0a, 0xa4, 0xc9, 0xd1, 0x59, 0x43, 0x7e, 0x84, 0xb9,
@@ -268,7 +268,7 @@ func TestDust(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		res := isDust(&test.txOut, test.relayFee)
+		res := IsDust(&test.txOut, test.relayFee)
 		if res != test.isDust {
 			t.Fatalf("Dust test '%s' failed: want %v got %v",
 				test.name, test.isDust, res)
@@ -277,7 +277,7 @@ func TestDust(t *testing.T) {
 	}
 }
 
-// TestCheckTransactionStandard tests the checkTransactionStandard API.
+// TestCheckTransactionStandard tests the CheckTransactionStandard API.
 func TestCheckTransactionStandard(t *testing.T) {
 	// Create some dummy, but otherwise standard, data for transactions.
 	prevOutHash, err := chainhash.NewHashFromStr("01")
@@ -469,7 +469,7 @@ func TestCheckTransactionStandard(t *testing.T) {
 	pastMedianTime := time.Now()
 	for _, test := range tests {
 		// Ensure standardness is as expected.
-		err := checkTransactionStandard(btcutil.NewTx(&test.tx),
+		err := CheckTransactionStandard(btcutil.NewTx(&test.tx),
 			test.height, pastMedianTime, DefaultMinRelayTxFee, 1)
 		if err == nil && test.isStandard {
 			// Test passes since function returned standard for a
@@ -477,12 +477,12 @@ func TestCheckTransactionStandard(t *testing.T) {
 			continue
 		}
 		if err == nil && !test.isStandard {
-			t.Errorf("checkTransactionStandard (%s): standard when "+
+			t.Errorf("CheckTransactionStandard (%s): standard when "+
 				"it should not be", test.name)
 			continue
 		}
 		if err != nil && test.isStandard {
-			t.Errorf("checkTransactionStandard (%s): nonstandard "+
+			t.Errorf("CheckTransactionStandard (%s): nonstandard "+
 				"when it should not be: %v", test.name, err)
 			continue
 		}
@@ -490,20 +490,20 @@ func TestCheckTransactionStandard(t *testing.T) {
 		// Ensure error type is a TxRuleError inside of a RuleError.
 		rerr, ok := err.(RuleError)
 		if !ok {
-			t.Errorf("checkTransactionStandard (%s): unexpected "+
+			t.Errorf("CheckTransactionStandard (%s): unexpected "+
 				"error type - got %T", test.name, err)
 			continue
 		}
 		txrerr, ok := rerr.Err.(TxRuleError)
 		if !ok {
-			t.Errorf("checkTransactionStandard (%s): unexpected "+
+			t.Errorf("CheckTransactionStandard (%s): unexpected "+
 				"error type - got %T", test.name, rerr.Err)
 			continue
 		}
 
 		// Ensure the reject code is the expected one.
 		if txrerr.RejectCode != test.code {
-			t.Errorf("checkTransactionStandard (%s): unexpected "+
+			t.Errorf("CheckTransactionStandard (%s): unexpected "+
 				"error code - got %v, want %v", test.name,
 				txrerr.RejectCode, test.code)
 			continue

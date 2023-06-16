@@ -1,4 +1,4 @@
-// Copyright (c) 2014 The btcsuite developers
+// Copyright (c) 2014-2020 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/btcsuite/btcd/btcjson"
+	"github.com/btcsuite/btcd/btcutil"
 )
 
 // TestWalletSvrCmds tests all of the wallet server commands marshal and
@@ -62,6 +63,61 @@ func TestWalletSvrCmds(t *testing.T) {
 			},
 		},
 		{
+			name: "createwallet",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("createwallet", "mywallet", true, true, "secret", true)
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewCreateWalletCmd("mywallet",
+					btcjson.Bool(true), btcjson.Bool(true),
+					btcjson.String("secret"), btcjson.Bool(true))
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"createwallet","params":["mywallet",true,true,"secret",true],"id":1}`,
+			unmarshalled: &btcjson.CreateWalletCmd{
+				WalletName:         "mywallet",
+				DisablePrivateKeys: btcjson.Bool(true),
+				Blank:              btcjson.Bool(true),
+				Passphrase:         btcjson.String("secret"),
+				AvoidReuse:         btcjson.Bool(true),
+			},
+		},
+		{
+			name: "createwallet - optional1",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("createwallet", "mywallet")
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewCreateWalletCmd("mywallet",
+					nil, nil, nil, nil)
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"createwallet","params":["mywallet"],"id":1}`,
+			unmarshalled: &btcjson.CreateWalletCmd{
+				WalletName:         "mywallet",
+				DisablePrivateKeys: btcjson.Bool(false),
+				Blank:              btcjson.Bool(false),
+				Passphrase:         btcjson.String(""),
+				AvoidReuse:         btcjson.Bool(false),
+			},
+		},
+		{
+			name: "createwallet - optional2",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("createwallet", "mywallet", "null", "null", "secret")
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewCreateWalletCmd("mywallet",
+					nil, nil, btcjson.String("secret"), nil)
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"createwallet","params":["mywallet",null,null,"secret"],"id":1}`,
+			unmarshalled: &btcjson.CreateWalletCmd{
+				WalletName:         "mywallet",
+				DisablePrivateKeys: nil,
+				Blank:              nil,
+				Passphrase:         btcjson.String("secret"),
+				AvoidReuse:         btcjson.Bool(false),
+			},
+		},
+		{
 			name: "addwitnessaddress",
 			newCmd: func() (interface{}, error) {
 				return btcjson.NewCmd("addwitnessaddress", "1address")
@@ -73,6 +129,49 @@ func TestWalletSvrCmds(t *testing.T) {
 			unmarshalled: &btcjson.AddWitnessAddressCmd{
 				Address: "1address",
 			},
+		},
+		{
+			name: "backupwallet",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("backupwallet", "backup.dat")
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewBackupWalletCmd("backup.dat")
+			},
+			marshalled:   `{"jsonrpc":"1.0","method":"backupwallet","params":["backup.dat"],"id":1}`,
+			unmarshalled: &btcjson.BackupWalletCmd{Destination: "backup.dat"},
+		},
+		{
+			name: "loadwallet",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("loadwallet", "wallet.dat")
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewLoadWalletCmd("wallet.dat")
+			},
+			marshalled:   `{"jsonrpc":"1.0","method":"loadwallet","params":["wallet.dat"],"id":1}`,
+			unmarshalled: &btcjson.LoadWalletCmd{WalletName: "wallet.dat"},
+		},
+		{
+			name: "unloadwallet",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("unloadwallet", "default")
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewUnloadWalletCmd(btcjson.String("default"))
+			},
+			marshalled:   `{"jsonrpc":"1.0","method":"unloadwallet","params":["default"],"id":1}`,
+			unmarshalled: &btcjson.UnloadWalletCmd{WalletName: btcjson.String("default")},
+		},
+		{name: "unloadwallet - nil arg",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("unloadwallet")
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewUnloadWalletCmd(nil)
+			},
+			marshalled:   `{"jsonrpc":"1.0","method":"unloadwallet","params":[],"id":1}`,
+			unmarshalled: &btcjson.UnloadWalletCmd{WalletName: nil},
 		},
 		{
 			name: "createmultisig",
@@ -129,6 +228,34 @@ func TestWalletSvrCmds(t *testing.T) {
 			},
 		},
 		{
+			name: "estimatesmartfee - no mode",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("estimatesmartfee", 6)
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewEstimateSmartFeeCmd(6, nil)
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"estimatesmartfee","params":[6],"id":1}`,
+			unmarshalled: &btcjson.EstimateSmartFeeCmd{
+				ConfTarget:   6,
+				EstimateMode: &btcjson.EstimateModeConservative,
+			},
+		},
+		{
+			name: "estimatesmartfee - economical mode",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("estimatesmartfee", 6, btcjson.EstimateModeEconomical)
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewEstimateSmartFeeCmd(6, &btcjson.EstimateModeEconomical)
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"estimatesmartfee","params":[6,"ECONOMICAL"],"id":1}`,
+			unmarshalled: &btcjson.EstimateSmartFeeCmd{
+				ConfTarget:   6,
+				EstimateMode: &btcjson.EstimateModeEconomical,
+			},
+		},
+		{
 			name: "estimatepriority",
 			newCmd: func() (interface{}, error) {
 				return btcjson.NewCmd("estimatepriority", 6)
@@ -181,6 +308,19 @@ func TestWalletSvrCmds(t *testing.T) {
 			},
 		},
 		{
+			name: "getaddressinfo",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("getaddressinfo", "1234")
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewGetAddressInfoCmd("1234")
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"getaddressinfo","params":["1234"],"id":1}`,
+			unmarshalled: &btcjson.GetAddressInfoCmd{
+				Address: "1234",
+			},
+		},
+		{
 			name: "getbalance",
 			newCmd: func() (interface{}, error) {
 				return btcjson.NewCmd("getbalance")
@@ -223,29 +363,56 @@ func TestWalletSvrCmds(t *testing.T) {
 			},
 		},
 		{
+			name: "getbalances",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("getbalances")
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewGetBalancesCmd()
+			},
+			marshalled:   `{"jsonrpc":"1.0","method":"getbalances","params":[],"id":1}`,
+			unmarshalled: &btcjson.GetBalancesCmd{},
+		},
+		{
 			name: "getnewaddress",
 			newCmd: func() (interface{}, error) {
 				return btcjson.NewCmd("getnewaddress")
 			},
 			staticCmd: func() interface{} {
-				return btcjson.NewGetNewAddressCmd(nil)
+				return btcjson.NewGetNewAddressCmd(nil, nil)
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"getnewaddress","params":[],"id":1}`,
 			unmarshalled: &btcjson.GetNewAddressCmd{
-				Account: nil,
+				Account:     nil,
+				AddressType: nil,
 			},
 		},
 		{
-			name: "getnewaddress optional",
+			name: "getnewaddress optional acct",
 			newCmd: func() (interface{}, error) {
 				return btcjson.NewCmd("getnewaddress", "acct")
 			},
 			staticCmd: func() interface{} {
-				return btcjson.NewGetNewAddressCmd(btcjson.String("acct"))
+				return btcjson.NewGetNewAddressCmd(btcjson.String("acct"), nil)
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"getnewaddress","params":["acct"],"id":1}`,
 			unmarshalled: &btcjson.GetNewAddressCmd{
-				Account: btcjson.String("acct"),
+				Account:     btcjson.String("acct"),
+				AddressType: nil,
+			},
+		},
+		{
+			name: "getnewaddress optional acct and type",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("getnewaddress", "acct", "legacy")
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewGetNewAddressCmd(btcjson.String("acct"), btcjson.String("legacy"))
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"getnewaddress","params":["acct","legacy"],"id":1}`,
+			unmarshalled: &btcjson.GetNewAddressCmd{
+				Account:     btcjson.String("acct"),
+				AddressType: btcjson.String("legacy"),
 			},
 		},
 		{
@@ -254,24 +421,40 @@ func TestWalletSvrCmds(t *testing.T) {
 				return btcjson.NewCmd("getrawchangeaddress")
 			},
 			staticCmd: func() interface{} {
-				return btcjson.NewGetRawChangeAddressCmd(nil)
+				return btcjson.NewGetRawChangeAddressCmd(nil, nil)
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"getrawchangeaddress","params":[],"id":1}`,
 			unmarshalled: &btcjson.GetRawChangeAddressCmd{
-				Account: nil,
+				Account:     nil,
+				AddressType: nil,
 			},
 		},
 		{
-			name: "getrawchangeaddress optional",
+			name: "getrawchangeaddress optional acct",
 			newCmd: func() (interface{}, error) {
 				return btcjson.NewCmd("getrawchangeaddress", "acct")
 			},
 			staticCmd: func() interface{} {
-				return btcjson.NewGetRawChangeAddressCmd(btcjson.String("acct"))
+				return btcjson.NewGetRawChangeAddressCmd(btcjson.String("acct"), nil)
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"getrawchangeaddress","params":["acct"],"id":1}`,
 			unmarshalled: &btcjson.GetRawChangeAddressCmd{
-				Account: btcjson.String("acct"),
+				Account:     btcjson.String("acct"),
+				AddressType: nil,
+			},
+		},
+		{
+			name: "getrawchangeaddress optional acct and type",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("getrawchangeaddress", "acct", "legacy")
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewGetRawChangeAddressCmd(btcjson.String("acct"), btcjson.String("legacy"))
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"getrawchangeaddress","params":["acct","legacy"],"id":1}`,
+			unmarshalled: &btcjson.GetRawChangeAddressCmd{
+				Account:     btcjson.String("acct"),
+				AddressType: btcjson.String("legacy"),
 			},
 		},
 		{
@@ -666,6 +849,21 @@ func TestWalletSvrCmds(t *testing.T) {
 				BlockHash:           btcjson.String("123"),
 				TargetConfirmations: btcjson.Int(6),
 				IncludeWatchOnly:    btcjson.Bool(true),
+			},
+		},
+		{
+			name: "listsinceblock pad null",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("listsinceblock", "null", 1, false)
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewListSinceBlockCmd(nil, btcjson.Int(1), btcjson.Bool(false))
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"listsinceblock","params":[null,1,false],"id":1}`,
+			unmarshalled: &btcjson.ListSinceBlockCmd{
+				BlockHash:           nil,
+				TargetConfirmations: btcjson.Int(1),
+				IncludeWatchOnly:    btcjson.Bool(false),
 			},
 		},
 		{
@@ -1166,6 +1364,103 @@ func TestWalletSvrCmds(t *testing.T) {
 			},
 		},
 		{
+			name: "signrawtransactionwithwallet",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("signrawtransactionwithwallet", "001122")
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewSignRawTransactionWithWalletCmd("001122", nil, nil)
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"signrawtransactionwithwallet","params":["001122"],"id":1}`,
+			unmarshalled: &btcjson.SignRawTransactionWithWalletCmd{
+				RawTx:       "001122",
+				Inputs:      nil,
+				SigHashType: btcjson.String("ALL"),
+			},
+		},
+		{
+			name: "signrawtransactionwithwallet optional1",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("signrawtransactionwithwallet", "001122", `[{"txid":"123","vout":1,"scriptPubKey":"00","redeemScript":"01","witnessScript":"02","amount":1.5}]`)
+			},
+			staticCmd: func() interface{} {
+				txInputs := []btcjson.RawTxWitnessInput{
+					{
+						Txid:          "123",
+						Vout:          1,
+						ScriptPubKey:  "00",
+						RedeemScript:  btcjson.String("01"),
+						WitnessScript: btcjson.String("02"),
+						Amount:        btcjson.Float64(1.5),
+					},
+				}
+
+				return btcjson.NewSignRawTransactionWithWalletCmd("001122", &txInputs, nil)
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"signrawtransactionwithwallet","params":["001122",[{"txid":"123","vout":1,"scriptPubKey":"00","redeemScript":"01","witnessScript":"02","amount":1.5}]],"id":1}`,
+			unmarshalled: &btcjson.SignRawTransactionWithWalletCmd{
+				RawTx: "001122",
+				Inputs: &[]btcjson.RawTxWitnessInput{
+					{
+						Txid:          "123",
+						Vout:          1,
+						ScriptPubKey:  "00",
+						RedeemScript:  btcjson.String("01"),
+						WitnessScript: btcjson.String("02"),
+						Amount:        btcjson.Float64(1.5),
+					},
+				},
+				SigHashType: btcjson.String("ALL"),
+			},
+		},
+		{
+			name: "signrawtransactionwithwallet optional1 with blank fields in input",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("signrawtransactionwithwallet", "001122", `[{"txid":"123","vout":1,"scriptPubKey":"00","redeemScript":"01"}]`)
+			},
+			staticCmd: func() interface{} {
+				txInputs := []btcjson.RawTxWitnessInput{
+					{
+						Txid:         "123",
+						Vout:         1,
+						ScriptPubKey: "00",
+						RedeemScript: btcjson.String("01"),
+					},
+				}
+
+				return btcjson.NewSignRawTransactionWithWalletCmd("001122", &txInputs, nil)
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"signrawtransactionwithwallet","params":["001122",[{"txid":"123","vout":1,"scriptPubKey":"00","redeemScript":"01"}]],"id":1}`,
+			unmarshalled: &btcjson.SignRawTransactionWithWalletCmd{
+				RawTx: "001122",
+				Inputs: &[]btcjson.RawTxWitnessInput{
+					{
+						Txid:         "123",
+						Vout:         1,
+						ScriptPubKey: "00",
+						RedeemScript: btcjson.String("01"),
+					},
+				},
+				SigHashType: btcjson.String("ALL"),
+			},
+		},
+		{
+			name: "signrawtransactionwithwallet optional2",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("signrawtransactionwithwallet", "001122", `[]`, "ALL")
+			},
+			staticCmd: func() interface{} {
+				txInputs := []btcjson.RawTxWitnessInput{}
+				return btcjson.NewSignRawTransactionWithWalletCmd("001122", &txInputs, btcjson.String("ALL"))
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"signrawtransactionwithwallet","params":["001122",[],"ALL"],"id":1}`,
+			unmarshalled: &btcjson.SignRawTransactionWithWalletCmd{
+				RawTx:       "001122",
+				Inputs:      &[]btcjson.RawTxWitnessInput{},
+				SigHashType: btcjson.String("ALL"),
+			},
+		},
+		{
 			name: "walletlock",
 			newCmd: func() (interface{}, error) {
 				return btcjson.NewCmd("walletlock")
@@ -1204,13 +1499,340 @@ func TestWalletSvrCmds(t *testing.T) {
 				NewPassphrase: "new",
 			},
 		},
+		{
+			name: "importmulti with descriptor + options",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd(
+					"importmulti",
+					// Cannot use a native string, due to special types like timestamp.
+					[]btcjson.ImportMultiRequest{
+						{Descriptor: btcjson.String("123"), Timestamp: btcjson.TimestampOrNow{Value: 0}},
+					},
+					`{"rescan": true}`,
+				)
+			},
+			staticCmd: func() interface{} {
+				requests := []btcjson.ImportMultiRequest{
+					{Descriptor: btcjson.String("123"), Timestamp: btcjson.TimestampOrNow{Value: 0}},
+				}
+				options := btcjson.ImportMultiOptions{Rescan: true}
+				return btcjson.NewImportMultiCmd(requests, &options)
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"importmulti","params":[[{"desc":"123","timestamp":0}],{"rescan":true}],"id":1}`,
+			unmarshalled: &btcjson.ImportMultiCmd{
+				Requests: []btcjson.ImportMultiRequest{
+					{
+						Descriptor: btcjson.String("123"),
+						Timestamp:  btcjson.TimestampOrNow{Value: 0},
+					},
+				},
+				Options: &btcjson.ImportMultiOptions{Rescan: true},
+			},
+		},
+		{
+			name: "importmulti with descriptor + no options",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd(
+					"importmulti",
+					// Cannot use a native string, due to special types like timestamp.
+					[]btcjson.ImportMultiRequest{
+						{
+							Descriptor: btcjson.String("123"),
+							Timestamp:  btcjson.TimestampOrNow{Value: 0},
+							WatchOnly:  btcjson.Bool(false),
+							Internal:   btcjson.Bool(true),
+							Label:      btcjson.String("aaa"),
+							KeyPool:    btcjson.Bool(false),
+						},
+					},
+				)
+			},
+			staticCmd: func() interface{} {
+				requests := []btcjson.ImportMultiRequest{
+					{
+						Descriptor: btcjson.String("123"),
+						Timestamp:  btcjson.TimestampOrNow{Value: 0},
+						WatchOnly:  btcjson.Bool(false),
+						Internal:   btcjson.Bool(true),
+						Label:      btcjson.String("aaa"),
+						KeyPool:    btcjson.Bool(false),
+					},
+				}
+				return btcjson.NewImportMultiCmd(requests, nil)
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"importmulti","params":[[{"desc":"123","timestamp":0,"internal":true,"watchonly":false,"label":"aaa","keypool":false}]],"id":1}`,
+			unmarshalled: &btcjson.ImportMultiCmd{
+				Requests: []btcjson.ImportMultiRequest{
+					{
+						Descriptor: btcjson.String("123"),
+						Timestamp:  btcjson.TimestampOrNow{Value: 0},
+						WatchOnly:  btcjson.Bool(false),
+						Internal:   btcjson.Bool(true),
+						Label:      btcjson.String("aaa"),
+						KeyPool:    btcjson.Bool(false),
+					},
+				},
+			},
+		},
+		{
+			name: "importmulti with descriptor + string timestamp",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd(
+					"importmulti",
+					// Cannot use a native string, due to special types like timestamp.
+					[]btcjson.ImportMultiRequest{
+						{
+							Descriptor: btcjson.String("123"),
+							Timestamp:  btcjson.TimestampOrNow{Value: "now"},
+						},
+					},
+				)
+			},
+			staticCmd: func() interface{} {
+				requests := []btcjson.ImportMultiRequest{
+					{Descriptor: btcjson.String("123"), Timestamp: btcjson.TimestampOrNow{Value: "now"}},
+				}
+				return btcjson.NewImportMultiCmd(requests, nil)
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"importmulti","params":[[{"desc":"123","timestamp":"now"}]],"id":1}`,
+			unmarshalled: &btcjson.ImportMultiCmd{
+				Requests: []btcjson.ImportMultiRequest{
+					{Descriptor: btcjson.String("123"), Timestamp: btcjson.TimestampOrNow{Value: "now"}},
+				},
+			},
+		},
+		{
+			name: "importmulti with scriptPubKey script",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd(
+					"importmulti",
+					// Cannot use a native string, due to special types like timestamp and scriptPubKey
+					[]btcjson.ImportMultiRequest{
+						{
+							ScriptPubKey: &btcjson.ScriptPubKey{Value: "script"},
+							RedeemScript: btcjson.String("123"),
+							Timestamp:    btcjson.TimestampOrNow{Value: 0},
+							PubKeys:      &[]string{"aaa"},
+						},
+					},
+				)
+			},
+			staticCmd: func() interface{} {
+				requests := []btcjson.ImportMultiRequest{
+					{
+						ScriptPubKey: &btcjson.ScriptPubKey{Value: "script"},
+						RedeemScript: btcjson.String("123"),
+						Timestamp:    btcjson.TimestampOrNow{Value: 0},
+						PubKeys:      &[]string{"aaa"},
+					},
+				}
+				return btcjson.NewImportMultiCmd(requests, nil)
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"importmulti","params":[[{"scriptPubKey":"script","timestamp":0,"redeemscript":"123","pubkeys":["aaa"]}]],"id":1}`,
+			unmarshalled: &btcjson.ImportMultiCmd{
+				Requests: []btcjson.ImportMultiRequest{
+					{
+						ScriptPubKey: &btcjson.ScriptPubKey{Value: "script"},
+						RedeemScript: btcjson.String("123"),
+						Timestamp:    btcjson.TimestampOrNow{Value: 0},
+						PubKeys:      &[]string{"aaa"},
+					},
+				},
+			},
+		},
+		{
+			name: "importmulti with scriptPubKey address",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd(
+					"importmulti",
+					// Cannot use a native string, due to special types like timestamp and scriptPubKey
+					[]btcjson.ImportMultiRequest{
+						{
+							ScriptPubKey:  &btcjson.ScriptPubKey{Value: btcjson.ScriptPubKeyAddress{Address: "addr"}},
+							WitnessScript: btcjson.String("123"),
+							Timestamp:     btcjson.TimestampOrNow{Value: 0},
+							Keys:          &[]string{"aaa"},
+						},
+					},
+				)
+			},
+			staticCmd: func() interface{} {
+				requests := []btcjson.ImportMultiRequest{
+					{
+						ScriptPubKey:  &btcjson.ScriptPubKey{Value: btcjson.ScriptPubKeyAddress{Address: "addr"}},
+						WitnessScript: btcjson.String("123"),
+						Timestamp:     btcjson.TimestampOrNow{Value: 0},
+						Keys:          &[]string{"aaa"},
+					},
+				}
+				return btcjson.NewImportMultiCmd(requests, nil)
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"importmulti","params":[[{"scriptPubKey":{"address":"addr"},"timestamp":0,"witnessscript":"123","keys":["aaa"]}]],"id":1}`,
+			unmarshalled: &btcjson.ImportMultiCmd{
+				Requests: []btcjson.ImportMultiRequest{
+					{
+						ScriptPubKey:  &btcjson.ScriptPubKey{Value: btcjson.ScriptPubKeyAddress{Address: "addr"}},
+						WitnessScript: btcjson.String("123"),
+						Timestamp:     btcjson.TimestampOrNow{Value: 0},
+						Keys:          &[]string{"aaa"},
+					},
+				},
+			},
+		},
+		{
+			name: "importmulti with ranged (int) descriptor",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd(
+					"importmulti",
+					// Cannot use a native string, due to special types like timestamp.
+					[]btcjson.ImportMultiRequest{
+						{
+							Descriptor: btcjson.String("123"),
+							Timestamp:  btcjson.TimestampOrNow{Value: 0},
+							Range:      &btcjson.DescriptorRange{Value: 7},
+						},
+					},
+				)
+			},
+			staticCmd: func() interface{} {
+				requests := []btcjson.ImportMultiRequest{
+					{
+						Descriptor: btcjson.String("123"),
+						Timestamp:  btcjson.TimestampOrNow{Value: 0},
+						Range:      &btcjson.DescriptorRange{Value: 7},
+					},
+				}
+				return btcjson.NewImportMultiCmd(requests, nil)
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"importmulti","params":[[{"desc":"123","timestamp":0,"range":7}]],"id":1}`,
+			unmarshalled: &btcjson.ImportMultiCmd{
+				Requests: []btcjson.ImportMultiRequest{
+					{
+						Descriptor: btcjson.String("123"),
+						Timestamp:  btcjson.TimestampOrNow{Value: 0},
+						Range:      &btcjson.DescriptorRange{Value: 7},
+					},
+				},
+			},
+		},
+		{
+			name: "importmulti with ranged (slice) descriptor",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd(
+					"importmulti",
+					// Cannot use a native string, due to special types like timestamp.
+					[]btcjson.ImportMultiRequest{
+						{
+							Descriptor: btcjson.String("123"),
+							Timestamp:  btcjson.TimestampOrNow{Value: 0},
+							Range:      &btcjson.DescriptorRange{Value: []int{1, 7}},
+						},
+					},
+				)
+			},
+			staticCmd: func() interface{} {
+				requests := []btcjson.ImportMultiRequest{
+					{
+						Descriptor: btcjson.String("123"),
+						Timestamp:  btcjson.TimestampOrNow{Value: 0},
+						Range:      &btcjson.DescriptorRange{Value: []int{1, 7}},
+					},
+				}
+				return btcjson.NewImportMultiCmd(requests, nil)
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"importmulti","params":[[{"desc":"123","timestamp":0,"range":[1,7]}]],"id":1}`,
+			unmarshalled: &btcjson.ImportMultiCmd{
+				Requests: []btcjson.ImportMultiRequest{
+					{
+						Descriptor: btcjson.String("123"),
+						Timestamp:  btcjson.TimestampOrNow{Value: 0},
+						Range:      &btcjson.DescriptorRange{Value: []int{1, 7}},
+					},
+				},
+			},
+		},
+		{
+			name: "walletcreatefundedpsbt",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd(
+					"walletcreatefundedpsbt",
+					[]btcjson.PsbtInput{
+						{
+							Txid:     "1234",
+							Vout:     0,
+							Sequence: 0,
+						},
+					},
+					[]btcjson.PsbtOutput{
+						btcjson.NewPsbtOutput("1234", btcutil.Amount(1234)),
+						btcjson.NewPsbtDataOutput([]byte{1, 2, 3, 4}),
+					},
+					btcjson.Uint32(1),
+					btcjson.WalletCreateFundedPsbtOpts{},
+					btcjson.Bool(true),
+				)
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewWalletCreateFundedPsbtCmd(
+					[]btcjson.PsbtInput{
+						{
+							Txid:     "1234",
+							Vout:     0,
+							Sequence: 0,
+						},
+					},
+					[]btcjson.PsbtOutput{
+						btcjson.NewPsbtOutput("1234", btcutil.Amount(1234)),
+						btcjson.NewPsbtDataOutput([]byte{1, 2, 3, 4}),
+					},
+					btcjson.Uint32(1),
+					&btcjson.WalletCreateFundedPsbtOpts{},
+					btcjson.Bool(true),
+				)
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"walletcreatefundedpsbt","params":[[{"txid":"1234","vout":0,"sequence":0}],[{"1234":0.00001234},{"data":"01020304"}],1,{},true],"id":1}`,
+			unmarshalled: &btcjson.WalletCreateFundedPsbtCmd{
+				Inputs: []btcjson.PsbtInput{
+					{
+						Txid:     "1234",
+						Vout:     0,
+						Sequence: 0,
+					},
+				},
+				Outputs: []btcjson.PsbtOutput{
+					btcjson.NewPsbtOutput("1234", btcutil.Amount(1234)),
+					btcjson.NewPsbtDataOutput([]byte{1, 2, 3, 4}),
+				},
+				Locktime:    btcjson.Uint32(1),
+				Options:     &btcjson.WalletCreateFundedPsbtOpts{},
+				Bip32Derivs: btcjson.Bool(true),
+			},
+		},
+		{
+			name: "walletprocesspsbt",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd(
+					"walletprocesspsbt", "1234", btcjson.Bool(true), btcjson.String("ALL"), btcjson.Bool(true))
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewWalletProcessPsbtCmd(
+					"1234", btcjson.Bool(true), btcjson.String("ALL"), btcjson.Bool(true))
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"walletprocesspsbt","params":["1234",true,"ALL",true],"id":1}`,
+			unmarshalled: &btcjson.WalletProcessPsbtCmd{
+				Psbt:        "1234",
+				Sign:        btcjson.Bool(true),
+				SighashType: btcjson.String("ALL"),
+				Bip32Derivs: btcjson.Bool(true),
+			},
+		},
 	}
 
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
 		// Marshal the command as created by the new static command
 		// creation function.
-		marshalled, err := btcjson.MarshalCmd(testID, test.staticCmd())
+		marshalled, err := btcjson.MarshalCmd(btcjson.RpcVersion1, testID, test.staticCmd())
 		if err != nil {
 			t.Errorf("MarshalCmd #%d (%s) unexpected error: %v", i,
 				test.name, err)
@@ -1234,7 +1856,7 @@ func TestWalletSvrCmds(t *testing.T) {
 
 		// Marshal the command as created by the generic new command
 		// creation function.
-		marshalled, err = btcjson.MarshalCmd(testID, cmd)
+		marshalled, err = btcjson.MarshalCmd(btcjson.RpcVersion1, testID, cmd)
 		if err != nil {
 			t.Errorf("MarshalCmd #%d (%s) unexpected error: %v", i,
 				test.name, err)

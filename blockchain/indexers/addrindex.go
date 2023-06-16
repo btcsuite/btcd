@@ -10,12 +10,12 @@ import (
 	"sync"
 
 	"github.com/btcsuite/btcd/blockchain"
+	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil"
 )
 
 const (
@@ -62,6 +62,11 @@ const (
 	// as p2wsh are distinct from p2sh addresses since they use a new
 	// script template, as well as a 32-byte data push.
 	addrKeyTypeWitnessScriptHash = 3
+
+	// addrKeyTypeTaprootPubKey is the address type in an address key that
+	// represnts a pay-to-taproot adress. We use this to denote addresses
+	// related to the segwit v1 that are encoded in the bech32m format.
+	addrKeyTypeTaprootPubKey = 4
 
 	// Size of a transaction entry.  It consists of 4 bytes block id + 4
 	// bytes offset + 4 bytes length.
@@ -155,7 +160,9 @@ func serializeAddrIndexEntry(blockID uint32, txLoc wire.TxLoc) []byte {
 // provided region struct according to the format described in detail above and
 // uses the passed block hash fetching function in order to conver the block ID
 // to the associated block hash.
-func deserializeAddrIndexEntry(serialized []byte, region *database.BlockRegion, fetchBlockHash fetchBlockHashFunc) error {
+func deserializeAddrIndexEntry(serialized []byte, region *database.BlockRegion,
+	fetchBlockHash fetchBlockHashFunc) error {
+
 	// Ensure there are enough bytes to decode.
 	if len(serialized) < txEntrySize {
 		return errDeserialize("unexpected end of data")
@@ -182,7 +189,9 @@ func keyForLevel(addrKey [addrKeySize]byte, level uint8) [levelKeySize]byte {
 
 // dbPutAddrIndexEntry updates the address index to include the provided entry
 // according to the level-based scheme described in detail above.
-func dbPutAddrIndexEntry(bucket internalBucket, addrKey [addrKeySize]byte, blockID uint32, txLoc wire.TxLoc) error {
+func dbPutAddrIndexEntry(bucket internalBucket, addrKey [addrKeySize]byte,
+	blockID uint32, txLoc wire.TxLoc) error {
+
 	// Start with level 0 and its initial max number of entries.
 	curLevel := uint8(0)
 	maxLevelBytes := level0MaxEntries * txEntrySize
@@ -253,7 +262,10 @@ func dbPutAddrIndexEntry(bucket internalBucket, addrKey [addrKeySize]byte, block
 // the given address key and the number of entries skipped since it could have
 // been less in the case where there are less total entries than the requested
 // number of entries to skip.
-func dbFetchAddrIndexEntries(bucket internalBucket, addrKey [addrKeySize]byte, numToSkip, numRequested uint32, reverse bool, fetchBlockHash fetchBlockHashFunc) ([]database.BlockRegion, uint32, error) {
+func dbFetchAddrIndexEntries(bucket internalBucket, addrKey [addrKeySize]byte,
+	numToSkip, numRequested uint32, reverse bool,
+	fetchBlockHash fetchBlockHashFunc) ([]database.BlockRegion, uint32, error) {
+
 	// When the reverse flag is not set, all levels need to be fetched
 	// because numToSkip and numRequested are counted from the oldest
 	// transactions (highest level) and thus the total count is needed.
@@ -356,7 +368,9 @@ func maxEntriesForLevel(level uint8) int {
 // dbRemoveAddrIndexEntries removes the specified number of entries from from
 // the address index for the provided key.  An assertion error will be returned
 // if the count exceeds the total number of entries in the index.
-func dbRemoveAddrIndexEntries(bucket internalBucket, addrKey [addrKeySize]byte, count int) error {
+func dbRemoveAddrIndexEntries(bucket internalBucket, addrKey [addrKeySize]byte,
+	count int) error {
+
 	// Nothing to do if no entries are being deleted.
 	if count <= 0 {
 		return nil
@@ -563,6 +577,16 @@ func addrToKey(addr btcutil.Address) ([addrKeySize]byte, error) {
 		var result [addrKeySize]byte
 		result[0] = addrKeyTypeWitnessPubKeyHash
 		copy(result[1:], addr.Hash160()[:])
+		return result, nil
+
+	case *btcutil.AddressTaproot:
+		var result [addrKeySize]byte
+		result[0] = addrKeyTypeTaprootPubKey
+
+		// Taproot outputs are actually just the 32-byte public key.
+		// Similar to the P2WSH outputs, we'll map these to 20-bytes
+		// via the hash160.
+		copy(result[1:], btcutil.Hash160(addr.ScriptAddress()))
 		return result, nil
 	}
 
@@ -796,7 +820,9 @@ func (idx *AddrIndex) DisconnectBlock(dbTx database.Tx, block *btcutil.Block,
 // that involve a given address.
 //
 // This function is safe for concurrent access.
-func (idx *AddrIndex) TxRegionsForAddress(dbTx database.Tx, addr btcutil.Address, numToSkip, numRequested uint32, reverse bool) ([]database.BlockRegion, uint32, error) {
+func (idx *AddrIndex) TxRegionsForAddress(dbTx database.Tx, addr btcutil.Address,
+	numToSkip, numRequested uint32, reverse bool) ([]database.BlockRegion, uint32, error) {
+
 	addrKey, err := addrToKey(addr)
 	if err != nil {
 		return nil, 0, err

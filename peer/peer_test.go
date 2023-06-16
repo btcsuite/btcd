@@ -238,6 +238,7 @@ func TestPeerConnection(t *testing.T) {
 		ProtocolVersion:   wire.RejectVersion, // Configure with older version
 		Services:          0,
 		TrickleInterval:   time.Second * 10,
+		AllowSelfConns:    true,
 	}
 	peer2Cfg := &peer.Config{
 		Listeners:         peer1Cfg.Listeners,
@@ -247,6 +248,7 @@ func TestPeerConnection(t *testing.T) {
 		ChainParams:       &chaincfg.MainNetParams,
 		Services:          wire.SFNodeNetwork | wire.SFNodeWitness,
 		TrickleInterval:   time.Second * 10,
+		AllowSelfConns:    true,
 	}
 
 	wantStats1 := peerStats{
@@ -287,18 +289,16 @@ func TestPeerConnection(t *testing.T) {
 		{
 			"basic handshake",
 			func() (*peer.Peer, *peer.Peer, error) {
-				inConn, outConn := pipe(
-					&conn{raddr: "10.0.0.1:8333"},
-					&conn{raddr: "10.0.0.2:8333"},
-				)
 				inPeer := peer.NewInboundPeer(peer1Cfg)
-				inPeer.AssociateConnection(inConn)
-
 				outPeer, err := peer.NewOutboundPeer(peer2Cfg, "10.0.0.2:8333")
 				if err != nil {
 					return nil, nil, err
 				}
-				outPeer.AssociateConnection(outConn)
+
+				err = setupPeerConnection(inPeer, outPeer)
+				if err != nil {
+					return nil, nil, err
+				}
 
 				for i := 0; i < 4; i++ {
 					select {
@@ -313,18 +313,16 @@ func TestPeerConnection(t *testing.T) {
 		{
 			"socks proxy",
 			func() (*peer.Peer, *peer.Peer, error) {
-				inConn, outConn := pipe(
-					&conn{raddr: "10.0.0.1:8333", proxy: true},
-					&conn{raddr: "10.0.0.2:8333"},
-				)
 				inPeer := peer.NewInboundPeer(peer1Cfg)
-				inPeer.AssociateConnection(inConn)
-
 				outPeer, err := peer.NewOutboundPeer(peer2Cfg, "10.0.0.2:8333")
 				if err != nil {
 					return nil, nil, err
 				}
-				outPeer.AssociateConnection(outConn)
+
+				err = setupPeerConnection(inPeer, outPeer)
+				if err != nil {
+					return nil, nil, err
+				}
 
 				for i := 0; i < 4; i++ {
 					select {
@@ -357,7 +355,7 @@ func TestPeerConnection(t *testing.T) {
 // TestPeerListeners tests that the peer listeners are called as expected.
 func TestPeerListeners(t *testing.T) {
 	verack := make(chan struct{}, 1)
-	ok := make(chan wire.Message, 20)
+	ok := make(chan wire.Message, 22)
 	peerCfg := &peer.Config{
 		Listeners: peer.MessageListeners{
 			OnGetAddr: func(p *peer.Peer, msg *wire.MsgGetAddr) {
@@ -445,6 +443,12 @@ func TestPeerListeners(t *testing.T) {
 			OnSendHeaders: func(p *peer.Peer, msg *wire.MsgSendHeaders) {
 				ok <- msg
 			},
+			OnSendAddrV2: func(p *peer.Peer, msg *wire.MsgSendAddrV2) {
+				ok <- msg
+			},
+			OnAddrV2: func(p *peer.Peer, msg *wire.MsgAddrV2) {
+				ok <- msg
+			},
 		},
 		UserAgentName:     "peer",
 		UserAgentVersion:  "1.0",
@@ -452,13 +456,9 @@ func TestPeerListeners(t *testing.T) {
 		ChainParams:       &chaincfg.MainNetParams,
 		Services:          wire.SFNodeBloom,
 		TrickleInterval:   time.Second * 10,
+		AllowSelfConns:    true,
 	}
-	inConn, outConn := pipe(
-		&conn{raddr: "10.0.0.1:8333"},
-		&conn{raddr: "10.0.0.2:8333"},
-	)
 	inPeer := peer.NewInboundPeer(peerCfg)
-	inPeer.AssociateConnection(inConn)
 
 	peerCfg.Listeners = peer.MessageListeners{
 		OnVerAck: func(p *peer.Peer, msg *wire.MsgVerAck) {
@@ -470,7 +470,12 @@ func TestPeerListeners(t *testing.T) {
 		t.Errorf("NewOutboundPeer: unexpected err %v\n", err)
 		return
 	}
-	outPeer.AssociateConnection(outConn)
+
+	err = setupPeerConnection(inPeer, outPeer)
+	if err != nil {
+		t.Errorf("setupPeerConnection: failed: %v\n", err)
+		return
+	}
 
 	for i := 0; i < 2; i++ {
 		select {
@@ -594,6 +599,14 @@ func TestPeerListeners(t *testing.T) {
 			"OnSendHeaders",
 			wire.NewMsgSendHeaders(),
 		},
+		{
+			"OnSendAddrV2",
+			wire.NewMsgSendAddrV2(),
+		},
+		{
+			"OnAddrV2",
+			wire.NewMsgAddrV2(),
+		},
 	}
 	t.Logf("Running %d tests", len(tests))
 	for _, test := range tests {
@@ -623,6 +636,7 @@ func TestOutboundPeer(t *testing.T) {
 		ChainParams:       &chaincfg.MainNetParams,
 		Services:          0,
 		TrickleInterval:   time.Second * 10,
+		AllowSelfConns:    true,
 	}
 
 	r, w := io.Pipe()
@@ -764,6 +778,7 @@ func TestUnsupportedVersionPeer(t *testing.T) {
 		ChainParams:       &chaincfg.MainNetParams,
 		Services:          0,
 		TrickleInterval:   time.Second * 10,
+		AllowSelfConns:    true,
 	}
 
 	localNA := wire.NewNetAddressIPPort(
@@ -874,18 +889,19 @@ func TestDuplicateVersionMsg(t *testing.T) {
 		UserAgentVersion: "1.0",
 		ChainParams:      &chaincfg.MainNetParams,
 		Services:         0,
+		AllowSelfConns:   true,
 	}
-	inConn, outConn := pipe(
-		&conn{laddr: "10.0.0.1:9108", raddr: "10.0.0.2:9108"},
-		&conn{laddr: "10.0.0.2:9108", raddr: "10.0.0.1:9108"},
-	)
-	outPeer, err := peer.NewOutboundPeer(peerCfg, inConn.laddr)
+	outPeer, err := peer.NewOutboundPeer(peerCfg, "10.0.0.2:8333")
 	if err != nil {
 		t.Fatalf("NewOutboundPeer: unexpected err: %v\n", err)
 	}
-	outPeer.AssociateConnection(outConn)
 	inPeer := peer.NewInboundPeer(peerCfg)
-	inPeer.AssociateConnection(inConn)
+
+	err = setupPeerConnection(inPeer, outPeer)
+	if err != nil {
+		t.Fatalf("setupPeerConnection failed to connect: %v\n", err)
+	}
+
 	// Wait for the veracks from the initial protocol version negotiation.
 	for i := 0; i < 2; i++ {
 		select {
@@ -917,7 +933,279 @@ func TestDuplicateVersionMsg(t *testing.T) {
 	}
 }
 
-func init() {
-	// Allow self connection when running the tests.
-	peer.TstAllowSelfConns()
+// TestUpdateLastBlockHeight ensures the last block height is set properly
+// during the initial version negotiation and is only allowed to advance to
+// higher values via the associated update function.
+func TestUpdateLastBlockHeight(t *testing.T) {
+	// Create a pair of peers that are connected to each other using a fake
+	// connection and the remote peer starting at height 100.
+	const remotePeerHeight = 100
+	verack := make(chan struct{})
+	peerCfg := peer.Config{
+		Listeners: peer.MessageListeners{
+			OnVerAck: func(p *peer.Peer, msg *wire.MsgVerAck) {
+				verack <- struct{}{}
+			},
+		},
+		UserAgentName:    "peer",
+		UserAgentVersion: "1.0",
+		ChainParams:      &chaincfg.MainNetParams,
+		Services:         0,
+		AllowSelfConns:   true,
+	}
+	remotePeerCfg := peerCfg
+	remotePeerCfg.NewestBlock = func() (*chainhash.Hash, int32, error) {
+		return &chainhash.Hash{}, remotePeerHeight, nil
+	}
+	localPeer, err := peer.NewOutboundPeer(&peerCfg, "10.0.0.2:8333")
+	if err != nil {
+		t.Fatalf("NewOutboundPeer: unexpected err: %v\n", err)
+	}
+	inPeer := peer.NewInboundPeer(&remotePeerCfg)
+
+	err = setupPeerConnection(inPeer, localPeer)
+	if err != nil {
+		t.Fatalf("setupPeerConnection failed to connect: %v\n", err)
+	}
+
+	// Wait for the veracks from the initial protocol version negotiation.
+	for i := 0; i < 2; i++ {
+		select {
+		case <-verack:
+		case <-time.After(time.Second):
+			t.Fatal("verack timeout")
+		}
+	}
+
+	// Ensure the latest block height starts at the value reported by the remote
+	// peer via its version message.
+	if height := localPeer.LastBlock(); height != remotePeerHeight {
+		t.Fatalf("wrong starting height - got %d, want %d", height,
+			remotePeerHeight)
+	}
+
+	// Ensure the latest block height is not allowed to go backwards.
+	localPeer.UpdateLastBlockHeight(remotePeerHeight - 1)
+	if height := localPeer.LastBlock(); height != remotePeerHeight {
+		t.Fatalf("height allowed to go backwards - got %d, want %d", height,
+			remotePeerHeight)
+	}
+
+	// Ensure the latest block height is allowed to advance.
+	localPeer.UpdateLastBlockHeight(remotePeerHeight + 1)
+	if height := localPeer.LastBlock(); height != remotePeerHeight+1 {
+		t.Fatalf("height not allowed to advance - got %d, want %d", height,
+			remotePeerHeight+1)
+	}
+}
+
+// setupPeerConnection initiates a tcp connection between two peers.
+func setupPeerConnection(in, out *peer.Peer) error {
+	// listenFunc is a function closure that listens for a tcp connection.
+	// The tcp connection will be the one the inbound peer uses. This will
+	// be run as a goroutine.
+	listenFunc := func(l *net.TCPListener, errChan chan error,
+		listenChan chan struct{}) {
+
+		listenChan <- struct{}{}
+
+		conn, err := l.Accept()
+		if err != nil {
+			errChan <- err
+			return
+		}
+
+		in.AssociateConnection(conn)
+		errChan <- nil
+	}
+
+	// dialFunc is a function closure that initiates the tcp connection.
+	// The tcp connection will be the one the outbound peer uses.
+	dialFunc := func(addr *net.TCPAddr) error {
+		conn, err := net.Dial("tcp", addr.String())
+		if err != nil {
+			return err
+		}
+
+		out.AssociateConnection(conn)
+		return nil
+	}
+
+	listenAddr := "localhost:0"
+
+	addr, err := net.ResolveTCPAddr("tcp", listenAddr)
+	if err != nil {
+		return err
+	}
+
+	l, err := net.ListenTCP("tcp", addr)
+	if err != nil {
+		return err
+	}
+
+	errChan := make(chan error, 1)
+	listenChan := make(chan struct{}, 1)
+
+	go listenFunc(l, errChan, listenChan)
+	<-listenChan
+
+	if err := dialFunc(l.Addr().(*net.TCPAddr)); err != nil {
+		return err
+	}
+
+	select {
+	case err = <-errChan:
+		return err
+	case <-time.After(time.Second * 2):
+		return errors.New("failed to create connection")
+	}
+}
+
+// TestSendAddrV2Handshake tests that the version-verack handshake with the
+// addition of the sendaddrv2 message works as expected.
+func TestSendAddrV2Handshake(t *testing.T) {
+	verack := make(chan struct{}, 2)
+	sendaddr := make(chan struct{}, 2)
+	peer1Cfg := &peer.Config{
+		Listeners: peer.MessageListeners{
+			OnVerAck: func(p *peer.Peer, msg *wire.MsgVerAck) {
+				verack <- struct{}{}
+			},
+			OnSendAddrV2: func(p *peer.Peer,
+				msg *wire.MsgSendAddrV2) {
+
+				sendaddr <- struct{}{}
+			},
+		},
+		AllowSelfConns: true,
+		ChainParams:    &chaincfg.MainNetParams,
+	}
+
+	peer2Cfg := &peer.Config{
+		Listeners:      peer1Cfg.Listeners,
+		AllowSelfConns: true,
+		ChainParams:    &chaincfg.MainNetParams,
+	}
+
+	verackErr := errors.New("verack timeout")
+
+	tests := []struct {
+		name      string
+		expectsV2 bool
+		setup     func() (*peer.Peer, *peer.Peer, error)
+	}{
+		{
+			"successful sendaddrv2 handshake",
+			true,
+			func() (*peer.Peer, *peer.Peer, error) {
+				inPeer := peer.NewInboundPeer(peer1Cfg)
+				outPeer, err := peer.NewOutboundPeer(
+					peer2Cfg, "10.0.0.2:8333",
+				)
+				if err != nil {
+					return nil, nil, err
+				}
+
+				err = setupPeerConnection(inPeer, outPeer)
+				if err != nil {
+					return nil, nil, err
+				}
+
+				for i := 0; i < 4; i++ {
+					select {
+					case <-sendaddr:
+					case <-verack:
+					case <-time.After(time.Second * 2):
+						return nil, nil, verackErr
+					}
+				}
+
+				return inPeer, outPeer, nil
+			},
+		},
+		{
+			"handshake with legacy inbound peer",
+			false,
+			func() (*peer.Peer, *peer.Peer, error) {
+				legacyVersion := wire.AddrV2Version - 1
+				peer1Cfg.ProtocolVersion = legacyVersion
+				inPeer := peer.NewInboundPeer(peer1Cfg)
+				outPeer, err := peer.NewOutboundPeer(
+					peer2Cfg, "10.0.0.2:8333",
+				)
+				if err != nil {
+					return nil, nil, err
+				}
+
+				err = setupPeerConnection(inPeer, outPeer)
+				if err != nil {
+					return nil, nil, err
+				}
+
+				for i := 0; i < 2; i++ {
+					select {
+					case <-verack:
+					case <-time.After(time.Second * 2):
+						return nil, nil, verackErr
+					}
+				}
+
+				return inPeer, outPeer, nil
+			},
+		},
+		{
+			"handshake with legacy outbound peer",
+			false,
+			func() (*peer.Peer, *peer.Peer, error) {
+				inPeer := peer.NewInboundPeer(peer1Cfg)
+				legacyVersion := wire.AddrV2Version - 1
+				peer2Cfg.ProtocolVersion = legacyVersion
+				outPeer, err := peer.NewOutboundPeer(
+					peer2Cfg, "10.0.0.2:8333",
+				)
+				if err != nil {
+					return nil, nil, err
+				}
+
+				err = setupPeerConnection(inPeer, outPeer)
+				if err != nil {
+					return nil, nil, err
+				}
+
+				for i := 0; i < 2; i++ {
+					select {
+					case <-verack:
+					case <-time.After(time.Second * 2):
+						return nil, nil, verackErr
+					}
+				}
+
+				return inPeer, outPeer, nil
+			},
+		},
+	}
+
+	t.Logf("Running %d tests", len(tests))
+	for i, test := range tests {
+		inPeer, outPeer, err := test.setup()
+		if err != nil {
+			t.Fatalf("TestSendAddrV2Handshake setup #%d: "+
+				"unexpected err: %v", i, err)
+		}
+
+		if inPeer.WantsAddrV2() != test.expectsV2 {
+			t.Fatalf("TestSendAddrV2Handshake #%d expected "+
+				"wantsAddrV2 to be %v instead was %v", i,
+				test.expectsV2, inPeer.WantsAddrV2())
+		} else if outPeer.WantsAddrV2() != test.expectsV2 {
+			t.Fatalf("TestSendAddrV2Handshake #%d expected "+
+				"wantsAddrV2 to be %v instead was %v", i,
+				test.expectsV2, outPeer.WantsAddrV2())
+		}
+
+		inPeer.Disconnect()
+		outPeer.Disconnect()
+		inPeer.WaitForDisconnect()
+		outPeer.WaitForDisconnect()
+	}
 }

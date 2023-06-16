@@ -200,7 +200,7 @@ func BenchmarkWriteOutPoint(b *testing.B) {
 		Index: 0,
 	}
 	for i := 0; i < b.N; i++ {
-		writeOutPoint(ioutil.Discard, 0, 0, op)
+		WriteOutPoint(ioutil.Discard, 0, 0, op)
 	}
 }
 
@@ -226,7 +226,7 @@ func BenchmarkReadTxOut(b *testing.B) {
 	var txOut TxOut
 	for i := 0; i < b.N; i++ {
 		r.Seek(0, 0)
-		readTxOut(r, 0, 0, &txOut)
+		ReadTxOut(r, 0, 0, &txOut)
 		scriptPool.Return(txOut.PkScript)
 	}
 }
