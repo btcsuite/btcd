@@ -9,9 +9,9 @@ import (
 	"fmt"
 	"math"
 
+	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/txscript"
-	"github.com/btcsuite/btcd/btcutil"
 )
 
 const (
@@ -86,7 +86,7 @@ func HashMerkleBranches(left *chainhash.Hash, right *chainhash.Hash) *chainhash.
 //
 // The above stored as a linear array is as follows:
 //
-// 	[h1 h2 h3 h4 h12 h34 root]
+//	[h1 h2 h3 h4 h12 h34 root]
 //
 // As the above shows, the merkle root is always the last element in the array.
 //

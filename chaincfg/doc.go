@@ -18,40 +18,40 @@
 // When a network parameter is needed, it may then be looked up through this
 // variable (either directly, or hidden in a library call).
 //
-//  package main
+//	package main
 //
-//  import (
-//          "flag"
-//          "fmt"
-//          "log"
+//	import (
+//	        "flag"
+//	        "fmt"
+//	        "log"
 //
-//          "github.com/btcsuite/btcd/btcutil"
-//          "github.com/btcsuite/btcd/chaincfg"
-//  )
+//	        "github.com/btcsuite/btcd/btcutil"
+//	        "github.com/btcsuite/btcd/chaincfg"
+//	)
 //
-//  var testnet = flag.Bool("testnet", false, "operate on the testnet Bitcoin network")
+//	var testnet = flag.Bool("testnet", false, "operate on the testnet Bitcoin network")
 //
-//  // By default (without -testnet), use mainnet.
-//  var chainParams = &chaincfg.MainNetParams
+//	// By default (without -testnet), use mainnet.
+//	var chainParams = &chaincfg.MainNetParams
 //
-//  func main() {
-//          flag.Parse()
+//	func main() {
+//	        flag.Parse()
 //
-//          // Modify active network parameters if operating on testnet.
-//          if *testnet {
-//                  chainParams = &chaincfg.TestNet3Params
-//          }
+//	        // Modify active network parameters if operating on testnet.
+//	        if *testnet {
+//	                chainParams = &chaincfg.TestNet3Params
+//	        }
 //
-//          // later...
+//	        // later...
 //
-//          // Create and print new payment address, specific to the active network.
-//          pubKeyHash := make([]byte, 20)
-//          addr, err := btcutil.NewAddressPubKeyHash(pubKeyHash, chainParams)
-//          if err != nil {
-//                  log.Fatal(err)
-//          }
-//          fmt.Println(addr)
-//  }
+//	        // Create and print new payment address, specific to the active network.
+//	        pubKeyHash := make([]byte, 20)
+//	        addr, err := btcutil.NewAddressPubKeyHash(pubKeyHash, chainParams)
+//	        if err != nil {
+//	                log.Fatal(err)
+//	        }
+//	        fmt.Println(addr)
+//	}
 //
 // If an application does not use one of the three standard Bitcoin networks,
 // a new Params struct may be created which defines the parameters for the

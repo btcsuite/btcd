@@ -68,14 +68,14 @@ func (w *WIF) IsForNet(net *chaincfg.Params) bool {
 // The WIF string must be a base58-encoded string of the following byte
 // sequence:
 //
-//  * 1 byte to identify the network, must be 0x80 for mainnet or 0xef for
-//    either testnet3 or the regression test network
-//  * 32 bytes of a binary-encoded, big-endian, zero-padded private key
-//  * Optional 1 byte (equal to 0x01) if the address being imported or exported
-//    was created by taking the RIPEMD160 after SHA256 hash of a serialized
-//    compressed (33-byte) public key
-//  * 4 bytes of checksum, must equal the first four bytes of the double SHA256
-//    of every byte before the checksum in this sequence
+//   - 1 byte to identify the network, must be 0x80 for mainnet or 0xef for
+//     either testnet3 or the regression test network
+//   - 32 bytes of a binary-encoded, big-endian, zero-padded private key
+//   - Optional 1 byte (equal to 0x01) if the address being imported or exported
+//     was created by taking the RIPEMD160 after SHA256 hash of a serialized
+//     compressed (33-byte) public key
+//   - 4 bytes of checksum, must equal the first four bytes of the double SHA256
+//     of every byte before the checksum in this sequence
 //
 // If the base58-decoded byte sequence does not match this, DecodeWIF will
 // return a non-nil error.  ErrMalformedPrivateKey is returned when the WIF

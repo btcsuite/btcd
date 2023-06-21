@@ -5,7 +5,7 @@
 /*
 Package connmgr implements a generic Bitcoin network connection manager.
 
-Connection Manager Overview
+# Connection Manager Overview
 
 Connection Manager handles all the general connection concerns such as
 maintaining a set number of outbound connections, sourcing peers, banning,

@@ -320,19 +320,20 @@ func testBIP0009(t *testing.T, forkKey string, deploymentID uint32) {
 // - Assert the chain height is 0 and the state is ThresholdDefined
 // - Generate 1 fewer blocks than needed to reach the first state transition
 //   - Assert chain height is expected and state is still ThresholdDefined
+//
 // - Generate 1 more block to reach the first state transition
 //   - Assert chain height is expected and state moved to ThresholdStarted
-// - Generate enough blocks to reach the next state transition window, but only
-//   signal support in 1 fewer than the required number to achieve
-//   ThresholdLockedIn
+//   - Generate enough blocks to reach the next state transition window, but only
+//     signal support in 1 fewer than the required number to achieve
+//     ThresholdLockedIn
 //   - Assert chain height is expected and state is still ThresholdStarted
-// - Generate enough blocks to reach the next state transition window with only
-//   the exact number of blocks required to achieve locked in status signalling
-//   support.
+//   - Generate enough blocks to reach the next state transition window with only
+//     the exact number of blocks required to achieve locked in status signalling
+//     support.
 //   - Assert chain height is expected and state moved to ThresholdLockedIn
-// - Generate 1 fewer blocks than needed to reach the next state transition
+//   - Generate 1 fewer blocks than needed to reach the next state transition
 //   - Assert chain height is expected and state is still ThresholdLockedIn
-// - Generate 1 more block to reach the next state transition
+//   - Generate 1 more block to reach the next state transition
 //   - Assert chain height is expected and state moved to ThresholdActive
 func TestBIP0009(t *testing.T) {
 	t.Parallel()
@@ -348,11 +349,14 @@ func TestBIP0009(t *testing.T) {
 // Overview:
 // - Generate block 1
 //   - Assert bit is NOT set (ThresholdDefined)
+//
 // - Generate enough blocks to reach first state transition
 //   - Assert bit is NOT set for block prior to state transition
 //   - Assert bit is set for block at state transition (ThresholdStarted)
+//
 // - Generate enough blocks to reach second state transition
 //   - Assert bit is set for block at state transition (ThresholdLockedIn)
+//
 // - Generate enough blocks to reach third state transition
 //   - Assert bit is set for block prior to state transition (ThresholdLockedIn)
 //   - Assert bit is NOT set for block at state transition (ThresholdActive)
