@@ -183,6 +183,11 @@ type Params struct {
 	// block in compact form.
 	PowLimitBits uint32
 
+	// PoWNoRetargeting defines whether the network has difficulty
+	// retargeting enabled or not. This should only be set to true for
+	// regtest like networks.
+	PoWNoRetargeting bool
+
 	// These fields define the block heights at which the specified softfork
 	// BIP became active.
 	BIP0034Height int32
@@ -432,6 +437,7 @@ var RegressionNetParams = Params{
 	GenesisHash:              &regTestGenesisHash,
 	PowLimit:                 regressionPowLimit,
 	PowLimitBits:             0x207fffff,
+	PoWNoRetargeting:         true,
 	CoinbaseMaturity:         100,
 	BIP0034Height:            100000000, // Not active - Permit ver 1 blocks
 	BIP0065Height:            1351,      // Used by regression tests
