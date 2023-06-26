@@ -1641,6 +1641,8 @@ func (c *Client) BackendVersion() (BackendVersion, error) {
 	// assume the network is beyond v0.19
 	if networkInfo == nil {
 		log.Debug("Could not detect bitcoind version. Assuming post v0.19")
+		version := BitcoindPost19
+		c.backendVersion = &version
 		return BitcoindPost19, nil
 	}
 
