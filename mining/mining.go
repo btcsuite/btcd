@@ -42,7 +42,7 @@ type TxDesc struct {
 	// Added is the time when the entry was added to the source pool.
 	Added time.Time
 
-	// Height is the block height when the entry was added to the the source
+	// Height is the block height when the entry was added to the source
 	// pool.
 	Height int32
 

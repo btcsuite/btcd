@@ -8,7 +8,7 @@ Package btcjson provides primitives for working with the bitcoin JSON-RPC API.
 # Overview
 
 When communicating via the JSON-RPC protocol, all of the commands need to be
-marshalled to and from the the wire in the appropriate format.  This package
+marshalled to and from the wire in the appropriate format.  This package
 provides data structures and primitives to ease this process.
 
 In addition, it also provides some additional features such as custom command
