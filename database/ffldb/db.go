@@ -1015,7 +1015,7 @@ func (tx *transaction) notifyActiveIters() {
 	tx.activeIterLock.RUnlock()
 }
 
-// checkClosed returns an error if the the database or transaction is closed.
+// checkClosed returns an error if the database or transaction is closed.
 func (tx *transaction) checkClosed() error {
 	// The transaction is no longer valid if it has been closed.
 	if tx.closed {

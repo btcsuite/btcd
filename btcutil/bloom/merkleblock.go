@@ -21,7 +21,7 @@ type merkleBlock struct {
 	bits        []byte
 }
 
-// calcTreeWidth calculates and returns the the number of nodes (width) or a
+// calcTreeWidth calculates and returns the number of nodes (width) or a
 // merkle tree at the given depth-first height.
 func (m *merkleBlock) calcTreeWidth(height uint32) uint32 {
 	return (m.numTx + (1 << height) - 1) >> height

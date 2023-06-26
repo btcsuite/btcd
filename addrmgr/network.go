@@ -20,7 +20,7 @@ var (
 		ipNet("192.168.0.0", 16, 32),
 	}
 
-	// rfc2544Net specifies the the IPv4 block as defined by RFC2544
+	// rfc2544Net specifies the IPv4 block as defined by RFC2544
 	// (198.18.0.0/15)
 	rfc2544Net = ipNet("198.18.0.0", 15, 32)
 

@@ -292,7 +292,7 @@ func NewTxIn(prevOut *OutPoint, signatureScript []byte, witness [][]byte) *TxIn 
 // a slice of byte slices, or a stack with one or many elements.
 type TxWitness [][]byte
 
-// SerializeSize returns the number of bytes it would take to serialize the the
+// SerializeSize returns the number of bytes it would take to serialize the
 // transaction input's witness.
 func (t TxWitness) SerializeSize() int {
 	// A varint to signal the number of elements the witness has.

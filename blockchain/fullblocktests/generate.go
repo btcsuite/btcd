@@ -423,7 +423,7 @@ func replaceCoinbaseSigScript(script []byte) func(*wire.MsgBlock) {
 }
 
 // additionalTx returns a function that itself takes a block and modifies it by
-// adding the the provided transaction.
+// adding the provided transaction.
 func additionalTx(tx *wire.MsgTx) func(*wire.MsgBlock) {
 	return func(b *wire.MsgBlock) {
 		b.AddTransaction(tx)
