@@ -437,7 +437,7 @@ func (b *BlockChain) calcSequenceLock(node *blockNode, tx *btcutil.Tx, utxoView 
 				prevInputHeight = 0
 			}
 			blockNode := node.Ancestor(prevInputHeight)
-			medianTime := blockNode.CalcPastMedianTime()
+			medianTime := CalcPastMedianTime(blockNode)
 
 			// Time based relative time-locks as defined by BIP 68
 			// have a time granularity of RelativeLockSeconds, so
@@ -595,7 +595,8 @@ func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block,
 	blockSize := uint64(block.MsgBlock().SerializeSize())
 	blockWeight := uint64(GetBlockWeight(block))
 	state := newBestState(node, blockSize, blockWeight, numTxns,
-		curTotalTxns+numTxns, node.CalcPastMedianTime())
+		curTotalTxns+numTxns, CalcPastMedianTime(node),
+	)
 
 	// Atomically insert info into the database.
 	err = b.db.Update(func(dbTx database.Tx) error {
@@ -708,7 +709,7 @@ func (b *BlockChain) disconnectBlock(node *blockNode, block *btcutil.Block, view
 	blockWeight := uint64(GetBlockWeight(prevBlock))
 	newTotalTxns := curTotalTxns - uint64(len(block.MsgBlock().Transactions))
 	state := newBestState(prevNode, blockSize, blockWeight, numTxns,
-		newTotalTxns, prevNode.CalcPastMedianTime())
+		newTotalTxns, CalcPastMedianTime(prevNode))
 
 	err = b.db.Update(func(dbTx database.Tx) error {
 		// Update best block state.

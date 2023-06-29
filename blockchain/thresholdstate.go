@@ -153,7 +153,7 @@ func (b *BlockChain) PastMedianTime(blockHeader *wire.BlockHeader) (time.Time, e
 
 	blockNode := newBlockNode(blockHeader, prevNode)
 
-	return blockNode.CalcPastMedianTime(), nil
+	return CalcPastMedianTime(blockNode), nil
 }
 
 // thresholdStateTransition given a state, a previous node, and a toeholds

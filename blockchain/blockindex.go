@@ -169,6 +169,60 @@ func (node *blockNode) Ancestor(height int32) *blockNode {
 	return n
 }
 
+// Height returns the blockNode's height in the chain.
+//
+// NOTE: Part of the HeaderCtx interface.
+func (node *blockNode) Height() int32 {
+	return node.height
+}
+
+// Bits returns the blockNode's nBits.
+//
+// NOTE: Part of the HeaderCtx interface.
+func (node *blockNode) Bits() uint32 {
+	return node.bits
+}
+
+// Timestamp returns the blockNode's timestamp.
+//
+// NOTE: Part of the HeaderCtx interface.
+func (node *blockNode) Timestamp() int64 {
+	return node.timestamp
+}
+
+// Parent returns the blockNode's parent.
+//
+// NOTE: Part of the HeaderCtx interface.
+func (node *blockNode) Parent() HeaderCtx {
+	if node.parent == nil {
+		// This is required since node.parent is a *blockNode and if we
+		// do not explicitly return nil here, the caller may fail when
+		// nil-checking this.
+		return nil
+	}
+
+	return node.parent
+}
+
+// RelativeAncestorCtx returns the blockNode's ancestor that is distance blocks
+// before it in the chain. This is equivalent to the RelativeAncestor function
+// below except that the return type is different.
+//
+// This function is safe for concurrent access.
+//
+// NOTE: Part of the HeaderCtx interface.
+func (node *blockNode) RelativeAncestorCtx(distance int32) HeaderCtx {
+	ancestor := node.RelativeAncestor(distance)
+	if ancestor == nil {
+		// This is required since RelativeAncestor returns a *blockNode
+		// and if we do not explicitly return nil here, the caller may
+		// fail when nil-checking this.
+		return nil
+	}
+
+	return ancestor
+}
+
 // RelativeAncestor returns the ancestor block node a relative 'distance' blocks
 // before this node.  This is equivalent to calling Ancestor with the node's
 // height minus provided distance.
@@ -182,17 +236,17 @@ func (node *blockNode) RelativeAncestor(distance int32) *blockNode {
 // prior to, and including, the block node.
 //
 // This function is safe for concurrent access.
-func (node *blockNode) CalcPastMedianTime() time.Time {
+func CalcPastMedianTime(node HeaderCtx) time.Time {
 	// Create a slice of the previous few block timestamps used to calculate
 	// the median per the number defined by the constant medianTimeBlocks.
 	timestamps := make([]int64, medianTimeBlocks)
 	numNodes := 0
 	iterNode := node
 	for i := 0; i < medianTimeBlocks && iterNode != nil; i++ {
-		timestamps[i] = iterNode.timestamp
+		timestamps[i] = iterNode.Timestamp()
 		numNodes++
 
-		iterNode = iterNode.parent
+		iterNode = iterNode.Parent()
 	}
 
 	// Prune the slice to the actual number of available timestamps which
@@ -216,6 +270,10 @@ func (node *blockNode) CalcPastMedianTime() time.Time {
 	medianTimestamp := timestamps[numNodes/2]
 	return time.Unix(medianTimestamp, 0)
 }
+
+// A compile-time assertion to ensure blockNode implements the HeaderCtx
+// interface.
+var _ HeaderCtx = (*blockNode)(nil)
 
 // blockIndex provides facilities for keeping track of an in-memory index of the
 // block chain.  Although the name block chain suggests a single chain of
