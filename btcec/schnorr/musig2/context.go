@@ -234,22 +234,21 @@ func NewContext(signingKey *btcec.PrivateKey, shouldSort bool,
 		opts.keySet = make([]*btcec.PublicKey, 0, opts.numSigners)
 		opts.keySet = append(opts.keySet, pubKey)
 
-		// If early nonce generation is specified, then we'll generate
-		// the nonce now to pass in to the session once all the callers
-		// are known.
-		if opts.earlyNonce {
-			var err error
-			ctx.sessionNonce, err = GenNonces(
-				WithPublicKey(ctx.pubKey),
-				WithNonceSecretKeyAux(signingKey),
-			)
-			if err != nil {
-				return nil, err
-			}
-		}
-
 	default:
 		return nil, ErrSignersNotSpecified
+	}
+
+	// If early nonce generation is specified, then we'll generate the
+	// nonce now to pass in to the session once all the callers are known.
+	if opts.earlyNonce {
+		var err error
+		ctx.sessionNonce, err = GenNonces(
+			WithPublicKey(ctx.pubKey),
+			WithNonceSecretKeyAux(signingKey),
+		)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return ctx, nil
