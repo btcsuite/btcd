@@ -799,32 +799,54 @@ func dbPutUtxoView(dbTx database.Tx, view *UtxoViewpoint) error {
 
 		// Remove the utxo entry if it is spent.
 		if entry.IsSpent() {
-			key := outpointKey(outpoint)
-			err := utxoBucket.Delete(*key)
-			recycleOutpointKey(key)
+			err := dbDeleteUtxoEntry(utxoBucket, outpoint)
 			if err != nil {
 				return err
 			}
-
-			continue
-		}
-
-		// Serialize and store the utxo entry.
-		serialized, err := serializeUtxoEntry(entry)
-		if err != nil {
-			return err
-		}
-		key := outpointKey(outpoint)
-		err = utxoBucket.Put(*key, serialized)
-		// NOTE: The key is intentionally not recycled here since the
-		// database interface contract prohibits modifications.  It will
-		// be garbage collected normally when the database is done with
-		// it.
-		if err != nil {
-			return err
+		} else {
+			err := dbPutUtxoEntry(utxoBucket, outpoint, entry)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
+	return nil
+}
+
+// dbDeleteUtxoEntry uses an existing database transaction to delete the utxo
+// entry from the database.
+func dbDeleteUtxoEntry(utxoBucket database.Bucket, outpoint wire.OutPoint) error {
+	key := outpointKey(outpoint)
+	err := utxoBucket.Delete(*key)
+	recycleOutpointKey(key)
+	return err
+}
+
+// dbPutUtxoEntry uses an existing database transaction to update the utxo entry
+// in the database.
+func dbPutUtxoEntry(utxoBucket database.Bucket, outpoint wire.OutPoint,
+	entry *UtxoEntry) error {
+
+	if entry == nil || entry.IsSpent() {
+		return AssertError("trying to store nil or spent entry")
+	}
+
+	// Serialize and store the utxo entry.
+	serialized, err := serializeUtxoEntry(entry)
+	if err != nil {
+		return err
+	}
+	key := outpointKey(outpoint)
+	err = utxoBucket.Put(*key, serialized)
+	if err != nil {
+		return err
+	}
+
+	// NOTE: The key is intentionally not recycled here since the
+	// database interface contract prohibits modifications.  It will
+	// be garbage collected normally when the database is done with
+	// it.
 	return nil
 }
 
