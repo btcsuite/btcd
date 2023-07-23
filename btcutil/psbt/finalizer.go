@@ -15,6 +15,7 @@ import (
 	"bytes"
 	"fmt"
 
+	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 )
@@ -519,7 +520,20 @@ func finalizeTaprootInput(p *Packet, inIndex int) error {
 	switch {
 	// Key spend path.
 	case len(pInput.TaprootKeySpendSig) > 0:
-		serializedWitness, err = writeWitness(pInput.TaprootKeySpendSig)
+		sig := pInput.TaprootKeySpendSig
+
+		// Make sure TaprootKeySpendSig is equal to size of signature,
+		// if not, we assume that sighash flag was appended to the
+		// signature.
+		if len(pInput.TaprootKeySpendSig) == schnorr.SignatureSize {
+			// Append to the signature if flag is not equal to the
+			// default sighash (that can be omitted).
+			if pInput.SighashType != txscript.SigHashDefault {
+				sigHashType := byte(pInput.SighashType)
+				sig = append(sig, sigHashType)
+			}
+		}
+		serializedWitness, err = writeWitness(sig)
 
 	// Script spend path.
 	case len(pInput.TaprootScriptSpendSig) > 0:
