@@ -56,6 +56,11 @@ const (
 	//  [4:8]  File offset (4 bytes)
 	//  [8:12] Block length (4 bytes)
 	blockLocSize = 12
+
+	// blockMetadataSize is the number of bytes added as the metadata to
+	// a serialized block (4 bytes network version + 4 bytes block size +
+	// 4 bytes checksum).
+	blockMetadataSize = 12
 )
 
 var (
