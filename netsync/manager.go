@@ -1133,7 +1133,7 @@ func (sm *SyncManager) handleInvMsg(imsg *invMsg) {
 
 	// Ignore invs from peers that aren't the sync if we are not current.
 	// Helps prevent fetching a mass of orphans.
-	if peer != sm.syncPeer && !sm.current() {
+	if !sm.current() && peer != sm.syncPeer {
 		return
 	}
 
