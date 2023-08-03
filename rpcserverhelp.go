@@ -84,9 +84,10 @@ var helpDescsEnUS = map[string]string{
 	// ScriptPubKeyResult help.
 	"scriptpubkeyresult-asm":       "Disassembly of the script",
 	"scriptpubkeyresult-hex":       "Hex-encoded bytes of the script",
-	"scriptpubkeyresult-reqSigs":   "The number of required signatures",
+	"scriptpubkeyresult-reqSigs":   "(DEPRECATED) The number of required signatures",
 	"scriptpubkeyresult-type":      "The type of the script (e.g. 'pubkeyhash')",
-	"scriptpubkeyresult-addresses": "The bitcoin addresses associated with this script",
+	"scriptpubkeyresult-address":   "The bitcoin address associated with this script (only if a well-defined address exists)",
+	"scriptpubkeyresult-addresses": "(DEPRECATED) The bitcoin addresses associated with this script",
 
 	// Vout help.
 	"vout-value":        "The amount in BTC",
@@ -106,9 +107,10 @@ var helpDescsEnUS = map[string]string{
 
 	// DecodeScriptResult help.
 	"decodescriptresult-asm":       "Disassembly of the script",
-	"decodescriptresult-reqSigs":   "The number of required signatures",
+	"decodescriptresult-reqSigs":   "(DEPRECATED) The number of required signatures",
 	"decodescriptresult-type":      "The type of the script (e.g. 'pubkeyhash')",
-	"decodescriptresult-addresses": "The bitcoin addresses associated with this script",
+	"decodescriptresult-address":   "The bitcoin address associated with this script (only if a well-defined address exists)",
+	"decodescriptresult-addresses": "(DEPRECATED) The bitcoin addresses associated with this script",
 	"decodescriptresult-p2sh":      "The script hash for use in pay-to-script-hash transactions (only present if the provided redeem script is not already a pay-to-script-hash script)",
 
 	// DecodeScriptCmd help.
