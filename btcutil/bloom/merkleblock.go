@@ -6,9 +6,9 @@ package bloom
 
 import (
 	"github.com/btcsuite/btcd/blockchain"
+	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcd/btcutil"
 )
 
 // merkleBlock is used to house intermediate information needed to generate a
@@ -41,7 +41,8 @@ func (m *merkleBlock) calcHash(height, pos uint32) *chainhash.Hash {
 	} else {
 		right = left
 	}
-	return blockchain.HashMerkleBranches(left, right)
+	res := blockchain.HashMerkleBranches(left, right)
+	return &res
 }
 
 // traverseAndBuild builds a partial merkle tree using a recursive depth-first
