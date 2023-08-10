@@ -58,14 +58,13 @@ func nextPowerOfTwo(n int) int {
 // HashMerkleBranches takes two hashes, treated as the left and right tree
 // nodes, and returns the hash of their concatenation.  This is a helper
 // function used to aid in the generation of a merkle tree.
-func HashMerkleBranches(left *chainhash.Hash, right *chainhash.Hash) *chainhash.Hash {
+func HashMerkleBranches(left, right *chainhash.Hash) chainhash.Hash {
 	// Concatenate the left and right nodes.
 	var hash [chainhash.HashSize * 2]byte
 	copy(hash[:chainhash.HashSize], left[:])
 	copy(hash[chainhash.HashSize:], right[:])
 
-	newHash := chainhash.DoubleHashH(hash[:])
-	return &newHash
+	return chainhash.DoubleHashH(hash[:])
 }
 
 // BuildMerkleTreeStore creates a merkle tree from a slice of transactions,
@@ -140,18 +139,48 @@ func BuildMerkleTreeStore(transactions []*btcutil.Tx, witness bool) []*chainhash
 		// hashing the concatenation of the left child with itself.
 		case merkles[i+1] == nil:
 			newHash := HashMerkleBranches(merkles[i], merkles[i])
-			merkles[offset] = newHash
+			merkles[offset] = &newHash
 
 		// The normal case sets the parent node to the double sha256
 		// of the concatentation of the left and right children.
 		default:
 			newHash := HashMerkleBranches(merkles[i], merkles[i+1])
-			merkles[offset] = newHash
+			merkles[offset] = &newHash
 		}
 		offset++
 	}
 
 	return merkles
+}
+
+// CalcMerkleRoot computes the merkle root over a set of hashed leaves. The
+// interior nodes are computed opportunistically as the leaves are added to the
+// abstract tree to reduce the total number of allocations. Throughout the
+// computation, this computation only requires storing O(log n) interior
+// nodes.
+//
+// This method differs from BuildMerkleTreeStore in that the interior nodes are
+// discarded instead of being returned along with the root. CalcMerkleRoot is
+// slightly faster than BuildMerkleTreeStore and requires significantly less
+// memory and fewer allocations.
+//
+// A merkle tree is a tree in which every non-leaf node is the hash of its
+// children nodes. A diagram depicting how this works for bitcoin transactions
+// where h(x) is a double sha256 follows:
+//
+//	         root = h1234 = h(h12 + h34)
+//	        /                           \
+//	  h12 = h(h1 + h2)            h34 = h(h3 + h4)
+//	   /            \              /            \
+//	h1 = h(tx1)  h2 = h(tx2)    h3 = h(tx3)  h4 = h(tx4)
+//
+// The additional bool parameter indicates if we are generating the merkle tree
+// using witness transaction id's rather than regular transaction id's. This
+// also presents an additional case wherein the wtxid of the coinbase transaction
+// is the zeroHash.
+func CalcMerkleRoot(transactions []*btcutil.Tx, witness bool) chainhash.Hash {
+	s := newRollingMerkleTreeStore(uint64(len(transactions)))
+	return s.calcMerkleRoot(transactions, witness)
 }
 
 // ExtractWitnessCommitment attempts to locate, and return the witness
@@ -246,8 +275,7 @@ func ValidateWitnessCommitment(blk *btcutil.Block) error {
 	// the extracted witnessCommitment is equal to:
 	// SHA256(witnessMerkleRoot || witnessNonce). Where witnessNonce is the
 	// coinbase transaction's only witness item.
-	witnessMerkleTree := BuildMerkleTreeStore(blk.Transactions(), true)
-	witnessMerkleRoot := witnessMerkleTree[len(witnessMerkleTree)-1]
+	witnessMerkleRoot := CalcMerkleRoot(blk.Transactions(), true)
 
 	var witnessPreimage [chainhash.HashSize * 2]byte
 	copy(witnessPreimage[:], witnessMerkleRoot[:])

@@ -197,12 +197,12 @@ func CreateBlock(prevBlock *btcutil.Block, inclusionTxs []*btcutil.Tx,
 		_ = mining.AddWitnessCommitment(coinbaseTx, blockTxns)
 	}
 
-	merkles := blockchain.BuildMerkleTreeStore(blockTxns, false)
+	merkleRoot := blockchain.CalcMerkleRoot(blockTxns, false)
 	var block wire.MsgBlock
 	block.Header = wire.BlockHeader{
 		Version:    blockVersion,
 		PrevBlock:  *prevHash,
-		MerkleRoot: *merkles[len(merkles)-1],
+		MerkleRoot: merkleRoot,
 		Timestamp:  ts,
 		Bits:       net.PowLimitBits,
 	}
