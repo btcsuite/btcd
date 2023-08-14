@@ -519,7 +519,7 @@ func (ef *FeeEstimator) newEstimateFeeSet() *estimateFeeSet {
 	set := &estimateFeeSet{}
 
 	capacity := 0
-	for i, b := range ef.bin {
+	for i, b := range &ef.bin {
 		l := len(b)
 		set.bin[i] = uint32(l)
 		capacity += l
@@ -528,7 +528,7 @@ func (ef *FeeEstimator) newEstimateFeeSet() *estimateFeeSet {
 	set.feeRate = make([]SatoshiPerByte, capacity)
 
 	i := 0
-	for _, b := range ef.bin {
+	for _, b := range &ef.bin {
 		for _, o := range b {
 			set.feeRate[i] = o.feeRate
 			i++
@@ -665,7 +665,7 @@ func (ef *FeeEstimator) Save() FeeEstimatorState {
 	}
 
 	// Save all the right bins.
-	for _, list := range ef.bin {
+	for _, list := range &ef.bin {
 
 		binary.Write(w, binary.BigEndian, uint32(len(list)))
 
