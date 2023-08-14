@@ -91,10 +91,7 @@ func ParseSignature(sig []byte) (*Signature, error) {
 		return nil, signatureError(ecdsa_schnorr.ErrSigRTooBig, str)
 	}
 	var s btcec.ModNScalar
-	if overflow := s.SetByteSlice(sig[32:64]); overflow {
-		str := "invalid signature: s >= group order"
-		return nil, signatureError(ecdsa_schnorr.ErrSigSTooBig, str)
-	}
+	s.SetByteSlice(sig[32:64])
 
 	// Return the signature.
 	return NewSignature(&r, &s), nil
