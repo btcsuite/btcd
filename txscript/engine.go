@@ -285,6 +285,33 @@ type Engine struct {
 	witnessProgram  []byte
 	inputAmount     int64
 	taprootCtx      *taprootExecutionCtx
+
+	// stepCallback is an optional function that will be called every time
+	// a step has been performed during script execution.
+	//
+	// NOTE: This is only meant to be used in debugging, and SHOULD NOT BE
+	// USED during regular operation.
+	stepCallback func(*StepInfo) error
+}
+
+// StepInfo houses the current VM state information that is passed back to the
+// stepCallback during script execution.
+type StepInfo struct {
+	// ScriptIndex is the index of the script currently being executed by
+	// the Engine.
+	ScriptIndex int
+
+	// OpcodeIndex is the index of the next opcode that will be executed.
+	// In case the execution has completed, the opcode index will be
+	// incrementet beyond the number of the current script's opcodes. This
+	// indicates no new script is being executed, and execution is done.
+	OpcodeIndex int
+
+	// Stack is the Engine's current content on the stack:
+	Stack [][]byte
+
+	// AltStack is the Engine's current content on the alt stack.
+	AltStack [][]byte
 }
 
 // hasFlag returns whether the script engine instance has the passed flag set.
@@ -1023,6 +1050,17 @@ func (vm *Engine) Step() (done bool, err error) {
 	return false, nil
 }
 
+// copyStack makes a deep copy of the provided slice.
+func copyStack(stk [][]byte) [][]byte {
+	c := make([][]byte, len(stk))
+	for i := range stk {
+		c[i] = make([]byte, len(stk[i]))
+		copy(c[i][:], stk[i][:])
+	}
+
+	return c
+}
+
 // Execute will execute all scripts in the script engine and return either nil
 // for successful validation or an error if one occurred.
 func (vm *Engine) Execute() (err error) {
@@ -1031,6 +1069,22 @@ func (vm *Engine) Execute() (err error) {
 	// will allow for the addition of new scripting languages.
 	if vm.version != 0 {
 		return nil
+	}
+
+	// If the stepCallback is set, we start by making a call back with the
+	// initial engine state.
+	var stepInfo *StepInfo
+	if vm.stepCallback != nil {
+		stepInfo = &StepInfo{
+			ScriptIndex: vm.scriptIdx,
+			OpcodeIndex: vm.opcodeIdx,
+			Stack:       copyStack(vm.dstack.stk),
+			AltStack:    copyStack(vm.astack.stk),
+		}
+		err := vm.stepCallback(stepInfo)
+		if err != nil {
+			return err
+		}
 	}
 
 	done := false
@@ -1060,6 +1114,31 @@ func (vm *Engine) Execute() (err error) {
 
 			return dstr + astr
 		}))
+
+		if vm.stepCallback != nil {
+			scriptIdx := vm.scriptIdx
+			opcodeIdx := vm.opcodeIdx
+
+			// In case the execution has completed, we keep the
+			// current script index while increasing the opcode
+			// index. This is to indicate that no new script is
+			// being executed.
+			if done {
+				scriptIdx = stepInfo.ScriptIndex
+				opcodeIdx = stepInfo.OpcodeIndex + 1
+			}
+
+			stepInfo = &StepInfo{
+				ScriptIndex: scriptIdx,
+				OpcodeIndex: opcodeIdx,
+				Stack:       copyStack(vm.dstack.stk),
+				AltStack:    copyStack(vm.astack.stk),
+			}
+			err := vm.stepCallback(stepInfo)
+			if err != nil {
+				return err
+			}
+		}
 	}
 
 	return vm.CheckErrorCondition(true)
@@ -1548,4 +1627,23 @@ func NewEngine(scriptPubKey []byte, tx *wire.MsgTx, txIdx int, flags ScriptFlags
 	vm.txIdx = txIdx
 
 	return &vm, nil
+}
+
+// NewEngine returns a new script engine with a script execution callback set.
+// This is useful for debugging script execution.
+func NewDebugEngine(scriptPubKey []byte, tx *wire.MsgTx, txIdx int,
+	flags ScriptFlags, sigCache *SigCache, hashCache *TxSigHashes,
+	inputAmount int64, prevOutFetcher PrevOutputFetcher,
+	stepCallback func(*StepInfo) error) (*Engine, error) {
+
+	vm, err := NewEngine(
+		scriptPubKey, tx, txIdx, flags, sigCache, hashCache,
+		inputAmount, prevOutFetcher,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	vm.stepCallback = stepCallback
+	return vm, nil
 }
