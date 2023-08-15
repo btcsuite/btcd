@@ -174,10 +174,7 @@ func schnorrVerify(sig *Signature, hash []byte, pubKeyBytes []byte) error {
 	)
 
 	var e btcec.ModNScalar
-	if overflow := e.SetBytes((*[32]byte)(commitment)); overflow != 0 {
-		str := "hash of (r || P || m) too big"
-		return signatureError(ecdsa_schnorr.ErrSchnorrHashValue, str)
-	}
+	e.SetBytes((*[32]byte)(commitment))
 
 	// Negate e here so we can use AddNonConst below to subtract the s*G
 	// point from e*P.
