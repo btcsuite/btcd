@@ -58,6 +58,7 @@ const (
 	PubKeyTy                                 // Pay pubkey.
 	PubKeyHashTy                             // Pay pubkey hash.
 	WitnessV0PubKeyHashTy                    // Pay witness pubkey hash.
+	WitnessV1PubKeyHashTy                    // Pay witness pubkey hash V1.
 	ScriptHashTy                             // Pay to script hash.
 	WitnessV0ScriptHashTy                    // Pay to witness script hash.
 	MultiSigTy                               // Multi signature.
@@ -357,6 +358,22 @@ func extractWitnessPubKeyHash(script []byte) []byte {
 	//   OP_0 OP_DATA_20 <20-byte-hash>
 	if len(script) == witnessV0PubKeyHashLen &&
 		script[0] == OP_0 &&
+		script[1] == OP_DATA_20 {
+
+		return script[2:witnessV0PubKeyHashLen]
+	}
+
+	return nil
+}
+
+// extractWitnessPubKeyHashV1 extracts the witness public key hash from the passed
+// script if it is a v1 pay-to-witness-pubkey-hash script. It will return
+// nil otherwise.
+func extractWitnessPubKeyHashV1(script []byte) []byte {
+	// A pay-to-witness-pubkey-hash V1 script is of the form:
+	//   OP_1 OP_DATA_20 <20-byte-hash>
+	if len(script) == witnessV0PubKeyHashLen &&
+		script[0] == OP_1 &&
 		script[1] == OP_DATA_20 {
 
 		return script[2:witnessV0PubKeyHashLen]
@@ -1017,6 +1034,15 @@ func ExtractPkScriptAddrs(pkScript []byte,
 			addrs = append(addrs, addr)
 		}
 		return WitnessV0PubKeyHashTy, addrs, 1, nil
+	}
+
+	if hash := extractWitnessPubKeyHashV1(pkScript); hash != nil {
+		var addrs []btcutil.Address
+		addr, err := btcutil.NewAddressWitnessPubKeyHashV1(hash, chainParams)
+		if err == nil {
+			addrs = append(addrs, addr)
+		}
+		return WitnessV1PubKeyHashTy, addrs, 1, nil
 	}
 
 	if hash := extractWitnessV0ScriptHash(pkScript); hash != nil {

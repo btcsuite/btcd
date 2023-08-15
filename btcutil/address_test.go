@@ -432,6 +432,25 @@ func TestAddresses(t *testing.T) {
 			net: &chaincfg.MainNetParams,
 		},
 		{
+			name:    "segwit mainnet p2wpkh v1",
+			addr:    "BC1PCHJS0JHPGA0LRQWWN26K6A9V5HJ9PR8E522VQ8",
+			encoded: "bc1pchjs0jhpga0lrqwwn26k6a9v5hj9pr8e522vq8",
+			valid:   true,
+			result: btcutil.TstAddressWitnessPubKeyHash(
+				1,
+				[20]byte{
+					0xc5, 0xe5, 0x07, 0xca, 0xe1, 0x47, 0x5f, 0xf1, 0x81, 0xce,
+					0x9a, 0xb5, 0x6d, 0x74, 0xac, 0xa5, 0xe4, 0x50, 0x8c, 0xf9},
+				chaincfg.MainNetParams.Bech32HRPSegwit),
+			f: func() (btcutil.Address, error) {
+				pkHash := []byte{
+					0xc5, 0xe5, 0x07, 0xca, 0xe1, 0x47, 0x5f, 0xf1, 0x81, 0xce,
+					0x9a, 0xb5, 0x6d, 0x74, 0xac, 0xa5, 0xe4, 0x50, 0x8c, 0xf9}
+				return btcutil.NewAddressWitnessPubKeyHashV1(pkHash, &chaincfg.MainNetParams)
+			},
+			net: &chaincfg.MainNetParams,
+		},
+		{
 			name:    "segwit mainnet p2wsh v0",
 			addr:    "bc1qrp33g0q5c5txsp9arysrx4k6zdkfs4nce4xj0gdcccefvpysxf3qccfmv3",
 			encoded: "bc1qrp33g0q5c5txsp9arysrx4k6zdkfs4nce4xj0gdcccefvpysxf3qccfmv3",
@@ -827,7 +846,6 @@ func TestAddresses(t *testing.T) {
 						test.name, saddr, p)
 					return
 				}
-
 			case *btcutil.AddressWitnessScriptHash:
 				if hrp := a.Hrp(); test.net.Bech32HRPSegwit != hrp {
 					t.Errorf("%v: hrps do not match:\n%x != \n%x",

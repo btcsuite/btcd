@@ -102,7 +102,7 @@ func ParsePkScript(pkScript []byte) (PkScript, error) {
 // PkScript struct.
 func isSupportedScriptType(class ScriptClass) bool {
 	switch class {
-	case PubKeyHashTy, WitnessV0PubKeyHashTy, ScriptHashTy,
+	case PubKeyHashTy, WitnessV0PubKeyHashTy, WitnessV1PubKeyHashTy, ScriptHashTy,
 		WitnessV0ScriptHashTy, WitnessV1TaprootTy:
 		return true
 	default:

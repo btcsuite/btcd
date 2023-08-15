@@ -172,6 +172,9 @@ func DecodeAddress(addr string, defaultNet *chaincfg.Params) (Address, error) {
 
 			switch len(witnessProg) {
 			case 20:
+				if witnessVer == 1 {
+					return newAddressWitnessPubKeyHashV1(hrp, witnessProg)
+				}
 				return newAddressWitnessPubKeyHash(hrp, witnessProg)
 			case 32:
 				if witnessVer == 1 {
@@ -619,6 +622,37 @@ func newAddressWitnessPubKeyHash(hrp string,
 		AddressSegWit{
 			hrp:            strings.ToLower(hrp),
 			witnessVersion: 0x00,
+			witnessProgram: witnessProg,
+		},
+	}
+
+	return addr, nil
+}
+
+// NewAddressWitnessPubKeyHashV1 returns a new AddressWitnessPubKeyHashV1.
+func NewAddressWitnessPubKeyHashV1(witnessProg []byte,
+	net *chaincfg.Params) (*AddressWitnessPubKeyHash, error) {
+
+	return newAddressWitnessPubKeyHashV1(net.Bech32HRPSegwit, witnessProg)
+}
+
+// newAddressWitnessPubKeyHashV1 is an internal helper function to create an
+// AddressWitnessPubKeyHash with a known human-readable part, rather than
+// looking it up through its parameters.
+func newAddressWitnessPubKeyHashV1(hrp string,
+	witnessProg []byte) (*AddressWitnessPubKeyHash, error) {
+
+	// Check for valid program length for witness version 1, which is 20
+	// for P2WPKH.
+	if len(witnessProg) != 20 {
+		return nil, errors.New("witness program must be 20 " +
+			"bytes for p2wpkh")
+	}
+
+	addr := &AddressWitnessPubKeyHash{
+		AddressSegWit{
+			hrp:            strings.ToLower(hrp),
+			witnessVersion: 0x01,
 			witnessProgram: witnessProg,
 		},
 	}
