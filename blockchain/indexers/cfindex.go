@@ -355,3 +355,15 @@ func NewCfIndex(db database.DB, chainParams *chaincfg.Params) *CfIndex {
 func DropCfIndex(db database.DB, interrupt <-chan struct{}) error {
 	return dropIndex(db, cfIndexParentBucketKey, cfIndexName, interrupt)
 }
+
+// CfIndexInitialized returns true if the cfindex has been created previously.
+func CfIndexInitialized(db database.DB) bool {
+	var exists bool
+	db.View(func(dbTx database.Tx) error {
+		bucket := dbTx.Metadata().Bucket(cfIndexParentBucketKey)
+		exists = bucket != nil
+		return nil
+	})
+
+	return exists
+}
