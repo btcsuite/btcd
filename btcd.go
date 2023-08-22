@@ -175,6 +175,20 @@ func btcdMain(serverChan chan<- *server) error {
 		btcdLog.Errorf("%v", err)
 		return err
 	}
+	if beenPruned && cfg.TxIndex {
+		err = fmt.Errorf("--txindex cannot be enabled as the node has been "+
+			"previously pruned. You must delete the files in the datadir: \"%s\" "+
+			"and sync from the beginning to enable the desired index", cfg.DataDir)
+		btcdLog.Errorf("%v", err)
+		return err
+	}
+	if beenPruned && cfg.AddrIndex {
+		err = fmt.Errorf("--addrindex cannot be enabled as the node has been "+
+			"previously pruned. You must delete the files in the datadir: \"%s\" "+
+			"and sync from the beginning to enable the desired index", cfg.DataDir)
+		btcdLog.Errorf("%v", err)
+		return err
+	}
 
 	// Enforce removal of txindex and addrindex if user requested pruning.
 	// This is to require explicit action from the user before removing
