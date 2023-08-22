@@ -404,6 +404,11 @@ type Tx interface {
 	// implementations.
 	PruneBlocks(targetSize uint64) ([]chainhash.Hash, error)
 
+	// BeenPruned returns if the block storage has ever been pruned.
+	//
+	// Implementation specific errors are possible.
+	BeenPruned() (bool, error)
+
 	// ******************************************************************
 	// Methods related to both atomic metadata storage and block storage.
 	// ******************************************************************

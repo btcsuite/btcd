@@ -319,6 +319,21 @@ func TestPrune(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		err = db.View(func(tx database.Tx) error {
+			pruned, err := tx.BeenPruned()
+			if err != nil {
+				return err
+			}
+
+			if pruned {
+				err = fmt.Errorf("The database hasn't been pruned but " +
+					"BeenPruned returned true")
+			}
+			return err
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		var deletedBlocks []chainhash.Hash
 
@@ -337,6 +352,22 @@ func TestPrune(t *testing.T) {
 		if len(files) != 3 {
 			t.Fatalf("Expected to find %d files but got %d",
 				3, len(files))
+		}
+
+		err = db.View(func(tx database.Tx) error {
+			pruned, err := tx.BeenPruned()
+			if err != nil {
+				return err
+			}
+
+			if !pruned {
+				err = fmt.Errorf("The database has been pruned but " +
+					"BeenPruned returned false")
+			}
+			return err
+		})
+		if err != nil {
+			t.Fatal(err)
 		}
 
 		// Check that all the blocks that say were deleted are deleted from the

@@ -1764,6 +1764,21 @@ func (tx *transaction) PruneBlocks(targetSize uint64) ([]chainhash.Hash, error) 
 	return deletedBlockHashes, nil
 }
 
+// BeenPruned returns if the block storage has ever been pruned.
+//
+// This function is part of the database.Tx interface implementation.
+func (tx *transaction) BeenPruned() (bool, error) {
+	first, last, _, err := scanBlockFiles(tx.db.store.basePath)
+	if err != nil {
+		return false, err
+	}
+
+	// If the database is pruned, then the first .fdb will not be there.
+	// We also check that there isn't just 1 file on disk or if there are
+	// no files on disk by checking if first != last.
+	return first != 0 && (first != last), nil
+}
+
 // Commit commits all changes that have been made to the root metadata bucket
 // and all of its sub-buckets to the database cache which is periodically synced
 // to persistent storage.  In addition, it commits all new blocks directly to
