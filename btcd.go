@@ -157,6 +157,25 @@ func btcdMain(serverChan chan<- *server) error {
 		return nil
 	}
 
+	// Check if the database had previously been pruned.  If it had been, it's
+	// not possible to newly generate the tx index and addr index.
+	var beenPruned bool
+	db.View(func(dbTx database.Tx) error {
+		beenPruned, err = dbTx.BeenPruned()
+		return err
+	})
+	if err != nil {
+		btcdLog.Errorf("%v", err)
+		return err
+	}
+	if beenPruned && cfg.Prune == 0 {
+		err = fmt.Errorf("--prune cannot be disabled as the node has been "+
+			"previously pruned. You must delete the files in the datadir: \"%s\" "+
+			"and sync from the beginning to disable pruning", cfg.DataDir)
+		btcdLog.Errorf("%v", err)
+		return err
+	}
+
 	// The config file is already created if it did not exist and the log
 	// file has already been opened by now so we only need to allow
 	// creating rpc cert and key files if they don't exist.
