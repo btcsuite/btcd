@@ -176,6 +176,28 @@ func btcdMain(serverChan chan<- *server) error {
 		return err
 	}
 
+	// Enforce removal of txindex and addrindex if user requested pruning.
+	// This is to require explicit action from the user before removing
+	// indexes that won't be useful when block files are pruned.
+	//
+	// NOTE: The order is important here because dropping the tx index also
+	// drops the address index since it relies on it.  We explicitly make the
+	// user drop both indexes if --addrindex was enabled previously.
+	if cfg.Prune != 0 && indexers.AddrIndexInitialized(db) {
+		err = fmt.Errorf("--prune flag may not be given when the address index " +
+			"has been initialized. Please drop the address index with the " +
+			"--dropaddrindex flag before enabling pruning")
+		btcdLog.Errorf("%v", err)
+		return err
+	}
+	if cfg.Prune != 0 && indexers.TxIndexInitialized(db) {
+		err = fmt.Errorf("--prune flag may not be given when the transaction index " +
+			"has been initialized. Please drop the transaction index with the " +
+			"--droptxindex flag before enabling pruning")
+		btcdLog.Errorf("%v", err)
+		return err
+	}
+
 	// The config file is already created if it did not exist and the log
 	// file has already been opened by now so we only need to allow
 	// creating rpc cert and key files if they don't exist.
