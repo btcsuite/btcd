@@ -991,3 +991,15 @@ func NewAddrIndex(db database.DB, chainParams *chaincfg.Params) *AddrIndex {
 func DropAddrIndex(db database.DB, interrupt <-chan struct{}) error {
 	return dropIndex(db, addrIndexKey, addrIndexName, interrupt)
 }
+
+// AddrIndexInitialized returns true if the address index has been created previously.
+func AddrIndexInitialized(db database.DB) bool {
+	var exists bool
+	db.View(func(dbTx database.Tx) error {
+		bucket := dbTx.Metadata().Bucket(addrIndexKey)
+		exists = bucket != nil
+		return nil
+	})
+
+	return exists
+}
