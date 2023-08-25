@@ -587,3 +587,120 @@ func TestUtxoCacheFlush(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestFlushNeededAfterPrune(t *testing.T) {
+	// Construct a synthetic block chain with a block index consisting of
+	// the following structure.
+	// 	genesis -> 1 -> 2 -> ... -> 15 -> 16  -> 17  -> 18
+	tip := tstTip
+	chain := newFakeChain(&chaincfg.MainNetParams)
+	chain.utxoCache = newUtxoCache(nil, 0)
+	branchNodes := chainedNodes(chain.bestChain.Genesis(), 18)
+	for _, node := range branchNodes {
+		chain.index.SetStatusFlags(node, statusValid)
+		chain.index.AddNode(node)
+	}
+	chain.bestChain.SetTip(tip(branchNodes))
+
+	tests := []struct {
+		name          string
+		lastFlushHash chainhash.Hash
+		delHashes     []chainhash.Hash
+		expected      bool
+	}{
+		{
+			name: "deleted block up to height 9, last flush hash at block 10",
+			delHashes: func() []chainhash.Hash {
+				delBlockHashes := make([]chainhash.Hash, 0, 9)
+				for i := range branchNodes {
+					if branchNodes[i].height < 10 {
+						delBlockHashes = append(delBlockHashes, branchNodes[i].hash)
+					}
+				}
+
+				return delBlockHashes
+			}(),
+			lastFlushHash: func() chainhash.Hash {
+				// Just some sanity checking to make sure the height is 10.
+				if branchNodes[9].height != 10 {
+					panic("was looking for height 10")
+				}
+				return branchNodes[9].hash
+			}(),
+			expected: false,
+		},
+		{
+			name: "deleted blocks up to height 10, last flush hash at block 10",
+			delHashes: func() []chainhash.Hash {
+				delBlockHashes := make([]chainhash.Hash, 0, 10)
+				for i := range branchNodes {
+					if branchNodes[i].height < 11 {
+						delBlockHashes = append(delBlockHashes, branchNodes[i].hash)
+					}
+				}
+				return delBlockHashes
+			}(),
+			lastFlushHash: func() chainhash.Hash {
+				// Just some sanity checking to make sure the height is 10.
+				if branchNodes[9].height != 10 {
+					panic("was looking for height 10")
+				}
+				return branchNodes[9].hash
+			}(),
+			expected: true,
+		},
+		{
+			name: "deleted block height 17, last flush hash at block 5",
+			delHashes: func() []chainhash.Hash {
+				delBlockHashes := make([]chainhash.Hash, 1)
+				delBlockHashes[0] = branchNodes[16].hash
+				// Just some sanity checking to make sure the height is 10.
+				if branchNodes[16].height != 17 {
+					panic("was looking for height 17")
+				}
+				return delBlockHashes
+			}(),
+			lastFlushHash: func() chainhash.Hash {
+				// Just some sanity checking to make sure the height is 10.
+				if branchNodes[4].height != 5 {
+					panic("was looking for height 5")
+				}
+				return branchNodes[4].hash
+			}(),
+			expected: true,
+		},
+		{
+			name: "deleted block height 3, last flush hash at block 4",
+			delHashes: func() []chainhash.Hash {
+				delBlockHashes := make([]chainhash.Hash, 1)
+				delBlockHashes[0] = branchNodes[2].hash
+				// Just some sanity checking to make sure the height is 10.
+				if branchNodes[2].height != 3 {
+					panic("was looking for height 3")
+				}
+				return delBlockHashes
+			}(),
+			lastFlushHash: func() chainhash.Hash {
+				// Just some sanity checking to make sure the height is 10.
+				if branchNodes[3].height != 4 {
+					panic("was looking for height 4")
+				}
+				return branchNodes[3].hash
+			}(),
+			expected: false,
+		},
+	}
+
+	for _, test := range tests {
+		chain.utxoCache.lastFlushHash = test.lastFlushHash
+		got, err := chain.flushNeededAfterPrune(test.delHashes)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if got != test.expected {
+			t.Fatalf("for test %s, expected need flush to return %v but got %v",
+				test.name, test.expected, got)
+		}
+	}
+}

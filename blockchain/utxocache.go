@@ -711,3 +711,34 @@ func (b *BlockChain) InitConsistentState(tip *blockNode, interrupt <-chan struct
 
 	return nil
 }
+
+// flushNeededAfterPrune returns true if the utxo cache needs to be flushed after a prune
+// of the block storage.  In the case of an unexpected shutdown, the utxo cache needs
+// to be reconstructed from where the utxo cache was last flushed.  In order for the
+// utxo cache to be reconstructed, we always need to have the blocks since the utxo cache
+// flush last happened.
+//
+// Example: if the last flush hash was at height 100 and one of the deleted blocks was at
+// height 98, this function will return true.
+func (b *BlockChain) flushNeededAfterPrune(deletedBlockHashes []chainhash.Hash) (bool, error) {
+	lastFlushHeight, err := b.BlockHeightByHash(&b.utxoCache.lastFlushHash)
+	if err != nil {
+		return false, err
+	}
+
+	// Loop through all the block hashes and find out what the highest block height
+	// among the deleted hashes is.
+	highestDeletedHeight := int32(-1)
+	for _, deletedBlockHash := range deletedBlockHashes {
+		height, err := b.BlockHeightByHash(&deletedBlockHash)
+		if err != nil {
+			return false, err
+		}
+
+		if height > highestDeletedHeight {
+			highestDeletedHeight = height
+		}
+	}
+
+	return highestDeletedHeight >= lastFlushHeight, nil
+}
