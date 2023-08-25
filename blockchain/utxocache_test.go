@@ -16,6 +16,7 @@ import (
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/database"
+	"github.com/btcsuite/btcd/database/ffldb"
 	"github.com/btcsuite/btcd/wire"
 )
 
@@ -703,4 +704,97 @@ func TestFlushNeededAfterPrune(t *testing.T) {
 				test.name, test.expected, got)
 		}
 	}
+}
+
+func TestFlushOnPrune(t *testing.T) {
+	chain, tearDown, err := chainSetup("TestFlushOnPrune", &chaincfg.MainNetParams)
+	if err != nil {
+		panic(fmt.Sprintf("error loading blockchain with database: %v", err))
+	}
+	defer tearDown()
+
+	chain.utxoCache.maxTotalMemoryUsage = 10 * 1024 * 1024
+	chain.utxoCache.cachedEntries.maxTotalMemoryUsage = chain.utxoCache.maxTotalMemoryUsage
+
+	// Set the maxBlockFileSize and the prune target small so that we can trigger a
+	// prune to happen.
+	maxBlockFileSize := uint32(8192)
+	chain.pruneTarget = uint64(maxBlockFileSize) * 2
+
+	// Read blocks from the file.
+	blocks, err := loadBlocks("blk_0_to_14131.dat")
+	if err != nil {
+		t.Fatalf("failed to read block from file. %v", err)
+	}
+
+	syncBlocks := func() {
+		for i, block := range blocks {
+			if i == 0 {
+				// Skip the genesis block.
+				continue
+			}
+			isMainChain, _, err := chain.ProcessBlock(block, BFNone)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if !isMainChain {
+				t.Fatalf("expected block %s to be on the main chain", block.Hash())
+			}
+		}
+	}
+
+	// Sync the chain.
+	ffldb.TstRunWithMaxBlockFileSize(chain.db, maxBlockFileSize, syncBlocks)
+
+	// Function that errors out if the block that should exist doesn't exist.
+	shouldExist := func(dbTx database.Tx, blockHash *chainhash.Hash) {
+		bytes, err := dbTx.FetchBlock(blockHash)
+		if err != nil {
+			t.Fatal(err)
+		}
+		block, err := btcutil.NewBlockFromBytes(bytes)
+		if err != nil {
+			t.Fatalf("didn't find block %v. %v", blockHash, err)
+		}
+
+		if !block.Hash().IsEqual(blockHash) {
+			t.Fatalf("expected to find block %v but got %v",
+				blockHash, block.Hash())
+		}
+	}
+
+	// Function that errors out if the block that shouldn't exist exists.
+	shouldNotExist := func(dbTx database.Tx, blockHash *chainhash.Hash) {
+		bytes, err := dbTx.FetchBlock(chaincfg.MainNetParams.GenesisHash)
+		if err == nil {
+			t.Fatalf("expected block %s to be pruned", blockHash)
+		}
+		if len(bytes) != 0 {
+			t.Fatalf("expected block %s to be pruned but got %v",
+				blockHash, bytes)
+		}
+	}
+
+	// The below code checks that the correct blocks were pruned.
+	chain.db.View(func(dbTx database.Tx) error {
+		exist := false
+		for _, block := range blocks {
+			// Blocks up to the last flush hash should not exist.
+			// The utxocache is big enough so that it shouldn't flush
+			// on it being full.  It should only flush on prunes.
+			if block.Hash().IsEqual(&chain.utxoCache.lastFlushHash) {
+				exist = true
+			}
+
+			if exist {
+				shouldExist(dbTx, block.Hash())
+			} else {
+				shouldNotExist(dbTx, block.Hash())
+			}
+
+		}
+
+		return nil
+	})
 }

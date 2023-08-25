@@ -642,6 +642,24 @@ func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block,
 				if err != nil {
 					return err
 				}
+
+				// We may need to flush if the prune will delete blocks that
+				// are past our last flush block.
+				//
+				// NOTE: the database will never be inconsistent here as the
+				// actual blocks are not deleted until the db.Update returns.
+				needsFlush, err := b.flushNeededAfterPrune(deletedHashes)
+				if err != nil {
+					return err
+				}
+				if needsFlush {
+					// Since the deleted hashes are past our last
+					// flush block, flush the utxo cache now.
+					err = b.utxoCache.flush(dbTx, FlushRequired, state)
+					if err != nil {
+						return err
+					}
+				}
 			}
 		}
 
@@ -719,7 +737,7 @@ func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block,
 	// Since we may have changed the UTXO cache, we make sure it didn't exceed its
 	// maximum size.  If we're pruned and have flushed already, this will be a no-op.
 	return b.db.Update(func(dbTx database.Tx) error {
-		return b.utxoCache.flush(dbTx, FlushIfNeeded, b.BestSnapshot())
+		return b.utxoCache.flush(dbTx, FlushIfNeeded, state)
 	})
 }
 
