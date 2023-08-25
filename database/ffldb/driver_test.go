@@ -340,6 +340,19 @@ func TestPrune(t *testing.T) {
 		// This should leave 3 files on disk.
 		err = db.Update(func(tx database.Tx) error {
 			deletedBlocks, err = tx.PruneBlocks(blockFileSize * 3)
+			if err != nil {
+				return err
+			}
+
+			pruned, err := tx.BeenPruned()
+			if err != nil {
+				return err
+			}
+
+			if pruned {
+				err = fmt.Errorf("The database hasn't been commited yet " +
+					"but files were already deleted")
+			}
 			return err
 		})
 		if err != nil {
