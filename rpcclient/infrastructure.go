@@ -29,6 +29,7 @@ import (
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/go-socks/socks"
 	"github.com/btcsuite/websocket"
+	"golang.org/x/sync/errgroup"
 )
 
 var (
@@ -90,6 +91,12 @@ const (
 	// requestRetryInterval is the initial amount of time to wait in between
 	// retries when sending HTTP POST requests.
 	requestRetryInterval = time.Millisecond * 500
+
+	// rpcRequestInterval is the duration to wait before making more RPC
+	// requests to bitcoind. This is only used by low priority messages.
+	// For every 4 messages, we would sleep this duration before making
+	// more post requests.
+	rpcRequestInterval = time.Millisecond * 10
 )
 
 // jsonRequest holds information about a json request that is used to properly
@@ -928,6 +935,39 @@ func (c *Client) nextPostRequest() chan *jsonRequest {
 // while allowing the sender to continue running asynchronously.  It must be run
 // as a goroutine.
 func (c *Client) sendPostHandler() {
+	// Add an errgroup to handle the post messages in goroutines.
+	var eg errgroup.Group
+
+	// Limit the number of concurrent RPC calls.
+	//
+	// TODO(yy): Ideally we should pass the `-rpcthreads` used in
+	// `bitcoind` here to better increase the performance.
+	const numThreads = 4
+	eg.SetLimit(numThreads)
+
+	// lowReqCounter counts the number of low priority requests.
+	var lowReqCounter uint64
+
+	// handleLowPriorityRequest handles a low priority RPC request. It will
+	// sleep 10ms for every 4 messages to avoid slow response from
+	// bitcoind.
+	handleLowPriorityRequest := func(req *jsonRequest) {
+		lowReqCounter++
+		if lowReqCounter%numThreads == 0 {
+			log.Tracef("Sleeping %v for low priority command [%s] "+
+				"with id %d.", rpcRequestInterval,
+				req.method, req.id)
+
+			select {
+			case <-time.After(rpcRequestInterval):
+			case <-c.shutdown:
+				return
+			}
+		}
+
+		c.handleSendPostMessage(req, c.shutdown)
+	}
+
 out:
 	for {
 		// Send any messages ready for send until the shutdown channel
@@ -939,8 +979,27 @@ out:
 				break out
 			}
 
-			c.handleSendPostMessage(jReq, c.shutdown)
+			// For low priority messages we will process them
+			// sequentially.
+			if jReq.lowPriority {
+				handleLowPriorityRequest(jReq)
+			} else {
+				// For high priority messages we'll process
+				// them in goroutines to priorize them.
+				eg.Go(func() error {
+					c.handleSendPostMessage(
+						jReq, c.shutdown,
+					)
+
+					return nil
+				})
+			}
 		}
+	}
+
+	// Wait for all goroutines to report back.
+	if err := eg.Wait(); err != nil {
+		log.Errorf("Error sending post message: %v", err)
 	}
 
 	// Drain any wait channels before exiting so nothing is left waiting
