@@ -100,6 +100,7 @@ type jsonRequest struct {
 	cmd            interface{}
 	marshalledJSON []byte
 	responseChan   chan *Response
+	lowPriority    bool
 }
 
 // BackendVersion represents the version of the backend the client is currently
@@ -180,6 +181,7 @@ type Client struct {
 	// Networking infrastructure.
 	sendChan              chan []byte
 	highPriorityPostQueue chan *jsonRequest
+	lowPriorityPostQueue  chan *jsonRequest
 	connEstablished       chan struct{}
 	disconnect            chan struct{}
 	shutdown              chan struct{}
@@ -882,6 +884,45 @@ func (c *Client) handleSendPostMessage(jReq *jsonRequest,
 	jReq.responseChan <- &Response{result: res, err: err}
 }
 
+// nextPostRequest returns a channel that contains the next request received
+// from the queue. It will return the messages from the high priority queue
+// first. If the client is shutting down, a nil message will be returned.
+func (c *Client) nextPostRequest() chan *jsonRequest {
+	reqChan := make(chan *jsonRequest, 1)
+
+	// First, do a non-blocking read of the high priority queue.
+	select {
+	case req := <-c.highPriorityPostQueue:
+		log.Tracef("Recieved high priority command [%s] with id %d",
+			req.method, req.id)
+		reqChan <- req
+
+		return reqChan
+
+	default:
+	}
+
+	// If there're no high priority messages, block until a new message is
+	// received.
+	select {
+	case req := <-c.lowPriorityPostQueue:
+		log.Tracef("Recieved low priority command [%s] with id %d",
+			req.method, req.id)
+		reqChan <- req
+
+	case req := <-c.highPriorityPostQueue:
+		log.Tracef("Recieved high priority command [%s] with id %d",
+			req.method, req.id)
+		reqChan <- req
+
+	case <-c.shutdown:
+		log.Trace("Recieved shutdown signal")
+		reqChan <- nil
+	}
+
+	return reqChan
+}
+
 // sendPostHandler handles all outgoing messages when the client is running
 // in HTTP POST mode.  It uses a buffered channel to serialize output messages
 // while allowing the sender to continue running asynchronously.  It must be run
@@ -892,11 +933,13 @@ out:
 		// Send any messages ready for send until the shutdown channel
 		// is closed.
 		select {
-		case jReq := <-c.highPriorityPostQueue:
-			c.handleSendPostMessage(jReq, c.shutdown)
+		case jReq := <-c.nextPostRequest():
+			// A nil request means we are shutting down.
+			if jReq == nil {
+				break out
+			}
 
-		case <-c.shutdown:
-			break out
+			c.handleSendPostMessage(jReq, c.shutdown)
 		}
 	}
 
@@ -905,6 +948,14 @@ out:
 cleanup:
 	for {
 		select {
+		// Drain low priority queue.
+		case jReq := <-c.lowPriorityPostQueue:
+			jReq.responseChan <- &Response{
+				result: nil,
+				err:    ErrClientShutdown,
+			}
+
+		// Drain high priority queue.
 		case jReq := <-c.highPriorityPostQueue:
 			jReq.responseChan <- &Response{
 				result: nil,
@@ -931,9 +982,15 @@ func (c *Client) sendPostRequest(jReq *jsonRequest) {
 	default:
 	}
 
-	log.Tracef("Sending command [%s] with id %d", jReq.method, jReq.id)
+	log.Tracef("Sending command [%s] with id %d, lowPriority=%v",
+		jReq.method, jReq.id, jReq.lowPriority)
 
-	c.highPriorityPostQueue <- jReq
+	// Send the request to the queue based on its priority flag.
+	if jReq.lowPriority {
+		c.lowPriorityPostQueue <- jReq
+	} else {
+		c.highPriorityPostQueue <- jReq
+	}
 }
 
 // newFutureError returns a new future result channel that already has the
@@ -1465,6 +1522,10 @@ func New(config *ConnConfig, ntfnHandlers *NotificationHandlers) (*Client, error
 		highPriorityPostQueue: make(
 			chan *jsonRequest, sendPostBufferSize,
 		),
+		lowPriorityPostQueue: make(
+			chan *jsonRequest, sendPostBufferSize,
+		),
+
 		connEstablished: connEstablished,
 		disconnect:      make(chan struct{}),
 		shutdown:        make(chan struct{}),
