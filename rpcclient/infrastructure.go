@@ -761,9 +761,7 @@ out:
 // handleSendPostMessage handles performing the passed HTTP request, reading the
 // result, unmarshalling it, and delivering the unmarshalled result to the
 // provided response channel.
-func (c *Client) handleSendPostMessage(jReq *jsonRequest,
-	shutdown chan struct{}) {
-
+func (c *Client) handleSendPostMessage(jReq *jsonRequest) {
 	protocol := "http"
 	if !c.config.DisableTLS {
 		protocol = "https"
@@ -825,7 +823,7 @@ func (c *Client) handleSendPostMessage(jReq *jsonRequest,
 		select {
 		case <-time.After(backoff):
 
-		case <-shutdown:
+		case <-c.shutdown:
 			return
 		}
 	}
@@ -893,7 +891,7 @@ out:
 		// is closed.
 		select {
 		case jReq := <-c.sendPostChan:
-			c.handleSendPostMessage(jReq, c.shutdown)
+			c.handleSendPostMessage(jReq)
 
 		case <-c.shutdown:
 			break out
@@ -917,7 +915,6 @@ cleanup:
 	}
 	c.wg.Done()
 	log.Tracef("RPC client send handler done for %s", c.config.Host)
-
 }
 
 // sendPostRequest sends the passed HTTP request to the RPC server using the
