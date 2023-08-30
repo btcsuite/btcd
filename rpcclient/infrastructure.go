@@ -770,9 +770,7 @@ out:
 // handleSendPostMessage handles performing the passed HTTP request, reading the
 // result, unmarshalling it, and delivering the unmarshalled result to the
 // provided response channel.
-func (c *Client) handleSendPostMessage(jReq *jsonRequest,
-	shutdown chan struct{}) {
-
+func (c *Client) handleSendPostMessage(jReq *jsonRequest) {
 	protocol := "http"
 	if !c.config.DisableTLS {
 		protocol = "https"
@@ -834,7 +832,7 @@ func (c *Client) handleSendPostMessage(jReq *jsonRequest,
 		select {
 		case <-time.After(backoff):
 
-		case <-shutdown:
+		case <-c.shutdown:
 			return
 		}
 	}
@@ -965,7 +963,7 @@ func (c *Client) sendPostHandler() {
 			}
 		}
 
-		c.handleSendPostMessage(req, c.shutdown)
+		c.handleSendPostMessage(req)
 	}
 
 out:
@@ -987,9 +985,7 @@ out:
 				// For high priority messages we'll process
 				// them in goroutines to priorize them.
 				eg.Go(func() error {
-					c.handleSendPostMessage(
-						jReq, c.shutdown,
-					)
+					c.handleSendPostMessage(jReq)
 
 					return nil
 				})
@@ -1027,7 +1023,6 @@ cleanup:
 	}
 	c.wg.Done()
 	log.Tracef("RPC client send handler done for %s", c.config.Host)
-
 }
 
 // sendPostRequest sends the passed HTTP request to the RPC server using the
