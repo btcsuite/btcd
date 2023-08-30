@@ -98,17 +98,44 @@ func (r FutureGetRawTransactionResult) Receive() (*btcutil.Tx, error) {
 }
 
 // GetRawTransactionAsync returns an instance of a type that can be used to get
-// the result of the RPC at some future time by invoking the Receive function on
-// the returned instance.
+// the result of the RPC at some future time by invoking the Receive function
+// on the returned instance.
 //
 // See GetRawTransaction for the blocking version and more details.
-func (c *Client) GetRawTransactionAsync(txHash *chainhash.Hash) FutureGetRawTransactionResult {
+func (c *Client) GetRawTransactionAsync(
+	txHash *chainhash.Hash) FutureGetRawTransactionResult {
+
+	return c.getRawTransactionAsync(txHash, false)
+}
+
+// GetRawTransactionAsyncSlow returns an instance of a type that can be used to
+// get the result of the RPC at some future time by invoking the Receive
+// function on the returned instance. The request has a low priority and will
+// be processed once the high priority requests are handled.
+//
+// See GetRawTransaction for the blocking version and more details.
+func (c *Client) GetRawTransactionAsyncSlow(
+	txHash *chainhash.Hash) FutureGetRawTransactionResult {
+
+	return c.getRawTransactionAsync(txHash, true)
+}
+
+// getRawTransactionAsync is the internal implementation of
+// GetRawTransaction/GetRawTransactionLazy and takes a bool to indicate whether
+// this request has a low priority.
+func (c *Client) getRawTransactionAsync(txHash *chainhash.Hash,
+	lazy bool) FutureGetRawTransactionResult {
+
 	hash := ""
 	if txHash != nil {
 		hash = txHash.String()
 	}
 
 	cmd := btcjson.NewGetRawTransactionCmd(hash, btcjson.Int(0))
+	if lazy {
+		return c.SendCmdSlow(cmd)
+	}
+
 	return c.SendCmd(cmd)
 }
 
@@ -116,8 +143,22 @@ func (c *Client) GetRawTransactionAsync(txHash *chainhash.Hash) FutureGetRawTran
 //
 // See GetRawTransactionVerbose to obtain additional information about the
 // transaction.
-func (c *Client) GetRawTransaction(txHash *chainhash.Hash) (*btcutil.Tx, error) {
+func (c *Client) GetRawTransaction(
+	txHash *chainhash.Hash) (*btcutil.Tx, error) {
+
 	return c.GetRawTransactionAsync(txHash).Receive()
+}
+
+// GetRawTransactionSlow returns a transaction given its hash. The request will
+// be considered as low priority and will only be processed when there are no
+// high priority requests.
+//
+// See GetRawTransactionVerbose to obtain additional information about the
+// transaction.
+func (c *Client) GetRawTransactionSlow(
+	txHash *chainhash.Hash) (*btcutil.Tx, error) {
+
+	return c.GetRawTransactionAsyncSlow(txHash).Receive()
 }
 
 // FutureGetRawTransactionVerboseResult is a future promise to deliver the

@@ -1116,6 +1116,22 @@ func (c *Client) sendRequest(jReq *jsonRequest) {
 // future.  It handles both websocket and HTTP POST mode depending on the
 // configuration of the client.
 func (c *Client) SendCmd(cmd interface{}) chan *Response {
+	return c.sendCmdWithPriority(cmd, false)
+}
+
+// SendCmdSlow flags the the passed command as low priority and sends it to the
+// associated server and returns a response channel on which the reply will be
+// delivered at some point in the future. It handles both websocket and HTTP
+// POST mode depending on the configuration of the client.
+func (c *Client) SendCmdSlow(cmd interface{}) chan *Response {
+	return c.sendCmdWithPriority(cmd, true)
+}
+
+// sendCmdWithPriority is the internal implementation of SendCmd/SendCmdLazy
+// and takes a bool to indicate whether this cmd has a low priority.
+func (c *Client) sendCmdWithPriority(cmd interface{},
+	lowPriority bool) chan *Response {
+
 	rpcVersion := btcjson.RpcVersion1
 	if c.batch {
 		rpcVersion = btcjson.RpcVersion2
@@ -1141,6 +1157,7 @@ func (c *Client) SendCmd(cmd interface{}) chan *Response {
 		cmd:            cmd,
 		marshalledJSON: marshalledJSON,
 		responseChan:   responseChan,
+		lowPriority:    lowPriority,
 	}
 
 	c.sendRequest(jReq)
