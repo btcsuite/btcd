@@ -178,12 +178,12 @@ type Client struct {
 	ntfnState     *notificationState
 
 	// Networking infrastructure.
-	sendChan        chan []byte
-	sendPostChan    chan *jsonRequest
-	connEstablished chan struct{}
-	disconnect      chan struct{}
-	shutdown        chan struct{}
-	wg              sync.WaitGroup
+	sendChan              chan []byte
+	highPriorityPostQueue chan *jsonRequest
+	connEstablished       chan struct{}
+	disconnect            chan struct{}
+	shutdown              chan struct{}
+	wg                    sync.WaitGroup
 }
 
 // NextID returns the next id to be used when sending a JSON-RPC message.  This
@@ -892,7 +892,7 @@ out:
 		// Send any messages ready for send until the shutdown channel
 		// is closed.
 		select {
-		case jReq := <-c.sendPostChan:
+		case jReq := <-c.highPriorityPostQueue:
 			c.handleSendPostMessage(jReq, c.shutdown)
 
 		case <-c.shutdown:
@@ -905,7 +905,7 @@ out:
 cleanup:
 	for {
 		select {
-		case jReq := <-c.sendPostChan:
+		case jReq := <-c.highPriorityPostQueue:
 			jReq.responseChan <- &Response{
 				result: nil,
 				err:    ErrClientShutdown,
@@ -933,7 +933,7 @@ func (c *Client) sendPostRequest(jReq *jsonRequest) {
 
 	log.Tracef("Sending command [%s] with id %d", jReq.method, jReq.id)
 
-	c.sendPostChan <- jReq
+	c.highPriorityPostQueue <- jReq
 }
 
 // newFutureError returns a new future result channel that already has the
@@ -1452,17 +1452,19 @@ func New(config *ConnConfig, ntfnHandlers *NotificationHandlers) (*Client, error
 	}
 
 	client := &Client{
-		config:          config,
-		wsConn:          wsConn,
-		httpClient:      httpClient,
-		requestMap:      make(map[uint64]*list.Element),
-		requestList:     list.New(),
-		batch:           false,
-		batchList:       list.New(),
-		ntfnHandlers:    ntfnHandlers,
-		ntfnState:       newNotificationState(),
-		sendChan:        make(chan []byte, sendBufferSize),
-		sendPostChan:    make(chan *jsonRequest, sendPostBufferSize),
+		config:       config,
+		wsConn:       wsConn,
+		httpClient:   httpClient,
+		requestMap:   make(map[uint64]*list.Element),
+		requestList:  list.New(),
+		batch:        false,
+		batchList:    list.New(),
+		ntfnHandlers: ntfnHandlers,
+		ntfnState:    newNotificationState(),
+		sendChan:     make(chan []byte, sendBufferSize),
+		highPriorityPostQueue: make(
+			chan *jsonRequest, sendPostBufferSize,
+		),
 		connEstablished: connEstablished,
 		disconnect:      make(chan struct{}),
 		shutdown:        make(chan struct{}),
