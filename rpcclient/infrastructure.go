@@ -928,9 +928,13 @@ func (c *Client) sendPostRequest(jReq *jsonRequest) {
 	default:
 	}
 
-	log.Tracef("Sending command [%s] with id %d", jReq.method, jReq.id)
+	select {
+	case c.sendPostChan <- jReq:
+		log.Tracef("Sent command [%s] with id %d", jReq.method, jReq.id)
 
-	c.sendPostChan <- jReq
+	case <-c.shutdown:
+		return
+	}
 }
 
 // newFutureError returns a new future result channel that already has the
