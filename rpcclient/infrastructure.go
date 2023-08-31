@@ -92,11 +92,9 @@ const (
 	// retries when sending HTTP POST requests.
 	requestRetryInterval = time.Millisecond * 500
 
-	// rpcRequestInterval is the duration to wait before making more RPC
-	// requests to bitcoind. This is only used by low priority messages.
-	// For every 4 messages, we would sleep this duration before making
-	// more post requests.
-	rpcRequestInterval = time.Millisecond * 10
+	// defaultRPCRequestInterval specifies the default value to be used for
+	// RPCRequestInterval when it's not set.
+	defaultRPCRequestInterval = time.Millisecond * 10
 )
 
 // jsonRequest holds information about a json request that is used to properly
@@ -953,11 +951,11 @@ func (c *Client) sendPostHandler() {
 		lowReqCounter++
 		if lowReqCounter%numThreads == 0 {
 			log.Tracef("Sleeping %v for low priority command [%s] "+
-				"with id %d.", rpcRequestInterval,
+				"with id %d.", c.config.RPCRequestInterval,
 				req.method, req.id)
 
 			select {
-			case <-time.After(rpcRequestInterval):
+			case <-time.After(c.config.RPCRequestInterval):
 			case <-c.shutdown:
 				return
 			}
@@ -1406,6 +1404,26 @@ type ConnConfig struct {
 	// EnableBCInfoHacks is an option provided to enable compatibility hacks
 	// when connecting to blockchain.info RPC server
 	EnableBCInfoHacks bool
+
+	// RPCRequestInterval is the duration to wait before making more RPC
+	// requests to bitcoind. This is only used by low priority messages.
+	// For every 4 messages, we would sleep this duration before making
+	// more post requests.
+	RPCRequestInterval time.Duration
+}
+
+// validate verifies the configuration options have valid values.
+func (config *ConnConfig) validate() error {
+	if config.RPCRequestInterval < 0 {
+		return errors.New("RPCRequestInterval cannot be negative")
+	}
+
+	if config.RPCRequestInterval > 1*time.Second {
+		return fmt.Errorf("RPCRequestInterval cannot be greater than "+
+			"1 second: %v", config.RPCRequestInterval)
+	}
+
+	return nil
 }
 
 // getAuth returns the username and passphrase that will actually be used for
@@ -1558,7 +1576,19 @@ func dial(config *ConnConfig) (*websocket.Conn, error) {
 // details.  The notification handlers parameter may be nil if you are not
 // interested in receiving notifications and will be ignored if the
 // configuration is set to run in HTTP POST mode.
-func New(config *ConnConfig, ntfnHandlers *NotificationHandlers) (*Client, error) {
+func New(config *ConnConfig,
+	ntfnHandlers *NotificationHandlers) (*Client, error) {
+
+	// Make sure the config is valid.
+	if err := config.validate(); err != nil {
+		return nil, err
+	}
+
+	// Set default values if not specified.
+	if config.RPCRequestInterval == 0 {
+		config.RPCRequestInterval = defaultRPCRequestInterval
+	}
+
 	// Either open a websocket connection or create an HTTP client depending
 	// on the HTTP POST mode.  Also, set the notification handlers to nil
 	// when running in HTTP POST mode.
