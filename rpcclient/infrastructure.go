@@ -1036,14 +1036,21 @@ func (c *Client) sendPostRequest(jReq *jsonRequest) {
 	default:
 	}
 
-	log.Tracef("Sending command [%s] with id %d, lowPriority=%v",
-		jReq.method, jReq.id, jReq.lowPriority)
-
 	// Send the request to the queue based on its priority flag.
+	var queue chan *jsonRequest
 	if jReq.lowPriority {
-		c.lowPriorityPostQueue <- jReq
+		queue = c.lowPriorityPostQueue
 	} else {
-		c.highPriorityPostQueue <- jReq
+		queue = c.highPriorityPostQueue
+	}
+
+	select {
+	case queue <- jReq:
+		log.Tracef("Sent command [%s] with id %d, lowPriority=%v",
+			jReq.method, jReq.id, jReq.lowPriority)
+
+	case <-c.shutdown:
+		return
 	}
 }
 
