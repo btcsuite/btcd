@@ -199,6 +199,7 @@ func TestNewHashFromStr(t *testing.T) {
 // TestHashJsonMarshal tests json marshal and unmarshal.
 func TestHashJsonMarshal(t *testing.T) {
 	hashStr := "000000000003ba27aa200b1cecaad478d2b00432346c3f1f3986da1afd33e506"
+	legacyHashStr := []byte("[6,229,51,253,26,218,134,57,31,63,108,52,50,4,176,210,120,212,170,236,28,11,32,170,39,186,3,0,0,0,0,0]")
 
 	hash, err := NewHashFromStr(hashStr)
 	if err != nil {
@@ -214,6 +215,15 @@ func TestHashJsonMarshal(t *testing.T) {
 	err = json.Unmarshal(hashBytes, &newHash)
 	if err != nil {
 		t.Errorf("Unmarshal json error:%v, hash:%v", err, hashBytes)
+	}
+
+	if !hash.IsEqual(&newHash) {
+		t.Errorf("String: wrong hash string - got %v, want %v", newHash.String(), hashStr)
+	}
+
+	err = newHash.UnmarshalJSON(legacyHashStr)
+	if err != nil {
+		t.Errorf("Unmarshal legacy json error:%v, hash:%v", err, legacyHashStr)
 	}
 
 	if !hash.IsEqual(&newHash) {
