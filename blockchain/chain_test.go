@@ -964,3 +964,62 @@ func TestIntervalBlockHashes(t *testing.T) {
 		}
 	}
 }
+
+func TestProcessOrphans(t *testing.T) {
+	chain, teardownFunc, err := chainSetup("TestProcessOrphans", &chaincfg.MainNetParams)
+	if err != nil {
+		t.Errorf("Failed to setup chain instance: %v", err)
+		return
+	}
+	defer teardownFunc()
+
+	chain.TstSetCoinbaseMaturity(0)
+
+	blocksFile := "blk_0_to_4.dat.bz2"
+	blocks, err := loadBlocks(blocksFile)
+	if err != nil {
+		t.Fatalf("TestProcessOrphans: "+
+			"Error loading file '%s': %s\n", blocksFile, err)
+	}
+
+	// Get a reference to a parent block
+	parentBlock := blocks[1]
+
+	// Create a child of parentBlock in a way that:
+	// a. It gets added to the orphan pool
+	// b. It gets rejected once it's unorphaned
+	invalidChildMsgBlock := blocks[2].MsgBlock()
+	invalidChildMsgBlock.Transactions[1].TxIn[0].SignatureScript = nil
+	invalidChildBlock := btcutil.NewBlock(invalidChildMsgBlock)
+
+	merkles := BuildMerkleTreeStore(invalidChildBlock.Transactions(), false)
+	calculatedMerkleRoot := merkles[len(merkles)-1]
+	invalidChildBlock.MsgBlock().Header.MerkleRoot = *calculatedMerkleRoot
+
+	// Process the invalid child block so that it gets added to the orphan pool
+	_, isOrphan, err := chain.ProcessBlock(invalidChildBlock, BFNoPoWCheck)
+	if err != nil {
+		t.Fatalf("TestProcessOrphans: child block unexpectedly returned an error: %s", err)
+	}
+	if !isOrphan {
+		t.Fatalf("TestProcessOrphans: incorrectly returned that child block is not an orphan")
+	}
+
+	// Process the parent block. Note that this will attempt to unorphan the invalid child block
+	_, isOrphan, err = chain.ProcessBlock(parentBlock, BFNoPoWCheck)
+	if err != nil {
+		t.Fatalf("TestProcessOrphans: parent block unexpectedly returned an error: %s", err)
+	}
+	if isOrphan {
+		t.Fatalf("TestProcessOrphans: incorrectly returned that parent block is an orphan")
+	}
+
+	// Make sure that the invalid child block had been rejected
+	node := chain.index.LookupNode(invalidChildBlock.Hash())
+	if node == nil {
+		t.Fatalf("TestProcessOrphans: child block missing from block index")
+	}
+	if !chain.index.NodeStatus(node).KnownInvalid() {
+		t.Fatalf("TestProcessOrphans: child block erroneously not marked as invalid")
+	}
+}

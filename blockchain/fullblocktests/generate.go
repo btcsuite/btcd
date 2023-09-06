@@ -1037,7 +1037,7 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 	tests = append(tests, []TestInstance{
 		acceptBlock("b13", b13, false, true),
 		acceptBlock("b14", b14, false, true),
-		rejectBlock("b12", b12, blockchain.ErrBadCoinbaseValue),
+		acceptBlock("b12", b12, false, false),
 		expectTipBlock("b13", b13),
 	})
 
