@@ -151,6 +151,12 @@ func (f ServiceFlag) String() string {
 	return s
 }
 
+const (
+	// NodeNetworkLimitedBlockThreshold is the number of blocks that a node
+	// broadcasting SFNodeNetworkLimited MUST be able to serve from the tip.
+	NodeNetworkLimitedBlockThreshold = 288
+)
+
 // BitcoinNet represents which bitcoin network a message belongs to.
 type BitcoinNet uint32
 
