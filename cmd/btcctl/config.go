@@ -143,7 +143,7 @@ func normalizeAddress(addr string, chain *chaincfg.Params, useWallet bool) (stri
 			if useWallet {
 				defaultPort = "38332"
 			} else {
-				defaultPort = "38332"
+				defaultPort = "38334"
 			}
 		default:
 			if useWallet {
