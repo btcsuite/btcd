@@ -303,13 +303,9 @@ func schnorrSign(privKey, nonce *btcec.ModNScalar, pubKey *btcec.PublicKey, hash
 	// Step 12.
 	//
 	// e = tagged_hash("BIP0340/challenge", bytes(R) || bytes(P) || m) mod n
-	var rBytes [32]byte
-	r := &R.X
-	r.PutBytesUnchecked(rBytes[:])
 	pBytes := SerializePubKey(pubKey)
-
 	commitment := chainhash.TaggedHash(
-		chainhash.TagBIP0340Challenge, rBytes[:], pBytes, hash,
+		chainhash.TagBIP0340Challenge, R.X.Bytes()[:], pBytes, hash,
 	)
 
 	var e btcec.ModNScalar
@@ -325,7 +321,7 @@ func schnorrSign(privKey, nonce *btcec.ModNScalar, pubKey *btcec.PublicKey, hash
 	s := new(btcec.ModNScalar).Mul2(&e, privKey).Add(&k)
 	k.Zero()
 
-	sig := NewSignature(r, s)
+	sig := NewSignature(&R.X, s)
 
 	// Step 14.
 	//
