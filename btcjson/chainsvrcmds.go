@@ -48,6 +48,23 @@ func NewAddNodeCmd(addr string, subCmd AddNodeSubCmd) *AddNodeCmd {
 	}
 }
 
+// ConvertToPsbtCmd defines the converttopsbt JSON-RPC command.
+type ConvertToPsbtCmd struct {
+	Psbt          string
+	PermitSigData *bool
+	IsWitness     *bool
+}
+
+// NewConvertToPsbtCmd returns a new instance which can be used to issue a
+// converttopsbt JSON-RPC command.
+func NewConvertToPsbtCmd(psbt string, permitSigData, isWitness *bool) *ConvertToPsbtCmd {
+	return &ConvertToPsbtCmd{
+		Psbt:          psbt,
+		PermitSigData: permitSigData,
+		IsWitness:     isWitness,
+	}
+}
+
 // TransactionInput represents the inputs to a transaction.  Specifically a
 // transaction hash and output number pair.
 type TransactionInput struct {
@@ -1047,6 +1064,7 @@ func init() {
 	flags := UsageFlag(0)
 
 	MustRegisterCmd("addnode", (*AddNodeCmd)(nil), flags)
+	MustRegisterCmd("converttopsbt", (*ConvertToPsbtCmd)(nil), flags)
 	MustRegisterCmd("createrawtransaction", (*CreateRawTransactionCmd)(nil), flags)
 	MustRegisterCmd("decoderawtransaction", (*DecodeRawTransactionCmd)(nil), flags)
 	MustRegisterCmd("decodescript", (*DecodeScriptCmd)(nil), flags)

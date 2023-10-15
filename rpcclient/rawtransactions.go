@@ -882,3 +882,48 @@ func (c *Client) DecodeScriptAsync(serializedScript []byte) FutureDecodeScriptRe
 func (c *Client) DecodeScript(serializedScript []byte) (*btcjson.DecodeScriptResult, error) {
 	return c.DecodeScriptAsync(serializedScript).Receive()
 }
+
+// FutureConvertToPsbtResult is a future promise to deliver the result of a
+// ConvertToPsbt RPC invocation (or an applicable error).
+type FutureConvertToPsbtResult chan *Response
+
+func (r FutureConvertToPsbtResult) Receive() (*btcjson.ConvertToPsbtResult, error) {
+	res, err := ReceiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal result as a convertpsbt result object.
+	var convertToPsbtResult btcjson.ConvertToPsbtResult
+	err = json.Unmarshal(res, &convertToPsbtResult)
+	if err != nil {
+		return nil, err
+	}
+
+	return &convertToPsbtResult, nil
+}
+
+// ConvertToPsbtAsync returns an instance of a type that can be used to
+// get the result of the RPC at some future time by invoking the Receive
+// function on the returned instance.
+//
+// See ConvertToPsbt for the blocking version and more details.
+func (c *Client) ConvertToPsbtAsync(tx *wire.MsgTx, permitSigData *bool, isWitness *bool) FutureConvertToPsbtResult {
+	txHex := ""
+	if tx != nil {
+		// Serialize the transaction and convert to hex string.
+		buf := bytes.NewBuffer(make([]byte, 0, tx.SerializeSize()))
+		if err := tx.Serialize(buf); err != nil {
+			return newFutureError(err)
+		}
+		txHex = hex.EncodeToString(buf.Bytes())
+	}
+
+	cmd := btcjson.NewConvertToPsbtCmd(txHex, permitSigData, isWitness)
+	return c.SendCmd(cmd)
+}
+
+// ConvertToPsbt returns a PSBT version of the transaction given.
+func (c *Client) ConvertToPsbt(tx *wire.MsgTx, permitSigData *bool, isWitness *bool) (*btcjson.ConvertToPsbtResult, error) {
+	return c.ConvertToPsbtAsync(tx, permitSigData, isWitness).Receive()
+}
