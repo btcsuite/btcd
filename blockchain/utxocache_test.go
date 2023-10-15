@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
+	"path/filepath"
 	"reflect"
 	"sync"
 	"testing"
@@ -797,4 +798,118 @@ func TestFlushOnPrune(t *testing.T) {
 
 		return nil
 	})
+}
+
+func TestInitConsistentState(t *testing.T) {
+	//  Boilerplate for creating a chain.
+	dbName := "TestFlushOnPrune"
+	chain, tearDown, err := chainSetup(dbName, &chaincfg.MainNetParams)
+	if err != nil {
+		panic(fmt.Sprintf("error loading blockchain with database: %v", err))
+	}
+	defer tearDown()
+	chain.utxoCache.maxTotalMemoryUsage = 10 * 1024 * 1024
+	chain.utxoCache.cachedEntries.maxTotalMemoryUsage = chain.utxoCache.maxTotalMemoryUsage
+
+	// Read blocks from the file.
+	blocks, err := loadBlocks("blk_0_to_14131.dat")
+	if err != nil {
+		t.Fatalf("failed to read block from file. %v", err)
+	}
+
+	// Sync up to height 13,000.  Flush the utxocache at height 11_000.
+	cacheFlushHeight := 9000
+	initialSyncHeight := 12_000
+	for i, block := range blocks {
+		if i == 0 {
+			// Skip the genesis block.
+			continue
+		}
+
+		isMainChain, _, err := chain.ProcessBlock(block, BFNone)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if !isMainChain {
+			t.Fatalf("expected block %s to be on the main chain", block.Hash())
+		}
+
+		if i == cacheFlushHeight {
+			err = chain.FlushUtxoCache(FlushRequired)
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+		if i == initialSyncHeight {
+			break
+		}
+	}
+
+	// Sanity check.
+	if chain.BestSnapshot().Height != int32(initialSyncHeight) {
+		t.Fatalf("expected the chain to sync up to height %d", initialSyncHeight)
+	}
+
+	// Close the database without flushing the utxocache.  This leaves the
+	// chaintip at height 13,000 but the utxocache consistent state at 11,000.
+	err = chain.db.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	chain.db = nil
+
+	// Re-open the database and pass the re-opened db to internal structs.
+	dbPath := filepath.Join(testDbRoot, dbName)
+	ndb, err := database.Open(testDbType, dbPath, blockDataNet)
+	if err != nil {
+		t.Fatal(err)
+	}
+	chain.db = ndb
+	chain.utxoCache.db = ndb
+	chain.index.db = ndb
+
+	// Sanity check to see that the utxo cache was flushed before the
+	// current chain tip.
+	var statusBytes []byte
+	ndb.View(func(dbTx database.Tx) error {
+		statusBytes = dbFetchUtxoStateConsistency(dbTx)
+		return nil
+	})
+	statusHash, err := chainhash.NewHash(statusBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !statusHash.IsEqual(blocks[cacheFlushHeight].Hash()) {
+		t.Fatalf("expected the utxocache to be flushed at "+
+			"block hash %s but got %s",
+			blocks[cacheFlushHeight].Hash(), statusHash)
+	}
+
+	// Call InitConsistentState.  This will make the utxocache catch back
+	// up to the tip.
+	err = chain.InitConsistentState(chain.bestChain.tip(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Sync the reset of the blocks.
+	for i, block := range blocks {
+		if i <= initialSyncHeight {
+			continue
+		}
+		isMainChain, _, err := chain.ProcessBlock(block, BFNone)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if !isMainChain {
+			t.Fatalf("expected block %s to be on the main chain", block.Hash())
+		}
+	}
+
+	if chain.BestSnapshot().Height != blocks[len(blocks)-1].Height() {
+		t.Fatalf("expected the chain to sync up to height %d",
+			blocks[len(blocks)-1].Height())
+	}
 }
