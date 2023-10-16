@@ -13,6 +13,7 @@ import (
 
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/integration/rpctest"
+	"github.com/stretchr/testify/require"
 )
 
 func TestPrune(t *testing.T) {
@@ -21,19 +22,17 @@ func TestPrune(t *testing.T) {
 	// Boilerplate code to make a pruned node.
 	btcdCfg := []string{"--prune=1536"}
 	r, err := rpctest.New(&chaincfg.SimNetParams, nil, btcdCfg, "")
-	if err != nil {
-		t.Fatal("unable to create primary harness: ", err)
-	}
+	require.NoError(t, err)
+
 	if err := r.SetUp(false, 0); err != nil {
-		t.Fatalf("unable to setup chain: %v", err)
+		require.NoError(t, err)
 	}
-	defer r.TearDown()
+	t.Cleanup(func() { r.TearDown() })
 
 	// Check that the rpc call for block chain info comes back correctly.
 	chainInfo, err := r.Client.GetBlockChainInfo()
-	if err != nil {
-		t.Fatalf("unable to query for chain info: %v", err)
-	}
+	require.NoError(t, err)
+
 	if !chainInfo.Pruned {
 		t.Fatalf("expected the node to be pruned but the pruned "+
 			"boolean was %v", chainInfo.Pruned)
