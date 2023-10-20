@@ -348,7 +348,7 @@ type taprootSigHashOptions struct {
 	codeSepPos uint32
 }
 
-// writeDigestExtensions writes out the sighah mesage extensiosn defined by the
+// writeDigestExtensions writes out the sighash message extension defined by the
 // current active sigHashExtFlags.
 func (t *taprootSigHashOptions) writeDigestExtensions(w io.Writer) error {
 	switch t.extFlag {
@@ -588,7 +588,7 @@ func calcTaprootSignatureHashRaw(sigHashes *TxSigHashes, hType SigHashType,
 
 // CalcTaprootSignatureHash computes the sighash digest of a transaction's
 // taproot-spending input using the new sighash digest algorithm described in
-// BIP 341. As the new digest algoriths may require the digest to commit to the
+// BIP 341. As the new digest algorithms may require the digest to commit to the
 // entire prev output, a PrevOutputFetcher argument is required to obtain the
 // needed information. The TxSigHashes pre-computed sighash midstate MUST be
 // specified.
