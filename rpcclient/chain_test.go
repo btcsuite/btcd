@@ -1,6 +1,9 @@
 package rpcclient
 
-import "testing"
+import (
+	"errors"
+	"testing"
+)
 
 // TestUnmarshalGetBlockChainInfoResult ensures that the SoftForks and
 // UnifiedSoftForks fields of GetBlockChainInfoResult are properly unmarshaled
@@ -88,5 +91,41 @@ func TestUnmarshalGetBlockChainInfoResultSoftForks(t *testing.T) {
 		if !success {
 			return
 		}
+	}
+}
+
+func TestFutureGetBlockCountResultReceiveErrors(t *testing.T) {
+	responseChan := FutureGetBlockCountResult(make(chan *Response))
+	response := Response{
+		result: []byte{},
+		err:    errors.New("blah blah something bad happened"),
+	}
+	go func() {
+		responseChan <- &response
+	}()
+
+	_, err := responseChan.Receive()
+	if err == nil || err.Error() != "blah blah something bad happened" {
+		t.Fatalf("unexpected error: %s", err.Error())
+	}
+}
+
+func TestFutureGetBlockCountResultReceiveMarshalsResponseCorrectly(t *testing.T) {
+	responseChan := FutureGetBlockCountResult(make(chan *Response))
+	response := Response{
+		result: []byte{0x36, 0x36},
+		err:    nil,
+	}
+	go func() {
+		responseChan <- &response
+	}()
+
+	res, err := responseChan.Receive()
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err.Error())
+	}
+
+	if res != 66 {
+		t.Fatalf("unexpected response: %d (0x%X)", res, res)
 	}
 }
