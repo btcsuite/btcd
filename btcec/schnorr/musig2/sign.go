@@ -104,65 +104,65 @@ func (p *PartialSignature) Decode(r io.Reader) error {
 
 // SignOption is a functional option argument that allows callers to modify the
 // way we generate musig2 schnorr signatures.
-type SignOption func(*signOptions)
+type SignOption func(*SignOptions)
 
-// signOptions houses the set of functional options that can be used to modify
+// SignOptions houses the set of functional options that can be used to modify
 // the method used to generate the musig2 partial signature.
-type signOptions struct {
-	// fastSign determines if we'll skip the check at the end of the
+type SignOptions struct {
+	// FastSign determines if we'll skip the check at the end of the
 	// routine where we attempt to verify the produced signature.
-	fastSign bool
+	FastSign bool
 
-	// sortKeys determines if the set of keys should be sorted before doing
+	// SortKeys determines if the set of keys should be sorted before doing
 	// key aggregation.
-	sortKeys bool
+	SortKeys bool
 
-	// tweaks specifies a series of tweaks to be applied to the aggregated
+	// Tweaks specifies a series of tweaks to be applied to the aggregated
 	// public key, which also partially carries over into the signing
 	// process.
-	tweaks []KeyTweakDesc
+	Tweaks []KeyTweakDesc
 
-	// taprootTweak specifies a taproot specific tweak.  of the tweaks
+	// TaprootTweak specifies a taproot specific tweak of the tweaks
 	// specified above. Normally we'd just apply the raw 32 byte tweak, but
 	// for taproot, we first need to compute the aggregated key before
 	// tweaking, and then use it as the internal key. This is required as
 	// the taproot tweak also commits to the public key, which in this case
 	// is the aggregated key before the tweak.
-	taprootTweak []byte
+	TaprootTweak []byte
 
-	// bip86Tweak specifies that the taproot tweak should be done in a BIP
+	// BIP86Tweak specifies that the taproot tweak should be done in a BIP
 	// 86 style, where we don't expect an actual tweak and instead just
 	// commit to the public key itself.
-	bip86Tweak bool
+	BIP86Tweak bool
 }
 
 // defaultSignOptions returns the default set of signing operations.
-func defaultSignOptions() *signOptions {
-	return &signOptions{}
+func defaultSignOptions() *SignOptions {
+	return &SignOptions{}
 }
 
 // WithFastSign forces signing to skip the extra verification step at the end.
 // Performance sensitive applications may opt to use this option to speed up
 // the signing operation.
 func WithFastSign() SignOption {
-	return func(o *signOptions) {
-		o.fastSign = true
+	return func(o *SignOptions) {
+		o.FastSign = true
 	}
 }
 
 // WithSortedKeys determines if the set of signing public keys are to be sorted
 // or not before doing key aggregation.
 func WithSortedKeys() SignOption {
-	return func(o *signOptions) {
-		o.sortKeys = true
+	return func(o *SignOptions) {
+		o.SortKeys = true
 	}
 }
 
 // WithTweaks determines if the aggregated public key used should apply a
 // series of tweaks before key aggregation.
 func WithTweaks(tweaks ...KeyTweakDesc) SignOption {
-	return func(o *signOptions) {
-		o.tweaks = tweaks
+	return func(o *SignOptions) {
+		o.Tweaks = tweaks
 	}
 }
 
@@ -176,8 +176,8 @@ func WithTweaks(tweaks ...KeyTweakDesc) SignOption {
 // signature for the keypath spend for taproot, when the output key is actually
 // committing to a script path, or some other data.
 func WithTaprootSignTweak(scriptRoot []byte) SignOption {
-	return func(o *signOptions) {
-		o.taprootTweak = scriptRoot
+	return func(o *SignOptions) {
+		o.TaprootTweak = scriptRoot
 	}
 }
 
@@ -190,8 +190,8 @@ func WithTaprootSignTweak(scriptRoot []byte) SignOption {
 // signature for the keypath spend for taproot, when the output key was
 // generated using BIP 86.
 func WithBip86SignTweak() SignOption {
-	return func(o *signOptions) {
-		o.bip86Tweak = true
+	return func(o *SignOptions) {
+		o.BIP86Tweak = true
 	}
 }
 
@@ -282,29 +282,29 @@ func Sign(secNonce [SecNonceSize]byte, privKey *btcec.PrivateKey,
 
 	// Compute the hash of all the keys here as we'll need it do aggregate
 	// the keys and also at the final step of signing.
-	keysHash := keyHashFingerprint(pubKeys, opts.sortKeys)
-	uniqueKeyIndex := secondUniqueKeyIndex(pubKeys, opts.sortKeys)
+	keysHash := keyHashFingerprint(pubKeys, opts.SortKeys)
+	uniqueKeyIndex := secondUniqueKeyIndex(pubKeys, opts.SortKeys)
 
 	keyAggOpts := []KeyAggOption{
 		WithKeysHash(keysHash), WithUniqueKeyIndex(uniqueKeyIndex),
 	}
 	switch {
-	case opts.bip86Tweak:
+	case opts.BIP86Tweak:
 		keyAggOpts = append(
 			keyAggOpts, WithBIP86KeyTweak(),
 		)
-	case opts.taprootTweak != nil:
+	case opts.TaprootTweak != nil:
 		keyAggOpts = append(
-			keyAggOpts, WithTaprootKeyTweak(opts.taprootTweak),
+			keyAggOpts, WithTaprootKeyTweak(opts.TaprootTweak),
 		)
-	case len(opts.tweaks) != 0:
-		keyAggOpts = append(keyAggOpts, WithKeyTweaks(opts.tweaks...))
+	case len(opts.Tweaks) != 0:
+		keyAggOpts = append(keyAggOpts, WithKeyTweaks(opts.Tweaks...))
 	}
 
 	// Next we'll construct the aggregated public key based on the set of
 	// signers.
 	combinedKey, parityAcc, _, err := AggregateKeys(
-		pubKeys, opts.sortKeys, keyAggOpts...,
+		pubKeys, opts.SortKeys, keyAggOpts...,
 	)
 	if err != nil {
 		return nil, err
@@ -390,7 +390,7 @@ func Sign(secNonce [SecNonceSize]byte, privKey *btcec.PrivateKey,
 
 	// If we're not in fast sign mode, then we'll also validate our partial
 	// signature.
-	if !opts.fastSign {
+	if !opts.FastSign {
 		pubNonce := secNonceToPubNonce(secNonce)
 		sigValid := sig.Verify(
 			pubNonce, combinedNonce, pubKeys, pubKey, msg,
@@ -439,29 +439,29 @@ func verifyPartialSig(partialSig *PartialSignature, pubNonce [PubNonceSize]byte,
 	//
 	// Compute the hash of all the keys here as we'll need it do aggregate
 	// the keys and also at the final step of verification.
-	keysHash := keyHashFingerprint(keySet, opts.sortKeys)
-	uniqueKeyIndex := secondUniqueKeyIndex(keySet, opts.sortKeys)
+	keysHash := keyHashFingerprint(keySet, opts.SortKeys)
+	uniqueKeyIndex := secondUniqueKeyIndex(keySet, opts.SortKeys)
 
 	keyAggOpts := []KeyAggOption{
 		WithKeysHash(keysHash), WithUniqueKeyIndex(uniqueKeyIndex),
 	}
 	switch {
-	case opts.bip86Tweak:
+	case opts.BIP86Tweak:
 		keyAggOpts = append(
 			keyAggOpts, WithBIP86KeyTweak(),
 		)
-	case opts.taprootTweak != nil:
+	case opts.TaprootTweak != nil:
 		keyAggOpts = append(
-			keyAggOpts, WithTaprootKeyTweak(opts.taprootTweak),
+			keyAggOpts, WithTaprootKeyTweak(opts.TaprootTweak),
 		)
-	case len(opts.tweaks) != 0:
-		keyAggOpts = append(keyAggOpts, WithKeyTweaks(opts.tweaks...))
+	case len(opts.Tweaks) != 0:
+		keyAggOpts = append(keyAggOpts, WithKeyTweaks(opts.Tweaks...))
 	}
 
 	// Next we'll construct the aggregated public key based on the set of
 	// signers.
 	combinedKey, parityAcc, _, err := AggregateKeys(
-		keySet, opts.sortKeys, keyAggOpts...,
+		keySet, opts.SortKeys, keyAggOpts...,
 	)
 	if err != nil {
 		return err
