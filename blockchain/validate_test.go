@@ -169,7 +169,7 @@ func TestCheckBlockSanity(t *testing.T) {
 	}
 }
 
-// TestCheckSerializedHeight tests the checkSerializedHeight function with
+// TestCheckSerializedHeight tests the CheckSerializedHeight function with
 // various serialized heights and also does negative tests to ensure errors
 // and handled properly.
 func TestCheckSerializedHeight(t *testing.T) {
@@ -215,9 +215,9 @@ func TestCheckSerializedHeight(t *testing.T) {
 		msgTx.TxIn[0].SignatureScript = test.sigScript
 		tx := btcutil.NewTx(msgTx)
 
-		err := checkSerializedHeight(tx, test.wantHeight)
+		err := CheckSerializedHeight(tx, test.wantHeight)
 		if reflect.TypeOf(err) != reflect.TypeOf(test.err) {
-			t.Errorf("checkSerializedHeight #%d wrong error type "+
+			t.Errorf("CheckSerializedHeight #%d wrong error type "+
 				"got: %v <%T>, want: %T", i, err, err, test.err)
 			continue
 		}
@@ -225,7 +225,7 @@ func TestCheckSerializedHeight(t *testing.T) {
 		if rerr, ok := err.(RuleError); ok {
 			trerr := test.err.(RuleError)
 			if rerr.ErrorCode != trerr.ErrorCode {
-				t.Errorf("checkSerializedHeight #%d wrong "+
+				t.Errorf("CheckSerializedHeight #%d wrong "+
 					"error code got: %v, want: %v", i,
 					rerr.ErrorCode, trerr.ErrorCode)
 				continue
