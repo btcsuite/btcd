@@ -1042,6 +1042,27 @@ func NewVerifyTxOutProofCmd(proof string) *VerifyTxOutProofCmd {
 	}
 }
 
+// TestMempoolAcceptCmd defines the testmempoolaccept JSON-RPC command.
+type TestMempoolAcceptCmd struct {
+	// An array of hex strings of raw transactions.
+	RawTxns []string
+
+	// Reject transactions whose fee rate is higher than the specified
+	// value, expressed in BTC/kvB, optional, default="0.10".
+	MaxFeeRate float64 `json:"omitempty"`
+}
+
+// NewTestMempoolAcceptCmd returns a new instance which can be used to issue a
+// testmempoolaccept JSON-RPC command.
+func NewTestMempoolAcceptCmd(rawTxns []string,
+	maxFeeRate float64) *TestMempoolAcceptCmd {
+
+	return &TestMempoolAcceptCmd{
+		RawTxns:    rawTxns,
+		MaxFeeRate: maxFeeRate,
+	}
+}
+
 func init() {
 	// No special flags for commands in this file.
 	flags := UsageFlag(0)
@@ -1102,4 +1123,5 @@ func init() {
 	MustRegisterCmd("verifychain", (*VerifyChainCmd)(nil), flags)
 	MustRegisterCmd("verifymessage", (*VerifyMessageCmd)(nil), flags)
 	MustRegisterCmd("verifytxoutproof", (*VerifyTxOutProofCmd)(nil), flags)
+	MustRegisterCmd("testmempoolaccept", (*TestMempoolAcceptCmd)(nil), flags)
 }
