@@ -75,6 +75,10 @@ const (
 
 	// maxProtocolVersion is the max protocol version the server supports.
 	maxProtocolVersion = 70002
+
+	// defaultMaxFeeRate is the default value to use(0.1 BTC/kvB) when the
+	// `MaxFee` field is not set when calling `testmempoolaccept`.
+	defaultMaxFeeRate = 0.1
 )
 
 var (
@@ -179,6 +183,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"verifychain":            handleVerifyChain,
 	"verifymessage":          handleVerifyMessage,
 	"version":                handleVersion,
+	"testmempoolaccept":      handleTestMempoolAccept,
 }
 
 // list of commands that we recognize, but for which btcd has no support because
@@ -3804,6 +3809,125 @@ func handleVersion(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (in
 		},
 	}
 	return result, nil
+}
+
+// handleTestMempoolAccept implements the testmempoolaccept command.
+func handleTestMempoolAccept(s *rpcServer, cmd interface{},
+	closeChan <-chan struct{}) (interface{}, error) {
+
+	c := cmd.(*btcjson.TestMempoolAcceptCmd)
+
+	// Create txns to hold the decoded tx.
+	txns := make([]*btcutil.Tx, 0, len(c.RawTxns))
+
+	// Iterate the raw hex slice and decode them.
+	for _, rawTx := range c.RawTxns {
+		rawBytes, err := hex.DecodeString(rawTx)
+		if err != nil {
+			return nil, rpcDecodeHexError(rawTx)
+		}
+
+		tx, err := btcutil.NewTxFromBytes(rawBytes)
+		if err != nil {
+			return nil, &btcjson.RPCError{
+				Code:    btcjson.ErrRPCDeserialization,
+				Message: "TX decode failed: " + err.Error(),
+			}
+		}
+
+		txns = append(txns, tx)
+	}
+
+	results := make([]*btcjson.TestMempoolAcceptResult, 0, len(txns))
+	for _, tx := range txns {
+		// Create a test result item.
+		item := &btcjson.TestMempoolAcceptResult{
+			Txid:  tx.Hash().String(),
+			Wtxid: tx.WitnessHash().String(),
+		}
+
+		// Check the mempool acceptance.
+		result, err := s.cfg.TxMemPool.CheckMempoolAcceptance(tx)
+
+		// If an error is returned, this tx is not allow, hence we
+		// record the reason.
+		if err != nil {
+			item.Allowed = false
+
+			// TODO(yy): differentiate the errors and put package
+			// error in `PackageError` field.
+			item.RejectReason = err.Error()
+
+			results = append(results, item)
+
+			// Move to the next transaction.
+			continue
+		}
+
+		// If this transaction is an orphan, it's not allowed.
+		if result.MissingParents != nil {
+			item.Allowed = false
+
+			// NOTE: "missing-inputs" is what bitcoind returns
+			// here, so we mimic the same error message.
+			item.RejectReason = "missing-inputs"
+
+			results = append(results, item)
+
+			// Move to the next transaction.
+			continue
+		}
+
+		// Otherwise this tx is allowed if its fee rate is below the
+		// max fee rate, we now patch the fields in
+		// `TestMempoolAcceptItem` as much as possible.
+		//
+		// Calculate the fee field and validate its fee rate.
+		item.Fees, item.Allowed = validateFeeRate(
+			result.TxFee, result.TxSize, c.MaxFeeRate,
+		)
+
+		// If the fee rate check passed, assign the corresponding
+		// fields.
+		if item.Allowed {
+			item.Vsize = int32(result.TxSize)
+		} else {
+			// NOTE: "max-fee-exceeded" is what bitcoind returns
+			// here, so we mimic the same error message.
+			item.RejectReason = "max-fee-exceeded"
+		}
+
+		results = append(results, item)
+	}
+
+	return results, nil
+}
+
+// validateFeeRate checks that the fee rate used by transaction doesn't exceed
+// the max fee rate specified.
+func validateFeeRate(feeSats btcutil.Amount, txSize int64,
+	maxFeeRate float64) (*btcjson.TestMempoolAcceptFees, bool) {
+
+	// Calculate fee rate in sats/kvB.
+	feeRateSatsPerKVB := feeSats * 1e3 / btcutil.Amount(txSize)
+
+	// Convert sats/vB to BTC/kvB.
+	feeRate := feeRateSatsPerKVB.ToBTC()
+
+	// Get the max fee rate, if not provided, default to 0.1 BTC/kvB.
+	if maxFeeRate == 0 {
+		maxFeeRate = defaultMaxFeeRate
+	}
+
+	// If the fee rate is above the max fee rate, this tx is not accepted.
+	if feeRate > maxFeeRate {
+		return nil, false
+	}
+
+	return &btcjson.TestMempoolAcceptFees{
+		Base:             feeSats.ToBTC(),
+		EffectiveFeeRate: feeRate,
+	}, true
 }
 
 // rpcServer provides a concurrent safe RPC server to a chain server.
