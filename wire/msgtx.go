@@ -353,6 +353,11 @@ func (msg *MsgTx) TxHash() chainhash.Hash {
 	return chainhash.DoubleHashRaw(msg.SerializeNoWitness)
 }
 
+// TxID generates the transaction ID of the transaction.
+func (msg *MsgTx) TxID() string {
+	return msg.TxHash().String()
+}
+
 // WitnessHash generates the hash of the transaction serialized according to
 // the new witness serialization defined in BIP0141 and BIP0144. The final
 // output is used within the Segregated Witness commitment of all the witnesses
