@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -188,6 +189,48 @@ func TestClientConnectedToWSServerRunner(t *testing.T) {
 				if response.err == nil || response.err.Error() != "the client has been shutdown" {
 					t.Fatalf("unexpected error: %s", response.err.Error())
 				}
+			},
+		},
+		TestTableItem{
+			Name: "TestGetBestBlockHashAsync",
+			TestCase: func(t *testing.T) {
+				client, serverReceivedChannel, cleanup := makeClient(t)
+				defer cleanup()
+				ch := client.GetBestBlockHashAsync()
+
+				message := <-serverReceivedChannel
+				if message != "{\"jsonrpc\":\"1.0\",\"method\":\"getbestblockhash\",\"params\":[],\"id\":1}" {
+					t.Fatalf("received unexpected message: %s", message)
+				}
+
+				expectedResponse := Response{}
+
+				wg := sync.WaitGroup{}
+
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					for {
+						client.requestLock.Lock()
+						if client.requestList.Len() > 0 {
+							r := client.requestList.Back()
+							r.Value.(*jsonRequest).responseChan <- &expectedResponse
+							client.requestLock.Unlock()
+							return
+						}
+						client.requestLock.Unlock()
+					}
+				}()
+
+				response := <-ch
+
+				if &expectedResponse != response {
+					t.Fatalf("received unexepcted response")
+				}
+
+				// ensure the goroutine created in this test exists,
+				// the test is ran with a timeout
+				wg.Wait()
 			},
 		},
 	}
