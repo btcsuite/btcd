@@ -101,6 +101,7 @@ unit:
 	cd btcutil && $(GOTEST_DEV) ./... -test.timeout=20m
 	cd chaincfg && $(GOTEST_DEV) ./... -test.timeout=20m
 	cd chainhash && $(GOTEST_DEV) ./... -test.timeout=20m
+	cd descriptors && $(GOTEST_DEV) ./... -test.timeout=20m
 	cd txscript && $(GOTEST_DEV) ./... -test.timeout=20m
 	cd psbt && $(GOTEST_DEV) ./... -test.timeout=20m
 	cd wire && $(GOTEST_DEV) ./... -test.timeout=20m
@@ -117,6 +118,7 @@ unit-cover:
 	cd btcutil && $(GOTEST) $(COVER_FLAGS) ./... && sed -i.bak 's/v2\///g' coverage.txt
 	cd chaincfg && $(GOTEST) $(COVER_FLAGS) ./... && sed -i.bak 's/v2\///g' coverage.txt
 	cd chainhash && $(GOTEST) $(COVER_FLAGS) ./... && sed -i.bak 's/v2\///g' coverage.txt
+	cd descriptors && $(GOTEST) $(COVER_FLAGS) ./... && sed -i.bak 's/v2\///g' coverage.txt
 	cd txscript && $(GOTEST) $(COVER_FLAGS) ./... && sed -i.bak 's/v2\///g' coverage.txt
 	cd psbt && $(GOTEST) $(COVER_FLAGS) ./... && sed -i.bak 's/v2\///g' coverage.txt
 	cd wire && $(GOTEST) $(COVER_FLAGS) ./... && sed -i.bak 's/v2\///g' coverage.txt
@@ -130,6 +132,7 @@ unit-race:
 	cd btcutil && env CGO_ENABLED=1 GORACE="history_size=7 halt_on_errors=1" $(GOTEST) -race -test.timeout=20m ./...
 	cd chaincfg && env CGO_ENABLED=1 GORACE="history_size=7 halt_on_errors=1" $(GOTEST) -race -test.timeout=20m ./...
 	cd chainhash && env CGO_ENABLED=1 GORACE="history_size=7 halt_on_errors=1" $(GOTEST) -race -test.timeout=20m ./...
+	cd descriptors && env CGO_ENABLED=1 GORACE="history_size=7 halt_on_errors=1" $(GOTEST) -race -test.timeout=20m ./...
 	cd txscript && env CGO_ENABLED=1 GORACE="history_size=7 halt_on_errors=1" $(GOTEST) -race -test.timeout=20m ./...
 	cd psbt && env CGO_ENABLED=1 GORACE="history_size=7 halt_on_errors=1" $(GOTEST) -race -test.timeout=20m ./...
 	cd wire && env CGO_ENABLED=1 GORACE="history_size=7 halt_on_errors=1" $(GOTEST) -race -test.timeout=20m ./...
