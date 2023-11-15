@@ -1280,6 +1280,119 @@ func (b *BlockChain) BestSnapshot() *BestState {
 	return snapshot
 }
 
+// TipStatus is the status of a chain tip.
+type TipStatus byte
+
+const (
+	// StatusUnknown indicates that the tip status isn't any of the defined
+	// statuses.
+	StatusUnknown TipStatus = iota
+
+	// StatusActive indicates that the tip is considered active and is in
+	// the best chain.
+	StatusActive
+
+	// StatusInvalid indicates that this tip or any of the ancestors of this
+	// tip are invalid.
+	StatusInvalid
+
+	// StatusValidFork is given if:
+	// 1: Not a part of the best chain.
+	// 2: Is not invalid.
+	// 3: Has the block data stored to disk.
+	StatusValidFork
+)
+
+// String returns the status flags as string.
+func (ts TipStatus) String() string {
+	switch ts {
+	case StatusActive:
+		return "active"
+	case StatusInvalid:
+		return "invalid"
+	case StatusValidFork:
+		return "valid-fork"
+	}
+	return fmt.Sprintf("unknown: %b", ts)
+}
+
+// ChainTip represents the last block in a branch of the block tree.
+type ChainTip struct {
+	// Height of the tip.
+	Height int32
+
+	// BlockHash hash of the tip.
+	BlockHash chainhash.Hash
+
+	// BranchLen is length of the fork point of this chain from the main chain.
+	// Returns 0 if the chain tip is a part of the best chain.
+	BranchLen int32
+
+	// Status is the validity status of the branch this tip is in.
+	Status TipStatus
+}
+
+// ChainTips returns all the chain tips the node itself is aware of.  Each tip is
+// represented by its height, block hash, branch length, and status.
+//
+// This function is safe for concurrent access.
+func (b *BlockChain) ChainTips() []ChainTip {
+	b.chainLock.RLock()
+	defer b.chainLock.RUnlock()
+
+	// Grab all the inactive tips.
+	tips := b.index.InactiveTips(b.bestChain)
+
+	// Add the current tip.
+	tips = append(tips, b.bestChain.Tip())
+
+	chainTips := make([]ChainTip, 0, len(tips))
+
+	// Go through all the tips and grab the height, hash, branch length, and the block
+	// status.
+	for _, tip := range tips {
+		var status TipStatus
+		switch {
+		// The tip is considered active if it's in the best chain.
+		case b.bestChain.Contains(tip):
+			status = StatusActive
+
+		// This block or any of the ancestors of this block are invalid.
+		case tip.status.KnownInvalid():
+			status = StatusInvalid
+
+		// If the tip meets the following criteria:
+		// 1: Not a part of the best chain.
+		// 2: Is not invalid.
+		// 3: Has the block data stored to disk.
+		//
+		// The tip is considered a valid fork.
+		//
+		// We can check if a tip is a valid-fork by checking that
+		// its data is available. Since the behavior is to give a
+		// block node the statusDataStored status once it passes
+		// the proof of work checks and basic chain validity checks.
+		//
+		// We can't use the KnownValid status since it's only given
+		// to blocks that passed the validation AND were a part of
+		// the bestChain.
+		case tip.status.HaveData():
+			status = StatusValidFork
+		}
+
+		chainTip := ChainTip{
+			Height:    tip.height,
+			BlockHash: tip.hash,
+			BranchLen: tip.height - b.bestChain.FindFork(tip).height,
+			Status:    status,
+		}
+
+		chainTips = append(chainTips, chainTip)
+	}
+
+	return chainTips
+}
+
 // HeaderByHash returns the block header identified by the given hash or an
 // error if it doesn't exist. Note that this will return headers from both the
 // main and side chains.

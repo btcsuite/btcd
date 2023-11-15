@@ -349,6 +349,15 @@ var helpDescsEnUS = map[string]string{
 	"getblocktemplate--condition2": "mode=proposal, accepted",
 	"getblocktemplate--result1":    "An error string which represents why the proposal was rejected or nothing if accepted",
 
+	// GetChainTipsResult help.
+	"getchaintipsresult-chaintips": "The chaintips that this node is aware of",
+	"getchaintipsresult-height":    "The height of the chain tip",
+	"getchaintipsresult-hash":      "The block hash of the chain tip",
+	"getchaintipsresult-branchlen": "Returns zero for main chain. Otherwise is the length of branch connecting the tip to the main chain",
+	"getchaintipsresult-status":    "Status of the chain. Returns \"active\" for the main chain",
+	// GetChainTipsCmd help.
+	"getchaintips--synopsis": "Returns information about all known tips in the block tree, including the main chain as well as orphaned branches.",
+
 	// GetCFilterCmd help.
 	"getcfilter--synopsis":  "Returns a block's committed filter given its hash.",
 	"getcfilter-filtertype": "The type of filter to return (0=regular)",
@@ -730,6 +739,7 @@ var rpcResultTypes = map[string][]interface{}{
 	"getblockheader":         {(*string)(nil), (*btcjson.GetBlockHeaderVerboseResult)(nil)},
 	"getblocktemplate":       {(*btcjson.GetBlockTemplateResult)(nil), (*string)(nil), nil},
 	"getblockchaininfo":      {(*btcjson.GetBlockChainInfoResult)(nil)},
+	"getchaintips":           {(*[]btcjson.GetChainTipsResult)(nil)},
 	"getcfilter":             {(*string)(nil)},
 	"getcfilterheader":       {(*string)(nil)},
 	"getconnectioncount":     {(*int32)(nil)},

@@ -685,6 +685,44 @@ func (c *Client) GetBlockHeaderVerbose(blockHash *chainhash.Hash) (*btcjson.GetB
 	return c.GetBlockHeaderVerboseAsync(blockHash).Receive()
 }
 
+// FutureGetChainTipsResult is a future promise to deliver the result of a
+// GetChainTips RPC invocation (or an applicable error).
+type FutureGetChainTipsResult chan *Response
+
+// Receive waits for the Response promised by the future and returns the
+// data structure of all the chain tips the node is aware of.
+func (r FutureGetChainTipsResult) Receive() ([]*btcjson.GetChainTipsResult, error) {
+	res, err := ReceiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal result as a string.
+	var chainTips []*btcjson.GetChainTipsResult
+	err = json.Unmarshal(res, &chainTips)
+	if err != nil {
+		return nil, err
+	}
+
+	return chainTips, nil
+}
+
+// GetChainTipsAsync returns an instance of a type that can be used to get the
+// result of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+//
+// See GetChainTips for the blocking version and more details.
+func (c *Client) GetChainTipsAsync() FutureGetChainTipsResult {
+	cmd := btcjson.NewGetChainTipsCmd()
+	return c.SendCmd(cmd)
+}
+
+// GetChainTips returns a slice of data structure with information about all the
+// current chain tips that this node is aware of.
+func (c *Client) GetChainTips() ([]*btcjson.GetChainTipsResult, error) {
+	return c.GetChainTipsAsync().Receive()
+}
+
 // FutureGetMempoolEntryResult is a future promise to deliver the result of a
 // GetMempoolEntryAsync RPC invocation (or an applicable error).
 type FutureGetMempoolEntryResult chan *Response
