@@ -60,3 +60,16 @@ func BenchmarkUtxoFetchSlices(b *testing.B) {
 		}
 	}
 }
+
+func BenchmarkAncestor(b *testing.B) {
+	height := 1 << 19
+	blockNodes := chainedNodes(nil, height)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		blockNodes[len(blockNodes)-1].Ancestor(0)
+		for j := 0; j <= 19; j++ {
+			blockNodes[len(blockNodes)-1].Ancestor(1 << j)
+		}
+	}
+}
