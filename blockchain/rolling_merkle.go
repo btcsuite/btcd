@@ -94,7 +94,7 @@ func (s *rollingMerkleTreeStore) calcMerkleRoot(adds []*btcutil.Tx, witness bool
 	// If we still have more than 1 root after adding on the last tx again,
 	// we need to do the same for the upper rows.
 	//
-	// For exmaple, the below tree has 6 leaves.  For row 1, you'll need to
+	// For example, the below tree has 6 leaves.  For row 1, you'll need to
 	// hash 'F' with itself to create 'C' so you have something to hash with
 	// 'B'.  For bigger trees we may need to do the same in rows 2 or 3 as
 	// well.
