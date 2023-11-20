@@ -832,7 +832,7 @@ func (c *Client) handleSendPostMessage(jReq *jsonRequest) {
 		return
 	}
 
-	// We still want to return an error if for any reason the respone
+	// We still want to return an error if for any reason the response
 	// remains empty.
 	if httpResponse == nil {
 		jReq.responseChan <- &Response{

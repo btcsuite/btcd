@@ -64,7 +64,7 @@ const (
 	addrKeyTypeWitnessScriptHash = 3
 
 	// addrKeyTypeTaprootPubKey is the address type in an address key that
-	// represnts a pay-to-taproot adress. We use this to denote addresses
+	// represnts a pay-to-taproot address. We use this to denote addresses
 	// related to the segwit v1 that are encoded in the bech32m format.
 	addrKeyTypeTaprootPubKey = 4
 
