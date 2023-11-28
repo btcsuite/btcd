@@ -124,8 +124,7 @@ func schnorrVerify(sig *Signature, hash []byte, pubKeyBytes []byte) error {
 	// 7. Fail if is_infinite(R)
 	// 8. Fail if not hash_even_y(R)
 	// 9. Fail is x(R) != r.
-	// 10. Return success iff not failure occured before reachign this
-	// point.
+	// 10. Return success if failure did not occur before reaching this point.
 
 	// Step 1.
 	//
@@ -238,14 +237,14 @@ func zeroArray(a *[scalarSize]byte) {
 	}
 }
 
-// schnorrSign generates an BIP-340 signature over the secp256k1 curve for the
+// schnorrSign generates a BIP-340 signature over the secp256k1 curve for the
 // provided hash (which should be the result of hashing a larger message) using
 // the given nonce and private key.  The produced signature is deterministic
 // (same message, nonce, and key yield the same signature) and canonical.
 //
 // WARNING: The hash MUST be 32 bytes and both the nonce and private keys must
 // NOT be 0.  Since this is an internal use function, these preconditions MUST
-// be satisified by the caller.
+// be satisfied by the caller.
 func schnorrSign(privKey, nonce *btcec.ModNScalar, pubKey *btcec.PublicKey, hash []byte,
 	opts *signOptions) (*Signature, error) {
 
@@ -256,7 +255,7 @@ func schnorrSign(privKey, nonce *btcec.ModNScalar, pubKey *btcec.PublicKey, hash
 	// n = curve order
 	// d = private key
 	// m = message
-	// a = input randmoness
+	// a = input randomness
 	// r, s = signature
 	//
 	// 1. d' = int(d)
@@ -342,8 +341,8 @@ func schnorrSign(privKey, nonce *btcec.ModNScalar, pubKey *btcec.PublicKey, hash
 	return sig, nil
 }
 
-// SignOption is a functional option arguemnt that allows callers to modify the
-// way we generate BIP-340 schnorr signatues.
+// SignOption is a functional option argument that allows callers to modify the
+// way we generate BIP-340 schnorr signatures.
 type SignOption func(*signOptions)
 
 // signOptions houses the set of functional options that can be used to modify
@@ -364,7 +363,7 @@ func defaultSignOptions() *signOptions {
 }
 
 // FastSign forces signing to skip the extra verification step at the end.
-// Peformance sensitive applications may opt to use this option to speed up the
+// Performance sensitive applications may opt to use this option to speed up the
 // signing operation.
 func FastSign() SignOption {
 	return func(o *signOptions) {
@@ -409,7 +408,7 @@ func Sign(privKey *btcec.PrivateKey, hash []byte,
 	// n = curve order
 	// d = private key
 	// m = message
-	// a = input randmoness
+	// a = input randomness
 	// r, s = signature
 	//
 	// 1. d' = int(d)
@@ -471,7 +470,7 @@ func Sign(privKey *btcec.PrivateKey, hash []byte,
 
 	// At this point, we check to see if a CustomNonce has been passed in,
 	// and if so, then we'll deviate from the main routine here by
-	// generating the nonce value as specifid by BIP-0340.
+	// generating the nonce value as specified by BIP-0340.
 	if opts.authNonce != nil {
 		// Step 6.
 		//
