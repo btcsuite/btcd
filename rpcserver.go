@@ -4633,7 +4633,7 @@ type rpcserverConfig struct {
 	DB          database.DB
 
 	// TxMemPool defines the transaction memory pool to interact with.
-	TxMemPool *mempool.TxPool
+	TxMemPool mempool.TxMempool
 
 	// These fields allow the RPC server to interface with mining.
 	//

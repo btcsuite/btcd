@@ -196,6 +196,9 @@ type TxPool struct {
 // Ensure the TxPool type implements the mining.TxSource interface.
 var _ mining.TxSource = (*TxPool)(nil)
 
+// Ensure the TxPool type implements the TxMemPool interface.
+var _ TxMempool = (*TxPool)(nil)
+
 // removeOrphan is the internal function which implements the public
 // RemoveOrphan.  See the comment for RemoveOrphan for more details.
 //
