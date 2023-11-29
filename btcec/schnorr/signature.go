@@ -124,7 +124,7 @@ func schnorrVerify(sig *Signature, hash []byte, pubKeyBytes []byte) error {
 	// 7. Fail if is_infinite(R)
 	// 8. Fail if not hash_even_y(R)
 	// 9. Fail is x(R) != r.
-	// 10. Return success if failure did not occur before reaching this point.
+	// 10. Return success iff failure did not occur before reaching this point.
 
 	// Step 1.
 	//
@@ -219,7 +219,7 @@ func schnorrVerify(sig *Signature, hash []byte, pubKeyBytes []byte) error {
 
 	// Step 10.
 	//
-	// Return success iff not failure occured before reachign this
+	// Return success iff failure did not occur before reaching this point.
 	return nil
 }
 
