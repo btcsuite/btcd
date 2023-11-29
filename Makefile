@@ -133,6 +133,10 @@ lint: $(LINT_BIN)
 clean:
 	@$(call print, "Cleaning source.$(NC)")
 	$(RM) coverage.txt btcec/coverage.txt btcutil/coverage.txt btcutil/psbt/coverage.txt
+	
+tidy-module:
+	echo "Running 'go mod tidy' for all modules"
+	scripts/tidy_modules.sh
 
 .PHONY: all \
 	default \
