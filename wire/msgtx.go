@@ -378,6 +378,13 @@ func (msg *MsgTx) TxHash() chainhash.Hash {
 	return chainhash.DoubleHashH(msg.cachedSeralizedNoWitness)
 }
 
+// WipeCache removes the cached serialized bytes of the transaction. This is
+// useful to be able to get the correct txid after mutating a transaction's
+// state.
+func (msg *MsgTx) WipeCache() {
+	msg.cachedSeralizedNoWitness = nil
+}
+
 // WitnessHash generates the hash of the transaction serialized according to
 // the new witness serialization defined in BIP0141 and BIP0144. The final
 // output is used within the Segregated Witness commitment of all the witnesses

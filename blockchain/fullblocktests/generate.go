@@ -384,6 +384,8 @@ func additionalCoinbase(amount btcutil.Amount) func(*wire.MsgBlock) {
 		// Increase the first proof-of-work coinbase subsidy by the
 		// provided amount.
 		b.Transactions[0].TxOut[0].Value += int64(amount)
+
+		b.Transactions[0].WipeCache()
 	}
 }
 
@@ -402,6 +404,8 @@ func additionalSpendFee(fee btcutil.Amount) func(*wire.MsgBlock) {
 				fee))
 		}
 		b.Transactions[1].TxOut[0].Value -= int64(fee)
+
+		b.Transactions[1].WipeCache()
 	}
 }
 
@@ -410,6 +414,8 @@ func additionalSpendFee(fee btcutil.Amount) func(*wire.MsgBlock) {
 func replaceSpendScript(pkScript []byte) func(*wire.MsgBlock) {
 	return func(b *wire.MsgBlock) {
 		b.Transactions[1].TxOut[0].PkScript = pkScript
+
+		b.Transactions[1].WipeCache()
 	}
 }
 
@@ -418,6 +424,8 @@ func replaceSpendScript(pkScript []byte) func(*wire.MsgBlock) {
 func replaceCoinbaseSigScript(script []byte) func(*wire.MsgBlock) {
 	return func(b *wire.MsgBlock) {
 		b.Transactions[0].TxIn[0].SignatureScript = script
+
+		b.Transactions[0].WipeCache()
 	}
 }
 
