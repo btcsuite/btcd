@@ -39,6 +39,7 @@ import (
 	"github.com/btcsuite/btcd/mining"
 	"github.com/btcsuite/btcd/mining/cpuminer"
 	"github.com/btcsuite/btcd/peer"
+	"github.com/btcsuite/btcd/rpcclient"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/websocket"
@@ -3856,7 +3857,9 @@ func handleTestMempoolAccept(s *rpcServer, cmd interface{},
 
 			// TODO(yy): differentiate the errors and put package
 			// error in `PackageError` field.
-			item.RejectReason = err.Error()
+			item.RejectReason = rpcclient.MapBtcdErrToRejectReason(
+				err,
+			)
 
 			results = append(results, item)
 

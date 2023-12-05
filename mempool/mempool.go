@@ -592,9 +592,9 @@ func (mp *TxPool) checkPoolDoubleSpend(tx *btcutil.Tx) (bool, error) {
 		// transactions or if it doesn't signal replacement.
 		if mp.cfg.Policy.RejectReplacement ||
 			!mp.signalsReplacement(conflict, nil) {
-			str := fmt.Sprintf("output %v already spent by "+
-				"transaction %v in the memory pool",
-				txIn.PreviousOutPoint, conflict.Hash())
+			str := fmt.Sprintf("output already spent in mempool: "+
+				"output=%v, tx=%v", txIn.PreviousOutPoint,
+				conflict.Hash())
 			return false, txRuleError(wire.RejectDuplicate, str)
 		}
 
@@ -842,7 +842,7 @@ func (mp *TxPool) validateReplacement(tx *btcutil.Tx,
 	// exceed the maximum allowed.
 	conflicts := mp.txConflicts(tx)
 	if len(conflicts) > MaxReplacementEvictions {
-		str := fmt.Sprintf("replacement transaction %v evicts more "+
+		str := fmt.Sprintf("%v: replacement transaction evicts more "+
 			"transactions than permitted: max is %v, evicts %v",
 			tx.Hash(), MaxReplacementEvictions, len(conflicts))
 		return nil, txRuleError(wire.RejectNonstandard, str)
@@ -855,7 +855,7 @@ func (mp *TxPool) validateReplacement(tx *btcutil.Tx,
 		if _, ok := conflicts[ancestorHash]; !ok {
 			continue
 		}
-		str := fmt.Sprintf("replacement transaction %v spends parent "+
+		str := fmt.Sprintf("%v: replacement transaction spends parent "+
 			"transaction %v", tx.Hash(), ancestorHash)
 		return nil, txRuleError(wire.RejectInvalid, str)
 	}
@@ -876,7 +876,7 @@ func (mp *TxPool) validateReplacement(tx *btcutil.Tx,
 	)
 	for hash, conflict := range conflicts {
 		if txFeeRate <= mp.pool[hash].FeePerKB {
-			str := fmt.Sprintf("replacement transaction %v has an "+
+			str := fmt.Sprintf("%v: replacement transaction has an "+
 				"insufficient fee rate: needs more than %v, "+
 				"has %v", tx.Hash(), mp.pool[hash].FeePerKB,
 				txFeeRate)
@@ -897,7 +897,7 @@ func (mp *TxPool) validateReplacement(tx *btcutil.Tx,
 	// which is determined by our minimum relay fee.
 	minFee := calcMinRequiredTxRelayFee(txSize, mp.cfg.Policy.MinRelayTxFee)
 	if txFee < conflictsFee+minFee {
-		str := fmt.Sprintf("replacement transaction %v has an "+
+		str := fmt.Sprintf("%v: replacement transaction has an "+
 			"insufficient absolute fee: needs %v, has %v",
 			tx.Hash(), conflictsFee+minFee, txFee)
 		return nil, txRuleError(wire.RejectInsufficientFee, str)
@@ -1350,7 +1350,8 @@ func (mp *TxPool) checkMempoolAcceptance(tx *btcutil.Tx,
 	if mp.isTransactionInPool(txHash) || (rejectDupOrphans &&
 		mp.isOrphanInPool(txHash)) {
 
-		str := fmt.Sprintf("already have transaction %v", txHash)
+		str := fmt.Sprintf("already have transaction in mempool %v",
+			txHash)
 		return nil, txRuleError(wire.RejectDuplicate, str)
 	}
 
@@ -1368,7 +1369,7 @@ func (mp *TxPool) checkMempoolAcceptance(tx *btcutil.Tx,
 
 	// A standalone transaction must not be a coinbase transaction.
 	if blockchain.IsCoinBase(tx) {
-		str := fmt.Sprintf("transaction %v is an individual coinbase",
+		str := fmt.Sprintf("transaction is an individual coinbase %v",
 			txHash)
 
 		return nil, txRuleError(wire.RejectInvalid, str)
@@ -1418,7 +1419,7 @@ func (mp *TxPool) checkMempoolAcceptance(tx *btcutil.Tx,
 		entry := utxoView.LookupEntry(prevOut)
 		if entry != nil && !entry.IsSpent() {
 			return nil, txRuleError(wire.RejectDuplicate,
-				"transaction already exists")
+				"transaction already exists in blockchain")
 		}
 
 		utxoView.RemoveEntry(prevOut)
