@@ -74,6 +74,9 @@ type blockNode struct {
 	// parent is the parent block for this node.
 	parent *blockNode
 
+	// ancestor is a block that is more than one block back from this node.
+	ancestor *blockNode
+
 	// hash is the double sha 256 of the block.
 	hash chainhash.Hash
 
@@ -119,6 +122,7 @@ func initBlockNode(node *blockNode, blockHeader *wire.BlockHeader, parent *block
 		node.parent = parent
 		node.height = parent.height + 1
 		node.workSum = node.workSum.Add(parent.workSum, node.workSum)
+		node.buildAncestor()
 	}
 }
 
@@ -150,6 +154,26 @@ func (node *blockNode) Header() wire.BlockHeader {
 	}
 }
 
+// invertLowestOne turns the lowest 1 bit in the binary representation of a number into a 0.
+func invertLowestOne(n int32) int32 {
+	return n & (n - 1)
+}
+
+// getAncestorHeight returns a suitable ancestor for the node at the given height.
+func getAncestorHeight(height int32) int32 {
+	// We pop off two 1 bits of the height.
+	// This results in a maximum of 330 steps to go back to an ancestor
+	// from height 1<<29.
+	return invertLowestOne(invertLowestOne(height))
+}
+
+// buildAncestor sets an ancestor for the given blocknode.
+func (node *blockNode) buildAncestor() {
+	if node.parent != nil {
+		node.ancestor = node.parent.Ancestor(getAncestorHeight(node.height))
+	}
+}
+
 // Ancestor returns the ancestor block node at the provided height by following
 // the chain backwards from this node.  The returned block will be nil when a
 // height is requested that is after the height of the passed node or is less
@@ -161,9 +185,22 @@ func (node *blockNode) Ancestor(height int32) *blockNode {
 		return nil
 	}
 
+	// Traverse back until we find the desired node.
 	n := node
-	for ; n != nil && n.height != height; n = n.parent {
-		// Intentionally left blank
+	for n != nil && n.height != height {
+		// If there's an ancestor available, use it. Otherwise, just
+		// follow the parent.
+		if n.ancestor != nil {
+			// Calculate the height for this ancestor and
+			// check if we can take the ancestor skip.
+			if getAncestorHeight(n.height) >= height {
+				n = n.ancestor
+				continue
+			}
+		}
+
+		// We couldn't take the ancestor skip so traverse back to the parent.
+		n = n.parent
 	}
 
 	return n
