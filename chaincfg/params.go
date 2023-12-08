@@ -287,6 +287,7 @@ var MainNetParams = Params{
 		{"seed.bitcoinstats.com", true},
 		{"seed.bitnodes.io", false},
 		{"seed.bitcoin.jonasschnelli.ch", true},
+		{"seed.btc.petertodd.net", true},
 	},
 
 	// Chain parameters
@@ -541,7 +542,7 @@ var TestNet3Params = Params{
 	DNSSeeds: []DNSSeed{
 		{"testnet-seed.bitcoin.jonasschnelli.ch", true},
 		{"testnet-seed.bitcoin.schildbach.de", false},
-		{"seed.tbtc.petertodd.org", true},
+		{"seed.tbtc.petertodd.net", true},
 		{"testnet-seed.bluematt.me", false},
 	},
 
