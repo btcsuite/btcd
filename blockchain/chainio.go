@@ -795,6 +795,7 @@ func dbPutUtxoView(dbTx database.Tx, view *UtxoViewpoint) error {
 	if view == nil {
 		return nil
 	}
+
 	utxoBucket := dbTx.Metadata().Bucket(utxoSetBucketName)
 	for outpoint, entry := range view.entries {
 		// No need to update the database if the entry was not modified.

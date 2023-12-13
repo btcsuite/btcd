@@ -262,8 +262,10 @@ func (s *utxoCache) totalMemoryUsage() uint64 {
 // The returned entries are NOT safe for concurrent access.
 func (s *utxoCache) fetchEntries(outpoints []wire.OutPoint) ([]*UtxoEntry, error) {
 	entries := make([]*UtxoEntry, len(outpoints))
-	var missingOps []wire.OutPoint
-	var missingOpsIdx []int
+	var (
+		missingOps    []wire.OutPoint
+		missingOpsIdx []int
+	)
 	for i := range outpoints {
 		if entry, ok := s.cachedEntries.get(outpoints[i]); ok {
 			entries[i] = entry
@@ -330,8 +332,8 @@ func (s *utxoCache) fetchEntries(outpoints []wire.OutPoint) ([]*UtxoEntry, error
 // unspendable.  When the cache already has an entry for the output, it will be
 // overwritten with the given output.  All fields will be updated for existing
 // entries since it's possible it has changed during a reorg.
-func (s *utxoCache) addTxOut(
-	outpoint wire.OutPoint, txOut *wire.TxOut, isCoinBase bool, blockHeight int32) error {
+func (s *utxoCache) addTxOut(outpoint wire.OutPoint, txOut *wire.TxOut, isCoinBase bool,
+	blockHeight int32) error {
 
 	// Don't add provably unspendable outputs.
 	if txscript.IsUnspendable(txOut.PkScript) {
@@ -340,6 +342,7 @@ func (s *utxoCache) addTxOut(
 
 	entry := new(UtxoEntry)
 	entry.amount = txOut.Value
+
 	// Deep copy the script when the script in the entry differs from the one in
 	// the txout.  This is required since the txout script is a subslice of the
 	// overall contiguous buffer that the msg tx houses for all scripts within
@@ -406,7 +409,7 @@ func (s *utxoCache) addTxIn(txIn *wire.TxIn, stxos *[]SpentTxOut) error {
 	entry := entries[0]
 	if stxos != nil {
 		// Populate the stxo details using the utxo entry.
-		var stxo = SpentTxOut{
+		stxo := SpentTxOut{
 			Amount:     entry.Amount(),
 			PkScript:   entry.PkScript(),
 			Height:     entry.BlockHeight(),
@@ -498,29 +501,25 @@ func (s *utxoCache) writeCache(dbTx database.Tx, bestState *BestState) error {
 	utxoBucket := dbTx.Metadata().Bucket(utxoSetBucketName)
 	for i := range s.cachedEntries.maps {
 		for outpoint, entry := range s.cachedEntries.maps[i] {
+			switch {
 			// If the entry is nil or spent, remove the entry from the database
 			// and the cache.
-			if entry == nil || entry.IsSpent() {
+			case entry == nil || entry.IsSpent():
 				err := dbDeleteUtxoEntry(utxoBucket, outpoint)
 				if err != nil {
 					return err
 				}
-				delete(s.cachedEntries.maps[i], outpoint)
-
-				continue
-			}
 
 			// No need to update the cache if the entry was not modified.
-			if !entry.isModified() {
-				delete(s.cachedEntries.maps[i], outpoint)
-				continue
+			case !entry.isModified():
+			default:
+				// Entry is fresh and needs to be put into the database.
+				err := dbPutUtxoEntry(utxoBucket, outpoint, entry)
+				if err != nil {
+					return err
+				}
 			}
 
-			// Entry is fresh and needs to be put into the database.
-			err := dbPutUtxoEntry(utxoBucket, outpoint, entry)
-			if err != nil {
-				return err
-			}
 			delete(s.cachedEntries.maps[i], outpoint)
 		}
 	}
@@ -600,6 +599,7 @@ func (b *BlockChain) FlushUtxoCache(mode FlushMode) error {
 // get changed during the execution of this method.
 func (b *BlockChain) InitConsistentState(tip *blockNode, interrupt <-chan struct{}) error {
 	s := b.utxoCache
+
 	// Load the consistency status from the database.
 	var statusBytes []byte
 	s.db.View(func(dbTx database.Tx) error {
