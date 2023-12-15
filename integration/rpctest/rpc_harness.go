@@ -272,8 +272,8 @@ func (h *Harness) SetUp(createTestChain bool, numMatureOutputs uint32) error {
 	// Create a test chain with the desired number of mature coinbase
 	// outputs.
 	if createTestChain && numMatureOutputs != 0 {
-		numToGenerate := (uint32(h.ActiveNet.CoinbaseMaturity) +
-			numMatureOutputs)
+		coinbaseMaturity := uint32(h.ActiveNet.CoinbaseMaturity)
+		numToGenerate := coinbaseMaturity + numMatureOutputs
 		_, err := h.Client.Generate(numToGenerate)
 		if err != nil {
 			return err
@@ -351,15 +351,18 @@ func (h *Harness) connectRPCClient() error {
 	batchConf.HTTPPostMode = true
 	for i := 0; i < h.MaxConnRetries; i++ {
 		fail := false
+		timeout := time.Duration(i) * h.ConnectionRetryTimeout
 		if client == nil {
-			if client, err = rpcclient.New(&rpcConf, h.handlers); err != nil {
-				time.Sleep(time.Duration(i) * h.ConnectionRetryTimeout)
+			client, err = rpcclient.New(&rpcConf, h.handlers)
+			if err != nil {
+				time.Sleep(timeout)
 				fail = true
 			}
 		}
 		if batchClient == nil {
-			if batchClient, err = rpcclient.NewBatch(&batchConf); err != nil {
-				time.Sleep(time.Duration(i) * h.ConnectionRetryTimeout)
+			batchClient, err = rpcclient.NewBatch(&batchConf)
+			if err != nil {
+				time.Sleep(timeout)
 				fail = true
 			}
 		}
