@@ -6,7 +6,6 @@ package rpctest
 
 import (
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -31,7 +30,7 @@ type nodeConfig struct {
 	profile    string
 	debugLevel string
 	extra      []string
-	prefix     string
+	nodeDir    string
 
 	exe          string
 	endpoint     string
@@ -41,7 +40,7 @@ type nodeConfig struct {
 }
 
 // newConfig returns a newConfig with all default values.
-func newConfig(prefix, certFile, keyFile string, extra []string,
+func newConfig(nodeDir, certFile, keyFile string, extra []string,
 	customExePath string) (*nodeConfig, error) {
 
 	var btcdPath string
@@ -61,7 +60,7 @@ func newConfig(prefix, certFile, keyFile string, extra []string,
 		rpcUser:   "user",
 		rpcPass:   "pass",
 		extra:     extra,
-		prefix:    prefix,
+		nodeDir:   nodeDir,
 		exe:       btcdPath,
 		endpoint:  "ws",
 		certFile:  certFile,
@@ -77,17 +76,9 @@ func newConfig(prefix, certFile, keyFile string, extra []string,
 // temporary data, and log directories which must be cleaned up with a call to
 // cleanup().
 func (n *nodeConfig) setDefaults() error {
-	datadir, err := ioutil.TempDir("", n.prefix+"-data")
-	if err != nil {
-		return err
-	}
-	n.dataDir = datadir
-	logdir, err := ioutil.TempDir("", n.prefix+"-logs")
-	if err != nil {
-		return err
-	}
-	n.logDir = logdir
-	cert, err := ioutil.ReadFile(n.certFile)
+	n.dataDir = filepath.Join(n.nodeDir, "data")
+	n.logDir = filepath.Join(n.nodeDir, "logs")
+	cert, err := os.ReadFile(n.certFile)
 	if err != nil {
 		return err
 	}
@@ -163,22 +154,7 @@ func (n *nodeConfig) rpcConnConfig() rpc.ConnConfig {
 
 // String returns the string representation of this nodeConfig.
 func (n *nodeConfig) String() string {
-	return n.prefix
-}
-
-// cleanup removes the tmp data and log directories.
-func (n *nodeConfig) cleanup() error {
-	dirs := []string{
-		n.logDir,
-		n.dataDir,
-	}
-	var err error
-	for _, dir := range dirs {
-		if err = os.RemoveAll(dir); err != nil {
-			log.Printf("Cannot remove dir %s: %v", dir, err)
-		}
-	}
-	return err
+	return n.nodeDir
 }
 
 // node houses the necessary state required to configure, launch, and manage a
@@ -213,8 +189,7 @@ func (n *node) start() error {
 		return err
 	}
 
-	pid, err := os.Create(filepath.Join(n.dataDir,
-		fmt.Sprintf("%s.pid", n.config)))
+	pid, err := os.Create(filepath.Join(n.dataDir, "btcd.pid"))
 	if err != nil {
 		return err
 	}
@@ -258,7 +233,10 @@ func (n *node) cleanup() error {
 		}
 	}
 
-	return n.config.cleanup()
+	// Since the node's main data directory is passed in to the node config,
+	// it isn't our responsibility to clean it up. So we're done after
+	// removing the pid file.
+	return nil
 }
 
 // shutdown terminates the running btcd process, and cleans up all
@@ -283,11 +261,11 @@ func genCertPair(certFile, keyFile string) error {
 	}
 
 	// Write cert and key files.
-	if err = ioutil.WriteFile(certFile, cert, 0666); err != nil {
+	if err = os.WriteFile(certFile, cert, 0666); err != nil {
 		return err
 	}
-	if err = ioutil.WriteFile(keyFile, key, 0600); err != nil {
-		os.Remove(certFile)
+	if err = os.WriteFile(keyFile, key, 0600); err != nil {
+		_ = os.Remove(certFile)
 		return err
 	}
 

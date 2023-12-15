@@ -6,7 +6,6 @@ package rpctest
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"path/filepath"
@@ -152,8 +151,7 @@ func New(activeNet *chaincfg.Params, handlers *rpcclient.NotificationHandlers,
 		return nil, err
 	}
 
-	harnessID := strconv.Itoa(numTestInstances)
-	nodeTestData, err := ioutil.TempDir(testDir, "harness-"+harnessID)
+	nodeTestData, err := os.MkdirTemp(testDir, "rpc-node")
 	if err != nil {
 		return nil, err
 	}
@@ -173,7 +171,7 @@ func New(activeNet *chaincfg.Params, handlers *rpcclient.NotificationHandlers,
 	extraArgs = append(extraArgs, miningAddr)
 
 	config, err := newConfig(
-		"rpctest", certFile, keyFile, extraArgs, customExePath,
+		nodeTestData, certFile, keyFile, extraArgs, customExePath,
 	)
 	if err != nil {
 		return nil, err
