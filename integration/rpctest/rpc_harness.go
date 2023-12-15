@@ -246,10 +246,10 @@ func (h *Harness) SetUp(createTestChain bool, numMatureOutputs uint32) error {
 	// Start the btcd node itself. This spawns a new process which will be
 	// managed
 	if err := h.node.start(); err != nil {
-		return err
+		return fmt.Errorf("error starting node: %w", err)
 	}
 	if err := h.connectRPCClient(); err != nil {
-		return err
+		return fmt.Errorf("error connecting RPC client: %w", err)
 	}
 
 	h.wallet.Start()
@@ -370,7 +370,9 @@ func (h *Harness) connectRPCClient() error {
 	}
 
 	if client == nil || batchClient == nil {
-		return fmt.Errorf("connection timeout")
+		return fmt.Errorf("connection timeout, tried %d times with "+
+			"timeout %v, last err: %w", h.MaxConnRetries,
+			h.ConnectionRetryTimeout, err)
 	}
 
 	h.Client = client
