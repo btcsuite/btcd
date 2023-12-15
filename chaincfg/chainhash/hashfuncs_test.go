@@ -6,6 +6,7 @@ package chainhash
 
 import (
 	"fmt"
+	"io"
 	"testing"
 )
 
@@ -129,6 +130,22 @@ func TestDoubleHashFuncs(t *testing.T) {
 		h := fmt.Sprintf("%x", hash[:])
 		if h != test.out {
 			t.Errorf("DoubleHashH(%q) = %s, want %s", test.in, h,
+				test.out)
+			continue
+		}
+	}
+
+	// Ensure the hash function which accepts a hash.Hash returns the expected
+	// result when given a hash.Hash that is of type SHA256.
+	for _, test := range tests {
+		serialize := func(w io.Writer) error {
+			w.Write([]byte(test.in))
+			return nil
+		}
+		hash := DoubleHashRaw(serialize)
+		h := fmt.Sprintf("%x", hash[:])
+		if h != test.out {
+			t.Errorf("DoubleHashRaw(%q) = %s, want %s", test.in, h,
 				test.out)
 			continue
 		}
