@@ -3,9 +3,9 @@ module github.com/btcsuite/btcd/btcutil/psbt
 go 1.17
 
 require (
-	github.com/btcsuite/btcd v0.23.0
+	github.com/btcsuite/btcd v0.23.5-0.20231219003633-4c2ce6daed8f
 	github.com/btcsuite/btcd/btcec/v2 v2.1.3
-	github.com/btcsuite/btcd/btcutil v1.1.3
+	github.com/btcsuite/btcd/btcutil v1.1.4
 	github.com/btcsuite/btcd/chaincfg/chainhash v1.1.0
 	github.com/davecgh/go-spew v1.1.1
 	github.com/stretchr/testify v1.7.0
