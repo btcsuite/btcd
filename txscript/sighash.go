@@ -206,11 +206,12 @@ func calcWitnessSignatureHashRaw(subScript []byte, sigHashes *TxSigHashes,
 	}
 
 	sigHashBytes := chainhash.DoubleHashRaw(func(w io.Writer) error {
+		var scratch [8]byte
+
 		// First write out, then encode the transaction's version
 		// number.
-		var bVersion [4]byte
-		binary.LittleEndian.PutUint32(bVersion[:], uint32(tx.Version))
-		w.Write(bVersion[:])
+		binary.LittleEndian.PutUint32(scratch[:], uint32(tx.Version))
+		w.Write(scratch[:4])
 
 		// Next write out the possibly pre-calculated hashes for the
 		// sequence numbers of all inputs, and the hashes of the
@@ -269,12 +270,10 @@ func calcWitnessSignatureHashRaw(subScript []byte, sigHashes *TxSigHashes,
 
 		// Next, add the input amount, and sequence number of the input
 		// being signed.
-		var bAmount [8]byte
-		binary.LittleEndian.PutUint64(bAmount[:], uint64(amt))
-		w.Write(bAmount[:])
-		var bSequence [4]byte
-		binary.LittleEndian.PutUint32(bSequence[:], txIn.Sequence)
-		w.Write(bSequence[:])
+		binary.LittleEndian.PutUint64(scratch[:], uint64(amt))
+		w.Write(scratch[:])
+		binary.LittleEndian.PutUint32(scratch[:], txIn.Sequence)
+		w.Write(scratch[:4])
 
 		// If the current signature mode isn't single, or none, then we
 		// can re-use the pre-generated hashoutputs sighash fragment.
@@ -298,12 +297,10 @@ func calcWitnessSignatureHashRaw(subScript []byte, sigHashes *TxSigHashes,
 
 		// Finally, write out the transaction's locktime, and the sig
 		// hash type.
-		var bLockTime [4]byte
-		binary.LittleEndian.PutUint32(bLockTime[:], tx.LockTime)
-		w.Write(bLockTime[:])
-		var bHashType [4]byte
-		binary.LittleEndian.PutUint32(bHashType[:], uint32(hashType))
-		w.Write(bHashType[:])
+		binary.LittleEndian.PutUint32(scratch[:], tx.LockTime)
+		w.Write(scratch[:4])
+		binary.LittleEndian.PutUint32(scratch[:], uint32(hashType))
+		w.Write(scratch[:4])
 
 		return nil
 	})
