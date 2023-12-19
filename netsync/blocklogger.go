@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcd/blockchain"
-	"github.com/btcsuite/btcd/btcutil"
+	"github.com/btcsuite/btcd/btcutil/v2"
 	"github.com/btcsuite/btclog"
 )
 

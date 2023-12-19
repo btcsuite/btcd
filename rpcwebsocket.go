@@ -20,14 +20,15 @@ import (
 	"sync"
 	"time"
 
+	"github.com/btcsuite/btcd/address/v2"
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/btcjson"
-	"github.com/btcsuite/btcd/btcutil"
-	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/btcutil/v2"
+	"github.com/btcsuite/btcd/chaincfg/v2"
+	"github.com/btcsuite/btcd/chainhash/v2"
 	"github.com/btcsuite/btcd/database"
-	"github.com/btcsuite/btcd/txscript"
-	"github.com/btcsuite/btcd/wire"
+	"github.com/btcsuite/btcd/txscript/v2"
+	"github.com/btcsuite/btcd/wire/v2"
 	"github.com/btcsuite/websocket"
 	"golang.org/x/crypto/ripemd160"
 )
@@ -296,15 +297,15 @@ func newWSClientFilter(addresses []string, unspentOutPoints []wire.OutPoint, par
 // on the type of address passed as an argument.
 //
 // NOTE: This extension was ported from github.com/decred/dcrd
-func (f *wsClientFilter) addAddress(a btcutil.Address) {
+func (f *wsClientFilter) addAddress(a address.Address) {
 	switch a := a.(type) {
-	case *btcutil.AddressPubKeyHash:
+	case *address.AddressPubKeyHash:
 		f.pubKeyHashes[*a.Hash160()] = struct{}{}
 		return
-	case *btcutil.AddressScriptHash:
+	case *address.AddressScriptHash:
 		f.scriptHashes[*a.Hash160()] = struct{}{}
 		return
-	case *btcutil.AddressPubKey:
+	case *address.AddressPubKey:
 		serializedPubKey := a.ScriptAddress()
 		switch len(serializedPubKey) {
 		case 33: // compressed
@@ -331,7 +332,7 @@ func (f *wsClientFilter) addAddressStr(s string, params *chaincfg.Params) {
 	// If address can't be decoded, no point in saving it since it should also
 	// impossible to create the address from an inspected transaction output
 	// script.
-	a, err := btcutil.DecodeAddress(s, params)
+	a, err := address.DecodeAddress(s, params)
 	if err != nil {
 		return
 	}
@@ -342,15 +343,15 @@ func (f *wsClientFilter) addAddressStr(s string, params *chaincfg.Params) {
 // wsClientFilter.
 //
 // NOTE: This extension was ported from github.com/decred/dcrd
-func (f *wsClientFilter) existsAddress(a btcutil.Address) bool {
+func (f *wsClientFilter) existsAddress(a address.Address) bool {
 	switch a := a.(type) {
-	case *btcutil.AddressPubKeyHash:
+	case *address.AddressPubKeyHash:
 		_, ok := f.pubKeyHashes[*a.Hash160()]
 		return ok
-	case *btcutil.AddressScriptHash:
+	case *address.AddressScriptHash:
 		_, ok := f.scriptHashes[*a.Hash160()]
 		return ok
-	case *btcutil.AddressPubKey:
+	case *address.AddressPubKey:
 		serializedPubKey := a.ScriptAddress()
 		switch len(serializedPubKey) {
 		case 33: // compressed
@@ -380,15 +381,15 @@ func (f *wsClientFilter) existsAddress(a btcutil.Address) bool {
 // wsClientFilter.
 //
 // NOTE: This extension was ported from github.com/decred/dcrd
-func (f *wsClientFilter) removeAddress(a btcutil.Address) {
+func (f *wsClientFilter) removeAddress(a address.Address) {
 	switch a := a.(type) {
-	case *btcutil.AddressPubKeyHash:
+	case *address.AddressPubKeyHash:
 		delete(f.pubKeyHashes, *a.Hash160())
 		return
-	case *btcutil.AddressScriptHash:
+	case *address.AddressScriptHash:
 		delete(f.scriptHashes, *a.Hash160())
 		return
-	case *btcutil.AddressPubKey:
+	case *address.AddressPubKey:
 		serializedPubKey := a.ScriptAddress()
 		switch len(serializedPubKey) {
 		case 33: // compressed
@@ -412,7 +413,7 @@ func (f *wsClientFilter) removeAddress(a btcutil.Address) {
 //
 // NOTE: This extension was ported from github.com/decred/dcrd
 func (f *wsClientFilter) removeAddressStr(s string, params *chaincfg.Params) {
-	a, err := btcutil.DecodeAddress(s, params)
+	a, err := address.DecodeAddress(s, params)
 	if err == nil {
 		f.removeAddress(a)
 	} else {
@@ -2231,7 +2232,7 @@ func handleStopNotifyReceived(wsc *wsClient, icmd interface{}) (interface{}, err
 // properly, the function returns an error. Otherwise, nil is returned.
 func checkAddressValidity(addrs []string, params *chaincfg.Params) error {
 	for _, addr := range addrs {
-		_, err := btcutil.DecodeAddress(addr, params)
+		_, err := address.DecodeAddress(addr, params)
 		if err != nil {
 			return &btcjson.RPCError{
 				Code: btcjson.ErrRPCInvalidAddressOrKey,

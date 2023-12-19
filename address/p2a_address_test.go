@@ -1,10 +1,10 @@
-package btcutil_test
+package address_test
 
 import (
 	"testing"
 
-	"github.com/btcsuite/btcd/btcutil"
-	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/btcsuite/btcd/address/v2"
+	"github.com/btcsuite/btcd/chaincfg/v2"
 	"github.com/stretchr/testify/require"
 )
 
@@ -39,7 +39,7 @@ func TestAddressPayToAnchor(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			addr, err := btcutil.NewAddressPayToAnchor(tt.net)
+			addr, err := address.NewAddressPayToAnchor(tt.net)
 			require.NoError(t, err)
 
 			require.Equal(t, tt.wantAddress, addr.EncodeAddress())
@@ -101,7 +101,7 @@ func TestDecodeAddressP2A(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			addr, err := btcutil.DecodeAddress(tt.address, tt.net)
+			addr, err := address.DecodeAddress(tt.address, tt.net)
 			if tt.wantErr {
 				require.Error(t, err)
 				return
@@ -109,7 +109,7 @@ func TestDecodeAddressP2A(t *testing.T) {
 			require.NoError(t, err)
 
 			// Ensure the decoded address is of the correct P2A type.
-			p2aAddr, ok := addr.(*btcutil.AddressPayToAnchor)
+			p2aAddr, ok := addr.(*address.AddressPayToAnchor)
 			require.True(t, ok, "expected *AddressPayToAnchor, got %T", addr)
 
 			// Ensure round-trip encoding produces the canonical
@@ -121,6 +121,6 @@ func TestDecodeAddressP2A(t *testing.T) {
 
 // TestNewAddressPayToAnchorNilNetwork tests that nil network returns error.
 func TestNewAddressPayToAnchorNilNetwork(t *testing.T) {
-	_, err := btcutil.NewAddressPayToAnchor(nil)
+	_, err := address.NewAddressPayToAnchor(nil)
 	require.Error(t, err)
 }

@@ -1,6 +1,6 @@
 module github.com/btcsuite/btcd/txscript/v2
 
-go 1.23.2
+go 1.25
 
 require (
 	github.com/btcsuite/btcd/address/v2 v2.0.0

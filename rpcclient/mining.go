@@ -9,9 +9,10 @@ import (
 	"encoding/json"
 	"errors"
 
+	"github.com/btcsuite/btcd/address/v2"
 	"github.com/btcsuite/btcd/btcjson"
-	"github.com/btcsuite/btcd/btcutil"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/btcutil/v2"
+	"github.com/btcsuite/btcd/chainhash/v2"
 )
 
 // FutureGenerateResult is a future promise to deliver the result of a
@@ -98,13 +99,17 @@ func (f FutureGenerateToAddressResult) Receive() ([]*chainhash.Hash, error) {
 // the returned instance.
 //
 // See GenerateToAddress for the blocking version and more details.
-func (c *Client) GenerateToAddressAsync(numBlocks int64, address btcutil.Address, maxTries *int64) FutureGenerateToAddressResult {
+func (c *Client) GenerateToAddressAsync(numBlocks int64,
+	address address.Address, maxTries *int64) FutureGenerateToAddressResult {
+
 	cmd := btcjson.NewGenerateToAddressCmd(numBlocks, address.EncodeAddress(), maxTries)
 	return c.SendCmd(cmd)
 }
 
 // GenerateToAddress generates numBlocks blocks to the given address and returns their hashes.
-func (c *Client) GenerateToAddress(numBlocks int64, address btcutil.Address, maxTries *int64) ([]*chainhash.Hash, error) {
+func (c *Client) GenerateToAddress(numBlocks int64,
+	address address.Address, maxTries *int64) ([]*chainhash.Hash, error) {
+
 	return c.GenerateToAddressAsync(numBlocks, address, maxTries).Receive()
 }
 

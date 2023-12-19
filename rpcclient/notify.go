@@ -13,10 +13,11 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/btcsuite/btcd/address/v2"
 	"github.com/btcsuite/btcd/btcjson"
-	"github.com/btcsuite/btcd/btcutil"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/wire"
+	"github.com/btcsuite/btcd/btcutil/v2"
+	"github.com/btcsuite/btcd/chainhash/v2"
+	"github.com/btcsuite/btcd/wire/v2"
 )
 
 var (
@@ -1079,7 +1080,9 @@ func (c *Client) notifyReceivedInternal(addresses []string) FutureNotifyReceived
 // NOTE: This is a btcd extension and requires a websocket connection.
 //
 // Deprecated: Use LoadTxFilterAsync instead.
-func (c *Client) NotifyReceivedAsync(addresses []btcutil.Address) FutureNotifyReceivedResult {
+func (c *Client) NotifyReceivedAsync(
+	addresses []address.Address) FutureNotifyReceivedResult {
+
 	// Not supported in HTTP POST mode.
 	if c.config.HTTPPostMode {
 		return newFutureError(ErrWebsocketsRequired)
@@ -1119,7 +1122,7 @@ func (c *Client) NotifyReceivedAsync(addresses []btcutil.Address) FutureNotifyRe
 // NOTE: This is a btcd extension and requires a websocket connection.
 //
 // Deprecated: Use LoadTxFilter instead.
-func (c *Client) NotifyReceived(addresses []btcutil.Address) error {
+func (c *Client) NotifyReceived(addresses []address.Address) error {
 	return c.NotifyReceivedAsync(addresses).Receive()
 }
 
@@ -1152,7 +1155,7 @@ func (r FutureRescanResult) Receive() error {
 //
 // Deprecated: Use RescanBlocksAsync instead.
 func (c *Client) RescanAsync(startBlock *chainhash.Hash,
-	addresses []btcutil.Address,
+	addresses []address.Address,
 	outpoints []*wire.OutPoint) FutureRescanResult {
 
 	// Not supported in HTTP POST mode.
@@ -1217,7 +1220,7 @@ func (c *Client) RescanAsync(startBlock *chainhash.Hash,
 //
 // Deprecated: Use RescanBlocks instead.
 func (c *Client) Rescan(startBlock *chainhash.Hash,
-	addresses []btcutil.Address,
+	addresses []address.Address,
 	outpoints []*wire.OutPoint) error {
 
 	return c.RescanAsync(startBlock, addresses, outpoints).Receive()
@@ -1233,7 +1236,7 @@ func (c *Client) Rescan(startBlock *chainhash.Hash,
 //
 // Deprecated: Use RescanBlocksAsync instead.
 func (c *Client) RescanEndBlockAsync(startBlock *chainhash.Hash,
-	addresses []btcutil.Address, outpoints []*wire.OutPoint,
+	addresses []address.Address, outpoints []*wire.OutPoint,
 	endBlock *chainhash.Hash) FutureRescanResult {
 
 	// Not supported in HTTP POST mode.
@@ -1295,7 +1298,7 @@ func (c *Client) RescanEndBlockAsync(startBlock *chainhash.Hash,
 //
 // Deprecated: Use RescanBlocks instead.
 func (c *Client) RescanEndHeight(startBlock *chainhash.Hash,
-	addresses []btcutil.Address, outpoints []*wire.OutPoint,
+	addresses []address.Address, outpoints []*wire.OutPoint,
 	endBlock *chainhash.Hash) error {
 
 	return c.RescanEndBlockAsync(startBlock, addresses, outpoints,
@@ -1327,7 +1330,7 @@ func (r FutureLoadTxFilterResult) Receive() error {
 //
 // NOTE: This is a btcd extension ported from github.com/decred/dcrrpcclient
 // and requires a websocket connection.
-func (c *Client) LoadTxFilterAsync(reload bool, addresses []btcutil.Address,
+func (c *Client) LoadTxFilterAsync(reload bool, addresses []address.Address,
 	outPoints []wire.OutPoint) FutureLoadTxFilterResult {
 
 	addrStrs := make([]string, len(addresses))
@@ -1352,6 +1355,8 @@ func (c *Client) LoadTxFilterAsync(reload bool, addresses []btcutil.Address,
 //
 // NOTE: This is a btcd extension ported from github.com/decred/dcrrpcclient
 // and requires a websocket connection.
-func (c *Client) LoadTxFilter(reload bool, addresses []btcutil.Address, outPoints []wire.OutPoint) error {
+func (c *Client) LoadTxFilter(reload bool, addresses []address.Address,
+	outPoints []wire.OutPoint) error {
+
 	return c.LoadTxFilterAsync(reload, addresses, outPoints).Receive()
 }

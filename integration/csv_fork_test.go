@@ -15,14 +15,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/btcsuite/btcd/address/v2"
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/btcec/v2"
-	"github.com/btcsuite/btcd/btcutil"
-	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/btcutil/v2"
+	"github.com/btcsuite/btcd/chaincfg/v2"
+	"github.com/btcsuite/btcd/chainhash/v2"
 	"github.com/btcsuite/btcd/integration/rpctest"
-	"github.com/btcsuite/btcd/txscript"
-	"github.com/btcsuite/btcd/wire"
+	"github.com/btcsuite/btcd/txscript/v2"
+	"github.com/btcsuite/btcd/wire/v2"
 )
 
 const (
@@ -43,7 +44,7 @@ func makeTestOutput(r *rpctest.Harness, t *testing.T,
 
 	// Using the key created above, generate a pkScript which it's able to
 	// spend.
-	a, err := btcutil.NewAddressPubKey(key.PubKey().SerializeCompressed(), r.ActiveNet)
+	a, err := address.NewAddressPubKey(key.PubKey().SerializeCompressed(), r.ActiveNet)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -303,7 +304,7 @@ func createCSVOutput(r *rpctest.Harness, t *testing.T,
 
 	// Using the script generated above, create a P2SH output which will be
 	// accepted into the mempool.
-	p2shAddr, err := btcutil.NewAddressScriptHash(csvScript, r.ActiveNet)
+	p2shAddr, err := address.NewAddressScriptHash(csvScript, r.ActiveNet)
 	if err != nil {
 		return nil, nil, nil, err
 	}
