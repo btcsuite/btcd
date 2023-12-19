@@ -14,9 +14,10 @@ import (
 	"bytes"
 	"crypto/sha256"
 
+	"github.com/btcsuite/btcd/address/v2"
 	"github.com/btcsuite/btcd/txscript/v2"
 	"github.com/btcsuite/btcd/wire/v2"
-	"github.com/btcsuite/btcutil/v2"
+	"github.com/btcsuite/btcd/btcutil/v2"
 )
 
 // Updater encapsulates the role 'Updater' as specified in BIP174; it accepts
@@ -125,7 +126,7 @@ func (u *Updater) addPartialSignature(inIndex int, sig []byte,
 		if pInput.RedeemScript != nil {
 			outIndex := u.Upsbt.UnsignedTx.TxIn[inIndex].PreviousOutPoint.Index
 			scriptPubKey := pInput.NonWitnessUtxo.TxOut[outIndex].PkScript
-			scriptHash := btcutil.Hash160(pInput.RedeemScript)
+			scriptHash := address.Hash160(pInput.RedeemScript)
 
 			scriptHashScript, err := txscript.NewScriptBuilder().
 				AddOp(txscript.OP_HASH160).
@@ -155,7 +156,7 @@ func (u *Updater) addPartialSignature(inIndex int, sig []byte,
 
 		var script []byte
 		if pInput.RedeemScript != nil {
-			scriptHash := btcutil.Hash160(pInput.RedeemScript)
+			scriptHash := address.Hash160(pInput.RedeemScript)
 			scriptHashScript, err := txscript.NewScriptBuilder().
 				AddOp(txscript.OP_HASH160).
 				AddData(scriptHash).
@@ -195,7 +196,7 @@ func (u *Updater) addPartialSignature(inIndex int, sig []byte,
 			}
 		} else {
 			// Otherwise, this is a p2wkh input.
-			pubkeyHash := btcutil.Hash160(pubkey)
+			pubkeyHash := address.Hash160(pubkey)
 			pubkeyHashScript, err := txscript.NewScriptBuilder().
 				AddOp(txscript.OP_0).
 				AddData(pubkeyHash).
