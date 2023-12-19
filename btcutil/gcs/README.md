@@ -15,7 +15,7 @@ A comprehensive suite of tests is provided to ensure proper functionality.
 ## Installation and Updating
 
 ```bash
-$ go get -u github.com/btcsuite/btcd/btcutil/gcs
+$ go get -u github.com/btcsuite/btcd/btcutil/v2/gcs
 ```
 
 ## License
