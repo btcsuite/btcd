@@ -21,7 +21,7 @@ can be found at https://en.bitcoin.it/wiki/Script
 ## Installation and Updating
 
 ```bash
-$ go get -u github.com/btcsuite/btcd/txscript
+$ go get -u github.com/btcsuite/btcd/txscript/v2
 ```
 
 ## Examples
