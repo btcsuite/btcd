@@ -287,9 +287,11 @@ func calcWitnessSignatureHashRaw(subScript []byte, sigHashes *TxSigHashes,
 		} else if hashType&sigHashMask == SigHashSingle &&
 			idx < len(tx.TxOut) {
 
-			var b bytes.Buffer
-			wire.WriteTxOut(&b, 0, 0, tx.TxOut[idx])
-			w.Write(chainhash.DoubleHashB(b.Bytes()))
+			h := chainhash.DoubleHashRaw(func(tw io.Writer) error {
+				wire.WriteTxOut(tw, 0, 0, tx.TxOut[idx])
+				return nil
+			})
+			w.Write(h[:])
 		} else {
 			w.Write(zeroHash[:])
 		}
