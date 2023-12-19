@@ -5,10 +5,9 @@
 package bloom
 
 import (
-	"github.com/btcsuite/btcd/blockchain"
-	"github.com/btcsuite/btcd/btcutil"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/wire"
+	"github.com/btcsuite/btcd/btcutil/v2"
+	"github.com/btcsuite/btcd/chainhash/v2"
+	"github.com/btcsuite/btcd/wire/v2"
 )
 
 // merkleBlock is used to house intermediate information needed to generate a
@@ -41,7 +40,7 @@ func (m *merkleBlock) calcHash(height, pos uint32) *chainhash.Hash {
 	} else {
 		right = left
 	}
-	res := blockchain.HashMerkleBranches(left, right)
+	res := HashMerkleBranches(left, right)
 	return &res
 }
 
@@ -123,4 +122,16 @@ func NewMerkleBlock(block *btcutil.Block, filter *Filter) (*wire.MsgMerkleBlock,
 		msgMerkleBlock.Flags[i/8] |= mBlock.bits[i] << (i % 8)
 	}
 	return &msgMerkleBlock, matchedIndices
+}
+
+// HashMerkleBranches takes two hashes, treated as the left and right tree
+// nodes, and returns the hash of their concatenation.  This is a helper
+// function used to aid in the generation of a merkle tree.
+func HashMerkleBranches(left, right *chainhash.Hash) chainhash.Hash {
+	// Concatenate the left and right nodes.
+	var hash [chainhash.HashSize * 2]byte
+	copy(hash[:chainhash.HashSize], left[:])
+	copy(hash[chainhash.HashSize:], right[:])
+
+	return chainhash.DoubleHashH(hash[:])
 }
