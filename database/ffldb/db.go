@@ -966,6 +966,10 @@ type transaction struct {
 	pendingBlocks    map[chainhash.Hash]int
 	pendingBlockData []pendingBlock
 
+	// Files that need to be deleted on commit.  These are the files that
+	// are marked as files to be deleted during pruning.
+	pendingDelFileNums []uint32
+
 	// Keys that need to be stored or deleted on commit.
 	pendingKeys   *treap.Mutable
 	pendingRemove *treap.Mutable
@@ -1593,6 +1597,9 @@ func (tx *transaction) close() {
 	tx.pendingBlocks = nil
 	tx.pendingBlockData = nil
 
+	// Clear pending file deletions.
+	tx.pendingDelFileNums = nil
+
 	// Clear pending keys that would have been written or deleted on commit.
 	tx.pendingKeys = nil
 	tx.pendingRemove = nil
@@ -1619,6 +1626,18 @@ func (tx *transaction) close() {
 //
 // This function MUST only be called when there is pending data to be written.
 func (tx *transaction) writePendingAndCommit() error {
+	// Loop through all the pending file deletions and delete them.
+	// We do this first before doing any of the writes as we can't undo
+	// deletions of files.
+	for _, fileNum := range tx.pendingDelFileNums {
+		err := tx.db.store.deleteFileFunc(fileNum)
+		if err != nil {
+			// Nothing we can do if we fail to delete blocks besides
+			// return an error.
+			return err
+		}
+	}
+
 	// Save the current block store write position for potential rollback.
 	// These variables are only updated here in this function and there can
 	// only be one write transaction active at a time, so it's safe to store
@@ -1725,11 +1744,12 @@ func (tx *transaction) PruneBlocks(targetSize uint64) ([]chainhash.Hash, error) 
 	// We use < not <= so that the last file is never deleted.  There are other checks in place
 	// but setting it to < here doesn't hurt.
 	for i := uint32(first); i < uint32(last); i++ {
-		err = tx.db.store.deleteFileFunc(i)
-		if err != nil {
-			return nil, fmt.Errorf("PruneBlocks: Failed to delete block file "+
-				"number %d: %v", i, err)
+		// Add the block file to be deleted to the list of files pending deletion to
+		// delete when the transaction is committed.
+		if tx.pendingDelFileNums == nil {
+			tx.pendingDelFileNums = make([]uint32, 0, 1)
 		}
+		tx.pendingDelFileNums = append(tx.pendingDelFileNums, i)
 
 		// Add the file index to the deleted files map so that we can later
 		// delete the block location index.
