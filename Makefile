@@ -4,6 +4,12 @@ LINT_PKG := github.com/golangci/golangci-lint/v2/cmd/golangci-lint
 GOIMPORTS_PKG := golang.org/x/tools/cmd/goimports
 
 GO_BIN := ${shell go env GOBIN}
+
+# If GOBIN is not set, default to GOPATH/bin.
+ifeq ($(GO_BIN),)
+GO_BIN := $(shell go env GOPATH)/bin
+endif
+
 LINT_BIN := $(GO_BIN)/golangci-lint
 GOIMPORTS_BIN := $(GO_BIN)/goimports
 
@@ -90,9 +96,14 @@ check: unit
 unit:
 	@$(call print, "Running unit tests.")
 	$(GOTEST_DEV) ./... -test.timeout=20m
+	cd address && $(GOTEST_DEV) ./... -test.timeout=20m
 	cd btcec && $(GOTEST_DEV) ./... -test.timeout=20m
 	cd btcutil && $(GOTEST_DEV) ./... -test.timeout=20m
-	cd btcutil/psbt && $(GOTEST_DEV) ./... -test.timeout=20m
+	cd chaincfg && $(GOTEST_DEV) ./... -test.timeout=20m
+	cd chainhash && $(GOTEST_DEV) ./... -test.timeout=20m
+	cd txscript && $(GOTEST_DEV) ./... -test.timeout=20m
+	cd psbt && $(GOTEST_DEV) ./... -test.timeout=20m
+	cd wire && $(GOTEST_DEV) ./... -test.timeout=20m
 
 #? unit-cover: Run unit coverage tests
 unit-cover:
@@ -101,17 +112,27 @@ unit-cover:
 
 	# We need to remove the /v2 pathing from the module to have it work
 	# nicely with the CI tool we use to render live code coverage.
+	cd address && $(GOTEST) $(COVER_FLAGS) ./... && sed -i.bak 's/v2\///g' coverage.txt
 	cd btcec && $(GOTEST) $(COVER_FLAGS) ./... && sed -i.bak 's/v2\///g' coverage.txt
-	cd btcutil && $(GOTEST) $(COVER_FLAGS) ./...
-	cd btcutil/psbt && $(GOTEST) $(COVER_FLAGS) ./...
+	cd btcutil && $(GOTEST) $(COVER_FLAGS) ./... && sed -i.bak 's/v2\///g' coverage.txt
+	cd chaincfg && $(GOTEST) $(COVER_FLAGS) ./... && sed -i.bak 's/v2\///g' coverage.txt
+	cd chainhash && $(GOTEST) $(COVER_FLAGS) ./... && sed -i.bak 's/v2\///g' coverage.txt
+	cd txscript && $(GOTEST) $(COVER_FLAGS) ./... && sed -i.bak 's/v2\///g' coverage.txt
+	cd psbt && $(GOTEST) $(COVER_FLAGS) ./... && sed -i.bak 's/v2\///g' coverage.txt
+	cd wire && $(GOTEST) $(COVER_FLAGS) ./... && sed -i.bak 's/v2\///g' coverage.txt
 
 #? unit-race: Run unit race tests
 unit-race:
 	@$(call print, "Running unit race tests.")
 	env CGO_ENABLED=1 GORACE="history_size=7 halt_on_errors=1" $(GOTEST) -race -test.timeout=20m ./...
+	cd address && env CGO_ENABLED=1 GORACE="history_size=7 halt_on_errors=1" $(GOTEST) -race -test.timeout=20m ./...
 	cd btcec && env CGO_ENABLED=1 GORACE="history_size=7 halt_on_errors=1" $(GOTEST) -race -test.timeout=20m ./...
 	cd btcutil && env CGO_ENABLED=1 GORACE="history_size=7 halt_on_errors=1" $(GOTEST) -race -test.timeout=20m ./...
-	cd btcutil/psbt && env CGO_ENABLED=1 GORACE="history_size=7 halt_on_errors=1" $(GOTEST) -race -test.timeout=20m ./...
+	cd chaincfg && env CGO_ENABLED=1 GORACE="history_size=7 halt_on_errors=1" $(GOTEST) -race -test.timeout=20m ./...
+	cd chainhash && env CGO_ENABLED=1 GORACE="history_size=7 halt_on_errors=1" $(GOTEST) -race -test.timeout=20m ./...
+	cd txscript && env CGO_ENABLED=1 GORACE="history_size=7 halt_on_errors=1" $(GOTEST) -race -test.timeout=20m ./...
+	cd psbt && env CGO_ENABLED=1 GORACE="history_size=7 halt_on_errors=1" $(GOTEST) -race -test.timeout=20m ./...
+	cd wire && env CGO_ENABLED=1 GORACE="history_size=7 halt_on_errors=1" $(GOTEST) -race -test.timeout=20m ./...
 
 # =========
 # UTILITIES
@@ -132,7 +153,8 @@ lint: $(LINT_BIN)
 #? clean: Clean source
 clean:
 	@$(call print, "Cleaning source.$(NC)")
-	rm -f coverage.txt btcec/coverage.txt btcutil/coverage.txt btcutil/psbt/coverage.txt
+	find . -name coverage.txt | xargs $(RM)
+	find . -name coverage.txt.bak | xargs $(RM)
 
 #? tidy-module: Run 'go mod tidy' for all modules
 tidy-module:

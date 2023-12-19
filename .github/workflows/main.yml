@@ -47,12 +47,36 @@ jobs:
           format: 'golang'
           parallel: true
 
-      - name: Send btcec
+      - name: Send address coverage
+        uses: coverallsapp/github-action@v2
+        with:
+          file: address/coverage.txt
+          flag-name: address
+          format: 'golang'
+          parallel: true
+
+      - name: Send btcec coverage
         uses: coverallsapp/github-action@v2
         continue-on-error: true
         with:
           file: btcec/coverage.txt
           flag-name: btcec
+          format: 'golang'
+          parallel: true
+
+      - name: Send chaincfg coverage
+        uses: coverallsapp/github-action@v2
+        with:
+          file: chaincfg/coverage.txt
+          flag-name: chaincfg
+          format: 'golang'
+          parallel: true
+
+      - name: Send chainhash coverage
+        uses: coverallsapp/github-action@v2
+        with:
+          file: chainhash/coverage.txt
+          flag-name: chainhash
           format: 'golang'
           parallel: true
 
@@ -65,15 +89,33 @@ jobs:
           format: 'golang'
           parallel: true
 
-      - name: Send btcutil coverage for psbt package
+      - name: Send psbt coverage
         uses: coverallsapp/github-action@v2
         continue-on-error: true
         with:
-          file: btcutil/psbt/coverage.txt
-          flag-name: btcutilpsbt
+          file: psbt/coverage.txt
+          flag-name: psbt
           format: 'golang'
           parallel: true
-      
+
+      - name: Send txscript coverage
+        uses: coverallsapp/github-action@v2
+        continue-on-error: true
+        with:
+          file: txscript/coverage.txt
+          flag-name: txscript
+          format: 'golang'
+          parallel: true
+
+      - name: Send wire coverage
+        uses: coverallsapp/github-action@v2
+        continue-on-error: true
+        with:
+          file: wire/coverage.txt
+          flag-name: wire
+          format: 'golang'
+          parallel: true
+
       - name: Notify coveralls all reports sent
         uses: coverallsapp/github-action@v2
         continue-on-error: true
