@@ -5,7 +5,6 @@
 package wire
 
 import (
-	"bytes"
 	"io"
 	"time"
 
@@ -46,14 +45,9 @@ const blockHeaderLen = 80
 
 // BlockHash computes the block identifier hash for the given block header.
 func (h *BlockHeader) BlockHash() chainhash.Hash {
-	// Encode the header and double sha256 everything prior to the number of
-	// transactions.  Ignore the error returns since there is no way the
-	// encode could fail except being out of memory which would cause a
-	// run-time panic.
-	buf := bytes.NewBuffer(make([]byte, 0, MaxBlockHeaderPayload))
-	_ = writeBlockHeader(buf, 0, h)
-
-	return chainhash.DoubleHashH(buf.Bytes())
+	return chainhash.DoubleHashRaw(func(w io.Writer) error {
+		return writeBlockHeader(w, 0, h)
+	})
 }
 
 // BtcDecode decodes r using the bitcoin protocol encoding into the receiver.
