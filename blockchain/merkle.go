@@ -7,6 +7,7 @@ package blockchain
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"math"
 
 	"github.com/btcsuite/btcd/btcutil"
@@ -64,7 +65,10 @@ func HashMerkleBranches(left, right *chainhash.Hash) chainhash.Hash {
 	copy(hash[:chainhash.HashSize], left[:])
 	copy(hash[chainhash.HashSize:], right[:])
 
-	return chainhash.DoubleHashH(hash[:])
+	return chainhash.DoubleHashRaw(func(w io.Writer) error {
+		_, err := w.Write(hash[:])
+		return err
+	})
 }
 
 // BuildMerkleTreeStore creates a merkle tree from a slice of transactions,

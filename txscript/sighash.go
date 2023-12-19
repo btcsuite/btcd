@@ -169,10 +169,18 @@ func calcSignatureHash(sigScript []byte, hashType SigHashType, tx *wire.MsgTx, i
 	// The final hash is the double sha256 of both the serialized modified
 	// transaction and the hash type (encoded as a 4-byte little-endian
 	// value) appended.
-	wbuf := bytes.NewBuffer(make([]byte, 0, txCopy.SerializeSizeStripped()+4))
-	txCopy.SerializeNoWitness(wbuf)
-	binary.Write(wbuf, binary.LittleEndian, hashType)
-	return chainhash.DoubleHashB(wbuf.Bytes())
+	sigHashBytes := chainhash.DoubleHashRaw(func(w io.Writer) error {
+		if err := txCopy.SerializeNoWitness(w); err != nil {
+			return err
+		}
+		err := binary.Write(w, binary.LittleEndian, hashType)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+
+	return sigHashBytes[:]
 }
 
 // calcWitnessSignatureHashRaw computes the sighash digest of a transaction's
@@ -289,7 +297,14 @@ func calcWitnessSignatureHashRaw(subScript []byte, sigHashes *TxSigHashes,
 	binary.LittleEndian.PutUint32(bHashType[:], uint32(hashType))
 	sigHash.Write(bHashType[:])
 
-	return chainhash.DoubleHashB(sigHash.Bytes()), nil
+	sigHashBytes := chainhash.DoubleHashRaw(func(w io.Writer) error {
+		// TODO(rosabeef): put entire calc func into this? then no
+		// intermediate buffer
+		_, err := sigHash.WriteTo(w)
+		return err
+	})
+
+	return sigHashBytes[:], nil
 }
 
 // CalcWitnessSigHash computes the sighash digest for the specified input of
