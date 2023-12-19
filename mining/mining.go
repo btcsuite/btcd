@@ -520,7 +520,7 @@ mempoolLoop:
 			continue
 		}
 
-		// Fetch all of the utxos referenced by the this transaction.
+		// Fetch all of the utxos referenced by this transaction.
 		// NOTE: This intentionally does not fetch inputs from the
 		// mempool since a transaction which depends on other
 		// transactions in the mempool must come after those
