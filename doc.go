@@ -36,11 +36,11 @@ Application Options:
 	                            and banning misbehaving peers. (default: 100)
 	    --blockmaxsize=         Maximum block size in bytes to be used when
 	                            creating a block (default: 750000)
-	    --blockminsize=         Mininum block size in bytes to be used when
+	    --blockminsize=         Minimum block size in bytes to be used when
 	                            creating a block
 	    --blockmaxweight=       Maximum block weight to be used when creating a
 	                            block (default: 3000000)
-	    --blockminweight=       Mininum block weight to be used when creating a
+	    --blockminweight=       Minimum block weight to be used when creating a
 	                            block
 	    --blockprioritysize=    Size in bytes for high-priority/low-fee
 	                            transactions when creating a block (default:
