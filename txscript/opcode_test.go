@@ -117,6 +117,9 @@ func TestOpcodeDisasm(t *testing.T) {
 			case 0xb2:
 				// OP_NOP3 is an alias of OP_CHECKSEQUENCEVERIFY
 				expectedStr = "OP_CHECKSEQUENCEVERIFY"
+			case 0xb3:
+				// OP_NOP4 is an alias for OP_OP_CHECKTXHASHVERIFY
+				expectedStr = "OP_CHECKTXHASHVERIFY"
 			default:
 				val := byte(opcodeVal - (0xb0 - 1))
 				expectedStr = "OP_NOP" + strconv.Itoa(int(val))
@@ -124,7 +127,14 @@ func TestOpcodeDisasm(t *testing.T) {
 
 		// OP_UNKNOWN#.
 		case opcodeVal >= 0xbb && opcodeVal <= 0xf9 || opcodeVal == 0xfc:
-			expectedStr = "OP_UNKNOWN" + strconv.Itoa(opcodeVal)
+			switch opcodeVal {
+			// OP_UNKOWN189 a.k.a 0xbd is now OP_TXHASH.
+			case 0xbd:
+				expectedStr = "OP_TXHASH"
+
+			default:
+				expectedStr = "OP_UNKNOWN" + strconv.Itoa(opcodeVal)
+			}
 		}
 
 		var buf strings.Builder
@@ -184,6 +194,9 @@ func TestOpcodeDisasm(t *testing.T) {
 			case 0xb2:
 				// OP_NOP3 is an alias of OP_CHECKSEQUENCEVERIFY
 				expectedStr = "OP_CHECKSEQUENCEVERIFY"
+			case 0xb3:
+				// OP_NOP4 is an alias for OP_OP_CHECKTXHASHVERIFY
+				expectedStr = "OP_CHECKTXHASHVERIFY"
 			default:
 				val := byte(opcodeVal - (0xb0 - 1))
 				expectedStr = "OP_NOP" + strconv.Itoa(int(val))
@@ -195,6 +208,9 @@ func TestOpcodeDisasm(t *testing.T) {
 			// OP_UNKNOWN186 a.k.a 0xba is now OP_CHECKSIGADD.
 			case 0xba:
 				expectedStr = "OP_CHECKSIGADD"
+			// OP_UNKNOWN189 a.k.a 0xbd is now OP_TXHASH.
+			case 0xbd:
+				expectedStr = "OP_TXHASH"
 			default:
 				expectedStr = "OP_UNKNOWN" + strconv.Itoa(opcodeVal)
 			}

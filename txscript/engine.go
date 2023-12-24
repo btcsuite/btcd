@@ -114,6 +114,10 @@ const (
 	// ScriptVerifyDiscourageUpgradeablePubkeyType defines if unknown
 	// public key versions (during tapscript execution) is non-standard.
 	ScriptVerifyDiscourageUpgradeablePubkeyType
+
+	// ScriptVerifyTxHash defines whether or not to support the OP_TxHash
+	// and OP_TxHashVerify op codes.
+	ScriptVerifyTxHash
 )
 
 const (

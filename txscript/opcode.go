@@ -220,7 +220,7 @@ const (
 	OP_CHECKLOCKTIMEVERIFY = 0xb1 // 177 - AKA OP_NOP2
 	OP_NOP3                = 0xb2 // 178
 	OP_CHECKSEQUENCEVERIFY = 0xb2 // 178 - AKA OP_NOP3
-	OP_NOP4                = 0xb3 // 179
+	OP_CHECKTXHASHVERIFY   = 0xb3 // 179 - AKA OP_NOP4
 	OP_NOP5                = 0xb4 // 180
 	OP_NOP6                = 0xb5 // 181
 	OP_NOP7                = 0xb6 // 182
@@ -230,7 +230,7 @@ const (
 	OP_CHECKSIGADD         = 0xba // 186
 	OP_UNKNOWN187          = 0xbb // 187
 	OP_UNKNOWN188          = 0xbc // 188
-	OP_UNKNOWN189          = 0xbd // 189
+	OP_TXHASH              = 0xbd // 189
 	OP_UNKNOWN190          = 0xbe // 190
 	OP_UNKNOWN191          = 0xbf // 191
 	OP_UNKNOWN192          = 0xc0 // 192
@@ -503,9 +503,12 @@ var opcodeArray = [256]opcode{
 	OP_CHECKMULTISIGVERIFY: {OP_CHECKMULTISIGVERIFY, "OP_CHECKMULTISIGVERIFY", 1, opcodeCheckMultiSigVerify},
 	OP_CHECKSIGADD:         {OP_CHECKSIGADD, "OP_CHECKSIGADD", 1, opcodeCheckSigAdd},
 
+	// TxHash opcodes.
+	OP_CHECKTXHASHVERIFY: {OP_CHECKTXHASHVERIFY, "OP_CHECKTXHASHVERIFY", 1, opcodeCheckTxHashVerify},
+	OP_TXHASH:            {OP_TXHASH, "OP_TXHASH", 1, opcodeTxHash},
+
 	// Reserved opcodes.
 	OP_NOP1:  {OP_NOP1, "OP_NOP1", 1, opcodeNop},
-	OP_NOP4:  {OP_NOP4, "OP_NOP4", 1, opcodeNop},
 	OP_NOP5:  {OP_NOP5, "OP_NOP5", 1, opcodeNop},
 	OP_NOP6:  {OP_NOP6, "OP_NOP6", 1, opcodeNop},
 	OP_NOP7:  {OP_NOP7, "OP_NOP7", 1, opcodeNop},
@@ -516,7 +519,6 @@ var opcodeArray = [256]opcode{
 	// Undefined opcodes.
 	OP_UNKNOWN187: {OP_UNKNOWN187, "OP_UNKNOWN187", 1, opcodeInvalid},
 	OP_UNKNOWN188: {OP_UNKNOWN188, "OP_UNKNOWN188", 1, opcodeInvalid},
-	OP_UNKNOWN189: {OP_UNKNOWN189, "OP_UNKNOWN189", 1, opcodeInvalid},
 	OP_UNKNOWN190: {OP_UNKNOWN190, "OP_UNKNOWN190", 1, opcodeInvalid},
 	OP_UNKNOWN191: {OP_UNKNOWN191, "OP_UNKNOWN191", 1, opcodeInvalid},
 	OP_UNKNOWN192: {OP_UNKNOWN192, "OP_UNKNOWN192", 1, opcodeInvalid},
@@ -638,7 +640,6 @@ var successOpcodes = map[byte]struct{}{
 	OP_RSHIFT:       {}, // 153
 	OP_UNKNOWN187:   {}, // 187
 	OP_UNKNOWN188:   {}, // 188
-	OP_UNKNOWN189:   {}, // 189
 	OP_UNKNOWN190:   {}, // 190
 	OP_UNKNOWN191:   {}, // 191
 	OP_UNKNOWN192:   {}, // 192
@@ -819,7 +820,7 @@ func opcodeN(op *opcode, data []byte, vm *Engine) error {
 // the flag to discourage use of NOPs is set for select opcodes.
 func opcodeNop(op *opcode, data []byte, vm *Engine) error {
 	switch op.value {
-	case OP_NOP1, OP_NOP4, OP_NOP5,
+	case OP_NOP1, OP_NOP5,
 		OP_NOP6, OP_NOP7, OP_NOP8, OP_NOP9, OP_NOP10:
 
 		if vm.hasFlag(ScriptDiscourageUpgradableNops) {
@@ -2450,6 +2451,110 @@ func opcodeCheckMultiSigVerify(op *opcode, data []byte, vm *Engine) error {
 		err = abstractVerify(op, vm, ErrCheckMultiSigVerify)
 	}
 	return err
+}
+
+// opcodeCheckTxHashVerify treats the top item of the data stack as a TxHash
+// and a TxFieldSelector. It will create TxHash of the transaction at the
+// current index using the TxFieldSelector and compare it with the
+// provided TxHash.
+//
+// Stack transformation: [... TxHash+TxFieldSelector] -> [... TxHash+TxFieldSelector]
+func opcodeCheckTxHashVerify(op *opcode, data []byte, vm *Engine) error {
+	// If the flag is not enabled treat it as a NOP.
+	if !vm.hasFlag(ScriptVerifyTxHash) {
+		return nil
+	}
+
+	if vm.dstack.Depth() < 1 {
+		str := fmt.Sprintf("stack has %d items, not enough to "+
+			"execute OP_CHECKTXHASHVERIFY", vm.dstack.Depth())
+		return scriptError(ErrInvalidStackOperation, str)
+	}
+
+	so, err := vm.dstack.PopByteArray()
+	if err != nil {
+		return err
+	}
+
+	// Check if the stack top element is at least 32 bytes.
+	if len(so) < 32 {
+		str := fmt.Sprintf("stack top element has %d bytes, "+
+			"must be at least 32", len(so))
+		return scriptError(ErrInvalidStackOperation, str)
+	}
+
+	// The first 32 bytes of the stack are interpreted as a tx hash.
+	// The remaining bytes specify the TxFieldSelector.
+	txHash := so[:32]
+	txfs, err := NewTxFieldSelectorFromBytes(so[32:])
+	if err != nil {
+		return scriptError(ErrInternal, err.Error())
+	}
+
+	// Calculate the actual TxHash of the transaction at the current index.
+	txHashActual, err := txfs.GetTxHash(
+		&vm.tx, uint32(vm.txIdx), vm.prevOutFetcher,
+		uint32(vm.lastCodeSep),
+	)
+	if err != nil {
+		return scriptError(ErrInternal, err.Error())
+	}
+
+	// Check if the TxHash matches the expected TxHash.
+	if !bytes.Equal(txHash, txHashActual) {
+		str := fmt.Sprintf("TxHash mismatch: expected %x, got %x",
+			txHash, txHashActual)
+
+		return scriptError(ErrCheckTxHashVerify, str)
+	}
+
+	// Put the item back on the stack.
+	vm.dstack.PushByteArray(so)
+
+	return nil
+}
+
+// opcodeTxHash treats the top item of the data stack as a TxFieldSelector.
+// It will create TxHash of the transaction at the current index using the
+// TxFieldSelector and push it to the stack.
+//
+// Stack transformation: [... TxFieldSelector] -> [... TxHash]
+func opcodeTxHash(op *opcode, data []byte, vm *Engine) error {
+	// If the flag is not enabled treat it as a NOP.
+	if !vm.hasFlag(ScriptVerifyTxHash) {
+		return nil
+	}
+
+	if vm.dstack.Depth() < 1 {
+		str := fmt.Sprintf("stack has %d items, not enough to "+
+			"execute OP_CHECKTXHASHVERIFY", vm.dstack.Depth())
+		return scriptError(ErrInvalidStackOperation, str)
+	}
+
+	so, err := vm.dstack.PopByteArray()
+	if err != nil {
+		return err
+	}
+
+	// Create a TxFieldSelector from the stack top element.
+	txfs, err := NewTxFieldSelectorFromBytes(so)
+	if err != nil {
+		return scriptError(ErrInternal, err.Error())
+	}
+
+	// Calculate the TxHash of the transaction at the current index.
+	txHash, err := txfs.GetTxHash(
+		&vm.tx, uint32(vm.txIdx), vm.prevOutFetcher,
+		uint32(vm.lastCodeSep),
+	)
+	if err != nil {
+		return scriptError(ErrInternal, err.Error())
+	}
+
+	// Push the TxHash to the stack.
+	vm.dstack.PushByteArray(txHash)
+
+	return nil
 }
 
 // OpcodeByName is a map that can be used to lookup an opcode by its
