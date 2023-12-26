@@ -3,6 +3,7 @@ package txscript
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
@@ -384,6 +385,10 @@ func inOutSelectorToBytes(selector InOutSelector,
 // InputSelector is used to get the hash of the inputs of a transaction, as
 // specified by the TxFieldSelector.
 type InputSelector struct {
+	// InputsCache is a cache that can be used to speed up the hashing of
+	// inputs.
+	InputsCache *TxfsInputsCache
+
 	// CommitNumber is true if the number of inputs should be committed to
 	// the TxHash.
 	CommitNumber bool
@@ -418,8 +423,8 @@ type InputSelector struct {
 }
 
 // NewInputSelectorFromBytes creates a new inputSelector from a byte slice.
-func NewInputSelectorFromBytes(inoutFields byte, txfs []byte) (*InputSelector,
-	[]byte, error) {
+func NewInputSelectorFromBytes(inoutFields byte, txfs []byte,
+	inputsCache *TxfsInputsCache) (*InputSelector, []byte, error) {
 
 	inputSelector := &InputSelector{
 		PrevOuts:          inoutFields&TXFSInputsPrevouts != 0,
@@ -428,6 +433,7 @@ func NewInputSelectorFromBytes(inoutFields byte, txfs []byte) (*InputSelector,
 		PrevScriptPubkeys: inoutFields&TXFSInputsPrevScriptpubkeys != 0,
 		PrevValues:        inoutFields&TXFSInputsPrevValues != 0,
 		TaprootAnnexes:    inoutFields&TXFSInputsTaprootAnnexes != 0,
+		InputsCache:       inputsCache,
 	}
 
 	var err error
@@ -463,90 +469,138 @@ func (s *InputSelector) writeInputsHash(txHashBuffer *bytes.Buffer,
 	}
 
 	if len(inputIndices) > 0 && s.PrevOuts {
-		var buffer bytes.Buffer
-		for _, idx := range inputIndices {
-			wire.WriteOutPoint(
-				&buffer, 0, tx.Version,
-				&tx.TxIn[idx].PreviousOutPoint,
+		// If we have a cache, use it to speed up the hashing.
+		if s.InputsCache != nil {
+			bufferHash := s.InputsCache.GetPrevoutHash(
+				tx, inputIndices,
 			)
+			txHashBuffer.Write(bufferHash)
+		} else {
+			var buffer bytes.Buffer
+			for _, idx := range inputIndices {
+				wire.WriteOutPoint(
+					&buffer, 0, tx.Version,
+					&tx.TxIn[idx].PreviousOutPoint,
+				)
+			}
+			bufferHash := chainhash.HashB(buffer.Bytes())
+			txHashBuffer.Write(bufferHash)
 		}
-		bufferHash := chainhash.HashB(buffer.Bytes())
-		txHashBuffer.Write(bufferHash)
 	}
 
 	if len(inputIndices) > 0 && s.Sequences {
-		var buffer bytes.Buffer
-		for _, idx := range inputIndices {
-			binary.Write(
-				&buffer, binary.LittleEndian,
-				tx.TxIn[idx].Sequence,
+		// If we have a cache, use it to speed up the hashing.
+		if s.InputsCache != nil {
+			bufferHash := s.InputsCache.GetSequenceHash(
+				tx, inputIndices,
 			)
+			txHashBuffer.Write(bufferHash)
+		} else {
+			var buffer bytes.Buffer
+			for _, idx := range inputIndices {
+				binary.Write(
+					&buffer, binary.LittleEndian,
+					tx.TxIn[idx].Sequence,
+				)
+			}
+			bufferHash := chainhash.HashB(buffer.Bytes())
+			txHashBuffer.Write(bufferHash)
 		}
-		bufferHash := chainhash.HashB(buffer.Bytes())
-		txHashBuffer.Write(bufferHash)
 	}
 
 	if len(inputIndices) > 0 && s.ScriptSigs {
-		var buffer bytes.Buffer
-		for _, idx := range inputIndices {
-			buffer.Write(
-				chainhash.HashB(tx.TxIn[idx].SignatureScript),
+		// If we have a cache, use it to speed up the hashing.
+		if s.InputsCache != nil {
+			bufferHash := s.InputsCache.GetScriptSigHash(
+				tx, inputIndices,
 			)
+			txHashBuffer.Write(bufferHash)
+		} else {
+			var buffer bytes.Buffer
+			for _, idx := range inputIndices {
+				buffer.Write(
+					chainhash.HashB(tx.TxIn[idx].SignatureScript),
+				)
+			}
+			bufferHash := chainhash.HashB(buffer.Bytes())
+			txHashBuffer.Write(bufferHash)
 		}
-		bufferHash := chainhash.HashB(buffer.Bytes())
-		txHashBuffer.Write(bufferHash)
 	}
 
 	if len(inputIndices) > 0 && s.PrevScriptPubkeys {
-		var buffer bytes.Buffer
-		for _, idx := range inputIndices {
-			prevout := prevoutFetcher.FetchPrevOutput(
-				tx.TxIn[idx].PreviousOutPoint,
+		// If we have a cache, use it to speed up the hashing.
+		if s.InputsCache != nil {
+			bufferHash := s.InputsCache.GetPrevScriptPubkeyHash(
+				tx, inputIndices, prevoutFetcher,
 			)
-			buffer.Write(chainhash.HashB(prevout.PkScript))
+			txHashBuffer.Write(bufferHash)
+		} else {
+			var buffer bytes.Buffer
+			for _, idx := range inputIndices {
+				prevout := prevoutFetcher.FetchPrevOutput(
+					tx.TxIn[idx].PreviousOutPoint,
+				)
+				buffer.Write(chainhash.HashB(prevout.PkScript))
+			}
+			bufferHash := chainhash.HashB(buffer.Bytes())
+			txHashBuffer.Write(bufferHash)
 		}
-		bufferHash := chainhash.HashB(buffer.Bytes())
-		txHashBuffer.Write(bufferHash)
 	}
 
 	if len(inputIndices) > 0 && s.PrevValues {
-		var buffer bytes.Buffer
-		for _, idx := range inputIndices {
-			prevout := prevoutFetcher.FetchPrevOutput(
-				tx.TxIn[idx].PreviousOutPoint,
+		// If we have a cache, use it to speed up the hashing.
+		if s.InputsCache != nil {
+			bufferHash := s.InputsCache.GetPrevValueHash(
+				tx, inputIndices, prevoutFetcher,
 			)
-			binary.Write(
-				&buffer, binary.LittleEndian, prevout.Value,
-			)
+			txHashBuffer.Write(bufferHash)
+		} else {
+			var buffer bytes.Buffer
+			for _, idx := range inputIndices {
+				prevout := prevoutFetcher.FetchPrevOutput(
+					tx.TxIn[idx].PreviousOutPoint,
+				)
+				binary.Write(
+					&buffer, binary.LittleEndian, prevout.Value,
+				)
+			}
+			bufferHash := chainhash.HashB(buffer.Bytes())
+			txHashBuffer.Write(bufferHash)
 		}
-		bufferHash := chainhash.HashB(buffer.Bytes())
-		txHashBuffer.Write(bufferHash)
 	}
 
 	if len(inputIndices) > 0 && s.TaprootAnnexes {
-		var buffer bytes.Buffer
-		for _, idx := range inputIndices {
-			if IsPayToTaproot(prevoutFetcher.FetchPrevOutput(
-				tx.TxIn[idx].PreviousOutPoint).PkScript,
-			) {
+		// If we have a cache, use it to speed up the hashing.
+		if s.InputsCache != nil {
+			bufferHash := s.InputsCache.GetTaprootAnnexHash(
+				tx, inputIndices, prevoutFetcher,
+			)
+			txHashBuffer.Write(bufferHash)
+		} else {
+			var buffer bytes.Buffer
+			for _, idx := range inputIndices {
+				if IsPayToTaproot(prevoutFetcher.FetchPrevOutput(
+					tx.TxIn[idx].PreviousOutPoint).PkScript,
+				) {
 
-				if isAnnexedWitness(tx.TxIn[idx].Witness) {
-					annex, err := extractAnnex(
-						tx.TxIn[idx].Witness,
-					)
-					if err != nil {
-						return err
+					if isAnnexedWitness(tx.TxIn[idx].Witness) {
+						annex, err := extractAnnex(
+							tx.TxIn[idx].Witness,
+						)
+						if err != nil {
+							return err
+						}
+						buffer.Write(chainhash.HashB(annex))
+					} else {
+						buffer.Write(chainhash.HashB([]byte{}))
 					}
-					buffer.Write(chainhash.HashB(annex))
 				} else {
 					buffer.Write(chainhash.HashB([]byte{}))
 				}
-			} else {
-				buffer.Write(chainhash.HashB([]byte{}))
 			}
+			bufferHash := chainhash.HashB(buffer.Bytes())
+			txHashBuffer.Write(bufferHash)
 		}
-		bufferHash := chainhash.HashB(buffer.Bytes())
-		txHashBuffer.Write(bufferHash)
 	}
 
 	return nil
@@ -555,6 +609,10 @@ func (s *InputSelector) writeInputsHash(txHashBuffer *bytes.Buffer,
 // OutputSelector is used to get the hash of the outputs of a transaction, as
 // specified by the TxFieldSelector.
 type OutputSelector struct {
+	// OutputsCache is a cache that can be used to speed up the hashing of
+	// outputs.
+	OutputsCache *TxfsOutputsCache
+
 	// CommitNumber is true if the number of outputs should be committed to
 	// the TxHash.
 	CommitNumber bool
@@ -572,12 +630,13 @@ type OutputSelector struct {
 }
 
 // newOutputSelectorFromBytes creates a new outputSelector from a byte slice.
-func newOutputSelectorFromBytes(inoutFields byte, txfs []byte) (*OutputSelector,
-	[]byte, error) {
+func newOutputSelectorFromBytes(inoutFields byte, txfs []byte,
+	outputsCache *TxfsOutputsCache) (*OutputSelector, []byte, error) {
 
 	outputSelector := &OutputSelector{
 		ScriptPubkeys: inoutFields&TXFSOutputsScriptpubkeys != 0,
 		Values:        inoutFields&TXFSOutputsValues != 0,
+		OutputsCache:  outputsCache,
 	}
 
 	var err error
@@ -612,24 +671,38 @@ func (s *OutputSelector) writeOutputsHash(sigMsg *bytes.Buffer, tx *wire.MsgTx,
 	}
 
 	if len(outputIndices) > 0 && s.ScriptPubkeys {
-		var buffer bytes.Buffer
-		for _, idx := range outputIndices {
-			buffer.Write(chainhash.HashB(tx.TxOut[idx].PkScript))
+		if s.OutputsCache != nil {
+			bufferHash := s.OutputsCache.GetScriptPubkeyHash(
+				tx, outputIndices,
+			)
+			sigMsg.Write(bufferHash)
+		} else {
+			var buffer bytes.Buffer
+			for _, idx := range outputIndices {
+				buffer.Write(chainhash.HashB(tx.TxOut[idx].PkScript))
+			}
+			bufferHash := chainhash.HashB(buffer.Bytes())
+			sigMsg.Write(bufferHash)
 		}
-		bufferHash := chainhash.HashB(buffer.Bytes())
-		sigMsg.Write(bufferHash)
 	}
 
 	if len(outputIndices) > 0 && s.Values {
-		var buffer bytes.Buffer
-		for _, idx := range outputIndices {
-			binary.Write(
-				&buffer, binary.LittleEndian,
-				tx.TxOut[idx].Value,
+		if s.OutputsCache != nil {
+			bufferHash := s.OutputsCache.GetValueHash(
+				tx, outputIndices,
 			)
+			sigMsg.Write(bufferHash)
+		} else {
+			var buffer bytes.Buffer
+			for _, idx := range outputIndices {
+				binary.Write(
+					&buffer, binary.LittleEndian,
+					tx.TxOut[idx].Value,
+				)
+			}
+			bufferHash := chainhash.HashB(buffer.Bytes())
+			sigMsg.Write(bufferHash)
 		}
-		bufferHash := chainhash.HashB(buffer.Bytes())
-		sigMsg.Write(bufferHash)
 	}
 
 	return nil
@@ -670,7 +743,9 @@ type TxFieldSelector struct {
 }
 
 // NewTxFieldSelectorFromBytes creates a new TxFieldSelector from a byte slice.
-func NewTxFieldSelectorFromBytes(txfs []byte) (*TxFieldSelector, error) {
+func NewTxFieldSelectorFromBytes(txfs []byte, inputsCache *TxfsInputsCache,
+	outputsCache *TxfsOutputsCache) (*TxFieldSelector, error) {
+
 	if len(txfs) == 0 {
 		txfs = TXFSSpecialTemplate[:]
 	} else if len(txfs) == 1 && txfs[0] == 0x00 {
@@ -711,7 +786,7 @@ func NewTxFieldSelectorFromBytes(txfs []byte) (*TxFieldSelector, error) {
 	// InputSelector from the in- and output byte.
 	if global&TXFSInputs != 0 {
 		fields.Inputs, txfs, err = NewInputSelectorFromBytes(
-			inoutFields, txfs,
+			inoutFields, txfs, inputsCache,
 		)
 		if err != nil {
 			return nil, err
@@ -722,7 +797,7 @@ func NewTxFieldSelectorFromBytes(txfs []byte) (*TxFieldSelector, error) {
 	// OutputSelector from the in- and output byte.
 	if global&TXFSOutputs != 0 {
 		fields.Outputs, _, err = newOutputSelectorFromBytes(
-			inoutFields, txfs,
+			inoutFields, txfs, outputsCache,
 		)
 		if err != nil {
 			return nil, err
@@ -910,4 +985,307 @@ func (f *TxFieldSelector) ToBytes() ([]byte, error) {
 	}
 
 	return txfs, nil
+}
+
+// TxfsInputsCache is a cache that can be used to speed up the hashing of
+// inputs.
+type TxfsInputsCache struct {
+	// PrevoutHashes is a map from the previous outpoint to the hash of the
+	// previous outpoint.
+	PrevoutHashes map[string][]byte
+
+	// SequenceHashes is a map from the previous outpoint to the hash of
+	// the sequence.
+	SequenceHashes map[string][]byte
+
+	// ScriptSigHashes is a map from the previous outpoint to the hash of
+	// the scriptSig.
+	ScriptSigHashes map[string][]byte
+
+	// PrevScriptPubkeyHashes is a map from the previous outpoint to the
+	// hash of the previous scriptPubkey.
+	PrevScriptPubkeyHashes map[string][]byte
+
+	// PrevValueHashes is a map from the previous outpoint to the hash of
+	// the previous value.
+	PrevValueHashes map[string][]byte
+
+	// TaprootAnnexHashes is a map from the previous outpoint to the hash
+	// of the annex of the taproot input.
+	TaprootAnnexHashes map[string][]byte
+}
+
+// NewTxfsInputsCache creates a new TxfsInputsCache.
+func NewTxfsInputsCache() *TxfsInputsCache {
+	return &TxfsInputsCache{
+		PrevoutHashes:          make(map[string][]byte),
+		SequenceHashes:         make(map[string][]byte),
+		ScriptSigHashes:        make(map[string][]byte),
+		PrevScriptPubkeyHashes: make(map[string][]byte),
+		PrevValueHashes:        make(map[string][]byte),
+		TaprootAnnexHashes:     make(map[string][]byte),
+	}
+}
+
+// GetPrevoutHash returns the hash of the previous outpoint. If the hash is not
+// in the cache, it is calculated and added to the cache.
+func (c *TxfsInputsCache) GetPrevoutHash(tx *wire.MsgTx,
+	inputIndices []int) []byte {
+
+	// Create a string from the tx hash and the input indices. This is
+	// used as a key in the cache.
+	var buffer bytes.Buffer
+	for _, idx := range inputIndices {
+		binary.Write(&buffer, binary.LittleEndian, uint32(idx))
+	}
+	key := hex.EncodeToString(buffer.Bytes())
+
+	hash, ok := c.PrevoutHashes[key]
+	if !ok {
+		var buffer bytes.Buffer
+		for _, idx := range inputIndices {
+			wire.WriteOutPoint(
+				&buffer, 0, tx.Version,
+				&tx.TxIn[idx].PreviousOutPoint,
+			)
+		}
+		hash = chainhash.HashB(buffer.Bytes())
+		c.PrevoutHashes[key] = hash
+	}
+
+	return hash
+}
+
+// GetSequenceHash returns the hash of the sequence. If the hash is not in the
+// cache, it is calculated and added to the cache.
+func (c *TxfsInputsCache) GetSequenceHash(tx *wire.MsgTx,
+	inputIndices []int) []byte {
+
+	// Create a string from the tx hash and the input indices. This is
+	// used as a key in the cache.
+	var buffer bytes.Buffer
+	for _, idx := range inputIndices {
+		binary.Write(&buffer, binary.LittleEndian, uint32(idx))
+	}
+	key := hex.EncodeToString(buffer.Bytes())
+
+	hash, ok := c.SequenceHashes[key]
+	if !ok {
+		var buffer bytes.Buffer
+		for _, idx := range inputIndices {
+			binary.Write(
+				&buffer, binary.LittleEndian,
+				tx.TxIn[idx].Sequence,
+			)
+		}
+		hash = chainhash.HashB(buffer.Bytes())
+		c.SequenceHashes[key] = hash
+	}
+
+	return hash
+}
+
+// GetScriptSigHash returns the hash of the scriptSig. If the hash is not in the
+// cache, it is calculated and added to the cache.
+func (c *TxfsInputsCache) GetScriptSigHash(tx *wire.MsgTx,
+	inputIndices []int) []byte {
+
+	// Create a string from the tx hash and the input indices. This is
+	// used as a key in the cache.
+	var buffer bytes.Buffer
+	for _, idx := range inputIndices {
+		binary.Write(&buffer, binary.LittleEndian, uint32(idx))
+	}
+	key := hex.EncodeToString(buffer.Bytes())
+
+	hash, ok := c.ScriptSigHashes[key]
+	if !ok {
+		var buffer bytes.Buffer
+		for _, idx := range inputIndices {
+			buffer.Write(
+				chainhash.HashB(tx.TxIn[idx].SignatureScript),
+			)
+		}
+		hash = chainhash.HashB(buffer.Bytes())
+		c.ScriptSigHashes[key] = hash
+	}
+
+	return hash
+}
+
+// GetPrevScriptPubkeyHash returns the hash of the previous scriptPubkey. If the
+// hash is not in the cache, it is calculated and added to the cache.
+func (c *TxfsInputsCache) GetPrevScriptPubkeyHash(tx *wire.MsgTx,
+	inputIndices []int, prevOutputFetcher PrevOutputFetcher) []byte {
+
+	// Create a string from the tx hash and the input indices. This is
+	// used as a key in the cache.
+	var buffer bytes.Buffer
+	for _, idx := range inputIndices {
+		binary.Write(&buffer, binary.LittleEndian, uint32(idx))
+	}
+	key := hex.EncodeToString(buffer.Bytes())
+
+	hash, ok := c.PrevScriptPubkeyHashes[key]
+	if !ok {
+		var buffer bytes.Buffer
+		for _, idx := range inputIndices {
+			prevout := prevOutputFetcher.FetchPrevOutput(
+				tx.TxIn[idx].PreviousOutPoint,
+			)
+			buffer.Write(chainhash.HashB(prevout.PkScript))
+		}
+		hash = chainhash.HashB(buffer.Bytes())
+		c.PrevScriptPubkeyHashes[key] = hash
+	}
+
+	return hash
+}
+
+// GetPrevValueHash returns the hash of the previous value. If the hash is not
+// in the cache, it is calculated and added to the cache.
+func (c *TxfsInputsCache) GetPrevValueHash(tx *wire.MsgTx,
+	inputIndices []int, prevOutputFetcher PrevOutputFetcher) []byte {
+
+	// Create a string from the tx hash and the input indices. This is
+	// used as a key in the cache.
+	var buffer bytes.Buffer
+	for _, idx := range inputIndices {
+		binary.Write(&buffer, binary.LittleEndian, uint32(idx))
+	}
+	key := hex.EncodeToString(buffer.Bytes())
+
+	hash, ok := c.PrevValueHashes[key]
+	if !ok {
+		var buffer bytes.Buffer
+		for _, idx := range inputIndices {
+			prevout := prevOutputFetcher.FetchPrevOutput(
+				tx.TxIn[idx].PreviousOutPoint,
+			)
+			binary.Write(
+				&buffer, binary.LittleEndian, prevout.Value,
+			)
+		}
+		hash = chainhash.HashB(buffer.Bytes())
+		c.PrevValueHashes[key] = hash
+	}
+
+	return hash
+}
+
+// GetTaprootAnnexHash returns the hash of the annex of the taproot input. If
+// the hash is not in the cache, it is calculated and added to the cache.
+func (c *TxfsInputsCache) GetTaprootAnnexHash(tx *wire.MsgTx,
+	inputIndices []int, prevOutputFetcher PrevOutputFetcher) []byte {
+
+	// Create a string from the tx hash and the input indices. This is
+	// used as a key in the cache.
+	var buffer bytes.Buffer
+	for _, idx := range inputIndices {
+		binary.Write(&buffer, binary.LittleEndian, uint32(idx))
+	}
+	key := hex.EncodeToString(buffer.Bytes())
+
+	hash, ok := c.TaprootAnnexHashes[key]
+	if !ok {
+		var buffer bytes.Buffer
+		for _, idx := range inputIndices {
+			if IsPayToTaproot(prevOutputFetcher.FetchPrevOutput(
+				tx.TxIn[idx].PreviousOutPoint).PkScript,
+			) {
+
+				if isAnnexedWitness(tx.TxIn[idx].Witness) {
+					annex, err := extractAnnex(
+						tx.TxIn[idx].Witness,
+					)
+					if err != nil {
+						return nil
+					}
+					buffer.Write(chainhash.HashB(annex))
+				} else {
+					buffer.Write(chainhash.HashB([]byte{}))
+				}
+			} else {
+				buffer.Write(chainhash.HashB([]byte{}))
+			}
+		}
+		hash = chainhash.HashB(buffer.Bytes())
+		c.TaprootAnnexHashes[key] = hash
+	}
+
+	return hash
+}
+
+// TxfsOutputsCache is a cache that can be used to speed up the hashing of
+// outputs.
+type TxfsOutputsCache struct {
+	// ScriptPubkeyHashes is a map from the output index to the hash of the
+	// scriptPubkey.
+	ScriptPubkeyHashes map[string][]byte
+
+	// ValueHashes is a map from the output index to the hash of the value.
+	ValueHashes map[string][]byte
+}
+
+// NewTxfsOutputsCache creates a new TxfsOutputsCache.
+func NewTxfsOutputsCache() *TxfsOutputsCache {
+	return &TxfsOutputsCache{
+		ScriptPubkeyHashes: make(map[string][]byte),
+		ValueHashes:        make(map[string][]byte),
+	}
+}
+
+// GetScriptPubkeyHash returns the hash of the scriptPubkey. If the hash is not
+// in the cache, it is calculated and added to the cache.
+func (c *TxfsOutputsCache) GetScriptPubkeyHash(tx *wire.MsgTx,
+	outputIndices []int) []byte {
+
+	// Create a string from the tx hash and the output indices. This is
+	// used as a key in the cache.
+	var buffer bytes.Buffer
+	for _, idx := range outputIndices {
+		binary.Write(&buffer, binary.LittleEndian, uint32(idx))
+	}
+	key := hex.EncodeToString(buffer.Bytes())
+
+	hash, ok := c.ScriptPubkeyHashes[key]
+	if !ok {
+		var buffer bytes.Buffer
+		for _, idx := range outputIndices {
+			buffer.Write(chainhash.HashB(tx.TxOut[idx].PkScript))
+		}
+		hash = chainhash.HashB(buffer.Bytes())
+		c.ScriptPubkeyHashes[key] = hash
+	}
+
+	return hash
+}
+
+// GetValueHash returns the hash of the value. If the hash is not in the cache,
+// it is calculated and added to the cache.
+func (c *TxfsOutputsCache) GetValueHash(tx *wire.MsgTx,
+	outputIndices []int) []byte {
+
+	// Create a string from the tx hash and the output indices. This is
+	// used as a key in the cache.
+	var buffer bytes.Buffer
+	for _, idx := range outputIndices {
+		binary.Write(&buffer, binary.LittleEndian, uint32(idx))
+	}
+	key := hex.EncodeToString(buffer.Bytes())
+
+	hash, ok := c.ValueHashes[key]
+	if !ok {
+		var buffer bytes.Buffer
+		for _, idx := range outputIndices {
+			binary.Write(
+				&buffer, binary.LittleEndian,
+				tx.TxOut[idx].Value,
+			)
+		}
+		hash = chainhash.HashB(buffer.Bytes())
+		c.ValueHashes[key] = hash
+	}
+
+	return hash
 }

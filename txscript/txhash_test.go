@@ -52,7 +52,76 @@ func TestCalculateTxHash(t *testing.T) {
 		txfs := decodeHex(t, testVector.Txfs)
 
 		// Create the TxFieldSelector from the bytes.
-		TxFields, err := NewTxFieldSelectorFromBytes(txfs)
+		TxFields, err := NewTxFieldSelectorFromBytes(txfs, nil, nil)
+		require.NoError(t, err)
+
+		// Calculate the tx hash.
+		txHash, err := TxFields.GetTxHash(
+			tx, testVector.Input, prevOutFetcher, 0,
+		)
+		require.NoError(
+			t, err, fmt.Sprintf("failed at test vector %d"+
+				" expected hash %s", testIdx, testVector.TxHash),
+		)
+
+		// Make sure the tx hash matches the expected.
+		require.Equal(
+			t, testVector.TxHash, fmt.Sprintf("%x", txHash),
+			fmt.Sprintf("failed at test vector %d", testIdx),
+		)
+
+		// Now we'll serialize the TxFieldSelector and make sure it
+		// matches the original.
+		txfs2, err := TxFields.ToBytes()
+		require.NoError(t, err, "failed to serialize txfs")
+
+		// We'll need to handle the special cases where the expected is
+		// either empty or the special template selector.
+		compareTxfs(t, txfs, txfs2)
+	}
+	t.Logf("passed %d test vectors", len(testVectors.Vectors))
+}
+
+func TestCalculateTxHashWithCache(t *testing.T) {
+	// First read the test vectors from the file.
+	testVectors := parseTestVectorsFromFile(t, "./data/txhash_vectors.json")
+
+	// Create a new transaction from the hex string.
+	tx := wire.NewMsgTx(wire.TxVersion)
+	err := tx.Deserialize(bytes.NewReader(
+		decodeHex(t, testVectors.Tx),
+	))
+	require.NoError(t, err)
+
+	// Create the prevout map for the prevout fetcher.
+	prevOuts := make([]*wire.TxOut, len(testVectors.Prevs))
+	prevOutMap := make(map[wire.OutPoint]*wire.TxOut)
+	for idx, prev := range testVectors.Prevs {
+		txOut := wire.NewTxOut(0, nil)
+
+		r := bytes.NewReader(decodeHex(t, prev))
+
+		err = wire.ReadTxOut(r, 0, wire.TxVersion, txOut)
+		require.NoError(t, err)
+
+		prevOuts[idx] = txOut
+
+		prevOutMap[tx.TxIn[idx].PreviousOutPoint] = txOut
+	}
+
+	prevOutFetcher := NewMultiPrevOutFetcher(prevOutMap)
+
+	inputsCache := NewTxfsInputsCache()
+	outputsCache := NewTxfsOutputsCache()
+
+	// Run through the test vectors and make sure the tx hash matches.
+	for testIdx, testVector := range testVectors.Vectors {
+		txfs := decodeHex(t, testVector.Txfs)
+
+		// Create the TxFieldSelector from the bytes.
+		TxFields, err := NewTxFieldSelectorFromBytes(
+			txfs, inputsCache, outputsCache,
+		)
 		require.NoError(t, err)
 
 		// Calculate the tx hash.
@@ -154,6 +223,12 @@ func TestExampleTx(t *testing.T) {
 	// OP_TXHASHVERIFY output.
 	tx := wire.NewMsgTx(wire.TxVersion)
 
+	// Add a fake input to the transaction.
+	tx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: wire.OutPoint{
+			Hash:  sha256.Sum256([]byte{1, 2, 3}),
+			Index: 0,
+		}})
 	// Add a fake input to the transaction.
 	tx.AddTxIn(&wire.TxIn{
 		PreviousOutPoint: wire.OutPoint{
