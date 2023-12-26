@@ -317,6 +317,144 @@ func TestExampleTx(t *testing.T) {
 	}
 }
 
+// This test benchmarks the execution of the engine with and without the
+// txfs cache.
+func BenchmarkTxfsCache(t *testing.B) {
+	var (
+		inputCount            = 100
+		outputCount           = 100
+		outputValue           = int64(5000)
+		chekTxHashVerifyCount = 200
+	)
+
+	txTemplate := wire.NewMsgTx(wire.TxVersion)
+
+	// Fill the template with inputs and outputs.
+	inputTxHash := sha256.Sum256([]byte{1, 2, 3})
+	for i := 0; i < inputCount; i++ {
+		txTemplate.AddTxIn(&wire.TxIn{
+			PreviousOutPoint: wire.OutPoint{
+				Hash:  inputTxHash,
+				Index: uint32(i),
+			},
+		})
+	}
+
+	for i := 0; i < outputCount; i++ {
+		txTemplate.AddTxOut(&wire.TxOut{
+			Value:    outputValue,
+			PkScript: []byte{0x00},
+		})
+	}
+
+	// Create the TxFieldSelector that will be used to generate and
+	// verify the OP_TXHASHVERIFY output.
+	inputSelector := &InputSelector{
+		CommitNumber:  true,
+		PrevOuts:      true,
+		Sequences:     true,
+		InOutSelector: &InOutSelectorAll{},
+	}
+
+	outputSelector := &OutputSelector{
+		CommitNumber:  true,
+		ScriptPubkeys: true,
+		Values:        true,
+		InOutSelector: &InOutSelectorAll{},
+	}
+
+	txFieldSelector := TxFieldSelector{
+		Control: true,
+		Version: true,
+		Inputs:  inputSelector,
+		Outputs: outputSelector,
+	}
+
+	txfs, err := txFieldSelector.ToBytes()
+	require.NoError(t, err)
+
+	// Now we'll create the TxHash that the OP_TXHASHVERIFY output will
+	// require.
+	txHash, err := txFieldSelector.GetTxHash(txTemplate, 0, nil, 0)
+	require.NoError(t, err)
+
+	// We'll now create the transaction that will be verified.
+	tx := wire.NewMsgTx(wire.TxVersion)
+
+	for i := 0; i < inputCount; i++ {
+		tx.AddTxIn(&wire.TxIn{
+			PreviousOutPoint: wire.OutPoint{
+				Hash:  inputTxHash,
+				Index: uint32(i),
+			}})
+	}
+
+	// Add the outputs as defined in the template
+	for _, txOut := range txTemplate.TxOut {
+		tx.AddTxOut(txOut)
+	}
+
+	// Create a really large tx hash script.
+	builder := NewScriptBuilder()
+	builder.AddData(append(txHash[:], txfs...))
+	for i := 0; i < chekTxHashVerifyCount; i++ {
+		builder.AddOp(OP_CHECKTXHASHVERIFY)
+	}
+	txHashScript, err := builder.Script()
+	require.NoError(t, err)
+
+	// This prevout fetcher will ensure that the engine checks against
+	// the txHashScript we created above.
+	prevoutFetcher := NewCannedPrevOutputFetcher(
+		txHashScript, outputValue*int64(outputCount),
+	)
+
+	sigHashes := NewTxSigHashes(tx, prevoutFetcher)
+
+	testCases := []struct {
+		// If we should use a cache or not.
+		useCache bool
+		// Name of the test case.
+		name string
+	}{
+		{
+			useCache: false,
+			name:     "no_cache",
+		},
+		{
+			useCache: true,
+			name:     "cache",
+		},
+	}
+
+	for _, testCase := range testCases {
+		// Now run the test benchmarked.
+		t.Run(testCase.name, func(b *testing.B) {
+			b.ReportAllocs()
+			b.ResetTimer()
+
+			for i := 0; i < b.N; i++ {
+				// Create a new engine with the ScriptVerifyTxHash flag set.
+				engine, err := NewEngine(
+					txHashScript, tx, 0, StandardVerifyFlags|ScriptVerifyTxHash, nil,
+					sigHashes, outputValue*int64(outputCount),
+					prevoutFetcher,
+				)
+				require.NoError(t, err)
+
+				if !testCase.useCache {
+					engine.txfsInputsCache = nil
+					engine.txfsOutputsCache = nil
+				}
+
+				err = engine.Execute()
+				require.NoError(t, err)
+			}
+		})
+	}
+
+}
+
 // genTxHashScript generates a script that will require the tx hash to be
 // committed to in the transaction.
 func genTxHashScript(txhash, txfs []byte) ([]byte, error) {
