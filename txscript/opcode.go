@@ -2486,7 +2486,9 @@ func opcodeCheckTxHashVerify(op *opcode, data []byte, vm *Engine) error {
 	// The first 32 bytes of the stack are interpreted as a tx hash.
 	// The remaining bytes specify the TxFieldSelector.
 	txHash := so[:32]
-	txfs, err := NewTxFieldSelectorFromBytes(so[32:], nil, nil)
+	txfs, err := NewTxFieldSelectorFromBytes(
+		so[32:], vm.txfsInputsCache, vm.txfsOutputsCache,
+	)
 	if err != nil {
 		return scriptError(ErrInternal, err.Error())
 	}
