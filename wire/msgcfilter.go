@@ -39,15 +39,15 @@ type MsgCFilter struct {
 func (msg *MsgCFilter) BtcDecode(r io.Reader, pver uint32, _ MessageEncoding) error {
 	// Read filter type
 	buf := binarySerializer.Borrow()
+	defer binarySerializer.Return(buf)
+
 	if _, err := io.ReadFull(r, buf[:1]); err != nil {
-		binarySerializer.Return(buf)
 		return err
 	}
 	msg.FilterType = FilterType(buf[0])
 
 	// Read the hash of the filter's block
 	if _, err := io.ReadFull(r, msg.BlockHash[:]); err != nil {
-		binarySerializer.Return(buf)
 		return err
 	}
 
@@ -55,7 +55,6 @@ func (msg *MsgCFilter) BtcDecode(r io.Reader, pver uint32, _ MessageEncoding) er
 	var err error
 	msg.Data, err = ReadVarBytesBuf(r, pver, buf, MaxCFilterDataSize,
 		"cfilter data")
-	binarySerializer.Return(buf)
 	return err
 }
 
@@ -70,19 +69,18 @@ func (msg *MsgCFilter) BtcEncode(w io.Writer, pver uint32, _ MessageEncoding) er
 	}
 
 	buf := binarySerializer.Borrow()
+	defer binarySerializer.Return(buf)
+
 	buf[0] = byte(msg.FilterType)
 	if _, err := w.Write(buf[:1]); err != nil {
-		binarySerializer.Return(buf)
 		return err
 	}
 
 	if _, err := w.Write(msg.BlockHash[:]); err != nil {
-		binarySerializer.Return(buf)
 		return err
 	}
 
 	err := WriteVarBytesBuf(w, pver, msg.Data, buf)
-	binarySerializer.Return(buf)
 	return err
 }
 

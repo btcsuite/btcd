@@ -50,14 +50,14 @@ func (msg *MsgMerkleBlock) BtcDecode(r io.Reader, pver uint32, enc MessageEncodi
 	}
 
 	buf := binarySerializer.Borrow()
+	defer binarySerializer.Return(buf)
+
 	err := readBlockHeaderBuf(r, pver, &msg.Header, buf)
 	if err != nil {
-		binarySerializer.Return(buf)
 		return err
 	}
 
 	if _, err := io.ReadFull(r, buf[:4]); err != nil {
-		binarySerializer.Return(buf)
 		return err
 	}
 	msg.Transactions = littleEndian.Uint32(buf[:4])
@@ -65,11 +65,9 @@ func (msg *MsgMerkleBlock) BtcDecode(r io.Reader, pver uint32, enc MessageEncodi
 	// Read num block locator hashes and limit to max.
 	count, err := ReadVarIntBuf(r, pver, buf)
 	if err != nil {
-		binarySerializer.Return(buf)
 		return err
 	}
 	if count > maxTxPerBlock {
-		binarySerializer.Return(buf)
 		str := fmt.Sprintf("too many transaction hashes for message "+
 			"[count %v, max %v]", count, maxTxPerBlock)
 		return messageError("MsgMerkleBlock.BtcDecode", str)
@@ -83,7 +81,6 @@ func (msg *MsgMerkleBlock) BtcDecode(r io.Reader, pver uint32, enc MessageEncodi
 		hash := &hashes[i]
 		_, err := io.ReadFull(r, hash[:])
 		if err != nil {
-			binarySerializer.Return(buf)
 			return err
 		}
 		msg.AddTxHash(hash)
@@ -91,7 +88,6 @@ func (msg *MsgMerkleBlock) BtcDecode(r io.Reader, pver uint32, enc MessageEncodi
 
 	msg.Flags, err = ReadVarBytesBuf(r, pver, buf, maxFlagsPerMerkleBlock,
 		"merkle block flags size")
-	binarySerializer.Return(buf)
 	return err
 }
 
@@ -119,34 +115,30 @@ func (msg *MsgMerkleBlock) BtcEncode(w io.Writer, pver uint32, enc MessageEncodi
 	}
 
 	buf := binarySerializer.Borrow()
+	defer binarySerializer.Return(buf)
+
 	err := writeBlockHeaderBuf(w, pver, &msg.Header, buf)
 	if err != nil {
-		binarySerializer.Return(buf)
 		return err
 	}
 
 	littleEndian.PutUint32(buf[:4], msg.Transactions)
 	if _, err := w.Write(buf[:4]); err != nil {
-		binarySerializer.Return(buf)
 		return err
 	}
 
 	err = WriteVarIntBuf(w, pver, uint64(numHashes), buf)
 	if err != nil {
-		binarySerializer.Return(buf)
 		return err
 	}
 	for _, hash := range msg.Hashes {
 		_, err := w.Write(hash[:])
 		if err != nil {
-			binarySerializer.Return(buf)
 			return err
 		}
 	}
 
 	err = WriteVarBytesBuf(w, pver, msg.Flags, buf)
-	binarySerializer.Return(buf)
-
 	return err
 }
 

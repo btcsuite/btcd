@@ -63,16 +63,15 @@ func (msg *MsgBlock) ClearTransactions() {
 // opposed to decoding blocks from the wire.
 func (msg *MsgBlock) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) error {
 	buf := binarySerializer.Borrow()
+	defer binarySerializer.Return(buf)
 
 	err := readBlockHeaderBuf(r, pver, &msg.Header, buf)
 	if err != nil {
-		binarySerializer.Return(buf)
 		return err
 	}
 
 	txCount, err := ReadVarIntBuf(r, pver, buf)
 	if err != nil {
-		binarySerializer.Return(buf)
 		return err
 	}
 
@@ -80,26 +79,23 @@ func (msg *MsgBlock) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) er
 	// It would be possible to cause memory exhaustion and panics without
 	// a sane upper bound on this count.
 	if txCount > maxTxPerBlock {
-		binarySerializer.Return(buf)
 		str := fmt.Sprintf("too many transactions to fit into a block "+
 			"[count %d, max %d]", txCount, maxTxPerBlock)
 		return messageError("MsgBlock.BtcDecode", str)
 	}
 
 	scriptBuf := scriptPool.Borrow()
+	defer scriptPool.Return(scriptBuf)
+
 	msg.Transactions = make([]*MsgTx, 0, txCount)
 	for i := uint64(0); i < txCount; i++ {
 		tx := MsgTx{}
 		err := tx.btcDecode(r, pver, enc, buf, scriptBuf[:])
 		if err != nil {
-			scriptPool.Return(scriptBuf)
-			binarySerializer.Return(buf)
 			return err
 		}
 		msg.Transactions = append(msg.Transactions, &tx)
 	}
-	scriptPool.Return(scriptBuf)
-	binarySerializer.Return(buf)
 
 	return nil
 }
@@ -140,19 +136,18 @@ func (msg *MsgBlock) DeserializeTxLoc(r *bytes.Buffer) ([]TxLoc, error) {
 	fullLen := r.Len()
 
 	buf := binarySerializer.Borrow()
+	defer binarySerializer.Return(buf)
 
 	// At the current time, there is no difference between the wire encoding
 	// at protocol version 0 and the stable long-term storage format.  As
 	// a result, make use of existing wire protocol functions.
 	err := readBlockHeaderBuf(r, 0, &msg.Header, buf)
 	if err != nil {
-		binarySerializer.Return(buf)
 		return nil, err
 	}
 
 	txCount, err := ReadVarIntBuf(r, 0, buf)
 	if err != nil {
-		binarySerializer.Return(buf)
 		return nil, err
 	}
 
@@ -160,13 +155,13 @@ func (msg *MsgBlock) DeserializeTxLoc(r *bytes.Buffer) ([]TxLoc, error) {
 	// It would be possible to cause memory exhaustion and panics without
 	// a sane upper bound on this count.
 	if txCount > maxTxPerBlock {
-		binarySerializer.Return(buf)
 		str := fmt.Sprintf("too many transactions to fit into a block "+
 			"[count %d, max %d]", txCount, maxTxPerBlock)
 		return nil, messageError("MsgBlock.DeserializeTxLoc", str)
 	}
 
 	scriptBuf := scriptPool.Borrow()
+	defer scriptPool.Return(scriptBuf)
 
 	// Deserialize each transaction while keeping track of its location
 	// within the byte stream.
@@ -177,15 +172,11 @@ func (msg *MsgBlock) DeserializeTxLoc(r *bytes.Buffer) ([]TxLoc, error) {
 		tx := MsgTx{}
 		err := tx.btcDecode(r, 0, WitnessEncoding, buf, scriptBuf[:])
 		if err != nil {
-			scriptPool.Return(scriptBuf)
-			binarySerializer.Return(buf)
 			return nil, err
 		}
 		msg.Transactions = append(msg.Transactions, &tx)
 		txLocs[i].TxLen = (fullLen - r.Len()) - txLocs[i].TxStart
 	}
-	scriptPool.Return(scriptBuf)
-	binarySerializer.Return(buf)
 
 	return txLocs, nil
 }
@@ -196,28 +187,24 @@ func (msg *MsgBlock) DeserializeTxLoc(r *bytes.Buffer) ([]TxLoc, error) {
 // database, as opposed to encoding blocks for the wire.
 func (msg *MsgBlock) BtcEncode(w io.Writer, pver uint32, enc MessageEncoding) error {
 	buf := binarySerializer.Borrow()
+	defer binarySerializer.Return(buf)
 
 	err := writeBlockHeaderBuf(w, pver, &msg.Header, buf)
 	if err != nil {
-		binarySerializer.Return(buf)
 		return err
 	}
 
 	err = WriteVarIntBuf(w, pver, uint64(len(msg.Transactions)), buf)
 	if err != nil {
-		binarySerializer.Return(buf)
 		return err
 	}
 
 	for _, tx := range msg.Transactions {
 		err = tx.btcEncode(w, pver, enc, buf)
 		if err != nil {
-			binarySerializer.Return(buf)
 			return err
 		}
 	}
-
-	binarySerializer.Return(buf)
 
 	return nil
 }

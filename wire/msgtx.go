@@ -456,10 +456,12 @@ func (msg *MsgTx) Copy() *MsgTx {
 // database, as opposed to decoding transactions from the wire.
 func (msg *MsgTx) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) error {
 	buf := binarySerializer.Borrow()
+	defer binarySerializer.Return(buf)
+
 	sbuf := scriptPool.Borrow()
+	defer scriptPool.Return(sbuf)
+
 	err := msg.btcDecode(r, pver, enc, buf, sbuf[:])
-	scriptPool.Return(sbuf)
-	binarySerializer.Return(buf)
 	return err
 }
 
@@ -695,8 +697,9 @@ func (msg *MsgTx) DeserializeNoWitness(r io.Reader) error {
 // database, as opposed to encoding transactions for the wire.
 func (msg *MsgTx) BtcEncode(w io.Writer, pver uint32, enc MessageEncoding) error {
 	buf := binarySerializer.Borrow()
+	defer binarySerializer.Return(buf)
+
 	err := msg.btcEncode(w, pver, enc, buf)
-	binarySerializer.Return(buf)
 	return err
 }
 
@@ -947,8 +950,9 @@ func readOutPointBuf(r io.Reader, pver uint32, version int32, op *OutPoint,
 // w.
 func WriteOutPoint(w io.Writer, pver uint32, version int32, op *OutPoint) error {
 	buf := binarySerializer.Borrow()
+	defer binarySerializer.Return(buf)
+
 	err := writeOutPointBuf(w, pver, version, op, buf)
-	binarySerializer.Return(buf)
 	return err
 }
 
@@ -986,8 +990,8 @@ func writeOutPointBuf(w io.Writer, pver uint32, version int32, op *OutPoint,
 // and return when the method finishes.
 //
 // NOTE: b MUST either be nil or at least an 8-byte slice.
-func readScriptBuf(r io.Reader, pver uint32, buf, s []byte, maxAllowed uint32,
-	fieldName string) ([]byte, error) {
+func readScriptBuf(r io.Reader, pver uint32, buf, s []byte,
+	maxAllowed uint32, fieldName string) ([]byte, error) {
 
 	count, err := ReadVarIntBuf(r, pver, buf)
 	if err != nil {
@@ -1070,8 +1074,9 @@ func ReadTxOut(r io.Reader, pver uint32, version int32, to *TxOut) error {
 	var s scriptSlab
 
 	buf := binarySerializer.Borrow()
+	defer binarySerializer.Return(buf)
+
 	err := readTxOutBuf(r, pver, version, to, buf, s[:])
-	binarySerializer.Return(buf)
 	return err
 }
 
@@ -1102,8 +1107,9 @@ func readTxOutBuf(r io.Reader, pver uint32, version int32, to *TxOut,
 // new sighashes for witness transactions (BIP0143).
 func WriteTxOut(w io.Writer, pver uint32, version int32, to *TxOut) error {
 	buf := binarySerializer.Borrow()
+	defer binarySerializer.Return(buf)
+
 	err := WriteTxOutBuf(w, pver, version, to, buf)
-	binarySerializer.Return(buf)
 	return err
 }
 

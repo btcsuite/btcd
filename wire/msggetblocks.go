@@ -52,8 +52,9 @@ func (msg *MsgGetBlocks) AddBlockLocatorHash(hash *chainhash.Hash) error {
 // This is part of the Message interface implementation.
 func (msg *MsgGetBlocks) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) error {
 	buf := binarySerializer.Borrow()
+	defer binarySerializer.Return(buf)
+
 	if _, err := io.ReadFull(r, buf[:4]); err != nil {
-		binarySerializer.Return(buf)
 		return err
 	}
 	msg.ProtocolVersion = littleEndian.Uint32(buf[:4])
@@ -61,10 +62,8 @@ func (msg *MsgGetBlocks) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding
 	// Read num block locator hashes and limit to max.
 	count, err := ReadVarIntBuf(r, pver, buf)
 	if err != nil {
-		binarySerializer.Return(buf)
 		return err
 	}
-	binarySerializer.Return(buf)
 
 	if count > MaxBlockLocatorsPerMsg {
 		str := fmt.Sprintf("too many block locator hashes for message "+
@@ -100,18 +99,17 @@ func (msg *MsgGetBlocks) BtcEncode(w io.Writer, pver uint32, enc MessageEncoding
 	}
 
 	buf := binarySerializer.Borrow()
+	defer binarySerializer.Return(buf)
+
 	littleEndian.PutUint32(buf[:4], msg.ProtocolVersion)
 	if _, err := w.Write(buf[:4]); err != nil {
-		binarySerializer.Return(buf)
 		return err
 	}
 
 	err := WriteVarIntBuf(w, pver, uint64(count), buf)
 	if err != nil {
-		binarySerializer.Return(buf)
 		return err
 	}
-	binarySerializer.Return(buf)
 
 	for _, hash := range msg.BlockLocatorHashes {
 		_, err := w.Write(hash[:])

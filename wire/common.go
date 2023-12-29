@@ -73,12 +73,13 @@ func (l binaryFreeList) Return(buf []byte) {
 // free list and returns it as a uint8.
 func (l binaryFreeList) Uint8(r io.Reader) (uint8, error) {
 	buf := l.Borrow()[:1]
+	defer l.Return(buf)
+
 	if _, err := io.ReadFull(r, buf); err != nil {
-		l.Return(buf)
 		return 0, err
 	}
 	rv := buf[0]
-	l.Return(buf)
+
 	return rv, nil
 }
 
@@ -87,12 +88,13 @@ func (l binaryFreeList) Uint8(r io.Reader) (uint8, error) {
 // the resulting uint16.
 func (l binaryFreeList) Uint16(r io.Reader, byteOrder binary.ByteOrder) (uint16, error) {
 	buf := l.Borrow()[:2]
+	defer l.Return(buf)
+
 	if _, err := io.ReadFull(r, buf); err != nil {
-		l.Return(buf)
 		return 0, err
 	}
 	rv := byteOrder.Uint16(buf)
-	l.Return(buf)
+
 	return rv, nil
 }
 
@@ -101,12 +103,13 @@ func (l binaryFreeList) Uint16(r io.Reader, byteOrder binary.ByteOrder) (uint16,
 // the resulting uint32.
 func (l binaryFreeList) Uint32(r io.Reader, byteOrder binary.ByteOrder) (uint32, error) {
 	buf := l.Borrow()[:4]
+	defer l.Return(buf)
+
 	if _, err := io.ReadFull(r, buf); err != nil {
-		l.Return(buf)
 		return 0, err
 	}
 	rv := byteOrder.Uint32(buf)
-	l.Return(buf)
+
 	return rv, nil
 }
 
@@ -115,12 +118,13 @@ func (l binaryFreeList) Uint32(r io.Reader, byteOrder binary.ByteOrder) (uint32,
 // the resulting uint64.
 func (l binaryFreeList) Uint64(r io.Reader, byteOrder binary.ByteOrder) (uint64, error) {
 	buf := l.Borrow()[:8]
+	defer l.Return(buf)
+
 	if _, err := io.ReadFull(r, buf); err != nil {
-		l.Return(buf)
 		return 0, err
 	}
 	rv := byteOrder.Uint64(buf)
-	l.Return(buf)
+
 	return rv, nil
 }
 
@@ -128,9 +132,11 @@ func (l binaryFreeList) Uint64(r io.Reader, byteOrder binary.ByteOrder) (uint64,
 // writes the resulting byte to the given writer.
 func (l binaryFreeList) PutUint8(w io.Writer, val uint8) error {
 	buf := l.Borrow()[:1]
+	defer l.Return(buf)
+
 	buf[0] = val
 	_, err := w.Write(buf)
-	l.Return(buf)
+
 	return err
 }
 
@@ -139,9 +145,11 @@ func (l binaryFreeList) PutUint8(w io.Writer, val uint8) error {
 // writer.
 func (l binaryFreeList) PutUint16(w io.Writer, byteOrder binary.ByteOrder, val uint16) error {
 	buf := l.Borrow()[:2]
+	defer l.Return(buf)
+
 	byteOrder.PutUint16(buf, val)
 	_, err := w.Write(buf)
-	l.Return(buf)
+
 	return err
 }
 
@@ -150,9 +158,11 @@ func (l binaryFreeList) PutUint16(w io.Writer, byteOrder binary.ByteOrder, val u
 // writer.
 func (l binaryFreeList) PutUint32(w io.Writer, byteOrder binary.ByteOrder, val uint32) error {
 	buf := l.Borrow()[:4]
+	defer l.Return(buf)
+
 	byteOrder.PutUint32(buf, val)
 	_, err := w.Write(buf)
-	l.Return(buf)
+
 	return err
 }
 
@@ -161,9 +171,11 @@ func (l binaryFreeList) PutUint32(w io.Writer, byteOrder binary.ByteOrder, val u
 // writer.
 func (l binaryFreeList) PutUint64(w io.Writer, byteOrder binary.ByteOrder, val uint64) error {
 	buf := l.Borrow()[:8]
+	defer l.Return(buf)
+
 	byteOrder.PutUint64(buf, val)
 	_, err := w.Write(buf)
-	l.Return(buf)
+
 	return err
 }
 
@@ -475,8 +487,9 @@ func writeElements(w io.Writer, elements ...interface{}) error {
 // ReadVarInt reads a variable length integer from r and returns it as a uint64.
 func ReadVarInt(r io.Reader, pver uint32) (uint64, error) {
 	buf := binarySerializer.Borrow()
+	defer binarySerializer.Return(buf)
+
 	n, err := ReadVarIntBuf(r, pver, buf)
-	binarySerializer.Return(buf)
 	return n, err
 }
 
@@ -545,8 +558,9 @@ func ReadVarIntBuf(r io.Reader, pver uint32, buf []byte) (uint64, error) {
 // on its value.
 func WriteVarInt(w io.Writer, pver uint32, val uint64) error {
 	buf := binarySerializer.Borrow()
+	defer binarySerializer.Return(buf)
+
 	err := WriteVarIntBuf(w, pver, val, buf)
-	binarySerializer.Return(buf)
 	return err
 }
 
@@ -616,8 +630,9 @@ func VarIntSerializeSize(val uint64) int {
 // attacks and forced panics through malformed messages.
 func ReadVarString(r io.Reader, pver uint32) (string, error) {
 	buf := binarySerializer.Borrow()
+	defer binarySerializer.Return(buf)
+
 	str, err := readVarStringBuf(r, pver, buf)
-	binarySerializer.Return(buf)
 	return str, err
 }
 
@@ -661,8 +676,9 @@ func readVarStringBuf(r io.Reader, pver uint32, buf []byte) (string, error) {
 // itself.
 func WriteVarString(w io.Writer, pver uint32, str string) error {
 	buf := binarySerializer.Borrow()
+	defer binarySerializer.Return(buf)
+
 	err := writeVarStringBuf(w, pver, str, buf)
-	binarySerializer.Return(buf)
 	return err
 }
 
@@ -696,8 +712,9 @@ func ReadVarBytes(r io.Reader, pver uint32, maxAllowed uint32,
 	fieldName string) ([]byte, error) {
 
 	buf := binarySerializer.Borrow()
+	defer binarySerializer.Return(buf)
+
 	b, err := ReadVarBytesBuf(r, pver, buf, maxAllowed, fieldName)
-	binarySerializer.Return(buf)
 	return b, err
 }
 
@@ -739,8 +756,9 @@ func ReadVarBytesBuf(r io.Reader, pver uint32, buf []byte, maxAllowed uint32,
 // containing the number of bytes, followed by the bytes themselves.
 func WriteVarBytes(w io.Writer, pver uint32, bytes []byte) error {
 	buf := binarySerializer.Borrow()
+	defer binarySerializer.Return(buf)
+
 	err := WriteVarBytesBuf(w, pver, bytes, buf)
-	binarySerializer.Return(buf)
 	return err
 }
 

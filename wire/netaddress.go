@@ -89,8 +89,9 @@ func NewNetAddress(addr *net.TCPAddr, services ServiceFlag) *NetAddress {
 // like version do not include the timestamp.
 func readNetAddress(r io.Reader, pver uint32, na *NetAddress, ts bool) error {
 	buf := binarySerializer.Borrow()
+	defer binarySerializer.Return(buf)
+
 	err := readNetAddressBuf(r, pver, na, ts, buf)
-	binarySerializer.Return(buf)
 	return err
 }
 
@@ -152,8 +153,9 @@ func readNetAddressBuf(r io.Reader, pver uint32, na *NetAddress, ts bool,
 // like version do not include the timestamp.
 func writeNetAddress(w io.Writer, pver uint32, na *NetAddress, ts bool) error {
 	buf := binarySerializer.Borrow()
+	defer binarySerializer.Return(buf)
 	err := writeNetAddressBuf(w, pver, na, ts, buf)
-	binarySerializer.Return(buf)
+
 	return err
 }
 

@@ -36,15 +36,15 @@ func (msg *MsgNotFound) AddInvVect(iv *InvVect) error {
 // This is part of the Message interface implementation.
 func (msg *MsgNotFound) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) error {
 	buf := binarySerializer.Borrow()
+	defer binarySerializer.Return(buf)
+
 	count, err := ReadVarIntBuf(r, pver, buf)
 	if err != nil {
-		binarySerializer.Return(buf)
 		return err
 	}
 
 	// Limit to max inventory vectors per message.
 	if count > MaxInvPerMsg {
-		binarySerializer.Return(buf)
 		str := fmt.Sprintf("too many invvect in message [%v]", count)
 		return messageError("MsgNotFound.BtcDecode", str)
 	}
@@ -57,12 +57,10 @@ func (msg *MsgNotFound) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding)
 		iv := &invList[i]
 		err := readInvVectBuf(r, pver, iv, buf)
 		if err != nil {
-			binarySerializer.Return(buf)
 			return err
 		}
 		msg.AddInvVect(iv)
 	}
-	binarySerializer.Return(buf)
 
 	return nil
 }
@@ -78,20 +76,19 @@ func (msg *MsgNotFound) BtcEncode(w io.Writer, pver uint32, enc MessageEncoding)
 	}
 
 	buf := binarySerializer.Borrow()
+	defer binarySerializer.Return(buf)
+
 	err := WriteVarIntBuf(w, pver, uint64(count), buf)
 	if err != nil {
-		binarySerializer.Return(buf)
 		return err
 	}
 
 	for _, iv := range msg.InvList {
 		err := writeInvVectBuf(w, pver, iv, buf)
 		if err != nil {
-			binarySerializer.Return(buf)
 			return err
 		}
 	}
-	binarySerializer.Return(buf)
 
 	return nil
 }

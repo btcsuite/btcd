@@ -27,18 +27,17 @@ type MsgGetCFilters struct {
 // This is part of the Message interface implementation.
 func (msg *MsgGetCFilters) BtcDecode(r io.Reader, pver uint32, _ MessageEncoding) error {
 	buf := binarySerializer.Borrow()
+	defer binarySerializer.Return(buf)
+
 	if _, err := io.ReadFull(r, buf[:1]); err != nil {
-		binarySerializer.Return(buf)
 		return err
 	}
 	msg.FilterType = FilterType(buf[0])
 
 	if _, err := io.ReadFull(r, buf[:4]); err != nil {
-		binarySerializer.Return(buf)
 		return err
 	}
 	msg.StartHeight = littleEndian.Uint32(buf[:4])
-	binarySerializer.Return(buf)
 
 	_, err := io.ReadFull(r, msg.StopHash[:])
 	return err
@@ -48,18 +47,17 @@ func (msg *MsgGetCFilters) BtcDecode(r io.Reader, pver uint32, _ MessageEncoding
 // This is part of the Message interface implementation.
 func (msg *MsgGetCFilters) BtcEncode(w io.Writer, pver uint32, _ MessageEncoding) error {
 	buf := binarySerializer.Borrow()
+	defer binarySerializer.Return(buf)
+
 	buf[0] = byte(msg.FilterType)
 	if _, err := w.Write(buf[:1]); err != nil {
-		binarySerializer.Return(buf)
 		return err
 	}
 
 	littleEndian.PutUint32(buf[:4], msg.StartHeight)
 	if _, err := w.Write(buf[:4]); err != nil {
-		binarySerializer.Return(buf)
 		return err
 	}
-	binarySerializer.Return(buf)
 
 	_, err := w.Write(msg.StopHash[:])
 	return err

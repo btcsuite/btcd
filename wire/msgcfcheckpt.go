@@ -53,27 +53,24 @@ func (msg *MsgCFCheckpt) AddCFHeader(header *chainhash.Hash) error {
 // This is part of the Message interface implementation.
 func (msg *MsgCFCheckpt) BtcDecode(r io.Reader, pver uint32, _ MessageEncoding) error {
 	buf := binarySerializer.Borrow()
+	defer binarySerializer.Return(buf)
 
 	// Read filter type
 	if _, err := io.ReadFull(r, buf[:1]); err != nil {
-		binarySerializer.Return(buf)
 		return err
 	}
 	msg.FilterType = FilterType(buf[0])
 
 	// Read stop hash
 	if _, err := io.ReadFull(r, msg.StopHash[:]); err != nil {
-		binarySerializer.Return(buf)
 		return err
 	}
 
 	// Read number of filter headers
 	count, err := ReadVarIntBuf(r, pver, buf)
 	if err != nil {
-		binarySerializer.Return(buf)
 		return err
 	}
-	binarySerializer.Return(buf)
 
 	// Refuse to decode an insane number of cfheaders.
 	if count > maxCFHeadersLen {
@@ -99,17 +96,16 @@ func (msg *MsgCFCheckpt) BtcDecode(r io.Reader, pver uint32, _ MessageEncoding) 
 // This is part of the Message interface implementation.
 func (msg *MsgCFCheckpt) BtcEncode(w io.Writer, pver uint32, _ MessageEncoding) error {
 	buf := binarySerializer.Borrow()
+	defer binarySerializer.Return(buf)
 
 	// Write filter type
 	buf[0] = byte(msg.FilterType)
 	if _, err := w.Write(buf[:1]); err != nil {
-		binarySerializer.Return(buf)
 		return err
 	}
 
 	// Write stop hash
 	if _, err := w.Write(msg.StopHash[:]); err != nil {
-		binarySerializer.Return(buf)
 		return err
 	}
 
@@ -117,10 +113,8 @@ func (msg *MsgCFCheckpt) BtcEncode(w io.Writer, pver uint32, _ MessageEncoding) 
 	count := len(msg.FilterHeaders)
 	err := WriteVarIntBuf(w, pver, uint64(count), buf)
 	if err != nil {
-		binarySerializer.Return(buf)
 		return err
 	}
-	binarySerializer.Return(buf)
 
 	for _, cfh := range msg.FilterHeaders {
 		_, err := w.Write(cfh[:])

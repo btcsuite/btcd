@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"compress/bzip2"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net"
 	"os"
@@ -66,7 +67,7 @@ func BenchmarkWriteVarInt1(b *testing.B) {
 	b.ReportAllocs()
 
 	for i := 0; i < b.N; i++ {
-		WriteVarInt(ioutil.Discard, 0, 1)
+		WriteVarInt(io.Discard, 0, 1)
 	}
 }
 
@@ -76,7 +77,7 @@ func BenchmarkWriteVarInt3(b *testing.B) {
 	b.ReportAllocs()
 
 	for i := 0; i < b.N; i++ {
-		WriteVarInt(ioutil.Discard, 0, 65535)
+		WriteVarInt(io.Discard, 0, 65535)
 	}
 }
 
@@ -86,7 +87,7 @@ func BenchmarkWriteVarInt5(b *testing.B) {
 	b.ReportAllocs()
 
 	for i := 0; i < b.N; i++ {
-		WriteVarInt(ioutil.Discard, 0, 4294967295)
+		WriteVarInt(io.Discard, 0, 4294967295)
 	}
 }
 
@@ -96,7 +97,7 @@ func BenchmarkWriteVarInt9(b *testing.B) {
 	b.ReportAllocs()
 
 	for i := 0; i < b.N; i++ {
-		WriteVarInt(ioutil.Discard, 0, 18446744073709551615)
+		WriteVarInt(io.Discard, 0, 18446744073709551615)
 	}
 }
 
@@ -159,7 +160,7 @@ func BenchmarkWriteVarIntBuf1(b *testing.B) {
 
 	buffer := binarySerializer.Borrow()
 	for i := 0; i < b.N; i++ {
-		WriteVarIntBuf(ioutil.Discard, 0, 1, buffer)
+		WriteVarIntBuf(io.Discard, 0, 1, buffer)
 	}
 	binarySerializer.Return(buffer)
 }
@@ -171,7 +172,7 @@ func BenchmarkWriteVarIntBuf3(b *testing.B) {
 
 	buffer := binarySerializer.Borrow()
 	for i := 0; i < b.N; i++ {
-		WriteVarIntBuf(ioutil.Discard, 0, 65535, buffer)
+		WriteVarIntBuf(io.Discard, 0, 65535, buffer)
 	}
 	binarySerializer.Return(buffer)
 }
@@ -183,7 +184,7 @@ func BenchmarkWriteVarIntBuf5(b *testing.B) {
 
 	buffer := binarySerializer.Borrow()
 	for i := 0; i < b.N; i++ {
-		WriteVarIntBuf(ioutil.Discard, 0, 4294967295, buffer)
+		WriteVarIntBuf(io.Discard, 0, 4294967295, buffer)
 	}
 	binarySerializer.Return(buffer)
 }
@@ -195,7 +196,7 @@ func BenchmarkWriteVarIntBuf9(b *testing.B) {
 
 	buffer := binarySerializer.Borrow()
 	for i := 0; i < b.N; i++ {
-		WriteVarIntBuf(ioutil.Discard, 0, 18446744073709551615, buffer)
+		WriteVarIntBuf(io.Discard, 0, 18446744073709551615, buffer)
 	}
 	binarySerializer.Return(buffer)
 }
@@ -292,7 +293,7 @@ func BenchmarkWriteVarStr4(b *testing.B) {
 	b.ReportAllocs()
 
 	for i := 0; i < b.N; i++ {
-		WriteVarString(ioutil.Discard, 0, "test")
+		WriteVarString(io.Discard, 0, "test")
 	}
 }
 
@@ -302,7 +303,7 @@ func BenchmarkWriteVarStr10(b *testing.B) {
 	b.ReportAllocs()
 
 	for i := 0; i < b.N; i++ {
-		WriteVarString(ioutil.Discard, 0, "test012345")
+		WriteVarString(io.Discard, 0, "test012345")
 	}
 }
 
@@ -343,7 +344,7 @@ func BenchmarkWriteVarStrBuf4(b *testing.B) {
 
 	buf := binarySerializer.Borrow()
 	for i := 0; i < b.N; i++ {
-		writeVarStringBuf(ioutil.Discard, 0, "test", buf)
+		writeVarStringBuf(io.Discard, 0, "test", buf)
 	}
 	binarySerializer.Return(buf)
 }
@@ -355,7 +356,7 @@ func BenchmarkWriteVarStrBuf10(b *testing.B) {
 
 	buf := binarySerializer.Borrow()
 	for i := 0; i < b.N; i++ {
-		writeVarStringBuf(ioutil.Discard, 0, "test012345", buf)
+		writeVarStringBuf(io.Discard, 0, "test012345", buf)
 	}
 	binarySerializer.Return(buf)
 }
@@ -392,7 +393,7 @@ func BenchmarkWriteOutPoint(b *testing.B) {
 		Index: 0,
 	}
 	for i := 0; i < b.N; i++ {
-		WriteOutPoint(ioutil.Discard, 0, 0, op)
+		WriteOutPoint(io.Discard, 0, 0, op)
 	}
 }
 
@@ -407,7 +408,7 @@ func BenchmarkWriteOutPointBuf(b *testing.B) {
 		Index: 0,
 	}
 	for i := 0; i < b.N; i++ {
-		writeOutPointBuf(ioutil.Discard, 0, 0, op, buf)
+		writeOutPointBuf(io.Discard, 0, 0, op, buf)
 	}
 	binarySerializer.Return(buf)
 }
@@ -480,7 +481,7 @@ func BenchmarkWriteTxOut(b *testing.B) {
 
 	txOut := blockOne.Transactions[0].TxOut[0]
 	for i := 0; i < b.N; i++ {
-		WriteTxOut(ioutil.Discard, 0, 0, txOut)
+		WriteTxOut(io.Discard, 0, 0, txOut)
 	}
 }
 
@@ -492,7 +493,7 @@ func BenchmarkWriteTxOutBuf(b *testing.B) {
 	buf := binarySerializer.Borrow()
 	txOut := blockOne.Transactions[0].TxOut[0]
 	for i := 0; i < b.N; i++ {
-		WriteTxOutBuf(ioutil.Discard, 0, 0, txOut, buf)
+		WriteTxOutBuf(io.Discard, 0, 0, txOut, buf)
 	}
 	binarySerializer.Return(buf)
 }
@@ -533,7 +534,7 @@ func BenchmarkWriteTxIn(b *testing.B) {
 	buf := binarySerializer.Borrow()
 	txIn := blockOne.Transactions[0].TxIn[0]
 	for i := 0; i < b.N; i++ {
-		writeTxInBuf(ioutil.Discard, 0, 0, txIn, buf)
+		writeTxInBuf(io.Discard, 0, 0, txIn, buf)
 	}
 	binarySerializer.Return(buf)
 }
@@ -608,15 +609,9 @@ func BenchmarkDeserializeTxLarge(b *testing.B) {
 }
 
 func BenchmarkDeserializeBlock(b *testing.B) {
-	f, err := os.Open(
+	buf, err := os.ReadFile(
 		"testdata/block-00000000000000000021868c2cefc52a480d173c849412fe81c4e5ab806f94ab.blk",
 	)
-	if err != nil {
-		b.Fatalf("Failed to open block file: %v", err)
-	}
-	defer f.Close()
-
-	buf, err := ioutil.ReadAll(f)
 	if err != nil {
 		b.Fatalf("Failed to read block data: %v", err)
 	}
@@ -633,15 +628,9 @@ func BenchmarkDeserializeBlock(b *testing.B) {
 }
 
 func BenchmarkSerializeBlock(b *testing.B) {
-	f, err := os.Open(
+	buf, err := os.ReadFile(
 		"testdata/block-00000000000000000021868c2cefc52a480d173c849412fe81c4e5ab806f94ab.blk",
 	)
-	if err != nil {
-		b.Fatalf("Failed to open block file: %v", err)
-	}
-	defer f.Close()
-
-	buf, err := ioutil.ReadAll(f)
 	if err != nil {
 		b.Fatalf("Failed to read block data: %v", err)
 	}
@@ -656,7 +645,7 @@ func BenchmarkSerializeBlock(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		block.Serialize(ioutil.Discard)
+		block.Serialize(io.Discard)
 	}
 }
 
@@ -667,7 +656,7 @@ func BenchmarkSerializeTx(b *testing.B) {
 
 	tx := blockOne.Transactions[0]
 	for i := 0; i < b.N; i++ {
-		tx.Serialize(ioutil.Discard)
+		tx.Serialize(io.Discard)
 
 	}
 }
@@ -710,7 +699,7 @@ func BenchmarkSerializeTxSmall(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		tx.Serialize(ioutil.Discard)
+		tx.Serialize(io.Discard)
 	}
 }
 
@@ -736,7 +725,7 @@ func BenchmarkSerializeTxLarge(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		tx.Serialize(ioutil.Discard)
+		tx.Serialize(io.Discard)
 	}
 }
 
@@ -805,7 +794,7 @@ func BenchmarkWriteBlockHeader(b *testing.B) {
 
 	header := blockOne.Header
 	for i := 0; i < b.N; i++ {
-		writeBlockHeader(ioutil.Discard, 0, &header)
+		writeBlockHeader(io.Discard, 0, &header)
 	}
 }
 
@@ -817,7 +806,7 @@ func BenchmarkWriteBlockHeaderBuf(b *testing.B) {
 	buf := binarySerializer.Borrow()
 	header := blockOne.Header
 	for i := 0; i < b.N; i++ {
-		writeBlockHeaderBuf(ioutil.Discard, 0, &header, buf)
+		writeBlockHeaderBuf(io.Discard, 0, &header, buf)
 	}
 	binarySerializer.Return(buf)
 }

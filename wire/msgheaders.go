@@ -38,15 +38,15 @@ func (msg *MsgHeaders) AddBlockHeader(bh *BlockHeader) error {
 // This is part of the Message interface implementation.
 func (msg *MsgHeaders) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) error {
 	buf := binarySerializer.Borrow()
+	defer binarySerializer.Return(buf)
+
 	count, err := ReadVarIntBuf(r, pver, buf)
 	if err != nil {
-		binarySerializer.Return(buf)
 		return err
 	}
 
 	// Limit to max block headers per message.
 	if count > MaxBlockHeadersPerMsg {
-		binarySerializer.Return(buf)
 		str := fmt.Sprintf("too many block headers for message "+
 			"[count %v, max %v]", count, MaxBlockHeadersPerMsg)
 		return messageError("MsgHeaders.BtcDecode", str)
@@ -60,27 +60,22 @@ func (msg *MsgHeaders) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) 
 		bh := &headers[i]
 		err := readBlockHeaderBuf(r, pver, bh, buf)
 		if err != nil {
-			binarySerializer.Return(buf)
 			return err
 		}
 
 		txCount, err := ReadVarIntBuf(r, pver, buf)
 		if err != nil {
-			binarySerializer.Return(buf)
 			return err
 		}
 
 		// Ensure the transaction count is zero for headers.
 		if txCount > 0 {
-			binarySerializer.Return(buf)
 			str := fmt.Sprintf("block headers may not contain "+
 				"transactions [count %v]", txCount)
 			return messageError("MsgHeaders.BtcDecode", str)
 		}
 		msg.AddBlockHeader(bh)
 	}
-
-	binarySerializer.Return(buf)
 
 	return nil
 }
@@ -97,16 +92,16 @@ func (msg *MsgHeaders) BtcEncode(w io.Writer, pver uint32, enc MessageEncoding) 
 	}
 
 	buf := binarySerializer.Borrow()
+	defer binarySerializer.Return(buf)
+
 	err := WriteVarIntBuf(w, pver, uint64(count), buf)
 	if err != nil {
-		binarySerializer.Return(buf)
 		return err
 	}
 
 	for _, bh := range msg.Headers {
 		err := writeBlockHeaderBuf(w, pver, bh, buf)
 		if err != nil {
-			binarySerializer.Return(buf)
 			return err
 		}
 
@@ -116,12 +111,9 @@ func (msg *MsgHeaders) BtcEncode(w io.Writer, pver uint32, enc MessageEncoding) 
 		// block headers, but it is required.
 		err = WriteVarIntBuf(w, pver, 0, buf)
 		if err != nil {
-			binarySerializer.Return(buf)
 			return err
 		}
 	}
-
-	binarySerializer.Return(buf)
 
 	return nil
 }
