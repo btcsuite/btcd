@@ -36,10 +36,10 @@ func (t *Tx) MsgTx() *wire.MsgTx {
 	return t.msgTx
 }
 
-// Hash returns the hash of the transaction.  This is equivalent to
-// calling TxHash on the underlying wire.MsgTx, however it caches the
-// result so subsequent calls are more efficient.  If the Tx has the
-// raw bytes of the tx cached, it will use that and skip serialization.
+// Hash returns the hash of the transaction.  This is equivalent to calling
+// TxHash on the underlying wire.MsgTx, however it caches the result so
+// subsequent calls are more efficient.  If the Tx has the raw bytes of the tx
+// cached, it will use that and skip serialization.
 func (t *Tx) Hash() *chainhash.Hash {
 	// Return the cached hash if it has already been generated.
 	if t.txHash != nil {
@@ -53,45 +53,57 @@ func (t *Tx) Hash() *chainhash.Hash {
 		return &hash
 	}
 
-	// If we have the raw bytes, then don't call msgTx.TxHash as that has the
-	// overhead of serialization.
+	// If we have the raw bytes, then don't call msgTx.TxHash as that has
+	// the overhead of serialization. Instead, we can take the existing
+	// serialized bytes and hash them to speed things up.
 	var hash chainhash.Hash
 	if t.HasWitness() {
-		// If the raw bytes contain the witness, we must strip it out before
-		// calculating the hash.
+		// If the raw bytes contain the witness, we must strip it out
+		// before calculating the hash.
 		baseSize := t.msgTx.SerializeSizeStripped()
 		nonWitnessBytes := make([]byte, 0, baseSize)
 
 		// Append the version bytes.
 		offset := 4
-		nonWitnessBytes = append(nonWitnessBytes, t.rawBytes[:offset]...)
+		nonWitnessBytes = append(
+			nonWitnessBytes, t.rawBytes[:offset]...,
+		)
 
 		// Append the input and output bytes.  -8 to account for the
 		// version bytes and the locktime bytes.
 		//
 		// Skip the 2 bytes for the witness encoding.
 		offset += 2
-		nonWitnessBytes = append(nonWitnessBytes, t.rawBytes[offset:offset+baseSize-8]...)
+		nonWitnessBytes = append(
+			nonWitnessBytes,
+			t.rawBytes[offset:offset+baseSize-8]...,
+		)
 
 		// Append the last 4 bytes which are the locktime bytes.
-		nonWitnessBytes = append(nonWitnessBytes, t.rawBytes[len(t.rawBytes)-4:]...)
+		nonWitnessBytes = append(
+			nonWitnessBytes, t.rawBytes[len(t.rawBytes)-4:]...,
+		)
 
-		// We purposely call doublehashh here instead of doublehashraw as we don't have the
-		// serialization overhead and avoiding the 1 alloc is better in this case.
+		// We purposely call doublehashh here instead of doublehashraw
+		// as we don't have the serialization overhead and avoiding the
+		// 1 alloc is better in this case.
 		hash = chainhash.DoubleHashRaw(func(w io.Writer) error {
 			_, err := w.Write(nonWitnessBytes)
 			return err
 		})
 	} else {
-		// If the raw bytes don't have the witness, we can use it directly.
+		// If the raw bytes don't have the witness, we can use it
+		// directly.
 		//
-		// We purposely call doublehashh here instead of doublehashraw as we don't have the
-		// serialization overhead and avoiding the 1 alloc is better in this case.
+		// We purposely call doublehashh here instead of doublehashraw
+		// as we don't have the serialization overhead and avoiding the
+		// 1 alloc is better in this case.
 		hash = chainhash.DoubleHashRaw(func(w io.Writer) error {
 			_, err := w.Write(t.rawBytes)
 			return err
 		})
 	}
+
 	t.txHash = &hash
 	return &hash
 }
