@@ -4,7 +4,7 @@
 #
 # docker build . -t yourregistry/btcd
 #
-# You can use the following command to buid an arm64v8 container:
+# You can use the following command to build an arm64v8 container:
 #
 # docker build . -t yourregistry/btcd --build-arg ARCH=arm64v8
 #
