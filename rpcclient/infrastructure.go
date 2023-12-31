@@ -733,10 +733,10 @@ out:
 
 			// Reset the connection state and signal the reconnect
 			// has happened.
+			c.mtx.Lock()
 			c.wsConn = wsConn
 			c.retryCount = 0
 
-			c.mtx.Lock()
 			c.disconnect = make(chan struct{})
 			c.disconnected = false
 			c.mtx.Unlock()
