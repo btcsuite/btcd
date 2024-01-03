@@ -927,9 +927,8 @@ func (mp *TxPool) validateReplacement(tx *btcutil.Tx,
 func (mp *TxPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit, rejectDupOrphans bool) ([]*chainhash.Hash, *TxDesc, error) {
 	txHash := tx.Hash()
 
-	// If a transaction has witness data, and segwit isn't active yet, If
-	// segwit isn't active yet, then we won't accept it into the mempool as
-	// it can't be mined yet.
+	// If a transaction has witness data, and segwit isn't active yet, then
+	// we won't accept it into the mempool as it can't be mined yet.
 	if tx.MsgTx().HasWitness() {
 		segwitActive, err := mp.cfg.IsDeploymentActive(chaincfg.DeploymentSegwit)
 		if err != nil {
