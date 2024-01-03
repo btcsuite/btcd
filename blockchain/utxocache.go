@@ -634,6 +634,10 @@ func (b *BlockChain) InitConsistentState(tip *blockNode, interrupt <-chan struct
 		// it to the tip since we checked it's consistent.
 		s.lastFlushHash = tip.hash
 
+		// Set the last flush time as now since we know the state is consistent
+		// at this time.
+		s.lastFlushTime = time.Now()
+
 		return nil
 	}
 
