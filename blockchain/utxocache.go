@@ -177,7 +177,7 @@ const (
 	// utxoFlushPeriodicInterval is the interval at which a flush is performed
 	// when the flush mode FlushPeriodic is used.  This is used when the initial
 	// block download is complete and it's useful to flush periodically in case
-	// of unforseen shutdowns.
+	// of unforeseen shutdowns.
 	utxoFlushPeriodicInterval = time.Minute * 5
 )
 

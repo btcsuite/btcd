@@ -39,7 +39,7 @@ const (
 	avgEntrySize = baseEntrySize + (pubKeyHashLen + 7)
 )
 
-// The code here is shamelessely taken from the go runtime package.  All the relevant
+// The code here is shamelessly taken from the go runtime package.  All the relevant
 // code and variables are copied to here.  These values are only correct for a 64 bit
 // system.
 

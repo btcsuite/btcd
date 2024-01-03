@@ -260,7 +260,7 @@ func TestUtxoCacheEntrySize(t *testing.T) {
 				}
 				return blocks
 			}(),
-			// Multipled by 6 since we'll have 6 entries left.
+			// Multiplied by 6 since we'll have 6 entries left.
 			expectedSize: (pubKeyHashLen + baseEntrySize) * 6,
 		},
 		{
