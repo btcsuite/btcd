@@ -6,10 +6,14 @@
 package txscript
 
 import (
+	"bytes"
+	"crypto/sha256"
 	"testing"
 
+	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
+	"github.com/stretchr/testify/require"
 )
 
 // TestBadPC sets the pc to a deliberately bad result then confirms that Step
@@ -424,5 +428,228 @@ func TestCheckSignatureEncoding(t *testing.T) {
 			t.Errorf("checkSignatureEncooding test '%s' succeeded "+
 				"when it should have failed", test.name)
 		}
+	}
+}
+
+// TestOpcodeCat tests that scripts with OP_CAT are executed correctly.
+func TestOpcodeCat(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		script     *ScriptBuilder
+		expErr     ErrorCode
+		expStack   [][]byte
+		nonTaproot bool
+	}{
+
+		// No elements to cat.
+		{
+			script: NewScriptBuilder().
+				AddOp(OP_CAT),
+			expErr:   ErrInvalidStackOperation,
+			expStack: [][]byte{},
+		},
+
+		// Only a single element to cat.
+		{
+			script: NewScriptBuilder().
+				AddData([]byte{0xaa}).
+				AddOp(OP_CAT),
+			expErr: ErrInvalidStackOperation,
+			expStack: [][]byte{
+				{0xaa},
+			},
+		},
+
+		// Normal cat.
+		{
+			script: NewScriptBuilder().
+				AddData([]byte{0xaa}).
+				AddData([]byte{0xbb}).
+				AddOp(OP_CAT),
+			expErr: -1,
+			expStack: [][]byte{
+				{0xaa, 0xbb},
+			},
+		},
+
+		// Disabled in non-taproot context.
+		{
+			script: NewScriptBuilder().
+				AddData([]byte{0xaa}).
+				AddData([]byte{0xbb}).
+				AddOp(OP_CAT),
+			expErr: ErrDisabledOpcode,
+			expStack: [][]byte{
+				{0xaa}, {0xbb},
+			},
+			nonTaproot: true,
+		},
+
+		// Cat with empty element.
+		{
+			script: NewScriptBuilder().
+				AddData([]byte{0xaa}).
+				AddData([]byte{}).
+				AddOp(OP_CAT),
+			expErr: -1,
+			expStack: [][]byte{
+				{0xaa},
+			},
+		},
+
+		// Cat with empty element.
+		{
+			script: NewScriptBuilder().
+				AddData([]byte{}).
+				AddData([]byte{0xbb}).
+				AddOp(OP_CAT),
+			expErr: -1,
+			expStack: [][]byte{
+				{0xbb},
+			},
+		},
+
+		// Cat elements of different lengths.
+		{
+			script: NewScriptBuilder().
+				AddData([]byte{0xaa, 0xbb, 0xcc}).
+				AddData([]byte{0xdd}).
+				AddOp(OP_CAT),
+			expErr: -1,
+			expStack: [][]byte{
+				{0xaa, 0xbb, 0xcc, 0xdd},
+			},
+		},
+
+		// Cat up to max element size.
+		{
+			script: NewScriptBuilder().
+				AddData(
+					bytes.Repeat(
+						[]byte{0xaa}, MaxScriptElementSize-1,
+					),
+				).
+				AddData([]byte{0xdd}).
+				AddOp(OP_CAT),
+			expErr: -1,
+			expStack: [][]byte{
+				append(
+					bytes.Repeat([]byte{0xaa}, MaxScriptElementSize-1),
+					0xdd,
+				),
+			},
+		},
+
+		// Failing to when result exceeds max element size.
+		{
+			script: NewScriptBuilder().
+				AddData(
+					bytes.Repeat(
+						[]byte{0xaa}, MaxScriptElementSize-1,
+					),
+				).
+				AddData([]byte{0xdd, 0xee}).
+				AddOp(OP_CAT),
+			expErr: ErrElementTooBig,
+			expStack: [][]byte{
+				bytes.Repeat([]byte{0xaa}, MaxScriptElementSize-1),
+				[]byte{0xdd, 0xee},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		tx := wire.NewMsgTx(2)
+		tx.AddTxIn(&wire.TxIn{
+			PreviousOutPoint: wire.OutPoint{
+				Index: 0,
+			},
+		})
+
+		script, err := test.script.Script()
+		if err != nil {
+			t.Error(err)
+		}
+
+		// Assmble the script into a taproot output key.
+		tapScriptTree := AssembleTaprootScriptTree(
+			NewBaseTapLeaf(script),
+		)
+		privKey, err := btcec.NewPrivateKey()
+		if err != nil {
+			t.Error(err)
+			continue
+		}
+
+		inputKey := privKey.PubKey()
+		ctrlBlock := tapScriptTree.LeafMerkleProofs[0].ToControlBlock(inputKey)
+		tapScriptRootHash := tapScriptTree.RootNode.TapHash()
+		inputTapKey := ComputeTaprootOutputKey(
+			inputKey, tapScriptRootHash[:],
+		)
+
+		inputScript, err := PayToTaprootScript(inputTapKey)
+		if err != nil {
+			t.Error(err)
+			continue
+
+		}
+
+		cbBytes, err := ctrlBlock.ToBytes()
+		if err != nil {
+			t.Error(err)
+			continue
+		}
+		tx.TxIn[0].Witness = wire.TxWitness{script, cbBytes}
+
+		// As a special case, if we are testing non-taproot spends, we
+		// recreate the pkscript as a P2WSH.
+		if test.nonTaproot {
+			scriptHash := sha256.Sum256(script)
+			inputScript, err = payToWitnessScriptHashScript(scriptHash[:])
+			if err != nil {
+				t.Error(err)
+				continue
+			}
+			tx.TxIn[0].Witness = wire.TxWitness{script}
+		}
+
+		prevOut := &wire.TxOut{
+			Value:    1e8,
+			PkScript: inputScript,
+		}
+		prevOutFetcher := NewCannedPrevOutputFetcher(
+			prevOut.PkScript, prevOut.Value,
+		)
+
+		sigHashes := NewTxSigHashes(tx, prevOutFetcher)
+
+		// We'll record the final stack, since we want to check it
+		// against what we expect.
+		var finalStack [][]byte
+		cb := func(step *StepInfo) error {
+			finalStack = step.Stack
+			return nil
+		}
+
+		// TODO: test discourage script flags if added.
+		vm, err := NewDebugEngine(
+			prevOut.PkScript, tx, 0, StandardVerifyFlags, nil,
+			sigHashes, prevOut.Value, nil, cb,
+		)
+		if err != nil {
+			t.Errorf("Failed to create script: %v", err)
+			continue
+		}
+
+		err = vm.Execute()
+		if (test.expErr != -1 || err != nil) && !IsErrorCode(err, test.expErr) {
+			t.Errorf("Expected error %v, got %v", test.expErr, err)
+			continue
+		}
+
+		// Check expected stack.
+		require.Equal(t, test.expStack, finalStack)
 	}
 }
