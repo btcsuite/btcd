@@ -358,9 +358,8 @@ func (c *Client) SendRawTransactionAsync(tx *wire.MsgTx, allowHighFees bool) Fut
 	}
 
 	var cmd *btcjson.SendRawTransactionCmd
-	switch version {
 	// Starting from bitcoind v0.19.0, the MaxFeeRate field should be used.
-	case BitcoindPost19:
+	if version > BitcoindPre19 {
 		// Using a 0 MaxFeeRate is interpreted as a maximum fee rate not
 		// being enforced by bitcoind.
 		var maxFeeRate int32
@@ -368,9 +367,8 @@ func (c *Client) SendRawTransactionAsync(tx *wire.MsgTx, allowHighFees bool) Fut
 			maxFeeRate = defaultMaxFeeRate
 		}
 		cmd = btcjson.NewBitcoindSendRawTransactionCmd(txHex, maxFeeRate)
-
-	// Otherwise, use the AllowHighFees field.
-	default:
+	} else {
+		// Otherwise, use the AllowHighFees field.
 		cmd = btcjson.NewSendRawTransactionCmd(txHex, &allowHighFees)
 	}
 
