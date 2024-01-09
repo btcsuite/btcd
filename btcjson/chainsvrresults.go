@@ -154,6 +154,11 @@ type DecodeScriptResult struct {
 	P2sh      string   `json:"p2sh,omitempty"`
 }
 
+// ConvertToPsbtResult models the data returned from the converttopsbt command.
+type ConvertToPsbtResult struct {
+	Psbt string `json:"psbt"`
+}
+
 // GetAddedNodeInfoResultAddr models the data of the addresses portion of the
 // getaddednodeinfo command.
 type GetAddedNodeInfoResultAddr struct {
