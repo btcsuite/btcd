@@ -5,7 +5,7 @@ details on how to install on the supported operating systems.
 
 ## Requirements
 
-[Go](http://golang.org) 1.16 or newer.
+[Go](http://golang.org) 1.17 or newer.
 
 ## GPG Verification Key
 
@@ -54,7 +54,7 @@ recommended that `GOPATH` is set to a directory in your home directory such as
 ```bash
 git clone https://github.com/btcsuite/btcd $GOPATH/src/github.com/btcsuite/btcd
 cd $GOPATH/src/github.com/btcsuite/btcd
-GO111MODULE=on go install -v . ./cmd/...
+go install -v . ./cmd/...
 ```
 
 * btcd (and utilities) will now be installed in ```$GOPATH/bin```.  If you did

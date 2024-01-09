@@ -5,7 +5,7 @@
 /*
 Package addrmgr implements concurrency safe Bitcoin address manager.
 
-Address Manager Overview
+# Address Manager Overview
 
 In order maintain the peer-to-peer Bitcoin network, there needs to be a source
 of addresses to connect to as nodes come and go.  The Bitcoin protocol provides

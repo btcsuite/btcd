@@ -9,10 +9,10 @@ import (
 	"fmt"
 
 	"github.com/btcsuite/btcd/blockchain"
+	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcd/btcutil"
 )
 
 const (
@@ -480,4 +480,16 @@ func DropTxIndex(db database.DB, interrupt <-chan struct{}) error {
 	}
 
 	return dropIndex(db, txIndexKey, txIndexName, interrupt)
+}
+
+// TxIndexInitialized returns true if the tx index has been created previously.
+func TxIndexInitialized(db database.DB) bool {
+	var exists bool
+	db.View(func(dbTx database.Tx) error {
+		bucket := dbTx.Metadata().Bucket(txIndexKey)
+		exists = bucket != nil
+		return nil
+	})
+
+	return exists
 }

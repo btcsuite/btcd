@@ -146,6 +146,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"getblockhash":           handleGetBlockHash,
 	"getblockheader":         handleGetBlockHeader,
 	"getblocktemplate":       handleGetBlockTemplate,
+	"getchaintips":           handleGetChainTips,
 	"getcfilter":             handleGetCFilter,
 	"getcfilterheader":       handleGetCFilterHeader,
 	"getconnectioncount":     handleGetConnectionCount,
@@ -231,7 +232,6 @@ var rpcAskWallet = map[string]struct{}{
 // Commands that are currently unimplemented, but should ultimately be.
 var rpcUnimplemented = map[string]struct{}{
 	"estimatepriority": {},
-	"getchaintips":     {},
 	"getmempoolentry":  {},
 	"getnetworkinfo":   {},
 	"getwork":          {},
@@ -266,6 +266,7 @@ var rpcLimited = map[string]struct{}{
 	"getblockcount":         {},
 	"getblockhash":          {},
 	"getblockheader":        {},
+	"getchaintips":          {},
 	"getcfilter":            {},
 	"getcfilterheader":      {},
 	"getcurrentnet":         {},
@@ -738,6 +739,13 @@ func createVoutList(mtx *wire.MsgTx, chainParams *chaincfg.Params, filterAddrMap
 		vout.ScriptPubKey.Type = scriptClass.String()
 		vout.ScriptPubKey.ReqSigs = int32(reqSigs)
 
+		// Address is defined when there's a single well-defined
+		// receiver address. To spend the output a signature for this,
+		// and only this, address is required.
+		if len(encodedAddrs) == 1 && reqSigs <= 1 {
+			vout.ScriptPubKey.Address = encodedAddrs[0]
+		}
+
 		voutList = append(voutList, vout)
 	}
 
@@ -856,6 +864,13 @@ func handleDecodeScript(s *rpcServer, cmd interface{}, closeChan <-chan struct{}
 	}
 	if scriptClass != txscript.ScriptHashTy {
 		reply.P2sh = p2sh.EncodeAddress()
+	}
+
+	// Address is defined when there's a single well-defined
+	// receiver address. To spend the output a signature for this,
+	// and only this, address is required.
+	if len(addresses) == 1 && reqSigs <= 1 {
+		reply.Address = addresses[0]
 	}
 	return reply, nil
 }
@@ -1200,7 +1215,7 @@ func handleGetBlockChainInfo(s *rpcServer, cmd interface{}, closeChan <-chan str
 		BestBlockHash: chainSnapshot.Hash.String(),
 		Difficulty:    getDifficultyRatio(chainSnapshot.Bits, params),
 		MedianTime:    chainSnapshot.MedianTime.Unix(),
-		Pruned:        false,
+		Pruned:        cfg.Prune != 0,
 		SoftForks: &btcjson.SoftForks{
 			Bip9SoftForks: make(map[string]*btcjson.Bip9SoftForkDescription),
 		},
@@ -1651,8 +1666,8 @@ func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bo
 
 			// Update the merkle root.
 			block := btcutil.NewBlock(template.Block)
-			merkles := blockchain.BuildMerkleTreeStore(block.Transactions(), false)
-			template.Block.Header.MerkleRoot = *merkles[len(merkles)-1]
+			merkleRoot := blockchain.CalcMerkleRoot(block.Transactions(), false)
+			template.Block.Header.MerkleRoot = merkleRoot
 		}
 
 		// Set locals for convenience.
@@ -2192,6 +2207,28 @@ func handleGetBlockTemplate(s *rpcServer, cmd interface{}, closeChan <-chan stru
 	}
 }
 
+// handleGetChainTips implements the getchaintips command.
+func handleGetChainTips(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	chainTips := s.cfg.Chain.ChainTips()
+
+	ret := make([]btcjson.GetChainTipsResult, 0, len(chainTips))
+	for _, chainTip := range chainTips {
+		ret = append(ret, struct {
+			Height    int32  "json:\"height\""
+			Hash      string "json:\"hash\""
+			BranchLen int32  "json:\"branchlen\""
+			Status    string "json:\"status\""
+		}{
+			Height:    chainTip.Height,
+			Hash:      chainTip.BlockHash.String(),
+			BranchLen: chainTip.BranchLen,
+			Status:    chainTip.Status.String(),
+		})
+	}
+
+	return ret, nil
+}
+
 // handleGetCFilter implements the getcfilter command.
 func handleGetCFilter(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	if s.cfg.CfIndex == nil {
@@ -2725,6 +2762,7 @@ func handleGetTxOut(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 	var value int64
 	var pkScript []byte
 	var isCoinbase bool
+	var address string
 	includeMempool := true
 	if c.IncludeMempool != nil {
 		includeMempool = *c.IncludeMempool
@@ -2798,6 +2836,13 @@ func handleGetTxOut(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 		addresses[i] = addr.EncodeAddress()
 	}
 
+	// Address is defined when there's a single well-defined
+	// receiver address. To spend the output a signature for this,
+	// and only this, address is required.
+	if len(addresses) == 1 && reqSigs <= 1 {
+		address = addresses[0]
+	}
+
 	txOutReply := &btcjson.GetTxOutResult{
 		BestBlock:     bestBlockHash,
 		Confirmations: int64(confirmations),
@@ -2807,10 +2852,12 @@ func handleGetTxOut(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 			Hex:       hex.EncodeToString(pkScript),
 			ReqSigs:   int32(reqSigs),
 			Type:      scriptClass.String(),
+			Address:   address,
 			Addresses: addresses,
 		},
 		Coinbase: isCoinbase,
 	}
+
 	return txOutReply, nil
 }
 

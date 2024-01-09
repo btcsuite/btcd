@@ -21,9 +21,9 @@ certificate into the default system Certificate Authority list.
 
 ## Ubuntu
 
-1. Copy rpc.cert to /usr/share/ca-certificates: `# cp /home/user/.btcd/rpc.cert /usr/share/ca-certificates/btcd.crt`
-2. Add btcd.crt to /etc/ca-certificates.conf: `# echo btcd.crt >> /etc/ca-certificates.conf`
-3. Update the CA certificate list: `# update-ca-certificates`
+1. Copy rpc.cert to /usr/share/ca-certificates: `cp /home/user/.btcd/rpc.cert /usr/share/ca-certificates/btcd.crt`
+2. Add btcd.crt to /etc/ca-certificates.conf: `echo btcd.crt >> /etc/ca-certificates.conf`
+3. Update the CA certificate list: `update-ca-certificates`
 
 ## Set your mining software url to use https
 

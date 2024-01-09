@@ -27,6 +27,7 @@ type Tx struct {
 	txHashWitness *chainhash.Hash // Cached transaction witness hash
 	txHasWitness  *bool           // If the transaction has witness data
 	txIndex       int             // Position within a block or TxIndexUnknown
+	rawBytes      []byte          // Raw bytes for the tx in the raw block.
 }
 
 // MsgTx returns the underlying wire.MsgTx for the transaction.
@@ -35,24 +36,82 @@ func (t *Tx) MsgTx() *wire.MsgTx {
 	return t.msgTx
 }
 
-// Hash returns the hash of the transaction.  This is equivalent to
-// calling TxHash on the underlying wire.MsgTx, however it caches the
-// result so subsequent calls are more efficient.
+// Hash returns the hash of the transaction.  This is equivalent to calling
+// TxHash on the underlying wire.MsgTx, however it caches the result so
+// subsequent calls are more efficient.  If the Tx has the raw bytes of the tx
+// cached, it will use that and skip serialization.
 func (t *Tx) Hash() *chainhash.Hash {
 	// Return the cached hash if it has already been generated.
 	if t.txHash != nil {
 		return t.txHash
 	}
 
-	// Cache the hash and return it.
-	hash := t.msgTx.TxHash()
+	// If the rawBytes aren't available, call msgtx.TxHash.
+	if t.rawBytes == nil {
+		hash := t.msgTx.TxHash()
+		t.txHash = &hash
+		return &hash
+	}
+
+	// If we have the raw bytes, then don't call msgTx.TxHash as that has
+	// the overhead of serialization. Instead, we can take the existing
+	// serialized bytes and hash them to speed things up.
+	var hash chainhash.Hash
+	if t.HasWitness() {
+		// If the raw bytes contain the witness, we must strip it out
+		// before calculating the hash.
+		baseSize := t.msgTx.SerializeSizeStripped()
+		nonWitnessBytes := make([]byte, 0, baseSize)
+
+		// Append the version bytes.
+		offset := 4
+		nonWitnessBytes = append(
+			nonWitnessBytes, t.rawBytes[:offset]...,
+		)
+
+		// Append the input and output bytes.  -8 to account for the
+		// version bytes and the locktime bytes.
+		//
+		// Skip the 2 bytes for the witness encoding.
+		offset += 2
+		nonWitnessBytes = append(
+			nonWitnessBytes,
+			t.rawBytes[offset:offset+baseSize-8]...,
+		)
+
+		// Append the last 4 bytes which are the locktime bytes.
+		nonWitnessBytes = append(
+			nonWitnessBytes, t.rawBytes[len(t.rawBytes)-4:]...,
+		)
+
+		// We purposely call doublehashh here instead of doublehashraw
+		// as we don't have the serialization overhead and avoiding the
+		// 1 alloc is better in this case.
+		hash = chainhash.DoubleHashRaw(func(w io.Writer) error {
+			_, err := w.Write(nonWitnessBytes)
+			return err
+		})
+	} else {
+		// If the raw bytes don't have the witness, we can use it
+		// directly.
+		//
+		// We purposely call doublehashh here instead of doublehashraw
+		// as we don't have the serialization overhead and avoiding the
+		// 1 alloc is better in this case.
+		hash = chainhash.DoubleHashRaw(func(w io.Writer) error {
+			_, err := w.Write(t.rawBytes)
+			return err
+		})
+	}
+
 	t.txHash = &hash
 	return &hash
 }
 
 // WitnessHash returns the witness hash (wtxid) of the transaction.  This is
 // equivalent to calling WitnessHash on the underlying wire.MsgTx, however it
-// caches the result so subsequent calls are more efficient.
+// caches the result so subsequent calls are more efficient.  If the Tx has the
+// raw bytes of the tx cached, it will use that and skip serialization.
 func (t *Tx) WitnessHash() *chainhash.Hash {
 	// Return the cached hash if it has already been generated.
 	if t.txHashWitness != nil {
@@ -60,7 +119,13 @@ func (t *Tx) WitnessHash() *chainhash.Hash {
 	}
 
 	// Cache the hash and return it.
-	hash := t.msgTx.WitnessHash()
+	var hash chainhash.Hash
+	if len(t.rawBytes) > 0 {
+		hash = chainhash.DoubleHashH(t.rawBytes)
+	} else {
+		hash = t.msgTx.WitnessHash()
+	}
+
 	t.txHashWitness = &hash
 	return &hash
 }
@@ -97,6 +162,11 @@ func NewTx(msgTx *wire.MsgTx) *Tx {
 		msgTx:   msgTx,
 		txIndex: TxIndexUnknown,
 	}
+}
+
+// setBytes sets the raw bytes of the tx.
+func (t *Tx) setBytes(bytes []byte) {
+	t.rawBytes = bytes
 }
 
 // NewTxFromBytes returns a new instance of a bitcoin transaction given the

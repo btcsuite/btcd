@@ -5,7 +5,6 @@
 package wire
 
 import (
-	"bytes"
 	"io"
 	"time"
 
@@ -46,14 +45,9 @@ const blockHeaderLen = 80
 
 // BlockHash computes the block identifier hash for the given block header.
 func (h *BlockHeader) BlockHash() chainhash.Hash {
-	// Encode the header and double sha256 everything prior to the number of
-	// transactions.  Ignore the error returns since there is no way the
-	// encode could fail except being out of memory which would cause a
-	// run-time panic.
-	buf := bytes.NewBuffer(make([]byte, 0, MaxBlockHeaderPayload))
-	_ = writeBlockHeader(buf, 0, h)
-
-	return chainhash.DoubleHashH(buf.Bytes())
+	return chainhash.DoubleHashRaw(func(w io.Writer) error {
+		return writeBlockHeader(w, 0, h)
+	})
 }
 
 // BtcDecode decodes r using the bitcoin protocol encoding into the receiver.
@@ -113,16 +107,109 @@ func NewBlockHeader(version int32, prevHash, merkleRootHash *chainhash.Hash,
 // readBlockHeader reads a bitcoin block header from r.  See Deserialize for
 // decoding block headers stored to disk, such as in a database, as opposed to
 // decoding from the wire.
+//
+// DEPRECATED: Use readBlockHeaderBuf instead.
 func readBlockHeader(r io.Reader, pver uint32, bh *BlockHeader) error {
-	return readElements(r, &bh.Version, &bh.PrevBlock, &bh.MerkleRoot,
-		(*uint32Time)(&bh.Timestamp), &bh.Bits, &bh.Nonce)
+	buf := binarySerializer.Borrow()
+	err := readBlockHeaderBuf(r, pver, bh, buf)
+	binarySerializer.Return(buf)
+	return err
+}
+
+// readBlockHeaderBuf reads a bitcoin block header from r.  See Deserialize for
+// decoding block headers stored to disk, such as in a database, as opposed to
+// decoding from the wire.
+//
+// If b is non-nil, the provided buffer will be used for serializing small
+// values.  Otherwise a buffer will be drawn from the binarySerializer's pool
+// and return when the method finishes.
+//
+// NOTE: b MUST either be nil or at least an 8-byte slice.
+func readBlockHeaderBuf(r io.Reader, pver uint32, bh *BlockHeader,
+	buf []byte) error {
+
+	if _, err := io.ReadFull(r, buf[:4]); err != nil {
+		return err
+	}
+	bh.Version = int32(littleEndian.Uint32(buf[:4]))
+
+	if _, err := io.ReadFull(r, bh.PrevBlock[:]); err != nil {
+		return err
+	}
+
+	if _, err := io.ReadFull(r, bh.MerkleRoot[:]); err != nil {
+		return err
+	}
+
+	if _, err := io.ReadFull(r, buf[:4]); err != nil {
+		return err
+	}
+	bh.Timestamp = time.Unix(int64(littleEndian.Uint32(buf[:4])), 0)
+
+	if _, err := io.ReadFull(r, buf[:4]); err != nil {
+		return err
+	}
+	bh.Bits = littleEndian.Uint32(buf[:4])
+
+	if _, err := io.ReadFull(r, buf[:4]); err != nil {
+		return err
+	}
+	bh.Nonce = littleEndian.Uint32(buf[:4])
+
+	return nil
 }
 
 // writeBlockHeader writes a bitcoin block header to w.  See Serialize for
 // encoding block headers to be stored to disk, such as in a database, as
 // opposed to encoding for the wire.
+//
+// DEPRECATED: Use writeBlockHeaderBuf instead.
 func writeBlockHeader(w io.Writer, pver uint32, bh *BlockHeader) error {
-	sec := uint32(bh.Timestamp.Unix())
-	return writeElements(w, bh.Version, &bh.PrevBlock, &bh.MerkleRoot,
-		sec, bh.Bits, bh.Nonce)
+	buf := binarySerializer.Borrow()
+	err := writeBlockHeaderBuf(w, pver, bh, buf)
+	binarySerializer.Return(buf)
+	return err
+}
+
+// writeBlockHeaderBuf writes a bitcoin block header to w.  See Serialize for
+// encoding block headers to be stored to disk, such as in a database, as
+// opposed to encoding for the wire.
+//
+// If b is non-nil, the provided buffer will be used for serializing small
+// values.  Otherwise a buffer will be drawn from the binarySerializer's pool
+// and return when the method finishes.
+//
+// NOTE: b MUST either be nil or at least an 8-byte slice.
+func writeBlockHeaderBuf(w io.Writer, pver uint32, bh *BlockHeader,
+	buf []byte) error {
+
+	littleEndian.PutUint32(buf[:4], uint32(bh.Version))
+	if _, err := w.Write(buf[:4]); err != nil {
+		return err
+	}
+
+	if _, err := w.Write(bh.PrevBlock[:]); err != nil {
+		return err
+	}
+
+	if _, err := w.Write(bh.MerkleRoot[:]); err != nil {
+		return err
+	}
+
+	littleEndian.PutUint32(buf[:4], uint32(bh.Timestamp.Unix()))
+	if _, err := w.Write(buf[:4]); err != nil {
+		return err
+	}
+
+	littleEndian.PutUint32(buf[:4], bh.Bits)
+	if _, err := w.Write(buf[:4]); err != nil {
+		return err
+	}
+
+	littleEndian.PutUint32(buf[:4], bh.Nonce)
+	if _, err := w.Write(buf[:4]); err != nil {
+		return err
+	}
+
+	return nil
 }

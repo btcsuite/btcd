@@ -48,7 +48,7 @@ func maxNetAddressV2Payload() uint32 {
 	plen += 1
 
 	// The largest address is 512 bytes. Even though it will not be a valid
-	// address, we should read and ignore it. The preceeding varint to
+	// address, we should read and ignore it. The preceding varint to
 	// store 512 bytes is 3 bytes long. This gives us a total of 515 bytes.
 	plen += 515
 

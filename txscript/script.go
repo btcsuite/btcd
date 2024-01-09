@@ -40,13 +40,13 @@ const (
 	MaxScriptElementSize  = 520 // Max bytes pushable to the stack.
 )
 
-// isSmallInt returns whether or not the opcode is considered a small integer,
+// IsSmallInt returns whether or not the opcode is considered a small integer,
 // which is an OP_0, or OP_1 through OP_16.
 //
 // NOTE: This function is only valid for version 0 opcodes.  Since the function
 // does not accept a script version, the results are undefined for other script
 // versions.
-func isSmallInt(op byte) bool {
+func IsSmallInt(op byte) bool {
 	return op == OP_0 || (op >= OP_1 && op <= OP_16)
 }
 
@@ -74,19 +74,19 @@ func IsPayToScriptHash(script []byte) bool {
 	return isScriptHashScript(script)
 }
 
-// IsPayToWitnessScriptHash returns true if the is in the standard
+// IsPayToWitnessScriptHash returns true if the script is in the standard
 // pay-to-witness-script-hash (P2WSH) format, false otherwise.
 func IsPayToWitnessScriptHash(script []byte) bool {
 	return isWitnessScriptHashScript(script)
 }
 
-// IsPayToWitnessPubKeyHash returns true if the is in the standard
+// IsPayToWitnessPubKeyHash returns true if the script is in the standard
 // pay-to-witness-pubkey-hash (P2WKH) format, false otherwise.
 func IsPayToWitnessPubKeyHash(script []byte) bool {
 	return isWitnessPubKeyHashScript(script)
 }
 
-// IsPayToTaproot returns true if if the passed script is a standard
+// IsPayToTaproot returns true if the passed script is a standard
 // pay-to-taproot (PTTR) scripts, and false otherwise.
 func IsPayToTaproot(script []byte) bool {
 	return isWitnessTaprootScript(script)
@@ -294,9 +294,9 @@ func removeOpcodeByData(script []byte, dataToRemove []byte) []byte {
 	return result
 }
 
-// asSmallInt returns the passed opcode, which must be true according to
-// isSmallInt(), as an integer.
-func asSmallInt(op byte) int {
+// AsSmallInt returns the passed opcode, which must be true according to
+// IsSmallInt(), as an integer.
+func AsSmallInt(op byte) int {
 	if op == OP_0 {
 		return 0
 	}
@@ -342,7 +342,7 @@ func countSigOpsV0(script []byte, precise bool) int {
 			// operations in new script versions should move to
 			// aggregated schemes such as Schnorr instead.
 			if precise && prevOp >= OP_1 && prevOp <= OP_16 {
-				numSigOps += asSmallInt(prevOp)
+				numSigOps += AsSmallInt(prevOp)
 			} else {
 				numSigOps += MaxPubKeysPerMultiSig
 			}
@@ -504,7 +504,7 @@ func checkScriptParses(scriptVersion uint16, script []byte) error {
 }
 
 // IsUnspendable returns whether the passed public key script is unspendable, or
-// guaranteed to fail at execution.  This allows inputs to be pruned instantly
+// guaranteed to fail at execution.  This allows outputs to be pruned instantly
 // when entering the UTXO set.
 //
 // NOTE: This function is only valid for version 0 scripts.  Since the function

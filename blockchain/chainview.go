@@ -36,11 +36,13 @@ func fastLog2Floor(n uint32) uint8 {
 // for comparing chains.
 //
 // For example, assume a block chain with a side chain as depicted below:
-//   genesis -> 1 -> 2 -> 3 -> 4  -> 5 ->  6  -> 7  -> 8
-//                         \-> 4a -> 5a -> 6a
+//
+//	genesis -> 1 -> 2 -> 3 -> 4  -> 5 ->  6  -> 7  -> 8
+//	                      \-> 4a -> 5a -> 6a
 //
 // The chain view for the branch ending in 6a consists of:
-//   genesis -> 1 -> 2 -> 3 -> 4a -> 5a -> 6a
+//
+//	genesis -> 1 -> 2 -> 3 -> 4a -> 5a -> 6a
 type chainView struct {
 	mtx   sync.Mutex
 	nodes []*blockNode
@@ -258,12 +260,14 @@ func (c *chainView) next(node *blockNode) *blockNode {
 // view.
 //
 // For example, assume a block chain with a side chain as depicted below:
-//   genesis -> 1 -> 2 -> 3 -> 4  -> 5 ->  6  -> 7  -> 8
-//                         \-> 4a -> 5a -> 6a
+//
+//	genesis -> 1 -> 2 -> 3 -> 4  -> 5 ->  6  -> 7  -> 8
+//	                      \-> 4a -> 5a -> 6a
 //
 // Further, assume the view is for the longer chain depicted above.  That is to
 // say it consists of:
-//   genesis -> 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8
+//
+//	genesis -> 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8
 //
 // Invoking this function with block node 5 would return block node 6 while
 // invoking it with block node 5a would return nil since that node is not part
@@ -321,12 +325,14 @@ func (c *chainView) findFork(node *blockNode) *blockNode {
 // the chain view.  It will return nil if there is no common block.
 //
 // For example, assume a block chain with a side chain as depicted below:
-//   genesis -> 1 -> 2 -> ... -> 5 -> 6  -> 7  -> 8
-//                                \-> 6a -> 7a
+//
+//	genesis -> 1 -> 2 -> ... -> 5 -> 6  -> 7  -> 8
+//	                             \-> 6a -> 7a
 //
 // Further, assume the view is for the longer chain depicted above.  That is to
 // say it consists of:
-//   genesis -> 1 -> 2 -> ... -> 5 -> 6 -> 7 -> 8.
+//
+//	genesis -> 1 -> 2 -> ... -> 5 -> 6 -> 7 -> 8.
 //
 // Invoking this function with block node 7a would return block node 5 while
 // invoking it with block node 7 would return itself since it is already part of

@@ -14,8 +14,8 @@ import (
 	"strings"
 
 	"github.com/btcsuite/btcd/btcjson"
-	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/btcutil"
+	"github.com/btcsuite/btcd/chaincfg"
 	flags "github.com/jessevdk/go-flags"
 )
 
@@ -143,7 +143,7 @@ func normalizeAddress(addr string, chain *chaincfg.Params, useWallet bool) (stri
 			if useWallet {
 				defaultPort = "38332"
 			} else {
-				defaultPort = "38332"
+				defaultPort = "38334"
 			}
 		default:
 			if useWallet {
@@ -158,7 +158,7 @@ func normalizeAddress(addr string, chain *chaincfg.Params, useWallet bool) (stri
 	return addr, nil
 }
 
-// cleanAndExpandPath expands environement variables and leading ~ in the
+// cleanAndExpandPath expands environment variables and leading ~ in the
 // passed path, cleans the result, and returns it.
 func cleanAndExpandPath(path string) string {
 	// Expand initial ~ to OS specific home directory.
@@ -176,10 +176,10 @@ func cleanAndExpandPath(path string) string {
 // line options.
 //
 // The configuration proceeds as follows:
-// 	1) Start with a default config with sane settings
-// 	2) Pre-parse the command line to check for an alternative config file
-// 	3) Load configuration file overwriting defaults with any specified options
-// 	4) Parse CLI options and overwrite/add any specified options
+//  1. Start with a default config with sane settings
+//  2. Pre-parse the command line to check for an alternative config file
+//  3. Load configuration file overwriting defaults with any specified options
+//  4. Parse CLI options and overwrite/add any specified options
 //
 // The above results in functioning properly without any config settings
 // while still allowing the user to override settings with config files and

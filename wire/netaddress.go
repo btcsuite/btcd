@@ -5,7 +5,6 @@
 package wire
 
 import (
-	"encoding/binary"
 	"io"
 	"net"
 	"time"
@@ -89,31 +88,60 @@ func NewNetAddress(addr *net.TCPAddr, services ServiceFlag) *NetAddress {
 // version and whether or not the timestamp is included per ts.  Some messages
 // like version do not include the timestamp.
 func readNetAddress(r io.Reader, pver uint32, na *NetAddress, ts bool) error {
-	var ip [16]byte
+	buf := binarySerializer.Borrow()
+	defer binarySerializer.Return(buf)
+
+	err := readNetAddressBuf(r, pver, na, ts, buf)
+	return err
+}
+
+// readNetAddressBuf reads an encoded NetAddress from r depending on the
+// protocol version and whether or not the timestamp is included per ts.  Some
+// messages like version do not include the timestamp.
+//
+// If b is non-nil, the provided buffer will be used for serializing small
+// values.  Otherwise a buffer will be drawn from the binarySerializer's pool
+// and return when the method finishes.
+//
+// NOTE: b MUST either be nil or at least an 8-byte slice.
+func readNetAddressBuf(r io.Reader, pver uint32, na *NetAddress, ts bool,
+	buf []byte) error {
+
+	var (
+		timestamp time.Time
+		services  ServiceFlag
+		ip        [16]byte
+		port      uint16
+	)
 
 	// NOTE: The bitcoin protocol uses a uint32 for the timestamp so it will
 	// stop working somewhere around 2106.  Also timestamp wasn't added until
 	// protocol version >= NetAddressTimeVersion
 	if ts && pver >= NetAddressTimeVersion {
-		err := readElement(r, (*uint32Time)(&na.Timestamp))
-		if err != nil {
+		if _, err := io.ReadFull(r, buf[:4]); err != nil {
 			return err
 		}
+		timestamp = time.Unix(int64(littleEndian.Uint32(buf[:4])), 0)
 	}
 
-	err := readElements(r, &na.Services, &ip)
-	if err != nil {
+	if _, err := io.ReadFull(r, buf); err != nil {
 		return err
 	}
+	services = ServiceFlag(littleEndian.Uint64(buf))
+
+	if _, err := io.ReadFull(r, ip[:]); err != nil {
+		return err
+	}
+
 	// Sigh.  Bitcoin protocol mixes little and big endian.
-	port, err := binarySerializer.Uint16(r, bigEndian)
-	if err != nil {
+	if _, err := io.ReadFull(r, buf[:2]); err != nil {
 		return err
 	}
+	port = bigEndian.Uint16(buf[:2])
 
 	*na = NetAddress{
-		Timestamp: na.Timestamp,
-		Services:  na.Services,
+		Timestamp: timestamp,
+		Services:  services,
 		IP:        net.IP(ip[:]),
 		Port:      port,
 	}
@@ -124,14 +152,36 @@ func readNetAddress(r io.Reader, pver uint32, na *NetAddress, ts bool) error {
 // version and whether or not the timestamp is included per ts.  Some messages
 // like version do not include the timestamp.
 func writeNetAddress(w io.Writer, pver uint32, na *NetAddress, ts bool) error {
+	buf := binarySerializer.Borrow()
+	defer binarySerializer.Return(buf)
+	err := writeNetAddressBuf(w, pver, na, ts, buf)
+
+	return err
+}
+
+// writeNetAddressBuf serializes a NetAddress to w depending on the protocol
+// version and whether or not the timestamp is included per ts.  Some messages
+// like version do not include the timestamp.
+//
+// If b is non-nil, the provided buffer will be used for serializing small
+// values.  Otherwise a buffer will be drawn from the binarySerializer's pool
+// and return when the method finishes.
+//
+// NOTE: b MUST either be nil or at least an 8-byte slice.
+func writeNetAddressBuf(w io.Writer, pver uint32, na *NetAddress, ts bool, buf []byte) error {
 	// NOTE: The bitcoin protocol uses a uint32 for the timestamp so it will
 	// stop working somewhere around 2106.  Also timestamp wasn't added until
 	// until protocol version >= NetAddressTimeVersion.
 	if ts && pver >= NetAddressTimeVersion {
-		err := writeElement(w, uint32(na.Timestamp.Unix()))
-		if err != nil {
+		littleEndian.PutUint32(buf[:4], uint32(na.Timestamp.Unix()))
+		if _, err := w.Write(buf[:4]); err != nil {
 			return err
 		}
+	}
+
+	littleEndian.PutUint64(buf, uint64(na.Services))
+	if _, err := w.Write(buf); err != nil {
+		return err
 	}
 
 	// Ensure to always write 16 bytes even if the ip is nil.
@@ -139,11 +189,13 @@ func writeNetAddress(w io.Writer, pver uint32, na *NetAddress, ts bool) error {
 	if na.IP != nil {
 		copy(ip[:], na.IP.To16())
 	}
-	err := writeElements(w, na.Services, ip)
-	if err != nil {
+	if _, err := w.Write(ip[:]); err != nil {
 		return err
 	}
 
 	// Sigh.  Bitcoin protocol mixes little and big endian.
-	return binary.Write(w, bigEndian, na.Port)
+	bigEndian.PutUint16(buf[:2], na.Port)
+	_, err := w.Write(buf[:2])
+
+	return err
 }

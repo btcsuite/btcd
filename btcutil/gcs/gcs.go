@@ -44,7 +44,7 @@ const (
 // described in:
 // https://lemire.me/blog/2016/06/27/a-fast-alternative-to-the-modulo-reduction/
 //
-//  * v * N  >> log_2(N)
+//	v * N  >> log_2(N)
 //
 // In our case, using 64-bit integers, log_2 is 64. As most processors don't
 // support 128-bit arithmetic natively, we'll be super portable and unfold the

@@ -20,11 +20,11 @@ import (
 
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/btcec/v2"
+	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcd/btcutil"
 )
 
 const (
@@ -309,8 +309,7 @@ func calcMerkleRoot(txns []*wire.MsgTx) chainhash.Hash {
 	for _, tx := range txns {
 		utilTxns = append(utilTxns, btcutil.NewTx(tx))
 	}
-	merkles := blockchain.BuildMerkleTreeStore(utilTxns, false)
-	return *merkles[len(merkles)-1]
+	return blockchain.CalcMerkleRoot(utilTxns, false)
 }
 
 // solveBlock attempts to find a nonce which makes the passed block header hash
@@ -423,7 +422,7 @@ func replaceCoinbaseSigScript(script []byte) func(*wire.MsgBlock) {
 }
 
 // additionalTx returns a function that itself takes a block and modifies it by
-// adding the the provided transaction.
+// adding the provided transaction.
 func additionalTx(tx *wire.MsgTx) func(*wire.MsgBlock) {
 	return func(b *wire.MsgBlock) {
 		b.AddTransaction(tx)
@@ -466,9 +465,9 @@ func createSpendTxForTx(tx *wire.MsgTx, fee btcutil.Amount) *wire.MsgTx {
 // - A coinbase that pays the required subsidy to an OP_TRUE script
 // - When a spendable output is provided:
 //   - A transaction that spends from the provided output the following outputs:
-//     - One that pays the inputs amount minus 1 atom to an OP_TRUE script
-//     - One that contains an OP_RETURN output with a random uint64 in order to
-//       ensure the transaction has a unique hash
+//   - One that pays the inputs amount minus 1 atom to an OP_TRUE script
+//   - One that contains an OP_RETURN output with a random uint64 in order to
+//     ensure the transaction has a unique hash
 //
 // Additionally, if one or more munge functions are specified, they will be
 // invoked with the block prior to solving it.  This provides callers with the

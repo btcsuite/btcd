@@ -166,8 +166,8 @@ func TestControlBlockParsing(t *testing.T) {
 // key, then generating a public key from that. This test a quickcheck test to
 // assert the following invariant:
 //
-// * taproot_tweak_pubkey(pubkey_gen(seckey), h)[1] ==
-//   pubkey_gen(taproot_tweak_seckey(seckey, h))
+//   - taproot_tweak_pubkey(pubkey_gen(seckey), h)[1] ==
+//     pubkey_gen(taproot_tweak_seckey(seckey, h))
 func TestTaprootScriptSpendTweak(t *testing.T) {
 	t.Parallel()
 
@@ -186,7 +186,7 @@ func TestTaprootScriptSpendTweak(t *testing.T) {
 		tweakedPub := ComputeTaprootOutputKey(privKey.PubKey(), x[:])
 
 		// Now we'll generate the corresponding tweaked private key.
-		tweakedPriv := TweakTaprootPrivKey(privKey, x[:])
+		tweakedPriv := TweakTaprootPrivKey(*privKey, x[:])
 
 		// The public key for this private key should be the same as
 		// the tweaked public key we generate above.
@@ -202,6 +202,42 @@ func TestTaprootScriptSpendTweak(t *testing.T) {
 			"incorrect: %v", err)
 	}
 
+}
+
+// TestTaprootTweakNoMutation tests that the underlying private key passed into
+// TweakTaprootPrivKey is never mutated.
+func TestTaprootTweakNoMutation(t *testing.T) {
+	t.Parallel()
+
+	// Assert that given a random tweak, and a random private key, that if
+	// we tweak the private key it remains unaffected.
+	f := func(privBytes, tweak [32]byte) bool {
+		privKey, _ := btcec.PrivKeyFromBytes(privBytes[:])
+
+		// Now we'll generate the corresponding tweaked private key.
+		tweakedPriv := TweakTaprootPrivKey(*privKey, tweak[:])
+
+		// The tweaked private key and the original private key should
+		// NOT be the same.
+		if *privKey == *tweakedPriv {
+			t.Logf("private key was mutated")
+			return false
+		}
+
+		// We shuold be able to re-derive the private key from raw
+		// bytes and have that match up again.
+		privKeyCopy, _ := btcec.PrivKeyFromBytes(privBytes[:])
+		if *privKey != *privKeyCopy {
+			t.Logf("private doesn't match")
+			return false
+		}
+
+		return true
+	}
+
+	if err := quick.Check(f, nil); err != nil {
+		t.Fatalf("private key modified: %v", err)
+	}
 }
 
 // TestTaprootConstructKeyPath tests the key spend only taproot construction.

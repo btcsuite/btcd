@@ -6,7 +6,7 @@
 Package hdkeychain provides an API for bitcoin hierarchical deterministic
 extended keys (BIP0032).
 
-Overview
+# Overview
 
 The ability to implement hierarchical deterministic wallets depends on the
 ability to create and derive hierarchical deterministic extended keys.
@@ -16,19 +16,19 @@ deterministic extended keys by providing an ExtendedKey type and supporting
 functions.  Each extended key can either be a private or public extended key
 which itself is capable of deriving a child extended key.
 
-Determining the Extended Key Type
+# Determining the Extended Key Type
 
 Whether an extended key is a private or public extended key can be determined
 with the IsPrivate function.
 
-Transaction Signing Keys and Payment Addresses
+# Transaction Signing Keys and Payment Addresses
 
 In order to create and sign transactions, or provide others with addresses to
 send funds to, the underlying key and address material must be accessible.  This
 package provides the ECPubKey, ECPrivKey, and Address functions for this
 purpose.
 
-The Master Node
+# The Master Node
 
 As previously mentioned, the extended keys are hierarchical meaning they are
 used to form a tree.  The root of that tree is called the master node and this
@@ -36,7 +36,7 @@ package provides the NewMaster function to create it from a cryptographically
 random seed.  The GenerateSeed function is provided as a convenient way to
 create a random seed for use with the NewMaster function.
 
-Deriving Children
+# Deriving Children
 
 Once you have created a tree root (or have deserialized an extended key as
 discussed later), the child extended keys can be derived by using the Derive
@@ -46,7 +46,7 @@ the HardenedKeyStart constant + the hardened key number as the index to the
 Derive function.  This provides the ability to cascade the keys into a tree and
 hence generate the hierarchical deterministic key chains.
 
-Normal vs Hardened Derived Extended Keys
+# Normal vs Hardened Derived Extended Keys
 
 A private extended key can be used to derive both hardened and non-hardened
 (normal) child private and public extended keys.  A public extended key can only
@@ -59,22 +59,23 @@ the reason for the existence of hardened keys, and why they are used for the
 account level in the tree. This way, a leak of an account-specific (or below)
 private key never risks compromising the master or other accounts."
 
-Neutering a Private Extended Key
+# Neutering a Private Extended Key
 
 A private extended key can be converted to a new instance of the corresponding
 public extended key with the Neuter function.  The original extended key is not
 modified.  A public extended key is still capable of deriving non-hardened child
 public extended keys.
 
-Serializing and Deserializing Extended Keys
+# Serializing and Deserializing Extended Keys
 
 Extended keys are serialized and deserialized with the String and
 NewKeyFromString functions.  The serialized key is a Base58-encoded string which
 looks like the following:
+
 	public key:   xpub68Gmy5EdvgibQVfPdqkBBCHxA5htiqg55crXYuXoQRKfDBFA1WEjWgP6LHhwBZeNK1VTsfTFUHCdrfp1bgwQ9xv5ski8PX9rL2dZXvgGDnw
 	private key:  xprv9uHRZZhk6KAJC1avXpDAp4MDc3sQKNxDiPvvkX8Br5ngLNv1TxvUxt4cV1rGL5hj6KCesnDYUhd7oWgT11eZG7XnxHrnYeSvkzY7d2bhkJ7
 
-Network
+# Network
 
 Extended keys are much like normal Bitcoin addresses in that they have version
 bytes which tie them to a specific network.  The SetNet and IsForNet functions

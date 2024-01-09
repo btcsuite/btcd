@@ -60,6 +60,12 @@ const (
 	AddrV2Version uint32 = 70016
 )
 
+const (
+	// NodeNetworkLimitedBlockThreshold is the number of blocks that a node
+	// broadcasting SFNodeNetworkLimited MUST be able to serve from the tip.
+	NodeNetworkLimitedBlockThreshold = 288
+)
+
 // ServiceFlag identifies services supported by a bitcoin peer.
 type ServiceFlag uint64
 
@@ -93,18 +99,23 @@ const (
 	// SFNode2X is a flag used to indicate a peer is running the Segwit2X
 	// software.
 	SFNode2X
+
+	// SFNodeNetWorkLimited is a flag used to indicate a peer supports serving
+	// the last 288 blocks.
+	SFNodeNetworkLimited = 1 << 10
 )
 
 // Map of service flags back to their constant names for pretty printing.
 var sfStrings = map[ServiceFlag]string{
-	SFNodeNetwork: "SFNodeNetwork",
-	SFNodeGetUTXO: "SFNodeGetUTXO",
-	SFNodeBloom:   "SFNodeBloom",
-	SFNodeWitness: "SFNodeWitness",
-	SFNodeXthin:   "SFNodeXthin",
-	SFNodeBit5:    "SFNodeBit5",
-	SFNodeCF:      "SFNodeCF",
-	SFNode2X:      "SFNode2X",
+	SFNodeNetwork:        "SFNodeNetwork",
+	SFNodeGetUTXO:        "SFNodeGetUTXO",
+	SFNodeBloom:          "SFNodeBloom",
+	SFNodeWitness:        "SFNodeWitness",
+	SFNodeXthin:          "SFNodeXthin",
+	SFNodeBit5:           "SFNodeBit5",
+	SFNodeCF:             "SFNodeCF",
+	SFNode2X:             "SFNode2X",
+	SFNodeNetworkLimited: "SFNodeNetworkLimited",
 }
 
 // orderedSFStrings is an ordered list of service flags from highest to
@@ -118,6 +129,12 @@ var orderedSFStrings = []ServiceFlag{
 	SFNodeBit5,
 	SFNodeCF,
 	SFNode2X,
+	SFNodeNetworkLimited,
+}
+
+// HasFlag returns a bool indicating if the service has the given flag.
+func (f ServiceFlag) HasFlag(s ServiceFlag) bool {
+	return f&s == s
 }
 
 // String returns the ServiceFlag in human-readable form.

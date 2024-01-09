@@ -44,8 +44,8 @@ import (
 const (
 	// defaultServices describes the default services that are supported by
 	// the server.
-	defaultServices = wire.SFNodeNetwork | wire.SFNodeBloom |
-		wire.SFNodeWitness | wire.SFNodeCF
+	defaultServices = wire.SFNodeNetwork | wire.SFNodeNetworkLimited |
+		wire.SFNodeBloom | wire.SFNodeWitness | wire.SFNodeCF
 
 	// defaultRequiredServices describes the default services that are
 	// required to be supported by outbound peers.
@@ -2730,6 +2730,9 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 	if cfg.NoCFilters {
 		services &^= wire.SFNodeCF
 	}
+	if cfg.Prune != 0 {
+		services &^= wire.SFNodeNetwork
+	}
 
 	amgr := addrmgr.New(cfg.DataDir, btcdLookup)
 
@@ -2823,14 +2826,16 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 	// Create a new block chain instance with the appropriate configuration.
 	var err error
 	s.chain, err = blockchain.New(&blockchain.Config{
-		DB:           s.db,
-		Interrupt:    interrupt,
-		ChainParams:  s.chainParams,
-		Checkpoints:  checkpoints,
-		TimeSource:   s.timeSource,
-		SigCache:     s.sigCache,
-		IndexManager: indexManager,
-		HashCache:    s.hashCache,
+		DB:               s.db,
+		Interrupt:        interrupt,
+		ChainParams:      s.chainParams,
+		Checkpoints:      checkpoints,
+		TimeSource:       s.timeSource,
+		SigCache:         s.sigCache,
+		IndexManager:     indexManager,
+		HashCache:        s.hashCache,
+		Prune:            cfg.Prune * 1024 * 1024,
+		UtxoCacheMaxSize: uint64(cfg.UtxoCacheMaxSizeMiB) * 1024 * 1024,
 	})
 	if err != nil {
 		return nil, err

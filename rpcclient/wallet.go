@@ -1016,10 +1016,10 @@ func (c *Client) CreateWalletAsync(name string, opts ...CreateWalletOpt) FutureC
 //
 // Optional parameters can be specified using functional-options pattern. The
 // following functions are available:
-//   * WithCreateWalletDisablePrivateKeys
-//   * WithCreateWalletBlank
-//   * WithCreateWalletPassphrase
-//   * WithCreateWalletAvoidReuse
+//   - WithCreateWalletDisablePrivateKeys
+//   - WithCreateWalletBlank
+//   - WithCreateWalletPassphrase
+//   - WithCreateWalletAvoidReuse
 func (c *Client) CreateWallet(name string, opts ...CreateWalletOpt) (*btcjson.CreateWalletResult, error) {
 	return c.CreateWalletAsync(name, opts...).Receive()
 }
@@ -2661,7 +2661,7 @@ func (c *Client) WalletCreateFundedPsbt(
 type FutureWalletProcessPsbtResult chan *Response
 
 // Receive waits for the Response promised by the future and returns an updated
-// PSBT with signed inputs from the wallet and a boolen indicating if the the
+// PSBT with signed inputs from the wallet and a boolen indicating if the
 // transaction has a complete set of signatures.
 func (r FutureWalletProcessPsbtResult) Receive() (*btcjson.WalletProcessPsbtResult, error) {
 	res, err := ReceiveFuture(r)

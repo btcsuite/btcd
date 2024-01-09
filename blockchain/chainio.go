@@ -12,10 +12,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcd/btcutil"
 )
 
 const (
@@ -50,6 +50,10 @@ var (
 	// chainStateKeyName is the name of the db key used to store the best
 	// chain state.
 	chainStateKeyName = []byte("chainstate")
+
+	// utxoStateConsistencyKeyName is the name of the db key used to store the
+	// consistency status of the utxo state.
+	utxoStateConsistencyKeyName = []byte("utxostateconsistency")
 
 	// spendJournalVersionKeyName is the name of the db key used to store
 	// the version of the spend journal currently in the database.
@@ -243,10 +247,10 @@ type SpentTxOut struct {
 	// Amount is the amount of the output.
 	Amount int64
 
-	// PkScipt is the the public key script for the output.
+	// PkScipt is the public key script for the output.
 	PkScript []byte
 
-	// Height is the height of the the block containing the creating tx.
+	// Height is the height of the block containing the creating tx.
 	Height int32
 
 	// Denotes if the creating tx is a coinbase.
@@ -494,6 +498,21 @@ func dbRemoveSpendJournalEntry(dbTx database.Tx, blockHash *chainhash.Hash) erro
 	return spendBucket.Delete(blockHash[:])
 }
 
+// dbPruneSpendJournalEntry uses an existing database transaction to remove all
+// the spend journal entries for the pruned blocks.
+func dbPruneSpendJournalEntry(dbTx database.Tx, blockHashes []chainhash.Hash) error {
+	spendBucket := dbTx.Metadata().Bucket(spendJournalBucketName)
+
+	for _, blockHash := range blockHashes {
+		err := spendBucket.Delete(blockHash[:])
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // -----------------------------------------------------------------------------
 // The unspent transaction output (utxo) set consists of an entry for each
 // unspent output using a format that is optimized to reduce space using domain
@@ -729,11 +748,12 @@ func dbFetchUtxoEntryByHash(dbTx database.Tx, hash *chainhash.Hash) (*UtxoEntry,
 //
 // When there is no entry for the provided output, nil will be returned for both
 // the entry and the error.
-func dbFetchUtxoEntry(dbTx database.Tx, outpoint wire.OutPoint) (*UtxoEntry, error) {
+func dbFetchUtxoEntry(dbTx database.Tx, utxoBucket database.Bucket,
+	outpoint wire.OutPoint) (*UtxoEntry, error) {
+
 	// Fetch the unspent transaction output information for the passed
 	// transaction output.  Return now when there is no entry.
 	key := outpointKey(outpoint)
-	utxoBucket := dbTx.Metadata().Bucket(utxoSetBucketName)
 	serializedUtxo := utxoBucket.Get(*key)
 	recycleOutpointKey(key)
 	if serializedUtxo == nil {
@@ -771,6 +791,11 @@ func dbFetchUtxoEntry(dbTx database.Tx, outpoint wire.OutPoint) (*UtxoEntry, err
 // particular, only the entries that have been marked as modified are written
 // to the database.
 func dbPutUtxoView(dbTx database.Tx, view *UtxoViewpoint) error {
+	// Return early if the view is nil.
+	if view == nil {
+		return nil
+	}
+
 	utxoBucket := dbTx.Metadata().Bucket(utxoSetBucketName)
 	for outpoint, entry := range view.entries {
 		// No need to update the database if the entry was not modified.
@@ -780,32 +805,54 @@ func dbPutUtxoView(dbTx database.Tx, view *UtxoViewpoint) error {
 
 		// Remove the utxo entry if it is spent.
 		if entry.IsSpent() {
-			key := outpointKey(outpoint)
-			err := utxoBucket.Delete(*key)
-			recycleOutpointKey(key)
+			err := dbDeleteUtxoEntry(utxoBucket, outpoint)
 			if err != nil {
 				return err
 			}
-
-			continue
-		}
-
-		// Serialize and store the utxo entry.
-		serialized, err := serializeUtxoEntry(entry)
-		if err != nil {
-			return err
-		}
-		key := outpointKey(outpoint)
-		err = utxoBucket.Put(*key, serialized)
-		// NOTE: The key is intentionally not recycled here since the
-		// database interface contract prohibits modifications.  It will
-		// be garbage collected normally when the database is done with
-		// it.
-		if err != nil {
-			return err
+		} else {
+			err := dbPutUtxoEntry(utxoBucket, outpoint, entry)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
+	return nil
+}
+
+// dbDeleteUtxoEntry uses an existing database transaction to delete the utxo
+// entry from the database.
+func dbDeleteUtxoEntry(utxoBucket database.Bucket, outpoint wire.OutPoint) error {
+	key := outpointKey(outpoint)
+	err := utxoBucket.Delete(*key)
+	recycleOutpointKey(key)
+	return err
+}
+
+// dbPutUtxoEntry uses an existing database transaction to update the utxo entry
+// in the database.
+func dbPutUtxoEntry(utxoBucket database.Bucket, outpoint wire.OutPoint,
+	entry *UtxoEntry) error {
+
+	if entry == nil || entry.IsSpent() {
+		return AssertError("trying to store nil or spent entry")
+	}
+
+	// Serialize and store the utxo entry.
+	serialized, err := serializeUtxoEntry(entry)
+	if err != nil {
+		return err
+	}
+	key := outpointKey(outpoint)
+	err = utxoBucket.Put(*key, serialized)
+	if err != nil {
+		return err
+	}
+
+	// NOTE: The key is intentionally not recycled here since the
+	// database interface contract prohibits modifications.  It will
+	// be garbage collected normally when the database is done with
+	// it.
 	return nil
 }
 
@@ -997,6 +1044,21 @@ func dbPutBestState(dbTx database.Tx, snapshot *BestState, workSum *big.Int) err
 
 	// Store the current best chain state into the database.
 	return dbTx.Metadata().Put(chainStateKeyName, serializedData)
+}
+
+// dbPutUtxoStateConsistency uses an existing database transaction to
+// update the utxo state consistency status with the given parameters.
+func dbPutUtxoStateConsistency(dbTx database.Tx, hash *chainhash.Hash) error {
+	// Store the utxo state consistency status into the database.
+	return dbTx.Metadata().Put(utxoStateConsistencyKeyName, hash[:])
+}
+
+// dbFetchUtxoStateConsistency uses an existing database transaction to retrieve
+// the utxo state consistency status from the database.  The code is 0 when
+// nothing was found.
+func dbFetchUtxoStateConsistency(dbTx database.Tx) []byte {
+	// Fetch the serialized data from the database.
+	return dbTx.Metadata().Get(utxoStateConsistencyKeyName)
 }
 
 // createChainState initializes both the database and the chain state to the
@@ -1236,7 +1298,7 @@ func (b *BlockChain) initChainState() error {
 		blockWeight := uint64(GetBlockWeight(btcutil.NewBlock(&block)))
 		numTxns := uint64(len(block.Transactions))
 		b.stateSnapshot = newBestState(tip, blockSize, blockWeight,
-			numTxns, state.totalTxns, tip.CalcPastMedianTime())
+			numTxns, state.totalTxns, CalcPastMedianTime(tip))
 
 		return nil
 	})

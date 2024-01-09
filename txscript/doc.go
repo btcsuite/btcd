@@ -12,7 +12,7 @@ overview to provide information on how to use the package.
 This package provides data structures and functions to parse and execute
 bitcoin transaction scripts.
 
-Script Overview
+# Script Overview
 
 Bitcoin transaction scripts are written in a stack-base, FORTH-like language.
 
@@ -25,12 +25,12 @@ to right and intentionally do not provide loops.
 The vast majority of Bitcoin scripts at the time of this writing are of several
 standard forms which consist of a spender providing a public key and a signature
 which proves the spender owns the associated private key.  This information
-is used to prove the the spender is authorized to perform the transaction.
+is used to prove the spender is authorized to perform the transaction.
 
 One benefit of using a scripting language is added flexibility in specifying
 what conditions must be met in order to spend bitcoins.
 
-Errors
+# Errors
 
 Errors returned by this package are of type txscript.Error.  This allows the
 caller to programmatically determine the specific error by examining the

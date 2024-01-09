@@ -1073,7 +1073,7 @@ func opcodeCheckLockTimeVerify(op *opcode, data []byte, vm *Engine) error {
 	if err != nil {
 		return err
 	}
-	lockTime, err := makeScriptNum(so, vm.dstack.verifyMinimalData, 5)
+	lockTime, err := MakeScriptNum(so, vm.dstack.verifyMinimalData, 5)
 	if err != nil {
 		return err
 	}
@@ -1147,7 +1147,7 @@ func opcodeCheckSequenceVerify(op *opcode, data []byte, vm *Engine) error {
 	if err != nil {
 		return err
 	}
-	stackSequence, err := makeScriptNum(so, vm.dstack.verifyMinimalData, 5)
+	stackSequence, err := MakeScriptNum(so, vm.dstack.verifyMinimalData, 5)
 	if err != nil {
 		return err
 	}
@@ -1171,7 +1171,7 @@ func opcodeCheckSequenceVerify(op *opcode, data []byte, vm *Engine) error {
 
 	// Transaction version numbers not high enough to trigger CSV rules must
 	// fail.
-	if vm.tx.Version < 2 {
+	if uint32(vm.tx.Version) < 2 {
 		str := fmt.Sprintf("invalid transaction version: %d",
 			vm.tx.Version)
 		return scriptError(ErrUnsatisfiedLockTime, str)

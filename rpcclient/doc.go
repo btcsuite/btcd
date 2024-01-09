@@ -5,7 +5,7 @@
 /*
 Package rpcclient implements a websocket-enabled Bitcoin JSON-RPC client.
 
-Overview
+# Overview
 
 This client provides a robust and easy to use client for interfacing with a
 Bitcoin RPC server that uses a btcd/bitcoin core compatible Bitcoin JSON-RPC
@@ -24,7 +24,7 @@ btcd or btcwallet by default.  However, configuration options are provided to
 fall back to HTTP POST and disable TLS to support talking with inferior bitcoin
 core style RPC servers.
 
-Websockets vs HTTP POST
+# Websockets vs HTTP POST
 
 In HTTP POST-based JSON-RPC, every request creates a new HTTP connection,
 issues the call, waits for the response, and closes the connection.  This adds
@@ -40,7 +40,7 @@ can be invoked without having to go through a connect/disconnect cycle for every
 call.  In addition, the websocket interface provides other nice features such as
 the ability to register for asynchronous notifications of various events.
 
-Synchronous vs Asynchronous API
+# Synchronous vs Asynchronous API
 
 The client provides both a synchronous (blocking) and asynchronous API.
 
@@ -57,7 +57,7 @@ the Receive method on the returned instance will either return the result
 immediately if it has already arrived, or block until it has.  This is useful
 since it provides the caller with greater control over concurrency.
 
-Notifications
+# Notifications
 
 The first important part of notifications is to realize that they will only
 work when connected via websockets.  This should intuitively make sense
@@ -67,7 +67,7 @@ All notifications provided by btcd require registration to opt-in.  For example,
 if you want to be notified when funds are received by a set of addresses, you
 register the addresses via the NotifyReceived (or NotifyReceivedAsync) function.
 
-Notification Handlers
+# Notification Handlers
 
 Notifications are exposed by the client through the use of callback handlers
 which are setup via a NotificationHandlers instance that is specified by the
@@ -83,7 +83,7 @@ will cause a deadlock as more server responses won't be read until the callback
 returns, but the callback would be waiting for a response.   Thus, any
 additional RPCs must be issued an a completely decoupled manner.
 
-Automatic Reconnection
+# Automatic Reconnection
 
 By default, when running in websockets mode, this client will automatically
 keep trying to reconnect to the RPC server should the connection be lost.  There
@@ -116,7 +116,7 @@ chain services will be available.  Depending on your application, you might only
 need chain-related RPCs.  In contrast, btcwallet provides pass through treatment
 for chain-related RPCs, so it supports them in addition to wallet-related RPCs.
 
-Errors
+# Errors
 
 There are 3 categories of errors that will be returned throughout this package:
 
@@ -144,35 +144,35 @@ The third category of errors, that is errors returned by the server, can be
 detected by type asserting the error in a *btcjson.RPCError.  For example, to
 detect if a command is unimplemented by the remote RPC server:
 
-  amount, err := client.GetBalance("")
-  if err != nil {
-  	if jerr, ok := err.(*btcjson.RPCError); ok {
-  		switch jerr.Code {
-  		case btcjson.ErrRPCUnimplemented:
-  			// Handle not implemented error
+	  amount, err := client.GetBalance("")
+	  if err != nil {
+	  	if jerr, ok := err.(*btcjson.RPCError); ok {
+	  		switch jerr.Code {
+	  		case btcjson.ErrRPCUnimplemented:
+	  			// Handle not implemented error
 
-  		// Handle other specific errors you care about
-		}
-  	}
+	  		// Handle other specific errors you care about
+			}
+	  	}
 
-  	// Log or otherwise handle the error knowing it was not one returned
-  	// from the remote RPC server.
-  }
+	  	// Log or otherwise handle the error knowing it was not one returned
+	  	// from the remote RPC server.
+	  }
 
-Example Usage
+# Example Usage
 
 The following full-blown client examples are in the examples directory:
 
- - bitcoincorehttp
-   Connects to a bitcoin core RPC server using HTTP POST mode with TLS disabled
-   and gets the current block count
- - btcdwebsockets
-   Connects to a btcd RPC server using TLS-secured websockets, registers for
-   block connected and block disconnected notifications, and gets the current
-   block count
- - btcwalletwebsockets
-   Connects to a btcwallet RPC server using TLS-secured websockets, registers
-   for notifications about changes to account balances, and gets a list of
-   unspent transaction outputs (utxos) the wallet can sign
+  - bitcoincorehttp
+    Connects to a bitcoin core RPC server using HTTP POST mode with TLS disabled
+    and gets the current block count
+  - btcdwebsockets
+    Connects to a btcd RPC server using TLS-secured websockets, registers for
+    block connected and block disconnected notifications, and gets the current
+    block count
+  - btcwalletwebsockets
+    Connects to a btcwallet RPC server using TLS-secured websockets, registers
+    for notifications about changes to account balances, and gets a list of
+    unspent transaction outputs (utxos) the wallet can sign
 */
 package rpcclient

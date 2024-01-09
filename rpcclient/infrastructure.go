@@ -733,10 +733,10 @@ out:
 
 			// Reset the connection state and signal the reconnect
 			// has happened.
+			c.mtx.Lock()
 			c.wsConn = wsConn
 			c.retryCount = 0
 
-			c.mtx.Lock()
 			c.disconnect = make(chan struct{})
 			c.disconnected = false
 			c.mtx.Unlock()
@@ -761,9 +761,7 @@ out:
 // handleSendPostMessage handles performing the passed HTTP request, reading the
 // result, unmarshalling it, and delivering the unmarshalled result to the
 // provided response channel.
-func (c *Client) handleSendPostMessage(jReq *jsonRequest,
-	shutdown chan struct{}) {
-
+func (c *Client) handleSendPostMessage(jReq *jsonRequest) {
 	protocol := "http"
 	if !c.config.DisableTLS {
 		protocol = "https"
@@ -825,7 +823,7 @@ func (c *Client) handleSendPostMessage(jReq *jsonRequest,
 		select {
 		case <-time.After(backoff):
 
-		case <-shutdown:
+		case <-c.shutdown:
 			return
 		}
 	}
@@ -834,7 +832,7 @@ func (c *Client) handleSendPostMessage(jReq *jsonRequest,
 		return
 	}
 
-	// We still want to return an error if for any reason the respone
+	// We still want to return an error if for any reason the response
 	// remains empty.
 	if httpResponse == nil {
 		jReq.responseChan <- &Response{
@@ -893,7 +891,7 @@ out:
 		// is closed.
 		select {
 		case jReq := <-c.sendPostChan:
-			c.handleSendPostMessage(jReq, c.shutdown)
+			c.handleSendPostMessage(jReq)
 
 		case <-c.shutdown:
 			break out
@@ -917,7 +915,6 @@ cleanup:
 	}
 	c.wg.Done()
 	log.Tracef("RPC client send handler done for %s", c.config.Host)
-
 }
 
 // sendPostRequest sends the passed HTTP request to the RPC server using the
@@ -931,9 +928,13 @@ func (c *Client) sendPostRequest(jReq *jsonRequest) {
 	default:
 	}
 
-	log.Tracef("Sending command [%s] with id %d", jReq.method, jReq.id)
+	select {
+	case c.sendPostChan <- jReq:
+		log.Tracef("Sent command [%s] with id %d", jReq.method, jReq.id)
 
-	c.sendPostChan <- jReq
+	case <-c.shutdown:
+		return
+	}
 }
 
 // newFutureError returns a new future result channel that already has the

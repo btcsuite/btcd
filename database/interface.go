@@ -8,8 +8,8 @@
 package database
 
 import (
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/btcutil"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 )
 
 // Cursor represents a cursor over key/value pairs and nested buckets of a
@@ -388,6 +388,26 @@ type Tx interface {
 	// additional data copies and allows support for memory-mapped database
 	// implementations.
 	FetchBlockRegions(regions []BlockRegion) ([][]byte, error)
+
+	// PruneBlocks deletes the block files until it reaches the target size
+	// (specificed in bytes).
+	//
+	// The interface contract guarantees at least the following errors will
+	// be returned (other implementation-specific errors are possible):
+	//   - ErrTxNotWritable if attempted against a read-only transaction
+	//   - ErrTxClosed if the transaction has already been closed
+	//
+	// NOTE: The data returned by this function is only valid during a
+	// database transaction.  Attempting to access it after a transaction
+	// has ended results in undefined behavior.  This constraint prevents
+	// additional data copies and allows support for memory-mapped database
+	// implementations.
+	PruneBlocks(targetSize uint64) ([]chainhash.Hash, error)
+
+	// BeenPruned returns if the block storage has ever been pruned.
+	//
+	// Implementation specific errors are possible.
+	BeenPruned() (bool, error)
 
 	// ******************************************************************
 	// Methods related to both atomic metadata storage and block storage.

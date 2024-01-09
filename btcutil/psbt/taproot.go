@@ -2,6 +2,7 @@ package psbt
 
 import (
 	"bytes"
+
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
@@ -92,10 +93,10 @@ func (s *TaprootBip32Derivation) SortBefore(other *TaprootBip32Derivation) bool 
 	return bytes.Compare(s.XOnlyPubKey, other.XOnlyPubKey) < 0
 }
 
-// readTaprootBip32Derivation deserializes a byte slice containing the Taproot
+// ReadTaprootBip32Derivation deserializes a byte slice containing the Taproot
 // BIP32 derivation info that consists of a list of leaf hashes as well as the
 // normal BIP32 derivation info.
-func readTaprootBip32Derivation(xOnlyPubKey,
+func ReadTaprootBip32Derivation(xOnlyPubKey,
 	value []byte) (*TaprootBip32Derivation, error) {
 
 	// The taproot key BIP 32 derivation path is defined as:
@@ -141,7 +142,7 @@ func readTaprootBip32Derivation(xOnlyPubKey,
 	}
 
 	// Read the BIP32 derivation info.
-	fingerprint, path, err := readBip32Derivation(leftoverBuf.Bytes())
+	fingerprint, path, err := ReadBip32Derivation(leftoverBuf.Bytes())
 	if err != nil {
 		return nil, err
 	}
@@ -152,9 +153,9 @@ func readTaprootBip32Derivation(xOnlyPubKey,
 	return &derivation, nil
 }
 
-// serializeTaprootBip32Derivation serializes a TaprootBip32Derivation to its
+// SerializeTaprootBip32Derivation serializes a TaprootBip32Derivation to its
 // raw byte representation.
-func serializeTaprootBip32Derivation(d *TaprootBip32Derivation) ([]byte,
+func SerializeTaprootBip32Derivation(d *TaprootBip32Derivation) ([]byte,
 	error) {
 
 	var buf bytes.Buffer

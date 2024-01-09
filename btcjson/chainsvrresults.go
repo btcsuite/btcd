@@ -117,6 +117,14 @@ type GetBlockVerboseTxResult struct {
 	NextHash      string        `json:"nextblockhash,omitempty"`
 }
 
+// GetChainTipsResult models the data from the getchaintips command.
+type GetChainTipsResult struct {
+	Height    int32  `json:"height"`
+	Hash      string `json:"hash"`
+	BranchLen int32  `json:"branchlen"`
+	Status    string `json:"status"`
+}
+
 // GetChainTxStatsResult models the data from the getchaintxstats command.
 type GetChainTxStatsResult struct {
 	Time                   int64   `json:"time"`
@@ -139,9 +147,10 @@ type CreateMultiSigResult struct {
 // DecodeScriptResult models the data returned from the decodescript command.
 type DecodeScriptResult struct {
 	Asm       string   `json:"asm"`
-	ReqSigs   int32    `json:"reqSigs,omitempty"`
+	ReqSigs   int32    `json:"reqSigs,omitempty"` // Deprecated: removed in Bitcoin Core
 	Type      string   `json:"type"`
-	Addresses []string `json:"addresses,omitempty"`
+	Address   string   `json:"address,omitempty"`
+	Addresses []string `json:"addresses,omitempty"` // Deprecated: removed in Bitcoin Core
 	P2sh      string   `json:"p2sh,omitempty"`
 }
 
@@ -429,9 +438,10 @@ type GetRawMempoolVerboseResult struct {
 type ScriptPubKeyResult struct {
 	Asm       string   `json:"asm"`
 	Hex       string   `json:"hex,omitempty"`
-	ReqSigs   int32    `json:"reqSigs,omitempty"`
+	ReqSigs   int32    `json:"reqSigs,omitempty"` // Deprecated: removed in Bitcoin Core
 	Type      string   `json:"type"`
-	Addresses []string `json:"addresses,omitempty"`
+	Address   string   `json:"address,omitempty"`
+	Addresses []string `json:"addresses,omitempty"` // Deprecated: removed in Bitcoin Core
 }
 
 // GetTxOutResult models the data from the gettxout command.

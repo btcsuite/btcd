@@ -93,7 +93,7 @@ services:
   btcd:
     container_name: btcd
     hostname: btcd
-    image: btcsuite/btcd:latest
+    build: https://github.com/btcsuite/btcd.git#master
     restart: unless-stopped
     volumes:
       - btcd-data:/root/.btcd
@@ -115,7 +115,7 @@ services:
   btcd:
     container_name: btcd
     hostname: btcd
-    image: btcsuite/btcd:latest
+    build: https://github.com/btcsuite/btcd.git#master
     restart: unless-stopped
     volumes:
       - btcd-data:/root/.btcd
@@ -142,7 +142,7 @@ services:
   btcd:
     container_name: btcd
     hostname: btcd
-    image: btcsuite/btcd:latest
+    build: https://github.com/btcsuite/btcd.git#master
     restart: unless-stopped
     volumes:
       - btcd-data:/root/.btcd

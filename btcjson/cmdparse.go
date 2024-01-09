@@ -495,7 +495,7 @@ func assignField(paramNum int, fieldName string, dest reflect.Value, src reflect
 // by this package are already registered by default.
 //
 // The arguments are most efficient when they are the exact same type as the
-// underlying field in the command struct associated with the the method,
+// underlying field in the command struct associated with the method,
 // however this function also will perform a variety of conversions to make it
 // more flexible.  This allows, for example, command line args which are strings
 // to be passed unaltered.  In particular, the following conversions are

@@ -74,6 +74,9 @@ type blockNode struct {
 	// parent is the parent block for this node.
 	parent *blockNode
 
+	// ancestor is a block that is more than one block back from this node.
+	ancestor *blockNode
+
 	// hash is the double sha 256 of the block.
 	hash chainhash.Hash
 
@@ -119,6 +122,7 @@ func initBlockNode(node *blockNode, blockHeader *wire.BlockHeader, parent *block
 		node.parent = parent
 		node.height = parent.height + 1
 		node.workSum = node.workSum.Add(parent.workSum, node.workSum)
+		node.buildAncestor()
 	}
 }
 
@@ -150,6 +154,26 @@ func (node *blockNode) Header() wire.BlockHeader {
 	}
 }
 
+// invertLowestOne turns the lowest 1 bit in the binary representation of a number into a 0.
+func invertLowestOne(n int32) int32 {
+	return n & (n - 1)
+}
+
+// getAncestorHeight returns a suitable ancestor for the node at the given height.
+func getAncestorHeight(height int32) int32 {
+	// We pop off two 1 bits of the height.
+	// This results in a maximum of 330 steps to go back to an ancestor
+	// from height 1<<29.
+	return invertLowestOne(invertLowestOne(height))
+}
+
+// buildAncestor sets an ancestor for the given blocknode.
+func (node *blockNode) buildAncestor() {
+	if node.parent != nil {
+		node.ancestor = node.parent.Ancestor(getAncestorHeight(node.height))
+	}
+}
+
 // Ancestor returns the ancestor block node at the provided height by following
 // the chain backwards from this node.  The returned block will be nil when a
 // height is requested that is after the height of the passed node or is less
@@ -161,12 +185,79 @@ func (node *blockNode) Ancestor(height int32) *blockNode {
 		return nil
 	}
 
+	// Traverse back until we find the desired node.
 	n := node
-	for ; n != nil && n.height != height; n = n.parent {
-		// Intentionally left blank
+	for n != nil && n.height != height {
+		// If there's an ancestor available, use it. Otherwise, just
+		// follow the parent.
+		if n.ancestor != nil {
+			// Calculate the height for this ancestor and
+			// check if we can take the ancestor skip.
+			if getAncestorHeight(n.height) >= height {
+				n = n.ancestor
+				continue
+			}
+		}
+
+		// We couldn't take the ancestor skip so traverse back to the parent.
+		n = n.parent
 	}
 
 	return n
+}
+
+// Height returns the blockNode's height in the chain.
+//
+// NOTE: Part of the HeaderCtx interface.
+func (node *blockNode) Height() int32 {
+	return node.height
+}
+
+// Bits returns the blockNode's nBits.
+//
+// NOTE: Part of the HeaderCtx interface.
+func (node *blockNode) Bits() uint32 {
+	return node.bits
+}
+
+// Timestamp returns the blockNode's timestamp.
+//
+// NOTE: Part of the HeaderCtx interface.
+func (node *blockNode) Timestamp() int64 {
+	return node.timestamp
+}
+
+// Parent returns the blockNode's parent.
+//
+// NOTE: Part of the HeaderCtx interface.
+func (node *blockNode) Parent() HeaderCtx {
+	if node.parent == nil {
+		// This is required since node.parent is a *blockNode and if we
+		// do not explicitly return nil here, the caller may fail when
+		// nil-checking this.
+		return nil
+	}
+
+	return node.parent
+}
+
+// RelativeAncestorCtx returns the blockNode's ancestor that is distance blocks
+// before it in the chain. This is equivalent to the RelativeAncestor function
+// below except that the return type is different.
+//
+// This function is safe for concurrent access.
+//
+// NOTE: Part of the HeaderCtx interface.
+func (node *blockNode) RelativeAncestorCtx(distance int32) HeaderCtx {
+	ancestor := node.RelativeAncestor(distance)
+	if ancestor == nil {
+		// This is required since RelativeAncestor returns a *blockNode
+		// and if we do not explicitly return nil here, the caller may
+		// fail when nil-checking this.
+		return nil
+	}
+
+	return ancestor
 }
 
 // RelativeAncestor returns the ancestor block node a relative 'distance' blocks
@@ -182,17 +273,17 @@ func (node *blockNode) RelativeAncestor(distance int32) *blockNode {
 // prior to, and including, the block node.
 //
 // This function is safe for concurrent access.
-func (node *blockNode) CalcPastMedianTime() time.Time {
+func CalcPastMedianTime(node HeaderCtx) time.Time {
 	// Create a slice of the previous few block timestamps used to calculate
 	// the median per the number defined by the constant medianTimeBlocks.
 	timestamps := make([]int64, medianTimeBlocks)
 	numNodes := 0
 	iterNode := node
 	for i := 0; i < medianTimeBlocks && iterNode != nil; i++ {
-		timestamps[i] = iterNode.timestamp
+		timestamps[i] = iterNode.Timestamp()
 		numNodes++
 
-		iterNode = iterNode.parent
+		iterNode = iterNode.Parent()
 	}
 
 	// Prune the slice to the actual number of available timestamps which
@@ -216,6 +307,10 @@ func (node *blockNode) CalcPastMedianTime() time.Time {
 	medianTimestamp := timestamps[numNodes/2]
 	return time.Unix(medianTimestamp, 0)
 }
+
+// A compile-time assertion to ensure blockNode implements the HeaderCtx
+// interface.
+var _ HeaderCtx = (*blockNode)(nil)
 
 // blockIndex provides facilities for keeping track of an in-memory index of the
 // block chain.  Although the name block chain suggests a single chain of
@@ -317,6 +412,44 @@ func (bi *blockIndex) UnsetStatusFlags(node *blockNode, flags blockStatus) {
 	node.status &^= flags
 	bi.dirty[node] = struct{}{}
 	bi.Unlock()
+}
+
+// InactiveTips returns all the block nodes that aren't in the best chain.
+//
+// This function is safe for concurrent access.
+func (bi *blockIndex) InactiveTips(bestChain *chainView) []*blockNode {
+	bi.RLock()
+	defer bi.RUnlock()
+
+	// Look through the entire blockindex and look for nodes that aren't in
+	// the best chain. We're gonna keep track of all the orphans and the parents
+	// of the orphans.
+	orphans := make(map[chainhash.Hash]*blockNode)
+	orphanParent := make(map[chainhash.Hash]*blockNode)
+	for hash, node := range bi.index {
+		found := bestChain.Contains(node)
+		if !found {
+			orphans[hash] = node
+			orphanParent[node.parent.hash] = node.parent
+		}
+	}
+
+	// If an orphan isn't pointed to by another orphan, it is a chain tip.
+	//
+	// We can check this by looking for the orphan in the orphan parent map.
+	// If the orphan exists in the orphan parent map, it means that another
+	// orphan is pointing to it.
+	tips := make([]*blockNode, 0, len(orphans))
+	for hash, orphan := range orphans {
+		_, found := orphanParent[hash]
+		if !found {
+			tips = append(tips, orphan)
+		}
+
+		delete(orphanParent, hash)
+	}
+
+	return tips
 }
 
 // flushToDB writes all dirty block nodes to the database. If all writes

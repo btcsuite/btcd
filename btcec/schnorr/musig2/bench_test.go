@@ -45,14 +45,9 @@ func genSigner(t *testing.B) signer {
 		t.Fatalf("unable to gen priv key: %v", err)
 	}
 
-	pubKey, err := schnorr.ParsePubKey(
-		schnorr.SerializePubKey(privKey.PubKey()),
-	)
-	if err != nil {
-		t.Fatalf("unable to gen key: %v", err)
-	}
+	pubKey := privKey.PubKey()
 
-	nonces, err := GenNonces()
+	nonces, err := GenNonces(WithPublicKey(pubKey))
 	if err != nil {
 		t.Fatalf("unable to gen nonces: %v", err)
 	}
@@ -185,7 +180,7 @@ func BenchmarkPartialVerify(b *testing.B) {
 				for i := 0; i < b.N; i++ {
 					ok = sig.Verify(
 						signers[0].nonces.PubNonce, combinedNonce,
-						keys, pubKey, msg,
+						keys, pubKey, msg, signOpts...,
 					)
 					if !ok {
 						b.Fatalf("generated invalid sig!")

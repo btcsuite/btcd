@@ -5,7 +5,7 @@
 /*
 Package txsort provides the transaction sorting according to BIP 69.
 
-Overview
+# Overview
 
 BIP 69 defines a standard lexicographical sort order of transaction inputs and
 outputs.  This is useful to standardize transactions for faster multi-party

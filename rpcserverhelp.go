@@ -84,9 +84,10 @@ var helpDescsEnUS = map[string]string{
 	// ScriptPubKeyResult help.
 	"scriptpubkeyresult-asm":       "Disassembly of the script",
 	"scriptpubkeyresult-hex":       "Hex-encoded bytes of the script",
-	"scriptpubkeyresult-reqSigs":   "The number of required signatures",
+	"scriptpubkeyresult-reqSigs":   "(DEPRECATED) The number of required signatures",
 	"scriptpubkeyresult-type":      "The type of the script (e.g. 'pubkeyhash')",
-	"scriptpubkeyresult-addresses": "The bitcoin addresses associated with this script",
+	"scriptpubkeyresult-address":   "The bitcoin address associated with this script (only if a well-defined address exists)",
+	"scriptpubkeyresult-addresses": "(DEPRECATED) The bitcoin addresses associated with this script",
 
 	// Vout help.
 	"vout-value":        "The amount in BTC",
@@ -106,9 +107,10 @@ var helpDescsEnUS = map[string]string{
 
 	// DecodeScriptResult help.
 	"decodescriptresult-asm":       "Disassembly of the script",
-	"decodescriptresult-reqSigs":   "The number of required signatures",
+	"decodescriptresult-reqSigs":   "(DEPRECATED) The number of required signatures",
 	"decodescriptresult-type":      "The type of the script (e.g. 'pubkeyhash')",
-	"decodescriptresult-addresses": "The bitcoin addresses associated with this script",
+	"decodescriptresult-address":   "The bitcoin address associated with this script (only if a well-defined address exists)",
+	"decodescriptresult-addresses": "(DEPRECATED) The bitcoin addresses associated with this script",
 	"decodescriptresult-p2sh":      "The script hash for use in pay-to-script-hash transactions (only present if the provided redeem script is not already a pay-to-script-hash script)",
 
 	// DecodeScriptCmd help.
@@ -346,6 +348,15 @@ var helpDescsEnUS = map[string]string{
 	"getblocktemplate--condition1": "mode=proposal, rejected",
 	"getblocktemplate--condition2": "mode=proposal, accepted",
 	"getblocktemplate--result1":    "An error string which represents why the proposal was rejected or nothing if accepted",
+
+	// GetChainTipsResult help.
+	"getchaintipsresult-chaintips": "The chaintips that this node is aware of",
+	"getchaintipsresult-height":    "The height of the chain tip",
+	"getchaintipsresult-hash":      "The block hash of the chain tip",
+	"getchaintipsresult-branchlen": "Returns zero for main chain. Otherwise is the length of branch connecting the tip to the main chain",
+	"getchaintipsresult-status":    "Status of the chain. Returns \"active\" for the main chain",
+	// GetChainTipsCmd help.
+	"getchaintips--synopsis": "Returns information about all known tips in the block tree, including the main chain as well as orphaned branches.",
 
 	// GetCFilterCmd help.
 	"getcfilter--synopsis":  "Returns a block's committed filter given its hash.",
@@ -728,6 +739,7 @@ var rpcResultTypes = map[string][]interface{}{
 	"getblockheader":         {(*string)(nil), (*btcjson.GetBlockHeaderVerboseResult)(nil)},
 	"getblocktemplate":       {(*btcjson.GetBlockTemplateResult)(nil), (*string)(nil), nil},
 	"getblockchaininfo":      {(*btcjson.GetBlockChainInfoResult)(nil)},
+	"getchaintips":           {(*[]btcjson.GetChainTipsResult)(nil)},
 	"getcfilter":             {(*string)(nil)},
 	"getcfilterheader":       {(*string)(nil)},
 	"getconnectioncount":     {(*int32)(nil)},
