@@ -82,7 +82,7 @@ func RawTxInTaprootSignature(tx *wire.MsgTx, sigHashes *TxSigHashes, idx int,
 
 	// Before we sign the sighash, we'll need to apply the taptweak to the
 	// private key based on the tapScriptRootHash.
-	privKeyTweak := TweakTaprootPrivKey(key, tapScriptRootHash)
+	privKeyTweak := TweakTaprootPrivKey(*key, tapScriptRootHash)
 
 	// With the sighash constructed, we can sign it with the specified
 	// private key.
@@ -95,7 +95,7 @@ func RawTxInTaprootSignature(tx *wire.MsgTx, sigHashes *TxSigHashes, idx int,
 
 	// If this is sighash default, then we can just return the signature
 	// directly.
-	if hashType&SigHashDefault == SigHashDefault {
+	if hashType == SigHashDefault {
 		return sig, nil
 	}
 

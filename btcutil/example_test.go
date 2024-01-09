@@ -20,7 +20,7 @@ func ExampleAmount() {
 	// Output:
 	// Zero Satoshi: 0 BTC
 	// 100,000,000 Satoshis: 1 BTC
-	// 100,000 Satoshis: 0.001 BTC
+	// 100,000 Satoshis: 0.00100000 BTC
 }
 
 func ExampleNewAmount() {
@@ -69,7 +69,7 @@ func ExampleAmount_unitConversions() {
 
 	// Output:
 	// Satoshi to kBTC: 444.333222111 kBTC
-	// Satoshi to BTC: 444333.222111 BTC
+	// Satoshi to BTC: 444333.22211100 BTC
 	// Satoshi to MilliBTC: 444333222.111 mBTC
 	// Satoshi to MicroBTC: 444333222111 μBTC
 	// Satoshi to Satoshi: 44433322211100 Satoshi

@@ -5,7 +5,7 @@
 /*
 Package database provides a block and metadata storage database.
 
-Overview
+# Overview
 
 As of Feb 2016, there are over 400,000 blocks in the Bitcoin block chain and
 and over 112 million transactions (which turns out to be over 60GB of data).
@@ -18,15 +18,15 @@ storage, and strict checksums in key areas to ensure data integrity.
 
 A quick overview of the features database provides are as follows:
 
- - Key/value metadata store
- - Bitcoin block storage
- - Efficient retrieval of block headers and regions (transactions, scripts, etc)
- - Read-only and read-write transactions with both manual and managed modes
- - Nested buckets
- - Supports registration of backend databases
- - Comprehensive test coverage
+  - Key/value metadata store
+  - Bitcoin block storage
+  - Efficient retrieval of block headers and regions (transactions, scripts, etc)
+  - Read-only and read-write transactions with both manual and managed modes
+  - Nested buckets
+  - Supports registration of backend databases
+  - Comprehensive test coverage
 
-Database
+# Database
 
 The main entry point is the DB interface.  It exposes functionality for
 transactional-based access and storage of metadata and block data.  It is
@@ -43,14 +43,14 @@ The Begin function provides an unmanaged transaction while the View and Update
 functions provide a managed transaction.  These are described in more detail
 below.
 
-Transactions
+# Transactions
 
 The Tx interface provides facilities for rolling back or committing changes that
 took place while the transaction was active.  It also provides the root metadata
 bucket under which all keys, values, and nested buckets are stored.  A
 transaction can either be read-only or read-write and managed or unmanaged.
 
-Managed versus Unmanaged Transactions
+# Managed versus Unmanaged Transactions
 
 A managed transaction is one where the caller provides a function to execute
 within the context of the transaction and the commit or rollback is handled
@@ -63,7 +63,7 @@ call Commit or Rollback when they are finished with it.  Leaving transactions
 open for long periods of time can have several adverse effects, so it is
 recommended that managed transactions are used instead.
 
-Buckets
+# Buckets
 
 The Bucket interface provides the ability to manipulate key/value pairs and
 nested buckets as well as iterate through them.
@@ -73,7 +73,7 @@ CreateBucket, CreateBucketIfNotExists, and DeleteBucket functions work with
 buckets.  The ForEach function allows the caller to provide a function to be
 called with each key/value pair and nested bucket in the current bucket.
 
-Metadata Bucket
+# Metadata Bucket
 
 As discussed above, all of the functions which are used to manipulate key/value
 pairs and nested buckets exist on the Bucket interface.  The root metadata
@@ -81,7 +81,7 @@ bucket is the upper-most bucket in which data is stored and is created at the
 same time as the database.  Use the Metadata function on the Tx interface
 to retrieve it.
 
-Nested Buckets
+# Nested Buckets
 
 The CreateBucket and CreateBucketIfNotExists functions on the Bucket interface
 provide the ability to create an arbitrary number of nested buckets.  It is

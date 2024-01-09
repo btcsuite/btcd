@@ -24,7 +24,6 @@ ARG ARCH=amd64
 FROM golang@sha256:c80567372be0d486766593cc722d3401038e2f150a0f6c5c719caa63afb4026a AS build-container
 
 ARG ARCH
-ENV GO111MODULE=on
 
 ADD . /app
 WORKDIR /app
@@ -35,7 +34,7 @@ RUN set -ex \
   && echo "Compiling for $GOARCH" \
   && go install -v . ./cmd/...
 
-FROM $ARCH/alpine:3.12
+FROM $ARCH/alpine:3.16
 
 COPY --from=build-container /go/bin /bin
 

@@ -13,7 +13,7 @@ type Bip32Derivation struct {
 	// PubKey is the raw pubkey serialized in compressed format.
 	PubKey []byte
 
-	// MasterKeyFingerprint is the finger print of the master pubkey.
+	// MasterKeyFingerprint is the fingerprint of the master pubkey.
 	MasterKeyFingerprint uint32
 
 	// Bip32Path is the BIP 32 path with child index as a distinct integer.
@@ -36,10 +36,10 @@ func (s Bip32Sorter) Less(i, j int) bool {
 	return bytes.Compare(s[i].PubKey, s[j].PubKey) < 0
 }
 
-// readBip32Derivation deserializes a byte slice containing chunks of 4 byte
+// ReadBip32Derivation deserializes a byte slice containing chunks of 4 byte
 // little endian encodings of uint32 values, the first of which is the
 // masterkeyfingerprint and the remainder of which are the derivation path.
-func readBip32Derivation(path []byte) (uint32, []uint32, error) {
+func ReadBip32Derivation(path []byte) (uint32, []uint32, error) {
 	// BIP-0174 defines the derivation path being encoded as
 	//   "<32-bit uint> <32-bit uint>*"
 	// with the asterisk meaning 0 to n times. Which in turn means that an

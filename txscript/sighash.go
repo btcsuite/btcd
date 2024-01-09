@@ -169,10 +169,18 @@ func calcSignatureHash(sigScript []byte, hashType SigHashType, tx *wire.MsgTx, i
 	// The final hash is the double sha256 of both the serialized modified
 	// transaction and the hash type (encoded as a 4-byte little-endian
 	// value) appended.
-	wbuf := bytes.NewBuffer(make([]byte, 0, txCopy.SerializeSizeStripped()+4))
-	txCopy.SerializeNoWitness(wbuf)
-	binary.Write(wbuf, binary.LittleEndian, hashType)
-	return chainhash.DoubleHashB(wbuf.Bytes())
+	sigHashBytes := chainhash.DoubleHashRaw(func(w io.Writer) error {
+		if err := txCopy.SerializeNoWitness(w); err != nil {
+			return err
+		}
+		err := binary.Write(w, binary.LittleEndian, hashType)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+
+	return sigHashBytes[:]
 }
 
 // calcWitnessSignatureHashRaw computes the sighash digest of a transaction's
@@ -197,99 +205,107 @@ func calcWitnessSignatureHashRaw(subScript []byte, sigHashes *TxSigHashes,
 		return nil, fmt.Errorf("idx %d but %d txins", idx, len(tx.TxIn))
 	}
 
-	// We'll utilize this buffer throughout to incrementally calculate
-	// the signature hash for this transaction.
-	var sigHash bytes.Buffer
+	sigHashBytes := chainhash.DoubleHashRaw(func(w io.Writer) error {
+		var scratch [8]byte
 
-	// First write out, then encode the transaction's version number.
-	var bVersion [4]byte
-	binary.LittleEndian.PutUint32(bVersion[:], uint32(tx.Version))
-	sigHash.Write(bVersion[:])
+		// First write out, then encode the transaction's version
+		// number.
+		binary.LittleEndian.PutUint32(scratch[:], uint32(tx.Version))
+		w.Write(scratch[:4])
 
-	// Next write out the possibly pre-calculated hashes for the sequence
-	// numbers of all inputs, and the hashes of the previous outs for all
-	// outputs.
-	var zeroHash chainhash.Hash
+		// Next write out the possibly pre-calculated hashes for the
+		// sequence numbers of all inputs, and the hashes of the
+		// previous outs for all outputs.
+		var zeroHash chainhash.Hash
 
-	// If anyone can pay isn't active, then we can use the cached
-	// hashPrevOuts, otherwise we just write zeroes for the prev outs.
-	if hashType&SigHashAnyOneCanPay == 0 {
-		sigHash.Write(sigHashes.HashPrevOutsV0[:])
-	} else {
-		sigHash.Write(zeroHash[:])
-	}
+		// If anyone can pay isn't active, then we can use the cached
+		// hashPrevOuts, otherwise we just write zeroes for the prev
+		// outs.
+		if hashType&SigHashAnyOneCanPay == 0 {
+			w.Write(sigHashes.HashPrevOutsV0[:])
+		} else {
+			w.Write(zeroHash[:])
+		}
 
-	// If the sighash isn't anyone can pay, single, or none, the use the
-	// cached hash sequences, otherwise write all zeroes for the
-	// hashSequence.
-	if hashType&SigHashAnyOneCanPay == 0 &&
-		hashType&sigHashMask != SigHashSingle &&
-		hashType&sigHashMask != SigHashNone {
-		sigHash.Write(sigHashes.HashSequenceV0[:])
-	} else {
-		sigHash.Write(zeroHash[:])
-	}
+		// If the sighash isn't anyone can pay, single, or none, the
+		// use the cached hash sequences, otherwise write all zeroes
+		// for the hashSequence.
+		if hashType&SigHashAnyOneCanPay == 0 &&
+			hashType&sigHashMask != SigHashSingle &&
+			hashType&sigHashMask != SigHashNone {
 
-	txIn := tx.TxIn[idx]
+			w.Write(sigHashes.HashSequenceV0[:])
+		} else {
+			w.Write(zeroHash[:])
+		}
 
-	// Next, write the outpoint being spent.
-	sigHash.Write(txIn.PreviousOutPoint.Hash[:])
-	var bIndex [4]byte
-	binary.LittleEndian.PutUint32(bIndex[:], txIn.PreviousOutPoint.Index)
-	sigHash.Write(bIndex[:])
+		txIn := tx.TxIn[idx]
 
-	if isWitnessPubKeyHashScript(subScript) {
-		// The script code for a p2wkh is a length prefix varint for
-		// the next 25 bytes, followed by a re-creation of the original
-		// p2pkh pk script.
-		sigHash.Write([]byte{0x19})
-		sigHash.Write([]byte{OP_DUP})
-		sigHash.Write([]byte{OP_HASH160})
-		sigHash.Write([]byte{OP_DATA_20})
-		sigHash.Write(extractWitnessPubKeyHash(subScript))
-		sigHash.Write([]byte{OP_EQUALVERIFY})
-		sigHash.Write([]byte{OP_CHECKSIG})
-	} else {
-		// For p2wsh outputs, and future outputs, the script code is
-		// the original script, with all code separators removed,
-		// serialized with a var int length prefix.
-		wire.WriteVarBytes(&sigHash, 0, subScript)
-	}
+		// Next, write the outpoint being spent.
+		w.Write(txIn.PreviousOutPoint.Hash[:])
+		var bIndex [4]byte
+		binary.LittleEndian.PutUint32(
+			bIndex[:], txIn.PreviousOutPoint.Index,
+		)
+		w.Write(bIndex[:])
 
-	// Next, add the input amount, and sequence number of the input being
-	// signed.
-	var bAmount [8]byte
-	binary.LittleEndian.PutUint64(bAmount[:], uint64(amt))
-	sigHash.Write(bAmount[:])
-	var bSequence [4]byte
-	binary.LittleEndian.PutUint32(bSequence[:], txIn.Sequence)
-	sigHash.Write(bSequence[:])
+		if isWitnessPubKeyHashScript(subScript) {
+			// The script code for a p2wkh is a length prefix
+			// varint for the next 25 bytes, followed by a
+			// re-creation of the original p2pkh pk script.
+			w.Write([]byte{0x19})
+			w.Write([]byte{OP_DUP})
+			w.Write([]byte{OP_HASH160})
+			w.Write([]byte{OP_DATA_20})
+			w.Write(extractWitnessPubKeyHash(subScript))
+			w.Write([]byte{OP_EQUALVERIFY})
+			w.Write([]byte{OP_CHECKSIG})
+		} else {
+			// For p2wsh outputs, and future outputs, the script
+			// code is the original script, with all code
+			// separators removed, serialized with a var int length
+			// prefix.
+			wire.WriteVarBytes(w, 0, subScript)
+		}
 
-	// If the current signature mode isn't single, or none, then we can
-	// re-use the pre-generated hashoutputs sighash fragment. Otherwise,
-	// we'll serialize and add only the target output index to the signature
-	// pre-image.
-	if hashType&sigHashMask != SigHashSingle &&
-		hashType&sigHashMask != SigHashNone {
-		sigHash.Write(sigHashes.HashOutputsV0[:])
-	} else if hashType&sigHashMask == SigHashSingle && idx < len(tx.TxOut) {
-		var b bytes.Buffer
-		wire.WriteTxOut(&b, 0, 0, tx.TxOut[idx])
-		sigHash.Write(chainhash.DoubleHashB(b.Bytes()))
-	} else {
-		sigHash.Write(zeroHash[:])
-	}
+		// Next, add the input amount, and sequence number of the input
+		// being signed.
+		binary.LittleEndian.PutUint64(scratch[:], uint64(amt))
+		w.Write(scratch[:])
+		binary.LittleEndian.PutUint32(scratch[:], txIn.Sequence)
+		w.Write(scratch[:4])
 
-	// Finally, write out the transaction's locktime, and the sig hash
-	// type.
-	var bLockTime [4]byte
-	binary.LittleEndian.PutUint32(bLockTime[:], tx.LockTime)
-	sigHash.Write(bLockTime[:])
-	var bHashType [4]byte
-	binary.LittleEndian.PutUint32(bHashType[:], uint32(hashType))
-	sigHash.Write(bHashType[:])
+		// If the current signature mode isn't single, or none, then we
+		// can re-use the pre-generated hashoutputs sighash fragment.
+		// Otherwise, we'll serialize and add only the target output
+		// index to the signature pre-image.
+		if hashType&sigHashMask != SigHashSingle &&
+			hashType&sigHashMask != SigHashNone {
 
-	return chainhash.DoubleHashB(sigHash.Bytes()), nil
+			w.Write(sigHashes.HashOutputsV0[:])
+		} else if hashType&sigHashMask == SigHashSingle &&
+			idx < len(tx.TxOut) {
+
+			h := chainhash.DoubleHashRaw(func(tw io.Writer) error {
+				wire.WriteTxOut(tw, 0, 0, tx.TxOut[idx])
+				return nil
+			})
+			w.Write(h[:])
+		} else {
+			w.Write(zeroHash[:])
+		}
+
+		// Finally, write out the transaction's locktime, and the sig
+		// hash type.
+		binary.LittleEndian.PutUint32(scratch[:], tx.LockTime)
+		w.Write(scratch[:4])
+		binary.LittleEndian.PutUint32(scratch[:], uint32(hashType))
+		w.Write(scratch[:4])
+
+		return nil
+	})
+
+	return sigHashBytes[:], nil
 }
 
 // CalcWitnessSigHash computes the sighash digest for the specified input of
@@ -348,7 +364,7 @@ type taprootSigHashOptions struct {
 	codeSepPos uint32
 }
 
-// writeDigestExtensions writes out the sighah mesage extensiosn defined by the
+// writeDigestExtensions writes out the sighash message extension defined by the
 // current active sigHashExtFlags.
 func (t *taprootSigHashOptions) writeDigestExtensions(w io.Writer) error {
 	switch t.extFlag {
@@ -588,7 +604,7 @@ func calcTaprootSignatureHashRaw(sigHashes *TxSigHashes, hType SigHashType,
 
 // CalcTaprootSignatureHash computes the sighash digest of a transaction's
 // taproot-spending input using the new sighash digest algorithm described in
-// BIP 341. As the new digest algoriths may require the digest to commit to the
+// BIP 341. As the new digest algorithms may require the digest to commit to the
 // entire prev output, a PrevOutputFetcher argument is required to obtain the
 // needed information. The TxSigHashes pre-computed sighash midstate MUST be
 // specified.

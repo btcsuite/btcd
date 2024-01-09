@@ -13,10 +13,10 @@ import (
 
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/blockchain/indexers"
+	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcd/btcutil"
 )
 
 var zeroHash = chainhash.Hash{}
@@ -287,6 +287,16 @@ func (bi *blockImporter) Import() chan *importResults {
 	// the status handler when done.
 	go func() {
 		bi.wg.Wait()
+
+		// Flush the changes made to the blockchain.
+		log.Info("Flushing blockchain caches to the disk...")
+		if err := bi.chain.FlushUtxoCache(blockchain.FlushRequired); err != nil {
+			log.Errorf("Error while flushing the blockchain state: %v", err)
+			bi.errChan <- err
+			return
+		}
+		log.Info("Done flushing blockchain caches to disk")
+
 		bi.doneChan <- true
 	}()
 

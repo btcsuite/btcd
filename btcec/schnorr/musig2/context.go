@@ -234,21 +234,21 @@ func NewContext(signingKey *btcec.PrivateKey, shouldSort bool,
 		opts.keySet = make([]*btcec.PublicKey, 0, opts.numSigners)
 		opts.keySet = append(opts.keySet, pubKey)
 
-		// If early nonce generation is specified, then we'll generate
-		// the nonce now to pass in to the session once all the callers
-		// are known.
-		if opts.earlyNonce {
-			var err error
-			ctx.sessionNonce, err = GenNonces(
-				WithNonceSecretKeyAux(signingKey),
-			)
-			if err != nil {
-				return nil, err
-			}
-		}
-
 	default:
 		return nil, ErrSignersNotSpecified
+	}
+
+	// If early nonce generation is specified, then we'll generate the
+	// nonce now to pass in to the session once all the callers are known.
+	if opts.earlyNonce {
+		var err error
+		ctx.sessionNonce, err = GenNonces(
+			WithPublicKey(ctx.pubKey),
+			WithNonceSecretKeyAux(signingKey),
+		)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return ctx, nil
@@ -483,6 +483,7 @@ func (c *Context) NewSession(options ...SessionOption) (*Session, error) {
 		// in some auxiliary information to strengthen the nonce
 		// generated.
 		localNonces, err = GenNonces(
+			WithPublicKey(c.pubKey),
 			WithNonceSecretKeyAux(c.signingKey),
 			WithNonceCombinedKeyAux(c.combinedKey.FinalKey),
 		)
@@ -560,7 +561,7 @@ func (s *Session) Sign(msg [32]byte,
 		return nil, ErrSigningContextReuse
 
 	// We also need to make sure we have the combined nonce, otherwise this
-	// funciton was called too early.
+	// function was called too early.
 	case s.combinedNonce == nil:
 		return nil, ErrCombinedNonceUnavailable
 	}

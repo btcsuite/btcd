@@ -51,7 +51,7 @@ const (
 // method to get the serialized representation (including values that overflow).
 //
 // Then, whenever data is interpreted as an integer, it is converted to this
-// type by using the makeScriptNum function which will return an error if the
+// type by using the MakeScriptNum function which will return an error if the
 // number is out of range or not minimally encoded depending on parameters.
 // Since all numeric opcodes involve pulling data from the stack and
 // interpreting it as an integer, it provides the required behavior.
@@ -89,18 +89,19 @@ func checkMinimalDataEncoding(v []byte) error {
 // Bytes returns the number serialized as a little endian with a sign bit.
 //
 // Example encodings:
-//       127 -> [0x7f]
-//      -127 -> [0xff]
-//       128 -> [0x80 0x00]
-//      -128 -> [0x80 0x80]
-//       129 -> [0x81 0x00]
-//      -129 -> [0x81 0x80]
-//       256 -> [0x00 0x01]
-//      -256 -> [0x00 0x81]
-//     32767 -> [0xff 0x7f]
-//    -32767 -> [0xff 0xff]
-//     32768 -> [0x00 0x80 0x00]
-//    -32768 -> [0x00 0x80 0x80]
+//
+//	   127 -> [0x7f]
+//	  -127 -> [0xff]
+//	   128 -> [0x80 0x00]
+//	  -128 -> [0x80 0x80]
+//	   129 -> [0x81 0x00]
+//	  -129 -> [0x81 0x80]
+//	   256 -> [0x00 0x01]
+//	  -256 -> [0x00 0x81]
+//	 32767 -> [0xff 0x7f]
+//	-32767 -> [0xff 0xff]
+//	 32768 -> [0x00 0x80 0x00]
+//	-32768 -> [0x00 0x80 0x80]
 func (n scriptNum) Bytes() []byte {
 	// Zero encodes as an empty byte slice.
 	if n == 0 {
@@ -151,7 +152,7 @@ func (n scriptNum) Bytes() []byte {
 // provide this behavior.
 //
 // In practice, for most opcodes, the number should never be out of range since
-// it will have been created with makeScriptNum using the defaultScriptLen
+// it will have been created with MakeScriptNum using the defaultScriptLen
 // value, which rejects them.  In case something in the future ends up calling
 // this function against the result of some arithmetic, which IS allowed to be
 // out of range before being reinterpreted as an integer, this will provide the
@@ -168,7 +169,7 @@ func (n scriptNum) Int32() int32 {
 	return int32(n)
 }
 
-// makeScriptNum interprets the passed serialized bytes as an encoded integer
+// MakeScriptNum interprets the passed serialized bytes as an encoded integer
 // and returns the result as a script number.
 //
 // Since the consensus rules dictate that serialized bytes interpreted as ints
@@ -194,9 +195,9 @@ func (n scriptNum) Int32() int32 {
 // overflows.
 //
 // See the Bytes function documentation for example encodings.
-func makeScriptNum(v []byte, requireMinimal bool, scriptNumLen int) (scriptNum, error) {
+func MakeScriptNum(v []byte, requireMinimal bool, scriptNumLen int) (scriptNum, error) {
 	// Interpreting data requires that it is not larger than
-	// the the passed scriptNumLen value.
+	// the passed scriptNumLen value.
 	if len(v) > scriptNumLen {
 		str := fmt.Sprintf("numeric value encoded as %x is %d bytes "+
 			"which exceeds the max allowed of %d", v, len(v),

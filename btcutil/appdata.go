@@ -95,11 +95,12 @@ func appDataDir(goos, appName string, roaming bool) string {
 // (%LOCALAPPDATA%) that is used by default.
 //
 // Example results:
-//  dir := AppDataDir("myapp", false)
-//   POSIX (Linux/BSD): ~/.myapp
-//   Mac OS: $HOME/Library/Application Support/Myapp
-//   Windows: %LOCALAPPDATA%\Myapp
-//   Plan 9: $home/myapp
+//
+//	dir := AppDataDir("myapp", false)
+//	 POSIX (Linux/BSD): ~/.myapp
+//	 Mac OS: $HOME/Library/Application Support/Myapp
+//	 Windows: %LOCALAPPDATA%\Myapp
+//	 Plan 9: $home/myapp
 func AppDataDir(appName string, roaming bool) string {
 	return appDataDir(runtime.GOOS, appName, roaming)
 }

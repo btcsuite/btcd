@@ -318,13 +318,14 @@ func (iter *Iterator) ForceReseek() {
 // unexpected keys and/or values.
 //
 // For example:
-//   iter := t.Iterator(nil, nil)
-//   for iter.Next() {
-//   	if someCondition {
-//   		t.Delete(iter.Key())
-//   		iter.ForceReseek()
-//   	}
-//   }
+//
+//	iter := t.Iterator(nil, nil)
+//	for iter.Next() {
+//		if someCondition {
+//			t.Delete(iter.Key())
+//			iter.ForceReseek()
+//		}
+//	}
 func (t *Mutable) Iterator(startKey, limitKey []byte) *Iterator {
 	iter := &Iterator{
 		t:        t,

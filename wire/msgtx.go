@@ -5,10 +5,11 @@
 package wire
 
 import (
-	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"strconv"
+	"strings"
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 )
@@ -92,7 +93,7 @@ const (
 	// scripts per transaction being simultaneously deserialized by 125
 	// peers.  Thus, the peak usage of the free list is 12,500 * 512 =
 	// 6,400,000 bytes.
-	freeListMaxItems = 12500
+	freeListMaxItems = 125
 
 	// maxWitnessItemsPerInput is the maximum number of witness items to
 	// be read for the witness data for a single TxIn. This number is
@@ -145,6 +146,10 @@ const (
 	WitnessFlag TxFlag = 0x01
 )
 
+const scriptSlabSize = 1 << 22
+
+type scriptSlab [scriptSlabSize]byte
+
 // scriptFreeList defines a free list of byte slices (up to the maximum number
 // defined by the freeListMaxItems constant) that have a cap according to the
 // freeListMaxScriptSize constant.  It is used to provide temporary buffers for
@@ -153,7 +158,7 @@ const (
 //
 // The caller can obtain a buffer from the free list by calling the Borrow
 // function and should return it via the Return function when done using it.
-type scriptFreeList chan []byte
+type scriptFreeList chan *scriptSlab
 
 // Borrow returns a byte slice from the free list with a length according the
 // provided size.  A new buffer is allocated if there are any items available.
@@ -162,18 +167,14 @@ type scriptFreeList chan []byte
 // a new buffer of the appropriate size is allocated and returned.  It is safe
 // to attempt to return said buffer via the Return function as it will be
 // ignored and allowed to go the garbage collector.
-func (c scriptFreeList) Borrow(size uint64) []byte {
-	if size > freeListMaxScriptSize {
-		return make([]byte, size)
-	}
-
-	var buf []byte
+func (c scriptFreeList) Borrow() *scriptSlab {
+	var buf *scriptSlab
 	select {
 	case buf = <-c:
 	default:
-		buf = make([]byte, freeListMaxScriptSize)
+		buf = new(scriptSlab)
 	}
-	return buf[:size]
+	return buf
 }
 
 // Return puts the provided byte slice back on the free list when it has a cap
@@ -181,13 +182,7 @@ func (c scriptFreeList) Borrow(size uint64) []byte {
 // the Borrow function.  Any slices that are not of the appropriate size, such
 // as those whose size is greater than the largest allowed free list item size
 // are simply ignored so they can go to the garbage collector.
-func (c scriptFreeList) Return(buf []byte) {
-	// Ignore any buffers returned that aren't the expected size for the
-	// free list.
-	if cap(buf) != freeListMaxScriptSize {
-		return
-	}
-
+func (c scriptFreeList) Return(buf *scriptSlab) {
 	// Return the buffer to the free list when it's not full.  Otherwise let
 	// it be garbage collected.
 	select {
@@ -200,7 +195,7 @@ func (c scriptFreeList) Return(buf []byte) {
 // Create the concurrent safe free list to use for script deserialization.  As
 // previously described, this free list is maintained to significantly reduce
 // the number of allocations.
-var scriptPool scriptFreeList = make(chan []byte, freeListMaxItems)
+var scriptPool = make(scriptFreeList, freeListMaxItems)
 
 // OutPoint defines a bitcoin data type that is used to track previous
 // transaction outputs.
@@ -216,6 +211,29 @@ func NewOutPoint(hash *chainhash.Hash, index uint32) *OutPoint {
 		Hash:  *hash,
 		Index: index,
 	}
+}
+
+// NewOutPointFromString returns a new bitcoin transaction outpoint parsed from
+// the provided string, which should be in the format "hash:index".
+func NewOutPointFromString(outpoint string) (*OutPoint, error) {
+	parts := strings.Split(outpoint, ":")
+	if len(parts) != 2 {
+		return nil, errors.New("outpoint should be of the form txid:index")
+	}
+	hash, err := chainhash.NewHashFromStr(parts[0])
+	if err != nil {
+		return nil, err
+	}
+
+	outputIndex, err := strconv.ParseUint(parts[1], 10, 32)
+	if err != nil {
+		return nil, fmt.Errorf("invalid output index: %v", err)
+	}
+
+	return &OutPoint{
+		Hash:  *hash,
+		Index: uint32(outputIndex),
+	}, nil
 }
 
 // String returns the OutPoint in the human-readable form "hash:index".
@@ -267,7 +285,7 @@ func NewTxIn(prevOut *OutPoint, signatureScript []byte, witness [][]byte) *TxIn 
 // a slice of byte slices, or a stack with one or many elements.
 type TxWitness [][]byte
 
-// SerializeSize returns the number of bytes it would take to serialize the the
+// SerializeSize returns the number of bytes it would take to serialize the
 // transaction input's witness.
 func (t TxWitness) SerializeSize() int {
 	// A varint to signal the number of elements the witness has.
@@ -332,13 +350,7 @@ func (msg *MsgTx) AddTxOut(to *TxOut) {
 
 // TxHash generates the Hash for the transaction.
 func (msg *MsgTx) TxHash() chainhash.Hash {
-	// Encode the transaction and calculate double sha256 on the result.
-	// Ignore the error returns since the only way the encode could fail
-	// is being out of memory or due to nil pointers, both of which would
-	// cause a run-time panic.
-	buf := bytes.NewBuffer(make([]byte, 0, msg.SerializeSizeStripped()))
-	_ = msg.SerializeNoWitness(buf)
-	return chainhash.DoubleHashH(buf.Bytes())
+	return chainhash.DoubleHashRaw(msg.SerializeNoWitness)
 }
 
 // WitnessHash generates the hash of the transaction serialized according to
@@ -348,9 +360,7 @@ func (msg *MsgTx) TxHash() chainhash.Hash {
 // is the same as its txid.
 func (msg *MsgTx) WitnessHash() chainhash.Hash {
 	if msg.HasWitness() {
-		buf := bytes.NewBuffer(make([]byte, 0, msg.SerializeSize()))
-		_ = msg.Serialize(buf)
-		return chainhash.DoubleHashH(buf.Bytes())
+		return chainhash.DoubleHashRaw(msg.Serialize)
 	}
 
 	return msg.TxHash()
@@ -436,13 +446,25 @@ func (msg *MsgTx) Copy() *MsgTx {
 // See Deserialize for decoding transactions stored to disk, such as in a
 // database, as opposed to decoding transactions from the wire.
 func (msg *MsgTx) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) error {
-	version, err := binarySerializer.Uint32(r, littleEndian)
-	if err != nil {
+	buf := binarySerializer.Borrow()
+	defer binarySerializer.Return(buf)
+
+	sbuf := scriptPool.Borrow()
+	defer scriptPool.Return(sbuf)
+
+	err := msg.btcDecode(r, pver, enc, buf, sbuf[:])
+	return err
+}
+
+func (msg *MsgTx) btcDecode(r io.Reader, pver uint32, enc MessageEncoding,
+	buf, sbuf []byte) error {
+
+	if _, err := io.ReadFull(r, buf[:4]); err != nil {
 		return err
 	}
-	msg.Version = int32(version)
+	msg.Version = int32(littleEndian.Uint32(buf[:4]))
 
-	count, err := ReadVarInt(r, pver)
+	count, err := ReadVarIntBuf(r, pver, buf)
 	if err != nil {
 		return err
 	}
@@ -466,7 +488,7 @@ func (msg *MsgTx) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) error
 
 		// With the Segregated Witness specific fields decoded, we can
 		// now read in the actual txin count.
-		count, err = ReadVarInt(r, pver)
+		count, err = ReadVarIntBuf(r, pver, buf)
 		if err != nil {
 			return err
 		}
@@ -482,35 +504,6 @@ func (msg *MsgTx) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) error
 		return messageError("MsgTx.BtcDecode", str)
 	}
 
-	// returnScriptBuffers is a closure that returns any script buffers that
-	// were borrowed from the pool when there are any deserialization
-	// errors.  This is only valid to call before the final step which
-	// replaces the scripts with the location in a contiguous buffer and
-	// returns them.
-	returnScriptBuffers := func() {
-		for _, txIn := range msg.TxIn {
-			if txIn == nil {
-				continue
-			}
-
-			if txIn.SignatureScript != nil {
-				scriptPool.Return(txIn.SignatureScript)
-			}
-
-			for _, witnessElem := range txIn.Witness {
-				if witnessElem != nil {
-					scriptPool.Return(witnessElem)
-				}
-			}
-		}
-		for _, txOut := range msg.TxOut {
-			if txOut == nil || txOut.PkScript == nil {
-				continue
-			}
-			scriptPool.Return(txOut.PkScript)
-		}
-	}
-
 	// Deserialize the inputs.
 	var totalScriptSize uint64
 	txIns := make([]TxIn, count)
@@ -520,17 +513,16 @@ func (msg *MsgTx) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) error
 		// and needs to be returned to the pool on error.
 		ti := &txIns[i]
 		msg.TxIn[i] = ti
-		err = readTxIn(r, pver, msg.Version, ti)
+		err = readTxInBuf(r, pver, msg.Version, ti, buf, sbuf)
 		if err != nil {
-			returnScriptBuffers()
 			return err
 		}
 		totalScriptSize += uint64(len(ti.SignatureScript))
+		sbuf = sbuf[len(ti.SignatureScript):]
 	}
 
-	count, err = ReadVarInt(r, pver)
+	count, err = ReadVarIntBuf(r, pver, buf)
 	if err != nil {
-		returnScriptBuffers()
 		return err
 	}
 
@@ -538,7 +530,6 @@ func (msg *MsgTx) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) error
 	// message.  It would be possible to cause memory exhaustion and panics
 	// without a sane upper bound on this count.
 	if count > uint64(maxTxOutPerMessage) {
-		returnScriptBuffers()
 		str := fmt.Sprintf("too many output transactions to fit into "+
 			"max message size [count %d, max %d]", count,
 			maxTxOutPerMessage)
@@ -553,12 +544,12 @@ func (msg *MsgTx) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) error
 		// and needs to be returned to the pool on error.
 		to := &txOuts[i]
 		msg.TxOut[i] = to
-		err = ReadTxOut(r, pver, msg.Version, to)
+		err = readTxOutBuf(r, pver, msg.Version, to, buf, sbuf)
 		if err != nil {
-			returnScriptBuffers()
 			return err
 		}
 		totalScriptSize += uint64(len(to.PkScript))
+		sbuf = sbuf[len(to.PkScript):]
 	}
 
 	// If the transaction's flag byte isn't 0x00 at this point, then one or
@@ -568,16 +559,14 @@ func (msg *MsgTx) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) error
 			// For each input, the witness is encoded as a stack
 			// with one or more items. Therefore, we first read a
 			// varint which encodes the number of stack items.
-			witCount, err := ReadVarInt(r, pver)
+			witCount, err := ReadVarIntBuf(r, pver, buf)
 			if err != nil {
-				returnScriptBuffers()
 				return err
 			}
 
 			// Prevent a possible memory exhaustion attack by
 			// limiting the witCount value to a sane upper bound.
 			if witCount > maxWitnessItemsPerInput {
-				returnScriptBuffers()
 				str := fmt.Sprintf("too many witness items to fit "+
 					"into max message size [count %d, max %d]",
 					witCount, maxWitnessItemsPerInput)
@@ -589,23 +578,23 @@ func (msg *MsgTx) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) error
 			// item itself.
 			txin.Witness = make([][]byte, witCount)
 			for j := uint64(0); j < witCount; j++ {
-				txin.Witness[j], err = readScript(
-					r, pver, maxWitnessItemSize, "script witness item",
+				txin.Witness[j], err = readScriptBuf(
+					r, pver, buf, sbuf, maxWitnessItemSize,
+					"script witness item",
 				)
 				if err != nil {
-					returnScriptBuffers()
 					return err
 				}
 				totalScriptSize += uint64(len(txin.Witness[j]))
+				sbuf = sbuf[len(txin.Witness[j]):]
 			}
 		}
 	}
 
-	msg.LockTime, err = binarySerializer.Uint32(r, littleEndian)
-	if err != nil {
-		returnScriptBuffers()
+	if _, err := io.ReadFull(r, buf[:4]); err != nil {
 		return err
 	}
+	msg.LockTime = littleEndian.Uint32(buf[:4])
 
 	// Create a single allocation to house all of the scripts and set each
 	// input signature script and output public key script to the
@@ -636,9 +625,6 @@ func (msg *MsgTx) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) error
 		msg.TxIn[i].SignatureScript = scripts[offset:end:end]
 		offset += scriptSize
 
-		// Return the temporary script buffer to the pool.
-		scriptPool.Return(signatureScript)
-
 		for j := 0; j < len(msg.TxIn[i].Witness); j++ {
 			// Copy each item within the witness stack for this
 			// input into the contiguous buffer at the appropriate
@@ -652,10 +638,6 @@ func (msg *MsgTx) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) error
 			end := offset + witnessElemSize
 			msg.TxIn[i].Witness[j] = scripts[offset:end:end]
 			offset += witnessElemSize
-
-			// Return the temporary buffer used for the witness stack
-			// item to the pool.
-			scriptPool.Return(witnessElem)
 		}
 	}
 	for i := 0; i < len(msg.TxOut); i++ {
@@ -670,9 +652,6 @@ func (msg *MsgTx) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) error
 		end := offset + scriptSize
 		msg.TxOut[i].PkScript = scripts[offset:end:end]
 		offset += scriptSize
-
-		// Return the temporary script buffer to the pool.
-		scriptPool.Return(pkScript)
 	}
 
 	return nil
@@ -708,8 +687,18 @@ func (msg *MsgTx) DeserializeNoWitness(r io.Reader) error {
 // See Serialize for encoding transactions to be stored to disk, such as in a
 // database, as opposed to encoding transactions for the wire.
 func (msg *MsgTx) BtcEncode(w io.Writer, pver uint32, enc MessageEncoding) error {
-	err := binarySerializer.PutUint32(w, littleEndian, uint32(msg.Version))
-	if err != nil {
+	buf := binarySerializer.Borrow()
+	defer binarySerializer.Return(buf)
+
+	err := msg.btcEncode(w, pver, enc, buf)
+	return err
+}
+
+func (msg *MsgTx) btcEncode(w io.Writer, pver uint32, enc MessageEncoding,
+	buf []byte) error {
+
+	littleEndian.PutUint32(buf[:4], uint32(msg.Version))
+	if _, err := w.Write(buf[:4]); err != nil {
 		return err
 	}
 
@@ -729,26 +718,26 @@ func (msg *MsgTx) BtcEncode(w io.Writer, pver uint32, enc MessageEncoding) error
 	}
 
 	count := uint64(len(msg.TxIn))
-	err = WriteVarInt(w, pver, count)
+	err := WriteVarIntBuf(w, pver, count, buf)
 	if err != nil {
 		return err
 	}
 
 	for _, ti := range msg.TxIn {
-		err = writeTxIn(w, pver, msg.Version, ti)
+		err = writeTxInBuf(w, pver, msg.Version, ti, buf)
 		if err != nil {
 			return err
 		}
 	}
 
 	count = uint64(len(msg.TxOut))
-	err = WriteVarInt(w, pver, count)
+	err = WriteVarIntBuf(w, pver, count, buf)
 	if err != nil {
 		return err
 	}
 
 	for _, to := range msg.TxOut {
-		err = WriteTxOut(w, pver, msg.Version, to)
+		err = WriteTxOutBuf(w, pver, msg.Version, to, buf)
 		if err != nil {
 			return err
 		}
@@ -759,14 +748,16 @@ func (msg *MsgTx) BtcEncode(w io.Writer, pver uint32, enc MessageEncoding) error
 	// within the transaction.
 	if doWitness {
 		for _, ti := range msg.TxIn {
-			err = writeTxWitness(w, pver, msg.Version, ti.Witness)
+			err = writeTxWitnessBuf(w, pver, msg.Version, ti.Witness, buf)
 			if err != nil {
 				return err
 			}
 		}
 	}
 
-	return binarySerializer.PutUint32(w, littleEndian, msg.LockTime)
+	littleEndian.PutUint32(buf[:4], msg.LockTime)
+	_, err = w.Write(buf[:4])
+	return err
 }
 
 // HasWitness returns false if none of the inputs within the transaction
@@ -923,26 +914,58 @@ func NewMsgTx(version int32) *MsgTx {
 	}
 }
 
-// readOutPoint reads the next sequence of bytes from r as an OutPoint.
-func readOutPoint(r io.Reader, pver uint32, version int32, op *OutPoint) error {
+// readOutPointBuf reads the next sequence of bytes from r as an OutPoint.
+//
+// If b is non-nil, the provided buffer will be used for serializing small
+// values.  Otherwise a buffer will be drawn from the binarySerializer's pool
+// and return when the method finishes.
+//
+// NOTE: b MUST either be nil or at least an 8-byte slice.
+func readOutPointBuf(r io.Reader, pver uint32, version int32, op *OutPoint,
+	buf []byte) error {
+
 	_, err := io.ReadFull(r, op.Hash[:])
 	if err != nil {
 		return err
 	}
 
-	op.Index, err = binarySerializer.Uint32(r, littleEndian)
+	if _, err := io.ReadFull(r, buf[:4]); err != nil {
+		return err
+	}
+	op.Index = littleEndian.Uint32(buf[:4])
+
+	return nil
+}
+
+// WriteOutPoint encodes op to the bitcoin protocol encoding for an OutPoint to
+// w.
+func WriteOutPoint(w io.Writer, pver uint32, version int32, op *OutPoint) error {
+	buf := binarySerializer.Borrow()
+	defer binarySerializer.Return(buf)
+
+	err := writeOutPointBuf(w, pver, version, op, buf)
 	return err
 }
 
-// WriteOutPoint encodes op to the bitcoin protocol encoding for an OutPoint
+// writeOutPointBuf encodes op to the bitcoin protocol encoding for an OutPoint
 // to w.
-func WriteOutPoint(w io.Writer, pver uint32, version int32, op *OutPoint) error {
+//
+// If b is non-nil, the provided buffer will be used for serializing small
+// values.  Otherwise a buffer will be drawn from the binarySerializer's pool
+// and return when the method finishes.
+//
+// NOTE: b MUST either be nil or at least an 8-byte slice.
+func writeOutPointBuf(w io.Writer, pver uint32, version int32, op *OutPoint,
+	buf []byte) error {
+
 	_, err := w.Write(op.Hash[:])
 	if err != nil {
 		return err
 	}
 
-	return binarySerializer.PutUint32(w, littleEndian, op.Index)
+	littleEndian.PutUint32(buf[:4], op.Index)
+	_, err = w.Write(buf[:4])
+	return err
 }
 
 // readScript reads a variable length byte array that represents a transaction
@@ -952,8 +975,16 @@ func WriteOutPoint(w io.Writer, pver uint32, version int32, op *OutPoint) error 
 // memory exhaustion attacks and forced panics through malformed messages.  The
 // fieldName parameter is only used for the error message so it provides more
 // context in the error.
-func readScript(r io.Reader, pver uint32, maxAllowed uint32, fieldName string) ([]byte, error) {
-	count, err := ReadVarInt(r, pver)
+//
+// If b is non-nil, the provided buffer will be used for serializing small
+// values.  Otherwise a buffer will be drawn from the binarySerializer's pool
+// and return when the method finishes.
+//
+// NOTE: b MUST either be nil or at least an 8-byte slice.
+func readScriptBuf(r io.Reader, pver uint32, buf, s []byte,
+	maxAllowed uint32, fieldName string) ([]byte, error) {
+
+	count, err := ReadVarIntBuf(r, pver, buf)
 	if err != nil {
 		return nil, err
 	}
@@ -967,58 +998,96 @@ func readScript(r io.Reader, pver uint32, maxAllowed uint32, fieldName string) (
 		return nil, messageError("readScript", str)
 	}
 
-	b := scriptPool.Borrow(count)
-	_, err = io.ReadFull(r, b)
+	_, err = io.ReadFull(r, s[:count])
 	if err != nil {
-		scriptPool.Return(b)
 		return nil, err
 	}
-	return b, nil
+	return s[:count], nil
 }
 
-// readTxIn reads the next sequence of bytes from r as a transaction input
+// readTxInBuf reads the next sequence of bytes from r as a transaction input
 // (TxIn).
-func readTxIn(r io.Reader, pver uint32, version int32, ti *TxIn) error {
-	err := readOutPoint(r, pver, version, &ti.PreviousOutPoint)
+//
+// If b is non-nil, the provided buffer will be used for serializing small
+// values.  Otherwise a buffer will be drawn from the binarySerializer's pool
+// and return when the method finishes.
+//
+// NOTE: b MUST either be nil or at least an 8-byte slice.
+func readTxInBuf(r io.Reader, pver uint32, version int32, ti *TxIn,
+	buf, s []byte) error {
+
+	err := readOutPointBuf(r, pver, version, &ti.PreviousOutPoint, buf)
 	if err != nil {
 		return err
 	}
 
-	ti.SignatureScript, err = readScript(r, pver, MaxMessagePayload,
+	ti.SignatureScript, err = readScriptBuf(r, pver, buf, s, MaxMessagePayload,
 		"transaction input signature script")
 	if err != nil {
 		return err
 	}
 
-	return readElement(r, &ti.Sequence)
+	if _, err := io.ReadFull(r, buf[:4]); err != nil {
+		return err
+	}
+
+	ti.Sequence = littleEndian.Uint32(buf[:4])
+
+	return nil
 }
 
-// writeTxIn encodes ti to the bitcoin protocol encoding for a transaction
-// input (TxIn) to w.
-func writeTxIn(w io.Writer, pver uint32, version int32, ti *TxIn) error {
-	err := WriteOutPoint(w, pver, version, &ti.PreviousOutPoint)
+// writeTxInBuf encodes ti to the bitcoin protocol encoding for a transaction
+// input (TxIn) to w. If b is non-nil, the provided buffer will be used for
+// serializing small values. Otherwise a buffer will be drawn from the
+// binarySerializer's pool and return when the method finishes.
+func writeTxInBuf(w io.Writer, pver uint32, version int32, ti *TxIn,
+	buf []byte) error {
+
+	err := writeOutPointBuf(w, pver, version, &ti.PreviousOutPoint, buf)
 	if err != nil {
 		return err
 	}
 
-	err = WriteVarBytes(w, pver, ti.SignatureScript)
+	err = WriteVarBytesBuf(w, pver, ti.SignatureScript, buf)
 	if err != nil {
 		return err
 	}
 
-	return binarySerializer.PutUint32(w, littleEndian, ti.Sequence)
+	littleEndian.PutUint32(buf[:4], ti.Sequence)
+	_, err = w.Write(buf[:4])
+
+	return err
 }
 
 // ReadTxOut reads the next sequence of bytes from r as a transaction output
 // (TxOut).
 func ReadTxOut(r io.Reader, pver uint32, version int32, to *TxOut) error {
-	err := readElement(r, &to.Value)
+	var s scriptSlab
+
+	buf := binarySerializer.Borrow()
+	defer binarySerializer.Return(buf)
+
+	err := readTxOutBuf(r, pver, version, to, buf, s[:])
+	return err
+}
+
+// readTxOutBuf reads the next sequence of bytes from r as a transaction output
+// (TxOut). If b is non-nil, the provided buffer will be used for serializing
+// small values. Otherwise a buffer will be drawn from the binarySerializer's
+// pool and return when the method finishes.
+func readTxOutBuf(r io.Reader, pver uint32, version int32, to *TxOut,
+	buf, s []byte) error {
+
+	_, err := io.ReadFull(r, buf)
 	if err != nil {
 		return err
 	}
+	to.Value = int64(littleEndian.Uint64(buf))
 
-	to.PkScript, err = readScript(r, pver, MaxMessagePayload,
-		"transaction output public key script")
+	to.PkScript, err = readScriptBuf(
+		r, pver, buf, s, MaxMessagePayload,
+		"transaction output public key script",
+	)
 	return err
 }
 
@@ -1028,26 +1097,49 @@ func ReadTxOut(r io.Reader, pver uint32, version int32, to *TxOut) error {
 // NOTE: This function is exported in order to allow txscript to compute the
 // new sighashes for witness transactions (BIP0143).
 func WriteTxOut(w io.Writer, pver uint32, version int32, to *TxOut) error {
-	err := binarySerializer.PutUint64(w, littleEndian, uint64(to.Value))
+	buf := binarySerializer.Borrow()
+	defer binarySerializer.Return(buf)
+
+	err := WriteTxOutBuf(w, pver, version, to, buf)
+	return err
+}
+
+// WriteTxOutBuf encodes to into the bitcoin protocol encoding for a transaction
+// output (TxOut) to w. If b is non-nil, the provided buffer will be used for
+// serializing small values. Otherwise a buffer will be drawn from the
+// binarySerializer's pool and return when the method finishes.
+//
+// NOTE: This function is exported in order to allow txscript to compute the
+// new sighashes for witness transactions (BIP0143).
+func WriteTxOutBuf(w io.Writer, pver uint32, version int32, to *TxOut,
+	buf []byte) error {
+
+	littleEndian.PutUint64(buf, uint64(to.Value))
+	_, err := w.Write(buf)
 	if err != nil {
 		return err
 	}
 
-	return WriteVarBytes(w, pver, to.PkScript)
+	return WriteVarBytesBuf(w, pver, to.PkScript, buf)
 }
 
-// writeTxWitness encodes the bitcoin protocol encoding for a transaction
-// input's witness into to w.
-func writeTxWitness(w io.Writer, pver uint32, version int32, wit [][]byte) error {
-	err := WriteVarInt(w, pver, uint64(len(wit)))
+// writeTxWitnessBuf encodes the bitcoin protocol encoding for a transaction
+// input's witness into to w. If b is non-nil, the provided buffer will be used
+// for serializing small values. Otherwise a buffer will be drawn from the
+// binarySerializer's pool and return when the method finishes.
+func writeTxWitnessBuf(w io.Writer, pver uint32, version int32, wit [][]byte,
+	buf []byte) error {
+
+	err := WriteVarIntBuf(w, pver, uint64(len(wit)), buf)
 	if err != nil {
 		return err
 	}
 	for _, item := range wit {
-		err = WriteVarBytes(w, pver, item)
+		err = WriteVarBytesBuf(w, pver, item, buf)
 		if err != nil {
 			return err
 		}
 	}
+
 	return nil
 }

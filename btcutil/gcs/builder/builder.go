@@ -8,12 +8,13 @@ package builder
 import (
 	"crypto/rand"
 	"fmt"
+	"io"
 	"math"
 
+	"github.com/btcsuite/btcd/btcutil/gcs"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcd/btcutil/gcs"
 )
 
 const (
@@ -348,7 +349,10 @@ func GetFilterHash(filter *gcs.Filter) (chainhash.Hash, error) {
 		return chainhash.Hash{}, err
 	}
 
-	return chainhash.DoubleHashH(filterData), nil
+	return chainhash.DoubleHashRaw(func(w io.Writer) error {
+		_, err := w.Write(filterData)
+		return err
+	}), nil
 }
 
 // MakeHeaderForFilter makes a filter chain header for a filter, given the
@@ -367,5 +371,8 @@ func MakeHeaderForFilter(filter *gcs.Filter, prevHeader chainhash.Hash) (chainha
 
 	// The final filter hash is the double-sha256 of the hash computed
 	// above.
-	return chainhash.DoubleHashH(filterTip), nil
+	return chainhash.DoubleHashRaw(func(w io.Writer) error {
+		_, err := w.Write(filterTip)
+		return err
+	}), nil
 }

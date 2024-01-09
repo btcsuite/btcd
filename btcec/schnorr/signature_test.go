@@ -10,8 +10,10 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"testing/quick"
 
 	"github.com/btcsuite/btcd/btcec/v2"
+	"github.com/davecgh/go-spew/spew"
 	secp_ecdsa "github.com/decred/dcrd/dcrec/secp256k1/v4"
 	ecdsa_schnorr "github.com/decred/dcrd/dcrec/secp256k1/v4/schnorr"
 )
@@ -252,5 +254,40 @@ func TestSchnorrVerify(t *testing.T) {
 				t.Fatalf("test #%v: expect error %v : got %v", i, test.expectErr, err)
 			}
 		}
+	}
+}
+
+// TestSchnorrSignNoMutate tests that generating a schnorr signature doesn't
+// modify/mutate the underlying private key.
+func TestSchnorrSignNoMutate(t *testing.T) {
+	t.Parallel()
+
+	// Assert that given a random private key and message, we can generate
+	// a signature from that w/o modifying the underlying private key.
+	f := func(privBytes, msg [32]byte) bool {
+		privBytesCopy := privBytes
+		privKey, _ := btcec.PrivKeyFromBytes(privBytesCopy[:])
+
+		// Generate a signature for private key with our message.
+		_, err := Sign(privKey, msg[:])
+		if err != nil {
+			t.Logf("unable to gen sig: %v", err)
+			return false
+		}
+
+		// We should be able to re-derive the private key from raw
+		// bytes and have that match up again.
+		privKeyCopy, _ := btcec.PrivKeyFromBytes(privBytes[:])
+		if *privKey != *privKeyCopy {
+			t.Logf("private doesn't match: expected %v, got %v",
+				spew.Sdump(privKeyCopy), spew.Sdump(privKey))
+			return false
+		}
+
+		return true
+	}
+
+	if err := quick.Check(f, nil); err != nil {
+		t.Fatalf("private key modified: %v", err)
 	}
 }

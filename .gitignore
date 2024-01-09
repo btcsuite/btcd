@@ -40,3 +40,13 @@ coverage.txt
 btcec/coverage.txt
 btcutil/coverage.txt
 btcutil/psbt/coverage.txt
+
+# vim
+*.swp
+
+# Binaries produced by "make build"
+/addblock
+/btcctl
+/btcd
+/findcheckpoint
+/gencerts

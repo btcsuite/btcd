@@ -13,13 +13,13 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcd/blockchain"
+	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcd/mempool"
 	peerpkg "github.com/btcsuite/btcd/peer"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcd/btcutil"
 )
 
 const (
@@ -397,20 +397,55 @@ func (sm *SyncManager) isSyncCandidate(peer *peerpkg.Peer) bool {
 		if host != "127.0.0.1" && host != "localhost" {
 			return false
 		}
-	} else {
-		// The peer is not a candidate for sync if it's not a full
-		// node. Additionally, if the segwit soft-fork package has
-		// activated, then the peer must also be upgraded.
-		segwitActive, err := sm.chain.IsDeploymentActive(chaincfg.DeploymentSegwit)
-		if err != nil {
-			log.Errorf("Unable to query for segwit "+
-				"soft-fork state: %v", err)
-		}
-		nodeServices := peer.Services()
-		if nodeServices&wire.SFNodeNetwork != wire.SFNodeNetwork ||
-			(segwitActive && !peer.IsWitnessEnabled()) {
+
+		// Candidate if all checks passed.
+		return true
+	}
+
+	// If the segwit soft-fork package has activated, then the peer must
+	// also be upgraded.
+	segwitActive, err := sm.chain.IsDeploymentActive(
+		chaincfg.DeploymentSegwit,
+	)
+	if err != nil {
+		log.Errorf("Unable to query for segwit soft-fork state: %v",
+			err)
+	}
+
+	if segwitActive && !peer.IsWitnessEnabled() {
+		return false
+	}
+
+	var (
+		nodeServices = peer.Services()
+		fullNode     = nodeServices.HasFlag(wire.SFNodeNetwork)
+		prunedNode   = nodeServices.HasFlag(wire.SFNodeNetworkLimited)
+	)
+
+	switch {
+	case fullNode:
+		// Node is a sync candidate if it has all the blocks.
+
+	case prunedNode:
+		// Even if the peer is pruned, if they have the node network
+		// limited flag, they are able to serve 2 days worth of blocks
+		// from the current tip. Therefore, check if our chaintip is
+		// within that range.
+		bestHeight := sm.chain.BestSnapshot().Height
+		peerLastBlock := peer.LastBlock()
+
+		// bestHeight+1 as we need the peer to serve us the next block,
+		// not the one we already have.
+		if bestHeight+1 <=
+			peerLastBlock-wire.NodeNetworkLimitedBlockThreshold {
+
 			return false
 		}
+
+	default:
+		// If the peer isn't an archival node, and it's not signaling
+		// NODE_NETWORK_LIMITED, we can't sync off of this node.
+		return false
 	}
 
 	// Candidate if all checks passed.
@@ -428,7 +463,7 @@ func (sm *SyncManager) handleNewPeerMsg(peer *peerpkg.Peer) {
 
 	log.Infof("New valid peer %s (%s)", peer, peer.UserAgent())
 
-	// Initialize the peer state
+	// Initialize the peer state.
 	isSyncCandidate := sm.isSyncCandidate(peer)
 	sm.peerStates[peer] = &peerSyncState{
 		syncCandidate:   isSyncCandidate,
@@ -781,7 +816,7 @@ func (sm *SyncManager) handleBlockMsg(bmsg *blockMsg) {
 
 		// When the block is not an orphan, log information about it and
 		// update the chain state.
-		sm.progressLogger.LogBlockHeight(bmsg.block)
+		sm.progressLogger.LogBlockHeight(bmsg.block, sm.chain)
 
 		// Update this peer's latest block height, for future
 		// potential sync node candidacy.
@@ -805,8 +840,13 @@ func (sm *SyncManager) handleBlockMsg(bmsg *blockMsg) {
 		}
 	}
 
-	// Nothing more to do if we aren't in headers-first mode.
+	// If we are not in headers first mode, it's a good time to periodically
+	// flush the blockchain cache because we don't expect new blocks immediately.
+	// After that, there is nothing more to do.
 	if !sm.headersFirstMode {
+		if err := sm.chain.FlushUtxoCache(blockchain.FlushPeriodic); err != nil {
+			log.Errorf("Error while flushing the blockchain cache: %v", err)
+		}
 		return
 	}
 
@@ -1377,6 +1417,11 @@ out:
 		case <-sm.quit:
 			break out
 		}
+	}
+
+	log.Debug("Block handler shutting down: flushing blockchain caches...")
+	if err := sm.chain.FlushUtxoCache(blockchain.FlushRequired); err != nil {
+		log.Errorf("Error while flushing blockchain caches: %v", err)
 	}
 
 	sm.wg.Done()

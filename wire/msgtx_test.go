@@ -13,6 +13,7 @@ import (
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/stretchr/testify/require"
 )
 
 // TestTx tests the MsgTx API.
@@ -775,6 +776,76 @@ func TestTxWitnessSize(t *testing.T) {
 				serializedSize, test.size)
 			continue
 		}
+	}
+}
+
+// TestTxOutPointFromString performs tests to ensure that the outpoint string
+// parser works as expected.
+func TestTxOutPointFromString(t *testing.T) {
+	hashFromStr := func(hash string) chainhash.Hash {
+		h, _ := chainhash.NewHashFromStr(hash)
+		return *h
+	}
+
+	tests := []struct {
+		name   string
+		input  string
+		result *OutPoint
+		err    bool
+	}{
+		{
+			name:  "normal outpoint 1",
+			input: "2ebd15a7e758d5f4c7c74181b99e5b8586f88e0682dc13e09d92612a2b2bb0a2:1",
+			result: &OutPoint{
+				Hash:  hashFromStr("2ebd15a7e758d5f4c7c74181b99e5b8586f88e0682dc13e09d92612a2b2bb0a2"),
+				Index: 1,
+			},
+			err: false,
+		},
+		{
+			name:  "normal outpoint 2",
+			input: "94c7762a68ff164352bd31fd95fa875204e811c09acef40ba781787eb28e3b55:42",
+			result: &OutPoint{
+				Hash:  hashFromStr("94c7762a68ff164352bd31fd95fa875204e811c09acef40ba781787eb28e3b55"),
+				Index: 42,
+			},
+			err: false,
+		},
+		{
+			name:  "big index outpoint",
+			input: "94c7762a68ff164352bd31fd95fa875204e811c09acef40ba781787eb28e3b55:2147484242",
+			result: &OutPoint{
+				Hash:  hashFromStr("94c7762a68ff164352bd31fd95fa875204e811c09acef40ba781787eb28e3b55"),
+				Index: 2147484242,
+			},
+			err: false,
+		},
+		{
+			name:   "bad string",
+			input:  "not_outpoint_not_outpoint_not_outpoint",
+			result: nil,
+			err:    true,
+		},
+		{
+			name:   "empty string",
+			input:  "",
+			result: nil,
+			err:    true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			outpoint, err := NewOutPointFromString(test.input)
+
+			isErr := (err != nil)
+			require.Equal(t, isErr, test.err)
+
+			if !isErr {
+				require.Equal(t, test.result, outpoint)
+			}
+		})
+
 	}
 }
 

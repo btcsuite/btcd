@@ -34,8 +34,9 @@ const (
 // from the block being located.
 //
 // For example, assume a block chain with a side chain as depicted below:
-// 	genesis -> 1 -> 2 -> ... -> 15 -> 16  -> 17  -> 18
-// 	                              \-> 16a -> 17a
+//
+//	genesis -> 1 -> 2 -> ... -> 15 -> 16  -> 17  -> 18
+//	                              \-> 16a -> 17a
 //
 // The block locator for block 17a would be the hashes of blocks:
 // [17a 16a 15 14 13 12 11 10 9 8 7 6 4 genesis]
@@ -114,6 +115,10 @@ type BlockChain struct {
 	// fields in this struct below this point.
 	chainLock sync.RWMutex
 
+	// pruneTarget is the size in bytes the database targets for when the node
+	// is pruned.
+	pruneTarget uint64
+
 	// These fields are related to the memory block index.  They both have
 	// their own locks, however they are often also protected by the chain
 	// lock to help prevent logic races when blocks are being processed.
@@ -125,6 +130,10 @@ type BlockChain struct {
 	// efficient chain view into the block index.
 	index     *blockIndex
 	bestChain *chainView
+
+	// The UTXO state holds a cached view of the UTXO state of the chain.
+	// It is protected by the chain lock.
+	utxoCache *utxoCache
 
 	// These fields are related to handling of orphan blocks.  They are
 	// protected by a combination of the chain lock and the orphan lock.
@@ -386,7 +395,7 @@ func (b *BlockChain) calcSequenceLock(node *blockNode, tx *btcutil.Tx, utxoView 
 	// return sequence lock values of -1 indicating that this transaction
 	// can be included within a block at any given height or time.
 	mTx := tx.MsgTx()
-	sequenceLockActive := mTx.Version >= 2 && csvSoftforkActive
+	sequenceLockActive := uint32(mTx.Version) >= 2 && csvSoftforkActive
 	if !sequenceLockActive || IsCoinBase(tx) {
 		return sequenceLock, nil
 	}
@@ -436,7 +445,7 @@ func (b *BlockChain) calcSequenceLock(node *blockNode, tx *btcutil.Tx, utxoView 
 				prevInputHeight = 0
 			}
 			blockNode := node.Ancestor(prevInputHeight)
-			medianTime := blockNode.CalcPastMedianTime()
+			medianTime := CalcPastMedianTime(blockNode)
 
 			// Time based relative time-locks as defined by BIP 68
 			// have a time granularity of RelativeLockSeconds, so
@@ -468,7 +477,7 @@ func (b *BlockChain) calcSequenceLock(node *blockNode, tx *btcutil.Tx, utxoView 
 // LockTimeToSequence converts the passed relative locktime to a sequence
 // number in accordance to BIP-68.
 // See: https://github.com/bitcoin/bips/blob/master/bip-0068.mediawiki
-//  * (Compatibility)
+//   - (Compatibility)
 func LockTimeToSequence(isSeconds bool, locktime uint32) uint32 {
 	// If we're expressing the relative lock time in blocks, then the
 	// corresponding sequence number is simply the desired input age.
@@ -546,9 +555,14 @@ func (b *BlockChain) getReorganizeNodes(node *blockNode) (*list.List, *list.List
 // connectBlock handles connecting the passed node/block to the end of the main
 // (best) chain.
 //
-// This passed utxo view must have all referenced txos the block spends marked
-// as spent and all of the new txos the block creates added to it.  In addition,
-// the passed stxos slice must be populated with all of the information for the
+// Passing in a utxo view is optional.  If the passed in utxo view is nil,
+// connectBlock will assume that the utxo cache has already connected all the
+// txs in the block being connected.
+// If a utxo view is passed in, this passed utxo view must have all referenced
+// txos the block spends marked as spent and all of the new txos the block creates
+// added to it.
+//
+// The passed stxos slice must be populated with all of the information for the
 // spent txos.  This approach is used because the connection validation that
 // must happen prior to calling this function requires the same details, so
 // it would be inefficient to repeat it.
@@ -594,10 +608,61 @@ func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block,
 	blockSize := uint64(block.MsgBlock().SerializeSize())
 	blockWeight := uint64(GetBlockWeight(block))
 	state := newBestState(node, blockSize, blockWeight, numTxns,
-		curTotalTxns+numTxns, node.CalcPastMedianTime())
+		curTotalTxns+numTxns, CalcPastMedianTime(node),
+	)
+
+	// If a utxoviewpoint was passed in, we'll be writing that viewpoint
+	// directly to the database on disk.  In order for the database to be
+	// consistent, we must flush the cache before writing the viewpoint.
+	if view != nil {
+		err = b.db.Update(func(dbTx database.Tx) error {
+			return b.utxoCache.flush(dbTx, FlushRequired, state)
+		})
+		if err != nil {
+			return err
+		}
+	}
 
 	// Atomically insert info into the database.
 	err = b.db.Update(func(dbTx database.Tx) error {
+		// If the pruneTarget isn't 0, we should attempt to delete older blocks
+		// from the database.
+		if b.pruneTarget != 0 {
+			// When the total block size is under the prune target, prune blocks is
+			// a no-op and the deleted hashes are nil.
+			deletedHashes, err := dbTx.PruneBlocks(b.pruneTarget)
+			if err != nil {
+				return err
+			}
+
+			// Only attempt to delete if we have any deleted blocks.
+			if len(deletedHashes) != 0 {
+				// Delete the spend journals of the pruned blocks.
+				err = dbPruneSpendJournalEntry(dbTx, deletedHashes)
+				if err != nil {
+					return err
+				}
+
+				// We may need to flush if the prune will delete blocks that
+				// are past our last flush block.
+				//
+				// NOTE: the database will never be inconsistent here as the
+				// actual blocks are not deleted until the db.Update returns.
+				needsFlush, err := b.flushNeededAfterPrune(deletedHashes)
+				if err != nil {
+					return err
+				}
+				if needsFlush {
+					// Since the deleted hashes are past our last
+					// flush block, flush the utxo cache now.
+					err = b.utxoCache.flush(dbTx, FlushRequired, state)
+					if err != nil {
+						return err
+					}
+				}
+			}
+		}
+
 		// Update best block state.
 		err := dbPutBestState(dbTx, state, node.workSum)
 		if err != nil {
@@ -614,6 +679,8 @@ func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block,
 		// Update the utxo set using the state of the utxo view.  This
 		// entails removing all of the utxos spent and adding the new
 		// ones created by the block.
+		//
+		// A nil viewpoint is a no-op.
 		err = dbPutUtxoView(dbTx, view)
 		if err != nil {
 			return err
@@ -644,7 +711,9 @@ func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block,
 
 	// Prune fully spent entries and mark all entries in the view unmodified
 	// now that the modifications have been committed to the database.
-	view.commit()
+	if view != nil {
+		view.commit()
+	}
 
 	// This node is now the end of the best chain.
 	b.bestChain.SetTip(node)
@@ -665,7 +734,11 @@ func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block,
 	b.sendNotification(NTBlockConnected, block)
 	b.chainLock.Lock()
 
-	return nil
+	// Since we may have changed the UTXO cache, we make sure it didn't exceed its
+	// maximum size.  If we're pruned and have flushed already, this will be a no-op.
+	return b.db.Update(func(dbTx database.Tx) error {
+		return b.utxoCache.flush(dbTx, FlushIfNeeded, state)
+	})
 }
 
 // disconnectBlock handles disconnecting the passed node/block from the end of
@@ -707,7 +780,7 @@ func (b *BlockChain) disconnectBlock(node *blockNode, block *btcutil.Block, view
 	blockWeight := uint64(GetBlockWeight(prevBlock))
 	newTotalTxns := curTotalTxns - uint64(len(block.MsgBlock().Transactions))
 	state := newBestState(prevNode, blockSize, blockWeight, numTxns,
-		newTotalTxns, prevNode.CalcPastMedianTime())
+		newTotalTxns, CalcPastMedianTime(prevNode))
 
 	err = b.db.Update(func(dbTx database.Tx) error {
 		// Update best block state.
@@ -814,6 +887,15 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List) error 
 		return nil
 	}
 
+	// The rest of the reorg depends on all STXOs already being in the database
+	// so we flush before reorg.
+	err := b.db.Update(func(dbTx database.Tx) error {
+		return b.utxoCache.flush(dbTx, FlushRequired, b.BestSnapshot())
+	})
+	if err != nil {
+		return err
+	}
+
 	// Ensure the provided nodes match the current best chain.
 	tip := b.bestChain.Tip()
 	if detachNodes.Len() != 0 {
@@ -875,7 +957,7 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List) error 
 
 		// Load all of the utxos referenced by the block that aren't
 		// already in the view.
-		err = view.fetchInputUtxos(b.db, block)
+		err = view.fetchInputUtxos(b.db, nil, block)
 		if err != nil {
 			return err
 		}
@@ -942,7 +1024,7 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List) error 
 		// checkConnectBlock gets skipped, we still need to update the UTXO
 		// view.
 		if b.index.NodeStatus(n).KnownValid() {
-			err = view.fetchInputUtxos(b.db, block)
+			err = view.fetchInputUtxos(b.db, nil, block)
 			if err != nil {
 				return err
 			}
@@ -994,7 +1076,7 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List) error 
 
 		// Load all of the utxos referenced by the block that aren't
 		// already in the view.
-		err := view.fetchInputUtxos(b.db, block)
+		err := view.fetchInputUtxos(b.db, nil, block)
 		if err != nil {
 			return err
 		}
@@ -1021,7 +1103,7 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List) error 
 
 		// Load all of the utxos referenced by the block that aren't
 		// already in the view.
-		err := view.fetchInputUtxos(b.db, block)
+		err := view.fetchInputUtxos(b.db, nil, block)
 		if err != nil {
 			return err
 		}
@@ -1041,6 +1123,15 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List) error 
 		if err != nil {
 			return err
 		}
+	}
+
+	// We call the flush at the end to update the last flush hash to the new
+	// best tip.
+	err = b.db.Update(func(dbTx database.Tx) error {
+		return b.utxoCache.flush(dbTx, FlushRequired, b.BestSnapshot())
+	})
+	if err != nil {
+		return err
 	}
 
 	// Log the point where the chain forked and old and new best chain
@@ -1067,8 +1158,8 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List) error 
 // a reorganization to become the main chain).
 //
 // The flags modify the behavior of this function as follows:
-//  - BFFastAdd: Avoids several expensive transaction validation operations.
-//    This is useful when using checkpoints.
+//   - BFFastAdd: Avoids several expensive transaction validation operations.
+//     This is useful when using checkpoints.
 //
 // This function MUST be called with the chain state lock held (for writes).
 func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, flags BehaviorFlags) (bool, error) {
@@ -1095,11 +1186,21 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, fla
 		// Perform several checks to verify the block can be connected
 		// to the main chain without violating any rules and without
 		// actually connecting the block.
-		view := NewUtxoViewpoint()
-		view.SetBestHash(parentHash)
-		stxos := make([]SpentTxOut, 0, countSpentOutputs(block))
 		if !fastAdd {
-			err := b.checkConnectBlock(node, block, view, &stxos)
+			// We create a viewpoint here to avoid spending or adding new
+			// coins to the utxo cache.
+			//
+			// checkConnectBlock spends and adds utxos before doing the
+			// signature validation and if the signature validation fails,
+			// we would be forced to undo the utxo cache.
+			//
+			// TODO (kcalvinalvin): Doing all of the validation before connecting
+			// the tx inside check connect block would allow us to pass the utxo
+			// cache directly to the check connect block.  This would save on the
+			// expensive memory allocation done by fetch input utxos.
+			view := NewUtxoViewpoint()
+			view.SetBestHash(parentHash)
+			err := b.checkConnectBlock(node, block, view, nil)
 			if err == nil {
 				b.index.SetStatusFlags(node, statusValid)
 			} else if _, ok := err.(RuleError); ok {
@@ -1115,23 +1216,16 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, fla
 			}
 		}
 
-		// In the fast add case the code to check the block connection
-		// was skipped, so the utxo view needs to load the referenced
-		// utxos, spend them, and add the new utxos being created by
-		// this block.
-		if fastAdd {
-			err := view.fetchInputUtxos(b.db, block)
-			if err != nil {
-				return false, err
-			}
-			err = view.connectTransactions(block, &stxos)
-			if err != nil {
-				return false, err
-			}
+		// Connect the transactions to the cache.  All the txs are considered valid
+		// at this point as they have passed validation or was considered valid already.
+		stxos := make([]SpentTxOut, 0, countSpentOutputs(block))
+		err := b.utxoCache.connectTransactions(block, &stxos)
+		if err != nil {
+			return false, err
 		}
 
 		// Connect the block to the main chain.
-		err := b.connectBlock(node, block, view, stxos)
+		err = b.connectBlock(node, block, nil, stxos)
 		if err != nil {
 			// If we got hit with a rule error, then we'll mark
 			// that status of the block as invalid and flush the
@@ -1207,8 +1301,8 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, fla
 // isCurrent returns whether or not the chain believes it is current.  Several
 // factors are used to guess, but the key factors that allow the chain to
 // believe it is current are:
-//  - Latest block height is after the latest checkpoint (if enabled)
-//  - Latest block has a timestamp newer than 24 hours ago
+//   - Latest block height is after the latest checkpoint (if enabled)
+//   - Latest block has a timestamp newer than 24 hours ago
 //
 // This function MUST be called with the chain state lock held (for reads).
 func (b *BlockChain) isCurrent() bool {
@@ -1231,8 +1325,8 @@ func (b *BlockChain) isCurrent() bool {
 // IsCurrent returns whether or not the chain believes it is current.  Several
 // factors are used to guess, but the key factors that allow the chain to
 // believe it is current are:
-//  - Latest block height is after the latest checkpoint (if enabled)
-//  - Latest block has a timestamp newer than 24 hours ago
+//   - Latest block height is after the latest checkpoint (if enabled)
+//   - Latest block has a timestamp newer than 24 hours ago
 //
 // This function is safe for concurrent access.
 func (b *BlockChain) IsCurrent() bool {
@@ -1252,6 +1346,119 @@ func (b *BlockChain) BestSnapshot() *BestState {
 	snapshot := b.stateSnapshot
 	b.stateLock.RUnlock()
 	return snapshot
+}
+
+// TipStatus is the status of a chain tip.
+type TipStatus byte
+
+const (
+	// StatusUnknown indicates that the tip status isn't any of the defined
+	// statuses.
+	StatusUnknown TipStatus = iota
+
+	// StatusActive indicates that the tip is considered active and is in
+	// the best chain.
+	StatusActive
+
+	// StatusInvalid indicates that this tip or any of the ancestors of this
+	// tip are invalid.
+	StatusInvalid
+
+	// StatusValidFork is given if:
+	// 1: Not a part of the best chain.
+	// 2: Is not invalid.
+	// 3: Has the block data stored to disk.
+	StatusValidFork
+)
+
+// String returns the status flags as string.
+func (ts TipStatus) String() string {
+	switch ts {
+	case StatusActive:
+		return "active"
+	case StatusInvalid:
+		return "invalid"
+	case StatusValidFork:
+		return "valid-fork"
+	}
+	return fmt.Sprintf("unknown: %b", ts)
+}
+
+// ChainTip represents the last block in a branch of the block tree.
+type ChainTip struct {
+	// Height of the tip.
+	Height int32
+
+	// BlockHash hash of the tip.
+	BlockHash chainhash.Hash
+
+	// BranchLen is length of the fork point of this chain from the main chain.
+	// Returns 0 if the chain tip is a part of the best chain.
+	BranchLen int32
+
+	// Status is the validity status of the branch this tip is in.
+	Status TipStatus
+}
+
+// ChainTips returns all the chain tips the node itself is aware of.  Each tip is
+// represented by its height, block hash, branch length, and status.
+//
+// This function is safe for concurrent access.
+func (b *BlockChain) ChainTips() []ChainTip {
+	b.chainLock.RLock()
+	defer b.chainLock.RUnlock()
+
+	// Grab all the inactive tips.
+	tips := b.index.InactiveTips(b.bestChain)
+
+	// Add the current tip.
+	tips = append(tips, b.bestChain.Tip())
+
+	chainTips := make([]ChainTip, 0, len(tips))
+
+	// Go through all the tips and grab the height, hash, branch length, and the block
+	// status.
+	for _, tip := range tips {
+		var status TipStatus
+		switch {
+		// The tip is considered active if it's in the best chain.
+		case b.bestChain.Contains(tip):
+			status = StatusActive
+
+		// This block or any of the ancestors of this block are invalid.
+		case tip.status.KnownInvalid():
+			status = StatusInvalid
+
+		// If the tip meets the following criteria:
+		// 1: Not a part of the best chain.
+		// 2: Is not invalid.
+		// 3: Has the block data stored to disk.
+		//
+		// The tip is considered a valid fork.
+		//
+		// We can check if a tip is a valid-fork by checking that
+		// its data is available. Since the behavior is to give a
+		// block node the statusDataStored status once it passes
+		// the proof of work checks and basic chain validity checks.
+		//
+		// We can't use the KnownValid status since it's only given
+		// to blocks that passed the validation AND were a part of
+		// the bestChain.
+		case tip.status.HaveData():
+			status = StatusValidFork
+		}
+
+		chainTip := ChainTip{
+			Height:    tip.height,
+			BlockHash: tip.hash,
+			BranchLen: tip.height - b.bestChain.FindFork(tip).height,
+			Status:    status,
+		}
+
+		chainTips = append(chainTips, chainTip)
+	}
+
+	return chainTips
 }
 
 // HeaderByHash returns the block header identified by the given hash or an
@@ -1467,11 +1674,11 @@ func (b *BlockChain) IntervalBlockHashes(endHash *chainhash.Hash, interval int,
 //
 // In addition, there are two special cases:
 //
-// - When no locators are provided, the stop hash is treated as a request for
-//   that block, so it will either return the node associated with the stop hash
-//   if it is known, or nil if it is unknown
-// - When locators are provided, but none of them are known, nodes starting
-//   after the genesis block will be returned
+//   - When no locators are provided, the stop hash is treated as a request for
+//     that block, so it will either return the node associated with the stop hash
+//     if it is known, or nil if it is unknown
+//   - When locators are provided, but none of them are known, nodes starting
+//     after the genesis block will be returned
 //
 // This is primarily a helper function for the locateBlocks and locateHeaders
 // functions.
@@ -1555,11 +1762,11 @@ func (b *BlockChain) locateBlocks(locator BlockLocator, hashStop *chainhash.Hash
 //
 // In addition, there are two special cases:
 //
-// - When no locators are provided, the stop hash is treated as a request for
-//   that block, so it will either return the stop hash itself if it is known,
-//   or nil if it is unknown
-// - When locators are provided, but none of them are known, hashes starting
-//   after the genesis block will be returned
+//   - When no locators are provided, the stop hash is treated as a request for
+//     that block, so it will either return the stop hash itself if it is known,
+//     or nil if it is unknown
+//   - When locators are provided, but none of them are known, hashes starting
+//     after the genesis block will be returned
 //
 // This function is safe for concurrent access.
 func (b *BlockChain) LocateBlocks(locator BlockLocator, hashStop *chainhash.Hash, maxHashes uint32) []chainhash.Hash {
@@ -1600,11 +1807,11 @@ func (b *BlockChain) locateHeaders(locator BlockLocator, hashStop *chainhash.Has
 //
 // In addition, there are two special cases:
 //
-// - When no locators are provided, the stop hash is treated as a request for
-//   that header, so it will either return the header for the stop hash itself
-//   if it is known, or nil if it is unknown
-// - When locators are provided, but none of them are known, headers starting
-//   after the genesis block will be returned
+//   - When no locators are provided, the stop hash is treated as a request for
+//     that header, so it will either return the header for the stop hash itself
+//     if it is known, or nil if it is unknown
+//   - When locators are provided, but none of them are known, headers starting
+//     after the genesis block will be returned
 //
 // This function is safe for concurrent access.
 func (b *BlockChain) LocateHeaders(locator BlockLocator, hashStop *chainhash.Hash) []wire.BlockHeader {
@@ -1645,6 +1852,11 @@ type Config struct {
 	//
 	// This field is required.
 	DB database.DB
+
+	// The maximum size in bytes of the UTXO cache.
+	//
+	// This field is required.
+	UtxoCacheMaxSize uint64
 
 	// Interrupt specifies a channel the caller can close to signal that
 	// long running operations, such as catching up indexes or performing
@@ -1700,6 +1912,11 @@ type Config struct {
 	// This field can be nil if the caller is not interested in using a
 	// signature cache.
 	HashCache *txscript.HashCache
+
+	// Prune specifies the target database usage (in bytes) the database
+	// will target for with block files.  Prune at 0 specifies that no
+	// blocks will be deleted.
+	Prune uint64
 }
 
 // New returns a BlockChain instance using the provided configuration details.
@@ -1749,12 +1966,14 @@ func New(config *Config) (*BlockChain, error) {
 		maxRetargetTimespan: targetTimespan * adjustmentFactor,
 		blocksPerRetarget:   int32(targetTimespan / targetTimePerBlock),
 		index:               newBlockIndex(config.DB, params),
+		utxoCache:           newUtxoCache(config.DB, config.UtxoCacheMaxSize),
 		hashCache:           config.HashCache,
 		bestChain:           newChainView(nil),
 		orphans:             make(map[chainhash.Hash]*orphanBlock),
 		prevOrphans:         make(map[chainhash.Hash][]*orphanBlock),
 		warningCaches:       newThresholdCaches(vbNumBits),
 		deploymentCaches:    newThresholdCaches(chaincfg.DefinedDeployments),
+		pruneTarget:         config.Prune,
 	}
 
 	// Ensure all the deployments are synchronized with our clock if
@@ -1797,10 +2016,23 @@ func New(config *Config) (*BlockChain, error) {
 		return nil, err
 	}
 
+	// Make sure the utxo state is catched up if it was left in an inconsistent
+	// state.
 	bestNode := b.bestChain.Tip()
+	if err := b.InitConsistentState(bestNode, config.Interrupt); err != nil {
+		return nil, err
+	}
 	log.Infof("Chain state (height %d, hash %v, totaltx %d, work %v)",
 		bestNode.height, bestNode.hash, b.stateSnapshot.TotalTxns,
 		bestNode.workSum)
 
 	return &b, nil
+}
+
+// CachedStateSize returns the total size of the cached state of the blockchain
+// in bytes.
+func (b *BlockChain) CachedStateSize() uint64 {
+	b.chainLock.Lock()
+	defer b.chainLock.Unlock()
+	return b.utxoCache.totalMemoryUsage()
 }

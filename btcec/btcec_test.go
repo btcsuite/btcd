@@ -527,7 +527,7 @@ type baseMultTest struct {
 	x, y string
 }
 
-//TODO: add more test vectors
+// TODO: add more test vectors
 var s256BaseMultTests = []baseMultTest{
 	{
 		"AA5E28D6A97A2479A65527F7290311A3624D4CC0FA1578598EE3C2613BF99522",
@@ -556,7 +556,7 @@ var s256BaseMultTests = []baseMultTest{
 	},
 }
 
-//TODO: test different curves as well?
+// TODO: test different curves as well?
 func TestBaseMult(t *testing.T) {
 	s256 := S256()
 	for i, e := range s256BaseMultTests {

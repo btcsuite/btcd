@@ -25,11 +25,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcd/btcutil"
 )
 
 var (
@@ -1212,7 +1212,7 @@ func testFetchBlockIOMissing(tc *testContext, tx database.Tx) bool {
 
 // testFetchBlockIO ensures all of the block retrieval API functions work as
 // expected for the provide set of blocks.  The blocks must already be stored in
-// the database, or at least stored into the the passed transaction.  It also
+// the database, or at least stored into the passed transaction.  It also
 // tests several error conditions such as ensuring the expected errors are
 // returned when fetching blocks, headers, and regions that don't exist.
 func testFetchBlockIO(tc *testContext, tx database.Tx) bool {

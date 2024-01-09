@@ -168,26 +168,27 @@ the method name for further details such as parameter and return information.
 |8|[getblockcount](#getblockcount)|Y|Returns the number of blocks in the longest block chain.|
 |9|[getblockhash](#getblockhash)|Y|Returns hash of the block in best block chain at the given height.|
 |10|[getblockheader](#getblockheader)|Y|Returns the block header of the block.|
-|11|[getconnectioncount](#getconnectioncount)|N|Returns the number of active connections to other peers.|
-|12|[getdifficulty](#getdifficulty)|Y|Returns the proof-of-work difficulty as a multiple of the minimum difficulty.|
-|13|[getgenerate](#getgenerate)|N|Return if the server is set to generate coins (mine) or not.|
-|14|[gethashespersec](#gethashespersec)|N|Returns a recent hashes per second performance measurement while generating coins (mining).|
-|15|[getinfo](#getinfo)|Y|Returns a JSON object containing various state info.|
-|16|[getmempoolinfo](#getmempoolinfo)|N|Returns a JSON object containing mempool-related information.|
-|17|[getmininginfo](#getmininginfo)|N|Returns a JSON object containing mining-related information.|
-|18|[getnettotals](#getnettotals)|Y|Returns a JSON object containing network traffic statistics.|
-|19|[getnetworkhashps](#getnetworkhashps)|Y|Returns the estimated network hashes per second for the block heights provided by the parameters.|
-|20|[getpeerinfo](#getpeerinfo)|N|Returns information about each connected network peer as an array of json objects.|
-|21|[getrawmempool](#getrawmempool)|Y|Returns an array of hashes for all of the transactions currently in the memory pool.|
-|22|[getrawtransaction](#getrawtransaction)|Y|Returns information about a transaction given its hash.|
-|23|[help](#help)|Y|Returns a list of all commands or help for a specified command.|
-|24|[ping](#ping)|N|Queues a ping to be sent to each connected peer.|
-|25|[sendrawtransaction](#sendrawtransaction)|Y|Submits the serialized, hex-encoded transaction to the local peer and relays it to the network.<br /><font color="orange">btcd does not yet implement the `allowhighfees` parameter, so it has no effect</font>|
-|26|[setgenerate](#setgenerate) |N|Set the server to generate coins (mine) or not.<br/>NOTE: Since btcd does not have the wallet integrated to provide payment addresses, btcd must be configured via the `--miningaddr` option to provide which payment addresses to pay created blocks to for this RPC to function.|
-|27|[stop](#stop)|N|Shutdown btcd.|
-|28|[submitblock](#submitblock)|Y|Attempts to submit a new serialized, hex-encoded block to the network.|
-|29|[validateaddress](#validateaddress)|Y|Verifies the given address is valid.  NOTE: Since btcd does not have a wallet integrated, btcd will only return whether the address is valid or not.|
-|30|[verifychain](#verifychain)|N|Verifies the block chain database.|
+|11|[getchaintips](#getchaintips)|Y|Returns information about all known tips in the block tree, including the main chain as well as orphaned branches.|
+|12|[getconnectioncount](#getconnectioncount)|N|Returns the number of active connections to other peers.|
+|13|[getdifficulty](#getdifficulty)|Y|Returns the proof-of-work difficulty as a multiple of the minimum difficulty.|
+|14|[getgenerate](#getgenerate)|N|Return if the server is set to generate coins (mine) or not.|
+|15|[gethashespersec](#gethashespersec)|N|Returns a recent hashes per second performance measurement while generating coins (mining).|
+|16|[getinfo](#getinfo)|Y|Returns a JSON object containing various state info.|
+|17|[getmempoolinfo](#getmempoolinfo)|N|Returns a JSON object containing mempool-related information.|
+|18|[getmininginfo](#getmininginfo)|N|Returns a JSON object containing mining-related information.|
+|19|[getnettotals](#getnettotals)|Y|Returns a JSON object containing network traffic statistics.|
+|20|[getnetworkhashps](#getnetworkhashps)|Y|Returns the estimated network hashes per second for the block heights provided by the parameters.|
+|21|[getpeerinfo](#getpeerinfo)|N|Returns information about each connected network peer as an array of json objects.|
+|22|[getrawmempool](#getrawmempool)|Y|Returns an array of hashes for all of the transactions currently in the memory pool.|
+|23|[getrawtransaction](#getrawtransaction)|Y|Returns information about a transaction given its hash.|
+|24|[help](#help)|Y|Returns a list of all commands or help for a specified command.|
+|25|[ping](#ping)|N|Queues a ping to be sent to each connected peer.|
+|26|[sendrawtransaction](#sendrawtransaction)|Y|Submits the serialized, hex-encoded transaction to the local peer and relays it to the network.<br /><font color="orange">btcd does not yet implement the `allowhighfees` parameter, so it has no effect</font>|
+|27|[setgenerate](#setgenerate) |N|Set the server to generate coins (mine) or not.<br/>NOTE: Since btcd does not have the wallet integrated to provide payment addresses, btcd must be configured via the `--miningaddr` option to provide which payment addresses to pay created blocks to for this RPC to function.|
+|28|[stop](#stop)|N|Shutdown btcd.|
+|29|[submitblock](#submitblock)|Y|Attempts to submit a new serialized, hex-encoded block to the network.|
+|30|[validateaddress](#validateaddress)|Y|Verifies the given address is valid.  NOTE: Since btcd does not have a wallet integrated, btcd will only return whether the address is valid or not.|
+|31|[verifychain](#verifychain)|N|Verifies the block chain database.|
 
 <a name="MethodDetails" />
 
@@ -317,6 +318,18 @@ the method name for further details such as parameter and return information.
 |Returns (verbose=true)|`{ (json object)`<br />&nbsp;&nbsp;`"hash": "blockhash", (string) the hash of the block (same as provided)`<br />&nbsp;&nbsp;`"confirmations": n,  (numeric) the number of confirmations`<br />&nbsp;&nbsp;`"height": n, (numeric) the height of the block in the block chain`<br />&nbsp;&nbsp;`"version": n,  (numeric) the block version`<br />&nbsp;&nbsp;`"merkleroot": "hash",  (string) root hash of the merkle tree`<br />&nbsp;&nbsp;`"time": n,  (numeric) the block time in seconds since 1 Jan 1970 GMT`<br />&nbsp;&nbsp;`"nonce": n,  (numeric) the block nonce`<br />&nbsp;&nbsp;`"bits": n,  (numeric) the bits which represent the block difficulty`<br />&nbsp;&nbsp;`"difficulty": n.nn,  (numeric) the proof-of-work difficulty as a multiple of the minimum difficulty`<br />&nbsp;&nbsp;`"previousblockhash": "hash",  (string) the hash of the previous block`<br />&nbsp;&nbsp;`"nextblockhash": "hash",  (string) the hash of the next block (only if there is one)`<br />`}`|
 |Example Return (verbose=false)|`"0200000035ab154183570282ce9afc0b494c9fc6a3cfea05aa8c1add2ecc564900000000`<br />`38ba3d78e4500a5a7570dbe61960398add4410d278b21cd9708e6d9743f374d544fc0552`<br />`27f1001c29c1ea3b"`<br /><font color="orange">**Newlines added for display purposes.  The actual return does not contain newlines.**</font>|
 |Example Return (verbose=true)|`{`<br />&nbsp;&nbsp;`"hash": "00000000009e2958c15ff9290d571bf9459e93b19765c6801ddeccadbb160a1e",`<br />&nbsp;&nbsp;`"confirmations": 392076,`<br />&nbsp;&nbsp;`"height": 100000,`<br />&nbsp;&nbsp;`"version": 2,`<br />&nbsp;&nbsp;`"merkleroot": "d574f343976d8e70d91cb278d21044dd8a396019e6db70755a0a50e4783dba38",`<br />&nbsp;&nbsp;`"time": 1376123972,`<br />&nbsp;&nbsp;`"nonce": 1005240617,`<br />&nbsp;&nbsp;`"bits": "1c00f127",`<br />&nbsp;&nbsp;`"difficulty": 271.75767393,`<br />&nbsp;&nbsp;`"previousblockhash": "000000004956cc2edd1a8caa05eacfa3c69f4c490bfc9ace820257834115ab35",`<br />&nbsp;&nbsp;`"nextblockhash": "0000000000629d100db387f37d0f37c51118f250fb0946310a8c37316cbc4028"`<br />`}`|
+[Return to Overview](#MethodOverview)<br />
+
+***
+<a name="getchaintips"/>
+
+|   |   |
+|---|---|
+|Method|getchaintips|
+|Parameters|None|
+|Description|Returns information about all known tips in the block tree, including the main chain as well as orphaned branches|
+|Returns|`(A json object array)`<br />`height`: `(numeric)` The height of the chain tip.<br />`hash`: `(string)` The block hash of the chain tip.<br />`branchlen`: `(numeric)` Returns zero for main chain. Otherwise is the length of branch connecting the tip to the main chain.<br />`status`: `(string)`  Status of the chain. Returns "active" for the main chain.`|
+|Example Return|`["{"height": 1, "hash": "78b945a390c561cf8b9ccf0598be15d7d85c67022bf71083c0b0bd8042fc30d7", "branchlen": 1, "status": "valid-fork"}, {"height": 1, "hash": "584c830a4783c6331e59cb984686cfec14bccc596fe8bbd1660b90cda359b42a", "branchlen": 0, "status": "active"}"]`|
 [Return to Overview](#MethodOverview)<br />
 
 ***

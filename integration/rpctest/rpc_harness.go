@@ -6,7 +6,6 @@ package rpctest
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"path/filepath"
@@ -152,8 +151,7 @@ func New(activeNet *chaincfg.Params, handlers *rpcclient.NotificationHandlers,
 		return nil, err
 	}
 
-	harnessID := strconv.Itoa(numTestInstances)
-	nodeTestData, err := ioutil.TempDir(testDir, "harness-"+harnessID)
+	nodeTestData, err := os.MkdirTemp(testDir, "rpc-node")
 	if err != nil {
 		return nil, err
 	}
@@ -173,7 +171,7 @@ func New(activeNet *chaincfg.Params, handlers *rpcclient.NotificationHandlers,
 	extraArgs = append(extraArgs, miningAddr)
 
 	config, err := newConfig(
-		"rpctest", certFile, keyFile, extraArgs, customExePath,
+		nodeTestData, certFile, keyFile, extraArgs, customExePath,
 	)
 	if err != nil {
 		return nil, err
@@ -248,10 +246,10 @@ func (h *Harness) SetUp(createTestChain bool, numMatureOutputs uint32) error {
 	// Start the btcd node itself. This spawns a new process which will be
 	// managed
 	if err := h.node.start(); err != nil {
-		return err
+		return fmt.Errorf("error starting node: %w", err)
 	}
 	if err := h.connectRPCClient(); err != nil {
-		return err
+		return fmt.Errorf("error connecting RPC client: %w", err)
 	}
 
 	h.wallet.Start()
@@ -272,8 +270,8 @@ func (h *Harness) SetUp(createTestChain bool, numMatureOutputs uint32) error {
 	// Create a test chain with the desired number of mature coinbase
 	// outputs.
 	if createTestChain && numMatureOutputs != 0 {
-		numToGenerate := (uint32(h.ActiveNet.CoinbaseMaturity) +
-			numMatureOutputs)
+		coinbaseMaturity := uint32(h.ActiveNet.CoinbaseMaturity)
+		numToGenerate := coinbaseMaturity + numMatureOutputs
 		_, err := h.Client.Generate(numToGenerate)
 		if err != nil {
 			return err
@@ -351,15 +349,18 @@ func (h *Harness) connectRPCClient() error {
 	batchConf.HTTPPostMode = true
 	for i := 0; i < h.MaxConnRetries; i++ {
 		fail := false
+		timeout := time.Duration(i) * h.ConnectionRetryTimeout
 		if client == nil {
-			if client, err = rpcclient.New(&rpcConf, h.handlers); err != nil {
-				time.Sleep(time.Duration(i) * h.ConnectionRetryTimeout)
+			client, err = rpcclient.New(&rpcConf, h.handlers)
+			if err != nil {
+				time.Sleep(timeout)
 				fail = true
 			}
 		}
 		if batchClient == nil {
-			if batchClient, err = rpcclient.NewBatch(&batchConf); err != nil {
-				time.Sleep(time.Duration(i) * h.ConnectionRetryTimeout)
+			batchClient, err = rpcclient.NewBatch(&batchConf)
+			if err != nil {
+				time.Sleep(timeout)
 				fail = true
 			}
 		}
@@ -369,7 +370,9 @@ func (h *Harness) connectRPCClient() error {
 	}
 
 	if client == nil || batchClient == nil {
-		return fmt.Errorf("connection timeout")
+		return fmt.Errorf("connection timeout, tried %d times with "+
+			"timeout %v, last err: %w", h.MaxConnRetries,
+			h.ConnectionRetryTimeout, err)
 	}
 
 	h.Client = client
@@ -556,6 +559,111 @@ func NextAvailablePort() int {
 
 	// No ports available? Must be a mistake.
 	panic("no ports available for listening")
+}
+
+// NextAvailablePortForProcess returns the first port that is available for
+// listening by a new node, using a lock file to make sure concurrent access for
+// parallel tasks within the same process don't re-use the same port. It panics
+// if no port is found and the maximum available TCP port is reached.
+func NextAvailablePortForProcess(pid int) int {
+	lockFile := filepath.Join(
+		os.TempDir(), fmt.Sprintf("rpctest-port-pid-%d.lock", pid),
+	)
+	timeout := time.After(time.Second)
+	
+	var (
+		lockFileHandle *os.File
+		err error
+	)
+	for {
+		// Attempt to acquire the lock file. If it already exists, wait
+		// for a bit and retry.
+		lockFileHandle, err = os.OpenFile(
+			lockFile, os.O_CREATE|os.O_EXCL, 0600,
+		)
+		if err == nil {
+			// Lock acquired.
+			break
+		}
+
+		// Wait for a bit and retry.
+		select {
+		case <-timeout:
+			panic("timeout waiting for lock file")
+		case <-time.After(10 * time.Millisecond):
+		}
+	}
+
+	// Release the lock file when we're done.
+	defer func() {
+		// Always close file first, Windows won't allow us to remove it
+		// otherwise.
+		_ = lockFileHandle.Close()
+		err := os.Remove(lockFile)
+		if err != nil {
+			panic(fmt.Errorf("couldn't remove lock file: %w", err))
+		}
+	}()
+
+	portFile := filepath.Join(
+		os.TempDir(), fmt.Sprintf("rpctest-port-pid-%d", pid),
+	)
+	port, err := os.ReadFile(portFile)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			panic(fmt.Errorf("error reading port file: %w", err))
+		}
+		port = []byte(strconv.Itoa(int(defaultNodePort)))
+	}
+
+	lastPort, err := strconv.Atoi(string(port))
+	if err != nil {
+		panic(fmt.Errorf("error parsing port: %w", err))
+	}
+
+	// We take the next one.
+	lastPort++
+	for lastPort < 65535 {
+		// If there are no errors while attempting to listen on this
+		// port, close the socket and return it as available. While it
+		// could be the case that some other process picks up this port
+		// between the time the socket is closed and it's reopened in
+		// the harness node, in practice in CI servers this seems much
+		// less likely than simply some other process already being
+		// bound at the start of the tests.
+		addr := fmt.Sprintf(ListenerFormat, lastPort)
+		l, err := net.Listen("tcp4", addr)
+		if err == nil {
+			err := l.Close()
+			if err == nil {
+				err := os.WriteFile(
+					portFile,
+					[]byte(strconv.Itoa(lastPort)), 0600,
+				)
+				if err != nil {
+					panic(fmt.Errorf("error updating "+
+						"port file: %w", err))
+				}
+
+				return lastPort
+			}
+		}
+		lastPort++
+	}
+
+	// No ports available? Must be a mistake.
+	panic("no ports available for listening")
+}
+
+// GenerateProcessUniqueListenerAddresses is a function that returns two
+// listener addresses with unique ports per the given process id and should be
+// used to overwrite rpctest's default generator which is prone to use colliding
+// ports.
+func GenerateProcessUniqueListenerAddresses(pid int) (string, string) {
+	port1 := NextAvailablePortForProcess(pid)
+	port2 := NextAvailablePortForProcess(pid)
+	return fmt.Sprintf(ListenerFormat, port1),
+		fmt.Sprintf(ListenerFormat, port2)
 }
 
 // baseDir is the directory path of the temp directory for all rpctest files.

@@ -61,13 +61,14 @@ func Extract(p *Packet) (*wire.MsgTx, error) {
 				return nil, err
 			}
 
-			// Now that we know how may inputs we'll need, we'll
+			// Now that we know how many inputs we'll need, we'll
 			// construct a packing slice, then read out each input
 			// (with a varint prefix) from the witnessReader.
 			tin.Witness = make(wire.TxWitness, witCount)
 			for j := uint64(0); j < witCount; j++ {
 				wit, err := wire.ReadVarBytes(
-					witnessReader, 0, txscript.MaxScriptSize, "witness",
+					witnessReader, 0,
+					txscript.MaxScriptSize, "witness",
 				)
 				if err != nil {
 					return nil, err
