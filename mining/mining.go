@@ -861,7 +861,7 @@ mempoolLoop:
 	}, nil
 }
 
-// AddWitnessCommitment adds the witness commitment as an OP_RETURN outpout
+// AddWitnessCommitment adds the witness commitment as an OP_RETURN output
 // within the coinbase tx.  The raw commitment is returned.
 func AddWitnessCommitment(coinbaseTx *btcutil.Tx,
 	blockTxns []*btcutil.Tx) []byte {

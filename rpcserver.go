@@ -840,7 +840,7 @@ func handleDecodeScript(s *rpcServer, cmd interface{}, closeChan <-chan struct{}
 
 	// Get information about the script.
 	// Ignore the error here since an error means the script couldn't parse
-	// and there is no additinal information about it anyways.
+	// and there is no additional information about it anyways.
 	scriptClass, addrs, reqSigs, _ := txscript.ExtractPkScriptAddrs(script,
 		s.cfg.ChainParams)
 	addresses := make([]string, len(addrs))
@@ -3214,7 +3214,7 @@ func handleSearchRawTransactions(s *rpcServer, cmd interface{}, closeChan <-chan
 	addressTxns := make([]retrievedTx, 0, numRequested)
 	if reverse {
 		// Transactions in the mempool are not in a block header yet,
-		// so the block header field in the retieved transaction struct
+		// so the block header field in the retrieved transaction struct
 		// is left nil.
 		mpTxns, mpSkipped := fetchMempoolTxnsForAddress(s, addr,
 			uint32(numToSkip), uint32(numRequested))
@@ -3268,7 +3268,7 @@ func handleSearchRawTransactions(s *rpcServer, cmd interface{}, closeChan <-chan
 	// order and the number of results is still under the number requested.
 	if !reverse && len(addressTxns) < numRequested {
 		// Transactions in the mempool are not in a block header yet,
-		// so the block header field in the retieved transaction struct
+		// so the block header field in the retrieved transaction struct
 		// is left nil.
 		mpTxns, mpSkipped := fetchMempoolTxnsForAddress(s, addr,
 			uint32(numToSkip)-numSkipped, uint32(numRequested-
@@ -4168,7 +4168,7 @@ func (s *rpcServer) jsonRPCRead(w http.ResponseWriter, r *http.Request, isAdmin 
 	// change the read deadline for the new connection and having one breaks
 	// long polling.  However, not having a read deadline on the initial
 	// connection would mean clients can connect and idle forever.  Thus,
-	// hijack the connecton from the HTTP server, clear the read deadline,
+	// hijack the connection from the HTTP server, clear the read deadline,
 	// and handle writing the response manually.
 	hj, ok := w.(http.Hijacker)
 	if !ok {
@@ -4191,7 +4191,7 @@ func (s *rpcServer) jsonRPCRead(w http.ResponseWriter, r *http.Request, isAdmin 
 
 	// Attempt to parse the raw body into a JSON-RPC request.
 	// Setup a close notifier.  Since the connection is hijacked,
-	// the CloseNotifer on the ResponseWriter is not available.
+	// the CloseNotifier on the ResponseWriter is not available.
 	closeChan := make(chan struct{}, 1)
 	go func() {
 		_, err = conn.Read(make([]byte, 1))
@@ -4241,7 +4241,7 @@ func (s *rpcServer) jsonRPCRead(w http.ResponseWriter, r *http.Request, isAdmin 
 			// Btcd does not respond to any request without and "id" or "id":null,
 			// regardless the indicated JSON-RPC protocol version unless RPC quirks
 			// are enabled. With RPC quirks enabled, such requests will be responded
-			// to if the reqeust does not indicate JSON-RPC version.
+			// to if the request does not indicate JSON-RPC version.
 			//
 			// RPC quirks can be enabled by the user to avoid compatibility issues
 			// with software relying on Core's behavior.

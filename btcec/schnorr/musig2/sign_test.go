@@ -298,7 +298,7 @@ type sigCombineTestVectors struct {
 	ValidCases []sigCombineValidCase `json:"valid_test_cases"`
 }
 
-func pSigsFromIndicies(t *testing.T, sigs []string, indices []int) []*PartialSignature {
+func pSigsFromIndices(t *testing.T, sigs []string, indices []int) []*PartialSignature {
 	pSigs := make([]*PartialSignature, len(indices))
 	for i, idx := range indices {
 		var pSig PartialSignature
@@ -341,7 +341,7 @@ func TestMusig2SignCombine(t *testing.T) {
 				t, testCase.NonceIndices, testCases.PubNonces,
 			)
 
-			partialSigs := pSigsFromIndicies(
+			partialSigs := pSigsFromIndices(
 				t, testCases.Psigs, testCase.PSigIndices,
 			)
 

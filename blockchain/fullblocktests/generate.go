@@ -936,7 +936,7 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 	// ---------------------------------------------------------------------
 	// The comments below identify the structure of the chain being built.
 	//
-	// The values in parenthesis repesent which outputs are being spent.
+	// The values in parenthesis represent which outputs are being spent.
 	//
 	// For example, b1(0) indicates the first collected spendable output
 	// which, due to the code above to create the correct number of blocks,
@@ -1194,7 +1194,7 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 	accepted()
 
 	// ---------------------------------------------------------------------
-	// Multisig[Verify]/ChecksigVerifiy signature operation count tests.
+	// Multisig[Verify]/ChecksigVerify signature operation count tests.
 	// ---------------------------------------------------------------------
 
 	// Create block with max signature operations as OP_CHECKMULTISIG.

@@ -232,7 +232,7 @@ func baseType(arg reflect.Type) (reflect.Type, int) {
 // assignField is the main workhorse for the NewCmd function which handles
 // assigning the provided source value to the destination field.  It supports
 // direct type assignments, indirection, conversion of numeric types, and
-// unmarshaling of strings into arrays, slices, structs, and maps via
+// unmarshalling of strings into arrays, slices, structs, and maps via
 // json.Unmarshal.
 func assignField(paramNum int, fieldName string, dest reflect.Value, src reflect.Value) error {
 	// Just error now when the types have no chance of being compatible.

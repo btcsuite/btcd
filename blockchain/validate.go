@@ -879,7 +879,7 @@ func (b *BlockChain) checkBlockContext(block *btcutil.Block, prevNode *blockNode
 //
 // This function MUST be called with the chain state lock held (for reads).
 func (b *BlockChain) checkBIP0030(node *blockNode, block *btcutil.Block, view *UtxoViewpoint) error {
-	// Fetch utxos for all of the transaction ouputs in this block.
+	// Fetch utxos for all of the transaction outputs in this block.
 	// Typically, there will not be any utxos for any of the outputs.
 	fetch := make([]wire.OutPoint, 0, len(block.Transactions()))
 	for _, tx := range block.Transactions() {

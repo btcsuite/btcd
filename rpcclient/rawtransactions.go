@@ -718,7 +718,7 @@ func (c *Client) SignRawTransactionWithWallet3Async(tx *wire.MsgTx,
 //
 // This function should only used if a non-default signature hash type is
 // desired.  Otherwise, see SignRawTransactionWithWallet if the RPC server already
-// knows the input transactions, or SignRawTransactionWihWallet2 if it does not.
+// knows the input transactions, or SignRawTransactionWithWallet2 if it does not.
 func (c *Client) SignRawTransactionWithWallet3(tx *wire.MsgTx,
 	inputs []btcjson.RawTxWitnessInput, hashType SigHashType) (*wire.MsgTx, bool, error) {
 

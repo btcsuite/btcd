@@ -168,7 +168,7 @@ func TestAddrManagerV1ToV2(t *testing.T) {
 	addrMgr.loadPeers()
 	addrs := addrMgr.getAddresses()
 	if len(addrs) != len(expectedAddrs) {
-		t.Fatalf("expected to find %d adddresses, found %d",
+		t.Fatalf("expected to find %d addresses, found %d",
 			len(expectedAddrs), len(addrs))
 	}
 	for _, addr := range addrs {

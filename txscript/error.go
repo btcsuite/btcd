@@ -267,7 +267,7 @@ const (
 	ErrPubKeyType
 
 	// ErrCleanStack is returned when the ScriptVerifyCleanStack flag
-	// is set, and after evalution, the stack does not contain only a
+	// is set, and after evaluation, the stack does not contain only a
 	// single element.
 	ErrCleanStack
 

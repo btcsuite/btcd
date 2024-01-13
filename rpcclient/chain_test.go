@@ -53,7 +53,7 @@ func TestUnmarshalGetBlockChainInfoResultSoftForks(t *testing.T) {
 
 	for _, test := range tests {
 		success := t.Run(test.name, func(t *testing.T) {
-			// We'll start by unmarshaling the JSON into a struct.
+			// We'll start by unmarshalling the JSON into a struct.
 			// The SoftForks and UnifiedSoftForks field should not
 			// be set yet, as they are unmarshaled within a
 			// different function.
@@ -225,7 +225,7 @@ func TestClientConnectedToWSServerRunner(t *testing.T) {
 				response := <-ch
 
 				if &expectedResponse != response {
-					t.Fatalf("received unexepcted response")
+					t.Fatalf("received unexpected response")
 				}
 
 				// ensure the goroutine created in this test exists,
@@ -235,7 +235,7 @@ func TestClientConnectedToWSServerRunner(t *testing.T) {
 		},
 	}
 
-	// since these tests rely on concurrency, ensure there is a resonable timeout
+	// since these tests rely on concurrency, ensure there is a reasonable timeout
 	// that they should run within
 	for _, testCase := range testTable {
 		done := make(chan bool)

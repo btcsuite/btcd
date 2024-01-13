@@ -224,7 +224,7 @@ func TestTaprootTweakNoMutation(t *testing.T) {
 			return false
 		}
 
-		// We shuold be able to re-derive the private key from raw
+		// We should be able to re-derive the private key from raw
 		// bytes and have that match up again.
 		privKeyCopy, _ := btcec.PrivKeyFromBytes(privBytes[:])
 		if *privKey != *privKeyCopy {

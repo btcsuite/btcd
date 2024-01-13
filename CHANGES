@@ -782,7 +782,7 @@ Changes in 0.8.0-beta (Sun May 25 2014)
       recent reference client changes
       (https://github.com/conformal/btcd/issues/100)
     - Raise the maximum signature script size to support standard 15-of-15
-      multi-signature pay-to-sript-hash transactions with compressed pubkeys
+      multi-signature pay-to-script-hash transactions with compressed pubkeys
       to remain compatible with the reference client
       (https://github.com/conformal/btcd/issues/128)
     - Reduce max bytes allowed for a standard nulldata transaction to 40 for

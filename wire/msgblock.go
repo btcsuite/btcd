@@ -231,7 +231,7 @@ func (msg *MsgBlock) Serialize(w io.Writer) error {
 
 // SerializeNoWitness encodes a block to w using an identical format to
 // Serialize, with all (if any) witness data stripped from all transactions.
-// This method is provided in additon to the regular Serialize, in order to
+// This method is provided in addition to the regular Serialize, in order to
 // allow one to selectively encode transaction witness data to non-upgraded
 // peers which are unaware of the new encoding.
 func (msg *MsgBlock) SerializeNoWitness(w io.Writer) error {

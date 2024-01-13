@@ -744,7 +744,7 @@ func (p *Peer) LastRecv() time.Time {
 
 // LocalAddr returns the local address of the connection.
 //
-// This function is safe fo concurrent access.
+// This function is safe for concurrent access.
 func (p *Peer) LocalAddr() net.Addr {
 	var localAddr net.Addr
 	if atomic.LoadInt32(&p.connected) != 0 {
