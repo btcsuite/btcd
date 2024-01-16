@@ -717,6 +717,23 @@ var helpDescsEnUS = map[string]string{
 	"versionresult-patch":         "The patch component of the JSON-RPC API version",
 	"versionresult-prerelease":    "Prerelease info about the current build",
 	"versionresult-buildmetadata": "Metadata about the current build",
+
+	// TestMempoolAcceptCmd help.
+	"testmempoolaccept--synopsis":  "Returns result of mempool acceptance tests indicating if raw transaction(s) would be accepted by mempool.",
+	"testmempoolaccept-rawtxns":    "Serialized transactions to test.",
+	"testmempoolaccept-maxfeerate": "Maximum acceptable fee rate in BTC/kB",
+
+	// TestMempoolAcceptCmd result help.
+	"testmempoolacceptresult-txid":             "The transaction hash in hex.",
+	"testmempoolacceptresult-wtxid":            "The transaction witness hash in hex.",
+	"testmempoolacceptresult-package-error":    "Package validation error, if any (only possible if rawtxs had more than 1 transaction).",
+	"testmempoolacceptresult-allowed":          "Whether the transaction would be accepted to the mempool.",
+	"testmempoolacceptresult-vsize":            "Virtual transaction size as defined in BIP 141.(only present when 'allowed' is true)",
+	"testmempoolacceptresult-reject-reason":    "Rejection string (only present when 'allowed' is false).",
+	"testmempoolacceptresult-fees":             "Transaction fees (only present if 'allowed' is true).",
+	"testmempoolacceptfees-base":               "Transaction fees (only present if 'allowed' is true).",
+	"testmempoolacceptfees-effective-feerate":  "The effective feerate in BTC per KvB.",
+	"testmempoolacceptfees-effective-includes": "Transactions whose fees and vsizes are included in effective-feerate. Each item is a transaction wtxid in hex.",
 }
 
 // rpcResultTypes specifies the result types that each RPC command can return.
@@ -772,6 +789,7 @@ var rpcResultTypes = map[string][]interface{}{
 	"verifychain":            {(*bool)(nil)},
 	"verifymessage":          {(*bool)(nil)},
 	"version":                {(*map[string]btcjson.VersionResult)(nil)},
+	"testmempoolaccept":      {(*[]btcjson.TestMempoolAcceptResult)(nil)},
 
 	// Websocket commands.
 	"loadtxfilter":              nil,

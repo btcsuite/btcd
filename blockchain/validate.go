@@ -243,9 +243,9 @@ func CheckTransactionSanity(tx *btcutil.Tx) error {
 			return ruleError(ErrBadTxOutValue, str)
 		}
 		if satoshi > btcutil.MaxSatoshi {
-			str := fmt.Sprintf("transaction output value of %v is "+
-				"higher than max allowed value of %v", satoshi,
-				btcutil.MaxSatoshi)
+			str := fmt.Sprintf("transaction output value is "+
+				"higher than max allowed value: %v > %v ",
+				satoshi, btcutil.MaxSatoshi)
 			return ruleError(ErrBadTxOutValue, str)
 		}
 
@@ -968,8 +968,8 @@ func CheckTransactionInputs(tx *btcutil.Tx, txHeight int32, utxoView *UtxoViewpo
 			return 0, ruleError(ErrBadTxOutValue, str)
 		}
 		if originTxSatoshi > btcutil.MaxSatoshi {
-			str := fmt.Sprintf("transaction output value of %v is "+
-				"higher than max allowed value of %v",
+			str := fmt.Sprintf("transaction output value is "+
+				"higher than max allowed value: %v > %v ",
 				btcutil.Amount(originTxSatoshi),
 				btcutil.MaxSatoshi)
 			return 0, ruleError(ErrBadTxOutValue, str)
