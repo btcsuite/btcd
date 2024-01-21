@@ -45,6 +45,20 @@ type MsgBlock struct {
 	Transactions []*MsgTx
 }
 
+// Copy creates a deep copy of MsgBlock.
+func (msg *MsgBlock) Copy() *MsgBlock {
+	block := &MsgBlock{
+		Header:       msg.Header,
+		Transactions: make([]*MsgTx, len(msg.Transactions)),
+	}
+
+	for i, tx := range msg.Transactions {
+		block.Transactions[i] = tx.Copy()
+	}
+
+	return block
+}
+
 // AddTransaction adds a transaction to the message.
 func (msg *MsgBlock) AddTransaction(tx *MsgTx) error {
 	msg.Transactions = append(msg.Transactions, tx)
