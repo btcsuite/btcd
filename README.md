@@ -5,6 +5,8 @@ btcd
 [![Coverage Status](https://coveralls.io/repos/github/btcsuite/btcd/badge.svg?branch=master)](https://coveralls.io/github/btcsuite/btcd?branch=master)
 [![ISC License](https://img.shields.io/badge/license-ISC-blue.svg)](http://copyfree.org)
 [![GoDoc](https://img.shields.io/badge/godoc-reference-blue.svg)](https://pkg.go.dev/github.com/btcsuite/btcd)
+[![Go Report Card](https://goreportcard.com/badge/github.com/btcsuite/btcd)](https://goreportcard.com/report/github.com/btcsuite/btcd)
+[![Latest Release](https://img.shields.io/github/v/release/btcsuite/btcd)](https://github.com/btcsuite/btcd/releases/latest)
 
 btcd is an alternative full node bitcoin implementation written in Go (golang).
 
