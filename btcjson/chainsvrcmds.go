@@ -147,6 +147,7 @@ type FundRawTransactionOpts struct {
 	Replaceable            *bool                 `json:"replaceable,omitempty"`
 	ConfTarget             *int                  `json:"conf_target,omitempty"`
 	EstimateMode           *EstimateSmartFeeMode `json:"estimate_mode,omitempty"`
+	IncludeUnsafe          *bool                 `json:"include_unsafe,omitempty"`
 }
 
 // FundRawTransactionCmd defines the fundrawtransaction JSON-RPC command
