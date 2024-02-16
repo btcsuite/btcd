@@ -729,18 +729,33 @@ func TestFlushOnPrune(t *testing.T) {
 	}
 
 	syncBlocks := func() {
+		// Modify block 1 to be a different hash.  This is to artificially
+		// create a stale branch in the chain.
+		staleMsgBlock := blocks[1].MsgBlock().Copy()
+		staleMsgBlock.Header.Nonce = 0
+		staleBlock := btcutil.NewBlock(staleMsgBlock)
+
+		// Add the stale block here to create a chain view like so. The
+		// block will be the main chain at first but become stale as we
+		// keep adding blocks.  BFNoPoWCheck is given as the pow check will
+		// fail.
+		//
+		// (genesis block) -> 1 -> 2 -> 3 -> ...
+		//                \-> 1a
+		_, _, err = chain.ProcessBlock(staleBlock, BFNoPoWCheck)
+		if err != nil {
+			t.Fatal(err)
+		}
+
 		for i, block := range blocks {
 			if i == 0 {
 				// Skip the genesis block.
 				continue
 			}
-			isMainChain, _, err := chain.ProcessBlock(block, BFNone)
+			_, _, err = chain.ProcessBlock(block, BFNone)
 			if err != nil {
-				t.Fatal(err)
-			}
-
-			if !isMainChain {
-				t.Fatalf("expected block %s to be on the main chain", block.Hash())
+				t.Fatalf("Failed to process block %v(%v). %v",
+					block.Hash().String(), block.Height(), err)
 			}
 		}
 	}
