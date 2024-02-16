@@ -749,36 +749,40 @@ func TestFlushOnPrune(t *testing.T) {
 	ffldb.TstRunWithMaxBlockFileSize(chain.db, maxBlockFileSize, syncBlocks)
 
 	// Function that errors out if the block that should exist doesn't exist.
-	shouldExist := func(dbTx database.Tx, blockHash *chainhash.Hash) {
+	shouldExist := func(dbTx database.Tx, blockHash *chainhash.Hash) error {
 		bytes, err := dbTx.FetchBlock(blockHash)
 		if err != nil {
-			t.Fatal(err)
+			return err
 		}
 		block, err := btcutil.NewBlockFromBytes(bytes)
 		if err != nil {
-			t.Fatalf("didn't find block %v. %v", blockHash, err)
+			return fmt.Errorf("didn't find block %v. %v", blockHash, err)
 		}
 
 		if !block.Hash().IsEqual(blockHash) {
-			t.Fatalf("expected to find block %v but got %v",
+			return fmt.Errorf("expected to find block %v but got %v",
 				blockHash, block.Hash())
 		}
+
+		return nil
 	}
 
 	// Function that errors out if the block that shouldn't exist exists.
-	shouldNotExist := func(dbTx database.Tx, blockHash *chainhash.Hash) {
+	shouldNotExist := func(dbTx database.Tx, blockHash *chainhash.Hash) error {
 		bytes, err := dbTx.FetchBlock(chaincfg.MainNetParams.GenesisHash)
 		if err == nil {
-			t.Fatalf("expected block %s to be pruned", blockHash)
+			return fmt.Errorf("expected block %s to be pruned", blockHash.String())
 		}
 		if len(bytes) != 0 {
-			t.Fatalf("expected block %s to be pruned but got %v",
+			return fmt.Errorf("expected block %s to be pruned but got %v",
 				blockHash, bytes)
 		}
+
+		return nil
 	}
 
 	// The below code checks that the correct blocks were pruned.
-	chain.db.View(func(dbTx database.Tx) error {
+	err = chain.db.View(func(dbTx database.Tx) error {
 		exist := false
 		for _, block := range blocks {
 			// Blocks up to the last flush hash should not exist.
@@ -789,15 +793,23 @@ func TestFlushOnPrune(t *testing.T) {
 			}
 
 			if exist {
-				shouldExist(dbTx, block.Hash())
+				err = shouldExist(dbTx, block.Hash())
+				if err != nil {
+					return err
+				}
 			} else {
-				shouldNotExist(dbTx, block.Hash())
+				err = shouldNotExist(dbTx, block.Hash())
+				if err != nil {
+					return err
+				}
 			}
-
 		}
 
 		return nil
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestInitConsistentState(t *testing.T) {
