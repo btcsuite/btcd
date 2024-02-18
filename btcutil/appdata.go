@@ -23,6 +23,11 @@ func appDataDir(goos, appName string, roaming bool) string {
 		return "."
 	}
 
+	// Fallback to an empty string on js since we do not have a file system.
+	if goos == "js" {
+		return ""
+	}
+
 	// The caller really shouldn't prepend the appName with a period, but
 	// if they do, handle it gracefully by trimming it.
 	appName = strings.TrimPrefix(appName, ".")
