@@ -796,6 +796,15 @@ func (b *BlockChain) disconnectBlock(node *blockNode, block *btcutil.Block, view
 			return err
 		}
 
+		// Flush the cache on every disconnect.  Since the code for
+		// reorganization modifies the database directly, the cache
+		// will be left in an inconsistent state if we don't flush it
+		// prior to the dbPutUtxoView that happends below.
+		err = b.utxoCache.flush(dbTx, FlushRequired, state)
+		if err != nil {
+			return err
+		}
+
 		// Update the utxo set using the state of the utxo view.  This
 		// entails restoring all of the utxos spent and removing the new
 		// ones created by the block.
@@ -880,20 +889,14 @@ func countSpentOutputs(block *btcutil.Block) int {
 //
 // This function may modify node statuses in the block index without flushing.
 //
+// This function never leaves the utxo set in an inconsistent state for block
+// disconnects.
+//
 // This function MUST be called with the chain state lock held (for writes).
 func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List) error {
 	// Nothing to do if no reorganize nodes were provided.
 	if detachNodes.Len() == 0 && attachNodes.Len() == 0 {
 		return nil
-	}
-
-	// The rest of the reorg depends on all STXOs already being in the database
-	// so we flush before reorg.
-	err := b.db.Update(func(dbTx database.Tx) error {
-		return b.utxoCache.flush(dbTx, FlushRequired, b.BestSnapshot())
-	})
-	if err != nil {
-		return err
 	}
 
 	// Ensure the provided nodes match the current best chain.
@@ -957,7 +960,7 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List) error 
 
 		// Load all of the utxos referenced by the block that aren't
 		// already in the view.
-		err = view.fetchInputUtxos(b.db, nil, block)
+		err = view.fetchInputUtxos(nil, b.utxoCache, block)
 		if err != nil {
 			return err
 		}
@@ -1024,7 +1027,7 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List) error 
 		// checkConnectBlock gets skipped, we still need to update the UTXO
 		// view.
 		if b.index.NodeStatus(n).KnownValid() {
-			err = view.fetchInputUtxos(b.db, nil, block)
+			err = view.fetchInputUtxos(nil, b.utxoCache, block)
 			if err != nil {
 				return err
 			}
@@ -1061,11 +1064,21 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List) error 
 		newBest = n
 	}
 
+	// Flush the utxo cache for the block disconnect below.  The disconnect
+	// code assumes that it's directly modifying the database so the cache
+	// will be left in an inconsistent state.  It needs to be flushed beforehand
+	// in order for that to not happen.
+	err := b.db.Update(func(dbTx database.Tx) error {
+		return b.utxoCache.flush(dbTx, FlushRequired, b.BestSnapshot())
+	})
+	if err != nil {
+		return err
+	}
+
 	// Reset the view for the actual connection code below.  This is
 	// required because the view was previously modified when checking if
 	// the reorg would be successful and the connection code requires the
-	// view to be valid from the viewpoint of each block being connected or
-	// disconnected.
+	// view to be valid from the viewpoint of each block being disconnected.
 	view = NewUtxoViewpoint()
 	view.SetBestHash(&b.bestChain.Tip().hash)
 
@@ -1076,7 +1089,7 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List) error 
 
 		// Load all of the utxos referenced by the block that aren't
 		// already in the view.
-		err := view.fetchInputUtxos(b.db, nil, block)
+		err := view.fetchInputUtxos(nil, b.utxoCache, block)
 		if err != nil {
 			return err
 		}
@@ -1089,49 +1102,37 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List) error 
 			return err
 		}
 
-		// Update the database and chain state.
+		// Update the database and chain state. The cache will be flushed
+		// here before the utxoview modifications happen to the database.
 		err = b.disconnectBlock(n, block, view)
 		if err != nil {
 			return err
 		}
 	}
 
-	// Connect the new best chain blocks.
+	// Connect the new best chain blocks using the utxocache directly.  It's more
+	// efficient and since we already checked that the blocks are correct and that
+	// the transactions connect properly, it's ok to access the cache.  If we suddenly
+	// crash here, we are able to recover as well.
 	for i, e := 0, attachNodes.Front(); e != nil; i, e = i+1, e.Next() {
 		n := e.Value.(*blockNode)
 		block := attachBlocks[i]
-
-		// Load all of the utxos referenced by the block that aren't
-		// already in the view.
-		err := view.fetchInputUtxos(b.db, nil, block)
-		if err != nil {
-			return err
-		}
 
 		// Update the view to mark all utxos referenced by the block
 		// as spent and add all transactions being created by this block
 		// to it.  Also, provide an stxo slice so the spent txout
 		// details are generated.
 		stxos := make([]SpentTxOut, 0, countSpentOutputs(block))
-		err = view.connectTransactions(block, &stxos)
+		err := b.utxoCache.connectTransactions(block, &stxos)
 		if err != nil {
 			return err
 		}
 
 		// Update the database and chain state.
-		err = b.connectBlock(n, block, view, stxos)
+		err = b.connectBlock(n, block, nil, stxos)
 		if err != nil {
 			return err
 		}
-	}
-
-	// We call the flush at the end to update the last flush hash to the new
-	// best tip.
-	err = b.db.Update(func(dbTx database.Tx) error {
-		return b.utxoCache.flush(dbTx, FlushRequired, b.BestSnapshot())
-	})
-	if err != nil {
-		return err
 	}
 
 	// Log the point where the chain forked and old and new best chain
