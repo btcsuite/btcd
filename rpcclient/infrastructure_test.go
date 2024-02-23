@@ -34,11 +34,16 @@ func TestParseBitcoindVersion(t *testing.T) {
 		{
 			name:          "parse version 22.0",
 			rpcVersion:    "/Satoshi:22.0.0/",
-			parsedVersion: BitcoindPre25,
+			parsedVersion: BitcoindPre24,
 		},
 		{
-			name:          "parse version 22.0 - 25.0",
-			rpcVersion:    "/Satoshi:23.0.0/",
+			name:          "parse version 22.0 - 24.0",
+			rpcVersion:    "/Satoshi:23.1.0/",
+			parsedVersion: BitcoindPre24,
+		},
+		{
+			name:          "parse version 24.0",
+			rpcVersion:    "/Satoshi:24.0.0/",
 			parsedVersion: BitcoindPre25,
 		},
 		{

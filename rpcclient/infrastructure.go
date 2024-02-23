@@ -114,8 +114,12 @@ const (
 	// 0.19.0 and smaller than 22.0.0.
 	BitcoindPre22
 
+	// BitcoindPre24 represents a bitcoind version equal to or greater than
+	// 22.0.0 and smaller than 24.0.0.
+	BitcoindPre24
+
 	// BitcoindPre25 represents a bitcoind version equal to or greater than
-	// 22.0.0 and smaller than 25.0.0.
+	// 24.0.0 and smaller than 25.0.0.
 	BitcoindPre25
 
 	// BitcoindPre25 represents a bitcoind version equal to or greater than
@@ -135,8 +139,11 @@ func (b BackendVersion) String() string {
 	case BitcoindPre22:
 		return "bitcoind v0.19.0-v22.0.0"
 
+	case BitcoindPre24:
+		return "bitcoind v22.0.0-v24.0.0"
+
 	case BitcoindPre25:
-		return "bitcoind v22.0.0-v25.0.0"
+		return "bitcoind v24.0.0-v25.0.0"
 
 	case BitcoindPost25:
 		return "bitcoind v25.0.0 and above"
@@ -1625,6 +1632,9 @@ const (
 	// bitcoind22Str is the string representation of bitcoind v22.0.0.
 	bitcoind22Str = "22.0.0"
 
+	// bitcoind24Str is the string representation of bitcoind v24.0.0.
+	bitcoind24Str = "24.0.0"
+
 	// bitcoind25Str is the string representation of bitcoind v25.0.0.
 	bitcoind25Str = "25.0.0"
 
@@ -1652,6 +1662,9 @@ func parseBitcoindVersion(version string) BackendVersion {
 
 	case version < bitcoind22Str:
 		return BitcoindPre22
+
+	case version < bitcoind24Str:
+		return BitcoindPre24
 
 	case version < bitcoind25Str:
 		return BitcoindPre25
