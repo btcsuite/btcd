@@ -116,6 +116,10 @@ const (
 	ScriptVerifyDiscourageUpgradeablePubkeyType
 )
 
+func (f ScriptFlags) hasFlag(flag ScriptFlags) bool {
+	return f&flag == flag
+}
+
 const (
 	// MaxStackSize is the maximum combined height of stack and alt stack
 	// during execution.
@@ -316,7 +320,7 @@ type StepInfo struct {
 
 // hasFlag returns whether the script engine instance has the passed flag set.
 func (vm *Engine) hasFlag(flag ScriptFlags) bool {
-	return vm.flags&flag == flag
+	return vm.flags.hasFlag(flag)
 }
 
 // isBranchExecuting returns whether or not the current conditional branch is
