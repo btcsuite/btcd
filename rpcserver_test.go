@@ -9,6 +9,7 @@ import (
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/mempool"
+	"github.com/btcsuite/btcd/wire"
 	"github.com/stretchr/testify/require"
 )
 
@@ -410,4 +411,87 @@ func TestHandleTestMempoolAcceptFees(t *testing.T) {
 			mm.AssertExpectations(t)
 		})
 	}
+}
+
+// TestGetTxSpendingPrevOut checks that handleGetTxSpendingPrevOut handles the
+// cmd as expected.
+func TestGetTxSpendingPrevOut(t *testing.T) {
+	t.Parallel()
+
+	require := require.New(t)
+
+	// Create a mock mempool.
+	mm := &mempool.MockTxMempool{}
+	defer mm.AssertExpectations(t)
+
+	// Create a testing server with the mock mempool.
+	s := &rpcServer{cfg: rpcserverConfig{
+		TxMemPool: mm,
+	}}
+
+	// First, check the error case.
+	//
+	// Create a request that will cause an error.
+	cmd := &btcjson.GetTxSpendingPrevOutCmd{
+		Outputs: []*btcjson.GetTxSpendingPrevOutCmdOutput{
+			{Txid: "invalid"},
+		},
+	}
+
+	// Call the method handler and assert the error is returned.
+	closeChan := make(chan struct{})
+	results, err := handleGetTxSpendingPrevOut(s, cmd, closeChan)
+	require.Error(err)
+	require.Nil(results)
+
+	// We now check the normal case. Two outputs will be tested - one found
+	// in mempool and other not.
+	//
+	// Decode the hex so we can assert the mock mempool is called with it.
+	tx := decodeTxHex(t, txHex1)
+
+	// Create testing outpoints.
+	opInMempool := wire.OutPoint{Hash: chainhash.Hash{1}, Index: 1}
+	opNotInMempool := wire.OutPoint{Hash: chainhash.Hash{2}, Index: 1}
+
+	// We only expect to see one output being found as spent in mempool.
+	expectedResults := []*btcjson.GetTxSpendingPrevOutResult{
+		{
+			Txid:         opInMempool.Hash.String(),
+			Vout:         opInMempool.Index,
+			SpendingTxid: tx.Hash().String(),
+		},
+		{
+			Txid: opNotInMempool.Hash.String(),
+			Vout: opNotInMempool.Index,
+		},
+	}
+
+	// We mock the first call to `CheckSpend` to return a result saying the
+	// output is found.
+	mm.On("CheckSpend", opInMempool).Return(tx).Once()
+
+	// We mock the second call to `CheckSpend` to return a result saying the
+	// output is NOT found.
+	mm.On("CheckSpend", opNotInMempool).Return(nil).Once()
+
+	// Create a request with the above outputs.
+	cmd = &btcjson.GetTxSpendingPrevOutCmd{
+		Outputs: []*btcjson.GetTxSpendingPrevOutCmdOutput{
+			{
+				Txid: opInMempool.Hash.String(),
+				Vout: opInMempool.Index,
+			},
+			{
+				Txid: opNotInMempool.Hash.String(),
+				Vout: opNotInMempool.Index,
+			},
+		},
+	}
+
+	// Call the method handler and assert the expected result is returned.
+	closeChan = make(chan struct{})
+	results, err = handleGetTxSpendingPrevOut(s, cmd, closeChan)
+	require.NoError(err)
+	require.Equal(expectedResults, results)
 }

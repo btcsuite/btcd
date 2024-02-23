@@ -185,6 +185,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"verifymessage":          handleVerifyMessage,
 	"version":                handleVersion,
 	"testmempoolaccept":      handleTestMempoolAccept,
+	"gettxspendingprevout":   handleGetTxSpendingPrevOut,
 }
 
 // list of commands that we recognize, but for which btcd has no support because
@@ -3901,6 +3902,49 @@ func handleTestMempoolAccept(s *rpcServer, cmd interface{},
 		}
 
 		results = append(results, item)
+	}
+
+	return results, nil
+}
+
+// handleGetTxSpendingPrevOut implements the gettxspendingprevout command.
+func handleGetTxSpendingPrevOut(s *rpcServer, cmd interface{},
+	closeChan <-chan struct{}) (interface{}, error) {
+
+	c := cmd.(*btcjson.GetTxSpendingPrevOutCmd)
+
+	// Convert the outpoints.
+	ops := make([]wire.OutPoint, 0, len(c.Outputs))
+	for _, o := range c.Outputs {
+		hash, err := chainhash.NewHashFromStr(o.Txid)
+		if err != nil {
+			return nil, err
+		}
+
+		ops = append(ops, wire.OutPoint{
+			Hash:  *hash,
+			Index: o.Vout,
+		})
+	}
+
+	// Check mempool spend for all the outpoints.
+	results := make([]*btcjson.GetTxSpendingPrevOutResult, 0, len(ops))
+	for _, op := range ops {
+		// Create a result entry.
+		result := &btcjson.GetTxSpendingPrevOutResult{
+			Txid: op.Hash.String(),
+			Vout: op.Index,
+		}
+
+		// Check the mempool spend.
+		spendingTx := s.cfg.TxMemPool.CheckSpend(op)
+
+		// Set the spending txid if found.
+		if spendingTx != nil {
+			result.SpendingTxid = spendingTx.Hash().String()
+		}
+
+		results = append(results, result)
 	}
 
 	return results, nil
