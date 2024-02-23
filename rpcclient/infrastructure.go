@@ -134,7 +134,7 @@ type Client struct {
 	// backendVersion is the version of the backend the client is currently
 	// connected to. This should be retrieved through GetVersion.
 	backendVersionMu sync.Mutex
-	backendVersion   *BackendVersion
+	backendVersion   BackendVersion
 
 	// mtx is a mutex to protect access to connection related fields.
 	mtx sync.Mutex
@@ -1577,7 +1577,7 @@ func (c *Client) BackendVersion() (BackendVersion, error) {
 	defer c.backendVersionMu.Unlock()
 
 	if c.backendVersion != nil {
-		return *c.backendVersion, nil
+		return c.backendVersion, nil
 	}
 
 	// We'll start by calling GetInfo. This method doesn't exist for
@@ -1589,20 +1589,20 @@ func (c *Client) BackendVersion() (BackendVersion, error) {
 	// Parse the btcd version and cache it.
 	case nil:
 		log.Debugf("Detected btcd version: %v", info.Version)
-		version := Btcd
-		c.backendVersion = &version
-		return *c.backendVersion, nil
+		version := parseBtcdVersion(info.Version)
+		c.backendVersion = version
+		return c.backendVersion, nil
 
 	// Inspect the RPC error to ensure the method was not found, otherwise
 	// we actually ran into an error.
 	case *btcjson.RPCError:
 		if err.Code != btcjson.ErrRPCMethodNotFound.Code {
-			return 0, fmt.Errorf("unable to detect btcd version: "+
+			return nil, fmt.Errorf("unable to detect btcd version: "+
 				"%v", err)
 		}
 
 	default:
-		return 0, fmt.Errorf("unable to detect btcd version: %v", err)
+		return nil, fmt.Errorf("unable to detect btcd version: %v", err)
 	}
 
 	// Since the GetInfo method was not found, we assume the client is
@@ -1610,7 +1610,8 @@ func (c *Client) BackendVersion() (BackendVersion, error) {
 	// GetNetworkInfo.
 	networkInfo, err := c.GetNetworkInfo()
 	if err != nil {
-		return 0, fmt.Errorf("unable to detect bitcoind version: %v", err)
+		return nil, fmt.Errorf("unable to detect bitcoind version: %v",
+			err)
 	}
 
 	// Parse the bitcoind version and cache it.
@@ -1618,7 +1619,7 @@ func (c *Client) BackendVersion() (BackendVersion, error) {
 	version := parseBitcoindVersion(networkInfo.SubVersion)
 	c.backendVersion = &version
 
-	return *c.backendVersion, nil
+	return c.backendVersion, nil
 }
 
 func (c *Client) sendAsync() FutureGetBulkResult {

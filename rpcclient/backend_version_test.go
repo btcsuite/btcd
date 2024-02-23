@@ -14,7 +14,7 @@ func TestParseBitcoindVersion(t *testing.T) {
 	testCases := []struct {
 		name          string
 		rpcVersion    string
-		parsedVersion BackendVersion
+		parsedVersion BitcoindVersion
 	}{
 		{
 			name:          "parse version 0.19 and below",
@@ -103,4 +103,46 @@ func TestParseBtcdVersion(t *testing.T) {
 			require.Equal(t, tc.parsedVersion, version)
 		})
 	}
+}
+
+// TestVersionSupports checks all the versions of bitcoind and btcd to ensure
+// that the RPCs are supported correctly.
+func TestVersionSupports(t *testing.T) {
+	t.Parallel()
+
+	require := require.New(t)
+
+	// For bitcoind, unified softforks format is supported in 19.0 and
+	// above.
+	require.False(BitcoindPre19.SupportUnifiedSoftForks())
+	require.True(BitcoindPre22.SupportUnifiedSoftForks())
+	require.True(BitcoindPre24.SupportUnifiedSoftForks())
+	require.True(BitcoindPre25.SupportUnifiedSoftForks())
+	require.True(BitcoindPost25.SupportUnifiedSoftForks())
+
+	// For bitcoind, `testmempoolaccept` is supported in 22.0 and above.
+	require.False(BitcoindPre19.SupportTestMempoolAccept())
+	require.False(BitcoindPre22.SupportTestMempoolAccept())
+	require.True(BitcoindPre24.SupportTestMempoolAccept())
+	require.True(BitcoindPre25.SupportTestMempoolAccept())
+	require.True(BitcoindPost25.SupportTestMempoolAccept())
+
+	// For bitcoind, `gettxspendingprevout` is supported in 24.0 and above.
+	require.False(BitcoindPre19.SupportGetTxSpendingPrevOut())
+	require.False(BitcoindPre22.SupportGetTxSpendingPrevOut())
+	require.False(BitcoindPre24.SupportGetTxSpendingPrevOut())
+	require.True(BitcoindPre25.SupportGetTxSpendingPrevOut())
+	require.True(BitcoindPost25.SupportGetTxSpendingPrevOut())
+
+	// For btcd, unified softforks format is supported in all versions.
+	require.True(BtcdPre2401.SupportUnifiedSoftForks())
+	require.True(BtcdPost2401.SupportUnifiedSoftForks())
+
+	// For btcd, `testmempoolaccept` is supported in 24.1 and above.
+	require.False(BtcdPre2401.SupportTestMempoolAccept())
+	require.True(BtcdPost2401.SupportTestMempoolAccept())
+
+	// For btcd, `gettxspendingprevout` is supported in 24.1 and above.
+	require.False(BtcdPre2401.SupportGetTxSpendingPrevOut())
+	require.True(BtcdPost2401.SupportGetTxSpendingPrevOut())
 }

@@ -360,7 +360,9 @@ func (c *Client) SendRawTransactionAsync(tx *wire.MsgTx, allowHighFees bool) Fut
 
 	var cmd *btcjson.SendRawTransactionCmd
 	// Starting from bitcoind v0.19.0, the MaxFeeRate field should be used.
-	if version > BitcoindPre19 {
+	//
+	// When unified softforks format is supported, it's 0.19 and above.
+	if version.SupportUnifiedSoftForks() {
 		// Using a 0 MaxFeeRate is interpreted as a maximum fee rate not
 		// being enforced by bitcoind.
 		var maxFeeRate int32
@@ -943,7 +945,7 @@ func (c *Client) TestMempoolAcceptAsync(txns []*wire.MsgTx,
 	//
 	// We decide to not support this call for versions below 22.0.0. as the
 	// request/response formats are very different.
-	if version < BitcoindPre22 {
+	if !version.SupportTestMempoolAccept() {
 		err := fmt.Errorf("%w: %v", ErrBitcoindVersion, version)
 		return newFutureError(err)
 	}
@@ -1057,7 +1059,7 @@ func (c *Client) GetTxSpendingPrevOutAsync(
 	log.Debugf("GetTxSpendingPrevOutAsync: backend version %s", version)
 
 	// Exit early if the version is below 24.0.0.
-	if version < BitcoindPre24 {
+	if !version.SupportGetTxSpendingPrevOut() {
 		err := fmt.Errorf("%w: %v", ErrBitcoindVersion, version)
 		return newFutureError(err)
 	}

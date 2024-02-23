@@ -2,13 +2,32 @@ package rpcclient
 
 import "strings"
 
-// BackendVersion represents the version of the backend the client is currently
-// connected to.
-type BackendVersion uint8
+// BackendVersion defines an interface to handle the version of the backend
+// used by the client.
+type BackendVersion interface {
+	// String returns a human-readable backend version.
+	String() string
+
+	// SupportUnifiedSoftForks returns true if the backend supports the
+	// unified softforks format.
+	SupportUnifiedSoftForks() bool
+
+	// SupportTestMempoolAccept returns true if the backend supports the
+	// testmempoolaccept RPC.
+	SupportTestMempoolAccept() bool
+
+	// SupportGetTxSpendingPrevOut returns true if the backend supports the
+	// gettxspendingprevout RPC.
+	SupportGetTxSpendingPrevOut() bool
+}
+
+// BitcoindVersion represents the version of the bitcoind the client is
+// currently connected to.
+type BitcoindVersion uint8
 
 const (
 	// BitcoindPre19 represents a bitcoind version before 0.19.0.
-	BitcoindPre19 BackendVersion = iota
+	BitcoindPre19 BitcoindVersion = iota
 
 	// BitcoindPre22 represents a bitcoind version equal to or greater than
 	// 0.19.0 and smaller than 22.0.0.
@@ -28,7 +47,7 @@ const (
 )
 
 // String returns a human-readable backend version.
-func (b BackendVersion) String() string {
+func (b BitcoindVersion) String() string {
 	switch b {
 	case BitcoindPre19:
 		return "bitcoind 0.19 and below"
@@ -49,6 +68,29 @@ func (b BackendVersion) String() string {
 		return "unknown"
 	}
 }
+
+// SupportUnifiedSoftForks returns true if the backend supports the unified
+// softforks format.
+func (b BitcoindVersion) SupportUnifiedSoftForks() bool {
+	// Versions of bitcoind on or after v0.19.0 use the unified format.
+	return b > BitcoindPre19
+}
+
+// SupportTestMempoolAccept returns true if bitcoind version is 22.0.0 or
+// above.
+func (b BitcoindVersion) SupportTestMempoolAccept() bool {
+	return b > BitcoindPre22
+}
+
+// SupportGetTxSpendingPrevOut returns true if bitcoind version is 24.0.0 or
+// above.
+func (b BitcoindVersion) SupportGetTxSpendingPrevOut() bool {
+	return b > BitcoindPre24
+}
+
+// Compile-time checks to ensure that BitcoindVersion satisfy the
+// BackendVersion interface.
+var _ BackendVersion = BitcoindVersion(0)
 
 const (
 	// bitcoind19Str is the string representation of bitcoind v0.19.0.
@@ -74,7 +116,7 @@ const (
 
 // parseBitcoindVersion parses the bitcoind version from its string
 // representation.
-func parseBitcoindVersion(version string) BackendVersion {
+func parseBitcoindVersion(version string) BitcoindVersion {
 	// Trim the version of its prefix and suffix to determine the
 	// appropriate version number.
 	version = strings.TrimPrefix(
@@ -126,6 +168,28 @@ func (b BtcdVersion) String() string {
 		return "unknown"
 	}
 }
+
+// SupportUnifiedSoftForks returns true if the backend supports the unified
+// softforks format.
+//
+// NOTE: always true for btcd as we didn't track it before.
+func (b BtcdVersion) SupportUnifiedSoftForks() bool {
+	return true
+}
+
+// SupportTestMempoolAccept returns true if btcd version is 24.1.0 or above.
+func (b BtcdVersion) SupportTestMempoolAccept() bool {
+	return b > BtcdPre2401
+}
+
+// SupportGetTxSpendingPrevOut returns true if btcd version is 24.1.0 or above.
+func (b BtcdVersion) SupportGetTxSpendingPrevOut() bool {
+	return b > BtcdPre2401
+}
+
+// Compile-time checks to ensure that BtcdVersion satisfy the BackendVersion
+// interface.
+var _ BackendVersion = BtcdVersion(0)
 
 const (
 	// btcd2401Val is the int representation of btcd v0.24.1.
