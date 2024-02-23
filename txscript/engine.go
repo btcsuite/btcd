@@ -114,6 +114,14 @@ const (
 	// ScriptVerifyDiscourageUpgradeablePubkeyType defines if unknown
 	// public key versions (during tapscript execution) is non-standard.
 	ScriptVerifyDiscourageUpgradeablePubkeyType
+
+	// ScriptVerifyOpCat defines whether to verify an encounted OP_CAT
+	// opcode in tapscript, or fall back to OP_SUCCESS behavior.
+	ScriptVerifyOpCat
+
+	// ScriptVerifyDiscourageOpCat defines whether or not to consider usage
+	// of OP_CAT during tapscript execution as non-standard.
+	ScriptVerifyDiscourageOpCat
 )
 
 func (f ScriptFlags) hasFlag(flag ScriptFlags) bool {

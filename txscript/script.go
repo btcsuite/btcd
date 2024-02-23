@@ -538,6 +538,24 @@ func ScriptHasOpSuccess(witnessScript []byte, flags ScriptFlags) (bool, error) {
 	for tokenizer.Next() {
 		op := tokenizer.Opcode()
 
+		// OP_CAT is considered a success opcode if it is not
+		// activated.
+		if op == OP_CAT {
+			switch {
+			// If OP_CAT is discouraged, it doesn't matter if it is
+			// active or not.
+			case flags.hasFlag(ScriptVerifyDiscourageOpCat):
+				errStr := fmt.Sprintf("script contains " +
+					"discouraged OP_CAT op code")
+				return true, scriptError(ErrDiscourageOpSuccess,
+					errStr)
+
+			// If not activated it has success behavior.
+			case !flags.hasFlag(ScriptVerifyOpCat):
+				return true, nil
+			}
+		}
+
 		if _, ok := successOpcodes[op]; ok {
 			// An op success op code has been found, however if the
 			// policy flag forbidding them is active, then we'll
