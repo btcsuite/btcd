@@ -1012,3 +1012,71 @@ func (c *Client) TestMempoolAccept(txns []*wire.MsgTx,
 
 	return c.TestMempoolAcceptAsync(txns, maxFeeRate).Receive()
 }
+
+// FutureGetTxSpendingPrevOut is a future promise to deliver the result of a
+// GetTxSpendingPrevOut RPC invocation (or an applicable error).
+type FutureGetTxSpendingPrevOut chan *Response
+
+// Receive waits for the Response promised by the future and returns the
+// response from GetTxSpendingPrevOut.
+func (r FutureGetTxSpendingPrevOut) Receive() (
+	[]*btcjson.GetTxSpendingPrevOutResult, error) {
+
+	response, err := ReceiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal as an array of GetTxSpendingPrevOutResult items.
+	var results []*btcjson.GetTxSpendingPrevOutResult
+
+	err = json.Unmarshal(response, &results)
+	if err != nil {
+		return nil, err
+	}
+
+	return results, nil
+}
+
+// GetTxSpendingPrevOutAsync returns an instance of a type that can be used to
+// get the result of the RPC at some future time by invoking the Receive
+// function on the returned instance.
+//
+// See GetTxSpendingPrevOut for the blocking version and more details.
+func (c *Client) GetTxSpendingPrevOutAsync(
+	outpoints []wire.OutPoint) FutureGetTxSpendingPrevOut {
+
+	// Due to differences in the testmempoolaccept API for different
+	// backends, we'll need to inspect our version and construct the
+	// appropriate request.
+	version, err := c.BackendVersion()
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	log.Debugf("GetTxSpendingPrevOutAsync: backend version %s", version)
+
+	// Exit early if the version is below 24.0.0.
+	if version < BitcoindPre24 {
+		err := fmt.Errorf("%w: %v", ErrBitcoindVersion, version)
+		return newFutureError(err)
+	}
+
+	// Exit early if an empty array of outpoints is provided.
+	if len(outpoints) == 0 {
+		err := fmt.Errorf("%w: no outpoints provided", ErrInvalidParam)
+		return newFutureError(err)
+	}
+
+	cmd := btcjson.NewGetTxSpendingPrevOutCmd(outpoints)
+
+	return c.SendCmd(cmd)
+}
+
+// GetTxSpendingPrevOut returns the result from calling `gettxspendingprevout`
+// RPC.
+func (c *Client) GetTxSpendingPrevOut(outpoints []wire.OutPoint) (
+	[]*btcjson.GetTxSpendingPrevOutResult, error) {
+
+	return c.GetTxSpendingPrevOutAsync(outpoints).Receive()
+}
