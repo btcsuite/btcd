@@ -67,3 +67,40 @@ func TestParseBitcoindVersion(t *testing.T) {
 		})
 	}
 }
+
+// TestParseBtcdVersion checks that the correct version from btcd's `getinfo`
+// RPC call is parsed.
+func TestParseBtcdVersion(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name          string
+		rpcVersion    int32
+		parsedVersion BtcdVersion
+	}{
+		{
+			name:          "parse version 0.24 and below",
+			rpcVersion:    230000,
+			parsedVersion: BtcdPre2401,
+		},
+		{
+			name:          "parse version 0.24.1",
+			rpcVersion:    240100,
+			parsedVersion: BtcdPost2401,
+		},
+		{
+			name:          "parse version 0.24.1 and above",
+			rpcVersion:    250000,
+			parsedVersion: BtcdPost2401,
+		},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+
+		t.Run(tc.name, func(t *testing.T) {
+			version := parseBtcdVersion(tc.rpcVersion)
+			require.Equal(t, tc.parsedVersion, version)
+		})
+	}
+}

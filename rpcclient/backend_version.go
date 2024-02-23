@@ -25,9 +25,6 @@ const (
 	// BitcoindPre25 represents a bitcoind version equal to or greater than
 	// 25.0.0.
 	BitcoindPost25
-
-	// Btcd represents a catch-all btcd version.
-	Btcd
 )
 
 // String returns a human-readable backend version.
@@ -47,9 +44,6 @@ func (b BackendVersion) String() string {
 
 	case BitcoindPost25:
 		return "bitcoind v25.0.0 and above"
-
-	case Btcd:
-		return "btcd"
 
 	default:
 		return "unknown"
@@ -102,5 +96,49 @@ func parseBitcoindVersion(version string) BackendVersion {
 
 	default:
 		return BitcoindPost25
+	}
+}
+
+// BtcdVersion represents the version of the btcd the client is currently
+// connected to.
+type BtcdVersion int32
+
+const (
+	// BtcdPre2401 describes a btcd version before 0.24.1, which doesn't
+	// include the `testmempoolaccept` and `gettxspendingprevout` RPCs.
+	BtcdPre2401 BtcdVersion = iota
+
+	// BtcdPost2401 describes a btcd version equal to or greater than
+	// 0.24.1.
+	BtcdPost2401
+)
+
+// String returns a human-readable backend version.
+func (b BtcdVersion) String() string {
+	switch b {
+	case BtcdPre2401:
+		return "btcd 24.0.0 and below"
+
+	case BtcdPost2401:
+		return "btcd 24.1.0 and above"
+
+	default:
+		return "unknown"
+	}
+}
+
+const (
+	// btcd2401Val is the int representation of btcd v0.24.1.
+	btcd2401Val = 240100
+)
+
+// parseBtcdVersion parses the btcd version from its string representation.
+func parseBtcdVersion(version int32) BtcdVersion {
+	switch {
+	case version < btcd2401Val:
+		return BtcdPre2401
+
+	default:
+		return BtcdPost2401
 	}
 }
