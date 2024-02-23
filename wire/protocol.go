@@ -173,6 +173,9 @@ const (
 	// MainNet represents the main bitcoin network.
 	MainNet BitcoinNet = 0xd9b4bef9
 
+	// FreshNet represents the fresh network (magic byte is a randomly generated 4-bytes)
+	FreshNet BitcoinNet = 0xe01591ea
+
 	// TestNet represents the regression test network.
 	TestNet BitcoinNet = 0xdab5bffa
 
