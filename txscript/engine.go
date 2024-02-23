@@ -333,8 +333,14 @@ func (vm *Engine) isBranchExecuting() bool {
 // isOpcodeDisabled returns whether or not the opcode is disabled and thus is
 // always bad to see in the instruction stream (even if turned off by a
 // conditional).
-func isOpcodeDisabled(opcode byte) bool {
+func isOpcodeDisabled(opcode byte, tapscript bool) bool {
 	switch opcode {
+	case OP_CAT:
+		// CAT is re-enabled for tapscript.
+		if tapscript {
+			return false
+		}
+		return true
 	case OP_SUBSTR:
 		return true
 	case OP_LEFT:
@@ -453,7 +459,7 @@ func checkMinimalDataPush(op *opcode, data []byte) error {
 // tested in this case.
 func (vm *Engine) executeOpcode(op *opcode, data []byte) error {
 	// Disabled opcodes are fail on program counter.
-	if isOpcodeDisabled(op.value) {
+	if isOpcodeDisabled(op.value, vm.taprootCtx != nil) {
 		str := fmt.Sprintf("attempt to execute disabled opcode %s", op.name)
 		return scriptError(ErrDisabledOpcode, str)
 	}
