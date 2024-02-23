@@ -1964,18 +1964,18 @@ func opcodeCat(op *opcode, data []byte, vm *Engine) error {
 		return err
 	}
 
-	var buf bytes.Buffer
-	buf.Write(x1)
-	buf.Write(x2)
-
-	c := buf.Bytes()
+	n := len(x1) + len(x2)
 
 	// Ensure result is within the max allowed size.
-	if len(c) > MaxScriptElementSize {
+	if n > MaxScriptElementSize {
 		str := fmt.Sprintf("element size %d exceeds max allowed size %d",
-			len(c), MaxScriptElementSize)
+			n, MaxScriptElementSize)
 		return scriptError(ErrElementTooBig, str)
 	}
+
+	c := make([]byte, n)
+	copy(c[:], x1[:])
+	copy(c[len(x1):], x2[:])
 
 	vm.dstack.PushByteArray(c)
 	return nil
