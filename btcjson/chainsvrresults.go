@@ -911,3 +911,17 @@ type TestMempoolAcceptFees struct {
 	// NOTE: this field only exists in bitcoind v25.0 and above.
 	EffectiveIncludes []string `json:"effective-includes"`
 }
+
+// GetTxSpendingPrevOutResult defines a single item returned from the
+// gettxspendingprevout command.
+type GetTxSpendingPrevOutResult struct {
+	// Txid is the transaction id of the checked output.
+	Txid string `json:"txid"`
+
+	// Vout is the vout value of the checked output.
+	Vout uint32 `json:"vout"`
+
+	// SpendingTxid is the transaction id of the mempool transaction
+	// spending this output (omitted if unspent).
+	SpendingTxid string `json:"spendingtxid,omitempty"`
+}
