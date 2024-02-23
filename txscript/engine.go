@@ -702,17 +702,12 @@ func (vm *Engine) verifyWitnessProgram(witness wire.TxWitness) error {
 			// check to see if OP_SUCCESS op codes are found in the
 			// script. If so, then we'll return here early as we
 			// skip proper validation.
-			if ScriptHasOpSuccess(witnessScript) {
-				// An op success op code has been found, however if
-				// the policy flag forbidding them is active, then
-				// we'll return an error.
-				// TODO: add flag for discourage OP_CAT.
-				if vm.hasFlag(ScriptVerifyDiscourageOpSuccess) {
-					errStr := fmt.Sprintf("script contains " +
-						"OP_SUCCESS op code")
-					return scriptError(ErrDiscourageOpSuccess, errStr)
-				}
+			suc, err := ScriptHasOpSuccess(witnessScript, vm.flags)
+			if err != nil {
+				return err
+			}
 
+			if suc {
 				// Otherwise, the script passes scott free.
 				vm.taprootCtx.mustSucceed = true
 				return nil
