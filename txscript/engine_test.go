@@ -435,39 +435,44 @@ func TestCheckSignatureEncoding(t *testing.T) {
 func TestOpcodeCat(t *testing.T) {
 	t.Parallel()
 
+	// Define helper constants for non-error cases.
+	const (
+		NO_ERROR = -1
+		SUCCESS  = -2
+	)
+
 	tests := []struct {
-		script     *ScriptBuilder
+		flags      ScriptFlags
 		expErr     ErrorCode
+		startStack [][]byte
 		expStack   [][]byte
 		nonTaproot bool
 	}{
 
 		// No elements to cat.
 		{
-			script: NewScriptBuilder().
-				AddOp(OP_CAT),
-			expErr:   ErrInvalidStackOperation,
-			expStack: [][]byte{},
+			startStack: [][]byte{},
+			flags:      ScriptVerifyOpCat,
+			expErr:     ErrInvalidStackOperation,
 		},
 
 		// Only a single element to cat.
 		{
-			script: NewScriptBuilder().
-				AddData([]byte{0xaa}).
-				AddOp(OP_CAT),
-			expErr: ErrInvalidStackOperation,
-			expStack: [][]byte{
+			startStack: [][]byte{
 				{0xaa},
 			},
+			flags:  ScriptVerifyOpCat,
+			expErr: ErrInvalidStackOperation,
 		},
 
 		// Normal cat.
 		{
-			script: NewScriptBuilder().
-				AddData([]byte{0xaa}).
-				AddData([]byte{0xbb}).
-				AddOp(OP_CAT),
-			expErr: -1,
+			startStack: [][]byte{
+				{0xaa},
+				{0xbb},
+			},
+			flags:  ScriptVerifyOpCat,
+			expErr: NO_ERROR,
 			expStack: [][]byte{
 				{0xaa, 0xbb},
 			},
@@ -475,24 +480,23 @@ func TestOpcodeCat(t *testing.T) {
 
 		// Disabled in non-taproot context.
 		{
-			script: NewScriptBuilder().
-				AddData([]byte{0xaa}).
-				AddData([]byte{0xbb}).
-				AddOp(OP_CAT),
-			expErr: ErrDisabledOpcode,
-			expStack: [][]byte{
-				{0xaa}, {0xbb},
+			startStack: [][]byte{
+				{0xaa},
+				{0xbb},
 			},
+			flags:      ScriptVerifyOpCat,
+			expErr:     ErrDisabledOpcode,
 			nonTaproot: true,
 		},
 
 		// Cat with empty element.
 		{
-			script: NewScriptBuilder().
-				AddData([]byte{0xaa}).
-				AddData([]byte{}).
-				AddOp(OP_CAT),
-			expErr: -1,
+			startStack: [][]byte{
+				{0xaa},
+				{},
+			},
+			flags:  ScriptVerifyOpCat,
+			expErr: NO_ERROR,
 			expStack: [][]byte{
 				{0xaa},
 			},
@@ -500,11 +504,12 @@ func TestOpcodeCat(t *testing.T) {
 
 		// Cat with empty element.
 		{
-			script: NewScriptBuilder().
-				AddData([]byte{}).
-				AddData([]byte{0xbb}).
-				AddOp(OP_CAT),
-			expErr: -1,
+			startStack: [][]byte{
+				{},
+				{0xbb},
+			},
+			flags:  ScriptVerifyOpCat,
+			expErr: NO_ERROR,
 			expStack: [][]byte{
 				{0xbb},
 			},
@@ -512,11 +517,13 @@ func TestOpcodeCat(t *testing.T) {
 
 		// Cat elements of different lengths.
 		{
-			script: NewScriptBuilder().
-				AddData([]byte{0xaa, 0xbb, 0xcc}).
-				AddData([]byte{0xdd}).
-				AddOp(OP_CAT),
-			expErr: -1,
+			startStack: [][]byte{
+				{0xaa, 0xbb, 0xcc},
+				{0xdd},
+			},
+
+			flags:  ScriptVerifyOpCat,
+			expErr: NO_ERROR,
 			expStack: [][]byte{
 				{0xaa, 0xbb, 0xcc, 0xdd},
 			},
@@ -524,15 +531,14 @@ func TestOpcodeCat(t *testing.T) {
 
 		// Cat up to max element size.
 		{
-			script: NewScriptBuilder().
-				AddData(
-					bytes.Repeat(
-						[]byte{0xaa}, MaxScriptElementSize-1,
-					),
-				).
-				AddData([]byte{0xdd}).
-				AddOp(OP_CAT),
-			expErr: -1,
+			startStack: [][]byte{
+				bytes.Repeat(
+					[]byte{0xaa}, MaxScriptElementSize-1,
+				),
+				{0xdd},
+			},
+			flags:  ScriptVerifyOpCat,
+			expErr: NO_ERROR,
 			expStack: [][]byte{
 				append(
 					bytes.Repeat([]byte{0xaa}, MaxScriptElementSize-1),
@@ -543,19 +549,61 @@ func TestOpcodeCat(t *testing.T) {
 
 		// Failing to when result exceeds max element size.
 		{
-			script: NewScriptBuilder().
-				AddData(
-					bytes.Repeat(
-						[]byte{0xaa}, MaxScriptElementSize-1,
-					),
-				).
-				AddData([]byte{0xdd, 0xee}).
-				AddOp(OP_CAT),
-			expErr: ErrElementTooBig,
-			expStack: [][]byte{
-				bytes.Repeat([]byte{0xaa}, MaxScriptElementSize-1),
-				[]byte{0xdd, 0xee},
+			startStack: [][]byte{
+				bytes.Repeat(
+					[]byte{0xaa}, MaxScriptElementSize-1,
+				),
+				{0xdd, 0xee},
 			},
+			flags:  ScriptVerifyOpCat,
+			expErr: ErrElementTooBig,
+		},
+
+		// ======== Flag tests =========
+
+		// Discourage CAT.
+		{
+			startStack: [][]byte{
+				{0xaa}, {0xbb},
+			},
+			flags:  ScriptVerifyDiscourageOpCat,
+			expErr: ErrDiscourageOpSuccess,
+		},
+
+		// Discourage CAT when CAT is active.
+		{
+			startStack: [][]byte{
+				{0xaa}, {0xbb},
+			},
+			flags:  ScriptVerifyDiscourageOpCat | ScriptVerifyOpCat,
+			expErr: ErrDiscourageOpSuccess,
+		},
+
+		// Valid CAT but CAT is not active. It should behave as
+		// OP_SUCCESS.
+		{
+			startStack: [][]byte{
+				{0xaa}, {0xbb},
+			},
+			expErr: SUCCESS,
+		},
+
+		// Invalid CAT when CAT is not active. It should behave as
+		// OP_SUCCESS.
+		{
+			startStack: [][]byte{
+				{0xaa},
+			},
+			expErr: SUCCESS,
+		},
+
+		// Invalid CAT when CAT is active.
+		{
+			startStack: [][]byte{
+				{0xaa},
+			},
+			flags:  ScriptVerifyOpCat,
+			expErr: ErrInvalidStackOperation,
 		},
 	}
 
@@ -567,7 +615,13 @@ func TestOpcodeCat(t *testing.T) {
 			},
 		})
 
-		script, err := test.script.Script()
+		// OP_CAT will be our one and only script opcode apart from
+		// making sure the script is valid.
+		script, err := NewScriptBuilder().
+			AddOp(OP_CAT).
+			AddOp(OP_DROP).
+			AddInt64(1).
+			Script()
 		if err != nil {
 			t.Error(err)
 		}
@@ -601,7 +655,14 @@ func TestOpcodeCat(t *testing.T) {
 			t.Error(err)
 			continue
 		}
-		tx.TxIn[0].Witness = wire.TxWitness{script, cbBytes}
+
+		w := wire.TxWitness{}
+		for _, e := range test.startStack {
+			w = append(w, e)
+		}
+
+		w = append(w, script, cbBytes)
+		tx.TxIn[0].Witness = w
 
 		// As a special case, if we are testing non-taproot spends, we
 		// recreate the pkscript as a P2WSH.
@@ -625,17 +686,26 @@ func TestOpcodeCat(t *testing.T) {
 
 		sigHashes := NewTxSigHashes(tx, prevOutFetcher)
 
-		// We'll record the final stack, since we want to check it
-		// against what we expect.
-		var finalStack [][]byte
+		// We'll record the stack after the CAT operation, since we
+		// want to check it against what we expect.
+		finalStack := [][]byte{}
 		cb := func(step *StepInfo) error {
+			if step.ScriptIndex != 2 {
+				return nil
+			}
+
+			// Our script has OP_CAT as first opcode.
+			if step.OpcodeIndex != 1 {
+				return nil
+			}
+
 			finalStack = step.Stack
 			return nil
 		}
 
-		// TODO: test discourage script flags if added.
+		flags := StandardVerifyFlags | test.flags
 		vm, err := NewDebugEngine(
-			prevOut.PkScript, tx, 0, StandardVerifyFlags, nil,
+			prevOut.PkScript, tx, 0, flags, nil,
 			sigHashes, prevOut.Value, nil, cb,
 		)
 		if err != nil {
@@ -644,12 +714,19 @@ func TestOpcodeCat(t *testing.T) {
 		}
 
 		err = vm.Execute()
-		if (test.expErr != -1 || err != nil) && !IsErrorCode(err, test.expErr) {
-			t.Errorf("Expected error %v, got %v", test.expErr, err)
-			continue
+		if err != nil {
+			if !IsErrorCode(err, test.expErr) {
+				t.Errorf("Expected error %v, got %v", test.expErr, err)
+			}
+		} else {
+			// Check expected stack if we didn't expect error
+			// during execution. We skip this check for the SUCCESS
+			// case, as stack is not altered at all.
+			if test.expErr == NO_ERROR {
+				require.Equal(t, test.expStack, finalStack)
+			} else if test.expErr != SUCCESS {
+				t.Errorf("Expected error %v, got %v", test.expErr, err)
+			}
 		}
-
-		// Check expected stack.
-		require.Equal(t, test.expStack, finalStack)
 	}
 }
