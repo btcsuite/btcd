@@ -984,6 +984,11 @@ func newFutureError(err error) chan *Response {
 	return responseChan
 }
 
+// Expose newFutureError for developer usage when creating custom commands.
+func NewFutureError(err error) chan *Response {
+	return newFutureError(err)
+}
+
 // ReceiveFuture receives from the passed futureResult channel to extract a
 // reply or any errors.  The examined errors include an error in the
 // futureResult and the error in the reply from the server.  This will block
