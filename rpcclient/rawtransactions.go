@@ -946,7 +946,7 @@ func (c *Client) TestMempoolAcceptAsync(txns []*wire.MsgTx,
 	// We decide to not support this call for versions below 22.0.0. as the
 	// request/response formats are very different.
 	if !version.SupportTestMempoolAccept() {
-		err := fmt.Errorf("%w: %v", ErrBitcoindVersion, version)
+		err := fmt.Errorf("%w: %v", ErrBackendVersion, version)
 		return newFutureError(err)
 	}
 
@@ -1060,7 +1060,7 @@ func (c *Client) GetTxSpendingPrevOutAsync(
 
 	// Exit early if the version is below 24.0.0.
 	if !version.SupportGetTxSpendingPrevOut() {
-		err := fmt.Errorf("%w: %v", ErrBitcoindVersion, version)
+		err := fmt.Errorf("%w: %v", ErrBackendVersion, version)
 		return newFutureError(err)
 	}
 
