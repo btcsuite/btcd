@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/btcsuite/btcd/btcjson"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 )
 
@@ -1498,6 +1499,29 @@ func TestChainSvrCmds(t *testing.T) {
 			unmarshalled: &btcjson.TestMempoolAcceptCmd{
 				RawTxns:    []string{"rawhex"},
 				MaxFeeRate: 0.01,
+			},
+		},
+		{
+			name: "gettxspendingprevout",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd(
+					"gettxspendingprevout",
+					[]*btcjson.GetTxSpendingPrevOutCmdOutput{
+						{Txid: "0000000000000000000000000000000000000000000000000000000000000001", Vout: 0},
+					})
+			},
+			staticCmd: func() interface{} {
+				outputs := []wire.OutPoint{
+					{Hash: chainhash.Hash{1}, Index: 0},
+				}
+				return btcjson.NewGetTxSpendingPrevOutCmd(outputs)
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"gettxspendingprevout","params":[[{"txid":"0000000000000000000000000000000000000000000000000000000000000001","vout":0}]],"id":1}`,
+			unmarshalled: &btcjson.GetTxSpendingPrevOutCmd{
+				Outputs: []*btcjson.GetTxSpendingPrevOutCmdOutput{{
+					Txid: "0000000000000000000000000000000000000000000000000000000000000001",
+					Vout: 0,
+				}},
 			},
 		},
 	}

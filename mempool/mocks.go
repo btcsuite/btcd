@@ -117,5 +117,9 @@ func (m *MockTxMempool) CheckMempoolAcceptance(
 func (m *MockTxMempool) CheckSpend(op wire.OutPoint) *btcutil.Tx {
 	args := m.Called(op)
 
+	if args.Get(0) == nil {
+		return nil
+	}
+
 	return args.Get(0).(*btcutil.Tx)
 }

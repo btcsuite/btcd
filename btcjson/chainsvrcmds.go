@@ -1064,6 +1064,38 @@ func NewTestMempoolAcceptCmd(rawTxns []string,
 	}
 }
 
+// GetTxSpendingPrevOutCmd defines the gettxspendingprevout JSON-RPC command.
+type GetTxSpendingPrevOutCmd struct {
+	// Outputs is a list of transaction outputs to query.
+	Outputs []*GetTxSpendingPrevOutCmdOutput
+}
+
+// GetTxSpendingPrevOutCmdOutput defines the output to query for the
+// gettxspendingprevout JSON-RPC command.
+type GetTxSpendingPrevOutCmdOutput struct {
+	Txid string `json:"txid"`
+	Vout uint32 `json:"vout"`
+}
+
+// NewGetTxSpendingPrevOutCmd returns a new instance which can be used to issue
+// a gettxspendingprevout JSON-RPC command.
+func NewGetTxSpendingPrevOutCmd(
+	outpoints []wire.OutPoint) *GetTxSpendingPrevOutCmd {
+
+	outputs := make([]*GetTxSpendingPrevOutCmdOutput, 0, len(outpoints))
+
+	for _, op := range outpoints {
+		outputs = append(outputs, &GetTxSpendingPrevOutCmdOutput{
+			Txid: op.Hash.String(),
+			Vout: op.Index,
+		})
+	}
+
+	return &GetTxSpendingPrevOutCmd{
+		Outputs: outputs,
+	}
+}
+
 func init() {
 	// No special flags for commands in this file.
 	flags := UsageFlag(0)
@@ -1125,4 +1157,5 @@ func init() {
 	MustRegisterCmd("verifymessage", (*VerifyMessageCmd)(nil), flags)
 	MustRegisterCmd("verifytxoutproof", (*VerifyTxOutProofCmd)(nil), flags)
 	MustRegisterCmd("testmempoolaccept", (*TestMempoolAcceptCmd)(nil), flags)
+	MustRegisterCmd("gettxspendingprevout", (*GetTxSpendingPrevOutCmd)(nil), flags)
 }
