@@ -107,6 +107,7 @@ type config struct {
 	SimNet         bool   `long:"simnet" description:"Connect to the simulation test network"`
 	TLSSkipVerify  bool   `long:"skipverify" description:"Do not verify tls certificates (not recommended!)"`
 	TestNet3       bool   `long:"testnet" description:"Connect to testnet"`
+	FreshNet       bool   `long:"freshnet" description:"Connect to freshnet"`
 	SigNet         bool   `long:"signet" description:"Connect to signet"`
 	ShowVersion    bool   `short:"V" long:"version" description:"Display version information and exit"`
 	Wallet         bool   `long:"wallet" description:"Connect to wallet"`
@@ -125,6 +126,14 @@ func normalizeAddress(addr string, chain *chaincfg.Params, useWallet bool) (stri
 			} else {
 				defaultPort = "18334"
 			}
+		case &chaincfg.FreshNetParams:
+			if useWallet {
+				// TODO: add port once freshnet is supported in btcwallet
+				paramErr := fmt.Errorf("cannot use -wallet with -freshnet, btcwallet not yet compatible with freshnet")
+				return "", paramErr
+			} else {
+				defaultPort = "41601"
+			} 
 		case &chaincfg.SimNetParams:
 			if useWallet {
 				defaultPort = "18554"
@@ -272,6 +281,10 @@ func loadConfig() (*config, []string, error) {
 		numNets++
 		network = &chaincfg.TestNet3Params
 	}
+	if cfg.FreshNet {
+		numNets++
+		network = &chaincfg.FreshNetParams
+	} 
 	if cfg.SimNet {
 		numNets++
 		network = &chaincfg.SimNetParams

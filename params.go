@@ -31,6 +31,15 @@ var mainNetParams = params{
 	rpcPort: "8334",
 }
 
+// freshNetParams contains parameters specific to the fresh network
+// (wire.FreshNet). NOTE: The RPC port is intentionally different than the
+// reference implementation - see the mainNetParams comment for details.
+var freshNetParams = params{
+	Params:  &chaincfg.FreshNetParams,
+	rpcPort: "41601",
+ }
+ 
+
 // regressionNetParams contains parameters specific to the regression test
 // network (wire.TestNet).  NOTE: The RPC port is intentionally different
 // than the reference implementation - see the mainNetParams comment for

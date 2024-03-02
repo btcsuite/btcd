@@ -170,6 +170,7 @@ type config struct {
 	SigNetChallenge      string        `long:"signetchallenge" description:"Connect to a custom signet network defined by this challenge instead of using the global default signet test network -- Can be specified multiple times"`
 	SigNetSeedNode       []string      `long:"signetseednode" description:"Specify a seed node for the signet network instead of using the global default signet network seed nodes"`
 	TestNet3             bool          `long:"testnet" description:"Use the test network"`
+	FreshNet             bool          `long:"freshnet" description:"Use the fresh network"`
 	TorIsolation         bool          `long:"torisolation" description:"Enable Tor stream isolation by randomizing user credentials for each connection."`
 	TrickleInterval      time.Duration `long:"trickleinterval" description:"Minimum time between attempts to send new inventory to a connected peer"`
 	UtxoCacheMaxSizeMiB  uint          `long:"utxocachemaxsize" description:"The maximum size in MiB of the UTXO cache"`
@@ -552,6 +553,10 @@ func loadConfig() (*config, []string, error) {
 		numNets++
 		activeNetParams = &testNet3Params
 	}
+	if cfg.FreshNet {
+		numNets++
+		activeNetParams = &freshNetParams
+	} 
 	if cfg.RegressionTest {
 		numNets++
 		activeNetParams = &regressionNetParams
