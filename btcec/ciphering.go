@@ -12,6 +12,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	secp "github.com/decred/dcrd/dcrec/secp256k1/v4"
+	"math/big"
 )
 
 // GenerateSharedSecret generates a shared secret based on a private key and a
@@ -61,4 +62,45 @@ func Encrypt(pubKey *PublicKey, msg []byte) ([]byte, error) {
 	pt.Write(ciphertext)
 
 	return pt.Bytes(), nil
+}
+
+// Decrypt decrypts a passed message with a receiver private key, returns plaintext or decryption error
+func Decrypt(privkey *PrivateKey, msg []byte) ([]byte, error) {
+	// Message cannot be less than length of public key (65) + nonce (16) + tag (16)
+	if len(msg) <= (1 + 32 + 32 + 16 + 16) {
+		return nil, fmt.Errorf("invalid length of message")
+	}
+
+	pb := new(big.Int).SetBytes(msg[:65]).Bytes()
+	pubKey, err := ParsePubKey(pb)
+	if err != nil {
+		return nil, err
+	}
+
+	ecdhKey := GenerateSharedSecret(privkey, pubKey)
+	hashedSecret := sha256.Sum256(ecdhKey)
+	encryptionKey := hashedSecret[:16]
+
+	msg = msg[65:]
+	nonce := msg[:16]
+	tag := msg[16:32]
+
+	ciphertext := bytes.Join([][]byte{msg[32:], tag}, nil)
+
+	block, err := aes.NewCipher(encryptionKey)
+	if err != nil {
+		return nil, fmt.Errorf("cannot create new aes block: %w", err)
+	}
+
+	gcm, err := cipher.NewGCMWithNonceSize(block, 16)
+	if err != nil {
+		return nil, fmt.Errorf("cannot create gcm cipher: %w", err)
+	}
+
+	plaintext, err := gcm.Open(nil, nonce, ciphertext, nil)
+	if err != nil {
+		return nil, fmt.Errorf("cannot decrypt ciphertext: %w", err)
+	}
+
+	return plaintext, nil
 }
