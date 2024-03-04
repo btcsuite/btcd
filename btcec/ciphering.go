@@ -5,6 +5,7 @@
 package btcec
 
 import (
+	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
@@ -22,14 +23,19 @@ func GenerateSharedSecret(privkey *PrivateKey, pubkey *PublicKey) []byte {
 
 // Encrypt encrypts data for the target public key using AES-128-GCM
 func Encrypt(pubKey *PublicKey, msg []byte) ([]byte, error) {
+	var pt bytes.Buffer
+
 	ephemeral, err := NewPrivateKey()
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate private key: %v", err)
 	}
 
+	pt.Write(ephemeral.PubKey().SerializeUncompressed())
+
 	ecdhKey := GenerateSharedSecret(ephemeral, pubKey)
 	hashedSecret := sha256.Sum256(ecdhKey)
 	encryptionKey := hashedSecret[:16]
+
 	block, err := aes.NewCipher(encryptionKey)
 	if err != nil {
 		return nil, err
@@ -40,12 +46,19 @@ func Encrypt(pubKey *PublicKey, msg []byte) ([]byte, error) {
 		return nil, err
 	}
 
+	pt.Write(nonce)
+
 	gcm, err := cipher.NewGCMWithNonceSize(block, 16)
 	if err != nil {
 		return nil, err
 	}
 
 	ciphertext := gcm.Seal(nil, nonce, msg, nil)
-	ciphertext = append(nonce, ciphertext...)
-	return ciphertext, nil
+
+	tag := ciphertext[len(ciphertext)-gcm.NonceSize():]
+	pt.Write(tag)
+	ciphertext = ciphertext[:len(ciphertext)-len(tag)]
+	pt.Write(ciphertext)
+
+	return pt.Bytes(), nil
 }
