@@ -519,41 +519,6 @@ func (view *UtxoViewpoint) commit() {
 	}
 }
 
-// fetchUtxosMain fetches unspent transaction output data about the provided
-// set of outpoints from the point of view of the end of the main chain at the
-// time of the call.
-//
-// Upon completion of this function, the view will contain an entry for each
-// requested outpoint.  Spent outputs, or those which otherwise don't exist,
-// will result in a nil entry in the view.
-func (view *UtxoViewpoint) fetchUtxosMain(db database.DB, outpoints []wire.OutPoint) error {
-	// Nothing to do if there are no requested outputs.
-	if len(outpoints) == 0 {
-		return nil
-	}
-
-	// Load the requested set of unspent transaction outputs from the point
-	// of view of the end of the main chain.
-	//
-	// NOTE: Missing entries are not considered an error here and instead
-	// will result in nil entries in the view.  This is intentionally done
-	// so other code can use the presence of an entry in the store as a way
-	// to unnecessarily avoid attempting to reload it from the database.
-	return db.View(func(dbTx database.Tx) error {
-		utxoBucket := dbTx.Metadata().Bucket(utxoSetBucketName)
-		for i := range outpoints {
-			entry, err := dbFetchUtxoEntry(dbTx, utxoBucket, outpoints[i])
-			if err != nil {
-				return err
-			}
-
-			view.entries[outpoints[i]] = entry
-		}
-
-		return nil
-	})
-}
-
 // fetchUtxosFromCache fetches unspent transaction output data about the provided
 // set of outpoints from the point of view of the end of the main chain at the
 // time of the call.  It attempts to fetch them from the cache and whatever entries
