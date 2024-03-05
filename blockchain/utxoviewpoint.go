@@ -666,15 +666,11 @@ func (view *UtxoViewpoint) findInputsToFetch(block *btcutil.Block) []wire.OutPoi
 
 // fetchInputUtxos loads the unspent transaction outputs for the inputs
 // referenced by the transactions in the given block into the view from the
-// database or the cache as needed.  In particular, referenced entries that
-// are earlier in the block are added to the view and entries that are already
-// in the view are not modified.
-func (view *UtxoViewpoint) fetchInputUtxos(db database.DB, cache *utxoCache, block *btcutil.Block) error {
-	if cache != nil {
-		return view.fetchUtxosFromCache(cache, view.findInputsToFetch(block))
-	}
-	// Request the input utxos from the cache.
-	return view.fetchUtxosMain(db, view.findInputsToFetch(block))
+// cache as needed.  In particular, referenced entries that are earlier in
+// the block are added to the view and entries that are already in the view
+// are not modified.
+func (view *UtxoViewpoint) fetchInputUtxos(cache *utxoCache, block *btcutil.Block) error {
+	return view.fetchUtxosFromCache(cache, view.findInputsToFetch(block))
 }
 
 // NewUtxoViewpoint returns a new empty unspent transaction output view.

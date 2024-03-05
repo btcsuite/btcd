@@ -960,7 +960,7 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List) error 
 
 		// Load all of the utxos referenced by the block that aren't
 		// already in the view.
-		err = view.fetchInputUtxos(nil, b.utxoCache, block)
+		err = view.fetchInputUtxos(b.utxoCache, block)
 		if err != nil {
 			return err
 		}
@@ -1027,7 +1027,7 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List) error 
 		// checkConnectBlock gets skipped, we still need to update the UTXO
 		// view.
 		if b.index.NodeStatus(n).KnownValid() {
-			err = view.fetchInputUtxos(nil, b.utxoCache, block)
+			err = view.fetchInputUtxos(b.utxoCache, block)
 			if err != nil {
 				return err
 			}
@@ -1089,7 +1089,7 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List) error 
 
 		// Load all of the utxos referenced by the block that aren't
 		// already in the view.
-		err := view.fetchInputUtxos(nil, b.utxoCache, block)
+		err := view.fetchInputUtxos(b.utxoCache, block)
 		if err != nil {
 			return err
 		}
