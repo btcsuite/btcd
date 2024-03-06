@@ -1,7 +1,6 @@
 package main
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -23,14 +22,14 @@ func TestCreateDefaultConfigFile(t *testing.T) {
 	sampleConfigFile := filepath.Join(filepath.Dir(path), "sample-btcd.conf")
 
 	// Setup a temporary directory
-	tmpDir, err := ioutil.TempDir("", "btcd")
+	tmpDir, err := os.MkdirTemp("", "btcd")
 	if err != nil {
 		t.Fatalf("Failed creating a temporary directory: %v", err)
 	}
 	testpath := filepath.Join(tmpDir, "test.conf")
 
 	// copy config file to location of btcd binary
-	data, err := ioutil.ReadFile(sampleConfigFile)
+	data, err := os.ReadFile(sampleConfigFile)
 	if err != nil {
 		t.Fatalf("Failed reading sample config file: %v", err)
 	}
@@ -39,7 +38,7 @@ func TestCreateDefaultConfigFile(t *testing.T) {
 		t.Fatalf("Failed obtaining app path: %v", err)
 	}
 	tmpConfigFile := filepath.Join(appPath, "sample-btcd.conf")
-	err = ioutil.WriteFile(tmpConfigFile, data, 0644)
+	err = os.WriteFile(tmpConfigFile, data, 0644)
 	if err != nil {
 		t.Fatalf("Failed copying sample config file: %v", err)
 	}
@@ -57,7 +56,7 @@ func TestCreateDefaultConfigFile(t *testing.T) {
 		t.Fatalf("Failed to create a default config file: %v", err)
 	}
 
-	content, err := ioutil.ReadFile(testpath)
+	content, err := os.ReadFile(testpath)
 	if err != nil {
 		t.Fatalf("Failed to read generated default config file: %v", err)
 	}
