@@ -17,6 +17,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/btcsuite/btcd/btcec/v2"
+	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
@@ -59,20 +61,67 @@ func parseHex(tok string) ([]byte, error) {
 	return hex.DecodeString(tok[2:])
 }
 
+var testPrivKey, _ = btcec.NewPrivateKey()
+
 // parseWitnessStack parses a json array of witness items encoded as hex into a
 // slice of witness elements.
-func parseWitnessStack(elements []interface{}) ([][]byte, error) {
-	witness := make([][]byte, len(elements))
-	for i, e := range elements {
-		witElement, err := hex.DecodeString(e.(string))
-		if err != nil {
-			return nil, err
-		}
+func parseWitnessStack(elements []interface{}) ([][]byte,
+	*IndexedTapScriptTree, error) {
 
-		witness[i] = witElement
+	const (
+		autogenScript       = "<AUTOGEN:SERIALIZED_SCRIPT>"
+		autogenControlblock = "<AUTOGEN:CONTROLBLOCK>"
+	)
+
+	var (
+		witness  = make([][]byte, len(elements))
+		tree     *IndexedTapScriptTree
+		pkScript []byte
+	)
+	for i, e := range elements {
+		s := e.(string)
+		switch {
+		case strings.HasPrefix(s, autogenScript):
+			scriptStr := strings.TrimPrefix(s, autogenScript)
+			script, err := parseShortForm(scriptStr, nil)
+			if err != nil {
+				return nil, nil, err
+			}
+
+			pkScript = script
+			witness[i] = script
+
+		case strings.HasPrefix(s, autogenControlblock):
+			if len(pkScript) == 0 {
+				return nil, nil, fmt.Errorf("tap script not set")
+			}
+
+			leaf := NewBaseTapLeaf(pkScript)
+			tree = AssembleTaprootScriptTree(leaf)
+
+			inputKey := testPrivKey.PubKey()
+			ctrlBlock := tree.LeafMerkleProofs[0].ToControlBlock(
+				inputKey,
+			)
+
+			ctrlBlockBytes, err := ctrlBlock.ToBytes()
+			if err != nil {
+				return nil, nil, err
+			}
+
+			witness[i] = ctrlBlockBytes
+
+		default:
+			witElement, err := hex.DecodeString(s)
+			if err != nil {
+				return nil, nil, err
+			}
+
+			witness[i] = witElement
+		}
 	}
 
-	return witness, nil
+	return witness, tree, nil
 }
 
 // shortFormOps holds a map of opcode names to values for use in short form
@@ -90,7 +139,7 @@ var shortFormOps map[string]byte
 //     0x14 is OP_DATA_20)
 //   - Single quoted strings are pushed as data
 //   - Anything else is an error
-func parseShortForm(script string) ([]byte, error) {
+func parseShortForm(script string, tree *IndexedTapScriptTree) ([]byte, error) {
 	// Only create the short form opcode map once.
 	if shortFormOps == nil {
 		ops := make(map[string]byte)
@@ -142,6 +191,15 @@ func parseShortForm(script string) ([]byte, error) {
 			builder.AddFullData([]byte(tok[1 : len(tok)-1]))
 		} else if opcode, ok := shortFormOps[tok]; ok {
 			builder.AddOp(opcode)
+		} else if tok == "<AUTOGEN:TAPROOTOUTPUT>" {
+			inputKey := testPrivKey.PubKey()
+			tapScriptRootHash := tree.RootNode.TapHash()
+			tapKey := ComputeTaprootOutputKey(
+				inputKey, tapScriptRootHash[:],
+			)
+
+			pubKeyBytes := schnorr.SerializePubKey(tapKey)
+			builder.script = append(builder.script, pubKeyBytes...)
 		} else {
 			return nil, fmt.Errorf("bad token %q", tok)
 		}
@@ -196,6 +254,8 @@ func parseScriptFlags(flagStr string) (ScriptFlags, error) {
 			flags |= ScriptVerifyWitnessPubKeyType
 		case "TAPROOT":
 			flags |= ScriptVerifyTaproot
+		case "OP_CAT":
+			flags |= ScriptVerifyOpCat
 		default:
 			return flags, fmt.Errorf("invalid flag: %s", flag)
 		}
@@ -358,6 +418,7 @@ func testScripts(t *testing.T, tests [][]interface{}, useSigCache bool) {
 		var (
 			witness  wire.TxWitness
 			inputAmt btcutil.Amount
+			tapTree  *IndexedTapScriptTree
 		)
 
 		// When the first field of the test data is a slice it contains
@@ -371,7 +432,7 @@ func testScripts(t *testing.T, tests [][]interface{}, useSigCache bool) {
 			// all but the last element in order to parse the
 			// witness stack.
 			strWitnesses := witnessData[:len(witnessData)-1]
-			witness, err = parseWitnessStack(strWitnesses)
+			witness, tapTree, err = parseWitnessStack(strWitnesses)
 			if err != nil {
 				t.Errorf("%s: can't parse witness; %v", name, err)
 				continue
@@ -392,7 +453,7 @@ func testScripts(t *testing.T, tests [][]interface{}, useSigCache bool) {
 			t.Errorf("%s: signature script is not a string", name)
 			continue
 		}
-		scriptSig, err := parseShortForm(scriptSigStr)
+		scriptSig, err := parseShortForm(scriptSigStr, tapTree)
 		if err != nil {
 			t.Errorf("%s: can't parse signature script: %v", name,
 				err)
@@ -405,7 +466,7 @@ func testScripts(t *testing.T, tests [][]interface{}, useSigCache bool) {
 			t.Errorf("%s: public key script is not a string", name)
 			continue
 		}
-		scriptPubKey, err := parseShortForm(scriptPubKeyStr)
+		scriptPubKey, err := parseShortForm(scriptPubKeyStr, tapTree)
 		if err != nil {
 			t.Errorf("%s: can't parse public key script: %v", name,
 				err)
@@ -624,7 +685,7 @@ testloop:
 				continue testloop
 			}
 
-			script, err := parseShortForm(oscript)
+			script, err := parseShortForm(oscript, nil)
 			if err != nil {
 				t.Errorf("bad test (%dth input script doesn't "+
 					"parse %v) %d: %v", j, err, i, test)
@@ -781,7 +842,7 @@ testloop:
 				continue
 			}
 
-			script, err := parseShortForm(oscript)
+			script, err := parseShortForm(oscript, nil)
 			if err != nil {
 				t.Errorf("bad test (%dth input script doesn't "+
 					"parse %v) %d: %v", j, err, i, test)
