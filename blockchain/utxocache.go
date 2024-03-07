@@ -99,7 +99,8 @@ func (ms *mapSlice) put(op wire.OutPoint, entry *UtxoEntry, totalEntryMemory uin
 	ms.mtx.Lock()
 	defer ms.mtx.Unlock()
 
-	for i, maxNum := range ms.maxEntries {
+	// Look for the key in the maps.
+	for i := range ms.maxEntries {
 		m := ms.maps[i]
 		_, found := m[op]
 		if found {
@@ -107,6 +108,10 @@ func (ms *mapSlice) put(op wire.OutPoint, entry *UtxoEntry, totalEntryMemory uin
 			m[op] = entry
 			return // Return as we were successful in adding the entry.
 		}
+	}
+
+	for i, maxNum := range ms.maxEntries {
+		m := ms.maps[i]
 		if len(m) >= maxNum {
 			// Don't try to insert if the map already at max since
 			// that'll force the map to allocate double the memory it's
