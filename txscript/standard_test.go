@@ -21,7 +21,7 @@ import (
 // tests as a helper since the only way it can fail is if there is an error in
 // the test source code.
 func mustParseShortForm(script string) []byte {
-	s, err := parseShortForm(script)
+	s, err := parseShortForm(script, nil)
 	if err != nil {
 		panic("invalid short form script in test source: err " +
 			err.Error() + ", script: " + script)
