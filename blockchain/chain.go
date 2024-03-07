@@ -569,7 +569,7 @@ func (b *BlockChain) getReorganizeNodes(node *blockNode) (*list.List, *list.List
 //
 // This function MUST be called with the chain state lock held (for writes).
 func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block,
-	view *UtxoViewpoint, stxos []SpentTxOut) error {
+	stxos []SpentTxOut) error {
 
 	// Make sure it's extending the end of the best chain.
 	prevHash := &block.MsgBlock().Header.PrevBlock
@@ -610,18 +610,6 @@ func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block,
 	state := newBestState(node, blockSize, blockWeight, numTxns,
 		curTotalTxns+numTxns, CalcPastMedianTime(node),
 	)
-
-	// If a utxoviewpoint was passed in, we'll be writing that viewpoint
-	// directly to the database on disk.  In order for the database to be
-	// consistent, we must flush the cache before writing the viewpoint.
-	if view != nil {
-		err = b.db.Update(func(dbTx database.Tx) error {
-			return b.utxoCache.flush(dbTx, FlushRequired, state)
-		})
-		if err != nil {
-			return err
-		}
-	}
 
 	// Atomically insert info into the database.
 	err = b.db.Update(func(dbTx database.Tx) error {
@@ -676,16 +664,6 @@ func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block,
 			return err
 		}
 
-		// Update the utxo set using the state of the utxo view.  This
-		// entails removing all of the utxos spent and adding the new
-		// ones created by the block.
-		//
-		// A nil viewpoint is a no-op.
-		err = dbPutUtxoView(dbTx, view)
-		if err != nil {
-			return err
-		}
-
 		// Update the transaction spend journal by adding a record for
 		// the block that contains all txos spent by it.
 		err = dbPutSpendJournalEntry(dbTx, block.Hash(), stxos)
@@ -707,12 +685,6 @@ func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block,
 	})
 	if err != nil {
 		return err
-	}
-
-	// Prune fully spent entries and mark all entries in the view unmodified
-	// now that the modifications have been committed to the database.
-	if view != nil {
-		view.commit()
 	}
 
 	// This node is now the end of the best chain.
@@ -1118,18 +1090,18 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List) error 
 		n := e.Value.(*blockNode)
 		block := attachBlocks[i]
 
-		// Update the view to mark all utxos referenced by the block
+		// Update the cache to mark all utxos referenced by the block
 		// as spent and add all transactions being created by this block
 		// to it.  Also, provide an stxo slice so the spent txout
 		// details are generated.
 		stxos := make([]SpentTxOut, 0, countSpentOutputs(block))
-		err := b.utxoCache.connectTransactions(block, &stxos)
+		err = b.utxoCache.connectTransactions(block, &stxos)
 		if err != nil {
 			return err
 		}
 
 		// Update the database and chain state.
-		err = b.connectBlock(n, block, nil, stxos)
+		err = b.connectBlock(n, block, stxos)
 		if err != nil {
 			return err
 		}
@@ -1226,7 +1198,7 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, fla
 		}
 
 		// Connect the block to the main chain.
-		err = b.connectBlock(node, block, nil, stxos)
+		err = b.connectBlock(node, block, stxos)
 		if err != nil {
 			// If we got hit with a rule error, then we'll mark
 			// that status of the block as invalid and flush the
