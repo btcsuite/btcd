@@ -150,6 +150,21 @@ type RejectedNonCanonicalBlock struct {
 // This implements the TestInstance interface.
 func (b RejectedNonCanonicalBlock) FullBlockTestInstance() {}
 
+// BlockDisconnectExpectUTXO defines a test instance that tests an utxo to exist or not
+// exist after a specified block has been disconnected.
+type BlockDisconnectExpectUTXO struct {
+	Name      string
+	Expected  bool
+	BlockHash chainhash.Hash
+	OutPoint  wire.OutPoint
+}
+
+// FullBlockTestInstance only exists to allow BlockDisconnectExpectUTXO to be treated as
+// a TestInstance.
+//
+// This implements the TestInstance interface.
+func (b BlockDisconnectExpectUTXO) FullBlockTestInstance() {}
+
 // spendableOut represents a transaction output that is spendable along with
 // additional metadata such as the block its in and how much it pays.
 type spendableOut struct {
@@ -878,6 +893,9 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 	//
 	// orphanedOrRejected creates and appends a single orphanOrRejectBlock
 	// test instance for the current tip.
+	//
+	// blockDisconnectExpectUTXO creates and appends a BlockDisconnectExpectUTXO test
+	// instance with the passed in values.
 	accepted := func() {
 		tests = append(tests, []TestInstance{
 			acceptBlock(g.tipName, g.tip, true, false),
@@ -902,6 +920,12 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 	orphanedOrRejected := func() {
 		tests = append(tests, []TestInstance{
 			orphanOrRejectBlock(g.tipName, g.tip),
+		})
+	}
+	blockDisconnectExpectUTXO := func(name string, expected bool, op wire.OutPoint,
+		hash chainhash.Hash) {
+		tests = append(tests, []TestInstance{
+			BlockDisconnectExpectUTXO{name, expected, hash, op},
 		})
 	}
 
@@ -2044,6 +2068,55 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 	}
 	accepted()
 
+	// Create a chain where the utxo created in b82a is spent in b83a.
+	//
+	//   b81() -> b82a(28) -> b83a(b82.tx[1].out[0])
+	//
+	g.nextBlock("b82a", outs[28])
+	accepted()
+
+	b82aTx1Out0 := makeSpendableOut(g.tip, 1, 0)
+	g.nextBlock("b83a", &b82aTx1Out0)
+	accepted()
+
+	// Now we'll build a side-chain where we don't spend any of the outputs.
+	//
+	//   b81() -> b82a(28) -> b83a(b82.tx[1].out[0])
+	//        \-> b82()    -> b83()
+	//
+	g.setTip("b81")
+	g.nextBlock("b82", nil)
+	acceptedToSideChainWithExpectedTip("b83a")
+
+	g.nextBlock("b83", nil)
+	acceptedToSideChainWithExpectedTip("b83a")
+
+	// At this point b83a is still the tip.  When we add block 84, the tip
+	// will change. Pre-load up the expected utxos test before the reorganization.
+	//
+	// We expect b82a output to now be a utxo since b83a was spending it and it was
+	// removed from the main chain.
+	blockDisconnectExpectUTXO("b82aTx1Out0",
+		true, b82aTx1Out0.prevOut, g.blocksByName["b83a"].BlockHash())
+
+	// We expect the output from b82 to not exist once b82a itself has been removed
+	// from the main chain.
+	blockDisconnectExpectUTXO("b82aTx1Out0",
+		false, b82aTx1Out0.prevOut, g.blocksByName["b82a"].BlockHash())
+
+	// The output that was being spent in b82a should exist after the removal of
+	// b82a.
+	blockDisconnectExpectUTXO("outs[28]",
+		true, outs[28].prevOut, g.blocksByName["b82a"].BlockHash())
+
+	// Create block 84 and reorg out the sidechain with b83a as the tip.
+	//
+	//   b81() -> b82a(28) -> b83a(b82.tx[1].out[0])
+	//        \-> b82()    -> b83()                  -> b84()
+	//
+	g.nextBlock("b84", nil)
+	accepted()
+
 	// ---------------------------------------------------------------------
 	// Large block re-org test.
 	// ---------------------------------------------------------------------
@@ -2054,8 +2127,8 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 
 	// Ensure the tip the re-org test builds on is the best chain tip.
 	//
-	//   ... -> b81(27) -> ...
-	g.setTip("b81")
+	//   ... -> b84() -> ...
+	g.setTip("b84")
 
 	// Collect all of the spendable coinbase outputs from the previous
 	// collection point up to the current tip.
