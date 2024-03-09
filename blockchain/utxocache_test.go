@@ -69,6 +69,26 @@ func TestMapSlice(t *testing.T) {
 			t.Fatalf("expected len of %d, got %d", len(m), ms.length())
 		}
 
+		// Delete the first element in the first map.
+		ms.delete(test.keys[0])
+		delete(m, test.keys[0])
+
+		// Try to insert the last element in the mapslice again.
+		ms.put(test.keys[len(test.keys)-1], &UtxoEntry{}, 0)
+		m[test.keys[len(test.keys)-1]] = &UtxoEntry{}
+
+		// Check that the duplicate didn't make it in.
+		if len(m) != ms.length() {
+			t.Fatalf("expected len of %d, got %d", len(m), ms.length())
+		}
+
+		ms.put(test.keys[0], &UtxoEntry{}, 0)
+		m[test.keys[0]] = &UtxoEntry{}
+
+		if len(m) != ms.length() {
+			t.Fatalf("expected len of %d, got %d", len(m), ms.length())
+		}
+
 		for _, key := range test.keys {
 			expected, found := m[key]
 			if !found {
