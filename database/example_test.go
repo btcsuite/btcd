@@ -7,7 +7,6 @@ package database_test
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -123,7 +122,7 @@ func Example_blockStorageAndRetrieval() {
 	// Typically you wouldn't want to remove the database right away like
 	// this, nor put it in the temp directory, but it's done here to ensure
 	// the example cleans up after itself.
-	dbPath, err := ioutil.TempDir("", "exampleblkstorage")
+	dbPath, err := os.MkdirTemp("", "exampleblkstorage")
 	if err != nil {
 		fmt.Println(err)
 		return

@@ -1,7 +1,6 @@
 package addrmgr
 
 import (
-	"io/ioutil"
 	"math/rand"
 	"net"
 	"os"
@@ -108,7 +107,7 @@ func TestAddrManagerSerialization(t *testing.T) {
 
 	// We'll start by creating our address manager backed by a temporary
 	// directory.
-	tempDir, err := ioutil.TempDir("", "addrmgr")
+	tempDir, err := os.MkdirTemp("", "addrmgr")
 	if err != nil {
 		t.Fatalf("unable to create temp dir: %v", err)
 	}
@@ -148,7 +147,7 @@ func TestAddrManagerV1ToV2(t *testing.T) {
 
 	// We'll start by creating our address manager backed by a temporary
 	// directory.
-	tempDir, err := ioutil.TempDir("", "addrmgr")
+	tempDir, err := os.MkdirTemp("", "addrmgr")
 	if err != nil {
 		t.Fatalf("unable to create temp dir: %v", err)
 	}
