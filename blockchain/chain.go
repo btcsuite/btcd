@@ -702,9 +702,11 @@ func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block,
 	// Notify the caller that the block was connected to the main chain.
 	// The caller would typically want to react with actions such as
 	// updating wallets.
-	b.chainLock.Unlock()
-	b.sendNotification(NTBlockConnected, block)
-	b.chainLock.Lock()
+	func() {
+		b.chainLock.Unlock()
+		defer b.chainLock.Lock()
+		b.sendNotification(NTBlockConnected, block)
+	}()
 
 	// Since we may have changed the UTXO cache, we make sure it didn't exceed its
 	// maximum size.  If we're pruned and have flushed already, this will be a no-op.
@@ -834,9 +836,11 @@ func (b *BlockChain) disconnectBlock(node *blockNode, block *btcutil.Block, view
 	// Notify the caller that the block was disconnected from the main
 	// chain.  The caller would typically want to react with actions such as
 	// updating wallets.
-	b.chainLock.Unlock()
-	b.sendNotification(NTBlockDisconnected, block)
-	b.chainLock.Lock()
+	func() {
+		b.chainLock.Unlock()
+		defer b.chainLock.Lock()
+		b.sendNotification(NTBlockDisconnected, block)
+	}()
 
 	return nil
 }
