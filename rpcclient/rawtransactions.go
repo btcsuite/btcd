@@ -17,9 +17,9 @@ import (
 )
 
 const (
-	// defaultMaxFeeRate is the default maximum fee rate in sat/KB enforced
+	// defaultMaxFeeRate is the default maximum fee rate in BTC/kvB enforced
 	// by bitcoind v0.19.0 or after for transaction broadcast.
-	defaultMaxFeeRate = btcutil.SatoshiPerBitcoin / 10
+	defaultMaxFeeRate float64 = 0.1
 )
 
 // SigHashType enumerates the available signature hashing types that the
@@ -365,7 +365,7 @@ func (c *Client) SendRawTransactionAsync(tx *wire.MsgTx, allowHighFees bool) Fut
 	if version.SupportUnifiedSoftForks() {
 		// Using a 0 MaxFeeRate is interpreted as a maximum fee rate not
 		// being enforced by bitcoind.
-		var maxFeeRate int32
+		var maxFeeRate float64
 		if !allowHighFees {
 			maxFeeRate = defaultMaxFeeRate
 		}

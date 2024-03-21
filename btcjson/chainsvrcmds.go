@@ -862,7 +862,7 @@ func (a *AllowHighFeesOrMaxFeeRate) UnmarshalJSON(data []byte) error {
 	case bool:
 		a.Value = Bool(v)
 	case float64:
-		a.Value = Int32(int32(v))
+		a.Value = Float64(v)
 	default:
 		return fmt.Errorf("invalid allowhighfees or maxfeerate value: "+
 			"%v", unmarshalled)
@@ -893,9 +893,10 @@ func NewSendRawTransactionCmd(hexTx string, allowHighFees *bool) *SendRawTransac
 
 // NewSendRawTransactionCmd returns a new instance which can be used to issue a
 // sendrawtransaction JSON-RPC command to a bitcoind node.
+// maxFeeRate is the maximum fee rate for the transaction in BTC/kvB.
 //
 // A 0 maxFeeRate indicates that a maximum fee rate won't be enforced.
-func NewBitcoindSendRawTransactionCmd(hexTx string, maxFeeRate int32) *SendRawTransactionCmd {
+func NewBitcoindSendRawTransactionCmd(hexTx string, maxFeeRate float64) *SendRawTransactionCmd {
 	return &SendRawTransactionCmd{
 		HexTx: hexTx,
 		FeeSetting: &AllowHighFeesOrMaxFeeRate{
