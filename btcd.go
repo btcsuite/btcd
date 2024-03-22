@@ -19,6 +19,8 @@ import (
 	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcd/limits"
 	"github.com/btcsuite/btcd/ossec"
+	"github.com/btcsuite/btcd/btcutil"
+	"github.com/btcsuite/btcd/chaincfg"
 )
 
 const (
@@ -110,6 +112,14 @@ func btcdMain(serverChan chan<- *server) error {
 	if interruptRequested(interrupt) {
 		return nil
 	}
+
+	// Generate a new freshnet address
+	addr, err := btcutil.NewAddressPubKeyHash(
+		make([]byte, 20), &chaincfg.FreshNetParams)
+	if err != nil {
+		return nil
+	}
+	fmt.Println("Freshnet Address:", addr.EncodeAddress())
 
 	// Load the block database.
 	db, err := loadBlockDB()

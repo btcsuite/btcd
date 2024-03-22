@@ -438,24 +438,38 @@ var FreshNetParams = Params{
 	// looking at the port number
 	DefaultPort: "41600",
 	// TODO: seed nodes left blank for now
-	DNSSeeds:    []DNSSeed{},
+	DNSSeeds: []DNSSeed{},
 
 	// Chain parameters
-	GenesisBlock:             &genesisBlock,
-	GenesisHash:              &genesisHash,
-	PowLimit:                 freshNetPowLimit,
-	PowLimitBits:             0x1d00ffff,
-	BIP0034Height:            227931, // 000000000000024b89b42a942fe0d9fea3bb44ab7bd1b19115dd6a759c0808b8
-	BIP0065Height:            388381, // 000000000000000004c2b624ed5d7756c508d90fd0da2c7c679febfa6c4735f0
-	BIP0066Height:            363725, // 00000000000000000379eaa19dce8c9b722d46ae6a57c2f1a988119488b50931
-	CoinbaseMaturity:         100,
+	GenesisBlock: &freshNetGenesisBlock,
+	GenesisHash:  &freshNetGenesisHash,
+	PowLimit:     freshNetPowLimit,
+	// determines how difficult to mine
+	// PowLimitBits:             0x1d00ffff,
+	PowLimitBits:  0x1e0fffff,
+	BIP0034Height: 227931, // 000000000000024b89b42a942fe0d9fea3bb44ab7bd1b19115dd6a759c0808b8
+	BIP0065Height: 388381, // 000000000000000004c2b624ed5d7756c508d90fd0da2c7c679febfa6c4735f0
+	BIP0066Height: 363725, // 00000000000000000379eaa19dce8c9b722d46ae6a57c2f1a988119488b50931
+	// defines the number of confirmations required before newly mined coins can be spent.
+	// Lowering this value reduces the waiting time for miners to spend their rewards, which can incentivize mining
+	// CoinbaseMaturity:         100,
+	CoinbaseMaturity:         50,
 	SubsidyReductionInterval: 210000,
-	TargetTimespan:           time.Hour * 24 * 14, // 14 days
-	TargetTimePerBlock:       time.Minute * 10,    // 10 minutes
-	RetargetAdjustmentFactor: 4,                   // 25% less, 400% more
-	ReduceMinDifficulty:      false,
+	// widens the window for difficulty adjustments.
+	// TargetTimespan: time.Hour * 24 * 14, // 14 days
+	TargetTimespan: time.Hour * 24 * 28, // 28 days
+	// to slow down the block production rate
+	// TargetTimePerBlock:       time.Minute * 10, // 10 minutes
+	TargetTimePerBlock: time.Minute * 20, // 20 minutes
+	// controls how much the difficulty can adjust in each retargeting period.
+	// Lowering this value allows for more significant adjustments,
+	// which can help the network quickly adapt to changes in mining power or difficulty
+	// RetargetAdjustmentFactor: 4, // 25% less, 400% more
+	RetargetAdjustmentFactor: 2, // (50% less, 200% more)
+	ReduceMinDifficulty:      true,
 	MinDiffReductionTime:     0,
-	GenerateSupported:        false,
+	// can use generate command from RPC to generate blocks in lieu of standard mining procedures
+	GenerateSupported: false,
 
 	// Checkpoints ordered from oldest to newest.
 	// these are specific blocks as the chain grows to maintain stability and security
@@ -566,7 +580,6 @@ var FreshNetParams = Params{
 
 	// Address encoding magics
 	// these are used to determine the type of network for a particular address
-	// TODO: might have to change this to connect with peers
 	PubKeyHashAddrID:        0x00, // starts with 1
 	ScriptHashAddrID:        0x05, // starts with 3
 	PrivateKeyID:            0x80, // starts with 5 (uncompressed) or K (compressed)

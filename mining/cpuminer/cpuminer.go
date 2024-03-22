@@ -109,6 +109,7 @@ type CPUMiner struct {
 // speedMonitor handles tracking the number of hashes per second the mining
 // process is performing.  It must be run as a goroutine.
 func (m *CPUMiner) speedMonitor() {
+	fmt.Println("Speed Monitor started")
 	log.Tracef("CPU miner speed monitor started")
 
 	var hashesPerSec float64
@@ -132,6 +133,7 @@ out:
 			}
 			hashesPerSec = (hashesPerSec + curHashesPerSec) / 2
 			totalHashes = 0
+			fmt.Println("Hash speed:", hashesPerSec/1000, "kilohashes/s")
 			if hashesPerSec != 0 {
 				log.Debugf("Hash speed: %6.0f kilohashes/s",
 					hashesPerSec/1000)
@@ -297,6 +299,7 @@ func (m *CPUMiner) solveBlock(msgBlock *wire.MsgBlock, blockHeight int32,
 //
 // It must be run as a goroutine.
 func (m *CPUMiner) generateBlocks(quit chan struct{}) {
+	fmt.Print("Starting generate blocks worker\n")
 	log.Tracef("Starting generate blocks worker")
 
 	// Start a ticker which is used to signal checks for stale work and
@@ -311,12 +314,14 @@ out:
 			break out
 		default:
 			// Non-blocking select to fall through
+			fmt.Println("Worker generating block with hash per second:", m.HashesPerSecond(), ". Is running:", m.IsMining())
 		}
 
 		// Wait until there is a connection to at least one other peer
 		// since there is no way to relay a found block or receive
 		// transactions to work on when there are no connected peers.
 		if m.cfg.ConnectedCount() == 0 {
+			fmt.Println("zzz")
 			time.Sleep(time.Second)
 			continue
 		}
@@ -370,11 +375,13 @@ out:
 //
 // It must be run as a goroutine.
 func (m *CPUMiner) miningWorkerController() {
+	fmt.Print("Mining worker controller\n")
 	// launchWorkers groups common code to launch a specified number of
 	// workers for generating blocks.
 	var runningWorkers []chan struct{}
 	launchWorkers := func(numWorkers uint32) {
 		for i := uint32(0); i < numWorkers; i++ {
+			fmt.Println("worker", i)
 			quit := make(chan struct{})
 			runningWorkers = append(runningWorkers, quit)
 

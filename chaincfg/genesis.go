@@ -87,34 +87,41 @@ var genesisBlock = wire.MsgBlock{
 	Transactions: []*wire.MsgTx{&genesisCoinbaseTx},
 }
 
-// // freshNetGenesisHash is the hash of the first block in the block chain for the fresh
-// // network (genesis block).
-// var freshNetGenesisHash = chainhash.Hash([chainhash.HashSize]byte{
-// 	0x57, 0xea, 0x6b, 0x1a, 0x54, 0x39, 0x81, 0x1d,
-// 	0xc5, 0xd6, 0xa0, 0x7a, 0xa5, 0x16, 0x7b, 0x7a,
-// 	0xf5, 0x5b, 0x8e, 0x3c, 0x37, 0xc4, 0x70, 0x77,
-// 	0x18, 0x04, 0x12, 0x4b, 0x9d, 0x22, 0xc3, 0xa3,
-// })
+// freshNetGenesisMerkleRoot is the hash of the first transaction in the genesis block
+// for the fresh network.
+var freshNetGenesisMerkleRoot = genesisMerkleRoot
 
-// // freshNetGenesisMerkleRoot is the hash of the first transaction in the genesis block
-// // for the fresh network.
-// var freshNetGenesisMerkleRoot = genesisMerkleRoot
+// freshNetGenesisBlock defines the genesis block of the block chain which serves as the
+// public transaction ledger for the fresh network.
+var freshNetGenesisBlock = wire.MsgBlock{
+	Header: wire.BlockHeader{
+		Version:    1,
+		PrevBlock:  chainhash.Hash{},
+		MerkleRoot: freshNetGenesisMerkleRoot,
+		Timestamp:  time.Unix(1701599110, 0), // 2024-02-21 18:58:30 +0000 UTC
+		Bits:       0x1d00ffff,
+		// nonce can be any number, the miners will modify it anyways so that it satisfies
+		// the target difficulty set by Bits
+		Nonce: 0x00000000,
+	},
+	Transactions: []*wire.MsgTx{&genesisCoinbaseTx},
+}
 
-// // freshNetGenesisBlock defines the genesis block of the block chain which serves as the
-// // public transaction ledger for the fresh network.
-// var freshNetGenesisBlock = wire.MsgBlock{
-// 	Header: wire.BlockHeader{
-// 		Version: 1,
-// 		PrevBlock: chainhash.Hash{},
-// 		MerkleRoot: freshNetGenesisMerkleRoot,
-// 		Timestamp: time.Unix(1701599110, 0), // 2024-02-21 18:58:30 +0000 UTC
-// 		Bits: 0x1d00ffff,
-// 		// nonce can be any number, the miners will modify it anyways so that it satisfies
-// 		// the target difficulty set by Bits
-// 		Nonce: 0x00000000,
-// 	},
-// 	Transactions: []*wire.MsgTx{&genesisCoinbaseTx},
-// } 
+// Used to get the hash of the fresh net genesis block
+// var freshNetBuffer bytes.Buffer
+// var freshNetBufferErr = freshNetGenesisBlock.Serialize(&freshNetBuffer)
+// var freshNetHashBytes = chainhash.DoubleHashB(freshNetBuffer.Bytes())
+// var freshNetGenesisHash chainhash.Hash
+// var freshNetHashErr = freshNetGenesisHash.SetBytes(freshNetHashBytes)
+
+// freshNetGenesisHash is the hash of the first block in the block chain for the fresh
+// network (genesis block).
+var freshNetGenesisHash = chainhash.Hash([chainhash.HashSize]byte{ // Make go vet happy.
+	0xbc, 0x4e, 0xa4, 0x01, 0x7e, 0x04, 0x4b, 0x55,
+	0x26, 0xf3, 0x3f, 0xbe, 0x40, 0xce, 0xcd, 0xdf,
+	0x51, 0xf3, 0x5a, 0xa8, 0x96, 0x80, 0x6a, 0xa8,
+	0xba, 0x7d, 0x9a, 0xbe, 0xca, 0xd0, 0x98, 0xc1,
+})
 
 // regTestGenesisHash is the hash of the first block in the block chain for the
 // regression test network (genesis block).
