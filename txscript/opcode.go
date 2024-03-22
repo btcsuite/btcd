@@ -220,7 +220,7 @@ const (
 	OP_CHECKLOCKTIMEVERIFY = 0xb1 // 177 - AKA OP_NOP2
 	OP_NOP3                = 0xb2 // 178
 	OP_CHECKSEQUENCEVERIFY = 0xb2 // 178 - AKA OP_NOP3
-	OP_NOP4                = 0xb3 // 179
+	OP_CHECKTEMPLATEVERIFY = 0xb3 // 179 - AKA OP_NOP4
 	OP_NOP5                = 0xb4 // 180
 	OP_NOP6                = 0xb5 // 181
 	OP_NOP7                = 0xb6 // 182
@@ -422,6 +422,7 @@ var opcodeArray = [256]opcode{
 	OP_RETURN:              {OP_RETURN, "OP_RETURN", 1, opcodeReturn},
 	OP_CHECKLOCKTIMEVERIFY: {OP_CHECKLOCKTIMEVERIFY, "OP_CHECKLOCKTIMEVERIFY", 1, opcodeCheckLockTimeVerify},
 	OP_CHECKSEQUENCEVERIFY: {OP_CHECKSEQUENCEVERIFY, "OP_CHECKSEQUENCEVERIFY", 1, opcodeCheckSequenceVerify},
+	OP_CHECKTEMPLATEVERIFY: {OP_CHECKTEMPLATEVERIFY, "OP_CHECKTEMPLATEVERIFY", 1, opcodeCheckTemplateVerify},
 
 	// Stack opcodes.
 	OP_TOALTSTACK:   {OP_TOALTSTACK, "OP_TOALTSTACK", 1, opcodeToAltStack},
@@ -505,7 +506,6 @@ var opcodeArray = [256]opcode{
 
 	// Reserved opcodes.
 	OP_NOP1:  {OP_NOP1, "OP_NOP1", 1, opcodeNop},
-	OP_NOP4:  {OP_NOP4, "OP_NOP4", 1, opcodeNop},
 	OP_NOP5:  {OP_NOP5, "OP_NOP5", 1, opcodeNop},
 	OP_NOP6:  {OP_NOP6, "OP_NOP6", 1, opcodeNop},
 	OP_NOP7:  {OP_NOP7, "OP_NOP7", 1, opcodeNop},
@@ -819,7 +819,7 @@ func opcodeN(op *opcode, data []byte, vm *Engine) error {
 // the flag to discourage use of NOPs is set for select opcodes.
 func opcodeNop(op *opcode, data []byte, vm *Engine) error {
 	switch op.value {
-	case OP_NOP1, OP_NOP4, OP_NOP5,
+	case OP_NOP1, OP_NOP5,
 		OP_NOP6, OP_NOP7, OP_NOP8, OP_NOP9, OP_NOP10:
 
 		if vm.hasFlag(ScriptDiscourageUpgradableNops) {
@@ -1193,6 +1193,49 @@ func opcodeCheckSequenceVerify(op *opcode, data []byte, vm *Engine) error {
 		wire.SequenceLockTimeMask)
 	return verifyLockTime(txSequence&lockTimeMask,
 		wire.SequenceLockTimeIsSeconds, sequence&lockTimeMask)
+}
+
+func opcodeCheckTemplateVerify(op *opcode, data []byte, vm *Engine) error {
+	if !vm.hasFlag(ScriptVerifyCheckTemplateVerify) {
+		if vm.hasFlag(ScriptDiscourageUpgradableNops) {
+			return scriptError(ErrDiscourageUpgradableNOPs,
+				"OP_NOP4 reserved for soft-fork upgrades")
+		}
+		return nil
+	}
+
+	if vm.dstack.Depth() < 1 {
+		str := fmt.Sprintf("stack has %d items, not enough to "+
+			"execute OP_CHECKTEMPLATEVERIFY", vm.dstack.Depth())
+		return scriptError(ErrInvalidStackOperation, str)
+	}
+
+	topData, err := vm.dstack.PeekByteArray(0)
+	if err != nil {
+		return err
+	}
+
+	// CTV only verifies the hash against a 32 byte argument
+	if len(topData) == 32 {
+		// Ensure the precomputed data required for anti-DoS is available, or cache it on first use
+		if vm.preComputedData == nil {
+			vm.preComputedData, err = vm.GetDefaultCheckTemplatePrecomputedData()
+			if err != nil {
+				return err
+			}
+		}
+
+		// Compare the top stack item with the computed hash
+		computedHash, err := vm.GetDefaultCheckTemplateHash(vm.txIdx)
+		if err != nil {
+			return err
+		}
+
+		if !bytes.Equal(topData, computedHash) {
+			return scriptError(ErrTemplateMismatch, "CTV hash mismatch")
+		}
+	}
+	return nil // Act as NOP after successful execution
 }
 
 // opcodeToAltStack removes the top item from the main data stack and pushes it
@@ -2468,4 +2511,5 @@ func init() {
 	OpcodeByName["OP_TRUE"] = OP_TRUE
 	OpcodeByName["OP_NOP2"] = OP_CHECKLOCKTIMEVERIFY
 	OpcodeByName["OP_NOP3"] = OP_CHECKSEQUENCEVERIFY
+	OpcodeByName["OP_NOP4"] = OP_CHECKTEMPLATEVERIFY
 }
