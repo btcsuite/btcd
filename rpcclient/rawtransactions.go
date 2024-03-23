@@ -19,7 +19,7 @@ import (
 const (
 	// defaultMaxFeeRate is the default maximum fee rate in BTC/kvB enforced
 	// by bitcoind v0.19.0 or after for transaction broadcast.
-	defaultMaxFeeRate float64 = 0.1
+	defaultMaxFeeRate btcjson.BTCPerkvB = 0.1
 )
 
 // SigHashType enumerates the available signature hashing types that the
@@ -365,7 +365,7 @@ func (c *Client) SendRawTransactionAsync(tx *wire.MsgTx, allowHighFees bool) Fut
 	if version.SupportUnifiedSoftForks() {
 		// Using a 0 MaxFeeRate is interpreted as a maximum fee rate not
 		// being enforced by bitcoind.
-		var maxFeeRate float64
+		var maxFeeRate btcjson.BTCPerkvB
 		if !allowHighFees {
 			maxFeeRate = defaultMaxFeeRate
 		}
@@ -915,7 +915,7 @@ func (r FutureTestMempoolAcceptResult) Receive() (
 //
 // See TestMempoolAccept for the blocking version and more details.
 func (c *Client) TestMempoolAcceptAsync(txns []*wire.MsgTx,
-	maxFeeRate float64) FutureTestMempoolAcceptResult {
+	maxFeeRate btcjson.BTCPerkvB) FutureTestMempoolAcceptResult {
 
 	// Due to differences in the testmempoolaccept API for different
 	// backends, we'll need to inspect our version and construct the
@@ -1010,7 +1010,7 @@ func (c *Client) TestMempoolAcceptAsync(txns []*wire.MsgTx,
 //
 // The maximum number of transactions allowed is 25.
 func (c *Client) TestMempoolAccept(txns []*wire.MsgTx,
-	maxFeeRate float64) ([]*btcjson.TestMempoolAcceptResult, error) {
+	maxFeeRate btcjson.BTCPerkvB) ([]*btcjson.TestMempoolAcceptResult, error) {
 
 	return c.TestMempoolAcceptAsync(txns, maxFeeRate).Receive()
 }
