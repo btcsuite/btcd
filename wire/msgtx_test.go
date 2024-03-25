@@ -756,6 +756,34 @@ func TestTxSerializeSizeStripped(t *testing.T) {
 	}
 }
 
+// TestTxID performs tests to ensure the serialize size for various transactions
+// is accurate.
+func TestTxID(t *testing.T) {
+	// Empty tx message.
+	noTx := NewMsgTx(1)
+	noTx.Version = 1
+
+	tests := []struct {
+		in   *MsgTx // Tx to encode.
+		txid string // Expected transaction ID.
+	}{
+		// No inputs or outputs.
+		{noTx, "d21633ba23f70118185227be58a63527675641ad37967e2aa461559f577aec43"},
+
+		// Transaction with an input and an output.
+		{multiTx, "0100d15a522ff38de05c164ca0a56379a1b77dd1e4805a6534dc9b3d88290e9d"},
+
+		// Transaction with an input which includes witness data, and
+		// one output.
+		{multiWitnessTx, "0f167d1385a84d1518cfee208b653fc9163b605ccf1b75347e2850b3e2eb19f3"},
+	}
+
+	for i, test := range tests {
+		txid := test.in.TxID()
+		require.Equal(t, test.txid, txid, "test #%d", i)
+	}
+}
+
 // TestTxWitnessSize performs tests to ensure that the serialized size for
 // various types of transactions that include witness data is accurate.
 func TestTxWitnessSize(t *testing.T) {
