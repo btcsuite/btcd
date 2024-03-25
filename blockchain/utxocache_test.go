@@ -445,7 +445,7 @@ func TestUtxoCacheFlush(t *testing.T) {
 				t.Fatalf("Unexpected nil entry found for %v", outpoint)
 			}
 			if !entry.isModified() {
-				t.Fatal("Entry should be marked mofified")
+				t.Fatal("Entry should be marked modified")
 			}
 			if !entry.isFresh() {
 				t.Fatal("Entry should be marked fresh")

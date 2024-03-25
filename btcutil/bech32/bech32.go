@@ -18,7 +18,7 @@ const charset = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
 var gen = []int{0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3}
 
 // toBytes converts each character in the string 'chars' to the value of the
-// index of the correspoding character in 'charset'.
+// index of the corresponding character in 'charset'.
 func toBytes(chars string) ([]byte, error) {
 	decoded := make([]byte, 0, len(chars))
 	for i := 0; i < len(chars); i++ {

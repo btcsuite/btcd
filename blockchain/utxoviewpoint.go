@@ -163,13 +163,13 @@ type UtxoViewpoint struct {
 }
 
 // BestHash returns the hash of the best block in the chain the view currently
-// respresents.
+// represents.
 func (view *UtxoViewpoint) BestHash() *chainhash.Hash {
 	return &view.bestHash
 }
 
 // SetBestHash sets the hash of the best block in the chain the view currently
-// respresents.
+// represents.
 func (view *UtxoViewpoint) SetBestHash(hash *chainhash.Hash) {
 	view.bestHash = *hash
 }

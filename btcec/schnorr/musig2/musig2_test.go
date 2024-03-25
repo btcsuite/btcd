@@ -258,7 +258,7 @@ func TestMuSigMultiParty(t *testing.T) {
 }
 
 // TestMuSigEarlyNonce tests that for protocols where nonces need to be
-// exchagned before all signers are known, the context API works as expected.
+// exchanged before all signers are known, the context API works as expected.
 func TestMuSigEarlyNonce(t *testing.T) {
 	t.Parallel()
 

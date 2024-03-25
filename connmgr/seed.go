@@ -23,7 +23,7 @@ const (
 )
 
 // OnSeed is the signature of the callback function which is invoked when DNS
-// seeding is succesfull.
+// seeding is successful.
 type OnSeed func(addrs []*wire.NetAddressV2)
 
 // LookupFunc is the signature of the DNS lookup function.

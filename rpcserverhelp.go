@@ -376,7 +376,7 @@ var helpDescsEnUS = map[string]string{
 
 	// GetCurrentNetCmd help.
 	"getcurrentnet--synopsis": "Get bitcoin network the server is running on.",
-	"getcurrentnet--result0":  "The network identifer",
+	"getcurrentnet--result0":  "The network identifier",
 
 	// GetDifficultyCmd help.
 	"getdifficulty--synopsis": "Returns the proof-of-work difficulty as a multiple of the minimum difficulty.",

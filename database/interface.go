@@ -390,7 +390,7 @@ type Tx interface {
 	FetchBlockRegions(regions []BlockRegion) ([][]byte, error)
 
 	// PruneBlocks deletes the block files until it reaches the target size
-	// (specificed in bytes).
+	// (specified in bytes).
 	//
 	// The interface contract guarantees at least the following errors will
 	// be returned (other implementation-specific errors are possible):

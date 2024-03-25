@@ -153,7 +153,7 @@ func installService() error {
 
 	// Support events to the event log using the standard "standard" Windows
 	// EventCreate.exe message file.  This allows easy logging of custom
-	// messges instead of needing to create our own message catalog.
+	// messages instead of needing to create our own message catalog.
 	eventlog.Remove(svcName)
 	eventsSupported := uint32(eventlog.Error | eventlog.Warning | eventlog.Info)
 	return eventlog.InstallAsEventCreate(svcName, eventsSupported)

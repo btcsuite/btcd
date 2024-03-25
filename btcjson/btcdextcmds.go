@@ -20,7 +20,7 @@ const (
 	// persistent peer.
 	NRemove NodeSubCmd = "remove"
 
-	// NDisconnect indicates the specified peer should be disonnected.
+	// NDisconnect indicates the specified peer should be disconnected.
 	NDisconnect NodeSubCmd = "disconnect"
 )
 

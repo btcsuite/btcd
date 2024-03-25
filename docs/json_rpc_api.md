@@ -472,7 +472,7 @@ Example Return|`{`<br />&nbsp;&nbsp;`"bytes": 310768,`<br />&nbsp;&nbsp;`"size":
 |---|---|
 |Method|help|
 |Parameters|1. command (string, optional) - the command to get help for|
-|Description|Returns a list of all commands or help for a specified command.<br />When no `command` parameter is specified, a list of avaialable commands is returned<br />When `command` is a valid method, the help text for that method is returned.|
+|Description|Returns a list of all commands or help for a specified command.<br />When no `command` parameter is specified, a list of available commands is returned<br />When `command` is a valid method, the help text for that method is returned.|
 |Returns|string|
 |Example Return|getblockcount<br />Returns a numeric for the number of blocks in the longest block chain.|
 [Return to Overview](#MethodOverview)<br />

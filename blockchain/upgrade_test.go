@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-// TestDeserializeUtxoEntryV0 ensures deserializing unspent trasaction output
+// TestDeserializeUtxoEntryV0 ensures deserializing unspent transaction output
 // entries from the legacy version 0 format works as expected.
 func TestDeserializeUtxoEntryV0(t *testing.T) {
 	tests := []struct {
