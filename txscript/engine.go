@@ -114,7 +114,19 @@ const (
 	// ScriptVerifyDiscourageUpgradeablePubkeyType defines if unknown
 	// public key versions (during tapscript execution) is non-standard.
 	ScriptVerifyDiscourageUpgradeablePubkeyType
+
+	// ScriptVerifyOpCat defines whether to verify an encounted OP_CAT
+	// opcode in tapscript, or fall back to OP_SUCCESS behavior.
+	ScriptVerifyOpCat
+
+	// ScriptVerifyDiscourageOpCat defines whether or not to consider usage
+	// of OP_CAT during tapscript execution as non-standard.
+	ScriptVerifyDiscourageOpCat
 )
+
+func (f ScriptFlags) hasFlag(flag ScriptFlags) bool {
+	return f&flag == flag
+}
 
 const (
 	// MaxStackSize is the maximum combined height of stack and alt stack
@@ -316,7 +328,7 @@ type StepInfo struct {
 
 // hasFlag returns whether the script engine instance has the passed flag set.
 func (vm *Engine) hasFlag(flag ScriptFlags) bool {
-	return vm.flags&flag == flag
+	return vm.flags.hasFlag(flag)
 }
 
 // isBranchExecuting returns whether or not the current conditional branch is
@@ -333,9 +345,13 @@ func (vm *Engine) isBranchExecuting() bool {
 // isOpcodeDisabled returns whether or not the opcode is disabled and thus is
 // always bad to see in the instruction stream (even if turned off by a
 // conditional).
-func isOpcodeDisabled(opcode byte) bool {
+func isOpcodeDisabled(opcode byte, tapscript bool) bool {
 	switch opcode {
 	case OP_CAT:
+		// CAT is re-enabled for tapscript.
+		if tapscript {
+			return false
+		}
 		return true
 	case OP_SUBSTR:
 		return true
@@ -455,7 +471,7 @@ func checkMinimalDataPush(op *opcode, data []byte) error {
 // tested in this case.
 func (vm *Engine) executeOpcode(op *opcode, data []byte) error {
 	// Disabled opcodes are fail on program counter.
-	if isOpcodeDisabled(op.value) {
+	if isOpcodeDisabled(op.value, vm.taprootCtx != nil) {
 		str := fmt.Sprintf("attempt to execute disabled opcode %s", op.name)
 		return scriptError(ErrDisabledOpcode, str)
 	}
@@ -694,16 +710,12 @@ func (vm *Engine) verifyWitnessProgram(witness wire.TxWitness) error {
 			// check to see if OP_SUCCESS op codes are found in the
 			// script. If so, then we'll return here early as we
 			// skip proper validation.
-			if ScriptHasOpSuccess(witnessScript) {
-				// An op success op code has been found, however if
-				// the policy flag forbidding them is active, then
-				// we'll return an error.
-				if vm.hasFlag(ScriptVerifyDiscourageOpSuccess) {
-					errStr := fmt.Sprintf("script contains " +
-						"OP_SUCCESS op code")
-					return scriptError(ErrDiscourageOpSuccess, errStr)
-				}
+			suc, err := ScriptHasOpSuccess(witnessScript, vm.flags)
+			if err != nil {
+				return err
+			}
 
+			if suc {
 				// Otherwise, the script passes scott free.
 				vm.taprootCtx.mustSucceed = true
 				return nil

@@ -528,7 +528,7 @@ func IsUnspendable(pkScript []byte) bool {
 
 // ScriptHasOpSuccess returns true if any op codes in the script contain an
 // OP_SUCCESS op code.
-func ScriptHasOpSuccess(witnessScript []byte) bool {
+func ScriptHasOpSuccess(witnessScript []byte, flags ScriptFlags) (bool, error) {
 	// First, create a new script tokenizer so we can run through all the
 	// elements.
 	tokenizer := MakeScriptTokenizer(0, witnessScript)
@@ -536,10 +536,41 @@ func ScriptHasOpSuccess(witnessScript []byte) bool {
 	// Run through all the op codes, returning true if we find anything
 	// that is marked as a new op success.
 	for tokenizer.Next() {
-		if _, ok := successOpcodes[tokenizer.Opcode()]; ok {
-			return true
+		op := tokenizer.Opcode()
+
+		// OP_CAT is considered a success opcode if it is not
+		// activated.
+		if op == OP_CAT {
+			switch {
+			// If OP_CAT is discouraged, it doesn't matter if it is
+			// active or not.
+			case flags.hasFlag(ScriptVerifyDiscourageOpCat):
+				errStr := fmt.Sprintf("script contains " +
+					"discouraged OP_CAT op code")
+				return true, scriptError(ErrDiscourageOpSuccess,
+					errStr)
+
+			// If not activated it has success behavior.
+			case !flags.hasFlag(ScriptVerifyOpCat):
+				return true, nil
+			}
 		}
+
+		if _, ok := successOpcodes[op]; ok {
+			// An op success op code has been found, however if the
+			// policy flag forbidding them is active, then we'll
+			// return an error.
+			if flags.hasFlag(ScriptVerifyDiscourageOpSuccess) {
+				errStr := fmt.Sprintf("script contains " +
+					"OP_SUCCESS op code")
+				return true, scriptError(ErrDiscourageOpSuccess,
+					errStr)
+			}
+
+			return true, nil
+		}
+
 	}
 
-	return false
+	return false, nil
 }
