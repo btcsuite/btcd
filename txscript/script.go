@@ -178,7 +178,7 @@ func DisasmString(script []byte) (string, error) {
 // removeOpcodeRaw will return the script after removing any opcodes that match
 // `opcode`. If the opcode does not appear in script, the original script will
 // be returned unmodified. Otherwise, a new script will be allocated to contain
-// the filtered script. This metehod assumes that the script parses
+// the filtered script. This method assumes that the script parses
 // successfully.
 //
 // NOTE: This function is only valid for version 0 scripts.  Since the function

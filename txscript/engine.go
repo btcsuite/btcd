@@ -605,7 +605,7 @@ func (vm *Engine) verifyWitnessProgram(witness wire.TxWitness) error {
 			return scriptError(ErrWitnessProgramWrongLength, errStr)
 		}
 
-	// We're attempting to to verify a taproot input, and the witness
+	// We're attempting to verify a taproot input, and the witness
 	// program data push is of the expected size, so we'll be looking for a
 	// normal key-path spend, or a merkle proof for a tapscript with
 	// execution afterwards.
