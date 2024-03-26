@@ -563,9 +563,6 @@ mempoolLoop:
 				}
 				prioItem.dependsOn[*originHash] = struct{}{}
 
-				// Skip the check below. We already know the
-				// referenced transaction is available.
-				continue
 			}
 		}
 
