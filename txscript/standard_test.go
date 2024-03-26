@@ -884,7 +884,7 @@ func TestMultiSigScript(t *testing.T) {
 	}
 }
 
-// TestCalcMultiSigStats ensures the CalcMutliSigStats function returns the
+// TestCalcMultiSigStats ensures the CalcMultiSigStats function returns the
 // expected errors.
 func TestCalcMultiSigStats(t *testing.T) {
 	t.Parallel()

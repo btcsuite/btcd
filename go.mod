@@ -2,7 +2,7 @@ module github.com/btcsuite/btcd
 
 require (
 	github.com/btcsuite/btcd/btcec/v2 v2.1.3
-	github.com/btcsuite/btcd/btcutil v1.1.4
+	github.com/btcsuite/btcd/btcutil v1.1.5
 	github.com/btcsuite/btcd/chaincfg/chainhash v1.1.0
 	github.com/btcsuite/btclog v0.0.0-20170628155309-84c8d2346e9f
 	github.com/btcsuite/go-socks v0.0.0-20170105172521-4720035b7bfd
@@ -14,7 +14,7 @@ require (
 	github.com/gorilla/websocket v1.5.0
 	github.com/jessevdk/go-flags v1.4.0
 	github.com/jrick/logrotate v1.0.0
-	github.com/stretchr/testify v1.7.0
+	github.com/stretchr/testify v1.8.4
 	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7
 	golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9
 	golang.org/x/sys v0.0.0-20200814200057-3d37ad5750ed
@@ -26,7 +26,8 @@ require (
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/kkdai/bstream v0.0.0-20161212061736-f391b8402d23 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c // indirect
+	github.com/stretchr/objx v0.5.0 // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
 // The retract statements below fixes an accidental push of the tags of a btcd

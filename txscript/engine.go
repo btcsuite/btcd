@@ -1414,7 +1414,7 @@ func (vm *Engine) checkSignatureEncoding(sig []byte) error {
 func getStack(stack *stack) [][]byte {
 	array := make([][]byte, stack.Depth())
 	for i := range array {
-		// PeekByteArry can't fail due to overflow, already checked
+		// PeekByteArray can't fail due to overflow, already checked
 		array[len(array)-i-1], _ = stack.PeekByteArray(int32(i))
 	}
 	return array

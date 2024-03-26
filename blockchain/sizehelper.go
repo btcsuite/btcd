@@ -39,7 +39,7 @@ const (
 	avgEntrySize = baseEntrySize + (pubKeyHashLen + 7)
 )
 
-// The code here is shamelessely taken from the go runtime package.  All the relevant
+// The code here is shamelessly taken from the go runtime package.  All the relevant
 // code and variables are copied to here.  These values are only correct for a 64 bit
 // system.
 
@@ -63,14 +63,32 @@ const (
 	loadFactorNum = 13
 	loadFactorDen = 2
 
-	// maxAlloc is the maximum size of an allocation. On 64-bit,
-	// it's theoretically possible to allocate 1<<heapAddrBits bytes. On
-	// 32-bit, however, this is one less than 1<<32 because the
-	// number of bytes in the address space doesn't actually fit
-	// in a uintptr.
+	// _64bit = 1 on 64-bit systems, 0 on 32-bit systems
+	_64bit = 1 << (^uintptr(0) >> 63) / 2
+
+	// PtrSize is the size of a pointer in bytes - unsafe.Sizeof(uintptr(0))
+	// but as an ideal constant. It is also the size of the machine's native
+	// word size (that is, 4 on 32-bit systems, 8 on 64-bit).
+	PtrSize = 4 << (^uintptr(0) >> 63)
+
+	// heapAddrBits is the number of bits in a heap address that's actually
+	// available for memory allocation.
 	//
-	// NOTE (kcalvinalvin): I just took the constant for a 64 bit system.
-	maxAlloc = 281474976710656
+	// NOTE (guggero): For 64-bit systems, we just assume 40 bits of address
+	// space available, as that seems to be the lowest common denominator.
+	// See heapAddrBits in runtime/malloc.go of the standard library for
+	// more details
+	heapAddrBits = 32 + (_64bit * 8)
+
+	// maxAlloc is the maximum size of an allocation on the heap.
+	//
+	// NOTE(guggero): With the somewhat simplified heapAddrBits calculation
+	// above, this will currently limit the maximum allocation size of the
+	// UTXO cache to around 300GiB on 64-bit systems. This should be more
+	// than enough for the foreseeable future, but if we ever need to
+	// increase it, we should probably use the same calculation as the
+	// standard library.
+	maxAlloc = (1 << heapAddrBits) - (1-_64bit)*1
 )
 
 var class_to_size = [_NumSizeClasses]uint16{0, 8, 16, 24, 32, 48, 64, 80, 96, 112, 128, 144, 160, 176, 192, 208, 224, 240, 256, 288, 320, 352, 384, 416, 448, 480, 512, 576, 640, 704, 768, 896, 1024, 1152, 1280, 1408, 1536, 1792, 2048, 2304, 2688, 3072, 3200, 3456, 4096, 4864, 5376, 6144, 6528, 6784, 6912, 8192, 9472, 9728, 10240, 10880, 12288, 13568, 14336, 16384, 18432, 19072, 20480, 21760, 24576, 27264, 28672, 32768}
@@ -175,7 +193,7 @@ func calculateMinEntries(totalBytes int, bucketSize int) int {
 // mulUintptr returns a * b and whether the multiplication overflowed.
 // On supported platforms this is an intrinsic lowered by the compiler.
 func mulUintptr(a, b uintptr) (uintptr, bool) {
-	if a|b < 1<<(4*8) || a == 0 {
+	if a|b < 1<<(4*PtrSize) || a == 0 {
 		return a * b, false
 	}
 	overflow := b > MaxUintptr/a

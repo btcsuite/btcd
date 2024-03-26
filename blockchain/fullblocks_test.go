@@ -146,6 +146,70 @@ func TestFullBlocks(t *testing.T) {
 	}
 	defer teardownFunc()
 
+	testBlockDisconnectExpectUTXO := func(item fullblocktests.BlockDisconnectExpectUTXO) {
+		expectedCallBack := func(notification *blockchain.Notification) {
+			switch notification.Type {
+
+			case blockchain.NTBlockDisconnected:
+				block, ok := notification.Data.(*btcutil.Block)
+				if !ok {
+					t.Fatalf("expected a block")
+				}
+
+				// Return early if the block we get isn't the relevant
+				// block.
+				if !block.Hash().IsEqual(&item.BlockHash) {
+					return
+				}
+
+				entry, err := chain.FetchUtxoEntry(item.OutPoint)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				if entry == nil || entry.IsSpent() {
+					t.Logf("expected utxo %v to exist but it's "+
+						"nil or spent\n", item.OutPoint.String())
+					t.Fatalf("expected utxo %v to exist but it's "+
+						"nil or spent", item.OutPoint.String())
+				}
+			}
+		}
+		unexpectedCallBack := func(notification *blockchain.Notification) {
+			switch notification.Type {
+			case blockchain.NTBlockDisconnected:
+				block, ok := notification.Data.(*btcutil.Block)
+				if !ok {
+					t.Fatalf("expected a block")
+				}
+
+				// Return early if the block we get isn't the relevant
+				// block.
+				if !block.Hash().IsEqual(&item.BlockHash) {
+					return
+				}
+
+				entry, err := chain.FetchUtxoEntry(item.OutPoint)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				if entry != nil && !entry.IsSpent() {
+					t.Logf("unexpected utxo %v to exist but it's "+
+						"not nil and not spent", item.OutPoint.String())
+					t.Fatalf("unexpected utxo %v exists but it's "+
+						"not nil and not spent\n", item.OutPoint.String())
+				}
+			}
+		}
+
+		if item.Expected {
+			chain.Subscribe(expectedCallBack)
+		} else {
+			chain.Subscribe(unexpectedCallBack)
+		}
+	}
+
 	// testAcceptedBlock attempts to process the block in the provided test
 	// instance and ensures that it was accepted according to the flags
 	// specified in the test.
@@ -300,6 +364,8 @@ func TestFullBlocks(t *testing.T) {
 				testOrphanOrRejectedBlock(item)
 			case fullblocktests.ExpectedTip:
 				testExpectedTip(item)
+			case fullblocktests.BlockDisconnectExpectUTXO:
+				testBlockDisconnectExpectUTXO(item)
 			default:
 				t.Fatalf("test #%d, item #%d is not one of "+
 					"the supported test instance types -- "+

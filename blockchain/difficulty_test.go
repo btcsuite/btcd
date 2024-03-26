@@ -32,7 +32,7 @@ func TestBigToCompact(t *testing.T) {
 }
 
 // TestCompactToBig ensures CompactToBig converts numbers using the compact
-// representation to the expected big intergers.
+// representation to the expected big integers.
 func TestCompactToBig(t *testing.T) {
 	tests := []struct {
 		in  uint32

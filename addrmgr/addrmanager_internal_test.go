@@ -1,7 +1,6 @@
 package addrmgr
 
 import (
-	"io/ioutil"
 	"math/rand"
 	"net"
 	"os"
@@ -12,7 +11,7 @@ import (
 )
 
 // randAddr generates a *wire.NetAddressV2 backed by a random IPv4/IPv6
-// address.
+// address.  Some of the returned addresses may not be routable.
 func randAddr(t *testing.T) *wire.NetAddressV2 {
 	t.Helper()
 
@@ -38,6 +37,23 @@ func randAddr(t *testing.T) *wire.NetAddressV2 {
 	return wire.NetAddressV2FromBytes(
 		time.Now(), services, ip, port,
 	)
+}
+
+// routableRandAddr generates a *wire.NetAddressV2 backed by a random IPv4/IPv6
+// address that is always routable.
+func routableRandAddr(t *testing.T) *wire.NetAddressV2 {
+	t.Helper()
+
+	var addr *wire.NetAddressV2
+
+	// If the address is not routable, try again.
+	routable := false
+	for !routable {
+		addr = randAddr(t)
+		routable = IsRoutable(addr)
+	}
+
+	return addr
 }
 
 // assertAddr ensures that the two addresses match. The timestamp is not
@@ -91,7 +107,7 @@ func TestAddrManagerSerialization(t *testing.T) {
 
 	// We'll start by creating our address manager backed by a temporary
 	// directory.
-	tempDir, err := ioutil.TempDir("", "addrmgr")
+	tempDir, err := os.MkdirTemp("", "addrmgr")
 	if err != nil {
 		t.Fatalf("unable to create temp dir: %v", err)
 	}
@@ -104,9 +120,9 @@ func TestAddrManagerSerialization(t *testing.T) {
 
 	expectedAddrs := make(map[string]*wire.NetAddressV2, numAddrs)
 	for i := 0; i < numAddrs; i++ {
-		addr := randAddr(t)
+		addr := routableRandAddr(t)
 		expectedAddrs[NetAddressKey(addr)] = addr
-		addrMgr.AddAddress(addr, randAddr(t))
+		addrMgr.AddAddress(addr, routableRandAddr(t))
 	}
 
 	// Now that the addresses have been added, we should be able to retrieve
@@ -131,7 +147,7 @@ func TestAddrManagerV1ToV2(t *testing.T) {
 
 	// We'll start by creating our address manager backed by a temporary
 	// directory.
-	tempDir, err := ioutil.TempDir("", "addrmgr")
+	tempDir, err := os.MkdirTemp("", "addrmgr")
 	if err != nil {
 		t.Fatalf("unable to create temp dir: %v", err)
 	}
@@ -149,9 +165,9 @@ func TestAddrManagerV1ToV2(t *testing.T) {
 
 	expectedAddrs := make(map[string]*wire.NetAddressV2, numAddrs)
 	for i := 0; i < numAddrs; i++ {
-		addr := randAddr(t)
+		addr := routableRandAddr(t)
 		expectedAddrs[NetAddressKey(addr)] = addr
-		addrMgr.AddAddress(addr, randAddr(t))
+		addrMgr.AddAddress(addr, routableRandAddr(t))
 	}
 
 	// Then, we'll persist these addresses to disk and restart the address
@@ -168,7 +184,7 @@ func TestAddrManagerV1ToV2(t *testing.T) {
 	addrMgr.loadPeers()
 	addrs := addrMgr.getAddresses()
 	if len(addrs) != len(expectedAddrs) {
-		t.Fatalf("expected to find %d adddresses, found %d",
+		t.Fatalf("expected to find %d addresses, found %d",
 			len(expectedAddrs), len(addrs))
 	}
 	for _, addr := range addrs {

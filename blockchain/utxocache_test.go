@@ -69,6 +69,26 @@ func TestMapSlice(t *testing.T) {
 			t.Fatalf("expected len of %d, got %d", len(m), ms.length())
 		}
 
+		// Delete the first element in the first map.
+		ms.delete(test.keys[0])
+		delete(m, test.keys[0])
+
+		// Try to insert the last element in the mapslice again.
+		ms.put(test.keys[len(test.keys)-1], &UtxoEntry{}, 0)
+		m[test.keys[len(test.keys)-1]] = &UtxoEntry{}
+
+		// Check that the duplicate didn't make it in.
+		if len(m) != ms.length() {
+			t.Fatalf("expected len of %d, got %d", len(m), ms.length())
+		}
+
+		ms.put(test.keys[0], &UtxoEntry{}, 0)
+		m[test.keys[0]] = &UtxoEntry{}
+
+		if len(m) != ms.length() {
+			t.Fatalf("expected len of %d, got %d", len(m), ms.length())
+		}
+
 		for _, key := range test.keys {
 			expected, found := m[key]
 			if !found {
@@ -260,7 +280,7 @@ func TestUtxoCacheEntrySize(t *testing.T) {
 				}
 				return blocks
 			}(),
-			// Multipled by 6 since we'll have 6 entries left.
+			// Multiplied by 6 since we'll have 6 entries left.
 			expectedSize: (pubKeyHashLen + baseEntrySize) * 6,
 		},
 		{
@@ -425,7 +445,7 @@ func TestUtxoCacheFlush(t *testing.T) {
 				t.Fatalf("Unexpected nil entry found for %v", outpoint)
 			}
 			if !entry.isModified() {
-				t.Fatal("Entry should be marked mofified")
+				t.Fatal("Entry should be marked modified")
 			}
 			if !entry.isFresh() {
 				t.Fatal("Entry should be marked fresh")
@@ -729,18 +749,33 @@ func TestFlushOnPrune(t *testing.T) {
 	}
 
 	syncBlocks := func() {
+		// Modify block 1 to be a different hash.  This is to artificially
+		// create a stale branch in the chain.
+		staleMsgBlock := blocks[1].MsgBlock().Copy()
+		staleMsgBlock.Header.Nonce = 0
+		staleBlock := btcutil.NewBlock(staleMsgBlock)
+
+		// Add the stale block here to create a chain view like so. The
+		// block will be the main chain at first but become stale as we
+		// keep adding blocks.  BFNoPoWCheck is given as the pow check will
+		// fail.
+		//
+		// (genesis block) -> 1 -> 2 -> 3 -> ...
+		//                \-> 1a
+		_, _, err = chain.ProcessBlock(staleBlock, BFNoPoWCheck)
+		if err != nil {
+			t.Fatal(err)
+		}
+
 		for i, block := range blocks {
 			if i == 0 {
 				// Skip the genesis block.
 				continue
 			}
-			isMainChain, _, err := chain.ProcessBlock(block, BFNone)
+			_, _, err = chain.ProcessBlock(block, BFNone)
 			if err != nil {
-				t.Fatal(err)
-			}
-
-			if !isMainChain {
-				t.Fatalf("expected block %s to be on the main chain", block.Hash())
+				t.Fatalf("Failed to process block %v(%v). %v",
+					block.Hash().String(), block.Height(), err)
 			}
 		}
 	}
@@ -749,36 +784,40 @@ func TestFlushOnPrune(t *testing.T) {
 	ffldb.TstRunWithMaxBlockFileSize(chain.db, maxBlockFileSize, syncBlocks)
 
 	// Function that errors out if the block that should exist doesn't exist.
-	shouldExist := func(dbTx database.Tx, blockHash *chainhash.Hash) {
+	shouldExist := func(dbTx database.Tx, blockHash *chainhash.Hash) error {
 		bytes, err := dbTx.FetchBlock(blockHash)
 		if err != nil {
-			t.Fatal(err)
+			return err
 		}
 		block, err := btcutil.NewBlockFromBytes(bytes)
 		if err != nil {
-			t.Fatalf("didn't find block %v. %v", blockHash, err)
+			return fmt.Errorf("didn't find block %v. %v", blockHash, err)
 		}
 
 		if !block.Hash().IsEqual(blockHash) {
-			t.Fatalf("expected to find block %v but got %v",
+			return fmt.Errorf("expected to find block %v but got %v",
 				blockHash, block.Hash())
 		}
+
+		return nil
 	}
 
 	// Function that errors out if the block that shouldn't exist exists.
-	shouldNotExist := func(dbTx database.Tx, blockHash *chainhash.Hash) {
+	shouldNotExist := func(dbTx database.Tx, blockHash *chainhash.Hash) error {
 		bytes, err := dbTx.FetchBlock(chaincfg.MainNetParams.GenesisHash)
 		if err == nil {
-			t.Fatalf("expected block %s to be pruned", blockHash)
+			return fmt.Errorf("expected block %s to be pruned", blockHash.String())
 		}
 		if len(bytes) != 0 {
-			t.Fatalf("expected block %s to be pruned but got %v",
+			return fmt.Errorf("expected block %s to be pruned but got %v",
 				blockHash, bytes)
 		}
+
+		return nil
 	}
 
 	// The below code checks that the correct blocks were pruned.
-	chain.db.View(func(dbTx database.Tx) error {
+	err = chain.db.View(func(dbTx database.Tx) error {
 		exist := false
 		for _, block := range blocks {
 			// Blocks up to the last flush hash should not exist.
@@ -789,15 +828,23 @@ func TestFlushOnPrune(t *testing.T) {
 			}
 
 			if exist {
-				shouldExist(dbTx, block.Hash())
+				err = shouldExist(dbTx, block.Hash())
+				if err != nil {
+					return err
+				}
 			} else {
-				shouldNotExist(dbTx, block.Hash())
+				err = shouldNotExist(dbTx, block.Hash())
+				if err != nil {
+					return err
+				}
 			}
-
 		}
 
 		return nil
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestInitConsistentState(t *testing.T) {

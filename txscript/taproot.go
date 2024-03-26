@@ -255,7 +255,7 @@ func ComputeTaprootOutputKey(pubKey *btcec.PublicKey,
 		scriptRoot,
 	)
 
-	// With the tap tweek computed,  we'll need to convert the merkle root
+	// With the tap tweak computed,  we'll need to convert the merkle root
 	// into something in the domain we can manipulate: a scalar value mod
 	// N.
 	var tweakScalar btcec.ModNScalar

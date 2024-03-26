@@ -244,7 +244,7 @@ func isCanonicalPush(opcode byte, data []byte) bool {
 // removeOpcodeByData will return the script minus any opcodes that perform a
 // canonical push of data that contains the passed data to remove.  This
 // function assumes it is provided a version 0 script as any future version of
-// script should avoid this functionality since it is unncessary due to the
+// script should avoid this functionality since it is unnecessary due to the
 // signature scripts not being part of the witness-free transaction hash.
 //
 // WARNING: This will return the passed script unmodified unless a modification

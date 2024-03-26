@@ -154,12 +154,32 @@ func (b *Block) Transactions() []*Tx {
 		b.transactions = make([]*Tx, len(b.msgBlock.Transactions))
 	}
 
+	// Offset of each tx.  80 accounts for the block header size.
+	offset := 80 + wire.VarIntSerializeSize(
+		uint64(len(b.msgBlock.Transactions)),
+	)
+
 	// Generate and cache the wrapped transactions for all that haven't
 	// already been done.
 	for i, tx := range b.transactions {
 		if tx == nil {
 			newTx := NewTx(b.msgBlock.Transactions[i])
 			newTx.SetIndex(i)
+
+			size := b.msgBlock.Transactions[i].SerializeSize()
+
+			// The block may not always have the serializedBlock.
+			if len(b.serializedBlock) > 0 {
+				// This allows for the reuse of the already
+				// serialized tx.
+				newTx.setBytes(
+					b.serializedBlock[offset : offset+size],
+				)
+
+				// Increment offset for this block.
+				offset += size
+			}
+
 			b.transactions[i] = newTx
 		}
 	}
@@ -234,6 +254,12 @@ func NewBlockFromBytes(serializedBlock []byte) (*Block, error) {
 		return nil, err
 	}
 	b.serializedBlock = serializedBlock
+
+	// This initializes []btcutil.Tx to have the serialized raw
+	// transactions cached.  Helps speed up things like generating the
+	// txhash.
+	b.Transactions()
+
 	return b, nil
 }
 
@@ -256,10 +282,19 @@ func NewBlockFromReader(r io.Reader) (*Block, error) {
 
 // NewBlockFromBlockAndBytes returns a new instance of a bitcoin block given
 // an underlying wire.MsgBlock and the serialized bytes for it.  See Block.
-func NewBlockFromBlockAndBytes(msgBlock *wire.MsgBlock, serializedBlock []byte) *Block {
-	return &Block{
+func NewBlockFromBlockAndBytes(msgBlock *wire.MsgBlock,
+	serializedBlock []byte) *Block {
+
+	b := &Block{
 		msgBlock:        msgBlock,
 		serializedBlock: serializedBlock,
 		blockHeight:     BlockHeightUnknown,
 	}
+
+	// This initializes []btcutil.Tx to have the serialized raw
+	// transactions cached.  Helps speed up things like generating the
+	// txhash.
+	b.Transactions()
+
+	return b
 }

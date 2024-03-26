@@ -16,7 +16,7 @@ import (
 )
 
 // mockRemotePeer creates a basic inbound peer listening on the simnet port for
-// use with Example_peerConnection.  It does not return until the listner is
+// use with Example_peerConnection.  It does not return until the listener is
 // active.
 func mockRemotePeer() error {
 	// Configure peer to act as a simnet node that offers no services.

@@ -20,7 +20,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -102,22 +101,6 @@ type jsonRequest struct {
 	responseChan   chan *Response
 }
 
-// BackendVersion represents the version of the backend the client is currently
-// connected to.
-type BackendVersion uint8
-
-const (
-	// BitcoindPre19 represents a bitcoind version before 0.19.0.
-	BitcoindPre19 BackendVersion = iota
-
-	// BitcoindPost19 represents a bitcoind version equal to or greater than
-	// 0.19.0.
-	BitcoindPost19
-
-	// Btcd represents a catch-all btcd version.
-	Btcd
-)
-
 // Client represents a Bitcoin RPC client which allows easy access to the
 // various RPC methods available on a Bitcoin RPC server.  Each of the wrapper
 // functions handle the details of converting the passed and return types to and
@@ -133,7 +116,7 @@ const (
 type Client struct {
 	id uint64 // atomic, so must stay 64-bit aligned
 
-	// config holds the connection configuration assoiated with this client.
+	// config holds the connection configuration associated with this client.
 	config *ConnConfig
 
 	// chainParams holds the params for the chain that this client is using,
@@ -151,7 +134,7 @@ type Client struct {
 	// backendVersion is the version of the backend the client is currently
 	// connected to. This should be retrieved through GetVersion.
 	backendVersionMu sync.Mutex
-	backendVersion   *BackendVersion
+	backendVersion   BackendVersion
 
 	// mtx is a mutex to protect access to connection related fields.
 	mtx sync.Mutex
@@ -239,14 +222,21 @@ func (c *Client) removeRequest(id uint64) *jsonRequest {
 	c.requestLock.Lock()
 	defer c.requestLock.Unlock()
 
-	element := c.requestMap[id]
-	if element != nil {
-		delete(c.requestMap, id)
-		request := c.requestList.Remove(element).(*jsonRequest)
-		return request
+	element, ok := c.requestMap[id]
+	if !ok {
+		return nil
 	}
 
-	return nil
+	delete(c.requestMap, id)
+
+	var request *jsonRequest
+	if c.batch {
+		request = c.batchList.Remove(element).(*jsonRequest)
+	} else {
+		request = c.requestList.Remove(element).(*jsonRequest)
+	}
+
+	return request
 }
 
 // removeAllRequests removes all the jsonRequests which contain the response
@@ -361,7 +351,7 @@ type Response struct {
 }
 
 // result checks whether the unmarshaled response contains a non-nil error,
-// returning an unmarshaled btcjson.RPCError (or an unmarshaling error) if so.
+// returning an unmarshaled btcjson.RPCError (or an unmarshalling error) if so.
 // If the response is not an error, the raw bytes of the request are
 // returned for further unmashaling into specific result types.
 func (r rawResponse) result() (result []byte, err error) {
@@ -443,7 +433,7 @@ func (c *Client) handleMessage(msg []byte) {
 // to have come from reading from the websocket connection in wsInHandler,
 // should be logged.
 func (c *Client) shouldLogReadError(err error) bool {
-	// No logging when the connetion is being forcibly disconnected.
+	// No logging when the connection is being forcibly disconnected.
 	select {
 	case <-c.shutdown:
 		return false
@@ -733,10 +723,10 @@ out:
 
 			// Reset the connection state and signal the reconnect
 			// has happened.
+			c.mtx.Lock()
 			c.wsConn = wsConn
 			c.retryCount = 0
 
-			c.mtx.Lock()
 			c.disconnect = make(chan struct{})
 			c.disconnected = false
 			c.mtx.Unlock()
@@ -944,6 +934,11 @@ func newFutureError(err error) chan *Response {
 	responseChan := make(chan *Response, 1)
 	responseChan <- &Response{err: err}
 	return responseChan
+}
+
+// Expose newFutureError for developer usage when creating custom commands.
+func NewFutureError(err error) chan *Response {
+	return newFutureError(err)
 }
 
 // ReceiveFuture receives from the passed futureResult channel to extract a
@@ -1575,36 +1570,6 @@ func (c *Client) Connect(tries int) error {
 	return err
 }
 
-const (
-	// bitcoind19Str is the string representation of bitcoind v0.19.0.
-	bitcoind19Str = "0.19.0"
-
-	// bitcoindVersionPrefix specifies the prefix included in every bitcoind
-	// version exposed through GetNetworkInfo.
-	bitcoindVersionPrefix = "/Satoshi:"
-
-	// bitcoindVersionSuffix specifies the suffix included in every bitcoind
-	// version exposed through GetNetworkInfo.
-	bitcoindVersionSuffix = "/"
-)
-
-// parseBitcoindVersion parses the bitcoind version from its string
-// representation.
-func parseBitcoindVersion(version string) BackendVersion {
-	// Trim the version of its prefix and suffix to determine the
-	// appropriate version number.
-	version = strings.TrimPrefix(
-		strings.TrimSuffix(version, bitcoindVersionSuffix),
-		bitcoindVersionPrefix,
-	)
-	switch {
-	case version < bitcoind19Str:
-		return BitcoindPre19
-	default:
-		return BitcoindPost19
-	}
-}
-
 // BackendVersion retrieves the version of the backend the client is currently
 // connected to.
 func (c *Client) BackendVersion() (BackendVersion, error) {
@@ -1612,7 +1577,7 @@ func (c *Client) BackendVersion() (BackendVersion, error) {
 	defer c.backendVersionMu.Unlock()
 
 	if c.backendVersion != nil {
-		return *c.backendVersion, nil
+		return c.backendVersion, nil
 	}
 
 	// We'll start by calling GetInfo. This method doesn't exist for
@@ -1624,20 +1589,20 @@ func (c *Client) BackendVersion() (BackendVersion, error) {
 	// Parse the btcd version and cache it.
 	case nil:
 		log.Debugf("Detected btcd version: %v", info.Version)
-		version := Btcd
-		c.backendVersion = &version
-		return *c.backendVersion, nil
+		version := parseBtcdVersion(info.Version)
+		c.backendVersion = version
+		return c.backendVersion, nil
 
 	// Inspect the RPC error to ensure the method was not found, otherwise
 	// we actually ran into an error.
 	case *btcjson.RPCError:
 		if err.Code != btcjson.ErrRPCMethodNotFound.Code {
-			return 0, fmt.Errorf("unable to detect btcd version: "+
+			return nil, fmt.Errorf("unable to detect btcd version: "+
 				"%v", err)
 		}
 
 	default:
-		return 0, fmt.Errorf("unable to detect btcd version: %v", err)
+		return nil, fmt.Errorf("unable to detect btcd version: %v", err)
 	}
 
 	// Since the GetInfo method was not found, we assume the client is
@@ -1645,7 +1610,8 @@ func (c *Client) BackendVersion() (BackendVersion, error) {
 	// GetNetworkInfo.
 	networkInfo, err := c.GetNetworkInfo()
 	if err != nil {
-		return 0, fmt.Errorf("unable to detect bitcoind version: %v", err)
+		return nil, fmt.Errorf("unable to detect bitcoind version: %v",
+			err)
 	}
 
 	// Parse the bitcoind version and cache it.
@@ -1653,7 +1619,7 @@ func (c *Client) BackendVersion() (BackendVersion, error) {
 	version := parseBitcoindVersion(networkInfo.SubVersion)
 	c.backendVersion = &version
 
-	return *c.backendVersion, nil
+	return c.backendVersion, nil
 }
 
 func (c *Client) sendAsync() FutureGetBulkResult {
@@ -1689,28 +1655,38 @@ func (c *Client) Send() error {
 		return nil
 	}
 
-	// clear batchlist in case of an error
-	defer func() {
-		c.batchList = list.New()
-	}()
-
-	result, err := c.sendAsync().Receive()
-
+	batchResp, err := c.sendAsync().Receive()
 	if err != nil {
+		// Clear batchlist in case of an error.
+		//
+		// TODO(yy): need to double check to make sure there's no
+		// concurrent access to this batch list, otherwise we may miss
+		// some batched requests.
+		c.batchList = list.New()
+
 		return err
 	}
 
-	for iter := c.batchList.Front(); iter != nil; iter = iter.Next() {
-		var requestError error
-		request := iter.Value.(*jsonRequest)
-		individualResult := result[request.id]
-		fullResult, err := json.Marshal(individualResult.Result)
+	// Iterate each response and send it to the corresponding request.
+	for id, resp := range batchResp {
+		// Perform a GC on batchList and requestMap before moving
+		// forward.
+		request := c.removeRequest(id)
+
+		// If there's an error, we log it and continue to the next
+		// request.
+		fullResult, err := json.Marshal(resp.Result)
 		if err != nil {
-			return err
+			log.Errorf("Unable to marshal result: %v for req=%v",
+				err, request.id)
+
+			continue
 		}
 
-		if individualResult.Error != nil {
-			requestError = individualResult.Error
+		// If there's a response error, we send it back the request.
+		var requestError error
+		if resp.Error != nil {
+			requestError = resp.Error
 		}
 
 		result := Response{
@@ -1719,5 +1695,6 @@ func (c *Client) Send() error {
 		}
 		request.responseChan <- &result
 	}
+
 	return nil
 }

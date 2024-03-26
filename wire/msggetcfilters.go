@@ -26,33 +26,41 @@ type MsgGetCFilters struct {
 // BtcDecode decodes r using the bitcoin protocol encoding into the receiver.
 // This is part of the Message interface implementation.
 func (msg *MsgGetCFilters) BtcDecode(r io.Reader, pver uint32, _ MessageEncoding) error {
-	err := readElement(r, &msg.FilterType)
-	if err != nil {
+	buf := binarySerializer.Borrow()
+	defer binarySerializer.Return(buf)
+
+	if _, err := io.ReadFull(r, buf[:1]); err != nil {
 		return err
 	}
+	msg.FilterType = FilterType(buf[0])
 
-	err = readElement(r, &msg.StartHeight)
-	if err != nil {
+	if _, err := io.ReadFull(r, buf[:4]); err != nil {
 		return err
 	}
+	msg.StartHeight = littleEndian.Uint32(buf[:4])
 
-	return readElement(r, &msg.StopHash)
+	_, err := io.ReadFull(r, msg.StopHash[:])
+	return err
 }
 
 // BtcEncode encodes the receiver to w using the bitcoin protocol encoding.
 // This is part of the Message interface implementation.
 func (msg *MsgGetCFilters) BtcEncode(w io.Writer, pver uint32, _ MessageEncoding) error {
-	err := writeElement(w, msg.FilterType)
-	if err != nil {
+	buf := binarySerializer.Borrow()
+	defer binarySerializer.Return(buf)
+
+	buf[0] = byte(msg.FilterType)
+	if _, err := w.Write(buf[:1]); err != nil {
 		return err
 	}
 
-	err = writeElement(w, &msg.StartHeight)
-	if err != nil {
+	littleEndian.PutUint32(buf[:4], msg.StartHeight)
+	if _, err := w.Write(buf[:4]); err != nil {
 		return err
 	}
 
-	return writeElement(w, &msg.StopHash)
+	_, err := w.Write(msg.StopHash[:])
+	return err
 }
 
 // Command returns the protocol command string for the message.  This is part

@@ -267,7 +267,7 @@ const (
 	ErrPubKeyType
 
 	// ErrCleanStack is returned when the ScriptVerifyCleanStack flag
-	// is set, and after evalution, the stack does not contain only a
+	// is set, and after evaluation, the stack does not contain only a
 	// single element.
 	ErrCleanStack
 
@@ -309,9 +309,9 @@ const (
 	ErrMinimalIf
 
 	// ErrDiscourageUpgradableWitnessProgram is returned if
-	// ScriptVerifyWitness is set and the versino of an executing witness
+	// ScriptVerifyWitness is set and the version of an executing witness
 	// program is outside the set of currently defined witness program
-	// vesions.
+	// versions.
 	ErrDiscourageUpgradableWitnessProgram
 
 	// ----------------------------------------
@@ -363,7 +363,7 @@ const (
 	ErrTapscriptCheckMultisig
 
 	// ErrDiscourageUpgradeableTaprootVersion is returned if during
-	// tapscript execution, we encoutner a public key that isn't 0 or 32
+	// tapscript execution, we encounter a public key that isn't 0 or 32
 	// bytes.
 	ErrDiscourageUpgradeablePubKeyType
 

@@ -297,9 +297,9 @@ func TestMixedCaseEncode(t *testing.T) {
 	}
 }
 
-// TestCanDecodeUnlimtedBech32 tests whether decoding a large bech32 string works
+// TestCanDecodeUnlimitedBech32 tests whether decoding a large bech32 string works
 // when using the DecodeNoLimit version
-func TestCanDecodeUnlimtedBech32(t *testing.T) {
+func TestCanDecodeUnlimitedBech32(t *testing.T) {
 	input := "11qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqsqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq5kx0yd"
 
 	// Sanity check that an input of this length errors on regular Decode()

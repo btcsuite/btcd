@@ -343,7 +343,7 @@ func (b *BlockChain) TstSetCoinbaseMaturity(maturity uint16) {
 	b.chainParams.CoinbaseMaturity = maturity
 }
 
-// newFakeChain returns a chain that is usable for syntetic tests.  It is
+// newFakeChain returns a chain that is usable for synthetic tests.  It is
 // important to note that this chain has no database associated with it, so
 // it is not usable with all functions and the tests must take care when making
 // use of it.
