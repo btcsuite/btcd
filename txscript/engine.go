@@ -114,6 +114,10 @@ const (
 	// ScriptVerifyDiscourageUpgradeablePubkeyType defines if unknown
 	// public key versions (during tapscript execution) is non-standard.
 	ScriptVerifyDiscourageUpgradeablePubkeyType
+
+	// ScriptVerifyTxHash defines whether or not to support the OP_TxHash
+	// and OP_TxHashVerify op codes.
+	ScriptVerifyTxHash
 )
 
 const (
@@ -228,14 +232,19 @@ type Engine struct {
 	// prevOutFetcher is used to look up all the previous output of
 	// taproot transactions, as that information is hashed into the
 	// sighash digest for such inputs.
-	flags          ScriptFlags
-	tx             wire.MsgTx
-	txIdx          int
-	version        uint16
-	bip16          bool
-	sigCache       *SigCache
-	hashCache      *TxSigHashes
-	prevOutFetcher PrevOutputFetcher
+	//
+	// todo(sputn1ck): comment for inputs and outputs cache.
+
+	flags            ScriptFlags
+	tx               wire.MsgTx
+	txIdx            int
+	version          uint16
+	bip16            bool
+	sigCache         *SigCache
+	hashCache        *TxSigHashes
+	prevOutFetcher   PrevOutputFetcher
+	txfsInputsCache  *TxfsInputsCache
+	txfsOutputsCache *TxfsOutputsCache
 
 	// The following fields handle keeping track of the current execution state
 	// of the engine.
@@ -1617,6 +1626,13 @@ func NewEngine(scriptPubKey []byte, tx *wire.MsgTx, txIdx int, flags ScriptFlags
 			}
 		}
 
+	}
+
+	// If the vm has the ScriptVerifyTxHash flag set, then we'll also
+	// create the txfs input and outputs cache.
+	if vm.hasFlag(ScriptVerifyTxHash) {
+		vm.txfsInputsCache = NewTxfsInputsCache()
+		vm.txfsOutputsCache = NewTxfsOutputsCache()
 	}
 
 	// Setup the current tokenizer used to parse through the script one opcode
