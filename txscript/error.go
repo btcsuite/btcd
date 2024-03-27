@@ -411,6 +411,8 @@ const (
 	// numErrorCodes is the maximum error code number used in tests.  This
 	// entry MUST be the last entry in the enum.
 	numErrorCodes
+
+	ErrTemplateMismatch
 )
 
 // Map of ErrorCode values back to their constant names for pretty printing.
