@@ -207,7 +207,7 @@ func (b *GCSBuilder) Build() (*gcs.Filter, error) {
 		return nil, b.err
 	}
 
-	// We'll ensure that all the paramaters we need to actually build the
+	// We'll ensure that all the parameters we need to actually build the
 	// filter properly are set.
 	if b.p == 0 {
 		return nil, fmt.Errorf("p value is not set, cannot build")
