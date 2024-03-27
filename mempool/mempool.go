@@ -1635,7 +1635,7 @@ func (mp *TxPool) validateStandardness(tx *btcutil.Tx, nextBlockHeight int32,
 }
 
 // validateSigCost checks the cost to run the signature operations to make sure
-// the number of singatures are sane.
+// the number of signatures are sane.
 func (mp *TxPool) validateSigCost(tx *btcutil.Tx,
 	utxoView *blockchain.UtxoViewpoint) error {
 

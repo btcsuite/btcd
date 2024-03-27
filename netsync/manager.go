@@ -1136,7 +1136,7 @@ func (sm *SyncManager) haveInventory(invVect *wire.InvVect) (bool, error) {
 		return false, nil
 	}
 
-	// The requested inventory is is an unsupported type, so just claim
+	// The requested inventory is an unsupported type, so just claim
 	// it is known to avoid requesting it.
 	return true, nil
 }
