@@ -445,8 +445,8 @@ var FreshNetParams = Params{
 	GenesisHash:  &freshNetGenesisHash,
 	PowLimit:     freshNetPowLimit,
 	// determines how difficult to mine
-	// PowLimitBits:             0x1d00ffff,
-	PowLimitBits:  0x1e0fffff,
+	PowLimitBits: 0x1d00ffff,
+	// PowLimitBits:  0x1e000fff,
 	BIP0034Height: 227931, // 000000000000024b89b42a942fe0d9fea3bb44ab7bd1b19115dd6a759c0808b8
 	BIP0065Height: 388381, // 000000000000000004c2b624ed5d7756c508d90fd0da2c7c679febfa6c4735f0
 	BIP0066Height: 363725, // 00000000000000000379eaa19dce8c9b722d46ae6a57c2f1a988119488b50931
@@ -456,11 +456,11 @@ var FreshNetParams = Params{
 	CoinbaseMaturity:         50,
 	SubsidyReductionInterval: 210000,
 	// widens the window for difficulty adjustments.
-	// TargetTimespan: time.Hour * 24 * 14, // 14 days
-	TargetTimespan: time.Hour * 24 * 28, // 28 days
+	TargetTimespan: time.Hour * 24 * 14, // 14 days
+	// TargetTimespan: time.Hour * 24 * 28, // 28 days
 	// to slow down the block production rate
-	// TargetTimePerBlock:       time.Minute * 10, // 10 minutes
-	TargetTimePerBlock: time.Minute * 20, // 20 minutes
+	TargetTimePerBlock:       time.Minute * 10, // 10 minutes
+	// TargetTimePerBlock: time.Minute * 20, // 20 minutes
 	// controls how much the difficulty can adjust in each retargeting period.
 	// Lowering this value allows for more significant adjustments,
 	// which can help the network quickly adapt to changes in mining power or difficulty
@@ -510,12 +510,15 @@ var FreshNetParams = Params{
 		{800000, newHashFromStr("00000000000000000002a7c4c1e48d76c5a37902165a270156b7a8d72728a054")},
 		{810000, newHashFromStr("000000000000000000028028ca82b6aa81ce789e4eb9e0321b74c3cbaf405dd1")},
 	},
+	// Checkpoints: []Checkpoint{},
 
 	// Consensus rule change deployments.
 	// The miner confirmation window is defined as:
 	//   target proof of work timespan / target proof of work spacing
 	RuleChangeActivationThreshold: 1916, // 95% of MinerConfirmationWindow
+	// RuleChangeActivationThreshold: 108,
 	MinerConfirmationWindow:       2016,
+	// MinerConfirmationWindow:       144,
 
 	// can leave this as is, unless we want to change the consensus rules
 	// these are rules that everyone must follows to reach an agreeable state of the network
