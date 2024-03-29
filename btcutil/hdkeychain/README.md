@@ -17,7 +17,7 @@ report.
 
 - Full BIP0032 implementation
 - Single type for private and public extended keys
-- Convenient cryptograpically secure seed generation
+- Convenient cryptographically secure seed generation
 - Simple creation of master nodes
 - Support for multi-layer derivation
 - Easy serialization and deserialization for both private and public extended
