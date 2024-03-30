@@ -165,3 +165,23 @@ func BuildToSignTx(toSpendTxId string, witnessScript []byte,
 
 	return psbt, nil
 }
+
+// EncodeWitness encodes witness stack in a signed BIP-322 PSBT into
+// its base-64 encoded format. For more details on
+// BIP-322, see: https://github.com/bitcoin/bips/blob/master/bip-0322.mediawiki
+//
+// Parameters:
+//   - signedPsbt: The signed Partially Signed Bitcoin Transaction (PSBT).
+//
+// Returns:
+//   - string: The base-64 encoded witness stack.
+//   - error: An error if the witness data is empty.
+func EncodeWitness(signedPsbt *Packet) (string, error) {
+	witness := signedPsbt.Inputs[0].FinalScriptWitness
+	if len(witness) > 0 {
+		return base64.StdEncoding.EncodeToString(witness), nil
+	} else {
+		return "", errors.New("witness data is empty")
+	}
+
+}
