@@ -136,3 +136,83 @@ func TestBuildToSignTx(t *testing.T) {
 		helloWorldToSignTxSigned.TxHash().String(),
 	)
 }
+
+// TestEncodeWitness tests that the EncodeWitness function works as
+// expected on the passed test vector(s) as mentioned in BIP-322:
+// https://github.com/bitcoin/bips/blob/master/bip-0322.mediawiki
+func TestEncodeWitness(t *testing.T) {
+	SegWitAddress := "bc1q9vza2e8x573nczrlzms0wvx3gsqjx7vavgkx0l"
+
+	addr, err := btcutil.DecodeAddress(
+		SegWitAddress, &chaincfg.MainNetParams,
+	)
+	require.NoError(t, err)
+
+	scriptPubKey, err := txscript.PayToAddrScript(addr)
+	require.NoError(t, err)
+
+	TestPrivateKey := "L3VFeEujGtevx9w18HD1fhRbCH67Az2dpCymeRE1SoPK6XQtaN2k"
+
+	wif, err := btcutil.DecodeWIF(TestPrivateKey)
+	require.NoError(t, err)
+
+	// Create to_sign transaction with "Hello World" message.
+	toSpendTxId := "b79d196740ad5217771c1098fc4a4b51e053" +
+	"5c32236c71f1ea4d61a2d603352b"
+	toSignTx, err := BuildToSignTx(
+		toSpendTxId, scriptPubKey, false, nil,
+	)
+	require.NoError(t, err)
+
+	sigInput, err := txscript.RawTxInSignature(
+		toSignTx.UnsignedTx, 0, scriptPubKey,
+		txscript.SigHashAll, wif.PrivKey,
+	)
+	require.NoError(t, err)
+
+	toSignTxUpdater, err := NewUpdater(toSignTx)
+	if err != nil {
+		t.Fatalf("Failed to create updater: %v", err)
+	}
+
+	_, err = toSignTxUpdater.Sign(
+		0, sigInput, wif.SerializePubKey(), nil, nil,
+	)
+	require.NoError(t, err)
+
+	err = Finalize(toSignTx, 0)
+	require.NoError(t, err)
+
+	signature, err := EncodeWitness(toSignTx)
+	require.NoError(t, err)
+
+	signatureExpected := "AkgwRQIhALd8FRASRGU0ZayijetagasQv/2Vv0hEadfFC/" +
+		"m5PtdKAiAevL10hn93NSSag0nYg1zZPIVKrL+e9MoStYkc" +
+		"+JKvGgEhAsfxIAMZZEKUPYWI4BruhAQjzFT8FSFSajuFwrDL1Yhy"
+	require.Equal(t, signatureExpected, signature)
+}
+
+// TestEncodeWitnessFromUnsignedPSBT tests that the EncodeWitness function
+// throws an error if unsigned psbt.
+func TestEncodeWitnessFromUnsignedPSBT(t *testing.T) {
+	SegWitAddress := "bc1q9vza2e8x573nczrlzms0wvx3gsqjx7vavgkx0l"
+
+	addr, err := btcutil.DecodeAddress(
+		SegWitAddress, &chaincfg.MainNetParams,
+	)
+	require.NoError(t, err)
+
+	scriptPubKey, err := txscript.PayToAddrScript(addr)
+	require.NoError(t, err)
+
+	// Create to_sign transaction with "Hello World" message.
+	toSpendTxId := "b79d196740ad5217771c1098fc4a4b51e053" +
+	"5c32236c71f1ea4d61a2d603352b"
+	toSignTx, err := BuildToSignTx(
+		toSpendTxId, scriptPubKey, false, nil,
+	)
+	require.NoError(t, err)
+
+	_, err = EncodeWitness(toSignTx)
+	require.NotNil(t, err)
+}
