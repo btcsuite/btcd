@@ -1687,6 +1687,10 @@ func (vm *Engine) GetDefaultCheckTemplatePrecomputedData() (map[string][]byte, e
 
 	for _, txOut := range vm.tx.TxOut {
 		outputs.Write(txOut.PkScript)
+		err := binary.Write(&outputs, binary.LittleEndian, txOut.Value)
+		if err != nil {
+			return nil, err
+		}
 	}
 	if outputs.Len() > 0 {
 		outHash := chainhash.HashB(outputs.Bytes())
