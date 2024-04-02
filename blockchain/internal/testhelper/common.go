@@ -1,6 +1,7 @@
 package testhelper
 
 import (
+	"encoding/binary"
 	"math"
 	"runtime"
 
@@ -19,6 +20,30 @@ var (
 	// readable.
 	LowFee = btcutil.Amount(1)
 )
+
+// OpReturnScript returns a provably-pruneable OP_RETURN script with the
+// provided data.
+func OpReturnScript(data []byte) ([]byte, error) {
+	builder := txscript.NewScriptBuilder()
+	script, err := builder.AddOp(txscript.OP_RETURN).AddData(data).Script()
+	if err != nil {
+		return nil, err
+	}
+	return script, nil
+}
+
+// UniqueOpReturnScript returns a standard provably-pruneable OP_RETURN script
+// with a random uint64 encoded as the data.
+func UniqueOpReturnScript() ([]byte, error) {
+	rand, err := wire.RandomUint64()
+	if err != nil {
+		return nil, err
+	}
+
+	data := make([]byte, 8)
+	binary.LittleEndian.PutUint64(data[0:8], rand)
+	return OpReturnScript(data)
+}
 
 // SpendableOut represents a transaction output that is spendable along with
 // additional metadata such as the block its in and how much it pays.

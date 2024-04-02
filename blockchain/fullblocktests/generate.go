@@ -228,30 +228,6 @@ func standardCoinbaseScript(blockHeight int32, extraNonce uint64) ([]byte, error
 		AddInt64(int64(extraNonce)).Script()
 }
 
-// opReturnScript returns a provably-pruneable OP_RETURN script with the
-// provided data.
-func opReturnScript(data []byte) []byte {
-	builder := txscript.NewScriptBuilder()
-	script, err := builder.AddOp(txscript.OP_RETURN).AddData(data).Script()
-	if err != nil {
-		panic(err)
-	}
-	return script
-}
-
-// uniqueOpReturnScript returns a standard provably-pruneable OP_RETURN script
-// with a random uint64 encoded as the data.
-func uniqueOpReturnScript() []byte {
-	rand, err := wire.RandomUint64()
-	if err != nil {
-		panic(err)
-	}
-
-	data := make([]byte, 8)
-	binary.LittleEndian.PutUint64(data[0:8], rand)
-	return opReturnScript(data)
-}
-
 // createCoinbaseTx returns a coinbase transaction paying an appropriate
 // subsidy based on the passed block height.  The coinbase signature script
 // conforms to the requirements of version 2 blocks.
@@ -358,7 +334,11 @@ func createSpendTx(spend *testhelper.SpendableOut, fee btcutil.Amount) *wire.Msg
 	})
 	spendTx.AddTxOut(wire.NewTxOut(int64(spend.Amount-fee),
 		testhelper.OpTrueScript))
-	spendTx.AddTxOut(wire.NewTxOut(0, uniqueOpReturnScript()))
+	opRetScript, err := testhelper.UniqueOpReturnScript()
+	if err != nil {
+		panic(err)
+	}
+	spendTx.AddTxOut(wire.NewTxOut(0, opRetScript))
 
 	return spendTx
 }
@@ -1959,7 +1939,10 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 		const zeroCoin = int64(0)
 		spendTx := b.Transactions[1]
 		for i := 0; i < numAdditionalOutputs; i++ {
-			opRetScript := uniqueOpReturnScript()
+			opRetScript, err := testhelper.UniqueOpReturnScript()
+			if err != nil {
+				panic(err)
+			}
 			spendTx.AddTxOut(wire.NewTxOut(zeroCoin, opRetScript))
 		}
 	})
