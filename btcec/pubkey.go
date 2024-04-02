@@ -10,6 +10,8 @@ import (
 
 // These constants define the lengths of serialized public keys.
 const (
+	// PubKeyBytesLenCompressed is the bytes length of a serialized compressed
+	// public key.
 	PubKeyBytesLenCompressed = 33
 )
 
