@@ -7,6 +7,7 @@ import (
 
 	"github.com/btcsuite/btcd/blockchain/internal/workmath"
 	"github.com/btcsuite/btcd/btcutil"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 )
@@ -20,6 +21,32 @@ var (
 	// readable.
 	LowFee = btcutil.Amount(1)
 )
+
+// CreateCoinbaseTx returns a coinbase transaction paying an appropriate
+// subsidy based on the passed block height and the block subsidy.  The
+// coinbase signature script conforms to the requirements of version 2 blocks.
+func CreateCoinbaseTx(blockHeight int32, blockSubsidy int64) *wire.MsgTx {
+	extraNonce := uint64(0)
+	coinbaseScript, err := StandardCoinbaseScript(blockHeight, extraNonce)
+	if err != nil {
+		panic(err)
+	}
+
+	tx := wire.NewMsgTx(1)
+	tx.AddTxIn(&wire.TxIn{
+		// Coinbase transactions have no inputs, so previous outpoint is
+		// zero hash and max index.
+		PreviousOutPoint: *wire.NewOutPoint(&chainhash.Hash{},
+			wire.MaxPrevOutIndex),
+		Sequence:        wire.MaxTxInSequenceNum,
+		SignatureScript: coinbaseScript,
+	})
+	tx.AddTxOut(&wire.TxOut{
+		Value:    blockSubsidy,
+		PkScript: OpTrueScript,
+	})
+	return tx
+}
 
 // StandardCoinbaseScript returns a standard script suitable for use as the
 // signature script of the coinbase transaction of a new block.  In particular,

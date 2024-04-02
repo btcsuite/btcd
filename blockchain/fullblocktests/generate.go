@@ -224,26 +224,8 @@ func pushDataScript(items ...[]byte) []byte {
 // subsidy based on the passed block height.  The coinbase signature script
 // conforms to the requirements of version 2 blocks.
 func (g *testGenerator) createCoinbaseTx(blockHeight int32) *wire.MsgTx {
-	extraNonce := uint64(0)
-	coinbaseScript, err := testhelper.StandardCoinbaseScript(blockHeight, extraNonce)
-	if err != nil {
-		panic(err)
-	}
-
-	tx := wire.NewMsgTx(1)
-	tx.AddTxIn(&wire.TxIn{
-		// Coinbase transactions have no inputs, so previous outpoint is
-		// zero hash and max index.
-		PreviousOutPoint: *wire.NewOutPoint(&chainhash.Hash{},
-			wire.MaxPrevOutIndex),
-		Sequence:        wire.MaxTxInSequenceNum,
-		SignatureScript: coinbaseScript,
-	})
-	tx.AddTxOut(&wire.TxOut{
-		Value:    blockchain.CalcBlockSubsidy(blockHeight, g.params),
-		PkScript: testhelper.OpTrueScript,
-	})
-	return tx
+	return testhelper.CreateCoinbaseTx(
+		blockHeight, blockchain.CalcBlockSubsidy(blockHeight, g.params))
 }
 
 // calcMerkleRoot creates a merkle tree from the slice of transactions and
