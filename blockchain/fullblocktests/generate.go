@@ -294,29 +294,6 @@ func additionalTx(tx *wire.MsgTx) func(*wire.MsgBlock) {
 	}
 }
 
-// createSpendTx creates a transaction that spends from the provided spendable
-// output and includes an additional unique OP_RETURN output to ensure the
-// transaction ends up with a unique hash.  The script is a simple OP_TRUE
-// script which avoids the need to track addresses and signature scripts in the
-// tests.
-func createSpendTx(spend *testhelper.SpendableOut, fee btcutil.Amount) *wire.MsgTx {
-	spendTx := wire.NewMsgTx(1)
-	spendTx.AddTxIn(&wire.TxIn{
-		PreviousOutPoint: spend.PrevOut,
-		Sequence:         wire.MaxTxInSequenceNum,
-		SignatureScript:  nil,
-	})
-	spendTx.AddTxOut(wire.NewTxOut(int64(spend.Amount-fee),
-		testhelper.OpTrueScript))
-	opRetScript, err := testhelper.UniqueOpReturnScript()
-	if err != nil {
-		panic(err)
-	}
-	spendTx.AddTxOut(wire.NewTxOut(0, opRetScript))
-
-	return spendTx
-}
-
 // createSpendTxForTx creates a transaction that spends from the first output of
 // the provided transaction and includes an additional unique OP_RETURN output
 // to ensure the transaction ends up with a unique hash.  The public key script
@@ -324,7 +301,7 @@ func createSpendTx(spend *testhelper.SpendableOut, fee btcutil.Amount) *wire.Msg
 // signature scripts in the tests.  The signature script is nil.
 func createSpendTxForTx(tx *wire.MsgTx, fee btcutil.Amount) *wire.MsgTx {
 	spend := testhelper.MakeSpendableOutForTx(tx, 0)
-	return createSpendTx(&spend, fee)
+	return testhelper.CreateSpendTx(&spend, fee)
 }
 
 // nextBlock builds a new block that extends the current tip associated with the
@@ -364,7 +341,7 @@ func (g *testGenerator) nextBlock(blockName string, spend *testhelper.SpendableO
 		// add it to the list of transactions to include in the block.
 		// The script is a simple OP_TRUE script in order to avoid the
 		// need to track addresses and signature scripts in the tests.
-		txns = append(txns, createSpendTx(spend, fee))
+		txns = append(txns, testhelper.CreateSpendTx(spend, fee))
 	}
 
 	// Use a timestamp that is one second after the previous block unless
@@ -1152,7 +1129,7 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 	//                 \-> b38(b37.tx[1])
 	//
 	g.setTip("b35")
-	doubleSpendTx := createSpendTx(outs[11], testhelper.LowFee)
+	doubleSpendTx := testhelper.CreateSpendTx(outs[11], testhelper.LowFee)
 	g.nextBlock("b37", outs[11], additionalTx(doubleSpendTx))
 	b37Tx1Out := testhelper.MakeSpendableOut(g.tip, 1, 0)
 	rejected(blockchain.ErrMissingTxOut)
@@ -1211,7 +1188,7 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 			// Create a signed transaction that spends from the
 			// associated p2sh output in b39.
 			spend := testhelper.MakeSpendableOutForTx(b39.Transactions[i+2], 2)
-			tx := createSpendTx(&spend, testhelper.LowFee)
+			tx := testhelper.CreateSpendTx(&spend, testhelper.LowFee)
 			sig, err := txscript.RawTxInSignature(tx, 0,
 				redeemScript, txscript.SigHashAll, g.privKey)
 			if err != nil {
@@ -1242,7 +1219,7 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 		txnsNeeded := (maxBlockSigOps / redeemScriptSigOps)
 		for i := 0; i < txnsNeeded; i++ {
 			spend := testhelper.MakeSpendableOutForTx(b39.Transactions[i+2], 2)
-			tx := createSpendTx(&spend, testhelper.LowFee)
+			tx := testhelper.CreateSpendTx(&spend, testhelper.LowFee)
 			sig, err := txscript.RawTxInSignature(tx, 0,
 				redeemScript, txscript.SigHashAll, g.privKey)
 			if err != nil {
@@ -1291,7 +1268,7 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 	//   ... -> b43(13)
 	//                 \-> b44(14)
 	g.nextBlock("b44", nil, func(b *wire.MsgBlock) {
-		nonCoinbaseTx := createSpendTx(outs[14], testhelper.LowFee)
+		nonCoinbaseTx := testhelper.CreateSpendTx(outs[14], testhelper.LowFee)
 		b.Transactions[0] = nonCoinbaseTx
 	})
 	rejected(blockchain.ErrFirstTxNotCoinbase)
@@ -1688,7 +1665,7 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 	//   ... -> b65(19)
 	//                 \-> b66(20)
 	g.nextBlock("b66", nil, func(b *wire.MsgBlock) {
-		tx2 := createSpendTx(outs[20], testhelper.LowFee)
+		tx2 := testhelper.CreateSpendTx(outs[20], testhelper.LowFee)
 		tx3 := createSpendTxForTx(tx2, testhelper.LowFee)
 		b.AddTransaction(tx3)
 		b.AddTransaction(tx2)
@@ -1858,7 +1835,7 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 		zeroFee := btcutil.Amount(0)
 		for i := uint32(0); i < numAdditionalOutputs; i++ {
 			spend := testhelper.MakeSpendableOut(b, 1, i+2)
-			tx := createSpendTx(&spend, zeroFee)
+			tx := testhelper.CreateSpendTx(&spend, zeroFee)
 			b.AddTransaction(tx)
 		}
 	})

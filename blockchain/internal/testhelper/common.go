@@ -22,6 +22,29 @@ var (
 	LowFee = btcutil.Amount(1)
 )
 
+// CreateSpendTx creates a transaction that spends from the provided spendable
+// output and includes an additional unique OP_RETURN output to ensure the
+// transaction ends up with a unique hash.  The script is a simple OP_TRUE
+// script which avoids the need to track addresses and signature scripts in the
+// tests.
+func CreateSpendTx(spend *SpendableOut, fee btcutil.Amount) *wire.MsgTx {
+	spendTx := wire.NewMsgTx(1)
+	spendTx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: spend.PrevOut,
+		Sequence:         wire.MaxTxInSequenceNum,
+		SignatureScript:  nil,
+	})
+	spendTx.AddTxOut(wire.NewTxOut(int64(spend.Amount-fee),
+		OpTrueScript))
+	opRetScript, err := UniqueOpReturnScript()
+	if err != nil {
+		panic(err)
+	}
+	spendTx.AddTxOut(wire.NewTxOut(0, opRetScript))
+
+	return spendTx
+}
+
 // CreateCoinbaseTx returns a coinbase transaction paying an appropriate
 // subsidy based on the passed block height and the block subsidy.  The
 // coinbase signature script conforms to the requirements of version 2 blocks.
