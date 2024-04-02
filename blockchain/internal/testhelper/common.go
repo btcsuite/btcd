@@ -6,7 +6,18 @@ import (
 
 	"github.com/btcsuite/btcd/blockchain/internal/workmath"
 	"github.com/btcsuite/btcd/btcutil"
+	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
+)
+
+var (
+	// OpTrueScript is simply a public key script that contains the OP_TRUE
+	// opcode.  It is defined here to reduce garbage creation.
+	OpTrueScript = []byte{txscript.OP_TRUE}
+
+	// LowFee is a single satoshi and exists to make the test code more
+	// readable.
+	LowFee = btcutil.Amount(1)
 )
 
 // SpendableOut represents a transaction output that is spendable along with

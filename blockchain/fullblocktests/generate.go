@@ -43,16 +43,6 @@ const (
 	numLargeReorgBlocks = 1088
 )
 
-var (
-	// opTrueScript is simply a public key script that contains the OP_TRUE
-	// opcode.  It is defined here to reduce garbage creation.
-	opTrueScript = []byte{txscript.OP_TRUE}
-
-	// lowFee is a single satoshi and exists to make the test code more
-	// readable.
-	lowFee = btcutil.Amount(1)
-)
-
 // TestInstance is an interface that describes a specific test instance returned
 // by the tests generated in this package.  It should be type asserted to one
 // of the concrete test instance types in order to test accordingly.
@@ -283,7 +273,7 @@ func (g *testGenerator) createCoinbaseTx(blockHeight int32) *wire.MsgTx {
 	})
 	tx.AddTxOut(&wire.TxOut{
 		Value:    blockchain.CalcBlockSubsidy(blockHeight, g.params),
-		PkScript: opTrueScript,
+		PkScript: testhelper.OpTrueScript,
 	})
 	return tx
 }
@@ -367,7 +357,7 @@ func createSpendTx(spend *testhelper.SpendableOut, fee btcutil.Amount) *wire.Msg
 		SignatureScript:  nil,
 	})
 	spendTx.AddTxOut(wire.NewTxOut(int64(spend.Amount-fee),
-		opTrueScript))
+		testhelper.OpTrueScript))
 	spendTx.AddTxOut(wire.NewTxOut(0, uniqueOpReturnScript()))
 
 	return spendTx
@@ -1208,7 +1198,7 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 	//                 \-> b38(b37.tx[1])
 	//
 	g.setTip("b35")
-	doubleSpendTx := createSpendTx(outs[11], lowFee)
+	doubleSpendTx := createSpendTx(outs[11], testhelper.LowFee)
 	g.nextBlock("b37", outs[11], additionalTx(doubleSpendTx))
 	b37Tx1Out := testhelper.MakeSpendableOut(g.tip, 1, 0)
 	rejected(blockchain.ErrMissingTxOut)
@@ -1246,7 +1236,7 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 		txnsNeeded := (maxBlockSigOps / redeemScriptSigOps) + 1
 		prevTx := b.Transactions[1]
 		for i := 0; i < txnsNeeded; i++ {
-			prevTx = createSpendTxForTx(prevTx, lowFee)
+			prevTx = createSpendTxForTx(prevTx, testhelper.LowFee)
 			prevTx.TxOut[0].Value -= 2
 			prevTx.AddTxOut(wire.NewTxOut(2, p2shScript))
 			b.AddTransaction(prevTx)
@@ -1267,7 +1257,7 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 			// Create a signed transaction that spends from the
 			// associated p2sh output in b39.
 			spend := testhelper.MakeSpendableOutForTx(b39.Transactions[i+2], 2)
-			tx := createSpendTx(&spend, lowFee)
+			tx := createSpendTx(&spend, testhelper.LowFee)
 			sig, err := txscript.RawTxInSignature(tx, 0,
 				redeemScript, txscript.SigHashAll, g.privKey)
 			if err != nil {
@@ -1283,7 +1273,7 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 		// the block one over the max allowed.
 		fill := maxBlockSigOps - (txnsNeeded * redeemScriptSigOps) + 1
 		finalTx := b.Transactions[len(b.Transactions)-1]
-		tx := createSpendTxForTx(finalTx, lowFee)
+		tx := createSpendTxForTx(finalTx, testhelper.LowFee)
 		tx.TxOut[0].PkScript = repeatOpcode(txscript.OP_CHECKSIG, fill)
 		b.AddTransaction(tx)
 	})
@@ -1298,7 +1288,7 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 		txnsNeeded := (maxBlockSigOps / redeemScriptSigOps)
 		for i := 0; i < txnsNeeded; i++ {
 			spend := testhelper.MakeSpendableOutForTx(b39.Transactions[i+2], 2)
-			tx := createSpendTx(&spend, lowFee)
+			tx := createSpendTx(&spend, testhelper.LowFee)
 			sig, err := txscript.RawTxInSignature(tx, 0,
 				redeemScript, txscript.SigHashAll, g.privKey)
 			if err != nil {
@@ -1317,7 +1307,7 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 			return
 		}
 		finalTx := b.Transactions[len(b.Transactions)-1]
-		tx := createSpendTxForTx(finalTx, lowFee)
+		tx := createSpendTxForTx(finalTx, testhelper.LowFee)
 		tx.TxOut[0].PkScript = repeatOpcode(txscript.OP_CHECKSIG, fill)
 		b.AddTransaction(tx)
 	})
@@ -1347,7 +1337,7 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 	//   ... -> b43(13)
 	//                 \-> b44(14)
 	g.nextBlock("b44", nil, func(b *wire.MsgBlock) {
-		nonCoinbaseTx := createSpendTx(outs[14], lowFee)
+		nonCoinbaseTx := createSpendTx(outs[14], testhelper.LowFee)
 		b.Transactions[0] = nonCoinbaseTx
 	})
 	rejected(blockchain.ErrFirstTxNotCoinbase)
@@ -1552,7 +1542,7 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 	g.setTip("b55")
 	b57 := g.nextBlock("b57", outs[16], func(b *wire.MsgBlock) {
 		tx2 := b.Transactions[1]
-		tx3 := createSpendTxForTx(tx2, lowFee)
+		tx3 := createSpendTxForTx(tx2, testhelper.LowFee)
 		b.AddTransaction(tx3)
 	})
 	g.assertTipBlockNumTxns(3)
@@ -1597,7 +1587,7 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 		// in the block.
 		spendTx := b.Transactions[1]
 		for i := 0; i < 4; i++ {
-			spendTx = createSpendTxForTx(spendTx, lowFee)
+			spendTx = createSpendTxForTx(spendTx, testhelper.LowFee)
 			b.AddTransaction(spendTx)
 		}
 
@@ -1734,7 +1724,7 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 	//   ... b64(18) -> b65(19)
 	g.setTip("b64")
 	g.nextBlock("b65", outs[19], func(b *wire.MsgBlock) {
-		tx3 := createSpendTxForTx(b.Transactions[1], lowFee)
+		tx3 := createSpendTxForTx(b.Transactions[1], testhelper.LowFee)
 		b.AddTransaction(tx3)
 	})
 	accepted()
@@ -1744,8 +1734,8 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 	//   ... -> b65(19)
 	//                 \-> b66(20)
 	g.nextBlock("b66", nil, func(b *wire.MsgBlock) {
-		tx2 := createSpendTx(outs[20], lowFee)
-		tx3 := createSpendTxForTx(tx2, lowFee)
+		tx2 := createSpendTx(outs[20], testhelper.LowFee)
+		tx3 := createSpendTxForTx(tx2, testhelper.LowFee)
 		b.AddTransaction(tx3)
 		b.AddTransaction(tx2)
 	})
@@ -1759,8 +1749,8 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 	g.setTip("b65")
 	g.nextBlock("b67", outs[20], func(b *wire.MsgBlock) {
 		tx2 := b.Transactions[1]
-		tx3 := createSpendTxForTx(tx2, lowFee)
-		tx4 := createSpendTxForTx(tx2, lowFee)
+		tx3 := createSpendTxForTx(tx2, testhelper.LowFee)
+		tx4 := createSpendTxForTx(tx2, testhelper.LowFee)
 		b.AddTransaction(tx3)
 		b.AddTransaction(tx4)
 	})
@@ -1883,7 +1873,7 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 		txscript.OP_ELSE, txscript.OP_TRUE, txscript.OP_ENDIF}
 	g.nextBlock("b74", outs[23], replaceSpendScript(script), func(b *wire.MsgBlock) {
 		tx2 := b.Transactions[1]
-		tx3 := createSpendTxForTx(tx2, lowFee)
+		tx3 := createSpendTxForTx(tx2, testhelper.LowFee)
 		tx3.TxIn[0].SignatureScript = []byte{txscript.OP_FALSE}
 		b.AddTransaction(tx3)
 	})
@@ -1904,7 +1894,7 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 		const zeroCoin = int64(0)
 		spendTx := b.Transactions[1]
 		for i := 0; i < numAdditionalOutputs; i++ {
-			spendTx.AddTxOut(wire.NewTxOut(zeroCoin, opTrueScript))
+			spendTx.AddTxOut(wire.NewTxOut(zeroCoin, testhelper.OpTrueScript))
 		}
 
 		// Add transactions spending from the outputs added above that
