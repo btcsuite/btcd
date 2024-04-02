@@ -21,6 +21,14 @@ var (
 	LowFee = btcutil.Amount(1)
 )
 
+// StandardCoinbaseScript returns a standard script suitable for use as the
+// signature script of the coinbase transaction of a new block.  In particular,
+// it starts with the block height that is required by version 2 blocks.
+func StandardCoinbaseScript(blockHeight int32, extraNonce uint64) ([]byte, error) {
+	return txscript.NewScriptBuilder().AddInt64(int64(blockHeight)).
+		AddInt64(int64(extraNonce)).Script()
+}
+
 // OpReturnScript returns a provably-pruneable OP_RETURN script with the
 // provided data.
 func OpReturnScript(data []byte) ([]byte, error) {
