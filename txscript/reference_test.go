@@ -63,15 +63,18 @@ func parseHex(tok string) ([]byte, error) {
 
 var testPrivKey, _ = btcec.NewPrivateKey()
 
+// Tags that are used to know how to parse the various elements of the
+// reference test json.
+const (
+	tagScript        = "#SCRIPT#"
+	tagControlblock  = "#CONTROLBLOCK#"
+	tagTaprootOutput = "#TAPROOTOUTPUT#"
+)
+
 // parseWitnessStack parses a json array of witness items encoded as hex into a
 // slice of witness elements.
 func parseWitnessStack(elements []interface{}) ([][]byte,
 	*IndexedTapScriptTree, error) {
-
-	const (
-		autogenScript       = "<AUTOGEN:SERIALIZED_SCRIPT>"
-		autogenControlblock = "<AUTOGEN:CONTROLBLOCK>"
-	)
 
 	var (
 		witness  = make([][]byte, len(elements))
@@ -81,8 +84,11 @@ func parseWitnessStack(elements []interface{}) ([][]byte,
 	for i, e := range elements {
 		s := e.(string)
 		switch {
-		case strings.HasPrefix(s, autogenScript):
-			scriptStr := strings.TrimPrefix(s, autogenScript)
+
+		// In case we encounter a script tag, we'll intepret the
+		// element as a script.
+		case strings.HasPrefix(s, tagScript):
+			scriptStr := strings.TrimPrefix(s, tagScript)
 			script, err := parseShortForm(scriptStr, nil)
 			if err != nil {
 				return nil, nil, err
@@ -91,7 +97,8 @@ func parseWitnessStack(elements []interface{}) ([][]byte,
 			pkScript = script
 			witness[i] = script
 
-		case strings.HasPrefix(s, autogenControlblock):
+		// We will create a control block from the current tap script.
+		case strings.HasPrefix(s, tagControlblock):
 			if len(pkScript) == 0 {
 				return nil, nil, fmt.Errorf("tap script not set")
 			}
@@ -191,7 +198,11 @@ func parseShortForm(script string, tree *IndexedTapScriptTree) ([]byte, error) {
 			builder.AddFullData([]byte(tok[1 : len(tok)-1]))
 		} else if opcode, ok := shortFormOps[tok]; ok {
 			builder.AddOp(opcode)
-		} else if tok == "<AUTOGEN:TAPROOTOUTPUT>" {
+		} else if tok == tagTaprootOutput {
+			// Use the current tap tree to create a taproot output.
+			if tree == nil {
+				return nil, fmt.Errorf("no taptree set")
+			}
 			inputKey := testPrivKey.PubKey()
 			tapScriptRootHash := tree.RootNode.TapHash()
 			tapKey := ComputeTaprootOutputKey(
