@@ -135,6 +135,20 @@ func newBlockNode(blockHeader *wire.BlockHeader, parent *blockNode) *blockNode {
 	return &node
 }
 
+// Equals compares all the fields of the block node except for the parent and
+// ancestor and returns true if they're equal.
+func (node *blockNode) Equals(other *blockNode) bool {
+	return node.hash == other.hash &&
+		node.workSum.Cmp(other.workSum) == 0 &&
+		node.height == other.height &&
+		node.version == other.version &&
+		node.bits == other.bits &&
+		node.nonce == other.nonce &&
+		node.timestamp == other.timestamp &&
+		node.merkleRoot == other.merkleRoot &&
+		node.status == other.status
+}
+
 // Header constructs a block header from the node and returns it.
 //
 // This function is safe for concurrent access.
