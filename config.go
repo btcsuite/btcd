@@ -511,7 +511,8 @@ func loadConfig() (*config, []string, error) {
 		}
 	}
 
-	//Check if global home path is set
+	// Check if global home root path  is set and reassigns the config, datadir,
+	// rpc & rpccert paths to the global root
 	if len(preCfg.GlobalHomeRoot) > 0 && preCfg.GlobalHomeRoot != defaultHomeDir{
 		defaultHomeDir     = preCfg.GlobalHomeRoot
 		cfg.ConfigFile  = filepath.Join(defaultHomeDir, defaultConfigFilename)
