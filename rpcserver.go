@@ -39,7 +39,6 @@ import (
 	"github.com/btcsuite/btcd/mining"
 	"github.com/btcsuite/btcd/mining/cpuminer"
 	"github.com/btcsuite/btcd/peer"
-	"github.com/btcsuite/btcd/rpcclient"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/websocket"
@@ -185,6 +184,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"verifymessage":          handleVerifyMessage,
 	"version":                handleVersion,
 	"testmempoolaccept":      handleTestMempoolAccept,
+	"gettxspendingprevout":   handleGetTxSpendingPrevOut,
 }
 
 // list of commands that we recognize, but for which btcd has no support because
@@ -646,23 +646,6 @@ func handleDebugLevel(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) 
 	return "Done.", nil
 }
 
-// witnessToHex formats the passed witness stack as a slice of hex-encoded
-// strings to be used in a JSON response.
-func witnessToHex(witness wire.TxWitness) []string {
-	// Ensure nil is returned when there are no entries versus an empty
-	// slice so it can properly be omitted as necessary.
-	if len(witness) == 0 {
-		return nil
-	}
-
-	result := make([]string, 0, len(witness))
-	for _, wit := range witness {
-		result = append(result, hex.EncodeToString(wit))
-	}
-
-	return result
-}
-
 // createVinList returns a slice of JSON objects for the inputs of the passed
 // transaction.
 func createVinList(mtx *wire.MsgTx) []btcjson.Vin {
@@ -672,7 +655,7 @@ func createVinList(mtx *wire.MsgTx) []btcjson.Vin {
 		txIn := mtx.TxIn[0]
 		vinList[0].Coinbase = hex.EncodeToString(txIn.SignatureScript)
 		vinList[0].Sequence = txIn.Sequence
-		vinList[0].Witness = witnessToHex(txIn.Witness)
+		vinList[0].Witness = txIn.Witness.ToHexStrings()
 		return vinList
 	}
 
@@ -692,7 +675,7 @@ func createVinList(mtx *wire.MsgTx) []btcjson.Vin {
 		}
 
 		if mtx.HasWitness() {
-			vinEntry.Witness = witnessToHex(txIn.Witness)
+			vinEntry.Witness = txIn.Witness.ToHexStrings()
 		}
 	}
 
@@ -846,7 +829,7 @@ func handleDecodeScript(s *rpcServer, cmd interface{}, closeChan <-chan struct{}
 
 	// Get information about the script.
 	// Ignore the error here since an error means the script couldn't parse
-	// and there is no additinal information about it anyways.
+	// and there is no additional information about it anyways.
 	scriptClass, addrs, reqSigs, _ := txscript.ExtractPkScriptAddrs(script,
 		s.cfg.ChainParams)
 	addresses := make([]string, len(addrs))
@@ -3052,7 +3035,7 @@ func createVinListPrevOut(s *rpcServer, mtx *wire.MsgTx, chainParams *chaincfg.P
 		}
 
 		if len(txIn.Witness) != 0 {
-			vinEntry.Witness = witnessToHex(txIn.Witness)
+			vinEntry.Witness = txIn.Witness.ToHexStrings()
 		}
 
 		// Add the entry to the list now if it already passed the filter
@@ -3220,7 +3203,7 @@ func handleSearchRawTransactions(s *rpcServer, cmd interface{}, closeChan <-chan
 	addressTxns := make([]retrievedTx, 0, numRequested)
 	if reverse {
 		// Transactions in the mempool are not in a block header yet,
-		// so the block header field in the retieved transaction struct
+		// so the block header field in the retrieved transaction struct
 		// is left nil.
 		mpTxns, mpSkipped := fetchMempoolTxnsForAddress(s, addr,
 			uint32(numToSkip), uint32(numRequested))
@@ -3274,7 +3257,7 @@ func handleSearchRawTransactions(s *rpcServer, cmd interface{}, closeChan <-chan
 	// order and the number of results is still under the number requested.
 	if !reverse && len(addressTxns) < numRequested {
 		// Transactions in the mempool are not in a block header yet,
-		// so the block header field in the retieved transaction struct
+		// so the block header field in the retrieved transaction struct
 		// is left nil.
 		mpTxns, mpSkipped := fetchMempoolTxnsForAddress(s, addr,
 			uint32(numToSkip)-numSkipped, uint32(numRequested-
@@ -3857,9 +3840,7 @@ func handleTestMempoolAccept(s *rpcServer, cmd interface{},
 
 			// TODO(yy): differentiate the errors and put package
 			// error in `PackageError` field.
-			item.RejectReason = rpcclient.MapBtcdErrToRejectReason(
-				err,
-			)
+			item.RejectReason = err.Error()
 
 			results = append(results, item)
 
@@ -3901,6 +3882,49 @@ func handleTestMempoolAccept(s *rpcServer, cmd interface{},
 		}
 
 		results = append(results, item)
+	}
+
+	return results, nil
+}
+
+// handleGetTxSpendingPrevOut implements the gettxspendingprevout command.
+func handleGetTxSpendingPrevOut(s *rpcServer, cmd interface{},
+	closeChan <-chan struct{}) (interface{}, error) {
+
+	c := cmd.(*btcjson.GetTxSpendingPrevOutCmd)
+
+	// Convert the outpoints.
+	ops := make([]wire.OutPoint, 0, len(c.Outputs))
+	for _, o := range c.Outputs {
+		hash, err := chainhash.NewHashFromStr(o.Txid)
+		if err != nil {
+			return nil, err
+		}
+
+		ops = append(ops, wire.OutPoint{
+			Hash:  *hash,
+			Index: o.Vout,
+		})
+	}
+
+	// Check mempool spend for all the outpoints.
+	results := make([]*btcjson.GetTxSpendingPrevOutResult, 0, len(ops))
+	for _, op := range ops {
+		// Create a result entry.
+		result := &btcjson.GetTxSpendingPrevOutResult{
+			Txid: op.Hash.String(),
+			Vout: op.Index,
+		}
+
+		// Check the mempool spend.
+		spendingTx := s.cfg.TxMemPool.CheckSpend(op)
+
+		// Set the spending txid if found.
+		if spendingTx != nil {
+			result.SpendingTxid = spendingTx.Hash().String()
+		}
+
+		results = append(results, result)
 	}
 
 	return results, nil
@@ -4295,7 +4319,7 @@ func (s *rpcServer) jsonRPCRead(w http.ResponseWriter, r *http.Request, isAdmin 
 	// change the read deadline for the new connection and having one breaks
 	// long polling.  However, not having a read deadline on the initial
 	// connection would mean clients can connect and idle forever.  Thus,
-	// hijack the connecton from the HTTP server, clear the read deadline,
+	// hijack the connection from the HTTP server, clear the read deadline,
 	// and handle writing the response manually.
 	hj, ok := w.(http.Hijacker)
 	if !ok {
@@ -4318,7 +4342,7 @@ func (s *rpcServer) jsonRPCRead(w http.ResponseWriter, r *http.Request, isAdmin 
 
 	// Attempt to parse the raw body into a JSON-RPC request.
 	// Setup a close notifier.  Since the connection is hijacked,
-	// the CloseNotifer on the ResponseWriter is not available.
+	// the CloseNotifier on the ResponseWriter is not available.
 	closeChan := make(chan struct{}, 1)
 	go func() {
 		_, err = conn.Read(make([]byte, 1))
@@ -4368,7 +4392,7 @@ func (s *rpcServer) jsonRPCRead(w http.ResponseWriter, r *http.Request, isAdmin 
 			// Btcd does not respond to any request without and "id" or "id":null,
 			// regardless the indicated JSON-RPC protocol version unless RPC quirks
 			// are enabled. With RPC quirks enabled, such requests will be responded
-			// to if the reqeust does not indicate JSON-RPC version.
+			// to if the request does not indicate JSON-RPC version.
 			//
 			// RPC quirks can be enabled by the user to avoid compatibility issues
 			// with software relying on Core's behavior.
@@ -4606,10 +4630,10 @@ func genCertPair(certFile, keyFile string) error {
 	}
 
 	// Write cert and key files.
-	if err = ioutil.WriteFile(certFile, cert, 0666); err != nil {
+	if err = os.WriteFile(certFile, cert, 0666); err != nil {
 		return err
 	}
-	if err = ioutil.WriteFile(keyFile, key, 0600); err != nil {
+	if err = os.WriteFile(keyFile, key, 0600); err != nil {
 		os.Remove(certFile)
 		return err
 	}

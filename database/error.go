@@ -87,7 +87,7 @@ const (
 	// should be relatively, so this should rarely be an issue.
 	ErrKeyTooLarge
 
-	// ErrValueTooLarge indicates an attmpt to insert a value that is larger
+	// ErrValueTooLarge indicates an attempt to insert a value that is larger
 	// than max allowed value size.  The max key size depends on the
 	// specific backend driver being used.
 	ErrValueTooLarge

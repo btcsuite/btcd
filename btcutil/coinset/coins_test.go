@@ -252,7 +252,7 @@ func TestSimpleCoin(t *testing.T) {
 		t.Error("Different value of coin pkScript than expected")
 	}
 	if testSimpleCoin.NumConfs() != 1 {
-		t.Error("Differet value of num confs than expected")
+		t.Error("Different value of num confs than expected")
 	}
 	if testSimpleCoin.ValueAge() != testSimpleCoinTxValueAge0 {
 		t.Error("Different value of coin value * age than expected")

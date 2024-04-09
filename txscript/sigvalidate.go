@@ -331,7 +331,7 @@ func newTaprootSigVerifier(pkBytes []byte, fullSigBytes []byte,
 // key and signature, and the passed sigHash as the message digest.
 func (t *taprootSigVerifier) verifySig(sigHash []byte) bool {
 	// At this point, we can check to see if this signature is already
-	// included in the sigCcahe and is valid or not (if one was passed in).
+	// included in the sigCache and is valid or not (if one was passed in).
 	cacheKey, _ := chainhash.NewHash(sigHash)
 	if t.sigCache != nil {
 		if t.sigCache.Exists(*cacheKey, t.fullSigBytes, t.pkBytes) {

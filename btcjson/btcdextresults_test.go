@@ -13,7 +13,7 @@ import (
 )
 
 // TestBtcdExtCustomResults ensures any results that have custom marshalling
-// work as inteded.
+// work as intended.
 // and unmarshal code of results are as expected.
 func TestBtcdExtCustomResults(t *testing.T) {
 	t.Parallel()

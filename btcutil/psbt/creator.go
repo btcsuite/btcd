@@ -17,7 +17,7 @@ const MinTxVersion = 1
 // within the unsigned transaction.  The values of nLockTime, nSequence (per
 // input) and transaction version (must be 1 of 2) must be specified here. Note
 // that the default nSequence value is wire.MaxTxInSequenceNum.  Referencing
-// the PSBT BIP, this function serves the roles of teh Creator.
+// the PSBT BIP, this function serves the roles of the Creator.
 func New(inputs []*wire.OutPoint,
 	outputs []*wire.TxOut, version int32, nLockTime uint32,
 	nSequences []uint32) (*Packet, error) {

@@ -441,7 +441,7 @@ func unmarshalGetBlockChainInfoResultSoftForks(chainInfo *btcjson.GetBlockChainI
 	version BackendVersion, res []byte) error {
 
 	// Versions of bitcoind on or after v0.19.0 use the unified format.
-	if version > BitcoindPre19 {
+	if version.SupportUnifiedSoftForks() {
 		var softForks btcjson.UnifiedSoftForks
 		if err := json.Unmarshal(res, &softForks); err != nil {
 			return err

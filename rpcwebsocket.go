@@ -132,8 +132,8 @@ type wsNotificationManager struct {
 	queueNotification chan interface{}
 
 	// notificationMsgs feeds notificationHandler with notifications
-	// and client (un)registeration requests from a queue as well as
-	// registeration and unregisteration requests from clients.
+	// and client (un)registration requests from a queue as well as
+	// registration and unregistration requests from clients.
 	notificationMsgs chan interface{}
 
 	// Access channel for current number of connected clients.
@@ -228,7 +228,7 @@ func (m *wsNotificationManager) NotifyBlockDisconnected(block *btcutil.Block) {
 
 // NotifyMempoolTx passes a transaction accepted by mempool to the
 // notification manager for transaction notification processing.  If
-// isNew is true, the tx is is a new transaction, rather than one
+// isNew is true, the tx is a new transaction, rather than one
 // added to the mempool during a reorg.
 func (m *wsNotificationManager) NotifyMempoolTx(tx *btcutil.Tx, isNew bool) {
 	n := &notificationTxAcceptedByMempool{
@@ -1236,7 +1236,7 @@ type wsResponse struct {
 // requested notifications to all connected websocket clients.   Inbound
 // messages are read via the inHandler goroutine and generally dispatched to
 // their own handler.  However, certain potentially long-running operations such
-// as rescans, are sent to the asyncHander goroutine and are limited to one at a
+// as rescans, are sent to the asyncHandler goroutine and are limited to one at a
 // time.  There are two outbound message types - one for responding to client
 // requests and another for async notifications.  Responses to client requests
 // use SendMessage which employs a buffered channel thereby limiting the number
@@ -2144,7 +2144,7 @@ func handleNotifySpent(wsc *wsClient, icmd interface{}) (interface{}, error) {
 	return nil, nil
 }
 
-// handleNotifyNewTransations implements the notifynewtransactions command
+// handleNotifyNewTransactions implements the notifynewtransactions command
 // extension for websocket connections.
 func handleNotifyNewTransactions(wsc *wsClient, icmd interface{}) (interface{}, error) {
 	cmd, ok := icmd.(*btcjson.NotifyNewTransactionsCmd)
@@ -2157,7 +2157,7 @@ func handleNotifyNewTransactions(wsc *wsClient, icmd interface{}) (interface{}, 
 	return nil, nil
 }
 
-// handleStopNotifyNewTransations implements the stopnotifynewtransactions
+// handleStopNotifyNewTransactions implements the stopnotifynewtransactions
 // command extension for websocket connections.
 func handleStopNotifyNewTransactions(wsc *wsClient, icmd interface{}) (interface{}, error) {
 	wsc.server.ntfnMgr.UnregisterNewMempoolTxsUpdates(wsc)
@@ -2724,7 +2724,7 @@ fetchRange:
 				// was any) still exists in the database.  If it
 				// doesn't, we error.
 				//
-				// A goto is used to branch executation back to
+				// A goto is used to branch execution back to
 				// before the range was evaluated, as it must be
 				// reevaluated for the new hashList.
 				minBlock += int32(i)

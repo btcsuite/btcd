@@ -16,6 +16,10 @@ import (
 	"github.com/btcsuite/btcd/wire"
 )
 
+// BTCPerkvB is the units used to represent Bitcoin transaction fees.
+// This unit represents the fee in BTC for a transaction size of 1 kB.
+type BTCPerkvB = float64
+
 // AddNodeSubCmd defines the type used in the addnode JSON-RPC command for the
 // sub command field.
 type AddNodeSubCmd string
@@ -142,7 +146,7 @@ type FundRawTransactionOpts struct {
 	ChangeType             *ChangeType           `json:"change_type,omitempty"`
 	IncludeWatching        *bool                 `json:"includeWatching,omitempty"`
 	LockUnspents           *bool                 `json:"lockUnspents,omitempty"`
-	FeeRate                *float64              `json:"feeRate,omitempty"` // BTC/kB
+	FeeRate                *BTCPerkvB            `json:"feeRate,omitempty"` // BTC/kB
 	SubtractFeeFromOutputs []int                 `json:"subtractFeeFromOutputs,omitempty"`
 	Replaceable            *bool                 `json:"replaceable,omitempty"`
 	ConfTarget             *int                  `json:"conf_target,omitempty"`
@@ -822,7 +826,7 @@ func NewSearchRawTransactionsCmd(address string, verbose, skip, count *int, vinE
 }
 
 // AllowHighFeesOrMaxFeeRate defines a type that can either be the legacy
-// allowhighfees boolean field or the new maxfeerate int field.
+// allowhighfees boolean field or the new maxfeerate float64 field.
 type AllowHighFeesOrMaxFeeRate struct {
 	Value interface{}
 }
@@ -862,7 +866,7 @@ func (a *AllowHighFeesOrMaxFeeRate) UnmarshalJSON(data []byte) error {
 	case bool:
 		a.Value = Bool(v)
 	case float64:
-		a.Value = Int32(int32(v))
+		a.Value = Float64(v)
 	default:
 		return fmt.Errorf("invalid allowhighfees or maxfeerate value: "+
 			"%v", unmarshalled)
@@ -893,9 +897,10 @@ func NewSendRawTransactionCmd(hexTx string, allowHighFees *bool) *SendRawTransac
 
 // NewSendRawTransactionCmd returns a new instance which can be used to issue a
 // sendrawtransaction JSON-RPC command to a bitcoind node.
+// maxFeeRate is the maximum fee rate for the transaction in BTC/kvB.
 //
 // A 0 maxFeeRate indicates that a maximum fee rate won't be enforced.
-func NewBitcoindSendRawTransactionCmd(hexTx string, maxFeeRate int32) *SendRawTransactionCmd {
+func NewBitcoindSendRawTransactionCmd(hexTx string, maxFeeRate BTCPerkvB) *SendRawTransactionCmd {
 	return &SendRawTransactionCmd{
 		HexTx: hexTx,
 		FeeSetting: &AllowHighFeesOrMaxFeeRate{
@@ -1050,17 +1055,49 @@ type TestMempoolAcceptCmd struct {
 
 	// Reject transactions whose fee rate is higher than the specified
 	// value, expressed in BTC/kvB, optional, default="0.10".
-	MaxFeeRate float64 `json:"omitempty"`
+	MaxFeeRate BTCPerkvB `json:"omitempty"`
 }
 
 // NewTestMempoolAcceptCmd returns a new instance which can be used to issue a
 // testmempoolaccept JSON-RPC command.
 func NewTestMempoolAcceptCmd(rawTxns []string,
-	maxFeeRate float64) *TestMempoolAcceptCmd {
+	maxFeeRate BTCPerkvB) *TestMempoolAcceptCmd {
 
 	return &TestMempoolAcceptCmd{
 		RawTxns:    rawTxns,
 		MaxFeeRate: maxFeeRate,
+	}
+}
+
+// GetTxSpendingPrevOutCmd defines the gettxspendingprevout JSON-RPC command.
+type GetTxSpendingPrevOutCmd struct {
+	// Outputs is a list of transaction outputs to query.
+	Outputs []*GetTxSpendingPrevOutCmdOutput
+}
+
+// GetTxSpendingPrevOutCmdOutput defines the output to query for the
+// gettxspendingprevout JSON-RPC command.
+type GetTxSpendingPrevOutCmdOutput struct {
+	Txid string `json:"txid"`
+	Vout uint32 `json:"vout"`
+}
+
+// NewGetTxSpendingPrevOutCmd returns a new instance which can be used to issue
+// a gettxspendingprevout JSON-RPC command.
+func NewGetTxSpendingPrevOutCmd(
+	outpoints []wire.OutPoint) *GetTxSpendingPrevOutCmd {
+
+	outputs := make([]*GetTxSpendingPrevOutCmdOutput, 0, len(outpoints))
+
+	for _, op := range outpoints {
+		outputs = append(outputs, &GetTxSpendingPrevOutCmdOutput{
+			Txid: op.Hash.String(),
+			Vout: op.Index,
+		})
+	}
+
+	return &GetTxSpendingPrevOutCmd{
+		Outputs: outputs,
 	}
 }
 
@@ -1125,4 +1162,5 @@ func init() {
 	MustRegisterCmd("verifymessage", (*VerifyMessageCmd)(nil), flags)
 	MustRegisterCmd("verifytxoutproof", (*VerifyTxOutProofCmd)(nil), flags)
 	MustRegisterCmd("testmempoolaccept", (*TestMempoolAcceptCmd)(nil), flags)
+	MustRegisterCmd("gettxspendingprevout", (*GetTxSpendingPrevOutCmd)(nil), flags)
 }

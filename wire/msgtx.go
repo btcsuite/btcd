@@ -5,6 +5,7 @@
 package wire
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -302,6 +303,22 @@ func (t TxWitness) SerializeSize() int {
 	return n
 }
 
+// ToHexStrings formats the witness stack as a slice of hex-encoded strings.
+func (t TxWitness) ToHexStrings() []string {
+	// Ensure nil is returned when there are no entries versus an empty
+	// slice so it can properly be omitted as necessary.
+	if len(t) == 0 {
+		return nil
+	}
+
+	result := make([]string, len(t))
+	for idx, wit := range t {
+		result[idx] = hex.EncodeToString(wit)
+	}
+
+	return result
+}
+
 // TxOut defines a bitcoin transaction output.
 type TxOut struct {
 	Value    int64
@@ -351,6 +368,11 @@ func (msg *MsgTx) AddTxOut(to *TxOut) {
 // TxHash generates the Hash for the transaction.
 func (msg *MsgTx) TxHash() chainhash.Hash {
 	return chainhash.DoubleHashRaw(msg.SerializeNoWitness)
+}
+
+// TxID generates the transaction ID of the transaction.
+func (msg *MsgTx) TxID() string {
+	return msg.TxHash().String()
 }
 
 // WitnessHash generates the hash of the transaction serialized according to

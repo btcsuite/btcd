@@ -20,7 +20,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -102,53 +101,6 @@ type jsonRequest struct {
 	responseChan   chan *Response
 }
 
-// BackendVersion represents the version of the backend the client is currently
-// connected to.
-type BackendVersion uint8
-
-const (
-	// BitcoindPre19 represents a bitcoind version before 0.19.0.
-	BitcoindPre19 BackendVersion = iota
-
-	// BitcoindPre22 represents a bitcoind version equal to or greater than
-	// 0.19.0 and smaller than 22.0.0.
-	BitcoindPre22
-
-	// BitcoindPre25 represents a bitcoind version equal to or greater than
-	// 22.0.0 and smaller than 25.0.0.
-	BitcoindPre25
-
-	// BitcoindPre25 represents a bitcoind version equal to or greater than
-	// 25.0.0.
-	BitcoindPost25
-
-	// Btcd represents a catch-all btcd version.
-	Btcd
-)
-
-// String returns a human-readable backend version.
-func (b BackendVersion) String() string {
-	switch b {
-	case BitcoindPre19:
-		return "bitcoind 0.19 and below"
-
-	case BitcoindPre22:
-		return "bitcoind v0.19.0-v22.0.0"
-
-	case BitcoindPre25:
-		return "bitcoind v22.0.0-v25.0.0"
-
-	case BitcoindPost25:
-		return "bitcoind v25.0.0 and above"
-
-	case Btcd:
-		return "btcd"
-
-	default:
-		return "unknown"
-	}
-}
-
 // Client represents a Bitcoin RPC client which allows easy access to the
 // various RPC methods available on a Bitcoin RPC server.  Each of the wrapper
 // functions handle the details of converting the passed and return types to and
@@ -164,7 +116,7 @@ func (b BackendVersion) String() string {
 type Client struct {
 	id uint64 // atomic, so must stay 64-bit aligned
 
-	// config holds the connection configuration assoiated with this client.
+	// config holds the connection configuration associated with this client.
 	config *ConnConfig
 
 	// chainParams holds the params for the chain that this client is using,
@@ -182,7 +134,7 @@ type Client struct {
 	// backendVersion is the version of the backend the client is currently
 	// connected to. This should be retrieved through GetVersion.
 	backendVersionMu sync.Mutex
-	backendVersion   *BackendVersion
+	backendVersion   BackendVersion
 
 	// mtx is a mutex to protect access to connection related fields.
 	mtx sync.Mutex
@@ -399,7 +351,7 @@ type Response struct {
 }
 
 // result checks whether the unmarshaled response contains a non-nil error,
-// returning an unmarshaled btcjson.RPCError (or an unmarshaling error) if so.
+// returning an unmarshaled btcjson.RPCError (or an unmarshalling error) if so.
 // If the response is not an error, the raw bytes of the request are
 // returned for further unmashaling into specific result types.
 func (r rawResponse) result() (result []byte, err error) {
@@ -481,7 +433,7 @@ func (c *Client) handleMessage(msg []byte) {
 // to have come from reading from the websocket connection in wsInHandler,
 // should be logged.
 func (c *Client) shouldLogReadError(err error) bool {
-	// No logging when the connetion is being forcibly disconnected.
+	// No logging when the connection is being forcibly disconnected.
 	select {
 	case <-c.shutdown:
 		return false
@@ -1618,49 +1570,6 @@ func (c *Client) Connect(tries int) error {
 	return err
 }
 
-const (
-	// bitcoind19Str is the string representation of bitcoind v0.19.0.
-	bitcoind19Str = "0.19.0"
-
-	// bitcoind22Str is the string representation of bitcoind v22.0.0.
-	bitcoind22Str = "22.0.0"
-
-	// bitcoind25Str is the string representation of bitcoind v25.0.0.
-	bitcoind25Str = "25.0.0"
-
-	// bitcoindVersionPrefix specifies the prefix included in every bitcoind
-	// version exposed through GetNetworkInfo.
-	bitcoindVersionPrefix = "/Satoshi:"
-
-	// bitcoindVersionSuffix specifies the suffix included in every bitcoind
-	// version exposed through GetNetworkInfo.
-	bitcoindVersionSuffix = "/"
-)
-
-// parseBitcoindVersion parses the bitcoind version from its string
-// representation.
-func parseBitcoindVersion(version string) BackendVersion {
-	// Trim the version of its prefix and suffix to determine the
-	// appropriate version number.
-	version = strings.TrimPrefix(
-		strings.TrimSuffix(version, bitcoindVersionSuffix),
-		bitcoindVersionPrefix,
-	)
-	switch {
-	case version < bitcoind19Str:
-		return BitcoindPre19
-
-	case version < bitcoind22Str:
-		return BitcoindPre22
-
-	case version < bitcoind25Str:
-		return BitcoindPre25
-
-	default:
-		return BitcoindPost25
-	}
-}
-
 // BackendVersion retrieves the version of the backend the client is currently
 // connected to.
 func (c *Client) BackendVersion() (BackendVersion, error) {
@@ -1668,7 +1577,7 @@ func (c *Client) BackendVersion() (BackendVersion, error) {
 	defer c.backendVersionMu.Unlock()
 
 	if c.backendVersion != nil {
-		return *c.backendVersion, nil
+		return c.backendVersion, nil
 	}
 
 	// We'll start by calling GetInfo. This method doesn't exist for
@@ -1680,20 +1589,20 @@ func (c *Client) BackendVersion() (BackendVersion, error) {
 	// Parse the btcd version and cache it.
 	case nil:
 		log.Debugf("Detected btcd version: %v", info.Version)
-		version := Btcd
-		c.backendVersion = &version
-		return *c.backendVersion, nil
+		version := parseBtcdVersion(info.Version)
+		c.backendVersion = version
+		return c.backendVersion, nil
 
 	// Inspect the RPC error to ensure the method was not found, otherwise
 	// we actually ran into an error.
 	case *btcjson.RPCError:
 		if err.Code != btcjson.ErrRPCMethodNotFound.Code {
-			return 0, fmt.Errorf("unable to detect btcd version: "+
+			return nil, fmt.Errorf("unable to detect btcd version: "+
 				"%v", err)
 		}
 
 	default:
-		return 0, fmt.Errorf("unable to detect btcd version: %v", err)
+		return nil, fmt.Errorf("unable to detect btcd version: %v", err)
 	}
 
 	// Since the GetInfo method was not found, we assume the client is
@@ -1701,7 +1610,8 @@ func (c *Client) BackendVersion() (BackendVersion, error) {
 	// GetNetworkInfo.
 	networkInfo, err := c.GetNetworkInfo()
 	if err != nil {
-		return 0, fmt.Errorf("unable to detect bitcoind version: %v", err)
+		return nil, fmt.Errorf("unable to detect bitcoind version: %v",
+			err)
 	}
 
 	// Parse the bitcoind version and cache it.
@@ -1709,7 +1619,7 @@ func (c *Client) BackendVersion() (BackendVersion, error) {
 	version := parseBitcoindVersion(networkInfo.SubVersion)
 	c.backendVersion = &version
 
-	return *c.backendVersion, nil
+	return c.backendVersion, nil
 }
 
 func (c *Client) sendAsync() FutureGetBulkResult {

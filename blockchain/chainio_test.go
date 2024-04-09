@@ -403,7 +403,7 @@ func TestSpendJournalErrors(t *testing.T) {
 }
 
 // TestUtxoSerialization ensures serializing and deserializing unspent
-// trasaction output entries works as expected.
+// transaction output entries works as expected.
 func TestUtxoSerialization(t *testing.T) {
 	t.Parallel()
 
