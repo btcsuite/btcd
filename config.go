@@ -123,6 +123,7 @@ type config struct {
 	ExternalIPs          []string      `long:"externalip" description:"Add an ip to the list of local addresses we claim to listen on to peers"`
 	Generate             bool          `long:"generate" description:"Generate (mine) bitcoins using the CPU"`
 	FreeTxRelayLimit     float64       `long:"limitfreerelay" description:"Limit relay of transactions with no transaction fee to the given amount in thousands of bytes per minute"`
+	GlobalHomeRoot       string        `short:"g" long:"globalhomeroot" description:"Global root home directory"`
 	Listeners            []string      `long:"listen" description:"Add an interface/port to listen for connections (default all interfaces port: 8333, testnet: 18333)"`
 	LogDir               string        `long:"logdir" description:"Directory to log output."`
 	MaxOrphanTxs         int           `long:"maxorphantx" description:"Max number of orphan transactions to keep in memory"`
@@ -508,6 +509,15 @@ func loadConfig() (*config, []string, error) {
 			}
 			configFileError = err
 		}
+	}
+
+	//Check if global home path is set
+	if len(preCfg.GlobalHomeRoot) > 0 && preCfg.GlobalHomeRoot != defaultHomeDir{
+		defaultHomeDir     = preCfg.GlobalHomeRoot
+		cfg.ConfigFile  = filepath.Join(defaultHomeDir, defaultConfigFilename)
+		cfg.DataDir     = filepath.Join(defaultHomeDir, defaultDataDirname)
+		cfg.RPCKey  = filepath.Join(defaultHomeDir, "rpc.key")
+		cfg.RPCCert = filepath.Join(defaultHomeDir, "rpc.cert")
 	}
 
 	// Don't add peers from the config file when in regression test mode.
