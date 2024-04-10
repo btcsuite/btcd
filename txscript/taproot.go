@@ -84,8 +84,8 @@ func VerifyTaprootKeySpend(witnessProgram []byte, rawSig []byte, tx *wire.MsgTx,
 		return err
 	}
 
-	valid := keySpendVerifier.Verify()
-	if valid {
+	result := keySpendVerifier.Verify()
+	if result.sigValid {
 		return nil
 	}
 

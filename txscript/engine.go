@@ -114,6 +114,10 @@ const (
 	// ScriptVerifyDiscourageUpgradeablePubkeyType defines if unknown
 	// public key versions (during tapscript execution) is non-standard.
 	ScriptVerifyDiscourageUpgradeablePubkeyType
+
+	// ScriptVerifyConstScriptCode fails non-segwit scripts if a signature
+	// match is found in the script code or if OP_CODESEPARATOR is used.
+	ScriptVerifyConstScriptCode
 )
 
 const (
