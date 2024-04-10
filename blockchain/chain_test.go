@@ -1155,3 +1155,159 @@ func TestChainTips(t *testing.T) {
 		}
 	}
 }
+
+func TestIsAncestor(t *testing.T) {
+	// Construct a synthetic block chain with a block index consisting of
+	// the following structure.
+	// 	genesis -> 1  -> 2  -> 3 (active)
+	//            \ -> 1a (valid-fork)
+	//            \ -> 1b (invalid)
+	tip := tstTip
+	chain := newFakeChain(&chaincfg.MainNetParams)
+	branch0Nodes := chainedNodes(chain.bestChain.Genesis(), 3)
+	for _, node := range branch0Nodes {
+		chain.index.SetStatusFlags(node, statusDataStored)
+		chain.index.SetStatusFlags(node, statusValid)
+		chain.index.AddNode(node)
+	}
+	chain.bestChain.SetTip(tip(branch0Nodes))
+
+	branch1Nodes := chainedNodes(chain.bestChain.Genesis(), 1)
+	for _, node := range branch1Nodes {
+		chain.index.SetStatusFlags(node, statusDataStored)
+		chain.index.SetStatusFlags(node, statusValid)
+		chain.index.AddNode(node)
+	}
+
+	branch2Nodes := chainedNodes(chain.bestChain.Genesis(), 1)
+	for _, node := range branch2Nodes {
+		chain.index.SetStatusFlags(node, statusDataStored)
+		chain.index.SetStatusFlags(node, statusValidateFailed)
+		chain.index.AddNode(node)
+	}
+
+	// Is 1 an ancestor of 3?
+	//
+	// 	genesis -> 1  -> 2  -> 3 (active)
+	//            \ -> 1a (valid-fork)
+	//            \ -> 1b (invalid)
+	shouldBeTrue := branch0Nodes[2].IsAncestor(branch0Nodes[0])
+	if !shouldBeTrue {
+		t.Errorf("TestIsAncestor fail. Node %s is an ancestor of node %s but got false",
+			branch0Nodes[0].hash.String(), branch0Nodes[2].hash.String())
+	}
+
+	// Is 1 an ancestor of 2?
+	//
+	// 	genesis -> 1  -> 2  -> 3 (active)
+	//            \ -> 1a (valid-fork)
+	//            \ -> 1b (invalid)
+	shouldBeTrue = branch0Nodes[1].IsAncestor(branch0Nodes[0])
+	if !shouldBeTrue {
+		t.Errorf("TestIsAncestor fail. Node %s is an ancestor of node %s but got false",
+			branch0Nodes[0].hash.String(), branch0Nodes[1].hash.String())
+	}
+
+	// Is the genesis an ancestor of 1?
+	//
+	// 	genesis -> 1  -> 2  -> 3 (active)
+	//            \ -> 1a (valid-fork)
+	//            \ -> 1b (invalid)
+	shouldBeTrue = branch0Nodes[0].IsAncestor(chain.bestChain.Genesis())
+	if !shouldBeTrue {
+		t.Errorf("TestIsAncestor fail. The genesis block is an ancestor of all blocks "+
+			"but got false for node %s",
+			branch0Nodes[0].hash.String())
+	}
+
+	// Is the genesis an ancestor of 1a?
+	//
+	// 	genesis -> 1  -> 2  -> 3 (active)
+	//            \ -> 1a (valid-fork)
+	//            \ -> 1b (invalid)
+	shouldBeTrue = branch1Nodes[0].IsAncestor(chain.bestChain.Genesis())
+	if !shouldBeTrue {
+		t.Errorf("TestIsAncestor fail. The genesis block is an ancestor of all blocks "+
+			"but got false for node %s",
+			branch1Nodes[0].hash.String())
+	}
+
+	// Is the genesis an ancestor of 1b?
+	//
+	// 	genesis -> 1  -> 2  -> 3 (active)
+	//            \ -> 1a (valid-fork)
+	//            \ -> 1b (invalid)
+	shouldBeTrue = branch2Nodes[0].IsAncestor(chain.bestChain.Genesis())
+	if !shouldBeTrue {
+		t.Errorf("TestIsAncestor fail. The genesis block is an ancestor of all blocks "+
+			"but got false for node %s",
+			branch2Nodes[0].hash.String())
+	}
+
+	// Is 1 an ancestor of 1a?
+	//
+	// 	genesis -> 1  -> 2  -> 3 (active)
+	//            \ -> 1a (valid-fork)
+	//            \ -> 1b (invalid)
+	shouldBeFalse := branch1Nodes[0].IsAncestor(branch0Nodes[0])
+	if shouldBeFalse {
+		t.Errorf("TestIsAncestor fail. Node %s is in a different branch than "+
+			"node %s but got true", branch1Nodes[0].hash.String(),
+			branch0Nodes[0].hash.String())
+	}
+
+	// Is 1 an ancestor of 1b?
+	//
+	// 	genesis -> 1  -> 2  -> 3 (active)
+	//            \ -> 1a (valid-fork)
+	//            \ -> 1b (invalid)
+	shouldBeFalse = branch2Nodes[0].IsAncestor(branch0Nodes[0])
+	if shouldBeFalse {
+		t.Errorf("TestIsAncestor fail. Node %s is in a different branch than "+
+			"node %s but got true", branch2Nodes[0].hash.String(),
+			branch0Nodes[0].hash.String())
+	}
+
+	// Is 1a an ancestor of 1b?
+	//
+	// 	genesis -> 1  -> 2  -> 3 (active)
+	//            \ -> 1a (valid-fork)
+	//            \ -> 1b (invalid)
+	shouldBeFalse = branch2Nodes[0].IsAncestor(branch1Nodes[0])
+	if shouldBeFalse {
+		t.Errorf("TestIsAncestor fail. Node %s is in a different branch than "+
+			"node %s but got true", branch2Nodes[0].hash.String(),
+			branch1Nodes[0].hash.String())
+	}
+
+	// Is 1 an ancestor of 1?
+	//
+	// 	genesis -> 1  -> 2  -> 3 (active)
+	//            \ -> 1a (valid-fork)
+	//            \ -> 1b (invalid)
+	shouldBeFalse = branch0Nodes[0].IsAncestor(branch0Nodes[0])
+	if shouldBeFalse {
+		t.Errorf("TestIsAncestor fail. Node is not an ancestor of itself but got true for node %s",
+			branch0Nodes[0].hash.String())
+	}
+
+	// Is the geneis an ancestor of genesis?
+	//
+	// 	genesis -> 1  -> 2  -> 3 (active)
+	//            \ -> 1a (valid-fork)
+	//            \ -> 1b (invalid)
+	shouldBeFalse = chain.bestChain.Genesis().IsAncestor(chain.bestChain.Genesis())
+	if shouldBeFalse {
+		t.Errorf("TestIsAncestor fail. Node is not an ancestor of itself but got true for node %s",
+			chain.bestChain.Genesis().hash.String())
+	}
+
+	// Is a block from another chain an ancestor of 1b?
+	fakeChain := newFakeChain(&chaincfg.TestNet3Params)
+	shouldBeFalse = branch2Nodes[0].IsAncestor(fakeChain.bestChain.Genesis())
+	if shouldBeFalse {
+		t.Errorf("TestIsAncestor fail. Node %s is in a different chain than "+
+			"node %s but got true", fakeChain.bestChain.Genesis().hash.String(),
+			branch2Nodes[0].hash.String())
+	}
+}

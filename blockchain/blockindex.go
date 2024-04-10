@@ -135,6 +135,20 @@ func newBlockNode(blockHeader *wire.BlockHeader, parent *blockNode) *blockNode {
 	return &node
 }
 
+// Equals compares all the fields of the block node except for the parent and
+// ancestor and returns true if they're equal.
+func (node *blockNode) Equals(other *blockNode) bool {
+	return node.hash == other.hash &&
+		node.workSum.Cmp(other.workSum) == 0 &&
+		node.height == other.height &&
+		node.version == other.version &&
+		node.bits == other.bits &&
+		node.nonce == other.nonce &&
+		node.timestamp == other.timestamp &&
+		node.merkleRoot == other.merkleRoot &&
+		node.status == other.status
+}
+
 // Header constructs a block header from the node and returns it.
 //
 // This function is safe for concurrent access.
@@ -258,6 +272,28 @@ func (node *blockNode) RelativeAncestorCtx(distance int32) HeaderCtx {
 	}
 
 	return ancestor
+}
+
+// IsAncestor returns if the other node is an ancestor of this block node.
+func (node *blockNode) IsAncestor(otherNode *blockNode) bool {
+	// Return early as false if the otherNode is nil.
+	if otherNode == nil {
+		return false
+	}
+
+	ancestor := node.Ancestor(otherNode.height)
+	if ancestor == nil {
+		return false
+	}
+
+	// If the otherNode has the same height as me, then the returned
+	// ancestor will be me.  Return false since I'm not an ancestor of me.
+	if node.height == ancestor.height {
+		return false
+	}
+
+	// Return true if the fetched ancestor is other node.
+	return ancestor.Equals(otherNode)
 }
 
 // RelativeAncestor returns the ancestor block node a relative 'distance' blocks
