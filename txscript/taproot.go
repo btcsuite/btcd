@@ -65,7 +65,7 @@ func VerifyTaprootKeySpend(witnessProgram []byte, rawSig []byte, tx *wire.MsgTx,
 	// program.
 	rawKey := witnessProgram
 
-	// Extract the annex if it exists, so we can compute the proper proper
+	// Extract the annex if it exists, so we can compute the proper
 	// sighash below.
 	var annex []byte
 	witness := tx.TxIn[inputIndex].Witness

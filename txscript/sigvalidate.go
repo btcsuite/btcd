@@ -385,7 +385,7 @@ func (t *taprootSigVerifier) Verify() bool {
 var _ signatureVerifier = (*taprootSigVerifier)(nil)
 
 // baseTapscriptSigVerifier verifies a signature for an input spending a
-// tapscript leaf from the prevoous output.
+// tapscript leaf from the previous output.
 type baseTapscriptSigVerifier struct {
 	*taprootSigVerifier
 
