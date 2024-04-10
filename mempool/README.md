@@ -7,7 +7,7 @@ mempool
 
 Package mempool provides a policy-enforced pool of unmined bitcoin transactions.
 
-A key responsbility of the bitcoin network is mining user-generated transactions
+A key responsibility of the bitcoin network is mining user-generated transactions
 into blocks.  In order to facilitate this, the mining process relies on having a
 readily-available source of transactions to include in a block that is being
 solved.
