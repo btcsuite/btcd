@@ -761,7 +761,7 @@ func CheckBlockHeaderContext(header *wire.BlockHeader, prevNode HeaderCtx,
 	return nil
 }
 
-// checkBlockContext peforms several validation checks on the block which depend
+// checkBlockContext performs several validation checks on the block which depend
 // on its position within the block chain.
 //
 // The flags modify the behavior of this function as follows:
