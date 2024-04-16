@@ -890,7 +890,7 @@ func (c *Client) EstimateFee(numBlocks int64) (float64, error) {
 	return c.EstimateFeeAsync(numBlocks).Receive()
 }
 
-// FutureEstimateFeeResult is a future promise to deliver the result of a
+// FutureEstimateSmartFeeResult is a future promise to deliver the result of a
 // EstimateSmartFeeAsync RPC invocation (or an applicable error).
 type FutureEstimateSmartFeeResult chan *Response
 
