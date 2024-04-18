@@ -481,6 +481,32 @@ func (c *Client) ListLockUnspent() ([]*wire.OutPoint, error) {
 	return c.ListLockUnspentAsync().Receive()
 }
 
+// FutureSetLabelResult is a future promise to deliver the result of a
+// SetLabelAsync RPC invocation (or an applicable error).
+type FutureSetLabelResult chan *Response
+
+// Receive waits for the Response promised by the future and returns the result
+// of setting a label to address.
+func (r FutureSetLabelResult) Receive() error {
+	_, err := ReceiveFuture(r)
+	return err
+}
+
+// SetLabelAsync returns an instance of a type that can be used to get the
+// result of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+//
+// See SetLabel for the blocking version and more details.
+func (c *Client) SetLabelAsync(addr string, label string) FutureSetLabelResult {
+	cmd := btcjson.NewSetLabelCmd(addr, label)
+	return c.SendCmd(cmd)
+}
+
+// SetLabel sets an optional label to an address.
+func (c *Client) SetLabel(addr string, label string) error {
+	return c.SetLabelAsync(addr, label).Receive()
+}
+
 // FutureSetTxFeeResult is a future promise to deliver the result of a
 // SetTxFeeAsync RPC invocation (or an applicable error).
 type FutureSetTxFeeResult chan *Response
