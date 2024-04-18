@@ -22,7 +22,9 @@ func GenerateSharedSecret(privkey *PrivateKey, pubkey *PublicKey) []byte {
 	return secp.GenerateSharedSecret(privkey, pubkey)
 }
 
-// Encrypt encrypts data for the target public key using AES-128-GCM
+// Encrypt encrypts a message using a public key, returning the encrypted message or an error.
+// It generates an ephemeral key, derives a shared secret and an encryption key, then encrypts the message using AES-GCM.
+// The ephemeral public key, nonce, tag and encrypted message are then combined and returned as a single byte slice.
 func Encrypt(pubKey *PublicKey, msg []byte) ([]byte, error) {
 	var pt bytes.Buffer
 
@@ -64,7 +66,8 @@ func Encrypt(pubKey *PublicKey, msg []byte) ([]byte, error) {
 	return pt.Bytes(), nil
 }
 
-// Decrypt decrypts a passed message with a receiver private key, returns plaintext or decryption error
+// Decrypt decrypts data that was encrypted using the Encrypt function.
+// The decrypted message is returned if the decryption is successful, or an error is returned if there are any issues.
 func Decrypt(privkey *PrivateKey, msg []byte) ([]byte, error) {
 	// Message cannot be less than length of public key (65) + nonce (16) + tag (16)
 	if len(msg) <= (1 + 32 + 32 + 16 + 16) {
