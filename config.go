@@ -485,6 +485,40 @@ func loadConfig() (*config, []string, error) {
 		os.Exit(0)
 	}
 
+	// Check if global home root path  is set and reassigns the config, datadir,
+	// rpc & rpccert paths to the global root
+	if len(preCfg.GlobalHomeRoot) > 0 && preCfg.GlobalHomeRoot != defaultHomeDir{
+		defaultHomeDir = filepath.Join(preCfg.GlobalHomeRoot, "Btcd")
+		
+		if _, err := os.Stat(defaultHomeDir); os.IsNotExist(err) {
+			perm := os.FileMode(0700)
+			err = os.Mkdir(defaultHomeDir, perm)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error creating Btcd directory: %v\n",
+						err)
+			}
+		}
+		
+		newFile, err := os.Create(filepath.Join(defaultHomeDir, defaultConfigFilename))
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error creating Btcd config file: %v\n",
+					err)
+		}
+
+		// Write sample config into the file
+		_, err = fmt.Fprintf(newFile, "regtest=1\ntxindex=1\nrpcuser=btcduser\nrpcpass=btcdpass\ndebuglevel=info\n")
+		if err != nil {
+			// Error writing to file, handle the error
+			fmt.Fprintf(os.Stderr, "Error writing default values to btcd config file: %v\n",
+					err)
+		}
+
+		preCfg.ConfigFile = filepath.Join(defaultHomeDir, defaultConfigFilename)
+		cfg.DataDir    = filepath.Join(defaultHomeDir, defaultDataDirname)
+		cfg.RPCKey     = filepath.Join(defaultHomeDir, "rpc.key")
+		cfg.RPCCert    = filepath.Join(defaultHomeDir, "rpc.cert")
+	}
+
 	// Load additional config from file.
 	var configFileError error
 	parser := newConfigParser(&cfg, &serviceOpts, flags.Default)
@@ -509,16 +543,6 @@ func loadConfig() (*config, []string, error) {
 			}
 			configFileError = err
 		}
-	}
-
-	// Check if global home root path  is set and reassigns the config, datadir,
-	// rpc & rpccert paths to the global root
-	if len(preCfg.GlobalHomeRoot) > 0 && preCfg.GlobalHomeRoot != defaultHomeDir{
-		defaultHomeDir     = preCfg.GlobalHomeRoot
-		cfg.ConfigFile  = filepath.Join(defaultHomeDir, defaultConfigFilename)
-		cfg.DataDir     = filepath.Join(defaultHomeDir, defaultDataDirname)
-		cfg.RPCKey  = filepath.Join(defaultHomeDir, "rpc.key")
-		cfg.RPCCert = filepath.Join(defaultHomeDir, "rpc.cert")
 	}
 
 	// Don't add peers from the config file when in regression test mode.
