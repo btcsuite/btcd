@@ -110,6 +110,7 @@ type config struct {
 	SigNet         bool   `long:"signet" description:"Connect to signet"`
 	ShowVersion    bool   `short:"V" long:"version" description:"Display version information and exit"`
 	Wallet         bool   `long:"wallet" description:"Connect to wallet"`
+	GlobalCtlRoot  string `long:"globalctlroot" description:"Global btcctl root directory"`
 }
 
 // normalizeAddress returns addr with the passed default port appended if
@@ -211,6 +212,29 @@ func loadConfig() (*config, []string, error) {
 		}
 	}
 
+	// Check if global home root path  is set and reassigns the config, datadir,
+	// rpc & rpccert paths to the global root
+	if len(preCfg.GlobalCtlRoot) > 0 {
+		btcdHomeDir           = filepath.Join(preCfg.GlobalCtlRoot, "Btcd")
+		btcctlHomeDir         = filepath.Join(preCfg.GlobalCtlRoot, "Btcctl")
+		btcwalletHomeDir      = filepath.Join(preCfg.GlobalCtlRoot, "Btcwallet")
+
+		if _, err := os.Stat(btcctlHomeDir); os.IsNotExist(err) {
+			perm := os.FileMode(0700)
+			err = os.Mkdir(btcctlHomeDir, perm)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error creating Btcctl directory: %v\n",
+						err)
+			}
+		}
+		
+		os.Create(filepath.Join(btcctlHomeDir, "btcctl.conf"))
+
+		preCfg.ConfigFile  = filepath.Join(btcctlHomeDir, "btcctl.conf")
+		cfg.RPCCert = filepath.Join(btcdHomeDir, "rpc.cert")
+
+	}
+
 	// Show the version and exit if the version flag was specified.
 	appName := filepath.Base(os.Args[0])
 	appName = strings.TrimSuffix(appName, filepath.Ext(appName))
@@ -228,6 +252,7 @@ func loadConfig() (*config, []string, error) {
 	}
 
 	if _, err := os.Stat(preCfg.ConfigFile); os.IsNotExist(err) {
+		fmt.Println("CREATING DEFUALT CONFIG FILE")
 		// Use config file for RPC server to create default btcctl config
 		var serverConfigPath string
 		if preCfg.Wallet {
@@ -245,6 +270,7 @@ func loadConfig() (*config, []string, error) {
 	// Load additional config from file.
 	parser := flags.NewParser(&cfg, flags.Default)
 	err = flags.NewIniParser(parser).ParseFile(preCfg.ConfigFile)
+	
 	if err != nil {
 		if _, ok := err.(*os.PathError); !ok {
 			fmt.Fprintf(os.Stderr, "Error parsing config file: %v\n",
