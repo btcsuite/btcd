@@ -289,6 +289,7 @@ var MainNetParams = Params{
 		{"seed.bitcoin.jonasschnelli.ch", true},
 		{"seed.btc.petertodd.net", true},
 		{"seed.bitcoin.sprovoost.nl", true},
+		{"seed.bitcoin.wiz.biz", true},
 	},
 
 	// Chain parameters
