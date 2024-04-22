@@ -59,6 +59,7 @@ var (
 	// DefaultSignetDNSSeeds is the list of seed nodes for the default
 	// (public, Taproot enabled) signet network.
 	DefaultSignetDNSSeeds = []DNSSeed{
+		{"seed.signet.bitcoin.sprovoost.nl", true},
 		{"178.128.221.177", false},
 		{"2a01:7c8:d005:390::5", false},
 		{"v7ajjeirttkbnt32wpy3c6w3emwnfr3fkla7hpxcfokr3ysd3kqtzmqd.onion:38333", false},
@@ -288,6 +289,7 @@ var MainNetParams = Params{
 		{"seed.bitnodes.io", false},
 		{"seed.bitcoin.jonasschnelli.ch", true},
 		{"seed.btc.petertodd.net", true},
+		{"seed.bitcoin.sprovoost.nl", true},
 	},
 
 	// Chain parameters
@@ -545,6 +547,7 @@ var TestNet3Params = Params{
 	DNSSeeds: []DNSSeed{
 		{"testnet-seed.bitcoin.jonasschnelli.ch", true},
 		{"seed.tbtc.petertodd.net", true},
+		{"seed.testnet.bitcoin.sprovoost.nl", true},
 		{"testnet-seed.bluematt.me", false},
 	},
 
