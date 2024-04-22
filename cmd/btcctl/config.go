@@ -226,10 +226,10 @@ func loadConfig() (*config, []string, error) {
 				fmt.Fprintf(os.Stderr, "Error creating Btcctl directory: %v\n",
 						err)
 			}
+
+			os.Create(filepath.Join(btcctlHomeDir, "btcctl.conf"))
 		}
 		
-		os.Create(filepath.Join(btcctlHomeDir, "btcctl.conf"))
-
 		preCfg.ConfigFile  = filepath.Join(btcctlHomeDir, "btcctl.conf")
 		cfg.RPCCert = filepath.Join(btcdHomeDir, "rpc.cert")
 
