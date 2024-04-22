@@ -40,6 +40,7 @@ cd $MAINDIR
 # for a subset of systems/architectures.
 SYS=${BTCDBUILDSYS:-"
         darwin-amd64
+        darwin-arm64
         dragonfly-amd64
         freebsd-386
         freebsd-amd64
