@@ -498,20 +498,6 @@ func loadConfig() (*config, []string, error) {
 						err)
 			}
 		}
-		
-		newFile, err := os.Create(filepath.Join(defaultHomeDir, defaultConfigFilename))
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error creating Btcd config file: %v\n",
-					err)
-		}
-
-		// Write sample config into the file
-		_, err = fmt.Fprintf(newFile, "regtest=1\ntxindex=1\nrpcuser=btcduser\nrpcpass=btcdpass\ndebuglevel=info\n")
-		if err != nil {
-			// Error writing to file, handle the error
-			fmt.Fprintf(os.Stderr, "Error writing default values to btcd config file: %v\n",
-					err)
-		}
 
 		preCfg.ConfigFile = filepath.Join(defaultHomeDir, defaultConfigFilename)
 		cfg.DataDir    = filepath.Join(defaultHomeDir, defaultDataDirname)
@@ -1225,6 +1211,7 @@ func createDefaultConfigFile(destinationPath string) error {
 	if err != nil {
 		return err
 	}
+
 	sampleConfigPath := filepath.Join(path, sampleConfigFilename)
 
 	// We generate a random user and password

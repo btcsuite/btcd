@@ -227,7 +227,7 @@ func loadConfig() (*config, []string, error) {
 						err)
 			}
 
-			os.Create(filepath.Join(btcctlHomeDir, "btcctl.conf"))
+			// os.Create(filepath.Join(btcctlHomeDir, "btcctl.conf"))
 		}
 		
 		preCfg.ConfigFile  = filepath.Join(btcctlHomeDir, "btcctl.conf")
@@ -252,7 +252,6 @@ func loadConfig() (*config, []string, error) {
 	}
 
 	if _, err := os.Stat(preCfg.ConfigFile); os.IsNotExist(err) {
-		fmt.Println("CREATING DEFUALT CONFIG FILE")
 		// Use config file for RPC server to create default btcctl config
 		var serverConfigPath string
 		if preCfg.Wallet {
