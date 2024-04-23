@@ -110,7 +110,7 @@ type config struct {
 	SigNet         bool   `long:"signet" description:"Connect to signet"`
 	ShowVersion    bool   `short:"V" long:"version" description:"Display version information and exit"`
 	Wallet         bool   `long:"wallet" description:"Connect to wallet"`
-	GlobalCtlRoot  string `long:"globalctlroot" description:"Global btcctl root directory"`
+	GlobalHomeRoot  string `long:"globalhomeroot" description:"Global btcctl root directory"`
 }
 
 // normalizeAddress returns addr with the passed default port appended if
@@ -214,10 +214,10 @@ func loadConfig() (*config, []string, error) {
 
 	// Check if global home root path  is set and reassigns the config, datadir,
 	// rpc & rpccert paths to the global root
-	if len(preCfg.GlobalCtlRoot) > 0 {
-		btcdHomeDir           = filepath.Join(preCfg.GlobalCtlRoot, "Btcd")
-		btcctlHomeDir         = filepath.Join(preCfg.GlobalCtlRoot, "Btcctl")
-		btcwalletHomeDir      = filepath.Join(preCfg.GlobalCtlRoot, "Btcwallet")
+	if len(preCfg.GlobalHomeRoot) > 0 {
+		btcdHomeDir           = filepath.Join(preCfg.GlobalHomeRoot, "Btcd")
+		btcctlHomeDir         = filepath.Join(preCfg.GlobalHomeRoot, "Btcctl")
+		btcwalletHomeDir      = filepath.Join(preCfg.GlobalHomeRoot, "Btcwallet")
 
 		if _, err := os.Stat(btcctlHomeDir); os.IsNotExist(err) {
 			perm := os.FileMode(0700)
