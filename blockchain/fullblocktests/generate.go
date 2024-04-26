@@ -608,7 +608,7 @@ func (g *testGenerator) saveTipCoinbaseOut() {
 }
 
 // saveSpendableCoinbaseOuts adds all coinbase outputs from the last block that
-// had its coinbase tx output colleted to the current tip.  This is useful to
+// had its coinbase tx output collected to the current tip.  This is useful to
 // batch the collection of coinbase outputs once the tests reach a stable point
 // so they don't have to manually add them for the right tests which will
 // ultimately end up being the best chain.
