@@ -668,7 +668,7 @@ func BenchmarkConvertBitsDown(b *testing.B) {
 	}
 }
 
-// BenchmarkConvertBitsDown benchmarks the speed and memory allocation behavior
+// BenchmarkConvertBitsUp benchmarks the speed and memory allocation behavior
 // of ConvertBits when converting from a lower base into a higher base (e.g. 5
 // => 8).
 //
