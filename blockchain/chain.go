@@ -1949,6 +1949,88 @@ func (b *BlockChain) InvalidateBlock(hash *chainhash.Hash) error {
 	return err
 }
 
+// ReconsiderBlock reconsiders the validity of the block with the given hash.
+//
+// This function is safe for concurrent access.
+func (b *BlockChain) ReconsiderBlock(hash *chainhash.Hash) error {
+	b.chainLock.Lock()
+	defer b.chainLock.Unlock()
+
+	node := b.index.LookupNode(hash)
+	if node == nil {
+		// Return an error if the block doesn't exist.
+		return fmt.Errorf("Requested block hash of %s is not found "+
+			"and thus cannot be reconsidered.", hash)
+	}
+
+	// Nothing to do if the given block is already valid.
+	if node.status.KnownValid() {
+		return nil
+	}
+
+	// Clear the status of the block being reconsidered.
+	b.index.UnsetStatusFlags(node, statusInvalidAncestor)
+	b.index.UnsetStatusFlags(node, statusValidateFailed)
+
+	// Grab all the tips.
+	tips := b.index.InactiveTips(b.bestChain)
+	tips = append(tips, b.bestChain.Tip())
+
+	// Go through all the tips and unset the status for all the descendents of the
+	// block being reconsidered.
+	var reconsiderTip *blockNode
+	for _, tip := range tips {
+		// Continue if the given inactive tip is not a descendant of the block
+		// being invalidated.
+		if !tip.IsAncestor(node) {
+			// Set as the reconsider tip if the block node being reconsidered
+			// is a tip.
+			if tip == node {
+				reconsiderTip = node
+			}
+			continue
+		}
+
+		// Mark the current tip as the tip being reconsidered.
+		reconsiderTip = tip
+
+		// Unset the status of all the parents up until it reaches the block
+		// being reconsidered.
+		for n := tip; n != nil && n != node; n = n.parent {
+			b.index.UnsetStatusFlags(n, statusInvalidAncestor)
+		}
+	}
+
+	// Compare the cumulative work for the branch being reconsidered.
+	if reconsiderTip.workSum.Cmp(b.bestChain.Tip().workSum) <= 0 {
+		return nil
+	}
+
+	// If the reconsider tip has a higher cumulative work, then reorganize
+	// to it after checking the validity of the nodes.
+	detachNodes, attachNodes := b.getReorganizeNodes(reconsiderTip)
+
+	// We're checking if the reorganization that'll happen is actually valid.
+	// While this is called in reorganizeChain, we call it beforehand as the error
+	// returned from reorganizeChain doesn't differentiate between actual disconnect/
+	// connect errors or whether the branch we're trying to fork to is invalid.
+	//
+	// The block status changes here without being flushed so we immediately flush
+	// the blockindex after we call this function.
+	_, _, _, err := b.verifyReorganizationValidity(detachNodes, attachNodes)
+	if writeErr := b.index.flushToDB(); writeErr != nil {
+		log.Warnf("Error flushing block index changes to disk: %v", writeErr)
+	}
+	if err != nil {
+		// If we errored out during the verification of the reorg branch,
+		// it's ok to return nil as we reconsidered the block and determined
+		// that it's invalid.
+		return nil
+	}
+
+	return b.reorganizeChain(detachNodes, attachNodes)
+}
+
 // IndexManager provides a generic interface that the is called when blocks are
 // connected and disconnected to and from the tip of the main chain for the
 // purpose of supporting optional indexes.
