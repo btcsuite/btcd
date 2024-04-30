@@ -1622,3 +1622,229 @@ func TestInvalidateBlock(t *testing.T) {
 		}()
 	}
 }
+
+func TestReconsiderBlock(t *testing.T) {
+	tests := []struct {
+		name     string
+		chainGen func() (*BlockChain, []*chainhash.Hash, func())
+	}{
+		{
+			name: "one branch, invalidate once and revalidate",
+			chainGen: func() (*BlockChain, []*chainhash.Hash, func()) {
+				chain, params, tearDown := utxoCacheTestChain("TestInvalidateBlock-one-branch-invalidate-once")
+
+				// Create a chain with 101 blocks.
+				tip := btcutil.NewBlock(params.GenesisBlock)
+				_, _, err := addBlocks(101, chain, tip, []*testhelper.SpendableOut{})
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				// Invalidate block 5.
+				block, err := chain.BlockByHeight(5)
+				if err != nil {
+					t.Fatal(err)
+				}
+				invalidateHash := block.Hash()
+
+				return chain, []*chainhash.Hash{invalidateHash}, tearDown
+			},
+		},
+		{
+			name: "invalidate the active branch with a side branch present and revalidate",
+			chainGen: func() (*BlockChain, []*chainhash.Hash, func()) {
+				chain, params, tearDown := utxoCacheTestChain("TestReconsiderBlock-invalidate-with-side-branch")
+
+				// Create a chain with 101 blocks.
+				tip := btcutil.NewBlock(params.GenesisBlock)
+				_, spendableOuts, err := addBlocks(101, chain, tip, []*testhelper.SpendableOut{})
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				// Invalidate block 5.
+				block, err := chain.BlockByHeight(5)
+				if err != nil {
+					t.Fatal(err)
+				}
+				invalidateHash := block.Hash()
+
+				// Create a side chain with 7 blocks that builds on block 1.
+				b1, err := chain.BlockByHeight(1)
+				if err != nil {
+					t.Fatal(err)
+				}
+				_, _, err = addBlocks(6, chain, b1, spendableOuts[0])
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				return chain, []*chainhash.Hash{invalidateHash}, tearDown
+			},
+		},
+		{
+			name: "invalidate a side branch and revalidate it",
+			chainGen: func() (*BlockChain, []*chainhash.Hash, func()) {
+				chain, params, tearDown := utxoCacheTestChain("TestReconsiderBlock-invalidate-a-side-branch")
+
+				// Create a chain with 101 blocks.
+				tip := btcutil.NewBlock(params.GenesisBlock)
+				_, spendableOuts, err := addBlocks(101, chain, tip, []*testhelper.SpendableOut{})
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				// Create a side chain with 7 blocks that builds on block 1.
+				b1, err := chain.BlockByHeight(1)
+				if err != nil {
+					t.Fatal(err)
+				}
+				altBlockHashes, _, err := addBlocks(6, chain, b1, spendableOuts[0])
+				if err != nil {
+					t.Fatal(err)
+				}
+				// Grab block at height 4:
+				//
+				// b2, b3, b4, b5
+				//  0,  1,  2,  3
+				invalidateHash := altBlockHashes[2]
+
+				return chain, []*chainhash.Hash{invalidateHash}, tearDown
+			},
+		},
+		{
+			name: "reconsider an invalid side branch with a higher work",
+			chainGen: func() (*BlockChain, []*chainhash.Hash, func()) {
+				chain, params, tearDown := utxoCacheTestChain("TestReconsiderBlock-reconsider-an-invalid-side-branch-higher")
+
+				tip := btcutil.NewBlock(params.GenesisBlock)
+				_, spendableOuts, err := addBlocks(6, chain, tip, []*testhelper.SpendableOut{})
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				// Select utxos to be spent from the best block and
+				// modify the amount so that the block will be invalid.
+				nextSpends, _ := randomSelect(spendableOuts[len(spendableOuts)-1])
+				nextSpends[0].Amount += testhelper.LowFee
+
+				// Make an invalid block that best on top of the current tip.
+				bestBlock, err := chain.BlockByHash(&chain.BestSnapshot().Hash)
+				if err != nil {
+					t.Fatal(err)
+				}
+				invalidBlock, _, _ := newBlock(chain, bestBlock, nextSpends)
+				invalidateHash := invalidBlock.Hash()
+
+				// The block validation will fail here and we'll mark the
+				// block as invalid in the block index.
+				chain.ProcessBlock(invalidBlock, BFNone)
+
+				// Modify the amount again so it's valid.
+				nextSpends[0].Amount -= testhelper.LowFee
+
+				return chain, []*chainhash.Hash{invalidateHash}, tearDown
+			},
+		},
+		{
+			name: "reconsider an invalid side branch with a lower work",
+			chainGen: func() (*BlockChain, []*chainhash.Hash, func()) {
+				chain, params, tearDown := utxoCacheTestChain("TestReconsiderBlock-reconsider-an-invalid-side-branch-lower")
+
+				tip := btcutil.NewBlock(params.GenesisBlock)
+				_, spendableOuts, err := addBlocks(6, chain, tip, []*testhelper.SpendableOut{})
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				// Select utxos to be spent from the best block and
+				// modify the amount so that the block will be invalid.
+				nextSpends, _ := randomSelect(spendableOuts[len(spendableOuts)-1])
+				nextSpends[0].Amount += testhelper.LowFee
+
+				// Make an invalid block that best on top of the current tip.
+				bestBlock, err := chain.BlockByHash(&chain.BestSnapshot().Hash)
+				if err != nil {
+					t.Fatal(err)
+				}
+				invalidBlock, _, _ := newBlock(chain, bestBlock, nextSpends)
+				invalidateHash := invalidBlock.Hash()
+
+				// The block validation will fail here and we'll mark the
+				// block as invalid in the block index.
+				chain.ProcessBlock(invalidBlock, BFNone)
+
+				// Modify the amount again so it's valid.
+				nextSpends[0].Amount -= testhelper.LowFee
+
+				// Add more blocks to make the invalid block a
+				// side chain and not the most pow.
+				_, _, err = addBlocks(3, chain, bestBlock, []*testhelper.SpendableOut{})
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				return chain, []*chainhash.Hash{invalidateHash}, tearDown
+			},
+		},
+	}
+
+	for _, test := range tests {
+		chain, invalidateHashes, tearDown := test.chainGen()
+		func() {
+			defer tearDown()
+			for _, invalidateHash := range invalidateHashes {
+				// Cache the chain tips before the invalidate. Since we'll reconsider
+				// the invalidated block, we should come back to these tips in the end.
+				tips := chain.ChainTips()
+				expectedChainTips := make(map[chainhash.Hash]ChainTip, len(tips))
+				for _, tip := range tips {
+					expectedChainTips[tip.BlockHash] = tip
+				}
+
+				// Invalidation.
+				err := chain.InvalidateBlock(invalidateHash)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				// Reconsideration.
+				err = chain.ReconsiderBlock(invalidateHash)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				// Compare the tips aginst the tips we've cached.
+				gotChainTips := chain.ChainTips()
+				for _, gotChainTip := range gotChainTips {
+					testChainTip, found := expectedChainTips[gotChainTip.BlockHash]
+					if !found {
+						t.Errorf("TestReconsiderBlock Failed test \"%s\". Couldn't find an expected "+
+							"chain tip with height %d, hash %s, branchlen %d, status \"%s\"",
+							test.name, testChainTip.Height, testChainTip.BlockHash.String(),
+							testChainTip.BranchLen, testChainTip.Status.String())
+					}
+
+					// If the invalid side branch is a lower work, we'll never
+					// actually process the block again until the branch becomes
+					// a greater work chain so it'll show up as valid-fork.
+					if test.name == "reconsider an invalid side branch with a lower work" &&
+						testChainTip.BlockHash == *invalidateHash {
+
+						testChainTip.Status = StatusValidFork
+					}
+
+					if !reflect.DeepEqual(testChainTip, gotChainTip) {
+						t.Errorf("TestReconsiderBlock Failed test \"%s\". Expected chain tip with "+
+							"height %d, hash %s, branchlen %d, status \"%s\" but got "+
+							"height %d, hash %s, branchlen %d, status \"%s\"", test.name,
+							testChainTip.Height, testChainTip.BlockHash.String(),
+							testChainTip.BranchLen, testChainTip.Status.String(),
+							gotChainTip.Height, gotChainTip.BlockHash.String(),
+							gotChainTip.BranchLen, gotChainTip.Status.String())
+					}
+				}
+			}
+		}()
+	}
+}
