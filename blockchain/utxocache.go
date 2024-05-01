@@ -234,7 +234,7 @@ func newUtxoCache(db database.DB, maxTotalMemoryUsage uint64) *utxoCache {
 	numMaxElements := calculateMinEntries(int(maxTotalMemoryUsage), bucketSize+avgEntrySize)
 	numMaxElements -= 1
 
-	log.Infof("Pre-alloacting for %d MiB: ", maxTotalMemoryUsage/(1024*1024)+1)
+	log.Infof("Pre-alloacting for %d MiB", maxTotalMemoryUsage/(1024*1024)+1)
 
 	m := make(map[wire.OutPoint]*UtxoEntry, numMaxElements)
 
