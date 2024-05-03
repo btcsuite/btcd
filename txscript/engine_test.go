@@ -6,10 +6,14 @@
 package txscript
 
 import (
+	"bytes"
+	"crypto/sha256"
 	"testing"
 
+	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
+	"github.com/stretchr/testify/require"
 )
 
 // TestBadPC sets the pc to a deliberately bad result then confirms that Step
@@ -423,6 +427,306 @@ func TestCheckSignatureEncoding(t *testing.T) {
 		} else if err == nil && !test.isValid {
 			t.Errorf("checkSignatureEncooding test '%s' succeeded "+
 				"when it should have failed", test.name)
+		}
+	}
+}
+
+// TestOpcodeCat tests that scripts with OP_CAT are executed correctly.
+func TestOpcodeCat(t *testing.T) {
+	t.Parallel()
+
+	// Define helper constants for non-error cases.
+	const (
+		NO_ERROR = -1
+		SUCCESS  = -2
+	)
+
+	tests := []struct {
+		flags      ScriptFlags
+		expErr     ErrorCode
+		startStack [][]byte
+		expStack   [][]byte
+		nonTaproot bool
+	}{
+
+		// No elements to cat.
+		{
+			startStack: [][]byte{},
+			flags:      ScriptVerifyOpCat,
+			expErr:     ErrInvalidStackOperation,
+		},
+
+		// Only a single element to cat.
+		{
+			startStack: [][]byte{
+				{0xaa},
+			},
+			flags:  ScriptVerifyOpCat,
+			expErr: ErrInvalidStackOperation,
+		},
+
+		// Normal cat.
+		{
+			startStack: [][]byte{
+				{0xaa},
+				{0xbb},
+			},
+			flags:  ScriptVerifyOpCat,
+			expErr: NO_ERROR,
+			expStack: [][]byte{
+				{0xaa, 0xbb},
+			},
+		},
+
+		// Disabled in non-taproot context.
+		{
+			startStack: [][]byte{
+				{0xaa},
+				{0xbb},
+			},
+			flags:      ScriptVerifyOpCat,
+			expErr:     ErrDisabledOpcode,
+			nonTaproot: true,
+		},
+
+		// Cat with empty element.
+		{
+			startStack: [][]byte{
+				{0xaa},
+				{},
+			},
+			flags:  ScriptVerifyOpCat,
+			expErr: NO_ERROR,
+			expStack: [][]byte{
+				{0xaa},
+			},
+		},
+
+		// Cat with empty element.
+		{
+			startStack: [][]byte{
+				{},
+				{0xbb},
+			},
+			flags:  ScriptVerifyOpCat,
+			expErr: NO_ERROR,
+			expStack: [][]byte{
+				{0xbb},
+			},
+		},
+
+		// Cat elements of different lengths.
+		{
+			startStack: [][]byte{
+				{0xaa, 0xbb, 0xcc},
+				{0xdd},
+			},
+
+			flags:  ScriptVerifyOpCat,
+			expErr: NO_ERROR,
+			expStack: [][]byte{
+				{0xaa, 0xbb, 0xcc, 0xdd},
+			},
+		},
+
+		// Cat up to max element size.
+		{
+			startStack: [][]byte{
+				bytes.Repeat(
+					[]byte{0xaa}, MaxScriptElementSize-1,
+				),
+				{0xdd},
+			},
+			flags:  ScriptVerifyOpCat,
+			expErr: NO_ERROR,
+			expStack: [][]byte{
+				append(
+					bytes.Repeat([]byte{0xaa}, MaxScriptElementSize-1),
+					0xdd,
+				),
+			},
+		},
+
+		// Failing to when result exceeds max element size.
+		{
+			startStack: [][]byte{
+				bytes.Repeat(
+					[]byte{0xaa}, MaxScriptElementSize-1,
+				),
+				{0xdd, 0xee},
+			},
+			flags:  ScriptVerifyOpCat,
+			expErr: ErrElementTooBig,
+		},
+
+		// ======== Flag tests =========
+
+		// Discourage CAT.
+		{
+			startStack: [][]byte{
+				{0xaa}, {0xbb},
+			},
+			flags:  ScriptVerifyDiscourageOpCat,
+			expErr: ErrDiscourageOpSuccess,
+		},
+
+		// Discourage CAT when CAT is active.
+		{
+			startStack: [][]byte{
+				{0xaa}, {0xbb},
+			},
+			flags:  ScriptVerifyDiscourageOpCat | ScriptVerifyOpCat,
+			expErr: ErrDiscourageOpSuccess,
+		},
+
+		// Valid CAT but CAT is not active. It should behave as
+		// OP_SUCCESS.
+		{
+			startStack: [][]byte{
+				{0xaa}, {0xbb},
+			},
+			expErr: SUCCESS,
+		},
+
+		// Invalid CAT when CAT is not active. It should behave as
+		// OP_SUCCESS.
+		{
+			startStack: [][]byte{
+				{0xaa},
+			},
+			expErr: SUCCESS,
+		},
+
+		// Invalid CAT when CAT is active.
+		{
+			startStack: [][]byte{
+				{0xaa},
+			},
+			flags:  ScriptVerifyOpCat,
+			expErr: ErrInvalidStackOperation,
+		},
+	}
+
+	for _, test := range tests {
+		tx := wire.NewMsgTx(2)
+		tx.AddTxIn(&wire.TxIn{
+			PreviousOutPoint: wire.OutPoint{
+				Index: 0,
+			},
+		})
+
+		// OP_CAT will be our one and only script opcode apart from
+		// making sure the script is valid.
+		script, err := NewScriptBuilder().
+			AddOp(OP_CAT).
+			AddOp(OP_DROP).
+			AddInt64(1).
+			Script()
+		if err != nil {
+			t.Error(err)
+		}
+
+		// Assmble the script into a taproot output key.
+		tapScriptTree := AssembleTaprootScriptTree(
+			NewBaseTapLeaf(script),
+		)
+		privKey, err := btcec.NewPrivateKey()
+		if err != nil {
+			t.Error(err)
+			continue
+		}
+
+		inputKey := privKey.PubKey()
+		ctrlBlock := tapScriptTree.LeafMerkleProofs[0].ToControlBlock(inputKey)
+		tapScriptRootHash := tapScriptTree.RootNode.TapHash()
+		inputTapKey := ComputeTaprootOutputKey(
+			inputKey, tapScriptRootHash[:],
+		)
+
+		inputScript, err := PayToTaprootScript(inputTapKey)
+		if err != nil {
+			t.Error(err)
+			continue
+
+		}
+
+		cbBytes, err := ctrlBlock.ToBytes()
+		if err != nil {
+			t.Error(err)
+			continue
+		}
+
+		w := wire.TxWitness{}
+		for _, e := range test.startStack {
+			w = append(w, e)
+		}
+
+		w = append(w, script, cbBytes)
+		tx.TxIn[0].Witness = w
+
+		// As a special case, if we are testing non-taproot spends, we
+		// recreate the pkscript as a P2WSH.
+		if test.nonTaproot {
+			scriptHash := sha256.Sum256(script)
+			inputScript, err = payToWitnessScriptHashScript(scriptHash[:])
+			if err != nil {
+				t.Error(err)
+				continue
+			}
+			tx.TxIn[0].Witness = wire.TxWitness{script}
+		}
+
+		prevOut := &wire.TxOut{
+			Value:    1e8,
+			PkScript: inputScript,
+		}
+		prevOutFetcher := NewCannedPrevOutputFetcher(
+			prevOut.PkScript, prevOut.Value,
+		)
+
+		sigHashes := NewTxSigHashes(tx, prevOutFetcher)
+
+		// We'll record the stack after the CAT operation, since we
+		// want to check it against what we expect.
+		finalStack := [][]byte{}
+		cb := func(step *StepInfo) error {
+			if step.ScriptIndex != 2 {
+				return nil
+			}
+
+			// Our script has OP_CAT as first opcode.
+			if step.OpcodeIndex != 1 {
+				return nil
+			}
+
+			finalStack = step.Stack
+			return nil
+		}
+
+		flags := StandardVerifyFlags | test.flags
+		vm, err := NewDebugEngine(
+			prevOut.PkScript, tx, 0, flags, nil,
+			sigHashes, prevOut.Value, nil, cb,
+		)
+		if err != nil {
+			t.Errorf("Failed to create script: %v", err)
+			continue
+		}
+
+		err = vm.Execute()
+		if err != nil {
+			if !IsErrorCode(err, test.expErr) {
+				t.Errorf("Expected error %v, got %v", test.expErr, err)
+			}
+		} else {
+			// Check expected stack if we didn't expect error
+			// during execution. We skip this check for the SUCCESS
+			// case, as stack is not altered at all.
+			if test.expErr == NO_ERROR {
+				require.Equal(t, test.expStack, finalStack)
+			} else if test.expErr != SUCCESS {
+				t.Errorf("Expected error %v, got %v", test.expErr, err)
+			}
 		}
 	}
 }
