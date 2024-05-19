@@ -141,6 +141,11 @@ const (
 	// evaluate to true.
 	ErrCheckMultiSigVerify
 
+	// ErrCheckTxHashVerify is returned when OP_CHECKTXHASHVERIFY is
+	// encountered in a script and the TxHash at the top of the stack does
+	// not match the calculated TxHash of the transaction being verified.
+	ErrCheckTxHashVerify
+
 	// --------------------------------------------
 	// Failures related to improper use of opcodes.
 	// --------------------------------------------
@@ -440,6 +445,7 @@ var errorCodeStrings = map[ErrorCode]string{
 	ErrNumEqualVerify:                      "ErrNumEqualVerify",
 	ErrCheckSigVerify:                      "ErrCheckSigVerify",
 	ErrCheckMultiSigVerify:                 "ErrCheckMultiSigVerify",
+	ErrCheckTxHashVerify:                   "ErrCheckTxHashVerify",
 	ErrDisabledOpcode:                      "ErrDisabledOpcode",
 	ErrReservedOpcode:                      "ErrReservedOpcode",
 	ErrMalformedPush:                       "ErrMalformedPush",

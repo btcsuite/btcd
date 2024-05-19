@@ -489,6 +489,18 @@ func extractAnnex(witness [][]byte) ([]byte, error) {
 	return lastElement, nil
 }
 
+// extractControlBlock attempts to extract the control block from the passed
+// witness. If the witness doesn't contain a control block, then nil is
+// returned.
+func extractControlBlock(witness [][]byte) []byte {
+	if !isAnnexedWitness(witness) {
+		return nil
+	}
+
+	// return the second to last element, which is the control block.
+	return witness[len(witness)-2]
+}
+
 // isNullDataScript returns whether or not the passed script is a standard
 // null data script.
 //
