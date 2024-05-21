@@ -112,6 +112,14 @@ const (
 	maxWitnessItemSize = 4_000_000
 )
 
+var (
+	// errSuperfluousWitnessRecord is returned during tx deserialization when
+	// a tx has the witness marker flag set but has no witnesses.
+	errSuperfluousWitnessRecord = fmt.Errorf(
+		"witness flag set but tx has no witnesses",
+	)
+)
+
 // TxFlagMarker is the first byte of the FLAG field in a bitcoin tx
 // message. It allows decoders to distinguish a regular serialized
 // transaction from one that would require a different parsing logic.
@@ -601,8 +609,7 @@ func (msg *MsgTx) btcDecode(r io.Reader, pver uint32, enc MessageEncoding,
 			txin.Witness = make([][]byte, witCount)
 			for j := uint64(0); j < witCount; j++ {
 				txin.Witness[j], err = readScriptBuf(
-					r, pver, buf, sbuf, maxWitnessItemSize,
-					"script witness item",
+					r, pver, buf, sbuf, "script witness item",
 				)
 				if err != nil {
 					return err
@@ -610,6 +617,12 @@ func (msg *MsgTx) btcDecode(r io.Reader, pver uint32, enc MessageEncoding,
 				totalScriptSize += uint64(len(txin.Witness[j]))
 				sbuf = sbuf[len(txin.Witness[j]):]
 			}
+		}
+
+		// Check that if the witness flag is set that we actually have
+		// witnesses. This check is also done by bitcoind.
+		if !msg.HasWitness() {
+			return errSuperfluousWitnessRecord
 		}
 	}
 
@@ -1004,7 +1017,7 @@ func writeOutPointBuf(w io.Writer, pver uint32, version int32, op *OutPoint,
 //
 // NOTE: b MUST either be nil or at least an 8-byte slice.
 func readScriptBuf(r io.Reader, pver uint32, buf, s []byte,
-	maxAllowed uint32, fieldName string) ([]byte, error) {
+	fieldName string) ([]byte, error) {
 
 	count, err := ReadVarIntBuf(r, pver, buf)
 	if err != nil {
@@ -1014,9 +1027,9 @@ func readScriptBuf(r io.Reader, pver uint32, buf, s []byte,
 	// Prevent byte array larger than the max message size.  It would
 	// be possible to cause memory exhaustion and panics without a sane
 	// upper bound on this count.
-	if count > uint64(maxAllowed) {
+	if count > maxWitnessItemSize {
 		str := fmt.Sprintf("%s is larger than the max allowed size "+
-			"[count %d, max %d]", fieldName, count, maxAllowed)
+			"[count %d, max %d]", fieldName, count, maxWitnessItemSize)
 		return nil, messageError("readScript", str)
 	}
 
@@ -1043,8 +1056,9 @@ func readTxInBuf(r io.Reader, pver uint32, version int32, ti *TxIn,
 		return err
 	}
 
-	ti.SignatureScript, err = readScriptBuf(r, pver, buf, s, MaxMessagePayload,
-		"transaction input signature script")
+	ti.SignatureScript, err = readScriptBuf(
+		r, pver, buf, s, "transaction input signature script",
+	)
 	if err != nil {
 		return err
 	}
@@ -1107,8 +1121,7 @@ func readTxOutBuf(r io.Reader, pver uint32, version int32, to *TxOut,
 	to.Value = int64(littleEndian.Uint64(buf))
 
 	to.PkScript, err = readScriptBuf(
-		r, pver, buf, s, MaxMessagePayload,
-		"transaction output public key script",
+		r, pver, buf, s, "transaction output public key script",
 	)
 	return err
 }

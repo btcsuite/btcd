@@ -408,6 +408,14 @@ const (
 	// is exceeded during taproot execution.
 	ErrTaprootMaxSigOps
 
+	// ErrNonConstScriptCode is returned when a signature match is found when
+	// calling removeOpcodeByData in a non-segwit script.
+	ErrNonConstScriptCode
+
+	// ErrCodeSeparator is returned when OP_CODESEPARATOR is used in a
+	// non-segwit script.
+	ErrCodeSeparator
+
 	// numErrorCodes is the maximum error code number used in tests.  This
 	// entry MUST be the last entry in the enum.
 	numErrorCodes
@@ -494,6 +502,8 @@ var errorCodeStrings = map[ErrorCode]string{
 	ErrInvalidTaprootSigLen:                "ErrInvalidTaprootSigLen",
 	ErrTaprootPubkeyIsEmpty:                "ErrTaprootPubkeyIsEmpty",
 	ErrTaprootMaxSigOps:                    "ErrTaprootMaxSigOps",
+	ErrNonConstScriptCode:                  "ErrNonConstScriptCode",
+	ErrCodeSeparator:                       "ErrCodeSeparator",
 }
 
 // String returns the ErrorCode as a human-readable name.

@@ -1953,6 +1953,12 @@ func opcodeCodeSeparator(op *opcode, data []byte, vm *Engine) error {
 
 	if vm.taprootCtx != nil {
 		vm.taprootCtx.codeSepPos = uint32(vm.tokenizer.OpcodePosition())
+	} else if vm.witnessProgram == nil &&
+		vm.hasFlag(ScriptVerifyConstScriptCode) {
+
+		// Disable OP_CODESEPARATOR for non-segwit scripts.
+		str := "OP_CODESEPARATOR used in non-segwit script"
+		return scriptError(ErrCodeSeparator, str)
 	}
 
 	return nil
@@ -2073,7 +2079,13 @@ func opcodeCheckSig(op *opcode, data []byte, vm *Engine) error {
 		// TODO(roasbeef): return an error?
 	}
 
-	valid := sigVerifier.Verify()
+	result := sigVerifier.Verify()
+	valid := result.sigValid
+
+	if vm.hasFlag(ScriptVerifyConstScriptCode) && result.sigMatch {
+		str := "non-const script code"
+		return scriptError(ErrNonConstScriptCode, str)
+	}
 
 	switch {
 	// For tapscript, and prior execution with null fail active, if the
@@ -2166,11 +2178,11 @@ func opcodeCheckSigAdd(op *opcode, data []byte, vm *Engine) error {
 		return err
 	}
 
-	valid := sigVerifier.Verify()
+	result := sigVerifier.Verify()
 
 	// If the signature is invalid, this we fail execution, as it should
 	// have been an empty signature.
-	if !valid {
+	if !result.sigValid {
 		str := "signature not empty on failed checksig"
 		return scriptError(ErrNullFail, str)
 	}
@@ -2303,7 +2315,13 @@ func opcodeCheckMultiSig(op *opcode, data []byte, vm *Engine) error {
 	// no way for a signature to sign itself.
 	if !vm.isWitnessVersionActive(0) {
 		for _, sigInfo := range signatures {
-			script = removeOpcodeByData(script, sigInfo.signature)
+			var match bool
+			script, match = removeOpcodeByData(script, sigInfo.signature)
+			if vm.hasFlag(ScriptVerifyConstScriptCode) && match {
+				str := fmt.Sprintf("got match of %v in %v", sigInfo.signature,
+					script)
+				return scriptError(ErrNonConstScriptCode, str)
+			}
 		}
 	}
 

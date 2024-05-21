@@ -196,6 +196,8 @@ func parseScriptFlags(flagStr string) (ScriptFlags, error) {
 			flags |= ScriptVerifyWitnessPubKeyType
 		case "TAPROOT":
 			flags |= ScriptVerifyTaproot
+		case "CONST_SCRIPTCODE":
+			flags |= ScriptVerifyConstScriptCode
 		default:
 			return flags, fmt.Errorf("invalid flag: %s", flag)
 		}

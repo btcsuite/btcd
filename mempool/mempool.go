@@ -49,6 +49,10 @@ const (
 	// can be evicted from the mempool when accepting a transaction
 	// replacement.
 	MaxReplacementEvictions = 100
+
+	// Transactions smaller than 65 non-witness bytes are not relayed to
+	// mitigate CVE-2017-12842.
+	MinStandardTxNonWitnessSize = 65
 )
 
 // Tag represents an identifier to use for tagging orphan transactions.  The
@@ -1353,6 +1357,12 @@ func (mp *TxPool) checkMempoolAcceptance(tx *btcutil.Tx,
 		str := fmt.Sprintf("already have transaction in mempool %v",
 			txHash)
 		return nil, txRuleError(wire.RejectDuplicate, str)
+	}
+
+	// Disallow transactions under the minimum standardness size.
+	if tx.MsgTx().SerializeSizeStripped() < MinStandardTxNonWitnessSize {
+		str := fmt.Sprintf("tx %v is too small", txHash)
+		return nil, txRuleError(wire.RejectNonstandard, str)
 	}
 
 	// Perform preliminary sanity checks on the transaction. This makes use
