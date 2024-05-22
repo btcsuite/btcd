@@ -1798,6 +1798,144 @@ func (b *BlockChain) LocateHeaders(locator BlockLocator, hashStop *chainhash.Has
 	return headers
 }
 
+// InvalidateBlock invalidates the requested block and all its descedents.  If a block
+// in the best chain is invalidated, the active chain tip will be the parent of the
+// invalidated block.
+//
+// This function is safe for concurrent access.
+func (b *BlockChain) InvalidateBlock(hash *chainhash.Hash) error {
+	b.chainLock.Lock()
+	defer b.chainLock.Unlock()
+
+	node := b.index.LookupNode(hash)
+	if node == nil {
+		// Return an error if the block doesn't exist.
+		return fmt.Errorf("Requested block hash of %s is not found "+
+			"and thus cannot be invalidated.", hash)
+	}
+	if node.height == 0 {
+		return fmt.Errorf("Requested block hash of %s is a at height 0 "+
+			"and is thus a genesis block and cannot be invalidated.",
+			node.hash)
+	}
+
+	// Nothing to do if the given block is already invalid.
+	if node.status.KnownInvalid() {
+		return nil
+	}
+
+	// Set the status of the block being invalidated.
+	b.index.SetStatusFlags(node, statusValidateFailed)
+	b.index.UnsetStatusFlags(node, statusValid)
+
+	// If the block we're invalidating is not on the best chain, we simply
+	// mark the block and all its descendants as invalid and return.
+	if !b.bestChain.Contains(node) {
+		// Grab all the tips excluding the active tip.
+		tips := b.index.InactiveTips(b.bestChain)
+		for _, tip := range tips {
+			// Continue if the given inactive tip is not a descendant of the block
+			// being invalidated.
+			if !tip.IsAncestor(node) {
+				continue
+			}
+
+			// Keep going back until we get to the block being invalidated.
+			// For each of the parent, we'll unset valid status and set invalid
+			// ancestor status.
+			for n := tip; n != nil && n != node; n = n.parent {
+				// Continue if it's already invalid.
+				if n.status.KnownInvalid() {
+					continue
+				}
+				b.index.SetStatusFlags(n, statusInvalidAncestor)
+				b.index.UnsetStatusFlags(n, statusValid)
+			}
+		}
+
+		if writeErr := b.index.flushToDB(); writeErr != nil {
+			return fmt.Errorf("Error flushing block index "+
+				"changes to disk: %v", writeErr)
+		}
+
+		// Return since the block being invalidated is on a side branch.
+		// Nothing else left to do.
+		return nil
+	}
+
+	// If we're here, it means a block from the active chain tip is getting
+	// invalidated.
+	//
+	// Grab all the nodes to detach from the active chain.
+	detachNodes := list.New()
+	for n := b.bestChain.Tip(); n != nil && n != node; n = n.parent {
+		// Continue if it's already invalid.
+		if n.status.KnownInvalid() {
+			continue
+		}
+
+		// Change the status of the block node.
+		b.index.SetStatusFlags(n, statusInvalidAncestor)
+		b.index.UnsetStatusFlags(n, statusValid)
+		detachNodes.PushBack(n)
+	}
+
+	// Push back the block node being invalidated.
+	detachNodes.PushBack(node)
+
+	// Reorg back to the parent of the block being invalidated.
+	// Nothing to attach so just pass an empty list.
+	err := b.reorganizeChain(detachNodes, list.New())
+	if err != nil {
+		return err
+	}
+
+	if writeErr := b.index.flushToDB(); writeErr != nil {
+		log.Warnf("Error flushing block index changes to disk: %v", writeErr)
+	}
+
+	// Grab all the tips.
+	tips := b.index.InactiveTips(b.bestChain)
+	tips = append(tips, b.bestChain.Tip())
+
+	// Here we'll check if the invalidation of the block in the active tip
+	// changes the status of the chain tips.  If a side branch now has more
+	// worksum, it becomes the active chain tip.
+	var bestTip *blockNode
+	for _, tip := range tips {
+		// Skip invalid tips as they cannot become the active tip.
+		if tip.status.KnownInvalid() {
+			continue
+		}
+
+		// If we have no best tips, then set this tip as the best tip.
+		if bestTip == nil {
+			bestTip = tip
+		} else {
+			// If there is an existing best tip, then compare it
+			// against the current tip.
+			if tip.workSum.Cmp(bestTip.workSum) == 1 {
+				bestTip = tip
+			}
+		}
+	}
+
+	// Return if the best tip is the current tip.
+	if bestTip == b.bestChain.Tip() {
+		return nil
+	}
+
+	// Reorganize to the best tip if a side branch is now the most work tip.
+	detachNodes, attachNodes := b.getReorganizeNodes(bestTip)
+	err = b.reorganizeChain(detachNodes, attachNodes)
+
+	if writeErr := b.index.flushToDB(); writeErr != nil {
+		log.Warnf("Error flushing block index changes to disk: %v", writeErr)
+	}
+
+	return err
+}
+
 // IndexManager provides a generic interface that the is called when blocks are
 // connected and disconnected to and from the tip of the main chain for the
 // purpose of supporting optional indexes.
