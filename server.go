@@ -2823,6 +2823,11 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 		checkpoints = mergeCheckpoints(s.chainParams.Checkpoints, cfg.addCheckpoints)
 	}
 
+	// Log that the node is pruned.
+	if cfg.Prune != 0 {
+		btcdLog.Infof("Prune set to %d MiB", cfg.Prune)
+	}
+
 	// Create a new block chain instance with the appropriate configuration.
 	var err error
 	s.chain, err = blockchain.New(&blockchain.Config{
