@@ -165,11 +165,14 @@ func bech32VerifyChecksum(hrp string, data []byte) (Version, bool) {
 	return VersionUnknown, false
 }
 
-// DecodeNoLimit is a bech32 checksum version aware arbitrary string length
-// decoder. This function will return the version of the decoded checksum
-// constant so higher level validation can be performed to ensure the correct
-// version of bech32 was used when encoding.
-func decodeNoLimit(bech string) (string, []byte, Version, error) {
+// DecodeNoLimitWithVersion is a bech32 checksum version aware arbitrary string
+// length decoder. This function will return the version of the decoded
+// checksum constant so higher level validation can be performed to ensure the
+// correct version of bech32 was used when encoding.
+//
+// Note that the returned data is 5-bit (base32) encoded and the human-readable
+// part will be lowercase.
+func DecodeNoLimitWithVersion(bech string) (string, []byte, Version, error) {
 	// The minimum allowed size of a bech32 string is 8 characters, since it
 	// needs a non-empty HRP, a separator, and a 6 character checksum.
 	if len(bech) < 8 {
@@ -262,7 +265,7 @@ func decodeNoLimit(bech string) (string, []byte, Version, error) {
 // Note that the returned data is 5-bit (base32) encoded and the human-readable
 // part will be lowercase.
 func DecodeNoLimit(bech string) (string, []byte, error) {
-	hrp, data, _, err := decodeNoLimit(bech)
+	hrp, data, _, err := DecodeNoLimitWithVersion(bech)
 	return hrp, data, err
 }
 
@@ -277,7 +280,7 @@ func Decode(bech string) (string, []byte, error) {
 		return "", nil, ErrInvalidLength(len(bech))
 	}
 
-	hrp, data, _, err := decodeNoLimit(bech)
+	hrp, data, _, err := DecodeNoLimitWithVersion(bech)
 	return hrp, data, err
 }
 
@@ -291,7 +294,7 @@ func DecodeGeneric(bech string) (string, []byte, Version, error) {
 		return "", nil, VersionUnknown, ErrInvalidLength(len(bech))
 	}
 
-	return decodeNoLimit(bech)
+	return DecodeNoLimitWithVersion(bech)
 }
 
 // encodeGeneric is the base bech32 encoding function that is aware of the
