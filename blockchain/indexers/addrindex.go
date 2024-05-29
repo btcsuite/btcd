@@ -36,7 +36,7 @@ const (
 	// consumes.  It consists of the address key + 1 byte for the level.
 	levelKeySize = addrKeySize + 1
 
-	// levelOffset is the offset in the level key which identifes the level.
+	// levelOffset is the offset in the level key which identifies the level.
 	levelOffset = levelKeySize - 1
 
 	// addrKeyTypePubKeyHash is the address type in an address key which

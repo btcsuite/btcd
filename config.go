@@ -244,7 +244,7 @@ func supportedSubsystems() []string {
 // the levels accordingly.  An appropriate error is returned if anything is
 // invalid.
 func parseAndSetDebugLevels(debugLevel string) error {
-	// When the specified string doesn't have any delimters, treat it as
+	// When the specified string doesn't have any delimiters, treat it as
 	// the log level for all subsystems.
 	if !strings.Contains(debugLevel, ",") && !strings.Contains(debugLevel, "=") {
 		// Validate debug log level.
