@@ -451,7 +451,7 @@ func assignField(paramNum int, fieldName string, dest reflect.Value, src reflect
 
 		// String -> float of varying size.
 		case reflect.Float32, reflect.Float64:
-			srcFloat, err := strconv.ParseFloat(src.String(), 0)
+			srcFloat, err := strconv.ParseFloat(src.String(), 64)
 			if err != nil {
 				str := fmt.Sprintf("parameter #%d '%s' must "+
 					"parse to a %v", paramNum, fieldName,
