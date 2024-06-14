@@ -13,9 +13,16 @@ package psbt
 
 import (
 	"bytes"
+	"crypto/hmac"
+	"crypto/sha512"
+	"encoding/binary"
 	"fmt"
 
+	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
+	"github.com/btcsuite/btcd/btcec/v2/schnorr/musig2"
+	"github.com/btcsuite/btcd/btcutil/v2/hdkeychain"
+	"github.com/btcsuite/btcd/chainhash/v2"
 	"github.com/btcsuite/btcd/txscript/v2"
 	"github.com/btcsuite/btcd/wire/v2"
 )
@@ -47,9 +54,23 @@ func isFinalizableWitnessInput(pInput *PInput) bool {
 
 		case txscript.IsPayToTaproot(pkScript):
 			if pInput.TaprootKeySpendSig == nil &&
-				pInput.TaprootScriptSpendSig == nil {
+				pInput.TaprootScriptSpendSig == nil &&
+				pInput.MuSig2PartialSigs == nil {
 
 				return false
+			}
+
+			// MuSig2 partial sigs are only useful when there is a
+			// matching nonce per participant AND every partial sig
+			// and nonce references the same aggregate key and tap
+			// leaf hash. The pre-aggregated TaprootKeySpendSig /
+			// TaprootScriptSpendSig branch above is preferred when
+			// either is also present.
+			if len(pInput.MuSig2PartialSigs) > 0 &&
+				pInput.TaprootKeySpendSig == nil &&
+				pInput.TaprootScriptSpendSig == nil {
+
+				return musig2InputReady(pInput)
 			}
 
 			// For each of the script spend signatures we need a
@@ -133,7 +154,8 @@ func isFinalizable(p *Packet, inIndex int) bool {
 
 	// The input cannot be finalized without any signatures.
 	if pInput.PartialSigs == nil && pInput.TaprootKeySpendSig == nil &&
-		pInput.TaprootScriptSpendSig == nil {
+		pInput.TaprootScriptSpendSig == nil &&
+		pInput.MuSig2PartialSigs == nil {
 
 		return false
 	}
@@ -577,6 +599,22 @@ func finalizeTaprootInput(p *Packet, inIndex int) error {
 
 		serializedWitness, err = writeWitness(witnessStack...)
 
+	// MuSig2 spend path. Dispatch on the presence of a tap leaf hash on
+	// the partial signatures: if all partial sigs reference a tap leaf
+	// hash, this is a tapscript leaf spend; otherwise it's a top-level
+	// keyspend.
+	case len(pInput.MuSig2PartialSigs) > 0:
+		firstSig := pInput.MuSig2PartialSigs[0]
+		if len(firstSig.TapLeafHash) > 0 {
+			serializedWitness, err = finalizeMuSig2ScriptSpend(
+				p, inIndex,
+			)
+		} else {
+			serializedWitness, err = finalizeMuSig2KeySpend(
+				p, inIndex,
+			)
+		}
+
 	default:
 		return ErrInvalidPsbtFormat
 	}
@@ -594,4 +632,571 @@ func finalizeTaprootInput(p *Packet, inIndex int) error {
 	// index.
 	p.Inputs[inIndex] = *newInput
 	return nil
+}
+
+// finalizeMuSig2KeySpend handles BIP-373 test vector cases 1 and 2: a top-level
+// taproot key spend where the aggregate MuSig2 key is either the output key
+// directly (no tweak) or the internal key (BIP-86 or merkle-root taproot
+// tweak). Returns the serialized witness containing the aggregated BIP-340
+// Schnorr signature.
+func finalizeMuSig2KeySpend(p *Packet, inIndex int) ([]byte, error) {
+	pInput := &p.Inputs[inIndex]
+
+	keys, pubNonces, partialSigs, aggKey, _, err := extractMuSig2SigningSet(
+		pInput,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	prevOutFetcher := PrevOutputFetcher(p)
+	sigHashes := txscript.NewTxSigHashes(p.UnsignedTx, prevOutFetcher)
+	sigHash, err := txscript.CalcTaprootSignatureHash(
+		sigHashes, pInput.SighashType, p.UnsignedTx, inIndex,
+		prevOutFetcher,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error calculating signature hash: %w",
+			err)
+	}
+
+	var sigHashMsg [32]byte
+	copy(sigHashMsg[:], sigHash)
+
+	keyAggOpts, combineOpts, err := selectMuSig2KeyAggTweaks(
+		p, pInput, aggKey, keys, sigHashMsg,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	schnorrSig, err := combineMuSig2Sig(
+		sigHashMsg, keys, pubNonces, partialSigs, keyAggOpts,
+		combineOpts,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	sig := appendSighashType(schnorrSig.Serialize(), pInput.SighashType)
+	return writeWitness(sig)
+}
+
+// selectMuSig2KeyAggTweaks decides which (if any) tweaks the finalizer must
+// apply when combining the keyspend MuSig2 partial signatures. It compares
+// the aggregate key recorded in the partial sig keydata against the bare
+// aggregate from PSBT_IN_MUSIG2_PARTICIPANT_PUBKEYS:
+//
+//   - Equal → no tweak was applied at sign time (BIP-373 case 1: output key
+//     IS the aggregate).
+//   - Differ + TaprootInternalKey == bare aggregate → BIP-86 tweak (or
+//     taproot tweak with the merkle root, if present). BIP-373 test vector
+//     case 2.
+//   - Differ + TaprootInternalKey ≠ bare aggregate → BIP-373 test vector case 4
+//     (the internal key was derived from the aggregate via BIP-32). Not yet
+//     supported; return an explicit error rather than silently producing a
+//     wrong signature.
+func selectMuSig2KeyAggTweaks(p *Packet, pInput *PInput,
+	partialSigAggregate *btcec.PublicKey, keys []*btcec.PublicKey,
+	sigHashMsg [32]byte) ([]musig2.KeyAggOption, []musig2.CombineOption,
+	error) {
+
+	var bareAggregate *btcec.PublicKey
+	if len(pInput.MuSig2Participants) > 0 {
+		bareAggregate = pInput.MuSig2Participants[0].AggregateKey
+	}
+
+	// If MuSig2Participants is missing, fall back to treating the partial
+	// sig aggregate as the bare aggregate. This mirrors the behavior of a
+	// PSBT in which an updater only set the partial sigs.
+	if bareAggregate == nil {
+		bareAggregate = partialSigAggregate
+	}
+
+	// Case 1: no tweak. The signers signed against the bare aggregate.
+	if bareAggregate.IsEqual(partialSigAggregate) {
+		return nil, []musig2.CombineOption{
+			musig2.WithTweakedCombine(sigHashMsg, keys, nil, true),
+		}, nil
+	}
+
+	// A tweak was applied at sign time. We can only recover the right
+	// tweak when the PSBT pins down the internal key.
+	if pInput.TaprootInternalKey == nil {
+		return nil, nil, fmt.Errorf("MuSig2 finalize: tweaked " +
+			"aggregate without PSBT_IN_TAP_INTERNAL_KEY is not " +
+			"supported")
+	}
+
+	// Case 4: TaprootInternalKey was derived from the bare aggregate via
+	// BIP-32. Walk the path on the synthetic xpub from PSBT_GLOBAL_XPUB
+	// to compute the per-step BIP-32 tweaks, then add the taproot tweak.
+	if !bytes.Equal(
+		schnorr.SerializePubKey(bareAggregate),
+		pInput.TaprootInternalKey,
+	) {
+
+		return musig2BIP32DerivedTweaks(
+			p, pInput, bareAggregate, keys, sigHashMsg,
+		)
+	}
+
+	// Case 2: TaprootInternalKey is the bare aggregate; the output key is
+	// either BIP-86 tweaked (no script tree) or taproot-tweaked with a
+	// known merkle root.
+	if pInput.TaprootMerkleRoot != nil {
+		return []musig2.KeyAggOption{
+				musig2.WithTaprootKeyTweak(
+					pInput.TaprootMerkleRoot,
+				),
+			}, []musig2.CombineOption{
+				musig2.WithTaprootTweakedCombine(
+					sigHashMsg, keys,
+					pInput.TaprootMerkleRoot, true,
+				),
+			}, nil
+	}
+
+	return []musig2.KeyAggOption{
+			musig2.WithBIP86KeyTweak(),
+		}, []musig2.CombineOption{
+			musig2.WithBip86TweakedCombine(sigHashMsg, keys, true),
+		}, nil
+}
+
+// musig2BIP32DerivedTweaks handles BIP-373 test vector case 4: the taproot
+// internal key is a BIP-32 unhardened child of the bare MuSig2 aggregate. The
+// PSBT must include a PSBT_GLOBAL_XPUB whose serialized public key matches the
+// bare aggregate; the chain code from that xpub is used to walk the path
+// recorded on the internal key's PSBT_IN_TAP_BIP32_DERIVATION entry.
+//
+// The resulting list of tweaks is:
+//   - one non-x-only KeyTweakDesc per BIP-32 derivation step
+//   - one x-only KeyTweakDesc carrying the taproot tweak hash, computed
+//     against the post-BIP-32 derived internal key (BIP-86 if no merkle
+//     root; tagged hash with the merkle root otherwise)
+//
+// The combined Schnorr signature produced via these tweaks verifies under
+// the post-derivation, post-taproot-tweak output key.
+func musig2BIP32DerivedTweaks(p *Packet, pInput *PInput,
+	bareAggregate *btcec.PublicKey, keys []*btcec.PublicKey,
+	sigHashMsg [32]byte) ([]musig2.KeyAggOption, []musig2.CombineOption,
+	error) {
+
+	xpub, err := findAggregateXpub(p, bareAggregate)
+	if err != nil {
+		return nil, nil, err
+	}
+	if xpub == nil {
+		return nil, nil, fmt.Errorf("MuSig2 finalize: aggregate is " +
+			"BIP-32 derived but no matching PSBT_GLOBAL_XPUB " +
+			"found (BIP-328 fallback is not supported)")
+	}
+
+	path, err := internalKeyDerivationPath(pInput)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	bip32Tweaks, derivedXpub, err := bip32TweaksForPath(xpub, path)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Sanity-check: the derived xpub must equal the taproot internal key
+	// (compared as x-only). If it doesn't match, the path on the input
+	// doesn't correspond to the synthetic xpub we used and the partial
+	// signatures were produced for a different signing context.
+	derivedKey, err := derivedXpub.ECPubKey()
+	if err != nil {
+		return nil, nil, err
+	}
+	if !bytes.Equal(
+		schnorr.SerializePubKey(derivedKey),
+		pInput.TaprootInternalKey,
+	) {
+
+		return nil, nil, fmt.Errorf("MuSig2 finalize: BIP-32 derived " +
+			"key does not match taproot internal key on input")
+	}
+
+	// Compute the taproot tweak: BIP-86 (empty merkle root) or a tagged
+	// hash with the merkle root.
+	internalKeyXOnly := schnorr.SerializePubKey(derivedKey)
+	var merkleRoot []byte
+	if pInput.TaprootMerkleRoot != nil {
+		merkleRoot = pInput.TaprootMerkleRoot
+	}
+	tapTweakHash := chainhash.TaggedHash(
+		chainhash.TagTapTweak, internalKeyXOnly, merkleRoot,
+	)
+	allTweaks := append(bip32Tweaks, musig2.KeyTweakDesc{
+		Tweak:   *tapTweakHash,
+		IsXOnly: true,
+	})
+
+	return []musig2.KeyAggOption{
+			musig2.WithKeyTweaks(allTweaks...),
+		}, []musig2.CombineOption{
+			musig2.WithTweakedCombine(
+				sigHashMsg, keys, allTweaks, true,
+			),
+		}, nil
+}
+
+// findAggregateXpub returns the PSBT_GLOBAL_XPUB whose serialized public key
+// matches the given bare MuSig2 aggregate, or nil if no such xpub is present.
+func findAggregateXpub(p *Packet,
+	aggregate *btcec.PublicKey) (*hdkeychain.ExtendedKey, error) {
+
+	want := aggregate.SerializeCompressed()
+	for _, x := range p.XPubs {
+		ext, err := DecodeExtendedKey(x.ExtendedKey)
+		if err != nil {
+			return nil, err
+		}
+
+		pub, err := ext.ECPubKey()
+		if err != nil {
+			return nil, err
+		}
+
+		if bytes.Equal(pub.SerializeCompressed(), want) {
+			return ext, nil
+		}
+	}
+
+	return nil, nil
+}
+
+// internalKeyDerivationPath returns the BIP-32 path recorded on the
+// taproot internal key's PSBT_IN_TAP_BIP32_DERIVATION entry. Returns an
+// error if no derivation entry matches the internal key.
+func internalKeyDerivationPath(pInput *PInput) ([]uint32, error) {
+	if pInput.TaprootInternalKey == nil {
+		return nil, fmt.Errorf("input has no taproot internal key")
+	}
+
+	for _, d := range pInput.TaprootBip32Derivation {
+		if bytes.Equal(d.XOnlyPubKey, pInput.TaprootInternalKey) {
+			return d.Bip32Path, nil
+		}
+	}
+
+	return nil, fmt.Errorf("no PSBT_IN_TAP_BIP32_DERIVATION entry for " +
+		"taproot internal key")
+}
+
+// bip32TweaksForPath walks the unhardened BIP-32 derivation path on the given
+// parent extended key. For each step it computes the per-step scalar tweak (the
+// IL half of HMAC-SHA512) and returns it as a non-x-only KeyTweakDesc. The
+// fully derived child xpub is also returned so callers can compute follow-up
+// tweaks (e.g. the taproot tweak) over its public key.
+func bip32TweaksForPath(parent *hdkeychain.ExtendedKey,
+	path []uint32) ([]musig2.KeyTweakDesc, *hdkeychain.ExtendedKey,
+	error) {
+
+	tweaks := make([]musig2.KeyTweakDesc, 0, len(path))
+	current := parent
+
+	for _, idx := range path {
+		if idx >= hdkeychain.HardenedKeyStart {
+			return nil, nil, fmt.Errorf("hardened derivation step "+
+				"%d not supported with public-only xpub", idx)
+		}
+
+		parentPub, err := current.ECPubKey()
+		if err != nil {
+			return nil, nil, err
+		}
+
+		// I = HMAC-SHA512(parent.ChainCode,
+		//                 parent.SerializedCompressed || idx_be).
+		var idxBytes [4]byte
+		binary.BigEndian.PutUint32(idxBytes[:], idx)
+
+		h := hmac.New(sha512.New, current.ChainCode())
+		h.Write(parentPub.SerializeCompressed())
+		h.Write(idxBytes[:])
+		ilr := h.Sum(nil)
+
+		var tweak [32]byte
+		copy(tweak[:], ilr[:32])
+		tweaks = append(tweaks, musig2.KeyTweakDesc{
+			Tweak:   tweak,
+			IsXOnly: false,
+		})
+
+		next, err := current.Derive(idx)
+		if err != nil {
+			return nil, nil, err
+		}
+		current = next
+	}
+
+	return tweaks, current, nil
+}
+
+// finalizeMuSig2ScriptSpend handles BIP-373 test vector case 3: a tapscript
+// leaf spend where the aggregate MuSig2 key is the key in the leaf script.
+// Returns the serialized witness as [aggregatedSig, leafScript, controlBlock],
+// mirroring the regular taproot script-spend witness shape.
+func finalizeMuSig2ScriptSpend(p *Packet, inIndex int) ([]byte, error) {
+	pInput := &p.Inputs[inIndex]
+
+	keys, pubNonces, partialSigs, _, tapLeafHash, err :=
+		extractMuSig2SigningSet(pInput)
+	if err != nil {
+		return nil, err
+	}
+	if len(tapLeafHash) == 0 {
+		return nil, fmt.Errorf("script spend MuSig2 signing requires " +
+			"a tap leaf hash on partial signatures")
+	}
+
+	leaf, err := FindLeafScript(pInput, tapLeafHash)
+	if err != nil {
+		return nil, fmt.Errorf("leaf script for tap leaf hash %x not "+
+			"found: %w", tapLeafHash, err)
+	}
+
+	prevOutFetcher := PrevOutputFetcher(p)
+	sigHashes := txscript.NewTxSigHashes(p.UnsignedTx, prevOutFetcher)
+	sigHash, err := txscript.CalcTapscriptSignaturehash(
+		sigHashes, pInput.SighashType, p.UnsignedTx, inIndex,
+		prevOutFetcher, txscript.TapLeaf{
+			LeafVersion: leaf.LeafVersion,
+			Script:      leaf.Script,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error calculating tapscript signature "+
+			"hash: %w", err)
+	}
+
+	var sigHashMsg [32]byte
+	copy(sigHashMsg[:], sigHash)
+
+	// No taproot tweak: the aggregate key is the key in the script and is
+	// committed to directly via the leaf script's CHECKSIG opcode.
+	combineOpts := []musig2.CombineOption{
+		musig2.WithTweakedCombine(sigHashMsg, keys, nil, true),
+	}
+
+	schnorrSig, err := combineMuSig2Sig(
+		sigHashMsg, keys, pubNonces, partialSigs, nil, combineOpts,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	sig := appendSighashType(schnorrSig.Serialize(), pInput.SighashType)
+	return writeWitness(sig, leaf.Script, leaf.ControlBlock)
+}
+
+// musig2InputReady reports whether a taproot input has a complete and
+// internally consistent set of MuSig2 fields ready for finalization: the
+// number of nonces matches the number of partial signatures, and every
+// nonce and partial signature references the same (AggregateKey,
+// TapLeafHash) pair.
+func musig2InputReady(pInput *PInput) bool {
+	if len(pInput.MuSig2PartialSigs) != len(pInput.MuSig2PubNonces) {
+		return false
+	}
+
+	first := pInput.MuSig2PartialSigs[0]
+	for _, ps := range pInput.MuSig2PartialSigs {
+		if !ps.AggregateKey.IsEqual(first.AggregateKey) {
+			return false
+		}
+		if !bytes.Equal(ps.TapLeafHash, first.TapLeafHash) {
+			return false
+		}
+	}
+	for _, n := range pInput.MuSig2PubNonces {
+		if !n.AggregateKey.IsEqual(first.AggregateKey) {
+			return false
+		}
+		if !bytes.Equal(n.TapLeafHash, first.TapLeafHash) {
+			return false
+		}
+	}
+
+	return true
+}
+
+// extractMuSig2SigningSet validates that all MuSig2 nonces and partial
+// signatures on the input reference the same aggregate key (and the same
+// optional tap leaf hash) and returns parallel slices of participant keys,
+// nonces, and partial signatures, paired up by participant pubkey. The
+// returned aggregate key and tap leaf hash are taken from the partial
+// signatures (and verified to agree with the nonces).
+func extractMuSig2SigningSet(pInput *PInput) ([]*btcec.PublicKey,
+	[][musig2.PubNonceSize]byte, []*musig2.PartialSignature,
+	*btcec.PublicKey, []byte, error) {
+
+	if len(pInput.MuSig2PartialSigs) == 0 {
+		return nil, nil, nil, nil, nil, fmt.Errorf("no MuSig2 " +
+			"partial signatures on input")
+	}
+	if len(pInput.MuSig2PubNonces) != len(pInput.MuSig2PartialSigs) {
+		return nil, nil, nil, nil, nil, fmt.Errorf("number of MuSig2 " +
+			"pub nonces does not match number of partial " +
+			"signatures")
+	}
+
+	first := pInput.MuSig2PartialSigs[0]
+	aggregateKey := first.AggregateKey
+	tapLeafHash := first.TapLeafHash
+
+	// All partial sigs must agree on the aggregate key and tap leaf hash.
+	for i, ps := range pInput.MuSig2PartialSigs {
+		if !ps.AggregateKey.IsEqual(aggregateKey) {
+			return nil, nil, nil, nil, nil, fmt.Errorf("partial "+
+				"sig %d references different aggregate key "+
+				"than first signature", i)
+		}
+		if !bytes.Equal(ps.TapLeafHash, tapLeafHash) {
+			return nil, nil, nil, nil, nil, fmt.Errorf("partial "+
+				"sig %d references different tap leaf hash "+
+				"than first signature", i)
+		}
+	}
+
+	// Likewise for the nonces.
+	for i, n := range pInput.MuSig2PubNonces {
+		if !n.AggregateKey.IsEqual(aggregateKey) {
+			return nil, nil, nil, nil, nil, fmt.Errorf("pub nonce "+
+				"%d references different aggregate key than "+
+				"partial signatures", i)
+		}
+		if !bytes.Equal(n.TapLeafHash, tapLeafHash) {
+			return nil, nil, nil, nil, nil, fmt.Errorf("pub nonce "+
+				"%d references different tap leaf hash than "+
+				"partial signatures", i)
+		}
+	}
+
+	// Pair each pub nonce with its partial sig by participant key, so
+	// that the parallel slices we return are aligned regardless of the
+	// order the fields appear on the input.
+	n := len(pInput.MuSig2PubNonces)
+	keys := make([]*btcec.PublicKey, n)
+	pubNonces := make([][musig2.PubNonceSize]byte, n)
+	partialSigs := make([]*musig2.PartialSignature, n)
+	for i, nonce := range pInput.MuSig2PubNonces {
+		keys[i] = nonce.PubKey
+		pubNonces[i] = nonce.PubNonce
+
+		var matched *MuSig2PartialSig
+		for _, ps := range pInput.MuSig2PartialSigs {
+			if ps.PubKey.IsEqual(nonce.PubKey) {
+				matched = ps
+				break
+			}
+		}
+		if matched == nil {
+			return nil, nil, nil, nil, nil, fmt.Errorf("no MuSig2 "+
+				"partial signature found for participant key "+
+				"%x", nonce.PubKey.SerializeCompressed())
+		}
+		partialSigs[i] = &matched.PartialSig
+	}
+
+	return keys, pubNonces, partialSigs, aggregateKey, tapLeafHash, nil
+}
+
+// combineMuSig2Sig aggregates the keys/nonces and combines the partial
+// signatures into a single BIP-340 Schnorr signature. The keyAggOpts and
+// combineOpts must describe the same tweak chain: tweaks applied during key
+// aggregation must match the tweaks accumulated by the combine option.
+func combineMuSig2Sig(sigHashMsg [32]byte, keys []*btcec.PublicKey,
+	pubNonces [][musig2.PubNonceSize]byte,
+	partialSigs []*musig2.PartialSignature,
+	keyAggOpts []musig2.KeyAggOption,
+	combineOpts []musig2.CombineOption) (*schnorr.Signature, error) {
+
+	aggKey, _, _, err := musig2.AggregateKeys(keys, true, keyAggOpts...)
+	if err != nil {
+		return nil, fmt.Errorf("error aggregating keys: %w", err)
+	}
+
+	aggregateNonce, err := musig2.AggregateNonces(pubNonces)
+	if err != nil {
+		return nil, fmt.Errorf("error aggregating pub nonces: %w", err)
+	}
+
+	combinedNonce, err := computeSigningNonce(
+		aggregateNonce, aggKey.FinalKey, sigHashMsg,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error computing signing nonce: %w", err)
+	}
+
+	return musig2.CombineSigs(
+		combinedNonce, partialSigs, combineOpts...,
+	), nil
+}
+
+// appendSighashType appends a one-byte sighash type to the signature if it
+// differs from the default sighash (which is omitted on the wire).
+func appendSighashType(sig []byte, sht txscript.SigHashType) []byte {
+	if sht == txscript.SigHashDefault {
+		return sig
+	}
+	return append(sig, byte(sht))
+}
+
+// computeSigningNonce calculates the final nonce used for signing. This will
+// be the R value used in the final signature.
+func computeSigningNonce(combinedNonce [musig2.PubNonceSize]byte,
+	combinedKey *btcec.PublicKey, msg [32]byte) (*btcec.PublicKey, error) {
+
+	// Next we'll compute the value b, that blinds our second public
+	// nonce:
+	//  * b = h(tag=NonceBlindTag, combinedNonce || combinedKey || m).
+	var (
+		nonceMsgBuf  bytes.Buffer
+		nonceBlinder btcec.ModNScalar
+	)
+	nonceMsgBuf.Write(combinedNonce[:])
+	nonceMsgBuf.Write(schnorr.SerializePubKey(combinedKey))
+	nonceMsgBuf.Write(msg[:])
+	nonceBlindHash := chainhash.TaggedHash(
+		musig2.NonceBlindTag, nonceMsgBuf.Bytes(),
+	)
+	nonceBlinder.SetByteSlice(nonceBlindHash[:])
+
+	// Next, we'll parse the public nonces into R1 and R2.
+	r1J, err := btcec.ParseJacobian(
+		combinedNonce[:btcec.PubKeyBytesLenCompressed],
+	)
+	if err != nil {
+		return nil, err
+	}
+	r2J, err := btcec.ParseJacobian(
+		combinedNonce[btcec.PubKeyBytesLenCompressed:],
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	// With our nonce blinding value, we'll now combine both the public
+	// nonces, using the blinding factor to tweak the second nonce:
+	//  * R = R_1 + b*R_2
+	var nonce btcec.JacobianPoint
+	btcec.ScalarMultNonConst(&nonceBlinder, &r2J, &r2J)
+	btcec.AddNonConst(&r1J, &r2J, &nonce)
+
+	// If the combined nonce is the point at infinity, we'll use the
+	// generator point instead.
+	var infinityPoint btcec.JacobianPoint
+	if nonce == infinityPoint {
+		G := btcec.Generator()
+		G.AsJacobian(&nonce)
+	}
+
+	nonce.ToAffine()
+
+	return btcec.NewPublicKey(&nonce.X, &nonce.Y), nil
 }
