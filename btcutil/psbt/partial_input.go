@@ -28,6 +28,9 @@ type PInput struct {
 	TaprootBip32Derivation []*TaprootBip32Derivation
 	TaprootInternalKey     []byte
 	TaprootMerkleRoot      []byte
+	MuSig2Participants     []*MuSig2Participants
+	MuSig2PubNonces        []*MuSig2PubNonce
+	MuSig2PartialSigs      []*MuSig2PartialSig
 	Unknowns               []*Unknown
 }
 
@@ -363,6 +366,60 @@ func (pi *PInput) deserialize(r io.Reader) error {
 
 			pi.TaprootMerkleRoot = value
 
+		case MuSig2ParticipantsInputType:
+			participants, err := ReadMuSig2Participants(
+				keyData, value,
+			)
+			if err != nil {
+				return err
+			}
+
+			// Duplicate keys are not allowed.
+			newKey := participants.KeyData()
+			for _, x := range pi.MuSig2Participants {
+				if bytes.Equal(x.KeyData(), newKey) {
+					return ErrDuplicateKey
+				}
+			}
+
+			pi.MuSig2Participants = append(
+				pi.MuSig2Participants, participants,
+			)
+
+		case MuSig2PubNoncesInputType:
+			nonce, err := ReadMuSig2PubNonce(keyData, value)
+			if err != nil {
+				return err
+			}
+
+			// Duplicate keys are not allowed.
+			newKey := nonce.KeyData()
+			for _, x := range pi.MuSig2PubNonces {
+				if bytes.Equal(x.KeyData(), newKey) {
+					return ErrDuplicateKey
+				}
+			}
+
+			pi.MuSig2PubNonces = append(pi.MuSig2PubNonces, nonce)
+
+		case MuSig2PartialSigsInputType:
+			partialSig, err := ReadMuSig2PartialSig(keyData, value)
+			if err != nil {
+				return err
+			}
+
+			// Duplicate keys are not allowed.
+			newKey := partialSig.KeyData()
+			for _, x := range pi.MuSig2PartialSigs {
+				if bytes.Equal(x.KeyData(), newKey) {
+					return ErrDuplicateKey
+				}
+			}
+
+			pi.MuSig2PartialSigs = append(
+				pi.MuSig2PartialSigs, partialSig,
+			)
+
 		default:
 			// A fall through case for any proprietary types.
 			keyCodeAndData := append(
@@ -567,6 +624,36 @@ func (pi *PInput) serialize(w io.Writer) error {
 			err := serializeKVPairWithType(
 				w, uint8(TaprootMerkleRootType), nil,
 				pi.TaprootMerkleRoot,
+			)
+			if err != nil {
+				return err
+			}
+		}
+
+		for _, participants := range pi.MuSig2Participants {
+			err := SerializeMuSig2Participants(
+				w, uint8(MuSig2ParticipantsInputType),
+				participants,
+			)
+			if err != nil {
+				return err
+			}
+		}
+
+		for _, nonce := range pi.MuSig2PubNonces {
+			err := SerializeMuSig2PubNonce(
+				w, uint8(MuSig2PubNoncesInputType),
+				nonce,
+			)
+			if err != nil {
+				return err
+			}
+		}
+
+		for _, sig := range pi.MuSig2PartialSigs {
+			err := SerializeMuSig2PartialSig(
+				w, uint8(MuSig2PartialSigsInputType),
+				sig,
 			)
 			if err != nil {
 				return err
