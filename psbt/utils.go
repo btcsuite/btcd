@@ -569,3 +569,48 @@ func FindLeafScript(pInput *PInput,
 	return nil, fmt.Errorf("leaf script for target leaf hash %x not "+
 		"found in input", targetLeafHash)
 }
+
+// PrevOutputFetcher returns a txscript.PrevOutFetcher built from the UTXO
+// information in a PSBT packet. Returns an error if no UTXO information is
+// present for an input.
+func PrevOutputFetcher(packet *Packet) (*txscript.MultiPrevOutFetcher, error) {
+	fetcher := txscript.NewMultiPrevOutFetcher(nil)
+	for idx, txIn := range packet.UnsignedTx.TxIn {
+		in := packet.Inputs[idx]
+
+		// If a PrevOutputFetcher is used in a P2TR signing context,
+		// every input's UTXO information will be looked up. Which means
+		// we can prevent a panic in such a case by requiring it to be
+		// set here.
+		if in.WitnessUtxo == nil && in.NonWitnessUtxo == nil {
+			return nil, fmt.Errorf("input %d has no UTXO info", idx)
+		}
+
+		if in.NonWitnessUtxo != nil {
+			prevIndex := txIn.PreviousOutPoint.Index
+
+			// Prevent a panic by checking the index is actually
+			// valid.
+			if prevIndex >= uint32(len(in.NonWitnessUtxo.TxOut)) {
+				return nil, fmt.Errorf("input %d has invalid "+
+					"UTXO information", idx)
+			}
+
+			fetcher.AddPrevOut(
+				txIn.PreviousOutPoint,
+				in.NonWitnessUtxo.TxOut[prevIndex],
+			)
+
+			continue
+		}
+
+		// Fall back to witness UTXO only for older wallets.
+		if in.WitnessUtxo != nil {
+			fetcher.AddPrevOut(
+				txIn.PreviousOutPoint, in.WitnessUtxo,
+			)
+		}
+	}
+
+	return fetcher, nil
+}
