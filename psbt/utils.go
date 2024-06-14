@@ -287,6 +287,44 @@ func assertFullyConsumed(r *bytes.Reader) error {
 	return nil
 }
 
+// assertNoDuplicateKey asserts that the new element's KeyData() doesn't collide
+// with an existing element.
+func assertNoDuplicateKey[T interface{ KeyData() []byte }](newItem T,
+	existingElements []T) error {
+
+	newKey := newItem.KeyData()
+	for _, x := range existingElements {
+		if bytes.Equal(x.KeyData(), newKey) {
+			return ErrDuplicateKey
+		}
+	}
+
+	return nil
+}
+
+// assertIndexValid makes sure the index is a valid slice index that doesn't
+// lead to an out-of-bound panic.
+func assertIndexValid[Slice interface{ ~[]E }, E any](idx int,
+	slice Slice) error {
+
+	if idx < 0 || idx >= len(slice) {
+		return ErrInvalidPsbtFormat
+	}
+
+	return nil
+}
+
+// assertNoNilElements makes sure the given slice contains no nil elements.
+func assertNoNilElements[Slice interface{ ~[]*E }, E any](slice Slice) error {
+	for idx, elem := range slice {
+		if elem == nil {
+			return fmt.Errorf("item %d is nil", idx)
+		}
+	}
+
+	return nil
+}
+
 // readTxOut parses a transaction output value and requires the full value to
 // be consumed.
 func readTxOut(txout []byte) (*wire.TxOut, error) {
