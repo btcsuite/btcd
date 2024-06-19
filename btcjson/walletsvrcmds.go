@@ -978,7 +978,7 @@ type ImportMultiRequest struct {
 	KeyPool *bool `json:"keypool,omitempty"`
 }
 
-// ImportMultiRequest defines the options struct, provided to the
+// ImportMultiOptions defines the options struct, provided to the
 // ImportMultiCmd as a pointer argument.
 type ImportMultiOptions struct {
 	Rescan bool `json:"rescan"` // Rescan the blockchain after all imports
