@@ -1491,7 +1491,7 @@ func TestRBF(t *testing.T) {
 
 				return tx, nil
 			},
-			err: "already spent by transaction",
+			err: "already spent in mempool",
 		},
 		{
 			// A transaction cannot replace another if we don't
@@ -1522,7 +1522,7 @@ func TestRBF(t *testing.T) {
 
 				return tx, nil
 			},
-			err: "already spent by transaction",
+			err: "already spent in mempool",
 		},
 		{
 			// A transaction cannot replace another if doing so

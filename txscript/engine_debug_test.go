@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestDebugEngine checks that the StepCallbck called during debug script
+// TestDebugEngine checks that the StepCallback called during debug script
 // execution contains the expected data.
 func TestDebugEngine(t *testing.T) {
 	t.Parallel()

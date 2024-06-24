@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/btcsuite/btcd/blockchain/internal/testhelper"
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
@@ -343,7 +344,7 @@ func (b *BlockChain) TstSetCoinbaseMaturity(maturity uint16) {
 	b.chainParams.CoinbaseMaturity = maturity
 }
 
-// newFakeChain returns a chain that is usable for syntetic tests.  It is
+// newFakeChain returns a chain that is usable for synthetic tests.  It is
 // important to note that this chain has no database associated with it, so
 // it is not usable with all functions and the tests must take care when making
 // use of it.
@@ -395,4 +396,97 @@ func newFakeNode(parent *blockNode, blockVersion int32, bits uint32, timestamp t
 		Timestamp: timestamp,
 	}
 	return newBlockNode(header, parent)
+}
+
+// addBlock adds a block to the blockchain that succeeds the previous block.
+// The blocks spends all the provided spendable outputs.  The new block and
+// the new spendable outputs created in the block are returned.
+func addBlock(chain *BlockChain, prev *btcutil.Block, spends []*testhelper.SpendableOut) (
+	*btcutil.Block, []*testhelper.SpendableOut, error) {
+
+	block, outs, err := newBlock(chain, prev, spends)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	_, _, err = chain.ProcessBlock(block, BFNone)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return block, outs, nil
+}
+
+// calcMerkleRoot creates a merkle tree from the slice of transactions and
+// returns the root of the tree.
+func calcMerkleRoot(txns []*wire.MsgTx) chainhash.Hash {
+	if len(txns) == 0 {
+		return chainhash.Hash{}
+	}
+
+	utilTxns := make([]*btcutil.Tx, 0, len(txns))
+	for _, tx := range txns {
+		utilTxns = append(utilTxns, btcutil.NewTx(tx))
+	}
+	return CalcMerkleRoot(utilTxns, false)
+}
+
+// newBlock creates a block to the blockchain that succeeds the previous block.
+// The blocks spends all the provided spendable outputs.  The new block and the
+// newly spendable outputs created in the block are returned.
+func newBlock(chain *BlockChain, prev *btcutil.Block,
+	spends []*testhelper.SpendableOut) (*btcutil.Block, []*testhelper.SpendableOut, error) {
+
+	blockHeight := prev.Height() + 1
+	txns := make([]*wire.MsgTx, 0, 1+len(spends))
+
+	// Create and add coinbase tx.
+	cb := testhelper.CreateCoinbaseTx(blockHeight, CalcBlockSubsidy(blockHeight, chain.chainParams))
+	txns = append(txns, cb)
+
+	// Spend all txs to be spent.
+	for _, spend := range spends {
+		cb.TxOut[0].Value += int64(testhelper.LowFee)
+
+		spendTx := testhelper.CreateSpendTx(spend, testhelper.LowFee)
+		txns = append(txns, spendTx)
+	}
+
+	// Use a timestamp that is one second after the previous block unless
+	// this is the first block in which case the current time is used.
+	var ts time.Time
+	if blockHeight == 1 {
+		ts = time.Unix(time.Now().Unix(), 0)
+	} else {
+		ts = prev.MsgBlock().Header.Timestamp.Add(time.Second)
+	}
+
+	// Create the block. The nonce will be solved in the below code in
+	// SolveBlock.
+	block := btcutil.NewBlock(&wire.MsgBlock{
+		Header: wire.BlockHeader{
+			Version:    1,
+			PrevBlock:  *prev.Hash(),
+			MerkleRoot: calcMerkleRoot(txns),
+			Bits:       chain.chainParams.PowLimitBits,
+			Timestamp:  ts,
+			Nonce:      0, // To be solved.
+		},
+		Transactions: txns,
+	})
+	block.SetHeight(blockHeight)
+
+	// Solve the block.
+	if !testhelper.SolveBlock(&block.MsgBlock().Header) {
+		return nil, nil, fmt.Errorf("Unable to solve block at height %d", blockHeight)
+	}
+
+	// Create spendable outs to return.
+	outs := make([]*testhelper.SpendableOut, len(txns))
+	for i, tx := range txns {
+		out := testhelper.MakeSpendableOutForTx(tx, 0)
+		outs[i] = &out
+	}
+
+	return block, outs, nil
 }

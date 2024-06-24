@@ -218,7 +218,7 @@ func TestCornerCases(t *testing.T) {
 	ldb := idb.(*db).cache.ldb
 	ldb.Close()
 
-	// Ensure initilization errors in the underlying database work as
+	// Ensure initialization errors in the underlying database work as
 	// expected.
 	testName = "initDB: reinitialization"
 	wantErrCode = database.ErrDbNotOpen

@@ -111,7 +111,7 @@ type nonceAggTestCases struct {
 }
 
 // TestMusig2AggregateNoncesTestVectors tests that the musig2 implementation
-// passes the nonce aggregration test vectors for musig2 1.0.
+// passes the nonce aggregation test vectors for musig2 1.0.
 func TestMusig2AggregateNoncesTestVectors(t *testing.T) {
 	t.Parallel()
 

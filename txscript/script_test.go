@@ -358,6 +358,12 @@ func TestRemoveOpcodeByData(t *testing.T) {
 			after:  []byte{OP_NOP},
 		},
 		{
+			name:   "",
+			before: []byte{OP_NOP, OP_DATA_8, 1, 2, 3, 4, 5, 6, 7, 8, OP_DATA_4, 1, 2, 3, 4},
+			remove: []byte{1, 2, 3, 4},
+			after:  []byte{OP_NOP, OP_DATA_8, 1, 2, 3, 4, 5, 6, 7, 8},
+		},
+		{
 			name:   "simple case",
 			before: []byte{OP_DATA_4, 1, 2, 3, 4},
 			remove: []byte{1, 2, 3, 4},
@@ -376,7 +382,9 @@ func TestRemoveOpcodeByData(t *testing.T) {
 				bytes.Repeat([]byte{0}, 72)...),
 				[]byte{1, 2, 3, 4}...),
 			remove: []byte{1, 2, 3, 4},
-			after:  nil,
+			after: append(append([]byte{OP_PUSHDATA1, 76},
+				bytes.Repeat([]byte{0}, 72)...),
+				[]byte{1, 2, 3, 4}...),
 		},
 		{
 			name: "simple case (pushdata1 miss)",
@@ -400,7 +408,9 @@ func TestRemoveOpcodeByData(t *testing.T) {
 				bytes.Repeat([]byte{0}, 252)...),
 				[]byte{1, 2, 3, 4}...),
 			remove: []byte{1, 2, 3, 4},
-			after:  nil,
+			after: append(append([]byte{OP_PUSHDATA2, 0, 1},
+				bytes.Repeat([]byte{0}, 252)...),
+				[]byte{1, 2, 3, 4}...),
 		},
 		{
 			name: "simple case (pushdata2 miss)",
@@ -425,7 +435,9 @@ func TestRemoveOpcodeByData(t *testing.T) {
 				bytes.Repeat([]byte{0}, 65532)...),
 				[]byte{1, 2, 3, 4}...),
 			remove: []byte{1, 2, 3, 4},
-			after:  nil,
+			after: append(append([]byte{OP_PUSHDATA4, 0, 0, 1, 0},
+				bytes.Repeat([]byte{0}, 65532)...),
+				[]byte{1, 2, 3, 4}...),
 		},
 		{
 			name:   "simple case (pushdata4 miss noncanonical)",
@@ -465,16 +477,17 @@ func TestRemoveOpcodeByData(t *testing.T) {
 	// tstRemoveOpcodeByData is a convenience function to ensure the provided
 	// script parses before attempting to remove the passed data.
 	const scriptVersion = 0
-	tstRemoveOpcodeByData := func(script []byte, data []byte) ([]byte, error) {
+	tstRemoveOpcodeByData := func(script []byte, data []byte) ([]byte, bool, error) {
 		if err := checkScriptParses(scriptVersion, script); err != nil {
-			return nil, err
+			return nil, false, err
 		}
 
-		return removeOpcodeByData(script, data), nil
+		result, match := removeOpcodeByData(script, data)
+		return result, match, nil
 	}
 
 	for _, test := range tests {
-		result, err := tstRemoveOpcodeByData(test.before, test.remove)
+		result, _, err := tstRemoveOpcodeByData(test.before, test.remove)
 		if e := tstCheckScriptError(err, test.err); e != nil {
 			t.Errorf("%s: %v", test.name, e)
 			continue

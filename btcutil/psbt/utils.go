@@ -226,7 +226,7 @@ func serializeKVPairWithType(w io.Writer, kt uint8, keydata []byte,
 
 // getKey retrieves a single key - both the key type and the keydata (if
 // present) from the stream and returns the key type as an integer, or -1 if
-// the key was of zero length. This integer is is used to indicate the presence
+// the key was of zero length. This integer is used to indicate the presence
 // of a separator byte which indicates the end of a given key-value pair list,
 // and the keydata as a byte slice or nil if none is present.
 func getKey(r io.Reader) (int, []byte, error) {

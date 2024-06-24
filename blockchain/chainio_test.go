@@ -23,7 +23,7 @@ func TestErrNotInMainChain(t *testing.T) {
 
 	// Ensure the stringized output for the error is as expected.
 	if err.Error() != errStr {
-		t.Fatalf("errNotInMainChain retuned unexpected error string - "+
+		t.Fatalf("errNotInMainChain returned unexpected error string - "+
 			"got %q, want %q", err.Error(), errStr)
 	}
 
@@ -403,7 +403,7 @@ func TestSpendJournalErrors(t *testing.T) {
 }
 
 // TestUtxoSerialization ensures serializing and deserializing unspent
-// trasaction output entries works as expected.
+// transaction output entries works as expected.
 func TestUtxoSerialization(t *testing.T) {
 	t.Parallel()
 

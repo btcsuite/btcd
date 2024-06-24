@@ -952,7 +952,7 @@ func TestFieldSquareRoot(t *testing.T) {
 		input := setHex(test.in).Normalize()
 		want := setHex(test.want).Normalize()
 
-		// Calculate the square root and enusre the validity flag matches the
+		// Calculate the square root and ensure the validity flag matches the
 		// expected value.
 		var result FieldVal
 		isValid := result.SquareRootVal(input)

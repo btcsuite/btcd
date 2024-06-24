@@ -245,7 +245,7 @@ func TestSchnorrVerify(t *testing.T) {
 
 		verify := err == nil
 		if test.verifyResult != verify {
-			t.Fatalf("test #%v: verificaiton mismatch: expected "+
+			t.Fatalf("test #%v: verification mismatch: expected "+
 				"%v, got %v", i, test.verifyResult, verify)
 		}
 

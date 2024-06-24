@@ -36,7 +36,7 @@ const (
 	// consumes.  It consists of the address key + 1 byte for the level.
 	levelKeySize = addrKeySize + 1
 
-	// levelOffset is the offset in the level key which identifes the level.
+	// levelOffset is the offset in the level key which identifies the level.
 	levelOffset = levelKeySize - 1
 
 	// addrKeyTypePubKeyHash is the address type in an address key which
@@ -64,7 +64,7 @@ const (
 	addrKeyTypeWitnessScriptHash = 3
 
 	// addrKeyTypeTaprootPubKey is the address type in an address key that
-	// represnts a pay-to-taproot address. We use this to denote addresses
+	// represents a pay-to-taproot address. We use this to denote addresses
 	// related to the segwit v1 that are encoded in the bech32m format.
 	addrKeyTypeTaprootPubKey = 4
 
@@ -158,7 +158,7 @@ func serializeAddrIndexEntry(blockID uint32, txLoc wire.TxLoc) []byte {
 
 // deserializeAddrIndexEntry decodes the passed serialized byte slice into the
 // provided region struct according to the format described in detail above and
-// uses the passed block hash fetching function in order to conver the block ID
+// uses the passed block hash fetching function in order to convert the block ID
 // to the associated block hash.
 func deserializeAddrIndexEntry(serialized []byte, region *database.BlockRegion,
 	fetchBlockHash fetchBlockHashFunc) error {
@@ -734,7 +734,7 @@ func (idx *AddrIndex) indexBlock(data writeIndexData, block *btcutil.Block,
 				idx.indexPkScript(data, pkScript, txIdx)
 
 				// With an input indexed, we'll advance the
-				// stxo coutner.
+				// stxo counter.
 				stxoIndex++
 			}
 		}

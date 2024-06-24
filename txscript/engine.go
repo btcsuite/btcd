@@ -114,6 +114,10 @@ const (
 	// ScriptVerifyDiscourageUpgradeablePubkeyType defines if unknown
 	// public key versions (during tapscript execution) is non-standard.
 	ScriptVerifyDiscourageUpgradeablePubkeyType
+
+	// ScriptVerifyConstScriptCode fails non-segwit scripts if a signature
+	// match is found in the script code or if OP_CODESEPARATOR is used.
+	ScriptVerifyConstScriptCode
 )
 
 const (
@@ -450,7 +454,7 @@ func checkMinimalDataPush(op *opcode, data []byte) error {
 	return nil
 }
 
-// executeOpcode peforms execution on the passed opcode.  It takes into account
+// executeOpcode performs execution on the passed opcode.  It takes into account
 // whether or not it is hidden by conditionals, but some rules still must be
 // tested in this case.
 func (vm *Engine) executeOpcode(op *opcode, data []byte) error {
@@ -605,7 +609,7 @@ func (vm *Engine) verifyWitnessProgram(witness wire.TxWitness) error {
 			return scriptError(ErrWitnessProgramWrongLength, errStr)
 		}
 
-	// We're attempting to to verify a taproot input, and the witness
+	// We're attempting to verify a taproot input, and the witness
 	// program data push is of the expected size, so we'll be looking for a
 	// normal key-path spend, or a merkle proof for a tapscript with
 	// execution afterwards.
@@ -1414,7 +1418,7 @@ func (vm *Engine) checkSignatureEncoding(sig []byte) error {
 func getStack(stack *stack) [][]byte {
 	array := make([][]byte, stack.Depth())
 	for i := range array {
-		// PeekByteArry can't fail due to overflow, already checked
+		// PeekByteArray can't fail due to overflow, already checked
 		array[len(array)-i-1], _ = stack.PeekByteArray(int32(i))
 	}
 	return array

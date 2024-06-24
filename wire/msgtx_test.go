@@ -6,6 +6,7 @@ package wire
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"reflect"
@@ -672,7 +673,7 @@ func TestTxOverflowErrors(t *testing.T) {
 				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // Previous output hash
-				0xff, 0xff, 0xff, 0xff, // Prevous output index
+				0xff, 0xff, 0xff, 0xff, // Previous output index
 				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 				0xff, // Varint for length of signature script
 			}, pver, BaseEncoding, txVer, &MessageError{},
@@ -688,7 +689,7 @@ func TestTxOverflowErrors(t *testing.T) {
 				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // Previous output hash
-				0xff, 0xff, 0xff, 0xff, // Prevous output index
+				0xff, 0xff, 0xff, 0xff, // Previous output index
 				0x00,                   // Varint for length of signature script
 				0xff, 0xff, 0xff, 0xff, // Sequence
 				0x01,                                           // Varint for number of output transactions
@@ -733,7 +734,7 @@ func TestTxSerializeSizeStripped(t *testing.T) {
 		in   *MsgTx // Tx to encode
 		size int    // Expected serialized size
 	}{
-		// No inputs or outpus.
+		// No inputs or outputs.
 		{noTx, 10},
 
 		// Transcaction with an input and an output.
@@ -753,6 +754,34 @@ func TestTxSerializeSizeStripped(t *testing.T) {
 				serializedSize, test.size)
 			continue
 		}
+	}
+}
+
+// TestTxID performs tests to ensure the serialize size for various transactions
+// is accurate.
+func TestTxID(t *testing.T) {
+	// Empty tx message.
+	noTx := NewMsgTx(1)
+	noTx.Version = 1
+
+	tests := []struct {
+		in   *MsgTx // Tx to encode.
+		txid string // Expected transaction ID.
+	}{
+		// No inputs or outputs.
+		{noTx, "d21633ba23f70118185227be58a63527675641ad37967e2aa461559f577aec43"},
+
+		// Transaction with an input and an output.
+		{multiTx, "0100d15a522ff38de05c164ca0a56379a1b77dd1e4805a6534dc9b3d88290e9d"},
+
+		// Transaction with an input which includes witness data, and
+		// one output.
+		{multiWitnessTx, "0f167d1385a84d1518cfee208b653fc9163b605ccf1b75347e2850b3e2eb19f3"},
+	}
+
+	for i, test := range tests {
+		txid := test.in.TxID()
+		require.Equal(t, test.txid, txid, "test #%d", i)
 	}
 }
 
@@ -849,6 +878,17 @@ func TestTxOutPointFromString(t *testing.T) {
 	}
 }
 
+// TestTxSuperfluousWitnessRecord ensures that btcd fails to parse a tx with
+// the witness marker flag set but without any actual witnesses.
+func TestTxSuperfluousWitnessRecord(t *testing.T) {
+	m := &MsgTx{}
+	rbuf := bytes.NewReader(multiWitnessFlagNoWitness)
+	err := m.BtcDecode(rbuf, ProtocolVersion, WitnessEncoding)
+	if !errors.Is(err, errSuperfluousWitnessRecord) {
+		t.Fatalf("should have failed with %v", errSuperfluousWitnessRecord)
+	}
+}
+
 // multiTx is a MsgTx with an input and output and used in various tests.
 var multiTx = &MsgTx{
 	Version: 1,
@@ -910,7 +950,7 @@ var multiTxEncoded = []byte{
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // Previous output hash
-	0xff, 0xff, 0xff, 0xff, // Prevous output index
+	0xff, 0xff, 0xff, 0xff, // Previous output index
 	0x07,                                     // Varint for length of signature script
 	0x04, 0x31, 0xdc, 0x00, 0x1b, 0x01, 0x62, // Signature script
 	0xff, 0xff, 0xff, 0xff, // Sequence
@@ -999,6 +1039,33 @@ var multiWitnessTx = &MsgTx{
 			},
 		},
 	},
+}
+
+// multiWitnessFlagNoWitness is the wire encoded bytes for multiWitnessTx with
+// the witness flag set but with witnesses omitted.
+var multiWitnessFlagNoWitness = []byte{
+	0x1, 0x0, 0x0, 0x0, // Version
+	TxFlagMarker, // Marker byte indicating 0 inputs, or a segwit encoded tx
+	WitnessFlag,  // Flag byte
+	0x1,          // Varint for number of inputs
+	0xa5, 0x33, 0x52, 0xd5, 0x13, 0x57, 0x66, 0xf0,
+	0x30, 0x76, 0x59, 0x74, 0x18, 0x26, 0x3d, 0xa2,
+	0xd9, 0xc9, 0x58, 0x31, 0x59, 0x68, 0xfe, 0xa8,
+	0x23, 0x52, 0x94, 0x67, 0x48, 0x1f, 0xf9, 0xcd, // Previous output hash
+	0x13, 0x0, 0x0, 0x0, // Little endian previous output index
+	0x0,                    // No sig script (this is a witness input)
+	0xff, 0xff, 0xff, 0xff, // Sequence
+	0x1,                                    // Varint for number of outputs
+	0xb, 0x7, 0x6, 0x0, 0x0, 0x0, 0x0, 0x0, // Output amount
+	0x16, // Varint for length of pk script
+	0x0,  // Version 0 witness program
+	0x14, // OP_DATA_20
+	0x9d, 0xda, 0xc6, 0xf3, 0x9d, 0x51, 0xe0, 0x39,
+	0x8e, 0x53, 0x2a, 0x22, 0xc4, 0x1b, 0xa1, 0x89,
+	0x40, 0x6a, 0x85, 0x23, // 20-byte pub key hash
+	0x00,               // No item on the witness stack for the first input
+	0x00,               // No item on the witness stack for the second input
+	0x0, 0x0, 0x0, 0x0, // Lock time
 }
 
 // multiWitnessTxEncoded is the wire encoded bytes for multiWitnessTx including inputs

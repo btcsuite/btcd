@@ -350,7 +350,7 @@ func TestPrune(t *testing.T) {
 			}
 
 			if pruned {
-				err = fmt.Errorf("The database hasn't been commited yet " +
+				err = fmt.Errorf("The database hasn't been committed yet " +
 					"but files were already deleted")
 			}
 			return err

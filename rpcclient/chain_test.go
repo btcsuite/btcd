@@ -2,13 +2,14 @@ package rpcclient
 
 import (
 	"errors"
-	"github.com/gorilla/websocket"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/gorilla/websocket"
 )
 
 var upgrader = websocket.Upgrader{}
@@ -33,7 +34,7 @@ func TestUnmarshalGetBlockChainInfoResultSoftForks(t *testing.T) {
 		},
 		{
 			name:       "bitcoind >= 0.19.0 with separate softforks",
-			version:    BitcoindPost19,
+			version:    BitcoindPre22,
 			res:        []byte(`{"softforks": [{"version": 2}]}`),
 			compatible: false,
 		},
@@ -45,7 +46,7 @@ func TestUnmarshalGetBlockChainInfoResultSoftForks(t *testing.T) {
 		},
 		{
 			name:       "bitcoind >= 0.19.0 with unified softforks",
-			version:    BitcoindPost19,
+			version:    BitcoindPre22,
 			res:        []byte(`{"softforks": {"segwit": {"type": "bip9"}}}`),
 			compatible: true,
 		},
@@ -53,7 +54,7 @@ func TestUnmarshalGetBlockChainInfoResultSoftForks(t *testing.T) {
 
 	for _, test := range tests {
 		success := t.Run(test.name, func(t *testing.T) {
-			// We'll start by unmarshaling the JSON into a struct.
+			// We'll start by unmarshalling the JSON into a struct.
 			// The SoftForks and UnifiedSoftForks field should not
 			// be set yet, as they are unmarshaled within a
 			// different function.
@@ -87,7 +88,7 @@ func TestUnmarshalGetBlockChainInfoResultSoftForks(t *testing.T) {
 
 			// If the version is compatible with the response, we
 			// should expect to see the proper softforks field set.
-			if test.version == BitcoindPost19 &&
+			if test.version == BitcoindPre22 &&
 				info.SoftForks != nil {
 				t.Fatal("expected SoftForks to be empty")
 			}
@@ -225,7 +226,7 @@ func TestClientConnectedToWSServerRunner(t *testing.T) {
 				response := <-ch
 
 				if &expectedResponse != response {
-					t.Fatalf("received unexepcted response")
+					t.Fatalf("received unexpected response")
 				}
 
 				// ensure the goroutine created in this test exists,
@@ -235,7 +236,7 @@ func TestClientConnectedToWSServerRunner(t *testing.T) {
 		},
 	}
 
-	// since these tests rely on concurrency, ensure there is a resonable timeout
+	// since these tests rely on concurrency, ensure there is a reasonable timeout
 	// that they should run within
 	for _, testCase := range testTable {
 		done := make(chan bool)

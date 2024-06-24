@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/btcsuite/btcd/btcjson"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 )
 
@@ -1256,16 +1257,16 @@ func TestChainSvrCmds(t *testing.T) {
 		{
 			name: "sendrawtransaction optional, bitcoind >= 0.19.0",
 			newCmd: func() (interface{}, error) {
-				return btcjson.NewCmd("sendrawtransaction", "1122", &btcjson.AllowHighFeesOrMaxFeeRate{Value: btcjson.Int32(1234)})
+				return btcjson.NewCmd("sendrawtransaction", "1122", &btcjson.AllowHighFeesOrMaxFeeRate{Value: btcjson.Float64(0.1234)})
 			},
 			staticCmd: func() interface{} {
-				return btcjson.NewBitcoindSendRawTransactionCmd("1122", 1234)
+				return btcjson.NewBitcoindSendRawTransactionCmd("1122", 0.1234)
 			},
-			marshalled: `{"jsonrpc":"1.0","method":"sendrawtransaction","params":["1122",1234],"id":1}`,
+			marshalled: `{"jsonrpc":"1.0","method":"sendrawtransaction","params":["1122",0.1234],"id":1}`,
 			unmarshalled: &btcjson.SendRawTransactionCmd{
 				HexTx: "1122",
 				FeeSetting: &btcjson.AllowHighFeesOrMaxFeeRate{
-					Value: btcjson.Int32(1234),
+					Value: btcjson.Float64(0.1234),
 				},
 			},
 		},
@@ -1471,6 +1472,57 @@ func TestChainSvrCmds(t *testing.T) {
 
 			marshalled:   `{"jsonrpc":"1.0","method":"getzmqnotifications","params":[],"id":1}`,
 			unmarshalled: &btcjson.GetZmqNotificationsCmd{},
+		},
+		{
+			name: "testmempoolaccept",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("testmempoolaccept", []string{"rawhex"}, 0.1)
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewTestMempoolAcceptCmd([]string{"rawhex"}, 0.1)
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"testmempoolaccept","params":[["rawhex"],0.1],"id":1}`,
+			unmarshalled: &btcjson.TestMempoolAcceptCmd{
+				RawTxns:    []string{"rawhex"},
+				MaxFeeRate: 0.1,
+			},
+		},
+		{
+			name: "testmempoolaccept with maxfeerate",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("testmempoolaccept", []string{"rawhex"}, 0.01)
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewTestMempoolAcceptCmd([]string{"rawhex"}, 0.01)
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"testmempoolaccept","params":[["rawhex"],0.01],"id":1}`,
+			unmarshalled: &btcjson.TestMempoolAcceptCmd{
+				RawTxns:    []string{"rawhex"},
+				MaxFeeRate: 0.01,
+			},
+		},
+		{
+			name: "gettxspendingprevout",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd(
+					"gettxspendingprevout",
+					[]*btcjson.GetTxSpendingPrevOutCmdOutput{
+						{Txid: "0000000000000000000000000000000000000000000000000000000000000001", Vout: 0},
+					})
+			},
+			staticCmd: func() interface{} {
+				outputs := []wire.OutPoint{
+					{Hash: chainhash.Hash{1}, Index: 0},
+				}
+				return btcjson.NewGetTxSpendingPrevOutCmd(outputs)
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"gettxspendingprevout","params":[[{"txid":"0000000000000000000000000000000000000000000000000000000000000001","vout":0}]],"id":1}`,
+			unmarshalled: &btcjson.GetTxSpendingPrevOutCmd{
+				Outputs: []*btcjson.GetTxSpendingPrevOutCmdOutput{{
+					Txid: "0000000000000000000000000000000000000000000000000000000000000001",
+					Vout: 0,
+				}},
+			},
 		},
 	}
 

@@ -308,8 +308,8 @@ func CheckTransactionStandard(tx *btcutil.Tx, height int32,
 	// attacks.
 	txWeight := blockchain.GetTransactionWeight(tx)
 	if txWeight > maxStandardTxWeight {
-		str := fmt.Sprintf("weight of transaction %v is larger than max "+
-			"allowed weight of %v", txWeight, maxStandardTxWeight)
+		str := fmt.Sprintf("weight of transaction is larger than max "+
+			"allowed: %v > %v", txWeight, maxStandardTxWeight)
 		return txRuleError(wire.RejectNonstandard, str)
 	}
 
@@ -320,8 +320,8 @@ func CheckTransactionStandard(tx *btcutil.Tx, height int32,
 		sigScriptLen := len(txIn.SignatureScript)
 		if sigScriptLen > maxStandardSigScriptSize {
 			str := fmt.Sprintf("transaction input %d: signature "+
-				"script size of %d bytes is large than max "+
-				"allowed size of %d bytes", i, sigScriptLen,
+				"script size is larger than max allowed: "+
+				"%d > %d bytes", i, sigScriptLen,
 				maxStandardSigScriptSize)
 			return txRuleError(wire.RejectNonstandard, str)
 		}
@@ -359,8 +359,8 @@ func CheckTransactionStandard(tx *btcutil.Tx, height int32,
 		if scriptClass == txscript.NullDataTy {
 			numNullDataOutputs++
 		} else if IsDust(txOut, minRelayTxFee) {
-			str := fmt.Sprintf("transaction output %d: payment "+
-				"of %d is dust", i, txOut.Value)
+			str := fmt.Sprintf("transaction output %d: payment is "+
+				"dust: %v", i, txOut.Value)
 			return txRuleError(wire.RejectDust, str)
 		}
 	}

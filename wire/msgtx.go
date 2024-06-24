@@ -5,6 +5,7 @@
 package wire
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -109,6 +110,14 @@ const (
 	// an input's witness data. This value is bounded by the largest
 	// possible block size, post segwit v1 (taproot).
 	maxWitnessItemSize = 4_000_000
+)
+
+var (
+	// errSuperfluousWitnessRecord is returned during tx deserialization when
+	// a tx has the witness marker flag set but has no witnesses.
+	errSuperfluousWitnessRecord = fmt.Errorf(
+		"witness flag set but tx has no witnesses",
+	)
 )
 
 // TxFlagMarker is the first byte of the FLAG field in a bitcoin tx
@@ -302,6 +311,22 @@ func (t TxWitness) SerializeSize() int {
 	return n
 }
 
+// ToHexStrings formats the witness stack as a slice of hex-encoded strings.
+func (t TxWitness) ToHexStrings() []string {
+	// Ensure nil is returned when there are no entries versus an empty
+	// slice so it can properly be omitted as necessary.
+	if len(t) == 0 {
+		return nil
+	}
+
+	result := make([]string, len(t))
+	for idx, wit := range t {
+		result[idx] = hex.EncodeToString(wit)
+	}
+
+	return result
+}
+
 // TxOut defines a bitcoin transaction output.
 type TxOut struct {
 	Value    int64
@@ -351,6 +376,11 @@ func (msg *MsgTx) AddTxOut(to *TxOut) {
 // TxHash generates the Hash for the transaction.
 func (msg *MsgTx) TxHash() chainhash.Hash {
 	return chainhash.DoubleHashRaw(msg.SerializeNoWitness)
+}
+
+// TxID generates the transaction ID of the transaction.
+func (msg *MsgTx) TxID() string {
+	return msg.TxHash().String()
 }
 
 // WitnessHash generates the hash of the transaction serialized according to
@@ -579,8 +609,7 @@ func (msg *MsgTx) btcDecode(r io.Reader, pver uint32, enc MessageEncoding,
 			txin.Witness = make([][]byte, witCount)
 			for j := uint64(0); j < witCount; j++ {
 				txin.Witness[j], err = readScriptBuf(
-					r, pver, buf, sbuf, maxWitnessItemSize,
-					"script witness item",
+					r, pver, buf, sbuf, "script witness item",
 				)
 				if err != nil {
 					return err
@@ -588,6 +617,12 @@ func (msg *MsgTx) btcDecode(r io.Reader, pver uint32, enc MessageEncoding,
 				totalScriptSize += uint64(len(txin.Witness[j]))
 				sbuf = sbuf[len(txin.Witness[j]):]
 			}
+		}
+
+		// Check that if the witness flag is set that we actually have
+		// witnesses. This check is also done by bitcoind.
+		if !msg.HasWitness() {
+			return errSuperfluousWitnessRecord
 		}
 	}
 
@@ -982,7 +1017,7 @@ func writeOutPointBuf(w io.Writer, pver uint32, version int32, op *OutPoint,
 //
 // NOTE: b MUST either be nil or at least an 8-byte slice.
 func readScriptBuf(r io.Reader, pver uint32, buf, s []byte,
-	maxAllowed uint32, fieldName string) ([]byte, error) {
+	fieldName string) ([]byte, error) {
 
 	count, err := ReadVarIntBuf(r, pver, buf)
 	if err != nil {
@@ -992,9 +1027,9 @@ func readScriptBuf(r io.Reader, pver uint32, buf, s []byte,
 	// Prevent byte array larger than the max message size.  It would
 	// be possible to cause memory exhaustion and panics without a sane
 	// upper bound on this count.
-	if count > uint64(maxAllowed) {
+	if count > maxWitnessItemSize {
 		str := fmt.Sprintf("%s is larger than the max allowed size "+
-			"[count %d, max %d]", fieldName, count, maxAllowed)
+			"[count %d, max %d]", fieldName, count, maxWitnessItemSize)
 		return nil, messageError("readScript", str)
 	}
 
@@ -1021,8 +1056,9 @@ func readTxInBuf(r io.Reader, pver uint32, version int32, ti *TxIn,
 		return err
 	}
 
-	ti.SignatureScript, err = readScriptBuf(r, pver, buf, s, MaxMessagePayload,
-		"transaction input signature script")
+	ti.SignatureScript, err = readScriptBuf(
+		r, pver, buf, s, "transaction input signature script",
+	)
 	if err != nil {
 		return err
 	}
@@ -1085,8 +1121,7 @@ func readTxOutBuf(r io.Reader, pver uint32, version int32, to *TxOut,
 	to.Value = int64(littleEndian.Uint64(buf))
 
 	to.PkScript, err = readScriptBuf(
-		r, pver, buf, s, MaxMessagePayload,
-		"transaction output public key script",
+		r, pver, buf, s, "transaction output public key script",
 	)
 	return err
 }

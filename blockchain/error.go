@@ -70,7 +70,7 @@ const (
 
 	// ErrUnexpectedDifficulty indicates specified bits do not align with
 	// the expected value either because it doesn't match the calculated
-	// valued based on difficulty regarted rules or it is out of the valid
+	// valued based on difficulty regarded rules or it is out of the valid
 	// range.
 	ErrUnexpectedDifficulty
 

@@ -467,7 +467,7 @@ func (k *ExtendedKey) DeriveNonStandard(i uint32) (*ExtendedKey, error) {
 		k.depth+1, i, isPrivate), nil
 }
 
-// ChildNum returns the index at which the child extended key was derived.
+// ChildIndex returns the index at which the child extended key was derived.
 //
 // Extended keys with ChildNum value between 0 and 2^31-1 are normal child
 // keys, and those with a value between 2^31 and 2^32-1 are hardened keys.

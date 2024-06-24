@@ -46,7 +46,8 @@ const (
 		ScriptVerifyTaproot |
 		ScriptVerifyDiscourageUpgradeableTaprootVersion |
 		ScriptVerifyDiscourageOpSuccess |
-		ScriptVerifyDiscourageUpgradeablePubkeyType
+		ScriptVerifyDiscourageUpgradeablePubkeyType |
+		ScriptVerifyConstScriptCode
 )
 
 // ScriptClass is an enumeration for the list of standard types of script.
@@ -153,7 +154,7 @@ func isPubKeyScript(script []byte) bool {
 // is a standard pay-to-pubkey-hash script.  It will return nil otherwise.
 func extractPubKeyHash(script []byte) []byte {
 	// A pay-to-pubkey-hash script is of the form:
-	//  OP_DUP OP_HASH160 <20-byte hash> OP_EQUALVERIFY OP_CHECKSIG
+	//  OP_DUP OP_HASH160 OP_DATA_20 <20-byte hash> OP_EQUALVERIFY OP_CHECKSIG
 	if len(script) == 25 &&
 		script[0] == OP_DUP &&
 		script[1] == OP_HASH160 &&
@@ -181,7 +182,7 @@ func isPubKeyHashScript(script []byte) bool {
 // versions.
 func extractScriptHash(script []byte) []byte {
 	// A pay-to-script-hash script is of the form:
-	//  OP_HASH160 <20-byte scripthash> OP_EQUAL
+	//  OP_HASH160 OP_DATA_20 <20-byte scripthash> OP_EQUAL
 	if len(script) == 23 &&
 		script[0] == OP_HASH160 &&
 		script[1] == OP_DATA_20 &&

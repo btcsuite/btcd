@@ -178,7 +178,7 @@ func DisasmString(script []byte) (string, error) {
 // removeOpcodeRaw will return the script after removing any opcodes that match
 // `opcode`. If the opcode does not appear in script, the original script will
 // be returned unmodified. Otherwise, a new script will be allocated to contain
-// the filtered script. This metehod assumes that the script parses
+// the filtered script. This method assumes that the script parses
 // successfully.
 //
 // NOTE: This function is only valid for version 0 scripts.  Since the function
@@ -244,7 +244,7 @@ func isCanonicalPush(opcode byte, data []byte) bool {
 // removeOpcodeByData will return the script minus any opcodes that perform a
 // canonical push of data that contains the passed data to remove.  This
 // function assumes it is provided a version 0 script as any future version of
-// script should avoid this functionality since it is unncessary due to the
+// script should avoid this functionality since it is unnecessary due to the
 // signature scripts not being part of the witness-free transaction hash.
 //
 // WARNING: This will return the passed script unmodified unless a modification
@@ -255,10 +255,10 @@ func isCanonicalPush(opcode byte, data []byte) bool {
 // NOTE: This function is only valid for version 0 scripts.  Since the function
 // does not accept a script version, the results are undefined for other script
 // versions.
-func removeOpcodeByData(script []byte, dataToRemove []byte) []byte {
+func removeOpcodeByData(script []byte, dataToRemove []byte) ([]byte, bool) {
 	// Avoid work when possible.
 	if len(script) == 0 || len(dataToRemove) == 0 {
-		return script
+		return script, false
 	}
 
 	// Parse through the script looking for a canonical data push that contains
@@ -266,32 +266,48 @@ func removeOpcodeByData(script []byte, dataToRemove []byte) []byte {
 	const scriptVersion = 0
 	var result []byte
 	var prevOffset int32
+	var match bool
 	tokenizer := MakeScriptTokenizer(scriptVersion, script)
 	for tokenizer.Next() {
-		// In practice, the script will basically never actually contain the
-		// data since this function is only used during signature verification
-		// to remove the signature itself which would require some incredibly
-		// non-standard code to create.
-		//
-		// Thus, as an optimization, avoid allocating a new script unless there
-		// is actually a match that needs to be removed.
-		op, data := tokenizer.Opcode(), tokenizer.Data()
-		if isCanonicalPush(op, data) && bytes.Contains(data, dataToRemove) {
-			if result == nil {
-				fullPushLen := tokenizer.ByteIndex() - prevOffset
-				result = make([]byte, 0, int32(len(script))-fullPushLen)
-				result = append(result, script[0:prevOffset]...)
-			}
-		} else if result != nil {
-			result = append(result, script[prevOffset:tokenizer.ByteIndex()]...)
+		var found bool
+		result, prevOffset, found = removeOpcodeCanonical(
+			&tokenizer, script, dataToRemove, prevOffset, result,
+		)
+		if found {
+			match = true
 		}
-
-		prevOffset = tokenizer.ByteIndex()
 	}
 	if result == nil {
 		result = script
 	}
-	return result
+	return result, match
+}
+
+func removeOpcodeCanonical(t *ScriptTokenizer, script, dataToRemove []byte,
+	prevOffset int32, result []byte) ([]byte, int32, bool) {
+
+	var found bool
+
+	// In practice, the script will basically never actually contain the
+	// data since this function is only used during signature verification
+	// to remove the signature itself which would require some incredibly
+	// non-standard code to create.
+	//
+	// Thus, as an optimization, avoid allocating a new script unless there
+	// is actually a match that needs to be removed.
+	op, data := t.Opcode(), t.Data()
+	if isCanonicalPush(op, data) && bytes.Equal(data, dataToRemove) {
+		if result == nil {
+			fullPushLen := t.ByteIndex() - prevOffset
+			result = make([]byte, 0, int32(len(script))-fullPushLen)
+			result = append(result, script[0:prevOffset]...)
+		}
+		found = true
+	} else if result != nil {
+		result = append(result, script[prevOffset:t.ByteIndex()]...)
+	}
+
+	return result, t.ByteIndex(), found
 }
 
 // AsSmallInt returns the passed opcode, which must be true according to
