@@ -411,7 +411,10 @@ var BtcdErrMap = map[string]error{
 	"transaction already exists in blockchain":    ErrTxAlreadyConfirmed,
 
 	// A transaction in the mempool.
-	"already have transaction in mempool": ErrTxAlreadyInMempool,
+	//
+	// NOTE: For btcd v0.24.2 and beyond, the error message is "already
+	// have transaction in mempool".
+	"already have transaction": ErrTxAlreadyInMempool,
 
 	// A transaction with missing inputs, that never existed or only
 	// existed once in the past.
