@@ -23,7 +23,7 @@ import (
 //
 // The algorithm for building the block locator hashes should be to add the
 // hashes in reverse order until you reach the genesis block.  In order to keep
-// the list of locator hashes to a resonable number of entries, first add the
+// the list of locator hashes to a reasonable number of entries, first add the
 // most recent 10 block hashes, then double the step each loop iteration to
 // exponentially decrease the number of hashes the further away from head and
 // closer to the genesis block you get.

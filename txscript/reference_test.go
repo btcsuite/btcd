@@ -11,7 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -196,6 +196,8 @@ func parseScriptFlags(flagStr string) (ScriptFlags, error) {
 			flags |= ScriptVerifyWitnessPubKeyType
 		case "TAPROOT":
 			flags |= ScriptVerifyTaproot
+		case "CONST_SCRIPTCODE":
+			flags |= ScriptVerifyConstScriptCode
 		default:
 			return flags, fmt.Errorf("invalid flag: %s", flag)
 		}
@@ -490,7 +492,7 @@ func testScripts(t *testing.T, tests [][]interface{}, useSigCache bool) {
 // TestScripts ensures all of the tests in script_tests.json execute with the
 // expected results as defined in the test data.
 func TestScripts(t *testing.T) {
-	file, err := ioutil.ReadFile("data/script_tests.json")
+	file, err := os.ReadFile("data/script_tests.json")
 	if err != nil {
 		t.Fatalf("TestScripts: %v\n", err)
 	}
@@ -521,7 +523,7 @@ func testVecF64ToUint32(f float64) uint32 {
 // TestTxInvalidTests ensures all of the tests in tx_invalid.json fail as
 // expected.
 func TestTxInvalidTests(t *testing.T) {
-	file, err := ioutil.ReadFile("data/tx_invalid.json")
+	file, err := os.ReadFile("data/tx_invalid.json")
 	if err != nil {
 		t.Fatalf("TestTxInvalidTests: %v\n", err)
 	}
@@ -679,7 +681,7 @@ testloop:
 
 // TestTxValidTests ensures all of the tests in tx_valid.json pass as expected.
 func TestTxValidTests(t *testing.T) {
-	file, err := ioutil.ReadFile("data/tx_valid.json")
+	file, err := os.ReadFile("data/tx_valid.json")
 	if err != nil {
 		t.Fatalf("TestTxValidTests: %v\n", err)
 	}
@@ -836,7 +838,7 @@ testloop:
 // in sighash.json.
 // https://github.com/bitcoin/bitcoin/blob/master/src/test/data/sighash.json
 func TestCalcSignatureHash(t *testing.T) {
-	file, err := ioutil.ReadFile("data/sighash.json")
+	file, err := os.ReadFile("data/sighash.json")
 	if err != nil {
 		t.Fatalf("TestCalcSignatureHash: %v\n", err)
 	}
@@ -1044,7 +1046,7 @@ func TestTaprootReferenceTests(t *testing.T) {
 			return nil
 		}
 
-		testJson, err := ioutil.ReadFile(path)
+		testJson, err := os.ReadFile(path)
 		if err != nil {
 			return fmt.Errorf("unable to read file: %v", err)
 		}

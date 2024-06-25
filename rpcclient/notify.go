@@ -472,13 +472,13 @@ func (c *Client) handleNotification(ntfn *rawNotification) {
 	}
 }
 
-// wrongNumParams is an error type describing an unparseable JSON-RPC
-// notificiation due to an incorrect number of parameters for the
+// wrongNumParams is an error type describing an unparsable JSON-RPC
+// notification due to an incorrect number of parameters for the
 // expected notification type.  The value is the number of parameters
 // of the invalid notification.
 type wrongNumParams int
 
-// Error satisifies the builtin error interface.
+// Error satisfies the builtin error interface.
 func (e wrongNumParams) Error() string {
 	return fmt.Sprintf("wrong number of parameters (%d)", e)
 }
@@ -599,7 +599,7 @@ func parseFilteredBlockDisconnectedParams(params []json.RawMessage) (int32,
 		return 0, nil, err
 	}
 
-	// Unmarshal second parmeter as a slice of bytes.
+	// Unmarshal second parameter as a slice of bytes.
 	blockHeaderBytes, err := parseHexParam(params[1])
 	if err != nil {
 		return 0, nil, err

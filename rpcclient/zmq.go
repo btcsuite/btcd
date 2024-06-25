@@ -24,7 +24,7 @@ func (r FutureGetZmqNotificationsResult) Receive() (btcjson.GetZmqNotificationRe
 	return notifications, nil
 }
 
-// GetZmqNotificationsAsync returns an instance ofa type that can be used to get
+// GetZmqNotificationsAsync returns an instance of a type that can be used to get
 // the result of a custom RPC request at some future time by invoking the Receive
 // function on the returned instance.
 //

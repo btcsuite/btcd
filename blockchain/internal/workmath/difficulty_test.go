@@ -2,7 +2,7 @@
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package blockchain
+package workmath
 
 import (
 	"math/big"
@@ -32,7 +32,7 @@ func TestBigToCompact(t *testing.T) {
 }
 
 // TestCompactToBig ensures CompactToBig converts numbers using the compact
-// representation to the expected big intergers.
+// representation to the expected big integers.
 func TestCompactToBig(t *testing.T) {
 	tests := []struct {
 		in  uint32

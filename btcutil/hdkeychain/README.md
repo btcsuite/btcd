@@ -17,7 +17,7 @@ report.
 
 - Full BIP0032 implementation
 - Single type for private and public extended keys
-- Convenient cryptograpically secure seed generation
+- Convenient cryptographically secure seed generation
 - Simple creation of master nodes
 - Support for multi-layer derivation
 - Easy serialization and deserialization for both private and public extended
@@ -26,7 +26,7 @@ report.
 - Obtaining the underlying EC pubkeys, EC privkeys, and associated bitcoin
   addresses ties in seamlessly with existing btcec and btcutil types which
   provide powerful tools for working with them to do things like sign
-  transations and generate payment scripts
+  transactions and generate payment scripts
 - Uses the btcec package which is highly optimized for secp256k1
 - Code examples including:
   - Generating a cryptographically secure random seed and deriving a

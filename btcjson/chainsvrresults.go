@@ -304,8 +304,8 @@ type GetBlockTemplateResult struct {
 	NonceRange string   `json:"noncerange,omitempty"`
 
 	// Block proposal from BIP 0023.
-	Capabilities  []string `json:"capabilities,omitempty"`
-	RejectReasion string   `json:"reject-reason,omitempty"`
+	Capabilities []string `json:"capabilities,omitempty"`
+	RejectReason string   `json:"reject-reason,omitempty"`
 }
 
 // GetMempoolEntryResult models the data returned from the getmempoolentry's
@@ -854,4 +854,74 @@ type LoadWalletResult struct {
 // DumpWalletResult models the data from the dumpwallet command
 type DumpWalletResult struct {
 	Filename string `json:"filename"`
+}
+
+// TestMempoolAcceptResult models the data from the testmempoolaccept command.
+// The result of the mempool acceptance test for each raw transaction in the
+// input array. Returns results for each transaction in the same order they
+// were passed in. Transactions that cannot be fully validated due to failures
+// in other transactions will not contain an 'allowed' result.
+type TestMempoolAcceptResult struct {
+	// Txid is the transaction hash in hex.
+	Txid string `json:"txid"`
+
+	// Wtxid is the transaction witness hash in hex.
+	Wtxid string `json:"wtxid"`
+
+	// PackageError is the package validation error, if any (only possible
+	// if rawtxs had more than 1 transaction).
+	PackageError string `json:"package-error"`
+
+	// Allowed specifies whether this tx would be accepted to the mempool
+	// and pass client-specified maxfeerate. If not present, the tx was not
+	// fully validated due to a failure in another tx in the list.
+	Allowed bool `json:"allowed,omitempty"`
+
+	// Vsize is the virtual transaction size as defined in BIP 141. This is
+	// different from actual serialized size for witness transactions as
+	// witness data is discounted (only present when 'allowed' is true)
+	Vsize int32 `json:"vsize,omitempty"`
+
+	// Fees specifies the transaction fees (only present if 'allowed' is
+	// true).
+	Fees *TestMempoolAcceptFees `json:"fees,omitempty"`
+
+	// RejectReason is the rejection string (only present when 'allowed' is
+	// false).
+	RejectReason string `json:"reject-reason,omitempty"`
+}
+
+// TestMempoolAcceptFees models the `fees` section from the testmempoolaccept
+// command.
+type TestMempoolAcceptFees struct {
+	// Base is the transaction fee in BTC.
+	Base float64 `json:"base"`
+
+	// EffectiveFeeRate specifies the effective feerate in BTC per KvB. May
+	// differ from the base feerate if, for example, there are modified
+	// fees from prioritisetransaction or a package feerate was used.
+	//
+	// NOTE: this field only exists in bitcoind v25.0 and above.
+	EffectiveFeeRate float64 `json:"effective-feerate"`
+
+	// EffectiveIncludes specifies transactions whose fees and vsizes are
+	// included in effective-feerate. Each item is a transaction wtxid in
+	// hex.
+	//
+	// NOTE: this field only exists in bitcoind v25.0 and above.
+	EffectiveIncludes []string `json:"effective-includes"`
+}
+
+// GetTxSpendingPrevOutResult defines a single item returned from the
+// gettxspendingprevout command.
+type GetTxSpendingPrevOutResult struct {
+	// Txid is the transaction id of the checked output.
+	Txid string `json:"txid"`
+
+	// Vout is the vout value of the checked output.
+	Vout uint32 `json:"vout"`
+
+	// SpendingTxid is the transaction id of the mempool transaction
+	// spending this output (omitted if unspent).
+	SpendingTxid string `json:"spendingtxid,omitempty"`
 }

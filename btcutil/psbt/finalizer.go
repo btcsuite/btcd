@@ -404,7 +404,7 @@ func finalizeWitnessInput(p *Packet, inIndex int) error {
 	}
 
 	containsRedeemScript := pInput.RedeemScript != nil
-	cointainsWitnessScript := pInput.WitnessScript != nil
+	containsWitnessScript := pInput.WitnessScript != nil
 
 	// If there's no redeem script, then we assume that this is native
 	// segwit input.
@@ -413,7 +413,7 @@ func finalizeWitnessInput(p *Packet, inIndex int) error {
 		// If we have only a sigley pubkey+sig pair, and no witness
 		// script, then we assume this is a P2WKH input.
 		if len(pubKeys) == 1 && len(sigs) == 1 &&
-			!cointainsWitnessScript {
+			!containsWitnessScript {
 
 			serializedWitness, err = writePKHWitness(
 				sigs[0], pubKeys[0],
@@ -430,7 +430,7 @@ func finalizeWitnessInput(p *Packet, inIndex int) error {
 			// TODO(roasbeef): need to add custom finalize for
 			// non-multisig P2WSH outputs (HTLCs, delay outputs,
 			// etc).
-			if !cointainsWitnessScript {
+			if !containsWitnessScript {
 				return ErrNotFinalizable
 			}
 
@@ -457,7 +457,7 @@ func finalizeWitnessInput(p *Packet, inIndex int) error {
 
 		// If don't have a witness script, then we assume this is a
 		// nested p2wkh output.
-		if !cointainsWitnessScript {
+		if !containsWitnessScript {
 			// Assumed p2sh-p2wkh Here the witness is just (sig,
 			// pub) as for p2pkh case
 			if len(sigs) != 1 || len(pubKeys) != 1 {

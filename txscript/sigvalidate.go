@@ -20,9 +20,14 @@ import (
 // pre-segwit, segwit v0, segwit v1 (taproot key spend validation), and the
 // base tapscript verification.
 type signatureVerifier interface {
-	// Verify returns true if the signature verifier context deems the
+	// Verify returns whether or not the signature verifier context deems the
 	// signature to be valid for the given context.
-	Verify() bool
+	Verify() verifyResult
+}
+
+type verifyResult struct {
+	sigValid bool
+	sigMatch bool
 }
 
 // baseSigVerifier is used to verify signatures for the _base_ system, meaning
@@ -147,20 +152,23 @@ func (b *baseSigVerifier) verifySig(sigHash []byte) bool {
 	return valid
 }
 
-// Verify returns true if the signature verifier context deems the signature to
-// be valid for the given context.
+// Verify returns whether or not the signature verifier context deems the
+// signature to be valid for the given context.
 //
 // NOTE: This is part of the baseSigVerifier interface.
-func (b *baseSigVerifier) Verify() bool {
+func (b *baseSigVerifier) Verify() verifyResult {
 	// Remove the signature since there is no way for a signature
 	// to sign itself.
-	subScript := removeOpcodeByData(b.subScript, b.fullSigBytes)
+	subScript, match := removeOpcodeByData(b.subScript, b.fullSigBytes)
 
 	sigHash := calcSignatureHash(
 		subScript, b.hashType, &b.vm.tx, b.vm.txIdx,
 	)
 
-	return b.verifySig(sigHash)
+	return verifyResult{
+		sigValid: b.verifySig(sigHash),
+		sigMatch: match,
+	}
 }
 
 // A compile-time assertion to ensure baseSigVerifier implements the
@@ -192,7 +200,7 @@ func newBaseSegwitSigVerifier(pkBytes, fullSigBytes []byte,
 // be valid for the given context.
 //
 // NOTE: This is part of the baseSigVerifier interface.
-func (s *baseSegwitSigVerifier) Verify() bool {
+func (s *baseSegwitSigVerifier) Verify() verifyResult {
 	var sigHashes *TxSigHashes
 	if s.vm.hashCache != nil {
 		sigHashes = s.vm.hashCache
@@ -208,10 +216,12 @@ func (s *baseSegwitSigVerifier) Verify() bool {
 		// TODO(roasbeef): this doesn't need to return an error, should
 		// instead be further up the stack? this only returns an error
 		// if the input index is greater than the number of inputs
-		return false
+		return verifyResult{}
 	}
 
-	return s.verifySig(sigHash)
+	return verifyResult{
+		sigValid: s.verifySig(sigHash),
+	}
 }
 
 // A compile-time assertion to ensure baseSegwitSigVerifier implements the
@@ -331,7 +341,7 @@ func newTaprootSigVerifier(pkBytes []byte, fullSigBytes []byte,
 // key and signature, and the passed sigHash as the message digest.
 func (t *taprootSigVerifier) verifySig(sigHash []byte) bool {
 	// At this point, we can check to see if this signature is already
-	// included in the sigCcahe and is valid or not (if one was passed in).
+	// included in the sigCache and is valid or not (if one was passed in).
 	cacheKey, _ := chainhash.NewHash(sigHash)
 	if t.sigCache != nil {
 		if t.sigCache.Exists(*cacheKey, t.fullSigBytes, t.pkBytes) {
@@ -356,11 +366,11 @@ func (t *taprootSigVerifier) verifySig(sigHash []byte) bool {
 	return false
 }
 
-// Verify returns true if the signature verifier context deems the signature to
-// be valid for the given context.
+// Verify returns whether or not the signature verifier context deems the
+// signature to be valid for the given context.
 //
 // NOTE: This is part of the baseSigVerifier interface.
-func (t *taprootSigVerifier) Verify() bool {
+func (t *taprootSigVerifier) Verify() verifyResult {
 	var opts []TaprootSigHashOption
 	if t.annex != nil {
 		opts = append(opts, WithAnnex(t.annex))
@@ -374,10 +384,12 @@ func (t *taprootSigVerifier) Verify() bool {
 	)
 	if err != nil {
 		// TODO(roasbeef): propagate the error here?
-		return false
+		return verifyResult{}
 	}
 
-	return t.verifySig(sigHash)
+	return verifyResult{
+		sigValid: t.verifySig(sigHash),
+	}
 }
 
 // A compile-time assertion to ensure taprootSigVerifier implements the
@@ -385,7 +397,7 @@ func (t *taprootSigVerifier) Verify() bool {
 var _ signatureVerifier = (*taprootSigVerifier)(nil)
 
 // baseTapscriptSigVerifier verifies a signature for an input spending a
-// tapscript leaf from the prevoous output.
+// tapscript leaf from the previous output.
 type baseTapscriptSigVerifier struct {
 	*taprootSigVerifier
 
@@ -439,16 +451,18 @@ func newBaseTapscriptSigVerifier(pkBytes, rawSig []byte,
 	}
 }
 
-// Verify returns true if the signature verifier context deems the signature to
-// be valid for the given context.
+// Verify returns whether or not the signature verifier context deems the
+// signature to be valid for the given context.
 //
 // NOTE: This is part of the baseSigVerifier interface.
-func (b *baseTapscriptSigVerifier) Verify() bool {
+func (b *baseTapscriptSigVerifier) Verify() verifyResult {
 	// If the public key is blank, then that means it wasn't 0 or 32 bytes,
 	// so we'll treat this as an unknown public key version and return
-	// true.
+	// that it's valid.
 	if b.pubKey == nil {
-		return true
+		return verifyResult{
+			sigValid: true,
+		}
 	}
 
 	var opts []TaprootSigHashOption
@@ -468,10 +482,12 @@ func (b *baseTapscriptSigVerifier) Verify() bool {
 	)
 	if err != nil {
 		// TODO(roasbeef): propagate the error here?
-		return false
+		return verifyResult{}
 	}
 
-	return b.verifySig(sigHash)
+	return verifyResult{
+		sigValid: b.verifySig(sigHash),
+	}
 }
 
 // A compile-time assertion to ensure baseTapscriptSigVerifier implements the

@@ -146,7 +146,7 @@ func BuildMerkleTreeStore(transactions []*btcutil.Tx, witness bool) []*chainhash
 			merkles[offset] = &newHash
 
 		// The normal case sets the parent node to the double sha256
-		// of the concatentation of the left and right children.
+		// of the concatenation of the left and right children.
 		default:
 			newHash := HashMerkleBranches(merkles[i], merkles[i+1])
 			merkles[offset] = &newHash

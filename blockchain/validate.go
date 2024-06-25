@@ -243,9 +243,9 @@ func CheckTransactionSanity(tx *btcutil.Tx) error {
 			return ruleError(ErrBadTxOutValue, str)
 		}
 		if satoshi > btcutil.MaxSatoshi {
-			str := fmt.Sprintf("transaction output value of %v is "+
-				"higher than max allowed value of %v", satoshi,
-				btcutil.MaxSatoshi)
+			str := fmt.Sprintf("transaction output value is "+
+				"higher than max allowed value: %v > %v ",
+				satoshi, btcutil.MaxSatoshi)
 			return ruleError(ErrBadTxOutValue, str)
 		}
 
@@ -761,7 +761,7 @@ func CheckBlockHeaderContext(header *wire.BlockHeader, prevNode HeaderCtx,
 	return nil
 }
 
-// checkBlockContext peforms several validation checks on the block which depend
+// checkBlockContext performs several validation checks on the block which depend
 // on its position within the block chain.
 //
 // The flags modify the behavior of this function as follows:
@@ -879,7 +879,7 @@ func (b *BlockChain) checkBlockContext(block *btcutil.Block, prevNode *blockNode
 //
 // This function MUST be called with the chain state lock held (for reads).
 func (b *BlockChain) checkBIP0030(node *blockNode, block *btcutil.Block, view *UtxoViewpoint) error {
-	// Fetch utxos for all of the transaction ouputs in this block.
+	// Fetch utxos for all of the transaction outputs in this block.
 	// Typically, there will not be any utxos for any of the outputs.
 	fetch := make([]wire.OutPoint, 0, len(block.Transactions()))
 	for _, tx := range block.Transactions() {
@@ -968,8 +968,8 @@ func CheckTransactionInputs(tx *btcutil.Tx, txHeight int32, utxoView *UtxoViewpo
 			return 0, ruleError(ErrBadTxOutValue, str)
 		}
 		if originTxSatoshi > btcutil.MaxSatoshi {
-			str := fmt.Sprintf("transaction output value of %v is "+
-				"higher than max allowed value of %v",
+			str := fmt.Sprintf("transaction output value is "+
+				"higher than max allowed value: %v > %v ",
 				btcutil.Amount(originTxSatoshi),
 				btcutil.MaxSatoshi)
 			return 0, ruleError(ErrBadTxOutValue, str)
@@ -1084,7 +1084,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block, vi
 	//
 	// These utxo entries are needed for verification of things such as
 	// transaction inputs, counting pay-to-script-hashes, and scripts.
-	err := view.fetchInputUtxos(nil, b.utxoCache, block)
+	err := view.fetchInputUtxos(b.utxoCache, block)
 	if err != nil {
 		return err
 	}

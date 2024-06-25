@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 
 	"github.com/btcsuite/btcd/btcjson"
 	"github.com/btcsuite/btcd/btcutil"
@@ -16,9 +17,9 @@ import (
 )
 
 const (
-	// defaultMaxFeeRate is the default maximum fee rate in sat/KB enforced
+	// defaultMaxFeeRate is the default maximum fee rate in BTC/kvB enforced
 	// by bitcoind v0.19.0 or after for transaction broadcast.
-	defaultMaxFeeRate = btcutil.SatoshiPerBitcoin / 10
+	defaultMaxFeeRate btcjson.BTCPerkvB = 0.1
 )
 
 // SigHashType enumerates the available signature hashing types that the
@@ -358,19 +359,19 @@ func (c *Client) SendRawTransactionAsync(tx *wire.MsgTx, allowHighFees bool) Fut
 	}
 
 	var cmd *btcjson.SendRawTransactionCmd
-	switch version {
 	// Starting from bitcoind v0.19.0, the MaxFeeRate field should be used.
-	case BitcoindPost19:
+	//
+	// When unified softforks format is supported, it's 0.19 and above.
+	if version.SupportUnifiedSoftForks() {
 		// Using a 0 MaxFeeRate is interpreted as a maximum fee rate not
 		// being enforced by bitcoind.
-		var maxFeeRate int32
+		var maxFeeRate btcjson.BTCPerkvB
 		if !allowHighFees {
 			maxFeeRate = defaultMaxFeeRate
 		}
 		cmd = btcjson.NewBitcoindSendRawTransactionCmd(txHex, maxFeeRate)
-
-	// Otherwise, use the AllowHighFees field.
-	default:
+	} else {
+		// Otherwise, use the AllowHighFees field.
 		cmd = btcjson.NewSendRawTransactionCmd(txHex, &allowHighFees)
 	}
 
@@ -718,7 +719,7 @@ func (c *Client) SignRawTransactionWithWallet3Async(tx *wire.MsgTx,
 //
 // This function should only used if a non-default signature hash type is
 // desired.  Otherwise, see SignRawTransactionWithWallet if the RPC server already
-// knows the input transactions, or SignRawTransactionWihWallet2 if it does not.
+// knows the input transactions, or SignRawTransactionWithWallet2 if it does not.
 func (c *Client) SignRawTransactionWithWallet3(tx *wire.MsgTx,
 	inputs []btcjson.RawTxWitnessInput, hashType SigHashType) (*wire.MsgTx, bool, error) {
 
@@ -881,4 +882,203 @@ func (c *Client) DecodeScriptAsync(serializedScript []byte) FutureDecodeScriptRe
 // DecodeScript returns information about a script given its serialized bytes.
 func (c *Client) DecodeScript(serializedScript []byte) (*btcjson.DecodeScriptResult, error) {
 	return c.DecodeScriptAsync(serializedScript).Receive()
+}
+
+// FutureTestMempoolAcceptResult is a future promise to deliver the result
+// of a TestMempoolAccept RPC invocation (or an applicable error).
+type FutureTestMempoolAcceptResult chan *Response
+
+// Receive waits for the Response promised by the future and returns the
+// response from TestMempoolAccept.
+func (r FutureTestMempoolAcceptResult) Receive() (
+	[]*btcjson.TestMempoolAcceptResult, error) {
+
+	response, err := ReceiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal as an array of TestMempoolAcceptResult items.
+	var results []*btcjson.TestMempoolAcceptResult
+
+	err = json.Unmarshal(response, &results)
+	if err != nil {
+		return nil, err
+	}
+
+	return results, nil
+}
+
+// TestMempoolAcceptAsync returns an instance of a type that can be used to get
+// the result of the RPC at some future time by invoking the Receive function
+// on the returned instance.
+//
+// See TestMempoolAccept for the blocking version and more details.
+func (c *Client) TestMempoolAcceptAsync(txns []*wire.MsgTx,
+	maxFeeRate btcjson.BTCPerkvB) FutureTestMempoolAcceptResult {
+
+	// Due to differences in the testmempoolaccept API for different
+	// backends, we'll need to inspect our version and construct the
+	// appropriate request.
+	version, err := c.BackendVersion()
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	log.Debugf("TestMempoolAcceptAsync: backend version %s", version)
+
+	// Exit early if the version is below 22.0.0.
+	//
+	// Based on the history of `testmempoolaccept` in bitcoind,
+	// - introduced in 0.17.0
+	// - unchanged in 0.18.0
+	// - allowhighfees(bool) param is changed to maxfeerate(numeric) in
+	//   0.19.0
+	// - unchanged in 0.20.0
+	// - added fees and vsize fields in its response in 0.21.0
+	// - allow more than one txes in param rawtx and added package-error
+	//   and wtxid fields in its response in 0.22.0
+	// - unchanged in 0.23.0
+	// - unchanged in 0.24.0
+	// - added effective-feerate and effective-includes fields in its
+	//   response in 0.25.0
+	//
+	// We decide to not support this call for versions below 22.0.0. as the
+	// request/response formats are very different.
+	if !version.SupportTestMempoolAccept() {
+		err := fmt.Errorf("%w: %v", ErrBackendVersion, version)
+		return newFutureError(err)
+	}
+
+	// The maximum number of transactions allowed is 25.
+	if len(txns) > 25 {
+		err := fmt.Errorf("%w: too many transactions provided",
+			ErrInvalidParam)
+		return newFutureError(err)
+	}
+
+	// Exit early if an empty array of transactions is provided.
+	if len(txns) == 0 {
+		err := fmt.Errorf("%w: no transactions provided",
+			ErrInvalidParam)
+		return newFutureError(err)
+	}
+
+	// Iterate all the transactions and turn them into hex strings.
+	rawTxns := make([]string, 0, len(txns))
+	for _, tx := range txns {
+		// Serialize the transaction and convert to hex string.
+		buf := bytes.NewBuffer(make([]byte, 0, tx.SerializeSize()))
+
+		// TODO(yy): add similar checks found in `BtcDecode` to
+		// `BtcEncode` - atm it just serializes bytes without any
+		// bitcoin-specific checks.
+		if err := tx.Serialize(buf); err != nil {
+			err = fmt.Errorf("%w: %v", ErrInvalidParam, err)
+			return newFutureError(err)
+		}
+
+		rawTx := hex.EncodeToString(buf.Bytes())
+		rawTxns = append(rawTxns, rawTx)
+
+		// Sanity check the provided tx is valid, which can be removed
+		// once we have similar checks added in `BtcEncode`.
+		//
+		// NOTE: must be performed after buf.Bytes is copied above.
+		//
+		// TODO(yy): remove it once the above TODO is addressed.
+		if err := tx.Deserialize(buf); err != nil {
+			err = fmt.Errorf("%w: %v", ErrInvalidParam, err)
+			return newFutureError(err)
+		}
+	}
+
+	cmd := btcjson.NewTestMempoolAcceptCmd(rawTxns, maxFeeRate)
+
+	return c.SendCmd(cmd)
+}
+
+// TestMempoolAccept returns result of mempool acceptance tests indicating if
+// raw transaction(s) would be accepted by mempool.
+//
+// If multiple transactions are passed in, parents must come before children
+// and package policies apply: the transactions cannot conflict with any
+// mempool transactions or each other.
+//
+// If one transaction fails, other transactions may not be fully validated (the
+// 'allowed' key will be blank).
+//
+// The maximum number of transactions allowed is 25.
+func (c *Client) TestMempoolAccept(txns []*wire.MsgTx,
+	maxFeeRate btcjson.BTCPerkvB) ([]*btcjson.TestMempoolAcceptResult, error) {
+
+	return c.TestMempoolAcceptAsync(txns, maxFeeRate).Receive()
+}
+
+// FutureGetTxSpendingPrevOut is a future promise to deliver the result of a
+// GetTxSpendingPrevOut RPC invocation (or an applicable error).
+type FutureGetTxSpendingPrevOut chan *Response
+
+// Receive waits for the Response promised by the future and returns the
+// response from GetTxSpendingPrevOut.
+func (r FutureGetTxSpendingPrevOut) Receive() (
+	[]*btcjson.GetTxSpendingPrevOutResult, error) {
+
+	response, err := ReceiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal as an array of GetTxSpendingPrevOutResult items.
+	var results []*btcjson.GetTxSpendingPrevOutResult
+
+	err = json.Unmarshal(response, &results)
+	if err != nil {
+		return nil, err
+	}
+
+	return results, nil
+}
+
+// GetTxSpendingPrevOutAsync returns an instance of a type that can be used to
+// get the result of the RPC at some future time by invoking the Receive
+// function on the returned instance.
+//
+// See GetTxSpendingPrevOut for the blocking version and more details.
+func (c *Client) GetTxSpendingPrevOutAsync(
+	outpoints []wire.OutPoint) FutureGetTxSpendingPrevOut {
+
+	// Due to differences in the testmempoolaccept API for different
+	// backends, we'll need to inspect our version and construct the
+	// appropriate request.
+	version, err := c.BackendVersion()
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	log.Debugf("GetTxSpendingPrevOutAsync: backend version %s", version)
+
+	// Exit early if the version is below 24.0.0.
+	if !version.SupportGetTxSpendingPrevOut() {
+		err := fmt.Errorf("%w: %v", ErrBackendVersion, version)
+		return newFutureError(err)
+	}
+
+	// Exit early if an empty array of outpoints is provided.
+	if len(outpoints) == 0 {
+		err := fmt.Errorf("%w: no outpoints provided", ErrInvalidParam)
+		return newFutureError(err)
+	}
+
+	cmd := btcjson.NewGetTxSpendingPrevOutCmd(outpoints)
+
+	return c.SendCmd(cmd)
+}
+
+// GetTxSpendingPrevOut returns the result from calling `gettxspendingprevout`
+// RPC.
+func (c *Client) GetTxSpendingPrevOut(outpoints []wire.OutPoint) (
+	[]*btcjson.GetTxSpendingPrevOutResult, error) {
+
+	return c.GetTxSpendingPrevOutAsync(outpoints).Receive()
 }

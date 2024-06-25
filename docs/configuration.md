@@ -175,7 +175,7 @@ and we prefer to keep the daemon itself as lightweight as possible.
    access the database used by btcd and it will be locked if btcd is using it.
 2. Note the path to the downloaded bootstrap.dat file.
 3. Run the addblock utility with the `-i` argument pointing to the location of
-   boostrap.dat:
+   bootstrap.dat:
 
 **Windows:**
 

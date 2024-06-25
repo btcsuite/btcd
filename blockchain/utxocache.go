@@ -99,7 +99,8 @@ func (ms *mapSlice) put(op wire.OutPoint, entry *UtxoEntry, totalEntryMemory uin
 	ms.mtx.Lock()
 	defer ms.mtx.Unlock()
 
-	for i, maxNum := range ms.maxEntries {
+	// Look for the key in the maps.
+	for i := range ms.maxEntries {
 		m := ms.maps[i]
 		_, found := m[op]
 		if found {
@@ -107,6 +108,10 @@ func (ms *mapSlice) put(op wire.OutPoint, entry *UtxoEntry, totalEntryMemory uin
 			m[op] = entry
 			return // Return as we were successful in adding the entry.
 		}
+	}
+
+	for i, maxNum := range ms.maxEntries {
+		m := ms.maps[i]
 		if len(m) >= maxNum {
 			// Don't try to insert if the map already at max since
 			// that'll force the map to allocate double the memory it's
@@ -177,7 +182,7 @@ const (
 	// utxoFlushPeriodicInterval is the interval at which a flush is performed
 	// when the flush mode FlushPeriodic is used.  This is used when the initial
 	// block download is complete and it's useful to flush periodically in case
-	// of unforseen shutdowns.
+	// of unforeseen shutdowns.
 	utxoFlushPeriodicInterval = time.Minute * 5
 )
 
@@ -229,7 +234,7 @@ func newUtxoCache(db database.DB, maxTotalMemoryUsage uint64) *utxoCache {
 	numMaxElements := calculateMinEntries(int(maxTotalMemoryUsage), bucketSize+avgEntrySize)
 	numMaxElements -= 1
 
-	log.Infof("Pre-alloacting for %d MiB: ", maxTotalMemoryUsage/(1024*1024)+1)
+	log.Infof("Pre-alloacting for %d MiB", maxTotalMemoryUsage/(1024*1024)+1)
 
 	m := make(map[wire.OutPoint]*UtxoEntry, numMaxElements)
 
@@ -617,6 +622,7 @@ func (b *BlockChain) InitConsistentState(tip *blockNode, interrupt <-chan struct
 
 		// Set the last flush hash as it's the default value of 0s.
 		s.lastFlushHash = tip.hash
+		s.lastFlushTime = time.Now()
 
 		return err
 	}
@@ -633,6 +639,10 @@ func (b *BlockChain) InitConsistentState(tip *blockNode, interrupt <-chan struct
 		// The last flush hash is set to the default value of all 0s. Set
 		// it to the tip since we checked it's consistent.
 		s.lastFlushHash = tip.hash
+
+		// Set the last flush time as now since we know the state is consistent
+		// at this time.
+		s.lastFlushTime = time.Now()
 
 		return nil
 	}
@@ -721,22 +731,35 @@ func (b *BlockChain) InitConsistentState(tip *blockNode, interrupt <-chan struct
 // Example: if the last flush hash was at height 100 and one of the deleted blocks was at
 // height 98, this function will return true.
 func (b *BlockChain) flushNeededAfterPrune(deletedBlockHashes []chainhash.Hash) (bool, error) {
-	lastFlushHeight, err := b.BlockHeightByHash(&b.utxoCache.lastFlushHash)
-	if err != nil {
-		return false, err
+	node := b.index.LookupNode(&b.utxoCache.lastFlushHash)
+	if node == nil {
+		// If we couldn't find the node where we last flushed at, have the utxo cache
+		// flush to be safe and that will set the last flush hash again.
+		//
+		// This realistically should never happen as nodes are never deleted from
+		// the block index.  This happening likely means that there's a hardware
+		// error which is something we can't recover from.  The best that we can
+		// do here is to just force a flush and hope that the newly set
+		// lastFlushHash doesn't error.
+		return true, nil
 	}
+
+	lastFlushHeight := node.Height()
 
 	// Loop through all the block hashes and find out what the highest block height
 	// among the deleted hashes is.
 	highestDeletedHeight := int32(-1)
 	for _, deletedBlockHash := range deletedBlockHashes {
-		height, err := b.BlockHeightByHash(&deletedBlockHash)
-		if err != nil {
-			return false, err
+		node := b.index.LookupNode(&deletedBlockHash)
+		if node == nil {
+			// If we couldn't find this node, just skip it and try the next
+			// deleted hash.  This might be a corruption in the database
+			// but there's nothing we can do here to address it except for
+			// moving onto the next block.
+			continue
 		}
-
-		if height > highestDeletedHeight {
-			highestDeletedHeight = height
+		if node.height > highestDeletedHeight {
+			highestDeletedHeight = node.height
 		}
 	}
 

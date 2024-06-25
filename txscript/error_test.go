@@ -96,6 +96,8 @@ func TestErrorCodeStringer(t *testing.T) {
 		{ErrInvalidTaprootSigLen, "ErrInvalidTaprootSigLen"},
 		{ErrTaprootPubkeyIsEmpty, "ErrTaprootPubkeyIsEmpty"},
 		{ErrTaprootMaxSigOps, "ErrTaprootMaxSigOps"},
+		{ErrNonConstScriptCode, "ErrNonConstScriptCode"},
+		{ErrCodeSeparator, "ErrCodeSeparator"},
 		{0xffff, "Unknown ErrorCode (65535)"},
 	}
 

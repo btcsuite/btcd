@@ -65,7 +65,7 @@ func VerifyTaprootKeySpend(witnessProgram []byte, rawSig []byte, tx *wire.MsgTx,
 	// program.
 	rawKey := witnessProgram
 
-	// Extract the annex if it exists, so we can compute the proper proper
+	// Extract the annex if it exists, so we can compute the proper
 	// sighash below.
 	var annex []byte
 	witness := tx.TxIn[inputIndex].Witness
@@ -84,8 +84,8 @@ func VerifyTaprootKeySpend(witnessProgram []byte, rawSig []byte, tx *wire.MsgTx,
 		return err
 	}
 
-	valid := keySpendVerifier.Verify()
-	if valid {
+	result := keySpendVerifier.Verify()
+	if result.sigValid {
 		return nil
 	}
 
@@ -255,7 +255,7 @@ func ComputeTaprootOutputKey(pubKey *btcec.PublicKey,
 		scriptRoot,
 	)
 
-	// With the tap tweek computed,  we'll need to convert the merkle root
+	// With the tap tweak computed,  we'll need to convert the merkle root
 	// into something in the domain we can manipulate: a scalar value mod
 	// N.
 	var tweakScalar btcec.ModNScalar

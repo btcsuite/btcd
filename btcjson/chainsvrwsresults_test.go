@@ -13,7 +13,7 @@ import (
 )
 
 // TestChainSvrWsResults ensures any results that have custom marshalling
-// work as inteded.
+// work as intended.
 func TestChainSvrWsResults(t *testing.T) {
 	t.Parallel()
 

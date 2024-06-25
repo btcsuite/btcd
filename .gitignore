@@ -43,6 +43,8 @@ btcutil/psbt/coverage.txt
 
 # vim
 *.swp
+*.swo
+/.vim
 
 # Binaries produced by "make build"
 /addblock

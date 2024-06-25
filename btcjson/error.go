@@ -30,7 +30,7 @@ const (
 	// embedded type which is not not supported.
 	ErrEmbeddedType
 
-	// ErrUnexportedField indiciates the provided command struct contains an
+	// ErrUnexportedField indicates the provided command struct contains an
 	// unexported field which is not supported.
 	ErrUnexportedField
 

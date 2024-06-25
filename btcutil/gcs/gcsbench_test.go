@@ -158,7 +158,7 @@ var matchAnyBenchmarks = []struct {
 	{"q10M-f10K", randElems10000000, filter10000},
 }
 
-// BenchmarkGCSFilterMatchAny benchmarks the sort-and-zip MatchAny impl.
+// BenchmarkGCSFilterZipMatchAny benchmarks the sort-and-zip MatchAny impl.
 func BenchmarkGCSFilterZipMatchAny(b *testing.B) {
 	for _, test := range matchAnyBenchmarks {
 		test := test
@@ -184,7 +184,7 @@ func BenchmarkGCSFilterZipMatchAny(b *testing.B) {
 	}
 }
 
-// BenchmarkGCSFilterMatchAny benchmarks the hash-join MatchAny impl.
+// BenchmarkGCSFilterHashMatchAny benchmarks the hash-join MatchAny impl.
 func BenchmarkGCSFilterHashMatchAny(b *testing.B) {
 	for _, test := range matchAnyBenchmarks {
 		test := test

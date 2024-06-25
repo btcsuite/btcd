@@ -5,7 +5,7 @@
 package main
 
 import (
-	"io/ioutil"
+	"os"
 	"log"
 	"path/filepath"
 	"time"
@@ -33,7 +33,7 @@ func main() {
 
 	// Connect to local btcd RPC server using websockets.
 	btcdHomeDir := btcutil.AppDataDir("btcd", false)
-	certs, err := ioutil.ReadFile(filepath.Join(btcdHomeDir, "rpc.cert"))
+	certs, err := os.ReadFile(filepath.Join(btcdHomeDir, "rpc.cert"))
 	if err != nil {
 		log.Fatal(err)
 	}

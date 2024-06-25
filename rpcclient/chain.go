@@ -440,17 +440,16 @@ func unmarshalPartialGetBlockChainInfoResult(res []byte) (*btcjson.GetBlockChain
 func unmarshalGetBlockChainInfoResultSoftForks(chainInfo *btcjson.GetBlockChainInfoResult,
 	version BackendVersion, res []byte) error {
 
-	switch version {
 	// Versions of bitcoind on or after v0.19.0 use the unified format.
-	case BitcoindPost19:
+	if version.SupportUnifiedSoftForks() {
 		var softForks btcjson.UnifiedSoftForks
 		if err := json.Unmarshal(res, &softForks); err != nil {
 			return err
 		}
 		chainInfo.UnifiedSoftForks = &softForks
+	} else {
 
-	// All other versions use the original format.
-	default:
+		// All other versions use the original format.
 		var softForks btcjson.SoftForks
 		if err := json.Unmarshal(res, &softForks); err != nil {
 			return err
@@ -891,7 +890,7 @@ func (c *Client) EstimateFee(numBlocks int64) (float64, error) {
 	return c.EstimateFeeAsync(numBlocks).Receive()
 }
 
-// FutureEstimateFeeResult is a future promise to deliver the result of a
+// FutureEstimateSmartFeeResult is a future promise to deliver the result of a
 // EstimateSmartFeeAsync RPC invocation (or an applicable error).
 type FutureEstimateSmartFeeResult chan *Response
 
@@ -1419,4 +1418,39 @@ func (c *Client) GetDescriptorInfoAsync(descriptor string) FutureGetDescriptorIn
 // See btcjson.GetDescriptorInfoResult for details about the result.
 func (c *Client) GetDescriptorInfo(descriptor string) (*btcjson.GetDescriptorInfoResult, error) {
 	return c.GetDescriptorInfoAsync(descriptor).Receive()
+}
+
+// FutureReconsiderBlockResult is a future promise to deliver the result of a
+// ReconsiderBlockAsync RPC invocation (or an applicable error).
+type FutureReconsiderBlockResult chan *Response
+
+// Receive waits for the Response promised by the future and returns the raw
+// block requested from the server given its hash.
+func (r FutureReconsiderBlockResult) Receive() error {
+	_, err := ReceiveFuture(r)
+	return err
+}
+
+// ReconsiderBlockAsync returns an instance of a type that can be used to get the
+// result of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+//
+// See ReconsiderBlock for the blocking version and more details.
+func (c *Client) ReconsiderBlockAsync(
+	blockHash *chainhash.Hash) FutureReconsiderBlockResult {
+
+	hash := ""
+	if blockHash != nil {
+		hash = blockHash.String()
+	}
+
+	cmd := btcjson.NewReconsiderBlockCmd(hash)
+	return c.SendCmd(cmd)
+}
+
+// ReconsiderBlock reconsiders an verifies a specific block and the branch that
+// the block is included in.  If the block is valid on reconsideration, the chain
+// will reorg to that block if it has more PoW than the current tip.
+func (c *Client) ReconsiderBlock(blockHash *chainhash.Hash) error {
+	return c.ReconsiderBlockAsync(blockHash).Receive()
 }
