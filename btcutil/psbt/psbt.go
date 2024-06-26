@@ -37,6 +37,12 @@ const MaxPsbtValueLength = 4000000
 // deserialize from the wire. Anything more will return ErrInvalidKeyData.
 const MaxPsbtKeyLength = 10000
 
+// MaxPsbtKeyValue is the maximum value of a key type in a PSBT. This maximum
+// isn't specified by the BIP but used by bitcoind in various places to limit
+// the number of items processed. So we use it to validate the key type in order
+// to have a consistent behavior.
+const MaxPsbtKeyValue = 0x02000000
+
 var (
 
 	// ErrInvalidPsbtFormat is a generic error for any situation in which a
