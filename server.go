@@ -2483,6 +2483,7 @@ func (s *server) Start() {
 		// the RPC server are rebroadcast until being included in a block.
 		go s.rebroadcastHandler()
 
+		s.rpcServer.cfg.StartupTime = s.startupTime
 		s.rpcServer.Start()
 	}
 
