@@ -11,11 +11,11 @@ import (
 	"encoding/base32"
 	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math/rand"
 	"net"
-	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -27,11 +27,21 @@ import (
 	"github.com/btcsuite/btcd/wire"
 )
 
+var ErrNotExist = errors.New("store does not exist")
+
+// store is a basic storage interface. Either using the file system or localStorage in the browser.
+type store interface {
+	Reader() (io.ReadCloser, error)
+	Writer() (io.WriteCloser, error)
+	Remove() error
+	String() string
+}
+
 // AddrManager provides a concurrency safe address manager for caching potential
 // peers on the bitcoin network.
 type AddrManager struct {
 	mtx            sync.RWMutex
-	peersFile      string
+	store          store
 	lookupFunc     func(string) ([]net.IP, error)
 	rand           *rand.Rand
 	key            [32]byte
@@ -407,15 +417,15 @@ func (a *AddrManager) savePeers() {
 		}
 	}
 
-	w, err := os.Create(a.peersFile)
+	w, err := a.store.Writer()
 	if err != nil {
-		log.Errorf("Error opening file %s: %v", a.peersFile, err)
+		log.Errorf("Error opening store %s: %v", a.store, err)
 		return
 	}
 	enc := json.NewEncoder(w)
 	defer w.Close()
 	if err := enc.Encode(&sam); err != nil {
-		log.Errorf("Failed to encode file %s: %v", a.peersFile, err)
+		log.Errorf("Failed to encode peers %s: %v", a.store, err)
 		return
 	}
 }
@@ -426,30 +436,27 @@ func (a *AddrManager) loadPeers() {
 	a.mtx.Lock()
 	defer a.mtx.Unlock()
 
-	err := a.deserializePeers(a.peersFile)
+	err := a.deserializePeers()
 	if err != nil {
-		log.Errorf("Failed to parse file %s: %v", a.peersFile, err)
+		log.Errorf("Failed to parse store %s: %v", a.store, err)
 		// if it is invalid we nuke the old one unconditionally.
-		err = os.Remove(a.peersFile)
+		err = a.store.Remove()
 		if err != nil {
-			log.Warnf("Failed to remove corrupt peers file %s: %v",
-				a.peersFile, err)
+			log.Warnf("Failed to remove corrupt peers %s: %v", a.store, err)
 		}
 		a.reset()
 		return
 	}
-	log.Infof("Loaded %d addresses from file '%s'", a.numAddresses(), a.peersFile)
+	log.Infof("Loaded %d addresses from store '%s'", a.numAddresses(), a.store)
 }
 
-func (a *AddrManager) deserializePeers(filePath string) error {
-
-	_, err := os.Stat(filePath)
-	if os.IsNotExist(err) {
+func (a *AddrManager) deserializePeers() error {
+	r, err := a.store.Reader()
+	if errors.Is(err, ErrNotExist) {
 		return nil
 	}
-	r, err := os.Open(filePath)
 	if err != nil {
-		return fmt.Errorf("%s error opening file: %v", filePath, err)
+		return fmt.Errorf("error opening store: %v", err)
 	}
 	defer r.Close()
 
@@ -457,7 +464,7 @@ func (a *AddrManager) deserializePeers(filePath string) error {
 	dec := json.NewDecoder(r)
 	err = dec.Decode(&sam)
 	if err != nil {
-		return fmt.Errorf("error reading %s: %v", filePath, err)
+		return fmt.Errorf("error reading %s: %v", a.store, err)
 	}
 
 	// Since decoding JSON is backwards compatible (i.e., only decodes
@@ -1206,7 +1213,7 @@ func (a *AddrManager) GetBestLocalAddress(remoteAddr *wire.NetAddressV2) *wire.N
 // Use Start to begin processing asynchronous address updates.
 func New(dataDir string, lookupFunc func(string) ([]net.IP, error)) *AddrManager {
 	am := AddrManager{
-		peersFile:      filepath.Join(dataDir, "peers.json"),
+		store:          NewStore(filepath.Join(dataDir, "peers.json")),
 		lookupFunc:     lookupFunc,
 		rand:           rand.New(rand.NewSource(time.Now().UnixNano())),
 		quit:           make(chan struct{}),

@@ -62,6 +62,10 @@ github.com/jrick/logrotate v1.0.0 h1:lQ1bL/n9mBNeIXoTUoYRlK4dHuNJVofX9oWqBtPnSzI
 github.com/jrick/logrotate v1.0.0/go.mod h1:LNinyqDIJnpAur+b8yyulnQw/wDuN1+BYKlTRt3OuAQ=
 github.com/kkdai/bstream v0.0.0-20161212061736-f391b8402d23 h1:FOOIBWrEkLgmlgGfMuZT83xIwfPDxEI2OHu6xUmJMFE=
 github.com/kkdai/bstream v0.0.0-20161212061736-f391b8402d23/go.mod h1:J+Gs4SYgM6CZQHDETBtE9HaSEkGmuNXF86RwHhHUvq4=
+github.com/linden/localstorage v0.0.0-20231116131807-4984ea9234ae h1:aShKD5W7/reF6oTj+JsQP/Yf/7B3sYiqx6K9tIp6KFI=
+github.com/linden/localstorage v0.0.0-20231116131807-4984ea9234ae/go.mod h1:uQBC250C4YSyzxNly4CR02PT2VKoO3H9zlJXbUXVLl8=
+github.com/linden/localstorage v0.0.0-20231117043609-5d94f0a86609 h1:oRjHnrgw7Jo+B0MokX+2L7ugroptSEhvJpc3RenpZL8=
+github.com/linden/localstorage v0.0.0-20231117043609-5d94f0a86609/go.mod h1:uQBC250C4YSyzxNly4CR02PT2VKoO3H9zlJXbUXVLl8=
 github.com/nxadm/tail v1.4.4 h1:DQuhQpB1tVlglWS2hLQ5OV6B5r8aGxSrPc5Qo6uTN78=
 github.com/nxadm/tail v1.4.4/go.mod h1:kenIhsEOeOJmVchQTgglprH7qJGnHDVpk1VPCcaMI8A=
 github.com/onsi/ginkgo v1.6.0/go.mod h1:lLunBs/Ym6LB5Z9jYTR76FiuTmxDTDusOGeTQH+WWjE=
