@@ -335,6 +335,20 @@ func TestPrune(t *testing.T) {
 			t.Fatal(err)
 		}
 
+		// Open the first block file before the pruning happens in the
+		// code snippet below.  This let's us test that block files are
+		// properly closed before attempting to delete them.
+		err = db.View(func(tx database.Tx) error {
+			_, err := tx.FetchBlock(blocks[0].Hash())
+			if err != nil {
+				return err
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
 		var deletedBlocks []chainhash.Hash
 
 		// This should leave 3 files on disk.

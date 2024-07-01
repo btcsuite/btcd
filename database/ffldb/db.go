@@ -1630,6 +1630,9 @@ func (tx *transaction) writePendingAndCommit() error {
 	// We do this first before doing any of the writes as we can't undo
 	// deletions of files.
 	for _, fileNum := range tx.pendingDelFileNums {
+		// Make sure the file is closed before attempting to delete it.
+		tx.db.store.closeFile(fileNum)
+
 		err := tx.db.store.deleteFileFunc(fileNum)
 		if err != nil {
 			// Nothing we can do if we fail to delete blocks besides
