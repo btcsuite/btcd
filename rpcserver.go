@@ -380,11 +380,11 @@ func handleAddNode(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (in
 	addr := normalizeAddress(c.Addr, s.cfg.ChainParams.DefaultPort)
 	var err error
 	switch c.SubCmd {
-	case "add":
+	case btcjson.ANAdd:
 		err = s.cfg.ConnMgr.Connect(addr, true)
-	case "remove":
+	case btcjson.ANRemove:
 		err = s.cfg.ConnMgr.RemoveByAddr(addr)
-	case "onetry":
+	case btcjson.ANOneTry:
 		err = s.cfg.ConnMgr.Connect(addr, false)
 	default:
 		return nil, &btcjson.RPCError{
@@ -413,7 +413,7 @@ func handleNode(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (inter
 	var errN, err error
 	params := s.cfg.ChainParams
 	switch c.SubCmd {
-	case "disconnect":
+	case btcjson.NDisconnect:
 		// If we have a valid uint disconnect by node id. Otherwise,
 		// attempt to disconnect by address, returning an error if a
 		// valid IP address is not supplied.
@@ -438,7 +438,7 @@ func handleNode(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (inter
 			}
 		}
 
-	case "remove":
+	case btcjson.NRemove:
 		// If we have a valid uint disconnect by node id. Otherwise,
 		// attempt to disconnect by address, returning an error if a
 		// valid IP address is not supplied.
@@ -462,7 +462,7 @@ func handleNode(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (inter
 			}
 		}
 
-	case "connect":
+	case btcjson.NConnect:
 		addr = normalizeAddress(c.Target, params.DefaultPort)
 
 		// Default to temporary connections.
