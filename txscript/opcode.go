@@ -1989,7 +1989,7 @@ func opcodeCheckSig(op *opcode, data []byte, vm *Engine) error {
 		return err
 	}
 
-	// The signature actually needs needs to be longer than this, but at
+	// The signature actually needs to be longer than this, but at
 	// least 1 byte is needed for the hash type below.  The full length is
 	// checked depending on the script flags and upon parsing the signature.
 	//
