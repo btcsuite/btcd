@@ -281,17 +281,7 @@ func (s *blockStore) openFile(fileNum uint32) (*lockableFile, error) {
 	lruList := s.openBlocksLRU
 	if lruList.Len() >= maxOpenFiles {
 		lruFileNum := lruList.Remove(lruList.Back()).(uint32)
-		oldBlockFile := s.openBlockFiles[lruFileNum]
-
-		// Close the old file under the write lock for the file in case
-		// any readers are currently reading from it so it's not closed
-		// out from under them.
-		oldBlockFile.Lock()
-		_ = oldBlockFile.file.Close()
-		oldBlockFile.Unlock()
-
-		delete(s.openBlockFiles, lruFileNum)
-		delete(s.fileNumToLRUElem, lruFileNum)
+		s.closeFile(lruFileNum)
 	}
 	s.fileNumToLRUElem[fileNum] = lruList.PushFront(fileNum)
 	s.lruMutex.Unlock()
@@ -300,6 +290,26 @@ func (s *blockStore) openFile(fileNum uint32) (*lockableFile, error) {
 	s.openBlockFiles[fileNum] = blockFile
 
 	return blockFile, nil
+}
+
+// closeFile checks that the file corresponding to the file number is open and
+// if it is, it closes it in a concurrency safe manner and cleans up associated
+// data in the blockstore struct.
+func (s *blockStore) closeFile(fileNum uint32) {
+	blockFile := s.openBlockFiles[fileNum]
+	if blockFile == nil {
+		return
+	}
+
+	// Close the old file under the write lock for the file in case
+	// any readers are currently reading from it so it's not closed
+	// out from under them.
+	blockFile.Lock()
+	_ = blockFile.file.Close()
+	blockFile.Unlock()
+
+	delete(s.openBlockFiles, fileNum)
+	delete(s.fileNumToLRUElem, fileNum)
 }
 
 // deleteFile removes the block file for the passed flat file number.  The file
