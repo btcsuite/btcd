@@ -307,6 +307,11 @@ func (s *blockStore) openFile(fileNum uint32) (*lockableFile, error) {
 // other state cleanup necessary.
 func (s *blockStore) deleteFile(fileNum uint32) error {
 	filePath := blockFilePath(s.basePath, fileNum)
+	blockFile := s.openBlockFiles[fileNum]
+	if blockFile != nil {
+		err := fmt.Errorf("attempted to delete open file at %v", filePath)
+		return makeDbErr(database.ErrDriverSpecific, err.Error(), err)
+	}
 	if err := os.Remove(filePath); err != nil {
 		return makeDbErr(database.ErrDriverSpecific, err.Error(), err)
 	}
