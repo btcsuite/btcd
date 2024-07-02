@@ -406,9 +406,14 @@ var BtcdErrMap = map[string]error{
 	// A transaction with too many sigops.
 	"sigop cost is too hight": ErrTooManySigOps,
 
-	// A transaction already in the blockchain.
+	// A transaction already in the database.
 	"database contains entry for spent tx output": ErrTxAlreadyKnown,
-	"transaction already exists in blockchain":    ErrTxAlreadyConfirmed,
+
+	// A transaction already in the blockchain.
+	//
+	// NOTE: For btcd v0.24.2 and beyond, the error message is "transaction
+	// already exists in blockchain".
+	"transaction already exists": ErrTxAlreadyConfirmed,
 
 	// A transaction in the mempool.
 	//
