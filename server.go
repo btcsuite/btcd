@@ -22,6 +22,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	bip324_transport "github.com/lnliz/bitcoin-bip324-proxy/transport"
+
 	"github.com/btcsuite/btcd/addrmgr"
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/blockchain/indexers"
@@ -2175,6 +2177,14 @@ func (s *server) inboundPeerConnected(conn net.Conn) {
 	sp := newServerPeer(s, false)
 	sp.isWhitelisted = isWhitelisted(conn.RemoteAddr())
 	sp.Peer = peer.NewInboundPeer(newPeerConfig(sp))
+
+	/*
+		initialize bip324 transport for inbound connection (isInitialize=false)
+	*/
+	if t, err := bip324_transport.NewTransport(conn, uint32(s.chainParams.Net), false); err == nil {
+		sp.Peer.V2Transport = t
+	}
+
 	sp.AssociateConnection(conn)
 	go s.peerDoneHandler(sp)
 }
@@ -2186,6 +2196,7 @@ func (s *server) inboundPeerConnected(conn net.Conn) {
 // manager of the attempt.
 func (s *server) outboundPeerConnected(c *connmgr.ConnReq, conn net.Conn) {
 	sp := newServerPeer(s, c.Permanent)
+
 	p, err := peer.NewOutboundPeer(newPeerConfig(sp), c.Addr.String())
 	if err != nil {
 		srvrLog.Debugf("Cannot create outbound peer %s: %v", c.Addr, err)
@@ -2197,6 +2208,14 @@ func (s *server) outboundPeerConnected(c *connmgr.ConnReq, conn net.Conn) {
 		}
 		return
 	}
+
+	/*
+		initialize bip324 transport for outbound connection (isInitialize=true)
+	*/
+	if t, err := bip324_transport.NewTransport(conn, uint32(s.chainParams.Net), true); err == nil {
+		p.V2Transport = t
+	}
+
 	sp.Peer = p
 	sp.connReq = c
 	sp.isWhitelisted = isWhitelisted(conn.RemoteAddr())
@@ -2484,6 +2503,7 @@ func (s *server) Start() {
 		go s.rebroadcastHandler()
 
 		s.rpcServer.cfg.StartupTime = s.startupTime
+
 		s.rpcServer.Start()
 	}
 

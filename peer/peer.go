@@ -18,6 +18,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	bip324_transport "github.com/lnliz/bitcoin-bip324-proxy/transport"
+
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
@@ -443,6 +445,8 @@ type Peer struct {
 	disconnect    int32
 
 	conn net.Conn
+
+	V2Transport *bip324_transport.V2Transport
 
 	// These fields are set at creation time and never modified, so they are
 	// safe to read from concurrently without a mutex.
@@ -1067,6 +1071,23 @@ func (p *Peer) handlePongMsg(msg *wire.MsgPong) {
 
 // readMessage reads the next bitcoin message from the peer with logging.
 func (p *Peer) readMessage(encoding wire.MessageEncoding) (wire.Message, []byte, error) {
+
+	if p.V2Transport != nil {
+		msg, _, buf, err := p.V2Transport.RecvV2Message()
+
+		// todo: this is not exactly correct as this is missing a few bytes
+		atomic.AddUint64(&p.bytesReceived, uint64(len(buf)))
+
+		if p.cfg.Listeners.OnRead != nil {
+			p.cfg.Listeners.OnRead(p, len(buf), msg, err)
+		}
+		if err != nil {
+			return nil, nil, err
+		}
+
+		return msg, buf, err
+	}
+
 	n, msg, buf, err := wire.ReadMessageWithEncodingN(p.conn,
 		p.ProtocolVersion(), p.cfg.ChainParams.Net, encoding)
 	atomic.AddUint64(&p.bytesReceived, uint64(n))
@@ -1103,6 +1124,20 @@ func (p *Peer) writeMessage(msg wire.Message, enc wire.MessageEncoding) error {
 	// Don't do anything if we're disconnecting.
 	if atomic.LoadInt32(&p.disconnect) != 0 {
 		return nil
+	}
+
+	if p.V2Transport != nil {
+		err := p.V2Transport.SendV2Message(msg)
+
+		// todo: need to get bytesSent from SendV2
+		bytesSent := 321
+		atomic.AddUint64(&p.bytesSent, uint64(bytesSent))
+
+		if p.cfg.Listeners.OnWrite != nil {
+			p.cfg.Listeners.OnWrite(p, bytesSent, msg, err)
+		}
+		return err
+
 	}
 
 	// Use closures to log expensive operations so they are only run when
@@ -2279,9 +2314,37 @@ func (p *Peer) negotiateOutboundProtocol() error {
 	return p.waitToFinishNegotiation(protoVersion)
 }
 
+func (p *Peer) TryEstablishingV2Connection() error {
+	if p.V2Transport == nil {
+		return nil
+	}
+
+	/*
+		v2 for non-tor only right now
+	*/
+	if p.na.IsTorV3() {
+		p.V2Transport = nil
+		return nil
+	}
+
+	log.Errorf("try using v2 proto")
+	if err := p.V2Transport.V2Handshake(); err != nil {
+		log.Errorf("bip324_transport.V2Handshake err: %s", err)
+		p.V2Transport = nil
+		return err
+	}
+
+	log.Infof("using v2 proto")
+	return nil
+}
+
 // start begins processing input and output messages.
 func (p *Peer) start() error {
 	log.Tracef("Starting peer %s", p)
+
+	if err := p.TryEstablishingV2Connection(); err != nil {
+		return err
+	}
 
 	negotiateErr := make(chan error, 1)
 	go func() {
