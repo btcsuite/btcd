@@ -8,11 +8,13 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"errors"
+	"math"
 	"math/big"
 	"strings"
 	"time"
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
+
 	"github.com/btcsuite/btcd/wire"
 )
 
@@ -647,6 +649,84 @@ var TestNet3Params = Params{
 				time.Unix(1628640000, 0), // August 11th, 2021 UTC
 			),
 			CustomActivationThreshold: 1512, // 75%
+		},
+	},
+
+	// Mempool parameters
+	RelayNonStdTxs: true,
+
+	// Human-readable part for Bech32 encoded segwit addresses, as defined in
+	// BIP 173.
+	Bech32HRPSegwit: "tb", // always tb for test net
+
+	// Address encoding magics
+	PubKeyHashAddrID:        0x6f, // starts with m or n
+	ScriptHashAddrID:        0xc4, // starts with 2
+	WitnessPubKeyHashAddrID: 0x03, // starts with QW
+	WitnessScriptHashAddrID: 0x28, // starts with T7n
+	PrivateKeyID:            0xef, // starts with 9 (uncompressed) or c (compressed)
+
+	// BIP32 hierarchical deterministic extended key magics
+	HDPrivateKeyID: [4]byte{0x04, 0x35, 0x83, 0x94}, // starts with tprv
+	HDPublicKeyID:  [4]byte{0x04, 0x35, 0x87, 0xcf}, // starts with tpub
+
+	// BIP44 coin type used in the hierarchical deterministic path for
+	// address generation.
+	HDCoinType: 1,
+}
+
+// TestNet4Params defines the network parameters for the test Bitcoin network
+// (version 4).  Not to be confused with the regression test network, this
+// network is sometimes simply called "testnet4".
+var TestNet4Params = Params{
+	Name:        "testnet4",
+	Net:         wire.TestNet4,
+	DefaultPort: "48333",
+	DNSSeeds: []DNSSeed{
+		{"seed.testnet4.bitcoin.sprovoost.nl.", true},
+		{"seed.testnet4.wiz.biz.", true},
+	},
+
+	// Chain parameters
+	GenesisBlock:             &testNet4GenesisBlock,
+	GenesisHash:              &testNet4GenesisHash,
+	PowLimit:                 testNet3PowLimit,
+	PowLimitBits:             0x1d00ffff,
+	CoinbaseMaturity:         100,
+	SubsidyReductionInterval: 210000,
+	TargetTimespan:           time.Hour * 24 * 14, // 14 days
+	TargetTimePerBlock:       time.Minute * 10,    // 10 minutes
+	RetargetAdjustmentFactor: 4,                   // 25% less, 400% more
+	ReduceMinDifficulty:      true,
+	MinDiffReductionTime:     time.Minute * 20, // TargetTimePerBlock * 2
+	GenerateSupported:        false,
+
+	// Checkpoints ordered from oldest to newest.
+	Checkpoints: []Checkpoint{
+		{500, newHashFromStr("00000000c674047be3a7b25fefe0b6416f6f4e88ff9b01ddc05471b8e2ea603a")},
+		{1000, newHashFromStr("00000000b747d47c3b38161693ad05e26924b3775a8be669751f969da836311e")},
+		{10000, newHashFromStr("000000000037079ff4c37eed57d00eb9ddfde8737b559ffa4101b11e76c97466")},
+		{25000, newHashFromStr("00000000000000c207c423ebb2d935e7b867b51710aaf72967666e83696f01e2")},
+		{35000, newHashFromStr("0000000047f9360bd7e79d3959bd32366e24b4182caf138a8b10d42add3b7fd7")},
+		{45000, newHashFromStr("0000000019ae521883b2597ed74cd21e2efa43fbf487815300cad96206d76f0e")},
+	},
+
+	// Consensus rule change deployments.
+	//
+	// The miner confirmation window is defined as:
+	//   target proof of work timespan / target proof of work spacing
+	RuleChangeActivationThreshold: 1512, // 75% of MinerConfirmationWindow
+	MinerConfirmationWindow:       2016,
+	Deployments: [DefinedDeployments]ConsensusDeployment{
+		DeploymentTestDummy: {
+			BitNumber:         28,
+			DeploymentStarter: NewMedianTimeDeploymentStarter(time.Unix(math.MaxInt64, 0)), // Never active
+			DeploymentEnder:   &MedianTimeDeploymentEnder{},
+		},
+		DeploymentTaproot: {
+			BitNumber:         2,
+			DeploymentStarter: &MedianTimeDeploymentStarter{}, // Always active
+			DeploymentEnder:   &MedianTimeDeploymentEnder{},
 		},
 	},
 
