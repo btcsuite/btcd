@@ -233,9 +233,9 @@ func ParseDERSignature(sigStr []byte) (*Signature, error) {
 // <(byte of 27+public key solution)+4 if compressed >< padded bytes for signature R><padded bytes for signature S>
 // where the R and S parameters are padde up to the bitlengh of the curve.
 func SignCompact(key *btcec.PrivateKey, hash []byte,
-	isCompressedKey bool) ([]byte, error) {
+	isCompressedKey bool) []byte {
 
-	return secp_ecdsa.SignCompact(key, hash, isCompressedKey), nil
+	return secp_ecdsa.SignCompact(key, hash, isCompressedKey)
 }
 
 // RecoverCompact verifies the compact signature "signature" of "hash" for the
