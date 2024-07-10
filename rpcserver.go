@@ -140,6 +140,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"decodescript":           handleDecodeScript,
 	"estimatefee":            handleEstimateFee,
 	"generate":               handleGenerate,
+	"generatetoaddress":      handleGenerateToAddress,
 	"getaddednodeinfo":       handleGetAddedNodeInfo,
 	"getbestblock":           handleGetBestBlock,
 	"getbestblockhash":       handleGetBestBlockHash,
@@ -887,8 +888,7 @@ func handleEstimateFee(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 	return float64(feeRate), nil
 }
 
-// handleGenerate handles generate commands.
-func handleGenerate(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+func generate(s *rpcServer, blocks uint32) ([]string, error) {
 	// Respond with an error if there are no addresses to pay the
 	// created blocks to.
 	if len(cfg.miningAddrs) == 0 {
@@ -911,10 +911,8 @@ func handleGenerate(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 		}
 	}
 
-	c := cmd.(*btcjson.GenerateCmd)
-
 	// Respond with an error if the client is requesting 0 blocks to be generated.
-	if c.NumBlocks == 0 {
+	if blocks == 0 {
 		return nil, &btcjson.RPCError{
 			Code:    btcjson.ErrRPCInternal.Code,
 			Message: "Please request a nonzero number of blocks to generate.",
@@ -922,9 +920,9 @@ func handleGenerate(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 	}
 
 	// Create a reply
-	reply := make([]string, c.NumBlocks)
+	reply := make([]string, blocks)
 
-	blockHashes, err := s.cfg.CPUMiner.GenerateNBlocks(c.NumBlocks)
+	blockHashes, err := s.cfg.CPUMiner.GenerateNBlocks(blocks)
 	if err != nil {
 		return nil, &btcjson.RPCError{
 			Code:    btcjson.ErrRPCInternal.Code,
@@ -939,6 +937,31 @@ func handleGenerate(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 	}
 
 	return reply, nil
+}
+
+func handleGenerateToAddress(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	c := cmd.(*btcjson.GenerateToAddressCmd)
+
+	addr, err := btcutil.DecodeAddress(c.Address, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	before := s.cfg.CPUMiner.MiningAddrs[:]
+	s.cfg.CPUMiner.MiningAddrs = []btcutil.Address{addr}
+
+	reply, err := generate(s, uint32(c.NumBlocks))
+
+	s.cfg.CPUMiner.MiningAddrs = before
+
+	return reply, err
+}
+
+// handleGenerate handles generate commands.
+func handleGenerate(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	c := cmd.(*btcjson.GenerateCmd)
+
+	return generate(s, c.NumBlocks)
 }
 
 // handleGetAddedNodeInfo handles getaddednodeinfo commands.
