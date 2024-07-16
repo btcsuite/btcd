@@ -105,7 +105,7 @@ type Config struct {
 	// This can be nil if the address index is not enabled.
 	AddrIndex *indexers.AddrIndex
 
-	// FeeEstimatator provides a feeEstimator. If it is not nil, the mempool
+	// FeeEstimator provides a feeEstimator. If it is not nil, the mempool
 	// records all new transactions it observes into the feeEstimator.
 	FeeEstimator *FeeEstimator
 }
