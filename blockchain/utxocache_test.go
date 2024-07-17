@@ -586,8 +586,8 @@ func TestUtxoCacheFlush(t *testing.T) {
 			len(outPoints1), cache.cachedEntries.length())
 	}
 
-	// Arbitrarily set the last flush time to 6 minutes ago.
-	cache.lastFlushTime = time.Now().Add(-time.Minute * 6)
+	// Arbitrarily set the last flush time to 49 hours ago.
+	cache.lastFlushTime = time.Now().Add(-time.Hour * 49)
 
 	// Attempt to flush with flush periodic.  Should flush now.
 	err = chain.db.Update(func(dbTx database.Tx) error {
