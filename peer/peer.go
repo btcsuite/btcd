@@ -21,6 +21,7 @@ import (
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/v2transport"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/go-socks/socks"
 	"github.com/davecgh/go-spew/spew"
@@ -289,6 +290,10 @@ type Config struct {
 	// scenarios where the stall behavior isn't important to the system
 	// under test.
 	DisableStallHandler bool
+
+	// UsingV2Conn is defined if and only if we accept and attempt to make
+	// v2 connections.
+	UsingV2Conn bool
 }
 
 // minUint32 is a helper function to return the minimum of two uint32s.
@@ -462,6 +467,8 @@ type Peer struct {
 	verAckReceived       bool
 	witnessEnabled       bool
 	sendAddrV2           bool
+
+	V2Transport *v2transport.Peer
 
 	wireEncoding wire.MessageEncoding
 
@@ -1065,10 +1072,41 @@ func (p *Peer) handlePongMsg(msg *wire.MsgPong) {
 	}
 }
 
-// readMessage reads the next bitcoin message from the peer with logging.
-func (p *Peer) readMessage(encoding wire.MessageEncoding) (wire.Message, []byte, error) {
-	n, msg, buf, err := wire.ReadMessageWithEncodingN(p.conn,
-		p.ProtocolVersion(), p.cfg.ChainParams.Net, encoding)
+// readMessage reads the next bitcoin message from the peer with logging. The
+// partial bool indicates that we've partially read a message already. In this
+// case, we use the ReadPartialMessageWithEncodingN function.
+func (p *Peer) readMessage(encoding wire.MessageEncoding, partial bool) (
+	wire.Message, []byte, error) {
+
+	var (
+		n         int
+		msg       wire.Message
+		buf       []byte
+		plaintext []byte
+		err       error
+	)
+
+	if p.cfg.UsingV2Conn {
+		plaintext, err = p.V2Transport.V2ReceivePacket(nil)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		msg, buf, err = wire.ReadV2MessageN(
+			plaintext, p.ProtocolVersion(), encoding,
+		)
+		n = len(plaintext)
+	} else if partial {
+		n, msg, buf, err = wire.ReadPartialMessageWithEncodingN(
+			p.conn, p.ProtocolVersion(), p.cfg.ChainParams.Net, encoding,
+			p.V2Transport.ReceivedPrefix(),
+		)
+	} else {
+		n, msg, buf, err = wire.ReadMessageWithEncodingN(
+			p.conn, p.ProtocolVersion(), p.cfg.ChainParams.Net, encoding,
+		)
+	}
+
 	atomic.AddUint64(&p.bytesReceived, uint64(n))
 	if p.cfg.Listeners.OnRead != nil {
 		p.cfg.Listeners.OnRead(p, n, msg, err)
@@ -1105,6 +1143,25 @@ func (p *Peer) writeMessage(msg wire.Message, enc wire.MessageEncoding) error {
 		return nil
 	}
 
+	var (
+		buf bytes.Buffer
+		n   int
+		err error
+	)
+
+	if p.cfg.UsingV2Conn {
+		_, err = wire.WriteV2MessageN(&buf, msg, p.ProtocolVersion(), enc)
+		if err != nil {
+			return err
+		}
+
+		_, n, err = p.V2Transport.V2EncPacket(buf.Bytes(), nil, false)
+	} else {
+		n, err = wire.WriteMessageWithEncodingN(
+			p.conn, msg, p.ProtocolVersion(), p.cfg.ChainParams.Net, enc,
+		)
+	}
+
 	// Use closures to log expensive operations so they are only run when
 	// the logging level requires it.
 	log.Debugf("%v", newLogClosure(func() string {
@@ -1120,18 +1177,9 @@ func (p *Peer) writeMessage(msg wire.Message, enc wire.MessageEncoding) error {
 		return spew.Sdump(msg)
 	}))
 	log.Tracef("%v", newLogClosure(func() string {
-		var buf bytes.Buffer
-		_, err := wire.WriteMessageWithEncodingN(&buf, msg, p.ProtocolVersion(),
-			p.cfg.ChainParams.Net, enc)
-		if err != nil {
-			return err.Error()
-		}
 		return spew.Sdump(buf.Bytes())
 	}))
 
-	// Write the message to the peer.
-	n, err := wire.WriteMessageWithEncodingN(p.conn, msg,
-		p.ProtocolVersion(), p.cfg.ChainParams.Net, enc)
 	atomic.AddUint64(&p.bytesSent, uint64(n))
 	if p.cfg.Listeners.OnWrite != nil {
 		p.cfg.Listeners.OnWrite(p, n, msg, err)
@@ -1400,7 +1448,7 @@ out:
 		// Read a message and stop the idle timer as soon as the read
 		// is done.  The timer is reset below for the next iteration if
 		// needed.
-		rmsg, buf, err := p.readMessage(p.wireEncoding)
+		rmsg, buf, err := p.readMessage(p.wireEncoding, false)
 		idleTimer.Stop()
 		if err != nil {
 			// In order to allow regression tests with malformed messages, don't
@@ -1963,10 +2011,16 @@ func (p *Peer) Disconnect() {
 
 // readRemoteVersionMsg waits for the next message to arrive from the remote
 // peer.  If the next message is not a version message or the version is not
-// acceptable then return an error.
-func (p *Peer) readRemoteVersionMsg() error {
-	// Read their version message.
-	remoteMsg, _, err := p.readMessage(wire.LatestEncoding)
+// acceptable then return an error.  The readPartial bool denotes whether we
+// need to read the rest of a partially-received version message.  This only
+// happens with implicitly downgraded v2->v1 connections.
+func (p *Peer) readRemoteVersionMsg(readPartial bool) error {
+	var (
+		remoteMsg wire.Message
+		err       error
+	)
+
+	remoteMsg, _, err = p.readMessage(wire.LatestEncoding, readPartial)
 	if err != nil {
 		return err
 	}
@@ -2171,7 +2225,7 @@ func (p *Peer) waitToFinishNegotiation(pver uint32) error {
 	// can receive unknown messages before and after sendaddrv2 and still
 	// have to wait for verack.
 	for {
-		remoteMsg, _, err := p.readMessage(wire.LatestEncoding)
+		remoteMsg, _, err := p.readMessage(wire.LatestEncoding, false)
 		if err == wire.ErrUnknownMessage {
 			continue
 		} else if err != nil {
@@ -2215,7 +2269,39 @@ func (p *Peer) waitToFinishNegotiation(pver uint32) error {
 //     that btcd does not implement but bitcoind does.
 //  6. If remote peer sent sendaddrv2 above, wait until receipt of verack.
 func (p *Peer) negotiateInboundProtocol() error {
-	if err := p.readRemoteVersionMsg(); err != nil {
+	// We may be anticipating a v2 connection, but if the initiating peer sends
+	// us a v1 version message, we need to note down that we've downgraded the
+	// connection internally.
+	downgradedConn := false
+
+	if p.cfg.UsingV2Conn {
+		// TODO: Change garbageLen to be random.
+		err := p.V2Transport.RespondV2Handshake(1, p.cfg.ChainParams.Net)
+		switch errors.Is(err, v2transport.ErrUseV1Protocol) {
+		case true:
+			// We fallback to the v1 protocol since the peer sent a v1 version
+			// message. We have received a partial version message and need to
+			// account for that when determining how to parse the remaining
+			// bytes on the wire.
+			p.cfg.UsingV2Conn = false
+			downgradedConn = true
+
+		case false:
+			// This is potentially a v2 connection. V1 connections can use the
+			// legacy negotiation code below immediately.
+			err = p.V2Transport.CompleteHandshake(
+				false, nil, p.cfg.ChainParams.Net,
+			)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	// If the connection has been downgraded, then we need to parse the rest of
+	// the v1 version message properly. Otherwise, we read the entire version
+	// message off the wire.
+	if err := p.readRemoteVersionMsg(downgradedConn); err != nil {
 		return err
 	}
 
@@ -2253,11 +2339,28 @@ func (p *Peer) negotiateInboundProtocol() error {
 //     in the inbound case.
 //  6. If sendaddrv2 was received, wait for receipt of verack.
 func (p *Peer) negotiateOutboundProtocol() error {
+	if p.cfg.UsingV2Conn {
+		// Note that it's possible that the v2 handshake fails because the peer
+		// does not support v2 connections. In this case, we should detect that
+		// and reconnect using a v1 connection. This is the logic that
+		// bitcoind uses.
+		// TODO: random value for garbage len?
+		if err := p.V2Transport.InitiateV2Handshake(1); err != nil {
+			return err
+		}
+
+		if err := p.V2Transport.CompleteHandshake(
+			true, nil, p.cfg.ChainParams.Net,
+		); err != nil {
+			return err
+		}
+	}
+
 	if err := p.writeLocalVersionMsg(); err != nil {
 		return err
 	}
 
-	if err := p.readRemoteVersionMsg(); err != nil {
+	if err := p.readRemoteVersionMsg(false); err != nil {
 		return err
 	}
 
@@ -2326,6 +2429,10 @@ func (p *Peer) AssociateConnection(conn net.Conn) {
 
 	p.conn = conn
 	p.timeConnected = time.Now()
+
+	if p.cfg.UsingV2Conn {
+		p.V2Transport.UseReadWriter(conn)
+	}
 
 	if p.inbound {
 		p.addr = p.conn.RemoteAddr().String()
@@ -2401,6 +2508,14 @@ func newPeerBase(origCfg *Config, inbound bool) *Peer {
 		services:        cfg.Services,
 		protocolVersion: cfg.ProtocolVersion,
 	}
+
+	if p.cfg.UsingV2Conn && p.Services()&wire.SFNodeP2PV2 == wire.SFNodeP2PV2 {
+		p.V2Transport = v2transport.NewPeer()
+	} else {
+		// TODO: Hack, change.
+		p.cfg.UsingV2Conn = false
+	}
+
 	return &p
 }
 
