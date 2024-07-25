@@ -4,6 +4,7 @@ require (
 	github.com/btcsuite/btcd/btcec/v2 v2.3.4
 	github.com/btcsuite/btcd/btcutil v1.1.5
 	github.com/btcsuite/btcd/chaincfg/chainhash v1.1.0
+	github.com/btcsuite/btcd/v2transport v1.0.0
 	github.com/btcsuite/btclog v0.0.0-20170628155309-84c8d2346e9f
 	github.com/btcsuite/go-socks v0.0.0-20170105172521-4720035b7bfd
 	github.com/btcsuite/websocket v0.0.0-20150119174127-31079b680792
@@ -16,8 +17,8 @@ require (
 	github.com/jrick/logrotate v1.0.0
 	github.com/stretchr/testify v1.8.4
 	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7
-	golang.org/x/crypto v0.22.0
-	golang.org/x/sys v0.19.0
+	golang.org/x/crypto v0.25.0
+	golang.org/x/sys v0.22.0
 	pgregory.net/rapid v1.2.0
 )
 
@@ -31,6 +32,10 @@ require (
 	golang.org/x/net v0.24.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+replace github.com/btcsuite/btcd/btcec/v2 => ./btcec
+
+replace github.com/btcsuite/btcd/v2transport => ./v2transport
 
 // The retract statements below fixes an accidental push of the tags of a btcd
 // fork.
@@ -64,4 +69,4 @@ retract (
 	v0.13.0-beta
 )
 
-go 1.22
+go 1.23.2
