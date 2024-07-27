@@ -137,7 +137,7 @@ type blockStore struct {
 	// lruMutex protects concurrent access to the least recently used list
 	// and lookup map.
 	//
-	// openBlocksLRU tracks how the open files are refenced by pushing the
+	// openBlocksLRU tracks how the open files are referenced by pushing the
 	// most recently used files to the front of the list thereby trickling
 	// the least recently used files to end of the list.  When a file needs
 	// to be closed due to exceeding the max number of allowed open
@@ -224,7 +224,7 @@ func serializeBlockLoc(loc blockLocation) []byte {
 	return serializedData[:]
 }
 
-// blockFilePath return the file path for the provided block file number.
+// blockFilePath returns the file path for the provided block file number.
 func blockFilePath(dbPath string, fileNum uint32) string {
 	fileName := fmt.Sprintf(blockFilenameTemplate, fileNum)
 	return filepath.Join(dbPath, fileName)
@@ -780,7 +780,7 @@ func scanBlockFiles(dbPath string) (int, int, uint32, error) {
 // and offset set and all fields initialized.
 func newBlockStore(basePath string, network wire.BitcoinNet) (*blockStore, error) {
 	// Look for the end of the latest block to file to determine what the
-	// write cursor position is from the viewpoing of the block files on
+	// write cursor position is from the viewpoint of the block files on
 	// disk.
 	_, fileNum, fileOff, err := scanBlockFiles(basePath)
 	if err != nil {
