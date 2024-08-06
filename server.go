@@ -2042,6 +2042,34 @@ type removeNodeMsg struct {
 	reply chan error
 }
 
+// ConnectedPeers returns an array consisting of all connected peers.
+func (s *server) ConnectedPeers() []*peer.Peer {
+	replyChan := make(chan []*serverPeer, 1)
+
+	// Send a query for a subscription for the connected peers.
+	select {
+	case s.query <- getPeersMsg{
+		reply: replyChan,
+	}:
+
+	case <-s.quit:
+		return nil
+	}
+
+	// Wait for the result here.
+	select {
+	case reply := <-replyChan:
+		peers := make([]*peer.Peer, 0, len(reply))
+		for _, sp := range reply {
+			peers = append(peers, sp.Peer)
+		}
+
+		return peers
+	case <-s.quit:
+		return nil
+	}
+}
+
 // handleQuery is the central handler for all queries and commands from other
 // goroutines related to peer state.
 func (s *server) handleQuery(state *peerState, querymsg interface{}) {
