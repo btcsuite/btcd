@@ -29,6 +29,15 @@ const (
 	// more.
 	minInFlightBlocks = 10
 
+	// maxInFlightBlocks is the maximum number of blocks per peer that
+	// should be in the request queue for headers-first mode before
+	// requesting more.
+	maxInFlightBlocksPerPeer = 16
+
+	// blockDownloadWindow is the maximum number of blocks that are allowed
+	// to be out of sync.
+	blockDownloadWindow = 1024
+
 	// maxRejectedTxns is the maximum number of rejected transactions
 	// hashes to store in memory.
 	maxRejectedTxns = 1000
@@ -247,6 +256,7 @@ type SyncManager struct {
 	queuedBlocks     map[chainhash.Hash]*blockMsg
 	peerSubscribers  []*peerSubscription
 	connectedPeers   func() []*peerpkg.Peer
+	fetchManager     query.WorkManager
 
 	// An optional fee estimator.
 	feeEstimator *mempool.FeeEstimator
@@ -1048,8 +1058,13 @@ func (sm *SyncManager) fetchHeaderBlocks() {
 	// Build up a getdata request for the list of blocks the headers
 	// describe.  The size hint will be limited to wire.MaxInvPerMsg by
 	// the function, so no need to double check it here.
-	gdmsg := wire.NewMsgGetDataSizeHint(uint(sm.headerList.Len()))
 	numRequested := 0
+	queryMessages := make([]*wire.MsgGetData, 0,
+		blockDownloadWindow/maxInFlightBlocksPerPeer)
+
+	queryMessages = append(queryMessages,
+		wire.NewMsgGetDataSizeHint(maxInFlightBlocksPerPeer))
+	queryIdx := 0
 	for e := sm.startHeader; e != nil; e = e.Next() {
 		node, ok := e.Value.(*headerNode)
 		if !ok {
@@ -1057,18 +1072,40 @@ func (sm *SyncManager) fetchHeaderBlocks() {
 			continue
 		}
 
+		// Prevent the blocks from being too out of order.
+		if node.height-blockDownloadWindow > sm.chain.BestSnapshot().Height {
+			break
+		}
+
+		// Check if the block is already requested.  If it is just move
+		// to the next block.
+		_, requested := sm.requestedBlocks[*node.hash]
+		if requested {
+			sm.startHeader = e.Next()
+			continue
+		}
+
+		// Check if the block is already queued.  If it is just move to
+		// the next block.
+		_, queued := sm.queuedBlocks[*node.hash]
+		if queued {
+			sm.startHeader = e.Next()
+			continue
+		}
+
+		// Check if we already have the block.
 		iv := wire.NewInvVect(wire.InvTypeBlock, node.hash)
 		haveInv, err := sm.haveInventory(iv)
 		if err != nil {
+			// If we error out, fetch the block anyways.
 			log.Warnf("Unexpected failure when checking for "+
 				"existing inventory during header block "+
 				"fetch: %v", err)
 		}
-		if !haveInv {
-			syncPeerState := sm.peerStates[sm.syncPeer]
 
+		// We don't have this block so include it in the invs.
+		if !haveInv {
 			sm.requestedBlocks[*node.hash] = struct{}{}
-			syncPeerState.requestedBlocks[*node.hash] = struct{}{}
 
 			// If we're fetching from a witness enabled peer
 			// post-fork, then ensure that we receive all the
@@ -1077,17 +1114,36 @@ func (sm *SyncManager) fetchHeaderBlocks() {
 				iv.Type = wire.InvTypeWitnessBlock
 			}
 
+			gdmsg := queryMessages[queryIdx]
+
+			// Each getdata may be queued to a different peer.
+			// So ensure that each getdata doesn't go over the max
+			// requested amount.
+			if len(gdmsg.InvList) > maxInFlightBlocksPerPeer {
+				gdmsg = wire.NewMsgGetDataSizeHint(
+					maxInFlightBlocksPerPeer)
+				queryMessages = append(queryMessages, gdmsg)
+				queryIdx++
+			}
+
 			gdmsg.AddInvVect(iv)
 			numRequested++
 		}
+
 		sm.startHeader = e.Next()
-		if numRequested >= wire.MaxInvPerMsg {
-			break
-		}
 	}
-	if len(gdmsg.InvList) > 0 {
-		sm.syncPeer.QueueMessage(gdmsg, nil)
+
+	// If there's nothing to request, return early.
+	if len(queryMessages) == 0 {
+		return
 	}
+
+	r := checkpointedBlocksQuery{queryMessages}
+	sm.fetchManager.Query(
+		r.requests(),
+		query.Cancel(sm.quit),
+		query.NoRetryMax(),
+	)
 }
 
 // handleHeadersMsg handles block header messages from all peers.  Headers are
@@ -1696,6 +1752,15 @@ func (sm *SyncManager) QueueBlock(block *btcutil.Block, peer *peerpkg.Peer, done
 		return
 	}
 
+	// We mark the block that we just received as requested from this peer
+	// as requested because the fetchManager handles which blocks are
+	// fetched from whom.  Normally we'd mark a block when we're requesting
+	// for them but in headers first mode we don't know which block is being
+	// fetched from whom.  This is where we're able to mark it as requested.
+	if sm.headersFirstMode {
+		state := sm.peerStates[peer]
+		state.requestedBlocks[*block.Hash()] = struct{}{}
+	}
 	sm.msgChan <- &blockMsg{block: block, peer: peer, reply: done}
 }
 
@@ -1749,6 +1814,10 @@ func (sm *SyncManager) Start() {
 	// Already started?
 	if atomic.AddInt32(&sm.started, 1) != 1 {
 		return
+	}
+
+	if err := sm.fetchManager.Start(); err != nil {
+		log.Info(err)
 	}
 
 	log.Trace("Starting sync manager")
@@ -1855,6 +1924,13 @@ func New(config *Config) (*SyncManager, error) {
 		feeEstimator:    config.FeeEstimator,
 		connectedPeers:  config.ConnectedPeers,
 	}
+	sm.fetchManager = query.NewWorkManager(
+		&query.Config{
+			ConnectedPeers: sm.ConnectedPeers,
+			NewWorker:      query.NewWorker,
+			Ranking:        query.NewPeerRanking(),
+		},
+	)
 
 	best := sm.chain.BestSnapshot()
 	if !config.DisableCheckpoints {
