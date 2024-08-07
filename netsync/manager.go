@@ -20,6 +20,7 @@ import (
 	"github.com/btcsuite/btcd/mempool"
 	peerpkg "github.com/btcsuite/btcd/peer"
 	"github.com/btcsuite/btcd/wire"
+	"github.com/lightninglabs/neutrino/query"
 )
 
 const (
@@ -203,6 +204,7 @@ type SyncManager struct {
 	headerList       *list.List
 	startHeader      *list.Element
 	nextCheckpoint   *chaincfg.Checkpoint
+	peerSubscribers  []*peerSubscription
 
 	// An optional fee estimator.
 	feeEstimator *mempool.FeeEstimator
@@ -452,6 +454,31 @@ func (sm *SyncManager) isSyncCandidate(peer *peerpkg.Peer) bool {
 	return true
 }
 
+// notifyPeerSubscribers notifies all the current peer subscribers of the peer
+// that was passed in.
+func (sm *SyncManager) notifyPeerSubscribers(peer *peerpkg.Peer) {
+	// Loop for alerting subscribers to the new peer that was connected to.
+	n := 0
+	for i, sub := range sm.peerSubscribers {
+		select {
+		// Quickly check whether this subscription has been canceled.
+		case <-sub.cancel:
+			// Avoid GC leak.
+			sm.peerSubscribers[i] = nil
+			continue
+		default:
+		}
+
+		// Keep non-canceled subscribers around.
+		sm.peerSubscribers[n] = sub
+		n++
+
+		sub.peers <- peer
+	}
+	// Re-align the slice to only active subscribers.
+	sm.peerSubscribers = sm.peerSubscribers[:n]
+}
+
 // handleNewPeerMsg deals with new peers that have signalled they may
 // be considered as a sync peer (they have already successfully negotiated).  It
 // also starts syncing if needed.  It is invoked from the syncHandler goroutine.
@@ -469,6 +496,13 @@ func (sm *SyncManager) handleNewPeerMsg(peer *peerpkg.Peer) {
 		syncCandidate:   isSyncCandidate,
 		requestedTxns:   make(map[chainhash.Hash]struct{}),
 		requestedBlocks: make(map[chainhash.Hash]struct{}),
+	}
+
+	// Only pass the peer off to the subscribers if we're able to sync off of
+	// the peer.
+	bestHeight := sm.chain.BestSnapshot().Height
+	if isSyncCandidate && peer.LastBlock() > bestHeight {
+		sm.notifyPeerSubscribers(peer)
 	}
 
 	// Start syncing by choosing the best candidate if needed.
@@ -1664,6 +1698,13 @@ func (sm *SyncManager) Pause() chan<- struct{} {
 	c := make(chan struct{})
 	sm.msgChan <- pauseMsg{c}
 	return c
+}
+
+// peerSubscription holds a peer subscription which we'll notify about any
+// connected peers.
+type peerSubscription struct {
+	peers  chan<- query.Peer
+	cancel <-chan struct{}
 }
 
 // New constructs a new SyncManager. Use Start to begin processing asynchronous
