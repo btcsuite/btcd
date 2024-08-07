@@ -284,6 +284,7 @@ type SyncManager struct {
 	txMemPool      *mempool.TxPool
 	chainParams    *chaincfg.Params
 	progressLogger *blockProgressLogger
+	peerLogger     *peerLogger
 	msgChan        chan interface{}
 	wg             sync.WaitGroup
 	quit           chan struct{}
@@ -2034,6 +2035,7 @@ func New(config *Config) (*SyncManager, error) {
 		peerStates:           make(map[*peerpkg.Peer]*peerSyncState),
 		progressLogger:       newBlockProgressLogger("Processed", log),
 		msgChan:              make(chan interface{}, config.MaxPeers*maxInFlightBlocksPerPeer),
+		peerLogger:           newPeerLogger(log),
 		headerList:           list.New(),
 		quit:                 make(chan struct{}),
 		queuedBlocks:         make(map[chainhash.Hash]*blockMsg),
