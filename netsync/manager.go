@@ -245,6 +245,7 @@ type SyncManager struct {
 	startHeader      *list.Element
 	nextCheckpoint   *chaincfg.Checkpoint
 	queuedBlocks     map[chainhash.Hash]*blockMsg
+	peerSubscribers  []*peerSubscription
 
 	// An optional fee estimator.
 	feeEstimator *mempool.FeeEstimator
@@ -512,6 +513,30 @@ func (sm *SyncManager) handleNewPeerMsg(peer *peerpkg.Peer) {
 		requestedTxns:   make(map[chainhash.Hash]struct{}),
 		requestedBlocks: make(map[chainhash.Hash]struct{}),
 	}
+
+	// Loop for alerting subscribers to the new peer that was connected to.
+	n := 0
+	for i, sub := range sm.peerSubscribers {
+		select {
+		// Quickly check whether this subscription has been canceled.
+		case <-sub.cancel:
+			// Avoid GC leak.
+			sm.peerSubscribers[i] = nil
+			continue
+		default:
+		}
+
+		// Keep non-canceled subscribers around.
+		sm.peerSubscribers[n] = sub
+		n++
+
+		// Send the peer only if it's a sync candidate.
+		if isSyncCandidate {
+			sub.peers <- peer
+		}
+	}
+	// Re-align the slice to only active subscribers.
+	sm.peerSubscribers = sm.peerSubscribers[:n]
 
 	// Start syncing by choosing the best candidate if needed.
 	if isSyncCandidate && sm.syncPeer == nil {
@@ -1777,6 +1802,13 @@ func (sm *SyncManager) Pause() chan<- struct{} {
 	c := make(chan struct{})
 	sm.msgChan <- pauseMsg{c}
 	return c
+}
+
+// peerSubscription holds a peer subscription which we'll notify about any
+// connected peers.
+type peerSubscription struct {
+	peers  chan<- query.Peer
+	cancel <-chan struct{}
 }
 
 // New constructs a new SyncManager. Use Start to begin processing asynchronous
