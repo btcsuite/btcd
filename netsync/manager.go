@@ -20,6 +20,7 @@ import (
 	"github.com/btcsuite/btcd/mempool"
 	peerpkg "github.com/btcsuite/btcd/peer"
 	"github.com/btcsuite/btcd/wire"
+	"github.com/lightninglabs/neutrino/query"
 )
 
 const (
@@ -171,6 +172,46 @@ func limitAdd(m map[chainhash.Hash]struct{}, hash chainhash.Hash, limit int) {
 		}
 	}
 	m[hash] = struct{}{}
+}
+
+// checkpointedBlocksQuery is a helper to construct query.Requests for GetData
+// messages.
+type checkpointedBlocksQuery struct {
+	msgs []*wire.MsgGetData
+}
+
+// handleResponse returns that the progress is progressed and finished if the
+// received wire.Message is a MsgBlock.
+func (c *checkpointedBlocksQuery) handleResponse(req, resp wire.Message,
+	peerAddr string) query.Progress {
+
+	_, ok := resp.(*wire.MsgBlock)
+	if !ok {
+		// We are only looking for block messages.
+		return query.Progress{
+			Finished:   false,
+			Progressed: false,
+		}
+	}
+
+	return query.Progress{
+		Finished:   true,
+		Progressed: true,
+	}
+}
+
+// requests returns a slice of query.Request that can be queued to
+// query.WorkManager.
+func (c *checkpointedBlocksQuery) requests() []*query.Request {
+	reqs := make([]*query.Request, len(c.msgs))
+	for idx, m := range c.msgs {
+		reqs[idx] = &query.Request{
+			Req:        m,
+			HandleResp: c.handleResponse,
+		}
+	}
+
+	return reqs
 }
 
 // SyncManager is used to communicate block related messages with peers. The
