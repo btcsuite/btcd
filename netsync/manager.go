@@ -30,6 +30,16 @@ const (
 	// more.
 	minInFlightBlocks = 10
 
+	// maxInFlightBlocks is the maximum number of blocks per peer that
+	// should be in the request queue for headers-first mode before
+	// requesting more.
+	maxInFlightBlocksPerPeer = 32
+
+	// blockDownloadWindow is the maximum number of blocks that are allowed
+	// to be fetch from the current best tip.  This number limits the memory
+	// usage a node will have.
+	blockDownloadWindow = 1024
+
 	// maxRejectedTxns is the maximum number of rejected transactions
 	// hashes to store in memory.
 	maxRejectedTxns = 1000
@@ -279,6 +289,7 @@ type SyncManager struct {
 	queuedBlocks     map[chainhash.Hash]*blockMsg
 	peerSubscribers  []*peerSubscription
 	connectedPeers   func() []*peerpkg.Peer
+	fetchManager     query.WorkManager
 
 	// An optional fee estimator.
 	feeEstimator *mempool.FeeEstimator
@@ -1043,7 +1054,7 @@ func (sm *SyncManager) handleBlockMsg(bmsg *blockMsg) {
 	}
 }
 
-// handleBlockMsgInHeadersFirst handles block messages from all peers when the
+// handleBlockMsgHeadersFirst handles block messages from all peers when the
 // sync manager is in headers first mode.  For blocks received out of order, it
 // first keeps them in memory and sends them to be processed when the next block
 // from the tip is available.
@@ -1054,22 +1065,7 @@ func (sm *SyncManager) handleBlockMsgHeadersFirst(bmsg *blockMsg) {
 		log.Warnf("Received block message from unknown peer %s", peer)
 		return
 	}
-
-	// If we didn't ask for this block then the peer is misbehaving.
 	blockHash := bmsg.block.Hash()
-	if _, exists = state.requestedBlocks[*blockHash]; !exists {
-		// The regression test intentionally sends some blocks twice
-		// to test duplicate block insertion fails.  Don't disconnect
-		// the peer or ignore the block when we're in regression test
-		// mode in this case so the chain code is actually fed the
-		// duplicate blocks.
-		if sm.chainParams != &chaincfg.RegressionNetParams {
-			log.Warnf("Got unrequested block %v from %s -- "+
-				"disconnecting", blockHash, peer.Addr())
-			peer.Disconnect()
-			return
-		}
-	}
 
 	// Add the block to the queue.
 	sm.queuedBlocks[*blockHash] = bmsg
@@ -1216,11 +1212,36 @@ func (sm *SyncManager) fetchHeaderBlocks() {
 		return
 	}
 
+	queueFetch := func(msg *wire.MsgGetData, quit chan struct{}) {
+		if msg == nil || len(msg.InvList) == 0 {
+			return
+		}
+
+		// Keep fetching until we don't have an error.
+		blockMap, err := sm.queueFetchManager(msg)
+		if err != nil {
+		Loop:
+			for err != nil {
+				select {
+				case <-quit:
+					break Loop
+				default:
+				}
+				gdmsg := wire.NewMsgGetDataSizeHint(maxInFlightBlocksPerPeer)
+				for k := range blockMap {
+					iv := wire.NewInvVect(wire.InvTypeWitnessBlock, &k)
+					gdmsg.AddInvVect(iv)
+				}
+				blockMap, err = sm.queueFetchManager(gdmsg)
+			}
+		}
+	}
+
 	// Build up a getdata request for the list of blocks the headers
 	// describe.  The size hint will be limited to wire.MaxInvPerMsg by
 	// the function, so no need to double check it here.
-	gdmsg := wire.NewMsgGetDataSizeHint(uint(sm.headerList.Len()))
-	numRequested := 0
+	bestHeight := sm.chain.BestSnapshot().Height
+	msgs := make([]*wire.MsgGetData, 0, blockDownloadWindow/maxInFlightBlocksPerPeer)
 	for e := sm.startHeader; e != nil; e = e.Next() {
 		node, ok := e.Value.(*headerNode)
 		if !ok {
@@ -1228,17 +1249,39 @@ func (sm *SyncManager) fetchHeaderBlocks() {
 			continue
 		}
 
+		// Prevent the blocks from being too out of order.
+		if node.height-blockDownloadWindow > bestHeight {
+			break
+		}
+
+		// Check if the block is already requested.  If it is just move
+		// to the next block.
+		_, requested := sm.requestedBlocks[*node.hash]
+		if requested {
+			sm.startHeader = e.Next()
+			continue
+		}
+
+		// Check if the block is already queued.  If it is just move to
+		// the next block.
+		_, queued := sm.queuedBlocks[*node.hash]
+		if queued {
+			sm.startHeader = e.Next()
+			continue
+		}
+
+		// Check if we already have the block.
 		iv := wire.NewInvVect(wire.InvTypeBlock, node.hash)
 		haveInv, err := sm.haveInventory(iv)
 		if err != nil {
+			// If we error out, fetch the block anyways.
 			log.Warnf("Unexpected failure when checking for "+
 				"existing inventory during header block "+
 				"fetch: %v", err)
 		}
-		if !haveInv {
-			syncPeerState := sm.peerStates[sm.syncPeer]
-			syncPeerState.requestedBlocks[*node.hash] = struct{}{}
 
+		// We don't have this block so include it in the invs.
+		if !haveInv {
 			// If we're fetching from a witness enabled peer
 			// post-fork, then ensure that we receive all the
 			// witness data in the blocks.
@@ -1246,16 +1289,26 @@ func (sm *SyncManager) fetchHeaderBlocks() {
 				iv.Type = wire.InvTypeWitnessBlock
 			}
 
-			gdmsg.AddInvVect(iv)
-			numRequested++
+			if len(msgs) == 0 {
+				gdmsg := wire.NewMsgGetDataSizeHint(maxInFlightBlocksPerPeer)
+				msgs = append(msgs, gdmsg)
+			}
+
+			gdmsg := msgs[len(msgs)-1]
+			if gdmsg != nil && len(gdmsg.InvList) < maxInFlightBlocksPerPeer {
+				gdmsg.AddInvVect(iv)
+			} else {
+				gdmsg := wire.NewMsgGetDataSizeHint(maxInFlightBlocksPerPeer)
+				gdmsg.AddInvVect(iv)
+				msgs = append(msgs, gdmsg)
+			}
 		}
+
 		sm.startHeader = e.Next()
-		if numRequested >= wire.MaxInvPerMsg {
-			break
-		}
 	}
-	if len(gdmsg.InvList) > 0 {
-		sm.syncPeer.QueueMessage(gdmsg, nil)
+
+	for _, m := range msgs {
+		go queueFetch(m, sm.quit)
 	}
 }
 
@@ -1678,11 +1731,14 @@ out:
 
 			case *blockMsg:
 				if sm.headersFirstMode {
+					// We're purposefully not sending back
+					// reply as that'll happen within this
+					// function.
 					sm.handleBlockMsgHeadersFirst(msg)
 				} else {
 					sm.handleBlockMsg(msg)
+					msg.reply <- struct{}{}
 				}
-				msg.reply <- struct{}{}
 
 			case *invMsg:
 				sm.handleInvMsg(msg)
@@ -1876,7 +1932,24 @@ func (sm *SyncManager) QueueBlock(block *btcutil.Block, peer *peerpkg.Peer, done
 		return
 	}
 
-	sm.msgChan <- &blockMsg{block: block, peer: peer, reply: done}
+	if sm.headersFirstMode {
+		// Since we're in headers first mode, we're downloading blocks
+		// from multiple peers and we're relying on a timeout to determine if
+		// the peer is lagging or not.  The peer thread is blocked by this
+		// function here and wait for the block to be processed, then the
+		// block that the peer sent over is not being read and we may confuse
+		// the fetchManager that the peer is lagging so we send that we've
+		// processed the block to the peer so that it'll go download another
+		// block.
+		//
+		// During a headers-first download, it's much harder for a peer
+		// to be queuing up a bunch of bad blocks as we specifically ask
+		// for the blocks that had their proof of work verified.
+		done <- struct{}{}
+		sm.msgChan <- &blockMsg{block: block, peer: peer, reply: make(chan struct{})}
+	} else {
+		sm.msgChan <- &blockMsg{block: block, peer: peer, reply: done}
+	}
 }
 
 // QueueInv adds the passed inv message and peer to the block handling queue.
@@ -1931,6 +2004,10 @@ func (sm *SyncManager) Start() {
 		return
 	}
 
+	if err := sm.fetchManager.Start(); err != nil {
+		log.Info(err)
+	}
+
 	log.Trace("Starting sync manager")
 	sm.wg.Add(1)
 	go sm.blockHandler()
@@ -1946,6 +2023,8 @@ func (sm *SyncManager) Stop() error {
 	}
 
 	log.Infof("Sync manager shutting down")
+
+	sm.fetchManager.Stop()
 	close(sm.quit)
 	sm.wg.Wait()
 	return nil
@@ -2015,6 +2094,28 @@ func (sm *SyncManager) ConnectedPeers() (<-chan query.Peer, func(), error) {
 	}, nil
 }
 
+// queueFetchManager queues the given getdata to the fetch manager and waits for
+// the resulting error from the channel and returns the value.
+func (sm *SyncManager) queueFetchManager(msg *wire.MsgGetData) (
+	map[chainhash.Hash]struct{}, error) {
+
+	r := newCheckpointedBlocksQuery(msg, sm)
+	errChan := sm.fetchManager.Query(
+		r.requests(),
+		query.Cancel(sm.quit),
+		query.NumRetries(0),
+	)
+
+	var err error
+	select {
+	case err = <-errChan:
+		return r.blocks, err
+	case <-sm.quit:
+	}
+
+	return nil, nil
+}
+
 // New constructs a new SyncManager. Use Start to begin processing asynchronous
 // block, tx, and inv updates.
 func New(config *Config) (*SyncManager, error) {
@@ -2035,6 +2136,13 @@ func New(config *Config) (*SyncManager, error) {
 		feeEstimator:    config.FeeEstimator,
 		connectedPeers:  config.ConnectedPeers,
 	}
+	sm.fetchManager = query.NewWorkManager(
+		&query.Config{
+			ConnectedPeers: sm.ConnectedPeers,
+			NewWorker:      query.NewWorker,
+			Ranking:        query.NewPeerRanking(),
+		},
+	)
 
 	best := sm.chain.BestSnapshot()
 	if !config.DisableCheckpoints {
