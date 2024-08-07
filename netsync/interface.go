@@ -38,4 +38,7 @@ type Config struct {
 	MaxPeers           int
 
 	FeeEstimator *mempool.FeeEstimator
+
+	// ConnectedPeers returns all the currently connected peers.
+	ConnectedPeers func() []*peer.Peer
 }
