@@ -291,6 +291,7 @@ type SyncManager struct {
 	queuedBlocks         map[chainhash.Hash]*blockMsg
 	peerSubscriptionLock sync.Mutex
 	peerSubscribers      map[peerSubscription]struct{}
+	connectedPeers       func() []*peerpkg.Peer
 
 	// An optional fee estimator.
 	feeEstimator *mempool.FeeEstimator
@@ -1968,6 +1969,37 @@ type peerSubscription struct {
 	cancel <-chan struct{}
 }
 
+// ConnectedPeers returns all the currently connected peers to the channel
+// and then any additional new peers on connect.
+func (sm *SyncManager) ConnectedPeers() (<-chan query.Peer, func(), error) {
+	sm.peerSubscriptionLock.Lock()
+	defer sm.peerSubscriptionLock.Unlock()
+
+	peers := sm.connectedPeers()
+	peerChan := make(chan query.Peer, len(peers))
+
+	// Load up the channel with the current peers.
+	bestHeight := sm.chain.BestSnapshot().Height
+	for _, peer := range peers {
+		if sm.isSyncCandidate(peer) &&
+			peer.LastBlock() > bestHeight {
+
+			peerChan <- peer
+		}
+	}
+
+	cancelChan := make(chan struct{})
+	sub := peerSubscription{
+		peers:  peerChan,
+		cancel: cancelChan,
+	}
+	sm.peerSubscribers[sub] = struct{}{}
+
+	return peerChan, func() {
+		close(cancelChan)
+	}, nil
+}
+
 // New constructs a new SyncManager. Use Start to begin processing asynchronous
 // block, tx, and inv updates.
 func New(config *Config) (*SyncManager, error) {
@@ -1987,6 +2019,7 @@ func New(config *Config) (*SyncManager, error) {
 		peerSubscribers: make(map[peerSubscription]struct{}),
 		quit:            make(chan struct{}),
 		feeEstimator:    config.FeeEstimator,
+		connectedPeers:  config.ConnectedPeers,
 	}
 
 	best := sm.chain.BestSnapshot()
