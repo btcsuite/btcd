@@ -284,11 +284,13 @@ type SyncManager struct {
 	lastProgressTime time.Time
 
 	// The following fields are used for headers-first mode.
-	headersFirstMode bool
-	headerList       *list.List
-	startHeader      *list.Element
-	nextCheckpoint   *chaincfg.Checkpoint
-	queuedBlocks     map[chainhash.Hash]*blockMsg
+	headersFirstMode     bool
+	headerList           *list.List
+	startHeader          *list.Element
+	nextCheckpoint       *chaincfg.Checkpoint
+	queuedBlocks         map[chainhash.Hash]*blockMsg
+	peerSubscriptionLock sync.Mutex
+	peerSubscribers      map[peerSubscription]struct{}
 
 	// An optional fee estimator.
 	feeEstimator *mempool.FeeEstimator
@@ -574,6 +576,34 @@ func (sm *SyncManager) isSyncCandidate(peer *peerpkg.Peer) bool {
 	return true
 }
 
+// notifyPeerSubscribers notifies all the current peer subscribers of the peer
+// that was passed in.
+func (sm *SyncManager) notifyPeerSubscribers(peer *peerpkg.Peer) {
+	sm.peerSubscriptionLock.Lock()
+	defer sm.peerSubscriptionLock.Unlock()
+
+	for sub := range sm.peerSubscribers {
+		select {
+		case <-sub.cancel:
+			delete(sm.peerSubscribers, sub)
+			continue
+		default:
+		}
+
+		// Spin up a goroutine so that we don't block here.
+		go func(subscription peerSubscription,
+			quit chan struct{}) {
+
+			select {
+			case subscription.peers <- peer:
+			case <-subscription.cancel:
+			case <-sm.quit:
+			}
+
+		}(sub, sm.quit)
+	}
+}
+
 // handleNewPeerMsg deals with new peers that have signalled they may
 // be considered as a sync peer (they have already successfully negotiated).  It
 // also starts syncing if needed.  It is invoked from the syncHandler goroutine.
@@ -591,6 +621,13 @@ func (sm *SyncManager) handleNewPeerMsg(peer *peerpkg.Peer) {
 		syncCandidate:   isSyncCandidate,
 		requestedTxns:   make(map[chainhash.Hash]struct{}),
 		requestedBlocks: make(map[chainhash.Hash]struct{}),
+	}
+
+	// Only pass the peer off to the subscribers if we're able to sync off of
+	// the peer.
+	bestHeight := sm.chain.BestSnapshot().Height
+	if isSyncCandidate && peer.LastBlock() > bestHeight {
+		sm.notifyPeerSubscribers(peer)
 	}
 
 	// Start syncing by choosing the best candidate if needed.
@@ -1924,6 +1961,13 @@ func (sm *SyncManager) Pause() chan<- struct{} {
 	return c
 }
 
+// peerSubscription holds a peer subscription which we'll notify about any
+// connected peers.
+type peerSubscription struct {
+	peers  chan<- query.Peer
+	cancel <-chan struct{}
+}
+
 // New constructs a new SyncManager. Use Start to begin processing asynchronous
 // block, tx, and inv updates.
 func New(config *Config) (*SyncManager, error) {
@@ -1940,6 +1984,7 @@ func New(config *Config) (*SyncManager, error) {
 		msgChan:         make(chan interface{}, config.MaxPeers*3),
 		headerList:      list.New(),
 		queuedBlocks:    make(map[chainhash.Hash]*blockMsg),
+		peerSubscribers: make(map[peerSubscription]struct{}),
 		quit:            make(chan struct{}),
 		feeEstimator:    config.FeeEstimator,
 	}
