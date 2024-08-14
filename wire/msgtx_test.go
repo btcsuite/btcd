@@ -850,6 +850,15 @@ func TestTxOutPointFromString(t *testing.T) {
 			err: false,
 		},
 		{
+			name:  "normal outpoint 2 with 31-byte txid",
+			input: "c7762a68ff164352bd31fd95fa875204e811c09acef40ba781787eb28e3b55:42",
+			result: &OutPoint{
+				Hash:  hashFromStr("c7762a68ff164352bd31fd95fa875204e811c09acef40ba781787eb28e3b55"),
+				Index: 42,
+			},
+			err: true,
+		},
+		{
 			name:   "bad string",
 			input:  "not_outpoint_not_outpoint_not_outpoint",
 			result: nil,
