@@ -23,7 +23,6 @@ import (
 	"github.com/btcsuite/btcd/txscript"
 
 	"github.com/btcsuite/btclog"
-	"github.com/jrick/logrotate/rotator"
 )
 
 // logWriter implements an io.Writer that outputs to both standard output and
@@ -52,7 +51,7 @@ var (
 
 	// logRotator is one of the logging outputs.  It should be closed on
 	// application shutdown.
-	logRotator *rotator.Rotator
+	logRotator *Rotator
 
 	adxrLog = backendLog.Logger("ADXR")
 	amgrLog = backendLog.Logger("AMGR")
@@ -115,7 +114,7 @@ func initLogRotator(logFile string) {
 		fmt.Fprintf(os.Stderr, "failed to create log directory: %v\n", err)
 		os.Exit(1)
 	}
-	r, err := rotator.New(logFile, 10*1024, false, 3)
+	r, err := NewRotatorWithCompressor(logFile, 10*1024, false, 3, Zstd)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to create file rotator: %v\n", err)
 		os.Exit(1)
