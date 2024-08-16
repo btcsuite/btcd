@@ -675,7 +675,8 @@ func loadConfig() (*config, []string, error) {
 
 	// Initialize log rotation.  After log rotation has been initialized, the
 	// logger variables may be used.
-	initLogRotator(filepath.Join(cfg.LogDir, defaultLogFilename))
+	logFile := filepath.Join(cfg.LogDir, defaultLogFilename)
+	initLogRotator(logFile, cfg.LogCompressor)
 
 	// Parse, validate, and set debug log level(s).
 	if err := parseAndSetDebugLevels(cfg.DebugLevel); err != nil {

@@ -6,6 +6,7 @@
 package main
 
 import (
+	"compress/gzip"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -24,6 +25,7 @@ import (
 
 	"github.com/btcsuite/btclog"
 	"github.com/jrick/logrotate/rotator"
+	"github.com/klauspost/compress/zstd"
 )
 
 // logWriter implements an io.Writer that outputs to both standard output and
@@ -128,8 +130,8 @@ func supportedCompressor(compressor string) bool {
 
 // initLogRotator initializes the logging rotater to write logs to logFile and
 // create roll files in the same directory.  It must be called before the
-// package-global log rotater variables are used.
-func initLogRotator(logFile string) {
+// package-global log rotator variables are used.
+func initLogRotator(logFile, logCompressor string) {
 	logDir, _ := filepath.Split(logFile)
 	err := os.MkdirAll(logDir, 0700)
 	if err != nil {
@@ -148,6 +150,23 @@ func initLogRotator(logFile string) {
 			"invalid", cfg.LogCompressor)
 		os.Exit(1)
 	}
+
+	var c rotator.Compressor
+	switch logCompressor {
+	case Gzip:
+		c = gzip.NewWriter(nil)
+
+	case Zstd:
+		c, err = zstd.NewWriter(nil)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "failed to create zstd "+
+				"compressor: %v\n", err)
+			os.Exit(1)
+		}
+	}
+
+	// Apply the compressor and its file suffix to the log rotator.
+	r.SetCompressor(c, logCompressors[logCompressor])
 
 	logRotator = r
 }
