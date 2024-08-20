@@ -1277,14 +1277,16 @@ func TestMaybeFinalizeAll(t *testing.T) {
 
 func TestFromUnsigned(t *testing.T) {
 	serTx, err := hex.DecodeString("00000000000101e165f072311e71825b47a4797221d7ae56d4b40b7707c540049aee43302448a40000000000feffffff0212f1126a0000000017a9143e836801b2b15aa193449d815c62d6c4b6227c898780778e060000000017a914ba4bdb0b07d67bc60f59c1f4fe54170565254974870000000000")
-	if err != nil {
-		t.Fatalf("Error: %v", err)
-	}
+	require.NoError(t, err)
+
+	// The above tx has witness flag set but no witness data, so we expect
+	// an error.
 	tx := wire.NewMsgTx(2)
 	err = tx.Deserialize(bytes.NewReader(serTx))
-	if err != nil {
-		t.Fatalf("Error: %v", err)
-	}
+	require.EqualError(t, err, "witness flag set but tx has no witnesses")
+
+	// Although the above tx is not valid, fields we need are still
+	// deserialized into the tx.
 	psbt1, err := NewFromUnsignedTx(tx)
 	if err != nil {
 		t.Fatalf("Error: %v", err)
