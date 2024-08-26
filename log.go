@@ -105,6 +105,27 @@ var subsystemLoggers = map[string]btclog.Logger{
 	"TXMP": txmpLog,
 }
 
+// Declare the supported compressors as exported consts for easier use from
+// other projects.
+const (
+	Gzip = "gzip"
+	Zstd = "zstd"
+)
+
+// logCompressors maps the identifier for each supported compression algorithm
+// to the extension used for the compressed log files.
+var logCompressors = map[string]string{
+	Gzip: "gz",
+	Zstd: "zst",
+}
+
+// supportedCompressor checks that the named compressor is known and supported
+// for use during log rotation.
+func supportedCompressor(compressor string) bool {
+	_, ok := logCompressors[compressor]
+	return ok
+}
+
 // initLogRotator initializes the logging rotater to write logs to logFile and
 // create roll files in the same directory.  It must be called before the
 // package-global log rotater variables are used.
@@ -118,6 +139,13 @@ func initLogRotator(logFile string) {
 	r, err := rotator.New(logFile, 10*1024, false, 3)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to create file rotator: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Reject unknown compressors.
+	if !supportedCompressor(cfg.LogCompressor) {
+		fmt.Fprintf(os.Stderr, "specified log compressor [%v] is "+
+			"invalid", cfg.LogCompressor)
 		os.Exit(1)
 	}
 

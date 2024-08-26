@@ -76,6 +76,8 @@ Application Options:
 	                            (default all interfaces port: 8333, testnet:
 	                            18333, signet: 38333)
 	    --logdir=               Directory to log output
+	    --logcompressor=[gzip,zstd] Compression algorithm to use when rotating logs.
+				    (default: gzip)
 	    --maxorphantx=          Max number of orphan transactions to keep in
 	                            memory (default: 100)
 	    --maxpeers=             Max number of inbound and outbound peers
