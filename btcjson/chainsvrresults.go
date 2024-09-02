@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 
@@ -363,6 +364,49 @@ type LocalAddressesResult struct {
 	Score   int32  `json:"score"`
 }
 
+// StringOrArray defines a type that can be used as type that is either a single
+// string value or a string array in JSON-RPC commands, depending on the version
+// of the chain backend.
+type StringOrArray []string
+
+// MarshalJSON implements the json.Marshaler interface.
+func (h StringOrArray) MarshalJSON() ([]byte, error) {
+	return json.Marshal(h)
+}
+
+// UnmarshalJSON implements the json.Unmarshaler interface.
+func (h *StringOrArray) UnmarshalJSON(data []byte) error {
+	var unmarshalled interface{}
+	if err := json.Unmarshal(data, &unmarshalled); err != nil {
+		return err
+	}
+
+	switch v := unmarshalled.(type) {
+	case string:
+		*h = []string{v}
+
+	case []interface{}:
+		s := make([]string, len(v))
+		for i, e := range v {
+			str, ok := e.(string)
+			if !ok {
+				return fmt.Errorf("invalid string_or_array "+
+					"value: %v", unmarshalled)
+			}
+
+			s[i] = str
+		}
+
+		*h = s
+
+	default:
+		return fmt.Errorf("invalid string_or_array value: %v",
+			unmarshalled)
+	}
+
+	return nil
+}
+
 // GetNetworkInfoResult models the data returned from the getnetworkinfo
 // command.
 type GetNetworkInfoResult struct {
@@ -380,7 +424,7 @@ type GetNetworkInfoResult struct {
 	RelayFee        float64                `json:"relayfee"`
 	IncrementalFee  float64                `json:"incrementalfee"`
 	LocalAddresses  []LocalAddressesResult `json:"localaddresses"`
-	Warnings        string                 `json:"warnings"`
+	Warnings        StringOrArray          `json:"warnings"`
 }
 
 // GetNodeAddressesResult models the data returned from the getnodeaddresses
