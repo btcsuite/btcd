@@ -429,11 +429,6 @@ func (sm *SyncManager) startSync() {
 
 	// Start syncing from the best peer if one was selected.
 	if bestPeer != nil {
-		// Clear the requestedBlocks if the sync peer changes, otherwise
-		// we may ignore blocks we need that the last sync peer failed
-		// to send.
-		sm.requestedBlocks = make(map[chainhash.Hash]struct{})
-
 		locator, err := sm.chain.LatestBlockLocator()
 		if err != nil {
 			log.Errorf("Failed to get block locator for the "+
@@ -471,6 +466,10 @@ func (sm *SyncManager) startSync() {
 				"%d from peer %s", best.Height+1,
 				sm.nextCheckpoint.Height, bestPeer.Addr())
 		} else {
+			// Clear the requestedBlocks if the sync peer changes, otherwise
+			// we may ignore blocks we need that the last sync peer failed
+			// to send.
+			sm.requestedBlocks = make(map[chainhash.Hash]struct{})
 			bestPeer.PushGetBlocksMsg(locator, &zeroHash)
 		}
 		sm.syncPeer = bestPeer
@@ -708,12 +707,14 @@ func (sm *SyncManager) clearRequestedState(state *peerSyncState) {
 		delete(sm.requestedTxns, txHash)
 	}
 
-	// Remove requested blocks from the global map so that they will be
-	// fetched from elsewhere next time we get an inv.
-	// TODO: we could possibly here check which peers have these blocks
-	// and request them now to speed things up a little.
-	for blockHash := range state.requestedBlocks {
-		delete(sm.requestedBlocks, blockHash)
+	if !sm.headersFirstMode {
+		// Remove requested blocks from the global map so that they will be
+		// fetched from elsewhere next time we get an inv.
+		// TODO: we could possibly here check which peers have these blocks
+		// and request them now to speed things up a little.
+		for blockHash := range state.requestedBlocks {
+			delete(sm.requestedBlocks, blockHash)
+		}
 	}
 }
 
