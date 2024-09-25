@@ -775,7 +775,7 @@ func (c *Client) handleSendPostMessage(jReq *jsonRequest) {
 	}
 
 	var url string
-	switch parsedAddr.Network(){
+	switch parsedAddr.Network() {
 	case "unix", "unixpacket":
 		// Using a placeholder URL because a non-empty URL is required.
 		// The Unix domain socket is specified in the DialContext.
@@ -1733,74 +1733,74 @@ func (c *Client) Send() error {
 // connections. We accept a custom function to resolve any TCP addresses so
 // that caller is able control exactly how resolution is performed.
 func ParseAddressString(strAddress string) (net.Addr, error) {
-    var parsedNetwork, parsedAddr string
+	var parsedNetwork, parsedAddr string
 
-    // Addresses can either be in network://address:port format,
-    // network:address:port, address:port, or just port. We want to support
-    // all possible types.
-    if strings.Contains(strAddress, "://") {
-        parts := strings.Split(strAddress, "://")
-        parsedNetwork, parsedAddr = parts[0], parts[1]
-    } else if strings.Contains(strAddress, ":") {
-        parts := strings.Split(strAddress, ":")
-        parsedNetwork = parts[0]
-        parsedAddr = strings.Join(parts[1:], ":")
-    } else {
-        parsedAddr = strAddress
-    }
+	// Addresses can either be in network://address:port format,
+	// network:address:port, address:port, or just port. We want to support
+	// all possible types.
+	if strings.Contains(strAddress, "://") {
+		parts := strings.Split(strAddress, "://")
+		parsedNetwork, parsedAddr = parts[0], parts[1]
+	} else if strings.Contains(strAddress, ":") {
+		parts := strings.Split(strAddress, ":")
+		parsedNetwork = parts[0]
+		parsedAddr = strings.Join(parts[1:], ":")
+	} else {
+		parsedAddr = strAddress
+	}
 
-    // Only TCP and Unix socket addresses are valid. We can't use IP or
-    // UDP only connections for anything we do in lnd.
-    switch parsedNetwork {
-    case "unix", "unixpacket":
-        return net.ResolveUnixAddr(parsedNetwork, parsedAddr)
+	// Only TCP and Unix socket addresses are valid. We can't use IP or
+	// UDP only connections for anything we do in lnd.
+	switch parsedNetwork {
+	case "unix", "unixpacket":
+		return net.ResolveUnixAddr(parsedNetwork, parsedAddr)
 
-    case "tcp", "tcp4", "tcp6":
-        return net.ResolveTCPAddr(parsedNetwork, verifyPort(parsedAddr))
+	case "tcp", "tcp4", "tcp6":
+		return net.ResolveTCPAddr(parsedNetwork, verifyPort(parsedAddr))
 
-    case "ip", "ip4", "ip6", "udp", "udp4", "udp6", "unixgram":
-        return nil, fmt.Errorf("only TCP or unix socket "+
-            "addresses are supported: %s", parsedAddr)
+	case "ip", "ip4", "ip6", "udp", "udp4", "udp6", "unixgram":
+		return nil, fmt.Errorf("only TCP or unix socket "+
+			"addresses are supported: %s", parsedAddr)
 
-    default:
-        // We'll now possibly use the local host short circuit
-        // or parse out an all interfaces listen.
-        addrWithPort := verifyPort(strAddress)
+	default:
+		// We'll now possibly use the local host short circuit
+		// or parse out an all interfaces listen.
+		addrWithPort := verifyPort(strAddress)
 
-        // Otherwise, we'll attempt to resolve the host.
-        return net.ResolveTCPAddr("tcp", addrWithPort)
-    }
+		// Otherwise, we'll attempt to resolve the host.
+		return net.ResolveTCPAddr("tcp", addrWithPort)
+	}
 }
 
 // verifyPort makes sure that an address string has both a host and a port.
 // If the address is just a port, then we'll assume that the user is using the
 // short cut to specify a localhost:port address.
 func verifyPort(address string) string {
-    host, port, err := net.SplitHostPort(address)
-    if err != nil {
-        // If the address itself is just an integer, then we'll assume
-        // that we're mapping this directly to a localhost:port pair.
-        // This ensures we maintain the legacy behavior.
-        if _, err := strconv.Atoi(address); err == nil {
-            return net.JoinHostPort("localhost", address)
-        }
+	host, port, err := net.SplitHostPort(address)
+	if err != nil {
+		// If the address itself is just an integer, then we'll assume
+		// that we're mapping this directly to a localhost:port pair.
+		// This ensures we maintain the legacy behavior.
+		if _, err := strconv.Atoi(address); err == nil {
+			return net.JoinHostPort("localhost", address)
+		}
 
-        // Otherwise, we'll assume that the address just failed to
-        // attach its own port, so we'll leave it as is. In the
-        // case of IPv6 addresses, if the host is already surrounded by
-        // brackets, then we'll avoid using the JoinHostPort function,
-        // since it will always add a pair of brackets.
-        if strings.HasPrefix(address, "[") {
-            return address
-        }
-        return net.JoinHostPort(address, "")
-    }
+		// Otherwise, we'll assume that the address just failed to
+		// attach its own port, so we'll leave it as is. In the
+		// case of IPv6 addresses, if the host is already surrounded by
+		// brackets, then we'll avoid using the JoinHostPort function,
+		// since it will always add a pair of brackets.
+		if strings.HasPrefix(address, "[") {
+			return address
+		}
+		return net.JoinHostPort(address, "")
+	}
 
-    // In the case that both the host and port are empty, we'll use the
-    // an empty port.
-    if host == "" && port == "" {
-        return ":"
-    }
+	// In the case that both the host and port are empty, we'll use the
+	// an empty port.
+	if host == "" && port == "" {
+		return ":"
+	}
 
-    return address
+	return address
 }
