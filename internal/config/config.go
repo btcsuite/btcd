@@ -2,7 +2,7 @@
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package main
+package config
 
 import (
 	"bufio"
@@ -29,6 +29,8 @@ import (
 	"github.com/btcsuite/btcd/connmgr"
 	"github.com/btcsuite/btcd/database"
 	_ "github.com/btcsuite/btcd/database/ffldb"
+	"github.com/btcsuite/btcd/internal/log"
+	"github.com/btcsuite/btcd/internal/params"
 	"github.com/btcsuite/btcd/mempool"
 	"github.com/btcsuite/btcd/peer"
 	"github.com/btcsuite/btcd/wire"
@@ -37,48 +39,48 @@ import (
 )
 
 const (
-	defaultConfigFilename        = "btcd.conf"
-	defaultDataDirname           = "data"
-	defaultLogLevel              = "info"
-	defaultLogDirname            = "logs"
-	defaultLogFilename           = "btcd.log"
-	defaultMaxPeers              = 125
-	defaultBanDuration           = time.Hour * 24
-	defaultBanThreshold          = 100
-	defaultConnectTimeout        = time.Second * 30
-	defaultMaxRPCClients         = 10
-	defaultMaxRPCWebsockets      = 25
-	defaultMaxRPCConcurrentReqs  = 20
-	defaultDbType                = "ffldb"
-	defaultFreeTxRelayLimit      = 15.0
-	defaultTrickleInterval       = peer.DefaultTrickleInterval
-	defaultBlockMinSize          = 0
-	defaultBlockMaxSize          = 750000
-	defaultBlockMinWeight        = 0
-	defaultBlockMaxWeight        = 3000000
-	blockMaxSizeMin              = 1000
-	blockMaxSizeMax              = blockchain.MaxBlockBaseSize - 1000
-	blockMaxWeightMin            = 4000
-	blockMaxWeightMax            = blockchain.MaxBlockWeight - 4000
-	defaultGenerate              = false
-	defaultMaxOrphanTransactions = 100
-	defaultMaxOrphanTxSize       = 100000
-	defaultSigCacheMaxSize       = 100000
-	defaultUtxoCacheMaxSizeMiB   = 250
-	sampleConfigFilename         = "sample-btcd.conf"
-	defaultTxIndex               = false
-	defaultAddrIndex             = false
-	pruneMinSize                 = 1536
+	DefaultConfigFilename        = "btcd.conf"
+	DefaultDataDirname           = "data"
+	DefaultLogLevel              = "info"
+	DefaultLogDirname            = "logs"
+	DefaultLogFilename           = "btcd.log"
+	DefaultMaxPeers              = 125
+	DefaultBanDuration           = time.Hour * 24
+	DefaultBanThreshold          = 100
+	DefaultConnectTimeout        = time.Second * 30
+	DefaultMaxRPCClients         = 10
+	DefaultMaxRPCWebsockets      = 25
+	DefaultMaxRPCConcurrentReqs  = 20
+	DefaultDbType                = "ffldb"
+	DefaultFreeTxRelayLimit      = 15.0
+	DefaultTrickleInterval       = peer.DefaultTrickleInterval
+	DefaultBlockMinSize          = 0
+	DefaultBlockMaxSize          = 750000
+	DefaultBlockMinWeight        = 0
+	DefaultBlockMaxWeight        = 3000000
+	BlockMaxSizeMin              = 1000
+	BlockMaxSizeMax              = blockchain.MaxBlockBaseSize - 1000
+	BlockMaxWeightMin            = 4000
+	BlockMaxWeightMax            = blockchain.MaxBlockWeight - 4000
+	DefaultGenerate              = false
+	DefaultMaxOrphanTransactions = 100
+	DefaultMaxOrphanTxSize       = 100000
+	DefaultSigCacheMaxSize       = 100000
+	DefaultUtxoCacheMaxSizeMiB   = 250
+	SampleConfigFilename         = "sample-btcd.conf"
+	DefaultTxIndex               = false
+	DefaultAddrIndex             = false
+	PruneMinSize                 = 1536
 )
 
 var (
-	defaultHomeDir     = btcutil.AppDataDir("btcd", false)
-	defaultConfigFile  = filepath.Join(defaultHomeDir, defaultConfigFilename)
-	defaultDataDir     = filepath.Join(defaultHomeDir, defaultDataDirname)
-	knownDbTypes       = database.SupportedDrivers()
-	defaultRPCKeyFile  = filepath.Join(defaultHomeDir, "rpc.key")
-	defaultRPCCertFile = filepath.Join(defaultHomeDir, "rpc.cert")
-	defaultLogDir      = filepath.Join(defaultHomeDir, defaultLogDirname)
+	DefaultHomeDir     = btcutil.AppDataDir("btcd", false)
+	DefaultConfigFile  = filepath.Join(DefaultHomeDir, DefaultConfigFilename)
+	DefaultDataDir     = filepath.Join(DefaultHomeDir, DefaultDataDirname)
+	KnownDbTypes       = database.SupportedDrivers()
+	DefaultRPCKeyFile  = filepath.Join(DefaultHomeDir, "rpc.key")
+	DefaultRPCCertFile = filepath.Join(DefaultHomeDir, "rpc.cert")
+	DefaultLogDir      = filepath.Join(DefaultHomeDir, DefaultLogDirname)
 )
 
 // runServiceCommand is only set to a real function on Windows.  It is used
@@ -94,11 +96,7 @@ func minUint32(a, b uint32) uint32 {
 	return b
 }
 
-// config defines the configuration options for btcd.
-//
-// See loadConfig for details on the configuration load process.
-type config struct {
-	AddCheckpoints       []string      `long:"addcheckpoint" description:"Add a custom checkpoint.  Format: '<height>:<hash>'"`
+type Config struct {
 	AddPeers             []string      `short:"a" long:"addpeer" description:"Add a peer to connect with at startup"`
 	AddrIndex            bool          `long:"addrindex" description:"Maintain a full address-based transaction index which makes the searchrawtransactions RPC available"`
 	AgentBlacklist       []string      `long:"agentblacklist" description:"A comma separated list of user-agent substrings which will cause btcd to reject any peers whose user-agent contains any of the blacklisted substrings."`
@@ -129,8 +127,6 @@ type config struct {
 	LogDir               string        `long:"logdir" description:"Directory to log output."`
 	MaxOrphanTxs         int           `long:"maxorphantx" description:"Max number of orphan transactions to keep in memory"`
 	MaxPeers             int           `long:"maxpeers" description:"Max number of inbound and outbound peers"`
-	MiningAddrs          []string      `long:"miningaddr" description:"Add the specified payment address to the list of addresses to use for generated blocks -- At least one address is required if the generate option is set"`
-	MinRelayTxFee        float64       `long:"minrelaytxfee" description:"The minimum transaction fee in BTC/kB to be considered a non-zero fee."`
 	DisableBanning       bool          `long:"nobanning" description:"Disable banning of misbehaving peers"`
 	NoCFilters           bool          `long:"nocfilters" description:"Disable committed filtering (CF) support"`
 	DisableCheckpoints   bool          `long:"nocheckpoints" description:"Disable built-in checkpoints.  Don't do this unless you know what you're doing."`
@@ -180,14 +176,60 @@ type config struct {
 	UserAgentComments    []string      `long:"uacomment" description:"Comment to add to the user agent -- See BIP 14 for more information."`
 	Upnp                 bool          `long:"upnp" description:"Use UPnP to map our listening port outside of NAT"`
 	ShowVersion          bool          `short:"V" long:"version" description:"Display version information and exit"`
-	Whitelists           []string      `long:"whitelist" description:"Add an IP network or IP that will not be banned. (eg. 192.168.1.0/24 or ::1)"`
-	lookup               func(string) ([]net.IP, error)
-	oniondial            func(string, string, time.Duration) (net.Conn, error)
-	dial                 func(string, string, time.Duration) (net.Conn, error)
-	addCheckpoints       []chaincfg.Checkpoint
-	miningAddrs          []btcutil.Address
-	minRelayTxFee        btcutil.Amount
-	whitelists           []*net.IPNet
+
+	AddCheckpoints []chaincfg.Checkpoint
+	MiningAddrs    []btcutil.Address
+	MinRelayTxFee  btcutil.Amount
+	Whitelists     []*net.IPNet
+
+	lookup    func(string) ([]net.IP, error)
+	oniondial func(string, string, time.Duration) (net.Conn, error)
+	dial      func(string, string, time.Duration) (net.Conn, error)
+}
+
+func (cfg *Config) ChangeRoot(root string) {
+	cfg.LogDir = filepath.Join(root, "data")
+	cfg.RPCKey = filepath.Join(root, "rpc.key")
+	cfg.DataDir = filepath.Join(root, "data")
+	cfg.RPCCert = filepath.Join(root, "rpc.cert")
+	cfg.ConfigFile = filepath.Join(root, "btcd.conf")
+}
+
+// Dial connects to the address on the named network using the appropriate
+// dial function depending on the address and configuration options.  For
+// example, .onion addresses will be dialed using the onion specific proxy if
+// one was specified, but will otherwise use the normal dial function (which
+// could itself use a proxy or not).
+func (cfg *Config) Dial(addr net.Addr) (net.Conn, error) {
+	if strings.Contains(addr.String(), ".onion:") {
+		return cfg.oniondial(addr.Network(), addr.String(),
+			DefaultConnectTimeout)
+	}
+	return cfg.dial(addr.Network(), addr.String(), DefaultConnectTimeout)
+}
+
+// Lookup resolves the IP of the given host using the correct DNS lookup
+// function depending on the configuration options.  For example, addresses will
+// be resolved using tor when the --proxy flag was specified unless --noonion
+// was also specified in which case the normal system DNS resolver will be used.
+//
+// Any attempt to resolve a tor address (.onion) will return an error since they
+// are not intended to be resolved outside of the tor proxy.
+func (cfg *Config) Lookup(host string) ([]net.IP, error) {
+	if strings.HasSuffix(host, ".onion") {
+		return nil, fmt.Errorf("attempt to resolve tor address %s", host)
+	}
+
+	return cfg.lookup(host)
+}
+
+type config struct {
+	Config
+
+	AddCheckpoints []string `long:"addcheckpoint" description:"Add a custom checkpoint.  Format: '<height>:<hash>'"`
+	MiningAddrs    []string `long:"miningaddr" description:"Add the specified payment address to the list of addresses to use for generated blocks -- At least one address is required if the generate option is set"`
+	MinRelayTxFee  float64  `long:"minrelaytxfee" description:"The minimum transaction fee in BTC/kB to be considered a non-zero fee."`
+	Whitelists     []string `long:"whitelist" description:"Add an IP network or IP that will not be banned. (eg. 192.168.1.0/24 or ::1)"`
 }
 
 // serviceOptions defines the configuration options for the daemon as a service on
@@ -201,7 +243,7 @@ type serviceOptions struct {
 func cleanAndExpandPath(path string) string {
 	// Expand initial ~ to OS specific home directory.
 	if strings.HasPrefix(path, "~") {
-		homeDir := filepath.Dir(defaultHomeDir)
+		homeDir := filepath.Dir(DefaultHomeDir)
 		path = strings.Replace(path, "~", homeDir, 1)
 	}
 
@@ -229,12 +271,12 @@ func validLogLevel(logLevel string) bool {
 	return false
 }
 
-// supportedSubsystems returns a sorted slice of the supported subsystems for
+// SupportedSubsystems returns a sorted slice of the supported subsystems for
 // logging purposes.
-func supportedSubsystems() []string {
+func SupportedSubsystems() []string {
 	// Convert the subsystemLoggers map keys to a slice.
-	subsystems := make([]string, 0, len(subsystemLoggers))
-	for subsysID := range subsystemLoggers {
+	subsystems := make([]string, 0, len(log.SubsystemLoggers))
+	for subsysID := range log.SubsystemLoggers {
 		subsystems = append(subsystems, subsysID)
 	}
 
@@ -243,10 +285,10 @@ func supportedSubsystems() []string {
 	return subsystems
 }
 
-// parseAndSetDebugLevels attempts to parse the specified debug level and set
+// ParseAndSetDebugLevels attempts to parse the specified debug level and set
 // the levels accordingly.  An appropriate error is returned if anything is
 // invalid.
-func parseAndSetDebugLevels(debugLevel string) error {
+func ParseAndSetDebugLevels(debugLevel string) error {
 	// When the specified string doesn't have any delimiters, treat it as
 	// the log level for all subsystems.
 	if !strings.Contains(debugLevel, ",") && !strings.Contains(debugLevel, "=") {
@@ -257,7 +299,7 @@ func parseAndSetDebugLevels(debugLevel string) error {
 		}
 
 		// Change the logging level for all subsystems.
-		setLogLevels(debugLevel)
+		log.SetLogLevels(debugLevel)
 
 		return nil
 	}
@@ -276,10 +318,10 @@ func parseAndSetDebugLevels(debugLevel string) error {
 		subsysID, logLevel := fields[0], fields[1]
 
 		// Validate subsystem.
-		if _, exists := subsystemLoggers[subsysID]; !exists {
+		if _, exists := log.SubsystemLoggers[subsysID]; !exists {
 			str := "The specified subsystem [%v] is invalid -- " +
 				"supported subsystems %v"
-			return fmt.Errorf(str, subsysID, supportedSubsystems())
+			return fmt.Errorf(str, subsysID, SupportedSubsystems())
 		}
 
 		// Validate log level.
@@ -288,7 +330,7 @@ func parseAndSetDebugLevels(debugLevel string) error {
 			return fmt.Errorf(str, logLevel)
 		}
 
-		setLogLevel(subsysID, logLevel)
+		log.SetLogLevel(subsysID, logLevel)
 	}
 
 	return nil
@@ -296,7 +338,7 @@ func parseAndSetDebugLevels(debugLevel string) error {
 
 // validDbType returns whether or not dbType is a supported database type.
 func validDbType(dbType string) bool {
-	return slices.Contains(knownDbTypes, dbType)
+	return slices.Contains(KnownDbTypes, dbType)
 }
 
 // removeDuplicateAddresses returns a new slice with all duplicate entries in
@@ -313,9 +355,9 @@ func removeDuplicateAddresses(addrs []string) []string {
 	return result
 }
 
-// normalizeAddress returns addr with the passed default port appended if
+// NormalizeAddress returns addr with the passed default port appended if
 // there is not already a port specified.
-func normalizeAddress(addr, defaultPort string) string {
+func NormalizeAddress(addr, defaultPort string) string {
 	_, _, err := net.SplitHostPort(addr)
 	if err != nil {
 		return net.JoinHostPort(addr, defaultPort)
@@ -327,7 +369,7 @@ func normalizeAddress(addr, defaultPort string) string {
 // normalized with the given default port, and all duplicates removed.
 func normalizeAddresses(addrs []string, defaultPort string) []string {
 	for i, addr := range addrs {
-		addrs[i] = normalizeAddress(addr, defaultPort)
+		addrs[i] = NormalizeAddress(addr, defaultPort)
 	}
 
 	return removeDuplicateAddresses(addrs)
@@ -400,7 +442,39 @@ func newConfigParser(cfg *config, so *serviceOptions, options flags.Options) *fl
 	return parser
 }
 
-// loadConfig initializes and parses the config using a config file and command
+func NewDefaultConfig() Config {
+	return Config{
+		ConfigFile:           DefaultConfigFile,
+		DebugLevel:           DefaultLogLevel,
+		MaxPeers:             DefaultMaxPeers,
+		BanDuration:          DefaultBanDuration,
+		BanThreshold:         DefaultBanThreshold,
+		RPCMaxClients:        DefaultMaxRPCClients,
+		RPCMaxWebsockets:     DefaultMaxRPCWebsockets,
+		RPCMaxConcurrentReqs: DefaultMaxRPCConcurrentReqs,
+		DataDir:              DefaultDataDir,
+		LogDir:               DefaultLogDir,
+		DbType:               DefaultDbType,
+		RPCKey:               DefaultRPCKeyFile,
+		RPCCert:              DefaultRPCCertFile,
+		FreeTxRelayLimit:     DefaultFreeTxRelayLimit,
+		TrickleInterval:      DefaultTrickleInterval,
+		BlockMinSize:         DefaultBlockMinSize,
+		BlockMaxSize:         DefaultBlockMaxSize,
+		BlockMinWeight:       DefaultBlockMinWeight,
+		BlockMaxWeight:       DefaultBlockMaxWeight,
+		BlockPrioritySize:    mempool.DefaultBlockPrioritySize,
+		MaxOrphanTxs:         DefaultMaxOrphanTransactions,
+		SigCacheMaxSize:      DefaultSigCacheMaxSize,
+		UtxoCacheMaxSizeMiB:  DefaultUtxoCacheMaxSizeMiB,
+		Generate:             DefaultGenerate,
+		TxIndex:              DefaultTxIndex,
+		AddrIndex:            DefaultAddrIndex,
+		MinRelayTxFee:        mempool.DefaultMinRelayTxFee,
+	}
+}
+
+// LoadConfig initializes and parses the config using a config file and command
 // line options.
 //
 // The configuration proceeds as follows:
@@ -412,36 +486,11 @@ func newConfigParser(cfg *config, so *serviceOptions, options flags.Options) *fl
 // The above results in btcd functioning properly without any config settings
 // while still allowing the user to override settings with config files and
 // command line options.  Command line options always take precedence.
-func loadConfig() (*config, []string, error) {
+func LoadConfig(version string) (*Config, []string, error) {
 	// Default config.
 	cfg := config{
-		ConfigFile:           defaultConfigFile,
-		DebugLevel:           defaultLogLevel,
-		MaxPeers:             defaultMaxPeers,
-		BanDuration:          defaultBanDuration,
-		BanThreshold:         defaultBanThreshold,
-		RPCMaxClients:        defaultMaxRPCClients,
-		RPCMaxWebsockets:     defaultMaxRPCWebsockets,
-		RPCMaxConcurrentReqs: defaultMaxRPCConcurrentReqs,
-		DataDir:              defaultDataDir,
-		LogDir:               defaultLogDir,
-		DbType:               defaultDbType,
-		RPCKey:               defaultRPCKeyFile,
-		RPCCert:              defaultRPCCertFile,
-		MinRelayTxFee:        mempool.DefaultMinRelayTxFee.ToBTC(),
-		FreeTxRelayLimit:     defaultFreeTxRelayLimit,
-		TrickleInterval:      defaultTrickleInterval,
-		BlockMinSize:         defaultBlockMinSize,
-		BlockMaxSize:         defaultBlockMaxSize,
-		BlockMinWeight:       defaultBlockMinWeight,
-		BlockMaxWeight:       defaultBlockMaxWeight,
-		BlockPrioritySize:    mempool.DefaultBlockPrioritySize,
-		MaxOrphanTxs:         defaultMaxOrphanTransactions,
-		SigCacheMaxSize:      defaultSigCacheMaxSize,
-		UtxoCacheMaxSizeMiB:  defaultUtxoCacheMaxSizeMiB,
-		Generate:             defaultGenerate,
-		TxIndex:              defaultTxIndex,
-		AddrIndex:            defaultAddrIndex,
+		Config:        NewDefaultConfig(),
+		MinRelayTxFee: mempool.DefaultMinRelayTxFee.ToBTC(),
 	}
 
 	// Service options which are only added on Windows.
@@ -466,7 +515,7 @@ func loadConfig() (*config, []string, error) {
 	appName = strings.TrimSuffix(appName, filepath.Ext(appName))
 	usageMessage := fmt.Sprintf("Use %s -h to show usage", appName)
 	if preCfg.ShowVersion {
-		fmt.Println(appName, "version", version())
+		fmt.Println(appName, "version", version)
 		os.Exit(0)
 	}
 
@@ -485,7 +534,7 @@ func loadConfig() (*config, []string, error) {
 	var configFileError error
 	parser := newConfigParser(&cfg, &serviceOpts, flags.Default)
 	if !(preCfg.RegressionTest || preCfg.SimNet || preCfg.SigNet) ||
-		preCfg.ConfigFile != defaultConfigFile {
+		preCfg.ConfigFile != DefaultConfigFile {
 
 		if _, err := os.Stat(preCfg.ConfigFile); os.IsNotExist(err) {
 			err := createDefaultConfigFile(preCfg.ConfigFile)
@@ -523,7 +572,7 @@ func loadConfig() (*config, []string, error) {
 
 	// Create the home directory if it doesn't already exist.
 	funcName := "loadConfig"
-	err = os.MkdirAll(defaultHomeDir, 0700)
+	err = os.MkdirAll(DefaultHomeDir, 0700)
 	if err != nil {
 		// Show a nicer error message if it's because a symlink is
 		// linked to a directory that does not exist (probably because
@@ -547,25 +596,25 @@ func loadConfig() (*config, []string, error) {
 	// while we're at it
 	if cfg.TestNet3 {
 		numNets++
-		activeNetParams = &testNet3Params
+		params.ActiveNetParams = &params.TestNet3Params
 	}
 	if cfg.TestNet4 {
 		numNets++
-		activeNetParams = &testNet4Params
+		params.ActiveNetParams = &params.TestNet4Params
 	}
 	if cfg.RegressionTest {
 		numNets++
-		activeNetParams = &regressionNetParams
+		params.ActiveNetParams = &params.RegressionNetParams
 	}
 	if cfg.SimNet {
 		numNets++
 		// Also disable dns seeding on the simulation test network.
-		activeNetParams = &simNetParams
+		params.ActiveNetParams = &params.SimNetParams
 		cfg.DisableDNSSeed = true
 	}
 	if cfg.SigNet {
 		numNets++
-		activeNetParams = &sigNetParams
+		params.ActiveNetParams = &params.SigNetParams
 
 		// Let the user overwrite the default signet parameters. The
 		// challenge defines the actual signet network to join and the
@@ -600,7 +649,7 @@ func loadConfig() (*config, []string, error) {
 		chainParams := chaincfg.CustomSignetParams(
 			sigNetChallenge, sigNetSeeds,
 		)
-		activeNetParams.Params = &chainParams
+		params.ActiveNetParams.Params = &chainParams
 	}
 	if numNets > 1 {
 		str := "%s: The testnet, regtest, segnet, signet and simnet " +
@@ -614,7 +663,7 @@ func loadConfig() (*config, []string, error) {
 
 	// If mainnet is active, then we won't allow the stall handler to be
 	// disabled.
-	if activeNetParams.Params.Net == wire.MainNet && cfg.DisableStallHandler {
+	if params.ActiveNetParams.Params.Net == wire.MainNet && cfg.DisableStallHandler {
 		str := "%s: stall handler cannot be disabled on mainnet"
 		err := fmt.Errorf(str, funcName)
 		fmt.Fprintln(os.Stderr, err)
@@ -626,7 +675,7 @@ func loadConfig() (*config, []string, error) {
 	// according to the default of the active network. The set
 	// configuration value takes precedence over the default value for the
 	// selected network.
-	relayNonStd := activeNetParams.RelayNonStdTxs
+	relayNonStd := params.ActiveNetParams.RelayNonStdTxs
 	switch {
 	case cfg.RelayNonStd && cfg.RejectNonStd:
 		str := "%s: rejectnonstd and relaynonstd cannot be used " +
@@ -649,25 +698,25 @@ func loadConfig() (*config, []string, error) {
 	// means each individual piece of serialized data does not have to
 	// worry about changing names per network and such.
 	cfg.DataDir = cleanAndExpandPath(cfg.DataDir)
-	cfg.DataDir = filepath.Join(cfg.DataDir, netName(activeNetParams))
+	cfg.DataDir = filepath.Join(cfg.DataDir, params.NetName(params.ActiveNetParams))
 
 	// Append the network type to the log directory so it is "namespaced"
 	// per network in the same fashion as the data directory.
 	cfg.LogDir = cleanAndExpandPath(cfg.LogDir)
-	cfg.LogDir = filepath.Join(cfg.LogDir, netName(activeNetParams))
+	cfg.LogDir = filepath.Join(cfg.LogDir, params.NetName(params.ActiveNetParams))
 
 	// Special show command to list supported subsystems and exit.
 	if cfg.DebugLevel == "show" {
-		fmt.Println("Supported subsystems", supportedSubsystems())
+		fmt.Println("Supported subsystems", SupportedSubsystems())
 		os.Exit(0)
 	}
 
 	// Initialize log rotation.  After log rotation has been initialized, the
 	// logger variables may be used.
-	initLogRotator(filepath.Join(cfg.LogDir, defaultLogFilename))
+	log.InitLogRotator(filepath.Join(cfg.LogDir, DefaultLogFilename))
 
 	// Parse, validate, and set debug log level(s).
-	if err := parseAndSetDebugLevels(cfg.DebugLevel); err != nil {
+	if err := ParseAndSetDebugLevels(cfg.DebugLevel); err != nil {
 		err := fmt.Errorf("%s: %v", funcName, err.Error())
 		fmt.Fprintln(os.Stderr, err)
 		fmt.Fprintln(os.Stderr, usageMessage)
@@ -678,7 +727,7 @@ func loadConfig() (*config, []string, error) {
 	if !validDbType(cfg.DbType) {
 		str := "%s: The specified database type [%v] is invalid -- " +
 			"supported types %v"
-		err := fmt.Errorf(str, funcName, cfg.DbType, knownDbTypes)
+		err := fmt.Errorf(str, funcName, cfg.DbType, KnownDbTypes)
 		fmt.Fprintln(os.Stderr, err)
 		fmt.Fprintln(os.Stderr, usageMessage)
 		return nil, nil, err
@@ -708,7 +757,7 @@ func loadConfig() (*config, []string, error) {
 	// Validate any given whitelisted IP addresses and networks.
 	if len(cfg.Whitelists) > 0 {
 		var ip net.IP
-		cfg.whitelists = make([]*net.IPNet, 0, len(cfg.Whitelists))
+		cfg.Config.Whitelists = make([]*net.IPNet, 0, len(cfg.Whitelists))
 
 		for _, addr := range cfg.Whitelists {
 			_, ipnet, err := net.ParseCIDR(addr)
@@ -733,7 +782,7 @@ func loadConfig() (*config, []string, error) {
 					Mask: net.CIDRMask(bits, bits),
 				}
 			}
-			cfg.whitelists = append(cfg.whitelists, ipnet)
+			cfg.Config.Whitelists = append(cfg.Config.Whitelists, ipnet)
 		}
 	}
 
@@ -763,7 +812,7 @@ func loadConfig() (*config, []string, error) {
 	// we are to connect to.
 	if len(cfg.Listeners) == 0 {
 		cfg.Listeners = []string{
-			net.JoinHostPort("", activeNetParams.DefaultPort),
+			net.JoinHostPort("", params.ActiveNetParams.DefaultPort),
 		}
 	}
 
@@ -794,7 +843,7 @@ func loadConfig() (*config, []string, error) {
 	}
 
 	if cfg.DisableRPC {
-		btcdLog.Infof("RPC service is disabled")
+		log.BtcdLog.Infof("RPC service is disabled")
 	}
 
 	// Default RPC to listen on localhost only.
@@ -805,7 +854,7 @@ func loadConfig() (*config, []string, error) {
 		}
 		cfg.RPCListeners = make([]string, 0, len(addrs))
 		for _, addr := range addrs {
-			addr = net.JoinHostPort(addr, activeNetParams.rpcPort)
+			addr = net.JoinHostPort(addr, params.ActiveNetParams.RPCPort)
 			cfg.RPCListeners = append(cfg.RPCListeners, addr)
 		}
 	}
@@ -820,7 +869,7 @@ func loadConfig() (*config, []string, error) {
 	}
 
 	// Validate the minrelaytxfee.
-	cfg.minRelayTxFee, err = btcutil.NewAmount(cfg.MinRelayTxFee)
+	cfg.Config.MinRelayTxFee, err = btcutil.NewAmount(cfg.MinRelayTxFee)
 	if err != nil {
 		str := "%s: invalid minrelaytxfee: %v"
 		err := fmt.Errorf(str, funcName, err)
@@ -830,26 +879,26 @@ func loadConfig() (*config, []string, error) {
 	}
 
 	// Limit the max block size to a sane value.
-	if cfg.BlockMaxSize < blockMaxSizeMin || cfg.BlockMaxSize >
-		blockMaxSizeMax {
+	if cfg.BlockMaxSize < BlockMaxSizeMin || cfg.BlockMaxSize >
+		BlockMaxSizeMax {
 
 		str := "%s: The blockmaxsize option must be in between %d " +
 			"and %d -- parsed [%d]"
-		err := fmt.Errorf(str, funcName, blockMaxSizeMin,
-			blockMaxSizeMax, cfg.BlockMaxSize)
+		err := fmt.Errorf(str, funcName, BlockMaxSizeMin,
+			BlockMaxSizeMax, cfg.BlockMaxSize)
 		fmt.Fprintln(os.Stderr, err)
 		fmt.Fprintln(os.Stderr, usageMessage)
 		return nil, nil, err
 	}
 
 	// Limit the max block weight to a sane value.
-	if cfg.BlockMaxWeight < blockMaxWeightMin ||
-		cfg.BlockMaxWeight > blockMaxWeightMax {
+	if cfg.BlockMaxWeight < BlockMaxWeightMin ||
+		cfg.BlockMaxWeight > BlockMaxWeightMax {
 
 		str := "%s: The blockmaxweight option must be in between %d " +
 			"and %d -- parsed [%d]"
-		err := fmt.Errorf(str, funcName, blockMaxWeightMin,
-			blockMaxWeightMax, cfg.BlockMaxWeight)
+		err := fmt.Errorf(str, funcName, BlockMaxWeightMin,
+			BlockMaxWeightMax, cfg.BlockMaxWeight)
 		fmt.Fprintln(os.Stderr, err)
 		fmt.Fprintln(os.Stderr, usageMessage)
 		return nil, nil, err
@@ -874,15 +923,15 @@ func loadConfig() (*config, []string, error) {
 	// If the max block size isn't set, but the max weight is, then we'll
 	// set the limit for the max block size to a safe limit so weight takes
 	// precedence.
-	case cfg.BlockMaxSize == defaultBlockMaxSize &&
-		cfg.BlockMaxWeight != defaultBlockMaxWeight:
+	case cfg.BlockMaxSize == DefaultBlockMaxSize &&
+		cfg.BlockMaxWeight != DefaultBlockMaxWeight:
 
 		cfg.BlockMaxSize = blockchain.MaxBlockBaseSize - 1000
 
 	// If the max block weight isn't set, but the block size is, then we'll
 	// scale the set weight accordingly based on the max block size value.
-	case cfg.BlockMaxSize != defaultBlockMaxSize &&
-		cfg.BlockMaxWeight == defaultBlockMaxWeight:
+	case cfg.BlockMaxSize != DefaultBlockMaxSize &&
+		cfg.BlockMaxWeight == DefaultBlockMaxWeight:
 
 		cfg.BlockMaxWeight = cfg.BlockMaxSize * blockchain.WitnessScaleFactor
 	}
@@ -932,9 +981,9 @@ func loadConfig() (*config, []string, error) {
 	}
 
 	// Check mining addresses are valid and saved parsed versions.
-	cfg.miningAddrs = make([]btcutil.Address, 0, len(cfg.MiningAddrs))
+	cfg.Config.MiningAddrs = make([]btcutil.Address, 0, len(cfg.MiningAddrs))
 	for _, strAddr := range cfg.MiningAddrs {
-		addr, err := btcutil.DecodeAddress(strAddr, activeNetParams.Params)
+		addr, err := btcutil.DecodeAddress(strAddr, params.ActiveNetParams.Params)
 		if err != nil {
 			str := "%s: mining address '%s' failed to decode: %v"
 			err := fmt.Errorf(str, funcName, strAddr, err)
@@ -942,14 +991,14 @@ func loadConfig() (*config, []string, error) {
 			fmt.Fprintln(os.Stderr, usageMessage)
 			return nil, nil, err
 		}
-		if !addr.IsForNet(activeNetParams.Params) {
+		if !addr.IsForNet(params.ActiveNetParams.Params) {
 			str := "%s: mining address '%s' is on the wrong network"
 			err := fmt.Errorf(str, funcName, strAddr)
 			fmt.Fprintln(os.Stderr, err)
 			fmt.Fprintln(os.Stderr, usageMessage)
 			return nil, nil, err
 		}
-		cfg.miningAddrs = append(cfg.miningAddrs, addr)
+		cfg.Config.MiningAddrs = append(cfg.Config.MiningAddrs, addr)
 	}
 
 	// Ensure there is at least one mining address when the generate flag is
@@ -966,12 +1015,12 @@ func loadConfig() (*config, []string, error) {
 	// Add default port to all listener addresses if needed and remove
 	// duplicate addresses.
 	cfg.Listeners = normalizeAddresses(cfg.Listeners,
-		activeNetParams.DefaultPort)
+		params.ActiveNetParams.DefaultPort)
 
 	// Add default port to all rpc listener addresses if needed and remove
 	// duplicate addresses.
 	cfg.RPCListeners = normalizeAddresses(cfg.RPCListeners,
-		activeNetParams.rpcPort)
+		params.ActiveNetParams.RPCPort)
 
 	// Only allow TLS to be disabled if the RPC is bound to localhost
 	// addresses.
@@ -1006,9 +1055,9 @@ func loadConfig() (*config, []string, error) {
 	// Add default port to all added peer addresses if needed and remove
 	// duplicate addresses.
 	cfg.AddPeers = normalizeAddresses(cfg.AddPeers,
-		activeNetParams.DefaultPort)
+		params.ActiveNetParams.DefaultPort)
 	cfg.ConnectPeers = normalizeAddresses(cfg.ConnectPeers,
-		activeNetParams.DefaultPort)
+		params.ActiveNetParams.DefaultPort)
 
 	// --noonion and --onion do not mix.
 	if cfg.NoOnion && cfg.OnionProxy != "" {
@@ -1020,7 +1069,7 @@ func loadConfig() (*config, []string, error) {
 	}
 
 	// Check the checkpoints for syntax errors.
-	cfg.addCheckpoints, err = parseCheckpoints(cfg.AddCheckpoints)
+	cfg.Config.AddCheckpoints, err = parseCheckpoints(cfg.AddCheckpoints)
 	if err != nil {
 		str := "%s: Error parsing checkpoints: %v"
 		err := fmt.Errorf(str, funcName, err)
@@ -1143,9 +1192,9 @@ func loadConfig() (*config, []string, error) {
 		}
 	}
 
-	if cfg.Prune != 0 && cfg.Prune < pruneMinSize {
+	if cfg.Prune != 0 && cfg.Prune < PruneMinSize {
 		err := fmt.Errorf("%s: the minimum value for --prune is %d. Got %d",
-			funcName, pruneMinSize, cfg.Prune)
+			funcName, PruneMinSize, cfg.Prune)
 		fmt.Fprintln(os.Stderr, err)
 		fmt.Fprintln(os.Stderr, usageMessage)
 		return nil, nil, err
@@ -1171,10 +1220,10 @@ func loadConfig() (*config, []string, error) {
 	// done.  This prevents the warning on help messages and invalid
 	// options.  Note this should go directly before the return.
 	if configFileError != nil {
-		btcdLog.Warnf("%v", configFileError)
+		log.BtcdLog.Warnf("%v", configFileError)
 	}
 
-	return &cfg, remainingArgs, nil
+	return &cfg.Config, remainingArgs, nil
 }
 
 // createDefaultConfig copies the file sample-btcd.conf to the given destination path,
@@ -1191,7 +1240,7 @@ func createDefaultConfigFile(destinationPath string) error {
 	if err != nil {
 		return err
 	}
-	sampleConfigPath := filepath.Join(path, sampleConfigFilename)
+	sampleConfigPath := filepath.Join(path, SampleConfigFilename)
 
 	// We generate a random user and password
 	randomBytes := make([]byte, 20)
@@ -1242,32 +1291,4 @@ func createDefaultConfigFile(destinationPath string) error {
 	}
 
 	return nil
-}
-
-// btcdDial connects to the address on the named network using the appropriate
-// dial function depending on the address and configuration options.  For
-// example, .onion addresses will be dialed using the onion specific proxy if
-// one was specified, but will otherwise use the normal dial function (which
-// could itself use a proxy or not).
-func btcdDial(addr net.Addr) (net.Conn, error) {
-	if strings.Contains(addr.String(), ".onion:") {
-		return cfg.oniondial(addr.Network(), addr.String(),
-			defaultConnectTimeout)
-	}
-	return cfg.dial(addr.Network(), addr.String(), defaultConnectTimeout)
-}
-
-// btcdLookup resolves the IP of the given host using the correct DNS lookup
-// function depending on the configuration options.  For example, addresses will
-// be resolved using tor when the --proxy flag was specified unless --noonion
-// was also specified in which case the normal system DNS resolver will be used.
-//
-// Any attempt to resolve a tor address (.onion) will return an error since they
-// are not intended to be resolved outside of the tor proxy.
-func btcdLookup(host string) ([]net.IP, error) {
-	if strings.HasSuffix(host, ".onion") {
-		return nil, fmt.Errorf("attempt to resolve tor address %s", host)
-	}
-
-	return cfg.lookup(host)
 }
