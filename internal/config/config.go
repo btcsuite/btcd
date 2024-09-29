@@ -67,7 +67,7 @@ const (
 	DefaultMaxOrphanTxSize       = 100000
 	DefaultSigCacheMaxSize       = 100000
 	DefaultUtxoCacheMaxSizeMiB   = 250
-	SampleConfigFilename         = "sample-btcd.conf"
+	SampleConfigFilename         = "../../sample-btcd.conf"
 	DefaultTxIndex               = false
 	DefaultAddrIndex             = false
 	PruneMinSize                 = 1536
@@ -192,7 +192,11 @@ func (cfg *Config) ChangeRoot(root string) {
 	cfg.RPCKey = filepath.Join(root, "rpc.key")
 	cfg.DataDir = filepath.Join(root, "data")
 	cfg.RPCCert = filepath.Join(root, "rpc.cert")
-	cfg.ConfigFile = filepath.Join(root, "btcd.conf")
+	
+	// Only change the configuration file if supplied with one. 
+	if cfg.ConfigFile != "" {
+		cfg.ConfigFile = filepath.Join(root, "btcd.conf")
+	}
 }
 
 // Dial connects to the address on the named network using the appropriate
