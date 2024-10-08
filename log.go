@@ -21,6 +21,7 @@ import (
 	"github.com/btcsuite/btcd/netsync"
 	"github.com/btcsuite/btcd/peer"
 	"github.com/btcsuite/btcd/txscript"
+	"github.com/lightninglabs/neutrino/query"
 
 	"github.com/btcsuite/btclog"
 	"github.com/jrick/logrotate/rotator"
@@ -54,21 +55,22 @@ var (
 	// application shutdown.
 	logRotator *rotator.Rotator
 
-	adxrLog = backendLog.Logger("ADXR")
-	amgrLog = backendLog.Logger("AMGR")
-	cmgrLog = backendLog.Logger("CMGR")
-	bcdbLog = backendLog.Logger("BCDB")
-	btcdLog = backendLog.Logger("BTCD")
-	chanLog = backendLog.Logger("CHAN")
-	discLog = backendLog.Logger("DISC")
-	indxLog = backendLog.Logger("INDX")
-	minrLog = backendLog.Logger("MINR")
-	peerLog = backendLog.Logger("PEER")
-	rpcsLog = backendLog.Logger("RPCS")
-	scrpLog = backendLog.Logger("SCRP")
-	srvrLog = backendLog.Logger("SRVR")
-	syncLog = backendLog.Logger("SYNC")
-	txmpLog = backendLog.Logger("TXMP")
+	adxrLog  = backendLog.Logger("ADXR")
+	amgrLog  = backendLog.Logger("AMGR")
+	cmgrLog  = backendLog.Logger("CMGR")
+	bcdbLog  = backendLog.Logger("BCDB")
+	btcdLog  = backendLog.Logger("BTCD")
+	chanLog  = backendLog.Logger("CHAN")
+	discLog  = backendLog.Logger("DISC")
+	indxLog  = backendLog.Logger("INDX")
+	minrLog  = backendLog.Logger("MINR")
+	peerLog  = backendLog.Logger("PEER")
+	rpcsLog  = backendLog.Logger("RPCS")
+	scrpLog  = backendLog.Logger("SCRP")
+	srvrLog  = backendLog.Logger("SRVR")
+	syncLog  = backendLog.Logger("SYNC")
+	txmpLog  = backendLog.Logger("TXMP")
+	queryLog = backendLog.Logger("QURY")
 )
 
 // Initialize package-global logger variables.
@@ -84,6 +86,7 @@ func init() {
 	txscript.UseLogger(scrpLog)
 	netsync.UseLogger(syncLog)
 	mempool.UseLogger(txmpLog)
+	query.UseLogger(queryLog)
 }
 
 // subsystemLoggers maps each subsystem identifier to its associated logger.
