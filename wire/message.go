@@ -61,6 +61,62 @@ const (
 	CmdSendAddrV2   = "sendaddrv2"
 )
 
+var (
+	v2MessageIDs = map[uint8]string{
+		1:  CmdAddr,
+		2:  CmdBlock,
+		5:  CmdFeeFilter,
+		6:  CmdFilterAdd,
+		7:  CmdFilterClear,
+		8:  CmdFilterLoad,
+		9:  CmdGetBlocks,
+		11: CmdGetData,
+		12: CmdGetHeaders,
+		13: CmdHeaders,
+		14: CmdInv,
+		15: CmdMemPool,
+		16: CmdMerkleBlock,
+		17: CmdNotFound,
+		18: CmdPing,
+		19: CmdPong,
+		21: CmdTx,
+		22: CmdGetCFilters,
+		23: CmdCFilter,
+		24: CmdGetCFHeaders,
+		25: CmdCFHeaders,
+		26: CmdGetCFCheckpt,
+		27: CmdCFCheckpt,
+		28: CmdAddrV2,
+	}
+
+	v2Messages = map[string]uint8{
+		CmdAddr:         1,
+		CmdBlock:        2,
+		CmdFeeFilter:    5,
+		CmdFilterAdd:    6,
+		CmdFilterClear:  7,
+		CmdFilterLoad:   8,
+		CmdGetBlocks:    9,
+		CmdGetData:      11,
+		CmdGetHeaders:   12,
+		CmdHeaders:      13,
+		CmdInv:          14,
+		CmdMemPool:      15,
+		CmdMerkleBlock:  16,
+		CmdNotFound:     17,
+		CmdPing:         18,
+		CmdPong:         19,
+		CmdTx:           21,
+		CmdGetCFilters:  22,
+		CmdCFilter:      23,
+		CmdGetCFHeaders: 24,
+		CmdCFHeaders:    25,
+		CmdGetCFCheckpt: 26,
+		CmdCFCheckpt:    27,
+		CmdAddrV2:       28,
+	}
+)
+
 // MessageEncoding represents the wire message encoding format to be used.
 type MessageEncoding uint32
 
@@ -270,6 +326,80 @@ func WriteMessage(w io.Writer, msg Message, pver uint32, btcnet BitcoinNet) erro
 	return err
 }
 
+// WriteV2MessageN writes a Message to the passed Writer using the bip324
+// v2 encoding.
+func WriteV2MessageN(w io.Writer, msg Message, pver uint32,
+	encoding MessageEncoding) (int, error) {
+
+	var totalBytes int
+
+	cmd := msg.Command()
+	if len(cmd) > CommandSize {
+		str := fmt.Sprintf("command [%s] is too long [max %v]",
+			cmd, CommandSize)
+		return totalBytes, messageError("WriteMessage", str)
+	}
+
+	index, exists := v2Messages[cmd]
+	if !exists {
+		var command [CommandSize]byte
+		copy(command[:], cmd)
+		hw := bytes.NewBuffer(make([]byte, 0, CommandSize+1))
+		writeElements(hw, byte(0x00), command)
+
+		n, err := w.Write(hw.Bytes())
+		if err != nil {
+			return 0, err
+		}
+
+		totalBytes += n
+	} else {
+		hw := bytes.NewBuffer(make([]byte, 0, 1))
+		writeElement(hw, index)
+
+		n, err := w.Write(hw.Bytes())
+		if err != nil {
+			return 0, err
+		}
+
+		totalBytes += n
+	}
+
+	var bw bytes.Buffer
+	err := msg.BtcEncode(&bw, pver, encoding)
+	if err != nil {
+		return totalBytes, err
+	}
+
+	payload := bw.Bytes()
+	lenp := len(payload)
+
+	// Enforce maximum overall message payload.
+	if lenp > MaxMessagePayload {
+		str := fmt.Sprintf("message payload is too large - encoded "+
+			"%d bytes, but maximum message payload is %d bytes",
+			lenp, MaxMessagePayload)
+		return totalBytes, messageError("WriteMessage", str)
+	}
+
+	mpl := msg.MaxPayloadLength(pver)
+	if uint32(lenp) > mpl {
+		str := fmt.Sprintf("message payload is too large - encoded "+
+			"%d bytes, but maximum message payload size for "+
+			"messages of type [%s] is %d.", lenp, cmd, mpl)
+		return totalBytes, messageError("WriteMessage", str)
+	}
+
+	if len(payload) > 0 {
+		n, err := w.Write(payload)
+		totalBytes += n
+
+		return totalBytes, err
+	}
+
+	return totalBytes, nil
+}
+
 // WriteMessageWithEncodingN writes a bitcoin Message to w including the
 // necessary header information and returns the number of bytes written.
 // This function is the same as WriteMessageN except it also allows the caller
@@ -344,6 +474,57 @@ func WriteMessageWithEncodingN(w io.Writer, msg Message, pver uint32,
 	}
 
 	return totalBytes, err
+}
+
+// ReadV2MessageN takes the passed plaintext and attempts to construct a
+// Message from the bytes using the bip324 v2 encoding.
+func ReadV2MessageN(plaintext []byte, pver uint32, enc MessageEncoding) (
+	Message, []byte, error) {
+
+	if len(plaintext) == 0 {
+		return nil, nil, fmt.Errorf("invalid plaintext length")
+	}
+
+	var msgCmd string
+
+	// If the first byte is 0x00, read the next 12 bytes to determine what
+	// message this is.
+	if plaintext[0] == 0x00 {
+		if len(plaintext) < CommandSize+1 {
+			return nil, nil, fmt.Errorf("invalid plaintext length")
+		}
+
+		// Slice off the first 0x00 and the trailing 0x00 bytes.
+		var command [CommandSize]byte
+		copy(command[:], plaintext[1:CommandSize+1])
+
+		msgCmd = string(bytes.TrimRight(command[:], "\x00"))
+
+		plaintext = plaintext[CommandSize+1:]
+	} else {
+		// The first byte denotes what message this is.
+		msgCmd = v2MessageIDs[plaintext[0]]
+
+		plaintext = plaintext[1:]
+	}
+
+	msg, err := makeEmptyMessage(msgCmd)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	mpl := msg.MaxPayloadLength(pver)
+	if len(plaintext) > int(mpl) {
+		return nil, nil, fmt.Errorf("payload exceeds max length")
+	}
+
+	buf := bytes.NewBuffer(plaintext)
+	err = msg.BtcDecode(buf, pver, enc)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return msg, plaintext, nil
 }
 
 // ReadMessageWithEncodingN reads, validates, and parses the next bitcoin Message

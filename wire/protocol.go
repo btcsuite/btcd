@@ -103,6 +103,8 @@ const (
 	// SFNodeNetWorkLimited is a flag used to indicate a peer supports serving
 	// the last 288 blocks.
 	SFNodeNetworkLimited = 1 << 10
+
+	SFNodeP2PV2 = 1 << 11
 )
 
 // Map of service flags back to their constant names for pretty printing.
