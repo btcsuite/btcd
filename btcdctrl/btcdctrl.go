@@ -107,7 +107,7 @@ func (c *Controller) Stop() error {
 	for {
 		exit, err := c.cmd.Process.Wait()
 		if err != nil {
-			return err
+			break
 		}
 
 		// Check if the program exited.
@@ -139,9 +139,9 @@ func (c *Controller) RPCConnConfig() (*rpcclient.ConnConfig, error) {
 		User: c.cfg.RPCUser,
 		Pass: c.cfg.RPCPass,
 
-		Endpoint: "ws",
-
 		Certificates: cert,
+
+		HTTPPostMode: true,
 	}, nil
 }
 
@@ -288,21 +288,24 @@ func (c *Controller) Start() error {
 	p2p := false
 
 	// Scan each line until both RPC (if enabled) and P2P addresses are found.
-	for scan.Scan() && (!rpc || !p2p) {
+	for !rpc || !p2p {
 		line := scan.Text()
 
 		_, addr, ok := strings.Cut(line, "RPC server listening on ")
 		if ok {
 			c.rpc = addr
 			rpc = true
-			continue
 		}
 
 		_, addr, ok = strings.Cut(line, "Server listening on ")
 		if !ok {
 			c.p2p = addr
 			p2p = true
-			continue
+		}
+
+		// Ensure we've not found the RPC and P2P addresses, so we can continue scanning.
+		if (!rpc || !p2p) && !scan.Scan() {
+			break
 		}
 	}
 
