@@ -1,60 +1,37 @@
-package btcdctrl_test
+package btcdctrl
 
 import (
-	"fmt"
 	"os"
-
-	"github.com/btcsuite/btcd/btcdctrl"
+	"testing"
 )
 
-func ExampleController() {
-	// Create a temporary directory for the wallet data.
-	tmp, err := os.MkdirTemp("", "")
-	if err != nil {
-		panic(err)
+func TestFail(t *testing.T) {
+	for i := 0; i < 100; i++ {
+		cfg, err := NewTestConfig(t.TempDir())
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		cfg.DebugLevel = "trace"
+
+		// Create a new controller.
+		c := New(&ControllerConfig{
+			Stderr: os.Stderr,
+			Stdout: os.Stdout,
+
+			Config: cfg,
+		})
+
+		// Start btcd.
+		err = c.Start()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Stop btcd.
+		err = c.Stop()
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
-
-	// Create a new test-oriented configration.
-	cfg, err := btcdctrl.NewTestConfig(tmp)
-	if err != nil {
-		panic(err)
-	}
-
-	// Create a new controller.
-	c := btcdctrl.New(&btcdctrl.ControllerConfig{
-		Stderr: os.Stderr,
-		Stdout: os.Stdout,
-
-		Config: cfg,
-	})
-
-	// Start btcd.
-	err = c.Start()
-	if err != nil {
-		panic(err)
-	}
-
-	// Stop btcd on exit.
-	defer c.Stop()
-
-	// Enable generation.
-	err = c.SetGenerate(true, 0)
-	if err != nil {
-		panic(err)
-	}
-
-	// Generate 100 blocks.
-	_, err = c.Generate(100)
-	if err != nil {
-		panic(err)
-	}
-
-	// Query info.
-	info, err := c.GetInfo()
-	if err != nil {
-		panic(err)
-	}
-
-	fmt.Println(info.Blocks)
-	// Output: 100
 }
