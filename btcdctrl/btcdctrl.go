@@ -269,7 +269,7 @@ func (c *Controller) Start() error {
 	// Match the output configuration.
 	c.cmd.Stderr = c.cfg.Stderr
 
-	if c.cmd.Stdout != nil {
+	if c.cfg.Stdout != nil {
 		c.cmd.Stdout = io.MultiWriter(c.cfg.Stdout, pw)
 	} else {
 		c.cmd.Stdout = pw
