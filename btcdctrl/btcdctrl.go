@@ -354,13 +354,13 @@ func (c *Controller) Start() error {
 		break
 	}
 
+	// Check if the connection loop exited with an error.
+	if err != nil {
+		return errors.Join(errors.New("timeout"), err)
+	}
+
 	// Check if the client was created.
 	if c.Client == nil {
-		// Check if the connection loop exited with an error.
-		if err != nil {
-			return errors.Join(errors.New("timeout"), err)
-		}
-
 		return errors.New("timeout")
 	}
 
