@@ -268,12 +268,7 @@ func (c *Controller) Start() error {
 
 	// Match the output configuration.
 	c.cmd.Stderr = c.cfg.Stderr
-
-	if c.cfg.Stdout != nil {
-		c.cmd.Stdout = io.MultiWriter(c.cfg.Stdout, pw)
-	} else {
-		c.cmd.Stdout = pw
-	}
+	c.cmd.Stdout = pw
 
 	// Execute the command.
 	err = c.cmd.Start()
@@ -281,8 +276,15 @@ func (c *Controller) Start() error {
 		return err
 	}
 
+	var r io.Reader = pr
+
+	// Pipe the early output to stdout if configured.
+	if c.cfg.Stdout != nil {
+		r = io.TeeReader(pr, c.cfg.Stdout)
+	}
+
 	// Scan the stdout line by line.
-	scan := bufio.NewScanner(pr)
+	scan := bufio.NewScanner(r)
 
 	rpc := c.cfg.DisableRPC
 	p2p := false
@@ -313,6 +315,17 @@ func (c *Controller) Start() error {
 	if !rpc {
 		return nil
 	}
+
+	// Discard as a fallback.
+	stdout := io.Discard
+
+	// Use the configured stdout by default.
+	if c.cfg.Stdout != nil {
+		stdout = c.cfg.Stdout
+	}
+
+	// The pipe needs to continuously be read, otherwise `btcd` will hang.
+	go io.Copy(stdout, pr)
 
 	deadline := time.Now().Add(30 * time.Second)
 
