@@ -92,6 +92,10 @@ const (
 	// requestRetryInterval is the initial amount of time to wait in between
 	// retries when sending HTTP POST requests.
 	requestRetryInterval = time.Millisecond * 500
+
+	// defaultHTTPTimeout is the default timeout for an http request, so the
+	// request does not block indefinitely.
+	defaultHTTPTimeout = time.Minute
 )
 
 // jsonRequest holds information about a json request that is used to properly
@@ -1363,6 +1367,7 @@ func newHTTPClient(config *ConnConfig) (*http.Client, error) {
 				return net.Dial(parsedAddr.Network(), parsedAddr.String())
 			},
 		},
+		Timeout: defaultHTTPTimeout,
 	}
 
 	return &client, nil
