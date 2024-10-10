@@ -865,10 +865,10 @@ func popIfBool(vm *Engine) (bool, error) {
 		return false, err
 	}
 
-	// The top element MUST have a length of at least one.
+	// The top element MUST have a length of at most one.
 	if len(so) > 1 {
 		str := fmt.Sprintf("minimal if is active, top element MUST "+
-			"have a length of at least, instead length is %v",
+			"have a length of at most 1, instead length is %v",
 			len(so))
 		return false, scriptError(ErrMinimalIf, str)
 	}
