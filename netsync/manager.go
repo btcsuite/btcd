@@ -1171,6 +1171,11 @@ func (sm *SyncManager) handleInvMsg(imsg *invMsg) {
 		peer.UpdateLastAnnouncedBlock(&invVects[lastBlock].Hash)
 	}
 
+	// Ignore inventory when we're in headers-first mode.
+	if sm.headersFirstMode {
+		return
+	}
+
 	// Ignore invs from peers that aren't the sync if we are not current.
 	// Helps prevent fetching a mass of orphans.
 	if peer != sm.syncPeer && !sm.current() {
@@ -1201,14 +1206,19 @@ func (sm *SyncManager) handleInvMsg(imsg *invMsg) {
 			continue
 		}
 
+		// Ignore txs when we're not current as we can't verify them
+		// and they'll just go in the orphan pool.
+		if iv.Type == wire.InvTypeWitnessTx ||
+			iv.Type == wire.InvTypeTx {
+
+			if !sm.current() {
+				continue
+			}
+		}
+
 		// Add the inventory to the cache of known inventory
 		// for the peer.
 		peer.AddKnownInventory(iv)
-
-		// Ignore inventory when we're in headers-first mode.
-		if sm.headersFirstMode {
-			continue
-		}
 
 		// Request the inventory if we don't already have it.
 		haveInv, err := sm.haveInventory(iv)
