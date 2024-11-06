@@ -683,8 +683,8 @@ var TestNet4Params = Params{
 	Net:         wire.TestNet4,
 	DefaultPort: "48333",
 	DNSSeeds: []DNSSeed{
-		{"seed.testnet4.bitcoin.sprovoost.nl.", true},
-		{"seed.testnet4.wiz.biz.", true},
+		{"seed.testnet4.bitcoin.sprovoost.nl", true},
+		{"seed.testnet4.wiz.biz", true},
 	},
 
 	// Chain parameters
