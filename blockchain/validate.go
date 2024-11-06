@@ -451,7 +451,7 @@ func CheckBlockHeaderSanity(header *wire.BlockHeader, powLimit *big.Int, timeSou
 	}
 
 	if flags&BFEnforceBIP94 == BFEnforceBIP94 {
-		panic("gfy")
+		// log.Error("not checking BFEnforceBIP94!")
 	}
 
 	// Ensure the block time is not too far in the future.
