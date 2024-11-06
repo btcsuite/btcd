@@ -2195,6 +2195,10 @@ func (p *Peer) waitToFinishNegotiation(pver uint32) error {
 			// handshake.
 			p.processRemoteVerAckMsg(m)
 			return nil
+		case *wire.MsgWTxIdRelay:
+			if pver >= wire.WTxIdRelayVersion {
+				log.Infof("received WTxIdRelay, ignoring since we did not advertise it")
+			}
 		default:
 			// This is triggered if the peer sends, for example, a
 			// GETDATA message during this negotiation.

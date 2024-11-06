@@ -149,7 +149,9 @@ func (b *BlockChain) ProcessBlock(block *btcutil.Block, flags BehaviorFlags) (bo
 
 	fastAdd := flags&BFFastAdd == BFFastAdd
 	if b.chainParams.Net == wire.TestNet4 {
-		panic("xx")
+		if flags&BFEnforceBIP94 != BFEnforceBIP94 {
+			panic("BFEnforceBIP94 flag not set")
+		}
 	}
 
 	blockHash := block.Hash()

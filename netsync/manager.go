@@ -733,6 +733,9 @@ func (sm *SyncManager) handleBlockMsg(bmsg *blockMsg) {
 			}
 		}
 	}
+	if sm.chainParams.Net == wire.TestNet4 {
+		behaviorFlags |= blockchain.BFEnforceBIP94
+	}
 
 	// Remove block from request maps. Either chain will know about it and
 	// so we shouldn't have any more instances of trying to fetch it, or we

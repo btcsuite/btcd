@@ -27,10 +27,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/btcsuite/btcd/btcjson"
-	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/go-socks/socks"
 	"github.com/btcsuite/websocket"
+
+	"github.com/btcsuite/btcd/btcjson"
+	"github.com/btcsuite/btcd/chaincfg"
 )
 
 var (
@@ -276,7 +277,6 @@ func (c *Client) trackRegisteredNtfns(cmd interface{}) {
 			c.ntfnState.notifyNewTxVerbose = true
 		} else {
 			c.ntfnState.notifyNewTx = true
-
 		}
 
 	case *btcjson.NotifySpentCmd:
@@ -1378,7 +1378,7 @@ func newHTTPClient(config *ConnConfig) (*http.Client, error) {
 func dial(config *ConnConfig) (*websocket.Conn, error) {
 	// Setup TLS if not disabled.
 	var tlsConfig *tls.Config
-	var scheme = "ws"
+	scheme := "ws"
 	if !config.DisableTLS {
 		tlsConfig = &tls.Config{
 			MinVersion: tls.VersionTLS12,
@@ -1505,6 +1505,8 @@ func New(config *ConnConfig, ntfnHandlers *NotificationHandlers) (*Client, error
 		client.chainParams = &chaincfg.MainNetParams
 	case chaincfg.TestNet3Params.Name:
 		client.chainParams = &chaincfg.TestNet3Params
+	case chaincfg.TestNet4Params.Name:
+		client.chainParams = &chaincfg.TestNet4Params
 	case chaincfg.RegressionNetParams.Name:
 		client.chainParams = &chaincfg.RegressionNetParams
 	case chaincfg.SigNetParams.Name:
@@ -1542,7 +1544,7 @@ func NewBatch(config *ConnConfig) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	client.batch = true //copy the client with changed batch setting
+	client.batch = true // copy the client with changed batch setting
 	client.start()
 	return client, nil
 }
