@@ -18,18 +18,19 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/btcsuite/go-socks/socks"
+	"github.com/davecgh/go-spew/spew"
+	"github.com/decred/dcrd/lru"
+
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/go-socks/socks"
-	"github.com/davecgh/go-spew/spew"
-	"github.com/decred/dcrd/lru"
 )
 
 const (
 	// MaxProtocolVersion is the max protocol version the peer supports.
-	MaxProtocolVersion = wire.AddrV2Version
+	MaxProtocolVersion = wire.SendAddrV2Version
 
 	// DefaultTrickleInterval is the min time between attempts to send an
 	// inv message to a peer.
@@ -877,8 +878,8 @@ func (p *Peer) PushAddrMsg(addresses []*wire.NetAddress) ([]*wire.NetAddress, er
 //
 // This function is safe for concurrent access.
 func (p *Peer) PushAddrV2Msg(addrs []*wire.NetAddressV2) (
-	[]*wire.NetAddressV2, error) {
-
+	[]*wire.NetAddressV2, error,
+) {
 	count := len(addrs)
 
 	// Nothing to send.
@@ -1900,8 +1901,8 @@ func (p *Peer) QueueMessage(msg wire.Message, doneChan chan<- struct{}) {
 //
 // This function is safe for concurrent access.
 func (p *Peer) QueueMessageWithEncoding(msg wire.Message, doneChan chan<- struct{},
-	encoding wire.MessageEncoding) {
-
+	encoding wire.MessageEncoding,
+) {
 	// Avoid risk of deadlock if goroutine already exited.  The goroutine
 	// we will be sending to hangs around until it knows for a fact that
 	// it is marked as disconnected and *then* it drains the channels.
@@ -2152,7 +2153,7 @@ func (p *Peer) writeLocalVersionMsg() error {
 // writeSendAddrV2Msg writes our sendaddrv2 message to the remote peer if the
 // peer supports protocol version 70016 and above.
 func (p *Peer) writeSendAddrV2Msg(pver uint32) error {
-	if pver < wire.AddrV2Version {
+	if pver < wire.SendAddrV2Version {
 		return nil
 	}
 
@@ -2180,7 +2181,7 @@ func (p *Peer) waitToFinishNegotiation(pver uint32) error {
 
 		switch m := remoteMsg.(type) {
 		case *wire.MsgSendAddrV2:
-			if pver >= wire.AddrV2Version {
+			if pver >= wire.SendAddrV2Version {
 				p.flagsMtx.Lock()
 				p.sendAddrV2 = true
 				p.flagsMtx.Unlock()

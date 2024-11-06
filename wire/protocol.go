@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2016 The btcsuite developers
+// Copyright (c) 2013-2024 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -52,12 +52,16 @@ const (
 	// feefilter message.
 	FeeFilterVersion uint32 = 70013
 
-	// AddrV2Version is the protocol version which added two new messages.
-	// sendaddrv2 is sent during the version-verack handshake and signals
-	// support for sending and receiving the addrv2 message. In the future,
-	// new messages that occur during the version-verack handshake will not
-	// come with a protocol version bump.
-	AddrV2Version uint32 = 70016
+	// SendAddrV2Version is the protocol version which added two new
+	// messages.  sendaddrv2 is sent during the version-verack handshake
+	// and signals support for sending and receiving the addrv2 message. In
+	// the future, new messages that occur during the version-verack
+	// handshake will not come with a protocol version bump.
+	// In addition, wtxidrelay was also added as an optional message in the
+	// same protocol version.
+	SendAddrV2Version uint32 = 70016
+	WTxIdRelayVersion uint32 = SendAddrV2Version
+	AddrV2Version     uint32 = SendAddrV2Version // Keep for upstream compatibility
 )
 
 const (
