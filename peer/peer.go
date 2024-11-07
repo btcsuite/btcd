@@ -463,6 +463,7 @@ type Peer struct {
 	verAckReceived       bool
 	witnessEnabled       bool
 	sendAddrV2           bool
+	wTxIdRelay           bool // Relay witness TxId instead of TxId
 
 	wireEncoding wire.MessageEncoding
 
@@ -836,6 +837,15 @@ func (p *Peer) WantsAddrV2() bool {
 	p.flagsMtx.Unlock()
 
 	return wantsAddrV2
+}
+
+// WantsWTxIdRelay returns if the peer wants witness TxIds.
+func (p *Peer) WantsWTxIdRelay() bool {
+	p.flagsMtx.Lock()
+	wantsWTxIdRelay := p.wTxIdRelay
+	p.flagsMtx.Unlock()
+
+	return wantsWTxIdRelay
 }
 
 // PushAddrMsg sends an addr message to the connected peer using the provided
@@ -2190,15 +2200,18 @@ func (p *Peer) waitToFinishNegotiation(pver uint32) error {
 					p.cfg.Listeners.OnSendAddrV2(p, m)
 				}
 			}
+		case *wire.MsgWTxIdRelay:
+			if pver >= wire.WTxIdRelayVersion {
+				p.flagsMtx.Lock()
+				p.wTxIdRelay = true
+				p.flagsMtx.Unlock()
+				log.Infof("received WTxIdRelay, ignoring since we did not advertise it")
+			}
 		case *wire.MsgVerAck:
 			// Receiving a verack means we are done with the
 			// handshake.
 			p.processRemoteVerAckMsg(m)
 			return nil
-		case *wire.MsgWTxIdRelay:
-			if pver >= wire.WTxIdRelayVersion {
-				log.Infof("received WTxIdRelay, ignoring since we did not advertise it")
-			}
 		default:
 			// This is triggered if the peer sends, for example, a
 			// GETDATA message during this negotiation.
