@@ -754,6 +754,7 @@ func (sm *SyncManager) handleBlockMsg(bmsg *blockMsg) {
 		if _, ok := err.(blockchain.RuleError); ok {
 			log.Infof("Rejected block %v from %s: %v", blockHash,
 				peer, err)
+			panic(err)
 		} else {
 			log.Errorf("Failed to process block %v: %v",
 				blockHash, err)

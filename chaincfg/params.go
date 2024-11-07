@@ -702,12 +702,12 @@ var TestNet4Params = Params{
 
 	// Checkpoints ordered from oldest to newest.
 	Checkpoints: []Checkpoint{
-		{500, newHashFromStr("00000000c674047be3a7b25fefe0b6416f6f4e88ff9b01ddc05471b8e2ea603a")},
-		{1000, newHashFromStr("00000000b747d47c3b38161693ad05e26924b3775a8be669751f969da836311e")},
-		{10000, newHashFromStr("000000000037079ff4c37eed57d00eb9ddfde8737b559ffa4101b11e76c97466")},
-		{25000, newHashFromStr("00000000000000c207c423ebb2d935e7b867b51710aaf72967666e83696f01e2")},
-		{35000, newHashFromStr("0000000047f9360bd7e79d3959bd32366e24b4182caf138a8b10d42add3b7fd7")},
-		{45000, newHashFromStr("0000000019ae521883b2597ed74cd21e2efa43fbf487815300cad96206d76f0e")},
+		//{500, newHashFromStr("00000000c674047be3a7b25fefe0b6416f6f4e88ff9b01ddc05471b8e2ea603a")},
+		//{1000, newHashFromStr("00000000b747d47c3b38161693ad05e26924b3775a8be669751f969da836311e")},
+		//{10000, newHashFromStr("000000000037079ff4c37eed57d00eb9ddfde8737b559ffa4101b11e76c97466")},
+		//{25000, newHashFromStr("00000000000000c207c423ebb2d935e7b867b51710aaf72967666e83696f01e2")},
+		//{35000, newHashFromStr("0000000047f9360bd7e79d3959bd32366e24b4182caf138a8b10d42add3b7fd7")},
+		//{45000, newHashFromStr("0000000019ae521883b2597ed74cd21e2efa43fbf487815300cad96206d76f0e")},
 	},
 
 	// Consensus rule change deployments.
