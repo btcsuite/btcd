@@ -80,6 +80,7 @@ func netName(chainParams *chaincfg.Params) string {
 	switch chainParams.Net {
 	case wire.TestNet3:
 		return "testnet"
+	// TODO do we need to use "testnet" dir for testnet4 as well?
 	default:
 		return chainParams.Name
 	}
