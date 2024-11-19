@@ -37,6 +37,7 @@ import (
 	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcd/internal/config"
 	"github.com/btcsuite/btcd/internal/log"
+	"github.com/btcsuite/btcd/internal/params"
 	"github.com/btcsuite/btcd/mempool"
 	"github.com/btcsuite/btcd/mining"
 	"github.com/btcsuite/btcd/mining/cpuminer"
@@ -945,7 +946,7 @@ func generate(s *rpcServer, blocks uint32) ([]string, error) {
 func handleGenerateToAddress(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	c := cmd.(*btcjson.GenerateToAddressCmd)
 
-	addr, err := btcutil.DecodeAddress(c.Address, nil)
+	addr, err := btcutil.DecodeAddress(c.Address, params.ActiveNetParams.Params)
 	if err != nil {
 		return nil, err
 	}
