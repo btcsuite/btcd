@@ -17,6 +17,9 @@ import (
 
 	"github.com/btcsuite/btcd/blockchain/indexers"
 	"github.com/btcsuite/btcd/database"
+	"github.com/btcsuite/btcd/internal/config"
+	"github.com/btcsuite/btcd/internal/log"
+	"github.com/btcsuite/btcd/internal/params"
 	"github.com/btcsuite/btcd/limits"
 	"github.com/btcsuite/btcd/ossec"
 )
@@ -29,12 +32,22 @@ const (
 )
 
 var (
-	cfg *config
+	cfg *config.Config
 )
 
 // winServiceMain is only invoked on Windows.  It detects when btcd is running
 // as a service and reacts accordingly.
 var winServiceMain func() (bool, error)
+
+var (
+	btcdLog = log.BtcdLog
+	srvrLog = log.SrvrLog
+	rpcsLog = log.RpcsLog
+	peerLog = log.PeerLog
+	txmpLog = log.TxmpLog
+	indxLog = log.IndxLog
+	amgrLog = log.AmgrLog
+)
 
 // btcdMain is the real main function for btcd.  It is necessary to work around
 // the fact that deferred functions do not run when os.Exit() is called.  The
@@ -44,14 +57,14 @@ var winServiceMain func() (bool, error)
 func btcdMain(serverChan chan<- *server) error {
 	// Load configuration and parse command line.  This function also
 	// initializes logging and configures it accordingly.
-	tcfg, _, err := loadConfig()
+	tcfg, _, err := config.LoadConfig(version())
 	if err != nil {
 		return err
 	}
 	cfg = tcfg
 	defer func() {
-		if logRotator != nil {
-			logRotator.Close()
+		if log.LogRotator != nil {
+			log.LogRotator.Close()
 		}
 	}()
 
@@ -251,7 +264,7 @@ func btcdMain(serverChan chan<- *server) error {
 
 	// Create server and start it.
 	server, err := newServer(cfg.Listeners, cfg.AgentBlacklist,
-		cfg.AgentWhitelist, db, activeNetParams.Params, interrupt)
+		cfg.AgentWhitelist, db, params.ActiveNetParams.Params, interrupt)
 	if err != nil {
 		// TODO: this logging could do with some beautifying.
 		btcdLog.Errorf("Unable to start server on %v: %v",
@@ -376,7 +389,7 @@ func loadBlockDB() (database.DB, error) {
 	removeRegressionDB(dbPath)
 
 	btcdLog.Infof("Loading block database from '%s'", dbPath)
-	db, err := database.Open(cfg.DbType, dbPath, activeNetParams.Net)
+	db, err := database.Open(cfg.DbType, dbPath, params.ActiveNetParams.Net)
 	if err != nil {
 		// Return the error if it's not because the database doesn't
 		// exist.
@@ -391,7 +404,7 @@ func loadBlockDB() (database.DB, error) {
 		if err != nil {
 			return nil, err
 		}
-		db, err = database.Create(cfg.DbType, dbPath, activeNetParams.Net)
+		db, err = database.Create(cfg.DbType, dbPath, params.ActiveNetParams.Net)
 		if err != nil {
 			return nil, err
 		}
@@ -455,4 +468,14 @@ func main() {
 	if err := btcdMain(nil); err != nil {
 		os.Exit(1)
 	}
+}
+
+// fileExists reports whether the named file or directory exists.
+func fileExists(name string) bool {
+	if _, err := os.Stat(name); err != nil {
+		if os.IsNotExist(err) {
+			return false
+		}
+	}
+	return true
 }

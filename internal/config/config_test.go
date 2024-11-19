@@ -1,4 +1,4 @@
-package main
+package config
 
 import (
 	"os"
@@ -19,7 +19,7 @@ func TestCreateDefaultConfigFile(t *testing.T) {
 	if !ok {
 		t.Fatalf("Failed finding config file path")
 	}
-	sampleConfigFile := filepath.Join(filepath.Dir(path), "sample-btcd.conf")
+	sampleConfigFile := filepath.Join(filepath.Dir(path), "../..", "sample-btcd.conf")
 
 	// Setup a temporary directory
 	tmpDir, err := os.MkdirTemp("", "btcd")

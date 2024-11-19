@@ -35,6 +35,9 @@ import (
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/database"
+	"github.com/btcsuite/btcd/internal/config"
+	"github.com/btcsuite/btcd/internal/log"
+	"github.com/btcsuite/btcd/internal/params"
 	"github.com/btcsuite/btcd/mempool"
 	"github.com/btcsuite/btcd/mining"
 	"github.com/btcsuite/btcd/mining/cpuminer"
@@ -141,6 +144,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"decodescript":           handleDecodeScript,
 	"estimatefee":            handleEstimateFee,
 	"generate":               handleGenerate,
+	"generatetoaddress":      handleGenerateToAddress,
 	"getaddednodeinfo":       handleGetAddedNodeInfo,
 	"getbestblock":           handleGetBestBlock,
 	"getbestblockhash":       handleGetBestBlockHash,
@@ -377,7 +381,7 @@ func handleAskWallet(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (
 func handleAddNode(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	c := cmd.(*btcjson.AddNodeCmd)
 
-	addr := normalizeAddress(c.Addr, s.cfg.ChainParams.DefaultPort)
+	addr := config.NormalizeAddress(c.Addr, s.cfg.ChainParams.DefaultPort)
 	var err error
 	switch c.SubCmd {
 	case "add":
@@ -421,7 +425,7 @@ func handleNode(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (inter
 			err = s.cfg.ConnMgr.DisconnectByID(int32(nodeID))
 		} else {
 			if _, _, errP := net.SplitHostPort(c.Target); errP == nil || net.ParseIP(c.Target) != nil {
-				addr = normalizeAddress(c.Target, params.DefaultPort)
+				addr = config.NormalizeAddress(c.Target, params.DefaultPort)
 				err = s.cfg.ConnMgr.DisconnectByAddr(addr)
 			} else {
 				return nil, &btcjson.RPCError{
@@ -446,7 +450,7 @@ func handleNode(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (inter
 			err = s.cfg.ConnMgr.RemoveByID(int32(nodeID))
 		} else {
 			if _, _, errP := net.SplitHostPort(c.Target); errP == nil || net.ParseIP(c.Target) != nil {
-				addr = normalizeAddress(c.Target, params.DefaultPort)
+				addr = config.NormalizeAddress(c.Target, params.DefaultPort)
 				err = s.cfg.ConnMgr.RemoveByAddr(addr)
 			} else {
 				return nil, &btcjson.RPCError{
@@ -463,7 +467,7 @@ func handleNode(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (inter
 		}
 
 	case "connect":
-		addr = normalizeAddress(c.Target, params.DefaultPort)
+		addr = config.NormalizeAddress(c.Target, params.DefaultPort)
 
 		// Default to temporary connections.
 		subCmd := "temp"
@@ -634,10 +638,10 @@ func handleDebugLevel(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) 
 	// Special show command to list supported subsystems.
 	if c.LevelSpec == "show" {
 		return fmt.Sprintf("Supported subsystems %v",
-			supportedSubsystems()), nil
+			config.SupportedSubsystems()), nil
 	}
 
-	err := parseAndSetDebugLevels(c.LevelSpec)
+	err := config.ParseAndSetDebugLevels(c.LevelSpec)
 	if err != nil {
 		return nil, &btcjson.RPCError{
 			Code:    btcjson.ErrRPCInvalidParams.Code,
@@ -888,11 +892,10 @@ func handleEstimateFee(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 	return float64(feeRate), nil
 }
 
-// handleGenerate handles generate commands.
-func handleGenerate(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+func generate(s *rpcServer, blocks uint32) ([]string, error) {
 	// Respond with an error if there are no addresses to pay the
 	// created blocks to.
-	if len(cfg.miningAddrs) == 0 {
+	if len(cfg.MiningAddrs) == 0 {
 		return nil, &btcjson.RPCError{
 			Code: btcjson.ErrRPCInternal.Code,
 			Message: "No payment addresses specified " +
@@ -912,10 +915,8 @@ func handleGenerate(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 		}
 	}
 
-	c := cmd.(*btcjson.GenerateCmd)
-
 	// Respond with an error if the client is requesting 0 blocks to be generated.
-	if c.NumBlocks == 0 {
+	if blocks == 0 {
 		return nil, &btcjson.RPCError{
 			Code:    btcjson.ErrRPCInternal.Code,
 			Message: "Please request a nonzero number of blocks to generate.",
@@ -923,9 +924,9 @@ func handleGenerate(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 	}
 
 	// Create a reply
-	reply := make([]string, c.NumBlocks)
+	reply := make([]string, blocks)
 
-	blockHashes, err := s.cfg.CPUMiner.GenerateNBlocks(c.NumBlocks)
+	blockHashes, err := s.cfg.CPUMiner.GenerateNBlocks(blocks)
 	if err != nil {
 		return nil, &btcjson.RPCError{
 			Code:    btcjson.ErrRPCInternal.Code,
@@ -940,6 +941,31 @@ func handleGenerate(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 	}
 
 	return reply, nil
+}
+
+func handleGenerateToAddress(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	c := cmd.(*btcjson.GenerateToAddressCmd)
+
+	addr, err := btcutil.DecodeAddress(c.Address, params.ActiveNetParams.Params)
+	if err != nil {
+		return nil, err
+	}
+
+	before := s.cfg.CPUMiner.MiningAddrs[:]
+	s.cfg.CPUMiner.MiningAddrs = []btcutil.Address{addr}
+
+	reply, err := generate(s, uint32(c.NumBlocks))
+
+	s.cfg.CPUMiner.MiningAddrs = before
+
+	return reply, err
+}
+
+// handleGenerate handles generate commands.
+func handleGenerate(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	c := cmd.(*btcjson.GenerateCmd)
+
+	return generate(s, c.NumBlocks)
 }
 
 // handleGetAddedNodeInfo handles getaddednodeinfo commands.
@@ -1003,7 +1029,7 @@ func handleGetAddedNodeInfo(s *rpcServer, cmd interface{}, closeChan <-chan stru
 		default:
 			// Do a DNS lookup for the address.  If the lookup fails, just
 			// use the host.
-			ips, err := btcdLookup(host)
+			ips, err := cfg.Lookup(host)
 			if err != nil {
 				ipList = make([]string, 1)
 				ipList[0] = host
@@ -1022,7 +1048,7 @@ func handleGetAddedNodeInfo(s *rpcServer, cmd interface{}, closeChan <-chan stru
 			addr.Address = ip
 			addr.Connected = "false"
 			if ip == host && peer.Connected() {
-				addr.Connected = directionString(peer.Inbound())
+				addr.Connected = log.DirectionString(peer.Inbound())
 			}
 			addrs = append(addrs, addr)
 		}
@@ -1588,7 +1614,7 @@ func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bo
 		// to create their own coinbase.
 		var payAddr btcutil.Address
 		if !useCoinbaseValue {
-			payAddr = cfg.miningAddrs[rand.Intn(len(cfg.miningAddrs))]
+			payAddr = cfg.MiningAddrs[rand.Intn(len(cfg.MiningAddrs))]
 		}
 
 		// Create a new block template that has a coinbase which anyone
@@ -1643,7 +1669,7 @@ func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bo
 		// returned if none have been specified.
 		if !useCoinbaseValue && !template.ValidPayAddress {
 			// Choose a payment address at random.
-			payToAddr := cfg.miningAddrs[rand.Intn(len(cfg.miningAddrs))]
+			payToAddr := cfg.MiningAddrs[rand.Intn(len(cfg.MiningAddrs))]
 
 			// Update the block coinbase output of the template to
 			// pay to the randomly selected payment address.
@@ -1952,7 +1978,7 @@ func handleGetBlockTemplateRequest(s *rpcServer, request *btcjson.TemplateReques
 
 	// When a coinbase transaction has been requested, respond with an error
 	// if there are no addresses to pay the created block template to.
-	if !useCoinbaseValue && len(cfg.miningAddrs) == 0 {
+	if !useCoinbaseValue && len(cfg.MiningAddrs) == 0 {
 		return nil, &btcjson.RPCError{
 			Code: btcjson.ErrRPCInternal.Code,
 			Message: "A coinbase transaction has been requested, " +
@@ -2360,7 +2386,7 @@ func handleGetInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (in
 		Proxy:           cfg.Proxy,
 		Difficulty:      getDifficultyRatio(best.Bits, s.cfg.ChainParams),
 		TestNet:         cfg.TestNet3,
-		RelayFee:        cfg.minRelayTxFee.ToBTC(),
+		RelayFee:        cfg.MinRelayTxFee.ToBTC(),
 	}
 
 	return ret, nil
@@ -3546,7 +3572,7 @@ func handleSetGenerate(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 	} else {
 		// Respond with an error if there are no addresses to pay the
 		// created blocks to.
-		if len(cfg.miningAddrs) == 0 {
+		if len(cfg.MiningAddrs) == 0 {
 			return nil, &btcjson.RPCError{
 				Code: btcjson.ErrRPCInternal.Code,
 				Message: "No payment addresses specified " +

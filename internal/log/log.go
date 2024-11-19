@@ -3,7 +3,7 @@
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package main
+package log
 
 import (
 	"fmt"
@@ -32,7 +32,7 @@ type logWriter struct{}
 
 func (logWriter) Write(p []byte) (n int, err error) {
 	os.Stdout.Write(p)
-	logRotator.Write(p)
+	LogRotator.Write(p)
 	return len(p), nil
 }
 
@@ -50,65 +50,65 @@ var (
 	// or data races and/or nil pointer dereferences will occur.
 	backendLog = btclog.NewBackend(logWriter{})
 
-	// logRotator is one of the logging outputs.  It should be closed on
+	// LogRotator is one of the logging outputs.  It should be closed on
 	// application shutdown.
-	logRotator *rotator.Rotator
+	LogRotator *rotator.Rotator
 
 	adxrLog = backendLog.Logger("ADXR")
-	amgrLog = backendLog.Logger("AMGR")
+	AmgrLog = backendLog.Logger("AMGR")
 	cmgrLog = backendLog.Logger("CMGR")
 	bcdbLog = backendLog.Logger("BCDB")
-	btcdLog = backendLog.Logger("BTCD")
+	BtcdLog = backendLog.Logger("BTCD")
 	chanLog = backendLog.Logger("CHAN")
 	discLog = backendLog.Logger("DISC")
-	indxLog = backendLog.Logger("INDX")
+	IndxLog = backendLog.Logger("INDX")
 	minrLog = backendLog.Logger("MINR")
-	peerLog = backendLog.Logger("PEER")
-	rpcsLog = backendLog.Logger("RPCS")
+	PeerLog = backendLog.Logger("PEER")
+	RpcsLog = backendLog.Logger("RPCS")
 	scrpLog = backendLog.Logger("SCRP")
-	srvrLog = backendLog.Logger("SRVR")
+	SrvrLog = backendLog.Logger("SRVR")
 	syncLog = backendLog.Logger("SYNC")
-	txmpLog = backendLog.Logger("TXMP")
+	TxmpLog = backendLog.Logger("TXMP")
 )
 
 // Initialize package-global logger variables.
 func init() {
-	addrmgr.UseLogger(amgrLog)
+	addrmgr.UseLogger(AmgrLog)
 	connmgr.UseLogger(cmgrLog)
 	database.UseLogger(bcdbLog)
 	blockchain.UseLogger(chanLog)
-	indexers.UseLogger(indxLog)
+	indexers.UseLogger(IndxLog)
 	mining.UseLogger(minrLog)
 	cpuminer.UseLogger(minrLog)
-	peer.UseLogger(peerLog)
+	peer.UseLogger(PeerLog)
 	txscript.UseLogger(scrpLog)
 	netsync.UseLogger(syncLog)
-	mempool.UseLogger(txmpLog)
+	mempool.UseLogger(TxmpLog)
 }
 
-// subsystemLoggers maps each subsystem identifier to its associated logger.
-var subsystemLoggers = map[string]btclog.Logger{
+// SubsystemLoggers maps each subsystem identifier to its associated logger.
+var SubsystemLoggers = map[string]btclog.Logger{
 	"ADXR": adxrLog,
-	"AMGR": amgrLog,
+	"AMGR": AmgrLog,
 	"CMGR": cmgrLog,
 	"BCDB": bcdbLog,
-	"BTCD": btcdLog,
+	"BTCD": BtcdLog,
 	"CHAN": chanLog,
 	"DISC": discLog,
-	"INDX": indxLog,
+	"INDX": IndxLog,
 	"MINR": minrLog,
-	"PEER": peerLog,
-	"RPCS": rpcsLog,
+	"PEER": PeerLog,
+	"RPCS": RpcsLog,
 	"SCRP": scrpLog,
-	"SRVR": srvrLog,
+	"SRVR": SrvrLog,
 	"SYNC": syncLog,
-	"TXMP": txmpLog,
+	"TXMP": TxmpLog,
 }
 
-// initLogRotator initializes the logging rotater to write logs to logFile and
+// InitLogRotator initializes the logging rotater to write logs to logFile and
 // create roll files in the same directory.  It must be called before the
 // package-global log rotater variables are used.
-func initLogRotator(logFile string) {
+func InitLogRotator(logFile string) {
 	logDir, _ := filepath.Split(logFile)
 	err := os.MkdirAll(logDir, 0700)
 	if err != nil {
@@ -121,15 +121,15 @@ func initLogRotator(logFile string) {
 		os.Exit(1)
 	}
 
-	logRotator = r
+	LogRotator = r
 }
 
-// setLogLevel sets the logging level for provided subsystem.  Invalid
+// SetLogLevel sets the logging level for provided subsystem.  Invalid
 // subsystems are ignored.  Uninitialized subsystems are dynamically created as
 // needed.
-func setLogLevel(subsystemID string, logLevel string) {
+func SetLogLevel(subsystemID string, logLevel string) {
 	// Ignore invalid subsystems.
-	logger, ok := subsystemLoggers[subsystemID]
+	logger, ok := SubsystemLoggers[subsystemID]
 	if !ok {
 		return
 	}
@@ -139,29 +139,29 @@ func setLogLevel(subsystemID string, logLevel string) {
 	logger.SetLevel(level)
 }
 
-// setLogLevels sets the log level for all subsystem loggers to the passed
+// SetLogLevels sets the log level for all subsystem loggers to the passed
 // level.  It also dynamically creates the subsystem loggers as needed, so it
 // can be used to initialize the logging system.
-func setLogLevels(logLevel string) {
+func SetLogLevels(logLevel string) {
 	// Configure all sub-systems with the new logging level.  Dynamically
 	// create loggers as needed.
-	for subsystemID := range subsystemLoggers {
-		setLogLevel(subsystemID, logLevel)
+	for subsystemID := range SubsystemLoggers {
+		SetLogLevel(subsystemID, logLevel)
 	}
 }
 
-// directionString is a helper function that returns a string that represents
+// DirectionString is a helper function that returns a string that represents
 // the direction of a connection (inbound or outbound).
-func directionString(inbound bool) string {
+func DirectionString(inbound bool) string {
 	if inbound {
 		return "inbound"
 	}
 	return "outbound"
 }
 
-// pickNoun returns the singular or plural form of a noun depending
+// PickNoun returns the singular or plural form of a noun depending
 // on the count n.
-func pickNoun(n uint64, singular, plural string) string {
+func PickNoun(n uint64, singular, plural string) string {
 	if n == 1 {
 		return singular
 	}
