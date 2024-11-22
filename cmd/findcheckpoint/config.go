@@ -41,7 +41,7 @@ type config struct {
 	NumCandidates  int    `short:"n" long:"numcandidates" description:"Max num of checkpoint candidates to show {1-20}"`
 	RegressionTest bool   `long:"regtest" description:"Use the regression test network"`
 	SimNet         bool   `long:"simnet" description:"Use the simulation test network"`
-	TestNet3       bool   `long:"testnet" description:"Use the test network"`
+	TestNet3       bool   `long:"testnet" description:"Use the test network (version 3). Support for testnet3 is deprecated. Consider moving to testnet4 now by using -testnet4"`
 	TestNet4       bool   `long:"testnet4" description:"Use the test network (version 4)"`
 }
 
