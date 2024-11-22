@@ -46,6 +46,11 @@ const (
 	// coinbaseHeightAllocSize is the amount of bytes that the
 	// ScriptBuilder will allocate when validating the coinbase height.
 	coinbaseHeightAllocSize = 5
+
+	// maxTimeWarp is a maximum number of seconds that the timestamp of the first
+	// block of a difficulty adjustment period is allowed to
+	// be earlier than the last block of the previous period (BIP94).
+	maxTimeWarp = 600 * time.Second
 )
 
 var (
@@ -446,7 +451,7 @@ func CheckBlockHeaderSanity(header *wire.BlockHeader, powLimit *big.Int,
 	// A block timestamp must not have a greater precision than one second.
 	// This check is necessary because Go time.Time values support
 	// nanosecond precision whereas the consensus rules only apply to
-	// seconds and it's much nicer to deal with standard Go time values
+	// seconds, and it's much nicer to deal with standard Go time values
 	// instead of converting to seconds everywhere.
 	if !header.Timestamp.Equal(time.Unix(header.Timestamp.Unix(), 0)) {
 		str := fmt.Sprintf("block timestamp of %v has a higher "+
@@ -669,7 +674,7 @@ func compareScript(height int32, script []byte) error {
 }
 
 // CheckBlockHeaderContext performs several validation checks on the block header
-// which depend on its position within the block chain.
+// which depend on its position within the blockchain.
 //
 // The flags modify the behavior of this function as follows:
 //   - BFFastAdd: All checks except those involving comparing the header against
@@ -683,6 +688,10 @@ func compareScript(height int32, script []byte) error {
 // *Blockchain instance as the ChainCtx argument.
 func CheckBlockHeaderContext(header *wire.BlockHeader, prevNode HeaderCtx,
 	flags BehaviorFlags, c ChainCtx, skipCheckpoint bool) error {
+
+	// The height of this block is one more than the referenced previous
+	// block.
+	blockHeight := prevNode.Height() + 1
 
 	fastAdd := flags&BFFastAdd == BFFastAdd
 	if !fastAdd {
@@ -710,11 +719,22 @@ func CheckBlockHeaderContext(header *wire.BlockHeader, prevNode HeaderCtx,
 			str = fmt.Sprintf(str, header.Timestamp, medianTime)
 			return ruleError(ErrTimeTooOld, str)
 		}
-	}
 
-	// The height of this block is one more than the referenced previous
-	// block.
-	blockHeight := prevNode.Height() + 1
+		// Testnet4 only: Check timestamp against prev for difficulty-adjustment
+		// blocks to prevent timewarp attacks.
+		if c.ChainParams().EnforceBIP94 {
+			// Check timestamp for the first block of each difficulty adjustment
+			// interval, except the genesis block.
+			if blockHeight%c.BlocksPerRetarget() == 0 {
+				prevBlockTimestamp := time.Unix(prevNode.Timestamp(), 0)
+				if header.Timestamp.Before(prevBlockTimestamp.Add(-maxTimeWarp)) {
+					str := "block's timestamp %v is too early on diff adjustment block %v"
+					str = fmt.Sprintf(str, header.Timestamp, prevBlockTimestamp)
+					return ruleError(ErrTimewarpAttack, str)
+				}
+			}
+		}
+	}
 
 	// Reject outdated block versions once a majority of the network
 	// has upgraded.  These were originally voted on by BIP0034,
