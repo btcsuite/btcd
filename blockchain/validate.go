@@ -90,7 +90,7 @@ func ShouldHaveSerializedBlockHeight(header *wire.BlockHeader) bool {
 
 // IsCoinBaseTx determines whether or not a transaction is a coinbase.  A coinbase
 // is a special transaction created by miners that has no inputs.  This is
-// represented in the block chain by a transaction with a single input that has
+// represented in the blockchain by a transaction with a single input that has
 // a previous output transaction index set to the maximum value along with a
 // zero hash.
 //
@@ -114,7 +114,7 @@ func IsCoinBaseTx(msgTx *wire.MsgTx) bool {
 
 // IsCoinBase determines whether or not a transaction is a coinbase.  A coinbase
 // is a special transaction created by miners that has no inputs.  This is
-// represented in the block chain by a transaction with a single input that has
+// represented in the blockchain by a transaction with a single input that has
 // a previous output transaction index set to the maximum value along with a
 // zero hash.
 //
@@ -782,7 +782,7 @@ func CheckBlockHeaderContext(header *wire.BlockHeader, prevNode HeaderCtx,
 }
 
 // checkBlockContext performs several validation checks on the block which depend
-// on its position within the block chain.
+// on its position within the blockchain.
 //
 // The flags modify the behavior of this function as follows:
 //   - BFFastAdd: The transaction are not checked to see if they are finalized
@@ -1087,7 +1087,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block, vi
 	//
 	// In addition, as of BIP0034, duplicate coinbases are no longer
 	// possible due to its requirement for including the block height in the
-	// coinbase and thus it is no longer possible to create transactions
+	// coinbase, and thus it is no longer possible to create transactions
 	// that 'overwrite' older ones.  Therefore, only enforce the rule if
 	// BIP0034 is not yet active.  This is a useful optimization because the
 	// BIP0030 check is expensive since it involves a ton of cache misses in
@@ -1250,7 +1250,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block, vi
 	if csvState == ThresholdActive {
 		// If the CSV soft-fork is now active, then modify the
 		// scriptFlags to ensure that the CSV op code is properly
-		// validated during the script checks bleow.
+		// validated during the script checks below.
 		scriptFlags |= txscript.ScriptVerifyCheckSequenceVerify
 
 		// We obtain the MTP of the *previous* block in order to
