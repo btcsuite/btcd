@@ -2190,11 +2190,18 @@ func (p *Peer) waitToFinishNegotiation(pver uint32) error {
 					p.cfg.Listeners.OnSendAddrV2(p, m)
 				}
 			}
+
+		// Receiving a verack means we are done with the handshake.
 		case *wire.MsgVerAck:
-			// Receiving a verack means we are done with the
-			// handshake.
 			p.processRemoteVerAckMsg(m)
 			return nil
+
+		// Received an optional wtxidrelay message.
+		//
+		// TODO(yy): We ignore it atm, but should figure out how to
+		// process it?
+		case *wire.MsgWTxIdRelay:
+
 		default:
 			// This is triggered if the peer sends, for example, a
 			// GETDATA message during this negotiation.
