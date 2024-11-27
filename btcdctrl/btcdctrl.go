@@ -81,6 +81,8 @@ type ControllerConfig struct {
 	Stderr io.Writer
 	Stdout io.Writer
 
+	Path string
+
 	*Config
 }
 
@@ -257,8 +259,13 @@ func (c *Controller) Start() error {
 		args = append(args, "--whitelist", addr.String())
 	}
 
+	name := "btcd"
+	if c.cfg.Path != "" {
+		name = c.cfg.Path
+	}
+
 	// Create the command.
-	c.cmd = exec.Command("btcd", args...)
+	c.cmd = exec.Command(name, args...)
 
 	// Create a pipe of stdout.
 	pr, pw, err := os.Pipe()
