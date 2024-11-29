@@ -138,6 +138,13 @@ type pauseMsg struct {
 	unpause <-chan struct{}
 }
 
+// peerDisconnectMsg is a message type to be sent across the message channel for
+// the disconnection of the given peer.
+type peerDisconnectMsg struct {
+	peer  string
+	reply chan struct{}
+}
+
 // headerNode is used as a node in a list of headers that are linked together
 // between checkpoints.
 type headerNode struct {
@@ -1402,6 +1409,15 @@ out:
 			case isCurrentMsg:
 				msg.reply <- sm.current()
 
+			case peerDisconnectMsg:
+				for peer := range sm.peerStates {
+					if peer.String() == msg.peer {
+						peer.Disconnect()
+						break
+					}
+				}
+				msg.reply <- struct{}{}
+
 			case pauseMsg:
 				// Wait until the sender unpauses the manager.
 				<-msg.unpause
@@ -1532,6 +1548,13 @@ func (sm *SyncManager) NewPeer(peer *peerpkg.Peer) {
 		return
 	}
 	sm.msgChan <- &newPeerMsg{peer: peer}
+}
+
+// queuePeerToBeDisconnected takes in a string of a peer and passes it to the
+// message channel in order for the peer to be disconnected.  It's done in this
+// fashion to avoid hv
+func (sm *SyncManager) queuePeerToBeDisconnected(disconnectPeer string, done chan struct{}) {
+	sm.msgChan <- peerDisconnectMsg{disconnectPeer, done}
 }
 
 // QueueTx adds the passed transaction message and peer to the block handling
