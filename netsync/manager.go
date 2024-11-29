@@ -20,6 +20,7 @@ import (
 	"github.com/btcsuite/btcd/mempool"
 	peerpkg "github.com/btcsuite/btcd/peer"
 	"github.com/btcsuite/btcd/wire"
+	"github.com/lightninglabs/neutrino/query"
 )
 
 const (
@@ -138,6 +139,14 @@ type pauseMsg struct {
 	unpause <-chan struct{}
 }
 
+// peerDisconnectMsg is a message type to be sent across the message channel for
+// the disconnection of the given peer.
+type peerDisconnectMsg struct {
+	peer   string
+	blocks map[chainhash.Hash]struct{}
+	reply  chan struct{}
+}
+
 // headerNode is used as a node in a list of headers that are linked together
 // between checkpoints.
 type headerNode struct {
@@ -171,6 +180,86 @@ func limitAdd(m map[chainhash.Hash]struct{}, hash chainhash.Hash, limit int) {
 		}
 	}
 	m[hash] = struct{}{}
+}
+
+// checkpointedBlocksQuery is a helper to construct query.Requests for GetData
+// messages.
+type checkpointedBlocksQuery struct {
+	msg    *wire.MsgGetData
+	sm     *SyncManager
+	blocks map[chainhash.Hash]struct{}
+}
+
+// newCheckpointedBlocksQuery returns an initialized newCheckpointedBlocksQuery.
+func newCheckpointedBlocksQuery(msg *wire.MsgGetData,
+	sm *SyncManager) checkpointedBlocksQuery {
+
+	m := make(map[chainhash.Hash]struct{}, len(msg.InvList))
+	for _, inv := range msg.InvList {
+		m[inv.Hash] = struct{}{}
+	}
+	return checkpointedBlocksQuery{msg, sm, m}
+}
+
+// handleResponse returns that the progress is progressed and finished if the
+// received wire.Message is a MsgBlock.
+func (c *checkpointedBlocksQuery) handleResponse(req, resp wire.Message,
+	peerAddr string) query.Progress {
+
+	block, ok := resp.(*wire.MsgBlock)
+	if !ok {
+		// We are only looking for block messages.
+		return query.Progress{
+			Finished:   false,
+			Progressed: false,
+		}
+	}
+
+	// If we didn't find this block in the map of blocks we're expecting,
+	// we're neither finished nor progressed.
+	hash := block.BlockHash()
+	_, found := c.blocks[hash]
+	if !found {
+		log.Warnf("Got unrequested block %v from %s -- disconnecting",
+			hash, peerAddr)
+
+		done := make(chan struct{})
+		c.sm.queuePeerToBeDisconnected(peerAddr, c.blocks, done)
+
+		// Block until we disconnect the peer.
+		<-done
+
+		return query.Progress{
+			Finished:   false,
+			Progressed: false,
+		}
+	}
+	delete(c.blocks, hash)
+
+	// If we have blocks we're expecting, we've progressed but not finished.
+	if len(c.blocks) > 0 {
+		return query.Progress{
+			Finished:   false,
+			Progressed: true,
+		}
+	}
+
+	// We have no more blocks we're expecting from heres so we're finished.
+	return query.Progress{
+		Finished:   true,
+		Progressed: true,
+	}
+}
+
+// requests returns a slice of query.Request that can be queued to
+// query.WorkManager.
+func (c *checkpointedBlocksQuery) requests() []*query.Request {
+	req := &query.Request{
+		Req:        c.msg,
+		HandleResp: c.handleResponse,
+	}
+
+	return []*query.Request{req}
 }
 
 // SyncManager is used to communicate block related messages with peers. The
@@ -1402,6 +1491,29 @@ out:
 			case isCurrentMsg:
 				msg.reply <- sm.current()
 
+			case peerDisconnectMsg:
+				found := false
+				for peer := range sm.peerStates {
+					if peer.Addr() == msg.peer {
+						peer.Disconnect()
+						found = true
+						// Remove requested blocks from the global map so that they will be
+						// fetched from elsewhere next time we get an inv.
+						// TODO: we could possibly here check which peers have these blocks
+						// and request them now to speed things up a little.
+						for blockHash := range msg.blocks {
+							delete(sm.requestedBlocks, blockHash)
+						}
+						break
+					}
+				}
+				if !found {
+					log.Debugf("Disconnect peer %v "+
+						"failed. Peer not found "+
+						"in peerStates", msg.peer)
+				}
+				msg.reply <- struct{}{}
+
 			case pauseMsg:
 				// Wait until the sender unpauses the manager.
 				<-msg.unpause
@@ -1532,6 +1644,13 @@ func (sm *SyncManager) NewPeer(peer *peerpkg.Peer) {
 		return
 	}
 	sm.msgChan <- &newPeerMsg{peer: peer}
+}
+
+// queuePeerToBeDisconnected takes in a string of a peer and passes it to the
+// message channel in order for the peer to be disconnected.  It's done in this
+// fashion to avoid hv
+func (sm *SyncManager) queuePeerToBeDisconnected(disconnectPeer string, blocks map[chainhash.Hash]struct{}, done chan struct{}) {
+	sm.msgChan <- peerDisconnectMsg{disconnectPeer, blocks, done}
 }
 
 // QueueTx adds the passed transaction message and peer to the block handling
