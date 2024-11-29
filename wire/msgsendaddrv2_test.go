@@ -45,7 +45,7 @@ func TestSendAddrV2(t *testing.T) {
 
 	// Older protocol versions should fail encode since message didn't
 	// exist yet.
-	oldPver := SendAddrV2Version - 1
+	oldPver := AddrV2Version - 1
 	err = msg.BtcEncode(&buf, oldPver, enc)
 	if err == nil {
 		s := "encode of MsgSendAddrV2 passed for old protocol " +
@@ -72,10 +72,10 @@ func TestSendAddrV2(t *testing.T) {
 }
 
 // TestSendAddrV2BIP0130 tests the MsgSendAddrV2 API against the protocol
-// prior to version SendAddrV2Version.
+// prior to version AddrV2Version.
 func TestSendAddrV2BIP0130(t *testing.T) {
-	// Use the protocol version just prior to SendAddrV2Version changes.
-	pver := SendAddrV2Version - 1
+	// Use the protocol version just prior to AddrV2Version changes.
+	pver := AddrV2Version - 1
 	enc := BaseEncoding
 
 	msg := NewMsgSendAddrV2()
@@ -98,7 +98,7 @@ func TestSendAddrV2BIP0130(t *testing.T) {
 }
 
 // TestSendAddrV2CrossProtocol tests the MsgSendAddrV2 API when encoding with
-// the latest protocol version and decoding with SendAddrV2Version.
+// the latest protocol version and decoding with AddrV2Version.
 func TestSendAddrV2CrossProtocol(t *testing.T) {
 	enc := BaseEncoding
 	msg := NewMsgSendAddrV2()
@@ -113,7 +113,7 @@ func TestSendAddrV2CrossProtocol(t *testing.T) {
 
 	// Decode with old protocol version.
 	readmsg := NewMsgSendAddrV2()
-	err = readmsg.BtcDecode(&buf, SendAddrV2Version, enc)
+	err = readmsg.BtcDecode(&buf, AddrV2Version, enc)
 	if err != nil {
 		t.Errorf("decode of MsgSendAddrV2 failed [%v] err <%v>", buf,
 			err)
@@ -142,21 +142,21 @@ func TestSendAddrV2Wire(t *testing.T) {
 			BaseEncoding,
 		},
 
-		// Protocol version SendAddrV2Version+1
+		// Protocol version AddrV2Version+1
 		{
 			msgSendAddrV2,
 			msgSendAddrV2,
 			msgSendAddrV2Encoded,
-			SendAddrV2Version + 1,
+			AddrV2Version + 1,
 			BaseEncoding,
 		},
 
-		// Protocol version SendAddrV2Version
+		// Protocol version AddrV2Version
 		{
 			msgSendAddrV2,
 			msgSendAddrV2,
 			msgSendAddrV2Encoded,
-			SendAddrV2Version,
+			AddrV2Version,
 			BaseEncoding,
 		},
 	}

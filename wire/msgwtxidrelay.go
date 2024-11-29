@@ -19,7 +19,7 @@ type MsgWTxIdRelay struct{}
 // BtcDecode decodes r using the bitcoin protocol encoding into the receiver.
 // This is part of the Message interface implementation.
 func (msg *MsgWTxIdRelay) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) error {
-	if pver < WTxIdRelayVersion {
+	if pver < AddrV2Version {
 		str := fmt.Sprintf("wtxidrelay message invalid for protocol "+
 			"version %d", pver)
 		return messageError("MsgWTxIdRelay.BtcDecode", str)
@@ -31,7 +31,7 @@ func (msg *MsgWTxIdRelay) BtcDecode(r io.Reader, pver uint32, enc MessageEncodin
 // BtcEncode encodes the receiver to w using the bitcoin protocol encoding.
 // This is part of the Message interface implementation.
 func (msg *MsgWTxIdRelay) BtcEncode(w io.Writer, pver uint32, enc MessageEncoding) error {
-	if pver < WTxIdRelayVersion {
+	if pver < AddrV2Version {
 		str := fmt.Sprintf("wtxidrelay message invalid for protocol "+
 			"version %d", pver)
 		return messageError("MsgWTxIdRelay.BtcEncode", str)
