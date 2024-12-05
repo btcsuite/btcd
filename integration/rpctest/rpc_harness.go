@@ -303,10 +303,12 @@ func (h *Harness) SetUp(createTestChain bool, numMatureOutputs uint32) error {
 func (h *Harness) tearDown() error {
 	if h.Client != nil {
 		h.Client.Shutdown()
+		h.Client.WaitForShutdown()
 	}
 
 	if h.BatchClient != nil {
 		h.BatchClient.Shutdown()
+		h.BatchClient.WaitForShutdown()
 	}
 
 	if err := h.node.shutdown(); err != nil {
@@ -570,10 +572,10 @@ func NextAvailablePortForProcess(pid int) int {
 		os.TempDir(), fmt.Sprintf("rpctest-port-pid-%d.lock", pid),
 	)
 	timeout := time.After(time.Second)
-	
+
 	var (
 		lockFileHandle *os.File
-		err error
+		err            error
 	)
 	for {
 		// Attempt to acquire the lock file. If it already exists, wait
