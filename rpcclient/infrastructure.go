@@ -1232,6 +1232,11 @@ type ConnConfig struct {
 	// the wire in cleartext.
 	DisableTLS bool
 
+	// DisableTLSVerify specifies whether TLS certificates should be checked.
+	// Disabling the check will allow potential man-in-the-middle attack. For
+	// testing only
+	DisableTLSVerify bool
+
 	// Certificates are the bytes for a PEM-encoded certificate chain used
 	// for the TLS connection.  It has no effect if the DisableTLS parameter
 	// is true.
@@ -1337,6 +1342,10 @@ func newHTTPClient(config *ConnConfig) (*http.Client, error) {
 			tlsConfig = &tls.Config{
 				RootCAs: pool,
 			}
+		} else {
+			tlsConfig = &tls.Config{
+				InsecureSkipVerify: config.DisableTLSVerify,
+			}
 		}
 	}
 
@@ -1403,6 +1412,8 @@ func dial(config *ConnConfig) (*websocket.Conn, error) {
 			pool := x509.NewCertPool()
 			pool.AppendCertsFromPEM(config.Certificates)
 			tlsConfig.RootCAs = pool
+		} else {
+			tlsConfig.InsecureSkipVerify = config.DisableTLSVerify
 		}
 		scheme = "wss"
 	}
