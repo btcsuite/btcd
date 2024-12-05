@@ -189,6 +189,8 @@ type Params struct {
 	// regtest like networks.
 	PoWNoRetargeting bool
 
+	EnforceBIP94 bool
+
 	// These fields define the block heights at which the specified softfork
 	// BIP became active.
 	BIP0034Height int32
@@ -297,6 +299,7 @@ var MainNetParams = Params{
 	GenesisHash:              &genesisHash,
 	PowLimit:                 mainPowLimit,
 	PowLimitBits:             0x1d00ffff,
+	EnforceBIP94:             false,
 	BIP0034Height:            227931, // 000000000000024b89b42a942fe0d9fea3bb44ab7bd1b19115dd6a759c0808b8
 	BIP0065Height:            388381, // 000000000000000004c2b624ed5d7756c508d90fd0da2c7c679febfa6c4735f0
 	BIP0066Height:            363725, // 00000000000000000379eaa19dce8c9b722d46ae6a57c2f1a988119488b50931
@@ -445,6 +448,7 @@ var RegressionNetParams = Params{
 	PowLimitBits:             0x207fffff,
 	PoWNoRetargeting:         true,
 	CoinbaseMaturity:         100,
+	EnforceBIP94:             false,
 	BIP0034Height:            100000000, // Not active - Permit ver 1 blocks
 	BIP0065Height:            1351,      // Used by regression tests
 	BIP0066Height:            1251,      // Used by regression tests
@@ -556,6 +560,7 @@ var TestNet3Params = Params{
 	GenesisHash:              &testNet3GenesisHash,
 	PowLimit:                 testNet3PowLimit,
 	PowLimitBits:             0x1d00ffff,
+	EnforceBIP94:             false,
 	BIP0034Height:            21111,  // 0000000023b3a96d3484e5abb3755c413e7d41500f8e2a5c3f0dd01299cd8ef8
 	BIP0065Height:            581885, // 00000000007f6655f22f98e72ed80d8b06dc761d5da09df0fa1dc4be4f861eb6
 	BIP0066Height:            330776, // 000000002104c8c45e99a8853285a3b592602a3ccde2b832481da85e9e4ba182
@@ -673,6 +678,87 @@ var TestNet3Params = Params{
 	HDCoinType: 1,
 }
 
+var TestNet4Params = Params{
+	Name:        "testnet4",
+	Net:         wire.TestNet4,
+	DefaultPort: "48333",
+	DNSSeeds: []DNSSeed{
+		{"seed.testnet4.bitcoin.sprovoost.nl", true},
+		{"seed.testnet4.wiz.biz", true},
+	},
+
+	//// Chain parameters
+	GenesisBlock:             &testNet4GenesisBlock,
+	GenesisHash:              &testNet4GenesisHash,
+	PowLimit:                 testNet3PowLimit,
+	PowLimitBits:             0x1d00ffff,
+	EnforceBIP94:             true,
+	BIP0034Height:            1,
+	BIP0065Height:            1,
+	BIP0066Height:            1,
+	CoinbaseMaturity:         100,
+	SubsidyReductionInterval: 210000,
+	TargetTimespan:           time.Hour * 24 * 14, // 14 days
+	TargetTimePerBlock:       time.Minute * 10,    // 10 minutes
+	RetargetAdjustmentFactor: 4,                   // 25% less, 400% more
+	ReduceMinDifficulty:      true,
+	MinDiffReductionTime:     time.Minute * 20, // TargetTimePerBlock * 2
+	GenerateSupported:        false,
+
+	// Checkpoints ordered from oldest to newest.
+	Checkpoints: []Checkpoint{},
+
+	// Consensus rule change deployments.
+	//
+	// The miner confirmation window is defined as:
+	//   target proof of work timespan / target proof of work spacing
+	RuleChangeActivationThreshold: 1512, // 75% of MinerConfirmationWindow
+	MinerConfirmationWindow:       2016,
+	Deployments: [DefinedDeployments]ConsensusDeployment{
+		DeploymentTestDummy: {
+			BitNumber: 28,
+			DeploymentStarter: NewMedianTimeDeploymentStarter(
+				time.Unix(1199145601, 0), // January 1, 2008 UTC
+			),
+			DeploymentEnder: NewMedianTimeDeploymentEnder(
+				time.Unix(1230767999, 0), // December 31, 2008 UTC
+			),
+		},
+		DeploymentTaproot: {
+			BitNumber: 2,
+			DeploymentStarter: NewMedianTimeDeploymentStarter(
+				time.Unix(0, 0), // Always true
+			),
+			DeploymentEnder: NewMedianTimeDeploymentEnder(
+				time.Unix(0, 0), // Always true
+			),
+			MinActivationHeight: 0,
+		},
+	},
+
+	// Mempool parameters
+	RelayNonStdTxs: true,
+
+	// Human-readable part for Bech32 encoded segwit addresses, as defined in
+	// BIP 173.
+	Bech32HRPSegwit: "tb", // always tb for test net
+
+	// Address encoding magics
+	PubKeyHashAddrID:        0x6f, // starts with m or n
+	ScriptHashAddrID:        0xc4, // starts with 2
+	WitnessPubKeyHashAddrID: 0x03, // starts with QW
+	WitnessScriptHashAddrID: 0x28, // starts with T7n
+	PrivateKeyID:            0xef, // starts with 9 (uncompressed) or c (compressed)
+
+	// BIP32 hierarchical deterministic extended key magics
+	HDPrivateKeyID: [4]byte{0x04, 0x35, 0x83, 0x94}, // starts with tprv
+	HDPublicKeyID:  [4]byte{0x04, 0x35, 0x87, 0xcf}, // starts with tpub
+
+	// BIP44 coin type used in the hierarchical deterministic path for
+	// address generation.
+	HDCoinType: 1,
+}
+
 // SimNetParams defines the network parameters for the simulation test Bitcoin
 // network.  This network is similar to the normal test network except it is
 // intended for private use within a group of individuals doing simulation
@@ -691,6 +777,7 @@ var SimNetParams = Params{
 	GenesisHash:              &simNetGenesisHash,
 	PowLimit:                 simNetPowLimit,
 	PowLimitBits:             0x207fffff,
+	EnforceBIP94:             false,
 	BIP0034Height:            0, // Always active on simnet
 	BIP0065Height:            0, // Always active on simnet
 	BIP0066Height:            0, // Always active on simnet
@@ -819,6 +906,7 @@ func CustomSignetParams(challenge []byte, dnsSeeds []DNSSeed) Params {
 		GenesisHash:              &sigNetGenesisHash,
 		PowLimit:                 sigNetPowLimit,
 		PowLimitBits:             0x1e0377ae,
+		EnforceBIP94:             false,
 		BIP0034Height:            1,
 		BIP0065Height:            1,
 		BIP0066Height:            1,
@@ -1075,6 +1163,7 @@ func init() {
 	// Register all default networks when the package is initialized.
 	mustRegister(&MainNetParams)
 	mustRegister(&TestNet3Params)
+	mustRegister(&TestNet4Params)
 	mustRegister(&RegressionNetParams)
 	mustRegister(&SimNetParams)
 }

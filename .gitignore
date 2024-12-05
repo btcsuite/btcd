@@ -46,6 +46,8 @@ btcutil/psbt/coverage.txt
 *.swo
 /.vim
 
+.idea
+
 # Binaries produced by "make build"
 /addblock
 /btcctl
