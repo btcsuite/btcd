@@ -2085,7 +2085,13 @@ func New(config *Config) (*SyncManager, error) {
 		&query.Config{
 			ConnectedPeers: sm.ConnectedPeers,
 			NewWorker:      query.NewWorker,
-			Ranking:        query.NewPeerRanking(),
+			OnMaxTries: func(peerString string) {
+				log.Infof("queuing %v to be disconnected", peerString)
+
+				done := make(chan struct{}, 1)
+				sm.queuePeerToBeDisconnected(peerString, nil, done)
+			},
+			Ranking: query.NewPeerRanking(),
 		},
 	)
 
