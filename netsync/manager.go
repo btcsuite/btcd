@@ -590,10 +590,17 @@ func (sm *SyncManager) handleNewPeerMsg(peer *peerpkg.Peer) {
 		return
 	}
 
-	log.Infof("New valid peer %s (%s)", peer, peer.UserAgent())
-
 	// Initialize the peer state.
 	isSyncCandidate := sm.isSyncCandidate(peer)
+	if !sm.current() && !isSyncCandidate {
+		log.Infof("New peer %s (%s) is not a valid sync candidate -- disconnecting",
+			peer, peer.UserAgent())
+		peer.Disconnect()
+		return
+	}
+
+	log.Infof("New valid peer %s (%s)", peer, peer.UserAgent())
+
 	sm.peerStates[peer] = &peerSyncState{
 		syncCandidate:   isSyncCandidate,
 		requestedTxns:   make(map[chainhash.Hash]struct{}),
