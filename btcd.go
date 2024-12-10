@@ -65,6 +65,11 @@ func btcdMain(serverChan chan<- *server) error {
 	// Show version at startup.
 	btcdLog.Infof("Version %s", version())
 
+	if cfg.TestNet3 {
+		btcdLog.Warn("Support for testnet3 is deprecated and will be removed in an upcoming release. " +
+			"Consider switching to testnet4.")
+	}
+
 	// Enable http profiling server if requested.
 	if cfg.Profile != "" {
 		go func() {
