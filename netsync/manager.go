@@ -138,6 +138,14 @@ type pauseMsg struct {
 	unpause <-chan struct{}
 }
 
+// peerDisconnectMsg is a message type to be sent across the message channel for
+// the disconnection of the given peer.
+type peerDisconnectMsg struct {
+	peer   string
+	blocks map[chainhash.Hash]struct{}
+	reply  chan struct{}
+}
+
 // headerNode is used as a node in a list of headers that are linked together
 // between checkpoints.
 type headerNode struct {
@@ -1503,6 +1511,29 @@ out:
 			case isCurrentMsg:
 				msg.reply <- sm.current()
 
+			case peerDisconnectMsg:
+				found := false
+				for peer := range sm.peerStates {
+					if peer.Addr() == msg.peer {
+						peer.Disconnect()
+						found = true
+						// Remove requested blocks from the global map so that they will be
+						// fetched from elsewhere next time we get an inv.
+						// TODO: we could possibly here check which peers have these blocks
+						// and request them now to speed things up a little.
+						for blockHash := range msg.blocks {
+							delete(sm.requestedBlocks, blockHash)
+						}
+						break
+					}
+				}
+				if !found {
+					log.Debugf("Disconnect peer %v "+
+						"failed. Peer not found "+
+						"in peerStates", msg.peer)
+				}
+				msg.reply <- struct{}{}
+
 			case pauseMsg:
 				// Wait until the sender unpauses the manager.
 				<-msg.unpause
@@ -1633,6 +1664,13 @@ func (sm *SyncManager) NewPeer(peer *peerpkg.Peer) {
 		return
 	}
 	sm.msgChan <- &newPeerMsg{peer: peer}
+}
+
+// queuePeerToBeDisconnected takes in a string of a peer and passes it to the
+// message channel in order for the peer to be disconnected.  It's done in this
+// fashion to avoid hv
+func (sm *SyncManager) queuePeerToBeDisconnected(disconnectPeer string, blocks map[chainhash.Hash]struct{}, done chan struct{}) {
+	sm.msgChan <- peerDisconnectMsg{disconnectPeer, blocks, done}
 }
 
 // QueueTx adds the passed transaction message and peer to the block handling
