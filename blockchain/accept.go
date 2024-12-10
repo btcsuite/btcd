@@ -6,6 +6,7 @@ package blockchain
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/database"
@@ -44,20 +45,36 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, flags BehaviorFlags)
 		return false, err
 	}
 
-	// Insert the block into the database if it's not already there.  Even
-	// though it is possible the block will ultimately fail to connect, it
-	// has already passed all proof-of-work and validity tests which means
-	// it would be prohibitively expensive for an attacker to fill up the
-	// disk with a bunch of blocks that fail to connect.  This is necessary
-	// since it allows block download to be decoupled from the much more
-	// expensive connection logic.  It also has some other nice properties
-	// such as making blocks that never become part of the main chain or
-	// blocks that fail to connect available for further analysis.
-	err = b.db.Update(func(dbTx database.Tx) error {
-		return dbStoreBlock(dbTx, block)
-	})
-	if err != nil {
-		return false, err
+	// Store the block in parallel if we're in headers first mode.  The
+	// headers were already checked and this block is under the checkpoint
+	// so it's safe to just add it to the database while the block
+	// validation is happening.
+	var wg sync.WaitGroup
+	var dbStoreError error
+	if flags&BFFastAdd == BFFastAdd {
+		go func() {
+			wg.Add(1)
+			defer wg.Done()
+			// Insert the block into the database if it's not already there.  Even
+			// though it is possible the block will ultimately fail to connect, it
+			// has already passed all proof-of-work and validity tests which means
+			// it would be prohibitively expensive for an attacker to fill up the
+			// disk with a bunch of blocks that fail to connect.  This is necessary
+			// since it allows block download to be decoupled from the much more
+			// expensive connection logic.  It also has some other nice properties
+			// such as making blocks that never become part of the main chain or
+			// blocks that fail to connect available for further analysis.
+			dbStoreError = b.db.Update(func(dbTx database.Tx) error {
+				return dbTx.StoreBlock(block)
+			})
+		}()
+	} else {
+		err = b.db.Update(func(dbTx database.Tx) error {
+			return dbStoreBlock(dbTx, block)
+		})
+		if err != nil {
+			return false, err
+		}
 	}
 
 	// Create a new block node for the block and add it to the node index. Even
@@ -89,6 +106,18 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, flags BehaviorFlags)
 		defer b.chainLock.Lock()
 		b.sendNotification(NTBlockAccepted, block)
 	}()
+
+	// Wait until the block is saved.  If there was a db error, then unset
+	// the data stored flag and flush the block index.
+	wg.Wait()
+	if dbStoreError != nil {
+		b.index.UnsetStatusFlags(newNode, statusDataStored)
+		err = b.index.flushToDB()
+		if err != nil {
+			return false, fmt.Errorf("%v. %v", err, dbStoreError)
+		}
+		return false, dbStoreError
+	}
 
 	return isMainChain, nil
 }
