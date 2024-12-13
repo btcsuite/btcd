@@ -1190,6 +1190,11 @@ func (sm *SyncManager) handleInvMsg(imsg *invMsg) {
 		}
 	}
 
+	// Don't request on inventory messages when we're in headers-first mode.
+	if sm.headersFirstMode {
+		return
+	}
+
 	// Request the advertised inventory if we don't already have it.  Also,
 	// request parent blocks of orphans if we receive one we already have.
 	// Finally, attempt to detect potential stalls due to long side chains
@@ -1208,11 +1213,6 @@ func (sm *SyncManager) handleInvMsg(imsg *invMsg) {
 		// Add the inventory to the cache of known inventory
 		// for the peer.
 		peer.AddKnownInventory(iv)
-
-		// Ignore inventory when we're in headers-first mode.
-		if sm.headersFirstMode {
-			continue
-		}
 
 		// Request the inventory if we don't already have it.
 		haveInv, err := sm.haveInventory(iv)
