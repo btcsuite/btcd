@@ -507,6 +507,54 @@ func (c *Client) GetBlockChainInfo() (*btcjson.GetBlockChainInfoResult, error) {
 	return c.GetBlockChainInfoAsync().Receive()
 }
 
+// FutureGetIndexInfoResult is a promise to deliver the result of a
+// GetIndexInfoAsync RPC invocation (or an applicable error).
+type FutureGetIndexInfoResult struct {
+	client   *Client
+	Response chan *Response
+}
+
+// unmarshalPartialGetIndexInfoResult unmarshals the response into an
+// instance of GetIndexInfoResult.
+func unmarshalPartialGetIndexInfoResult(res []byte) (*btcjson.GetIndexInfoResult, error) {
+	var indexInfo btcjson.GetIndexInfoResult
+	if err := json.Unmarshal(res, &indexInfo); err != nil {
+		return nil, err
+	}
+	return &indexInfo, nil
+}
+
+// Receive waits for the Response promised by the future and returns txindex info
+// result provided by the server.
+func (r FutureGetIndexInfoResult) Receive() (*btcjson.GetIndexInfoResult, error) {
+	res, err := ReceiveFuture(r.Response)
+	if err != nil {
+		return nil, err
+	}
+	indexInfo, err := unmarshalPartialGetIndexInfoResult(res)
+	if err != nil {
+		return nil, err
+	}
+
+	return indexInfo, nil
+}
+
+// GetIndexInfoAsync returns an instance of a type that can be used to get
+// the result of the RPC at some future time by invoking the Receive function
+// on the returned instance.
+func (c *Client) GetIndexInfoAsync() FutureGetIndexInfoResult {
+	cmd := btcjson.NewGetIndexInfoCmd()
+	return FutureGetIndexInfoResult{
+		client:   c,
+		Response: c.SendCmd(cmd),
+	}
+}
+
+// GetIndexInfo returns information related to the txindex state.
+func (c *Client) GetIndexInfo() (*btcjson.GetIndexInfoResult, error) {
+	return c.GetIndexInfoAsync().Receive()
+}
+
 // FutureGetBlockFilterResult is a future promise to deliver the result of a
 // GetBlockFilterAsync RPC invocation (or an applicable error).
 type FutureGetBlockFilterResult chan *Response
