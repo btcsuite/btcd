@@ -211,8 +211,9 @@ type SyncManager struct {
 // resetHeaderState sets the headers-first mode state to values appropriate for
 // syncing from a new peer.
 func (sm *SyncManager) resetHeaderState(newestHash *chainhash.Hash, newestHeight int32) {
-	sm.headerList.Init()
-	sm.startHeader = nil
+	if sm.headerList.Len() != 0 {
+		return
+	}
 
 	// When there is a next checkpoint, add an entry for the latest known
 	// block into the header pool.  This allows the next downloaded header
@@ -339,15 +340,47 @@ func (sm *SyncManager) startSync() {
 			sm.requestedBlocks = make(map[chainhash.Hash]struct{})
 		}
 
-		locator, err := sm.chain.LatestBlockLocator()
-		if err != nil {
-			log.Errorf("Failed to get block locator for the "+
-				"latest block: %v", err)
-			return
-		}
-
 		log.Infof("Syncing to block height %d from peer %v",
 			bestPeer.LastBlock(), bestPeer.Addr())
+
+		sm.syncPeer = bestPeer
+
+		// Reset the last progress time now that we have a non-nil
+		// syncPeer to avoid instantly detecting it as stalled in the
+		// event the progress time hasn't been updated recently.
+		sm.lastProgressTime = time.Now()
+
+		// Check if we have some headers already downloaded.
+		var locator blockchain.BlockLocator
+		if sm.headerList.Len() > 0 && sm.nextCheckpoint != nil {
+			e := sm.headerList.Back()
+			node := e.Value.(*headerNode)
+
+			// If the final hash equals next checkpoint, that
+			// means we've verified the downloaded headers and
+			// can start fetching blocks.
+			if node.hash.IsEqual(sm.nextCheckpoint.Hash) {
+				sm.startHeader = sm.headerList.Front()
+				sm.fetchHeaderBlocks()
+				return
+			}
+
+			// If the last hash doesn't equal the checkpoint,
+			// make the locator as the last hash.
+			locator = blockchain.BlockLocator(
+				[]*chainhash.Hash{node.hash})
+		}
+
+		// If we don't already have headers downloaded we need to fetch
+		// the block locator from chain.
+		if len(locator) == 0 {
+			locator, err = sm.chain.LatestBlockLocator()
+			if err != nil {
+				log.Errorf("Failed to get block locator for the "+
+					"latest block: %v", err)
+				return
+			}
+		}
 
 		// When the current height is less than a known checkpoint we
 		// can use block headers to learn about which blocks comprise
@@ -378,12 +411,6 @@ func (sm *SyncManager) startSync() {
 		} else {
 			bestPeer.PushGetBlocksMsg(locator, &zeroHash)
 		}
-		sm.syncPeer = bestPeer
-
-		// Reset the last progress time now that we have a non-nil
-		// syncPeer to avoid instantly detecting it as stalled in the
-		// event the progress time hasn't been updated recently.
-		sm.lastProgressTime = time.Now()
 	} else {
 		log.Warnf("No sync peer candidates available")
 	}
