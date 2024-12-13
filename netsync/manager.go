@@ -211,7 +211,6 @@ type SyncManager struct {
 // resetHeaderState sets the headers-first mode state to values appropriate for
 // syncing from a new peer.
 func (sm *SyncManager) resetHeaderState(newestHash *chainhash.Hash, newestHeight int32) {
-	sm.headersFirstMode = false
 	sm.headerList.Init()
 	sm.startHeader = nil
 
