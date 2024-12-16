@@ -6,6 +6,7 @@ package netsync
 
 import (
 	"container/list"
+	"fmt"
 	"math/rand"
 	"net"
 	"sync"
@@ -203,6 +204,7 @@ type SyncManager struct {
 	headerList       *list.List
 	startHeader      *list.Element
 	nextCheckpoint   *chaincfg.Checkpoint
+	queuedBlocks     map[chainhash.Hash]*blockMsg
 
 	// An optional fee estimator.
 	feeEstimator *mempool.FeeEstimator
@@ -940,6 +942,203 @@ func (sm *SyncManager) handleBlockMsg(bmsg *blockMsg) {
 	}
 }
 
+// handleBlockMsgHeadersFirst handles block messages from all peers when the
+// sync manager is in headers first mode.  For blocks received out of order, it
+// first keeps them in memory and sends them to be processed when the next block
+// from the tip is available.
+func (sm *SyncManager) handleBlockMsgHeadersFirst(bmsg *blockMsg) {
+	peer := bmsg.peer
+	_, exists := sm.peerStates[peer]
+	if !exists {
+		log.Warnf("Received block message from unknown peer %s", peer)
+		return
+	}
+
+	// If we didn't ask for this block then the peer is misbehaving.
+	blockHash := bmsg.block.Hash()
+	if _, exists = state.requestedBlocks[*blockHash]; !exists {
+		// The regression test intentionally sends some blocks twice
+		// to test duplicate block insertion fails.  Don't disconnect
+		// the peer or ignore the block when we're in regression test
+		// mode in this case so the chain code is actually fed the
+		// duplicate blocks.
+		if sm.chainParams != &chaincfg.RegressionNetParams {
+			log.Warnf("Got unrequested block %v from %s -- "+
+				"disconnecting", blockHash, peer.Addr())
+			peer.Disconnect()
+			return
+		}
+	}
+
+	haveInv, err := sm.haveInventory(&wire.InvVect{
+		Type: wire.InvTypeBlock,
+		Hash: *bmsg.block.Hash(),
+	})
+	if err != nil {
+		// This error should never happen since it's can only mean a
+		// database error.  We'll accept the block and if it's a
+		// duplicate, we'll just have an extra block in memory until
+		// we finish the headers-first download or we shutdown.
+		log.Warnf("failed to check if we already have block %v. %v",
+			bmsg.block.Hash(), err)
+	}
+	if haveInv {
+		log.Debugf("Ignoring duplicate block of %v during "+
+			"headers-first mode", bmsg.block.Hash())
+		return
+	}
+
+	// Add the block to the queue.
+	sm.queuedBlocks[*blockHash] = bmsg
+
+	// Log the progress as we have received the block.
+	sm.lastProgressTime = time.Now()
+
+	firstNodeEl := sm.headerList.Front()
+	if firstNodeEl == nil {
+		log.Errorf("missing first node in the headerlist on block %v",
+			bmsg.block.Hash())
+		return
+	}
+
+	// Look for blocks that we can process next.
+	processBlocks := make([]*blockMsg, 0, len(sm.queuedBlocks)+1)
+	var next *list.Element
+	for e := firstNodeEl; e != nil; e = next {
+		next = e.Next()
+		node, ok := e.Value.(*headerNode)
+		if !ok {
+			log.Warn("Header list node type is not a headerNode")
+			continue
+		}
+
+		b, found := sm.queuedBlocks[*node.hash]
+		if !found {
+			// Break when we're missing the next block in
+			// sequence.
+			break
+		}
+
+		// We have a block we can process so remove from the queue and
+		// add it to the processBlocks slice.
+		processBlocks = append(processBlocks, b)
+		delete(sm.queuedBlocks, *node.hash)
+
+		// Remove the block from the headerList.
+		//
+		// NOTE We leave in the checkpointed hash so that we can connect
+		// headers on the next get headers request.
+		if !node.hash.IsEqual(sm.nextCheckpoint.Hash) {
+			sm.headerList.Remove(e)
+		}
+	}
+
+	// If we have any blocks to process, process them now.
+	isCheckpointBlock := false
+	for _, processBlock := range processBlocks {
+		// Process the block to include validation, best chain selection, orphan
+		// handling, etc.
+		_, _, err := sm.chain.ProcessBlock(processBlock.block, blockchain.BFFastAdd)
+		if err != nil {
+			// This is a checkpointed block and therefore should never fail
+			// validation.  If it did, then the binary is likely corrupted.
+			if ruleErr, ok := err.(blockchain.RuleError); ok {
+				// If it's not a duplicate block error, we can panic.
+				if ruleErr.ErrorCode != blockchain.ErrDuplicateBlock {
+					panicErr := fmt.Errorf("Rejected checkpointed block %v from %s: %v"+
+						" -- The binary is likely corrupted and should "+
+						"not be trusted. Exiting.",
+						blockHash, peer, err)
+					panic(panicErr)
+				}
+			} else {
+				log.Errorf("Failed to process block %v: %v",
+					blockHash, err)
+			}
+			if dbErr, ok := err.(database.Error); ok && dbErr.ErrorCode ==
+				database.ErrCorruption {
+				panic(dbErr)
+			}
+		}
+
+		// Look for checkpointed blocks.
+		if processBlock.block.Hash().IsEqual(sm.nextCheckpoint.Hash) {
+			isCheckpointBlock = true
+		}
+
+		// If we have a lot of blocks we're processing, then the last
+		// progress time will be in the past and we may incorrectly
+		// punish a peer thus we need to update the lastProgressTime
+		// now.
+		sm.lastProgressTime = time.Now()
+		sm.progressLogger.LogBlockHeight(bmsg.block, sm.chain)
+	}
+
+	// This is headers-first mode, so if the block is not a checkpoint,
+	// request more blocks.
+	if !isCheckpointBlock {
+		if sm.startHeader != nil {
+			bestHeight := sm.chain.BestSnapshot().Height
+			node := sm.startHeader.Value.(*headerNode)
+
+			// Since fetchHeaderBlocks stops before requesting the
+			// startHeader, if the best height is the block before
+			// the startHeader, we've downloaded all the blocks
+			// within the blockDownloadWindow and should ask for
+			// more blocks.
+			if bestHeight+1 == node.height {
+				sm.fetchHeaderBlocks()
+			}
+		}
+		return
+	}
+
+	// This is headers-first mode and the block is a checkpoint.  When
+	// there is a next checkpoint, get the next round of headers by asking
+	// for headers starting from the block after this one up to the next
+	// checkpoint.
+	prevHeight := sm.nextCheckpoint.Height
+	prevHash := sm.nextCheckpoint.Hash
+	sm.nextCheckpoint = sm.findNextHeaderCheckpoint(prevHeight)
+	if sm.nextCheckpoint != nil {
+		locator := blockchain.BlockLocator([]*chainhash.Hash{prevHash})
+		err := peer.PushGetHeadersMsg(locator, sm.nextCheckpoint.Hash)
+		if err != nil {
+			log.Warnf("Failed to send getheaders message to "+
+				"peer %s: %v", peer.Addr(), err)
+			return
+		}
+		log.Infof("Downloading headers for blocks %d to %d from "+
+			"peer %s", prevHeight+1, sm.nextCheckpoint.Height,
+			peer.Addr())
+		return
+	}
+
+	// This is headers-first mode, the block is a checkpoint, and there are
+	// no more checkpoints, so switch to normal mode by requesting blocks
+	// from the block after this one up to the end of the chain (zero hash).
+	sm.headersFirstMode = false
+	sm.headerList.Init()
+	sm.queuedBlocks = nil
+
+	bestHash := sm.chain.BestSnapshot().Hash
+	log.Infof("Reached the final checkpoint -- switching to normal mode")
+	locator := blockchain.BlockLocator([]*chainhash.Hash{&bestHash})
+	if sm.syncPeer == nil {
+		// We call updateSyncPeer which will select a new sync peer and
+		// start requesting blocks from it.
+		sm.updateSyncPeer(false)
+		return
+	}
+
+	err = sm.syncPeer.PushGetBlocksMsg(locator, &zeroHash)
+	if err != nil {
+		log.Warnf("Failed to send getblocks message to peer %s: %v",
+			sm.syncPeer.Addr(), err)
+		return
+	}
+}
+
 // fetchHeaderBlocks creates and sends a request to the syncPeer for the next
 // list of blocks to be downloaded based on the current list of headers.
 func (sm *SyncManager) fetchHeaderBlocks() {
@@ -1410,7 +1609,11 @@ out:
 				msg.reply <- struct{}{}
 
 			case *blockMsg:
-				sm.handleBlockMsg(msg)
+				if sm.headersFirstMode {
+					sm.handleBlockMsgHeadersFirst(msg)
+				} else {
+					sm.handleBlockMsg(msg)
+				}
 				msg.reply <- struct{}{}
 
 			case *invMsg:
@@ -1729,6 +1932,7 @@ func New(config *Config) (*SyncManager, error) {
 		progressLogger:  newBlockProgressLogger("Processed", log),
 		msgChan:         make(chan interface{}, config.MaxPeers*3),
 		headerList:      list.New(),
+		queuedBlocks:    make(map[chainhash.Hash]*blockMsg),
 		quit:            make(chan struct{}),
 		feeEstimator:    config.FeeEstimator,
 	}
