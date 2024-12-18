@@ -1060,7 +1060,7 @@ func (sm *SyncManager) handleBlockMsg(bmsg *blockMsg) {
 // from the tip is available.
 func (sm *SyncManager) handleBlockMsgHeadersFirst(bmsg *blockMsg) {
 	peer := bmsg.peer
-	state, exists := sm.peerStates[peer]
+	_, exists := sm.peerStates[peer]
 	if !exists {
 		log.Warnf("Received block message from unknown peer %s", peer)
 		return
@@ -1069,9 +1069,6 @@ func (sm *SyncManager) handleBlockMsgHeadersFirst(bmsg *blockMsg) {
 
 	// Add the block to the queue.
 	sm.queuedBlocks[*blockHash] = bmsg
-
-	// Remove block from the request map as we've added it to queuedBlocks.
-	delete(state.requestedBlocks, *blockHash)
 
 	// Log the progress as we have received the block.
 	sm.lastProgressTime = time.Now()
@@ -1156,13 +1153,21 @@ func (sm *SyncManager) handleBlockMsgHeadersFirst(bmsg *blockMsg) {
 		sm.progressLogger.LogBlockHeight(bmsg.block, sm.chain)
 	}
 
-	// This is headers-first mode, so if the block is not a checkpoint
-	// request more blocks using the header list when the request queue is
-	// getting short.
+	// This is headers-first mode, so if the block is not a checkpoint,
+	// request more blocks.
 	if !isCheckpointBlock {
-		if sm.startHeader != nil &&
-			len(state.requestedBlocks) < minInFlightBlocks {
-			sm.fetchHeaderBlocks()
+		if sm.startHeader != nil {
+			bestHeight := sm.chain.BestSnapshot().Height
+			node := sm.startHeader.Value.(*headerNode)
+
+			// Since fetchHeaderBlocks stops before requesting the
+			// startHeader, if the best height is the block before
+			// the startHeader, we've downloaded all the blocks
+			// within the blockDownloadWindow and should ask for
+			// more blocks.
+			if bestHeight+1 == node.height {
+				sm.fetchHeaderBlocks()
+			}
 		}
 		return
 	}
@@ -1252,14 +1257,6 @@ func (sm *SyncManager) fetchHeaderBlocks() {
 		// Prevent the blocks from being too out of order.
 		if node.height-blockDownloadWindow > bestHeight {
 			break
-		}
-
-		// Check if the block is already requested.  If it is just move
-		// to the next block.
-		_, requested := sm.requestedBlocks[*node.hash]
-		if requested {
-			sm.startHeader = e.Next()
-			continue
 		}
 
 		// Check if the block is already queued.  If it is just move to
