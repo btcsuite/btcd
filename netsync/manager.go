@@ -733,6 +733,9 @@ func (sm *SyncManager) handleBlockMsg(bmsg *blockMsg) {
 			}
 		}
 	}
+	if sm.chainParams.Net == wire.TestNet4 {
+		behaviorFlags |= blockchain.BFEnforceBIP94
+	}
 
 	// Remove block from request maps. Either chain will know about it and
 	// so we shouldn't have any more instances of trying to fetch it, or we
@@ -751,6 +754,7 @@ func (sm *SyncManager) handleBlockMsg(bmsg *blockMsg) {
 		if _, ok := err.(blockchain.RuleError); ok {
 			log.Infof("Rejected block %v from %s: %v", blockHash,
 				peer, err)
+			panic(err)
 		} else {
 			log.Errorf("Failed to process block %v: %v",
 				blockHash, err)
@@ -1486,7 +1490,6 @@ func (sm *SyncManager) handleBlockchainNotification(notification *blockchain.Not
 		// Register block with the fee estimator, if it exists.
 		if sm.feeEstimator != nil {
 			err := sm.feeEstimator.RegisterBlock(block)
-
 			// If an error is somehow generated then the fee estimator
 			// has entered an invalid state. Since it doesn't know how
 			// to recover, create a new one.
