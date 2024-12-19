@@ -6,6 +6,7 @@ package netsync
 
 import (
 	"fmt"
+	"sort"
 	"sync"
 	"time"
 
@@ -81,4 +82,78 @@ func (b *blockProgressLogger) LogBlockHeight(block *btcutil.Block, chain *blockc
 
 func (b *blockProgressLogger) SetLastLogTime(time time.Time) {
 	b.lastBlockLogTime = time
+}
+
+// peerLogger logs the progress of blocks downloaded from different peers during
+// headers-first download.
+type peerLogger struct {
+	lastPeerLogTime time.Time
+	peers           map[string]int
+
+	subsystemLogger btclog.Logger
+	sync.Mutex
+}
+
+// newPeerLogger returns a new peerLogger with fields initialized.
+func newPeerLogger(logger btclog.Logger) *peerLogger {
+	return &peerLogger{
+		lastPeerLogTime: time.Now(),
+		subsystemLogger: logger,
+		peers:           make(map[string]int),
+	}
+}
+
+// LogPeers logs how many blocks have been received from which peers in the last
+// 10 seconds.
+func (p *peerLogger) LogPeers(peer string) {
+	p.Lock()
+	defer p.Unlock()
+
+	count, found := p.peers[peer]
+	if found {
+		count++
+		p.peers[peer] = count
+	} else {
+		p.peers[peer] = 1
+	}
+
+	now := time.Now()
+	duration := now.Sub(p.lastPeerLogTime)
+	if duration < time.Second*10 {
+		return
+	}
+	// Truncate the duration to 10s of milliseconds.
+	durationMillis := int64(duration / time.Millisecond)
+	tDuration := 10 * time.Millisecond * time.Duration(durationMillis/10)
+
+	type peerInfo struct {
+		name  string
+		count int
+	}
+
+	// Sort by blocks downloaded before printing.
+	var sortedPeers []peerInfo
+	for k, v := range p.peers {
+		sortedPeers = append(sortedPeers, peerInfo{k, v})
+	}
+	sort.Slice(sortedPeers, func(i, j int) bool {
+		return sortedPeers[i].count > sortedPeers[j].count
+	})
+
+	totalBlocks := 0
+	peerDownloadStr := ""
+	for _, sortedPeer := range sortedPeers {
+		peerDownloadStr += fmt.Sprintf("%d blocks from %v, ",
+			sortedPeer.count, sortedPeer.name)
+		totalBlocks += sortedPeer.count
+	}
+
+	p.subsystemLogger.Infof("Peer download stats in the last %s. total: %v, %s",
+		tDuration, totalBlocks, peerDownloadStr)
+
+	// Reset fields.
+	p.lastPeerLogTime = now
+	for k := range p.peers {
+		delete(p.peers, k)
+	}
 }
