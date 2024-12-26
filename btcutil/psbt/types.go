@@ -13,22 +13,22 @@ const (
 	// invalid.
 	UnsignedTxType GlobalType = 0
 
-	// XpubType houses a global xpub for the entire PSBT packet.
+	// XPubType houses a global xPub for the entire PSBT packet.
 	//
-	// The key ({0x01}|{xpub}) is he 78 byte serialized extended public key
-	// as defined by BIP 32.  Extended public keys are those that can be
+	// The key ({0x01}|{xpub}) is the 78 byte serialized extended public key
+	// as defined by BIP-0032. Extended public keys are those that can be
 	// used to derive public keys used in the inputs and outputs of this
 	// transaction. It should be the public key at the highest hardened
-	// derivation index so that
-	// the unhardened child keys used in the transaction can be derived.
+	// derivation index so that the unhardened child keys used in the
+	// transaction can be derived.
 	//
-	// The value is the master key fingerprint as defined by BIP 32
+	// The value is the master key fingerprint as defined by BIP-0032
 	// concatenated with the derivation path of the public key. The
 	// derivation path is represented as 32-bit little endian unsigned
-	// integer indexes concatenated with each other. The number of 32 bit
+	// integer indexes concatenated with each other. The number of 32-bit
 	// unsigned integer indexes must match the depth provided in the
 	// extended public key.
-	XpubType GlobalType = 1
+	XPubType GlobalType = 1
 
 	// VersionType houses the global version number of this PSBT. There is
 	// no key (only contains the byte type), then the value if omitted, is

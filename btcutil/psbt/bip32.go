@@ -5,6 +5,11 @@ import (
 	"encoding/binary"
 )
 
+const (
+	// uint32Size is the size of a uint32 in bytes.
+	uint32Size = 4
+)
+
 // Bip32Derivation encapsulates the data for the input and output
 // Bip32Derivation key-value fields.
 //
@@ -38,21 +43,23 @@ func (s Bip32Sorter) Less(i, j int) bool {
 
 // ReadBip32Derivation deserializes a byte slice containing chunks of 4 byte
 // little endian encodings of uint32 values, the first of which is the
-// masterkeyfingerprint and the remainder of which are the derivation path.
+// MasterKeyFingerprint and the remainder of which are the derivation path.
 func ReadBip32Derivation(path []byte) (uint32, []uint32, error) {
 	// BIP-0174 defines the derivation path being encoded as
 	//   "<32-bit uint> <32-bit uint>*"
 	// with the asterisk meaning 0 to n times. Which in turn means that an
 	// empty path is valid, only the key fingerprint is mandatory.
-	if len(path)%4 != 0 {
+	if len(path)%uint32Size != 0 {
 		return 0, nil, ErrInvalidPsbtFormat
 	}
 
-	masterKeyInt := binary.LittleEndian.Uint32(path[:4])
+	masterKeyInt := binary.LittleEndian.Uint32(path[:uint32Size])
 
 	var paths []uint32
-	for i := 4; i < len(path); i += 4 {
-		paths = append(paths, binary.LittleEndian.Uint32(path[i:i+4]))
+	for i := uint32Size; i < len(path); i += uint32Size {
+		paths = append(paths, binary.LittleEndian.Uint32(
+			path[i:i+uint32Size],
+		))
 	}
 
 	return masterKeyInt, paths, nil
@@ -65,15 +72,15 @@ func ReadBip32Derivation(path []byte) (uint32, []uint32, error) {
 func SerializeBIP32Derivation(masterKeyFingerprint uint32,
 	bip32Path []uint32) []byte {
 
-	var masterKeyBytes [4]byte
+	var masterKeyBytes [uint32Size]byte
 	binary.LittleEndian.PutUint32(masterKeyBytes[:], masterKeyFingerprint)
 
-	derivationPath := make([]byte, 0, 4+4*len(bip32Path))
+	derivationPath := make([]byte, 0, uint32Size+uint32Size*len(bip32Path))
 	derivationPath = append(derivationPath, masterKeyBytes[:]...)
 	for _, path := range bip32Path {
-		var pathbytes [4]byte
-		binary.LittleEndian.PutUint32(pathbytes[:], path)
-		derivationPath = append(derivationPath, pathbytes[:]...)
+		var pathBytes [uint32Size]byte
+		binary.LittleEndian.PutUint32(pathBytes[:], path)
+		derivationPath = append(derivationPath, pathBytes[:]...)
 	}
 
 	return derivationPath
