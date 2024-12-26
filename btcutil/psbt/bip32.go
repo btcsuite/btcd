@@ -3,6 +3,10 @@ package psbt
 import (
 	"bytes"
 	"encoding/binary"
+
+	"github.com/btcsuite/btcd/btcutil/base58"
+	"github.com/btcsuite/btcd/btcutil/hdkeychain"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 )
 
 const (
@@ -84,4 +88,69 @@ func SerializeBIP32Derivation(masterKeyFingerprint uint32,
 	}
 
 	return derivationPath
+}
+
+// XPub is a struct that encapsulates an extended public key, as defined in
+// BIP-0032.
+type XPub struct {
+	// ExtendedKey is the serialized extended public key as defined in
+	// BIP-0032.
+	ExtendedKey []byte
+
+	// MasterFingerprint is the fingerprint of the master pubkey.
+	MasterKeyFingerprint uint32
+
+	// Bip32Path is the derivation path of the key, with hardened elements
+	// having the 0x80000000 offset added, as defined in BIP-0032. The
+	// number of path elements must match the depth provided in the extended
+	// public key.
+	Bip32Path []uint32
+}
+
+// ReadXPub deserializes a byte slice containing an extended public key and a
+// BIP-0032 derivation path.
+func ReadXPub(keyData []byte, path []byte) (*XPub, error) {
+	xPub, err := DecodeExtendedKey(keyData)
+	if err != nil {
+		return nil, ErrInvalidPsbtFormat
+	}
+	numPathElements := xPub.Depth()
+
+	// The path also contains the master key fingerprint,
+	expectedSize := int(uint32Size * (numPathElements + 1))
+	if len(path) != expectedSize {
+		return nil, ErrInvalidPsbtFormat
+	}
+
+	masterKeyFingerprint, bip32Path, err := ReadBip32Derivation(path)
+	if err != nil {
+		return nil, err
+	}
+
+	return &XPub{
+		ExtendedKey:          keyData,
+		MasterKeyFingerprint: masterKeyFingerprint,
+		Bip32Path:            bip32Path,
+	}, nil
+}
+
+// EncodeExtendedKey serializes an extended key to a byte slice, without the
+// checksum.
+func EncodeExtendedKey(key *hdkeychain.ExtendedKey) []byte {
+	serializedKey := key.String()
+	decodedKey := base58.Decode(serializedKey)
+	return decodedKey[:len(decodedKey)-uint32Size]
+}
+
+// DecodeExtendedKey deserializes an extended key from a byte slice that does
+// not contain the checksum.
+func DecodeExtendedKey(encodedKey []byte) (*hdkeychain.ExtendedKey, error) {
+	checkSum := chainhash.DoubleHashB(encodedKey)[:uint32Size]
+	serializedBytes := append(encodedKey, checkSum...)
+	xPub, err := hdkeychain.NewKeyFromString(base58.Encode(serializedBytes))
+	if err != nil {
+		return nil, err
+	}
+
+	return xPub, nil
 }
