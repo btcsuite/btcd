@@ -30,6 +30,10 @@ const (
 	// extended public key.
 	XpubType GlobalType = 1
 
+	// SilentPaymentShareType is used to house the ECDH shares for silent
+	// payments.
+	SilentPaymentShareType GlobalType = 0x07
+
 	// VersionType houses the global version number of this PSBT. There is
 	// no key (only contains the byte type), then the value if omitted, is
 	// assumed to be zero.
