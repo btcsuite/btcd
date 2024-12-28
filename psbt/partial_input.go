@@ -29,6 +29,7 @@ type PInput struct {
 	TaprootBip32Derivation []*TaprootBip32Derivation
 	TaprootInternalKey     []byte
 	TaprootMerkleRoot      []byte
+	SilentPaymentShares    []SilentPaymentShare
 	Unknowns               []*Unknown
 }
 
@@ -362,6 +363,23 @@ func (pi *PInput) deserialize(r io.Reader) error {
 
 			pi.TaprootMerkleRoot = value
 
+		case SilentPaymentShareInputType:
+			share, err := ReadSilentPaymentShare(keyData, value)
+			if err != nil {
+				return err
+			}
+
+			// Duplicate keys are not allowed.
+			for _, x := range pi.SilentPaymentShares {
+				if x.EqualKey(share) {
+					return ErrDuplicateKey
+				}
+			}
+
+			pi.SilentPaymentShares = append(
+				pi.SilentPaymentShares, *share,
+			)
+
 		default:
 			// A fall through case for any proprietary types.
 			keyCodeAndData := append(
@@ -585,6 +603,20 @@ func (pi *PInput) serialize(w io.Writer) error {
 			err := serializeKVPairWithType(
 				w, uint8(TaprootMerkleRootType), nil,
 				pi.TaprootMerkleRoot,
+			)
+			if err != nil {
+				return err
+			}
+		}
+
+		// Serialize the input's silent payment shares.
+		for _, share := range pi.SilentPaymentShares {
+			keyBytes, valueBytes := SerializeSilentPaymentShare(
+				&share,
+			)
+			err := serializeKVPairWithType(
+				w, uint8(SilentPaymentShareInputType), keyBytes,
+				valueBytes,
 			)
 			if err != nil {
 				return err
