@@ -33,6 +33,10 @@ const (
 	// SilentPaymentShareType is used to house the ECDH shares for silent
 	// payments.
 	SilentPaymentShareType GlobalType = 0x07
+	
+	// SilentPaymentDLEQType is used to house the DLEQ proofs for silent
+	// payments.
+	SilentPaymentDLEQType GlobalType = 0x08
 
 	// VersionType houses the global version number of this PSBT. There is
 	// no key (only contains the byte type), then the value if omitted, is

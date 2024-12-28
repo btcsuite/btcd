@@ -125,3 +125,78 @@ func SerializeSilentPaymentShare(share *SilentPaymentShare) ([]byte, []byte) {
 
 	return keyData, share.Share
 }
+
+// SilentPaymentDLEQ is a DLEQ proof for a silent payment share.
+type SilentPaymentDLEQ struct {
+	// ScanKey is the silent payment recipient's scan key.
+	ScanKey []byte
+
+	// OutPoints is the list of outpoints the share proof is for.
+	OutPoints []wire.OutPoint
+
+	// Proof is the DLEQ proof for the share with the same key.
+	Proof []byte
+}
+
+// EqualKey returns true if this silent payment DLEQ's key data is the same as
+// the given silent payment DLEQ.
+func (d *SilentPaymentDLEQ) EqualKey(other *SilentPaymentDLEQ) bool {
+	if !bytes.Equal(d.ScanKey, other.ScanKey) {
+		return false
+	}
+
+	return equalOutPoints(d.OutPoints, other.OutPoints)
+}
+
+// ReadSilentPaymentDLEQ deserializes a silent payment DLEQ proof from the given
+// key data and value.
+func ReadSilentPaymentDLEQ(keyData, value []byte) (*SilentPaymentDLEQ, error) {
+	// There must be at least the scan key in the key data.
+	if len(keyData) < secp.PubKeyBytesLenCompressed {
+		return nil, ErrInvalidKeyData
+	}
+
+	// The remaining bytes of the key data are outpoints.
+	outPointsLen := len(keyData) - secp.PubKeyBytesLenCompressed
+	if outPointsLen%outPointSize != 0 {
+		return nil, ErrInvalidKeyData
+	}
+
+	// The proof must be 64 bytes.
+	if len(value) != 64 {
+		return nil, ErrInvalidPsbtFormat
+	}
+
+	share := &SilentPaymentDLEQ{
+		ScanKey:   keyData[:secp.PubKeyBytesLenCompressed],
+		OutPoints: make([]wire.OutPoint, outPointsLen/outPointSize),
+		Proof:     value,
+	}
+
+	for i := 0; i < outPointsLen; i += outPointSize {
+		idx := i / outPointSize
+		copy(share.OutPoints[idx].Hash[:], keyData[i:i+sha256.Size])
+		share.OutPoints[idx].Index = binary.LittleEndian.Uint32(
+			keyData[i+sha256.Size : i+sha256.Size+uint32Size],
+		)
+	}
+
+	return share, nil
+}
+
+// SerializeSilentPaymentDLEQ serializes a silent payment DLEQ proof to key data
+// and value.
+func SerializeSilentPaymentDLEQ(dleq *SilentPaymentDLEQ) ([]byte, []byte) {
+	keyData := make(
+		[]byte, 0, len(dleq.ScanKey)+len(dleq.OutPoints)*outPointSize,
+	)
+	keyData = append(keyData, dleq.ScanKey...)
+	for _, outPoint := range dleq.OutPoints {
+		keyData = append(keyData, outPoint.Hash[:]...)
+		var idx [4]byte
+		binary.LittleEndian.PutUint32(idx[:], outPoint.Index)
+		keyData = append(keyData, idx[:]...)
+	}
+
+	return keyData, dleq.Proof
+}
