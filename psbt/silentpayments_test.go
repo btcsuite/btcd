@@ -45,6 +45,12 @@ func TestSilentPaymentsPacket(t *testing.T) {
 		Proof:   randomData2,
 	}
 
+	info := SilentPaymentInfo{
+		ScanKey:  share1.ScanKey,
+		SpendKey: share2.ScanKey,
+	}
+	label := uint32(1234567890)
+
 	// Start with a valid packet from our test vectors (number 9, with the
 	// PSBT_GLOBAL_XPUB field set).
 	originalBase64 := validPsbtBase64[8]
@@ -72,6 +78,8 @@ func TestSilentPaymentsPacket(t *testing.T) {
 	testPacket.Inputs[0].SilentPaymentDLEQs = append(
 		testPacket.Inputs[0].SilentPaymentDLEQs, proof2,
 	)
+	testPacket.Outputs[0].SilentPaymentInfo = &info
+	testPacket.Outputs[0].SilentPaymentLabel = &label
 
 	// And do another full encoding/decoding round trip.
 	newBytes := serialize(t, testPacket)
