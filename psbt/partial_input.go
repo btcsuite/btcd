@@ -30,6 +30,7 @@ type PInput struct {
 	TaprootInternalKey     []byte
 	TaprootMerkleRoot      []byte
 	SilentPaymentShares    []SilentPaymentShare
+	SilentPaymentDLEQs     []SilentPaymentDLEQ
 	Unknowns               []*Unknown
 }
 
@@ -380,6 +381,23 @@ func (pi *PInput) deserialize(r io.Reader) error {
 				pi.SilentPaymentShares, *share,
 			)
 
+		case SilentPaymentDLEQInputType:
+			proof, err := ReadSilentPaymentDLEQ(keyData, value)
+			if err != nil {
+				return err
+			}
+
+			// Duplicate keys are not allowed.
+			for _, x := range pi.SilentPaymentDLEQs {
+				if x.EqualKey(proof) {
+					return ErrDuplicateKey
+				}
+			}
+
+			pi.SilentPaymentDLEQs = append(
+				pi.SilentPaymentDLEQs, *proof,
+			)
+
 		default:
 			// A fall through case for any proprietary types.
 			keyCodeAndData := append(
@@ -616,6 +634,20 @@ func (pi *PInput) serialize(w io.Writer) error {
 			)
 			err := serializeKVPairWithType(
 				w, uint8(SilentPaymentShareInputType), keyBytes,
+				valueBytes,
+			)
+			if err != nil {
+				return err
+			}
+		}
+
+		// Serialize the input's silent payment DLEQ proofs.
+		for _, dleq := range pi.SilentPaymentDLEQs {
+			keyBytes, valueBytes := SerializeSilentPaymentDLEQ(
+				&dleq,
+			)
+			err := serializeKVPairWithType(
+				w, uint8(SilentPaymentDLEQInputType), keyBytes,
 				valueBytes,
 			)
 			if err != nil {
