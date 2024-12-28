@@ -216,4 +216,13 @@ const (
 	// followed by said number of 32-byte leaf hashes. The rest of the value
 	// is then identical to the Bip32DerivationInputType value.
 	TaprootBip32DerivationOutputType OutputType = 7
+
+	// SilentPaymentV0InfoOutputType is used to house the silent payment
+	// recipient information for a version 0 silent payment output.
+	SilentPaymentV0InfoOutputType OutputType = 0x09
+
+	// SilentPaymentV0LabelOutputType is used to house the silent payment
+	// label for a version 0 silent payment output, which is used to compute
+	// the spend key of the silent payments address to verify change.
+	SilentPaymentV0LabelOutputType OutputType = 0x0a
 )
