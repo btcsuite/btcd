@@ -3,7 +3,18 @@ package psbt
 import (
 	"bytes"
 
+	"github.com/btcsuite/btcd/txscript"
 	secp "github.com/decred/dcrd/dcrec/secp256k1/v4"
+)
+
+var (
+	// SilentPaymentDummyP2TROutput is a dummy P2TR output that can be used
+	// to mark a transaction output as a silent payment recipient output to
+	// which the final Taproot output key hasn't been calculated yet.
+	SilentPaymentDummyP2TROutput = append(
+		[]byte{txscript.OP_1, txscript.OP_DATA_32},
+		bytes.Repeat([]byte{0x00}, 32)...,
+	)
 )
 
 // SilentPaymentShare is a single ECDH share for a silent payment.
@@ -97,4 +108,36 @@ func SerializeSilentPaymentDLEQ(dleq *SilentPaymentDLEQ) ([]byte, []byte) {
 	keyData := append([]byte{}, dleq.ScanKey...)
 
 	return keyData, dleq.Proof
+}
+
+// SilentPaymentInfo is the information needed to create a silent payment
+// recipient output.
+type SilentPaymentInfo struct {
+	// ScanKey is the silent payment recipient's scan key.
+	ScanKey []byte
+
+	// SpendKey is the silent payment recipient's spend key.
+	SpendKey []byte
+}
+
+// ReadSilentPaymentInfo deserializes a silent payment info from the given
+// value.
+func ReadSilentPaymentInfo(value []byte) (*SilentPaymentInfo, error) {
+	if len(value) != secp.PubKeyBytesLenCompressed*2 {
+		return nil, ErrInvalidPsbtFormat
+	}
+
+	return &SilentPaymentInfo{
+		ScanKey:  value[:secp.PubKeyBytesLenCompressed],
+		SpendKey: value[secp.PubKeyBytesLenCompressed:],
+	}, nil
+}
+
+// SerializeSilentPaymentInfo serializes a silent payment info to value.
+func SerializeSilentPaymentInfo(info *SilentPaymentInfo) []byte {
+	value := make([]byte, 0, secp.PubKeyBytesLenCompressed*2)
+	value = append(value, info.ScanKey...)
+	value = append(value, info.SpendKey...)
+
+	return value
 }
