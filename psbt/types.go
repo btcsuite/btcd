@@ -30,6 +30,10 @@ const (
 	// extended public key.
 	XPubType GlobalType = 1
 
+	// SilentPaymentShareType is used to house the ECDH shares for silent
+	// payments.
+	SilentPaymentShareType GlobalType = 0x07
+
 	// VersionType houses the global version number of this PSBT. There is
 	// no key (only contains the byte type), then the value if omitted, is
 	// assumed to be zero.
@@ -150,6 +154,10 @@ const (
 	// TaprootMerkleRootType is an empty key ({0x18}). The value is a
 	// 32-byte hash denoting the root hash of a merkle tree of scripts.
 	TaprootMerkleRootType InputType = 0x18
+
+	// SilentPaymentShareInputType is used to house the ECDH share for a
+	// single input in silent payments.
+	SilentPaymentShareInputType InputType = 0x1d
 
 	// ProprietaryInputType is a custom type for use by devs.
 	//
