@@ -2,8 +2,20 @@ package psbt
 
 import (
 	"bytes"
+	"encoding/binary"
 
+	"github.com/btcsuite/btcd/txscript/v2"
 	secp "github.com/decred/dcrd/dcrec/secp256k1/v4"
+)
+
+var (
+	// SilentPaymentDummyP2TROutput is a dummy P2TR output that can be used
+	// to mark a transaction output as a silent payment recipient output to
+	// which the final Taproot output key hasn't been calculated yet.
+	SilentPaymentDummyP2TROutput = append(
+		[]byte{txscript.OP_1, txscript.OP_DATA_32},
+		bytes.Repeat([]byte{0x00}, 32)...,
+	)
 )
 
 // SilentPaymentShare is a single ECDH share for a silent payment.
@@ -103,4 +115,55 @@ func SerializeSilentPaymentDLEQ(dleq *SilentPaymentDLEQ) ([]byte, []byte) {
 	keyData := append([]byte{}, dleq.ScanKey...)
 
 	return keyData, dleq.Proof
+}
+
+// SilentPaymentInfo is the information needed to create a silent payment
+// recipient output.
+type SilentPaymentInfo struct {
+	// ScanKey is the silent payment recipient's scan key.
+	ScanKey []byte
+
+	// SpendKey is the silent payment recipient's spend key.
+	SpendKey []byte
+}
+
+// ReadSilentPaymentInfo deserializes a silent payment info from the given
+// value.
+func ReadSilentPaymentInfo(value []byte) (*SilentPaymentInfo, error) {
+	if len(value) != secp.PubKeyBytesLenCompressed*2 {
+		return nil, ErrInvalidPsbtFormat
+	}
+
+	scanKey := value[:secp.PubKeyBytesLenCompressed]
+	spendKey := value[secp.PubKeyBytesLenCompressed:]
+
+	// Both the scan and spend keys must be valid compressed public keys.
+	if !validatePubkey(scanKey) || !validatePubkey(spendKey) {
+		return nil, ErrInvalidPsbtFormat
+	}
+
+	return &SilentPaymentInfo{
+		ScanKey:  scanKey,
+		SpendKey: spendKey,
+	}, nil
+}
+
+// SerializeSilentPaymentInfo serializes a silent payment info to value.
+func SerializeSilentPaymentInfo(info *SilentPaymentInfo) []byte {
+	value := make([]byte, 0, secp.PubKeyBytesLenCompressed*2)
+	value = append(value, info.ScanKey...)
+	value = append(value, info.SpendKey...)
+
+	return value
+}
+
+// ReadSilentPaymentLabel deserializes a silent payment output label from the
+// given key data and value. The key data must be empty and the value must be a
+// 32-bit little-endian integer.
+func ReadSilentPaymentLabel(value []byte) (uint32, error) {
+	if len(value) != uint32Size {
+		return 0, ErrInvalidPsbtFormat
+	}
+
+	return binary.LittleEndian.Uint32(value), nil
 }
