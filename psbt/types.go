@@ -34,6 +34,10 @@ const (
 	// payments.
 	SilentPaymentShareType GlobalType = 0x07
 
+	// SilentPaymentDLEQType is used to house the DLEQ proofs for silent
+	// payments.
+	SilentPaymentDLEQType GlobalType = 0x08
+
 	// VersionType houses the global version number of this PSBT. There is
 	// no key (only contains the byte type), then the value if omitted, is
 	// assumed to be zero.
@@ -158,6 +162,10 @@ const (
 	// SilentPaymentShareInputType is used to house the ECDH share for a
 	// single input in silent payments.
 	SilentPaymentShareInputType InputType = 0x1d
+
+	// SilentPaymentDLEQInputType is used to house the DLEQ proofs for a
+	// single input in silent payments.
+	SilentPaymentDLEQInputType InputType = 0x1e
 
 	// ProprietaryInputType is a custom type for use by devs.
 	//
