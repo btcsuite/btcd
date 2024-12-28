@@ -146,6 +146,10 @@ type Packet struct {
 	// the shared secret for a silent payment.
 	SilentPaymentShares []SilentPaymentShare
 
+	// SilentPaymentDLEQs is a list of DLEQ proofs that are used to prove
+	// the validity of the shares for a silent payment.
+	SilentPaymentDLEQs []SilentPaymentDLEQ
+
 	// Unknowns are the set of custom types (global only) within this PSBT.
 	Unknowns []*Unknown
 }
@@ -174,6 +178,7 @@ func NewFromUnsignedTx(tx *wire.MsgTx) (*Packet, error) {
 	outSlice := make([]POutput, len(tx.TxOut))
 	xPubSlice := make([]XPub, 0)
 	spsSlice := make([]SilentPaymentShare, 0)
+	spdSlice := make([]SilentPaymentDLEQ, 0)
 	unknownSlice := make([]*Unknown, 0)
 
 	return &Packet{
@@ -182,6 +187,7 @@ func NewFromUnsignedTx(tx *wire.MsgTx) (*Packet, error) {
 		Outputs:             outSlice,
 		XPubs:               xPubSlice,
 		SilentPaymentShares: spsSlice,
+		SilentPaymentDLEQs:  spdSlice,
 		Unknowns:            unknownSlice,
 	}, nil
 }
@@ -248,6 +254,7 @@ func NewFromRawBytes(r io.Reader, b64 bool) (*Packet, error) {
 	var (
 		xPubSlice    []XPub
 		spsSlice     []SilentPaymentShare
+		spdSlice     []SilentPaymentDLEQ
 		unknownSlice []*Unknown
 	)
 	for {
@@ -297,6 +304,21 @@ func NewFromRawBytes(r io.Reader, b64 bool) (*Packet, error) {
 
 			spsSlice = append(spsSlice, *share)
 
+		case SilentPaymentDLEQType:
+			proof, err := ReadSilentPaymentDLEQ(keydata, value)
+			if err != nil {
+				return nil, err
+			}
+
+			// Duplicate keys are not allowed.
+			for _, x := range spdSlice {
+				if x.EqualKey(proof) {
+					return nil, ErrDuplicateKey
+				}
+			}
+
+			spdSlice = append(spdSlice, *proof)
+
 		default:
 			keyintanddata := []byte{byte(keyint)}
 			keyintanddata = append(keyintanddata, keydata...)
@@ -340,6 +362,7 @@ func NewFromRawBytes(r io.Reader, b64 bool) (*Packet, error) {
 		Outputs:             outSlice,
 		XPubs:               xPubSlice,
 		SilentPaymentShares: spsSlice,
+		SilentPaymentDLEQs:  spdSlice,
 		Unknowns:            unknownSlice,
 	}
 
@@ -397,6 +420,17 @@ func (p *Packet) Serialize(w io.Writer) error {
 		keyBytes, valueBytes := SerializeSilentPaymentShare(&share)
 		err := serializeKVPairWithType(
 			w, uint8(SilentPaymentShareType), keyBytes, valueBytes,
+		)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Serialize the global silent payment DLEQ proofs.
+	for _, dleq := range p.SilentPaymentDLEQs {
+		keyBytes, valueBytes := SerializeSilentPaymentDLEQ(&dleq)
+		err := serializeKVPairWithType(
+			w, uint8(SilentPaymentDLEQType), keyBytes, valueBytes,
 		)
 		if err != nil {
 			return err
