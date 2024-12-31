@@ -17,6 +17,7 @@ type POutput struct {
 	TaprootInternalKey     []byte
 	TaprootTapTree         []byte
 	TaprootBip32Derivation []*TaprootBip32Derivation
+	SilentPaymentInfo      *SilentPaymentInfo
 	Unknowns               []*Unknown
 }
 
@@ -144,6 +145,18 @@ func (po *POutput) deserialize(r io.Reader) error {
 				po.TaprootBip32Derivation, taprootDerivation,
 			)
 
+		case SilentPaymentV0InfoOutputType:
+			if po.SilentPaymentInfo != nil {
+				return ErrDuplicateKey
+			}
+
+			info, err := ReadSilentPaymentInfo(value)
+			if err != nil {
+				return err
+			}
+
+			po.SilentPaymentInfo = info
+
 		default:
 			// A fall through case for any proprietary types.
 			keyCodeAndData := append(
@@ -240,6 +253,16 @@ func (po *POutput) serialize(w io.Writer) error {
 		err = serializeKVPairWithType(
 			w, uint8(TaprootBip32DerivationOutputType),
 			derivation.XOnlyPubKey, value,
+		)
+		if err != nil {
+			return err
+		}
+	}
+
+	if po.SilentPaymentInfo != nil {
+		err := serializeKVPairWithType(
+			w, uint8(SilentPaymentV0InfoOutputType), nil,
+			SerializeSilentPaymentInfo(po.SilentPaymentInfo),
 		)
 		if err != nil {
 			return err

@@ -135,6 +135,14 @@ type Packet struct {
 	// produced by this PSBT.
 	Outputs []POutput
 
+	// SilentPaymentShares is a list of ECDH shares that are used to derive
+	// the shared secret for a silent payment.
+	SilentPaymentShares []SilentPaymentShare
+
+	// SilentPaymentDLEQs is a list of DLEQ proofs that are used to prove
+	// the validity of the shares for a silent payment.
+	SilentPaymentDLEQs []SilentPaymentDLEQ
+
 	// Unknowns are the set of custom types (global only) within this PSBT.
 	Unknowns []*Unknown
 }
@@ -161,13 +169,17 @@ func NewFromUnsignedTx(tx *wire.MsgTx) (*Packet, error) {
 
 	inSlice := make([]PInput, len(tx.TxIn))
 	outSlice := make([]POutput, len(tx.TxOut))
+	spsSlice := make([]SilentPaymentShare, 0)
+	spdSlice := make([]SilentPaymentDLEQ, 0)
 	unknownSlice := make([]*Unknown, 0)
 
 	return &Packet{
-		UnsignedTx: tx,
-		Inputs:     inSlice,
-		Outputs:    outSlice,
-		Unknowns:   unknownSlice,
+		UnsignedTx:          tx,
+		Inputs:              inSlice,
+		Outputs:             outSlice,
+		SilentPaymentShares: spsSlice,
+		SilentPaymentDLEQs:  spdSlice,
+		Unknowns:            unknownSlice,
 	}, nil
 }
 
@@ -230,7 +242,11 @@ func NewFromRawBytes(r io.Reader, b64 bool) (*Packet, error) {
 
 	// Next we parse any unknowns that may be present, making sure that we
 	// break at the separator.
-	var unknownSlice []*Unknown
+	var (
+		spsSlice     []SilentPaymentShare
+		spdSlice     []SilentPaymentDLEQ
+		unknownSlice []*Unknown
+	)
 	for {
 		keyint, keydata, err := getKey(r)
 		if err != nil {
@@ -247,14 +263,47 @@ func NewFromRawBytes(r io.Reader, b64 bool) (*Packet, error) {
 			return nil, err
 		}
 
-		keyintanddata := []byte{byte(keyint)}
-		keyintanddata = append(keyintanddata, keydata...)
+		switch GlobalType(keyint) {
+		case SilentPaymentShareType:
+			share, err := ReadSilentPaymentShare(keydata, value)
+			if err != nil {
+				return nil, err
+			}
 
-		newUnknown := &Unknown{
-			Key:   keyintanddata,
-			Value: value,
+			// Duplicate keys are not allowed.
+			for _, x := range spsSlice {
+				if x.EqualKey(share) {
+					return nil, ErrDuplicateKey
+				}
+			}
+
+			spsSlice = append(spsSlice, *share)
+
+		case SilentPaymentDLEQType:
+			proof, err := ReadSilentPaymentDLEQ(keydata, value)
+			if err != nil {
+				return nil, err
+			}
+
+			// Duplicate keys are not allowed.
+			for _, x := range spdSlice {
+				if x.EqualKey(proof) {
+					return nil, ErrDuplicateKey
+				}
+			}
+
+			spdSlice = append(spdSlice, *proof)
+
+		default:
+			keyintanddata := []byte{byte(keyint)}
+			keyintanddata = append(keyintanddata, keydata...)
+
+			newUnknown := &Unknown{
+				Key:   keyintanddata,
+				Value: value,
+			}
+			unknownSlice = append(unknownSlice, newUnknown)
 		}
-		unknownSlice = append(unknownSlice, newUnknown)
 	}
 
 	// Next we parse the INPUT section.
@@ -283,10 +332,12 @@ func NewFromRawBytes(r io.Reader, b64 bool) (*Packet, error) {
 
 	// Populate the new Packet object.
 	newPsbt := Packet{
-		UnsignedTx: msgTx,
-		Inputs:     inSlice,
-		Outputs:    outSlice,
-		Unknowns:   unknownSlice,
+		UnsignedTx:          msgTx,
+		Inputs:              inSlice,
+		Outputs:             outSlice,
+		SilentPaymentShares: spsSlice,
+		SilentPaymentDLEQs:  spdSlice,
+		Unknowns:            unknownSlice,
 	}
 
 	// Extended sanity checking is applied here to make sure the
@@ -323,6 +374,28 @@ func (p *Packet) Serialize(w io.Writer) error {
 	)
 	if err != nil {
 		return err
+	}
+
+	// Serialize the global silent payment shares.
+	for _, share := range p.SilentPaymentShares {
+		keyBytes, valueBytes := SerializeSilentPaymentShare(&share)
+		err := serializeKVPairWithType(
+			w, uint8(SilentPaymentShareType), keyBytes, valueBytes,
+		)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Serialize the global silent payment DLEQ proofs.
+	for _, dleq := range p.SilentPaymentDLEQs {
+		keyBytes, valueBytes := SerializeSilentPaymentDLEQ(&dleq)
+		err := serializeKVPairWithType(
+			w, uint8(SilentPaymentDLEQType), keyBytes, valueBytes,
+		)
+		if err != nil {
+			return err
+		}
 	}
 
 	// Unknown is a special case; we don't have a key type, only a key and
