@@ -179,3 +179,17 @@ and `go` (matching the same version used in the release):
    release script and recompute the `SHA256` hash of the release binaries (btcd
    and btcctl) with `shasum -a 256 <filename>`. These should match __exactly__
    as the ones noted above.
+   Changes in X.YY.Z (Month Day Year):
+  - Protocol and Network-related changes:
+    - PR Title One (#PRNUM)
+    - PR Title Two (#PRNUMTWO)
+    ...
+  - RPC changes:
+  - Crypto changes:
+  ...
+
+  - Contributors (alphabetical order):
+    - Contributor A
+    - Contributor B
+    - Contributor C
+    ...
