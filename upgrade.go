@@ -173,3 +173,66 @@ func doUpgrades() error {
 	}
 	return upgradeDataPaths()
 }
+Edit
+
+Preview
+
+Show Diff
+Loading preview…There are no changes to show. But you can preview the whole file.
+btcd's Reproducible Build System
+This package contains the build script that the btcd project uses in order to build binaries for each new release. As of go1.13, with some new build flags, binaries are now reproducible, allowing developers to build the binary on distinct machines, and end up with a byte-for-byte identical binary. Every release should note which Go version was used to build the release, so that version should be used for verifying the release.
+
+Building a New Release
+Tagging and pushing a new tag (for maintainers)
+Before running release scripts, a few things need to happen in order to finally create a release and make sure there are no mistakes in the release process.
+
+First, make sure that before the tagged commit there are modifications to the CHANGES file committed. The CHANGES file should be a changelog that roughly mirrors the release notes. Generally, the PRs that have been merged since the last release have been listed in the CHANGES file and categorized. For example, these changes have had the following format in the past:
+
+Changes in X.YY.Z (Month Day Year):
+  - Protocol and Network-related changes:
+    - PR Title One (#PRNUM)
+    - PR Title Two (#PRNUMTWO)
+    ...
+  - RPC changes:
+  - Crypto changes:
+  ...
+
+  - Contributors (alphabetical order):
+    - Contributor A
+    - Contributor B
+    - Contributor C
+    ...
+If the previous tag is, for example, vA.B.C, then you can get the list of contributors (from vA.B.C until the current HEAD) using the following command:
+
+git log vA.B.C..HEAD --pretty="%an" | sort | uniq
+After committing changes to the CHANGES file, the tagged release commit should be created.
+
+The tagged commit should be a commit that bumps version numbers in version.go and cmd/btcctl/version.go. For example (taken from f3ec130):
+
+diff --git a/cmd/btcctl/version.go b/cmd/btcctl/version.go
+index 2195175c71..f65cacef7e 100644
+--- a/cmd/btcctl/version.go
++++ b/cmd/btcctl/version.go
+@@ -18,7 +18,7 @@ const semanticAlphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqr
+ const (
+ 	appMajor uint = 0
+ 	appMinor uint = 20
+-	appPatch uint = 0
++	appPatch uint = 1
+ 
+ 	// appPreRelease MUST only contain characters from semanticAlphabet
+ 	// per the semantic versioning spec.
+diff --git a/version.go b/version.go
+index 92fd60fdd4..fba55b5a37 100644
+--- a/version.go
++++ b/version.go
+@@ -18,7 +18,7 @@ const semanticAlphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqr
+ const (
+ 	appMajor uint = 0
+ 	appMinor uint = 20
+-	appPatch uint = 0
++	appPatch uint = 1
+ 
+ 	// appPreRelease MUST only contain characters from semanticAlphabet
+ 	// per the semantic
+
