@@ -1317,8 +1317,8 @@ func TestIsAncestor(t *testing.T) {
 // randomSelect selects random amount of random elements from a slice and returns a
 // new slice.  The selected elements are removed.
 func randomSelect(input []*testhelper.SpendableOut) (
-	[]*testhelper.SpendableOut, []*testhelper.SpendableOut) {
-
+	[]*testhelper.SpendableOut, []*testhelper.SpendableOut,
+) {
 	selected := []*testhelper.SpendableOut{}
 
 	// Select random elements from the input slice
@@ -1343,8 +1343,8 @@ func randomSelect(input []*testhelper.SpendableOut) (
 // the hashes of the newly generated blocks.
 func addBlocks(count int, chain *BlockChain, prevBlock *btcutil.Block,
 	allSpendableOutputs []*testhelper.SpendableOut) (
-	[]*chainhash.Hash, [][]*testhelper.SpendableOut, error) {
-
+	[]*chainhash.Hash, [][]*testhelper.SpendableOut, error,
+) {
 	blockHashes := make([]*chainhash.Hash, 0, count)
 	spendablesOuts := make([][]*testhelper.SpendableOut, 0, count)
 

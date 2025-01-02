@@ -22,6 +22,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/decred/dcrd/lru"
+
 	"github.com/btcsuite/btcd/addrmgr"
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/blockchain/indexers"
@@ -38,7 +40,6 @@ import (
 	"github.com/btcsuite/btcd/peer"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/decred/dcrd/lru"
 )
 
 const (
@@ -718,7 +719,13 @@ func (sp *serverPeer) OnGetData(_ *peer.Peer, msg *wire.MsgGetData) {
 		case wire.InvTypeWitnessTx:
 			err = sp.server.pushTxMsg(sp, &iv.Hash, c, waitChan, wire.WitnessEncoding)
 		case wire.InvTypeTx:
-			err = sp.server.pushTxMsg(sp, &iv.Hash, c, waitChan, wire.BaseEncoding)
+			enc := wire.BaseEncoding
+			if sp.Peer.WantsWTxIdRelay() && sp.Peer.IsWitnessEnabled() {
+				// BIP0339 dictates that if so negotiated with
+				// the peer we must use the witness TxId.
+				enc = wire.WitnessEncoding
+			}
+			err = sp.server.pushTxMsg(sp, &iv.Hash, c, waitChan, enc)
 		case wire.InvTypeWitnessBlock:
 			err = sp.server.pushBlockMsg(sp, &iv.Hash, c, waitChan, wire.WitnessEncoding)
 		case wire.InvTypeBlock:
@@ -1458,7 +1465,7 @@ func randomUint16Number(max uint16) uint16 {
 	// from a random source that has a range limited to a multiple of the
 	// modulus.
 	var randomNumber uint16
-	var limitRange = (math.MaxUint16 / max) * max
+	limitRange := (math.MaxUint16 / max) * max
 	for {
 		binary.Read(rand.Reader, binary.LittleEndian, &randomNumber)
 		if randomNumber < limitRange {
@@ -1529,8 +1536,8 @@ func (s *server) TransactionConfirmed(tx *btcutil.Tx) {
 // pushTxMsg sends a tx message for the provided transaction hash to the
 // connected peer.  An error is returned if the transaction hash is not known.
 func (s *server) pushTxMsg(sp *serverPeer, hash *chainhash.Hash, doneChan chan<- struct{},
-	waitChan <-chan struct{}, encoding wire.MessageEncoding) error {
-
+	waitChan <-chan struct{}, encoding wire.MessageEncoding,
+) error {
 	// Attempt to fetch the requested transaction from the pool.  A
 	// call could be made to check for existence first, but simply trying
 	// to fetch a missing transaction results in the same behavior.
@@ -1558,8 +1565,8 @@ func (s *server) pushTxMsg(sp *serverPeer, hash *chainhash.Hash, doneChan chan<-
 // pushBlockMsg sends a block message for the provided block hash to the
 // connected peer.  An error is returned if the block hash is not known.
 func (s *server) pushBlockMsg(sp *serverPeer, hash *chainhash.Hash, doneChan chan<- struct{},
-	waitChan <-chan struct{}, encoding wire.MessageEncoding) error {
-
+	waitChan <-chan struct{}, encoding wire.MessageEncoding,
+) error {
 	// Fetch the raw block bytes from the database.
 	var blockBytes []byte
 	err := sp.server.db.View(func(dbTx database.Tx) error {
@@ -1626,8 +1633,8 @@ func (s *server) pushBlockMsg(sp *serverPeer, hash *chainhash.Hash, doneChan cha
 // loaded, this call will simply be ignored if there is no filter loaded.  An
 // error is returned if the block hash is not known.
 func (s *server) pushMerkleBlockMsg(sp *serverPeer, hash *chainhash.Hash,
-	doneChan chan<- struct{}, waitChan <-chan struct{}, encoding wire.MessageEncoding) error {
-
+	doneChan chan<- struct{}, waitChan <-chan struct{}, encoding wire.MessageEncoding,
+) error {
 	// Do not send a response if the peer doesn't have a filter loaded.
 	if !sp.filter.IsLoaded() {
 		if doneChan != nil {
@@ -1921,6 +1928,14 @@ func (s *server) handleRelayInvMsg(state *peerState, msg relayMsg) {
 				if !sp.filter.MatchTxAndUpdate(txD.Tx) {
 					return
 				}
+			}
+
+			// If we received a MSG_TX, relay it as a MSG_WTX per
+			// BIP0339.
+			if sp.Peer.WantsWTxIdRelay() && sp.Peer.IsWitnessEnabled() {
+				// TODO: Verify hash is indeed witness TxId
+				// instead of TxId.
+				msg.invVect.Type = wire.InvTypeWitnessTx
 			}
 		}
 
@@ -2722,8 +2737,8 @@ func setupRPCListeners() ([]net.Listener, error) {
 // connections from peers.
 func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 	db database.DB, chainParams *chaincfg.Params,
-	interrupt <-chan struct{}) (*server, error) {
-
+	interrupt <-chan struct{},
+) (*server, error) {
 	services := defaultServices
 	if cfg.NoPeerBloomFilters {
 		services &^= wire.SFNodeBloom
@@ -2860,7 +2875,6 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 			// If there is an error, log it and make a new fee estimator.
 			var err error
 			s.feeEstimator, err = mempool.RestoreFeeEstimator(feeEstimationData)
-
 			if err != nil {
 				peerLog.Errorf("Failed to restore fee estimator %v", err)
 			}
@@ -3352,8 +3366,8 @@ func mergeCheckpoints(defaultCheckpoints, additional []chaincfg.Checkpoint) []ch
 // 3) Accept the peer if it contains a whitelisted agent.
 // 4) Reject all other peers.
 func (sp *serverPeer) HasUndesiredUserAgent(blacklistedAgents,
-	whitelistedAgents []string) bool {
-
+	whitelistedAgents []string,
+) bool {
 	agent := sp.UserAgent()
 
 	// First, if peer's user agent contains any blacklisted substring, we
