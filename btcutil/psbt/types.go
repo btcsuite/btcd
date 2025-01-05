@@ -30,6 +30,14 @@ const (
 	// extended public key.
 	XpubType GlobalType = 1
 
+	// SilentPaymentShareType is used to house the ECDH shares for silent
+	// payments.
+	SilentPaymentShareType GlobalType = 0x07
+	
+	// SilentPaymentDLEQType is used to house the DLEQ proofs for silent
+	// payments.
+	SilentPaymentDLEQType GlobalType = 0x08
+
 	// VersionType houses the global version number of this PSBT. There is
 	// no key (only contains the byte type), then the value if omitted, is
 	// assumed to be zero.
@@ -200,4 +208,8 @@ const (
 	// followed by said number of 32-byte leaf hashes. The rest of the value
 	// is then identical to the Bip32DerivationInputType value.
 	TaprootBip32DerivationOutputType OutputType = 7
+	
+	// SilentPaymentV0InfoOutputType is used to house the silent payment
+	// recipient information for a version 0 silent payment output.
+	SilentPaymentV0InfoOutputType OutputType = 0x09
 )

@@ -5,6 +5,11 @@ import (
 	"encoding/binary"
 )
 
+const (
+	// uint32Size is the size of a uint32 in bytes.
+	uint32Size = 4
+)
+
 // Bip32Derivation encapsulates the data for the input and output
 // Bip32Derivation key-value fields.
 //
