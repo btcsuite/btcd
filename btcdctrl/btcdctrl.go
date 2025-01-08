@@ -307,7 +307,7 @@ func (c *Controller) Start() error {
 		}
 
 		_, addr, ok = strings.Cut(line, "Server listening on ")
-		if !ok {
+		if ok {
 			c.p2p = addr
 			p2p = true
 		}
