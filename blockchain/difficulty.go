@@ -133,9 +133,7 @@ func findPrevTestNetDifficulty(startNode HeaderCtx, c ChainCtx) uint32 {
 // the exported version uses the current best chain as the previous HeaderCtx
 // while this function accepts any block node. This function accepts a ChainCtx
 // parameter that gives the necessary difficulty context variables.
-func calcNextRequiredDifficulty(lastNode HeaderCtx, newBlockTime time.Time,
-	c ChainCtx) (uint32, error) {
-
+func calcNextRequiredDifficulty(lastNode HeaderCtx, newBlockTime time.Time, c ChainCtx) (uint32, error) {
 	// Emulate the same behavior as Bitcoin Core that for regtest there is
 	// no difficulty retargeting.
 	if c.ChainParams().PoWNoRetargeting {
@@ -154,6 +152,8 @@ func calcNextRequiredDifficulty(lastNode HeaderCtx, newBlockTime time.Time,
 		// required difficulty once too much time has elapsed without
 		// mining a block.
 		if c.ChainParams().ReduceMinDifficulty {
+			// XXX TestNet4 issue is here somewhere!
+
 			// Return minimum difficulty when more than the desired
 			// amount of time has elapsed without mining a block.
 			reductionTime := int64(c.ChainParams().MinDiffReductionTime /

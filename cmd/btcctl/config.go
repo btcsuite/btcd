@@ -13,10 +13,11 @@ import (
 	"regexp"
 	"strings"
 
+	flags "github.com/jessevdk/go-flags"
+
 	"github.com/btcsuite/btcd/btcjson"
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
-	flags "github.com/jessevdk/go-flags"
 )
 
 const (
@@ -107,6 +108,7 @@ type config struct {
 	SimNet         bool   `long:"simnet" description:"Connect to the simulation test network"`
 	TLSSkipVerify  bool   `long:"skipverify" description:"Do not verify tls certificates (not recommended!)"`
 	TestNet3       bool   `long:"testnet" description:"Connect to testnet"`
+	TestNet4       bool   `long:"testnet4" description:"Connect to testnet"`
 	SigNet         bool   `long:"signet" description:"Connect to signet"`
 	ShowVersion    bool   `short:"V" long:"version" description:"Display version information and exit"`
 	Wallet         bool   `long:"wallet" description:"Connect to wallet"`
@@ -124,6 +126,12 @@ func normalizeAddress(addr string, chain *chaincfg.Params, useWallet bool) (stri
 				defaultPort = "18332"
 			} else {
 				defaultPort = "18334"
+			}
+		case &chaincfg.TestNet4Params:
+			if useWallet {
+				defaultPort = "48332"
+			} else {
+				defaultPort = "48334"
 			}
 		case &chaincfg.SimNetParams:
 			if useWallet {
@@ -272,6 +280,10 @@ func loadConfig() (*config, []string, error) {
 		numNets++
 		network = &chaincfg.TestNet3Params
 	}
+	if cfg.TestNet4 {
+		numNets++
+		network = &chaincfg.TestNet4Params
+	}
 	if cfg.SimNet {
 		numNets++
 		network = &chaincfg.SimNetParams
@@ -348,14 +360,14 @@ func createDefaultConfigFile(destinationPath, serverConfigPath string) error {
 	noTLSSubmatches := noTLSRegexp.FindSubmatch(content)
 
 	// Create the destination directory if it does not exists
-	err = os.MkdirAll(filepath.Dir(destinationPath), 0700)
+	err = os.MkdirAll(filepath.Dir(destinationPath), 0o700)
 	if err != nil {
 		return err
 	}
 
 	// Create the destination file and write the rpcuser and rpcpass to it
 	dest, err := os.OpenFile(destinationPath,
-		os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
+		os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
 		return err
 	}

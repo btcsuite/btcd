@@ -29,9 +29,7 @@ const (
 	blockDbNamePrefix = "blocks"
 )
 
-var (
-	cfg *config
-)
+var cfg *config
 
 // winServiceMain is only invoked on Windows.  It detects when btcd is running
 // as a service and reacts accordingly.
@@ -400,7 +398,7 @@ func loadBlockDB() (database.DB, error) {
 		}
 
 		// Create the db if it does not exist.
-		err = os.MkdirAll(cfg.DataDir, 0700)
+		err = os.MkdirAll(cfg.DataDir, 0o700)
 		if err != nil {
 			return nil, err
 		}

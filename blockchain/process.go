@@ -11,6 +11,7 @@ import (
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/database"
+	"github.com/btcsuite/btcd/wire"
 )
 
 // BehaviorFlags is a bitmask defining tweaks to the normal behavior when
@@ -28,6 +29,9 @@ const (
 	// ensures a block hashes to a value less than the required target will
 	// not be performed.
 	BFNoPoWCheck
+
+	// BFEnforceBIP94 testnet4 shit
+	BFEnforceBIP94
 
 	// BFNone is a convenience value to specifically indicate no flags.
 	BFNone BehaviorFlags = 0
@@ -144,6 +148,11 @@ func (b *BlockChain) ProcessBlock(block *btcutil.Block, flags BehaviorFlags) (bo
 	defer b.chainLock.Unlock()
 
 	fastAdd := flags&BFFastAdd == BFFastAdd
+	if b.chainParams.Net == wire.TestNet4 {
+		if flags&BFEnforceBIP94 != BFEnforceBIP94 {
+			panic("BFEnforceBIP94 flag not set")
+		}
+	}
 
 	blockHash := block.Hash()
 	log.Tracef("Processing block %v", blockHash)
