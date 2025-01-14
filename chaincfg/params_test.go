@@ -9,6 +9,9 @@ import (
 	"encoding/hex"
 	"math/big"
 	"testing"
+
+	"github.com/btcsuite/btcd/wire"
+	"github.com/stretchr/testify/require"
 )
 
 // TestInvalidHashStr ensures the newShaHashFromStr function panics when used to
@@ -102,6 +105,12 @@ func TestSigNetPowLimit(t *testing.T) {
 			"int (%s)", sigNetGenesisBlock.Header.Bits,
 			powLimit.Text(16))
 	}
+}
+
+// TestSigNetMagic makes sure that the default signet has the expected bitcoin
+// network magic.
+func TestSigNetMagic(t *testing.T) {
+	require.Equal(t, wire.SigNet, SigNetParams.Net)
 }
 
 // compactToBig is a copy of the blockchain.CompactToBig function. We copy it
