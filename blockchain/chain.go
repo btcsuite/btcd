@@ -128,8 +128,12 @@ type BlockChain struct {
 	//
 	// bestChain tracks the current active chain by making use of an
 	// efficient chain view into the block index.
-	index     *blockIndex
-	bestChain *chainView
+	//
+	// bestHeader tracks the current active header chain. The tip is the last
+	// header we have on the block index.
+	index      *blockIndex
+	bestChain  *chainView
+	bestHeader *chainView
 
 	// The UTXO state holds a cached view of the UTXO state of the chain.
 	// It is protected by the chain lock.
@@ -2188,6 +2192,7 @@ func New(config *Config) (*BlockChain, error) {
 		utxoCache:           newUtxoCache(config.DB, config.UtxoCacheMaxSize),
 		hashCache:           config.HashCache,
 		bestChain:           newChainView(nil),
+		bestHeader:          newChainView(nil),
 		orphans:             make(map[chainhash.Hash]*orphanBlock),
 		prevOrphans:         make(map[chainhash.Hash][]*orphanBlock),
 		warningCaches:       newThresholdCaches(vbNumBits),
