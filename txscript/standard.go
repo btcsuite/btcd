@@ -1151,7 +1151,7 @@ func ExtractAtomicSwapDataPushes(version uint16, pkScript []byte) (*AtomicSwapDa
 	}
 
 	// At this point, the script appears to be an atomic swap, so populate and
-	// return the extacted data.
+	// return the extracted data.
 	pushes := AtomicSwapDataPushes{
 		SecretSize: template[2].extractedInt,
 		LockTime:   template[11].extractedInt,
