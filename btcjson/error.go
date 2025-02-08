@@ -58,7 +58,7 @@ const (
 	// help is missing.
 	ErrMissingDescription
 
-	// ErrNumParams inidcates the number of params supplied do not
+	// ErrNumParams indicates the number of params supplied do not
 	// match the requirements of the associated command.
 	ErrNumParams
 
