@@ -52,7 +52,7 @@ type Indexer interface {
 
 	// ConnectBlock is invoked when a new block has been connected to the
 	// main chain. The set of output spent within a block is also passed in
-	// so indexers can access the pevious output scripts input spent if
+	// so indexers can access the previous output scripts input spent if
 	// required.
 	ConnectBlock(database.Tx, *btcutil.Block, []blockchain.SpentTxOut) error
 
