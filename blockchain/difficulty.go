@@ -191,12 +191,20 @@ func calcNextRequiredDifficulty(lastNode HeaderCtx, newBlockTime time.Time,
 		adjustedTimespan = c.MaxRetargetTimespan()
 	}
 
+	// Special difficulty rule for Testnet4
+	oldTarget := CompactToBig(lastNode.Bits())
+	if c.ChainParams().EnforceBIP94 {
+		// Here we use the first block of the difficulty period. This way
+		// the real difficulty is always preserved in the first block as
+		// it is not allowed to use the min-difficulty exception.
+		oldTarget = CompactToBig(firstNode.Bits())
+	}
+
 	// Calculate new target difficulty as:
 	//  currentDifficulty * (adjustedTimespan / targetTimespan)
 	// The result uses integer division which means it will be slightly
 	// rounded down.  Bitcoind also uses integer division to calculate this
 	// result.
-	oldTarget := CompactToBig(lastNode.Bits())
 	newTarget := new(big.Int).Mul(oldTarget, big.NewInt(adjustedTimespan))
 	targetTimeSpan := int64(c.ChainParams().TargetTimespan / time.Second)
 	newTarget.Div(newTarget, big.NewInt(targetTimeSpan))
