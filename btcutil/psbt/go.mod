@@ -1,6 +1,6 @@
 module github.com/btcsuite/btcd/btcutil/psbt
 
-go 1.17
+go 1.22
 
 require (
 	github.com/btcsuite/btcd v0.23.5-0.20231219003633-4c2ce6daed8f

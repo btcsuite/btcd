@@ -5,7 +5,7 @@ details on how to install on the supported operating systems.
 
 ## Requirements
 
-[Go](http://golang.org) 1.17 or newer.
+[Go](http://golang.org) 1.22 or newer.
 
 ## GPG Verification Key
 
