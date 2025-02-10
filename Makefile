@@ -11,7 +11,7 @@ GOACC_BIN := $(GO_BIN)/go-acc
 LINT_COMMIT := v1.18.0
 GOACC_COMMIT := 80342ae2e0fcf265e99e76bcc4efd022c7c3811b
 
-DEPGET := cd /tmp && go get -v
+DEPGET := cd /tmp && go install -v
 GOBUILD := go build -v
 GOINSTALL := go install -v 
 DEV_TAGS := rpctest
