@@ -17,6 +17,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -294,13 +295,7 @@ func parseAndSetDebugLevels(debugLevel string) error {
 
 // validDbType returns whether or not dbType is a supported database type.
 func validDbType(dbType string) bool {
-	for _, knownType := range knownDbTypes {
-		if dbType == knownType {
-			return true
-		}
-	}
-
-	return false
+	return slices.Contains(knownDbTypes, dbType)
 }
 
 // removeDuplicateAddresses returns a new slice with all duplicate entries in
