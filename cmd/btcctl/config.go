@@ -106,7 +106,8 @@ type config struct {
 	RPCUser        string `short:"u" long:"rpcuser" description:"RPC username"`
 	SimNet         bool   `long:"simnet" description:"Connect to the simulation test network"`
 	TLSSkipVerify  bool   `long:"skipverify" description:"Do not verify tls certificates (not recommended!)"`
-	TestNet3       bool   `long:"testnet" description:"Connect to testnet"`
+	TestNet3       bool   `long:"testnet" description:"Connect to testnet (version 3)"`
+	TestNet4       bool   `long:"testnet4" description:"Connect to testnet (version 4)"`
 	SigNet         bool   `long:"signet" description:"Connect to signet"`
 	ShowVersion    bool   `short:"V" long:"version" description:"Display version information and exit"`
 	Wallet         bool   `long:"wallet" description:"Connect to wallet"`
@@ -124,6 +125,12 @@ func normalizeAddress(addr string, chain *chaincfg.Params, useWallet bool) (stri
 				defaultPort = "18332"
 			} else {
 				defaultPort = "18334"
+			}
+		case &chaincfg.TestNet4Params:
+			if useWallet {
+				defaultPort = "48332"
+			} else {
+				defaultPort = "48334"
 			}
 		case &chaincfg.SimNetParams:
 			if useWallet {
@@ -271,6 +278,10 @@ func loadConfig() (*config, []string, error) {
 	if cfg.TestNet3 {
 		numNets++
 		network = &chaincfg.TestNet3Params
+	}
+	if cfg.TestNet4 {
+		numNets++
+		network = &chaincfg.TestNet4Params
 	}
 	if cfg.SimNet {
 		numNets++
