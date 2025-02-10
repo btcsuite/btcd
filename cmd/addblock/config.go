@@ -31,7 +31,7 @@ var (
 	activeNetParams = &chaincfg.MainNetParams
 )
 
-// config defines the configuration options for findcheckpoint.
+// config defines the configuration options for addblock.
 //
 // See loadConfig for details on the configuration load process.
 type config struct {

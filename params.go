@@ -21,7 +21,7 @@ type params struct {
 }
 
 // mainNetParams contains parameters specific to the main network
-// (wire.MainNet).  NOTE: The RPC port is intentionally different than the
+// (wire.MainNet).  NOTE: The RPC port is intentionally different from the
 // reference implementation because btcd does not handle wallet requests.  The
 // separate wallet process listens on the well-known port and forwards requests
 // it does not handle on to btcd.  This approach allows the wallet process
@@ -41,7 +41,7 @@ var regressionNetParams = params{
 }
 
 // testNet3Params contains parameters specific to the test network (version 3)
-// (wire.TestNet3).  NOTE: The RPC port is intentionally different than the
+// (wire.TestNet3).  NOTE: The RPC port is intentionally different from the
 // reference implementation - see the mainNetParams comment for details.
 var testNet3Params = params{
 	Params:  &chaincfg.TestNet3Params,
