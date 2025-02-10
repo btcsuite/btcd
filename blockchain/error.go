@@ -220,6 +220,10 @@ const (
 	// current chain tip. This is not a block validation rule, but is required
 	// for block proposals submitted via getblocktemplate RPC.
 	ErrPrevBlockNotBest
+
+	// ErrTimewarpAttack indicates a timewarp attack i.e.
+	// when block's timestamp is too early on diff adjustment block.
+	ErrTimewarpAttack
 )
 
 // Map of ErrorCode values back to their constant names for pretty printing.

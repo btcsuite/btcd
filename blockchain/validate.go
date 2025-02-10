@@ -46,6 +46,11 @@ const (
 	// coinbaseHeightAllocSize is the amount of bytes that the
 	// ScriptBuilder will allocate when validating the coinbase height.
 	coinbaseHeightAllocSize = 5
+
+	// maxTimeWarp is a maximum number of seconds that the timestamp of the first
+	// block of a difficulty adjustment period is allowed to
+	// be earlier than the last block of the previous period (BIP94).
+	maxTimeWarp = 600 * time.Second
 )
 
 var (
@@ -684,6 +689,10 @@ func compareScript(height int32, script []byte) error {
 func CheckBlockHeaderContext(header *wire.BlockHeader, prevNode HeaderCtx,
 	flags BehaviorFlags, c ChainCtx, skipCheckpoint bool) error {
 
+	// The height of this block is one more than the referenced previous
+	// block.
+	blockHeight := prevNode.Height() + 1
+
 	fastAdd := flags&BFFastAdd == BFFastAdd
 	if !fastAdd {
 		// Ensure the difficulty specified in the block header matches
@@ -710,11 +719,25 @@ func CheckBlockHeaderContext(header *wire.BlockHeader, prevNode HeaderCtx,
 			str = fmt.Sprintf(str, header.Timestamp, medianTime)
 			return ruleError(ErrTimeTooOld, str)
 		}
-	}
 
-	// The height of this block is one more than the referenced previous
-	// block.
-	blockHeight := prevNode.Height() + 1
+		// Testnet4 only: Check timestamp against prev for difficulty-adjustment
+		// blocks to prevent timewarp attacks.
+		if c.ChainParams().EnforceBIP94 {
+			// Check timestamp for the first block of each difficulty adjustment
+			// interval, except the genesis block.
+			if blockHeight%c.BlocksPerRetarget() == 0 {
+				prevBlockTimestamp := time.Unix(prevNode.Timestamp(), 0)
+				if header.Timestamp.Before(
+					prevBlockTimestamp.Add(-maxTimeWarp)) {
+					str := "block's timestamp %v is too early " +
+						"on diff adjustment block %v"
+					str = fmt.Sprintf(str, header.Timestamp,
+						prevBlockTimestamp)
+					return ruleError(ErrTimewarpAttack, str)
+				}
+			}
+		}
+	}
 
 	// Reject outdated block versions once a majority of the network
 	// has upgraded.  These were originally voted on by BIP0034,
