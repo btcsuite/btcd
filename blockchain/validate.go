@@ -1230,7 +1230,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block, vi
 	if csvState == ThresholdActive {
 		// If the CSV soft-fork is now active, then modify the
 		// scriptFlags to ensure that the CSV op code is properly
-		// validated during the script checks bleow.
+		// validated during the script checks below.
 		scriptFlags |= txscript.ScriptVerifyCheckSequenceVerify
 
 		// We obtain the MTP of the *previous* block in order to
