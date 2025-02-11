@@ -297,7 +297,7 @@ Rejoice as you will now be listed as a [contributor](https://github.com/btcsuite
 
 ## Contribution Checklist
 
-- [&nbsp;&nbsp;] All changes are Go version 1.17 compliant
+- [&nbsp;&nbsp;] All changes are Go version 1.22 compliant
 - [&nbsp;&nbsp;] The code being submitted is commented according to the
   [Code Documentation and Commenting](#CodeDocumentation) section
 - [&nbsp;&nbsp;] For new code: Code is accompanied by tests which exercise both

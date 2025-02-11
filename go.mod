@@ -63,4 +63,4 @@ retract (
 	v0.13.0-beta
 )
 
-go 1.17
+go 1.22

@@ -1,6 +1,6 @@
 module github.com/btcsuite/btcd/btcec/v2
 
-go 1.17
+go 1.22
 
 require (
 	github.com/btcsuite/btcd/chaincfg/chainhash v1.0.1

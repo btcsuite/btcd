@@ -5,7 +5,7 @@ env:
   # go needs absolute directories, using the $HOME variable doesn't work here.
   GOCACHE: /home/runner/work/go/pkg/build
   GOPATH: /home/runner/work/go
-  GO_VERSION: 1.17.5
+  GO_VERSION: 1.22.11
 
 jobs:
   build:
