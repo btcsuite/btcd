@@ -1359,6 +1359,19 @@ func testFetchBlockIO(tc *testContext, tx database.Tx) bool {
 		if !checkDbError(tc.t, testName, err, wantErrCode) {
 			return false
 		}
+
+		// Ensure fetching a block region larger than the block returns
+		// the expected error.
+		testName = fmt.Sprintf("FetchBlockRegion(%s) out of block size",
+			blockHash)
+		wantErrCode = database.ErrBlockRegionInvalid
+		region.Hash = blockHash
+		region.Offset = 0
+		region.Len = uint32(len(blockBytes) + 1)
+		_, err = tx.FetchBlockRegion(&region)
+		if !checkDbError(tc.t, testName, err, wantErrCode) {
+			return false
+		}
 	}
 
 	// -----------------
@@ -1496,6 +1509,20 @@ func testFetchBlockIO(tc *testContext, tx database.Tx) bool {
 	badBlockRegions = badBlockRegions[:len(badBlockRegions)-1]
 	for i := range badBlockRegions {
 		badBlockRegions[i].Offset = ^uint32(0)
+	}
+	wantErrCode = database.ErrBlockRegionInvalid
+	_, err = tx.FetchBlockRegions(badBlockRegions)
+	if !checkDbError(tc.t, testName, err, wantErrCode) {
+		return false
+	}
+
+	// Ensure fetching block regions larger than the block returns the
+	// expected error.
+	testName = "FetchBlockRegions out of bunds"
+	badBlockRegions = badBlockRegions[:len(badBlockRegions)-1]
+	for i := range badBlockRegions {
+		badBlockRegions[i].Offset = 0
+		badBlockRegions[i].Len = uint32(len(allBlockBytes[i]) + 1)
 	}
 	wantErrCode = database.ErrBlockRegionInvalid
 	_, err = tx.FetchBlockRegions(badBlockRegions)
