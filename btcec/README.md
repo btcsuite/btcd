@@ -7,10 +7,10 @@ btcec
 
 Package btcec implements elliptic curve cryptography needed for working with
 Bitcoin (secp256k1 only for now). It is designed so that it may be used with the
-standard crypto/ecdsa packages provided with go.  A comprehensive suite of test
+standard crypto/ecdsa packages provided with go.  A comprehensive suite of tests
 is provided to ensure proper functionality.  Package btcec was originally based
 on work from ThePiachu which is licensed under the same terms as Go, but it has
-significantly diverged since then.  The btcsuite developers original is licensed
+significantly diverged since then.  The btcsuite developers' original is licensed
 under the liberal ISC license.
 
 Although this package was primarily written for btcd, it has intentionally been
@@ -27,7 +27,7 @@ $ go install -u -v github.com/btcsuite/btcd/btcec/v2
 
 * [Sign Message](https://pkg.go.dev/github.com/btcsuite/btcd/btcec/v2#example-package--SignMessage)  
   Demonstrates signing a message with a secp256k1 private key that is first
-  parsed form raw bytes and serializing the generated signature.
+  parsed from raw bytes and serializing the generated signature.
 
 * [Verify Signature](https://pkg.go.dev/github.com/btcsuite/btcd/btcec/v2#example-package--VerifySignature)  
   Demonstrates verifying a secp256k1 signature against a public key that is
