@@ -7,7 +7,7 @@ package gcs
 
 import (
 	"bytes"
-	"fmt"
+	"errors"
 	"io"
 	"sort"
 
@@ -20,11 +20,11 @@ import (
 
 var (
 	// ErrNTooBig signifies that the filter can't handle N items.
-	ErrNTooBig = fmt.Errorf("N is too big to fit in uint32")
+	ErrNTooBig = errors.New("N is too big to fit in uint32")
 
 	// ErrPTooBig signifies that the filter can't handle `1/2**P`
 	// collision probability.
-	ErrPTooBig = fmt.Errorf("P is too big to fit in uint32")
+	ErrPTooBig = errors.New("P is too big to fit in uint32")
 )
 
 const (

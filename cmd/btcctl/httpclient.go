@@ -104,7 +104,7 @@ func sendPostRequest(marshalledJSON []byte, cfg *config) ([]byte, error) {
 	}
 
 	// Handle unsuccessful HTTP responses
-	if httpResponse.StatusCode < 200 || httpResponse.StatusCode >= 300 {
+	if httpResponse.StatusCode < http.StatusOK || httpResponse.StatusCode >= http.StatusMultipleChoices {
 		// Generate a standard error to return if the server body is
 		// empty.  This should not happen very often, but it's better
 		// than showing nothing in case the target server has a poor
