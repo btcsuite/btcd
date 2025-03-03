@@ -1546,7 +1546,7 @@ func TestWitnessForNonWitnessUtxo(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to sign with pubkey 1: %v", err)
 	}
-	if res != SignSuccessful {
+	if res != SignSuccesful {
 		t.Fatalf("signing was not successful, got result %v", res)
 	}
 
@@ -1567,7 +1567,7 @@ func TestWitnessForNonWitnessUtxo(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to sign with pubkey 2: %v", err)
 	}
-	if res != SignSuccessful {
+	if res != SignSuccesful {
 		t.Fatalf("signing was not successful, got result %v", res)
 	}
 
