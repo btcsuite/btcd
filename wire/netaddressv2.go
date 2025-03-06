@@ -3,7 +3,7 @@ package wire
 import (
 	"encoding/base32"
 	"encoding/binary"
-	"fmt"
+	"errors"
 	"io"
 	"net"
 	"strings"
@@ -22,7 +22,7 @@ var (
 	// ErrInvalidAddressSize is an error that means an incorrect address
 	// size was decoded for a networkID or that the address exceeded the
 	// maximum size for an unknown networkID.
-	ErrInvalidAddressSize = fmt.Errorf("invalid address size")
+	ErrInvalidAddressSize = errors.New("invalid address size")
 
 	// ErrSkippedNetworkID is returned when the cjdns, i2p, or unknown
 	// networks are encountered during decoding. btcd does not support i2p
@@ -32,7 +32,7 @@ var (
 	// addresses. This error can also be returned when an OnionCat-encoded
 	// torv2 address is received with the ipv6 networkID. This error
 	// signals to the caller to continue reading.
-	ErrSkippedNetworkID = fmt.Errorf("skipped networkID")
+	ErrSkippedNetworkID = errors.New("skipped networkID")
 )
 
 // maxNetAddressV2Payload returns the max payload size for an address used in
@@ -225,7 +225,7 @@ func writeNetAddressV2(w io.Writer, pver uint32, na *NetAddressV2) error {
 		address = a.addr[:]
 	default:
 		// This should not occur.
-		return fmt.Errorf("unexpected address type")
+		return errors.New("unexpected address type")
 	}
 
 	if err := writeElement(w, netID); err != nil {

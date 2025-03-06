@@ -7,7 +7,7 @@ package builder
 
 import (
 	"crypto/rand"
-	"fmt"
+	"errors"
 	"io"
 	"math"
 
@@ -210,10 +210,10 @@ func (b *GCSBuilder) Build() (*gcs.Filter, error) {
 	// We'll ensure that all the parameters we need to actually build the
 	// filter properly are set.
 	if b.p == 0 {
-		return nil, fmt.Errorf("p value is not set, cannot build")
+		return nil, errors.New("p value is not set, cannot build")
 	}
 	if b.m == 0 {
-		return nil, fmt.Errorf("m value is not set, cannot build")
+		return nil, errors.New("m value is not set, cannot build")
 	}
 
 	dataSlice := make([][]byte, 0, len(b.data))

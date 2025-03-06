@@ -4,7 +4,7 @@ package musig2
 
 import (
 	"bytes"
-	"fmt"
+	"errors"
 	"io"
 
 	secp "github.com/decred/dcrd/dcrec/secp256k1/v4"
@@ -24,28 +24,28 @@ var (
 
 	// ErrNoncePointAtInfinity is returned if during signing, the fully
 	// combined public nonce is the point at infinity.
-	ErrNoncePointAtInfinity = fmt.Errorf("signing nonce is the infinity " +
+	ErrNoncePointAtInfinity = errors.New("signing nonce is the infinity " +
 		"point")
 
 	// ErrPrivKeyZero is returned when the private key for signing is
 	// actually zero.
-	ErrPrivKeyZero = fmt.Errorf("priv key is zero")
+	ErrPrivKeyZero = errors.New("priv key is zero")
 
 	// ErrPartialSigInvalid is returned when a partial is found to be
 	// invalid.
-	ErrPartialSigInvalid = fmt.Errorf("partial signature is invalid")
+	ErrPartialSigInvalid = errors.New("partial signature is invalid")
 
 	// ErrSecretNonceZero is returned when a secret nonce is passed in a
 	// zero.
-	ErrSecretNonceZero = fmt.Errorf("secret nonce is blank")
+	ErrSecretNonceZero = errors.New("secret nonce is blank")
 
 	// ErrSecNoncePubkey is returned when the signing key does not match the
 	// sec nonce pubkey
-	ErrSecNoncePubkey = fmt.Errorf("public key does not match secnonce")
+	ErrSecNoncePubkey = errors.New("public key does not match secnonce")
 
 	// ErrPubkeyNotIncluded is returned when the signers pubkey is not included
 	// in the list of pubkeys.
-	ErrPubkeyNotIncluded = fmt.Errorf("signer's pubkey must be included" +
+	ErrPubkeyNotIncluded = errors.New("signer's pubkey must be included" +
 		" in the list of pubkeys")
 )
 
@@ -397,7 +397,7 @@ func Sign(secNonce [SecNonceSize]byte, privKey *btcec.PrivateKey,
 			signOpts...,
 		)
 		if !sigValid {
-			return nil, fmt.Errorf("sig is invalid!")
+			return nil, errors.New("sig is invalid!")
 		}
 	}
 
