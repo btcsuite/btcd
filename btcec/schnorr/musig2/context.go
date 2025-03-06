@@ -3,8 +3,7 @@
 package musig2
 
 import (
-	"fmt"
-
+	"errors"
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 )
@@ -13,52 +12,52 @@ var (
 	// ErrSignersNotSpecified is returned when a caller attempts to create
 	// a context without specifying either the total number of signers, or
 	// the complete set of singers.
-	ErrSignersNotSpecified = fmt.Errorf("total number of signers or all " +
+	ErrSignersNotSpecified = errors.New("total number of signers or all " +
 		"signers must be known")
 
 	// ErrSignerNotInKeySet is returned when a the private key for a signer
 	// isn't included in the set of signing public keys.
-	ErrSignerNotInKeySet = fmt.Errorf("signing key is not found in key" +
+	ErrSignerNotInKeySet = errors.New("signing key is not found in key" +
 		" set")
 
 	// ErrAlredyHaveAllNonces is called when RegisterPubNonce is called too
 	// many times for a given signing session.
-	ErrAlredyHaveAllNonces = fmt.Errorf("already have all nonces")
+	ErrAlredyHaveAllNonces = errors.New("already have all nonces")
 
 	// ErrNotEnoughSigners is returned when a caller attempts to create a
 	// session from a context, but before all the required signers are
 	// known.
-	ErrNotEnoughSigners = fmt.Errorf("not enough signers")
+	ErrNotEnoughSigners = errors.New("not enough signers")
 
 	// ErrAlredyHaveAllNonces is returned when a caller attempts to
 	// register a signer, once we already have the total set of known
 	// signers.
-	ErrAlreadyHaveAllSigners = fmt.Errorf("all signers registered")
+	ErrAlreadyHaveAllSigners = errors.New("all signers registered")
 
 	// ErrAlredyHaveAllSigs is called when CombineSig is called too many
 	// times for a given signing session.
-	ErrAlredyHaveAllSigs = fmt.Errorf("already have all sigs")
+	ErrAlredyHaveAllSigs = errors.New("already have all sigs")
 
 	// ErrSigningContextReuse is returned if a user attempts to sign using
 	// the same signing context more than once.
-	ErrSigningContextReuse = fmt.Errorf("nonce already used")
+	ErrSigningContextReuse = errors.New("nonce already used")
 
 	// ErrFinalSigInvalid is returned when the combined signature turns out
 	// to be invalid.
-	ErrFinalSigInvalid = fmt.Errorf("final signature is invalid")
+	ErrFinalSigInvalid = errors.New("final signature is invalid")
 
 	// ErrCombinedNonceUnavailable is returned when a caller attempts to
 	// sign a partial signature, without first having collected all the
 	// required combined nonces.
-	ErrCombinedNonceUnavailable = fmt.Errorf("missing combined nonce")
+	ErrCombinedNonceUnavailable = errors.New("missing combined nonce")
 
 	// ErrTaprootInternalKeyUnavailable is returned when a user attempts to
 	// obtain the
-	ErrTaprootInternalKeyUnavailable = fmt.Errorf("taproot tweak not used")
+	ErrTaprootInternalKeyUnavailable = errors.New("taproot tweak not used")
 
 	// ErrNotEnoughSigners is returned if a caller attempts to obtain an
 	// early nonce when it wasn't specified
-	ErrNoEarlyNonce = fmt.Errorf("no early nonce available")
+	ErrNoEarlyNonce = errors.New("no early nonce available")
 )
 
 // Context is a managed signing context for musig2. It takes care of things

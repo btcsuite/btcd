@@ -6,6 +6,7 @@ package wire
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"unicode/utf8"
@@ -81,11 +82,11 @@ const (
 var LatestEncoding = WitnessEncoding
 
 // ErrUnknownMessage is the error returned when decoding an unknown message.
-var ErrUnknownMessage = fmt.Errorf("received unknown message")
+var ErrUnknownMessage = errors.New("received unknown message")
 
 // ErrInvalidHandshake is the error returned when a peer sends us a known
 // message that does not belong in the version-verack handshake.
-var ErrInvalidHandshake = fmt.Errorf("invalid message during handshake")
+var ErrInvalidHandshake = errors.New("invalid message during handshake")
 
 // Message is an interface that describes a bitcoin message.  A type that
 // implements Message has complete control over the representation of its data
