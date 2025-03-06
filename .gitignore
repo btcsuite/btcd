@@ -52,3 +52,5 @@ btcutil/psbt/coverage.txt
 /btcd
 /findcheckpoint
 /gencerts
+
+.DS_Store
