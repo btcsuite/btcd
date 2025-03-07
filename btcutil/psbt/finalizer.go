@@ -13,6 +13,7 @@ package psbt
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
@@ -547,7 +548,7 @@ func finalizeTaprootInput(p *Packet, inIndex int) error {
 		targetLeafHash := pInput.TaprootScriptSpendSig[0].LeafHash
 		leafScript, err := FindLeafScript(pInput, targetLeafHash)
 		if err != nil {
-			return fmt.Errorf("control block for script spend " +
+			return errors.New("control block for script spend " +
 				"signature not found")
 		}
 

@@ -5,6 +5,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -134,7 +135,7 @@ func normalizeAddress(addr string, chain *chaincfg.Params, useWallet bool) (stri
 		case &chaincfg.RegressionNetParams:
 			if useWallet {
 				// TODO: add port once regtest is supported in btcwallet
-				paramErr := fmt.Errorf("cannot use -wallet with -regtest, btcwallet not yet compatible with regtest")
+				paramErr := errors.New("cannot use -wallet with -regtest, btcwallet not yet compatible with regtest")
 				return "", paramErr
 			} else {
 				defaultPort = "18334"
