@@ -15,7 +15,8 @@ import (
 var log = btclog.Disabled
 
 const (
-	LevelDB = "ffldb"
+	LevelDB  = "ffldb"
+	PebbleDB = "pebbledb"
 )
 
 // parseArgs parses the arguments from the database Open/Create methods.
@@ -74,6 +75,12 @@ func init() {
 	drivers := []database.Driver{
 		{
 			DbType:    LevelDB,
+			Create:    createDBDriver,
+			Open:      openDBDriver,
+			UseLogger: useLogger,
+		},
+		{
+			DbType:    PebbleDB,
 			Create:    createDBDriver,
 			Open:      openDBDriver,
 			UseLogger: useLogger,

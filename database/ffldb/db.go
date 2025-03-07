@@ -19,6 +19,7 @@ import (
 	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcd/database/engine"
 	"github.com/btcsuite/btcd/database/engine/leveldb"
+	"github.com/btcsuite/btcd/database/engine/pebbledb"
 	"github.com/btcsuite/btcd/database/internal/treap"
 	"github.com/btcsuite/btcd/wire"
 
@@ -143,13 +144,13 @@ func convertErr(desc string, dbErr error) database.Error {
 		code = database.ErrCorruption
 
 	// Database open/create errors.
-	case dbErr == ldb.ErrClosed:
+	case dbErr == ldb.ErrClosed, dbErr == pebbledb.ErrDbClosed:
 		code = database.ErrDbNotOpen
 
 	// Transaction errors.
-	case dbErr == ldb.ErrSnapshotReleased:
+	case dbErr == ldb.ErrSnapshotReleased, dbErr == pebbledb.ErrSnapshotReleased:
 		code = database.ErrTxClosed
-	case dbErr == ldb.ErrIterReleased:
+	case dbErr == ldb.ErrIterReleased, dbErr == pebbledb.ErrIteratorReleased:
 		code = database.ErrTxClosed
 	}
 
@@ -2137,6 +2138,8 @@ func openDB(dbType string, dbPath string, network wire.BitcoinNet, create bool) 
 	var dbEngine engine.Engine
 	var err error
 	switch dbType {
+	case PebbleDB:
+		dbEngine, err = pebbledb.NewDB(metadataDbPath, create, 0, 0)
 	case LevelDB:
 		dbEngine, err = leveldb.NewDB(metadataDbPath, create)
 	default:
