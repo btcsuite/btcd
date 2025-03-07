@@ -165,8 +165,8 @@ func TestConvertErr(t *testing.T) {
 func TestCornerCases(t *testing.T) {
 	t.Parallel()
 
-	// Create a file at the datapase path to force the open below to fail.
-	dbPath := filepath.Join(os.TempDir(), "ffldb-errors")
+	// Create a file at the database path to force the open below to fail.
+	dbPath := filepath.Join(t.TempDir(), "ffldb-errors")
 	_ = os.RemoveAll(dbPath)
 	fi, err := os.Create(dbPath)
 	if err != nil {
@@ -603,14 +603,13 @@ func testCorruption(tc *testContext) bool {
 // correctly.
 func TestFailureScenarios(t *testing.T) {
 	// Create a new database to run tests against.
-	dbPath := filepath.Join(os.TempDir(), "ffldb-failurescenarios")
+	dbPath := filepath.Join(t.TempDir(), "ffldb-failurescenarios")
 	_ = os.RemoveAll(dbPath)
 	idb, err := database.Create(dbType, dbPath, blockDataNet)
 	if err != nil {
 		t.Errorf("Failed to create test database (%s) %v", dbType, err)
 		return
 	}
-	defer os.RemoveAll(dbPath)
 	defer idb.Close()
 
 	// Create a test context to pass around.
