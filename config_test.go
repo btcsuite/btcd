@@ -22,10 +22,7 @@ func TestCreateDefaultConfigFile(t *testing.T) {
 	sampleConfigFile := filepath.Join(filepath.Dir(path), "sample-btcd.conf")
 
 	// Setup a temporary directory
-	tmpDir, err := os.MkdirTemp("", "btcd")
-	if err != nil {
-		t.Fatalf("Failed creating a temporary directory: %v", err)
-	}
+	tmpDir := t.TempDir()
 	testpath := filepath.Join(tmpDir, "test.conf")
 
 	// copy config file to location of btcd binary
@@ -42,13 +39,6 @@ func TestCreateDefaultConfigFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed copying sample config file: %v", err)
 	}
-
-	// Clean-up
-	defer func() {
-		os.Remove(testpath)
-		os.Remove(tmpConfigFile)
-		os.Remove(tmpDir)
-	}()
 
 	err = createDefaultConfigFile(testpath)
 
