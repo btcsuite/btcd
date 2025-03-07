@@ -179,7 +179,7 @@ func TestCornerCases(t *testing.T) {
 	// directory is needed.
 	testName := "openDB: fail due to file at target location"
 	wantErrCode := database.ErrDriverSpecific
-	idb, err := openDB(dbPath, blockDataNet, true)
+	idb, err := openDB(LevelDB, dbPath, blockDataNet, true)
 	if !checkDbError(t, testName, err, wantErrCode) {
 		if err == nil {
 			idb.Close()
@@ -191,7 +191,7 @@ func TestCornerCases(t *testing.T) {
 	// Remove the file and create the database to run tests against.  It
 	// should be successful this time.
 	_ = os.RemoveAll(dbPath)
-	idb, err = openDB(dbPath, blockDataNet, true)
+	idb, err = openDB(LevelDB, dbPath, blockDataNet, true)
 	if err != nil {
 		t.Errorf("openDB: unexpected error: %v", err)
 		return
@@ -605,9 +605,9 @@ func TestFailureScenarios(t *testing.T) {
 	// Create a new database to run tests against.
 	dbPath := filepath.Join(t.TempDir(), "ffldb-failurescenarios")
 	_ = os.RemoveAll(dbPath)
-	idb, err := database.Create(dbType, dbPath, blockDataNet)
+	idb, err := database.Create(LevelDB, dbPath, blockDataNet)
 	if err != nil {
-		t.Errorf("Failed to create test database (%s) %v", dbType, err)
+		t.Errorf("Failed to create test database (%s) %v", LevelDB, err)
 		return
 	}
 	defer idb.Close()

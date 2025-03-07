@@ -1860,6 +1860,8 @@ func (tx *transaction) Rollback() error {
 // the database.DB interface.  All database access is performed through
 // transactions which are obtained through the specific Namespace.
 type db struct {
+	dbType string
+
 	writeLock sync.Mutex   // Limit to one write transaction at a time.
 	closeLock sync.RWMutex // Make database close block while txns active.
 	closed    bool         // Is the database closed?
@@ -1875,7 +1877,7 @@ var _ database.DB = (*db)(nil)
 //
 // This function is part of the database.DB interface implementation.
 func (db *db) Type() string {
-	return dbType
+	return db.dbType
 }
 
 // begin is the implementation function for the Begin database method.  See its
@@ -2115,7 +2117,7 @@ func initDB(ldb *leveldb.DB) error {
 
 // openDB opens the database at the provided path.  database.ErrDbDoesNotExist
 // is returned if the database doesn't exist and the create flag is not set.
-func openDB(dbPath string, network wire.BitcoinNet, create bool) (database.DB, error) {
+func openDB(dbType string, dbPath string, network wire.BitcoinNet, create bool) (database.DB, error) {
 	// Error if the database doesn't exist and the create flag is not set.
 	metadataDbPath := filepath.Join(dbPath, metadataDbName)
 	dbExists := fileExists(metadataDbPath)
@@ -2154,7 +2156,7 @@ func openDB(dbPath string, network wire.BitcoinNet, create bool) (database.DB, e
 		return nil, convertErr(err.Error(), err)
 	}
 	cache := newDbCache(ldb, store, defaultCacheSize, defaultFlushSecs)
-	pdb := &db{store: store, cache: cache}
+	pdb := &db{dbType: dbType, store: store, cache: cache}
 
 	// Perform any reconciliation needed between the block and metadata as
 	// well as database initialization, if needed.
