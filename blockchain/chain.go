@@ -96,6 +96,7 @@ type BlockChain struct {
 	// separate mutex.
 	checkpoints         []chaincfg.Checkpoint
 	checkpointsByHeight map[int32]*chaincfg.Checkpoint
+	assumeValidHash     *chainhash.Hash
 	db                  database.DB
 	chainParams         *chaincfg.Params
 	timeSource          MedianTimeSource
@@ -2174,6 +2175,7 @@ func New(config *Config) (*BlockChain, error) {
 	targetTimePerBlock := int64(params.TargetTimePerBlock / time.Second)
 	adjustmentFactor := params.RetargetAdjustmentFactor
 	b := BlockChain{
+		assumeValidHash:     params.AssumeValid,
 		checkpoints:         config.Checkpoints,
 		checkpointsByHeight: checkpointsByHeight,
 		db:                  config.DB,
