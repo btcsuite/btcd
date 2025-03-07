@@ -17,15 +17,13 @@ import (
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/database"
+	"github.com/btcsuite/btcd/database/engine"
+	"github.com/btcsuite/btcd/database/engine/leveldb"
 	"github.com/btcsuite/btcd/database/internal/treap"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/syndtr/goleveldb/leveldb"
-	"github.com/syndtr/goleveldb/leveldb/comparer"
+
+	ldb "github.com/syndtr/goleveldb/leveldb"
 	ldberrors "github.com/syndtr/goleveldb/leveldb/errors"
-	"github.com/syndtr/goleveldb/leveldb/filter"
-	"github.com/syndtr/goleveldb/leveldb/iterator"
-	"github.com/syndtr/goleveldb/leveldb/opt"
-	"github.com/syndtr/goleveldb/leveldb/util"
 )
 
 const (
@@ -131,35 +129,35 @@ func makeDbErr(c database.ErrorCode, desc string, err error) database.Error {
 	return database.Error{ErrorCode: c, Description: desc, Err: err}
 }
 
-// convertErr converts the passed leveldb error into a database error with an
+// convertErr converts the passed db engine error into a database error with an
 // equivalent error code  and the passed description.  It also sets the passed
 // error as the underlying error.
-func convertErr(desc string, ldbErr error) database.Error {
+func convertErr(desc string, dbErr error) database.Error {
 	// Use the driver-specific error code by default.  The code below will
 	// update this with the converted error if it's recognized.
 	var code = database.ErrDriverSpecific
 
 	switch {
 	// Database corruption errors.
-	case ldberrors.IsCorrupted(ldbErr):
+	case ldberrors.IsCorrupted(dbErr):
 		code = database.ErrCorruption
 
 	// Database open/create errors.
-	case ldbErr == leveldb.ErrClosed:
+	case dbErr == ldb.ErrClosed:
 		code = database.ErrDbNotOpen
 
 	// Transaction errors.
-	case ldbErr == leveldb.ErrSnapshotReleased:
+	case dbErr == ldb.ErrSnapshotReleased:
 		code = database.ErrTxClosed
-	case ldbErr == leveldb.ErrIterReleased:
+	case dbErr == ldb.ErrIterReleased:
 		code = database.ErrTxClosed
 	}
 
-	return database.Error{ErrorCode: code, Description: desc, Err: ldbErr}
+	return database.Error{ErrorCode: code, Description: desc, Err: dbErr}
 }
 
 // copySlice returns a copy of the passed slice.  This is mostly used to copy
-// leveldb iterator keys and values since they are only valid until the iterator
+// db iterator keys and values since they are only valid until the iterator
 // is moved instead of during the entirety of the transaction.
 func copySlice(slice []byte) []byte {
 	ret := make([]byte, len(slice))
@@ -171,9 +169,9 @@ func copySlice(slice []byte) []byte {
 // and nested buckets of a bucket and implements the database.Cursor interface.
 type cursor struct {
 	bucket      *bucket
-	dbIter      iterator.Iterator
-	pendingIter iterator.Iterator
-	currentIter iterator.Iterator
+	dbIter      engine.Iterator
+	pendingIter engine.Iterator
+	currentIter engine.Iterator
 }
 
 // Enforce cursor implements the database.Cursor interface.
@@ -491,10 +489,10 @@ func cursorFinalizer(c *cursor) {
 // NOTE: The caller is responsible for calling the cursorFinalizer function on
 // the returned cursor.
 func newCursor(b *bucket, bucketID []byte, cursorTyp cursorType) *cursor {
-	var dbIter, pendingIter iterator.Iterator
+	var dbIter, pendingIter engine.Iterator
 	switch cursorTyp {
 	case ctKeys:
-		keyRange := util.BytesPrefix(bucketID)
+		keyRange := engine.BytesPrefix(bucketID)
 		dbIter = b.tx.snapshot.NewIterator(keyRange)
 		pendingKeyIter := newLdbTreapIter(b.tx, keyRange)
 		pendingIter = pendingKeyIter
@@ -509,7 +507,7 @@ func newCursor(b *bucket, bucketID []byte, cursorTyp cursorType) *cursor {
 		prefix := make([]byte, len(bucketIndexPrefix)+4)
 		copy(prefix, bucketIndexPrefix)
 		copy(prefix[len(bucketIndexPrefix):], bucketID)
-		bucketRange := util.BytesPrefix(prefix)
+		bucketRange := engine.BytesPrefix(prefix)
 
 		dbIter = b.tx.snapshot.NewIterator(bucketRange)
 		pendingBucketIter := newLdbTreapIter(b.tx, bucketRange)
@@ -523,26 +521,26 @@ func newCursor(b *bucket, bucketID []byte, cursorTyp cursorType) *cursor {
 		prefix := make([]byte, len(bucketIndexPrefix)+4)
 		copy(prefix, bucketIndexPrefix)
 		copy(prefix[len(bucketIndexPrefix):], bucketID)
-		bucketRange := util.BytesPrefix(prefix)
-		keyRange := util.BytesPrefix(bucketID)
+		bucketRange := engine.BytesPrefix(prefix)
+		keyRange := engine.BytesPrefix(bucketID)
 
 		// Since both keys and buckets are needed from the database,
 		// create an individual iterator for each prefix and then create
 		// a merged iterator from them.
 		dbKeyIter := b.tx.snapshot.NewIterator(keyRange)
 		dbBucketIter := b.tx.snapshot.NewIterator(bucketRange)
-		iters := []iterator.Iterator{dbKeyIter, dbBucketIter}
-		dbIter = iterator.NewMergedIterator(iters,
-			comparer.DefaultComparer, true)
+		iters := []engine.Iterator{dbKeyIter, dbBucketIter}
+		dbIter = engine.NewMergedIterator(iters,
+			engine.DefaultComparer, true)
 
 		// Since both keys and buckets are needed from the pending keys,
 		// create an individual iterator for each prefix and then create
 		// a merged iterator from them.
 		pendingKeyIter := newLdbTreapIter(b.tx, keyRange)
 		pendingBucketIter := newLdbTreapIter(b.tx, bucketRange)
-		iters = []iterator.Iterator{pendingKeyIter, pendingBucketIter}
-		pendingIter = iterator.NewMergedIterator(iters,
-			comparer.DefaultComparer, true)
+		iters = []engine.Iterator{pendingKeyIter, pendingBucketIter}
+		pendingIter = engine.NewMergedIterator(iters,
+			engine.DefaultComparer, true)
 	}
 
 	// Create the cursor using the iterators.
@@ -1866,7 +1864,7 @@ type db struct {
 	closeLock sync.RWMutex // Make database close block while txns active.
 	closed    bool         // Is the database closed?
 	store     *blockStore  // Handles read/writing blocks to flat files.
-	cache     *dbCache     // Cache layer which wraps underlying leveldb DB.
+	cache     *dbCache     // Cache layer which wraps underlying DB engine.
 }
 
 // Enforce db implements the database.DB interface.
@@ -2054,7 +2052,7 @@ func (db *db) Close() error {
 	// cache and clear all state without the individual locks.
 
 	// Close the database cache which will flush any existing entries to
-	// disk and close the underlying leveldb database.  Any error is saved
+	// disk and close the underlying database.  Any error is saved
 	// and returned at the end after the remaining cleanup since the
 	// database will be marked closed even if this fails given there is no
 	// good way for the caller to recover from a failure here anyways.
@@ -2088,11 +2086,13 @@ func fileExists(name string) bool {
 
 // initDB creates the initial buckets and values used by the package.  This is
 // mainly in a separate function for testing purposes.
-func initDB(ldb *leveldb.DB) error {
-	// The starting block file write cursor location is file num 0, offset
-	// 0.
-	batch := new(leveldb.Batch)
-	batch.Put(bucketizedKey(metadataBucketID, writeLocKeyName),
+func initDB(engine engine.Engine) error {
+	// The starting block file write cursor location is file num 0, offset 0.
+	tx, err := engine.Transaction()
+	if err != nil {
+		return convertErr(err.Error(), err)
+	}
+	tx.Put(bucketizedKey(metadataBucketID, writeLocKeyName),
 		serializeWriteRow(0, 0))
 
 	// Create block index bucket and set the current bucket id.
@@ -2101,14 +2101,13 @@ func initDB(ldb *leveldb.DB) error {
 	// there is no need to store the bucket index data for the metadata
 	// bucket in the database.  However, the first bucket ID to use does
 	// need to account for it to ensure there are no key collisions.
-	batch.Put(bucketIndexKey(metadataBucketID, blockIdxBucketName),
+	tx.Put(bucketIndexKey(metadataBucketID, blockIdxBucketName),
 		blockIdxBucketID[:])
-	batch.Put(curBucketIDKeyName, blockIdxBucketID[:])
+	tx.Put(curBucketIDKeyName, blockIdxBucketID[:])
 
-	// Write everything as a single batch.
-	if err := ldb.Write(batch, nil); err != nil {
-		str := fmt.Sprintf("failed to initialize metadata database: %v",
-			err)
+	// Apply the batch write.
+	if err := tx.Commit(); err != nil {
+		str := fmt.Sprintf("failed to initialize metadata database: %v", err)
 		return convertErr(str, err)
 	}
 
@@ -2129,19 +2128,20 @@ func openDB(dbType string, dbPath string, network wire.BitcoinNet, create bool) 
 	// Ensure the full path to the database exists.
 	if !dbExists {
 		// The error can be ignored here since the call to
-		// leveldb.OpenFile will fail if the directory couldn't be
+		// db Open will fail if the directory couldn't be
 		// created.
 		_ = os.MkdirAll(dbPath, 0700)
 	}
 
 	// Open the metadata database (will create it if needed).
-	opts := opt.Options{
-		ErrorIfExist: create,
-		Strict:       opt.DefaultStrict,
-		Compression:  opt.NoCompression,
-		Filter:       filter.NewBloomFilter(10),
+	var dbEngine engine.Engine
+	var err error
+	switch dbType {
+	case LevelDB:
+		dbEngine, err = leveldb.NewDB(metadataDbPath, create)
+	default:
+		err = fmt.Errorf("driver %q is not registered", dbType)
 	}
-	ldb, err := leveldb.OpenFile(metadataDbPath, &opts)
 	if err != nil {
 		return nil, convertErr(err.Error(), err)
 	}
@@ -2149,16 +2149,16 @@ func openDB(dbType string, dbPath string, network wire.BitcoinNet, create bool) 
 	// Create the block store which includes scanning the existing flat
 	// block files to find what the current write cursor position is
 	// according to the data that is actually on disk.  Also create the
-	// database cache which wraps the underlying leveldb database to provide
+	// database cache which wraps the underlying database to provide
 	// write caching.
 	store, err := newBlockStore(dbPath, network)
 	if err != nil {
 		return nil, convertErr(err.Error(), err)
 	}
-	cache := newDbCache(ldb, store, defaultCacheSize, defaultFlushSecs)
-	pdb := &db{dbType: dbType, store: store, cache: cache}
+	cache := newDbCache(dbEngine, store, defaultCacheSize, defaultFlushSecs)
+	db := &db{dbType: dbType, store: store, cache: cache}
 
 	// Perform any reconciliation needed between the block and metadata as
 	// well as database initialization, if needed.
-	return reconcileDB(pdb, create)
+	return reconcileDB(db, create)
 }
