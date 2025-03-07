@@ -11,9 +11,9 @@ Steps for reviewers to follow to test the change.
 - [ ] Bug fixes contain tests triggering the bug to prevent regressions.
 
 ### Code Style and Documentation
-- [ ] The change is not [insubstantial](https://github.com/lightningnetwork/lnd/blob/master/docs/code_contribution_guidelines.md#substantial-contributions-only). Typo fixes are not accepted to fight bot spam.
-- [ ] The change obeys the [Code Documentation and Commenting](https://github.com/lightningnetwork/lnd/blob/master/docs/code_contribution_guidelines.md#code-documentation-and-commenting) guidelines, and lines wrap at 80.
-- [ ] Commits follow the [Ideal Git Commit Structure](https://github.com/lightningnetwork/lnd/blob/master/docs/code_contribution_guidelines.md#ideal-git-commit-structure).
+- [ ] The change is not [insubstantial](https://github.com/btcsuite/btcd/master/docs/code_contribution_guidelines.md#substantial-contributions-only). Typo fixes are not accepted to fight bot spam.
+- [ ] The change obeys the [Code Documentation and Commenting](https://github.com/btcsuite/btcd/blob/master/docs/code_contribution_guidelines.md#code-documentation-and-commenting) guidelines, and lines wrap at 80.
+- [ ] Commits follow the [Ideal Git Commit Structure](https://github.com/btcsuite/btcd/blob/master/docs/code_contribution_guidelines.md#model-git-commit-messages). 
 - [ ] Any new logging statements use an appropriate subsystem and logging level.
 
-📝 Please see our [Contribution Guidelines](https://github.com/lightningnetwork/lnd/blob/master/docs/code_contribution_guidelines.md) for further guidance.
+📝 Please see our [Contribution Guidelines](https://github.com/btcsuite/btcd/blob/master/docs/code_contribution_guidelines.md) for further guidance.
