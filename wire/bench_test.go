@@ -9,7 +9,6 @@ import (
 	"compress/bzip2"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"os"
 	"testing"
@@ -592,7 +591,7 @@ func BenchmarkDeserializeTxLarge(b *testing.B) {
 		b.Fatalf("Failed to read transaction data: %v", err)
 	}
 	defer fi.Close()
-	buf, err := ioutil.ReadAll(bzip2.NewReader(fi))
+	buf, err := io.ReadAll(bzip2.NewReader(fi))
 	if err != nil {
 		b.Fatalf("Failed to read transaction data: %v", err)
 	}
@@ -713,7 +712,7 @@ func BenchmarkSerializeTxLarge(b *testing.B) {
 		b.Fatalf("Failed to read transaction data: %v", err)
 	}
 	defer fi.Close()
-	buf, err := ioutil.ReadAll(bzip2.NewReader(fi))
+	buf, err := io.ReadAll(bzip2.NewReader(fi))
 	if err != nil {
 		b.Fatalf("Failed to read transaction data: %v", err)
 	}
