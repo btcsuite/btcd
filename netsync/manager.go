@@ -309,6 +309,11 @@ func (sm *SyncManager) startSync() {
 		higherPeers = append(higherPeers, peer)
 	}
 
+	if sm.chain.IsCurrent() && len(higherPeers) == 0 {
+		log.Infof("Caught up to block %s(%d)", best.Hash.String(), best.Height)
+		return
+	}
+
 	// Pick randomly from the set of peers greater than our block height,
 	// falling back to a random peer of the same height if none are greater.
 	//
