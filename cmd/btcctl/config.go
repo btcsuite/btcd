@@ -6,7 +6,7 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net"
 	"os"
 	"path/filepath"
@@ -322,7 +322,7 @@ func createDefaultConfigFile(destinationPath, serverConfigPath string) error {
 		return err
 	}
 	defer serverConfigFile.Close()
-	content, err := ioutil.ReadAll(serverConfigFile)
+	content, err := io.ReadAll(serverConfigFile)
 	if err != nil {
 		return err
 	}

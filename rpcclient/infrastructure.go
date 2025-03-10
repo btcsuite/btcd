@@ -15,7 +15,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math"
 	"net"
 	"net/http"
@@ -852,7 +851,7 @@ func (c *Client) handleSendPostMessage(jReq *jsonRequest) {
 	}
 
 	// Read the raw bytes and close the response.
-	respBytes, err := ioutil.ReadAll(httpResponse.Body)
+	respBytes, err := io.ReadAll(httpResponse.Body)
 	httpResponse.Body.Close()
 	if err != nil {
 		err = fmt.Errorf("error reading json reply: %v", err)
