@@ -19,6 +19,20 @@ is outlined on this page.
 We highly encourage code contributions, however it is imperative that you adhere
 to the guidelines established on this page.
 
+## Substantial contributions only
+
+Due to the prevalence of automated analysis and pull request authoring tools
+and online competitions that incentivize creating commits in popular
+repositories, the maintainers of this project are flooded with trivial pull
+requests that only change some typos or other insubstantial content (e.g. the
+year in the license file).
+If you are an honest user that wants to contribute to this project, please
+consider that every pull request takes precious time from the maintainers to
+review and consider the impact of changes. Time that could be spent writing
+features or fixing bugs.
+If you really want to contribute, consider reviewing and testing other users'
+pull requests instead. Or add value to the project by writing unit tests.
+
 ## Minimum Recommended Skillset
 
 The following list is a set of core competencies that we recommend you possess
@@ -181,6 +195,11 @@ if amt < 5460 {
 **NOTE:** The above should really use a constant as opposed to a magic number,
 but it was left as a magic number to show how much of a difference a good
 comment can make.
+
+**Please refer to the [code formatting rules
+document](./code_formatting_rules.md)** to see the list of additional style
+rules we enforce.
+
 
 ## Model Git Commit Messages
 
