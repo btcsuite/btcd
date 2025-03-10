@@ -102,6 +102,11 @@ type thresholdConditionChecker interface {
 	// not the bit associated with the condition is set, but can be more
 	// complex as needed.
 	Condition(*blockNode) (bool, error)
+
+	// ForceActive returns if the deployment should be forced to transition
+	// to the active state. This is useful on certain testnet, where we
+	// we'd like for a deployment to always be active.
+	ForceActive(*blockNode) bool
 }
 
 // thresholdStateCache provides a type to cache the threshold states of each
@@ -279,7 +284,17 @@ func thresholdStateTransition(state ThresholdState, prevNode *blockNode,
 // threshold states for previous windows are only calculated once.
 //
 // This function MUST be called with the chain state lock held (for writes).
-func (b *BlockChain) thresholdState(prevNode *blockNode, checker thresholdConditionChecker, cache *thresholdStateCache) (ThresholdState, error) {
+func (b *BlockChain) thresholdState(prevNode *blockNode,
+	checker thresholdConditionChecker,
+	cache *thresholdStateCache) (ThresholdState, error) {
+
+	// If the deployment has a nonzero AlwaysActiveHeight and the next
+	// block’s height is at or above that threshold, then force the state
+	// to Active.
+	if checker.ForceActive(prevNode) {
+		return ThresholdActive, nil
+	}
+
 	// The threshold state for the window that contains the genesis block is
 	// defined by definition.
 	confirmationWindow := int32(checker.MinerConfirmationWindow())

@@ -57,3 +57,4 @@ btcutil/psbt/coverage.txt
 /gencerts
 
 .DS_Store
+.aider*
