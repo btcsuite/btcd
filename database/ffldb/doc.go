@@ -3,10 +3,10 @@
 // license that can be found in the LICENSE file.
 
 /*
-Package ffldb implements a driver for the database package that uses leveldb
+Package ffldb implements a driver for the database package that uses db engine
 for the backing metadata and flat files for block storage.
 
-This driver is the recommended driver for use with btcd.  It makes use leveldb
+This driver is the recommended driver for use with btcd.  It makes use db engine
 for the metadata, flat files for block storage, and checksums in key areas to
 ensure data integrity.
 
