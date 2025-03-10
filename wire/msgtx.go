@@ -115,7 +115,7 @@ const (
 var (
 	// errSuperfluousWitnessRecord is returned during tx deserialization when
 	// a tx has the witness marker flag set but has no witnesses.
-	errSuperfluousWitnessRecord = fmt.Errorf(
+	errSuperfluousWitnessRecord = errors.New(
 		"witness flag set but tx has no witnesses",
 	)
 )

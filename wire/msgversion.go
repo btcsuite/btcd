@@ -6,6 +6,7 @@ package wire
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -79,7 +80,7 @@ func (msg *MsgVersion) AddService(service ServiceFlag) {
 func (msg *MsgVersion) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) error {
 	buf, ok := r.(*bytes.Buffer)
 	if !ok {
-		return fmt.Errorf("MsgVersion.BtcDecode reader is not a " +
+		return errors.New("MsgVersion.BtcDecode reader is not a " +
 			"*bytes.Buffer")
 	}
 

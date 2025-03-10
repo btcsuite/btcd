@@ -229,7 +229,7 @@ func getServiceURL(rootURL string) (url string, err error) {
 		return
 	}
 	defer r.Body.Close()
-	if r.StatusCode >= 400 {
+	if r.StatusCode >= http.StatusBadRequest {
 		err = errors.New(fmt.Sprint(r.StatusCode))
 		return
 	}
@@ -312,7 +312,7 @@ func soapRequest(url, function, message string) (replyXML []byte, err error) {
 		defer r.Body.Close()
 	}
 
-	if r.StatusCode >= 400 {
+	if r.StatusCode >= http.StatusBadRequest {
 		err = errors.New("Error " + strconv.Itoa(r.StatusCode) + " for " + function)
 		r = nil
 		return

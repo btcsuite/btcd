@@ -4,7 +4,7 @@ package musig2
 
 import (
 	"bytes"
-	"fmt"
+	"errors"
 	"sort"
 
 	secp "github.com/decred/dcrd/dcrec/secp256k1/v4"
@@ -25,11 +25,11 @@ var (
 
 	// ErrTweakedKeyIsInfinity is returned if while tweaking a key, we end
 	// up with the point at infinity.
-	ErrTweakedKeyIsInfinity = fmt.Errorf("tweaked key is infinity point")
+	ErrTweakedKeyIsInfinity = errors.New("tweaked key is infinity point")
 
 	// ErrTweakedKeyOverflows is returned if a tweaking key is larger than
 	// 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141.
-	ErrTweakedKeyOverflows = fmt.Errorf("tweaked key is too large")
+	ErrTweakedKeyOverflows = errors.New("tweaked key is too large")
 )
 
 // sortableKeys defines a type of slice of public keys that implements the sort
