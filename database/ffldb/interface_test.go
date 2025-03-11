@@ -836,12 +836,12 @@ func testMetadataManualTxInterface(tc *testContext) bool {
 // testManagedTxPanics ensures calling Rollback of Commit inside a managed
 // transaction panics.
 func testManagedTxPanics(tc *testContext) bool {
-	testPanic := func(fn func()) (paniced bool) {
+	testPanic := func(fn func()) (panicked bool) {
 		// Setup a defer to catch the expected panic and update the
 		// return variable.
 		defer func() {
 			if err := recover(); err != nil {
-				paniced = true
+				panicked = true
 			}
 		}()
 
@@ -850,49 +850,49 @@ func testManagedTxPanics(tc *testContext) bool {
 	}
 
 	// Ensure calling Commit on a managed read-only transaction panics.
-	paniced := testPanic(func() {
+	panicked := testPanic(func() {
 		tc.db.View(func(tx database.Tx) error {
 			tx.Commit()
 			return nil
 		})
 	})
-	if !paniced {
+	if !panicked {
 		tc.t.Error("Commit called inside View did not panic")
 		return false
 	}
 
 	// Ensure calling Rollback on a managed read-only transaction panics.
-	paniced = testPanic(func() {
+	panicked = testPanic(func() {
 		tc.db.View(func(tx database.Tx) error {
 			tx.Rollback()
 			return nil
 		})
 	})
-	if !paniced {
+	if !panicked {
 		tc.t.Error("Rollback called inside View did not panic")
 		return false
 	}
 
 	// Ensure calling Commit on a managed read-write transaction panics.
-	paniced = testPanic(func() {
+	panicked = testPanic(func() {
 		tc.db.Update(func(tx database.Tx) error {
 			tx.Commit()
 			return nil
 		})
 	})
-	if !paniced {
+	if !panicked {
 		tc.t.Error("Commit called inside Update did not panic")
 		return false
 	}
 
 	// Ensure calling Rollback on a managed read-write transaction panics.
-	paniced = testPanic(func() {
+	panicked = testPanic(func() {
 		tc.db.Update(func(tx database.Tx) error {
 			tx.Rollback()
 			return nil
 		})
 	})
-	if !paniced {
+	if !panicked {
 		tc.t.Error("Rollback called inside Update did not panic")
 		return false
 	}
