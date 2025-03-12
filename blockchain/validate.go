@@ -46,6 +46,11 @@ const (
 	// coinbaseHeightAllocSize is the amount of bytes that the
 	// ScriptBuilder will allocate when validating the coinbase height.
 	coinbaseHeightAllocSize = 5
+
+	// maxTimeWarp is a maximum number of seconds that the timestamp of the first
+	// block of a difficulty adjustment period is allowed to
+	// be earlier than the last block of the previous period (BIP94).
+	maxTimeWarp = 600 * time.Second
 )
 
 var (
@@ -684,6 +689,12 @@ func compareScript(height int32, script []byte) error {
 func CheckBlockHeaderContext(header *wire.BlockHeader, prevNode HeaderCtx,
 	flags BehaviorFlags, c ChainCtx, skipCheckpoint bool) error {
 
+	// The height of this block is one more than the referenced previous
+	// block.
+	blockHeight := prevNode.Height() + 1
+
+	params := c.ChainParams()
+
 	fastAdd := flags&BFFastAdd == BFFastAdd
 	if !fastAdd {
 		// Ensure the difficulty specified in the block header matches
@@ -710,16 +721,24 @@ func CheckBlockHeaderContext(header *wire.BlockHeader, prevNode HeaderCtx,
 			str = fmt.Sprintf(str, header.Timestamp, medianTime)
 			return ruleError(ErrTimeTooOld, str)
 		}
-	}
 
-	// The height of this block is one more than the referenced previous
-	// block.
-	blockHeight := prevNode.Height() + 1
+		// Testnet4 only: Check timestamp against prev for
+		// difficulty-adjustment blocks to prevent timewarp attacks.
+		if params.EnforceBIP94 {
+			err := assertNoTimeWarp(
+				blockHeight, c.BlocksPerRetarget(),
+				header.Timestamp,
+				time.Unix(prevNode.Timestamp(), 0),
+			)
+			if err != nil {
+				return err
+			}
+		}
+	}
 
 	// Reject outdated block versions once a majority of the network
 	// has upgraded.  These were originally voted on by BIP0034,
 	// BIP0065, and BIP0066.
-	params := c.ChainParams()
 	if header.Version < 2 && blockHeight >= params.BIP0034Height ||
 		header.Version < 3 && blockHeight >= params.BIP0066Height ||
 		header.Version < 4 && blockHeight >= params.BIP0065Height {
@@ -756,6 +775,30 @@ func CheckBlockHeaderContext(header *wire.BlockHeader, prevNode HeaderCtx,
 			"before the previous checkpoint at height %d",
 			blockHeight, checkpointNode.Height())
 		return ruleError(ErrForkTooOld, str)
+	}
+
+	return nil
+}
+
+// assertNoTimeWarp checks the timestamp of the block against the previous
+// block's timestamp for the first block of each difficulty adjustment interval
+// to prevent timewarp attacks. This is defined in BIP-0094.
+func assertNoTimeWarp(blockHeight, blocksPerReTarget int32, headerTimestamp,
+	prevBlockTimestamp time.Time) error {
+
+	// If this isn't the first block of the difficulty adjustment interval,
+	// then we can exit early.
+	if blockHeight%blocksPerReTarget != 0 {
+		return nil
+	}
+
+	// Check timestamp for the first block of each difficulty adjustment
+	// interval, except the genesis block.
+	if headerTimestamp.Before(prevBlockTimestamp.Add(-maxTimeWarp)) {
+		str := "block's timestamp %v is too early on diff adjustment " +
+			"block %v"
+		str = fmt.Sprintf(str, headerTimestamp, prevBlockTimestamp)
+		return ruleError(ErrTimewarpAttack, str)
 	}
 
 	return nil
@@ -1230,7 +1273,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block, vi
 	if csvState == ThresholdActive {
 		// If the CSV soft-fork is now active, then modify the
 		// scriptFlags to ensure that the CSV op code is properly
-		// validated during the script checks bleow.
+		// validated during the script checks below.
 		scriptFlags |= txscript.ScriptVerifyCheckSequenceVerify
 
 		// We obtain the MTP of the *previous* block in order to

@@ -134,6 +134,13 @@ func (c bitConditionChecker) IsSpeedy() bool {
 	return false
 }
 
+// ForceActive returns if the deployment should be forced to transition to the
+// active state. This is useful on certain testnet, where we we'd like for a
+// deployment to always be active.
+func (c bitConditionChecker) ForceActive(node *blockNode) bool {
+	return false
+}
+
 // deploymentChecker provides a thresholdConditionChecker which can be used to
 // test a specific deployment rule.  This is required for properly detecting
 // and activating consensus rule changes.
@@ -207,15 +214,9 @@ func (c deploymentChecker) MinerConfirmationWindow() uint32 {
 }
 
 // EligibleToActivate returns true if a custom deployment can transition from
-// the LockedIn to the Active state. For normal deployments, this always
-// returns true. However, some deployments add extra rules like a minimum
-// activation height, which can be abstracted into a generic arbitrary check at
-// the final state via this method.
-//
-// This implementation always returns true, unless a minimum activation height
-// is specified.
-//
-// This is part of the thresholdConditionChecker interface implementation.
+// the LockedIn to the Active state. In addition to the traditional minimum
+// activation height (MinActivationHeight), an optional AlwaysActiveHeight can
+// force the deployment to be active after a specified height.
 func (c deploymentChecker) EligibleToActivate(blkNode *blockNode) bool {
 	// No activation height, so it's always ready to go.
 	if c.deployment.MinActivationHeight == 0 {
@@ -247,6 +248,28 @@ func (c deploymentChecker) Condition(node *blockNode) (bool, error) {
 	version := uint32(node.version)
 	return (version&vbTopMask == vbTopBits) && (version&conditionMask != 0),
 		nil
+}
+
+// ForceActive returns if the deployment should be forced to transition to the
+// active state. This is useful on certain testnet, where we we'd like for a
+// deployment to always be active.
+func (c deploymentChecker) ForceActive(node *blockNode) bool {
+	if node == nil {
+		return false
+	}
+
+	// If the deployment has a nonzero AlwaysActiveHeight and the next
+	// block’s height is at or above that threshold, then force the state
+	// to Active.
+	effectiveHeight := c.deployment.EffectiveAlwaysActiveHeight()
+	if uint32(node.height)+1 >= effectiveHeight {
+		log.Debugf("Force activating deployment: next block "+
+			"height %d >= EffectiveAlwaysActiveHeight %d",
+			uint32(node.height)+1, effectiveHeight)
+		return true
+	}
+
+	return false
 }
 
 // calcNextBlockVersion calculates the expected version of the block after the

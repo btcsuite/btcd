@@ -1258,6 +1258,9 @@ func handleGetBlockChainInfo(s *rpcServer, cmd interface{}, closeChan <-chan str
 		case chaincfg.DeploymentTestDummyMinActivation:
 			forkName = "dummy-min-activation"
 
+		case chaincfg.DeploymentTestDummyAlwaysActive:
+			forkName = "dummy-always-active"
+
 		case chaincfg.DeploymentCSV:
 			forkName = "csv"
 
@@ -2358,7 +2361,7 @@ func handleGetInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (in
 		Connections:     s.cfg.ConnMgr.ConnectedCount(),
 		Proxy:           cfg.Proxy,
 		Difficulty:      getDifficultyRatio(best.Bits, s.cfg.ChainParams),
-		TestNet:         cfg.TestNet3,
+		TestNet:         cfg.TestNet3 || cfg.TestNet4,
 		RelayFee:        cfg.minRelayTxFee.ToBTC(),
 	}
 
@@ -2413,7 +2416,7 @@ func handleGetMiningInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 		HashesPerSec:       s.cfg.CPUMiner.HashesPerSecond(),
 		NetworkHashPS:      networkHashesPerSec,
 		PooledTx:           uint64(s.cfg.TxMemPool.Count()),
-		TestNet:            cfg.TestNet3,
+		TestNet:            cfg.TestNet3 || cfg.TestNet4,
 	}
 	return &result, nil
 }

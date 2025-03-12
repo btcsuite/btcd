@@ -175,6 +175,10 @@ func (c customDeploymentChecker) Condition(_ *blockNode) (bool, error) {
 	return c.conditionTrue, nil
 }
 
+func (c customDeploymentChecker) ForceActive(_ *blockNode) bool {
+	return false
+}
+
 // TestThresholdStateTransition tests that the thresholdStateTransition
 // properly implements the BIP 009 state machine, along with the speedy trial
 // augments.
