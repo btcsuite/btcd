@@ -42,7 +42,8 @@ type config struct {
 	NumCandidates  int    `short:"n" long:"numcandidates" description:"Max num of checkpoint candidates to show {1-20}"`
 	RegressionTest bool   `long:"regtest" description:"Use the regression test network"`
 	SimNet         bool   `long:"simnet" description:"Use the simulation test network"`
-	TestNet3       bool   `long:"testnet" description:"Use the test network"`
+	TestNet3       bool   `long:"testnet" description:"Use the test network (version 3)"`
+	TestNet4       bool   `long:"testnet4" description:"Use the test network (version 4)"`
 }
 
 // validDbType returns whether or not dbType is a supported database type.
@@ -95,6 +96,10 @@ func loadConfig() (*config, []string, error) {
 	if cfg.TestNet3 {
 		numNets++
 		activeNetParams = &chaincfg.TestNet3Params
+	}
+	if cfg.TestNet4 {
+		numNets++
+		activeNetParams = &chaincfg.TestNet4Params
 	}
 	if cfg.RegressionTest {
 		numNets++
