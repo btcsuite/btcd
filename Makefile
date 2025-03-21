@@ -1,15 +1,12 @@
 PKG := github.com/btcsuite/btcd
 
 LINT_PKG := github.com/golangci/golangci-lint/cmd/golangci-lint
-GOACC_PKG := github.com/ory/go-acc
 GOIMPORTS_PKG := golang.org/x/tools/cmd/goimports
 
 GO_BIN := ${GOPATH}/bin
 LINT_BIN := $(GO_BIN)/golangci-lint
-GOACC_BIN := $(GO_BIN)/go-acc
 
 LINT_COMMIT := v1.18.0
-GOACC_COMMIT := 80342ae2e0fcf265e99e76bcc4efd022c7c3811b
 
 DEPGET := cd /tmp && go install -v
 GOBUILD := go build -v
@@ -17,6 +14,7 @@ GOINSTALL := go install -v
 DEV_TAGS := rpctest
 GOTEST_DEV = go test -v -tags=$(DEV_TAGS)
 GOTEST := go test -v
+COVER_FLAGS = -coverprofile=coverage.txt -covermode=atomic -coverpkg=$(PKG)/...
 
 GOFILES_NOVENDOR = $(shell find . -type f -name '*.go' -not -path "./vendor/*")
 
@@ -52,10 +50,6 @@ all: build check
 $(LINT_BIN):
 	@$(call print, "Fetching linter")
 	$(DEPGET) $(LINT_PKG)@$(LINT_COMMIT)
-
-$(GOACC_BIN):
-	@$(call print, "Fetching go-acc")
-	$(DEPGET) $(GOACC_PKG)@$(GOACC_COMMIT)
 
 #? goimports: Install goimports
 goimports:
@@ -106,17 +100,17 @@ unit:
 	cd btcutil/psbt; $(GOTEST_DEV) ./... -test.timeout=20m
 
 #? unit-cover: Run unit coverage tests
-unit-cover: $(GOACC_BIN)
+unit-cover:
 	@$(call print, "Running unit coverage tests.")
-	$(GOACC_BIN) ./...
-	
+	$(GOTEST) $(COVER_FLAGS) ./...
 	# We need to remove the /v2 pathing from the module to have it work
-	# nicely with the CI tool we use to render live code coverage.
-	cd btcec; $(GOACC_BIN) ./...; sed -i.bak 's/v2\///g' coverage.txt
+	# nicely with the CI tool we use to render live code coverage.	
+	cd btcec; $(GOTEST) $(COVER_FLAGS) ./...; \
+		sed -i.bak 's/v2\///g' coverage.txt
 
-	cd btcutil; $(GOACC_BIN) ./...
+	cd btcutil; $(GOTEST) $(COVER_FLAGS) ./...
 
-	cd btcutil/psbt; $(GOACC_BIN) ./...
+	cd btcutil/psbt; $(GOTEST) $(COVER_FLAGS) ./...
 
 #? unit-race: Run unit race tests
 unit-race:
