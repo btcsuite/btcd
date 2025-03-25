@@ -1,4 +1,4 @@
-package btcdctrl
+package btcdtest
 
 import (
 	"bufio"

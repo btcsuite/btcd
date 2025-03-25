@@ -1,10 +1,10 @@
-package btcdctrl_test
+package btcdtest_test
 
 import (
 	"fmt"
 	"os"
 
-	"github.com/btcsuite/btcd/btcdctrl"
+	"github.com/btcsuite/btcd/btcdtest"
 )
 
 func ExampleController() {
@@ -15,13 +15,13 @@ func ExampleController() {
 	}
 
 	// Create a new test-oriented configration.
-	cfg, err := btcdctrl.NewTestConfig(tmp)
+	cfg, err := btcdtest.NewTestConfig(tmp)
 	if err != nil {
 		panic(err)
 	}
 
 	// Create a new controller.
-	c := btcdctrl.New(&btcdctrl.ControllerConfig{
+	c := btcdtest.New(&btcdtest.ControllerConfig{
 		Config: cfg,
 	})
 
