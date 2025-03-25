@@ -2,7 +2,6 @@ package btcdtest
 
 import (
 	"bufio"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -10,6 +9,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/btcsuite/btcd/btcec/v2"
@@ -18,17 +18,6 @@ import (
 	"github.com/btcsuite/btcd/internal/config"
 	"github.com/btcsuite/btcd/rpcclient"
 )
-
-type Config = config.Config
-
-func NewDefaultConfig() *Config {
-	cfg := config.NewDefaultConfig()
-
-	// Remove the configuration file, as everything is supplied in flags.
-	cfg.ConfigFile = ""
-
-	return &cfg
-}
 
 // Create a new random address.
 func newRandAddress(chain *chaincfg.Params) (btcutil.Address, error) {
@@ -45,8 +34,13 @@ func newRandAddress(chain *chaincfg.Params) (btcutil.Address, error) {
 	return btcutil.NewAddressPubKey(pk, chain)
 }
 
-func NewTestConfig(tmp string) (*Config, error) {
-	cfg := NewDefaultConfig()
+// Create the default configuration for testing. Ranomized ports for RPC & P2P, RPC user is "user", pass is "pass".
+// Random mining address.
+func defaultConfig(tmp string) (*Config, error) {
+	cfg := config.NewDefaultConfig()
+
+	// Remove the configuration file, as everything is supplied in flags.
+	cfg.ConfigFile = ""
 
 	// Set the network to simnet.
 	cfg.SimNet = true
@@ -74,19 +68,21 @@ func NewTestConfig(tmp string) (*Config, error) {
 	cfg.RPCListeners = []string{"127.0.0.1:0"}
 	cfg.Listeners = []string{"127.0.0.1:0"}
 
-	return cfg, nil
+	return &Config{
+		Config: &cfg,
+	}, nil
 }
 
-type ControllerConfig struct {
+type Config struct {
 	Stderr io.Writer
 	Stdout io.Writer
 
 	Path string
 
-	*Config
+	*config.Config
 }
 
-type Controller struct {
+type Harness struct {
 	*rpcclient.Client
 
 	cmd *exec.Cmd
@@ -94,20 +90,28 @@ type Controller struct {
 	rpc string
 	p2p string
 
-	cfg *ControllerConfig
+	cfg *Config
+
+	running atomic.Bool
+	stopped atomic.Bool
 }
 
-// gracefully shutdown btcd instance using SIGINT and wait for it to exit.
-func (c *Controller) Stop() error {
+// Gracefully shutdown btcd instance using SIGINT and wait for it to exit.
+func (h *Harness) Stop() {
+	if !h.stopped.CompareAndSwap(false, true) {
+		h.running.Store(false)
+		return
+	}
+
 	// Signal SIGINT, for graceful shutdown.
-	err := c.cmd.Process.Signal(os.Interrupt)
+	err := h.cmd.Process.Signal(os.Interrupt)
 	if err != nil {
-		return err
+		panic(err)
 	}
 
 	// Wait for the program to exit.
 	for {
-		exit, err := c.cmd.Process.Wait()
+		exit, err := h.cmd.Process.Wait()
 		if err != nil {
 			break
 		}
@@ -117,19 +121,17 @@ func (c *Controller) Stop() error {
 			break
 		}
 	}
-
-	return nil
 }
 
-func (c *Controller) RPCAddress() string {
+func (c *Harness) RPCAddress() string {
 	return c.rpc
 }
 
-func (c *Controller) P2PAddress() string {
+func (c *Harness) P2PAddress() string {
 	return c.p2p
 }
 
-func (c *Controller) RPCConnConfig() (*rpcclient.ConnConfig, error) {
+func (c *Harness) RPCConnConfig() (*rpcclient.ConnConfig, error) {
 	cert, err := os.ReadFile(c.cfg.Config.RPCCert)
 	if err != nil {
 		return nil, err
@@ -148,13 +150,17 @@ func (c *Controller) RPCConnConfig() (*rpcclient.ConnConfig, error) {
 }
 
 // Start btcd and wait for the RPC to be ready.
-func (c *Controller) Start() error {
+func (h *Harness) Start() {
+	if !h.running.CompareAndSwap(false, true) {
+		return
+	}
+
 	var args []string
 
 	// First, we convert the `Config` type into flags.
 
 	// struct value.
-	sv := reflect.ValueOf(*c.cfg.Config)
+	sv := reflect.ValueOf(*h.cfg.Config)
 
 	// Iterate over visible fields.
 	for i, ft := range reflect.VisibleFields(sv.Type()) {
@@ -230,7 +236,7 @@ func (c *Controller) Start() error {
 			continue
 
 		default:
-			return errors.New("unknown type")
+			panic("unknown type")
 		}
 
 		// Append the flag name.
@@ -245,55 +251,55 @@ func (c *Controller) Start() error {
 	// Handle fields that depend on custom encoding/decoding.
 
 	// Encode checkpoints.
-	for _, chk := range c.cfg.Config.AddCheckpoints {
+	for _, chk := range h.cfg.Config.AddCheckpoints {
 		args = append(args, "--addcheckpoint", fmt.Sprintf("%d:%s", chk.Height, chk.Hash))
 	}
 
 	// Encode mining addresses.
-	for _, addr := range c.cfg.Config.MiningAddrs {
+	for _, addr := range h.cfg.Config.MiningAddrs {
 		args = append(args, "--miningaddr", addr.EncodeAddress())
 	}
 
 	// Encode whitelists.
-	for _, addr := range c.cfg.Config.Whitelists {
+	for _, addr := range h.cfg.Config.Whitelists {
 		args = append(args, "--whitelist", addr.String())
 	}
 
 	name := "btcd"
-	if c.cfg.Path != "" {
-		name = c.cfg.Path
+	if h.cfg.Path != "" {
+		name = h.cfg.Path
 	}
 
 	// Create the command.
-	c.cmd = exec.Command(name, args...)
+	h.cmd = exec.Command(name, args...)
 
 	// Create a pipe of stdout.
 	pr, pw, err := os.Pipe()
 	if err != nil {
-		return err
+		panic(err)
 	}
 
 	// Match the output configuration.
-	c.cmd.Stderr = c.cfg.Stderr
-	c.cmd.Stdout = pw
+	h.cmd.Stderr = h.cfg.Stderr
+	h.cmd.Stdout = pw
 
 	// Execute the command.
-	err = c.cmd.Start()
+	err = h.cmd.Start()
 	if err != nil {
-		return err
+		panic(err)
 	}
 
 	var r io.Reader = pr
 
 	// Pipe the early output to stdout if configured.
-	if c.cfg.Stdout != nil {
-		r = io.TeeReader(pr, c.cfg.Stdout)
+	if h.cfg.Stdout != nil {
+		r = io.TeeReader(pr, h.cfg.Stdout)
 	}
 
 	// Scan the stdout line by line.
 	scan := bufio.NewScanner(r)
 
-	rpc := c.cfg.DisableRPC
+	rpc := h.cfg.DisableRPC
 	p2p := false
 
 	// Scan each line until both RPC (if enabled) and P2P addresses are found.
@@ -302,13 +308,13 @@ func (c *Controller) Start() error {
 
 		_, addr, ok := strings.Cut(line, "RPC server listening on ")
 		if ok {
-			c.rpc = addr
+			h.rpc = addr
 			rpc = true
 		}
 
 		_, addr, ok = strings.Cut(line, "Server listening on ")
 		if ok {
-			c.p2p = addr
+			h.p2p = addr
 			p2p = true
 		}
 
@@ -320,15 +326,15 @@ func (c *Controller) Start() error {
 
 	// Return early if RPC is disabled.
 	if !rpc {
-		return nil
+		return
 	}
 
 	// Discard as a fallback.
 	stdout := io.Discard
 
 	// Use the configured stdout by default.
-	if c.cfg.Stdout != nil {
-		stdout = c.cfg.Stdout
+	if h.cfg.Stdout != nil {
+		stdout = h.cfg.Stdout
 	}
 
 	// The pipe needs to continuously be read, otherwise `btcd` will hang.
@@ -340,19 +346,19 @@ func (c *Controller) Start() error {
 	for deadline.After(time.Now()) {
 		var cfg *rpcclient.ConnConfig
 		// Create the RPC config.
-		cfg, err = c.RPCConnConfig()
+		cfg, err = h.RPCConnConfig()
 		if err != nil {
 			continue
 		}
 
 		// Create the RPC client.
-		c.Client, err = rpcclient.New(cfg, nil)
+		h.Client, err = rpcclient.New(cfg, nil)
 		if err != nil {
 			continue
 		}
 
 		// Ping the RPC client.
-		err = c.Client.Ping()
+		err = h.Client.Ping()
 		if err != nil {
 			continue
 		}
@@ -363,19 +369,123 @@ func (c *Controller) Start() error {
 
 	// Check if the connection loop exited with an error.
 	if err != nil {
-		return errors.Join(errors.New("timeout"), err)
+		panic(fmt.Sprintf("timeout: %v", err))
 	}
 
 	// Check if the client was created.
-	if c.Client == nil {
-		return errors.New("timeout")
+	if h.Client == nil {
+		panic("timeout")
 	}
 
-	return nil
+	// Enable block generation.
+	if h.cfg.Config.Generate {
+		err := h.SetGenerate(true, 0)
+		if err != nil {
+			panic(err)
+		}
+	}
+
 }
 
-func New(cfg *ControllerConfig) *Controller {
-	return &Controller{
+// Override the default configuration.
+func WithConfig(cfg *Config) func(*Config) {
+	return func(p *Config) {
+		*p = *cfg
+	}
+}
+
+// Update the root directory.
+func WithRootDir(dir string) func(*Config) {
+	return func(cfg *Config) {
+		cfg.Config.ChangeRoot(dir)
+	}
+}
+
+// Update the output.
+func WithOutput(stderr io.Writer, stdout io.Writer) func(*Config) {
+	return func(cfg *Config) {
+		cfg.Stderr = stderr
+		cfg.Stdout = stdout
+	}
+}
+
+// Set custom debug log level.
+func WithDebugLevel(level string) func(*Config) {
+	return func(cfg *Config) {
+		cfg.Config.DebugLevel = level
+	}
+}
+
+// Set custom binary path.
+func WithBinary(path string) func(*Config) {
+	return func(cfg *Config) {
+		cfg.Path = path
+	}
+}
+
+func WithChainParams(chain *chaincfg.Params) func(*Config) {
+	return func(cfg *Config) {
+		cfg.Config.SimNet = false
+
+		switch chain.Name {
+		case chaincfg.TestNet3Params.Name:
+			cfg.Config.TestNet3 = true
+
+		case chaincfg.TestNet4Params.Name:
+			cfg.Config.TestNet4 = true
+
+		case chaincfg.SimNetParams.Name:
+			cfg.Config.SimNet = true
+
+		case chaincfg.MainNetParams.Name:
+			// nop
+
+		case chaincfg.SigNetParams.Name:
+			cfg.Config.SigNet = true
+
+		case chaincfg.RegressionNetParams.Name:
+			cfg.Config.RegressionTest = true
+
+		default:
+			panic("unknown network")
+		}
+
+		addr, err := newRandAddress(chain)
+		if err != nil {
+			panic(err)
+		}
+
+		cfg.MiningAddrs = []btcutil.Address{addr}
+
+	}
+}
+
+// Create and start a harness.
+func New(opts ...func(*Config)) *Harness {
+	h := NewUnstarted(opts...)
+	h.Start()
+
+	return h
+}
+
+func NewUnstarted(opts ...func(*Config)) *Harness {
+	tmp, err := os.MkdirTemp("", "btcdtest-*")
+	if err != nil {
+		panic(err)
+	}
+
+	cfg, err := defaultConfig(tmp)
+	if err != nil {
+		panic(err)
+	}
+
+	for _, opt := range opts {
+		opt(cfg)
+	}
+
+	h := &Harness{
 		cfg: cfg,
 	}
+
+	return h
 }
