@@ -520,13 +520,7 @@ func (sm *SyncManager) handleStallSample() {
 func (sm *SyncManager) shouldDCStalledSyncPeer() bool {
 	lastBlock := sm.syncPeer.LastBlock()
 	startHeight := sm.syncPeer.StartingHeight()
-
-	var peerHeight int32
-	if lastBlock > startHeight {
-		peerHeight = lastBlock
-	} else {
-		peerHeight = startHeight
-	}
+	peerHeight := max(lastBlock, startHeight)
 
 	// If we've stalled out yet the sync peer reports having more blocks for
 	// us we will disconnect them. This allows us at tip to not disconnect

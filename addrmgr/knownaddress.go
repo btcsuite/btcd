@@ -54,12 +54,7 @@ func (ka *KnownAddress) Services() wire.ServiceFlag {
 // attempted and how often attempts to connect to it have failed.
 func (ka *KnownAddress) chance() float64 {
 	now := time.Now()
-	lastAttempt := now.Sub(ka.lastattempt)
-
-	if lastAttempt < 0 {
-		lastAttempt = 0
-	}
-
+	lastAttempt := max(now.Sub(ka.lastattempt), 0)
 	c := 1.0
 
 	// Very recent attempts are less likely to be retried.
