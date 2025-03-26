@@ -3218,10 +3218,7 @@ func handleSearchRawTransactions(s *rpcServer, cmd interface{}, closeChan <-chan
 	// Override the default number of entries to skip if needed.
 	var numToSkip int
 	if c.Skip != nil {
-		numToSkip = *c.Skip
-		if numToSkip < 0 {
-			numToSkip = 0
-		}
+		numToSkip = max(*c.Skip, 0)
 	}
 
 	// Override the reverse flag if needed.
@@ -3699,10 +3696,7 @@ func handleValidateAddress(s *rpcServer, cmd interface{}, closeChan <-chan struc
 
 func verifyChain(s *rpcServer, level, depth int32) error {
 	best := s.cfg.Chain.BestSnapshot()
-	finishHeight := best.Height - depth
-	if finishHeight < 0 {
-		finishHeight = 0
-	}
+	finishHeight := max(best.Height-depth, 0)
 	rpcsLog.Infof("Verifying chain for %d blocks at level %d",
 		best.Height-finishHeight, level)
 
