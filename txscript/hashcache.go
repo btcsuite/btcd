@@ -7,6 +7,7 @@ package txscript
 import (
 	"bytes"
 	"encoding/binary"
+	"maps"
 	"math"
 	"sync"
 
@@ -142,9 +143,7 @@ func (m *MultiPrevOutFetcher) AddPrevOut(op wire.OutPoint, txOut *wire.TxOut) {
 
 // Merge merges two instances of a MultiPrevOutFetcher into a single source.
 func (m *MultiPrevOutFetcher) Merge(other *MultiPrevOutFetcher) {
-	for k, v := range other.prevOuts {
-		m.prevOuts[k] = v
-	}
+	maps.Copy(m.prevOuts, other.prevOuts)
 }
 
 // A compile-time assertion to ensure that MultiPrevOutFetcher matches the
