@@ -20,6 +20,7 @@ import (
 	"github.com/btcsuite/btcd/mempool"
 	peerpkg "github.com/btcsuite/btcd/peer"
 	"github.com/btcsuite/btcd/wire"
+	"github.com/lightninglabs/neutrino/query"
 )
 
 const (
@@ -171,6 +172,77 @@ func limitAdd(m map[chainhash.Hash]struct{}, hash chainhash.Hash, limit int) {
 		}
 	}
 	m[hash] = struct{}{}
+}
+
+// checkpointedBlocksQuery is a helper to construct query.Requests for GetData
+// messages.
+type checkpointedBlocksQuery struct {
+	msg    *wire.MsgGetData
+	sm     *SyncManager
+	blocks map[chainhash.Hash]struct{}
+}
+
+// newCheckpointedBlocksQuery returns an initialized newCheckpointedBlocksQuery.
+func newCheckpointedBlocksQuery(msg *wire.MsgGetData,
+	sm *SyncManager) checkpointedBlocksQuery {
+
+	m := make(map[chainhash.Hash]struct{}, len(msg.InvList))
+	for _, inv := range msg.InvList {
+		m[inv.Hash] = struct{}{}
+	}
+	return checkpointedBlocksQuery{msg, sm, m}
+}
+
+// handleResponse returns that the progress is progressed and finished if the
+// received wire.Message is a MsgBlock.
+func (c *checkpointedBlocksQuery) handleResponse(req, resp wire.Message,
+	peerAddr string) query.Progress {
+
+	block, ok := resp.(*wire.MsgBlock)
+	if !ok {
+		// We are only looking for block messages.
+		return query.Progress{
+			Finished:   false,
+			Progressed: false,
+		}
+	}
+
+	// If we didn't find this block in the map of blocks we're expecting,
+	// we're neither finished nor progressed.
+	hash := block.BlockHash()
+	_, found := c.blocks[hash]
+	if !found {
+		return query.Progress{
+			Finished:   false,
+			Progressed: false,
+		}
+	}
+	delete(c.blocks, hash)
+
+	// If we have blocks we're expecting, we've progressed but not finished.
+	if len(c.blocks) > 0 {
+		return query.Progress{
+			Finished:   false,
+			Progressed: true,
+		}
+	}
+
+	// We have no more blocks we're expecting from heres so we're finished.
+	return query.Progress{
+		Finished:   true,
+		Progressed: true,
+	}
+}
+
+// requests returns a slice of query.Request that can be queued to
+// query.WorkManager.
+func (c *checkpointedBlocksQuery) requests() []*query.Request {
+	req := &query.Request{
+		Req:        c.msg,
+		HandleResp: c.handleResponse,
+	}
+
+	return []*query.Request{req}
 }
 
 // SyncManager is used to communicate block related messages with peers. The
