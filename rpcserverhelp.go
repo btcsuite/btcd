@@ -500,6 +500,7 @@ var helpDescsEnUS = map[string]string{
 	"getpeerinforesult-banscore":       "The ban score",
 	"getpeerinforesult-feefilter":      "The requested minimum fee a transaction must have to be announced to the peer",
 	"getpeerinforesult-syncnode":       "Whether or not the peer is the sync peer",
+	"getpeerinforesult-v2_connection":  "Whether or not the peer is a v2 connection",
 
 	// GetPeerInfoCmd help.
 	"getpeerinfo--synopsis": "Returns data about each connected network peer as an array of json objects.",
