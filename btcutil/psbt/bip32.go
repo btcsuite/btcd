@@ -53,7 +53,7 @@ func ReadBip32Derivation(path []byte) (uint32, []uint32, error) {
 	//   "<32-bit uint> <32-bit uint>*"
 	// with the asterisk meaning 0 to n times. Which in turn means that an
 	// empty path is valid, only the key fingerprint is mandatory.
-	if len(path)%uint32Size != 0 {
+	if len(path) < uint32Size || len(path)%uint32Size != 0 {
 		return 0, nil, ErrInvalidPsbtFormat
 	}
 
