@@ -55,16 +55,16 @@ var (
 
 	// ErrFinalSigUnavailable is returned when a caller attempts to adapt a
 	// final signature, but the final signature is not available.
-	ErrFinalSigUnavailable = fmt.Errorf("final signature not available")
+	ErrFinalSigUnavailable = fmt.Errorf("final signature unavailable")
 
-	// ErrAdaptorSecretUnavailable is returned when a caller attempts to adapt a
-	// final signature, but the adaptor secret key is not available.
-	ErrAdaptorSecretUnavailable = fmt.Errorf("adaptor secret key not available")
+	// ErrAdaptorSecretUnavailable is returned when a caller attempts to adapt
+	// a final signature, but the adaptor secret key is not available.
+	ErrAdaptorSecretUnavailable = fmt.Errorf("adaptor secret key unavailable")
 
 	// ErrAdaptorPointUnavailable is returned when a caller attempts to recover
 	// the adaptor signature from a valid signature, but the adaptor point
 	// is not available.
-	ErrAdaptorPointUnavailable = fmt.Errorf("adaptor point not available")
+	ErrAdaptorPointUnavailable = fmt.Errorf("adaptor point unavailable")
 
 	// ErrInvalidAdaptorPoint is returned when a caller attempts to provide
 	// an adaptor point that is incompatible with the combined nonce.
@@ -573,26 +573,13 @@ func (s *Session) RegisterPubNonce(nonce [PubNonceSize]byte) (bool, error) {
 	return haveAllNonces, nil
 }
 
-// GenerateAdaptorSecret generates an adaptor secret key. This must be called
-// after the public nonces have been registered for all signers, because
+// GenerateAdaptor generates an adaptor secret key and point. This must be
+// called after the public nonces have been registered for all signers, because
 // the validity of the adaptor secret key depends on the combined nonce. It
 // must also be called before any partial signatures are generated or provided,
 // because the validation of the signatures depends on the adaptor point.
-func (s *Session) GenerateAdaptor(msg [32]byte) (*btcec.ModNScalar, *btcec.JacobianPoint, error) {
-	if s.combinedNonce == nil {
-		return nil, nil, ErrCombinedNonceUnavailable
-	}
-
-	if len(s.sigs) != 0 {
-		return nil, nil, ErrAlreadySigned
-	}
-
-	nonce, _, err := computeSigningNonce(
-		*s.combinedNonce, s.ctx.combinedKey.FinalKey, msg,
-	)
-	if err != nil {
-		return nil, nil, err
-	}
+func (s *Session) GenerateAdaptor(msg [32]byte) (*btcec.ModNScalar,
+	*btcec.JacobianPoint, error) {
 
 	// The adaptor point added to the combined nonce must be even.
 	// We keep generating random secrets until we find one that works.
@@ -606,19 +593,14 @@ func (s *Session) GenerateAdaptor(msg [32]byte) (*btcec.ModNScalar, *btcec.Jacob
 		var secret btcec.ModNScalar
 		secret.SetBytes(&secretB)
 
-		var adaptorPoint btcec.JacobianPoint
-		btcec.ScalarBaseMultNonConst(&secret, &adaptorPoint)
-		adaptorPoint.ToAffine()
-
-		var adaptedNonce btcec.JacobianPoint
-		btcec.AddNonConst(&adaptorPoint, nonce, &adaptedNonce)
-		adaptedNonce.ToAffine()
-
-		if !adaptedNonce.Y.IsOdd() {
-			s.adaptorSecret = &secret
-			s.adaptorPoint = &adaptorPoint
-			return &secret, &adaptorPoint, nil
+		err = s.SetAdaptorSecret(msg, &secret)
+		if err == ErrInvalidAdaptorPoint {
+			continue
+		} else if err != nil {
+			return nil, nil, err
 		}
+
+		return &secret, s.adaptorPoint, nil
 	}
 }
 
@@ -627,7 +609,9 @@ func (s *Session) GenerateAdaptor(msg [32]byte) (*btcec.ModNScalar, *btcec.Jacob
 // the validity of the adaptor secret key depends on the combined nonce. It
 // must also be called before any partial signatures are generated or provided,
 // because the validation of the signatures depends on the adaptor point.
-func (s *Session) SetAdaptorSecret(msg [32]byte, adaptorSecret *btcec.ModNScalar) error {
+func (s *Session) SetAdaptorSecret(msg [32]byte,
+	adaptorSecret *btcec.ModNScalar) error {
+
 	if s.combinedNonce == nil {
 		return ErrCombinedNonceUnavailable
 	}
@@ -666,7 +650,9 @@ func (s *Session) SetAdaptorSecret(msg [32]byte, adaptorSecret *btcec.ModNScalar
 // knows the adaptor secret key. It must be called after all the public nonces
 // have been registered, and before any partial signatures are generated or
 // provided.
-func (s *Session) SetAdaptorPoint(msg [32]byte, adaptorPoint *btcec.JacobianPoint) error {
+func (s *Session) SetAdaptorPoint(msg [32]byte,
+	adaptorPoint *btcec.JacobianPoint) error {
+
 	if s.combinedNonce == nil {
 		return ErrCombinedNonceUnavailable
 	}
@@ -799,10 +785,6 @@ func (s *Session) CombineSig(sig *PartialSignature) (bool, error) {
 			)
 		}
 
-		if s.adaptorPoint != nil {
-			combineOpts = append(combineOpts, WithAdaptorCombine(s.msg, s.adaptorPoint))
-		}
-
 		finalSig := CombineSigs(s.ourSig.R, s.sigs, combineOpts...)
 
 		// We'll also verify the signature at this point to ensure it's
@@ -829,7 +811,9 @@ func (s *Session) FinalSig() *schnorr.Signature {
 
 // AdaptFinalSig adapts the final signature with the provided adaptor secret
 // key, and returns a valid signature.
-func (s *Session) AdaptFinalSig(adaptorSecret *btcec.ModNScalar) (*schnorr.Signature, error) {
+func (s *Session) AdaptFinalSig(adaptorSecret *btcec.ModNScalar) (
+	*schnorr.Signature, error) {
+
 	if s.finalSig == nil {
 		return nil, ErrFinalSigUnavailable
 	}
@@ -855,7 +839,9 @@ func (s *Session) AdaptFinalSig(adaptorSecret *btcec.ModNScalar) (*schnorr.Signa
 
 // RecoverAdaptorSecret recovers the adaptor secret key from a valid signature
 // created by the signer that knows the adaptor secret key.
-func (s *Session) RecoverAdaptorSecret(sig *schnorr.Signature) (*btcec.ModNScalar, error) {
+func (s *Session) RecoverAdaptorSecret(sig *schnorr.Signature) (
+	*btcec.ModNScalar, error) {
+
 	if s.finalSig == nil {
 		return nil, ErrFinalSigUnavailable
 	}

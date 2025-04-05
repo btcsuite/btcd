@@ -334,13 +334,11 @@ func Sign(secNonce [SecNonceSize]byte, privKey *btcec.PrivateKey,
 
 	nonce.ToAffine()
 
-	var adaptedNonce *btcec.JacobianPoint
+	adaptedNonce := nonce
 	if opts.adaptorPoint != nil {
-		adaptedNonce = new(btcec.JacobianPoint)
+		adaptedNonce = new(secp.JacobianPoint)
 		btcec.AddNonConst(nonce, opts.adaptorPoint, adaptedNonce)
 		adaptedNonce.ToAffine()
-	} else {
-		adaptedNonce = nonce
 	}
 
 	adaptedNonceKey := btcec.NewPublicKey(&adaptedNonce.X, &adaptedNonce.Y)
@@ -521,12 +519,10 @@ func verifyPartialSig(partialSig *PartialSignature, pubNonce [PubNonceSize]byte,
 	btcec.ScalarMultNonConst(&nonceBlinder, &r2J, &r2J)
 	btcec.AddNonConst(&r1J, &r2J, &nonce)
 
-	var adaptedNonce *btcec.JacobianPoint
+	adaptedNonce := &nonce
 	if opts.adaptorPoint != nil {
 		adaptedNonce = new(btcec.JacobianPoint)
 		btcec.AddNonConst(&nonce, opts.adaptorPoint, adaptedNonce)
-	} else {
-		adaptedNonce = &nonce
 	}
 
 	// If the nonce is the infinity point we set it to the Generator.
@@ -635,8 +631,6 @@ type combineOptions struct {
 	combinedKey *btcec.PublicKey
 
 	tweakAcc *btcec.ModNScalar
-
-	adaptorPub *btcec.JacobianPoint
 }
 
 // defaultCombineOptions returns the default set of signing operations.
@@ -660,16 +654,6 @@ func WithTweakedCombine(msg [32]byte, keys []*btcec.PublicKey,
 		o.msg = msg
 		o.combinedKey = combinedKey.FinalKey
 		o.tweakAcc = tweakAcc
-	}
-}
-
-// WithAdaptorCombine is a functional option that allows callers to specify
-// that the signature was produced using an adaptor point. In order to properly
-// combine the partial signatures, the caller must specify the adaptor point.
-func WithAdaptorCombine(msg [32]byte, adaptorPub *btcec.JacobianPoint) CombineOption {
-	return func(o *combineOptions) {
-		o.msg = msg
-		o.adaptorPub = adaptorPub
 	}
 }
 

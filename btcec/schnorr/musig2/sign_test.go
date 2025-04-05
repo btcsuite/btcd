@@ -392,7 +392,6 @@ func TestMusig2SignCombine(t *testing.T) {
 }
 
 func TestMusig2SignCombineAdaptor(t *testing.T) {
-	// Pre-generate 10 deterministic private keys
 	privKeys := make([]*btcec.PrivateKey, 10)
 	pubKeys := make([]*btcec.PublicKey, 10)
 	for i := 0; i < 10; i++ {
@@ -402,12 +401,11 @@ func TestMusig2SignCombineAdaptor(t *testing.T) {
 		pubKeys[i] = privKey.PubKey()
 	}
 
-	// Helper function to run test with different number of signers and context options
 	runTest := func(t *testing.T, numSigners int, ctxOpt ContextOption) {
 		contexts := make([]*Context, numSigners)
 		sessions := make([]*Session, numSigners)
 
-		// Create context for each signer
+		// First, create a context for each signer.
 		for i := 0; i < numSigners; i++ {
 			ctx, err := NewContext(
 				privKeys[i], true,
@@ -417,7 +415,6 @@ func TestMusig2SignCombineAdaptor(t *testing.T) {
 			require.NoError(t, err)
 			contexts[i] = ctx
 
-			// Register all other public keys
 			for j := 0; j < numSigners; j++ {
 				if j != i {
 					_, err = contexts[i].RegisterSigner(pubKeys[j])
@@ -425,40 +422,39 @@ func TestMusig2SignCombineAdaptor(t *testing.T) {
 				}
 			}
 
-			// Create session
 			sess, err := contexts[i].NewSession()
 			require.NoError(t, err)
 			sessions[i] = sess
 		}
 
-		// Exchange public nonces
+		// Next, all signers send their public nonces to each other.
 		for i := 0; i < numSigners; i++ {
 			for j := 0; j < numSigners; j++ {
 				if j != i {
-					_, err := sessions[i].RegisterPubNonce(sessions[j].PublicNonce())
+					_, err := sessions[i].RegisterPubNonce(
+						sessions[j].PublicNonce())
 					require.NoError(t, err)
 				}
 			}
 		}
 
-		// Message to sign
 		msg := [32]byte{1, 2, 3, 4}
 
-		// Signer 0 generates and uses the adaptor secret
+		// Signer 0 generates and uses the adaptor secret.
 		adaptorSecret, adaptorPoint, err := sessions[0].GenerateAdaptor(msg)
 		require.NoError(t, err)
 
-		// No-op, but test SetAdaptorSecret
+		// This is a no-op, but it tests SetAdaptorSecret.
 		err = sessions[0].SetAdaptorSecret(msg, adaptorSecret)
 		require.NoError(t, err)
 
-		// All other signers set the adaptor point
+		// All other signers set the adaptor point.
 		for i := 1; i < numSigners; i++ {
 			err = sessions[i].SetAdaptorPoint(msg, adaptorPoint)
 			require.NoError(t, err)
 		}
 
-		// Each signer generates a partial signature
+		// Each signer generates their partial signature.
 		partialSigs := make([]*PartialSignature, numSigners)
 		for i := 0; i < numSigners; i++ {
 			sig, err := sessions[i].Sign(msg)
@@ -466,7 +462,7 @@ func TestMusig2SignCombineAdaptor(t *testing.T) {
 			partialSigs[i] = sig
 		}
 
-		// Each signer combines all partial signatures
+		// Each signer combines all other signers' partial signatures.
 		for i := 0; i < numSigners; i++ {
 			for j := 0; j < numSigners; j++ {
 				if j != i {
@@ -476,16 +472,18 @@ func TestMusig2SignCombineAdaptor(t *testing.T) {
 			}
 		}
 
-		// Signer 0 adapts the final signature
+		// Signer 0, the one that knows the adaptor secret, adapts the
+		// final signature.
 		validSig, err := sessions[0].AdaptFinalSig(adaptorSecret)
 		require.NoError(t, err)
 
-		// Verify the final signature is valid under the combined key
+		// Verify the final signature is valid under the combined key.
 		combinedKey, _ := contexts[0].CombinedKey()
 		require.True(t, validSig.Verify(msg[:], combinedKey),
 			"Final signature verification failed")
 
-		// All other signers recover the adaptor secret
+		// Make sure all other signers can use the final signature to recover
+		// the adaptor secret.
 		for i := 1; i < numSigners; i++ {
 			recoveredSecret, err := sessions[i].RecoverAdaptorSecret(validSig)
 			require.NoError(t, err)
@@ -494,15 +492,15 @@ func TestMusig2SignCombineAdaptor(t *testing.T) {
 		}
 	}
 
-	// Run test for 2-10 signers with different context options
-	for numSigners := 2; numSigners <= 10; numSigners++ {
-		t.Run(fmt.Sprintf("BIP86_%d_signers", numSigners), func(t *testing.T) {
-			runTest(t, numSigners, WithBip86TweakCtx())
+	// Run test for 2-10 signers with different context options.
+	for numSigs := 2; numSigs <= 10; numSigs++ {
+		t.Run(fmt.Sprintf("BIP86_%d_signers", numSigs), func(t *testing.T) {
+			runTest(t, numSigs, WithBip86TweakCtx())
 		})
 
 		scriptRoot := sha256.Sum256([]byte("test_script_root"))
-		t.Run(fmt.Sprintf("Taproot_%d_signers", numSigners), func(t *testing.T) {
-			runTest(t, numSigners, WithTaprootTweakCtx(scriptRoot[:]))
+		t.Run(fmt.Sprintf("Taproot_%d_signers", numSigs), func(t *testing.T) {
+			runTest(t, numSigs, WithTaprootTweakCtx(scriptRoot[:]))
 		})
 	}
 }
