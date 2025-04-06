@@ -33,8 +33,7 @@ func (m *MockTxMempool) TxDescs() []*TxDesc {
 
 // RawMempoolVerbose returns all the entries in the mempool as a fully
 // populated btcjson result.
-func (m *MockTxMempool) RawMempoolVerbose() map[string]*btcjson.
-	GetRawMempoolVerboseResult {
+func (m *MockTxMempool) RawMempoolVerbose() map[string]*btcjson.GetRawMempoolVerboseResult {
 
 	args := m.Called()
 	return args.Get(0).(map[string]*btcjson.GetRawMempoolVerboseResult)
