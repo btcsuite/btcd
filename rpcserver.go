@@ -2588,6 +2588,7 @@ func handleGetPeerInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 			BanScore:       int32(p.BanScore()),
 			FeeFilter:      p.FeeFilter(),
 			SyncNode:       statsSnap.ID == syncPeerID,
+			V2Connection:   statsSnap.V2Connection,
 		}
 		if p.ToPeer().LastPingNonce() != 0 {
 			wait := float64(time.Since(statsSnap.LastPingTime).Nanoseconds())
