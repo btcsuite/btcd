@@ -1008,7 +1008,7 @@ func writeOutPointBuf(w io.Writer, pver uint32, version int32, op *OutPoint,
 	return err
 }
 
-// readScript reads a variable length byte array that represents a transaction
+// readScriptBuf reads a variable length byte array that represents a transaction
 // script.  It is encoded as a varInt containing the length of the array
 // followed by the bytes themselves.  An error is returned if the length is
 // greater than the passed maxAllowed parameter which helps protect against
