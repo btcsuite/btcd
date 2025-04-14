@@ -10,6 +10,7 @@ package ffldb
 import (
 	"container/list"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"hash/crc32"
 	"io"
@@ -19,6 +20,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/database"
@@ -402,6 +404,12 @@ func (s *blockStore) writeData(data []byte, fieldName string) error {
 	n, err := wc.curFile.file.WriteAt(data, int64(wc.curOffset))
 	wc.curOffset += uint32(n)
 	if err != nil {
+		if errors.Is(err, syscall.ENOSPC) {
+			log.Errorf("%v. Cannot save any more blocks "+
+				"due to the disk being full "+
+				"-- exiting", err)
+			os.Exit(1)
+		}
 		str := fmt.Sprintf("failed to write %s to file %d at "+
 			"offset %d: %v", fieldName, wc.curFileNum,
 			wc.curOffset-uint32(n), err)
@@ -631,6 +639,12 @@ func (s *blockStore) syncBlocks() error {
 
 	// Sync the file to disk.
 	if err := wc.curFile.file.Sync(); err != nil {
+		if errors.Is(err, syscall.ENOSPC) {
+			log.Errorf("%v. Cannot save any more blocks "+
+				"due to the disk being full "+
+				"-- exiting", err)
+			os.Exit(1)
+		}
 		str := fmt.Sprintf("failed to sync file %d: %v", wc.curFileNum,
 			err)
 		return makeDbErr(database.ErrDriverSpecific, str, err)
