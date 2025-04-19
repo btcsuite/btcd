@@ -130,15 +130,11 @@ func IsCoinBase(tx *btcutil.Tx) bool {
 func SequenceLockActive(sequenceLock *SequenceLock, blockHeight int32,
 	medianTimePast time.Time) bool {
 
-	// If either the seconds, or height relative-lock time has not yet
-	// reached, then the transaction is not yet mature according to its
-	// sequence locks.
-	if sequenceLock.Seconds >= medianTimePast.Unix() ||
-		sequenceLock.BlockHeight >= blockHeight {
-		return false
-	}
-
-	return true
+	// If either the relative lock-time (in seconds) or the relative
+	// lock-height hasn't been reached yet, then the transaction is
+	// not yet valid under BIP 68 rules.
+	return sequenceLock.Seconds < medianTimePast.Unix() && 
+	sequenceLock.BlockHeight < blockHeight
 }
 
 // IsFinalizedTransaction determines whether or not a transaction is finalized.
