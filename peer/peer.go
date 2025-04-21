@@ -293,6 +293,7 @@ type Config struct {
 
 	// UsingV2Conn is defined if and only if we accept and attempt to make
 	// v2 connections.
+	// TODO: Modify this so that we can downgrade certain peers.
 	UsingV2Conn bool
 }
 
@@ -468,7 +469,8 @@ type Peer struct {
 	witnessEnabled       bool
 	sendAddrV2           bool
 
-	V2Transport *v2transport.Peer
+	V2Transport         *v2transport.Peer
+	shouldDowngradeToV1 atomic.Bool
 
 	wireEncoding wire.MessageEncoding
 
@@ -2345,13 +2347,19 @@ func (p *Peer) negotiateOutboundProtocol() error {
 		// and reconnect using a v1 connection. This is the logic that
 		// bitcoind uses.
 		// TODO: random value for garbage len?
-		if err := p.V2Transport.InitiateV2Handshake(1); err != nil {
+		if err := p.V2Transport.InitiateV2Handshake(0); err != nil {
 			return err
 		}
 
-		if err := p.V2Transport.CompleteHandshake(
+		err := p.V2Transport.CompleteHandshake(
 			true, nil, p.cfg.ChainParams.Net,
-		); err != nil {
+		)
+		if errors.Is(err, v2transport.ErrShouldDowngradeToV1) {
+			// If we should downgrade, mark Peer and then return an error to
+			// trigger a Disconnect call.
+			p.shouldDowngradeToV1.Store(true)
+			return err
+		} else if err != nil {
 			return err
 		}
 	}
@@ -2468,6 +2476,13 @@ func (p *Peer) AssociateConnection(conn net.Conn) {
 // Disconnect.
 func (p *Peer) WaitForDisconnect() {
 	<-p.quit
+}
+
+// ShouldDowngradeToV1 is called when we try to connect to a peer via v2 BIP324
+// transport and they hang up. In this case, we should reconnect with the
+// legacy transport.
+func (p *Peer) ShouldDowngradeToV1() bool {
+	return p.shouldDowngradeToV1.Load()
 }
 
 // newPeerBase returns a new base bitcoin peer based on the inbound flag.  This
