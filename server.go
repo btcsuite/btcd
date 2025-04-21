@@ -2209,6 +2209,19 @@ func (s *server) outboundPeerConnected(c *connmgr.ConnReq, conn net.Conn) {
 // done along with other performing other desirable cleanup.
 func (s *server) peerDoneHandler(sp *serverPeer) {
 	sp.WaitForDisconnect()
+
+	// If this is an outbound peer and the shouldDowngradeToV1 bool is set on
+	// the underlying Peer, trigger a reconnect using the OG v1 connection
+	// scheme.
+	if !sp.Inbound() && sp.Peer.ShouldDowngradeToV1() {
+		// TODO: Determine _how_ to trigger a reconnect that does not use v2
+		//       transport. If it goes to donePeers, the Disconnect call for
+		//       persistent peers will trigger a reconnect. For non-persistent
+		//       peers, we will disconnect them and then find a new peer to
+		//       connect to.
+	}
+
+	// This is sent to a buffered channel, so it may not execute immediately.
 	s.donePeers <- sp
 
 	// Only tell sync manager we are gone if we ever told it we existed.

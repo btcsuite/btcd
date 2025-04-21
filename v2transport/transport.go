@@ -88,6 +88,14 @@ var (
 	// errGarbageTooLarge is returned if a caller attempts to send garbage
 	// larger than normal.
 	errGarbageTooLarge = fmt.Errorf("garbage too large")
+
+	// ErrShouldDowngradeToV1 is returned when we send the peer our
+	// ellswift key and they immediately hang up. This indicates that they
+	// don't understand v2 transport and interpreted the 64-byte key as a
+	// v1 message header + message. This will (always?) decode to an
+	// invalid command and checksum. The caller should try connecting to
+	// the peer with the OG v1 transport.
+	ErrShouldDowngradeToV1 = fmt.Errorf("should downgrade to v1")
 )
 
 // Peer defines the components necessary for sending/receiving data over the v2
@@ -376,7 +384,7 @@ func (p *Peer) RespondV2Handshake(garbageLen int, net wire.BitcoinNet) error {
 			len(p.receivedPrefix), len(v1Prefix))
 
 		var receiveBytes []byte
-		receiveBytes, err = p.Receive(1)
+		receiveBytes, _, err = p.Receive(1)
 		if err != nil {
 			log.Errorf("Failed to receive byte for v1 prefix "+
 				"check: %v", err)
@@ -473,11 +481,11 @@ func createV1Prefix(net wire.BitcoinNet) []byte {
 // CompleteHandshake finishes the v2 protocol negotiation and optionally sends
 // decoy packets after sending the garbage terminator.
 func (p *Peer) CompleteHandshake(initiating bool, decoyContentLens []int,
-	net wire.BitcoinNet) error {
+	btcnet wire.BitcoinNet) error {
 
 	log.Debugf("Completing v2 handshake (initiating=%v, "+
 		"num_decoys=%d, net=%v)", initiating, len(decoyContentLens),
-		net)
+		btcnet)
 
 	var receivedPrefix []byte
 	if initiating {
@@ -498,8 +506,28 @@ func (p *Peer) CompleteHandshake(initiating bool, decoyContentLens []int,
 			len(receivedPrefix), 64-len(receivedPrefix))
 	}
 
-	recvData, err := p.Receive(64 - len(receivedPrefix))
+	recvData, numRead, err := p.Receive(64 - len(receivedPrefix))
 	if err != nil {
+		// If we receive an error when reading off the wire and we read
+		// zero bytes, then we will reconnect to the peer using v1.
+		// There are several different errors that Receive can return
+		// that indicate we should reconnect. Instead of special-casing
+		// them all, just perform these checks if any error was
+		// returned.
+		if numRead == 0 && initiating {
+			// The peer most likely attempted to parse our 64-byte
+			// elligator-swift key as a version message and failed
+			// when trying to parse the message header into
+			// something valid. In this case, return a special
+			// error that signals to the server that we can
+			// reconnect with the OG v1 scheme.
+			log.Debugf("Received transport error during " +
+				"v2 handshake, retying downgraded v1 " +
+				"connection.")
+			return ErrShouldDowngradeToV1
+		}
+
+		// If we are the recipient, we can fail.
 		log.Errorf("Failed to receive peer's ellswift key data: %v",
 			err)
 		return err
@@ -533,7 +561,7 @@ func (p *Peer) CompleteHandshake(initiating bool, decoyContentLens []int,
 
 	// Calculate the v1 protocol's message prefix and see if the bytes read
 	// read into ellswiftTheirs matches it.
-	v1Prefix := createV1Prefix(net)
+	v1Prefix := createV1Prefix(btcnet)
 
 	// ellswiftTheirs should be at least 16 bytes if receive succeeded, but
 	// just in case, check the size.
@@ -546,7 +574,7 @@ func (p *Peer) CompleteHandshake(initiating bool, decoyContentLens []int,
 
 	if !initiating && bytes.Equal(ellswiftTheirs[4:16], v1Prefix[4:16]) {
 		log.Warnf("Peer sent v1 version message for wrong network "+
-			"(expected %v)", net)
+			"(expected %v)", btcnet)
 		return errWrongNetV1Peer
 	}
 
@@ -563,7 +591,7 @@ func (p *Peer) CompleteHandshake(initiating bool, decoyContentLens []int,
 
 	log.Tracef("Calculated ECDH shared secret: %x", ecdhSecret)
 
-	err = p.createV2Ciphers(ecdhSecret[:], initiating, net)
+	err = p.createV2Ciphers(ecdhSecret[:], initiating, btcnet)
 	if err != nil {
 		// createV2Ciphers logs its own errors
 		return err
@@ -606,7 +634,7 @@ func (p *Peer) CompleteHandshake(initiating bool, decoyContentLens []int,
 		p.recvGarbageTerm)
 
 	// Skip garbage until encountering garbage terminator.
-	recvGarbage, err := p.Receive(16)
+	recvGarbage, _, err := p.Receive(16)
 	if err != nil {
 		log.Errorf("Failed to receive initial 16 bytes of "+
 			"garbage: %v", err)
@@ -645,7 +673,7 @@ func (p *Peer) CompleteHandshake(initiating bool, decoyContentLens []int,
 		log.Tracef("Garbage terminator not found, receiving 1 more "+
 			"byte (total_received=%d)", recvGarbageLen)
 
-		recvData, err := p.Receive(1)
+		recvData, _, err := p.Receive(1)
 		if err != nil {
 			log.Errorf("Failed to receive garbage "+
 				"byte %d: %v", recvGarbageLen+1, err)
@@ -746,7 +774,7 @@ func (p *Peer) V2ReceivePacket(aad []byte) ([]byte, error) {
 			lengthFieldLen)
 
 		// Decrypt the length field so we know how many more bytes to receive.
-		encContentsLen, err := p.Receive(lengthFieldLen)
+		encContentsLen, _, err := p.Receive(lengthFieldLen)
 		if err != nil {
 			log.Errorf("Failed to receive encrypted length: %v",
 				err)
@@ -783,7 +811,7 @@ func (p *Peer) V2ReceivePacket(aad []byte) ([]byte, error) {
 		log.Tracef("Receiving %d bytes for encrypted packet body",
 			numBytes)
 
-		aeadCiphertext, err := p.Receive(numBytes)
+		aeadCiphertext, _, err := p.Receive(numBytes)
 		if err != nil {
 			log.Errorf("Failed to receive encrypted "+
 				"packet body: %v", err)
@@ -844,7 +872,7 @@ func (p *Peer) Send(data []byte) (int, error) {
 }
 
 // Receive receives numBytes bytes from the underlying connection.
-func (p *Peer) Receive(numBytes int) ([]byte, error) {
+func (p *Peer) Receive(numBytes int) ([]byte, int, error) {
 	b := make([]byte, numBytes)
 	index := 0
 	total := 0
@@ -858,12 +886,12 @@ func (p *Peer) Receive(numBytes int) ([]byte, error) {
 			// used implicitly by the loop structure.
 			log.Criticalf("Receive logic error: total=%d > "+
 				"numBytes=%d", total, numBytes)
-			return nil, errFailedToRecv
+			return nil, total, errFailedToRecv
 		}
 
 		if total == numBytes {
 			log.Tracef("Successfully received %d bytes", total)
-			return b, nil
+			return b, total, nil
 		}
 
 		log.Tracef("Calling Read (need %d bytes, have "+
@@ -873,7 +901,7 @@ func (p *Peer) Receive(numBytes int) ([]byte, error) {
 		if err != nil {
 			log.Errorf("Receive failed after reading %d bytes "+
 				"(target %d): %v", total+n, numBytes, err)
-			return nil, err
+			return nil, total, err
 		}
 
 		log.Tracef("Read returned %d bytes", n)
