@@ -11,6 +11,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -49,13 +50,7 @@ func fileExists(name string) bool {
 // currently supported.
 func isSupportedDbType(dbType string) bool {
 	supportedDrivers := database.SupportedDrivers()
-	for _, driver := range supportedDrivers {
-		if dbType == driver {
-			return true
-		}
-	}
-
-	return false
+	return slices.Contains(supportedDrivers, dbType)
 }
 
 // loadBlocks reads files containing bitcoin block data (gzipped but otherwise

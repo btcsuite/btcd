@@ -7,6 +7,7 @@ package btcjson
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
 )
 
 // RPCVersion is a type to indicate RPC versions.
@@ -23,12 +24,7 @@ var validRpcVersions = []RPCVersion{RpcVersion1, RpcVersion2}
 
 // check if the rpc version is a valid version
 func (r RPCVersion) IsValid() bool {
-	for _, version := range validRpcVersions {
-		if version == r {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(validRpcVersions, r)
 }
 
 // cast rpc version to a string

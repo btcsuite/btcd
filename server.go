@@ -15,6 +15,7 @@ import (
 	"math"
 	"net"
 	"runtime"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -1939,10 +1940,8 @@ func (s *server) handleBroadcastMsg(state *peerState, bmsg *broadcastMsg) {
 			return
 		}
 
-		for _, ep := range bmsg.excludePeers {
-			if sp == ep {
-				return
-			}
+		if slices.Contains(bmsg.excludePeers, sp) {
+			return
 		}
 
 		sp.QueueMessage(bmsg.message, nil)
