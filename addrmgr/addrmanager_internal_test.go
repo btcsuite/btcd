@@ -1,7 +1,8 @@
 package addrmgr
 
 import (
-	"math/rand"
+	crand "crypto/rand"
+	mrand "math/rand"
 	"net"
 	"testing"
 	"time"
@@ -14,24 +15,24 @@ import (
 func randAddr(t *testing.T) *wire.NetAddressV2 {
 	t.Helper()
 
-	ipv4 := rand.Intn(2) == 0
+	ipv4 := mrand.Intn(2) == 0
 	var ip net.IP
 	if ipv4 {
 		var b [4]byte
-		if _, err := rand.Read(b[:]); err != nil {
+		if _, err := crand.Read(b[:]); err != nil { //replaced with crypto/rand.Read (math.rand.Read is deprecated)
 			t.Fatal(err)
 		}
 		ip = b[:]
 	} else {
 		var b [16]byte
-		if _, err := rand.Read(b[:]); err != nil {
+		if _, err := crand.Read(b[:]); err != nil { //replaced with crypto/rand.Read (math.rand.Read is deprecated)
 			t.Fatal(err)
 		}
 		ip = b[:]
 	}
 
-	services := wire.ServiceFlag(rand.Uint64())
-	port := uint16(rand.Uint32())
+	services := wire.ServiceFlag(mrand.Uint64())
+	port := uint16(mrand.Uint32())
 
 	return wire.NetAddressV2FromBytes(
 		time.Now(), services, ip, port,
