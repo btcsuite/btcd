@@ -293,7 +293,6 @@ type Config struct {
 
 	// UsingV2Conn is defined if and only if we accept and attempt to make
 	// v2 connections.
-	// TODO: Modify this so that we can downgrade certain peers.
 	UsingV2Conn bool
 }
 
