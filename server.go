@@ -255,6 +255,12 @@ type server struct {
 	// agentWhitelist is a list of whitelisted user agent substrings, no
 	// whitelisting will be applied if the list is empty or nil.
 	agentWhitelist []string
+
+	// pendingReconnects is a map of peer addresses that have failed when
+	// connecting outbound.
+	// TODO: Memory leak if outbound target reached and non-persistent peer.
+	pendingReconnects    map[string]struct{}
+	pendingReconnectsMtx sync.RWMutex
 }
 
 // serverPeer extends the peer to maintain state shared by the server and
@@ -281,6 +287,9 @@ type serverPeer struct {
 	// The following chans are used to sync blockmanager and server.
 	txProcessed    chan struct{}
 	blockProcessed chan struct{}
+
+	reconnectMtx    sync.RWMutex
+	shouldReconnect bool
 }
 
 // newServerPeer returns a new serverPeer instance. The peer needs to be set by
@@ -455,6 +464,23 @@ func (sp *serverPeer) addBanScore(persistent, transient uint32, reason string) b
 // all of the provided desired service flags set.
 func hasServices(advertised, desired wire.ServiceFlag) bool {
 	return advertised&desired == desired
+}
+
+// SetShouldReconnect is invoked when we attempted a BIP324 v2 outbound connection
+// but the peer immediately hung up. In this case, we need to mark a bit so that
+// we'll remember to reconnect if this isn't a persistent peer.
+func (sp *serverPeer) SetShouldReconnect() {
+	sp.reconnectMtx.Lock()
+	sp.shouldReconnect = true
+	sp.reconnectMtx.Unlock()
+}
+
+// ShouldReconnect is invoked when we need to determine if we are going to
+// reconnect to an outbound peer.
+func (sp *serverPeer) ShouldReconnect() bool {
+	sp.reconnectMtx.RLock()
+	defer sp.reconnectMtx.RUnlock()
+	return sp.shouldReconnect
 }
 
 // OnVersion is invoked when a peer receives a version bitcoin message
@@ -1835,6 +1861,11 @@ func (s *server) handleDonePeerMsg(state *peerState, sp *serverPeer) {
 	if !sp.Inbound() {
 		if sp.persistent {
 			s.connManager.Disconnect(sp.connReq.ID())
+		} else if sp.ShouldReconnect() {
+			// If we need to reconnect due to an outbound v2
+			// connection failing, call connmgr's Disconnect to
+			// trigger a reconnect.
+			s.connManager.Disconnect(sp.connReq.ID())
 		} else {
 			s.connManager.Remove(sp.connReq.ID())
 			go s.connManager.NewConnReq()
@@ -2187,7 +2218,24 @@ func (s *server) inboundPeerConnected(conn net.Conn) {
 // manager of the attempt.
 func (s *server) outboundPeerConnected(c *connmgr.ConnReq, conn net.Conn) {
 	sp := newServerPeer(s, c.Permanent)
-	p, err := peer.NewOutboundPeer(newPeerConfig(sp), c.Addr.String())
+
+	// Just an alias.
+	peerAddr := c.Addr.String()
+
+ 	// Check pendingReconnects for this peer. If it exists, do v1 transport
+	// and delete the map entry.
+	s.pendingReconnectsMtx.RLock()
+	_, shouldDowngrade := s.pendingReconnects[peerAddr]
+	delete(s.pendingReconnects, peerAddr)
+	s.pendingReconnectsMtx.RUnlock()
+
+	// Modify the UsingV2Conn parameter if shouldDowngrade is true.
+	peerCfg := newPeerConfig(sp)
+	if shouldDowngrade {
+		peerCfg.UsingV2Conn = false
+	}
+
+	p, err := peer.NewOutboundPeer(peerCfg, peerAddr)
 	if err != nil {
 		srvrLog.Debugf("Cannot create outbound peer %s: %v", c.Addr, err)
 		if c.Permanent {
@@ -2214,11 +2262,17 @@ func (s *server) peerDoneHandler(sp *serverPeer) {
 	// the underlying Peer, trigger a reconnect using the OG v1 connection
 	// scheme.
 	if !sp.Inbound() && sp.Peer.ShouldDowngradeToV1() {
-		// TODO: Determine _how_ to trigger a reconnect that does not use v2
-		//       transport. If it goes to donePeers, the Disconnect call for
-		//       persistent peers will trigger a reconnect. For non-persistent
-		//       peers, we will disconnect them and then find a new peer to
-		//       connect to.
+		// Store the peer's address in a reconnect map that will store the
+		// set of connections to downgrade to v1.
+		s.pendingReconnectsMtx.Lock()
+		s.pendingReconnects[sp.Addr()] = struct{}{}
+		s.pendingReconnectsMtx.Unlock()
+
+		// Flip a bool in serverPeer to mark that we should reconnect to
+		// this peer.
+		sp.SetShouldReconnect()
+		srvrLog.Infof("Reconnecting to peer(%v) since v2 transport " +
+			"failed.", sp.Addr())
 	}
 
 	// This is sent to a buffered channel, so it may not execute immediately.
@@ -2792,6 +2846,7 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 		cfCheckptCaches:      make(map[wire.FilterType][]cfHeaderKV),
 		agentBlacklist:       agentBlacklist,
 		agentWhitelist:       agentWhitelist,
+		pendingReconnects:    make(map[string]struct{}),
 	}
 
 	// Create the transaction and address indexes if needed.
