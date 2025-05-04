@@ -161,8 +161,12 @@ type handleConnected struct {
 
 // handleDisconnected is used to remove a connection.
 type handleDisconnected struct {
-	id    uint64
-	retry bool
+	id        uint64
+	retry     bool
+
+	// reconnect is similar to retry except that retry does not guarantee
+	// that we'll attempt a reconnect.
+	reconnect bool
 }
 
 // handleFailed is used to remove a pending connection.
@@ -189,12 +193,13 @@ type ConnManager struct {
 // other failure. If permanent, it retries the connection after the configured
 // retry duration. Otherwise, if required, it makes a new connection request.
 // After maxFailedConnectionAttempts new connections will be retried after the
-// configured retry duration.
-func (cm *ConnManager) handleFailedConn(c *ConnReq) {
+// configured retry duration. The reconnect bool is used in the v2->v1
+// downgrade case.
+func (cm *ConnManager) handleFailedConn(c *ConnReq, reconnect bool) {
 	if atomic.LoadInt32(&cm.stop) != 0 {
 		return
 	}
-	if c.Permanent {
+	if c.Permanent || reconnect {
 		c.retryCount++
 		d := time.Duration(c.retryCount) * cm.cfg.RetryDuration
 		if d > maxRetryDuration {
@@ -334,7 +339,9 @@ out:
 					log.Debugf("Reconnecting to %v",
 						connReq)
 					pending[msg.id] = connReq
-					cm.handleFailedConn(connReq)
+					cm.handleFailedConn(
+						connReq, msg.reconnect,
+					)
 				}
 
 			case handleFailed:
@@ -349,7 +356,7 @@ out:
 				connReq.updateState(ConnFailing)
 				log.Debugf("Failed to connect to %v: %v",
 					connReq, msg.err)
-				cm.handleFailedConn(connReq)
+				cm.handleFailedConn(connReq, false)
 			}
 
 		case <-cm.quit:
@@ -463,14 +470,15 @@ func (cm *ConnManager) Connect(c *ConnReq) {
 
 // Disconnect disconnects the connection corresponding to the given connection
 // id. If permanent, the connection will be retried with an increasing backoff
-// duration.
-func (cm *ConnManager) Disconnect(id uint64) {
+// duration. If the reconnect bool is passed, we will attempt to reconnect
+// after the disconnect.
+func (cm *ConnManager) Disconnect(id uint64, reconnect bool) {
 	if atomic.LoadInt32(&cm.stop) != 0 {
 		return
 	}
 
 	select {
-	case cm.requests <- handleDisconnected{id, true}:
+	case cm.requests <- handleDisconnected{id, true, reconnect}:
 	case <-cm.quit:
 	}
 }
@@ -486,7 +494,7 @@ func (cm *ConnManager) Remove(id uint64) {
 	}
 
 	select {
-	case cm.requests <- handleDisconnected{id, false}:
+	case cm.requests <- handleDisconnected{id, false, false}:
 	case <-cm.quit:
 	}
 }
