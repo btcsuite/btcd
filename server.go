@@ -1860,12 +1860,13 @@ func (s *server) handleDonePeerMsg(state *peerState, sp *serverPeer) {
 	// process a peer's `done` message before its `add`.
 	if !sp.Inbound() {
 		if sp.persistent {
-			s.connManager.Disconnect(sp.connReq.ID())
+			s.connManager.Disconnect(sp.connReq.ID(), false)
 		} else if sp.ShouldReconnect() {
 			// If we need to reconnect due to an outbound v2
 			// connection failing, call connmgr's Disconnect to
-			// trigger a reconnect.
-			s.connManager.Disconnect(sp.connReq.ID())
+			// trigger a reconnect. We set the reconnect bool to true
+			// in case the ConnReq is not marked Permanent.
+			s.connManager.Disconnect(sp.connReq.ID(), true)
 		} else {
 			s.connManager.Remove(sp.connReq.ID())
 			go s.connManager.NewConnReq()
@@ -2239,7 +2240,7 @@ func (s *server) outboundPeerConnected(c *connmgr.ConnReq, conn net.Conn) {
 	if err != nil {
 		srvrLog.Debugf("Cannot create outbound peer %s: %v", c.Addr, err)
 		if c.Permanent {
-			s.connManager.Disconnect(c.ID())
+			s.connManager.Disconnect(c.ID(), false)
 		} else {
 			s.connManager.Remove(c.ID())
 			go s.connManager.NewConnReq()
