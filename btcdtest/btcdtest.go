@@ -80,6 +80,8 @@ type Config struct {
 	Path string
 
 	*config.Config
+
+	Args []string
 }
 
 type Harness struct {
@@ -264,6 +266,8 @@ func (h *Harness) Start() {
 	for _, addr := range h.cfg.Config.Whitelists {
 		args = append(args, "--whitelist", addr.String())
 	}
+
+	args = append(args, h.cfg.Args...)
 
 	name := "btcd"
 	if h.cfg.Path != "" {
@@ -457,6 +461,12 @@ func WithChainParams(chain *chaincfg.Params) func(*Config) {
 
 		cfg.MiningAddrs = []btcutil.Address{addr}
 
+	}
+}
+
+func WithArgs(args ...string) func(*Config) {
+	return func(cfg *Config) {
+		cfg.Args = append(cfg.Args, args...)
 	}
 }
 
