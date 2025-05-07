@@ -1032,11 +1032,10 @@ var scriptClassTests = []struct {
 		class: NonStandardTy,
 	},
 	{
-		// Almost nulldata, but add an additional opcode after the data
-		// to make it nonstandard.
-		name:   "almost nulldata",
+		// nulldata, with combinations of op_code and pushdata
+		name:   "nulldata with multiple pushes",
 		script: "RETURN 4 TRUE",
-		class:  NonStandardTy,
+		class:  NullDataTy,
 	},
 
 	// The next few are almost multisig (it is the more complex script type)
@@ -1272,6 +1271,28 @@ func TestNullDataScript(t *testing.T) {
 			t.Errorf("GetScriptClass: #%d (%s) wrong result -- "+
 				"got: %v, want: %v", i, test.name, scriptType,
 				test.class)
+			continue
+		}
+	}
+}
+
+func TestIsNullDataScript(t *testing.T) {
+	tests := []struct {
+		name               string
+		data               []byte
+		expectedIsNullData bool
+	}{{
+		name:               "multiple pushes",
+		data:               hexToBytes("6a5d0f160100e6a233fc078088a5a9a30700"),
+		expectedIsNullData: true,
+	},
+	}
+	for i, test := range tests {
+		isNullData := isNullDataScript(0, test.data)
+		if isNullData != test.expectedIsNullData {
+			t.Errorf("IsNullDataScript: #%d (%s) wrong result -- "+
+				"got: %v, want: %v", i, test.name, isNullData,
+				test.expectedIsNullData)
 			continue
 		}
 	}
