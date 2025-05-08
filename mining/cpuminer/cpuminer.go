@@ -104,6 +104,7 @@ type CPUMiner struct {
 	updateHashes      chan uint64
 	speedMonitorQuit  chan struct{}
 	quit              chan struct{}
+	MiningAddrs       []btcutil.Address
 }
 
 // speedMonitor handles tracking the number of hashes per second the mining
@@ -336,7 +337,7 @@ out:
 
 		// Choose a payment address at random.
 		rand.Seed(time.Now().UnixNano())
-		payToAddr := m.cfg.MiningAddrs[rand.Intn(len(m.cfg.MiningAddrs))]
+		payToAddr := m.MiningAddrs[rand.Intn(len(m.MiningAddrs))]
 
 		// Create a new block template using the available transactions
 		// in the memory pool as a source of transactions to potentially
@@ -590,7 +591,7 @@ func (m *CPUMiner) GenerateNBlocks(n uint32) ([]*chainhash.Hash, error) {
 
 		// Choose a payment address at random.
 		rand.Seed(time.Now().UnixNano())
-		payToAddr := m.cfg.MiningAddrs[rand.Intn(len(m.cfg.MiningAddrs))]
+		payToAddr := m.MiningAddrs[rand.Intn(len(m.MiningAddrs))]
 
 		// Create a new block template using the available transactions
 		// in the memory pool as a source of transactions to potentially
@@ -638,5 +639,6 @@ func New(cfg *Config) *CPUMiner {
 		updateNumWorkers:  make(chan struct{}),
 		queryHashesPerSec: make(chan float64),
 		updateHashes:      make(chan uint64),
+		MiningAddrs:       cfg.MiningAddrs,
 	}
 }

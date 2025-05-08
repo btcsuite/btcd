@@ -8,6 +8,8 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+
+	"github.com/btcsuite/btcd/internal/config"
 )
 
 // dirEmpty returns whether or not the specified directory path is empty.
@@ -109,7 +111,7 @@ func upgradeDBPaths() error {
 func upgradeDataPaths() error {
 	// No need to migrate if the old and new home paths are the same.
 	oldHomePath := oldBtcdHomeDir()
-	newHomePath := defaultHomeDir
+	newHomePath := config.DefaultHomeDir
 	if oldHomePath == newHomePath {
 		return nil
 	}
@@ -125,8 +127,8 @@ func upgradeDataPaths() error {
 		}
 
 		// Move old btcd.conf into new location if needed.
-		oldConfPath := filepath.Join(oldHomePath, defaultConfigFilename)
-		newConfPath := filepath.Join(newHomePath, defaultConfigFilename)
+		oldConfPath := filepath.Join(oldHomePath, config.DefaultConfigFilename)
+		newConfPath := filepath.Join(newHomePath, config.DefaultConfigFilename)
 		if fileExists(oldConfPath) && !fileExists(newConfPath) {
 			err := os.Rename(oldConfPath, newConfPath)
 			if err != nil {
@@ -135,8 +137,8 @@ func upgradeDataPaths() error {
 		}
 
 		// Move old data directory into new location if needed.
-		oldDataPath := filepath.Join(oldHomePath, defaultDataDirname)
-		newDataPath := filepath.Join(newHomePath, defaultDataDirname)
+		oldDataPath := filepath.Join(oldHomePath, config.DefaultDataDirname)
+		newDataPath := filepath.Join(newHomePath, config.DefaultDataDirname)
 		if fileExists(oldDataPath) && !fileExists(newDataPath) {
 			err := os.Rename(oldDataPath, newDataPath)
 			if err != nil {
