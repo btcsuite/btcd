@@ -103,6 +103,11 @@ type donePeerMsg struct {
 	peer *peerpkg.Peer
 }
 
+// disconnectPeerMsg signifies a peer to be disconnected to the block handler.
+type disconnectPeerMsg struct {
+	peer string
+}
+
 // txMsg packages a bitcoin tx message and the peer it came from together
 // so the block handler has access to that information.
 type txMsg struct {
@@ -250,7 +255,7 @@ func (c *checkpointedBlocksQuery) handleResponse(req, resp wire.Message,
 		}
 	}
 
-	// We have no more blocks we're expecting from heres so we're finished.
+	// We have no more blocks we're expecting from here so we're finished.
 	return query.Progress{
 		Finished:   true,
 		Progressed: true,
@@ -752,6 +757,29 @@ func (sm *SyncManager) handleDonePeerMsg(peer *peerpkg.Peer) {
 		// Update the sync peer. The server has already disconnected the
 		// peer before signaling to the sync manager.
 		sm.updateSyncPeer(false)
+	}
+}
+
+// handleDisconnectPeerMsg disconnects the passed in peer address.  If the peer
+// is a sync peer, we set another candidate as the sync peer.
+func (sm *SyncManager) handleDisconnectPeerMsg(peerAddr string) {
+	for peer, state := range sm.peerStates {
+		if peer.Addr() == peerAddr {
+			log.Infof("Disconnecting peer %s", peer)
+			peer.Disconnect()
+
+			delete(sm.peerStates, peer)
+			sm.clearRequestedState(state)
+
+			// Set a new peer as the sync peer if we're
+			// disconnecting it.
+			if peer == sm.syncPeer {
+				// Segwit is always active.
+				sm.syncPeer, _ = sm.returnBestPeer(true)
+			}
+
+			break
+		}
 	}
 }
 
@@ -1756,6 +1784,9 @@ out:
 			case *donePeerMsg:
 				sm.handleDonePeerMsg(msg.peer)
 
+			case *disconnectPeerMsg:
+				sm.handleDisconnectPeerMsg(msg.peer)
+
 			case getSyncPeerMsg:
 				var peerID int32
 				if sm.syncPeer != nil {
@@ -2001,6 +2032,16 @@ func (sm *SyncManager) DonePeer(peer *peerpkg.Peer) {
 	sm.msgChan <- &donePeerMsg{peer: peer}
 }
 
+// disconnectPeer informs the blockmanager that the peer should be disconnected.
+func (sm *SyncManager) disconnectPeer(peer query.Peer) {
+	// Ignore if we are shutting down.
+	if atomic.LoadInt32(&sm.shutdown) != 0 {
+		return
+	}
+
+	sm.msgChan <- &disconnectPeerMsg{peer: peer.Addr()}
+}
+
 // Start begins the core block handler which processes block and inv messages.
 func (sm *SyncManager) Start() {
 	// Already started?
@@ -2154,6 +2195,7 @@ func New(config *Config) (*SyncManager, error) {
 			ConnectedPeers: sm.ConnectedPeers,
 			NewWorker:      query.NewWorker,
 			Ranking:        query.NewPeerRanking(),
+			OnMaxTries:     sm.disconnectPeer,
 		},
 	)
 
