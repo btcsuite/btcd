@@ -263,3 +263,24 @@ func TestGetNetworkInfoWarnings(t *testing.T) {
 		}
 	}
 }
+
+func TestStringOrArray_MarshalJSON(t *testing.T) {
+    cases := []struct {
+        arr      btcjson.StringOrArray
+        expected string
+    }{
+        {btcjson.StringOrArray{"only"}, `"only"`},
+        {btcjson.StringOrArray{"a", "b"}, `["a","b"]`},
+        {btcjson.StringOrArray{}, `[]`},
+    }
+
+    for i, tc := range cases {
+        b, err := json.Marshal(tc.arr)
+        if err != nil {
+            t.Fatalf("case %d: unexpected error: %v", i, err)
+        }
+        if string(b) != tc.expected {
+            t.Errorf("case %d: got %s, want %s", i, b, tc.expected)
+        }
+    }
+}
