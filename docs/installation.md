@@ -14,7 +14,7 @@ has not been tampered with and is coming from the btcsuite developers.  To
 verify the signature perform the following:
 
 * Download the Conformal public key:
-  https://raw.githubusercontent.com/btcsuite/btcd/master/release/GIT-GPG-KEY-conformal.txt
+  https://opensource.conformal.com/GIT-GPG-KEY-conformal.txt
 
 * Import the public key into your GPG keyring:
 
