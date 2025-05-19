@@ -1639,6 +1639,22 @@ func (mp *TxPool) validateStandardness(tx *btcutil.Tx, nextBlockHeight int32,
 		return txRuleError(rejectCode, str)
 	}
 
+	// Check the witness standard.
+	err = checkWitnessStandard(tx, utxoView)
+	if err != nil {
+		// Attempt to extract a reject code from the error so it can be
+		// retained. When not possible, fall back to a non-standard
+		// error.
+		rejectCode, found := extractRejectCode(err)
+		if !found {
+			rejectCode = wire.RejectNonstandard
+		}
+		str := fmt.Sprintf("transaction %v has a non-standard "+
+			"witness: %v", tx.Hash(), err)
+
+		return txRuleError(rejectCode, str)
+	}
+
 	return nil
 }
 
